@@ -6,7 +6,7 @@ Created on Sun May 26 11:21:31 2019
 """
 from biosteam.evaluation import Model, Metric
 from biosteam.evaluation.evaluation_tools import triang
-import biosteam.biorefineries.lipidcane as lc
+import biorefineries.lipidcane as lc
 import numpy as np
 
 __all__ = ('lipidcane_model', 'lipidcane_model_with_lipidfraction_parameter')

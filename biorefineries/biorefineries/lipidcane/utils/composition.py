@@ -7,8 +7,8 @@ This module defines the composition_balance function, which performs mass energy
 @author: yoelr
 """
 from biosteam import Stream
-from biosteam.biorefineries.lipidcane.species import pretreatment_species
-from biosteam.biorefineries.lipidcane.system.pretreatment import lipid_cane
+from biorefineries.lipidcane.species import pretreatment_species
+from biorefineries.lipidcane.system.pretreatment import lipid_cane
 from array_collections import tuple_array
 
 __all__ = ('set_lipid_fraction',)

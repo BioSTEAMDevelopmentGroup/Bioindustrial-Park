@@ -6,7 +6,7 @@ Created on Sun May 26 11:21:31 2019
 """
 from biosteam.evaluation import Model, Metric
 from biosteam.evaluation.evaluation_tools import triang
-import biosteam.biorefineries.sugarcane as sc
+import biorefineries.sugarcane as sc
 
 __all__ = ('sugarcane_model',)
 

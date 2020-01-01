@@ -9,11 +9,11 @@ The ethanol production section for the baseline lipid cane biorefinery is define
 """
 # import numpy as np
 from biosteam import Stream, System
-from biosteam.biorefineries.lipidcane.species import ethanol_species
+from biorefineries.lipidcane.species import ethanol_species
 from biosteam.units import Mixer, Splitter, HXutility, HXprocess, \
      MultiEffectEvaporator, Fermentation, StorageTank, Pump, \
      Distillation, SolidsCentrifuge, MolecularSieve, MixTank, VentScrubber
-from biosteam.biorefineries.lipidcane.process_settings import price
+from biorefineries.lipidcane.process_settings import price
 
 __all__ = ('area_300',)
 

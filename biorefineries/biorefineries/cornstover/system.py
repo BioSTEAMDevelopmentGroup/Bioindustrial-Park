@@ -6,10 +6,10 @@ Created on Thu Jun 27 23:12:28 2019
 """
 from biosteam import Stream, System
 import biosteam as bst
-from biosteam.biorefineries.cornstover.process_settings import price, ethanol_density_kggal
-from biosteam.biorefineries.cornstover.species import species, get_grouped_species, species_groups
-from biosteam.biorefineries.cornstover.tea import CornstoverTEA
-from biosteam.biorefineries.cornstover import units
+from biorefineries.cornstover.process_settings import price, ethanol_density_kggal
+from biorefineries.cornstover.species import species, get_grouped_species, species_groups
+from biorefineries.cornstover.tea import CornstoverTEA
+from biorefineries.cornstover import units
 import biosteam.reaction as rxn
 import numpy as np
 

@@ -6,7 +6,7 @@ Created on Thu Jun 27 23:12:04 2019
 """
 import biosteam as bst
 import biosteam.compounds as cp
-from biosteam.biorefineries.lipidcane import species as lcspecies
+from biorefineries.lipidcane import species as lcspecies
 import pandas as pd
 from copy import copy as _copy
 

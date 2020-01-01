@@ -18,9 +18,9 @@ from biosteam.units.facilities import CoolingTower, \
                                       BoilerTurbogenerator, \
                                       ChilledWaterPackage, \
                                       ProcessWaterCenter
-from biosteam.biorefineries.lipidcane.tea import LipidcaneTEA
-from biosteam.biorefineries.sugarcane.species import sugarcane_species
-from biosteam.biorefineries.sugarcane.process_settings import price
+from biorefineries.lipidcane.tea import LipidcaneTEA
+from biorefineries.sugarcane.species import sugarcane_species
+from biorefineries.sugarcane.process_settings import price
 # import warnings
 # warnings.filterwarnings('ignore')
 

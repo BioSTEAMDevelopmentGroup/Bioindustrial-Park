@@ -14,8 +14,8 @@ from biosteam.units import Mixer, EnzymeTreatment, CrushingMill, \
     MagneticSeparator, Clarifier, MixTank, \
     Shredder, ConveyingBelt, Splitter, \
     SplitCentrifuge_LLE, Pump, StorageTank
-from biosteam.biorefineries.lipidcane.species import pretreatment_species
-from biosteam.biorefineries.lipidcane.process_settings import price
+from biorefineries.lipidcane.species import pretreatment_species
+from biorefineries.lipidcane.process_settings import price
 
 __all__ = ('pretreatment_sys', 'lipid_cane', 'lipidcane', 'area_100', 'area_200')
 

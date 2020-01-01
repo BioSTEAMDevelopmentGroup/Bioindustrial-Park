@@ -4,18 +4,18 @@ Created on Mon Feb 18 22:18:21 2019
 
 @author: Guest Group
 """
-from biosteam.biorefineries.lipidcane.system.ethanol import area_300, sugar_solution
-from biosteam.biorefineries.lipidcane.system.biodiesel import area_400, oil
-from biosteam.biorefineries.lipidcane.system.pretreatment import \
+from biorefineries.lipidcane.system.ethanol import area_300, sugar_solution
+from biorefineries.lipidcane.system.biodiesel import area_400, oil
+from biorefineries.lipidcane.system.pretreatment import \
     pretreatment_sys, pretreatment_species, U202, lipid, sugar
-from biosteam.biorefineries.lipidcane.tea import LipidcaneTEA
+from biorefineries.lipidcane.tea import LipidcaneTEA
 from biosteam.units.facilities import CoolingTower, \
                                       BoilerTurbogenerator, \
                                       ChilledWaterPackage, \
                                       ProcessWaterCenter
 from biosteam import System, Stream, find, Species
 from biosteam.units import Junction, Splitter
-from biosteam.biorefineries.lipidcane.utils import set_lipid_fraction
+from biorefineries.lipidcane.utils import set_lipid_fraction
 import warnings
 
 warnings.filterwarnings('ignore')

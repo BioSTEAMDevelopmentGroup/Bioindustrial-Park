@@ -6,7 +6,7 @@ Created on Tue Aug 13 21:43:56 2019
 """
 from biosteam.evaluation import evaluation_tools as tools
 from biosteam.evaluation import Model, Metric
-from biosteam.biorefineries.cornstover.system import \
+from biorefineries.cornstover.system import \
     cornstover_sys, ethanol_tea, cornstover_tea, \
     ethanol, cornstover, R301, ethanol_density_kggal, \
     areas, BT, Area700

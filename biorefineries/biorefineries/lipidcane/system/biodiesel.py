@@ -13,8 +13,8 @@ from biosteam.units import Transesterification, \
     InvSplitter, Pump, StorageTank, \
     HXutility, HXprocess, Flash, \
     SplitCentrifuge_LLE, MassBalance
-from biosteam.biorefineries.lipidcane.species import biodiesel_species
-from biosteam.biorefineries.lipidcane.process_settings import price
+from biorefineries.lipidcane.species import biodiesel_species
+from biorefineries.lipidcane.process_settings import price
 from numpy import array
 
 

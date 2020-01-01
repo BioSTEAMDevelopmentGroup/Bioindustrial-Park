@@ -4,7 +4,7 @@ Created on Tue Sep  3 22:30:47 2019
 
 @author: yoelr
 """
-from biosteam.biorefineries.cornstover.model import cornstover_model as model_cs
+from biorefineries.cornstover.model import cornstover_model as model_cs
 
 N_samples = 1000
 rule = 'L'

@@ -5,8 +5,8 @@ Created on Sun Sep  1 04:37:16 2019
 @author: yoelr
 """
 import numpy as np
-from biosteam.biorefineries import lipidcane as lc
-from biosteam.biorefineries import sugarcane as sc
+from biorefineries import lipidcane as lc
+from biorefineries import sugarcane as sc
 
 model_lc = lc.model.lipidcane_model
 model_sc = sc.model.sugarcane_model
