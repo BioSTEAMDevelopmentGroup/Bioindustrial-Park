@@ -1,6 +1,6 @@
-====================================================
-Biorefineries: BioSTEAM's Premier Biorefinery Models
-====================================================
+=============================================
+Biorefineries: Biorefinery Models in BioSTEAM
+=============================================
 
 .. image:: http://img.shields.io/pypi/v/biorefineries.svg?style=flat
    :target: https://pypi.python.org/pypi/biorefineries
