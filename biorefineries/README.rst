@@ -6,7 +6,7 @@ Biorefineries: Biorefinery Models in BioSTEAM
    :target: https://pypi.python.org/pypi/biorefineries
    :alt: Version_status
 .. image:: http://img.shields.io/badge/license-MIT-blue.svg?style=flat
-   :target: https://github.com/yoelcortes/Bioindustrial-Complex/biorefineries/blob/master/LICENSE.txt
+   :target: https://github.com/yoelcortes/Bioindustrial-Park/biorefineries/blob/master/LICENSE.txt
    :alt: license
 
 
@@ -15,7 +15,7 @@ Biorefineries: Biorefinery Models in BioSTEAM
 What is Biorefineries?
 ----------------------
 
-Biorefineries serves as a standard package for complete biorefinery models to foster accessibility and deeper communication within the BioSTEAM biorefinery simulation community.
+Biorefineries serves as a standard package for complete biorefinery models in BioSTEAM.
 
 Installation
 ------------
@@ -29,7 +29,7 @@ If you have an installation of Python with pip, simple install it with:
 
 To get the git version, run:
 
-    $ git clone git://github.com/yoelcortes/Bioindustrial-Complex/biorefineries
+    $ git clone git://github.com/yoelcortes/Bioindustrial-Park/biorefineries
 
 Documentation
 -------------
@@ -43,7 +43,7 @@ Bug reports
 
 To report bugs, please use the biorefineries's Bug Tracker at:
 
-    git://github.com/yoelcortes/Bioindustrial-Complex/biorefineries
+    git://github.com/yoelcortes/Bioindustrial-Park/biorefineries
 
 
 License information
