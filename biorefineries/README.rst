@@ -29,7 +29,7 @@ If you have an installation of Python with pip, simple install it with:
 
 To get the git version, run:
 
-    $ git clone git://github.com/yoelcortes/Bioindustrial-Park/biorefineries
+    $ git clone git:github.com/yoelcortes/Bioindustrial-Park/tree/master/biorefineries
 
 Documentation
 -------------
@@ -43,8 +43,7 @@ Bug reports
 
 To report bugs, please use the biorefineries's Bug Tracker at:
 
-    git://github.com/yoelcortes/Bioindustrial-Park/biorefineries
-
+    git://github.com/yoelcortes/Bioindustrial-Park
 
 License information
 -------------------
