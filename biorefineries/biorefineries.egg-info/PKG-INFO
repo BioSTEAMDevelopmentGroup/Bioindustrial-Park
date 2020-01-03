@@ -1,21 +1,21 @@
 Metadata-Version: 1.2
 Name: biorefineries
-Version: 0.1
-Summary: BioSTEAM's premier repository for biorefinery models
-Home-page: https://github.com/yoelcortes/Bioindustrial-Complex/biorefineries
+Version: 0.1.1
+Summary: Biorefinery models in BioSTEAM
+Home-page: https://github.com/yoelcortes/Bioindustrial-Park/biorefineries
 Author: Yoel Cortes-Pena
 Author-email: yoelcortes@gmail.com
 License: MIT
-Download-URL: https://github.com/yoelcortes/Bioindustrial-Complex/biorefineries.git
-Description: ====================================================
-        Biorefineries: BioSTEAM's Premier Biorefinery Models
-        ====================================================
+Download-URL: https://github.com/yoelcortes/Bioindustrial-Park/biorefineries.git
+Description: =============================================
+        Biorefineries: Biorefinery Models in BioSTEAM
+        =============================================
         
         .. image:: http://img.shields.io/pypi/v/biorefineries.svg?style=flat
            :target: https://pypi.python.org/pypi/biorefineries
            :alt: Version_status
         .. image:: http://img.shields.io/badge/license-MIT-blue.svg?style=flat
-           :target: https://github.com/yoelcortes/Bioindustrial-Complex/biorefineries/blob/master/LICENSE.txt
+           :target: https://github.com/yoelcortes/Bioindustrial-Park/biorefineries/blob/master/LICENSE.txt
            :alt: license
         
         
@@ -24,7 +24,7 @@ Description: ====================================================
         What is Biorefineries?
         ----------------------
         
-        Biorefineries serves as a standard package for complete biorefinery models to foster accessibility and deeper communication within the BioSTEAM biorefinery simulation community.
+        Biorefineries serves as a standard package for complete biorefinery models in BioSTEAM.
         
         Installation
         ------------
@@ -38,7 +38,7 @@ Description: ====================================================
         
         To get the git version, run:
         
-            $ git clone git://github.com/yoelcortes/Bioindustrial-Complex/biorefineries
+            $ git clone git://github.com/yoelcortes/Bioindustrial-Park/biorefineries
         
         Documentation
         -------------
@@ -52,7 +52,7 @@ Description: ====================================================
         
         To report bugs, please use the biorefineries's Bug Tracker at:
         
-            git://github.com/yoelcortes/Bioindustrial-Complex/biorefineries
+            git://github.com/yoelcortes/Bioindustrial-Park/biorefineries
         
         
         License information
