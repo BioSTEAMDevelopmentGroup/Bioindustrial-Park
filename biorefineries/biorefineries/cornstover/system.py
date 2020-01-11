@@ -18,7 +18,7 @@ System.maxiter = 200
 System.molar_tolerance = 1
 
 Ethanol_MW = species.Ethanol.MW
-Water_MW = species.H2O.MW
+Water_MW = species.Water.MW
 
 def Ethanol_molfrac(e):
     """Return ethanol mol fraction in a ethanol water mixture"""
@@ -42,7 +42,7 @@ def find_split(IDs, flow0, flow1):
 bst.find.set_flowsheet(bst.Flowsheet('cornstover'))
 synonym = species.set_synonym 
 synonym('CaO', 'Lime')
-synonym('H2O', 'Water')
+synonym('Water', 'H2O')
 synonym('H2SO4', 'SulfuricAcid')
 synonym('NH3', 'Ammonia')
 synonym('Denaturant', 'Octane')
@@ -50,7 +50,7 @@ synonym('CO2', 'CarbonDioxide')
 bst.Stream.species = pretreatment_species = bst.WorkingSpecies.subgroup(species, 
         ['Acetate', 'AceticAcid', 'Arabinan', 'Ash', 'Cellulase',
          'Ethanol', 'Extract', 'Furfural', 'Glucan', 'Glucose',
-         'GlucoseOligomer', 'H2O', 'H2SO4', 'HMF', 'Lignin',
+         'GlucoseOligomer', 'Water', 'H2SO4', 'HMF', 'Lignin',
          'Mannan', 'NH3', 'Protein', 'SolubleLignin', 'Sucrose',
          'Xylan', 'Xylose', 'Arabinose', 'XyloseOligomer',
          'ArabinoseOligomer', 'Mannose', 'MannoseOligomer',
@@ -152,7 +152,7 @@ def update_ammonia_loading():
 
 cooled_hydrolyzate = H301.outs[0]
 cellulose_index = cornstover.index('Glucan')
-enzyme_over_cellulose = 20/1000 * 20 # (20 g enzyme / cellulose) / (100 g cellulase / 1 L enzyme)
+enzyme_over_cellulose = 20/1000 * 20 # (20 g enzyme / cellulose) / (50 g cellulase / 1 L enzyme)
 water_cellulase_mass = cellulase.mass[cellulase.indices(('Water', 'Cellulase'))]
 water_cellulase_to_cellulase = np.array([0.95, 0.05])
 def update_cellulase_and_nutrient_loading():
@@ -181,7 +181,7 @@ bst.Stream.species = fermentation_species = bst.WorkingSpecies.subgroup(species,
         ['Acetate', 'AceticAcid', 'Arabinan', 'Ash', 'CO2', 'CSL',
          'Cellobiose', 'DAP', 'Denaturant', 'Enzyme', 'Ethanol',
          'Extract', 'Furfural', 'Glucan', 'Glucose', 'GlucoseOligomer', 
-         'Glycerol', 'H2O', 'H2SO4', 'HMF', 'LacticAcid', 'Lignin',
+         'Glycerol', 'Water', 'H2SO4', 'HMF', 'LacticAcid', 'Lignin',
          'Mannan', 'NH3', 'O2', 'Protein', 'SolubleLignin',
          'SuccinicAcid', 'Sucrose', 'Xylan', 'Xylitol', 'Xylose',
          'XyloseOligomer', 'Z_mobilis', 'Arabinose', 'Mannose',
@@ -222,7 +222,7 @@ DAP2_over_hydrolyzate = DAP2.mol/451077.22446428984
 CSL1_over_hydrolyzate = CSL1.mol/451077.22446428984
 CSL2_over_hydrolyzate = CSL2.mol/451077.22446428984
 
-J1 = bst.Junction(upstream=M301-0, downstream=Stream())
+J1 = upstream=M301-0 - bst.Junction('J1') - Stream()
 M302 = bst.Mixer('M302', ins=(J1-0, None))
 R301 = units.SaccharificationAndCoFermentation('R301', ins=(M302-0, CSL2, DAP2))
 M303 = bst.Mixer('M303', ins=(R301-2, CSL1, DAP1))
@@ -281,7 +281,7 @@ D403._boiler.U = 1.85
 D403.BM = 2.8
 P402 = bst.Pump('P402', ins=D403-1)
 P402.link_streams()
-JX = bst.Junction(P402-0, 0-M201)
+JX = P402-0 - bst.Junction("JX") - 0**M201
 
 # Superheat vapor for mol sieve
 H402 = bst.HXutility('H402', ins=D403-0, T=115+273.15, V=1)
@@ -372,20 +372,20 @@ splits = [('Glucose', 19, 502),
 S401 = units.PressureFilter('S401', ins=('', recycled_water),
                             moisture_content=0.35,
                             split=find_split(*zip(*splits)))
-J2 = bst.Junction(H401-1, 0-S401)
+J2 = H401-1 - bst.Junction('J2') - 0**S401
 
 # %% Waste water treatment
 
-def burn(reactant, O2=0, H2O=0, CO2=0, SO2=0, NO2=0, N2=0, Ash=0, NaOH=0):
-    r = rxn.Reaction(f"{reactant} + {O2}O2 -> {H2O}H2O + {CO2}CO2 + {Ash}Ash + "
+def burn(reactant, O2=0, Water=0, CO2=0, SO2=0, NO2=0, N2=0, Ash=0, NaOH=0):
+    r = rxn.Reaction(f"{reactant} + {O2}O2 -> {Water}Water + {CO2}CO2 + {Ash}Ash + "
                      f"{SO2}SO2 + {NO2}NO2 + {N2}N2 + {NaOH}NaOH", reactant, 1.)
     cmp = getattr(species, reactant)
-    species.H2O.P = 101325
-    species.H2O.T = 298.15
-    cmp.Hc = (cmp.Hf - (H2O*species.H2O.Hf
+    species.Water.P = 101325
+    species.Water.T = 298.15
+    cmp.Hc = (cmp.Hf - (Water*species.Water.Hf
                         + CO2*species.CO2.Hf
                         + SO2*species.SO2.Hf
-                        + NO2*species.NO2.Hf) - H2O*species.H2O.Hvapm)
+                        + NO2*species.NO2.Hf) - Water*species.Water.Hvapm)
     return r
 
 combustion = rxn.ParallelReaction([    
@@ -424,7 +424,7 @@ combustion = rxn.ParallelReaction([
         burn('H2S', 1.5, 1, SO2=1),
         burn('CO', 0.5, CO2=1),
         burn('HNO3', -1.75, 0.5, N2=0.5),
-        burn('NaNO3', -1.25, N2=0.5, H2O=-0.5, NaOH=1),
+        burn('NaNO3', -1.25, N2=0.5, Water=-0.5, NaOH=1),
         burn('Cellulose', 6, 5, 6),
         burn('Xylan', 5, 4, 5),
         burn('Lignin', 8.5, 4, 8),
@@ -440,7 +440,7 @@ combustion = rxn.ParallelReaction([
         burn('T_reesei', 1.19375, 0.8225, 1, N2=0.1025, SO2=0.005),
         burn('Protein', 1.2445, 0.785, 1, N2=0.145, SO2=0.007),
         burn('Graphite', 1, CO2=1),
-        burn('Lime', H2O=1, Ash=1),
+        burn('Lime', Water=1, Ash=1),
         burn('CaSO4', -0.5, SO2=1, Ash=1)])
 
 def growth(reactant):
@@ -499,8 +499,8 @@ splits = [('Ethanol', 1, 15),
 # bst.Stream.default_ID_number = 600
 
 well_water = Stream('well_water', Water=1, T=15+273.15)
-M601 = bst.Mixer(ins=(S401-1, '', '', ''))
-J3 = bst.Junction(H201-0, 1-M601)
+M601 = bst.Mixer('M601', ins=(S401-1, '', '', ''))
+J3 = H201-0 - bst.Junction('J3') - 1**M601
 
 WWTC = units.WasteWaterSystemCost('WWTC', ins=M601-0)
 R601 = units.AnaerobicDigestion('R601', ins=(WWTC-0, well_water),
@@ -512,7 +512,7 @@ caustic = Stream('WWT_caustic', Water=2252, NaOH=2252,
                  units='kg/hr', price=price['Caustic']*0.5)
 # polymer = Stream('WWT polymer') # Empty in humbird report :-/
 
-M602 = bst.Mixer(ins=(R601-1, None))
+M602 = bst.Mixer('M602', ins=(R601-1, None))
 
 caustic_over_waste = caustic.mol / 2544300.6261793654
 air_over_waste = air.mol / 2544300.6261793654
@@ -580,7 +580,7 @@ aerobic_digestion_sys = System('aerobic_digestion_sys',
 
 # bst.Stream.default_ID_number = 500
 
-M501 = bst.Mixer(ins=(S603-1, S401-0))
+M501 = bst.Mixer('M501', ins=(S603-1, S401-0))
 BT = bst.facilities.BoilerTurbogenerator('BT', ins=M501-0, 
                                          turbogenerator_efficiency=0.85)
 BT.outs[1].T = 373.15
@@ -611,8 +611,8 @@ makeup_water = Stream('makeup_water', species=water, price=price['Makeup water']
 PWC = bst.facilities.ProcessWaterCenter('PWC',
                                         ins=(S604-0, makeup_water),
                                         outs=(process_water,))
-J4 = bst.Junction(BT.outs[1], 2**M601)
-J5 = bst.Junction(CT.outs[1], 3**M601)
+J4 = BT.outs[1] - bst.Junction('J4') - 2**M601
+J5 = CT.outs[1] - bst.Junction('J5') - 3**M601
 
 substance = bst.Species('substance', cls=bst.Substance)
 ash = Stream('ash', species=substance,
@@ -641,7 +641,7 @@ ADP = bst.facilities.AirDistributionPackage('ADP', ins=plant_air)
 ADP.link_streams()
 
 
-FW = units.FireWaterTank('FT',
+FT = units.FireWaterTank('FT',
                          ins=Stream('fire_water', flow=(8343,), species=substance))
 
 # %% Complete system
@@ -654,7 +654,7 @@ cornstover_sys = System('cornstover_sys',
                         facilities=(M501, CWP, BT, CT, update_water_loss,
                                     PWC, ADP, update_lime_boilerchems_and_ash,
                                     CIP_package, S301, S302, DAP_storage,
-                                    CSL_storage, FW))
+                                    CSL_storage, FT))
 cornstover_sys.products.update((ash, boilerchems))
 baghouse_bags = Stream(ID='Baghouse_bags', species=substance, flow=(1,), price=11.1)
 cornstover_sys.feeds.add(lime)
@@ -705,7 +705,7 @@ Area400 = bst.TEA.like(System(None,
 Area500 = bst.TEA.like(System(None, (WWTC,)),
                        ethanol_tea)
 Area600 = bst.TEA.like(System(None,
-                              (T701, T702, P701, P702, M701, FW,
+                              (T701, T702, P701, P702, M701, FT,
                                CSL_storage, DAP_storage)),
                        ethanol_tea) 
 Area800 = bst.TEA.like(System(None, (CWP, CT, PWC, ADP, CIP_package)),
@@ -734,7 +734,7 @@ get_ecost = lambda units: sum([i._power_utility.cost
                                for i in units
                                if i._has_power_utility])*24*350.4/1e6
 
-cooling_water_uses = {i.system.ID: get_utility(i.units, 'Cooling water', 'duty')/1e6/4.182
+cooling_water_uses = {i.system.ID: get_utility(i.units, 'Cooling water', 'duty')/1e6/4.184
                       for i in areas}
 electricity_uses = {i: get_rate(j.units)/41 for i,j in enumerate(areas)}
 electricity_costs = {i.system.ID: get_ecost(i.units) for i in areas}

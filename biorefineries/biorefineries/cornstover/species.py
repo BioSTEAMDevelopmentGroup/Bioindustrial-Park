@@ -69,7 +69,7 @@ def copy(ID, ChemID):
 
 # Species to define
 species_IDs = [
-        'H2O', 'Ethanol', 'Glucose', 'Galactose',
+        'Water', 'Ethanol', 'Glucose', 'Galactose',
         'Mannose', 'Xylose', 'Arabinose', 'Cellobiose',
         'Sucrose', 'GlucoseOligomer', 'GalactoseOligomer',
         'MannoseOligomer', 'XyloseOligomer', 'ArabinoseOligomer',
@@ -91,7 +91,7 @@ missing = species_IDs.copy()
 # TODO: Add heats of combustion
 
 # As is in data bank
-addspecies('H2O', 'Ethanol', 'AceticAcid', 'Furfural', 'Glycerol',
+addspecies('Water', 'Ethanol', 'AceticAcid', 'Furfural', 'Glycerol',
            'H2SO4', 'LacticAcid', 'SuccinicAcid') 
 sp.SuccinicAcid.Hf = -940.26e3 # kJ/mol
 sp.LacticAcid.T = sp.LacticAcid.Tb = 122+273.15
@@ -164,7 +164,7 @@ addsubstance('Glucan', MW=162.14, Hf=-233200*cal2joule)
 addsubstance('Xylan', MW=132.12, Hf=-182100*cal2joule)
 addsubstance('Xylitol', MW=152.15, Hf=-243145*cal2joule)
 addsubstance('Cellobiose', MW=342.30, Hf=-480900*cal2joule)
-addsubstance('CSL', MW=1, Hf=sp.Protein.Hf/4+sp.H2O.Hf/2+sp.LacticAcid.Hf/4)
+addsubstance('CSL', MW=1, Hf=sp.Protein.Hf/4+sp.Water.Hf/2+sp.LacticAcid.Hf/4)
 copy('DenaturedEnzyme', 'Enzyme')
 copy('Arabinan', 'Xylan')
 copy('Mannan',   'Glucan')
