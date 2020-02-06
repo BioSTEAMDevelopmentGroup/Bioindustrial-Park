@@ -1,0 +1,55 @@
+README.rst
+setup.py
+biorefineries/__init__.py
+biorefineries.egg-info/PKG-INFO
+biorefineries.egg-info/SOURCES.txt
+biorefineries.egg-info/dependency_links.txt
+biorefineries.egg-info/requires.txt
+biorefineries.egg-info/top_level.txt
+biorefineries/cornstover/Monte Carlo cornstover.xlsx
+biorefineries/cornstover/Spearman correlation cornstover.xlsx
+biorefineries/cornstover/__init__.py
+biorefineries/cornstover/_analysis.py
+biorefineries/cornstover/_humbird2011.xlsx
+biorefineries/cornstover/_plot_bars.py
+biorefineries/cornstover/_plot_spearman.py
+biorefineries/cornstover/_plot_uncertainty_bottom.py
+biorefineries/cornstover/_plot_uncertainty_top.py
+biorefineries/cornstover/diagram.png
+biorefineries/cornstover/model.py
+biorefineries/cornstover/process_settings.py
+biorefineries/cornstover/species.py
+biorefineries/cornstover/system.py
+biorefineries/cornstover/tea.py
+biorefineries/cornstover/units.py
+biorefineries/lipidcane/Monte Carlo across lipid fraction.xlsx
+biorefineries/lipidcane/Monte Carlo sugarcane.xlsx
+biorefineries/lipidcane/Spearman correlation lipidcane.xlsx
+biorefineries/lipidcane/__init__.py
+biorefineries/lipidcane/_analysis.py
+biorefineries/lipidcane/_plot_spearman.py
+biorefineries/lipidcane/_plot_uncertainty.py
+biorefineries/lipidcane/model.py
+biorefineries/lipidcane/process_settings.py
+biorefineries/lipidcane/tea.py
+biorefineries/lipidcane/species/__init__.py
+biorefineries/lipidcane/species/biodiesel.py
+biorefineries/lipidcane/species/ethanol.py
+biorefineries/lipidcane/species/lipid.py
+biorefineries/lipidcane/species/pretreatment.py
+biorefineries/lipidcane/species/tripalmitin_liquid.xlsx
+biorefineries/lipidcane/system/__init__.py
+biorefineries/lipidcane/system/biodiesel.py
+biorefineries/lipidcane/system/biorefinery.py
+biorefineries/lipidcane/system/ethanol.py
+biorefineries/lipidcane/system/pretreatment.py
+biorefineries/lipidcane/utils/__init__.py
+biorefineries/lipidcane/utils/composition.py
+biorefineries/sugarcane/Monte Carlo across lipid fraction.xlsx
+biorefineries/sugarcane/Monte Carlo sugarcane.xlsx
+biorefineries/sugarcane/__init__.py
+biorefineries/sugarcane/distribution_summary.xlsx
+biorefineries/sugarcane/model.py
+biorefineries/sugarcane/process_settings.py
+biorefineries/sugarcane/species.py
+biorefineries/sugarcane/system.py
