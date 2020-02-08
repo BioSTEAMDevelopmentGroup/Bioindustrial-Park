@@ -114,14 +114,14 @@ annotate_line('Excess electricity', 4, lipid_fraction, ys,
 
 # Plot sugarcane values and SuperPro values
 x_superpro = [0, 2, 5, 10]
-# data_sc = pd.read_excel('Monte Carlo sugarcane.xlsx', header=[0,1])
-# get_metric = lambda name: np.asarray(data_sc['Biorefinery', name]).flatten()
+data_sc = pd.read_excel('Monte Carlo sugarcane.xlsx', header=[0,1])
+get_metric = lambda name: np.asarray(data_sc['Biorefinery', name]).flatten()
 
 # IRR
 plt.sca(IRR_ax)
 plot_single_points(x_superpro, [13.5, 13.7, 15.2, 17.5])
-# IRR = get_metric('Internal rate of return') * 100 # To percent
-# plot_montecarlo(IRR)
+IRR = get_metric('Internal rate of return [%]') * 100 # To percent
+plot_montecarlo(IRR)
 plot_vertical_line(1)
 IRR_ub = 30
 plt.ylim(0, IRR_ub)
@@ -135,9 +135,9 @@ plt.text(0.05, y_text, "A", color=colors.neutral_shade.RGBn,
 
 # TCI
 plt.sca(TCI_ax)
-# TCI = get_metric('Fixed capital investment')  * 1.05 / 1e6 # Account for working capital
+TCI = get_metric('Fixed capital investment [USD]')  * 1.05 / 1e6 # Account for working capital
 plot_single_points(x_superpro, [158.5, 172.9, 178.3, 195.0])
-# plot_montecarlo(TCI)
+plot_montecarlo(TCI)
 plot_vertical_line(1)
 TCI_ub = 300
 plt.ylim(0, TCI_ub)
@@ -153,10 +153,10 @@ plt.text(0.05, y_text, "B", color=colors.neutral_shade.RGBn,
 plt.sca(production_ax)
 plot_single_points(x_superpro[-1], [48], colors.blue_shade.RGBn)
 plot_single_points([0, x_superpro[-1]], [141, 70], colors.orange_shade.RGBn)
-# ethanol_production = get_metric('Ethanol production') / (1e6*rho_etoh)
-# plot_montecarlo(ethanol_production,
-#                 colors.orange_tint.RGBn,
-#                 colors.orange_shade.RGBn)
+ethanol_production = get_metric('Ethanol production [kg/hr]') / (1e6*rho_etoh)
+plot_montecarlo(ethanol_production,
+                colors.orange_tint.RGBn,
+                colors.orange_shade.RGBn)
 production_ub = 225
 plt.ylim(0, production_ub)
 production_yticks = np.arange(0, 226, 225/5)
@@ -172,10 +172,10 @@ plt.text(0.05, y_text, "D", color=colors.neutral_shade.RGBn,
 plt.sca(production_cost_ax)
 plot_single_points(x_superpro[1:], [0.89, 0.84, 0.76], colors.blue_shade.RGBn)
 plot_single_points(x_superpro, [0.48, 0.46, 0.44, 0.4], colors.orange_shade.RGBn)
-# ethanol_production_cost = get_metric('Ethanol production cost') / ethanol_production / 1e6
-# plot_montecarlo(ethanol_production_cost,
-#                 colors.orange_tint.RGBn,
-#                 colors.orange_shade.RGBn)
+ethanol_production_cost = get_metric('Ethanol production cost [USD/yr]') / ethanol_production / 1e6
+plot_montecarlo(ethanol_production_cost,
+                colors.orange_tint.RGBn,
+                colors.orange_shade.RGBn)
 plot_vertical_line(1)
 production_cost_ub = 1.2
 plt.ylim(0, production_cost_ub)
@@ -190,8 +190,8 @@ plt.text(0.05, y_text, "E", color=colors.neutral_shade.RGBn,
 # Steam
 plt.sca(steam_ax)
 plot_single_points([0, 10], [686.056, 656.000])
-# steam = get_metric('Steam')/1000
-# plot_montecarlo(steam)
+steam = get_metric('Steam [MT/yr]')/1000
+plot_montecarlo(steam)
 plot_vertical_line(1)
 steam_ub = 900
 plt.ylim(0, steam_ub)
@@ -208,14 +208,14 @@ plt.text(0.05, y_text, "C", color=colors.neutral_shade.RGBn,
 plt.sca(electricity_ax)
 plot_single_points([0, 10], [50.187, 62.644], colors.purple_shade.RGBn)
 plot_single_points([0, 10], [110, 260], colors.yellow_shade.RGBn)
-# consumed_electricity = get_metric('Consumed electricity')/1000
-#  excess_electricity = get_metric('Excess electricity')/1000
-# plot_montecarlo(consumed_electricity,
-#                 colors.purple_tint.RGBn,
-#                 colors.purple_shade.RGBn)
-# plot_montecarlo(excess_electricity,
-#                 colors.yellow_tint.RGBn,
-#                 colors.yellow_shade.RGBn)
+consumed_electricity = get_metric('Consumed electricity [MWhr/yr]')/1000
+excess_electricity = get_metric('Excess electricity [MWhr/yr]')/1000
+plot_montecarlo(consumed_electricity,
+                colors.purple_tint.RGBn,
+                colors.purple_shade.RGBn)
+plot_montecarlo(excess_electricity,
+                colors.yellow_tint.RGBn,
+                colors.yellow_shade.RGBn)
 plot_vertical_line(1)
 electricity_ub = 575
 plt.ylim(0, electricity_ub)

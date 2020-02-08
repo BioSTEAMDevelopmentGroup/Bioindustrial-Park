@@ -38,8 +38,8 @@ lc_sys = lc.lipidcane_sys
 def get_steam():
     return sum([i.flow for i in BT.steam_utilities])*18.01528*tea._annual_factor/1000
 
-power_utils = ([i._power_utility for i in lc_sys.units
-                if (hasattr(i, '_power_utility')and i is not BT)])
+power_utils = ([i.power_utility for i in lc_sys.units
+                if (hasattr(i, 'power_utility')and i is not BT)])
 excess_electricity = [0]
 def get_consumed_electricity():
     factor =  tea._annual_factor/1000
