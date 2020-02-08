@@ -15,7 +15,7 @@ from biorefineries.cornstover import units
 import thermosteam.reaction as rxn
 import numpy as np
 
-bst.CE = 525
+bst.CE = 525.4
 System.maxiter = 200
 System.molar_tolerance = 1
 
