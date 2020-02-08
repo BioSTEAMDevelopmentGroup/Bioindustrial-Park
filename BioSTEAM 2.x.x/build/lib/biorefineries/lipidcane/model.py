@@ -6,15 +6,15 @@ Created on Sun May 26 11:21:31 2019
 """
 from biosteam.evaluation import Model, Metric
 from biosteam.evaluation.evaluation_tools import triang
-import lipidcane2 as lc
+import biorefineries.lipidcane as lc
 import numpy as np
 
 __all__ = ('lipidcane_model', 'lipidcane_model_with_lipidfraction_parameter')
 
 tea = lc.lipidcane_tea
-ethanol = lc.system.ethanol.ethanol
-biodiesel = lc.system.biodiesel.biodiesel
-lipid_cane = lc.system.pretreatment.lipid_cane
+ethanol = lc.system.ethanol
+biodiesel = lc.system.biodiesel
+lipid_cane = lc.system.lipid_cane
 
 etoh_prodcost = [0]
 products = (biodiesel, ethanol)
@@ -33,7 +33,7 @@ def get_biodiesel_prod():
 def get_etoh_prod():
     return etoh_prod[0]
 
-BT = lc.system.biorefinery.BT
+BT = lc.system.BT
 lc_sys = lc.lipidcane_sys
 def get_steam():
     return sum([i.flow for i in BT.steam_utilities])*18.01528*tea._annual_factor/1000
@@ -66,7 +66,7 @@ lipidcane_model.load_default_parameters(lipid_cane)
 param = lipidcane_model.parameter
 
 # Lipid extraction rate
-Mill = lc.system.pretreatment.U201
+Mill = lc.system.U201
 @param(element=Mill,
        distribution=triang(Mill.isplit['Lipid']),
        kind='coupled')
@@ -74,25 +74,25 @@ def set_lipid_extraction_rate(lipid_extraction_rate):
     Mill.isplit['Lipid'] = lipid_extraction_rate
     
 # Transesterification efficiency (both tanks)
-R401 = lc.system.biodiesel.R401
+R401 = lc.system.R401
 @param(element=R401, distribution=triang(R401.efficiency), kind='coupled')
 def set_transesterification_401_efficiency(efficiency):
     R401.efficiency = efficiency
 
-R402 = lc.system.biodiesel.R402
+R402 = lc.system.R402
 @param(element=R402, distribution=triang(R402.efficiency), kind='coupled')
 def set_transesterification_402_efficiency(efficiency):
     R402.efficiency = efficiency
 
 # Fermentation efficiency
-fermentation = lc.system.ethanol.R301
+fermentation = lc.system.R301
 @param(element=fermentation, distribution=triang(fermentation.efficiency),
        kind='coupled')
 def set_fermentation_efficiency(efficiency):
     fermentation.efficiency= efficiency
     
 # Boiler efficiency
-BT = lc.system.biorefinery.BT
+BT = lc.system.BT
 @param(element=BT, distribution=triang(BT.boiler_efficiency))
 def set_boiler_efficiency(boiler_efficiency):
     BT.boiler_efficiency = boiler_efficiency
@@ -103,7 +103,7 @@ def set_turbogenerator_efficiency(turbo_generator_efficiency):
     BT.turbo_generator_efficiency = turbo_generator_efficiency
     
 # RVF separation
-rvf = lc.system.pretreatment.C202
+rvf = lc.system.C202
 @param(element=rvf, distribution=triang(rvf.isplit['Lignin']),
         kind='coupled')
 def set_rvf_solids_retention(solids_retention):

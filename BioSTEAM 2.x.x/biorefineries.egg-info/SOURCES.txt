@@ -20,6 +20,7 @@ biorefineries/cornstover/process_settings.py
 biorefineries/cornstover/system.py
 biorefineries/cornstover/tea.py
 biorefineries/cornstover/units.py
+biorefineries/lipidcane/Monte Carlo across lipid fraction.xlsx
 biorefineries/lipidcane/__init__.py
 biorefineries/lipidcane/_analysis.py
 biorefineries/lipidcane/_plot_spearman.py
