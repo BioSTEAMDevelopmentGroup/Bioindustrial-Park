@@ -47,25 +47,29 @@ param = sugarcane_model.parameter
 # Fermentation efficiency
 fermentation = sc.system.R301
 @param(element=fermentation, distribution=triang(fermentation.efficiency),
+       baseline=fermentation.efficiency,
        kind='coupled')
 def set_fermentation_efficiency(efficiency):
     fermentation.efficiency= efficiency
     
 # Boiler efficiency
 BT = sc.system.BT
-@param(element=BT, distribution=triang(BT.boiler_efficiency))
+@param(element=BT, distribution=triang(BT.boiler_efficiency),
+       baseline=BT.boiler_efficiency)
 def set_boiler_efficiency(boiler_efficiency):
     BT.boiler_efficiency = boiler_efficiency
 
 # Turbogenerator efficiency
-@param(element=BT, distribution=triang(BT.turbogenerator_efficiency))
+@param(element=BT, distribution=triang(BT.turbogenerator_efficiency),
+       baseline=BT.turbogenerator_efficiency)
 def set_turbogenerator_efficiency(turbo_generator_efficiency):
     BT.turbo_generator_efficiency = turbo_generator_efficiency
     
 # RVF separation
 rvf = sc.system.C202
 @param(element=rvf, distribution=triang(rvf.isplit['Lignin']),
-        kind='coupled')
+       baseline=rvf.isplit['Lignin'],
+       kind='coupled')
 def set_rvf_solids_retention(solids_retention):
     rvf.isplit['Lignin', 'CaO', 'Ash', 'Cellulose', 'Hemicellulose'] = solids_retention
 

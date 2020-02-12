@@ -39,7 +39,7 @@ def get_steam():
     return sum([i.flow for i in BT.steam_utilities])*18.01528*tea._annual_factor/1000
 
 power_utils = ([i.power_utility for i in lc_sys.units
-                if (hasattr(i, 'power_utility')and i is not BT)])
+                if i.power_utility and i is not BT])
 excess_electricity = [0]
 def get_consumed_electricity():
     factor =  tea._annual_factor/1000
@@ -67,44 +67,57 @@ param = lipidcane_model.parameter
 
 # Lipid extraction rate
 Mill = lc.system.U201
+baseline = Mill.isplit['Lipid']
 @param(element=Mill,
-       distribution=triang(Mill.isplit['Lipid']),
+       distribution=triang(baseline),
+       baseline=baseline,
        kind='coupled')
 def set_lipid_extraction_rate(lipid_extraction_rate):
     Mill.isplit['Lipid'] = lipid_extraction_rate
     
 # Transesterification efficiency (both tanks)
 R401 = lc.system.R401
-@param(element=R401, distribution=triang(R401.efficiency), kind='coupled')
+baseline = R401.efficiency
+@param(element=R401, distribution=triang(baseline), kind='coupled',
+       baseline=baseline)
 def set_transesterification_401_efficiency(efficiency):
     R401.efficiency = efficiency
 
 R402 = lc.system.R402
-@param(element=R402, distribution=triang(R402.efficiency), kind='coupled')
+baseline = R402.efficiency
+@param(element=R402, distribution=triang(baseline), kind='coupled',
+       baseline=baseline)
 def set_transesterification_402_efficiency(efficiency):
     R402.efficiency = efficiency
 
 # Fermentation efficiency
 fermentation = lc.system.R301
-@param(element=fermentation, distribution=triang(fermentation.efficiency),
+baseline = fermentation.efficiency
+@param(element=fermentation, distribution=triang(baseline),
+       baseline=baseline,
        kind='coupled')
 def set_fermentation_efficiency(efficiency):
     fermentation.efficiency= efficiency
     
 # Boiler efficiency
 BT = lc.system.BT
-@param(element=BT, distribution=triang(BT.boiler_efficiency))
+baseline = BT.boiler_efficiency
+@param(element=BT, distribution=triang(baseline),
+       baseline=baseline)
 def set_boiler_efficiency(boiler_efficiency):
     BT.boiler_efficiency = boiler_efficiency
 
 # Turbogenerator efficiency
-@param(element=BT, distribution=triang(BT.turbogenerator_efficiency))
+baseline = BT.turbogenerator_efficiency
+@param(element=BT, distribution=triang(baseline),
+       baseline=baseline)
 def set_turbogenerator_efficiency(turbo_generator_efficiency):
     BT.turbo_generator_efficiency = turbo_generator_efficiency
     
 # RVF separation
 rvf = lc.system.C202
-@param(element=rvf, distribution=triang(rvf.isplit['Lignin']),
+baseline = rvf.isplit['Lignin']
+@param(element=rvf, distribution=triang(baseline), baseline=baseline,
         kind='coupled')
 def set_rvf_solids_retention(solids_retention):
     rvf.isplit['Lignin', 'CaO', 'Ash', 'Cellulose', 'Hemicellulose'] = solids_retention
@@ -113,6 +126,7 @@ lipidcane_model_with_lipidfraction_parameter = lipidcane_model.copy()
 lipidcane_model_with_lipidfraction_parameter.parameter(lc.set_lipid_fraction,
                                                        element=lipid_cane,
                                                        name='Lipid fraction',
+                                                       baseline=0.05,
                                                        distribution=triang(0.05))
 
 

@@ -299,14 +299,15 @@ H403 = bst.HXutility('H403', ins=U401-1, V=0, T=350.)
 # IDnum_400 = tmo.Stream.default_ID_number
 
 # tmo.Stream.default_ID_number = 700
-T701 = bst.StorageTank('T701', ins=H403-0)
-T701.line = 'Ethanol storage'
-T701.tau = 7*24
+T701 = bst.StorageTank('T701', ins=H403-0, tau=7*24,
+                       vessel_type='Floating roof',
+                       material='Carbon steel')
 P701 = bst.Pump('P701', ins=T701-0)
 
 # Storage for gasoline
-T702 = bst.StorageTank('T702', ins=denaturant)
-T702.tau = 7*24
+T702 = bst.StorageTank('T702', ins=denaturant, tau=7*24,
+                       vessel_type='Floating roof',
+                       material='Carbon steel')
 P702 = bst.Pump('P702', ins=T702-0)
 
 # Mix in denaturant

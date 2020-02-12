@@ -19,6 +19,7 @@ __all__ = ('sugarcane_sys', 'sugarcane_tea', 'sugarcane', 'sugar_cane')
 
 # %% Pretreatment section
 
+bst.find.set_flowsheet('sugarcane')
 tmo.settings.set_thermo(sugarcane_chemicals)
 
 ### Streams ###
@@ -117,8 +118,7 @@ S201 = units.VibratingScreen('S201',
                                         Water=0.88))
 
 # Store juice before treatment
-T202 = units.StorageTank('T202')
-T202.tau = 4
+T202 = units.StorageTank('T202', tau=4, material='Carbon steel')
 
 # Heat up before adding acid
 H201 = units.HXutility('H201', T=343.15)
@@ -303,8 +303,7 @@ H301 = units.HXutility('H301', T=295.15)
 
 # Ethanol Production
 R301 = units.Fermentation('R301', outs=('CO2', ''), tau=10, efficiency=0.90, N=6) 
-T301 = units.StorageTank('T301')
-T301.tau = 4
+T301 = units.StorageTank('T301', tau=4, material='Carbon steel')
 T301.line = 'Beer tank'
 
 D301 = units.VentScrubber('D301', ins=(stripping_water, R301-0), gas=('CO2',))
@@ -359,14 +358,15 @@ U301 = units.MolecularSieve('U301',
 
 # Condense ethanol product
 H304 = units.HXutility('H304', 'S149', V=0, T=350.)
-T302 = units.StorageTank('T302')
-T302.line = 'Ethanol storage'
-T302.tau = 6*24
+T302 = units.StorageTank('T302', tau=7*24,
+                         vessel_type='Floating roof',
+                         material='Carbon steel')
 P304 = units.Pump('P304')
 
 # Storage for gasoline
-T303 = units.StorageTank('T303')
-T303.tau = 6*24
+T303 = units.StorageTank('T303', tau=7*24,
+                         vessel_type='Floating roof',
+                         material='Carbon steel')
 P305 = units.Pump('P305')
 
 # denaturantd ethanol product
