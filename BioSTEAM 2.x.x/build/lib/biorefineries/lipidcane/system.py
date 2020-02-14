@@ -3,8 +3,6 @@
 """
 Created on Thu Dec 21 11:05:24 2017
 
-The oil and sugar separation (pretreatment) section for the baseline lipid cane biorefinery is defined here as System objects. The systems include all streams and units starting from enzyme treatment to purification of the sugar solution and the oil stream.
-
 @author: Yoel
 """
 import numpy as np
@@ -117,8 +115,7 @@ S201 = units.VibratingScreen('S201',
                                         Water=0.88))
 
 # Store juice before treatment
-T202 = units.StorageTank('T202')
-T202.tau = 4
+T202 = units.StorageTank('T202', tau=4, vessel_material='Carbon steel')
 
 # Heat up before adding acid
 H201 = units.HXutility('H201', T=343.15)
@@ -338,8 +335,7 @@ H301 = units.HXutility('H301', T=295.15)
 
 # Ethanol Production
 R301 = units.Fermentation('R301', outs=('CO2', ''), tau=10, efficiency=0.90, N=6) 
-T301 = units.StorageTank('T301')
-T301.tau = 4
+T301 = units.StorageTank('T301', tau=4, vessel_material='Carbon steel')
 T301.line = 'Beer tank'
 
 D301 = units.VentScrubber('D301', ins=(stripping_water, R301-0), gas=('CO2',))
@@ -364,11 +360,11 @@ H302 = units.HXprocess('H302', outs=('', 'stillage'),
 xbot = mass2molar_ethanol_fraction(0.00001)
 ytop = mass2molar_ethanol_fraction(0.574)
 D302 = units.Distillation('D302', P=101325,
-                        y_top=ytop, x_bot=xbot, k=1.20,
-                        LHK=('Ethanol', 'Water'))
-D302.tray_material = 'Stainless steel 316'
-D302.vessel_material = 'Stainless steel 316'
-D302._boiler.U = 1.85
+                          y_top=ytop, x_bot=xbot, k=1.20,
+                          LHK=('Ethanol', 'Water'),
+                          tray_material='Stainless steel 304',
+                          vessel_material='Stainless steel 304')
+D302.boiler.U = 1.85
 P302 = units.Pump('P302')
 
 # Mix ethanol Recycle (Set-up)
@@ -377,11 +373,11 @@ M303 = units.Mixer('M303')
 ytop = mass2molar_ethanol_fraction(0.9061726)
 D303 = units.Distillation('D303', P=101325,
                           y_top=ytop, x_bot=xbot, k=1.20,
-                          LHK=('Ethanol', 'Water'))
-D303.tray_material = 'Stainless steel 316'
-D303.vessel_material = 'Stainless steel 316'
-D303.is_divided = True
-D303._boiler.U = 1.85
+                          LHK=('Ethanol', 'Water'),
+                          is_divided=True,
+                          vessel_material='Stainless steel 304',
+                          tray_material='Stainless steel 304')
+D303.boiler.U = 1.85
 P303 = units.Pump('P303')
 
 # Superheat vapor for mol sieve
@@ -394,14 +390,16 @@ U301 = units.MolecularSieve('U301',
 
 # Condense ethanol product
 H304 = units.HXutility('H304', 'S149', V=0, T=350.)
-T302 = units.StorageTank('T302')
-T302.line = 'Ethanol storage'
-T302.tau = 6*24
+T302 = units.StorageTank('T302',
+                         vessel_type='Floating roof',
+                         tau=7*24, vessel_material='Carbon steel')
 P304 = units.Pump('P304')
 
 # Storage for gasoline
-T303 = units.StorageTank('T303')
-T303.tau = 6*24
+T303 = units.StorageTank('T303',
+                         vessel_type='Floating roof',
+                         tau=7*24, vessel_material='Carbon steel')
+T303.tau = 7*24
 P305 = units.Pump('P305')
 
 # denaturantd ethanol product
@@ -416,7 +414,7 @@ M305 = units.Mixer('M305', outs='recycle_water')
 
 # Yeast mixing
 T305 = units.MixTank('T305')
-T305.tau = 0.1
+T305.tau = 0.10
 yeast-T305
 
 # Multi-effect evaporator pumps
@@ -585,7 +583,6 @@ def adjust_acid_and_base():
 
 # Water wash
 T405 = units.MixTank('T405')
-T405.tau = 0.25
 P406 = units.Pump('P406')
 
 # Centrifuge out water
@@ -605,7 +602,7 @@ F401 = units.SplitFlash('F401',
                 split=(0.9999, 0.9999, 0.00001),
                 P=2026.5, T=331.5, Q=0)
 F401.line = 'Vacuum dryer'
-F401.material = 'Stainless steel 316'
+F401.material = 'Stainless steel 304'
 P407 = units.Pump('P407')
 
 """Glycerol Purification Section"""
@@ -631,9 +628,10 @@ P410 = units.Pump('P410')
 # Methanol/Water distillation column
 D401 = units.Distillation('D401',
                   LHK=('Methanol', 'Water'), P=101325,
-                  y_top=0.99999, x_bot=0.0001, k=2.5)
-D401.is_divided = True
-D401.tray_material = D401.vessel_material = 'Stainless steel 316'
+                  y_top=0.99999, x_bot=0.0001, k=2.5,
+                  is_divided=True,
+                  vessel_material='Stainless steel 304',
+                  tray_material='Stainless steel 304')
 
 # Condense water to recycle
 H402 = units.HXutility('H402', T=353, V=0)
@@ -648,8 +646,9 @@ D402 = units.Distillation('D402',
                     k=1.1,
                     P=101325,
                     y_top=0.999,
-                    x_bot=x_water)
-D402.tray_material = D402.vessel_material = 'Stainless steel 316'
+                    x_bot=x_water,
+                    tray_material='Stainless steel 304',
+                    vessel_material='Stainless steel 304')
 
 # Condense recycle methanol
 H403 = units.HXutility('H403', V=0, T=315)

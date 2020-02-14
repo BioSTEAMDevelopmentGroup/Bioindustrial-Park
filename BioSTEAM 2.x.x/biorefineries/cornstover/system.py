@@ -589,7 +589,7 @@ aerobic_digestion_sys = System('aerobic_digestion_sys',
 M501 = bst.Mixer('M501', ins=(S603-1, S401-0))
 BT = bst.facilities.BoilerTurbogenerator('BT', ins=(M501-0, R601-0), 
                                          turbogenerator_efficiency=0.85)
-BT.outs[1].T = 373.15
+BT.outs[-1].T = 373.15
 
 # tmo.Stream.default_ID_number = 700
 
@@ -610,7 +610,7 @@ makeup_water = Stream('makeup_water', thermo=water_thermo, price=price['Makeup w
 PWC = bst.facilities.ProcessWaterCenter('PWC',
                                         ins=(S604-0, makeup_water),
                                         outs=(process_water,))
-J4 = BT.outs[1] - bst.Junction('J4') - 2**M601
+J4 = BT.outs[-1] - bst.Junction('J4') - 2**M601
 J5 = CT.outs[1] - bst.Junction('J5') - 3**M601
 
 Substance = tmo.Chemical.blank('Substance')

@@ -17,7 +17,7 @@ get_coproduct_credit = lambda: sum([i._utility_cost_cached for i in cornstover_t
 get_ethanol_production = lambda: ethanol.F_mass
 get_steam_demand = lambda: BT.steam_demand.F_mass
 pws = [i.power_utility for i in cornstover_sys.units
-       if hasattr(i, 'power_utility') and i is not BT]
+       if i.power_utility and i is not BT]
 get_excess_electricity = lambda: (-BT.power_utility.rate - sum([i.rate for i in pws]))/1e3
 
 metrics =[Metric('Minimum ethanol selling price', get_MESP, 'USD/gal'),
@@ -32,7 +32,7 @@ def electricity_rate_function(tea):
         boiler_item = BT.cost_items['Boiler']
         Design = BT.design_results
         return lambda: boiler_item.kW/boiler_item.S * Design['Flow rate']/1e3
-    power_utilities = [i.power_utility for i in tea.units if hasattr(i, 'power_utility')]
+    power_utilities = [i.power_utility for i in tea.units if i.power_utility]
     return lambda: sum([i.rate for i in power_utilities])/1e3
 
 def cooling_duty_function(tea):

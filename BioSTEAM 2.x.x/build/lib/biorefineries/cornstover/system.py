@@ -15,7 +15,7 @@ from biorefineries.cornstover import units
 import thermosteam.reaction as rxn
 import numpy as np
 
-bst.CE = 525
+bst.CE = 525.4
 System.maxiter = 200
 System.molar_tolerance = 1
 
@@ -259,7 +259,7 @@ D402 = bst.Distillation('D402', ins=H401-0,
 D402.tray_material = 'Stainless steel 304'
 D402.vessel_material = 'Stainless steel 304'
 D402.BM = 2.4
-D402._boiler.U = 1.85
+D402.boiler.U = 1.85
 P401 = bst.Pump('P401', ins=D402-1)
 P401-0-1-H401
 
@@ -273,7 +273,7 @@ D403 = bst.Distillation('D403', ins=M402-0,
 D403.tray_material = 'Stainless steel 304'
 D403.vessel_material = 'Stainless steel 304'
 D403.is_divided = True
-D403._boiler.U = 1.85
+D403.boiler.U = 1.85
 D403.BM = 2.8
 P402 = bst.Pump('P402', ins=D403-1)
 
@@ -299,14 +299,15 @@ H403 = bst.HXutility('H403', ins=U401-1, V=0, T=350.)
 # IDnum_400 = tmo.Stream.default_ID_number
 
 # tmo.Stream.default_ID_number = 700
-T701 = bst.StorageTank('T701', ins=H403-0)
-T701.line = 'Ethanol storage'
-T701.tau = 7*24
+T701 = bst.StorageTank('T701', ins=H403-0, tau=7*24,
+                       vessel_type='Floating roof',
+                       vessel_material='Carbon steel')
 P701 = bst.Pump('P701', ins=T701-0)
 
 # Storage for gasoline
-T702 = bst.StorageTank('T702', ins=denaturant)
-T702.tau = 7*24
+T702 = bst.StorageTank('T702', ins=denaturant, tau=7*24,
+                       vessel_type='Floating roof',
+                       vessel_material='Carbon steel')
 P702 = bst.Pump('P702', ins=T702-0)
 
 # Mix in denaturant
