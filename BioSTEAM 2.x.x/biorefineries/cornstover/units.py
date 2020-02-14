@@ -19,7 +19,7 @@ from flexsolve import aitken_secant
 from thermosteam import MultiStream, Stream
 from biosteam import Unit
 from biosteam.units.decorators import cost
-from biosteam.units.designtools import size_batch
+from biosteam.units.design_tools import size_batch
 import thermosteam as tmo
 import biosteam as bst
 Rxn = tmo.reaction.Reaction

@@ -118,7 +118,7 @@ S201 = units.VibratingScreen('S201',
                                         Water=0.88))
 
 # Store juice before treatment
-T202 = units.StorageTank('T202', tau=4, material='Carbon steel')
+T202 = units.StorageTank('T202', tau=4, vessel_material='Carbon steel')
 
 # Heat up before adding acid
 H201 = units.HXutility('H201', T=343.15)
@@ -303,7 +303,7 @@ H301 = units.HXutility('H301', T=295.15)
 
 # Ethanol Production
 R301 = units.Fermentation('R301', outs=('CO2', ''), tau=10, efficiency=0.90, N=6) 
-T301 = units.StorageTank('T301', tau=4, material='Carbon steel')
+T301 = units.StorageTank('T301', tau=4, vessel_material='Carbon steel')
 T301.line = 'Beer tank'
 
 D301 = units.VentScrubber('D301', ins=(stripping_water, R301-0), gas=('CO2',))
@@ -330,9 +330,9 @@ ytop = mass2molar_ethanol_fraction(0.574)
 D302 = units.Distillation('D302', P=101325,
                         y_top=ytop, x_bot=xbot, k=1.20,
                         LHK=('Ethanol', 'Water'))
-D302.tray_material = 'Stainless steel 316'
-D302.vessel_material = 'Stainless steel 316'
-D302._boiler.U = 1.85
+D302.tray_material = 'Stainless steel 304'
+D302.vessel_material = 'Stainless steel 304'
+D302.boiler.U = 1.85
 P302 = units.Pump('P302')
 
 # Mix ethanol Recycle (Set-up)
@@ -342,10 +342,10 @@ ytop = mass2molar_ethanol_fraction(0.9061726)
 D303 = units.Distillation('D303', P=101325,
                           y_top=ytop, x_bot=xbot, k=1.20,
                           LHK=('Ethanol', 'Water'))
-D303.tray_material = 'Stainless steel 316'
-D303.vessel_material = 'Stainless steel 316'
+D303.tray_material = 'Stainless steel 304'
+D303.vessel_material = 'Stainless steel 304'
 D303.is_divided = True
-D303._boiler.U = 1.85
+D303.boiler.U = 1.85
 P303 = units.Pump('P303')
 
 # Superheat vapor for mol sieve
@@ -360,13 +360,13 @@ U301 = units.MolecularSieve('U301',
 H304 = units.HXutility('H304', 'S149', V=0, T=350.)
 T302 = units.StorageTank('T302', tau=7*24,
                          vessel_type='Floating roof',
-                         material='Carbon steel')
+                         vessel_material='Carbon steel')
 P304 = units.Pump('P304')
 
 # Storage for gasoline
 T303 = units.StorageTank('T303', tau=7*24,
                          vessel_type='Floating roof',
-                         material='Carbon steel')
+                         vessel_material='Carbon steel')
 P305 = units.Pump('P305')
 
 # denaturantd ethanol product
