@@ -339,7 +339,6 @@ class SaccharificationAndCoFermentation(Unit):
         self.loss(effluent.mol)
         self.cofermentation(effluent.mol)
         self.CSL2constituents(effluent.mass)
-        vent.copy_flow(effluent, ('CO2', 'NH3', 'O2'), remove=True)
         vent.recieve_vent(effluent)
     
     def _design(self):
@@ -461,7 +460,7 @@ class AnaerobicDigestion(bst.Unit):
         liquid_mol = self.multi_stream.imol['l']
         sludge.mol[:] = liquid_mol * self.sludge_split
         waste.mol[:] = liquid_mol - sludge.mol
-        biogas.recieve_vent(waste)
+        biogas.recieve_vent(waste, accumulate=True)
         
     
 class AerobicDigestion(bst.Unit):
