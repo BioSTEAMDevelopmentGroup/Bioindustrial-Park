@@ -360,7 +360,7 @@ H302 = units.HXprocess('H302', outs=('', 'stillage'),
 xbot = mass2molar_ethanol_fraction(0.00001)
 ytop = mass2molar_ethanol_fraction(0.574)
 D302 = units.Distillation('D302', P=101325,
-                          y_top=ytop, x_bot=xbot, k=1.20,
+                          y_top=ytop, x_bot=xbot, k=1.25,
                           LHK=('Ethanol', 'Water'),
                           tray_material='Stainless steel 304',
                           vessel_material='Stainless steel 304')
@@ -372,7 +372,7 @@ M303 = units.Mixer('M303')
 
 ytop = mass2molar_ethanol_fraction(0.9061726)
 D303 = units.Distillation('D303', P=101325,
-                          y_top=ytop, x_bot=xbot, k=1.20,
+                          y_top=ytop, x_bot=xbot, k=1.25,
                           LHK=('Ethanol', 'Water'),
                           is_divided=True,
                           vessel_material='Stainless steel 304',

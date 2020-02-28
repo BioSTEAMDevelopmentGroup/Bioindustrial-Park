@@ -5,6 +5,8 @@ biorefineries.egg-info/SOURCES.txt
 biorefineries.egg-info/dependency_links.txt
 biorefineries.egg-info/requires.txt
 biorefineries.egg-info/top_level.txt
+biorefineries/cornstover/Monte Carlo cornstover.xlsx
+biorefineries/cornstover/Spearman correlation cornstover.xlsx
 biorefineries/cornstover/__init__.py
 biorefineries/cornstover/_analysis.py
 biorefineries/cornstover/_humbird2011.xlsx
