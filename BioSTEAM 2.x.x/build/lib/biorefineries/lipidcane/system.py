@@ -765,8 +765,7 @@ PWC = units.ProcessWaterCenter('PWC',
                                ins=('recycle_water', makeup_water),
                                outs=process_water)
 units.Splitter._outs_size_is_fixed = False     
-S601 = units.Splitter('S601', ins=process_water, outs=process_water_streams,
-                      split=(1,), order=('Water',))
+S601 = process_water - units.Splitter('S601', split=(1,), order=('Water',)) - process_water_streams
 units.Splitter._outs_size_is_fixed = True     
 UO = bst.find.unit
 area_500 = bst.System('area_500', (BT,))

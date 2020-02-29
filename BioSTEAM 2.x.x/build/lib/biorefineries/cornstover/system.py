@@ -56,7 +56,7 @@ tmo.settings.set_thermo(pretreatment_chemicals)
 # tmo.Stream.default_ID_number = 100
     
 # feed flow
-drycomposition = pretreatment_chemicals.kwarray(
+dry_composition = pretreatment_chemicals.kwarray(
     dict(Glucan=0.3505, Xylan=0.1953, Lignin=0.1576,
          Ash=0.0493, Acetate=0.0181, Protein=0.0310,
          Extract=0.1465, Arabinan=0.0238, Galactan=0.0143,
@@ -66,7 +66,7 @@ moisture_content = pretreatment_chemicals.kwarray(
     dict(Water=0.20)
 )
 netflow = 104167.0
-feedflow = netflow*(drycomposition*0.8 + moisture_content)
+feedflow = netflow*(dry_composition*0.8 + moisture_content)
 
 cornstover = Stream('cornstover',
                     feedflow,
@@ -631,14 +631,15 @@ def update_lime_boilerchems_and_ash():
     boilerchems.imol['Substance'] = 0.24620/865 * lime_flow
 
 CIP = Stream('CIP', thermo=substance_thermo, flow=(126,))
-CIP_package = units.CIPpackage('CIP_package', ins=CIP)
+CIP_package = units.CIPpackage('CIP_package', ins=CIP, thermo=substance_thermo)
 
 plant_air = Stream('plant_air', flow=(83333,), thermo=substance_thermo)
 
-ADP = bst.facilities.AirDistributionPackage('ADP', ins=plant_air)
+ADP = bst.facilities.AirDistributionPackage('ADP', ins=plant_air, thermo=substance_thermo)
 
 FT = units.FireWaterTank('FT',
-                         ins=Stream('fire_water', flow=(8343,), thermo=substance_thermo))
+                         ins=Stream('fire_water', flow=(8343,), thermo=substance_thermo),
+                         thermo=substance_thermo)
 
 # %% Complete system
 
