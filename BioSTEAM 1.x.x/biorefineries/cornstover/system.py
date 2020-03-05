@@ -60,10 +60,10 @@ bst.Stream.species = pretreatment_species = bst.WorkingSpecies.subgroup(species,
     
 # feed flow
 drycomposition = pretreatment_species.kwarray(
-                 Glucan=0.3505, Xylan=0.1953, Lignin=0.1576,
-                 Ash=0.0493, Acetate=0.0181, Protein=0.0310,
-                 Extract=0.1465, Arabinan=0.0238, Galactan=0.0143,
-                 Mannan=0.0060, Sucrose=0.0077)
+    Glucan=0.3505, Xylan=0.1953, Lignin=0.1576,
+    Ash=0.0493, Acetate=0.0181, Protein=0.0310,
+    Extract=0.1465, Arabinan=0.0238, Galactan=0.0143,
+    Mannan=0.0060, Sucrose=0.0077)
 moisture_content = pretreatment_species.kwarray(Water=0.20)
 netflow = 104167.0
 feedflow = netflow*(drycomposition*0.8 + moisture_content)
