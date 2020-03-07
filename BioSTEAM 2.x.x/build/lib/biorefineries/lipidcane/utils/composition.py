@@ -42,8 +42,8 @@ fiber_massnet = fiber_mass.sum()
 lipid_massnet = lipid_mass.sum()
 
 # Heats of combustion per kg
-Hc_carbs_kg = carbs.Hc/carbs_massnet
-Hc_lipid_kg = lipid.Hc/lipid_massnet
+LHV_carbs_kg = carbs.LHV/carbs_massnet
+LHV_lipid_kg = lipid.LHV/lipid_massnet
 
 # Composition
 carbs_massfrac = tuple_array(carbs_mass/carbs_massnet)
@@ -59,7 +59,7 @@ def set_lipid_fraction(lipid_fraction):
     F_mass = lc.F_mass
     z_dry = 0.3
     z_mass_new_lipid = z_mass_lipid * z_dry 
-    z_mass_new_carbs = 0.149 - z_mass_new_lipid * (Hc_lipid_kg / Hc_carbs_kg)
+    z_mass_new_carbs = 0.149 - z_mass_new_lipid * (LHV_lipid_kg / LHV_carbs_kg)
     new_fiber_massfrac = z_dry - z_mass_new_carbs - z_mass_new_lipid - 0.006 - 0.015
     
     water_mass.value = F_mass*0.7
@@ -74,12 +74,12 @@ def set_lipid_fraction(lipid_fraction):
 
 ### Old attempt to include energy balance. It does not work because fiber is more energy dense than sugar (to my surprise) ###
 
-# Hc_0 = lc.Hc
-# def Hc_error(carbs_massnet, dryweight_no_oil):
+# LHV_0 = lc.LHV
+# def LHV_error(carbs_massnet, dryweight_no_oil):
 #     """Return the difference between the original heat of combustion and the heat of combustion at the new carbohydrate composition"""
 #     carbs_mass[:] = carbs_massfrac * carbs_massnet
 #     fiber_mass[:] = fiber_massfrac * (dryweight_no_oil - carbs_massnet)
-#     return Hc_0 - lc.Hc
+#     return LHV_0 - lc.LHV
 
 # def composition_balance(oilfrac):
 #     """Adjust composition of lipid cane to achieve desired oil fraction (dry weight)."""
@@ -87,7 +87,7 @@ def set_lipid_fraction(lipid_fraction):
 #     arg = oilfrac
 #     oil_mass[:] = mass_oil = oilfrac * dryweight
 #     dryweight_no_oil = dryweight - mass_oil
-#     carbs_massnet = newton(Hc_error, carbs_massnet, args=(dryweight_no_oil,))
+#     carbs_massnet = newton(LHV_error, carbs_massnet, args=(dryweight_no_oil,))
 #     if any(lc.mol < 0):
 #         raise ValueError(f'Lipid cane oil composition of {arg*100:.0f}% dry weight is infeasible')
 #     return carbs_massnet

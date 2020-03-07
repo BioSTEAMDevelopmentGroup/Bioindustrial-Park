@@ -70,9 +70,9 @@ class SteamMixer(Unit):
                                   args=(self.P, steam, mixed, feed))
         mixed.P = self.P
         hu = self.heat_utilities[0]
-        hu.ID = 'Low pressure steam'
+        hu.agent = hu.get_heating_agent('low_pressure_steam')
         hu.flow = steam_mol
-        hu.cost = steam_mol*bst.HeatUtility.heating_agents['Low pressure steam'].price_kmol
+        hu.cost = steam_mol*bst.HeatUtility.get_heating_agent('low_pressure_steam').regeneration_price
     
     @property
     def installation_cost(self): return 0

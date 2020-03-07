@@ -373,75 +373,7 @@ J2 = H401-1 - bst.Junction('J2') - 0**S401
 # %% Waste water treatment
 
 Hvap_water = cornstover_chemicals.Water.Hvap(298.15, 101325)
-
-def burn(reactant, O2=0, Water=0, CO2=0, SO2=0, NO2=0, N2=0, Ash=0, NaOH=0):
-    r = rxn.Reaction(f"{reactant} + {O2}O2 -> {Water}Water + {CO2}CO2 + {Ash}Ash + "
-                     f"{SO2}SO2 + {NO2}NO2 + {N2}N2 + {NaOH}NaOH", reactant, 1.)
-    chems = cornstover_chemicals
-    cmp = getattr(chems, reactant)
-    cmp.Hc = (cmp.Hf - (Water * chems.Water.Hf
-                        + CO2 * chems.CO2.Hf
-                        + SO2 * chems.SO2.Hf
-                        + NO2 * chems.NO2.Hf) - Water * Hvap_water)
-    return r
-
-combustion = rxn.ParallelReaction([    
-        burn('Glucose', 6, 6, 6),
-        burn('Xylose', 5, 5, 5),
-        burn('Sucrose', 12, 11, 12),
-        burn('Extract', 6, 6, 6),
-        burn('Arabinose', 5, 5, 5),
-        burn('Galactose', 6, 6, 6),
-        burn('Mannose', 6, 6, 6),
-        burn('GlucoseOligomer', 6, 5, 6),
-        burn('Cellobiose', 12, 11, 12),
-        burn('XyloseOligomer', 5, 4, 5),
-        burn('MannoseOligomer', 6, 5, 6),
-        burn('GalactoseOligomer', 6, 5, 6),
-        burn('ArabinoseOligomer', 5, 4, 5),
-        burn('Xylitol', 5.5, 6, 5),
-        burn('SolubleLignin', 8.5, 4, 8),
-        burn('Ethanol', 3, 3, 2),
-        burn('Furfural', 5, 2, 5),
-        burn('HMF', 6, 3, 6),
-        burn('H2SO4', -0.5, 1, SO2=1),
-        burn('CH4', 2, 2, 1),
-        burn('NO', 0.5, NO2=1),
-        burn('NH3', 0.75, 1.5, N2=0.5),
-        burn('LacticAcid', 3, 3, 3),
-        burn('AceticAcid', 2, 2, 2),
-        burn('NH4SO4', 1, 4, N2=1, SO2=1),
-        burn('AmmoniumAcetate', 2.75, 3.5, 2, N2=0.5),
-        burn('Glycerol', 3.5, 4, 3),
-        burn('SuccinicAcid', 3.5, 3, 4),
-        burn('Denaturant', 12, 9, 8), # Octane
-        burn('Oil', 25.5, 17, 18),
-        burn('WWTsludge', 1.2185, 0.82, 1, N2=0.115, SO2=0.0035),
-        burn('CellulaseNutrients', 6, 17, 18),
-        burn('H2S', 1.5, 1, SO2=1),
-        burn('CO', 0.5, CO2=1),
-        burn('HNO3', -1.75, 0.5, N2=0.5),
-        burn('NaNO3', -1.25, N2=0.5, Water=-0.5, NaOH=1),
-        burn('Cellulose', 6, 5, 6),
-        burn('Xylan', 5, 4, 5),
-        burn('Lignin', 8.5, 4, 8),
-        burn('Enzyme', 1.1975, 0.795, 1, N2=0.12, SO2=0.01),
-        burn('DenaturedEnzyme', 1.1975, 0.795, 1, N2=0.12, SO2=0.01),
-        burn('Biomass', 1.2185, 0.82, 1, N2=0.115, SO2=0.0035),
-        burn('Z_mobilis', 1.2, 0.9, 1, N2=0.1),
-        burn('Acetate', 2, 2, 2),
-        burn('Arabinan', 5, 4, 5),
-        burn('Mannan', 6, 5, 6),
-        burn('Galactan', 6, 5, 6),
-        burn('Tar', 5, 5, 5),
-        burn('T_reesei', 1.19375, 0.8225, 1, N2=0.1025, SO2=0.005),
-        burn('Protein', 1.2445, 0.785, 1, N2=0.145, SO2=0.007),
-        burn('Graphite', 1, CO2=1),
-        burn('Lime', Water=1, Ash=1),
-        burn('CaSO4', -0.5, SO2=1, Ash=1)])
-cornstover_chemicals.Graphite.Hc = 0
-cornstover_chemicals.Graphite.Hf = 0
-cornstover_chemicals.refresh_constants()
+combustion = cornstover_chemicals.get_combustion_reactions()
 def growth(reactant):
     f = cornstover_chemicals.WWTsludge.MW / getattr(cornstover_chemicals, reactant).MW
     return rxn.Reaction(f"{f}{reactant} -> WWTsludge", reactant, 1.)

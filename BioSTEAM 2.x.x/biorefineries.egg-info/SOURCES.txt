@@ -22,6 +22,7 @@ biorefineries/cornstover/tea.py
 biorefineries/cornstover/units.py
 biorefineries/lipidcane/Monte Carlo across lipid fraction.xlsx
 biorefineries/lipidcane/Monte Carlo sugarcane.xlsx
+biorefineries/lipidcane/Spearman correlation lipidcane.xlsx
 biorefineries/lipidcane/__init__.py
 biorefineries/lipidcane/_analysis.py
 biorefineries/lipidcane/_plot_spearman.py

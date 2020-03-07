@@ -10,18 +10,17 @@ __all__ = ('price',)
 
 # %% Process settings
 
-def set_lipidcane_process_settings():
+def set_sugarcane_process_settings():
     bst.CE = 567 # 2013
     bst.PowerUtility.price = 0.065
     HeatUtility = bst.HeatUtility
-    steam_utility = HeatUtility.heating_agents['Low pressure steam']
-    steam_utility.efficiency = 0.85
+    steam_utility = HeatUtility.heating_agents.get_agent('low_pressure_steam')
+    steam_utility.heat_transfer_efficiency = 0.85
+    steam_utility.regeneration_price = 0.30626
     steam_utility.T = 529.2
     steam_utility.P = 44e5
-    steam_utility.price_kmol = 0.30626
-    steam_utility.Hvap = 30235.86
-    HeatUtility.cooling_agents['Cooling water'].price_kmol = 0
-    HeatUtility.cooling_agents['Chilled water'].price_kJ = 0
+    HeatUtility.cooling_agents.get_agent('cooling_water').regeneration_price = 0
+    HeatUtility.cooling_agents.get_agent('chilled_water').heat_transfer_price = 0
     bst.find.set_flowsheet('lipidcane')
 
 # Raw material price (USD/kg)
@@ -38,4 +37,4 @@ price = {'Sugar cane': 0.03455, # 70% m.c
          'Waste': -0.33,
          'Gasoline': 0.756} # 2 USD/gal
 
-set_lipidcane_process_settings()
+set_sugarcane_process_settings()
