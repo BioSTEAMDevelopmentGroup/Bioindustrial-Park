@@ -250,7 +250,7 @@ ax2s = [ax.twinx() for ax in axs]
 for ub, yt, ax, ax2 in zip(ubs, yticks, axs, ax2s):
     ax.tick_params(axis='y', right=False, direction="inout", length=4)
     plt.sca(ax2)
-    plt.yticks(yt, ['']*len(yt))
+    plt.yticks(yt, ())
     plt.ylim(0, ub)
     ax2.zorder = 1000
     ax2.tick_params(direction="in")
