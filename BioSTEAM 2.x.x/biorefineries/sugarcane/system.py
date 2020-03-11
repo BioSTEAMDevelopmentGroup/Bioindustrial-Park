@@ -7,7 +7,6 @@ Created on Thu Dec 21 11:05:24 2017
 """
 import numpy as np
 import biosteam as bst
-import thermosteam as tmo
 from biosteam import units
 from biorefineries.lipidcane.tea import LipidcaneTEA
 from biorefineries.sugarcane.chemicals import sugarcane_chemicals
@@ -18,7 +17,7 @@ __all__ = ('sugarcane_sys', 'sugarcane_tea', 'sugarcane', 'sugar_cane')
 # %% Pretreatment section
 
 bst.find.set_flowsheet('sugarcane')
-tmo.settings.set_thermo(sugarcane_chemicals)
+bst.settings.set_thermo(sugarcane_chemicals)
 
 ### Streams ###
 
@@ -34,43 +33,43 @@ z_mass_sugarcane = sugarcane_chemicals.kwarray(
          Water=0.7)
 )
 
-sugarcane = sugar_cane = tmo.Stream('sugar_cane',
+sugarcane = sugar_cane = bst.Stream('sugar_cane',
                                     flow=F_mass_sugarcane * z_mass_sugarcane,
                                     units='kg/hr',
                                     price=price['Sugar cane'])
 
-enzyme = tmo.Stream('enzyme',
+enzyme = bst.Stream('enzyme',
                     Cellulose=100, Water=900, units='kg/hr',
                     price=price['Protease'])
 
-imbibition_water = tmo.Stream('imbibition_water',
+imbibition_water = bst.Stream('imbibition_water',
                               Water=87023.35, units='kg/hr',
                               T = 338.15)
 
-H3PO4 = tmo.Stream('H3PO4',
+H3PO4 = bst.Stream('H3PO4',
                    H3PO4=74.23, Water=13.10, units='kg/hr',
                    price=price['H3PO4'])  # to T203
 
-lime = tmo.Stream('lime',
+lime = bst.Stream('lime',
                   CaO=333.00, Water=2200.00, units='kg/hr',
                   price=price['Lime'])  # to P5
 
-polymer = tmo.Stream('polymer',
+polymer = bst.Stream('polymer',
                      Flocculant=0.83, units='kg/hr',
                      price=price['Polymer'])  # to T205
 
-rvf_wash_water = tmo.Stream('rvf_wash_water',
+rvf_wash_water = bst.Stream('rvf_wash_water',
                             Water=16770, units='kg/hr',
                             T=363.15)  # to C202
 
-oil_wash_water = tmo.Stream('oil_wash_water',
+oil_wash_water = bst.Stream('oil_wash_water',
                             Water=1350, units='kg/hr',
                             T=358.15)  # to T207
 
 ### Unit operations ###
 
-tmo.Stream.ticket_name = 'd'
-tmo.Stream.ticket_number = 100
+bst.Stream.ticket_name = 'd'
+bst.Stream.ticket_number = 100
 
 # Feed the shredder
 U101 = units.ConveyingBelt('U101', ins=sugar_cane)
@@ -82,7 +81,7 @@ U102 = units.MagneticSeparator('U102', ins=U101-0)
 # Shredded cane
 U103 = units.Shredder('U103', ins=U102-0)
 
-tmo.Stream.ticket_number = 200
+bst.Stream.ticket_number = 200
 
 # Hydrolyze starch
 T201 = units.EnzymeTreatment('T201', T=323.15)  # T=50
@@ -237,22 +236,8 @@ P202-0-correct_wash_water_unit
 (correct_wash_water_unit-0, P203-0)-M202-H202
 (H202-0, polymer)-T206-C201
 (C201-1, rvf_wash_water)-C202-1-P203
-clarification_recycle_sys = bst.System('clarification_recycle_sys',
-                                   path=(M202, H202, T206,
-                                         C201, C202, P203),
-                                   recycle=C202-1)
-
 C201-0-S202
 
-pretreatment_sys = bst.System('pretreatment_sys',
-                          path=(U101, U102, U103,
-                                correct_flows_unit, T201,
-                                crushing_mill_recycle_sys,
-                                U202, T202, H201, T203,
-                                P201, T204, T205, P202,
-                                correct_wash_water_unit,
-                                clarification_recycle_sys,
-                                S202))
 
 
 # %% Ethanol section
@@ -270,20 +255,20 @@ def mass2molar_ethanol_fraction(ethanol_mass_fraction):
 ### Input streams ###
 
 # Fresh water
-stripping_water = tmo.Stream('stripping_water', Water=5000, units='kg/hr')
+stripping_water = bst.Stream('stripping_water', Water=5000, units='kg/hr')
 
 # Gasoline
-denaturant = tmo.Stream('denaturant', Octane=230.69,
+denaturant = bst.Stream('denaturant', Octane=230.69,
                         units='kg/hr', price=price['Gasoline'])
 
 # Yeast
-yeast = tmo.Stream('yeast', Water=24700, DryYeast=10300, units='kg/hr')
+yeast = bst.Stream('yeast', Water=24700, DryYeast=10300, units='kg/hr')
 
 # From Pretreatment section
 sugar_solution = S202-0
 
 # Ethanol product
-ethanol = tmo.Stream('ethanol', price=price['Ethanol'])
+ethanol = bst.Stream('ethanol', price=price['Ethanol'])
 
 ### Units ###
 
@@ -399,14 +384,8 @@ sugar_solution-S301-1-F301-0-P306
 (H301-0, yeast-T305-0)-R301-1-T301-0-C301
 (C301-0, D301-1)-M302-P301
 (P301-0, P302-0)-H302-0-D302-1-P302
-EtOH_start_path = (S301, F301, P306, M301, H301, T305, R301, T301,
-                      C301, D301, M302, P301, H302, D302, P302, H302)
-
 (D302-0, U301-0)-M303-0-D303-0-H303-U301
 D303-1-P303
-ethanol_recycle_sys = bst.System('ethanol_recycle_sys',
-                           path=(M303, D303, H303, U301),
-                           recycle=M303-0)
 
 pure_ethanol = P304.outs[0]
 def adjust_denaturant():
@@ -417,23 +396,12 @@ adjust_denaturant_unit = bst.ProcessSpecification(adjust_denaturant)
 U301-1-H304-0-T302-0-P304-0-adjust_denaturant_unit
 denaturant-T303-P305
 (P305-0, adjust_denaturant_unit-0)-M304-T304
-EtOH_end_path=(P303, H304, T302, P304,
-               adjust_denaturant_unit,
-               T303, P305, M304, T304)
-
 (P303-0, F301-1)-M305
-EtOH_process_water_path=(M305,)    
-
-area_300 = bst.System('area_300',
-                      path=(EtOH_start_path
-                               + (ethanol_recycle_sys,)
-                               + EtOH_end_path
-                               + EtOH_process_water_path))
 
 
 # %% Facilities
 
-emission = tmo.Stream('emission')
+emission = bst.Stream('emission')
 stream = bst.find.stream
 
 # Stream.default_ID_number = 500
@@ -444,13 +412,13 @@ BT = units.BoilerTurbogenerator('BT',
                                 boiler_efficiency=0.80,
                                 turbogenerator_efficiency=0.85)
 
-tmo.Stream.ticket_number = 600
+bst.Stream.ticket_number = 600
 
 CT = units.CoolingTower('CT')
 process_water_streams = (stream.cooling_tower_makeup_water,
                          stream.boiler_makeup_water)
-makeup_water = tmo.Stream('makeup_water', price=0.000254)
-process_water = tmo.Stream('process_water')
+makeup_water = bst.Stream('makeup_water', price=0.000254)
+process_water = bst.Stream('process_water')
 def update_water():
     process_water.imol['Water'] = sum([stream.imol['Water'] 
                                        for stream in process_water_streams])
@@ -459,22 +427,12 @@ CWP = units.ChilledWaterPackage('CWP')
 PWC = units.ProcessWaterCenter('PWC',
                                ins=('recycle_water', makeup_water),
                                outs=process_water)
-units.Splitter._outs_size_is_fixed = False     
-S601 = process_water - units.Splitter('S601', split=(1,), order=('Water',)) ** process_water_streams
-units.Splitter._outs_size_is_fixed = True     
-UO = bst.find.unit
-area_500 = bst.System('area_500', (BT,))
-area_600 = bst.System('area_600', (CT, CWP, PWC, S601))
-
-# %% Set up system
-
-sugarcane_sys = bst.System('sugarcane_sys',
-                           path=pretreatment_sys.path + area_300.path,
-                           facilities=(CWP, BT, CT, update_water, PWC))
 
 # %% Perform TEA
 
-sugarcane_tea = LipidcaneTEA(system=sugarcane_sys, IRR=0.15, duration=(2018, 2038),
+sugarcane_sys = bst.find.create_system()
+sugarcane_tea = LipidcaneTEA(system=sugarcane_sys, IRR=0.15,
+                             duration=(2018, 2038),
                              depreciation='MACRS7', income_tax=0.35,
                              operating_days=200, lang_factor=3,
                              construction_schedule=(0.4, 0.6), WC_over_FCI=0.05,
