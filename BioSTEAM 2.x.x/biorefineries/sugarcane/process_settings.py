@@ -14,14 +14,14 @@ def set_sugarcane_process_settings():
     bst.CE = 567 # 2013
     bst.PowerUtility.price = 0.065
     HeatUtility = bst.HeatUtility
-    steam_utility = HeatUtility.heating_agents.get_agent('low_pressure_steam')
+    steam_utility = HeatUtility.get_agent('low_pressure_steam')
     steam_utility.heat_transfer_efficiency = 0.85
     steam_utility.regeneration_price = 0.30626
     steam_utility.T = 529.2
     steam_utility.P = 44e5
-    HeatUtility.cooling_agents.get_agent('cooling_water').regeneration_price = 0
-    HeatUtility.cooling_agents.get_agent('chilled_water').heat_transfer_price = 0
-    bst.find.set_flowsheet('lipidcane')
+    HeatUtility.get_agent('cooling_water').regeneration_price = 0
+    HeatUtility.get_agent('chilled_water').heat_transfer_price = 0
+    bst.find.set_flowsheet('sugarcane')
 
 # Raw material price (USD/kg)
 price = {'Sugar cane': 0.03455, # 70% m.c

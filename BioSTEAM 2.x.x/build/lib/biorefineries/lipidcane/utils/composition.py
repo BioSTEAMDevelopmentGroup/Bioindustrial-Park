@@ -6,12 +6,11 @@ This module defines the composition_balance function, which performs mass energy
 
 @author: yoelr
 """
-import biosteam as bst
 import thermosteam as tmo
 from thermosteam import Stream
 from biorefineries.lipidcane.chemicals import pretreatment_chemicals
 from biorefineries.lipidcane.system import lipid_cane
-from array_collections import tuple_array
+from numpy import array
 
 __all__ = ('set_lipid_fraction',)
 
@@ -46,8 +45,8 @@ LHV_carbs_kg = carbs.LHV/carbs_massnet
 LHV_lipid_kg = lipid.LHV/lipid_massnet
 
 # Composition
-carbs_massfrac = tuple_array(carbs_mass/carbs_massnet)
-fiber_massfrac = tuple_array(fiber_mass/fiber_massnet)
+carbs_massfrac = array(carbs_mass/carbs_massnet)
+fiber_massfrac = array(fiber_mass/fiber_massnet)
 
 water_mass = lc.imass['Water']
 solids_mass = lc.imass['Solids']

@@ -163,7 +163,7 @@ def update_cellulase_and_nutrient_loading():
     CSL2.mol[:] = CSL2_over_hydrolyzate * F_mas_cooled_hydrolyzate
     
 pretreatment_sys = System('pretreatment_sys',
-               network=(U101, T201, M201, M202, M203,
+               path=(U101, T201, M201, M202, M203,
                         R201, P201, T202, F201, M204,
                         H201, M210, M205, T203, T203,
                         H301,
@@ -227,7 +227,7 @@ T301 = units.SeedHoldTank('T301', ins=R302-1)
 T301-0-1-M302
 
 fermentation_sys = System('fermentation_sys',
-               network=(update_cellulase_and_nutrient_loading,
+               path=(update_cellulase_and_nutrient_loading,
                         J1, M302, R301, M303, R302, T301),
                recycle=M302-0)
 
@@ -290,7 +290,7 @@ U401 = bst.MolecularSieve('U401', ins=H402-0,
 U401-0-1-M402
 
 ethanol_recycle_sys = System('ethanol_recycle_sys',
-                             network=(M402, D403, H402, U401),
+                             path=(M402, D403, H402, U401),
                              recycle=M402-0)
 
 # Condense ethanol product
@@ -328,7 +328,7 @@ def update_stripping_water():
     stripping_water.mol[:] = stripping_water_over_vent * vent_stream.F_mass
 
 puresys = System('purification',
-                 network=(M304,
+                 path=(M304,
                           update_stripping_water,
                           D401, 
                           M401, T302,
@@ -511,7 +511,7 @@ S604 = bst.Splitter('S604', ins=S601-0, outs=('treated_water', 'waste_brine'),
                   split=find_split(brine_species, S626_flow, S627_flow))
 
 aerobic_digestion_sys = System('aerobic_digestion_sys',
-                               network=(M602, R602, S601, S602, M604, S603, M603),
+                               path=(M602, R602, S601, S602, M604, S603, M603),
                                recycle=M602-0)
 
 # %% Facilities
@@ -576,7 +576,7 @@ FT = units.FireWaterTank('FT',
 # %% Complete system
 
 cornstover_sys = System('cornstover_sys',
-                        network=(pretreatment_sys, fermentation_sys, puresys, J2, S401,
+                        path=(pretreatment_sys, fermentation_sys, puresys, J2, S401,
                                  J3, J4, J5, M601, WWTC, R601,
                                  update_aerobic_input_streams,
                                  aerobic_digestion_sys, S604),

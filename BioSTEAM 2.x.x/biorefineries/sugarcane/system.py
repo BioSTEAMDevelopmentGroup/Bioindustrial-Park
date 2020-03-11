@@ -209,44 +209,50 @@ def correct_flows():
         imbibition_water.imass['Water'] = 0.25* F_mass
         F_mass_last_sugarcane = int(F_mass)
 
+correct_flows_unit = bst.ProcessSpecification(correct_flows)
+
 # Specifications within a system
 def correct_wash_water():
     solids = P202.outs[0].imol['Ash', 'CaO', 'Cellulose',
                                'Hemicellulose', 'Lignin'].sum()
     rvf_wash_water.imol['Water'] = 0.0574 * solids
 
+correct_wash_water_unit = bst.ProcessSpecification(correct_wash_water)
+
 
 ### System set-up ###
 
-(U103-0, enzyme)-T201
+U103-0-correct_flows_unit-0
+(correct_flows_unit-0, enzyme)-T201
 (T201-0, M201-0)-U201-1-S201-0-T202
 (S201-1, imbibition_water)-M201
 crushing_mill_recycle_sys = bst.System('crushing_mill_recycle_sys',
-                               network=(U201, S201, M201),
+                               path=(U201, S201, M201),
                                recycle=M201-0)
 
 T202-0-H201
 (H201-0, H3PO4)-T203-P201
 (P201-0, lime-T204-0)-T205-P202
-(P202-0, P203-0)-M202-H202
+P202-0-correct_wash_water_unit
+(correct_wash_water_unit-0, P203-0)-M202-H202
 (H202-0, polymer)-T206-C201
 (C201-1, rvf_wash_water)-C202-1-P203
 clarification_recycle_sys = bst.System('clarification_recycle_sys',
-                                   network=(M202, H202, T206,
-                                            C201, C202, P203),
+                                   path=(M202, H202, T206,
+                                         C201, C202, P203),
                                    recycle=C202-1)
 
 C201-0-S202
 
 pretreatment_sys = bst.System('pretreatment_sys',
-                          network=(U101, U102, U103,
-                                   correct_flows, T201,
-                                   crushing_mill_recycle_sys,
-                                   U202, T202, H201, T203,
-                                   P201, T204, T205, P202,
-                                   correct_wash_water,
-                                   clarification_recycle_sys,
-                                   S202))
+                          path=(U101, U102, U103,
+                                correct_flows_unit, T201,
+                                crushing_mill_recycle_sys,
+                                U202, T202, H201, T203,
+                                P201, T204, T205, P202,
+                                correct_wash_water_unit,
+                                clarification_recycle_sys,
+                                S202))
 
 
 # %% Ethanol section
@@ -393,34 +399,36 @@ sugar_solution-S301-1-F301-0-P306
 (H301-0, yeast-T305-0)-R301-1-T301-0-C301
 (C301-0, D301-1)-M302-P301
 (P301-0, P302-0)-H302-0-D302-1-P302
-EtOH_start_network = (S301, F301, P306, M301, H301, T305, R301, T301,
+EtOH_start_path = (S301, F301, P306, M301, H301, T305, R301, T301,
                       C301, D301, M302, P301, H302, D302, P302, H302)
 
 (D302-0, U301-0)-M303-0-D303-0-H303-U301
 D303-1-P303
 ethanol_recycle_sys = bst.System('ethanol_recycle_sys',
-                           network=(M303, D303, H303, U301),
+                           path=(M303, D303, H303, U301),
                            recycle=M303-0)
 
 pure_ethanol = P304.outs[0]
 def adjust_denaturant():
     denaturant.imol['Octane'] = 0.021*pure_ethanol.F_mass/114.232
+   
+adjust_denaturant_unit = bst.ProcessSpecification(adjust_denaturant)
     
-U301-1-H304-0-T302-0-P304
+U301-1-H304-0-T302-0-P304-0-adjust_denaturant_unit
 denaturant-T303-P305
-(P305-0, P304-0)-M304-T304
-EtOH_end_network=(P303, H304, T302, P304,
-                  adjust_denaturant, T303,
-                  P305, M304, T304)
+(P305-0, adjust_denaturant_unit-0)-M304-T304
+EtOH_end_path=(P303, H304, T302, P304,
+               adjust_denaturant_unit,
+               T303, P305, M304, T304)
 
 (P303-0, F301-1)-M305
-EtOH_process_water_network=(M305,)    
+EtOH_process_water_path=(M305,)    
 
 area_300 = bst.System('area_300',
-                      network=(EtOH_start_network
+                      path=(EtOH_start_path
                                + (ethanol_recycle_sys,)
-                               + EtOH_end_network
-                               + EtOH_process_water_network))
+                               + EtOH_end_path
+                               + EtOH_process_water_path))
 
 
 # %% Facilities
@@ -461,7 +469,7 @@ area_600 = bst.System('area_600', (CT, CWP, PWC, S601))
 # %% Set up system
 
 sugarcane_sys = bst.System('sugarcane_sys',
-                           network=pretreatment_sys.network + area_300.network,
+                           path=pretreatment_sys.path + area_300.path,
                            facilities=(CWP, BT, CT, update_water, PWC))
 
 # %% Perform TEA

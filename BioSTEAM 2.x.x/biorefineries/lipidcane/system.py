@@ -247,7 +247,7 @@ def correct_wash_water():
 (T201-0, M201-0)-U201-1-S201-0-T202
 (S201-1, imbibition_water)-M201
 crushing_mill_recycle_sys = bst.System('crushing_mill_recycle_sys',
-                               network=(U201, S201, M201),
+                               path=(U201, S201, M201),
                                recycle=M201-0)
 
 T202-0-H201
@@ -257,7 +257,7 @@ T202-0-H201
 (H202-0, polymer)-T206-C201
 (C201-1, rvf_wash_water)-C202-1-P203
 clarification_recycle_sys = bst.System('clarification_recycle_sys',
-                                   network=(M202, H202, T206,
+                                   path=(M202, H202, T206,
                                             C201, C202, P203),
                                    recycle=C202-1)
 
@@ -266,7 +266,7 @@ C201-0-T207-T207_2-0-H203
 T207-T207_2-1-S202
 
 pretreatment_sys = bst.System('pretreatment_sys',
-                          network=(U101, U102, U103,
+                          path=(U101, U102, U103,
                                    correct_flows, T201,
                                    crushing_mill_recycle_sys,
                                    U202, T202, H201, T203,
@@ -428,13 +428,13 @@ sugar_solution-S301-1-F301-0-P306
 (H301-0, yeast-T305-0)-R301-1-T301-0-C301
 (C301-0, D301-1)-M302-P301
 (P301-0, P302-0)-H302-0-D302-1-P302
-EtOH_start_network = (S301, F301, P306, M301, H301, T305, R301, T301,
+EtOH_start_path = (S301, F301, P306, M301, H301, T305, R301, T301,
                       C301, D301, M302, P301, H302, D302, P302, H302)
 
 (D302-0, U301-0)-M303-0-D303-0-H303-U301
 D303-1-P303
 ethanol_recycle_sys = bst.System('ethanol_recycle_sys',
-                           network=(M303, D303, H303, U301),
+                           path=(M303, D303, H303, U301),
                            recycle=M303-0)
 
 pure_ethanol = P304.outs[0]
@@ -444,18 +444,18 @@ def adjust_denaturant():
 U301-1-H304-0-T302-0-P304
 denaturant-T303-P305
 (P305-0, P304-0)-M304-T304
-EtOH_end_network=(P303, H304, T302, P304,
+EtOH_end_path=(P303, H304, T302, P304,
                   adjust_denaturant, T303,
                   P305, M304, T304)
 
 (P303-0, F301-1)-M305
-EtOH_process_water_network=(M305,)    
+EtOH_process_water_path=(M305,)    
 
 area_300 = bst.System('area_300',
-                      network=(EtOH_start_network
+                      path=(EtOH_start_path
                                + (ethanol_recycle_sys,)
-                               + EtOH_end_network
-                               + EtOH_process_water_network))
+                               + EtOH_end_path
+                               + EtOH_process_water_path))
 
 # %% Biodiesel section
 
@@ -671,7 +671,7 @@ F401-1-P407-0-T409
 oil-T403-P403
 (P403-0, S401-0)-R401-0-C401
 (C401-0, S401-1)-R402-0-C402
-transesterification_network = (T403, P403, R401, C401, P405, R402, C402,
+transesterification_path = (T403, P403, R401, C401, P405, R402, C402,
                                adjust_acid_and_base)
 
 """
@@ -706,7 +706,7 @@ C401-1-P405
 H402-0-D401-1-D402-1-T408
 P410-0-H402
 glycerol_recycle_sys = bst.System('glycerol_recycle_sys',
-                              network=(adjust_water_flow, 
+                              path=(adjust_water_flow, 
                                        T405, P406, C403, F401, H401,
                                        P408, P407, T406, P409, C404,
                                        T407, P410, H402, D401, D402,
@@ -717,7 +717,7 @@ D401-0-H403-P411    # Recycle methanol
 methanol-T401-P401  # Mix fresh and recycled methanol
 catalyst-T402-P402  # Fresh catalyst
 (P411-0, P401-0, P402-0)-T404-P404-S401  # Mix Catalyst with Methanol
-meoh_network = (H403, P411, T401, P401, T402, P402, T404, P404, S401)
+meoh_path = (H403, P411, T401, P401, T402, P402, T404, P404, S401)
 
 # Set connections for mass balance proxy
 (catalyst, methanol, D401-0)-B401
@@ -725,9 +725,9 @@ B401**(1**R401, 1**R402)
 
 # Complete System
 area_400 = bst.System('area_400',
-                  network=transesterification_network
+                  path=transesterification_path
                           + (glycerol_recycle_sys, B401)
-                          + meoh_network
+                          + meoh_path
                           + (T408, T409))
 
 # Initial guess
@@ -776,10 +776,10 @@ connect_sugar = units.Junction('J1', sugar, sugar_solution, ('Water', 'Glucose',
 connect_lipid = units.Junction('J2', lipid, oil, ('Lipid',))
 
 lipidcane_sys = bst.System('lipidcane_sys',
-                           network=pretreatment_sys.network
+                           path=pretreatment_sys.path
                                  + (connect_sugar, connect_lipid)
-                                 + area_300.network
-                                 + area_400.network,
+                                 + area_300.path
+                                 + area_400.path,
                            facilities=(CWP, BT, CT, update_water, PWC))
 
 # %% Perform TEA
