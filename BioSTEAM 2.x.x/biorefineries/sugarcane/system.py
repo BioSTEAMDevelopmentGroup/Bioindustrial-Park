@@ -16,7 +16,7 @@ __all__ = ('sugarcane_sys', 'sugarcane_tea', 'sugarcane', 'sugar_cane')
 
 # %% Pretreatment section
 
-bst.find.set_flowsheet('sugarcane')
+bst.main_flowsheet.set_flowsheet('sugarcane')
 bst.settings.set_thermo(sugarcane_chemicals)
 
 ### Streams ###
@@ -73,7 +73,6 @@ bst.Stream.ticket_number = 100
 
 # Feed the shredder
 U101 = units.ConveyingBelt('U101', ins=sugar_cane)
-U101.cost_items['Conveying belt'].ub = 5000
 
 # Separate metals
 U102 = units.MagneticSeparator('U102', ins=U101-0)
@@ -127,8 +126,7 @@ T203 = units.MixTank('T203')
 P201 = units.Pump('P201')
 
 # Mix lime solution
-T204 = units.MixTank('T204')
-T204.tau = 0.25
+T204 = units.MixTank('T204', tau=0.25)
 P202 = units.Pump('P202')
 
 # Blend acid lipid solution with lime
@@ -136,13 +134,6 @@ T205 = units.MixTank('T205')
 
 # Mix recycle
 M202 = units.Mixer('M202')
-def run_and_retry():
-    try:
-        units.Mixer._run(M202)
-    except:
-        M202.outs[0].T = 298.15
-        units.Mixer._run(M202)
-M202._run = run_and_retry
 
 # Heat before adding flocculant
 H202 = units.HXutility('H202', T=372.15)
@@ -221,7 +212,7 @@ correct_wash_water_unit = bst.ProcessSpecification(correct_wash_water)
 
 ### System set-up ###
 
-U103-0-correct_flows_unit-0
+U103-0-correct_flows_unit
 (correct_flows_unit-0, enzyme)-T201
 (T201-0, M201-0)-U201-1-S201-0-T202
 (S201-1, imbibition_water)-M201
@@ -330,10 +321,10 @@ M303 = units.Mixer('M303')
 ytop = mass2molar_ethanol_fraction(0.9061726)
 D303 = units.Distillation('D303', P=101325,
                           y_top=ytop, x_bot=xbot, k=1.25,
-                          LHK=('Ethanol', 'Water'))
-D303.tray_material = 'Stainless steel 304'
-D303.vessel_material = 'Stainless steel 304'
-D303.is_divided = True
+                          LHK=('Ethanol', 'Water'),
+                          tray_material='Stainless steel 304',
+                          vessel_material='Stainless steel 304',
+                          is_divided=True)
 D303.boiler.U = 1.85
 P303 = units.Pump('P303')
 
@@ -346,7 +337,7 @@ U301 = units.MolecularSieve('U301',
                             order=('Ethanol', 'Water'))
 
 # Condense ethanol product
-H304 = units.HXutility('H304', 'S149', V=0, T=350.)
+H304 = units.HXutility('H304', 'S149', V=0, T=340.)
 T302 = units.StorageTank('T302', tau=7*24,
                          vessel_type='Floating roof',
                          vessel_material='Carbon steel')
@@ -395,14 +386,14 @@ adjust_denaturant_unit = bst.ProcessSpecification(adjust_denaturant)
     
 U301-1-H304-0-T302-0-P304-0-adjust_denaturant_unit
 denaturant-T303-P305
-(P305-0, adjust_denaturant_unit-0)-M304-T304
+(P305-0, adjust_denaturant_unit-0)-T304
 (P303-0, F301-1)-M305
 
 
 # %% Facilities
 
 emission = bst.Stream('emission')
-stream = bst.find.stream
+stream = bst.main_flowsheet.stream
 
 # Stream.default_ID_number = 500
 
@@ -419,18 +410,19 @@ process_water_streams = (stream.cooling_tower_makeup_water,
                          stream.boiler_makeup_water)
 makeup_water = bst.Stream('makeup_water', price=0.000254)
 process_water = bst.Stream('process_water')
-def update_water():
+def update_recycled_process_water():
     process_water.imol['Water'] = sum([stream.imol['Water'] 
                                        for stream in process_water_streams])
 
 CWP = units.ChilledWaterPackage('CWP')
 PWC = units.ProcessWaterCenter('PWC',
-                               ins=('recycle_water', makeup_water),
-                               outs=process_water)
+                               ('recycle_water', makeup_water),
+                               process_water,
+                               update_recycled_process_water)
 
 # %% Perform TEA
 
-sugarcane_sys = bst.find.create_system()
+sugarcane_sys = bst.main_flowsheet.create_system()
 sugarcane_tea = LipidcaneTEA(system=sugarcane_sys, IRR=0.15,
                              duration=(2018, 2038),
                              depreciation='MACRS7', income_tax=0.35,

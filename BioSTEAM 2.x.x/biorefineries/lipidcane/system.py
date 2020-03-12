@@ -7,7 +7,6 @@ Created on Thu Dec 21 11:05:24 2017
 """
 import numpy as np
 import biosteam as bst
-import thermosteam as tmo
 from biosteam import units
 from biorefineries.lipidcane.tea import LipidcaneTEA
 from biorefineries.lipidcane.chemicals import (pretreatment_chemicals,
@@ -19,11 +18,11 @@ __all__ = ('lipidcane_sys', 'lipidcane_tea', 'lipidcane', 'lipid_cane')
 
 # %% Pretreatment section
 
-tmo.settings.set_thermo(pretreatment_chemicals)
+bst.settings.set_thermo(pretreatment_chemicals)
 
 ### Streams ###
 
-lipidcane = lipid_cane = tmo.Stream('lipid_cane',
+lipidcane = lipid_cane = bst.Stream('lipid_cane',
                                     Ash=2000.042,
                                     Cellulose=26986.69,
                                     Glucose=2007.067,
@@ -36,38 +35,38 @@ lipidcane = lipid_cane = tmo.Stream('lipid_cane',
                                     units='kg/hr',
                                     price=price['Lipid cane'])
 
-enzyme = tmo.Stream('enzyme',
+enzyme = bst.Stream('enzyme',
                     Cellulose=100, Water=900, units='kg/hr',
                     price=price['Protease'])
 
-imbibition_water = tmo.Stream('imbibition_water',
+imbibition_water = bst.Stream('imbibition_water',
                               Water=87023.35, units='kg/hr',
                               T = 338.15)
 
-H3PO4 = tmo.Stream('H3PO4',
+H3PO4 = bst.Stream('H3PO4',
                    H3PO4=74.23, Water=13.10, units='kg/hr',
                    price=price['H3PO4'])  # to T203
 
-lime = tmo.Stream('lime',
+lime = bst.Stream('lime',
                   CaO=333.00, Water=2200.00, units='kg/hr',
                   price=price['Lime'])  # to P5
 
-polymer = tmo.Stream('polymer',
+polymer = bst.Stream('polymer',
                      Flocculant=0.83, units='kg/hr',
                      price=price['Polymer'])  # to T205
 
-rvf_wash_water = tmo.Stream('rvf_wash_water',
+rvf_wash_water = bst.Stream('rvf_wash_water',
                             Water=16770, units='kg/hr',
                             T=363.15)  # to C202
 
-oil_wash_water = tmo.Stream('oil_wash_water',
+oil_wash_water = bst.Stream('oil_wash_water',
                             Water=1350, units='kg/hr',
                             T=358.15)  # to T207
 
 ### Unit operations ###
 
-tmo.Stream.ticket_name = 'd'
-tmo.Stream.ticket_number = 100
+bst.Stream.ticket_name = 'd'
+bst.Stream.ticket_number = 100
 
 # Feed the shredder
 U101 = units.ConveyingBelt('U101', ins=lipid_cane)
@@ -79,7 +78,7 @@ U102 = units.MagneticSeparator('U102', ins=U101-0)
 # Shredded cane
 U103 = units.Shredder('U103', ins=U102-0)
 
-tmo.Stream.ticket_number = 200
+bst.Stream.ticket_number = 200
 
 # Hydrolyze starch
 T201 = units.EnzymeTreatment('T201', T=323.15)  # T=50
@@ -136,13 +135,6 @@ T205 = units.MixTank('T205')
 
 # Mix recycle
 M202 = units.Mixer('M202')
-def run_and_retry():
-    try:
-        units.Mixer._run(M202)
-    except:
-        M202.outs[0].T = 298.15
-        units.Mixer._run(M202)
-M202._run = run_and_retry
 
 # Heat before adding flocculant
 H202 = units.HXutility('H202', T=372.15)
@@ -232,56 +224,44 @@ def correct_flows():
         imbibition_water.imass['Water'] = 0.25* F_mass
         F_mass_last_lipidcane = int(F_mass)
 
+correct_flows_unit = bst.ProcessSpecification(correct_flows)
+
 # Specifications within a system
 def correct_lipid_wash_water():
     oil_wash_water.imol['Water'] = 100/11 * H202.outs[0].imol['Lipid']
+
+correct_lipid_wash_water_unit = bst.ProcessSpecification(correct_lipid_wash_water)
 
 def correct_wash_water():
     solids = P202.outs[0].imol['Ash', 'CaO', 'Cellulose', 'Hemicellulose', 'Lignin'].sum()
     rvf_wash_water.imol['Water'] = 0.0574 * solids
 
+correct_wash_water_unit = bst.ProcessSpecification(correct_wash_water)
 
 ### System set-up ###
 
-(U103-0, enzyme)-T201
+U103-0-correct_flows_unit
+(correct_flows_unit-0, enzyme)-T201
 (T201-0, M201-0)-U201-1-S201-0-T202
 (S201-1, imbibition_water)-M201
-crushing_mill_recycle_sys = bst.System('crushing_mill_recycle_sys',
-                               path=(U201, S201, M201),
-                               recycle=M201-0)
 
 T202-0-H201
 (H201-0, H3PO4)-T203-P201
 (P201-0, lime-T204-0)-T205-P202
-(P202-0, P203-0)-M202-H202
+P202-0-correct_wash_water_unit
+(correct_wash_water_unit-0, P203-0)-M202-H202
 (H202-0, polymer)-T206-C201
 (C201-1, rvf_wash_water)-C202-1-P203
-clarification_recycle_sys = bst.System('clarification_recycle_sys',
-                                   path=(M202, H202, T206,
-                                            C201, C202, P203),
-                                   recycle=C202-1)
 
 C201-0-T207-T207_2-0-H203
 (H203-0, oil_wash_water)-T208-C203-0-F201
 T207-T207_2-1-S202
 
-pretreatment_sys = bst.System('pretreatment_sys',
-                          path=(U101, U102, U103,
-                                   correct_flows, T201,
-                                   crushing_mill_recycle_sys,
-                                   U202, T202, H201, T203,
-                                   P201, T204, T205, P202,
-                                   correct_wash_water,
-                                   clarification_recycle_sys,
-                                   T207, T207_2, H203, S202,
-                                   correct_lipid_wash_water,
-                                   T208, C203, F201,))
-
 lipid = F201-1
 
 # %% Ethanol section
 
-tmo.settings.set_thermo(ethanol_chemicals)
+bst.settings.set_thermo(ethanol_chemicals)
 
 ### Utilities ###
 
@@ -296,22 +276,22 @@ def mass2molar_ethanol_fraction(ethanol_mass_fraction):
 ### Input streams ###
 
 # Fresh water
-stripping_water = tmo.Stream('stripping_water', Water=5000, units='kg/hr')
+stripping_water = bst.Stream('stripping_water', Water=5000, units='kg/hr')
 
 # Gasoline
-denaturant = tmo.Stream('denaturant', Octane=230.69,
+denaturant = bst.Stream('denaturant', Octane=230.69,
                         units='kg/hr', price=price['Gasoline'])
 
 # Yeast
-yeast = tmo.Stream('yeast', Water=24700, DryYeast=10300, units='kg/hr')
+yeast = bst.Stream('yeast', Water=24700, DryYeast=10300, units='kg/hr')
 
-# Sugar tmo.Stream (from Pretreatment section)
-sugar_solution = tmo.Stream('sugar_solution', Glucose=1888.23, H3PO4=0,
+# Sugar stream (from Pretreatment section)
+sugar_solution = bst.Stream('sugar_solution', Glucose=1888.23, H3PO4=0,
                             Sucrose=21399.94, Water=264523.53,
                             units='kg/hr', T=99+273.15)
 
 # Ethanol product
-ethanol = tmo.Stream('ethanol', price=price['Ethanol'])
+ethanol = bst.Stream('ethanol', price=price['Ethanol'])
 
 ### Units ###
 
@@ -441,9 +421,11 @@ pure_ethanol = P304.outs[0]
 def adjust_denaturant():
     denaturant.imol['Octane'] = 0.021*pure_ethanol.F_mass/114.232
     
-U301-1-H304-0-T302-0-P304
+adjust_denaturant_unit = bst.ProcessSpecification(adjust_denaturant)
+    
+U301-1-H304-0-T302-0-P304-0-adjust_denaturant_unit
 denaturant-T303-P305
-(P305-0, P304-0)-M304-T304
+(P305-0, adjust_denaturant_unit-0)-M304-T304
 EtOH_end_path=(P303, H304, T302, P304,
                   adjust_denaturant, T303,
                   P305, M304, T304)
@@ -459,48 +441,48 @@ area_300 = bst.System('area_300',
 
 # %% Biodiesel section
 
-tmo.settings.set_thermo(biodiesel_chemicals)
+bst.settings.set_thermo(biodiesel_chemicals)
 
 ### Streams ###
 
 # Fresh degummed oil
-oil = tmo.Stream('oil', Lipid=8853.49, Water=1.00e-02,
+oil = bst.Stream('oil', Lipid=8853.49, Water=1.00e-02,
                  units='kg/hr', T=347.15)
 
 # Fresh methanol
-methanol = tmo.Stream('methanol', Methanol=1,
+methanol = bst.Stream('methanol', Methanol=1,
                       price=price['Methanol'])
 
 # Catalyst
-catalyst = tmo.Stream('catalyst', NaOCH3=0.25,
+catalyst = bst.Stream('catalyst', NaOCH3=0.25,
                       Methanol=0.75, units='kg/hr',
                       price=price['NaOCH3'])
                   # price=0.25*price['NaOCH3'] + 0.75*Methanol.price)
 
 # Water to remove glycerol
-biodiesel_wash_water = tmo.Stream('biodiesel_wash_water', Water=13.6, T=273.15+60, 
+biodiesel_wash_water = bst.Stream('biodiesel_wash_water', Water=13.6, T=273.15+60, 
                                   price=price['Water'])
 
 # Acid to neutralize catalyst after second centrifuge
-HCl1 = tmo.Stream('HCl1', HCl=0.21, Water=0.79,
+HCl1 = bst.Stream('HCl1', HCl=0.21, Water=0.79,
                   price=price['HCl'])
               # price=0.21*price['HCl'] + 0.79*Water.price) # 35% HCl by mass
 
 # Acid to remove soaps after first centrifuge
-HCl2 = tmo.Stream('HCl2', HCl=0.21, Water=0.79,
+HCl2 = bst.Stream('HCl2', HCl=0.21, Water=0.79,
                   price=HCl1.price)
 
 # Base to neutralize acid before distillation
-NaOH = tmo.Stream('NaOH', NaOH=1, price=price['NaOH'])
+NaOH = bst.Stream('NaOH', NaOH=1, price=price['NaOH'])
 
 # Products
-crude_glycerol = tmo.Stream('crude_glycerol',
+crude_glycerol = bst.Stream('crude_glycerol',
                             price=price['Crude glycerol'])
-biodiesel = tmo.Stream('biodiesel',
+biodiesel = bst.Stream('biodiesel',
                        price=price['Biodiesel'])
 
 # Waste
-waste = tmo.Stream('waste', price=price['Waste'])
+waste = bst.Stream('waste', price=price['Waste'])
 
 ### Units ###
 
@@ -528,11 +510,8 @@ P403 = units.Pump('P403')
 T404 = units.MixTank('T404')
 P404 = units.Pump('P404')
 
-# Mass Balance for Methanol, Recycle Methanol, and Catalyst stream
-B401 = bst.MassBalance('B401', chemical_IDs=('Methanol', 'NaOCH3'), streams=(0, 1))
-
-# Split Methanol/Catalyst to reactors
-S401 = bst.InvSplitter('S401')
+# Split Methanol/Catalyst to reactors (this is done through a process specification, so use a fake splitter)
+S401 = bst.FakeSplitter('S401')
 
 # First Reactor
 R401 = units.Transesterification('R401', efficiency=0.90, methanol2lipid=6, T=333.15,
@@ -554,6 +533,8 @@ P405 = units.Pump('P405')
 # Second Reactor
 R402 = units.Transesterification('R402', efficiency=0.90, methanol2lipid=6, T=333.15,
                          catalyst_molfrac=x_cat) 
+
+adjust_feed_to_reactors = S401.create_inverse_splitter_process_specification('adjust_feed_to_reactors')
 
 # Centrifuge to remove glycerol
 C402 = units.LiquidsSplitCentrifuge('C402',
@@ -579,7 +560,9 @@ def adjust_acid_and_base():
         HCl1.imol['HCl'] = k2 * new
         HCl2.imol['HCl'] = k3 * new
 
-"""Biodiesel Purification Section"""
+adjust_acid_and_base_unit = bst.ProcessSpecification(adjust_acid_and_base)
+
+### Biodiesel Purification Section ###
 
 # Water wash
 T405 = units.MixTank('T405')
@@ -605,7 +588,7 @@ F401.line = 'Vacuum dryer'
 F401.material = 'Stainless steel 304'
 P407 = units.Pump('P407')
 
-"""Glycerol Purification Section"""
+### Glycerol Purification Section ###
 
 # Condense vacuumed methanol to recycle
 H401 = units.HXutility('H401', V=0, T=295)
@@ -670,22 +653,18 @@ F401-1-P407-0-T409
 # Biodiesel Transesterification Section
 oil-T403-P403
 (P403-0, S401-0)-R401-0-C401
-(C401-0, S401-1)-R402-0-C402
-transesterification_path = (T403, P403, R401, C401, P405, R402, C402,
-                               adjust_acid_and_base)
+(C401-0, S401-1)-R402-0-adjust_feed_to_reactors-C402-1
 
-"""
-Specs for product https://www.afdc.energy.gov/fuels/biodiesel_specifications.html
-minimum spec requirements:
- 0.050 wt % water (lower to 0.045)
- 0.2 wt % meoh (lower to 0.15)
- 0.02 wt % glycerol (lower to 0.015)
- 0.4 wt % free lipids (lower to 0.35)
-"""
+# Specs for product https://www.afdc.energy.gov/fuels/biodiesel_specifications.html
+# minimum spec requirements:
+#  0.050 wt % water (lower to 0.045)
+#  0.2 wt % meoh (lower to 0.15)
+#  0.02 wt % glycerol (lower to 0.015)
+#  0.4 wt % free lipids (lower to 0.35)
+
 
 # Find Water Flow
-(C402-0, D402-0-H404-0-P412-0, biodiesel_wash_water, HCl1)-T405-P406-C403
-def adjust_water_flow():
+def adjust_biodiesel_wash_water():
     total_glycerol =  (C401.outs[1].imol['Glycerol'] + R402.outs[0].imol['Glycerol'])
     wash_water = (x_water / (1 - x_water) * total_glycerol
                   - HCl1.imol['Water']
@@ -693,9 +672,18 @@ def adjust_water_flow():
                   - oil.imol['Water']
                   - HCl2.imol['Water'])
     biodiesel_wash_water.imol['Water'] = wash_water if wash_water > 0 else 0.
-    
+
+adjust_biodiesel_wash_water_unit = bst.ProcessSpecification(adjust_biodiesel_wash_water)
+P412-0-adjust_acid_and_base_unit-0-adjust_biodiesel_wash_water_unit
+
 def remove_accumulation():
     D402.outs[0].imol['Water'] = 1100*C402.outs[0].imol['Water']
+
+remove_accumulation_unit = bst.ProcessSpecification(remove_accumulation)
+D402-0-remove_accumulation_unit-0-H404-0-P412
+
+# Biodiesel wash
+(C402-0, adjust_biodiesel_wash_water_unit-0, biodiesel_wash_water, HCl1)-T405-P406-C403
 
 # Glycerol recycle and purification section
 C403-0-F401
@@ -704,31 +692,20 @@ C401-1-P405
 (P405-0, C402-1, C403-1, P408-0, HCl2)-T406-P409-C404
 (C404-0, NaOH)-T407-P410
 H402-0-D401-1-D402-1-T408
-P410-0-H402
-glycerol_recycle_sys = bst.System('glycerol_recycle_sys',
-                              path=(adjust_water_flow, 
-                                       T405, P406, C403, F401, H401,
-                                       P408, P407, T406, P409, C404,
-                                       T407, P410, H402, D401, D402,
-                                       remove_accumulation, H404, P412),
-                              recycle=D402-0)                           
+P410-0-H402                
+
+# Mass Balance for Methanol, Recycle Methanol, and Catalyst stream
+B401 = bst.MassBalance('B401',
+                       variable_inlets=[catalyst, methanol],
+                       constant_inlets=[D401-0],
+                       constant_outlets=[1**R401, 1**R402],
+                       chemical_IDs=('Methanol', 'NaOCH3'))
+
 # Find Fresh Methanol Flow
-D401-0-H403-P411    # Recycle methanol
+D401-0-B401-H403-P411 # Recycle methanol
 methanol-T401-P401  # Mix fresh and recycled methanol
 catalyst-T402-P402  # Fresh catalyst
 (P411-0, P401-0, P402-0)-T404-P404-S401  # Mix Catalyst with Methanol
-meoh_path = (H403, P411, T401, P401, T402, P402, T404, P404, S401)
-
-# Set connections for mass balance proxy
-(catalyst, methanol, D401-0)-B401
-B401**(1**R401, 1**R402)
-
-# Complete System
-area_400 = bst.System('area_400',
-                  path=transesterification_path
-                          + (glycerol_recycle_sys, B401)
-                          + meoh_path
-                          + (T408, T409))
 
 # Initial guess
 D402.outs[0].imol['Methanol', 'Glycerol', 'Water'] = [0.00127, 3.59e-05, 0.0244]
@@ -736,9 +713,9 @@ D402.outs[0].imol['Methanol', 'Glycerol', 'Water'] = [0.00127, 3.59e-05, 0.0244]
 
 # %% Facilities
 
-tmo.settings.set_thermo(pretreatment_chemicals)
-emission = tmo.Stream('emission')
-stream = bst.find.stream
+bst.settings.set_thermo(pretreatment_chemicals)
+emission = bst.Stream('emission')
+stream = bst.main_flowsheet.stream
 
 # Stream.default_ID_number = 500
 
@@ -748,48 +725,40 @@ BT = units.BoilerTurbogenerator('BT',
                               boiler_efficiency=0.80,
                               turbogenerator_efficiency=0.85)
 
-tmo.Stream.ticket_number = 600
+bst.Stream.ticket_number = 600
 
 CT = units.CoolingTower('CT')
 process_water_streams = (stream.biodiesel_wash_water,
                          stream.cooling_tower_makeup_water,
                          stream.boiler_makeup_water)
-makeup_water = tmo.Stream('makeup_water', price=0.000254)
-process_water = tmo.Stream('process_water')
-def update_water():
+makeup_water = bst.Stream('makeup_water', price=0.000254)
+process_water = bst.Stream('process_water')
+def update_recycled_process_water():
     process_water.imol['Water'] = sum([stream.imol['Water'] 
                                        for stream in process_water_streams])
 
 CWP = units.ChilledWaterPackage('CWP')
 PWC = units.ProcessWaterCenter('PWC',
-                               ins=('recycle_water', makeup_water),
-                               outs=process_water)
-units.Splitter._outs_size_is_fixed = False     
-S601 = process_water - units.Splitter('S601', split=(1,), order=('Water',)) - process_water_streams
-units.Splitter._outs_size_is_fixed = True     
-UO = bst.find.unit
-area_500 = bst.System('area_500', (BT,))
-area_600 = bst.System('area_600', (CT, CWP, PWC, S601))
+                               ('recycle_water', makeup_water),
+                               process_water,
+                               update_recycled_process_water)
 
 # %% Set up system
 connect_sugar = units.Junction('J1', sugar, sugar_solution, ('Water', 'Glucose', 'Sucrose'))
 connect_lipid = units.Junction('J2', lipid, oil, ('Lipid',))
 
-lipidcane_sys = bst.System('lipidcane_sys',
-                           path=pretreatment_sys.path
-                                 + (connect_sugar, connect_lipid)
-                                 + area_300.path
-                                 + area_400.path,
-                           facilities=(CWP, BT, CT, update_water, PWC))
 
 # %% Perform TEA
 
+# Use `ends` to not create a recycle system based on those streams, which
+# do not ultimately affect the system due to process specifications.
+lipidcane_sys = bst.main_flowsheet.create_system(ends=(*S401.outs, P408-0))
 lipidcane_tea = LipidcaneTEA(system=lipidcane_sys, IRR=0.15, duration=(2018, 2038),
-                             depreciation='MACRS7', income_tax=0.35,
-                             operating_days=200, lang_factor=3,
-                             construction_schedule=(0.4, 0.6), WC_over_FCI=0.05,
-                             labor_cost=2.5e6, fringe_benefits=0.4,
-                             property_tax=0.001, property_insurance=0.005,
-                             supplies=0.20, maintenance=0.01, administration=0.005)
+                              depreciation='MACRS7', income_tax=0.35,
+                              operating_days=200, lang_factor=3,
+                              construction_schedule=(0.4, 0.6), WC_over_FCI=0.05,
+                              labor_cost=2.5e6, fringe_benefits=0.4,
+                              property_tax=0.001, property_insurance=0.005,
+                              supplies=0.20, maintenance=0.01, administration=0.005)
 lipidcane_sys.simulate()
 lipidcane_tea.IRR = lipidcane_tea.solve_IRR()

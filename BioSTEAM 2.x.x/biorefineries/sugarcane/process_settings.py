@@ -21,7 +21,7 @@ def set_sugarcane_process_settings():
     steam_utility.P = 44e5
     HeatUtility.get_agent('cooling_water').regeneration_price = 0
     HeatUtility.get_agent('chilled_water').heat_transfer_price = 0
-    bst.find.set_flowsheet('sugarcane')
+    bst.main_flowsheet.set_flowsheet('sugarcane')
 
 # Raw material price (USD/kg)
 price = {'Sugar cane': 0.03455, # 70% m.c
