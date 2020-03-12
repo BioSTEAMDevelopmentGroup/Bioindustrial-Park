@@ -534,7 +534,7 @@ P405 = units.Pump('P405')
 R402 = units.Transesterification('R402', efficiency=0.90, methanol2lipid=6, T=333.15,
                          catalyst_molfrac=x_cat) 
 
-adjust_feed_to_reactors = S401.create_inverse_splitter_process_specification('adjust_feed_to_reactors')
+adjust_feed_to_reactors = S401.create_reversed_splitter_process_specification('adjust_feed_to_reactors')
 
 # Centrifuge to remove glycerol
 C402 = units.LiquidsSplitCentrifuge('C402',
@@ -744,14 +744,18 @@ PWC = units.ProcessWaterCenter('PWC',
                                update_recycled_process_water)
 
 # %% Set up system
-connect_sugar = units.Junction('J1', sugar, sugar_solution, ('Water', 'Glucose', 'Sucrose'))
-connect_lipid = units.Junction('J2', lipid, oil, ('Lipid',))
+connect_sugar = units.Junction('J1', sugar, sugar_solution,
+                               ('Water', 'Glucose', 'Sucrose'))
+connect_lipid = units.Junction('J2', lipid, oil,
+                               ('Lipid',))
 
 
 # %% Perform TEA
 
 # Use `ends` to not create a recycle system based on those streams, which
 # do not ultimately affect the system due to process specifications.
+# Doing this decreases convergence time. The system would still work
+# well without passing the `ends` argument.
 lipidcane_sys = bst.main_flowsheet.create_system(ends=(*S401.outs, P408-0))
 lipidcane_tea = LipidcaneTEA(system=lipidcane_sys, IRR=0.15, duration=(2018, 2038),
                               depreciation='MACRS7', income_tax=0.35,

@@ -512,6 +512,7 @@ class AerobicDigestion(bst.Unit):
       S=63, cost=421e3, CE=522, BM=1.8, n=0.6)
 class CIPpackage(bst.Facility):
     line = 'CIP Package'
+    network_priority = 0
     _N_ins = 1
     _N_outs = 1
     

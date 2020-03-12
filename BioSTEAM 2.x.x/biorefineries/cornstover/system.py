@@ -42,7 +42,7 @@ def find_split(IDs, flow0, flow1):
 
 # %% Streams
 
-bst.find.set_flowsheet(bst.Flowsheet('cornstover'))
+bst.main_flowsheet.set_flowsheet(bst.Flowsheet('cornstover'))
 pretreatment_chemical_IDs = ['Acetate', 'AceticAcid', 'Arabinan', 'Ash', 'Cellulase',
                              'Ethanol', 'Extract', 'Furfural', 'Glucan', 'Glucose',
                              'GlucoseOligomer', 'Water', 'H2SO4', 'HMF', 'Lignin',
@@ -194,7 +194,7 @@ DAP2 = Stream('DAP2',
                 price=price['DAP'])
 DAP_storage = units.DAPTank('DAP_storage', ins=Stream('DAP_fresh'), outs='DAP')
 
-S301 = bst.InvSplitter('S301', ins=DAP_storage-0, outs=(DAP1, DAP2))
+S301 = bst.ReversedSplitter('S301', ins=DAP_storage-0, outs=(DAP1, DAP2))
 CSL1 = Stream('CSL1',
                 CSL=211,
                 units='kg/hr',
@@ -205,7 +205,7 @@ CSL2 = Stream('CSL2',
                 price=price['CSL'])
 CSL_storage = units.CSLTank('CSL_storage', ins=Stream('CSL_fresh'), outs='CSL')
 
-S302 = bst.InvSplitter('S302', ins=CSL_storage-0, outs=(CSL1, CSL2))
+S302 = bst.ReversedSplitter('S302', ins=CSL_storage-0, outs=(CSL1, CSL2))
 denaturant = Stream('denaturant',
                     Octane=230.69,
                     units='kg/hr',
