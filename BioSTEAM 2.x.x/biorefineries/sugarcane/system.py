@@ -199,7 +199,7 @@ def correct_flows():
         imbibition_water.imass['Water'] = 0.25* F_mass
         F_mass_last_sugarcane = int(F_mass)
 
-correct_flows_unit = bst.ProcessSpecification(correct_flows)
+PS2 = bst.ProcessSpecification('PS2', specification=correct_flows)
 
 # Specifications within a system
 def correct_wash_water():
@@ -207,13 +207,13 @@ def correct_wash_water():
                                'Hemicellulose', 'Lignin'].sum()
     rvf_wash_water.imol['Water'] = 0.0574 * solids
 
-correct_wash_water_unit = bst.ProcessSpecification(correct_wash_water)
+PS3 = bst.ProcessSpecification('PS3', specification=correct_wash_water)
 
 
 ### System set-up ###
 
-U103-0-correct_flows_unit
-(correct_flows_unit-0, enzyme)-T201
+U103-0-PS2
+(PS2-0, enzyme)-T201
 (T201-0, M201-0)-U201-1-S201-0-T202
 (S201-1, imbibition_water)-M201
 crushing_mill_recycle_sys = bst.System('crushing_mill_recycle_sys',
@@ -223,8 +223,8 @@ crushing_mill_recycle_sys = bst.System('crushing_mill_recycle_sys',
 T202-0-H201
 (H201-0, H3PO4)-T203-P201
 (P201-0, lime-T204-0)-T205-P202
-P202-0-correct_wash_water_unit
-(correct_wash_water_unit-0, P203-0)-M202-H202
+P202-0-PS3
+(PS3-0, P203-0)-M202-H202
 (H202-0, polymer)-T206-C201
 (C201-1, rvf_wash_water)-C202-1-P203
 C201-0-S202
@@ -381,12 +381,12 @@ D303-1-P303
 pure_ethanol = P304.outs[0]
 def adjust_denaturant():
     denaturant.imol['Octane'] = 0.021*pure_ethanol.F_mass/114.232
-   
-adjust_denaturant_unit = bst.ProcessSpecification(adjust_denaturant)
     
-U301-1-H304-0-T302-0-P304-0-adjust_denaturant_unit
+PS4 = bst.ProcessSpecification('PS4', specification=adjust_denaturant)
+    
+U301-1-H304-0-T302-0-P304-0-PS4
 denaturant-T303-P305
-(P305-0, adjust_denaturant_unit-0)-T304
+(P305-0, PS4-0)-T304
 (P303-0, F301-1)-M305
 
 

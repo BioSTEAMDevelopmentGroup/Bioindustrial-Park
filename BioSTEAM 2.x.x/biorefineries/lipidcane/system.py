@@ -224,32 +224,32 @@ def correct_flows():
         imbibition_water.imass['Water'] = 0.25* F_mass
         F_mass_last_lipidcane = int(F_mass)
 
-correct_flows_unit = bst.ProcessSpecification(correct_flows)
+PS1 = bst.ProcessSpecification('PS1', specification=correct_flows)
 
 # Specifications within a system
 def correct_lipid_wash_water():
     oil_wash_water.imol['Water'] = 100/11 * H202.outs[0].imol['Lipid']
 
-correct_lipid_wash_water_unit = bst.ProcessSpecification(correct_lipid_wash_water)
+PS2 = bst.ProcessSpecification('PS2', specification=correct_lipid_wash_water)
 
 def correct_wash_water():
     solids = P202.outs[0].imol['Ash', 'CaO', 'Cellulose', 'Hemicellulose', 'Lignin'].sum()
     rvf_wash_water.imol['Water'] = 0.0574 * solids
 
-correct_wash_water_unit = bst.ProcessSpecification(correct_wash_water)
+PS3 = bst.ProcessSpecification('PS3', specification=correct_wash_water)
 
 ### System set-up ###
 
-U103-0-correct_flows_unit
-(correct_flows_unit-0, enzyme)-T201
+U103-0-PS1
+(PS1-0, enzyme)-T201
 (T201-0, M201-0)-U201-1-S201-0-T202
 (S201-1, imbibition_water)-M201
 
 T202-0-H201
 (H201-0, H3PO4)-T203-P201
 (P201-0, lime-T204-0)-T205-P202
-P202-0-correct_wash_water_unit
-(correct_wash_water_unit-0, P203-0)-M202-H202
+P202-0-PS3
+(PS3-0, P203-0)-M202-H202
 (H202-0, polymer)-T206-C201
 (C201-1, rvf_wash_water)-C202-1-P203
 
@@ -421,11 +421,11 @@ pure_ethanol = P304.outs[0]
 def adjust_denaturant():
     denaturant.imol['Octane'] = 0.021*pure_ethanol.F_mass/114.232
     
-adjust_denaturant_unit = bst.ProcessSpecification(adjust_denaturant)
+PS4 = bst.ProcessSpecification('PS4', specification=adjust_denaturant)
     
-U301-1-H304-0-T302-0-P304-0-adjust_denaturant_unit
+U301-1-H304-0-T302-0-P304-0-PS4
 denaturant-T303-P305
-(P305-0, adjust_denaturant_unit-0)-M304-T304
+(P305-0, PS4-0)-M304-T304
 EtOH_end_path=(P303, H304, T302, P304,
                   adjust_denaturant, T303,
                   P305, M304, T304)
@@ -486,7 +486,7 @@ waste = bst.Stream('waste', price=price['Waste'])
 
 ### Units ###
 
-"""Biodiesel Transesterification Section"""
+### Biodiesel Transesterification Section ###
 
 # Aparently reactors are adiabatic, meoh coming in at 40C, lipid at 60C
 
@@ -534,7 +534,8 @@ P405 = units.Pump('P405')
 R402 = units.Transesterification('R402', efficiency=0.90, methanol2lipid=6, T=333.15,
                          catalyst_molfrac=x_cat) 
 
-adjust_feed_to_reactors = S401.create_reversed_splitter_process_specification('adjust_feed_to_reactors')
+PS5 = S401.create_reversed_splitter_process_specification(
+    'PS5', description='Adjust feed to reactors')
 
 # Centrifuge to remove glycerol
 C402 = units.LiquidsSplitCentrifuge('C402',
@@ -560,7 +561,7 @@ def adjust_acid_and_base():
         HCl1.imol['HCl'] = k2 * new
         HCl2.imol['HCl'] = k3 * new
 
-adjust_acid_and_base_unit = bst.ProcessSpecification(adjust_acid_and_base)
+PS6 = bst.ProcessSpecification('PS6', specification=adjust_acid_and_base)
 
 ### Biodiesel Purification Section ###
 
@@ -653,7 +654,7 @@ F401-1-P407-0-T409
 # Biodiesel Transesterification Section
 oil-T403-P403
 (P403-0, S401-0)-R401-0-C401
-(C401-0, S401-1)-R402-0-adjust_feed_to_reactors-C402-1
+(C401-0, S401-1)-R402-0-PS5-C402-1
 
 # Specs for product https://www.afdc.energy.gov/fuels/biodiesel_specifications.html
 # minimum spec requirements:
@@ -673,17 +674,17 @@ def adjust_biodiesel_wash_water():
                   - HCl2.imol['Water'])
     biodiesel_wash_water.imol['Water'] = wash_water if wash_water > 0 else 0.
 
-adjust_biodiesel_wash_water_unit = bst.ProcessSpecification(adjust_biodiesel_wash_water)
-P412-0-adjust_acid_and_base_unit-0-adjust_biodiesel_wash_water_unit
+PS7 = bst.ProcessSpecification('PS7', specification=adjust_biodiesel_wash_water)
+P412-0-PS6-0-PS7
 
 def remove_accumulation():
     D402.outs[0].imol['Water'] = 1100*C402.outs[0].imol['Water']
 
-remove_accumulation_unit = bst.ProcessSpecification(remove_accumulation)
-D402-0-remove_accumulation_unit-0-H404-0-P412
+PS8 = bst.ProcessSpecification('PS8', specification=remove_accumulation)
+D402-0-PS8-0-H404-0-P412
 
 # Biodiesel wash
-(C402-0, adjust_biodiesel_wash_water_unit-0, biodiesel_wash_water, HCl1)-T405-P406-C403
+(C402-0, PS7-0, biodiesel_wash_water, HCl1)-T405-P406-C403
 
 # Glycerol recycle and purification section
 C403-0-F401
