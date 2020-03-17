@@ -422,7 +422,7 @@ PWC = units.ProcessWaterCenter('PWC',
 
 # %% Perform TEA
 
-sugarcane_sys = bst.main_flowsheet.create_system()
+sugarcane_sys = bst.main_flowsheet.create_system('sugarcane_sys')
 sugarcane_tea = LipidcaneTEA(system=sugarcane_sys, IRR=0.15,
                              duration=(2018, 2038),
                              depreciation='MACRS7', income_tax=0.35,

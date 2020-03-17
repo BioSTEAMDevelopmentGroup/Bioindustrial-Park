@@ -9,7 +9,8 @@ import numpy as np
 import biosteam as bst
 from biosteam import units
 from biorefineries.lipidcane.tea import LipidcaneTEA
-from biorefineries.lipidcane.chemicals import (pretreatment_chemicals,
+from biorefineries.lipidcane.chemicals import (
+                                  pretreatment_chemicals,
                                   ethanol_chemicals,
                                   biodiesel_chemicals)
 from biorefineries.lipidcane.process_settings import price
@@ -290,6 +291,9 @@ sugar_solution = bst.Stream('sugar_solution', Glucose=1888.23, H3PO4=0,
                             Sucrose=21399.94, Water=264523.53,
                             units='kg/hr', T=99+273.15)
 
+connect_sugar = units.Junction('J1', sugar, sugar_solution,
+                               ('Water', 'Glucose', 'Sucrose'))
+
 # Ethanol product
 ethanol = bst.Stream('ethanol', price=price['Ethanol'])
 
@@ -426,18 +430,9 @@ PS4 = bst.ProcessSpecification('PS4', specification=adjust_denaturant)
 U301-1-H304-0-T302-0-P304-0-PS4
 denaturant-T303-P305
 (P305-0, PS4-0)-M304-T304
-EtOH_end_path=(P303, H304, T302, P304,
-                  adjust_denaturant, T303,
-                  P305, M304, T304)
-
 (P303-0, F301-1)-M305
-EtOH_process_water_path=(M305,)    
 
-area_300 = bst.System('area_300',
-                      path=(EtOH_start_path
-                               + (ethanol_recycle_sys,)
-                               + EtOH_end_path
-                               + EtOH_process_water_path))
+# pretreatment_and_ethanol_production_path = bst.main_flowsheet.create_path()
 
 # %% Biodiesel section
 
@@ -678,7 +673,7 @@ PS7 = bst.ProcessSpecification('PS7', specification=adjust_biodiesel_wash_water)
 P412-0-PS6-0-PS7
 
 def remove_accumulation():
-    D402.outs[0].imol['Water'] = 1100*C402.outs[0].imol['Water']
+    D402.outs[0].imol['Water'] = 1100*C402.outs[0].imol['Glycerol']
 
 PS8 = bst.ProcessSpecification('PS8', specification=remove_accumulation)
 D402-0-PS8-0-H404-0-P412
@@ -697,6 +692,7 @@ P410-0-H402
 
 # Mass Balance for Methanol, Recycle Methanol, and Catalyst stream
 B401 = bst.MassBalance('B401',
+                       description='Adjust catalyst and methanol feed to reactors',
                        variable_inlets=[catalyst, methanol],
                        constant_inlets=[D401-0],
                        constant_outlets=[1**R401, 1**R402],
@@ -744,20 +740,32 @@ PWC = units.ProcessWaterCenter('PWC',
                                process_water,
                                update_recycled_process_water)
 
-# %% Set up system
-connect_sugar = units.Junction('J1', sugar, sugar_solution,
-                               ('Water', 'Glucose', 'Sucrose'))
 connect_lipid = units.Junction('J2', lipid, oil,
                                ('Lipid',))
 
-
 # %% Perform TEA
 
-# Use `ends` to not create a recycle system based on those streams, which
-# do not ultimately affect the system due to process specifications.
-# Doing this decreases convergence time. The system would still work
-# well without passing the `ends` argument.
-lipidcane_sys = bst.main_flowsheet.create_system(ends=(*S401.outs, P408-0))
+# transesterification_path = (connect_lipid, T403, P403, R401, C401, P405, R402, PS5, C402)
+# glycerol_recycle_sys = bst.System('glycerol_recycle_sys',
+#                                   path=(PS6, PS7, T405, P406, C403, F401,
+#                                         H401, P408, P407, T406, P409,
+#                                         C404, T407, P410, H402, D401,
+#                                         D402, PS8, H404, P412),
+#                                   recycle=D402-0)    
+# meoh_path = (H403, P411, T401, P401, T402, P402, T404, P404, S401)
+
+# facilities = bst.main_flowsheet.get_facilities()
+# lipidcane_sys = bst.System('lipidcane_sys',
+#                            pretreatment_and_ethanol_production_path
+#                            + transesterification_path
+#                            + (glycerol_recycle_sys, B401)
+#                            + meoh_path
+#                            + (T408, T409),
+#                            facilities=facilities)
+
+lipidcane_sys = bst.main_flowsheet.create_system('lipidcane_sys',
+                                                 ends=(*S401.outs, P408-0))
+
 lipidcane_tea = LipidcaneTEA(system=lipidcane_sys, IRR=0.15, duration=(2018, 2038),
                               depreciation='MACRS7', income_tax=0.35,
                               operating_days=200, lang_factor=3,
