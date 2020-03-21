@@ -34,15 +34,14 @@ _Gcal2kJ = 4184e3
 
 class SteamMixer(Unit):
     """
-    **ins**
+    ins : stream sequence
     
         [0] Feed
         
         [1] Steam
     
-    **outs**
-    
-        [0] Mixed
+    outs : stream
+        Mixed product.
     
     """
     _N_outs = 1
@@ -411,19 +410,19 @@ class WasteWaterSystemCost(bst.Unit): pass
 class AnaerobicDigestion(bst.Unit):
     """Anaerobic digestion system as modeled by Humbird 2011
     
-    **Parameters**
-    
-        **reactions:** [ReactionSet] Anaerobic digestion reactions.
+    Parameters
+    ----------
+    reactions : ReactionSet 
+        Anaerobic digestion reactions.
+    sludge_split : Array Split between waste water and sludge
         
-        **sludge_split:** [Array] Split between waste water and sludge
-        
-    **ins**
+    ins : stream sequence
     
         [0] Waste water
         
         [1] Cool well water
         
-    **outs**
+    outs : stream sequence
     
         [0] Biogas
         
@@ -464,15 +463,18 @@ class AnaerobicDigestion(bst.Unit):
         
     
 class AerobicDigestion(bst.Unit):
-    """Anaerobic digestion system as modeled by Humbird 2011
+    """
+    Anaerobic digestion system as modeled by Humbird 2011
     
-    **Parameters**
+    Parameters
+    ----------
+    reactions : ReactionSet
+        Anaerobic digestion reactions.
     
-        **reactions:** [ReactionSet] Anaerobic digestion reactions.
+    sludge_split : Array
+        Split between waste water and sludge
         
-        **sludge_split:** [Array] Split between waste water and sludge
-        
-    **ins**
+    ins : stream sequence
     
         [0] Waste water
         
@@ -480,7 +482,7 @@ class AerobicDigestion(bst.Unit):
         
         [2] Caustic
         
-    **outs**
+    outs : stream sequence
     
         [0] Vent
         
@@ -512,6 +514,7 @@ class AerobicDigestion(bst.Unit):
       S=63, cost=421e3, CE=522, BM=1.8, n=0.6)
 class CIPpackage(bst.Facility):
     line = 'CIP Package'
+    network_priority = 0
     _N_ins = 1
     _N_outs = 1
     

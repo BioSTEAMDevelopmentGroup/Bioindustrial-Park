@@ -307,9 +307,9 @@ H302 = units.HXprocess('H302', outs=('', 'stillage'),
 # Beer column
 xbot = mass2molar_ethanol_fraction(0.00001)
 ytop = mass2molar_ethanol_fraction(0.574)
-D302 = units.Distillation('D302', P=101325,
-                        y_top=ytop, x_bot=xbot, k=1.25,
-                        LHK=('Ethanol', 'Water'))
+D302 = units.BinaryDistillation('D302', P=101325,
+                            y_top=ytop, x_bot=xbot, k=1.25,
+                            LHK=('Ethanol', 'Water'))
 D302.tray_material = 'Stainless steel 304'
 D302.vessel_material = 'Stainless steel 304'
 D302.boiler.U = 1.85
@@ -319,12 +319,12 @@ P302 = units.Pump('P302')
 M303 = units.Mixer('M303')
 
 ytop = mass2molar_ethanol_fraction(0.9061726)
-D303 = units.Distillation('D303', P=101325,
-                          y_top=ytop, x_bot=xbot, k=1.25,
-                          LHK=('Ethanol', 'Water'),
-                          tray_material='Stainless steel 304',
-                          vessel_material='Stainless steel 304',
-                          is_divided=True)
+D303 = units.BinaryDistillation('D303', P=101325,
+                            y_top=ytop, x_bot=xbot, k=1.25,
+                            LHK=('Ethanol', 'Water'),
+                            tray_material='Stainless steel 304',
+                            vessel_material='Stainless steel 304',
+                            is_divided=True)
 D303.boiler.U = 1.85
 P303 = units.Pump('P303')
 

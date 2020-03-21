@@ -338,7 +338,7 @@ class SaccharificationAndCoFermentation(Unit):
         self.loss(effluent.mol)
         self.cofermentation(effluent.mol)
         self.CSL2constituents(effluent.mass)
-        vent.recieve_vent(effluent)
+        vent.receive_vent(effluent)
     
     def _design(self):
         effluent = self.outs[1]
@@ -385,11 +385,11 @@ class SaccharificationAndCoFermentation(Unit):
       cost=7e4, CE=521.9, S=28630, n=0.8, BM=1.7)
 @cost('Flow rate', 'Pressure filter',
       cost=3294700, CE=551, S=31815, n=0.8, BM=1.7)
-@cost('Flow rate', 'Pressing air compressor reciever tank',
+@cost('Flow rate', 'Pressing air compressor receiver tank',
       cost=8e3, CE=551, S=31815, n=0.7, BM=3.1)
 @cost('Flow rate', 'Cloth wash pump', kW=150*_hp2kW,
       cost=29154, CE=551, S=31815, n=0.8, BM=2.3)
-@cost('Flow rate', 'Dry air compressor reciever tank',
+@cost('Flow rate', 'Dry air compressor receiver tank',
       cost=17e3, CE=551, S=31815, n=0.7, BM=3.1)
 @cost('Flow rate', 'Pressing air pressure filter',
       cost=75200, CE=521.9, S=31815, n=0.6, kW=112, BM=1.6)
@@ -459,7 +459,7 @@ class AnaerobicDigestion(bst.Unit):
         liquid_mol = self.multi_stream.imol['l']
         sludge.mol[:] = liquid_mol * self.sludge_split
         waste.mol[:] = liquid_mol - sludge.mol
-        biogas.recieve_vent(waste, accumulate=True)
+        biogas.receive_vent(waste, accumulate=True)
         
     
 class AerobicDigestion(bst.Unit):
