@@ -83,6 +83,7 @@ class OrganicAcidsBT(bst.units.Facility):
     total_steam = 0
     plant_size_ratio = 1
     combustables = []
+    lps = bst.HeatUtility.get_heating_agent('low_pressure_steam')
     
     def __init__(self, ID='', ins=None, outs=(), *,
                  boiler_efficiency=0.80,
@@ -90,7 +91,7 @@ class OrganicAcidsBT(bst.units.Facility):
                  combustables=[], plant_size_ratio=1):
         Unit.__init__(self, ID, ins, outs)
         
-        lps = bst.HeatUtility.get_heating_agent('low_pressure_steam')
+        lps = self.lps
         self.makeup_water = makeup_water = Stream('boiler_makeup_water', 
                                                   thermo=lps.thermo)
         loss = makeup_water.flow_proxy()

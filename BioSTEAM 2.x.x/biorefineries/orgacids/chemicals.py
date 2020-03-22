@@ -41,7 +41,7 @@ chemical_IDs = [
         # Organic acid related ones
         'LacticAcid',
         'CalciumLactate', 'CalciumAcetate', 
-        'Methanol', 'EthylLactate', 'EthylAcetate'
+        'EthylLactate', 'EthylAcetate'
         #'HydroxypropionicAcid', 'AdipicAcid', 'ButyricAcid', 'CitricAcid',
         #'LacticAcid', 'CisCis-MuconicAcid', 'PropionicAcid', 'SuccinicAcid',
         ]
@@ -78,7 +78,7 @@ for chemical in chemical_IDs:
 #            'Glucan', 'Lignin', 'Acetate', 'CalciumDihydroxide', 'CaSO4', 'N2', 
 #            'O2', 'CO2', 'CH4', 'H2S', 'SO2', 'NitricOxide', 'CarbonMonoxide', 
 #            'AmmoniumSulfate', 'NO2', 'P4O10', 'LacticAcid', 'CalciumLactate', 
-#            'CalciumAcetate', 'Methanol', 'EthylLactate', 'EthylAcetate'])
+#            'CalciumAcetate', 'EthylLactate', 'EthylAcetate'])
 
 # if len(available_chemicals_dict) == len(chems):
 #     print('Mission complete for batch-creating available chemicals!')
@@ -175,7 +175,6 @@ def append_chemical_copy(ID, chemical, **data):
 
 append_chemical('SolubleLignin', 'Vanillin', Hf=-108248*_cal2joule)
 append_chemical('DAP', 'DiammoniumPhosphate', Hf= -283996*_cal2joule)
-#!!! Don't need denaturant if Ethanol not generated as a final product
 append_chemical('Denaturant', 'n-Heptane')
 append_chemical('Ash', 'CaO', Hf=-151688*_cal2joule)
 
@@ -234,7 +233,7 @@ chemical_groups = dict(
     InorganicSolubleSolids = ('AmmoniumSulfate', 'DAP', 'NaOH', 'HNO3', 'NaNO3',
                               'BoilerChemicals'),
     Furfurals = ('Furfural', 'HMF'),
-    OtherOrganics = ('Denaturant', 'Xylitol', 'Methanol'),
+    OtherOrganics = ('Denaturant', 'Xylitol'),
     COxSOxNOxH2S = ('NitricOxide', 'NO2', 'SO2', 'CarbonMonoxide', 'H2S'),
     Proteins = ('Protein', 'Enzyme', 'DenaturedEnzyme'),
     CellMass = ('WWTsludge', 'FermMicrobeGlu', 'FermMicrobeXyl'),
@@ -278,9 +277,9 @@ for chemical in ('NH3', 'NitricOxide', 'CarbonMonoxide', 'H2S', 'CH4'):
 # Chemicals that will be modeled in Distallation/Flash units,
 # list is in ascending order of Tb,
 # HMF and Xylitol are not included due to high Tm and Tb thus  will stay in liquid phase
-phase_change_chemicals = ['Methanol', 'Ethanol', 'H2O', 'Denaturant',
-                          'AceticAcid', 'EthylAcetate', 'EthylLactate', 'Furfural',
-                          'LacticAcid']
+phase_change_chemicals = ['Ethanol', 'H2O', 'Denaturant',
+                          'EthylAcetate', 'AceticAcid',
+                          'EthylLactate', 'Furfural', 'LacticAcid']
 
 
 # %% # Lock chemical phases
@@ -364,7 +363,9 @@ for chemical in chems:
     if not chemical.V:
         if chemical.ID in solubles: set_rho(chemical, 1e5)
         elif chemical.ID in insolubles: set_rho(chemical, 1540)
-            
+# Available models do not cover simulated conditions
+set_rho(chems.NaNO3, 1e5)
+
 # # Check missing molar volume
 # missing_V = []
 # for chemical in chems:

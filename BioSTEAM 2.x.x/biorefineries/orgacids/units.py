@@ -40,10 +40,6 @@ from biosteam.units._splitter import run_split_with_mixing
 from thermosteam import Stream, MultiStream
 from orgacids.EB import EB_simulation
 
-# Used by Sarang's unit
-#from scipy.optimize import fsolve
-#import math
-
 Rxn = tmo.reaction.Reaction
 ParallelRxn = tmo.reaction.ParallelReaction
 _lb2MT = 0.000453592 # MT is metric tonne
@@ -767,6 +763,7 @@ class AcidulationReactor(Unit):
 #!!! Need to look into Aden et al. and see how the filter was designed there
 class GypsumFilter(bst.units.SolidsSeparator):
     _units = {'Flow rate': 'kg/hr'}
+    _N_ins = 1
     
     def _design(self):
         self.design_results['Flow rate'] = self.outs[0].F_mass
@@ -787,33 +784,20 @@ class EsterificationReactor(Unit):
         # Conversions are placeholders now
         self.esterification_rxns = ParallelRxn([
             #   Reaction definition                               Reactant  Conversion
-            Rxn('LacticAcid + Methanol -> MethylLactate + H2O', 'LacticAcid', 0.98),
-            Rxn('AceticAcid + Methanol -> MethylAcetate + H2O', 'AceticAcid', 0.98)
+            Rxn('LacticAcid + Ethanol -> EthylLactate + H2O', 'LacticAcid', 0.98),
+            Rxn('AceticAcid + Ethanol -> EthylAcetate + H2O', 'AceticAcid', 0.98)
             ])
-        
-    # def _run(self):
-    #     feed, recycled, methanol = self.ins
-    #     effluent = self.outs[0]
-        
-    #     # Add 5% extra
-    #     methanol_needed = (feed.imol['LacticAcid']/self.esterification_rxns.X[0] \
-    #                         +feed.imol['AceticAcid']/self.esterification_rxns.X[1]) \
-    #                       * 1.05
-                          
-    #     methanol.imol['Methanol'] = max(0, methanol_needed-recycled.imol['Methanol'])
-    #     effluent.mix_from([feed, recycled, methanol])
-    #     self.esterification_rxns(effluent.mol)
-    
+
     def _run(self):
-        feed, methanol = self.ins
+        feed, ethanol = self.ins
         effluent = self.outs[0]
         
         # Add 5% extra
-        methanol_needed = (feed.imol['LacticAcid']/self.esterification_rxns.X[0] \
-                            +feed.imol['AceticAcid']/self.esterification_rxns.X[1]) \
-                          * 1.05           
-        methanol.imol['Methanol'] = methanol_needed
-        effluent.mix_from([feed, methanol])
+        ethanol_needed = (feed.imol['LacticAcid']/self.esterification_rxns.X[0] \
+                          +feed.imol['AceticAcid']/self.esterification_rxns.X[1]) \
+                          * 1.05 - feed.imol['Ethanol']
+        ethanol.imol['Ethanol'] = max(0, ethanol_needed)
+        effluent.mix_from([feed, ethanol])
         self.esterification_rxns(effluent.mol)
 
 # Cost copied from OligomerConversionTank
@@ -833,8 +817,8 @@ class HydrolysisReactor(Unit):
         # Conversions are placeholders now
         self.hydrolysis_rxns = ParallelRxn([
             #   Reaction definition                                Reactant    Conversion
-            Rxn('MethylLactate + H2O -> LacticAcid + Methanol', 'MethylLactate', 0.98),
-            Rxn('MethylAcetate + H2O -> AceticAcid + Methanol', 'MethylAcetate', 0.98)
+            Rxn('EthylLactate + H2O -> LacticAcid + Ethanol', 'EthylLactate', 0.98),
+            Rxn('EthylAcetate + H2O -> AceticAcid + Ethanol', 'EthylAcetate', 0.98)
             ])
     
     def _run(self):
@@ -843,14 +827,34 @@ class HydrolysisReactor(Unit):
         effluent = self.outs[0]
         
         # Add 5% extra
-        water_needed = (feed.imol['MethylLactate']/self.hydrolysis_rxns.X[0] \
-                        +feed.imol['MethylAcetate']/self.hydrolysis_rxns.X[1]) \
+        water_needed = (feed.imol['EthylLactate']/self.hydrolysis_rxns.X[0] \
+                        +feed.imol['EthylAcetate']/self.hydrolysis_rxns.X[1]) \
                        * 1.05
         water.imol['Water'] = max(0, (water_needed-feed.imol['Water'])) 
         effluent.mix_from([feed, water])
         
         self.hydrolysis_rxns(effluent.mol)
 
+class EthanolMixer(bst.units.Mixer):
+    _N_ins = 2
+    _N_outs = 1
+
+    def _run(self):
+        ethanol, denaturant = self.ins
+        mixture = self.outs[0]
+        
+        # 465 and 21673 based on streams 701 and 515 in Humbird et al.
+        denaturant.imass['Denaturant'] = 465 / 21673 * ethanol.imass['Ethanol']
+        mixture.mix_from([ethanol, denaturant])
+
+class EthanolSplitter(Unit):
+    _N_ins = 1
+    _N_outs = 2
+
+    def _run(self):
+        ethanol = self.ins[0]
+        ethanol_product, ethanol_spp = self.outs
+        ethanol_product.mol = ethanol.mol - ethanol_spp.mol
 
 # %% Wastewater treatment
 
@@ -1016,215 +1020,10 @@ class DAPStorageTank(Unit): pass
       S=227, ub=False, CE=386.5, cost=3900, n=0, kW=20*_hp2kW*7000*_lb2MT/160, BM=1.3)
 class LimeStorageTank(Unit): pass
 
-# Methanol storage tank, based on Ethanol storage tank from Humbird et al.
-# scaled down from 7-d to 14-hr storage
-# (similar to sulfuric acid/CSL/DAP storage in Humbird et al.)
-@cost(basis='Flow rate', ID='Tank', units='kg/hr',
-      S=21808/24/7*14, ub=False, CE=521.9, cost=1340000, n=0.7, kW=0, BM=1.7)
-class MethanolStorageTank(Unit): pass
-
 # Fire water tank
 @cost(basis='Flow rate', ID='Tank', units='kg/hr',
       S=8343, ub=False, CE=521.9, cost=803000, n=0.7, kW=0, BM=1.8)
 @cost(basis='Flow rate', ID='Pump', units='kg/hr',
       S=8343, ub=False, CE=521.9, cost=15000, n=0.8, kW=93.2125, BM=1.7)
 class FireWaterTank(Unit): pass
-
-
-# %% Sarang's work in progress
-'''
-class MultiComponentDistillation(Unit, isabstract=True):
-    
-    _N_ins = 1
-    _N_outs = 2
-    
-    def __init__(self, ID='', ins=None, outs=(), thermo=None,
-                 P=101325, *, LHK, rLKD, rHKB, K_HK, K_specs):
-        super().__init__(ID, ins, outs)
-        self.outs[0].phase = 'g'
-        
-        self.P = P_in = ins.P
-        self.T = T_in = ins.T
-        self.LHK = LHK
-        self.rLKD = rLKD
-        self.rHKB = rHKB
-        self.K_HK = K_HK
-        self.K_specs = K_specs
-        
-        # equilibrium_chemicals should be an iterable of Chemical objects
-        #??? Why use Water and Ethanol?
-        equilibrium_chemicals = tmo.Chemicals(['Ethanol', 'Water'])
-        F_l = tmo.equilibrium.LiquidFugacities(equilibrium_chemicals)
-        liquid_molar_composition = np.array([0.9, 0.1])
-        fugacities = F_l(x=liquid_molar_composition, T=T_in)
-        
-    def GetRelativeVolatilities(self):
-        K_HK = self.K_HK
-        K_specs = self.K_specs
-        
-        rel_vols = []
-        for K_i in K_specs:
-            rel_vols.append(K_i/K_HK)        
-       
-        self.rel_vols = rel_vols
-        
-        return rel_vols
-    
-    def EstimateMinStages(self):
-        LHK = self.LHK
-        rLKD = self.rLKD
-        rHKB = self.rHKB
-        
-        alpha_LH = self.rel_vols[self.ins[0].chemicals.index(LHK[0])]
-        Nm = math.log10((rLKD/(1-rHKB)) * (rHKB/(1-rLKD))) \
-            /math.log10(alpha_LH)
-        
-        self.alpha_LH = alpha_LH
-        self.Nm = Nm
-        
-        return Nm
-    
-    def EstimateDBCompositions(self):
-        rHKB = self.rHKB
-        Nm = self.Nm
-        rel_vols = self.rel_vols
-        
-        A = math.log10((1-rHKB) / rHKB)*1**(-Nm)
-        D_by_B_ratios = []
-        for rv_i in rel_vols:
-            D_by_B_ratios.append(10**(A + Nm*math.log10(rv_i)))        
-        
-        self.D_by_B_ratios = D_by_B_ratios
-        
-        DB = []
-        mass = self.ins[0].F_mass
-        for ind in range(len(D_by_B_ratios)):
-            F = self.ins[0].mass[ind] / mass
-            d = F / (1 + 1 / (D_by_B_ratios[ind]))
-            b = F - d
-            DB.append((d,b))
-        
-        self.DB = DB
-        
-        return DB
-    
-    def Underwood_1_single(self, ind, theta):
-        return self.rel_vols[ind] * (self.DB[ind][0] + self.DB[ind][1]) \
-               / (self.rel_vols[ind] - theta)
-
-    """ Underwood Ean. # 1"""
-    #!!! Ean. or Eqn.?
-    def Underwood_1(self, theta):
-        sum = 0.0000
-        
-        for ind in range(len(self.DB)):
-            sum += self.Underwood_1_single(ind, theta)
-            
-        return sum
-
-    def Underwood_2_single(self, ind):
-        return self.rel_vols[ind] * (self.DB[ind][0]) / (self.rel_vols[ind] - self.theta)
-
-    """Underwood Ean. #2"""
-    def Underwood_2(self, Rm):
-        sum = 0.0000
-        
-        for ind in range(len(self.DB)):
-            sum += self.Underwood_2_single(ind)
-        
-        sum -= (Rm + 1)
-            
-        return sum
-
-    """Uses Underwood Eqns."""
-    def EstimateOperatingRefluxRatio(self):
-        theta = fsolve(self.Underwood_1, [1, 1, 1])
-        self.theta = theta
-        
-        Rm = fsolve(self.Underwood_2, [1, 1, 1])
-        self.Rm = Rm
-        
-        self.R_heuristic = 1.2
-        self.R_op = self.Rm * self.R_heuristic
-        
-        return self.R_op
-    
-    """Gilliland Eqn."""
-    def Gilliland(self, N):
-        N_ratio = ((N-self.Nm) / (N+1))
-        fi = (self.R_op-self.Rm) / (self.R_op+1)
-        exp = math.exp(((1+54.4*fi)/(11+117.2*fi)) * ((fi-1)/(fi**0.5)))
-        
-        return N_ratio - 1 + exp
-        
-    """Uses Gilliland Eqn."""
-    def EstimateNumTheoreticalStages(self):
-        N = fsolve(self.Gilliland, [4, 4, 4])
-        
-        return N
-
-    """ WIP: Kirkbride Approximation for Feed Tray Location"""
-    def Kirkbride(self): #WIP
-        Nf = 1
-        
-        return Nf
-
-    # """WIP"""
-    # def _mass_balance(self):
-    #     vap, liq = self.outs
-        
-    #     # Get all important flow rates (both light and heavy keys and non-keys)
-    #     LHK_index = self.LHK_index
-    #     LNK_index = self.LNK_index
-    #     HNK_index = self.HNK_index
-    #     mol = self._mol_in
-        
-    #     LHK_mol = mol[LHK_index]
-    #     LNK_mol = mol[LNK_index]
-    #     HNK_mol = mol[HNK_index]
-        
-    #     # Set light and heavy keys by lever rule
-    #     light, heavy = LHK_mol
-    #     LHK_mol = light + heavy
-    #     zf = light / LHK_mol
-    #     split_frac = (zf-self.x_bot) / (self.y_top-self.x_bot)
-    #     top_net = LHK_mol * split_frac
-        
-    #     # Set output streams
-    #     vap.mol[LHK_index] = top_net * self._y
-    #     liq.mol[LHK_index] = LHK_mol - vap.mol[LHK_index]
-    #     vap.mol[LNK_index] = LNK_mol
-    #     liq.mol[HNK_index] = HNK_mol
-        
-    """WIP"""
-    def _run(self):
-        ins_0 = self.ins[0]
-        vap, liq = self.outs
-        LHK_0 = self.LHK[0]
-        
-        rel_vols = self.GetRelativeVolatilities()
-        Nm = self.EstimateMinStages()
-        DB = self.EstimateDBCompositions()
-        R_op = self.EstimateOperatingRefluxRatio()
-        
-        vap.copy_flow(ins_0)
-        liq.copy_flow(ins_0)
-        
-        FLK = ins_0.mass[ins_0.chemicals.index(LHK_0)]
-        F = self.ins[0].F_mass
-        
-        dLK = DB[vap.chemicals.index(LHK_0)][0]
-        bLK = DB[vap.chemicals.index(LHK_0)][1]
-        
-        D = (FLK-F*bLK) / (dLK-bLK)
-        B = F - D
-        print(D)
-        print(F)
-        print(B)
-        
-        for spec in vap.chemicals.IDs:
-            vap.imol[spec] = DB[vap.chemicals.index(spec)][0] * D
-            liq.imol[spec] = DB[vap.chemicals.index(spec)][1] * B
-'''
-
 

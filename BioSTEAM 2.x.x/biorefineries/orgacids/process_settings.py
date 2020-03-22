@@ -25,11 +25,17 @@ feedstock_cost = 58.5 /_kg_per_ton*0.8
 # $4.24/kg protein in P51 of Humbird et al., 2007$
 enzyme_cost = 4.24 # USD/kg
 
-# Methanol price from Goellner et al., production from natural gas (Case 3),
-# average of tow load structures, (311.17+345.39)/2 = 328.28/ton in 2011$,
-# which is 328.28/1.034*1.114 = 353.68/ton in 2016$
-# crude methanol with ~1% CO2 and 1% H2O
-methanol_cost = 353.68 # USD/ton
+# 2.21 is the average whole-sale ethanol price between 2010-2019 in 2016 $/gal 
+# based on Annual Energy Outlook from Energy Information Adiministration
+# (https://www.eia.gov/outlooks/aeo/)
+# 0.789 is density of ethanol in kg/L
+ethanol_price = 2.21 / (_liter_per_gallon*0.789)
+
+# $2.10/gal from Humbird et al. in 2007$, density of gasoline is 2.819 kg/gal
+# based on Lower and Higher Heating Values of Hydrogen and Other Fuels
+# from H2 Tools maintained by Pacific Northwest National Laboratory
+# (https://h2tools.org/hyarc/calculator-tools/lower-and-higher-heating-values-fuels)
+denaturant_price = 2.10 / 2.819 * _GDP_2007to2016
 
 # Mentioned in P53 of Humbird et al., not into any units, but a cashflow
 # The original cost is $466,183 every 5 years, converted to per hour assuming 96% uptime
@@ -66,12 +72,14 @@ price = {'3-hydroxypropionic acid': HPA_price,
          'Lime': 180.87 / _kg_per_ton * _GDP_2007to2016,
          'Cooling tower chems': 2716.1 / _kg_per_ton * _GDP_2007to2016,
          'Makeup water': 0.23 / _kg_per_ton * _GDP_2007to2016,
-         # Price of ash is negative because it's a product stream
+         # Cost of ash is negative because it's a product stream
          'Ash disposal': -28.86 / _kg_per_ton * _GDP_2007to2016,
          'Electricity': 0.0572 * _GDP_2007to2016, # USD/kWh
          'Enzyme': enzyme_cost * _GDP_2007to2016,
-         'Methanol': methanol_cost / _kg_per_ton,
-         'Baghouse bag': baghouse_bag_cost} 
+         'Ethanol': ethanol_price,
+         'Denaturant': denaturant_price,
+         'Baghouse bag': baghouse_bag_cost
+         } 
 bst.PowerUtility.price = price['Electricity']
 
 _ha = bst.HeatUtility.get_heating_agent('low_pressure_steam')

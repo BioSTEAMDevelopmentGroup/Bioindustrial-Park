@@ -18,7 +18,7 @@ from orgacids.system import *
 
 for i in range(0, 10):
     orgacids_sys.simulate()
-    MPSP = orgacids_tea.solve_price(product_stream, orgacids_sys_no_boiler_tea)
+    MPSP = orgacids_tea.solve_price(lactic_acid, orgacids_sys_no_boiler_tea)
     print(MPSP)
     
 # orgacids_sys.save_report('11.xlsx')
@@ -29,107 +29,118 @@ for i in range(0, 10):
 from orgacids.system import *
 feedstock_sys.simulate()
 pretreatment_sys.simulate()
-
-# H301.simulate()
-# update_fermentation_CSL_DAP()
-# M301.simulate()
-# M302.simulate()
-# R301.simulate()
 fermentation_sys.simulate()
 
 
 
-# %%
+# %% Separation system
 
+# update_stripping_water()
 
+# separation_sys_units_1 = (U401, M401, S401, R401)
 
-                   
-update_stripping_water()
-U401.simulate()
-M401.simulate()
-S401.simulate()
-R401.simulate()
-update_separation_sulfuric_acid()
-T401.simulate()
-M402.simulate()
+# for unit in separation_sys_units_1:
+#     try:
+#         unit.simulate()
+#         unit.show(N=100)
+#     except: 
+#         print(unit)
+#         break
 
-S402.simulate()
-print('S402.outs[0] is')
-S402.outs[0].show(N=100)
+# update_separation_sulfuric_acid()
 
+# separation_sys_units_2 = (T401, M402, S402, 
+#                           F401, H401,
+#                           F402, H402, R402,
+#                           S403,
+#                           H403, R403, S404, 
+#                           H404, S405, H405, M403)
 
-F401.simulate()
-print('F401.outs[0] is')
-F401.outs[0].show(N=100)
-print('F401.outs[1] is')
-F401.outs[1].show(N=100)
-
-
-# %%
-H401.simulate()
-R402.simulate()
-print('R402.outs[0] is')
-R402.outs[0].show(N=100)
-
-S403.simulate()
-print('S403.outs[0] is')
-S403.outs[0].show(N=100)
-print('S403.outs[1] is')
-S403.outs[1].show(N=100)
-
-
-# %%
-H402.simulate()
-
-R403.simulate()
-print('R403.outs[0] is')
-R403.outs[0].show(N=100)
-
-S404.simulate()
-print('S404.ins[0] is')
-S404.ins[0].show(N=100)
-print('S404.outs[0] is')
-S404.outs[0].show(N=100)
-print('S404.outs[1] is')
-S404.outs[1].show(N=100)
-
-F402.simulate()
-F402.show(N=100)
-H403.simulate()
-
-
-separation_sys = System('separation_sys',
-                         network=(update_stripping_water,
-                                  U401, M401, S401,
-                                  R401, update_separation_sulfuric_acid,
-                                  T401, M402, 
-                                  S402, F401, H401, R402,
-                                  S403,
-                                  H402, R403, S404, 
-                                  F402, S405, update_spp_methanol,
-                                  M403, H403)
-                        )
-
-
-
-# %%
-
-
+# for unit in separation_sys_units_2:
+#     try:
+#         unit.simulate()
+#         unit.show(N=100)
+#     except: 
+#         print(unit)
+#         break
 
 separation_sys.simulate()
+
+
+# %% Wastewtaer treatment
+
+# wastewater_sys_units_1 = (M501, WWT_cost, R501)
+
+# for unit in wastewater_sys_units_1:
+#     try:
+#         unit.simulate()
+#         unit.show(N=100)
+#     except: 
+#         print(unit)
+#         break
+
+# update_aerobic_input_streams()
+                          
+# aerobic_digestion_sys_units = (M502, R502, S501, S502, M503, M504, S503)
+
+# for unit in aerobic_digestion_sys_units:
+#     try:
+#         unit.simulate()
+#         unit.show(N=100)
+#     except: 
+#         print(unit)
+#         break
+
+# aerobic_digestion_sys.simulate()
+
+# wastewater_sys_units_2 = (aerobic_digestion_sys, S504, M505)
+
+# for unit in wastewater_sys_units_2:
+#     try:
+#         unit.simulate()
+#         unit.show(N=100)
+#     except: 
+#         print(unit)
+#         break
+
 wastewater_sys.simulate()
+
+
+# %% Facilities
+
+facilities_sys_units_1 = (CIP, ADP, FWT, BT, J601,
+                          S601, T601, T602, T603, T604, S602, T605,
+                          P601, T606, T607, S603, M601, T608, P602, 
+                          CT, J602)
+
+
+for unit in facilities_sys_units_1:
+    try:
+        unit.simulate()
+        unit.show(N=100)
+    except: 
+        print(unit)
+        break
+
+update_process_water()
+
+CWP.simulate()
+S604.simulate()
+PWC.simulate()
+update_discharged_water()
+update_fresh_streams()
+
 facilities_sys.simulate()
+
 
 # %%
 
-import thermosteam as tmo
+from biosteam.units import HXutility
+from thermosteam import Stream, settings
+settings.set_thermo(['Water', 'Ethanol'])
+feed = Stream('feed', Water=200, Ethanol=200)
+hx = HXutility('hx', ins=feed, outs='product', T=50+273.15,
+              rigorous=True) # Ignore VLE
+hx.simulate()
+hx.show()
 
-chemicals = tmo.Chemicals(['Water', 'Ethanol'])
-chemicals.Ethanol.at_state('g')
-tmo.settings.set_thermo(chemicals)
-s1 = tmo.Stream('s1', Water=10, T=300)
-s2 = tmo.Stream('s2', Water=20, Ethanol=400, T=323)
-s3 = tmo.Stream('s3', T=20)
-s3.show()
-s3.mix_from([s1, s2])
-s3.show()
