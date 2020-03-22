@@ -446,7 +446,7 @@ class AnaerobicDigestion(bst.Unit):
         feed, cool_water = self.ins
         biogas, waste, sludge, hot_water = self.outs
         biogas.phase = 'g'
-        hot_water.link_with(cool_water)
+        hot_water.link_with(cool_water, TP=False)
         biogas.T = waste.T = sludge.T = T = 35+273.15
         hot_water.T = feed.T - 5
         H_at_35C = feed.thermo.mixture.H(z=feed.mol, phase='l', T=T, P=101325)
