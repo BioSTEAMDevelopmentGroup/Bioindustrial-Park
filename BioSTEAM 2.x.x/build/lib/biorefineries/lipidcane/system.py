@@ -118,7 +118,7 @@ S201 = units.VibratingScreen('S201',
 T202 = units.StorageTank('T202', tau=4, vessel_material='Carbon steel')
 
 # Heat up before adding acid
-H201 = units.HXutility('H201', T=343.15)
+H201 = units.HXutility('H201', T=343.15, V=0)
 
 # Mix in acid
 T203 = units.MixTank('T203')
@@ -138,7 +138,7 @@ T205 = units.MixTank('T205')
 M202 = units.Mixer('M202')
 
 # Heat before adding flocculant
-H202 = units.HXutility('H202', T=372.15)
+H202 = units.HXutility('H202', T=372.15, V=0)
 
 # Mix in flocculant
 T206 = units.MixTank('T206')
@@ -178,7 +178,7 @@ T207_2 = units.Splitter('T207_2',
                                    Water=1e-4))
 
 # Cool the oil
-H203 = units.HXutility('H203', T=343.15)
+H203 = units.HXutility('H203', T=343.15, V=0)
 
 # Screen out small fibers from sugar stream
 S202 = units.VibratingScreen('S202', outs=('', 'fiber_fines'),
@@ -343,7 +343,7 @@ H302 = units.HXprocess('H302', outs=('', 'stillage'),
 # Beer column
 xbot = mass2molar_ethanol_fraction(0.00001)
 ytop = mass2molar_ethanol_fraction(0.574)
-D302 = units.Distillation('D302', P=101325,
+D302 = units.BinaryDistillation('D302', P=101325,
                           y_top=ytop, x_bot=xbot, k=1.25,
                           LHK=('Ethanol', 'Water'),
                           tray_material='Stainless steel 304',
@@ -355,7 +355,7 @@ P302 = units.Pump('P302')
 M303 = units.Mixer('M303')
 
 ytop = mass2molar_ethanol_fraction(0.9061726)
-D303 = units.Distillation('D303', P=101325,
+D303 = units.BinaryDistillation('D303', P=101325,
                           y_top=ytop, x_bot=xbot, k=1.25,
                           LHK=('Ethanol', 'Water'),
                           is_divided=True,
@@ -605,7 +605,7 @@ T407 = units.MixTank('T407')
 P410 = units.Pump('P410')
 
 # Methanol/Water distillation column
-D401 = units.Distillation('D401',
+D401 = units.BinaryDistillation('D401',
                   LHK=('Methanol', 'Water'), P=101325,
                   y_top=0.99999, x_bot=0.0001, k=2.5,
                   is_divided=True,
@@ -620,7 +620,7 @@ w = 0.20/biodiesel_chemicals.Water.MW
 g = 0.80/biodiesel_chemicals.Glycerol.MW
 x_water = w/(w+g)
 
-D402 = units.Distillation('D402',
+D402 = units.BinaryDistillation('D402',
                     LHK=('Water', 'Glycerol'),
                     k=1.1,
                     P=101325,
@@ -775,3 +775,4 @@ lipidcane_tea = LipidcaneTEA(system=lipidcane_sys, IRR=0.15, duration=(2018, 203
                               supplies=0.20, maintenance=0.01, administration=0.005)
 lipidcane_sys.simulate()
 lipidcane_tea.IRR = lipidcane_tea.solve_IRR()
+
