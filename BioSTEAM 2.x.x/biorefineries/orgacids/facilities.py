@@ -9,7 +9,7 @@ Created on Fri Feb 28 09:53:03 2020
 # %% Setup
 
 import biosteam as bst
-from biosteam import Unit
+from biosteam import HeatUtility, Unit
 from biosteam.units.decorators import cost
 from thermosteam import Stream
 
@@ -24,6 +24,7 @@ class CIPpackage(bst.Facility):
     line = 'Clean in place package'
     _N_ins = 1
     _N_outs = 1
+    network_priority = 0
 
 
 # %% Boiler and turbogenerator
@@ -68,6 +69,24 @@ class OrganicAcidsBT(bst.units.Facility):
         Fraction of heat transfered to steam.
     turbo_generator_efficiency : float
         Fraction of steam heat converted to electricity.
+    agent : UtilityAgent
+        Steam produced.
+        
+    References
+    ----------
+    .. [1] Humbird, D., Davis, R., Tao, L., Kinchin, C., Hsu, D., Aden, A.,
+        Dudgeon, D. (2011). Process Design and Economics for Biochemical 
+        Conversion of Lignocellulosic Biomass to Ethanol: Dilute-Acid 
+        Pretreatment and Enzymatic Hydrolysis of Corn Stover
+        (No. NREL/TP-5100-47764, 1013269). https://doi.org/10.2172/1013269
+        
+    .. [2] Cortes-Peña, Y.; Kumar, D.; Singh, V.; Guest, J. S. 
+        BioSTEAM: A Fast and Flexible Platform for the Design, Simulation, 
+        and Techno-Economic Analysis of Biorefineries under Uncertainty. 
+        ACS Sustainable Chem. Eng. 2020, 8 (8), 3302–3310. 
+        https://doi.org/10.1021/acssuschemeng.9b07040.
+
+        
     """
 
     _N_ins = 6
@@ -76,24 +95,26 @@ class OrganicAcidsBT(bst.units.Facility):
     _units = {'Flow rate': 'kg/hr',
               'Work': 'kW'}
     
-    duty_over_mol = 45000 # Superheat steam with 40000 kJ/kmol
+    network_priority = 0
+    duty_over_mol = 40000 # Superheat steam with 40000 kJ/kmol
     boiler_blowdown = 0.03
-    RO_rejection = 0
+    RO_rejection = 0    
     generated_heat = 0
     total_steam = 0
+    
     plant_size_ratio = 1
     combustables = []
-    lps = bst.HeatUtility.get_heating_agent('low_pressure_steam')
+
     
     def __init__(self, ID='', ins=None, outs=(), *,
                  boiler_efficiency=0.80,
                  turbogenerator_efficiency=0.85, 
-                 combustables=[], plant_size_ratio=1):
+                 combustables=[], plant_size_ratio=1,
+                 agent=HeatUtility.get_heating_agent('low_pressure_steam')):
         Unit.__init__(self, ID, ins, outs)
         
-        lps = self.lps
-        self.makeup_water = makeup_water = Stream('boiler_makeup_water', 
-                                                  thermo=lps.thermo)
+        self.agent = agent
+        self.makeup_water = makeup_water = agent.to_stream('boiler_makeup_water')
         loss = makeup_water.flow_proxy()
         loss.ID = 'rejected_water_and_blowdown'
         self.ins[-1] = makeup_water
@@ -101,8 +122,7 @@ class OrganicAcidsBT(bst.units.Facility):
         self.boiler_efficiency = boiler_efficiency
         self.turbogenerator_efficiency = turbogenerator_efficiency
         self.steam_utilities = set()
-        self.steam_demand = Stream(None, thermo=lps.thermo, 
-                                   P=lps.P, T=lps.T, phase='g')
+        self.steam_demand = agent.to_stream()
         self.steam_demand.chemicals.set_synonym('Water', 'H2O')
     
     def _run(self):
@@ -116,7 +136,7 @@ class OrganicAcidsBT(bst.units.Facility):
         # Use combustion reactions to create outs
         combustion_rxns = self.chemicals.get_combustion_reactions()
         combustable_feeds = Stream(None)
-        combustable_feeds.copy_flow(emissions, combustables, remove=True)
+        combustable_feeds.copy_flow(emissions, tuple(combustables), remove=True)
         combustion_rxns(combustable_feeds.mol)
         emissions.mol += combustable_feeds.mol
         # Air usage not rigorously modeled, but can easily be added
@@ -145,13 +165,14 @@ class OrganicAcidsBT(bst.units.Facility):
         steam_utilities = self.steam_utilities
         generated_heat = self.generated_heat
         duty_over_mol = self.duty_over_mol
+        #: [float] Total steam produced by the boiler (kmol/hr)
         total_steam = self.total_steam = self.generated_heat / duty_over_mol
         
         if not steam_utilities:
             for u in self.system.units:
                 if u is self: continue
                 for hu in u.heat_utilities:
-                    if hu.ID == 'low_pressure_steam':
+                    if hu.ID == self.agent.ID:
                         steam_utilities.add(hu)
         steam.imol['H2O'] = steam_mol = sum([i.flow for i in steam_utilities])
         hu_cooling, hu_steam = self.heat_utilities
@@ -178,20 +199,10 @@ class OrganicAcidsBT(bst.units.Facility):
             electricity = H_electricity * TG_eff
             cooling = electricity - H_electricity
         hu_cooling(cooling, steam.T)
-        hu_steam.agent = self.lps
+        hu_steam.agent = self.agent
         hu_steam.cost = -sum([i.cost for i in steam_utilities])
-        Design['Work'] = electricity/3600
+        Design['Work'] = electricity/3600 #!!! what is this 3600?
 
     def _end_decorated_cost_(self):
         self.power_utility(self.power_utility.rate - self.design_results['Work'])
 
-# Simulation of ethanol production from sugarcane
-# in Brazil: economic study of an autonomous
-# distillery
-# Marina O.S. Diasa,b, Marcelo P. Cunhaa, Charles D.F. Jesusa, Mirna I.G.
-# Scandiffioa, Carlos E.V. Rossella,b, Rubens Maciel Filhob, Antonio Bonomia
-# a CTBE – Bioethanol Science and Technology National Laboratory, PO Box 6170 –
-# CEP 13083-970, Campinas – SP, Brazil, marina.dias@bioetanol.org.br
-# b School of Chemical Engineering, University of Campinas, PO Box 6066 – CEP
-# 13083-970, Campinas – SP, Brazil
-# LHV = 7565 # Bagasse lower heating value (kJ/kg)

@@ -396,7 +396,7 @@ class SeedTrain(Unit):
         effluent.imass['CO2'] += loss
         effluent.T = self.T
         vent.phase = 'g'
-        vent.recieve_vent(effluent)
+        vent.receive_vent(effluent)
 
     def _design(self): 
         maxvol = self.outs[1].F_vol*self.tau_turnover
@@ -615,7 +615,7 @@ class SaccharificationAndCoFermentation(Unit):
                             * 1.05
         effluent.mol += lime.mol
         self.neutralization_rxns(effluent.mol)
-        vent.recieve_vent(effluent)
+        vent.receive_vent(effluent)
     
     def _design(self):
         effluent = self.outs[1]
@@ -920,7 +920,7 @@ class AnaerobicDigestion(Unit):
         liquid_mol = self.multi_stream.imol['l']
         sludge.mol[:] = liquid_mol * self.sludge_split
         waste.mol[:] = liquid_mol - sludge.mol
-        biogas.recieve_vent(waste)     
+        biogas.receive_vent(waste)     
     
 class AerobicDigestion(Unit):
     """Anaerobic digestion system as modeled by Humbird 2011

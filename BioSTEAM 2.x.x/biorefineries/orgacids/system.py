@@ -51,14 +51,14 @@ from orgacids.process_settings import price
 from orgacids.chemicals import orgacids_chemicals, chemical_groups, soluble_organics, combustables
 from orgacids.tea import OrgacidsTEA
 
-bst.find.set_flowsheet(bst.Flowsheet('orgacids'))
+bst.main_flowsheet.set_flowsheet(bst.Flowsheet('orgacids'))
 #TODO: need to consider labor and chemical costs across different years \
 #      consider adding an Excel table of all indcies (CE, labor, chemical, GDP),
 #      so here just need to specify the cost-year wanted
 bst.CE = 541.7 # Year 2016
 System.maxiter = 200
 System.molar_tolerance = 1
-_GDP_2007to2016 = 1.114 / 0.961 #!!! should be changed to chemical/labor index
+_labor_2007to2016 = 22.71 / 19.55
 _kg_per_ton = 907.18474
 _ton_per_day = 2205 # 2000 metric tonne/day
 
@@ -104,7 +104,7 @@ U101 = units.FeedstockHandling('U101', ins=feedstock)
 U101.cost_items['System'].cost = 0
 U101.cost_items['System'].kW = 0
 
-feedstock_sys = System('feedstock_sys', network=(U101, ))
+feedstock_sys = System('feedstock_sys', path=(U101, ))
 Area100 = feedstock_sys
 
 
@@ -177,11 +177,11 @@ def update_ammonia():
     ammonia.imass['Ammonia'] = 4.8 * hydrolysate.F_vol # F_vol in m3/hr
 
 pretreatment_sys = System('pretreatment_sys',
-                   network=(T201, M201, M202, M203,
-                            R201, P201, T202, F201,
-                            M204, H201,
-                            update_ammonia,
-                            M205, M206, T203)
+                   path=(T201, M201, M202, M203,
+                         R201, P201, T202, F201,
+                         M204, H201,
+                         update_ammonia,
+                         M205, M206, T203)
                    )
 Area200 = pretreatment_sys
 
@@ -203,8 +203,10 @@ seed_train_DAP = Stream('seed_train_DAP', DAP=26, units='kg/hr')
 # Lime for neutralization of produced acid
 fermentation_lime = Stream('fermentation_lime', units='kg/hr')
 
-S301 = bst.units.InvSplitter('S301', ins='CSL', outs=(fermentation_CSL, seed_train_CSL))
-S302 = bst.units.InvSplitter('S302', ins='DAP', outs=(fermentation_DAP, seed_train_DAP))
+S301 = bst.units.ReversedSplitter('S301', ins='CSL', 
+                                  outs=(fermentation_CSL, seed_train_CSL))
+S302 = bst.units.ReversedSplitter('S302', ins='DAP', 
+                                  outs=(fermentation_DAP, seed_train_DAP))
 # 49 based on stream 302 in Humbird et al.
 H301 = units.HydrolysateCooler('H301', ins=T203-0, T=49+273.15)
 # Mix cellulase with the cooled pretreatment hydrolysate
@@ -256,11 +258,11 @@ def update_seed_train_CSL_DAP():
                             * saccharified_slurry_mass
 
 fermentation_sys = System('fermentation_sys',
-                   network=(H301,
-                            update_fermentation_CSL_DAP,
-                            M301, M302, R301,
-                            update_seed_train_CSL_DAP,
-                            S301, S302, M303, R302, T301, M304),
+                   path=(H301,
+                         update_fermentation_CSL_DAP,
+                         M301, M302, R301,
+                         update_seed_train_CSL_DAP,
+                         S301, S302, M303, R302, T301, M304),
                    recycle=M302-0)
 Area300 = fermentation_sys
 
@@ -346,10 +348,10 @@ R402 = units.EsterificationReactor('R402', ins=(F402-1, ethanol_spp))
 # Distillation to separate the ester from bottom
 #!!! Binary distillation in biosteam is currently used until development of 
 # multi-component distillation is completed
-S403 = bst.units.Distillation('S403', ins=R402-0,
-                              LHK=('EthylLactate', 'Furfural'),
-                              product_specification_format='Recovery',
-                              Lr=0.9, Hr=0.05, k=1.2)
+S403 = bst.units.BinaryDistillation('S403', ins=R402-0,
+                                    LHK=('EthylLactate', 'Furfural'),
+                                    product_specification_format='Recovery',
+                                    Lr=0.9, Hr=0.05, k=1.2)
 
 #!!! Special _run function needed because of unknown issues with Distillation,
 # hopefully this can be resolved after changing to multi-component distillation
@@ -373,10 +375,10 @@ H403 = units.WasteVaporCondenser('H403', ins=S403-0, T=350, V=0)
 R403 = units.HydrolysisReactor('R403', ins=(H403-0, separation_hydrolysis_water))
 
 # To get the final acid product
-S404 = bst.units.Distillation('S404', ins=R403-0,
-                              LHK=('AceticAcid', 'EthylLactate'),
-                              product_specification_format='Recovery',
-                              Lr=0.9, Hr=0.9, k=1.2)
+S404 = bst.units.BinaryDistillation('S404', ins=R403-0,
+                                    LHK=('AceticAcid', 'EthylLactate'),
+                                    product_specification_format='Recovery',
+                                    Lr=0.9, Hr=0.9, k=1.2)
 
 # Condense waste vapors
 H404 = units.WasteVaporCondenser('H404', ins=S404-0, T=350, V=0)
@@ -385,10 +387,10 @@ H404 = units.WasteVaporCondenser('H404', ins=S404-0, T=350, V=0)
 # H404 = units.WasteVaporCondenser('H404', ins=S404-0, V=0, rigorous=True)
 
 # Seperate out Ethanol
-S405 = bst.units.Distillation('S405', ins=H404-0,
-                              LHK=('Ethanol', 'H2O'),
-                              product_specification_format='Recovery',
-                              Lr=0.9, Hr=0.9, k=1.2)
+S405 = bst.units.BinaryDistillation('S405', ins=H404-0,
+                                    LHK=('Ethanol', 'H2O'),
+                                    product_specification_format='Recovery',
+                                    Lr=0.9, Hr=0.9, k=1.2)
 # Condense Ethanol
 H405 = units.WasteVaporCondenser('H405', ins=S405-0, T=350, V=0)
 #!!! Check if the mixed phase issus has been solved when using rigorous=True,
@@ -408,15 +410,15 @@ def update_separation_sulfuric_acid():
     separation_sulfuric_acid.imol['H2SO4'] = R401.ins[1].imol['H2SO4']
 
 separation_sys = System('separation_sys',
-                         network=(update_stripping_water,
-                                  U401, M401, S401,
-                                  R401, update_separation_sulfuric_acid,
-                                  T401, M402, S402, 
-                                  F401, H401,
-                                  F402, H402, R402,
-                                  S403,
-                                  H403, R403, S404, 
-                                  H404, S405, H405, M403)
+                         path=(update_stripping_water,
+                               U401, M401, S401,
+                               R401, update_separation_sulfuric_acid,
+                               T401, M402, S402, 
+                               F401, H401,
+                               F402, H402, R402,
+                               S403,
+                               H403, R403, S404, 
+                               H404, S405, H405, M403)
                         )
 Area400 = separation_sys
 
@@ -576,13 +578,13 @@ def update_aerobic_input_streams():
     air_lagoon.mol = air_lagoon.mol * M502.outs[0].F_mass / 28626
 
 aerobic_digestion_sys = System('aerobic_digestion_sys',
-                               network=(M502, R502, S501, S502, M503, M504, S503),
+                               path=(M502, R502, S501, S502, M503, M504, S503),
                                recycle=M502-0)
 aerobic_digestion_sys.converge_method = 'Fixed point'
 wastewater_sys = System('wastewater_sys',
-                        network=(M501, WWT_cost, R501, 
-                                 update_aerobic_input_streams,
-                                 aerobic_digestion_sys, S504, M505)
+                        path=(M501, WWT_cost, R501, 
+                              update_aerobic_input_streams,
+                              aerobic_digestion_sys, S504, M505)
                         )
 Area600 = wastewater_sys
 
@@ -628,9 +630,9 @@ plant_air_in = Stream('plant_air_in',
                       O2=0.21*83333*plant_size_ratio)
 
 # Total needed sulfuric acid for pretreatment and separation
-S601 = bst.units.InvSplitter('S601', ins='sulfuric_acid', 
-                             outs=(pretreatment_sulfuric_acid, 
-                                   separation_sulfuric_acid))
+S601 = bst.units.ReversedSplitter('S601', ins='sulfuric_acid', 
+                                  outs=(pretreatment_sulfuric_acid, 
+                                        separation_sulfuric_acid))
 T601 = units.SulfuricAcidStorageTank('T601', ins=sulfuric_acid_fresh, outs=0-S601)
 T601.line = 'Sulfuric acid storage tank'
 T602 = units.AmmoniaStorageTank('T602', ins=ammonia_fresh, outs=ammonia)
@@ -641,8 +643,8 @@ T604 = units.DAPStorageTank('T604', ins=DAP_fresh, outs=0-S302)
 T604.line = 'DAP storage tank'
 T605 = units.LimeStorageTank('T605', ins=lime_fresh, outs='lime')
 T605.line = 'Lime storage tank'
-S602 = bst.units.InvSplitter('S602', ins=T605-0, 
-                             outs=(fermentation_lime, FGD_lime))
+S602 = bst.units.ReversedSplitter('S602', ins=T605-0, 
+                                  outs=(fermentation_lime, FGD_lime))
 # Lactic acid product stream
 P601 = bst.units.Pump('P601', ins=S404-1)
 # For acid storage, 7-day storage time as in Humbird et al.
@@ -692,8 +694,8 @@ CWP.outs[0].ID = 'cilled_water'
 PWC = bst.units.facilities.ProcessWaterCenter('PWC',
                                               ins=(S504-0, makeup_water),
                                               outs=PWC_water_out)
-S604 = bst.units.InvSplitter('S604', ins=PWC_water_out, 
-                             outs=(process_water, discharged_water))
+S604 = bst.units.ReversedSplitter('S604', ins=PWC_water_out, 
+                                  outs=(process_water, discharged_water))
 process_water_streams = (WWT_caustic, stripping_water, warm_process_water, steam,
                          pretreatment_acid_water, recycled_water,
                          separation_acid_water, separation_hydrolysis_water,
@@ -716,17 +718,17 @@ def update_fresh_streams():
     denaturant_fresh.copy_flow(denaturant)
 
 # Boiler turbogenerator potentially has different depreciation schedule thus set aside
-boiler_sys = System('boiler_sys', network=(BT,))
+boiler_sys = System('boiler_sys', path=(BT,))
 # All units in facilities except boiler turbogenerator
 facilities_sys = System('facilities_sys',
-                        network=(CIP, ADP, FWT, BT, J601,
-                                 S601, T601, T602, T603, T604, S602, T605,
-                                 P601, T606, S603, T607, M601, P602, T608, 
-                                 CT, J602,
-                                 update_process_water,
-                                 CWP, S604, PWC, 
-                                 update_discharged_water,
-                                 update_fresh_streams)
+                        path=(CIP, ADP, FWT, BT, J601,
+                              S601, T601, T602, T603, T604, S602, T605,
+                              P601, T606, S603, T607, M601, P602, T608, 
+                              CT, J602,
+                              update_process_water,
+                              CWP, S604, PWC, 
+                              update_discharged_water,
+                              update_fresh_streams)
                                  )
 # Area 600 includes all facility units (boiler turbogeneration and others)
 Area600 = facilities_sys
@@ -735,12 +737,12 @@ Area600 = facilities_sys
 # %% Complete system
 
 orgacids_sys = System('orgacids_sys',
-                      network=(feedstock_sys,
-                               pretreatment_sys,
-                               fermentation_sys,
-                               separation_sys,
-                               wastewater_sys
-                               ),
+                      path=(feedstock_sys,
+                            pretreatment_sys,
+                            fermentation_sys,
+                            separation_sys,
+                            wastewater_sys
+                            ),
                       facilities=(CIP, ADP, FWT, BT, J601,
                                   S601, T601, T602, T603, T604, S602, T605,
                                   P601, T606, S603, T607, M601, P602, T608, 
@@ -766,7 +768,7 @@ orgacids_sys_no_boiler_tea = OrgacidsTEA(
         warehouse=0.04, site_development=0.09, additional_piping=0.045,
         proratable_costs=0.10, field_expenses=0.10, construction=0.20,
         contingency=0.10, other_indirect_costs=0.10, 
-        labor_cost=2.5e6*_GDP_2007to2016*plant_size_ratio, #!!! Needs updating
+        labor_cost=2.5e6*_labor_2007to2016*plant_size_ratio,
         labor_burden=0.90, property_insurance=0.007, maintenance=0.03)
 orgacids_sys_no_boiler_tea.units.remove(BT)
 
