@@ -9,47 +9,56 @@ from biosteam import TEA
 __all__ = ('LipidcaneTEA',)
 
 class LipidcaneTEA(TEA):
-    """Create a LipidcaneTEA object for techno-economic analysis of a biorefinery [1]
+    """
+    Create a TEA_lipidcane object for techno-economic analysis of a biorefinery [1]_.
     
-    **Parameters**
-        
-            **system:** [System] Should contain feed and product streams.
-            
-            **IRR:** [float]  Internal rate of return (fraction).
-            
-            **duration:** tuple[int, int] Start and end year of venture (e.g. (2018, 2038)).
-            
-            **depreciation:** [str] 'MACRS' + number of years (e.g. 'MACRS7').
-            
-            **operating_days:** [float] Number of operating days per year.
-            
-            **income_tax:** [float] Combined federal and state income tax rate (fraction).
-            
-            **lang_factor:** [float] Lang factor for getting fixed capital investment from total purchase cost. If no lang factor, estimate capital investment using bare module factors.
-            
-            **startup_schedule:** tuple[float] Startup investment fractions per year (e.g. (0.5, 0.5) for 50% capital investment in the first year and 50% investment in the second).
-            
-            **WC_over_FCI**: [float] Working capital as a fraction of fixed capital investment.
-    
-            **labor_cost:** [float] Total labor cost (USD/yr).
+    Parameters
+    ----------    
+    system : System
+        Should contain feed and product streams.
+    IRR : float
+        Internal rate of return (fraction).
+    duration : tuple[int, int]
+        Start and end year of venture (e.g. (2018, 2038)).
+    depreciation : str
+        'MACRS' + number of years (e.g. 'MACRS7').
+    operating_days : float
+        Number of operating days per year.
+    income_tax : float
+        Combined federal and state income tax rate (fraction).
+    lang_factor : float
+        Lang factor for getting fixed capital investment from
+        total purchase cost. If no lang factor, estimate capital investment
+        using bare module factors.
+    startup_schedule : tuple[float]
+        Startup investment fractions per year 
+        (e.g. (0.5, 0.5) for 50% capital investment in the first year and 50%
+        investment in the second).
+    WC_over_FCI : float
+        Working capital as a fraction of fixed capital investment.
+    labor_cost : float
+        Total labor cost (USD/yr).
+    fringe_benefits : float
+        Cost of fringe benefits as a fraction of labor cost.
+    property_tax : float
+        Fee as a fraction of fixed capital investment.
+    property_insurance : float
+        Fee as a fraction of fixed capital investment.    
+    supplies : float
+        Yearly fee as a fraction of labor cost.
+    maintenance : float
+        Yearly fee as a fraction of fixed capital investment.
+    administration : float
+        Yearly fee as a fraction of fixed capital investment.
 
-            **fringe_benefits:** [float] Cost of fringe benefits as a fraction of labor cost.
-            
-            **property_tax:** [float] Fee as a fraction of fixed capital investment.
-
-            **property_insurance:** [float] Fee as a fraction of fixed capital investment.    
-    
-            **supplies:** [float] Yearly fee as a fraction of labor cost.
-
-            **maintenance:** [float] Yearly fee as a fraction of fixed capital investment.
-
-            **administration:** [float] Yearly fee as a fraction of fixed capital investment.
-        
-    **References**
-    
-        [1] Huang, H., Long, S., & Singh, V. (2016). Techno-economic analysis of biodiesel and ethanol co-production from lipid-producing sugarcane. Biofuels, Bioproducts and Biorefining, 10(3), 299–315. https://doi.org/10.1002/bbb.1640
+    References
+    ----------
+    .. [1] Huang, H., Long, S., & Singh, V. (2016). Techno-economic analysis of biodiesel
+        and ethanol co-production from lipid-producing sugarcane. Biofuels, Bioproducts
+        and Biorefining, 10(3), 299–315. https://doi.org/10.1002/bbb.1640
     
     """
+    
     __slots__ = ('labor_cost', 'fringe_benefits', 'maintenance',
                  'property_tax', 'property_insurance', '_FCI_cached',
                  'supplies', 'maintanance', 'administration')

@@ -42,7 +42,7 @@ def find_split(IDs, flow0, flow1):
 
 # %% Streams
 
-bst.find.set_flowsheet(bst.Flowsheet('cornstover'))
+bst.main_flowsheet.set_flowsheet(bst.Flowsheet('cornstover'))
 pretreatment_chemical_IDs = ['Acetate', 'AceticAcid', 'Arabinan', 'Ash', 'Cellulase',
                              'Ethanol', 'Extract', 'Furfural', 'Glucan', 'Glucose',
                              'GlucoseOligomer', 'Water', 'H2SO4', 'HMF', 'Lignin',
@@ -163,7 +163,7 @@ def update_cellulase_and_nutrient_loading():
     CSL2.mol[:] = CSL2_over_hydrolyzate * F_mas_cooled_hydrolyzate
     
 pretreatment_sys = System('pretreatment_sys',
-               network=(U101, T201, M201, M202, M203,
+               path=(U101, T201, M201, M202, M203,
                         R201, P201, T202, F201, M204,
                         H201, M210, M205, T203, T203,
                         H301,
@@ -194,7 +194,7 @@ DAP2 = Stream('DAP2',
                 price=price['DAP'])
 DAP_storage = units.DAPTank('DAP_storage', ins=Stream('DAP_fresh'), outs='DAP')
 
-S301 = bst.InvSplitter('S301', ins=DAP_storage-0, outs=(DAP1, DAP2))
+S301 = bst.ReversedSplitter('S301', ins=DAP_storage-0, outs=(DAP1, DAP2))
 CSL1 = Stream('CSL1',
                 CSL=211,
                 units='kg/hr',
@@ -205,7 +205,7 @@ CSL2 = Stream('CSL2',
                 price=price['CSL'])
 CSL_storage = units.CSLTank('CSL_storage', ins=Stream('CSL_fresh'), outs='CSL')
 
-S302 = bst.InvSplitter('S302', ins=CSL_storage-0, outs=(CSL1, CSL2))
+S302 = bst.ReversedSplitter('S302', ins=CSL_storage-0, outs=(CSL1, CSL2))
 denaturant = Stream('denaturant',
                     Octane=230.69,
                     units='kg/hr',
@@ -227,7 +227,7 @@ T301 = units.SeedHoldTank('T301', ins=R302-1)
 T301-0-1-M302
 
 fermentation_sys = System('fermentation_sys',
-               network=(update_cellulase_and_nutrient_loading,
+               path=(update_cellulase_and_nutrient_loading,
                         J1, M302, R301, M303, R302, T301),
                recycle=M302-0)
 
@@ -253,7 +253,7 @@ H401 = bst.HXprocess('H401', ins=(T302-0, None),
 # Beer column
 xbot = Ethanol_molfrac(0.00001)
 ytop = Ethanol_molfrac(0.50)
-D402 = bst.Distillation('D402', ins=H401-0,
+D402 = bst.BinaryDistillation('D402', ins=H401-0,
                        P=101325, y_top=ytop, x_bot=xbot,
                        k=1.25, LHK=('Ethanol', 'Water'))
 D402.tray_material = 'Stainless steel 304'
@@ -267,7 +267,7 @@ P401-0-1-H401
 M402 = bst.Mixer('M402', ins=(D402-0, None))
 
 ytop = Ethanol_molfrac(0.915)
-D403 = bst.Distillation('D403', ins=M402-0,
+D403 = bst.BinaryDistillation('D403', ins=M402-0,
                        P=101325, y_top=ytop, x_bot=xbot,
                        k=1.25, LHK=('Ethanol', 'Water'))
 D403.tray_material = 'Stainless steel 304'
@@ -290,7 +290,7 @@ U401 = bst.MolecularSieve('U401', ins=H402-0,
 U401-0-1-M402
 
 ethanol_recycle_sys = System('ethanol_recycle_sys',
-                             network=(M402, D403, H402, U401),
+                             path=(M402, D403, H402, U401),
                              recycle=M402-0)
 
 # Condense ethanol product
@@ -328,7 +328,7 @@ def update_stripping_water():
     stripping_water.mol[:] = stripping_water_over_vent * vent_stream.F_mass
 
 puresys = System('purification',
-                 network=(M304,
+                 path=(M304,
                           update_stripping_water,
                           D401, 
                           M401, T302,
@@ -511,7 +511,7 @@ S604 = bst.Splitter('S604', ins=S601-0, outs=('treated_water', 'waste_brine'),
                   split=find_split(brine_species, S626_flow, S627_flow))
 
 aerobic_digestion_sys = System('aerobic_digestion_sys',
-                               network=(M602, R602, S601, S602, M604, S603, M603),
+                               path=(M602, R602, S601, S602, M604, S603, M603),
                                recycle=M602-0)
 
 # %% Facilities
@@ -576,7 +576,7 @@ FT = units.FireWaterTank('FT',
 # %% Complete system
 
 cornstover_sys = System('cornstover_sys',
-                        network=(pretreatment_sys, fermentation_sys, puresys, J2, S401,
+                        path=(pretreatment_sys, fermentation_sys, puresys, J2, S401,
                                  J3, J4, J5, M601, WWTC, R601,
                                  update_aerobic_input_streams,
                                  aerobic_digestion_sys, S604),

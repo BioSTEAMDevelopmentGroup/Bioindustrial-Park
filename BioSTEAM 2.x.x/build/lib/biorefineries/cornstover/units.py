@@ -34,15 +34,14 @@ _Gcal2kJ = 4184e3
 
 class SteamMixer(Unit):
     """
-    **ins**
+    ins : stream sequence
     
         [0] Feed
         
         [1] Steam
     
-    **outs**
-    
-        [0] Mixed
+    outs : stream
+        Mixed product.
     
     """
     _N_outs = 1
@@ -339,7 +338,7 @@ class SaccharificationAndCoFermentation(Unit):
         self.loss(effluent.mol)
         self.cofermentation(effluent.mol)
         self.CSL2constituents(effluent.mass)
-        vent.recieve_vent(effluent)
+        vent.receive_vent(effluent)
     
     def _design(self):
         effluent = self.outs[1]
@@ -386,11 +385,11 @@ class SaccharificationAndCoFermentation(Unit):
       cost=7e4, CE=521.9, S=28630, n=0.8, BM=1.7)
 @cost('Flow rate', 'Pressure filter',
       cost=3294700, CE=551, S=31815, n=0.8, BM=1.7)
-@cost('Flow rate', 'Pressing air compressor reciever tank',
+@cost('Flow rate', 'Pressing air compressor receiver tank',
       cost=8e3, CE=551, S=31815, n=0.7, BM=3.1)
 @cost('Flow rate', 'Cloth wash pump', kW=150*_hp2kW,
       cost=29154, CE=551, S=31815, n=0.8, BM=2.3)
-@cost('Flow rate', 'Dry air compressor reciever tank',
+@cost('Flow rate', 'Dry air compressor receiver tank',
       cost=17e3, CE=551, S=31815, n=0.7, BM=3.1)
 @cost('Flow rate', 'Pressing air pressure filter',
       cost=75200, CE=521.9, S=31815, n=0.6, kW=112, BM=1.6)
@@ -411,19 +410,19 @@ class WasteWaterSystemCost(bst.Unit): pass
 class AnaerobicDigestion(bst.Unit):
     """Anaerobic digestion system as modeled by Humbird 2011
     
-    **Parameters**
-    
-        **reactions:** [ReactionSet] Anaerobic digestion reactions.
+    Parameters
+    ----------
+    reactions : ReactionSet 
+        Anaerobic digestion reactions.
+    sludge_split : Array Split between waste water and sludge
         
-        **sludge_split:** [Array] Split between waste water and sludge
-        
-    **ins**
+    ins : stream sequence
     
         [0] Waste water
         
         [1] Cool well water
         
-    **outs**
+    outs : stream sequence
     
         [0] Biogas
         
@@ -447,7 +446,7 @@ class AnaerobicDigestion(bst.Unit):
         feed, cool_water = self.ins
         biogas, waste, sludge, hot_water = self.outs
         biogas.phase = 'g'
-        hot_water.link_with(cool_water)
+        hot_water.link_with(cool_water, TP=False)
         biogas.T = waste.T = sludge.T = T = 35+273.15
         hot_water.T = feed.T - 5
         H_at_35C = feed.thermo.mixture.H(z=feed.mol, phase='l', T=T, P=101325)
@@ -460,19 +459,22 @@ class AnaerobicDigestion(bst.Unit):
         liquid_mol = self.multi_stream.imol['l']
         sludge.mol[:] = liquid_mol * self.sludge_split
         waste.mol[:] = liquid_mol - sludge.mol
-        biogas.recieve_vent(waste, accumulate=True)
+        biogas.receive_vent(waste, accumulate=True)
         
     
 class AerobicDigestion(bst.Unit):
-    """Anaerobic digestion system as modeled by Humbird 2011
+    """
+    Anaerobic digestion system as modeled by Humbird 2011
     
-    **Parameters**
+    Parameters
+    ----------
+    reactions : ReactionSet
+        Anaerobic digestion reactions.
     
-        **reactions:** [ReactionSet] Anaerobic digestion reactions.
+    sludge_split : Array
+        Split between waste water and sludge
         
-        **sludge_split:** [Array] Split between waste water and sludge
-        
-    **ins**
+    ins : stream sequence
     
         [0] Waste water
         
@@ -480,7 +482,7 @@ class AerobicDigestion(bst.Unit):
         
         [2] Caustic
         
-    **outs**
+    outs : stream sequence
     
         [0] Vent
         
@@ -512,6 +514,7 @@ class AerobicDigestion(bst.Unit):
       S=63, cost=421e3, CE=522, BM=1.8, n=0.6)
 class CIPpackage(bst.Facility):
     line = 'CIP Package'
+    network_priority = 0
     _N_ins = 1
     _N_outs = 1
     

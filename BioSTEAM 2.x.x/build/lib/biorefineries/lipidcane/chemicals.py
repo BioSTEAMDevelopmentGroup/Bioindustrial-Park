@@ -39,17 +39,17 @@ def create_new_chemical(ID, phase='s', **constants):
 
 Ash = create_new_chemical('Ash', MW=1.)
 Cellulose = create_new_chemical('Cellulose',
-                                formula="C6H10O5", # Glucose monomer
+                                formula="C6H10O5", # Glucose monomer minus water
                                 MW=162.14,
                                 Hf=-975708.8)
 Hemicellulose = create_new_chemical('Hemicellulose',
-                                    formula="C5H8O5", # Xylose monomer
+                                    formula="C5H8O5", # Xylose monomer minus water
                                     MW=132.12,
                                     Hf=-761906.4)
 Flocculant = create_new_chemical('Flocculant',
                                  MW=1.)
 Lignin = create_new_chemical('Lignin',
-                             formula='C8H8O3',
+                             formula='C8H8O3', # Vainillin
                              MW=152.15,
                              Hf=-452909.632)
 Solids = create_new_chemical('Solids', MW=1.)
