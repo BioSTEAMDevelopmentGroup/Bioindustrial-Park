@@ -743,26 +743,6 @@ PWC = units.ProcessWaterCenter('PWC',
 connect_lipid = units.Junction('J2', lipid, oil,
                                ('Lipid',))
 
-# %% Perform TEA
-
-# transesterification_path = (connect_lipid, T403, P403, R401, C401, P405, R402, PS5, C402)
-# glycerol_recycle_sys = bst.System('glycerol_recycle_sys',
-#                                   path=(PS6, PS7, T405, P406, C403, F401,
-#                                         H401, P408, P407, T406, P409,
-#                                         C404, T407, P410, H402, D401,
-#                                         D402, PS8, H404, P412),
-#                                   recycle=D402-0)    
-# meoh_path = (H403, P411, T401, P401, T402, P402, T404, P404, S401)
-
-# facilities = bst.main_flowsheet.get_facilities()
-# lipidcane_sys = bst.System('lipidcane_sys',
-#                            pretreatment_and_ethanol_production_path
-#                            + transesterification_path
-#                            + (glycerol_recycle_sys, B401)
-#                            + meoh_path
-#                            + (T408, T409),
-#                            facilities=facilities)
-
 lipidcane_sys = bst.main_flowsheet.create_system('lipidcane_sys',
                                                  ends=(*S401.outs, P408-0))
 
