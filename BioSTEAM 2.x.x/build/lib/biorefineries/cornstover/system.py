@@ -501,14 +501,8 @@ S603 = bst.Splitter('S603', ins=M604-0, outs=('', 'sludge'),
                   split=find_split(centrifuge_species, S616_flow, S623_flow))
 S603-0-1-M603
 
-brine_species = ('Water',  'Xylose', 'OtherSugars', 'SugarOligomers',
-                 'OrganicSolubleSolids', 'InorganicSolubleSolids', 'Furfurals',
-                 'OtherOrganics', 'CO2', 'COxSOxNOxH2S')
-S627_flow = np.array([4967, 1, 1, 1, 79, 4828, 1, 3, 44])
-S626_flow = np.array([376324, 0, 0,0, 0, 0,    0,  0, 0])
-
 S604 = bst.Splitter('S604', ins=S601-0, outs=('treated_water', 'waste_brine'),
-                  split=find_split(brine_species, S626_flow, S627_flow))
+                  split={'Water': 0.987})
 
 aerobic_digestion_sys = System('aerobic_digestion_sys',
                                path=(M602, R602, S601, S602, M604, S603, M603),
