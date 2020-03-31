@@ -406,19 +406,18 @@ BT = units.BoilerTurbogenerator('BT',
 bst.Stream.ticket_number = 600
 
 CT = units.CoolingTower('CT')
-process_water_streams = (stream.cooling_tower_makeup_water,
-                         stream.boiler_makeup_water)
+makeup_water_streams = (stream.cooling_tower_makeup_water,
+                        stream.boiler_makeup_water)
+process_water_streams = (stream.imbibition_water,
+                         *makeup_water_streams)
 makeup_water = bst.Stream('makeup_water', price=0.000254)
-process_water = bst.Stream('process_water')
-def update_recycled_process_water():
-    process_water.imol['Water'] = sum([stream.imol['Water'] 
-                                       for stream in process_water_streams])
 
 CWP = units.ChilledWaterPackage('CWP')
 PWC = units.ProcessWaterCenter('PWC',
-                               ('recycle_water', makeup_water),
-                               process_water,
-                               update_recycled_process_water)
+                               (M305-0, makeup_water),
+                               (),
+                               makeup_water_streams,
+                               process_water_streams)
 
 # %% Perform TEA
 

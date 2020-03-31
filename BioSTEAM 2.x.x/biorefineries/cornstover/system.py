@@ -523,19 +523,19 @@ CWP = bst.facilities.ChilledWaterPackage('CWP')
 CT = bst.facilities.CoolingTower('CT')
 CT.outs[1].T = 273.15 + 28
 water_thermo = tmo.Thermo(tmo.Chemicals(['Water']))
-process_water = tmo.Stream(ID='process_water',
-                           thermo=water_thermo)
 
-process_water_streams = (caustic, stripping_water,  warm_process_water, steam, BT-1, CT-1)
-
-def update_water_loss():
-    process_water.imol['Water'] = sum([i.imol['Water'] for i in process_water_streams])
+process_water_streams = (caustic,
+                         stripping_water,
+                         warm_process_water,
+                         steam, BT-1, CT-1)
         
 makeup_water = Stream('makeup_water', thermo=water_thermo, price=price['Makeup water'])
 
 PWC = bst.facilities.ProcessWaterCenter('PWC',
-                                        ins=(S604-0, makeup_water),
-                                        outs=(process_water,))
+                                        (S604-0, makeup_water),
+                                        (),
+                                        (BT-1, CT-1),
+                                        process_water_streams)
 J4 = BT.outs[-1] - bst.Junction('J4') - 2**M601
 J5 = CT.outs[1] - bst.Junction('J5') - 3**M601
 
@@ -574,7 +574,7 @@ cornstover_sys = System('cornstover_sys',
                                  J3, J4, J5, M601, WWTC, R601,
                                  update_aerobic_input_streams,
                                  aerobic_digestion_sys, S604),
-                        facilities=(M501, CWP, BT, CT, update_water_loss,
+                        facilities=(M501, CWP, BT, CT,
                                     PWC, ADP, update_lime_boilerchems_and_ash,
                                     CIP_package, S301, S302, DAP_storage,
                                     CSL_storage, FT))

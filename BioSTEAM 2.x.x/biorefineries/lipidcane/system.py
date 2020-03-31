@@ -255,7 +255,7 @@ P202-0-PS3
 (C201-1, rvf_wash_water)-C202-1-P203
 
 C201-0-T207-T207_2-0-H203
-(H203-0, oil_wash_water)-T208-C203-0-F201
+(H203-0, oil_wash_water-PS2-0)-T208-C203-0-F201
 T207-T207_2-1-S202
 
 lipid = F201-1
@@ -725,20 +725,21 @@ BT = units.BoilerTurbogenerator('BT',
 bst.Stream.ticket_number = 600
 
 CT = units.CoolingTower('CT')
-process_water_streams = (stream.biodiesel_wash_water,
-                         stream.cooling_tower_makeup_water,
-                         stream.boiler_makeup_water)
+makeup_water_streams = (stream.cooling_tower_makeup_water,
+                        stream.boiler_makeup_water)
+
+process_water_streams = (stream.imbibition_water,
+                         stream.biodiesel_wash_water,
+                         *makeup_water_streams)
+
 makeup_water = bst.Stream('makeup_water', price=0.000254)
-process_water = bst.Stream('process_water')
-def update_recycled_process_water():
-    process_water.imol['Water'] = sum([stream.imol['Water'] 
-                                       for stream in process_water_streams])
 
 CWP = units.ChilledWaterPackage('CWP')
 PWC = units.ProcessWaterCenter('PWC',
-                               ('recycle_water', makeup_water),
-                               process_water,
-                               update_recycled_process_water)
+                               (M305-0, makeup_water),
+                               (),
+                               makeup_water_streams,
+                               process_water_streams)
 
 connect_lipid = units.Junction('J2', lipid, oil,
                                ('Lipid',))
