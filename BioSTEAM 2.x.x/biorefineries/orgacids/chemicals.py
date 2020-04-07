@@ -21,8 +21,10 @@ __all__ = ('orgacids_chemicals', 'chemical_groups', 'soluble_organics', 'combust
 # %% Batch-create chemical objects available in database
 
 # All involved chemicals
+# Some common names might not be pointing to the correct chemical,
+# therefore more accurate ones were used (e.g. NitricOxide was used instead of NO)
 chemical_IDs = [
-        'H2O', 'Ethanol', 'Glucose', 'Galactose',
+        'H2O', 'Glucose', 'Galactose',
         'Mannose', 'Xylose', 'Arabinose', 'Cellobiose',
         'Sucrose', 'GlucoseOligomer', 'GalactoseOligomer',
         'MannoseOligomer', 'XyloseOligomer', 'ArabinoseOligomer',
@@ -37,13 +39,16 @@ chemical_IDs = [
         # For combustion reaction
         'P4O10',
         # Names changed ones
-        'FermMicrobeGlu', 'FermMicrobeXyl', 'BoilerChemicals',
-        # Organic acid related ones
-        'LacticAcid',
-        'CalciumLactate', 'CalciumAcetate', 
-        'EthylLactate', 'EthylAcetate'
-        #'HydroxypropionicAcid', 'AdipicAcid', 'ButyricAcid', 'CitricAcid',
-        #'LacticAcid', 'CisCis-MuconicAcid', 'PropionicAcid', 'SuccinicAcid',
+        'BoilerChemicals',
+        # Newly added ones
+        'LacticAcid', 'Methanol',
+        'CalciumLactate', 'CalciumAcetate',
+        'MethylLactate', 'MethylAcetate',
+        'Na2SO4',
+        # Probably not needed ones
+        'Ethanol',
+        'EthylLactate', 'EthylAcetate',
+        'FermMicrobeGlu', 'FermMicrobeXyl'
         ]
 
 # Codes to test which ones are available in the database, this is only needed
@@ -64,21 +69,12 @@ for chemical in chemical_IDs:
     except:
         not_available_chemicals.append(chemical)
 
+# print(available_chemicals_dict.keys())
+
 # # Check molecular formula
 # import pandas as pd
 # chemical_formula = pd.DataFrame.from_dict(available_chemicals_dict, orient='index')
 # print(chemical_formula)
-
-# print(available_chemicals_dict.keys())
-# # N.B. Some common names might not be pointing to the correct chemical,
-# # therefore more accurate ones were used (e.g. NitricOxide was used instead of NO)
-# dict_keys(['H2O', 'Ethanol', 'Glucose', 'Galactose', 'Mannose', 'Xylose', 'Arabinose', 
-#            'Cellobiose', 'Sucrose', 'HMF', 'Furfural', 'AceticAcid', 'Xylitol', 
-#            'NH3', 'H2SO4', 'AmmoniumAcetate', 'HNO3', 'NaNO3', 'NaOH', 'Mannan', 
-#            'Glucan', 'Lignin', 'Acetate', 'CalciumDihydroxide', 'CaSO4', 'N2', 
-#            'O2', 'CO2', 'CH4', 'H2S', 'SO2', 'NitricOxide', 'CarbonMonoxide', 
-#            'AmmoniumSulfate', 'NO2', 'P4O10', 'LacticAcid', 'CalciumLactate', 
-#            'CalciumAcetate', 'EthylLactate', 'EthylAcetate'])
 
 # if len(available_chemicals_dict) == len(chems):
 #     print('Mission complete for batch-creating available chemicals!')
@@ -125,6 +121,8 @@ chems.P4O10.Hf = -713.2*_cal2joule
 # NIST https://webbook.nist.gov/cgi/cbook.cgi?ID=C50215&Mask=4
 chems.LacticAcid.Hfus = 11.34e3
 # Reference DIPPR value in Table 3 of Vatani et al., Int J Mol Sci 2007, 8 (5), 407–432
+chems.MethylLactate.Hf = -643.1e3
+# Reference DIPPR value in Table 3 of Vatani et al., Int J Mol Sci 2007, 8 (5), 407–432
 chems.EthylLactate.Hf = -695.08e3
 # From a Ph.D. dissertation (Lactic Acid Production from Agribusiness Waste Starch 
 # Fermentation with Lactobacillus Amylophilus and Its Cradle-To-Gate Life 
@@ -136,6 +134,8 @@ chems.EthylLactate.Hf = -695.08e3
 chems.CalciumLactate.Hf = -1686.1e3
 # Lange's Handbook of Chemistry, 15th edn., Table 6.3, PDF page 631
 chems.CalciumAcetate.Hf = -1514.73e3
+# NIST https://webbook.nist.gov/cgi/cbook.cgi?ID=C7757826&Mask=2
+chems.Na2SO4.Hf = -1356.38e3
 
 chems.Glucan.InChI = chems.Glucan.formula = 'C6H10O5'
 chems.Glucan.phase_ref='s'
@@ -151,13 +151,6 @@ chems.Arabinose.copy_missing_slots_from(chems.Xylose)
 
 # %% Create chemicals not available in database,
 # data from Humbird et al. unless otherwise noted
-
-# print(not_available_chemicals)
-# ['GlucoseOligomer', 'GalactoseOligomer', 'MannoseOligomer', 'XyloseOligomer', 
-#   'ArabinoseOligomer', 'Extract', 'SolubleLignin', 'DAP', 'Denaturant', 'Galactan', 
-#   'Xylan', 'Arabinan', 'Protein', 'Ash', 'Enzyme', 'DenaturedEnzyme', 'Tar',
-#   'CSL', 'WWTsludge', 'BaghouseBag', 'FermMicrobeGlu', 'FermMicrobeXyl', 
-#   'BoilerChemicals']
 
 def append_chemical(ID, search_ID=None, **data):
     chemical = tmo.Chemical(ID, search_ID=search_ID)
@@ -228,10 +221,11 @@ chemical_groups = dict(
     SugarOligomers = ('GlucoseOligomer', 'XyloseOligomer', 'GalactoseOligomer',
                       'ArabinoseOligomer', 'MannoseOligomer'),
     OrganicSolubleSolids = ('AmmoniumAcetate', 'SolubleLignin', 'Extract', 'CSL',
-                            'LacticAcid', 'EthylLactate', 'EthylAcetate',
-                            'CalciumLactate', 'CalciumAcetate'),
+                            'LacticAcid', 'CalciumLactate', 'CalciumAcetate',
+                            'Methanol', 'MethylLactate', 'MethylAcetate',
+                            'EthylLactate', 'EthylAcetate'),
     InorganicSolubleSolids = ('AmmoniumSulfate', 'DAP', 'NaOH', 'HNO3', 'NaNO3',
-                              'BoilerChemicals'),
+                              'BoilerChemicals', 'Na2SO4'),
     Furfurals = ('Furfural', 'HMF'),
     OtherOrganics = ('Denaturant', 'Xylitol'),
     COxSOxNOxH2S = ('NitricOxide', 'NO2', 'SO2', 'CarbonMonoxide', 'H2S'),
@@ -276,32 +270,13 @@ for chemical in ('NH3', 'NitricOxide', 'CarbonMonoxide', 'H2S', 'CH4'):
 
 # Chemicals that will be modeled in Distallation/Flash units,
 # list is in ascending order of Tb,
-# HMF and Xylitol are not included due to high Tm and Tb thus  will stay in liquid phase
-phase_change_chemicals = ['Ethanol', 'H2O', 'Denaturant',
-                          'EthylAcetate', 'AceticAcid',
+# HMF and Xylitol are not included due to high Tm and Tb thus will stay in liquid phase
+phase_change_chemicals = ['Methanol', 'Ethanol', 'H2O', 'EthylAcetate', 'Denaturant',
+                          'AceticAcid', 'MethylAcetate', 'MethylLactate',
                           'EthylLactate', 'Furfural', 'LacticAcid']
 
 
 # %% # Lock chemical phases
-
-# # Check chemical states
-# gases = []
-# liquids = []
-# solids = []
-# for chemical in chems:
-#     if chemical.phase_ref == 'g': gases.append(chemical.ID)
-#     if chemical.phase_ref == 'l': liquids.append(chemical.ID)
-#     if chemical.phase_ref == 's': solids.append(chemical.ID)
-# if len(gases)+len(liquids)+len(solids)==len(chems):
-#     print('All chemicals have reference phases')
-# else:
-#     no_ref_phase = []
-#     for chemical in chems:
-#         if not chemical.phase_ref: no_ref_phase.append(chemical.ID)
-#         print('These chemicals have no reference phase: \n')
-# print('Gases are: \n' + str(gases))
-# print('Liquids are: \n' + str(liquids))
-# print('Solids are: \n' + str(solids))
 
 for chemical in chems:
     if chemical.ID in phase_change_chemicals: pass
@@ -334,6 +309,8 @@ for chemical in chems:
 # print(missing_MW)
 
 # Set chemical heat capacity
+if hasattr(chems.CaSO4.Cn[1], 'value'):
+    chems.CaSO4.Cn.add_model(chems.CaSO4.Cn[1].value, top_priority=True) 
 chems.Xylan.Cn = chems.Glucan.Cn
 chems.Arabinan.Cn = chems.Glucan.Cn
 # Cp of biomass (1.25 J/g/K) from Leow et al., Green Chemistry 2015, 17 (6), 3584–3599
@@ -402,7 +379,7 @@ chems.CSL.HHV = chems.Protein.HHV/4+chems.H2O.HHV/2+chems.LacticAcid.HHV/4
 chems.CSL.LHV = chems.Protein.LHV/4+chems.H2O.LHV/2+chems.LacticAcid.LHV/4
 chems.BaghouseBag.HHV = chems.BaghouseBag.LHV = 0
 
-# Check missing HHV and LHV
+# # Check missing HHV and LHV
 # missing_HHV_or_LHV = []
 # for chemical in chems:
 #     if chemical.HHV == None:        
@@ -445,4 +422,31 @@ chems.set_synonym('CarbonMonoxide', 'CO')
 chems.set_synonym('NitricOxide', 'NO')
 chems.set_synonym('CaSO4', 'Gypsum')
 chems.set_synonym('P4O10', 'PhosphorusPentoxide')
+chems.set_synonym('Na2SO4', 'SodiumSulfate')
+
+
+# %% Output chemical properties (PAUSED)
+
+# IDs = chems.IDs
+# formulas = []
+# MWs = []
+# Tbs = []
+# HHVs = []
+# LHVs = []
+# Hfs = []
+# phases = []
+# Cns = []
+# mus = []
+# for chemical in chems:
+#     formulas.append(chemical.formula)
+#     MWs.append(chemical.formula)
+#     Tbs.append(chemical.Tb)
+#     HHVs.append(chemical.HHV)
+#     LHVs.append(chemical.LHV)
+#     Hfs.append(chemical.Hf)
+#     if chemical.locked_state:
+#         phases.append(chemical.phase_ref)
+#         Cns.append(chemical.Cn)
+#         mus.append(chemical.mu)
+
 

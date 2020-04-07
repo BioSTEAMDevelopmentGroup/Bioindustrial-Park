@@ -8,38 +8,131 @@ Created on Fri Feb 28 09:53:03 2020
 
 # %% Setup
 
-import biosteam as bst
-from biosteam import HeatUtility, Unit
+from biosteam import HeatUtility, Facility
+from biosteam.units._hx import HXutility
 from biosteam.units.decorators import cost
 from thermosteam import Stream
 
-__all__ = ('CIPpackage', 'OrganicAcidsBT')
+__all__ = ('CIPpackage', 'OrganicAcidsADP', 'OrganicAcidsPWC', 'OrganicAcidsBT')
+
+# Chemical Engineering Plant Cost Index from Chemical Engineering Magzine
+# (https://www.chemengonline.com/the-magazine/)
+# Year  1997    1998    2009    2010    2016
+# CE    386.5   389.5   521.9   550.8   541.7
 
 
 # %% Clean-in-place package
 
-@cost('Flow rate', units='kg/hr', ub=False,
-      S=63, cost=421e3, CE=521.9, BM=1.8, n=0.6)
-class CIPpackage(bst.Facility):
+@cost(basis='Flow rate', ID='Clean-in-place package', units='kg/hr',
+      cost=421000, S=63, CE=521.9, BM=1.8, n=0.6)
+class CIPpackage(Facility):
+    network_priority = 2
     line = 'Clean in place package'
-    _N_ins = 1
-    _N_outs = 1
-    network_priority = 0
+
+
+# %% Air distribution package
+
+# Size based on stream 950 in Humbird et al.
+@cost(basis='Flow rate', ID='Plant air compressor', units='kg/hr',
+      kW=111.855, cost=28000, S=1372608, CE=550.8, n=0.6, BM=1.6)
+@cost(basis='Flow rate', ID='Plant air reciever', units='kg/hr',
+      cost=16000, S=1372608, CE=521.9, n=0.6, BM=3.1)
+@cost(basis='Flow rate', ID='Instrument air dryer', units='kg/hr',
+      cost=15000, S=1372608, CE=521.9, n=0.6, BM=1.8)
+class OrganicAcidsADP(Facility): 
+    line = 'Air distribution package'
+    network_priority = 2
+
+
+# %% Process water center
+
+@cost(basis='Total water flow rate', ID='Tank', units='kg/hr',
+      # Size basis changed from 451555 as the original design is not sufficient
+      CE=521.9, cost=250000, S=106453, n=0.7, BM=1.7)
+@cost(basis='Total water flow rate', ID='PWC circulating pump', units='kg/hr',
+      CE=550.8, kW=55.9275, cost=15292, S=518924, n=0.8, BM=3.1)
+@cost(basis='Balance/discharged water flow rate', ID='Balance/discharged water pump', units='kg/hr',
+      CE=550.8, kW=14.914, cost=6864, S=155564, n=0.8, BM=3.1)
+class OrganicAcidsPWC(Facility):
+    """
+    Create a ProcessWaterCenter object that takes care of balancing the amount
+    of water (and energy associated with the water) required for the process.
+    The capital cost and power are based on the flow rate of process and make-up water as in [1]_.
+    
+    Parameters
+    ----------
+    ins :
+        [0] Recycled water.
+        
+        [1] Balance water (>0 when recycled water < process water).
+    outs :
+        [0] Process water.
+        
+        [1] Discharged water (>0 when recycled water > process water).
+    process_water_streams : streams, optional
+        All process water streams.
+    
+    References
+    ----------
+    .. [1] Humbird, D., Davis, R., Tao, L., Kinchin, C., Hsu, D., Aden, A.,
+        Dudgeon, D. (2011). Process Design and Economics for Biochemical 
+        Conversion of Lignocellulosic Biomass to Ethanol: Dilute-Acid 
+        Pretreatment and Enzymatic Hydrolysis of Corn Stover
+        (No. NREL/TP-5100-47764, 1013269). https://doi.org/10.2172/1013269
+    
+    """
+    network_priority = 1
+    _N_ins = 2
+    _N_outs = 2
+    _N_heat_utilities = 1
+    _units = {'Total water flow rate': 'kg/hr',
+              'Balance/discharged water flow rate': 'kg/hr'}
+    
+    def __init__(self, ID='', ins=None, outs=(),
+                 process_water_streams=None):
+        Facility.__init__(self, ID, ins, outs)
+        self.process_water_streams = process_water_streams
+        self.HX = HXutility(None)
+    
+    # def _assert_compatible_property_package(self): pass
+
+    def _run(self):
+        recycled, balance = self.ins
+        process, discharged = self.outs
+        process_water_streams = self.process_water_streams        
+        
+        process.mix_from(process_water_streams)
+        discharged.imol['Water'] = recycled.imol['Water'] - process.imol['Water']
+        if discharged.imol['Water'] < 0:
+            balance.imol['Water'] -= discharged.imol['Water']
+            discharged.imol['Water'] = 0
+            
+        Design = self.design_results
+        total_water = recycled.imass['Water'] + balance.imass['Water']
+        Design['Total water flow rate'] = total_water
+        Design['Balance/discharged water flow rate'] = max(balance.imass['Water'],
+                                                           discharged.imass['Water'])
+        
+        HX = self.HX
+        #!!! Why need a stream and should self.outs[0] be used?
+        H_net = process.H - recycled.H
+        HX.simulate_as_auxiliary_exchanger(H_net, process)
+        self.purchase_costs['Heat exchanger'] = HX.purchase_costs['Heat exchanger']
 
 
 # %% Boiler and turbogenerator
 
-@cost('Work', 'Turbogenerator',
-      CE=551, S=42200, kW=0, cost=9500e3, n=0.60, BM=1.8)
-@cost('Flow rate', 'Hot process water softener system', 
-      CE=551, cost=78e3, S=235803, n=0.6, BM=1.8)
-@cost('Flow rate', 'Amine addition pkg', 
-      CE=551, cost=40e3, S=235803, n=0.6, BM=1.8)
-@cost('Flow rate', 'Deaerator',
-      CE=551, cost=305e3, S=235803, n=0.6, BM=3.0)
-@cost('Flow rate', 'Boiler',
-      CE=551, cost=28550e3, kW=1000, S=238686, n=0.6, BM=1.8)
-class OrganicAcidsBT(bst.units.Facility):
+@cost(basis='Flow rate', ID='Boiler', units='kg/hr',
+      kW=2752, cost=28550000, S=238686, CE=550.8, n=0.6, BM=1.8)
+@cost(basis='Work', ID='Turbogenerator', units='kW',
+      cost=9500000, S=42200, CE=550.8, n=0.6, BM=1.8)
+@cost(basis='Flow rate', ID='Hot process water softener system', units='kg/hr',
+      cost=78000, S=235803, CE=550.8, n=0.6, BM=1.8)
+@cost(basis='Flow rate', ID='Deaerator', units='kg/hr',
+      cost=305000, S=235803, CE=550.8, n=0.6, BM=3)
+@cost(basis='Flow rate', ID='Amine addition pkg', units='kg/hr',
+      cost=40000, S=235803, CE=550.8, n=0, BM=1.8)
+class OrganicAcidsBT(Facility):
     """
     Create a BoilerTurbogenerator object that will calculate electricity
     generation from burning the feed. It also takes into account how much
@@ -62,9 +155,11 @@ class OrganicAcidsBT(bst.units.Facility):
                 
         [5] Make-up water.
     outs : stream sequence
-        [0] Solid and gas emissions.
+        [0] Gas emission.
         
-        [1] Blowdown water.
+        [1] Ash residues.
+        
+        [2] Blowdown water.
     boiler_efficiency : float
         Fraction of heat transfered to steam.
     turbo_generator_efficiency : float
@@ -88,30 +183,25 @@ class OrganicAcidsBT(bst.units.Facility):
 
         
     """
-
+    network_priority = 0
     _N_ins = 6
-    _N_outs = 2
+    _N_outs = 3
     _N_heat_utilities = 2
     _units = {'Flow rate': 'kg/hr',
               'Work': 'kW'}
     
-    network_priority = 0
-    duty_over_mol = 40000 # Superheat steam with 40000 kJ/kmol
+    duty_over_mol = 0
     boiler_blowdown = 0.03
     RO_rejection = 0    
     generated_heat = 0
     total_steam = 0
     
-    plant_size_ratio = 1
-    combustables = []
-
-    
     def __init__(self, ID='', ins=None, outs=(), *,
                  boiler_efficiency=0.80,
                  turbogenerator_efficiency=0.85, 
-                 combustables=[], plant_size_ratio=1,
+                 combustables, ratio,
                  agent=HeatUtility.get_heating_agent('low_pressure_steam')):
-        Unit.__init__(self, ID, ins, outs)
+        Facility.__init__(self, ID, ins, outs)
         
         self.agent = agent
         self.makeup_water = makeup_water = agent.to_stream('boiler_makeup_water')
@@ -124,42 +214,56 @@ class OrganicAcidsBT(bst.units.Facility):
         self.steam_utilities = set()
         self.steam_demand = agent.to_stream()
         self.steam_demand.chemicals.set_synonym('Water', 'H2O')
+        self.combustables = combustables
+        self.ratio = ratio
+        self.duty_over_mol = agent.H * agent.heat_transfer_efficiency
     
     def _run(self):
         B_eff = self.boiler_efficiency
-        plant_size_ratio = self.plant_size_ratio
+        ratio = self.ratio
         feed_solids, feed_gases, lime, boiler_chemicals, bag, _ = self.ins
-        emissions, _ = self.outs
+        emission, ash, _ = self.outs
         combustables = self.combustables
-        emissions.mol = feed_solids.mol + feed_gases.mol
+        emission.mol = feed_solids.mol + feed_gases.mol
 
         # Use combustion reactions to create outs
         combustion_rxns = self.chemicals.get_combustion_reactions()
         combustable_feeds = Stream(None)
-        combustable_feeds.copy_flow(emissions, tuple(combustables), remove=True)
+        combustable_feeds.copy_flow(emission, tuple(combustables), remove=True)
         combustion_rxns(combustable_feeds.mol)
-        emissions.mol += combustable_feeds.mol
+        emission.mol += combustable_feeds.mol
         # Air usage not rigorously modeled, but can easily be added
-        emissions.imol['O2'] = 0
-        emissions.T = 373.15
-        emissions.P = 101325
+        emission.imol['O2'] = 0
 
         # FGD lime scaled based on SO2 generated,
         # 20% stoichiometetric excess based on P52 of Humbird et al.
         # 895 kg/hr based on Table 30 in Humbird et al.
-        lime.imol['CalciumDihydroxide'] = emissions.imol['SO2'] * 1.2
+        lime.imol['CalciumDihydroxide'] = emission.imol['SO2'] * 1.2
         # boiler_chemicals and bag are scaled based on plant size,
         # 1.23 is $2007/hour and 2.2661 is $/lb from Table 30 in Humbird et al.
         # 2.20462 is kg to lb
-        boiler_chemicals.imass['BoilerChemicals'] = 1.23 / 2.2661 / 2.20462 * plant_size_ratio
-        bag.imass['BaghouseBag'] = plant_size_ratio
+        boiler_chemicals.imass['BoilerChemicals'] = 1.23 / 2.2661 / 2.20462 * ratio
+        bag.imass['BaghouseBag'] = ratio
+        
+        ash_mass = 0
+        for chemical in emission.chemicals:
+            if chemical.locked_state == 'l' or chemical.locked_state == 's':
+                ash_mass += emission.imass[chemical.ID]
+                emission.imass[chemical.ID] = 0
+        ash.imass['Ash'] = ash_mass
+        ash.phase = 's'
+        emission.phase = 'g'
+        self.outs[2].phase = 'l'
+
+        for i in range(0, 3):
+            self.outs[i].T = 373.15
+            self.outs[i].P = 101325
 
         # Generated heat
         #!!! See if need to consider situations where not all water can be evaporated
-        self.generated_heat = emissions.H - (feed_solids.LHV+feed_gases.LHV)*B_eff
+        self.generated_heat = emission.H - (feed_solids.LHV+feed_gases.LHV)*B_eff
 
     def _design(self):
-
         TG_eff = self.turbogenerator_efficiency
         steam = self.steam_demand
         steam_utilities = self.steam_utilities
@@ -186,7 +290,7 @@ class OrganicAcidsBT(bst.units.Facility):
         self.makeup_water.imol['H2O'] = total_steam * self.boiler_blowdown * \
                                         1/(1-self.RO_rejection)
 
-        # Heat available for the turbogenerator
+        # Heat available for the turbogenerator, in kJ/hr
         H_electricity = generated_heat - H_steam
         
         Design = self.design_results
@@ -201,8 +305,10 @@ class OrganicAcidsBT(bst.units.Facility):
         hu_cooling(cooling, steam.T)
         hu_steam.agent = self.agent
         hu_steam.cost = -sum([i.cost for i in steam_utilities])
-        Design['Work'] = electricity/3600 #!!! what is this 3600?
+        # 3600 is conversion of kJ/hr to kW (kJ/s)
+        Design['Work'] = electricity/3600
 
     def _end_decorated_cost_(self):
         self.power_utility(self.power_utility.rate - self.design_results['Work'])
+
 
