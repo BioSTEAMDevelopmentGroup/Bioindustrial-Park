@@ -66,6 +66,7 @@ Lipid = create_new_chemical(
     formula = 'C57H104O6',
     Hf = -2193.7e3
 )
+Lipid.Dortmund.set_group_counts_by_name({'CH3':3, 'CH2':41, 'CH':1, 'CH=CH':3, 'CH2COO':3})
 Lipid.load_combustion_data()
 
 # %% Fill missing properties
