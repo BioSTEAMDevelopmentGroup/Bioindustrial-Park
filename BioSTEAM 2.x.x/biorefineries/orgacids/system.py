@@ -14,7 +14,6 @@ with modification of fermentation system for organic acids instead of the origin
 Naming conventions:
     F = Flash tank
     H = Heat exchange
-    J = Junction
     M = Mixer
     R = Reactor
     S = Splitter
@@ -36,7 +35,7 @@ Areas:
 '''
 TODO:
     Search for #!!! for notes
-    Compare stream info with cornstover biorefinery
+    Compare stream info (T/P/flows) with Humbird report
     Make sure there are pumps between units, esp. storage units
 '''
 
@@ -51,7 +50,8 @@ from biosteam import System
 from thermosteam import Stream
 from orgacids import units, facilities
 from orgacids.process_settings import price
-from orgacids.chemicals import orgacids_chemicals, chemical_groups, soluble_organics, combustables
+from orgacids.chemicals import orgacids_chemicals, chemical_groups, \
+                               soluble_organics, combustables
 from orgacids.tea import OrgacidsTEA
 
 bst.main_flowsheet.set_flowsheet(bst.Flowsheet('orgacids'))
@@ -180,9 +180,9 @@ P201 = units.HydrolysatePump('P201', ins=T204-0)
 
 def update_ammonia():
     hydrolysate = F201.outs[1]
-    # Ammonia loading is 4.8 g/L in hydrolysate in Humbird et al.,
-    # equivalent to 4.8 kg/m3
-    ammonia.imass['Ammonia'] = 4.8 * hydrolysate.F_vol # F_vol in m3/hr
+    # Ammonia loading is 4.8 g/L in hydrolysate as NH3 in Humbird et al.,
+    # equivalent to 4.8 kg/m3, F_vol in m3/hr
+    ammonia.imass['AmmoniumHydroxide'] = 4.8*35.046/17.031 * hydrolysate.F_vol
 
 pretreatment_sys = System('pretreatment_sys',
                    path=(T201, M201, M202, M203,
@@ -513,7 +513,7 @@ Area500 = wastewater_sys
 
 # Chemicals for storage
 sulfuric_acid_fresh = Stream('sulfuric_acid_fresh',  price=price['Sulfuric acid'])
-ammonia_fresh = Stream('ammonia_fresh', price=price['Ammonia'])
+ammonia_fresh = Stream('ammonia_fresh', price=price['AmmoniumHydroxide'])
 CSL_fresh = Stream('CSL_fresh', price=price['CSL'])
 lime_fresh = Stream('lime_fresh', price=price['Lime'])
 methanol_fresh = Stream('methanol_fresh', price=price['Methanol'])
@@ -566,44 +566,34 @@ T606 = bst.units.StorageTank('T606', ins=P601-0, outs=lactic_acid, tau=7*24,
                              vessel_material='Stainless steel')
 T606.line = 'Lactic acid storage tank'
 
-CIP = facilities.CIPpackage('CIP', ins=CIP_chems_in, outs=CIP_chems_out)
+CIP = facilities.OrganicAcidsCIP('CIP', ins=CIP_chems_in, outs=CIP_chems_out)
 ADP = facilities.OrganicAcidsADP('ADP', ins=plant_air_in, outs='plant_air_out')
 # 8021 based on stream 713 in Humbird et al.
 FWT = units.FireWaterTank('FWT',
                          ins=Stream('fire_water_in', Water=8021*plant_size_ratio, units='kg/hr'),
                          outs='fire_water_out')
+
 BT = facilities.OrganicAcidsBT('BT', ins=(M505-0, R501-0, 
                                           FGD_lime, boiler_chemicals,
-                                          baghouse_bag),
-                               turbogenerator_efficiency=0.85,
+                                          baghouse_bag, 'makeup_water'),
+                               B_eff=0.8, TG_eff=0.85,
                                combustables=combustables,
                                ratio=plant_size_ratio,
-                               outs=('gas_emission', ash, 
-                                     'rejected_water_and_blowdown'))
-J601 = bst.units.Junction('J601', BT.outs[-1], Stream())
-J601.outs[0] = M501.ins[-2]
+                               outs=('gas_emission', ash, 'boiler_blowdown_water'))
+M501.ins[-2] = BT.outs[-1]
 
-#!!! Check if this will change after multiple simulation
-CT = bst.units.facilities.CoolingTower('CT')
-CT.cost_items['Cooling tower'].kW = 559.275
-CT.cost_items['Cooling tower'].S = 10037820 / 18.01528
-CT.cost_items['Cooling tower'].n = 0.6
-CT.cost_items['Cooling tower'].kW = 1118.55
-CT.cost_items['Cooling water pump'].S = 10982556 / 18.01528
-CT.outs[0].ID = 'cooling_water'
-CT.outs[-1].T = 273.15 + 28
+CT = facilities.OrganicAcidsCT('CT', 
+                                ins=('return_cooling_water',
+                                    'CT_makeup_water'),
+                                outs=('process_cooling_water',
+                                      'cooling_tower_blowdown'))
+M501.ins[-1] = CT.outs[-1]
 
-J602 = bst.units.Junction('J602', CT.outs[-1], Stream())
-J602.outs[0] = M501.ins[-1]
-
-# This is to match chemicals
-BT_water = CT_water = Stream(None)
-BT_water.imol['Water'] = BT.outs[-1].imol['Water']
-CT_water.imol['Water'] = CT.outs[-1].imol['Water']
+# All water used in the system
 process_water_streams = (hot_process_water, pretreatment_acid_water, steam,
                          warm_process_water, stripping_water, filter_water,
                          separation_acid_water, separation_hydrolysis_water,
-                         BT_water, CT_water)
+                         BT.ins[-1], CT.ins[-1])
 PWC = facilities.OrganicAcidsPWC('PWC', ins=(S504-0, balance_water), 
                                  process_water_streams=process_water_streams,
                                  outs=('process_water','discharged_water'))
@@ -619,10 +609,10 @@ def update_fresh_streams():
 boiler_sys = System('boiler_sys', path=(BT,))
 # All units in facilities except boiler turbogenerator
 facilities_sys = System('facilities_sys',
-                        path=(CIP, ADP, FWT, BT, J601,
+                        path=(CIP, ADP, FWT, BT,
                               S601, T601, T602, T603, S602, T604, T605,
                               P601, T606,
-                              CT, J602, PWC,
+                              CT, PWC,
                               update_fresh_streams)
                         )
 # Area 600 includes all facility units (boiler turbogeneration and others)
@@ -638,15 +628,15 @@ orgacids_sys = System('orgacids_sys',
                             separation_sys,
                             wastewater_sys
                             ),
-                      facilities=(CIP, ADP, FWT, BT, J601,
+                      facilities=(CIP, ADP, FWT, BT,
                                   S601, T601, T602, T603, S602, T604, T605,
                                   P601, T606,
-                                  CT, J602, PWC,
+                                  CT, PWC,
                                   update_fresh_streams)
                       )
 
 # Simulate system
-for i in range(3): orgacids_sys.simulate()
+# for i in range(3): orgacids_sys.simulate()
 
 orgacids_sys_no_boiler_tea = OrgacidsTEA(
         system=orgacids_sys, IRR=0.10, duration=(2016, 2046),
@@ -655,7 +645,7 @@ orgacids_sys_no_boiler_tea = OrgacidsTEA(
         startup_months=3, startup_FOCfrac=1, startup_salesfrac=0.5,
         startup_VOCfrac=0.75, WC_over_FCI=0.05,
         finance_interest=0.08, finance_years=10, finance_fraction=0.4,
-        # Junctions and biosteam native splitter/mixture have no cost, BT not included
+        # biosteam native splitter/mixture have no cost, BT not included
         OSBL_units=(WWT_cost, T601, T602, T603, T604, T605, T606,
                     P601,
                     CT, PWC, CIP, ADP, FWT),
@@ -695,32 +685,32 @@ all_tea = (feedstock_sys_tea,
            facilities_sys_tea)                 
 
 
-# %% Cost and utility analyses
+# %% Codes for analyses
 
-installation_costs = {i.system.ID: i.installation_cost/1e6 
-                      for i in all_tea}
-utility_costs = {i.system.ID: i.utility_cost/1e6 
-                 for i in all_tea}
+# installation_costs = {i.system.ID: i.installation_cost/1e6 
+#                       for i in all_tea}
+# utility_costs = {i.system.ID: i.utility_cost/1e6 
+#                  for i in all_tea}
 
-def get_utility(units, ID, attr):
-    out = 0
-    for i in units:
-        for j in i.heat_utilities:
-            if j.ID == ID:
-                out += getattr(j, attr)
-    return out
+# def get_utility(units, ID, attr):
+#     out = 0
+#     for i in units:
+#         for j in i.heat_utilities:
+#             if j.ID == ID:
+#                 out += getattr(j, attr)
+#     return out
 
-# 4.184 is heat capacity of water in J/(kg·°C)
-cooling_water_uses = {i.system.ID: get_utility(i.units, 'Cooling water', 'duty')/1e6/4.184
-                      for i in all_tea}
+# # 4.184 is heat capacity of water in J/(kg·°C)
+# cooling_water_uses = {i.system.ID: get_utility(i.units, 'Cooling water', 'duty')/1e6/4.184
+#                       for i in all_tea}
 
-get_rate = lambda units: sum([i.power_utility.rate
-                              for i in units])/1e3
+# get_rate = lambda units: sum(i.power_utility.rate
+#                               for i in units)/1e3
 
-get_ecost = lambda units: sum([i.power_utility.cost
-                               # 350.6 is from 96% uptime of 365 days per year 
-                               for i in units])*24*350.4/1e6
+# get_ecost = lambda units: sum(i.power_utility.cost
+#                                # 350.6 is from 96% uptime of 365 days per year 
+#                                for i in units)*24*350.4/1e6
 
-electricity_uses = {i: get_rate(j.units)/41 for i,j in enumerate(all_tea)}
-electricity_costs = {i.system.ID: get_ecost(i.units) for i in all_tea}
+# electricity_uses = {i: get_rate(j.units) for i,j in enumerate(all_tea)}
+# electricity_costs = {i.system.ID: get_ecost(i.units) for i in all_tea}
 

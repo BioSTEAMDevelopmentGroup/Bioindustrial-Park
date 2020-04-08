@@ -301,7 +301,7 @@ default_chl_flow = default_cellulose_flow + default_hemicellulose_flow + default
 # 100% sum of cellulose, hemicellulose, and lignin,
 # compositions of other components were assumed to be the same as in Humbird et al.
 # The first composition in the file is the default one as in Humbird et al.
-for i in range(0, len(simulated_composition['Cellulose'])):
+for i in range(len(simulated_composition['Cellulose'])):
     # Adjust feedstock flows
     adjusted_cellulose_flow =  default_chl_flow * simulated_composition['Cellulose'][i]
     adjusted_hemicellulose_flow =  default_chl_flow * simulated_composition['Hemicellulose'][i]

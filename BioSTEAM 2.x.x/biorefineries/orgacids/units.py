@@ -18,7 +18,7 @@ All units are explicitly defined here for transparency and easy reference
 
 '''
 TODO:
-   Separation units
+   Vet separation system design
 '''
 
 
@@ -105,10 +105,13 @@ class OligomerConversionTank(Unit): pass
 
 # Ammonia in-line mixer
 @cost(basis='Flow rate', ID='Mixer', units='kg/hr',
+      # Size basis on the total flow, not just ammonia, 
+      # thus assuming differences caused by MWs of NH3 and NH4OH
       cost=5000, S=157478, CE=521.9, n=0.5, BM=1)
 class AmmoniaMixer(Mixer): pass
 
-# Ammonia addition tank
+# Ammonia addition tank, size basis on the total flow, not just ammonia, 
+# thus assuming differences caused by MWs of NH3 and NH4OH
 @cost(basis='Flow rate', ID='Tank', units='kg/hr',
       cost=236000, S=410369, CE=521.9, n=0.7, BM=2)
 @cost(basis='Flow rate', ID='Agitator', units='kg/hr',
@@ -121,7 +124,7 @@ class AmmoniaAdditionTank(Unit):
         Unit.__init__(self, ID, ins, outs)
         
         #                                      Reaction definition      Reactant Conversion
-        self.neutralization_rxn = Rxn('2 NH3 + H2SO4 -> NH4SO4 + 2 H2O', 'H2SO4', 0.95)
+        self.neutralization_rxn = Rxn('2 NH4OH + H2SO4 -> NH4SO4 + 2 H2O', 'H2SO4', 0.95)
     
     def _run(self):
         ins = self.ins[0]
@@ -461,18 +464,6 @@ class SeedTrain(Unit):
         Design = self.design_results
         Design['Flow rate'] = self.outs[1].F_mass
         Design['Seed fermenter size'] = self.outs[1].F_mass * self.tau_batch
-#!!! Check if design is OK
-    # def _cost(self):
-        # D = self.design_results
-        # C = self.purchase_costs
-        # kW = 0
-        # for i, x in self.cost_items.items():
-        #     S = D[x._basis]
-        #     q = S/x.S
-        #     C[i] = bst.CE/x.CE*x.cost*q**x.n
-        #     # 2 is for 2 trains
-        #     kW += 2*x.kW*q
-        # self.power_utility(kW)
 
 # Seed hold tank
 @cost(basis='Flow rate', ID='Tank', units='kg/hr',
@@ -592,7 +583,6 @@ class GypsumFilter(SolidsSeparator):
               'Filtrate flow rate': 'kg/hr'}
     
     def _design(self):
-        gypsum, hydrolysate = self.outs
         self.design_results['Feed flow rate'] = self.ins[0].F_mass
         self.design_results['Filtrate flow rate'] = self.outs[1].F_mass
 
@@ -702,7 +692,7 @@ class AnaerobicDigestion(Unit):
         Unit.__init__(self, ID, ins, outs)
         self.digestion_rxns = digestion_rxns
         self.sludge_split = sludge_split
-        self.multi_stream = MultiStream()
+        self.multi_stream = MultiStream(None)
     
     def _run(self):
         feed, cool_water = self.ins
@@ -795,7 +785,8 @@ class SulfuricAcidStorageTank(StorageTank): pass
 
 # Ammonia storage tank, no pump
 @cost(basis='Flow rate', ID='Tank', units='kg/hr',
-      cost=196000, S=1171, CE=550.8, n=0.7, BM=2)
+      # Original size basis for NH3 instead of NH4OH
+      cost=196000, S=1171/17.031*35.046, CE=550.8, n=0.7, BM=2)
 class AmmoniaStorageTank(StorageTank): pass
 
 # CSL storage tank

@@ -49,7 +49,7 @@ chemical_IDs = [
         'LacticAcid', 'Methanol',
         'CalciumLactate', 'CalciumAcetate',
         'MethylLactate', 'MethylAcetate',
-        'Na2SO4',
+        'Na2SO4', 'AmmoniumHydroxide',
         # Probably not needed ones
         'Ethanol',
         'EthylLactate', 'EthylAcetate',
@@ -103,14 +103,14 @@ chems.Cellobiose.Hf = -480900*_cal2joule
 chems.Lignin.Hf = -108248*_cal2joule/tmo.Chemical('Vanillin').MW*chems.Lignin.MW
 chems.HMF.Hf = -99677*_cal2joule
 # chemspider from chemenu
-# http://www.chemspider.com/Chemical-Structure.207215.html
-# https://www.chemenu.com/products/CM196167
+# http://www.chemspider.com/Chemical-Structure.207215.html, accessed 04/07/2020
+# https://www.chemenu.com/products/CM196167, accessed 04/07/2020
 # Using Millipore Sigma's Pressure-Temperature Nomograph Interactive Tool
-# at https://www.sigmaaldrich.com/chemistry/solvents/learning-center/nomograph.html
+# at https://www.sigmaaldrich.com/chemistry/solvents/learning-center/nomograph.html, accessed 04/07/2020
 # will give ~300°C at 760 mmHg if using the 115°C Tb at 1 mmHg
 chems.HMF.Tb = 291.5 + 273.15
 chems.Xylitol.Hf=-243145*_cal2joule
-# NIST https://webbook.nist.gov/cgi/cbook.cgi?ID=C87990&Mask=4, condensed phase
+# NIST https://webbook.nist.gov/cgi/cbook.cgi?ID=C87990&Mask=4, condensed phase, accessed 04/07/2020
 chems.Xylitol.Hfus = -1118.6e3
 chems.Acetate.Hf = -108992*_cal2joule
 chems.AmmoniumAcetate.Hf = -154701*_cal2joule
@@ -123,7 +123,7 @@ chems.CarbonMonoxide.Hf = -26400*_cal2joule
 chems.AmmoniumSulfate.Hf = -288994*_cal2joule
 # Holmes, Trans. Faraday Soc. 1962, 58 (0), 1916–1925, abstract
 chems.P4O10.Hf = -713.2*_cal2joule
-# NIST https://webbook.nist.gov/cgi/cbook.cgi?ID=C50215&Mask=4
+# NIST https://webbook.nist.gov/cgi/cbook.cgi?ID=C50215&Mask=4, accessed 04/07/2020
 chems.LacticAcid.Hfus = 11.34e3
 # Reference DIPPR value in Table 3 of Vatani et al., Int J Mol Sci 2007, 8 (5), 407–432
 chems.MethylLactate.Hf = -643.1e3
@@ -139,8 +139,11 @@ chems.EthylLactate.Hf = -695.08e3
 chems.CalciumLactate.Hf = -1686.1e3
 # Lange's Handbook of Chemistry, 15th edn., Table 6.3, PDF page 631
 chems.CalciumAcetate.Hf = -1514.73e3
-# NIST https://webbook.nist.gov/cgi/cbook.cgi?ID=C7757826&Mask=2
+# NIST https://webbook.nist.gov/cgi/cbook.cgi?ID=C7757826&Mask=2, accessed 04/07/2020
 chems.Na2SO4.Hf = -1356.38e3
+# Arggone National Lab active thermochemical tables
+# https://atct.anl.gov/Thermochemical%20Data/version%201.118/species/?species_number=928, accessed 04/07/2020
+chems.AmmoniumHydroxide.Hf = -336.719e3
 
 chems.Glucan.InChI = chems.Glucan.formula = 'C6H10O5'
 chems.Glucan.phase_ref='s'
@@ -194,8 +197,7 @@ append_blank_chemical('BaghouseBag', MW=1, Hf=0, phase_ref = 's')
 # CSL stream is modeled as 50% water, 25% protein, and 25% lactic acid in Humbird et al.,
 # did not model separately as only one price is given
 append_blank_chemical('CSL', formula='CH2.8925O1.3275N0.0725S0.00175', phase_ref='l',
-                      Hf=chems.Protein.Hf/4+chems.H2O.Hf/2+chems.LacticAcid.Hf/4
-                      )
+                      Hf=chems.Protein.Hf/4+chems.H2O.Hf/2+chems.LacticAcid.Hf/4)
 
 append_chemical_copy('GlucoseOligomer', chems.Glucose,
                      formula = 'C6H10O5', Hf = -233200*_cal2joule)
@@ -230,7 +232,7 @@ chemical_groups = dict(
                             'Methanol', 'MethylLactate', 'MethylAcetate',
                             'EthylLactate', 'EthylAcetate'),
     InorganicSolubleSolids = ('AmmoniumSulfate', 'DAP', 'NaOH', 'HNO3', 'NaNO3',
-                              'BoilerChemicals', 'Na2SO4'),
+                              'BoilerChemicals', 'Na2SO4', 'AmmoniumHydroxide'),
     Furfurals = ('Furfural', 'HMF'),
     OtherOrganics = ('Denaturant', 'Xylitol'),
     COxSOxNOxH2S = ('NitricOxide', 'NO2', 'SO2', 'CarbonMonoxide', 'H2S'),
@@ -319,15 +321,15 @@ if hasattr(chems.CaSO4.Cn[1], 'value'):
 chems.Xylan.Cn = chems.Glucan.Cn
 chems.Arabinan.Cn = chems.Glucan.Cn
 # Cp of biomass (1.25 J/g/K) from Leow et al., Green Chemistry 2015, 17 (6), 3584–3599
-chems.FermMicrobeGlu.Cn.add_model(1.25*chems.FermMicrobeGlu.MW, top_priority=True)
-chems.WWTsludge.Cn.add_model(1.25*chems.WWTsludge.MW, top_priority=True)
-chems.Protein.Cn.add_model(1.25*chems.Protein.MW, top_priority=True)
-chems.Enzyme.Cn.add_model(1.25*chems.Enzyme.MW, top_priority=True)
-chems.CSL.Cn.add_model(1.25*chems.CSL.MW, top_priority=True)
-chems.DenaturedEnzyme.Cn.add_model(1.25*chems.DenaturedEnzyme.MW, top_priority=True)
-chems.FermMicrobeXyl.Cn.add_model(1.25*chems.FermMicrobeXyl.MW, top_priority=True)
+chems.FermMicrobeGlu.Cn.add_model(1.25*chems.FermMicrobeGlu.MW)
+chems.WWTsludge.Cn.add_model(1.25*chems.WWTsludge.MW)
+chems.Protein.Cn.add_model(1.25*chems.Protein.MW)
+chems.Enzyme.Cn.add_model(1.25*chems.Enzyme.MW)
+chems.CSL.Cn.add_model(1.25*chems.CSL.MW)
+chems.DenaturedEnzyme.Cn.add_model(1.25*chems.DenaturedEnzyme.MW)
+chems.FermMicrobeXyl.Cn.add_model(1.25*chems.FermMicrobeXyl.MW)
 # BaghouseBag is just a placeholder
-chems.BaghouseBag.Cn.add_model(0, top_priority=True)
+chems.BaghouseBag.Cn.add_model(0)
 
 # # Check missing Cn
 # missing_Cn = []
@@ -339,7 +341,7 @@ chems.BaghouseBag.Cn.add_model(0, top_priority=True)
 # assume densities for  solulables and insolubles to be 1e5 and 1540 kg/m3, respectively
 def set_rho(chemical, rho):       
     V = fn.rho_to_V(rho, chemical.MW)
-    chemical.V.add_model(V, top_priority=True)
+    chemical.V.add_model(V)
 
 for chemical in chems:
     if not chemical.V:
@@ -347,6 +349,7 @@ for chemical in chems:
         elif chemical.ID in insolubles: set_rho(chemical, 1540)
 # Available models do not cover simulated conditions
 set_rho(chems.NaNO3, 1e5)
+set_rho(chems.Na2SO4, 1e5)
 
 # # Check missing molar volume
 # missing_V = []
@@ -403,8 +406,9 @@ chems.BaghouseBag.HHV = chems.BaghouseBag.LHV = 0
 for chemical in chems:
     if hasattr(chemical.mu, 'l'):
         chemical.mu.l.add_model(0.00091272)
-    elif not chemical.mu:
-        chemical.mu.add_model(0.00091272)
+    else:
+        try: chemical.mu(T=298, P=101325)
+        except: chemical.mu.add_model(0.00091272)
 
 # Recalculate free energies based on updated properties
 for chemical in chems: chemical.load_free_energies()
@@ -428,30 +432,63 @@ chems.set_synonym('NitricOxide', 'NO')
 chems.set_synonym('CaSO4', 'Gypsum')
 chems.set_synonym('P4O10', 'PhosphorusPentoxide')
 chems.set_synonym('Na2SO4', 'SodiumSulfate')
+chems.set_synonym('AmmoniumHydroxide', 'NH4OH')
 
 
-# %% Output chemical properties (PAUSED)
+# %% Output chemical properties for checking
+
+# import pandas as pd
 
 # IDs = chems.IDs
 # formulas = []
 # MWs = []
-# Tbs = []
 # HHVs = []
 # LHVs = []
 # Hfs = []
 # phases = []
+# Tbs = []
+# Vs = []
 # Cns = []
 # mus = []
 # for chemical in chems:
 #     formulas.append(chemical.formula)
-#     MWs.append(chemical.formula)
-#     Tbs.append(chemical.Tb)
+#     MWs.append(chemical.MW)
 #     HHVs.append(chemical.HHV)
 #     LHVs.append(chemical.LHV)
 #     Hfs.append(chemical.Hf)
 #     if chemical.locked_state:
 #         phases.append(chemical.phase_ref)
-#         Cns.append(chemical.Cn)
-#         mus.append(chemical.mu)
+#         Tbs.append('NA')
+#         try: Vs.append(chemical.V(T=298, P=101325))
+#         except: Vs.append('')
+#         try: Cns.append(chemical.Cn(T=298))
+#         except: Cns.append('')
+#         try: mus.append(chemical.mu(T=298, P=101325))
+#         except: mus.append('')
+#     else:
+#         ref_phase = chemical.get_phase(T=298, P=101325)
+#         phases.append(f'variable, ref={ref_phase}')
+#         Tbs.append(chemical.Tb)
+#         try: Vs.append(chemical.V(ref_phase, T=298, P=101325))
+#         except: Vs.append('')
+#         try: Cns.append(chemical.Cn(ref_phase, T=298))
+#         except: Cns.append('')
+#         try: mus.append(chemical.mu(ref_phase, T=298, P=101325))
+#         except: mus.append('')
 
+# properties = pd.DataFrame(
+#     {'ID': chems.IDs,
+#      'Formula': formulas,
+#      'MW': MWs,
+#      'HHV': HHVs,
+#      'LHV': LHVs,
+#      'Hf': Hfs,
+#      'Phase': phases,
+#      'Boiling point': Tbs,
+#      'V': Vs,
+#      'Cn': Cns,
+#      'mu': mus}
+#     )
+
+# properties.to_excel('chemical_properties.xlsx', sheet_name='Properties')
 

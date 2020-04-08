@@ -73,7 +73,8 @@ price = {# IHS markit report, 2016 price, US market,
          'Lactic acid': 1.88, 
          'Feedstock': feedstock_cost, 
          'Sulfuric acid': 0.0430 * _lb_per_kg,
-         'Ammonia': 0.1900 * _lb_per_kg,
+         # 0.1900 is for NH3
+         'AmmoniumHydroxide': 0.1900 * _lb_per_kg * 17.031/35.046,
          'CSL': 0.0339 * _lb_per_kg,
          'DAP': 0.1645 * _lb_per_kg,
          'Caustic': 0.0832 * _lb_per_kg * _chemical_2011to2016, # Davis et al. 2013
@@ -94,13 +95,11 @@ price = {# IHS markit report, 2016 price, US market,
          } 
 bst.PowerUtility.price = price['Electricity']
 
-# # Not sure why Yoel changed these
-# _ha = bst.HeatUtility.get_heating_agent('high_pressure_steam')
-# _ha.heat_transfer_efficiency = 0.85
-# _ha.T = 529.2
-# _ha.P = 44e5
-# _ha.regeneration_price = 0.30626
-# _CW = bst.HeatUtility.get_cooling_agent('cooling_water')
-# _CW.T = 28 + 273.15
-# _CW.T_limit = _CW.T + 9
-# _CW.regeneration_price = 0
+# Based on BT and CT design in Humbird et al.
+_lps = bst.HeatUtility.get_heating_agent('low_pressure_steam')
+_hps = bst.HeatUtility.get_heating_agent('high_pressure_steam')
+_lps.heat_transfer_efficiency = _hps.heat_transfer_efficiency = 0.85
+_cw = bst.HeatUtility.get_cooling_agent('cooling_water')
+_cw.T = 28 + 273.15
+_cw.T_limit = _cw.T + 9
+_cw.regeneration_price = 0
