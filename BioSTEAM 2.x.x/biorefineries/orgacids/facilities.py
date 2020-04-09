@@ -82,7 +82,6 @@ class OrganicAcidsCT(Facility):
     _N_ins = 2
     _N_outs = 2    
     _N_heat_utilities = 1
-    _units = {'Flow rate': 'kg/hr'}
 
     # Page 55 of Humbird et al.
     blowdown = 0.00005+0.0015
@@ -165,8 +164,8 @@ class OrganicAcidsPWC(Facility):
     _N_ins = 2
     _N_outs = 2
     _N_heat_utilities = 1
-    _units = {'Total water flow rate': 'kg/hr',
-              'Balance/discharged water flow rate': 'kg/hr'}
+    _units= {'Total water flow rate': 'kg/hr',
+             'Balance/discharged water flow rate': 'kg/hr'}  
     
     def __init__(self, ID='', ins=None, outs=(), process_water_streams=None):
         Facility.__init__(self, ID, ins, outs)
@@ -192,7 +191,7 @@ class OrganicAcidsPWC(Facility):
         
         HX = self.HX
         #!!! Why need a stream and should self.outs[0] be used?
-        H_net = process.H - recycled.H
+        H_net = self.H_net = process.H - recycled.H
         HX.simulate_as_auxiliary_exchanger(H_net, process)
         self.purchase_costs['Heat exchanger'] = HX.purchase_costs['Heat exchanger']
 
@@ -264,15 +263,14 @@ class OrganicAcidsBT(Facility):
     _N_ins = 6
     _N_outs = 3
     _N_heat_utilities = 2
-    _units = {'Flow rate': 'kg/hr',
-              'Work': 'kW'}
+    _units= {'Flow rate': 'kg/hr',
+             'Work': 'kW'} 
     
     blowdown = 0.03
     
     def __init__(self, ID='', ins=None, outs=(), *, B_eff=0.8,
                  TG_eff=0.85, combustables, ratio):
         Facility.__init__(self, ID, ins, outs)
-        
         self.B_eff = B_eff
         self.TG_eff = TG_eff
         self.combustables = combustables
@@ -329,9 +327,6 @@ class OrganicAcidsBT(Facility):
         # LHV is initially negative so take the opposite here
         heat_generated = self.heat_generated = \
             -(feed_solids.LHV+feed_gases.LHV-emission.H-ash.H)*self.B_eff
-        
-        #!!! For trouble-shotting
-        # print('Generated heat is '+str(heat_generated))
 
         # To get steam demand of the whole system
         if not steam_utilities:
@@ -340,16 +335,11 @@ class OrganicAcidsBT(Facility):
                 for hu in u.heat_utilities:
                     if hu.ID in (i.ID for i in HeatUtility.heating_agents):
                         steam_utilities.add(hu)
-                        #!!! For trouble-shotting
-                        # print(u.ID)
         
         # Total demand of steam by other units in the whole system (kmol/hr)           
         steam_demand = self.steam_demand = sum(i.flow for i in steam_utilities)
         # Heat needed to generate the steam
         heat_demand = self.heat_demand = sum(i.agent.H*i.flow for i in steam_utilities)
-        
-        #!!! For trouble-shotting
-        # print('Total heat demand is '+str(heat_demand)) 
         
         # Use low_pressure_steam as the agent
         lps = HeatUtility.get_heating_agent('low_pressure_steam')

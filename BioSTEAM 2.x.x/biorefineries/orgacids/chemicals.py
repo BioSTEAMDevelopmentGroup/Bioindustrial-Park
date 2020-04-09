@@ -304,7 +304,7 @@ for chemical in chems:
 # %% Set assumptions/estimations for missing properties
 
 # Append missing MW
-get_MW = tmo.functors.elements.compute_molecular_weight
+get_MW = tmo.properties.elements.compute_molecular_weight
 for chemical in chems:
     if chemical.ID in not_available_chemicals and chemical.formula:
         chemical.MW = get_MW(chemical.get_atoms())
@@ -361,10 +361,10 @@ set_rho(chems.Na2SO4, 1e5)
 # print(missing_V)
 
 # Set HHV and LHV for combustables chemicals
-get_stoichiometry = tmo.functors.combustion.get_combustion_stoichiometry
-get_HHV_stoichiometry = tmo.functors.combustion.estimate_HHV_from_stoichiometry
-get_HHV_Dulong = tmo.functors.combustion.estimate_HHV_modified_Dulong
-get_LHV = tmo.functors.combustion.estimate_LHV
+get_stoichiometry = tmo.properties.combustion.get_combustion_stoichiometry
+get_HHV_stoichiometry = tmo.properties.combustion.estimate_HHV_from_stoichiometry
+get_HHV_Dulong = tmo.properties.combustion.estimate_HHV_modified_Dulong
+get_LHV = tmo.properties.combustion.estimate_LHV
 
 for chemical in chems:
     if not chemical.formula: pass
