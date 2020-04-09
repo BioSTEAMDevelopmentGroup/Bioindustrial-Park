@@ -18,7 +18,7 @@ import biosteam as bst
 from orgacids.system import *
 
 find = bst.main_flowsheet
-broth_for_separation = find.broth_for_separation
+broth_for_separation = find.stream.broth_for_separation
 
 for i in range(5):
     orgacids_sys.simulate()
