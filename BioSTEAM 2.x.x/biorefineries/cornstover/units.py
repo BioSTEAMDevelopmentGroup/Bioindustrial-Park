@@ -16,7 +16,7 @@ xl2mod(path, sys.modules[__name__])
 del sys, xl2mod, os, path
 
 from flexsolve import aitken_secant
-from thermosteam import MultiStream, Stream
+from thermosteam import MultiStream
 from biosteam import Unit
 from biosteam.units.decorators import cost
 from biosteam.units.design_tools import size_batch
@@ -55,7 +55,7 @@ class SteamMixer(Unit):
     def _P_at_flow(mol_water, P, steam, mixed, feed):
         steam.imol['7732-18-5'] = mol_water
         mixed.mol[:] = steam.mol + feed.mol
-        mixed.H = feed.H + mol_water * 40798
+        mixed.H = feed.H + steam.Hvap
         P_new = mixed.chemicals.Water.Psat(mixed.T)
         return P - P_new
     
@@ -69,9 +69,7 @@ class SteamMixer(Unit):
                                   args=(self.P, steam, mixed, feed))
         mixed.P = self.P
         hu = self.heat_utilities[0]
-        hu.agent = hu.get_heating_agent('low_pressure_steam')
-        hu.flow = steam_mol
-        hu.cost = steam_mol*bst.HeatUtility.get_heating_agent('low_pressure_steam').regeneration_price
+        hu(steam.Hvap, mixed.T)
     
     @property
     def installation_cost(self): return 0

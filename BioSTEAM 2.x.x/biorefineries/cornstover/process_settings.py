@@ -16,7 +16,6 @@ ethanol_cost = 2.15 # USD/gal
 ethanol_density_kggal = liter_per_gallon * ethanol_density_kgL # kg/gal
 enzyme_price = 4.24 * 50/1000 # USD/kg
 
-
 price = {'Ethanol': ethanol_cost/ethanol_density_kggal,
          'Feedstock': 46.8 * factor,
          'Sulfuric acid': 81.39 * factor,
@@ -34,6 +33,7 @@ price = {'Ethanol': ethanol_cost/ethanol_density_kggal,
          'Electricity': 0.0572, # USD/kWh
          'Denaturant': 0.756,
          'Enzyme': enzyme_price} 
+
 bst.PowerUtility.price = price['Electricity']
 _ha = bst.HeatUtility.get_heating_agent('low_pressure_steam')
 _ha.heat_transfer_efficiency = 0.85
