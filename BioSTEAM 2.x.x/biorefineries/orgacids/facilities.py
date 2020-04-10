@@ -88,7 +88,7 @@ class OrganicAcidsCT(Facility):
     
     def __init__(self, ID='', ins=None, outs=()):
         Facility.__init__(self, ID, ins, outs)
-        self.cooling_water_utilities = set()
+        self.system_cooling_utilities = set()
         
     def _run(self):
         return_cw, makeup_water = self.ins
@@ -101,24 +101,23 @@ class OrganicAcidsCT(Facility):
         # Based on streams 940/944 in Humbird et al.
         process_cw.T = blowdown.T = 28 + 273.15
         
-        cwu = self.cooling_water_utilities
-        if not cwu:
+        cw = self.system_cooling_utilities
+        if not cw:
             for u in self.system.units:
                 if u is self: continue
                 for hu in u.heat_utilities:
                     if hu.ID == 'cooling_water':
-                        cwu.add(hu)
+                        cw.add(hu)
         
         # Total amount of cooling water needed in the whole system (kmol/hr)
-        total_cooling_water = self.total_cooling_water = sum(i.flow for i in cwu)
+        total_cooling_water = self.total_cooling_water = sum(i.flow for i in cw)
         return_cw.imol['H2O'] = process_cw.imol['H2O'] = total_cooling_water
         makeup_water.imol['H2O'] = total_cooling_water * self.blowdown
+        blowdown.imol['H2O'] = makeup_water.imol['H2O']
         
-        hu = self.heat_utilities[0]
-        hu.get_cooling_agent('cooling_water')
-        hu.ID = 'cooling_water'
-        # Regeneration cost is modeled by this unit
-        hu.cost = 0
+        hu_cooling = self.heat_utilities[0]
+        hu_cooling.mix_from(cw)
+        hu_cooling.reverse()
 
         self.design_results['Flow rate'] = total_cooling_water
 
@@ -163,14 +162,22 @@ class OrganicAcidsPWC(Facility):
     network_priority = 1
     _N_ins = 2
     _N_outs = 2
-    _N_heat_utilities = 1
+    _N_heat_utilities = 2
     _units= {'Total water flow rate': 'kg/hr',
-             'Balance/discharged water flow rate': 'kg/hr'}  
+             'Balance/discharged water flow rate': 'kg/hr'}
+    
+    #!!! Currently no heating_utilities/cooling_utilities
+    
+    # Energy (kJ) that can be transfered by 1 kmol of heating agent,
+    # estimated conservatively based on the energy of lowest energy-carring 
+    # biosteam native heating agent (low_pressure_steam), which is 42759 kJ/kmol
+    # lps = bst.HeatUtility.get_heating_agent('low_pressure_steam')
+    # lps_heat_duty_over_mol = lps.H * 0.85 (heat transfer efficiency in Humbird et al.)
+    heat_duty_over_mol = 40000
     
     def __init__(self, ID='', ins=None, outs=(), process_water_streams=None):
         Facility.__init__(self, ID, ins, outs)
         self.process_water_streams = process_water_streams
-        self.HX = HXutility(None)
 
     def _run(self):
         recycled, balance = self.ins
@@ -189,12 +196,28 @@ class OrganicAcidsPWC(Facility):
         Design['Balance/discharged water flow rate'] = max(balance.imass['Water'],
                                                            discharged.imass['Water'])
         
-        HX = self.HX
-        #!!! Why need a stream and should self.outs[0] be used?
-        H_net = self.H_net = process.H - recycled.H
-        HX.simulate_as_auxiliary_exchanger(H_net, process)
-        self.purchase_costs['Heat exchanger'] = HX.purchase_costs['Heat exchanger']
+        HX = self.HX = HXutility('PWC_HX')
+        hu_heating, hu_cooling = self.heat_utilities
+        hu_heating.load_agent(HeatUtility.get_heating_agent('low_pressure_steam'))
+        hu_cooling.load_agent(HeatUtility.get_cooling_agent('cooling_water'))
+        
+        H_net = self.H_net = (process.H+discharged.H) - (recycled.H+balance.H)
+        # H_net > 0 means heating required
+        if H_net > 0:
+            hu_heating.duty = -H_net
+            hu_heating.flow = -H_net/self.heat_duty_over_mol
+            hu_cooling.duty = hu_cooling.flow = 0
+        else:
+            # Heat transfer for cooling agent is modeled
+            hu_cooling(H_net, process.T)
+            hu_heating.duty = hu_heating.flow = 0
 
+        # Design the heat exchanger
+        total_stream = process.copy()
+        total_stream.mix_from([process, balance])
+        HX.simulate_as_auxiliary_exchanger(H_net, total_stream)
+        self.purchase_costs['Heat exchanger'] = HX.purchase_costs['Heat exchanger']
+        
 
 # %% Boiler and turbogenerator
 
@@ -256,7 +279,6 @@ class OrganicAcidsBT(Facility):
         and Techno-Economic Analysis of Biorefineries under Uncertainty. 
         ACS Sustainable Chem. Eng. 2020, 8 (8), 3302–3310. 
         https://doi.org/10.1021/acssuschemeng.9b07040.
-
         
     """
     network_priority = 0
@@ -267,6 +289,12 @@ class OrganicAcidsBT(Facility):
              'Work': 'kW'} 
     
     blowdown = 0.03
+    # Energy (kJ) that can be transfered by 1 kmol of heating agent,
+    # estimated conservatively based on the energy of lowest energy-carring 
+    # biosteam native heating agent (low_pressure_steam), which is 42759 kJ/kmol
+    # lps = bst.HeatUtility.get_heating_agent('low_pressure_steam')
+    # lps_heat_duty_over_mol = lps.H * 0.85 (heat transfer efficiency in Humbird et al.)
+    heat_duty_over_mol = 40000
     
     def __init__(self, ID='', ins=None, outs=(), *, B_eff=0.8,
                  TG_eff=0.85, combustables, ratio):
@@ -276,8 +304,8 @@ class OrganicAcidsBT(Facility):
         self.combustables = combustables
         self.ratio = ratio
         # All needed steam streams in the system, using set to avoid adding duplicates
-        self.steam_utilities = set()
-    
+        self.system_heating_utilities = set()
+
     def _run(self): pass
 
     # Below cannot be put in the _run function because ins will be empty when simulated,
@@ -286,9 +314,10 @@ class OrganicAcidsBT(Facility):
         feed_solids, feed_gases, lime, boiler_chemicals, bag, makeup_water = self.ins
         emission, ash, blowdown_water = self.outs
         # hu_cooling used to condense blowdown
-        hu_steam, hu_cooling = self.heat_utilities
+        hu_heating, hu_cooling = self.heat_utilities
         ratio = self.ratio
-        steam_utilities = self.steam_utilities
+        system_heating_utilities = self.system_heating_utilities
+        heat_duty_over_mol = self.heat_duty_over_mol
         
         # Use combustion reactions to create outs
         combustion_rxns = self.chemicals.get_combustion_reactions()
@@ -329,39 +358,43 @@ class OrganicAcidsBT(Facility):
             -(feed_solids.LHV+feed_gases.LHV-emission.H-ash.H)*self.B_eff
 
         # To get steam demand of the whole system
-        if not steam_utilities:
+        if not system_heating_utilities:
             for u in self.system.units:
                 if u is self: continue
                 for hu in u.heat_utilities:
-                    if hu.ID in (i.ID for i in HeatUtility.heating_agents):
-                        steam_utilities.add(hu)
+                    if hu.ID == 'low_pressure_steam':
+                        system_heating_utilities.add(hu)
         
         # Total demand of steam by other units in the whole system (kmol/hr)           
-        steam_demand = self.steam_demand = sum(i.flow for i in steam_utilities)
+        steam_demand = self.steam_demand = sum(i.flow for i in system_heating_utilities)
         # Heat needed to generate the steam
-        heat_demand = self.heat_demand = sum(i.agent.H*i.flow for i in steam_utilities)
-        
-        # Use low_pressure_steam as the agent
-        lps = HeatUtility.get_heating_agent('low_pressure_steam')
-        hu_steam.agent = lps
-        # Regeneration cost is modeled by this unit
-        hu_steam.cost = 0
-        
+        heat_demand = self.heat_demand = heat_duty_over_mol * steam_demand
         # heat_generated - heat_demand
         heat_surplus = self.heat_surplus = max(0, heat_generated - heat_demand)
         # Steam generated by the boiler with the surplus energy (kmol/hr)
-        steam_surplus = self.steam_surplus = heat_surplus / lps.H
+        steam_surplus = self.steam_surplus = heat_surplus / heat_duty_over_mol
+
         blowdown_water.imol['H2O'] = steam_surplus * self.blowdown
         # Additional need from making lime slurry
         makeup_water.imol['H2O'] = blowdown_water.imol['H2O'] + lime.F_mol/0.2*0.8
-
+        
         # 3600 is conversion of kJ/hr to kW (kJ/s)
         electricity = heat_surplus * self.TG_eff / 3600
-        # Take the opposite to for cooling
+        # Take the opposite for cooling duty (i.e., cooling duty should be negative)
+        # this is to condense the unused steam
         cooling = -(heat_surplus - electricity)
-        
-        hu_cooling.get_cooling_agent('cooling_water')
-        hu_cooling(duty=cooling, T_in=lps.T)
+
+        # Humbird et al. used high pressure steam, however as only energy balance 
+        # is considered here, the type of steam does not affect simulation results,
+        # thus all steams used in the system are set to low_pressure_steam
+        hu_heating.load_agent(HeatUtility.get_heating_agent('low_pressure_steam'))
+        hu_cooling.load_agent(HeatUtility.get_cooling_agent('cooling_water'))
+
+        # Steam outs for BT is the sum of steam ins for all other units in the system
+        hu_heating.mix_from(system_heating_utilities)
+        hu_heating.reverse()
+        hu_cooling(duty=cooling, T_in=hu_heating.agent.T)
+        hu_cooling.ID = 'cooling_water'
 
         ash.phase = 's'
         emission.phase = 'g'

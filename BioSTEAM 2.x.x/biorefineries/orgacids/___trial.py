@@ -10,8 +10,8 @@ Created on Tue Jan 14 12:49:42 2020
 # %% Whole-system simulation
 
 '''
-biosteam v2.11.1
-thermosteam v0.10.2
+biosteam v2.11.3
+thermosteam v0.11.2
 '''
 
 import biosteam as bst
@@ -28,8 +28,6 @@ for i in range(5):
     MPSP = orgacids_tea.solve_price(lactic_acid, orgacids_sys_no_boiler_tea)
     print(MPSP)
 
-#!!! M203.heat_utilities raises error
-#!!! save_report not saving diagrams
 # orgacids_sys.save_report('orgacids_sys.xlsx')
 
 

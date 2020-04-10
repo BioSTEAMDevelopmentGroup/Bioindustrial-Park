@@ -26,7 +26,7 @@ TODO:
 
 import thermosteam as tmo
 from flexsolve import aitken_secant
-from biosteam import Unit
+from biosteam import Unit, HeatUtility
 from biosteam.units import Flash, HXutility, Mixer, Pump, SolidsSeparator, StorageTank
 from biosteam.units.decorators import cost
 from biosteam.units._splitter import run_split_with_mixing
@@ -92,16 +92,23 @@ class SteamMixer(Unit):
     _N_outs = 1
     _N_heat_utilities = 1
     
+    # Energy (kJ) that can be transfered by 1 kmol of heating agent,
+    # estimated conservatively based on the energy of lowest energy-carring 
+    # biosteam native heating agent (low_pressure_steam), which is 42759 kJ/kmol
+    # lps = bst.HeatUtility.get_heating_agent('low_pressure_steam')
+    # lps_heat_duty_over_mol = lps.H * 0.85 (heat transfer efficiency in Humbird et al.)
+    heat_duty_over_mol = 40000
+    
     def __init__(self, ID='', ins=None, outs=(), *, P):
         #!!! Why here must use super(). as opposed to Unit.?
         super().__init__(ID, ins, outs)
         self.P = P
         
     @staticmethod
-    def _P_at_flow(mol_water, P, steam, mixed, feed, duty_over_mol):
+    def _P_at_flow(mol_water, P, steam, mixed, feed, heat_duty_over_mol):
         steam.imol['Water'] = mol_water
         mixed.mol = steam.mol + feed.mol
-        mixed.H = feed.H + mol_water * duty_over_mol
+        mixed.H = feed.H + mol_water * heat_duty_over_mol
         P_new = mixed.chemicals.Water.Psat(mixed.T)
         return P - P_new
     
@@ -109,19 +116,23 @@ class SteamMixer(Unit):
         feed, steam = self.ins
         mixed = self.outs[0]
         mixed.P = self.P
-        
-        hu = self.heat_utilities[0]
-        hu.agent = hu.get_heating_agent('high_pressure_steam')
-        duty_over_mol = hu.agent.H * hu.agent.heat_transfer_efficiency
+        heat_duty_over_mol = self.heat_duty_over_mol
+        hu_heating = self.heat_utilities[0]
+        # Humbird et al. used high pressure steam, however as only energy balance 
+        # is considered here, the type of steam does not affect simulation results,
+        # thus all steams used in the system are set to low_pressure_steam
+        hu_heating.load_agent(HeatUtility.get_heating_agent('low_pressure_steam'))
 
         steam_mol = steam.F_mol
         # Results changes a tiny bit each simulation 
         steam_mol = aitken_secant(self._P_at_flow,
                                   steam_mol, steam_mol+0.1, 
                                   1e-4, 1e-4,
-                                  args=(self.P, steam, mixed, feed, duty_over_mol))
-        hu.flow = steam_mol
-        hu.cost = steam_mol * hu.agent.regeneration_price
+                                  args=(self.P, steam, mixed, feed, heat_duty_over_mol))
+        hu_heating.duty = steam_mol * heat_duty_over_mol
+        hu_heating.flow = steam_mol
+        # Regeneration price is accounted for by CAPEX and OPEX of the OrganicAcidsBT unit
+        hu_heating.cost = 0
     
     @property
     def installation_cost(self): return 0
