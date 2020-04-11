@@ -45,7 +45,7 @@ def run_uncertainty(N_spearman_samples = 5000,
 def run_without_uncertainty(N_coordinates = 40):
     model_lc = lc.model.lipidcane_model
     model_sc = sc.model.sugarcane_model
-    coordinate = np.linspace(0.15, 0.02, N_coordinates)
+    coordinate = np.linspace(0.15, 0.01, N_coordinates)
     
     # Lipid cane
     sample = model_lc.get_baseline_sample()

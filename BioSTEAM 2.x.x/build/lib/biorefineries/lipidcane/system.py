@@ -8,7 +8,6 @@ Created on Thu Dec 21 11:05:24 2017
 import numpy as np
 import biosteam as bst
 from biosteam import units
-from biorefineries.lipidcane.utils import set_lipid_fraction
 from biorefineries.lipidcane.tea import LipidcaneTEA
 from biorefineries.lipidcane.chemicals import (
                                   pretreatment_chemicals,
@@ -16,8 +15,7 @@ from biorefineries.lipidcane.chemicals import (
                                   biodiesel_chemicals)
 from biorefineries.lipidcane.process_settings import price
 
-__all__ = ('lipidcane_sys', 'lipidcane_tea', 'lipidcane', 'lipid_cane',
-           'set_lipid_fraction')
+__all__ = ('lipidcane_sys', 'lipidcane_tea', 'lipidcane', 'lipid_cane')
 
 # %% Pretreatment section
 
@@ -569,7 +567,7 @@ P406 = units.Pump('P406')
 # Centrifuge out water
 C403 = units.LiquidsRatioCentrifuge('C403',
                          K_chemicals=('Methanol', 'Glycerol'),
-                         Ks=np.array([0.382, 0.183]),
+                         Ks=np.array((0.382, 0.183)),
                          top_solvents=('Biodiesel',),
                          top_split=(0.999,),
                          bot_solvents=('Water', 'Lipid', 'NaOH', 'HCl'),
@@ -659,6 +657,7 @@ oil-T403-P403
 #  0.2 wt % meoh (lower to 0.15)
 #  0.02 wt % glycerol (lower to 0.015)
 #  0.4 wt % free lipids (lower to 0.35)
+
 
 # Find Water Flow
 def adjust_biodiesel_wash_water():
