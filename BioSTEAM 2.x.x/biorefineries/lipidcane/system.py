@@ -8,7 +8,6 @@ Created on Thu Dec 21 11:05:24 2017
 import numpy as np
 import biosteam as bst
 from biosteam import units
-from biorefineries.lipidcane.utils import set_lipid_fraction
 from biorefineries.lipidcane.tea import LipidcaneTEA
 from biorefineries.lipidcane.chemicals import (
                                   pretreatment_chemicals,
@@ -16,8 +15,7 @@ from biorefineries.lipidcane.chemicals import (
                                   biodiesel_chemicals)
 from biorefineries.lipidcane.process_settings import price
 
-__all__ = ('lipidcane_sys', 'lipidcane_tea', 'lipidcane', 'lipid_cane',
-           'set_lipid_fraction')
+__all__ = ('lipidcane_sys', 'lipidcane_tea', 'lipidcane', 'lipid_cane')
 
 # %% Pretreatment section
 
