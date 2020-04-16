@@ -61,7 +61,7 @@ ash_disposal_cost = -1.41e6 / (4279*7880)
 # 2018: 8.30 * 1.114 / 1.157 = 7.99
 # 2019: 8.00 * 1.114 / 1.185 = 7.52
 # (7.90+8.00+7.37+7.99+7.52) / 5 = 7.76 (in metric tonne)
-gypsum_price = 0
+gypsum_cost = 0
 
 # Mentioned in P53 of Humbird et al., not into any units, but a cashflow
 # The original cost is $466,183 every 5 years, converted to per hour assuming 96% uptime
@@ -80,11 +80,12 @@ price = {# IHS markit report, 2016 price, US market,
          'Caustic': 0.0832 * _lb_per_kg * _chemical_2011to2016, # Davis et al. 2013
          'Boiler chemicals': 2.9772 * _lb_per_kg,
          'Lime': 0.1189 * _lb_per_kg,
-         'Cooling tower chems': 1.7842 * _lb_per_kg,
+         # Cooling tower chemis in Humbird et al. (CIP is a part of cooling tower)
+         'CIP chems': 1.7842 * _lb_per_kg,
          'Makeup water': 0.0002 * _lb_per_kg,
          # Cost of ash is negative because it's a product stream
          'Ash disposal': ash_disposal_cost,
-         'Gypsum': gypsum_price,
+         'Gypsum': gypsum_cost,
          'Electricity': 0.068, # USD/kWh from Davis et al., 2018
          # $6.16/kg protein in 2016$, P25 of Davis et al., 2018
          'Enzyme': 6.16,
@@ -100,7 +101,7 @@ bst.PowerUtility.price = price['Electricity']
 _lps = bst.HeatUtility.get_heating_agent('low_pressure_steam')
 _lps.regeneration_price = 0
 _lps.heat_transfer_efficiency = 0.85
-_lps.T =266 + 273.15
+_lps.T = 266 + 273.15
 _cw = bst.HeatUtility.get_cooling_agent('cooling_water')
 _cw.T = 28 + 273.15
 _cw.T_limit = _cw.T + 9

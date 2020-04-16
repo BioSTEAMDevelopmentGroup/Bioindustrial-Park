@@ -18,7 +18,7 @@ All units are explicitly defined here for transparency and easy reference
 
 '''
 TODO:
-   Vet separation system design
+   Separation system design
 '''
 
 
@@ -92,23 +92,16 @@ class SteamMixer(Unit):
     _N_outs = 1
     _N_heat_utilities = 1
     
-    # Energy (kJ) that can be transfered by 1 kmol of heating agent,
-    # estimated conservatively based on the energy of lowest energy-carring 
-    # biosteam native heating agent (low_pressure_steam), which is 42759 kJ/kmol
-    # lps = bst.HeatUtility.get_heating_agent('low_pressure_steam')
-    # lps_heat_duty_over_mol = lps.H * 0.85 (heat transfer efficiency in Humbird et al.)
-    heat_duty_over_mol = 40000
-    
     def __init__(self, ID='', ins=None, outs=(), *, P):
         #!!! Why here must use super(). as opposed to Unit.?
         super().__init__(ID, ins, outs)
         self.P = P
         
     @staticmethod
-    def _P_at_flow(mol_water, P, steam, mixed, feed, heat_duty_over_mol):
+    def _P_at_flow(mol_water, P, steam, mixed, feed):
         steam.imol['Water'] = mol_water
         mixed.mol = steam.mol + feed.mol
-        mixed.H = feed.H + mol_water * heat_duty_over_mol
+        mixed.H = feed.H + steam.Hvap
         P_new = mixed.chemicals.Water.Psat(mixed.T)
         return P - P_new
     
@@ -116,21 +109,15 @@ class SteamMixer(Unit):
         feed, steam = self.ins
         mixed = self.outs[0]
         mixed.P = self.P
-        heat_duty_over_mol = self.heat_duty_over_mol
         hu_heating = self.heat_utilities[0]
-        # Humbird et al. used high pressure steam, however as only energy balance 
-        # is considered here, the type of steam does not affect simulation results,
-        # thus all steams used in the system are set to low_pressure_steam
-        hu_heating.load_agent(HeatUtility.get_heating_agent('low_pressure_steam'))
 
         steam_mol = steam.F_mol
         # Results changes a tiny bit each simulation 
         steam_mol = aitken_secant(self._P_at_flow,
                                   steam_mol, steam_mol+0.1, 
                                   1e-4, 1e-4,
-                                  args=(self.P, steam, mixed, feed, heat_duty_over_mol))
-        hu_heating.duty = steam_mol * heat_duty_over_mol
-        hu_heating.flow = steam_mol
+                                   args=(self.P, steam, mixed, feed))
+        hu_heating(steam.Hvap, mixed.T)
         # Regeneration price is accounted for by CAPEX and OPEX of the OrganicAcidsBT unit
         hu_heating.cost = 0
     
@@ -747,7 +734,7 @@ class AnaerobicDigestion(Unit):
         biogas.phase = 'g'
         hot_water.link_with(cool_water, TP=False)
         biogas.T = waste.T = sludge.T = hot_water.T = 35+273.15
-        H_at_35C = feed.thermo.mixture.H(z=feed.mol, phase='l', T=35+273.15, P=101325)
+        H_at_35C = feed.thermo.mixture.H(phase='l', mol=feed.mol, T=35+273.15, P=101325)
         # Water flow is adjusted to maintain heat balance
         cool_water.mol *= (feed.H - H_at_35C)/(hot_water.H - cool_water.H)
         sludge.copy_flow(feed)
@@ -808,8 +795,9 @@ class AerobicDigestion(Unit):
         # 51061 and 168162 from stream 630 in Humbird et al.
         air.imol['O2'] = 51061 * ratio
         air.imol['N2'] = 168162 * ratio
-        # 2252 from stream 632 in Humbird et al
-        caustic.imol['NaOH'] = (2252*ratio) + (2*influent.imol['H2SO4']/self.neutralization_rxn.X)
+        # 2252 from stream 632 in Humbird et al, 39.997109 is the MW of NaOH
+        caustic.imol['NaOH'] = (2252*ratio)/39.997109 + \
+                               (2*influent.imol['H2SO4']/self.neutralization_rxn.X)
         caustic.imol['H2O'] = caustic.imol['NaOH']
         effluent.copy_like(influent)
         effluent.mol += air.mol

@@ -50,6 +50,7 @@ chemical_IDs = [
         'CalciumLactate', 'CalciumAcetate',
         'MethylLactate', 'MethylAcetate',
         'Na2SO4', 'AmmoniumHydroxide',
+        'CIPchems',
         # Probably not needed ones
         'Ethanol',
         'EthylLactate', 'EthylAcetate',
@@ -211,6 +212,7 @@ append_chemical_copy('ArabinoseOligomer', chems.XyloseOligomer)
 append_chemical_copy('DenaturedEnzyme', chems.Enzyme)
 append_chemical_copy('Arabinan', chems.Xylan)
 append_chemical_copy('Galactan', chems.Glucan)
+append_chemical_copy('CIPchems', chems.BaghouseBag)
 
 # Boiler chemicals includes amine, ammonia, and phosphate,
 # did not model separately as composition unavailable and only one price is given
@@ -242,7 +244,7 @@ chemical_groups = dict(
     # but it's the product of the auto-populated combusion reactions so should in solid phase,
     # however no P4O10 will be generated in the system as no P-containing chemicals are included in "combustables"
     OtherInsolubleSolids = ('Tar', 'Ash', 'CalciumDihydroxide', 'CaSO4', 'P4O10',
-                            'BaghouseBag'),
+                            'BaghouseBag', 'CIPchems'),
     OtherStructuralCarbohydrates = ('Glucan', 'Xylan', 'Lignin', 'Arabinan', 
                                     'Mannan', 'Galactan'),
     SeparatelyListedOrganics = ('Ethanol', 'Glucose', 'Xylose', 'AceticAcid',
@@ -328,8 +330,9 @@ chems.Enzyme.Cn.add_model(1.25*chems.Enzyme.MW)
 chems.CSL.Cn.add_model(1.25*chems.CSL.MW)
 chems.DenaturedEnzyme.Cn.add_model(1.25*chems.DenaturedEnzyme.MW)
 chems.FermMicrobeXyl.Cn.add_model(1.25*chems.FermMicrobeXyl.MW)
-# BaghouseBag is just a placeholder
+# BaghouseBag and CIPchems are just placeholders
 chems.BaghouseBag.Cn.add_model(0)
+chems.CIPchems.Cn.add_model(0)
 
 # # Check missing Cn
 # missing_Cn = []
@@ -386,6 +389,7 @@ for chemical in chems:
 chems.CSL.HHV = chems.Protein.HHV/4+chems.H2O.HHV/2+chems.LacticAcid.HHV/4
 chems.CSL.LHV = chems.Protein.LHV/4+chems.H2O.LHV/2+chems.LacticAcid.LHV/4
 chems.BaghouseBag.HHV = chems.BaghouseBag.LHV = 0
+chems.CIPchems.HHV = chems.CIPchems.LHV = 0
 
 # # Check missing HHV and LHV
 # missing_HHV_or_LHV = []

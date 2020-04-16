@@ -86,9 +86,9 @@ class OrganicAcidsCT(Facility):
     # Page 55 of Humbird et al.
     blowdown = 0.00005+0.0015
     
-    def __init__(self, ID='', ins=None, outs=()):
+    def __init__(self, ID='', ins=None, outs=(), system_cooling_utilities=set()):
         Facility.__init__(self, ID, ins, outs)
-        self.system_cooling_utilities = set()
+        self.system_cooling_utilities = system_cooling_utilities
         
     def _run(self):
         return_cw, makeup_water = self.ins
@@ -102,9 +102,9 @@ class OrganicAcidsCT(Facility):
         process_cw.T = blowdown.T = 28 + 273.15
         
         cw = self.system_cooling_utilities
-        if not cw:
-            for u in self.system.units:
-                if u is self: continue
+        for u in list(self.system.units)+list(self.system.facilities):
+            if u is self: continue
+            if hasattr(u, 'heat_utilities'):
                 for hu in u.heat_utilities:
                     if hu.ID == 'cooling_water':
                         cw.add(hu)
@@ -129,7 +129,7 @@ class OrganicAcidsCT(Facility):
       CE=521.9, cost=250000, S=106453, n=0.7, BM=1.7)
 @cost(basis='Total water flow rate', ID='PWC circulating pump', units='kg/hr',
       CE=550.8, kW=55.9275, cost=15292, S=518924, n=0.8, BM=3.1)
-@cost(basis='Balance/discharged water flow rate', ID='Balance/discharged water pump', units='kg/hr',
+@cost(basis='Makeup/discharged water flow rate', ID='Makeup/discharged water pump', units='kg/hr',
       CE=550.8, kW=14.914, cost=6864, S=155564, n=0.8, BM=3.1)
 class OrganicAcidsPWC(Facility):
     """
@@ -142,7 +142,7 @@ class OrganicAcidsPWC(Facility):
     ins :
         [0] Recycled water.
         
-        [1] Balance water (>0 when recycled water < process water).
+        [1] Makeup water (>0 when recycled water < process water).
     outs :
         [0] Process water.
         
@@ -164,57 +164,47 @@ class OrganicAcidsPWC(Facility):
     _N_outs = 2
     _N_heat_utilities = 2
     _units= {'Total water flow rate': 'kg/hr',
-             'Balance/discharged water flow rate': 'kg/hr'}
-    
-    #!!! Currently no heating_utilities/cooling_utilities
-    
-    # Energy (kJ) that can be transfered by 1 kmol of heating agent,
-    # estimated conservatively based on the energy of lowest energy-carring 
-    # biosteam native heating agent (low_pressure_steam), which is 42759 kJ/kmol
-    # lps = bst.HeatUtility.get_heating_agent('low_pressure_steam')
-    # lps_heat_duty_over_mol = lps.H * 0.85 (heat transfer efficiency in Humbird et al.)
-    heat_duty_over_mol = 40000
+             'Makeup/discharged water flow rate': 'kg/hr'}
     
     def __init__(self, ID='', ins=None, outs=(), process_water_streams=None):
         Facility.__init__(self, ID, ins, outs)
         self.process_water_streams = process_water_streams
 
     def _run(self):
-        recycled, balance = self.ins
+        recycled, makeup = self.ins
         process, discharged = self.outs
         process_water_streams = self.process_water_streams        
-        
-        process.mix_from(process_water_streams)
+
+        process.mix_from(process_water_streams)      
         discharged.imol['Water'] = recycled.imol['Water'] - process.imol['Water']
         if discharged.imol['Water'] < 0:
-            balance.imol['Water'] -= discharged.imol['Water']
+            makeup.imol['Water'] -= discharged.imol['Water']
             discharged.imol['Water'] = 0
+        else:
+            makeup.imol['Water'] = 0
+        total_stream = process.copy()
+        total_stream.mix_from([process, makeup])
             
         Design = self.design_results
-        total_water = recycled.imass['Water'] + balance.imass['Water']
-        Design['Total water flow rate'] = total_water
-        Design['Balance/discharged water flow rate'] = max(balance.imass['Water'],
-                                                           discharged.imass['Water'])
+        Design['Total water flow rate'] = total_stream.F_mass
+        Design['Makeup/discharged water flow rate'] = max(makeup.imass['Water'],
+                                                          discharged.imass['Water'])
         
         HX = self.HX = HXutility('PWC_HX')
         hu_heating, hu_cooling = self.heat_utilities
         hu_heating.load_agent(HeatUtility.get_heating_agent('low_pressure_steam'))
         hu_cooling.load_agent(HeatUtility.get_cooling_agent('cooling_water'))
         
-        H_net = self.H_net = (process.H+discharged.H) - (recycled.H+balance.H)
+        H_net = self.H_net = total_stream.H - (recycled.H+makeup.H)
         # H_net > 0 means heating required
         if H_net > 0:
-            hu_heating.duty = -H_net
-            hu_heating.flow = -H_net/self.heat_duty_over_mol
+            hu_heating(H_net, total_stream.T)
             hu_cooling.duty = hu_cooling.flow = 0
         else:
-            # Heat transfer for cooling agent is modeled
-            hu_cooling(H_net, process.T)
+            hu_cooling(H_net, total_stream.T)
             hu_heating.duty = hu_heating.flow = 0
 
         # Design the heat exchanger
-        total_stream = process.copy()
-        total_stream.mix_from([process, balance])
         HX.simulate_as_auxiliary_exchanger(H_net, total_stream)
         self.purchase_costs['Heat exchanger'] = HX.purchase_costs['Heat exchanger']
         
@@ -297,14 +287,14 @@ class OrganicAcidsBT(Facility):
     heat_duty_over_mol = 40000
     
     def __init__(self, ID='', ins=None, outs=(), *, B_eff=0.8,
-                 TG_eff=0.85, combustables, ratio):
+                 TG_eff=0.85, combustables, ratio,
+                 system_heating_utilities=set()):
         Facility.__init__(self, ID, ins, outs)
         self.B_eff = B_eff
         self.TG_eff = TG_eff
         self.combustables = combustables
         self.ratio = ratio
-        # All needed steam streams in the system, using set to avoid adding duplicates
-        self.system_heating_utilities = set()
+        self.system_heating_utilities = system_heating_utilities
 
     def _run(self): pass
 
@@ -358,42 +348,38 @@ class OrganicAcidsBT(Facility):
             -(feed_solids.LHV+feed_gases.LHV-emission.H-ash.H)*self.B_eff
 
         # To get steam demand of the whole system
-        if not system_heating_utilities:
-            for u in self.system.units:
-                if u is self: continue
+        # Humbird et al. used some high pressure steam streams, however as only energy balance 
+        # is considered here, the type of steam does not affect simulation results,
+        # thus all steams used in the system are set to low_pressure_steam
+        for u in list(self.system.units)+list(self.system.facilities):
+            if u is self: continue
+            if hasattr(u, 'heat_utilities'):
                 for hu in u.heat_utilities:
                     if hu.ID == 'low_pressure_steam':
                         system_heating_utilities.add(hu)
-        
-        # Total demand of steam by other units in the whole system (kmol/hr)           
-        steam_demand = self.steam_demand = sum(i.flow for i in system_heating_utilities)
-        # Heat needed to generate the steam
-        heat_demand = self.heat_demand = heat_duty_over_mol * steam_demand
-        # heat_generated - heat_demand
-        heat_surplus = self.heat_surplus = max(0, heat_generated - heat_demand)
+
+        hu_heating.load_agent(HeatUtility.get_heating_agent('low_pressure_steam'))
+        hu_cooling.load_agent(HeatUtility.get_cooling_agent('cooling_water'))
+        # Steam outs for BT is the sum of steam ins for all other units in the system
+        hu_heating.mix_from(system_heating_utilities)
+        hu_heating.reverse()
+
+        # heat_generated - heat_demand (BT's heating duty is negative)
+        heat_surplus = self.heat_surplus = heat_generated - (-hu_heating.duty)
         # Steam generated by the boiler with the surplus energy (kmol/hr)
-        steam_surplus = self.steam_surplus = heat_surplus / heat_duty_over_mol
+        steam_surplus = self.steam_surplus = max(0, heat_surplus) / heat_duty_over_mol
 
         blowdown_water.imol['H2O'] = steam_surplus * self.blowdown
         # Additional need from making lime slurry
         makeup_water.imol['H2O'] = blowdown_water.imol['H2O'] + lime.F_mol/0.2*0.8
         
         # 3600 is conversion of kJ/hr to kW (kJ/s)
-        electricity = heat_surplus * self.TG_eff / 3600
+        generated_electricity = self.generated_electricity = heat_surplus * self.TG_eff / 3600
         # Take the opposite for cooling duty (i.e., cooling duty should be negative)
         # this is to condense the unused steam
-        cooling = -(heat_surplus - electricity)
+        cooling_need = self.cooling_need = min(0, -(heat_surplus - generated_electricity))
 
-        # Humbird et al. used high pressure steam, however as only energy balance 
-        # is considered here, the type of steam does not affect simulation results,
-        # thus all steams used in the system are set to low_pressure_steam
-        hu_heating.load_agent(HeatUtility.get_heating_agent('low_pressure_steam'))
-        hu_cooling.load_agent(HeatUtility.get_cooling_agent('cooling_water'))
-
-        # Steam outs for BT is the sum of steam ins for all other units in the system
-        hu_heating.mix_from(system_heating_utilities)
-        hu_heating.reverse()
-        hu_cooling(duty=cooling, T_in=hu_heating.agent.T)
+        hu_cooling(duty=cooling_need, T_in=hu_heating.agent.T)
         hu_cooling.ID = 'cooling_water'
 
         ash.phase = 's'
@@ -405,10 +391,11 @@ class OrganicAcidsBT(Facility):
             self.outs[i].P = 101325
 
         Design = self.design_results
-        Design['Flow rate'] = (steam_demand+steam_surplus) * 18.01528
-        Design['Work'] = electricity
+        # BT's heating agent flow is negative
+        Design['Flow rate'] = (-hu_heating.flow+steam_surplus) * 18.01528
+        Design['Work'] = max(0, generated_electricity)
 
     def _end_decorated_cost_(self):
-        self.power_utility(self.power_utility.rate - self.design_results['Work'])
+        self.power_utility(self.power_utility.rate - self.generated_electricity)
                 
 
