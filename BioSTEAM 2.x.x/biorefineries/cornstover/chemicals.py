@@ -114,8 +114,7 @@ append_single_phase_chemical('CO', 'Carbon monoxide', MW=28.01, Hf=-110.522)
 extend_single_phase_chemicals(['Glucose', 'Xylose', 'Sucrose'])
 append_single_phase_chemical('CaSO4')
 
-subgroup = chems.retrieve(['Glucose', 'Xylose', 'Sucrose',
-                           'CaSO4', 'AmmoniumSulfate'])
+subgroup = chems['Glucose', 'Xylose', 'Sucrose', 'CaSO4', 'AmmoniumSulfate']
 for chemical in subgroup: set_Cp(chemical, Cp_cellulosic)
 
 # Analagous sugars

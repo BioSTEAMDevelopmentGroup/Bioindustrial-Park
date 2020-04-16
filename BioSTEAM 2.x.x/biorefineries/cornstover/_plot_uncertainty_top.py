@@ -10,7 +10,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.patches import Patch
 from matplotlib.lines import Line2D
-from biosteam import colors
+from biosteam.utils import colors
 from biosteam.evaluation.evaluation_tools import plot_single_points, plot_horizontal_line, \
                                                  plot_montecarlo, plot_vertical_line
 
