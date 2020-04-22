@@ -26,8 +26,9 @@ Then the simulated pretreatment efficacy for acid pretreatment was used
     (python package biosteam) were described in Cortes-Peña et al.
     
     MESP in Humbird et al. is $2.15/gal using a feedstock price of $58.5/dry-ton,
-    both in 2007 U.S. dollars ($2.49/gal and $67.9/dry-ton in 2016$, respectively),
-    results were also converted to 2016$ using GDP chain index in Annual Energy Outlook 
+    both in 2007 U.S. dollars ($2.49/gal and $67.9/dry-ton in 2016$, respectively,
+    ton is U.S. ton), results were also converted to 2016$ using 
+    gross domestic product (GDP) chain-type index in Annual Energy Outlook 
     (https://www.eia.gov/outlooks/aeo/)
     
     Uncertainties of MESP were also calculated using the 1000 different 
@@ -43,8 +44,19 @@ Requirements:
     (2) Excel file named "_feedstock_composition_for_simulation.xlsx" in the same
         directory path as this script
 
-Note: This script was develoepd for biosteam v2.4.1, biorefineries v2.4.1, 
-      and thermosteam v0.4.1.
+Note: This script is compatible with biosteam v2.12.10, biorefineries v2.9.1, 
+      and thermosteam v0.12.17. Results used in the manuscript were generated using
+      biosteam v2.4.1, biorefineries v2.4.1, and thermosteam v0.4.1.
+      #!!! Check if it's compatible with newer biosteam
+      
+      Use pip install package_name==version to install the specific version
+      
+      If a "FloatingPointError: divide by zero encountered in double_scalars"
+      was prompted relating to cool_water, then in the cornstover.unit module,
+      replace the following line:
+          hot_water.link_with(cool_water)
+      with:
+          hot_water.link_with(cool_water, TP=False)
 
 References:
     (1) Humbirdet al., Technical Report NREL/TP-5100-47764; DOE: NREL, 2011
@@ -56,20 +68,15 @@ References:
 
 import numpy as np
 import pandas as pd
-from biosteam import find
-from biorefineries.cornstover import system
+# R201: pretreatment unit
+# R301: saccharification and co-fermentation unit
+from biorefineries.cornstover.system import cornstover_sys, cornstover, ethanol, \
+    R201, R301
 
 simulated_composition = pd.read_excel('_feedstock_composition_for_simulation.xlsx', \
                                       sheet_name='composition')
 
-cornstover_sys = system.cornstover_sys
 cornstover_tea = cornstover_sys.TEA
-cornstover = find.stream.cornstover
-ethanol = find.stream.ethanol
-# R201 is the preatreatment reactor
-R201 = find.unit.R201
-# R301 is the saccharification and co-fermentation reactor
-R301 = find.unit.R301
 
 _ethanol_density_kggal = 2.98668849
 _feedstock_conversion = 907.185 / 0.8 # from 80% moisture $/kg to $/dry-ton (U.S. ton)
@@ -80,6 +87,16 @@ _2007_to_2016 = 1.16
 default_ethanol_price = 2.15 / _ethanol_density_kggal
 default_feedstock_price = 58.5 / _feedstock_conversion
 default_total_flow = 2205 * 365 * 0.96 * 907.185 / 8410 / (1-0.2) # kg/hr including water
+
+# Function to calculate ethanol yield in gal/dry-ton feedstock
+calculate_yield = lambda: ethanol.F_mass/_ethanol_density_kggal/ \
+    (cornstover.F_mass/_feedstock_conversion)
+# Function to calculate minimum ethanol selling price (MESP) in $/gal
+calculate_MESP = lambda: cornstover_tea.solve_price(stream=ethanol) * \
+    _ethanol_density_kggal
+# Function to calculate maximum feedstock payment price (MFPP) in $/dry-ton
+calculate_MFPP = lambda: cornstover_tea.solve_price(stream=cornstover)* \
+    _feedstock_conversion
 
 
 # %% Calculate cellulose and hemicellulose conversions 
@@ -156,51 +173,15 @@ for i in range(1, 42):
                                               np.maximum(conversion_min,
                                                          OXD_individual))
 
-# Obtain conversion percentiles  
-LHW_5 = np.percentile(df_LHW, 5, axis=0)
-LHW_50 = np.percentile(df_LHW, 50, axis=0)
-LHW_95 = np.percentile(df_LHW, 95, axis=0)
+# Obtain conversion quantiles
+dfs =(df_LHW, df_acid, df_EXP, df_base, df_IL, df_ORG, df_OXD)
+indices = ['LHW', 'Acid', 'EXP', 'Base', 'IL', 'ORG', 'OXD']
+quantiles = [[df.quantile(q=i) for i in (0.05, 0.5, 0.95)] for df in dfs]
 
-acid_5 = np.percentile(df_acid, 5, axis=0)
-acid_50 = np.percentile(df_acid, 50, axis=0)
-acid_95 = np.percentile(df_acid, 95, axis=0)
-
-EXP_5 = np.percentile(df_EXP, 5, axis=0)
-EXP_50 = np.percentile(df_EXP, 50, axis=0)
-EXP_95 = np.percentile(df_EXP, 95, axis=0)
-
-base_5 = np.percentile(df_base, 5, axis=0)
-base_50 = np.percentile(df_base, 50, axis=0)
-base_95 = np.percentile(df_base, 95, axis=0)
-
-IL_5 = np.percentile(df_IL, 5, axis=0)
-IL_50 = np.percentile(df_IL, 50, axis=0)
-IL_95 = np.percentile(df_IL, 95, axis=0)
-
-ORG_5 = np.percentile(df_ORG, 5, axis=0)
-ORG_50 = np.percentile(df_ORG, 50, axis=0)
-ORG_95 = np.percentile(df_ORG, 95, axis=0)
-
-OXD_5 = np.percentile(df_OXD, 5, axis=0)
-OXD_50 = np.percentile(df_OXD, 50, axis=0)
-OXD_95 = np.percentile(df_OXD, 95, axis=0)
-
-df_stats = pd.DataFrame([LHW_5, LHW_50, LHW_95,
-                         acid_5, acid_50, acid_95,
-                         EXP_5, EXP_50, EXP_95,
-                         base_5, base_50, base_95,
-                         IL_5, IL_50, IL_95,
-                         ORG_5, ORG_50, ORG_95,
-                         OXD_5, OXD_50, OXD_95], 
-                        index=['LHW 5%', 'LHW 50%', 'LHW 95%',
-                               'Acid 5%', 'Acid 50%', 'Acid 95%',
-                               'EXP 5%', 'EXP 50%', 'EXP 95%',
-                               'Base 5%', 'Base 50%', 'Base 95%',
-                               'IL 5%', 'IL 50%', 'IL 95%',
-                               'ORG 5%', 'ORG 50%', 'ORG 95%',
-                               'OXD 5%', 'OXD 50%', 'OXD 95%'
-                               ],
-                        columns=lignin)
+df_stats = pd.concat([pd.concat(quantiles[indices.index(index)], axis=1) 
+                      for index in indices], 
+                     axis=1, keys=indices)
+df_stats.rename_axis('Lignin content')
 
 
 # %% Calculate minimum ethanol selling price (MESP) and maximum feedstock payment price (MFPP)
@@ -216,8 +197,8 @@ chemical_IDs = ('Ash', 'Glucan', 'Xylan', 'Lignin', 'Acetate', 'Protein',
 
 cornstover.empty()
 chemical_dw_flow = [i*dw_flow for i in dw_frac]
-cornstover.set_flow(data=water_flow, units='kg/hr', IDs='Water')
-cornstover.set_flow(data=chemical_dw_flow, units='kg/hr', IDs=chemical_IDs)
+cornstover.set_flow(water_flow, 'kg/hr', 'Water')
+cornstover.set_flow(chemical_dw_flow, 'kg/hr', chemical_IDs)
 
 # Cellulose conversion
 adjusted_conversion = min(1, max(0, (1.04 - 1.37*0.1576)))
@@ -230,27 +211,31 @@ R201.reactions[11].X = adjusted_conversion # arabinanan
 # Simulate the system
 cornstover_sys.simulate()
 
+# Calculate ethanol yield
+baseline_yield = calculate_yield()
 # Calculate MESP using default feedstock price
 cornstover.price = default_feedstock_price
-baseline_MESP_2007 = cornstover_tea.solve_price(stream=ethanol)*_ethanol_density_kggal
+baseline_MESP_2007 = calculate_MESP()
 # Calculate MFPP using default ethanol price
 ethanol.price = default_ethanol_price
-baseline_MFPP_2007 = cornstover_tea.solve_price(stream=cornstover)*_feedstock_conversion
+baseline_MFPP_2007 = calculate_MFPP()
 
 df_Humbird_baseline = pd.DataFrame(
-    {'2007$': (baseline_MESP_2007, baseline_MFPP_2007),
-     '2016$': (baseline_MESP_2007*_2007_to_2016, baseline_MFPP_2007*_2007_to_2016)},
-    index=('MESP [$/gal]', 'MFPP [$/dry-ton]')
-    )
+    data=(baseline_yield, baseline_MESP_2007, baseline_MESP_2007*_2007_to_2016,
+          baseline_MFPP_2007, baseline_MFPP_2007*_2007_to_2016),
+    index=('Yield [gal/dry-ton]', 'MESP [2007$/gal]', 'MESP [2016$/gal]',
+           'MFPP [2007$/dry-ton]', 'MFPP [2016$/dry-ton]'),
+    columns=('Results',))
 
 
-# %% Propagate uncertainties of pretreatment efficacy to MESP
+# %% Propagate uncertainties of pretreatment efficacy to ethanol yield and MESP
 
 # Pretreatment efficacies for the lignin content (0.1576) of corn stover as in Humbird et al.
 Humbird_conversion =  intercept_acid + 0.1576*slope_acid
 
 # Calculate MESP for each of these 1000 pretreatment efficacies using default feedstock price
 cornstover.price = default_feedstock_price
+Humbird_yield = []
 Humbird_MESP_2007 = []
 for conversion in Humbird_conversion:
     # Adjust cellulose conversion
@@ -264,13 +249,14 @@ for conversion in Humbird_conversion:
     
     # Simulate system and get MESP
     cornstover_sys.simulate()
-    MESP = cornstover_tea.solve_price(stream=ethanol)*_ethanol_density_kggal
-    Humbird_MESP_2007.append(MESP.copy())
+    Humbird_yield.append(calculate_yield())
+    Humbird_MESP_2007.append(calculate_MESP())
 
 Humbird_MESP_2016 = [i * _2007_to_2016 for i in Humbird_MESP_2007]
 
 df_Humbird_uncertainties = pd.DataFrame(
     {'Conversion': Humbird_conversion,
+     'Yield [gal/dry-ton]': Humbird_yield,
      'MESP [2007$/gal]': Humbird_MESP_2007,
      'MESP [2016$/gal]': Humbird_MESP_2016}
     )
@@ -278,12 +264,15 @@ df_Humbird_uncertainties = pd.DataFrame(
 
 # %% Run the baseline biorefinery for different feedstock compositions
 
-simulated_MESP_2007 = []
-simulated_MFPP_2007 = []
-simulated_conversions = []
 # This is for double-checking, simulated total flow rates should be the same 
 # as the default value (default_total_flow, 104179.5720749108 kg/hr)
 simulated_total_flow = []
+
+# These store output results
+simulated_conversions = []
+simulated_yields = []
+simulated_MESP_2007 = []
+simulated_MFPP_2007 = []
 
 #               glucan, xylan, arabinan, galactan, mannan, lignin
 default_fracs = [0.3505, 0.1953, 0.0238, 0.0143, 0.0060, 0.1576]
@@ -296,12 +285,11 @@ default_hemicellulose_flow = cornstover.imass['Xylan'] + cornstover.imass['Arabi
 default_lignin_flow = cornstover.imass['Lignin']
 default_chl_flow = default_cellulose_flow + default_hemicellulose_flow + default_lignin_flow
 
-
 # Run assumed compositions, the assumed compositions are corrected to
 # 100% sum of cellulose, hemicellulose, and lignin,
 # compositions of other components were assumed to be the same as in Humbird et al.
 # The first composition in the file is the default one as in Humbird et al.
-for i in range(len(simulated_composition['Cellulose'])):
+for i in range(0, len(simulated_composition['Cellulose'])):
     # Adjust feedstock flows
     adjusted_cellulose_flow =  default_chl_flow * simulated_composition['Cellulose'][i]
     adjusted_hemicellulose_flow =  default_chl_flow * simulated_composition['Hemicellulose'][i]
@@ -332,16 +320,17 @@ for i in range(len(simulated_composition['Cellulose'])):
     # Simulate system
     cornstover_sys.simulate()
     
-    # Get MESP based on default feedstock price
+    # Calculate ethanol yield
+    simulated_yields.append(calculate_yield())
+    
+    # Calculate MESP based on default feedstock price
     cornstover.price = default_feedstock_price
-    MESP = cornstover_tea.solve_price(stream=ethanol) * _ethanol_density_kggal   
-    simulated_MESP_2007.append(MESP.copy())
+    simulated_MESP_2007.append(calculate_MESP())  
    
-    # Gest MFPP based on market price of ethanol 
-    # (average of ethanol price in 2010-2019 based on Annual Energy Outlook)
-    ethanol.price = 1.90 / _ethanol_density_kggal
-    MFPP = cornstover_tea.solve_price(stream=cornstover) * _feedstock_conversion
-    simulated_MFPP_2007.append(MFPP.copy())
+    # Calculate MFPP based on market price of ethanol
+    # (1. is the average of ethanol price of 2010-2019 in 2007$ from Annual Energy Outlook)
+    ethanol.price = 1.88 / _ethanol_density_kggal
+    simulated_MFPP_2007.append(calculate_MFPP())
 
 simulated_MESP_2016 = [i * _2007_to_2016 for i in simulated_MESP_2007]
 simulated_MFPP_2016 = [i * _2007_to_2016 for i in simulated_MFPP_2007]
@@ -352,6 +341,7 @@ df_simulated_results = pd.DataFrame(
       'Hemicellulose': simulated_composition['Hemicellulose'],
       'Lignin': simulated_composition['Lignin'],
       'Conversion': simulated_conversions,
+      'Ethanol yield [gal/dry-ton]': simulated_yields,
       'MESP [2007$/gal]': simulated_MESP_2007,
       'MESP [2016$/gal]': simulated_MESP_2016,
       'MFPP [2007$/dry-ton]': simulated_MFPP_2007,
@@ -370,7 +360,7 @@ with pd.ExcelWriter('_Li_et_al_2020_results.xlsx') as writer:
     df_IL.to_excel(writer, sheet_name='IL')
     df_ORG.to_excel(writer, sheet_name='ORG')
     df_OXD.to_excel(writer, sheet_name='OXD')
-    df_Humbird_baseline.to_excel(writer, sheet_name='Humbird TEA baseline')
-    df_Humbird_uncertainties.to_excel(writer, sheet_name='Humbird TEA uncertainties')
-    df_simulated_results.to_excel(writer, sheet_name='Simulated TEA')
+    df_Humbird_baseline.to_excel(writer, sheet_name='Humbird baseline')
+    df_Humbird_uncertainties.to_excel(writer, sheet_name='Humbird uncertainties')
+    df_simulated_results.to_excel(writer, sheet_name='Simulated feedstocks')
 
