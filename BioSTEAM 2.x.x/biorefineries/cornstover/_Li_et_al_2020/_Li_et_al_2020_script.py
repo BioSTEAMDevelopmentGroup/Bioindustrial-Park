@@ -18,8 +18,8 @@ Monte Carlo simulation was first conducted to get pretreatment efficacy
     1000 simulation was conducted for each lignin content
 
 Then the simulated pretreatment efficacy for acid pretreatment was used 
-    in a biorefinery model to calculate minimum ethanol selling price (MESP) 
-    and maximum feedstock payment price (MFPP)
+    in a biorefinery model to calculate ethanol yield, minimum ethanol 
+    selling price (MESP), and maximum feedstock payment price (MFPP)
     
     The baseline biorefinery was described in Humbird et al.;
     the biorefinery model (python package biorefineries) and process modeling tool 
