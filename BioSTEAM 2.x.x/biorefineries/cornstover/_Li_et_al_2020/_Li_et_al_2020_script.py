@@ -14,7 +14,7 @@ Correlations between feedstock lignin content and pretreatment efficacy
     for seven different pretreatment technologies as described in the manuscript
     
 Monte Carlo simulation was first conducted to get pretreatment efficacy 
-    for feedstocks with lignin content ranging from 0-40% with a step of 1%,
+    for feedstocks with lignin content ranging from 0-40% with a step size of 1%,
     1000 simulation was conducted for each lignin content
 
 Then the simulated pretreatment efficacy for acid pretreatment was used 
@@ -47,7 +47,6 @@ Requirements:
 Note: This script is compatible with biosteam v2.12.10, biorefineries v2.9.1, 
       and thermosteam v0.12.17. Results used in the manuscript were generated using
       biosteam v2.4.1, biorefineries v2.4.1, and thermosteam v0.4.1.
-      #!!! Check if it's compatible with newer biosteam
       
       Use pip install package_name==version to install the specific version
       
