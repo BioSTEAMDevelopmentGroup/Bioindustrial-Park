@@ -106,8 +106,7 @@ Flocculant.Cn.add_model(4.184 * Flocculant.MW)
 Lignin.Cn.add_model(1.364 * Lignin.MW)
 Solids.Cn.add_model(1.100 * Solids.MW)
 
-for chemical in lipidcane_chemicals:
-    chemical.default()
+for chemical in lipidcane_chemicals: chemical.default()
 
 lipidcane_chemicals.compile()
 lipidcane_chemicals.set_synonym('Water', 'H2O')

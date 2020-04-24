@@ -109,11 +109,11 @@ append_single_phase_chemical('CO2')
 # Analagous vapors
 append_new_single_phase_chemical('NO2', chems.N2,
                                  formula='NO2',
-                                 MW=46.01, Hf=7925*cal2joule)
+                                 Hf=7925*cal2joule)
 append_new_single_phase_chemical('NO', chems.N2,
                                  formula='NO',
-                                 MW=30.01, Hf=82.05)
-append_single_phase_chemical('CO', 'Carbon monoxide', MW=28.01, Hf=-110.522)
+                                 Hf=82.05)
+append_single_phase_chemical('CO', 'Carbon monoxide', Hf=-110.522)
 
 # Will remain as  solid
 extend_single_phase_chemicals(['Glucose', 'Xylose', 'Sucrose'])
@@ -149,7 +149,6 @@ append_chemical_copy('SolubleLignin', chems.Lignin)
 append_chemical_copy('GlucoseOligomer', chems.Glucose)
 set_Cp(chems.GlucoseOligomer, Cp_cellulosic)
 chems.GlucoseOligomer.formula = "C6H10O5"
-chems.GlucoseOligomer.MW = 162.1424
 chems.GlucoseOligomer.Hf = -233200*cal2joule
 
 append_chemical_copy('GalactoseOligomer', chems.GlucoseOligomer)
@@ -157,32 +156,31 @@ append_chemical_copy('MannoseOligomer', chems.GlucoseOligomer)
 append_chemical_copy('XyloseOligomer', chems.Xylose)
 set_Cp(chems.XyloseOligomer, Cp_cellulosic)
 chems.XyloseOligomer.formula = "C5H8O4"
-chems.XyloseOligomer.MW = 132.11612
 chems.XyloseOligomer.Hf = -182100*cal2joule
 
 append_chemical_copy('ArabinoseOligomer', chems.XyloseOligomer)
 
 # Other
 append_new_single_phase_chemical('Z_mobilis', formula="CH1.8O0.5N0.2",
-                                 MW=24.6265, Hf=-31169.39*cal2joule)
+                                 Hf=-31169.39*cal2joule)
 append_new_single_phase_chemical('T_reesei', formula="CH1.645O0.445N0.205S0.005",
-                                 MW=23.8204, Hf=-23200.01*cal2joule)
+                                 Hf=-23200.01*cal2joule)
 append_new_single_phase_chemical('Biomass', formula="CH1.64O0.39N0.23S0.0035",
-                                 MW=23.238, Hf=-23200.01*cal2joule)
+                                 Hf=-23200.01*cal2joule)
 append_new_single_phase_chemical('Cellulose', formula="C6H10O5", # Glucose monomer minus water
-                                 MW=162.1406, Hf=-233200.06*cal2joule)
+                                 Hf=-233200.06*cal2joule)
 append_new_single_phase_chemical('Protein', formula="CH1.57O0.31N0.29S0.007",
-                                 MW=22.8396, Hf=-17618*cal2joule)
+                                 Hf=-17618*cal2joule)
 append_new_single_phase_chemical('Enzyme', formula="CH1.59O0.42N0.24S0.01",
-                                 MW=24.0156, Hf=-17618*cal2joule)
+                                 Hf=-17618*cal2joule)
 append_new_single_phase_chemical('Glucan', formula='C6H10O5',
-                                 MW=162.14, Hf=-233200*cal2joule)
+                                 Hf=-233200*cal2joule)
 append_new_single_phase_chemical('Xylan', formula="C5H8O4",
-                                 MW=132.12, Hf=-182100*cal2joule)
+                                 Hf=-182100*cal2joule)
 append_new_single_phase_chemical('Xylitol', formula="C5H12O5",
-                                 MW=152.15, Hf=-243145*cal2joule)
+                                 Hf=-243145*cal2joule)
 append_new_single_phase_chemical('Cellobiose', formula="C12H22O11",
-                                 MW=342.30, Hf=-480900*cal2joule)
+                                 Hf=-480900*cal2joule)
 append_new_single_phase_chemical('CSL', MW=1,
                                  Hf=(chems.Protein.Hf/4
                                      + chems.Water.Hf/2
@@ -197,9 +195,6 @@ append_chemical_copy('Galactan', chems.Glucan)
 # For waste water
 append_chemical_copy('WWTsludge', chems.Biomass)
 append_chemical_copy('Cellulase', chems.Enzyme)
-
-for i in chems: 
-    if i.formula: i.reset_combustion_data()
 
 # %% Grouped chemicals
 
