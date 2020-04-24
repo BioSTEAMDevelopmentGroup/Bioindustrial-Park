@@ -148,17 +148,21 @@ append_chemical_copy('SolubleLignin', chems.Lignin)
 # Create structural carbohydrates
 append_chemical_copy('GlucoseOligomer', chems.Glucose)
 set_Cp(chems.GlucoseOligomer, Cp_cellulosic)
+chems.GlucoseOligomer.reset_constants(
+    MW = 162.1424,
+    Hf = -233200*cal2joule,
+)
 chems.GlucoseOligomer.formula = "C6H10O5"
-chems.GlucoseOligomer.MW = 162.1424
-chems.GlucoseOligomer.Hf = -233200*cal2joule
 
 append_chemical_copy('GalactoseOligomer', chems.GlucoseOligomer)
 append_chemical_copy('MannoseOligomer', chems.GlucoseOligomer)
 append_chemical_copy('XyloseOligomer', chems.Xylose)
 set_Cp(chems.XyloseOligomer, Cp_cellulosic)
+chems.XyloseOligomer.reset_constants(
+    MW = 132.11612,
+    Hf = -182100*cal2joule,
+)
 chems.XyloseOligomer.formula = "C5H8O4"
-chems.XyloseOligomer.MW = 132.11612
-chems.XyloseOligomer.Hf = -182100*cal2joule
 
 append_chemical_copy('ArabinoseOligomer', chems.XyloseOligomer)
 
