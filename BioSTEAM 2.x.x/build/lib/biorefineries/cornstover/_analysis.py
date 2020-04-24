@@ -6,7 +6,7 @@ Created on Tue Sep  3 22:30:47 2019
 """
 from biorefineries.cornstover.model import cornstover_model as model_cs
 
-N_samples = 100
+N_samples = 1000
 rule = 'L'
 samples = model_cs.sample(N_samples, rule)
 model_cs.load_samples(samples)

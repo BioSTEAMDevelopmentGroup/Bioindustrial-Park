@@ -9,7 +9,7 @@ import biosteam as bst
 import thermosteam as tmo
 from thermosteam import Stream
 from biorefineries.cornstover.process_settings import price, ethanol_density_kggal
-from biorefineries.cornstover.chemicals import cornstover_chemicals, get_grouped_chemicals, chemical_groups
+from biorefineries.cornstover.chemicals import cornstover_chemicals, chemical_groups
 from biorefineries.cornstover.tea import CornstoverTEA
 from biorefineries.cornstover import units
 import thermosteam.reaction as rxn
@@ -253,9 +253,9 @@ H401 = bst.HXprocess('H401', ins=(T302-0, None),
 # Beer column
 xbot = Ethanol_molfrac(0.00001)
 ytop = Ethanol_molfrac(0.50)
-D402 = bst.BinaryDistillation('D402', ins=H401-0,
+D402 = bst.BinaryDistillation('D402', ins=H401-0, k=1.25,
                        P=101325, y_top=ytop, x_bot=xbot,
-                       k=1.25, LHK=('Ethanol', 'Water'))
+                       LHK=('Ethanol', 'Water'))
 D402.tray_material = 'Stainless steel 304'
 D402.vessel_material = 'Stainless steel 304'
 D402.BM = 2.4
@@ -586,20 +586,38 @@ cornstover_sys.feeds.add(baghouse_bags)
 aerobic_digestion_sys.converge_method = 'Fixed point'
 for i in range(3): cornstover_sys.simulate()
 ethanol_tea = CornstoverTEA(
-        system=cornstover_sys, IRR=0.10, duration=(2007, 2037),
-        depreciation='MACRS7', income_tax=0.35, operating_days=350.4,
-        lang_factor=None, construction_schedule=(0.08, 0.60, 0.32),
-        startup_months=3, startup_FOCfrac=1, startup_salesfrac=0.5,
-        startup_VOCfrac=0.75, WC_over_FCI=0.05,
-        finance_interest=0.08, finance_years=10, finance_fraction=0.4,
+        system=cornstover_sys, 
+        IRR=0.10, 
+        duration=(2007, 2037),
+        depreciation='MACRS7', 
+        income_tax=0.35,
+        operating_days=350.4,
+        lang_factor=None, 
+        construction_schedule=(0.08, 0.60, 0.32),
+        startup_months=3, 
+        startup_FOCfrac=1,
+        startup_salesfrac=0.5,
+        startup_VOCfrac=0.75,
+        WC_over_FCI=0.05,
+        finance_interest=0.08,
+        finance_years=10,
+        finance_fraction=0.4,
         OSBL_units=(WWTC, CWP, CT, PWC, ADP), # BT not included
-        warehouse=0.04, site_development=0.09, additional_piping=0.045,
-        proratable_costs=0.10, field_expenses=0.10, construction=0.20,
-        contingency=0.10, other_indirect_costs=0.10, labor_cost=2.5e6,
-        labor_burden=0.90, property_insurance=0.007, maintenance=0.03)
+        warehouse=0.04, 
+        site_development=0.09, 
+        additional_piping=0.045,
+        proratable_costs=0.10,
+        field_expenses=0.10,
+        construction=0.20,
+        contingency=0.10,
+        other_indirect_costs=0.10, 
+        labor_cost=2.5e6,
+        labor_burden=0.90,
+        property_insurance=0.007, 
+        maintenance=0.03)
 ethanol_tea.units.remove(BT)
-
-Area700 = bst.TEA.like(System('Area700', (M501, BT,)),
+ethanol_tea.units.remove(U101)
+Area700 = bst.TEA.like(System('Area700', (BT,)),
                        ethanol_tea)
 Area700.labor_cost = 0
 Area700.depreciation = 'MACRS20'
