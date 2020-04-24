@@ -60,9 +60,9 @@ class CornstoverTEA(TEA):
         return self._ISBL_DPI_cached
         
     def _TDC(self, DPI):
-        return DPI + self._ISBL_DPI(DPI) * (self.warehouse
-                                            + self.site_development
-                                            + self.additional_piping)
+        return DPI + self._ISBL_DPI(DPI)*(self.warehouse
+                                          + self.site_development
+                                          + self.additional_piping)
     
     def _indirect_costs(self, TDC):
         return TDC*(self.proratable_costs + self.field_expenses
@@ -76,4 +76,4 @@ class CornstoverTEA(TEA):
     def _FOC(self, FCI):
         return (FCI * self.property_insurance
                 + self._ISBL_DPI_cached * self.maintenance
-                + self.labor_cost * (1 + self.labor_burden))
+                + self.labor_cost*(1+self.labor_burden))

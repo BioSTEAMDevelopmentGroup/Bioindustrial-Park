@@ -47,7 +47,8 @@ chemical_IDs = [
 ]
 
 def append_single_phase_chemical(ID, search_ID=None, **data):
-    chemical = tmo.Chemical(ID, search_ID=search_ID, **data)
+    chemical = tmo.Chemical(ID, search_ID=search_ID)
+    for i, j in data.items(): setattr(chemical, i , j)
     try: chemical.at_state(phase=chemical.phase_ref)
     except: pass
     chemical.default()    
@@ -56,17 +57,11 @@ def append_single_phase_chemical(ID, search_ID=None, **data):
 def extend_single_phase_chemicals(IDs):
     for ID in IDs: append_single_phase_chemical(ID)
 
-def append_new_single_phase_chemical(ID, source=None, **data):
+def append_new_single_phase_chemical(ID, *sources, **data):
     chemical = tmo.Chemical.blank(ID, **data)
-    if source: 
-        default_phase_ref = source.phase_ref
-        chemical.copy_models_from(source)
-    else:
-        default_phase_ref = 'l'
-    if not chemical.phase_ref:
-        chemical.phase_ref = default_phase_ref
-    chemical.at_state(chemical.phase_ref)
-    chemical.default()
+    chemical.copy_missing_slots_from(*sources)
+    try: chemical.at_state(phase=chemical.phase_ref)
+    except: pass
     chems.append(chemical)
 
 def append_chemical_copy(ID, chemical):
@@ -148,22 +143,17 @@ append_chemical_copy('SolubleLignin', chems.Lignin)
 # Create structural carbohydrates
 append_chemical_copy('GlucoseOligomer', chems.Glucose)
 set_Cp(chems.GlucoseOligomer, Cp_cellulosic)
-chems.GlucoseOligomer.reset_constants(
-    MW = 162.1424,
-    Hf = -233200*cal2joule,
-)
 chems.GlucoseOligomer.formula = "C6H10O5"
+chems.GlucoseOligomer.MW = 162.1424
+chems.GlucoseOligomer.Hf = -233200*cal2joule
 
 append_chemical_copy('GalactoseOligomer', chems.GlucoseOligomer)
 append_chemical_copy('MannoseOligomer', chems.GlucoseOligomer)
 append_chemical_copy('XyloseOligomer', chems.Xylose)
 set_Cp(chems.XyloseOligomer, Cp_cellulosic)
-chems.XyloseOligomer.reset_constants(
-    MW = 132.11612,
-    Hf = -182100*cal2joule,
-)
 chems.XyloseOligomer.formula = "C5H8O4"
-
+chems.XyloseOligomer.MW = 132.11612
+chems.XyloseOligomer.Hf = -182100*cal2joule
 append_chemical_copy('ArabinoseOligomer', chems.XyloseOligomer)
 
 # Other
@@ -203,7 +193,7 @@ append_chemical_copy('WWTsludge', chems.Biomass)
 append_chemical_copy('Cellulase', chems.Enzyme)
 
 for i in chems: 
-    if i.formula: i.reset_combustion_data()
+    if i.formula: i.load_combustion_data()
 
 # %% Grouped chemicals
 

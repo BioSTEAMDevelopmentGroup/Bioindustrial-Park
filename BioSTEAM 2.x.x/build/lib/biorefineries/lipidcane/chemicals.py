@@ -67,12 +67,14 @@ Lipid = create_new_chemical(
     Hf = -2193.7e3
 )
 Lipid.Dortmund.set_group_counts_by_name({'CH3':3, 'CH2':41, 'CH':1, 'CH=CH':3, 'CH2COO':3})
+Lipid.load_combustion_data()
 
 # %% Fill missing properties
 
 # Assume properties are similar for trioleate and tripalmitin
 Tripalmitin = tmo.Chemical('Tripalmitin').at_state(phase='l', copy=True)
-Lipid.copy_models_from(Tripalmitin, ['V', 'sigma', 'kappa', 'Cn'])
+Lipid.copy_missing_slots_from(Tripalmitin, slots=['V', 'sigma',
+                                                  'kappa', 'Cn'])
 
 # Assume a constant volume for lipid
 lipid_molar_volume = fn.rho_to_V(rho=900, MW=Lipid.MW)
@@ -95,7 +97,9 @@ for chemical in soluble_solids:
 
 # Assume sodium methoxide has some of the same properities as methanol
 LiquidMethanol = Methanol.at_state(phase='l', copy=True)
-NaOCH3.copy_models_from(LiquidMethanol, ['V', 'sigma', 'kappa', 'Cn'])
+NaOCH3.copy_missing_slots_from(LiquidMethanol, slots=['V', 'sigma',
+                                                      'kappa', 'Cn',
+                                                      'H', 'S'])
 
 # Add constant models for molar heat capacity of solids
 Ash.Cn.add_model(0.09 * 4.184 * Ash.MW) 

@@ -1,2 +1,2 @@
-biosteam>=2.12.0
+biosteam>=2.12.1
 lazypkg==1.4

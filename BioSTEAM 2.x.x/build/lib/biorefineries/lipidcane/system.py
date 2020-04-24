@@ -622,7 +622,7 @@ x_water = w/(w+g)
 
 D402 = units.BinaryDistillation('D402',
                     LHK=('Water', 'Glycerol'),
-                    k=1.25,
+                    k=1.1,
                     P=101325,
                     y_top=0.999,
                     x_bot=x_water,
