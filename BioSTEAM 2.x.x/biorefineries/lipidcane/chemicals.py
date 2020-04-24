@@ -40,29 +40,25 @@ def create_new_chemical(ID, phase='s', **constants):
 Ash = create_new_chemical('Ash', MW=1.)
 Cellulose = create_new_chemical('Cellulose',
                                 formula="C6H10O5", # Glucose monomer minus water
-                                MW=162.14,
                                 Hf=-975708.8)
 Hemicellulose = create_new_chemical('Hemicellulose',
                                     formula="C5H8O5", # Xylose monomer minus water
-                                    MW=132.12,
                                     Hf=-761906.4)
 Flocculant = create_new_chemical('Flocculant',
                                  MW=1.)
 Lignin = create_new_chemical('Lignin',
                              formula='C8H8O3', # Vainillin
-                             MW=152.15,
                              Hf=-452909.632)
 Solids = create_new_chemical('Solids', MW=1.)
 DryYeast = create_new_chemical('DryYeast', MW=1., CAS='Yeast')
-CaO = create_new_chemical('CaO', MW=56.0774)
-HCl = create_new_chemical('HCl', MW=36.46094)
-NaOH = create_new_chemical('NaOH', MW=39.997109)
-NaOCH3 = create_new_chemical('NaOCH3', MW=54.023689)
+CaO = create_new_chemical('CaO', formula='CaO')
+HCl = create_new_chemical('HCl', formula='HCl')
+NaOH = create_new_chemical('NaOH', formula='NaOH')
+NaOCH3 = create_new_chemical('NaOCH3', formula='NaOCH3')
 
 Lipid = create_new_chemical(
     'Lipid',
     phase = 'l',
-    MW = 885.432,
     formula = 'C57H104O6',
     Hf = -2193.7e3
 )

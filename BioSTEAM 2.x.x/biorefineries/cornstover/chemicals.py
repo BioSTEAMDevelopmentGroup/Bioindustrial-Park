@@ -140,7 +140,7 @@ chems.append(lipidcane_chemicals.Ash)
 chems.append(lipidcane_chemicals.NaOH)
 append_new_single_phase_chemical('Lignin',
                                  formula='C8H8O3',
-                                 Hf=-108248*cal2joule, MW=152.15)
+                                 Hf=-108248*cal2joule)
 set_rho(chems.Lignin, 1540)
 set_Cp(chems.Lignin, Cp_cellulosic)
 append_chemical_copy('SolubleLignin', chems.Lignin)
