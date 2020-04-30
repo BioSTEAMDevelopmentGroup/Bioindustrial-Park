@@ -629,6 +629,15 @@ D402 = units.BinaryDistillation('D402',
                     tray_material='Stainless steel 304',
                     vessel_material='Stainless steel 304')
 
+def startup_water():
+    imol = D402.ins[0].imol
+    water, glycerol = imol['Water', 'Glycerol']
+    minimum_water = 5 * (w / (w + g)) * glycerol
+    if water < minimum_water:
+        imol['Water'] = minimum_water
+        
+PS_startup = bst.ProcessSpecification('PS_startup', specification=startup_water)
+
 # Condense recycle methanol
 H403 = units.HXutility('H403', V=0, T=315)
 P411 = units.Pump('P411')
@@ -686,7 +695,7 @@ F401-0-H401-P408
 C401-1-P405
 (P405-0, C402-1, C403-1, P408-0, HCl2)-T406-P409-C404
 (C404-0, NaOH)-T407-P410
-H402-0-D401-1-D402-1-T408
+H402-0-D401-1-PS_startup-D402-1-T408
 P410-0-H402                
 
 # Mass Balance for Methanol, Recycle Methanol, and Catalyst stream
