@@ -11,36 +11,32 @@ from biorefineries.cornstover.system import \
     ethanol, cornstover, R301, ethanol_density_kggal, \
     areas, BT, Area700
 
-cornstover_sys.simulate()
 get_MESP = lambda: cornstover_tea.solve_price(ethanol, ethanol_tea) * ethanol_density_kggal
 get_FCI = lambda: sum([i._FCI_cached for i in cornstover_tea.TEAs])
 get_coproduct_credit = lambda: sum([i._utility_cost_cached for i in cornstover_tea.TEAs])
 get_ethanol_production = lambda: ethanol.F_mass
 get_steam_demand = lambda: BT.steam_demand.F_mass
-get_electricity_demand = lambda: sum([i.power_utility.rate for i in cornstover_sys.units
-                                      if i.power_utility and i is not BT]) / 1e3
-get_electricity_production = lambda: -BT.power_utility.rate/1e3
-get_excess_electricity = lambda: get_electricity_production() - get_electricity_demand()
+pws = [i.power_utility for i in cornstover_sys.units
+       if i.power_utility and i is not BT]
+get_excess_electricity = lambda: (-BT.power_utility.rate - sum([i.rate for i in pws]))/1e3
 
 metrics =[Metric('Minimum ethanol selling price', get_MESP, 'USD/gal'),
           Metric('Fixed capital investment', get_FCI, 'USD'),
           Metric('Co-product credit', get_coproduct_credit, 'USD/yr'),
           Metric('Ethanol production', get_ethanol_production, 'kg/hr'),
           Metric('Steam demand', get_steam_demand, 'kg/hr'),
-          Metric('Excess electricity', get_excess_electricity, 'MW'),
-          Metric('Electricity production', get_electricity_production, 'MW'),
-          Metric('Total electricity demand', get_electricity_demand, 'MW')]
+          Metric('Excess electricity', get_excess_electricity, 'MW')]
 
 def electricity_rate_function(tea):
     if tea is Area700:
         boiler_item = BT.cost_items['Boiler']
         Design = BT.design_results
         return lambda: boiler_item.kW/boiler_item.S * Design['Flow rate']/1e3
-    power_utilities = [i.power_utility for i in tea.units]
+    power_utilities = [i.power_utility for i in tea.units if i.power_utility]
     return lambda: sum([i.rate for i in power_utilities])/1e3
 
 def cooling_duty_function(tea):
-    heat_utilities = sum([i.heat_utilities for i in tea.units], ())
+    heat_utilities = sum([i.heat_utilities for i in tea.units if i._N_heat_utilities], ())
     cooling_utilities = [i for i in heat_utilities if i.duty < 0]
     return lambda: sum([i.duty for i in cooling_utilities])
 
@@ -56,31 +52,31 @@ for i, tea in enumerate(areas, 1):
 
 cornstover_model = Model(cornstover_sys, metrics)
 cornstover_model.load_default_parameters(cornstover, operating_days=False)
-cornstover_sys.simulate()
 param = cornstover_model.parameter
 
 # Add saccharification as a parameter
 saccharification_reaction = R301.saccharification[2]
-X = tools.bounded_triang(saccharification_reaction.X, addition=0.04)
-@param(element=R301, kind='coupled', distribution=X, baseline=saccharification_reaction.X)
+X = tools.bounded_triang(saccharification_reaction.X, addition=0.05)
+@param(element=R301, kind='coupled', distribution=X)
 def set_saccharification_conversion(saccharification_conversion):
     saccharification_reaction.X = saccharification_conversion
 
 # Add ethanol conversion as a parameter
 ethanol_reaction = R301.cofermentation[0]
-X = tools.bounded_triang(ethanol_reaction.X, addition=0.02)
-@param(element=R301, kind='coupled', distribution=X, baseline=ethanol_reaction.X)
+X = tools.bounded_triang(ethanol_reaction.X, addition=0.05)
+@param(element=R301, kind='coupled', distribution=X)
 def set_ethanol_conversion(ethanol_conversion):
     ethanol_reaction.X = ethanol_conversion
     
 # Add saccharification time as a parameter
 X = tools.triang(R301.tau_saccharification)
-@param(element=R301, kind='isolated', distribution=X, baseline=R301.tau_saccharification)
+@param(element=R301, kind='isolated', distribution=X)
 def set_saccharification_time(saccharification_time):
     R301.tau_saccharification= saccharification_time
     
 # Add fermentation time as a parameter
 X = tools.triang(R301.tau_cofermentation)
-@param(element=R301, kind='isolated',  distribution=X, baseline=R301.tau_cofermentation)
+@param(element=R301, kind='isolated',  distribution=X)
 def set_fermentation_time(fermentation_time):
     R301.tau_cofermentation = fermentation_time
+
