@@ -75,11 +75,11 @@ lipid_molar_volume = fn.rho_to_V(rho=900, MW=Lipid.MW)
 Lipid.V.add_model(lipid_molar_volume)
 
 # Insolubles occupy a significant volume
-insoluble_solids = (Ash, Cellulose, Hemicellulose, Sucrose,
+insoluble_solids = (Ash, Cellulose, Hemicellulose,
                     Flocculant, Lignin, Solids, DryYeast, P4O10)
 
 # Solubles don't occupy much volume
-soluble_solids = (CaO, HCl, NaOH, H3PO4, Glucose) 
+soluble_solids = (CaO, HCl, NaOH, H3PO4, Glucose, Sucrose) 
 
 for chemical in insoluble_solids:
     V = fn.rho_to_V(rho=1540, MW=chemical.MW)
