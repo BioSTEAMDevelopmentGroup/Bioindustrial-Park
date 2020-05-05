@@ -14,6 +14,13 @@ with modification of fermentation system for organic acids instead of the origin
 @author: yalinli_cabbi
 """
 
+'''
+TODO:
+    Might want a better way to deal with insufficient BT steam generation
+'''
+
+
+
 # %% Setup
 
 from biosteam import HeatUtility, Facility
@@ -93,31 +100,35 @@ class OrganicAcidsCT(Facility):
     def _run(self):
         return_cw, makeup_water = self.ins
         process_cw, blowdown = self.outs
+        system_cooling_utilities = self.system_cooling_utilities
 
         # Based on stream 945 in Humbird et al.
         return_cw.T = 37 + 273.15
-        # Based on stream 941 in Humbird et al.
-        makeup_water.T = 33 + 273.15
         # Based on streams 940/944 in Humbird et al.
         process_cw.T = blowdown.T = 28 + 273.15
         
-        cw = self.system_cooling_utilities
-        for u in list(self.system.units)+list(self.system.facilities):
+        for u in self.system.units:
             if u is self: continue
             if hasattr(u, 'heat_utilities'):
                 for hu in u.heat_utilities:
-                    if hu.ID == 'cooling_water':
-                        cw.add(hu)
+                    # hu.flow>0 is to avoid having BT's steam counted here
+                    if hu.duty <0 and hu.flow >0:
+                        # Note that technically, CT can only produce cooling water,
+                        # but here includes all cool_utilities to check if
+                        # cooling water is the only cooling utility in the system
+                        system_cooling_utilities.add(hu)
+        
+        hu_cooling = HeatUtility().sum_by_agent(system_cooling_utilities)[0]
+        hu_cooling.reverse()
+        self.hu_cooling = hu_cooling
+        self.heat_utilities = (hu_cooling,)
+        self.system_cooling_demand = -hu_cooling.duty
         
         # Total amount of cooling water needed in the whole system (kmol/hr)
-        total_cooling_water = self.total_cooling_water = sum(i.flow for i in cw)
+        total_cooling_water = self.total_cooling_water = -hu_cooling.flow
         return_cw.imol['H2O'] = process_cw.imol['H2O'] = total_cooling_water
         makeup_water.imol['H2O'] = total_cooling_water * self.blowdown
         blowdown.imol['H2O'] = makeup_water.imol['H2O']
-        
-        hu_cooling = self.heat_utilities[0]
-        hu_cooling.mix_from(cw)
-        hu_cooling.reverse()
 
         self.design_results['Flow rate'] = total_cooling_water
 
@@ -162,7 +173,7 @@ class OrganicAcidsPWC(Facility):
     network_priority = 1
     _N_ins = 2
     _N_outs = 2
-    _N_heat_utilities = 2
+    _N_heat_utilities = 1
     _units= {'Total water flow rate': 'kg/hr',
              'Makeup/discharged water flow rate': 'kg/hr'}
     
@@ -191,18 +202,12 @@ class OrganicAcidsPWC(Facility):
                                                           discharged.imass['Water'])
         
         HX = self.HX = HXutility('PWC_HX')
-        hu_heating, hu_cooling = self.heat_utilities
-        hu_heating.load_agent(HeatUtility.get_heating_agent('low_pressure_steam'))
-        hu_cooling.load_agent(HeatUtility.get_cooling_agent('cooling_water'))
+        hu = self.heat_utilities[0]
         
-        H_net = self.H_net = total_stream.H - (recycled.H+makeup.H)
         # H_net > 0 means heating required
-        if H_net > 0:
-            hu_heating(H_net, total_stream.T)
-            hu_cooling.duty = hu_cooling.flow = 0
-        else:
-            hu_cooling(H_net, total_stream.T)
-            hu_heating.duty = hu_heating.flow = 0
+        H_net = self.H_net = total_stream.H - (recycled.H+makeup.H)
+        # Heating agent is automatically selected
+        hu(H_net, total_stream.T)
 
         # Design the heat exchanger
         HX.simulate_as_auxiliary_exchanger(H_net, total_stream)
@@ -227,7 +232,7 @@ class OrganicAcidsBT(Facility):
     generation from burning the feed. It also takes into account how much
     steam is being produced, and the required cooling utility of the turbo
     generator. Combustion reactions are populated based on molecular formula
-    of the ins.
+    of the ins. Purchase extra steam if BT cannot meet system demand.
     
     Parameters
     ----------
@@ -274,27 +279,23 @@ class OrganicAcidsBT(Facility):
     network_priority = 0
     _N_ins = 6
     _N_outs = 3
-    _N_heat_utilities = 2
+    # _N_heat_utilities = 2
     _units= {'Flow rate': 'kg/hr',
              'Work': 'kW'} 
     
     blowdown = 0.03
-    # Energy (kJ) that can be transfered by 1 kmol of heating agent,
-    # estimated conservatively based on the energy of lowest energy-carring 
-    # biosteam native heating agent (low_pressure_steam), which is 42759 kJ/kmol
-    # lps = bst.HeatUtility.get_heating_agent('low_pressure_steam')
-    # lps_heat_duty_over_mol = lps.H * 0.85 (heat transfer efficiency in Humbird et al.)
-    heat_duty_over_mol = 40000
     
     def __init__(self, ID='', ins=None, outs=(), *, B_eff=0.8,
-                 TG_eff=0.85, combustables, ratio,
+                 TG_eff=0.85, combustibles, ratio, side_steams=(),
                  system_heating_utilities=set()):
         Facility.__init__(self, ID, ins, outs)
         self.B_eff = B_eff
         self.TG_eff = TG_eff
-        self.combustables = combustables
+        self.combustibles = combustibles
         self.ratio = ratio
+        self.side_steams = side_steams
         self.system_heating_utilities = system_heating_utilities
+        self.side_steams_lps = None
 
     def _run(self): pass
 
@@ -303,18 +304,17 @@ class OrganicAcidsBT(Facility):
     def _design(self):
         feed_solids, feed_gases, lime, boiler_chemicals, bag, makeup_water = self.ins
         emission, ash, blowdown_water = self.outs
-        # hu_cooling used to condense blowdown
-        hu_heating, hu_cooling = self.heat_utilities
         ratio = self.ratio
+        side_steams = self.side_steams
         system_heating_utilities = self.system_heating_utilities
-        heat_duty_over_mol = self.heat_duty_over_mol
+        lps = HeatUtility.get_heating_agent('low_pressure_steam')
         
         # Use combustion reactions to create outs
         combustion_rxns = self.chemicals.get_combustion_reactions()
         combustable_feeds = Stream(None)
         emission.mol = feed_solids.mol + feed_gases.mol
-        combustable_feeds.copy_flow(emission, tuple(self.combustables), remove=True)
-        combustion_rxns(combustable_feeds.mol)
+        combustable_feeds.copy_flow(emission, tuple(self.combustibles), remove=True)
+        combustion_rxns.force_reaction(combustable_feeds.mol)
         emission.mol += combustable_feeds.mol
 
         # FGD lime scaled based on SO2 generated,
@@ -334,68 +334,117 @@ class OrganicAcidsBT(Facility):
         # Air usage not rigorously modeled
         emission.imol['O2'] = 0
         
-        ash_mass = 0
         for chemical in emission.chemicals:
             if chemical.locked_state == 'l' or chemical.locked_state == 's':
-                ash_mass += emission.imass[chemical.ID]
-                emission.imass[chemical.ID] = 0
-        ash.imass['Ash'] = ash_mass + CaSO4_mol*136.14 + (lime.F_mol-CaSO4_mol)*56.0774 \
-                           + boiler_chemicals.F_mass
+                ash.imol[chemical.ID] = emission.imol[chemical.ID]
+                emission.imol[chemical.ID] = 0
+                
+        ash.mol += boiler_chemicals.mol
+        ash.imol['CaSO4'] = CaSO4_mol
+        ash.imol['Lime'] += lime.F_mol - CaSO4_mol
+        
+        emission.phase = 'g'
+        ash.phase = 's'
+        # Assume T of emission and ash are the same as lps, which
+        # has lowest T amont all heating agents
+        emission.T = ash.T = lps.T
 
-        # Total heat generated by the boiler (kJ/hr), 
-        # LHV is initially negative so take the opposite here
+        # Total heat generated by the boiler (kJ/hr)
+        H_in = feed_solids.H + feed_gases.H
+        H_out = emission.H + ash.H
+        heat_from_combustion = -(feed_solids.LHV+feed_gases.LHV)
         heat_generated = self.heat_generated = \
-            -(feed_solids.LHV+feed_gases.LHV-emission.H-ash.H)*self.B_eff
-
-        # To get steam demand of the whole system
-        # Humbird et al. used some high pressure steam streams, however as only energy balance 
-        # is considered here, the type of steam does not affect simulation results,
-        # thus all steams used in the system are set to low_pressure_steam
-        for u in list(self.system.units)+list(self.system.facilities):
+            (H_in+heat_from_combustion)*self.B_eff - H_out
+        
+        for u in self.system.units:
             if u is self: continue
             if hasattr(u, 'heat_utilities'):
                 for hu in u.heat_utilities:
-                    if hu.ID == 'low_pressure_steam':
+                    # hu.flow>0 is to avoid having CT's cooling water counted here
+                    if hu.duty >0 and hu.flow >0:
                         system_heating_utilities.add(hu)
+            
+        
+        if side_steams:
+            # Use lps to account for the energy needed for the side steam
+            side_steams_lps = self.side_steams_lps = HeatUtility()
+            side_steams_lps.load_agent(lps)
+            side_steams_lps(duty=sum([i.H for i in side_steams]), T_in=298.15)
+            system_heating_utilities.add(side_steams_lps)
+            
+        system_heating_demand = self.system_heating_demand = \
+            sum([i.duty for i in system_heating_utilities])
+        BT_heat_surplus = self.BT_heat_surplus = heat_generated - system_heating_demand
+        self.system_steam_demand = sum([i.flow for i in system_heating_utilities])
+        
+        hu_BT = set()
+        hu_spp = set()
+        # BT can meet system heating demand
+        if BT_heat_surplus >0:
+            for i in system_heating_utilities:
+                j = HeatUtility()
+                j.copy_like(i)
+                j.reverse()
+                hu_BT.add(j)
 
-        hu_heating.load_agent(HeatUtility.get_heating_agent('low_pressure_steam'))
-        hu_cooling.load_agent(HeatUtility.get_cooling_agent('cooling_water'))
-        # Steam outs for BT is the sum of steam ins for all other units in the system
-        hu_heating.mix_from(system_heating_utilities)
-        hu_heating.reverse()
+            # 3600 is conversion of kJ/hr to kW (kJ/s)
+            generated_electricity = self.generated_electricity = \
+                BT_heat_surplus * self.TG_eff / 3600
+            
+            # Take the opposite for cooling duty (i.e., cooling duty should be negative)
+            # this is to condense the unused steam
+            cooling_need = self.cooling_need = -(BT_heat_surplus-generated_electricity)
+            hu_cooling = HeatUtility()
+            hu_cooling(duty=cooling_need, T_in=lps.T)
+            hu_BT.add(hu_cooling)
+        # BT cannot meet system heating demand, purchase supplement steams
+        else:
+            remaining_heat = heat_generated
+            hu_list = [i for i in system_heating_utilities]
+            for hu in hu_list:
+                remaining_heat -= hu.duty
+                if remaining_heat >0:
+                    hu_list.remove(hu)
+                    reversed_hu = HeatUtility()
+                    reversed_hu.copy_like(hu)
+                    reversed_hu.reverse()
+                    hu_BT.add(reversed_hu)
+                else: break
+            
+            split_BT = HeatUtility()
+            split_BT.copy_like(hu_list[0])
+            split_ratio = -remaining_heat / hu_list[0].duty
+            split_BT.scale(split_ratio)
+            split_spp = HeatUtility()
+            split_spp.copy_like(hu_list[0])
+            split_spp.scale(1-split_ratio)
+            hu_list.remove(hu_list[0])
+            split_BT.reverse()
+            hu_BT.add(split_BT)
+            hu_spp.add(split_spp)
+            
+            for i in hu_list: hu_spp.add(i)
 
-        # heat_generated - heat_demand (BT's heating duty is negative)
-        heat_surplus = self.heat_surplus = heat_generated - (-hu_heating.duty)
-        # Steam generated by the boiler with the surplus energy (kmol/hr)
-        steam_surplus = self.steam_surplus = max(0, heat_surplus) / heat_duty_over_mol
+            generated_electricity = self.generated_electricity = 0
 
-        blowdown_water.imol['H2O'] = steam_surplus * self.blowdown
+        BT_utilities = self.BT_utilities = HeatUtility().sum_by_agent(hu_BT)
+        # BT's heating agent flow is negative
+        BT_steam = sum([-i.flow for i in BT_utilities if i.flow<0])
+        blowdown_water.imol['H2O'] = BT_steam * self.blowdown
+        blowdown_water.T = 373.15
+        self.BT_spplement_utilities = HeatUtility().sum_by_agent(hu_spp)
+
         # Additional need from making lime slurry
         makeup_water.imol['H2O'] = blowdown_water.imol['H2O'] + lime.F_mol/0.2*0.8
-        
-        # 3600 is conversion of kJ/hr to kW (kJ/s)
-        generated_electricity = self.generated_electricity = heat_surplus * self.TG_eff / 3600
-        # Take the opposite for cooling duty (i.e., cooling duty should be negative)
-        # this is to condense the unused steam
-        cooling_need = self.cooling_need = min(0, -(heat_surplus - generated_electricity))
 
-        hu_cooling(duty=cooling_need, T_in=hu_heating.agent.T)
-        hu_cooling.ID = 'cooling_water'
-
-        ash.phase = 's'
-        emission.phase = 'g'
-        makeup_water.phase = 'l'
-        
-        for i in range(3):
-            self.outs[i].T = 373.15
-            self.outs[i].P = 101325
-
+        self.heat_utilities = tuple(BT_utilities)
         Design = self.design_results
-        # BT's heating agent flow is negative
-        Design['Flow rate'] = (-hu_heating.flow+steam_surplus) * 18.01528
-        Design['Work'] = max(0, generated_electricity)
+        
+        Design['Flow rate'] = BT_steam
+        Design['Work'] = generated_electricity
 
     def _end_decorated_cost_(self):
         self.power_utility(self.power_utility.rate - self.generated_electricity)
+        
                 
 

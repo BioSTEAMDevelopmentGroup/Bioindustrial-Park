@@ -96,13 +96,12 @@ price = {# IHS markit report, 2016 price, US market,
          } 
 bst.PowerUtility.price = price['Electricity']
 
-# Heating and cooling agent based on BT and CT design in Humbird et al.,
-# regeneration price is accounted for by CAPEX and OPEX of BT/CT
-_lps = bst.HeatUtility.get_heating_agent('low_pressure_steam')
-_lps.regeneration_price = 0
-_lps.heat_transfer_efficiency = 0.85
-_lps.T = 266 + 273.15
+_mps = bst.HeatUtility.get_heating_agent('medium_pressure_steam')
+_hps = bst.HeatUtility.get_heating_agent('high_pressure_steam')
+# Adjusted to Humbird LP/HP steam temperature
+# biosteam native mps T is lower than LP steam T in Humbird, thus adjust mps.T
+_mps.T = 233 + 273.15
+_hps.T = 266 + 273.15
 _cw = bst.HeatUtility.get_cooling_agent('cooling_water')
 _cw.T = 28 + 273.15
 _cw.T_limit = _cw.T + 9
-_cw.regeneration_price = 0
