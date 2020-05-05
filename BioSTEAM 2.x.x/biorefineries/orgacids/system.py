@@ -129,11 +129,10 @@ U101.cost_items['System'].kW = 0
 # %% Area 200: pretreatment
 
 # To be used for feedstock conditioning, 140850 from stream 212 in Humbird et al.
-hot_process_water = Stream('hot_process_water',
-                            T=95+273.15,
-                            P=4.7*101325,
-                            Water=140850*plant_size_ratio,
-                            units='kg/hr')
+pretreatment_feedstock_water = Stream('pretreatment_feedstock_water',
+                                      T=95+273.15, P=4.7*101325,
+                                      Water=140850*plant_size_ratio,
+                                      units='kg/hr')
 # Sulfuric acid loading is (18+4.1) mg/g dry biomass based on P21 in Humbird et al.
 # Sulfuric acid is 93% purity
 pretreatment_sulfuric_acid = Stream('pretreatment_sulfuric_acid',
@@ -150,25 +149,22 @@ pretreatment_acid_water = Stream('pretreatment_acid_water',
                                  units='kg/hr')
 # To be added to the feedstock/sulfuric acid mixture,
 # will be adjusted by the SteamMixer
-#!!! Note that the usage of this water (i.e., makeup water) is currently not accouted for
-pretreatment_steam = Stream('steam', phase='g',
+pretreatment_steam = Stream('pretreatment_steam', phase='g',
                             T=268+273.15, P=13*101325,
                             Water=(3490+24534)*plant_size_ratio,
                             units='kg/hr')
 # For neutralization of pretreatment hydrolysate
 ammonia = Stream('ammonia', units='kg/hr', phase='l')
 # To be used for ammonia addition, 150310 from stream 274 in Humbird et al.
-warm_process_water = Stream('warm_process_water',
-                            T=33+273.15,
-                            P=5*101325,
-                            Water=150310*plant_size_ratio,
-                            units='kg/hr')
+pretreatment_ammonia_water = Stream('pretreatment_ammonia_water',
+                                    Water=150310*plant_size_ratio,
+                                    units='kg/hr')
 
 # Sulfuric acid tank
 T201 = units.SulfuricAcidAdditionTank('T201', ins=pretreatment_sulfuric_acid)
 M201 = units.SulfuricAcidMixer('M201', ins=(T201-0, pretreatment_acid_water))
 # Mix sulfuric acid and feedstock
-M202 = bst.units.Mixer('M202', ins=(M201-0, hot_process_water, U101-0))
+M202 = bst.units.Mixer('M202', ins=(M201-0, pretreatment_feedstock_water, U101-0))
 # Mix feedstock/sulfuric acid mixture and steam
 M203 = units.SteamMixer('M203', ins=(M202-0, pretreatment_steam), P=5.5*101325)
 R201 = units.PretreatmentReactorSystem('R201', ins=M203-0,
@@ -192,7 +188,7 @@ def update_ammonia():
 PS_ammonia = bst.units.ProcessSpecification('PS_ammonia', ins=F201-1,
                                             specification=update_ammonia)
 
-M205 = units.AmmoniaMixer('M205', ins=(ammonia, warm_process_water))
+M205 = units.AmmoniaMixer('M205', ins=(ammonia, pretreatment_ammonia_water))
 # Neutralize pretreatment hydrolysate, M206 and T204 together represents a mixing tank
 # Note that all hydrolyzate was changed to hydrosate for consistency
 M206 = bst.units.Mixer('M206', ins=(PS_ammonia-0, M205-0))
@@ -454,7 +450,7 @@ air_lagoon = Stream('air_lagoon', phase='g', units='kg/hr')
 # To neutralize nitric acid formed by nitrification in aerobic digestion
 # flow will be updated in AerobicDigestion
 aerobic_caustic = Stream('aerobic_caustic', units='kg/hr', T=20+273.15, P=2*101325,
-                          price=(price['Caustic']+price['Makeup water'])*0.5)
+                          price=price['Makeup water']*0.5)
 # Based on stream 903 in Humbird et al.
 well_water_in = Stream('well_water_in', Water=147140*plant_size_ratio, T=13+273.15)
 
@@ -692,7 +688,9 @@ BT = facilities.OrganicAcidsBT('BT', ins=(M505-0, R501-0,
                                B_eff=0.8, TG_eff=0.85,
                                combustibles=combustibles,
                                ratio=plant_size_ratio,
-                               side_steams=(pretreatment_steam,),
+                               side_streams_to_heat=(pretreatment_feedstock_water,
+                                                     pretreatment_acid_water,
+                                                     pretreatment_steam),
                                outs=('gas_emission', ash, 'boiler_blowdown_water'))
 M501.ins[-2] = BT.outs[-1]
 
@@ -703,10 +701,12 @@ CT = facilities.OrganicAcidsCT('CT',
                                       'cooling_tower_blowdown'))
 M501.ins[-1] = CT.outs[-1]
 
-# All water used in the system
-process_water_streams = (hot_process_water, pretreatment_acid_water,
-                         warm_process_water, stripping_water,
-                         separation_acid_water, separation_hydrolysis_water,
+# All water used in the system, here only consider water usage,
+# if heating needed, then heeating duty required is considered in BT
+process_water_streams = (pretreatment_feedstock_water, pretreatment_acid_water,
+                         pretreatment_steam, pretreatment_ammonia_water, 
+                         stripping_water, separation_acid_water, 
+                         separation_hydrolysis_water, aerobic_caustic, 
                          BT.ins[-1], CT.ins[-1])
 PWC = facilities.OrganicAcidsPWC('PWC', ins=(S504-0, balance_water), 
                                  process_water_streams=process_water_streams,

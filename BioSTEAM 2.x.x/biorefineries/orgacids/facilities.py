@@ -24,7 +24,6 @@ TODO:
 # %% Setup
 
 from biosteam import HeatUtility, Facility
-from biosteam.units._hx import HXutility
 from biosteam.units.decorators import cost
 from thermosteam import Stream
 
@@ -93,7 +92,7 @@ class OrganicAcidsCT(Facility):
     # Page 55 of Humbird et al.
     blowdown = 0.00005+0.0015
     
-    def __init__(self, ID='', ins=None, outs=(), system_cooling_utilities=set()):
+    def __init__(self, ID='', ins=None, outs=(), system_cooling_utilities={}):
         Facility.__init__(self, ID, ins, outs)
         self.system_cooling_utilities = system_cooling_utilities
         
@@ -110,15 +109,15 @@ class OrganicAcidsCT(Facility):
         for u in self.system.units:
             if u is self: continue
             if hasattr(u, 'heat_utilities'):
-                for hu in u.heat_utilities:
+                for cw in u.heat_utilities:
                     # hu.flow>0 is to avoid having BT's steam counted here
-                    if hu.duty <0 and hu.flow >0:
+                    if cw.duty <0 and cw.flow >0:
                         # Note that technically, CT can only produce cooling water,
                         # but here includes all cool_utilities to check if
                         # cooling water is the only cooling utility in the system
-                        system_cooling_utilities.add(hu)
+                        system_cooling_utilities[f'{u.ID} - {cw.ID}'] = cw
         
-        hu_cooling = HeatUtility().sum_by_agent(system_cooling_utilities)[0]
+        hu_cooling = HeatUtility().sum_by_agent(system_cooling_utilities.values())[0]
         hu_cooling.reverse()
         self.hu_cooling = hu_cooling
         self.heat_utilities = (hu_cooling,)
@@ -145,8 +144,8 @@ class OrganicAcidsCT(Facility):
 class OrganicAcidsPWC(Facility):
     """
     Create a ProcessWaterCenter object that takes care of balancing the amount
-    of water (and energy associated with the water) required for the process.
-    The capital cost and power are based on the flow rate of process and makeup water as in [1]_.
+    of water required for the process. The capital cost and power are based on 
+    the flow rate of process and makeup water as in [1]_.
     
     Parameters
     ----------
@@ -173,7 +172,6 @@ class OrganicAcidsPWC(Facility):
     network_priority = 1
     _N_ins = 2
     _N_outs = 2
-    _N_heat_utilities = 1
     _units= {'Total water flow rate': 'kg/hr',
              'Makeup/discharged water flow rate': 'kg/hr'}
     
@@ -185,8 +183,8 @@ class OrganicAcidsPWC(Facility):
         recycled, makeup = self.ins
         process, discharged = self.outs
         process_water_streams = self.process_water_streams        
-
-        process.mix_from(process_water_streams)      
+        
+        process.imol['Water'] = sum(i.imol['Water'] for i in process_water_streams)           
         discharged.imol['Water'] = recycled.imol['Water'] - process.imol['Water']
         if discharged.imol['Water'] < 0:
             makeup.imol['Water'] -= discharged.imol['Water']
@@ -200,18 +198,6 @@ class OrganicAcidsPWC(Facility):
         Design['Total water flow rate'] = total_stream.F_mass
         Design['Makeup/discharged water flow rate'] = max(makeup.imass['Water'],
                                                           discharged.imass['Water'])
-        
-        HX = self.HX = HXutility('PWC_HX')
-        hu = self.heat_utilities[0]
-        
-        # H_net > 0 means heating required
-        H_net = self.H_net = total_stream.H - (recycled.H+makeup.H)
-        # Heating agent is automatically selected
-        hu(H_net, total_stream.T)
-
-        # Design the heat exchanger
-        HX.simulate_as_auxiliary_exchanger(H_net, total_stream)
-        self.purchase_costs['Heat exchanger'] = HX.purchase_costs['Heat exchanger']
         
 
 # %% Boiler and turbogenerator
@@ -279,23 +265,22 @@ class OrganicAcidsBT(Facility):
     network_priority = 0
     _N_ins = 6
     _N_outs = 3
-    # _N_heat_utilities = 2
     _units= {'Flow rate': 'kg/hr',
              'Work': 'kW'} 
     
     blowdown = 0.03
     
     def __init__(self, ID='', ins=None, outs=(), *, B_eff=0.8,
-                 TG_eff=0.85, combustibles, ratio, side_steams=(),
-                 system_heating_utilities=set()):
+                 TG_eff=0.85, combustibles, ratio, side_streams_to_heat=(),
+                 side_streams_lps=None, system_heating_utilities={}):
         Facility.__init__(self, ID, ins, outs)
         self.B_eff = B_eff
         self.TG_eff = TG_eff
         self.combustibles = combustibles
         self.ratio = ratio
-        self.side_steams = side_steams
+        self.side_streams_to_heat = side_streams_to_heat
+        self.side_streams_lps = side_streams_lps
         self.system_heating_utilities = system_heating_utilities
-        self.side_steams_lps = None
 
     def _run(self): pass
 
@@ -305,7 +290,8 @@ class OrganicAcidsBT(Facility):
         feed_solids, feed_gases, lime, boiler_chemicals, bag, makeup_water = self.ins
         emission, ash, blowdown_water = self.outs
         ratio = self.ratio
-        side_steams = self.side_steams
+        side_streams_to_heat = self.side_streams_to_heat
+        side_streams_lps = self.side_streams_lps
         system_heating_utilities = self.system_heating_utilities
         lps = HeatUtility.get_heating_agent('low_pressure_steam')
         
@@ -362,26 +348,29 @@ class OrganicAcidsBT(Facility):
                 for hu in u.heat_utilities:
                     # hu.flow>0 is to avoid having CT's cooling water counted here
                     if hu.duty >0 and hu.flow >0:
-                        system_heating_utilities.add(hu)
-            
+                        system_heating_utilities[f'{u.ID} - {hu.ID}'] = hu
         
-        if side_steams:
-            # Use lps to account for the energy needed for the side steam
-            side_steams_lps = self.side_steams_lps = HeatUtility()
-            side_steams_lps.load_agent(lps)
-            side_steams_lps(duty=sum([i.H for i in side_steams]), T_in=298.15)
-            system_heating_utilities.add(side_steams_lps)
-            
+        # Use lps to account for the energy needed for the side steam
+        if side_streams_to_heat:
+            if not side_streams_lps:
+                side_streams_lps = HeatUtility()
+                side_streams_lps.load_agent(lps)
+            side_streams_lps(duty=sum([i.H for i in side_streams_to_heat]), 
+                             T_in=298.15)
+            system_heating_utilities['BT - side_streams_lps'] = side_streams_lps
+
         system_heating_demand = self.system_heating_demand = \
-            sum([i.duty for i in system_heating_utilities])
+            sum([i.duty for i in system_heating_utilities.values()])
+            
         BT_heat_surplus = self.BT_heat_surplus = heat_generated - system_heating_demand
-        self.system_steam_demand = sum([i.flow for i in system_heating_utilities])
+        self.system_steam_demand = sum([i.flow for i in system_heating_utilities.values()])
         
         hu_BT = set()
         hu_spp = set()
         # BT can meet system heating demand
         if BT_heat_surplus >0:
-            for i in system_heating_utilities:
+            # for i in system_heating_utilities:
+            for i in system_heating_utilities.values():
                 j = HeatUtility()
                 j.copy_like(i)
                 j.reverse()
@@ -400,7 +389,7 @@ class OrganicAcidsBT(Facility):
         # BT cannot meet system heating demand, purchase supplement steams
         else:
             remaining_heat = heat_generated
-            hu_list = [i for i in system_heating_utilities]
+            hu_list = [i for i in system_heating_utilities.values()]
             for hu in hu_list:
                 remaining_heat -= hu.duty
                 if remaining_heat >0:
