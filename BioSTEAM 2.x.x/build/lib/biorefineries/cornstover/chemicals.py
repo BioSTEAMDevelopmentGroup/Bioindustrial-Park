@@ -140,7 +140,7 @@ chems.append(lipidcane_chemicals.Ash)
 chems.append(lipidcane_chemicals.NaOH)
 append_new_single_phase_chemical('Lignin',
                                  formula='C8H8O3',
-                                 Hf=-108248*cal2joule, MW=152.15)
+                                 Hf=-108248*cal2joule)
 set_rho(chems.Lignin, 1540)
 set_Cp(chems.Lignin, Cp_cellulosic)
 append_chemical_copy('SolubleLignin', chems.Lignin)
@@ -148,6 +148,7 @@ append_chemical_copy('SolubleLignin', chems.Lignin)
 # Create structural carbohydrates
 append_chemical_copy('GlucoseOligomer', chems.Glucose)
 set_Cp(chems.GlucoseOligomer, Cp_cellulosic)
+chems.GlucoseOligomer._formula = None
 chems.GlucoseOligomer.formula = "C6H10O5"
 chems.GlucoseOligomer.Hf = -233200*cal2joule
 
@@ -155,6 +156,7 @@ append_chemical_copy('GalactoseOligomer', chems.GlucoseOligomer)
 append_chemical_copy('MannoseOligomer', chems.GlucoseOligomer)
 append_chemical_copy('XyloseOligomer', chems.Xylose)
 set_Cp(chems.XyloseOligomer, Cp_cellulosic)
+chems.XyloseOligomer._formula =None
 chems.XyloseOligomer.formula = "C5H8O4"
 chems.XyloseOligomer.Hf = -182100*cal2joule
 

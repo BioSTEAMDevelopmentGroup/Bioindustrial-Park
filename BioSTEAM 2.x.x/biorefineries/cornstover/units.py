@@ -55,7 +55,7 @@ class SteamMixer(Unit):
     def _P_at_flow(mol_water, P, steam, mixed, feed):
         steam.imol['7732-18-5'] = mol_water
         mixed.mol[:] = steam.mol + feed.mol
-        mixed.H = feed.H + steam.Hvap
+        mixed.H = feed.H + steam.H
         P_new = mixed.chemicals.Water.Psat(mixed.T)
         return P - P_new
     
@@ -69,7 +69,7 @@ class SteamMixer(Unit):
                                   args=(self.P, steam, mixed, feed))
         mixed.P = self.P
         hu = self.heat_utilities[0]
-        hu(steam.Hvap, mixed.T)
+        hu(steam.H, mixed.T)
     
     @property
     def installation_cost(self): return 0

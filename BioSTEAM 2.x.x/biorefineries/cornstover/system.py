@@ -16,8 +16,9 @@ import thermosteam.reaction as rxn
 import numpy as np
 
 bst.CE = 525.4
-System.maxiter = 200
-System.molar_tolerance = 1
+System.maxiter = 400
+System.converge_method = 'Aitken'
+System.molar_tolerance = 0.01
 
 Ethanol_MW = cornstover_chemicals.Ethanol.MW
 Water_MW = cornstover_chemicals.Water.MW
@@ -505,7 +506,7 @@ S604 = bst.Splitter('S604', ins=S601-0, outs=('treated_water', 'waste_brine'),
                   split={'Water': 0.987})
 
 aerobic_digestion_sys = System('aerobic_digestion_sys',
-                               path=(M602, R602, S601, S602, M604, S603, M603),
+                               path=(M602, update_aerobic_input_streams, R602, S601, S602, M604, S603, M603),
                                recycle=M602-0)
 
 # %% Facilities
@@ -572,7 +573,6 @@ FT = units.FireWaterTank('FT',
 cornstover_sys = System('cornstover_sys',
                         path=(pretreatment_sys, fermentation_sys, puresys, J2, S401,
                                  J3, J4, J5, M601, WWTC, R601,
-                                 update_aerobic_input_streams,
                                  aerobic_digestion_sys, S604),
                         facilities=(M501, CWP, BT, CT,
                                     PWC, ADP, update_lime_boilerchems_and_ash,
@@ -583,8 +583,7 @@ baghouse_bags = Stream(ID='Baghouse_bags', thermo=substance_thermo, flow=(1,), p
 cornstover_sys.feeds.add(lime)
 cornstover_sys.feeds.add(boilerchems)
 cornstover_sys.feeds.add(baghouse_bags)
-aerobic_digestion_sys.converge_method = 'Fixed point'
-for i in range(3): cornstover_sys.simulate()
+for i in range(1): cornstover_sys.simulate()
 ethanol_tea = CornstoverTEA(
         system=cornstover_sys, 
         IRR=0.10, 
@@ -676,6 +675,6 @@ get_ecost = lambda units: sum([i.power_utility.cost
 
 cooling_water_uses = {i: get_utility(j.units, 'Cooling water', 'duty')/1e6/4.184
                       for i,j in numbered_areas}
+
 electricity_uses = {i: get_rate(j.units)/41 for i,j in numbered_areas}
 electricity_costs = {i: get_ecost(j.units) for i,j in numbered_areas}
-
