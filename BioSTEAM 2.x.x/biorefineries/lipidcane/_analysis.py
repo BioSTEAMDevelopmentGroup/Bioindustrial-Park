@@ -10,7 +10,7 @@ import biorefineries.sugarcane as sc
 
 def run_uncertainty(N_spearman_samples = 5000,
                     N_coordinate_samples = 1000,
-                    N_coordinates = 40):
+                    N_coordinates = 20):
     
     model_lc = lc.model.lipidcane_model
     model_sc = sc.model.sugarcane_model

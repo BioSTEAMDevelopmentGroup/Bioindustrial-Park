@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Created on Thu Dec 21 11:05:24 2017
+The complete lipid-cane biorefinery system is created here.
 
-@author: Yoel
 """
 import numpy as np
 import biosteam as bst
@@ -746,6 +745,7 @@ CWP = units.ChilledWaterPackage('CWP')
 PWC = units.ProcessWaterCenter('PWC',
                                (M305-0, makeup_water),
                                (),
+                               None,
                                makeup_water_streams,
                                process_water_streams)
 

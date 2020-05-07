@@ -431,7 +431,7 @@ splits = [('Ethanol', 1, 15),
 # tmo.Stream.default_ID_number = 600
 
 well_water = Stream('well_water', Water=1, T=15+273.15)
-M601 = bst.Mixer('M601', ins=(S401-1, '', '', ''))
+M601 = bst.Mixer('M601', ins=(S401-1, '', ''))
 J3 = H201-0 - bst.Junction('J3') - 1**M601
 
 WWTC = units.WasteWaterSystemCost('WWTC', ins=M601-0)
@@ -535,10 +535,12 @@ makeup_water = Stream('makeup_water', thermo=water_thermo, price=price['Makeup w
 PWC = bst.facilities.ProcessWaterCenter('PWC',
                                         (S604-0, makeup_water),
                                         (),
+                                        None,
                                         (BT-1, CT-1),
                                         process_water_streams)
-J4 = BT.outs[-1] - bst.Junction('J4') - 2**M601
-J5 = CT.outs[1] - bst.Junction('J5') - 3**M601
+blowdown_mixer = bst.BlowdownMixer('blowdown_mixer', ins=(), outs=2**M601)
+J4 = BT.outs[-1] - bst.Junction('J4') - 0**blowdown_mixer
+J5 = CT.outs[1] - bst.Junction('J5') - 1**blowdown_mixer
 
 Substance = tmo.Chemical.blank('Substance')
 Substance.at_state(phase='l')
@@ -571,13 +573,14 @@ FT = units.FireWaterTank('FT',
 # %% Complete system
 
 cornstover_sys = System('cornstover_sys',
-                        path=(pretreatment_sys, fermentation_sys, puresys, J2, S401,
-                                 J3, J4, J5, M601, WWTC, R601,
-                                 aerobic_digestion_sys, S604),
+                        path=(pretreatment_sys, fermentation_sys,
+                              puresys, J2, S401, J3, M601, WWTC, R601,
+                              aerobic_digestion_sys, S604),
                         facilities=(M501, CWP, BT, CT,
                                     PWC, ADP, update_lime_boilerchems_and_ash,
                                     CIP_package, S301, S302, DAP_storage,
-                                    CSL_storage, FT))
+                                    CSL_storage, FT, J4, J5, blowdown_mixer),
+                        facility_recycle=blowdown_mixer-0)
 cornstover_sys.products.add(ash)
 baghouse_bags = Stream(ID='Baghouse_bags', thermo=substance_thermo, flow=(1,), price=11.1)
 cornstover_sys.feeds.add(lime)

@@ -416,6 +416,7 @@ CWP = units.ChilledWaterPackage('CWP')
 PWC = units.ProcessWaterCenter('PWC',
                                (M305-0, makeup_water),
                                (),
+                               None,
                                makeup_water_streams,
                                process_water_streams)
 
