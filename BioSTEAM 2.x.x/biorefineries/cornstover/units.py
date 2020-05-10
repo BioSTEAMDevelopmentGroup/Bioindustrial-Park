@@ -14,8 +14,7 @@ from biosteam.units.factories import xl2mod
 path = os.path.join(os.path.dirname(os.path.realpath(__file__)), '_humbird2011.xlsx')
 xl2mod(path, sys.modules[__name__])
 del sys, xl2mod, os, path
-
-from flexsolve import aitken_secant
+import flexsolve as flx
 from thermosteam import MultiStream
 from biosteam import Unit
 from biosteam.units.decorators import cost
@@ -63,10 +62,10 @@ class SteamMixer(Unit):
         feed, steam = self._ins
         steam_mol = steam.F_mol
         mixed = self.outs[0]
-        steam_mol = aitken_secant(self._P_at_flow,
-                                  steam_mol, steam_mol+0.1, 
-                                  1e-4, 1e-4,
-                                  args=(self.P, steam, mixed, feed))
+        steam_mol = flx.aitken_secant(self._P_at_flow,
+                                      steam_mol, steam_mol+0.1, 
+                                      1e-4, 1e-4,
+                                      args=(self.P, steam, mixed, feed))
         mixed.P = self.P
         hu = self.heat_utilities[0]
         hu(steam.H, mixed.T)
