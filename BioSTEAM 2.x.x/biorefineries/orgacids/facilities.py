@@ -185,7 +185,8 @@ class OrganicAcidsPWC(Facility):
         process_water_streams = self.process_water_streams        
         
         process.imol['Water'] = sum(i.imol['Water'] for i in process_water_streams)           
-        discharged.imol['Water'] = recycled.imol['Water'] - process.imol['Water']
+        discharged.imol['Water'] = (recycled.imol['Water']+makeup.imol['Water']) - \
+            process.imol['Water']
         if discharged.imol['Water'] < 0:
             makeup.imol['Water'] -= discharged.imol['Water']
             discharged.imol['Water'] = 0
@@ -272,14 +273,14 @@ class OrganicAcidsBT(Facility):
     
     def __init__(self, ID='', ins=None, outs=(), *, B_eff=0.8,
                  TG_eff=0.85, combustibles, ratio, side_streams_to_heat=(),
-                 side_streams_lps=None, system_heating_utilities={}):
+                 system_heating_utilities={}):
         Facility.__init__(self, ID, ins, outs)
         self.B_eff = B_eff
         self.TG_eff = TG_eff
         self.combustibles = combustibles
         self.ratio = ratio
         self.side_streams_to_heat = side_streams_to_heat
-        self.side_streams_lps = side_streams_lps
+        self.side_streams_lps = None
         self.system_heating_utilities = system_heating_utilities
 
     def _run(self): pass
@@ -353,7 +354,7 @@ class OrganicAcidsBT(Facility):
         # Use lps to account for the energy needed for the side steam
         if side_streams_to_heat:
             if not side_streams_lps:
-                side_streams_lps = HeatUtility()
+                side_streams_lps = self.side_streams_lps = HeatUtility()
                 side_streams_lps.load_agent(lps)
             side_streams_lps(duty=sum([i.H for i in side_streams_to_heat]), 
                              T_in=298.15)
@@ -416,20 +417,18 @@ class OrganicAcidsBT(Facility):
 
             generated_electricity = self.generated_electricity = 0
 
-        BT_utilities = self.BT_utilities = HeatUtility().sum_by_agent(hu_BT)
-        # BT's heating agent flow is negative
-        BT_steam = sum([-i.flow for i in BT_utilities if i.flow<0])
-        blowdown_water.imol['H2O'] = BT_steam * self.blowdown
+        total_steam = sum([i.flow for i in system_heating_utilities.values()])
+        blowdown_water.imol['H2O'] = total_steam * self.blowdown
         blowdown_water.T = 373.15
         self.BT_spplement_utilities = HeatUtility().sum_by_agent(hu_spp)
 
         # Additional need from making lime slurry
         makeup_water.imol['H2O'] = blowdown_water.imol['H2O'] + lime.F_mol/0.2*0.8
 
+        BT_utilities = self.BT_utilities = HeatUtility().sum_by_agent(hu_BT)
         self.heat_utilities = tuple(BT_utilities)
-        Design = self.design_results
-        
-        Design['Flow rate'] = BT_steam
+        Design = self.design_results        
+        Design['Flow rate'] = total_steam
         Design['Work'] = generated_electricity
 
     def _end_decorated_cost_(self):

@@ -36,6 +36,7 @@ Areas:
 TODO:
     Search for #!!! for notes
     Compare stream info (T/P/flows) with Humbird report
+    Steam price?
 '''
 
 
@@ -121,10 +122,6 @@ U101 = units.FeedstockHandling('U101', ins=feedstock)
 U101.cost_items['System'].cost = 0
 U101.cost_items['System'].kW = 0
 
-###
-
-# Area100 = feedstock_sys
-
 
 # %% Area 200: pretreatment
 
@@ -195,10 +192,6 @@ M206 = bst.units.Mixer('M206', ins=(PS_ammonia-0, M205-0))
 T204 = units.AmmoniaAdditionTank('T204', ins=M206-0)
 P201 = units.HydrolysatePump('P201', ins=T204-0)
 
-###
-
-# Area200 = pretreatment_sys
-
 
 # %% Area 300: enzymatic hydrolysis and co-fermentation
 
@@ -217,55 +210,38 @@ M301 = units.EnzymeHydrolysateMixer('M301', ins=(H301-0, cellulase))
 # M302.ins[1] should come from T303.outs[0], but T303 has not been created,
 # thus M302.ins[1] is left as missing now and is connected to T303 later using -pipe- notation
 M302 = bst.units.Mixer('M302', ins=(M301-0, ''))
+#!!! Maybe don't need the "vent"
 R301 = units.SaccharificationAndCoFermentation('R301', 
                                                ins=(M302-0, CSL, fermentation_lime),
-                                               outs=('vent', 'fermentation_effluent', 
+                                               outs=('fermentation_effluent', 
                                                      'sidedraw'))
-R302 = units.SeedTrain('R302', ins=R301-2, outs=('vent', 'seed'))
-T301 = units.SeedHoldTank('T301', ins=R302-1)
+# ferm_ratio is the ratio of conversion relative to the fermenter
+R302 = units.SeedTrain('R302', ins=R301-1, outs=('seed',), ferm_ratio=0.9)
+T301 = units.SeedHoldTank('T301', ins=R302-0)
 # T301.outs[0] is fed into M302 as M302.ins[1]
 T301-0-1-M302
-# Mix gas product from saccharification and co-fermentation and seed train to vent
-M303 = bst.units.Mixer('M303', ins=(R302-0, R301-0)) 
-
-###
-
-# Area300 = fermentation_sys
 
 
 # %% Product separation
 #!!! biosteam native Flash/Distillation units have not pump, add those pumps!
 
-# Based on tream 524 in Humbird et al., will be updated by function
-stripping_water = Stream('stripping_water', Water=26836, units='kg/hr')
+
 # This flow will be automatically updated in CellMassFilter
 # filter_water = Stream('filter_water', units='kg/hr')
 separation_sulfuric_acid = Stream('separation_sulfuric_acid', units='kg/hr')
 # To be mixed with sulfuric acid, will be updated in SulfuricAdditionTank
 separation_acid_water = Stream('separation_acid_water', units='kg/hr')
 gypsum = Stream('gypsum', units='kg/hr', price=price['Gypsum'])
-# Methanol for esterification reaction, will be updated in the EsterificationReactor
+# Ethanol for esterification reaction, will be updated in the EsterificationReactor
 separation_spp_ethanol = Stream('separation_spp_ethanol', Ethanol = 500, units='kg/hr')
 # For ester hydrolysis
 separation_hydrolysis_water = Stream('separation_hydrolysis_water', units='kg/hr')
 
-def update_stripping_water():
-    stripping_water.mol = stripping_water_over_vent * vent_stream.F_mass
 
-PS_stripping_water = bst.units.ProcessSpecification('PS_stripping_water', ins=stripping_water,
-                                 specification=update_stripping_water)
-
-# Scrub fermentation vent
-#!!! Look at the vent composition of other separation units (e.g., distillation columns)
-# maybe want to scrub vents to recover products instead of directly sending to WWT
-
-#!!! Sarang: Scrubber not necessary since LA is trivially recovered compared to added throughput water
-U401 = units.VentScrubber('U401', ins=(PS_stripping_water-0, M303-0), 
-                          outs=('vent', 'scrubber_bottom'),
-                          gas=('CO2', 'NH3', 'O2'))
 # Mix scrubber bottom and fermentation broth,
 # based on stream 571 and 535 in Humbird et al.
-M401 = bst.units.Mixer('M401', ins=(R301-1, ''), outs='broth_for_separation')
+#!!! M401 is doing nothing now (becuase don't want to mix scrubber bottom)
+M401 = bst.units.Mixer('M401', ins=(R301-0, ''), outs='broth_for_separation')
 splits = [('Glucose', 19, 502),
           ('Xylose', 40, 1022),
           ('OtherSugars', 81, 2094),
@@ -287,28 +263,41 @@ S401 = units.CellMassFilter('S401', ins=M401-0, outs=('cell_mass', 'filtrate'),
                             moisture_content=0.35,
                             split=find_split(*zip(*splits))
                             )
-# For sulfuric acid addition
-T401 = units.SulfuricAcidAdditionTank('T401', ins=separation_sulfuric_acid)
-M402 = units.SulfuricAcidMixer('M402', ins=(T401-0, separation_acid_water))
-R401 = units.AcidulationReactor('R401', ins=(S401-1, M402-0))
-# Remove Gypsum and remained CellMass/Lime, 
-# moisture content (20%) and Gpysum removal (99.5%) on Page 24 of Aden et al.
 
+# R401 = units.AcidulationReactor('R401', ins=(S401-1, M402-0))
+R401 = units.AcidulationReactor('R401', ins=(S401-1, ''))
+
+# Sulfuric acid is 93% purity
 def update_separation_sulfuric_acid():
     separation_sulfuric_acid.imol['H2SO4'] = R401.ins[1].imol['H2SO4']
+    separation_sulfuric_acid.imol['H2O'] = R401.ins[1].imol['H2SO4'] / 0.93 * 0.07
 
-PS_separation_sulfuric_acid = bst.units.ProcessSpecification('PS_separation_sulfuric_acid', ins=separation_sulfuric_acid,
-                                 specification=update_separation_sulfuric_acid)
+# PS_separation_sulfuric_acid = bst.units.ProcessSpecification('PS_separation_sulfuric_acid', ins=separation_sulfuric_acid,
+PS_separation_sulfuric_acid = bst.units.ProcessSpecification(
+    'PS_separation_sulfuric_acid', ins=separation_sulfuric_acid,
+    specification=update_separation_sulfuric_acid)
+
+
+# For sulfuric acid addition
+T401 = units.SulfuricAcidAdditionTank('T401', ins=PS_separation_sulfuric_acid-0)
+# M402 = units.SulfuricAcidMixer('M402', ins=(T401-0, separation_acid_water))
+M402 = units.SulfuricAcidMixer('M402', ins=(T401-0, separation_acid_water))
+M402-0-1-R401
+
+
+
+# This shouldn't be a FakeSplitter, or should do things to make the ins work
+S601 = bst.units.ReversedSplitter('S601', ins='sulfuric_acid', 
+                                  outs=(pretreatment_sulfuric_acid, 
+                                        separation_sulfuric_acid))
+# PS_S601 = S601.create_reversed_splitter_process_specification('PS_S601', ins=R401.outs[0]) 
 
 splits.append(('Gypsum', 0.995, 0.005))
 
-S601 = bst.units.FakeSplitter('S601', ins='sulfuric_acid', 
-                                  outs=(pretreatment_sulfuric_acid, 
-                                        separation_sulfuric_acid))
-PS_S601 = S601.create_reversed_splitter_process_specification('PS_S601', ins=R401.outs[0]) 
-
-
-S402 = units.GypsumFilter('S402', ins=PS_S601-0,
+# Remove Gypsum and remained CellMass/Lime, 
+# moisture content (20%) and Gpysum removal (99.5%) on Page 24 of Aden et al.
+# S402 = units.GypsumFilter('S402', ins=PS_S601-0,
+S402 = units.GypsumFilter('S402', ins=R401-0,
                           moisture_content=0.2,
                           split=find_split(*zip(*splits)),
                           outs=(gypsum, 'filtrate'))
@@ -344,7 +333,8 @@ S403 = bst.units.BinaryDistillation('S403', ins=pre_S403-1, outs=('vapor', 'liqu
                                 is_divided=True,
                                 product_specification_format='Recovery',
                                 Lr=0.85, Hr=0.995, k=1.2)
-HXU1 = bst.units.HXutility('HXU1', ins=S403-1, T=383, V=0)
+# Temp of HXU1 needs to be changed from time to time, but fortunately this is only temporary
+HXU1 = bst.units.HXutility('HXU1', ins=S403-1, T=382.5, V=0)
 HXP1 = bst.units.HXprocess('HXP1', ins = (HXU1-0, ''), fluid_type = 'ss')
 Split_S403 = bst.units.Splitter('Split_S403',ins = HXP1-0, outs = ('bottom1', 'bottom2'), split = 0.95)
 
@@ -355,7 +345,8 @@ Split_S403-0-2-R402
 # Condense reactants into liquid phase, temperature selected based on Methanol.Tb
 H402 = bst.units.HXutility('H402', ins=S403-0, T=335, V=0)
 #!!! Need to add catalyst for the hydrolysis reaction
-R403 = units.HydrolysisReactor('R403', ins=(H402-0, '', H401-0, ''))
+R403 = units.HydrolysisReactor('R403', ins=(H402-0, separation_hydrolysis_water, 
+                                            H401-0, ''))
 
 # F111 = bst.units.Flash('F111', ins = R403-0, T=375, P=101325)
 pre_S404 = bst.units.ShortcutColumn('pre_S404', R403-0, outs=('vapor', 'liquid'),
@@ -429,28 +420,41 @@ H403-0-4-R402
 # S403-1-2-R402
 
 
-vent_stream = M303-0
 
-# Stream 523 in Humbird et al.
-stripping_water_over_vent = stripping_water.mol / 21759
-
-
-
-
-###
-
-
-# Area400 = separation_sys
 
 
 # %% Wastewater treatment
+
+# Placeholder for now, should collect all waste vapors after central HX
+fake_waste_stream1 = Stream('fake_waste_stream1', Water=10000, NH3=100)
+fake_waste_stream2 = Stream('fake_waste_stream2', Water=10000, NH3=100)
+# Based on tream 524 in Humbird et al., will be updated by function
+stripping_water = Stream('stripping_water', Water=26836, units='kg/hr')
+
+
+M50X = bst.units.Mixer('M50X', ins=(fake_waste_stream1, fake_waste_stream2))
+
+
+vent_stream = M50X-0
+# Stream 523 in Humbird et al.
+stripping_water_over_vent = stripping_water.mol / 21759
+
+def update_stripping_water():
+    stripping_water.mol = stripping_water_over_vent * vent_stream.F_mass
+PS_stripping_water = bst.units.ProcessSpecification('PS_stripping_water', ins=stripping_water,
+                                 specification=update_stripping_water)
+
+U501 = units.VentScrubber('U501', ins=(PS_stripping_water-0, M50X-0), 
+                          outs=('vent', 'scrubber_bottom'),
+                          gas=('CO2', 'NH3', 'O2'))
+
 
 # For aerobic digestion, flow will be updated in AerobicDigestion
 air_lagoon = Stream('air_lagoon', phase='g', units='kg/hr')
 # To neutralize nitric acid formed by nitrification in aerobic digestion
 # flow will be updated in AerobicDigestion
 aerobic_caustic = Stream('aerobic_caustic', units='kg/hr', T=20+273.15, P=2*101325,
-                          price=price['Makeup water']*0.5)
+                          price=price['Caustic']*0.5)
 # Based on stream 903 in Humbird et al.
 well_water_in = Stream('well_water_in', Water=147140*plant_size_ratio, T=13+273.15)
 
@@ -505,11 +509,11 @@ aerobic_digestion = rxn.ParallelReaction([i*0.74 + 0.22*growth(i.reactant)
 aerobic_digestion.X[:] = 0.96
 
 # Mix waste liquids for treatment, the last two slots reserved for BT and CT
-# M501 = bst.units.Mixer('M501', ins=(H201-0, H401-0, S403-1, S405-1, '', ''))
-M501 = bst.units.Mixer('M501', ins=(H201-0, S4ex-0, Split_S403-1,R402-1, R403-1, U401-1, H_S404-0))
+M501 = bst.units.Mixer('M501', ins=(H201-0, S4ex-0, Split_S403-1,R402-1, R403-1, 
+                                    U501-1, H_S404-0, '', ''))
 
 
-# !!! Adding '','' to end of M501's ins makes system fail to converge; not adding those there makes blowdown streams replace existing streams
+
 # This represents the total cost of wastewater treatment system
 WWT_cost = units.WastewaterSystemCost('WWT_cost', ins=M501-0)
 R501 = units.AnaerobicDigestion('R501', ins=(WWT_cost-0, well_water_in),
@@ -606,10 +610,6 @@ aerobic_digestion_sys = System('aerobic_digestion_sys',
                                recycle=M502-0)
 aerobic_digestion_sys.converge_method = 'Fixed point'
 
-###
-
-# Area500 = wastewater_sys
-
 
 # %% Facilities
 
@@ -640,16 +640,6 @@ plant_air_in = Stream('plant_air_in',
                       N2=0.79*1372608*plant_size_ratio,
                       O2=0.21*1372608*plant_size_ratio)
 
-# Total needed sulfuric acid for pretreatment and separation
-# S601 = bst.units.ReversedSplitter('S601', ins='sulfuric_acid', 
-#                                   outs=(pretreatment_sulfuric_acid, 
-#                                         separation_sulfuric_acid))
-
-
-
-
-
-
 T601 = units.SulfuricAcidStorageTank('T601', ins=sulfuric_acid_fresh, outs=0-S601)
 T601.line = 'Sulfuric acid storage tank'
 T602 = units.AmmoniaStorageTank('T602', ins=ammonia_fresh, outs=ammonia)
@@ -660,7 +650,7 @@ T604 = units.LimeStorageTank('T604', ins=lime_fresh, outs='lime')
 T604.line = 'Lime storage tank'
 S602 = bst.units.ReversedSplitter('S602', ins=T604-0, 
                                   outs=(fermentation_lime, FGD_lime))
-# For separation Methanol storage, 7-day storage time, similar as for CSL/ammonia in Humbird et al.
+# For separation Ethanol storage, 7-day storage time, similar as for CSL/ammonia in Humbird et al.
 T605 = bst.units.StorageTank('T605', ins=ethanol_fresh,
                              tau=7*24, 
                              vessel_type='Floating roof',
@@ -711,73 +701,14 @@ process_water_streams = (pretreatment_feedstock_water, pretreatment_acid_water,
 PWC = facilities.OrganicAcidsPWC('PWC', ins=(S504-0, balance_water), 
                                  process_water_streams=process_water_streams,
                                  outs=('process_water','discharged_water'))
-            
-# def update_fresh_streams():
-#     ammonia_fresh.copy_like(ammonia)
-#     sulfuric_acid_fresh.copy_like(S601.ins[0])
-#     CSL_fresh.copy_like(CSL)
-#     lime_fresh.copy_like(lime)
-#     ethanol_fresh.copy_like(separation_spp_ethanol)
-    
-# PS_fresh_streams = bst.units.ProcessSpecification('PS_fresh_streams', ins=(ammonia_fresh, sulfuric_acid_fresh, \
-#                                                                        CSL_fresh, lime_fresh, ethanol_fresh),
-#                                  specification=update_fresh_streams)
-    
-# def update_fresh_ammonia():
-#     ammonia_fresh.copy_like(ammonia)
-
-# def update_fresh_sulfuric_acid():
-#     sulfuric_acid_fresh.copy_like(S601.ins[0])
-
-# def update_fresh_CSL():
-#     CSL_fresh.copy_like(CSL)
-
-# def update_fresh_lime():
-#     lime_fresh.copy_like(lime)
-
-# def update_fresh_ethanol():
-#     ethanol_fresh.copy_like(separation_spp_ethanol)
-    
-
-# # PS_fresh_ammonia = bst.units.ProcessSpecification('PS_fresh_ammonia', ins=ammonia_fresh,
-# #                                  specification=update_fresh_ammonia)
-    
-# PS_fresh_sulfuric_acid = bst.units.ProcessSpecification('PS_fresh_sulfuric_acid', ins=sulfuric_acid_fresh,
-#                                  specification=update_fresh_sulfuric_acid)
-    
-# PS_fresh_CSL = bst.units.ProcessSpecification('PS_fresh_CSL', ins=CSL_fresh,
-#                                  specification=update_fresh_CSL)
-    
-# PS_fresh_lime = bst.units.ProcessSpecification('PS_fresh_lime', ins=lime_fresh,
-#                                  specification=update_fresh_lime)
-
-# PS_fresh_ethanol = bst.units.ProcessSpecification('PS_fresh_ethanol', ins=ethanol_fresh,
-#                                  specification=update_fresh_ethanol)
-    
-# Boiler turbogenerator potentially has different depreciation schedule thus set aside
-# boiler_sys = System('boiler_sys', path=(BT,))
-# All units in facilities except boiler turbogenerator
-
-###
-
-# Area 600 includes all facility units (boiler turbogeneration and others)
-# Area600 = facilities_sys
 
 
-# %% Complete system and simulation
-
-###
-# get_feeds = lambda streams: [i for i in streams if i.sink and not i.source]
-# feeds1 = get_feeds(bst.main_flowsheet.stream)
-# orgacids_sys = bst.main_flowsheet.create_system('orgacids_sys', feeds = feeds1)
+# %% Complete system and simulate
 
 stream = flowsheet.stream
 orgacids_sys = System('orgacids_sys',
     [U101,
-     T601,
-     S601,
      T201,
-     PS_separation_sulfuric_acid,
      M201,
      M202,
      M203,
@@ -801,19 +732,16 @@ orgacids_sys = System('orgacids_sys',
          R302,
          T301],
         recycle=T301-0),
-     M303,
-     PS_stripping_water,
-     U401,
      M401,
      S401,
      M402,
+     T401,
      R401,
-     PS_S601,
+     PS_separation_sulfuric_acid,
+     S601, 
      S402,
      F401,
      S4ex,
-     T605,
-     P601,
      System('esterification_recycle',
         [System('esterification_outer_loop',
             [System('esterification_inner_loop',
@@ -838,6 +766,9 @@ orgacids_sys = System('orgacids_sys',
          recycle=H403-0),
      S404,
      H_S404,
+     M50X,
+     PS_stripping_water,
+     U501,
      M501,
      WWT_cost,
      R501,
@@ -857,15 +788,31 @@ orgacids_sys = System('orgacids_sys',
      H401,
      M204,
      H201,
+     T601,
      T602,
+     R402, #!!! Simulate R402 again to avoid getting 0 spp ethanol flow
+     T605,
+     P601,
      FWT],
     facilities=(BT, CT, PWC, CIP, ADP))
 
 
 boiler_sys = System('boiler_sys', path=(BT,))
 
-# # Simulate for multiple times for better convergence
-# for i in range(3): orgacids_sys.simulate()
+System.converge_method = 'Fixed-point'
+# System.use_least_squares_solution = False
+# System.maxiter = 1000
+# System.molar_tolerance = 1
+
+#!!! These settings should be revised (i.e., smaller tolerance, more simulation time)
+# when HEN is ready
+System.maxiter = 1000
+System.molar_tolerance = 5
+
+
+# Simulate for multiple times for better convergence
+for i in range(5):
+    orgacids_sys.simulate()
 
 
 # %% TEA
@@ -888,12 +835,7 @@ orgacids_sys_no_boiler_tea = OrgacidsTEA(
         labor_burden=0.90, property_insurance=0.007, maintenance=0.03)
 orgacids_sys_no_boiler_tea.units.remove(BT)
 
-# feedstock_sys_tea = bst.TEA.like(feedstock_sys, orgacids_sys_no_boiler_tea)
-# pretreatment_sys_tea = bst.TEA.like(pretreatment_sys, orgacids_sys_no_boiler_tea)
-# fermentation_sys_tea = bst.TEA.like(fermentation_sys, orgacids_sys_no_boiler_tea)
-# separation_sys_tea = bst.TEA.like(separation_sys, orgacids_sys_no_boiler_tea)
-# wastewater_sys_tea = bst.TEA.like(wastewater_sys, orgacids_sys_no_boiler_tea)
-# # Specific settings for boiler turbogenerator
+# Boiler turbogenerator potentially has different depreciation schedule
 boiler_sys_tea = bst.TEA.like(boiler_sys, orgacids_sys_no_boiler_tea)
 # boiler_sys_tea.labor_cost = 0
 # # Changed to MACRS 20 to be consistent with Humbird
@@ -904,100 +846,28 @@ boiler_sys_tea = bst.TEA.like(boiler_sys, orgacids_sys_no_boiler_tea)
 orgacids_tea = bst.CombinedTEA([orgacids_sys_no_boiler_tea, boiler_sys_tea], IRR=0.10)
 orgacids_sys._TEA = orgacids_tea
 
-# all_tea = (feedstock_sys_tea,
-#            pretreatment_sys_tea,
-#            fermentation_sys_tea,
-#            separation_sys_tea,
-#            wastewater_sys_tea,
-#            boiler_sys_tea,
-#            facilities_sys_tea)
-
-# # Get break-even minimum selling price of lactic acid, 
-# # note that the input TEA should not be the CombinedTEA (i.e., orgacids_tea),
-# # but the individual TEA that contains the stream (i.e., orgacids_sys_no_boiler_tea) 
-# for i in range(3):
-#     lactic_acid.price = orgacids_tea.solve_price(lactic_acid, orgacids_sys_no_boiler_tea)
+# Simulate for multiple times for better convergence
+for i in range(5):
+   lactic_acid.price = orgacids_tea.solve_price(lactic_acid, orgacids_sys_no_boiler_tea)
 
 
 # %% Codes for analyses
 
-# installation_costs = {i.system.ID: i.installation_cost/1e6 
-#                       for i in all_tea}
-# utility_costs = {i.system.ID: i.utility_cost/1e6 
-#                  for i in all_tea}
+orgacids_sub_sys = {
+    'feedstock_sys': (U101,),
+    'pretreatment_sys': (T201, M201, M202, M203, R201, T202, T203, F201, M204, 
+                         H201, M205, M206, T204, P201),
+    'fermentation_sys': (H301, M301, M302, R301, R302, T301),
+    'separation_sys': (T401, M401, S401, R401, M402, S402, F401, H401, 
+                       S4ex, R402, S403, H402, R403, S404, H403, H404,
+                       H_pre_S404, pre_S404, pre_S403, H_S404, F_pre_S404,
+                       HXU1, HXP1, Split_S403),
+    'wastewater_sys': (M50X, U501, 
+                       M501, WWT_cost, R501, M502, R502, S501, S502, M503, M504, 
+                       S503, S504, M505),
+    'BT': (BT,),
+    'CT': (CT,),
+    'other_facilities': (CIP, ADP, FWT, PWC,
+                         S601, T601, T602, T603, S602, T604, T605, P601, P602, T606)
+    }
 
-# def get_utility(units, ID, attr):
-#     out = 0
-#     for i in units:
-#         for j in i.heat_utilities:
-#             if j.ID == ID:
-#                 out += getattr(j, attr)
-#     return out
-
-# # 4.184 is heat capacity of water in J/(kg·°C)
-# cooling_water_uses = {i.system.ID: get_utility(i.units, 'Cooling water', 'duty')/1e6/4.184
-#                       for i in all_tea}
-
-# get_rate = lambda units: sum(i.power_utility.rate
-#                               for i in units)/1e3
-
-# get_ecost = lambda units: sum(i.power_utility.cost
-#                                # 350.6 is from 96% uptime of 365 days per year 
-#                                for i in units)*24*350.4/1e6
-
-# electricity_uses = {i: get_rate(j.units) for i,j in enumerate(all_tea)}
-# electricity_costs = {i.system.ID: get_ecost(i.units) for i in all_tea}
-
-
-
-# feedstock_sys = System('feedstock_sys', path=(U101, ))
-
-# pretreatment_sys = System('pretreatment_sys',
-#                    path=(T201, M201, M202, M203,
-#                          R201, T202, T203, F201,
-#                          M204, H201,
-#                          update_ammonia,
-#                          M205, M206, T204, P201)
-
-# fermentation_sys = System('fermentation_sys',
-#                    path=(H301, M301, M302, R301, R302, T301, M303),
-#                    recycle=M302-0)
-
-# separation_sys = System('separation_sys',
-#                          path=(update_stripping_water,
-#                                U401, M401, S401,
-#                                R401, update_separation_sulfuric_acid,
-#                                T401, M402, S402, 
-#                                F401, H401, S4ex,
-#                                R402, S403,
-#                                H402, R403, S404, 
-#                                H403, S405, H404),
-#                          recycle=H404-0
-#                         )
-                            
-# wastewater_sys = System('wastewater_sys',
-#                         path=(M501, WWT_cost, R501,
-#                               aerobic_digestion_sys, S504, M505)
-#                         )
-
-# facilities_sys = System('facilities_sys',
-#                         path=(CIP, ADP, FWT, BT,
-#                               S601, T601, T602, T603, S602, T604, T605,
-#                               P602, T606,
-#                               CT, PWC,
-#                               update_fresh_streams)
-#                         )
-
-# orgacids_sys = System('orgacids_sys',
-#                       path=(feedstock_sys,
-#                             pretreatment_sys,
-#                             fermentation_sys,
-#                             separation_sys,
-#                             wastewater_sys
-#                             ),
-#                       facilities=(CIP, ADP, FWT, BT,
-#                                   S601, T601, T602, T603, S602, T604, T605, P601,
-#                                   P602, T606,
-#                                   CT, PWC,
-#                                   update_fresh_streams)
-#                       )

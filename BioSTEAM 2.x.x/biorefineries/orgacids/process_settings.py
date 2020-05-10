@@ -51,8 +51,10 @@ denaturant_cost = 2.86 / 2.819
 ash_disposal_cost = -1.41e6 / (4279*7880)
 
 # Assums no cost/credit for baseline, the same as ash disposal for lower end,
-# for the higher end, use USGS 2015-2019 average free on bard price in $/metric ton for crude gypsum
-# National Minerals Information Center. Mineral Commodity Summaries 2020; U.S. Geological Survey, 2020.
+# for the higher end (i.e., positive selling price indicating profit), use 
+# USGS 2015-2019 average  free on bard price in $/metric ton for crude gypsum. 
+# National Minerals Information Center. Mineral Commodity Summaries 2020; 
+# U.S. Geological Survey, 2020.
 # Assuming all prices were in their nominal year (e.g., 2015 price in 2015$)
 # and adjusted to 2016$
 # 2015: 7.80 * 1.114 / 1.100 = 7.90
@@ -61,6 +63,9 @@ ash_disposal_cost = -1.41e6 / (4279*7880)
 # 2018: 8.30 * 1.114 / 1.157 = 7.99
 # 2019: 8.00 * 1.114 / 1.185 = 7.52
 # (7.90+8.00+7.37+7.99+7.52) / 5 = 7.76 (in metric tonne)
+# For the lower end (i.e., negative selling price indicating cost), use price from
+# Aden et al., 2002: $0.0094/lb in 2000$ = 0.0094*1.114/0.802*2.20462 = $0.0288/kg
+# in 2016$
 gypsum_cost = 0
 
 # Mentioned in P53 of Humbird et al., not into any units, but a cashflow
