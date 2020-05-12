@@ -807,12 +807,16 @@ System.converge_method = 'Fixed-point'
 #!!! These settings should be revised (i.e., smaller tolerance, more simulation time)
 # when HEN is ready
 System.maxiter = 1000
-System.molar_tolerance = 5
+System.molar_tolerance = 10
 
 
 # Simulate for multiple times for better convergence
-for i in range(5):
-    orgacids_sys.simulate()
+#!!! Temporarily until HEN is ready
+for i in range(1):
+    try: orgacids_sys.simulate()
+    except: 
+        HXU1.T -= 0.1
+        orgacids_sys.simulate()
 
 
 # %% TEA

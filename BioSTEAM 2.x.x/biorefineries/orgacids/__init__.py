@@ -18,5 +18,5 @@ with modification of fermentation system for organic acids instead of the origin
 __all__ = []
 
 from lazypkg import LazyPkg
-LazyPkg(__name__, ['chemicals', 'facilities', 'process_settings', 'system', 
+LazyPkg(__name__, ['chemicals', 'facilities', 'model', 'process_settings', 'system', 
                    'tea', 'units'])

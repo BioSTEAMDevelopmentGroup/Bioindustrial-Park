@@ -1,14 +1,18 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Created on Mon Apr 13 10:24:42 2020
+Created on Mon May 11 16:26:46 2020
 
 @author: yalinli_cabbi
 """
 
+
 '''
 TODO:
-    Not sure why there are small errors in some sum calculations
+    Add more (esp. on separation process) uncertainty parameters,
+        consider using the bst.evaluation.State.load_default_parameters function
+    
+    Double-check the small errors in some sum calculations    
 '''
 
 
@@ -21,8 +25,11 @@ from biosteam.evaluation import Model, Metric
 from biosteam.evaluation import evaluation_tools as tools
 from orgacids.process_settings import price
 from orgacids.system import lactic_acid, gypsum, M301, R301, R302, BT, CT, \
-    orgacids_tea, orgacids_sys_no_boiler_tea, orgacids_sys, orgacids_sub_sys
-from orgacids.system import *
+    orgacids_tea, orgacids_sys_no_boiler_tea, orgacids_sys, orgacids_sub_sys, \
+    boiler_sys_tea
+# from orgacids.system import *
+
+__all__ = ('orgacids_model', 'orgacids_model_IRR')
 
 #!!! Want to change to orgacids_sys_no_BT_tea
 _hr_per_yr = orgacids_sys_no_boiler_tea._annual_factor
@@ -31,8 +38,11 @@ real_units = sum([i for i in orgacids_sub_sys.values()], ())
 
 # %% Define metric functions
 
-# Minimum selling price of lactic_acid stream ($/kg)
-get_MSP = lambda: orgacids_tea.solve_price(lactic_acid, orgacids_sys_no_boiler_tea)
+# Minimum selling price of lactic_acid stream
+get_MSP = lambda: [orgacids_tea.solve_price(lactic_acid, orgacids_sys_no_boiler_tea)
+                   for i in range(10)][-1]
+# Mass flow rate of lactic_acid stream
+get_yield = lambda: lactic_acid.F_mass
 # Purity (%) of LacticAcid in the final product
 get_purity = lambda: lactic_acid.imass['LacticAcid']/lactic_acid.F_mass
 # Recovery (%) = recovered/amount in fermentation broth
@@ -53,6 +63,7 @@ excess_power = lambda: BT.generated_electricity
 get_electricity_credit = lambda: (excess_power()*price['Electricity']*_hr_per_yr/1e6)
 
 metrics = [Metric('Minimum selling price', get_MSP, '$/kg'),
+           Metric('Product yield', get_yield, 'kg/hr'),
            Metric('Product purity', get_purity, '%'),
            Metric('Product recovery', get_recovery, '%'),
            Metric('Total capital investment', get_overall_TCI, '10^6 $'),
@@ -67,28 +78,29 @@ def get_CAPEX_ratios(system):
     return lambda: sum([i.installation_cost 
                         for i in orgacids_sub_sys[system]])/orgacids_tea.installation_cost
 for system in orgacids_sub_sys.keys():
+    if system == 'feedstock_sys': continue
     metrics.extend(
-        (Metric('CAPEX ratio', get_CAPEX_ratios(system), '%', system),))
+        (Metric(system, get_CAPEX_ratios(system), '%', 'CAPEX ratio'),))
 get_CAPEX_ratios_sum = lambda: sum(get_CAPEX_ratios(system)() 
                                    for system in orgacids_sub_sys.keys())
-metrics.extend((Metric('CAPEX ratio', get_CAPEX_ratios_sum, '%', 'Sum'),))
+metrics.extend((Metric('Sum', get_CAPEX_ratios_sum, '%', 'CAPEX ratio'),))
 
 # Get material costs (as ratios of overall costs)
 system_feeds = tuple(i for i in orgacids_sys.feeds if i.price)
 def get_material_cost_ratios(feed):
     return lambda: feed.price*feed.F_mass*_hr_per_yr/orgacids_tea.material_cost
 for feed in system_feeds:
-    metrics.extend((Metric('Cost ratio', get_material_cost_ratios(feed), '%', feed.ID),))
+    metrics.extend((Metric(feed.ID, get_material_cost_ratios(feed), '%', 'Cost ratio'),))
 get_get_material_cost_ratios_sum = lambda: sum(get_material_cost_ratios(feed)() 
                                                for feed in system_feeds)
-metrics.extend((Metric('Cost ratio', get_get_material_cost_ratios_sum, '%', 'Sum'),))
+metrics.extend((Metric('Sum', get_get_material_cost_ratios_sum, '%', 'Cost ratio'),))
 
 # Get product sales (as ratios of overall sales)
 system_products = tuple(i for i in orgacids_sys.products if i.price)
 def get_product_sale_ratios(stream):
     return lambda: stream.price*stream.F_mass*_hr_per_yr/orgacids_tea.sales
 for product in system_products:
-    metrics.extend((Metric('Sale ratio', get_product_sale_ratios(product), '%', product.ID),))
+    metrics.extend((Metric(product.ID, get_product_sale_ratios(product), '%', 'Sale ratio'),))
 # Baseline disposal cost of gypsum is 0, thus not caputured
 #!!! Need to add other baseline-0 wastes if considering their disposal costs in
 # sensitivity and uncertainty analyses
@@ -96,8 +108,8 @@ get_gypsum_sale_ratio = lambda: gypsum.price*gypsum.F_mass*_hr_per_yr/orgacids_t
 get_product_sale_ratios_sum = lambda: sum(get_product_sale_ratios(product)()
                                           for product in system_products)
 metrics.extend((
-    Metric('Sale ratio', get_gypsum_sale_ratio, '%', gypsum.ID),
-    Metric('Sale ratio', get_product_sale_ratios_sum, '%', 'Sum')))
+    Metric(gypsum.ID, get_gypsum_sale_ratio, '%', 'Sale ratio'),
+    Metric('Sum', get_product_sale_ratios_sum, '%', 'Sale ratio')))
 
 # Get heating demand (kJ/hr), positive if needs heating
 get_system_heating_demand = lambda: BT.system_heating_demand/1e3
@@ -109,17 +121,17 @@ get_side_streams_heating_demand = lambda: BT.side_streams_lps.duty/1e3/get_syste
 for system in orgacids_sub_sys.keys():
     if system == 'feedstock_sys': continue
     if system == 'pretreatment_sys':
-        metrics.extend((Metric('Heating demand ratio', 
-                                get_side_streams_heating_demand, '%', system),))
-    else: metrics.extend((Metric('Heating demand ratio', 
-                                 get_heating_demand_ratios(system), '%', system),))
+        metrics.extend((Metric(system, get_side_streams_heating_demand, '%', 
+                               'Heating demand ratio'),))
+    else: metrics.extend((Metric(system, get_heating_demand_ratios(system), '%', 
+                                 'Heating demand ratio'),))
 get_heating_demand_ratios_sum = lambda: sum((get_heating_demand_ratios(system)()
                                             for system in orgacids_sub_sys.keys()
                                             if system != 'BT'),
                                             (get_side_streams_heating_demand(),))
 metrics.extend((
-    Metric('Heating demand ratio', get_heating_demand_ratios_sum, '%', 'Sum'),
-    Metric('Heating demand', get_system_heating_demand, 'MJ/hr', 'Overall')
+    Metric('Sum', get_heating_demand_ratios_sum, '%', 'Heating demand ratio'),
+    Metric('Overall', get_system_heating_demand, 'MJ/hr', 'Heating demand')
     ))
 
 # Get cooling demand (kJ/hr), negative if needs cooling
@@ -130,13 +142,13 @@ def get_cooling_demand_ratios(system):
     return lambda: sum([i.duty for i in cooling_utilities])/1e3/get_system_cooling_demand()
 for system in orgacids_sub_sys.keys():
     if system == 'feedstock_sys': continue
-    metrics.extend((Metric('Cooling demand ratio', get_cooling_demand_ratios(system), '%', system),))
+    metrics.extend((Metric(system, get_cooling_demand_ratios(system), '%', 'Cooling demand ratio'),))
 get_cooling_demand_ratios_sum = lambda: sum(get_cooling_demand_ratios(system)()
                                             for system in orgacids_sub_sys.keys()
                                             if system != 'CT')
 metrics.extend((
-    Metric('Cooling demand ratio', get_cooling_demand_ratios_sum, '%', 'Sum'),
-    Metric('Cooling demand', get_system_cooling_demand, 'MJ/hr', 'Overall')
+    Metric('Sum', get_cooling_demand_ratios_sum, '%', 'Cooling demand ratio'),
+    Metric('Overall', get_system_cooling_demand, 'MJ/hr', 'Cooling demand')
     ))
 
 # Get power demand (kW), positive if using power
@@ -147,12 +159,12 @@ def get_power_demand_ratios(system):
     return lambda: sum([i.rate for i in power_utilities])/1e3/get_system_power_demand()
 for system in orgacids_sub_sys.keys():
     if system == 'feedstock_sys': continue
-    metrics.extend((Metric('Power demand ratio', get_power_demand_ratios(system), '%', system),))
+    metrics.extend((Metric(system, get_power_demand_ratios(system), '%', 'Power demand ratio'),))
 get_power_demand_ratios_sum = lambda: sum(get_power_demand_ratios(system)()
                                           for system in orgacids_sub_sys.keys())
 metrics.extend((
-    Metric('Power demand ratio', get_power_demand_ratios_sum, '%', 'Sum'),
-    Metric('Power demand', get_system_power_demand, 'MW', 'Overall')
+    Metric('Sum', get_power_demand_ratios_sum, '%', 'Power demand ratio'),
+    Metric('Overall', get_system_power_demand, 'MW', 'Power demand')
     ))
 
 # Get utility cost including heating, cooling, and power
@@ -170,7 +182,9 @@ metrics.extend((
     Metric('Utility cost', get_system_utility_cost, '10^6 $/yr', 'Overall')
     ))
 
-metric_number = len(metrics)
+# To see if TEA converges well for each simulation
+get_NPV = lambda: orgacids_tea.NPV
+metrics.extend((Metric('TEA', get_NPV, '$', 'NPV'), ))
 
 
 # %% Add evaluating parameters
@@ -184,9 +198,9 @@ def baseline_uniform(baseline, ratio):
 
 # Costs
 D = shape.Uniform(-0.0288, 0.00776)
-@param(name='Gypsum disposal', element='TEA', kind='isolated', units='$/kg', 
+@param(name='Gypsum price', element='TEA', kind='isolated', units='$/kg', 
        baseline=0, distribution=D)
-def set_gypsum_cost(cost): gypsum.price = cost
+def set_gypsum_price(cost): gypsum.price = cost
 
 D = shape.Triangle(0.9, 1, 1.1)
 @param(name='TCI ratio', element='TEA', kind='isolated', units='% of baseline',
@@ -209,7 +223,7 @@ D = baseline_uniform(24, 0.1)
 def set_R301_prehydrolysis_time(tau): R301.tau_prehydrolysis = tau
 
 D = shape.Triangle(76, 120, 145)
-@param(name='Batch fermentation time', element=R301, kind='coupled', units='hr',
+@param(name='Fermentation time', element=R301, kind='coupled', units='hr',
         baseline=120, distribution=D)
 def set_R301_fermentation_time(tau): R301.tau_cofermentation = tau
 
@@ -239,94 +253,36 @@ def set_innoculum_ratio(ratio): R301.inoculum_ratio = ratio
 
 # Seed train fermentation yield as a ratio of the main fermenter
 D = baseline_uniform(36, 0.1)
-@param(name='Residence time', element=R302, kind='coupled', units='hr',
+@param(name='Seed train time', element=R302, kind='coupled', units='hr',
         baseline=36, distribution=D)
 def set_R302_fermentation_time(tau): R302.tau_batch = tau
 
 D = shape.Triangle(0.8, 0.9, 1)
-@param(name='Fermentation yield', element=R302, kind='coupled', units='% of R301',
+@param(name='Seed train yield', element=R302, kind='coupled', units='% of R301',
         baseline=0.9, distribution=D)
 def set_R302_ratio(ratio):
     R302.ferm_ratio = ratio
 
-parameter_number = len(orgacids_model.get_baseline_sample())
 
+# %% Metrics to evalute system across IRR coordinate
 
-# %% Run evaluation and organize output results
+# Note: not using evaluate_across_coordinate function as the function will 
+# simulate the system at each coordinate point, which is not necessary since
+# changing IRR only affects the cashflow, not the system
 
-#!!! Maybe can use `orgacids_model.evaluate_across_coordinate` to look at
-# the impact of heavy acid content (maybe also latic acid purity?) vs. MSP
+def create_IRR_metric(IRR):
+    def get_IRR_based_MSP():
+        orgacids_tea.IRR = orgacids_sys_no_boiler_tea.IRR = boiler_sys_tea.IRR = IRR
+        return [orgacids_tea.solve_price(lactic_acid, orgacids_sys_no_boiler_tea) 
+                for i in range(10)][-1]
+    return Metric(f'MSP at IRR={IRR}', get_IRR_based_MSP, '$/kg', 'TEA')
+#     return Metric(f'MSP at IRR={int(IRR*100)}%', get_IRR_based_MSP, '$/kg', 'TEA')
 
-#!!! Should consider using the bst.evaluation.State.load_default_parameters function
+IRRs = np.linspace(0, 0.4, 41)
+IRR_metrics = [create_IRR_metric(IRR) for IRR in IRRs] + [metrics[-1]]
 
-samples = orgacids_model.sample(N=10, rule='L')
-orgacids_model.load_samples(samples)
-orgacids_model.evaluate()
-
-parameter_values = orgacids_model.table.iloc[:, :parameter_number].copy()
-# Add baseline values to the end
-parameter_values.loc['baseline'] = orgacids_model.get_baseline_sample()
-
-Monte_Carlo_results = orgacids_model.table.iloc[:, parameter_number::].copy()
-percentiles = [0, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 1]
-Monte_Carlo_percentiles = Monte_Carlo_results.quantile(q=percentiles)
-# Add baseline values to the end
-Monte_Carlo_results.loc['baseline'] = orgacids_model.metrics_at_baseline()
-
-# Note that if only one metric is used, then need to make sure it's a tuple
-spearman_metrics = (metrics[0],)
-spearman_metrics = metrics[0:3]
-spearman_results = orgacids_model.spearman(spearman_metrics)
-
-# Calculate the probabilities of each parameter and the overall scenario
-probabilities = {}
-for i in range(parameter_number):
-    p = orgacids_model.get_parameters()[i]
-    p_values = parameter_values.iloc[:, 2*i]
-    #!!! cdf vs. 1-cdf, might needed to be mannually reviewed
-    if spearman_results.iloc[:, 0][i]>0:
-        probabilities[p.name] = p.distribution.cdf(p_values)
-    else:
-        probabilities[p.name] = np.ones(len(p_values))-p.distribution.cdf(p_values)
-    parameter_values.insert(loc=2*i+1, 
-                            column=(parameter_values.iloc[:, 2*i].name[0], 
-                                    'Probability'), 
-                            value=probabilities[p.name],
-                            allow_duplicates=True)
-
-# Calculate the overall probabilities of scenario
-probability_list = list(i for i in probabilities.values())
-scenario_probability = probability_list[0].copy()
-for i in range(parameter_number-1):
-    scenario_probability *= list(i for i in probabilities.values())[i+1]
-probabilities['scenario_abs'] = scenario_probability
-
-# Normalize scenario probabilities by baseline probability
-scenario_probability_normalzied = probabilities['scenario_abs'].copy()
-scenario_probability_normalzied /= \
-    np.ones(len(probabilities['scenario_abs']))*probabilities['scenario_abs'][-1]
-probabilities['scenario_normalized'] = scenario_probability_normalzied
-parameter_values.insert(loc=parameter_values.shape[1],
-                        column=('Scenario', 'Absolute probability'), 
-                        value=probabilities['scenario_abs'])
-parameter_values.insert(loc=parameter_values.shape[1],
-                        column=('Scenario', 'Normalized probability'), 
-                        value=probabilities['scenario_normalized'])
-
-# Add scenario probabilities to Monte Carlo results
-Monte_Carlo_results.insert(loc=0, column=('Scenario', 'Normalized probability'),
-                           value=parameter_values.iloc[:, parameter_values.shape[1]-1])
-
-with pd.ExcelWriter('Analysis results.xlsx') as writer:
-    parameter_values.to_excel(writer, sheet_name='Parameters')
-    Monte_Carlo_results.to_excel(writer, sheet_name='Monte Carlo')
-    Monte_Carlo_percentiles.to_excel(writer, sheet_name='Monte Carlo Percentiles')
-    spearman_results.to_excel(writer, sheet_name='Spearman')
-
-
-
-
-
+orgacids_model_IRR = orgacids_model.copy()
+orgacids_model_IRR.metrics = IRR_metrics
 
 
 
