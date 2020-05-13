@@ -89,9 +89,8 @@ def set_rho(single_phase_chemical, rho):
 chems.extend(
     tmo.Chemicals(['Water', 'Ethanol', 'AceticAcid',
                    'Furfural', 'Glycerol', 'H2SO4',
-                   'LacticAcid', 'SuccinicAcid', 'P4O10'])
+                   'LacticAcid', 'SuccinicAcid', lipidcane_chemicals.P4O10])
 )
-chems.P4O10.at_state('s')
 chems.H2SO4.at_state('l')
 append_single_phase_chemical('HNO3', 'NitricAcid')
 append_single_phase_chemical('Denaturant', 'Octane')
