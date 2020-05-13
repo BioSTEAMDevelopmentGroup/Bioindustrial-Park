@@ -26,6 +26,22 @@ from orgacids.model import orgacids_model, orgacids_model_IRR
 percentiles = [0, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 1]
 
 
+
+np.random.seed(3221)
+samples = orgacids_model_IRR.sample(N=10, rule='L')
+parameter_len = len(orgacids_model_IRR.get_baseline_sample())
+
+orgacids_model_IRR.load_samples(samples)
+orgacids_model_IRR.evaluate()
+
+IRR_results = orgacids_model_IRR.table.iloc[:, parameter_len::].copy()
+IRR_percentiles = IRR_results.quantile(q=percentiles)
+
+
+print(IRR_results)
+
+
+
 # %% Perform Monte Carlo and calculate scenario probabilities
 
 # Set seed to make sure each time the same set of random numbers will be used

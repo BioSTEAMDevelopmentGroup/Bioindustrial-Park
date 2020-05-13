@@ -614,21 +614,22 @@ class AcidulationReactor(Unit):
             Rxn('2 AmmoniumHydroxide + H2SO4 -> AmmoniumSulfate + 2 H2O', 'AmmoniumHydroxide', 1),
             Rxn('CalciumDihydroxide + H2SO4 -> CaSO4 + 2 H2O', 'CalciumDihydroxide', 1)
             ])
-        
-        
         self.H_rxns = 0
-        self.H_rxns += 2*tmo.Chemical('LacticAcid').Hf + tmo.Chemical('CaSO4').Hf - \
-                (tmo.Chemical('CalciumLactate').Hf + tmo.Chemical('H2SO4').Hf)
-        self.H_rxns += 2*tmo.Chemical('AceticAcid').Hf + tmo.Chemical('CaSO4').Hf - \
-                (tmo.Chemical('CalciumAcetate').Hf + tmo.Chemical('H2SO4').Hf)
-        self.H_rxns += tmo.Chemical('AmmoniumSulfate').Hf + 2*tmo.Chemical('H2O').Hf - \
-                (2*tmo.Chemical('AmmoniumHydroxide').Hf + tmo.Chemical('H2SO4').Hf)
-        self.H_rxns += tmo.Chemical('CaSO4').Hf + 2*tmo.Chemical('H2O').Hf - \
-                (tmo.Chemical('CalciumDihydroxide').Hf + tmo.Chemical('H2SO4').Hf)
             
     def _run(self):
         feed, acid = self.ins
         effluent = self.outs[0]
+        H_rxns = self.H_rxns
+        chems = feed.chemicals
+        
+        H_rxns += 2*chems.LacticAcid.Hf + chems.CaSO4.Hf - \
+            (chems.CalciumLactate.Hf + chems.H2SO4.Hf)
+        H_rxns += 2*chems.AceticAcid.Hf + chems.CaSO4.Hf - \
+            (chems.CalciumAcetate.Hf + chems.H2SO4.Hf)
+        H_rxns += 2*chems.AmmoniumSulfate.Hf + chems.H2O.Hf - \
+            (chems.AmmoniumHydroxide.Hf + chems.H2SO4.Hf)
+        H_rxns += 2*chems.CaSO4.Hf + chems.H2O.Hf - \
+            (chems.CalciumDihydroxide.Hf + chems.H2SO4.Hf)
         
         effluent.copy_like(feed)
         # Set feed acid mol to match acidulation needs with 0% extra
@@ -639,7 +640,7 @@ class AcidulationReactor(Unit):
                              * 1
         effluent.mix_from([feed, acid])
         self.acidulation_rxns(effluent.mol)
-        effluent.H += self.H_rxns
+        effluent.H += H_rxns
 
 @cost(basis='Feed flow rate', ID='Hydroclone & rotary drum filter', units='kg/hr',
       # Size based on stream 239 in Aden et al.,

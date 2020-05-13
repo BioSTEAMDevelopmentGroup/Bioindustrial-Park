@@ -39,8 +39,11 @@ real_units = sum([i for i in orgacids_sub_sys.values()], ())
 # %% Define metric functions
 
 # Minimum selling price of lactic_acid stream
-get_MSP = lambda: [orgacids_tea.solve_price(lactic_acid, orgacids_sys_no_boiler_tea)
-                   for i in range(10)][-1]
+def get_MSP():
+    for i in range(5):
+        lactic_acid.price = orgacids_tea.solve_price(lactic_acid,
+                                                      orgacids_sys_no_boiler_tea)
+    return lactic_acid.price
 # Mass flow rate of lactic_acid stream
 get_yield = lambda: lactic_acid.F_mass
 # Purity (%) of LacticAcid in the final product
@@ -270,16 +273,16 @@ def set_R302_ratio(ratio):
 # simulate the system at each coordinate point, which is not necessary since
 # changing IRR only affects the cashflow, not the system
 
-def create_IRR_metric(IRR):
+def create_IRR_metrics(IRR):
     def get_IRR_based_MSP():
-        orgacids_tea.IRR = orgacids_sys_no_boiler_tea.IRR = boiler_sys_tea.IRR = IRR
-        return [orgacids_tea.solve_price(lactic_acid, orgacids_sys_no_boiler_tea) 
-                for i in range(10)][-1]
-    return Metric(f'MSP at IRR={IRR}', get_IRR_based_MSP, '$/kg', 'TEA')
-#     return Metric(f'MSP at IRR={int(IRR*100)}%', get_IRR_based_MSP, '$/kg', 'TEA')
+        # orgacids_tea.IRR = orgacids_sys_no_boiler_tea.IRR = boiler_sys_tea.IRR = IRR
+        orgacids_tea.IRR = IRR
+        return get_MSP()
+    return [Metric('MSP', get_IRR_based_MSP, '$/kg', f'IRR={IRR:.0%}'),
+            Metric('NPV', get_NPV, '$', f'IRR={IRR:.0%}')]
 
 IRRs = np.linspace(0, 0.4, 41)
-IRR_metrics = [create_IRR_metric(IRR) for IRR in IRRs] + [metrics[-1]]
+IRR_metrics = sum([create_IRR_metrics(IRR) for IRR in IRRs],[])
 
 orgacids_model_IRR = orgacids_model.copy()
 orgacids_model_IRR.metrics = IRR_metrics
