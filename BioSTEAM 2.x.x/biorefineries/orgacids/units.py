@@ -1294,10 +1294,11 @@ class AerobicDigestion(Unit):
         vent.phase = 'g'
 
         # 51061 and 168162 from stream 630 in Humbird et al.
-        air.imol['O2'] = 51061 * ratio
-        air.imol['N2'] = 168162 * ratio
+        air.imass['O2'] = 51061 * ratio
+        air.imass['N2'] = 168162 * ratio
         # 2252 from stream 632 in Humbird et al
-        caustic.imol['NaOH'] = (2252*ratio) + (2*influent.imol['H2SO4']/self.neutralization_rxn.X)
+        caustic.imass['NaOH'] = 2252 * ratio
+        caustic.imol['NaOH'] += 2 * influent.imol['H2SO4'] / self.neutralization_rxn.X
         caustic.imol['H2O'] = caustic.imol['NaOH']
         effluent.copy_like(influent)
         effluent.mol += air.mol

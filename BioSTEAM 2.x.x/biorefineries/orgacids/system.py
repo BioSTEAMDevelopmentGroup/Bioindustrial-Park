@@ -623,8 +623,6 @@ ethanol_fresh = Stream('ethanol_fresh', price=price['Ethanol'])
 balance_water = Stream('balance_water', price=price['Makeup water'])
 ash = Stream('ash', price=price['Ash disposal'])
 FGD_lime = Stream('FGD_lime', price=price['Lime'])
-# Total lime needed
-lime = Stream('lime', price=price['Lime'])
 # Final product, not pure acid (which should be the case in reality)
 lactic_acid = Stream('lactic_acid', units='kg/hr', price=price['Lactic acid'])
 boiler_chemicals = Stream('boiler_chemicals', price=price['Boiler chemicals'])
