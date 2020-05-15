@@ -620,9 +620,9 @@ CSL_fresh = Stream('CSL_fresh', price=price['CSL'])
 lime_fresh = Stream('lime_fresh', price=price['Lime'])
 ethanol_fresh = Stream('ethanol_fresh', price=price['Ethanol'])
 # Water used to keep system water usage balanced
-balance_water = Stream('balance_water', price=price['Makeup water'])
+system_makeup_water = Stream('system_makeup_water', price=price['Makeup water'])
 ash = Stream('ash', price=price['Ash disposal'])
-FGD_lime = Stream('FGD_lime', price=price['Lime'])
+FGD_lime = Stream('FGD_lime')
 # Final product, not pure acid (which should be the case in reality)
 lactic_acid = Stream('lactic_acid', units='kg/hr', price=price['Lactic acid'])
 boiler_chemicals = Stream('boiler_chemicals', price=price['Boiler chemicals'])
@@ -672,7 +672,7 @@ FWT = units.FireWaterTank('FWT',
 
 BT = facilities.OrganicAcidsBT('BT', ins=(M505-0, R501-0, 
                                           FGD_lime, boiler_chemicals,
-                                          baghouse_bag, 'makeup_water'),
+                                          baghouse_bag, 'BT_makeup_water'),
                                B_eff=0.8, TG_eff=0.85,
                                combustibles=combustibles,
                                ratio=plant_size_ratio,
@@ -696,7 +696,7 @@ process_water_streams = (pretreatment_feedstock_water, pretreatment_acid_water,
                          stripping_water, separation_acid_water, 
                          separation_hydrolysis_water, aerobic_caustic, 
                          BT.ins[-1], CT.ins[-1])
-PWC = facilities.OrganicAcidsPWC('PWC', ins=(S504-0, balance_water), 
+PWC = facilities.OrganicAcidsPWC('PWC', ins=(S504-0, system_makeup_water), 
                                  process_water_streams=process_water_streams,
                                  outs=('process_water','discharged_water'))
 
@@ -837,12 +837,19 @@ orgacids_sys_no_boiler_tea = OrgacidsTEA(
         labor_burden=0.90, property_insurance=0.007, maintenance=0.03)
 orgacids_sys_no_boiler_tea.units.remove(BT)
 
+# Removes feeds/products of boiler_sys from orgacids_sys to avoid double-counting
+for i in boiler_sys.feeds:
+    orgacids_sys.feeds.remove(i)
+for i in boiler_sys.products:
+    orgacids_sys.products.remove(i)
+    
 # Boiler turbogenerator potentially has different depreciation schedule
+#!!! Want to change to BT_sys
 boiler_sys_tea = bst.TEA.like(boiler_sys, orgacids_sys_no_boiler_tea)
-# boiler_sys_tea.labor_cost = 0
+boiler_sys_tea.labor_cost = 0
 # # Changed to MACRS 20 to be consistent with Humbird
-# boiler_sys_tea.depreciation = 'MACRS20'
-# boiler_sys_tea.OSBL_units = (BT,)
+boiler_sys_tea.depreciation = 'MACRS20'
+boiler_sys_tea.OSBL_units = (BT,)
 # facilities_sys_tea = bst.TEA.like(facilities_sys, orgacids_sys_no_boiler_tea)
 
 orgacids_tea = bst.CombinedTEA([orgacids_sys_no_boiler_tea, boiler_sys_tea], IRR=0.10)

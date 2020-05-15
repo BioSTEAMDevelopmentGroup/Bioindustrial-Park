@@ -25,11 +25,9 @@ from biosteam.evaluation import Model, Metric
 from biosteam.evaluation import evaluation_tools as tools
 from orgacids.process_settings import price
 from orgacids.system import lactic_acid, gypsum, M301, R301, R302, BT, CT, \
-    orgacids_tea, orgacids_sys_no_boiler_tea, orgacids_sys, orgacids_sub_sys, \
+    orgacids_sys, boiler_sys, orgacids_sub_sys, orgacids_tea, orgacids_sys_no_boiler_tea,  \
     boiler_sys_tea
 # from orgacids.system import *
-
-__all__ = ('orgacids_model', 'orgacids_model_IRR')
 
 #!!! Want to change to orgacids_sys_no_BT_tea
 _hr_per_yr = orgacids_sys_no_boiler_tea._annual_factor
@@ -51,143 +49,175 @@ get_purity = lambda: lactic_acid.imass['LacticAcid']/lactic_acid.F_mass
 # Recovery (%) = recovered/amount in fermentation broth
 get_recovery = lambda: lactic_acid.imass['LacticAcid'] \
     /(R301.outs[1].imass['LacticAcid']+R301.outs[1].imass['CalciumLactate'])
-get_overall_TCI = lambda: orgacids_tea.TCI/1e6
+get_overall_TCI = lambda: orgacids_tea.TCI
 # Annual operating cost, note that AOC excludes electricity credit
-get_overall_AOC = lambda: orgacids_tea.AOC/1e6
-get_material_costs = lambda: orgacids_tea.material_cost/1e6
+get_overall_AOC = lambda: orgacids_tea.AOC
+get_material_cost = lambda: orgacids_tea.material_cost
 # Annual sale revenue from products, note that electricity credit is not included,
 # but negative sales from waste disposal are included
 # (i.e., wastes are products of negative selling price)
-get_annual_sales = lambda: orgacids_tea.sales/1e6
+get_annual_sale = lambda: orgacids_tea.sales
 # System power usage, individual unit power usage should be positive
 unit_power_usage = [i.power_utility.rate for i in orgacids_sys.units if i.power_utility]
-excess_power = lambda: BT.generated_electricity
+excess_power = lambda: BT.electricity_generated
 # Electricity credit is positive if getting revenue from excess electricity
-get_electricity_credit = lambda: (excess_power()*price['Electricity']*_hr_per_yr/1e6)
+get_electricity_credit = lambda: (excess_power()*price['Electricity']*_hr_per_yr)
 
 metrics = [Metric('Minimum selling price', get_MSP, '$/kg'),
            Metric('Product yield', get_yield, 'kg/hr'),
            Metric('Product purity', get_purity, '%'),
            Metric('Product recovery', get_recovery, '%'),
-           Metric('Total capital investment', get_overall_TCI, '10^6 $'),
-           Metric('Annual operating cost', get_overall_AOC, '10^6 $/yr'),
-           Metric('Annual material costs', get_material_costs, '10^6 $/yr'),
-           Metric('Annual product sales', get_annual_sales, '10^6 $/yr'),
-           Metric('Annual electricity credit', get_electricity_credit, '10^6 $/yr')
+           Metric('Total capital investment', get_overall_TCI, '$'),
+           Metric('Annual operating cost', get_overall_AOC, '$/yr'),
+           Metric('Annual material cost', get_material_cost, '$/yr'),
+           Metric('Annual product sale', get_annual_sale, '$/yr'),
+           Metric('Annual electricity credit', get_electricity_credit, '$/yr')
            ]
 
-# Get capital cost of sub-systems (as ratios of overall capital cost)
-def get_CAPEX_ratios(system):
-    return lambda: sum([i.installation_cost 
-                        for i in orgacids_sub_sys[system]])/orgacids_tea.installation_cost
+# Get capital cost of sub-systems
+def get_installation_cost(system):
+    return lambda: sum(i.installation_cost for i in orgacids_sub_sys[system])
 for system in orgacids_sub_sys.keys():
     if system == 'feedstock_sys': continue
     metrics.extend(
-        (Metric(system, get_CAPEX_ratios(system), '%', 'CAPEX ratio'),))
-get_CAPEX_ratios_sum = lambda: sum(get_CAPEX_ratios(system)() 
-                                   for system in orgacids_sub_sys.keys())
-metrics.extend((Metric('Sum', get_CAPEX_ratios_sum, '%', 'CAPEX ratio'),))
+        (Metric(system, get_installation_cost(system), '$', 'Installation cost'),))
 
-# Get material costs (as ratios of overall costs)
-system_feeds = tuple(i for i in orgacids_sys.feeds if i.price)
-def get_material_cost_ratios(feed):
-    return lambda: feed.price*feed.F_mass*_hr_per_yr/orgacids_tea.material_cost
+# All checks should be ~0
+check_installation_cost = \
+    lambda: sum(get_installation_cost(system)() 
+                for system in orgacids_sub_sys.keys()) - orgacids_tea.installation_cost
+metrics.extend((Metric('Check', check_installation_cost, '$', 'Installation cost'),))
+
+# Get material cost
+system_feeds = [i for i in orgacids_sys.feeds if i.price] + \
+    [i for i in boiler_sys.feeds if i.price]
+def get_material_cost(feed):
+    return lambda: feed.price*feed.F_mass*_hr_per_yr
 for feed in system_feeds:
-    metrics.extend((Metric(feed.ID, get_material_cost_ratios(feed), '%', 'Cost ratio'),))
-get_get_material_cost_ratios_sum = lambda: sum(get_material_cost_ratios(feed)() 
-                                               for feed in system_feeds)
-metrics.extend((Metric('Sum', get_get_material_cost_ratios_sum, '%', 'Cost ratio'),))
+    metrics.extend((Metric(feed.ID, get_material_cost(feed), '$/yr', 'Material cost'),))
+check_material_cost = lambda: sum(get_material_cost(feed)()
+                                  for feed in system_feeds) - orgacids_tea.material_cost
 
-# Get product sales (as ratios of overall sales)
-system_products = tuple(i for i in orgacids_sys.products if i.price)
-def get_product_sale_ratios(stream):
-    return lambda: stream.price*stream.F_mass*_hr_per_yr/orgacids_tea.sales
+metrics.extend((Metric('Check', check_material_cost, '$/yr', 'Material cost'),))
+
+# Get product sale
+system_products = [i for i in orgacids_sys.products if i.price] + \
+    [i for i in boiler_sys.products if i.price]
+def get_product_sale(stream):
+    return lambda: stream.price * stream.F_mass * _hr_per_yr
 for product in system_products:
-    metrics.extend((Metric(product.ID, get_product_sale_ratios(product), '%', 'Sale ratio'),))
+    metrics.extend((Metric(product.ID, get_product_sale(product), '$/yr', 'Product sale'),))
 # Baseline disposal cost of gypsum is 0, thus not caputured
 #!!! Need to add other baseline-0 wastes if considering their disposal costs in
 # sensitivity and uncertainty analyses
-get_gypsum_sale_ratio = lambda: gypsum.price*gypsum.F_mass*_hr_per_yr/orgacids_tea.sales
-get_product_sale_ratios_sum = lambda: sum(get_product_sale_ratios(product)()
-                                          for product in system_products)
+get_gypsum_sale = lambda: gypsum.price * gypsum.F_mass * _hr_per_yr
+check_product_sale= \
+    lambda: sum(get_product_sale(product)() for product in system_products) \
+        + get_gypsum_sale() - orgacids_tea.sales
 metrics.extend((
-    Metric(gypsum.ID, get_gypsum_sale_ratio, '%', 'Sale ratio'),
-    Metric('Sum', get_product_sale_ratios_sum, '%', 'Sale ratio')))
+    Metric(gypsum.ID, get_gypsum_sale, '$/yr', 'Product sale'),
+    Metric('Check', check_product_sale, '$/yr', 'Product sale')))
 
-# Get heating demand (kJ/hr), positive if needs heating
-get_system_heating_demand = lambda: BT.system_heating_demand/1e3
-def get_heating_demand_ratios(system):
-    heat_utilities = sum([i.heat_utilities for i in orgacids_sub_sys[system]], ())
+# Get heating demand, positive if needs heating
+get_system_heating_demand = lambda: BT.system_heating_demand
+get_pretreatment_steam_heating_demand = lambda: BT.side_streams_lps.duty
+get_BT_heating_demand = lambda: sum(i.duty for i in BT.heat_utilities if i.duty*i.cost>0)
+
+def get_heating_demand(system):
+    heat_utilities = sum((i.heat_utilities for i in orgacids_sub_sys[system]), ())
     heating_utilities = [i for i in heat_utilities if i.duty*i.cost>0]
-    return lambda: sum([i.duty for i in heating_utilities])/1e3/get_system_heating_demand()
-get_side_streams_heating_demand = lambda: BT.side_streams_lps.duty/1e3/get_system_heating_demand()
+    return lambda: sum(i.duty for i in heating_utilities)
+
 for system in orgacids_sub_sys.keys():
     if system == 'feedstock_sys': continue
+    # The only heating demand for the pretreatment system is the heat needed to
+    # generate the side steam
     if system == 'pretreatment_sys':
-        metrics.extend((Metric(system, get_side_streams_heating_demand, '%', 
-                               'Heating demand ratio'),))
-    else: metrics.extend((Metric(system, get_heating_demand_ratios(system), '%', 
-                                 'Heating demand ratio'),))
-get_heating_demand_ratios_sum = lambda: sum((get_heating_demand_ratios(system)()
-                                            for system in orgacids_sub_sys.keys()
-                                            if system != 'BT'),
-                                            (get_side_streams_heating_demand(),))
+        metrics.extend((Metric(system, get_pretreatment_steam_heating_demand, 'kJ/hr', 
+                               'Heating demand'),))
+    elif system == 'BT':
+        metrics.extend((Metric(system, get_BT_heating_demand, 'kJ/hr', 
+                               'Heating demand'),))
+    else: metrics.extend((Metric(system, get_heating_demand(system), 'kJ/hr', 
+                                 'Heating demand'),))
+
+check_heating_demand = \
+    lambda: sum((get_heating_demand(system)() 
+                 for system in orgacids_sub_sys.keys() if system != 'BT'), 
+                get_pretreatment_steam_heating_demand()) - get_system_heating_demand()
+                                            # (get_side_streams_heating_demand(),))[0]
+                                            
 metrics.extend((
-    Metric('Sum', get_heating_demand_ratios_sum, '%', 'Heating demand ratio'),
-    Metric('Overall', get_system_heating_demand, 'MJ/hr', 'Heating demand')
+    Metric('Overall', get_system_heating_demand, 'kJ/hr', 'Heating demand'),
+    Metric('Check', check_heating_demand, 'MJ/hr', 'Heating demand')
     ))
 
-# Get cooling demand (kJ/hr), negative if needs cooling
-get_system_cooling_demand = lambda: CT.system_cooling_demand/1e3
-def get_cooling_demand_ratios(system):
-    heat_utilities = sum([i.heat_utilities for i in orgacids_sub_sys[system]], ())
+# Get cooling demand, negative if needs cooling
+get_system_cooling_demand = lambda: CT.system_cooling_demand
+get_CT_cooling_demand = lambda: sum(i.duty for i in CT.heat_utilities if i.duty*i.cost<0)
+
+def get_cooling_demand(system):
+    heat_utilities = sum((i.heat_utilities for i in orgacids_sub_sys[system]), ())
     cooling_utilities = [i for i in heat_utilities if i.duty*i.cost<0]
-    return lambda: sum([i.duty for i in cooling_utilities])/1e3/get_system_cooling_demand()
+    # return lambda: sum(i.duty for i in cooling_utilities)/1e3/get_system_cooling_demand()
+    return lambda: sum(i.duty for i in cooling_utilities)
+
 for system in orgacids_sub_sys.keys():
     if system == 'feedstock_sys': continue
-    metrics.extend((Metric(system, get_cooling_demand_ratios(system), '%', 'Cooling demand ratio'),))
-get_cooling_demand_ratios_sum = lambda: sum(get_cooling_demand_ratios(system)()
-                                            for system in orgacids_sub_sys.keys()
-                                            if system != 'CT')
+    elif system == 'CT':
+        metrics.extend((Metric(system, get_CT_cooling_demand, 'kJ/hr', 'Cooling demand'),))
+    else:
+        metrics.extend((Metric(system, get_cooling_demand(system), 'kJ/hr', 'Cooling demand'),))
+
+check_cooling_demand = \
+    lambda: sum(get_cooling_demand(system)()
+                for system in orgacids_sub_sys.keys() if system != 'CT') \
+        - get_system_cooling_demand()
+
 metrics.extend((
-    Metric('Sum', get_cooling_demand_ratios_sum, '%', 'Cooling demand ratio'),
-    Metric('Overall', get_system_cooling_demand, 'MJ/hr', 'Cooling demand')
+    Metric('Overall', get_system_cooling_demand, 'kJ/hr', 'Cooling demand'),
+    Metric('Check', check_cooling_demand, 'kJ/hr', 'Cooling demand')
     ))
 
-# Get power demand (kW), positive if using power
+# Get power demand, positive if using power
 get_system_power_demand = lambda: sum(i.power_utility.rate for i in orgacids_sys.units
-                                      if i.power_utility)/1e3
-def get_power_demand_ratios(system):
+                                      if i.power_utility)
+def get_power_demand(system):
     power_utilities = [i.power_utility for i in orgacids_sub_sys[system]]
-    return lambda: sum([i.rate for i in power_utilities])/1e3/get_system_power_demand()
+    return lambda: sum(i.rate for i in power_utilities)
+
 for system in orgacids_sub_sys.keys():
     if system == 'feedstock_sys': continue
-    metrics.extend((Metric(system, get_power_demand_ratios(system), '%', 'Power demand ratio'),))
-get_power_demand_ratios_sum = lambda: sum(get_power_demand_ratios(system)()
-                                          for system in orgacids_sub_sys.keys())
+    metrics.extend((Metric(system, get_power_demand(system), 'kW', 'Power demand'),))
+
+check_power_demand = lambda: sum(get_power_demand(system)()
+                                 for system in orgacids_sub_sys.keys()) - get_system_power_demand()
 metrics.extend((
-    Metric('Sum', get_power_demand_ratios_sum, '%', 'Power demand ratio'),
-    Metric('Overall', get_system_power_demand, 'MW', 'Power demand')
+    Metric('Overall', get_system_power_demand, 'kW', 'Power demand'),
+    Metric('Check', check_power_demand, 'kW', 'Power demand')
     ))
 
 # Get utility cost including heating, cooling, and power
-get_system_utility_cost = lambda: sum(i.utility_cost for i in real_units)*_hr_per_yr/1e6
-def get_utility_cost_ratios(system):
-    return lambda: sum([i.utility_cost for i in orgacids_sub_sys[system]]) \
-        *_hr_per_yr/1e6/get_system_utility_cost()
+get_system_utility_cost = lambda: sum(i.utility_cost for i in real_units)
+def get_utility_cost(system):
+    return lambda: sum(i.utility_cost for i in orgacids_sub_sys[system])
+
 for system in orgacids_sub_sys.keys():
     if system == 'feedstock_sys': continue
-    metrics.extend((Metric('Utility cost ratio', get_utility_cost_ratios(system), '%', system),))
-get_utility_cost_ratios_sum = lambda: sum(get_utility_cost_ratios(system)()
-                                          for system in orgacids_sub_sys.keys())
+    metrics.extend((Metric(system, get_utility_cost(system), '$/hr', 'Utility cost'),))
+
+check_utility_cost = \
+    lambda: sum(get_utility_cost(system)() for system in orgacids_sub_sys.keys()) \
+        - get_system_utility_cost()
+
 metrics.extend((
-    Metric('Utility cost ratio', get_utility_cost_ratios_sum, '%', 'Sum'),
-    Metric('Utility cost', get_system_utility_cost, '10^6 $/yr', 'Overall')
+    Metric('Sum', get_system_utility_cost, '$/hr', 'Utility cost'),
+    Metric('Overall', check_utility_cost, '$/hr', 'Utility cost')
     ))
 
 # To see if TEA converges well for each simulation
 get_NPV = lambda: orgacids_tea.NPV
-metrics.extend((Metric('TEA', get_NPV, '$', 'NPV'), ))
+metrics.extend((Metric('NPV', get_NPV, '$', 'TEA'), ))
 
 
 # %% Add evaluating parameters

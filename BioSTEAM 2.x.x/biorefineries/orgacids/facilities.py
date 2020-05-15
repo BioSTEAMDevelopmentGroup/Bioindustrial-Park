@@ -378,15 +378,16 @@ class OrganicAcidsBT(Facility):
                 hu_BT.add(j)
 
             # 3600 is conversion of kJ/hr to kW (kJ/s)
-            generated_electricity = self.generated_electricity = \
+            electricity_generated = self.electricity_generated = \
                 BT_heat_surplus * self.TG_eff / 3600
             
             # Take the opposite for cooling duty (i.e., cooling duty should be negative)
             # this is to condense the unused steam
-            cooling_need = self.cooling_need = -(BT_heat_surplus-generated_electricity)
+            cooling_need = self.cooling_need = -(BT_heat_surplus-electricity_generated)
             hu_cooling = HeatUtility()
             hu_cooling(duty=cooling_need, T_in=lps.T)
             hu_BT.add(hu_cooling)
+            
         # BT cannot meet system heating demand, purchase supplement steams
         else:
             remaining_heat = heat_generated
@@ -400,10 +401,10 @@ class OrganicAcidsBT(Facility):
                     reversed_hu.reverse()
                     hu_BT.add(reversed_hu)
                 else: break
-            
+
             split_BT = HeatUtility()
             split_BT.copy_like(hu_list[0])
-            split_ratio = -remaining_heat / hu_list[0].duty
+            split_ratio = (remaining_heat+hu_list[0].duty) / hu_list[0].duty
             split_BT.scale(split_ratio)
             split_spp = HeatUtility()
             split_spp.copy_like(hu_list[0])
@@ -415,7 +416,7 @@ class OrganicAcidsBT(Facility):
             
             for i in hu_list: hu_spp.add(i)
 
-            generated_electricity = self.generated_electricity = 0
+            electricity_generated = self.electricity_generated = 0
 
         total_steam = sum([i.flow for i in system_heating_utilities.values()])
         blowdown_water.imol['H2O'] = total_steam * self.blowdown
@@ -429,10 +430,10 @@ class OrganicAcidsBT(Facility):
         self.heat_utilities = tuple(BT_utilities)
         Design = self.design_results        
         Design['Flow rate'] = total_steam
-        Design['Work'] = generated_electricity
+        Design['Work'] = electricity_generated
 
     def _end_decorated_cost_(self):
-        self.power_utility(self.power_utility.rate - self.generated_electricity)
+        self.power_utility(self.power_utility.rate - self.electricity_generated)
         
                 
 

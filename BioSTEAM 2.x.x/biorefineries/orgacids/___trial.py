@@ -47,13 +47,20 @@ print('\n\nPurity = %s percent mass \t Separation yield = %s percent mass \t MPS
 # orgacids_sys.save_report('orgacids_sys.xlsx')
 
 
+# %%
 
+# from orgacids.system import *
+# from orgacids.model import *
 
-
-
-
-
-
+# def get_cooling_demand_ratios(system):
+#     heat_utilities = sum((i.heat_utilities for i in orgacids_sub_sys[system]), ())
+#     cooling_utilities = [i for i in heat_utilities if i.duty*i.cost<0]
+#     # return lambda: sum([i.duty for i in cooling_utilities])/1e3/get_system_cooling_demand()
+#     return lambda: sum(i.duty for i in cooling_utilities)
+# for system in orgacids_sub_sys.keys():
+#     if system == 'feedstock_sys': continue
+#     # metrics.extend((Metric(system, get_cooling_demand_ratios(system), '%', 'Cooling demand ratio'),))
+#     print(f'{system}: {get_cooling_demand_ratios(system)()}')
 
 
 

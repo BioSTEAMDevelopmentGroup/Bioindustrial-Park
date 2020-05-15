@@ -103,11 +103,11 @@ parameters.insert(loc=parameters.shape[1],
 Monte_Carlo_results.insert(loc=0, column=('Scenario', 'Normalized probability'),
                             value=parameters.iloc[:, parameters.shape[1]-1])
 
-# with pd.ExcelWriter('Monte Carlo scenarios and probabilities.xlsx') as writer:
-#     parameters.to_excel(writer, sheet_name='Parameters')
-#     Monte_Carlo_results.to_excel(writer, sheet_name='Monte Carlo')
-#     Monte_Carlo_percentiles.to_excel(writer, sheet_name='Monte Carlo Percentiles')
-#     spearman_results.to_excel(writer, sheet_name='Spearman')
+with pd.ExcelWriter('Monte Carlo scenarios and probabilities.xlsx') as writer:
+    parameters.to_excel(writer, sheet_name='Parameters')
+    Monte_Carlo_results.to_excel(writer, sheet_name='Monte Carlo')
+    Monte_Carlo_percentiles.to_excel(writer, sheet_name='Monte Carlo Percentiles')
+    spearman_results.to_excel(writer, sheet_name='Spearman')
 
 
 # %% Evaluated resutls across the IRR coordinate
@@ -129,9 +129,9 @@ IRR_percentiles = IRR_results.quantile(q=percentiles)
 #!!! If having multiple coordinates, consider summarizing all percentiles into
 # one df and make percentiles as the columns, make multi-level column labels
 
-# with pd.ExcelWriter('Monte Carlo across coordinates.xlsx') as writer:
-#     IRR_results.to_excel(writer, sheet_name='IRR')
-#     IRR_percentiles.to_excel(writer, sheet_name='IRR Percentiles')
+with pd.ExcelWriter('Monte Carlo across coordinates.xlsx') as writer:
+    IRR_results.to_excel(writer, sheet_name='IRR')
+    IRR_percentiles.to_excel(writer, sheet_name='IRR Percentiles')
 
 
 # %% Reference codes for using evaluate_across_coordinate
