@@ -25,6 +25,7 @@ TODO:
 
 # %% Setup
 
+import numpy as np
 import thermosteam as tmo
 from math import exp
 from flexsolve import aitken_secant
@@ -33,11 +34,8 @@ from biosteam.units import Flash, HXutility, Mixer, Pump, SolidsSeparator, Stora
 from biosteam.units.decorators import cost
 from biosteam.units._splitter import run_split_with_mixing
 from thermosteam import Stream, MultiStream
-from scipy.optimize import fsolve
-import numpy as np
-import copy
+from orgacids.utils import baseline_feedflow
 
-from thermosteam.reaction import Reaction, ParallelReaction
 # Chemical Engineering Plant Cost Index from Chemical Engineering Magzine
 # (https://www.chemengonline.com/the-magazine/)
 # Year  1997    1998    2009    2010    2016
@@ -52,11 +50,52 @@ ParallelRxn = tmo.reaction.ParallelReaction
 # Feedstock handling system as a whole, capital and operating costs considered in feedstock cost
 @cost(basis='Flow rate', ID='System', units='kg/hr',
       kW=511.3205, cost=13329690, S=94697, CE=521.9, n=0.6, BM=1.7)
-class FeedstockHandling(Unit): pass
+class FeedstockHandling(Unit):
+    _N_ins = 1
+    _N_outs = 1
+    
+    _baseline_feedflow = baseline_feedflow
+    
+    # U.S. ton/day, 2000 metric tonne/day as in Humbird et al.
+    feedstock_flow_rate = 2205
+    
+    def _run(self):
+        feed_in = self.ins[0]
+        feed_out = self.outs[0]
+        
+        feed_in.mol = self._baseline_feedflow * (self.feedstock_flow_rate/2205)
+        feed_out.copy_like(feed_in)
 
 
 # %% Pretreatment
 
+# Sulfuric acid addition tank
+@cost(basis='Flow rate', ID='Tank', units='kg/hr',
+      cost=6210, S=1981, CE=550.8,  n=0.7, BM=3)
+@cost(basis='Flow rate', ID='Pump2', units='kg/hr',
+      # Size basis changed from 3720 as the original one is not sufficient
+      cost=8000, S=1981, CE=521.9, n=0.8, BM=2.3)
+class SulfuricAcidAdditionTank(Unit):
+    _N_ins = 2
+    _N_outs = 1
+    
+    # loading at (18+4.1) mg/g dry biomass based on P21 in Humbird et al.
+    acid_loading = 22.1
+    
+    def __init__(self, ID='', ins=None, outs=(), feedstock_dry_mass=0):
+        Unit.__init__(self, ID, ins, outs)
+        self.feedstock_dry_mass = feedstock_dry_mass
+    
+    def _run(self):
+        feed = self.ins[0]
+        effluent = self.outs[0]
+
+        # Sulfuric acid is 93% purity
+        acid_mass = (self.acid_loading/1000) * self.feedstock_dry_mass
+        feed.imass['H2SO4'] = acid_mass
+        feed.imass['H2O'] = acid_mass / 0.93 * 0.07
+        effluent.copy_like(feed)
+        
 # Sulfuric acid in-line mixer
 @cost(basis='Flow rate', ID='Mixer', units='kg/hr',
       cost=6000, S=136260, CE=521.9, n=0.5, BM=1)
@@ -70,15 +109,26 @@ class SulfuricAcidMixer(Unit):
         mixture = self.outs[0]
         # 0.05 is from 1842/36629 from streams 710 and 516 of Humbird et al.
         water.imass['Water'] = acid.imass['SulfuricAcid'] / 0.05
-        mixture.mix_from([water, acid])
+        mixture.mix_from([acid, water])
 
-# Sulfuric acid addition tank
-@cost(basis='Flow rate', ID='Tank', units='kg/hr',
-      cost=6210, S=1981, CE=550.8,  n=0.7, BM=3)
-@cost(basis='Flow rate', ID='Pump2', units='kg/hr',
-      # Size basis changed from 3720 as the original one is not sufficient
-      cost=8000, S=1981, CE=521.9, n=0.8, BM=2.3)
-class SulfuricAcidAdditionTank(Unit): pass
+# Adjust pretreatment water loading, 30% from Table 5 on Page 21 of Humbird et al.
+class PretreatmentMixer(Mixer):
+    _N_ins = 3
+    _N_outs = 1
+    
+    solid_loading = 0.3
+        
+    def _run(self):
+        feedstock, acid, water = self.ins
+        mixture_out = self.outs[0]
+        
+        mixture = feedstock.copy()
+        mixture.mix_from([feedstock, acid])
+        
+        total_mass = (mixture.F_mass-mixture.imass['Water'])/self.solid_loading
+        water.imass['Water'] = total_mass - mixture.F_mass
+        
+        mixture_out.mix_from([mixture, water])
 
 # Steam mixer
 class SteamMixer(Unit):
@@ -175,7 +225,6 @@ class PretreatmentReactorSystem(Unit):
             Rxn('Furfural -> Tar',                           'Furfural', 1),
             Rxn('HMF -> Tar',                                'HMF',      1)
             ])
-
     
     def _run(self):
         ms = self._multistream
@@ -223,7 +272,14 @@ class PretreatmentFlash(Flash): pass
       # Size basis on the total flow, not just ammonia, 
       # thus assuming differences caused by MWs of NH3 and NH4OH
       cost=5000, S=157478, CE=521.9, n=0.5, BM=1)
-class AmmoniaMixer(Mixer): pass
+class AmmoniaMixer(Mixer):
+    def _run(self):
+        ammonia, water = self.ins
+        mixture = self.outs[0]
+        
+        # Make 10% ammonia solution
+        water.imass['Water'] = ammonia.imass['AmmoniumHydroxide'] * (1-0.1)/0.1
+        mixture.mix_from([ammonia, water])
 
 # Ammonia addition tank, size basis on the total flow, not just ammonia, 
 # thus assuming size basis difference caused by MWs of NH3 and NH4OH is negligible,
@@ -248,12 +304,6 @@ class AmmoniaAdditionTank(Unit):
         outs.copy_like(ins)        
         self.neutralization_rxn(outs.mol)
 
-# # Pretreatment water heater, not used as mass and energy balance of 
-# # all process water is simulated in OrganicAcidsPWC
-# @cost(basis='Duty', ID='Heat exchanger', units='Gcal/hr',
-#       cost=92000, S=8, CE=550.8, n=0.7, BM=2.2)
-# class PretreatmentWaterHeater(HXutility):
-#     _graphics = HXutility._graphics
 
 # Hydrolysate (spelled as "Hydrolyzate" in Humbird et al.) pump
 @cost(basis='Flow rate', ID='Pump6', units='kg/hr',
@@ -282,23 +332,29 @@ class EnzymeHydrolysateMixer(Mixer):
     _N_ins = 2
     _N_outs = 1
     
-    # Default loading is 20 mg/g cellulose based on Table 18 of Humbird et al.,
-    enzyme_loading = 20/1000
+    # 20 mg/g glucan based on Table 18 of Humbird et al.
+    enzyme_loading = 20
+    solid_loading = 0.2
 
     def _run(self):
-        feed, cellulase = self.ins
+        hydrolysate, enzyme, water = self.ins
         effluent = self.outs[0]
         
-        cellulase.imass['Enzyme'] = self.enzyme_loading*feed.imass['Glucan']
+        enzyme.imass['Enzyme'] = (self.enzyme_loading/1000) * hydrolysate.imass['Glucan']
         # 13054 and 13836 are from stream 422 in Humbird et al.
-        cellulase.imass['H2O'] = cellulase.imass['Enzyme'] * (13836-13054)/13836
-        cellulase.price *= (cellulase.imass['Enzyme']/cellulase.F_mass)
-        effluent.mol = feed.mol + cellulase.mol
+        enzyme.imass['Water'] = enzyme.imass['Enzyme'] * (13836-13054)/13836
+        mixture = hydrolysate.copy()
+        mixture.mix_from([hydrolysate, enzyme])
+        
+        total_mass = (mixture.F_mass-mixture.imass['Water'])/self.solid_loading
+        water.imass['Water'] = total_mass - mixture.F_mass
+        
+        effluent.mix_from([hydrolysate, enzyme, water])
 
 # Saccharification and co-fermentation (both Glucose & Xylose are used in fermentation)
 # Not including heat exchanger as saccharificatoin and co-fermentation 
 # are at the same temperature now
-@cost(basis='Prehydrolysis tank size', ID='Prehydrolysis tanks', units='kg',
+@cost(basis='Saccharification tank size', ID='Prehydrolysis tanks', units='kg',
       # Size basis changed from 421776 as the original design is not sufficient
       cost=3840000, S=283875*24, CE=521.9, n=0.7, BM=2)
 @cost(basis='Slurry flow rate', ID='Saccharification transfer pumps', units='kg/hr',
@@ -317,7 +373,7 @@ class EnzymeHydrolysateMixer(Mixer):
 class SaccharificationAndCoFermentation(Unit):    
     _N_ins = 3
     _N_outs = 2
-    _units= {'Prehydrolysis tank size': 'kg',
+    _units= {'Saccharification tank size': 'kg',
              'Slurry flow rate': 'kg/hr',
              'Fermenter size': 'kg',
              'Recirculation flow rate': 'kg/hr'}             
@@ -326,13 +382,13 @@ class SaccharificationAndCoFermentation(Unit):
     T = 50+273.15
     
     # Residence time of countinuous saccharification tanks (hr)
-    tau_prehydrolysis = 24
+    tau_saccharification = 24
     
     # Co-Fermentation time (hr)
     tau_cofermentation = 120
     
     # Equals the split of saccharified slurry to seed train
-    inoculum_ratio = 0.1
+    inoculum_ratio = 0.07
     
     CSL_loading = 10 # kg/m3
     
@@ -344,7 +400,7 @@ class SaccharificationAndCoFermentation(Unit):
             #   Reaction definition                   Reactant        Conversion
             Rxn('Glucan -> GlucoseOligomer',          'Glucan',         0.04),
             Rxn('Glucan + 0.5 H2O -> 0.5 Cellobiose', 'Glucan',         0.012),
-            Rxn('Glucan + H2O -> Glucose',            'Glucan',         0.9),
+            Rxn('Glucan + H2O -> Glucose',            'Glucan',         0.85),
             Rxn('Cellobiose + H2O -> 2 Glucose',      'Cellobiose',     1)
             ])
         
@@ -354,11 +410,11 @@ class SaccharificationAndCoFermentation(Unit):
         self.cofermentation_rxns = ParallelRxn([
         #      Reaction definition            Reactant    Conversion
         Rxn('Glucose -> 2 LacticAcid',        'Glucose',   0.76),
-        Rxn('Glucose -> 3 AceticAcid',        'Glucose',   0.069),
+        Rxn('Glucose -> 3 AceticAcid',        'Glucose',   0.07),
         Rxn('Glucose -> 6 FermMicrobe',       'Glucose',   0.02),
         Rxn('3 Xylose -> 5 LacticAcid',       'Xylose',    0.76),
-        Rxn('2 Xylose -> 5 AceticAcid',       'Xylose',    0.069),
-        Rxn('Xylose -> 5 FermMicrobe',        'Xylose',    0.019),
+        Rxn('2 Xylose -> 5 AceticAcid',       'Xylose',    0.07),
+        Rxn('Xylose -> 5 FermMicrobe',        'Xylose',    0.02),
         ])
         
         # Neutralization of lactic acid and acetic acid by lime (Ca(OH)2)
@@ -395,7 +451,7 @@ class SaccharificationAndCoFermentation(Unit):
     def _design(self):
         Design = self.design_results
         total_mass_flow = self.ins[0].F_mass + self.ins[1].F_mass
-        Design['Prehydrolysis tank size'] = total_mass_flow * self.tau_prehydrolysis
+        Design['Saccharification tank size'] = total_mass_flow * self.tau_saccharification
         Design['Slurry flow rate'] = total_mass_flow
         Design['Fermenter size'] = self.outs[0].F_mass * self.tau_cofermentation
         Design['Recirculation flow rate'] = total_mass_flow
@@ -440,10 +496,10 @@ class SeedTrain(Unit):
         self.cofermentation_rxns = ParallelRxn([
         #      Reaction definition            Reactant    Conversion
         Rxn('Glucose -> 2 LacticAcid',        'Glucose',   0.76*ferm_ratio),
-        Rxn('Glucose -> 3 AceticAcid',        'Glucose',   0.069*ferm_ratio),
+        Rxn('Glucose -> 3 AceticAcid',        'Glucose',   0.07*ferm_ratio),
         Rxn('Glucose -> 6 FermMicrobe',       'Glucose',   0.04),
         Rxn('3 Xylose -> 5 LacticAcid',       'Xylose',    0.76*ferm_ratio),
-        Rxn('2 Xylose -> 5 AceticAcid',       'Xylose',    0.069*ferm_ratio),
+        Rxn('2 Xylose -> 5 AceticAcid',       'Xylose',    0.07*ferm_ratio),
         Rxn('Xylose -> 5 FermMicrobe',        'Xylose',    0.04),
         ])
 
@@ -474,6 +530,7 @@ class SeedHoldTank(Unit): pass
 
 
 # %% Organic acid separation
+
 # class LiquidLiquidExtraction(Unit):
 #     _N_ins = 2
 #     _N_outs = 2
@@ -499,7 +556,6 @@ class SeedHoldTank(Unit): pass
 #         Design = self.design_results
 #         Design['Vent flow rate'] = self.ins[1].F_mass
 #         Design['Bottom flow rate'] = self.outs[1].F_mass
-        
         
 @cost(basis='Vent flow rate', ID='Scrubber', units='kg/hr',
       cost=215000, S=22608, CE=521.9, n=0.6, BM=2.4)
@@ -1263,7 +1319,8 @@ class AerobicDigestion(Unit):
         
         [1] Air
         
-        [2] Caustic
+        [2] Caustic, added to neutralize the nitric acid produced by 
+            nitrifying bacteria duing nitrification process
         
     **outs**
     
@@ -1308,6 +1365,8 @@ class AerobicDigestion(Unit):
         vent.copy_flow(effluent, ('CO2', 'O2', 'N2'), remove=True)
         vent.imol['Water'] = effluent.imol['Water'] * self.evaporation
         effluent.imol['Water'] -= vent.imol['Water']
+        # Assume NaOH is completely consumed
+        effluent.imol['NaOH'] = 0
 
 
 # %% Facility units in biosteam

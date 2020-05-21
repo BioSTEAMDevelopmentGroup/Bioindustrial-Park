@@ -219,14 +219,14 @@ class OrganicAcidsBT(Facility):
     generation from burning the feed. It also takes into account how much
     steam is being produced, and the required cooling utility of the turbo
     generator. Combustion reactions are populated based on molecular formula
-    of the ins. Purchase extra steam if BT cannot meet system demand.
+    of the ins. Purchase natural gas if BT cannot meet system heating/steam demand.
     
     Parameters
     ----------
     ins : stream sequence
-        [0] Liquid/solid feed that will be burned.
+        [0] Liquid/solid wastes to be burned.
         
-        [1] Gas that will be burned.
+        [1] Gas waste to be burned.
         
         [2] FGD lime.
         
@@ -234,13 +234,18 @@ class OrganicAcidsBT(Facility):
         
         [4] Baghouse bag.
                 
-        [5] Makeup water.
+        [5] Supplementary natural gas in the case that waste energy is not enough
+            to meet system steam demand
+
+        [6] Makeup water.
+        
     outs : stream sequence
         [0] Gas emission.
         
         [1] Ash residues.
         
         [2] Blowdown water.
+   
     boiler_efficiency : float
         Fraction of heat transfered to steam.
     turbo_generator_efficiency : float
@@ -264,7 +269,7 @@ class OrganicAcidsBT(Facility):
         
     """
     network_priority = 0
-    _N_ins = 6
+    _N_ins = 7
     _N_outs = 3
     _units= {'Flow rate': 'kg/hr',
              'Work': 'kW'} 
@@ -288,7 +293,7 @@ class OrganicAcidsBT(Facility):
     # Below cannot be put in the _run function because ins will be empty when simulated,
     # _design is run after _run so it'll work this way
     def _design(self):
-        feed_solids, feed_gases, lime, boiler_chemicals, bag, makeup_water = self.ins
+        feed_solids, feed_gases, lime, boiler_chems, bag, natural_gas, makeup_water = self.ins
         emission, ash, blowdown_water = self.outs
         ratio = self.ratio
         side_streams_to_heat = self.side_streams_to_heat
@@ -308,17 +313,17 @@ class OrganicAcidsBT(Facility):
         # 20% stoichiometetric excess based on P52 of Humbird et al.
         # 895 kg/hr based on Table 30 in Humbird et al.
         lime.imol['CalciumDihydroxide'] = emission.imol['SO2'] * 1.2
-        # boiler_chemicals and bag are scaled based on plant size,
+        # boiler_chems and bag are scaled based on plant size,
         # 1.23 is $2007/hour and 2.2661 is $/lb from Table 30 in Humbird et al.
         # 2.20462 is kg to lb
-        boiler_chemicals.imass['BoilerChemicals'] = 1.23 / 2.2661 / 2.20462 * ratio
+        boiler_chems.imass['BoilerChems'] = 1.23 / 2.2661 / 2.20462 * ratio
         bag.imass['BaghouseBag'] = ratio
         
         # 92% of SO2 removed by lime
         CaSO4_mol = emission.imol['SO2'] * 0.92
         emission.imol['SO2'] *= (1 - 0.92)
 
-        # Air usage not rigorously modeled
+        # Air/O2 usage not rigorously modeled
         emission.imol['O2'] = 0
         
         for chemical in emission.chemicals:
@@ -326,7 +331,7 @@ class OrganicAcidsBT(Facility):
                 ash.imol[chemical.ID] = emission.imol[chemical.ID]
                 emission.imol[chemical.ID] = 0
                 
-        ash.mol += boiler_chemicals.mol
+        ash.mol += boiler_chems.mol
         ash.imol['CaSO4'] = CaSO4_mol
         ash.imol['Lime'] += lime.F_mol - CaSO4_mol
         
@@ -367,16 +372,8 @@ class OrganicAcidsBT(Facility):
         self.system_steam_demand = sum([i.flow for i in system_heating_utilities.values()])
         
         hu_BT = set()
-        hu_spp = set()
-        # BT can meet system heating demand
+        # BT can meet system heating/steam demand
         if BT_heat_surplus >0:
-            # for i in system_heating_utilities:
-            for i in system_heating_utilities.values():
-                j = HeatUtility()
-                j.copy_like(i)
-                j.reverse()
-                hu_BT.add(j)
-
             # 3600 is conversion of kJ/hr to kW (kJ/s)
             electricity_generated = self.electricity_generated = \
                 BT_heat_surplus * self.TG_eff / 3600
@@ -388,40 +385,24 @@ class OrganicAcidsBT(Facility):
             hu_cooling(duty=cooling_need, T_in=lps.T)
             hu_BT.add(hu_cooling)
             
-        # BT cannot meet system heating demand, purchase supplement steams
+        # BT cannot meet system heating/steam demand, supplement with natural gas
         else:
-            remaining_heat = heat_generated
-            hu_list = [i for i in system_heating_utilities.values()]
-            for hu in hu_list:
-                remaining_heat -= hu.duty
-                if remaining_heat >0:
-                    hu_list.remove(hu)
-                    reversed_hu = HeatUtility()
-                    reversed_hu.copy_like(hu)
-                    reversed_hu.reverse()
-                    hu_BT.add(reversed_hu)
-                else: break
-
-            split_BT = HeatUtility()
-            split_BT.copy_like(hu_list[0])
-            split_ratio = (remaining_heat+hu_list[0].duty) / hu_list[0].duty
-            split_BT.scale(split_ratio)
-            split_spp = HeatUtility()
-            split_spp.copy_like(hu_list[0])
-            split_spp.scale(1-split_ratio)
-            hu_list.remove(hu_list[0])
-            split_BT.reverse()
-            hu_BT.add(split_BT)
-            hu_spp.add(split_spp)
-            
-            for i in hu_list: hu_spp.add(i)
-
+            CH4_LHV = natural_gas.chemicals.CH4.LHV
+            natural_gas.imol['CH4'] = BT_heat_surplus / (CH4_LHV*self.B_eff)
+            emission.imol['CO2'] += natural_gas.imol['CH4']
+            emission.imol['H2O'] += 2 * natural_gas.imol['CH4']
             electricity_generated = self.electricity_generated = 0
+            
 
+        for i in system_heating_utilities.values():
+            j = HeatUtility()
+            j.copy_like(i)
+            j.reverse()
+            hu_BT.add(j)
+        
         total_steam = sum([i.flow for i in system_heating_utilities.values()])
         blowdown_water.imol['H2O'] = total_steam * self.blowdown
         blowdown_water.T = 373.15
-        self.BT_spplement_utilities = HeatUtility().sum_by_agent(hu_spp)
 
         # Additional need from making lime slurry
         makeup_water.imol['H2O'] = blowdown_water.imol['H2O'] + lime.F_mol/0.2*0.8
