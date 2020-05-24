@@ -33,7 +33,7 @@ from orgacids.model import orgacids_model
 '''Quick look at baseline values'''
 # Set seed to make sure each time the same set of random numbers will be used
 np.random.seed(3221)
-N_simulation = 10
+N_simulation = 100
 samples = orgacids_model.sample(N=N_simulation, rule='L')
 orgacids_model.load_samples(samples)
 baseline = orgacids_model.metrics_at_baseline()
@@ -73,12 +73,12 @@ for i in range(parameter_len):
                       value=probabilities[p.name],
                       allow_duplicates=True)
 
-'''Output to Excel'''
-with pd.ExcelWriter('Evaluation scenarios and probabilities.xlsx') as writer:
-    parameters.to_excel(writer, sheet_name='Parameters')
-    Monte_Carlo_results.to_excel(writer, sheet_name='Monte Carlo')
-    Monte_Carlo_percentiles.to_excel(writer, sheet_name='Monte Carlo Percentiles')
-    spearman_results.to_excel(writer, sheet_name='Spearman')
+# '''Output to Excel'''
+# with pd.ExcelWriter('Evaluation scenarios and probabilities.xlsx') as writer:
+#     parameters.to_excel(writer, sheet_name='Parameters')
+#     Monte_Carlo_results.to_excel(writer, sheet_name='Monte Carlo')
+#     Monte_Carlo_percentiles.to_excel(writer, sheet_name='Monte Carlo Percentiles')
+#     spearman_results.to_excel(writer, sheet_name='Spearman')
 
 
 # %% Monte Carlo and evaluate across lactic acid yield

@@ -19,15 +19,12 @@ TODO:
 # %% Setup
 
 import numpy as np
-import pandas as pd
 import biosteam as bst
 from chaospy import distributions as shape
 from biosteam import main_flowsheet as find
 from biosteam.evaluation import Model, Metric
 from biosteam.evaluation.evaluation_tools import Setter
-from biosteam.evaluation import evaluation_tools as tools
 from orgacids.system import orgacids_sub_sys, orgacids_tea, orgacids_sys_no_boiler_tea
-from orgacids.utils import dry_composition
 
 __all__ = ('orgacids_model', 'orgacids_model_LA_yield', 'orgacids_model_IRR')
 
@@ -304,7 +301,7 @@ special_price = {
     }
 default_price_streams = (
     'sulfuric_acid_fresh', 'ammonia_fresh', 'enzyme', 'system_makeup_water',
-    'aerobic_caustic', 'CIP_chems_in', 'boiler_chems', 'baghouse_bag', 'ash',
+    'aerobic_caustic', 'cooling_tower_chems', 'boiler_chems', 'baghouse_bag', 'ash',
     )
 
 def add_stream_price_param(stream, D):

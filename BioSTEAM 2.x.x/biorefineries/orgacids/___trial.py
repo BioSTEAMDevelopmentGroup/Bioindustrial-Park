@@ -21,6 +21,12 @@ from orgacids.system import *
 
 # %% MPSP
 
+for i in range(5):
+   orgacids_sys.simulate()
+
+for i in range(5):
+   lactic_acid.price = orgacids_tea.solve_price(lactic_acid, orgacids_sys_no_boiler_tea)
+
 MPSP = lactic_acid.price
 # orgacids_sys.diagram()
 

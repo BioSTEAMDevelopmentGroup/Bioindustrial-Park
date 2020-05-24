@@ -191,14 +191,7 @@ LacticAcid.Hfus = 11.34e3
 EthylAcetate = chemical_database('EthylAcetate')
 # Hf from DIPPR value in Table 3 of Vatani et al., Int J Mol Sci 2007, 8 (5), 407–432
 EthylLactate = chemical_database('EthylLactate', Hf=-695.08e3)
-
-
 SuccinicAcid = chemical_database('SuccinicAcid')
-
-
-
-
-
 
 '''Insoluble organics'''
 Glucan = chemical_defined('Glucan', phase='s', formula='C6H10O5', Hf=-233200*_cal2joule)
@@ -238,7 +231,7 @@ BoilerChems = chemical_database('BoilerChems', search_ID='DiammoniumPhosphate',
 '''Filler chemicals'''
 BaghouseBag = chemical_defined('BaghouseBag', phase='s', MW=1, Hf=0, HHV=0, LHV=0)
 BaghouseBag.Cn.add_model(0)
-CIPchems = chemical_copied('CIPchems', BaghouseBag)
+CoolingTowerChems = chemical_copied('CoolingTowerChems', BaghouseBag)
 
 '''Might not needed'''
 DAP = chemical_database('DAP', search_ID='DiammoniumPhosphate',
@@ -250,7 +243,6 @@ DenaturedEnzyme = chemical_copied('DenaturedEnzyme', Enzyme)
 
 # Hf from DIPPR value in Table 3 of Vatani et al., Int J Mol Sci 2007, 8 (5), 407–432
 MethylLactate = chemical_database('MethylLactate', Hf=-643.1e3)
-
 FermMicrobeXyl = chemical_copied('FermMicrobeXyl', FermMicrobe)
 
 
@@ -268,7 +260,7 @@ chemical_groups = dict(
                               'BoilerChems', 'Na2SO4', 'AmmoniumHydroxide'),
     Furfurals = ('Furfural', 'HMF'),
     OtherOrganics = ('Denaturant', 'Xylitol'),
-    COxSOxNOxH2S = ('NitricOxide', 'NO2', 'SO2', 'CarbonMonoxide', 'H2S'),
+    COSOxNOxH2S = ('NitricOxide', 'NO2', 'SO2', 'CarbonMonoxide', 'H2S'),
     Proteins = ('Protein', 'Enzyme', 'DenaturedEnzyme'),
     CellMass = ('WWTsludge', 'FermMicrobe', 'FermMicrobeXyl'),
     # Theoretically P4O10 should be soluble, but it's the product of the
@@ -276,7 +268,7 @@ chemical_groups = dict(
     # P4O10 will be generated in the system as no P-containing chemicals 
     # are included in "combustibles"
     OtherInsolubleSolids = ('Tar', 'Ash', 'CalciumDihydroxide', 'CaSO4', 'P4O10',
-                            'BaghouseBag', 'CIPchems'),
+                            'BaghouseBag', 'CoolingTowerChems'),
     OtherStructuralCarbohydrates = ('Glucan', 'Xylan', 'Lignin', 'Arabinan', 
                                     'Mannan', 'Galactan'),
     SeparatelyListedOrganics = ('Ethanol', 'Glucose', 'Xylose', 'AceticAcid',

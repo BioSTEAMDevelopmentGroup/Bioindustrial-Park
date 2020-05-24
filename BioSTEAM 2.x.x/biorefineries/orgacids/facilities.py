@@ -85,19 +85,20 @@ class OrganicAcidsCT(Facility):
     
     """
     network_priority = 1
-    _N_ins = 2
+    _N_ins = 3
     _N_outs = 2    
     _N_heat_utilities = 1
 
     # Page 55 of Humbird et al.
     blowdown = 0.00005+0.0015
     
-    def __init__(self, ID='', ins=None, outs=(), system_cooling_utilities={}):
+    def __init__(self, ID='', ins=None, outs=(), system_cooling_utilities={}, ratio=0):
         Facility.__init__(self, ID, ins, outs)
         self.system_cooling_utilities = system_cooling_utilities
+        self.ratio = ratio
         
     def _run(self):
-        return_cw, makeup_water = self.ins
+        return_cw, makeup_water, ct_chems = self.ins
         process_cw, blowdown = self.outs
         system_cooling_utilities = self.system_cooling_utilities
 
@@ -128,6 +129,9 @@ class OrganicAcidsCT(Facility):
         return_cw.imol['H2O'] = process_cw.imol['H2O'] = total_cooling_water
         makeup_water.imol['H2O'] = total_cooling_water * self.blowdown
         blowdown.imol['H2O'] = makeup_water.imol['H2O']
+        
+        # 2 kg/hr from Table 30 on Page 63 of Humbird et al.
+        ct_chems.imass['CoolingTowerChems'] = 2 * self.ratio
 
         self.design_results['Flow rate'] = total_cooling_water
 

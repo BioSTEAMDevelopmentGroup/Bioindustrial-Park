@@ -107,11 +107,10 @@ price = {
          # 0.1900 is for NH3
          'AmmoniumHydroxide': 0.1900 * _lb_per_kg * 17.031/35.046,
          'CSL': 0.0339 * _lb_per_kg,
-         'Caustic': 0.0832 * _lb_per_kg * _chemical_2011to2016, # Davis et al. 2013
+         'NaOH': 0.2384 * _lb_per_kg,
          'Boiler chems': 2.9772 * _lb_per_kg,
          'Lime': lime_price,
-         # Cooling tower chemis in Humbird et al. (CIP is a part of cooling tower)
-         'CIP chems': 1.7842 * _lb_per_kg,
+         'Cooling tower chems': 1.7842 * _lb_per_kg,
          'Makeup water': 0.0002 * _lb_per_kg,
          # Cost of ash is negative because it's a product stream
          'Ash disposal': ash_disposal_price,

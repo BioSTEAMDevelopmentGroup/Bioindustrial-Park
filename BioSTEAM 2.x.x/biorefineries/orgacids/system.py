@@ -58,7 +58,7 @@ from thermosteam import Stream
 
 from orgacids import units, facilities
 from orgacids.process_settings import price
-from orgacids.utils import find_split, baseline_feedflow
+from orgacids.utils import find_split, splits_df, baseline_feedflow
 from orgacids.chemicals import orgacids_chemicals, chemical_groups, \
                                 soluble_organics, combustibles
 from orgacids.tea import OrgacidsTEA
@@ -89,7 +89,7 @@ feedstock = Stream('feedstock',
                     price=price['Feedstock'])
 
 '''----------------------------------units----------------------------------'''
-U101 = units.FeedstockHandling('U101', ins=feedstock)
+U101 = units.FeedstockPreprocessing('U101', ins=feedstock)
 plant_size_ratio = U101.feedstock_flow_rate / 2205
 # Handling costs/utilities included in feedstock cost thus not considered here
 U101.cost_items['System'].cost = 0
@@ -126,7 +126,8 @@ pretreatment_ammonia_water = Stream('pretreatment_ammonia_water', units='kg/hr')
 T201 = units.SulfuricAcidAdditionTank(
     'T201', ins=pretreatment_sulfuric_acid,
     feedstock_dry_mass=(feedstock.F_mass-feedstock.imass['H2O']))
-M201 = units.SulfuricAcidMixer('M201', ins=(T201-0, pretreatment_acid_water))
+M201 = units.SulfuricAcidMixer('M201', ins=(T201-0, 
+                                            pretreatment_acid_water))
 # Mix sulfuric acid and feedstock, adjust water loading
 M202 = units.PretreatmentMixer('M202', ins=(U101-0, M201-0,
                                             pretreatment_feedstock_water))
@@ -208,30 +209,20 @@ separation_spp_ethanol = Stream('separation_spp_ethanol', Ethanol = 500, units='
 separation_hydrolysis_water = Stream('separation_hydrolysis_water', units='kg/hr')
 
 '''----------------------------------units----------------------------------'''
-# Mix scrubber bottom and fermentation broth,
-# based on stream 571 and 535 in Humbird et al.
+# Mix scrubber bottom and fermentation broth
 #!!! M401 is doing nothing now (becuase don't want to mix scrubber bottom)
 M401 = bst.units.Mixer('M401', ins=(R301-0, ''), outs='broth_for_separation')
-splits = [('Glucose', 19, 502),
-          ('Xylose', 40, 1022),
-          ('OtherSugars', 81, 2094),
-          ('SugarOligomers', 60, 1552),
-          ('OrganicSolubleSolids', 612, 15808),
-          ('InorganicSolubleSolids', 97, 2513),
-          ('Furfurals', 19, 513),
-          ('OtherOrganics', 52, 1348),
-          ('Glucan', 1230, 25),
-          ('Xylan', 415, 8),
-          ('OtherStructuralCarbohydrates', 94, 2),
-          ('Lignin', 12226, 250),
-          ('Protein', 3376, 69),
-          ('CellMass', 925, 19),
-          ('OtherInsolubleSolids', 4489, 92)]
 # Remove CellMass and unreacted Lime, the original pressure filter in Humbird et al.
 # has a recycled water stream without indicating the purpose and was removed
+cell_mass_index = [splits_df.index[0]] + splits_df.index[2:].to_list()
+cell_mass_split = [splits_df['stream_571'][0]] + splits_df['stream_571'][2:].to_list()
+filtrate_split = [splits_df['stream_535'][0]] + splits_df['stream_535'][2:].to_list()
 S401 = units.CellMassFilter('S401', ins=M401-0, outs=('cell_mass', 'filtrate'),
                             moisture_content=0.35,
-                            split=find_split(*zip(*splits), chemical_groups))
+                            split=find_split(cell_mass_index,
+                                             cell_mass_split,
+                                             filtrate_split,
+                                             chemical_groups))
 
 # R401 = units.AcidulationReactor('R401', ins=(S401-1, M402-0))
 R401 = units.AcidulationReactor('R401', ins=(S401-1, ''))
@@ -253,27 +244,24 @@ T401 = units.SulfuricAcidAdditionTank('T401', ins=PS_separation_sulfuric_acid-0)
 M402 = units.SulfuricAcidMixer('M402', ins=(T401-0, separation_acid_water))
 M402-0-1-R401
 
-
-
-# This shouldn't be a FakeSplitter, or should do things to make the ins work
-S601 = bst.units.ReversedSplitter('S601', ins='sulfuric_acid', 
-                                  outs=(pretreatment_sulfuric_acid, 
-                                        separation_sulfuric_acid))
-# PS_S601 = S601.create_reversed_splitter_process_specification('PS_S601', ins=R401.outs[0]) 
-
-splits.append(('Gypsum', 0.995, 0.005))
-
 # Remove Gypsum and remained CellMass/Lime, 
 # moisture content (20%) and Gpysum removal (99.5%) on Page 24 of Aden et al.
-# S402 = units.GypsumFilter('S402', ins=PS_S601-0,
+gypsum_index = cell_mass_index + ['Gypsum']
+gypsum_split = cell_mass_split + [0.995]
+filtrate_split += [0.005]
 S402 = units.GypsumFilter('S402', ins=R401-0,
                           moisture_content=0.2,
-                          split=find_split(*zip(*splits), chemical_groups),
+                          split=find_split(gypsum_index,
+                                           gypsum_split,
+                                           filtrate_split,
+                                           chemical_groups),
                           outs=(gypsum, 'filtrate'))
 
 # Separate out other volatiles including Water
 F401 = bst.units.Flash('F401', ins=S402-1, outs=('vapor', 'liquid'),
-                       T=379, P=101325)
+                        T=379, P=101325)
+# F401 = units.PretreatmentFlash('F401', ins=S402-1, outs=('vapor', 'liquid'),
+#                        T=379, P=101325)
 
 # Condense waste vapor for wastewater treatment, temperature selected based on Methanol.Tb
 H401 = units.WasteVaporCondenser('H401', ins=F401-0, T=335, V=0)
@@ -312,6 +300,7 @@ Split_S403-0-2-R402
 # Split_S403-1-S4ex
 
 # Condense reactants into liquid phase, temperature selected based on Methanol.Tb
+#!!! Might need to update to Ethanol.Tb
 H402 = bst.units.HXutility('H402', ins=S403-0, T=335, V=0)
 #!!! Need to add catalyst for the hydrolysis reaction
 R403 = units.HydrolysisReactor('R403', ins=(H402-0, separation_hydrolysis_water, 
@@ -369,6 +358,7 @@ H403 = units.WasteVaporCondenser('H403', ins=pre_S404-0, T=orgacids_chemicals.Et
 #                                     Lr=0.9, Hr=0.9, k=1.2)
 
 # Condense Methanol, temperature selected based on Methanol.Tb
+#!!! Might need to update to Ethanol.Tb
 H404 = bst.units.HXutility('H404', ins=pre_S403-0, T=335, V=0)
 # Recycle condensed Methanol for Esterification reaction
 # Split_H403 = bst.units.Splitter('Split_H403',ins = H403-0, outs = ('bottom1', 'bottom2'), split = 0.9)
@@ -400,6 +390,15 @@ fake_waste_stream1 = Stream('fake_waste_stream1', Water=10000, NH3=100)
 fake_waste_stream2 = Stream('fake_waste_stream2', Water=10000, NH3=100)
 # Based on tream 524 in Humbird et al., will be updated by PS_stripping_water
 stripping_water = Stream('stripping_water', Water=26836, units='kg/hr')
+# For aerobic digestion, flow will be updated in AerobicDigestion
+air_lagoon = Stream('air_lagoon', phase='g', units='kg/hr')
+# To neutralize nitric acid formed by nitrification in aerobic digestion
+# flow will be updated in AerobicDigestion
+# The active chemical is modeled as NaOH, but the price is cheaper than that of NaOH
+aerobic_caustic = Stream('aerobic_caustic', units='kg/hr', T=20+273.15, P=2*101325,
+                          price=price['NaOH']*0.5)
+# Based on stream 903 in Humbird et al.
+well_water_in = Stream('well_water_in', Water=147140*plant_size_ratio, T=13+273.15)
 
 '''----------------------------------units----------------------------------'''
 M50X = bst.units.Mixer('M50X', ins=(fake_waste_stream1, fake_waste_stream2))
@@ -415,110 +414,32 @@ PS_stripping_water = bst.units.ProcessSpecification('PS_stripping_water', ins=st
 U501 = units.VentScrubber('U501', ins=(PS_stripping_water-0, M50X-0), 
                           outs=('vent', 'scrubber_bottom'),
                           gas=('CO2', 'NH3', 'O2'))
-
-
-# For aerobic digestion, flow will be updated in AerobicDigestion
-air_lagoon = Stream('air_lagoon', phase='g', units='kg/hr')
-# To neutralize nitric acid formed by nitrification in aerobic digestion
-# flow will be updated in AerobicDigestion
-# The active chemical is modeled as NaOH, but the price is cheaper than that of NaOH
-aerobic_caustic = Stream('aerobic_caustic', units='kg/hr', T=20+273.15, P=2*101325,
-                          price=price['Caustic']*0.5)
-# Based on stream 903 in Humbird et al.
-well_water_in = Stream('well_water_in', Water=147140*plant_size_ratio, T=13+273.15)
-
-# Based on P49 in Humbird et al., in AD, 91% of organic component is destroyed,
-# 86% is converted to biogas and 5% is converted to cell mass
-# The biogas is assumed to be 51% CH4 and 49% CO2
-P_sludge = 0.05/0.91/orgacids_chemicals.WWTsludge.MW
-MW = np.array([orgacids_chemicals.CH4.MW, orgacids_chemicals.CO2.MW])
-mass = np.array([0.51, 0.49])*MW
-mass /= mass.sum()
-mass *= 0.86/0.91
-P_CH4, P_CO2 = mass/MW
-def anaerobic_rxn(reactant):
-    MW = getattr(orgacids_chemicals, reactant).MW
-    return rxn.Reaction(f"{1/MW}{reactant} -> {P_CH4}CH4 + {P_CO2}CO2 + {P_sludge}WWTsludge",
-                        reactant, 0.91)
-soluble_organics = list(soluble_organics)
-# if 'WWTsludge' in soluble_organics: soluble_organics.remove('WWTsludge')
-anaerobic_digestion = rxn.ParallelReaction([anaerobic_rxn(i) for i in soluble_organics])
-# For anaerobic digestion, based on streams 612 and 611, note all gases have been removed
-# Maybe need to revise this split to make T of hot well water higher than cool well water
-splits = [('Ethanol', 1, 15),
-          ('H2O', 27158, 356069),
-          ('Glucose', 3, 42),
-          ('Xylose', 7, 85),
-          ('OtherSugars', 13, 175),
-          ('SugarOligomers', 10, 130),
-          ('OrganicSolubleSolids', 182, 2387),
-          ('InorganicSolubleSolids', 8, 110),
-          ('Ammonia', 48, 633),
-          ('AceticAcid', 0, 5),
-          ('Furfurals', 5, 70),
-          ('OtherOrganics', 9, 113),
-          ('Xylan', 6, 2),
-          ('OtherStructuralCarbohydrates', 1, 0),
-          ('Lignin', 186, 64),
-          ('Protein', 51, 18),
-          ('CellMass', 813, 280),
-          ('OtherInsolubleSolids', 68, 23)
-          ]
-def growth(reactant):
-    f = orgacids_chemicals.WWTsludge.MW / getattr(orgacids_chemicals, reactant).MW 
-    return rxn.Reaction(f"{f}{reactant} -> WWTsludge", reactant, 1.)
-
-# Reactions from auto-populated combustion reactions
-# 96% of remaining soluble organic matter is removed after aerobic digestion,
-# with 74% of which producing water and CO2 and 22% forming cell mass, based on P49 in Humbird et al.
-combustion_rxns = orgacids_chemicals.get_combustion_reactions()
-aerobic_digestion = rxn.ParallelReaction([i*0.74 + 0.22*growth(i.reactant)
-                                          for i in combustion_rxns
-                                          if (i.reactant in soluble_organics)])
-aerobic_digestion.X[:] = 0.96
-
-# Mix waste liquids for treatment, the last two slots reserved for BT and CT
+# Mix waste liquids for treatment, the last three slots reserved for CIP, BT and CT
 M501 = bst.units.Mixer('M501', ins=(H201-0, S4ex-0, Split_S403-1,R402-1, R403-1, 
-                                    U501-1, H_S404-0, '', ''))
+                                    U501-1, H_S404-0, '', '', ''))
 
 # This represents the total cost of wastewater treatment system
 WWT_cost = units.WastewaterSystemCost('WWT_cost', ins=M501-0)
 R501 = units.AnaerobicDigestion('R501', ins=(WWT_cost-0, well_water_in),
                                 # well_water_out assumed to be directly discharged
                                 outs=('biogas', 'treated_water', 'sludge', 'well_water_out'),
-                                digestion_rxns=anaerobic_digestion,
-                                sludge_split=find_split(*zip(*splits), 
-                                                        chemical_groups))
+                                reactants=soluble_organics,
+                                split=find_split(splits_df.index,
+                                                 splits_df['stream_611'],
+                                                 splits_df['stream_612'],
+                                                 chemical_groups))
 # Mix recycled stream and wastewater after R501
 M502 = bst.units.Mixer('M502', ins=(R501-1, ''))
 R502 = units.AerobicDigestion('R502', ins=(M502.outs[0], air_lagoon, aerobic_caustic),
                               outs=('evaporated_water', 'treated_water'),
-                              digestion_rxns=aerobic_digestion,
+                              reactants=soluble_organics,
                               ratio=plant_size_ratio)
-# Membrane bioreactor to split treated wastewater from R502, based on 624 and 625
-splits = [('Ethanol', 0, 1),
-          ('H2O', 381300, 2241169),
-          ('Glucose', 0, 2),
-          ('Xylose', 1, 3),
-          ('OtherSugars', 1, 7),
-          ('SugarOligomers', 1, 6),
-          ('OrganicSolubleSolids', 79, 466),
-          ('InorganicSolubleSolids', 4828, 28378),
-          ('Ammonia', 3, 16),
-          ('Furfurals', 0, 3),
-          ('OtherOrganics', 1, 7),
-          ('CarbonDioxide', 6, 38),
-          ('O2', 3, 17),
-          ('N2', 5, 32),
-          ('Xylan', 0, 65),
-          ('OtherStructuralCarbohydrates', 0, 15),
-          ('Lignin', 0, 1925),
-          ('Protein', 0, 90),
-          ('CellMass', 0, 19778),
-          ('OtherInsolubleSolids', 0, 707)
-          ]
+# Membrane bioreactor to split treated wastewater from R502
 S501 = bst.units.Splitter('S501', ins=R502-1, outs=('treated_water', 'sludge'),
-                          split=find_split(*zip(*splits), chemical_groups))
+                          split=find_split(splits_df.index,
+                                           splits_df['stream_624'],
+                                           splits_df['stream_625'],
+                                           chemical_groups))
 S501.line = 'Membrane bioreactor'
 # Recycled sludge stream of memberane bioreactor, the majority of it (96%)
 # goes to anaerobic sludge holding tank and the rest to aerobic digestion
@@ -531,43 +452,19 @@ M503 = bst.units.Mixer('M503', ins=(S502-0, ''))
 M503-0-1-M502
 # Mix sludge from R501 with S502.outs[1]
 M504 = bst.units.Mixer('M504', ins=(R501-2, S502-1))
-# Sludge centrifuge to split M504, based on 623 and 616, note that O2 and N2 are left out
-centrifuge_species = ('H2O','Glucose', 'Xylose', 'OtherSugars', 
-                      'SugarOligomers', 'OrganicSolubleSolids', 
-                      'InorganicSolubleSolids', 'Furfurals', 'OtherOrganics', 
-                      'CO2', 'COxSOxNOxH2S', 'Xylan', 
-                      'OtherStructuralCarbohydrates', 'Acetate', 'Lignin', 'Protein', 
-                      'CellMass', 'OtherInsolubleSolids')
-S616_flow = np.array([109098, 3, 6, 13,
-                      9, 187, 
-                      1068, 46, 5,
-                      8, 14, 31, 1,
-                      0, 0, 13, 3,
-                      80, 5])
-S623_flow = np.array([7708, 0, 0, 1,
-                      1, 13,
-                      75, 3, 0,
-                      1, 1, 2, 25, 
-                      8, 2, 250, 52, 
-                      1523, 92])
+# Sludge centrifuge to split M504
 S503 = bst.units.Splitter('S503', ins=M504-0, outs=('centrate', 'sludge'),
-                          split=find_split(centrifuge_species, S616_flow, S623_flow,
+                          split=find_split(splits_df.index,
+                                           splits_df['stream_616'],
+                                           splits_df['stream_623'],
                                            chemical_groups))
 S503.line = 'Sludge centrifuge'
 S503-0-1-M503
-# Reverse osmosis to split S501 into treated water and waste brine, 
-# based on 626 and 627, note that Ammonia is left out
-brine_species = ('H2O',  'Xylose', 'OtherSugars', 'SugarOligomers', 
-                 'OrganicSolubleSolids', 'InorganicSolubleSolids',
-                 'OtherOrganics', 'CO2', 'COxSOxNOxH2S')
-S626_flow = np.array([376324, 0, 0, 0,
-                      0, 0,
-                      0, 0, 0])
-S627_flow = np.array([4967, 1, 1, 1,
-                      79, 4828,
-                      1, 3, 44])
+# Reverse osmosis to split S501 into treated water and waste brine
 S504 = bst.units.Splitter('S504', ins=S501-0, outs=('treated_water', 'waste_brine'),
-                          split=find_split(brine_species, S626_flow, S627_flow,
+                          split=find_split(splits_df.index,
+                                           splits_df['stream_626'],
+                                           splits_df['stream_627'],
                                            chemical_groups))
 S504.line = 'Reverse osmosis'
 # Mix solid wastes to boiler turbogeneration
@@ -597,9 +494,9 @@ FGD_lime = Stream('FGD_lime')
 lactic_acid = Stream('lactic_acid', units='kg/hr', price=price['Lactic acid'])
 boiler_chems = Stream('boiler_chems', price=price['Boiler chems'])
 baghouse_bag = Stream('baghouse_bag', price=price['Baghouse bag'])
+cooling_tower_chems = Stream('cooling_tower_chems', price=price['Cooling tower chems'])
 # 145 based on equipment M-910 (CIP system) in Humbird et al.
-CIP_chems_in = Stream('CIP_chems_in', Water=145*plant_size_ratio, units='kg/hr',
-                      price=price['CIP chems'] )
+CIP_chems_in = Stream('CIP_chems_in', Water=145*plant_size_ratio, units='kg/hr')
 CIP_chems_out = Stream('CIP_chems_out')
 CIP_chems_out.copy_like(CIP_chems_in)
 # 1372608 based on stream 950 in Humbird et al.
@@ -613,8 +510,13 @@ plant_air_in = Stream('plant_air_in',
 natural_gas = Stream('natural_gas', price=price['Natural gas'])
 
 '''----------------------------------units----------------------------------'''
-T601 = units.SulfuricAcidStorageTank('T601', ins=sulfuric_acid_fresh, outs=0-S601)
+T601 = units.SulfuricAcidStorageTank('T601', ins=sulfuric_acid_fresh, 
+                                     outs='sulfuric_acid')
 T601.line = 'Sulfuric acid storage tank'
+S601 = bst.units.ReversedSplitter('S601', ins=T601-0, 
+                                  outs=(pretreatment_sulfuric_acid, 
+                                        separation_sulfuric_acid))
+
 T602 = units.AmmoniaStorageTank('T602', ins=ammonia_fresh, outs=ammonia)
 T602.line = 'Ammonia storage tank'
 T603 = units.CSLstorageTank('T603', ins=CSL_fresh, outs=CSL)
@@ -639,6 +541,7 @@ T606 = bst.units.StorageTank('T606', ins=P602-0, outs=lactic_acid, tau=7*24,
 T606.line = 'Lactic acid storage tank'
 
 CIP = facilities.OrganicAcidsCIP('CIP', ins=CIP_chems_in, outs=CIP_chems_out)
+M501.ins[-3] = CIP.outs[-1]
 ADP = facilities.OrganicAcidsADP('ADP', ins=plant_air_in, outs='plant_air_out')
 # 8021 based on stream 713 in Humbird et al.
 FWT = units.FireWaterTank('FWT',
@@ -660,9 +563,11 @@ M501.ins[-2] = BT.outs[-1]
 
 CT = facilities.OrganicAcidsCT('CT', 
                                 ins=('return_cooling_water',
-                                    'CT_makeup_water'),
+                                    'CT_makeup_water',
+                                    cooling_tower_chems),
                                 outs=('process_cooling_water',
-                                      'cooling_tower_blowdown'))
+                                      'cooling_tower_blowdown'),
+                                ratio=plant_size_ratio)
 M501.ins[-1] = CT.outs[-1]
 
 # All water used in the system, here only consider water usage,
@@ -671,7 +576,7 @@ process_water_streams = (pretreatment_feedstock_water, pretreatment_acid_water,
                          pretreatment_steam, pretreatment_ammonia_water, 
                          enzyme_water, stripping_water, separation_acid_water, 
                          separation_hydrolysis_water, aerobic_caustic, 
-                         BT.ins[-1], CT.ins[-1])
+                         CIP.ins[-1], BT.ins[-1], CT.ins[-1])
 PWC = facilities.OrganicAcidsPWC('PWC', ins=(S504-0, system_makeup_water), 
                                  process_water_streams=process_water_streams,
                                  outs=('process_water','discharged_water'))
