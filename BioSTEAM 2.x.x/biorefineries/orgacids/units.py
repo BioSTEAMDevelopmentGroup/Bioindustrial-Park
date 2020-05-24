@@ -329,7 +329,7 @@ class HydrolysateCooler(HXutility):
 @cost(basis='Flow rate', ID='Mixer', units='kg/hr',
       kW=74.57, cost=109000, S=379938, CE=521.9, n=0.5, BM=1.7)
 class EnzymeHydrolysateMixer(Mixer):
-    _N_ins = 2
+    _N_ins = 3
     _N_outs = 1
     
     # 20 mg/g glucan based on Table 18 of Humbird et al.

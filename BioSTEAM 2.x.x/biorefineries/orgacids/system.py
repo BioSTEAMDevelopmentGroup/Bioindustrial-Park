@@ -135,11 +135,12 @@ M202 = units.PretreatmentMixer('M202', ins=(U101-0, M201-0,
 # Mix feedstock/sulfuric acid mixture and steam
 M203 = units.SteamMixer('M203', ins=(M202-0, pretreatment_steam), P=5.5*101325)
 R201 = units.PretreatmentReactorSystem('R201', ins=M203-0,
-                                       outs=('vapor', 'liquid'))
+                                       outs=('pretreatment_vapor', 
+                                             'pretreatment_liquid'))
 # Pump bottom of the pretreatment products to the oligomer conversion tank
 T202 = units.BlowdownTank('T202', ins=R201-1)
 T203 = units.OligomerConversionTank('T203', ins=T202-0)
-F201 = units.PretreatmentFlash('F201', ins=T203-0, outs=('vapor', 'liquid'),
+F201 = units.PretreatmentFlash('F201', ins=T203-0, # outs=('F201_vapor', 'F_201_liquid'),
                                P=101325, Q=0)
 # Mix top of pretreatment reaction and flash
 M204 = bst.units.Mixer('M204', ins=(R201-0, F201-0))
@@ -152,7 +153,7 @@ PS_ammonia = bst.units.ProcessSpecification('PS_ammonia', ins=F201-1,
                                             specification=update_ammonia)
 # Condense vapor mixture from M201 (pretreatment reaction and flash),
 # temperature selected based on H2O.Tb
-H201 = units.WasteVaporCondenser('H201', ins=M204-0, outs='condensed_vapor',
+H201 = units.WasteVaporCondenser('H201', ins=M204-0, # outs='condensed_vapor',
                                  T=371, V=0)
 M205 = units.AmmoniaMixer('M205', ins=(ammonia, pretreatment_ammonia_water))
 # Neutralize pretreatment hydrolysate, M206 and T204 together represents a mixing tank
@@ -258,7 +259,7 @@ S402 = units.GypsumFilter('S402', ins=R401-0,
                           outs=(gypsum, 'filtrate'))
 
 # Separate out other volatiles including Water
-F401 = bst.units.Flash('F401', ins=S402-1, outs=('vapor', 'liquid'),
+F401 = bst.units.Flash('F401', ins=S402-1, # outs=('F401_vapor', 'liquid'),
                         T=379, P=101325)
 # F401 = units.PretreatmentFlash('F401', ins=S402-1, outs=('vapor', 'liquid'),
 #                        T=379, P=101325)
@@ -279,13 +280,13 @@ R402 = units.Esterification('R402', ins=(S4ex-1, '', '', separation_spp_ethanol,
 # pre_S403 = bst.units.Flash('pre_S403', ins=R402-0, outs=('vapor', 'liquid'),
 #                                 V = 0.6, P = 101325)
 
-pre_S403 = bst.units.BinaryDistillation('pre_S403', ins=R402-0, outs=('vapor', 'liquid'),
+pre_S403 = bst.units.BinaryDistillation('pre_S403', ins=R402-0, # outs=('vapor', 'liquid'),
                                 LHK=('Ethanol', 'H2O'),
                                 is_divided=True,
                                 product_specification_format='Recovery',
                                 Lr = 0.99, Hr = 0.6, k=1.2)
 
-S403 = bst.units.BinaryDistillation('S403', ins=pre_S403-1, outs=('vapor', 'liquid'),
+S403 = bst.units.BinaryDistillation('S403', ins=pre_S403-1, # outs=('vapor', 'liquid'),
                                 LHK=('EthylLactate', 'LacticAcid'),
                                 is_divided=True,
                                 product_specification_format='Recovery',
@@ -307,7 +308,7 @@ R403 = units.HydrolysisReactor('R403', ins=(H402-0, separation_hydrolysis_water,
                                             H401-0, ''))
 
 # F111 = bst.units.Flash('F111', ins = R403-0, T=375, P=101325)
-pre_S404 = bst.units.ShortcutColumn('pre_S404', R403-0, outs=('vapor', 'liquid'),
+pre_S404 = bst.units.ShortcutColumn('pre_S404', R403-0, # outs=('vapor', 'liquid'),
                                 LHK=('Ethanol', 'H2O'),
                                 product_specification_format='Recovery',
                                 is_divided=True,
@@ -329,7 +330,7 @@ H_pre_S404-0-3-R403
 #!!! Recycle pre_S404 to Esterification
 #!!! Recycle S404-0 to Hydrolysis
 # To get the final acid product
-S404 = bst.units.ShortcutColumn('S404', ins=F_pre_S404-1, outs=('vapor', 'liquid'),
+S404 = bst.units.ShortcutColumn('S404', ins=F_pre_S404-1, # outs=('vapor', 'liquid'),
                                 LHK=('EthylLactate', 'LacticAcid'),
                                 is_divided=True,
                                 product_specification_format='Recovery',
@@ -412,7 +413,7 @@ PS_stripping_water = bst.units.ProcessSpecification('PS_stripping_water', ins=st
                                  specification=update_stripping_water)
 
 U501 = units.VentScrubber('U501', ins=(PS_stripping_water-0, M50X-0), 
-                          outs=('vent', 'scrubber_bottom'),
+                          outs=('scrubber_vent', 'scrubber_bottom'),
                           gas=('CO2', 'NH3', 'O2'))
 # Mix waste liquids for treatment, the last three slots reserved for CIP, BT and CT
 M501 = bst.units.Mixer('M501', ins=(H201-0, S4ex-0, Split_S403-1,R402-1, R403-1, 
@@ -422,7 +423,8 @@ M501 = bst.units.Mixer('M501', ins=(H201-0, S4ex-0, Split_S403-1,R402-1, R403-1,
 WWT_cost = units.WastewaterSystemCost('WWT_cost', ins=M501-0)
 R501 = units.AnaerobicDigestion('R501', ins=(WWT_cost-0, well_water_in),
                                 # well_water_out assumed to be directly discharged
-                                outs=('biogas', 'treated_water', 'sludge', 'well_water_out'),
+                                outs=('biogas', 'anaerobic_treated_water', 
+                                      'anaerobic_sludge', 'well_water_out'),
                                 reactants=soluble_organics,
                                 split=find_split(splits_df.index,
                                                  splits_df['stream_611'],
@@ -431,11 +433,12 @@ R501 = units.AnaerobicDigestion('R501', ins=(WWT_cost-0, well_water_in),
 # Mix recycled stream and wastewater after R501
 M502 = bst.units.Mixer('M502', ins=(R501-1, ''))
 R502 = units.AerobicDigestion('R502', ins=(M502.outs[0], air_lagoon, aerobic_caustic),
-                              outs=('evaporated_water', 'treated_water'),
+                              outs=('aerobic_vent', 'aerobic_treated_water'),
                               reactants=soluble_organics,
                               ratio=plant_size_ratio)
 # Membrane bioreactor to split treated wastewater from R502
-S501 = bst.units.Splitter('S501', ins=R502-1, outs=('treated_water', 'sludge'),
+S501 = bst.units.Splitter('S501', ins=R502-1, outs=('membrane_treated_water', 
+                                                    'membrane_sludge'),
                           split=find_split(splits_df.index,
                                            splits_df['stream_624'],
                                            splits_df['stream_625'],
@@ -634,7 +637,6 @@ orgacids_sys = System('orgacids_sys',
          H402,
          System('hydrolysis_recycle',
                 [R403,
-                 
                  pre_S404,
                  HXU1,
                  HXP1,

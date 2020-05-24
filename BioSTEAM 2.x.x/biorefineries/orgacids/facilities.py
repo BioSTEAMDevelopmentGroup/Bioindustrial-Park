@@ -36,13 +36,13 @@ __all__ = ('OrganicAcidsCIP', 'OrganicAcidsADP', 'OrganicAcidsCT', 'OrganicAcids
 # CE    386.5   389.5   521.9   550.8   541.7
 
 
-# %% Clean-in-place package
+# %% Clean-in-place system
 
-@cost(basis='Flow rate', ID='Clean-in-place package', units='kg/hr',
+@cost(basis='Flow rate', ID='System', units='kg/hr',
       cost=421000, S=63, CE=521.9, BM=1.8, n=0.6)
 class OrganicAcidsCIP(Facility):
     network_priority = 2
-    line = 'Clean-in-place package'
+    line = 'Clean-in-place system'
 
 
 # %% Air distribution package
