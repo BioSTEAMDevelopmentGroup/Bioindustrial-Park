@@ -14,12 +14,6 @@ with modification of fermentation system for organic acids instead of the origin
 @author: yalinli_cabbi
 """
 
-'''
-TODO:
-    Might want a better way to deal with insufficient BT steam generation
-'''
-
-
 
 # %% Setup
 
@@ -138,71 +132,32 @@ class OrganicAcidsCT(Facility):
 
 # %% Process water center
 
-@cost(basis='Total water flow rate', ID='Tank', units='kg/hr',
+# Assume all process water streams use fresh water
+@cost(basis='Flow rate', ID='Tank', units='kg/hr',
       # Size basis changed from 451555 as the original design is not sufficient
       CE=521.9, cost=250000, S=106453, n=0.7, BM=1.7)
-@cost(basis='Total water flow rate', ID='PWC circulating pump', units='kg/hr',
+@cost(basis='Flow rate', ID='Circulating pump', units='kg/hr',
       CE=550.8, kW=55.9275, cost=15292, S=518924, n=0.8, BM=3.1)
-@cost(basis='Makeup/discharged water flow rate', ID='Makeup/discharged water pump', units='kg/hr',
+@cost(basis='Flow rate', ID='Makeup water pump', units='kg/hr',
       CE=550.8, kW=14.914, cost=6864, S=155564, n=0.8, BM=3.1)
 class OrganicAcidsPWC(Facility):
-    """
-    Create a ProcessWaterCenter object that takes care of balancing the amount
-    of water required for the process. The capital cost and power are based on 
-    the flow rate of process and makeup water as in [1]_.
-    
-    Parameters
-    ----------
-    ins :
-        [0] Recycled water.
-        
-        [1] Makeup water (>0 when recycled water < process water).
-    outs :
-        [0] Process water.
-        
-        [1] Discharged water (>0 when recycled water > process water).
-    process_water_streams : streams, optional
-        All process water streams.
-    
-    References
-    ----------
-    .. [1] Humbird, D., Davis, R., Tao, L., Kinchin, C., Hsu, D., Aden, A.,
-        Dudgeon, D. (2011). Process Design and Economics for Biochemical 
-        Conversion of Lignocellulosic Biomass to Ethanol: Dilute-Acid 
-        Pretreatment and Enzymatic Hydrolysis of Corn Stover
-        (No. NREL/TP-5100-47764, 1013269). https://doi.org/10.2172/1013269
-    
-    """
     network_priority = 1
-    _N_ins = 2
-    _N_outs = 2
-    _units= {'Total water flow rate': 'kg/hr',
-             'Makeup/discharged water flow rate': 'kg/hr'}
+    _N_ins = 1
+    _N_outs = 1
+    _units= {'Flow rate': 'kg/hr'}
     
     def __init__(self, ID='', ins=None, outs=(), process_water_streams=None):
         Facility.__init__(self, ID, ins, outs)
         self.process_water_streams = process_water_streams
 
     def _run(self):
-        recycled, makeup = self.ins
-        process, discharged = self.outs
-        process_water_streams = self.process_water_streams        
+        makeup_in = self.ins[0]
+        makeup_out = self.outs[0]
+        makeup_out.link_with(makeup_in)
         
-        process.imol['Water'] = sum(i.imol['Water'] for i in process_water_streams)           
-        discharged.imol['Water'] = (recycled.imol['Water']+makeup.imol['Water']) - \
-            process.imol['Water']
-        if discharged.imol['Water'] < 0:
-            makeup.imol['Water'] -= discharged.imol['Water']
-            discharged.imol['Water'] = 0
-        else:
-            makeup.imol['Water'] = 0
-        total_stream = process.copy()
-        total_stream.mix_from([process, makeup])
+        makeup_in.imol['Water'] = sum(i.imol['Water'] for i in self.process_water_streams)           
             
-        Design = self.design_results
-        Design['Total water flow rate'] = total_stream.F_mass
-        Design['Makeup/discharged water flow rate'] = max(makeup.imass['Water'],
-                                                          discharged.imass['Water'])
+        self.design_results['Flow rate'] = makeup_in.F_mass
         
 
 # %% Boiler and turbogenerator
@@ -227,7 +182,7 @@ class OrganicAcidsBT(Facility):
     
     Parameters
     ----------
-    ins : stream sequence
+    ins : 
         [0] Liquid/solid wastes to be burned.
         
         [1] Gas waste to be burned.
@@ -243,7 +198,7 @@ class OrganicAcidsBT(Facility):
 
         [6] Makeup water.
         
-    outs : stream sequence
+    outs :
         [0] Gas emission.
         
         [1] Ash residues.
@@ -252,8 +207,10 @@ class OrganicAcidsBT(Facility):
    
     boiler_efficiency : float
         Fraction of heat transfered to steam.
+        
     turbo_generator_efficiency : float
         Fraction of steam heat converted to electricity.
+        
     agent : UtilityAgent
         Steam produced.
         
@@ -297,7 +254,8 @@ class OrganicAcidsBT(Facility):
     # Below cannot be put in the _run function because ins will be empty when simulated,
     # _design is run after _run so it'll work this way
     def _design(self):
-        feed_solids, feed_gases, lime, boiler_chems, bag, natural_gas, makeup_water = self.ins
+        feed_solids, feed_gases, lime, boiler_chems, bag, natural_gas, makeup_water \
+            = self.ins
         emission, ash, blowdown_water = self.outs
         ratio = self.ratio
         side_streams_to_heat = self.side_streams_to_heat

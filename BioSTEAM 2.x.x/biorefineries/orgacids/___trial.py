@@ -10,39 +10,52 @@ Created on Tue Jan 14 12:49:42 2020
 # %% Whole-system simulation
 
 '''
-biosteam v2.17.7
-thermosteam v0.17.15
+biosteam v2.18.0
+thermosteam v0.18.0
 '''
 
 import biosteam as bst
-# from Sarang.system import *
 from orgacids.system import *
 
-
-# %% MPSP
+System = bst.System
+System.converge_method = 'Fixed-point'
+System.maxiter = 1000
+System.molar_tolerance = 1
 
 for i in range(5):
-   orgacids_sys.simulate()
-
+    orgacids_sys.simulate()
 for i in range(5):
-   lactic_acid.price = orgacids_tea.solve_price(lactic_acid, orgacids_sys_no_boiler_tea)
+    MSP = lactic_acid.price = orgacids_tea.solve_price(
+        lactic_acid, orgacids_no_BT_tea)
 
-MPSP = lactic_acid.price
-# orgacids_sys.diagram()
+purity = lactic_acid.imass['LacticAcid'] / lactic_acid.F_mass
+print(f'\nPurity is {purity:.1%}')
 
+broth = R301.outs[0]
+produced_lactic_acid = broth.imol['LacticAcid'] + 2*broth.imol['CalciumLactate']
+separation_yield = lactic_acid.imol['LacticAcid'] / produced_lactic_acid
+print(f'\nSeparation yield is {separation_yield:.1%}')
+print(f'\nMinimum selling price is {MSP:.3f} $/kg')
 
-LA_purity = round(100*S404.outs[1].imass['LacticAcid']/S404.outs[1].F_mass)
-LA_yield = round(100*S404.outs[1].imol['LacticAcid']/(M401.outs[0].imol['LacticAcid'] + 2*M401.outs[0].imol['CalciumLactate']))
-print('\n\nPurity = %s percent mass \t Separation yield = %s percent mass \t MPSP = %s $/kg\n\n'%(LA_purity, LA_yield, round(MPSP,3)))
-
-# orgacids_sys.save_report('orgacids_sys.xlsx')
-
-
-# %% Sugar concentration
 
 from orgacids.utils import get_sugar_conc
+
+R301 = bst.main_flowsheet.unit.R301
 sugar_conc = get_sugar_conc(R301.saccharified_stream, ('Glucose','Xylose'))
-print(f'Sugar concentration of R301 after saccharification is {sugar_conc}')
+print(f'\nSugar concentration of R301 after saccharification is {sugar_conc:.1f} g/L')
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

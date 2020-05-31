@@ -28,7 +28,7 @@ percentiles = [0, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 1]
 
 # %% Evaluate and calculate probabilities
 
-from orgacids.model import orgacids_model
+from orgacids.models import orgacids_model
 
 '''Quick look at baseline values'''
 # Set seed to make sure each time the same set of random numbers will be used
@@ -84,16 +84,15 @@ for i in range(parameter_len):
 # %% Monte Carlo and evaluate across lactic acid yield
 
 from chaospy import distributions as shape
-from orgacids.model import orgacids_model_LA_yield, set_LA_yield
+from orgacids.models import orgacids_model_LA_yield, set_LA_yield
 
 '''Evaluate'''
 np.random.seed(3221)
-N_simulation = 10
+N_simulation = 50
 LA_yield_samples = orgacids_model_LA_yield.sample(N=N_simulation, rule='L')
 orgacids_model_LA_yield.load_samples(LA_yield_samples)
 
-#!!! Should be 0.93 to 0.55, now temporarily only to 0.65 due to the F_pre_S404 bug
-LA_yield_coordinate = np.linspace(0.93, 0.65, 28*1+1)
+LA_yield_coordinate = np.linspace(0.55, 0.93, 38*1+1)
 LA_yield_distribution = shape.Triangle(0.55, 0.76, 0.93)
 LA_yield_probability = np.ones(len(LA_yield_coordinate)) - \
     LA_yield_distribution.cdf(LA_yield_coordinate)
@@ -111,7 +110,8 @@ LA_yield_MSP = pd.DataFrame(
 LA_yield_MSP_percentiles = LA_yield_MSP.quantile(q=percentiles)
 
 # Frequency of simulation that has MSP < $3.5/kg
-LA_yield_MSP_f = LA_yield_MSP[LA_yield_MSP<3.5].count()/N_simulation
+MSP_target = 2.5
+LA_yield_MSP_f = LA_yield_MSP[LA_yield_MSP<MSP_target].count()/N_simulation
 LA_yield_MSP_f.name = 'frequency'
 LA_yield_MSP = LA_yield_MSP.append(LA_yield_MSP_f)
 
@@ -123,7 +123,7 @@ with pd.ExcelWriter('Evaluation across lactic acid yield.xlsx') as writer:
 
 # %% Feedstock price and carbohydrate content
 
-from orgacids.model import orgacids_model_feedstock, set_feedstock_carbs, prices
+from orgacids.models import orgacids_model_feedstock, set_feedstock_carbs, prices
 
 '''Evaluate'''
 np.random.seed(3221)
@@ -132,7 +132,7 @@ feedstock_samples_1d = orgacids_model_feedstock.sample(N=N_simulation, rule='L')
 feedstock_samples = feedstock_samples_1d[:, np.newaxis]
 orgacids_model_feedstock.load_samples(feedstock_samples)
 
-feedstock_carbs_coordinate = np.linspace(0.7, 0.4, 30*1+1)
+feedstock_carbs_coordinate = np.linspace(0.7, 0.4, 30*10+1)
 
 feedstock_data = orgacids_model_feedstock.evaluate_across_coordinate(
     'Feedstock carbohydate content', set_feedstock_carbs, 
@@ -153,27 +153,27 @@ y_axis = sum(([f'{i:.0f}']*len(feedstock_carbs_coordinate) for i in prices), [])
 MSP = []
 NPV = []
 for i in range(feedstock_MSP.columns.shape[0]):
-    if 'MSP' in feedstock_MSP.columns[i][1]:
+    if 'Minimum selling price' in feedstock_MSP.columns[i][1]:
         MSP +=  feedstock_MSP[feedstock_MSP.columns[i]].to_list()
-    if 'NPV' in feedstock_MSP.columns[i][1]:
+    if 'Net present value' in feedstock_MSP.columns[i][1]:
         NPV +=  feedstock_MSP[feedstock_MSP.columns[i]].to_list()
 
 feedstock_MSP_plot = pd.DataFrame()
 feedstock_MSP_plot['Carbohydrate content [dry mass %]'] = x_axis
 feedstock_MSP_plot['Price [$/dry-ton]'] = y_axis
-feedstock_MSP_plot['MSP [$/kg]'] = MSP
-feedstock_MSP_plot['NPV [$]'] = NPV
+feedstock_MSP_plot['Minimum selling price [$/kg]'] = MSP
+feedstock_MSP_plot['Net present value [$]'] = NPV
 
-'''Output to Excel'''
-name = 'Evaluation across feedstock cost and carbohydrate content.xlsx'
-with pd.ExcelWriter(name) as writer:
-    feedstock_MSP.to_excel(writer, sheet_name='Evaluation data')
-    feedstock_MSP_plot.to_excel(writer, sheet_name='For plotting')
+# '''Output to Excel'''
+# name = 'Evaluation across feedstock cost and carbohydrate content.xlsx'
+# with pd.ExcelWriter(name) as writer:
+#     feedstock_MSP.to_excel(writer, sheet_name='Evaluation data')
+#     feedstock_MSP_plot.to_excel(writer, sheet_name='For plotting')
 
 
 # %% Evaluating across internal rate of return
 
-from orgacids.model import orgacids_model_IRR
+from orgacids.models import orgacids_model_IRR
 
 '''
 Note:
@@ -184,7 +184,7 @@ Note:
 
 '''Evaluate'''
 np.random.seed(3221)
-N_simulation = 10
+N_simulation = 100
 samples = orgacids_model_IRR.sample(N=N_simulation, rule='L')
 orgacids_model_IRR.load_samples(samples)
 orgacids_model_IRR.evaluate()
@@ -195,16 +195,16 @@ IRR_percentiles = IRR_results.quantile(q=percentiles)
 
 '''To get a quick plot'''
 from biosteam.evaluation.evaluation_tools import plot_montecarlo_across_coordinate
-from orgacids.model import IRRs
+from orgacids.models import IRRs
 MSP_indices = [metric.index for metric in orgacids_model_IRR.metrics
-                if 'NPV' not in metric.index[1]]
+                if 'Net present value' not in metric.index[1]]
 MSP_data = orgacids_model_IRR.table[MSP_indices]
 plot_montecarlo_across_coordinate(IRRs, MSP_data.values)
 
-'''Output to Excel'''
-with pd.ExcelWriter('Evaluation across IRR.xlsx') as writer:
-    IRR_results.to_excel(writer, sheet_name='IRR')
-    IRR_percentiles.to_excel(writer, sheet_name='IRR Percentiles')
+# '''Output to Excel'''
+# with pd.ExcelWriter('Evaluation across IRR.xlsx') as writer:
+#     IRR_results.to_excel(writer, sheet_name='IRR')
+#     IRR_percentiles.to_excel(writer, sheet_name='IRR Percentiles')
 
 
 # %% Backup codes for calculating and inserting scenario probability

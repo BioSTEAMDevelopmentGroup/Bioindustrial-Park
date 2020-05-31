@@ -198,7 +198,7 @@ def get_chemical_properties(chemicals, T, P, output=False):
         properties.to_excel('chemical_properties.xlsx', sheet_name='properties')
 
 
-# %% Function to get the sugar content of a stream
+# %% Function for quick result checking
 
 def get_sugar_conc(stream, sugars=()):
     fermentable_sugar = 0

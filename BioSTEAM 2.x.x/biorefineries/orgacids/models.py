@@ -9,10 +9,7 @@ Created on Mon May 11 16:26:46 2020
 
 '''
 TODO:
-    Add more (esp. on separation process) uncertainty parameters,
-        consider using the bst.evaluation.State.load_default_parameters function
-    
-    Double-check the small errors in some sum calculations    
+    Add separation process uncertainty parameters  
 '''
 
 
@@ -24,43 +21,45 @@ from chaospy import distributions as shape
 from biosteam import main_flowsheet as find
 from biosteam.evaluation import Model, Metric
 from biosteam.evaluation.evaluation_tools import Setter
-from orgacids.system import orgacids_sub_sys, orgacids_tea, orgacids_sys_no_boiler_tea
+from orgacids.system import orgacids_sub_sys, orgacids_tea, orgacids_no_BT_tea
 
-__all__ = ('orgacids_model', 'orgacids_model_LA_yield', 'orgacids_model_IRR')
-
-#!!! Want to change to orgacids_sys_no_BT_tea
-_hr_per_yr = orgacids_sys_no_boiler_tea._annual_factor
+get_annual_factor = lambda: orgacids_no_BT_tea._annual_factor
 _kg_per_ton = 907.18474
 real_units = sum([i for i in orgacids_sub_sys.values()], ())
 
 orgacids_sys = find.system.orgacids_sys
-boiler_sys = find.system.boiler_sys
+BT_sys = find.system.BT_sys
 
 system_feeds = [i for i in orgacids_sys.feeds if i.price] + \
-    [i for i in boiler_sys.feeds if i.price]
+    [i for i in BT_sys.feeds if i.price]
 system_products = [i for i in orgacids_sys.products if i.price] + \
-    [i for i in boiler_sys.products if i.price]
+    [i for i in BT_sys.products if i.price]
+    
 gypsum = find.stream.gypsum
 system_products.append(gypsum)
 
 
 # %% Define metric functions
 
+# =============================================================================
+# Overall biorefinery
+# =============================================================================
+
 # Minimum selling price of lactic_acid stream
 def get_MSP():
     for i in range(5):
         lactic_acid.price = orgacids_tea.solve_price(lactic_acid,
-                                                      orgacids_sys_no_boiler_tea)
+                                                      orgacids_no_BT_tea)
     return lactic_acid.price
 # Mass flow rate of lactic_acid stream
 lactic_acid = find.stream.lactic_acid
-get_yield = lambda: lactic_acid.F_mass*_hr_per_yr/1e6
+get_yield = lambda: lactic_acid.F_mass*get_annual_factor()/1e6
 # Purity (%) of LacticAcid in the final product
 get_purity = lambda: lactic_acid.imass['LacticAcid']/lactic_acid.F_mass
 # Recovery (%) = recovered/amount in fermentation broth
 R301 = find.unit.R301
-get_recovery = lambda: lactic_acid.imass['LacticAcid'] \
-    /(R301.outs[1].imass['LacticAcid']+R301.outs[1].imass['CalciumLactate'])
+get_recovery = lambda: lactic_acid.imol['LacticAcid'] \
+    /(R301.outs[0].imol['LacticAcid']+2*R301.outs[0].imol['CalciumLactate'])
 get_overall_TCI = lambda: orgacids_tea.TCI/1e6
 # Annual operating cost, note that AOC excludes electricity credit
 get_overall_AOC = lambda: orgacids_tea.AOC/1e6
@@ -74,7 +73,7 @@ BT = find.unit.BT
 excess_power = lambda: BT.electricity_generated
 electricity_price = bst.PowerUtility.price
 # Electricity credit is positive if getting revenue from excess electricity
-get_electricity_credit = lambda: (excess_power()*electricity_price*_hr_per_yr)/1e6
+get_electricity_credit = lambda: (excess_power()*electricity_price*get_annual_factor())/1e6
 
 metrics = [Metric('Minimum selling price', get_MSP, '$/kg'),
            Metric('Product yield', get_yield, '10^6 kg/yr'),
@@ -87,7 +86,10 @@ metrics = [Metric('Minimum selling price', get_MSP, '$/kg'),
            Metric('Annual electricity credit', get_electricity_credit, '10^6 $/yr')
            ]
 
-# Get capital cost of sub-systems
+# =============================================================================
+# Capital cost breakdown
+# =============================================================================
+
 def get_installation_cost(system):
     return lambda: sum(i.installation_cost for i in orgacids_sub_sys[system])/1e6
 for system in orgacids_sub_sys.keys():
@@ -101,9 +103,12 @@ check_installation_cost = \
                 for system in orgacids_sub_sys.keys()) - orgacids_tea.installation_cost/1e6
 metrics.extend((Metric('Check', check_installation_cost, '10^6 $', 'Installed cost'),))
 
-# Get material cost
+# =============================================================================
+# Material cost breakdown
+# =============================================================================
+
 def get_material_cost(feed):
-    return lambda: feed.price*feed.F_mass*_hr_per_yr/1e6
+    return lambda: feed.price*feed.F_mass*get_annual_factor()/1e6
 for feed in system_feeds:
     metrics.extend((Metric(feed.ID, get_material_cost(feed), '10^6 $/yr', 'Material cost'),))
 S602 = find.unit.S602
@@ -120,9 +125,8 @@ metrics.extend((
            '%', 'Material cost'),
     Metric('Check', check_material_cost, '10^6 $/yr', 'Material cost')))
 
-# Get product sale
 def get_product_sale(stream):
-    return lambda: stream.price*stream.F_mass *_hr_per_yr/1e6
+    return lambda: stream.price*stream.F_mass *get_annual_factor()/1e6
 for product in system_products:
     metrics.extend((Metric(product.ID, get_product_sale(product), '10^6 $/yr', 'Product sale'),))
 check_product_sale= \
@@ -130,15 +134,19 @@ check_product_sale= \
         - orgacids_tea.sales/1e6
 metrics.extend((Metric('Check', check_product_sale, '10^6 $/yr', 'Product sale'),))
 
-# Get heating demand, positive if needs heating
-get_system_heating_demand = lambda: BT.system_heating_demand*_hr_per_yr/1e9
-get_pretreatment_steam_heating_demand = lambda: BT.side_streams_lps.duty*_hr_per_yr/1e9
-get_BT_heating_demand = lambda: sum(i.duty for i in BT.heat_utilities if i.duty*i.cost>0)*_hr_per_yr/1e9
+# =============================================================================
+# Heating demand breakdown (positive if needs heating)
+# =============================================================================
+
+get_system_heating_demand = lambda: BT.system_heating_demand*get_annual_factor()/1e9
+get_pretreatment_steam_heating_demand = lambda: BT.side_streams_lps.duty*get_annual_factor()/1e9
+get_BT_heating_demand = lambda: sum(i.duty for i in BT.heat_utilities 
+                                    if i.duty*i.cost>0)*get_annual_factor()/1e9
 
 def get_heating_demand(system):
     heat_utilities = sum((i.heat_utilities for i in orgacids_sub_sys[system]), ())
     heating_utilities = [i for i in heat_utilities if i.duty*i.cost>0]
-    return lambda: sum(i.duty for i in heating_utilities)*_hr_per_yr/1e9
+    return lambda: sum(i.duty for i in heating_utilities)*get_annual_factor()/1e9
 
 for system in orgacids_sub_sys.keys():
     if system == 'feedstock_sys': continue
@@ -163,16 +171,20 @@ metrics.extend((
     Metric('Check', check_heating_demand, '10^9 kJ/yr', 'Heating demand')
     ))
 
-# Get cooling demand, negative if needs cooling
+# =============================================================================
+# Cooling demand breakdown (negative if needs cooling)
+# =============================================================================
+
 CT = find.unit.CT
-get_system_cooling_demand = lambda: CT.system_cooling_demand*_hr_per_yr/1e9
-get_CT_cooling_demand = lambda: sum(i.duty for i in CT.heat_utilities if i.duty*i.cost<0)*_hr_per_yr/1e9
+get_system_cooling_demand = lambda: CT.system_cooling_demand*get_annual_factor()/1e9
+get_CT_cooling_demand = lambda: sum(i.duty for i in CT.heat_utilities 
+                                    if i.duty*i.cost<0)*get_annual_factor()/1e9
 
 def get_cooling_demand(system):
     heat_utilities = sum((i.heat_utilities for i in orgacids_sub_sys[system]), ())
     cooling_utilities = [i for i in heat_utilities if i.duty*i.cost<0]
     # return lambda: sum(i.duty for i in cooling_utilities)/1e3/get_system_cooling_demand()
-    return lambda: sum(i.duty for i in cooling_utilities)*_hr_per_yr/1e9
+    return lambda: sum(i.duty for i in cooling_utilities)*get_annual_factor()/1e9
 
 for system in orgacids_sub_sys.keys():
     if system == 'feedstock_sys': continue
@@ -191,7 +203,10 @@ metrics.extend((
     Metric('Check', check_cooling_demand, '10^9 kJ/yr', 'Cooling demand')
     ))
 
-# Get power demand, positive if using power
+# =============================================================================
+# Power demand breakdown (positive if using power)
+# =============================================================================
+
 get_system_power_demand = lambda: sum(i.power_utility.rate for i in orgacids_sys.units
                                       if i.power_utility)
 def get_power_demand(system):
@@ -209,10 +224,13 @@ metrics.extend((
     Metric('Check', check_power_demand, 'kW', 'Power demand')
     ))
 
-# Get utility cost including heating, cooling, and power
-get_system_utility_cost = lambda: sum(i.utility_cost for i in real_units)*_hr_per_yr/1e6
+# =============================================================================
+# Utility cost breakdown, (including heating, cooling, and power)
+# =============================================================================
+
+get_system_utility_cost = lambda: sum(i.utility_cost for i in real_units)*get_annual_factor()/1e6
 def get_utility_cost(system):
-    return lambda: sum(i.utility_cost for i in orgacids_sub_sys[system])*_hr_per_yr/1e6
+    return lambda: sum(i.utility_cost for i in orgacids_sub_sys[system])*get_annual_factor()/1e6
 
 for system in orgacids_sub_sys.keys():
     if system == 'feedstock_sys': continue
@@ -229,19 +247,23 @@ metrics.extend((
 
 # To see if TEA converges well for each simulation
 get_NPV = lambda: orgacids_tea.NPV
-metrics.extend((Metric('NPV', get_NPV, '$', 'TEA'), ))
+metrics.extend((Metric('Net present value', get_NPV, '$', 'TEA'), ))
 
 
 # %% Add evaluating parameters
-#!!! Parameters incomplete now
+#!!! Need to add separation parameters
 
+# This is the base model
 orgacids_model = Model(orgacids_sys, metrics)
 param = orgacids_model.parameter
 
 def baseline_uniform(baseline, ratio):
     return shape.Uniform(baseline*(1-ratio), baseline*(1+ratio))
 
-'''---------------------------------feedstock---------------------------------'''
+# =============================================================================
+# Feedstock
+# =============================================================================
+
 U101 = find.unit.U101
 D = baseline_uniform(2205, 0.1)
 @param(name='Flow rate', element=U101, kind='coupled', units='U.S. ton/day',
@@ -281,7 +303,10 @@ def set_feedstock_succinic_acid_content(content):
     feedstock.imass['SuccinicAcid'] += mass_diff
     feedstock.imass['Extract'] -= mass_diff
 
-'''-----------------------------------TEA-----------------------------------'''
+# =============================================================================
+# TEA
+# =============================================================================
+
 D = baseline_uniform(0.9, 0.1)
 @param(name='Plant uptime', element='TEA', kind='isolated', units='%',
        baseline=0.9, distribution=D)
@@ -293,7 +318,7 @@ def set_operating_days(uptime):
 special_price = {
 #     stream           distribution     min        max
     'feedstock':        ('Uniform',   (0.0529,    0.117)),
-    'CSL_fresh':        ('Uniform',   (0.0305,    0.0509)),
+    'CSL_fresh':        ('Uniform',   (0.0673,    0.112)),
     'lime_fresh':       ('Uniform',   (0.160,     0.288)),
     'ethanol_fresh':    ('Triangle',  (0.460,     0.978)),
     'natural_gas':      ('Triangle',  (0.198,     0.304)),
@@ -341,7 +366,10 @@ def set_TCI_ratio(ratio):
             for item in unit.cost_items:
                 unit.cost_items[item].cost *= ratio
 
-'''-------------------------------pretreatment-------------------------------'''
+# =============================================================================
+# Pretreatment
+# =============================================================================
+
 M202 = find.unit.M202
 D = shape.Uniform(0.25, 0.4)
 @param(name='Pretreatment solid loading', element=M202, kind='coupled', units='%', 
@@ -349,12 +377,14 @@ D = shape.Uniform(0.25, 0.4)
 def set_pretreatment_solid_loading(loading): 
     M202.solid_loading = loading
     
-T201 = find.unit.T201
+pretreatment_sulfuric_acid = find.stream.pretreatment_sulfuric_acid
 D = shape.Uniform(10, 35)
-@param(name='Pretreatment sulfuric acid loading', element=T201, kind='coupled', 
-       units='mg/g-dry feedstock', baseline=22.1, distribution=D)
+@param(name='Pretreatment sulfuric acid loading', element=pretreatment_sulfuric_acid,
+       kind='coupled', units='mg/g-dry feedstock', baseline=22.1, distribution=D)
 def set_pretreatment_sulfuric_acid_loading(loading): 
-    T201.acid_loading = loading
+    feedstock_dry_mass = feedstock.F_mass - feedstock.imass['H2O']
+    pretreatment_sulfuric_acid.imass['H2SO4'] = feedstock_dry_mass*loading/1000*0.93
+    pretreatment_sulfuric_acid.imass['H2O'] = feedstock_dry_mass*loading/1000*0.07
 
 R201 = find.unit.R201
 D = shape.Uniform(0.06, 0.12)
@@ -367,7 +397,10 @@ D = shape.Uniform(0.8, 0.92)
        baseline=0.9, distribution=D)
 def set_R201_xylan_conversion(X): R201.pretreatment_rxns[4].X = X        
 
-'''-------------------saccharification and co-fermentation-------------------'''
+# =============================================================================
+# Conversion
+# =============================================================================
+
 M301 = find.unit.M301
 D = shape.Uniform(0.175, 0.25)
 @param(name='Enzymatic hydrolysis solid loading', element=M301, kind='coupled', units='%',
@@ -401,19 +434,27 @@ D = shape.Uniform(5, 15)
         baseline=10, distribution=D)
 def set_CSL_loading(loading): R301.CSL_loading = loading
 
+R302 = find.unit.R302
 D = shape.Triangle(0.55, 0.76, 0.93)
 @param(name='Lactic acid yield', element=R301, kind='coupled', units='g/g substrate',
         baseline=0.76, distribution=D)
 def set_R301_lactic_acid_yield(X):
-    R301.cofermentation_rxns.X[0] = R301.cofermentation_rxns.X[3] = X
+    R301_X = R301.cofermentation_rxns.X
+    R301_X[0] = R301_X[3] = X
+    R302_X = R302.cofermentation_rxns.X
+    R302_X[0] = R302_X[3] = X * R302.ferm_ratio
 
 D = shape.Triangle(0.004, 0.07, 0.32)
 @param(name='Acetic acid yield', element=R301, kind='coupled', units='g/g substrate',
         baseline=0.07, distribution=D)
 def set_R301_acetic_acid_yield(X): 
     # 1e6 is to avoid generating tiny negative flow (e.g., 1e-14) in R301
-    X = min(X, 1-1e-6-R301.cofermentation_rxns.X[0]-R301.cofermentation_rxns.X[2])
-    R301.cofermentation_rxns.X[1] = R301.cofermentation_rxns.X[4] = X
+    R301_X = R301.cofermentation_rxns.X
+    X = min(X, 1-1e-6-R301_X[0]-R301_X[2])
+    R301_X[1] = R301_X[4] = X
+    R302_X = R302.cofermentation_rxns.X
+    X = min(X*R302.ferm_ratio, 1-1e-6-R302_X[0]-R302_X[2])
+    R302_X[1] = R302_X[4] = X
 
 D = shape.Uniform(0.05, 0.1)
 @param(name='Innoculum ratio', element=R301, kind='coupled', units='%',
@@ -421,7 +462,6 @@ D = shape.Uniform(0.05, 0.1)
 def set_innoculum_ratio(ratio): R301.inoculum_ratio = ratio
 
 # Seed train fermentation yield as a ratio of the main fermenter
-R302 = find.unit.R302
 D = baseline_uniform(36, 0.1)
 @param(name='Seed train time', element=R302, kind='coupled', units='hr',
         baseline=36, distribution=D)
@@ -431,35 +471,48 @@ D = shape.Triangle(0.8, 0.9, 1)
 @param(name='Seed train yield', element=R302, kind='coupled', units='% of R301',
         baseline=0.9, distribution=D)
 def set_R302_ratio(ratio):
+    R301_X = R301.cofermentation_rxns.X
+    R302_X = R302.cofermentation_rxns.X
+    ratio = min(ratio, (1-1e-6-R302_X[2])/(R301_X[0]+R301_X[1]))
     R302.ferm_ratio = ratio
 
-'''-----------------------separation and purification-----------------------'''
+# =============================================================================
+# Separation
+# =============================================================================
 
 
 parameters = orgacids_model.get_parameters()
 
 
-# %% Model to evalute system across lactic acid yield
+# %% Construct other models
 
-orgacids_model_LA_yield = Model(orgacids_sys, metrics[0:4])
+# =============================================================================
+# Model to evalute system across lactic acid yield
+# =============================================================================
+
+orgacids_model_LA_yield = Model(orgacids_sys, metrics)
 
 def set_LA_yield(LA_yield):
-    R301.cofermentation_rxns.X[0] = R301.cofermentation_rxns.X[3] = LA_yield
-    R302.cofermentation_rxns.X[0] = R301.cofermentation_rxns.X[3] = \
-        LA_yield * R302.ferm_ratio
+    R301_X = R301.cofermentation_rxns.X
+    R301_X[0] = R301_X[3] = LA_yield
+    R301_X[1] = R301_X[4] = min(1-1e-6-R301_X[0]-R301_X[2], R301_X[1])
+    R302_X = R302.cofermentation_rxns.X
+    R302_X[0] = R302_X[3] = R301_X[0] * R302.ferm_ratio
+    R302_X[1] = R302_X[4] = R301_X[1] * R302.ferm_ratio
 
 LA_yield_parameters = tuple([i for i in parameters if not i.name=='Lactic acid yield'])
 orgacids_model_LA_yield.set_parameters(LA_yield_parameters)
 
-
-# %% Model to evalute system across internal rate of return
+# =============================================================================
+# Model to evalute system across internal rate of return
+# =============================================================================
 
 def create_IRR_metrics(IRR):
     def get_IRR_based_MSP():
         orgacids_tea.IRR = IRR
         return get_MSP()
-    return [Metric('MSP', get_IRR_based_MSP, '$/kg', f'IRR={IRR:.0%}'),
-            Metric('NPV', get_NPV, '$', f'IRR={IRR:.0%}')]
+    return [Metric('Minimum selling price', get_IRR_based_MSP, '$/kg', f'IRR={IRR:.0%}'),
+            Metric('Net present value', get_NPV, '$', f'IRR={IRR:.0%}')]
 
 IRRs = np.linspace(0, 0.4, 41)
 IRR_metrics = sum([create_IRR_metrics(IRR) for IRR in IRRs],[])
@@ -467,16 +520,17 @@ IRR_metrics = sum([create_IRR_metrics(IRR) for IRR in IRRs],[])
 orgacids_model_IRR = Model(orgacids_sys, IRR_metrics)
 orgacids_model_IRR.set_parameters(parameters)
 
-
-# %% Model to evalute system across feedstock price and carbohydate content
+# =============================================================================
+# Model to evalute system across feedstock price and carbohydate content
+# =============================================================================
 
 def create_feedstock_price_metris(price):
     def get_price_based_MSP():
         price_per_kg = price / _kg_per_ton * 0.8
         feedstock.price = price_per_kg
         return get_MSP()
-    return [Metric('MSP', get_price_based_MSP, '$/kg', f'Price={price:.0f} [$/dry-ton]'),
-            Metric('NPV', get_NPV, '$', f'Price={price:.0f} [$/dry-ton]')]
+    return [Metric('Minimum selling price', get_price_based_MSP, '$/kg', f'Price={price:.0f} [$/dry-ton]'),
+            Metric('Net present value', get_NPV, '$', f'Price={price:.0f} [$/dry-ton]')]
 
 prices = np.linspace(50, 300, 26)
 feedstock_price_metrics = sum([create_feedstock_price_metris(price) 
