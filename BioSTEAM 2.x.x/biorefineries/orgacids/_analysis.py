@@ -33,7 +33,7 @@ from orgacids.models import orgacids_model
 '''Quick look at baseline values'''
 # Set seed to make sure each time the same set of random numbers will be used
 np.random.seed(3221)
-N_simulation = 100
+N_simulation = 1000
 samples = orgacids_model.sample(N=N_simulation, rule='L')
 orgacids_model.load_samples(samples)
 baseline = orgacids_model.metrics_at_baseline()
@@ -88,7 +88,7 @@ from orgacids.models import orgacids_model_LA_yield, set_LA_yield
 
 '''Evaluate'''
 np.random.seed(3221)
-N_simulation = 50
+N_simulation = 100
 LA_yield_samples = orgacids_model_LA_yield.sample(N=N_simulation, rule='L')
 orgacids_model_LA_yield.load_samples(LA_yield_samples)
 
@@ -115,10 +115,10 @@ LA_yield_MSP_f = LA_yield_MSP[LA_yield_MSP<MSP_target].count()/N_simulation
 LA_yield_MSP_f.name = 'frequency'
 LA_yield_MSP = LA_yield_MSP.append(LA_yield_MSP_f)
 
-'''Output to Excel'''
-with pd.ExcelWriter('Evaluation across lactic acid yield.xlsx') as writer:
-    LA_yield_MSP.to_excel(writer, sheet_name='LA yield')
-    LA_yield_MSP_percentiles.to_excel(writer, sheet_name='LA yield percentiles')
+# '''Output to Excel'''
+# with pd.ExcelWriter('Evaluation across lactic acid yield.xlsx') as writer:
+#     LA_yield_MSP.to_excel(writer, sheet_name='LA yield')
+#     LA_yield_MSP_percentiles.to_excel(writer, sheet_name='LA yield percentiles')
 
 
 # %% Feedstock price and carbohydrate content
@@ -127,12 +127,12 @@ from orgacids.models import orgacids_model_feedstock, set_feedstock_carbs, price
 
 '''Evaluate'''
 np.random.seed(3221)
-N_simulation = 1
+N_simulation = 1000
 feedstock_samples_1d = orgacids_model_feedstock.sample(N=N_simulation, rule='L')
 feedstock_samples = feedstock_samples_1d[:, np.newaxis]
 orgacids_model_feedstock.load_samples(feedstock_samples)
 
-feedstock_carbs_coordinate = np.linspace(0.7, 0.4, 30*10+1)
+feedstock_carbs_coordinate = np.linspace(0.4, 0.7, 15+1)
 
 feedstock_data = orgacids_model_feedstock.evaluate_across_coordinate(
     'Feedstock carbohydate content', set_feedstock_carbs, 
@@ -146,7 +146,7 @@ for (i, j) in zip(feedstock_data.keys(), feedstock_data.values()):
     feedstock_MSP[i] = j[0]
 
 '''Organize data for easy plotting'''
-x_axis = [f'{i:.2f}' for i in feedstock_carbs_coordinate]
+x_axis = [f'{i:.3f}' for i in feedstock_carbs_coordinate]
 x_axis *= len(prices)
 y_axis = sum(([f'{i:.0f}']*len(feedstock_carbs_coordinate) for i in prices), [])
 
@@ -184,7 +184,7 @@ Note:
 
 '''Evaluate'''
 np.random.seed(3221)
-N_simulation = 100
+N_simulation = 1000
 samples = orgacids_model_IRR.sample(N=N_simulation, rule='L')
 orgacids_model_IRR.load_samples(samples)
 orgacids_model_IRR.evaluate()

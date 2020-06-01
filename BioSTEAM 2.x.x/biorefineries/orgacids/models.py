@@ -260,58 +260,58 @@ param = orgacids_model.parameter
 def baseline_uniform(baseline, ratio):
     return shape.Uniform(baseline*(1-ratio), baseline*(1+ratio))
 
-# =============================================================================
-# Feedstock
-# =============================================================================
+# # =============================================================================
+# # Feedstock
+# # =============================================================================
 
-U101 = find.unit.U101
-D = baseline_uniform(2205, 0.1)
-@param(name='Flow rate', element=U101, kind='coupled', units='U.S. ton/day',
-       baseline=2205, distribution=D)
-def set_feedstock_flow_rate(rate):
-    U101.feedstock_flow_rate = rate
+# U101 = find.unit.U101
+# D = baseline_uniform(2205, 0.1)
+# @param(name='Flow rate', element=U101, kind='coupled', units='U.S. ton/day',
+#         baseline=2205, distribution=D)
+# def set_feedstock_flow_rate(rate):
+#     U101.feedstock_flow_rate = rate
 
-feedstock = find.stream.feedstock
-# Use Extract to close mass balance
-D = shape.Triangle(0.265, 0.319, 0.376)
-@param(name='Glucan content', element=feedstock, kind='coupled', 
-        units='dry mass %', baseline=0.3505, distribution=D)
-def set_feedstock_glucan_content(content):
-    dry_mass = feedstock.F_mass-feedstock.imass['H2O']
-    old_content = feedstock.imass['Glucan'] / dry_mass
-    mass_diff = (content-old_content) * dry_mass
-    feedstock.imass['Glucan'] += mass_diff
-    feedstock.imass['Extract'] -= mass_diff
+# feedstock = find.stream.feedstock
+# # Use Extract to close mass balance
+# D = shape.Triangle(0.265, 0.319, 0.376)
+# @param(name='Glucan content', element=feedstock, kind='coupled', 
+#         units='dry mass %', baseline=0.3505, distribution=D)
+# def set_feedstock_glucan_content(glucan_content):
+#     dry_mass = feedstock.F_mass - feedstock.imass['H2O']
+#     feedstock.imass['Glucan'] = glucan_content * dry_mass
+#     feedstock.imass['Extract'] -= (feedstock.F_mass-feedstock.imass['H2O']) - dry_mass
+#     if any(feedstock.mass < 0):
+#         raise ValueError(f'Glucan content of {glucan_content*100:.0f}% dry weight is infeasible')
 
-D = shape.Triangle(0.148, 0.189, 0.227)
-@param(name='Xylan content', element=feedstock, kind='coupled', 
-        units='dry mass %', baseline=0.1953, distribution=D)
-def set_feedstock_xylan_content(content):
-    dry_mass = feedstock.F_mass-feedstock.imass['H2O']
-    old_content = feedstock.imass['Xylan'] / dry_mass
-    mass_diff = (content-old_content) * dry_mass
-    feedstock.imass['Xylan'] += mass_diff
-    feedstock.imass['Extract'] -= mass_diff
+# D = shape.Triangle(0.148, 0.189, 0.227)
+# @param(name='Xylan content', element=feedstock, kind='coupled', 
+#         units='dry mass %', baseline=0.1953, distribution=D)
+# def set_feedstock_xylan_content(xylan_content):
+#     dry_mass = feedstock.F_mass - feedstock.imass['H2O']
+#     feedstock.imass['Xylan'] = xylan_content * dry_mass
+#     feedstock.imass['Extract'] -= (feedstock.F_mass-feedstock.imass['H2O']) - dry_mass
+#     if any(feedstock.mass < 0):
+#         raise ValueError(f'Xylan content of {xylan_content*100:.0f}% dry weight is infeasible')
     
-D = shape.Uniform(0, 0.05)
-@param(name='Succinic acid content', element=feedstock, kind='coupled', 
-        units='dry mass %', baseline=0, distribution=D)
-def set_feedstock_succinic_acid_content(content):
-    dry_mass = feedstock.F_mass-feedstock.imass['H2O']
-    old_content = feedstock.imass['SuccinicAcid'] / dry_mass
-    mass_diff = (content-old_content) * dry_mass
-    feedstock.imass['SuccinicAcid'] += mass_diff
-    feedstock.imass['Extract'] -= mass_diff
+# D = shape.Uniform(0, 0.05)
+# @param(name='Succinic acid content', element=feedstock, kind='coupled', 
+#         units='dry mass %', baseline=0, distribution=D)
+# def set_feedstock_succinic_acid_content(SA_content):
+#     dry_mass = feedstock.F_mass - feedstock.imass['H2O']
+#     feedstock.imass['SuccinicAcid'] = SA_content * dry_mass
+#     feedstock.imass['Extract'] -= (feedstock.F_mass-feedstock.imass['H2O']) - dry_mass
+#     if any(feedstock.mass < 0):
+#         raise ValueError(f'Succinic acid content of {SA_content*100:.0f}% dry weight is infeasible')
 
 # =============================================================================
 # TEA
 # =============================================================================
 
-D = baseline_uniform(0.9, 0.1)
-@param(name='Plant uptime', element='TEA', kind='isolated', units='%',
-       baseline=0.9, distribution=D)
-def set_operating_days(uptime):
-    orgacids_tea.operating_days = 365 * uptime
+# D = baseline_uniform(0.9, 0.1)
+# @param(name='Plant uptime', element='TEA', kind='isolated', units='%',
+#         baseline=0.9, distribution=D)
+# def set_operating_days(uptime):
+#     orgacids_tea.operating_days = 365 * uptime
 
 # Impactful parameters are set to triangular distribution based on literature,
 # less important ones are set to ±10% of baseline value
@@ -351,212 +351,212 @@ for stream_ID in default_price_streams:
     D = baseline_uniform(baseline, 0.1)
     add_stream_price_param(stream, D)
 
-D = shape.Triangle(0.067, 0.070, 0.074)
-@param(name='Electricity price', element='TEA', kind='isolated', units='$/kWh',
-        baseline=0.070, distribution=D)
-def set_electricity_price(price): 
-    bst.PowerUtility.price = price
+# D = shape.Triangle(0.067, 0.070, 0.074)
+# @param(name='Electricity price', element='TEA', kind='isolated', units='$/kWh',
+#         baseline=0.070, distribution=D)
+# def set_electricity_price(price): 
+#     bst.PowerUtility.price = price
 
-D = baseline_uniform(1, 0.1)
-@param(name='TCI ratio', element='TEA', kind='isolated', units='% of baseline',
-       baseline=1, distribution=D)
-def set_TCI_ratio(ratio): 
-    for unit in orgacids_sys.units:
-        if hasattr(unit, 'cost_items'):
-            for item in unit.cost_items:
-                unit.cost_items[item].cost *= ratio
+# D = baseline_uniform(1, 0.1)
+# @param(name='TCI ratio', element='TEA', kind='isolated', units='% of baseline',
+#         baseline=1, distribution=D)
+# def set_TCI_ratio(ratio): 
+#     for unit in orgacids_sys.units:
+#         if hasattr(unit, 'cost_items'):
+#             for item in unit.cost_items:
+#                 unit.cost_items[item].cost *= ratio
 
-# =============================================================================
-# Pretreatment
-# =============================================================================
+# # =============================================================================
+# # Pretreatment
+# # =============================================================================
 
-M202 = find.unit.M202
-D = shape.Uniform(0.25, 0.4)
-@param(name='Pretreatment solid loading', element=M202, kind='coupled', units='%', 
-       baseline=0.3, distribution=D)
-def set_pretreatment_solid_loading(loading): 
-    M202.solid_loading = loading
+# M202 = find.unit.M202
+# D = shape.Uniform(0.25, 0.4)
+# @param(name='Pretreatment solid loading', element=M202, kind='coupled', units='%', 
+#         baseline=0.3, distribution=D)
+# def set_pretreatment_solid_loading(loading): 
+#     M202.solid_loading = loading
     
-pretreatment_sulfuric_acid = find.stream.pretreatment_sulfuric_acid
-D = shape.Uniform(10, 35)
-@param(name='Pretreatment sulfuric acid loading', element=pretreatment_sulfuric_acid,
-       kind='coupled', units='mg/g-dry feedstock', baseline=22.1, distribution=D)
-def set_pretreatment_sulfuric_acid_loading(loading): 
-    feedstock_dry_mass = feedstock.F_mass - feedstock.imass['H2O']
-    pretreatment_sulfuric_acid.imass['H2SO4'] = feedstock_dry_mass*loading/1000*0.93
-    pretreatment_sulfuric_acid.imass['H2O'] = feedstock_dry_mass*loading/1000*0.07
+# pretreatment_sulfuric_acid = find.stream.pretreatment_sulfuric_acid
+# D = shape.Uniform(10, 35)
+# @param(name='Pretreatment sulfuric acid loading', element=pretreatment_sulfuric_acid,
+#         kind='coupled', units='mg/g-dry feedstock', baseline=22.1, distribution=D)
+# def set_pretreatment_sulfuric_acid_loading(loading): 
+#     feedstock_dry_mass = feedstock.F_mass - feedstock.imass['H2O']
+#     pretreatment_sulfuric_acid.imass['H2SO4'] = feedstock_dry_mass*loading/1000*0.93
+#     pretreatment_sulfuric_acid.imass['H2O'] = feedstock_dry_mass*loading/1000*0.07
 
-R201 = find.unit.R201
-D = shape.Uniform(0.06, 0.12)
-@param(name='Pretreatment glucan-to-glucose', element=R201, kind='coupled', units='%',
-       baseline=0.099, distribution=D)
-def set_R201_glucan_conversion(X): R201.pretreatment_rxns[0].X = X    
+# R201 = find.unit.R201
+# D = shape.Uniform(0.06, 0.12)
+# @param(name='Pretreatment glucan-to-glucose', element=R201, kind='coupled', units='%',
+#         baseline=0.099, distribution=D)
+# def set_R201_glucan_conversion(X): R201.pretreatment_rxns[0].X = X    
 
-D = shape.Uniform(0.8, 0.92)
-@param(name='Pretreatment xylan-to-xylose', element=R201, kind='coupled', units='%',
-       baseline=0.9, distribution=D)
-def set_R201_xylan_conversion(X): R201.pretreatment_rxns[4].X = X        
+# D = shape.Uniform(0.8, 0.92)
+# @param(name='Pretreatment xylan-to-xylose', element=R201, kind='coupled', units='%',
+#         baseline=0.9, distribution=D)
+# def set_R201_xylan_conversion(X): R201.pretreatment_rxns[4].X = X        
 
-# =============================================================================
-# Conversion
-# =============================================================================
+# # =============================================================================
+# # Conversion
+# # =============================================================================
 
-M301 = find.unit.M301
-D = shape.Uniform(0.175, 0.25)
-@param(name='Enzymatic hydrolysis solid loading', element=M301, kind='coupled', units='%',
-        baseline=0.2, distribution=D)
-def set_R301_hydrolysis_solid_loading(loading): M301.solid_loading = loading
+# M301 = find.unit.M301
+# D = shape.Uniform(0.175, 0.25)
+# @param(name='Enzymatic hydrolysis solid loading', element=M301, kind='coupled', units='%',
+#         baseline=0.2, distribution=D)
+# def set_R301_hydrolysis_solid_loading(loading): M301.solid_loading = loading
 
-D = shape.Uniform(10, 30)
-@param(name='Enzyme loading', element=M301, kind='coupled', units='mg/g glucan',
-        baseline=20, distribution=D)
-def set_R301_enzyme_loading(loading): M301.enzyme_loading = loading
+# D = shape.Uniform(10, 30)
+# @param(name='Enzyme loading', element=M301, kind='coupled', units='mg/g glucan',
+#         baseline=20, distribution=D)
+# def set_R301_enzyme_loading(loading): M301.enzyme_loading = loading
 
-# Enzymatic hydrolysis
-D = baseline_uniform(24, 0.1)
-@param(name='Enzymatic hydrolysis time', element=R301, kind='coupled', units='hr',
-        baseline=24, distribution=D)
-def set_R301_hydrolysis_time(tau): R301.tau_saccharification = tau
+# # Enzymatic hydrolysis
+# D = baseline_uniform(24, 0.1)
+# @param(name='Enzymatic hydrolysis time', element=R301, kind='coupled', units='hr',
+#         baseline=24, distribution=D)
+# def set_R301_hydrolysis_time(tau): R301.tau_saccharification = tau
 
-D = shape.Uniform(0.75, 0.9)
-@param(name='Enzymatic hydrolysis glucan-to-glucose', element=R301, kind='coupled', units='%',
-        baseline=0.85, distribution=D)
-def set_R301_glucan_conversion(X): R301.saccharification_rxns[2].X = X
+# D = shape.Uniform(0.75, 0.9)
+# @param(name='Enzymatic hydrolysis glucan-to-glucose', element=R301, kind='coupled', units='%',
+#         baseline=0.85, distribution=D)
+# def set_R301_glucan_conversion(X): R301.saccharification_rxns[2].X = X
 
-# Fermentation
-D = shape.Triangle(76, 120, 145)
-@param(name='Fermentation time', element=R301, kind='coupled', units='hr',
-        baseline=120, distribution=D)
-def set_R301_fermentation_time(tau): R301.tau_cofermentation = tau
+# # Fermentation
+# D = shape.Triangle(76, 120, 145)
+# @param(name='Fermentation time', element=R301, kind='coupled', units='hr',
+#         baseline=120, distribution=D)
+# def set_R301_fermentation_time(tau): R301.tau_cofermentation = tau
 
-D = shape.Uniform(5, 15)
-@param(name='CSL loading', element=R301, kind='coupled', units='g/L',
-        baseline=10, distribution=D)
-def set_CSL_loading(loading): R301.CSL_loading = loading
+# D = shape.Uniform(5, 15)
+# @param(name='CSL loading', element=R301, kind='coupled', units='g/L',
+#         baseline=10, distribution=D)
+# def set_CSL_loading(loading): R301.CSL_loading = loading
 
-R302 = find.unit.R302
-D = shape.Triangle(0.55, 0.76, 0.93)
-@param(name='Lactic acid yield', element=R301, kind='coupled', units='g/g substrate',
-        baseline=0.76, distribution=D)
-def set_R301_lactic_acid_yield(X):
-    R301_X = R301.cofermentation_rxns.X
-    R301_X[0] = R301_X[3] = X
-    R302_X = R302.cofermentation_rxns.X
-    R302_X[0] = R302_X[3] = X * R302.ferm_ratio
+# R302 = find.unit.R302
+# D = shape.Triangle(0.55, 0.76, 0.93)
+# @param(name='Lactic acid yield', element=R301, kind='coupled', units='g/g substrate',
+#         baseline=0.76, distribution=D)
+# def set_R301_lactic_acid_yield(X):
+#     R301_X = R301.cofermentation_rxns.X
+#     R301_X[0] = R301_X[3] = X
+#     R302_X = R302.cofermentation_rxns.X
+#     R302_X[0] = R302_X[3] = X * R302.ferm_ratio
 
-D = shape.Triangle(0.004, 0.07, 0.32)
-@param(name='Acetic acid yield', element=R301, kind='coupled', units='g/g substrate',
-        baseline=0.07, distribution=D)
-def set_R301_acetic_acid_yield(X): 
-    # 1e6 is to avoid generating tiny negative flow (e.g., 1e-14) in R301
-    R301_X = R301.cofermentation_rxns.X
-    X = min(X, 1-1e-6-R301_X[0]-R301_X[2])
-    R301_X[1] = R301_X[4] = X
-    R302_X = R302.cofermentation_rxns.X
-    X = min(X*R302.ferm_ratio, 1-1e-6-R302_X[0]-R302_X[2])
-    R302_X[1] = R302_X[4] = X
+# D = shape.Triangle(0.004, 0.07, 0.32)
+# @param(name='Acetic acid yield', element=R301, kind='coupled', units='g/g substrate',
+#         baseline=0.07, distribution=D)
+# def set_R301_acetic_acid_yield(X): 
+#     # 1e6 is to avoid generating tiny negative flow (e.g., 1e-14) in R301
+#     R301_X = R301.cofermentation_rxns.X
+#     X = min(X, 1-1e-6-R301_X[0]-R301_X[2])
+#     R301_X[1] = R301_X[4] = X
+#     R302_X = R302.cofermentation_rxns.X
+#     X = min(X*R302.ferm_ratio, 1-1e-6-R302_X[0]-R302_X[2])
+#     R302_X[1] = R302_X[4] = X
 
-D = shape.Uniform(0.05, 0.1)
-@param(name='Innoculum ratio', element=R301, kind='coupled', units='%',
-        baseline=0.07, distribution=D)
-def set_innoculum_ratio(ratio): R301.inoculum_ratio = ratio
+# D = shape.Uniform(0.05, 0.1)
+# @param(name='Innoculum ratio', element=R301, kind='coupled', units='%',
+#         baseline=0.07, distribution=D)
+# def set_innoculum_ratio(ratio): R301.inoculum_ratio = ratio
 
-# Seed train fermentation yield as a ratio of the main fermenter
-D = baseline_uniform(36, 0.1)
-@param(name='Seed train time', element=R302, kind='coupled', units='hr',
-        baseline=36, distribution=D)
-def set_R302_fermentation_time(tau): R302.tau_batch = tau
+# # Seed train fermentation yield as a ratio of the main fermenter
+# D = baseline_uniform(36, 0.1)
+# @param(name='Seed train time', element=R302, kind='coupled', units='hr',
+#         baseline=36, distribution=D)
+# def set_R302_fermentation_time(tau): R302.tau_batch = tau
 
-D = shape.Triangle(0.8, 0.9, 1)
-@param(name='Seed train yield', element=R302, kind='coupled', units='% of R301',
-        baseline=0.9, distribution=D)
-def set_R302_ratio(ratio):
-    R301_X = R301.cofermentation_rxns.X
-    R302_X = R302.cofermentation_rxns.X
-    ratio = min(ratio, (1-1e-6-R302_X[2])/(R301_X[0]+R301_X[1]))
-    R302.ferm_ratio = ratio
+# D = shape.Triangle(0.8, 0.9, 1)
+# @param(name='Seed train yield', element=R302, kind='coupled', units='% of R301',
+#         baseline=0.9, distribution=D)
+# def set_R302_ratio(ratio):
+#     R301_X = R301.cofermentation_rxns.X
+#     R302_X = R302.cofermentation_rxns.X
+#     ratio = min(ratio, (1-1e-6-R302_X[2])/(R301_X[0]+R301_X[1]))
+#     R302.ferm_ratio = ratio
 
-# =============================================================================
-# Separation
-# =============================================================================
-
-
-parameters = orgacids_model.get_parameters()
+# # =============================================================================
+# # Separation
+# # =============================================================================
 
 
-# %% Construct other models
+# parameters = orgacids_model.get_parameters()
 
-# =============================================================================
-# Model to evalute system across lactic acid yield
-# =============================================================================
 
-orgacids_model_LA_yield = Model(orgacids_sys, metrics)
+# # %% Construct other models
 
-def set_LA_yield(LA_yield):
-    R301_X = R301.cofermentation_rxns.X
-    R301_X[0] = R301_X[3] = LA_yield
-    R301_X[1] = R301_X[4] = min(1-1e-6-R301_X[0]-R301_X[2], R301_X[1])
-    R302_X = R302.cofermentation_rxns.X
-    R302_X[0] = R302_X[3] = R301_X[0] * R302.ferm_ratio
-    R302_X[1] = R302_X[4] = R301_X[1] * R302.ferm_ratio
+# # =============================================================================
+# # Model to evalute system across lactic acid yield
+# # =============================================================================
 
-LA_yield_parameters = tuple([i for i in parameters if not i.name=='Lactic acid yield'])
-orgacids_model_LA_yield.set_parameters(LA_yield_parameters)
+# orgacids_model_LA_yield = Model(orgacids_sys, metrics)
 
-# =============================================================================
-# Model to evalute system across internal rate of return
-# =============================================================================
+# def set_LA_yield(LA_yield):
+#     R301_X = R301.cofermentation_rxns.X
+#     R301_X[0] = R301_X[3] = LA_yield
+#     R301_X[1] = R301_X[4] = min(1-1e-6-R301_X[0]-R301_X[2], R301_X[1])
+#     R302_X = R302.cofermentation_rxns.X
+#     R302_X[0] = R302_X[3] = R301_X[0] * R302.ferm_ratio
+#     R302_X[1] = R302_X[4] = R301_X[1] * R302.ferm_ratio
 
-def create_IRR_metrics(IRR):
-    def get_IRR_based_MSP():
-        orgacids_tea.IRR = IRR
-        return get_MSP()
-    return [Metric('Minimum selling price', get_IRR_based_MSP, '$/kg', f'IRR={IRR:.0%}'),
-            Metric('Net present value', get_NPV, '$', f'IRR={IRR:.0%}')]
+# LA_yield_parameters = tuple([i for i in parameters if not i.name=='Lactic acid yield'])
+# orgacids_model_LA_yield.set_parameters(LA_yield_parameters)
 
-IRRs = np.linspace(0, 0.4, 41)
-IRR_metrics = sum([create_IRR_metrics(IRR) for IRR in IRRs],[])
+# # =============================================================================
+# # Model to evalute system across internal rate of return
+# # =============================================================================
 
-orgacids_model_IRR = Model(orgacids_sys, IRR_metrics)
-orgacids_model_IRR.set_parameters(parameters)
+# def create_IRR_metrics(IRR):
+#     def get_IRR_based_MSP():
+#         orgacids_tea.IRR = IRR
+#         return get_MSP()
+#     return [Metric('Minimum selling price', get_IRR_based_MSP, '$/kg', f'IRR={IRR:.0%}'),
+#             Metric('Net present value', get_NPV, '$', f'IRR={IRR:.0%}')]
 
-# =============================================================================
-# Model to evalute system across feedstock price and carbohydate content
-# =============================================================================
+# IRRs = np.linspace(0, 0.4, 41)
+# IRR_metrics = sum([create_IRR_metrics(IRR) for IRR in IRRs],[])
 
-def create_feedstock_price_metris(price):
-    def get_price_based_MSP():
-        price_per_kg = price / _kg_per_ton * 0.8
-        feedstock.price = price_per_kg
-        return get_MSP()
-    return [Metric('Minimum selling price', get_price_based_MSP, '$/kg', f'Price={price:.0f} [$/dry-ton]'),
-            Metric('Net present value', get_NPV, '$', f'Price={price:.0f} [$/dry-ton]')]
+# orgacids_model_IRR = Model(orgacids_sys, IRR_metrics)
+# orgacids_model_IRR.set_parameters(parameters)
 
-prices = np.linspace(50, 300, 26)
-feedstock_price_metrics = sum([create_feedstock_price_metris(price) 
-                               for price in prices],[])
+# # =============================================================================
+# # Model to evalute system across feedstock price and carbohydate content
+# # =============================================================================
 
-def set_feedstock_carbs(content):
-    ratio = feedstock.imass['Glucan'] / \
-        (feedstock.imass['Glucan']+feedstock.imass['Xylan'])
-    dry_mass = feedstock.F_mass-feedstock.imass['H2O']
-    old_content = sum(feedstock.imass[i] 
-                      for i in ('Glucan', 'Xylan', 'Arabinan', 
-                                'Galactan', 'Mannan')) / dry_mass
-    mass_diff = (content - old_content) * dry_mass
-    feedstock.imass['Glucan'] += mass_diff * ratio
-    feedstock.imass['Xylan'] += mass_diff * (1-ratio)
-    feedstock.imass['Extract'] -= mass_diff
+# def create_feedstock_price_metris(price):
+#     def get_price_based_MSP():
+#         price_per_kg = price / _kg_per_ton * 0.8
+#         feedstock.price = price_per_kg
+#         return get_MSP()
+#     return [Metric('Minimum selling price', get_price_based_MSP, '$/kg', f'Price={price:.0f} [$/dry-ton]'),
+#             Metric('Net present value', get_NPV, '$', f'Price={price:.0f} [$/dry-ton]')]
 
-orgacids_model_feedstock = Model(orgacids_sys, feedstock_price_metrics)
+# prices = np.linspace(50, 300, 26)
+# feedstock_price_metrics = sum([create_feedstock_price_metris(price) 
+#                                 for price in prices],[])
 
-param = orgacids_model_feedstock.parameter
+# def set_feedstock_carbs(carbs_content):
+#     carbs = ('Glucan', 'Xylan', 'Arabinan', 'Galactan', 'Mannan')
+#     dry_mass = feedstock.F_mass.copy() - feedstock.imass[('H2O',)].copy()
+#     old_mass = feedstock.imass[carbs].copy()
+#     ratio = old_mass / old_mass.sum()
+#     new_mass = dry_mass * carbs_content * ratio
+#     feedstock.set_flow(new_mass, 'kg/hr', carbs)
+#     mass_diff = new_mass.sum() - old_mass.sum()
+#     feedstock.imass['Extract'] -= mass_diff
+#     if any(feedstock.mass < 0):
+#         raise ValueError(f'Carbohydrate content of {carbs_content*100:.0f}% dry weight is infeasible')
 
-# Set a fake parameter to enable evaluation
-D = shape.Uniform(0.9, 1.1)
-@param(name='Fake parameter', element='TEA', kind='isolated', units='',
-       baseline=1, distribution=D)
-def set_fake_parameter(anything): pass
+# orgacids_model_feedstock = Model(orgacids_sys, feedstock_price_metrics)
+
+# param = orgacids_model_feedstock.parameter
+
+# # Set a fake parameter to enable evaluation
+# D = shape.Uniform(0.9, 1.1)
+# @param(name='Fake parameter', element=feedstock, kind='coupled', units='',
+#         baseline=1, distribution=D)
+# def set_fake_parameter(anything): pass
 
 
 

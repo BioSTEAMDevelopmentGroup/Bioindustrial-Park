@@ -30,8 +30,7 @@ import thermosteam as tmo
 from math import exp
 from flexsolve import aitken_secant
 from biosteam import Unit
-from biosteam.units import Flash, HXutility, Mixer, MixTank, Pump, \
-    SolidsSeparator, StorageTank
+from biosteam.units import Flash, Mixer, MixTank, Pump, SolidsSeparator, StorageTank
 from biosteam.units.decorators import cost
 from biosteam.units._tank import compute_number_of_tanks_and_total_purchase_cost
 from biosteam.units.design_tools import TankPurchaseCostAlgorithm, vessel_material_factors
@@ -43,6 +42,7 @@ from orgacids.utils import baseline_feedflow
 # Year  1997    1998    2009    2010    2016
 # CE    386.5   389.5   521.9   550.8   541.7
 
+_kg_per_ton = 907.18474
 Rxn = tmo.reaction.Reaction
 ParallelRxn = tmo.reaction.ParallelReaction
 
@@ -59,7 +59,7 @@ class FeedstockPreprocessing(Unit):
     _N_ins = 1
     _N_outs = 1
     
-    _baseline_feedflow = baseline_feedflow.copy()
+    _old_feedflow = baseline_feedflow.copy()
     
     # U.S. ton/day, 2000 metric tonne/day as in Humbird et al.
     feedstock_flow_rate = 2205
@@ -67,8 +67,12 @@ class FeedstockPreprocessing(Unit):
     def _run(self):
         feed_in = self.ins[0]
         feed_out = self.outs[0]
+        _old_feedflow = self._old_feedflow
         
-        feed_in.mass = self._baseline_feedflow * (self.feedstock_flow_rate/2205)
+        _old_water =_old_feedflow[feed_in.chemicals.index('H2O')]
+        _old_dry_flow_rate = (_old_feedflow.sum()-_old_water) * 24 / _kg_per_ton
+        feed_out.mass = _old_feedflow * (self.feedstock_flow_rate/_old_dry_flow_rate)
+        _old_feedflow = feed_in.mass
         feed_out.copy_like(feed_in)
 
 
@@ -571,7 +575,7 @@ class CellMassFilter(SolidsSeparator):
 # =============================================================================
 # A reactor class for acidulation, esterification, and hydrolysis
 # =============================================================================
-class BatchReactor(Unit, isabstract=True):
+class Reactor(Unit, isabstract=True):
     '''    
     Create an abstract class for batch reactor unit, purchase cost of the reactor
     is based on volume (0.1-20 m^3 for each tank) calculated by residence time.
@@ -658,7 +662,7 @@ class BatchReactor(Unit, isabstract=True):
 # =============================================================================
 # Reactor to acidify CalciumLactate into lactic acid
 # =============================================================================
-class AcidulationReactor(BatchReactor):
+class AcidulationReactor(Reactor):
     _N_ins = 2
     _N_outs = 1
     
@@ -961,7 +965,7 @@ class Esterification(Unit):
 # =============================================================================
 # Reactor to hydrolyze esters to acids
 # =============================================================================
-class HydrolysisReactor(BatchReactor):
+class HydrolysisReactor(Reactor):
     _N_ins = 4
     _N_outs = 2
     

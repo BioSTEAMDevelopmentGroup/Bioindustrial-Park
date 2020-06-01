@@ -100,14 +100,13 @@ natural_gas_price = 4.70/1e3*_ft3_per_m3*CH4_V * (1e3/CH4_MW)
 lactic_acid_price = 1.88
 
 # All in 2016$/kg
-price = {
-         'Lactic acid': lactic_acid_price, 
+price = {'Lactic acid': lactic_acid_price, 
          'Feedstock': feedstock_price, 
          'Sulfuric acid': 0.0430 * _lb_per_kg,
          # 0.1900 is for NH3
          'AmmoniumHydroxide': 0.1900 * _lb_per_kg * 17.031/35.046,
          'CSL': 0.0339 * _lb_per_kg,
-         'NaOH': 0.2384 * _lb_per_kg,
+         'Caustics': 0.2384 * _lb_per_kg * 0.5, # 50 wt% NaOH/water mixture
          'Boiler chems': 2.9772 * _lb_per_kg,
          'Lime': lime_price,
          'Cooling tower chems': 1.7842 * _lb_per_kg,
@@ -123,8 +122,8 @@ price = {
          'Baghouse bag': baghouse_bag_price,
          'Natural gas': natural_gas_price,
          'DAP': 0.1645 * _lb_per_kg,
-         'Methanol': methanol_price
-         } 
+         'Methanol': methanol_price}
+ 
 bst.PowerUtility.price = price['Electricity']
 
 _mps = bst.HeatUtility.get_heating_agent('medium_pressure_steam')

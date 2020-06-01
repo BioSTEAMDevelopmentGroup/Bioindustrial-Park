@@ -68,12 +68,12 @@ tmo.settings.set_thermo(orgacids_chemicals)
 # %% Feedstock preprocessing
 
 feedstock = Stream('feedstock',
-                    baseline_feedflow,
+                    baseline_feedflow.copy(),
                     units='kg/hr',
                     price=price['Feedstock'])
 
 U101 = units.FeedstockPreprocessing('U101', ins=feedstock)
-plant_size_ratio = U101.feedstock_flow_rate / 2205
+
 # Handling costs/utilities included in feedstock cost thus not considered here
 U101.cost_items['System'].cost = 0
 U101.cost_items['System'].kW = 0
@@ -91,7 +91,7 @@ pretreatment_feedstock_water = Stream('pretreatment_feedstock_water',
 
 # For pretreatment, baseline is (18+4.1) mg/g dry biomass
 # based on P21 in Humbird et al., 93% purity
-feedstock_dry_mass = feedstock.F_mass-feedstock.imass['H2O']
+feedstock_dry_mass = feedstock.F_mass - feedstock.imass['H2O']
 pretreatment_sulfuric_acid = Stream('pretreatment_sulfuric_acid', 
                                     H2SO4=feedstock_dry_mass*22.1/1000*0.93,
                                     H2O=feedstock_dry_mass*22.1/1000*0.07,
@@ -104,7 +104,7 @@ pretreatment_acid_water = Stream('pretreatment_acid_water', T=114+273.15)
 # will be adjusted by the SteamMixer
 pretreatment_steam = Stream('pretreatment_steam', phase='g',
                             T=268+273.15, P=13*101325,
-                            Water=(3490+24534)*plant_size_ratio,
+                            Water=(3490+24534)*U101.feedstock_flow_rate/ 2205,
                             units='kg/hr')
 
 # For neutralization of pretreatment hydrolysate
@@ -285,7 +285,7 @@ def update_F401_H_T():
 PS_F401_H_T = bst.units.ProcessSpecification(
     'PS_F401_H_T', ins=F401-0, specification=update_F401_H_T)
 
-F401_H = units.HXutility('F401_H', ins=PS_F401_H_T-0, V=0, T=370)
+F401_H = bst.units.HXutility('F401_H', ins=PS_F401_H_T-0, V=0, T=370)
 F401_P = units.OrganicAcidsPump('F401_P', ins=F401-1)
 
 #!!! What is D401 used for?
@@ -418,7 +418,7 @@ air_lagoon = Stream('air_lagoon', phase='g', units='kg/hr')
 # flow will be updated in AerobicDigestion
 # The active chemical is modeled as NaOH, but the price is cheaper than that of NaOH
 aerobic_caustic = Stream('aerobic_caustic', units='kg/hr', T=20+273.15, P=2*101325,
-                          price=price['NaOH']*0.5)
+                          price=price['Caustics'])
 
 # =============================================================================
 # Units
@@ -453,7 +453,7 @@ M503 = bst.units.Mixer('M503', ins=(R501-1, ''))
 R502 = units.AerobicDigestion('R502', ins=(M503-0, air_lagoon, aerobic_caustic),
                               outs=('aerobic_vent', 'aerobic_treated_water'),
                               reactants=soluble_organics,
-                              ratio=plant_size_ratio)
+                              ratio=U101.feedstock_flow_rate/2205)
 
 # Membrane bioreactor to split treated wastewater from R502
 S501 = bst.units.Splitter('S501', ins=R502-1, outs=('membrane_treated_water', 
@@ -528,7 +528,8 @@ natural_gas = Stream('natural_gas', price=price['Natural gas'])
 cooling_tower_chems = Stream('cooling_tower_chems', price=price['Cooling tower chems'])
 
 # 145 based on equipment M-910 (clean-in-place system) in Humbird et al.
-CIP_chems_in = Stream('CIP_chems_in', Water=145*plant_size_ratio, units='kg/hr')
+CIP_chems_in = Stream('CIP_chems_in', Water=145*U101.feedstock_flow_rate/2205, 
+                      units='kg/hr')
 CIP_chems_out = Stream('CIP_chems_out')
 CIP_chems_out.copy_like(CIP_chems_in)
 
@@ -536,8 +537,8 @@ CIP_chems_out.copy_like(CIP_chems_in)
 # Air needed for multiple processes (including enzyme production that was not included here),
 # not rigorously modeled, only scaled based on plant size
 plant_air_in = Stream('plant_air_in',
-                      N2=0.79*1372608*plant_size_ratio,
-                      O2=0.21*1372608*plant_size_ratio)
+                      N2=0.79*1372608*U101.feedstock_flow_rate/2205,
+                      O2=0.21*1372608*U101.feedstock_flow_rate/2205)
 
 # 2500 gpm from Table 23 on Page 51 of Humbird et al.
 fire_water_in = Stream('fire_water_in', 
@@ -611,7 +612,7 @@ BT = facilities.OrganicAcidsBT('BT', ins=(M506-0, R501-0,
                                           'BT_makeup_water'),
                                B_eff=0.8, TG_eff=0.85,
                                combustibles=combustibles,
-                               ratio=plant_size_ratio,
+                               ratio=U101.feedstock_flow_rate/2205,
                                side_streams_to_heat=(pretreatment_feedstock_water,
                                                      pretreatment_acid_water,
                                                      pretreatment_steam),
@@ -624,7 +625,7 @@ CT = facilities.OrganicAcidsCT('CT',
                                     cooling_tower_chems),
                                 outs=('process_cooling_water',
                                       'cooling_tower_blowdown'),
-                                ratio=plant_size_ratio)
+                                ratio=U101.feedstock_flow_rate/2205)
 M502.ins[-1] = CT.outs[-1]
 
 # All water used in the system, here only consider water usage,
@@ -747,7 +748,7 @@ orgacids_no_BT_tea = OrgacidsTEA(
         warehouse=0.04, site_development=0.09, additional_piping=0.045,
         proratable_costs=0.10, field_expenses=0.10, construction=0.20,
         contingency=0.10, other_indirect_costs=0.10, 
-        labor_cost=2.5e6*_labor_2007to2016*plant_size_ratio,
+        labor_cost=2.5e6*_labor_2007to2016*U101.feedstock_flow_rate/2205,
         labor_burden=0.90, property_insurance=0.007, maintenance=0.03)
 orgacids_no_BT_tea.units.remove(BT)
 
