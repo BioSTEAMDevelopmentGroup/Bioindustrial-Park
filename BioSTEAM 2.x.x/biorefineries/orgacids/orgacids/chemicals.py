@@ -25,6 +25,8 @@ TODO:
 import thermosteam as tmo
 from thermosteam import functional as fn
 
+__all__ = ('orgacids_chemicals', 'chemical_groups', 'soluble_organics', 'combustibles')
+
 # chems is the object containing all chemicals used in this biorefinery
 chems = orgacids_chemicals = tmo.Chemicals([])
 
@@ -103,6 +105,8 @@ Ethanol = chemical_database('Ethanol')
 Acetate = chemical_database('Acetate', phase='l', Hf=-108992*_cal2joule)
 AmmoniumAcetate = chemical_database('AmmoniumAcetate', phase='l', 
                                          Hf=-154701*_cal2joule)
+DAP = chemical_database('DAP', search_ID='DiammoniumPhosphate',
+                             phase='l', Hf= -283996*_cal2joule)
 
 # Hf from a Ph.D. dissertation (Lactic Acid Production from Agribusiness Waste Starch
 # Fermentation with Lactobacillus Amylophilus and Its Cradle-To-Gate Life 
@@ -191,7 +195,6 @@ LacticAcid.Hfus = 11.34e3
 EthylAcetate = chemical_database('EthylAcetate')
 # Hf from DIPPR value in Table 3 of Vatani et al., Int J Mol Sci 2007, 8 (5), 407–432
 EthylLactate = chemical_database('EthylLactate', Hf=-695.08e3)
-SuccinicAcid = chemical_database('SuccinicAcid')
 
 '''Insoluble organics'''
 Glucan = chemical_defined('Glucan', phase='s', formula='C6H10O5', Hf=-233200*_cal2joule)
@@ -225,17 +228,14 @@ CSL = chemical_defined('CSL', phase='l', formula='CH2.8925O1.3275N0.0725S0.00175
 
 # Boiler chemicals includes amine, ammonia, and phosphate,
 # did not model separately as composition unavailable and only one price is given
-BoilerChems = chemical_database('BoilerChems', search_ID='DiammoniumPhosphate',
-                                phase='l', Hf=0, HHV=0, LHV=0)
+BoilerChemicals = chemical_copied('BoilerChemicals', DAP)
 
 '''Filler chemicals'''
 BaghouseBag = chemical_defined('BaghouseBag', phase='s', MW=1, Hf=0, HHV=0, LHV=0)
 BaghouseBag.Cn.add_model(0)
-CoolingTowerChems = chemical_copied('CoolingTowerChems', BaghouseBag)
+CIPchems = chemical_copied('CIPchems', BaghouseBag)
 
 '''Might not needed'''
-DAP = chemical_database('DAP', search_ID='DiammoniumPhosphate',
-                        phase='l', Hf= -283996*_cal2joule)
 Methanol = chemical_database('Methanol')
 MethylAcetate = chemical_database('MethylAcetate')
 Denaturant = chemical_database('Denaturant', search_ID='n-Heptane')
@@ -243,6 +243,7 @@ DenaturedEnzyme = chemical_copied('DenaturedEnzyme', Enzyme)
 
 # Hf from DIPPR value in Table 3 of Vatani et al., Int J Mol Sci 2007, 8 (5), 407–432
 MethylLactate = chemical_database('MethylLactate', Hf=-643.1e3)
+
 FermMicrobeXyl = chemical_copied('FermMicrobeXyl', FermMicrobe)
 
 
@@ -255,12 +256,12 @@ chemical_groups = dict(
     OrganicSolubleSolids = ('AmmoniumAcetate', 'SolubleLignin', 'Extract', 'CSL',
                             'LacticAcid', 'CalciumLactate', 'CalciumAcetate',
                             'Methanol', 'MethylLactate', 'MethylAcetate',
-                            'EthylLactate', 'EthylAcetate', 'SuccinicAcid'),
+                            'EthylLactate', 'EthylAcetate'),
     InorganicSolubleSolids = ('AmmoniumSulfate', 'DAP', 'NaOH', 'HNO3', 'NaNO3',
-                              'BoilerChems', 'Na2SO4', 'AmmoniumHydroxide'),
+                              'BoilerChemicals', 'Na2SO4', 'AmmoniumHydroxide'),
     Furfurals = ('Furfural', 'HMF'),
     OtherOrganics = ('Denaturant', 'Xylitol'),
-    COSOxNOxH2S = ('NitricOxide', 'NO2', 'SO2', 'CarbonMonoxide', 'H2S'),
+    COxSOxNOxH2S = ('NitricOxide', 'NO2', 'SO2', 'CarbonMonoxide', 'H2S'),
     Proteins = ('Protein', 'Enzyme', 'DenaturedEnzyme'),
     CellMass = ('WWTsludge', 'FermMicrobe', 'FermMicrobeXyl'),
     # Theoretically P4O10 should be soluble, but it's the product of the
@@ -268,7 +269,7 @@ chemical_groups = dict(
     # P4O10 will be generated in the system as no P-containing chemicals 
     # are included in "combustibles"
     OtherInsolubleSolids = ('Tar', 'Ash', 'CalciumDihydroxide', 'CaSO4', 'P4O10',
-                            'BaghouseBag', 'CoolingTowerChems'),
+                            'BaghouseBag', 'CIPchems'),
     OtherStructuralCarbohydrates = ('Glucan', 'Xylan', 'Lignin', 'Arabinan', 
                                     'Mannan', 'Galactan'),
     SeparatelyListedOrganics = ('Ethanol', 'Glucose', 'Xylose', 'AceticAcid',
@@ -297,10 +298,9 @@ combustibles.extend(['WWTsludge','NH3', 'NitricOxide', 'CarbonMonoxide', 'H2S', 
 # Chemicals that will be modeled in Distallation/Flash units,
 # list is in ascending order of Tb,
 # Xylitol is not included due to high Tm and Tb thus will stay in liquid phase
-phase_change_chemicals = ['Methanol', 'Ethanol', 'H2O', 'EthylAcetate', 
-                          'Denaturant', 'AceticAcid', 'MethylAcetate', 
-                          'MethylLactate', 'EthylLactate', 'Furfural', 
-                          'SuccinicAcid', 'LacticAcid', 'HMF']
+phase_change_chemicals = ['Methanol', 'Ethanol', 'H2O', 'EthylAcetate', 'Denaturant',
+                          'AceticAcid', 'MethylAcetate', 'MethylLactate',
+                          'EthylLactate', 'Furfural', 'LacticAcid', 'HMF']
 
 for chem in chems:
     if chem.ID in phase_change_chemicals: pass
@@ -370,7 +370,70 @@ chems.set_synonym('AmmoniumHydroxide', 'NH4OH')
 
 # %% Output chemical properties for checking
 
-# from orgacids.utils import get_chemical_properties
-# get_chemical_properties(chems, 400, 101325)
+# import pandas as pd
 
+# ids = chems.ids
+# formulas = []
+# mws = []
+# hhvs = []
+# lhvs = []
+# hfs = []
+# phases = []
+# tbs = []
+# psats = []
+# vs = []
+# cns = []
+# mus = []
+# kappas = []
+# for chemical in chems:
+#     formulas.append(chemical.formula)
+#     mws.append(chemical.mw)
+#     hhvs.append(chemical.hhv)
+#     lhvs.append(chemical.lhv)
+#     hfs.append(chemical.hf)
+#     if chemical.locked_state:
+#         phases.append(chemical.phase_ref)
+#         tbs.append('na')
+#         try: psats.append(chemical.psat(t=400, p=101325))
+#         except: psats.append('')
+#         try: vs.append(chemical.v(t=400, p=101325))
+#         except: vs.append('')
+#         try: cns.append(chemical.cn(t=400))
+#         except: cns.append('')
+#         try: mus.append(chemical.mu(t=400, p=101325))
+#         except: mus.append('')
+#         try: kappas.append(chemical.kappa(t=400, p=101325))
+#         except: kappas.append('')
+#     else:
+#         ref_phase = chemical.get_phase(t=400, p=101325)
+#         phases.append(f'variable, ref={ref_phase}')
+#         tbs.append(chemical.tb)
+#         try: psats.append(chemical.psat(ref_phase, t=400, p=101325))
+#         except: psats.append('')
+#         try: vs.append(chemical.v(ref_phase, t=400, p=101325))
+#         except: vs.append('')
+#         try: cns.append(chemical.cn(ref_phase, t=400))
+#         except: cns.append('')
+#         try: mus.append(chemical.mu(ref_phase, t=400, p=101325))
+#         except: mus.append('')
+#         try: kappas.append(chemical.kappa(ref_phase, t=400, p=101325))
+#         except: kappas.append('')
+
+# properties = pd.dataframe(
+#     {'id': chems.ids,
+#       'formula': formulas,
+#       'mw': mws,
+#       'hhv': hhvs,
+#       'lhv': lhvs,
+#       'hf': hfs,
+#       'phase': phases,
+#       'boiling point': tbs,
+#       'psat': psats,
+#       'v': vs,
+#       'cn': cns,
+#       'mu': mus,
+#       'kappa': kappas}
+#     )
+
+# properties.to_excel('chemical_properties2.xlsx', sheet_name='properties')
 
