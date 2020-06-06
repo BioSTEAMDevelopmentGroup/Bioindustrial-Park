@@ -1,3 +1,8 @@
+build
+dist
+biorefineries.egg-info
+**/__pycache__
+
 # Compiled source #
 ###################
 *.com
