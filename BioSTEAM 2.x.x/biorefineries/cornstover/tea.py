@@ -56,7 +56,7 @@ class CornstoverTEA(TEA):
         if self.lang_factor:
             self._ISBL_DPI_cached = DPI - sum([i.purchase_cost for i in self.OSBL_units]) * self.lang_factor
         else:
-            self._ISBL_DPI_cached = DPI - sum([i.installation_cost for i in self.OSBL_units])
+            self._ISBL_DPI_cached = DPI - sum([i.installed_cost for i in self.OSBL_units])
         return self._ISBL_DPI_cached
         
     def _TDC(self, DPI):

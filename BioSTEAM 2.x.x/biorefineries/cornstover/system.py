@@ -165,10 +165,10 @@ def update_cellulase_and_nutrient_loading():
     
 pretreatment_sys = System('pretreatment_sys',
                path=(U101, T201, M201, M202, M203,
-                        R201, P201, T202, F201, M204,
-                        H201, M210, M205, T203, T203,
-                        H301,
-                        M301))
+                    R201, P201, T202, F201, M204,
+                    H201, M210, M205, T203, T203,
+                    H301,
+                    M301))
 
 # %% Fermentation system
 
@@ -249,7 +249,7 @@ D401-1-1-M401
 # Heat up before beer column
 # Exchange heat with stillage
 H401 = bst.HXprocess('H401', ins=(T302-0, None),
-                    fluid_type='ss', U=1.28)
+                     phase0='l', phase1='l', U=1.28)
 
 # Beer column
 xbot = Ethanol_molfrac(0.00001)
@@ -657,7 +657,7 @@ Area800 = bst.TEA.like(System(None, (CWP, CT, PWC, ADP, CIP_package)),
 areas = (Area100, Area200, Area300, Area400,
          Area500, Area600, Area700, Area800)
 numbered_areas = tuple(enumerate(areas, 1))
-installation_costs = {i: j.installation_cost/1e6
+installed_costs = {i: j.installed_cost/1e6
                       for i,j in numbered_areas}
 utility_costs = {i: j.utility_cost/1e6
                  for i,j in numbered_areas}
@@ -676,7 +676,7 @@ get_rate = lambda units: sum([i.power_utility.rate
 get_ecost = lambda units: sum([i.power_utility.cost
                                for i in units])*24*350.4/1e6
 
-cooling_water_uses = {i: get_utility(j.units, 'Cooling water', 'duty')/1e6/4.184
+cooling_water_uses = {i: get_utility(j.units, 'cooling_water', 'duty')/1e6/4.184
                       for i,j in numbered_areas}
 
 electricity_uses = {i: get_rate(j.units)/41 for i,j in numbered_areas}

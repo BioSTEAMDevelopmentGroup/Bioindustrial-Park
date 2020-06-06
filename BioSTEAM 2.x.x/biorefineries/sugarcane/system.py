@@ -126,11 +126,11 @@ T203 = units.MixTank('T203')
 P201 = units.Pump('P201')
 
 # Mix lime solution
-T204 = units.MixTank('T204', tau=0.25)
+T204 = units.MixTank('T204', tau=0.10)
 P202 = units.Pump('P202')
 
 # Blend acid lipid solution with lime
-T205 = units.MixTank('T205')
+T205 = units.MixTank('T205', tau=0.10)
 
 # Mix recycle
 M202 = units.Mixer('M202')
@@ -282,7 +282,7 @@ M301 = units.Mixer('M301')
 H301 = units.HXutility('H301', T=295.15)
 
 # Ethanol Production
-R301 = units.Fermentation('R301', outs=('CO2', ''), tau=10, efficiency=0.90, N=6) 
+R301 = units.Fermentation('R301', outs=('CO2', ''), tau=9, efficiency=0.90, N=4) 
 T301 = units.StorageTank('T301', tau=4, vessel_material='Carbon steel')
 T301.line = 'Beer tank'
 
@@ -302,7 +302,7 @@ P301 = units.Pump('P301')
 # Heat up before beer column
 # Exchange heat with stillage
 H302 = units.HXprocess('H302', outs=('', 'stillage'),
-                     fluid_type='ss', U=1.28)
+                      phase0='l', phase1='l', U=1.28)
 
 # Beer column
 xbot = mass2molar_ethanol_fraction(0.00001)

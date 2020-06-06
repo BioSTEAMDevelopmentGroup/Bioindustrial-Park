@@ -53,8 +53,8 @@ def append_single_phase_chemical(ID, search_ID=None, **data):
     chemical.default()    
     chems.append(chemical)
 
-def extend_single_phase_chemicals(IDs):
-    for ID in IDs: append_single_phase_chemical(ID)
+def extend_single_phase_chemicals(IDs, **data):
+    for ID in IDs: append_single_phase_chemical(ID, **data)
 
 def append_new_single_phase_chemical(ID, source=None, **data):
     chemical = tmo.Chemical.blank(ID, **data)
@@ -115,7 +115,7 @@ append_new_single_phase_chemical('NO', chems.N2,
 append_single_phase_chemical('CO', 'Carbon monoxide', Hf=-110.522)
 
 # Will remain as  solid
-extend_single_phase_chemicals(['Glucose', 'Xylose', 'Sucrose'])
+extend_single_phase_chemicals(['Glucose', 'Xylose', 'Sucrose'], Hfus=0)
 append_single_phase_chemical('CaSO4')
 
 subgroup = chems['Glucose', 'Xylose', 'Sucrose', 'CaSO4', 'AmmoniumSulfate']

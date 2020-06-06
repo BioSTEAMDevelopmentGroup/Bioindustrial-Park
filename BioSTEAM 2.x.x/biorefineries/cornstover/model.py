@@ -51,7 +51,7 @@ for i, tea in enumerate(areas, 1):
     Area = f'Area {i}00'
     metrics.extend(
         (Metric('Electricity', electricity_rate_function(tea), 'MW', Area),
-         Metric('Cooling duty', cooling_duty_function(tea), 'MMkcal/hr', Area),
+         Metric('Cooling duty', cooling_duty_function(tea), 'kJ/hr', Area),
          Metric('Installation cost', installation_cost_function(tea), '10^6 USD', Area)))
 
 cornstover_model = Model(cornstover_sys, metrics)
