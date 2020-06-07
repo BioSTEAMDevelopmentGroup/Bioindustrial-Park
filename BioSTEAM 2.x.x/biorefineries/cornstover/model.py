@@ -44,15 +44,15 @@ def cooling_duty_function(tea):
     cooling_utilities = [i for i in heat_utilities if i.duty < 0]
     return lambda: sum([i.duty for i in cooling_utilities])
 
-def installation_cost_function(tea):
-    return lambda: tea.installation_cost
+def installed_cost_function(tea):
+    return lambda: tea.installed_cost
 
 for i, tea in enumerate(areas, 1):
     Area = f'Area {i}00'
     metrics.extend(
         (Metric('Electricity', electricity_rate_function(tea), 'MW', Area),
          Metric('Cooling duty', cooling_duty_function(tea), 'kJ/hr', Area),
-         Metric('Installation cost', installation_cost_function(tea), '10^6 USD', Area)))
+         Metric('Installed equipment cost', installed_cost_function(tea), '10^6 USD', Area)))
 
 cornstover_model = Model(cornstover_sys, metrics)
 cornstover_model.load_default_parameters(cornstover, operating_days=False)
