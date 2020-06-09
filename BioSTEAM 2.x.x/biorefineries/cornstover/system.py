@@ -259,7 +259,6 @@ D402 = bst.BinaryDistillation('D402', ins=H401-0, k=1.25,
                        LHK=('Ethanol', 'Water'))
 D402.tray_material = 'Stainless steel 304'
 D402.vessel_material = 'Stainless steel 304'
-D402.BM = 2.4
 D402.boiler.U = 1.85
 P401 = bst.Pump('P401', ins=D402-1)
 P401-0-1-H401
@@ -275,7 +274,6 @@ D403.tray_material = 'Stainless steel 304'
 D403.vessel_material = 'Stainless steel 304'
 D403.is_divided = True
 D403.boiler.U = 1.85
-D403.BM = 2.8
 P402 = bst.Pump('P402', ins=D403-1)
 
 JX = P402-0 - bst.Junction("JX") - 0**M201

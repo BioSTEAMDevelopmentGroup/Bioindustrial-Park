@@ -10,7 +10,6 @@ biorefineries/cornstover/_analysis.py
 biorefineries/cornstover/_humbird2011.xlsx
 biorefineries/cornstover/_plot_bars.py
 biorefineries/cornstover/_plot_spearman.py
-biorefineries/cornstover/_plot_uncertainty_bottom.py
 biorefineries/cornstover/_plot_uncertainty_top.py
 biorefineries/cornstover/chemicals.py
 biorefineries/cornstover/model.py
