@@ -254,7 +254,7 @@ H401 = bst.HXprocess('H401', ins=(T302-0, None),
 # Beer column
 xbot = Ethanol_molfrac(0.00001)
 ytop = Ethanol_molfrac(0.50)
-D402 = bst.BinaryDistillation('D402', ins=H401-0, k=1.25,
+D402 = bst.BinaryDistillation('D402', ins=H401-0, k=1.25, Rmin=0.6,
                        P=101325, y_top=ytop, x_bot=xbot,
                        LHK=('Ethanol', 'Water'))
 D402.tray_material = 'Stainless steel 304'
@@ -267,7 +267,7 @@ P401-0-1-H401
 M402 = bst.Mixer('M402', ins=(D402-0, None))
 
 ytop = Ethanol_molfrac(0.915)
-D403 = bst.BinaryDistillation('D403', ins=M402-0,
+D403 = bst.BinaryDistillation('D403', ins=M402-0, Rmin=0.6,
                        P=101325, y_top=ytop, x_bot=xbot,
                        k=1.25, LHK=('Ethanol', 'Water'))
 D403.tray_material = 'Stainless steel 304'
