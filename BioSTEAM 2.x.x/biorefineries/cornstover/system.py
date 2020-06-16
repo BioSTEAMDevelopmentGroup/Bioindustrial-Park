@@ -602,7 +602,9 @@ ethanol_tea = CornstoverTEA(
         finance_interest=0.08,
         finance_years=10,
         finance_fraction=0.4,
-        OSBL_units=(WWTC, CWP, CT, PWC, ADP), # BT not included
+        OSBL_units=(WWTC, CWP, CT, PWC, ADP,
+                    T701, T702, P701, P702, M701, FT,
+                    CSL_storage, DAP_storage), # BT not included
         warehouse=0.04, 
         site_development=0.09, 
         additional_piping=0.045,

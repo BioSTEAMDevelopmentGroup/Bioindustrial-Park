@@ -269,8 +269,8 @@ S301 = units.Splitter('S301',
 
 # Concentrate sugars
 F301 = units.MultiEffectEvaporator('F301',
-                                   P=(101325, 73581, 50892, 32777, 20000),
-                                   V=0.95248) # fraction evaporated
+                                   P=(101325, 73581, 50892, 32777),
+                                   V=0.95) # fraction evaporated
 F301.components['condenser'].U = 1.85
 # Note: value of steam ~ 6.86 for the following 
 # (101325, 73580.467, 50891.17, 32777.406, 19999.925, 11331.5),
