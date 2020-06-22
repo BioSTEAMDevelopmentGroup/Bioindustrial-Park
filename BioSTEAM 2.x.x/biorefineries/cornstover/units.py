@@ -72,7 +72,8 @@ class SteamMixer(Unit):
         steam_mol = flx.aitken_secant(self._P_at_flow,
                                       steam_mol, steam_mol+0.1, 
                                       1e-4, 1e-4,
-                                      args=(self.P, steam, mixed, feed))
+                                      args=(self.P, steam, mixed, feed),
+                                      checkroot=False)
         mixed.P = self.P
         hu = self.heat_utilities[0]
         hu(steam.H, mixed.T)
