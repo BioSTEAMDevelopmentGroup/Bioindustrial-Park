@@ -431,6 +431,5 @@ sugarcane_tea = LipidcaneTEA(system=sugarcane_sys, IRR=0.15,
                              labor_cost=2.5e6, fringe_benefits=0.4,
                              property_tax=0.001, property_insurance=0.005,
                              supplies=0.20, maintenance=0.01, administration=0.005)
-sugarcane_sys.active_damping = True
 sugarcane_sys.simulate()
 sugarcane_tea.IRR = sugarcane_tea.solve_IRR()
