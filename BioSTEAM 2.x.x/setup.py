@@ -23,7 +23,7 @@ setup(
                            'lipidcane/utils/*', 
                            'cornstover/*', 
                            'cornstover/_humbird2011.xlsx',
-                           'sugarcane/',
+                           'sugarcane/*',
                       ]},
     platforms=['Windows', 'Mac', 'Linux'],
     author_email='yoelcortes@gmail.com',
