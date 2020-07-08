@@ -11,6 +11,7 @@ __all__ = ('create_chemicals',)
 
 def create_chemicals():
     ### Define common chemicals ###
+    
     Biodiesel = tmo.Chemical('Biodiesel',
                              search_ID='Methyl oleate')
     lipidcane_chemicals = tmo.Chemicals(
@@ -64,7 +65,7 @@ def create_chemicals():
     )
     Lipid.Dortmund.set_group_counts_by_name({'CH3':3, 'CH2':41, 'CH':1, 'CH=CH':3, 'CH2COO':3})
     
-    # %% Fill missing properties
+    ### Fill missing properties ###
     
     # Assume properties are similar for trioleate and tripalmitin
     Tripalmitin = tmo.Chemical('Tripalmitin').at_state(phase='l', copy=True)
