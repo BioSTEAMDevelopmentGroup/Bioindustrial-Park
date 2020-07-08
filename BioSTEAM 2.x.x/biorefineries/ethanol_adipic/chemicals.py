@@ -380,9 +380,11 @@ insolubles = sum([chemical_groups[i] for i in insoluble_groups], ('Lignin', 'Ace
 total_solids = ('Lignin', 'SolubleLignin', 'Glucan', 'Xylan', 'Arabinan', 'Mannan',
                 'Galactan', 'Ash', 'Protein')
 
-combustibles = (*soluble_organics, *chemical_groups['OtherStructuralCarbohydrates'],
+COD_chemicals = (*soluble_organics, *chemical_groups['OtherStructuralCarbohydrates'],
                 *chemical_groups['CellMass'],  *chemical_groups['Proteins'],
-                'MuconicAcid', 'AdipicAcid', 'NH3', 'NH4OH', 'NO', 'CO', 'H2S', 'CH4')
+                'MuconicAcid', 'AdipicAcid')
+
+combustibles = (*COD_chemicals, 'NH3', 'NH4OH', 'NO', 'CO', 'H2S', 'CH4')
 
 # Chemicals that will be modeled in Distallation/Flash
 # Xylitol is not included due to high Tm and Tb thus will stay in liquid phase

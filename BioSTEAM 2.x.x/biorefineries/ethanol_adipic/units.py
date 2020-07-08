@@ -56,7 +56,8 @@ from biosteam.units import Mixer, Flash, MixTank, HXutility, Pump, SolidsSeparat
 from biosteam.units.design_tools import separations
 from biosteam.units.decorators import cost
 from ethanol_adipic.process_settings import price
-from ethanol_adipic.chemicals import total_solids, solubles, insolubles, combustibles
+from ethanol_adipic.chemicals import total_solids, solubles, insolubles, \
+    COD_chemicals, combustibles
 from ethanol_adipic.utils import baseline_feedflow, compute_COD, CEPCI
 
 _kg_per_ton = 907.18474
@@ -1292,7 +1293,7 @@ class AnaerobicDigestion(Unit):
         
     def _design(self):
         wastewater = self.ins[0]
-        self.design_results['COD flow'] = compute_COD(combustibles, self.ins[0])
+        self.design_results['COD flow'] = compute_COD(COD_chemicals, self.ins[0])
         # Calculate utility needs to keep digester temperature at 35°C,	
         # heat change during reaction is not tracked	
         H_at_35C = wastewater.thermo.mixture.H(mol=wastewater.mol, 	
@@ -1390,7 +1391,7 @@ class AerobicDigestion(Unit):
         effluent.mix_from([effluent, air])
         # effluent.show(N=100)
         
-        self.design_results['COD flow'] = compute_COD(combustibles, effluent)
+        self.design_results['COD flow'] = compute_COD(COD_chemicals, effluent)
         self.digestion_rxns(effluent.mol)
         vent.copy_flow(effluent, ('CO2', 'O2', 'N2'), remove=True)
         vent.imol['Water'] = influent.imol['Water'] * self.evaporation
@@ -1428,7 +1429,7 @@ class MembraneBioreactor(Unit):
         # in sizing
         self.design_results['Volumetric flow'] = self.outs[0].F_vol
         # self.design_results['Volumetric flow'] = self.F_vol_out
-        self.design_results['COD flow'] = compute_COD(combustibles, self.ins[0])
+        self.design_results['COD flow'] = compute_COD(COD_chemicals, self.ins[0])
 
 
 @cost(basis='COD flow', ID='Thickeners', units='kg-O2/hr', 
@@ -1459,7 +1460,7 @@ class BeltThickener(Unit):
 
     
     def _design(self):
-        self.design_results['COD flow'] = compute_COD(combustibles, self.ins[0])
+        self.design_results['COD flow'] = compute_COD(COD_chemicals, self.ins[0])
 
 
 @cost(basis='COD flow', ID='Centrifuge', units='kg-O2/hr',
@@ -1489,7 +1490,7 @@ class SludgeCentrifuge(Unit):
             solids.copy_like(influent)
     
     def _design(self):
-        self.design_results['COD flow'] = compute_COD(combustibles, self.ins[0])
+        self.design_results['COD flow'] = compute_COD(COD_chemicals, self.ins[0])
 
 @cost(basis='Volumetric flow', ID='Reactor', units='m3/hr',
       # 2.7 in million gallons per day (MGD)

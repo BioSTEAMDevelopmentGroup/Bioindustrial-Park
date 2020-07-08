@@ -79,6 +79,7 @@ def convert_ethanol_wt_2_mol(wt):
 def compute_COD(IDs, stream):
     unit_COD = []
     for i in IDs:
+        if i not in stream.chemicals.IDs: continue
         chemical = getattr(stream.chemicals, i)
         atoms = {}
         for j in ('C', 'H', 'O', 'N'): atoms[j] = 0
