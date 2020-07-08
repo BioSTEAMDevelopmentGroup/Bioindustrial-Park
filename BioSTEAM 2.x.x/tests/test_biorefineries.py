@@ -21,17 +21,17 @@ def test_lipidcane():
     >>> test_lipidcane()
     
     """
-    from biorefineries.lipidcane.system import lipidcane_tea
+    from biorefineries.lipidcane import lipidcane_tea
     units = UnitGroup('Biorefinery', lipidcane_tea.units)
-    assert np.allclose(lipidcane_tea.IRR, 0.1777740209105262)
-    assert np.allclose(lipidcane_tea.sales, 102751539.14512987)
-    assert np.allclose(lipidcane_tea.material_cost, 62073249.769924864)
-    assert np.allclose(lipidcane_tea.installed_cost, 139776480.90494874)
-    assert np.allclose(lipidcane_tea.utility_cost, -25737178.078972895)
-    assert np.allclose(units.get_heating_duty(), 199.5814871059657)
-    assert np.allclose(units.get_cooling_duty(), 306.64848667499194)
-    assert np.allclose(units.get_electricity_consumption(), 9.708269935954073)
-    assert np.allclose(units.get_electricity_production(), 92.19922531727745)
+    assert np.allclose(lipidcane_tea.IRR, 0.18041682194921727)
+    assert np.allclose(lipidcane_tea.sales, 102753153.57737921)
+    assert np.allclose(lipidcane_tea.material_cost, 61370018.82006217)
+    assert np.allclose(lipidcane_tea.installed_cost, 139560995.69892246)
+    assert np.allclose(lipidcane_tea.utility_cost, -25857974.57909109)
+    assert np.allclose(units.get_heating_duty(), 198.1798177608488)
+    assert np.allclose(units.get_cooling_duty(), 304.18641844970176)
+    assert np.allclose(units.get_electricity_consumption(), 9.644005368832351)
+    assert np.allclose(units.get_electricity_production(), 92.52212901976533)
     
 def test_cornstover():
     """
@@ -45,15 +45,15 @@ def test_cornstover():
     from biorefineries.cornstover import cornstover_tea, ethanol
     MESP = cornstover_tea.solve_price(ethanol)
     units = UnitGroup('Biorefinery', cornstover_tea.units)
-    assert np.allclose(MESP, 0.7127573892429486)
-    assert np.allclose(cornstover_tea.sales, 130722340.25312951)
-    assert np.allclose(cornstover_tea.material_cost, 80542496.40653823)
-    assert np.allclose(cornstover_tea.installed_cost, 204437262.02031183)
-    assert np.allclose(cornstover_tea.utility_cost, -15306742.335879013)
-    assert np.allclose(units.get_heating_duty(), 305.00593360849587)
-    assert np.allclose(units.get_cooling_duty(), 318.85012928383793)
-    assert np.allclose(units.get_electricity_consumption(), 18.40075443477195)
-    assert np.allclose(units.get_electricity_production(), 50.22157712400753)
+    assert np.allclose(MESP, 0.7682887568365216)
+    assert np.allclose(cornstover_tea.sales, 140671775.0510175)
+    assert np.allclose(cornstover_tea.material_cost, 81524094.91850491)
+    assert np.allclose(cornstover_tea.installed_cost, 220430531.70399356)
+    assert np.allclose(cornstover_tea.utility_cost, -11054921.042512082)
+    assert np.allclose(units.get_heating_duty(), 318.0490631730075)
+    assert np.allclose(units.get_cooling_duty(), 364.9938841327776)
+    assert np.allclose(units.get_electricity_consumption(), 22.36637203703606)
+    assert np.allclose(units.get_electricity_production(), 45.3481845362712)
     
 if __name__ == '__main__':
     test_lipidcane()

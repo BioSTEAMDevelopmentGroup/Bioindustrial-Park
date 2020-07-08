@@ -1,21 +1,21 @@
 # -*- coding: utf-8 -*-
-"""
-Created on Sat Nov 18 16:17:00 2017
-
-@author: Yoel Cortes-Pena
-"""
+# BioSTEAM: The Biorefinery Simulation and Techno-Economic Analysis Modules
+# Copyright (C) 2020, Yoel Cortes-Pena <yoelcortes@gmail.com>
+# 
+# This module is under the UIUC open-source license. See 
+# github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
+# for license details.
 from setuptools import setup
 
 setup(
     name='biorefineries',
     packages=['biorefineries'],
     license='MIT',
-    version='2.14.7',
+    version='2.15.1',
     description="Biorefinery models in BioSTEAM",
     long_description=open('README.rst').read(),
     author='Yoel Cortes-Pena',
-    install_requires=['biosteam>=2.19.30',
-                      'lazypkg==1.4'],
+    install_requires=['biosteam>=2.20.1'],
     python_requires=">=3.6",
     package_data=
         {'biorefineries': ['biorefineries/*',
