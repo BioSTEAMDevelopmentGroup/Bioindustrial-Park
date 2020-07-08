@@ -14,13 +14,11 @@ with modification of fermentation system for organic acids instead of the origin
 @author: yalinli_cabbi
 """
 
-'''
-TODO:
-    Double-check chemical properties and make sure they are in good range
-'''
+# %%  
 
-
-# %%  Setup
+# =============================================================================
+# Setup
+# =============================================================================
 
 import thermosteam as tmo
 from thermosteam import functional as fn
@@ -61,14 +59,21 @@ def chemical_defined(ID, **kwargs):
 _cal2joule = 4.184
 
 
-# %% Create chemical objects available in database
+# %% 
+
+# =============================================================================
+# Create chemical objects available in database
 # Some common names might not be pointing to the correct chemical,
 # therefore more accurate ones were used (e.g. NitricOxide was used instead of NO),
 # data from Humbird et al. unless otherwise noted
+# =============================================================================
 
 H2O = chemical_database('H2O')
 
-'''Gases'''
+# =============================================================================
+# Gases
+# =============================================================================
+
 O2 = chemical_database('O2', phase='g', Hf=0)
 N2 = chemical_database('N2', phase='g', Hf=0)
 CH4 = chemical_database('CH4', phase='g')
@@ -81,7 +86,10 @@ NO2 = chemical_database('NO2', phase='g')
 H2S = chemical_database('H2S', phase='g', Hf=-4927*_cal2joule)
 SO2 = chemical_database('SO2', phase='g')
 
-'''Soluble inorganics'''
+# =============================================================================
+# Soluble inorganics
+# =============================================================================
+
 H2SO4 = chemical_database('H2SO4', phase='l')
 HNO3 = chemical_database('HNO3', phase='l', Hf=-41406*_cal2joule)
 NaOH = chemical_database('NaOH', phase='l')
@@ -100,13 +108,14 @@ CaSO4 = chemical_database('CaSO4', phase='s', Hf=-342531*_cal2joule)
 CaSO4.Cn.move_up_model_priority('Constant', 0)
 
 
-'''Soluble organic salts'''
+# =============================================================================
+# Soluble organic salts
+# =============================================================================
+
 Ethanol = chemical_database('Ethanol')
 Acetate = chemical_database('Acetate', phase='l', Hf=-108992*_cal2joule)
 AmmoniumAcetate = chemical_database('AmmoniumAcetate', phase='l', 
                                          Hf=-154701*_cal2joule)
-DAP = chemical_database('DAP', search_ID='DiammoniumPhosphate',
-                             phase='l', Hf= -283996*_cal2joule)
 
 # Hf from a Ph.D. dissertation (Lactic Acid Production from Agribusiness Waste Starch
 # Fermentation with Lactobacillus Amylophilus and Its Cradle-To-Gate Life 
@@ -117,11 +126,19 @@ DAP = chemical_database('DAP', search_ID='DiammoniumPhosphate',
 # which was also cited by other studies, but the origianl source cannot be found online
 CalciumLactate = chemical_database('CalciumLactate', phase='l',
                                    Hf=-1686.1e3)
-
 # Hf from Lange's Handbook of Chemistry, 15th edn., Table 6.3, PDF page 631
-CalciumLactate = chemical_database('CalciumAcetate', phase='l', Hf=-1514.73e3)
+CalciumAcetate = chemical_database('CalciumAcetate', phase='l', Hf=-1514.73e3)
 
-'''Soluble organics'''
+# Solubility of CalciumSuccinate is 3.2 g/L in water as Ca2+ based on 
+# Burgess and Drasdo, Polyhedron 1993, 12 (24), 2905–2911, which is 12.5 g/L as CaSA
+# Baseline CalciumSuccinate is ~14 g/L in fermentation broth, thus assumes all 
+# CalciumSuccinate in liquid phase
+CalciumSuccinate = chemical_database('CalciumSuccinate', phase='l')
+
+# =============================================================================
+# Soluble organics
+# =============================================================================
+
 AceticAcid = chemical_database('AceticAcid')
 Glucose = chemical_database('Glucose')
 # This one is more consistent with others
@@ -192,11 +209,22 @@ Xylitol = chemical_database('Xylitol', phase='l', Hf=-243145*_cal2joule, Hfus=-1
 LacticAcid = chemical_database('LacticAcid')
 LacticAcid.Hfus = 11.34e3
 
+SuccinicAcid = chemical_database('SuccinicAcid', phase_ref='s')
+
 EthylAcetate = chemical_database('EthylAcetate')
 # Hf from DIPPR value in Table 3 of Vatani et al., Int J Mol Sci 2007, 8 (5), 407–432
 EthylLactate = chemical_database('EthylLactate', Hf=-695.08e3)
 
-'''Insoluble organics'''
+EthylSuccinate = chemical_database('EthylSuccinate')
+# Cannot find data on Hf of CalciumSuccinate, estimate here assuming
+# Hrxn for Ca(OH)2 and SA and Ca(OH)2 and LA are the same 
+CalciumSuccinate.Hf = CalciumLactate.Hf + (SuccinicAcid.Hf-2*LacticAcid.Hf)
+
+
+# =============================================================================
+# Insoluble organics
+# =============================================================================
+
 Glucan = chemical_defined('Glucan', phase='s', formula='C6H10O5', Hf=-233200*_cal2joule)
 Glucan.copy_models_from(Glucose, ['Cn'])
 Mannan = chemical_copied('Mannan', Glucan)
@@ -210,7 +238,10 @@ Lignin = chemical_database('Lignin', phase='s')
 # Hf scaled based on vanillin
 Lignin.Hf = -108248*_cal2joule/tmo.Chemical('Vanillin').MW*Lignin.MW
 
-'''Insoluble inorganics'''
+# =============================================================================
+# Insoluble inorganics
+# =============================================================================
+
 # Holmes, Trans. Faraday Soc. 1962, 58 (0), 1916–1925, abstract
 # This is for auto-population of combustion reactions
 P4O10 = chemical_database('P4O10', phase='s', Hf=-713.2*_cal2joule)
@@ -220,7 +251,10 @@ Ash = chemical_database('Ash', search_ID='CaO', phase='s', Hf=-151688*_cal2joule
 # cannot directly use Xylose as Xylose is locked at liquid state now
 Tar = chemical_copied('Tar', Xylose, phase_ref='s')
 
-'''Mixtures'''
+# =============================================================================
+# Mixtures
+# =============================================================================
+
 # CSL is modeled as 50% water, 25% protein, and 25% lactic acid in Humbird et al.,
 # did not model separately as only one price is given
 CSL = chemical_defined('CSL', phase='l', formula='CH2.8925O1.3275N0.0725S0.00175', 
@@ -228,14 +262,23 @@ CSL = chemical_defined('CSL', phase='l', formula='CH2.8925O1.3275N0.0725S0.00175
 
 # Boiler chemicals includes amine, ammonia, and phosphate,
 # did not model separately as composition unavailable and only one price is given
-BoilerChemicals = chemical_copied('BoilerChemicals', DAP)
+BoilerChems = chemical_database('BoilerChems', search_ID='DiammoniumPhosphate',
+                                phase='l', Hf=0, HHV=0, LHV=0)
 
-'''Filler chemicals'''
+# =============================================================================
+# Filler
+# =============================================================================
+
 BaghouseBag = chemical_defined('BaghouseBag', phase='s', MW=1, Hf=0, HHV=0, LHV=0)
 BaghouseBag.Cn.add_model(0)
-CIPchems = chemical_copied('CIPchems', BaghouseBag)
+CoolingTowerChems = chemical_copied('CoolingTowerChems', BaghouseBag)
 
-'''Might not needed'''
+# =============================================================================
+# Not currently in use
+# =============================================================================
+
+DAP = chemical_database('DAP', search_ID='DiammoniumPhosphate',
+                             phase='l', Hf= -283996*_cal2joule)
 Methanol = chemical_database('Methanol')
 MethylAcetate = chemical_database('MethylAcetate')
 Denaturant = chemical_database('Denaturant', search_ID='n-Heptane')
@@ -243,11 +286,14 @@ DenaturedEnzyme = chemical_copied('DenaturedEnzyme', Enzyme)
 
 # Hf from DIPPR value in Table 3 of Vatani et al., Int J Mol Sci 2007, 8 (5), 407–432
 MethylLactate = chemical_database('MethylLactate', Hf=-643.1e3)
-
 FermMicrobeXyl = chemical_copied('FermMicrobeXyl', FermMicrobe)
 
 
-# %% Group chemicals
+# %% 
+
+# =============================================================================
+# Group chemicals
+# =============================================================================
 
 chemical_groups = dict(
     OtherSugars = ('Arabinose', 'Mannose', 'Galactose', 'Cellobiose', 'Sucrose'),
@@ -255,13 +301,14 @@ chemical_groups = dict(
                       'ArabinoseOligomer', 'MannoseOligomer'),
     OrganicSolubleSolids = ('AmmoniumAcetate', 'SolubleLignin', 'Extract', 'CSL',
                             'LacticAcid', 'CalciumLactate', 'CalciumAcetate',
-                            'Methanol', 'MethylLactate', 'MethylAcetate',
-                            'EthylLactate', 'EthylAcetate'),
+                            'EthylLactate', 'EthylAcetate', 'SuccinicAcid',
+                            'CalciumSuccinate', 'EthylSuccinate', 
+                            'Methanol', 'MethylLactate', 'MethylAcetate'),
     InorganicSolubleSolids = ('AmmoniumSulfate', 'DAP', 'NaOH', 'HNO3', 'NaNO3',
-                              'BoilerChemicals', 'Na2SO4', 'AmmoniumHydroxide'),
+                              'BoilerChems', 'Na2SO4', 'AmmoniumHydroxide'),
     Furfurals = ('Furfural', 'HMF'),
     OtherOrganics = ('Denaturant', 'Xylitol'),
-    COxSOxNOxH2S = ('NitricOxide', 'NO2', 'SO2', 'CarbonMonoxide', 'H2S'),
+    COSOxNOxH2S = ('NitricOxide', 'NO2', 'SO2', 'CarbonMonoxide', 'H2S'),
     Proteins = ('Protein', 'Enzyme', 'DenaturedEnzyme'),
     CellMass = ('WWTsludge', 'FermMicrobe', 'FermMicrobeXyl'),
     # Theoretically P4O10 should be soluble, but it's the product of the
@@ -269,7 +316,7 @@ chemical_groups = dict(
     # P4O10 will be generated in the system as no P-containing chemicals 
     # are included in "combustibles"
     OtherInsolubleSolids = ('Tar', 'Ash', 'CalciumDihydroxide', 'CaSO4', 'P4O10',
-                            'BaghouseBag', 'CIPchems'),
+                            'BaghouseBag', 'CoolingTowerChems'),
     OtherStructuralCarbohydrates = ('Glucan', 'Xylan', 'Lignin', 'Arabinan', 
                                     'Mannan', 'Galactan'),
     SeparatelyListedOrganics = ('Ethanol', 'Glucose', 'Xylose', 'AceticAcid',
@@ -298,9 +345,16 @@ combustibles.extend(['WWTsludge','NH3', 'NitricOxide', 'CarbonMonoxide', 'H2S', 
 # Chemicals that will be modeled in Distallation/Flash units,
 # list is in ascending order of Tb,
 # Xylitol is not included due to high Tm and Tb thus will stay in liquid phase
+
+
+# phase_change_chemicals = ['Methanol', 'Ethanol', 'H2O', 'EthylAcetate', 'Denaturant',
+#                           'AceticAcid', 'MethylAcetate', 'MethylLactate',
+#                           'EthylLactate', 'Furfural', 'SuccinicAcid', 'LacticAcid', 'HMF']
+
 phase_change_chemicals = ['Methanol', 'Ethanol', 'H2O', 'EthylAcetate', 'Denaturant',
                           'AceticAcid', 'MethylAcetate', 'MethylLactate',
-                          'EthylLactate', 'Furfural', 'LacticAcid', 'HMF']
+                          'EthylLactate', 'Furfural', 'EthylSuccinate',
+                          'SuccinicAcid', 'LacticAcid', 'HMF']
 
 for chem in chems:
     if chem.ID in phase_change_chemicals: pass
@@ -317,7 +371,11 @@ for chem in chems:
             chem.at_state('s')
 
 
-# %% Set assumptions/estimations for missing properties
+# %% 
+
+# =============================================================================
+# Set assumptions/estimations for missing properties
+# =============================================================================
 
 # Set chemical heat capacity
 # Cp of biomass (1.25 J/g/K) from Leow et al., Green Chemistry 2015, 17 (6), 3584–3599
@@ -347,7 +405,7 @@ for chemical in chems:
 for chemical in chems: chemical.default()
 
 
-# %% Set synonyms
+# %%
 
 # Though set_thermo will first compile the Chemicals object,
 # compile beforehand is easier to debug because of the helpful error message
@@ -368,72 +426,8 @@ chems.set_synonym('Na2SO4', 'SodiumSulfate')
 chems.set_synonym('AmmoniumHydroxide', 'NH4OH')
 
 
-# %% Output chemical properties for checking
+# %%
 
-# import pandas as pd
-
-# ids = chems.ids
-# formulas = []
-# mws = []
-# hhvs = []
-# lhvs = []
-# hfs = []
-# phases = []
-# tbs = []
-# psats = []
-# vs = []
-# cns = []
-# mus = []
-# kappas = []
-# for chemical in chems:
-#     formulas.append(chemical.formula)
-#     mws.append(chemical.mw)
-#     hhvs.append(chemical.hhv)
-#     lhvs.append(chemical.lhv)
-#     hfs.append(chemical.hf)
-#     if chemical.locked_state:
-#         phases.append(chemical.phase_ref)
-#         tbs.append('na')
-#         try: psats.append(chemical.psat(t=400, p=101325))
-#         except: psats.append('')
-#         try: vs.append(chemical.v(t=400, p=101325))
-#         except: vs.append('')
-#         try: cns.append(chemical.cn(t=400))
-#         except: cns.append('')
-#         try: mus.append(chemical.mu(t=400, p=101325))
-#         except: mus.append('')
-#         try: kappas.append(chemical.kappa(t=400, p=101325))
-#         except: kappas.append('')
-#     else:
-#         ref_phase = chemical.get_phase(t=400, p=101325)
-#         phases.append(f'variable, ref={ref_phase}')
-#         tbs.append(chemical.tb)
-#         try: psats.append(chemical.psat(ref_phase, t=400, p=101325))
-#         except: psats.append('')
-#         try: vs.append(chemical.v(ref_phase, t=400, p=101325))
-#         except: vs.append('')
-#         try: cns.append(chemical.cn(ref_phase, t=400))
-#         except: cns.append('')
-#         try: mus.append(chemical.mu(ref_phase, t=400, p=101325))
-#         except: mus.append('')
-#         try: kappas.append(chemical.kappa(ref_phase, t=400, p=101325))
-#         except: kappas.append('')
-
-# properties = pd.dataframe(
-#     {'id': chems.ids,
-#       'formula': formulas,
-#       'mw': mws,
-#       'hhv': hhvs,
-#       'lhv': lhvs,
-#       'hf': hfs,
-#       'phase': phases,
-#       'boiling point': tbs,
-#       'psat': psats,
-#       'v': vs,
-#       'cn': cns,
-#       'mu': mus,
-#       'kappa': kappas}
-#     )
-
-# properties.to_excel('chemical_properties2.xlsx', sheet_name='properties')
+# from orgacids.utils import get_chemical_properties	
+# get_chemical_properties(chems, 400, 101325, output=True)
 

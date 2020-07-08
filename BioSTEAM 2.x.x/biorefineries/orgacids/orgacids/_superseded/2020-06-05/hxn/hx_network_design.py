@@ -4,8 +4,12 @@ Created on Sat May  2 16:44:24 2020
 
 @author: sarangbhagwat
 """
+
+
 # import numpy as np
 import copy
+
+__all__ = ('Temperature_Interval_Method', 'Design_Network')
 
 
 def Temperature_Interval_Method(Flow_vector, T_in_vector, T_out_vector, VF_in_vector, VF_out_vector, Cp_vector, LH_vector, min_app_T = 10, duties = None):
@@ -175,6 +179,7 @@ def Design_Network(Flow_vector, T_in_vector, T_out_vector, VF_in_vector, VF_out_
         
     candidate_hot_streams = copy.deepcopy(hot_indices)
     candidate_cold_streams = copy.deepcopy(cold_indices)
+    
     
     T_transient_hot_side = copy.deepcopy(pinch_temperatures)
     
