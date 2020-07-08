@@ -10,19 +10,26 @@ Humbird, D., Davis, R., Tao, L., Kinchin, C., Hsu, D., Aden, A., Dudgeon, D. (20
 """
 import os
 import sys
+import flexsolve as flx
+from thermosteam import MultiStream
+from biosteam import Unit
+from biosteam.units.decorators import cost, design
+from biosteam.units.design_tools import size_batch
+import thermosteam as tmo
+import biosteam as bst
+
+Rxn = tmo.reaction.Reaction
+ParallelRxn = tmo.reaction.ParallelReaction
+
+# %% Add excel unit operations
+
 from biosteam.units.factories import xl2mod
 path = os.path.join(os.path.dirname(os.path.realpath(__file__)), '_humbird2011.xlsx')
 xl2mod(path, sys.modules[__name__])
 del sys, xl2mod, os, path
-import flexsolve as flx
-from thermosteam import MultiStream
-from biosteam import Unit
-from biosteam.units.decorators import cost
-from biosteam.units.design_tools import size_batch
-import thermosteam as tmo
-import biosteam as bst
-Rxn = tmo.reaction.Reaction
-ParallelRxn = tmo.reaction.ParallelReaction
+
+# %% Constants
+
 _gal2m3 = 0.003785
 _gpm2m3hr = 0.227124
 # _m3hr2gpm = 4.40287
@@ -46,8 +53,8 @@ class SteamMixer(Unit):
     _N_outs = 1
     _N_ins = 2
     _N_heat_utilities = 1
-    def __init__(self, ID='', ins=None, outs=(), *, P):
-        super().__init__(ID, ins, outs)
+    def __init__(self, ID='', ins=None, outs=(), thermo=None, *, P):
+        super().__init__(ID, ins, outs, thermo)
         self.P = P
     
     @staticmethod
@@ -55,7 +62,7 @@ class SteamMixer(Unit):
         steam.imol['7732-18-5'] = mol_water
         mixed.mol[:] = steam.mol + feed.mol
         mixed.H = feed.H + steam.H
-        P_new = mixed.chemicals.Water.Psat(mixed.T)
+        P_new = mixed.chemicals.Water.Psat(min(mixed.T, mixed.chemicals.Water.Tc - 1))
         return P - P_new
     
     def _run(self):
@@ -65,7 +72,8 @@ class SteamMixer(Unit):
         steam_mol = flx.aitken_secant(self._P_at_flow,
                                       steam_mol, steam_mol+0.1, 
                                       1e-4, 1e-4,
-                                      args=(self.P, steam, mixed, feed))
+                                      args=(self.P, steam, mixed, feed),
+                                      checkroot=False)
         mixed.P = self.P
         hu = self.heat_utilities[0]
         hu(steam.H, mixed.T)
@@ -77,9 +85,12 @@ class SteamMixer(Unit):
     def _design(self): pass
     def _cost(self): pass
         
+@cost('Flow rate', 'Pump', units='kg/hr',
+      S=402194, CE=522, cost=22500, n=0.8, kW=74.57, BM=2.3)
+class HydrolysatePump(Unit): pass
 
-@cost('Dry flow rate', units='kg/hr', S=83333, CE=522,
-      cost=19812400, n=0.6, kW=4578, BM=1.5)
+@cost('Dry flow rate', 'Pretreatment reactor system', units='kg/hr',
+      S=83333, CE=522, cost=19812400, n=0.6, kW=4578, BM=1.5)
 class PretreatmentReactorSystem(Unit):
     _N_ins = 1
     _N_outs = 2
@@ -113,10 +124,9 @@ class PretreatmentReactorSystem(Unit):
         feed = self.ins[0]
         vapor, liquid = self.outs
         liquid.copy_like(feed)
-        self.reactions(liquid.mol) 
+        self.reactions.adiabatic_reaction(liquid) 
         ms.copy_like(liquid)
-        H = ms.H + liquid.Hf - feed.Hf
-        ms.vle(T=130+273.15, H=H)
+        ms.vle(T=130+273.15, H=ms.H)
         vapor.mol[:] = ms.imol['g']
         liquid.mol[:] = ms.imol['l']
         vapor.T = liquid.T = ms.T
@@ -141,6 +151,8 @@ class PretreatmentReactorSystem(Unit):
       cost=43e3/2, S=200e3*_gal2m3, kW=10, CE=522, n=0.5, BM=1.5)
 class SeedTrain(Unit):
     _N_heat_utilities = 1
+    _N_ins = 1
+    _N_outs = 2
     
     _units= {'Flow rate': 'kg/hr',
              'Stage #1 reactor volume': 'm3',
@@ -179,12 +191,12 @@ class SeedTrain(Unit):
         self.reactions = ParallelRxn([
     #   Reaction definition                             Reactant    Conversion
     Rxn('Glucose -> 2 Ethanol + 2 CO2',                 'Glucose',   0.9000),
-    Rxn('Glucose + 8.463 CSL + 0.018 DAP -> 6 Z_mobilis + 2.4 H2O',
+    Rxn('Glucose + 0.047 CSL + 0.018 DAP -> 6 Z_mobilis + 2.4 H2O',
                                                         'Glucose',   0.0400),
     Rxn('Glucose + 2 H2O -> 2 Glycerol + O2',           'Glucose',   0.0040),
     Rxn('Glucose + 2 CO2 -> 2 SuccinicAcid + O2',       'Glucose',   0.0060),
     Rxn('3 Xylose -> 5 Ethanol + 5 CO2',                'Xylose',    0.8000),
-    Rxn('Xylose + 7.052 CSL + 0.015 DAP -> 5 Z_mobilis + 2 H2O',
+    Rxn('Xylose + 0.039 CSL + 0.015 DAP -> 5 Z_mobilis + 2 H2O',
                                                         'Xylose',    0.0400),
     Rxn('3 Xylose + 5 H2O -> 5 Glycerol + 2.5 O2',      'Xylose',    0.0030),
     Rxn('Xylose + H2O -> Xylitol + 0.5 O2',             'Xylose',    0.0460),
@@ -349,14 +361,15 @@ class SaccharificationAndCoFermentation(Unit):
         mixture = self.thermo.mixture
         ss = self.saccharified_stream
         mol = ss.mol
-        hu_cooling(mixture.H('l', mol, self.T_fermentation, 101325.)
-                   - mixture.H('l', mol, self.T_saccharification, 101325.),
+        duty = (mixture.H('l', mol, self.T_fermentation, 101325.)
+                - mixture.H('l', mol, self.T_saccharification, 101325.))
+        hu_cooling(duty,
                    self.T_fermentation)
         ei = effluent.chemicals.index('Ethanol')
         ethanol = (sum([i.mol[ei] for i in self.outs])
                    - sum([i.mol[ei] for i in self.ins]))
-        duty = ethanol*-5568
-        hu_fermentation(duty, effluent.T)
+        reactor_duty = ethanol*-5568
+        hu_fermentation(reactor_duty, effluent.T)
         Design['Reactor duty'] = -duty
         
    
@@ -516,126 +529,3 @@ class CIPpackage(bst.Facility):
     _N_outs = 1
     
         
-    
-# # %% Decorators 
-
-# _massflow_units = {'Flow rate': 'kg/hr'}
-# def _design_kg_hr(self):
-#     self._results['Design']['Flow rate'] = self._ins[0].F_mass
-
-# def cost_kg_hr(name=None, *, cost, exp, S, kW=0, CE=CE[2009], N=1):
-#     def decorator(cls):
-#         cls._design = _design_kg_hr
-#         cls._units = _massflow_units
-#         return decorators.cost('Flow rate', cost=cost, exp=exp,
-#                                CE=CE, S=S, kW=kW, N=N)(cls)
-#     return decorator
-
-# def _design_Gcal_hr(self):
-#     duty = self._outs[0].H - self._ins[0].H
-#     self.heat_utilities[0](duty, self.ins[0].T, self._kwargs['T'])
-#     self._results['Design']['Duty'] = duty*2.39e-7  # Gcal/hr
-
-# _heatflow_units = {'Duty': 'Gcal/hr'}
-# def heat_utility(name=None, *, cost, S, exp=0.7, kW=0, N=1, CE=CE[2009], BM=2.2):
-#     """Decorate class as a heat exchanger."""
-#     def decorator(cls):
-#         cls.BM = BM
-#         cls._graphics = units.HXutility._graphics
-#         cls._linkedstreams = True
-#         cls._N_heat_utilities = 1
-#         cls._units = _heatflow_units
-#         cls._design = _design_Gcal_hr
-#         return decorators.cost('Duty', name, cost=cost, exp=exp,
-#                                CE=CE, S=S, kW=kW, N=N)(cls)
-#     return decorator
-    
-
-# # %% Units
-
-# @cost_kg_hr(cost=13329690, exp=0.6, S=94697, kW=511.321)
-# class FeedStockHandling(Unit):
-#     """All area 100 equipment:
-#         * C101 Transfer Conveyor (2)
-#         * C102 High Angle Transfer Converyor (2)  
-#         * C103 Reversing Load-in Conveyor
-#         * C104 Dome Reclaim System (2)
-#         * C106 High Angle Transfer Conveyor
-#         * C107 Elevated Transfer Conveyor
-#         * M101 Truck Scale (2)
-#         * M102 Truck Dumper (2)
-#         * M103 Truck Dumper Hopper (2)
-#         * M104 Concrete Feedstock Storage Dome (2)
-#         * M105 Belt Scale (2)
-#         * M106 Dust Collection System (6)
-#     """
-#     _linkedstreams = True
-#     BM = 1.7
-    
-# @cost_kg_hr(cost=6000, exp=0.5, S=136260)
-# class SulfuricAcidMixer(Unit):
-#     """A-201"""
-#     _linkedstreams = True
-#     BM = 1.0
-    
-# @cost_kg_hr(cost=19812400, exp=0.6, S=83333, kW=5290)
-# class PretreatmentReactorSystem(Unit):
-#     """Includes the following:
-#         * C201 Transfer Conveyor (2)
-#         * C202 Distribution Conveyor (2)
-#         * C203 Overfeed Conveyor (4)
-#         * C204 Pressurized Heating Screw
-#         * C205 Pressurized Pre-heater Discharge (2)
-#         * C206 Pressurized Transport #1
-#         * C207 Pressurized Transport #2
-#         * M201 Doffing Roll Storage Bings (2)
-#         * M202 Pin Drum Feeder (2)
-#         * M203 Plug Screw Feeder (2)
-#         * M204 Prehydrolysis / Vertical Preheater
-#         * M205 Pin Drum Feeder (2)
-#         * M206 Plug Screw Feeder  (2)
-#         * M207 Pretreatment Reactor (3)
-#     """
-#     _linkedstreams = True
-#     BM = 1.5
-#     def _init(self):
-#         self._water_mass = Stream.indices('Water')
-    
-#     def _design(self):
-#         feed = self._ins[0]
-#         self._results['Design']['Flow rate'] = feed.F_mass - feed.mass[self._water_index]
-        
-
-# @heat_utility(cost=92e3, CE=CE[2010], S=-8, exp=0.70)
-# class PretreatmentWaterHeater(Unit):
-#     """H201"""
-#     _kwargs = {'T': None}
-    
-#     def _run(self):
-#         out = self._outs[0]
-#         out.P = self._ins[0].P
-#         out.T = self._kwargs['T']
-    
-    
-# @heat_utility(cost=34e3, S=2, exp=0.70)
-# class WasteVaporCondenser(Unit):
-#     """H244"""
-#     _kwargs = {'T': None}
-#     def _setup(self):
-#         self._outs[0].phase = 'l'
-    
-#     def _run(self):
-#         feed = self._ins[0]
-#         out = self._outs[0]
-#         out.P = feed.P
-#         out.T = self._kwargs['T'] or feed.T
-
-# @decorators.cost('Flow rate', 'Discharge pump', kW=75*hp2kW, CE=CE[2009], cost=30e3, exp=0.80)
-# @cost_kg_hr('Agitators', N=3, cost=90e3/3, S=252891, exp=0.5)
-# class Flash204(units.Flash):
-#     """Includes:
-#         * Discharge pump
-#         * Agitator
-#     """
-#     BM = {'Discharge pump': 1.5,
-#           'Agitators': 2.3}

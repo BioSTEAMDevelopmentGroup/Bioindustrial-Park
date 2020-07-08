@@ -6,20 +6,19 @@ Created on Tue Aug 13 21:43:56 2019
 """
 from biosteam.evaluation import evaluation_tools as tools
 from biosteam.evaluation import Model, Metric
-from biorefineries.cornstover.system import \
-    cornstover_sys, ethanol_tea, cornstover_tea, \
+from biorefineries.cornstover import \
+    cornstover_sys, cornstover_tea, \
     ethanol, cornstover, R301, ethanol_density_kggal, \
-    areas, BT, Area700
+    areas, BT, Area700, AllAreas
 
 cornstover_sys.simulate()
-get_MESP = lambda: cornstover_tea.solve_price(ethanol, ethanol_tea) * ethanol_density_kggal
-get_FCI = lambda: sum([i._FCI_cached for i in cornstover_tea.TEAs])
-get_coproduct_credit = lambda: sum([i._utility_cost_cached for i in cornstover_tea.TEAs])
+get_MESP = lambda: cornstover_tea.solve_price(ethanol) * ethanol_density_kggal
+get_FCI = lambda: cornstover_tea.FCI
+get_coproduct_credit = lambda: cornstover_tea.utility_cost
 get_ethanol_production = lambda: ethanol.F_mass
 get_steam_demand = lambda: BT.steam_demand.F_mass
-get_electricity_demand = lambda: sum([i.power_utility.rate for i in cornstover_sys.units
-                                      if i.power_utility and i is not BT]) / 1e3
-get_electricity_production = lambda: -BT.power_utility.rate/1e3
+get_electricity_demand = AllAreas.get_electricity_consumption
+get_electricity_production = AllAreas.get_electricity_production
 get_excess_electricity = lambda: get_electricity_production() - get_electricity_demand()
 
 metrics =[Metric('Minimum ethanol selling price', get_MESP, 'USD/gal'),
@@ -31,28 +30,12 @@ metrics =[Metric('Minimum ethanol selling price', get_MESP, 'USD/gal'),
           Metric('Electricity production', get_electricity_production, 'MW'),
           Metric('Total electricity demand', get_electricity_demand, 'MW')]
 
-def electricity_rate_function(tea):
-    if tea is Area700:
-        boiler_item = BT.cost_items['Boiler']
-        Design = BT.design_results
-        return lambda: boiler_item.kW/boiler_item.S * Design['Flow rate']/1e3
-    power_utilities = [i.power_utility for i in tea.units]
-    return lambda: sum([i.rate for i in power_utilities])/1e3
-
-def cooling_duty_function(tea):
-    heat_utilities = sum([i.heat_utilities for i in tea.units], ())
-    cooling_utilities = [i for i in heat_utilities if i.duty < 0]
-    return lambda: sum([i.duty for i in cooling_utilities])
-
-def installation_cost_function(tea):
-    return lambda: tea.installation_cost
-
-for i, tea in enumerate(areas, 1):
+for i, area in enumerate(areas, 1):
     Area = f'Area {i}00'
     metrics.extend(
-        (Metric('Electricity', electricity_rate_function(tea), 'MW', Area),
-         Metric('Cooling duty', cooling_duty_function(tea), 'MMkcal/hr', Area),
-         Metric('Installation cost', installation_cost_function(tea), '10^6 USD', Area)))
+        (Metric('Electricity', area.get_electricity_consumption, 'MW', Area),
+         Metric('Cooling duty', area.get_cooling_duty, 'GJ/hr', Area),
+         Metric('Installed equipment cost', area.get_installed_cost, '10^6 USD', Area)))
 
 cornstover_model = Model(cornstover_sys, metrics)
 cornstover_model.load_default_parameters(cornstover, operating_days=False)

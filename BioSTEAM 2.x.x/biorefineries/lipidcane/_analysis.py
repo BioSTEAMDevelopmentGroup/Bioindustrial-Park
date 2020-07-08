@@ -1,20 +1,22 @@
 # -*- coding: utf-8 -*-
+# BioSTEAM: The Biorefinery Simulation and Techno-Economic Analysis Modules
+# Copyright (C) 2020, Yoel Cortes-Pena <yoelcortes@gmail.com>
+# 
+# This module is under the UIUC open-source license. See 
+# github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
+# for license details.
 """
-Created on Sun Sep  1 04:37:16 2019
-
-@author: yoelr
 """
 import numpy as np
 import biorefineries.lipidcane as lc
 import biorefineries.sugarcane as sc
+from biorefineries.lipidcane.model import (lipidcane_model as model_lc,
+                                           lipidcane_model_with_lipidfraction_parameter as model_lc_lf)
+from biorefineries.sugarcane.model import sugarcane_model as model_sc
 
 def run_uncertainty(N_spearman_samples = 5000,
                     N_coordinate_samples = 1000,
                     N_coordinates = 20):
-    
-    model_lc = lc.model.lipidcane_model
-    model_sc = sc.model.sugarcane_model
-    model_lc_lf = lc.model.lipidcane_model_with_lipidfraction_parameter
     np.random.seed(1234)
     rule = 'L'
     
@@ -43,8 +45,6 @@ def run_uncertainty(N_spearman_samples = 5000,
         spearman.to_excel("Spearman correlation lipidcane.xlsx")
 
 def run_without_uncertainty(N_coordinates = 40):
-    model_lc = lc.model.lipidcane_model
-    model_sc = sc.model.sugarcane_model
     coordinate = np.linspace(0.15, 0.01, N_coordinates)
     
     # Lipid cane

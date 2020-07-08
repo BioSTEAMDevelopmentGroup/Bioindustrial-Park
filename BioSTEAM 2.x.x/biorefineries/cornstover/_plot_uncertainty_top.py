@@ -11,8 +11,8 @@ import matplotlib.pyplot as plt
 from matplotlib.patches import Patch
 from matplotlib.lines import Line2D
 from biosteam.utils import colors
-from biosteam.evaluation.evaluation_tools import plot_single_points, plot_horizontal_line, \
-                                                 plot_montecarlo, plot_vertical_line
+from biosteam.plots import (plot_single_points, plot_horizontal_line,
+                           plot_montecarlo, plot_vertical_line)
 
 data = pd.read_excel('Monte Carlo cornstover.xlsx', header=[0, 1])
 
@@ -79,19 +79,19 @@ bx_electricity = plot_montecarlo(electricity_data_humbird_normalized,
 # plot_vertical_line(7.5, color=colors.orange_tint.shade(15).RGBn, ls='-.')
 # plot_vertical_line(9.5, color=colors.orange_tint.shade(15).RGBn, ls='-.')
 
-# %% Plot installation cost
+# %% Plot installed cost
 
 units = '10^6 USD'
 plot_vertical_line(8.5, color=colors.grey_tint.RGBn)
-positions_installation = tuple(range(9, 16))
-installation_cols = [(i, 'Installation cost [10^6 USD]') for i in areas[1:]]
-humbird_installation = np.array([24.2, 32.9, 31.2, 22.3, 49.4, 5, 66, 6.9])
-installation_data = data[installation_cols]
-# installation_data[('Biorefinery', 'Installation cost')] = installation_data.sum(1)
-installation_data_humbird_normalized = installation_data * (100/humbird_installation[1:]/1e6)
-bx_installation = plot_montecarlo(installation_data_humbird_normalized,
+positions_installed = tuple(range(9, 16))
+installed_cols = [(i, 'Installed equipment cost [10^6 USD]') for i in areas[1:]]
+humbird_installed = np.array([24.2, 32.9, 31.2, 22.3, 49.4, 5, 66, 6.9])
+installed_data = data[installed_cols]
+# installed_data[('Biorefinery', 'Installed cost')] = installed_data.sum(1)
+installed_data_humbird_normalized = installed_data * (100/humbird_installed[1:])
+bx_installed = plot_montecarlo(installed_data_humbird_normalized,
                                   colors.purple_tint.RGBn, colors.purple_shade.RGBn,
-                                  transpose=True, positions=positions_installation)
+                                  transpose=True, positions=positions_installed)
 plot_horizontal_line(100, ls='--')
 u_lb = 0; y_ub = 250
 plt.ylim(0, 250)
@@ -103,7 +103,7 @@ plt.text(4, y_text, "Electricity demand", color=colors.orange_shade.RGBn,
           horizontalalignment='center', fontsize=12, fontweight='bold')
 plt.text(-0.25, y_letter, "C", color=colors.neutral_shade.RGBn,
          horizontalalignment='left', fontsize=16, fontweight='bold')
-plt.text(12, y_text, "Installation cost", color=colors.purple_shade.RGBn,
+plt.text(12, y_text, "Installed cost", color=colors.purple_shade.RGBn,
           horizontalalignment='center', fontsize=12, fontweight='bold')
 plt.text(8.75, y_letter, "D", color=colors.neutral_shade.RGBn,
          horizontalalignment='left', fontsize=16, fontweight='bold')
@@ -121,7 +121,7 @@ plt.xlim(-0.5, 18.5)
 plt.ylabel("Metric over benchmark [%]")
 area_marks = [i.replace(' ', '\n') for i in areas]
 xmarks = area_marks + ['Excess'] + area_marks[1:] + ['Steam\ndemand', '   EtOH\n    prod.', '  MESP']
-xticks = positions_electricity + positions_installation + positions_other
+xticks = positions_electricity + positions_installed + positions_other
 plt.xticks(xticks, xmarks)
 metric_over_benchmark_ax.set_zorder(1e6)
 
@@ -136,10 +136,10 @@ plt.bar(positions_electricity, electricity_areas, 0.5,
         edgecolor=colors.orange_shade.RGBn)
 plot_vertical_line(8.5, color=colors.grey_tint.RGBn)
 
-installation_areas = humbird_installation[1:]# installation_data.median()
-installation_areas /= max(installation_areas)
-plt.bar(positions_installation, installation_areas, 0.5,
-        align='center', label="Installation cost",
+installed_areas = humbird_installed[1:]# installed_data.median()
+installed_areas /= max(installed_areas)
+plt.bar(positions_installed, installed_areas, 0.5,
+        align='center', label="Installed equipment cost",
         color=colors.purple.tint(30).shade(15).RGBn,
         edgecolor=colors.purple_shade.RGBn)
 
@@ -188,7 +188,7 @@ xlabels = metric_over_benchmark_ax.get_xticklabels()
 
 # leg1 = ax.legend([bx_economic['boxes'][0]], ['MESP'], loc="upper left")
 # leg2 = ax.legend([bx_electricity['boxes'][0]], ['Electricity'], loc="upper center")
-# leg3 = ax.legend([bx_installation['boxes'][0]], ['Installation'], loc="upper right")
+# leg3 = ax.legend([bx_installed['boxes'][0]], ['Installation'], loc="upper right")
 # ax.add_artist(leg2)
 # ax.add_artist(leg1)
 

@@ -1,2 +1,1 @@
-biosteam>=2.17.6
-lazypkg==1.4
+biosteam>=2.20.2

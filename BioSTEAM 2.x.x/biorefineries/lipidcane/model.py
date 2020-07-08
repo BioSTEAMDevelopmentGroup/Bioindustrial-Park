@@ -1,8 +1,11 @@
 # -*- coding: utf-8 -*-
+# BioSTEAM: The Biorefinery Simulation and Techno-Economic Analysis Modules
+# Copyright (C) 2020, Yoel Cortes-Pena <yoelcortes@gmail.com>
+# 
+# This module is under the UIUC open-source license. See 
+# github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
+# for license details.
 """
-Created on Sun May 26 11:21:31 2019
-
-@author: yoelr
 """
 from biosteam.evaluation import Model, Metric
 from biosteam.evaluation.evaluation_tools import triang
@@ -12,9 +15,9 @@ import numpy as np
 __all__ = ('lipidcane_model', 'lipidcane_model_with_lipidfraction_parameter')
 
 tea = lc.lipidcane_tea
-ethanol = lc.system.ethanol
-biodiesel = lc.system.biodiesel
-lipid_cane = lc.system.lipid_cane
+ethanol = lc.ethanol
+biodiesel = lc.biodiesel
+lipidcane = lc.lipidcane
 
 etoh_prodcost = [0]
 products = (biodiesel, ethanol)
@@ -33,7 +36,7 @@ def get_biodiesel_prod():
 def get_etoh_prod():
     return etoh_prod[0]
 
-BT = lc.system.BT
+BT = lc.BT
 lc_sys = lc.lipidcane_sys
 def get_steam():
     return sum([i.flow for i in BT.steam_utilities])*18.01528*tea._annual_factor/1000
@@ -62,11 +65,11 @@ metrics = (Metric('Internal rate of return', lc.lipidcane_tea.solve_IRR),
            Metric('Excess electricity', get_excess_electricity, 'MWhr/yr'))
 
 lipidcane_model = Model(lc_sys, metrics)
-lipidcane_model.load_default_parameters(lipid_cane)
+lipidcane_model.load_default_parameters(lipidcane)
 param = lipidcane_model.parameter
 
 # Lipid extraction rate
-Mill = lc.system.U201
+Mill = lc.U201
 baseline = Mill.isplit['Lipid']
 @param(element=Mill,
        distribution=triang(baseline),
@@ -76,14 +79,14 @@ def set_lipid_extraction_rate(lipid_extraction_rate):
     Mill.isplit['Lipid'] = lipid_extraction_rate
     
 # Transesterification efficiency (both tanks)
-R401 = lc.system.R401
+R401 = lc.R401
 baseline = R401.efficiency
 @param(element=R401, distribution=triang(baseline), kind='coupled',
        baseline=baseline)
 def set_transesterification_401_efficiency(efficiency):
     R401.efficiency = efficiency
 
-R402 = lc.system.R402
+R402 = lc.R402
 baseline = R402.efficiency
 @param(element=R402, distribution=triang(baseline), kind='coupled',
        baseline=baseline)
@@ -91,7 +94,7 @@ def set_transesterification_402_efficiency(efficiency):
     R402.efficiency = efficiency
 
 # Fermentation efficiency
-fermentation = lc.system.R301
+fermentation = lc.R301
 baseline = fermentation.efficiency
 @param(element=fermentation, distribution=triang(baseline),
        baseline=baseline,
@@ -100,7 +103,7 @@ def set_fermentation_efficiency(efficiency):
     fermentation.efficiency= efficiency
     
 # Boiler efficiency
-BT = lc.system.BT
+BT = lc.BT
 baseline = BT.boiler_efficiency
 @param(element=BT, distribution=triang(baseline),
        baseline=baseline)
@@ -115,7 +118,7 @@ def set_turbogenerator_efficiency(turbo_generator_efficiency):
     BT.turbo_generator_efficiency = turbo_generator_efficiency
     
 # RVF separation
-rvf = lc.system.C202
+rvf = lc.C202
 baseline = rvf.isplit['Lignin']
 @param(element=rvf, distribution=triang(baseline), baseline=baseline,
         kind='coupled')
@@ -124,7 +127,7 @@ def set_rvf_solids_retention(solids_retention):
 
 lipidcane_model_with_lipidfraction_parameter = lipidcane_model.copy()
 lipidcane_model_with_lipidfraction_parameter.parameter(lc.set_lipid_fraction,
-                                                       element=lipid_cane,
+                                                       element=lipidcane,
                                                        name='Lipid fraction',
                                                        baseline=0.05,
                                                        distribution=triang(0.05))
