@@ -11,8 +11,8 @@ import matplotlib.pyplot as plt
 from matplotlib.patches import Patch
 from matplotlib.lines import Line2D
 from biosteam.utils import colors
-from biosteam.evaluation.evaluation_tools import plot_single_points, plot_horizontal_line, \
-                                                 plot_montecarlo, plot_vertical_line
+from biosteam.plots import (plot_single_points, plot_horizontal_line,
+                           plot_montecarlo, plot_vertical_line)
 
 data = pd.read_excel('Monte Carlo cornstover.xlsx', header=[0, 1])
 
@@ -88,7 +88,7 @@ installed_cols = [(i, 'Installed equipment cost [10^6 USD]') for i in areas[1:]]
 humbird_installed = np.array([24.2, 32.9, 31.2, 22.3, 49.4, 5, 66, 6.9])
 installed_data = data[installed_cols]
 # installed_data[('Biorefinery', 'Installed cost')] = installed_data.sum(1)
-installed_data_humbird_normalized = installed_data * (100/humbird_installed[1:]/1e6)
+installed_data_humbird_normalized = installed_data * (100/humbird_installed[1:])
 bx_installed = plot_montecarlo(installed_data_humbird_normalized,
                                   colors.purple_tint.RGBn, colors.purple_shade.RGBn,
                                   transpose=True, positions=positions_installed)

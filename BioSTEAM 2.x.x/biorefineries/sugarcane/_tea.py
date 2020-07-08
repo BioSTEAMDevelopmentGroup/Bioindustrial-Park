@@ -1,16 +1,20 @@
 # -*- coding: utf-8 -*-
+# BioSTEAM: The Biorefinery Simulation and Techno-Economic Analysis Modules
+# Copyright (C) 2020, Yoel Cortes-Pena <yoelcortes@gmail.com>
+# 
+# This module is under the UIUC open-source license. See 
+# github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
+# for license details.
 """
-Created on Thu Aug  1 11:48:19 2019
-
-@author: yoelr
 """
 from biosteam import TEA
 
-__all__ = ('LipidcaneTEA',)
+__all__ = ('ConventionalEthanolTEA', 'create_tea')
 
-class LipidcaneTEA(TEA):
+class ConventionalEthanolTEA(TEA):
     """
-    Create a TEA_lipidcane object for techno-economic analysis of a biorefinery [1]_.
+    Create a ConventionalEthanolTEA object for techno-economic analysis of a
+    biorefinery [1]_.
     
     Parameters
     ----------    
@@ -58,7 +62,6 @@ class LipidcaneTEA(TEA):
         and Biorefining, 10(3), 299–315. https://doi.org/10.1002/bbb.1640
     
     """
-    
     __slots__ = ('labor_cost', 'fringe_benefits', 'maintenance',
                  'property_tax', 'property_insurance', '_FCI_cached',
                  'supplies', 'maintanance', 'administration')
@@ -91,3 +94,13 @@ class LipidcaneTEA(TEA):
         return (FCI*(self.property_tax + self.property_insurance
                      + self.maintenance + self.administration)
                 + self.labor_cost*(1+self.fringe_benefits+self.supplies))
+    
+def create_tea(system):
+    return ConventionalEthanolTEA(system, IRR=0.15,
+                        duration=(2018, 2038),
+                        depreciation='MACRS7', income_tax=0.35,
+                        operating_days=200, lang_factor=3,
+                        construction_schedule=(0.4, 0.6), WC_over_FCI=0.05,
+                        labor_cost=2.5e6, fringe_benefits=0.4,
+                        property_tax=0.001, property_insurance=0.005,
+                        supplies=0.20, maintenance=0.01, administration=0.005)

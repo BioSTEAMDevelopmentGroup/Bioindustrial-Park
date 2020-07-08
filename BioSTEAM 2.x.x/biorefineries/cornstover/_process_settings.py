@@ -1,15 +1,17 @@
 # -*- coding: utf-8 -*-
+# BioSTEAM: The Biorefinery Simulation and Techno-Economic Analysis Modules
+# Copyright (C) 2020, Yoel Cortes-Pena <yoelcortes@gmail.com>
+# 
+# This module is under the UIUC open-source license. See 
+# github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
+# for license details.
 """
-Created on Thu Jun 27 23:12:15 2019
-
-@author: yoelr
 """
 import biosteam as bst
 
-bst.CE = 525
+__all__ = ('load_process_settings', 'ethanol_density_kggal')
 
-
-factor = 1/907.18474 # ton/hr to kg/hr
+factor = 1./907.18474 # ton/hr to kg/hr
 ethanol_density_kgL = 0.789 # kg/L
 liter_per_gallon = 3.78541
 ethanol_cost = 2.15 # USD/gal
@@ -34,14 +36,16 @@ price = {'Ethanol': ethanol_cost/ethanol_density_kggal,
          'Denaturant': 0.756,
          'Enzyme': enzyme_price} 
 
-bst.PowerUtility.price = price['Electricity']
-_ha = bst.HeatUtility.get_heating_agent('low_pressure_steam')
-_ha.heat_transfer_efficiency = 0.85
-_ha.T = 529.2
-_ha.P = 44e5
-_ha.regeneration_price = 0.30626
-_CW = bst.HeatUtility.get_cooling_agent('cooling_water')
-_CW.T = 28 + 273.15
-_CW.T_limit = _CW.T + 9
-_CW.regeneration_price = 0
-bst.HeatUtility.get_cooling_agent('chilled_water').heat_transfer_price = 0
+def load_process_settings():
+    bst.CE = 525.4
+    bst.PowerUtility.price = price['Electricity']
+    _ha = bst.HeatUtility.get_heating_agent('low_pressure_steam')
+    _ha.heat_transfer_efficiency = 0.85
+    _ha.T = 529.2
+    _ha.P = 44e5
+    _ha.regeneration_price = 0.30626
+    _CW = bst.HeatUtility.get_cooling_agent('cooling_water')
+    _CW.T = 28 + 273.15
+    _CW.T_limit = _CW.T + 9
+    _CW.regeneration_price = 0
+    bst.HeatUtility.get_cooling_agent('chilled_water').heat_transfer_price = 0

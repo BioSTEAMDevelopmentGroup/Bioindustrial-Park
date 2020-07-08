@@ -11,13 +11,13 @@ import biorefineries.sugarcane as sc
 __all__ = ('sugarcane_model',)
 
 tea = sc.sugarcane_sys.TEA
-ethanol = sc.system.ethanol
+ethanol = sc.ethanol
 products = (ethanol,)
 get_prodcost = lambda: float(tea.production_cost(products))
 get_FCI = lambda: tea._FCI_cached
 get_prod = lambda: ethanol.F_mass * tea._annual_factor
 
-BT = sc.system.BT
+BT = sc.BT
 sc_sys = sc.sugarcane_sys
 def get_steam():
     return sum([i.flow for i in BT.steam_utilities])*18.01528*tea._annual_factor/1000
@@ -41,11 +41,11 @@ metrics = (Metric('Internal rate of return', sc.sugarcane_tea.solve_IRR, '%'),
            Metric('Excess electricity', get_excess_electricity, 'MWhr/yr'))
 
 sugarcane_model = Model(sc.sugarcane_sys, metrics, skip=False)
-sugarcane_model.load_default_parameters(sc.system.sugar_cane)
+sugarcane_model.load_default_parameters(sc.sugarcane)
 param = sugarcane_model.parameter
 
 # Fermentation efficiency
-fermentation = sc.system.R301
+fermentation = sc.R301
 @param(element=fermentation, distribution=triang(fermentation.efficiency),
        baseline=fermentation.efficiency,
        kind='coupled')
@@ -53,7 +53,7 @@ def set_fermentation_efficiency(efficiency):
     fermentation.efficiency= efficiency
     
 # Boiler efficiency
-BT = sc.system.BT
+BT = sc.BT
 @param(element=BT, distribution=triang(BT.boiler_efficiency),
        baseline=BT.boiler_efficiency)
 def set_boiler_efficiency(boiler_efficiency):
@@ -66,7 +66,7 @@ def set_turbogenerator_efficiency(turbo_generator_efficiency):
     BT.turbo_generator_efficiency = turbo_generator_efficiency
     
 # RVF separation
-rvf = sc.system.C202
+rvf = sc.C202
 @param(element=rvf, distribution=triang(rvf.isplit['Lignin']),
        baseline=rvf.isplit['Lignin'],
        kind='coupled')

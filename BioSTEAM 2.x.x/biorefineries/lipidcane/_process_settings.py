@@ -6,11 +6,11 @@ Created on Mon Feb  4 10:02:05 2019
 """
 import biosteam as bst
 
-__all__ = ('price',)
+__all__ = ('load_process_settings', 'price',)
 
 # %% Process settings
 
-def set_lipidcane_process_settings():
+def load_process_settings():
     bst.CE = 567 # 2013
     bst.PowerUtility.price = 0.065
     HeatUtility = bst.HeatUtility
@@ -21,7 +21,6 @@ def set_lipidcane_process_settings():
     steam_utility.P = 44e5
     HeatUtility.get_agent('cooling_water').regeneration_price = 0
     HeatUtility.get_agent('chilled_water').heat_transfer_price = 0
-    bst.main_flowsheet.set_flowsheet('lipidcane')
 
 # Raw material price (USD/kg)
 price = {'Lipid cane': 0.03455, # 70% m.c
@@ -39,5 +38,3 @@ price = {'Lipid cane': 0.03455, # 70% m.c
          'Ethanol': 0.789,
          'Waste': -0.33,
          'Gasoline': 0.756} # 2 USD/gal
-
-set_lipidcane_process_settings()

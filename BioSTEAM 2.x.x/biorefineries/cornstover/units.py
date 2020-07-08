@@ -85,6 +85,9 @@ class SteamMixer(Unit):
     def _design(self): pass
     def _cost(self): pass
         
+@cost('Flow rate', 'Pump', units='kg/hr',
+      S=402194, CE=522, cost=22500, n=0.8, kW=74.57, BM=2.3)
+class HydrolysatePump(Unit): pass
 
 @cost('Dry flow rate', 'Pretreatment reactor system', units='kg/hr',
       S=83333, CE=522, cost=19812400, n=0.6, kW=4578, BM=1.5)
@@ -188,12 +191,12 @@ class SeedTrain(Unit):
         self.reactions = ParallelRxn([
     #   Reaction definition                             Reactant    Conversion
     Rxn('Glucose -> 2 Ethanol + 2 CO2',                 'Glucose',   0.9000),
-    Rxn('Glucose + 8.463 CSL + 0.018 DAP -> 6 Z_mobilis + 2.4 H2O',
+    Rxn('Glucose + 0.047 CSL + 0.018 DAP -> 6 Z_mobilis + 2.4 H2O',
                                                         'Glucose',   0.0400),
     Rxn('Glucose + 2 H2O -> 2 Glycerol + O2',           'Glucose',   0.0040),
     Rxn('Glucose + 2 CO2 -> 2 SuccinicAcid + O2',       'Glucose',   0.0060),
     Rxn('3 Xylose -> 5 Ethanol + 5 CO2',                'Xylose',    0.8000),
-    Rxn('Xylose + 7.052 CSL + 0.015 DAP -> 5 Z_mobilis + 2 H2O',
+    Rxn('Xylose + 0.039 CSL + 0.015 DAP -> 5 Z_mobilis + 2 H2O',
                                                         'Xylose',    0.0400),
     Rxn('3 Xylose + 5 H2O -> 5 Glycerol + 2.5 O2',      'Xylose',    0.0030),
     Rxn('Xylose + H2O -> Xylitol + 0.5 O2',             'Xylose',    0.0460),
