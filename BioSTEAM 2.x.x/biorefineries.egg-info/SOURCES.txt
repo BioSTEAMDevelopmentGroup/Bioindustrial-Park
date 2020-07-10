@@ -29,3 +29,9 @@ biorefineries/lipidcane/_tea.py
 biorefineries/lipidcane/model.py
 biorefineries/lipidcane/utils/__init__.py
 biorefineries/lipidcane/utils/composition.py
+biorefineries/sugarcane/__init__.py
+biorefineries/sugarcane/_chemicals.py
+biorefineries/sugarcane/_process_settings.py
+biorefineries/sugarcane/_system.py
+biorefineries/sugarcane/_tea.py
+biorefineries/sugarcane/model.py

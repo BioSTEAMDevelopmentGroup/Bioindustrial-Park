@@ -11,17 +11,20 @@ from . import (_process_settings,
                _chemicals,
                _system,
                _tea,
+               _ethanol_production_system
 )
 
 __all__ = [*_process_settings.__all__,
            *_chemicals.__all__,
            *_system.__all__,
            *_tea.__all__,
+           *_ethanol_production_system.__all__,
            'sugarcane_sys',
            'sugarcane_tea', 
            'flowsheet',
 ]
 
+from ._ethanol_production_system import *
 from ._process_settings import *
 from ._chemicals import *
 from ._system import *

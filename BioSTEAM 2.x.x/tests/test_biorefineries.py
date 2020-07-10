@@ -27,10 +27,10 @@ def test_lipidcane():
     assert np.allclose(lipidcane_tea.sales, 102753153.57737921)
     assert np.allclose(lipidcane_tea.material_cost, 61370018.82006217)
     assert np.allclose(lipidcane_tea.installed_cost, 139560995.69892246)
-    assert np.allclose(lipidcane_tea.utility_cost, -25857974.57909109)
+    assert np.allclose(lipidcane_tea.utility_cost, -25857650.125692848)
     assert np.allclose(units.get_heating_duty(), 198.1798177608488)
-    assert np.allclose(units.get_cooling_duty(), 304.18641844970176)
-    assert np.allclose(units.get_electricity_consumption(), 9.644005368832351)
+    assert np.allclose(units.get_cooling_duty(), 304.52025279499827)
+    assert np.allclose(units.get_electricity_consumption(), 9.645045283570328)
     assert np.allclose(units.get_electricity_production(), 92.52212901976533)
     
 def test_cornstover():
