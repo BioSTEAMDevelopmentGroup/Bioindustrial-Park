@@ -6,38 +6,30 @@ Created on Sun May 26 11:21:31 2019
 """
 from biosteam.evaluation import Model, Metric
 from biosteam.evaluation.evaluation_tools import triang
+from biosteam.process_tools import UnitGroup
 import biorefineries.sugarcane as sc
 
 __all__ = ('sugarcane_model',)
 
-tea = sc.sugarcane_sys.TEA
+tea = sc.sugarcane_tea
+ugroup = UnitGroup('Biorefinery', tea.units)
 ethanol = sc.ethanol
 products = (ethanol,)
+
 get_prodcost = lambda: float(tea.production_cost(products))
 get_FCI = lambda: tea._FCI_cached
 get_prod = lambda: ethanol.F_mass * tea._annual_factor
-
-BT = sc.BT
-sc_sys = sc.sugarcane_sys
-def get_steam():
-    return sum([i.flow for i in BT.steam_utilities])*18.01528*tea._annual_factor/1000
-
-power_utils = ([i.power_utility for i in sc_sys.units if (i.power_utility and i is not BT)])
-excess_electricity = [0]
-def get_consumed_electricity():
-    factor = tea._annual_factor/1000
-    electricity_generated = -BT.power_utility.rate * factor
-    consumed_electricity = sum([i.rate for i in power_utils]) * factor
-    excess_electricity[0] = electricity_generated - consumed_electricity
-    return consumed_electricity
-get_excess_electricity = lambda: excess_electricity[0]
+get_steam = lambda: sum([i.flow for i in sc.BT.steam_utilities])*18.01528*tea._annual_factor/1000
+get_electricity_consumption = lambda: tea._annual_factor * ugroup.get_electricity_consumption()
+get_electricity_production = lambda: tea._annual_factor * ugroup.get_electricity_production()
+get_excess_electricity = lambda: get_electricity_production() - get_electricity_consumption()
 
 metrics = (Metric('Internal rate of return', sc.sugarcane_tea.solve_IRR, '%'),
            Metric('Ethanol production cost', get_prodcost, 'USD/yr'),
            Metric('Fixed capital investment', get_FCI, 'USD'),
            Metric('Ethanol production', get_prod, 'kg/hr'),
            Metric('Steam', get_steam, 'MT/yr'),
-           Metric('Consumed electricity', get_consumed_electricity, 'MWhr/yr'),
+           Metric('Consumed electricity', get_electricity_consumption, 'MWhr/yr'),
            Metric('Excess electricity', get_excess_electricity, 'MWhr/yr'))
 
 sugarcane_model = Model(sc.sugarcane_sys, metrics, skip=False)

@@ -7,7 +7,7 @@ Created on Mon Sep  2 01:28:21 2019
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-from biosteam.evaluation.evaluation_tools import plot_single_points, \
+from biosteam.plots import plot_single_points, \
      plot_montecarlo_across_coordinate, plot_montecarlo, plot_vertical_line, annotate_line
 from biosteam.utils import colors
 from matplotlib.patches import Patch

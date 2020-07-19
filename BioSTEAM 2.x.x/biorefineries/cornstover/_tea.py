@@ -120,4 +120,6 @@ def create_tea(sys, OSBL_units, ignored_units=()):
     Area700.labor_cost = 0
     Area700.depreciation = 'MACRS20'
     Area700.OSBL_units = (BT,)
-    return bst.CombinedTEA([ethanol_tea, Area700], IRR=0.10)
+    tea = bst.CombinedTEA([ethanol_tea, Area700], IRR=0.10)
+    sys._TEA = tea
+    return tea

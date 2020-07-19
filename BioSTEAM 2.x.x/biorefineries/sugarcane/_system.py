@@ -227,25 +227,20 @@ def create_system(ID='sugarcane_sys'):
     
     ethanol_production_sys = create_ethanol_production_system(sugar_solution=S202-0)
     
-    ### Facilities ###
-    
-    emission = bst.Stream('emission')
-    stream = bst.main_flowsheet.stream
-    
-    BT = units.BoilerTurbogenerator('BT',
-                                    ins=U202-0, # Bagasse from conveyor belt
-                                    outs=emission,
+    ### Facilities ###    
+    s = F.stream
+    BT = units.BoilerTurbogenerator('BT', U202-0, # Bagasse from conveyor belt
                                     boiler_efficiency=0.80,
                                     turbogenerator_efficiency=0.85)
     
     bst.Stream.ticket_number = 600
     
     CT = units.CoolingTower('CT')
-    makeup_water_streams = (stream.cooling_tower_makeup_water,
-                            stream.boiler_makeup_water)
-    process_water_streams = (stream.imbibition_water,
+    makeup_water_streams = (s.cooling_tower_makeup_water,
+                            s.boiler_makeup_water)
+    process_water_streams = (s.imbibition_water,
                              rvf_wash_water,
-                             F.stream.stripping_water,
+                             s.stripping_water,
                              *makeup_water_streams)
     makeup_water = bst.Stream('makeup_water', price=0.000254)
     

@@ -549,24 +549,21 @@ def create_system(ID='lipidcane_sys'):
     
     ### Facilities ###
     
-    emission = bst.Stream('emission')
-    stream = bst.main_flowsheet.stream
-    
+    s = bst.main_flowsheet.stream
     BT = units.BoilerTurbogenerator('BT',
                                   ins=U202-0, # Bagasse from conveyor belt
-                                  outs=emission,
                                   boiler_efficiency=0.80,
                                   turbogenerator_efficiency=0.85)
     
     CT = units.CoolingTower('CT')
-    makeup_water_streams = (stream.cooling_tower_makeup_water,
-                            stream.boiler_makeup_water)
+    makeup_water_streams = (s.cooling_tower_makeup_water,
+                            s.boiler_makeup_water)
     
-    process_water_streams = (stream.imbibition_water,
-                             stream.biodiesel_wash_water,
+    process_water_streams = (s.imbibition_water,
+                             s.biodiesel_wash_water,
                              oil_wash_water,
                              rvf_wash_water,
-                             F.stream.stripping_water,
+                             s.stripping_water,
                              *makeup_water_streams)
     
     makeup_water = bst.Stream('makeup_water', price=0.000254)
