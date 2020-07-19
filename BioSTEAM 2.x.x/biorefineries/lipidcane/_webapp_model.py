@@ -48,8 +48,6 @@ metrics = (Metric('IRR', get_IRR, '%'),
 # Used to index metrics by name
 metrics_by_name = {i.name: i for i in metrics}
 
-lipidcane_model = Model(lc.lipidcane_sys, metrics)
-
 # %% Create model and populate parameters
 
 #: [float] Plant size process specification in ton / yr
@@ -133,7 +131,7 @@ def evaluate_sample(lipid_content, plant_size, operating_days, ethanol_price,
     Consumed electricity [MW]                   4.63e+04
     Excess electricity [MW]                     3.98e+05
     dtype: float64
-    >>> metric_values['Consumed electricity [MWhr/yr]']
+    >>> metric_values['Consumed electricity [MW]']
     46295.52888978263
     
     """
