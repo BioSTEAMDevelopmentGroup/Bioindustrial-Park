@@ -550,10 +550,11 @@ def create_system(ID='lipidcane_sys'):
     ### Facilities ###
     
     s = bst.main_flowsheet.stream
+    # Burn bagasse from conveyor belt
     BT = units.BoilerTurbogenerator('BT',
-                                  ins=U202-0, # Bagasse from conveyor belt
-                                  boiler_efficiency=0.80,
-                                  turbogenerator_efficiency=0.85)
+                                   (U202-0, '', 'boiler_makeup_water', 'natural_gas', '', ''),
+                                   boiler_efficiency=0.80,
+                                   turbogenerator_efficiency=0.85)
     
     CT = units.CoolingTower('CT')
     makeup_water_streams = (s.cooling_tower_makeup_water,

@@ -473,21 +473,24 @@ def create_system(ID='cornstover_sys'):
     ### Facilities
     
     M501 = bst.Mixer('M501', (S603-1, S401-0))
-    BT = bst.facilities.BoilerTurbogenerator('BT', (M501-0, R601-0), 
+    BT = bst.facilities.BoilerTurbogenerator('BT',
+                                             ins=(M501-0, R601-0, 
+                                                  'boiler_makeup_water',
+                                                  'natural_gas',
+                                                  'lime',
+                                                  'boilerchems'), 
                                              turbogenerator_efficiency=0.85)
-    BT.outs[-1].T = 373.15
     
     CWP = bst.facilities.ChilledWaterPackage('CWP')
     CT = bst.facilities.CoolingTower('CT')
     CT.outs[1].T = 273.15 + 28
-    water_thermo = tmo.Thermo(tmo.Chemicals(['Water']))
     
     process_water_streams = (caustic,
                              stripping_water,
                              warm_process_water,
                              steam, BT-1, CT-1)
             
-    makeup_water = Stream('makeup_water', thermo=water_thermo, price=price['Makeup water'])
+    makeup_water = Stream('makeup_water', price=price['Makeup water'])
     
     PWC = bst.facilities.ProcessWaterCenter('PWC',
                                             (S604-0, makeup_water),
@@ -495,37 +498,14 @@ def create_system(ID='cornstover_sys'):
                                             None,
                                             (BT-1, CT-1),
                                             process_water_streams)
-    blowdown_mixer = bst.BlowdownMixer('blowdown_mixer', (), outs=2**M601)
-    BT.outs[-1]-0-blowdown_mixer
-    CT.outs[1]-1-blowdown_mixer
+    blowdown_mixer = bst.BlowdownMixer('blowdown_mixer', (BT-1, CT-1), 2**M601)
     
-    Substance = tmo.Chemical.blank('Substance')
-    Substance.at_state(phase='l')
-    Substance.default()
-    substance_thermo = tmo.Thermo(tmo.Chemicals([Substance]))
-    ash = Stream('ash', thermo=substance_thermo,
-                 price=price['Ash disposal'])
-    lime = Stream('lime', thermo=substance_thermo,
-                 price=price['FGD lime'])
-    boilerchems = Stream('boiler_chemicals', thermo=substance_thermo,
-                         price=price['Boiler chems'])
-    emission = BT.outs[0]
-    def update_lime_boilerchems_and_ash():
-        emission_ash = emission.imol['Ash']
-        lime.imol['Substance'] = lime_flow = emission_ash * 0.21
-        ash.imol['Substance'] = (emission_ash + lime_flow) * 1.18 # Include lime and other stuff
-        boilerchems.imol['Substance'] = 0.24620/865 * lime_flow
-    
-    CIP = Stream('CIP', thermo=substance_thermo, flow=(126,))
-    CIP_package = units.CIPpackage('CIP_package', CIP, thermo=substance_thermo)
-    
-    plant_air = Stream('plant_air', flow=(83333,), thermo=substance_thermo)
-    
-    ADP = bst.facilities.AirDistributionPackage('ADP', plant_air, thermo=substance_thermo)
-    
-    FT = units.FireWaterTank('FT',
-                             Stream('fire_water', flow=(8343,), thermo=substance_thermo),
-                             thermo=substance_thermo)
+    CIP = Stream('CIP', Water=126, units='kg/hr')
+    CIP_package = units.CIPpackage('CIP_package', CIP)
+    plant_air = Stream('plant_air', N2=83333, units='kg/hr')
+    ADP = bst.facilities.AirDistributionPackage('ADP', plant_air)
+    fire_water = Stream('fire_water', Water=8343, units='kg/hr')
+    FT = units.FireWaterTank('FT', fire_water)
     
     ### Complete system
     
@@ -534,14 +514,8 @@ def create_system(ID='cornstover_sys'):
                                   puresys, S401, M601, WWTC, R601,
                                   aerobic_digestion_sys, S604),
                             facilities=(M501, CWP, BT, CT,
-                                        PWC, ADP, update_lime_boilerchems_and_ash,
-                                        CIP_package, S301, S302, DAP_storage,
-                                        CSL_storage, FT, blowdown_mixer),
+                                        PWC, ADP, CIP_package, S301, S302,
+                                        DAP_storage, CSL_storage, FT, blowdown_mixer),
                             facility_recycle=blowdown_mixer-0)
-    cornstover_sys.products.add(ash)
-    baghouse_bags = Stream('Baghouse_bags', thermo=substance_thermo, flow=(1,), price=11.1)
-    cornstover_sys.feeds.add(lime)
-    cornstover_sys.feeds.add(boilerchems)
-    cornstover_sys.feeds.add(baghouse_bags)
     
     return cornstover_sys

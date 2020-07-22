@@ -16,9 +16,9 @@ samples = model_cs.sample(N_samples, rule)
 model_cs.load_samples(samples)
 model_cs.evaluate()
 model_cs.table.to_excel('Monte Carlo cornstover.xlsx')
-metrics = (model_cs.metrics[0],)
-spearman = model_cs.spearman(metrics)
-spearman.to_excel("Spearman correlation cornstover.xlsx")
+# metrics = (model_cs.metrics[0],)
+# spearman = model_cs.spearman(metrics)
+# spearman.to_excel("Spearman correlation cornstover.xlsx")
 
 # %%
 # parameters = model_cs.get_parameters()

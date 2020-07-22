@@ -7,7 +7,7 @@ Created on Mon Sep  2 01:28:21 2019
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-from biosteam.plots import plot_single_points, \
+from biosteam.plots import plot_scatter_points, \
      plot_montecarlo_across_coordinate, plot_montecarlo, plot_vertical_line, annotate_line
 from biosteam.utils import colors
 from matplotlib.patches import Patch
@@ -118,7 +118,7 @@ get_metric = lambda name: np.asarray(data_sc['Biorefinery', name]).flatten()
 
 # IRR
 plt.sca(IRR_ax)
-plot_single_points(x_superpro, [13.5, 13.7, 15.2, 17.5])
+plot_scatter_points(x_superpro, [13.5, 13.7, 15.2, 17.5])
 IRR = get_metric('Internal rate of return [%]') * 100 # To percent
 plot_montecarlo(IRR)
 plot_vertical_line(1)
@@ -135,7 +135,7 @@ plt.text(0.05, y_text, "A", color=colors.neutral_shade.RGBn,
 # TCI
 plt.sca(TCI_ax)
 TCI = get_metric('Fixed capital investment [USD]')  * 1.05 / 1e6 # Account for working capital
-plot_single_points(x_superpro, [158.5, 172.9, 178.3, 195.0])
+plot_scatter_points(x_superpro, [158.5, 172.9, 178.3, 195.0])
 plot_montecarlo(TCI)
 plot_vertical_line(1)
 TCI_ub = 300
@@ -150,8 +150,8 @@ plt.text(0.05, y_text, "B", color=colors.neutral_shade.RGBn,
 
 # Production
 plt.sca(production_ax)
-plot_single_points(x_superpro[-1], [48], colors.blue_shade.RGBn)
-plot_single_points([0, x_superpro[-1]], [141, 70], colors.orange_shade.RGBn)
+plot_scatter_points(x_superpro[-1], [48], colors.blue_shade.RGBn)
+plot_scatter_points([0, x_superpro[-1]], [141, 70], colors.orange_shade.RGBn)
 ethanol_production = get_metric('Ethanol production [kg/hr]') / (1e6*rho_etoh)
 plot_montecarlo(ethanol_production,
                 colors.orange_tint.RGBn,
@@ -169,8 +169,8 @@ plt.text(0.05, y_text, "D", color=colors.neutral_shade.RGBn,
 
 # Production cost
 plt.sca(production_cost_ax)
-plot_single_points(x_superpro[1:], [0.89, 0.84, 0.76], colors.blue_shade.RGBn)
-plot_single_points(x_superpro, [0.48, 0.46, 0.44, 0.4], colors.orange_shade.RGBn)
+plot_scatter_points(x_superpro[1:], [0.89, 0.84, 0.76], colors.blue_shade.RGBn)
+plot_scatter_points(x_superpro, [0.48, 0.46, 0.44, 0.4], colors.orange_shade.RGBn)
 ethanol_production_cost = get_metric('Ethanol production cost [USD/yr]') / ethanol_production / 1e6
 plot_montecarlo(ethanol_production_cost,
                 colors.orange_tint.RGBn,
@@ -188,7 +188,7 @@ plt.text(0.05, y_text, "E", color=colors.neutral_shade.RGBn,
 
 # Steam
 plt.sca(steam_ax)
-plot_single_points([0, 10], [686.056, 656.000])
+plot_scatter_points([0, 10], [686.056, 656.000])
 steam = get_metric('Steam [MT/yr]')/1000
 plot_montecarlo(steam)
 plot_vertical_line(1)
@@ -205,8 +205,8 @@ plt.text(0.05, y_text, "C", color=colors.neutral_shade.RGBn,
 
 # Electricity
 plt.sca(electricity_ax)
-plot_single_points([0, 10], [50.187, 62.644], colors.purple_shade.RGBn)
-plot_single_points([0, 10], [110, 260], colors.yellow_shade.RGBn)
+plot_scatter_points([0, 10], [50.187, 62.644], colors.purple_shade.RGBn)
+plot_scatter_points([0, 10], [110, 260], colors.yellow_shade.RGBn)
 consumed_electricity = get_metric('Consumed electricity [MWhr/yr]')/1000
 excess_electricity = get_metric('Excess electricity [MWhr/yr]')/1000
 plot_montecarlo(consumed_electricity,

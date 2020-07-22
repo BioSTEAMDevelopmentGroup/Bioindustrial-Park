@@ -68,9 +68,6 @@ def create_system(ID='sugarcane_sys'):
     
     ### Unit operations ###
     
-    bst.Stream.ticket_name = 'd'
-    bst.Stream.ticket_number = 100
-    
     # Feed the shredder
     U101 = units.ConveyingBelt('U101', ins=sugarcane)
     
@@ -79,8 +76,6 @@ def create_system(ID='sugarcane_sys'):
     
     # Shredded cane
     U103 = units.Shredder('U103', ins=U102-0)
-    
-    bst.Stream.ticket_number = 200
     
     # Hydrolyze starch
     T201 = units.EnzymeTreatment('T201', T=323.15)  # T=50
@@ -229,11 +224,10 @@ def create_system(ID='sugarcane_sys'):
     
     ### Facilities ###    
     s = F.stream
-    BT = units.BoilerTurbogenerator('BT', U202-0, # Bagasse from conveyor belt
+    BT = units.BoilerTurbogenerator('BT',
+                                    (U202-0, '', 'boiler_makeup_water', 'natural_gas', '', ''),
                                     boiler_efficiency=0.80,
                                     turbogenerator_efficiency=0.85)
-    
-    bst.Stream.ticket_number = 600
     
     CT = units.CoolingTower('CT')
     makeup_water_streams = (s.cooling_tower_makeup_water,
