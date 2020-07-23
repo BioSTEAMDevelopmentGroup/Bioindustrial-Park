@@ -3,33 +3,27 @@
 # BioSTEAM: The Biorefinery Simulation and Techno-Economic Analysis Modules
 # Copyright (C) 2020, Yoel Cortes-Pena <yoelcortes@gmail.com>
 # Bioindustrial-Park: BioSTEAM's Premier Biorefinery Models and Results
-# Copyright (C) 2020, Yalin Li <yalinli2@illinois.edu> (this biorefinery)
+# Copyright (C) 2020, Yalin Li <yalinli2@illinois.edu>,
+# Sarang Bhagwat <sarangb2@illinois.edu>, and Yoel Cortes-Pena (this biorefinery)
 # 
 # This module is under the UIUC open-source license. See 
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
 # for license details.
 
 """
-Created on Fri Jun 26 11:48:00 2020
+Created on Tue May 19 14:17:17 2020
 
-Based on the biorefineries in [1] and [2] for the production of ethanol and 
-adipic acid from lignocellulosic biomass. Part of the script is developed in [3] 
+Modified from the biorefineries constructed in [1] and [2] for the production of
+lactic acid from lignocellulosic feedstocks
 
-[1] Humbird et al., Process Design and Economics for Biochemical Conversion of 
-    Lignocellulosic Biomass to Ethanol: Dilute-Acid Pretreatment and Enzymatic 
-    Hydrolysis of Corn Stover; Technical Report NREL/TP-5100-47764; 
-    National Renewable Energy Lab (NREL), 2011.
-    https://www.nrel.gov/docs/fy11osti/47764.pdf
-
-[2] Davis et al., Process Design and Economics for the Conversion of Lignocellulosic 
-    Biomass to Hydrocarbon Fuels and Coproducts: 2018 Biochemical Design Case Update; 
-    NREL/TP-5100-71949; National Renewable Energy Lab (NREL), 2018. 
-    https://doi.org/10.2172/1483234
-
-[3] Cortes-Peña et al., BioSTEAM: A Fast and Flexible Platform for the Design, 
+[1] Cortes-Peña et al., BioSTEAM: A Fast and Flexible Platform for the Design, 
     Simulation, and Techno-Economic Analysis of Biorefineries under Uncertainty. 
     ACS Sustainable Chem. Eng. 2020, 8 (8), 3302–3310. 
     https://doi.org/10.1021/acssuschemeng.9b07040
+    
+[2] Li et al., Tailored Pretreatment Processes for the Sustainable Design of
+    Lignocellulosic Biorefineries across the Feedstock Landscape. Submitted.
+    July, 2020.
 
 @author: yalinli_cabbi
 """
@@ -40,12 +34,13 @@ adipic acid from lignocellulosic biomass. Part of the script is developed in [3]
 import numpy as np
 import pandas as pd
 import thermosteam as tmo
-from ethanol_adipic.chemicals import chems
+from lactic.chemicals import chems
 _kg_per_ton = 907.18474
 
 # Chemical Engineering Plant Cost Index from Chemical Engineering Magzine
 # (https://www.chemengonline.com/the-magazine/)
 CEPCI = {1997: 386.5,
+         1998: 389.5,
          2007: 525.4,
          2009: 521.9,
          2010: 550.8,
@@ -83,18 +78,65 @@ baseline_feedflow = get_feedstock_flow(dry_composition, moisture_content,
 # %%
 
 # =============================================================================
-# Function to compute titer of muconic acid fermentation in g/L (kg/m3)
+# Function to calculate lactic acid titer in g/L (kg/m3) of a stream
 # =============================================================================
 
-def compute_muconic_titer(stream, V=None):
-    muconic_mass = stream.imol['MonoSodiumMuconate']*chems.MuconicAcid.MW \
-        + stream.imass['MuconicAcid']
-    if V: vol = V
+def compute_lactic_titer(stream, V=None):
+    lactic_mass = 2*stream.imol['CalciumLactate']*chems.LacticAcid.MW \
+        + stream.imass['LacticAcid']
+    if V:
+        vol = V
     else: vol = stream.F_vol
     if vol != 0:
-        titer = muconic_mass / vol
+        titer = lactic_mass / vol
     else: titer = 0
     return titer
+
+def set_yield(lactic_yield, R301, R302):
+    R301_X = R301.cofermentation_rxns.X
+    R301_X[0] = R301_X[3] = lactic_yield
+    R301_X[1] = R301_X[4] = R301._X[1]
+    R301_X[2] = R301_X[5] = R301._X[2]
+    if R301_X.sum()>2:
+        diff = 1 - R301_X[0]
+        R301_X[1] = R301_X[4] = max(0, diff * R301._X[1]/(R301._X[1]+R301._X[2]))
+        R301_X[2] = R301_X[5] = max(0, diff-R301._X[1])
+    R302_X = R302.cofermentation_rxns.X
+    R302_X[0] = R302_X[3] = R301_X[0] * R302.ferm_ratio
+    R302_X[1] = R302_X[4] = R301_X[1] * R302.ferm_ratio
+    R302.yield_limit = R301.yield_limit * R302.ferm_ratio
+
+
+# %% 
+
+# =============================================================================
+# Functions to compute chemical loading and adjust recycle flows to maintain
+# a certain ratio for Esterification and Hydrolysis reactor
+# =============================================================================
+
+def compute_extra_chemical(feed, recycle, reactants_ID, chemical_ID, ratios):
+    reactants_in_feed = feed.imol[reactants_ID]
+    reactants_in_recycle = recycle.imol[reactants_ID]
+    chemical_needed = (ratios*(reactants_in_feed+reactants_in_recycle)).sum()
+    chemical_extra = (feed.imol[chemical_ID]+recycle.imol[chemical_ID]) - chemical_needed
+    return chemical_extra
+
+def adjust_recycle(feed, recycle, reactants_ID, chemical_ID, ratios):
+    feed_chemical_needed = (feed.imol[reactants_ID]*ratios).sum() \
+        - feed.imol[chemical_ID]
+    
+    recycle_chemical_extra = recycle.imol[chemical_ID] \
+        - (recycle.imol[reactants_ID]*ratios).sum()
+    
+    split = feed_chemical_needed / recycle_chemical_extra
+    effluent = feed.copy()
+    recycle_recycled = recycle.copy()
+    recycle_recycled.mol *= split
+    recycle_discarded = recycle.copy()
+    recycle_discarded.mol *= (1 - split)
+    effluent.mix_from([feed, recycle_recycled])
+    
+    return effluent, recycle_discarded
 
 
 # %% 
@@ -122,24 +164,11 @@ def compute_COD(IDs, stream):
     return unit_COD.sum()*32
 
 
-# %%
-
-# =============================================================================
-# Function to convert ethanol fraction from weight basis to mol basis in an
-# ethanol-water mixture
-# =============================================================================
-
-def convert_ethanol_wt_2_mol(wt):
-    Ethanol_MW = chems.Ethanol.MW
-    Water_MW = chems.Water.MW
-    return (wt/Ethanol_MW) / (wt/Ethanol_MW + (1-wt)/Water_MW)
-
-
 # %% 
 
 # =============================================================================
-# Function to find the split ratios for Splitters, assume 0 for chemicals not specified in splits,
-# stream numbers refer to those in ref [1]
+# Function to find the split ratios for Splitters, assume 0 for chemicals not
+# specified in splits
 # =============================================================================
 
 def find_split(IDs, flow0, flow1, chemical_groups):
@@ -156,14 +185,14 @@ def find_split(IDs, flow0, flow1, chemical_groups):
         else:
             array[chemicals.index(ID)] = split
     # WWTsludge is removed from the cell mass group 
-    array[chemicals.index('WWTsludge')] = array[chemicals.index('Z_mobilis')]
+    array[chemicals.index('WWTsludge')] = array[chemicals.index('FermMicrobe')]
     return array
 
 IDs = ('Ethanol', 'H2O', 'Glucose', 'Xylose', 'OtherSugars',
     'SugarOligomers', 'OrganicSolubleSolids', 'InorganicSolubleSolids', 'Ammonia', 'AceticAcid', 
     'SulfuricAcid', 'Furfurals', 'OtherOrganics', 'CO2', 'CH4',
     'O2', 'N2', 'COSOxNOxH2S', 'Glucan', 'Xylan', 
-    'OtherStructuralCarbohydrates', 'Acetate', 'Lignin', 'Proteins', 'CellMass',
+    'OtherStructuralCarbohydrates', 'Acetate', 'Lignin', 'Protein', 'CellMass',
     'OtherInsolubleSolids')
 
 streams = {}
@@ -225,6 +254,7 @@ streams['stream_625'] = (1, 2241169, 2, 3, 7,
 
 splits_df = pd.DataFrame.from_dict(streams)
 splits_df.index = IDs
+
 
 
 

@@ -48,8 +48,8 @@ _ft3_per_m3 = 35.3147
 _J_per_BTU = 1055.06
 
 # From USD/dry-ton to USD/kg in 2016$, 20% moisture content
-# changed from Humbird et al., 2011 to Davis et al., 2018
-feedstock_price = 71.26 / _kg_per_ton * 0.8 
+_feedstock_factor = _kg_per_ton / 0.8
+feedstock_price = 71.3 / _feedstock_factor
 
 # 2.86 is the average motor gasoline price between 2010-2019 in 2016 $/gal	
 # based on AEO from EIA, density of gasoline is 2.819 kg/gal	
@@ -58,12 +58,12 @@ feedstock_price = 71.26 / _kg_per_ton * 0.8
 # (https://h2tools.org/hyarc/calculator-tools/lower-and-higher-heating-values-fuels)	
 denaturant_price = 2.86 / 2.819
 
-# 1.41e6 is $/yr and 4279 in kg/hr from Table 33 of Davis et al., 2018 (BDO scenario)
-# 7880 is operating hours/yr on Page 10 of Davis et al., 2018,
+# 1.41e6 is $/yr and 4279 in kg/hr from Table 33 of ref [2] (BDO scenario)
+# 7880 is operating hours/yr on Page 10 of ref [2],
 # cost is negative because it's a product stream
 ash_disposal_price = -1.41e6 / (4279*7880)
 
-# Baseline from Davis et al., 2018, lower bound is 2015-2019 average of 	
+# Baseline from ref [2], lower bound is 2015-2019 average of 	
 # hydrate lime in $/ton at plant from Mineral Commodity Summaries 2020.	
 # 2015: 146.40 * (1.114/1.100) / 907.18474 = 0.163	
 # 2016: 145.50 / 907.18474 = 0.160	
@@ -74,7 +74,6 @@ ash_disposal_price = -1.41e6 / (4279*7880)
 # Upper bound is +10% from baseline = 0.1189 * _lb_per_kg * 1.1 = 0.288
 lime_price = 0.1189 * _lb_per_kg
 
-# Mentioned in P53 of Humbird et al., not into any units, but a cashflow
 # The original cost is $466,183 every 5 years, converted to per hour assuming 96% uptime
 baghouse_bag_price = 466833 / 5 / (24*365*0.96)
 
@@ -109,7 +108,7 @@ price = {'Feedstock': feedstock_price,
          'Ash disposal': ash_disposal_price,
          'Electricity': 0.068,
          'Denaturant': denaturant_price,
-         'Ethanol': 0.3370 * _lb_per_kg,	
+         'Ethanol': 0.3370 * _lb_per_kg,
          'Adipic acid': 0.8554 * _lb_per_kg,
          'Sodium sulfate': 0.0706 * _lb_per_kg,	
          'Enzyme nutrients': 0.4896 * _lb_per_kg #!!! maybe not needed
@@ -126,7 +125,3 @@ _hps.T = 266 + 273.15
 _cooling = bst.HeatUtility.get_cooling_agent('cooling_water')
 _cooling.T = 28 + 273.15
 _cooling.T_limit = _cooling.T + 9
-
-# _chilled = bst.HeatUtility.get_cooling_agent('chilled_water')
-# _chilled.heat_transfer_price = 0
-# _chilled.regeneration_price = _cooling.regeneration_price

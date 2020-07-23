@@ -37,5 +37,5 @@ adipic acid from lignocellulosic biomass. Part of the script is developed in [3]
 __all__ = []
 
 from lazypkg import LazyPkg
-LazyPkg(__name__, ['chemicals', 'process_settings', 'units',
+LazyPkg(__name__, ['chemicals', 'process_settings', 'units', 'facilities',
                    'system_acid', 'system_base'])

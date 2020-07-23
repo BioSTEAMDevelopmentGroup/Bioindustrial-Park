@@ -36,7 +36,7 @@ Naming conventions:
     F = Flash tank
     H = Heat exchange
     M = Mixer
-    P = Pump (including conveying belt)
+    P = Pump
     R = Reactor
     S = Splitter (including solid/liquid separator)
     T = Tank or bin for storage
@@ -100,20 +100,21 @@ U101.cost_items['System'].kW = 0
 # Pretreatment streams
 # =============================================================================
 
+# For pretreatment, 93% purity
 sulfuric_acid_T201 = Stream('sulfuric_acid_T201', units='kg/hr')
-# Flow adjusted in SulfuricAcidMixer, stream 516 in ref [1]
-water_M201 = Stream('water_M201', T=114+273.15)
+# To be mixed with sulfuric acid, flow updated in SulfuricAcidMixer,
+# stream 516 in ref [1]
+water_M201 = Stream('water_M201', T=114+273.15, units='kg/hr')
 
-# To be used for feedstock conditioning, flow is adjusted in PretreatmentMixer
+# To be used for feedstock conditioning, flow updated in PretreatmentMixer
 water_M202 = Stream('water_M202', T=95+273.15, units='kg/hr')
 
-# To be added to the feedstock/sulfuric acid mixture,
-# will be adjusted by the SteamMixer
+# To be added to the feedstock/sulfuric acid mixture, flow updated by the SteamMixer
 steam_M203 = Stream('steam_M203', phase='g', T=268+273.15, P=13*101325, units='kg/hr')
 
 # For neutralization of pretreatment hydrolysate
 ammonia_M205 = Stream('ammonia_M205', phase='l', units='kg/hr')
-# To be used for ammonia addition, will be updated by AmmoniaMixer
+# To be used for ammonia addition, flow updated by AmmoniaMixer
 water_M205 = Stream('water_M205', units='kg/hr')
 
 
@@ -171,9 +172,9 @@ pretreatment_sys = System('pretreatment_sys',
 # Fermentation streams
 # =============================================================================
 
-# Flow and price will be updated in EnzymeHydrolysateMixer
-enzyme = Stream('enzyme', units='kg/hr', price=price['Enzyme'])
-# Used to adjust enzymatic hydrolysis solid loading, will be updated in EnzymeHydrolysateMixer
+# Flow updated in EnzymeHydrolysateMixer
+enzyme_R301 = Stream('enzyme_R301', units='kg/hr', price=price['Enzyme'])
+# Used to adjust enzymatic hydrolysis solid loading, flow updated in EnzymeHydrolysateMixer
 water_R301 = Stream('water_R301', units='kg/hr')
 
 # Streams 311 and 309 from ref [1]
@@ -190,7 +191,7 @@ DAP_R302 = Stream('DAP_R302', units='kg/hr')
 # =============================================================================
 
 H301 = units.HydrolysateCooler('H301', ins=P201-0, T=50+273.15)
-M301 = units.EnzymeHydrolysateMixer('M301', ins=(H301-0, enzyme, water_R301))
+M301 = units.EnzymeHydrolysateMixer('M301', ins=(H301-0, enzyme_R301, water_R301))
 
 R301 = units.SaccharificationAndCoFermentation('R301', ins=(M301-0, '', 
                                                             CSL_R301, DAP_R301),
@@ -199,7 +200,7 @@ R301 = units.SaccharificationAndCoFermentation('R301', ins=(M301-0, '',
 
 # Followed ref [2], no sorbitol in the final seed fermenter as in ref [1]
 R302 = units.SeedTrain('R302', ins=(R301-2, CSL_R302, DAP_R302),
-                          outs=('R302_g', 'R302_l'))
+                          outs=('R302_g', 'seed'))
 T301 = units.SeedHoldTank('T301', ins=R302-1, outs=1-R301)
 
 fermentation_sys = System('fermentation_sys', 
@@ -302,10 +303,8 @@ ethanol_purification_sys = System('ethanol_purification_sys',
 # =============================================================================
 
 caustic_R602 = Stream('caustic_R602', units='kg/hr')
-ammonia_R602 = Stream('ammonia_R602', units='kg/hr')
-polymer_R602 = Stream('polymer_R602', units='kg/hr')
+polymer_R602 = Stream('polymer_R602', units='kg/hr', price=price['WWT polymer'])
 air_R602 = Stream('air_R602', phase='g', units='kg/hr')
-
 
 # =============================================================================
 # Wastewater treatment units
@@ -325,7 +324,7 @@ R601 = units.AnaerobicDigestion('R601', ins=M601-0,
                                                  chemical_groups),
                                 T=35+273.15)
 
-R602 = units.AerobicDigestion('R602', ins=(R601-1, '', caustic_R602, ammonia_R602,
+R602 = units.AerobicDigestion('R602', ins=(R601-1, '', caustic_R602, 'ammonia_R601',
                                            polymer_R602, air_R602),
                               outs=('aerobic_vent', 'aerobic_treated_water'),
                               reactants=soluble_organics,
@@ -345,8 +344,8 @@ S601 = units.MembraneBioreactor('S601', ins=R602-1,
 S602 = bst.units.Splitter('S602', ins=S601-1, outs=('to_aerobic_digestion', ''), 
                           split=0.96)
 
-S603 = units.BeltThickener('S603', ins=(R601-2, S602-1), outs=('S603_centrate',
-                                                     'S603_solids'))
+S603 = units.BeltThickener('S603', ins=(R601-2, S602-1),
+                           outs=('S603_centrate', 'S603_solids'))
 
 # Ref [1] included polymer addition in process flow diagram, but did not include
 # in the variable operating cost, thus followed ref [2] to add polymer in AerobicDigestion
@@ -384,19 +383,18 @@ ammonia = Stream('ammonia', units='kg/hr', price=price['NH4OH'])
 sulfuric_acid = Stream('sulfuric_acid', units='kg/hr', price=price['Sulfuric acid'])
 
 # Chemicals used/generated in CHP
-FGD_lime = Stream('FGD_lime', units='kg/hr', price=price['Lime'])
+lime_CHP = Stream('lime_CHP', units='kg/hr', price=price['Lime'])
 # Scaled based on feedstock flow, 1054 from Table 33 in ref [2] as NH3
 ammonia_CHP = Stream('ammonia_CHP', units='kg/hr',
                      NH4OH=1054*35.046/17.031*U101.feedstock_flow_rate/2205)
-boiler_chems = Stream('boiler_chems', price=price['Boiler chems'])
-baghouse_bag = Stream('baghouse_bag', price=price['Baghouse bag'])
+boiler_chems = Stream('boiler_chems', units='kg/hr', price=price['Boiler chems'])
+baghouse_bag = Stream('baghouse_bag', units='kg/hr', price=price['Baghouse bag'])
 # Supplementary natural gas for CHP if produced steam not enough for regenerating
 # all steam streams required by the system
-natural_gas = Stream('natural_gas', price=price['Natural gas'])
-ash = Stream('ash', price=price['Ash disposal'])
+natural_gas = Stream('natural_gas', units='kg/hr', price=price['Natural gas'])
+ash = Stream('ash', units='kg/hr', price=price['Ash disposal'])
 
-# Cooling tower chemicals
-cooling_tower_chems = Stream('cooling_tower_chems',
+cooling_tower_chems = Stream('cooling_tower_chems', units='kg/hr',
                              price=price['Cooling tower chems'])
 
 system_makeup_water = Stream('system_makeup_water', units='kg/hr',
@@ -406,7 +404,7 @@ system_makeup_water = Stream('system_makeup_water', units='kg/hr',
 firewater_in = Stream('firewater_in', 
                        Water=8021*U101.feedstock_flow_rate/2205, units='kg/hr')
 
-# 145 based on equipment M-910 (clean-in-place system) in ref [1]
+# # Clean-in-place, 145 based on equipment M-910 (clean-in-place system) in ref [1]
 CIP_chems_in = Stream('CIP_chems_in', Water=145*U101.feedstock_flow_rate/2205, 
                       units='kg/hr')
 
@@ -416,7 +414,6 @@ CIP_chems_in = Stream('CIP_chems_in', Water=145*U101.feedstock_flow_rate/2205,
 plant_air_in = Stream('plant_air_in', phase='g', units='kg/hr',
                       N2=0.79*1372608*U101.feedstock_flow_rate/2205,
                       O2=0.21*1372608*U101.feedstock_flow_rate/2205)
-
 
 # =============================================================================
 # Facilities units
@@ -433,7 +430,7 @@ T703 = units.SulfuricAcidStorage('T703', ins=sulfuric_acid, outs=sulfuric_acid_T
 
 T704 = units.AmmoniaStorage('T704', ins=ammonia)
 T704_S = bst.units.ReversedSplitter('T704_S', ins=T704-0, 
-                                    outs=(ammonia_M205, ammonia_R602, ammonia_CHP))
+                                    outs=(ammonia_M205, ammonia_CHP))
 
 T705 = units.CausticStorage('T705', ins=caustic, outs=caustic_R602)
 
@@ -446,9 +443,9 @@ T707_S = bst.units.ReversedSplitter('T707_S', ins=T707-0, outs=(DAP_R301, DAP_R3
 T708 = units.FirewaterStorage('T708', ins=firewater_in, outs='firewater_out')
 
 # Mix solids for CHP
-M702 = bst.units.Mixer('M702', ins=(S401-0, S604-1))
+M702 = bst.units.Mixer('M702', ins=(S401-0, S604-1), outs='wastes_to_CHP')
 
-CHP = facilities.CHP('CHP', ins=(M702-0, R601-0, FGD_lime, ammonia_CHP, boiler_chems,
+CHP = facilities.CHP('CHP', ins=(M702-0, R601-0, lime_CHP, ammonia_CHP, boiler_chems,
                                  baghouse_bag, natural_gas, 'boiler_feed_water'),
                      B_eff=0.8, TG_eff=0.85, combustibles=combustibles,
                      side_streams_to_heat=(water_M201, water_M202, steam_M203),
@@ -487,8 +484,8 @@ ethanol_sys = System('ethanol_sys',
                      path=(U101, pretreatment_sys, fermentation_sys,
                            ethanol_purification_sys, 
                            M601, R601, aerobic_digestion_recycle, S605,
-                           T701, T702, M701, T703, T704, T704_S,
-                           T705, T706_S, T706, T707_S, T707,T708, M702),
+                           T701, T702, M701, T703, T704_S, T704,
+                           T705, T706_S, T706, T707_S, T707, T708, M702),
                      facilities=(CHP, CT, CWP, PWC, ADP, CIP, BDM),
                      facility_recycle=BDM-0)
 
@@ -511,7 +508,7 @@ for i in OSBL_units:
 
 ethanol_no_CHP_tea = ethanol_adipic_TEA(
         system=ethanol_sys, IRR=0.10, duration=(2016, 2046),
-        depreciation='MACRS7', income_tax=0.35, operating_days=0.96*365,
+        depreciation='MACRS7', income_tax=0.21, operating_days=0.96*365,
         lang_factor=None, construction_schedule=(0.08, 0.60, 0.32),
         startup_months=3, startup_FOCfrac=1, startup_salesfrac=0.5,
         startup_VOCfrac=0.75, WC_over_FCI=0.05,
@@ -523,12 +520,6 @@ ethanol_no_CHP_tea = ethanol_adipic_TEA(
         labor_cost=3212962*U101.feedstock_flow_rate/2205,
         labor_burden=0.90, property_insurance=0.007, maintenance=0.03)
 
-# Changed to MACRS 20 to be consistent with ref [1]
-CHP_tea = bst.TEA.like(CHP_sys, ethanol_no_CHP_tea)
-CHP_tea.labor_cost = 0
-CHP_tea.depreciation = 'MACRS20'
-CHP_tea.OSBL_units = (CHP,)
-
 # Removes units, feeds, and products of CHP_sys to avoid double-counting
 ethanol_no_CHP_tea.units.remove(CHP)
 
@@ -537,53 +528,39 @@ for i in CHP_sys.feeds:
 for i in CHP_sys.products:
     ethanol_sys.products.remove(i)
 
+# Changed to MACRS 20 to be consistent with ref [1]
+CHP_tea = bst.TEA.like(CHP_sys, ethanol_no_CHP_tea)
+CHP_tea.labor_cost = 0
+CHP_tea.depreciation = 'MACRS20'
+CHP_tea.OSBL_units = (CHP,)
+
 ethanol_tea = bst.CombinedTEA([ethanol_no_CHP_tea, CHP_tea], IRR=0.10)
 ethanol_sys._TEA = ethanol_tea
 
-
-# %%
-
 # Simulate system and get results
-ethanol_sys.simulate()
-ethanol.price = ethanol_tea.solve_price(ethanol)
+_ethanol_V = chems.Ethanol.V('l', 298.15, 101325) # molar volume in m3/mol	
+_ethanol_MW = chems.Ethanol.MW
+_liter_per_gallon = 3.78541
+_ethanol_kg_2_gal = _liter_per_gallon/_ethanol_V*_ethanol_MW/1e6
+_feedstock_factor = 907.185 / (1-0.2)
+def simulate_get_MESP(feedstock_price=71.3):
+    ethanol_sys.simulate()
+    feedstock.price = feedstock_price / _feedstock_factor
+    for i in range(3):
+        ethanol.price = ethanol_tea.solve_price(ethanol)
+    MESP = ethanol.price * _ethanol_kg_2_gal
+    return MESP
 
-# annual_factor = ethanol_no_CHP_tea._annual_factor
+def simulate_get_MFPP(ethanol_price=2.2):
+    ethanol_sys.simulate()
+    ethanol.price = ethanol_price / _ethanol_kg_2_gal
+    for i in range(3):
+        feedstock.price = ethanol_tea.solve_price(feedstock)
+    MFPP = feedstock.price * _feedstock_factor
+    return MFPP
 
-# print('\n---------------FEEDS---------------')
-
-# for i in (*ethanol_sys.feeds, *CHP_sys.feeds):
-#     if i.price:
-#         print(f'{i.ID}: {i.F_mass*i.price*annual_factor/1e6}')
-
-# print('\n---------------PRODUCTS---------------')
-
-# for i in (*ethanol_sys.products, *CHP_sys.products):
-#     if i.price:
-#         print(f'{i.ID}: {i.F_mass*i.price*annual_factor/1e6}')
-
-
-# print('\n---------------CAPEX---------------')
-
-# for i in (*ethanol_sys.units, *CHP_sys.units):
-#     if i.installed_cost:
-#         print(f'{i.ID}: {i.installed_cost/1e6}')
-        
-# print('\n---------------UTILITIES---------------')
-
-# for i in ethanol_sys.units:
-#     if hasattr(i, 'heat_utilities'):
-#         for hu in i.heat_utilities:
-#             print(f'{i.ID} - {hu.ID}: {hu.cost*annual_factor/1e6}')
-        
-# print('\n---------------POWER---------------')
-
-# for i in ethanol_sys.units:
-#     if hasattr(i, 'power_utility'):
-#         if i.power_utility.rate != 0:
-#             print(f'{i.ID}: {i.power_utility.cost*annual_factor/1e6}')
-
-print('\n---------------MESP---------------')
-print(f'MESP is {ethanol.price}')
+MESP = simulate_get_MESP()
+print(f'MESP of acid-pretreatment biorefinery is ${MESP:.2f}/gal with default pretreatment efficacy')
 
 
 
