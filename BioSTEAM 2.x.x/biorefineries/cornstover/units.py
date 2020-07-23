@@ -327,7 +327,7 @@ class SaccharificationAndCoFermentation(Unit):
     Rxn('3 Xylose + 5 CO2 -> 5 SuccinicAcid + 2.5 O2',              'Xylose',    0.0090),
     ])
     
-        self.CSL2constituents = Rxn(
+        self.CSL_to_constituents = Rxn(
         'CSL -> 0.5 H2O + 0.25 LacticAcid + 0.25 Protein', 'CSL',    1.0000)
     
         self.saccharified_stream = tmo.Stream(None)
@@ -346,7 +346,7 @@ class SaccharificationAndCoFermentation(Unit):
         effluent.mol[:] = ss.mol - sidedraw.mol + CSL.mol + DAP.mol
         self.loss(effluent.mol)
         self.cofermentation(effluent.mol)
-        self.CSL2constituents(effluent.mass)
+        self.CSL_to_constituents(effluent.mass)
         vent.receive_vent(effluent)
     
     def _design(self):

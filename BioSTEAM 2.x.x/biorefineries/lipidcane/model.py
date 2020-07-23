@@ -9,6 +9,7 @@
 """
 from biosteam.evaluation import Model, Metric
 from biosteam.evaluation.evaluation_tools import triang
+from biosteam.process_tools import UnitGroup
 import biorefineries.lipidcane as lc
 import numpy as np
 
@@ -18,53 +19,33 @@ tea = lc.lipidcane_tea
 ethanol = lc.ethanol
 biodiesel = lc.biodiesel
 lipidcane = lc.lipidcane
+ugroup = UnitGroup('Biorefinery', tea.units)
 
 etoh_prodcost = [0]
 products = (biodiesel, ethanol)
 def get_biodiesel_prodcost():
     bd, etoh_prodcost[0] = tea.production_cost(products)
     return bd
-def get_etoh_prodcost():
-    return etoh_prodcost[0]
-def get_FCI():
-    return tea._FCI_cached
-
-etoh_prod = [0]
-def get_biodiesel_prod():
-    bd, etoh_prod[0] = np.array([biodiesel.F_mass, ethanol.F_mass]) * tea._annual_factor
-    return bd
-def get_etoh_prod():
-    return etoh_prod[0]
-
-BT = lc.BT
-lc_sys = lc.lipidcane_sys
-def get_steam():
-    return sum([i.flow for i in BT.steam_utilities])*18.01528*tea._annual_factor/1000
-
-power_utils = ([i.power_utility for i in lc_sys.units
-                if i.power_utility and i is not BT])
-excess_electricity = [0]
-def get_consumed_electricity():
-    factor =  tea._annual_factor/1000
-    electricity_generated = -BT.power_utility.rate * factor
-    consumed_electricity = sum([i.rate for i in power_utils]) * factor
-    excess_electricity[0] = electricity_generated - consumed_electricity
-    return consumed_electricity
-
-def get_excess_electricity():
-    return excess_electricity[0]
+get_etoh_prodcost = lambda: etoh_prodcost[0]
+get_FCI = lambda: tea._FCI_cached
+get_ethanol_production = lambda: lc.ethanol.F_mass * tea._annual_factor
+get_biodiesel_production = lambda: lc.biodiesel.F_mass * tea._annual_factor
+get_steam = lambda: sum([i.flow for i in lc.BT.steam_utilities])*18.01528*tea._annual_factor/1000
+get_electricity_consumption = lambda: tea._annual_factor * ugroup.get_electricity_consumption()
+get_electricity_production = lambda: tea._annual_factor * ugroup.get_electricity_production()
+get_excess_electricity = lambda: get_electricity_production() - get_electricity_consumption()
 
 metrics = (Metric('Internal rate of return', lc.lipidcane_tea.solve_IRR),
            Metric('Biodiesel production cost', get_biodiesel_prodcost, 'USD/yr'),
            Metric('Ethanol production cost', get_etoh_prodcost, 'USD/yr'),
            Metric('Fixed capital investment', get_FCI, 'USD'),
-           Metric('Biodiesel production', get_biodiesel_prod, 'kg/hr'),
-           Metric('Ethanol production', get_etoh_prod, 'kg/hr'),
+           Metric('Biodiesel production', get_biodiesel_production, 'kg/yr'),
+           Metric('Ethanol production', get_ethanol_production, 'kg/yr'),
            Metric('Steam', get_steam, 'MT/yr'),
-           Metric('Consumed electricity', get_consumed_electricity, 'MWhr/yr'),
+           Metric('Consumed electricity', get_electricity_consumption, 'MWhr/yr'),
            Metric('Excess electricity', get_excess_electricity, 'MWhr/yr'))
 
-lipidcane_model = Model(lc_sys, metrics)
+lipidcane_model = Model(lc.lipidcane_sys, metrics)
 lipidcane_model.load_default_parameters(lipidcane)
 param = lipidcane_model.parameter
 

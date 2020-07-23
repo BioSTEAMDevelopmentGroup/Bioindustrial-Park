@@ -82,9 +82,6 @@ class ConventionalEthanolTEA(TEA):
         self.supplies= supplies
         self.maintenance = maintenance
         self.administration = administration
-        
-    def _TDC(self, DPI):
-        return DPI
     
     def _FCI(self, TDC):
         self._FCI_cached = TDC

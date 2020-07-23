@@ -15,12 +15,12 @@ from thermosteam import Stream
 from biorefineries import lipidcane as lc
 from numpy import array
 
-__all__ = ('set_lipid_fraction',)
+__all__ = ('set_lipid_fraction',
+           'get_lipid_fraction')
 
 def set_lipid_fraction(lipid_fraction, stream=None, data={}):
     """Adjust composition of lipid cane to achieve desired oil fraction (dry weight)."""
-    if not stream:
-        stream = lc.lipidcane
+    if not stream: stream = lc.lipidcane
     if not data:
         carbs_IDs = ('Glucose', 'Sucrose')
         fiber_IDs = ('Lignin', 'Cellulose', 'Hemicellulose')
@@ -69,3 +69,8 @@ def set_lipid_fraction(lipid_fraction, stream=None, data={}):
     if any(stream.mol < 0):
         raise ValueError(f'lipid cane oil composition of {z_mass_lipid*100:.0f}% dry weight is infeasible')
 
+def get_lipid_fraction(stream=None):
+    if not stream: stream = lc.lipidcane
+    imass = stream.imass
+    F_dry_mass = stream.F_mass - imass['Water']
+    return imass['Lipid'] / F_dry_mass
