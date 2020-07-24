@@ -58,8 +58,12 @@ model = models.model_full
 '''Quick look at baseline values'''
 # Set seed to make sure each time the same set of random numbers will be used
 np.random.seed(3221)
-N_simulation = 10 # 1000
+N_simulation = 100 # 1000
 samples = model.sample(N=N_simulation, rule='L')
+
+# samples = samples[77:79,]
+
+
 model.load_samples(samples)
 baseline = model.metrics_at_baseline()
 baseline_df = pd.DataFrame(data=np.array([[i for i in baseline.values],]), 
@@ -98,13 +102,13 @@ for i in range(parameter_len):
                       value=probabilities[p.name],
                       allow_duplicates=True)
 
-# '''Output to Excel'''
-# with pd.ExcelWriter('1_full_evaluation.xlsx') as writer:
-#     parameters.to_excel(writer, sheet_name='Parameters')
-#     Monte_Carlo_results.to_excel(writer, sheet_name='Monte Carlo')
-#     Monte_Carlo_percentiles.to_excel(writer, sheet_name='Monte Carlo Percentiles')
-#     spearman_results.to_excel(writer, sheet_name='Spearman')
-#     model.table.to_excel(writer, sheet_name='Raw data')
+'''Output to Excel'''
+with pd.ExcelWriter('1_full_evaluation.xlsx') as writer:
+    parameters.to_excel(writer, sheet_name='Parameters')
+    Monte_Carlo_results.to_excel(writer, sheet_name='Monte Carlo')
+    Monte_Carlo_percentiles.to_excel(writer, sheet_name='Monte Carlo Percentiles')
+    spearman_results.to_excel(writer, sheet_name='Spearman')
+    model.table.to_excel(writer, sheet_name='Raw data')
 
 run_number = N_simulation
 time = timer.elapsed_time / 60

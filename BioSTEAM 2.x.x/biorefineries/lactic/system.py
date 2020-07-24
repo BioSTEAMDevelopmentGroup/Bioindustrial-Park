@@ -755,8 +755,8 @@ def simulate_get_MPSP():
 # R301.yield_limit = 0.6
 
 # R301.set_titer_limit = False
-# set_yield(0.76, R301, R302)
-
+# set_yield(0.76, R301, R302)    
+    
 # MPSP = simulate_get_MPSP()
 # print(f'Baseline MPSP is ${MPSP:.3f}/kg')
 

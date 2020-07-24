@@ -41,7 +41,8 @@ import lactic.system as system
 from chaospy import distributions as shape
 from biosteam.evaluation import Model, Metric
 
-get_annual_factor = lambda: system.lactic_no_CHP_tea._annual_factor
+lactic_no_CHP_tea = system.lactic_no_CHP_tea
+get_annual_factor = lambda: lactic_no_CHP_tea._annual_factor
 _kg_per_ton = 907.18474
 
 lactic_sys = system.lactic_sys
@@ -345,12 +346,16 @@ def set_electricity_price(price):
 
 D = baseline_uniform(1, 0.25)
 @param(name='TCI ratio', element='TEA', kind='isolated', units='% of baseline',
-       baseline=1, distribution=D)
-def set_TCI_ratio(ratio): 
+        baseline=1, distribution=D)
+def set_TCI_ratio(new_ratio):
+    old_ratio = lactic_no_CHP_tea._TCI_ratio_cached
     for unit in lactic_sys.units:
         if hasattr(unit, 'cost_items'):
             for item in unit.cost_items:
-                unit.cost_items[item].cost *= ratio
+                unit.cost_items[item].cost /= old_ratio
+                unit.cost_items[item].cost *= new_ratio
+    lactic_no_CHP_tea._TCI_ratio_cached = new_ratio
+
 
 # =============================================================================
 # Pretreatment parameters
@@ -363,14 +368,13 @@ D = shape.Uniform(0.25, 0.4)
 def set_pretreatment_solid_loading(loading): 
     M202.solid_loading = loading
     
-sulfuric_acid_T201 = system.sulfuric_acid_T201
+T201 = system.T201
 D = shape.Uniform(10, 35)
-@param(name='Pretreatment sulfuric acid loading', element=sulfuric_acid_T201,
+@param(name='Pretreatment sulfuric acid loading', element=T201,
        kind='coupled', units='mg/g-dry feedstock', baseline=22.1, distribution=D)
 def set_pretreatment_sulfuric_acid_loading(loading): 
-    feedstock_dry_mass = feedstock.F_mass - feedstock.imass['H2O']
-    sulfuric_acid_T201.imass['H2SO4'] = feedstock_dry_mass*loading/1000*0.93
-    sulfuric_acid_T201.imass['H2O'] = feedstock_dry_mass*loading/1000*0.07
+    T201.feedstock_dry_mass = feedstock.F_mass - feedstock.imass['H2O']
+    T201.acid_loading = loading
 
 R201 = system.R201
 D = shape.Uniform(0.06, 0.12)

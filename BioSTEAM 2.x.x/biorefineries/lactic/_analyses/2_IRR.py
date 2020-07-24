@@ -65,8 +65,9 @@ Note:
 
 '''Evaluate'''
 np.random.seed(3221)
-N_simulation = 10 # 1000
+N_simulation = 100 # 1000
 samples = model.sample(N=N_simulation, rule='L')
+
 model.load_samples(samples)
 model.evaluate()
 

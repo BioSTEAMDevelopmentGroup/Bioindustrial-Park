@@ -532,8 +532,6 @@ class SeedTrain(Unit):
     
     productivity = 0.89*0.9 # in g/L/hr
     
-    yield_limit = 0.76*0.9 # in g/g-sugar
-    
     # Yield as a ratio of the yield in the main fermenter
     ferm_ratio = 0.9
     

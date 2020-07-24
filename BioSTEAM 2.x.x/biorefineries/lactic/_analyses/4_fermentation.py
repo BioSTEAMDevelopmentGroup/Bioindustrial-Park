@@ -60,7 +60,7 @@ timer = TicToc('timer')
 timer.tic()
 
 titer_range = np.linspace(40, 140, 11)
-yield_range = np.linspace(0.2, 1, 3)
+yield_range = np.linspace(0.3, 1, 15)
 limits = [[], [], []]
 
 R302 = system.R302
@@ -107,7 +107,8 @@ for i in titer_range:
         R301.titer_limit = i
         R301.yield_limit = j
         set_yield(j, R301, R302)
-        lactic_sys.simulate()
+        for m in range(2):
+            lactic_sys.simulate()
         limits[2].append(R301.sugar_limited_titer)
         update_productivity(0.89)
         solve_TEA()
@@ -172,7 +173,8 @@ for i in titer_range:
         R301.titer_limit = i
         R301.yield_limit = j
         set_yield(j, R301, R302)
-        lactic_sys.simulate()
+        for m in range(2):
+            lactic_sys.simulate()
         limits[2].append(R301.sugar_limited_titer)
         update_productivity(0.89)
         solve_TEA()

@@ -41,7 +41,7 @@ class LacticTEA(TEA):
                  'construction', 'contingency', 'other_indirect_costs', 
                  'labor_cost', 'labor_burden', 'property_insurance',
                  'maintenance', '_ISBL_DPI_cached', '_FCI_cached',
-                 '_utility_cost_cached')
+                 '_utility_cost_cached', '_TCI_ratio_cached')
     
     def __init__(self, system, IRR, duration, depreciation, income_tax,
                  operating_days, lang_factor, construction_schedule,
@@ -70,6 +70,9 @@ class LacticTEA(TEA):
         self.labor_burden = labor_burden
         self.property_insurance = property_insurance
         self.maintenance = maintenance
+        # A ratio used to adjust equipment installed cost, 1 equals baseline ratio,
+        # this is not used in by the TEA class, but in evaluation
+        self._TCI_ratio_cached = 1
     
     @property
     def utility_cost(self):
@@ -105,3 +108,4 @@ class LacticTEA(TEA):
                 + self._ISBL_DPI_cached * self.maintenance
                 + self.labor_cost*(1+self.labor_burden))
 
+        

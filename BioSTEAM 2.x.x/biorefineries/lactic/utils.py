@@ -104,7 +104,6 @@ def set_yield(lactic_yield, R301, R302):
     R302_X = R302.cofermentation_rxns.X
     R302_X[0] = R302_X[3] = R301_X[0] * R302.ferm_ratio
     R302_X[1] = R302_X[4] = R301_X[1] * R302.ferm_ratio
-    R302.yield_limit = R301.yield_limit * R302.ferm_ratio
 
 
 # %% 
