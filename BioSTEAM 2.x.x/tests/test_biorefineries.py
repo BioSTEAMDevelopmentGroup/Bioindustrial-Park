@@ -23,15 +23,15 @@ def test_lipidcane():
     """
     from biorefineries.lipidcane import lipidcane_tea
     units = UnitGroup('Biorefinery', lipidcane_tea.units)
-    assert np.allclose(lipidcane_tea.IRR, 0.17824969755468204)
-    assert np.allclose(lipidcane_tea.sales, 102394506.53266351)
-    assert np.allclose(lipidcane_tea.material_cost, 61762932.60602826)
-    assert np.allclose(lipidcane_tea.installed_equipment_cost, 139562256.39522457)
-    assert np.allclose(lipidcane_tea.utility_cost, -25857650.125692848)
-    assert np.allclose(units.get_heating_duty(), 198.17981776084886)
-    assert np.allclose(units.get_cooling_duty(), 304.52025279499816)
-    assert np.allclose(units.get_electricity_consumption(), 9.645045283570326)
-    assert np.allclose(units.get_electricity_production(), 92.52212901976533)
+    assert np.allclose(lipidcane_tea.IRR, 0.17829951498180963)
+    assert np.allclose(lipidcane_tea.sales, 102410583.81934823)
+    assert np.allclose(lipidcane_tea.material_cost, 61762909.6376681)
+    assert np.allclose(lipidcane_tea.installed_equipment_cost, 139554763.73812002)
+    assert np.allclose(lipidcane_tea.utility_cost, -25856786.959638454)
+    assert np.allclose(units.get_heating_duty(), 198.1915651157178)
+    assert np.allclose(units.get_cooling_duty(), 304.5184189296353)
+    assert np.allclose(units.get_electricity_consumption(), 9.645038160426235)
+    assert np.allclose(units.get_electricity_production(), 92.5193553387546)
     
 def test_cornstover():
     """

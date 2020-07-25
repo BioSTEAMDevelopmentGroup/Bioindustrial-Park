@@ -55,15 +55,15 @@ def replace_label_text(label_text):
         name = replacement_labels[name]
     return name + units + distribution
 
-# Get data
-rhos = pd.read_excel('Spearman correlation lipidcane.xlsx',
-                      header=[0], index_col=0).iloc[:, 0]
-rhos.name = 'IRR'
-# Sort most important
-rhos = rhos[(rhos.abs()>0.050)] 
+# # Get data
+# rhos = pd.read_excel('Spearman correlation lipidcane.xlsx',
+#                       header=[0], index_col=0).iloc[:, 0]
+# rhos.name = 'IRR'
+# # Sort most important
+# rhos = rhos[(rhos.abs()>0.050)] 
 
-# Plot and fix axis labels
-fig, ax = plot_spearman(rhos, top=10)
-labels = [item.get_text() for item in ax.get_yticklabels()]
-new_labels = [replace_label_text(i) for i in labels]
-ax.set_yticklabels(new_labels)
+# # Plot and fix axis labels
+# fig, ax = plot_spearman(rhos, top=10)
+# labels = [item.get_text() for item in ax.get_yticklabels()]
+# new_labels = [replace_label_text(i) for i in labels]
+# ax.set_yticklabels(new_labels)

@@ -11,7 +11,6 @@ The complete lipid-cane biorefinery system is created here.
 """
 import numpy as np
 import biosteam as bst
-from biosteam import main_flowsheet as F
 from biosteam import units
 from ._process_settings import price
 from ..sugarcane import create_ethanol_production_system
@@ -22,6 +21,8 @@ __all__ = ('create_system',)
 
 def create_system(ID='lipidcane_sys'):
     chemicals = bst.settings.get_chemicals()
+    s = bst.main_flowsheet.stream
+    u = bst.main_flowsheet.unit
     
     ### Streams ###
     
@@ -163,7 +164,7 @@ def create_system(ID='lipidcane_sys'):
     
     # Remove solids as filter cake
     C202 = units.RVF('C202', 
-                     outs=('filte_cake', ''),
+                     outs=('filter_cake', ''),
                      moisture_content=0.80,
                      split=dict(Ash=0.85,
                                 CaO=0.85,
@@ -210,6 +211,7 @@ def create_system(ID='lipidcane_sys'):
     
     # Vacume out water
     F201 = units.SplitFlash('F201', T=357.15, P=2026.5,
+                            outs=('water_vapor', ''),
                             split=dict(Lipid=0.0001,
                                        Water=0.999))
     
@@ -221,38 +223,39 @@ def create_system(ID='lipidcane_sys'):
         lime.imass['CaO', 'Water'] = 0.001 * F_mass * np.array([0.046, 0.954])
         H3PO4.imass['H3PO4', 'Water'] = 0.00025 * F_mass
         imbibition_water.imass['Water'] = 0.25* F_mass
+        T201._run()
     
-    PS1 = bst.ProcessSpecification('PS1', specification=correct_flows)
+    T201.specification = correct_flows
     
     # Specifications within a system
     def correct_lipid_wash_water():
         oil_wash_water.imol['Water'] = 100/11 * H202.outs[0].imol['Lipid']
+        T208._run()
     
-    PS2 = bst.ProcessSpecification('PS2', specification=correct_lipid_wash_water)
+    T208.specification = correct_lipid_wash_water
     
     def correct_wash_water():
+        P202._run()
         solids = P202.outs[0].imol['Ash', 'CaO', 'Cellulose', 'Hemicellulose', 'Lignin'].sum()
         rvf_wash_water.imol['Water'] = 0.0574 * solids
     
-    PS3 = bst.ProcessSpecification('PS3', specification=correct_wash_water)
+    P202.specification = correct_wash_water
     
     ### System set-up ###
     
-    U103-0-PS1
-    (PS1-0, enzyme)-T201
+    (U103-0, enzyme)-T201
     (T201-0, M201-0)-U201-1-S201-0-T202
     (S201-1, imbibition_water)-M201
     
     T202-0-H201
     (H201-0, H3PO4)-T203-P201
     (P201-0, lime-T204-0)-T205-P202
-    P202-0-PS3
-    (PS3-0, P203-0)-M202-H202
+    (P202-0, P203-0)-M202-H202
     (H202-0, polymer)-T206-C201
     (C201-1, rvf_wash_water)-C202-1-P203
     
     C201-0-T207-T207_2-0-H203
-    (H203-0, oil_wash_water-PS2-0)-T208-C203-0-F201
+    (H203-0, oil_wash_water)-T208-C203-0-F201
     T207-T207_2-1-S202
     
     lipid = F201-1
@@ -272,6 +275,7 @@ def create_system(ID='lipidcane_sys'):
     ### Input streams ###
     
     ethanol_production_sys = create_ethanol_production_system(sugar_solution=S202-0)
+    u.M305.ins.append(C203-1)
     
     ### Biodiesel section ###
     
@@ -382,13 +386,14 @@ def create_system(ID='lipidcane_sys'):
     # Acids and bases per catalyst by mol
     k1 = 0.323/1.5; k2 = 1.060/1.5; k3 = 0.04505/1.5
     def adjust_acid_and_base():
+        T404._run()
         # Adjust according to USDA biodiesel model
         catalyst_mol = T404.outs[0].imol['NaOCH3']
         NaOH.imol['NaOH'] = k1 * catalyst_mol
         HCl1.imol['HCl'] = k2 * catalyst_mol
         HCl2.imol['HCl'] = k3 * catalyst_mol
     
-    PS6 = bst.ProcessSpecification('PS6', specification=adjust_acid_and_base)
+    T404.specification = adjust_acid_and_base
     
     ### Biodiesel Purification Section ###
     
@@ -467,8 +472,11 @@ def create_system(ID='lipidcane_sys'):
         minimum_water = 5 * (w / (w + g)) * glycerol
         if water < minimum_water:
             imol['Water'] = minimum_water
+        D402._run()
+        # Remove accumulation
+        D402.outs[0].imol['Water'] = 1100*C402.outs[0].imol['Glycerol']
             
-    PS_startup = bst.ProcessSpecification('PS_startup', specification=startup_water)
+    D402.specification = startup_water
     
     # Condense recycle methanol
     H403 = units.HXutility('H403', V=0, T=315)
@@ -508,18 +516,13 @@ def create_system(ID='lipidcane_sys'):
                       - oil.imol['Water']
                       - HCl2.imol['Water'])
         biodiesel_wash_water.imol['Water'] = wash_water if wash_water > 0 else 0.
+        T405._run()
     
-    PS7 = bst.ProcessSpecification('PS7', specification=adjust_biodiesel_wash_water)
-    P412-0-PS6-0-PS7
-    
-    def remove_accumulation():
-        D402.outs[0].imol['Water'] = 1100*C402.outs[0].imol['Glycerol']
-    
-    PS8 = bst.ProcessSpecification('PS8', specification=remove_accumulation)
-    D402-0-PS8-0-H404-0-P412
+    T405.specification = adjust_biodiesel_wash_water
+    D402-0-H404-0-P412
     
     # Biodiesel wash
-    (C402-0, PS7-0, biodiesel_wash_water, HCl1)-T405-P406-C403
+    (C402-0, P412-0, biodiesel_wash_water, HCl1)-T405-P406-C403
     
     # Glycerol recycle and purification section
     C403-0-F401
@@ -527,7 +530,7 @@ def create_system(ID='lipidcane_sys'):
     C401-1-P405
     (P405-0, C402-1, C403-1, P408-0, HCl2)-T406-P409-C404
     (C404-0, NaOH)-T407-P410
-    H402-0-D401-1-PS_startup-D402-1-T408
+    H402-0-D401-1-D402-1-T408
     P410-0-H402                
     
     # Mass Balance for Methanol, Recycle Methanol, and Catalyst stream
@@ -549,7 +552,6 @@ def create_system(ID='lipidcane_sys'):
     
     ### Facilities ###
     
-    s = bst.main_flowsheet.stream
     # Burn bagasse from conveyor belt
     BT = units.BoilerTurbogenerator('BT',
                                    (U202-0, '', 'boiler_makeup_water', 'natural_gas', '', ''),

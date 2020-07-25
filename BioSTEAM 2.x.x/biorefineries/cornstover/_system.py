@@ -361,7 +361,7 @@ def create_system(ID='cornstover_sys'):
     
     # TODO: Revise this with Jeremy
     anaerobic_digestion = rxn.ParallelReaction([anaerobic_rxn(i) for i in organics] + 
-                                               [rxn.Reaction(f"H2SO4 -> H2S + 2O2", 'H2SO4', 1.)])
+                                               [rxn.Reaction("H2SO4 -> H2S + 2O2", 'H2SO4', 1.)])
     
     
     # Note, nitogenous species included here, but most of it removed in R601 digester
