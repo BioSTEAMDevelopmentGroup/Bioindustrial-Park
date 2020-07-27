@@ -1,24 +1,47 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+# BioSTEAM: The Biorefinery Simulation and Techno-Economic Analysis Modules
+# Copyright (C) 2020, Yoel Cortes-Pena <yoelcortes@gmail.com>
+# Bioindustrial-Park: BioSTEAM's Premier Biorefinery Models and Results
+# Copyright (C) 2020, Yalin Li <yalinli2@illinois.edu> (this biorefinery)
+# 
+# This module is under the UIUC open-source license. See 
+# github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
+# for license details.
+
 """
-Created on Mon Dec 30 16:58:09 2019
+Created on Sat Jun 27 13:54:11 2020
 
-Modified from the cornstover biorefinery constructed in Cortes-Peña et al., 2020,
-with modification of fermentation system for organic acids instead of the original ethanol
+Based on the biorefineries in [1] and [2] for the production of ethanol and 
+adipic acid from lignocellulosic biomass. Part of the script is developed in [3] 
 
-[1] Cortes-Peña et al., BioSTEAM: A Fast and Flexible Platform for the Design, 
+[1] Humbird et al., Process Design and Economics for Biochemical Conversion of 
+    Lignocellulosic Biomass to Ethanol: Dilute-Acid Pretreatment and Enzymatic 
+    Hydrolysis of Corn Stover; Technical Report NREL/TP-5100-47764; 
+    National Renewable Energy Lab (NREL), 2011.
+    https://www.nrel.gov/docs/fy11osti/47764.pdf
+
+[2] Davis et al., Process Design and Economics for the Conversion of Lignocellulosic 
+    Biomass to Hydrocarbon Fuels and Coproducts: 2018 Biochemical Design Case Update; 
+    NREL/TP-5100-71949; National Renewable Energy Lab (NREL), 2018. 
+    https://doi.org/10.2172/1483234
+
+[3] Cortes-Peña et al., BioSTEAM: A Fast and Flexible Platform for the Design, 
     Simulation, and Techno-Economic Analysis of Biorefineries under Uncertainty. 
     ACS Sustainable Chem. Eng. 2020, 8 (8), 3302–3310. 
-    https://doi.org/10.1021/acssuschemeng.9b07040.
+    https://doi.org/10.1021/acssuschemeng.9b07040
 
 @author: yalinli_cabbi
 """
 
+
+# %%
+
 from biosteam import TEA
 
-__slots__ = ('OrgacidsTEA',)
+__slots__ = ('ethanol_adipic_TEA',)
 
-class OrgacidsTEA(TEA):
+class ethanol_adipic_TEA(TEA):
     
     __slots__ = ('OSBL_units', 'warehouse', 'site_development',
                  'additional_piping', 'proratable_costs', 'field_expenses',
@@ -67,7 +90,7 @@ class OrgacidsTEA(TEA):
                 sum([i.purchase_cost for i in self.OSBL_units]) * self.lang_factor
         else:
             self._ISBL_DPI_cached = DPI - \
-                sum([i.installation_cost for i in self.OSBL_units])
+                sum([i.installed_cost for i in self.OSBL_units])
         return self._ISBL_DPI_cached
         
     def _TDC(self, DPI):

@@ -44,8 +44,8 @@ Requirements:
     (2) Excel file named "_feedstock_composition_for_simulation.xlsx" in the same
         directory path as this script
 
-Note: This script is compatible with biosteam v2.12.10, biorefineries v2.9.1, 
-      and thermosteam v0.12.17. Results used in the manuscript were generated using
+Note: This script is compatible with biosteam v2.13.1, biorefineries v2.9.3, 
+      and thermosteam v0.13.2. Results used in the manuscript were generated using
       biosteam v2.4.1, biorefineries v2.4.1, and thermosteam v0.4.1.
       
       Use pip install package_name==version to install the specific version
