@@ -79,24 +79,8 @@ ParallelRxn = tmo.reaction.ParallelReaction
 @cost(basis='Flow rate', ID='System', units='kg/hr',
       kW=511.3205, cost=13329690, S=94697, CE=CEPCI[2009], n=0.6, BM=1.7)
 class FeedstockPreprocessing(Unit):
-    _N_ins = 1
-    _N_outs = 1
-    
-    _old_feedflow = baseline_feedflow.copy()
-    
-    # U.S. ton/day (2000 metric tonne/day) as in ref [1]
-    feedstock_flow_rate = 2205
-    
-    def _run(self):
-        feed_in = self.ins[0]
-        feed_out = self.outs[0]
-        _old_feedflow = self._old_feedflow
-        
-        _old_water =_old_feedflow[feed_in.chemicals.index('H2O')]
-        _old_dry_flow_rate = (_old_feedflow.sum()-_old_water) * 24 / _kg_per_ton
-        feed_out.mass = _old_feedflow * (self.feedstock_flow_rate/_old_dry_flow_rate)
-        _old_feedflow = feed_in.mass
-        feed_out.copy_like(feed_in)
+    # 2205 U.S. ton/day (2000 metric tonne/day) as in ref [1]
+    _baseline_flow_rate = baseline_feedflow.sum()
 
 
 # %% 

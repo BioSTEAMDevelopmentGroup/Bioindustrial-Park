@@ -96,7 +96,6 @@ U101.cost_items['System'].cost = 0
 U101.cost_items['System'].kW = 0
 
 
-
 # %%
 
 # =============================================================================
@@ -311,8 +310,6 @@ PS501 = bst.units.ProcessSpecification(
     'PS501', ins=R502-1, specification=adjust_R502_titer)
 
 S501 = units.MuconicMembrane('S501', ins=PS501-0, outs=('S501_l', 'S501_to_WWT'))
-
-
 S502 = units.MuconicCrystallizer('S502', ins=(S501-0, sulfuric_acid_S502), 
                                  outs=('S502_to_WWT', 'muconic'))
 
@@ -419,9 +416,11 @@ sulfuric_acid = Stream('sulfuric_acid', units='kg/hr', price=price['Sulfuric aci
 
 # Chemicals used/generated in CHP
 lime_CHP = Stream('lime_CHP', units='kg/hr', price=price['Lime'])
-# Scaled based on feedstock flow, 1054 from Table 33 in ref [2] as NH3
+# Scaled based on feedstock flow (in dry U.S. ton per day),
+# 1054 from Table 33 in ref [2] as NH3
+get_flow_tpd = lambda: (feedstock.F_mass-feedstock.imass['H2O'])*24/907.185
 ammonia_CHP = Stream('ammonia_CHP', units='kg/hr',
-                     NH4OH=1054*35.046/17.031*U101.feedstock_flow_rate/2205)
+                     NH4OH=1054*35.046/17.031*get_flow_tpd()/2205)
 boiler_chems = Stream('boiler_chems', price=price['Boiler chems'])
 baghouse_bag = Stream('baghouse_bag', price=price['Baghouse bag'])
 # Supplementary natural gas for CHP if produced steam not enough for regenerating
@@ -437,18 +436,18 @@ system_makeup_water = Stream('system_makeup_water', units='kg/hr',
 
 # 8021 based on stream 713 in Humbird et al.
 firewater_in = Stream('firewater_in', 
-                       Water=8021*U101.feedstock_flow_rate/2205, units='kg/hr')
+                       Water=8021*get_flow_tpd()/2205, units='kg/hr')
 
 # Clean-in-place, 145 based on equipment M-910 (clean-in-place system) in ref [1]
-CIP_chems_in = Stream('CIP_chems_in', Water=145*U101.feedstock_flow_rate/2205, 
+CIP_chems_in = Stream('CIP_chems_in', Water=145*get_flow_tpd()/2205, 
                       units='kg/hr')
 
 # 1372608 based on stream 950 in ref [1]
 # Air needed for multiple processes (including enzyme production that was not included here),
 # not rigorously modeled, only scaled based on plant size
 plant_air_in = Stream('plant_air_in', phase='g', units='kg/hr',
-                      N2=0.79*1372608*U101.feedstock_flow_rate/2205,
-                      O2=0.21*1372608*U101.feedstock_flow_rate/2205)
+                      N2=0.79*1372608*get_flow_tpd()/2205,
+                      O2=0.21*1372608*get_flow_tpd()/2205)
 
 # =============================================================================
 # Facilities units
@@ -526,7 +525,7 @@ PWC = facilities.PWC('PWC', ins=(system_makeup_water, S605-0),
                      outs=('process_water', 'discharged_water'))
 
 ADP = facilities.ADP('ADP', ins=plant_air_in, outs='plant_air_out',
-                     ratio=U101.feedstock_flow_rate/2205)
+                     ratio=get_flow_tpd()/2205)
 CIP = facilities.CIP('CIP', ins=CIP_chems_in, outs='CIP_chems_out')
 
 
@@ -574,7 +573,7 @@ ethanol_adipic_no_CHP_tea = ethanol_adipic_TEA(
         warehouse=0.04, site_development=0.09, additional_piping=0.045,
         proratable_costs=0.10, field_expenses=0.10, construction=0.20,
         contingency=0.10, other_indirect_costs=0.10, 
-        labor_cost=3212962*U101.feedstock_flow_rate/2205,
+        labor_cost=3212962*get_flow_tpd()/2205,
         labor_burden=0.90, property_insurance=0.007, maintenance=0.03)
 
 # Removes units, feeds, and products of CHP_sys to avoid double-counting
@@ -616,8 +615,8 @@ def simulate_get_MFPP(ethanol_price=2.2):
     MFPP = feedstock.price * _feedstock_factor
     return MFPP
 
-MESP = simulate_get_MESP()
-print(f'MESP of base-pretreatment biorefinery is ${MESP:.2f}/gal with default pretreatment efficacy')
+# MESP = simulate_get_MESP()
+# print(f'Base MESP: ${MESP:.2f}/gal with default pretreatment efficacy')
 
 
 

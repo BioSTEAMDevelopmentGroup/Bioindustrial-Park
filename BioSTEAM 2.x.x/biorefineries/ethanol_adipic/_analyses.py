@@ -130,25 +130,25 @@ for i in range(1, 42):
     # Constrict conversion to [0, 100%]
     df_LHW[round(lignin[i-1],2)] = np.minimum(conversion_max, 
                                               np.maximum(conversion_min, 
-                                                         LHW_individual))
+                                                          LHW_individual))
     df_acid[round(lignin[i-1],2)] = np.minimum(conversion_max, 
-                                               np.maximum(conversion_min, 
+                                                np.maximum(conversion_min, 
                                                           acid_individual))
     df_EXP[round(lignin[i-1],2)] = np.minimum(conversion_max, 
                                               np.maximum(conversion_min, 
-                                                         EXP_individual))
+                                                          EXP_individual))
     df_base[round(lignin[i-1],2)] = np.minimum(conversion_max,
-                                               np.maximum(conversion_min,
+                                                np.maximum(conversion_min,
                                                           base_individual))
     df_IL[round(lignin[i-1],2)] = np.minimum(conversion_max, 
-                                             np.maximum(conversion_min,
+                                              np.maximum(conversion_min,
                                                         IL_individual))
     df_ORG[round(lignin[i-1],2)] = np.minimum(conversion_max, 
                                               np.maximum(conversion_min,
-                                                         ORG_individual))
+                                                          ORG_individual))
     df_OXD[round(lignin[i-1],2)] = np.minimum(conversion_max, 
                                               np.maximum(conversion_min,
-                                                         OXD_individual))
+                                                          OXD_individual))
 
 # Obtain conversion quantiles
 dfs =(df_LHW, df_acid, df_EXP, df_base, df_IL, df_ORG, df_OXD)
@@ -157,7 +157,7 @@ quantiles = [[df.quantile(q=i) for i in (0.05, 0.5, 0.95)] for df in dfs]
 
 df_stats = pd.concat([pd.concat(quantiles[indices.index(index)], axis=1) 
                       for index in indices], 
-                     axis=1, keys=indices)
+                      axis=1, keys=indices)
 df_stats.rename_axis('Lignin content')
 
 # =============================================================================
@@ -187,14 +187,23 @@ from biosteam.process_tools import UnitGroup
 from ethanol_adipic import system_acid as acid
 from ethanol_adipic import system_base as base
 from ethanol_adipic.chemicals import chems
-from ethanol_adipic.utils import baseline_feedflow
+from ethanol_adipic import utils
+# from ethanol_adipic.utils import baseline_feedflow
+
+# Set feedstock flow rate
+# baseline_feedflow = utils.baseline_feedflow.copy()
+# baseline_feedflow = utils.baseline_feedflow.copy() / 2
+baseline_feedflow = utils.baseline_feedflow.copy() * 2
+acid.feedstock.mass = baseline_feedflow
+base.feedstock.mass = baseline_feedflow
 
 _ethanol_kg_2_gal = acid._ethanol_kg_2_gal
 _feedstock_factor = acid._feedstock_factor
 
 simulated_composition = pd.read_excel('Feedstock compositions.xlsx', \
                                       sheet_name='Compositions')
-
+# simulated_composition = simulated_composition[0:5] # for debugging
+    
 market_ethanol_price = 2.2 / _ethanol_kg_2_gal
 # From 80% moisture $/kg to $/dry-U.S. ton to $/kg with 20% moiture
 default_feedstock_price = 71.3 / _feedstock_factor
@@ -265,13 +274,12 @@ acid_MFPPs = []
 # Run assumed compositions (varying cellulose, hemicellulose, and lignin compositions
 # while keeping compositions of other components unchanged).
 # The first composition in the file is the default one as in refs [1-3]
-feedstock_dry_mass = baseline_feedflow[1:].sum()
+feedstock_dry_mass = acid.feedstock.F_mass - acid.feedstock.imass['Water']
 acid_group = UnitGroup('Acid pretreatment', acid.ethanol_sys.units)
 acid_factor = acid.ethanol_no_CHP_tea._annual_factor
 for i in range(0, simulated_composition.shape[0]):
     # Update feedstock flow
     update_feedstock_flows(acid.feedstock, simulated_composition.iloc[i])
-    acid_total_flow.append(acid.feedstock.F_mass)
     
     # Adjust cellulose conversion 
     lignin_percent = acid.feedstock.imass['Lignin'] / feedstock_dry_mass
@@ -280,13 +288,11 @@ for i in range(0, simulated_composition.shape[0]):
     # 1.04-1.37*lignin_percent is the developed correlation
     C6_conversion = min(1-0.04-0.012-1e-6, max(0, (1.04-1.37*lignin_percent)))
     acid.R301.saccharification_rxns_C6[2].X = C6_conversion
-    acid_conversions_C6.append(C6_conversion)
 
     # Adjust hemicellulose conversion
     # 0.05 and 0.024 are cellulose (glucan) conversion to other products,
     # subtract 1e-6 to avoid getting tiny negatives
     C5_conversion = min(1-0.05-0.024-1e-6, C6_conversion)
-    acid_conversions_C5.append(C5_conversion)
     acid.R201.pretreatment_rxns[4].X = C5_conversion # xylan
     acid.R201.pretreatment_rxns[9].X = C5_conversion # mannan
     acid.R201.pretreatment_rxns[12].X = C5_conversion # galactan
@@ -294,6 +300,9 @@ for i in range(0, simulated_composition.shape[0]):
     
     # Simulate system and log results
     acid.ethanol_sys.simulate()
+    acid_total_flow.append(acid.feedstock.F_mass)
+    acid_conversions_C6.append(C6_conversion)    
+    acid_conversions_C5.append(C5_conversion)
     acid_produced_electricity.append(compute_electricity(acid_group, acid_factor))
     acid_ethanol_yields.append(compute_ethanol_yield(acid.ethanol, acid.feedstock))
     
@@ -335,16 +344,13 @@ base_MFPPs = []
 # Run assumed compositions (varying cellulose, hemicellulose, and lignin compositions
 # while keeping compositions of other components unchanged).
 # The first composition in the file is the default one as in refs [1-3]
-feedstock_dry_mass = baseline_feedflow[1:].sum()
 base_group = UnitGroup('Base pretreatment', base.ethanol_adipic_sys.units)
 base_factor = base.ethanol_adipic_no_CHP_tea._annual_factor
 for i in range(0, simulated_composition.shape[0]):
     update_feedstock_flows(base.feedstock, simulated_composition.iloc[i])
-    base_total_flow.append(base.feedstock.F_mass)
     
     # Adjust cellulose and hemicellulose conversions, 0.82 based on developed correlation
     conversion = 0.82
-    base_conversions.append(conversion)
     # Cellulose
     base.R301.saccharification_rxns_C6.X[2] = conversion
     # Xylan and arabinan, no mention of other carbohydrates conversion in the
@@ -353,6 +359,8 @@ for i in range(0, simulated_composition.shape[0]):
     
     # Simulate system and log results
     base.ethanol_adipic_sys.simulate()
+    base_total_flow.append(base.feedstock.F_mass)
+    base_conversions.append(conversion)
     base_muconic_titers.append(base.R502.effluent_titer)
     base_produced_electricity.append(compute_electricity(base_group, base_factor))
     base_ethanol_yields.append(compute_ethanol_yield(base.ethanol, base.feedstock))
@@ -453,7 +461,7 @@ df_varied_conversion_results = pd.DataFrame(
      'Maximum feedstock payment price [2016$/dry-ton]': varied_conversion_MFPPs
      })
 
-with pd.ExcelWriter('Biorefinery results.xlsx') as writer:
+with pd.ExcelWriter('Biorefinery results_double.xlsx') as writer:
     df_varied_composition_results.to_excel(writer, sheet_name='Varied composition')
     df_varied_conversion_results.to_excel(writer, sheet_name='Varied lignin conversion (base)')
 

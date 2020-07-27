@@ -31,7 +31,7 @@ biorefineries.egg-info
 *.sql
 *.sqlite 
 
-# OS generated files #
+# macOS generated files #
 ######################
 .DS_Store
 .DS_Store?
