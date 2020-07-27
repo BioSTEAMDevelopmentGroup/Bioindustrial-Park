@@ -72,7 +72,9 @@ def create_ethanol_production_system(ID='ethanol_production_sys',
     T301 = units.StorageTank('T301', tau=4, vessel_material='Carbon steel')
     T301.line = 'Beer tank'
     
-    D301 = units.VentScrubber('D301', ins=(stripping_water, R301-0), gas=('CO2',))
+    D301 = units.VentScrubber('D301', ins=(stripping_water, R301-0), 
+                              outs=('vent', ''),
+                              gas=('CO2',))
     
     # Separate 99% of yeast
     C301 = units.SolidsCentrifuge('C301', outs=('', 'recycle_yeast'),
@@ -87,8 +89,7 @@ def create_ethanol_production_system(ID='ethanol_production_sys',
     
     # Heat up before beer column
     # Exchange heat with stillage
-    H302 = units.HXprocess('H302', outs=('', 'stillage'),
-                          phase0='l', phase1='l', U=1.28)
+    H302 = units.HXprocess('H302', phase0='l', phase1='l', U=1.28)
     
     # Beer column
     xbot = mass2molar_ethanol_fraction(0.00001)
@@ -139,8 +140,8 @@ def create_ethanol_production_system(ID='ethanol_production_sys',
     T304 = units.MixTank('T304', outs=ethanol)
     T304.tau = 0.10
     
-    # Recycle water to Process Condensate Tank
-    M305 = units.Mixer('M305', outs='recycle_water')
+    # Waste water
+    M305 = units.Mixer('M305', outs='wastewater')
     
     # Yeast mixing
     T305 = units.MixTank('T305')
@@ -161,16 +162,16 @@ def create_ethanol_production_system(ID='ethanol_production_sys',
     (D302-0, U301-0)-M303-0-D303-0-H303-U301
     D303-1-P303
     
-    pure_ethanol = P304.outs[0]
     def adjust_denaturant():
+        P304._run()
+        pure_ethanol = P304.outs[0]
         denaturant.imol['Octane'] = 0.021*pure_ethanol.F_mass/114.232
         
-    PS4 = bst.ProcessSpecification('PS4', specification=adjust_denaturant)
-        
-    U301-1-H304-0-T302-0-P304-0-PS4
+    P304.specification = adjust_denaturant
+    U301-1-H304-0-T302-0-P304
     denaturant-T303-P305
-    (P305-0, PS4-0)-T304
-    (P303-0, F301-1)-M305
+    (P305-0, P304-0)-T304
+    (P303-0, F301-1, H302-1)-M305
     
     ### System ###
     
@@ -200,7 +201,6 @@ def create_ethanol_production_system(ID='ethanol_production_sys',
                  H304,
                  T302, 
                  P304,
-                 PS4, 
                  T303, 
                  P305, 
                  T304, 

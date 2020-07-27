@@ -155,7 +155,7 @@ def create_system(ID='sugarcane_sys'):
     
     # Remove solids as filter cake
     C202 = units.RVF('C202', 
-                     outs=('filte_cake', ''),
+                     outs=('filter_cake', ''),
                      moisture_content=0.80,
                      split=dict(Ash=0.85,
                                 CaO=0.85,
