@@ -191,9 +191,9 @@ from ethanol_adipic import utils
 # from ethanol_adipic.utils import baseline_feedflow
 
 # Set feedstock flow rate
-# baseline_feedflow = utils.baseline_feedflow.copy()
+baseline_feedflow = utils.baseline_feedflow.copy()
 # baseline_feedflow = utils.baseline_feedflow.copy() / 2
-baseline_feedflow = utils.baseline_feedflow.copy() * 2
+# baseline_feedflow = utils.baseline_feedflow.copy() * 2
 acid.feedstock.mass = baseline_feedflow
 base.feedstock.mass = baseline_feedflow
 
@@ -461,7 +461,7 @@ df_varied_conversion_results = pd.DataFrame(
      'Maximum feedstock payment price [2016$/dry-ton]': varied_conversion_MFPPs
      })
 
-with pd.ExcelWriter('Biorefinery results_double.xlsx') as writer:
+with pd.ExcelWriter('Biorefinery results.xlsx') as writer:
     df_varied_composition_results.to_excel(writer, sheet_name='Varied composition')
     df_varied_conversion_results.to_excel(writer, sheet_name='Varied lignin conversion (base)')
 
