@@ -59,8 +59,8 @@ S402 = system.S402
 timer = TicToc('timer')
 timer.tic()
 
-titer_range = np.linspace(40, 140, 11)
-yield_range = np.linspace(0.3, 1, 15)
+titer_range = np.arange(40, 150, 10)
+yield_range = np.arange(0.3, 1.05, 0.05)
 limits = [[], [], []]
 
 R302 = system.R302
@@ -89,7 +89,7 @@ def update_productivity(productivity):
 # =============================================================================
 
 bst.speed_up()
-R301.set_titer_limit = True
+# R301.set_titer_limit = True
 R301.neutralization = True
 R401.bypass = False
 S402.bypass = False
@@ -153,7 +153,7 @@ regular_data = pd.DataFrame({
 # =============================================================================
 
 bst.speed_up()
-R301.set_titer_limit = True
+# R301.set_titer_limit = True
 R301.neutralization = False
 R401.bypass = True
 S402.bypass = True
@@ -215,7 +215,7 @@ acid_resistent_data = pd.DataFrame({
 # %%
 
 '''Output to Excel'''
-with pd.ExcelWriter('4_fermentation.xlsx') as writer:
+with pd.ExcelWriter('2_fermentation.xlsx') as writer:
     regular_data.to_excel(writer, sheet_name='Regular')
     acid_resistent_data.to_excel(writer, sheet_name='Acid-resistant')
 

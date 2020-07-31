@@ -52,15 +52,24 @@ _liter_per_gallon = 3.78541
 _ft3_per_m3 = 35.3147
 _chemical_2020to2016 = 102.5 / 113.8 # average of Jan and Feb
 
-# From USD/dry-ton to USD/kg in 2016$, 20% moisture content
+# From USD/dry-ton to USD/kg in 2016$, 20% moisture content,
+# baseline and lower bound (60) from ref [3], upper bound (146.4) from
+# Hartley et al., ACS Sustainable Chem. Eng. 2020, 8 (19), 7267–7277.
+# https://doi.org/10.1021/acssuschemeng.9b06551.
 _feedstock_factor = _kg_per_ton / 0.8
 feedstock_price = 71.3 / _feedstock_factor
 		
+# Baseline from ref [3], lower and upper bounds (96% and 110% of baseline)
+# calculated using the index of sulfuric acid from U.S. Bureau of Labor Statistics
+# (Producer Price Index by Commodity for Chemicals and Allied Products)
+# https://fred.stlouisfed.org/series/WPU0613020T1 (accessed Jul 31, 2020).
+sulfuric_acid_price = 0.0430 * _lb_per_kg
+
 # 2.2 is the average whole-sale ethanol price between 2010-2019 in 2016 $/gal 	
 # based on Annual Energy Outlook (AEO) from Energy Information Adiministration (EIA)	
 # (https://www.eia.gov/outlooks/aeo/), which is $0.732/gal and similar to the 	
-# 2.2/(2988/1e3) = $0.736/gal based on a density of 2988 g/gal from H2 Tools	
-# Lower and upper bounds are $1.37/gal and $2.79/gal, or $0.460/kg and $0.978/kg	
+# 2.2/(2988/1e3) = $0.736/gal based on a density of 2988 g/gal from H2 Tools
+# Lower and upper bounds are $1.37/gal and $2.79/gal, or $0.460/kg and $0.978/kg
 _ethanol_V = chems.Ethanol.V('l', 298.15, 101325) # molar volume in m3/mol	
 _ethanol_MW = chems.Ethanol.MW
 _ethanol_kg_2_gal = _liter_per_gallon/_ethanol_V*_ethanol_MW/1e6
@@ -102,7 +111,7 @@ baghouse_bag_price = 466833 / 5 / (24*365*0.96)
 # 4.70 is the average natural gas price in 2016$/Mcf based on AEO from EIA,
 # which is $0.231/kg at 273.15 K or $0.253/kg at 298.15 K using BioSTEAM,   
 # similar to the 4.7/1000/22*1000 = $0.214/kg at 273.15 K using 22 g/ft3 from H2 Tools
-# Using the same conversion, lower and upper bounds should be 
+# Using the same conversion, lower and upper bounds (min/max of 2010-2019) should be 
 # $3.68/Mcf and $5.65/Mcf, or $0.198/kg and $0.304/kg
 _CH4_V = chems.CH4.V(298.15, 101325) # molar volume in m3/mol
 _CH4_MW = chems.CH4.MW
@@ -136,10 +145,23 @@ price = {'Feedstock': feedstock_price,
     
 bst.PowerUtility.price = price['Electricity']
 
+_lps = bst.HeatUtility.get_heating_agent('low_pressure_steam')
 _mps = bst.HeatUtility.get_heating_agent('medium_pressure_steam')
 _hps = bst.HeatUtility.get_heating_agent('high_pressure_steam')
 _mps.T = 233 + 273.15
 _hps.T = 266 + 273.15
+
 _cooling = bst.HeatUtility.get_cooling_agent('cooling_water')
+_cooling.regeneration_price = 0
 _cooling.T = 28 + 273.15
 _cooling.T_limit = _cooling.T + 9
+
+# Side steam in CHP not a heat utility, thus will cause problem in TEA utility
+# cost calculation if price not set to 0 here, costs for regeneration of heating
+# and cooling utilities will be considered as CAPEX and OPEX of CHP and CT, respectively
+for i in (_lps, _mps, _hps, _cooling):
+    i.heat_transfer_price = i.regeneration_price = 0
+    # if i == _cooling: continue
+    # i.heat_transfer_efficiency = 0.85
+
+

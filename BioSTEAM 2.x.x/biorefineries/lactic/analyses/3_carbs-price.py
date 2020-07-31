@@ -11,7 +11,7 @@
 # for license details.
 
 """
-Created on Wed Jul 22 19:45:17 2020
+Created on Wed Jul 22 19:48:14 2020
 
 Modified from the biorefineries constructed in [1] and [2] for the production of
 lactic acid from lignocellulosic feedstocks
@@ -38,59 +38,70 @@ lactic acid from lignocellulosic feedstocks
 import numpy as np
 import pandas as pd
 from biosteam.utils import TicToc
-from biosteam.plots import plot_montecarlo_across_coordinate
-from lactic import models
-
-percentiles = [0, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 1]
+from lactic.analyses import models
 
 
-# %% 
+# %%
 
 # =============================================================================
-# Evaluating across internal rate of return
+# Evaluate across feedstock price and carbohydrate content
 # =============================================================================
 
 # Initiate a timer
 timer = TicToc('timer')
 timer.tic()
 
-model = models.model_IRR
-
-'''
-Note:
-    Not using `evaluate_across_coordinate` function as changing IRR
-    does not affect the system, using IRR as the metrics for evaluation 
-    will save considerable time.
-'''
+model = models.model_carbs_price
+set_carbs = models.set_carbs
+prices = models.prices
 
 '''Evaluate'''
 np.random.seed(3221)
-N_simulation = 100 # 1000
-samples = model.sample(N=N_simulation, rule='L')
-
+# This is not a Monte Carlo simulation, this evaluation uses the baseline parameters
+# to see the impacts of feedstock carbohydrate content
+# The parameter is a fake one to enable the evaluation
+N_simulation = 1
+samples_1d = model.sample(N=N_simulation, rule='L')
+samples = samples_1d[:, np.newaxis]
 model.load_samples(samples)
-model.evaluate()
 
-parameter_len = len(model.get_baseline_sample())
-results = model.table.iloc[:, parameter_len::].copy()
-percentiles = results.quantile(q=percentiles)
+coordinate = np.arange(0.4, 0.701, 0.01)
 
-'''To get a quick plot'''
-plot_indices = [metric.index for metric in model.metrics
-                if 'Net present value' not in metric.index[1]]
-plot_data = model.table[plot_indices]
-plot_montecarlo_across_coordinate(models.IRRs, plot_data.values)
+data = model.evaluate_across_coordinate(
+    'Feedstock carbohydate content', set_carbs, coordinate, notify=True)
+
+MPSPs_NPVs = pd.DataFrame({
+    ('Parameter', 'Carbohydrate content [dry mass %]'): coordinate})
+
+for (i, j) in zip(data.keys(), data.values()):
+    MPSPs_NPVs[i] = j[0]
+
+'''Organize data for easy plotting'''
+x_axis = [f'{i:.3f}' for i in coordinate]
+x_axis *= len(prices)
+y_axis = sum(([f'{i:.0f}']*len(coordinate) for i in prices), [])
+
+MPSPs = []
+NPVs = []
+for i in range(MPSPs_NPVs.columns.shape[0]):
+    if 'Minimum product selling price' in MPSPs_NPVs.columns[i][1]:
+        MPSPs +=  MPSPs_NPVs[MPSPs_NPVs.columns[i]].to_list()
+    if 'Net present value' in MPSPs_NPVs.columns[i][1]:
+        NPVs +=  MPSPs_NPVs[MPSPs_NPVs.columns[i]].to_list()
+
+plot_data = pd.DataFrame()
+plot_data['Carbohydrate content [dry mass %]'] = x_axis
+plot_data['Price [$/dry-ton]'] = y_axis
+plot_data['Minimum product selling price [$/kg]'] = MPSPs
+plot_data['Net present value [$]'] = NPVs
 
 '''Output to Excel'''
-with pd.ExcelWriter('2_IRR.xlsx') as writer:
-    results.to_excel(writer, sheet_name='IRR')
-    percentiles.to_excel(writer, sheet_name='IRR percentiles')
-    model.table.to_excel(writer, sheet_name='Raw data')
+with pd.ExcelWriter('3_carbs-price.xlsx') as writer:
+    MPSPs_NPVs.to_excel(writer, sheet_name='Evaluation data')
+    plot_data.to_excel(writer, sheet_name='For plotting')
 
-run_number = N_simulation
+run_number = samples.shape[0] * len(coordinate)
 time = timer.elapsed_time / 60
 print(f'\nSimulation time for {run_number} runs is: {time:.1f} min')
-
-
 
 

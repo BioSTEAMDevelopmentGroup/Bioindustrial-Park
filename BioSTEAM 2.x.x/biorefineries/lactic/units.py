@@ -81,24 +81,9 @@ ParallelRxn = tmo.reaction.ParallelReaction
 @cost(basis='Flow rate', ID='System', units='kg/hr',
       kW=511.3205, cost=13329690, S=94697, CE=CEPCI[2009], n=0.6, BM=1.7)
 class FeedstockPreprocessing(Unit):
-    _N_ins = 1
-    _N_outs = 1
-    
-    _old_feedflow = baseline_feedflow.copy()
-    
-    # U.S. ton/day (2000 metric tonne/day)
-    feedstock_flow_rate = 2205
-    
-    def _run(self):
-        feed_in = self.ins[0]
-        feed_out = self.outs[0]
-        _old_feedflow = self._old_feedflow
-        
-        _old_water =_old_feedflow[feed_in.chemicals.index('H2O')]
-        _old_dry_flow_rate = (_old_feedflow.sum()-_old_water) * 24 / _kg_per_ton
-        feed_out.mass = _old_feedflow * (self.feedstock_flow_rate/_old_dry_flow_rate)
-        _old_feedflow = feed_in.mass
-        feed_out.copy_like(feed_in)
+    # 2205 U.S. ton/day (2000 metric tonne/day) as in ref [1]
+    _baseline_flow_rate = baseline_feedflow.sum()
+    _cached_flow_rate = 2205
 
 
 # %% 
@@ -181,7 +166,7 @@ class SteamMixer(Unit):
         steam_mol = steam.F_mol
         steam_mol = aitken_secant(f=self.P_at_flow,
                                   x0=steam_mol, x1=steam_mol+0.1, 
-                                  xtol=0.1, ytol=0.01,
+                                  xtol=1e-4, ytol=1e-4,
                                   args=(self.P, steam, mixed, feed))
         mixed.P = self.P
 
@@ -753,13 +738,13 @@ class Reactor(Unit, PressureVessel, isabstract=True):
     def BM(self):
         vessel_type = self.vessel_type
         if not vessel_type:
-            raise AttributeError('vessel_type not defined')
+            raise AttributeError('Vessel type not defined')
         elif vessel_type == 'Vertical':
             return self.BM_vertical
         elif vessel_type == 'Horizontal':
             return self.BM_horizontal 
         else:
-            raise RuntimeError("invalid vessel type")
+            raise RuntimeError('Invalid vessel type')
 
 class AcidulationReactor(Reactor):
     _N_ins = 2
@@ -810,7 +795,7 @@ class AcidulationReactor(Reactor):
         else: super()._cost()
         
 # Filter to separate gypsum from the acidified fermentation broth
-@cost(basis='Feed flow rate', ID='Hydroclone & rotary drum filter', units='kg/hr',
+@cost(basis='Feed flow rate', ID='Hydrocyclone & rotary drum filter', units='kg/hr',
       # Size based on stream 239 in ref [4]
       cost=187567, S=272342, CE=CEPCI[1998], n=0.39, BM=1.4)
 @cost(basis='Filtrate flow rate', ID='Filtered hydrolysate pump', units='kg/hr',
@@ -1263,6 +1248,7 @@ class AerobicDigestion(Unit):
         vent, effluent = self.outs
         vent.phase = 'g'
 
+        caustic.imass['NaOH'] = self.caustic_mass
         # Ammonia as a nutrient
         if self.need_ammonia is True:
             ammonia.imass['NH4OH'] = 36 * 35.046/17.031

@@ -33,4 +33,4 @@ __all__ = []
 
 from lazypkg import LazyPkg
 LazyPkg(__name__, ['chemicals', 'process_settings', 'units', 'facilities',
-                   'system', 'tea'])
+                   'system', 'tea_lca'])
