@@ -57,13 +57,13 @@ def set_succinic(feedstock, content):
     # Use Extractives to close mass balance
     feedstock.imass['Extractives'] -= (feedstock.F_mass-feedstock.imass['H2O']) - dry_mass
     if any(feedstock.mass<0):
-        raise ValueError(f'Succinic acid content of {content*100:.1f}% dry weight is infeasible')
+        raise ValueError(f'Succinic acid content of {content*100:.1f} dw% is infeasible')
 
 # Initiate a timer
 timer = TicToc('timer')
 timer.tic()
 
-succinic = np.arange(0, 0.10, 0.01)
+succinic_contents = np.arange(0, 0.10, 0.01)
 run_number = 0
 
 
@@ -74,48 +74,56 @@ run_number = 0
 # =============================================================================
 
 print('\n-------- Without D405 --------')
-succinic_wo_D405 = []
+succinic_axis = []
 F402 = system.F402
 F402_Vs = []
-MPSPs_wo_D405 = []
-purities_wo_D405 = []
-NPVs_wo_D405 = []
+MPSPs = []
+purities = []
+NPVs = []
+GWPs = []
+freshwater = []
 
 bst.speed_up()
 
 def simulate_log_results():
-    succinic_wo_D405.append(i)
     MPSP = system.simulate_get_MPSP()
-    MPSPs_wo_D405.append(MPSP)
+    MPSPs.append(MPSP)
     purity = system.lactic_acid.get_mass_composition('LacticAcid')
-    purities_wo_D405.append(purity)
-    NPVs_wo_D405.append(system.lactic_tea.NPV)
+    purities.append(purity)
+    NPVs.append(system.lactic_tea.NPV)
+    GWPs.append(system.get_functional_GWP())
+    freshwater.append(system.system_makeup_water.F_mass)
     F402_Vs.append(F402.V)
     print(f'{i:.1%} succinic acid:')
     print(f'F402 V: {F402.V:.3f}, MPSP: ${MPSP:.3f}/kg, purity: {purity:.1%}\n')
 
-for i in succinic:
+for i in succinic_contents:
     set_succinic(system.feedstock, i)
     if i < 0.08:
         simulate_log_results()
+        succinic_axis.append(i)
         run_number += 1
     if i == 0.08:
         F402.specification = None
         F402.V = 0.943
         simulate_log_results()
+        succinic_axis.append(i)
         run_number += 1
     if i == 0.09:
         for V in (0.96, 0.97, 0.98, 0.99):
             F402.V = V
             simulate_log_results()
+            succinic_axis.append(i)
             run_number += 1
     
 wo_D405_data = pd.DataFrame({
-    'Succinic acid content [%]': succinic_wo_D405,
+    'Succinic acid content [%]': succinic_axis,
     'F402 V': F402_Vs,
-    'Lactic acid purity [%]': purities_wo_D405,
-    'Minimum product selling price [$/kg]': MPSPs_wo_D405,
-    'Net present value [$]': NPVs_wo_D405
+    'Lactic acid purity [%]': purities,
+    'MPSP [$/kg]': MPSPs,
+    'Net present value [$]': NPVs,
+    'GWP [kg CO2-eq/kg lactic acid]': GWPs,
+    'Freshwater consumption [kg H2O/kg lactic acid]': freshwater
     })
 
 

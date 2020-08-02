@@ -38,8 +38,9 @@ lactic acid from lignocellulosic feedstocks
 import numpy as np
 import biosteam as bst
 import lactic.system as system
-from chaospy import distributions as shape
 from biosteam.evaluation import Model, Metric
+from chaospy import distributions as shape
+from lactic.process_settings import GWP_CFs
 
 _kg_per_ton = 907.18474
 _feedstock_factor = _kg_per_ton / 0.8
@@ -90,7 +91,7 @@ electricity_price = bst.PowerUtility.price
 # Electricity credit is positive if getting revenue from excess electricity
 get_electricity_credit = lambda: (excess_power()*electricity_price*get_annual_factor())/1e6
 
-metrics = [Metric('Minimum product selling price', get_MPSP, '$/kg'),
+metrics = [Metric('MPSP', get_MPSP, '$/kg'),
            Metric('Product mass yield', get_mass_yield, '%'),
            Metric('Total product yield', get_total_yield, '10^6 kg/yr'),
            Metric('Fermentation titer', get_titer, 'g/L'),
@@ -112,27 +113,27 @@ def get_installed_cost(group):
     return lambda: group.get_installed_cost()
 for group in process_groups:
     if group.name == 'feedstock_group': continue
-    metrics.extend(
-        (Metric(group.name, get_installed_cost(group), '10^6 $', 'Installed cost'),))
+    metrics.append(
+        Metric(group.name, get_installed_cost(group), '10^6 $', 'Installed cost'))
 
 # All checks should be ~0
 check_installed_cost = \
     lambda: sum(get_installed_cost(group)() 
                 for group in process_groups) - lactic_tea.installed_equipment_cost/1e6
-metrics.extend((Metric('Check', check_installed_cost, '10^6 $', 'Installed cost'),))
+metrics.append(Metric('Check', check_installed_cost, '10^6 $', 'Installed cost'))
 
 
 # =============================================================================
 # Material cost and product sale breakdown
 # =============================================================================
 
-tea_feeds = system.tea_feeds
-tea_products = system.tea_products
+TEA_feeds = system.TEA_feeds
+TEA_products = system.TEA_products
 
 def get_material_cost(feed):
     return lambda: feed.price*feed.F_mass*get_annual_factor()/1e6
-for feed in tea_feeds:
-    metrics.extend((Metric(feed.ID, get_material_cost(feed), '10^6 $/yr', 'Material cost'),))
+for feed in TEA_feeds:
+    metrics.append(Metric(feed.ID, get_material_cost(feed), '10^6 $/yr', 'Material cost'))
 
 # Sulfuric acid used in pretreatment and separation processes
 T602_S = system.T602_S
@@ -142,23 +143,24 @@ T603_S = system.T603_S
 get_pretreatment_ammonia_ratio = lambda: T603_S.outs[0].F_mass/T602_S.F_mass_out
 
 check_material_cost = lambda: sum(get_material_cost(feed)()
-                                  for feed in tea_feeds) - lactic_tea.material_cost/1e6
+                                  for feed in TEA_feeds) - lactic_tea.material_cost/1e6
 
 metrics.extend((
     Metric('Pretreatment sulfuric acid ratio', get_pretreatment_sulfuric_acid_ratio, 
            '%', 'Material cost'),
     Metric('Pretreatment ammonia ratio', get_pretreatment_ammonia_ratio, 
            '%', 'Material cost'),
-    Metric('Check', check_material_cost, '10^6 $/yr', 'Material cost')))
+    Metric('Check', check_material_cost, '10^6 $/yr', 'Material cost')
+    ))
 
 def get_product_sale(stream):
     return lambda: stream.price*stream.F_mass*get_annual_factor()/1e6
-for product in tea_products:
-    metrics.extend((Metric(product.ID, get_product_sale(product), '10^6 $/yr', 'Product sale'),))
+for product in TEA_products:
+    metrics.append(Metric(product.ID, get_product_sale(product), '10^6 $/yr', 'Product sale'))
 check_product_sale= \
-    lambda: sum(get_product_sale(product)() for product in tea_products) \
+    lambda: sum(get_product_sale(product)() for product in TEA_products) \
         - lactic_tea.sales/1e6
-metrics.extend((Metric('Check', check_product_sale, '10^6 $/yr', 'Product sale'),))
+metrics.append(Metric('Check', check_product_sale, '10^6 $/yr', 'Product sale'))
 
 
 # =============================================================================
@@ -181,10 +183,10 @@ for group in process_groups:
     # The only heating demand for the pretreatment system is the heat needed to
     # generate the side steam
     if group.name == 'pretreatment_group':
-        metrics.extend((Metric(group.name, get_pretreatment_steam_heating_demand, '10^9 kJ/yr', 
-                                'Heating demand'),))
-    else: metrics.extend((Metric(group.name, get_heating_demand(group), '10^9 kJ/yr', 
-                                  'Heating demand'),))
+        metrics.append(Metric(group.name, get_pretreatment_steam_heating_demand, '10^9 kJ/yr', 
+                                'Heating demand'))
+    else: metrics.append(Metric(group.name, get_heating_demand(group), '10^9 kJ/yr', 
+                                  'Heating demand'))
 
 check_heating_demand = \
     lambda: sum((get_heating_demand(group)() for group in process_groups), 
@@ -214,8 +216,8 @@ def get_cooling_demand(group):
 
 for group in process_groups:
     if group.name in ('feedstock_group', 'HXN_group', 'CT_group'): continue
-    else: metrics.extend((Metric(group.name, get_cooling_demand(group),
-                                  '10^9 kJ/yr', 'Cooling demand'),))
+    else: metrics.append(Metric(group.name, get_cooling_demand(group),
+                                  '10^9 kJ/yr', 'Cooling demand'))
 
 check_cooling_demand = \
     lambda: sum(get_cooling_demand(group)() for group in process_groups) + \
@@ -241,7 +243,7 @@ def get_power_demand(group):
 
 for group in process_groups:
     if group.name == 'feedstock_group': continue
-    metrics.extend((Metric(group.name, get_power_demand(group), 'kW', 'Power demand'),))
+    metrics.append(Metric(group.name, get_power_demand(group), 'kW', 'Power demand'))
 
 check_power_demand = lambda: sum(get_power_demand(group)()
                                  for group in process_groups) - get_system_power_demand()
@@ -261,7 +263,7 @@ def get_utility_cost(group):
 
 for group in process_groups:
     if group.name == 'feedstock_group': continue
-    metrics.extend((Metric(group.name, get_utility_cost(group), '10^6 $/yr', 'Utility cost'),))
+    metrics.append(Metric(group.name, get_utility_cost(group), '10^6 $/yr', 'Utility cost'))
 
 check_utility_cost = \
     lambda: sum(get_utility_cost(group)() for group in process_groups) \
@@ -274,8 +276,10 @@ metrics.extend((
 
 # To see if TEA converges well for each simulation
 get_NPV = lambda: lactic_tea.NPV
-metrics.extend((Metric('Net present value', get_NPV, '$', 'TEA'), ))
+metrics.append(Metric('NPV', get_NPV, '$', 'TEA'))
 metrics_no_IRRs = metrics.copy()
+
+index_TEA = len(metrics)
 
 
 # %%
@@ -297,7 +301,44 @@ IRR2 = np.arange(0.11, 0.41, 0.01)
 IRRs = IRR1.tolist() + IRR2.tolist() + [0.1]
 for IRR in IRRs:
     metrics.extend((i for i in create_IRR_metrics(IRR)))
-# IRR_metrics = sum([create_IRR_metrics(IRR) for IRR in IRRs],[])
+
+index_IRR = len(metrics)
+
+
+# %%
+
+# =============================================================================
+# Metrics for global warming potential
+# =============================================================================
+
+get_functional_GWP = system.get_functional_GWP
+get_total_material_GWP = lambda: system.get_total_material_GWP()/lactic_acid.F_mass
+get_electricity_GWP = lambda: system.get_electricity_GWP()/lactic_acid.F_mass
+get_non_bio_GWP = lambda: system.get_non_bio_GWP()/lactic_acid.F_mass
+get_functional_H2O = system.get_functional_H2O
+
+LCA_stream = system.LCA_stream
+def get_material_GWP(material):
+    return lambda: LCA_stream.imass[material]*GWP_CFs[material]/lactic_acid.F_mass
+
+check_GWP = lambda: get_functional_GWP() - \
+    (sum(get_material_GWP(i)() for i in GWP_CFs)+get_electricity_GWP()+get_non_bio_GWP())
+
+metrics.extend((
+    Metric('Total GWP', get_functional_GWP, 'kg CO2-eq/kg lactic acid', 'LCA'),
+    Metric('Material', get_total_material_GWP, 'kg CO2-eq/kg lactic acid', 'LCA')
+    ))
+
+for i in GWP_CFs.keys():
+    metrics.append(
+        Metric(i, get_material_GWP(i), 'kg CO2-eq/kg lactic acid', 'LCA'))   
+
+metrics.extend((
+    Metric('Electricity', get_electricity_GWP, 'kg CO2-eq/kg lactic acid', 'LCA'),
+    Metric('Non-biogenic combustion', get_non_bio_GWP, 'kg CO2-eq/kg lactic acid', 'LCA'),
+    Metric('GWP check', check_GWP, 'kg CO2-eq/kg lactic acid', 'LCA'),
+    Metric('Freshwater consumption', get_functional_H2O, 'kg H2O/kg lactic acid', 'LCA')
+    ))
 
 
 # %% 
@@ -567,16 +608,19 @@ def create_price_metrics(price):
         price_per_kg = price / _feedstock_factor
         feedstock.price = price_per_kg
         return get_MPSP()
-    return [Metric('Minimum product selling price', get_price_based_MPSP,
-                   '$/kg', f'Price={price:.0f} [$/dry-ton]'),
-            Metric('Net present value', get_NPV,
-                   '$', f'Price={price:.0f} [$/dry-ton]')]
+    header = f'Price={price:.0f} [$/dry-ton]'
+    return [Metric('MPSP', get_price_based_MPSP, '$/kg', header),
+            Metric('NPV', get_NPV, '$', header)]
 
 prices = np.arange(50, 300, 10)
 # 71.3 is the baseline
 prices = np.concatenate((prices, np.array([71.3])))
 
-price_metrics = sum([create_price_metrics(price) for price in prices],[])
+carb_metrics = sum([create_price_metrics(price) for price in prices],[])
+carb_metrics.extend((
+    Metric('Total GWP', get_functional_GWP, 'kg CO2-eq/kg lactic acid', 'LCA'),
+    Metric('Freshwater consumption', get_functional_H2O, 'kg H2O/kg lactic acid', 'LCA')
+    ))
 
 def set_carbs(carbs_content):
     carbs = ('Glucan', 'Xylan', 'Arabinan', 'Galactan', 'Mannan')
@@ -588,9 +632,9 @@ def set_carbs(carbs_content):
     mass_diff = new_carbs_mass.sum() - old_carbs_mass_total
     feedstock.imass['Extractives'] -= mass_diff
     if any(feedstock.mass < 0):
-        raise ValueError(f'Carbohydrate content of {carbs_content*100:.1f}% dry weight is infeasible')
+        raise ValueError(f'Carbohydrate content of {carbs_content*100:.1f} dw% is infeasible')
 
-model_carbs_price = Model(lactic_sys, price_metrics)
+model_carbs_price = Model(lactic_sys, carb_metrics)
 # Use the blank parameter to enable evaluation across internal rate of return
 blank_parameter = [i for i in model_full.get_parameters() if i.name=='Blank parameter']
 model_carbs_price.set_parameters(blank_parameter)

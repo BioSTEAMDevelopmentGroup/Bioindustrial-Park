@@ -97,6 +97,7 @@ S402.bypass = False
 run_number = 0
 MPSPs_regular = [[], [], []]
 NPVs_regular = [[], [], []]
+LCA_regular = [[], []]
 
 print('\n-------- Regular Strain --------')
 for i in titer_range:
@@ -110,6 +111,9 @@ for i in titer_range:
         for m in range(2):
             lactic_sys.simulate()
         limits[2].append(R301.sugar_limited_titer)
+        LCA_regular[0].append(system.get_functional_GWP())
+        LCA_regular[1].append(system.system_makeup_water.F_mass)
+        
         update_productivity(0.89)
         solve_TEA()
         MPSPs_regular[0].append(lactic_acid.price)
@@ -131,18 +135,20 @@ regular_data = pd.DataFrame({
     ('Limits', 'Yield [g/g]'): limits[1],
     ('Limits', 'Titer [g/L]'): limits[0],
     ('Limits', 'Sugar-limited titer [g/L]'): limits[2],
-    ('Productivity=0.89 [g/L/hr] (baseline)', 'Minimum product selling price [$/kg]'):
+    ('Productivity=0.89 [g/L/hr] (baseline)', 'MPSP [$/kg]'):
         MPSPs_regular[0],
-    ('Productivity=0.89 [g/L/hr] (baseline)', 'Net present value [$]'):
+    ('Productivity=0.89 [g/L/hr] (baseline)', 'NPV [$]'):
         NPVs_regular[0],
-    ('Productivity=0.18 [g/L/hr] (min)', 'Minimum product selling price [$/kg]'):
+    ('Productivity=0.18 [g/L/hr] (min)', 'MPSP [$/kg]'):
         MPSPs_regular[1],
-    ('Productivity=0.18 [g/L/hr] (min)', 'Net present value [$]'):
+    ('Productivity=0.18 [g/L/hr] (min)', 'NPV [$]'):
         NPVs_regular[1],
-    ('Productivity=1.92 [g/L/hr] (max)', 'Minimum product selling price [$/kg]'):
+    ('Productivity=1.92 [g/L/hr] (max)', 'MPSP [$/kg]'):
         MPSPs_regular[2],
-    ('Productivity=1.92 [g/L/hr] (max)', 'Net present value [$]'):
-        NPVs_regular[2]
+    ('Productivity=1.92 [g/L/hr] (max)', 'NPV [$]'):
+        NPVs_regular[2],
+    ('LCA', 'GWP [kg CO2-eq/kg lactic acid]'): LCA_regular[0],
+    ('LCA', 'Freshwater consumption [kg H2O/kg lactic acid]'): LCA_regular[1]
     })
 
 
@@ -161,6 +167,7 @@ S402.bypass = True
 limits = [[], [], []]
 MPSPs_acid_resistant = [[], [], []]
 NPVs_acid_resistant = [[], [], []]
+LCA_acid_resistant = [[], []]
 
 run_number = 0
 
@@ -176,6 +183,9 @@ for i in titer_range:
         for m in range(2):
             lactic_sys.simulate()
         limits[2].append(R301.sugar_limited_titer)
+        LCA_acid_resistant[0].append(system.get_functional_GWP())
+        LCA_acid_resistant[1].append(system.system_makeup_water.F_mass)
+        
         update_productivity(0.89)
         solve_TEA()
         MPSPs_acid_resistant[0].append(lactic_acid.price)
@@ -197,18 +207,20 @@ acid_resistent_data = pd.DataFrame({
     ('Limits', 'Yield [g/g]'): limits[1],
     ('Limits', 'Titer [g/L]'): limits[0],
     ('Limits', 'Sugar-limited titer [g/L]'): limits[2],
-    ('Productivity=0.89 [g/L/hr] (baseline)', 'Minimum product selling price [$/kg]'):
+    ('Productivity=0.89 [g/L/hr] (baseline)', 'MPSP [$/kg]'):
         MPSPs_acid_resistant[0],
-    ('Productivity=0.89 [g/L/hr] (baseline)', 'Net present value [$]'):
+    ('Productivity=0.89 [g/L/hr] (baseline)', 'NPV [$]'):
         NPVs_acid_resistant[0],
-    ('Productivity=0.18 [g/L/hr] (min)', 'Minimum product selling price [$/kg]'):
+    ('Productivity=0.18 [g/L/hr] (min)', 'MPSP [$/kg]'):
         MPSPs_acid_resistant[1],
-    ('Productivity=0.18 [g/L/hr] (min)', 'Net present value [$]'):
+    ('Productivity=0.18 [g/L/hr] (min)', 'NPV [$]'):
         NPVs_acid_resistant[1],
-    ('Productivity=1.92 [g/L/hr] (max)', 'Minimum product selling price [$/kg]'):
+    ('Productivity=1.92 [g/L/hr] (max)', 'MPSP [$/kg]'):
         MPSPs_acid_resistant[2],
-    ('Productivity=1.92 [g/L/hr] (max)', 'Net present value [$]'):
-        NPVs_acid_resistant[2]
+    ('Productivity=1.92 [g/L/hr] (max)', 'NPV [$]'):
+        NPVs_acid_resistant[2],
+    ('LCA', 'GWP [kg CO2-eq/kg lactic acid]'): LCA_acid_resistant[0],
+    ('LCA', 'Freshwater consumption [kg H2O/kg lactic acid]'): LCA_acid_resistant[1]
     })
 
     

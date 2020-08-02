@@ -112,33 +112,34 @@ class LacticTEA(TEA):
                 + self._ISBL_DPI_cached * self.maintenance
                 + self.labor_cost*(1+self.labor_burden))
 
+
 # %%
 
-# =============================================================================
-# For life cycle analysis (LCA)
-# =============================================================================
+# # =============================================================================
+# # For life cycle analysis (LCA), not used currently
+# # =============================================================================
 
-from biosteam_lca.multilca import MultiLCA
+# from biosteam_lca.multilca import MultiLCA
 
-class LacticLCA(MultiLCA):
-    # Total impact of the system as a dictionary
-    def compute_system_impacts(self):
-        total_scores = self.total_scores = super().scores()
-        system_impacts = [sum(total_scores[i] for i in total_scores.keys())]
-        self.system_impact = dict(zip(total_scores.keys(), system_impacts))
-        return system_impacts
+# class LacticLCA(MultiLCA):
+#     # Total impact of the system as a dictionary
+#     def compute_system_impacts(self):
+#         total_scores = self.total_scores = super().scores()
+#         system_impacts = [sum(total_scores[i] for i in total_scores.keys())]
+#         self.system_impact = dict(zip(total_scores.keys(), system_impacts))
+#         return system_impacts
     
-    # Impact by functional unit
-    def compute_functional_impacts(self, fu):
-        system_impacts = self.compute_system_impacts()
-        functional_impacts = self.functional_impacts = system_impacts / fu
+#     # Impact by functional unit
+#     def compute_functional_impacts(self, fu):
+#         system_impacts = self.compute_system_impacts()
+#         functional_impacts = self.functional_impacts = system_impacts / fu
 
-        system_impact = self.system_impact
-        functional_impact = self.functional_impact = {}
-        for i in system_impact.keys():
-            functional_impact[i] = system_impact[i] / fu
+#         system_impact = self.system_impact
+#         functional_impact = self.functional_impact = {}
+#         for i in system_impact.keys():
+#             functional_impact[i] = system_impact[i] / fu
 
-        return functional_impacts
+#         return functional_impacts
 
 
 

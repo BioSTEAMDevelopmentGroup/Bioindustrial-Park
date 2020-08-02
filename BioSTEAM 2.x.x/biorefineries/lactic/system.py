@@ -57,15 +57,14 @@ from flexsolve import aitken_secant, IQ_interpolation
 from biosteam import System
 from biosteam.process_tools import UnitGroup
 from thermosteam import Stream
-from biosteam_lca import InventoryConstructor as IC
 from lactic import units, facilities
 from lactic.hx_network import HX_Network
-from lactic.process_settings import price
+from lactic.process_settings import price, GWP_CF_stream, electricity_GWP_CF
 from lactic.utils import baseline_feedflow, set_yield, find_split, splits_df
 from lactic.chemicals import chems, chemical_groups, soluble_organics, combustibles
-from lactic.tea_lca import LacticTEA, LacticLCA
+from lactic.tea_lca import LacticTEA
 
-flowsheet = bst.Flowsheet('lactic_wo_D405')
+flowsheet = bst.Flowsheet('lactic')
 bst.main_flowsheet.set_flowsheet(flowsheet)
 bst.CE = 541.7 # year 2016
 
@@ -167,8 +166,7 @@ pretreatment_sys = System('pretreatment_sys',
                           path=(T201, M201, M202, M203, R201,
                                 T202, T203, F201, M204, H201, M205, T204, P201))
 
-pretreatment_group = UnitGroup('pretreatment_group',
-                               units=pretreatment_sys.units)
+pretreatment_group = UnitGroup('pretreatment_group', units=pretreatment_sys.units)
 process_groups.append(pretreatment_group)
 
 
@@ -230,8 +228,7 @@ PS301 = bst.units.ProcessSpecification('PS301', ins=R301-0,
 conversion_sys = System('conversion_sys',
                         path=(H301, M301, seed_recycle, PS301))
 
-conversion_group = UnitGroup('conversion_group',
-                              units=conversion_sys.units)
+conversion_group = UnitGroup('conversion_group', units=conversion_sys.units)
 process_groups.append(conversion_group)
 
 
@@ -348,7 +345,6 @@ ethanol_recycle = System('ethanol_recycle',
                          recycle=D402_H-0)
 
 # Principal recovery step; EtLA separated from less volatile impurities
-# N.B.: S403's Lr and Hr are great candidate parameters for formal optimization
 D403 = bst.units.BinaryDistillation('D403', ins=D402_P-0,
                                     outs=('D403_g_esters', 'D403_l'),
                                 LHK=('EthylLactate', 'LacticAcid'),
@@ -435,9 +431,7 @@ separation_sys = System('separation_sys',
                               D401, D401_H, D401_P, esterification_recycle,
                               F402_H2, F402_P, M401, M401_P,))
 
-separation_group = UnitGroup('separation_group',
-                             units=separation_sys.units)
-
+separation_group = UnitGroup('separation_group', units=separation_sys.units)
 process_groups.append(separation_group)
 
 
@@ -528,7 +522,7 @@ process_groups.append(wastewater_group)
 lactic_acid = Stream('lactic_acid', units='kg/hr')
 
 # Process chemicals
-sulfuric_acid = Stream('sulfuric_acid', units='kg/hr', price=price['Sulfuric acid'])
+sulfuric_acid = Stream('sulfuric_acid', units='kg/hr', price=price['H2SO4'])
 ammonia = Stream('ammonia', units='kg/hr', price=price['NH4OH'])
 CSL = Stream('CSL', units='kg/hr', price=price['CSL'])
 lime = Stream('lime', units='kg/hr', price=price['Lime'])
@@ -655,20 +649,19 @@ process_groups.append(facilities_no_hu_group)
 # =============================================================================
 
 lactic_sys = System('lactic_sys',
-    path=(U101,pretreatment_sys, conversion_sys, separation_sys, wastewater_sys,
-          T601, T601_P, T602_S, T602, T603_S, T603, T604, T605, T606, T606_P,
-          T607, M601),
-    facilities=(HXN, CHP, CT, PWC, ADP, CIP))
+                    path=(U101,pretreatment_sys, conversion_sys, separation_sys,
+                          wastewater_sys,
+                          T601, T601_P, T602_S, T602, T603_S, T603, T604, T605,
+                          T606, T606_P, T607, M601),
+                    facilities=(HXN, CHP, CT, PWC, ADP, CIP))
 
 CHP_sys = System('CHP_sys', path=(CHP,))
 
-tea_feeds = set([i for i in lactic_sys.feeds if i.price]+ \
+TEA_feeds = set([i for i in lactic_sys.feeds if i.price]+ \
     [i for i in CHP_sys.feeds if i.price])
 
-tea_products = set([i for i in lactic_sys.products if i.price]+ \
+TEA_products = set([i for i in lactic_sys.products if i.price]+ \
     [i for i in CHP_sys.products if i.price]+[lactic_acid, gypsum])
-
-
 
 
 # %%
@@ -728,7 +721,43 @@ def simulate_get_MPSP():
 
     
 MPSP = simulate_get_MPSP()
-print(f'Baseline MPSP is ${MPSP:.3f}/kg')
+print('\n---------- Baseline biorefinery ----------')
+print(f'MPSP is ${MPSP:.3f}/kg')
+
+
+# %%
+
+# =============================================================================
+# Gate-to-gate life cycle analysis (LCA), thus excluding feedstock impacts,
+# waste disposal, and biogenic emissions
+# =============================================================================
+
+# Global warming potential from material flows
+LCA_streams = TEA_feeds.copy()
+LCA_streams.add(gypsum)
+LCA_stream = Stream('LCA_stream', units='kg/hr')
+    
+def get_total_material_GWP():
+    LCA_stream.mass = sum(i.mass for i in LCA_streams)
+    material_GWP = LCA_stream.mass*GWP_CF_stream.mass
+    return material_GWP.sum()
+
+# GWP from non-biogenic carbons
+get_non_bio_GWP = lambda: chems.CO2.MW * \
+    (natural_gas.get_atomic_flow('C')+ethanol.get_atomic_flow('C'))
+
+# GWP from electricity usage
+get_electricity_GWP = lambda: sum(i.power_utility.rate for i in lactic_sys.units) * \
+    electricity_GWP_CF
+
+get_total_GWP = lambda: get_total_material_GWP()+get_non_bio_GWP()+ \
+    get_electricity_GWP()
+
+get_functional_GWP = lambda: get_total_GWP()/lactic_acid.F_mass
+print(f'GWP is {get_functional_GWP():.3f} kg CO2-eq/kg lactic acid')
+
+get_functional_H2O = lambda: system_makeup_water.F_mass / lactic_acid.F_mass
+print(f'Freshwater consumption is {get_functional_H2O():.3f} kg H2O/kg lactic acid')
 
 
 # %%
@@ -744,11 +773,9 @@ print(f'Baseline MPSP is ${MPSP:.3f}/kg')
 # R301.set_titer_limit = False
 # set_yield(0.76, R301, R302)    
 
-
 # for i in range(3):
 #     MPSP = simulate_get_MPSP()
 # print(f'MPSP is ${lactic_acid.price:.3f}/kg')
-
 
 # all_units = sum((i.units for i in process_groups), ())
 # for unit in all_units:

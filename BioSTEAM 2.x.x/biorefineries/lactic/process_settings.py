@@ -35,6 +35,20 @@ lactic acid from lignocellulosic feedstocks
     Acid Prehydrolysis and Enzymatic Hydrolysis for Corn Stover; NREL/TP-510-32438;
     National Renewable Energy Lab (NREL), 2002.
     https://doi.org/10.2172/1218326.
+    
+[5] Neupane et al., Life-Cycle Greenhouse Gas and Water Intensity of Cellulosic
+    Biofuel Production Using Cholinium Lysinate Ionic Liquid Pretreatment.
+    ACS Sustainable Chem. Eng. 2017, 5 (11), 10176–10185.
+    https://doi.org/10.1021/acssuschemeng.7b02116.
+
+[6] Nordahl et al., Life-Cycle Greenhouse Gas Emissions and Human Health
+    Trade-Offs of Organic Waste Management Strategies. Environ. Sci. Technol. 2020.
+    https://doi.org/10.1021/acs.est.0c00364.
+
+[7] Jiménez Rivero et al., Life Cycle Energy and Material Flow Implications
+    of Gypsum Plasterboard Recycling in the European Union.
+    Resources, Conservation and Recycling 2016, 108, 171–181.
+    https://doi.org/10.1016/j.resconrec.2016.01.014.
 
 @author: yalinli_cabbi
 """
@@ -42,8 +56,47 @@ lactic acid from lignocellulosic feedstocks
 
 # %%
 
+# =============================================================================
+# Setup
+# =============================================================================
+
 import biosteam as bst
+import thermosteam as tmo
 from lactic.chemicals import chems
+
+
+# %%
+
+# =============================================================================
+# Energy balances
+# =============================================================================
+
+_lps = bst.HeatUtility.get_heating_agent('low_pressure_steam')
+_mps = bst.HeatUtility.get_heating_agent('medium_pressure_steam')
+_hps = bst.HeatUtility.get_heating_agent('high_pressure_steam')
+_mps.T = 233 + 273.15
+_hps.T = 266 + 273.15
+
+_cooling = bst.HeatUtility.get_cooling_agent('cooling_water')
+_cooling.regeneration_price = 0
+_cooling.T = 28 + 273.15
+_cooling.T_limit = _cooling.T + 9
+
+# Side steam in CHP not a heat utility, thus will cause problem in TEA utility
+# cost calculation if price not set to 0 here, costs for regeneration of heating
+# and cooling utilities will be considered as CAPEX and OPEX of CHP and CT, respectively
+for i in (_lps, _mps, _hps, _cooling):
+    i.heat_transfer_price = i.regeneration_price = 0
+    # if i == _cooling: continue
+    # i.heat_transfer_efficiency = 0.85
+
+
+# %%
+
+# =============================================================================
+# Prices for techno-economic analysis (TEA), all in $/kg (electricity in $/kWh)
+# and from ref [3] if not noted
+# =============================================================================
 
 bst.CE = 541.7 # year 2016
 _kg_per_ton = 907.18474
@@ -51,6 +104,7 @@ _lb_per_kg = 2.20462
 _liter_per_gallon = 3.78541
 _ft3_per_m3 = 35.3147
 _chemical_2020to2016 = 102.5 / 113.8 # average of Jan and Feb
+_GDP_2007to2016 = 1.160
 
 # From USD/dry-ton to USD/kg in 2016$, 20% moisture content,
 # baseline and lower bound (60) from ref [3], upper bound (146.4) from
@@ -106,7 +160,7 @@ gypsum_price = 0
 # Upper bound is +10% from baseline = 0.1189 * _lb_per_kg * 1.1 = 0.288
 lime_price = 0.1189 * _lb_per_kg
 
-baghouse_bag_price = 466833 / 5 / (24*365*0.96)
+baghouse_bag_price = 466183/5/(24*365*0.96) * _GDP_2007to2016
 
 # 4.70 is the average natural gas price in 2016$/Mcf based on AEO from EIA,
 # which is $0.231/kg at 273.15 K or $0.253/kg at 298.15 K using BioSTEAM,   
@@ -123,9 +177,9 @@ amberlyst_15_price = 153.252 * _chemical_2020to2016
 
 # All in 2016$/kg
 price = {'Feedstock': feedstock_price, 	
-         'Sulfuric acid': 0.0430 * _lb_per_kg,	
+         'H2SO4': 0.0430 * _lb_per_kg,	
          # 0.1900 is for NH3	
-         'NH4OH': 0.1900 * _lb_per_kg * 17.031/35.046,	
+         'NH4OH': 0.1900 * _lb_per_kg * chems.NH3.MW/chems.NH4OH.MW,
          'CSL': 0.0339 * _lb_per_kg,
          'Enzyme': 6.16,
          'Lime': lime_price,
@@ -137,31 +191,58 @@ price = {'Feedstock': feedstock_price,
          'Makeup water': 0.0002 * _lb_per_kg,	
          # Cost of ash is negative because it's a product stream	
          'Ash disposal': ash_disposal_price,	
-         'Gypsum': gypsum_price,	
-         'Electricity': 0.070, # AEO from EIA, 2010-2019 average (0.067-0.074 range)	
+         'Gypsum': gypsum_price,
          'Ethanol': ethanol_price,	
          'Baghouse bag': baghouse_bag_price,	
          'Natural gas': natural_gas_price}
-    
-bst.PowerUtility.price = price['Electricity']
 
-_lps = bst.HeatUtility.get_heating_agent('low_pressure_steam')
-_mps = bst.HeatUtility.get_heating_agent('medium_pressure_steam')
-_hps = bst.HeatUtility.get_heating_agent('high_pressure_steam')
-_mps.T = 233 + 273.15
-_hps.T = 266 + 273.15
+# $/kWh, from EIA AEO, 2010-2019 average (0.067-0.074 range)
+bst.PowerUtility.price = 0.070
 
-_cooling = bst.HeatUtility.get_cooling_agent('cooling_water')
-_cooling.regeneration_price = 0
-_cooling.T = 28 + 273.15
-_cooling.T_limit = _cooling.T + 9
 
-# Side steam in CHP not a heat utility, thus will cause problem in TEA utility
-# cost calculation if price not set to 0 here, costs for regeneration of heating
-# and cooling utilities will be considered as CAPEX and OPEX of CHP and CT, respectively
-for i in (_lps, _mps, _hps, _cooling):
-    i.heat_transfer_price = i.regeneration_price = 0
-    # if i == _cooling: continue
-    # i.heat_transfer_efficiency = 0.85
+# %%
+
+# =============================================================================
+# Global warming potential (GWP) for life cycle analysis (LCA), all from ref [5] 
+# if not noted
+# =============================================================================
+
+_CH4_MJ_per_kg = - chems.CH4.HHV/1e6/(chems.CH4.MW/1e3)
+
+# In kg CO2-eq/kg
+GWP_CFs = {
+    'NH4OH': 1.987 * chems.NH3.MW/chems.NH4OH.MW,
+    'CSL': 0.1105,
+    'CH4': 0.00101 * _CH4_MJ_per_kg,
+    'Enzyme': 0.1128,
+    # From ref [6], 0.94 kg CO2 and 6e-7 kg N2O per kg of lime
+    'Lime': 0.94+6e-7*298,
+    'NaOH': 0.2186,
+    'H2SO4': 1.36e-5,
+    'Gypsum': -2.03/1e3 # ref[7]
+    }
+
+GWP_CF_array = chems.kwarray(GWP_CFs)
+
+# Actually in kg CO2-eq/kg
+GWP_CF_stream = tmo.Stream('impact_stream', GWP_CF_array, units='kg/hr')
+
+# In kg CO2-eq/kWh
+electricity_GWP_CF = 0.4481
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 

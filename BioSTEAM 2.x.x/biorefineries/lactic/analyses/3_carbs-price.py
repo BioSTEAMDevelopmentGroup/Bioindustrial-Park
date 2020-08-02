@@ -65,43 +65,63 @@ samples_1d = model.sample(N=N_simulation, rule='L')
 samples = samples_1d[:, np.newaxis]
 model.load_samples(samples)
 
-coordinate = np.arange(0.4, 0.701, 0.01)
+carb_contents = np.arange(0.4, 0.701, 0.01)
 
 data = model.evaluate_across_coordinate(
-    'Feedstock carbohydate content', set_carbs, coordinate, notify=True)
+    'Carbohydate content', set_carbs, carb_contents, notify=True)
 
-MPSPs_NPVs = pd.DataFrame({
-    ('Parameter', 'Carbohydrate content [dry mass %]'): coordinate})
+results = pd.DataFrame({
+    ('Parameter', 'Carbohydrate content [dw%]'): carb_contents})
 
 for (i, j) in zip(data.keys(), data.values()):
-    MPSPs_NPVs[i] = j[0]
+    results[i] = j[0]
 
-'''Organize data for easy plotting'''
-x_axis = [f'{i:.3f}' for i in coordinate]
-x_axis *= len(prices)
-y_axis = sum(([f'{i:.0f}']*len(coordinate) for i in prices), [])
+'''Organize TEA data for easy plotting'''
+TEA_x = [f'{i:.3f}' for i in carb_contents]
+TEA_x *= len(prices)
+TEA_y = sum(([f'{i:.0f}']*len(carb_contents) for i in prices), [])
 
 MPSPs = []
-NPVs = []
-for i in range(MPSPs_NPVs.columns.shape[0]):
-    if 'Minimum product selling price' in MPSPs_NPVs.columns[i][1]:
-        MPSPs +=  MPSPs_NPVs[MPSPs_NPVs.columns[i]].to_list()
-    if 'Net present value' in MPSPs_NPVs.columns[i][1]:
-        NPVs +=  MPSPs_NPVs[MPSPs_NPVs.columns[i]].to_list()
+GWPs = []
+freshwater = []
+for i in range(results.columns.shape[0]):
+    if 'MPSP' in results.columns[i][1]:
+        MPSPs +=  results[results.columns[i]].to_list()
+    if 'GWP' in results.columns[i][1]:
+        GWPs +=  results[results.columns[i]].to_list()
+    if 'Freshwater' in results.columns[i][1]:
+        freshwater +=  results[results.columns[i]].to_list()
 
-plot_data = pd.DataFrame()
-plot_data['Carbohydrate content [dry mass %]'] = x_axis
-plot_data['Price [$/dry-ton]'] = y_axis
-plot_data['Minimum product selling price [$/kg]'] = MPSPs
-plot_data['Net present value [$]'] = NPVs
+TEA_plot_data = pd.DataFrame({
+    'Carbohydrate content [dw%]': TEA_x,
+    'Price [$/dry-ton]': TEA_y,
+    'MPSP [$/kg]': MPSPs
+    })
+
+LCA_plot_data = pd.DataFrame({
+    'Carbohydrate content [dw%]': carb_contents,    
+    'GWP [kg CO2-eq/kg lactic acid]': GWPs,
+    'Freshwater consumption [kg H2O/kg lactic acid]': freshwater
+    })
 
 '''Output to Excel'''
 with pd.ExcelWriter('3_carbs-price.xlsx') as writer:
-    MPSPs_NPVs.to_excel(writer, sheet_name='Evaluation data')
-    plot_data.to_excel(writer, sheet_name='For plotting')
+    TEA_plot_data.to_excel(writer, sheet_name='TEA plotting')
+    LCA_plot_data.to_excel(writer, sheet_name='LCA plotting')
+    results.to_excel(writer, sheet_name='Raw data')
 
-run_number = samples.shape[0] * len(coordinate)
+run_number = samples.shape[0] * len(carb_contents)
 time = timer.elapsed_time / 60
 print(f'\nSimulation time for {run_number} runs is: {time:.1f} min')
+
+
+
+
+
+
+
+
+
+
 
 

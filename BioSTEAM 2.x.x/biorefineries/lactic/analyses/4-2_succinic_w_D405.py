@@ -57,14 +57,14 @@ def set_succinic(feedstock, content):
     # Use Extractives to close mass balance
     feedstock.imass['Extractives'] -= (feedstock.F_mass-feedstock.imass['H2O']) - dry_mass
     if any(feedstock.mass<0):
-        raise ValueError(f'Succinic acid content of {content*100:.1f}% dry weight is infeasible')
+        raise ValueError(f'Succinic acid content of {content*100:.1f} dw% is infeasible')
 
 # Initiate a timer
 timer = TicToc('timer')
 timer.tic()
 
-succinic = np.arange(0.07, 0.15, 0.01)
-succinic = succinic.tolist() + [0.145]
+succinic_contents = np.arange(0.07, 0.15, 0.01)
+succinic_contents = succinic_contents.tolist() + [0.145]
 run_number = 0
 
 
@@ -75,37 +75,41 @@ run_number = 0
 # =============================================================================
 
 print('\n-------- With D405 --------')
-succinic_w_D405 = []
 D405 = system_succinic.D405
 D405_Lrs = []
-MPSPs_w_D405 = []
-purities_w_D405 = []
-NPVs_w_D405 = []
+MPSPs = []
+purities = []
+NPVs = []
+GWPs = []
+freshwater = []
 
 bst.speed_up()
 
 def simulate_log_results():
-    succinic_w_D405.append(i)
     MPSP = system_succinic.simulate_get_MPSP()
-    MPSPs_w_D405.append(MPSP)
+    MPSPs.append(MPSP)
     purity = system_succinic.lactic_acid.get_mass_composition('LacticAcid')
-    purities_w_D405.append(purity)
-    NPVs_w_D405.append(system_succinic.lactic_tea.NPV)
+    purities.append(purity)
+    NPVs.append(system_succinic.lactic_tea.NPV)
+    GWPs.append(system_succinic.get_functional_GWP())
+    freshwater.append(system_succinic.system_makeup_water.F_mass)
     D405_Lrs.append(D405.Lr)
     print(f'{i:.1%} succinic acid:')
     print(f'D405 Lr: {D405.Lr:.3f}, MPSP: ${MPSP:.3f}/kg, purity: {purity:.1%}\n')
 
-for i in succinic:
+for i in succinic_contents:
     set_succinic(system_succinic.feedstock, i)
     simulate_log_results()
     run_number += 1
 
 w_D405_data = pd.DataFrame({
-    'Succinic acid content [%]': succinic_w_D405,
+    'Succinic acid content [%]': succinic_contents,
     'D405 Lr': D405_Lrs,
-    'Lactic acid purity [%]': purities_w_D405,
-    'Minimum product selling price [$/kg]': MPSPs_w_D405,
-    'Net present value [$]': NPVs_w_D405
+    'Lactic acid purity [%]': purities,
+    'MPSP [$/kg]': MPSPs,
+    'NPV [$]': NPVs,
+    'GWP [kg CO2-eq/kg lactic acid]': GWPs,
+    'Freshwater consumption [kg H2O/kg lactic acid]': freshwater
     })
 
 time = timer.elapsed_time / 60
