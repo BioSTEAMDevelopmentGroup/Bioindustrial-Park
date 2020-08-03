@@ -13,6 +13,7 @@ biorefineries/cornstover/_plot_bars.py
 biorefineries/cornstover/_plot_spearman.py
 biorefineries/cornstover/_plot_uncertainty_top.py
 biorefineries/cornstover/_process_settings.py
+biorefineries/cornstover/_sankey.py
 biorefineries/cornstover/_system.py
 biorefineries/cornstover/_tea.py
 biorefineries/cornstover/model.py
@@ -28,6 +29,7 @@ biorefineries/lipidcane/_system.py
 biorefineries/lipidcane/_tea.py
 biorefineries/lipidcane/_webapp_model.py
 biorefineries/lipidcane/model.py
+biorefineries/lipidcane/sankey_plot.ipynb
 biorefineries/lipidcane/utils/__init__.py
 biorefineries/lipidcane/utils/composition.py
 biorefineries/sugarcane/__init__.py

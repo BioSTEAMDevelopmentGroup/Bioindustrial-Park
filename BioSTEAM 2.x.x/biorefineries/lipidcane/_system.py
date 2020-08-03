@@ -369,8 +369,11 @@ def create_system(ID='lipidcane_sys'):
     R402 = units.Transesterification('R402', efficiency=0.90, methanol2lipid=6, T=333.15,
                              catalyst_molfrac=x_cat) 
     
-    PS5 = S401.create_reversed_splitter_process_specification(
-        'PS5', description='Adjust feed to reactors')
+    def adjust_feed_to_reactors():
+        R402._run()
+        S401.ins[0].sum(S401.outs)
+    
+    R402.specification = adjust_feed_to_reactors
     
     # Centrifuge to remove glycerol
     C402 = units.LiquidsSplitCentrifuge('C402',
@@ -498,7 +501,7 @@ def create_system(ID='lipidcane_sys'):
     # Biodiesel Transesterification Section
     oil-T403-P403
     (P403-0, S401-0)-R401-0-C401
-    (C401-0, S401-1)-R402-0-PS5-C402-1
+    (C401-0, S401-1)-R402-0-C402-1
     
     # Specs for product https://www.afdc.energy.gov/fuels/biodiesel_specifications.html
     # minimum spec requirements:

@@ -185,6 +185,7 @@ def create_system(ID='sugarcane_sys'):
     
     # Specifications dependent on lipid cane flow rate
     def correct_flows():
+        U103._run()
         F_mass = sugarcane.F_mass
         # correct enzyme, lime, phosphoric acid, and imbibition water
         enzyme.imass['Cellulose', 'Water'] = 0.003 * F_mass * np.array([0.1, 0.9])
@@ -192,28 +193,27 @@ def create_system(ID='sugarcane_sys'):
         H3PO4.imass['H3PO4', 'Water'] = 0.00025 * F_mass
         imbibition_water.imass['Water'] = 0.25* F_mass
     
-    PS2 = bst.ProcessSpecification('PS2', specification=correct_flows)
+    U103.specification = correct_flows
     
     # Specifications within a system
     def correct_wash_water():
+        P202._run()
         solids = P202.outs[0].imol['Ash', 'CaO', 'Cellulose',
                                    'Hemicellulose', 'Lignin'].sum()
         rvf_wash_water.imol['Water'] = 0.0574 * solids
     
-    PS3 = bst.ProcessSpecification('PS3', specification=correct_wash_water)
+    P202.specification = correct_wash_water
     
     ### System set-up ###
     
-    U103-0-PS2
-    (PS2-0, enzyme)-T201
+    (U103, enzyme)-T201
     (T201-0, M201-0)-U201-1-S201-0-T202
     (S201-1, imbibition_water)-M201
     
     T202-0-H201
     (H201-0, H3PO4)-T203-P201
     (P201-0, lime-T204-0)-T205-P202
-    P202-0-PS3
-    (PS3-0, P203-0)-M202-H202
+    (P202-0, P203-0)-M202-H202
     (H202-0, polymer)-T206-C201
     (C201-1, rvf_wash_water)-C202-1-P203
     C201-0-S202

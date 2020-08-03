@@ -45,15 +45,15 @@ def test_cornstover():
     from biorefineries.cornstover import cornstover_tea, ethanol
     MESP = cornstover_tea.solve_price(ethanol)
     units = UnitGroup('Biorefinery', cornstover_tea.units)
-    assert np.allclose(MESP, 0.779430272130384)
-    assert np.allclose(cornstover_tea.sales, 141622910.26714197)
-    assert np.allclose(cornstover_tea.material_cost, 82900270.63843912)
-    assert np.allclose(cornstover_tea.installed_equipment_cost, 220353539.85009325)
-    assert np.allclose(cornstover_tea.utility_cost, -11054921.042512089)
+    assert np.allclose(MESP, 0.7387411012675781)
+    assert np.allclose(cornstover_tea.sales, 134124825.10761952)
+    assert np.allclose(cornstover_tea.material_cost, 82900270.63843909)
+    assert np.allclose(cornstover_tea.installed_equipment_cost, 220353539.85009322)
+    assert np.allclose(cornstover_tea.utility_cost, -11054921.042512074)
     assert np.allclose(units.get_heating_duty(), 318.0490631730075)
     assert np.allclose(units.get_cooling_duty(), 364.9938841327776)
     assert np.allclose(units.get_electricity_consumption(), 22.36637203703606)
-    assert np.allclose(units.get_electricity_production(), 45.3481845362712)
+    assert np.allclose(units.get_electricity_production(), 45.34818453627118)
     
 if __name__ == '__main__':
     test_lipidcane()
