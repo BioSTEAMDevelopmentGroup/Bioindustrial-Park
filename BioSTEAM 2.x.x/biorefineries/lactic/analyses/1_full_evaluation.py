@@ -40,7 +40,8 @@ import pandas as pd
 import biosteam as bst
 from biosteam.utils import TicToc
 from biosteam.plots import plot_montecarlo_across_coordinate
-from lactic.system import lactic_sys, simulate_get_MPSP, get_total_GWP, system_makeup_water
+from lactic.system import R301, lactic_sys, simulate_get_MPSP, get_functional_GWP, \
+    get_functional_H2O
 from lactic.analyses import models
 
 percentiles = [0, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 1]
@@ -57,37 +58,30 @@ timer = TicToc('timer')
 timer.tic()
 
 model = models.model_full
+R301.set_titer_limit = False
 
 # Set seed to make sure each time the same set of random numbers will be used
 np.random.seed(3221)
-N_simulation = 100 # 1000
+N_simulation = 1000 # 1000
 samples = model.sample(N=N_simulation, rule='L')
 model.load_samples(samples)
 
 baseline_initial = model.metrics_at_baseline()
-baseline_df = pd.DataFrame(data=np.array([[i for i in baseline_initial.values],]), 
-                           columns=baseline_initial.keys())
+baseline = pd.DataFrame(data=np.array([[i for i in baseline_initial.values],]), 
+                        columns=baseline_initial.keys())
 
 model.evaluate()
 
 # Baseline results
 baseline_end = model.metrics_at_baseline()
-baseline_df = baseline_df.append(baseline_end, ignore_index=True)
-baseline_df.index = ('initial', 'end')
-baseline_df.to_excel('0_baseline.xlsx')
+baseline = baseline.append(baseline_end, ignore_index=True)
+baseline.index = ('initial', 'end')
+baseline.to_excel('0_baseline.xlsx')
 
 # Parameters
 parameters = model.get_parameters()
 index_parameters = len(model.get_baseline_sample())
 parameter_values = model.table.iloc[:, :index_parameters].copy()
-
-# Add baseline values to the end
-parameter_values.loc['baseline'] = model.get_baseline_sample()
-
-# All results
-all_results = model.table.iloc[:, index_parameters::].copy()
-all_results.loc['baseline initial'] = baseline_initial
-all_results.loc['baseline end'] = baseline_end
 
 # TEA results
 index_TEA = index_parameters + models.index_TEA
@@ -108,7 +102,7 @@ LCA_percentiles = LCA_results.quantile(q=percentiles)
 
 # Spearman's rank correlation
 spearman_metrics = model.metrics[0:3] + model.metrics[6:9] + \
-    (model.metrics[models.index_IRR],)
+    model.metrics[models.index_IRR:models.index_IRR+2]
 spearman_parameters = parameters
 spearman_results = model.spearman(spearman_parameters, spearman_metrics)
 spearman_results.columns = pd.Index([i.name_with_units for i in spearman_metrics])
@@ -150,8 +144,8 @@ for p in parameters:
         p_values[i].append(p_value[i])
         MPSP = simulate_get_MPSP()
         MPSPs[i].append(MPSP)
-        GWPs[i].append(get_total_GWP())
-        freshwater[i].append(system_makeup_water.F_mass)
+        GWPs[i].append(get_functional_GWP())
+        freshwater[i].append(get_functional_H2O())
         run_number += 1
 
 MPSP_baseline = np.asarray(MPSPs[2])
@@ -172,20 +166,20 @@ one_p_df = pd.DataFrame({
     ('Parameter', 'Min'): p_values[0],
     ('Parameter', 'Max'): p_values[1],
     ('MPSP [$/kg]', 'Baseline'): MPSP_baseline,
-    ('MPSP [$/kg]', 'Min-value'): MPSPs[0],
-    ('MPSP [$/kg]', 'Diff'): MPSP_min_diff,
-    ('MPSP [$/kg]', 'Max-value'): MPSPs[1],
-    ('MPSP [$/kg]', 'Diff'): MPSP_max_diff,
-    ('GWP [kg CO2-eq/kg lactic acid]', 'Baseline'): GWP_baseline,
-    ('GWP [kg CO2-eq/kg lactic acid]', 'Min-value'): GWPs[0],
-    ('GWP [kg CO2-eq/kg lactic acid]', 'Diff'): GWP_min_diff,
-    ('GWP [kg CO2-eq/kg lactic acid]', 'Max-value'): GWPs[1],
-    ('GWP [kg CO2-eq/kg lactic acid]', 'Diff'): GWP_max_diff,
-    ('Freshwater consumption [kg H2O/kg lactic acid]', 'Baseline'): freshwater_baseline,
-    ('Freshwater consumption [kg H2O/kg lactic acid]', 'Min-value'): freshwater[0],
-    ('Freshwater consumption [kg H2O/kg lactic acid]', 'Diff'): freshwater_min_diff,
-    ('Freshwater consumption [kg H2O/kg lactic acid]', 'Max-value'): freshwater[1],
-    ('Freshwater consumption [kg H2O/kg lactic acid]', 'Diff'): freshwater_max_diff,
+    ('MPSP [$/kg]', 'Min'): MPSPs[0],
+    ('MPSP [$/kg]', 'Min diff'): MPSP_min_diff,
+    ('MPSP [$/kg]', 'Max'): MPSPs[1],
+    ('MPSP [$/kg]', 'Max diff'): MPSP_max_diff,
+    ('GWP [kg CO2-eq/kg]', 'Baseline'): GWP_baseline,
+    ('GWP [kg CO2-eq/kg]', 'Min'): GWPs[0],
+    ('GWP [kg CO2-eq/kg]', 'Min diff'): GWP_min_diff,
+    ('GWP [kg CO2-eq/kg]', 'Max'): GWPs[1],
+    ('GWP [kg CO2-eq/kg]', 'Max diff'): GWP_max_diff,
+    ('Freshwater [kg H2O/kg]', 'Baseline'): freshwater_baseline,
+    ('Freshwater [kg H2O/kg]', 'Min'): freshwater[0],
+    ('Freshwater [kg H2O/kg]', 'Min diff'): freshwater_min_diff,
+    ('Freshwater [kg H2O/kg]', 'Max'): freshwater[1],
+    ('Freshwater [kg H2O/kg]', 'Max diff'): freshwater_max_diff,
     })
 
 time = timer.elapsed_time / 60
@@ -205,7 +199,7 @@ IRR_plot_x.sort()
 plot_montecarlo_across_coordinate(IRR_plot_x, IRR_plot_y.values)
 
 '''Output to Excel'''
-with pd.ExcelWriter('1_full_evaluation_2.xlsx') as writer:
+with pd.ExcelWriter('1_full_evaluation.xlsx') as writer:
     parameter_values.to_excel(writer, sheet_name='Parameters')
     TEA_results.to_excel(writer, sheet_name='TEA results')
     TEA_percentiles.to_excel(writer, sheet_name='TEA percentiles')

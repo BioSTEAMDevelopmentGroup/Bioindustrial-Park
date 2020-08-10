@@ -41,6 +41,8 @@ import biosteam as bst
 from biosteam.utils import TicToc
 from lactic import system_succinic
 
+system_succinic.R301.set_titer_limit = False
+
 
 # %%
 
@@ -86,13 +88,14 @@ freshwater = []
 bst.speed_up()
 
 def simulate_log_results():
+    system_succinic.lactic_acid.price = 0
     MPSP = system_succinic.simulate_get_MPSP()
     MPSPs.append(MPSP)
     purity = system_succinic.lactic_acid.get_mass_composition('LacticAcid')
     purities.append(purity)
     NPVs.append(system_succinic.lactic_tea.NPV)
     GWPs.append(system_succinic.get_functional_GWP())
-    freshwater.append(system_succinic.system_makeup_water.F_mass)
+    freshwater.append(system_succinic.get_functional_H2O())
     D405_Lrs.append(D405.Lr)
     print(f'{i:.1%} succinic acid:')
     print(f'D405 Lr: {D405.Lr:.3f}, MPSP: ${MPSP:.3f}/kg, purity: {purity:.1%}\n')
@@ -108,8 +111,8 @@ w_D405_data = pd.DataFrame({
     'Lactic acid purity [%]': purities,
     'MPSP [$/kg]': MPSPs,
     'NPV [$]': NPVs,
-    'GWP [kg CO2-eq/kg lactic acid]': GWPs,
-    'Freshwater consumption [kg H2O/kg lactic acid]': freshwater
+    'GWP [kg CO2-eq/kg]': GWPs,
+    'Freshwater [kg H2O/kg]': freshwater
     })
 
 time = timer.elapsed_time / 60

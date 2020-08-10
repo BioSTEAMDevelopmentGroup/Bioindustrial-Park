@@ -59,8 +59,11 @@ S402 = system.S402
 timer = TicToc('timer')
 timer.tic()
 
-titer_range = np.arange(40, 150, 10)
-yield_range = np.arange(0.3, 1.05, 0.05)
+titer_range = np.arange(40, 141, 5)
+yield_range = np.arange(0.3, 1.01, 0.05) - 1e-6
+# 130 and 0.76 are the baseline
+titer_range = [130] + titer_range.tolist()
+yield_range = [0.76] + yield_range.tolist()
 limits = [[], [], []]
 
 R302 = system.R302
@@ -69,9 +72,10 @@ lactic_sys = system.lactic_sys
 lactic_tea = system.lactic_tea
 
 def solve_TEA():
+    lactic_acid.price = 0
     for i in range(3):
-        lactic_acid.price = system.lactic_tea.solve_price(lactic_acid)
-    return lactic_acid.price
+        MPSP = lactic_acid.price = system.lactic_tea.solve_price(lactic_acid)
+    return MPSP
 
 def update_productivity(productivity):
     R301.productivity = productivity
@@ -79,7 +83,6 @@ def update_productivity(productivity):
     for unit in (R301, R302):
         unit._design()
         unit._cost()
-    solve_TEA()
 
 
 # %%
@@ -89,7 +92,7 @@ def update_productivity(productivity):
 # =============================================================================
 
 bst.speed_up()
-# R301.set_titer_limit = True
+R301.set_titer_limit = True
 R301.neutralization = True
 R401.bypass = False
 S402.bypass = False
@@ -99,7 +102,7 @@ MPSPs_regular = [[], [], []]
 NPVs_regular = [[], [], []]
 LCA_regular = [[], []]
 
-print('\n-------- Regular Strain --------')
+print('\n---------- Regular Strain ----------')
 for i in titer_range:
     for j in yield_range:
         limits[0].append(i)
@@ -112,21 +115,18 @@ for i in titer_range:
             lactic_sys.simulate()
         limits[2].append(R301.sugar_limited_titer)
         LCA_regular[0].append(system.get_functional_GWP())
-        LCA_regular[1].append(system.system_makeup_water.F_mass)
+        LCA_regular[1].append(system.get_functional_H2O())
         
         update_productivity(0.89)
-        solve_TEA()
-        MPSPs_regular[0].append(lactic_acid.price)
+        MPSPs_regular[0].append(solve_TEA())
         NPVs_regular[0].append(lactic_tea.NPV)
         # Alternative productivities, productivity only affects reactor sizing
         # thus no need to simulate the system again
         update_productivity(0.18)
-        solve_TEA()        
-        MPSPs_regular[1].append(lactic_acid.price)
+        MPSPs_regular[1].append(solve_TEA())
         NPVs_regular[1].append(lactic_tea.NPV) 
         update_productivity(1.92)
-        solve_TEA()        
-        MPSPs_regular[2].append(lactic_acid.price)
+        MPSPs_regular[2].append(solve_TEA())
         NPVs_regular[2].append(lactic_tea.NPV)
         run_number += 1
         print(f'Run #{run_number}: {timer.elapsed_time:.0f} sec')
@@ -147,8 +147,8 @@ regular_data = pd.DataFrame({
         MPSPs_regular[2],
     ('Productivity=1.92 [g/L/hr] (max)', 'NPV [$]'):
         NPVs_regular[2],
-    ('LCA', 'GWP [kg CO2-eq/kg lactic acid]'): LCA_regular[0],
-    ('LCA', 'Freshwater consumption [kg H2O/kg lactic acid]'): LCA_regular[1]
+    ('LCA', 'GWP [kg CO2-eq/kg]'): LCA_regular[0],
+    ('LCA', 'Freshwater [kg H2O/kg]'): LCA_regular[1]
     })
 
 
@@ -159,7 +159,7 @@ regular_data = pd.DataFrame({
 # =============================================================================
 
 bst.speed_up()
-# R301.set_titer_limit = True
+R301.set_titer_limit = True
 R301.neutralization = False
 R401.bypass = True
 S402.bypass = True
@@ -169,9 +169,7 @@ MPSPs_acid_resistant = [[], [], []]
 NPVs_acid_resistant = [[], [], []]
 LCA_acid_resistant = [[], []]
 
-run_number = 0
-
-print('\n-------- Acid-resistant Strain --------')
+print('\n---------- Acid-resistant Strain ----------')
 for i in titer_range:
     for j in yield_range:
         limits[0].append(i)
@@ -184,21 +182,18 @@ for i in titer_range:
             lactic_sys.simulate()
         limits[2].append(R301.sugar_limited_titer)
         LCA_acid_resistant[0].append(system.get_functional_GWP())
-        LCA_acid_resistant[1].append(system.system_makeup_water.F_mass)
+        LCA_acid_resistant[1].append(system.get_functional_H2O())
         
         update_productivity(0.89)
-        solve_TEA()
-        MPSPs_acid_resistant[0].append(lactic_acid.price)
+        MPSPs_acid_resistant[0].append(solve_TEA())
         NPVs_acid_resistant[0].append(lactic_tea.NPV)
         # Alternative productivities, productivity only affects reactor sizing
         # thus no need to simulate the system again
         update_productivity(0.18)
-        solve_TEA()        
-        MPSPs_acid_resistant[1].append(lactic_acid.price)
+        MPSPs_acid_resistant[1].append(solve_TEA())
         NPVs_acid_resistant[1].append(lactic_tea.NPV) 
         update_productivity(1.92)
-        solve_TEA()        
-        MPSPs_acid_resistant[2].append(lactic_acid.price)
+        MPSPs_acid_resistant[2].append(solve_TEA())
         NPVs_acid_resistant[2].append(lactic_tea.NPV)
         run_number += 1
         print(f'Run #{run_number}: {timer.elapsed_time:.0f} sec')
@@ -219,8 +214,8 @@ acid_resistent_data = pd.DataFrame({
         MPSPs_acid_resistant[2],
     ('Productivity=1.92 [g/L/hr] (max)', 'NPV [$]'):
         NPVs_acid_resistant[2],
-    ('LCA', 'GWP [kg CO2-eq/kg lactic acid]'): LCA_acid_resistant[0],
-    ('LCA', 'Freshwater consumption [kg H2O/kg lactic acid]'): LCA_acid_resistant[1]
+    ('LCA', 'GWP [kg CO2-eq/kg]'): LCA_acid_resistant[0],
+    ('LCA', 'Freshwater [kg H2O/kg]'): LCA_acid_resistant[1]
     })
 
     

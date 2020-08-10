@@ -644,10 +644,8 @@ class HX_Network(Facility):
         # print('\nQ balance: Q_new/Q_prev = %s'%Q_bal)
         
         if abs(Q_bal-1)>0.02:
-            # print(f'\n WARNING: Q balance of HXN is off by >2% ({Q_bal-1:.2%})')
             msg = f'Q balance of HXN is off by >2% ({Q_bal-1:.2%})'
-            warning = UnitWarning.from_source(self, msg)
-            warn(warning, stacklevel=1)
+            warn(UnitWarning.from_source(self, msg), stacklevel=2)
         
         # print('Q_new_heating/Q_prev_heating = %s, Q_new_cooling/Q_prev_cooling = %s'%(\
         #         Q_new_heating/Q_prev_heating,Q_new_cooling/Q_prev_cooling ))

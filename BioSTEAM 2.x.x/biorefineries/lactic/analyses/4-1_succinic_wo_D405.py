@@ -41,6 +41,8 @@ import biosteam as bst
 from biosteam.utils import TicToc
 from lactic import system
 
+system.R301.set_titer_limit = False
+
 
 # %%
 
@@ -86,13 +88,14 @@ freshwater = []
 bst.speed_up()
 
 def simulate_log_results():
+    system.lactic_acid.price = 0
     MPSP = system.simulate_get_MPSP()
     MPSPs.append(MPSP)
     purity = system.lactic_acid.get_mass_composition('LacticAcid')
     purities.append(purity)
     NPVs.append(system.lactic_tea.NPV)
     GWPs.append(system.get_functional_GWP())
-    freshwater.append(system.system_makeup_water.F_mass)
+    freshwater.append(system.get_functional_H2O())
     F402_Vs.append(F402.V)
     print(f'{i:.1%} succinic acid:')
     print(f'F402 V: {F402.V:.3f}, MPSP: ${MPSP:.3f}/kg, purity: {purity:.1%}\n')
@@ -105,7 +108,7 @@ for i in succinic_contents:
         run_number += 1
     if i == 0.08:
         F402.specification = None
-        F402.V = 0.943
+        F402.V = 0.944
         simulate_log_results()
         succinic_axis.append(i)
         run_number += 1
@@ -122,8 +125,8 @@ wo_D405_data = pd.DataFrame({
     'Lactic acid purity [%]': purities,
     'MPSP [$/kg]': MPSPs,
     'Net present value [$]': NPVs,
-    'GWP [kg CO2-eq/kg lactic acid]': GWPs,
-    'Freshwater consumption [kg H2O/kg lactic acid]': freshwater
+    'GWP [kg CO2-eq/kg]': GWPs,
+    'Freshwater [kg H2O/kg]': freshwater
     })
 
 

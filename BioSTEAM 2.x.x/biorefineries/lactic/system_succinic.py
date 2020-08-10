@@ -175,9 +175,9 @@ pretreatment_group = UnitGroup('pretreatment_group', units=pretreatment_sys.unit
 # =============================================================================
 
 # flow updated in EnzymeHydrolysateMixer
-enzyme_R301 = Stream('enzyme_R301', units='kg/hr', price=price['Enzyme'])
+enzyme_M301 = Stream('enzyme_M301', units='kg/hr', price=price['Enzyme'])
 # Used to adjust enzymatic hydrolysis solid loading, flow updated in EnzymeHydrolysateMixer
-water_R301 = Stream('water_R301', units='kg/hr')
+water_M301 = Stream('water_M301', units='kg/hr')
 # Corn steep liquor as nitrogen nutrient for microbes, flow updated in R301
 CSL_R301 = Stream('CSL_R301', units='kg/hr')
 # Lime for neutralization of produced acid
@@ -191,7 +191,7 @@ lime_R301 = Stream('lime_R301', units='kg/hr')
 H301 = units.HydrolysateCooler('H301', ins=P201-0, T=50+273.15)
 
 # Mix enzyme with the cooled pretreatment hydrolysate
-M301 = units.EnzymeHydrolysateMixer('M301', ins=(H301-0, enzyme_R301, water_R301))
+M301 = units.EnzymeHydrolysateMixer('M301', ins=(H301-0, enzyme_M301, water_M301))
 
 R301 = units.SaccharificationAndCoFermentation('R301',
                                                ins=(M301-0, '', CSL_R301, lime_R301),
@@ -614,13 +614,16 @@ CT = facilities.CT('CT', ins=('return_cooling_water', cooling_tower_chems,
                               'CT_makeup_water'),
                    outs=('process_cooling_water', 'cooling_tower_blowdown'))
 
-# All water used in the system, here only consider water usage,
-# if heating needed, then heeating duty required is considered in CHP
-process_water_streams = (water_M201, water_M202, steam_M203, water_M205,
-                         water_R301, water_R403, CHP.ins[-1], CT.ins[-1])
-
+# All water used in the system, here only consider water consumption,
+# if heating needed, then heating duty required is considered in CHP
+process_water_streams = {
+    'pretreatment_sys': (water_M201, water_M202, steam_M203, water_M205),
+    'conversion_sys': (water_M301,),
+    'separation_sys': (water_R403,),
+    'facilities_sys': (CHP.ins[-1], CT.ins[-1])
+    }
 PWC = facilities.PWC('PWC', ins=(system_makeup_water, S505-0),
-                     process_water_streams=process_water_streams,
+                     process_water_streams=sum(process_water_streams.values(), ()),
                      outs=('process_water', 'discharged_water'))
 
 ADP = facilities.ADP('ADP', ins=plant_air_in, outs='plant_air_out',
@@ -719,14 +722,11 @@ lactic_sys._TEA = lactic_tea
 
 # Simulate system and get results
 def simulate_get_MPSP():
+    lactic_acid.price = 0
     lactic_sys.simulate()
     for i in range(3):
         MPSP = lactic_acid.price = lactic_tea.solve_price(lactic_acid)
     return MPSP
-    
-MPSP = simulate_get_MPSP()
-print('\n---------- With an additional distillation column ----------')
-print(f'MPSP is ${MPSP:.3f}/kg ')
 
 
 # %%
@@ -758,10 +758,13 @@ get_total_GWP = lambda: get_total_material_GWP()+get_non_bio_GWP()+ \
     get_electricity_GWP()
 
 get_functional_GWP = lambda: get_total_GWP()/lactic_acid.F_mass
-print(f'GWP is {get_functional_GWP():.3f} kg CO2-eq/kg lactic acid')
-
 get_functional_H2O = lambda: system_makeup_water.F_mass / lactic_acid.F_mass
-print(f'Freshwater consumption is {get_functional_H2O():.3f} kg H2O/kg lactic acid')
+
+# print('\n---------- With an additional distillation column ----------')
+# print(f'MPSP is ${simulate_get_MPSP():.3f}/kg ')
+# print(f'GWP is {get_functional_GWP():.3f} kg CO2-eq/kg lactic acid')
+# print(f'Freshwater consumption is {get_functional_H2O():.3f} kg H2O/kg lactic acid')
+# print('--------------------\n')
 
 
 # %%

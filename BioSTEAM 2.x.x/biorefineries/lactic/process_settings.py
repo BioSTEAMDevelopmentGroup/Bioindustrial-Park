@@ -219,7 +219,8 @@ GWP_CFs = {
     'Lime': 0.94+6e-7*298,
     'NaOH': 0.2186,
     'H2SO4': 1.36e-5,
-    'Gypsum': -2.03/1e3 # ref[7]
+    'Gypsum': 0
+    # 'Gypsum': -2.03/1e3 # ref[7]
     }
 
 GWP_CF_array = chems.kwarray(GWP_CFs)

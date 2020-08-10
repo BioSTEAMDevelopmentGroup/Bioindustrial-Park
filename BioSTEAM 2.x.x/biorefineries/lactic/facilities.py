@@ -171,7 +171,7 @@ class CT(Facility):
         hu_cooling = self.heat_utilities[0]
         hu_cooling.mix_from(system_cooling_water_utilities.values())
         hu_cooling.reverse()
-        self.system_cooling_water_duty = hu_cooling.duty
+        self.system_cooling_water_duty = -hu_cooling.duty
         
         # Total amount of cooling water needed in the whole system
         total_cooling_water = self.total_cooling_water = \

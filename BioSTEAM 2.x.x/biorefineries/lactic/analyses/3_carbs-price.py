@@ -38,6 +38,7 @@ lactic acid from lignocellulosic feedstocks
 import numpy as np
 import pandas as pd
 from biosteam.utils import TicToc
+from lactic.system import R301
 from lactic.analyses import models
 
 
@@ -52,6 +53,7 @@ timer = TicToc('timer')
 timer.tic()
 
 model = models.model_carbs_price
+R301.set_titer_limit = True
 set_carbs = models.set_carbs
 prices = models.prices
 
@@ -65,7 +67,9 @@ samples_1d = model.sample(N=N_simulation, rule='L')
 samples = samples_1d[:, np.newaxis]
 model.load_samples(samples)
 
-carb_contents = np.arange(0.4, 0.701, 0.01)
+carb_contents = np.arange(0.3, 0.701, 0.01)
+# 0.59 is the baseline
+carb_contents = [0.59] + carb_contents.tolist()
 
 data = model.evaluate_across_coordinate(
     'Carbohydate content', set_carbs, carb_contents, notify=True)
@@ -73,35 +77,35 @@ data = model.evaluate_across_coordinate(
 results = pd.DataFrame({
     ('Parameter', 'Carbohydrate content [dw%]'): carb_contents})
 
-for (i, j) in zip(data.keys(), data.values()):
-    results[i] = j[0]
+for i in data.keys():
+    results[i] = data[i][0]
 
 '''Organize TEA data for easy plotting'''
-TEA_x = [f'{i:.3f}' for i in carb_contents]
+TEA_x = [i for i in carb_contents]
 TEA_x *= len(prices)
-TEA_y = sum(([f'{i:.0f}']*len(carb_contents) for i in prices), [])
+TEA_y = sum(([i]*len(carb_contents) for i in prices), [])
 
-MPSPs = []
-GWPs = []
-freshwater = []
+MPSPs = [[], []]
+GWPs = [[], []]
+freshwater = [[], []]
 for i in range(results.columns.shape[0]):
     if 'MPSP' in results.columns[i][1]:
-        MPSPs +=  results[results.columns[i]].to_list()
+        MPSPs[0] +=  results[results.columns[i]].to_list()
     if 'GWP' in results.columns[i][1]:
-        GWPs +=  results[results.columns[i]].to_list()
+        GWPs[0] +=  results[results.columns[i]].to_list()
     if 'Freshwater' in results.columns[i][1]:
-        freshwater +=  results[results.columns[i]].to_list()
+        freshwater[0] +=  results[results.columns[i]].to_list()
 
 TEA_plot_data = pd.DataFrame({
     'Carbohydrate content [dw%]': TEA_x,
     'Price [$/dry-ton]': TEA_y,
-    'MPSP [$/kg]': MPSPs
+    'MPSP [$/kg]': MPSPs[0]
     })
 
 LCA_plot_data = pd.DataFrame({
     'Carbohydrate content [dw%]': carb_contents,    
-    'GWP [kg CO2-eq/kg lactic acid]': GWPs,
-    'Freshwater consumption [kg H2O/kg lactic acid]': freshwater
+    'GWP [kg CO2-eq/kg]': GWPs[0],
+    'Freshwater [kg H2O/kg]': freshwater[0]
     })
 
 '''Output to Excel'''
@@ -110,7 +114,7 @@ with pd.ExcelWriter('3_carbs-price.xlsx') as writer:
     LCA_plot_data.to_excel(writer, sheet_name='LCA plotting')
     results.to_excel(writer, sheet_name='Raw data')
 
-run_number = samples.shape[0] * len(carb_contents)
+run_number = samples.shape[0]*len(carb_contents)
 time = timer.elapsed_time / 60
 print(f'\nSimulation time for {run_number} runs is: {time:.1f} min')
 

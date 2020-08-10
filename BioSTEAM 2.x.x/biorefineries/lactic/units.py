@@ -380,8 +380,7 @@ class SaccharificationAndCoFermentation(Unit):
              'Fermenter size': 'kg',
              'Recirculation flow rate': 'kg/hr'}
     
-    # Residence time of countinuous saccharification tanks (hr)
-    tau_saccharification = 24
+    tau_saccharification = 24 # in hr
     
     # Equals the split of saccharified slurry to seed train
     inoculum_ratio = 0.07

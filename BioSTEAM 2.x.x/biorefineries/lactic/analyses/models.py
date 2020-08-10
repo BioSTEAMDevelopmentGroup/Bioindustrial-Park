@@ -56,9 +56,10 @@ _feedstock_factor = _kg_per_ton / 0.8
 lactic_acid = system.lactic_acid
 lactic_tea = system.lactic_tea
 def get_MPSP():
+    lactic_acid.price = 0
     for i in range(3):
-        lactic_acid.price = lactic_tea.solve_price(lactic_acid)
-    return lactic_acid.price
+        MPSP = lactic_acid.price = lactic_tea.solve_price(lactic_acid)
+    return MPSP
 
 feedstock = system.feedstock
 # Yield in % of dry feedstock
@@ -171,9 +172,9 @@ get_system_heating_demand = lambda: CHP.system_heating_demand*get_annual_factor(
 get_pretreatment_steam_heating_demand = lambda: CHP.side_streams_lps.duty*get_annual_factor()/1e9
 HXN = system.HXN
 get_HXN_heating_demand = lambda: sum(i.duty for i in HXN.heat_utilities 
-                                    if i.duty*i.cost>0)*get_annual_factor()/1e9
+                                    if i.flow*i.duty>0)*get_annual_factor()/1e9
 get_CHP_heating_demand = lambda: sum(i.duty for i in CHP.heat_utilities 
-                                    if i.duty*i.cost>0)*get_annual_factor()/1e9
+                                    if i.flow*i.duty>0)*get_annual_factor()/1e9
 
 def get_heating_demand(group):
     return lambda: group.get_heating_duty()*get_annual_factor()/1e3
@@ -207,9 +208,9 @@ metrics.extend((
 CT = system.CT
 get_system_cooling_water_duty = lambda: CT.system_cooling_water_duty*get_annual_factor()/1e9
 get_HXN_cooling_demand = lambda: sum(i.duty for i in HXN.heat_utilities 
-                                    if i.duty*i.cost<0)*get_annual_factor()/1e9
+                                    if i.flow*i.duty<0)*get_annual_factor()/1e9
 get_CT_cooling_water_duty = lambda: sum(i.duty for i in CT.heat_utilities 
-                                    if i.duty*i.cost<0)*get_annual_factor()/1e9
+                                    if i.flow*i.duty<0)*get_annual_factor()/1e9
 
 def get_cooling_demand(group):
     return lambda: -group.get_cooling_duty()*get_annual_factor()/1e3
@@ -321,23 +322,43 @@ LCA_stream = system.LCA_stream
 def get_material_GWP(material):
     return lambda: LCA_stream.imass[material]*GWP_CFs[material]/lactic_acid.F_mass
 
-check_GWP = lambda: get_functional_GWP() - \
-    (sum(get_material_GWP(i)() for i in GWP_CFs)+get_electricity_GWP()+get_non_bio_GWP())
-
 metrics.extend((
-    Metric('Total GWP', get_functional_GWP, 'kg CO2-eq/kg lactic acid', 'LCA'),
-    Metric('Material', get_total_material_GWP, 'kg CO2-eq/kg lactic acid', 'LCA')
+    Metric('Total GWP', get_functional_GWP, 'kg CO2-eq/kg', 'LCA'),
+    Metric('Total freshwater', get_functional_H2O, 'kg H2O/kg', 'LCA')
     ))
 
 for i in GWP_CFs.keys():
     metrics.append(
-        Metric(i, get_material_GWP(i), 'kg CO2-eq/kg lactic acid', 'LCA'))   
+        Metric(i, get_material_GWP(i), 'kg CO2-eq/kg', 'Material GWP'))   
+
+check_GWP = lambda: get_functional_GWP() - \
+    (sum(get_material_GWP(i)() for i in GWP_CFs)+get_electricity_GWP()+get_non_bio_GWP())
+    
+metrics.extend((
+    Metric('Material', get_total_material_GWP, 'kg CO2-eq/kg', 'GWP'),
+    Metric('Electricity', get_electricity_GWP, 'kg CO2-eq/kg', 'GWP'),
+    Metric('Non-biogenic combustion', get_non_bio_GWP, 'kg CO2-eq/kg', 'GWP'),
+    Metric('GWP check', check_GWP, 'kg CO2-eq/kg', 'GWP')
+    ))
+
+process_water_streams = system.process_water_streams
+def get_freshwater(process):
+    return lambda: sum(i.F_mass for i in process_water_streams[process])/lactic_acid.F_mass
+
+for i in process_water_streams.keys():
+    metrics.append(Metric(i, get_freshwater(i), 'kg H2O/kg', 'Freshwater'))
+
+get_used_water = lambda: sum(get_freshwater(i)() for i in process_water_streams.keys())
+
+PWC = system.PWC
+get_recycled_water = lambda: -PWC.ins[1].F_mass/lactic_acid.F_mass
+
+check_freshwater = lambda: get_used_water() + get_recycled_water() - get_functional_H2O()
 
 metrics.extend((
-    Metric('Electricity', get_electricity_GWP, 'kg CO2-eq/kg lactic acid', 'LCA'),
-    Metric('Non-biogenic combustion', get_non_bio_GWP, 'kg CO2-eq/kg lactic acid', 'LCA'),
-    Metric('GWP check', check_GWP, 'kg CO2-eq/kg lactic acid', 'LCA'),
-    Metric('Freshwater consumption', get_functional_H2O, 'kg H2O/kg lactic acid', 'LCA')
+    Metric('Used', get_used_water, 'kg H2O/kg', 'Freshwater'),
+    Metric('Recycled', get_recycled_water, 'kg H2O/kg', 'Freshwater'),
+    Metric('Freshwater check', check_freshwater, 'kg H2O/kg', 'Freshwater')
     ))
 
 
@@ -449,7 +470,7 @@ def set_pretreatment_solid_loading(loading):
 T201 = system.T201
 D = shape.Uniform(10, 35)
 @param(name='Pretreatment sulfuric acid loading', element=T201,
-       kind='coupled', units='mg/g-dry feedstock', baseline=22.1, distribution=D)
+       kind='coupled', units='mg/g', baseline=22.1, distribution=D)
 def set_pretreatment_sulfuric_acid_loading(loading): 
     T201.feedstock_dry_mass = feedstock.F_mass - feedstock.imass['H2O']
     T201.acid_loading = loading
@@ -479,7 +500,7 @@ def set_R301_solid_loading(loading):
     M301.solid_loading = loading
 
 D = shape.Uniform(10, 30)
-@param(name='Enzyme loading', element=M301, kind='coupled', units='mg/g-glucan',
+@param(name='Enzyme loading', element=M301, kind='coupled', units='mg/g',
        baseline=20, distribution=D)
 def set_R301_enzyme_loading(loading):
     M301.enzyme_loading = loading
@@ -519,7 +540,7 @@ def set_productivity(productivity):
     R302.productivity = productivity * R302.ferm_ratio
 
 D = shape.Triangle(0.55, 0.76, 0.93)
-@param(name='Lactic acid yield', element=R301, kind='coupled', units='g/g-sugar',
+@param(name='Lactic acid yield', element=R301, kind='coupled', units='g/g',
        baseline=0.76, distribution=D)
 def set_lactic_acid_yield(lactic_yield):
     R301_X = R301.cofermentation_rxns.X
@@ -531,7 +552,7 @@ def set_lactic_acid_yield(lactic_yield):
     R302_X[1] = R302_X[4] = R301_X[1] * R302.ferm_ratio
 
 D = shape.Triangle(0.004, 0.07, 0.32)
-@param(name='Acetic acid yield', element=R301, kind='coupled', units='g/g-sugar',
+@param(name='Acetic acid yield', element=R301, kind='coupled', units='g/g',
        baseline=0.07, distribution=D)
 def set_acetic_acid_yield(acetic_yield): 
     R301_X = R301.cofermentation_rxns.X
@@ -612,14 +633,12 @@ def create_price_metrics(price):
     return [Metric('MPSP', get_price_based_MPSP, '$/kg', header),
             Metric('NPV', get_NPV, '$', header)]
 
-prices = np.arange(50, 300, 10)
-# 71.3 is the baseline
-prices = np.concatenate((prices, np.array([71.3])))
+prices = np.arange(0, 310, 10)
 
 carb_metrics = sum([create_price_metrics(price) for price in prices],[])
 carb_metrics.extend((
-    Metric('Total GWP', get_functional_GWP, 'kg CO2-eq/kg lactic acid', 'LCA'),
-    Metric('Freshwater consumption', get_functional_H2O, 'kg H2O/kg lactic acid', 'LCA')
+    Metric('GWP', get_functional_GWP, 'kg CO2-eq/kg', 'LCA'),
+    Metric('Freshwater', get_functional_H2O, 'kg H2O/kg', 'LCA')
     ))
 
 def set_carbs(carbs_content):
