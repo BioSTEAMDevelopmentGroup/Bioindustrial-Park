@@ -351,7 +351,7 @@ for i in process_water_streams.keys():
 get_used_water = lambda: sum(get_freshwater(i)() for i in process_water_streams.keys())
 
 PWC = system.PWC
-get_recycled_water = lambda: -PWC.ins[1].F_mass/lactic_acid.F_mass
+get_recycled_water = lambda: -PWC.recycled_water/lactic_acid.F_mass
 
 check_freshwater = lambda: get_used_water() + get_recycled_water() - get_functional_H2O()
 

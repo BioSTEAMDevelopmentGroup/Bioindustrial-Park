@@ -102,16 +102,22 @@ class PWC(Facility):
     network_priority = 2
     line = 'Process water center'
     
-    def __init__(self, ID='', ins=None, outs=(), process_water_streams=None):
+    def __init__(self, ID='', ins=None, outs=(), process_water_streams=None,
+                 blowdown_streams=None):
         Facility.__init__(self, ID, ins, outs)
         self.process_water_streams = process_water_streams
+        self.blowdown_streams = blowdown_streams
 
     def _run(self):
-        makeup, recycled = self.ins
+        makeup, RO_water = self.ins
         process_water, discharged = self.outs
         
         water_demand = sum(i.imol['Water'] for i in self.process_water_streams)
-        water_needs = water_demand - recycled.imol['Water']
+        water_blowdown_mol = sum(i.imol['Water'] for i in self.blowdown_streams)
+        water_blowdown_mass = sum(i.imass['Water'] for i in self.blowdown_streams)
+        water_needs = water_demand - RO_water.imol['Water'] - water_blowdown_mol
+        self.recycled_water = RO_water.imass['Water'] + water_blowdown_mass
+        
         if water_needs > 0:
             makeup.imol['Water'] = water_needs
             discharged.empty()
@@ -119,7 +125,7 @@ class PWC(Facility):
             discharged.imol['Water'] = - water_needs
             makeup.empty()
 
-        process_water.mol = makeup.mol + recycled.mol - discharged.mol
+        process_water.mol = makeup.mol + RO_water.mol - discharged.mol
 
         self.design_results['Flow rate'] = self.F_mass_in
 

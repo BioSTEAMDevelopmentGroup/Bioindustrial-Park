@@ -621,10 +621,12 @@ CT = facilities.CT('CT', ins=('return_cooling_water', cooling_tower_chems,
 process_water_streams = {
     'pretreatment_sys': (water_M201, water_M202, steam_M203, water_M205),
     'conversion_sys': (water_M301,),
-    'separation_sys': (water_R403,)
+    'separation_sys': (water_R403,),
+    'facilities': (CHP.ins[-1], CT.ins[-1])
     }
 PWC = facilities.PWC('PWC', ins=(system_makeup_water, S505-0),
                      process_water_streams=sum(process_water_streams.values(), ()),
+                     blowdown_streams=(CHP.outs[-1], CT.outs[-1]),
                      outs=('process_water', 'discharged_water'))
 
 ADP = facilities.ADP('ADP', ins=plant_air_in, outs='plant_air_out',

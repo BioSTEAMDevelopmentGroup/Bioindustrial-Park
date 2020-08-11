@@ -229,7 +229,7 @@ GWP_CF_array = chems.kwarray(GWP_CFs)
 GWP_CF_stream = tmo.Stream('impact_stream', GWP_CF_array, units='kg/hr')
 
 # In kg CO2-eq/kWh
-electricity_GWP_CF = 0.4481
+GWP_CF_electricity = 0.4481
 
 
 

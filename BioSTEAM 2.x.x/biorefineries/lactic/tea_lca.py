@@ -119,27 +119,27 @@ class LacticTEA(TEA):
 # # For life cycle analysis (LCA), not used currently
 # # =============================================================================
 
-from biosteam_lca.multilca import MultiLCA
+# from biosteam_lca.multilca import MultiLCA
 
-class LacticLCA(MultiLCA):
-    # Total impact of the system as a dictionary
-    def compute_system_impacts(self):
-        total_scores = self.total_scores = super().scores()
-        system_impact = [sum(total_scores[i] for i in total_scores.keys())]
-        self.system_impacts = dict(zip(total_scores.keys(), system_impact))
-        return system_impact
+# class LacticLCA(MultiLCA):
+#     # Total impact of the system as a dictionary
+#     def compute_system_impacts(self):
+#         total_scores = self.total_scores = super().scores()
+#         system_impact = [sum(total_scores[i] for i in total_scores.keys())]
+#         self.system_impacts = dict(zip(total_scores.keys(), system_impact))
+#         return system_impact
     
-    # Impact by functional unit
-    def compute_functional_impacts(self, fu):
-        system_impact = self.compute_system_impacts()
-        functional_impact = self.functional_impact = system_impact / fu
+#     # Impact by functional unit
+#     def compute_functional_impacts(self, fu):
+#         system_impact = self.compute_system_impacts()
+#         functional_impact = self.functional_impact = system_impact / fu
 
-        system_impacts = self.system_impacts
-        functional_impacts = self.functional_impacts = {}
-        for i in system_impacts.keys():
-            functional_impacts[i] = system_impacts[i] / fu
+#         system_impacts = self.system_impacts
+#         functional_impacts = self.functional_impacts = {}
+#         for i in system_impacts.keys():
+#             functional_impacts[i] = system_impacts[i] / fu
 
-        return functional_impact
+#         return functional_impact
 
 
 
