@@ -615,12 +615,13 @@ CT = facilities.CT('CT', ins=('return_cooling_water', cooling_tower_chems,
                    outs=('process_cooling_water', 'cooling_tower_blowdown'))
 
 # All water used in the system, here only consider water consumption,
-# if heating needed, then heating duty required is considered in CHP
+# if heating needed, then heating duty required is considered in CHP,
+# CHP and CT makeup water not included as their blowdowns were not included
+# in wastewater treatment (assumed to be directly recycled)
 process_water_streams = {
     'pretreatment_sys': (water_M201, water_M202, steam_M203, water_M205),
     'conversion_sys': (water_M301,),
-    'separation_sys': (water_R403,),
-    'facilities_sys': (CHP.ins[-1], CT.ins[-1])
+    'separation_sys': (water_R403,)
     }
 PWC = facilities.PWC('PWC', ins=(system_makeup_water, S505-0),
                      process_water_streams=sum(process_water_streams.values(), ()),

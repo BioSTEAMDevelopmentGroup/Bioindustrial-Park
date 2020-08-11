@@ -59,7 +59,7 @@ from biosteam.process_tools import UnitGroup
 from thermosteam import Stream
 from lactic import units, facilities
 from lactic.hx_network import HX_Network
-from lactic.process_settings import price, GWP_CF_stream, electricity_GWP_CF
+from lactic.process_settings import price, GWP_CF_stream, GWP_CF_electricity
 from lactic.utils import baseline_feedflow, set_yield, find_split, splits_df
 from lactic.chemicals import chems, chemical_groups, soluble_organics, combustibles
 from lactic.tea_lca import LacticTEA
@@ -610,12 +610,13 @@ CT = facilities.CT('CT', ins=('return_cooling_water', cooling_tower_chems,
                    outs=('process_cooling_water', 'cooling_tower_blowdown'))
 
 # All water used in the system, here only consider water consumption,
-# if heating needed, then heating duty required is considered in CHP
+# if heating needed, then heating duty required is considered in CHP,
+# CHP and CT makeup water not included as their blowdowns were not included
+# in wastewater treatment (assumed to be directly recycled)
 process_water_streams = {
     'pretreatment': (water_M201, water_M202, steam_M203, water_M205),
     'conversion': (water_M301,),
-    'separation': (water_R403,),
-    'facilities': (CHP.ins[-1], CT.ins[-1])
+    'separation': (water_R403,)
     }
 PWC = facilities.PWC('PWC', ins=(system_makeup_water, S505-0),
                      process_water_streams=sum(process_water_streams.values(), ()),
@@ -747,7 +748,7 @@ get_non_bio_GWP = lambda: chems.CO2.MW * \
 
 # GWP from electricity usage
 get_electricity_GWP = lambda: sum(i.power_utility.rate for i in lactic_sys.units) * \
-    electricity_GWP_CF
+    GWP_CF_electricity
 
 get_total_GWP = lambda: get_total_material_GWP()+get_non_bio_GWP()+ \
     get_electricity_GWP()
