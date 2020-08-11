@@ -206,7 +206,7 @@ def create_system(ID='sugarcane_sys'):
     
     ### System set-up ###
     
-    (U103, enzyme)-T201
+    (U103-0, enzyme)-T201
     (T201-0, M201-0)-U201-1-S201-0-T202
     (S201-1, imbibition_water)-M201
     
@@ -223,6 +223,7 @@ def create_system(ID='sugarcane_sys'):
     ethanol_production_sys = create_ethanol_production_system(sugar_solution=S202-0)
     
     ### Facilities ###    
+    
     s = F.stream
     BT = units.BoilerTurbogenerator('BT',
                                     (U202-0, '', 'boiler_makeup_water', 'natural_gas', '', ''),
@@ -248,4 +249,33 @@ def create_system(ID='sugarcane_sys'):
     
     ### System ###
     
-    return bst.main_flowsheet.create_system(ID)
+    return bst.System(ID,
+        [U101,
+         U102,
+         U103,
+         T201,
+         bst.System("juice_extraction_sys",
+            [U201,
+             S201,
+             M201],
+            recycle=M201-0),
+         T202,
+         H201,
+         T203,
+         P201,
+         T204,
+         T205,
+         P202,
+         bst.System('juice_separation_sys',
+            [M202,
+             H202,
+             T206,
+             C201,
+             C202,
+             P203],
+            recycle=P203-0),
+         S202,
+         ethanol_production_sys,
+         U202],
+        facilities=(CWP, BT, CT, PWC),
+    )
