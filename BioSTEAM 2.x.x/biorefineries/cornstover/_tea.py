@@ -260,10 +260,10 @@ def capex_table(tea):
     capex.entry('Total capital investment (TCI)', TCI)
     return capex.table()
 
-def voc_table(system, tea, main_product):
+def voc_table(system, tea, main_products):
     voc = VOCTableBuilder(tea.operating_days)
     for i in system.feeds | system.products: 
-        if i is main_product: continue
+        if i in main_products: continue
         if i.price and not i.isempty(): voc.entry(i)
     isa = isinstance
     for i in set(system.facilities):

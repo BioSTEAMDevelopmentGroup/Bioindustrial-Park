@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 from matplotlib.patches import Patch
 from matplotlib.lines import Line2D
 from biosteam.utils import colors
-from biosteam.plots import (plot_single_points, plot_horizontal_line,
+from biosteam.plots import (plot_scatter_points, plot_horizontal_line,
                            plot_montecarlo, plot_vertical_line)
 
 data = pd.read_excel('Monte Carlo cornstover.xlsx', header=[0, 1])
@@ -25,7 +25,7 @@ data = pd.read_excel('Monte Carlo cornstover.xlsx', header=[0, 1])
 #                           colors.blue_tint.RGBn,
 #                           colors.blue_shade.RGBn, 
 #                           posistions_MESP, transpose=False)
-# dot_MESP = plot_single_points(posistions_MESP, [2.15], s=125, color=colors.red_dark.RGBn)
+# dot_MESP = plot_scatter_points(posistions_MESP, [2.15], s=125, color=colors.red_dark.RGBn)
 # plt.ylabel('MESP ($\mathrm{USD} \cdot \mathrm{gal}^{-1}$)')
 # plt.ylim(1.5, 2.50)
 # bx_patch = Patch(facecolor=colors.blue_tint.RGBn, edgecolor=colors.blue_shade.RGBn)
