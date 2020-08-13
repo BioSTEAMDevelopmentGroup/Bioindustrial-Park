@@ -113,10 +113,12 @@ class PWC(Facility):
         process_water, discharged = self.outs
         
         water_demand = sum(i.imol['Water'] for i in self.process_water_streams)
-        water_blowdown_mol = sum(i.imol['Water'] for i in self.blowdown_streams)
-        water_blowdown_mass = sum(i.imass['Water'] for i in self.blowdown_streams)
-        water_needs = water_demand - RO_water.imol['Water'] - water_blowdown_mol
-        self.recycled_water = RO_water.imass['Water'] + water_blowdown_mass
+        water_needs = water_demand - RO_water.imol['Water']
+        self.recycled_water = RO_water.imass['Water']
+        
+        if self.blowdown_streams:
+            water_needs -= sum(i.imol['Water'] for i in self.blowdown_streams)
+            self.recycled_water += sum(i.imass['Water'] for i in self.blowdown_streams)
         
         if water_needs > 0:
             makeup.imol['Water'] = water_needs

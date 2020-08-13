@@ -198,7 +198,7 @@ R301 = units.SaccharificationAndCoFermentation('R301',
                                                outs=('fermentation_effluent', 
                                                      'sidedraw'),
                                                neutralization=True,
-                                               set_titer_limit=False)
+                                               set_titer_limit=True)
 
 R302 = units.SeedTrain('R302', ins=R301-1, outs=('seed',))
 
@@ -211,15 +211,20 @@ def titer_at_yield(lactic_yield):
     set_yield(lactic_yield, R301, R302)
     seed_recycle._run()
     return R301.effluent_titer-R301.titer_limit
-
+        
 def adjust_titer_yield():
     if R301.set_titer_limit:
-        lactic_yield = IQ_interpolation(
-            f=titer_at_yield, x0=0, x1=R301.yield_limit,
-            xtol=0.001, ytol=0.01, maxiter=50,
-            args=(), checkbounds=False)
-        set_yield(lactic_yield, R301, R302)
+        R301.cofermentation_rxns.X[0] = R301.cofermentation_rxns.X[3] = R301.yield_limit
+        R302.cofermentation_rxns.X[0] = R302.cofermentation_rxns.X[3] = \
+            R301.yield_limit*R302.ferm_ratio
         seed_recycle._run()
+        if R301.effluent_titer > R301.titer_limit:
+            lactic_yield = IQ_interpolation(
+                f=titer_at_yield, x0=0, x1=R301.yield_limit,
+                xtol=0.001, ytol=0.01, maxiter=50,
+                args=(), checkbounds=False)
+            set_yield(lactic_yield, R301, R302)
+            seed_recycle._run()
 PS301 = bst.units.ProcessSpecification('PS301', ins=R301-0,
                                         specification=adjust_titer_yield)
 
@@ -264,7 +269,7 @@ S401 = units.CellMassFilter('S401', ins=PS301-0, outs=('cell_mass', ''),
 
 # Ca(LA)2 + H2SO4 --> CaSO4 + 2 LA
 R401 = units.AcidulationReactor('R401', ins=(S401-1, sulfuric_acid_R401),
-                                P=101325, tau=0.5, V_wf=0.8, length_to_diameter=2,
+                                P=101325, tau=1, V_wf=0.8, length_to_diameter=2,
                                 kW_per_m3=0.985, wall_thickness_factor=1.5,
                                 vessel_material='Stainless steel 316',
                                 vessel_type='Vertical')
@@ -615,9 +620,7 @@ CT = facilities.CT('CT', ins=('return_cooling_water', cooling_tower_chems,
                    outs=('process_cooling_water', 'cooling_tower_blowdown'))
 
 # All water used in the system, here only consider water consumption,
-# if heating needed, then heating duty required is considered in CHP,
-# CHP and CT makeup water not included as their blowdowns were not included
-# in wastewater treatment (assumed to be directly recycled)
+# if heating needed, then heating duty required is considered in CHP
 process_water_streams = {
     'pretreatment_sys': (water_M201, water_M202, steam_M203, water_M205),
     'conversion_sys': (water_M301,),
@@ -626,7 +629,7 @@ process_water_streams = {
     }
 PWC = facilities.PWC('PWC', ins=(system_makeup_water, S505-0),
                      process_water_streams=sum(process_water_streams.values(), ()),
-                     blowdown_streams=(CHP.outs[-1], CT.outs[-1]),
+                     blowdown_streams=None,
                      outs=('process_water', 'discharged_water'))
 
 ADP = facilities.ADP('ADP', ins=plant_air_in, outs='plant_air_out',

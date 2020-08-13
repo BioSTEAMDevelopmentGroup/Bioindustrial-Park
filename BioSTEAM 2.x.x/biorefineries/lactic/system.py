@@ -59,7 +59,8 @@ from biosteam.process_tools import UnitGroup
 from thermosteam import Stream
 from lactic import units, facilities
 from lactic.hx_network import HX_Network
-from lactic.process_settings import price, GWP_CF_stream, GWP_CF_electricity
+from lactic.process_settings import price, GWP_CF_stream, GWP_CF_electricity, \
+    _CH4_MJ_per_kg, FEC_CF_electricity, GWP_CF_feedstock
 from lactic.utils import baseline_feedflow, set_yield, find_split, splits_df
 from lactic.chemicals import chems, chemical_groups, soluble_organics, combustibles
 from lactic.tea_lca import LacticTEA
@@ -216,12 +217,17 @@ def titer_at_yield(lactic_yield):
 
 def adjust_titer_yield():
     if R301.set_titer_limit:
-        lactic_yield = IQ_interpolation(
-            f=titer_at_yield, x0=0, x1=R301.yield_limit,
-            xtol=0.001, ytol=0.01, maxiter=50,
-            args=(), checkbounds=False)
-        set_yield(lactic_yield, R301, R302)
+        R301.cofermentation_rxns.X[0] = R301.cofermentation_rxns.X[3] = R301.yield_limit
+        R302.cofermentation_rxns.X[0] = R302.cofermentation_rxns.X[3] = \
+            R301.yield_limit*R302.ferm_ratio
         seed_recycle._run()
+        if R301.effluent_titer > R301.titer_limit:
+            lactic_yield = IQ_interpolation(
+                f=titer_at_yield, x0=0, x1=R301.yield_limit,
+                xtol=0.001, ytol=0.01, maxiter=50,
+                args=(), checkbounds=False)
+            set_yield(lactic_yield, R301, R302)
+            seed_recycle._run()
 PS301 = bst.units.ProcessSpecification('PS301', ins=R301-0,
                                         specification=adjust_titer_yield)
 
@@ -266,7 +272,7 @@ S401 = units.CellMassFilter('S401', ins=PS301-0, outs=('cell_mass', ''),
 
 # Ca(LA)2 + H2SO4 --> CaSO4 + 2 LA
 R401 = units.AcidulationReactor('R401', ins=(S401-1, sulfuric_acid_R401),
-                                P=101325, tau=0.5, V_wf=0.8, length_to_diameter=2,
+                                P=101325, tau=1, V_wf=0.8, length_to_diameter=2,
                                 kW_per_m3=0.985, wall_thickness_factor=1.5,
                                 vessel_material='Stainless steel 316',
                                 vessel_type='Vertical')
@@ -610,9 +616,7 @@ CT = facilities.CT('CT', ins=('return_cooling_water', cooling_tower_chems,
                    outs=('process_cooling_water', 'cooling_tower_blowdown'))
 
 # All water used in the system, here only consider water consumption,
-# if heating needed, then heating duty required is considered in CHP,
-# CHP and CT makeup water not included as their blowdowns were not included
-# in wastewater treatment (assumed to be directly recycled)
+# if heating needed, then heating duty required is considered in CHP
 process_water_streams = {
     'pretreatment': (water_M201, water_M202, steam_M203, water_M205),
     'conversion': (water_M301,),
@@ -621,7 +625,7 @@ process_water_streams = {
     }
 PWC = facilities.PWC('PWC', ins=(system_makeup_water, S505-0),
                      process_water_streams=sum(process_water_streams.values(), ()),
-                     blowdown_streams=(CHP.outs[-1], CT.outs[-1]),
+                     blowdown_streams=None,
                      outs=('process_water', 'discharged_water'))
 
 ADP = facilities.ADP('ADP', ins=plant_air_in, outs='plant_air_out',
@@ -689,7 +693,7 @@ for i in OSBL_units:
 
 lactic_no_CHP_tea = LacticTEA(
         system=lactic_sys, IRR=0.10, duration=(2016, 2046),
-        depreciation='MACRS7', income_tax=0.21, operating_days=0.96*365,
+        depreciation='MACRS7', income_tax=0.21, operating_days=0.9*365,
         lang_factor=None, construction_schedule=(0.08, 0.60, 0.32),
         startup_months=3, startup_FOCfrac=1, startup_salesfrac=0.5,
         startup_VOCfrac=0.75, WC_over_FCI=0.05,
@@ -744,11 +748,11 @@ def get_total_material_GWP():
     material_GWP = LCA_stream.mass*GWP_CF_stream.mass
     return material_GWP.sum()
 
-# GWP from non-biogenic carbons
+# GWP from combustion of non-biogenic carbons
 get_non_bio_GWP = lambda: chems.CO2.MW * \
     (natural_gas.get_atomic_flow('C')+ethanol.get_atomic_flow('C'))
 
-# GWP from electricity usage
+# GWP from electricity
 get_electricity_GWP = lambda: sum(i.power_utility.rate for i in lactic_sys.units) * \
     GWP_CF_electricity
 
@@ -756,12 +760,29 @@ get_total_GWP = lambda: get_total_material_GWP()+get_non_bio_GWP()+ \
     get_electricity_GWP()
 
 get_functional_GWP = lambda: get_total_GWP()/lactic_acid.F_mass
-get_functional_H2O = lambda: system_makeup_water.F_mass / lactic_acid.F_mass
+# Considering GWP from feedstock supply system and plant uptake of CO2
+get_functional_GWP_with_feedstock = lambda: \
+    (get_total_GWP()+feedstock.F_mass*GWP_CF_feedstock)/lactic_acid.F_mass-1.5
+
+# Freshwater consumption
+get_functional_H2O = lambda: system_makeup_water.F_mass/lactic_acid.F_mass
+
+# Fossil fuel consumption from natural gas
+get_natural_gas_FEC = lambda: natural_gas.F_mass*_CH4_MJ_per_kg/lactic_acid.F_mass
+
+# FEC from electricity
+get_system_power_demand = lambda: sum(i.power_utility.rate for i in lactic_sys.units
+                                      if i.power_utility)
+get_electricity_FEC = lambda: FEC_CF_electricity*get_system_power_demand()/lactic_acid.F_mass
+
+# Total FEC
+get_functional_FEC = lambda: get_natural_gas_FEC()+get_electricity_FEC()
 
 # print('\n---------- Baseline biorefinery ----------')
 # print(f'MPSP is ${simulate_get_MPSP():.3f}/kg')
 # print(f'GWP is {get_functional_GWP():.3f} kg CO2-eq/kg lactic acid')
 # print(f'Freshwater consumption is {get_functional_H2O():.3f} kg H2O/kg lactic acid')
+# print(f'Fossil fuel consumption is {get_functional_FEC():.3f} MJ/kg lactic acid')
 # print('--------------------\n')
 
 

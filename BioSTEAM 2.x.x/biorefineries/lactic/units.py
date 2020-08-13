@@ -410,7 +410,7 @@ class SaccharificationAndCoFermentation(Unit):
             #   Reaction definition                   Reactant        Conversion
             Rxn('Glucan -> GlucoseOligomer',          'Glucan',         0.04),
             Rxn('Glucan + 0.5 H2O -> 0.5 Cellobiose', 'Glucan',         0.012),
-            Rxn('Glucan + H2O -> Glucose',            'Glucan',         0.85),
+            Rxn('Glucan + H2O -> Glucose',            'Glucan',         0.9),
             Rxn('Cellobiose + H2O -> 2 Glucose',      'Cellobiose',     1)
             ])
         
@@ -514,10 +514,10 @@ class SeedTrain(Unit):
     
     effluent_titer = 0
     
-    productivity = 0.89*0.9 # in g/L/hr
+    productivity = 0.89*0.95 # in g/L/hr
     
     # Yield as a ratio of the yield in the main fermenter
-    ferm_ratio = 0.9
+    ferm_ratio = 0.95
     
     def __init__(self, ID='', ins=None, outs=(), T=50+273.15):
         Unit.__init__(self, ID, ins, outs)
@@ -526,11 +526,11 @@ class SeedTrain(Unit):
         # FermMicrobe reaction from ref [3]
         self.cofermentation_rxns = ParallelRxn([
         #      Reaction definition            Reactant    Conversion
-        Rxn('Glucose -> 2 LacticAcid',        'Glucose',   0.76*0.9),
-        Rxn('Glucose -> 3 AceticAcid',        'Glucose',   0.07*0.9),
+        Rxn('Glucose -> 2 LacticAcid',        'Glucose',   0.76*0.95),
+        Rxn('Glucose -> 3 AceticAcid',        'Glucose',   0.07*0.95),
         Rxn('Glucose -> 6 FermMicrobe',       'Glucose',   0.04),
-        Rxn('3 Xylose -> 5 LacticAcid',       'Xylose',    0.76*0.9),
-        Rxn('2 Xylose -> 5 AceticAcid',       'Xylose',    0.07*0.9),
+        Rxn('3 Xylose -> 5 LacticAcid',       'Xylose',    0.76*0.95),
+        Rxn('2 Xylose -> 5 AceticAcid',       'Xylose',    0.07*0.95),
         Rxn('Xylose -> 5 FermMicrobe',        'Xylose',    0.04)
         ])
         self._X = self.cofermentation_rxns.X.copy()
@@ -634,7 +634,7 @@ class Reactor(Unit, PressureVessel, isabstract=True):
         Inlet.        
     outs : stream
         Outlet.
-    tau=0.5 : float
+    tau=1 : float
         Residence time [hr].        
     V_wf=0.8 : float
         Fraction of working volume over total volume.        

@@ -111,8 +111,8 @@ for i in titer_range:
         R301.titer_limit = i
         R301.yield_limit = j
         set_yield(j, R301, R302)
-        for m in range(2):
-            lactic_sys.simulate()
+        # for m in range(2):
+        #     lactic_sys.simulate()
         limits[2].append(R301.sugar_limited_titer)
         LCA_regular[0].append(system.get_functional_GWP())
         LCA_regular[1].append(system.get_functional_H2O())
@@ -178,8 +178,8 @@ for i in titer_range:
         R301.titer_limit = i
         R301.yield_limit = j
         set_yield(j, R301, R302)
-        for m in range(2):
-            lactic_sys.simulate()
+        # for m in range(2):
+        #     lactic_sys.simulate()
         limits[2].append(R301.sugar_limited_titer)
         LCA_acid_resistant[0].append(system.get_functional_GWP())
         LCA_acid_resistant[1].append(system.get_functional_H2O())

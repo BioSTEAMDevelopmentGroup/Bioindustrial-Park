@@ -50,6 +50,13 @@ lactic acid from lignocellulosic feedstocks
     Resources, Conservation and Recycling 2016, 108, 171–181.
     https://doi.org/10.1016/j.resconrec.2016.01.014.
 
+[8] U.S. Energy Information Administration. U.S. electricity generation by energy source.
+    https://www.eia.gov/tools/faqs/faq.php (accessed Aug 11, 2020).
+
+[9] Roni et al., Herbaceous Feedstock 2018 State of Technology Report;
+    INL/EXT-18-51654-Rev000; Idaho National Lab. (INL), 2020.
+    https://doi.org/10.2172/1615147.
+
 @author: yalinli_cabbi
 """
 
@@ -231,10 +238,12 @@ GWP_CF_stream = tmo.Stream('impact_stream', GWP_CF_array, units='kg/hr')
 # In kg CO2-eq/kWh
 GWP_CF_electricity = 0.4481
 
+# In MJ/kWh, 0.627 from ref [8]
+_MJ_per_kWh = 3.6
+FEC_CF_electricity = 0.627 * _MJ_per_kWh
 
-
-
-
+# In kg CO2-eq/kg from ref [9]
+GWP_CF_feedstock = 66.2 / _feedstock_factor
 
 
 

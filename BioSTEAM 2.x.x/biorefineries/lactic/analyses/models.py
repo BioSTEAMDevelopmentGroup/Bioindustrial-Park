@@ -236,8 +236,7 @@ metrics.extend((
 # =============================================================================
 
 lactic_sys = system.lactic_sys
-get_system_power_demand = lambda: sum(i.power_utility.rate for i in lactic_sys.units
-                                      if i.power_utility)
+get_system_power_demand = system.get_system_power_demand
 
 def get_power_demand(group):
     return lambda: sum(i.rate for i in group.power_utilities)
@@ -374,9 +373,12 @@ param = model_full.parameter
 def baseline_uniform(baseline, ratio):
     return shape.Uniform(baseline*(1-ratio), baseline*(1+ratio))
 
+def baseline_triangle(baseline, ratio):
+    return shape.Triangle(baseline*(1-ratio), baseline, baseline*(1+ratio))
+
 # A fake parameter serving as a "blank" in sensitivity analysis to capture
 # fluctuations due to converging errors
-D = shape.Uniform(0.9, 1.1)
+D = baseline_uniform(1, 0.1)
 @param(name='Blank parameter', element=feedstock, kind='coupled', units='',
        baseline=1, distribution=D)
 def set_blank_parameter(anything):
@@ -395,18 +397,38 @@ def set_feedstock_flow_rate(rate):
     feedstock.mass *= rate / U101._cached_flow_rate
     U101._cached_flow_rate = rate
 
-D = shape.Uniform(0.96, 1)
+D = shape.Triangle(0.84, 0.9, 0.96)
 @param(name='Plant uptime', element='TEA', kind='isolated', units='%',
-       baseline=0.96, distribution=D)
+       baseline=0.9, distribution=D)
 def set_operating_days(uptime):
     lactic_tea.operating_days = 365 * uptime
 
-# Only include materials that account for >5% of total annual material cost
-D = shape.Triangle(60, 71.3, 146.4)
+D = baseline_triangle(1, 0.25)
+@param(name='TCI ratio', element='TEA', kind='isolated', units='% of baseline',
+        baseline=1, distribution=D)
+def set_TCI_ratio(new_ratio):
+    old_ratio = lactic_no_CHP_tea._TCI_ratio_cached
+    for unit in lactic_sys.units:
+        if hasattr(unit, 'cost_items'):
+            for item in unit.cost_items:
+                unit.cost_items[item].cost /= old_ratio
+                unit.cost_items[item].cost *= new_ratio
+    lactic_no_CHP_tea._TCI_ratio_cached = new_ratio
+
+# Only include materials that account for >5% of total annual material cost,
+# enzyme not included as it's cost is more affected by the loading (considered later)
+D = shape.Triangle(60, 71.3, 83.7)
 @param(name='Feedstock price', element='TEA', kind='isolated', units='$/dry-ton',
        baseline=71.3, distribution=D)
 def set_feedstock_price(price):
     feedstock.price = price / _feedstock_factor
+
+sulfuric_acid = system.sulfuric_acid
+D = shape.Triangle(0.0910, 0.0948, 0.1046)
+@param(name='Sulfuric acid price', element='TEA', kind='isolated', units='$/kg',
+       baseline=0.0948, distribution=D)
+def set_sulfuric_acid_price(price):
+    sulfuric_acid.price = price
 
 lime = system.lime
 lime_CHP = system.lime_CHP
@@ -430,30 +452,11 @@ D = shape.Triangle(-0.0288, 0, 0.00776)
 def set_gypsum_price(price):
     gypsum.price = price
 
-sulfuric_acid = system.sulfuric_acid
-D = shape.Triangle(0.0910, 0.0948, 0.1046)
-@param(name='Sulfuric acid price', element='TEA', kind='isolated', units='$/kg',
-       baseline=0.0948, distribution=D)
-def set_sulfuric_acid_price(price):
-    sulfuric_acid.price = price
-
 D = shape.Triangle(0.067, 0.070, 0.074)
 @param(name='Electricity price', element='TEA', kind='isolated', units='$/kWh',
        baseline=0.070, distribution=D)
 def set_electricity_price(price): 
     bst.PowerUtility.price = price
-
-D = baseline_uniform(1, 0.25)
-@param(name='TCI ratio', element='TEA', kind='isolated', units='% of baseline',
-        baseline=1, distribution=D)
-def set_TCI_ratio(new_ratio):
-    old_ratio = lactic_no_CHP_tea._TCI_ratio_cached
-    for unit in lactic_sys.units:
-        if hasattr(unit, 'cost_items'):
-            for item in unit.cost_items:
-                unit.cost_items[item].cost /= old_ratio
-                unit.cost_items[item].cost *= new_ratio
-    lactic_no_CHP_tea._TCI_ratio_cached = new_ratio
 
 
 # =============================================================================
@@ -461,14 +464,14 @@ def set_TCI_ratio(new_ratio):
 # =============================================================================
 
 M202 = system.M202
-D = shape.Uniform(0.25, 0.4)
+D = shape.Triangle(0.25, 0.3, 0.4)
 @param(name='Pretreatment solid loading', element=M202, kind='coupled', units='%', 
        baseline=0.3, distribution=D)
 def set_pretreatment_solid_loading(loading): 
     M202.solid_loading = loading
     
 T201 = system.T201
-D = shape.Uniform(10, 35)
+D = shape.Triangle(10, 22.1, 35)
 @param(name='Pretreatment sulfuric acid loading', element=T201,
        kind='coupled', units='mg/g', baseline=22.1, distribution=D)
 def set_pretreatment_sulfuric_acid_loading(loading): 
@@ -476,13 +479,13 @@ def set_pretreatment_sulfuric_acid_loading(loading):
     T201.acid_loading = loading
 
 R201 = system.R201
-D = shape.Uniform(0.06, 0.12)
+D = shape.Triangle(0.06, 0.099, 0.12)
 @param(name='Pretreatment glucan-to-glucose', element=R201, kind='coupled', units='%',
        baseline=0.099, distribution=D)
 def set_R201_glucan_conversion(X):
     R201.pretreatment_rxns[0].X = X    
 
-D = shape.Uniform(0.8, 0.92)
+D = shape.Triangle(0.8, 0.9, 0.92)
 @param(name='Pretreatment xylan-to-xylose', element=R201, kind='coupled', units='%',
        baseline=0.9, distribution=D)
 def set_R201_xylan_conversion(X):
@@ -493,51 +496,45 @@ def set_R201_xylan_conversion(X):
 # =============================================================================
 
 M301 = system.M301
-D = shape.Uniform(0.175, 0.25)
+D = shape.Triangle(0.175, 0.2, 0.25)
 @param(name='Enzymatic hydrolysis solid loading', element=M301, kind='coupled', units='%',
        baseline=0.2, distribution=D)
 def set_R301_solid_loading(loading):
     M301.solid_loading = loading
 
-D = shape.Uniform(10, 30)
+D = shape.Triangle(10, 20, 30)
 @param(name='Enzyme loading', element=M301, kind='coupled', units='mg/g',
        baseline=20, distribution=D)
 def set_R301_enzyme_loading(loading):
     M301.enzyme_loading = loading
 
 # Enzymatic hydrolysis
-D = baseline_uniform(24, 0.1)
+D = shape.Triangle(0, 24, 72)
 @param(name='Enzymatic hydrolysis time', element=R301, kind='coupled', units='hr',
        baseline=24, distribution=D)
 def set_R301_saccharification_time(tau):
     R301.tau_saccharification = tau
 
-D = shape.Uniform(0.75, 0.9)
+D = shape.Triangle(0.75, 0.9, 0.95)
 @param(name='Enzymatic hydrolysis glucan-to-glucose', element=R301, kind='coupled', units='%',
-       baseline=0.85, distribution=D)
+       baseline=0.9, distribution=D)
 def set_R301_glucan_conversion(X):
     R301.saccharification_rxns[2].X = X
 
 # Fermentation
-D = shape.Uniform(5, 15)
+D = shape.Triangle(5, 10, 15)
 @param(name='CSL loading', element=R301, kind='coupled', units='g/L',
        baseline=10, distribution=D)
 def set_CSL_loading(loading):
     R301.CSL_loading = loading
 
 R302 = system.R302
-D = baseline_uniform(0.9, 0.1)
+# 1e-6 is to avoid generating tiny negative flow (e.g., 1e-14)
+D = shape.Triangle(0.9, 0.95, 1-1e-6)
 @param(name='Seed train fermentation ratio', element=R302, kind='coupled', units='%',
-       baseline=0.9, distribution=D)
+       baseline=0.95, distribution=D)
 def set_ferm_ratio(ratio):
     R302.ferm_ratio = ratio
-
-D = shape.Triangle(0.18, 0.89, 1.92)
-@param(name='Productivity', element=R301, kind='coupled', units='g/L/hr',
-       baseline=0.89, distribution=D)
-def set_productivity(productivity):
-    R301.productivity = productivity
-    R302.productivity = productivity * R302.ferm_ratio
 
 D = shape.Triangle(0.55, 0.76, 0.93)
 @param(name='Lactic acid yield', element=R301, kind='coupled', units='g/g',
@@ -545,11 +542,17 @@ D = shape.Triangle(0.55, 0.76, 0.93)
 def set_lactic_acid_yield(lactic_yield):
     R301_X = R301.cofermentation_rxns.X
     R302_X = R302.cofermentation_rxns.X
-    R301_X[0] = R301_X[3] = lactic_yield
-    # 1e-6 is to avoid generating tiny negative flow (e.g., 1e-14) in R301
+    R301_X[0] = R301_X[3] = R301.yield_limit = lactic_yield
     R301_X[1] = R301_X[4] = min(R301_X[1], 1-1e-6-R301_X[0]-R301_X[2])
     R302_X[0] = R302_X[3] = lactic_yield * R302.ferm_ratio
     R302_X[1] = R302_X[4] = R301_X[1] * R302.ferm_ratio
+
+D = shape.Triangle(0.18, 0.89, 1.92)
+@param(name='Productivity', element=R301, kind='coupled', units='g/L/hr',
+       baseline=0.89, distribution=D)
+def set_lactic_productivity(productivity):
+    R301.productivity = productivity
+    R302.productivity = productivity * R302.ferm_ratio
 
 D = shape.Triangle(0.004, 0.07, 0.32)
 @param(name='Acetic acid yield', element=R301, kind='coupled', units='g/g',
@@ -563,10 +566,10 @@ def set_acetic_acid_yield(acetic_yield):
                             1-1e-6-R302_X[0]-R302_X[2])
     R302_X[1] = R302_X[4] = R302_acetic_yield
 
-D = shape.Uniform(0.05, 0.1)
+D = shape.Triangle(0.05, 0.07, 0.1)
 @param(name='Inoculum ratio', element=R301, kind='coupled', units='%',
        baseline=0.07, distribution=D)
-def set_innoculum_ratio(ratio):
+def set_inoculum_ratio(ratio):
     R301.inoculum_ratio = ratio
 
 
@@ -583,21 +586,21 @@ def set_S402_gypsum_split(split):
     S402.split[gypsum_index] = split
 
 R401 = system.R401
-D = baseline_uniform(0.5, 0.1)
+D = baseline_triangle(1, 0.1)
 @param(name='Acidulation time', element=R401, kind='coupled', units='hr',
-       baseline=0.5, distribution=D)
+       baseline=1, distribution=D)
 def set_R401_tau(tau):
     R401.tau = tau
 
 R402 = system.R402
-D = shape.Triangle(0.95, 1, 1.05)
+D = baseline_triangle(1, 0.1)
 @param(name='Esterification conversion factor', element=R402, kind='coupled', units='',
        baseline=1, distribution=D)
 def set_R402_conversion_factor(factor):
     R402.X_factor = factor
     
 R403 = system.R403
-D = shape.Triangle(0.72, 0.8, 0.88)
+D = baseline_triangle(0.8, 0.1)
 @param(name='Hydrolysis conversion', element=R403, kind='coupled', units='%',
        baseline=0.8, distribution=D)
 def set_R403_conversion_factor(X):
