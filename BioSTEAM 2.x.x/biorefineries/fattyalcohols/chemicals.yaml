@@ -1,0 +1,77 @@
+Chemicals:
+  HCl: 
+  Methane:
+  Water:
+  Acetone:
+  LacticAcid:
+  Tridecane:
+  Methanol:
+  Ethanol:
+  Butanol:
+  Hexanol:
+  Octanol:
+  Decanol:
+  Dodecanol:
+  Tetradecanol:
+  Hexadecanol:
+  P4O10:
+    phase: solid
+    default: True
+  SO2:
+    phase: gas
+  N2:
+    phase: gas
+  O2:
+    phase: gas
+  CO2:
+    phase: gas
+  Glucose:
+    phase: solid
+    default: True
+    rho: 1.0e+6
+  NaCl:
+    phase: solid
+    default: True
+    rho: 1.0e+6
+  DiammoniumPhosphate:
+    phase: solid
+    rho: 1.0e+6
+    default: True 
+  Ash:
+    search_db: False
+    phase: solid
+    default: True
+  Cells:
+    formula: CH1.61O0.56N0.16 # Yeast
+    search_db: False
+    phase_ref: solid
+    phase: solid
+    rho: 1540
+    default: True
+    Hf: -130412.73
+  # Gliadin:
+  #   formula: CH1.57O0.31N0.29S0.007
+  #   search_db: False
+  #   Hf: -73714
+  #   rho: 1.0e+6
+  #   phase: solid
+  #   default: True
+  DiammoniumPhosphate:
+    phase: solid
+    rho: 1.0e+6
+    default: True 
+  CornSteepLiquor:
+    search_db: False
+    phase: liquid
+    MW: 37.24
+    Hf: -334649
+    default: True  
+Synonyms: 
+  Methane: CH4
+  CornSteepLiquor: CSL
+  DiammoniumPhosphate: DAP
+  Water: H2O
+  Cells: Yeast
+  DiammoniumPhosphate: DAP
+  N2: Nitrogen
+  O2: Oxygen
