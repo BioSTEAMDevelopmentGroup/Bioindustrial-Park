@@ -5,6 +5,7 @@ biorefineries.egg-info/SOURCES.txt
 biorefineries.egg-info/dependency_links.txt
 biorefineries.egg-info/requires.txt
 biorefineries.egg-info/top_level.txt
+biorefineries/cornstover/README.rst
 biorefineries/cornstover/__init__.py
 biorefineries/cornstover/_analysis.py
 biorefineries/cornstover/_chemicals.py
@@ -18,6 +19,7 @@ biorefineries/cornstover/_system.py
 biorefineries/cornstover/_tea.py
 biorefineries/cornstover/model.py
 biorefineries/cornstover/units.py
+biorefineries/lipidcane/README.rst
 biorefineries/lipidcane/__init__.py
 biorefineries/lipidcane/_analysis.py
 biorefineries/lipidcane/_chemicals.py
@@ -32,6 +34,7 @@ biorefineries/lipidcane/model.py
 biorefineries/lipidcane/sankey_plot.ipynb
 biorefineries/lipidcane/utils/__init__.py
 biorefineries/lipidcane/utils/composition.py
+biorefineries/sugarcane/README.rst
 biorefineries/sugarcane/__init__.py
 biorefineries/sugarcane/_chemicals.py
 biorefineries/sugarcane/_ethanol_production_system.py

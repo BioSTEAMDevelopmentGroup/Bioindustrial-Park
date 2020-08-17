@@ -14,7 +14,7 @@ from biosteam import units
 from biosteam import main_flowsheet as F
 from biorefineries.LAOs import units as LAOs_units
 from biorefineries import LAOs
-from fattyalcohols import create_fattyalcohol_production_sys
+from biorefineries.fattyalcohols import create_fattyalcohol_production_sys
 from thermosteam.reaction import (Reaction as Rxn,
                                   ParallelReaction as ParallelRxn,
 )
@@ -136,24 +136,28 @@ def create_system(ID='LAOs_sys', stainless_steel=True):
                                           Decene=1.0,
                                           Dodecene=1.0,
                                           Tetradecene=1.0))
-    D103 = units.ShortcutColumn('D103', C103-0, LHK=('Hexene', 'Octene'),
-                                k=1.05, y_top=0.94, x_bot=1e-6)
+    
+    D103 = units.ShortcutColumn('D103', LHK=('Hexene', 'Octene'),
+                                k=1.05, y_top=0.98, x_bot=1e-6)
     H106 = units.HXutility('H106', D103-0, T=320, V=0)
     D104 = units.BinaryDistillation('D104', D103-1, LHK=('Octene', 'Decene'),
-                                k=1.05, y_top=0.94, x_bot=1e-6)
+                                k=1.05, y_top=0.98, x_bot=1e-6)
     H107 = units.HXutility('H107', D104-0, T=320, V=0)
-    H108 = units.HXutility('H108', D104-1, T=320, V=0)
+    H108 = units.HXprocess('H108', (C103-0, D104-1), dT=5, phase1='l')
+    H108-0-D103
+    
     T108 = units.StorageTank('T108', H106-0, hexene,
                               vessel_type='Floating roof',
                               tau=7*24)
     T109 = units.StorageTank('T109', H107-0, octene,
                               vessel_type='Floating roof',
                               tau=7*24)
-    T110 = units.StorageTank('T110', H108-0, decene,
+    T110 = units.StorageTank('T110', H108-1, decene,
                               vessel_type='Floating roof',
                               tau=7*24)
     
     ### Facilities ###
+    
     *other_agents, high_pressure_steam = bst.HeatUtility.heating_agents
     BT = bst.BoilerTurbogenerator('BT', 
                                   ins=(None, None, 'boiler_makeup_water', 
@@ -194,6 +198,7 @@ def create_system(ID='LAOs_sys', stainless_steel=True):
                 recycle=P108-0),
              P109],
             recycle=1**F.unit.M101),
+         H108,
          D103,
          D104,
          H106,

@@ -9,8 +9,7 @@
 import numpy as np
 import biosteam as bst
 from thermosteam.utils import get_instance
-from . import units as ol_units
-from fattyalcohols import units as fa_units
+from . import units as units
 
 __all__ = ('LAOsProcessSpecifications',
            'fermentation_products',)
@@ -60,10 +59,10 @@ class LAOsProcessSpecifications:
         #: [TEA] Should include settings for the complete process.
         self.TEA = TEA
         
-        fermentation_reactor = get_instance(system.units, fa_units.FattyAlcoholBioreactor)
+        fermentation_reactor = get_instance(system.units, units.FattyAlcoholBioreactor)
         
         #: [AdiabaticFixedbedGasReactor] Dehydration reactor.
-        self.dehydration_reactor = get_instance(system.units, ol_units.AdiabaticFixedbedGasReactor)
+        self.dehydration_reactor = get_instance(system.units, units.AdiabaticFixedbedGasReactor)
         
         #: [ReactorSpecification] Specifications for fementor.
         self.fermentation_specification = bst.process_tools.ReactorSpecification(

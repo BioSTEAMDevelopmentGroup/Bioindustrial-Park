@@ -77,10 +77,7 @@ def _load_system():
     bst.speed_up()
     bst.System.molar_tolerance = 0.1
     bst.System.converge_method = 'aitken'
-    try:
-        specs.run_specifications() # Sets process specifications and simulates system
-    except:
-        breakpoint()
+    specs.run_specifications() # Sets process specifications and simulates system
     products = (F('hexene'), F('octene'), F('decene'))
     for i in range(2): set_LAOs_MPSP(get_LAOs_MPSP())
     _system_loaded = True
