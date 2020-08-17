@@ -2,6 +2,8 @@
 lactic: Production of Lactic Acid from Lignocellulosic Feedstocks
 ======================================================================
 
+Simplified process flow scheme
+------------------------------
 .. figure:: ./images/lactic_acid_biorefinery.png
 
 The biorefinery is developed for a manuscript in preparation [1] for the production
@@ -165,10 +167,10 @@ References
 ----------
 .. [1] Li et al., Evaluating the Sustainability of Lactic Acid Production from
     Lignocellulosic Biomass. In Preparation 2020.
-
+    
 .. [2] Li et al., Tailored Pretreatment Processes for the Sustainable Design of
     Lignocellulosic Biorefineries across the Feedstock Landscape. Submitted 2020.
-
+    
 .. [3] Cortes-Peña et al., BioSTEAM: A Fast and Flexible Platform for the Design,
     Simulation, and Techno-Economic Analysis of Biorefineries under Uncertainty. 
     ACS Sustainable Chem. Eng. 2020, 8 (8), 3302–3310. 
