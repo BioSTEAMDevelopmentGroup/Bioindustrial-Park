@@ -1,6 +1,5 @@
 ======================================================================
-ethanol and ethanol_adipic:
-Tailored Pretreatment Processes for Production of Ethanol and Adipic
+ethanol and ethanol_adipic: Tailored Pretreatment Processes for Production of Ethanol and Adipic
 Acid from Lignocellulosic Feedstocks
 ======================================================================
 
@@ -54,22 +53,36 @@ ethanol_adipic_sys, ethanol_adipic_tea, and ethanol_adipic.
 
 Naming conventions:
     D = Distillation column
+    
     F = Flash tank
+    
     H = Heat exchange
+    
     M = Mixer
+    
     P = Pump
+    
     R = Reactor
+    
     S = Splitter (including solid/liquid separator)
+    
     T = Tank or bin for storage
+    
     U = Other units
 
 Processes:
     100: Feedstock preprocessing
+    
     200: Pretreatment
+    
     300: Carbohydrate conversion
+    
     400: Ethanol purification
+    
     500: Lignin utilization (not included in this biorefinery)
+    
     600: Wastewater treatment
+    
     700: Facilities
 
 .. code-block:: python
@@ -251,32 +264,32 @@ of each biorefinery.
 
 Requirements
 ------------
-..[1] Python module biosteam (https://pypi.org/project/biosteam/) and dependencies
+.. [1] Python module biosteam (https://pypi.org/project/biosteam/) and dependencies
 
     Note: results used in the manuscript were generated using biosteam v2.20.5
           and dependencies
 
-..[2] Excel file named "Feedstock compositions.xlsx" in the same directory path
+.. [2] Excel file named "Feedstock compositions.xlsx" in the same directory path
     as the _analyses.py module
 
 
 References
 ----------
-..[1] Li et al., Tailored Pretreatment Processes for the Sustainable Design of
+.. [1] Li et al., Tailored Pretreatment Processes for the Sustainable Design of
     Lignocellulosic Biorefineries across the Feedstock Landscape. Submitted 2020.
 
-..[2] Humbird et al., Process Design and Economics for Biochemical Conversion of 
+.. [2] Humbird et al., Process Design and Economics for Biochemical Conversion of 
     Lignocellulosic Biomass to Ethanol: Dilute-Acid Pretreatment and Enzymatic 
     Hydrolysis of Corn Stover; Technical Report NREL/TP-5100-47764; 
     National Renewable Energy Lab (NREL), 2011.
     https://www.nrel.gov/docs/fy11osti/47764.pdf
 
-..[3] Davis et al., Process Design and Economics for the Conversion of Lignocellulosic 
+.. [3] Davis et al., Process Design and Economics for the Conversion of Lignocellulosic 
     Biomass to Hydrocarbon Fuels and Coproducts: 2018 Biochemical Design Case Update; 
     NREL/TP-5100-71949; National Renewable Energy Lab (NREL), 2018. 
     https://doi.org/10.2172/1483234
 
-..[4] Cortes-Peña et al., BioSTEAM: A Fast and Flexible Platform for the Design,
+.. [4] Cortes-Peña et al., BioSTEAM: A Fast and Flexible Platform for the Design,
     Simulation, and Techno-Economic Analysis of Biorefineries under Uncertainty. 
     ACS Sustainable Chem. Eng. 2020, 8 (8), 3302–3310. 
     https://doi.org/10.1021/acssuschemeng.9b07040

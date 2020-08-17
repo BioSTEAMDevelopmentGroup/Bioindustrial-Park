@@ -44,22 +44,36 @@ The system, TEA, and flowsheet are lactic_sys, lactic_tea, and lactic.
 
 Naming conventions:
     D = Distillation column
+    
     F = Flash tank
+
     H = Heat exchange
+
     M = Mixer
+
     P = Pump (including conveying belt)
+
     R = Reactor
+
     S = Splitter (including solid/liquid separator)
+
     T = Tank or bin for storage
+
     U = Other units
+
     PS = Process specificiation, not physical units, but for adjusting streams
 
 Processes:
     100: Feedstock preprocessing
+
     200: Pretreatment
+
     300: Conversion
+
     400: Separation
+
     500: Wastewater treatment
+
     600: Facilities
 
 .. code-block:: python
@@ -149,13 +163,13 @@ be saved as Excel files in the same directory path as the module.
 
 References
 ----------
-..[1] Li et al., Evaluating the Sustainability of Lactic Acid Production from
-     Lignocellulosic Biomass. In Preparation 2020.
+.. [1] Li et al., Evaluating the Sustainability of Lactic Acid Production from
+    Lignocellulosic Biomass. In Preparation 2020.
 
-..[2] Li et al., Tailored Pretreatment Processes for the Sustainable Design of
+.. [2] Li et al., Tailored Pretreatment Processes for the Sustainable Design of
     Lignocellulosic Biorefineries across the Feedstock Landscape. Submitted 2020.
 
-..[3] Cortes-Peña et al., BioSTEAM: A Fast and Flexible Platform for the Design,
+.. [3] Cortes-Peña et al., BioSTEAM: A Fast and Flexible Platform for the Design,
     Simulation, and Techno-Economic Analysis of Biorefineries under Uncertainty. 
     ACS Sustainable Chem. Eng. 2020, 8 (8), 3302–3310. 
     https://doi.org/10.1021/acssuschemeng.9b07040
