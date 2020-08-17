@@ -22,8 +22,8 @@ lactic acid from lignocellulosic feedstocks
     https://doi.org/10.1021/acssuschemeng.9b07040
     
 [2] Li et al., Tailored Pretreatment Processes for the Sustainable Design of
-    Lignocellulosic Biorefineries across the Feedstock Landscape. Submitted.
-    July, 2020.
+    Lignocellulosic Biorefineries across the Feedstock Landscape. Submitted,
+    2020.
 
 @author: yalinli_cabbi
 """
@@ -67,7 +67,7 @@ samples_1d = model.sample(N=N_simulation, rule='L')
 samples = samples_1d[:, np.newaxis]
 model.load_samples(samples)
 
-carb_contents = np.arange(0.3, 0.701, 0.01)
+carb_contents = np.arange(0.25, 0.701, 0.01)
 # 0.59 is the baseline
 carb_contents = [0.59] + carb_contents.tolist()
 

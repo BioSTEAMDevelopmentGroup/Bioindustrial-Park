@@ -13,17 +13,15 @@
 """
 Created on Mon Dec 30 09:30:10 2019
 
-Modified from the biorefineries constructed in [1] and [2] for the production of
-lactic acid from lignocellulosic feedstocks
-
+References:
 [1] Cortes-Peña et al., BioSTEAM: A Fast and Flexible Platform for the Design, 
     Simulation, and Techno-Economic Analysis of Biorefineries under Uncertainty. 
     ACS Sustainable Chem. Eng. 2020, 8 (8), 3302–3310. 
     https://doi.org/10.1021/acssuschemeng.9b07040
     
 [2] Li et al., Tailored Pretreatment Processes for the Sustainable Design of
-    Lignocellulosic Biorefineries across the Feedstock Landscape. Submitted.
-    July, 2020.
+    Lignocellulosic Biorefineries across the Feedstock Landscape. Submitted,
+    2020.
 
 [3] Davis et al., Process Design and Economics for the Conversion of Lignocellulosic 
     Biomass to Hydrocarbon Fuels and Coproducts: 2018 Biochemical Design Case Update; 
@@ -141,7 +139,7 @@ ash_disposal_price = -1.41e6 / (4279*7880)
 
 # Assums no cost/credit for baseline, the same as ash disposal for the lower bound,	
 # for the upper bound (i.e., positive selling price indicating profit), use 	
-# USGS 2015-2019 average  free on bard price in $/metric ton for crude gypsum. 
+# USGS 2015-2019 average  free on bard price in $/metric tonne for crude gypsum. 
 # National Minerals Information Center. Mineral Commodity Summaries 2020; 
 # U.S. Geological Survey, 2020.
 # Assuming all prices were in their nominal year (e.g., 2015 price in 2015$)

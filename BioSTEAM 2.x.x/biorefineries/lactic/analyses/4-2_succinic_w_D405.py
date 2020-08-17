@@ -22,8 +22,8 @@ lactic acid from lignocellulosic feedstocks
     https://doi.org/10.1021/acssuschemeng.9b07040
     
 [2] Li et al., Tailored Pretreatment Processes for the Sustainable Design of
-    Lignocellulosic Biorefineries across the Feedstock Landscape. Submitted.
-    July, 2020.
+    Lignocellulosic Biorefineries across the Feedstock Landscape. Submitted,
+    2020.
     
 @author: yalinli_cabbi
 """
@@ -41,7 +41,7 @@ import biosteam as bst
 from biosteam.utils import TicToc
 from lactic import system_succinic
 
-system_succinic.R301.set_titer_limit = False
+system_succinic.R301.set_titer_limit = True
 
 
 # %%
@@ -66,7 +66,8 @@ timer = TicToc('timer')
 timer.tic()
 
 succinic_contents = np.arange(0.07, 0.15, 0.01)
-succinic_contents = succinic_contents.tolist() + [0.145]
+# succinic_contents = np.arange(0.14, 0.06, -0.01)
+succinic_contents = [0] + succinic_contents.tolist() + [0.145]
 run_number = 0
 
 
@@ -101,7 +102,18 @@ def simulate_log_results():
     print(f'D405 Lr: {D405.Lr:.3f}, MPSP: ${MPSP:.3f}/kg, purity: {purity:.1%}\n')
 
 for i in succinic_contents:
-    set_succinic(system_succinic.feedstock, i)
+    j = round(i, 3)
+    if j == 0:
+        system_succinic.F402.V = 0.9
+    elif j < 0.09:
+        system_succinic.F402.V = 0.92
+    elif j < 0.13:
+        system_succinic.F402.V = 0.94
+    elif j == 0.13:
+        system_succinic.F402.V = 0.95
+        system_succinic.D405.specification = None
+        system_succinic.D405.Lr = 0.8
+    set_succinic(system_succinic.feedstock, j)
     simulate_log_results()
     run_number += 1
 

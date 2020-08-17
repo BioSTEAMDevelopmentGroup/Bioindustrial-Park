@@ -22,8 +22,8 @@ lactic acid from lignocellulosic feedstocks
     https://doi.org/10.1021/acssuschemeng.9b07040
     
 [2] Li et al., Tailored Pretreatment Processes for the Sustainable Design of
-    Lignocellulosic Biorefineries across the Feedstock Landscape. Submitted.
-    July, 2020.
+    Lignocellulosic Biorefineries across the Feedstock Landscape. Submitted,
+    2020.
 
 @author: yalinli_cabbi
 """
@@ -58,7 +58,7 @@ timer = TicToc('timer')
 timer.tic()
 
 model = models.model_full
-R301.set_titer_limit = False
+R301.set_titer_limit = True
 
 # Set seed to make sure each time the same set of random numbers will be used
 np.random.seed(3221)

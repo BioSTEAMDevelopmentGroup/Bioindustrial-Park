@@ -12,25 +12,6 @@
 """
 Created on Sat Jun 27 13:54:11 2020
 
-Based on the biorefineries in [1] and [2] for the production of ethanol and 
-adipic acid from lignocellulosic biomass. Part of the script is developed in [3] 
-
-[1] Humbird et al., Process Design and Economics for Biochemical Conversion of 
-    Lignocellulosic Biomass to Ethanol: Dilute-Acid Pretreatment and Enzymatic 
-    Hydrolysis of Corn Stover; Technical Report NREL/TP-5100-47764; 
-    National Renewable Energy Lab (NREL), 2011.
-    https://www.nrel.gov/docs/fy11osti/47764.pdf
-
-[2] Davis et al., Process Design and Economics for the Conversion of Lignocellulosic 
-    Biomass to Hydrocarbon Fuels and Coproducts: 2018 Biochemical Design Case Update; 
-    NREL/TP-5100-71949; National Renewable Energy Lab (NREL), 2018. 
-    https://doi.org/10.2172/1483234
-
-[3] Cortes-Peña et al., BioSTEAM: A Fast and Flexible Platform for the Design, 
-    Simulation, and Techno-Economic Analysis of Biorefineries under Uncertainty. 
-    ACS Sustainable Chem. Eng. 2020, 8 (8), 3302–3310. 
-    https://doi.org/10.1021/acssuschemeng.9b07040
-
 @author: yalinli_cabbi
 """
 
@@ -48,7 +29,7 @@ class ethanol_adipic_TEA(TEA):
                  'construction', 'contingency', 'other_indirect_costs', 
                  'labor_cost', 'labor_burden', 'property_insurance',
                  'maintenance', '_ISBL_DPI_cached', '_FCI_cached',
-                 '_utility_cost_cached')
+                 '_utility_cost_cached', '_TCI_ratio_cached')
     
     def __init__(self, system, IRR, duration, depreciation, income_tax,
                  operating_days, lang_factor, construction_schedule,
@@ -77,6 +58,7 @@ class ethanol_adipic_TEA(TEA):
         self.labor_burden = labor_burden
         self.property_insurance = property_insurance
         self.maintenance = maintenance
+        self._TCI_ratio_cached = 1
     
     @property
     def utility_cost(self):

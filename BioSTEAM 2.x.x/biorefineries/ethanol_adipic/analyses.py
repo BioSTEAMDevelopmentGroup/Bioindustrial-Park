@@ -12,29 +12,6 @@
 """
 Created on Thu Jul  9 11:54:08 2020
 
-This script was used to generate results for a submitted manuscript (Li et al., 2020),
-running this script will save results as Excel files in the same directory path 
-as this script
-
-Correlations between feedstock lignin content and pretreatment efficacy 
-    (as sugar released from cellulose and hemicellulose) were developed 
-    for seven different pretreatment technologies as described in the manuscript
-    
-Monte Carlo simulation was first conducted to get pretreatment efficacy 
-    for feedstocks with lignin content ranging from 0-40% with a step size of 1%,
-    1000 simulation was conducted for each lignin content
-
-Then the developed pretreatment efficacy correlations for acid and base pretreatments
-    were used in respective biorefinery models to calculate minimum ethanol selling price
-    (MESP) and maximum feedstock payment price (MFPP). The biorefineries were
-    developed based on references [1] and [2] for the production of ethanol and
-    adipic acid (base-pretreatment biorefinery only) from lignocellulosic biomass.
-    Part of the script was developed in [3]
-    
-The biorefinery model was run for different feedstock compositions to simulate
-    how pretreatment efficacy affects MESP (with given feedstock price) and MFPP
-    (with given ethanol price) of each biorefinery
-
 References:
 [1] Humbird et al., Process Design and Economics for Biochemical Conversion of 
     Lignocellulosic Biomass to Ethanol: Dilute-Acid Pretreatment and Enzymatic 
@@ -51,16 +28,7 @@ References:
     Simulation, and Techno-Economic Analysis of Biorefineries under Uncertainty. 
     ACS Sustainable Chem. Eng. 2020, 8 (8), 3302–3310. 
     https://doi.org/10.1021/acssuschemeng.9b07040
-
-Requirements:
-[1] Python module biosteam (https://pypi.org/project/biosteam/) and dependencies
-
-    Note: results used in the manuscript were generated using biosteam v2.20.5
-          and dependencies
-
-[2] Excel file named "Feedstock compositions.xlsx" in the same directory path
-    as this script
-
+    
 @author: yalinli_cabbi
 """
 

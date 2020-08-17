@@ -13,17 +13,15 @@
 """
 Created on Mon Dec 30 09:15:23 2019
 
-Modified from the biorefineries constructed in [1] and [2] for the production of
-lactic acid from lignocellulosic feedstocks
-
+References:
 [1] Cortes-Peña et al., BioSTEAM: A Fast and Flexible Platform for the Design, 
     Simulation, and Techno-Economic Analysis of Biorefineries under Uncertainty. 
     ACS Sustainable Chem. Eng. 2020, 8 (8), 3302–3310. 
     https://doi.org/10.1021/acssuschemeng.9b07040
     
 [2] Li et al., Tailored Pretreatment Processes for the Sustainable Design of
-    Lignocellulosic Biorefineries across the Feedstock Landscape. Submitted.
-    July, 2020.
+    Lignocellulosic Biorefineries across the Feedstock Landscape. Submitted,
+    2020.
 
 Naming conventions:
     D = Distillation column
@@ -625,7 +623,7 @@ process_water_streams = {
     }
 PWC = facilities.PWC('PWC', ins=(system_makeup_water, S505-0),
                      process_water_streams=sum(process_water_streams.values(), ()),
-                     blowdown_streams=None,
+                     recycled_blowdown_streams=None,
                      outs=('process_water', 'discharged_water'))
 
 ADP = facilities.ADP('ADP', ins=plant_air_in, outs='plant_air_out',
@@ -760,6 +758,15 @@ get_total_GWP = lambda: get_total_material_GWP()+get_non_bio_GWP()+ \
     get_electricity_GWP()
 
 get_functional_GWP = lambda: get_total_GWP()/lactic_acid.F_mass
+
+# 79 is gal ethanol per dry ton of feedstock, 84530 is ethanol HHV in BTU/gal,
+# 0.001055 is BTU/MJ, 907.185 is kg per ton
+_MJ_per_kg = 79 * (84530*0.001055) / 907.185
+
+# Emissions associate with land-use change (LUC), -10 to 45 g CO2/MJ feedstock
+get_GPW_LUC_lower = lambda: (-10/1e3) * feedstock.F_mass*_MJ_per_kg / lactic_acid.F_mass
+get_GPW_LUC_upper = lambda: (45/1e3) * feedstock.F_mass*_MJ_per_kg / lactic_acid.F_mass
+
 # Considering GWP from feedstock supply system and plant uptake of CO2
 get_functional_GWP_with_feedstock = lambda: \
     (get_total_GWP()+feedstock.F_mass*GWP_CF_feedstock)/lactic_acid.F_mass-1.5
@@ -778,12 +785,11 @@ get_electricity_FEC = lambda: FEC_CF_electricity*get_system_power_demand()/lacti
 # Total FEC
 get_functional_FEC = lambda: get_natural_gas_FEC()+get_electricity_FEC()
 
-# print('\n---------- Baseline biorefinery ----------')
-# print(f'MPSP is ${simulate_get_MPSP():.3f}/kg')
-# print(f'GWP is {get_functional_GWP():.3f} kg CO2-eq/kg lactic acid')
-# print(f'Freshwater consumption is {get_functional_H2O():.3f} kg H2O/kg lactic acid')
-# print(f'Fossil fuel consumption is {get_functional_FEC():.3f} MJ/kg lactic acid')
-# print('--------------------\n')
+print('\n---------- Baseline biorefinery ----------')
+print(f'MPSP is ${simulate_get_MPSP():.3f}/kg')
+print(f'GWP is {get_functional_GWP():.3f} kg CO2-eq/kg lactic acid')
+print(f'Freshwater consumption is {get_functional_H2O():.3f} kg H2O/kg lactic acid')
+print('--------------------\n')
 
 
 # %%

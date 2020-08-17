@@ -12,9 +12,7 @@
 """
 Created on Fri Jun 26 07:33:04 2020
 
-Based on the biorefineries in [1] and [2] for the production of ethanol and 
-adipic acid from lignocellulosic biomass. Part of the script is developed in [3] 
-
+References:
 [1] Humbird et al., Process Design and Economics for Biochemical Conversion of 
     Lignocellulosic Biomass to Ethanol: Dilute-Acid Pretreatment and Enzymatic 
     Hydrolysis of Corn Stover; Technical Report NREL/TP-5100-47764; 
@@ -37,11 +35,9 @@ adipic acid from lignocellulosic biomass. Part of the script is developed in [3]
     NREL/TP-5100-62498; National Renewable Energy Lab (NREL), 2015.
     http://www.nrel.gov/docs/fy15osti/62498.pdf
     
-
 [5] Vardon et al., Cis,Cis-Muconic Acid: Separation and Catalysis to Bio-Adipic
     Acid for Nylon-6,6 Polymerization. Green Chem. 2016, 18 (11), 3397–3413.
     https://doi.org/10.1039/C5GC02844B.
-
 
 @author: yalinli_cabbi
 """
@@ -81,6 +77,7 @@ ParallelRxn = tmo.reaction.ParallelReaction
 class FeedstockPreprocessing(Unit):
     # 2205 U.S. ton/day (2000 metric tonne/day) as in ref [1]
     _baseline_flow_rate = baseline_feedflow.sum()
+    _cached_flow_rate = 2205
 
 
 # %% 
@@ -168,7 +165,7 @@ class SteamMixer(Unit):
         steam_mol = steam.F_mol
         steam_mol = aitken_secant(f=self.P_at_flow,
                                   x0=steam_mol, x1=steam_mol+0.1, 
-                                  xtol=0.1, ytol=0.01,
+                                  xtol=1e-4, ytol=1e-4,
                                   args=(self.P, steam, mixed, feed))
         mixed.P = self.P
     

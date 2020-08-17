@@ -22,8 +22,8 @@ lactic acid from lignocellulosic feedstocks
     https://doi.org/10.1021/acssuschemeng.9b07040
     
 [2] Li et al., Tailored Pretreatment Processes for the Sustainable Design of
-    Lignocellulosic Biorefineries across the Feedstock Landscape. Submitted.
-    July, 2020.
+    Lignocellulosic Biorefineries across the Feedstock Landscape. Submitted,
+    2020.
     
 @author: yalinli_cabbi
 """
@@ -41,7 +41,7 @@ import biosteam as bst
 from biosteam.utils import TicToc
 from lactic import system
 
-system.R301.set_titer_limit = False
+system.R301.set_titer_limit = True
 
 
 # %%
@@ -65,7 +65,9 @@ def set_succinic(feedstock, content):
 timer = TicToc('timer')
 timer.tic()
 
-succinic_contents = np.arange(0, 0.10, 0.01)
+succinic_contents = np.arange(0, 0.11, 0.01)
+# succinic_contents = np.arange(0.07, -0.01, -0.01)
+# succinic_contents = succinic_contents.tolist() + [0.08, 0.09, 0.1]
 run_number = 0
 
 
@@ -101,19 +103,26 @@ def simulate_log_results():
     print(f'F402 V: {F402.V:.3f}, MPSP: ${MPSP:.3f}/kg, purity: {purity:.1%}\n')
 
 for i in succinic_contents:
-    set_succinic(system.feedstock, i)
-    if i < 0.08:
+    j = round(i, 3)
+    set_succinic(system.feedstock, j)
+    if j < 0.08:
         simulate_log_results()
         succinic_axis.append(i)
         run_number += 1
-    if i == 0.08:
+    elif j == 0.08:
         F402.specification = None
-        F402.V = 0.944
+        F402.V = 0.941
         simulate_log_results()
         succinic_axis.append(i)
         run_number += 1
-    if i == 0.09:
-        for V in (0.96, 0.97, 0.98, 0.99):
+    elif j == 0.09:
+        for V in (0.97, 0.98, 0.99):
+            F402.V = V
+            simulate_log_results()
+            succinic_axis.append(i)
+            run_number += 1
+    elif j == 0.1:
+        for V in (0.98, 0.99):
             F402.V = V
             simulate_log_results()
             succinic_axis.append(i)

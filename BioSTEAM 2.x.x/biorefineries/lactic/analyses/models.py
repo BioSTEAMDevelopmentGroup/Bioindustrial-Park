@@ -13,18 +13,16 @@
 """
 Created on Mon May 11 16:26:46 2020
 
-Modified from the biorefineries constructed in [1] and [2] for the production of
-lactic acid from lignocellulosic feedstocks
-
+References:
 [1] Cortes-Peña et al., BioSTEAM: A Fast and Flexible Platform for the Design, 
     Simulation, and Techno-Economic Analysis of Biorefineries under Uncertainty. 
     ACS Sustainable Chem. Eng. 2020, 8 (8), 3302–3310. 
     https://doi.org/10.1021/acssuschemeng.9b07040
     
 [2] Li et al., Tailored Pretreatment Processes for the Sustainable Design of
-    Lignocellulosic Biorefineries across the Feedstock Landscape. Submitted.
-    July, 2020.
-
+    Lignocellulosic Biorefineries across the Feedstock Landscape. Submitted,
+    2020.
+    
 @author: yalinli_cabbi
 """
 
@@ -636,7 +634,7 @@ def create_price_metrics(price):
     return [Metric('MPSP', get_price_based_MPSP, '$/kg', header),
             Metric('NPV', get_NPV, '$', header)]
 
-prices = np.arange(0, 310, 10)
+prices = np.arange(0, 260, 10)
 
 carb_metrics = sum([create_price_metrics(price) for price in prices],[])
 carb_metrics.extend((

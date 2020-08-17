@@ -13,17 +13,15 @@
 """
 Created on Mon Dec 30 09:15:23 2019
 
-Modified from the biorefineries constructed in [1] and [2] for the production of
-lactic acid from lignocellulosic feedstocks
-
+References:
 [1] Cortes-Peña et al., BioSTEAM: A Fast and Flexible Platform for the Design, 
     Simulation, and Techno-Economic Analysis of Biorefineries under Uncertainty. 
     ACS Sustainable Chem. Eng. 2020, 8 (8), 3302–3310. 
     https://doi.org/10.1021/acssuschemeng.9b07040
     
 [2] Li et al., Tailored Pretreatment Processes for the Sustainable Design of
-    Lignocellulosic Biorefineries across the Feedstock Landscape. Submitted.
-    July, 2020.
+    Lignocellulosic Biorefineries across the Feedstock Landscape. Submitted,
+    2020.
 
 Naming conventions:
     D = Distillation column
@@ -59,7 +57,7 @@ from biosteam.process_tools import UnitGroup
 from thermosteam import Stream
 from lactic import units, facilities
 from lactic.hx_network import HX_Network
-from lactic.process_settings import price, GWP_CF_stream, electricity_GWP_CF
+from lactic.process_settings import price, GWP_CF_stream, GWP_CF_electricity
 from lactic.utils import baseline_feedflow, set_yield, find_split, splits_df
 from lactic.chemicals import chems, chemical_groups, soluble_organics, combustibles
 from lactic.tea_lca import LacticTEA
@@ -252,6 +250,9 @@ ethanol_R402 = Stream('ethanol_R402', units='kg/hr')
 # For ester hydrolysis
 water_R403 = Stream('water_R403', units='kg/hr')
 
+# For adjusting final lactic acid purity
+water_D405_M = Stream('water_D405_M', units='kg/hr')
+
 # =============================================================================
 # Separation units
 # =============================================================================
@@ -430,7 +431,16 @@ def adjust_D405_Lr():
 D405.specification = adjust_D405_Lr
 
 D405_H1 = bst.units.HXutility('D405_H1', ins=D405-0, V=0, rigorous=True)
-D405_H2 = bst.HXutility('D405_H2', ins=D405-1, T=345)
+
+D405_M = bst.units.Mixer('D405_M', ins=(D405-1, water_D405_M))
+def update_water_D405_M():
+    water = D405.outs[1].imass['LacticAcid']/0.88 - D405.outs[1].F_mass
+    water_D405_M.imass['Water'] = max(0, water)
+    D405_M._run()
+D405_M.specification = update_water_D405_M
+
+# D405_H2 = bst.HXutility('D405_H2', ins=D405-1, T=345)
+D405_H2 = bst.HXutility('D405_H2', ins=D405_M-0, T=345)
 D405_P = bst.units.Pump('D405_P', ins=D405_H2-0)
 
 M401 = bst.units.Mixer('M401', ins=(D401_H-0, S403-1, D405_H1-0))
@@ -439,7 +449,9 @@ M401_P = bst.units.Pump('M401_P', ins=M401-0, outs='condensed_separation_waste_v
 separation_sys = System('separation_sys',	
                         path=(S401, R401, R401_P, S402, F401, F401_H, F401_P,	
                               D401, D401_H, D401_P, esterification_recycle,	
-                              F402_P, D405, D405_H1, D405_H2, D405_P, M401, M401_P))
+                              F402_P, D405, D405_H1, 
+                              D405_M,
+                              D405_H2, D405_P, M401, M401_P))
 
 separation_group = UnitGroup('separation_group', units=separation_sys.units)
 process_groups.append(separation_group)
@@ -624,12 +636,12 @@ CT = facilities.CT('CT', ins=('return_cooling_water', cooling_tower_chems,
 process_water_streams = {
     'pretreatment_sys': (water_M201, water_M202, steam_M203, water_M205),
     'conversion_sys': (water_M301,),
-    'separation_sys': (water_R403,),
+    'separation_sys': (water_R403, water_D405_M),
     'facilities': (CHP.ins[-1], CT.ins[-1])
     }
 PWC = facilities.PWC('PWC', ins=(system_makeup_water, S505-0),
                      process_water_streams=sum(process_water_streams.values(), ()),
-                     blowdown_streams=None,
+                     recycled_blowdown_streams=None,
                      outs=('process_water', 'discharged_water'))
 
 ADP = facilities.ADP('ADP', ins=plant_air_in, outs='plant_air_out',
@@ -758,7 +770,7 @@ get_non_bio_GWP = lambda: chems.CO2.MW * \
 
 # GWP from electricity usage
 get_electricity_GWP = lambda: sum(i.power_utility.rate for i in lactic_sys.units) * \
-    electricity_GWP_CF
+    GWP_CF_electricity
 
 get_total_GWP = lambda: get_total_material_GWP()+get_non_bio_GWP()+ \
     get_electricity_GWP()
