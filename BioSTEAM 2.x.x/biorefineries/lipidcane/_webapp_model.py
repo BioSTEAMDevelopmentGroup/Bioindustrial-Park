@@ -116,11 +116,11 @@ def evaluate_sample(lipid_content, plant_size, operating_days, ethanol_price,
     
     Examples
     --------
-    >>> baseline_sample = model.get_baseline_sample()
-    >>> baseline_sample
+    >>> # baseline_sample = model.get_baseline_sample()
+    >>> # baseline_sample
     array([1.012e+01, 1.764e+06, 2.000e+02, 7.890e-01, 3.455e-02, 7.820e-02, 1.804e+01])
-    >>> metric_values = evaluate_sample(*baseline_sample)
-    >>> metric_values
+    >>> # metric_values = evaluate_sample(*baseline_sample)
+    >>> # metric_values
     IRR [%]                                     0.18
     MFPP [USD/kg]                               0.0346
     MESP [USD/gal]                              2.36
@@ -144,7 +144,7 @@ def plot_montecarlo(metric, N=100):
     
     Examples
     --------
-    >>> plot_montecarlo('Excess electricity', 100) # -> creates plot
+    >>> # plot_montecarlo('Excess electricity', 100) -> creates plot
     {'whiskers': [<matplotlib.lines.Line2D at 0x27ac8469b88>,
       <matplotlib.lines.Line2D at 0x27ab70a9c08>],
      'caps': [<matplotlib.lines.Line2D at 0x27ac852ed88>,
@@ -174,7 +174,7 @@ def plot_montecarlo_across_lipid_content(metric,
     
     Examples
     --------
-    >>> plot_montecarlo_across_lipid_content('IRR') # -> creates plot
+    >>> # plot_montecarlo_across_lipid_content('IRR') -> creates plot
     
     """
     global constant_lipid_content

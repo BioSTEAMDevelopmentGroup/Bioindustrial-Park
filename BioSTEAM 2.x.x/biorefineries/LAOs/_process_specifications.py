@@ -12,7 +12,8 @@ from thermosteam.utils import get_instance
 from . import units as units
 
 __all__ = ('LAOsProcessSpecifications',
-           'fermentation_products',)
+           'fermentation_products',
+           'load_process_settings')
 
 # %% Constant specifications
 
@@ -25,6 +26,31 @@ coef = np.polyfit(Ts, prices, 1)
 calculate_steam_price_at_T = np.poly1d(coef)
 
 # %% Overall process specifications
+
+def load_process_settings():
+    bst.process_tools.default_utilities()
+    
+    # CEPCI
+    bst.CE = 567.5 # 2017
+    
+    # High pressure steam conditions is a process specification that
+    # depends on dehydration reactor temperature
+    high_pressure_steam = bst.HeatUtility.get_heating_agent('high_pressure_steam')
+    high_pressure_steam.heat_transfer_efficiency = 0.95
+    
+    # About 10 degC higher than boiling point of tridecane
+    medium_pressure_steam = bst.HeatUtility.get_heating_agent('medium_pressure_steam')
+    medium_pressure_steam.heat_transfer_efficiency = 0.95
+    medium_pressure_steam.T = 510
+    medium_pressure_steam.P = medium_pressure_steam.chemicals.Water.Psat(510)
+    medium_pressure_steam.regeneration_price = calculate_steam_price_at_T(510)
+    
+    # Low pressure steam, T is default
+    low_pressure_steam = bst.HeatUtility.get_heating_agent('low_pressure_steam')
+    low_pressure_steam.T = 412.189
+    low_pressure_steam.P = 344738.0
+    low_pressure_steam.regeneration_price = 0.2378
+    low_pressure_steam.heat_transfer_efficiency = 0.95
 
 class LAOsProcessSpecifications:
     """
@@ -91,30 +117,6 @@ class LAOsProcessSpecifications:
         
         #: [float]Conversion of alcohols in dehydration reaction.
         self.dehydration_reactor_conversion = dehydration_reactor_conversion
-        self.load_process_settings()
-      
-    def load_process_settings(self):
-        # CEPCI
-        bst.CE = 567.5 # 2017
-        
-        # High pressure steam conditions is a process specification that
-        # depends on dehydration reactor temperature
-        high_pressure_steam = bst.HeatUtility.get_heating_agent('high_pressure_steam')
-        high_pressure_steam.heat_transfer_efficiency = 0.95
-        
-        # About 10 degC higher than boiling point of tridecane
-        medium_pressure_steam = bst.HeatUtility.get_heating_agent('medium_pressure_steam')
-        medium_pressure_steam.heat_transfer_efficiency = 0.95
-        medium_pressure_steam.T = 510
-        medium_pressure_steam.P = medium_pressure_steam.chemicals.Water.Psat(510)
-        medium_pressure_steam.regeneration_price = calculate_steam_price_at_T(510)
-        
-        # Low pressure steam, T is default
-        low_pressure_steam = bst.HeatUtility.get_heating_agent('low_pressure_steam')
-        low_pressure_steam.T = 412.189
-        low_pressure_steam.P = 344738.0
-        low_pressure_steam.regeneration_price = 0.2378
-        low_pressure_steam.heat_transfer_efficiency = 0.95
     
     def run_specifications(self, *args, **kwargs):
         """Load specifications and simulate system."""

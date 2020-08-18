@@ -43,6 +43,14 @@ from ._tea import *
 _system_loaded = False
 _chemicals_loaded = False
 
+def load():
+    if not _chemicals_loaded: _load_chemicals()
+    _load_system()
+    dct = globals()
+    dct.update(flowsheet.system.__dict__)
+    dct.update(flowsheet.stream.__dict__)
+    dct.update(flowsheet.unit.__dict__)
+
 def _load_chemicals():
     global chemicals, _chemicals_loaded
     chemicals = create_chemicals()

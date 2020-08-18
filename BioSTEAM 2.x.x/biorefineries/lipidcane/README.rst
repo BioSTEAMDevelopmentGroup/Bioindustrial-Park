@@ -28,30 +28,29 @@ are lazy loaded by the module:
 .. code-block:: python
 
     >>> from biorefineries import lipidcane as lc
-    >>> # First time accessing takes a bit to load the chemicals and system.
+    >>> # This is optional; it forces the biorefinery to load
+    >>> # Otherwise, first time accessing will take a bit to load.
+    >>> lc.load()
     >>> lc.chemicals # All chemicals used by the biorefinery.
     CompiledChemicals([Water, Methanol, Ethanol, Glycerol, Glucose, Sucrose, H3PO4, P4O10, CO2, Octane, O2, Biodiesel, CH4, Ash, Cellulose, Hemicellulose, Flocculant, Lignin, Solids, DryYeast, CaO, HCl, NaOH, NaOCH3, Lipid])
     >>> lc.lipidcane_sys.show() # The complete biorefinery system
     System: lipidcane_sys
-     path: (U101, U102, U103, T201, SYS1, T202,
-            H201, T203, P201, T204, T205,
-            P202, SYS2, T207, T207_2, H203,
-            T208, C203, F201, T403, P403,
-            R401, C401, R402, C402, SYS3,
-            F401, H401, P408, P407, T409,
-            P405, B401, H403, P411, T401,
-            P401, T402, P402, T404, P404,
-            S401, S202, S301, F301, P306,
-            M301, H301, T305, R301, T301,
-            C301, M302, P301, SYS4, SYS5,
-            H304, T302, P304, T303, P305,
-            T304, D301, T408, P303, M305, U202)
-     facilities: (BT, CWP, CT, PWC)
+     path: (U101, U102, U103, T201,
+            juice_extraction_sys, T202, H201,
+            T203, P201, T204, T205, P202,
+            juice_separation_sys, T207,
+            T207_2, H203, T208, C203, F201,
+            T403, P403, R401, C401, R402,
+            C402, methanol_recycle_sys, F401,
+            P407, T409, H401, P408, P405,
+            B401, H403, P411, T401, P401,
+            T402, P402, T404, P404, S401,
+            S202, ethanol_production_sys,
+            T408, U202)
+     facilities: (CWP, BT, CT, PWC)
     >>> lc.lipidcane_tea.show() # The TEA object
     ConventionalEthanolTEA: lipidcane_sys
-     NPV: 1.84e+07 USD at 17.8% IRR
-     ROI: 0.176 1/yr
-     PBP: 5.4 yr
+     NPV: 2 USD at 17.8% IRR
     >>> lc.flowsheet # The complete flowsheet
     <Flowsheet: lipidcane>
     >>> lc.R301.show() # Any unit operations and streams can be accessed through the module
