@@ -37,6 +37,7 @@ price = {'Ethanol': ethanol_cost/ethanol_density_kggal,
          'Enzyme': enzyme_price} 
 
 def load_process_settings():
+    bst.process_tools.default_utilities()
     bst.CE = 525.4
     bst.PowerUtility.price = price['Electricity']
     _ha = bst.HeatUtility.get_heating_agent('low_pressure_steam')

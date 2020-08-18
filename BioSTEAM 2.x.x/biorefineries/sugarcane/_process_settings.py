@@ -11,6 +11,7 @@ __all__ = ('price', 'load_process_settings')
 # %% Process settings
 
 def load_process_settings():
+    bst.process_tools.default_utilities()
     bst.CE = 567 # 2013
     bst.PowerUtility.price = 0.065
     HeatUtility = bst.HeatUtility

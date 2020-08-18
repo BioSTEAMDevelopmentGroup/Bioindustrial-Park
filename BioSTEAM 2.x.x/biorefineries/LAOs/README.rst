@@ -25,19 +25,20 @@ are lazy loaded by the module:
 .. code-block:: python
 
     >>> from biorefineries import LAOs as laos
-    >>> # First time accessing takes a bit to load the chemicals and system.
+    >>> # This is optional; it forces the biorefinery to load
+    >>> # Otherwise, first time accessing will take a bit to load.
+    >>> laos.load()
     >>> laos.chemicals # All chemicals used by the biorefinery.
     CompiledChemicals([HCl, Methane, Water, Acetone, LacticAcid, PhosphoricAcid, Tridecane, Ethanol, Butanol, Hexanol, Octanol, Decanol, Dodecanol, Tetradecanol, Hexadecanol, Hexene, Octene, Decene, Dodecene, Tetradecene, Hexadecene, P4O10, SO2, N2, O2, CO2, Glucose, NaCl, DiammoniumPhosphate, CornSteepLiquor, Ash, Cells, Gliadin, CellExtract, Tryptone])
     >>> laos.LAOs_sys.show() # The complete biorefinery system
     System: LAOs_sys
-     path: (tridecane_recycle, D103, D104,
-            H106, H107, H108, T108, T109, T110)
+     path: (tridecane_recycle, H108, D103,
+            D104, H106, H107, H108, T108,
+            T109, T110)
      facilities: (CWP, BT, CT, BT, CCI)
     >>> laos.LAOs_tea.show() # The TEA object
     CombinedTEA: LAOs_sys, Area700
-     NPV: -9.02e+04 USD at 10.0% IRR
-     ROI: 0.179 1/yr
-     PBP: 10.3 yr
+     NPV: -90,266 USD at 10.0% IRR
     >>> laos.flowsheet # The complete flowsheet
     <Flowsheet: LAOs>
     >>> laos.R101.show() # Any unit operations and streams can be accessed through the module
@@ -45,7 +46,7 @@ are lazy loaded by the module:
     ins...
     [0] mixed_bioreactor_feed  from  HXutility-H101
         phase: 'l', T: 310.15 K, P: 101325 Pa
-        flow (kmol/hr): Water                6.64e+03
+        flow (kmol/hr): Water                6.63e+03
                         Tridecane            130
                         Hexanol              4.51
                         Octanol              0.998
@@ -57,9 +58,9 @@ are lazy loaded by the module:
     [0] vent
         phase: 'g', T: 310.15 K, P: 101325 Pa
         flow (kmol/hr): CO2  641
-    [1] s9  to  StorageTank-T105
+    [1] d393  to  StorageTank-T105
         phase: 'l', T: 310.15 K, P: 101325 Pa
-        flow (kmol/hr): Water                7.08e+03
+        flow (kmol/hr): Water                7.07e+03
                         Tridecane            130
                         Hexanol              41
                         Octanol              29.6

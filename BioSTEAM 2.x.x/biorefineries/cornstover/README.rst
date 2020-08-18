@@ -33,7 +33,9 @@ are lazy loaded by the module:
 .. code-block:: python
 
     >>> from biorefineries import cornstover as cs
-    >>> # First time accessing takes a bit to load the chemicals and system.
+    >>> # This is optional; it forces the biorefinery to load
+    >>> # Otherwise, first time accessing will take a bit to load.
+    >>> cs.load()
     >>> cs.chemicals # All chemicals used by the biorefinery.
     CompiledChemicals([Water, Ethanol, AceticAcid, Furfural, Glycerol, H2SO4, LacticAcid, SuccinicAcid, P4O10, HNO3, Denaturant, DAP, AmmoniumAcetate, AmmoniumSulfate, NaNO3, Oil, HMF, N2, NH3, O2, CH4, H2S, SO2, CO2, NO2, NO, CO, Glucose, Xylose, Sucrose, CaSO4, Mannose, Galactose, Arabinose, CellulaseNutrients, Extract, Acetate, Tar, CaO, Ash, NaOH, Lignin, SolubleLignin, GlucoseOligomer, GalactoseOligomer, MannoseOligomer, XyloseOligomer, ArabinoseOligomer, Z_mobilis, T_reesei, Biomass, Cellulose, Protein, Enzyme, Glucan, Xylan, Xylitol, Cellobiose, CSL, DenaturedEnzyme, Arabinan, Mannan, Galactan, WWTsludge, Cellulase])
     >>> cs.cornstover_sys.show() # The complete biorefinery system
@@ -46,15 +48,13 @@ are lazy loaded by the module:
                   FT, blowdown_mixer)
     >>> cs.cornstover_tea.show() # The TEA object
     CombinedTEA: cornstover_sys, Area700
-     NPV: -1.92e+05 USD at 10.0% IRR
-     ROI: 0.25 1/yr
-     PBP: 11 yr
+     NPV: -192,362 USD at 10.0% IRR
     >>> cs.flowsheet # The complete flowsheet
     <Flowsheet: cornstover>
     >>> cs.R301.show() # Any unit operations and streams can be accessed through the module
-        SaccharificationAndCoFermentation: R301
+    SaccharificationAndCoFermentation: R301
     ins...
-    [0] s21  from  Mixer-M302
+    [0] d328  from  Mixer-M302
         phase: 'l', T: 319.61 K, P: 101325 Pa
         flow (kmol/hr): Water              1.92e+04
                         Ethanol            49.9
@@ -71,7 +71,7 @@ are lazy loaded by the module:
         phase: 'l', T: 298.15 K, P: 101325 Pa
         flow (kmol/hr): DAP  0.78
     outs...
-    [0] s22  to  Mixer-M304
+    [0] d329  to  Mixer-M304
         phase: 'g', T: 305.15 K, P: 101325 Pa
         flow (kmol/hr): Water         17.5
                         Ethanol       4.53
@@ -81,7 +81,7 @@ are lazy loaded by the module:
                         LacticAcid    9.49e-06
                         SuccinicAcid  0.000736
                         ...
-    [1] s23  to  Mixer-M401
+    [1] d330  to  Mixer-M401
         phase: 'l', T: 305.15 K, P: 101325 Pa
         flow (kmol/hr): Water              1.72e+04
                         Ethanol            460
@@ -91,7 +91,7 @@ are lazy loaded by the module:
                         H2SO4              18.8
                         LacticAcid         17.5
                         ...
-    [2] s24  to  Mixer-M303
+    [2] d331  to  Mixer-M303
         phase: 'l', T: 321.15 K, P: 101325 Pa
         flow (kmol/hr): Water              1.91e+03
                         Ethanol            4.99

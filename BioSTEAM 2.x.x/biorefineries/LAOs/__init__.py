@@ -38,6 +38,15 @@ from ._system import *
 from ._tea import *
 
 _system_loaded = False
+_chemicals_loaded = False
+
+def load():
+    if not _chemicals_loaded: _load_chemicals()
+    _load_system()
+    dct = globals()
+    dct.update(flowsheet.system.__dict__)
+    dct.update(flowsheet.stream.__dict__)
+    dct.update(flowsheet.unit.__dict__)
 
 def _load_chemicals():
     global chemicals
@@ -50,11 +59,12 @@ def _load_system():
     global _system_loaded, products
     flowsheet = bst.Flowsheet('LAOs')
     F.set_flowsheet(flowsheet)
-    chemicals = create_chemicals()
     bst.settings.set_thermo(chemicals)
+    load_process_settings()
     LAOs_sys = create_system()
     OSBL_units = (F.unit.CWP, F.unit.BT, F.unit.CT, F.unit.T101, F.unit.T102, 
-                  F.unit.T103, F.unit.T104, F.unit.T107, F.unit.T108, F.unit.T109)
+                  F.unit.T103, F.unit.T104, F.unit.T107, F.unit.T108, 
+                  F.unit.T109, F.unit.T110)
     LAOs_tea = create_tea(LAOs_sys, OSBL_units)
     for i in LAOs_tea.TEAs: i.duration = (2017, 2047)
     for i in LAOs_tea.TEAs: i.contingency = 0.3
@@ -83,9 +93,9 @@ def _load_system():
     _system_loaded = True
 
 def __getattr__(name):
-    if name == 'chemicals': 
+    if not _chemicals_loaded:
         _load_chemicals()
-        return chemicals
+        if name == 'chemicals': return chemicals
     if not _system_loaded: _load_system()
     dct = globals()
     dct.update(flowsheet.system.__dict__)
