@@ -785,11 +785,12 @@ get_electricity_FEC = lambda: FEC_CF_electricity*get_system_power_demand()/lacti
 # Total FEC
 get_functional_FEC = lambda: get_natural_gas_FEC()+get_electricity_FEC()
 
-print('\n---------- Baseline biorefinery ----------')
-print(f'MPSP is ${simulate_get_MPSP():.3f}/kg')
-print(f'GWP is {get_functional_GWP():.3f} kg CO2-eq/kg lactic acid')
-print(f'Freshwater consumption is {get_functional_H2O():.3f} kg H2O/kg lactic acid')
-print('--------------------\n')
+def simulate_and_print():
+    print('\n---------- Baseline biorefinery ----------')
+    print(f'MPSP is ${simulate_get_MPSP():.3f}/kg')
+    print(f'GWP is {get_functional_GWP():.3f} kg CO2-eq/kg lactic acid')
+    print(f'Freshwater consumption is {get_functional_H2O():.3f} kg H2O/kg lactic acid')
+    print('--------------------\n')
 
 
 # %%

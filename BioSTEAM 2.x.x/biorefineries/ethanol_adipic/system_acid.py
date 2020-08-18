@@ -559,8 +559,9 @@ def simulate_get_MFPP(ethanol_price=2.2):
     MFPP *= _feedstock_factor
     return MFPP
 
-MESP = simulate_get_MESP()
-print(f'Acid MESP: ${MESP:.2f}/gal with default pretreatment efficacy')
+def simulate_and_print():
+    MESP = simulate_get_MESP()
+    print(f'Acid MESP: ${MESP:.2f}/gal with default pretreatment efficacy')
 
 
 

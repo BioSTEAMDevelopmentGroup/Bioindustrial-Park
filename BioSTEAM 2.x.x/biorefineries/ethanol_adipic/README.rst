@@ -30,25 +30,12 @@ simulated (first time accessing takes a bit to load the chemicals and system).
 .. code-block:: python
 
     >>> from biorefineries.ethanol_adipic import system_acid as acid
-    Acid MESP: $2.33/gal with default pretreatment efficacy
     >>> # Acid-pretreatment biorefinery
-    
     >>> from biorefineries.ethanol_adipic import system_base as base
     >>> # Base-pretreatment biorefinery
-    Base MESP: $2.20/gal with default pretreatment efficacy
-    
     >>> acid.chems
     >>> # All chemicals used in acid and base biorefineries, can also use base.chems
-    CompiledChemicals([H2O, O2, N2, H2, CH4, CO, CO2, NH3, NO, NO2, H2S, SO2,
-    H2SO4, HNO3, NaOH, NH4OH, CalciumDihydroxide, AmmoniumSulfate, NaNO3, Na2SO4,
-    CaSO4, DAP, Ethanol, AceticAcid, Glucose, GlucoseOligomer, Extractives, Xylose,
-    XyloseOligomer, Sucrose, Cellobiose, Mannose, MannoseOligomer, Galactose,
-    GalactoseOligomer, Arabinose, ArabinoseOligomer, SolubleLignin, Glycerol,
-    Protein, Enzyme, Z_mobilis, P_putida, P_putidaGrow, WWTsludge, Denaturant,
-    Furfural, HMF, Xylitol, LacticAcid, SuccinicAcid, AdipicAcid, MuconicAcid,
-    MonoSodiumMuconate, Acetate, AmmoniumAcetate, Glucan, Mannan, Galactan, Xylan,
-    Arabinan, Lignin, P4O10, Ash, Tar, CSL, BoilerChems, Polymer, BaghouseBag,
-    CoolingTowerChems])
+    CompiledChemicals([H2O, O2, N2, H2, CH4, CO, CO2, NH3, NO, NO2, H2S, SO2, H2SO4, HNO3, NaOH, NH4OH, CalciumDihydroxide, AmmoniumSulfate, NaNO3, Na2SO4, CaSO4, DAP, Ethanol, AceticAcid, Glucose, GlucoseOligomer, Extractives, Xylose, XyloseOligomer, Sucrose, Cellobiose, Mannose, MannoseOligomer, Galactose, GalactoseOligomer, Arabinose, ArabinoseOligomer, SolubleLignin, Glycerol, Protein, Enzyme, Z_mobilis, P_putida, P_putidaGrow, WWTsludge, Denaturant, Furfural, HMF, Xylitol, LacticAcid, SuccinicAcid, AdipicAcid, MuconicAcid, MonoSodiumMuconate, Acetate, AmmoniumAcetate, Glucan, Mannan, Galactan, Xylan, Arabinan, Lignin, P4O10, Ash, Tar, CSL, BoilerChems, Polymer, BaghouseBag, CoolingTowerChems])
     
     
 Systems
@@ -102,7 +89,6 @@ Processes:
            T703, T704_S, T704, T705, T706_S,
            T706, T707_S, T707, T708, M702)
      facilities: (CHP, CT, CWP, PWC, ADP, CIP, BDM)
-    
     >>> base.ethanol_adipic_sys.show() # The complete base-pretreatment biorefinery
     System: ethanol_adipic_sys
      path: (U101, pretreatment_sys,
@@ -114,25 +100,20 @@ Processes:
             T707_S, T707, T708_S, T708,
             T709_S, T709, T710, M702)
      facilities: (CHP, CT, CWP, PWC, ADP, CIP, BDM)   
-     
     >>> acid.ethanol_tea.show() # TEA object for the acid-pretreatment biorefinery
     CombinedTEA: ethanol_sys, CHP_sys
      NPV: -398 USD at 10.0% IRR
      ROI: 0.225 1/yr
      PBP: 9.59 yr
-     
     >>> base.ethanol_adipic_tea.show() # TEA object for the base-pretreatment biorefinery
     CombinedTEA: LAOs_sys, Area700
      NPV: -9.02e+04 USD at 10.0% IRR
      ROI: 0.179 1/yr
      PBP: 10.3 yr
-     
     >>> acid.ethanol_sys.flowsheet # Flowsheet for the acid-pretreatment biorefinery
     <Flowsheet: ethanol>
-    
     >>> base.ethanol_adipic_sys.flowsheet # Flowsheet for the base-pretreatment biorefinery
     <Flowsheet: ethanol_adipic>
-    
     >>> acid.R301.show()
     >>> # Any unit operations and streams can be accessed through the module
     SaccharificationAndCoFermentation: R301
@@ -272,8 +253,7 @@ Requirements
 ------------
 .. [1] Python module biosteam (https://pypi.org/project/biosteam/) and dependencies
 
-    Note: results used in the manuscript were generated using biosteam v2.20.5
-          and dependencies
+    Note: results used in the manuscript were generated using biosteam v2.20.5 and dependencies
 
 .. [2] Excel file named "Feedstock compositions.xlsx" in the same directory path
     as the _analyses.py module

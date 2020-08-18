@@ -778,11 +778,12 @@ get_total_GWP = lambda: get_total_material_GWP()+get_non_bio_GWP()+ \
 get_functional_GWP = lambda: get_total_GWP()/lactic_acid.F_mass
 get_functional_H2O = lambda: system_makeup_water.F_mass / lactic_acid.F_mass
 
-# print('\n---------- With an additional distillation column ----------')
-# print(f'MPSP is ${simulate_get_MPSP():.3f}/kg ')
-# print(f'GWP is {get_functional_GWP():.3f} kg CO2-eq/kg lactic acid')
-# print(f'Freshwater consumption is {get_functional_H2O():.3f} kg H2O/kg lactic acid')
-# print('--------------------\n')
+def simulate_and_print():
+    print('\n---------- With an additional distillation column ----------')
+    print(f'MPSP is ${simulate_get_MPSP():.3f}/kg ')
+    print(f'GWP is {get_functional_GWP():.3f} kg CO2-eq/kg lactic acid')
+    print(f'Freshwater consumption is {get_functional_H2O():.3f} kg H2O/kg lactic acid')
+    print('--------------------\n')
 
 
 # %%

@@ -20,24 +20,15 @@ simulated (first time accessing takes a bit to load the chemicals and system).
 .. code-block:: python
 
     >>> from biorefineries.lactic import system
+    >>> system.simulate_and_print()
     ---------- Baseline biorefinery ----------
     MPSP is $1.470/kg
     GWP is 4.630 kg CO2-eq/kg lactic acid
     Freshwater consumption is 4.124 kg H2O/kg lactic acid
     --------------------
-    
-    >>> lactic.chems    
+    >>> system.chems    
     >>> # All chemicals used in acid and base biorefineries, can also use base.chems
-    CompiledChemicals([H2O, O2, N2, CH4, CO, CO2, NH3, NO, NO2, H2S, SO2, H2SO4,
-    HNO3, NaOH, NH4OH, CalciumDihydroxide, AmmoniumSulfate, NaNO3, Na2SO4, CaSO4,
-    Ethanol, AceticAcid, Glucose, GlucoseOligomer, Extractives, Xylose,
-    XyloseOligomer, Sucrose, Cellobiose, Mannose, MannoseOligomer, Galactose,
-    GalactoseOligomer, Arabinose, ArabinoseOligomer, SolubleLignin, Protein,
-    Enzyme, FermMicrobe, WWTsludge, Furfural, HMF, Xylitol, LacticAcid,
-    SuccinicAcid, EthylAcetate, EthylLactate, EthylSuccinate, Acetate,
-    AmmoniumAcetate, CalciumLactate, CalciumAcetate, CalciumSuccinate, Glucan,
-    Mannan, Galactan, Xylan, Arabinan, Lignin, P4O10, Ash, Tar, CSL, BoilerChems,
-    Polymer, BaghouseBag, CoolingTowerChems])
+    CompiledChemicals([H2O, O2, N2, CH4, CO, CO2, NH3, NO, NO2, H2S, SO2, H2SO4, HNO3, NaOH, NH4OH, CalciumDihydroxide, AmmoniumSulfate, NaNO3, Na2SO4, CaSO4, Ethanol, AceticAcid, Glucose, GlucoseOligomer, Extractives, Xylose, XyloseOligomer, Sucrose, Cellobiose, Mannose, MannoseOligomer, Galactose, GalactoseOligomer, Arabinose, ArabinoseOligomer, SolubleLignin, Protein, Enzyme, FermMicrobe, WWTsludge, Furfural, HMF, Xylitol, LacticAcid, SuccinicAcid, EthylAcetate, EthylLactate, EthylSuccinate, Acetate, AmmoniumAcetate, CalciumLactate, CalciumAcetate, CalciumSuccinate, Glucan, Mannan, Galactan, Xylan, Arabinan, Lignin, P4O10, Ash, Tar, CSL, BoilerChems, Polymer, BaghouseBag, CoolingTowerChems])
     
     
 Systems
@@ -88,16 +79,13 @@ Processes:
             T602_S, T602, T603_S, T603, T604,
             T605, T606, T606_P, T607, M601)
      facilities: (HXN, CHP, CT, PWC, ADP, CIP)
-     
     >>> acid.ethanol_tea.show() # The TEA object
     CombinedTEA: lactic_sys, CHP_sys
      NPV: -966 USD at 10.0% IRR
      ROI: -0.00435 1/yr
      PBP: 9.5 yr
-     
     >>> system.lactic_sys.flowsheet # The flowsheet
     <Flowsheet: lactic>
-    
     >>> system.R301.show()
     >>> # Any unit operations and streams can be accessed through the module
     SaccharificationAndCoFermentation: R301

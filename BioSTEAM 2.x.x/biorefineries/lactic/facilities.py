@@ -165,13 +165,15 @@ class CT(Facility):
         process_cw.T = blowdown.T = 28 + 273.15
         
         total_duty = 0
+        number = 1
         for u in self.system.units:
             if u is self: continue
             if hasattr(u, 'heat_utilities'):
                 for hu in u.heat_utilities:
                     # cooling_water and chilled_water
                     if hu.flow*hu.duty < 0:
-                        system_cooling_water_utilities[f'{u.ID} - {hu.ID}'] = hu
+                        system_cooling_water_utilities[f'#{number}: {u.ID} - {hu.ID}'] = hu
+                        number += 1
                         total_duty -= hu.duty
         
         hu_cooling = self.heat_utilities[0]
@@ -283,13 +285,15 @@ class CHP(Facility):
         heat_generated = self.heat_generated = \
             (H_in+heat_from_combustion)*self.B_eff - H_out
         
+        number = 1
         for u in self.system.units:
             if u is self: continue
             if hasattr(u, 'heat_utilities'):
                 for hu in u.heat_utilities:
                     # Including low/medium/high_pressure_steam
                     if hu.flow*hu.duty > 0:
-                        system_heating_utilities[f'{u.ID} - {hu.ID}'] = hu
+                        system_heating_utilities[f'#{number}: {u.ID} - {hu.ID}'] = hu
+                        number += 1
         
         # Use lps to account for the energy needed for the side steam
         if side_streams_to_heat:
@@ -316,7 +320,7 @@ class CHP(Facility):
             
             # Take the opposite for cooling duty (i.e., cooling duty should be negative)
             # this is to condense the unused steam
-            cooling_need = self.cooling_need = -(CHP_heat_surplus-electricity_generated)
+            cooling_need = self.cooling_need = -(CHP_heat_surplus-electricity_generated*3600)
             hu_cooling(duty=cooling_need, T_in=lps.T)
             natural_gas.empty()
             

@@ -16,7 +16,9 @@ from biosteam.process_tools import UnitGroup
 __all__ = ('test_sugarcane', 
            'test_lipidcane', 
            'test_cornstover',
-           'test_LAOs')
+           'test_LAOs',
+           'test_ethanol_adipic',
+           'test_lactic',)
 
 def test_sugarcane():
     from biorefineries import sugarcane as sc
@@ -76,8 +78,69 @@ def test_LAOs():
     assert np.allclose(units.get_electricity_consumption(), 3.155372464756524)
     assert np.allclose(units.get_electricity_production(), 3.155372464756526)   
     
+def test_ethanol_adipic():
+    from biorefineries.ethanol_adipic import system_acid as acid
+    MESP = acid.simulate_get_MESP()
+    assert np.allclose(MESP, 2.3383974799850873, atol=0.001)
+    tea = acid.ethanol_tea
+    assert np.allclose(tea.sales, 142814170.6871417, rtol=0.001)
+    assert np.allclose(tea.material_cost, 98030872.485875, rtol=0.001)
+    assert np.allclose(tea.installed_equipment_cost, 201617183.59793562, rtol=0.001)
+    assert np.allclose(tea.utility_cost, -12104425.737786738, rtol=0.001)
+    units = UnitGroup('Biorefinery', acid.ethanol_tea.units)
+    assert np.allclose(acid.CHP.system_heating_demand/1e6, 359.9811664916131, rtol=0.001)
+    assert np.allclose(units.get_cooling_duty(), 330.92129172498926, rtol=0.001)
+    assert np.allclose(units.get_electricity_consumption(), 23.900435032178247, rtol=0.001)
+    assert np.allclose(units.get_electricity_production(), 45.06746566975969, rtol=0.001)
+    
+    from biorefineries.ethanol_adipic import system_base as base
+    MESP = base.simulate_get_MESP()
+    assert np.allclose(MESP, 2.206842775418839, atol=0.001)
+    tea = base.ethanol_adipic_tea
+    assert np.allclose(tea.sales, 235176081.26473045, rtol=0.001)
+    assert np.allclose(tea.material_cost, 131288487.04028216, rtol=0.001)
+    assert np.allclose(tea.installed_equipment_cost, 298528854.16088444, rtol=0.001)
+    assert np.allclose(tea.utility_cost, 14579802.123597547, rtol=0.001)
+    units = UnitGroup('Biorefinery', base.ethanol_adipic_tea.units)
+    assert np.allclose(base.CHP.system_heating_demand/1e6, 336.5735818785919, rtol=0.001)
+    assert np.allclose(units.get_cooling_duty(), 359.1181296316559, rtol=0.001)
+    assert np.allclose(units.get_electricity_consumption(), 27.19544073551338, rtol=0.001)
+    assert np.allclose(units.get_electricity_production(), 0.0)
+    
+def test_lactic():
+    from biorefineries.lactic import system
+    MPSP = system.simulate_get_MPSP()
+    assert np.allclose(MPSP, 1.4699379255065734, atol=0.001)
+    tea = system.lactic_tea
+    assert np.allclose(tea.sales, 348614317.8536012, rtol=0.001)
+    assert np.allclose(tea.material_cost, 231635985.99205256, rtol=0.001)
+    assert np.allclose(tea.installed_equipment_cost, 334825974.99659723, rtol=0.001)
+    assert np.allclose(tea.utility_cost, 25534653.294393398, rtol=0.001)
+    units = UnitGroup('Biorefinery', system.lactic_tea.units)
+    assert np.allclose(system.CHP.system_heating_demand/1e6, 1982.4952869130711, rtol=0.001)
+    assert np.allclose(-system.CT.system_cooling_water_duty/1e6, 1850.4083885937812, rtol=0.001)
+    assert np.allclose(units.get_electricity_consumption(), 46.268488248157944, rtol=0.001)
+    assert np.allclose(units.get_electricity_production(), 0.0)
+
+    
 if __name__ == '__main__':
     test_sugarcane()
     test_lipidcane()
     test_cornstover()
     test_LAOs()
+    test_lactic()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
