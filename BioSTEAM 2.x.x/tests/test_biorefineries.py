@@ -79,7 +79,8 @@ def test_LAOs():
     assert np.allclose(units.get_electricity_production(), 3.155372464756526)   
     
 def test_ethanol_adipic():
-    from biorefineries.ethanol_adipic import system_acid as acid
+    from biorefineries import ethanol_adipic
+    acid = ethanol_adipic.system_acid
     MESP = acid.simulate_get_MESP()
     assert np.allclose(MESP, 2.3383974799850873, atol=0.001)
     tea = acid.ethanol_tea
@@ -93,7 +94,7 @@ def test_ethanol_adipic():
     assert np.allclose(units.get_electricity_consumption(), 23.900435032178247, rtol=0.001)
     assert np.allclose(units.get_electricity_production(), 45.06746566975969, rtol=0.001)
     
-    from biorefineries.ethanol_adipic import system_base as base
+    base = ethanol_adipic.system_base
     MESP = base.simulate_get_MESP()
     assert np.allclose(MESP, 2.206842775418839, atol=0.001)
     tea = base.ethanol_adipic_tea
@@ -108,7 +109,8 @@ def test_ethanol_adipic():
     assert np.allclose(units.get_electricity_production(), 0.0)
     
 def test_lactic():
-    from biorefineries.lactic import system
+    from biorefineries import lactic
+    system = lactic.system
     MPSP = system.simulate_get_MPSP()
     assert np.allclose(MPSP, 1.4699379255065734, atol=0.001)
     tea = system.lactic_tea
