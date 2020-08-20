@@ -11,7 +11,7 @@
 __all__ = ('SLLECentrifuge', 'SolidLiquidsSplitCentrifuge',)
 
 import biosteam as bst
-from biosteam.units.design_tools import separations as sep
+from thermosteam import separations as sep
 
 @bst.units.decorators.cost('Flow rate', units='m^3/hr',
     CE=525.4, cost=28100, n=0.574, kW=1.4, ub=400, BM=2.03,
