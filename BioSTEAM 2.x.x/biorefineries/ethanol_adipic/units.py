@@ -50,7 +50,7 @@ from flexsolve import aitken_secant
 from biosteam import Unit
 from biosteam.units import Mixer, Flash, MixTank, HXutility, Pump, SolidsSeparator
 from biosteam.units.decorators import cost
-from biosteam.units.design_tools import separations
+from thermosteam import separations
 from ethanol_adipic.process_settings import price
 from ethanol_adipic.chemicals import total_solids, solubles, insolubles, COD_chemicals
 from ethanol_adipic.utils import CEPCI, baseline_feedflow, compute_muconic_titer, \
@@ -459,10 +459,13 @@ class EnzymeHydrolysateMixer(Mixer):
       kW=268.452, cost=630000, S=421776, CE=CEPCI[2009], n=1, BM=1.5)
 @cost(basis='Flow rate', ID='Recirculation pump', units='kg/hr',
       kW=74.57, cost=47200, S=421776, CE=CEPCI[2009], n=0.8, BM=2.3)
+@cost(basis='Duty', ID='Hydrolysate cooler', units='kJ/hr',
+      # 13 is the duty in MMkca/hr
+      cost=85000, S=-8*_Gcal_2_kJ, CE=CEPCI[2010], n=0.7, BM=2.2)
 class SaccharificationAndCoFermentation(Unit):
     _N_ins = 4
     _N_outs = 3
-    _N_heat_utilities = 2
+    _N_heat_utilities = 3
     
     #: Saccharification temperature (K)
     T_saccharification = 48+273.15
@@ -470,7 +473,8 @@ class SaccharificationAndCoFermentation(Unit):
     #: Fermentation temperature (K)
     T_fermentation = 32+273.15
     
-    _units = {'Flow rate': 'kg/hr'}
+    _units = {'Flow rate': 'kg/hr',
+              'Duty': 'kJ/hr'}
     
     # Split to outs[2]
     inoculum_ratio = 0.1
@@ -520,14 +524,12 @@ class SaccharificationAndCoFermentation(Unit):
         vent, effluent, sidedraw = self.outs
         vent.P = effluent.P = sidedraw.P = self.P
         ss = self.saccharified_stream
-        ss.T = sidedraw.T = self.T_saccharification
-        vent.T = effluent.T = self.T_fermentation
         vent.phase = 'g'
         
         # 0.25 wt% and 0.33 g/L (kg/m3) based on ref [1]
         CSL.imass['CSL'] = feed.imass['CSL'] = 0.0025 * feed.F_mass
         DAP.imass['DAP'] = feed.imass['DAP'] = 0.33 * feed.F_vol
-        ss.mix_from([feed, inoculum])
+        ss.mix_from(self.ins)
         self.saccharification_rxns_C6(ss.mol)
         if self.C5_saccharification:
             self.saccharification_rxns_C5(ss.mol)
@@ -536,17 +538,25 @@ class SaccharificationAndCoFermentation(Unit):
         self.loss_rxns(effluent.mol)
         self.fermentation_rxns(effluent.mol)
         vent.receive_vent(effluent)
+        
+        ss.T = sidedraw.T = self.T_saccharification
+        vent.T = effluent.T = self.T_fermentation
     
     def _design(self):
         self.design_results['Flow rate'] = self.ins[0].F_mass
         effluent = self.outs[1]
-        hu_cooling, hu_fermentation = self.heat_utilities
+        hu_hydrolysate, hu_saccharification, hu_fermentation = self.heat_utilities
         mixture = self.thermo.mixture
         ss = self.saccharified_stream
+        ss_in = ss.copy()
+        ss_in.mix_from(self.ins)
+        self.design_results['Duty'] = ss.H-ss_in.H
+        hu_hydrolysate(duty=ss.H-ss_in.H, T_in=ss_in.T)
+        
         mol = ss.mol
         duty = (mixture.H('l', mol, self.T_fermentation, 101325.)
                 - mixture.H('l', mol, self.T_saccharification, 101325.))
-        hu_cooling(duty, self.T_fermentation)
+        hu_saccharification(duty, self.T_fermentation)
         ei = effluent.chemicals.index('Ethanol')
         ethanol = (sum([i.mol[ei] for i in self.outs])
                    - sum([i.mol[ei] for i in self.ins]))

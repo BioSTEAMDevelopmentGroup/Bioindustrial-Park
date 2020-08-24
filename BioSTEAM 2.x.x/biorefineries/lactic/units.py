@@ -56,7 +56,7 @@ from biosteam import Unit
 from biosteam.units import Flash, HXutility, Mixer, MixTank, Pump, \
     SolidsSeparator, StorageTank
 from biosteam.units.decorators import cost
-from biosteam.units.design_tools import separations
+from thermosteam import separations
 from lactic.process_settings import price
 from lactic.chemicals import COD_chemicals, solubles, insolubles
 from lactic.utils import CEPCI, baseline_feedflow, compute_lactic_titer, \
@@ -177,9 +177,10 @@ class AcidPretreatment(Unit):
     _N_outs = 2
     _graphics = Flash._graphics
     
-    def __init__(self, ID='', ins=None, outs=()):
+    def __init__(self, ID='', ins=None, outs=(), T=130+273.15):
         Unit.__init__(self, ID, ins, outs)
         self._multistream = tmo.MultiStream(None)
+        self.T = T
         vapor, liquid = self.outs
         vapor.phase = 'g'
         
@@ -215,7 +216,7 @@ class AcidPretreatment(Unit):
         self.pretreatment_rxns(liquid.mol) 
         ms.copy_like(liquid)
         H = ms.H + ms.Hf - feed.Hf
-        ms.vle(T=130+273.15, H=H)
+        ms.vle(T=self.T, H=H)
         vapor.mol = ms.imol['g']
         liquid.mol = ms.imol['l']
         vapor.T = liquid.T = ms.T
@@ -321,16 +322,6 @@ class HydrolysatePump(Unit):
 # Conversion
 # =============================================================================
 
-@cost(basis='Duty', ID='Hydrolysate cooler', units='kJ/hr',
-      # 13 is the duty in MMkca/hr
-      cost=85000, S=-8*_Gcal_2_kJ, CE=CEPCI[2010], n=0.7, BM=2.2)
-class HydrolysateCooler(HXutility):
-    _units={'Duty': 'kJ/hr'}
-    
-    def _design(self):
-        self.heat_utilities[0](self.Hnet, self.ins[0].T, self.outs[0].T)
-        self.Q = self.design_results['Duty'] = self.Hnet
-
 @cost(basis='Flow rate', ID='Mixer', units='kg/hr',
       kW=74.57, cost=109000, S=379938, CE=CEPCI[2009], n=0.5, BM=1.7)
 class EnzymeHydrolysateMixer(Mixer):	
@@ -372,13 +363,19 @@ class EnzymeHydrolysateMixer(Mixer):
       # Scaling basis based on sum of all streams into fermenter
       # (304, 306, 311, and 312 in ref [3])
       kW=74.57, cost=47200, S=(42607+443391+948+116), CE=CEPCI[2009], n=0.8, BM=2.3)
-class SaccharificationAndCoFermentation(Unit):    
+# The HydrolysateCooler in ref [3]
+@cost(basis='Duty', ID='Hydrolysate cooler', units='kJ/hr',
+      # 13 is the duty in MMkca/hr
+      cost=85000, S=-8*_Gcal_2_kJ, CE=CEPCI[2010], n=0.7, BM=2.2)
+class SaccharificationAndCoFermentation(Unit):
     _N_ins = 4
     _N_outs = 2
+    _N_heat_utilities = 1
     _units= {'Saccharification tank size': 'kg',
              'Slurry flow rate': 'kg/hr',
              'Fermenter size': 'kg',
-             'Recirculation flow rate': 'kg/hr'}
+             'Recirculation flow rate': 'kg/hr',
+             'Duty': 'kJ/hr'}
     
     tau_saccharification = 24 # in hr
     
@@ -445,10 +442,11 @@ class SaccharificationAndCoFermentation(Unit):
         feed, inoculum, CSL, lime = self.ins
         effluent, sidedraw = self.outs
         ss = self.saccharified_stream
-        ss.T = sidedraw.T = effluent.T = self.T
         
         CSL.imass['CSL'] = feed.F_vol * self.CSL_loading
-        ss.mix_from([feed, inoculum])
+        ss.mix_from([feed, inoculum, CSL])
+        ss.T = sidedraw.T = effluent.T = self.T
+        
         self.saccharification_rxns(ss.mol)
         # Sidedraw to SeedTrain
         sidedraw.mol = ss.mol * self.inoculum_ratio
@@ -473,7 +471,7 @@ class SaccharificationAndCoFermentation(Unit):
         self.effluent_titer = compute_lactic_titer(effluent)
         
         self._sugar_limited_rxns(effluent_copy.mol)
-        self.sugar_limited_titer = compute_lactic_titer(effluent_copy, V=effluent.F_vol)        
+        self.sugar_limited_titer = compute_lactic_titer(effluent_copy, V=effluent.F_vol)       
         
     def _design(self):
         Design = self.design_results
@@ -484,6 +482,13 @@ class SaccharificationAndCoFermentation(Unit):
         tau_cofermentation = self.tau_turnaround + self.effluent_titer/self.productivity
         Design['Fermenter size'] = self.outs[0].F_mass * tau_cofermentation
         Design['Recirculation flow rate'] = total_mass_flow
+
+        hu_cooling = self.heat_utilities[0]
+        mixture = tmo.Stream('mixture')
+        mixture.mix_from(self.ins[0:3])
+        Design['Duty'] = self.saccharified_stream.H  - mixture.H
+        hu_cooling(duty=Design['Duty'], T_in=mixture.T)
+        
 
 # Seed train, 5 stages, 2 trains
 # assumes no need for pH control due to low acid concentration

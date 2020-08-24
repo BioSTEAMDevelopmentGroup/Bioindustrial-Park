@@ -188,8 +188,7 @@ DAP_R302 = Stream('DAP_R302', units='kg/hr')
 # Fermentation units
 # =============================================================================
 
-H301 = units.HydrolysateCooler('H301', ins=P201-0, T=50+273.15)
-M301 = units.EnzymeHydrolysateMixer('M301', ins=(H301-0, enzyme_M301, water_M301))
+M301 = units.EnzymeHydrolysateMixer('M301', ins=(P201-0, enzyme_M301, water_M301))
 
 R301 = units.SaccharificationAndCoFermentation('R301', ins=(M301-0, '', 
                                                             CSL_R301, DAP_R301),
@@ -202,7 +201,7 @@ R302 = units.SeedTrain('R302', ins=(R301-2, CSL_R302, DAP_R302),
 T301 = units.SeedHoldTank('T301', ins=R302-1, outs=1-R301)
 
 fermentation_sys = System('fermentation_sys', 
-                          path=(H301, M301, R301, R302, T301), recycle=R302-1)
+                          path=(M301, R301, R302, T301), recycle=R302-1)
 
 
 

@@ -212,36 +212,74 @@ bst.PowerUtility.price = 0.070
 # if not noted
 # =============================================================================
 
-_CH4_MJ_per_kg = - chems.CH4.HHV/1e6/(chems.CH4.MW/1e3)
+# _CH4_MJ_per_kg = - chems.CH4.HHV/1e6/(chems.CH4.MW/1e3)
+
+# In kg CO2-eq/kg
+# GWP_CFs = {
+#     'NH4OH': 1.987 * chems.NH3.MW/chems.NH4OH.MW,
+#     'CSL': 0.1105,
+#     'CH4': 0.00101 * _CH4_MJ_per_kg,
+#     'Enzyme': 0.1128,
+#     # From ref [6], 0.94 kg CO2 and 6e-7 kg N2O per kg of lime
+#     'Lime': 0.94+6e-7*298,
+#     'NaOH': 0.2186,
+#     'H2SO4': 1.36e-5,
+#     'Gypsum': 0
+#     # 'Gypsum': -2.03/1e3 # ref[7]
+#     }
+
+
+_CH4_m3_per_kg = _CH4_V/_CH4_MW * 1e3
 
 # In kg CO2-eq/kg
 GWP_CFs = {
-    'NH4OH': 1.987 * chems.NH3.MW/chems.NH4OH.MW,
-    'CSL': 0.1105,
-    'CH4': 0.00101 * _CH4_MJ_per_kg,
-    'Enzyme': 0.1128,
-    # From ref [6], 0.94 kg CO2 and 6e-7 kg N2O per kg of lime
-    'Lime': 0.94+6e-7*298,
-    'NaOH': 0.2186,
-    'H2SO4': 1.36e-5,
-    'Gypsum': 0
-    # 'Gypsum': -2.03/1e3 # ref[7]
+    'NH4OH': 2.0462 * chems.NH3.MW/chems.NH4OH.MW,
+    'CSL': 2.7797, # fodder yeast
+    'CH4': 0.40519 * _CH4_m3_per_kg,
+    'Enzyme': 12.237,
+    'Lime': 0.96303,
+    'NaOH': 1.2909,
+    'H2SO4': 0.13803,
+    'Ethanol': 0.79329
     }
 
 GWP_CF_array = chems.kwarray(GWP_CFs)
 
 # Actually in kg CO2-eq/kg
-GWP_CF_stream = tmo.Stream('impact_stream', GWP_CF_array, units='kg/hr')
+GWP_CF_stream = tmo.Stream('GWP_CF_stream', GWP_CF_array, units='kg/hr')
 
 # In kg CO2-eq/kWh
-GWP_CF_electricity = 0.4481
-
-# In MJ/kWh, 0.627 from ref [8]
-_MJ_per_kWh = 3.6
-FEC_CF_electricity = 0.627 * _MJ_per_kWh
+GWP_CF_electricity = 0.58019
 
 # In kg CO2-eq/kg from ref [9]
 GWP_CF_feedstock = 66.2 / _feedstock_factor
+
+
+# =============================================================================
+# Cumulative energy demand - fossil (CEDf)
+# =============================================================================
+
+
+CEDf_CFs = {
+    'NH4OH': 37.89 * chems.NH3.MW/chems.NH4OH.MW,
+    'CSL': 19.058, # fodder yeast
+    'CH4': 42.378 * _CH4_m3_per_kg,
+    'Enzyme': 136.28,
+    'Lime': 4.7698,
+    'NaOH': 15.128,
+    'H2SO4': 4.1051,
+    'Ethanol': 5.0354
+    }
+
+CEDf_CF_array = chems.kwarray(CEDf_CFs)
+
+# Actually in kg CO2-eq/kg
+CEDf_CF_stream = tmo.Stream('CEDf_CF_stream', CEDf_CF_array, units='kg/hr')
+
+# In kg CO2-eq/kWh
+CEDf_CF_electricity = 6.9438
+
+
 
 
 

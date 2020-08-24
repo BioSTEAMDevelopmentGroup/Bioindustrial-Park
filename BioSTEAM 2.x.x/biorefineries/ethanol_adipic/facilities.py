@@ -150,7 +150,7 @@ class CWP(Facility):
         self.agent = HeatUtility.get_cooling_agent('chilled_water')
         
     def _run(self):
-        chilled_water_utilities = self.chilled_water_utilities = {}
+        system_chilled_water_utilities = self.system_chilled_water_utilities = {}
         
         total_duty = 0
         agent = self.agent
@@ -160,14 +160,14 @@ class CWP(Facility):
             if hasattr(u, 'heat_utilities'):
                 for hu in u.heat_utilities:
                     if hu.agent is agent:
-                        chilled_water_utilities[f'#{number}: {u.ID} - {hu.ID}'] = hu
+                        system_chilled_water_utilities[f'#{number}: {u.ID} - {hu.ID}'] = hu
                         number += 1
                         total_duty -= hu.duty
         
         hu_chilled = self.heat_utilities[0]
-        hu_chilled.mix_from(chilled_water_utilities.values())
+        hu_chilled.mix_from([i for i in system_chilled_water_utilities.values()])
         hu_chilled.reverse()        
-        self.system_chilled_water_duty = hu_chilled.duty
+        self.system_chilled_water_duty = -hu_chilled.duty
         
         # Total amount of chilled water needed in the whole system
         total_chilled_water = self.total_chilled_water = \
@@ -251,9 +251,9 @@ class CT(Facility):
                         total_duty -= hu.duty
         
         hu_cooling = self.heat_utilities[0]
-        hu_cooling.mix_from(system_cooling_water_utilities.values())
+        hu_cooling.mix_from([i for i in system_cooling_water_utilities.values()])
         hu_cooling.reverse()        
-        self.system_cooling_water_duty = hu_cooling.duty
+        self.system_cooling_water_duty = -hu_cooling.duty
         
         # Total amount of cooling water needed in the whole system
         total_cooling_water = self.total_cooling_water = \

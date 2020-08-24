@@ -185,11 +185,8 @@ lime_R301 = Stream('lime_R301', units='kg/hr')
 # Conversion units
 # =============================================================================
 
-# Cool hydrolysate down to fermentation temperature at 50°C
-H301 = units.HydrolysateCooler('H301', ins=P201-0, T=50+273.15)
-
-# Mix enzyme with the cooled pretreatment hydrolysate
-M301 = units.EnzymeHydrolysateMixer('M301', ins=(H301-0, enzyme_M301, water_M301))
+# Mix enzyme with pretreatment hydrolysate
+M301 = units.EnzymeHydrolysateMixer('M301', ins=(P201-0, enzyme_M301, water_M301))
 
 R301 = units.SaccharificationAndCoFermentation('R301',
                                                ins=(M301-0, '', CSL_R301, lime_R301),
@@ -197,6 +194,7 @@ R301 = units.SaccharificationAndCoFermentation('R301',
                                                      'sidedraw'),
                                                neutralization=True,
                                                set_titer_limit=True)
+
 
 R302 = units.SeedTrain('R302', ins=R301-1, outs=('seed',))
 
@@ -227,7 +225,7 @@ PS301 = bst.units.ProcessSpecification('PS301', ins=R301-0,
                                         specification=adjust_titer_yield)
 
 conversion_sys = System('conversion_sys',	
-                        path=(H301, M301, seed_recycle, PS301))
+                        path=(M301, seed_recycle, PS301))
 
 conversion_group = UnitGroup('conversion_group', units=conversion_sys.units)
 process_groups.append(conversion_group)

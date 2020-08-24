@@ -22,7 +22,13 @@ References:
 [2] Li et al., Tailored Pretreatment Processes for the Sustainable Design of
     Lignocellulosic Biorefineries across the Feedstock Landscape. Submitted,
     2020.
-
+    
+[3] Humbird et al., Process Design and Economics for Biochemical Conversion of 
+    Lignocellulosic Biomass to Ethanol: Dilute-Acid Pretreatment and Enzymatic 
+    Hydrolysis of Corn Stover; Technical Report NREL/TP-5100-47764; 
+    National Renewable Energy Lab (NREL), 2011.
+    https://www.nrel.gov/docs/fy11osti/47764.pdf
+    
 Naming conventions:
     D = Distillation column
     F = Flash tank
@@ -58,7 +64,7 @@ from thermosteam import Stream
 from lactic import units, facilities
 from lactic.hx_network import HX_Network
 from lactic.process_settings import price, GWP_CF_stream, GWP_CF_electricity, \
-    _CH4_MJ_per_kg, FEC_CF_electricity, GWP_CF_feedstock
+    GWP_CF_feedstock, CEDf_CF_stream, CEDf_CF_electricity
 from lactic.utils import baseline_feedflow, set_yield, find_split, splits_df
 from lactic.chemicals import chems, chemical_groups, soluble_organics, combustibles
 from lactic.tea_lca import LacticTEA
@@ -188,11 +194,8 @@ lime_R301 = Stream('lime_R301', units='kg/hr')
 # Conversion units
 # =============================================================================
 
-# Cool hydrolysate down to fermentation temperature at 50°C
-H301 = units.HydrolysateCooler('H301', ins=P201-0, T=50+273.15)
-
-# Mix enzyme with the cooled pretreatment hydrolysate
-M301 = units.EnzymeHydrolysateMixer('M301', ins=(H301-0, enzyme_M301, water_M301))
+# Mix enzyme with pretreatment hydrolysate
+M301 = units.EnzymeHydrolysateMixer('M301', ins=(P201-0, enzyme_M301, water_M301))
 
 R301 = units.SaccharificationAndCoFermentation('R301',
                                                ins=(M301-0, '', CSL_R301, lime_R301),
@@ -230,7 +233,7 @@ PS301 = bst.units.ProcessSpecification('PS301', ins=R301-0,
                                         specification=adjust_titer_yield)
 
 conversion_sys = System('conversion_sys',
-                        path=(H301, M301, seed_recycle, PS301))
+                        path=(M301, seed_recycle, PS301))
 
 conversion_group = UnitGroup('conversion_group', units=conversion_sys.units)
 process_groups.append(conversion_group)
@@ -759,13 +762,13 @@ get_total_GWP = lambda: get_total_material_GWP()+get_non_bio_GWP()+ \
 
 get_functional_GWP = lambda: get_total_GWP()/lactic_acid.F_mass
 
-# 79 is gal ethanol per dry ton of feedstock, 84530 is ethanol HHV in BTU/gal,
+# 79 is gal ethanol per dry ton of feedstock, 84530 is ethanol HHV in BTU/gal from ref[3],
 # 0.001055 is BTU/MJ, 907.185 is kg per ton
 _MJ_per_kg = 79 * (84530*0.001055) / 907.185
 
 # Emissions associate with land-use change (LUC), -10 to 45 g CO2/MJ feedstock
-get_GPW_LUC_lower = lambda: (-10/1e3) * feedstock.F_mass*_MJ_per_kg / lactic_acid.F_mass
-get_GPW_LUC_upper = lambda: (45/1e3) * feedstock.F_mass*_MJ_per_kg / lactic_acid.F_mass
+get_GWP_LUC_lower = lambda: (-10/1e3) * feedstock.F_mass*_MJ_per_kg / lactic_acid.F_mass
+get_GWP_LUC_upper = lambda: (45/1e3) * feedstock.F_mass*_MJ_per_kg / lactic_acid.F_mass
 
 # Considering GWP from feedstock supply system and plant uptake of CO2
 get_functional_GWP_with_feedstock = lambda: \
@@ -774,16 +777,19 @@ get_functional_GWP_with_feedstock = lambda: \
 # Freshwater consumption
 get_functional_H2O = lambda: system_makeup_water.F_mass/lactic_acid.F_mass
 
-# Fossil fuel consumption from natural gas
-get_natural_gas_FEC = lambda: natural_gas.F_mass*_CH4_MJ_per_kg/lactic_acid.F_mass
+# Cumulative energy demand - fossil (CEDf) from materials
+def get_total_material_CEDf():
+    LCA_stream.mass = sum(i.mass for i in LCA_streams)
+    material_CEDf = LCA_stream.mass*CEDf_CF_stream.mass
+    return material_CEDf.sum()
 
-# FEC from electricity
+# CEDf from electricity
 get_system_power_demand = lambda: sum(i.power_utility.rate for i in lactic_sys.units
                                       if i.power_utility)
-get_electricity_FEC = lambda: FEC_CF_electricity*get_system_power_demand()/lactic_acid.F_mass
+get_electricity_CEDf = lambda: CEDf_CF_electricity*get_system_power_demand()/lactic_acid.F_mass
 
-# Total FEC
-get_functional_FEC = lambda: get_natural_gas_FEC()+get_electricity_FEC()
+# Total CEDf
+get_functional_CEDf = lambda: get_total_material_CEDf()/lactic_acid.F_mass+get_electricity_CEDf()
 
 def simulate_and_print():
     print('\n---------- Baseline biorefinery ----------')
@@ -799,25 +805,24 @@ def simulate_and_print():
 # Temporary codes
 # =============================================================================
 
-# R301.set_titer_limit = True
-# R301.titer_limit = 30
-# R301.yield_limit = 0.6
+# System.molar_tolerance = 0.1
+# R402.X_factor = 5
+# R403.hydrolysis_rxns.X[:] = 0.95
+# lps = bst.HeatUtility.get_heating_agent('low_pressure_steam')
+# mps = bst.HeatUtility.get_heating_agent('medium_pressure_steam')
+# hps = bst.HeatUtility.get_heating_agent('high_pressure_steam')
 
-# R301.set_titer_limit = False
-# set_yield(0.76, R301, R302)    
+# for i in (lps, mps, hps):
+#     i.heat_transfer_efficiency = 1
 
-# for i in range(3):
-#     MPSP = simulate_get_MPSP()
-# print(f'MPSP is ${lactic_acid.price:.3f}/kg')
 
-# all_units = sum((i.units for i in process_groups), ())
-# for unit in all_units:
-#     if not unit in lactic_sys.units:
-#         print(f'{unit.ID} not in lactic_sys.units')
 
-# for unit in lactic_sys.units:
-#     if not unit in all_units:
-#         print(f'{unit.ID} not in all_units')
+
+
+
+
+
+
 
 
 
