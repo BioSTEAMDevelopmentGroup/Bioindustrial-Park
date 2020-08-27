@@ -7,6 +7,7 @@
 # for license details.
 """
 """
+from .. import PY37
 from . import (units,
                utils,
                _chemicals,
@@ -92,16 +93,19 @@ def _load_system():
     for i in range(2): set_LAOs_MPSP(get_LAOs_MPSP())
     _system_loaded = True
 
-def __getattr__(name):
-    if not _chemicals_loaded:
-        _load_chemicals()
-        if name == 'chemicals': return chemicals
-    if not _system_loaded: _load_system()
-    dct = globals()
-    dct.update(flowsheet.system.__dict__)
-    dct.update(flowsheet.stream.__dict__)
-    dct.update(flowsheet.unit.__dict__)
-    if name in dct:
-        return dct[name]
-    else:
-        raise AttributeError(f"module '{__name__}' has no attribute '{name}'")
+if PY37:
+    def __getattr__(name):
+        if not _chemicals_loaded:
+            _load_chemicals()
+            if name == 'chemicals': return chemicals
+        if not _system_loaded: _load_system()
+        dct = globals()
+        dct.update(flowsheet.system.__dict__)
+        dct.update(flowsheet.stream.__dict__)
+        dct.update(flowsheet.unit.__dict__)
+        if name in dct:
+            return dct[name]
+        else:
+            raise AttributeError(f"module '{__name__}' has no attribute '{name}'")
+else:
+    load()
