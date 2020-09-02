@@ -668,8 +668,12 @@ def create_system(ID='wheatstraw_sys'):
     ### Facilities
     
 # %% Facilities
+    
+    # TODO: Double check that I did is right.
+    # TODO: The BoilerTurbogenerator burns both biogas and lignin
+    # Note that lime and boilerchems cost is taking into account in the 
+    # unit operation now
     M605 = bst.Mixer('M605', ins=(R501-0, R601-0))
-
     BT = bst.facilities.BoilerTurbogenerator('BT',
                                              ins=(S402-0, M605-0, 
                                                   'boiler_makeup_water',
