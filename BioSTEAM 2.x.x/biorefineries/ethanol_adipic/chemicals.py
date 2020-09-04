@@ -360,7 +360,6 @@ soluble_groups = ('OtherSugars', 'SugarOligomers', 'OrganicSolubleSolids',
 soluble_organics = sum([chemical_groups[i] for i in soluble_groups], ())
 
 solubles = (*soluble_organics, *chemical_groups['InorganicSolubleSolids'], 'H2SO4')
-# solubles = tuple(soluble_organics) + chemical_groups['InorganicSolubleSolids'] + ('H2SO4',)
 
 insoluble_groups = ('Proteins', 'CellMass', 'OtherInsolubleSolids',
                     'OtherStructuralCarbohydrates')
