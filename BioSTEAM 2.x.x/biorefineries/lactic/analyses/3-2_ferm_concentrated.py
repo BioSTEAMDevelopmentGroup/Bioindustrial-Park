@@ -98,7 +98,7 @@ def update_productivity(productivity):
 
 bst.speed_up()
 R301.neutralization = True
-R301.mode = 'Continuous'
+R301.mode = 'Batch'
 R301.allow_dilution = False
 R401.bypass = False
 S402.bypass = False

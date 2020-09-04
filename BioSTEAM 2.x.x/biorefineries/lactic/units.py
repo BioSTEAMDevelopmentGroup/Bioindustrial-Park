@@ -571,9 +571,9 @@ class Reactor(Unit, PressureVessel, isabstract=True):
         Residence time [hr].        
     V_wf=0.8 : float
         Fraction of working volume over total volume.        
-    kW_per_m3=0.985: float
+    kW_per_m3=0.295: float
         Power usage of agitator
-        (0.985 converted from 5 hp/1000 gal as in [1], for liquid–liquid reaction or extraction).
+        (converted from 1.5 hp/1000 gal as in [1], for homogeneous liquid reaction).
     wall_thickness_factor=1: float
         A safety factor to scale up the calculated minimum wall thickness.
     vessel_material : str, optional
@@ -603,7 +603,7 @@ class Reactor(Unit, PressureVessel, isabstract=True):
     
     def __init__(self, ID='', ins=None, outs=(), *, 
                  P=101325, tau=0.5, V_wf=0.8,
-                 length_to_diameter=2, kW_per_m3=0.985,
+                 length_to_diameter=2, kW_per_m3=0.295,
                  wall_thickness_factor=1,
                  vessel_material='Stainless steel 316',
                  vessel_type='Vertical'):
@@ -721,7 +721,8 @@ class CoFermentation(Reactor):
 
     def __init__(self, ID='', ins=None, outs=(), thermo=None, *, T=50+273.15,
                  P=101325, V_wf=0.8, length_to_diameter=2,
-                 kW_per_m3=0.985, wall_thickness_factor=1,
+                 kW_per_m3=1.97, # 10 hp/1000 gal for suspension of solid particles
+                 wall_thickness_factor=1,
                  vessel_material='Stainless steel 304',
                  vessel_type='Vertical',
                  neutralization=True,
@@ -1110,7 +1111,7 @@ class Esterification(Reactor):
     
     def __init__(self, ID='', ins=None, outs=(), thermo=None, *, 
                  T=351.15, P=101325, tau=None, tau_max=15, 
-                 V_wf=0.8, length_to_diameter=2, kW_per_m3=0.985,
+                 V_wf=0.8, length_to_diameter=2, kW_per_m3=0.295,
                  X1=None, X2=None, assumeX2equalsX1=True, allow_higher_T=False,
                  wall_thickness_factor=1,
                  vessel_material='Stainless steel 316',

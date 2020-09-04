@@ -344,7 +344,7 @@ S401 = bst.units.SolidsCentrifuge('S401', ins=PS301-0, outs=('S401_cell_mass', '
 # Ca(LA)2 + H2SO4 --> CaSO4 + 2 LA
 R401 = units.AcidulationReactor('R401', ins=(S401-1, sulfuric_acid_R401),
                                 P=101325, tau=1, V_wf=0.8, length_to_diameter=2,
-                                kW_per_m3=0.985, wall_thickness_factor=1.5,
+                                kW_per_m3=0.295, wall_thickness_factor=1.5,
                                 vessel_material='Stainless steel 316',
                                 vessel_type='Vertical')
 R401_P = bst.units.Pump('R401_P', ins=R401-0)
@@ -397,7 +397,7 @@ D401_P = bst.units.Pump('D401_P', ins=D401-1)
 R402 = units.Esterification('R402', ins=(D401_P-0, '', 'D403_l_recycled', 
                                          ethanol_R402, ''),
                             V_wf=0.8, length_to_diameter=2,
-                            kW_per_m3=0.985, wall_thickness_factor=1,
+                            kW_per_m3=0.295, wall_thickness_factor=1,
                             vessel_material='Stainless steel 316',
                             vessel_type='Vertical')
 # Increase pressure as the solution can be very thick for some designs
@@ -454,7 +454,7 @@ acid_ester_recycle = System('acid_ester_recycle',
 # R403.outs[1] is the discarded fraction of R403.ins[2]
 R403 = units.HydrolysisReactor('R403', ins=(D403_H-0, water_R403, F401_H-0, ''),
                                tau=4, V_wf=0.8, length_to_diameter=2,
-                               kW_per_m3=0.985, wall_thickness_factor=1,
+                               kW_per_m3=0.295, wall_thickness_factor=1,
                                vessel_material='Stainless steel 316',
                                vessel_type='Vertical')
 R403_P = bst.units.Pump('R403_P', ins=R403-0)
