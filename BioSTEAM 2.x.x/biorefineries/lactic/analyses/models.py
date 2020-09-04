@@ -38,7 +38,8 @@ import biosteam as bst
 import lactic.system as system
 from biosteam.evaluation import Model, Metric
 from chaospy import distributions as shape
-from lactic.process_settings import GWP_CFs
+from lactic.process_settings import CFs
+from lactic.utils import set_yield
 
 _kg_per_ton = 907.18474
 _feedstock_factor = _kg_per_ton / 0.8
@@ -60,12 +61,12 @@ def get_MPSP():
     return MPSP
 
 feedstock = system.feedstock
-# Yield in % of dry feedstock
-get_mass_yield = lambda: lactic_acid.F_mass/(feedstock.F_mass-feedstock.imass['Water'])
 # Yield in 10^6 kg/yr
 lactic_no_CHP_tea = system.lactic_no_CHP_tea
 get_annual_factor = lambda: lactic_no_CHP_tea._annual_factor
 get_total_yield = lambda: lactic_acid.F_mass*get_annual_factor()/1e6
+# Yield in % of dry feedstock
+get_mass_yield = lambda: lactic_acid.F_mass/(feedstock.F_mass-feedstock.imass['Water'])
 R301 = system.R301
 get_titer = lambda: R301.effluent_titer
 # Purity (%) of LacticAcid in the final product
@@ -91,8 +92,8 @@ electricity_price = bst.PowerUtility.price
 get_electricity_credit = lambda: (excess_power()*electricity_price*get_annual_factor())/1e6
 
 metrics = [Metric('MPSP', get_MPSP, '$/kg'),
-           Metric('Product mass yield', get_mass_yield, '%'),
            Metric('Total product yield', get_total_yield, '10^6 kg/yr'),
+           Metric('Product mass yield', get_mass_yield, '%'),
            Metric('Fermentation titer', get_titer, 'g/L'),
            Metric('Product purity', get_purity, '%'),
            Metric('Product recovery', get_recovery, '%'),
@@ -166,25 +167,25 @@ metrics.append(Metric('Check', check_product_sale, '10^6 $/yr', 'Product sale'))
 # Heating demand breakdown (positive if needs heating)
 # =============================================================================
 
-get_system_heating_demand = lambda: CHP.system_heating_demand*get_annual_factor()/1e9
-get_pretreatment_steam_heating_demand = lambda: CHP.side_streams_lps.duty*get_annual_factor()/1e9
+get_system_heating_demand = lambda: CHP.system_heating_demand/1e6
+get_pretreatment_steam_heating_demand = lambda: CHP.side_streams_lps.duty/1e6
 HXN = system.HXN
-get_HXN_heating_demand = lambda: sum(i.duty for i in HXN.heat_utilities 
-                                    if i.flow*i.duty>0)*get_annual_factor()/1e9
+get_HXN_heating_demand = lambda: sum(i.duty for i in HXN.heat_utilities
+                                    if i.flow*i.duty>0)/1e6
 get_CHP_heating_demand = lambda: sum(i.duty for i in CHP.heat_utilities 
-                                    if i.flow*i.duty>0)*get_annual_factor()/1e9
+                                    if i.flow*i.duty>0)/1e6
 
 def get_heating_demand(group):
-    return lambda: group.get_heating_duty()*get_annual_factor()/1e3
+    return lambda: group.get_heating_duty()
 
 for group in process_groups:
     if group.name in ('feedstock_group', 'HXN_group', 'CHP_group'): continue
     # The only heating demand for the pretreatment system is the heat needed to
     # generate the side steam
     if group.name == 'pretreatment_group':
-        metrics.append(Metric(group.name, get_pretreatment_steam_heating_demand, '10^9 kJ/yr', 
+        metrics.append(Metric(group.name, get_pretreatment_steam_heating_demand, '10^6 kJ/hr', 
                                 'Heating demand'))
-    else: metrics.append(Metric(group.name, get_heating_demand(group), '10^9 kJ/yr', 
+    else: metrics.append(Metric(group.name, get_heating_demand(group), '10^6 kJ/hr', 
                                   'Heating demand'))
 
 check_heating_demand = \
@@ -193,10 +194,10 @@ check_heating_demand = \
                 get_HXN_heating_demand() + get_CHP_heating_demand()
                                             
 metrics.extend((
-    Metric('HXN', get_HXN_heating_demand, '10^9 kJ/yr', 'Heating demand'),
-    Metric('CHP', get_CHP_heating_demand, '10^9 kJ/yr', 'Heating demand'),    
-    Metric('Sum', get_system_heating_demand, '10^9 kJ/yr', 'Heating demand'),
-    Metric('Check', check_heating_demand, '10^9 kJ/yr', 'Heating demand')
+    Metric('HXN', get_HXN_heating_demand, '10^6 kJ/hr', 'Heating demand'),
+    Metric('CHP', get_CHP_heating_demand, '10^6 kJ/hr', 'Heating demand'),    
+    Metric('Sum', get_system_heating_demand, '10^6 kJ/hr', 'Heating demand'),
+    Metric('Check', check_heating_demand, '10^6 kJ/hr', 'Heating demand')
     ))
 
 # =============================================================================
@@ -204,14 +205,14 @@ metrics.extend((
 # =============================================================================
 
 CT = system.CT
-get_system_cooling_water_duty = lambda: CT.system_cooling_water_duty*get_annual_factor()/1e9
+get_system_cooling_water_duty = lambda: CT.system_cooling_water_duty/1e6
 get_HXN_cooling_demand = lambda: sum(i.duty for i in HXN.heat_utilities 
-                                    if i.flow*i.duty<0)*get_annual_factor()/1e9
+                                    if i.flow*i.duty<0)/1e6
 get_CT_cooling_water_duty = lambda: sum(i.duty for i in CT.heat_utilities 
-                                    if i.flow*i.duty<0)*get_annual_factor()/1e9
+                                    if i.flow*i.duty<0)/1e6
 
 def get_cooling_demand(group):
-    return lambda: -group.get_cooling_duty()*get_annual_factor()/1e3
+    return lambda: -group.get_cooling_duty()
 
 for group in process_groups:
     if group.name in ('feedstock_group', 'HXN_group', 'CT_group'): continue
@@ -223,10 +224,10 @@ check_cooling_demand = \
                 get_HXN_cooling_demand() + get_CT_cooling_water_duty()
 
 metrics.extend((
-    Metric('HXN', get_HXN_cooling_demand, '10^9 kJ/yr', 'Cooling demand'),
-    Metric('CT', get_CT_cooling_water_duty, '10^9 kJ/yr', 'Cooling demand'),    
-    Metric('Sum', get_system_cooling_water_duty, '10^9 kJ/yr', 'Cooling demand'),
-    Metric('Check', check_cooling_demand, '10^9 kJ/yr', 'Cooling demand')
+    Metric('HXN', get_HXN_cooling_demand, '10^6 kJ/hr', 'Cooling demand'),
+    Metric('CT', get_CT_cooling_water_duty, '10^6 kJ/hr', 'Cooling demand'),    
+    Metric('Sum', get_system_cooling_water_duty, '10^6 kJ/hr', 'Cooling demand'),
+    Metric('Check', check_cooling_demand, '10^6 kJ/hr', 'Cooling demand')
     ))
 
 # =============================================================================
@@ -234,7 +235,7 @@ metrics.extend((
 # =============================================================================
 
 lactic_sys = system.lactic_sys
-get_system_power_demand = system.get_system_power_demand
+get_electricity_use = system.get_electricity_use
 
 def get_power_demand(group):
     return lambda: sum(i.rate for i in group.power_utilities)
@@ -244,9 +245,9 @@ for group in process_groups:
     metrics.append(Metric(group.name, get_power_demand(group), 'kW', 'Power demand'))
 
 check_power_demand = lambda: sum(get_power_demand(group)()
-                                 for group in process_groups) - get_system_power_demand()
+                                 for group in process_groups) - get_electricity_use()
 metrics.extend((
-    Metric('Sum', get_system_power_demand, 'kW', 'Power demand'),
+    Metric('Sum', get_electricity_use, 'kW', 'Power demand'),
     Metric('Check', check_power_demand, 'kW', 'Power demand')
     ))
 
@@ -283,7 +284,7 @@ index_TEA = len(metrics)
 # %%
 
 # =============================================================================
-# Metrics to evalute system across internal rate of return
+# Metrics to evalute system at different internal rate of return metrics
 # =============================================================================
 
 def create_IRR_metrics(IRR):
@@ -309,53 +310,67 @@ index_IRR = len(metrics)
 # Metrics for global warming potential
 # =============================================================================
 
-get_functional_GWP = system.get_functional_GWP
-get_total_material_GWP = lambda: system.get_total_material_GWP()/lactic_acid.F_mass
-get_electricity_GWP = lambda: system.get_electricity_GWP()/lactic_acid.F_mass
-get_non_bio_GWP = lambda: system.get_non_bio_GWP()/lactic_acid.F_mass
-get_functional_H2O = system.get_functional_H2O
-
-LCA_stream = system.LCA_stream
-def get_material_GWP(material):
-    return lambda: LCA_stream.imass[material]*GWP_CFs[material]/lactic_acid.F_mass
-
+get_GWP = system.get_GWP
+get_FEC = system.get_FEC
 metrics.extend((
-    Metric('Total GWP', get_functional_GWP, 'kg CO2-eq/kg', 'LCA'),
-    Metric('Total freshwater', get_functional_H2O, 'kg H2O/kg', 'LCA')
+    Metric('Total GWP', get_GWP, 'kg CO2-eq/kg', 'LCA'),
+    Metric('Total FEC', get_FEC, 'MJ/kg', 'LCA')
     ))
 
-for i in GWP_CFs.keys():
-    metrics.append(
-        Metric(i, get_material_GWP(i), 'kg CO2-eq/kg', 'Material GWP'))   
+get_material_GWP = system.get_material_GWP
+get_electricity_GWP = system.get_electricity_GWP
 
-check_GWP = lambda: get_functional_GWP() - \
-    (sum(get_material_GWP(i)() for i in GWP_CFs)+get_electricity_GWP()+get_non_bio_GWP())
+natural_gas = system.natural_gas
+get_CH4_production_GWP = lambda: \
+    CFs['GWP_CFs']['CH4']*natural_gas.F_mass/lactic_acid.F_mass
+get_CH4_combustion_GWP = lambda: \
+     natural_gas.get_atomic_flow('C')*natural_gas.chemicals.CO2.MW/lactic_acid.F_mass
+
+lime = system.lime
+lime_CHP = system.lime_CHP
+get_lime_GWP  = lambda: \
+    CFs['GWP_CFs']['Lime']*(lime.F_mass+lime_CHP.F_mass)/lactic_acid.F_mass
+
+ethanol = system.ethanol
+get_ethanol_combustion_GWP = lambda: \
+     ethanol.get_atomic_flow('C')*ethanol.chemicals.CO2.MW/lactic_acid.F_mass
+
+# For all other materials, including both production and combustion
+get_other_materials_GWP = lambda: get_material_GWP()+get_ethanol_combustion_GWP()-\
+    get_CH4_production_GWP()-get_lime_GWP()
+
+check_GWP = lambda: get_GWP()-get_material_GWP()-get_electricity_GWP()- \
+    get_CH4_combustion_GWP()-get_ethanol_combustion_GWP()
     
 metrics.extend((
-    Metric('Material', get_total_material_GWP, 'kg CO2-eq/kg', 'GWP'),
     Metric('Electricity', get_electricity_GWP, 'kg CO2-eq/kg', 'GWP'),
-    Metric('Non-biogenic combustion', get_non_bio_GWP, 'kg CO2-eq/kg', 'GWP'),
+    Metric('Natural gas production', get_CH4_production_GWP, 'kg CO2-eq/kg', 'GWP'),
+    Metric('Natural gas combustion', get_CH4_combustion_GWP, 'kg CO2-eq/kg', 'GWP'), 
+    Metric('Lime', get_lime_GWP, 'kg CO2-eq/kg', 'GWP'),
+    Metric('Other materials', get_other_materials_GWP, 'kg CO2-eq/kg', 'GWP'),
     Metric('GWP check', check_GWP, 'kg CO2-eq/kg', 'GWP')
     ))
 
-process_water_streams = system.process_water_streams
-def get_freshwater(process):
-    return lambda: sum(i.F_mass for i in process_water_streams[process])/lactic_acid.F_mass
+get_electricity_FEC = system.get_electricity_FEC
+get_CH4_FEC = lambda: CFs['FEC_CFs']['CH4']*natural_gas.F_mass/lactic_acid.F_mass
+get_lime_FEC = lambda: \
+    CFs['FEC_CFs']['Lime']*(lime.F_mass+lime_CHP.F_mass)/lactic_acid.F_mass
 
-for i in process_water_streams.keys():
-    metrics.append(Metric(i, get_freshwater(i), 'kg H2O/kg', 'Freshwater'))
+get_material_FEC = system.get_material_FEC
+get_other_materials_FEC = lambda: get_material_FEC()-get_CH4_FEC()-get_lime_FEC()
 
-get_used_water = lambda: sum(get_freshwater(i)() for i in process_water_streams.keys())
 
-PWC = system.PWC
-get_recycled_water = lambda: -PWC.recycled_water/lactic_acid.F_mass
 
-check_freshwater = lambda: get_used_water() + get_recycled_water() - get_functional_H2O()
+check_FEC = lambda: get_FEC() - get_material_FEC() - \
+    get_system_utility_cost()*1e6/get_annual_factor()/bst.PowerUtility.price * \
+    CFs['FEC_CFs']['Electricity']/lactic_acid.F_mass
 
 metrics.extend((
-    Metric('Used', get_used_water, 'kg H2O/kg', 'Freshwater'),
-    Metric('Recycled', get_recycled_water, 'kg H2O/kg', 'Freshwater'),
-    Metric('Freshwater check', check_freshwater, 'kg H2O/kg', 'Freshwater')
+    Metric('Electricity', get_electricity_FEC, 'MJ/kg', 'FEC'),
+    Metric('Natural gas', get_CH4_FEC, 'MJ/kg', 'FEC'),
+    Metric('Lime', get_lime_FEC, 'MJ/kg', 'FEC'),
+    Metric('Other materials', get_other_materials_FEC, 'MJ/kg', 'FEC'),
+    Metric('FEC check', check_FEC, 'MJ/kg', 'FEC')
     ))
 
 
@@ -387,18 +402,18 @@ def set_blank_parameter(anything):
 # TEA parameters
 # =============================================================================
 
-U101 = system.U101
-D = baseline_uniform(2205, 0.1)
-@param(name='Feedstock flow rate', element=feedstock, kind='coupled', units='dry-ton/day',
-       baseline=2205, distribution=D)
-def set_feedstock_flow_rate(rate):
-    feedstock.mass *= rate / U101._cached_flow_rate
-    U101._cached_flow_rate = rate
+# U101 = system.U101
+# D = baseline_uniform(2205, 0.1)
+# @param(name='Feedstock flow rate', element=feedstock, kind='coupled', units='dry-ton/day',
+#        baseline=2205, distribution=D)
+# def set_feedstock_flow_rate(rate):
+#     feedstock.mass *= rate / U101._cached_flow_rate
+#     U101._cached_flow_rate = rate
 
 D = shape.Triangle(0.84, 0.9, 0.96)
 @param(name='Plant uptime', element='TEA', kind='isolated', units='%',
        baseline=0.9, distribution=D)
-def set_operating_days(uptime):
+def set_plant_uptime(uptime):
     lactic_tea.operating_days = 365 * uptime
 
 D = baseline_triangle(1, 0.25)
@@ -428,8 +443,6 @@ D = shape.Triangle(0.0910, 0.0948, 0.1046)
 def set_sulfuric_acid_price(price):
     sulfuric_acid.price = price
 
-lime = system.lime
-lime_CHP = system.lime_CHP
 D = shape.Triangle(0.160, 0.262, 0.288)
 @param(name='Lime price', element='TEA', kind='isolated', units='$/kg',
        baseline=0.262, distribution=D)
@@ -437,7 +450,6 @@ def set_lime_price(price):
     lime.price = price
     lime_CHP.price = price
 
-natural_gas = system.natural_gas
 D = shape.Triangle(0.198, 0.253, 0.304)
 @param(name='Natural gas price', element='TEA', kind='isolated', units='$/kg',
        baseline=0.253, distribution=D)
@@ -513,7 +525,7 @@ D = shape.Triangle(0, 24, 72)
 def set_R301_saccharification_time(tau):
     R301.tau_saccharification = tau
 
-D = shape.Triangle(0.75, 0.9, 0.95)
+D = shape.Triangle(0.75, 0.9, 0.948-1e-6)
 @param(name='Enzymatic hydrolysis glucan-to-glucose', element=R301, kind='coupled', units='%',
        baseline=0.9, distribution=D)
 def set_R301_glucan_conversion(X):
@@ -537,13 +549,15 @@ def set_ferm_ratio(ratio):
 D = shape.Triangle(0.55, 0.76, 0.93)
 @param(name='Lactic acid yield', element=R301, kind='coupled', units='g/g',
        baseline=0.76, distribution=D)
-def set_lactic_acid_yield(lactic_yield):
-    R301_X = R301.cofermentation_rxns.X
-    R302_X = R302.cofermentation_rxns.X
-    R301_X[0] = R301_X[3] = R301.yield_limit = lactic_yield
-    R301_X[1] = R301_X[4] = min(R301_X[1], 1-1e-6-R301_X[0]-R301_X[2])
-    R302_X[0] = R302_X[3] = lactic_yield * R302.ferm_ratio
-    R302_X[1] = R302_X[4] = R301_X[1] * R302.ferm_ratio
+def set_lactic_yield(lactic_yield):
+    R301.yield_limit = lactic_yield
+    set_yield(lactic_yield, R301, R302)
+    # R301_X = R301.cofermentation_rxns.X
+    # R302_X = R302.cofermentation_rxns.X
+    # R301_X[0] = R301_X[3] = R301.yield_limit = lactic_yield
+    # R301_X[1] = R301_X[4] = min(R301_X[1], 1-1e-6-R301_X[0]-R301_X[2])
+    # R302_X[0] = R302_X[3] = lactic_yield * R302.ferm_ratio
+    # R302_X[1] = R302_X[4] = min(R301_X[1]*R302.ferm_ratio, 1-1e-6-R302_X[0]-R302_X[2])    
 
 D = shape.Triangle(0.18, 0.89, 1.92)
 @param(name='Productivity', element=R301, kind='coupled', units='g/L/hr',
@@ -555,14 +569,11 @@ def set_lactic_productivity(productivity):
 D = shape.Triangle(0.004, 0.07, 0.32)
 @param(name='Acetic acid yield', element=R301, kind='coupled', units='g/g',
        baseline=0.07, distribution=D)
-def set_acetic_acid_yield(acetic_yield): 
+def set_acetic_yield(acetic_yield): 
     R301_X = R301.cofermentation_rxns.X
     R302_X = R302.cofermentation_rxns.X
-    R301_acetic_yield = min(acetic_yield, 1-1e-6-R301_X[0]-R301_X[2])
-    R301_X[1] = R301_X[4] = R301_acetic_yield
-    R302_acetic_yield = min(R301_acetic_yield*R302.ferm_ratio,
-                            1-1e-6-R302_X[0]-R302_X[2])
-    R302_X[1] = R302_X[4] = R302_acetic_yield
+    R301_X[1] = R301_X[4] = min(acetic_yield, 1-1e-6-R301_X[0]-R301_X[2])
+    R302_X[1] = R302_X[4] = min(R301_X[1]*R302.ferm_ratio, 1-1e-6-R302_X[0]-R302_X[2])
 
 D = shape.Triangle(0.05, 0.07, 0.1)
 @param(name='Inoculum ratio', element=R301, kind='coupled', units='%',
@@ -610,9 +621,9 @@ def set_R403_conversion_factor(X):
 # =============================================================================
 
 D = baseline_uniform(0.8, 0.1)
-@param(name='CHP combustion efficiency', element=CHP, kind='coupled', units='%',
+@param(name='boiler efficiency', element=CHP, kind='coupled', units='%',
        baseline=0.8, distribution=D)
-def set_CHP_combustion_efficiency(efficiency):
+def set_boiler_efficiency(efficiency):
     CHP.B_eff = efficiency
 
 # All parameters
@@ -622,7 +633,44 @@ parameters = model_full.get_parameters()
 # %%
 
 # =============================================================================
-# Model to evalute system across feedstock price and carbohydate content
+# Model to evaluate system across lactic acid yield at different productivity
+# metrics, titer is calculate based on yield
+# =============================================================================
+
+ferm_metrics = [Metric('Fermentation titer', get_titer, 'g/L')]
+
+def create_productivity_metrics(productivity):
+    def get_productivity_based_MPSP():
+        set_lactic_productivity(productivity)
+        for unit in (R301, R302):
+            unit._design()
+            unit._cost()
+        return get_MPSP()
+    header = f'Productivity={productivity:.2f} [g/L/hr]'
+    return [Metric('MPSP', get_productivity_based_MPSP, '$/kg', header),
+            Metric('NPV', get_NPV, '$', header)]
+
+productivities = (0.18, 0.89, 1.92)
+
+ferm_metrics_MPSP = sum([create_productivity_metrics(productivity)
+                          for productivity in productivities], [])
+ferm_metrics += ferm_metrics_MPSP
+ferm_metrics.extend((
+    Metric('GWP', get_GWP, 'kg CO2-eq/kg', 'LCA'),
+    Metric('FEC', get_FEC, 'MJ/kg', 'LCA')
+    ))
+
+model_ferm = Model(lactic_sys, ferm_metrics)
+ferm_parameters = [i for i in model_full.get_parameters()
+                   if i.name not in ('Lactic acid yield', 'Productivity')]
+model_ferm.set_parameters(ferm_parameters)
+
+
+# %%
+
+# =============================================================================
+# Model to evalute system across feedstock carbohydate content at different
+# feedstock price metrics
 # =============================================================================
 
 def create_price_metrics(price):
@@ -634,12 +682,12 @@ def create_price_metrics(price):
     return [Metric('MPSP', get_price_based_MPSP, '$/kg', header),
             Metric('NPV', get_NPV, '$', header)]
 
-prices = np.arange(0, 260, 10)
+prices = np.arange(0, 210, 10)
 
 carb_metrics = sum([create_price_metrics(price) for price in prices],[])
 carb_metrics.extend((
-    Metric('GWP', get_functional_GWP, 'kg CO2-eq/kg', 'LCA'),
-    Metric('Freshwater', get_functional_H2O, 'kg H2O/kg', 'LCA')
+    Metric('GWP', get_GWP, 'kg CO2-eq/kg', 'LCA'),
+    Metric('FEC', get_FEC, 'MJ/kg', 'LCA')
     ))
 
 def set_carbs(carbs_content):

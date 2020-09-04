@@ -93,17 +93,18 @@ def compute_lactic_titer(stream, V=None):
     return titer
 
 def set_yield(lactic_yield, R301, R302):
+    if lactic_yield > 1:
+        raise ValueError(f'Lactic acid yield of {lactic_yield:.2f} is infeasible')
     R301_X = R301.cofermentation_rxns.X
     R301_X[0] = R301_X[3] = lactic_yield
-    R301_X[1] = R301_X[4] = R301._X[1]
     R301_X[2] = R301_X[5] = R301._X[2]
-    if R301_X.sum()>2:
-        diff = 1 - R301_X[0]
-        R301_X[1] = R301_X[4] = max(0, diff * R301._X[1]/(R301._X[1]+R301._X[2]))
-        R301_X[2] = R301_X[5] = max(0, diff-R301._X[1])
+    R301_X[1] = R301_X[4] = min(R301._X[1], 1-1e-6-R301_X[0]-R301_X[2])
+    if R301_X[1] < 0:
+        R301_X[2] = R301_X[5] = min(R301._X[2], -(R301_X[1]+1e-6), 1-1e-6-R301_X[0])
+        R301_X[1] = R301_X[4] = 0
     R302_X = R302.cofermentation_rxns.X
     R302_X[0] = R302_X[3] = R301_X[0] * R302.ferm_ratio
-    R302_X[1] = R302_X[4] = R301_X[1] * R302.ferm_ratio
+    R302_X[1] = R302_X[4] = min(R301_X[1]*R302.ferm_ratio, 1-1e-6-R302_X[0]-R302_X[2])
 
 
 # %% 

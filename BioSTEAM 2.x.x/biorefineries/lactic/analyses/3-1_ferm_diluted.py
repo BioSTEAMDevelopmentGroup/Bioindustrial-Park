@@ -11,7 +11,7 @@
 # for license details.
 
 """
-Created on Wed Jul 22 20:02:49 2020
+Created on Tue Sep  1 17:43:13 2020
 
 Modified from the biorefineries constructed in [1] and [2] for the production of
 lactic acid from lignocellulosic feedstocks
@@ -39,12 +39,8 @@ import numpy as np
 import pandas as pd
 import biosteam as bst
 from biosteam.utils import TicToc
-from lactic import system
+from lactic import system_diluted
 from lactic.utils import set_yield
-
-R301 = system.R301
-R401 = system.R401
-S402 = system.S402
 
 
 # %% 
@@ -52,32 +48,33 @@ S402 = system.S402
 # =============================================================================
 # Evaluate system at different lactic acid titer and yield (conversion),
 # using either regular strain (need lime addition during fermentation to neutralize
-# produced lactic acid) or acid-resistent strain (no neutralization need)
+# produced lactic acid) or acid-resistant strain (no neutralization need)
 # =============================================================================
 
 # Initiate a timer
 timer = TicToc('timer')
 timer.tic()
 
-titer_range = np.arange(40, 141, 5)
 yield_range = np.arange(0.3, 1.01, 0.05) - 1e-6
-# titer_range = np.arange(40, 141, 50)
 # yield_range = np.arange(0.3, 1.01, 0.5) - 1e-6
 
-# 130 and 0.76 are the baseline
-titer_range = [130] + titer_range.tolist()
+# 0.76 is the baseline
 yield_range = [0.76] + yield_range.tolist()
-limits = [[], []]
+limits = [{}, {}]
 
-R302 = system.R302
-lactic_acid = system.lactic_acid
-lactic_sys = system.lactic_sys
-lactic_tea = system.lactic_tea
+R301 = system_diluted.R301
+R302 = system_diluted.R302
+R401 = system_diluted.R401
+S402 = system_diluted.S402
+
+lactic_acid = system_diluted.lactic_acid
+lactic_sys = system_diluted.lactic_sys
+lactic_tea = system_diluted.lactic_tea
 
 def solve_TEA():
     lactic_acid.price = 0
     for i in range(3):
-        MPSP = lactic_acid.price = system.lactic_tea.solve_price(lactic_acid)
+        MPSP = lactic_acid.price = lactic_tea.solve_price(lactic_acid)
     return MPSP
 
 def update_productivity(productivity):
@@ -95,33 +92,58 @@ def update_productivity(productivity):
 # =============================================================================
 
 bst.speed_up()
-R301.set_titer_limit = True
 R301.neutralization = True
+R301.allow_concentration = False
 R401.bypass = False
 S402.bypass = False
 
 run_number = 0
-actuals_regular = [[], []]
+lactic_regular = [[], []]
 MPSPs_regular = [[], [], []]
 NPVs_regular = [[], [], []]
 LCA_regular = [[], []]
 
 print('\n---------- Regular Strain ----------')
-for i in titer_range:
-    for j in yield_range:
-        limits[0].append(i)
-        limits[1].append(j)
+# First determine the maximum achievable titer at a given yield
+R301.allow_dilution = False
+for i in yield_range:
+    R301.yield_limit = i
+    set_yield(i, R301, R302)
+    lactic_sys.simulate()
+    limits[0][i] = R301.effluent_titer
+    lactic_regular[0].append(R301.cofermentation_rxns.X[0])
+    lactic_regular[1].append(R301.effluent_titer)
+    LCA_regular[0].append(system_diluted.get_GWP())
+    LCA_regular[1].append(system_diluted.get_FEC())
+    
+    update_productivity(0.89)
+    MPSPs_regular[0].append(solve_TEA())
+    NPVs_regular[0].append(lactic_tea.NPV)
+    # Alternative productivities, productivity only affects reactor sizing
+    # thus no need to simulate the system again
+    update_productivity(0.18)
+    MPSPs_regular[1].append(solve_TEA())
+    NPVs_regular[1].append(lactic_tea.NPV) 
+    update_productivity(1.92)
+    MPSPs_regular[2].append(solve_TEA())
+    NPVs_regular[2].append(lactic_tea.NPV)
+    run_number += 1
+    print(f'Run #{run_number}: {timer.elapsed_time:.0f} sec')
+
+# Dilute the saccharified stream to achieve lower titers
+R301.allow_dilution = True
+for i in yield_range:
+    titer_range = np.arange(40, limits[0][i], 1)
+    for j in titer_range:
+        R301.yield_limit = i
+        R301.titer_limit = j
         # Baseline productivity
-        R301.titer_limit = i
-        R301.yield_limit = j
-        set_yield(j, R301, R302)
-        # for m in range(2):
-        #     lactic_sys.simulate()
+        set_yield(i, R301, R302)
         lactic_sys.simulate()
-        actuals_regular[1].append(R301.cofermentation_rxns.X[0])
-        actuals_regular[0].append(R301.effluent_titer)
-        LCA_regular[0].append(system.get_functional_GWP())
-        LCA_regular[1].append(system.get_functional_H2O())
+        lactic_regular[0].append(R301.cofermentation_rxns.X[0])
+        lactic_regular[1].append(R301.effluent_titer)
+        LCA_regular[0].append(system_diluted.get_GWP())
+        LCA_regular[1].append(system_diluted.get_FEC())
         
         update_productivity(0.89)
         MPSPs_regular[0].append(solve_TEA())
@@ -138,10 +160,8 @@ for i in titer_range:
         print(f'Run #{run_number}: {timer.elapsed_time:.0f} sec')
 
 regular_data = pd.DataFrame({
-    ('Limit', 'Yield [g/g]'): limits[1],
-    ('Limit', 'Titer [g/L]'): limits[0],
-    ('Actual', 'Yield [g/L]'): actuals_regular[1],
-    ('Actual', 'Titer [g/g]'): actuals_regular[0],
+    ('Lactic', 'Yield [g/g]'): lactic_regular[0],
+    ('Lactic', 'Titer [g/L]'): lactic_regular[1],
     ('Productivity=0.89 [g/L/hr] (baseline)', 'MPSP [$/kg]'):
         MPSPs_regular[0],
     ('Productivity=0.89 [g/L/hr] (baseline)', 'NPV [$]'):
@@ -155,7 +175,7 @@ regular_data = pd.DataFrame({
     ('Productivity=1.92 [g/L/hr] (max)', 'NPV [$]'):
         NPVs_regular[2],
     ('LCA', 'GWP [kg CO2-eq/kg]'): LCA_regular[0],
-    ('LCA', 'Freshwater [kg H2O/kg]'): LCA_regular[1]
+    ('LCA', 'FEC [MJ/kg]'): LCA_regular[1]
     })
 
 
@@ -166,73 +186,99 @@ regular_data = pd.DataFrame({
 # =============================================================================
 
 bst.speed_up()
-R301.set_titer_limit = True
 R301.neutralization = False
+R301.allow_concentration = False
 R401.bypass = True
 S402.bypass = True
 
-actuals_acid_resistant = [[], []]
-MPSPs_acid_resistant = [[], [], []]
-NPVs_acid_resistant = [[], [], []]
-LCA_acid_resistant = [[], []]
+lactic_resistant = [[], []]
+MPSPs_resistant = [[], [], []]
+NPVs_resistant = [[], [], []]
+LCA_resistant = [[], []]
 
 print('\n---------- Acid-resistant Strain ----------')
-for i in titer_range:
-    for j in yield_range:
+# First determine the maximum achievable titer at a given yield
+R301.allow_dilution = False
+for i in yield_range:
+    R301.yield_limit = i
+    set_yield(i, R301, R302)
+    lactic_sys.simulate()
+    limits[1][i] = R301.effluent_titer
+    lactic_resistant[0].append(R301.cofermentation_rxns.X[0])
+    lactic_resistant[1].append(R301.effluent_titer)
+    LCA_resistant[0].append(system_diluted.get_GWP())
+    LCA_resistant[1].append(system_diluted.get_FEC())
+    
+    update_productivity(0.89)
+    MPSPs_resistant[0].append(solve_TEA())
+    NPVs_resistant[0].append(lactic_tea.NPV)
+    # Alternative productivities, productivity only affects reactor sizing
+    # thus no need to simulate the system again
+    update_productivity(0.18)
+    MPSPs_resistant[1].append(solve_TEA())
+    NPVs_resistant[1].append(lactic_tea.NPV) 
+    update_productivity(1.92)
+    MPSPs_resistant[2].append(solve_TEA())
+    NPVs_resistant[2].append(lactic_tea.NPV)
+    run_number += 1
+    print(f'Run #{run_number}: {timer.elapsed_time:.0f} sec')
+
+# Only simulate for achievable titers
+R301.allow_dilution = True
+for i in yield_range:
+    titer_range = np.arange(40, limits[1][i], 1)
+    for j in titer_range:        
+        R301.yield_limit = i
+        R301.titer_limit = j
         # Baseline productivity
-        R301.titer_limit = i
-        R301.yield_limit = j
-        set_yield(j, R301, R302)
-        # for m in range(2):
-        #     lactic_sys.simulate()
+        set_yield(i, R301, R302)
+        # lactic_sys.simulate()
         lactic_sys.simulate()
-        actuals_acid_resistant[1].append(R301.cofermentation_rxns.X[0])
-        actuals_acid_resistant[0].append(R301.effluent_titer)
-        LCA_acid_resistant[0].append(system.get_functional_GWP())
-        LCA_acid_resistant[1].append(system.get_functional_H2O())
+        lactic_resistant[0].append(R301.cofermentation_rxns.X[0])
+        lactic_resistant[1].append(R301.effluent_titer)
+        LCA_resistant[0].append(system_diluted.get_GWP())
+        LCA_resistant[1].append(system_diluted.get_FEC())
         
         update_productivity(0.89)
-        MPSPs_acid_resistant[0].append(solve_TEA())
-        NPVs_acid_resistant[0].append(lactic_tea.NPV)
+        MPSPs_resistant[0].append(solve_TEA())
+        NPVs_resistant[0].append(lactic_tea.NPV)
         # Alternative productivities, productivity only affects reactor sizing
         # thus no need to simulate the system again
         update_productivity(0.18)
-        MPSPs_acid_resistant[1].append(solve_TEA())
-        NPVs_acid_resistant[1].append(lactic_tea.NPV) 
+        MPSPs_resistant[1].append(solve_TEA())
+        NPVs_resistant[1].append(lactic_tea.NPV) 
         update_productivity(1.92)
-        MPSPs_acid_resistant[2].append(solve_TEA())
-        NPVs_acid_resistant[2].append(lactic_tea.NPV)
+        MPSPs_resistant[2].append(solve_TEA())
+        NPVs_resistant[2].append(lactic_tea.NPV)
         run_number += 1
         print(f'Run #{run_number}: {timer.elapsed_time:.0f} sec')
 
-acid_resistent_data = pd.DataFrame({
-    ('Limit', 'Yield [g/g]'): limits[1],
-    ('Limit', 'Titer [g/L]'): limits[0],
-    ('Actual', 'Yield [g/L]'): actuals_acid_resistant[1],
-    ('Actual', 'Titer [g/g]'): actuals_acid_resistant[0],
+acid_resistant_data = pd.DataFrame({
+    ('Lactic', 'Yield [g/g]'): lactic_resistant[0],
+    ('Lactic', 'Titer [g/L]'): lactic_resistant[1],
     ('Productivity=0.89 [g/L/hr] (baseline)', 'MPSP [$/kg]'):
-        MPSPs_acid_resistant[0],
+        MPSPs_resistant[0],
     ('Productivity=0.89 [g/L/hr] (baseline)', 'NPV [$]'):
-        NPVs_acid_resistant[0],
+        NPVs_resistant[0],
     ('Productivity=0.18 [g/L/hr] (min)', 'MPSP [$/kg]'):
-        MPSPs_acid_resistant[1],
+        MPSPs_resistant[1],
     ('Productivity=0.18 [g/L/hr] (min)', 'NPV [$]'):
-        NPVs_acid_resistant[1],
+        NPVs_resistant[1],
     ('Productivity=1.92 [g/L/hr] (max)', 'MPSP [$/kg]'):
-        MPSPs_acid_resistant[2],
+        MPSPs_resistant[2],
     ('Productivity=1.92 [g/L/hr] (max)', 'NPV [$]'):
-        NPVs_acid_resistant[2],
-    ('LCA', 'GWP [kg CO2-eq/kg]'): LCA_acid_resistant[0],
-    ('LCA', 'Freshwater [kg H2O/kg]'): LCA_acid_resistant[1]
+        NPVs_resistant[2],
+    ('LCA', 'GWP [kg CO2-eq/kg]'): LCA_resistant[0],
+    ('LCA', 'FEC [MJ/kg]'): LCA_resistant[1]
     })
 
     
 # %%
 
 '''Output to Excel'''
-with pd.ExcelWriter('2_fermentation.xlsx') as writer:
+with pd.ExcelWriter('3-1_fermentation_diluted.xlsx') as writer:
     regular_data.to_excel(writer, sheet_name='Regular')
-    acid_resistent_data.to_excel(writer, sheet_name='Acid-resistant')
+    acid_resistant_data.to_excel(writer, sheet_name='Acid-resistant')
 
 time = timer.elapsed_time / 60
 print(f'\nSimulation time for {run_number} runs is: {time:.1f} min')

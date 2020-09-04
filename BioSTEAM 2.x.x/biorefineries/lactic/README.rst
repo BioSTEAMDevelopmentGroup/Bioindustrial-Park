@@ -37,6 +37,8 @@ The system, TEA, and flowsheet are lactic_sys, lactic_tea, and lactic.
 
 Naming conventions:
     D = Distillation column
+
+    E = Evaporator
     
     F = Flash tank
 

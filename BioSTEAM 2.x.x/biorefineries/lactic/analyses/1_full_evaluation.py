@@ -40,8 +40,7 @@ import pandas as pd
 import biosteam as bst
 from biosteam.utils import TicToc
 from biosteam.plots import plot_montecarlo_across_coordinate
-from lactic.system import R301, lactic_sys, simulate_get_MPSP, get_functional_GWP, \
-    get_functional_H2O
+from lactic.system import R301, lactic_sys, simulate_get_MPSP, get_GWP, get_FEC
 from lactic.analyses import models
 
 percentiles = [0, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 1]
@@ -101,8 +100,9 @@ LCA_results = \
 LCA_percentiles = LCA_results.quantile(q=percentiles)
 
 # Spearman's rank correlation
-spearman_metrics = model.metrics[0:3] + model.metrics[6:9] + \
+spearman_metrics = model.metrics[0:2] + model.metrics[6:8] + \
     model.metrics[models.index_IRR:models.index_IRR+2]
+    
 spearman_parameters = parameters
 spearman_results = model.spearman(spearman_parameters, spearman_metrics)
 spearman_results.columns = pd.Index([i.name_with_units for i in spearman_metrics])
@@ -131,7 +131,7 @@ run_number = samples.shape[0]
 p_values = [[], [], []]
 MPSPs = [[], [], []]
 GWPs = [[], [], []]
-freshwater = [[], [], []]
+FECs = [[], [], []]
 
 bst.speed_up()
 for p in parameters:
@@ -144,8 +144,8 @@ for p in parameters:
         p_values[i].append(p_value[i])
         MPSP = simulate_get_MPSP()
         MPSPs[i].append(MPSP)
-        GWPs[i].append(get_functional_GWP())
-        freshwater[i].append(get_functional_H2O())
+        GWPs[i].append(get_GWP())
+        FECs[i].append(get_FEC())
         run_number += 1
 
 MPSP_baseline = np.asarray(MPSPs[2])
@@ -156,30 +156,30 @@ GWP_baseline = np.asarray(GWPs[2])
 GWP_min_diff = np.asarray(GWPs[0]) - GWP_baseline
 GWP_max_diff = np.asarray(GWPs[1]) - GWP_baseline
 
-freshwater_baseline = np.asarray(freshwater[2])
-freshwater_min_diff = np.asarray(freshwater[0]) - freshwater_baseline
-freshwater_max_diff = np.asarray(freshwater[1]) - freshwater_baseline
+FEC_baseline = np.asarray(FECs[2])
+FEC_min_diff = np.asarray(FECs[0]) - FEC_baseline
+FEC_max_diff = np.asarray(FECs[1]) - FEC_baseline
 
 one_p_df = pd.DataFrame({
     ('Parameter', 'Name'): [i.name_with_units for i in parameters],
     ('Parameter', 'Baseline'): p_values[2],
     ('Parameter', 'Min'): p_values[0],
     ('Parameter', 'Max'): p_values[1],
-    ('MPSP [$/kg]', 'Baseline'): MPSP_baseline,
-    ('MPSP [$/kg]', 'Min'): MPSPs[0],
-    ('MPSP [$/kg]', 'Min diff'): MPSP_min_diff,
-    ('MPSP [$/kg]', 'Max'): MPSPs[1],
-    ('MPSP [$/kg]', 'Max diff'): MPSP_max_diff,
-    ('GWP [kg CO2-eq/kg]', 'Baseline'): GWP_baseline,
-    ('GWP [kg CO2-eq/kg]', 'Min'): GWPs[0],
-    ('GWP [kg CO2-eq/kg]', 'Min diff'): GWP_min_diff,
-    ('GWP [kg CO2-eq/kg]', 'Max'): GWPs[1],
-    ('GWP [kg CO2-eq/kg]', 'Max diff'): GWP_max_diff,
-    ('Freshwater [kg H2O/kg]', 'Baseline'): freshwater_baseline,
-    ('Freshwater [kg H2O/kg]', 'Min'): freshwater[0],
-    ('Freshwater [kg H2O/kg]', 'Min diff'): freshwater_min_diff,
-    ('Freshwater [kg H2O/kg]', 'Max'): freshwater[1],
-    ('Freshwater [kg H2O/kg]', 'Max diff'): freshwater_max_diff,
+    ('MPSP [$/kg]', 'MPSP baseline'): MPSP_baseline,
+    ('MPSP [$/kg]', 'MPSP min'): MPSPs[0],
+    ('MPSP [$/kg]', 'MPSP min diff'): MPSP_min_diff,
+    ('MPSP [$/kg]', 'MPSP max'): MPSPs[1],
+    ('MPSP [$/kg]', 'MPSP max diff'): MPSP_max_diff,
+    ('GWP [kg CO2-eq/kg]', 'GWP baseline'): GWP_baseline,
+    ('GWP [kg CO2-eq/kg]', 'GWP min'): GWPs[0],
+    ('GWP [kg CO2-eq/kg]', 'GWP min diff'): GWP_min_diff,
+    ('GWP [kg CO2-eq/kg]', 'GWP max'): GWPs[1],
+    ('GWP [kg CO2-eq/kg]', 'GWP max diff'): GWP_max_diff,
+    ('FEC [MJ/kg]', 'FEC baseline'): FEC_baseline,
+    ('FEC [MJ/kg]', 'FEC min'): FECs[0],
+    ('FEC [MJ/kg]', 'FEC min diff'): FEC_min_diff,
+    ('FEC [MJ/kg]', 'FEC max'): FECs[1],
+    ('FEC [MJ/kg]', 'FEC max diff'): FEC_max_diff,
     })
 
 time = timer.elapsed_time / 60

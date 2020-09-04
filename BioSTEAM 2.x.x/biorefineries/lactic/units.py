@@ -50,11 +50,14 @@ TODO:
 
 import numpy as np
 import thermosteam as tmo
-from math import exp
+from math import exp, pi, ceil
 from flexsolve import aitken_secant
 from biosteam import Unit
+from biosteam.exceptions import DesignError
 from biosteam.units import Flash, HXutility, Mixer, MixTank, Pump, \
     SolidsSeparator, StorageTank
+from biosteam.units.design_tools import PressureVessel
+from biosteam.units.design_tools import pressure_vessel_material_factors as factors
 from biosteam.units.decorators import cost
 from thermosteam import separations
 from lactic.process_settings import price
@@ -66,6 +69,7 @@ _kg_per_ton = 907.18474
 _MGD_2_m3hr = (3.78541*1e6/24) / 1e3
 _GPM_2_m3hr = (3.78541*60) / 1e3
 _Gcal_2_kJ = 4.184 * 1e6 # (also MMkcal/hr)
+_316_over_304 = factors['Stainless steel 316'] / factors['Stainless steel 304']
 Rxn = tmo.reaction.Reaction
 ParallelRxn = tmo.reaction.ParallelReaction
 
@@ -81,9 +85,23 @@ ParallelRxn = tmo.reaction.ParallelReaction
 @cost(basis='Flow rate', ID='System', units='kg/hr',
       kW=511.3205, cost=13329690, S=94697, CE=CEPCI[2009], n=0.6, BM=1.7)
 class FeedstockPreprocessing(Unit):
+    _N_outs = 2
     # 2205 U.S. ton/day (2000 metric tonne/day) as in ref [1]
     _baseline_flow_rate = baseline_feedflow.sum()
     _cached_flow_rate = 2205
+
+    def __init__(self, ID='', ins=None, outs=(), diversion_to_CHP=0):
+        Unit.__init__(self, ID, ins, outs)
+        self.diversion_to_CHP = diversion_to_CHP
+
+    def _run(self):
+        total = self.ins[0]
+        processed, burned = self.outs
+        burned.mass = self.diversion_to_CHP * total.mass
+        processed.mass = total.mass - burned.mass
+            
+    def _design(self):
+        self.design_results['Flow rate'] = self.outs[0].F_mass
 
 
 # %% 
@@ -353,15 +371,18 @@ class EnzymeHydrolysateMixer(Mixer):
 @cost(basis='Slurry flow rate', ID='Saccharification transfer pump', units='kg/hr',
       kW=74.57, cost=47200, S=421776, CE=CEPCI[2009], n=0.8, BM=2.3)
 @cost(basis='Fermenter size', ID='Fermenter', units='kg',
-      cost=10128000, S=(42607+443391+948+116)*(60+36), CE=CEPCI[2009], n=1, BM=1.5)
+      cost=10128000, S=(42607+443391+948+116)*(60+36),
+      CE=CEPCI[2009], n=1, BM=1.5)
 @cost(basis='Fermenter size', ID='Agitator', units='kg',
       # Scaling basis based on sum of all streams into fermenter
       # (304, 306, 311, and 312 in ref [3])
-      # and total residence time (batch hydrolysis and fermentation)
-      kW=268.452, cost=630000, S=(42607+443391+948+116)*(60+36), CE=CEPCI[2009], n=1, BM=1.5)
+      # and total residence time (batch hydrolysis and fermentation),
+      kW=268.452, cost=630000, S=(42607+443391+948+116)*(60+36),
+      CE=CEPCI[2009], n=1, BM=1.5)
 @cost(basis='Recirculation flow rate', ID='Recirculation pump', units='kg/hr',
       # Scaling basis based on sum of all streams into fermenter
       # (304, 306, 311, and 312 in ref [3])
+      # Pumps already in SS316
       kW=74.57, cost=47200, S=(42607+443391+948+116), CE=CEPCI[2009], n=0.8, BM=2.3)
 # The HydrolysateCooler in ref [3]
 @cost(basis='Duty', ID='Hydrolysate cooler', units='kJ/hr',
@@ -395,7 +416,7 @@ class SaccharificationAndCoFermentation(Unit):
     tau_turnaround = 12 # in hr, the same as the seed train in ref [3]
     
     def __init__(self, ID='', ins=None, outs=(), T=50+273.15,
-                 neutralization=True, set_titer_limit=False):
+                 neutralization=True, set_titer_limit=True):
         Unit.__init__(self, ID, ins, outs)
         # Same T for saccharificatoin and co-fermentation
         self.T = T
@@ -488,146 +509,53 @@ class SaccharificationAndCoFermentation(Unit):
         mixture.mix_from(self.ins[0:3])
         Design['Duty'] = self.saccharified_stream.H  - mixture.H
         hu_cooling(duty=Design['Duty'], T_in=mixture.T)
-        
+    
+    def _cost(self):
+        super()._cost()
+        self._decorated_cost()
+        # Adjust fermenter cost for acid-resistant scenario
+        if not self.neutralization:
+            self.purchase_costs['Fermenter'] *= _316_over_304
+            self.purchase_costs['Agitator'] *= _316_over_304
 
-# Seed train, 5 stages, 2 trains
-# assumes no need for pH control due to low acid concentration
-@cost(basis='Seed fermenter size', ID='Stage #1 fermenter', units='kg',
-      # 44339, 211, and 26 are streams 303, 309, and 310 in ref [3]
-      cost=75400, S=(44339+211+26)*36, CE=CEPCI[2009], n=0.7, BM=1.8)
-@cost(basis='Seed fermenter size', ID='Stage #2 fermenter', units='kg',
-      cost=116600, S=(44339+211+26)*36, CE=CEPCI[2009], n=0.7, BM=1.8)
-@cost(basis='Seed fermenter size', ID='Stage #3 fermenter', units='kg',
-      cost=157600, S=(44339+211+26)*36, CE=CEPCI[2009], n=0.7, BM=1.8)
-@cost(basis='Seed fermenter size', ID='Stage #4 fermenter', units='kg',
-      cost=352000, S=(44339+211+26)*36, CE=CEPCI[2009], n=0.7, BM=2)
-@cost(basis='Seed fermenter size', ID='Stage #4 agitator', units='kg',
-      kW=11.1855, cost=26000, S=(44339+211+26)*36, CE=CEPCI[2009], n=0.5, BM=1.5)
-@cost(basis='Seed fermenter size', ID='Stage #5 fermenter', units='kg',
-      cost=1180000, S=(44339+211+26)*36, CE=CEPCI[2009], n=0.7, BM=2)
-@cost(basis='Seed fermenter size', ID='Stage #5 agitator', units='kg',
-      kW=14.914, cost=43000, S=(44339+211+26)*36, CE=CEPCI[2009], n=0.5, BM=1.5)
-@cost(basis='Flow rate', ID='Seed train pump', units='kg/hr',
-      kW=59.656, cost=24300, S=43149, CE=CEPCI[2009], n=0.8, BM=2.3)
-class SeedTrain(Unit):
+# Saccharification and co-fermentation (both glucose & xylose are used in fermentation)
+# Not including heat exchanger as saccharificatoin and co-fermentation 
+# are at the same temperature now
+@cost(basis='Saccharification tank size', ID='Saccharification tank', units='kg',
+      cost=3840000, S=421776*24, CE=CEPCI[2009], n=0.7, BM=2)
+@cost(basis='Slurry flow rate', ID='Saccharification transfer pump', units='kg/hr',
+      kW=74.57, cost=47200, S=421776, CE=CEPCI[2009], n=0.8, BM=2.3)
+class Saccharification(Unit):
     _N_ins = 1
     _N_outs = 1
-    _units= {'Seed fermenter size': 'kg',
-             'Flow rate': 'kg/hr'}
+    _units= {'Saccharification tank size': 'kg',
+             'Slurry flow rate': 'kg/hr'}
     
-    tau_turnaround = 12 # in hr, the same as ref [3]
-    
-    effluent_titer = 0
-    
-    productivity = 0.89*0.95 # in g/L/hr
-    
-    # Yield as a ratio of the yield in the main fermenter
-    ferm_ratio = 0.95
+    tau_saccharification = 24 # in hr
     
     def __init__(self, ID='', ins=None, outs=(), T=50+273.15):
         Unit.__init__(self, ID, ins, outs)
         self.T = T
         
-        # FermMicrobe reaction from ref [3]
-        self.cofermentation_rxns = ParallelRxn([
-        #      Reaction definition            Reactant    Conversion
-        Rxn('Glucose -> 2 LacticAcid',        'Glucose',   0.76*0.95),
-        Rxn('Glucose -> 3 AceticAcid',        'Glucose',   0.07*0.95),
-        Rxn('Glucose -> 6 FermMicrobe',       'Glucose',   0.04),
-        Rxn('3 Xylose -> 5 LacticAcid',       'Xylose',    0.76*0.95),
-        Rxn('2 Xylose -> 5 AceticAcid',       'Xylose',    0.07*0.95),
-        Rxn('Xylose -> 5 FermMicrobe',        'Xylose',    0.04)
-        ])
-        self._X = self.cofermentation_rxns.X.copy()
+        self.saccharification_rxns = ParallelRxn([
+            #   Reaction definition                   Reactant        Conversion
+            Rxn('Glucan -> GlucoseOligomer',          'Glucan',         0.04),
+            Rxn('Glucan + 0.5 H2O -> 0.5 Cellobiose', 'Glucan',         0.012),
+            Rxn('Glucan + H2O -> Glucose',            'Glucan',         0.9),
+            Rxn('Cellobiose + H2O -> 2 Glucose',      'Cellobiose',     1)
+            ])
 
     def _run(self):
         feed = self.ins[0]
-        effluent = self.outs[0]
-        effluent.copy_like(feed)
-
-        self.cofermentation_rxns(effluent.mol)
-        self.effluent_titer = compute_lactic_titer(effluent)
+        effluent = self.outs[0]        
+        effluent.copy_like(feed)        
+        self.saccharification_rxns(effluent.mol) 
         
-        # Assume all CSL is consumed
-        effluent.imass['CSL'] = 0 
-        effluent.T = self.T
-
     def _design(self):
         Design = self.design_results
-        Design['Flow rate'] = self.outs[0].F_mass
-        tau_total = self.tau_turnaround + self.effluent_titer/self.productivity
-        Design['Seed fermenter size'] = self.outs[0].F_mass * tau_total
+        Design['Saccharification tank size'] = self.F_mass_in * self.tau_saccharification
+        Design['Slurry flow rate'] = self.F_mass_in
 
-# Seed hold tank
-@cost(basis='Flow rate', ID='Tank', units='kg/hr',
-      cost=439000, S=40414, CE=CEPCI[2009], n=0.7, BM=1.8)
-@cost(basis='Flow rate', ID='Agitator', units='kg/hr',
-      kW=11.1855, cost=31800, S=40414, CE=CEPCI[2009], n=0.5, BM=1.5)
-@cost(basis='Flow rate', ID='Pump', units='kg/hr',
-      kW=7.457, cost=8200, S=43149, CE=CEPCI[2009], n=0.8, BM=2.3)
-class SeedHoldTank(Unit): pass
-
-
-# %% 
-
-# =============================================================================
-# Separation
-# =============================================================================
-
-# Filter to separate fermentation broth into products liquid and solid
-@cost(basis='Solids flow rate', ID='Feed tank', units='kg/hr',
-      cost=174800, S=31815, CE=CEPCI[2010], n=0.7, BM=2.0)
-@cost(basis='Solids flow rate', ID='Feed pump', units='kg/hr',
-      kW=74.57, cost=18173, S=31815, CE=CEPCI[2010], n=0.8, BM=2.3)
-@cost(basis='Pressing air flow rate', ID='Filter pressing compressor', units='kg/hr',
-      kW=111.855, cost=75200, S=808, CE=CEPCI[2009], n=0.6, BM=1.6)
-@cost(basis='Solids flow rate', ID='Pressing air compressor reciever', units='kg/hr',
-      cost=8000, S=31815, CE=CEPCI[2010], n=0.7, BM=3.1)
-@cost(basis='Drying air flow rate', ID='Filter drying compressor', units='kg/hr',
-      kW=1043.98, cost=405000, S=12233, CE=CEPCI[2009], n=0.6, BM=1.6)
-@cost(basis='Solids flow rate', ID='Dry air compressor reciever', units='kg/hr',
-      cost=17000, S=31815, CE=CEPCI[2010], n=0.7, BM=3.1)
-@cost(basis='Solids flow rate', ID='Pressure filter', units='kg/hr',
-      cost=3294700, S=31815, CE=CEPCI[2010], n=0.8, BM=1.7)
-@cost(basis='Solids flow rate', ID='Filtrate discharge pump', units='kg/hr',
-      # Power not specified, based on filtrate tank discharge pump
-      kW=55.9275, cost=13040, S=31815, CE=CEPCI[2010], n=0.8, BM=2.3)
-@cost(basis='Solids flow rate', ID='Filtrate tank', units='kg/hr',
-      cost=103000, S=31815, CE=CEPCI[2010], n=0.7, BM=2.0)
-@cost(basis='Filtrate flow rate', ID='Flitrate tank agitator', units='kg/hr',
-      kW=5.59275, cost=26000,  S=337439, CE=CEPCI[2009], n=0.5, BM=1.5)
-@cost(basis='Solids flow rate', ID='Filtrate tank discharge pump', units='kg/hr',
-      kW=55.9275, cost=13040, S=31815, CE=CEPCI[2010], n=0.8, BM=2.3)
-@cost(basis='Solids flow rate', ID='Cell mass wet cake conveyor', units='kg/hr',
-      kW=7.457, cost=70000, S=28630, CE=CEPCI[2009], n=0.8, BM=1.7)
-@cost(basis='Solids flow rate', ID='Cell mass wet cake screw',  units='kg/hr',
-      kW=11.1855, cost=20000, S=28630, CE=CEPCI[2009], n=0.8, BM=1.7)
-@cost(basis='Solids flow rate', ID='Recycled water tank', units='kg/hr',
-      cost=1520,  S=31815, CE=CEPCI[2010], n=0.7, BM=3.0)
-@cost(basis='Solids flow rate', ID='Manifold flush pump', units='kg/hr',
-      kW=74.57, cost=17057, S=31815, CE=CEPCI[2010], n=0.8, BM=2.3)
-@cost(basis='Solids flow rate', ID='Cloth wash pump', units='kg/hr',
-      kW=111.855,cost=29154, S=31815, CE=CEPCI[2010], n=0.8, BM=2.3)
-class CellMassFilter(SolidsSeparator):
-    _N_ins = 1
-    _units= {'Solids flow rate': 'kg/hr',
-             'Pressing air flow rate': 'kg/hr',
-             'Drying air flow rate': 'kg/hr',
-             'Filtrate flow rate': 'kg/hr'}
-            
-    def _design(self):
-        Design = self.design_results
-        # 809 is the scailng basis of equipment M-505,
-        # 391501 from stream 508 in ref [3]
-        Design['Pressing air flow rate'] = 809/391501 * self.ins[0].F_mass
-        # 12105 and 391501 from streams 559 and 508 in ref [3]
-        Design['Drying air flow rate'] = 12105/391501 * self.ins[0].F_mass
-        Design['Solids flow rate'] = self.outs[0].F_mass
-        Design['Filtrate flow rate'] = self.outs[1].F_mass
-
-from math import pi, ceil
-from biosteam.units.design_tools import PressureVessel
-from biosteam.exceptions import DesignError
 class Reactor(Unit, PressureVessel, isabstract=True):
     '''    
     Create an abstract class for reactor unit, purchase cost of the reactor
@@ -749,6 +677,312 @@ class Reactor(Unit, PressureVessel, isabstract=True):
             return self.BM_horizontal 
         else:
             raise RuntimeError('Invalid vessel type')
+
+
+@cost(basis='Fermenter size', ID='Fermenter', units='kg',
+      cost=10128000, S=(42607+443391+948+116)*(60+36),
+      CE=CEPCI[2009], n=1, BM=1.5)
+@cost(basis='Fermenter size', ID='Agitator', units='kg',
+      # Scaling basis based on sum of all streams into fermenter
+      # (304, 306, 311, and 312 in ref [3])
+      # and total residence time (batch hydrolysis and fermentation)
+      kW=268.452, cost=630000, S=(42607+443391+948+116)*(60+36),
+      CE=CEPCI[2009], n=1, BM=1.5)
+@cost(basis='Recirculation flow rate', ID='Recirculation pump', units='kg/hr',
+      # Scaling basis based on sum of all streams into fermenter
+      # (304, 306, 311, and 312 in ref [3])
+      kW=74.57, cost=47200, S=(42607+443391+948+116), CE=CEPCI[2009], n=0.8, BM=2.3)
+class CoFermentation(Reactor):
+    _N_ins = 5
+    _N_outs = 2
+    _units= {**Reactor._units,
+            'Fermenter size': 'kg',
+            'Recirculation flow rate': 'kg/hr',
+            'Duty': 'kJ/hr'}
+    _BM = {**Reactor._BM,
+           'Heat exchangers': 3.17}
+
+    auxiliary_unit_names = ('heat_exchanger',)
+    
+    # Equals the split of saccharified slurry to seed train
+    inoculum_ratio = 0.07
+    
+    CSL_loading = 10 # g/L (kg/m3)
+    
+    titer_limit = 130 # in g/L (kg/m3), the maximum titer in collected data
+    
+    effluent_titer = 0
+    
+    productivity = 0.89 # in g/L/hr
+    
+    yield_limit = 0.76 # in g/g-sugar
+    
+    tau_batch_turnaround = 12 # in hr, the same as the seed train in ref [3]
+
+    def __init__(self, ID='', ins=None, outs=(), thermo=None, *, T=50+273.15,
+                 P=101325, V_wf=0.8, length_to_diameter=2,
+                 kW_per_m3=0.985, wall_thickness_factor=1,
+                 vessel_material='Stainless steel 304',
+                 vessel_type='Vertical',
+                 neutralization=True,
+                 mode='Batch', # Batch or Continuous
+                 allow_dilution=False,
+                 allow_concentration=False):
+        
+        Unit.__init__(self, ID, ins, outs)
+        self.T = T
+        self.P = P
+        self.V_wf = V_wf
+        self.length_to_diameter = length_to_diameter
+        self.kW_per_m3 = kW_per_m3
+        self.wall_thickness_factor = wall_thickness_factor
+        self.vessel_material = vessel_material
+        self.vessel_type = vessel_type
+        self.neutralization = neutralization
+        self.mode = mode        
+        self.allow_dilution = allow_dilution
+        self.allow_concentration = allow_concentration
+        self.mixed_feed = tmo.Stream('mixed_feed')
+        self.heat_exchanger = hx = HXutility(None, None, None, T=T) 
+        self.heat_utilities = hx.heat_utilities
+        
+        # FermMicrobe reaction from ref [3]
+        self.cofermentation_rxns = ParallelRxn([
+        #      Reaction definition            Reactant    Conversion
+        Rxn('Glucose -> 2 LacticAcid',        'Glucose',   0.76),
+        Rxn('Glucose -> 3 AceticAcid',        'Glucose',   0.07),
+        Rxn('Glucose -> 6 FermMicrobe',       'Glucose',   0.02),
+        Rxn('3 Xylose -> 5 LacticAcid',       'Xylose',    0.76),
+        Rxn('2 Xylose -> 5 AceticAcid',       'Xylose',    0.07),
+        Rxn('Xylose -> 5 FermMicrobe',        'Xylose',    0.02)
+        ])
+        self._X = self.cofermentation_rxns.X.copy()
+        
+        # Neutralization of lactic acid and acetic acid by lime (Ca(OH)2)
+        self.neutralization_rxns = ParallelRxn([
+        #   Reaction definition                                               Reactant  Conversion
+        Rxn('2 LacticAcid + CalciumDihydroxide -> CalciumLactate + 2 H2O',  'LacticAcid',   1),
+        Rxn('2 AceticAcid + CalciumDihydroxide -> CalciumAcetate + 2 H2O',  'AceticAcid',   1),
+        Rxn('SuccinicAcid + CalciumDihydroxide -> CalciumSuccinate + 2H2O', 'SuccinicAcid', 1)
+            ])
+
+    def _run(self):
+        feed, inoculum, CSL, water, lime = self.ins
+        effluent, sidedraw = self.outs
+        mixed_feed = self.mixed_feed
+        
+        CSL.imass['CSL'] = feed.F_vol * self.CSL_loading
+        mixed_feed.mix_from([feed, inoculum, CSL, water])
+        mixed_feed.T = sidedraw.T = effluent.T = self.T
+        
+        # Sidedraw to SeedTrain
+        sidedraw.mol = mixed_feed.mol * self.inoculum_ratio
+        effluent.mol = mixed_feed.mol - sidedraw.mol
+        
+        self.cofermentation_rxns(effluent.mol)
+        # Assume all CSL is consumed
+        effluent.imass['CSL'] = 0
+        
+        # Need lime to neutralize produced acid
+        if self.neutralization:
+            self.vessel_material= 'Stainless steel 304'
+            # Set feed lime mol to match rate of acids production, add 10% extra
+            lime.imol['Lime'] = (effluent.imol['LacticAcid']/2/self.neutralization_rxns.X[0] \
+                                +effluent.imol['AceticAcid']/2/self.neutralization_rxns.X[1] \
+                                +effluent.imol['SuccinicAcid']/self.neutralization_rxns.X[2]) \
+                                * 1.1
+            effluent.mix_from([effluent, lime])
+            self.neutralization_rxns.adiabatic_reaction(effluent)
+        else:
+            self.vessel_material= 'Stainless steel 316'
+            lime.empty()
+        self.effluent_titer = compute_lactic_titer(effluent)
+        
+    def _design(self):
+        mode = self.mode
+        Design = self.design_results
+        Design.clear()
+        self.tau = self.effluent_titer / self.productivity
+        _mixture = self._mixture = tmo.Stream(None)
+        _mixture.mix_from(self.ins[0:4])
+        duty = Design['Duty'] = self.mixed_feed.H - _mixture.H
+
+        if mode == 'Batch':
+            tau_cofermentation = self.tau_batch_turnaround + self.tau
+            Design['Fermenter size'] = self.outs[0].F_mass * tau_cofermentation
+            Design['Recirculation flow rate'] = self.F_mass_in
+            self.heat_exchanger.simulate_as_auxiliary_exchanger(duty, _mixture)
+        
+        elif mode == 'Continuous':
+            Reactor._design(self)
+
+        else:
+            raise DesignError(f'Fermentation mode must be either Batch or Continuous, not {mode}')
+
+    def _cost(self):
+        Design = self.design_results
+        purchase_costs = self.purchase_costs
+        purchase_costs.clear()
+        hx = self.heat_exchanger
+
+        if self.mode == 'Batch':
+            Unit._cost()
+            self._decorated_cost()
+            purchase_costs['Heat exchangers'] = hx.purchase_cost
+            # Adjust fermenter cost for acid-resistant scenario
+            if not self.neutralization:
+                purchase_costs['Fermenter'] *= _316_over_304
+                purchase_costs['Agitator'] *= _316_over_304
+
+        elif self.mode == 'Continuous':
+            if not self.neutralization:
+                self.vessel_material= 'Stainless steel 316'
+            Reactor._cost(self)
+            
+            N = Design['Number of reactors']
+            single_rx_effluent = self._mixture.copy()
+            single_rx_effluent.mol[:] /= N
+            hx.simulate_as_auxiliary_exchanger(duty=Design['Duty']/N, 
+                                               stream=single_rx_effluent)
+            hu_total = self.heat_utilities[0]
+            hu_single_rx = hx.heat_utilities[0]
+            hu_total.copy_like(hu_single_rx)
+            hu_total.scale(N)
+
+# Seed train, 5 stages, 2 trains
+@cost(basis='Seed fermenter size', ID='Stage #1 fermenter', units='kg',
+      # 44339, 211, and 26 are streams 303, 309, and 310 in ref [3]
+      cost=75400*_316_over_304, S=(44339+211+26)*36, CE=CEPCI[2009], n=0.7, BM=1.8)
+@cost(basis='Seed fermenter size', ID='Stage #2 fermenter', units='kg',
+      cost=116600*_316_over_304, S=(44339+211+26)*36, CE=CEPCI[2009], n=0.7, BM=1.8)
+@cost(basis='Seed fermenter size', ID='Stage #3 fermenter', units='kg',
+      cost=157600*_316_over_304, S=(44339+211+26)*36, CE=CEPCI[2009], n=0.7, BM=1.8)
+@cost(basis='Seed fermenter size', ID='Stage #4 fermenter', units='kg',
+      cost=352000*_316_over_304, S=(44339+211+26)*36, CE=CEPCI[2009], n=0.7, BM=2)
+@cost(basis='Seed fermenter size', ID='Stage #4 agitator', units='kg',
+      kW=11.1855*_316_over_304, cost=26000, S=(44339+211+26)*36, CE=CEPCI[2009], n=0.5, BM=1.5)
+@cost(basis='Seed fermenter size', ID='Stage #5 fermenter', units='kg',
+      cost=1180000*_316_over_304, S=(44339+211+26)*36, CE=CEPCI[2009], n=0.7, BM=2)
+@cost(basis='Seed fermenter size', ID='Stage #5 agitator', units='kg',
+      kW=14.914, cost=43000*_316_over_304, S=(44339+211+26)*36, CE=CEPCI[2009], n=0.5, BM=1.5)
+@cost(basis='Flow rate', ID='Seed train pump', units='kg/hr',
+      kW=59.656, cost=24300, S=43149, CE=CEPCI[2009], n=0.8, BM=2.3)
+class SeedTrain(Unit):
+    _N_ins = 1
+    _N_outs = 1
+    _units= {'Seed fermenter size': 'kg',
+             'Flow rate': 'kg/hr'}
+    
+    tau_turnaround = 12 # in hr, the same as ref [3]
+    
+    effluent_titer = 0
+    
+    productivity = 0.89*0.95 # in g/L/hr
+    
+    # Yield as a ratio of the yield in the main fermenter
+    ferm_ratio = 0.95
+    
+    def __init__(self, ID='', ins=None, outs=(), T=50+273.15):
+        Unit.__init__(self, ID, ins, outs)
+        self.T = T
+        
+        # FermMicrobe reaction from ref [3]
+        self.cofermentation_rxns = ParallelRxn([
+        #      Reaction definition            Reactant    Conversion
+        Rxn('Glucose -> 2 LacticAcid',        'Glucose',   0.76*0.95),
+        Rxn('Glucose -> 3 AceticAcid',        'Glucose',   0.07*0.95),
+        Rxn('Glucose -> 6 FermMicrobe',       'Glucose',   0.04),
+        Rxn('3 Xylose -> 5 LacticAcid',       'Xylose',    0.76*0.95),
+        Rxn('2 Xylose -> 5 AceticAcid',       'Xylose',    0.07*0.95),
+        Rxn('Xylose -> 5 FermMicrobe',        'Xylose',    0.04)
+        ])
+        self._X = self.cofermentation_rxns.X.copy()
+
+    def _run(self):
+        feed = self.ins[0]
+        effluent = self.outs[0]
+        effluent.copy_like(feed)
+
+        self.cofermentation_rxns(effluent.mol)
+        self.effluent_titer = compute_lactic_titer(effluent)
+        
+        # Assume all CSL is consumed
+        effluent.imass['CSL'] = 0 
+        effluent.T = self.T
+
+    def _design(self):
+        Design = self.design_results
+        Design['Flow rate'] = self.outs[0].F_mass
+        tau_total = self.tau_turnaround + self.effluent_titer/self.productivity
+        Design['Seed fermenter size'] = self.outs[0].F_mass * tau_total
+
+
+# Seed hold tank
+@cost(basis='Flow rate', ID='Tank', units='kg/hr',
+      cost=439000, S=40414*_316_over_304, CE=CEPCI[2009], n=0.7, BM=1.8)
+@cost(basis='Flow rate', ID='Agitator', units='kg/hr',
+      kW=11.1855, cost=31800*_316_over_304, S=40414, CE=CEPCI[2009], n=0.5, BM=1.5)
+@cost(basis='Flow rate', ID='Pump', units='kg/hr',
+      kW=7.457, cost=8200, S=43149, CE=CEPCI[2009], n=0.8, BM=2.3)
+class SeedHoldTank(Unit): pass
+
+
+# %% 
+
+# =============================================================================
+# Separation
+# =============================================================================
+
+# Filter to separate fermentation broth into products liquid and solid
+@cost(basis='Solids flow rate', ID='Feed tank', units='kg/hr',
+      cost=174800, S=31815, CE=CEPCI[2010], n=0.7, BM=2.0)
+@cost(basis='Solids flow rate', ID='Feed pump', units='kg/hr',
+      kW=74.57, cost=18173, S=31815, CE=CEPCI[2010], n=0.8, BM=2.3)
+@cost(basis='Pressing air flow rate', ID='Filter pressing compressor', units='kg/hr',
+      kW=111.855, cost=75200, S=808, CE=CEPCI[2009], n=0.6, BM=1.6)
+@cost(basis='Solids flow rate', ID='Pressing air compressor reciever', units='kg/hr',
+      cost=8000, S=31815, CE=CEPCI[2010], n=0.7, BM=3.1)
+@cost(basis='Drying air flow rate', ID='Filter drying compressor', units='kg/hr',
+      kW=1043.98, cost=405000, S=12233, CE=CEPCI[2009], n=0.6, BM=1.6)
+@cost(basis='Solids flow rate', ID='Dry air compressor reciever', units='kg/hr',
+      cost=17000, S=31815, CE=CEPCI[2010], n=0.7, BM=3.1)
+@cost(basis='Solids flow rate', ID='Pressure filter', units='kg/hr',
+      cost=3294700, S=31815, CE=CEPCI[2010], n=0.8, BM=1.7)
+@cost(basis='Solids flow rate', ID='Filtrate discharge pump', units='kg/hr',
+      # Power not specified, based on filtrate tank discharge pump
+      kW=55.9275, cost=13040, S=31815, CE=CEPCI[2010], n=0.8, BM=2.3)
+@cost(basis='Solids flow rate', ID='Filtrate tank', units='kg/hr',
+      cost=103000, S=31815, CE=CEPCI[2010], n=0.7, BM=2.0)
+@cost(basis='Filtrate flow rate', ID='Flitrate tank agitator', units='kg/hr',
+      kW=5.59275, cost=26000,  S=337439, CE=CEPCI[2009], n=0.5, BM=1.5)
+@cost(basis='Solids flow rate', ID='Filtrate tank discharge pump', units='kg/hr',
+      kW=55.9275, cost=13040, S=31815, CE=CEPCI[2010], n=0.8, BM=2.3)
+@cost(basis='Solids flow rate', ID='Cell mass wet cake conveyor', units='kg/hr',
+      kW=7.457, cost=70000, S=28630, CE=CEPCI[2009], n=0.8, BM=1.7)
+@cost(basis='Solids flow rate', ID='Cell mass wet cake screw',  units='kg/hr',
+      kW=11.1855, cost=20000, S=28630, CE=CEPCI[2009], n=0.8, BM=1.7)
+@cost(basis='Solids flow rate', ID='Recycled water tank', units='kg/hr',
+      cost=1520,  S=31815, CE=CEPCI[2010], n=0.7, BM=3.0)
+@cost(basis='Solids flow rate', ID='Manifold flush pump', units='kg/hr',
+      kW=74.57, cost=17057, S=31815, CE=CEPCI[2010], n=0.8, BM=2.3)
+@cost(basis='Solids flow rate', ID='Cloth wash pump', units='kg/hr',
+      kW=111.855,cost=29154, S=31815, CE=CEPCI[2010], n=0.8, BM=2.3)
+class CellMassFilter(SolidsSeparator):
+    _N_ins = 1
+    _units= {'Solids flow rate': 'kg/hr',
+             'Pressing air flow rate': 'kg/hr',
+             'Drying air flow rate': 'kg/hr',
+             'Filtrate flow rate': 'kg/hr'}
+            
+    def _design(self):
+        Design = self.design_results
+        # 809 is the scailng basis of equipment M-505,
+        # 391501 from stream 508 in ref [3]
+        Design['Pressing air flow rate'] = 809/391501 * self.ins[0].F_mass
+        # 12105 and 391501 from streams 559 and 508 in ref [3]
+        Design['Drying air flow rate'] = 12105/391501 * self.ins[0].F_mass
+        Design['Solids flow rate'] = self.outs[0].F_mass
+        Design['Filtrate flow rate'] = self.outs[1].F_mass
 
 class AcidulationReactor(Reactor):
     _N_ins = 2
@@ -1446,9 +1680,13 @@ class SpecialStorage(StorageTank):
 
 # Modified from bst.units.Pump, which won't simulate for empty flow 
 class SpecialPump(Pump):
+    bypass = True
+    
     def _design(self):
-        if self.ins[0].F_mol == 0:
-            Design = self.design_results
+        Design = self.design_results
+        if self.bypass:
+            Design.clear()
+        elif self.ins[0].F_mol == 0:
             Design['Ideal power'] = 0
             Design['Flow rate'] = 0
             Design['Efficiency'] = 0
@@ -1457,14 +1695,18 @@ class SpecialPump(Pump):
             Design['N'] = 0
             Design['Head'] = 0
             Design['Type'] = 'NA'
-        else: Pump._design(self)
+        else:
+            Pump._design(self)
       
     def _cost(self):
-        if self.ins[0].F_mol == 0:
-            Cost = self.purchase_costs
+        Cost = self.purchase_costs
+        if self.bypass:
+            Cost.clear()
+        elif self.ins[0].F_mol == 0:  
             Cost['Pump'] = 0
             Cost['Motor'] = 0
-        else: Pump._cost(self)
+        else:
+            Pump._cost(self)
 
 @cost(basis='Flow rate', ID='Tank', units='kg/hr',
       cost=803000, S=8343, CE=CEPCI[2009], n=0.7, BM=1.7)

@@ -326,9 +326,11 @@ chemical_groups = dict(
 #     if i not in chems.IDs:
 #         print(i)
 
+sugars = ('Glucose', 'Xylose', *chemical_groups['OtherSugars'],
+          *chemical_groups['SugarOligomers'])
+
 soluble_groups = ('OtherSugars', 'SugarOligomers', 'OrganicSolubleSolids',
                   'Furfurals', 'OtherOrganics', 'SeparatelyListedOrganics')
-                  # 'Proteins', 'CellMass',
 soluble_organics = sum([chemical_groups[i] for i in soluble_groups], ())
 
 solubles = (*soluble_organics, *chemical_groups['InorganicSolubleSolids'], 'H2SO4')
@@ -337,9 +339,6 @@ insoluble_groups = ('Proteins', 'CellMass', 'OtherInsolubleSolids',
                     'OtherStructuralCarbohydrates')
 insolubles = sum([chemical_groups[i] for i in insoluble_groups], ('Lignin', 'Acetate'))
 
-# #!!! Might not be needed
-# total_solids = ('Lignin', 'SolubleLignin', 'Glucan', 'Xylan', 'Arabinan', 'Mannan',
-#                 'Galactan', 'Ash', 'Protein')
 
 COD_chemicals = (*soluble_organics, *chemical_groups['OtherStructuralCarbohydrates'],
                 *chemical_groups['CellMass'],  *chemical_groups['Proteins'])

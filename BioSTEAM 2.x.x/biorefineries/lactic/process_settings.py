@@ -34,26 +34,17 @@ References:
     National Renewable Energy Lab (NREL), 2002.
     https://doi.org/10.2172/1218326.
     
-[5] Neupane et al., Life-Cycle Greenhouse Gas and Water Intensity of Cellulosic
-    Biofuel Production Using Cholinium Lysinate Ionic Liquid Pretreatment.
-    ACS Sustainable Chem. Eng. 2017, 5 (11), 10176–10185.
-    https://doi.org/10.1021/acssuschemeng.7b02116.
+[5] Argonne National Laboratory. The Greenhouse gases, Regulated Emissions,
+    and Energy use in Transportation (GREET) Model https://greet.es.anl.gov/
+    (accessed Aug 25, 2020).
 
-[6] Nordahl et al., Life-Cycle Greenhouse Gas Emissions and Human Health
-    Trade-Offs of Organic Waste Management Strategies. Environ. Sci. Technol. 2020.
-    https://doi.org/10.1021/acs.est.0c00364.
-
-[7] Jiménez Rivero et al., Life Cycle Energy and Material Flow Implications
-    of Gypsum Plasterboard Recycling in the European Union.
-    Resources, Conservation and Recycling 2016, 108, 171–181.
-    https://doi.org/10.1016/j.resconrec.2016.01.014.
-
-[8] U.S. Energy Information Administration. U.S. electricity generation by energy source.
-    https://www.eia.gov/tools/faqs/faq.php (accessed Aug 11, 2020).
-
-[9] Roni et al., Herbaceous Feedstock 2018 State of Technology Report;
+[6] Roni et al., Herbaceous Feedstock 2018 State of Technology Report;
     INL/EXT-18-51654-Rev000; Idaho National Lab. (INL), 2020.
     https://doi.org/10.2172/1615147.
+    
+[7] ecoinvent 3.6 https://www.ecoinvent.org/home.html (accessed Aug 26, 2020).
+
+
 
 @author: yalinli_cabbi
 """
@@ -182,7 +173,7 @@ amberlyst_15_price = 153.252 * _chemical_2020to2016
 
 # All in 2016$/kg
 price = {'Feedstock': feedstock_price, 	
-         'H2SO4': 0.0430 * _lb_per_kg,	
+         'H2SO4': 0.0430 * _lb_per_kg,
          # 0.1900 is for NH3	
          'NH4OH': 0.1900 * _lb_per_kg * chems.NH3.MW/chems.NH4OH.MW,
          'CSL': 0.0339 * _lb_per_kg,
@@ -208,80 +199,79 @@ bst.PowerUtility.price = 0.070
 # %%
 
 # =============================================================================
-# Global warming potential (GWP) for life cycle analysis (LCA), all from ref [5] 
-# if not noted
+# Characterization factors (CFs) for life cycle analysis (LCA), all from ref [5] 
+# if not noted, note that it is unclear if in-plant receiving and preprocessing
+# (~50% of the total impact per ref [6]) of feedstock is included in ref [5]
 # =============================================================================
 
-# _CH4_MJ_per_kg = - chems.CH4.HHV/1e6/(chems.CH4.MW/1e3)
+CFs = {}
 
-# In kg CO2-eq/kg
-# GWP_CFs = {
-#     'NH4OH': 1.987 * chems.NH3.MW/chems.NH4OH.MW,
-#     'CSL': 0.1105,
-#     'CH4': 0.00101 * _CH4_MJ_per_kg,
-#     'Enzyme': 0.1128,
-#     # From ref [6], 0.94 kg CO2 and 6e-7 kg N2O per kg of lime
-#     'Lime': 0.94+6e-7*298,
-#     'NaOH': 0.2186,
-#     'H2SO4': 1.36e-5,
-#     'Gypsum': 0
-#     # 'Gypsum': -2.03/1e3 # ref[7]
-#     }
-
-
-_CH4_m3_per_kg = _CH4_V/_CH4_MW * 1e3
-
-# In kg CO2-eq/kg
+# =============================================================================
+# 100-year global warming potential (GWP) in kg CO2-eq/kg
+# =============================================================================
 GWP_CFs = {
-    'NH4OH': 2.0462 * chems.NH3.MW/chems.NH4OH.MW,
-    'CSL': 2.7797, # fodder yeast
-    'CH4': 0.40519 * _CH4_m3_per_kg,
-    'Enzyme': 12.237,
-    'Lime': 0.96303,
-    'NaOH': 1.2909,
-    'H2SO4': 0.13803,
-    'Ethanol': 0.79329
+    'NH4OH': 2.64 * chems.NH3.MW/chems.NH4OH.MW,
+    'CSL': 1.55,
+    'CH4': 0.40, # NA NG from shale and conventional recovery
+    'Enzyme': 2.24,
+    'Lime': 1.29,
+    'NaOH': 2.11,
+    'H2SO4': 44.47/1e3,
+    'Ethanol': 1.44,
     }
 
 GWP_CF_array = chems.kwarray(GWP_CFs)
-
-# Actually in kg CO2-eq/kg
+# In kg CO2-eq/kg of material
 GWP_CF_stream = tmo.Stream('GWP_CF_stream', GWP_CF_array, units='kg/hr')
 
+GWP_CFs['Corn stover'] = 44.70/1e3 * 0.8
+GWP_CFs['Switchgrass'] = 87.81/1e3 * 0.8
+GWP_CFs['Miscanthus'] = 78.28/1e3 * 0.8
+GWP_CFs['CaCO3'] = 10.30/1e3
+GWP_CFs['Gypsum'] = -4.20/1e3
 # In kg CO2-eq/kWh
-GWP_CF_electricity = 0.58019
+GWP_CFs['Electricity'] = 0.48
+# From corn stover
+GWP_CFs['LacticAcid_GREET'] = 1.80
+# From ref [7], lactic acid production, RoW, TRACI global warming
+GWP_CFs['LacticAcid_fossil'] = 4.1787
 
-# In kg CO2-eq/kg from ref [9]
-GWP_CF_feedstock = 66.2 / _feedstock_factor
-
+CFs['GWP_CFs'] = GWP_CFs
+CFs['GWP_CF_stream'] = GWP_CF_stream
 
 # =============================================================================
-# Cumulative energy demand - fossil (CEDf)
+# Fossil energy consumption (FEC), in MJ/kg of material
 # =============================================================================
 
-
-CEDf_CFs = {
-    'NH4OH': 37.89 * chems.NH3.MW/chems.NH4OH.MW,
-    'CSL': 19.058, # fodder yeast
-    'CH4': 42.378 * _CH4_m3_per_kg,
-    'Enzyme': 136.28,
-    'Lime': 4.7698,
-    'NaOH': 15.128,
-    'H2SO4': 4.1051,
-    'Ethanol': 5.0354
+FEC_CFs = {
+    'NH4OH': 42 * chems.NH3.MW/chems.NH4OH.MW,
+    'CSL': 12,
+    'CH4': 50, # NA NG from shale and conventional recovery
+    'Enzyme': 26,
+    'Lime': 4.896,
+    'NaOH': 29,
+    'H2SO4': 568.98/1e3,
+    'Ethanol': 16
     }
 
-CEDf_CF_array = chems.kwarray(CEDf_CFs)
+FEC_CF_array = chems.kwarray(FEC_CFs)
+# In MJ/kg of material
+FEC_CF_stream = tmo.Stream('FEC_CF_stream', FEC_CF_array, units='kg/hr')
 
-# Actually in kg CO2-eq/kg
-CEDf_CF_stream = tmo.Stream('CEDf_CF_stream', CEDf_CF_array, units='kg/hr')
+FEC_CFs['Corn stover'] = 688.60/1e3 * 0.8
+FEC_CFs['Switchgrass'] = 892.41/1e3 * 0.8
+FEC_CFs['Miscanthus'] = 569.05/1e3 * 0.8
+FEC_CFs['CaCO3'] = 133.19/1e3
+FEC_CFs['Gypsum'] = -44.19/1e3
+# In MJ/kWh
+FEC_CFs['Electricity'] = 5.926
+# From corn stover
+FEC_CFs['LacticAcid'] = 29
+# From ref [7], lactic acid production, RoW, cumulative energy demand, fossil
+FEC_CFs['LacticAcid_fossil'] = 79.524
 
-# In kg CO2-eq/kWh
-CEDf_CF_electricity = 6.9438
-
-
-
-
+CFs['FEC_CFs'] = FEC_CFs
+CFs['FEC_CF_stream'] = FEC_CF_stream
 
 
 

@@ -11,7 +11,7 @@
 # for license details.
 
 """
-Created on Mon Dec 30 09:15:23 2019
+Created on Tue Sep  1 15:56:17 2020
 
 References:
 [1] Cortes-Peña et al., BioSTEAM: A Fast and Flexible Platform for the Design, 
@@ -22,9 +22,23 @@ References:
 [2] Li et al., Tailored Pretreatment Processes for the Sustainable Design of
     Lignocellulosic Biorefineries across the Feedstock Landscape. Submitted,
     2020.
+    
+[3] Humbird et al., Process Design and Economics for Biochemical Conversion of 
+    Lignocellulosic Biomass to Ethanol: Dilute-Acid Pretreatment and Enzymatic 
+    Hydrolysis of Corn Stover; Technical Report NREL/TP-5100-47764; 
+    National Renewable Energy Lab (NREL), 2011.
+    https://www.nrel.gov/docs/fy11osti/47764.pdf
 
+[4] Kuo et al., Production of Optically Pure L-Lactic Acid from Lignocellulosic
+    Hydrolysate by Using a Newly Isolated and d-Lactate Dehydrogenase
+    Gene-Deficient Lactobacillus Paracasei Strain.
+    Bioresource Technology 2015, 198, 651–657.
+    https://doi.org/10.1016/j.biortech.2015.09.071.
+
+    
 Naming conventions:
     D = Distillation column
+    E = Evaporator
     F = Flash tank
     H = Heat exchange
     M = Mixer
@@ -51,7 +65,7 @@ Processes:
 
 import biosteam as bst
 import thermosteam as tmo
-from flexsolve import IQ_interpolation
+from flexsolve import aitken_secant, IQ_interpolation
 from biosteam import System
 from biosteam.process_tools import UnitGroup
 from thermosteam import Stream
@@ -59,7 +73,8 @@ from lactic import units, facilities
 from lactic.hx_network import HX_Network
 from lactic.process_settings import price, CFs
 from lactic.utils import baseline_feedflow, set_yield, find_split, splits_df
-from lactic.chemicals import chems, chemical_groups, soluble_organics, combustibles
+from lactic.chemicals import chems, chemical_groups, sugars, soluble_organics, \
+    insolubles, combustibles
 from lactic.tea_lca import LacticTEA
 
 flowsheet = bst.Flowsheet('lactic')
@@ -86,8 +101,8 @@ feedstock = Stream('feedstock', baseline_feedflow.copy(),
                     units='kg/hr', price=price['Feedstock'])
 
 U101 = units.FeedstockPreprocessing('U101', ins=feedstock,
-                                    outs=('processed', 'diverged_to_CHP'),
-                                    diverge_to_CHP=0)
+                                    outs=('processed', 'diverted_to_CHP'),
+                                    diversion_to_CHP=0)
 # Handling costs/utilities included in feedstock cost thus not considered here
 U101.cost_items['System'].cost = 0
 U101.cost_items['System'].kW = 0
@@ -126,7 +141,7 @@ water_M205 = Stream('water_M205', units='kg/hr')
 
 # Prepare sulfuric acid
 get_feedstock_dry_mass = lambda: \
-    (feedstock.F_mass-feedstock.imass['H2O'])*(1-U101.diverge_to_CHP)
+    (feedstock.F_mass-feedstock.imass['H2O'])*(1-U101.diversion_to_CHP)
 T201 = units.SulfuricAcidAdditionTank('T201', ins=sulfuric_acid_T201,
                                       feedstock_dry_mass=get_feedstock_dry_mass())
 
@@ -163,11 +178,13 @@ M205.specification = update_ammonia_and_mix
 T204 = units.AmmoniaAdditionTank('T204', ins=(F201-1, M205-0))
 P201 = units.HydrolysatePump('P201', ins=T204-0)
 
-pretreatment_sys = System('pretreatment_sys',	
-                          path=(T201, M201, M202, M203, R201,	
+pretreatment_sys = System('pretreatment_sys',
+                          path=(T201, M201, M202, M203, R201,
                                 T202, T203, F201, M204, H201, M205, T204, P201))
-	
+
 pretreatment_group = UnitGroup('pretreatment_group', units=pretreatment_sys.units)
+process_groups.append(pretreatment_group)
+
 
 # %% 
 
@@ -183,6 +200,9 @@ water_M301 = Stream('water_M301', units='kg/hr')
 CSL_R301 = Stream('CSL_R301', units='kg/hr')
 # Lime for neutralization of produced acid
 lime_R301 = Stream('lime_R301', units='kg/hr')
+# Empty for the concentrated scenario
+water_R301 = Stream('water_R301', units='kg/hr')
+
 
 # =============================================================================
 # Conversion units
@@ -191,42 +211,102 @@ lime_R301 = Stream('lime_R301', units='kg/hr')
 # Mix enzyme with pretreatment hydrolysate
 M301 = units.EnzymeHydrolysateMixer('M301', ins=(P201-0, enzyme_M301, water_M301))
 
-R301 = units.SaccharificationAndCoFermentation('R301',
-                                               ins=(M301-0, '', CSL_R301, lime_R301),
-                                               outs=('fermentation_effluent', 
-                                                     'sidedraw'),
-                                               neutralization=True,
-                                               set_titer_limit=True)
+H301 = bst.units.HXutility('H301', ins=M301-0, T=50+273.15)
 
+R300 = units.Saccharification('R300', ins=H301-0, outs=('saccharified_stream',))
+# Extend saccharification time based on ref [3] as saccharification and
+# co-fermentation are separated now
+R300.tau_saccharification = 84
 
-R302 = units.SeedTrain('R302', ins=R301-1, outs=('seed',))
+# Remove solids from saccharified stream
+S301_index = [splits_df.index[0]] + splits_df.index[2:].to_list()
+S301_cell_mass_split = [splits_df['stream_571'][0]] + splits_df['stream_571'][2:].to_list()
+S301_filtrate_split = [splits_df['stream_535'][0]] + splits_df['stream_535'][2:].to_list()
+S301 = units.CellMassFilter('S301', ins=R300-0, outs=('S301_cell_mass', ''),
+                            moisture_content=0.35,
+                            split=find_split(S301_index,
+                                             S301_cell_mass_split,
+                                             S301_filtrate_split,
+                                             chemical_groups))
+E301 = bst.units.MultiEffectEvaporator('E301', ins=S301-1, outs=('E301_solid',
+                                                                 'E301_condensate'),
+                                       P=(101325, 73581, 50892, 32777, 20000),
+                                       V=0)
+E301_P = bst.units.Pump('E301_P', ins=E301-0)
+
+R301 = units.CoFermentation('R301',
+                            ins=(E301_P-0, '', CSL_R301, water_R301, lime_R301),
+                            outs=('fermentation_effluent', 'sidedraw'),
+                            neutralization=True, mode='Batch',
+                            allow_dilution=False,
+                            allow_concentration=False)
+R301_P1 = units.SpecialPump('R301_P1', ins=R301-0)
+def R301_P1_bypass():
+    if R301.mode == 'Batch':
+        R301_P1.bypass = True
+    else:
+        R301_P1.bypass = False
+    R301_P1._run()
+R301_P1.specification = R301_P1_bypass
+
+R301_P2 = units.SpecialPump('R301_P2', ins=R301-1)
+def R301_P2_bypass():
+    if R301.mode == 'Batch':
+        R301_P2.bypass = True
+    else:
+        R301_P2.bypass = False
+    R301_P2._run()
+R301_P2.specification = R301_P2_bypass
+
+R302 = units.SeedTrain('R302', ins=R301_P2-0, outs=('seed',))
 
 T301 = units.SeedHoldTank('T301', ins=R302-0, outs=1-R301)
 
-seed_recycle = System('seed_recycle', path=(R301, R302, T301), recycle=R302-0)
+seed_recycle = System('seed_recycle', path=(R301, R301_P1, R301_P2, R302, T301),
+                      recycle=R302-0)
+titer_loop = System('titer_loop', path=(E301, E301_P, seed_recycle))
 
-# Adjust titer 
-def titer_at_yield(lactic_yield):
-    set_yield(lactic_yield, R301, R302)
-    seed_recycle._run()
+def sugar_at_V(V):
+    E301.V = V
+    titer_loop._run()
+    # In continuous mode, incoming sugar is immediately consumed, therefore 
+    # sugar concentration is always held at the same level (as effluent sugar
+    # concentration in batch mode)
+    if R301.mode == 'Batch':
+        sugar_conc = R301.ins[0].imass[sugars].sum()/R301.ins[0].F_vol
+    if R301.mode == 'Continuous':
+        sugar_conc = R301.outs[0].imass[sugars].sum()/R301.outs[0].F_vol
+    # Maximum sugar concentration of 220 g/L (initial titer in ref [4],
+    # highest from collected papers)
+    return sugar_conc-220
+
+# Adjust V of the multi-effect evaporator to achieve the set sugar concentration
+def titer_at_V(V):
+    E301.V = V
+    titer_loop._run()
     return R301.effluent_titer-R301.titer_limit
-        
-def adjust_titer_yield():
-    set_yield(R301.yield_limit, R301, R302)
-    seed_recycle._run()
-    if R301.set_titer_limit:
-        if R301.effluent_titer > R301.titer_limit:
-            lactic_yield = IQ_interpolation(
-                f=titer_at_yield, x0=0, x1=R301.yield_limit,
-                xtol=0.001, ytol=0.01, maxiter=50,
-                args=(), checkbounds=False)
-            set_yield(lactic_yield, R301, R302)
-            seed_recycle._run()
-PS301 = bst.units.ProcessSpecification('PS301', ins=R301-0,
-                                        specification=adjust_titer_yield)
 
-conversion_sys = System('conversion_sys',	
-                        path=(M301, seed_recycle, PS301))
+def adjust_R301_V():
+    E301.V = 0
+    set_yield(R301.yield_limit, R301, R302)
+    titer_loop._run()
+    if R301.allow_concentration:
+        if R301.effluent_titer < R301.titer_limit:
+            # When E301.V == 0.76, total sugar concentration is 600 g/L in
+            # the solid-rich condensate
+            sugar_based_V = IQ_interpolation(f=sugar_at_V, x0=0, x1=0.76,
+                                             xtol=0.001, ytol=0.1, maxiter=50, 
+                                             args=(), checkbounds=False)
+            E301.V = IQ_interpolation(f=titer_at_V, x0=0,
+                                      x1=min(0.76, sugar_based_V),
+                                      xtol=0.001, ytol=0.1, maxiter=50, 
+                                      args=(), checkbounds=False)
+            titer_loop._run()
+PS301 = bst.units.ProcessSpecification('PS301', ins=R301_P1-0,
+                                        specification=adjust_R301_V)
+
+conversion_sys = System('conversion_sys',
+                        path=(M301, H301, R300, S301, titer_loop, PS301))
 
 conversion_group = UnitGroup('conversion_group', units=conversion_sys.units)
 process_groups.append(conversion_group)
@@ -249,23 +329,17 @@ ethanol_R402 = Stream('ethanol_R402', units='kg/hr')
 # For ester hydrolysis
 water_R403 = Stream('water_R403', units='kg/hr')
 
-# For adjusting final lactic acid purity
-water_D405_M = Stream('water_D405_M', units='kg/hr')
-
 # =============================================================================
 # Separation units
 # =============================================================================
 
 # Remove solids from fermentation broth
-S401_index = [splits_df.index[0]] + splits_df.index[2:].to_list()
-S401_cell_mass_split = [splits_df['stream_571'][0]] + splits_df['stream_571'][2:].to_list()
-S401_filtrate_split = [splits_df['stream_535'][0]] + splits_df['stream_535'][2:].to_list()
-S401 = units.CellMassFilter('S401', ins=PS301-0, outs=('cell_mass', ''),
-                            moisture_content=0.35,
-                            split=find_split(S401_index,
-                                             S401_cell_mass_split,
-                                             S401_filtrate_split,
-                                             chemical_groups))
+S401 = bst.units.SolidsCentrifuge('S401', ins=PS301-0, outs=('S401_cell_mass', ''),
+                                  split=find_split(S301_index,
+                                                   S301_cell_mass_split,
+                                                   S301_filtrate_split,
+                                                   chemical_groups),
+                                  solids=insolubles)
 
 # Ca(LA)2 + H2SO4 --> CaSO4 + 2 LA
 R401 = units.AcidulationReactor('R401', ins=(S401-1, sulfuric_acid_R401),
@@ -276,9 +350,9 @@ R401 = units.AcidulationReactor('R401', ins=(S401-1, sulfuric_acid_R401),
 R401_P = bst.units.Pump('R401_P', ins=R401-0)
 
 # Moisture content (20%) and gypsum removal (99.5%) on Page 24 of Aden et al.
-S402_index = S401_index + ['Gypsum']
-S402_gypsum_split = S401_cell_mass_split + [0.995]
-S402_filtrate_split = S401_filtrate_split + [0.005]
+S402_index = S301_index + ['Gypsum']
+S402_gypsum_split = S301_cell_mass_split + [0.995]
+S402_filtrate_split = S301_filtrate_split + [0.005]
 S402 = units.GypsumFilter('S402', ins=R401_P-0,
                           moisture_content=0.2,
                           split=find_split(S402_index,
@@ -332,7 +406,8 @@ R402_P = bst.units.Pump('R402_P', ins=R402-0, dP_design=5*101325)
 # Distillation for recycling unreacted ethanol; 
 # keep as BinaryDistillation so top product's ethanol doesn't exceed azeotropic conc. 
 # during Monte Carlo
-D402 = bst.units.BinaryDistillation('D402', ins=R402_P-0, outs=('D402_g', 'D402_l'),
+D402 = bst.units.BinaryDistillation('D402', ins=R402_P-0,
+                                    outs=('D402_g_ethanol', 'D402_l'),
                                     LHK=('Ethanol', 'H2O'),
                                     is_divided=True,
                                     product_specification_format='Recovery',
@@ -342,8 +417,8 @@ D402 = bst.units.BinaryDistillation('D402', ins=R402_P-0, outs=('D402_g', 'D402_
 D402_H = bst.units.HXutility('D402_H', ins=D402-0, outs=1-R402, V=0, rigorous=True)
 D402_P = bst.units.Pump('D402_P', ins=D402-1)
 
-ethanol_recycle = System('ethanol_recycle',	
-                         path=(R402, R402_P, D402, D402_H, D402_P),	
+ethanol_recycle = System('ethanol_recycle',
+                         path=(R402, R402_P, D402, D402_H, D402_P),
                          recycle=D402_H-0)
 
 # Principal recovery step; EtLA separated from less volatile impurities
@@ -367,8 +442,8 @@ D403_P = bst.units.Pump('D403_P', ins=D403-1)
 S403 = bst.units.Splitter('S403',ins=D403_P-0, outs=(2-R402, 'D403_l_to_waste'), 
                           split=0.97)
 
-acid_ester_recycle = System('acid_ester_recycle',	
-                            path=(ethanol_recycle, D403, D403_H, D403_P, S403),	
+acid_ester_recycle = System('acid_ester_recycle',
+                            path=(ethanol_recycle, D403, D403_H, D403_P, S403),
                             recycle=S403-0)
 
 # EtLA + H2O --> LA + EtOH
@@ -398,59 +473,40 @@ D404_P = bst.units.Pump('D404_P', ins=D404-1)
 # To get the final acid product
 F402 = bst.units.Flash('F402', ins=D404_P-0, V=0.92, P=101325,
                         vessel_material='Stainless steel 316')
-
-F402_H = bst.units.HXutility('F402_H', ins=F402-0, outs=3-R403, V=0, rigorous=True)
-F402_P = bst.units.Pump('F402_P', ins=F402-1)
-
-hydrolysis_recycle = System('hydrolysis_recycle',	
-                            path=(R403, R403_P, D404, D404_H, D404_P,	
-                                  F402, F402_H),	
-                            recycle=F402_H-0)	
-esterification_recycle = System('esterification_recycle',	
-                                path=(acid_ester_recycle, hydrolysis_recycle),	
-                                recycle=D404_H-0)
-
-# Additional distillaiton column for high-succinic acid content feedstocks
-D405 = bst.units.ShortcutColumn('D405', ins=F402_P-0, outs=('D405_g', 'D405_l_LA'),
-                                LHK=('EthylLactate', 'LacticAcid'),
-                                is_divided=True,
-                                product_specification_format='Recovery',
-                                Lr=0.001, Hr=0.9995, k=1.2,
-                                vessel_material='Stainless steel 316')
-def purity_at_Lr(Lr):
-    D405.Lr = Lr
-    D405._run()
-    purity = D405.outs[1].get_mass_composition('LacticAcid')
+def purity_at_V(V):
+    F402.V = V
+    F402._run()
+    purity = F402.outs[1].get_mass_composition('LacticAcid')
     return purity-0.88
 
-def adjust_D405_Lr():
-    D405.Lr = IQ_interpolation(f=purity_at_Lr, x0=0.001, x1=0.999,
-                               xtol=0.001, ytol=0.001, maxiter=50,
-                               args=(), checkbounds=False)
-D405.specification = adjust_D405_Lr
+def adjust_F402_V():
+    H2O_molfrac = D404_P.outs[0].get_molar_composition('H2O')
+    V0 = H2O_molfrac
+    F402.V = aitken_secant(f=purity_at_V, x0=V0, x1=V0+0.001,
+                           xtol=0.001, ytol=0.001, maxiter=50,
+                           args=())
+F402.specification = adjust_F402_V
 
-D405_H1 = bst.units.HXutility('D405_H1', ins=D405-0, V=0, rigorous=True)
+F402_H1 = bst.units.HXutility('F402_H1', ins=F402-0, outs=3-R403, V=0, rigorous=True)
 
-D405_M = bst.units.Mixer('D405_M', ins=(D405-1, water_D405_M))
-def update_water_D405_M():
-    water = D405.outs[1].imass['LacticAcid']/0.88 - D405.outs[1].F_mass
-    water_D405_M.imass['Water'] = max(0, water)
-    D405_M._run()
-D405_M.specification = update_water_D405_M
+hydrolysis_recycle = System('hydrolysis_recycle',
+                            path=(R403, R403_P, D404, D404_H, D404_P,
+                                  F402, F402_H1),
+                            recycle=F402_H1-0)
+esterification_recycle = System('esterification_recycle',
+                                path=(acid_ester_recycle, hydrolysis_recycle),
+                                recycle=D404_H-0)
 
-# D405_H2 = bst.HXutility('D405_H2', ins=D405-1, T=345)
-D405_H2 = bst.HXutility('D405_H2', ins=D405_M-0, T=345)
-D405_P = bst.units.Pump('D405_P', ins=D405_H2-0)
+F402_H2 = bst.units.HXutility('F402_H2', ins=F402-1, T=345)
+F402_P = bst.units.Pump('F402_P', ins=F402_H2-0)
 
-M401 = bst.units.Mixer('M401', ins=(D401_H-0, S403-1, D405_H1-0))
+M401 = bst.units.Mixer('M401', ins=(D401_H-0, S403-1))
 M401_P = bst.units.Pump('M401_P', ins=M401-0, outs='condensed_separation_waste_vapor')
 
-separation_sys = System('separation_sys',	
-                        path=(S401, R401, R401_P, S402, F401, F401_H, F401_P,	
-                              D401, D401_H, D401_P, esterification_recycle,	
-                              F402_P, D405, D405_H1, 
-                              D405_M,
-                              D405_H2, D405_P, M401, M401_P))
+separation_sys = System('separation_sys',
+                        path=(S401, R401, R401_P, S402, F401, F401_H, F401_P,
+                              D401, D401_H, D401_P, esterification_recycle,
+                              F402_H2, F402_P, M401, M401_P,))
 
 separation_group = UnitGroup('separation_group', units=separation_sys.units)
 process_groups.append(separation_group)
@@ -474,7 +530,7 @@ brine = Stream('brine', units='kg/hr')
 # =============================================================================
 
 # Mix waste liquids for treatment
-M501 = bst.units.Mixer('M501', ins=(H201-0, M401_P-0, R402-1, R403-1))
+M501 = bst.units.Mixer('M501', ins=(H201-0, E301-1, M401_P-0, R402-1, R403-1))
 
 R501 = units.AnaerobicDigestion('R501', ins=M501-0,
                                 outs=('biogas', 'anaerobic_treated_water', 
@@ -488,7 +544,7 @@ R501 = units.AnaerobicDigestion('R501', ins=M501-0,
 
 # Feedstock flow rate in dry U.S. ton per day
 get_flow_tpd = lambda: \
-    (feedstock.F_mass-feedstock.imass['H2O'])*24/907.185*(1-U101.diverge_to_CHP)
+    (feedstock.F_mass-feedstock.imass['H2O'])*24/907.185*(1-U101.diversion_to_CHP)
 R502 = units.AerobicDigestion('R502', ins=(R501-1, '', caustic_R502, 'ammonia_R601',
                                            polymer_R502, air_R502),
                               outs=(vent_R502, 'aerobic_treated_water'),
@@ -519,17 +575,17 @@ S504 = units.SludgeCentrifuge('S504', ins=S503-1, outs=('S504_centrate',
 # Mix recycles to aerobic digestion
 M502 = bst.units.Mixer('M502', ins=(S502-0, S503-0, S504-0), outs=1-R502)
 
-aerobic_recycle = System('aerobic_recycle',	
-                         path=(R502, S501, S502, S503, S504, M502),	
+aerobic_recycle = System('aerobic_recycle',
+                         path=(R502, S501, S502, S503, S504, M502),
                          recycle=M502-0)
 
 # Reverse osmosis to treat membrane separated water
 S505 = units.ReverseOsmosis('S505', ins=S501-0, outs=('recycled_water', brine))
-		
-wastewater_sys = System('wastewater_sys',	
+
+wastewater_sys = System('wastewater_sys',
                         path=(M501, R501,aerobic_recycle, S505))
 
-wastewater_group = UnitGroup('wastewater_group',	
+wastewater_group = UnitGroup('wastewater_group',
                              units=wastewater_sys.units)
 process_groups.append(wastewater_group)
 
@@ -585,7 +641,7 @@ plant_air_in = Stream('plant_air_in', phase='g', units='kg/hr',
 # =============================================================================
 
 # 7-day storage time similar to ethanol's in ref [3]
-T601 = bst.units.StorageTank('T601', ins=D405_P-0, tau=7*24, V_wf=0.9,
+T601 = bst.units.StorageTank('T601', ins=F402_P-0, tau=7*24, V_wf=0.9,
                               vessel_type='Floating roof',
                               vessel_material='Stainless steel')
 T601.line = 'Lactic acid storage'
@@ -616,12 +672,14 @@ T606_P = units.SpecialPump('T606_P', ins=T606-0, outs=ethanol_R402)
 T607 = units.FireWaterStorage('T607', ins=firewater_in, outs='firewater_out')
 
 # Mix solid wastes to CHP
-M601 = bst.units.Mixer('M601', ins=(U101-1, S401-0, S504-1), outs='solids_to_CHP')
+M601 = bst.units.Mixer('M601', ins=(U101-1, S301-0, S401-0,
+                                    
+                                    S504-1), outs='solids_to_CHP')
 
 # Blowdown is discharged
 CHP = facilities.CHP('CHP', ins=(M601-0, R501-0, lime_CHP, ammonia_CHP,
                                  boiler_chems, baghouse_bag, natural_gas,
-                                 'boiler_feed_water'),
+                                 'boiler_makeup_water'),
                      B_eff=0.8, TG_eff=0.85, combustibles=combustibles,
                      side_streams_to_heat=(water_M201, water_M202, steam_M203),
                      outs=(vent_CHP, ash, 'boiler_blowdown_water'))
@@ -634,9 +692,9 @@ CT = facilities.CT('CT', ins=('return_cooling_water', cooling_tower_chems,
 # All water used in the system, here only consider water consumption,
 # if heating needed, then heating duty required is considered in CHP
 process_water_streams = {
-    'pretreatment_sys': (water_M201, water_M202, steam_M203, water_M205),
-    'conversion_sys': (water_M301,),
-    'separation_sys': (water_R403, water_D405_M),
+    'pretreatment': (water_M201, water_M202, steam_M203, water_M205),
+    'conversion': (water_M301, water_R301),
+    'separation': (water_R403,),
     'facilities': (CHP.ins[-1], CT.ins[-1])
     }
 PWC = facilities.PWC('PWC', ins=(system_makeup_water, S505-0),
@@ -687,7 +745,7 @@ TEA_feeds = set([i for i in lactic_sys.feeds if i.price]+ \
     [i for i in CHP_sys.feeds if i.price])
 
 TEA_products = set([i for i in lactic_sys.products if i.price]+ \
-    [i for i in CHP_sys.products if i.price]+[lactic_acid])
+    [i for i in CHP_sys.products if i.price]+[lactic_acid, gypsum])
 
 
 # %%
@@ -709,7 +767,7 @@ for i in OSBL_units:
 
 lactic_no_CHP_tea = LacticTEA(
         system=lactic_sys, IRR=0.10, duration=(2016, 2046),
-        depreciation='MACRS7', income_tax=0.21, operating_days=0.96*365,
+        depreciation='MACRS7', income_tax=0.21, operating_days=0.9*365,
         lang_factor=None, construction_schedule=(0.08, 0.60, 0.32),
         startup_months=3, startup_FOCfrac=1, startup_salesfrac=0.5,
         startup_VOCfrac=0.75, WC_over_FCI=0.05,
@@ -800,6 +858,7 @@ def simulate_and_print():
     print('--------------------\n')
 
 simulate_and_print()
+
 
 
 
