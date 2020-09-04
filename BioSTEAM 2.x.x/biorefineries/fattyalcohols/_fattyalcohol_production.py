@@ -117,7 +117,7 @@ def create_fattyalcohol_production_sys(ID='fattyalcohol_production_sys',
         #     DAP.imol['DAP'] = feed.imol['DAP'] = DAP_flow - effluent.imol['DAP']
         #     effluent.imol['CSL'] = effluent.imol['DAP'] = 0.
         # tmo.reaction.CHECK_FEASIBILITY = True    
-    R101 = fa_units.FattyAlcoholBioreactor('R101', outs=('vent', ''), ins=H101-0,
+    R101 = fa_units.FattyAlcoholBioreactor('R101', outs=('CO2', ''), ins=H101-0,
                                      fermentation_reaction=fatty_alcohol_production,
                                      postfermentation_reaction=yeast_growth, T=310.15, tau=32, 
                                      V=3785, Nmin=2, Nmax=32)
