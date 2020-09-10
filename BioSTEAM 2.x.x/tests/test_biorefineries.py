@@ -6,7 +6,7 @@
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
 # for license details.
 """
-Each function in this module tests a biorefinery.If all tests passed, no error 
+Each function in this module tests a biorefinery. If all tests passed, no error 
 is raised.
 
 """
@@ -22,27 +22,27 @@ def test_sugarcane():
     from biorefineries import sugarcane as sc
     sc.load()
     units = UnitGroup('Biorefinery', sc.sugarcane_tea.units)
-    assert np.allclose(sc.sugarcane_tea.IRR, 0.09952201383654127)
+    assert np.allclose(sc.sugarcane_tea.IRR, 0.10319729375184486)
     assert np.allclose(sc.sugarcane_tea.sales, 87641104.25548652)
     assert np.allclose(sc.sugarcane_tea.material_cost, 60096508.050463505)
-    assert np.allclose(sc.sugarcane_tea.installed_equipment_cost, 117725174.12298785)
-    assert np.allclose(sc.sugarcane_tea.utility_cost, -8589365.387334356)
-    assert np.allclose(units.get_heating_duty(), 272.487235278769)
-    assert np.allclose(units.get_cooling_duty(), 344.88392082847355)
+    assert np.allclose(sc.sugarcane_tea.installed_equipment_cost, 111512561.90122335)
+    assert np.allclose(sc.sugarcane_tea.utility_cost, -8589365.38733437)
+    assert np.allclose(units.get_heating_duty(), 272.4872352787688)
+    assert np.allclose(units.get_cooling_duty(), 344.88392082847315)
     assert np.allclose(units.get_electricity_consumption(), 9.853875285162502)
-    assert np.allclose(units.get_electricity_production(), 37.38389255225982)
+    assert np.allclose(units.get_electricity_production(), 37.383892552259844)
 
 def test_lipidcane():
     from biorefineries import lipidcane as lc
     lc.load()
     units = UnitGroup('Biorefinery', lc.lipidcane_tea.units)
-    assert np.allclose(lc.lipidcane_tea.IRR, 0.1733032594846777)
-    assert np.allclose(lc.lipidcane_tea.sales, 102410581.55979738)
+    assert np.allclose(lc.lipidcane_tea.IRR, 0.1783634347376759)
+    assert np.allclose(lc.lipidcane_tea.sales, 102410581.5597974)
     assert np.allclose(lc.lipidcane_tea.material_cost, 61762971.048900105)
-    assert np.allclose(lc.lipidcane_tea.installed_equipment_cost, 148647752.99924695)
+    assert np.allclose(lc.lipidcane_tea.installed_equipment_cost, 139559824.39299855)
     assert np.allclose(lc.lipidcane_tea.utility_cost, -25886609.91411801)
-    assert np.allclose(units.get_heating_duty(), 197.7426409332782)
-    assert np.allclose(units.get_cooling_duty(), 305.16703491311733)
+    assert np.allclose(units.get_heating_duty(), 197.74264093327824)
+    assert np.allclose(units.get_cooling_duty(), 305.1670349131174)
     assert np.allclose(units.get_electricity_consumption(), 9.65815356491132)
     assert np.allclose(units.get_electricity_production(), 92.62805713580244)
 
@@ -51,15 +51,15 @@ def test_cornstover():
     cs.load()
     MESP = cs.cornstover_tea.solve_price(cs.ethanol)
     units = UnitGroup('Biorefinery', cs.cornstover_tea.units)
-    assert np.allclose(MESP, 0.7382850997534475)
-    assert np.allclose(cs.cornstover_tea.sales, 134041032.28829786)
-    assert np.allclose(cs.cornstover_tea.material_cost, 82900270.63843909)
-    assert np.allclose(cs.cornstover_tea.installed_equipment_cost, 219990786.55181444)
-    assert np.allclose(cs.cornstover_tea.utility_cost, -11054921.042512089)
-    assert np.allclose(units.get_heating_duty(), 318.0490631730075)
-    assert np.allclose(units.get_cooling_duty(), 364.9938841327776)
-    assert np.allclose(units.get_electricity_consumption(), 22.36637203703606)
-    assert np.allclose(units.get_electricity_production(), 45.3481845362712)
+    assert np.allclose(MESP, 0.7383610895500932)
+    assert np.allclose(cs.cornstover_tea.sales, 134055638.87837549)
+    assert np.allclose(cs.cornstover_tea.material_cost, 82902092.80482696)
+    assert np.allclose(cs.cornstover_tea.installed_equipment_cost, 220012587.48251432)
+    assert np.allclose(cs.cornstover_tea.utility_cost, -11047774.698866017)
+    assert np.allclose(units.get_heating_duty(), 318.05635812416523)
+    assert np.allclose(units.get_cooling_duty(), 365.67806026618115)
+    assert np.allclose(units.get_electricity_consumption(), 22.371322764496814)
+    assert np.allclose(units.get_electricity_production(), 45.33827889984683)
  
 def test_LAOs():
     from biorefineries import LAOs as laos

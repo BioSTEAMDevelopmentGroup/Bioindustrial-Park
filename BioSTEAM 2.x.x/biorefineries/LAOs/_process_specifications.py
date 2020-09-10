@@ -72,7 +72,7 @@ class LAOsProcessSpecifications:
     def __init__(self, system, TEA,
                  plant_size=150000,
                  operating_days=350.4, 
-                 fermentation_titer=100,
+                 fermentation_titer=40,
                  fermentation_productivity=1.0,
                  fermentation_yield=0.90,
                  dehydration_reactor_temperature=623.15,

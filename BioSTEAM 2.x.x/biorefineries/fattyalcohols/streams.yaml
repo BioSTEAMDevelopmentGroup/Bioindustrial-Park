@@ -12,7 +12,7 @@ Streams:
     phase: g
   glucose:
     Glucose: 1
-    price: 0.3858 # 350 USD / ton http://www.agri-outlook.org/commodities/Sugar.pdf
+    price: 0.260145 # 236 USD / ton https://doi.org/10.1039/C9EE00447E
   process_water:
     Water: 1
     price: 0.000353
