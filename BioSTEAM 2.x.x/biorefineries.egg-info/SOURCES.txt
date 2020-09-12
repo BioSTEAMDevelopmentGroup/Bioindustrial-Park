@@ -16,6 +16,10 @@ biorefineries/LAOs/analysis.ipynb
 biorefineries/LAOs/chemicals.yaml
 biorefineries/LAOs/streams.yaml
 biorefineries/LAOs/utils.py
+biorefineries/LAOs/units/__init__.py
+biorefineries/LAOs/units/adiabatic_fixedbed_gas_reactor.py
+biorefineries/LAOs/units/nitrogen_generation_package.py
+biorefineries/LAOs/units/surge_tank.py
 biorefineries/cornstover/README.rst
 biorefineries/cornstover/__init__.py
 biorefineries/cornstover/_analysis.py
@@ -40,6 +44,9 @@ biorefineries/fattyalcohols/_tea.py
 biorefineries/fattyalcohols/chemicals.yaml
 biorefineries/fattyalcohols/streams.yaml
 biorefineries/fattyalcohols/utils.py
+biorefineries/fattyalcohols/units/__init__.py
+biorefineries/fattyalcohols/units/fatty_alcohol_bioreactor.py
+biorefineries/fattyalcohols/units/slle_centrifuge.py
 biorefineries/lipidcane/README.rst
 biorefineries/lipidcane/__init__.py
 biorefineries/lipidcane/_analysis.py
