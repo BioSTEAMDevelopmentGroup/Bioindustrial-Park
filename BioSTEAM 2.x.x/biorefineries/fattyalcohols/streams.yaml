@@ -12,13 +12,13 @@ Streams:
     phase: g
   glucose:
     Glucose: 1
-    price: 0.260145 # 236 USD / ton https://doi.org/10.1039/C9EE00447E
+    price: 0.265 # 240 USD / ton DOI average across dilute acid cornstover: 10.1002/bbb.1976
   process_water:
     Water: 1
     price: 0.000353
   tridecane:
     Tridecane: 1
-    price: 0.855 # Same as diesel (2.438 USD / gal)
+    price: 0.968 # Same as diesel (2.76 USD / gal) average between Jan 2015 to Aug 2020 https://www.eia.gov/petroleum/gasdiesel/
   tryptone:
     Tryptone: 1
     price: 10.
