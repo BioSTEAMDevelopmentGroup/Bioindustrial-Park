@@ -11,8 +11,8 @@
 __all__ = ('create_chemicals',)
 
 def create_chemicals():
-    from biorefineries import lipidcane as lc
-    return lc.chemicals.subgroup(
+    from biorefineries.lipidcane import chemicals
+    return chemicals.subgroup(
         ['Ash', 'Cellulose', 'Hemicellulose', 'Lignin',
          'Glucose', 'Sucrose', 'Solids', 'Water', 'Ethanol',
          'Octane', 'DryYeast', 'H3PO4', 'P4O10', 'CaO', 'Flocculant', 'CO2',
