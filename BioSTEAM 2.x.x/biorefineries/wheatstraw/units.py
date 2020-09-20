@@ -15,6 +15,8 @@ from thermosteam import MultiStream
 from biosteam import Unit
 from biosteam.units.decorators import cost, design
 from biosteam.units.design_tools import size_batch
+from biosteam.units.design_tools.specification_factors import  material_densities_lb_per_in3
+from biosteam.units.design_tools import column_design
 import thermosteam as tmo
 import biosteam as bst
 
@@ -163,9 +165,10 @@ class PretreatmentReactorSystem(Unit):
         feed = self.ins[0]
         vapor, liquid = self.outs
         liquid.copy_like(feed)
-        self.reactions.adiabatic_reaction(liquid) 
+        self.reactions(liquid) #self.reactions.adiabatic_reaction(liquid) 
         ms.copy_like(liquid)
-        ms.vle(T=190+273.15, H=ms.H)
+        H = ms.H + liquid.Hf - feed.Hf
+        ms.vle(T=190+273.15, H=H)
         vapor.mol[:] = ms.imol['g']
         liquid.mol[:] = ms.imol['l']
         vapor.T = liquid.T = ms.T
@@ -555,11 +558,26 @@ class DistillationColumn(bst.BinaryDistillation):
         bst.BinaryDistillation._run(self)
             
     def _design(self):
-        bst.BinaryDistillation._design(self)      
+        bst.BinaryDistillation._design(self)       
+        H=self.get_design_result('Height','ft')
+        Di=self.get_design_result('Diameter','ft')
+        Po = self.P * 0.000145078 #to psi
+        Pgauge = Po - 14.69
+        if Pgauge<0.0: Po=-Pgauge+14.69
+        Design = self.design_results
+        Design['Wall thickness'] = tv = column_design.compute_tower_wall_thickness(Po, Di, H)
+        rho_M = material_densities_lb_per_in3[self.vessel_material]
+        Design['Weight'] = column_design.compute_tower_weight(Di, H, tv, rho_M)
+        W = Design['Weight'] # in lb
+        L = Design['Height']*3.28 # in ft
+        Cost = self.purchase_costs
+        F_VM = self._F_VM
+        Cost['Tower'] = column_design.compute_purchase_cost_of_tower(Di, L, W, F_VM)
+        
         if self.energy_integration:  
             self.boiler.heat_utilities[0].flow=0
             self.boiler.heat_utilities[0].cost=0
-            
+        self._simulate_components()    
 # %% Biogas production
 
 @cost('Reactor cooling', 'Heat exchangers', CE=522, cost=23900,

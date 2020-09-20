@@ -70,3 +70,5 @@ biorefineries/sugarcane/_process_settings.py
 biorefineries/sugarcane/_system.py
 biorefineries/sugarcane/_tea.py
 biorefineries/sugarcane/model.py
+biorefineries/tests/run_readmes.py
+biorefineries/tests/test_biorefineries.py

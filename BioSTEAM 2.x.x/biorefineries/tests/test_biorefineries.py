@@ -68,8 +68,24 @@ def test_LAOs():
     assert np.allclose(units.get_electricity_consumption(), 3.689496361470118, rtol=1e-2)
     assert np.allclose(units.get_electricity_production(), 3.6894963614701215, rtol=1e-2)   
     
+def test_wheatstraw():
+    from biorefineries import wheatstraw as ws
+    ws.load()
+    MESP = ws.wheatstraw_tea.solve_price(ws.ethanol)
+    units = UnitGroup('Biorefinery', ws.wheatstraw_tea.units)
+    assert np.allclose(MESP, 0.8988122216128204, rtol=1e-2)
+    assert np.allclose(ws.wheatstraw_tea.sales, 126993140.05266903, rtol=1e-2)
+    assert np.allclose(ws.wheatstraw_tea.material_cost, 63299710.08900007, rtol=1e-2)
+    assert np.allclose(ws.wheatstraw_tea.installed_equipment_cost, 244243473.75764972, rtol=1e-2)
+    assert np.allclose(ws.wheatstraw_tea.utility_cost, -8089087.901156843, rtol=1e-2)
+    assert np.allclose(units.get_heating_duty(), 186.2281059784184, rtol=1e-2)
+    assert np.allclose(units.get_cooling_duty(), 270.20290353471364, rtol=1e-2)
+    assert np.allclose(units.get_electricity_consumption(), 22.924114167705298, rtol=1e-2)
+    assert np.allclose(units.get_electricity_production(), 39.74032666884628, rtol=1e-2)
+    
 if __name__ == '__main__':
     test_sugarcane()
     test_lipidcane()
     test_cornstover()
+    test_wheatstraw()
     test_LAOs()

@@ -2,7 +2,7 @@
 """
 Created on Thu Jun 27 23:12:28 2019
 
-@author: yoelr
+@author: Joaquin
 """
 from biosteam import System
 import biosteam as bst
@@ -82,7 +82,7 @@ def create_system(ID='wheatstraw_sys'):
     process_water1 = Stream('process_water1',
                              T=25+273.15,
                              P=1*101325,
-                             Water=process_water_over_dryflow*dryflow,
+                             Water=process_water_over_dryflow*dryflow,#only an initialization
                              units='kg/hr')
     
     sulfuric_acid = Stream('sulfuric_acid',
@@ -146,15 +146,15 @@ def create_system(ID='wheatstraw_sys'):
                    recycle=M204-0)          
     
     ### TODO: There is a bug in original code; for now spec is constant
-    S203.split[:] = 0.5
-    # T90 = 90+273.15
-    # def f_DSpret(split):
-    #     S203.split[:] = 0.5
-    #     for i in range(3): pretreatment_sys.simulate()
-    #     sobj=M205-0
-    #     return sobj.T-T90
+#    S203.split[:] = 0.5
+    T90 = 90+273.15
+    def f_DSpret(split):
+        S203.split[:] = split
+        for i in range(3): pretreatment_sys.simulate()
+        sobj=M205-0
+        return sobj.T-T90
     
-    # pretreatment_sys.specification = BoundedNumericalSpecification(f_DSpret, 0.10, 0.70)    
+    pretreatment_sys.specification = BoundedNumericalSpecification(f_DSpret, 0.10, 0.70)    
 
     
     ### Fermentation system ###
@@ -263,7 +263,7 @@ def create_system(ID='wheatstraw_sys'):
         else:
             ammonia2.imol['NH3'] = ammonia2_mol
         
-    air1_over_glucose = (R301.cofermentation.X[1]*2.17 + R301.cofermentation.X[3]*1.5/2 - R301.cofermentation.X[2])*1.1
+    air1_over_glucose = (R301.cofermentation.X[1]*2.17 + R301.cofermentation.X[3]*1.5/2 - R301.cofermentation.X[2])*1.2
     ammonia1_over_glucose = R301.cofermentation.X[1]*0.62*1.1
     
     preferm = M304-0
@@ -280,11 +280,11 @@ def create_system(ID='wheatstraw_sys'):
     
     # TODO: Bug in update nutrient loading (not enough O2 to run R301 and R302 seed train)
     # TODO: so just ignore negative flow in the meanwhile
-    def ignore_negative_O2_flow():
-        for i in (R301.outs + R302.outs): i.imol['O2'] = 0
+#    def ignore_negative_O2_flow():
+#        for i in (R301.outs + R302.outs): i.imol['O2'] = 0
         
     seed_recycle_sys = System('seed_recycle_sys',
-                              path=(M304,update_nutrient_loading1,R301, M305, update_nutrient_loading2, R302, ignore_negative_O2_flow, T301),
+                              path=(M304,update_nutrient_loading1,R301, M305, update_nutrient_loading2, R302, T301),
                               recycle=M304-0)  
     conc_yeast = 3.0 
     def f_DSferm1(x):
@@ -491,7 +491,7 @@ def create_system(ID='wheatstraw_sys'):
                                   H405,T701,P701))
     
     def f_DSpur(split):
-        S401.split[:]=split
+        S401.split[:] = split
         for i in range(3): purification_sys.simulate()
         heat_cond = D403.condenser.Q + H403_dist.Q
         heat_boil = D402.boiler.Q
@@ -659,7 +659,6 @@ def create_system(ID='wheatstraw_sys'):
                            path=(M602, update_aerobic_input_streams, R602, 
                                  S601, S602, M604, S603, M603),
                            recycle=M602-0)
-    aerobic_recycle_sys.converge_method = 'Fixed point'
     WWT_sys = System('WWT_sys',
                    path=(WWTC, R601, 
                          aerobic_recycle_sys, S604))
@@ -673,9 +672,9 @@ def create_system(ID='wheatstraw_sys'):
     # TODO: The BoilerTurbogenerator burns both biogas and lignin
     # Note that lime and boilerchems cost is taking into account in the 
     # unit operation now
-    M605 = bst.Mixer('M605', ins=(R501-0, R601-0))
+#    M605 = bst.Mixer('M605', ins=(R501-0, R601-0))
     BT = bst.facilities.BoilerTurbogenerator('BT',
-                                             ins=(S402-0, M605-0, 
+                                             ins=(S402-0, '', 
                                                   'boiler_makeup_water',
                                                   'natural_gas',
                                                   'lime',
@@ -725,7 +724,7 @@ def create_system(ID='wheatstraw_sys'):
                             path=(pretreatment_sys, fermentation_sys,ammonia_storage,S301,
                                   purification_sys,
                                   digestor_sys, WWT_sys),
-                            facilities=(CWP, M605, BT, CT, update_water_loss,
+                            facilities=(CWP, BT, CT, update_water_loss,
                                         PWC, ADP,
                                         CIP_package, S301, ammonia_storage,
                                         FT))
