@@ -32,6 +32,7 @@ biorefineries/cornstover/_process_settings.py
 biorefineries/cornstover/_sankey.py
 biorefineries/cornstover/_system.py
 biorefineries/cornstover/_tea.py
+biorefineries/cornstover/abm.py
 biorefineries/cornstover/model.py
 biorefineries/cornstover/units.py
 biorefineries/fattyalcohols/README.rst

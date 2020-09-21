@@ -45,8 +45,8 @@ others_composition = cs.chemicals.kwarray(
          Ash=0.07)
 )
 others_composition /= others_composition.sum()
-miscanthus_dry_composition += 0.053 * others_composition
-miscanthus_composition = miscanthus_dry_composition + cellulosic_moisture_content
+miscanthus_dry_composition += (1. - miscanthus_dry_composition.sum()) * others_composition
+miscanthus_composition = 0.8 * miscanthus_dry_composition + cellulosic_moisture_content
 
 def set_mixed_cornstover_miscanthus_feedstock(x_cornstover):
     x_miscanthus = 1 - x_cornstover
