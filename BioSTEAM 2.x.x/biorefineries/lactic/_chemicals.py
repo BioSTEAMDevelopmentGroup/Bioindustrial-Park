@@ -112,7 +112,7 @@ NaNO3 = chemical_database('NaNO3', phase='l', Hf=-118756*_cal2joule)
 Na2SO4 = chemical_database('Na2SO4', phase='l', Hf=-1356380)
 CaSO4 = chemical_database('CaSO4', phase='s', Hf=-342531*_cal2joule)
 # The default Perry 151 value is likely to be wrong, use another model instead
-CaSO4.Cn.move_up_model_priority('Constant', 0)
+CaSO4.Cn.move_up_model_priority('Lastovka solid', 0)
 
 # =============================================================================
 # Soluble organics
@@ -193,6 +193,8 @@ SuccinicAcid = chemical_database('SuccinicAcid', phase_ref='s')
 # accessed 06/30/2020
 V = tmo.functional.rho_to_V(1560, SuccinicAcid.MW)
 SuccinicAcid.V.s.add_model(V)
+# The default EQ105 values are off 
+SuccinicAcid.V.l.move_up_model_priority('Yen Woods saturation')
 
 EthylAcetate = chemical_database('EthylAcetate')
 # Hf from DIPPR value in Table 3 of Vatani et al., Int J Mol Sci 2007, 8 (5), 407–432

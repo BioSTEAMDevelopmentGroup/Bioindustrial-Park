@@ -58,7 +58,7 @@ References:
 
 import biosteam as bst
 import thermosteam as tmo
-from lactic.chemicals import chems
+from lactic._chemicals import chems
 
 
 # %%
@@ -83,8 +83,6 @@ _cooling.T_limit = _cooling.T + 9
 # and cooling utilities will be considered as CAPEX and OPEX of CHP and CT, respectively
 for i in (_lps, _mps, _hps, _cooling):
     i.heat_transfer_price = i.regeneration_price = 0
-    # if i == _cooling: continue
-    # i.heat_transfer_efficiency = 0.85
 
 
 # %%
@@ -217,7 +215,7 @@ GWP_CFs = {
     'Lime': 1.29,
     'NaOH': 2.11,
     'H2SO4': 44.47/1e3,
-    'Ethanol': 1.44,
+    'Ethanol': 1.44
     }
 
 GWP_CF_array = chems.kwarray(GWP_CFs)
@@ -231,10 +229,10 @@ GWP_CFs['CaCO3'] = 10.30/1e3
 GWP_CFs['Gypsum'] = -4.20/1e3
 # In kg CO2-eq/kWh
 GWP_CFs['Electricity'] = 0.48
-# From corn stover
-GWP_CFs['LacticAcid_GREET'] = 1.80
+# Lactic acid from corn stover
+GWP_CFs['Lactic acid_GREET'] = 1.80
 # From ref [7], lactic acid production, RoW, TRACI global warming
-GWP_CFs['LacticAcid_fossil'] = 4.1787
+GWP_CFs['Lactic acid_fossil'] = 4.1787
 
 CFs['GWP_CFs'] = GWP_CFs
 CFs['GWP_CF_stream'] = GWP_CF_stream
@@ -266,9 +264,9 @@ FEC_CFs['Gypsum'] = -44.19/1e3
 # In MJ/kWh
 FEC_CFs['Electricity'] = 5.926
 # From corn stover
-FEC_CFs['LacticAcid'] = 29
+FEC_CFs['Lactic acid'] = 29
 # From ref [7], lactic acid production, RoW, cumulative energy demand, fossil
-FEC_CFs['LacticAcid_fossil'] = 79.524
+FEC_CFs['Lactic acid_fossil'] = 79.524
 
 CFs['FEC_CFs'] = FEC_CFs
 CFs['FEC_CF_stream'] = FEC_CF_stream

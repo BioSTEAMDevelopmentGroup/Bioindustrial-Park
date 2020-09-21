@@ -54,15 +54,15 @@ from math import exp, pi, ceil
 from flexsolve import aitken_secant
 from biosteam import Unit
 from biosteam.exceptions import DesignError
-from biosteam.units import Flash, HXutility, Mixer, MixTank, Pump, \
-    SolidsSeparator, StorageTank
+from biosteam.units import Flash, HXutility, Mixer, MixTank, MultiEffectEvaporator, \
+    Pump, SolidsSeparator, StorageTank
 from biosteam.units.design_tools import PressureVessel
 from biosteam.units.design_tools import pressure_vessel_material_factors as factors
 from biosteam.units.decorators import cost
 from thermosteam import separations
-from lactic.process_settings import price
-from lactic.chemicals import COD_chemicals, solubles, insolubles
-from lactic.utils import CEPCI, baseline_feedflow, compute_lactic_titer, \
+from lactic._process_settings import price
+from lactic._chemicals import COD_chemicals, solubles, insolubles
+from lactic._utils import CEPCI, baseline_feedflow, compute_lactic_titer, \
     compute_extra_chemical, adjust_recycle, compute_COD
 
 _kg_per_ton = 907.18474
@@ -363,6 +363,30 @@ class EnzymeHydrolysateMixer(Mixer):
         	
         effluent.mix_from([hydrolysate, enzyme, water])
 
+# Modified from bst.units.MultiEffectEvaporator, which won't simulate for V=0
+class SpecialEvaporator(MultiEffectEvaporator):
+    bypass = True
+    
+    def _run(self):
+        if self.bypass:
+            self.outs[0].copy_like(self.ins[0])
+            self.outs[1].empty()
+            self.heat_utilities = ()
+        else:
+            super()._run()
+
+    def _design(self):
+        if self.bypass:
+            self.design_results.clear()
+        else:
+            super()._design()
+      
+    def _cost(self):
+        if self.bypass:
+            self.purchase_costs.clear()
+        else:
+            super()._cost()
+
 # Saccharification and co-fermentation (both glucose & xylose are used in fermentation)
 # Not including heat exchanger as saccharificatoin and co-fermentation 
 # are at the same temperature now
@@ -571,9 +595,9 @@ class Reactor(Unit, PressureVessel, isabstract=True):
         Residence time [hr].        
     V_wf=0.8 : float
         Fraction of working volume over total volume.        
-    kW_per_m3=0.295: float
+    kW_per_m3=0.0985: float
         Power usage of agitator
-        (converted from 1.5 hp/1000 gal as in [1], for homogeneous liquid reaction).
+        (converted from 0.5 hp/1000 gal as in [1]).
     wall_thickness_factor=1: float
         A safety factor to scale up the calculated minimum wall thickness.
     vessel_material : str, optional
@@ -599,11 +623,11 @@ class Reactor(Unit, PressureVessel, isabstract=True):
     
     # For a single reactor, based on diameter and length from PressureVessel._bounds,
     # converted from ft3 to m3
-    _V_max = pi/4*(20**2)*40/35.3147 
+    _Vmax = pi/4*(20**2)*40/35.3147 
     
     def __init__(self, ID='', ins=None, outs=(), *, 
                  P=101325, tau=0.5, V_wf=0.8,
-                 length_to_diameter=2, kW_per_m3=0.295,
+                 length_to_diameter=2, kW_per_m3=0.0985,
                  wall_thickness_factor=1,
                  vessel_material='Stainless steel 316',
                  vessel_type='Vertical'):
@@ -626,7 +650,7 @@ class Reactor(Unit, PressureVessel, isabstract=True):
         length_to_diameter = self.length_to_diameter
         wall_thickness_factor = self.wall_thickness_factor
         
-        N = ceil(V_total/self._V_max)
+        N = ceil(V_total/self._Vmax)
         if N == 0:
             V_reactor = 0
             D = 0
@@ -648,7 +672,7 @@ class Reactor(Unit, PressureVessel, isabstract=True):
         else:
              Design['Wall thickness'] *= wall_thickness_factor
              # Weight is proportional to wall thickness in PressureVessel design
-             Design['Weight'] = round(Design['Weight']*wall_thickness_factor,2)
+             Design['Weight'] = round(Design['Weight']*wall_thickness_factor, 2)
             
     def _cost(self):
         Design = self.design_results
@@ -664,7 +688,7 @@ class Reactor(Unit, PressureVessel, isabstract=True):
             for i, j in purchase_costs.items():
                 purchase_costs[i] *= Design['Number of reactors']
             
-            self.power_utility(self.kW_per_m3 * Design['Total volume'])
+            self.power_utility(self.kW_per_m3*Design['Total volume'])
             
     @property
     def BM(self):
@@ -720,8 +744,8 @@ class CoFermentation(Reactor):
     tau_batch_turnaround = 12 # in hr, the same as the seed train in ref [3]
 
     def __init__(self, ID='', ins=None, outs=(), thermo=None, *, T=50+273.15,
-                 P=101325, V_wf=0.8, length_to_diameter=2,
-                 kW_per_m3=1.97, # 10 hp/1000 gal for suspension of solid particles
+                 P=101325, V_wf=0.8, length_to_diameter=0.6,
+                 kW_per_m3=0.0985,
                  wall_thickness_factor=1,
                  vessel_material='Stainless steel 304',
                  vessel_type='Vertical',
@@ -815,8 +839,10 @@ class CoFermentation(Reactor):
             self.heat_exchanger.simulate_as_auxiliary_exchanger(duty, _mixture)
         
         elif mode == 'Continuous':
+            self._Vmax = 3785.41178 # 1,000,000 gallon from ref [3]
             Reactor._design(self)
-
+            # Include a backup fermenter for cleaning
+            Design['Number of reactors'] += 1
         else:
             raise DesignError(f'Fermentation mode must be either Batch or Continuous, not {mode}')
 
@@ -829,7 +855,7 @@ class CoFermentation(Reactor):
         if self.mode == 'Batch':
             Unit._cost()
             self._decorated_cost()
-            purchase_costs['Heat exchangers'] = hx.purchase_cost
+            # purchase_costs['Heat exchanger'] = hx.purchase_cost
             # Adjust fermenter cost for acid-resistant scenario
             if not self.neutralization:
                 purchase_costs['Fermenter'] *= _316_over_304
@@ -1111,7 +1137,7 @@ class Esterification(Reactor):
     
     def __init__(self, ID='', ins=None, outs=(), thermo=None, *, 
                  T=351.15, P=101325, tau=None, tau_max=15, 
-                 V_wf=0.8, length_to_diameter=2, kW_per_m3=0.295,
+                 V_wf=0.8, length_to_diameter=2, kW_per_m3=1.97,
                  X1=None, X2=None, assumeX2equalsX1=True, allow_higher_T=False,
                  wall_thickness_factor=1,
                  vessel_material='Stainless steel 316',

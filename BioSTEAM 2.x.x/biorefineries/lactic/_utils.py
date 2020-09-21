@@ -34,7 +34,7 @@ lactic acid from lignocellulosic feedstocks
 import numpy as np
 import pandas as pd
 import thermosteam as tmo
-from lactic.chemicals import chems
+from lactic._chemicals import chems
 _kg_per_ton = 907.18474
 
 # Chemical Engineering Plant Cost Index from Chemical Engineering Magzine

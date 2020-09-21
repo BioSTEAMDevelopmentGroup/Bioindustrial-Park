@@ -68,9 +68,6 @@ samples = samples_1d[:, np.newaxis]
 model.load_samples(samples)
 
 carb_contents = np.arange(0.25, 0.701, 0.01)
-# 0.59 is the baseline
-carb_contents = [0.59] + carb_contents.tolist()
-
 data = model.evaluate_across_coordinate(
     'Carbohydate content', set_carbs, carb_contents, notify=True)
 
@@ -109,7 +106,7 @@ LCA_plot_data = pd.DataFrame({
     })
 
 '''Output to Excel'''
-with pd.ExcelWriter('4_carbs-price.xlsx') as writer:
+with pd.ExcelWriter('3_carbs-price.xlsx') as writer:
     TEA_plot_data.to_excel(writer, sheet_name='TEA plotting')
     LCA_plot_data.to_excel(writer, sheet_name='LCA plotting')
     results.to_excel(writer, sheet_name='Raw data')

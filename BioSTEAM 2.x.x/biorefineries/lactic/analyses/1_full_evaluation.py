@@ -103,6 +103,7 @@ LCA_percentiles = LCA_results.quantile(q=percentiles)
 spearman_metrics = model.metrics[0:2] + model.metrics[6:8] + \
     model.metrics[models.index_IRR:models.index_IRR+2]
     
+model.table = model.table.dropna()
 spearman_parameters = parameters
 spearman_results = model.spearman(spearman_parameters, spearman_metrics)
 spearman_results.columns = pd.Index([i.name_with_units for i in spearman_metrics])
@@ -194,9 +195,10 @@ IRR_plot_indices = [metric.index for metric in model.metrics
 IRR_plot_data = IRR_results[IRR_plot_indices].copy()
 IRR_plot_data.columns = models.IRRs.copy()
 IRR_plot_y = IRR_plot_data.sort_index(axis=1)
+IRR_plot_y = IRR_plot_y.dropna()
 IRR_plot_x = models.IRRs.copy()
 IRR_plot_x.sort()
-plot_montecarlo_across_coordinate(IRR_plot_x, IRR_plot_y.values)
+plot_montecarlo_across_coordinate(IRR_plot_x, IRR_plot_y)
 
 '''Output to Excel'''
 with pd.ExcelWriter('1_full_evaluation.xlsx') as writer:

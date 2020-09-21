@@ -38,8 +38,8 @@ import biosteam as bst
 import lactic.system as system
 from biosteam.evaluation import Model, Metric
 from chaospy import distributions as shape
-from lactic.process_settings import CFs
-from lactic.utils import set_yield
+from lactic._process_settings import CFs
+from lactic._utils import set_yield
 
 _kg_per_ton = 907.18474
 _feedstock_factor = _kg_per_ton / 0.8
@@ -323,7 +323,7 @@ get_electricity_GWP = system.get_electricity_GWP
 natural_gas = system.natural_gas
 get_CH4_production_GWP = lambda: \
     CFs['GWP_CFs']['CH4']*natural_gas.F_mass/lactic_acid.F_mass
-get_CH4_combustion_GWP = lambda: \
+get_CH4_onsite_GWP = lambda: \
      natural_gas.get_atomic_flow('C')*natural_gas.chemicals.CO2.MW/lactic_acid.F_mass
 
 lime = system.lime
@@ -332,20 +332,20 @@ get_lime_GWP  = lambda: \
     CFs['GWP_CFs']['Lime']*(lime.F_mass+lime_CHP.F_mass)/lactic_acid.F_mass
 
 ethanol = system.ethanol
-get_ethanol_combustion_GWP = lambda: \
+get_ethanol_onsite_GWP = lambda: \
      ethanol.get_atomic_flow('C')*ethanol.chemicals.CO2.MW/lactic_acid.F_mass
 
 # For all other materials, including both production and combustion
-get_other_materials_GWP = lambda: get_material_GWP()+get_ethanol_combustion_GWP()-\
+get_other_materials_GWP = lambda: get_material_GWP()+get_ethanol_onsite_GWP()-\
     get_CH4_production_GWP()-get_lime_GWP()
 
 check_GWP = lambda: get_GWP()-get_material_GWP()-get_electricity_GWP()- \
-    get_CH4_combustion_GWP()-get_ethanol_combustion_GWP()
+    get_CH4_onsite_GWP()-get_ethanol_onsite_GWP()
     
 metrics.extend((
     Metric('Electricity', get_electricity_GWP, 'kg CO2-eq/kg', 'GWP'),
     Metric('Natural gas production', get_CH4_production_GWP, 'kg CO2-eq/kg', 'GWP'),
-    Metric('Natural gas combustion', get_CH4_combustion_GWP, 'kg CO2-eq/kg', 'GWP'), 
+    Metric('Natural gas combustion', get_CH4_onsite_GWP, 'kg CO2-eq/kg', 'GWP'), 
     Metric('Lime', get_lime_GWP, 'kg CO2-eq/kg', 'GWP'),
     Metric('Other materials', get_other_materials_GWP, 'kg CO2-eq/kg', 'GWP'),
     Metric('GWP check', check_GWP, 'kg CO2-eq/kg', 'GWP')
@@ -456,7 +456,7 @@ D = shape.Triangle(0.198, 0.253, 0.304)
 def set_natural_gas_price(price):
     natural_gas.price = price
 
-D = shape.Triangle(-0.0288, 0, 0.00776)
+D = shape.Uniform(-0.0288, 0.00776)
 @param(name='Gypsum price', element='TEA', kind='isolated', units='$/kg',
        baseline=0, distribution=D)
 def set_gypsum_price(price):
@@ -519,7 +519,7 @@ def set_R301_enzyme_loading(loading):
     M301.enzyme_loading = loading
 
 # Enzymatic hydrolysis
-D = shape.Triangle(0, 24, 72)
+D = shape.Triangle(0, 24, 56)
 @param(name='Enzymatic hydrolysis time', element=R301, kind='coupled', units='hr',
        baseline=24, distribution=D)
 def set_R301_saccharification_time(tau):
@@ -559,7 +559,7 @@ def set_lactic_yield(lactic_yield):
     # R302_X[0] = R302_X[3] = lactic_yield * R302.ferm_ratio
     # R302_X[1] = R302_X[4] = min(R301_X[1]*R302.ferm_ratio, 1-1e-6-R302_X[0]-R302_X[2])    
 
-D = shape.Triangle(0.18, 0.89, 1.92)
+D = shape.Triangle(0.33, 0.89, 1.66)
 @param(name='Productivity', element=R301, kind='coupled', units='g/L/hr',
        baseline=0.89, distribution=D)
 def set_lactic_productivity(productivity):

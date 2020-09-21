@@ -154,21 +154,21 @@ print('\n-------- Pretreatment Efficacy Simulation Completed --------\n')
 from biosteam.process_tools import UnitGroup
 from ethanol_adipic import system_acid as acid
 from ethanol_adipic import system_base as base
-from ethanol_adipic.chemicals import chems
-from ethanol_adipic import utils
+from ethanol_adipic._chemicals import chems
+from ethanol_adipic import _utils
 # from ethanol_adipic.utils import baseline_feedflow
 
 # Set feedstock flow rate
-baseline_feedflow = utils.baseline_feedflow.copy()
-# baseline_feedflow = utils.baseline_feedflow.copy() / 2
-# baseline_feedflow = utils.baseline_feedflow.copy() * 2
+# baseline_feedflow = _utils.baseline_feedflow.copy()
+# baseline_feedflow = _utils.baseline_feedflow.copy() / 2
+baseline_feedflow = _utils.baseline_feedflow.copy() * 2
 acid.feedstock.mass = baseline_feedflow
 base.feedstock.mass = baseline_feedflow
 
 _ethanol_kg_2_gal = acid._ethanol_kg_2_gal
 _feedstock_factor = acid._feedstock_factor
 
-simulated_composition = pd.read_excel('Feedstock compositions.xlsx', \
+simulated_composition = pd.read_excel('_Feedstock compositions.xlsx', \
                                       sheet_name='Compositions')
 # simulated_composition = simulated_composition[0:5] # for debugging
     
@@ -234,14 +234,13 @@ acid_total_flow = []
 # These lists store output results
 acid_conversions_C6 = []
 acid_conversions_C5 = []
-acid_ethanol_yields = []
 acid_produced_electricity = []
 acid_MESPs = []
 acid_MFPPs = []
+acid_GWPs = []
 
 # Run assumed compositions (varying cellulose, hemicellulose, and lignin compositions
 # while keeping compositions of other components unchanged).
-# The first composition in the file is the default one as in refs [1-3]
 feedstock_dry_mass = acid.feedstock.F_mass - acid.feedstock.imass['Water']
 acid_group = UnitGroup('Acid pretreatment', acid.ethanol_sys.units)
 acid_factor = acid.ethanol_no_CHP_tea._annual_factor
@@ -272,14 +271,13 @@ for i in range(0, simulated_composition.shape[0]):
     acid_conversions_C6.append(C6_conversion)    
     acid_conversions_C5.append(C5_conversion)
     acid_produced_electricity.append(compute_electricity(acid_group, acid_factor))
-    acid_ethanol_yields.append(compute_ethanol_yield(acid.ethanol, acid.feedstock))
+    acid_GWPs.append(acid.get_GWP())
     
     acid.feedstock.price = default_feedstock_price
     acid_MESPs.append(compute_MESP(acid.ethanol, acid.ethanol_tea))
    
     acid.ethanol.price = market_ethanol_price
     acid_MFPPs.append(compute_MFPP(acid.feedstock, acid.ethanol_tea))
-    print(f'Run #{len(acid_MESPs)}: {timer_acid.elapsed_time/60:.1f} min')
 
 print(f'\nSimulation time: {timer_acid.elapsed_time/60:.1f} min')
 print('\n-------- Acid-Pretreatment Biorefinery Simulation Completed --------\n\n')
@@ -305,9 +303,10 @@ base_total_flow = []
 base_conversions = []
 base_muconic_titers = []
 base_produced_electricity = []
-base_ethanol_yields = []
 base_MESPs = []
 base_MFPPs = []
+base_GWPs = []
+# base_GWPs = [[], []]
 
 # Run assumed compositions (varying cellulose, hemicellulose, and lignin compositions
 # while keeping compositions of other components unchanged).
@@ -331,14 +330,15 @@ for i in range(0, simulated_composition.shape[0]):
     base_conversions.append(conversion)
     base_muconic_titers.append(base.R502.effluent_titer)
     base_produced_electricity.append(compute_electricity(base_group, base_factor))
-    base_ethanol_yields.append(compute_ethanol_yield(base.ethanol, base.feedstock))
+    base_GWPs.append(base.get_GWP(divided=False))
+    # base_GWPs[0].append(base.get_GWP(divided=False))
+    # base_GWPs[1].append(base.get_GWP(divided=True))
 
     base.feedstock.price = default_feedstock_price
     base_MESPs.append(compute_MESP(base.ethanol, base.ethanol_adipic_tea))
     
     base.ethanol.price = market_ethanol_price
     base_MFPPs.append(compute_MFPP(base.feedstock, base.ethanol_adipic_tea))
-    print(f'Run #{len(base_MESPs)}: {timer_base.elapsed_time/60:.1f} min')
     
 print(f'\nSimulation time: {timer_base.elapsed_time/60:.1f} min')
 print('\n-------- Base-Pretreatment Biorefinery Simulation Completed --------\n\n')
@@ -347,92 +347,34 @@ print('\n-------- Base-Pretreatment Biorefinery Simulation Completed --------\n\
 # %%
 
 # =============================================================================
-# Run the base-pretreatment biorefinery for correlation between muconic acid titer
-# (by changing lignin conversion during muconic acid fermentation) and MESP,
-# for baseline feedstock composition only.
-# =============================================================================
-
-timer_varied = TicToc('timer_varied')
-timer_varied.tic()
-
-base.R502.set_titer_limit = False
-
-# These lists store output results
-varied_conversion_muconic_titers = []
-varied_conversion_produced_electricity = []
-# Ethanol yields should not change for different titers
-varied_conversion_ethanol_yields = []
-varied_conversion_MESPs = []
-varied_conversion_MFPPs = []
-
-lignin_conversions = np.arange(0.01, 101, 0.01)
-for i in lignin_conversions:
-    base.feedstock.mass = baseline_feedflow
-    # Adjust muconic acid titer by changing lignin conversion during fermentation
-    base.R502.main_fermentation_rxns.X[-1] = i
-
-    # Simulate system and log results
-    base.ethanol_adipic_sys.simulate()
-    varied_conversion_muconic_titers.append(base.R502.effluent_titer)
-    varied_conversion_produced_electricity.append(compute_electricity(base_group, base_factor))
-    varied_conversion_ethanol_yields.append(compute_ethanol_yield(base.ethanol, base.feedstock))
-    
-    base.feedstock.price = default_feedstock_price
-    varied_conversion_MESPs.append(compute_MESP(base.ethanol, base.ethanol_adipic_tea))
-    
-    base.ethanol.price = market_ethanol_price
-    varied_conversion_MFPPs.append(compute_MFPP(base.feedstock, base.ethanol_adipic_tea)) 
-    print(f'Run #{len(varied_conversion_MESPs)}: {timer_varied.elapsed_time/60:.1f} min')
-
-print(f'\nSimulation time: {timer_varied.elapsed_time/60:.1f} min')
-print('\n-------- Varied-conversion Simulation Completed --------\n\n')
-
-
-# %%
-
-# =============================================================================
 # Save biorefinery simulation results in Excel
 # =============================================================================
 
-df_varied_composition_results = pd.DataFrame(
-    {'Cellulose': simulated_composition['Cellulose'],
-     'Hemicellulose': simulated_composition['Hemicellulose'],
-     'Lignin': simulated_composition['Lignin'],
-     'Acid total flow': acid_total_flow,
-     'Acid cellulose conversion': acid_conversions_C6,
-     'Acid hemicellulose conversion': acid_conversions_C5,
-     'Acid produced electricity [10^6 kWh/y]': acid_produced_electricity,
-     'Acid ethanol yield [gal/dry-ton]': acid_ethanol_yields,
-     'Acid minimum ethanol selling price [2016$/gal]': acid_MESPs,
-     'Acid maximum feedstock payment price [2016$/dry-ton]': acid_MFPPs,
-     'Base total flow': base_total_flow,
-     'Base carbohydrate conversion': base_conversions,
-     'Base muconic acid titer [g/L]': base_muconic_titers,
-     'Base produced electricity [10^6 kWh/y]': base_produced_electricity,
-     'Base ethanol yield [gal/dry-ton]': base_ethanol_yields,
-     'Base minimum ethanol selling price [2016$/gal]': base_MESPs,
-     'Base maximum feedstock payment price [2016$/dry-ton]': base_MFPPs,
-     'Electricity difference (acid-base)':
-         np.asarray(acid_produced_electricity)-np.asarray(base_produced_electricity),
-     'Ethanol yield difference (acid-base)':
-         np.asarray(acid_ethanol_yields)-np.asarray(base_ethanol_yields),
-     'MESP difference (acid-base)': np.asarray(acid_MESPs)-np.asarray(base_MESPs),
-     'MFPP difference (acid-base)': np.asarray(acid_MFPPs)-np.asarray(base_MFPPs)
+df_varied_composition_results = pd.DataFrame({
+    ('Composition', 'Cellulose'): simulated_composition['Cellulose'],
+    ('Composition', 'Hemicellulose'): simulated_composition['Hemicellulose'],
+    ('Composition', 'Lignin'): simulated_composition['Lignin'],
+    ('Total flow [kg/hr]', 'Acid'): acid_total_flow,
+    ('Total flow [kg/hr]', 'Base'): base_total_flow,
+    ('Conversion', 'Acid C6'): acid_conversions_C6,
+    ('Conversion', 'Acid C5'): acid_conversions_C5,
+    ('Conversion', 'Base C6'): base_conversions,
+    ('Muconic acid titer [g/L]', 'Base'): base_muconic_titers,
+    ('MESP [$/gal]', 'Acid'): acid_MESPs,
+    ('MESP [$/gal]', 'Base'): base_MESPs,
+    ('MESP [$/gal]', 'Acid-Base'): np.asarray(acid_MESPs)-np.asarray(base_MESPs),
+    ('MFPP [$/dry-ton]', 'Acid'): acid_MFPPs,
+    ('MFPP [$/dry-ton]', 'Base'): base_MFPPs,
+    ('MFPP [$/dry-ton]', 'Acid-Base'): np.asarray(acid_MFPPs)-np.asarray(base_MFPPs),
+    ('Produced electricity [10^6 kWh/y]', 'Acid'): acid_produced_electricity,
+    ('Produced electricity [10^6 kWh/y]', 'Base'): base_produced_electricity,
+    ('Produced electricity [10^6 kWh/y]', 'Difference'): \
+        np.asarray(acid_produced_electricity)-np.asarray(base_produced_electricity),
+    ('GWP [kg CO2-eq./gal]', 'Acid'): acid_GWPs,
+    ('GWP [kg CO2-eq./gal]', 'Base'): base_GWPs,
+    ('GWP [kg CO2-eq./gal]', 'Acid-Base'): np.asarray(acid_GWPs)-np.asarray(base_GWPs),    
     })
 
-df_varied_conversion_results = pd.DataFrame(
-    {'Lignin conversion': lignin_conversions,
-     'Muconic acid titer [g/L]': varied_conversion_muconic_titers,
-     'Produced electricity [10^6 kWh/y]': varied_conversion_produced_electricity,
-     'Ethanol yield [gal/dry-ton]': varied_conversion_ethanol_yields,
-     'Minimum ethanol selling price [2016$/gal]': varied_conversion_MESPs,
-     'Maximum feedstock payment price [2016$/dry-ton]': varied_conversion_MFPPs
-     })
-
-with pd.ExcelWriter('Biorefinery results.xlsx') as writer:
-    df_varied_composition_results.to_excel(writer, sheet_name='Varied composition')
-    df_varied_conversion_results.to_excel(writer, sheet_name='Varied lignin conversion (base)')
-
-
+df_varied_composition_results.to_excel('Biorefinery results_double.xlsx')
 
 

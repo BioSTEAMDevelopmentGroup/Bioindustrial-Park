@@ -31,8 +31,12 @@ simulated (first time accessing takes a bit to load the chemicals and system).
 
     >>> from biorefineries.ethanol_adipic import system_acid as acid
     >>> # Acid-pretreatment biorefinery
+    Acid MESP: $2.51/gal with default pretreatment efficacy
+    GWP is 0.340 kg CO2-eq/gal ethanol
     >>> from biorefineries.ethanol_adipic import system_base as base
     >>> # Base-pretreatment biorefinery
+    Base MESP: $2.72/gal with default pretreatment efficacy
+    GWP is -0.851 kg CO2-eq/gal ethanol
     >>> acid.chems
     >>> # All chemicals used in acid and base biorefineries, can also use base.chems
     CompiledChemicals([H2O, O2, N2, H2, CH4, CO, CO2, NH3, NO, NO2, H2S, SO2, H2SO4, HNO3, NaOH, NH4OH, CalciumDihydroxide, AmmoniumSulfate, NaNO3, Na2SO4, CaSO4, DAP, Ethanol, AceticAcid, Glucose, GlucoseOligomer, Extractives, Xylose, XyloseOligomer, Sucrose, Cellobiose, Mannose, MannoseOligomer, Galactose, GalactoseOligomer, Arabinose, ArabinoseOligomer, SolubleLignin, Glycerol, Protein, Enzyme, Z_mobilis, P_putida, P_putidaGrow, WWTsludge, Denaturant, Furfural, HMF, Xylitol, LacticAcid, SuccinicAcid, AdipicAcid, MuconicAcid, MonoSodiumMuconate, Acetate, AmmoniumAcetate, Glucan, Mannan, Galactan, Xylan, Arabinan, Lignin, P4O10, Ash, Tar, CSL, BoilerChems, Polymer, BaghouseBag, CoolingTowerChems])
@@ -83,11 +87,11 @@ Processes:
     >>> acid.ethanol_sys.show() # The complete acid-pretreatment biorefinery
     System: ethanol_sys
      path: (U101, pretreatment_sys,
-           fermentation_sys,
-           ethanol_purification_sys,
-           wastewater_sys, T701, T702, M701,
-           T703, T704_S, T704, T705, T706_S,
-           T706, T707_S, T707, T708, M702)
+            fermentation_sys,
+            ethanol_purification_sys,
+            wastewater_sys, T701, T702, M701,
+            T703, T704_S, T704, T705, T706_S,
+            T706, T707_S, T707, T708, M702)
      facilities: (CHP, CT, CWP, PWC, ADP, CIP, BDM)
     >>> base.ethanol_adipic_sys.show() # The complete base-pretreatment biorefinery
     System: ethanol_adipic_sys
@@ -99,17 +103,13 @@ Processes:
             T705_S, T705, T706_S, T706,
             T707_S, T707, T708_S, T708,
             T709_S, T709, T710, M702)
-     facilities: (CHP, CT, CWP, PWC, ADP, CIP, BDM)   
+     facilities: (CHP, CT, CWP, PWC, ADP, CIP, BDM)  
     >>> acid.ethanol_tea.show() # TEA object for the acid-pretreatment biorefinery
     CombinedTEA: ethanol_sys, CHP_sys
-     NPV: -398 USD at 10.0% IRR
-     ROI: 0.225 1/yr
-     PBP: 9.59 yr
+     NPV: -429 USD at 10.0% IRR
     >>> base.ethanol_adipic_tea.show() # TEA object for the base-pretreatment biorefinery
-    CombinedTEA: LAOs_sys, Area700
-     NPV: -9.02e+04 USD at 10.0% IRR
-     ROI: 0.179 1/yr
-     PBP: 10.3 yr
+    CombinedTEA: ethanol_adipic_sys, CHP_sys
+     NPV: -3,398 USD at 10.0% IRR
     >>> acid.ethanol_sys.flowsheet # Flowsheet for the acid-pretreatment biorefinery
     <Flowsheet: ethanol>
     >>> base.ethanol_adipic_sys.flowsheet # Flowsheet for the base-pretreatment biorefinery
@@ -118,61 +118,61 @@ Processes:
     >>> # Any unit operations and streams can be accessed through the module
     SaccharificationAndCoFermentation: R301
     ins...
-    [0] s13  from  EnzymeHydrolysateMixer-M301
-        phase: 'l', T: 323.14 K, P: 101325 Pa
-        flow (kmol/hr): H2O                1.94e+04
+    [0] s12  from  EnzymeHydrolysateMixer-M301
+        phase: 'l', T: 346.38 K, P: 101325 Pa
+        flow (kmol/hr): H2O                1.97e+04
                         NH4OH              24.2
                         AmmoniumSulfate    18.8
-                        DAP                0.894
-                        AceticAcid         21.1
+                        DAP                0.919
+                        AceticAcid         20.8
                         Glucose            19.7
                         GlucoseOligomer    0.541
                         ...
-    [1] s14  from  SeedHoldTank-T301
+    [1] s13  from  SeedHoldTank-T301
         phase: 'l', T: 305.15 K, P: 101325 Pa
-        flow (kmol/hr): H2O                2.15e+03
+        flow (kmol/hr): H2O                2.18e+03
                         NH4OH              2.68
                         AmmoniumSulfate    2.09
-                        DAP                0.303
+                        DAP                0.411
                         Ethanol            49.9
-                        AceticAcid         2.35
+                        AceticAcid         2.31
                         Glucose            0.832
                         ...
     [2] CSL_R301  from  ReversedSplitter-T706_S
         phase: 'l', T: 298.15 K, P: 101325 Pa
-        flow (kmol/hr): CSL  29.5
+        flow (kmol/hr): CSL  29.8
     [3] DAP_R301  from  ReversedSplitter-T707_S
         phase: 'l', T: 298.15 K, P: 101325 Pa
-        flow (kmol/hr): DAP  0.894
+        flow (kmol/hr): DAP  0.919
     outs...
     [0] R301_g  to  Mixer-M401
         phase: 'g', T: 305.15 K, P: 101325 Pa
-        flow (kmol/hr): H2O           19.7
+        flow (kmol/hr): H2O           19.6
                         O2            4.68
                         CO2           411
-                        Ethanol       4.93
-                        AceticAcid    0.042
-                        Glycerol      1.84e-07
-                        Furfural      0.0233
+                        Ethanol       4.86
+                        AceticAcid    0.0408
+                        Glycerol      1.81e-07
+                        Furfural      0.0231
                         ...
     [1] effluent  to  Mixer-M402
         phase: 'l', T: 305.15 K, P: 101325 Pa
-        flow (kmol/hr): H2O                1.93e+04
+        flow (kmol/hr): H2O                1.96e+04
                         NH4OH              24.2
                         AmmoniumSulfate    18.8
-                        DAP                0.997
+                        DAP                1.94
                         Ethanol            460
-                        AceticAcid         21.1
+                        AceticAcid         20.8
                         Glucose            2.91
                         ...
     [2] side_draw  to  SeedTrain-R302
         phase: 'l', T: 321.15 K, P: 101325 Pa
-        flow (kmol/hr): H2O                2.14e+03
+        flow (kmol/hr): H2O                2.18e+03
                         NH4OH              2.68
                         AmmoniumSulfate    2.09
-                        DAP                0.321
+                        DAP                0.43
                         Ethanol            4.99
-                        AceticAcid         2.35
+                        AceticAcid         2.31
                         Glucose            16.6
                         ...
                         
@@ -180,11 +180,11 @@ Processes:
     >>> # Any unit operations and streams can be accessed through the module
     MuconicFermentation: R502
     ins...
-    [0] s62  from  NeutralizationTank-T502
-        phase: 'l', T: 387.96 K, P: 101325 Pa
+    [0] s60  from  NeutralizationTank-T502
+        phase: 'l', T: 387.93 K, P: 101325 Pa
         flow (kmol/hr): H2O              2.95e+03
                         Na2SO4           72.9
-                        DAP              0.0166
+                        DAP              0.0338
                         Ethanol          0.00123
                         Glucose          5.43
                         GlucoseOligomer  0.264
@@ -195,10 +195,10 @@ Processes:
         flow (kmol/hr): H2O  4.44e+03
     [2] ammonia_R502  from  ReversedSplitter-T706_S
         phase: 'l', T: 298.15 K, P: 101325 Pa
-        flow (kmol/hr): NH4OH  10.2
+        flow (kmol/hr): NH4OH  2.22
     [3] caustic_R502  from  ReversedSplitter-T707_S
         phase: 'l', T: 298.15 K, P: 101325 Pa
-        flow (kmol/hr): NaOH  50.7
+        flow (kmol/hr): NaOH  30.3
     [4] CSL_R502  from  ReversedSplitter-T708_S
         phase: 'l', T: 298.15 K, P: 101325 Pa
         flow (kmol/hr): CSL  6.37
@@ -207,22 +207,22 @@ Processes:
         flow (kmol/hr): DAP  0.156
     [6] air_R502
         phase: 'g', T: 298.15 K, P: 101325 Pa
-        flow (kmol/hr): O2  151
-                        N2  650
+        flow (kmol/hr): O2  97
+                        N2  417
     outs...
     [0] R502_vent
         phase: 'l', T: 305.15 K, P: 101325 Pa
-        flow (kmol/hr): N2   650
-                        CO2  149
+        flow (kmol/hr): N2   417
+                        CO2  70.7
     [1] crude_muconic  to  ProcessSpecification-PS501
         phase: 'l', T: 305.15 K, P: 101325 Pa
-        flow (kmol/hr): H2O                 7.76e+03
+        flow (kmol/hr): H2O                 7.53e+03
                         Na2SO4              72.9
                         DAP                 0.142
                         Ethanol             0.00123
                         GlucoseOligomer     0.264
+                        Extractives         62.2
                         Cellobiose          0.0357
-                        SolubleLignin       27.2
                         ...
 
 
@@ -255,8 +255,8 @@ Requirements
 
     Note: results used in the manuscript were generated using biosteam v2.20.5 and dependencies
 
-.. [2] Excel file named "Feedstock compositions.xlsx" in the same directory path
-    as the _analyses.py module
+.. [2] Excel file named "_Feedstock compositions.xlsx" in the same directory path
+    as the analyses.py module
 
 
 References

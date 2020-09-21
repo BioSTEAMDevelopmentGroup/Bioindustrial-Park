@@ -62,12 +62,13 @@ from flexsolve import aitken_secant, IQ_interpolation
 from biosteam import System
 from biosteam.process_tools import UnitGroup
 from thermosteam import Stream
-from lactic import units, facilities
-from lactic.hx_network import HX_Network
-from lactic.process_settings import price, CFs
-from lactic.utils import baseline_feedflow, set_yield, find_split, splits_df
-from lactic.chemicals import chems, chemical_groups, soluble_organics, combustibles
-from lactic.tea_lca import LacticTEA
+from lactic import _units as units
+from lactic import _facilities as facilities
+# from lactic.hx_network import HX_Network
+from lactic._process_settings import price, CFs
+from lactic._utils import baseline_feedflow, set_yield, find_split, splits_df
+from lactic._chemicals import chems, chemical_groups, soluble_organics, combustibles
+from lactic._tea_lca import LacticTEA
 
 flowsheet = bst.Flowsheet('lactic')
 bst.main_flowsheet.set_flowsheet(flowsheet)
@@ -276,7 +277,7 @@ S401 = units.CellMassFilter('S401', ins=PS301-0, outs=('cell_mass', ''),
 # Ca(LA)2 + H2SO4 --> CaSO4 + 2 LA
 R401 = units.AcidulationReactor('R401', ins=(S401-1, sulfuric_acid_R401),
                                 P=101325, tau=1, V_wf=0.8, length_to_diameter=2,
-                                kW_per_m3=0.295, wall_thickness_factor=1.5,
+                                kW_per_m3=0.0985, wall_thickness_factor=1.5,
                                 vessel_material='Stainless steel 316',
                                 vessel_type='Vertical')
 R401_P = bst.units.Pump('R401_P', ins=R401-0)
@@ -293,16 +294,24 @@ S402 = units.GypsumFilter('S402', ins=R401_P-0,
                                            chemical_groups),
                           outs=(gypsum, ''))
 
+# To avoid flash temperature lower than inlet temperature
+def adjust_F401_T():
+    S402._run()
+    if S402.ins[0].T > F401.T:
+        F401.T = F401.ins[0].T
+    else: F401.T = 379
+S402.specification = adjust_F401_T
+
 # Separate out the majority of water
 F401 = bst.units.Flash('F401', ins=S402-1, outs=('F401_g', 'F401_l'), T=379, P=101325,
                        vessel_material='Stainless steel 316')
-# To avoid flash temperature lower than inlet temperature
-def adjust_F401_T():
-    if F401.ins[0].T > F401.T:
-        F401.T = F401.ins[0].T
-    else: F401.T = 379
-    F401._run()
-F401.specification = adjust_F401_T
+
+# def adjust_F401_T():
+#     if F401.ins[0].T > F401.T:
+#         F401.T = F401.ins[0].T
+#     else: F401.T = 379
+#     F401._run()
+# F401.specification = adjust_F401_T
 
 # Condense waste vapor for recycling
 F401_H = bst.units.HXutility('F401_H', ins=F401-0, V=0, rigorous=True)
@@ -329,7 +338,7 @@ D401_P = bst.units.Pump('D401_P', ins=D401-1)
 R402 = units.Esterification('R402', ins=(D401_P-0, '', 'D403_l_recycled', 
                                          ethanol_R402, ''),
                             V_wf=0.8, length_to_diameter=2,
-                            kW_per_m3=0.295, wall_thickness_factor=1,
+                            kW_per_m3=1.97, wall_thickness_factor=1,
                             vessel_material='Stainless steel 316',
                             vessel_type='Vertical')
 # Increase pressure as the solution can be very thick for some designs
@@ -386,7 +395,7 @@ acid_ester_recycle = System('acid_ester_recycle',
 # R403.outs[1] is the discarded fraction of R403.ins[2]
 R403 = units.HydrolysisReactor('R403', ins=(D403_H-0, water_R403, F401_H-0, ''),
                                tau=4, V_wf=0.8, length_to_diameter=2,
-                               kW_per_m3=0.295, wall_thickness_factor=1,
+                               kW_per_m3=0.0985, wall_thickness_factor=1,
                                vessel_material='Stainless steel 316',
                                vessel_type='Vertical')
 R403_P = bst.units.Pump('R403_P', ins=R403-0)
@@ -637,6 +646,8 @@ ADP = facilities.ADP('ADP', ins=plant_air_in, outs='plant_air_out',
 CIP = facilities.CIP('CIP', ins=CIP_chems_in, outs='CIP_chems_out')
 
 # Heat exchange network
+# HXN = bst.units.HeatExchangerNetwork('HXN')
+from lactic.hx_network import HX_Network
 HXN = HX_Network('HXN')
 
 HXN_group = UnitGroup('HXN_group', units=(HXN,))
@@ -751,8 +762,8 @@ def get_material_GWP():
     # feedstock_GWP = feedstock.F_mass*CFs['GWP_CFs']['Corn stover']
     return chemical_GWP.sum()/lactic_acid.F_mass
 
-# GWP from combustion of non-biogenic carbons
-get_non_bio_GWP = lambda: (natural_gas.get_atomic_flow('C')+ethanol.get_atomic_flow('C')) \
+# GWP from onsite emission (e.g., combustion) of non-biogenic carbons
+get_onsite_GWP = lambda: (natural_gas.get_atomic_flow('C')+ethanol.get_atomic_flow('C')) \
     * chems.CO2.MW / lactic_acid.F_mass
 
 # GWP from electricity
@@ -764,7 +775,7 @@ get_electricity_GWP = lambda: get_electricity_use()*CFs['GWP_CFs']['Electricity'
 get_fixed_GWP = lambda: \
     lactic_acid.get_atomic_flow('C')*chems.CO2.MW/lactic_acid.F_mass
 
-get_GWP = lambda: get_material_GWP()+get_non_bio_GWP()+get_electricity_GWP()
+get_GWP = lambda: get_material_GWP()+get_onsite_GWP()+get_electricity_GWP()
 
 # Fossil energy consumption (FEC) from materials
 def get_material_FEC():
@@ -815,8 +826,14 @@ def simulate_operating_improvement():
     # hps = bst.HeatUtility.get_heating_agent('high_pressure_steam')
     # for i in (lps, mps, hps):
     #     i.heat_transfer_efficiency = 1
-    U101.diversion_to_CHP = 0.5
-    simulate_and_print()
+    U101.diversion_to_CHP = 0.25
+    print('\n---------- Simulation Results ----------')
+    print(f'MPSP is ${simulate_get_MPSP():.3f}/kg')
+    LCA_stream.imass['CH4'] *= 0.75
+    natural_gas.imass['CH4'] *= 0.75
+    print(f'GWP is {get_GWP():.3f} kg CO2-eq/kg lactic acid')
+    print(f'FEC is {get_FEC():.2f} MJ/kg lactic acid')
+    print('--------------------\n')    
 
 simulate_and_print()
 # simulate_fermentation_improvement()
