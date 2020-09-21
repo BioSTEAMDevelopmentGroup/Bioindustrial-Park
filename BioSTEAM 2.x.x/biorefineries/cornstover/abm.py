@@ -98,7 +98,7 @@ def ABM_TEA_model(
     cs.cornstover.price = (price_cornstover * x_cornstover 
                            + price_miscanthus * (1 - x_cornstover))
     cs.ethanol.price = price_ethanol
-    cs.cornstover.F_mass = plant_capacity / operating_days / 24
+    cs.cornstover.F_mass = plant_capacity / operating_days / 24.
     cs.cornstover_tea.operating_days = operating_days
     cs.cornstover_sys.simulate()
     cs.cornstover_tea.IRR = IRR
