@@ -9,6 +9,7 @@
 """
 import numpy as np
 from biosteam.process_tools import UnitGroup
+import pytest
 
 def test_sugarcane():
     from biorefineries import sugarcane as sc
@@ -67,7 +68,8 @@ def test_LAOs():
     assert np.allclose(units.get_cooling_duty(), 134.66774238880174, rtol=1e-2)
     assert np.allclose(units.get_electricity_consumption(), 3.689496361470118, rtol=1e-2)
     assert np.allclose(units.get_electricity_production(), 3.6894963614701215, rtol=1e-2)   
-    
+
+@pytest.mark.slow
 def test_wheatstraw():
     from biorefineries import wheatstraw as ws
     ws.load()
