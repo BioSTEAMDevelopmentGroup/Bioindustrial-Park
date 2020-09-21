@@ -139,6 +139,6 @@ if __name__ == '__main__':
     test_cornstover()
     test_wheatstraw()
     test_LAOs()
-    test_ethanol_adipic()
-    test_lactic()
+#    test_ethanol_adipic()
+#    test_lactic()
 
