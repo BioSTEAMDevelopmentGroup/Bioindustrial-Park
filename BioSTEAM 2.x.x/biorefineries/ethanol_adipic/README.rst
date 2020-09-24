@@ -253,7 +253,7 @@ Requirements
 ------------
 .. [1] Python module biosteam (https://pypi.org/project/biosteam/) and dependencies
 
-    Note: results used in the manuscript were generated using biosteam v2.20.5 and dependencies
+    Note: results used in the manuscript were generated using biosteam v2.20.21 and dependencies
 
 .. [2] Excel file named "_Feedstock compositions.xlsx" in the same directory path
     as the analyses.py module

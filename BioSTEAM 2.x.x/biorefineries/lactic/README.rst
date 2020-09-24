@@ -150,18 +150,25 @@ of varying succinic acid content.
 To reproduce the results, directly run the script of interest, and results will
 be saved as Excel files in the same directory path as the module.
 
-If running the 2-2_ferm_concentrated script return an error concerning E301 and
-f(x0) and f(x1) signs, then in biosteam.units._multi_effec_evaporator, change
-the last line of:
+.. note::
+        If running the 2-2_ferm_concentrated script return an error concerning E301 and
+        f(x0) and f(x1) signs, then in biosteam.units._multi_effec_evaporator, change
+    
+    .. code-block:: python
+    
+            self._V1 = flx.IQ_interpolation(compute_overall_vapor_fraction,
+                                            x0, x1, y0, y1, self._V1, 
+                                            xtol=0.000001, ytol=0.0001,
+                                            checkiter=False)
 
-        self._V1 = flx.IQ_interpolation(compute_overall_vapor_fraction,
-                                        x0, x1, y0, y1, self._V1, 
-                                        xtol=0.000001, ytol=0.0001,
-                                        checkiter=False)
-                                        
-to:
-                                        checkiter=False, checkbounds=False)
+    to
 
+    .. code-block:: python
+    
+            self._V1 = flx.IQ_interpolation(compute_overall_vapor_fraction,
+                                            x0, x1, y0, y1, self._V1, 
+                                            xtol=0.000001, ytol=0.0001,
+                                            checkiter=False, checkbounds=False)
 
 References
 ----------
