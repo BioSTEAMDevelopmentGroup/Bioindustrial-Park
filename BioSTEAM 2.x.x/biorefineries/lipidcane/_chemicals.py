@@ -65,5 +65,6 @@ def create_chemicals():
     
     lipidcane_chemicals.compile()
     lipidcane_chemicals.set_synonym('Water', 'H2O')
+    lipidcane_chemicals.set_synonym('Yeast', 'DryYeast')
     return lipidcane_chemicals
 
