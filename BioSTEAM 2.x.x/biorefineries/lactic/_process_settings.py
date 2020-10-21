@@ -231,8 +231,9 @@ GWP_CFs['Gypsum'] = -4.20/1e3
 GWP_CFs['Electricity'] = 0.48
 # Lactic acid from corn stover
 GWP_CFs['Lactic acid_GREET'] = 1.80
-# From ref [7], lactic acid production, RoW, TRACI global warming
-GWP_CFs['Lactic acid_fossil'] = 4.1787
+# From ref [7], lactic acid production, RoW, TRACI global warming,
+# substitution, consequential, long-term
+GWP_CFs['Lactic acid_fossil'] = 5.2796
 
 CFs['GWP_CFs'] = GWP_CFs
 CFs['GWP_CF_stream'] = GWP_CF_stream
@@ -265,8 +266,9 @@ FEC_CFs['Gypsum'] = -44.19/1e3
 FEC_CFs['Electricity'] = 5.926
 # From corn stover
 FEC_CFs['Lactic acid'] = 29
-# From ref [7], lactic acid production, RoW, cumulative energy demand, fossil
-FEC_CFs['Lactic acid_fossil'] = 79.524
+# From ref [7], lactic acid production, RoW, cumulative energy demand, fossil,
+# substitution, consequential, long-term
+FEC_CFs['Lactic acid_fossil'] = 91.265
 
 CFs['FEC_CFs'] = FEC_CFs
 CFs['FEC_CF_stream'] = FEC_CF_stream

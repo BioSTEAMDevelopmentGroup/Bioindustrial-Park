@@ -35,11 +35,11 @@ References:
 
 import numpy as np
 import biosteam as bst
-import lactic.system as system
 from biosteam.evaluation import Model, Metric
 from chaospy import distributions as shape
 from lactic._process_settings import CFs
 from lactic._utils import set_yield
+from lactic import system
 
 _kg_per_ton = 907.18474
 _feedstock_factor = _kg_per_ton / 0.8
@@ -431,39 +431,39 @@ def set_TCI_ratio(new_ratio):
 # Only include materials that account for >5% of total annual material cost,
 # enzyme not included as it's cost is more affected by the loading (considered later)
 D = shape.Triangle(60, 71.3, 83.7)
-@param(name='Feedstock price', element='TEA', kind='isolated', units='$/dry-ton',
+@param(name='Feedstock unit price', element='TEA', kind='isolated', units='$/dry-ton',
        baseline=71.3, distribution=D)
 def set_feedstock_price(price):
     feedstock.price = price / _feedstock_factor
 
 sulfuric_acid = system.sulfuric_acid
 D = shape.Triangle(0.0910, 0.0948, 0.1046)
-@param(name='Sulfuric acid price', element='TEA', kind='isolated', units='$/kg',
+@param(name='Sulfuric acid unit price', element='TEA', kind='isolated', units='$/kg',
        baseline=0.0948, distribution=D)
 def set_sulfuric_acid_price(price):
     sulfuric_acid.price = price
 
 D = shape.Triangle(0.160, 0.262, 0.288)
-@param(name='Lime price', element='TEA', kind='isolated', units='$/kg',
+@param(name='Lime unit price', element='TEA', kind='isolated', units='$/kg',
        baseline=0.262, distribution=D)
 def set_lime_price(price):
     lime.price = price
     lime_CHP.price = price
 
 D = shape.Triangle(0.198, 0.253, 0.304)
-@param(name='Natural gas price', element='TEA', kind='isolated', units='$/kg',
+@param(name='Natural gas unit price', element='TEA', kind='isolated', units='$/kg',
        baseline=0.253, distribution=D)
 def set_natural_gas_price(price):
     natural_gas.price = price
 
 D = shape.Uniform(-0.0288, 0.00776)
-@param(name='Gypsum price', element='TEA', kind='isolated', units='$/kg',
+@param(name='Gypsum unit price', element='TEA', kind='isolated', units='$/kg',
        baseline=0, distribution=D)
 def set_gypsum_price(price):
     gypsum.price = price
 
 D = shape.Triangle(0.067, 0.070, 0.074)
-@param(name='Electricity price', element='TEA', kind='isolated', units='$/kWh',
+@param(name='Electricity unit price', element='TEA', kind='isolated', units='$/kWh',
        baseline=0.070, distribution=D)
 def set_electricity_price(price): 
     bst.PowerUtility.price = price
@@ -629,82 +629,5 @@ def set_boiler_efficiency(efficiency):
 # All parameters
 parameters = model_full.get_parameters()
 
-
-# %%
-
-# =============================================================================
-# Model to evaluate system across lactic acid yield at different productivity
-# metrics, titer is calculate based on yield
-# =============================================================================
-
-ferm_metrics = [Metric('Fermentation titer', get_titer, 'g/L')]
-
-def create_productivity_metrics(productivity):
-    def get_productivity_based_MPSP():
-        set_lactic_productivity(productivity)
-        for unit in (R301, R302):
-            unit._design()
-            unit._cost()
-        return get_MPSP()
-    header = f'Productivity={productivity:.2f} [g/L/hr]'
-    return [Metric('MPSP', get_productivity_based_MPSP, '$/kg', header),
-            Metric('NPV', get_NPV, '$', header)]
-
-productivities = (0.18, 0.89, 1.92)
-
-ferm_metrics_MPSP = sum([create_productivity_metrics(productivity)
-                          for productivity in productivities], [])
-ferm_metrics += ferm_metrics_MPSP
-ferm_metrics.extend((
-    Metric('GWP', get_GWP, 'kg CO2-eq/kg', 'LCA'),
-    Metric('FEC', get_FEC, 'MJ/kg', 'LCA')
-    ))
-
-model_ferm = Model(lactic_sys, ferm_metrics)
-ferm_parameters = [i for i in model_full.get_parameters()
-                   if i.name not in ('Lactic acid yield', 'Productivity')]
-model_ferm.set_parameters(ferm_parameters)
-
-
-# %%
-
-# =============================================================================
-# Model to evalute system across feedstock carbohydate content at different
-# feedstock price metrics
-# =============================================================================
-
-def create_price_metrics(price):
-    def get_price_based_MPSP():
-        price_per_kg = price / _feedstock_factor
-        feedstock.price = price_per_kg
-        return get_MPSP()
-    header = f'Price={price:.0f} [$/dry-ton]'
-    return [Metric('MPSP', get_price_based_MPSP, '$/kg', header),
-            Metric('NPV', get_NPV, '$', header)]
-
-prices = np.arange(0, 210, 10)
-
-carb_metrics = sum([create_price_metrics(price) for price in prices],[])
-carb_metrics.extend((
-    Metric('GWP', get_GWP, 'kg CO2-eq/kg', 'LCA'),
-    Metric('FEC', get_FEC, 'MJ/kg', 'LCA')
-    ))
-
-def set_carbs(carbs_content):
-    carbs = ('Glucan', 'Xylan', 'Arabinan', 'Galactan', 'Mannan')
-    dry_mass = feedstock.F_mass.copy() - feedstock.imass[('H2O',)].copy()
-    old_carbs_mass_total = feedstock.imass[carbs].sum().copy()
-    ratio = feedstock.get_normalized_mass(carbs)
-    new_carbs_mass = dry_mass * carbs_content * ratio
-    feedstock.set_flow(new_carbs_mass, 'kg/hr', carbs)
-    mass_diff = new_carbs_mass.sum() - old_carbs_mass_total
-    feedstock.imass['Extractives'] -= mass_diff
-    if any(feedstock.mass < 0):
-        raise ValueError(f'Carbohydrate content of {carbs_content*100:.1f} dw% is infeasible')
-
-model_carbs_price = Model(lactic_sys, carb_metrics)
-# Use the blank parameter to enable evaluation across internal rate of return
-blank_parameter = [i for i in model_full.get_parameters() if i.name=='Blank parameter']
-model_carbs_price.set_parameters(blank_parameter)
 
 

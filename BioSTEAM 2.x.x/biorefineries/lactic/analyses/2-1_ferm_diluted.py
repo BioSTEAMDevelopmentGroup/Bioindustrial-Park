@@ -180,9 +180,9 @@ for i in yield_range:
 
 regular_data = save_data_clear()
 
-with pd.ExcelWriter('regular1.xlsx') as writer:
-    regular_limit.to_excel(writer, sheet_name='Regular limit')
-    regular_data.to_excel(writer, sheet_name='Regular data')
+# with pd.ExcelWriter('regular-1.xlsx') as writer:
+#     regular_limit.to_excel(writer, sheet_name='Regular limit')
+#     regular_data.to_excel(writer, sheet_name='Regular data')
 
 
 # %%

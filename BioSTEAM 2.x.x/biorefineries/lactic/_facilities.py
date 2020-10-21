@@ -158,11 +158,11 @@ class CT(Facility):
         
     def _run(self):
         return_cw, ct_chems, makeup_water = self.ins
-        process_cw, blowdown = self.outs
+        process_cw, blowdown_water = self.outs
         system_cooling_water_utilities = self.system_cooling_water_utilities = {}
 
         return_cw.T = 37 + 273.15
-        process_cw.T = blowdown.T = 28 + 273.15
+        process_cw.T = blowdown_water.T = 28 + 273.15
         
         total_duty = 0
         number = 1
@@ -186,7 +186,7 @@ class CT(Facility):
             - hu_cooling.flow * self.chemicals.H2O.MW
         return_cw.imass['H2O'] = process_cw.imass['H2O'] = total_cooling_water
         makeup_water.imass['H2O'] = total_cooling_water * self.blowdown
-        blowdown.imass['H2O'] = makeup_water.imass['H2O']
+        blowdown_water.imass['H2O'] = makeup_water.imass['H2O']
         
         ct_chems.imass['CoolingTowerChems'] = 2 * (hu_cooling.duty/(97.401*4184000))
         self.design_results['Flow rate'] = total_cooling_water

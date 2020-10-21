@@ -37,9 +37,33 @@ lactic acid from lignocellulosic feedstocks
 
 import numpy as np
 import pandas as pd
+import biosteam as bst
 from biosteam.utils import TicToc
-from lactic.system import R301
-from lactic.analyses import models
+
+_kg_per_ton = 907.18474
+_feedstock_factor = _kg_per_ton / 0.8
+
+
+# %%
+
+# =============================================================================
+# Model to evalute system across feedstock carbohydate content at different
+# feedstock price metrics
+# =============================================================================
+
+def set_carbs(carbs_content, feedstock):
+    carbs = ('Glucan', 'Xylan', 'Arabinan', 'Galactan', 'Mannan')
+    dry_mass = feedstock.F_mass.copy() - feedstock.imass[('H2O',)].copy()
+    old_carbs_mass_total = feedstock.imass[carbs].sum().copy()
+    ratio = feedstock.get_normalized_mass(carbs)
+    new_carbs_mass = dry_mass * carbs_content * ratio
+    feedstock.set_flow(new_carbs_mass, 'kg/hr', carbs)
+    mass_diff = new_carbs_mass.sum() - old_carbs_mass_total
+    feedstock.imass['Extractives'] -= mass_diff
+    if any(feedstock.mass < 0):
+        raise ValueError(f'Carbohydrate content of {carbs_content*100:.1f} dw% is infeasible')
+
+prices = np.arange(0, 210, 10)
 
 
 # %%
@@ -51,67 +75,93 @@ from lactic.analyses import models
 # Initiate a timer
 timer = TicToc('timer')
 timer.tic()
+run_number = 0
 
-model = models.model_carbs_price
-R301.set_titer_limit = True
-set_carbs = models.set_carbs
-prices = models.prices
+TEA_carbs = []
+TEA_prices = []
+titers = []
+MPSPs = []
+NPVs = []
+GWPs = []
+FECs = []
 
-'''Evaluate'''
-np.random.seed(3221)
-# This is not a Monte Carlo simulation, this evaluation uses the baseline parameters
-# to see the impacts of feedstock carbohydrate content
-# The parameter is a fake one to enable the evaluation
-N_simulation = 1
-samples_1d = model.sample(N=N_simulation, rule='L')
-samples = samples_1d[:, np.newaxis]
-model.load_samples(samples)
+# Configuration 1
+from lactic import system_concentrated as concentrated
+carb_contents1 = np.arange(0.25, 0.59, 0.01)
+carb_contents1 = carb_contents1.tolist() + [0.589]
+concentrated.R301.allow_dilution = False
+concentrated.R301.allow_concentration = True
+concentrated.R301.mode = 'Batch'
+concentrated.R301.titer_limit = 97.5
+concentrated.E301.bypass = False
 
-carb_contents = np.arange(0.25, 0.701, 0.01)
-data = model.evaluate_across_coordinate(
-    'Carbohydate content', set_carbs, carb_contents, notify=True)
+# Using two loops are not optimal, can potentially use Model and Metric to speed up
+bst.speed_up()
+for i in carb_contents1:
+    set_carbs(i, concentrated.feedstock)
+    concentrated.lactic_sys.simulate()
+    titers.append(concentrated.R301.effluent_titer)
+    GWPs.append(concentrated.get_GWP())
+    FECs.append(concentrated.get_FEC())
+    for j in prices:
+        TEA_carbs.append(i)
+        TEA_prices.append(j)
+        concentrated.feedstock.price = j / _feedstock_factor
+        concentrated.lactic_acid.price = 0
+        for m in range(3):
+            MPSP = concentrated.lactic_acid.price = \
+                concentrated.lactic_tea.solve_price(concentrated.lactic_acid)
+        MPSPs.append(MPSP)
+        NPVs.append(concentrated.lactic_tea.NPV)
+    run_number += 1
+    print(f'Run #{run_number}: {timer.elapsed_time:.0f} sec')
 
-results = pd.DataFrame({
-    ('Parameter', 'Carbohydrate content [dw%]'): carb_contents})
+# Then concentration needed to get to the baseline titer
+from lactic import system_diluted as diluted
+carb_contents2 = np.arange(0.59, 0.701, 0.01).tolist()
+diluted.R301.allow_dilution = True
+diluted.R301.allow_concentration = False
+diluted.R301.titer_limit = 97.5
 
-for i in data.keys():
-    results[i] = data[i][0]
-
-'''Organize data for easy plotting'''
-TEA_x = [i for i in carb_contents]
-TEA_x *= len(prices)
-TEA_y = sum(([i]*len(carb_contents) for i in prices), [])
-
-MPSPs = [[], []]
-GWPs = [[], []]
-FECs = [[], []]
-for i in range(results.columns.shape[0]):
-    if 'MPSP' in results.columns[i][1]:
-        MPSPs[0] +=  results[results.columns[i]].to_list()
-    if 'GWP' in results.columns[i][1]:
-        GWPs[0] +=  results[results.columns[i]].to_list()
-    if 'FEC' in results.columns[i][1]:
-        FECs[0] +=  results[results.columns[i]].to_list()
+bst.speed_up()
+for i in carb_contents2:
+    set_carbs(i, diluted.feedstock)
+    diluted.lactic_sys.simulate()
+    titers.append(diluted.R301.effluent_titer)
+    GWPs.append(diluted.get_GWP())
+    FECs.append(diluted.get_FEC())
+    for j in prices:
+        TEA_carbs.append(i)
+        TEA_prices.append(j)
+        diluted.feedstock.price = j / _feedstock_factor
+        diluted.lactic_acid.price = 0
+        for m in range(3):
+            MPSP = diluted.lactic_acid.price = \
+                diluted.lactic_tea.solve_price(diluted.lactic_acid)
+        MPSPs.append(MPSP)
+        NPVs.append(diluted.lactic_tea.NPV)
+    run_number += 1
+    print(f'Run #{run_number}: {timer.elapsed_time:.0f} sec')
 
 TEA_plot_data = pd.DataFrame({
-    'Carbohydrate content [dw%]': TEA_x,
-    'Price [$/dry-ton]': TEA_y,
-    'MPSP [$/kg]': MPSPs[0]
+    'Carbohydrate content [dw%]': TEA_carbs,
+    'Price [$/dry-ton]': TEA_prices,
+    'MPSP [$/kg]': MPSPs,
+    'NPVs [$]': NPVs
     })
 
 LCA_plot_data = pd.DataFrame({
-    'Carbohydrate content [dw%]': carb_contents,    
-    'GWP [kg CO2-eq/kg]': GWPs[0],
-    'FEC [MJ/kg]': FECs[0]
+    'Carbohydrate content [dw%]': carb_contents1+carb_contents2,
+    'Titers [g/L]': titers,
+    'GWP [kg CO2-eq/kg]': GWPs,
+    'FEC [MJ/kg]': FECs
     })
 
 '''Output to Excel'''
 with pd.ExcelWriter('3_carbs-price.xlsx') as writer:
-    TEA_plot_data.to_excel(writer, sheet_name='TEA plotting')
-    LCA_plot_data.to_excel(writer, sheet_name='LCA plotting')
-    results.to_excel(writer, sheet_name='Raw data')
+    TEA_plot_data.to_excel(writer, sheet_name='TEA')
+    LCA_plot_data.to_excel(writer, sheet_name='LCA')
 
-run_number = samples.shape[0]*len(carb_contents)
 time = timer.elapsed_time / 60
 print(f'\nSimulation time for {run_number} runs is: {time:.1f} min')
 

@@ -386,7 +386,7 @@ for chemical in chems:
         try: chemical.kappa.move_up_model_priority('Lakshmi Prasad', -1)
         except: pass
         
-# Default missing properties of chemicals to those of water,
+# Default missing properties of chemicals to those of water
 for chemical in chems: chemical.default()
 
 

@@ -43,7 +43,7 @@ from biosteam.plots import plot_montecarlo_across_coordinate
 from lactic.system import R301, lactic_sys, simulate_get_MPSP, get_GWP, get_FEC
 from lactic.analyses import models
 
-percentiles = [0, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 1]
+percentiles = [0, 0.05, 0.25, 0.5, 0.75, 0.95, 1]
 
 
 # %%
@@ -214,31 +214,6 @@ with pd.ExcelWriter('1_full_evaluation.xlsx') as writer:
     model.table.to_excel(writer, sheet_name='Raw data')
 
 
-# %%
-
-# =============================================================================
-# Temporary codes for debugging
-# =============================================================================
-
-# import numpy as np
-# from lactic.analyses import models
-
-# model = models.model_full
-# np.random.seed(3221)
-
-# try: parameter = [parameters[-2]]
-# except: parameter = parameters
-# model.set_parameters(parameter)
-
-# N_simulation = 20 # 1000
-# # samples = model.sample(N=N_simulation, rule='L')
-# samples = np.ones(N_simulation)
-# samples *= 0.070
-
-# model.load_samples(samples)
-# model.evaluate()
-
-# model.table.to_clipboard()
 
 
 

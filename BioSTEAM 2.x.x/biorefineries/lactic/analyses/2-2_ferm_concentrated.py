@@ -72,8 +72,7 @@ FECs = {0.89: [],
         0.18: [],
         1.92: []}
 
-yield_range = np.arange(0.3, 1.01, 0.05) - 1e-6
-# yield_range = np.arange(0.3, 1.01, 0.025) - 1e-6
+yield_range = np.arange(0.3, 1.01, 0.025) - 1e-6
 # yield_range = np.arange(0.3, 1.01, 0.5) - 1e-6
 
 # For the concentrated, batch scenario (regular and acid-resistant scenarios).
@@ -119,18 +118,21 @@ def simulate_log_results(return_limit=False):
             MPSP = solve_TEA()
             GWP = system_concentrated.get_GWP()
             FEC = system_concentrated.get_FEC()
-            if lactic_yield < 0.3:
-                MPSPs[productivity].append(MPSP)
-                GWPs[productivity].append(GWP)
-                FECs[productivity].append(FEC)
-            elif lactic_yield==lactics['yield'][-1] and MPSP>MPSPs[productivity][-1]:
-                MPSPs[productivity].append(np.nan)
-                GWPs[productivity].append(np.nan)
-                FECs[productivity].append(np.nan)
-            else:
-                MPSPs[productivity].append(MPSP)
-                GWPs[productivity].append(GWP)
-                FECs[productivity].append(FEC)
+            # if lactic_yield < 0.3:
+            #     MPSPs[productivity].append(MPSP)
+            #     GWPs[productivity].append(GWP)
+            #     FECs[productivity].append(FEC)
+            # elif lactic_yield==lactics['yield'][-1] and MPSP>MPSPs[productivity][-1]:
+            #     MPSPs[productivity].append(np.nan)
+            #     GWPs[productivity].append(np.nan)
+            #     FECs[productivity].append(np.nan)
+            # else:
+            #     MPSPs[productivity].append(MPSP)
+            #     GWPs[productivity].append(GWP)
+            #     FECs[productivity].append(FEC)
+            MPSPs[productivity].append(MPSP)
+            GWPs[productivity].append(GWP)
+            FECs[productivity].append(FEC)
             NPVs[productivity].append(lactic_tea.NPV)
         lactics['yield'].append(lactic_yield)
         lactics['titer'].append(R301.effluent_titer)
@@ -211,7 +213,9 @@ regular_limit2 = save_data_clear()
 print('\n---------- Regular Strain Batch Mode ----------')
 # Concentrate the saccharified stream to achieve higher titers in batch mode
 for i in yield_range:
-    titer_range = np.linspace(limits[0][0][i], limits[1][0][i], 5)
+    limit = limits[1][0][i]
+    titer_range = np.arange(limits[0][0][i], limits[1][0][i], 2.5)
+    titer_range = titer_range.tolist() + [limit]
     for j in titer_range:
         R301.yield_limit = i
         R301.titer_limit = j
@@ -219,7 +223,7 @@ for i in yield_range:
         simulate_log_results(return_limit=False)
 
 regular_batch = save_data_clear()
-regular_batch.to_excel('regular_batch.xlsx')
+# regular_batch.to_excel('regular_batch.xlsx')
 
 print('\n---------- Regular Strain Continuous Limits ----------')
 # Find the maximum achievable titer with concentration in continuous mode
@@ -250,10 +254,10 @@ for i in yield_range:
 
 regular_continuous = save_data_clear()
 
-with pd.ExcelWriter('regular2.xlsx') as writer:
-    regular_limits.to_excel(writer, sheet_name='Regular limits')
-    # regular_batch.to_excel(writer, sheet_name='Regular batch')
-    regular_continuous.to_excel(writer, sheet_name='Regular continuous')
+# with pd.ExcelWriter('regular-2.xlsx') as writer:
+#     regular_limits.to_excel(writer, sheet_name='Regular limits')
+#     regular_batch.to_excel(writer, sheet_name='Regular batch')
+#     regular_continuous.to_excel(writer, sheet_name='Regular continuous')
 
 
 # %%
@@ -293,6 +297,7 @@ resistant_limit2 = save_data_clear()
 print('\n---------- Acid-resistant Strain Batch Mode ----------')
 # Concentrate the saccharified stream to achieve higher titers in batch mode
 for i in yield_range:
+    limit = limits[1][1][i]
     titer_range = np.arange(limits[0][1][i], limits[1][1][i], 2.5)
     titer_range = titer_range.tolist() + [limit]
     for j in titer_range:
