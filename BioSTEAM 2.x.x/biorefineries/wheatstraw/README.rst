@@ -1,6 +1,10 @@
+==============================================================
+wheatstraw: 2nd Generation Ethanol Production from Wheat Straw
+==============================================================
+
 The wheatstraw biorefinery design for the production of ethanol
 follows all assumptions from a study by Humbird et. al. executed with Aspen 
-plus [1]. As discussed in our paper [2], the wheatstraw biorefinery can be 
+plus [1]_. As discussed in our paper [2]_, the wheatstraw biorefinery can be 
 divided into eight areas: pretreatment, fermentation, 
 ethanol purification, biogas production, wastewater treatment, storage, 
 boiler and turbo-generator system, and utilities. During pretreatment, the 
@@ -15,7 +19,7 @@ other column. The bottom fraction is filter-pressed. The solid fraction is sent 
 boiler turbogenerator to produce steam and electricity, and the liquid fraction is sent
 to the biogas production area. The liquid from the biogas reactor is sent to the wastewater
 treatment plant and the treated water in recirculated into the process.
-The results shown in [2] correspond to an implementation of the biorefinery in the Biosteam 
+The results shown in [2]_ correspond to an implementation of the biorefinery in the Biosteam 
 version 2.1.9. The update of the biorefinery to the latest version (v2.20.19) led to a slight
 change in the results due to the fact that the boiler turbogenerator is modelled differently 
 in the latest version.
