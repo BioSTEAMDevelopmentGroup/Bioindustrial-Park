@@ -8,6 +8,7 @@
 """
 """
 import biosteam as bst
+from biorefineries import corn as cn
 
 __all__ = ('create_system',)
 
@@ -37,3 +38,9 @@ def create_system(ID='corn_sys'):
     )
     
     
+    KMT = bst.StorageTank('KMT', ins=corn, tau=259.2)
+    U101 = cn.units.CleaningSystem('U101', KMT-0, outs=('', 'trash'), split=0.997)
+    U102 = bst.HammerMill('U102', U101-0)
+    U103 = bst.ConveyingBelt('U103', U102-0)
+    T101 = bst.StorageTank('T101', U103-0, tau=2.) # Weigh tank
+    T102 = bst.

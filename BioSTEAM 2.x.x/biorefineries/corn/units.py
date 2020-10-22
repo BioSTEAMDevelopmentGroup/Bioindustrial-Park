@@ -32,7 +32,7 @@ class CornStorage(bst.Unit):
     pass
 
 
-class CleaningSystem(bst.Unit):
+class CleaningSystem(bst.Splitter):
     pass
 
 
