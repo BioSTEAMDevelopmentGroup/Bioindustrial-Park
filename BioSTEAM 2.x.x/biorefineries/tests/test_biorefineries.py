@@ -10,6 +10,7 @@
 import numpy as np
 import biosteam as bst
 from biosteam.process_tools import UnitGroup
+import pytest
 
 def test_sugarcane():
     from biorefineries import sugarcane as sc
@@ -117,21 +118,37 @@ def test_lactic():
     assert np.allclose(units.get_electricity_consumption(), 45.934100853716096, rtol=0.01)
     assert np.allclose(units.get_electricity_production(), 0.0)
 
+@pytest.mark.slow
 def test_wheatstraw():
     from biorefineries import wheatstraw as ws
     ws.load()
     MESP = ws.wheatstraw_tea.solve_price(ws.ethanol)
     units = UnitGroup('Biorefinery', ws.wheatstraw_tea.units)
-    assert np.allclose(MESP, 0.8988122216128204, rtol=1e-2)
-    assert np.allclose(ws.wheatstraw_tea.sales, 126993140.05266903, rtol=1e-2)
-    assert np.allclose(ws.wheatstraw_tea.material_cost, 63299710.08900007, rtol=1e-2)
-    assert np.allclose(ws.wheatstraw_tea.installed_equipment_cost, 244243473.75764972, rtol=1e-2)
-    assert np.allclose(ws.wheatstraw_tea.utility_cost, -8089087.901156843, rtol=1e-2)
-    assert np.allclose(units.get_heating_duty(), 186.2281059784184, rtol=1e-2)
-    assert np.allclose(units.get_cooling_duty(), 270.20290353471364, rtol=1e-2)
-    assert np.allclose(units.get_electricity_consumption(), 22.924114167705298, rtol=1e-2)
-    assert np.allclose(units.get_electricity_production(), 39.74032666884628, rtol=1e-2)
+    assert np.allclose(MESP, 0.9384667423768497, rtol=1e-2)
+    assert np.allclose(ws.wheatstraw_tea.sales, 130275585.21251984, rtol=1e-2)
+    assert np.allclose(ws.wheatstraw_tea.material_cost, 63298497.065546915, rtol=1e-2)
+    assert np.allclose(ws.wheatstraw_tea.installed_equipment_cost, 242292530.10266995, rtol=1e-2)
+    assert np.allclose(ws.wheatstraw_tea.utility_cost, -4373067.719624106, rtol=1e-2)
+    assert np.allclose(units.get_heating_duty(), 219.0919211247056, rtol=1e-2)
+    assert np.allclose(units.get_cooling_duty(), 265.2733205865057, rtol=1e-2)
+    assert np.allclose(units.get_electricity_consumption(), 22.88974837441627, rtol=1e-2)
+    assert np.allclose(units.get_electricity_production(), 31.98081487705149, rtol=1e-2)
 
+@pytest.mark.slow
+def test_annimal_bedding():
+    from biorefineries import animal_bedding as ab
+    ab.load()
+    MESP = ab.bedding_tea.solve_price(ab.ethanol)
+    units = UnitGroup('Biorefinery', ab.bedding_tea.units)
+    assert np.allclose(MESP, 0.8188585523640879, rtol=1e-2)
+    assert np.allclose(ab.bedding_tea.sales, 115097527.36582053, rtol=1e-2)
+    assert np.allclose(ab.bedding_tea.material_cost, 33081968.8237324, rtol=1e-2)
+    assert np.allclose(ab.bedding_tea.installed_equipment_cost, 285002340.76542723, rtol=1e-2)
+    assert np.allclose(ab.bedding_tea.utility_cost, -1178035.514879562, rtol=1e-2)
+    assert np.allclose(units.get_heating_duty(), 161.56120885595166, rtol=1e-2)
+    assert np.allclose(units.get_cooling_duty(), 201.26648298810298, rtol=1e-2)
+    assert np.allclose(units.get_electricity_consumption(), 31.999853945401934, rtol=1e-2)
+    assert np.allclose(units.get_electricity_production(), 34.44884396679516, rtol=1e-2)
     
 if __name__ == '__main__':
     test_sugarcane()
@@ -139,6 +156,10 @@ if __name__ == '__main__':
     test_cornstover()
     test_wheatstraw()
     test_LAOs()
+    test_annimal_bedding()
 #    test_ethanol_adipic()
 #    test_lactic()
+
+
+
 

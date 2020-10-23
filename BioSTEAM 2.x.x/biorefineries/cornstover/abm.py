@@ -45,8 +45,8 @@ others_composition = cs.chemicals.kwarray(
          Ash=0.07)
 )
 others_composition /= others_composition.sum()
-miscanthus_dry_composition += 0.053 * others_composition
-miscanthus_composition = miscanthus_dry_composition + cellulosic_moisture_content
+miscanthus_dry_composition += (1. - miscanthus_dry_composition.sum()) * others_composition
+miscanthus_composition = 0.8 * miscanthus_dry_composition + cellulosic_moisture_content
 
 def set_mixed_cornstover_miscanthus_feedstock(x_cornstover):
     x_miscanthus = 1 - x_cornstover
@@ -80,7 +80,7 @@ def ABM_TEA_model(
     price_miscanthus : float
         Price of miscanthus in USD/kg.
     price_ethanol : float
-        Price of ethanol in USD/kg..
+        Price of ethanol in USD/kg.
     IRR : float
         Internal rate of return as a fraction (not percent!).
 
@@ -88,7 +88,8 @@ def ABM_TEA_model(
     -------
     metrics: dict
         Includes MESP [USD/kg], MFPP [USD/kg], IRR [-], NPV [USD], 
-        TCI [USD], VOC [USD/yr], and Production [kg/yr].
+        TCI [USD], FOC [USD/yr], VOC [USD/yr], Electricity consumption [MWhr/yr], 
+        Electricity production [MWhr/yr], and Production [kg/yr].
     
     """
     x_cornstover = cornstover_fraction
@@ -98,10 +99,12 @@ def ABM_TEA_model(
     cs.cornstover.price = (price_cornstover * x_cornstover 
                            + price_miscanthus * (1 - x_cornstover))
     cs.ethanol.price = price_ethanol
-    cs.cornstover.F_mass = plant_capacity / operating_days / 24.
+    hours = operating_days * 24 
+    cs.cornstover.F_mass = plant_capacity / hours
     cs.cornstover_tea.operating_days = operating_days
     cs.cornstover_sys.simulate()
     cs.cornstover_tea.IRR = IRR
+    unit_group = cs.AllAreas
     return {
         'MESP': cs.cornstover_tea.solve_price(cs.ethanol),
         'MFPP': cs.cornstover_tea.solve_price(cs.cornstover),
@@ -109,5 +112,8 @@ def ABM_TEA_model(
         'NPV': cs.cornstover_tea.NPV,
         'TCI': cs.cornstover_tea.TCI,
         'VOC': cs.cornstover_tea.VOC,
+        'FOC': cs.cornstover_tea.FOC,
+        'Electricity consumption [MWhr/yr]': hours * unit_group.get_electricity_consumption(), 
+        'Electricity production [MWhr/yr]': hours * unit_group.get_electricity_production(),
         'Production': cs.ethanol.F_mass * operating_days * 24.,
     }

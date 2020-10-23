@@ -7,12 +7,12 @@
 # for license details.
 """
 """
-import sys
-__all__ = ('PY37',)
+import biosteam as bst
 
-version_components = sys.version.split('.')
-PY_MAJOR, PY_MINOR = int(version_components[0]), int(version_components[1])
-PY37 = (PY_MAJOR, PY_MINOR) >= (3, 7)
-del sys, version_components, PY_MAJOR, PY_MINOR
+__all__ = ('load_process_settings', 'price',)
 
-__version__ = '2.15.24'
+def load_process_settings():
+    pass
+
+# Raw material price (USD/kg)
+price = {}

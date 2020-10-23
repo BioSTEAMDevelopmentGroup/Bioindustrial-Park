@@ -20,7 +20,7 @@ enzyme_price = 0.66 # USD/kg
 biogas_price = 1.03 #It includes the cost to purify the biogas
 
 price = {'Ethanol':   0.8031,
-         'Feedstock': 0.06, #checked in Elizabeth's article
+         'Feedstock': 0.2*0.06, #checked in Elizabeth's article
          'Sulfuric acid': 81.39 * factor,
          'Ammonia': 406.96 * factor,
          'Caustic': 135.65 * factor,
@@ -39,7 +39,7 @@ def load_process_settings():
     bst.CE = 525
     bst.PowerUtility.price = price['Electricity']
     _ha = bst.HeatUtility.get_heating_agent('low_pressure_steam')
-    _ha.heat_transfer_efficiency = 0.85
+    _ha.heat_transfer_efficiency = 1.00
     _ha.T = 529.2
     _ha.P = 44e5
     _ha.regeneration_price = 0.30626

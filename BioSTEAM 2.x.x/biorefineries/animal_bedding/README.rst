@@ -1,14 +1,18 @@
-==============================================================
-wheatstraw: 2nd Generation Ethanol Production from Wheat Straw
-==============================================================
+=====================================================================
+animal_bedding: 2nd Generation Ethanol Production from Animal Bedding
+=====================================================================
 
-The wheatstraw biorefinery design for the production of ethanol
+The animal bedding biorefinery design for the production of ethanol
 follows all assumptions from a study by Humbird et. al. executed with Aspen 
-plus [1]_. As discussed in our paper [2]_, the wheatstraw biorefinery can be 
-divided into eight areas: pretreatment, fermentation, 
+plus [1]_. As discussed in our paper [2]_, the animal bedding biorefinery can be 
+divided into nine areas: conditioning, pretreatment, fermentation, 
 ethanol purification, biogas production, wastewater treatment, storage, 
-boiler and turbo-generator system, and utilities. During pretreatment, the 
-wheatstraw is soaked with sulfuric acid and water, filtered and presteamed 
+boiler and turbo-generator system, and utilities. The conditioning step consists 
+of washing the animal bedding with water to transfer part of the manure to the liquid
+phase, to fractionate the different biomasses in the material by using several pressure 
+filters. The liquid fraction is sent to the biogas production area, and the solid 
+fraction (rich in fiber) is sent to the pretreatment area. During pretreatment, the 
+solid fraction is soaked with sulfuric acid and water, filtered and presteamed 
 under high pressures and temperatures to break down the biomass and facilitate 
 enzymatic hydrolysis. The liquid fraction is sent to the biogas reactor, and the 
 solid fraction is sent to the fermentor, where both saccharification and fermentation

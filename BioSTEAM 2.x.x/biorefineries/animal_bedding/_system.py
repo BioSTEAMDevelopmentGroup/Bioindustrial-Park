@@ -8,9 +8,9 @@ from biosteam import System
 import biosteam as bst
 import thermosteam as tmo
 from thermosteam import Stream
-from biorefineries.wheatstraw._process_settings import price
-from biorefineries.wheatstraw._chemicals import chemical_groups
-from biorefineries.wheatstraw import units
+from biorefineries.animal_bedding._process_settings import price
+from biorefineries.animal_bedding._chemicals import chemical_groups
+from biorefineries.animal_bedding import units
 import thermosteam.reaction as rxn
 import numpy as np
 from biosteam.process_tools import BoundedNumericalSpecification
@@ -50,78 +50,142 @@ def find_TS(stream):
     TS = (stream.F_mass-stream.imass['Water'])/stream.F_mass
     return TS
 
-def create_system(ID='wheatstraw_sys'):
+def create_system(ID='bedding_sys'):
     System.maxiter = 400
     System.converge_method = 'Aitken'
     System.molar_tolerance = 0.01
     
-    ### Streams   
+    ### Streams  
     chemicals = bst.settings.get_chemicals()
-    non_soluble = ['Xylan','Glucan','Arabinan','Lignin','Extract','Ash','Mannan','Galactan','Acetate']
+    non_soluble = ['Xylan','Glucan','Arabinan','Lignin','Extract','Ash','Mannan','Galactan','Acetate','ManureOrg','ManureInorg']
+
     # feed flow
+    fiber_comp = 0.66
+    manure_comp = 1-fiber_comp
+    
     drycomposition = chemicals.kwarray(
-    dict(Glucan=0.3342, Xylan=0.2330, Arabinan=0.0420, Lignin=0.2260, Extract=0.1330, Ash=0.0180, Acetate=0.0130)
+        dict(Glucan=0.4025*fiber_comp, Xylan=0.2294*fiber_comp, Lignin=0.2274*fiber_comp, Extract=0.0540*fiber_comp, Ash=0.0866*fiber_comp, ManureOrg=0.676*manure_comp, ManureInorg=0.324*manure_comp)
     )
-    TS=0.95
+    TS=0.25
     moisture_content = chemicals.kwarray(
         dict(Water=1-TS)
     )
     dryflow = 83333.0
     netflow = dryflow/TS
     feedflow = netflow*(drycomposition*TS + moisture_content)
-    process_water_over_dryflow = 19.96
-    sulfuric_acid_over_dryflow = 0.04
+    process_water_over_dryflow = 20.0 #kg/kg TS
+    sulfuric_acid_over_dryflow = 0.0826#kg/kg TS, corresponds to 43e-6 m3/kg TS
+    sulfuric_acid_conc = 0.95 #concentration %w/w
     
-    wheatstraw = Stream('wheatstraw',
+    bedding = Stream('bedding',
                         feedflow,
                         units='kg/hr',
                         price=price['Feedstock']*TS)
-
-    ### Pretreatment system
     
     process_water1 = Stream('process_water1',
                              T=25+273.15,
                              P=1*101325,
-                             Water=process_water_over_dryflow*dryflow,#only an initialization
+                             Water=process_water_over_dryflow*dryflow,
+                             units='kg/hr')
+    
+    process_water2 = Stream('process_water2',
+                             T=25+273.15,
+                             P=1*101325,
+                             Water=process_water_over_dryflow*dryflow/1000*790.7,
                              units='kg/hr')
     
     sulfuric_acid = Stream('sulfuric_acid',
                            P=1*101325,
                            T=25+273.15,
-                           Water=0.05*sulfuric_acid_over_dryflow*dryflow,
-                           SulfuricAcid=0.95*sulfuric_acid_over_dryflow*dryflow,
+                           Water=(1-sulfuric_acid_conc)*sulfuric_acid_over_dryflow*dryflow/1000*790.7,
+                           SulfuricAcid=sulfuric_acid_conc*sulfuric_acid_over_dryflow*dryflow/1000*790.7,
                            units='kg/hr',
-                           price=price['Sulfuric acid']*0.95)
+                           price=price['Sulfuric acid'])
     steam = Stream('steam',
                    phase='g',
                    T=212+273.15,
                    P=20*101325,
                    Water=dryflow*0.5,#This is just a guess
                    units='kg/hr')
+    recycled_steam = Stream('recycled_steam',
+                           phase='g',
+                           T=152+273.15,
+                           P=1*101325,
+                           Water=dryflow*0.2,#This is just a guess
+                           units='kg/hr')
+    
+    ### Pre-washing system
     
     
-    U101 = units.FeedStockHandling('U101', ins=wheatstraw)
+    washing_reactions1 = rxn.ParallelReaction([rxn.Reaction(f"ManureOrg -> ManureOrgSol", 'ManureOrg', 1-0.3494)] + 
+                                               [rxn.Reaction(f"ManureInorg -> ManureInorgSol", 'ManureInorg', 1-0.3903)])#defined by mass
+    
+    U101 = units.FeedStockHandling('U101', ins=bedding)
     U101.cost_items['System'].cost = 0
-    T201 = units.SulfuricAcidTank('T201', ins=sulfuric_acid)
-    M201 = bst.Mixer('M201', ins=(process_water1, T201-0,Stream()))
-    M202 = units.WashingTank('M202', ins=(M201-0, U101-0))
-    S200 = units.SieveFilter('S200', ins=(M202-0), outs=(Stream('feed_20TS'),Stream('recycled_water1')),moisture_content=1-0.20,split=find_split_solids(M202-0,non_soluble))
-    S201 = units.PressureFilter('S201', ins=(S200-0), outs=(Stream('feed_50TS'),Stream('recycled_water2')),moisture_content=0.5,split=find_split_solids(S200-0,non_soluble))
-    M200 = bst.Mixer('M200', ins=(S200-1, S201-1),outs='recycled_water')
-    M200-0-2-M201
-    recycled_water = M200-0
+    M100 = bst.Mixer('M100', ins=(process_water1, Stream()))
+    W101 = units.WashingTank('W101', ins=(U101-0,M100-0),
+                                    outs=('washed_bedding'),
+                                     reactions=washing_reactions1)
+    S100 = units.SieveFilter('S100', ins=(W101-0), outs=(Stream('washed_bedding_20TS'),Stream('washed_manure1')),moisture_content=1-0.20,split=find_split_solids(W101-0,non_soluble))
+    
+    S101 = units.PressureFilter('S101', ins=(S100-0), outs=(Stream('filtered_washed_bedding'),Stream('washed_manure2')),moisture_content=0.5,split=find_split_solids(S100-0,non_soluble))
+    M101 = bst.Mixer('M101', ins=(S100-1, S101-1),outs='washed_manure')
+    
+    splits = [('Water', 0, 1),
+              ('ManureOrgSol',  2/3, 1/3),
+              ('ManureInorgSol', 2/3, 1/3)]
+    
+    S103 = bst.Splitter('S103', ins=M101-0, outs=(Stream('washed_liquid_back'),Stream('residual_washed_liquid')), split=1.0)
+    
+    S102 = units.DrumFilter('S102', ins=S103-0, split=find_split(*zip(*splits)), moisture_content=1-0.05)
+    
+    S102-1-1-M100
+    recycled_washed_liquid = S102-1
+    filtered_feedstock = S101-0
     
     def update_process_water1(): 
-        process_water1.imass['Water'] =  process_water_over_dryflow*dryflow - recycled_water.imass['Water']
-        sulfuric_acid.imass['SulfuricAcid']= 0.95*sulfuric_acid_over_dryflow*dryflow - recycled_water.imass['SulfuricAcid']
-        sulfuric_acid.imass['Water']= 0.05/0.95*sulfuric_acid.imass['SulfuricAcid']
+        water_to_add = process_water_over_dryflow*dryflow - recycled_washed_liquid.imass['Water']
+        process_water1.imass['Water'] = water_to_add
+    
+    
+    prewashing_sys = System('prewashing_sys',
+                            path=(U101,M100,W101,S100,S101,M101,S103,S102,update_process_water1),
+                            recycle=M100-0)  
+    ### Pretreatment system
+    T201 = units.SulfuricAcidTank('T201', ins=sulfuric_acid)
+    M201 = bst.Mixer('M201', ins=(process_water2, T201-0,Stream()))
+    washing_reactions2 = rxn.ParallelReaction([rxn.Reaction(f"ManureOrg -> ManureOrgSol", 'ManureOrg', 1-0.7479)] + 
+                                               [rxn.Reaction(f"ManureInorg -> ManureInorgSol", 'ManureInorg', 1-0.8940)])#defined by mass
+    
+    W201 = units.WashingTank('W201', ins=(M201-0, S101-0),
+                                    outs=('soaked_bedding'),
+                                     reactions=washing_reactions2)
+    S200 = units.SieveFilter('S200', ins=(W201-0), outs=(Stream('feed_20TS'),Stream()),moisture_content=1-0.20,split=find_split_solids(W201-0,non_soluble))
+    
+    S201 = units.PressureFilter('S201', ins=(S200-0), outs=(Stream('feed_50TS'),Stream()),moisture_content=0.50,split=find_split_solids(S200-0,non_soluble))
+    M200 = bst.Mixer('M200', ins=(S200-1, S201-1))
+    M200-0-2-M201
+    
+    recycled_water = M200-0
+    
+    washed_stream = S101-0
+    def update_process_water2(): 
+        washed_dryflow = find_TS(washed_stream)*washed_stream.F_mass
+        water_to_add = process_water_over_dryflow*washed_dryflow - recycled_water.imass['Water']
+        if water_to_add<0:
+            process_water2.imass['Water'] = 0
+        else:
+            process_water2.imass['Water'] = water_to_add
+        sulfuric_acid.imass['SulfuricAcid']= sulfuric_acid_conc*sulfuric_acid_over_dryflow*washed_dryflow - recycled_water.imass['SulfuricAcid']
+        sulfuric_acid.imass['Water']= (1-sulfuric_acid_conc)/sulfuric_acid_conc*sulfuric_acid.imass['SulfuricAcid']
     
     water_recycle_sys = System('water_recycle_sys',
-                                 path=(U101, T201, M201, M202, S200, S201, M200, update_process_water1),
-                                 recycle=M201-0)    
-    M205 = bst.Mixer('M205', ins=(S201-0, None))
+                                 path=(T201, M201, W201, S200,S201,M200,update_process_water2),
+                                 recycle=M201-0) 
+    water_recycle_sys.maxiter = 600
     
-    M203 = units.SteamMixer('M203', ins=(M205-0, steam),P=steam.chemicals.Water.Psat(190.0+273.15))
+    M205 = bst.Mixer('M205', ins=(S201-0, None))
+    M203 = units.SteamMixer('M203', ins=(M205-0, steam),P=steam.chemicals.Water.Psat(200.0+273.15))
     R201 = units.PretreatmentReactorSystem('R201', ins=M203-0,outs=(Stream('pretreatment_steam'),Stream('pretreatment_effluent')))
     P201 = units.BlowdownDischargePump('P201', ins=R201-1)
     T202 = units.OligomerConversionTank('T202', ins=P201-0)
@@ -129,34 +193,27 @@ def create_system(ID='wheatstraw_sys'):
     M204 = bst.Mixer('M204', ins=(R201-0, F201-0))    
     S202 = units.PressureFilter('S202', ins=(F201-1), outs=(Stream('pretreated_stream'),Stream('pretreated_liquid')),moisture_content=0.5,split=find_split_solids(F201-1,non_soluble))  
     S203 = bst.Splitter('S203', ins=M204-0, outs=(Stream('steam_back'),Stream('residual_steam')), split=0.25)
-    H201 = units.WasteVaporCondenser('H201', ins=S203-1, outs=Stream('condensed_steam'), T=99+273.15, V=0)
+    H201 = units.WasteVaporCondenser('H201', ins=S203-1,outs=Stream('condensed_steam'), T=99+273.15, V=0)
     S203-0-1-M205
     
-    steam_out1 = S203-1
-    steam_inS203 = 0-S203
-    steam_out0 = S203-0
-    def update_split():
-        steam_out1.mol[:] = steam_inS203.mol[:] - steam_out0.mol[:]
-        
+    
     pretreatment_sys = System('pretreatment_sys',
                    path=(water_recycle_sys,
                             M205, M203,
                             R201, P201, T202, F201, M204,
-                            S202, S203, update_split, H201), # TODO: H201 moved to the end, no need to resimulate system
-                   recycle=M204-0)          
-
+                            S202,S203,H201),
+                    recycle=M204-0)          
     T90 = 90+273.15
     def f_DSpret(split):
         S203.split[:] = split
-        for i in range(3): pretreatment_sys.simulate()
+        for i in range(3): pretreatment_sys.simulate()  
         sobj=M205-0
         return sobj.T-T90
     
-    pretreatment_sys.specification = BoundedNumericalSpecification(f_DSpret, 0.10, 0.70)    
-
-    
+    pretreatment_sys.specification=BoundedNumericalSpecification(f_DSpret, 0.25, 0.45)    
+                 
     ### Fermentation system
-    
+
     cellulase_conc = 0.05
     cellulase = Stream('cellulase',
                        units='kg/hr',
@@ -168,7 +225,7 @@ def create_system(ID='wheatstraw_sys'):
                      phase='l',
                      price=price['Ammonia'])
     
-    process_water2 = Stream('process_water2',
+    process_water3 = Stream('process_water3',
                              T=10+273.15,
                              P=1*101325,
                              Water=1664.8/1000*dryflow,#This is just a guess
@@ -181,17 +238,13 @@ def create_system(ID='wheatstraw_sys'):
                         Ammonia=116/1000*dryflow,#This is just a initialization
                         units='kg/hr',
                         price=price['Ammonia'])
+    ammonia_storage = units.DAPTank('Ammonia_storage', ins=Stream('Ammonia_fresh'), outs='Ammonia_fermentation')
     
-    ammonia_fresh = Stream('ammonia_fresh',
-                        units='kg/hr',
-                        price=price['Ammonia'])
-    
-    ammonia_storage = units.DAPTank('Ammonia_storage', ins=ammonia_fresh, outs='Ammonia_fermentation')
-    
-    S301 = bst.ReversedSplitter('S301', ins=ammonia_storage-0, outs=(ammonia,ammonia1, ammonia2))
+    S301 = bst.ReversedSplitter('S301', ins=ammonia_storage-0, outs=(ammonia1, ammonia2))
     
     air1 = Stream('air_lagoon1', O2=51061, N2=168162, phase='g', units='kg/hr')
     air2 = Stream('air_lagoon2', O2=51061, N2=168162, phase='g', units='kg/hr')
+    
     
     J1 = bst.Junction('J1', upstream=S202-0, downstream=Stream())
     
@@ -199,7 +252,7 @@ def create_system(ID='wheatstraw_sys'):
     
     ammonia_zmass = 0.0052
     
-    M301 = bst.Mixer('M301', ins=(ammonia, process_water2))  
+    M301 = bst.Mixer('M301', ins=(ammonia, process_water3))  
     M302 = bst.Mixer('M302', ins=(J1-0, M301-0))  
     S303 = units.PressureFilter('S303', ins=(M302-0),outs=(Stream('cooled_hydrolysate'),Stream('residual_water')), moisture_content=0.4,split=find_split_solids(M302-0,non_soluble))
     WIS_prehyd = 0.20  
@@ -218,6 +271,7 @@ def create_system(ID='wheatstraw_sys'):
     
     T203 = units.AmmoniaAdditionTank('T203', ins=S303-0)
     M303 = units.EnzymeHydrolysateMixer('M303', ins=(T203-0, cellulase))  
+    
     
     cellulase_over_WIS = 0.05*cellulase_conc
     water_over_WIS = 0.05*(1-cellulase_conc)
@@ -275,14 +329,9 @@ def create_system(ID='wheatstraw_sys'):
             ammonia1.imol['NH3'] = 0
         else:
             ammonia1.imol['NH3'] = ammonia1_mol
-    
-    # TODO: Bug in update nutrient loading (not enough O2 to run R301 and R302 seed train)
-    # TODO: so just ignore negative flow in the meanwhile
-#    def ignore_negative_O2_flow():
-#        for i in (R301.outs + R302.outs): i.imol['O2'] = 0
         
     seed_recycle_sys = System('seed_recycle_sys',
-                              path=(M304,update_nutrient_loading1,R301, M305, update_nutrient_loading2, R302, T301),
+                              path=(M304,update_nutrient_loading1,R301,M305,update_nutrient_loading2,R302,T301),
                               recycle=M304-0)  
     conc_yeast = 3.0 
     def f_DSferm1(x):
@@ -291,28 +340,27 @@ def create_system(ID='wheatstraw_sys'):
         for i in range(3): seed_recycle_sys.simulate()
         s_obj2=R301-1
         light_ind = s_obj2.chemicals._light_indices  
-        l = [a for a in s_obj2.vol[light_ind] if not a==0]
-        v_0 = s_obj2.F_vol - sum(l)
-        conc_yeast_obtained = s_obj2.imass['S_cerevisiae']/v_0
+        s_obj2.vol[light_ind] = 0
+        conc_yeast_obtained = s_obj2.imass['S_cerevisiae']/s_obj2.F_vol
         return ((conc_yeast_obtained - conc_yeast)/conc_yeast)
     
     seed_recycle_sys.specification=BoundedNumericalSpecification(f_DSferm1, 0.01, 0.35)    
     
     
     fermentation_sys = System('fermentation_sys',
-                              path=(J1,M301,M302,S303,update_ammonia_loading,T203,update_cellulase_and_nutrient_loading,update_moisture_content,M303,seed_recycle_sys))#update_moisture_content,    
+                              path=(J1,M301,M302,update_ammonia_loading, S303,update_moisture_content,T203,update_cellulase_and_nutrient_loading,M303,seed_recycle_sys))    
     T_solid_cool = 50.0+273.15    
     def f_DSferm2(x):
         mass_water=x
-        process_water2.F_mass = mass_water
+        process_water3.F_mass = mass_water
         for i in range(3): fermentation_sys.simulate()
         s_obj1=M302-0
         return ((s_obj1.T-T_solid_cool)/T_solid_cool) 
     
-    fermentation_sys.specification=BoundedNumericalSpecification(f_DSferm2, process_water2.F_mass/2, process_water2.F_mass*2)
-               
+    fermentation_sys.specification=BoundedNumericalSpecification(f_DSferm2, process_water3.F_mass/2, process_water3.F_mass*2)
     
-    ### Ethanol purification
+    
+    ### Purification system
     
     stripping_water = Stream('stripping_water',
                               Water=26836,#This is just a initialization
@@ -321,7 +369,6 @@ def create_system(ID='wheatstraw_sys'):
     M306 = bst.Mixer('M306', ins=(R302-0, R301-0))
     T302 = units.BeerTank('T302',outs=Stream('cool_feed'))
     
-    # tmo.Stream.default_ID_number = 400
     
     M401 = bst.Mixer('M401', ins=(R301-1, None))
     M401-0-T302
@@ -373,7 +420,6 @@ def create_system(ID='wheatstraw_sys'):
     
     
     # Beer column
-    
     Ethanol_MW = chemicals.Ethanol.MW
     Water_MW = chemicals.Water.MW
     def Ethanol_molfrac(e):
@@ -381,7 +427,7 @@ def create_system(ID='wheatstraw_sys'):
         return e/Ethanol_MW / (e/Ethanol_MW + (1-e)/Water_MW)    
     
     xbot = Ethanol_molfrac(bott_eth_massfrac)
-    ytop = Ethanol_molfrac(mid_eth_massfrac)
+    ytop = Ethanol_molfrac(mid_eth_massfrac)    
     
     D402 = units.DistillationColumn('D402', ins=H402-0,
                             P=bott_low_dp.P, y_top=ytop, x_bot=xbot,
@@ -417,7 +463,8 @@ def create_system(ID='wheatstraw_sys'):
     
     
     D403-1-1-H403
-
+    
+    
     MP_dist_sys = System('MP_dist_sys',
                          path=(H403,D403,H403_dist),
                          recycle=H403-0)
@@ -441,13 +488,15 @@ def create_system(ID='wheatstraw_sys'):
                            k=1.5, LHK=('Ethanol', 'Water'),energy_integration=True)
     D404.tray_material = 'Stainless steel 304'
     D404.vessel_material = 'Stainless steel 304'
-
+    
     D404.BM = 2.4
     D404.boiler.U = 1.85
     
     
     P405 = bst.Pump('P405', ins=D404-1,outs=Stream('bottom_water'))
-
+    
+    
+    
     # Superheat vapor for mol sieve
     H404 = bst.HXutility('H404', ins=D404-0, T=dist_high_dp.T+37.0, V=1)
     
@@ -461,17 +510,19 @@ def create_system(ID='wheatstraw_sys'):
     ethanol_recycle_sys = System('ethanol_recycle_sys',
                                  path=(M404, D404, H404, U401),
                                  recycle=M404-0)
-
+    
     # Condense ethanol product
     H405 = bst.HXutility('H405', ins=U401-1, V=0,T=dist_high_dp.T-1)
-
+    
+    
     T701 = bst.StorageTank('T701', ins=H405-0, tau=7*24,
                            vessel_type='Floating roof',
                            vessel_material='Carbon steel')
     
     ethanol = Stream('ethanol', price=price['Ethanol'])
     P701 = bst.Pump('P701', ins=T701-0, outs=ethanol)
-        
+    
+    
     P701.BM = 3.1
     T701.BM = 1.7
     
@@ -495,22 +546,22 @@ def create_system(ID='wheatstraw_sys'):
         heat_boil = D402.boiler.Q
         return heat_boil + heat_cond #heat_boil and heat_cond have different signs
     
-    purification_sys.specification=BoundedNumericalSpecification(f_DSpur, 0.10, 0.70)   
+    purification_sys.specification=BoundedNumericalSpecification(f_DSpur, 0.10, 0.70)    
     
     ### Biogas production
 
     organic_groups = ['OtherSugars', 'SugarOligomers', 'OrganicSolubleSolids',
                       'Furfurals', 'OtherOrganics', 'Protein', 'CellMass']
     organics = list(sum([chemical_groups[i] for i in organic_groups],
-                        ('Ethanol', 'AceticAcid', 'Xylose', 'Glucose','ExtractVol','ExtractNonVol')))
+                        ('Ethanol', 'AceticAcid', 'Xylose', 'Glucose','ExtractVol','ExtractNonVol','ManureOrg','ManureOrgSol')))
     organics.remove('WWTsludge')
+    
     
     P_sludge = 0.05/0.91/chemicals.WWTsludge.MW
     MW = np.array([chemicals.CH4.MW, chemicals.CO2.MW])
-    CH4_molcomp = 0.60
-    mass = np.array([CH4_molcomp, 1-CH4_molcomp])*MW
+    mass = np.array([0.60, 0.40])*MW
     mass /= mass.sum()
-    mass *= 0.381/(0.91)
+    mass *= 0.563/(0.91)
     P_ch4, P_co2 = mass/MW
     def anaerobic_rxn(reactant):
         MW = getattr(chemicals, reactant).MW
@@ -522,15 +573,18 @@ def create_system(ID='wheatstraw_sys'):
     
     
     well_water1 = Stream('well_water1', Water=1, T=15+273.15)
-
-    J5_1 = bst.Junction('J5_1', upstream=S303-1, downstream=Stream())
-    J5_2 = bst.Junction('J5_2', upstream=S402-1, downstream=Stream())
-    J5_3 = bst.Junction('J5_3', upstream=S202-1, downstream=Stream())
-    J5_4 = bst.Junction('J5_4', upstream=H201-0, downstream=Stream())
-    J5_5 = bst.Junction('J5_5', upstream=P405-0, downstream=Stream())
-    M501 = bst.Mixer('M501', ins=(J5_1-0,J5_2-0, J5_3-0,J5_4-0,J5_5-0))
     
-
+    
+    J5_1 = bst.Junction('J5_1', upstream=S102-0, downstream=Stream())
+    J5_2 = bst.Junction('J5_2', upstream=S303-1, downstream=Stream())
+    J5_3 = bst.Junction('J5_3', upstream=S402-1, downstream=Stream())
+    J5_4 = bst.Junction('J5_4', upstream=S202-1, downstream=Stream())
+    J5_5 = bst.Junction('J5_5', upstream=H201-0, downstream=Stream())
+    J5_6 = bst.Junction('J5_6', upstream=P405-0, downstream=Stream())
+    J5_7 = bst.Junction('J5_7', upstream=S103-1, downstream=Stream())
+    
+    M501 = bst.Mixer('M501', ins=(J5_1-0, J5_2-0, J5_3-0,J5_4-0,J5_5-0,J5_6-0,J5_7-0))
+    
     
     splits = [('Ethanol', 1, 15),
               ('Water', 27158, 356069),
@@ -540,6 +594,8 @@ def create_system(ID='wheatstraw_sys'):
               ('SugarOligomers', 10, 130),
               ('OrganicSolubleSolids', 182, 2387),
               ('InorganicSolubleSolids', 8, 110),
+              ('ManureOrgSol',  182, 2387),
+              ('ManureInorgSol', 8, 110),
               ('Ammonia', 48, 633),
               ('AceticAcid', 0, 5),
               ('Furfurals', 5, 70),
@@ -554,16 +610,19 @@ def create_system(ID='wheatstraw_sys'):
     
     raw_biogas = Stream('raw_biogas', price=price['Pure biogas']*0.33)
     Tin_digestor = 37 + 273.15
-    R501 = units.AnaerobicDigestion('R501', ins=(M501-0,well_water1),
-                                    outs=(raw_biogas, 'waste_effluent','sludge_effluent',''),
+    R501 = units.AnaerobicDigestion('R501', ins=(M501-0),
+                                    outs=(raw_biogas, 'waste_effluent','sludge_effluent'),
                                      reactions=anaerobic_digestion,
                                      sludge_split=find_split(*zip(*splits)),
-                                     T=Tin_digestor)   
-          
+                                     T=Tin_digestor)
+    
     digestor_sys = System('digestor_sys',
-                           path=(J5_1,J5_2,J5_3,J5_4,J5_5,M501,R501))
-
+                           path=(J5_1,J5_2,J5_3,J5_4,J5_5,J5_6,J5_7,M501,R501))
+    
+    
+    
     ### Waste water treatment
+    Hvap_water = chemicals.Water.Hvap(298.15, 101325)
     combustion = chemicals.get_combustion_reactions()
     
     def growth(reactant):
@@ -576,7 +635,6 @@ def create_system(ID='wheatstraw_sys'):
                                               if (i.reactant in organics)])
     aerobic_digestion.X[:] = 0.96
     
-    # tmo.Stream.default_ID_number = 600
     
     well_water = Stream('well_water', Water=1, T=15+273.15)
     raw_biogas2 = Stream('raw_biogas2', price=price['Pure biogas']*0.33)
@@ -590,7 +648,6 @@ def create_system(ID='wheatstraw_sys'):
     air = Stream('air_lagoon', O2=51061, N2=168162, phase='g', units='kg/hr')
     caustic = Stream('WWT_caustic', Water=2252, NaOH=2252,
                      units='kg/hr', price=price['Caustic']*0.5)
-    # polymer = Stream('WWT polymer') # Empty in humbird report :-/
     
     M602 = bst.Mixer('M602', ins=(R601-1, None))
     
@@ -602,7 +659,7 @@ def create_system(ID='wheatstraw_sys'):
         caustic.mol[:] = F_mass_waste * caustic_over_waste
         air.mol[:] = F_mass_waste * air_over_waste
     
-    R602 = units.AerobicDigestionWWT('R602', ins=(waste, air, caustic),
+    R602 = units.AerobicDigestionWWT('R602', ins=(M602-0, air, caustic),
                                   outs=('evaporated_water', ''),
                                   reactions=aerobic_digestion)
     
@@ -614,6 +671,8 @@ def create_system(ID='wheatstraw_sys'):
               ('SugarOligomers', 1, 6),
               ('OrganicSolubleSolids', 79, 466),
               ('InorganicSolubleSolids', 4828, 28378),
+              ('ManureOrgSol',  79, 466),
+              ('ManureInorgSol', 4828, 28378),
               ('Ammonia', 3, 16),
               ('Furfurals', 0, 3),
               ('OtherOrganics', 1, 7),
@@ -658,22 +717,20 @@ def create_system(ID='wheatstraw_sys'):
                                  S601, S602, M604, S603, M603),
                            recycle=M602-0)
     aerobic_recycle_sys.converge_method = 'Fixed point'
+    aerobic_recycle_sys.maxiter = 600
     WWT_sys = System('WWT_sys',
                    path=(WWTC, R601, 
                          aerobic_recycle_sys, S604))
-
-    
-    
     ### Facilities
-
+      
     BT = bst.facilities.BoilerTurbogenerator('BT',
-                                             ins=(S402-0, '', 
-                                                  'boiler_makeup_water',
-                                                  'natural_gas',
-                                                  'lime',
-                                                  'boilerchems'), 
-                                             turbogenerator_efficiency=0.85)
-    
+                                         ins=(S402-0, '', 
+                                              'boiler_makeup_water',
+                                              'natural_gas',
+                                              'lime',
+                                              'boilerchems'), 
+                                         turbogenerator_efficiency=0.85)
+
     
     CWP = bst.facilities.ChilledWaterPackage('CWP')
     CT = bst.facilities.CoolingTower('CT')
@@ -682,7 +739,7 @@ def create_system(ID='wheatstraw_sys'):
     process_water = tmo.Stream(ID='process_water',
                                thermo=water_thermo)
     
-    process_water_streams = (caustic, stripping_water,  process_water1, process_water2, steam, BT-1, CT-1)
+    process_water_streams = (caustic, stripping_water,  process_water1, process_water2, process_water3, steam, BT-1, CT-1)
     
     def update_water_loss():
         process_water.imol['Water'] = sum([i.imol['Water'] for i in process_water_streams])
@@ -712,13 +769,12 @@ def create_system(ID='wheatstraw_sys'):
                              thermo=substance_thermo)
     
     ### Complete system
-    wheatstraw_sys = System('wheatstraw_sys',
-                            path=(pretreatment_sys, fermentation_sys,ammonia_storage,S301,
-                                  purification_sys,
+    bedding_sys = System('bedding_sys',
+                            path=(prewashing_sys, pretreatment_sys,fermentation_sys,purification_sys,
                                   digestor_sys, WWT_sys),
                             facilities=(CWP, BT, CT, update_water_loss,
                                         PWC, ADP,
                                         CIP_package, S301, ammonia_storage,
                                         FT))
 
-    return wheatstraw_sys
+    return bedding_sys

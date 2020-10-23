@@ -7,12 +7,7 @@
 # for license details.
 """
 """
-import sys
-__all__ = ('PY37',)
+__all__ = ('create_tea',)
 
-version_components = sys.version.split('.')
-PY_MAJOR, PY_MINOR = int(version_components[0]), int(version_components[1])
-PY37 = (PY_MAJOR, PY_MINOR) >= (3, 7)
-del sys, version_components, PY_MAJOR, PY_MINOR
-
-__version__ = '2.15.24'
+def create_tea(sys):
+    pass
