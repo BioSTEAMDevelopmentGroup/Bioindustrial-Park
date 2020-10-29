@@ -13,14 +13,18 @@ import thermosteam as tmo
 __all__ = ('create_chemicals',)
 
 def create_chemicals():
-    from biorefineries import sugarcane as sc
-    chemicals = sc.chemicals['Water', 'Ethanol', 'Glucose', 'H3PO4', 'P4O10', 
+    from biorefineries import lipidcane as lc, cornstover as cs
+    chemicals = lc.chemicals['Water', 'Ethanol', 'Glucose', 'H3PO4', 'P4O10', 
                              'CO2', 'Octane', 'O2', 'CH4', 'Ash', 
                              'Yeast', 'CaO', 'Lipid', 'Cellulose']
+    chemicals += cs.chemicals['H2SO4', 'N2', 'NH3']
+    chemicals = tmo.Chemicals(chemicals)
     Starch = chemicals.Cellulose.copy('Starch')
     Fiber = chemicals.Cellulose.copy('Fiber')
-    Protein = chemicals.Cellulose.copy('Protein')
-    chemicals.extend([Starch, Fiber, Protein])
+    SolubleProtein = chemicals.Cellulose.copy('SolubleProtein')
+    InsolubleProtein = chemicals.Cellulose.copy('InsolubleProtein')
+    chemicals.extend([Starch, Fiber, SolubleProtein, InsolubleProtein])
     chemicals.compile()
     chemicals.set_synonym('Lipid', 'Oil')
+    chemicals.set_synonym('Water', 'H2O')
     return chemicals
