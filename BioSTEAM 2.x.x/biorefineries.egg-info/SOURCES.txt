@@ -66,7 +66,6 @@ biorefineries/lipidcane/utils/composition.py
 biorefineries/sugarcane/README.rst
 biorefineries/sugarcane/__init__.py
 biorefineries/sugarcane/_chemicals.py
-biorefineries/sugarcane/_ethanol_production_system.py
 biorefineries/sugarcane/_process_settings.py
 biorefineries/sugarcane/_system.py
 biorefineries/sugarcane/_tea.py

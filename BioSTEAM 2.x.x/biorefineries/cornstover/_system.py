@@ -238,7 +238,6 @@ def create_system(ID='cornstover_sys'):
     
     # Mix ethanol Recycle (Set-up)
     M402 = bst.Mixer('M402', (D402-0, None))
-    
     ytop = Ethanol_molfrac(0.915)
     D403 = bst.BinaryDistillation('D403', M402-0, Rmin=0.3,
                            P=101325, y_top=ytop, x_bot=xbot,

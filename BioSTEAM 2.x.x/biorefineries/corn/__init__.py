@@ -39,11 +39,13 @@ _chemicals_loaded = False
 
 def load():
     if not _chemicals_loaded: _load_chemicals()
-    _load_system()
-    dct = globals()
-    dct.update(flowsheet.system.__dict__)
-    dct.update(flowsheet.stream.__dict__)
-    dct.update(flowsheet.unit.__dict__)
+    try:
+        _load_system()
+    finally:
+        dct = globals()
+        dct.update(flowsheet.system.__dict__)
+        dct.update(flowsheet.stream.__dict__)
+        dct.update(flowsheet.unit.__dict__)
 
 def _load_chemicals():
     global chemicals, _chemicals_loaded
@@ -70,11 +72,13 @@ if PY37:
             _load_chemicals()
             if name == 'chemicals': return chemicals
         if not _system_loaded: 
-            _load_system()
-            dct = globals()
-            dct.update(flowsheet.system.__dict__)
-            dct.update(flowsheet.stream.__dict__)
-            dct.update(flowsheet.unit.__dict__)
+            try:
+                _load_system()
+            finally:
+                dct = globals()
+                dct.update(flowsheet.system.__dict__)
+                dct.update(flowsheet.stream.__dict__)
+                dct.update(flowsheet.unit.__dict__)
             if name in dct: return dct[name]
         raise AttributeError(f"module '{__name__}' has no attribute '{name}'")
 else:
