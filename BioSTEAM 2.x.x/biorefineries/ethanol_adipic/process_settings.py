@@ -12,9 +12,7 @@
 """
 Created on Sat Jun 27 13:51:49 2020
 
-Based on the biorefineries in [1] and [2] for the production of ethanol and 
-adipic acid from lignocellulosic biomass. Part of the script is developed in [3] 
-
+References:
 [1] Humbird et al., Process Design and Economics for Biochemical Conversion of 
     Lignocellulosic Biomass to Ethanol: Dilute-Acid Pretreatment and Enzymatic 
     Hydrolysis of Corn Stover; Technical Report NREL/TP-5100-47764; 
@@ -46,6 +44,7 @@ _lb_per_kg = 2.20462
 _liter_per_gallon = 3.78541
 _ft3_per_m3 = 35.3147
 _J_per_BTU = 1055.06
+_GDP_2007to2016 = 1.160
 
 # From USD/dry-ton to USD/kg in 2016$, 20% moisture content
 _feedstock_factor = _kg_per_ton / 0.8
@@ -74,8 +73,9 @@ ash_disposal_price = -1.41e6 / (4279*7880)
 # Upper bound is +10% from baseline = 0.1189 * _lb_per_kg * 1.1 = 0.288
 lime_price = 0.1189 * _lb_per_kg
 
-# The original cost is $466,183 every 5 years, converted to per hour assuming 96% uptime
-baghouse_bag_price = 466833 / 5 / (24*365*0.96)
+# The original cost is $466,183 every 5 years in ref [1], converted to per hour using
+# the assumed 96% uptime
+baghouse_bag_price = 466183/5/(24*365*0.96) * _GDP_2007to2016
 
 # $5/MM BTU
 CH4_LHV = chems.CH4.LHV
@@ -87,7 +87,7 @@ natural_gas_price = CH4_cost_per_mol * (1000/CH4_MW)
 
 # All in 2016$/kg
 price = {'Feedstock': feedstock_price, 	
-         'Sulfuric acid': 0.0430 * _lb_per_kg,	
+         'H2SO4': 0.0430 * _lb_per_kg,	
          # 0.1900 is for NH3	
          'NH4OH': 0.1900 * _lb_per_kg * 17.031/35.046,
          'NaOH': 0.2384 * _lb_per_kg,
@@ -110,18 +110,28 @@ price = {'Feedstock': feedstock_price,
          'Denaturant': denaturant_price,
          'Ethanol': 0.3370 * _lb_per_kg,
          'Adipic acid': 0.8554 * _lb_per_kg,
-         'Sodium sulfate': 0.0706 * _lb_per_kg,	
-         'Enzyme nutrients': 0.4896 * _lb_per_kg #!!! maybe not needed
+         'Sodium sulfate': 0.0706 * _lb_per_kg
          }
     
 bst.PowerUtility.price = price['Electricity']
 
+_lps = bst.HeatUtility.get_heating_agent('low_pressure_steam')
 _mps = bst.HeatUtility.get_heating_agent('medium_pressure_steam')
 _hps = bst.HeatUtility.get_heating_agent('high_pressure_steam')
+
 # Adjusted to LP/HP steam temperature as in ref [1]
 # biosteam native mps T is lower than LP steam T in ref [1], thus adjust mps.T
 _mps.T = 233 + 273.15
 _hps.T = 266 + 273.15
 _cooling = bst.HeatUtility.get_cooling_agent('cooling_water')
+_chilled = bst.HeatUtility.get_cooling_agent('chilled_water')
 _cooling.T = 28 + 273.15
 _cooling.T_limit = _cooling.T + 9
+
+# Side steam in CHP not a heat utility, thus will cause problem in TEA utility
+# cost calculation if price not set to 0 here, costs for regeneration of heating
+# and cooling utilities will be considered as CAPEX and OPEX of CHP and CT, respectively
+for i in (_lps, _mps, _hps, _cooling, _chilled):
+    i.heat_transfer_price = i.regeneration_price = 0
+    
+    

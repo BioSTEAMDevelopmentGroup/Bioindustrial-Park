@@ -8,6 +8,7 @@
 """
 """
 import numpy as np
+import biosteam as bst
 from biosteam.process_tools import UnitGroup
 import pytest
 
@@ -101,6 +102,24 @@ def test_annimal_bedding():
     assert np.allclose(units.get_electricity_consumption(), 31.999853945401934, rtol=1e-2)
     assert np.allclose(units.get_electricity_production(), 34.44884396679516, rtol=1e-2)
     
+@pytest.mark.slow
+def test_lactic():
+    bst.process_tools.default_utilities()
+    from biorefineries import lactic
+    system = lactic.system
+    MPSP = system.lactic_acid.price
+    assert np.allclose(MPSP, 1.5704836997441853, atol=0.01)
+    tea = system.lactic_tea
+    assert np.allclose(tea.sales, 340805307.1489925, rtol=0.01)
+    assert np.allclose(tea.material_cost, 225035229.6439402, rtol=0.01)
+    assert np.allclose(tea.installed_equipment_cost, 329160559.8556272, rtol=0.01)
+    assert np.allclose(tea.utility_cost, 25551416.34519198, rtol=0.01)
+    units = UnitGroup('Biorefinery', system.lactic_tea.units)
+    assert np.allclose(system.CHP.system_heating_demand/1e6, 1881.5136539040284, rtol=0.01)
+    assert np.allclose(-system.CT.system_cooling_water_duty/1e6, 1714.9228013906093, rtol=0.01)
+    assert np.allclose(units.get_electricity_consumption(), 46.29886269694857, rtol=0.01)
+    assert np.allclose(units.get_electricity_production(), 0.0)
+    
 if __name__ == '__main__':
     test_sugarcane()
     test_lipidcane()
@@ -108,3 +127,8 @@ if __name__ == '__main__':
     test_wheatstraw()
     test_LAOs()
     test_annimal_bedding()
+    test_lactic()
+
+
+
+
