@@ -19,8 +19,7 @@ __all__ = (
 
 # %% Ethanol separation
 
-def create_ethanol_separation_units(ID='ethanol_separation_sys',
-                                    degassed_beer=None,
+def create_ethanol_separation_units(degassed_beer=None,
                                     ethanol_product=None,
                                     denaturant=None,
                                     IDs={}):
