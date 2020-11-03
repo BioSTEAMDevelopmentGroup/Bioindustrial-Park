@@ -10,7 +10,7 @@
 import biosteam as bst
 import thermosteam as tmo
 import flexsolve as flx
-from biosteam.units.decorators import cost
+from biosteam.units.decorators import cost, copy_algorithm
 from biosteam.units.design_tools import CEPCI_by_year, cylinder_diameter_from_volume, cylinder_area
 from biosteam import tank_factory
 import numpy as np
@@ -41,6 +41,7 @@ __all__ = (
     'ThermalOxidizer',
     'DDGSHandling',
     'DDGSCentrifuge',
+    'PlantAir_CIP_WasteWater_Facilities',
 )
 
 CE2007 = CEPCI_by_year[2007]
@@ -59,7 +60,7 @@ CornStorage = tank_factory('CornStorage',
     V_units='m3'
 )
 
-@cost('Flow rate', units='kg/hr', CE=CE2007, cost=979300., S=18540., n=1.0, ub=3e5)
+@cost('Flow rate', units='kg/hr', CE=CE2007, cost=60300., S=45350., n=0.6, ub=7.2e5)
 class CleaningSystem(bst.Splitter): pass
     
 
@@ -119,17 +120,18 @@ class JetCooker(bst.Unit):
     
     @staticmethod
     def _T_objective_function(steam_mol, T, steam, effluent, feed):
-        steam.imol[CAS_water] = steam_mol
+        steam.imol[CAS_water] = abs(steam_mol)
         effluent.mol[:] = steam.mol + feed.mol
         effluent.H = feed.H + steam.H
         return effluent.T - T
     
     def _run(self):
         feed, steam = self._ins
-        steam_mol = steam.F_mol
+        steam_mol = feed.F_mol / 100.
         effluent, = self.outs
+        effluent.T = self.T
         steam_mol = flx.aitken_secant(self._T_objective_function,
-                                      steam_mol, steam_mol+1., 
+                                      steam_mol, 1/8 * steam_mol + 1., 
                                       1e-4, 1e-4,
                                       args=(self.T, steam, effluent, feed),
                                       checkroot=False)
@@ -178,7 +180,7 @@ class DDGSDryer(bst.Unit):
         [1] Hot air
         [2] Emissions
     split : dict[str, float]
-        Component splits to [0] stream.
+        Component splits to hot air (stream [1]).
     R : float, optional
         Flow of hot air over evaporation. Defaults to 1.4 wt gas / wt evap.
     H : float, optional
@@ -222,11 +224,15 @@ class DDGSDryer(bst.Unit):
     
     @property
     def utility_cost(self):
-        return super().utility_cost + self.natural_gas_price * self.natural_gas.F_mass
+        return super().utility_cost + self.natural_gas_cost
+    
+    @property
+    def natural_gas_cost(self):
+        return self.natural_gas_price * self.natural_gas.F_mass
     
     def __init__(self, ID="", ins=None, outs=(), thermo=None, *,
                  split, R=1.4, H=20., length_to_diameter=25, T=343.15,
-                 natural_gas_price=0.218, moisture_content=0.10):
+                 natural_gas_price=0.289, moisture_content=0.10):
         super().__init__(ID, ins, outs, thermo)
         self._isplit = self.chemicals.isplit(split)
         self.T = T
@@ -239,31 +245,33 @@ class DDGSDryer(bst.Unit):
     def _run(self):
         wet_solids, air, natural_gas = self.ins
         dry_solids, hot_air, emissions = self.outs
-        tmo.separations.split(wet_solids, dry_solids, hot_air)
+        tmo.separations.split(wet_solids, hot_air, dry_solids, self.split)
         tmo.separations.adjust_moisture_content(dry_solids, hot_air, self.moisture_content)
         design_results = self.design_results
         design_results['Evaporation'] = evaporation = hot_air.F_mass
-        air.imol['N2', 'O2'] = np.array([0.78, 0.32]) * self.R * evaporation
-        hot_air.mol[:] = air.mol
+        air.imass['N2', 'O2'] = np.array([0.78, 0.32]) * self.R * evaporation
+        hot_air.mol += air.mol
         dry_solids.T = hot_air.T = self.T
         duty = (dry_solids.H + hot_air.H) - (wet_solids.H + air.H)
         natural_gas.empty()
-        CO2 = CH4 = duty / self.chemicals.CH4.LHV
+        CO2 = CH4 = - duty / self.chemicals.CH4.LHV
         H2O = 2. * CH4
         natural_gas.imol['CH4'] = CH4
         emissions.imol['CO2', 'H2O'] = [CO2, H2O]
         emissions.T = self.T + 30.
+        emissions.phase = air.phase = natural_gas.phase = hot_air.phase = 'g'
         
     def _design(self):
         length_to_diameter = self.length_to_diameter
         design_results = self.design_results
-        design_results['Volume'] = volume = design_results['Evaporation'] / self.H
+        design_results['Volume'] = volume = design_results['Evaporation'] / self.H 
         design_results['Diameter'] = diameter = cylinder_diameter_from_volume(volume, length_to_diameter)
         design_results['Length'] = length = diameter * length_to_diameter
         design_results['Peripheral drum area'] = cylinder_area(diameter, length)
 
 LiquefactionTank = tank_factory('LiquefactionTank', 
     CE=CE2007, cost=160900., S=141.3, tau=0.9, n=0.6, V_wf=0.90, V_max=500., kW_per_m3=0.6,
+    mixing=True,
 )
 
 class Liquefaction(LiquefactionTank):
@@ -363,15 +371,15 @@ class SimultaneousSaccharificationFermentation(bst.BatchBioreactor):
     
     
     """
-    V_wf = 0.83
     
     def __init__(self, ID='', ins=None, outs=(), thermo=None, *, 
                  tau=60.,  N=None, V=None, T=305.15, P=101325., Nmin=2, Nmax=36,
-                 yield_=0.9):
+                 yield_=0.9, V_wf=0.83):
         bst.BatchBioreactor.__init__(self, ID, ins, outs, thermo,
             tau=tau, N=N, V=V, T=T, P=P, Nmin=Nmin, Nmax=Nmax
         )
         self.reaction = tmo.reaction.Reaction('Glucose -> 2Ethanol + 2CO2',  'Glucose', yield_)
+        self.V_wf = V_wf
     
     def _run(self):
         vent, effluent = self.outs
@@ -383,11 +391,8 @@ class SimultaneousSaccharificationFermentation(bst.BatchBioreactor):
     
 SSF = SimultaneousSaccharificationFermentation
 
-class DDGSCentrifuge(bst.SolidLiquidsSplitCentrifuge):
-    _run = bst.Splitter._run
-    isplit = bst.Splitter.isplit
-    split = bst.Splitter.split
-    __init__ = bst.Splitter.__init__
+@copy_algorithm(bst.SolidLiquidsSplitCentrifuge, run=False)
+class DDGSCentrifuge(bst.Splitter): pass
     
 class ThermalOxidizer(bst.Unit):
     """
@@ -413,10 +418,11 @@ class ThermalOxidizer(bst.Unit):
         https://doi.org/10.1016/j.indcrop.2005.08.004.
 
     """
-    
+    _N_ins = 2
+    _N_outs = 1
     max_volume = 20. # m3
     
-    def __init__(self, *args, tau=0.5, kW_per_m3=18.47, V_wf=0.95, **kwargs):
+    def __init__(self, *args, tau=0.00014, kW_per_m3=18.47, V_wf=0.95, **kwargs):
         bst.Unit.__init__(self, *args, **kwargs)
         self.tau = tau
         self.kW_per_m3 = kW_per_m3
@@ -427,14 +433,16 @@ class ThermalOxidizer(bst.Unit):
         emissions, = self.outs
         emissions.copy_like(feed)
         combustion_rxns = self.chemicals.get_combustion_reactions()
-        combustion_rxns.force_adiabatic_reaction(emissions)
-        O2 = -emissions.imol['O2']
+        combustion_rxns.force_reaction(emissions)
+        O2 = max(-emissions.imol['O2'], 0.)
+        emissions.copy_like(feed)
         air.imol['N2', 'O2'] = [0.78/0.32 * O2, O2]
         emissions.mol += air.mol
+        combustion_rxns.adiabatic_reaction(emissions)
         
     def _design(self):
         design_results = self.design_results
-        volume = self.tau * self.ins[0].F_vol / self.V_wf
+        volume = self.tau * self.outs[0].F_vol / self.V_wf
         V_max = self.max_volume
         design_results['Number of vessels'] = N = np.ceil(volume / V_max)
         design_results['Vessel volume'] = volume / N
@@ -452,3 +460,18 @@ class ThermalOxidizer(bst.Unit):
 
 @cost('Flow rate', units='kg/hr', CE=CE2007, cost=122800, S=15303.5346, kW=37.3, n=0.6)
 class DDGSHandling(bst.Unit): pass
+
+
+class PlantAir_CIP_WasteWater_Facilities(bst.Facility):
+    network_priority = 0
+    
+    def __init__(self, ID, corn):
+        self.corn = corn
+        super().__init__(ID)
+        
+    def _run(self):
+        pass
+        
+    def _cost(self):
+        C = self.purchase_costs
+        C['Facilities'] = 6e5 * (self.corn.F_mass / 46211.6723)**0.6
