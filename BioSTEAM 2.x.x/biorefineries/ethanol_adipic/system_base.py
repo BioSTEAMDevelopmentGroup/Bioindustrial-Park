@@ -12,9 +12,7 @@
 """
 Created on Sat Jun 27 13:46:07 2020
 
-Based on the biorefineries in [1] and [2] for the production of ethanol and 
-adipic acid from lignocellulosic biomass. Part of the script is developed in [3] 
-
+References:
 [1] Humbird et al., Process Design and Economics for Biochemical Conversion of 
     Lignocellulosic Biomass to Ethanol: Dilute-Acid Pretreatment and Enzymatic 
     Hydrolysis of Corn Stover; Technical Report NREL/TP-5100-47764;
@@ -131,9 +129,9 @@ pretreatment_sys = System('pretreatment_sys',
 # =============================================================================
 
 # Flow updated in EnzymeHydrolysateMixer
-enzyme_R301 = Stream('enzyme_R301', units='kg/hr', price=price['Enzyme'])
+enzyme_M301 = Stream('enzyme_M301', units='kg/hr', price=price['Enzyme'])
 # Used to adjust enzymatic hydrolysis solid loading, flow updated in EnzymeHydrolysateMixer
-water_R301 = Stream('water_R301', units='kg/hr')
+water_M301 = Stream('water_M301', units='kg/hr')
 
 # Streams 311 and 309 from ref [1]
 CSL_R301 = Stream('CSL_R301', units='kg/hr')
@@ -148,8 +146,7 @@ DAP_R302 = Stream('DAP_R302', units='kg/hr')
 # Fermentation units
 # =============================================================================
 
-H301 = units.HydrolysateCooler('H301', ins=P202-0, T=50+273.15)
-M301 = units.EnzymeHydrolysateMixer('M301', ins=(H301-0, enzyme_R301, water_R301))
+M301 = units.EnzymeHydrolysateMixer('M301', ins=(P202-0, enzyme_M301, water_M301))
 
 R301 = units.SaccharificationAndCoFermentation('R301', ins=(M301-0, '',
                                                             CSL_R301, DAP_R301),
@@ -161,7 +158,7 @@ R302 = units.SeedTrain('R302', ins=(R301-2, CSL_R302, DAP_R302),
 T301 = units.SeedHoldTank('T301', ins=R302-1, outs=1-R301)
 
 fermentation_sys = System('fermentation_sys', 
-                          path=(H301, M301, R301, R302, T301), recycle=R302-1)
+                          path=(M301, R301, R302, T301), recycle=R302-1)
 
 
 
@@ -412,7 +409,7 @@ caustic = Stream('caustic', units='kg/hr', price=price['NaOH'])
 CSL = Stream('CSL', units='kg/hr', price=price['CSL'])
 DAP = Stream('DAP', units='kg/hr', price=price['DAP'])
 ammonia = Stream('ammonia', units='kg/hr', price=price['NH4OH'])
-sulfuric_acid = Stream('sulfuric_acid', units='kg/hr', price=price['Sulfuric acid'])
+sulfuric_acid = Stream('sulfuric_acid', units='kg/hr', price=price['H2SO4'])
 
 # Chemicals used/generated in CHP
 lime_CHP = Stream('lime_CHP', units='kg/hr', price=price['Lime'])
@@ -516,8 +513,8 @@ CWP = facilities.CWP('CWP', ins='return_chilled_water',
 BDM = bst.units.BlowdownMixer('BDM',ins=(CHP.outs[-1], CT.outs[-1]),
                               outs=M601.ins[-1])
 
-# All water used in the system
-process_water_streams = (water_R201, water_R301, water_U401, water_R502,
+# All water consumed by the system
+process_water_streams = (water_R201, water_M301, water_U401, water_R502,
                          CHP.ins[-1], CT.ins[-1])
 
 PWC = facilities.PWC('PWC', ins=(system_makeup_water, S605-0), 
@@ -538,7 +535,7 @@ CIP = facilities.CIP('CIP', ins=CIP_chems_in, outs='CIP_chems_out')
 ethanol_adipic_sys = System('ethanol_adipic_sys',
                         path=(U101, pretreatment_sys, fermentation_sys,
                               ethanol_purification_sys, lignin_sys,
-                              M601, aerobic_digestion_recycle, S605, S606,
+                              wastewater_sys,
                               S701, T701, T702, M701, T703, T704,
                               T705_S, T705, T706_S, T706, T707_S, T707, 
                               T708_S, T708, T709_S, T709, T710, M702),
@@ -600,6 +597,7 @@ _liter_per_gallon = 3.78541
 _ethanol_kg_2_gal = _liter_per_gallon/_ethanol_V*_ethanol_MW/1e6
 _feedstock_factor = 907.185 / (1-0.2)
 def simulate_get_MESP(feedstock_price=71.3):
+    ethanol.price = 0
     ethanol_adipic_sys.simulate()
     feedstock.price = feedstock_price / _feedstock_factor
     for i in range(3):
@@ -611,12 +609,13 @@ def simulate_get_MFPP(ethanol_price=2.2):
     ethanol_adipic_sys.simulate()
     ethanol.price = ethanol_price / _ethanol_kg_2_gal
     for i in range(3):
-        feedstock.price = ethanol_adipic_tea.solve_price(feedstock)
-    MFPP = feedstock.price * _feedstock_factor
+        MFPP = ethanol_adipic_tea.solve_price(feedstock)
+    MFPP *= _feedstock_factor
     return MFPP
 
-# MESP = simulate_get_MESP()
-# print(f'Base MESP: ${MESP:.2f}/gal with default pretreatment efficacy')
+def simulate_and_print():
+    MESP = simulate_get_MESP()
+    print(f'Base MESP: ${MESP:.2f}/gal with default pretreatment efficacy')
 
 
 

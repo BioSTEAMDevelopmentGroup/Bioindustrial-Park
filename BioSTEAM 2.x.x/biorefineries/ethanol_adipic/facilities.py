@@ -12,9 +12,7 @@
 """
 Created on Fri Jun 26 13:49:44 2020
 
-Based on the biorefineries in [1] and [2] for the production of ethanol and 
-adipic acid from lignocellulosic biomass. Part of the script is developed in [3] 
-
+References:
 [1] Humbird et al., Process Design and Economics for Biochemical Conversion of 
     Lignocellulosic Biomass to Ethanol: Dilute-Acid Pretreatment and Enzymatic 
     Hydrolysis of Corn Stover; Technical Report NREL/TP-5100-47764; 
@@ -152,22 +150,24 @@ class CWP(Facility):
         self.agent = HeatUtility.get_cooling_agent('chilled_water')
         
     def _run(self):
-        chilled_water_utilities = self.chilled_water_utilities = {}
+        system_chilled_water_utilities = self.system_chilled_water_utilities = {}
         
         total_duty = 0
         agent = self.agent
+        number = 1
         for u in self.system.units:
             if u is self: continue
             if hasattr(u, 'heat_utilities'):
                 for hu in u.heat_utilities:
                     if hu.agent is agent:
-                        chilled_water_utilities[f'{u.ID} - {hu.ID}'] = hu
+                        system_chilled_water_utilities[f'#{number}: {u.ID} - {hu.ID}'] = hu
+                        number += 1
                         total_duty -= hu.duty
         
         hu_chilled = self.heat_utilities[0]
-        hu_chilled.mix_from(chilled_water_utilities.values())
+        hu_chilled.mix_from([i for i in system_chilled_water_utilities.values()])
         hu_chilled.reverse()        
-        self.system_chilled_water_duty = hu_chilled.duty
+        self.system_chilled_water_duty = -hu_chilled.duty
         
         # Total amount of chilled water needed in the whole system
         total_chilled_water = self.total_chilled_water = \
@@ -239,19 +239,21 @@ class CT(Facility):
         process_cw.T = blowdown.T = 28 + 273.15
         
         total_duty = 0
+        number = 1
         agent = self.agent
         for u in self.system.units:
             if u is self: continue
             if hasattr(u, 'heat_utilities'):
                 for hu in u.heat_utilities:
                     if hu.agent is agent:
-                        system_cooling_water_utilities[f'{u.ID} - {hu.ID}'] = hu
+                        system_cooling_water_utilities[f'#{number}: {u.ID} - {hu.ID}'] = hu
+                        number += 1
                         total_duty -= hu.duty
         
         hu_cooling = self.heat_utilities[0]
-        hu_cooling.mix_from(system_cooling_water_utilities.values())
+        hu_cooling.mix_from([i for i in system_cooling_water_utilities.values()])
         hu_cooling.reverse()        
-        self.system_cooling_water_duty = hu_cooling.duty
+        self.system_cooling_water_duty = -hu_cooling.duty
         
         # Total amount of cooling water needed in the whole system
         total_cooling_water = self.total_cooling_water = \
@@ -406,13 +408,15 @@ class CHP(Facility):
         heat_generated = self.heat_generated = \
             (H_in+heat_from_combustion)*self.B_eff - H_out
         
+        number = 1
         for u in self.system.units:
             if u is self: continue
             if hasattr(u, 'heat_utilities'):
                 for hu in u.heat_utilities:
                     # Including low/medium/high_pressure_steam
                     if hu.flow*hu.duty > 0:
-                        system_heating_utilities[f'{u.ID} - {hu.ID}'] = hu
+                        system_heating_utilities[f'#{number}: {u.ID} - {hu.ID}'] = hu
+                        number += 1
         
         # Use lps to account for the energy needed for the side steam
         if side_streams_to_heat:
@@ -439,7 +443,7 @@ class CHP(Facility):
             
             # Take the opposite for cooling duty (i.e., cooling duty should be negative)
             # this is to condense the unused steam
-            cooling_need = self.cooling_need = -(CHP_heat_surplus-electricity_generated)
+            cooling_need = self.cooling_need = -(CHP_heat_surplus-electricity_generated*3600)
             hu_cooling(duty=cooling_need, T_in=lps.T)
             natural_gas.empty()
             
