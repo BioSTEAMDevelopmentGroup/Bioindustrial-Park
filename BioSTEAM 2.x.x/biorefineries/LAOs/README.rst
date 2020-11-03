@@ -38,7 +38,7 @@ are lazy loaded by the module:
      facilities: (CWP, BT, CT, BT, CCI)
     >>> laos.LAOs_tea.show() # The TEA object
     CombinedTEA: LAOs_sys, Area700
-     NPV: -90,266 USD at 10.0% IRR
+     NPV: -79,822 USD at 10.0% IRR
     >>> laos.flowsheet # The complete flowsheet
     <Flowsheet: LAOs>
     >>> laos.R101.show() # Any unit operations and streams can be accessed through the module
@@ -46,8 +46,8 @@ are lazy loaded by the module:
     ins...
     [0] mixed_bioreactor_feed  from  HXutility-H101
         phase: 'l', T: 310.15 K, P: 101325 Pa
-        flow (kmol/hr): Water                6.63e+03
-                        Tridecane            130
+        flow (kmol/hr): Water                1.87e+04
+                        Tridecane            366
                         Hexanol              4.51
                         Octanol              0.998
                         Decanol              0.231
@@ -55,13 +55,13 @@ are lazy loaded by the module:
                         Octene               0.0275
                         ...
     outs...
-    [0] vent
+    [0] CO2
         phase: 'g', T: 310.15 K, P: 101325 Pa
         flow (kmol/hr): CO2  641
-    [1] d393  to  StorageTank-T105
+    [1] d394  to  StorageTank-T105
         phase: 'l', T: 310.15 K, P: 101325 Pa
-        flow (kmol/hr): Water                7.07e+03
-                        Tridecane            130
+        flow (kmol/hr): Water                1.92e+04
+                        Tridecane            366
                         Hexanol              41
                         Octanol              29.6
                         Decanol              70.8
