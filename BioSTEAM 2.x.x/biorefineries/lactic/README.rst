@@ -1,14 +1,14 @@
-======================================================================
-lactic: Production of Lactic Acid from Lignocellulosic Feedstocks
-======================================================================
+==============================================================
+lactic: Production of Lactic Acid from Lignocellulosic Biomass
+==============================================================
 
 Simplified process flow scheme
 ------------------------------
 .. figure:: ./images/lactic_acid_biorefinery.png
 
-The biorefinery is developed for a manuscript in preparation [1] for the production
+The biorefinery is developed for a manuscript in preparation [1]_ for the production
 of lactic acid  via dilute sulfuric acid pretreatment, fermentation, and separation
-processes from lignocellulosic biomass. Part of the script is based on [2] and [3].
+processes from lignocellulosic biomass. Part of the script is based on [2]_ and [3]_.
 
 
 Getting Started
@@ -20,11 +20,11 @@ simulated (first time accessing takes a bit to load the chemicals and system).
 .. code-block:: python
 
     >>> from biorefineries.lactic import system
-
+    
     ---------- Simulation Results ----------
-    MPSP is $1.548/kg
-    GWP is 5.721 kg CO2-eq/kg lactic acid
-    FEC is 74.02 MJ/kg lactic acid
+    MPSP is $1.570/kg
+    GWP is 5.922 kg CO2-eq/kg lactic acid
+    FEC is 77.19 MJ/kg lactic acid
     --------------------
     >>> system.chems
     >>> # All chemicals used in the bioreinfery
@@ -83,7 +83,7 @@ Processes:
      facilities: (HXN, CHP, CT, PWC, ADP, CIP)
     >>> system.lactic_tea.show() # The TEA object
     CombinedTEA: lactic_sys, CHP_sys
-     NPV: -931 USD at 10.0% IRR
+     NPV: -945 USD at 10.0% IRR
     >>> system.lactic_sys.flowsheet # The flowsheet
     <Flowsheet: lactic>
     >>> system.R301.show()
@@ -142,10 +142,13 @@ Processes:
 Analyses
 --------
 Multiple analysis modules (in ./analyses) were used to evaluate the biorefinery
-from different aspects for [1], including: full Monte Carlo simulation,
+from different aspects for [1]_, including: full Monte Carlo simulation,
 titer-yield-productivity analysis for the fermentation process, evaluate feedstocks
 of varying carbohydrate contents and at different prices, and evaluate feedstocks
 of varying succinic acid content.
+
+Note that results used in the manuscript [1]_ were generated using biosteam v2.20.21
+and thermosteam v0.20.26
 
 To reproduce the results, directly run the script of interest, and results will
 be saved as Excel files in the same directory path as the module.
@@ -172,8 +175,8 @@ be saved as Excel files in the same directory path as the module.
 
 References
 ----------
-.. [1] Li et al., Evaluating the Sustainability of Lactic Acid Production from
-    Lignocellulosic Biomass. In Preparation 2020.
+.. [1] Li et al., Sustainable Lactic Acid Production from Lignocellulosic
+     Biomass. Submitted 2020.
     
 .. [2] Li et al., Tailored Pretreatment Processes for the Sustainable Design of
     Lignocellulosic Biorefineries across the Feedstock Landscape. Submitted 2020.

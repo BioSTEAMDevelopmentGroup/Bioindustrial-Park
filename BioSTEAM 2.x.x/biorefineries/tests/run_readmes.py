@@ -15,7 +15,6 @@ from biorefineries import (
     lipidcane as lc,
     cornstover as cs,
     LAOs as laos,
-    ethanol_adipic,
     lactic,
     )
 
@@ -24,5 +23,4 @@ testfile(get_readme(sc))
 testfile(get_readme(lc))
 testfile(get_readme(cs))
 testfile(get_readme(laos))
-testfile(get_readme(ethanol_adipic))
 testfile(get_readme(lactic))

@@ -39,9 +39,13 @@ import numpy as np
 import pandas as pd
 import biosteam as bst
 from biosteam.utils import TicToc
-from lactic import system_concentrated
-from lactic._chemicals import sugars
-from lactic._utils import set_yield
+
+# import os
+# path = os.path.join(os.path.dirname(os.path.realpath(__file__)), '../')
+# os.chdir(path)
+from biorefineries.lactic import system_concentrated
+from biorefineries.lactic._chemicals import sugars
+from biorefineries.lactic._utils import set_yield
 
 
 # %% 

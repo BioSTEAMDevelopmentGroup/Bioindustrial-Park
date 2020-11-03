@@ -69,54 +69,6 @@ def test_LAOs():
     assert np.allclose(units.get_cooling_duty(), 134.66774238880174, rtol=1e-2)
     assert np.allclose(units.get_electricity_consumption(), 3.689496361470118, rtol=1e-2)
     assert np.allclose(units.get_electricity_production(), 3.6894963614701215, rtol=1e-2)   
-    
-def test_ethanol_adipic():
-    bst.process_tools.default_utilities()
-    from biorefineries import ethanol_adipic
-    acid = ethanol_adipic.system_acid
-    MESP = acid.ethanol.price
-    assert np.allclose(MESP, 2.512942530141015, atol=0.01)
-    tea = acid.ethanol_tea
-    assert np.allclose(tea.sales, 153621809.87439528, rtol=0.01)
-    assert np.allclose(tea.material_cost, 112976158.84156583, rtol=0.01)
-    assert np.allclose(tea.installed_equipment_cost, 202999332.38051096, rtol=0.01)
-    assert np.allclose(tea.utility_cost, -16654751.636141604, rtol=0.01)
-    units = UnitGroup('Biorefinery', acid.ethanol_tea.units)
-    assert np.allclose(acid.CHP.system_heating_demand/1e6, 342.19255164427744, rtol=0.01)
-    assert np.allclose(units.get_cooling_duty(), 335.3383652559594, rtol=0.01)
-    assert np.allclose(units.get_electricity_consumption(), 23.921945234219077, rtol=0.01)
-    assert np.allclose(units.get_electricity_production(), 53.04613879616649, rtol=0.01)
-    
-    base = ethanol_adipic.system_base
-    MESP = base.ethanol.price
-    assert np.allclose(MESP, 2.723886457801242, atol=0.01)
-    tea = base.ethanol_adipic_tea
-    assert np.allclose(tea.sales, 220968148.48076087, rtol=0.01)
-    assert np.allclose(tea.material_cost, 121378733.07275604, rtol=0.01)
-    assert np.allclose(tea.installed_equipment_cost, 284333240.3730375, rtol=0.01)
-    assert np.allclose(tea.utility_cost, 14299236.824111573, rtol=0.01)
-    units = UnitGroup('Biorefinery', base.ethanol_adipic_tea.units)
-    assert np.allclose(base.CHP.system_heating_demand/1e6, 307.55991674861224, rtol=0.01)
-    assert np.allclose(units.get_cooling_duty(), 259.37733506080116, rtol=0.01)
-    assert np.allclose(units.get_electricity_consumption(), 26.67210736583321, rtol=0.001)
-    assert np.allclose(units.get_electricity_production(), 0.0)
-    
-def test_lactic():
-    bst.process_tools.default_utilities()
-    from biorefineries import lactic
-    system = lactic.system
-    MPSP = system.lactic_acid.price
-    assert np.allclose(MPSP, 1.548015650016793, atol=0.01)
-    tea = system.lactic_tea
-    assert np.allclose(tea.sales, 335881119.8206509, rtol=0.01)
-    assert np.allclose(tea.material_cost, 221588718.1301599, rtol=0.01)
-    assert np.allclose(tea.installed_equipment_cost, 324175792.74265414, rtol=0.01)
-    assert np.allclose(tea.utility_cost, 25350111.57914885, rtol=0.01)
-    units = UnitGroup('Biorefinery', system.lactic_tea.units)
-    assert np.allclose(system.CHP.system_heating_demand/1e6, 1812.5943347629961, rtol=0.01)
-    assert np.allclose(-system.CT.system_cooling_water_duty/1e6, 1715.9264327014253, rtol=0.01)
-    assert np.allclose(units.get_electricity_consumption(), 45.934100853716096, rtol=0.01)
-    assert np.allclose(units.get_electricity_production(), 0.0)
 
 @pytest.mark.slow
 def test_wheatstraw():
@@ -150,6 +102,24 @@ def test_annimal_bedding():
     assert np.allclose(units.get_electricity_consumption(), 31.999853945401934, rtol=1e-2)
     assert np.allclose(units.get_electricity_production(), 34.44884396679516, rtol=1e-2)
     
+@pytest.mark.slow
+def test_lactic():
+    bst.process_tools.default_utilities()
+    from biorefineries import lactic
+    system = lactic.system
+    MPSP = system.lactic_acid.price
+    assert np.allclose(MPSP, 1.5704836997441853, atol=0.01)
+    tea = system.lactic_tea
+    assert np.allclose(tea.sales, 340805307.1489925, rtol=0.01)
+    assert np.allclose(tea.material_cost, 225035229.6439402, rtol=0.01)
+    assert np.allclose(tea.installed_equipment_cost, 329160559.8556272, rtol=0.01)
+    assert np.allclose(tea.utility_cost, 25551416.34519198, rtol=0.01)
+    units = UnitGroup('Biorefinery', system.lactic_tea.units)
+    assert np.allclose(system.CHP.system_heating_demand/1e6, 1881.5136539040284, rtol=0.01)
+    assert np.allclose(-system.CT.system_cooling_water_duty/1e6, 1714.9228013906093, rtol=0.01)
+    assert np.allclose(units.get_electricity_consumption(), 46.29886269694857, rtol=0.01)
+    assert np.allclose(units.get_electricity_production(), 0.0)
+    
 if __name__ == '__main__':
     test_sugarcane()
     test_lipidcane()
@@ -157,8 +127,7 @@ if __name__ == '__main__':
     test_wheatstraw()
     test_LAOs()
     test_annimal_bedding()
-#    test_ethanol_adipic()
-#    test_lactic()
+    test_lactic()
 
 
 

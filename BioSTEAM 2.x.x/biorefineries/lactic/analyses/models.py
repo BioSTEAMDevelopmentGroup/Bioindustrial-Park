@@ -37,9 +37,13 @@ import numpy as np
 import biosteam as bst
 from biosteam.evaluation import Model, Metric
 from chaospy import distributions as shape
-from lactic._process_settings import CFs
-from lactic._utils import set_yield
-from lactic import system
+
+# import os
+# path = os.path.join(os.path.dirname(os.path.realpath(__file__)), '../')
+# os.chdir(path)
+from biorefineries.lactic._process_settings import CFs
+from biorefineries.lactic._utils import set_yield
+from biorefineries.lactic import system
 
 _kg_per_ton = 907.18474
 _feedstock_factor = _kg_per_ton / 0.8

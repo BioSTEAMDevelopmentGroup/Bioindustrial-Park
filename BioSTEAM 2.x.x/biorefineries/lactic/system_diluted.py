@@ -62,12 +62,16 @@ from flexsolve import aitken_secant, IQ_interpolation
 from biosteam import System
 from biosteam.process_tools import UnitGroup
 from thermosteam import Stream
-from lactic import _units as units
-from lactic import _facilities as facilities
-from lactic._process_settings import price, CFs
-from lactic._utils import baseline_feedflow, set_yield, find_split, splits_df
-from lactic._chemicals import chems, chemical_groups, soluble_organics, combustibles
-from lactic._tea_lca import LacticTEA
+
+# import os
+# path = os.path.join(os.path.dirname(os.path.realpath(__file__)), '../')
+# os.chdir(path)
+from biorefineries.lactic import _units as units
+from biorefineries.lactic import _facilities as facilities
+from biorefineries.lactic._process_settings import price, CFs
+from biorefineries.lactic._utils import baseline_feedflow, set_yield, find_split, splits_df
+from biorefineries.lactic._chemicals import chems, chemical_groups, soluble_organics, combustibles
+from biorefineries.lactic._tea_lca import LacticTEA
 
 flowsheet = bst.Flowsheet('lactic')
 bst.main_flowsheet.set_flowsheet(flowsheet)

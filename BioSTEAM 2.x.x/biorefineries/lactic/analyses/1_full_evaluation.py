@@ -40,8 +40,12 @@ import pandas as pd
 import biosteam as bst
 from biosteam.utils import TicToc
 from biosteam.plots import plot_montecarlo_across_coordinate
-from lactic.system import R301, lactic_sys, simulate_get_MPSP, get_GWP, get_FEC
-from lactic.analyses import models
+
+# import os
+# path = os.path.join(os.path.dirname(os.path.realpath(__file__)), '../../')
+# os.chdir(path)
+from biorefineries.lactic.system import R301, lactic_sys, simulate_get_MPSP, get_GWP, get_FEC
+from biorefineries.lactic.analyses import models
 
 percentiles = [0, 0.05, 0.25, 0.5, 0.75, 0.95, 1]
 

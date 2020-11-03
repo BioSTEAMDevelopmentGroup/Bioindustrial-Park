@@ -72,6 +72,10 @@ prices = np.arange(0, 210, 10)
 # Evaluate across feedstock price and carbohydrate content
 # =============================================================================
 
+# import os
+# path = os.path.join(os.path.dirname(os.path.realpath(__file__)), '../')
+# os.chdir(path)
+
 # Initiate a timer
 timer = TicToc('timer')
 timer.tic()
@@ -86,7 +90,7 @@ GWPs = []
 FECs = []
 
 # Configuration 1
-from lactic import system_concentrated as concentrated
+from biorefineries.lactic import system_concentrated as concentrated
 carb_contents1 = np.arange(0.25, 0.59, 0.01)
 carb_contents1 = carb_contents1.tolist() + [0.589]
 concentrated.R301.allow_dilution = False
@@ -117,7 +121,7 @@ for i in carb_contents1:
     print(f'Run #{run_number}: {timer.elapsed_time:.0f} sec')
 
 # Then concentration needed to get to the baseline titer
-from lactic import system_diluted as diluted
+from biorefineries.lactic import system_diluted as diluted
 carb_contents2 = np.arange(0.59, 0.701, 0.01).tolist()
 diluted.R301.allow_dilution = True
 diluted.R301.allow_concentration = False
