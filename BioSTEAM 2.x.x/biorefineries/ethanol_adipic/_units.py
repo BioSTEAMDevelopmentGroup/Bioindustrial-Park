@@ -34,10 +34,13 @@ References:
     to Sugars and Catalytic Conversion of Sugars to Hydrocarbons;
     NREL/TP-5100-62498; National Renewable Energy Lab (NREL), 2015.
     http://www.nrel.gov/docs/fy15osti/62498.pdf
-    
-[5] Vardon et al., Cis,Cis-Muconic Acid: Separation and Catalysis to Bio-Adipic
-    Acid for Nylon-6,6 Polymerization. Green Chem. 2016, 18 (11), 3397–3413.
-    https://doi.org/10.1039/C5GC02844B.
+
+[5] Bioenergy Technologies Office. Bioenergy Technologies Office 2019 R&D
+    State of Technology; U.S. Department of Energy, 2020.
+
+[6] Salvachúa et al., Bioprocess Development for Muconic Acid Production from
+    Aromatic Compounds and Lignin. Green Chem. 2018, 20 (21), 5007–5019.
+    https://doi.org/10.1039/C8GC02519C.
 
 @author: yalinli_cabbi
 """
@@ -51,9 +54,9 @@ from biosteam import Unit
 from biosteam.units import Mixer, Flash, MixTank, HXutility, Pump, SolidsSeparator
 from biosteam.units.decorators import cost
 from thermosteam import separations
-from ethanol_adipic.process_settings import price
-from ethanol_adipic.chemicals import total_solids, solubles, insolubles, COD_chemicals
-from ethanol_adipic.utils import CEPCI, baseline_feedflow, compute_muconic_titer, \
+from biorefineries.ethanol_adipic._process_settings import price
+from biorefineries.ethanol_adipic._chemicals import total_solids, solubles, insolubles, COD_chemicals
+from biorefineries.ethanol_adipic._utils import CEPCI, baseline_feedflow, compute_muconic_titer, \
     compute_COD
 
 _kg_per_ton = 907.18474
@@ -423,14 +426,15 @@ class HydrolysateCooler(HXutility): pass
 
 @cost(basis='Flow rate', ID='Mixer', units='kg/hr',
       kW=74.57, cost=109000, S=379938, CE=CEPCI[2009], n=0.5, BM=1.7)
-class EnzymeHydrolysateMixer(Mixer):
+class EnzymeHydrolysateMixer(Unit):
     _N_ins = 3	
-    _N_outs = 1	
+    _N_outs = 1
+    _graphics = Mixer._graphics
     
-    # Updated from ref [1] values (20 mg/g enzyme loading and 0.2 solid loading)
-    # to ref [2]
-    enzyme_loading = 10
-    solid_loading = 0.25
+    def __init__(self, ID='', ins=None, outs=(), *, enzyme_loading, solid_loading):
+        Unit.__init__(self, ID, ins, outs)
+        self.enzyme_loading = enzyme_loading
+        self.solid_loading = solid_loading
     
     def _run(self):	
         hydrolysate, enzyme, water = self.ins	
@@ -854,7 +858,11 @@ class MuconicFermentation(Unit):
     Rxn('Arabinose + 1.57 O2 -> 0.62 MuconicAcid + 1.26 CO2 + 3.13 H2O',  'Arabinose',  0.54)
             ])
         self._seed_X = self.seed_fermentation_rxns.X.copy()
-        
+
+    # Lower conversions of extratives and lignin than ref [4] to better reflect
+    # current state of technology, resulting in a titer of ~31.5 g/L for the
+    # composition in ref [4]. Titers from real hydrolysate remains low (< 15 g/L)
+    # based on refs [5] and [6]
         self.main_fermentation_rxns = ParallelRxn([
     #                           Reaction definition                                 Reactant        Conversion
     Rxn('Glucose + 1.18 O2 + 0.28 NH4OH -> 4.8 P_putida + 1.2 CO2 + 2.26 H2O',      'Glucose',        0.46),
@@ -866,15 +874,9 @@ class MuconicFermentation(Unit):
     Rxn('Sucrose + 2.35 O2 + 0.56 NH4OH -> 9.6 P_putida + 2.4 CO2 + 3.52 H2O',      'Sucrose',        0.46),
     Rxn('Sucrose + 3.8731 O2 -> 1.48 MuconicAcid + 3.13 CO2 + 6.57 H2O',            'Sucrose',        0.54),
     Rxn('Acetate + 0.39 O2 + 0.093 NH4OH -> 1.6 P_putida + 0.4 CO2 + 0.753 H2O',    'Acetate',        1),
-    Rxn('Extractives + 0.68 O2 + 0.28 NH4OH -> 4.8 P_putida + 1.2 CO2 + 2.26 H2O',  'Extractives',    0.46),
-    Rxn('Extractives + 1.44 O2 -> 0.74 MuconicAcid + 1.57 CO2 + 3.78 H2O',          'Extractives',    0.54),
-    # Used a mid point between experimentally proved titer (34.5 g/L in ref [5], ~0% conversion)
-    # and the designed titer in ref [2] (68.5/L, ~80% conversion);
-    # using 100% conversion in ref [2] would lead to a titer around 77 g/L
-    # due to the higher sugar content in ethanol fermentation stillage compared to ref [2],
-    # which fermented sugars for 2,3-butanediol
-    Rxn('SolubleLignin + 3 O2 -> MuconicAcid + 2 CO2 + H2O',                        'SolubleLignin',  0.4)
-    # Rxn('SolubleLignin + 3 O2 -> MuconicAcid + 2 CO2 + H2O',                        'SolubleLignin',  1)
+    Rxn('Extractives + 0.68 O2 + 0.28 NH4OH -> 4.8 P_putida + 1.2 CO2 + 2.26 H2O',  'Extractives',    0),
+    Rxn('Extractives + 1.44 O2 -> 0.74 MuconicAcid + 1.57 CO2 + 3.78 H2O',          'Extractives',    0),
+    Rxn('SolubleLignin + 3 O2 -> MuconicAcid + 2 CO2 + H2O',                        'SolubleLignin',  0.5)
             ])
         self._main_X = self.main_fermentation_rxns.X.copy()
 

@@ -29,14 +29,23 @@ References:
     ACS Sustainable Chem. Eng. 2020, 8 (8), 3302–3310. 
     https://doi.org/10.1021/acssuschemeng.9b07040
     
+[4] Argonne National Laboratory. The Greenhouse gases, Regulated Emissions,
+    and Energy use in Transportation (GREET) Model https://greet.es.anl.gov/
+    (accessed Aug 25, 2020).
+    
 @author: yalinli_cabbi
 """
 
 
 # %%
 
+# =============================================================================
+# Setup
+# =============================================================================
+
 import biosteam as bst
-from ethanol_adipic.chemicals import chems
+import thermosteam as tmo
+from biorefineries.ethanol_adipic._chemicals import chems
 
 bst.CE = 541.7 # year 2016
 _kg_per_ton = 907.18474
@@ -45,6 +54,34 @@ _liter_per_gallon = 3.78541
 _ft3_per_m3 = 35.3147
 _J_per_BTU = 1055.06
 _GDP_2007to2016 = 1.160
+
+# =============================================================================
+# Energy balances
+# =============================================================================
+
+_lps = bst.HeatUtility.get_heating_agent('low_pressure_steam')
+_mps = bst.HeatUtility.get_heating_agent('medium_pressure_steam')
+_hps = bst.HeatUtility.get_heating_agent('high_pressure_steam')
+
+# Adjusted to LP/HP steam temperature as in ref [1]
+# biosteam native mps T is lower than LP steam T in ref [1], thus adjust mps.T
+_mps.T = 233 + 273.15
+_hps.T = 266 + 273.15
+_cooling = bst.HeatUtility.get_cooling_agent('cooling_water')
+_chilled = bst.HeatUtility.get_cooling_agent('chilled_water')
+_cooling.T = 28 + 273.15
+_cooling.T_limit = _cooling.T + 9
+
+# Side steam in CHP not a heat utility, thus will cause problem in TEA utility
+# cost calculation if price not set to 0 here, costs for regeneration of heating
+# and cooling utilities will be considered as CAPEX and OPEX of CHP and CT, respectively
+for i in (_lps, _mps, _hps, _cooling, _chilled):
+    i.heat_transfer_price = i.regeneration_price = 0
+    i.heat_transfer_efficiency = 1
+
+# =============================================================================
+# Prices for techno-economic analysis (TEA)
+# =============================================================================
 
 # From USD/dry-ton to USD/kg in 2016$, 20% moisture content
 _feedstock_factor = _kg_per_ton / 0.8
@@ -107,7 +144,7 @@ price = {'Feedstock': feedstock_price,
          # Cost of ash is negative because it's a product stream	
          'Ash disposal': ash_disposal_price,
          'Electricity': 0.068,
-         'Denaturant': denaturant_price,
+         'Denaturant': denaturant_price, # n-Heptane
          'Ethanol': 0.3370 * _lb_per_kg,
          'Adipic acid': 0.8554 * _lb_per_kg,
          'Sodium sulfate': 0.0706 * _lb_per_kg
@@ -115,23 +152,48 @@ price = {'Feedstock': feedstock_price,
     
 bst.PowerUtility.price = price['Electricity']
 
-_lps = bst.HeatUtility.get_heating_agent('low_pressure_steam')
-_mps = bst.HeatUtility.get_heating_agent('medium_pressure_steam')
-_hps = bst.HeatUtility.get_heating_agent('high_pressure_steam')
+# =============================================================================
+# Characterization factors (CFs) for life cycle analysis (LCA), 100-year global
+# warming potential (GWP) in kg CO2-eq/kg
+# =============================================================================
 
-# Adjusted to LP/HP steam temperature as in ref [1]
-# biosteam native mps T is lower than LP steam T in ref [1], thus adjust mps.T
-_mps.T = 233 + 273.15
-_hps.T = 266 + 273.15
-_cooling = bst.HeatUtility.get_cooling_agent('cooling_water')
-_chilled = bst.HeatUtility.get_cooling_agent('chilled_water')
-_cooling.T = 28 + 273.15
-_cooling.T_limit = _cooling.T + 9
+GWP_CFs = {
+    'H2SO4': 44.47/1e3,
+    'NH4OH': 2.64 * chems.NH3.MW/chems.NH4OH.MW,    
+    'NaOH': 2.11,
+    'CSL': 1.55,
+    'DAP': 1.20,
+    'Enzyme': 2.24,
+    'H2': 15.80, # liquid H2 combined
+    'CH4': 0.40, # NA NG from shale and conventional recovery
+    'Lime': 1.29,
+    'Denaturant': 0.88, # gasoline blendstock from crude oil for use in US refineries
+    }
 
-# Side steam in CHP not a heat utility, thus will cause problem in TEA utility
-# cost calculation if price not set to 0 here, costs for regeneration of heating
-# and cooling utilities will be considered as CAPEX and OPEX of CHP and CT, respectively
-for i in (_lps, _mps, _hps, _cooling, _chilled):
-    i.heat_transfer_price = i.regeneration_price = 0
+GWP_CF_array = chems.kwarray(GWP_CFs)
+# In kg CO2-eq/kg of material
+GWP_CF_stream = tmo.Stream('GWP_CF_stream', GWP_CF_array, units='kg/hr')
+
+GWP_CFs['Corn stover'] = 44.70/1e3 * 0.8
+# In kg CO2-eq/kWh
+GWP_CFs['Electricity'] = 0.48
+# From ref [4]
+GWP_CFs['Adipic acid_fossil'] = 12.03
+GWP_CFs['Sodium sulfate'] = 0.47 # from sodium brine
+
+# [5] ecoinvent 3.6 https://www.ecoinvent.org/home.html (accessed Aug 26, 2020).
+# # From ref [5], cut-off by classification, adipic acid production, RoW, TRACI
+# GWP_CFs['Adipic acid_ecoinvent'] = 14.3
+# # From ref [5], cut-off by classification, sodium sulfate production,
+# # from natural sources, RoW, TRACI
+# GWP_CFs['Sodium sulfate_ecoinvent'] = 0.10829
+
+
+
+
+
+
+
+
     
     

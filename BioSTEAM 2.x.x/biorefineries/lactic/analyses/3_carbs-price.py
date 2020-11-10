@@ -72,10 +72,6 @@ prices = np.arange(0, 210, 10)
 # Evaluate across feedstock price and carbohydrate content
 # =============================================================================
 
-# import os
-# path = os.path.join(os.path.dirname(os.path.realpath(__file__)), '../')
-# os.chdir(path)
-
 # Initiate a timer
 timer = TicToc('timer')
 timer.tic()

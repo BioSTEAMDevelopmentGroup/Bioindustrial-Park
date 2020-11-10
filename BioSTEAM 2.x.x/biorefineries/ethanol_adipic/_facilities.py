@@ -44,7 +44,7 @@ from biosteam.units.decorators import cost
 from thermosteam import Stream
 from thermosteam.reaction import Reaction as Rxn
 from thermosteam.reaction import ParallelReaction as ParallelRxn
-from ethanol_adipic.utils import CEPCI
+from biorefineries.ethanol_adipic._utils import CEPCI
 
 __all__ = ('ADP', 'CIP', 'CT', 'PWC', 'CHP')
 
