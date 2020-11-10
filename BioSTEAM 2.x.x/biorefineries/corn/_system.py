@@ -9,7 +9,7 @@
 """
 import biosteam as bst
 from biorefineries import corn as cn
-from biorefineries.sugarcane import create_ethanol_separation_units, price
+from biorefineries.sugarcane import create_ethanol_separation_units
 from ._process_settings import price
 
 __all__ = ('create_system',)
@@ -150,7 +150,7 @@ def create_system(ID='corn_sys'):
     MX2 = bst.Mixer('MX2', (E408_2-1, E413-0))
     P411 = bst.Pump('P411', MX2-0)
     
-    dct = create_ethanol_separation_units(
+    create_ethanol_separation_units(
         degassed_beer=P411-0,
         ethanol_product=ethanol,
         denaturant=denaturant,

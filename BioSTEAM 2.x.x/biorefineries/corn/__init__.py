@@ -27,6 +27,7 @@ __all__ = [*utils.__all__,
            'flowsheet',
 ]
 
+from .abm import *
 from .utils import *
 from .units import *
 from ._process_settings import *
@@ -55,7 +56,7 @@ def _load_chemicals():
 def _load_system():
     import biosteam as bst
     from biosteam import main_flowsheet as F
-    global corn_sys, corn_tea, flowsheet, _system_loaded
+    global corn_sys, corn_tea, flowsheet, all_areas, _system_loaded
     flowsheet = bst.Flowsheet('corn')
     F.set_flowsheet(flowsheet)
     bst.settings.set_thermo(chemicals)
@@ -64,6 +65,7 @@ def _load_system():
     corn_sys.simulate()
     corn_tea = create_tea(corn_sys)
     corn_tea.IRR = corn_tea.solve_IRR()
+    all_areas = bst.process_tools.UnitGroup('All Areas', corn_sys.units)
     _system_loaded = True
 
 if PY37:    

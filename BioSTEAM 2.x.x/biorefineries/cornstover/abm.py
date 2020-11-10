@@ -62,6 +62,7 @@ def ABM_TEA_model(
         price_miscanthus=0.08, 
         price_ethanol=0.80,
         IRR=0.10,
+        duration=(2007, 2037),
     ):
     """
     Return a dictionary of biorefinery metrics for the production of cellulosic
@@ -83,6 +84,8 @@ def ABM_TEA_model(
         Price of ethanol in USD/kg.
     IRR : float
         Internal rate of return as a fraction (not percent!).
+    duration : tuple(int, int)
+        Years of operation.
 
     Returns
     -------
@@ -102,6 +105,7 @@ def ABM_TEA_model(
     hours = operating_days * 24 
     cs.cornstover.F_mass = plant_capacity / hours
     cs.cornstover_tea.operating_days = operating_days
+    cs.cornstover_tea.duration = duration
     cs.cornstover_sys.simulate()
     cs.cornstover_tea.IRR = IRR
     unit_group = cs.AllAreas
