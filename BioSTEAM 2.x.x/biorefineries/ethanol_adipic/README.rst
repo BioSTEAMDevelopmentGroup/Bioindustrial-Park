@@ -251,12 +251,12 @@ of each biorefinery across the feedstock landscape.
 
 Requirements
 ------------
-.. [1] Python module biosteam (https://pypi.org/project/biosteam/) and dependencies
+[1] Python module biosteam (https://pypi.org/project/biosteam/) and dependencies
 
     Note: results used in the manuscript were generated using biosteam v2.20.21,
     thermosteam v0.20.26, and dependencies
 
-.. [2] Excel file named "_Feedstock compositions.xlsx" in the same directory path
+[2] Excel file named "_Feedstock compositions.xlsx" in the same directory path
     as the analyses.py module
 
 
