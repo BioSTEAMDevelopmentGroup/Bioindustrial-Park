@@ -59,12 +59,14 @@ import biosteam as bst
 import thermosteam as tmo
 from biosteam import System
 from thermosteam import Stream
-from ethanol_adipic import units, facilities
-from ethanol_adipic.chemicals import chems, chemical_groups, soluble_organics, combustibles
-from ethanol_adipic.process_settings import price
-from ethanol_adipic.utils import baseline_feedflow, convert_ethanol_wt_2_mol, \
+from biorefineries.ethanol_adipic import _units as units
+from biorefineries.ethanol_adipic import _facilities as facilities
+from biorefineries.ethanol_adipic._chemicals import chems, chemical_groups, \
+    soluble_organics, combustibles
+from biorefineries.ethanol_adipic._process_settings import price, GWP_CF_stream, GWP_CFs
+from biorefineries.ethanol_adipic._utils import baseline_feedflow, convert_ethanol_wt_2_mol, \
     find_split, splits_df
-from ethanol_adipic.tea import ethanol_adipic_TEA
+from biorefineries.ethanol_adipic._tea import ethanol_adipic_TEA
 
 flowsheet = bst.Flowsheet('ethanol')
 bst.main_flowsheet.set_flowsheet(flowsheet)
@@ -188,7 +190,8 @@ DAP_R302 = Stream('DAP_R302', units='kg/hr')
 # Fermentation units
 # =============================================================================
 
-M301 = units.EnzymeHydrolysateMixer('M301', ins=(P201-0, enzyme_M301, water_M301))
+M301 = units.EnzymeHydrolysateMixer('M301', ins=(P201-0, enzyme_M301, water_M301),
+                                    enzyme_loading=20, solid_loading=0.2)
 
 R301 = units.SaccharificationAndCoFermentation('R301', ins=(M301-0, '', 
                                                             CSL_R301, DAP_R301),
@@ -489,9 +492,16 @@ ethanol_sys = System('ethanol_sys',
 
 CHP_sys = System('CHP_sys', path=(CHP,))
 
+
 # =============================================================================
-# TEA
+# Techno-economic analysis (TEA)
 # =============================================================================
+
+_ethanol_V = chems.Ethanol.V('l', 298.15, 101325) # molar volume in m3/mol	
+_ethanol_MW = chems.Ethanol.MW
+_liter_per_gallon = 3.78541
+_ethanol_kg_2_gal = _liter_per_gallon/_ethanol_V*_ethanol_MW/1e6
+_feedstock_factor = 907.185 / (1-0.2)
 
 ISBL_units = set((*pretreatment_sys.units, *fermentation_sys.units,
                   *ethanol_purification_sys.units))
@@ -535,12 +545,37 @@ CHP_tea.OSBL_units = (CHP,)
 ethanol_tea = bst.CombinedTEA([ethanol_no_CHP_tea, CHP_tea], IRR=0.10)
 ethanol_sys._TEA = ethanol_tea
 
+# =============================================================================
+# Life cycle assessment (LCA)
+# =============================================================================
+
+LCA_streams = set([i for i in ethanol_sys.feeds if i.price]+ \
+    [i for i in CHP_sys.feeds if i.price])
+LCA_stream = Stream('LCA_stream', units='kg/hr')
+    
+def get_material_GWP():
+    LCA_stream.mass = sum(i.mass for i in LCA_streams)
+    chemical_GWP = LCA_stream.mass*GWP_CF_stream.mass
+    return chemical_GWP.sum()/(ethanol.F_mass/_ethanol_kg_2_gal)
+
+# GWP from onsite emission (e.g., combustion) of non-biogenic carbons
+get_onsite_GWP = lambda: natural_gas.get_atomic_flow('C')*chems.CO2.MW \
+    / (ethanol.F_mass/_ethanol_kg_2_gal)
+
+# GWP from electricity
+get_electricity_use = lambda: sum(i.power_utility.rate for i in ethanol_sys.units)
+get_electricity_GWP = lambda: get_electricity_use()*GWP_CFs['Electricity'] \
+    / (ethanol.F_mass/_ethanol_kg_2_gal)
+
+get_GWP = lambda: get_material_GWP()+get_onsite_GWP()+get_electricity_GWP()
+
+
+# %%
+
+# =============================================================================
 # Simulate system and get results
-_ethanol_V = chems.Ethanol.V('l', 298.15, 101325) # molar volume in m3/mol	
-_ethanol_MW = chems.Ethanol.MW
-_liter_per_gallon = 3.78541
-_ethanol_kg_2_gal = _liter_per_gallon/_ethanol_V*_ethanol_MW/1e6
-_feedstock_factor = 907.185 / (1-0.2)
+# =============================================================================
+
 def simulate_get_MESP(feedstock_price=71.3):
     ethanol.price = 0
     ethanol_sys.simulate()
@@ -561,8 +596,9 @@ def simulate_get_MFPP(ethanol_price=2.2):
 def simulate_and_print():
     MESP = simulate_get_MESP()
     print(f'Acid MESP: ${MESP:.2f}/gal with default pretreatment efficacy')
+    print(f'GWP is {get_GWP():.3f} kg CO2-eq/gal ethanol')
 
-
+simulate_and_print()
 
 
 

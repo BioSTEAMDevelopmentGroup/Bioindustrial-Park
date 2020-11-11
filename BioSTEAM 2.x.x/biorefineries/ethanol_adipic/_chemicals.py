@@ -133,7 +133,7 @@ NaNO3 = chemical_database('NaNO3', phase='l', Hf=-118756*_cal2joule)
 Na2SO4 = chemical_database('Na2SO4', Hf=-1356380)
 CaSO4 = chemical_database('CaSO4', phase='s', Hf=-342531*_cal2joule)
 # The default Perry 151 value is likely to be wrong, use another model instead
-CaSO4.Cn.move_up_model_priority('Constant', 0)
+CaSO4.Cn.move_up_model_priority('Lastovka solid', 0)
 
 DAP = chemical_database('DAP', search_ID='DiammoniumPhosphate',
                              phase='l', Hf= -283996*_cal2joule)

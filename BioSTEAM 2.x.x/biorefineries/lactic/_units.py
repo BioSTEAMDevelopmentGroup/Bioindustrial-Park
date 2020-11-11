@@ -60,10 +60,6 @@ from biosteam.units.design_tools import PressureVessel
 from biosteam.units.design_tools import pressure_vessel_material_factors as factors
 from biosteam.units.decorators import cost
 from thermosteam import separations
-
-# import os
-# path = os.path.join(os.path.dirname(os.path.realpath(__file__)), '../')
-# os.chdir(path)
 from biorefineries.lactic._process_settings import price
 from biorefineries.lactic._chemicals import COD_chemicals, solubles, insolubles
 from biorefineries.lactic._utils import CEPCI, baseline_feedflow, compute_lactic_titer, \

@@ -38,7 +38,7 @@ References:
 import numpy as np
 import pandas as pd
 import thermosteam as tmo
-from ethanol_adipic.chemicals import chems
+from biorefineries.ethanol_adipic._chemicals import chems
 _kg_per_ton = 907.18474
 
 # Chemical Engineering Plant Cost Index from Chemical Engineering Magzine
@@ -70,7 +70,7 @@ def get_feedstock_flow(dry_composition, moisture_content, dry_flow):
 dry_composition = dict(
     Glucan=0.3505, Xylan=0.1953, Lignin=0.1576, Ash=0.0493, Acetate=0.0181,
     Protein=0.0310, Arabinan=0.0238, Galactan=0.0143, Mannan=0.0060, 
-    Sucrose=0.0077, Extractives=0.1465, SuccinicAcid=0)
+    Sucrose=0.0077, Extractives=0.1465)
 
 moisture_content = 0.2
 dry_feedstock_flow = 2205 * _kg_per_ton / 24     
