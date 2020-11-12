@@ -402,7 +402,7 @@ for chemical in chems:
     if chemical.locked_state == 'l':
         chemical.V.add_model(V_l, top_priority=True)
     elif chemical.locked_state == 's':
-        chemical.V.add_model(V_l, top_priority=True)
+        chemical.V.add_model(V_s, top_priority=True)
     elif hasattr(chemical.V, 'l'):
         chemical.V.l.add_model(V_l, top_priority=True)
 
