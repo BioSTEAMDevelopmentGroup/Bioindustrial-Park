@@ -375,7 +375,7 @@ for chemical in chems:
     if chemical.locked_state == 'l':
         chemical.V.add_model(V_l, top_priority=True)
     elif chemical.locked_state == 's':
-        chemical.V.add_model(V_l, top_priority=True)
+        chemical.V.add_model(V_s, top_priority=True)
         
     # elif chemical.ID in solubles: set_rho(chemical, 1e5)
     # elif chemical.ID in insolubles: set_rho(chemical, 1540)
