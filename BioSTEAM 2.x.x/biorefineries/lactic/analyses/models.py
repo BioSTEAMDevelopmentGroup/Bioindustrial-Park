@@ -307,7 +307,7 @@ index_IRR = len(metrics)
 # %%
 
 # =============================================================================
-# Metrics for global warming potential
+# Metrics for life cycle assessment (LCA)
 # =============================================================================
 
 get_GWP = system.get_GWP
