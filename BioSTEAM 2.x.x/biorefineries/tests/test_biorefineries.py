@@ -9,8 +9,14 @@
 """
 import numpy as np
 import biosteam as bst
+import thermosteam as tmo
+import flexsolve as flx
 from biosteam.process_tools import UnitGroup
 import pytest
+
+# Block speed-up for consistent testing. Note that speed-up wrapps functions
+# and also prevents code coverage to be analyzed
+bst.speed_up = tmo.speed_up = flx.speed_up = lambda: None 
 
 def test_sugarcane():
     from biorefineries import sugarcane as sc
@@ -104,8 +110,8 @@ def test_annimal_bedding():
     
 @pytest.mark.slow
 def test_lactic():
-    bst.process_tools.default_utilities()
     from biorefineries import lactic
+    bst.process_tools.default_utilities()
     system = lactic.system
     MPSP = system.lactic_acid.price
     assert np.allclose(MPSP, 1.5704836997441853, atol=0.01)
