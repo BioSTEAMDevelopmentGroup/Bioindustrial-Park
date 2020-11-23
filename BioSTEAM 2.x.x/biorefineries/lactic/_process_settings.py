@@ -58,10 +58,6 @@ References:
 
 import biosteam as bst
 import thermosteam as tmo
-
-# import os
-# path = os.path.join(os.path.dirname(os.path.realpath(__file__)), '../')
-# os.chdir(path)
 from biorefineries.lactic._chemicals import chems
 
 

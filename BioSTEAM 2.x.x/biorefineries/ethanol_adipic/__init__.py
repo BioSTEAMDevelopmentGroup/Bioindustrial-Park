@@ -18,5 +18,5 @@ Created on Fri Jun 26 07:17:38 2020
 __all__ = []
 
 from lazypkg import LazyPkg
-LazyPkg(__name__, ['chemicals', 'process_settings', 'units', 'facilities',
+LazyPkg(__name__, ['_chemicals', '_process_settings', '_units', '_facilities',
                    'system_acid', 'system_base'])

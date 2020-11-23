@@ -147,8 +147,8 @@ titer-yield-productivity analysis for the fermentation process, evaluate feedsto
 of varying carbohydrate contents and at different prices, and evaluate feedstocks
 of varying succinic acid content.
 
-Note that results used in the manuscript [1]_ were generated using biosteam v2.20.21
-and thermosteam v0.20.26
+Note that results used in the manuscript [1]_ were generated using biosteam v2.20.21,
+thermosteam v0.20.26, and dependencies
 
 To reproduce the results, directly run the script of interest, and results will
 be saved as Excel files in the same directory path as the module.
@@ -178,8 +178,8 @@ References
 .. [1] Li et al., Sustainable Lactic Acid Production from Lignocellulosic
      Biomass. Submitted 2020.
     
-.. [2] Li et al., Tailored Pretreatment Processes for the Sustainable Design of
-    Lignocellulosic Biorefineries across the Feedstock Landscape. Submitted 2020.
+.. [2] Li et al., Modeling Pretreatment Technologies to Evaluate the Sustainability
+    of Lignocellulosic Biorefineries across the Feedstock Landscape. Submitted 2020.
     
 .. [3] Cortes-Peña et al., BioSTEAM: A Fast and Flexible Platform for the Design,
     Simulation, and Techno-Economic Analysis of Biorefineries under Uncertainty. 

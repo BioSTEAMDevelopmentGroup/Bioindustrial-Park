@@ -38,10 +38,6 @@ from biosteam.units.decorators import cost
 from thermosteam import Stream
 from thermosteam.reaction import Reaction as Rxn
 from thermosteam.reaction import ParallelReaction as ParallelRxn
-
-# import os
-# path = os.path.join(os.path.dirname(os.path.realpath(__file__)), '../')
-# os.chdir(path)
 from biorefineries.lactic._utils import CEPCI
 
 __all__ = ('ADP', 'CIP', 'CT', 'PWC', 'CHP')

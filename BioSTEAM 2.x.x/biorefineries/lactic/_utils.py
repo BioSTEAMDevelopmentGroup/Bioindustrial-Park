@@ -34,10 +34,6 @@ lactic acid from lignocellulosic feedstocks
 import numpy as np
 import pandas as pd
 import thermosteam as tmo
-
-# import os
-# path = os.path.join(os.path.dirname(os.path.realpath(__file__)), '../')
-# os.chdir(path)
 from biorefineries.lactic._chemicals import chems
 _kg_per_ton = 907.18474
 

@@ -69,10 +69,6 @@ from flexsolve import aitken_secant, IQ_interpolation
 from biosteam import System
 from biosteam.process_tools import UnitGroup
 from thermosteam import Stream
-
-# import os
-# path = os.path.join(os.path.dirname(os.path.realpath(__file__)), '../')
-# os.chdir(path)
 from biorefineries.lactic import _units as units
 from biorefineries.lactic import _facilities as facilities
 from biorefineries.lactic._process_settings import price, CFs

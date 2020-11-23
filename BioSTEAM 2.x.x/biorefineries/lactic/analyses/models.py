@@ -37,10 +37,6 @@ import numpy as np
 import biosteam as bst
 from biosteam.evaluation import Model, Metric
 from chaospy import distributions as shape
-
-# import os
-# path = os.path.join(os.path.dirname(os.path.realpath(__file__)), '../')
-# os.chdir(path)
 from biorefineries.lactic._process_settings import CFs
 from biorefineries.lactic._utils import set_yield
 from biorefineries.lactic import system
@@ -67,7 +63,7 @@ def get_MPSP():
 feedstock = system.feedstock
 # Yield in 10^6 kg/yr
 lactic_no_CHP_tea = system.lactic_no_CHP_tea
-get_annual_factor = lambda: lactic_no_CHP_tea._annual_factor
+get_annual_factor = lambda: lactic_tea.operating_days*24
 get_total_yield = lambda: lactic_acid.F_mass*get_annual_factor()/1e6
 # Yield in % of dry feedstock
 get_mass_yield = lambda: lactic_acid.F_mass/(feedstock.F_mass-feedstock.imass['Water'])

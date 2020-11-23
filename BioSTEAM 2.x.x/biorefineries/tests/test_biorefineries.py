@@ -125,6 +125,37 @@ def test_lactic():
     assert np.allclose(-system.CT.system_cooling_water_duty/1e6, 1714.9228013906093, rtol=0.01)
     assert np.allclose(units.get_electricity_consumption(), 46.29886269694857, rtol=0.01)
     assert np.allclose(units.get_electricity_production(), 0.0)
+
+def test_ethanol_adipic():
+    bst.process_tools.default_utilities()
+    from biorefineries import ethanol_adipic
+    acid = ethanol_adipic.system_acid
+    MESP = acid.ethanol.price * acid._ethanol_kg_2_gal
+    assert np.allclose(MESP, 2.5129469668039466, atol=0.01)
+    tea = acid.ethanol_tea
+    assert np.allclose(tea.sales, 153621778.3372457, rtol=0.01)
+    assert np.allclose(tea.material_cost, 112976150.82603873, rtol=0.01)
+    assert np.allclose(tea.installed_equipment_cost, 202999308.86767417, rtol=0.01)
+    assert np.allclose(tea.utility_cost, -16654769.10968671, rtol=0.01)
+    units = UnitGroup('Biorefinery', acid.ethanol_tea.units)
+    assert np.allclose(acid.CHP.system_heating_demand/1e6, 342.1923726275533, rtol=0.01)
+    assert np.allclose(units.get_cooling_duty(), 335.33817940144684, rtol=0.01)
+    assert np.allclose(units.get_electricity_consumption(), 23.92194273439516, rtol=0.01)
+    assert np.allclose(units.get_electricity_production(), 53.046166852361736, rtol=0.01)
+    
+    base = ethanol_adipic.system_base
+    MESP = base.ethanol.price * base._ethanol_kg_2_gal
+    assert np.allclose(MESP, 2.723970457769621, atol=0.01)
+    tea = base.ethanol_adipic_tea
+    assert np.allclose(tea.sales, 220970967.54102248, rtol=0.01)
+    assert np.allclose(tea.material_cost, 121379016.75618957, rtol=0.01)
+    assert np.allclose(tea.installed_equipment_cost, 284337535.4201393, rtol=0.01)
+    assert np.allclose(tea.utility_cost, 14300575.593832163, rtol=0.01)
+    units = UnitGroup('Biorefinery', base.ethanol_adipic_tea.units)
+    assert np.allclose(base.CHP.system_heating_demand/1e6, 307.5620831043227, rtol=0.01)
+    assert np.allclose(units.get_cooling_duty(), 259.4359048142001, rtol=0.01)
+    assert np.allclose(units.get_electricity_consumption(), 26.674604548736383, rtol=0.001)
+    assert np.allclose(units.get_electricity_production(), 0.0)
     
 if __name__ == '__main__':
     test_sugarcane()
@@ -134,6 +165,7 @@ if __name__ == '__main__':
     test_LAOs()
     test_annimal_bedding()
     test_lactic()
+    test_ethanol_adipic()
 
 
 

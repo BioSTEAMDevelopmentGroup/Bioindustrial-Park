@@ -1,6 +1,6 @@
-======================================================================
-ethanol and ethanol_adipic: Tailored Pretreatment Processes for Production of Ethanol and Adipic Acid from Lignocellulosic Feedstocks
-======================================================================
+=====================================================================================
+ethanol_adipic: Production of Ethanol and Adipic Acid from Lignocellulosic Feedstocks
+=====================================================================================
 
 Simplified process flow schemes
 -------------------------------
@@ -12,13 +12,13 @@ Base-pretreatment biorefinery:
 
 .. figure:: ./images/base_pretreatment_biorefinery.png
 
-The biorefineries are developed for a submitted manuscript [1] based on [2]
-and [3] for the production of ethanol via acid-pretreatment (dilute sulfuric acid)
-or base-pretreatment (deacetylation and mechanical refining, DMR), carbohydrate
+The biorefineries are developed for a submitted manuscript [1]_ based on [2]_
+and [3]_ for the production of ethanol via acid (dilute sulfuric acid) or
+base pretreatment (deacetylation and mechanical refining, DMR), carbohydrate
 fermentation, and ethanol purification processes from lignocellulosic biomass.
 In the base-pretreatment biorefinery, adipic acid is generated from lignin
 utilization (fermentation) process and sodium sulfate is generated from wastewater
-treatment process (reverse osmosis). Part of the script is developed in [4].
+treatment process (reverse osmosis). Part of the script is developed in [4]_.
 
 
 Getting Started
@@ -103,7 +103,7 @@ Processes:
             T705_S, T705, T706_S, T706,
             T707_S, T707, T708_S, T708,
             T709_S, T709, T710, M702)
-     facilities: (CHP, CT, CWP, PWC, ADP, CIP, BDM)  
+     facilities: (CHP, CT, CWP, PWC, ADP, CIP, BDM) 
     >>> acid.ethanol_tea.show() # TEA object for the acid-pretreatment biorefinery
     CombinedTEA: ethanol_sys, CHP_sys
      NPV: -429 USD at 10.0% IRR
@@ -228,11 +228,11 @@ Processes:
 
 Analyses
 --------
-The analyses module was used to generate results for the submitted manuscript [1],
+The analyses module was used to generate results for the submitted manuscript [1]_,
 running this script will save results as Excel files in the same directory path 
 as the module.
 
-In [1], correlations between feedstock lignin content and pretreatment efficacy 
+In [1]_, correlations between feedstock lignin content and pretreatment efficacy 
 (as sugar released from cellulose and hemicellulose) were developed for seven 
 different pretreatment technologies (liquid hot water, acid, explosion, base,
 ionic liquid, organic solvent, and oxidative pretreatment).
@@ -243,26 +243,27 @@ of 1% (1000 simulation was conducted for each lignin content).
 
 The developed pretreatment efficacy correlations for acid and base pretreatments
 were used in respective biorefinery models to calculate minimum ethanol selling
-price (MESP) and maximum feedstock payment price (MFPP). The biorefinery modules
-were run for different feedstock compositions to simulate how pretreatment efficacy
-affects MESP (with given feedstock price) and MFPP (with given ethanol price)
-of each biorefinery.
+price (MESP), maximum feedstock payment price (MFPP), and 100-year global warming
+potential (GWP). The biorefinery modules were run for different feedstock compositions
+to simulate how pretreatment efficacy affects these three sustainability indicators
+of each biorefinery across the feedstock landscape.
 
 
 Requirements
 ------------
-.. [1] Python module biosteam (https://pypi.org/project/biosteam/) and dependencies
+[1] Python module biosteam (https://pypi.org/project/biosteam/) and dependencies
 
-    Note: results used in the manuscript were generated using biosteam v2.20.21 and dependencies
+    Note: results used in the manuscript were generated using biosteam v2.20.21,
+    thermosteam v0.20.26, and dependencies
 
-.. [2] Excel file named "_Feedstock compositions.xlsx" in the same directory path
-    as the analyses.py module
+
+[2] Excel file named "_Feedstock compositions.xlsx" in the same directory path as the analyses.py module
 
 
 References
 ----------
-.. [1] Li et al., Tailored Pretreatment Processes for the Sustainable Design of
-    Lignocellulosic Biorefineries across the Feedstock Landscape. Submitted 2020.
+.. [1] Li et al., Modeling Pretreatment Technologies to Evaluate the Sustainability
+    of Lignocellulosic Biorefineries across the Feedstock Landscape. Submitted 2020.
     
 .. [2] Humbird et al., Process Design and Economics for Biochemical Conversion of 
     Lignocellulosic Biomass to Ethanol: Dilute-Acid Pretreatment and Enzymatic 
