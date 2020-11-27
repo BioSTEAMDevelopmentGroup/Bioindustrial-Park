@@ -85,7 +85,6 @@ def _load_system():
     }
     unit_groups = UnitGroup.group_by_types(LAOs_tea.units, name_types)
     OSBL_unit_group = UnitGroup('OSBL', OSBL_units)
-    bst.speed_up()
     bst.System.molar_tolerance = 0.1
     bst.System.converge_method = 'aitken'
     specs.run_specifications() # Sets process specifications and simulates system
