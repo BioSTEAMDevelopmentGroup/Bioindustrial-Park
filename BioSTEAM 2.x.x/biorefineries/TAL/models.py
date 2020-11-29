@@ -28,19 +28,18 @@ import biosteam as bst
 from chaospy import distributions as shape
 from biosteam import main_flowsheet as find
 from biosteam.evaluation import Model, Metric
-from biosteam.evaluation.evaluation_tools.parameter import Setter
-from HP.system import HP_sub_sys, HP_tea, HP_no_BT_tea, flowsheet, unit_groups
+from biosteam.evaluation.evaluation_tools import Setter
+from TAL.system import TAL_sub_sys, TAL_tea, TAL_no_BT_tea
 
-find.set_flowsheet(flowsheet)
-get_annual_factor = lambda: HP_no_BT_tea._annual_factor
+get_annual_factor = lambda: TAL_no_BT_tea._annual_factor
 _kg_per_ton = 907.18474
 
-HP_sys = find.system.HP_sys
+TAL_sys = find.system.TAL_sys
 BT_sys = find.system.BT_sys
 
-system_feeds = [i for i in HP_sys.feeds if i.price] + \
+system_feeds = [i for i in TAL_sys.feeds if i.price] + \
     [i for i in BT_sys.feeds if i.price]
-system_products = [i for i in HP_sys.products if i.price] + \
+system_products = [i for i in TAL_sys.products if i.price] + \
     [i for i in BT_sys.products if i.price]
     
 gypsum = find.stream.gypsum
@@ -53,33 +52,33 @@ system_products.append(gypsum)
 # Overall biorefinery metrics
 # =============================================================================
 
-# Minimum selling price of AA stream
+# Minimum selling price of TAL stream
 def get_MSP():
     for i in range(3):
-        AA.price = HP_tea.solve_price(HP,
-                                                      HP_no_BT_tea)
-    return AA.price
+        TAL.price = TAL_tea.solve_price(TAL,
+                                                      TAL_no_BT_tea)
+    return TAL.price
 
-# Mass flow rate of HP stream
-AA = find.unit.T606_P-0
-get_yield = lambda: AA.F_mass*get_annual_factor()/1e6
-# Purity (%) of HP in the final product
-get_purity = lambda: AA.imass['HP']/AA.F_mass
+# Mass flow rate of TAL stream
+TAL = find.stream.TAL
+get_yield = lambda: TAL.F_mass*get_annual_factor()/1e6
+# Purity (%) of LacticAcid in the final product
+get_purity = lambda: TAL.imass['LacticAcid']/TAL.F_mass
 # Adjust for purity
 get_adjusted_MSP = lambda: get_MSP() / get_purity()
 get_adjusted_yield = lambda: get_yield() * get_purity()
 # Recovery (%) = recovered/amount in fermentation broth
 R301 = find.unit.R301
-get_recovery = lambda: AA.imol['HP'] \
-    /(R301.outs[0].imol['HP']+2*R301.outs[0].imol['CalciumLactate'])
-get_overall_TCI = lambda: HP_tea.TCI/1e6
+get_recovery = lambda: TAL.imol['LacticAcid'] \
+    /(R301.outs[0].imol['LacticAcid']+2*R301.outs[0].imol['CalciumLactate'])
+get_overall_TCI = lambda: TAL_tea.TCI/1e6
 # Annual operating cost, note that AOC excludes electricity credit
-get_overall_AOC = lambda: HP_tea.AOC/1e6
-get_material_cost = lambda: HP_tea.material_cost/1e6
+get_overall_AOC = lambda: TAL_tea.AOC/1e6
+get_material_cost = lambda: TAL_tea.material_cost/1e6
 # Annual sale revenue from products, note that electricity credit is not included,
 # but negative sales from waste disposal are included
 # (i.e., wastes are products of negative selling price)
-get_annual_sale = lambda: HP_tea.sales/1e6
+get_annual_sale = lambda: TAL_tea.sales/1e6
 # System power usage, individual unit power usage should be positive
 BT = find.unit.BT
 excess_power = lambda: BT.electricity_generated
@@ -105,8 +104,8 @@ metrics = [Metric('Minimum selling price', get_MSP, '$/kg'),
 # =============================================================================
 
 def get_installed_cost(system):
-    return lambda: sum(i.installed_cost for i in HP_sub_sys[system])/1e6
-for system in HP_sub_sys.keys():
+    return lambda: sum(i.installed_cost for i in TAL_sub_sys[system])/1e6
+for system in TAL_sub_sys.keys():
     if system == 'feedstock_sys': continue
     metrics.extend(
         (Metric(system, get_installed_cost(system), '10^6 $', 'Installed cost'),))
@@ -114,7 +113,7 @@ for system in HP_sub_sys.keys():
 # All checks should be ~0
 check_installed_cost = \
     lambda: sum(get_installed_cost(system)() 
-                for system in HP_sub_sys.keys()) - HP_tea.installed_cost/1e6
+                for system in TAL_sub_sys.keys()) - TAL_tea.installed_cost/1e6
 metrics.extend((Metric('Check', check_installed_cost, '10^6 $', 'Installed cost'),))
 
 
@@ -130,17 +129,16 @@ fermentation_lime = find.stream.fermentation_lime
 FGD_lime = find.stream.FGD_lime
 get_fermentation_lime_ratio = lambda: fermentation_lime.imol['Lime'] \
     / (fermentation_lime.imol['Lime']+FGD_lime.imol['Lime']) 
-# S601 = find.unit.S601
-# get_separation_sulfuric_acid_ratio = lambda: S601.outs[1].imol['H2SO4']/S601.ins[0].imol['H2SO4']
-# get_separation_sulfuric_acid_ratio = 
+S601 = find.unit.S601
+get_separation_sulfuric_acid_ratio = lambda: S601.outs[1].imol['H2SO4']/S601.ins[0].imol['H2SO4']
 check_material_cost = lambda: sum(get_material_cost(feed)()
-                                  for feed in system_feeds) - HP_tea.material_cost/1e6
+                                  for feed in system_feeds) - TAL_tea.material_cost/1e6
 
 metrics.extend((
     Metric('Fermentation lime ratio', get_fermentation_lime_ratio, 
            '%', 'Material cost'),
-    # Metric('Separation sulfuric acid ratio', get_separation_sulfuric_acid_ratio, 
-    #        '%', 'Material cost'),
+    Metric('Separation sulfuric acid ratio', get_separation_sulfuric_acid_ratio, 
+           '%', 'Material cost'),
     Metric('Check', check_material_cost, '10^6 $/yr', 'Material cost')))
 
 def get_product_sale(stream):
@@ -149,7 +147,7 @@ for product in system_products:
     metrics.extend((Metric(product.ID, get_product_sale(product), '10^6 $/yr', 'Product sale'),))
 check_product_sale= \
     lambda: sum(get_product_sale(product)() for product in system_products) \
-        - HP_tea.sales/1e6
+        - TAL_tea.sales/1e6
 metrics.extend((Metric('Check', check_product_sale, '10^6 $/yr', 'Product sale'),))
 
 
@@ -166,11 +164,11 @@ get_BT_heating_demand = lambda: sum(i.duty for i in BT.heat_utilities
                                     if i.duty*i.cost>0)*get_annual_factor()/1e9
 
 def get_heating_demand(system):
-    heat_utilities = sum([i.heat_utilities for i in HP_sub_sys[system]], ())
+    heat_utilities = sum([i.heat_utilities for i in TAL_sub_sys[system]], ())
     return lambda: sum([i.duty for i in heat_utilities
                         if i.duty*i.cost>0])*get_annual_factor()/1e9
 
-for system in HP_sub_sys.keys():
+for system in TAL_sub_sys.keys():
     if system in ('feedstock_sys', 'HXN', 'BT'): continue
     # The only heating demand for the pretreatment system is the heat needed to
     # generate the side steam
@@ -181,7 +179,7 @@ for system in HP_sub_sys.keys():
                                   'Heating demand'),))
 
 check_heating_demand = \
-    lambda: sum((get_heating_demand(system)() for system in HP_sub_sys.keys()), 
+    lambda: sum((get_heating_demand(system)() for system in TAL_sub_sys.keys()), 
                 get_pretreatment_steam_heating_demand())
                                             
 metrics.extend((
@@ -203,17 +201,17 @@ get_CT_cooling_demand = lambda: sum(i.duty for i in CT.heat_utilities
                                     if i.duty*i.cost<0)*get_annual_factor()/1e9
 
 def get_cooling_demand(system):
-    heat_utilities = sum((i.heat_utilities for i in HP_sub_sys[system]), ())
+    heat_utilities = sum((i.heat_utilities for i in TAL_sub_sys[system]), ())
     return lambda: sum([i.duty for i in heat_utilities
                         if i.duty*i.cost<0])*get_annual_factor()/1e9
 
-for system in HP_sub_sys.keys():
+for system in TAL_sub_sys.keys():
     if system in ('feedstock_sys', 'HXN', 'CT'): continue
     else: metrics.extend((Metric(system, get_cooling_demand(system),
                                   '10^9 kJ/yr', 'Cooling demand'),))
 
 check_cooling_demand = \
-    lambda: sum(get_cooling_demand(system)() for system in HP_sub_sys.keys())
+    lambda: sum(get_cooling_demand(system)() for system in TAL_sub_sys.keys())
 
 metrics.extend((
     Metric('HXN', get_HXN_cooling_demand, '10^9 kJ/yr', 'Cooling demand'),
@@ -226,19 +224,19 @@ metrics.extend((
 # Power demand breakdown (positive if using power)
 # =============================================================================
 
-get_system_power_demand = lambda: sum(i.power_utility.rate for i in HP_sys.units
+get_system_power_demand = lambda: sum(i.power_utility.rate for i in TAL_sys.units
                                       if i.power_utility)
 
 def get_power_demand(system):
-    power_utilities = [i.power_utility for i in HP_sub_sys[system]]
+    power_utilities = [i.power_utility for i in TAL_sub_sys[system]]
     return lambda: sum(i.rate for i in power_utilities)
 
-for system in HP_sub_sys.keys():
+for system in TAL_sub_sys.keys():
     if system == 'feedstock_sys': continue
     metrics.extend((Metric(system, get_power_demand(system), 'kW', 'Power demand'),))
 
 check_power_demand = lambda: sum(get_power_demand(system)()
-                                 for system in HP_sub_sys.keys()) - get_system_power_demand()
+                                 for system in TAL_sub_sys.keys()) - get_system_power_demand()
 metrics.extend((
     Metric('Sum', get_system_power_demand, 'kW', 'Power demand'),
     Metric('Check', check_power_demand, 'kW', 'Power demand')
@@ -248,17 +246,17 @@ metrics.extend((
 # Utility cost breakdown (including heating, cooling, and power)
 # =============================================================================
 
-get_system_utility_cost = lambda: HP_tea.utility_cost/1e6
+get_system_utility_cost = lambda: TAL_tea.utility_cost/1e6
 
 def get_utility_cost(system):
-    return lambda: sum(i.utility_cost for i in HP_sub_sys[system])*get_annual_factor()/1e6
+    return lambda: sum(i.utility_cost for i in TAL_sub_sys[system])*get_annual_factor()/1e6
 
-for system in HP_sub_sys.keys():
+for system in TAL_sub_sys.keys():
     if system == 'feedstock_sys': continue
     metrics.extend((Metric(system, get_utility_cost(system), '10^6 $/yr', 'Utility cost'),))
 
 check_utility_cost = \
-    lambda: sum(get_utility_cost(system)() for system in HP_sub_sys.keys()) \
+    lambda: sum(get_utility_cost(system)() for system in TAL_sub_sys.keys()) \
         - get_system_utility_cost()
 
 metrics.extend((
@@ -267,7 +265,7 @@ metrics.extend((
     ))
 
 # To see if TEA converges well for each simulation
-get_NPV = lambda: HP_tea.NPV
+get_NPV = lambda: TAL_tea.NPV
 metrics.extend((Metric('Net present value', get_NPV, '$', 'TEA'), ))
 
 
@@ -277,8 +275,8 @@ metrics.extend((Metric('Net present value', get_NPV, '$', 'TEA'), ))
 # Construction base model
 # =============================================================================
 
-HP_model = Model(HP_sys, metrics)
-param = HP_model.parameter
+TAL_model = Model(TAL_sys, metrics)
+param = TAL_model.parameter
 
 def baseline_uniform(baseline, ratio):
     return shape.Uniform(baseline*(1-ratio), baseline*(1+ratio))
@@ -299,7 +297,7 @@ D = baseline_uniform(0.9, 0.1)
 @param(name='Plant uptime', element='TEA', kind='isolated', units='%',
        baseline=0.9, distribution=D)
 def set_operating_days(uptime):
-    HP_tea.operating_days = 365 * uptime
+    TAL_tea.operating_days = 365 * uptime
 
 # Impactful parameters are set to triangular distribution based on literature,
 # less important ones are set to ±10% of baseline value
@@ -308,7 +306,7 @@ special_price = {
     'feedstock':        ('Uniform',   (0.0529,    0.117)),
     'CSL_fresh':        ('Uniform',   (0.0673,    0.112)),
     'lime_fresh':       ('Uniform',   (0.160,     0.288)),
-    # 'ethanol_fresh':    ('Triangle',  (0.460,     0.978)),
+    'ethanol_fresh':    ('Triangle',  (0.460,     0.978)),
     'natural_gas':      ('Triangle',  (0.198,     0.304)),
     'gypsum':           ('Uniform',   (-0.0288,   0.00776))
     }
@@ -350,7 +348,7 @@ D = baseline_uniform(1, 0.1)
 @param(name='TCI ratio', element='TEA', kind='isolated', units='% of baseline',
        baseline=1, distribution=D)
 def set_TCI_ratio(ratio): 
-    for unit in HP_sys.units:
+    for unit in TAL_sys.units:
         if hasattr(unit, 'cost_items'):
             for item in unit.cost_items:
                 unit.cost_items[item].cost *= ratio
@@ -429,7 +427,7 @@ R302 = find.unit.R302
 D = shape.Triangle(0.55, 0.76, 0.93)
 @param(name='Lactic acid yield', element=R301, kind='coupled', units='g/g substrate',
        baseline=0.76, distribution=D)
-def set_R301_HP_yield(X):
+def set_R301_TAL_yield(X):
     R301_X = R301.cofermentation_rxns.X
     R301_X[0] = R301_X[3] = X
     R302_X = R302.cofermentation_rxns.X
@@ -487,18 +485,18 @@ def set_R401_tau(tau):
     R401.tau = tau
 
 R402 = find.unit.R402
-D = baseline_uniform(0.95, 1.)
-@param(name='Dehydration conversion', element=R402, kind='coupled', units='',
+D = shape.Triangle(0.95, 1, 1.05)
+@param(name='Esterification conversion factor', element=R402, kind='coupled', units='',
        baseline=1, distribution=D)
-def set_R402_conversion_factor(X):
-    R402.X = X
+def set_R402_conversion_factor(factor):
+    R402.X_factor = factor
     
-# R403 = find.unit.R403
-# D = shape.Triangle(0.72, 0.8, 0.88)
-# @param(name='Hydrolysis conversion', element=R403, kind='coupled', units='%',
-#        baseline=0.8, distribution=D)
-# def set_R403_conversion_factor(X):
-#     R403.hydrolysis_rxns.X[:] = X
+R403 = find.unit.R403
+D = shape.Triangle(0.72, 0.8, 0.88)
+@param(name='Hydrolysis conversion', element=R403, kind='coupled', units='%',
+       baseline=0.8, distribution=D)
+def set_R403_conversion_factor(X):
+    R403.hydrolysis_rxns.X[:] = X
     
 
 # =============================================================================
@@ -513,7 +511,7 @@ def set_BT_combustion_efficiency(efficiency):
     BT.B_eff = efficiency
 
 # All parameters
-parameters = HP_model.get_parameters()
+parameters = TAL_model.get_parameters()
 
 
 # %%
@@ -524,7 +522,7 @@ parameters = HP_model.get_parameters()
 
 def create_IRR_metrics(IRR):
     def get_IRR_based_MSP():
-        HP_tea.IRR = IRR
+        TAL_tea.IRR = IRR
         return get_MSP()
     return [Metric('Minimum selling price', get_IRR_based_MSP, '$/kg', f'IRR={IRR:.0%}'),
             Metric('Net present value', get_NPV, '$', f'IRR={IRR:.0%}')]
@@ -532,8 +530,8 @@ def create_IRR_metrics(IRR):
 IRRs = np.linspace(0, 0.4, 41)
 IRR_metrics = sum([create_IRR_metrics(IRR) for IRR in IRRs],[])
 
-HP_model_IRR = Model(HP_sys, IRR_metrics)
-HP_model_IRR.set_parameters(parameters)
+TAL_model_IRR = Model(TAL_sys, IRR_metrics)
+TAL_model_IRR.set_parameters(parameters)
 
 
 # %% 
@@ -542,7 +540,7 @@ HP_model_IRR.set_parameters(parameters)
 # Model to evalute system across lactic acid yield
 # =============================================================================
 
-HP_model_LA_yield = Model(HP_sys, metrics)
+TAL_model_LA_yield = Model(TAL_sys, metrics)
 
 def set_LA_yield(LA_yield):
     R301_X = R301.cofermentation_rxns.X
@@ -553,7 +551,7 @@ def set_LA_yield(LA_yield):
     R302_X[1] = R302_X[4] = R301_X[1] * R302.ferm_ratio
 
 LA_yield_parameters = tuple([i for i in parameters if not i.name=='Lactic acid yield'])
-HP_model_LA_yield.set_parameters(LA_yield_parameters)
+TAL_model_LA_yield.set_parameters(LA_yield_parameters)
 
 
 # %%
@@ -587,9 +585,9 @@ def set_feedstock_carbs(carbs_content):
     if any(feedstock.mass < 0):
         raise ValueError(f'Carbohydrate content of {carbs_content*100:.0f}% dry weight is infeasible')
 
-HP_model_feedstock = Model(HP_sys, feedstock_price_metrics)
+TAL_model_feedstock = Model(TAL_sys, feedstock_price_metrics)
 
-param = HP_model_feedstock.parameter
+param = TAL_model_feedstock.parameter
 
 # Set a fake parameter to enable evaluation across internal rate of return
 feedstock = find.stream.feedstock
@@ -613,8 +611,8 @@ def set_feedstock_succinic_acid_content(SA_content):
     if any(feedstock.mass<0):
         raise ValueError(f'Succinic acid content of {SA_content*100:.0f}% dry weight is infeasible')
 
-HP_model_SA_content = Model(HP_sys, metrics)
-HP_model_SA_content.set_parameters(parameters)
+TAL_model_SA_content = Model(TAL_sys, metrics)
+TAL_model_SA_content.set_parameters(parameters)
 
 
 # %% 
@@ -623,7 +621,7 @@ HP_model_SA_content.set_parameters(parameters)
 # Model to evalute system across HXN minimum approach temperature
 # =============================================================================
 get_HXN_util_cost = lambda: HXN.utility_cost
-get_HXN_util_savings = lambda: - 100*(HXN.utility_cost*350*24) / (HP_sys.utility_cost - HXN.utility_cost*350*24)
+get_HXN_util_savings = lambda: - 100*(HXN.utility_cost*350*24) / (TAL_sys.utility_cost - HXN.utility_cost*350*24)
 def create_HXN_T_min_app_metrics(T_min_app):
     return [Metric('HXN utility savings', get_HXN_util_savings, '%', f'T_min_app={T_min_app:.0f} [K]')]
 
@@ -631,11 +629,11 @@ T_min_apps = np.linspace(1, 20, 21)
 HXN_T_min_app_metrics = sum([create_HXN_T_min_app_metrics(T_min_app) for T_min_app in T_min_apps],[])
 
 
-HP_model_HXN_T_min_app = Model(HP_sys, metrics)
+TAL_model_HXN_T_min_app = Model(TAL_sys, metrics)
 
 def set_HXN_T_min_app(T_min_app):
     HXN.T_min_app = T_min_app
 
-HP_model_HXN_T_min_app.set_parameters(parameters)
+TAL_model_HXN_T_min_app.set_parameters(parameters)
 
 
