@@ -611,7 +611,7 @@ class CoFermentation_original(Unit):
       kW=59.656, cost=24300, S=43149, CE=CEPCI[2009], n=0.8, BM=2.3)
 class SeedTrain(Unit):
     _N_ins = 1
-    _N_outs = 1
+    _N_outs = 2
     _units= {'Seed fermenter size': 'kg',
              'Flow rate': 'kg/hr'}
     
@@ -636,14 +636,17 @@ class SeedTrain(Unit):
 
     def _run(self):
         feed = self.ins[0]
-        effluent = self.outs[0]
+        effluent, CO2 = self.outs
         effluent.copy_like(feed)
+        CO2.phase = 'g'
 
         self.cofermentation_rxns(effluent.mol)
         # Assume all CSL is used up
         effluent.imass['CSL'] = 0 
         
-        effluent.T = self.T
+        effluent.T = CO2.T = self.T
+        CO2.imass['CO2'] = effluent.imass['CO2']
+        effluent.imass['CO2'] = 0
 
     def _design(self):
         Design = self.design_results

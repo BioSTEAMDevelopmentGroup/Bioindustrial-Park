@@ -106,18 +106,18 @@ class CWP(Facility):
                         chilled_water_utilities[f'#{number}: {u.ID} - {hu.ID}'] = hu
                         number += 1
                         total_duty -= hu.duty
-        
         hu_chilled = self.heat_utilities[0]
         hu_chilled.mix_from([i for i in chilled_water_utilities.values()])
-        hu_chilled.reverse()        
+        if total_duty != 0:
+            hu_chilled.reverse() # will trigger an error if hu_chilled is None
+            self.ins[0].T = hu_chilled.agent.T_limit
+            self.outs[0].T = hu_chilled.agent.T
         self.system_chilled_water_duty = -hu_chilled.duty
         
         # Total amount of chilled water needed in the whole system
         total_chilled_water = self.total_chilled_water = \
             - hu_chilled.flow * self.chemicals.H2O.MW
         self.ins[0].imass['H2O'] = self.outs[0].imass['H2O'] = total_chilled_water
-        self.ins[0].T = hu_chilled.agent.T_limit
-        self.outs[0].T = hu_chilled.agent.T
 
         self.design_results['Duty'] = hu_chilled.duty
 
@@ -194,7 +194,6 @@ class CT(Facility):
         # Total amount of cooling water needed in the whole system
         total_cooling_water = self.total_cooling_water = \
             - hu_cooling.flow * self.chemicals.H2O.MW
-        # return_cw.imass['H2O'] = process_cw.imol['H2O'] = total_cooling_water
         return_cw.imass['H2O'] = process_cw.imass['H2O'] = total_cooling_water
         makeup_water.imass['H2O'] = total_cooling_water * self.blowdown
         blowdown.imass['H2O'] = makeup_water.imass['H2O']
