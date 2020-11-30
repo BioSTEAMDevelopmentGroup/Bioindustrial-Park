@@ -1556,6 +1556,7 @@ _316_over_304 = 1.2
 class CoFermentation(Reactor):
     _N_ins = 3
     _N_outs = 2
+    _N_heat_utilities = 1
     _units= {**Reactor._units,
             'Fermenter size': 'kg',
             'Recirculation flow rate': 'kg/hr',
@@ -1605,8 +1606,7 @@ class CoFermentation(Reactor):
         self.allow_dilution = allow_dilution
         self.allow_concentration = allow_concentration
         self.mixed_feed = tmo.Stream('mixed_feed')
-        self.heat_exchanger = hx = HXutility(None, None, None, T=T) 
-        self.heat_utilities = hx.heat_utilities
+        self.heat_exchanger = HXutility(None, None, None, T=T)
         
         # FermMicrobe reaction from Table 14 on Page 31 of Humbird et al.
         self.cofermentation_rxns = ParallelRxn([
