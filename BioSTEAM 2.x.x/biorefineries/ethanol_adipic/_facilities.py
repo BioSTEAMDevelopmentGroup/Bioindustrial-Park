@@ -258,7 +258,7 @@ class CT(Facility):
         # Total amount of cooling water needed in the whole system
         total_cooling_water = self.total_cooling_water = \
             - hu_cooling.flow * self.chemicals.H2O.MW
-        return_cw.imass['H2O'] = process_cw.imol['H2O'] = total_cooling_water
+        return_cw.imass['H2O'] = process_cw.imass['H2O'] = total_cooling_water
         makeup_water.imass['H2O'] = total_cooling_water * self.blowdown
         blowdown.imass['H2O'] = makeup_water.imass['H2O']
         
