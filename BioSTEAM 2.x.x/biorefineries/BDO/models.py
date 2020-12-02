@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-<<<<<<< HEAD
 Created on Sun Aug 23 12:11:15 2020
 
 Modified from the cornstover biorefinery constructed in Cortes-Peña et al., 2020,
@@ -13,9 +12,6 @@ with modification of fermentation system for 2,3-Butanediol instead of the origi
     https://doi.org/10.1021/acssuschemeng.9b07040.
 
 All units are explicitly defined here for transparency and easy reference
-=======
-Created on Mon May 11 16:26:46 2020
->>>>>>> b56b583bf0a4722eb35c59e514ce4ede181c5739
 
 @author: yalinli_cabbi
 """
