@@ -208,7 +208,7 @@ AA_price_range = [1250, 1500]
 # temporary price range from https://www.alibaba.com/product-detail/hot-sale-C4H8O-butanon-mek_62345760689.html?spm=a2700.7724857.normalList.26.1d194486SbCyfR
 
 
-get_AA_MPSP = lambda: HP_tea.solve_price(product) * 907.185 # To USD / ton
+solve_AA_price = lambda: HP_tea.solve_price(product) * 907.185 # To USD / ton
 get_HP_VOC = lambda: HP_tea.VOC / 1e6 # million USD / yr
 get_HP_FCI = lambda: HP_tea.FCI / 1e6 # million USD
 
@@ -288,11 +288,11 @@ get_HP_inhibitors_conc = lambda: 1000*sum(R302.outs[0].imass['AceticAcid', 'Furf
 
 # get_rel_impact_t_y = lambda: rel_impact_fn(steps)
 
-# HP_metrics = [get_AA_MPSP, get_HP_sugars_conc, get_HP_inhibitors_conc]
-HP_metrics = [get_AA_MPSP, get_GWP, get_FEC]
+# HP_metrics = [solve_AA_price, get_HP_sugars_conc, get_HP_inhibitors_conc]
+HP_metrics = [solve_AA_price, get_GWP, get_FEC]
 
 # %% Generate 3-specification meshgrid and set specification loading functions
-steps = 30
+steps = 40
 
 # Yield, titer, productivity (rate)
 spec_1 = np.linspace(0.1,0.99, steps) # yield

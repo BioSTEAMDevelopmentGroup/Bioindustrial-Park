@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
+<<<<<<< HEAD
 Created on Sun Aug 23 12:11:15 2020
 
 Modified from the cornstover biorefinery constructed in Cortes-Peña et al., 2020,
@@ -14,6 +15,11 @@ with modification of fermentation system for 2,3-Butanediol instead of the origi
 All units are explicitly defined here for transparency and easy reference
 
 @author: sarangbhagwat
+=======
+Created on Tue May 19 14:17:17 2020
+
+@author: yalinli_cabbi
+>>>>>>> b56b583bf0a4722eb35c59e514ce4ede181c5739
 """
 
 
@@ -22,7 +28,11 @@ All units are explicitly defined here for transparency and easy reference
 import numpy as np
 import pandas as pd
 import thermosteam as tmo
+<<<<<<< HEAD
 from BDO.chemicals_data import BDO_chemicals
+=======
+from BDO.chemicals import BDO_chemicals
+>>>>>>> b56b583bf0a4722eb35c59e514ce4ede181c5739
 _kg_per_ton = 907.18474
 
 # Chemical Engineering Plant Cost Index from Chemical Engineering Magzine
@@ -159,7 +169,11 @@ dry_composition = dict(
 
 moisture_content = 0.2
 dry_feedstock_flow = 2205 * _kg_per_ton / 24     
+<<<<<<< HEAD
 # dry_feedstock_flow = 1188.9732935254162 * _kg_per_ton / 24     
+=======
+
+>>>>>>> b56b583bf0a4722eb35c59e514ce4ede181c5739
 # dry_feedstock_flow = 500 * _kg_per_ton / 24     
 baseline_feedflow = get_feedstock_flow(dry_composition, moisture_content, 
                                        dry_feedstock_flow)
