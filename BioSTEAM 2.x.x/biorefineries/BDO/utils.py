@@ -1,9 +1,19 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Created on Tue May 19 14:17:17 2020
+Created on Sun Aug 23 12:11:15 2020
 
-@author: yalinli_cabbi
+Modified from the cornstover biorefinery constructed in Cortes-Peña et al., 2020,
+with modification of fermentation system for 2,3-Butanediol instead of the original ethanol
+
+[1] Cortes-Peña et al., BioSTEAM: A Fast and Flexible Platform for the Design, 
+    Simulation, and Techno-Economic Analysis of Biorefineries under Uncertainty. 
+    ACS Sustainable Chem. Eng. 2020, 8 (8), 3302–3310. 
+    https://doi.org/10.1021/acssuschemeng.9b07040.
+
+All units are explicitly defined here for transparency and easy reference
+
+@author: sarangbhagwat
 """
 
 
@@ -12,7 +22,7 @@ Created on Tue May 19 14:17:17 2020
 import numpy as np
 import pandas as pd
 import thermosteam as tmo
-from BDO.chemicals import BDO_chemicals
+from BDO.chemicals_data import BDO_chemicals
 _kg_per_ton = 907.18474
 
 # Chemical Engineering Plant Cost Index from Chemical Engineering Magzine
@@ -149,7 +159,7 @@ dry_composition = dict(
 
 moisture_content = 0.2
 dry_feedstock_flow = 2205 * _kg_per_ton / 24     
-
+# dry_feedstock_flow = 1188.9732935254162 * _kg_per_ton / 24     
 # dry_feedstock_flow = 500 * _kg_per_ton / 24     
 baseline_feedflow = get_feedstock_flow(dry_composition, moisture_content, 
                                        dry_feedstock_flow)

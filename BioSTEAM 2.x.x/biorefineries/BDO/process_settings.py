@@ -1,21 +1,24 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Created on Mon Dec 30 09:30:10 2019
+Created on Sun Aug 23 12:11:15 2020
 
 Modified from the cornstover biorefinery constructed in Cortes-Peña et al., 2020,
-with modification of fermentation system for organic acids instead of the original ethanol
+with modification of fermentation system for 2,3-Butanediol instead of the original ethanol
 
 [1] Cortes-Peña et al., BioSTEAM: A Fast and Flexible Platform for the Design, 
     Simulation, and Techno-Economic Analysis of Biorefineries under Uncertainty. 
     ACS Sustainable Chem. Eng. 2020, 8 (8), 3302–3310. 
     https://doi.org/10.1021/acssuschemeng.9b07040.
 
-@author: yalinli_cabbi
+All units are explicitly defined here for transparency and easy reference
+
+@author: sarangbhagwat
 """
 
 import biosteam as bst
-from BDO.chemicals import chems
+import thermosteam as tmo
+from BDO.chemicals_data import chems
 
 bst.CE = 541.7 # year 2016
 _kg_per_ton = 907.18474
@@ -28,7 +31,7 @@ _chemical_2020to2016 = 102.5 / 113.8 # average of Jan and Feb
 # From USD/dry-ton to USD/kg in 2016$, 20% moisture content
 # changed from Humbird et al., 2011 to Davis et al., 2018
 feedstock_price = 71.26 / _kg_per_ton * 0.8 
-		
+
 # 2.18 is the average whole-sale ethanol price between 2010-2019 in 2016 $/gal 	
 # based on Annual Energy Outlook (AEO) from Energy Information Adiministration (EIA)	
 # (https://www.eia.gov/outlooks/aeo/), which is $0.732/gal and similar to the 	
@@ -103,8 +106,12 @@ natural_gas_price = 4.70/1e3*_ft3_per_m3*CH4_V * (1e3/CH4_MW)
 # USD 383.13 for 2.5kg (largest available size order), accessed 06/11/2020
 amberlyst_15_price = 153.252 * _chemical_2020to2016
 
-# Initial value	
-BDO_price = 1.88
+# https://www.alibaba.com/product-detail/Tricalcium-Phosphate-Tricalcium-Phosphate-TCP-Tricalcium_60744013678.html?spm=a2700.galleryofferlist.0.0.42f16684C9iJhz&s=p
+TCP_price = 850 / _kg_per_ton # tricalcium (di)phosphate
+
+
+# BDO_price = 1.88 # initial value
+MEK_price = 1.88 # initial value
 
 # Currently not in use
 # Methanol price from Goellner et al., production from natural gas (Case 3),
@@ -113,38 +120,58 @@ BDO_price = 1.88
 methanol_price = (311.17+345.39)/2/_kg_per_ton * _chemical_2011to2016
 
 
-# Acetoin product selling price (assumed)
-acetoin_price = 0
+# Acetoin product selling price
+# https://www.alibaba.com/product-detail/Acetoin-CAS-NO-513-86-0_60673118759.html?spm=a2700.galleryofferlist.0.0.4d906f82dIhSkn
+# acetoin_price = 5.925
+acetoin_price = 0. # assumed
+# Isobutyraldehyde product selling price
+# https://www.alibaba.com/product-detail/China-manufacture-Isobutyraldehyde-price_60837108075.html?spm=a2700.galleryofferlist.0.0.753369fcbZcNhe
+# IBA_price = 1.2
+IBA_price = 0. # assumed
+ 
+# https://www.alibaba.com/product-detail/High-purity-99-Isobutanol-Iso-butanol_62334586181.html?spm=a2700.galleryofferlist.normal_offer.d_title.6a377f34hUhyuR
+isobutanol_price = 1.3
 
+# https://www.alibaba.com/product-detail/Carboxy-Methyl-Cellulose-CAS-9000-11_62593143048.html?spm=a2700.galleryofferlist.normal_offer.d_title.714574f8fNXgfq&s=p
+# https://www.alibaba.com/product-detail/hydrogenation-catalyst-HT-40-nickel-catalyst_507577301.html?spm=a2700.galleryofferlist.normal_offer.d_title.61e474d0VtlyjV&s=p
+hydrogenation_catalyst_price = 1.3 + 0.18*20
+
+# https://www.alibaba.com/product-detail/Gas-Hydrogen-45kg-Lpg-Gas-Cylinder_62018626105.html?spm=a2700.galleryofferlist.topad_creative.d_title.4a5c7ce2MUN3cm
+h2_price = 1.03
 
 # All in 2016$/kg
-price = {'BDO': BDO_price, 	
+price = {'MEK': MEK_price,
+         'TCP': TCP_price,
+         'IBA': IBA_price,
          'Acetoin': acetoin_price,
-         'Feedstock': feedstock_price, 	
+         'Feedstock': feedstock_price,
+         'H2': h2_price,
+         'Isobutanol': isobutanol_price,
          'Sulfuric acid': 0.0430 * _lb_per_kg,	
+         'Hydrogenation catalyst': hydrogenation_catalyst_price,
          # 0.1900 is for NH3	
          'AmmoniumHydroxide': 0.1900 * _lb_per_kg * 17.031/35.046,	
-         'CSL': 0.0339 * _lb_per_kg,	
+         'CSL': 0.0339 * _lb_per_kg,
          'Caustics': 0.2384 * _lb_per_kg * 0.5, # 50 wt% NaOH/water mixture	
          'Boiler chems': 2.9772 * _lb_per_kg,	
-         'Lime': lime_price,	
+         'Lime': lime_price,
          'Cooling tower chems': 1.7842 * _lb_per_kg,	
          'Makeup water': 0.0002 * _lb_per_kg,	
          # Cost of ash is negative because it's a product stream	
-         'Ash disposal': ash_disposal_price,	
-         'Gypsum': gypsum_price,	
+         'Ash disposal': ash_disposal_price,
          'Electricity': 0.070, # AEO from EIA, 2010-2019 average (0.067-0.074 range)	
          # $6.16/kg protein in 2016$, P25 of Davis et al., 2018	
-         'Enzyme': 6.16,	
-         'Ethanol': ethanol_price,	
+         'Enzyme': 6.16,
          'DPHP': DPHP_price,
-         'Denaturant': denaturant_price,	
          'Baghouse bag': baghouse_bag_price,	
          'Natural gas': natural_gas_price,
-         'Amberlyst15': amberlyst_15_price,
+         'Methanol': methanol_price,
+         'Ethanol': ethanol_price,
          # Below currently not in use
-         'DAP': 0.1645 * _lb_per_kg,	
-         'Methanol': methanol_price}
+         'Gypsum': gypsum_price,
+         'Denaturant': denaturant_price,
+         'Amberlyst15': amberlyst_15_price,
+         'DAP': 0.1645 * _lb_per_kg}
     
 
 
@@ -157,6 +184,7 @@ _mps.T = 233 + 273.15
 _hps.T = 266 + 273.15
 
 _cooling = bst.HeatUtility.get_cooling_agent('cooling_water')
+_chilled = bst.HeatUtility.get_cooling_agent('chilled_water')
 _cooling.regeneration_price = 0
 _cooling.T = 28 + 273.15
 _cooling.T_limit = _cooling.T + 9
@@ -164,10 +192,104 @@ _cooling.T_limit = _cooling.T + 9
 # Side steam in CHP not a heat utility, thus will cause problem in TEA utility
 # cost calculation if price not set to 0 here, costs for regeneration of heating
 # and cooling utilities will be considered as CAPEX and OPEX of CHP and CT, respectively
-for i in (_lps, _mps, _hps, _cooling):
+for i in (_lps, _mps, _hps, _cooling, _chilled):
     i.heat_transfer_price = i.regeneration_price = 0
     # if i == _cooling: continue
     # i.heat_transfer_efficiency = 0.85
+
+
+# %%
+
+# =============================================================================
+# Characterization factors (CFs) for life cycle analysis (LCA), all from ref [5] 
+# if not noted, note that it is unclear if in-plant receiving and preprocessing
+# (~50% of the total impact per ref [6]) of feedstock is included in ref [5]
+# =============================================================================
+
+CFs = {}
+
+# =============================================================================
+# 100-year global warming potential (GWP) in kg CO2-eq/kg
+# =============================================================================
+GWP_CFs = {
+    'NH4OH': 2.64 * chems.NH3.MW/chems.NH4OH.MW,
+    'CSL': 1.55,
+    'CH4': 0.40, # NA NG from shale and conventional recovery
+    'Enzyme': 2.24,
+    'Lime': 1.29,
+    'NaOH': 2.11,
+    'H2SO4': 44.47/1e3,
+    'Ethanol': 1.44,
+    'Isobutanol': 3.7703,
+    'H2' : 	1.5907
+    }
+H3PO4_GWP_CF = 2.5426
+KOH_GWP_CF = 2.299
+GWP_CFs['DPHP'] = 174.2*(H3PO4_GWP_CF/97.944 + 2*KOH_GWP_CF/56.106)
+
+GWP_CF_array = chems.kwarray(GWP_CFs)
+# In kg CO2-eq/kg of material
+GWP_CF_stream = tmo.Stream('GWP_CF_stream', GWP_CF_array, units='kg/hr')
+
+GWP_CFs['Corn stover'] = 44.70/1e3 * 0.8
+GWP_CFs['Switchgrass'] = 87.81/1e3 * 0.8
+GWP_CFs['Miscanthus'] = 78.28/1e3 * 0.8
+GWP_CFs['CaCO3'] = 10.30/1e3
+GWP_CFs['Gypsum'] = -4.20/1e3
+# In kg CO2-eq/kWh
+GWP_CFs['Electricity'] = 0.48
+# From corn stover
+GWP_CFs['LacticAcid_GREET'] = 1.80
+# From ref [7], lactic acid production, RoW, TRACI global warming
+GWP_CFs['LacticAcid_fossil'] = 4.1787
+
+CFs['GWP_CFs'] = GWP_CFs
+CFs['GWP_CF_stream'] = GWP_CF_stream
+
+# =============================================================================
+# Fossil energy consumption (FEC), in MJ/kg of material
+# =============================================================================
+
+FEC_CFs = {
+    'NH4OH': 42 * chems.NH3.MW/chems.NH4OH.MW,
+    'CSL': 12,
+    'CH4': 50, # NA NG from shale and conventional recovery
+    'Enzyme': 26,
+    'Lime': 4.896,
+    'NaOH': 29,
+    'H2SO4': 568.98/1e3,
+    'Ethanol': 16,
+    'Isobutanol': 85.597,
+    'H2' : 148.23
+    }
+H3PO4_FEC_CF = 39.542
+KOH_FEC_CF = 30.421
+FEC_CFs['DPHP'] = 174.2*(H3PO4_FEC_CF/97.944 + 2*KOH_FEC_CF/56.106)
+
+FEC_CF_array = chems.kwarray(FEC_CFs)
+# In MJ/kg of material
+FEC_CF_stream = tmo.Stream('FEC_CF_stream', FEC_CF_array, units='kg/hr')
+
+FEC_CFs['Corn stover'] = 688.60/1e3 * 0.8
+FEC_CFs['Switchgrass'] = 892.41/1e3 * 0.8
+FEC_CFs['Miscanthus'] = 569.05/1e3 * 0.8
+FEC_CFs['CaCO3'] = 133.19/1e3
+FEC_CFs['Gypsum'] = -44.19/1e3
+# In MJ/kWh
+FEC_CFs['Electricity'] = 5.926
+# From corn stover
+FEC_CFs['LacticAcid'] = 29
+# From ref [7], lactic acid production, RoW, cumulative energy demand, fossil
+FEC_CFs['LacticAcid_fossil'] = 79.524
+
+CFs['FEC_CFs'] = FEC_CFs
+CFs['FEC_CF_stream'] = FEC_CF_stream
+
+
+
+
+
+
 # #!/usr/bin/env python3
 # # -*- coding: utf-8 -*-
 # # BioSTEAM: The Biorefinery Simulation and Techno-Economic Analysis Modules
