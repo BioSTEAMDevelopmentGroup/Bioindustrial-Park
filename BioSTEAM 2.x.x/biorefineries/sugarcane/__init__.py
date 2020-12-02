@@ -7,24 +7,22 @@
 # for license details.
 """
 """
+from .. import PY37
 from . import (_process_settings,
                _chemicals,
                _system,
                _tea,
-               _ethanol_production_system
 )
 
 __all__ = [*_process_settings.__all__,
            *_chemicals.__all__,
            *_system.__all__,
            *_tea.__all__,
-           *_ethanol_production_system.__all__,
            'sugarcane_sys',
            'sugarcane_tea', 
            'flowsheet',
 ]
 
-from ._ethanol_production_system import *
 from ._process_settings import *
 from ._chemicals import *
 from ._system import *
@@ -35,11 +33,13 @@ _chemicals_loaded = False
 
 def load():
     if not _chemicals_loaded: _load_chemicals()
-    _load_system()
-    dct = globals()
-    dct.update(flowsheet.system.__dict__)
-    dct.update(flowsheet.stream.__dict__)
-    dct.update(flowsheet.unit.__dict__)
+    try: 
+        _load_system()
+    finally: 
+        dct = globals()
+        dct.update(flowsheet.system.__dict__)
+        dct.update(flowsheet.stream.__dict__)
+        dct.update(flowsheet.unit.__dict__)
 
 def _load_chemicals():
     global chemicals, _chemicals_loaded
@@ -59,17 +59,22 @@ def _load_system():
     sugarcane_tea = create_tea(sugarcane_sys)
     sugarcane_tea.IRR = sugarcane_tea.solve_IRR()
     _system_loaded = True
-    
-def __getattr__(name):
-    if not _chemicals_loaded:
-        _load_chemicals()
-        if name == 'chemicals': return chemicals
-    if not _system_loaded: 
-        _load_system()
-        dct = globals()
-        dct.update(flowsheet.system.__dict__)
-        dct.update(flowsheet.stream.__dict__)
-        dct.update(flowsheet.unit.__dict__)
-        if name in dct: return dct[name]
-    raise AttributeError(f"module '{__name__}' has no attribute '{name}'")
-
+  
+if PY37:
+    def __getattr__(name):
+        if not _chemicals_loaded:
+            _load_chemicals()
+            if name == 'chemicals': return chemicals
+        if not _system_loaded: 
+            try:
+                _load_system()
+            except Exception as Error:
+                dct = globals()
+                dct.update(flowsheet.system.__dict__)
+                dct.update(flowsheet.stream.__dict__)
+                dct.update(flowsheet.unit.__dict__)
+                if name in dct: return dct[name]
+                raise Error
+        raise AttributeError(f"module '{__name__}' has no attribute '{name}'")
+else: 
+    load()

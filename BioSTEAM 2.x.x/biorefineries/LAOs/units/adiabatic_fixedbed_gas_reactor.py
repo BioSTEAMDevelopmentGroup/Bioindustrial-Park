@@ -5,16 +5,10 @@
 # for license details.
 """
 """
+from biosteam.units.design_tools.geometry import cylinder_diameter_from_volume
 import biosteam as bst
-from math import pi
 
-__all__ = ('AdiabaticFixedbedGasReactor', 'cylinder_diameter_from_volume',)
-
-def cylinder_diameter_from_volume(volume, length_to_diameter):
-    return (4. * length_to_diameter * volume / pi)**(1./3.)
-
-def cylinder_volume_from_diameter(diameter, length_to_diameter):
-    return pi * (diameter / 2) ** 2 * diameter / length_to_diameter
+__all__ = ('AdiabaticFixedbedGasReactor',)
 
 class AdiabaticFixedbedGasReactor(bst.design_tools.PressureVessel, bst.Unit):
     _N_ins = _N_outs = 1

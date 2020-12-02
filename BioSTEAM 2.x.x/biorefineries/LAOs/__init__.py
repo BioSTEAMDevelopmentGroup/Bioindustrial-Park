@@ -7,6 +7,7 @@
 # for license details.
 """
 """
+from .. import PY37
 from . import (units,
                utils,
                _chemicals,
@@ -84,7 +85,6 @@ def _load_system():
     }
     unit_groups = UnitGroup.group_by_types(LAOs_tea.units, name_types)
     OSBL_unit_group = UnitGroup('OSBL', OSBL_units)
-    bst.speed_up()
     bst.System.molar_tolerance = 0.1
     bst.System.converge_method = 'aitken'
     specs.run_specifications() # Sets process specifications and simulates system
@@ -92,16 +92,19 @@ def _load_system():
     for i in range(2): set_LAOs_MPSP(get_LAOs_MPSP())
     _system_loaded = True
 
-def __getattr__(name):
-    if not _chemicals_loaded:
-        _load_chemicals()
-        if name == 'chemicals': return chemicals
-    if not _system_loaded: _load_system()
-    dct = globals()
-    dct.update(flowsheet.system.__dict__)
-    dct.update(flowsheet.stream.__dict__)
-    dct.update(flowsheet.unit.__dict__)
-    if name in dct:
-        return dct[name]
-    else:
-        raise AttributeError(f"module '{__name__}' has no attribute '{name}'")
+if PY37:
+    def __getattr__(name):
+        if not _chemicals_loaded:
+            _load_chemicals()
+            if name == 'chemicals': return chemicals
+        if not _system_loaded: _load_system()
+        dct = globals()
+        dct.update(flowsheet.system.__dict__)
+        dct.update(flowsheet.stream.__dict__)
+        dct.update(flowsheet.unit.__dict__)
+        if name in dct:
+            return dct[name]
+        else:
+            raise AttributeError(f"module '{__name__}' has no attribute '{name}'")
+else:
+    load()

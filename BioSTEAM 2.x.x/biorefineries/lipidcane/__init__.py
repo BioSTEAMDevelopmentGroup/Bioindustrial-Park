@@ -7,6 +7,7 @@
 # for license details.
 """
 """
+from .. import PY37
 from . import (utils,
                _process_settings,
                _chemicals,
@@ -59,16 +60,19 @@ def _load_system():
     lipidcane_tea = create_tea(lipidcane_sys)
     lipidcane_tea.IRR = lipidcane_tea.solve_IRR()
     _system_loaded = True
-    
-def __getattr__(name):
-    if not _chemicals_loaded:
-        _load_chemicals()
-        if name == 'chemicals': return chemicals
-    if not _system_loaded: 
-        _load_system()
-        dct = globals()
-        dct.update(flowsheet.system.__dict__)
-        dct.update(flowsheet.stream.__dict__)
-        dct.update(flowsheet.unit.__dict__)
-        if name in dct: return dct[name]
-    raise AttributeError(f"module '{__name__}' has no attribute '{name}'")
+
+if PY37:    
+    def __getattr__(name):
+        if not _chemicals_loaded:
+            _load_chemicals()
+            if name == 'chemicals': return chemicals
+        if not _system_loaded: 
+            _load_system()
+            dct = globals()
+            dct.update(flowsheet.system.__dict__)
+            dct.update(flowsheet.stream.__dict__)
+            dct.update(flowsheet.unit.__dict__)
+            if name in dct: return dct[name]
+        raise AttributeError(f"module '{__name__}' has no attribute '{name}'")
+else:
+    load()

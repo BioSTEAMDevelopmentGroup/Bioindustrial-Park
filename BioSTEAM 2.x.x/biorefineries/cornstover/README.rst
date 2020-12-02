@@ -48,18 +48,18 @@ are lazy loaded by the module:
                   FT, blowdown_mixer)
     >>> cs.cornstover_tea.show() # The TEA object
     CombinedTEA: cornstover_sys, Area700
-     NPV: -192,362 USD at 10.0% IRR
+     NPV: -193,156 USD at 10.0% IRR
     >>> cs.flowsheet # The complete flowsheet
     <Flowsheet: cornstover>
     >>> cs.R301.show() # Any unit operations and streams can be accessed through the module
     SaccharificationAndCoFermentation: R301
     ins...
-    [0] d328  from  Mixer-M302
+    [0] d329  from  Mixer-M302
         phase: 'l', T: 319.61 K, P: 101325 Pa
         flow (kmol/hr): Water              1.92e+04
                         Ethanol            49.9
                         AceticAcid         21.5
-                        Furfural           0.329
+                        Furfural           0.327
                         Glycerol           0.21
                         H2SO4              20.9
                         SuccinicAcid       0.409
@@ -69,34 +69,34 @@ are lazy loaded by the module:
         flow (kmol/hr): CSL  22.6
     [2] DAP2  from  ReversedSplitter-S301
         phase: 'l', T: 298.15 K, P: 101325 Pa
-        flow (kmol/hr): DAP  0.78
+        flow (kmol/hr): DAP  0.779
     outs...
-    [0] d329  to  Mixer-M304
+    [0] d330  to  Mixer-M304
         phase: 'g', T: 305.15 K, P: 101325 Pa
         flow (kmol/hr): Water         17.5
                         Ethanol       4.53
                         AceticAcid    0.0394
-                        Furfural      0.00192
+                        Furfural      0.00191
                         Glycerol      1.34e-07
-                        LacticAcid    9.49e-06
-                        SuccinicAcid  0.000736
+                        LacticAcid    1.14e-05
+                        SuccinicAcid  0.000737
                         ...
-    [1] d330  to  Mixer-M401
+    [1] d331  to  Mixer-M401
         phase: 'l', T: 305.15 K, P: 101325 Pa
         flow (kmol/hr): Water              1.72e+04
                         Ethanol            460
-                        AceticAcid         19.4
-                        Furfural           0.296
+                        AceticAcid         19.3
+                        Furfural           0.294
                         Glycerol           1.84
                         H2SO4              18.8
                         LacticAcid         17.5
                         ...
-    [2] d331  to  Mixer-M303
+    [2] d332  to  Mixer-M303
         phase: 'l', T: 321.15 K, P: 101325 Pa
         flow (kmol/hr): Water              1.91e+03
                         Ethanol            4.99
                         AceticAcid         2.15
-                        Furfural           0.0329
+                        Furfural           0.0327
                         Glycerol           0.021
                         H2SO4              2.09
                         SuccinicAcid       0.0409

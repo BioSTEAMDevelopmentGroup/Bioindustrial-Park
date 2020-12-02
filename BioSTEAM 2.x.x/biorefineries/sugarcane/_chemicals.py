@@ -7,14 +7,77 @@
 # for license details.
 """
 """
+import thermosteam as tmo
+from thermosteam import functional as fn
 
 __all__ = ('create_chemicals',)
 
 def create_chemicals():
-    from biorefineries import lipidcane as lc
-    return lc.chemicals.subgroup(
-        ['Ash', 'Cellulose', 'Hemicellulose', 'Lignin',
-         'Glucose', 'Sucrose', 'Solids', 'Water', 'Ethanol',
-         'Octane', 'DryYeast', 'H3PO4', 'P4O10', 'CaO', 'Flocculant', 'CO2',
-         'O2', 'CH4']
+    (Water, Ethanol, Glucose, Sucrose, H3PO4, P4O10, CO2, Octane, O2, CH4) = chemicals = tmo.Chemicals(
+        ['Water', 'Ethanol', 'Glucose', 'Sucrose', 'H3PO4', 'P4O10',
+         'CO2', 'Octane', 'O2', 'CH4']
     )
+    O2.at_state(phase='g')
+    CH4.at_state(phase='g')
+    CO2.at_state(phase='g')
+    H3PO4.at_state(phase='s')
+    P4O10.at_state(phase='s')
+    Glucose.at_state(phase='s')
+    Sucrose.at_state(phase='s')
+    
+    def create_new_chemical(ID, phase='s', **constants):
+        solid = tmo.Chemical.blank(ID, phase=phase, **constants)
+        chemicals.append(solid)
+        return solid
+    
+    Ash = create_new_chemical('Ash', MW=1.)
+    Cellulose = create_new_chemical('Cellulose',
+                                    formula="C6H10O5", # Glucose monomer minus water
+                                    Hf=-975708.8)
+    Hemicellulose = create_new_chemical('Hemicellulose',
+                                        formula="C5H8O5", # Xylose monomer minus water
+                                        Hf=-761906.4)
+    Flocculant = create_new_chemical('Flocculant',
+                                     MW=1.)
+    Lignin = create_new_chemical('Lignin',
+                                 formula='C8H8O3', # Vainillin
+                                 Hf=-452909.632)
+    Solids = create_new_chemical('Solids', MW=1.)
+    Yeast = create_new_chemical('Yeast', MW=1., CAS='Yeast')
+    CaO = create_new_chemical('CaO', formula='CaO')
+
+    
+    ### Fill missing properties ###
+    
+    # Insolubles occupy a significant volume
+    insoluble_solids = (Ash, Cellulose, Hemicellulose,
+                        Flocculant, Lignin, Solids, Yeast, P4O10)
+    
+    # Solubles don't occupy much volume
+    soluble_solids = (CaO, H3PO4, Glucose, Sucrose) 
+    
+    for chemical in insoluble_solids:
+        V = fn.rho_to_V(rho=1540, MW=chemical.MW)
+        chemical.V.add_model(V, top_priority=True)
+    
+    for chemical in soluble_solids:
+        V = fn.rho_to_V(rho=1e5, MW=chemical.MW)
+        chemical.V.add_model(V, top_priority=True)
+    
+    # Add constant models for molar heat capacity of solids
+    Ash.Cn.add_model(0.09 * 4.184 * Ash.MW) 
+    CaO.Cn.add_model(1.02388 * CaO.MW) 
+    Cellulose.Cn.add_model(1.364 * Cellulose.MW) 
+    Hemicellulose.Cn.add_model(1.364 * Hemicellulose.MW)
+    Flocculant.Cn.add_model(4.184 * Flocculant.MW)
+    Lignin.Cn.add_model(1.364 * Lignin.MW)
+    Solids.Cn.add_model(1.100 * Solids.MW)
+    
+    for chemical in chemicals: chemical.default()
+    
+    chemicals.compile()
+    chemicals.set_synonym('Water', 'H2O')
+    chemicals.set_synonym('Yeast', 'DryYeast')
+    
+    return chemicals
+

@@ -20,10 +20,11 @@ __all__ = ('LAOsProcessSpecifications',
 fermentation_products = ('Hexanol','Octanol', 'Decanol', 
                          'Dodecanol', 'Tetradecanol')
 
-prices = [0.2378, 0.2756, 0.3171]
-Ts = [412.189, 454.77, 508.991]
-coef = np.polyfit(Ts, prices, 1)
-calculate_steam_price_at_T = np.poly1d(coef)
+# Not used; all steam produced on-site
+# prices = [0.2378, 0.2756, 0.3171]
+# Ts = [412.189, 454.77, 508.991]
+# coef = np.polyfit(Ts, prices, 1)
+# calculate_steam_price_at_T = np.poly1d(coef)
 
 # %% Overall process specifications
 
@@ -37,20 +38,28 @@ def load_process_settings():
     # depends on dehydration reactor temperature
     high_pressure_steam = bst.HeatUtility.get_heating_agent('high_pressure_steam')
     high_pressure_steam.heat_transfer_efficiency = 0.95
+    high_pressure_steam.regeneration_price = 0.
     
     # About 10 degC higher than boiling point of tridecane
     medium_pressure_steam = bst.HeatUtility.get_heating_agent('medium_pressure_steam')
     medium_pressure_steam.heat_transfer_efficiency = 0.95
     medium_pressure_steam.T = 510
     medium_pressure_steam.P = medium_pressure_steam.chemicals.Water.Psat(510)
-    medium_pressure_steam.regeneration_price = calculate_steam_price_at_T(510)
+    medium_pressure_steam.regeneration_price = 0.
+    # medium_pressure_steam.regeneration_price = calculate_steam_price_at_T(510)
     
     # Low pressure steam, T is default
     low_pressure_steam = bst.HeatUtility.get_heating_agent('low_pressure_steam')
     low_pressure_steam.T = 412.189
     low_pressure_steam.P = 344738.0
-    low_pressure_steam.regeneration_price = 0.2378
-    low_pressure_steam.heat_transfer_efficiency = 0.95
+    low_pressure_steam.regeneration_price = 0.
+    # low_pressure_steam.regeneration_price = 0.2378
+    # low_pressure_steam.heat_transfer_efficiency = 0.95
+    
+    cooling_water = bst.HeatUtility.get_cooling_agent('cooling_water')
+    chilled_water = bst.HeatUtility.get_cooling_agent('chilled_water')
+    cooling_water.regeneration_price = cooling_water.heat_transfer_price = 0.
+    chilled_water.regeneration_price = chilled_water.heat_transfer_price = 0.
 
 class LAOsProcessSpecifications:
     """
@@ -72,7 +81,7 @@ class LAOsProcessSpecifications:
     def __init__(self, system, TEA,
                  plant_size=150000,
                  operating_days=350.4, 
-                 fermentation_titer=100,
+                 fermentation_titer=40,
                  fermentation_productivity=1.0,
                  fermentation_yield=0.90,
                  dehydration_reactor_temperature=623.15,
@@ -239,7 +248,7 @@ class LAOsProcessSpecifications:
         # Higher pressure steam is required to heatup reactor feed
         high_pressure_steam = bst.HeatUtility.get_heating_agent('high_pressure_steam')
         high_pressure_steam.T = T_steam = T_reactor + 10
-        high_pressure_steam.regeneration_price =  calculate_steam_price_at_T(T_reactor)
+        # high_pressure_steam.regeneration_price =  calculate_steam_price_at_T(T_reactor)
         high_pressure_steam.P = high_pressure_steam.chemicals.Water.Psat(T_steam)
         
     def load_dehydration_reactor_mass_fraction(self, dehydration_reactor_mass_fraction):

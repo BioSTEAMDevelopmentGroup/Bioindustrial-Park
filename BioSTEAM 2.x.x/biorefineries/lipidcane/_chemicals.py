@@ -10,26 +10,19 @@ import thermosteam as tmo
 __all__ = ('create_chemicals',)
 
 def create_chemicals():
-    ### Define common chemicals ###
+    from biorefineries import sugarcane as sc
+    (Water, Ethanol, Glucose, Sucrose, H3PO4, P4O10, CO2, Octane, O2, CH4, 
+     Ash, Cellulose, Hemicellulose, Flocculant, Lignin, Solids, DryYeast, CaO) = sc.chemicals
     
+    
+    
+    ### Define common chemicals ###
     Biodiesel = tmo.Chemical('Biodiesel',
                              search_ID='Methyl oleate')
-    lipidcane_chemicals = tmo.Chemicals(
-        ['Water', 'Methanol', 'Ethanol', 'Glycerol',
-         'Glucose', 'Sucrose', 'H3PO4', 'P4O10', 'CO2',
-         'Octane', 'O2', Biodiesel, 'CH4'])
-    
-    (Water, Methanol, Ethanol,
-     Glycerol, Glucose, Sucrose,
-     H3PO4, P4O10, CO2, Octane, O2, Biodiesel, CH4) = lipidcane_chemicals
-    
-    O2.at_state(phase='g')
-    CH4.at_state(phase='g')
-    CO2.at_state(phase='g')
-    H3PO4.at_state(phase='s')
-    P4O10.at_state(phase='s')
-    Glucose.at_state(phase='s')
-    Sucrose.at_state(phase='s')
+    Methanol = tmo.Chemical('Methanol')
+    Glycerol = tmo.Chemical('Glycerol')
+    lipidcane_chemicals = sc.chemicals.copy()
+    lipidcane_chemicals.extend([Biodiesel, Methanol, Glycerol])
     
     ### Define new chemicals ###
     
@@ -38,25 +31,9 @@ def create_chemicals():
         lipidcane_chemicals.append(solid)
         return solid
     
-    Ash = create_new_chemical('Ash', MW=1.)
-    Cellulose = create_new_chemical('Cellulose',
-                                    formula="C6H10O5", # Glucose monomer minus water
-                                    Hf=-975708.8)
-    Hemicellulose = create_new_chemical('Hemicellulose',
-                                        formula="C5H8O5", # Xylose monomer minus water
-                                        Hf=-761906.4)
-    Flocculant = create_new_chemical('Flocculant',
-                                     MW=1.)
-    Lignin = create_new_chemical('Lignin',
-                                 formula='C8H8O3', # Vainillin
-                                 Hf=-452909.632)
-    Solids = create_new_chemical('Solids', MW=1.)
-    DryYeast = create_new_chemical('DryYeast', MW=1., CAS='Yeast')
-    CaO = create_new_chemical('CaO', formula='CaO')
     HCl = create_new_chemical('HCl', formula='HCl')
     NaOH = create_new_chemical('NaOH', formula='NaOH')
     NaOCH3 = create_new_chemical('NaOCH3', formula='NaOCH3')
-    
     Lipid = create_new_chemical(
         'Lipid',
         phase = 'l',
@@ -75,18 +52,8 @@ def create_chemicals():
     lipid_molar_volume = fn.rho_to_V(rho=900, MW=Lipid.MW)
     Lipid.V.add_model(lipid_molar_volume)
     
-    # Insolubles occupy a significant volume
-    insoluble_solids = (Ash, Cellulose, Hemicellulose,
-                        Flocculant, Lignin, Solids, DryYeast, P4O10)
-    
     # Solubles don't occupy much volume
-    soluble_solids = (CaO, HCl, NaOH, H3PO4, Glucose, Sucrose) 
-    
-    for chemical in insoluble_solids:
-        V = fn.rho_to_V(rho=1540, MW=chemical.MW)
-        chemical.V.add_model(V, top_priority=True)
-    
-    for chemical in soluble_solids:
+    for chemical in (HCl, NaOH):
         V = fn.rho_to_V(rho=1e5, MW=chemical.MW)
         chemical.V.add_model(V, top_priority=True)
     
@@ -94,18 +61,10 @@ def create_chemicals():
     LiquidMethanol = Methanol.at_state(phase='l', copy=True)
     NaOCH3.copy_models_from(LiquidMethanol, ['V', 'sigma', 'kappa', 'Cn'])
     
-    # Add constant models for molar heat capacity of solids
-    Ash.Cn.add_model(0.09 * 4.184 * Ash.MW) 
-    CaO.Cn.add_model(1.02388 * CaO.MW) 
-    Cellulose.Cn.add_model(1.364 * Cellulose.MW) 
-    Hemicellulose.Cn.add_model(1.364 * Hemicellulose.MW)
-    Flocculant.Cn.add_model(4.184 * Flocculant.MW)
-    Lignin.Cn.add_model(1.364 * Lignin.MW)
-    Solids.Cn.add_model(1.100 * Solids.MW)
-    
     for chemical in lipidcane_chemicals: chemical.default()
     
     lipidcane_chemicals.compile()
     lipidcane_chemicals.set_synonym('Water', 'H2O')
+    lipidcane_chemicals.set_synonym('Yeast', 'DryYeast')
     return lipidcane_chemicals
 

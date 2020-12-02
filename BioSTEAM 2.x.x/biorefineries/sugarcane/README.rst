@@ -22,7 +22,7 @@ are lazy loaded by the module:
     >>> # Otherwise, first time accessing will take a bit to load.
     >>> sc.load()
     >>> sc.chemicals # All chemicals used by the biorefinery.
-    CompiledChemicals([Ash, Cellulose, Hemicellulose, Lignin, Glucose, Sucrose, Solids, Water, Ethanol, Octane, DryYeast, H3PO4, P4O10, CaO, Flocculant, CO2, O2, CH4])
+    CompiledChemicals([Water, Ethanol, Glucose, Sucrose, H3PO4, P4O10, CO2, Octane, O2, CH4, Ash, Cellulose, Hemicellulose, Flocculant, Lignin, Solids, Yeast, CaO])
     >>> sc.sugarcane_sys.show() # The complete biorefinery system
     System: sugarcane_sys
      path: (U101, U102, U103, T201,
@@ -41,14 +41,14 @@ are lazy loaded by the module:
     ins...
     [0] s30  from  HXutility-H301
         phase: 'l', T: 295.15 K, P: 101325 Pa
-        flow (kmol/hr): Glucose  21.1
+        flow (kmol/hr): Water    4.34e+03
+                        Glucose  21.1
                         Sucrose  126
-                        Water    4.34e+03
                         H3PO4    0.85
-    [1] s54  from  MixTank-T305
+    [1] s55  from  MixTank-T305
         phase: 'l', T: 298.15 K, P: 101325 Pa
-        flow (kmol/hr): Water     1.37e+03
-                        DryYeast  1.03e+04
+        flow (kmol/hr): Water  1.37e+03
+                        Yeast  1.03e+04
     outs...
     [0] CO2  to  VentScrubber-D301
         phase: 'g', T: 305.15 K, P: 101325 Pa
@@ -57,11 +57,11 @@ are lazy loaded by the module:
                         CO2      491
     [1] s31  to  StorageTank-T301
         phase: 'l', T: 295.98 K, P: 101325 Pa
-        flow (kmol/hr): Glucose   27.3
-                        Water     5.58e+03
-                        Ethanol   489
-                        DryYeast  1.03e+04
-                        H3PO4     0.85
+        flow (kmol/hr): Water    5.58e+03
+                        Ethanol  489
+                        Glucose  27.3
+                        H3PO4    0.85
+                        Yeast    1.03e+04
 
 
 References
