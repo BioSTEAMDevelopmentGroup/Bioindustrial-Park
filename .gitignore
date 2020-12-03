@@ -1,7 +1,6 @@
 build
 dist
 biorefineries.egg-info
-**/__pycache__
 
 # Compiled source #
 ###################
@@ -32,7 +31,7 @@ biorefineries.egg-info
 *.sqlite 
 
 # macOS generated files #
-######################
+#########################
 .DS_Store
 .DS_Store?
 ._*
@@ -42,5 +41,5 @@ ehthumbs.db
 Thumbs.db
 
 # Python caches #
-######################
+#################
 **/__pycache__
