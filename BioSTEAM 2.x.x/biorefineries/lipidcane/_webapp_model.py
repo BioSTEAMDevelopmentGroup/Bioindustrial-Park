@@ -24,7 +24,7 @@ np.random.seed(1234)
 ethanol_density = 2.9866 # kg/gallon
 tea = lc.lipidcane_tea
 ugroup = UnitGroup('Biorefinery', tea.units)
-get_steam_demand = lambda: sum([i.flow for i in lc.BT.steam_utilities]) * 18.01528 * tea._annual_factor / 1000
+get_steam_demand = lambda: sum([i.flow for i in lc.BT.steam_utilities]) * 18.01528 * tea._operating_hours / 1000
 get_electricity_consumption = ugroup.get_electricity_consumption
 get_electricity_production = ugroup.get_electricity_production
 get_excess_electricity = lambda: get_electricity_production() - get_electricity_consumption()

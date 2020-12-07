@@ -60,6 +60,7 @@ def load_process_settings():
     chilled_water = bst.HeatUtility.get_cooling_agent('chilled_water')
     cooling_water.regeneration_price = cooling_water.heat_transfer_price = 0.
     chilled_water.regeneration_price = chilled_water.heat_transfer_price = 0.
+    bst.PowerUtility.price = 0.
 
 class LAOsProcessSpecifications:
     """

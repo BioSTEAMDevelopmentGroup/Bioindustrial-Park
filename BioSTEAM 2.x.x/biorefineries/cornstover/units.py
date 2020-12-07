@@ -110,7 +110,7 @@ class PretreatmentReactorSystem(Unit):
     Rxn('Sucrose -> HMF + Glucose + 2H2O',           'Sucrose',  1.0000),
     Rxn('Xylan + H2O -> Xylose',                     'Xylan',    0.9000),
     Rxn('Xylan + H2O -> XyloseOligomer',             'Xylan',    0.0024),
-    Rxn('Xylan -> Furfural + 2 H2O',                 'Xylan',    0.0050),
+    Rxn('Xylan -> Furfural + 2 H2O',                 'Xylan',    0.0500),
     Rxn('Arabinan + H2O -> Arabinose',               'Arabinan', 0.9000),
     Rxn('Arabinan + H2O -> ArabinoseOligomer',       'Arabinan', 0.0024),
     Rxn('Arabinan -> Furfural + 2 H2O',              'Arabinan', 0.0050),

@@ -14,21 +14,33 @@ import flexsolve as flx
 from biosteam.process_tools import UnitGroup
 import pytest
 
+__all__ = (
+    'test_sugarcane',
+    'test_lipidcane',
+    'test_cornstover',
+    'test_LAOs',
+    'test_wheatstraw',
+    'test_annimal_bedding',
+    'test_lactic',
+    'test_ethanol_adipic',
+    'print_results',
+)
+
 # Block speed-up for consistent testing. Note that speed-up wrapps functions,
 # thus preventing code coverage to be analyzed
 bst.speed_up = tmo.speed_up = flx.speed_up = lambda: None 
 
 def print_results(tea):
     units = UnitGroup('Biorefinery', tea.units)
-    print(tea.IRR)
-    print(tea.sales)
-    print(tea.material_cost)
-    print(tea.installed_equipment_cost)
-    print(tea.utility_cost)
-    print(units.get_heating_duty())
-    print(units.get_cooling_duty())
-    print(units.get_electricity_consumption())
-    print(units.get_electricity_production())
+    print('IRR:', tea.IRR)
+    print('Sales:', tea.sales)
+    print('Material cost:', tea.material_cost)
+    print('Installed equipment cost:', tea.installed_equipment_cost)
+    print('Utility cost:', tea.utility_cost)
+    print('Heating duty:', units.get_heating_duty())
+    print('Cooling duty:', units.get_cooling_duty())
+    print('Electricity consumption:', units.get_electricity_consumption())
+    print('Electricity production:', units.get_electricity_production())
     
 def test_sugarcane():
     from biorefineries import sugarcane as sc
@@ -63,15 +75,15 @@ def test_cornstover():
     cs.load()
     MESP = cs.cornstover_tea.solve_price(cs.ethanol)
     units = UnitGroup('Biorefinery', cs.cornstover_tea.units)
-    assert np.allclose(MESP, 0.7308776819169308, rtol=1e-2)
-    assert np.allclose(cs.cornstover_tea.sales, 132680811.62702852, rtol=1e-2)
-    assert np.allclose(cs.cornstover_tea.material_cost, 82899286.3495096, rtol=1e-2)
-    assert np.allclose(cs.cornstover_tea.installed_equipment_cost, 221139367.31134215, rtol=1e-2)
-    assert np.allclose(cs.cornstover_tea.utility_cost, -12676528.501955263, rtol=1e-2)
-    assert np.allclose(units.get_heating_duty(), 310.33962099605156, rtol=1e-2)
-    assert np.allclose(units.get_cooling_duty(), 359.055441898979, rtol=1e-2)
-    assert np.allclose(units.get_electricity_consumption(), 22.34435621558365, rtol=1e-2)
-    assert np.allclose(units.get_electricity_production(), 48.69728990482738, rtol=1e-2)
+    assert np.allclose(MESP, 0.7317730703256459, rtol=1e-2)
+    assert np.allclose(cs.cornstover_tea.sales, 132843833.61822793, rtol=1e-2)
+    assert np.allclose(cs.cornstover_tea.material_cost, 82902427.63227807, rtol=1e-2)
+    assert np.allclose(cs.cornstover_tea.installed_equipment_cost, 220687096.75274014, rtol=1e-2)
+    assert np.allclose(cs.cornstover_tea.utility_cost, -12398868.781486541, rtol=1e-2)
+    assert np.allclose(units.get_heating_duty(), 310.3265668144915, rtol=1e-2)
+    assert np.allclose(units.get_cooling_duty(), 358.6403621978023, rtol=1e-2)
+    assert np.allclose(units.get_electricity_consumption(), 22.2979899399842, rtol=1e-2)
+    assert np.allclose(units.get_electricity_production(), 48.07370343834068, rtol=1e-2)
     
 def test_LAOs():
     from biorefineries import LAOs as laos
@@ -138,6 +150,7 @@ def test_lactic():
     assert np.allclose(units.get_electricity_consumption(), 45.291535445041546, rtol=0.01)
     assert np.allclose(units.get_electricity_production(), 0.0)
 
+@pytest.mark.slow
 def test_ethanol_adipic():
     bst.process_tools.default_utilities()
     from biorefineries import ethanol_adipic

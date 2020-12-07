@@ -16,13 +16,30 @@ from biorefineries import (
     cornstover as cs,
     LAOs as laos,
     lactic,
-    ethanol_lactic,
+    ethanol_adipic,
     )
 
+__all__ = (
+    'test_sugarcane_readme',
+    'test_lipidcane_readme',
+    'test_cornstover_readme',
+    'test_laos_readme',
+    'test_lactic_readme',
+    'test_ethanol_adipic_readme',
+)
+
 get_readme = lambda module: os.path.join(os.path.dirname(module.__file__), 'README.rst')
-testfile(get_readme(sc))
-testfile(get_readme(lc))
-testfile(get_readme(cs))
-testfile(get_readme(laos))
-testfile(get_readme(lactic))
-testfile(get_readme(ethanol_lactic))
+test_sugarcane_readme = lambda: testfile(get_readme(sc))
+test_lipidcane_readme = lambda: testfile(get_readme(lc))
+test_cornstover_readme = lambda: testfile(get_readme(cs))
+test_laos_readme = lambda: testfile(get_readme(laos))
+test_lactic_readme = lambda: testfile(get_readme(lactic))
+test_ethanol_adipic_readme = lambda: testfile(get_readme(ethanol_adipic))
+
+if __name__ == '__main__':
+    test_sugarcane_readme()
+    test_lipidcane_readme()
+    test_cornstover_readme()
+    test_laos_readme()
+    test_lactic_readme()
+    test_ethanol_adipic_readme()
