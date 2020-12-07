@@ -611,7 +611,7 @@ class CoFermentation_original(Unit):
       kW=59.656, cost=24300, S=43149, CE=CEPCI[2009], n=0.8, BM=2.3)
 class SeedTrain(Unit):
     _N_ins = 1
-    _N_outs = 1
+    _N_outs = 2
     _units= {'Seed fermenter size': 'kg',
              'Flow rate': 'kg/hr'}
     
@@ -638,14 +638,17 @@ class SeedTrain(Unit):
 
     def _run(self):
         feed = self.ins[0]
-        effluent = self.outs[0]
+        effluent, CO2 = self.outs
         effluent.copy_like(feed)
+        CO2.phase = 'g'
 
         self.cofermentation_rxns(effluent.mol)
         # Assume all CSL is used up
         effluent.imass['CSL'] = 0 
         
-        effluent.T = self.T
+        effluent.T = CO2.T = self.T
+        CO2.imass['CO2'] = effluent.imass['CO2']
+        effluent.imass['CO2'] = 0
 
     def _design(self):
         Design = self.design_results
@@ -1479,15 +1482,13 @@ class DehydrationReactor(Reactor):
             'TiO2 catalyst': 1,
             'Heat exchangers': 3.17}
     mcat_frac = (12/1.5) * (1e3)# kg per m3/h
-                                 # Dishisha et al. 2015
-    
     
     def __init__(self, ID='', ins=None, outs=(), thermo=None, *, T=230+273.15,
                   P=101325, V_wf=0.8, length_to_diameter=2, tau = 1,
                   kW_per_m3=0.0985, # Perry's handbook
                   wall_thickness_factor=1,
                   vessel_material='Stainless steel 304',
-                  vessel_type='Vertical', X = 0.999):
+                  vessel_type='Vertical', X = 0.999):  # Dishisha et al. 2015
         Unit.__init__(self, ID, ins, outs)
         
         self.T = T
@@ -1514,7 +1515,6 @@ class DehydrationReactor(Reactor):
         effluent.mix_from([feed])
         effluent.T = self.T
         # effluent.P = feed.P
-        
         self.dehydration_reactions(effluent.mol)
         
    
@@ -1560,7 +1560,6 @@ class CoFermentation(Reactor):
     _N_ins = 3
     _N_outs = 2
     _N_heat_utilities = 1
-    
     _units= {**Reactor._units,
             'Fermenter size': 'kg',
             'Recirculation flow rate': 'kg/hr',
