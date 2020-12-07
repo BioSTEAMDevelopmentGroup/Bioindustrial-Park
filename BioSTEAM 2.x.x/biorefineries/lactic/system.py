@@ -523,7 +523,7 @@ aerobic_recycle = System('aerobic_recycle',
 S505 = units.ReverseOsmosis('S505', ins=S501-0, outs=('recycled_water', brine))
 
 wastewater_sys = System('wastewater_sys',
-                        path=(M501, R501,aerobic_recycle, S505))
+                        path=(M501, R501, aerobic_recycle, S505))
 
 wastewater_group = UnitGroup('wastewater_group',
                              units=wastewater_sys.units)
