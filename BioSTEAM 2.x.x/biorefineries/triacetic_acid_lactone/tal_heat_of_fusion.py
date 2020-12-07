@@ -8,6 +8,7 @@ import numpy as np
 from scipy.optimize import curve_fit
 import matplotlib.pyplot as plt
 from thermosteam import (
+    functional as fn,
     Thermo,
     Chemical,
     Chemicals,
@@ -22,11 +23,11 @@ Phenol = Chemical('Phenol').Cn.l[0]
 TAL = Chemical('TAL',
                search_ID='Triacetic acid lactone')
 TAL.Tm = 185 + 273.15
-rho_TAL = 1.348e-3
-TAL.V.l.add_model(rho_TAL, top_priority=True)
-TAL.V.s.add_model(rho_TAL, top_priority=True)
-TAL.Cn.l.add_model(800, top_priority=True)
-TAL.Cn.s.add_model(800, top_priority=True)
+molar_volume_TAL = fn.rho_to_V(1.348e-3, TAL.MW)
+TAL.V.l.add_model(molar_volume_TAL, top_priority=True)
+TAL.V.s.add_model(molar_volume_TAL, top_priority=True)
+TAL.Cn.l.add_model(2 * TAL.MW, top_priority=True)
+TAL.Cn.s.add_model(2 * TAL.MW, top_priority=True)
 Water, TAL = chemicals = Chemicals(['Water', TAL])
 chemicals.compile(skip_checks=True)
 thermo = Thermo(chemicals)
