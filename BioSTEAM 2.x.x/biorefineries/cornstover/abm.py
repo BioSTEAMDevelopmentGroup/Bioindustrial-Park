@@ -119,5 +119,5 @@ def ABM_TEA_model(
         'FOC': cs.cornstover_tea.FOC,
         'Electricity consumption [MWhr/yr]': hours * unit_group.get_electricity_consumption(), 
         'Electricity production [MWhr/yr]': hours * unit_group.get_electricity_production(),
-        'Production': cs.ethanol.F_mass * operating_days * 24.,
+        'Production': cs.ethanol.F_mass * hours,
     }

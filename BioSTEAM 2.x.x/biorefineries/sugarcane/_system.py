@@ -20,7 +20,7 @@ __all__ = (
 
 # %% Juicing and evaporation
 
-def create_juicing_system(ID='juicing_sys'):
+def create_juicing_system(ID='juicing_sys', sugar_solution_ID=''):
     ### Streams ###
     chemicals = bst.settings.get_chemicals()
     
@@ -166,7 +166,7 @@ def create_juicing_system(ID='juicing_sys'):
     
     
     # Screen out small fibers from sugar stream
-    S202 = units.VibratingScreen('S202', outs=('', 'fiber_fines'),
+    S202 = units.VibratingScreen('S202', outs=(sugar_solution_ID, 'fiber_fines'),
                                  split=dict(Ash=1.0,
                                             CaO=1.0,
                                             Cellulose=1.0,
