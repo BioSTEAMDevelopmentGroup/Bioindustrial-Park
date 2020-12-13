@@ -49,7 +49,7 @@ def solubility(T, Hfus, Cns): # g/L
     tal_wt = TAL.MW * sle.imol['l', 'TAL']
     tal_vol = tal_wt / rho_TAL
     water_vol = molar_volume * sle.imol['l', 'Water']
-    return  tal_wt / (water_vol + tal_vol) / 1000
+    return  tal_wt / (1000 * water_vol)
 
 Cn_lb = Cn/4
 Cn_ub = 4*Cn
@@ -57,8 +57,10 @@ Hfus_lb = 0.
 Hfus_ub = 2*95.15
 gamma_lb = 0.000000001
 gamma_ub = 20
-params, _ = curve_fit(solubility, temperatures, solubilities, p0=[40, Cn],
-                      bounds=([Hfus_lb, Cn_lb], [Hfus_ub, Cn_ub]))
+params, _ = curve_fit(solubility, temperatures, solubilities,
+                      p0=[40, Cn],
+                      bounds=([Hfus_lb, Cn_lb], [Hfus_ub, Cn_ub])
+)
 
 def display_solubility_results(Hfus, gamma):
     plt.figure()
