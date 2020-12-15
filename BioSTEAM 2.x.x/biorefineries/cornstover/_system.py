@@ -150,8 +150,8 @@ def create_system(ID='cornstover_sys'):
         
     pretreatment_sys = System('pretreatment_sys',
                    path=(U101, T201, M201, update_pretreatment_process_water, 
-                         M202, M203, R201, P201, T202, F201, M204, H201, M210,
-                         M205, T203, P209, T203, H301, M301))
+                         M202, M203, R201, P201, T202, F201, update_ammonia_loading, 
+                         M204, H201, M210, M205, T203, P209, T203, H301, M301))
     
     ### Fermentation system ###
     

@@ -1,6 +1,7 @@
 README.rst
 setup.py
 biorefineries/__init__.py
+biorefineries/abm_yield_example.py
 biorefineries.egg-info/PKG-INFO
 biorefineries.egg-info/SOURCES.txt
 biorefineries.egg-info/dependency_links.txt
@@ -79,5 +80,6 @@ biorefineries/sugarcane/_process_settings.py
 biorefineries/sugarcane/_system.py
 biorefineries/sugarcane/_tea.py
 biorefineries/sugarcane/model.py
+biorefineries/tests/__init__.py
 biorefineries/tests/run_readmes.py
 biorefineries/tests/test_biorefineries.py
