@@ -247,6 +247,8 @@ sugars_concentration = lambda x: sum(x.imass[sugars_IDs])/x.F_vol
 fixed_sugars_concentration = 591.25
 fixed_inhibitors_concentration = 0.9
     
+
+# self.products.F_mass - self.product.imass[self.products] - (self.products.F_mass - self.product.imass[self.products]*self.target_titer/current_titer)
 def F301_spec_sugars(V):
     F301.V = V
     F301._run()

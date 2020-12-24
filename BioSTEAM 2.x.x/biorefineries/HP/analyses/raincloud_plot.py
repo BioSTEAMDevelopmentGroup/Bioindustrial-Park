@@ -45,7 +45,7 @@ df = pd.read_csv("just_MPSP.csv", sep= ",")
 f, ax = plt.subplots(figsize=(7, 5))
 
 ax=pt.RainCloud(x = dx, y = dy, data = df, palette = pal, bw = sigma,
-                 width_viol = .6, ax = ax, orient = ort, move = .2)
+                 width_viol = .3, ax = ax, orient = ort, move = .2)
 
 # plt.title("Figure P8\n Rainclouds with Shifted Rain")
 
