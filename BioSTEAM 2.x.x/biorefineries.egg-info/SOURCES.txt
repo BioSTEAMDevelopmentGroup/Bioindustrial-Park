@@ -35,6 +35,7 @@ biorefineries/cornstover/__init__.py
 biorefineries/cornstover/_analysis.py
 biorefineries/cornstover/_chemicals.py
 biorefineries/cornstover/_humbird2011.xlsx
+biorefineries/cornstover/_legacy_code.py
 biorefineries/cornstover/_plot_bars.py
 biorefineries/cornstover/_plot_spearman.py
 biorefineries/cornstover/_plot_uncertainty_top.py
@@ -44,6 +45,7 @@ biorefineries/cornstover/_system.py
 biorefineries/cornstover/_tea.py
 biorefineries/cornstover/abm.py
 biorefineries/cornstover/model.py
+biorefineries/cornstover/specifications.py
 biorefineries/cornstover/units.py
 biorefineries/fattyalcohols/README.rst
 biorefineries/fattyalcohols/__init__.py
