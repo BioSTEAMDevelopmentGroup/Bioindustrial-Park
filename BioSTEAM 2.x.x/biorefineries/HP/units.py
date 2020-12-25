@@ -853,11 +853,11 @@ class AcidulationReactor(Reactor):
     _N_outs = 1
     
     acidulation_rxns = ParallelRxn([
-        #   Reaction definition                                           Reactant        Conversion
-        Rxn('CalciumLactate + H2SO4 -> 2 HP + CaSO4',         'CalciumLactate',       1),
+        #   Reaction definition                                        Reactant        Conversion
+        Rxn('CalciumLactate + H2SO4 -> 2 HP + CaSO4',                 'CalciumLactate',       1),
         Rxn('CalciumAcetate + H2SO4 -> 2 AceticAcid + CaSO4',         'CalciumAcetate',       1),
         Rxn('CalciumDihydroxide + H2SO4 -> CaSO4 + 2 H2O',            'CalciumDihydroxide',   1)
-            ])
+    ])
             
     def _run(self):
         feed, acid = self.ins
@@ -1250,7 +1250,7 @@ class AnaerobicDigestion(Unit):
             MW = getattr(chems, reactant).MW	
             return Rxn(f'{1/MW}{reactant} -> {f_CH4}CH4 + {f_CO2}CO2 + {f_sludge}WWTsludge',	
                        reactant, 0.91)	
-        self.digestion_rxns = ParallelRxn([anaerobic_rxn(i) for i in self.reactants])	
+        self.digestion_rxns = ParallelRxn([anaerobic_rxn(i) for i in self.reactants])
                 	
     def _run(self):	
         wastewater = self.ins[0]	

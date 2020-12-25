@@ -14,7 +14,7 @@ from ._process_settings import price
 __all__ = (
     'create_juicing_system',
     'create_ethanol_production_system',
-    'create_ethanol_separation_units',
+    'create_ethanol_purification_system',
     'create_system',
 )
 
@@ -94,9 +94,6 @@ def create_juicing_system(ID='juicing_sys', sugar_solution_ID=''):
     
     # Mix in water
     M201 = units.Mixer('M201')
-    # crushing_mill_recycle_sys = bst.System('crushing_mill_recycle_sys',
-    #                                path=(U201, S201, M201),
-    #                                recycle=M201-0)
     
     # Screen out fibers
     S201 = units.VibratingScreen('S201',
@@ -249,10 +246,11 @@ def create_juicing_system(ID='juicing_sys', sugar_solution_ID=''):
 
 # %% Ethanol separation
 
-def create_ethanol_separation_units(degassed_beer=None,
-                                    ethanol_product=None,
-                                    denaturant=None,
-                                    IDs={}):
+def create_ethanol_purification_system(ID='ethanol_purification_sys',
+                                       degassed_beer=None,
+                                       ethanol_product=None,
+                                       denaturant=None,
+                                       IDs={}):
     if not degassed_beer: # Feedstock
         degassed_beer = bst.Stream(
             ID='degassed_beer', 
@@ -269,7 +267,7 @@ def create_ethanol_separation_units(degassed_beer=None,
     x_bot = 3.910570816782338e-06
     y_top = 0.2811210085806504
     D302 = units.BinaryDistillation(IDs.get('Beer column', 'D302'), P=101325,
-                                y_top=y_top, x_bot=x_bot, k=1.25, Rmin=0.02,
+                                y_top=y_top, x_bot=x_bot, k=1.1, Rmin=0.01,
                                 LHK=('Ethanol', 'Water'))
     D302.tray_material = 'Stainless steel 304'
     D302.vessel_material = 'Stainless steel 304'
@@ -281,7 +279,7 @@ def create_ethanol_separation_units(degassed_beer=None,
     
     y_top = 0.8080462715940735
     D303 = units.BinaryDistillation(IDs.get('Distillation', 'D303'), P=101325,
-                                y_top=y_top, x_bot=x_bot, k=1.25,
+                                y_top=y_top, x_bot=x_bot, k=1.25, Rmin=0.01,
                                 LHK=('Ethanol', 'Water'),
                                 tray_material='Stainless steel 304',
                                 vessel_material='Stainless steel 304',
@@ -318,56 +316,65 @@ def create_ethanol_separation_units(degassed_beer=None,
                              vessel_material='Carbon steel',
                              tau=6.5*24, outs=ethanol_product)
     
+    # Heat up before beer column
+    # Exchange heat with stillage
+    P301 = units.Pump(IDs.get('Beer pump', 'P301'))
+    H302 = units.HXprocess(IDs.get('Beer column heat exchange', 'H302'), 
+                           phase0='l', phase1='l', U=1.28)
+    
     ### Ethanol system set-up ###
     
-    degassed_beer-D302-1-P302
+    (degassed_beer-P301-0, P302-0)-H302-0-D302-1-P302
     (D302-0, U301-0)-M303-0-D303-0-H303-U301
     D303-1-P303
     
     def adjust_denaturant():
         P304._run()
         pure_ethanol = P304.outs[0]
-        denaturant.imol['Octane'] = 0.021*pure_ethanol.F_mass/114.232
+        denaturant.imol['Octane'] = 0.022*pure_ethanol.F_mass/114.232
     
     P304.specification = adjust_denaturant
     U301-1-H304-0-T302-0-P304
     denaturant-T303-P305
     (P305-0, P304-0)-M304-T304
+    
+    return bst.System('ethanol_purification_sys',
+               [P301,
+                bst.System('beer_column_heat_integration_sys',
+                    [H302,
+                     D302,
+                     P302],
+                    recycle=P302-0),
+                bst.System('ethanol_dehydration_sys',
+                    [M303,
+                     D303,
+                     H303,
+                     U301],
+                    recycle=U301-0), 
+                bst.System('ethanol_denaturation_sys',
+                    [H304,
+                     T302, 
+                     P304,
+                     T303, 
+                     P305, 
+                     M304,
+                     T304,
+                     P303])])
 
-    return {
-        'Beer column': D302,
-        'Beer column bottoms product pump': P302,
-        'Ethanol dehydration system': 
-            bst.System('ethanol_dehydration_sys',
-                [M303,
-                 D303,
-                 H303,
-                 U301],
-                 recycle=U301-0
-            ),
-        'Recycle mixer': M303,
-        'Distillation': D303,
-        'Heat exchanger to superheat vapor to molecular sieves': H303,
-        'Molecular sieves': U301,
-        'Ethanol condenser': H304,
-        'Ethanol day tank': T302, 
-        'Ethanol day tank pump': P304,
-        'Denaturant storage': T303, 
-        'Denaturant pump': P305, 
-        'Ethanol-denaturant mixer': M304,
-        'Product tank': T304,
-        'Distillation bottoms product pump': P303,
-    }
-        
 
 # %% Ethanol production section (fermentation and separations)
 
 def create_ethanol_production_system(ID='ethanol_production_sys',
                                      sugar_solution=None):
+    f = bst.main_flowsheet
+    u = f.unit
+    
     ### Streams ###
     
     # Fresh water
-    stripping_water = bst.Stream('stripping_water', Water=5000, units='kg/hr')
+    stripping_water = bst.Stream('stripping_water',
+                                 Water=26836,
+                                 units='kg/hr')
     
     # Gasoline
     denaturant = bst.Stream('denaturant', Octane=230.69,
@@ -399,7 +406,7 @@ def create_ethanol_production_system(ID='ethanol_production_sys',
     F301 = units.MultiEffectEvaporator('F301',
                                        P=(101325, 73581, 50892, 32777),
                                        V=0.95) # fraction evaporated
-    F301.components['condenser'].U = 1.85
+    
     # Note: value of steam ~ 6.86 for the following 
     # (101325, 73580.467, 50891.17, 32777.406, 19999.925, 11331.5),
     
@@ -414,6 +421,11 @@ def create_ethanol_production_system(ID='ethanol_production_sys',
     T301 = units.StorageTank('T301', tau=4, vessel_material='Carbon steel')
     T301.line = 'Beer tank'
     
+    stripping_water_over_vent = stripping_water.mol / 21202.490455845436
+    def update_stripping_water():
+        stripping_water, vent = D301.ins
+        stripping_water.mol[:] = stripping_water_over_vent * vent.F_mass
+    
     D301 = units.VentScrubber('D301', ins=(stripping_water, R301-0), 
                               outs=('vent', ''),
                               gas=('CO2',))
@@ -427,27 +439,11 @@ def create_ethanol_production_system(ID='ethanol_production_sys',
     
     # Mix in Water
     M302 = units.Mixer('M302')
-    P301 = units.Pump('P301')
     
-    # Heat up before beer column
-    # Exchange heat with stillage
-    H302 = units.HXprocess('H302', phase0='l', phase1='l', U=1.28)
-    
-    dct = create_ethanol_separation_units(
-        degassed_beer=H302-0,
+    ethanol_purification_sys = create_ethanol_purification_system(
+        degassed_beer=M302-0,
         ethanol_product=ethanol,
         denaturant=denaturant)
-    D302 = dct['Beer column']
-    P302 = dct['Beer column bottoms product pump']
-    ethanol_dehydration_sys = dct['Ethanol dehydration system']
-    H304 = dct['Ethanol condenser']
-    T302 = dct['Ethanol day tank']
-    P304 = dct['Ethanol day tank pump']
-    T303 = dct['Denaturant storage']
-    P305 = dct['Denaturant pump']
-    M304 = dct['Ethanol-denaturant mixer']
-    T304 = dct['Product tank']
-    P303 = dct['Distillation bottoms product pump']
     
     # Waste water
     M305 = units.Mixer('M305', outs='wastewater')
@@ -466,8 +462,8 @@ def create_ethanol_production_system(ID='ethanol_production_sys',
     sugar_solution-S301-1-F301-0-P306
     (S301-0, P306-0)-M301-H301
     (H301-0, yeast-T305-0)-R301-1-T301-0-C301
-    (C301-0, D301-1)-M302-P301
-    (P303-0, F301-1, (P301-0, P302-0)-H302-1)-M305
+    (C301-0, D301-1)-M302
+    (u.P303-0, F301-1, u.H302-1)-M305
     
     ### System ###
     
@@ -480,24 +476,10 @@ def create_ethanol_production_system(ID='ethanol_production_sys',
                  T305,
                  R301,
                  T301, 
-                 C301, 
-                 M302, 
-                 P301,
-                 bst.System('beer_column_heat_integration',
-                     [H302,
-                      D302,
-                      P302],
-                     recycle=P302-0),
-                 ethanol_dehydration_sys,
-                 H304,
-                 T302, 
-                 P304,
-                 T303, 
-                 P305, 
-                 M304,
-                 T304, 
+                 C301,
                  D301,
-                 P303, 
+                 M302, 
+                 ethanol_purification_sys,
                  M305])
 
 

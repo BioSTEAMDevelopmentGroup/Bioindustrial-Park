@@ -86,13 +86,6 @@ class SulfuricAcidMixer(Unit):
     _N_ins = 2
     _N_outs = 1
     _graphics = Mixer._graphics
-        
-    def __init__(self, f)
-    
-    def set_sulfuric_acid_to_feedstock_specification(self, feedstock, sulfuric_acid_fraction):
-        self._sulfuric_acid_fraction
-        self._feedstock
-        
     
     def _run(self):
         acid, water = self.ins

@@ -43,6 +43,7 @@ from ._tea import *
 
 _system_loaded = False
 _chemicals_loaded = False
+_include_blowdown_recycle = True
 
 def load():
     if not _chemicals_loaded: _load_chemicals()
@@ -67,7 +68,7 @@ def _load_system():
     F.set_flowsheet(flowsheet)
     bst.settings.set_thermo(chemicals)
     load_process_settings()
-    cornstover_sys = create_system()
+    cornstover_sys = create_system(include_blowdown_recycle=_include_blowdown_recycle)
     cornstover_sys.simulate()
     u = F.unit
     OSBL_units = (u.WWTC, u.CWP, u.CT, u.PWC, u.ADP,
@@ -80,7 +81,7 @@ def _load_system():
     UnitGroup = bst.process_tools.UnitGroup
     Area100 = UnitGroup('Area 100', (u.U101,))
     Area200 = UnitGroup('Area 200', (u.T201, u.M201, u.R201, u.P201,
-                                    u.T202, u.F201, u.H201, u.M210, u.T203))
+                                    u.T202, u.F201, u.H201, u.T203))
     Area300 = UnitGroup('Area 300', (u.H301, u.M301, u.R301,
                                     u.R302, u.T301, u.T302))                 
     Area400 = UnitGroup('Area 400', (u.D401, u.H401, u.D402, u.P401,
@@ -88,7 +89,7 @@ def _load_system():
                                     u.U401, u.H403, u.M701, u.S401))
     Area500 = UnitGroup('Area 500', (u.WWTC,))
     Area600 = UnitGroup('Area 600', (u.T701, u.T702, u.P701, u.P702, u.M701, u.FT,
-                                    u.CSL_storage, u.DAP_storage))
+                                     u.CSL_storage, u.DAP_storage))
     Area700 = UnitGroup('Area 700', (u.BT,))
     Area800 = UnitGroup('Area 800', (u.CWP, u.CT, u.PWC, u.ADP, u.CIP_package))
     areas = (Area100, Area200, Area300, Area400,
