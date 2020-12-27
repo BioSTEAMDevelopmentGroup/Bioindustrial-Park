@@ -20,7 +20,7 @@ __all__ = (
 
 # %% Juicing and evaporation
 
-def create_juicing_system(ID='juicing_sys', sugar_solution_ID=''):
+def create_juicing_system(ID='juicing_sys', sugar_solution_ID='', feedstock=None):
     ### Streams ###
     chemicals = bst.settings.get_chemicals()
     
@@ -34,12 +34,15 @@ def create_juicing_system(ID='juicing_sys', sugar_solution_ID=''):
              Hemicellulose=0.036082,
              Water=0.7)
     )
-    
-    sugarcane = bst.Stream('sugarcane',
-                           flow=333334 * z_mass_sugarcane,
-                           units='kg/hr',
-                           price=price['Sugar cane'])
-    
+    if not feedstock: feedstock = 'sugarcane'
+    if isinstance(feedstock, str):
+        sugarcane = bst.Stream(feedstock,
+                               flow=333334 * z_mass_sugarcane,
+                               units='kg/hr',
+                               price=price['Sugar cane'])
+    elif not isinstance(feedstock, bst.Stream):
+        raise ValueError('feedstock must a Stream object')
+        
     enzyme = bst.Stream('enzyme',
                         Cellulose=100, Water=900, units='kg/hr',
                         price=price['Protease'])
@@ -250,6 +253,7 @@ def create_ethanol_purification_system(ID='ethanol_purification_sys',
                                        degassed_beer=None,
                                        ethanol_product=None,
                                        denaturant=None,
+                                       beer_column_heat_integration=True,
                                        IDs={}):
     if not degassed_beer: # Feedstock
         degassed_beer = bst.Stream(
@@ -319,12 +323,22 @@ def create_ethanol_purification_system(ID='ethanol_purification_sys',
     # Heat up before beer column
     # Exchange heat with stillage
     P301 = units.Pump(IDs.get('Beer pump', 'P301'))
-    H302 = units.HXprocess(IDs.get('Beer column heat exchange', 'H302'), 
-                           phase0='l', phase1='l', U=1.28)
-    
+    if beer_column_heat_integration:
+        H302 = units.HXprocess(IDs.get('Beer column heat exchange', 'H302'), 
+                               phase0='l', phase1='l', U=1.28)
+        (degassed_beer-P301-0, P302-0)-H302-0-D302-1-P302
+        beer_column_path = [bst.System('beer_column_heat_integration_sys',
+                    [H302,
+                     D302,
+                     P302],
+                    recycle=P302-0)]
+    else:
+        beer_column_path = (D302, P302)
+        degassed_beer-P301-0-D302-1-P302
+        
     ### Ethanol system set-up ###
     
-    (degassed_beer-P301-0, P302-0)-H302-0-D302-1-P302
+    
     (D302-0, U301-0)-M303-0-D303-0-H303-U301
     D303-1-P303
     
@@ -340,11 +354,7 @@ def create_ethanol_purification_system(ID='ethanol_purification_sys',
     
     return bst.System('ethanol_purification_sys',
                [P301,
-                bst.System('beer_column_heat_integration_sys',
-                    [H302,
-                     D302,
-                     P302],
-                    recycle=P302-0),
+                *beer_column_path,
                 bst.System('ethanol_dehydration_sys',
                     [M303,
                      D303,
@@ -431,12 +441,11 @@ def create_ethanol_production_system(ID='ethanol_production_sys',
                               gas=('CO2',))
     
     # Separate 99% of yeast
-    C301 = units.SolidsCentrifuge('C301', outs=('', 'recycle_yeast'),
-                                split=(1, 0.99999, 1, 0.96, 0.01),
-                                order=('Ethanol', 'Glucose', 'H3PO4', 
-                                       'Water', 'DryYeast'),
-                                solids=('DryYeast',))
-    
+    C301 = units.SolidsCentrifuge('C301', outs=('recycle_yeast', ''),
+                                  split=(1, 0.99999, 1, 0.01),
+                                  order=('Ethanol', 'Glucose', 'H3PO4', 'DryYeast'),
+                                  solids=('DryYeast',))
+    C301.split[:] = 1. - C301.split
     # Mix in Water
     M302 = units.Mixer('M302')
     
@@ -462,7 +471,7 @@ def create_ethanol_production_system(ID='ethanol_production_sys',
     sugar_solution-S301-1-F301-0-P306
     (S301-0, P306-0)-M301-H301
     (H301-0, yeast-T305-0)-R301-1-T301-0-C301
-    (C301-0, D301-1)-M302
+    (C301-1, D301-1)-M302
     (u.P303-0, F301-1, u.H302-1)-M305
     
     ### System ###

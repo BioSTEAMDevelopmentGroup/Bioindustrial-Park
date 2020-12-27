@@ -28,9 +28,9 @@ from biosteam.units import Flash, HXutility, Mixer, MixTank, Pump, \
     SolidsSeparator, StorageTank, LiquidsSplitSettler
 from biosteam.units.decorators import cost
 from thermosteam import Stream, MultiStream
-from HP.process_settings import price
-from HP.utils import CEPCI, baseline_feedflow, compute_extra_chemical, adjust_recycle
-from HP.chemicals_data import HP_chemicals
+from biorefineries.HP.process_settings import price
+from biorefineries.HP.utils import CEPCI, baseline_feedflow, compute_extra_chemical, adjust_recycle
+from biorefineries.HP.chemicals_data import HP_chemicals
 tmo.settings.set_thermo(HP_chemicals)
 _kg_per_ton = 907.18474
 _Gcal_2_kJ = 4.184 * 1e6 # (also MMkcal/hr)
@@ -1633,6 +1633,9 @@ class CoFermentation(Reactor):
         self.glucose_to_microbe_rxn = self.cofermentation_rxns[2]
         self.xylose_to_microbe_rxn = self.cofermentation_rxns[5]
         
+        if 'Sucrose' in self.chemicals:
+            self.sucrose_hydrolysis_rxn = Rxn('Sucrose + Water -> 2Glucose', 'Sucrose', 1.00)
+        
         self._X = self.cofermentation_rxns.X.copy()
         
         # Neutralization of lactic acid and acetic acid by lime (Ca(OH)2)
@@ -1650,11 +1653,13 @@ class CoFermentation(Reactor):
         effluent, vapor = self.outs
         effluent.mix_from([feed, sugars])
         
+        if 'Sucrose' in effluent.chemicals:
+            self.sucrose_hydrolysis_rxn(effluent)
+        
         # ss = Stream(None)
         # effluent.copy_like(feed)
         effluent.T = vapor.T = self.T
         CSL.imass['CSL'] = (sugars.F_vol + feed.F_vol) * self.CSL_loading 
-        
         self.cofermentation_rxns(effluent.mol)
         vapor.imol['CO2'] = effluent.imol['CO2']
         vapor.phase = 'g'
