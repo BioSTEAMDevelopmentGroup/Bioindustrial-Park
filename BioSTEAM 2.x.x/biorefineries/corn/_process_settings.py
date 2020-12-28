@@ -21,7 +21,7 @@ def load_process_settings():
     lps.T = 152 + 273.15
     lps.P = Water.Psat(lps.T)
     lps.heat_transfer_efficiency = 0.95 
-    lps.regeneration_price = 17.08e-3 * Water.MW
+    lps.regeneration_price = price['Steam'] * Water.MW
     cw = HeatUtility.get_agent('cooling_water')
     cw.regeneration_price = 0.073e-3 * Water.MW
     cw.T = 25. + 273.15
@@ -29,15 +29,17 @@ def load_process_settings():
 
 # Raw material price (USD/kg)
 price = {
-    'Ethanol': 0.48547915353569393, # 0.789,
-    'Corn': 0.08476585075177462,
-    'DDGS': 0.09687821462905594,
+    'Ethanol': 0.48547915353569393, 
+    'Corn': 0.08476585075177462, # 0.13227735731092652 in Chinmay's report
+    'DDGS': 0.12026, # Value from Chinmay's report; 0.09687821462905594, in original
     'Yeast': 0.907310526171629,
-    'Enzyme': 3.20739717428309,
+    'Enzyme': 2.25, # Value from Chinmay's report; 3.20739717428309 in original
     'Denaturant': 0.4355069727002459,
     'Sulfuric acid': 0.08971711759613593,
     'Ammonia': 0.4485966110937889,
     'Caustic': 0.14952852932689323,
     'Lime': 0.19937504680689405,
     'Steam': 17.08e-3,
+    'Crude oil': 0.56,
 }
+

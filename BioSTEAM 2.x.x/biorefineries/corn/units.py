@@ -254,7 +254,7 @@ class DDGSDryer(bst.Unit):
         dry_solids.T = hot_air.T = self.T
         duty = (dry_solids.H + hot_air.H) - (wet_solids.H + air.H)
         natural_gas.empty()
-        CO2 = CH4 = - duty / self.chemicals.CH4.LHV
+        CO2 = CH4 = duty / self.chemicals.CH4.LHV
         H2O = 2. * CH4
         natural_gas.imol['CH4'] = CH4
         emissions.imol['CO2', 'H2O'] = [CO2, H2O]
@@ -374,7 +374,7 @@ class SimultaneousSaccharificationFermentation(bst.BatchBioreactor):
     
     def __init__(self, ID='', ins=None, outs=(), thermo=None, *, 
                  tau=60.,  N=None, V=None, T=305.15, P=101325., Nmin=2, Nmax=36,
-                 yield_=0.9, V_wf=0.83):
+                 yield_=0.90, V_wf=0.83):
         bst.BatchBioreactor.__init__(self, ID, ins, outs, thermo,
             tau=tau, N=N, V=V, T=T, P=P, Nmin=Nmin, Nmax=Nmax
         )

@@ -104,15 +104,19 @@ F301 = bst.units.MultiEffectEvaporator('F301', ins=s.sugar_solution, outs=('F301
                                         # P = (101325, 73581, 50892, 32777, 20000), V = 0.001)
 F301.V = 0.5 #for sugars concentration of 591.25 g/L (599.73 g/L after cooling to 30 C)
 
+# TODO: Add mixer for dilution water
+
 F301_P = units.HPPump('F301_P', ins=F301-1)
 # F301_H = bst.units.HXutility('F301_H', ins=F301-0, V = 0.)
 
-M304_H = bst.units.HXutility('M304_H', ins=F301-0, T=30+273.15)
-M304_H_P = units.HPPump('M304_H_P', ins=M304_H-0)
+M304_H_P = units.HPPump('M304_H_P', ins=F301-0)
+
+M304_H = bst.units.HXutility('M304_H', ins=M304_H_P-0, T=30+273.15)
+
 
 
 R302 = units.CoFermentation('R302', 
-                            ins=(M304_H_P-0, '', CSL, fermentation_lime),
+                            ins=(M304_H-0, '', CSL, fermentation_lime),
                             outs=('fermentation_effluent', 'CO2'),
                             vessel_material='Stainless steel 316',
                             neutralization=True)
@@ -564,7 +568,9 @@ HXN = bst.facilities.HeatExchangerNetwork('HXN')
 HP_sys = bst.main_flowsheet.create_system(
     'HP_sys', feeds=[i for i in bst.main_flowsheet.stream
                             if i.sink and not i.source])
-
+HP_sys.simulate()
+for i in HXN.original_heat_utils:
+    i.heat_exchanger.rigorous = True
 BT_sys = System('BT_sys', path=(BT,))
 
 # %%
