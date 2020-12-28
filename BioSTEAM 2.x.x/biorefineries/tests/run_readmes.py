@@ -10,19 +10,47 @@
 
 import os
 from doctest import testfile
-from biorefineries import (
-    sugarcane as sc,
-    lipidcane as lc,
-    cornstover as cs,
-    LAOs as laos,
-    lactic,
-    ethanol_lactic,
-    )
+
+
+__all__ = (
+    'run_sugarcane_readme',
+    'run_lipidcane_readme',
+    'run_cornstover_readme',
+    'run_laos_readme',
+    'run_lactic_readme',
+    'run_ethanol_adipic_readme',
+)
 
 get_readme = lambda module: os.path.join(os.path.dirname(module.__file__), 'README.rst')
-testfile(get_readme(sc))
-testfile(get_readme(lc))
-testfile(get_readme(cs))
-testfile(get_readme(laos))
-testfile(get_readme(lactic))
-testfile(get_readme(ethanol_lactic))
+
+def run_sugarcane_readme():
+    from biorefineries import sugarcane as sc
+    testfile(get_readme(sc))
+    
+def run_lipidcane_readme():
+    from biorefineries import lipidcane as lc
+    testfile(get_readme(lc))
+
+def run_cornstover_readme():
+    from biorefineries import cornstover as cs
+    testfile(get_readme(cs))
+
+def run_laos_readme():
+    from biorefineries import LAOs as laos
+    runfile(get_readme(laos))
+    
+def run_lactic_readme():
+    from biorefineries import lactic
+    testfile(get_readme(lactic))
+    
+def run_ethanol_adipic_readme():
+    from biorefineries import ethanol_adipic
+    testfile(get_readme(ethanol_adipic))
+
+if __name__ == '__main__':
+    run_sugarcane_readme()
+    run_lipidcane_readme()
+    run_cornstover_readme()
+    run_laos_readme()
+    run_lactic_readme()
+    run_ethanol_adipic_readme()

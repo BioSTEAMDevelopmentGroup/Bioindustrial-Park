@@ -21,6 +21,7 @@ import biosteam as bst
 Rxn = tmo.reaction.Reaction
 ParallelRxn = tmo.reaction.ParallelReaction
 
+
 # %% Add excel unit operations
 
 from biosteam.units.factories import xl2mod
@@ -37,53 +38,6 @@ _hp2kW = 0.7457
 _Gcal2kJ = 4184e3
 
 # %% Pretreatment
-
-class SteamMixer(Unit):
-    """
-    ins : stream sequence
-    
-        [0] Feed
-        
-        [1] Steam
-    
-    outs : stream
-        Mixed product.
-    
-    """
-    _N_outs = 1
-    _N_ins = 2
-    _N_heat_utilities = 1
-    def __init__(self, ID='', ins=None, outs=(), thermo=None, *, P):
-        super().__init__(ID, ins, outs, thermo)
-        self.P = P
-    
-    @staticmethod
-    def _P_at_flow(mol_water, P, steam, mixed, feed):
-        steam.imol['7732-18-5'] = mol_water
-        mixed.mol[:] = steam.mol + feed.mol
-        mixed.H = feed.H + steam.H
-        P_new = mixed.chemicals.Water.Psat(min(mixed.T, mixed.chemicals.Water.Tc - 1))
-        return P - P_new
-    
-    def _run(self):
-        feed, steam = self._ins
-        steam_mol = steam.F_mol
-        mixed = self.outs[0]
-        steam_mol = flx.aitken_secant(self._P_at_flow,
-                                      steam_mol, steam_mol+0.1, 
-                                      1e-4, 1e-4,
-                                      args=(self.P, steam, mixed, feed),
-                                      checkroot=False)
-        mixed.P = self.P
-        hu = self.heat_utilities[0]
-        hu(steam.H, mixed.T)
-    
-    @property
-    def installation_cost(self): return 0
-    @property
-    def purchase_cost(self): return 0
-    def _design(self): pass
-    def _cost(self): pass
         
 @cost('Flow rate', 'Pump', units='kg/hr',
       S=402194, CE=522, cost=22500, n=0.8, kW=74.57, BM=2.3)
@@ -110,7 +64,7 @@ class PretreatmentReactorSystem(Unit):
     Rxn('Sucrose -> HMF + Glucose + 2H2O',           'Sucrose',  1.0000),
     Rxn('Xylan + H2O -> Xylose',                     'Xylan',    0.9000),
     Rxn('Xylan + H2O -> XyloseOligomer',             'Xylan',    0.0024),
-    Rxn('Xylan -> Furfural + 2 H2O',                 'Xylan',    0.0050),
+    Rxn('Xylan -> Furfural + 2 H2O',                 'Xylan',    0.0500),
     Rxn('Arabinan + H2O -> Arabinose',               'Arabinan', 0.9000),
     Rxn('Arabinan + H2O -> ArabinoseOligomer',       'Arabinan', 0.0024),
     Rxn('Arabinan -> Furfural + 2 H2O',              'Arabinan', 0.0050),
@@ -249,7 +203,7 @@ class SeedTrain(Unit):
 @cost('Tank volume', 'Tanks', cost=3840e3/8, S=250e3*_gal2m3, 
       CE=522, n=0.7, BM=2.0, N='N_tanks')
 class SaccharificationAndCoFermentation(Unit):
-    _N_ins = 3
+    _N_ins = 4
     _N_outs = 3
     _N_heat_utilities = 2
     
@@ -333,7 +287,7 @@ class SaccharificationAndCoFermentation(Unit):
         self.saccharified_stream = tmo.Stream(None)
     
     def _run(self):
-        feed, CSL, DAP = self.ins
+        feed, innoculum, CSL, DAP = self.ins
         vent, effluent, sidedraw = self.outs
         vent.P = effluent.P = sidedraw.P = self.P
         ss = self.saccharified_stream
@@ -343,7 +297,7 @@ class SaccharificationAndCoFermentation(Unit):
         ss.copy_flow(feed)
         self.saccharification(ss.mol)
         sidedraw.mol[:] = ss.mol * self.saccharified_slurry_split
-        effluent.mol[:] = ss.mol - sidedraw.mol + CSL.mol + DAP.mol
+        effluent.mol[:] = ss.mol - sidedraw.mol + CSL.mol + DAP.mol + innoculum.mol
         self.loss(effluent.mol)
         self.cofermentation(effluent.mol)
         self.CSL_to_constituents(effluent.mass)
@@ -363,163 +317,23 @@ class SaccharificationAndCoFermentation(Unit):
         mol = ss.mol
         duty = (mixture.H('l', mol, self.T_fermentation, 101325.)
                 - mixture.H('l', mol, self.T_saccharification, 101325.))
+        # feed, innoculum, CSL, DAP = self.ins
+        # vent, effluent, sidedraw = self.outs
+        # print(duty, ss.Hnet - feed.Hnet)
         hu_cooling(duty,
                    self.T_fermentation)
         ei = effluent.chemicals.index('Ethanol')
         ethanol = (sum([i.mol[ei] for i in self.outs])
                    - sum([i.mol[ei] for i in self.ins]))
         reactor_duty = ethanol*-5568
+        # print(duty, effluent.Hnet + vent.Hnet - (ss.Hnet - sidedraw.Hnet + CSL.Hnet + DAP.Hnet))
         hu_fermentation(reactor_duty, effluent.T)
         Design['Reactor duty'] = -duty
         
    
 # %% Lignin separation
 
-@cost('Flow rate', 'Flitrate tank agitator',
-      cost=26e3, CE=551, kW=7.5*_hp2kW, S=31815, n=0.5, BM=1.5)
-@cost('Flow rate', 'Discharge pump',
-      cost=13040, CE=551, S=31815, n=0.8, BM=2.3)
-@cost('Flow rate', 'Filtrate tank',
-      cost=103e3, S=31815, CE=551, BM=2.0, n=0.7)
-@cost('Flow rate', 'Feed pump', kW=74.57,
-      cost= 18173, S=31815, CE=551, n=0.8, BM=2.3)
-@cost('Flow rate', 'Stillage tank 531',
-      cost=174800, CE=551, S=31815, n=0.7, BM=2.0)
-@cost('Flow rate', 'Mafifold flush pump', kW=74.57,
-      cost=17057, CE=551, S=31815, n=0.8, BM=2.3)
-@cost('Flow rate', 'Recycled water tank',
-      cost=1520, CE=551, S=31815, n=0.7, BM=3.0)
-@cost('Flow rate', 'Lignin wet cake screw',  kW=15*_hp2kW,
-      cost=2e4, CE=521.9, S=28630, n=0.8, BM=1.7)
-@cost('Flow rate', 'Lignin wet cake conveyor', kW=10*_hp2kW,
-      cost=7e4, CE=521.9, S=28630, n=0.8, BM=1.7)
-@cost('Flow rate', 'Pressure filter',
-      cost=3294700, CE=551, S=31815, n=0.8, BM=1.7)
-@cost('Flow rate', 'Pressing air compressor receiver tank',
-      cost=8e3, CE=551, S=31815, n=0.7, BM=3.1)
-@cost('Flow rate', 'Cloth wash pump', kW=150*_hp2kW,
-      cost=29154, CE=551, S=31815, n=0.8, BM=2.3)
-@cost('Flow rate', 'Dry air compressor receiver tank',
-      cost=17e3, CE=551, S=31815, n=0.7, BM=3.1)
-@cost('Flow rate', 'Pressing air pressure filter',
-      cost=75200, CE=521.9, S=31815, n=0.6, kW=112, BM=1.6)
-@cost('Flow rate', 'Dry air pressure filter (2)',
-      cost=405000, CE=521.9, S=31815, n=0.6, kW=1044, BM=1.6)
-class PressureFilter(bst.SolidsSeparator):
-    _units = {'Flow rate': 'kg/hr'}
-    
-    def _design(self):
-        self.design_results['Flow rate'] = self.outs[0].F_mass
 
-
-@cost('Flow rate', 'Waste water system', units='kg/hr', CE=551,
-      cost=50280080., n=0.6, BM=1, kW=7139/1.05, S=393100)
-class WasteWaterSystemCost(bst.Unit): pass
-
-
-class AnaerobicDigestion(bst.Unit):
-    """Anaerobic digestion system as modeled by Humbird 2011
-    
-    Parameters
-    ----------
-    reactions : ReactionSet 
-        Anaerobic digestion reactions.
-    sludge_split : Array Split between waste water and sludge
-        
-    ins : stream sequence
-    
-        [0] Waste water
-        
-        [1] Cool well water
-        
-    outs : stream sequence
-    
-        [0] Biogas
-        
-        [1] Waste water
-        
-        [2] Sludge
-        
-        [3] Hot well water
-    
-    """
-    purchase_cost = installation_cost = 0
-    _N_ins = 2
-    _N_outs = 4
-    def __init__(self, ID='', ins=None, outs=(), *, reactions, sludge_split):
-        Unit.__init__(self, ID, ins, outs)
-        self.reactions = reactions
-        self.sludge_split = sludge_split
-        self.multi_stream = tmo.MultiStream()
-    
-    def _run(self):
-        feed, cool_water = self.ins
-        biogas, waste, sludge, hot_water = self.outs
-        biogas.phase = 'g'
-        hot_water.link_with(cool_water, TP=False)
-        biogas.T = waste.T = sludge.T = T = 35+273.15
-        hot_water.T = feed.T - 5
-        H_at_35C = feed.thermo.mixture.H('l', feed.mol, T, 101325)
-        cool_water.mol[:] *= (feed.H - H_at_35C)/(hot_water.H - cool_water.H)
-        sludge.copy_flow(feed)
-        self.reactions(sludge.mol)
-        self.multi_stream.copy_flow(sludge)
-        self.multi_stream.vle(P=101325, H=self.multi_stream.H)
-        biogas.mol[:] = self.multi_stream.imol['g']
-        liquid_mol = self.multi_stream.imol['l']
-        sludge.mol[:] = liquid_mol * self.sludge_split
-        waste.mol[:] = liquid_mol - sludge.mol
-        biogas.receive_vent(waste, accumulate=True)
-        
-    
-class AerobicDigestion(bst.Unit):
-    """
-    Anaerobic digestion system as modeled by Humbird 2011
-    
-    Parameters
-    ----------
-    reactions : ReactionSet
-        Anaerobic digestion reactions.
-    
-    sludge_split : Array
-        Split between waste water and sludge
-        
-    ins : stream sequence
-    
-        [0] Waste water
-        
-        [1] Air
-        
-        [2] Caustic
-        
-    outs : stream sequence
-    
-        [0] Vent
-        
-        [1] Treated waste water
-
-    """    
-    _N_ins = 3
-    _N_outs = 2
-    purchase_cost = installation_cost = 0
-    evaporation = 4/355
-    
-    def __init__(self, ID='', ins=None, outs=(), *, reactions):
-        Unit.__init__(self, ID, ins, outs)
-        self.reactions = reactions
-    
-    def _run(self):
-        waste, air, caustic = self._ins
-        vent, water = self.outs
-        vent.phase = 'g'
-        water.copy_like(waste)
-        water.mol[:] += air.mol
-        water.mol[:] += caustic.mol
-        self.reactions(water.mol)
-        vent.copy_flow(water, ('CO2', 'O2', 'N2'))
-        vent.imol['7732-18-5'] = water.imol['7732-18-5'] * self.evaporation
-        water.mol[:] -= vent.mol
-        
 @cost('Flow rate', units='kg/hr',
       S=63, cost=421e3, CE=522, BM=1.8, n=0.6)
 class CIPpackage(bst.Facility):
