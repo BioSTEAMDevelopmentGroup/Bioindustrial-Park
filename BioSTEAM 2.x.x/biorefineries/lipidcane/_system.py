@@ -582,6 +582,18 @@ def create_system(ID='lipidcane_sys'):
                                    makeup_water_streams,
                                    process_water_streams)
     
+    def heat_integration():
+        hu_mee = u.F301.heat_utilities[0]
+        hu_dist = u.D303.heat_utilities[0]
+        actual_duty = hu_mee.duty + hu_dist.duty
+        if actual_duty > 0.:
+            hu_mee(actual_duty, 373.15, 373.15)
+            hu_dist.empty()
+        else:
+            hu_mee.empty()
+            condenser = u.D303.condenser
+            hu_dist(actual_duty, condenser.ins[0].T, condenser.outs[0].T)
+    
     return bst.System(ID, 
         [U101,
          U102,
@@ -654,7 +666,7 @@ def create_system(ID='lipidcane_sys'):
          ethanol_production_sys,
          T408,
          U202],
-        facilities=(CWP, BT, CT, PWC),
+        facilities=(heat_integration, CWP, BT, CT, PWC),
     )
     
     

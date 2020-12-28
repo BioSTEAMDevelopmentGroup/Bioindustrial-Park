@@ -39,7 +39,7 @@ price = {
     'Ammonia': 0.4485966110937889,
     'Caustic': 0.14952852932689323,
     'Lime': 0.19937504680689405,
-    'Steam': 17.08e-3,
+    'Steam': 12.86e-3, # Value from Chinmay's report; 17.08e-3 in original lipidcane report 
     'Crude oil': 0.56,
 }
 
