@@ -112,7 +112,7 @@ class JetCooker(bst.Unit):
     """
     _N_outs = 1
     _N_ins = 2
-    _N_heat_utilities = 1
+    _N_heat_utilities = 0
     
     def __init__(self, ID="", ins=None, outs=(), thermo=None, T=483.15):
         super().__init__(ID, ins, outs, thermo)
@@ -136,8 +136,6 @@ class JetCooker(bst.Unit):
                                       args=(self.T, steam, effluent, feed),
                                       checkroot=False)
         effluent.P = steam.P / 2.
-        hu, = self.heat_utilities
-        hu(steam.H, effluent.T)
 
 CookedSlurrySurgeTank = tank_factory('CookedSlurrySurgeTank',
     CE=CE2007, cost=MF90 * 173700., S=14.16, tau=0.25, n=0.6, V_wf=0.90, V_max=100., V_units='m3',
@@ -374,7 +372,7 @@ class SimultaneousSaccharificationFermentation(bst.BatchBioreactor):
     
     def __init__(self, ID='', ins=None, outs=(), thermo=None, *, 
                  tau=60.,  N=None, V=None, T=305.15, P=101325., Nmin=2, Nmax=36,
-                 yield_=0.90, V_wf=0.83):
+                 yield_=0.95, V_wf=0.83):
         bst.BatchBioreactor.__init__(self, ID, ins, outs, thermo,
             tau=tau, N=N, V=V, T=T, P=P, Nmin=Nmin, Nmax=Nmax
         )

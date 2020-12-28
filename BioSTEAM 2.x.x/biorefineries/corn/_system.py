@@ -19,11 +19,11 @@ import numpy as np
 warnings.filterwarnings("error", category=np.ComplexWarning)
 
 SLURRY_SOLIDS_CONTENT = 0.311   # g Corn / g Total
-SLURRY_AMMONIA_LOADING = 0.002  # g Ammonia / g Corn
-SLURRY_LIME_LOADING = 0.00012   # g Lime / g Corn
-LIQUEFACTION_ALPHA_AMYLASE_LOADING = 0.0007    # g Enzyme / g Corn
-SACCHARIFICATION_SULFURIC_ACID_LOADING = 0.001 # g Enzyme / g Corn
-SACCHARIFICATION_GLUCO_AMYLASE_LOADING = 0.002 # g H2SO4 / g Corn
+SLURRY_AMMONIA_LOADING = 0.002  # g Ammonia / g dry Corn
+SLURRY_LIME_LOADING = 0.00012   # g Lime / g dry Corn
+LIQUEFACTION_ALPHA_AMYLASE_LOADING = 0.0007    # g Enzyme / g dry Corn
+SACCHARIFICATION_SULFURIC_ACID_LOADING = 0.001 # g Enzyme / g dry Corn
+SACCHARIFICATION_GLUCO_AMYLASE_LOADING = 0.002 # g H2SO4 / g dry Corn
 SCRUBBER_WASH_WATER_OVER_VENT = 1.39 # g Water / g Vent
 
 def create_system(ID='corn_sys'):
@@ -83,13 +83,13 @@ def create_system(ID='corn_sys'):
     ### Process specifications ###
     
     def refresh_feed_specifications():
-        F_mass_corn = corn.F_mass
-        recycled_process_water.F_mass = 0.85 * F_mass_corn * (1. - SLURRY_SOLIDS_CONTENT) / SLURRY_SOLIDS_CONTENT
-        lime.F_mass = F_mass_corn * SLURRY_LIME_LOADING
-        ammonia.F_mass = F_mass_corn * SLURRY_AMMONIA_LOADING
-        alpha_amylase.F_mass = F_mass_corn * LIQUEFACTION_ALPHA_AMYLASE_LOADING
-        sulfuric_acid.F_mass = F_mass_corn * SACCHARIFICATION_SULFURIC_ACID_LOADING
-        gluco_amylase.F_mass = F_mass_corn * SACCHARIFICATION_GLUCO_AMYLASE_LOADING
+        F_mass_dry_corn = 0.85 * corn.F_mass
+        recycled_process_water.F_mass = F_mass_dry_corn * (1. - SLURRY_SOLIDS_CONTENT) / SLURRY_SOLIDS_CONTENT
+        lime.F_mass = F_mass_dry_corn * SLURRY_LIME_LOADING
+        ammonia.F_mass = F_mass_dry_corn * SLURRY_AMMONIA_LOADING
+        alpha_amylase.F_mass = F_mass_dry_corn * LIQUEFACTION_ALPHA_AMYLASE_LOADING
+        sulfuric_acid.F_mass = F_mass_dry_corn * SACCHARIFICATION_SULFURIC_ACID_LOADING
+        gluco_amylase.F_mass = F_mass_dry_corn * SACCHARIFICATION_GLUCO_AMYLASE_LOADING
         MH101._run()
     
     def update_scrubber_wash_water():
@@ -214,10 +214,23 @@ def create_system(ID='corn_sys'):
         (),
         (recycled_process_water,)
     )
-    facilities = u.PlantAir_CIP_WasteWater_Facilities('facilities', corn)
+    other_facilities = u.PlantAir_CIP_WasteWater_Facilities('other_facilities', corn)
     # return f.create_system('corn_sys', feeds=[i for i in f.stream if i.isfeed()],
     #                         hx_convergence='rigorous')
     # breakpoint()
+    
+    def heat_integration():
+        hu_mee = fu.Ev607.heat_utilities[0]
+        hu_dist = fu.T503_T507.heat_utilities[0]
+        actual_duty = hu_mee.duty + hu_dist.duty
+        if actual_duty > 0.:
+            hu_mee(actual_duty, 373.15, 373.15)
+            hu_dist.empty()
+        else:
+            hu_mee.empty()
+            condenser = fu.T503_T507.condenser
+            hu_dist(actual_duty, condenser.ins[0].T, condenser.outs[0].T)
+    
     System = bst.System
     return System('corn_sys',
     [fu.MH101,
@@ -304,5 +317,6 @@ def create_system(ID='corn_sys'):
      fu.MH604,
      fu.MX1,
      fu.V409,
-     fu.P410])
+     fu.P410],
+    facilities=[heat_integration, T608, other_facilities])
                     

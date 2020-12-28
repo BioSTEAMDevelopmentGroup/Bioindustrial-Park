@@ -33,6 +33,7 @@ __all__ = (
 bst.speed_up = tmo.speed_up = flx.speed_up = lambda: None 
 
 feedstocks_by_module = {
+    'corn': 'corn',
     'lipidcane': 'lipidcane',
     'cornstover': 'cornstover',
     'sugarcane': 'sugarcane',
@@ -43,6 +44,7 @@ feedstocks_by_module = {
     'ethanol_adipic': 'feedstock',
 }
 products_by_module = {
+    'corn': 'ethanol',
     'lipidcane': 'ethanol',
     'cornstover': 'ethanol',
     'sugarcane': 'ethanol',
@@ -122,6 +124,27 @@ def print_results(tea):
     print('Cooling duty:', units.get_cooling_duty())
     print('Electricity consumption:', units.get_electricity_consumption())
     print('Electricity production:', units.get_electricity_production())
+    
+def test_corn():
+    bst.process_tools.default_utilities()
+    from biorefineries import corn as module
+    try: module.load()
+    except: pass
+    feedstock = module.corn
+    product = module.ethanol
+    tea = module.corn_tea
+    units = UnitGroup('Biorefinery', tea.units)
+    assert np.allclose(tea.IRR, 0.06009468775560948, rtol=1e-2)
+    assert np.allclose(feedstock.price, 0.13227735731092652, rtol=1e-2)
+    assert np.allclose(product.price, 0.48547915353569393, rtol=1e-2)
+    assert np.allclose(tea.sales, 73825384.45819378, rtol=1e-2)
+    assert np.allclose(tea.material_cost, 55359948.53311168, rtol=1e-2)
+    assert np.allclose(tea.installed_equipment_cost, 72727839.39700232, rtol=1e-2)
+    assert np.allclose(tea.utility_cost, 7930331.742321829, rtol=1e-2)
+    assert np.allclose(units.get_heating_duty(), 114.00442278638879, rtol=1e-2)
+    assert np.allclose(units.get_cooling_duty(), 145.67667702559, rtol=1e-2)
+    assert np.allclose(units.get_electricity_consumption(), 2.416729889525678, rtol=1e-2)
+    assert np.allclose(units.get_electricity_production(), 0.0, rtol=1e-2)
     
 def test_lipidcane():
     bst.process_tools.default_utilities()
