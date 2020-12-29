@@ -9,6 +9,7 @@ Examples
 >>> from biorefineries.corn.abm import ABM_TEA_model
 >>> corn_price = [0.0847, 0.09] # Corn price [USD/kg]
 >>> DDGS_price = [0.05159, 0.0968] # DDGS price [USD/kg]
+>>> corn_oil_price = [0.5, 0.6] # Corn oil price [USD/kg]
 >>> ethanol_price = [0.485, 0.5] # Ethanol price [USD/kg]
 >>> operating_days = [330., 330.] # Operating days [day/yr]
 >>> IRR = [0.1, 0.15] # Internal rate of return
@@ -18,6 +19,7 @@ Examples
 >>> samples = np.array([
 ...     corn_price, 
 ...     DDGS_price,
+...     corn_oil_price,
 ...     ethanol_price,
 ...     operating_days,
 ...     IRR,
@@ -30,8 +32,8 @@ Examples
 >>> table = ABM_TEA_model.table # A pandas data frame
 >>> MESP_index = ABM_TEA_model.metrics[0].index
 >>> ABM_TEA_model.table[MESP_index] 
-0   0.526
-1   0.505
+0   0.385
+1   0.386
 Name: (Biorefinery, MESP [USD/kr]), dtype: float64
 >>> parameters = ABM_TEA_model.get_parameters()
 >>> cornstover_price_index = parameters[0].index
@@ -51,8 +53,9 @@ __all__ = ('ABM_TEA_model',)
 def ABM_TEA_function(
         operating_days=330,
         plant_capacity=876072883.4242561, 
-        price_corn=0.08476585075177462, 
-        price_DDGS=0.09687821462905594, 
+        price_corn=0.13227735731092652, 
+        price_DDGS=0.12026, 
+        price_corn_oil=0.56,
         price_ethanol=0.48547915353569393,
         IRR=0.15,
         duration=(2007, 2027),
@@ -88,6 +91,7 @@ def ABM_TEA_function(
     """
     cn.corn.price = price_corn
     cn.DDGS.price = price_DDGS
+    cn.crude_oil.price = price_corn_oil
     cn.ethanol.price = price_ethanol
     hours = operating_days * 24 
     cn.corn.F_mass = plant_capacity / hours
@@ -106,7 +110,7 @@ def ABM_TEA_function(
         'FOC': cn.corn_tea.FOC,
         'Electricity consumption [MWhr/yr]': hours * unit_group.get_electricity_consumption(), 
         'Electricity production [MWhr/yr]': hours * unit_group.get_electricity_production(),
-        'Production': cn.ethanol.F_mass * operating_days * 24.,
+        'Production': hours * cn.ethanol.F_mass,
     }
 
 # %% ABM Model object
@@ -133,6 +137,10 @@ def set_corn_price(price):
 @ABM_TEA_model.parameter(element='DDGS', units='USD/kg')
 def set_DDGS_price(price):
     cn.DDGS.price = price
+    
+@ABM_TEA_model.parameter(element='Corn oil', units='USD/kg')
+def set_corn_oil_price(price):
+    cn.crude_oil.price = price
 
 @ABM_TEA_model.parameter(element='Ethanol', units='USD/kg')
 def set_ethanol_price(price):
