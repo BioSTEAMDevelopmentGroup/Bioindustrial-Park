@@ -112,17 +112,20 @@ def create_system(ID='corn_sys'):
     V303 = u.AmmoniaTank('V303', ammonia)
     P304 = bst.Pump('P304', V303-0)
     V305 = u.LimeHopper('V305', lime)
-    V307 = u.SlurryMixTank('V307', (V107-0, P302-0, P304-0, V305-0, recycled_process_water))
-    P308 = bst.Pump('P308', V307-0)
-    HX101 = bst.HXutility('HX101', P308-0, U=1.5, T=87 + 273.15, ft=1.0)
-    V310 = u.Liquefaction('V310', (HX101-0, backwater))
-    P311 = bst.Pump('P311', V310-0)
-    E312 = bst.HXprocess('E312', (P311-0, None), U=0.56783, ft=1.0, T_lim0=370.)
+    V307 = u.SlurryMixTank('V307', (V107-0, P302-0, P304-0, V305-0, recycled_process_water, backwater))
+    
+    P311 = bst.Pump('P311', V307-0, P=1e6)
+    E312 = bst.HXprocess('E312', (P311-0, None), U=0.56783, ft=1.0, T_lim0=410.)
     E313 = u.JetCooker('E313', (E312-0, steam))
     V314 = u.CookedSlurrySurgeTank('V314', E313-0)
-    V314-0-1-E312
+    P308 = bst.Pump('P308', V314-0)
+    P308-0-1-E312
     # E315 = bst.HXutility('E315', E312-1, U=0.9937, ft=1.0, T= + 273.15)
-    E316 = bst.HXprocess('E316', (E312-1, None), U=0.85174, ft=1.0, dT=12)
+    
+    HX101 = bst.HXutility('HX101', E312-1, U=1.5, T=87 + 273.15, ft=1.0)
+    V310 = u.Liquefaction('V310', HX101-0)
+    E316 = bst.HXprocess('E316', (V310-0, None), U=0.85174, ft=1.0, dT=12)
+    
     V317 = u.GlucoAmylaseTank('V317', gluco_amylase)
     P318 = bst.Pump('P318', V317-0)
     V319 = u.SulfuricAcidTank('V319', sulfuric_acid)
@@ -215,9 +218,6 @@ def create_system(ID='corn_sys'):
         (recycled_process_water,)
     )
     other_facilities = u.PlantAir_CIP_WasteWater_Facilities('other_facilities', corn)
-    # return f.create_system('corn_sys', feeds=[i for i in f.stream if i.isfeed()],
-    #                         hx_convergence='rigorous')
-    # breakpoint()
     
     def heat_integration():
         hu_mee = fu.Ev607.heat_utilities[0]
@@ -231,92 +231,95 @@ def create_system(ID='corn_sys'):
             condenser = fu.T503_T507.condenser
             hu_dist(actual_duty, condenser.ins[0].T, condenser.outs[0].T)
     
+    # return f.create_system('corn_sys', feeds=[i for i in f.stream if i.isfeed()],
+    #                         hx_convergence='rigorous')
+    # breakpoint()
+    
     System = bst.System
     return System('corn_sys',
-    [fu.MH101,
-     fu.V102,
-     fu.MH103,
-     fu.M104,
-     fu.V105,
-     fu.W106,
-     fu.V107,
-     fu.V303,
-     fu.P304,
-     fu.V305,
-     fu.V301,
-     fu.P302,
-     fu.V307,
-     fu.P308,
-     fu.HX101,
-     fu.V317,
-     fu.P318,
-     fu.V319,
-     fu.P320,
-     fu.V403,
-     fu.P404,
-     System('SYS1',
-        [fu.V310,
-         fu.P311,
-         System('SYS2',
-            [fu.E312,
-             fu.E313,
-             fu.V314],
-            recycle=fu.V314-0),
-         # fu.E315,
-         System('SYS3',
-            [fu.E316,
-             fu.V321,
-             fu.P322,
-             System('SYS4',
-                [fu.E401,
-                 fu.E402,
-                 fu.V405,
-                 fu.P406],
-                recycle=fu.P406-0),
-             fu.P407],
-            recycle=fu.P407-0),
-         fu.V412,
-         System('SYS5',
-            [fu.E413,
-             fu.MX2,
-             fu.P411,
-             fu.P301,
-             fu.T501,
-             fu.P502],
-            recycle=fu.P502-0),
-         fu.V601,
-         fu.P602,
-         fu.C603,
-         fu.S1],
-        recycle=fu.S1-0),
-     fu.E408,
-     fu.E408_2,
-     System('SYS6',
-        [fu.MX3,
-         fu.T503_T507,
-         fu.HX500,
-         fu.X504],
-        recycle=fu.X504-0),
-     fu.HX501,
-     fu.V511,
-     fu.P512,
-     fu.V509,
-     fu.P510,
-     fu.MX4,
-     fu.V513,
-     fu.V605,
-     fu.P606,
-     fu.Ev607,
-     fu.C603_2,
-     fu.MX6,
-     fu.D610,
-     fu.X611,
-     fu.MH612,
-     fu.P508,
-     fu.MX5,
-     fu.MH604,
-     fu.MX1,
-     fu.V409,
-     fu.P410],
-    facilities=[heat_integration, T608, other_facilities])
+        [fu.MH101,
+         fu.V102,
+         fu.MH103,
+         fu.M104,
+         fu.V105,
+         fu.W106,
+         fu.V107,
+         fu.V303,
+         fu.P304,
+         fu.V305,
+         fu.V301,
+         fu.P302,
+         fu.V317,
+         fu.P318,
+         fu.V319,
+         fu.P320,
+         fu.V403,
+         fu.P404,
+         System('SYS1',
+            [fu.V307,
+             fu.P311,
+             System('SYS2',
+                [fu.E312,
+                 fu.E313,
+                 fu.V314,
+                 fu.P308],
+                recycle=fu.P308-0),
+             fu.HX101,
+             fu.V310,
+             System('SYS3',
+                [fu.E316,
+                 fu.V321,
+                 fu.P322,
+                 System('SYS4',
+                    [fu.E401,
+                     fu.E402,
+                     fu.V405,
+                     fu.P406],
+                    recycle=fu.P406-0),
+                 fu.P407],
+                recycle=fu.P407-0),
+             fu.V412,
+             System('SYS5',
+                [fu.E413,
+                 fu.MX2,
+                 fu.P411,
+                 fu.P301,
+                 fu.T501,
+                 fu.P502],
+                recycle=fu.P502-0),
+             fu.V601,
+             fu.P602,
+             fu.C603,
+             fu.S1],
+            recycle=fu.S1-0),
+         fu.E408,
+         fu.E408_2,
+         System('SYS6',
+            [fu.MX3,
+             fu.T503_T507,
+             fu.HX500,
+             fu.X504],
+            recycle=fu.X504-0),
+         fu.HX501,
+         fu.V511,
+         fu.P512,
+         fu.V509,
+         fu.P510,
+         fu.MX4,
+         fu.V513,
+         fu.V605,
+         fu.P606,
+         fu.Ev607,
+         fu.C603_2,
+         fu.MX6,
+         fu.D610,
+         fu.MH612,
+         fu.X611,
+         fu.P508,
+         fu.MX5,
+         fu.MH604,
+         fu.MX1,
+         fu.V409,
+         fu.P410],
+        facilities=[heat_integration, fu.T608, other_facilities])
                     

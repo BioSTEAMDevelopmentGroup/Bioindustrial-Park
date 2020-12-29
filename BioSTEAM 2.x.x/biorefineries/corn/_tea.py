@@ -18,8 +18,8 @@ def create_tea(system, cls=ConventionalEthanolTEA):
                duration=(2018, 2038),
                depreciation='MACRS7', income_tax=0.35,
                operating_days=330, lang_factor=4,
-               construction_schedule=(1.0,), WC_over_FCI=0.05,
-               labor_cost=6e5, fringe_benefits=0.4,
+               construction_schedule=(0.4, 0.6), WC_over_FCI=0.05,
+               labor_cost=2.3e6, fringe_benefits=0.4,
                property_tax=0.001, property_insurance=0.005,
                supplies=0.20, maintenance=0.01, administration=0.005)
 
