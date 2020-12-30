@@ -89,6 +89,9 @@ juicing_sys = sc.create_juicing_system(feedstock='feedstock',
                                        sugar_solution_ID='sugar_solution')
 feedstock = s.feedstock
 
+# For diluting concentrated, inhibitor-reduced hydrolysate
+dilution_water = Stream('dilution_water')
+
 # =============================================================================
 # Concentration
 # =============================================================================
@@ -111,7 +114,9 @@ F301_P = units.HPPump('F301_P', ins=F301-1)
 
 M304_H_P = units.HPPump('M304_H_P', ins=F301-0)
 
-M304_H = bst.units.HXutility('M304_H', ins=M304_H_P-0, T=30+273.15)
+M304 = bst.units.Mixer('M304', ins=(M304_H_P-0, dilution_water))
+
+M304_H = bst.units.HXutility('M304_H', ins=M304-0, T=30+273.15)
 
 
 
@@ -622,16 +627,8 @@ HP_sys._TEA = HP_tea
 # Simulate system and get results
 # =============================================================================
 
-System.converge_method = 'fixed-point' # aitken isn't stable
-System.maxiter = 1500
-System.molar_tolerance = 0.1
-
-# def get_HP_MPSP():
-#     HP_sys.simulate()
-    
-#     for i in range(3):
-#         HP.price = HP_tea.solve_price(HP, HP_no_BT_tea)
-#     return HP.price
+System.maxiter = 50
+System.molar_tolerance = 0.5
 
 num_sims = 1
 num_solve_tea = 3
@@ -644,6 +641,51 @@ def get_AA_MPSP():
 
 get_AA_MPSP()
 
+# R301 = F('R301') # Fermentor
+# yearly_production = 125000 # ton/yr
+spec = ProcessSpecification(
+    evaporator = F301,
+    pump = M304_H_P,
+    mixer = M304,
+    heat_exchanger = M304_H,
+    reactor= R302,
+    reaction_name='fermentation_reaction',
+    substrates=('Xylose', 'Glucose'),
+    products=('HP','CalciumLactate'),
+    spec_1=100,
+    spec_2=0.909,
+    spec_3=18.5,
+    xylose_utilization_fraction = 0.80,
+    feedstock = feedstock,
+    dehydration_reactor = R401,
+    byproduct_streams = [Acetoin, IBA],
+    feedstock_mass = feedstock.F_mass,
+    pretreatment_reactor = None)
+
+path = (F301, R302)
+@np.vectorize
+def calculate_titer(V):
+    F301.V = V
+    for i in path: i._run()
+    return spec._calculate_titer()
+
+@np.vectorize   
+def calculate_MPSP(V):
+    F301.V = V
+    HP_sys.simulate()
+    MPSP = AA.price = HP_tea.solve_price(AA, HP_no_BT_tea)
+    return MPSP
+
+fermentation_broth = R302.outs[0]
+
+get_titer = lambda: ((fermentation_broth.imass['HP'] + fermentation_broth.imol['CalciumLactate']*2*HP_chemicals.HP.MW)/fermentation_broth.F_vol)
+
+
+def set_titer(titer):
+    curr_titer = get_titer()
+    M304.water_multiplier *= curr_titer/titer
+    get_AA_MPSP()
+    
 # Unit groups
 
 
