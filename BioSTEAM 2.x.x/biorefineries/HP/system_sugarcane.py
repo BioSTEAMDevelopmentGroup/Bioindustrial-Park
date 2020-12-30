@@ -129,7 +129,11 @@ R302 = units.CoFermentation('R302',
 # Mix waste liquids for treatment
 S301 = bst.units.FakeSplitter('S301', ins=F301_P-0, outs=('', s.imbibition_water, s.rvf_wash_water))
 def remove_recycled_water():
-    S301.outs[0].mol = F301_P.outs[0].mol - s.imbibition_water.mol - s.rvf_wash_water.mol
+    recycled_water = F301_P.outs[0].mol - s.imbibition_water.mol - s.rvf_wash_water.mol
+    if (recycled_water > 0).all():
+        S301.outs[0].mol = recycled_water
+    else:
+        S301.outs[0].mol[:] = 0.
 S301.specification = remove_recycled_water
 
 # %% 
@@ -571,8 +575,8 @@ HXN = bst.facilities.HeatExchangerNetwork('HXN')
 #!!! Yalin strongly recommends reviewing the system path or manually set up the system
 # for lactic acid, the automatically created system has bugs
 HP_sys = bst.main_flowsheet.create_system(
-    'HP_sys', feeds=[i for i in bst.main_flowsheet.stream
-                            if i.sink and not i.source])
+    'HP_sys', feeds=[i for i in bst.main_flowsheet.stream if i.sink and not i.source],
+    ends=[s.imbibition_water, s.rvf_wash_water])
 HP_sys.simulate()
 for i in HXN.original_heat_utils:
     i.heat_exchanger.rigorous = True
