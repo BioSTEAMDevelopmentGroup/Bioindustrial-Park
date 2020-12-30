@@ -17,7 +17,7 @@ All units are explicitly defined here for transparency and easy reference
 """
 import thermosteam as tmo
 import biosteam as bst
-from HP.chemicals_data import chems
+from biorefineries.HP.chemicals_data import chems
 
 bst.CE = 541.7 # year 2016
 _kg_per_ton = 907.18474

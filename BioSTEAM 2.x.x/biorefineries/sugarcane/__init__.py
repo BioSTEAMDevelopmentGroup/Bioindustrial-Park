@@ -66,15 +66,12 @@ if PY37:
             _load_chemicals()
             if name == 'chemicals': return chemicals
         if not _system_loaded: 
-            try:
-                _load_system()
-            except Exception as Error:
-                dct = globals()
-                dct.update(flowsheet.system.__dict__)
-                dct.update(flowsheet.stream.__dict__)
-                dct.update(flowsheet.unit.__dict__)
-                if name in dct: return dct[name]
-                raise Error
+            _load_system()
+            dct = globals()
+            dct.update(flowsheet.system.__dict__)
+            dct.update(flowsheet.stream.__dict__)
+            dct.update(flowsheet.unit.__dict__)
+            if name in dct: return dct[name]
         raise AttributeError(f"module '{__name__}' has no attribute '{name}'")
 else: 
     load()

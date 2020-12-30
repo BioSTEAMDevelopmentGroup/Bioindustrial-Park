@@ -9,7 +9,7 @@
 """
 import biosteam as bst
 from biorefineries import corn as cn
-from biorefineries.sugarcane import create_ethanol_separation_units
+from biorefineries.sugarcane import create_ethanol_purification_system
 from ._process_settings import price
 
 __all__ = ('create_system',)
@@ -19,11 +19,11 @@ import numpy as np
 warnings.filterwarnings("error", category=np.ComplexWarning)
 
 SLURRY_SOLIDS_CONTENT = 0.311   # g Corn / g Total
-SLURRY_AMMONIA_LOADING = 0.002  # g Ammonia / g Corn
-SLURRY_LIME_LOADING = 0.00012   # g Lime / g Corn
-LIQUEFACTION_ALPHA_AMYLASE_LOADING = 0.0007    # g Enzyme / g Corn
-SACCHARIFICATION_SULFURIC_ACID_LOADING = 0.001 # g Enzyme / g Corn
-SACCHARIFICATION_GLUCO_AMYLASE_LOADING = 0.002 # g H2SO4 / g Corn
+SLURRY_AMMONIA_LOADING = 0.002  # g Ammonia / g dry Corn
+SLURRY_LIME_LOADING = 0.00012   # g Lime / g dry Corn
+LIQUEFACTION_ALPHA_AMYLASE_LOADING = 0.0007    # g Enzyme / g dry Corn
+SACCHARIFICATION_SULFURIC_ACID_LOADING = 0.001 # g Enzyme / g dry Corn
+SACCHARIFICATION_GLUCO_AMYLASE_LOADING = 0.002 # g H2SO4 / g dry Corn
 SCRUBBER_WASH_WATER_OVER_VENT = 1.39 # g Water / g Vent
 
 def create_system(ID='corn_sys'):
@@ -32,9 +32,9 @@ def create_system(ID='corn_sys'):
     chemicals = bst.settings.get_chemicals()
     
     z_mass_corn = chemicals.kwarray(
-        dict(Starch=0.595,
+        dict(Starch=0.612,
              Water=0.15,
-             Fiber=0.1237,
+             Fiber=0.1067,
              SolubleProtein=0.034,
              InsolubleProtein=0.0493,
              Oil=0.034,
@@ -45,6 +45,7 @@ def create_system(ID='corn_sys'):
     mass_corn = F_mass_corn * z_mass_corn
 
     corn = bst.Stream('corn', flow=mass_corn, price=price['Corn'], units='kg/hr')
+    crude_oil = bst.Stream('crude_oil', price=price['Crude oil'], units='kg/hr')
     ammonia = bst.Stream('ammonia', NH3=89.723, price=price['Ammonia'], units='kg/hr')
     lime = bst.Stream('lime', CaO=53.609, price=price['Lime'], units='kg/hr') 
     alpha_amylase = bst.Stream('alpha_amylase',
@@ -82,13 +83,13 @@ def create_system(ID='corn_sys'):
     ### Process specifications ###
     
     def refresh_feed_specifications():
-        F_mass_corn = corn.F_mass
-        recycled_process_water.F_mass = 0.85 * F_mass_corn * (1. - SLURRY_SOLIDS_CONTENT) / SLURRY_SOLIDS_CONTENT
-        lime.F_mass = F_mass_corn * SLURRY_LIME_LOADING
-        ammonia.F_mass = F_mass_corn * SLURRY_AMMONIA_LOADING
-        alpha_amylase.F_mass = F_mass_corn * LIQUEFACTION_ALPHA_AMYLASE_LOADING
-        sulfuric_acid.F_mass = F_mass_corn * SACCHARIFICATION_SULFURIC_ACID_LOADING
-        gluco_amylase.F_mass = F_mass_corn * SACCHARIFICATION_GLUCO_AMYLASE_LOADING
+        F_mass_dry_corn = 0.85 * corn.F_mass
+        recycled_process_water.F_mass = F_mass_dry_corn * (1. - SLURRY_SOLIDS_CONTENT) / SLURRY_SOLIDS_CONTENT
+        lime.F_mass = F_mass_dry_corn * SLURRY_LIME_LOADING
+        ammonia.F_mass = F_mass_dry_corn * SLURRY_AMMONIA_LOADING
+        alpha_amylase.F_mass = F_mass_dry_corn * LIQUEFACTION_ALPHA_AMYLASE_LOADING
+        sulfuric_acid.F_mass = F_mass_dry_corn * SACCHARIFICATION_SULFURIC_ACID_LOADING
+        gluco_amylase.F_mass = F_mass_dry_corn * SACCHARIFICATION_GLUCO_AMYLASE_LOADING
         MH101._run()
     
     def update_scrubber_wash_water():
@@ -111,17 +112,20 @@ def create_system(ID='corn_sys'):
     V303 = u.AmmoniaTank('V303', ammonia)
     P304 = bst.Pump('P304', V303-0)
     V305 = u.LimeHopper('V305', lime)
-    V307 = u.SlurryMixTank('V307', (V107-0, P302-0, P304-0, V305-0, recycled_process_water))
-    P308 = bst.Pump('P308', V307-0)
-    HX101 = bst.HXutility('HX101', P308-0, U=1.5, T=87 + 273.15, ft=1.0)
-    V310 = u.Liquefaction('V310', (HX101-0, backwater))
-    P311 = bst.Pump('P311', V310-0)
-    E312 = bst.HXprocess('E312', (P311-0, None), U=0.56783, ft=1.0, T_lim0=370.)
+    V307 = u.SlurryMixTank('V307', (V107-0, P302-0, P304-0, V305-0, recycled_process_water, backwater))
+    
+    P311 = bst.Pump('P311', V307-0, P=1e6)
+    E312 = bst.HXprocess('E312', (P311-0, None), U=0.56783, ft=1.0, T_lim0=410.)
     E313 = u.JetCooker('E313', (E312-0, steam))
     V314 = u.CookedSlurrySurgeTank('V314', E313-0)
-    V314-0-1-E312
-    E315 = bst.HXutility('E315', E312-1, U=0.9937, ft=1.0, T=97.8 + 273.15)
-    E316 = bst.HXprocess('E316', (E315-0, None), U=0.85174, ft=1.0, dT=12)
+    P308 = bst.Pump('P308', V314-0)
+    P308-0-1-E312
+    # E315 = bst.HXutility('E315', E312-1, U=0.9937, ft=1.0, T= + 273.15)
+    
+    HX101 = bst.HXutility('HX101', E312-1, U=1.5, T=87 + 273.15, ft=1.0)
+    V310 = u.Liquefaction('V310', HX101-0)
+    E316 = bst.HXprocess('E316', (V310-0, None), U=0.85174, ft=1.0, dT=12)
+    
     V317 = u.GlucoAmylaseTank('V317', gluco_amylase)
     P318 = bst.Pump('P318', V317-0)
     V319 = u.SulfuricAcidTank('V319', sulfuric_acid)
@@ -150,10 +154,11 @@ def create_system(ID='corn_sys'):
     MX2 = bst.Mixer('MX2', (E408_2-1, E413-0))
     P411 = bst.Pump('P411', MX2-0)
     
-    create_ethanol_separation_units(
+    ethanol_purification_sys = create_ethanol_purification_system(
         degassed_beer=P411-0,
         ethanol_product=ethanol,
         denaturant=denaturant,
+        beer_column_heat_integration=False,
         IDs={
             'Beer column': 'T501',
             'Beer column bottoms product pump': 'P502',
@@ -181,7 +186,7 @@ def create_system(ID='corn_sys'):
             Water=0.8285,
             Ethanol=0.8285,
             Yeast=0.2734,
-            Lipid=0.331,
+            Lipid=0.5, # 0.331 originally
             H2SO4=0.8285,
             Starch=0.08,
             Fiber=0.5328,
@@ -197,9 +202,10 @@ def create_system(ID='corn_sys'):
         P=(101325, 73581, 50892, 32777),
         V=0.90
     ) 
-    Ev607.components['condenser'].U = 1.85
+    C603_2 = bst.LiquidsSplitCentrifuge('C603_2', Ev607-0, (crude_oil, ''), split={'Oil':0.99})
+    
     MX5 = bst.Mixer('MX5', (Ev607-1, P410-0, fu.P508-0))
-    MX6 = bst.Mixer('MX6', (Ev607-0, MH604-0))
+    MX6 = bst.Mixer('MX6', (C603_2-1, MH604-0))
     D610 = u.DDGSDryer('D610', (MX6-0, 'dryer_air', 'natural_gas'), moisture_content=0.10, split=dict(Ethanol=1.0))
     X611 = u.ThermalOxidizer('X611', (D610-1, 'oxidizer_air'))
     MH612 = u.DDGSHandling('MH612', D610-0, DDGS)
@@ -211,95 +217,109 @@ def create_system(ID='corn_sys'):
         (),
         (recycled_process_water,)
     )
+    other_facilities = u.PlantAir_CIP_WasteWater_Facilities('other_facilities', corn)
     
-    facilities = u.PlantAir_CIP_WasteWater_Facilities('facilities', corn)
-    # feeds = [i for i in f.stream if i.isfeed()]
-    # return f.create_system('corn_sys', feeds=feeds, ends=[S1-0],
+    def heat_integration():
+        hu_mee = fu.Ev607.heat_utilities[0]
+        hu_dist = fu.T503_T507.heat_utilities[0]
+        actual_duty = hu_mee.duty + hu_dist.duty
+        if actual_duty > 0.:
+            hu_mee(actual_duty, 373.15, 373.15)
+            hu_dist.empty()
+        else:
+            hu_mee.empty()
+            condenser = fu.T503_T507.condenser
+            hu_dist(actual_duty, condenser.ins[0].T, condenser.outs[0].T)
+    
+    # return f.create_system('corn_sys', feeds=[i for i in f.stream if i.isfeed()],
     #                         hx_convergence='rigorous')
+    # breakpoint()
+    
     System = bst.System
     return System('corn_sys',
-        [MH101,
-         V102,
-         MH103,
-         M104,
-         V105,
-         W106,
-         V107,
-         V303,
-         P304,
-         V305,
-         V301,
-         P302,
-         V307,
-         P308,
-         HX101,
-         System('SYS6', 
-            [V310,
-             P311,
-             System('SYS1',
-                [E312,
-                 E313,
-                 V314],
-                recycle=V314-0),
-             E315,
+        [fu.MH101,
+         fu.V102,
+         fu.MH103,
+         fu.M104,
+         fu.V105,
+         fu.W106,
+         fu.V107,
+         fu.V303,
+         fu.P304,
+         fu.V305,
+         fu.V301,
+         fu.P302,
+         fu.V317,
+         fu.P318,
+         fu.V319,
+         fu.P320,
+         fu.V403,
+         fu.P404,
+         System('SYS1',
+            [fu.V307,
+             fu.P311,
+             System('SYS2',
+                [fu.E312,
+                 fu.E313,
+                 fu.V314,
+                 fu.P308],
+                recycle=fu.P308-0),
+             fu.HX101,
+             fu.V310,
              System('SYS3',
-                [E316,
-                 V317,
-                 P318,
-                 V319,
-                 P320,
-                 V321,
-                 P322,
-                 System('SYS2',
-                    [E401,
-                     E402,
-                     V403,
-                     P404,
-                     V405,
-                     P406],
-                    recycle=P406-0),
-                 P407],
-                recycle=P407-0),
-             V412,
-             E408,
-             E408_2,
-             System('SYS4',
-                [E413,
-                 MX2,
-                 P411,
+                [fu.E316,
+                 fu.V321,
+                 fu.P322,
+                 System('SYS4',
+                    [fu.E401,
+                     fu.E402,
+                     fu.V405,
+                     fu.P406],
+                    recycle=fu.P406-0),
+                 fu.P407],
+                recycle=fu.P407-0),
+             fu.V412,
+             System('SYS5',
+                [fu.E413,
+                 fu.MX2,
+                 fu.P411,
+                 fu.P301,
                  fu.T501,
                  fu.P502],
                 recycle=fu.P502-0),
-             System('SYS5',
-                [fu.MX3,
-                 fu.T503_T507,
-                 fu.HX500,
-                 fu.X504],
-                recycle=fu.X504-0),
-             fu.HX501,
-             fu.V511,
-             fu.P512,
-             fu.V509,
-             fu.P510,
-             fu.MX4,
-             fu.V513,
-             V601,
-             P602,
-             C603,
-             S1],
-             recycle=S1-0),
-         V605,
-         P606,
-         Ev607,
-         MX6,
-         D610,
-         X611,
-         MH612,
-         MH604,
+             fu.V601,
+             fu.P602,
+             fu.C603,
+             fu.S1],
+            recycle=fu.S1-0),
+         fu.E408,
+         fu.E408_2,
+         System('SYS6',
+            [fu.MX3,
+             fu.T503_T507,
+             fu.HX500,
+             fu.X504],
+            recycle=fu.X504-0),
+         fu.HX501,
+         fu.V511,
+         fu.P512,
+         fu.V509,
+         fu.P510,
+         fu.MX4,
+         fu.V513,
+         fu.V605,
+         fu.P606,
+         fu.Ev607,
+         fu.C603_2,
+         fu.MX6,
+         fu.D610,
+         fu.MH612,
+         fu.X611,
          fu.P508,
-         MX5,
-         MX1,
-         V409,
-         P410],
-        facilities=[T608, facilities])
+         fu.MX5,
+         fu.MH604,
+         fu.MX1,
+         fu.V409,
+         fu.P410],
+        facilities=[heat_integration, fu.T608, other_facilities])
                     

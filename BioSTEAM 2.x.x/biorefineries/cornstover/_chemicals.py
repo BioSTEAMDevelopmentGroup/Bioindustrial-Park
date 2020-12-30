@@ -123,7 +123,7 @@ def create_chemicals():
     # As is in data bank
     chems.extend(
         tmo.Chemicals(['Water', 'Ethanol', 'AceticAcid',
-                       'Furfural', 'Glycerol', 'H2SO4',
+                       'Furfural', 'Glycerol', 'H2SO4', 'NH3', 
                        'LacticAcid', 'SuccinicAcid', lc.chemicals.P4O10])
     )
     chems.H2SO4.at_state('l')
@@ -137,7 +137,7 @@ def create_chemicals():
     append_single_phase_chemical('HMF')
     
     # Will remain in the vapor phase
-    extend_single_phase_chemicals(['N2', 'NH3', 'O2', 'CH4', 'H2S', 'SO2'])
+    extend_single_phase_chemicals(['N2', 'O2', 'CH4', 'H2S', 'SO2'])
     append_single_phase_chemical('CO2')
     
     # Analagous vapors

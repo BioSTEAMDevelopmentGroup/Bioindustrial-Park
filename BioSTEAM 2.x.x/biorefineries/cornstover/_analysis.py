@@ -7,17 +7,21 @@
 # for license details.
 """
 """
+from biosteam import speed_up
+from biorefineries import cornstover
+cornstover._include_blowdown_recycle = False # For speed
 from biorefineries.cornstover.model import cornstover_model as model_cs
 # from sklearn.model_selection import KFold, cross_validate
 
-N_samples = 5000
+speed_up()
+N_samples = 600
 rule = 'L'
 samples = model_cs.sample(N_samples, rule)
 model_cs.load_samples(samples)
 model_cs.evaluate()
 model_cs.table.to_excel('Monte Carlo cornstover.xlsx')
-spearman = model_cs.spearman(metrics=(model_cs.metrics[0],))
-spearman.to_excel("Spearman correlation cornstover.xlsx")
+# spearman = model_cs.spearman(metrics=(model_cs.metrics[0],))
+# spearman.to_excel("Spearman correlation cornstover.xlsx")
 
 # %%
 # parameters = model_cs.get_parameters()
@@ -31,8 +35,7 @@ spearman.to_excel("Spearman correlation cornstover.xlsx")
 # indices = [('Stream-cellulase', 'Price [USD/kg]'),
 #            ('Stream-cornstover', 'Price [USD/kg]'),
 #            ('Stream-cornstover', 'Flow rate [kg/hr]'),
-#            ('Saccharification and co fermentation-R301', 'Saccharification conversion'),
-# ]
+#            ('Saccharification and co fermentation-R301', 'Saccharification conversion')]
 
 # N_samples = 1000
 # rule = 'L'

@@ -23,6 +23,7 @@ All units are explicitly defined here for transparency and easy reference
 # =============================================================================
 
 import thermosteam as tmo
+import biorefineries.sugarcane as sc
 from thermosteam import functional as fn
 
 __all__ = ('HP_chemicals', 'chemical_groups', 'soluble_organics', 'combustibles')
@@ -154,10 +155,10 @@ Glucose = chemical_database('Glucose', phase = 'l')
 # HP.Tb = LA.Tb
 
 # MEK = chemical_database('MEK')
-TOA = chemical_database('tri-n-octylamine') 
+TOA = chemical_database('TOA', search_ID='tri-n-octylamine') 
 # AQ336 = chemical_database('N-Methyl-N,N,N-trioctylammonium chloride') 
 IBA = chemical_database('Isobutyraldehyde')
-DPHP = chemical_database('Dipotassium hydrogen phosphate', phase = 'l')
+DPHP = chemical_database('DPHP', search_ID='Dipotassium hydrogen phosphate', phase = 'l')
 
 # This one is more consistent with others
 # try: Glucose.Cn.l.move_up_model_priority('Dadgostar and Shaw (2011)', 0)
@@ -207,7 +208,7 @@ WWTsludge = chemical_defined('WWTsludge', phase='s',
 Furfural = chemical_database('Furfural')
 
 
-Acetoin = chemical_database('3-Hydroxybutanone', phase = None, Hvap = 44.56*1000) # , V = 89.5e-6
+Acetoin = chemical_database('Acetoin', search_ID='3-Hydroxybutanone', phase = None, Hvap = 44.56*1000) # , V = 89.5e-6
 Acetoin.copy_models_from(Furfural, ['Psat', 'Cn', 'mu', 'kappa', 'V'])
 Acetoin.Tb = 145.4 + 273.15
 
@@ -235,7 +236,7 @@ LacticAcid = chemical_database('LacticAcid')
 LacticAcid.Hfus = 11.34e3
 
 
-HP = chemical_copied('3-Hydroxypropionic acid', LacticAcid)
+HP = chemical_copied('HP', LacticAcid)
 # HP.Tb = 25
 SuccinicAcid = chemical_database('SuccinicAcid', phase_ref='s')
 
@@ -439,21 +440,29 @@ for chemical in chems:
 # Default missing properties of chemicals to those of water,
 for chemical in chems: chemical.default()
 
+defined_chemicals = {
+    'Cellulose', 'Lime', '3-Hydroxybutanone', '3-Hydroxypropionic acid'
+    'AA', 'tri-n-octylamine', 'Dipotassium hydrogen phosphate',
+    'Water', 'SulfuricAcid', 'Ammonia', 'NH4SO4', 'Octane',
+    'CarbonDioxide', 'CO', 'NO', 'Gypsum', 'PhosphorusPentoxide',
+    'SodiumSulfate', 'NH4OH', 'IBA', *[i.ID for i in HP_chemicals]
+}
 
+HP_chemicals.extend([i for i in sc.chemicals if i.ID not in defined_chemicals])
 # %%
 
 # Though set_thermo will first compile the Chemicals object,
 # compile beforehand is easier to debug because of the helpful error message
 chems.compile()
 tmo.settings.set_thermo(chems)
+chems.set_synonym('Glucan', 'Cellulose')
 chems.set_synonym('CalciumDihydroxide', 'Lime')
-chems.set_synonym('3-Hydroxybutanone', 'Acetoin')
-chems.set_synonym('3-Hydroxypropionic acid', 'HP')
-# chems.set_synonym('LacticAcid', 'HP')
+chems.set_synonym('Acetoin', '3-Hydroxybutanone')
+chems.set_synonym('HP', '3-Hydroxypropionic acid')
 chems.set_synonym('AcrylicAcid', 'AA')
-chems.set_synonym('tri-n-octylamine', 'TOA')
+chems.set_synonym('TOA', 'tri-n-octylamine')
 # chems.set_synonym('N-Methyl-N,N,N-trioctylammonium chloride', 'AQ336')
-chems.set_synonym('Dipotassium hydrogen phosphate', 'DPHP')
+chems.set_synonym('DPHP', 'Dipotassium hydrogen phosphate')
 chems.set_synonym('H2O', 'Water')
 chems.set_synonym('H2SO4', 'SulfuricAcid')
 chems.set_synonym('NH3', 'Ammonia')

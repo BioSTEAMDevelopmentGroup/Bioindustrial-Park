@@ -13,8 +13,10 @@ from matplotlib.lines import Line2D
 from biosteam.utils import colors
 from biosteam.plots import (plot_scatter_points, plot_horizontal_line,
                            plot_montecarlo, plot_vertical_line)
+import os
 
-data = pd.read_excel('Monte Carlo cornstover.xlsx', header=[0, 1])
+path = os.path.join('results', 'Monte Carlo cornstover.xlsx')
+data = pd.read_excel(path, header=[0, 1])
 
 # %% Plot MESP
 # plt.figure()

@@ -86,7 +86,7 @@ class SulfuricAcidMixer(Unit):
     _N_ins = 2
     _N_outs = 1
     _graphics = Mixer._graphics
-        
+    
     def _run(self):
         acid, water = self.ins
         mixture = self.outs[0]
