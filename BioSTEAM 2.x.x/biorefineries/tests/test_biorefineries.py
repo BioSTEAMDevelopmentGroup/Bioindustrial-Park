@@ -42,6 +42,7 @@ feedstocks_by_module = {
     'animal_bedding': 'bedding',
     'lactic': 'feedstock',
     'ethanol_adipic': 'feedstock',
+    'HP': 'feedstock',
 }
 products_by_module = {
     'corn': 'ethanol',
@@ -53,16 +54,23 @@ products_by_module = {
     'animal_bedding': 'ethanol',
     'lactic': 'lactic_acid',
     'ethanol_adipic': 'ethanol',
+    'HP': 'AcrylicAcid',
 }
 
-def generate_code(module_name, feedstock_name=None, product_name=None):
+marked_slow = {'wheatstraw', 'animal_bedding'}
+
+configurations = {
+    'HP': ('cellulosic', 'sugarcane')
+}
+
+def generate_code(module_name, feedstock_name=None, product_name=None, configuration=None):
     if not feedstock_name:
         feedstock_name = feedstocks_by_module[module_name]
     if not product_name:
         product_name = products_by_module[module_name]
     bst.process_tools.default_utilities()
     module = import_module('biorefineries.' + module_name)
-    try: module.load()
+    try: module.load(configuration)
     except: pass
     feedstock = getattr(module, feedstock_name)
     product = getattr(module, product_name)
@@ -86,10 +94,13 @@ def generate_code(module_name, feedstock_name=None, product_name=None):
     cooling_duty = units.get_cooling_duty()
     electricity_consumption = units.get_electricity_consumption()
     electricity_production = units.get_electricity_production()
-    print(f"""def test_{module_name}():
+    configuration_tag = f"_{configuration}" if configuration else ''
+    print(
+    ("@pytest.mark.slow\n" if module_name in marked_slow else "") +
+    f"""def test_{module_name}{configuration_tag}():
     bst.process_tools.default_utilities()
     from biorefineries import {module_name} as module
-    try: module.load()
+    try: module.load({configuration if configuration else ''})
     except: pass
     feedstock = module.{feedstock_name}
     product = module.{product_name}
@@ -229,7 +240,8 @@ def test_LAOs():
     assert np.allclose(units.get_cooling_duty(), 125.31693495458933, rtol=1e-2)
     assert np.allclose(units.get_electricity_consumption(), 3.596591914799831, rtol=1e-2)
     assert np.allclose(units.get_electricity_production(), 3.5965919147998306, rtol=1e-2)
-    
+
+@pytest.mark.slow
 def test_wheatstraw():
     bst.process_tools.default_utilities()
     from biorefineries import wheatstraw as module
@@ -250,7 +262,8 @@ def test_wheatstraw():
     assert np.allclose(units.get_cooling_duty(), 261.6818186290857, rtol=1e-2)
     assert np.allclose(units.get_electricity_consumption(), 22.954763387282593, rtol=1e-2)
     assert np.allclose(units.get_electricity_production(), 34.09357263357368, rtol=1e-2)
-    
+
+@pytest.mark.slow
 def test_animal_bedding():
     bst.process_tools.default_utilities()
     from biorefineries import animal_bedding as module
@@ -313,7 +326,49 @@ def test_ethanol_adipic():
     assert np.allclose(units.get_cooling_duty(), 247.78343626334382, rtol=1e-2)
     assert np.allclose(units.get_electricity_consumption(), 26.56706595101369, rtol=1e-2)
     assert np.allclose(units.get_electricity_production(), 0.0, rtol=1e-2)
+
+def test_HP_sugarcane():
+    bst.process_tools.default_utilities()
+    from biorefineries import HP as module
+    try: module.load(sugarcane)
+    except: pass
+    feedstock = module.feedstock
+    product = module.AcrylicAcid
+    tea = module.HP_tea
+    units = UnitGroup('Biorefinery', tea.units)
+    assert np.allclose(tea.IRR, 0.1, rtol=1e-2)
+    assert np.allclose(feedstock.price, 0.03455, rtol=1e-2)
+    assert np.allclose(product.price, 1.090489643376373, rtol=1e-2)
+    assert np.allclose(tea.sales, 254704149.45123833, rtol=1e-2)
+    assert np.allclose(tea.material_cost, 140314025.04254422, rtol=1e-2)
+    assert np.allclose(tea.installed_equipment_cost, 350243109.2367097, rtol=1e-2)
+    assert np.allclose(tea.utility_cost, 9896573.834944557, rtol=1e-2)
+    assert np.allclose(units.get_heating_duty(), 677.6578622401962, rtol=1e-2)
+    assert np.allclose(units.get_cooling_duty(), 598.6311212813808, rtol=1e-2)
+    assert np.allclose(units.get_electricity_consumption(), 17.932474151889103, rtol=1e-2)
+    assert np.allclose(units.get_electricity_production(), 0.0, rtol=1e-2)
     
+def test_HP_cellulosic():
+    bst.process_tools.default_utilities()
+    from biorefineries import HP as module
+    try: module.load(cellulosic)
+    except: pass
+    feedstock = module.feedstock
+    product = module.AcrylicAcid
+    tea = module.HP_tea
+    units = UnitGroup('Biorefinery', tea.units)
+    assert np.allclose(tea.IRR, 0.1, rtol=1e-2)
+    assert np.allclose(feedstock.price, 0.0628405632131775, rtol=1e-2)
+    assert np.allclose(product.price, 1.3133785673495766, rtol=1e-2)
+    assert np.allclose(tea.sales, 284131780.2396171, rtol=1e-2)
+    assert np.allclose(tea.material_cost, 162129254.49112293, rtol=1e-2)
+    assert np.allclose(tea.installed_equipment_cost, 376707410.1560533, rtol=1e-2)
+    assert np.allclose(tea.utility_cost, 14130575.482473236, rtol=1e-2)
+    assert np.allclose(units.get_heating_duty(), 538.7576586193621, rtol=1e-2)
+    assert np.allclose(units.get_cooling_duty(), 673.8500627932124, rtol=1e-2)
+    assert np.allclose(units.get_electricity_consumption(), 25.60443480914915, rtol=1e-2)
+    assert np.allclose(units.get_electricity_production(), 0.0, rtol=1e-2)
+
 ### DO NOT DELETE:
 ### Code commented for legacy purposes
 # @pytest.mark.slow
@@ -366,16 +421,16 @@ def test_ethanol_adipic():
 #     assert np.allclose(units.get_electricity_consumption(), 26.565278642577344, rtol=0.001)
 #     assert np.allclose(units.get_electricity_production(), 0.0)
     
-if __name__ == '__main__':
-    test_corn()
-    test_sugarcane()
-    test_lipidcane()
-    test_cornstover()
-    test_wheatstraw()
-    test_LAOs()
-    test_animal_bedding()
-    test_lactic()
-    test_ethanol_adipic()
+# if __name__ == '__main__':
+#     test_corn()
+#     test_sugarcane()
+#     test_lipidcane()
+#     test_cornstover()
+#     test_wheatstraw()
+#     test_LAOs()
+#     test_animal_bedding()
+#     test_lactic()
+#     test_ethanol_adipic()
 
 
 

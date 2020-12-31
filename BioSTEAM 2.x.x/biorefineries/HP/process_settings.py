@@ -19,7 +19,6 @@ import thermosteam as tmo
 import biosteam as bst
 from biorefineries.HP.chemicals_data import chems
 
-bst.CE = 541.7 # year 2016
 _kg_per_ton = 907.18474
 _lb_per_kg = 2.20462
 _liter_per_gallon = 3.78541
@@ -160,30 +159,31 @@ price = {'AA': AA_price,
          'DAP': 0.1645 * _lb_per_kg}
     
 
-
-bst.PowerUtility.price = price['Electricity']
-
-_lps = bst.HeatUtility.get_heating_agent('low_pressure_steam')
-_mps = bst.HeatUtility.get_heating_agent('medium_pressure_steam')
-_hps = bst.HeatUtility.get_heating_agent('high_pressure_steam')
-_mps.T = 233 + 273.15
-_hps.T = 266 + 273.15
-
-_cooling = bst.HeatUtility.get_cooling_agent('cooling_water')
-_chilled = bst.HeatUtility.get_cooling_agent('chilled_water')
-_cooling.regeneration_price = 0
-_cooling.T = 28 + 273.15
-_cooling.T_limit = _cooling.T + 9
-
-# Side steam in CHP not a heat utility, thus will cause problem in TEA utility
-# cost calculation if price not set to 0 here, costs for regeneration of heating
-# and cooling utilities will be considered as CAPEX and OPEX of CHP and CT, respectively
-for i in (_lps, _mps, _hps, _cooling, _chilled):
-    i.heat_transfer_price = i.regeneration_price = 0
-    # if i == _cooling: continue
-    # i.heat_transfer_efficiency = 0.85
+def load_process_settings():
+    bst.CE = 541.7 # year 2016
+    bst.PowerUtility.price = price['Electricity']
     
+    _lps = bst.HeatUtility.get_heating_agent('low_pressure_steam')
+    _mps = bst.HeatUtility.get_heating_agent('medium_pressure_steam')
+    _hps = bst.HeatUtility.get_heating_agent('high_pressure_steam')
+    _mps.T = 233 + 273.15
+    _hps.T = 266 + 273.15
     
+    _cooling = bst.HeatUtility.get_cooling_agent('cooling_water')
+    _chilled = bst.HeatUtility.get_cooling_agent('chilled_water')
+    _cooling.regeneration_price = 0
+    _cooling.T = 28 + 273.15
+    _cooling.T_limit = _cooling.T + 9
+    
+    # Side steam in CHP not a heat utility, thus will cause problem in TEA utility
+    # cost calculation if price not set to 0 here, costs for regeneration of heating
+    # and cooling utilities will be considered as CAPEX and OPEX of CHP and CT, respectively
+    for i in (_lps, _mps, _hps, _cooling, _chilled):
+        i.heat_transfer_price = i.regeneration_price = 0
+        # if i == _cooling: continue
+        # i.heat_transfer_efficiency = 0.85
+    
+load_process_settings()
 
 # %%
 

@@ -220,6 +220,7 @@ def create_system(ID='corn_sys'):
     other_facilities = u.PlantAir_CIP_WasteWater_Facilities('other_facilities', corn)
     
     def heat_integration():
+        other_facilities._run()
         hu_mee = fu.Ev607.heat_utilities[0]
         hu_dist = fu.T503_T507.heat_utilities[0]
         actual_duty = hu_mee.duty + hu_dist.duty
@@ -231,9 +232,10 @@ def create_system(ID='corn_sys'):
             condenser = fu.T503_T507.condenser
             hu_dist(actual_duty, condenser.ins[0].T, condenser.outs[0].T)
     
-    # return f.create_system('corn_sys', feeds=[i for i in f.stream if i.isfeed()],
+    other_facilities.specification = heat_integration
+    
+    # sys = f.create_system('corn_sys', feeds=[i for i in f.stream if i.isfeed()],
     #                         hx_convergence='rigorous')
-    # breakpoint()
     
     System = bst.System
     return System('corn_sys',
@@ -321,5 +323,5 @@ def create_system(ID='corn_sys'):
          fu.MX1,
          fu.V409,
          fu.P410],
-        facilities=[heat_integration, fu.T608, other_facilities])
+        facilities=[fu.T608, other_facilities])
                     
