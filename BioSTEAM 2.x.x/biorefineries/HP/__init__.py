@@ -30,6 +30,14 @@ from .tea import *
 from .units import *
 from .facilities import *
 
+__all__ = [
+    'process_settings', 
+    'chemicals_data', 
+    'tea', 
+    'units', 
+    'facilities',
+]
+
 _system_loaded = False
 _chemicals_loaded = False
 
@@ -86,4 +94,11 @@ if PY37:
             if name in dct: return dct[name]
         raise AttributeError(f"module '{__name__}' has no attribute '{name}'")
 else:
-    load()
+    try:
+        from lazypkg import LazyPkg
+    except:
+        from warnings import warn
+        warn('Python 3.7 or newer is required to lazy load biorefinery; import '
+             'and run the load function to load a biorefinery')
+    else:
+        LazyPkg(__name__, ['system'])
