@@ -51,9 +51,9 @@ def find_TS(stream):
     return TS
 
 def create_system(ID='bedding_sys'):
-    System.maxiter = 400
-    System.converge_method = 'Aitken'
-    System.molar_tolerance = 0.01
+    System.default_maxiter = 400
+    System.default_converge_method = 'Aitken'
+    System.default_molar_tolerance = 0.01
     
     ### Streams  
     chemicals = bst.settings.get_chemicals()

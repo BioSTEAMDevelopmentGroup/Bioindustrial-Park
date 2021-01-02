@@ -892,9 +892,9 @@ BDO_sys._TEA = BDO_tea
 
 # These settings are sufficient to get lactic acid price error below $0.001/kg
 # after three simulations
-System.converge_method = 'fixed-point' # aitken isn't stable
-System.maxiter = 1500
-System.molar_tolerance = 0.1
+System.default_converge_method = 'fixed-point' # aitken isn't stable
+System.default_maxiter = 1500
+System.default_molar_tolerance = 0.1
 
 def get_BDO_MPSP():
     BDO_sys.simulate()
