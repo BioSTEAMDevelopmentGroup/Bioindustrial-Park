@@ -85,8 +85,8 @@ def _load_system():
     }
     unit_groups = UnitGroup.group_by_types(LAOs_tea.units, name_types)
     OSBL_unit_group = UnitGroup('OSBL', OSBL_units)
-    bst.System.molar_tolerance = 0.1
-    bst.System.converge_method = 'aitken'
+    bst.System.default_molar_tolerance = 0.1
+    bst.System.default_converge_method = 'aitken'
     specs.run_specifications() # Sets process specifications and simulates system
     products = (F('hexene'), F('octene'), F('decene'))
     for i in range(2): set_LAOs_MPSP(get_LAOs_MPSP())

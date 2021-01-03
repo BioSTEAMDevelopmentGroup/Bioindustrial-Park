@@ -74,9 +74,9 @@ flowsheet = bst.Flowsheet('ethanol_adipic')
 bst.main_flowsheet.set_flowsheet(flowsheet)
 
 bst.CE = 541.7 # year 2016
-System.maxiter = 400
-System.converge_method = 'fixed-point'
-System.molar_tolerance = 0.01
+System.default_maxiter = 400
+System.default_converge_method = 'fixed-point'
+System.default_molar_tolerance = 0.01
 
 tmo.settings.set_thermo(chems)
 

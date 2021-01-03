@@ -49,7 +49,7 @@ def _load_chemicals():
 def _load_system():
     import biosteam as bst
     from biosteam import main_flowsheet as F
-    global sugarcane_sys, sugarcane_tea, specs, flowsheet, _system_loaded
+    global sugarcane_sys, sugarcane_tea, flowsheet, _system_loaded
     flowsheet = bst.Flowsheet('sugarcane')
     F.set_flowsheet(flowsheet)
     bst.settings.set_thermo(chemicals)

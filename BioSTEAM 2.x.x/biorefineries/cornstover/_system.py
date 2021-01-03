@@ -340,9 +340,9 @@ def system_with_facilities(
     return system
 
 def create_system(ID='cornstover_sys', include_blowdown_recycle=True):
-    System.maxiter = 400
-    System.converge_method = 'Aitken'
-    System.molar_tolerance = 0.01
+    System.default_maxiter = 400
+    System.default_converge_method = 'Aitken'
+    System.default_molar_tolerance = 0.01
     
     f = bst.main_flowsheet
     s = f.stream

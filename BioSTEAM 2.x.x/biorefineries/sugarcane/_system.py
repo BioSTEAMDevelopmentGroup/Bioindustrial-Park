@@ -8,7 +8,6 @@ Created on Thu Dec 21 11:05:24 2017
 import numpy as np
 import biosteam as bst
 from biosteam import units
-from biosteam import main_flowsheet as F
 from ._process_settings import price
 
 __all__ = (
@@ -495,8 +494,9 @@ def create_ethanol_production_system(ID='ethanol_production_sys',
 # %% Complete system
 
 def create_system(ID='sugarcane_sys'):
-    s = F.stream
-    u = F.unit
+    from biosteam import main_flowsheet as f
+    s = f.stream
+    u = f.unit
     
     ### Juicing section ###
     
