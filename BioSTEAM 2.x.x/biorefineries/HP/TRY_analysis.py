@@ -4,7 +4,6 @@ Created on Fri Jul 31 13:57:09 2020
 
 @author: sarangbhagwat
 """
-system = 'sugarcane' # Either 'sugarcane' or 'original'
 
 # Run this cell first
 from warnings import filterwarnings
@@ -19,12 +18,10 @@ import biosteam as bst
 from biosteam.utils import colors
 from matplotlib.ticker import AutoMinorLocator as AML
 
-if system == 'sugarcane':
-    from biorefineries.HP.system_sugarcane import HP_sys, HP_tea, R302, spec, get_GWP, get_non_bio_GWP, get_FEC, get_SPED
-    from biorefineries.HP.system_sugarcane import AA as product
-else:
-    from biorefineries.HP.system import HP_sys, HP_tea, R302, spec, get_GWP, get_non_bio_GWP, get_FEC, get_SPED
-    from biorefineries.HP.system import AA as product
+# from biorefineries.HP.system import HP_sys, HP_tea, R302, spec
+# from biorefineries.HP.system import MEK as product
+from biorefineries.HP.system_sugarcane import HP_sys, HP_tea, R302, spec, get_GWP, get_non_bio_GWP, get_FEC, get_SPED
+from biorefineries.HP.system_sugarcane import AA as product
 
 from matplotlib import pyplot as plt
 from  matplotlib.colors import LinearSegmentedColormap
@@ -369,6 +366,7 @@ spec_1, spec_2 = np.meshgrid(spec_1, spec_2)
 
 data_1 = HP_data = spec.evaluate_across_specs(
         HP_sys, spec_1, spec_2, HP_metrics, spec_3)
+
 # spec.load_spec_1 = spec.load_dehydration_conversion
 # spec.load_spec_2 = spec.load_titer
 # spec.load_spec_3 = spec.load_feedstock_price
@@ -403,7 +401,6 @@ d1_Metric3 = data_1[:, :, 2, :]
 d2_Metric1 = data_2[:, :, 0, :]
 d2_Metric2 = data_2[:, :, 1, :]
 d2_Metric3 = data_2[:, :, 2, :]
-
 
 # %% Functions to make regions with Total sugars > 150 g/L and Total inhibitors > 1000 mg/L
 # also infeasible

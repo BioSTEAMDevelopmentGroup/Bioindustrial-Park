@@ -78,7 +78,9 @@ bst.CE = 541.7
 # Set default thermo object for the system
 tmo.settings.set_thermo(HP_chemicals)
 
-
+System.default_maxiter = 1500
+System.default_converge_method = 'aitken'
+System.default_molar_tolerance = 0.02
 
 # %% 
 
@@ -462,10 +464,7 @@ F401 = bst.units.Flash('F401', ins=D401_P-0, outs=('F401_g', 'F401_l'),
 F401_H = bst.units.HXutility('F401_H', ins=F401-0, V=0, rigorous=True)
 F401_P = units.HPPump('F401_P', ins=F401-1)
 
-# <<<<<<< HEAD
-# S403 = bst.units.Splitter('S403', ins=F401_P-0, outs=('to_fermentor', 
-# =======
-S403 = bst.units.Splitter('S402', ins=F401_P-0, outs=('to_fermentor', 
+S403 = bst.units.Splitter('S403', ins=F401_P-0, outs=('to_fermentor', 
                                                       'to_M501'),
                                                       split=0.96)
 

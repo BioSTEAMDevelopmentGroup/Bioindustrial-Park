@@ -40,8 +40,8 @@ import pandas as pd
 import biosteam as bst
 from biosteam.utils import TicToc
 from biosteam.plots import plot_montecarlo_across_coordinate
-from HP.system import R301, HP_sys, get_AA_MPSP, get_GWP, get_FEC
-from HP.analyses import models
+from biorefineries.HP.system_sugarcane import HP_sys, get_AA_MPSP, get_GWP, get_FEC, R301
+from biorefineries.HP.analyses import models
 
 percentiles = [0, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 1]
 
@@ -58,11 +58,11 @@ timer.tic()
 
 # model = models.model_full
 model = models.HP_model
-# R301.set_titer_limit = True
+R301.set_titer_limit = True
 
 # Set seed to make sure each time the same set of random numbers will be used
 np.random.seed(3221)
-N_simulation = 1000 # 1000
+N_simulation = 100 # 1000
 samples = model.sample(N=N_simulation, rule='L')
 model.load_samples(samples)
 
