@@ -29,7 +29,7 @@ from chaospy import distributions as shape
 from biosteam import main_flowsheet as find
 from biosteam.evaluation import Model, Metric
 from biosteam.evaluation.evaluation_tools.parameter import Setter
-from HP.system import HP_sub_sys, HP_tea, HP_no_BT_tea, flowsheet, unit_groups
+from biorefineries.HP.system import HP_sub_sys, HP_tea, HP_no_BT_tea, flowsheet, unit_groups
 from warnings import warn
 
 find.set_flowsheet(flowsheet)
@@ -298,7 +298,8 @@ metrics.extend((
 get_NPV = lambda: HP_tea.NPV
 metrics.extend((Metric('Net present value', get_NPV, '$', 'TEA'), ))
 
-
+# To check HXN energy balance error
+metrics.append(Metric('HXN energy balance error', lambda: HXN.energy_balance_percent_error))
 # %% 
 
 # =============================================================================

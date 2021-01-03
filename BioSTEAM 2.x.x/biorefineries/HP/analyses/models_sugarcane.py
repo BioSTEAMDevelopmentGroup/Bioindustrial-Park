@@ -29,10 +29,12 @@ from chaospy import distributions as shape
 from biosteam import main_flowsheet as find
 from biosteam.evaluation import Model, Metric
 from biosteam.evaluation.evaluation_tools.parameter import Setter
-from HP.system import HP_sub_sys, HP_tea, HP_no_BT_tea, flowsheet, unit_groups
+from biorefineries.HP.system_sugarcane import HP_sub_sys, HP_tea, HP_no_BT_tea, flowsheet, unit_groups
+from warnings import warn
 
 find.set_flowsheet(flowsheet)
-get_annual_factor = lambda: HP_no_BT_tea._annual_factor
+# get_annual_factor = lambda: HP_no_BT_tea._annual_factor
+get_annual_factor = lambda: 1
 _kg_per_ton = 907.18474
 
 HP_sys = find.system.HP_sys
@@ -64,14 +66,14 @@ def get_MSP():
 AA = find.unit.T606_P-0
 get_yield = lambda: AA.F_mass*get_annual_factor()/1e6
 # Purity (%) of HP in the final product
-get_purity = lambda: AA.imass['HP']/AA.F_mass
+get_purity = lambda: AA.imass['AA']/AA.F_mass
 # Adjust for purity
 get_adjusted_MSP = lambda: get_MSP() / get_purity()
 get_adjusted_yield = lambda: get_yield() * get_purity()
 # Recovery (%) = recovered/amount in fermentation broth
-R301 = find.unit.R301
-get_recovery = lambda: AA.imol['HP'] \
-    /(R301.outs[0].imol['HP']+2*R301.outs[0].imol['CalciumLactate'])
+# R301 = find.unit.R301
+# get_recovery = lambda: AA.imol['HP'] \
+#     /(R301.outs[0].imol['HP']+2*R301.outs[0].imol['CalciumLactate'])
 get_overall_TCI = lambda: HP_tea.TCI/1e6
 # Annual operating cost, note that AOC excludes electricity credit
 get_overall_AOC = lambda: HP_tea.AOC/1e6
@@ -87,35 +89,61 @@ electricity_price = bst.PowerUtility.price
 # Electricity credit is positive if getting revenue from excess electricity
 get_electricity_credit = lambda: (excess_power()*electricity_price*get_annual_factor())/1e6
 
-metrics = [Metric('Minimum selling price', get_MSP, '$/kg'),
+
+#%% 
+class Metrics(list):
+    def __init__(self, metrics):
+        self.extend(metrics)
+        
+    def append(self, metric):
+        # self_copy = copy.deepcopy(self)
+        repeated = False
+        for i in self:
+            if i.index == metric.index:
+                repeated = True
+                break
+        if repeated:
+            warn("Metric {metric.index} already exists in Metrics object. Second instance has been deleted.")
+        else:
+            super().append(metric)
+        
+    def extend(self,metrics):
+        for i in metrics:
+            self.append(i)
+#%%
+
+metrics = Metrics([Metric('Minimum selling price', get_MSP, '$/kg'),
            Metric('Product yield', get_yield, '10^6 kg/yr'),
            Metric('Product purity', get_purity, '%'),
-           Metric('Adjusted minimum selling price', get_adjusted_MSP, '$/kg'),
+            Metric('Adjusted minimum selling price', get_adjusted_MSP, '$/kg'),
            Metric('Adjusted product yield', get_adjusted_yield, '10^6 kg/yr'),
-           Metric('Product recovery', get_recovery, '%'),
+           # Metric('Product recovery', get_recovery, '%'),
            Metric('Total capital investment', get_overall_TCI, '10^6 $'),
            Metric('Annual operating cost', get_overall_AOC, '10^6 $/yr'),
            Metric('Annual material cost', get_material_cost, '10^6 $/yr'),
            Metric('Annual product sale', get_annual_sale, '10^6 $/yr'),
            Metric('Annual electricity credit', get_electricity_credit, '10^6 $/yr')
-           ]
+           ])
 
+for unit_group in unit_groups:
+    metrics.extend((Metric('%s - heating duty'%unit_group.name,
+                          unit_group.get_heating_duty, 'kJ/kg'),))
 # =============================================================================
 # Capital cost breakdown
 # =============================================================================
 
-def get_installed_cost(system):
-    return lambda: sum(i.installed_cost for i in HP_sub_sys[system])/1e6
+def get_installed_equipment_cost(system):
+    return lambda: sum(i.installed_equipment_cost for i in HP_sub_sys[system])/1e6
 for system in HP_sub_sys.keys():
     if system == 'feedstock_sys': continue
     metrics.extend(
-        (Metric(system, get_installed_cost(system), '10^6 $', 'Installed cost'),))
+        (Metric(system, get_installed_equipment_cost(system), '10^6 $', 'Installed cost'),))
 
 # All checks should be ~0
-check_installed_cost = \
-    lambda: sum(get_installed_cost(system)() 
-                for system in HP_sub_sys.keys()) - HP_tea.installed_cost/1e6
-metrics.extend((Metric('Check', check_installed_cost, '10^6 $', 'Installed cost'),))
+check_installed_equipment_cost = \
+    lambda: sum(get_installed_equipment_cost(system)() 
+                for system in HP_sub_sys.keys()) - HP_tea.installed_equipment_cost/1e6
+metrics.extend((Metric('Check', check_installed_equipment_cost, '10^6 $', 'Installed cost'),))
 
 
 # =============================================================================
@@ -158,7 +186,7 @@ metrics.extend((Metric('Check', check_product_sale, '10^6 $/yr', 'Product sale')
 # =============================================================================
 
 get_system_heating_demand = lambda: BT.system_heating_demand*get_annual_factor()/1e9
-get_pretreatment_steam_heating_demand = lambda: BT.side_streams_lps.duty*get_annual_factor()/1e9
+# get_pretreatment_steam_heating_demand = lambda: BT.side_streams_lps.duty*get_annual_factor()/1e9
 HXN = find.unit.HXN
 get_HXN_heating_demand = lambda: sum(i.duty for i in HXN.heat_utilities 
                                     if i.duty*i.cost>0)*get_annual_factor()/1e9
@@ -174,15 +202,14 @@ for system in HP_sub_sys.keys():
     if system in ('feedstock_sys', 'HXN', 'BT'): continue
     # The only heating demand for the pretreatment system is the heat needed to
     # generate the side steam
-    if system == 'pretreatment_sys':
-        metrics.extend((Metric(system, get_pretreatment_steam_heating_demand, '10^9 kJ/yr', 
-                                'Heating demand'),))
+    # if system == 'pretreatment_sys':
+    #     metrics.extend((Metric(system, get_pretreatment_steam_heating_demand, '10^9 kJ/yr', 
+    #                             'Heating demand'),))
     else: metrics.extend((Metric(system, get_heating_demand(system), '10^9 kJ/yr', 
                                   'Heating demand'),))
 
 check_heating_demand = \
-    lambda: sum((get_heating_demand(system)() for system in HP_sub_sys.keys()), 
-                get_pretreatment_steam_heating_demand())
+    lambda: sum([get_heating_demand(system)() for system in HP_sub_sys.keys()])
                                             
 metrics.extend((
     Metric('HXN', get_HXN_heating_demand, '10^9 kJ/yr', 'Heating demand'),
@@ -196,7 +223,7 @@ metrics.extend((
 # =============================================================================
 
 CT = find.unit.CT
-get_system_cooling_demand = lambda: CT.system_cooling_demand*get_annual_factor()/1e9
+get_system_cooling_water_duty = lambda: CT.system_cooling_water_duty*get_annual_factor()/1e9
 get_HXN_cooling_demand = lambda: sum(i.duty for i in HXN.heat_utilities 
                                     if i.duty*i.cost<0)*get_annual_factor()/1e9
 get_CT_cooling_demand = lambda: sum(i.duty for i in CT.heat_utilities 
@@ -218,7 +245,7 @@ check_cooling_demand = \
 metrics.extend((
     Metric('HXN', get_HXN_cooling_demand, '10^9 kJ/yr', 'Cooling demand'),
     Metric('CT', get_CT_cooling_demand, '10^9 kJ/yr', 'Cooling demand'),    
-    Metric('Sum', get_system_cooling_demand, '10^9 kJ/yr', 'Cooling demand'),
+    Metric('Sum', get_system_cooling_water_duty, '10^9 kJ/yr', 'Cooling demand'),
     Metric('Check', check_cooling_demand, '10^9 kJ/yr', 'Cooling demand')
     ))
 
@@ -315,8 +342,8 @@ special_price = {
 
 # Prices for boiler_chems, baghouse_bag, and cooling_tower_chems are not included
 # as they are tied to BT/CT duties
-default_price_streams = ('sulfuric_acid_fresh', 'ammonia_fresh', 'enzyme', 
-                         'system_makeup_water', 'aerobic_caustic', 'ash')
+default_price_streams = ('enzyme', 
+                         'system_makeup_water', 'ash')
 
 def add_stream_price_param(stream, D):
     param(setter=Setter(stream, 'price'),
@@ -356,116 +383,58 @@ def set_TCI_ratio(ratio):
                 unit.cost_items[item].cost *= ratio
 
 
-# =============================================================================
-# Pretreatment parameters
-# =============================================================================
-
-M202 = find.unit.M202
-D = shape.Uniform(0.25, 0.4)
-@param(name='Pretreatment solid loading', element=M202, kind='coupled', units='%', 
-       baseline=0.3, distribution=D)
-def set_pretreatment_solid_loading(loading): 
-    M202.solid_loading = loading
-    
-pretreatment_sulfuric_acid = find.stream.pretreatment_sulfuric_acid
-D = shape.Uniform(10, 35)
-@param(name='Pretreatment sulfuric acid loading', element=pretreatment_sulfuric_acid,
-       kind='coupled', units='mg/g-dry feedstock', baseline=22.1, distribution=D)
-def set_pretreatment_sulfuric_acid_loading(loading): 
-    feedstock_dry_mass = feedstock.F_mass - feedstock.imass['H2O']
-    pretreatment_sulfuric_acid.imass['H2SO4'] = feedstock_dry_mass*loading/1000*0.93
-    pretreatment_sulfuric_acid.imass['H2O'] = feedstock_dry_mass*loading/1000*0.07
-
-R201 = find.unit.R201
-D = shape.Uniform(0.06, 0.12)
-@param(name='Pretreatment glucan-to-glucose', element=R201, kind='coupled', units='%',
-       baseline=0.099, distribution=D)
-def set_R201_glucan_conversion(X): R201.pretreatment_rxns[0].X = X    
-
-D = shape.Uniform(0.8, 0.92)
-@param(name='Pretreatment xylan-to-xylose', element=R201, kind='coupled', units='%',
-       baseline=0.9, distribution=D)
-def set_R201_xylan_conversion(X): R201.pretreatment_rxns[4].X = X        
-
 
 # =============================================================================
 # Conversion parameters
 # =============================================================================
 
-M301 = find.unit.M301
-D = shape.Uniform(0.175, 0.25)
-@param(name='Enzymatic hydrolysis solid loading', element=M301, kind='coupled', units='%',
-       baseline=0.2, distribution=D)
-def set_R301_hydrolysis_solid_loading(loading): M301.solid_loading = loading
+# M301 = find.unit.M301
+R302 = find.unit.R302
+# R303 = find.unit.R303
 
-D = shape.Uniform(10, 30)
-@param(name='Enzyme loading', element=M301, kind='coupled', units='mg/g glucan',
-       baseline=20, distribution=D)
-def set_R301_enzyme_loading(loading): M301.enzyme_loading = loading
+# D = shape.Uniform(0.175, 0.25)
+# @param(name='Enzymatic hydrolysis solid loading', element=M301, kind='coupled', units='%',
+#        # baseline=0.2, distribution=D)
+# def set_R301_hydrolysis_solid_loading(loading): M301.solid_loading = loading
 
-# Enzymatic hydrolysis
-D = baseline_uniform(24, 0.1)
-@param(name='Enzymatic hydrolysis time', element=R301, kind='coupled', units='hr',
-       baseline=24, distribution=D)
-def set_R301_hydrolysis_time(tau): R301.tau_saccharification = tau
+# D = shape.Uniform(10, 30)
+# @param(name='Enzyme loading', element=M301, kind='coupled', units='mg/g glucan',
+#        baseline=20, distribution=D)
+# def set_R301_enzyme_loading(loading): M301.enzyme_loading = loading
 
-D = shape.Uniform(0.75, 0.9)
-@param(name='Enzymatic hydrolysis glucan-to-glucose', element=R301, kind='coupled', units='%',
-       baseline=0.85, distribution=D)
-def set_R301_glucan_conversion(X): R301.saccharification_rxns[2].X = X
+# # Enzymatic hydrolysis
+# D = baseline_uniform(24, 0.1)
+# @param(name='Enzymatic hydrolysis time', element=R301, kind='coupled', units='hr',
+#        baseline=24, distribution=D)
+# def set_R301_hydrolysis_time(tau): R301.tau_saccharification = tau
+
+# D = shape.Uniform(0.75, 0.9)
+# @param(name='Enzymatic hydrolysis glucan-to-glucose', element=R301, kind='coupled', units='%',
+#        baseline=0.85, distribution=D)
+# def set_R301_glucan_conversion(X): R301.saccharification_rxns[2].X = X
 
 # Fermentation
 D = shape.Triangle(76, 120, 145)
-@param(name='Fermentation time', element=R301, kind='coupled', units='hr',
+@param(name='Fermentation time', element=R302, kind='coupled', units='hr',
        baseline=120, distribution=D)
-def set_R301_fermentation_time(tau): R301.tau_cofermentation = tau
+def set_R302_fermentation_time(tau): R302.tau_cofermentation = tau
 
-D = shape.Uniform(5, 15)
-@param(name='CSL loading', element=R301, kind='coupled', units='g/L',
-       baseline=10, distribution=D)
-def set_CSL_loading(loading): R301.CSL_loading = loading
+# D = shape.Uniform(5, 15)
+# @param(name='CSL loading', element=R301, kind='coupled', units='g/L',
+#        baseline=10, distribution=D)
+# def set_CSL_loading(loading): R302.CSL_loading = loading
 
-R302 = find.unit.R302
-D = shape.Triangle(0.55, 0.76, 0.93)
-@param(name='Lactic acid yield', element=R301, kind='coupled', units='g/g substrate',
-       baseline=0.76, distribution=D)
-def set_R301_HP_yield(X):
-    R301_X = R301.cofermentation_rxns.X
-    R301_X[0] = R301_X[3] = X
+
+D = shape.Triangle(0.424, 0.53, 0.636) # +/- 20% of baseline
+@param(name='3-Hydroxypropionic acid yield', element=R302, kind='coupled', units='% theoretical',
+       baseline=0.53, distribution=D)
+def set_R302_HP_yield(X):
     R302_X = R302.cofermentation_rxns.X
-    R302_X[0] = R302_X[3] = X * R302.ferm_ratio
+    R302_X[0] = R302_X[3] = X
+    # R303_X = R303.cofermentation_rxns.X
+    # R303_X[0] = R303_X[3] = X * R303.ferm_ratio
 
-D = shape.Triangle(0.004, 0.07, 0.32)
-@param(name='Acetic acid yield', element=R301, kind='coupled', units='g/g substrate',
-       baseline=0.07, distribution=D)
-def set_R301_acetic_acid_yield(X): 
-    # 1e6 is to avoid generating tiny negative flow (e.g., 1e-14) in R301
-    R301_X = R301.cofermentation_rxns.X
-    X = min(X, 1-1e-6-R301_X[0]-R301_X[2])
-    R301_X[1] = R301_X[4] = X
-    R302_X = R302.cofermentation_rxns.X
-    X = min(X*R302.ferm_ratio, 1-1e-6-R302_X[0]-R302_X[2])
-    R302_X[1] = R302_X[4] = X
 
-D = shape.Uniform(0.05, 0.1)
-@param(name='Innoculum ratio', element=R301, kind='coupled', units='%',
-       baseline=0.07, distribution=D)
-def set_innoculum_ratio(ratio): R301.inoculum_ratio = ratio
-
-# Seed train fermentation yield as a ratio of the main fermenter
-D = baseline_uniform(36, 0.1)
-@param(name='Seed train time', element=R302, kind='coupled', units='hr',
-       baseline=36, distribution=D)
-def set_R302_fermentation_time(tau): R302.tau_batch = tau
-
-D = shape.Triangle(0.8, 0.9, 1)
-@param(name='Seed train yield', element=R302, kind='coupled', units='% of R301',
-       baseline=0.9, distribution=D)
-def set_R302_ratio(ratio):
-    R301_X = R301.cofermentation_rxns.X
-    R302_X = R302.cofermentation_rxns.X
-    ratio = min(ratio, (1-1e-6-R302_X[2])/(R301_X[0]+R301_X[1]))
-    R302.ferm_ratio = ratio
 
 # =============================================================================
 # Separation parameters
@@ -487,11 +456,11 @@ def set_R401_tau(tau):
     R401.tau = tau
 
 R402 = find.unit.R402
-D = baseline_uniform(0.95, 1.)
+D = baseline_uniform(0.95, 0.05)
 @param(name='Dehydration conversion', element=R402, kind='coupled', units='',
-       baseline=1, distribution=D)
-def set_R402_conversion_factor(X):
-    R402.X = X
+       baseline=0.95, distribution=D)
+def set_R402_conversion(X):
+    R402.dehydration_reactions[0].X = X
     
 # R403 = find.unit.R403
 # D = shape.Triangle(0.72, 0.8, 0.88)
@@ -514,6 +483,8 @@ def set_BT_combustion_efficiency(efficiency):
 
 # All parameters
 parameters = HP_model.get_parameters()
+
+index_TEA = len(metrics)
 
 
 # %%
@@ -539,20 +510,20 @@ HP_model_IRR.set_parameters(parameters)
 # %% 
 
 # =============================================================================
-# Model to evalute system across lactic acid yield
+# Model to evalute system across 3-Hydroxypropionic acid yield
 # =============================================================================
 
 HP_model_LA_yield = Model(HP_sys, metrics)
 
 def set_LA_yield(LA_yield):
-    R301_X = R301.cofermentation_rxns.X
-    R301_X[0] = R301_X[3] = LA_yield
-    R301_X[1] = R301_X[4] = min(1-1e-6-R301_X[0]-R301_X[2], R301_X[1])
+    # R301_X = R301.cofermentation_rxns.X
+    # R301_X[0] = R301_X[3] = LA_yield
+    # R301_X[1] = R301_X[4] = min(1-1e-6-R301_X[0]-R301_X[2], R301_X[1])
     R302_X = R302.cofermentation_rxns.X
-    R302_X[0] = R302_X[3] = R301_X[0] * R302.ferm_ratio
-    R302_X[1] = R302_X[4] = R301_X[1] * R302.ferm_ratio
+    R302_X[0] = R302_X[3] = LA_yield * R302.ferm_ratio
+    R302_X[1] = R302_X[4] = LA_yield * R302.ferm_ratio
 
-LA_yield_parameters = tuple([i for i in parameters if not i.name=='Lactic acid yield'])
+LA_yield_parameters = tuple([i for i in parameters if not i.name=='3-Hydroxypropionic acid yield'])
 HP_model_LA_yield.set_parameters(LA_yield_parameters)
 
 
@@ -598,7 +569,7 @@ D = shape.Uniform(0.9, 1.1)
        baseline=1, distribution=D)
 def set_fake_parameter(anything): pass
 
-
+index_IRR = len(metrics)
 # %%
 
 # =============================================================================
@@ -638,4 +609,13 @@ def set_HXN_T_min_app(T_min_app):
 
 HP_model_HXN_T_min_app.set_parameters(parameters)
 
+metrics.append(Metric('HXN energy balance error', lambda: HXN.energy_balance_percent_error))
 
+# %% Evaluate
+# N_samples = 100
+# rule = 'L' # For Latin-Hypercube sampling
+# model=HP_model
+# samples = model.sample(N_samples, rule)
+# model.load_samples(samples)
+# model.evaluate()
+# model.table # All evaluations are stored as a pandas DataFrame

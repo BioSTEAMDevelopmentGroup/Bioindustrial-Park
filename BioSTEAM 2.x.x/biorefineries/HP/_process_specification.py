@@ -16,10 +16,14 @@ def evaluate_across_specs(spec, system,
             spec_1, spec_2, metrics, spec_3):
     try:
         spec.load_specifications(spec_1=spec_1, spec_2=spec_2)
-        system._setup()
-        for i in range(2): system._converge()
+        # system._setup()
+        # for i in range(2): system._converge()
         system.simulate()
-    except (ValueError, InfeasibleRegion): # (ValueError, RuntimeError) (ValueError, AssertionError)
+    except ValueError:# (ValueError, RuntimeError) (ValueError, AssertionError)
+        import pdb
+        pdb.set_trace()
+        return np.nan*np.ones([len(metrics), len(spec_3)])
+    except InfeasibleRegion:
         return np.nan*np.ones([len(metrics), len(spec_3)])
     return spec.evaluate_across_productivity(metrics, spec_3)
     
@@ -424,7 +428,7 @@ class TiterAndInhibitorsSpecification:
             self.evaporator.V = flx.IQ_interpolation(self.inhibitor_objective_function,
                                                      V_min, 0.999, ytol=1e-4, maxiter=100) 
         
-        self.check_sugar_concentration()
+        # self.check_sugar_concentration()
     
     def update_dilution_water(self, x_titer=None):
         if x_titer is None: x_titer = self.calculate_titer()

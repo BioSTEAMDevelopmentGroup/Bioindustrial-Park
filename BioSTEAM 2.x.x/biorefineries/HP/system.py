@@ -78,7 +78,10 @@ bst.CE = 541.7
 # Set default thermo object for the system
 tmo.settings.set_thermo(HP_chemicals)
 
-
+System.default_maxiter = 1500
+# System.default_converge_method = 'fixed-point'
+System.default_converge_method = 'aitken'
+System.default_molar_tolerance = 0.02
 
 # %% 
 
@@ -871,9 +874,6 @@ HP_sys._TEA = HP_tea
 # Simulate system and get results
 # =============================================================================
 
-System.default_converge_method = 'fixed-point' # aitken isn't stable
-System.default_maxiter = 1500
-System.default_molar_tolerance = 0.1
 
 # def get_HP_MPSP():
 #     HP_sys.simulate()

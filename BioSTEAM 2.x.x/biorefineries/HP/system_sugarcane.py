@@ -76,6 +76,17 @@ bst.CE = 541.7
 # Set default thermo object for the system
 tmo.settings.set_thermo(HP_chemicals)
 
+
+# if BST222:
+#     System.default_converge_method = 'fixed-point' # aitken isn't stable
+#     System.default_maxiter = 1500
+#     System.default_molar_tolerance = 0.02
+# else:
+
+System.default_maxiter = 1500
+System.default_converge_method = 'fixed-point'
+System.default_molar_tolerance = 0.02
+    
 # %% 
 
 # =============================================================================
@@ -577,11 +588,14 @@ HXN = bst.facilities.HeatExchangerNetwork('HXN')
 HP_sys = bst.main_flowsheet.create_system(
     'HP_sys', feeds=[i for i in bst.main_flowsheet.stream if i.sink and not i.source],
     ends=[s.imbibition_water, s.rvf_wash_water])
+
+BT_sys = System('BT_sys', path=(BT,))
+
 HP_sys.simulate()
 for i in HXN.original_heat_utils:
     i.heat_exchanger.rigorous = True
-BT_sys = System('BT_sys', path=(BT,))
 
+bst.main_flowsheet.set_flowsheet(flowsheet)
 # %%
 # =============================================================================
 # TEA
