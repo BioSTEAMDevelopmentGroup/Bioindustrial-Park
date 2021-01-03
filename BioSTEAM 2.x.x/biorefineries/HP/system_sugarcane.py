@@ -630,9 +630,6 @@ HP_sys._TEA = HP_tea
 # =============================================================================
 # Simulate system and get results
 # =============================================================================
-System.default_converge_method = 'Aitken'
-System.default_maxiter = 50
-System.default_molar_tolerance = 0.5
 
 num_sims = 1
 num_solve_tea = 3

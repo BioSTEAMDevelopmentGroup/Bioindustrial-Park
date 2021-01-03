@@ -8,6 +8,7 @@ from biosteam import System
 import biosteam as bst
 import thermosteam as tmo
 from thermosteam import Stream
+from biorefineries import BST222
 from biorefineries.sugarcane import create_ethanol_purification_system
 from biorefineries.cornstover._process_settings import price
 from biorefineries.cornstover._chemicals import chemical_groups
@@ -340,9 +341,14 @@ def system_with_facilities(
     return system
 
 def create_system(ID='cornstover_sys', include_blowdown_recycle=True):
-    System.default_maxiter = 400
-    System.default_converge_method = 'Aitken'
-    System.default_molar_tolerance = 0.01
+    if BST222:
+        System.default_maxiter = 400
+        System.default_converge_method = 'Aitken'
+        System.default_molar_tolerance = 0.01
+    else:
+        System.maxiter = 400
+        System.converge_method = 'Aitken'
+        System.molar_tolerance = 0.01
     
     f = bst.main_flowsheet
     s = f.stream

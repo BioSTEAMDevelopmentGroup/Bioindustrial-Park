@@ -24,6 +24,7 @@ __all__ = (
     'test_animal_bedding',
     'test_lactic',
     'test_ethanol_adipic',
+    'generate_all_code',
     'generate_code',
     'print_results',
 )
@@ -157,7 +158,7 @@ def test_corn():
     assert np.allclose(tea.sales, 73911903.87893353, rtol=1e-2)
     assert np.allclose(tea.material_cost, 54229612.27968673, rtol=1e-2)
     assert np.allclose(tea.installed_equipment_cost, 68401874.44387494, rtol=1e-2)
-    assert np.allclose(tea.utility_cost, 6798714.215908765, rtol=1e-2)
+    assert np.allclose(tea.utility_cost, 6646814.904073888, rtol=1e-2)
     assert np.allclose(units.get_heating_duty(), 93.75005124179637, rtol=1e-2)
     assert np.allclose(units.get_cooling_duty(), 96.87211085978647, rtol=1e-2)
     assert np.allclose(units.get_electricity_consumption(), 2.3389275658240734, rtol=1e-2)
@@ -321,14 +322,14 @@ def test_HP_sugarcane():
     units = UnitGroup('Biorefinery', tea.units)
     assert np.allclose(tea.IRR, 0.1, rtol=1e-2)
     assert np.allclose(feedstock.price, 0.03455, rtol=1e-2)
-    assert np.allclose(product.price, 1.0904605869079125, rtol=1e-2)
-    assert np.allclose(tea.sales, 254696847.18088722, rtol=1e-2)
-    assert np.allclose(tea.material_cost, 140311828.895894, rtol=1e-2)
-    assert np.allclose(tea.installed_equipment_cost, 350227180.5260039, rtol=1e-2)
-    assert np.allclose(tea.utility_cost, 9895991.956257405, rtol=1e-2)
-    assert np.allclose(units.get_heating_duty(), 677.6374794070114, rtol=1e-2)
-    assert np.allclose(units.get_cooling_duty(), 598.6093294046894, rtol=1e-2)
-    assert np.allclose(units.get_electricity_consumption(), 17.931419794624567, rtol=1e-2)
+    assert np.allclose(product.price, 1.090422097540445, rtol=1e-2)
+    assert np.allclose(tea.sales, 254687708.9208518, rtol=1e-2)
+    assert np.allclose(tea.material_cost, 140313832.4673765, rtol=1e-2)
+    assert np.allclose(tea.installed_equipment_cost, 350187173.2190206, rtol=1e-2)
+    assert np.allclose(tea.utility_cost, 9896515.53236391, rtol=1e-2)
+    assert np.allclose(units.get_heating_duty(), 677.6570914757609, rtol=1e-2)
+    assert np.allclose(units.get_cooling_duty(), 598.6300005307196, rtol=1e-2)
+    assert np.allclose(units.get_electricity_consumption(), 17.93236850830599, rtol=1e-2)
     assert np.allclose(units.get_electricity_production(), 0.0, rtol=1e-2)
     
 @pytest.mark.slow

@@ -76,6 +76,7 @@ from biorefineries.lactic._utils import baseline_feedflow, set_yield, find_split
 from biorefineries.lactic._chemicals import chems, chemical_groups, sugars, soluble_organics, \
     insolubles, combustibles
 from biorefineries.lactic._tea_lca import LacticTEA
+from biorefineries import BST222
 
 flowsheet = bst.Flowsheet('lactic')
 bst.main_flowsheet.set_flowsheet(flowsheet)
@@ -86,10 +87,14 @@ tmo.settings.set_thermo(chems)
 
 # These settings are sufficient to get baseline lactic acid price within $0.002/kg
 # of the final stabilized results
-System.default_converge_method = 'fixed-point' # aitken isn't stable
-System.default_maxiter = 1500
-System.default_molar_tolerance = 0.02
-
+if BST222:
+    System.default_converge_method = 'fixed-point' # aitken isn't stable
+    System.default_maxiter = 1500
+    System.default_molar_tolerance = 0.02
+else:
+    System.maxiter = 1500
+    System.converge_method = 'fixed-point'
+    System.molar_tolerance = 0.02
 
 # %% 
 
