@@ -20,8 +20,6 @@ def evaluate_across_specs(spec, system,
         # for i in range(2): system._converge()
         system.simulate()
     except ValueError:# (ValueError, RuntimeError) (ValueError, AssertionError)
-        import pdb
-        pdb.set_trace()
         return np.nan*np.ones([len(metrics), len(spec_3)])
     except InfeasibleRegion:
         return np.nan*np.ones([len(metrics), len(spec_3)])
