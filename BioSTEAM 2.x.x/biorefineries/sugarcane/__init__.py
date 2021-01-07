@@ -52,6 +52,9 @@ def _load_system():
     global sugarcane_sys, sugarcane_tea, flowsheet, _system_loaded
     flowsheet = bst.Flowsheet('sugarcane')
     F.set_flowsheet(flowsheet)
+    bst.Stream.ticket_name = 's'
+    bst.Stream.ticket_number = 0
+    bst.Stream.unregistered_ticket_number = 0
     bst.settings.set_thermo(chemicals)
     load_process_settings()
     sugarcane_sys = create_system()
