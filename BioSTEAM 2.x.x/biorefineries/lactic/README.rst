@@ -8,7 +8,7 @@ Simplified process flow scheme
 
 The biorefinery is developed for a manuscript in preparation [1]_ for the production
 of lactic acid  via dilute sulfuric acid pretreatment, fermentation, and separation
-processes from lignocellulosic biomass. Part of the script is based on [2]_ and [3]_.
+processes from lignocellulosic biomass. Part of the script is based on [2]_.
 
 
 Getting Started
@@ -148,7 +148,7 @@ of varying carbohydrate contents and at different prices, and evaluate feedstock
 of varying succinic acid content.
 
 Note that results used in the manuscript [1]_ were generated using biosteam v2.20.21,
-thermosteam v0.20.26, and dependencies
+thermosteam v0.20.26, and dependencies (`commit f56692d <https://github.com/BioSTEAMDevelopmentGroup/Bioindustrial-Park/commit/f56692d3bc06527b57dc77ed7cb929a40b59bc4d>`_).
 
 To reproduce the results, directly run the script of interest, and results will
 be saved as Excel files in the same directory path as the module.
@@ -176,17 +176,12 @@ be saved as Excel files in the same directory path as the module.
 References
 ----------
 .. [1] Li et al., Sustainable Lactic Acid Production from Lignocellulosic
-     Biomass. Submitted 2020.
+     Biomass. Accepted 2020.
     
-.. [2] Li et al., Modeling Pretreatment Technologies to Evaluate the Sustainability
-    of Lignocellulosic Biorefineries across the Feedstock Landscape. Submitted 2020.
-    
-.. [3] Cortes-Peña et al., BioSTEAM: A Fast and Flexible Platform for the Design,
+.. [2] Cortes-Peña et al., BioSTEAM: A Fast and Flexible Platform for the Design,
     Simulation, and Techno-Economic Analysis of Biorefineries under Uncertainty. 
     ACS Sustainable Chem. Eng. 2020, 8 (8), 3302–3310. 
     `<https://doi.org/10.1021/acssuschemeng.9b07040>`_
-    
-
 
 
 

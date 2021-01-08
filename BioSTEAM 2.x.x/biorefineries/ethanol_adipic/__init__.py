@@ -9,14 +9,23 @@
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
 # for license details.
 
-"""
-Created on Fri Jun 26 07:17:38 2020
-    
-@author: yalinli_cabbi
-"""
 
-__all__ = []
+from . import (
+    _chemicals,
+    _process_settings,
+    _utils,
+    _units,
+    _facilities,
+    _tea,
+    system_acid,
+    system_base,
+    # system_afex,
+    )
 
-from lazypkg import LazyPkg
-LazyPkg(__name__, ['_chemicals', '_process_settings', '_units', '_facilities',
-                   'system_acid', 'system_base'])
+
+from ._chemicals import *
+from ._process_settings import *
+from ._utils import *
+from ._units import *
+from ._facilities import *
+from ._tea import *

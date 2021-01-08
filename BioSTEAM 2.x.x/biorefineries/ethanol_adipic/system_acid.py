@@ -10,24 +10,17 @@
 # for license details.
 
 """
-Created on Mon Jul  6 18:50:28 2020
-
-References:
+References
+----------
 [1] Humbird et al., Process Design and Economics for Biochemical Conversion of 
     Lignocellulosic Biomass to Ethanol: Dilute-Acid Pretreatment and Enzymatic 
     Hydrolysis of Corn Stover; Technical Report NREL/TP-5100-47764; 
     National Renewable Energy Lab (NREL), 2011.
     https://www.nrel.gov/docs/fy11osti/47764.pdf
-
 [2] Davis et al., Process Design and Economics for the Conversion of Lignocellulosic 
     Biomass to Hydrocarbon Fuels and Coproducts: 2018 Biochemical Design Case Update; 
     NREL/TP-5100-71949; National Renewable Energy Lab (NREL), 2018. 
     https://doi.org/10.2172/1483234
-
-[3] Cortes-Peña et al., BioSTEAM: A Fast and Flexible Platform for the Design, 
-    Simulation, and Techno-Economic Analysis of Biorefineries under Uncertainty. 
-    ACS Sustainable Chem. Eng. 2020, 8 (8), 3302–3310. 
-    https://doi.org/10.1021/acssuschemeng.9b07040
 
 Naming conventions:
     D = Distillation column
@@ -49,7 +42,6 @@ Processes:
     600: Wastewater treatment
     700: Facilities
 
-@author: yalinli_cabbi
 """
 
 
@@ -63,7 +55,8 @@ from biorefineries.ethanol_adipic import _units as units
 from biorefineries.ethanol_adipic import _facilities as facilities
 from biorefineries.ethanol_adipic._chemicals import chems, chemical_groups, \
     soluble_organics, combustibles
-from biorefineries.ethanol_adipic._process_settings import price, GWP_CF_stream, GWP_CFs
+from biorefineries.ethanol_adipic._process_settings import \
+    price, GWP_CF_stream, GWP_CFs, _labor_2011to2016, set_feedstock_price
 from biorefineries.ethanol_adipic._utils import baseline_feedflow, convert_ethanol_wt_2_mol, \
     find_split, splits_df
 from biorefineries.ethanol_adipic._tea import ethanol_adipic_TEA
@@ -85,13 +78,34 @@ tmo.settings.set_thermo(chems)
 # Feedstock preprocessing
 # =============================================================================
 
-feedstock = Stream('feedstock', baseline_feedflow.copy(),
-                   units='kg/hr', price=price['Feedstock'])
+# factor = (83.67-22.4+30.7)/71.3
+# feedstock_price = price['Feedstock']*factor
 
-U101 = units.FeedstockPreprocessing('U101', ins=feedstock)
-# Handling costs/utilities included in feedstock cost thus not considered here
-U101.cost_items['System'].cost = 0
-U101.cost_items['System'].kW = 0
+# feedstock = Stream('feedstock', baseline_feedflow.copy(),
+#                    units='kg/hr', price=feedstock_price)
+
+# U101 = units.FeedstockPreprocessing('U101', ins=feedstock)
+# # Handling costs/utilities included in feedstock cost thus not considered here
+# U101.cost_items['System'].cost = 0
+# U101.cost_items['System'].kW = 0
+
+from biorefineries.ethanol_adipic._preprocessing import \
+    create_default_depot, PreprocessingCost
+
+prep_sys = create_default_depot(kind='HMPP', with_AFEX=False)
+
+prep_sys.simulate()
+
+prep_cost = PreprocessingCost(depot_sys=prep_sys,
+                              labor_adjustment=_labor_2011to2016)
+
+(U101, U102, U103, U104, U105) = sorted(prep_sys.units, key=lambda u: u.ID)
+feedstock, = (i.copy() for i in sorted(prep_sys.products, key=lambda s: s.ID))
+
+# $/Mg
+# set_feedstock_price(feedstock, preprocessing=None)
+set_feedstock_price(feedstock, preprocessing=prep_cost.feedstock_unit_price)
+feedstock.price = price['Feedstock']
 
 
 # %%
@@ -130,7 +144,7 @@ T201 = units.SulfuricAcidAdditionTank('T201', ins=sulfuric_acid_T201,
 M201 = units.SulfuricAcidMixer('M201', ins=(T201-0, water_M201))
 
 # Mix sulfuric acid and feedstock, adjust water loading
-M202 = units.PretreatmentMixer('M202', ins=(U101-0, M201-0, water_M202))
+M202 = units.PretreatmentMixer('M202', ins=(feedstock, M201-0, water_M202))
 
 # Mix feedstock/sulfuric acid mixture and steam
 M203 = units.SteamMixer('M203', ins=(M202-0, steam_M203), P=5.5*101325)
@@ -464,11 +478,16 @@ BDM = bst.units.BlowdownMixer('BDM',ins=(CHP.outs[-1], CT.outs[-1]),
                               outs=M601.ins[-1])
 
 # All water consumed by the system
-process_water_streams = (water_M201, water_M202, steam_M203, water_M205, 
-                         water_M301, water_U401, CHP.ins[-1], CT.ins[-1])
+process_water_streams = {
+    'pretreatment': (water_M201, water_M202, steam_M203, water_M205),
+    'conversion': (water_M301,),
+    'separation': (water_U401,),
+    'facilities': (CHP.ins[-1], CT.ins[-1])
+    }
 
 PWC = facilities.PWC('PWC', ins=(system_makeup_water, S605-0), 
-                     process_water_streams=process_water_streams,
+                     process_water_streams=sum(process_water_streams.values(), ()),
+                     recycled_blowdown_streams=None,
                      outs=('process_water', 'discharged_water'))
 
 ADP = facilities.ADP('ADP', ins=plant_air_in, outs='plant_air_out',
@@ -579,7 +598,7 @@ get_GWP = lambda: get_material_GWP()+get_onsite_GWP()+get_electricity_GWP()
 def simulate_get_MESP(feedstock_price=71.3):
     ethanol.price = 0
     ethanol_sys.simulate()
-    feedstock.price = feedstock_price / _feedstock_factor
+    # feedstock.price = feedstock_price / _feedstock_factor
     for i in range(3):
         ethanol.price = ethanol_tea.solve_price(ethanol)
     MESP = ethanol.price * _ethanol_kg_2_gal
@@ -598,7 +617,7 @@ def simulate_and_print():
     print(f'Acid MESP: ${MESP:.2f}/gal with default pretreatment efficacy')
     print(f'GWP is {get_GWP():.3f} kg CO2-eq/gal ethanol')
 
-simulate_and_print()
+# simulate_and_print()
 
 
 

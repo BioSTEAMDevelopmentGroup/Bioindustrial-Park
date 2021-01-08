@@ -11,19 +11,14 @@
 # for license details.
 
 """
-Created on Fri Feb 28 09:53:03 2020
+References
+----------
+[1] Humbird et al., Process Design and Economics for Biochemical Conversion of 
+    Lignocellulosic Biomass to Ethanol: Dilute-Acid Pretreatment and Enzymatic 
+    Hydrolysis of Corn Stover; Technical Report NREL/TP-5100-47764; 
+    National Renewable Energy Lab (NREL), 2011.
+    https://www.nrel.gov/docs/fy11osti/47764.pdf
 
-References:
-[1] Cortes-Peña et al., BioSTEAM: A Fast and Flexible Platform for the Design, 
-    Simulation, and Techno-Economic Analysis of Biorefineries under Uncertainty. 
-    ACS Sustainable Chem. Eng. 2020, 8 (8), 3302–3310. 
-    https://doi.org/10.1021/acssuschemeng.9b07040
-    
-[2] Li et al., Tailored Pretreatment Processes for the Sustainable Design of
-    Lignocellulosic Biorefineries across the Feedstock Landscape. Submitted,
-    2020.
-
-@author: yalinli_cabbi
 """
 
 
@@ -141,6 +136,20 @@ class PWC(Facility):
 @cost('Flow rate', 'Cooling water pump', units='kg/hr',
       kW=1118.55, cost=283671, S=10982556,  CE=CEPCI[2010], n=0.8, BM=3.1)
 class CT(Facility):
+    '''
+    Create a cooling tower process with capital cost and power based on the
+    flow rate of cooling water as in [1]_.	
+    	
+    References	
+    ----------	
+    .. [1] Humbird et al., Process Design and Economics for Biochemical Conversion of 	
+        Lignocellulosic Biomass to Ethanol: Dilute-Acid Pretreatment and Enzymatic 	
+        Hydrolysis of Corn Stover; Technical Report NREL/TP-5100-47764; 	
+        National Renewable Energy Lab (NREL), 2011.	
+        https://www.nrel.gov/docs/fy11osti/47764.pdf	
+    	
+    '''
+    
     _N_ins = 3
     _N_outs = 2    
     _N_heat_utilities = 1
@@ -149,7 +158,7 @@ class CT(Facility):
     network_priority = 1
     line = 'Cooling tower'
 
-    # Including windage
+    # # Page 55 of ref [1], including windage
     blowdown = 0.00005+0.0015
     
     def __init__(self, ID='', ins=None, outs=()):
@@ -160,18 +169,20 @@ class CT(Facility):
         return_cw, ct_chems, makeup_water = self.ins
         process_cw, blowdown_water = self.outs
         system_cooling_water_utilities = self.system_cooling_water_utilities = {}
-
+        
+        # Based on stream 945 in ref [1]
         return_cw.T = 37 + 273.15
+        # Based on streams 940/944 in ref [1]
         process_cw.T = blowdown_water.T = 28 + 273.15
         
         total_duty = 0
         number = 1
+        agent = self.agent
         for u in self.system.units:
             if u is self: continue
             if hasattr(u, 'heat_utilities'):
                 for hu in u.heat_utilities:
-                    # cooling_water and chilled_water
-                    if hu.flow*hu.duty < 0:
+                    if hu.agent is agent:
                         system_cooling_water_utilities[f'#{number}: {u.ID} - {hu.ID}'] = hu
                         number += 1
                         total_duty -= hu.duty
@@ -188,6 +199,8 @@ class CT(Facility):
         makeup_water.imass['H2O'] = total_cooling_water * self.blowdown
         blowdown_water.imass['H2O'] = makeup_water.imass['H2O']
         
+        # 2 kg/hr from Table 30 on Page 63 of ref [1], 4.184 is kcal to kJ,	
+        # 97.401 MMkcal/hr is the cooling duty on Page 134 of ref [1]
         ct_chems.imass['CoolingTowerChems'] = 2 * (hu_cooling.duty/(97.401*4184000))
         self.design_results['Flow rate'] = total_cooling_water
 
@@ -199,7 +212,9 @@ class CT(Facility):
 # =============================================================================
 
 @cost(basis='Flow rate', ID='Boiler', units='kg/hr',
-      kW=2752, cost=28550000, S=238686, CE=CEPCI[2010], n=0.6, BM=1.8)
+      # 1336 based on process flow diagrams in ref [1], the info in equipment
+      # table (2752 kW) is not accurate
+      kW=1336, cost=28550000, S=238686, CE=CEPCI[2010], n=0.6, BM=1.8)
 @cost(basis='Work', ID='Turbogenerator', units='kW',
       kW=23.6, cost=9500000, S=42200, CE=CEPCI[2010], n=0.6, BM=1.8)
 @cost(basis='Flow rate', ID='Hot process water softener system', units='kg/hr',
@@ -209,10 +224,60 @@ class CT(Facility):
 @cost(basis='Flow rate', ID='Amine addition pkg', units='kg/hr',
       cost=40000, S=235803, CE=CEPCI[2010], n=0, BM=1.8)
 class CHP(Facility):
+    '''
+    Create a combined heat and power process that will calculate electricity	
+    generation from burning the feed based on [1]_ and [2]_.
+    
+    It also takes into account how much steam is being produced, and the
+    required cooling utility of the turbogenerator.
+    
+    Combustion reactions are populated based on molecular formula	
+    of the ins. Purchase natural gas if CHP cannot meet system heating demand.	
+    	
+    Parameters	
+    ----------	
+    ins : 	bst.Stream
+        [0] Liquid/solid wastes to be burned.	
+        [1] Gas waste to be burned.	
+        [2] Lime added for flue gas desulfurization.	
+        [3] Ammonia added for NOx removal.	
+        [4] Boiler chemicals.        	
+        [5] Baghouse bag.                	
+        [6] Supplementary natural gas in the case that waste energy is not enough	
+            to meet system steam demand	
+        [7] Makeup water.	
+    outs :	bst.Stream
+        [0] Gas emission.        	
+        [1] Ash residues.        	
+        [2] Blowdown water.	
+   	
+    B_eff : float	
+        Fraction of heat transfered to steam.        	
+    TG_eff : float	
+        Fraction of steam heat converted to electricity.        	
+    combustibles : tuple
+        IDs of combustible chemicals.
+    side_streams_to_heat : tuple
+        Process streams that need to be heat up.
+        	
+    References	
+    ----------	
+    .. [1] Humbird et al., Process Design and Economics for Biochemical Conversion of 	
+        Lignocellulosic Biomass to Ethanol: Dilute-Acid Pretreatment and Enzymatic 	
+        Hydrolysis of Corn Stover; Technical Report NREL/TP-5100-47764; 	
+        National Renewable Energy Lab (NREL), 2011.	
+        https://www.nrel.gov/docs/fy11osti/47764.pdf	
+	.. [2] Davis et al., Process Design and Economics for the Conversion of Lignocellulosic 	
+        Biomass to Hydrocarbon Fuels and Coproducts: 2018 Biochemical Design Case Update; 	
+        NREL/TP-5100-71949; National Renewable Energy Lab (NREL), 2018. 	
+        https://doi.org/10.2172/1483234
+        	
+    '''
+    
     _N_ins = 8
     _N_outs = 3
     _units= {'Flow rate': 'kg/hr',
-             'Work': 'kW'} 
+             'Work': 'kW'}
 
     network_priority = 0
     line = 'Combined heat and power'
@@ -237,7 +302,7 @@ class CHP(Facility):
     def _run(self): pass
 
     def _design(self):
-        feed_solids, feed_gases, lime, ammonia, boiler_chems, bag, natural_gas,\
+        feed_solids, feed_gases, lime, ammonia, boiler_chems, bag, natural_gas, \
             makeup_water = self.ins
         emission, ash, blowdown_water = self.outs
         side_streams_to_heat = self.side_streams_to_heat
@@ -255,7 +320,9 @@ class CHP(Facility):
         emission.mol += (combustible_feeds.mol+ammonia.mol)
         
         self.emission_rxns.force_reaction(emission.mol)
-        
+	       
+        # FGD lime scaled based on SO2 generated,	
+        # 20% stoichiometetric excess based on P52 of ref [1]
         lime.imol['Lime'] = max(0, - emission.imol['Lime'] * 1.2)
         emission.mol += lime.mol
 
@@ -349,6 +416,9 @@ class CHP(Facility):
         # Additional need for making lime slurry
         makeup_water.imol['H2O'] = blowdown_water.imol['H2O'] + lime.F_mol/0.2*0.8
         
+	    # 1.23 is $2007/hour and 2.2661 is 2007$/lb from Table 30 in ref [1],	
+        # 144.629 is the total duty from Page 131 in ref [1],	
+        # 2.20462 is kg to lb, 4.184 is kcal to kJ
         ratio = system_heating_demand/(144.629*1e6*4.184)
         boiler_chems.imass['BoilerChems'] = 1.23/2.2661/2.20462 * ratio
         bag.imass['BaghouseBag'] = ratio

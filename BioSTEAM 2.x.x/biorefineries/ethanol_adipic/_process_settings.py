@@ -10,30 +10,21 @@
 # for license details.
 
 """
-Created on Sat Jun 27 13:51:49 2020
-
-References:
+References
+----------
 [1] Humbird et al., Process Design and Economics for Biochemical Conversion of 
     Lignocellulosic Biomass to Ethanol: Dilute-Acid Pretreatment and Enzymatic 
     Hydrolysis of Corn Stover; Technical Report NREL/TP-5100-47764; 
     National Renewable Energy Lab (NREL), 2011.
     https://www.nrel.gov/docs/fy11osti/47764.pdf
-
 [2] Davis et al., Process Design and Economics for the Conversion of Lignocellulosic 
     Biomass to Hydrocarbon Fuels and Coproducts: 2018 Biochemical Design Case Update; 
     NREL/TP-5100-71949; National Renewable Energy Lab (NREL), 2018. 
-    https://doi.org/10.2172/1483234
-
-[3] Cortes-Peña et al., BioSTEAM: A Fast and Flexible Platform for the Design, 
-    Simulation, and Techno-Economic Analysis of Biorefineries under Uncertainty. 
-    ACS Sustainable Chem. Eng. 2020, 8 (8), 3302–3310. 
-    https://doi.org/10.1021/acssuschemeng.9b07040
-    
-[4] Argonne National Laboratory. The Greenhouse gases, Regulated Emissions,
+    https://doi.org/10.2172/1483234    
+[3] Argonne National Laboratory. The Greenhouse gases, Regulated Emissions,
     and Energy use in Transportation (GREET) Model https://greet.es.anl.gov/
     (accessed Aug 25, 2020).
     
-@author: yalinli_cabbi
 """
 
 
@@ -48,12 +39,14 @@ import thermosteam as tmo
 from biorefineries.ethanol_adipic._chemicals import chems
 
 bst.CE = 541.7 # year 2016
-_kg_per_ton = 907.18474
-_lb_per_kg = 2.20462
-_liter_per_gallon = 3.78541
-_ft3_per_m3 = 35.3147
-_J_per_BTU = 1055.06
+auom = tmo.units_of_measure.AbsoluteUnitsOfMeasure
+_kg_per_ton = auom('ton').conversion_factor('kg')
+_lb_per_kg = auom('kg').conversion_factor('lb')
+_liter_per_gallon = auom('gal').conversion_factor('L')
+_ft3_per_m3 = auom('m3').conversion_factor('ft3')
+_J_per_BTU =  auom('BTU').conversion_factor('J')
 _GDP_2007to2016 = 1.160
+_labor_2011to2016 = 1.059
 
 # =============================================================================
 # Energy balances
@@ -86,6 +79,23 @@ for i in (_lps, _mps, _hps, _cooling, _chilled):
 # From USD/dry-ton to USD/kg in 2016$, 20% moisture content
 _feedstock_factor = _kg_per_ton / 0.8
 feedstock_price = 71.3 / _feedstock_factor
+
+# $/Mg
+default_costs = {
+    'Grower': 23.94,
+    'Harvest': 20.72,
+    'Storage': 7.18,
+    'Transportation': 16.14,
+    'Preprocessing': 24.35
+    }
+
+def set_feedstock_price(feedstock, preprocessing=None):
+    '''Set price for the feedstock stream.'''
+    price = sum(i for i in default_costs.values())
+    if preprocessing:
+        price = price - default_costs['Preprocessing'] + preprocessing
+    feedstock.price = price/1e3/(1-feedstock.imass['Water']/feedstock.F_mass)
+    return feedstock.price
 
 # 2.86 is the average motor gasoline price between 2010-2019 in 2016 $/gal	
 # based on AEO from EIA, density of gasoline is 2.819 kg/gal	
@@ -126,6 +136,7 @@ natural_gas_price = CH4_cost_per_mol * (1000/CH4_MW)
 price = {'Feedstock': feedstock_price, 	
          'H2SO4': 0.0430 * _lb_per_kg,	
          # 0.1900 is for NH3	
+         'NH3': 0.1900 * _lb_per_kg,
          'NH4OH': 0.1900 * _lb_per_kg * 17.031/35.046,
          'NaOH': 0.2384 * _lb_per_kg,
          'CSL': 0.0339 * _lb_per_kg,	
@@ -159,6 +170,7 @@ bst.PowerUtility.price = price['Electricity']
 
 GWP_CFs = {
     'H2SO4': 44.47/1e3,
+    'NH3': 2.64,
     'NH4OH': 2.64 * chems.NH3.MW/chems.NH4OH.MW,    
     'NaOH': 2.11,
     'CSL': 1.55,
@@ -177,7 +189,7 @@ GWP_CF_stream = tmo.Stream('GWP_CF_stream', GWP_CF_array, units='kg/hr')
 GWP_CFs['Corn stover'] = 44.70/1e3 * 0.8
 # In kg CO2-eq/kWh
 GWP_CFs['Electricity'] = 0.48
-# From ref [4]
+# From ref [3]
 GWP_CFs['Adipic acid_fossil'] = 12.03
 GWP_CFs['Sodium sulfate'] = 0.47 # from sodium brine
 

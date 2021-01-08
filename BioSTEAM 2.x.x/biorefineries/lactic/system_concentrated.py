@@ -11,31 +11,19 @@
 # for license details.
 
 """
-Created on Tue Sep  1 15:56:17 2020
-
-References:
-[1] Cortes-Peña et al., BioSTEAM: A Fast and Flexible Platform for the Design, 
-    Simulation, and Techno-Economic Analysis of Biorefineries under Uncertainty. 
-    ACS Sustainable Chem. Eng. 2020, 8 (8), 3302–3310. 
-    https://doi.org/10.1021/acssuschemeng.9b07040
-    
-[2] Li et al., Tailored Pretreatment Processes for the Sustainable Design of
-    Lignocellulosic Biorefineries across the Feedstock Landscape. Submitted,
-    2020.
-    
-[3] Humbird et al., Process Design and Economics for Biochemical Conversion of 
+References
+----------   
+[1] Humbird et al., Process Design and Economics for Biochemical Conversion of 
     Lignocellulosic Biomass to Ethanol: Dilute-Acid Pretreatment and Enzymatic 
     Hydrolysis of Corn Stover; Technical Report NREL/TP-5100-47764; 
     National Renewable Energy Lab (NREL), 2011.
     https://www.nrel.gov/docs/fy11osti/47764.pdf
-
-[4] Kuo et al., Production of Optically Pure L-Lactic Acid from Lignocellulosic
+[2] Kuo et al., Production of Optically Pure L-Lactic Acid from Lignocellulosic
     Hydrolysate by Using a Newly Isolated and d-Lactate Dehydrogenase
     Gene-Deficient Lactobacillus Paracasei Strain.
     Bioresource Technology 2015, 198, 651–657.
     https://doi.org/10.1016/j.biortech.2015.09.071.
 
-    
 Naming conventions:
     D = Distillation column
     E = Evaporator
@@ -57,7 +45,6 @@ Processes:
     500: Wastewater treatment
     600: Facilities
 
-@author: yalinli_cabbi
 """
 
 
@@ -75,7 +62,7 @@ from biorefineries.lactic._process_settings import price, CFs
 from biorefineries.lactic._utils import baseline_feedflow, set_yield, find_split, splits_df
 from biorefineries.lactic._chemicals import chems, chemical_groups, sugars, soluble_organics, \
     insolubles, combustibles
-from biorefineries.lactic._tea_lca import LacticTEA
+from biorefineries.lactic._tea import LacticTEA
 
 flowsheet = bst.Flowsheet('lactic')
 bst.main_flowsheet.set_flowsheet(flowsheet)
@@ -214,7 +201,7 @@ M301 = units.EnzymeHydrolysateMixer('M301', ins=(P201-0, enzyme_M301, water_M301
 H301 = bst.units.HXutility('H301', ins=M301-0, T=50+273.15)
 
 R300 = units.Saccharification('R300', ins=H301-0, outs=('saccharified_stream',))
-# Extend saccharification time based on ref [3] as saccharification and
+# Extend saccharification time based on ref [1] as saccharification and
 # co-fermentation are separated now
 R300.tau_saccharification = 84
 
@@ -228,19 +215,12 @@ S301 = units.CellMassFilter('S301', ins=R300-0, outs=('S301_cell_mass', ''),
                                              S301_cell_mass_split,
                                              S301_filtrate_split,
                                              chemical_groups))
-E301 = units.SpecialEvaporator('E301', ins=S301-1, outs=('E301_solid',
-                                                         'E301_condensate'),
-                               P=(101325, 73581, 50892, 32777, 20000), V=0.76)
-E301.bypass = True
 
-E301_P = units.SpecialPump('E301_P', ins=E301-0)
-def E301_P1_bypass():
-    if E301.bypass == True:
-        E301_P.bypass = True
-    else:
-        E301_P.bypass = False
-    E301_P._run()
-E301_P.specification = E301_P1_bypass
+E301 = bst.units.MultiEffectEvaporator('E301', ins=S301-1,
+                                       outs=('E301_solid', 'E301_condensate'),
+                                       P=(101325, 73581, 50892, 32777, 20000),
+                                       V=0.76)
+E301_P = bst.units.Pump('E301_P', ins=E301-0)
 
 R301 = units.CoFermentation('R301',
                             ins=(E301_P-0, '', CSL_R301, water_R301, lime_R301),
@@ -248,23 +228,8 @@ R301 = units.CoFermentation('R301',
                             neutralization=True, mode='Batch',
                             allow_dilution=False,
                             allow_concentration=False)
-R301_P1 = units.SpecialPump('R301_P1', ins=R301-0)
-def R301_P1_bypass():
-    if R301.mode == 'Batch':
-        R301_P1.bypass = True
-    else:
-        R301_P1.bypass = False
-    R301_P1._run()
-R301_P1.specification = R301_P1_bypass
-
-R301_P2 = units.SpecialPump('R301_P2', ins=R301-1)
-def R301_P2_bypass():
-    if R301.mode == 'Batch':
-        R301_P2.bypass = True
-    else:
-        R301_P2.bypass = False
-    R301_P2._run()
-R301_P2.specification = R301_P2_bypass
+R301_P1 = bst.units.Pump('R301_P1', ins=R301-0)
+R301_P2 = bst.units.Pump('R301_P2', ins=R301-1)
 
 R302 = units.SeedTrain('R302', ins=R301_P2-0, outs=('seed',))
 
@@ -285,7 +250,7 @@ def sugar_at_V(V):
         sugar_conc = R301.ins[0].imass[sugars].sum()/R301.ins[0].F_vol
     if R301.mode == 'Continuous':
         sugar_conc = R301.outs[0].imass[sugars].sum()/R301.outs[0].F_vol
-    # Maximum sugar concentration of 220 g/L (initial titer in ref [4],
+    # Maximum sugar concentration of 220 g/L (initial titer in ref [2],
     # highest from collected papers)
     return sugar_conc-220
 
@@ -300,8 +265,8 @@ def adjust_R301_V():
     set_yield(R301.yield_limit, R301, R302)
     titer_loop._run()
     if R301.allow_concentration:
-        E301.bypass = False
-        E301_P.bypass = False
+        # E301.bypass = False
+        # E301_P.bypass = False
         if R301.effluent_titer < R301.titer_limit:
             # When E301.V == 0.76, total sugar concentration is 600 g/L in
             # the solid-rich condensate
@@ -661,7 +626,7 @@ plant_air_in = Stream('plant_air_in', phase='g', units='kg/hr',
 # Facilities units
 # =============================================================================
 
-# 7-day storage time similar to ethanol's in ref [3]
+# 7-day storage time similar to ethanol's in ref [1]
 T601 = bst.units.StorageTank('T601', ins=F402_P-0, tau=7*24, V_wf=0.9,
                               vessel_type='Floating roof',
                               vessel_material='Stainless steel')
@@ -683,12 +648,12 @@ T604 = units.CSLstorage('T604', ins=CSL, outs=CSL_R301)
 # simulation (facilities simulated after system)
 T605 = units.LimeStorage('T605', ins=lime, outs=lime_R301)
 
-# 7-day storage time similar to ethanol's in ref [3]
+# 7-day storage time similar to ethanol's in ref [1]
 T606 = units.SpecialStorage('T606', ins=ethanol, tau=7*24, V_wf=0.9,
                             vessel_type='Floating roof',
                             vessel_material='Carbon steel')
 T606.line = 'Ethanol storage'
-T606_P = units.SpecialPump('T606_P', ins=T606-0, outs=ethanol_R402)
+T606_P = bst.units.Pump('T606_P', ins=T606-0, outs=ethanol_R402)
 
 T607 = units.FireWaterStorage('T607', ins=firewater_in, outs='firewater_out')
 
@@ -729,8 +694,6 @@ CIP = facilities.CIP('CIP', ins=CIP_chems_in, outs='CIP_chems_out')
 
 # Heat exchange network
 HXN = bst.units.HeatExchangerNetwork('HXN')
-# from lactic.hx_network import HX_Network
-# HXN = HX_Network('HXN')
 
 HXN_group = UnitGroup('HXN_group', units=(HXN,))
 process_groups.append(HXN_group)
@@ -761,6 +724,7 @@ lactic_sys = System('lactic_sys',
                           T601, T601_P, T602_S, T602, T603_S, T603, T604, T605,
                           T606, T606_P, T607, M601),
                     facilities=(HXN, CHP, CT, PWC, ADP, CIP))
+                    # facilities=(CHP, CT, PWC, ADP, CIP))
 
 CHP_sys = System('CHP_sys', path=(CHP,))
 
@@ -810,7 +774,7 @@ for i in CHP_sys.feeds:
 for i in CHP_sys.products:
     lactic_sys.products.remove(i)
 
-# Changed to MACRS 20 to be consistent with ref [3]
+# Changed to MACRS 20 to be consistent with ref [1]
 CHP_tea = bst.TEA.like(CHP_sys, lactic_no_CHP_tea)
 CHP_tea.labor_cost = 0
 CHP_tea.depreciation = 'MACRS20'
@@ -845,7 +809,7 @@ def get_material_GWP():
     return chemical_GWP.sum()/lactic_acid.F_mass
 
 # GWP from onsite emission (e.g., combustion) of non-biogenic carbons
-get_onsite_GWP =  lambda: (natural_gas.get_atomic_flow('C')+ethanol.get_atomic_flow('C')) \
+get_onsite_GWP = lambda: (natural_gas.get_atomic_flow('C')+ethanol.get_atomic_flow('C')) \
     * chems.CO2.MW / lactic_acid.F_mass
 
 # GWP from electricity
@@ -881,7 +845,7 @@ def simulate_and_print():
     print('--------------------\n')
 
 bst.speed_up()
-simulate_and_print()
+# simulate_and_print()
 
 
 

@@ -10,22 +10,6 @@
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
 # for license details.
 
-"""
-Created on Mon May 11 16:26:46 2020
-
-References:
-[1] Cortes-Peña et al., BioSTEAM: A Fast and Flexible Platform for the Design, 
-    Simulation, and Techno-Economic Analysis of Biorefineries under Uncertainty. 
-    ACS Sustainable Chem. Eng. 2020, 8 (8), 3302–3310. 
-    https://doi.org/10.1021/acssuschemeng.9b07040
-    
-[2] Li et al., Tailored Pretreatment Processes for the Sustainable Design of
-    Lignocellulosic Biorefineries across the Feedstock Landscape. Submitted,
-    2020.
-    
-@author: yalinli_cabbi
-"""
-
 
 # %%
 
@@ -43,6 +27,8 @@ from biorefineries.lactic import system
 
 _kg_per_ton = 907.18474
 _feedstock_factor = _kg_per_ton / 0.8
+
+system.simulate_and_print()
 
 
 # %% 
@@ -307,7 +293,7 @@ index_IRR = len(metrics)
 # %%
 
 # =============================================================================
-# Metrics for life cycle assessment (LCA)
+# Metrics for global warming potential
 # =============================================================================
 
 get_GWP = system.get_GWP

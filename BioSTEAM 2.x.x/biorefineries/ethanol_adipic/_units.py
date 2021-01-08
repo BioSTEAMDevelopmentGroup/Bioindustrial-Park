@@ -18,12 +18,10 @@ References:
     Hydrolysis of Corn Stover; Technical Report NREL/TP-5100-47764; 
     National Renewable Energy Lab (NREL), 2011.
     https://www.nrel.gov/docs/fy11osti/47764.pdf
-
 [2] Davis et al., Process Design and Economics for the Conversion of Lignocellulosic 
     Biomass to Hydrocarbon Fuels and Coproducts: 2018 Biochemical Design Case Update; 
     NREL/TP-5100-71949; National Renewable Energy Lab (NREL), 2018. 
     https://doi.org/10.2172/1483234
-
 [3] Cortes-Peña et al., BioSTEAM: A Fast and Flexible Platform for the Design, 
     Simulation, and Techno-Economic Analysis of Biorefineries under Uncertainty. 
     ACS Sustainable Chem. Eng. 2020, 8 (8), 3302–3310. 
@@ -73,6 +71,7 @@ ParallelRxn = tmo.reaction.ParallelReaction
 # Feedstock preprocessing
 # =============================================================================
 
+
 # The system as a whole, capital and operating costs already considered in 
 # the cost of feedstock cost
 @cost(basis='Flow rate', ID='System', units='kg/hr',
@@ -97,7 +96,7 @@ class SulfuricAcidAdditionTank(Unit):
     _N_ins = 1
     _N_outs = 1
     
-    # Bseline is (18+4.1) mg/g dry biomass as in ref [1], 93% purity
+    # Baseline is (18+4.1) mg/g dry biomass as in ref [1], 93% purity
     acid_loading = 22.1
 
     def __init__(self, ID='', ins=None, outs=(), *, feedstock_dry_mass):

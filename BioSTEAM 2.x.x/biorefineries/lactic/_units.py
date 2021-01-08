@@ -11,39 +11,20 @@
 # for license details.
 
 """
-Created on Thu Dec 19 16:19:18 2019
-
-Modified from the biorefineries constructed in [1] and [2] for the production of
-lactic acid from lignocellulosic feedstocks
-
-[1] Cortes-Peña et al., BioSTEAM: A Fast and Flexible Platform for the Design, 
-    Simulation, and Techno-Economic Analysis of Biorefineries under Uncertainty. 
-    ACS Sustainable Chem. Eng. 2020, 8 (8), 3302–3310. 
-    https://doi.org/10.1021/acssuschemeng.9b07040
-    
-[2] Li et al., Tailored Pretreatment Processes for the Sustainable Design of
-    Lignocellulosic Biorefineries across the Feedstock Landscape. Submitted,
-    2020.
-    
-[3] Humbird et al., Process Design and Economics for Biochemical Conversion of 
+References
+----------
+[1] Humbird et al., Process Design and Economics for Biochemical Conversion of 
     Lignocellulosic Biomass to Ethanol: Dilute-Acid Pretreatment and Enzymatic 
     Hydrolysis of Corn Stover; Technical Report NREL/TP-5100-47764; 
     National Renewable Energy Lab (NREL), 2011.
     https://www.nrel.gov/docs/fy11osti/47764.pdf
-
-[4] Aden et al., Process Design Report for Stover Feedstock: Lignocellulosic
+[2] Aden et al., Process Design Report for Stover Feedstock: Lignocellulosic
     Biomass to Ethanol Process Design and Economics Utilizing Co-Current Dilute
     Acid Prehydrolysis and Enzymatic Hydrolysis for Corn Stover; NREL/TP-510-32438;
     National Renewable Energy Lab (NREL), 2002.
     https://doi.org/10.2172/1218326.
 
-@author: yalinli_cabbi
 """
-
-'''
-TODO:
-    After [2] is accepted, import all shared units from ethanol_adipic module
-'''
 
 
 # %% Setup
@@ -54,8 +35,8 @@ from math import exp, pi, ceil
 from flexsolve import aitken_secant
 from biosteam import Unit
 from biosteam.exceptions import DesignError
-from biosteam.units import Flash, HXutility, Mixer, MixTank, MultiEffectEvaporator, \
-    Pump, SolidsSeparator, StorageTank
+from biosteam.units import Flash, HXutility, Mixer, MixTank, Pump, \
+    SolidsSeparator, StorageTank
 from biosteam.units.design_tools import PressureVessel
 from biosteam.units.design_tools import pressure_vessel_material_factors as factors
 from biosteam.units.decorators import cost
@@ -363,30 +344,6 @@ class EnzymeHydrolysateMixer(Mixer):
         	
         effluent.mix_from([hydrolysate, enzyme, water])
 
-# Modified from bst.units.MultiEffectEvaporator, which won't simulate for V=0
-class SpecialEvaporator(MultiEffectEvaporator):
-    bypass = True
-    
-    def _run(self):
-        if self.bypass:
-            self.outs[0].copy_like(self.ins[0])
-            self.outs[1].empty()
-            self.heat_utilities = ()
-        else:
-            super()._run()
-
-    def _design(self):
-        if self.bypass:
-            self.design_results.clear()
-        else:
-            super()._design()
-      
-    def _cost(self):
-        if self.bypass:
-            self.purchase_costs.clear()
-        else:
-            super()._cost()
-
 # Saccharification and co-fermentation (both glucose & xylose are used in fermentation)
 # Not including heat exchanger as saccharificatoin and co-fermentation 
 # are at the same temperature now
@@ -399,16 +356,16 @@ class SpecialEvaporator(MultiEffectEvaporator):
       CE=CEPCI[2009], n=1, BM=1.5)
 @cost(basis='Fermenter size', ID='Agitator', units='kg',
       # Scaling basis based on sum of all streams into fermenter
-      # (304, 306, 311, and 312 in ref [3])
+      # (304, 306, 311, and 312 in ref [1])
       # and total residence time (batch hydrolysis and fermentation),
       kW=268.452, cost=630000, S=(42607+443391+948+116)*(60+36),
       CE=CEPCI[2009], n=1, BM=1.5)
 @cost(basis='Recirculation flow rate', ID='Recirculation pump', units='kg/hr',
       # Scaling basis based on sum of all streams into fermenter
-      # (304, 306, 311, and 312 in ref [3])
+      # (304, 306, 311, and 312 in ref [1])
       # Pumps already in SS316
       kW=74.57, cost=47200, S=(42607+443391+948+116), CE=CEPCI[2009], n=0.8, BM=2.3)
-# The HydrolysateCooler in ref [3]
+# The HydrolysateCooler in ref [1]
 @cost(basis='Duty', ID='Hydrolysate cooler', units='kJ/hr',
       # 13 is the duty in MMkca/hr
       cost=85000, S=-8*_Gcal_2_kJ, CE=CEPCI[2010], n=0.7, BM=2.2)
@@ -437,7 +394,7 @@ class SaccharificationAndCoFermentation(Unit):
     
     yield_limit = 0.76 # in g/g-sugar
     
-    tau_turnaround = 12 # in hr, the same as the seed train in ref [3]
+    tau_turnaround = 12 # in hr, the same as the seed train in ref [1]
     
     def __init__(self, ID='', ins=None, outs=(), T=50+273.15,
                  neutralization=True, set_titer_limit=True):
@@ -456,7 +413,7 @@ class SaccharificationAndCoFermentation(Unit):
             Rxn('Cellobiose + H2O -> 2 Glucose',      'Cellobiose',     1)
             ])
         
-        # FermMicrobe reaction from ref [3]
+        # FermMicrobe reaction from ref [1]
         self.cofermentation_rxns = ParallelRxn([
         #      Reaction definition            Reactant    Conversion
         Rxn('Glucose -> 2 LacticAcid',        'Glucose',   0.76),
@@ -708,13 +665,13 @@ class Reactor(Unit, PressureVessel, isabstract=True):
       CE=CEPCI[2009], n=1, BM=1.5)
 @cost(basis='Fermenter size', ID='Agitator', units='kg',
       # Scaling basis based on sum of all streams into fermenter
-      # (304, 306, 311, and 312 in ref [3])
+      # (304, 306, 311, and 312 in ref [1])
       # and total residence time (batch hydrolysis and fermentation)
       kW=268.452, cost=630000, S=(42607+443391+948+116)*(60+36),
       CE=CEPCI[2009], n=1, BM=1.5)
 @cost(basis='Recirculation flow rate', ID='Recirculation pump', units='kg/hr',
       # Scaling basis based on sum of all streams into fermenter
-      # (304, 306, 311, and 312 in ref [3])
+      # (304, 306, 311, and 312 in ref [1])
       kW=74.57, cost=47200, S=(42607+443391+948+116), CE=CEPCI[2009], n=0.8, BM=2.3)
 class CoFermentation(Reactor):
     _N_ins = 5
@@ -743,7 +700,7 @@ class CoFermentation(Reactor):
     
     yield_limit = 0.76 # in g/g-sugar
     
-    tau_batch_turnaround = 12 # in hr, the same as the seed train in ref [3]
+    tau_batch_turnaround = 12 # in hr, the same as the seed train in ref [1]
 
     def __init__(self, ID='', ins=None, outs=(), thermo=None, *, T=50+273.15,
                  P=101325, V_wf=0.8, length_to_diameter=0.6,
@@ -772,7 +729,7 @@ class CoFermentation(Reactor):
         self.mixed_feed = tmo.Stream('mixed_feed')
         self.heat_exchanger = HXutility(None, None, None, T=T) 
         
-        # FermMicrobe reaction from ref [3]
+        # FermMicrobe reaction from ref [1]
         self.cofermentation_rxns = ParallelRxn([
         #      Reaction definition            Reactant    Conversion
         Rxn('Glucose -> 2 LacticAcid',        'Glucose',   0.76),
@@ -840,7 +797,7 @@ class CoFermentation(Reactor):
             self.heat_exchanger.simulate_as_auxiliary_exchanger(duty, _mixture)
         
         elif mode == 'Continuous':
-            self._Vmax = 3785.41178 # 1,000,000 gallon from ref [3]
+            self._Vmax = 3785.41178 # 1,000,000 gallon from ref [1]
             Reactor._design(self)
             # Include a backup fermenter for cleaning
             Design['Number of reactors'] += 1
@@ -879,7 +836,7 @@ class CoFermentation(Reactor):
 
 # Seed train, 5 stages, 2 trains
 @cost(basis='Seed fermenter size', ID='Stage #1 fermenter', units='kg',
-      # 44339, 211, and 26 are streams 303, 309, and 310 in ref [3]
+      # 44339, 211, and 26 are streams 303, 309, and 310 in ref [1]
       cost=75400*_316_over_304, S=(44339+211+26)*36, CE=CEPCI[2009], n=0.7, BM=1.8)
 @cost(basis='Seed fermenter size', ID='Stage #2 fermenter', units='kg',
       cost=116600*_316_over_304, S=(44339+211+26)*36, CE=CEPCI[2009], n=0.7, BM=1.8)
@@ -901,7 +858,7 @@ class SeedTrain(Unit):
     _units= {'Seed fermenter size': 'kg',
              'Flow rate': 'kg/hr'}
     
-    tau_turnaround = 12 # in hr, the same as ref [3]
+    tau_turnaround = 12 # in hr, the same as ref [1]
     
     effluent_titer = 0
     
@@ -914,7 +871,7 @@ class SeedTrain(Unit):
         Unit.__init__(self, ID, ins, outs)
         self.T = T
         
-        # FermMicrobe reaction from ref [3]
+        # FermMicrobe reaction from ref [1]
         self.cofermentation_rxns = ParallelRxn([
         #      Reaction definition            Reactant    Conversion
         Rxn('Glucose -> 2 LacticAcid',        'Glucose',   0.76*0.95),
@@ -1005,9 +962,9 @@ class CellMassFilter(SolidsSeparator):
     def _design(self):
         Design = self.design_results
         # 809 is the scailng basis of equipment M-505,
-        # 391501 from stream 508 in ref [3]
+        # 391501 from stream 508 in ref [1]
         Design['Pressing air flow rate'] = 809/391501 * self.ins[0].F_mass
-        # 12105 and 391501 from streams 559 and 508 in ref [3]
+        # 12105 and 391501 from streams 559 and 508 in ref [1]
         Design['Drying air flow rate'] = 12105/391501 * self.ins[0].F_mass
         Design['Solids flow rate'] = self.outs[0].F_mass
         Design['Filtrate flow rate'] = self.outs[1].F_mass
@@ -1062,10 +1019,10 @@ class AcidulationReactor(Reactor):
         
 # Filter to separate gypsum from the acidified fermentation broth
 @cost(basis='Feed flow rate', ID='Hydrocyclone & rotary drum filter', units='kg/hr',
-      # Size based on stream 239 in ref [4]
+      # Size based on stream 239 in ref [2]
       cost=187567, S=272342, CE=CEPCI[1998], n=0.39, BM=1.4)
 @cost(basis='Filtrate flow rate', ID='Filtered hydrolysate pump', units='kg/hr',
-      # Size based on stream 230 in ref [4], power based on
+      # Size based on stream 230 in ref [2], power based on
       # SaccharificationAndCoFermentation Filtrate Saccharification transfer pumps
       kW=74.57*265125/421776, cost=31862, S=265125, CE=CEPCI[1997], n=0.79, BM=2.8)
 class GypsumFilter(SolidsSeparator):
@@ -1680,14 +1637,14 @@ class AmmoniaStorage(Unit): pass
       kW=0.37285, cost=3000, S=1393, CE=CEPCI[2009], n=0.8, BM=3.1)
 class CSLstorage(Unit): pass
 
-# For storage of lime used in separation and waste treatment as in ref [4]
+# For storage of lime used in separation and waste treatment as in ref [2]
 @cost(basis='Flow rate', ID='Storage bin', units='kg/hr',
       cost=136370, S=2395, CE=CEPCI[1997], n=0.46, BM=1.3)
 # Cost not scaled, thus used n=0
-# Power usage scaled based on M104 (truck dumper hopper) in ref [3]
+# Power usage scaled based on M104 (truck dumper hopper) in ref [1]
 @cost(basis='Flow rate', ID='Feeder', units='kg/hr',
       kW=37.285/3500*140, cost=3900, S=2395, CE=CEPCI[1997], n=0, BM=1.3)
-# Power usage scaled based on M-106 (dust collection system) in ref [3]
+# Power usage scaled based on M-106 (dust collection system) in ref [1]
 @cost(basis='Flow rate', ID='Unloading blower', units='kg/hr',
       kW=18.6425*7425/8500, cost=99594, S=2395, CE=CEPCI[1998], n=0.5, BM=1.4)
 @cost(basis='Flow rate', ID='Dust vent baghouse', units='kg/hr',
@@ -1705,36 +1662,6 @@ class SpecialStorage(StorageTank):
             self.design_results['Number of tanks'] = 0
             self.purchase_costs['Tanks'] = 0
         else: StorageTank._cost(self)
-
-# Modified from bst.units.Pump, which won't simulate for empty flow 
-class SpecialPump(Pump):
-    bypass = True
-    
-    def _design(self):
-        Design = self.design_results
-        if self.bypass:
-            Design.clear()
-        elif self.ins[0].F_mol == 0:
-            Design['Ideal power'] = 0
-            Design['Flow rate'] = 0
-            Design['Efficiency'] = 0
-            Design['Actual power'] = 0
-            Design['Pump power'] = 0
-            Design['N'] = 0
-            Design['Head'] = 0
-            Design['Type'] = 'NA'
-        else:
-            Pump._design(self)
-      
-    def _cost(self):
-        Cost = self.purchase_costs
-        if self.bypass:
-            Cost.clear()
-        elif self.ins[0].F_mol == 0:  
-            Cost['Pump'] = 0
-            Cost['Motor'] = 0
-        else:
-            Pump._cost(self)
 
 @cost(basis='Flow rate', ID='Tank', units='kg/hr',
       cost=803000, S=8343, CE=CEPCI[2009], n=0.7, BM=1.7)

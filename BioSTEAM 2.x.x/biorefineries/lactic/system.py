@@ -11,19 +11,9 @@
 # for license details.
 
 """
-Created on Mon Dec 30 09:15:23 2019
-
-References:
-[1] Cortes-Peña et al., BioSTEAM: A Fast and Flexible Platform for the Design, 
-    Simulation, and Techno-Economic Analysis of Biorefineries under Uncertainty. 
-    ACS Sustainable Chem. Eng. 2020, 8 (8), 3302–3310. 
-    https://doi.org/10.1021/acssuschemeng.9b07040
-    
-[2] Li et al., Tailored Pretreatment Processes for the Sustainable Design of
-    Lignocellulosic Biorefineries across the Feedstock Landscape. Submitted,
-    2020.
-    
-[3] Humbird et al., Process Design and Economics for Biochemical Conversion of 
+References
+----------
+[1] Humbird et al., Process Design and Economics for Biochemical Conversion of 
     Lignocellulosic Biomass to Ethanol: Dilute-Acid Pretreatment and Enzymatic 
     Hydrolysis of Corn Stover; Technical Report NREL/TP-5100-47764; 
     National Renewable Energy Lab (NREL), 2011.
@@ -50,7 +40,6 @@ Processes:
     500: Wastewater treatment
     600: Facilities
 
-@author: yalinli_cabbi
 """
 
 
@@ -62,12 +51,13 @@ from flexsolve import aitken_secant, IQ_interpolation
 from biosteam import System
 from biosteam.process_tools import UnitGroup
 from thermosteam import Stream
+
 from biorefineries.lactic import _units as units
 from biorefineries.lactic import _facilities as facilities
 from biorefineries.lactic._process_settings import price, CFs
 from biorefineries.lactic._utils import baseline_feedflow, set_yield, find_split, splits_df
 from biorefineries.lactic._chemicals import chems, chemical_groups, soluble_organics, combustibles
-from biorefineries.lactic._tea_lca import LacticTEA
+from biorefineries.lactic._tea import LacticTEA
 
 flowsheet = bst.Flowsheet('lactic')
 bst.main_flowsheet.set_flowsheet(flowsheet)
@@ -580,7 +570,7 @@ plant_air_in = Stream('plant_air_in', phase='g', units='kg/hr',
 # Facilities units
 # =============================================================================
 
-# 7-day storage time similar to ethanol's in ref [3]
+# 7-day storage time similar to ethanol's in ref [1]
 T601 = bst.units.StorageTank('T601', ins=F402_P-0, tau=7*24, V_wf=0.9,
                               vessel_type='Floating roof',
                               vessel_material='Stainless steel')
@@ -602,12 +592,12 @@ T604 = units.CSLstorage('T604', ins=CSL, outs=CSL_R301)
 # simulation (facilities simulated after system)
 T605 = units.LimeStorage('T605', ins=lime, outs=lime_R301)
 
-# 7-day storage time similar to ethanol's in ref [3]
+# 7-day storage time similar to ethanol's in ref [1]
 T606 = units.SpecialStorage('T606', ins=ethanol, tau=7*24, V_wf=0.9,
                             vessel_type='Floating roof',
                             vessel_material='Carbon steel')
 T606.line = 'Ethanol storage'
-T606_P = units.SpecialPump('T606_P', ins=T606-0, outs=ethanol_R402)
+T606_P = bst.units.Pump('T606_P', ins=T606-0, outs=ethanol_R402)
 
 T607 = units.FireWaterStorage('T607', ins=firewater_in, outs='firewater_out')
 
@@ -646,8 +636,6 @@ CIP = facilities.CIP('CIP', ins=CIP_chems_in, outs='CIP_chems_out')
 
 # Heat exchange network
 HXN = bst.units.HeatExchangerNetwork('HXN')
-# from lactic.hx_network import HX_Network
-# HXN = HX_Network('HXN')
 
 HXN_group = UnitGroup('HXN_group', units=(HXN,))
 process_groups.append(HXN_group)
@@ -727,7 +715,7 @@ for i in CHP_sys.feeds:
 for i in CHP_sys.products:
     lactic_sys.products.remove(i)
 
-# Changed to MACRS 20 to be consistent with ref [3]
+# Changed to MACRS 20 to be consistent with ref [1]
 CHP_tea = bst.TEA.like(CHP_sys, lactic_no_CHP_tea)
 CHP_tea.labor_cost = 0
 CHP_tea.depreciation = 'MACRS20'
@@ -835,7 +823,7 @@ def simulate_operating_improvement():
     print('--------------------\n')    
 
 bst.speed_up()
-simulate_and_print()
+# simulate_and_print()
 # simulate_fermentation_improvement()
 # simulate_separation_improvement()
 # simulate_operating_improvement()

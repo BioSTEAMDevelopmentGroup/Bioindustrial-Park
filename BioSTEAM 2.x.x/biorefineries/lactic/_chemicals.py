@@ -10,21 +10,6 @@
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
 # for license details.
 
-"""
-Created on Mon Dec 30 09:32:24 2019
-
-References:
-[1] Cortes-Peña et al., BioSTEAM: A Fast and Flexible Platform for the Design, 
-    Simulation, and Techno-Economic Analysis of Biorefineries under Uncertainty. 
-    ACS Sustainable Chem. Eng. 2020, 8 (8), 3302–3310. 
-    https://doi.org/10.1021/acssuschemeng.9b07040
-    
-[2] Li et al., Tailored Pretreatment Processes for the Sustainable Design of
-    Lignocellulosic Biorefineries across the Feedstock Landscape. Submitted,
-    2020.
-
-@author: yalinli_cabbi
-"""
 
 # %%  
 
@@ -66,7 +51,8 @@ def chemical_defined(ID, **kwargs):
     defined_chemicals_dict[ID] = f'{ID}: {chemical.formula}/{chemical.MW}'
     return chemical
 
-_cal2joule = 4.184
+auom = tmo.units_of_measure.AbsoluteUnitsOfMeasure
+_cal2joule = auom('cal').conversion_factor('J')
 
 
 # %% 
@@ -371,7 +357,7 @@ for chemical in chems:
     if chemical.ID in vle_chemicals or chemical.locked_state=='g':
         continue
     V_l = tmo.functional.rho_to_V(1e5, chemical.MW)
-    V_s = tmo.functional.rho_to_V(1540, chemical.MW)    
+    V_s = tmo.functional.rho_to_V(1540, chemical.MW)
     if chemical.locked_state == 'l':
         chemical.V.add_model(V_l, top_priority=True)
     elif chemical.locked_state == 's':

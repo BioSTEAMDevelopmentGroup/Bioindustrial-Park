@@ -10,24 +10,6 @@
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
 # for license details.
 
-"""
-Created on Wed Jul 22 19:48:14 2020
-
-Modified from the biorefineries constructed in [1] and [2] for the production of
-lactic acid from lignocellulosic feedstocks
-
-[1] Cortes-Peña et al., BioSTEAM: A Fast and Flexible Platform for the Design, 
-    Simulation, and Techno-Economic Analysis of Biorefineries under Uncertainty. 
-    ACS Sustainable Chem. Eng. 2020, 8 (8), 3302–3310. 
-    https://doi.org/10.1021/acssuschemeng.9b07040
-    
-[2] Li et al., Tailored Pretreatment Processes for the Sustainable Design of
-    Lignocellulosic Biorefineries across the Feedstock Landscape. Submitted,
-    2020.
-
-@author: yalinli_cabbi
-"""
-
 
 # %% 
 
@@ -85,8 +67,10 @@ NPVs = []
 GWPs = []
 FECs = []
 
-# Configuration 1
+# Configuration 2
 from biorefineries.lactic import system_concentrated as concentrated
+concentrated.simulate_and_print()
+
 carb_contents1 = np.arange(0.25, 0.59, 0.01)
 carb_contents1 = carb_contents1.tolist() + [0.589]
 concentrated.R301.allow_dilution = False
@@ -118,6 +102,8 @@ for i in carb_contents1:
 
 # Then concentration needed to get to the baseline titer
 from biorefineries.lactic import system_diluted as diluted
+diluted.simulate_and_print()
+
 carb_contents2 = np.arange(0.59, 0.701, 0.01).tolist()
 diluted.R301.allow_dilution = True
 diluted.R301.allow_concentration = False
