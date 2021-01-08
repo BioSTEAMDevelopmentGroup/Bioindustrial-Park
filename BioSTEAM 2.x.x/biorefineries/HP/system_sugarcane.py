@@ -76,6 +76,17 @@ bst.CE = 541.7
 # Set default thermo object for the system
 tmo.settings.set_thermo(HP_chemicals)
 
+
+# if BST222:
+#     System.default_converge_method = 'fixed-point' # aitken isn't stable
+#     System.default_maxiter = 1500
+#     System.default_molar_tolerance = 0.02
+# else:
+
+System.default_maxiter = 1500
+System.default_converge_method = 'aitken'
+System.default_molar_tolerance = 0.02
+    
 # %% 
 
 # =============================================================================
@@ -88,6 +99,9 @@ s = F.stream
 juicing_sys = sc.create_juicing_system(feedstock='feedstock',
                                        sugar_solution_ID='sugar_solution')
 feedstock = s.feedstock
+
+# For diluting concentrated, inhibitor-reduced hydrolysate
+dilution_water = Stream('dilution_water')
 
 # =============================================================================
 # Concentration
@@ -104,15 +118,21 @@ F301 = bst.units.MultiEffectEvaporator('F301', ins=s.sugar_solution, outs=('F301
                                         # P = (101325, 73581, 50892, 32777, 20000), V = 0.001)
 F301.V = 0.5 #for sugars concentration of 591.25 g/L (599.73 g/L after cooling to 30 C)
 
+# TODO: Add mixer for dilution water
+
 F301_P = units.HPPump('F301_P', ins=F301-1)
 # F301_H = bst.units.HXutility('F301_H', ins=F301-0, V = 0.)
 
-M304_H = bst.units.HXutility('M304_H', ins=F301-0, T=30+273.15)
-M304_H_P = units.HPPump('M304_H_P', ins=M304_H-0)
+M304_H_P = units.HPPump('M304_H_P', ins=F301-0)
+
+M304 = bst.units.Mixer('M304', ins=(M304_H_P-0, dilution_water))
+
+M304_H = bst.units.HXutility('M304_H', ins=M304-0, T=30+273.15)
+
 
 
 R302 = units.CoFermentation('R302', 
-                            ins=(M304_H_P-0, '', CSL, fermentation_lime),
+                            ins=(M304_H-0, '', CSL, fermentation_lime),
                             outs=('fermentation_effluent', 'CO2'),
                             vessel_material='Stainless steel 316',
                             neutralization=True)
@@ -120,7 +140,11 @@ R302 = units.CoFermentation('R302',
 # Mix waste liquids for treatment
 S301 = bst.units.FakeSplitter('S301', ins=F301_P-0, outs=('', s.imbibition_water, s.rvf_wash_water))
 def remove_recycled_water():
-    S301.outs[0].mol = F301_P.outs[0].mol - s.imbibition_water.mol - s.rvf_wash_water.mol
+    recycled_water = F301_P.outs[0].mol - s.imbibition_water.mol - s.rvf_wash_water.mol
+    if (recycled_water > 0).all():
+        S301.outs[0].mol = recycled_water
+    else:
+        S301.outs[0].mol[:] = 0.
 S301.specification = remove_recycled_water
 
 # %% 
@@ -313,10 +337,7 @@ F401 = bst.units.Flash('F401', ins=D401_P-0, outs=('F401_g', 'F401_l'),
 F401_H = bst.units.HXutility('F401_H', ins=F401-0, V=0, rigorous=True)
 F401_P = units.HPPump('F401_P', ins=F401-1)
 
-# <<<<<<< HEAD
-# S403 = bst.units.Splitter('S403', ins=F401_P-0, outs=('to_fermentor', 
-# =======
-S403 = bst.units.Splitter('S402', ins=F401_P-0, outs=('to_fermentor', 
+S403 = bst.units.Splitter('S403', ins=F401_P-0, outs=('to_fermentor', 
                                                       'to_M501'),
                                                       split=0.96)
 
@@ -562,11 +583,16 @@ HXN = bst.facilities.HeatExchangerNetwork('HXN')
 #!!! Yalin strongly recommends reviewing the system path or manually set up the system
 # for lactic acid, the automatically created system has bugs
 HP_sys = bst.main_flowsheet.create_system(
-    'HP_sys', feeds=[i for i in bst.main_flowsheet.stream
-                            if i.sink and not i.source])
+    'HP_sys', feeds=[i for i in bst.main_flowsheet.stream if i.sink and not i.source],
+    ends=[s.imbibition_water, s.rvf_wash_water])
 
 BT_sys = System('BT_sys', path=(BT,))
 
+HP_sys.simulate()
+for i in HXN.original_heat_utils:
+    i.heat_exchanger.rigorous = True
+
+bst.main_flowsheet.set_flowsheet(flowsheet)
 # %%
 # =============================================================================
 # TEA
@@ -616,17 +642,6 @@ HP_sys._TEA = HP_tea
 # Simulate system and get results
 # =============================================================================
 
-System.converge_method = 'fixed-point' # aitken isn't stable
-System.maxiter = 1500
-System.molar_tolerance = 0.1
-
-# def get_HP_MPSP():
-#     HP_sys.simulate()
-    
-#     for i in range(3):
-#         HP.price = HP_tea.solve_price(HP, HP_no_BT_tea)
-#     return HP.price
-
 num_sims = 1
 num_solve_tea = 3
 def get_AA_MPSP():
@@ -638,6 +653,51 @@ def get_AA_MPSP():
 
 get_AA_MPSP()
 
+# R301 = F('R301') # Fermentor
+# yearly_production = 125000 # ton/yr
+spec = ProcessSpecification(
+    evaporator = F301,
+    pump = M304_H_P,
+    mixer = M304,
+    heat_exchanger = M304_H,
+    reactor= R302,
+    reaction_name='fermentation_reaction',
+    substrates=('Xylose', 'Glucose'),
+    products=('HP','CalciumLactate'),
+    spec_1=100,
+    spec_2=0.909,
+    spec_3=18.5,
+    xylose_utilization_fraction = 0.80,
+    feedstock = feedstock,
+    dehydration_reactor = R401,
+    byproduct_streams = [Acetoin, IBA],
+    feedstock_mass = feedstock.F_mass,
+    pretreatment_reactor = None)
+
+path = (F301, R302)
+@np.vectorize
+def calculate_titer(V):
+    F301.V = V
+    for i in path: i._run()
+    return spec._calculate_titer()
+
+@np.vectorize   
+def calculate_MPSP(V):
+    F301.V = V
+    HP_sys.simulate()
+    MPSP = AA.price = HP_tea.solve_price(AA, HP_no_BT_tea)
+    return MPSP
+
+fermentation_broth = R302.outs[0]
+
+get_titer = lambda: ((fermentation_broth.imass['HP'] + fermentation_broth.imol['CalciumLactate']*2*HP_chemicals.HP.MW)/fermentation_broth.F_vol)
+
+
+def set_titer(titer):
+    curr_titer = get_titer()
+    M304.water_multiplier *= curr_titer/titer
+    get_AA_MPSP()
+    
 # Unit groups
 
 

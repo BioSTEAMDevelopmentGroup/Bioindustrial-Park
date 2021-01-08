@@ -18,10 +18,10 @@ import biosteam as bst
 from biosteam.utils import colors
 from matplotlib.ticker import AutoMinorLocator as AML
 
-# from HP.system import HP_sys, HP_tea, R302, spec
-# from HP.system import MEK as product
-from HP.system import HP_sys, HP_tea, R302, spec, get_GWP, get_non_bio_GWP, get_FEC, get_SPED
-from HP.system import AA as product
+# from biorefineries.HP.system import HP_sys, HP_tea, R302, spec
+# from biorefineries.HP.system import MEK as product
+from biorefineries.HP.system_sugarcane import HP_sys, HP_tea, R302, spec, get_GWP, get_non_bio_GWP, get_FEC, get_SPED
+from biorefineries.HP.system_sugarcane import AA as product
 
 from matplotlib import pyplot as plt
 from  matplotlib.colors import LinearSegmentedColormap
@@ -288,11 +288,11 @@ get_HP_inhibitors_conc = lambda: 1000*sum(R302.outs[0].imass['AceticAcid', 'Furf
 
 # get_rel_impact_t_y = lambda: rel_impact_fn(steps)
 
-# HP_metrics = [solve_AA_price, get_HP_sugars_conc, get_HP_inhibitors_conc]
-HP_metrics = [solve_AA_price, get_GWP, get_FEC]
+HP_metrics = [solve_AA_price, get_HP_sugars_conc, get_HP_inhibitors_conc]
+# HP_metrics = [solve_AA_price, get_GWP, get_FEC]
 
 # %% Generate 3-specification meshgrid and set specification loading functions
-steps = 40
+steps = 10
 
 # Yield, titer, productivity (rate)
 spec_1 = np.linspace(0.1,0.99, steps) # yield
@@ -663,12 +663,12 @@ Metric_3_tickmarks = tickmarks(
 
 # Metric_3_tickmarks = [0.0*1000, 0.24*1000, 0.48*1000, 0.72*1000, 0.96*1000, 1.2*1000]
 
-Metric_1_tickmarks = [500,1000, 1500, 2000, 2500, 3000]
+# Metric_1_tickmarks = [500,1000, 1500, 2000, 2500, 3000]
 # Metric_1_tickmarks = [2000, 2500, 3000, 3500, 4000, 4500]
-Metric_2_tickmarks = [0, 10, 20, 30, 40, 50]
+# Metric_2_tickmarks = [0, 10, 20, 30, 40, 50]
 # Metric_2_tickmarks = [0, 50, 100, 150, 200, 250, 300, 350, 400]
 # # Metric_3_tickmarks = [60, 70, 80, 90, 100, 110, 120]
-Metric_3_tickmarks = [0, 100, 200, 300, 400, 500]
+# Metric_3_tickmarks = [0, 100, 200, 300, 400, 500]
 
 
 def plot(data, titers, yields, productivities, 

@@ -1,22 +1,27 @@
 # -*- coding: utf-8 -*-
 """
 Created on Fri Jul 31 12:00:51 2020
-
-@author: saran
+@author: sarangbhagwat
 """
 
 import biosteam as bst
 import flexsolve as flx
 import numpy as np
+from biosteam.exceptions import InfeasibleRegion
+from biorefineries.HP.units import compute_HP_titer, compute_HP_mass
 # from biosteam.process_tools.reactor_specification import evaluate_across_TRY
 _kg_per_ton = 907.18474
+
 def evaluate_across_specs(spec, system,
             spec_1, spec_2, metrics, spec_3):
     try:
         spec.load_specifications(spec_1=spec_1, spec_2=spec_2)
-        for i in range(3):
-            system.simulate()
-    except ValueError: # (ValueError, RuntimeError) (ValueError, AssertionError)
+        # system._setup()
+        # for i in range(2): system._converge()
+        system.simulate()
+    except ValueError:# (ValueError, RuntimeError) (ValueError, AssertionError)
+        return np.nan*np.ones([len(metrics), len(spec_3)])
+    except InfeasibleRegion:
         return np.nan*np.ones([len(metrics), len(spec_3)])
     return spec.evaluate_across_productivity(metrics, spec_3)
     
@@ -36,10 +41,6 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
                  'spec_1',
                  'spec_2',
                  'spec_3',
-                 'path',
-                 'evaporator',
-                 'evaporator_pump',
-                 'mixer',
                  'substrates',
                  'xylose_utilization_fraction',
                  'load_spec_1',
@@ -49,18 +50,14 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
                  'dehydration_reactor', 
                  'byproduct_streams',
                  'feedstock_mass',
-                 'glucan_to_xylan',
-                 'pretreatment_reactor',)
+                 'pretreatment_reactor',
+                 'titer_inhibitor_specification')
     
-    def __init__(self, evaporator, mixer, reactor, reaction_name, substrates, products,
-                 spec_1, spec_2, spec_3, path, xylose_utilization_fraction,
-                 feedstock, dehydration_reactor, byproduct_streams, evaporator_pump=None,
-                 feedstock_mass=104192.83224417375, glucan_to_xylan=0.5, pretreatment_reactor = None,
+    def __init__(self, evaporator, pump, mixer, heat_exchanger, reactor, reaction_name, substrates, products,
+                 spec_1, spec_2, spec_3, xylose_utilization_fraction,
+                 feedstock, dehydration_reactor, byproduct_streams, 
+                 feedstock_mass=104192.83224417375, pretreatment_reactor = None,
                   load_spec_1=None, load_spec_2=None, load_spec_3=None):
-        self.evaporator = evaporator
-        self.evaporator_pump = evaporator_pump
-        self.mixer = mixer
-        self.path = path
         self.substrates = substrates
         self.reactor = reactor #: [Unit] Reactor unit operation
         self.products = products #: tuple[str] Names of main products
@@ -72,16 +69,19 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
         self.dehydration_reactor = dehydration_reactor
         self.byproduct_streams = byproduct_streams
         self.feedstock_mass = feedstock_mass
-        self.glucan_to_xylan = glucan_to_xylan
         self.pretreatment_reactor = pretreatment_reactor
+       
         self.load_spec_1 = load_spec_1
         self.load_spec_2 = load_spec_2
         self.load_spec_3 = load_spec_3
         
+        self.titer_inhibitor_specification =\
+            TiterAndInhibitorsSpecification(evaporator, pump, mixer, heat_exchanger, reactor,
+                 target_titer=100, product=reactor.outs[0])
+        
     def load_specifications(self, spec_1=None, spec_2=None, spec_3=None,):
         """
         Load ferementation specifications.
-
         Parameters
         ----------
         yield_ : float, optional
@@ -91,7 +91,6 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
             g products / L effluent
         productivity : float, optional
             g products / L effluent / hr
-
         """
         self.load_spec_1(spec_1 or self.spec_1)
         self.load_spec_2(spec_2 or self.spec_2)
@@ -204,17 +203,6 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
         self.spec_1 = reactor.glucose_to_HP_rxn.X = yield_
         reactor.xylose_to_HP_rxn.X = self.xylose_utilization_fraction * yield_
         
-        if reactor.glucose_to_HP_rxn.X+ reactor.glucose_to_microbe_rxn.X > 0.999:
-            
-           
-            reactor.glucose_to_microbe_rxn.X = 1. *(0.999 - reactor.glucose_to_HP_rxn.X)
-            # print(reactor.glucose_to_VitaminA_rxn.X)
-            # print(reactor.glucose_to_microbe_rxn.X)
-        if reactor.xylose_to_HP_rxn.X  + reactor.xylose_to_microbe_rxn.X > 0.999:
-            
-            
-            reactor.xylose_to_microbe_rxn.X = 1. * (0.999 - reactor.xylose_to_HP_rxn.X)
-
         if reactor.glucose_to_HP_rxn.X+ reactor.glucose_to_microbe_rxn.X +\
             reactor.glucose_to_acetic_acid_rxn.X> 0.999:
             
@@ -231,6 +219,7 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
             reactor.xylose_to_microbe_rxn.X = .3 * remainder
             reactor.xylose_to_acetic_acid_rxn.X = .7*remainder
             
+        
             # print(reactor.glucose_to_VitaminA_rxn.X)
             # print(reactor.glucose_to_microbe_rxn.X)
             # reactor.xylose_to_HP_rxn.X = 0
@@ -265,66 +254,16 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
         # else:
         #     return 0.
         return reactor.effluent_titer
-
-    def titer_objective_function(self, X):
-        """
-        Return the titer of products given the ratio of substrates over feed 
-        water.
-        """
-        # if X <= 1e-12: raise bst.exceptions.InfeasibleRegion('vapor fraction')
-        mixer = self.mixer
-        # evaporator = self.evaporator
-        # evaporator_pump = self.evaporator_pump
-        
-        # evaporator.V = X
-        mixer.water_multiplier = X
-        # evaporator._run()
-        # evaporator_pump._run()
-        mixer.specification()
-        for i in self.path: (i.specification or i._run)()
-        return self.calculate_titer() - self.spec_2
     
     def load_titer(self, titer):
-        """
-        Load titer specification
-        
-        Parameters
-        ----------
-        titer : float
-            Titer for fermentors in g products / L effluent.
-        
-        Notes
-        -----
-        Vapor fraction evaporated is adjusted to satisfy this 
-        specification. 
-        
-        Warnings
-        --------
-        Changing the titer affects the productivity.
-        
-        """
-        f = self.titer_objective_function
+        titer_inhibitor_specification = self.titer_inhibitor_specification
+        titer_inhibitor_specification.target_titer = titer
         self.spec_2 = titer
-        # reactor = self.reactor
-        # if titer>reactor.titer_limit:
-        #     reactor.neutralization = True
-        # else:
-        #     reactor.neutralization = False
-        # try:
-        #     flx.aitken_secant(f, 0.5, ytol=1e-5)
-        # except:
-        flx.IQ_interpolation(f, 1.0001, 30., ytol=1e-4, maxiter=100)
-
-        # flx.IQ_interpolation(f, 0.3, 0.99, ytol=1e-3, maxiter=100)
-        # if self.get_substrates_conc(self.evaporator.outs[0]) > 599:
-        #     raise ValueError
+        titer_inhibitor_specification.run()
         self.reactor.tau_cofermentation = titer / self.spec_3
         
     def load_feedstock_price(self, price):
         self.feedstock.price = price / _kg_per_ton * 0.8 # price per dry ton --> price per wet kg
-
-        self.spec_3 = price
-
         self.spec_2 = price
         
     def calculate_feedstock_sugar_content(self):
@@ -343,6 +282,8 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
         f = self.feedstock_sugar_content_objective_function
         self.spec_1 = sugar_content
         flx.IQ_interpolation(f, 0.00001, 30., ytol=1e-4, maxiter=100)
+        
+        # self.curr_sugar_content = sugar_content
         
     def get_substrates_conc(self, stream):
         substrates = self.substrates
@@ -381,4 +322,118 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
     def load_pretreatment_conversion_to_acetic_acid(self, conversion):
         self.spec_1 = conversion
         self.pretreatment_reactor.pretreatment_rxns[7].X = conversion
+        
 
+
+
+
+# -*- coding: utf-8 -*-
+"""
+Created on Thu Dec 24 15:31:18 2020
+@authors: yrc2 and sarangbhagwat
+"""
+
+
+
+class TiterAndInhibitorsSpecification:
+    
+    max_sugar_concentration = 600 # g / L
+    
+    def __init__(self, evaporator, pump, mixer, heat_exchanger, reactor,
+                 target_titer, product,
+                 maximum_inhibitor_concentration=1.,
+                 products=('HP',),
+                 sugars = ('Glucose', 'Xylose'),
+                 inhibitors = ('AceticAcid', 'HMF', 'Furfural')):
+        self.evaporator = evaporator
+        self.pump = pump
+        self.mixer = mixer
+        self.heat_exchanger = heat_exchanger
+        self.reactor = reactor
+        self.product = product
+        self.products = products
+        self.sugars = sugars
+        self.inhibitors = inhibitors
+        self.target_titer = target_titer
+        self.maximum_inhibitor_concentration = maximum_inhibitor_concentration
+        self.get_products_mass = compute_HP_mass
+    @property
+    def feed(self):
+        return self.evaporator.ins[0]
+    
+    @property
+    def sugar_solution(self):
+        return self.evaporator.outs[0]
+    
+    @property
+    def dilution_water(self):
+        return self.mixer.ins[1]
+    
+    def run_units(self):
+        self.evaporator._run()
+        self.pump._run()
+        self.mixer._run()
+        self.heat_exchanger._run()
+        self.reactor._run()
+    
+    def calculate_titer(self):
+        # product = self.product
+        # return product.imass[self.products].sum() / product.F_vol
+        return compute_HP_titer(self.product)
+    
+    def calculate_inhibitors(self): # g / L
+        product = self.product
+        return product.imass[self.inhibitors].sum() / product.F_vol
+    
+    def calculate_sugar_concentration(self): # g / L
+        sugar_solution = self.sugar_solution
+        return sugar_solution.imass[self.sugars].sum() / sugar_solution.F_vol 
+    
+    def check_sugar_concentration(self):
+        if self.calculate_sugar_concentration() > self.max_sugar_concentration:
+            raise InfeasibleRegion('sugar concentration')
+    
+    def titer_objective_function(self, V):
+        self.evaporator.V = V
+        self.run_units()
+        return self.calculate_titer() - self.target_titer
+    
+    def inhibitor_objective_function(self, V):
+        self.evaporator.V = V
+        self.run_units()
+        self.update_dilution_water()
+        self.run_units()
+        return self.calculate_inhibitors() - self.maximum_inhibitor_concentration
+    
+    def run(self):
+        self.dilution_water.empty()
+        self.evaporator.V = 0.
+        self.run_units()
+        x_titer = self.calculate_titer()
+        V_min = 0.
+        if x_titer < self.target_titer: # Evaporate
+            self.evaporator.V = V_min = flx.IQ_interpolation(self.titer_objective_function,
+                                                             V_min, 0.999, ytol=1e-4, maxiter=100) 
+        elif x_titer > self.target_titer: # Dilute
+            self.update_dilution_water(x_titer)
+            self.mixer._run()
+            self.heat_exchanger._run()
+            self.reactor._run()
+        
+        self.check_sugar_concentration()
+        x_inhibitor = self.calculate_inhibitors()
+        if x_inhibitor > self.maximum_inhibitor_concentration:
+            self.evaporator.V = flx.IQ_interpolation(self.inhibitor_objective_function,
+                                                     V_min, 0.999, ytol=1e-4, maxiter=100) 
+        
+        # self.check_sugar_concentration()
+    
+    def update_dilution_water(self, x_titer=None):
+        if x_titer is None: x_titer = self.calculate_titer()
+        water = self.water_required_to_dilute_to_set_titer(x_titer)
+        product = self.product
+        molar_volume = product.chemicals.Water.V('l', product.T, product.P) # m3 / mol
+        self.dilution_water.imol['Water'] += water / molar_volume / 1000
+        
+    def water_required_to_dilute_to_set_titer(self, current_titer):
+        return (1./self.target_titer - 1./current_titer) * self.get_products_mass(self.product)

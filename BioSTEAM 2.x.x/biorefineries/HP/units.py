@@ -1539,6 +1539,8 @@ class DehydrationReactor(Reactor):
 compute_HP_titer = lambda effluent: (effluent.imass['HP'] +
             effluent.imol['CalciumLactate']*2*HP_chemicals.HP.MW)/effluent.F_vol
 
+compute_HP_mass = lambda effluent: effluent.imass['HP'] +\
+            effluent.imol['CalciumLactate']*2*HP_chemicals.HP.MW
 _316_over_304 = 1.2
 
 
@@ -1634,7 +1636,7 @@ class CoFermentation(Reactor):
         self.xylose_to_microbe_rxn = self.cofermentation_rxns[5]
         
         if 'Sucrose' in self.chemicals:
-            self.sucrose_hydrolysis_rxn = Rxn('Sucrose + Water -> 2Glucose', 'Sucrose', 1.00)
+            self.sucrose_hydrolysis_rxn = Rxn('Sucrose + Water -> 2Glucose', 'Sucrose', 1.-1e-9)
         
         self._X = self.cofermentation_rxns.X.copy()
         
@@ -1737,3 +1739,16 @@ class CoFermentation(Reactor):
             hu_single_rx = hx.heat_utilities[0]
             hu_total.copy_like(hu_single_rx)
             hu_total.scale(N)
+
+# class SugarAndInhibitorSpecification(Unit):
+#     _N_ins = 2
+#     _N_outs = 2
+    
+#     def __init__():
+#         Unit.__init__(self, ID, ins, outs, thermo)
+#         # MEE.__init__()
+#         # Mixer.__init__()
+#         self.mixer = bst.Mixer(None, thermo=self.thermo)
+#         self.evaporator = bst.MultiEffectEvaporator(None, thermo=self.thermo)
+    
+    

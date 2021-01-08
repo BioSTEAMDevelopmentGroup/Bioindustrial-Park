@@ -8,7 +8,6 @@ Created on Thu Dec 21 11:05:24 2017
 import numpy as np
 import biosteam as bst
 from biosteam import units
-from biosteam import main_flowsheet as F
 from ._process_settings import price
 
 __all__ = (
@@ -495,8 +494,9 @@ def create_ethanol_production_system(ID='ethanol_production_sys',
 # %% Complete system
 
 def create_system(ID='sugarcane_sys'):
-    s = F.stream
-    u = F.unit
+    from biosteam import main_flowsheet as f
+    s = f.stream
+    u = f.unit
     
     ### Juicing section ###
     
@@ -530,10 +530,22 @@ def create_system(ID='sugarcane_sys'):
                                    makeup_water_streams,
                                    process_water_streams)
     
+    def heat_integration():
+        hu_mee = u.F301.heat_utilities[0]
+        hu_dist = u.D303.heat_utilities[0]
+        actual_duty = hu_mee.duty + hu_dist.duty
+        if actual_duty > 0.:
+            hu_mee(actual_duty, 373.15, 373.15)
+            hu_dist.empty()
+        else:
+            hu_mee.empty()
+            condenser = u.D303.condenser
+            hu_dist(actual_duty, condenser.ins[0].T, condenser.outs[0].T)
+    
     ### System ###
     
     return bst.System(ID,
         [juicing_system,
          ethanol_production_sys],
-        facilities=(CWP, BT, CT, PWC),
+        facilities=(heat_integration, CWP, BT, CT, PWC),
     )

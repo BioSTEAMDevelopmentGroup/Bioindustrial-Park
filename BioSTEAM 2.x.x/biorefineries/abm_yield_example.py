@@ -18,7 +18,6 @@ def compute_ethanol_yield(plant_capacity, production):
         / plant_capacity
     )
 
-
 # Yield of Corn
 results = corn_model(plant_capacity=corn_capacity)
 ethanol_yield = compute_ethanol_yield(corn_capacity, results['Production'])

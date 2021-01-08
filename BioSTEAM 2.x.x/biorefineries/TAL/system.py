@@ -53,14 +53,13 @@ from biosteam import main_flowsheet as F
 from copy import deepcopy
 from biosteam import System
 from thermosteam import Stream
-from TAL import units, facilities
-from TAL._process_specification import ProcessSpecification
-from TAL.process_settings import price, CFs
-from TAL.utils import find_split, splits_df, baseline_feedflow
-from TAL.chemicals_data import TAL_chemicals, chemical_groups, \
+from biorefineries.TAL import units, facilities
+from biorefineries.TAL._process_specification import ProcessSpecification
+from biorefineries.TAL.process_settings import price, CFs
+from biorefineries.TAL.utils import find_split, splits_df, baseline_feedflow
+from biorefineries.TAL.chemicals_data import TAL_chemicals, chemical_groups, \
                                 soluble_organics, combustibles
-from TAL.tea import TALTEA
-
+from biorefineries.TAL.tea import TALTEA
 # from lactic.hx_network import HX_Network
 
 # # Do this to be able to show more streams in a diagram
@@ -1101,10 +1100,6 @@ TAL_sys._TEA = TAL_tea
 # =============================================================================
 # Simulate system and get results
 # =============================================================================
-
-System.converge_method = 'fixed-point' # aitken isn't stable
-System.maxiter = 1500
-System.molar_tolerance = 0.1
 
 # def get_TAL_MPSP():
 #     TAL_sys.simulate()

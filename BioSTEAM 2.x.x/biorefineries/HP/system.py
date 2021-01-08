@@ -78,7 +78,9 @@ bst.CE = 541.7
 # Set default thermo object for the system
 tmo.settings.set_thermo(HP_chemicals)
 
-
+System.default_maxiter = 1500
+System.default_converge_method = 'aitken'
+System.default_molar_tolerance = 0.02
 
 # %% 
 
@@ -239,40 +241,17 @@ F301 = bst.units.MultiEffectEvaporator('F301', ins=S301-1, outs=('F301_l', 'F301
                                         # P = (101325, 73581, 50892, 32777, 20000), V = 0.001)
 F301.V = 0.797 #for sugars concentration of 591.25 g/L (599.73 g/L after cooling to 30 C)
 
-sugars_IDs = ('Glucose', 'Xylose')
-inhibitors_IDs = ('AceticAcid', 'HMF', 'Furfural')
-sugars_concentration = lambda x: sum(x.imass[sugars_IDs])/x.F_vol
-sugars_concentration = lambda x: sum(x.imass[sugars_IDs])/x.F_vol
-
-fixed_sugars_concentration = 591.25
-fixed_inhibitors_concentration = 0.9
-    
-def F301_spec_sugars(V):
-    F301.V = V
-    F301._run()
-    return sugars_concentration(F301.outs[0]) - fixed_sugars_concentration
-
-def F301_spec_inhibitors(V):
-    F301.V = V
-    F301._run()
-    return sugars_concentration(F301.outs[0]) - fixed_sugars_concentration
-
-F301.specification = BoundedNumericalSpecification(F301_spec_sugars, 0.2, 0.9999)
 
 F301_P = units.HPPump('F301_P', ins=F301-1)
 # F301_H = bst.units.HXutility('F301_H', ins=F301-0, V = 0.)
 
-def adjust_M304_water():
-    M304.ins[1].imol['Water'] = (M304.water_multiplier - 1) * M304.ins[0].imol['Water']
-    M304.ins[1].T = 30+273.15
-    M304._run()
     
-M304 = bst.units.Mixer('M304', ins=(F301-0, dilution_water))
+M304_H_P = units.HPPump('M304_H_P', ins=F301-0)
+M304 = bst.units.Mixer('M304', ins=(M304_H_P-0, dilution_water))
 # M304 = bst.units.Mixer('M304', ins=(S301-1, dilution_water, ''))
-M304.water_multiplier = 1.
-M304.specification = adjust_M304_water
+
 M304_H = bst.units.HXutility('M304_H', ins=M304-0, T=30+273.15)
-M304_H_P = units.HPPump('M304_H_P', ins=M304_H-0)
+
 
 
 
@@ -283,7 +262,7 @@ M304_H_P = units.HPPump('M304_H_P', ins=M304_H-0)
 
 
 R302 = units.CoFermentation('R302', 
-                                ins=(M304_H_P-0, '', CSL, fermentation_lime),
+                                ins=(M304_H-0, '', CSL, fermentation_lime),
                                 outs=('fermentation_effluent', 'CO2'),
                                 vessel_material='Stainless steel 316',
                                 neutralization=True)
@@ -485,10 +464,7 @@ F401 = bst.units.Flash('F401', ins=D401_P-0, outs=('F401_g', 'F401_l'),
 F401_H = bst.units.HXutility('F401_H', ins=F401-0, V=0, rigorous=True)
 F401_P = units.HPPump('F401_P', ins=F401-1)
 
-# <<<<<<< HEAD
-# S403 = bst.units.Splitter('S403', ins=F401_P-0, outs=('to_fermentor', 
-# =======
-S403 = bst.units.Splitter('S402', ins=F401_P-0, outs=('to_fermentor', 
+S403 = bst.units.Splitter('S403', ins=F401_P-0, outs=('to_fermentor', 
                                                       'to_M501'),
                                                       split=0.96)
 
@@ -894,10 +870,6 @@ HP_sys._TEA = HP_tea
 # Simulate system and get results
 # =============================================================================
 
-System.converge_method = 'fixed-point' # aitken isn't stable
-System.maxiter = 1500
-System.molar_tolerance = 0.1
-
 # def get_HP_MPSP():
 #     HP_sys.simulate()
     
@@ -920,22 +892,21 @@ get_AA_MPSP()
 # yearly_production = 125000 # ton/yr
 spec = ProcessSpecification(
     evaporator = F301,
+    pump = M304_H_P,
     mixer = M304,
-    reactor=R302,
+    heat_exchanger = M304_H,
+    reactor= R302,
     reaction_name='fermentation_reaction',
     substrates=('Xylose', 'Glucose'),
     products=('HP','CalciumLactate'),
     spec_1=100,
     spec_2=0.909,
     spec_3=18.5,
-    path = (M304_H, M304_H_P),
     xylose_utilization_fraction = 0.80,
     feedstock = feedstock,
     dehydration_reactor = R401,
     byproduct_streams = [Acetoin, IBA],
-    evaporator_pump = F301_P,
     feedstock_mass = feedstock.F_mass,
-    glucan_to_xylan = feedstock.imass['Glucan']/feedstock.imass['Xylan'],
     pretreatment_reactor = R201)
 
 path = (F301, R302)

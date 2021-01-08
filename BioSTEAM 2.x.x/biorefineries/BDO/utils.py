@@ -22,7 +22,7 @@ All units are explicitly defined here for transparency and easy reference
 import numpy as np
 import pandas as pd
 import thermosteam as tmo
-from BDO.chemicals_data import BDO_chemicals
+from biorefineries.BDO.chemicals_data import BDO_chemicals
 _kg_per_ton = 907.18474
 
 # Chemical Engineering Plant Cost Index from Chemical Engineering Magzine

@@ -28,8 +28,8 @@ from biosteam.units import Flash, HXutility, Mixer, MixTank, Pump, \
     SolidsSeparator, StorageTank, LiquidsSplitSettler
 from biosteam.units.decorators import cost
 from thermosteam import Stream, MultiStream
-from TAL.process_settings import price
-from TAL.utils import CEPCI, baseline_feedflow, compute_extra_chemical, adjust_recycle
+from biorefineries.TAL.process_settings import price
+from biorefineries.TAL.utils import CEPCI, baseline_feedflow, compute_extra_chemical, adjust_recycle
 
 _kg_per_ton = 907.18474
 _Gcal_2_kJ = 4.184 * 1e6 # (also MMkcal/hr)

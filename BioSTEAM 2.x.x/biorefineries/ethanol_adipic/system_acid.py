@@ -60,15 +60,20 @@ from biorefineries.ethanol_adipic._process_settings import \
 from biorefineries.ethanol_adipic._utils import baseline_feedflow, convert_ethanol_wt_2_mol, \
     find_split, splits_df
 from biorefineries.ethanol_adipic._tea import ethanol_adipic_TEA
+from biorefineries import BST222
 
 flowsheet = bst.Flowsheet('ethanol')
 bst.main_flowsheet.set_flowsheet(flowsheet)
 
 bst.CE = 541.7 # year 2016
-System.maxiter = 400
-System.converge_method = 'fixed-point'
-System.molar_tolerance = 0.01
-
+if BST222:
+    System.default_maxiter = 400
+    System.default_converge_method = 'fixed-point'
+    System.default_molar_tolerance = 0.01
+else:
+    System.maxiter = 400
+    System.converge_method = 'fixed-point'
+    System.molar_tolerance = 0.01
 tmo.settings.set_thermo(chems)
 
 

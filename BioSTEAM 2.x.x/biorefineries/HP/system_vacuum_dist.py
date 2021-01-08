@@ -878,10 +878,6 @@ HP_sys._TEA = HP_tea
 # Simulate system and get results
 # =============================================================================
 
-System.converge_method = 'fixed-point' # aitken isn't stable
-System.maxiter = 1500
-System.molar_tolerance = 0.1
-
 # def get_HP_MPSP():
 #     HP_sys.simulate()
     

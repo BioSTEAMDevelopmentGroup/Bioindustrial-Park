@@ -49,9 +49,12 @@ def _load_chemicals():
 def _load_system():
     import biosteam as bst
     from biosteam import main_flowsheet as F
-    global sugarcane_sys, sugarcane_tea, specs, flowsheet, _system_loaded
+    global sugarcane_sys, sugarcane_tea, flowsheet, _system_loaded
     flowsheet = bst.Flowsheet('sugarcane')
     F.set_flowsheet(flowsheet)
+    bst.Stream.ticket_name = 's'
+    bst.Stream.ticket_number = 0
+    bst.Stream.unregistered_ticket_number = 0
     bst.settings.set_thermo(chemicals)
     load_process_settings()
     sugarcane_sys = create_system()
@@ -66,15 +69,12 @@ if PY37:
             _load_chemicals()
             if name == 'chemicals': return chemicals
         if not _system_loaded: 
-            try:
-                _load_system()
-            except Exception as Error:
-                dct = globals()
-                dct.update(flowsheet.system.__dict__)
-                dct.update(flowsheet.stream.__dict__)
-                dct.update(flowsheet.unit.__dict__)
-                if name in dct: return dct[name]
-                raise Error
+            _load_system()
+            dct = globals()
+            dct.update(flowsheet.system.__dict__)
+            dct.update(flowsheet.stream.__dict__)
+            dct.update(flowsheet.unit.__dict__)
+            if name in dct: return dct[name]
         raise AttributeError(f"module '{__name__}' has no attribute '{name}'")
 else: 
     load()

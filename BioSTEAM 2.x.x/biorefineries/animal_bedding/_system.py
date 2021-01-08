@@ -14,7 +14,7 @@ from biorefineries.animal_bedding import units
 import thermosteam.reaction as rxn
 import numpy as np
 from biosteam.process_tools import BoundedNumericalSpecification
-
+from biorefineries import BST222
 
 __all__ = ('create_system',)
 
@@ -51,9 +51,14 @@ def find_TS(stream):
     return TS
 
 def create_system(ID='bedding_sys'):
-    System.maxiter = 400
-    System.converge_method = 'Aitken'
-    System.molar_tolerance = 0.01
+    if BST222:
+        System.default_maxiter = 400
+        System.default_converge_method = 'Aitken'
+        System.default_molar_tolerance = 0.01
+    else:
+        System.maxiter = 400
+        System.converge_method = 'Aitken'
+        System.molar_tolerance = 0.01
     
     ### Streams  
     chemicals = bst.settings.get_chemicals()

@@ -56,7 +56,7 @@ system_products.append(gypsum)
 # Minimum selling price of AA stream
 def get_MSP():
     for i in range(3):
-        AA.price = HP_tea.solve_price(HP,
+        AA.price = HP_tea.solve_price(AA,
                                                       HP_no_BT_tea)
     return AA.price
 
