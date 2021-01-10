@@ -126,7 +126,18 @@ acetoin_price = 3. # assumed
 # https://www.alibaba.com/product-detail/China-manufacture-Isobutyraldehyde-price_60837108075.html?spm=a2700.galleryofferlist.0.0.753369fcbZcNhe
 # IBA_price = 1.2
 IBA_price = 0. # assumed
- 
+
+
+# https://www.alibaba.com/product-detail/Decyl-Alcohol-98-min_62002993466.html?spm=a2700.galleryofferlist.normal_offer.d_title.67b2ac2fnUEnUY
+Decanol_price = 1.25
+
+# https://www.alibaba.com/product-detail/Trioctylamine-CAS-NO-1116-76-3_60139027874.html?spm=a2700.galleryofferlist.normal_offer.d_title.2b9b3d2fWfzxb0
+TOA_price = 7.5
+
+# https://www.alibaba.com/product-detail/Methyl-Trioctyl-Ammonium-Chloride-Aliquat-336-_50039302076.html?spm=a2700.galleryofferlist.normal_offer.d_title.6f3340baJbm4l2
+AQ336_price = 1.115
+
+
 # All in 2016$/kg
 price = {'AA': AA_price,
          'TiO2': TiO2_price,
@@ -156,7 +167,10 @@ price = {'AA': AA_price,
          'Gypsum': gypsum_price,
          'Denaturant': denaturant_price,
          'Amberlyst15': amberlyst_15_price,
-         'DAP': 0.1645 * _lb_per_kg}
+         'DAP': 0.1645 * _lb_per_kg,
+         'Decanol': Decanol_price,
+         'TOA': TOA_price,
+         'AQ336': AQ336_price}
     
 
 def load_process_settings():

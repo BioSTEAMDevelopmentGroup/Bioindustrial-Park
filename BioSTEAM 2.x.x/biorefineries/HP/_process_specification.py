@@ -19,11 +19,38 @@ def evaluate_across_specs(spec, system,
         # system._setup()
         # for i in range(2): system._converge()
         system.simulate()
-    except ValueError:# (ValueError, RuntimeError) (ValueError, AssertionError)
+    except ValueError as e:# (ValueError, RuntimeError) (ValueError, AssertionError)
+        
+        print(e)
+        print(spec.titer_inhibitor_specification.reactor.cofermentation_rxns[0].X, spec_1, '\n',
+                               compute_HP_titer(spec.titer_inhibitor_specification.reactor.outs[0]), spec_2, '\n',
+                               spec.titer_inhibitor_specification.reactor.ins[0].imass[spec.titer_inhibitor_specification.sugars].sum() / spec.titer_inhibitor_specification.reactor.ins[0].F_vol,
+                               '\n', spec.titer_inhibitor_specification.mixer.ins[1].F_vol)
+        # import pdb
+        # pdb.set_trace()
+        raise e
+        return np.nan*np.ones([len(metrics), len(spec_3)])
+    except InfeasibleRegion as e:
+        # print(spec.titer_inhibitor_specification.reactor.cofermentation_rxns[0].X, spec_1, '\n',
+        #                        compute_HP_titer(spec.titer_inhibitor_specification.reactor.outs[0]), spec_2, '\n',
+        #                        spec.titer_inhibitor_specification.reactor.ins[0].imass[spec.titer_inhibitor_specification.sugars].sum() / spec.titer_inhibitor_specification.reactor.ins[0].F_vol,
+        #                        '\n', spec.titer_inhibitor_specification.mixer.ins[1].F_vol)
+        # import pdb
+        # pdb.set_trace()
+        print(e)
+        print(spec.titer_inhibitor_specification.reactor.cofermentation_rxns[0].X, spec_1, '\n',
+                               compute_HP_titer(spec.titer_inhibitor_specification.reactor.outs[0]), spec_2, '\n',
+                               spec.titer_inhibitor_specification.reactor.ins[0].imass[spec.titer_inhibitor_specification.sugars].sum() / spec.titer_inhibitor_specification.reactor.ins[0].F_vol,
+                               '\n', spec.titer_inhibitor_specification.mixer.ins[1].F_vol)
+        return np.nan*np.ones([len(metrics), len(spec_3)])
+    except RuntimeError as e:
+        print(e)
+        print(spec.titer_inhibitor_specification.reactor.cofermentation_rxns[0].X, spec_1, '\n',
+                               compute_HP_titer(spec.titer_inhibitor_specification.reactor.outs[0]), spec_2, '\n',
+                               spec.titer_inhibitor_specification.reactor.ins[0].imass[spec.titer_inhibitor_specification.sugars].sum() / spec.titer_inhibitor_specification.reactor.ins[0].F_vol,
+                               '\n', spec.titer_inhibitor_specification.mixer.ins[1].F_vol)
         import pdb
         pdb.set_trace()
-        return np.nan*np.ones([len(metrics), len(spec_3)])
-    except InfeasibleRegion:
         return np.nan*np.ones([len(metrics), len(spec_3)])
     return spec.evaluate_across_productivity(metrics, spec_3)
     
@@ -412,10 +439,10 @@ class TiterAndInhibitorsSpecification:
         self.evaporator.V = 0.
         self.run_units()
         x_titer = self.calculate_titer()
-        V_min = 0.
+        V_min = 0.00001
         if x_titer < self.target_titer: # Evaporate
             self.evaporator.V = V_min = flx.IQ_interpolation(self.titer_objective_function,
-                                                             V_min, 0.999, ytol=1e-4, maxiter=100) 
+                                                             V_min, 0.95, ytol=1e-4, maxiter=100) 
         elif x_titer > self.target_titer: # Dilute
             self.update_dilution_water(x_titer)
             self.mixer._run()
@@ -426,7 +453,7 @@ class TiterAndInhibitorsSpecification:
         x_inhibitor = self.calculate_inhibitors()
         if x_inhibitor > self.maximum_inhibitor_concentration:
             self.evaporator.V = flx.IQ_interpolation(self.inhibitor_objective_function,
-                                                     V_min, 0.999, ytol=1e-4, maxiter=100) 
+                                                     V_min, 0.95, ytol=1e-4, maxiter=100) 
         
         # self.check_sugar_concentration()
     

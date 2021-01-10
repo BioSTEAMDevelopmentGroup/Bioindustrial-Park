@@ -466,7 +466,7 @@ class Saccharification(Unit):
     
     #!!! This needs to be updated
     # Equals the split of saccharified slurry to seed train
-    inoculum_ratio = 0.07
+    # inoculum_ratio = 0.07 # no longer needed since sidedraw is after evaporation and dilution
     
     # CSL_loading = 10 # kg/m3
     
@@ -488,7 +488,7 @@ class Saccharification(Unit):
 
     def _run(self):
         feed = self.ins[0]
-        ss, sidedraw = self.outs
+        ss  = self.outs[0]
         # ss = self.saccharified_stream
         
         ss.copy_like(feed)
@@ -498,8 +498,8 @@ class Saccharification(Unit):
         # ss.mol += CSL.mol
         self.saccharification_rxns(ss.mol)
         # Sidedraw to SeedTrain
-        sidedraw.mol = ss.mol * self.inoculum_ratio
-        ss.mol = ss.mol - sidedraw.mol
+        # sidedraw.mol = ss.mol * self.inoculum_ratio
+        # ss.mol = ss.mol - sidedraw.mol
 
 
         
@@ -1516,7 +1516,7 @@ class DehydrationReactor(Reactor):
         effluent.T = self.T
         # effluent.P = feed.P
         self.dehydration_reactions(effluent.mol)
-        
+        effluent.phase = 'g'
    
     def _cost(self):
         super()._cost()

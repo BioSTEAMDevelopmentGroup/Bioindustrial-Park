@@ -20,8 +20,8 @@ from matplotlib.ticker import AutoMinorLocator as AML
 
 # from biorefineries.HP.system import HP_sys, HP_tea, R302, spec
 # from biorefineries.HP.system import MEK as product
-from biorefineries.HP.system_sugarcane import HP_sys, HP_tea, R302, spec, get_GWP, get_non_bio_GWP, get_FEC, get_SPED
-from biorefineries.HP.system_sugarcane import AA as product
+from biorefineries.HP.system import HP_sys, HP_tea, R302, spec, get_GWP, get_non_bio_GWP, get_FEC, get_SPED
+from biorefineries.HP.system import AA as product
 
 from matplotlib import pyplot as plt
 from  matplotlib.colors import LinearSegmentedColormap
@@ -641,11 +641,11 @@ MPSP_units = r"$\mathrm{\$} \cdot \mathrm{ton}^{-1}$"
 
 # VOC_units = "$" + million_dollar + r"\cdot \mathrm{yr}^{-1}$"
 # FCI_units = f"${million_dollar}$"
-# VOC_units = r"$\mathrm{g} \cdot \mathrm{L}^{-1}$"
-VOC_units = r"$\mathrm{kg CO2 eq.} \cdot \mathrm{kg AA}^{-1}$"
+VOC_units = r"$\mathrm{g} \cdot \mathrm{L}^{-1}$"
+# VOC_units = r"$\mathrm{kg CO2 eq.} \cdot \mathrm{kg AA}^{-1}$"
 # FCI_units = r"$\mathrm{mg} \cdot \mathrm{L}^{-1}$"
-# FCI_units = r"$\mathrm{mg} \cdot \mathrm{L}^{-1}$"
-FCI_units = r"$\mathrm{MJ eq.} \cdot \mathrm{kg AA}^{-1}$"
+FCI_units = r"$\mathrm{mg} \cdot \mathrm{L}^{-1}$"
+# FCI_units = r"$\mathrm{MJ eq.} \cdot \mathrm{kg AA}^{-1}$"
 # data_1_copy = copy.deepcopy(data_1)
 
 Metric_1_tickmarks = tickmarks(
@@ -663,7 +663,7 @@ Metric_3_tickmarks = tickmarks(
 
 # Metric_3_tickmarks = [0.0*1000, 0.24*1000, 0.48*1000, 0.72*1000, 0.96*1000, 1.2*1000]
 
-# Metric_1_tickmarks = [500,1000, 1500, 2000, 2500, 3000]
+Metric_1_tickmarks = [500,1000, 1500, 2000, 2500, 3000]
 # Metric_1_tickmarks = [2000, 2500, 3000, 3500, 4000, 4500]
 # Metric_2_tickmarks = [0, 10, 20, 30, 40, 50]
 # Metric_2_tickmarks = [0, 50, 100, 150, 200, 250, 300, 350, 400]
@@ -673,17 +673,20 @@ Metric_3_tickmarks = tickmarks(
 
 def plot(data, titers, yields, productivities, 
          Metric_1_tickmarks, Metric_2_tickmarks, Metric_3_tickmarks):
-    metric_bars = (MetricBar('MPSP\n', MPSP_units, CABBI_green_colormap(),
+    metric_bars = (MetricBar('MPSP\n', 
+                             MPSP_units, CABBI_green_colormap(),
                              Metric_1_tickmarks,
                              1 + int((max(Metric_1_tickmarks) - min(Metric_1_tickmarks))/125)),
-                   MetricBar('CED-f\n', VOC_units,
-                            # CABBI_blue_colormap(),
-                            plt.cm.get_cmap('magma_r'),
+                   MetricBar('Total sugars\n',
+                            VOC_units,
+                            CABBI_blue_colormap(),
+                            # plt.cm.get_cmap('magma_r'),
                              Metric_2_tickmarks, 
                              1 + int((max(Metric_2_tickmarks) - min(Metric_2_tickmarks))/1.)),
-                   MetricBar('GWP-100a\n', FCI_units,
-                             # plt.cm.get_cmap('bone_r'),
-                              plt.cm.get_cmap('cividis_r'),
+                   MetricBar('Total inhibitors\n',
+                             FCI_units,
+                              plt.cm.get_cmap('bone_r'),
+                              # plt.cm.get_cmap('cividis_r'),
                              Metric_3_tickmarks,
                              1 + int((max(Metric_3_tickmarks) - min(Metric_3_tickmarks))/25)))
     
@@ -778,7 +781,7 @@ for i, ax_col in enumerate(axes[:, :len(spec_3)].transpose()):
             #            fmt=lambda x: format(x,'.0f'), inline=True, fontsize=12,
             #            manual = [(0.925, 90), (0.925, 80), (0.925, 70)])
             CS1b_lines = plt.contour(CS1, zorder=1e6, linestyles='solid', linewidths=0.9,
-                        levels=[1000,  2000, 3000], colors=[linecolor_dark])
+                        levels=[1000, 2000, 3000], colors=[linecolor_dark])
             plt.clabel(CS1b_lines, levels=[1000,  2000, 3000], inline_spacing = 0., \
                        fmt=lambda x: format(x,'.0f'), inline=True, fontsize=12,
                         manual = [ (0.925,260), (0.925,110),

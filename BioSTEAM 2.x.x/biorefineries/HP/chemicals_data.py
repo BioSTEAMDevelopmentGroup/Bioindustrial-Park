@@ -93,6 +93,7 @@ SO2 = chemical_database('SO2', phase='g')
 # Soluble inorganics
 # =============================================================================
 
+HCl = chemical_database('HCl')
 H2SO4 = chemical_database('H2SO4', phase='l')
 HNO3 = chemical_database('HNO3', phase='l', Hf=-41406*_cal2joule)
 NaOH = chemical_database('NaOH', phase='l')
@@ -155,7 +156,14 @@ Glucose = chemical_database('Glucose', phase = 'l')
 # HP.Tb = LA.Tb
 
 # MEK = chemical_database('MEK')
+Decanol = chemical_database('Decanol')
 TOA = chemical_database('TOA', search_ID='tri-n-octylamine') 
+AQ336 = chemical_database('AQ336', search_ID='63393-96-4') # aliquat 336
+
+AQ336.copy_models_from(TOA, ('Psat', 'Hvap', 'V'))
+AQ336._Dortmund = TOA.Dortmund
+
+AQ336.Hfus = TOA.Hfus
 # AQ336 = chemical_database('N-Methyl-N,N,N-trioctylammonium chloride') 
 IBA = chemical_database('Isobutyraldehyde')
 DPHP = chemical_database('DPHP', search_ID='Dipotassium hydrogen phosphate', phase = 'l')
@@ -477,8 +485,10 @@ chems.set_synonym('Na2SO4', 'SodiumSulfate')
 chems.set_synonym('AmmoniumHydroxide', 'NH4OH')
 chems.set_synonym('Isobutyraldehyde', 'IBA')
 
-# %%
-
+# %% Set all "None" Hfus values to 0
+for chem in HP_chemicals:
+    if chem.Hfus == None:
+        chem.Hfus = 0
 # from HP.utils import get_chemical_properties	
 # get_chemical_properties(chems, 400, 101325, output=True)
 
