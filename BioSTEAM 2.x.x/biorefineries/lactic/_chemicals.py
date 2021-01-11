@@ -10,6 +10,20 @@
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
 # for license details.
 
+"""
+References
+----------
+[1] Humbird et al., Process Design and Economics for Biochemical Conversion of 
+    Lignocellulosic Biomass to Ethanol: Dilute-Acid Pretreatment and Enzymatic 
+    Hydrolysis of Corn Stover; Technical Report NREL/TP-5100-47764; 
+    National Renewable Energy Lab (NREL), 2011.
+    https://www.nrel.gov/docs/fy11osti/47764.pdf
+[2] Davis et al., Process Design and Economics for the Conversion of Lignocellulosic 
+    Biomass to Hydrocarbon Fuels and Coproducts: 2018 Biochemical Design Case Update; 
+    NREL/TP-5100-71949; National Renewable Energy Lab (NREL), 2018. 
+    https://doi.org/10.2172/1483234
+
+"""
 
 # %%  
 
@@ -19,7 +33,8 @@
 
 import thermosteam as tmo
 
-__all__ = ('chems', 'chemical_groups', 'soluble_organics', 'combustibles')
+__all__ = ('chems', 'chemical_groups', 'soluble_organics', 'combustibles',
+           'get_chemical_properties')
 
 chems = tmo.Chemicals([])
 
@@ -90,7 +105,7 @@ NaOH = chemical_database('NaOH', phase='l')
 # https://atct.anl.gov/Thermochemical%20Data/version%201.118/species/?species_number=928
 NH4OH = chemical_database('NH4OH', search_ID='AmmoniumHydroxide', phase='l', Hf=-336719)
 CalciumDihydroxide = chemical_database('CalciumDihydroxide',
-                                        phase='s', Hf=-235522*_cal2joule)
+                                       phase='s', Hf=-235522*_cal2joule)
 AmmoniumSulfate = chemical_database('AmmoniumSulfate', phase='l',
                                     Hf=-288994*_cal2joule)
 NaNO3 = chemical_database('NaNO3', phase='l', Hf=-118756*_cal2joule)
@@ -114,6 +129,7 @@ GlucoseOligomer = chemical_defined('GlucoseOligomer', phase='l', formula='C6H10O
                                    Hf=-233200*_cal2joule)
 GlucoseOligomer.copy_models_from(Glucose, ['Hvap', 'Psat', 'Cn', 'mu', 'kappa'])
 Extractives = chemical_database('Extractives', search_ID='GluconicAcid', phase='l')
+# Ref [2] modeled this as gluconic acid, but here copy all properties from glucose
 Extractives.copy_models_from(Glucose)
 
 Xylose = chemical_database('Xylose')
@@ -147,6 +163,7 @@ Enzyme = chemical_defined('Enzyme', phase='l',
                            formula='CH1.59O0.42N0.24S0.01', 
                            Hf=-17618*_cal2joule)
 
+# Properties of fermentation microbes copied from Z_mobilis as in ref [1]
 FermMicrobe = chemical_defined('FermMicrobe', phase='l',
                       formula='CH1.8O0.5N0.2', Hf=-31169.39*_cal2joule)
 WWTsludge = chemical_defined('WWTsludge', phase='s', 
@@ -252,10 +269,13 @@ Tar.at_state('s')
 # Mixtures
 # =============================================================================
 
+# CSL is modeled as 50% water, 25% protein, and 25% lactic acid in ref [1]
+# did not model separately as only one price is given
 CSL = chemical_defined('CSL', phase='l', formula='CH2.8925O1.3275N0.0725S0.00175', 
                       Hf=Protein.Hf/4+H2O.Hf/2+LacticAcid.Hf/4)
 
-# Boiler chemicals includes amine, ammonia, and phosphate
+# Boiler chemicals includes amine, ammonia, and phosphate,
+# did not model separately as composition unavailable and only one price is given
 BoilerChems = chemical_database('BoilerChems', search_ID='DiammoniumPhosphate',
                                 phase='l')
 
