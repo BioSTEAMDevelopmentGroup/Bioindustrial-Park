@@ -38,33 +38,29 @@ __all__ = ('chems', 'chemical_groups', 'soluble_organics', 'combustibles',
 
 chems = tmo.Chemicals([])
 
-# To keep track of which chemicals are available in the database and which
-# are created from scratch
-database_chemicals_dict = {}
-copied_chemicals_dict = {}
-defined_chemicals_dict = {}
+def creating_funcs(chems):
+    def chemical_database(ID, phase=None, **data):
+        chemical = tmo.Chemical(ID, **data)
+        if phase:
+            chemical.at_state(phase)
+            chemical.phase_ref = phase
+        chems.append(chemical)
+        return chemical
+    
+    def chemical_copied(ID, ref_chemical, **data):
+        chemical = ref_chemical.copy(ID)
+        chems.append(chemical)
+        for i, j in data.items(): setattr(chemical, i, j)
+        return chemical
+    
+    def chemical_defined(ID, **data):
+        chemical = tmo.Chemical.blank(ID, **data)
+        chems.append(chemical)
+        return chemical
+    
+    return chemical_database, chemical_copied, chemical_defined
 
-def chemical_database(ID, phase=None, **kwargs):
-    chemical = tmo.Chemical(ID, **kwargs)
-    if phase:
-        chemical.at_state(phase)
-        chemical.phase_ref = phase
-    chems.append(chemical)
-    database_chemicals_dict[ID] = f'{ID}: {chemical.formula}/{chemical.MW}'
-    return chemical
-
-def chemical_copied(ID, ref_chemical, **data):
-    chemical = ref_chemical.copy(ID)
-    chems.append(chemical)
-    for i, j in data.items(): setattr(chemical, i, j)
-    copied_chemicals_dict[ID] = f'{ID}: {chemical.formula}/{chemical.MW}'
-    return chemical
-
-def chemical_defined(ID, **kwargs):
-    chemical = tmo.Chemical.blank(ID, **kwargs)
-    chems.append(chemical)
-    defined_chemicals_dict[ID] = f'{ID}: {chemical.formula}/{chemical.MW}'
-    return chemical
+chemical_database, chemical_copied, chemical_defined = creating_funcs(chems)
 
 auom = tmo.units_of_measure.AbsoluteUnitsOfMeasure
 _cal2joule = auom('cal').conversion_factor('J')

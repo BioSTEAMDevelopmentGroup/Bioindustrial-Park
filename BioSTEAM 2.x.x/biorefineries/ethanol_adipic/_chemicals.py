@@ -18,9 +18,6 @@
 
 import thermosteam as tmo
 from biorefineries.lactic import _chemicals as la_chemicals
-la_chems = la_chemicals.chems
-_cal2joule = la_chemicals._cal2joule
-get_chemical_properties = la_chemicals.get_chemical_properties
 
 __all__ = ('chems', 'chemical_groups', 'soluble_organics', 'combustibles')
 getattr = getattr
@@ -28,29 +25,13 @@ getattr = getattr
 # All chemicals used in this biorefinery
 chems = tmo.Chemicals([])
 
+la_chems = la_chemicals.chems
+chemical_database, chemical_copied, chemical_defined = la_chemicals.creating_funcs(chems)
+_cal2joule = la_chemicals._cal2joule
 
 # Chemicals directly copired from lactic acid biorefinery
 def chemical_la(ID):
     chemical = getattr(la_chems, ID)
-    chems.append(chemical)
-    return chemical
-
-def chemical_database(ID, phase=None, **kwargs):
-    chemical = tmo.Chemical(ID, **kwargs)
-    if phase:
-        chemical.at_state(phase)
-        chemical.phase_ref = phase
-    chems.append(chemical)
-    return chemical
-
-def chemical_copied(ID, ref_chemical, **data):
-    chemical = ref_chemical.copy(ID)
-    chems.append(chemical)
-    for i, j in data.items(): setattr(chemical, i, j)
-    return chemical
-
-def chemical_defined(ID, **kwargs):
-    chemical = tmo.Chemical.blank(ID, **kwargs)
     chems.append(chemical)
     return chemical
 
@@ -218,31 +199,18 @@ CoolingTowerChems = chemical_la('CoolingTowerChems')
 # Group chemicals
 # =============================================================================
 
-chemical_groups = dict(
-    OtherSugars = ('Arabinose', 'Mannose', 'Galactose', 'Cellobiose', 'Sucrose'),
-    SugarOligomers = ('GlucoseOligomer', 'XyloseOligomer', 'GalactoseOligomer',
-                      'ArabinoseOligomer', 'MannoseOligomer'),
-    OrganicSolubleSolids = ('AmmoniumAcetate', 'SolubleLignin', 'Extractives', 'CSL'),
-    InorganicSolubleSolids = ('AmmoniumSulfate', 'DAP', 'NaOH', 'HNO3', 'NaNO3',
-                              'BoilerChems', 'Na2SO4', 'NH4OH', 'MonoSodiumMuconate'),
-    Furfurals = ('Furfural', 'HMF'),
-    OtherOrganics = ('Glycerol', 'Denaturant', 'Xylitol', 'LacticAcid',  'SuccinicAcid'),
-    COSOxNOxH2S = ('NO', 'NO2', 'SO2', 'CO', 'H2S'),
-    Proteins = ('Protein', 'Enzyme'),
-    CellMass = ('WWTsludge', 'Z_mobilis', 'P_putida', 'P_putidaGrow'),
-    # Theoretically P4O10 should be soluble, but it's the product of the
-    # auto-populated combusion reactions so should in solid phase, however no
-    # P4O10 will be generated in the system as no P-containing chemicals 
-    # are included in "combustibles"
-    OtherInsolubleSolids = ('Tar', 'Ash', 'CalciumDihydroxide', 'CaSO4', 'P4O10',
-                            'BaghouseBag', 'CoolingTowerChems', 'Polymer',
-                            'MuconicAcid', 'AdipicAcid'),
-    OtherStructuralCarbohydrates = ('Glucan', 'Xylan', 'Arabinan', 'Mannan',
-                                    'Galactan'),
-    SeparatelyListedOrganics = ('Ethanol', 'Glucose', 'Xylose', 'AceticAcid',
-                                'Lignin', 'Acetate'),
-    SpearatedlyListedOthers = ('H2O', 'NH3', 'H2SO4', 'CO2', 'CH4', 'O2', 'N2', 'H2')
-    )
+la_groups = la_chemicals.chemical_groups
+chemical_groups = la_groups.copy()
+chemical_groups['InorganicSolubleSolids'] = \
+    ('AmmoniumSulfate', 'DAP', 'NaOH', 'HNO3', 'NaNO3',
+     'BoilerChems', 'Na2SO4', 'NH4OH', 'MonoSodiumMuconate')
+chemical_groups['OtherOrganics'] = \
+    ('Glycerol', 'Denaturant', 'Xylitol', 'LacticAcid',  'SuccinicAcid')
+chemical_groups['CellMass'] = ('WWTsludge', 'Z_mobilis', 'P_putida', 'P_putidaGrow')
+chemical_groups['OtherInsolubleSolids'] = \
+    (*la_groups['OtherInsolubleSolids'], 'MuconicAcid', 'AdipicAcid')
+chemical_groups['SpearatedlyListedOthers'] = \
+    (*la_groups['OtherInsolubleSolids'], 'H2')
 
 # all_chemicals = []
 # for i, j in chemical_groups.items():
@@ -333,4 +301,5 @@ chems.set_synonym('CalciumDihydroxide', 'Lime')
 chems.set_synonym('CaSO4', 'Gypsum')
 chems.set_synonym('FermMicrobe', 'Z_mobilis')
 
+# get_chemical_properties = la_chemicals.get_chemical_properties
 # get_chemical_properties(chems, 400, 101325, output=True)
