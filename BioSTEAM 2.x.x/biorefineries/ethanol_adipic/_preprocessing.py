@@ -31,8 +31,7 @@ def prep_cost(basis, ID=None, *, CE, cost, n,
               S=1, ub=0, kW=0, BM=1, units=None, fsize=None, N=None):
     
     def add_param(cls):
-        add_cost(cls, ID, basis, units, S, ub, CE, cost, n, kW, BM, fsize, N)
-        cls.lifetime[ID] = lifetime
+        add_cost(cls, ID, basis, units, S, ub, CE, cost, n, kW, BM, N, lifetime, fsize)
         cls.salvage[ID] = salvage
         cls.maintenance[ID] = maintenance
         cls.labor[ID] = labor
@@ -59,8 +58,6 @@ class Preprocessing(Unit):
         Maintenance cost as a fraction of purchase cost for each equipment in this unit.
     labor : dict
         Labor cost per hour for each equipment in this unit.
-    lifetime : dict
-        Lifetime in hour for each equipment in this unit.
 
     Notes
     -----
@@ -77,7 +74,6 @@ class Preprocessing(Unit):
     salvage = {}
     maintenance = {}
     labor = {}
-    lifetime = {}
     
     _units= {'Dry flow': 'kg/hr'}
     
@@ -138,19 +134,19 @@ class OptionPrep(Preprocessing):
 
 @prep_cost(basis='Dry flow', ID='Conveyor', units='kg/hr',
            kW=0.167*9.07, cost=268800, S=9070, CE=CEPCI[2011], n=1, BM=1,
-           lifetime=168000, salvage=0.3, maintenance=0,
+           lifetime=168000/(365*24), salvage=0.3, maintenance=0,
            labor=0)
 @prep_cost(basis='Dry flow', ID='Dust collection', units='kg/hr',
            kW=9.33*9.07, cost=286400, S=9070, CE=CEPCI[2011], n=1, BM=1,
-           lifetime=168000, salvage=0.3, maintenance=0,
+           lifetime=168000/(365*24), salvage=0.3, maintenance=0,
            labor=0)
 @prep_cost(basis='Dry flow', ID='Surge bin', units='kg/hr',
            kW=0.167*9.07, cost=96800, S=9070, CE=CEPCI[2011], n=1, BM=1,
-           lifetime=168000, salvage=0.3, maintenance=0,
+           lifetime=168000/(365*24), salvage=0.3, maintenance=0,
            labor=0)
 @prep_cost(basis='Dry flow', ID='Miscellaneous', units='kg/hr',
            kW=0.333*9.07, cost=84000, S=9070, CE=CEPCI[2011], n=1, BM=1,
-           lifetime=168000, salvage=0.3, maintenance=0,
+           lifetime=168000/(365*24), salvage=0.3, maintenance=0,
            labor=0)
 class Auxiliary(Preprocessing):
     '''
@@ -173,18 +169,18 @@ class Auxiliary(Preprocessing):
 
 @prep_cost(basis='Dry flow', ID='Grinder', units='kg/hr',
            kW=19.85*4.54, cost=180000, S=4540, CE=CEPCI[2011], n=1, BM=1,
-           lifetime=15000, salvage=0.3, maintenance=0.1,
+           lifetime=15000/(365*24), salvage=0.3, maintenance=0.1,
            labor=0.5*15.88)
 class Grinder(Preprocessing): pass
 
 
 @prep_cost(basis='Dry flow', ID='CPP hammer mill', units='kg/hr',
            kW=13.23*4.54, cost=105225, S=4540, CE=CEPCI[2011], n=1, BM=1,
-           lifetime=40000, salvage=0.3, maintenance=0.1,
+           lifetime=40000/(365*24), salvage=0.3, maintenance=0.1,
            labor=0.5*19.88)
 @prep_cost(basis='Dry flow', ID='HMPP hammer mill', units='kg/hr',
            kW=66.15*1.81, cost=105225, S=1810, CE=CEPCI[2011], n=1, BM=1,
-           lifetime=40000, salvage=0.3, maintenance=0.1,
+           lifetime=40000/(365*24), salvage=0.3, maintenance=0.1,
            labor=0.5*19.88)
 class HammerMill(OptionPrep):
     
@@ -193,11 +189,11 @@ class HammerMill(OptionPrep):
 
 @prep_cost(basis='Dry flow', ID='CPP dryer', units='kg/hr',
            kW=330.76*1.81, cost=354310, S=1810, CE=CEPCI[2011], n=1, BM=1,
-           lifetime=168000, salvage=0.3, maintenance=0.1,
+           lifetime=168000/(365*24), salvage=0.3, maintenance=0.1,
            labor=0.5*15.51)
 @prep_cost(basis='Dry flow', ID='HMPP dryer', units='kg/hr',
            kW=55.13*4.54, cost=35009, S=4540, CE=CEPCI[2011], n=1, BM=1,
-           lifetime=168000, salvage=0.3, maintenance=0.1,
+           lifetime=168000/(365*24), salvage=0.3, maintenance=0.1,
            labor=0.5*15.51)
 class Dryer(OptionPrep):
 
@@ -232,11 +228,11 @@ class Dryer(OptionPrep):
 
 @prep_cost(basis='Dry flow', ID='CPP pellet mill', units='kg/hr',
            kW=55.13*4.54, cost=304264, S=4540, CE=CEPCI[2011], n=1, BM=1,
-           lifetime=100000, salvage=0.3, maintenance=0.1,
+           lifetime=100000/(365*24), salvage=0.3, maintenance=0.1,
            labor=0.5*15.51)
 @prep_cost(basis='Dry flow', ID='HMPP pellet mill', units='kg/hr',
            kW=82.69*4.54, cost=304264, S=4540, CE=CEPCI[2011], n=1, BM=1,
-           lifetime=100000, salvage=0.3, maintenance=0.1,
+           lifetime=100000/(365*24), salvage=0.3, maintenance=0.1,
            labor=0.5*15.51)
 class PelletMill(OptionPrep):
     
@@ -257,7 +253,7 @@ class PelletMill(OptionPrep):
 CH4_HHV = bst.Chemical('CH4').HHV/bst.Chemical('CH4').MW
 @prep_cost(basis='Dry flow', ID='AFEX', units='kg/hr',
            kW=60.64*8.64, cost=3101027, S=8640, CE=CEPCI[2011], n=1, BM=1,
-           lifetime=262800, salvage=0.15, maintenance=0.05,
+           lifetime=262800/(365*24), salvage=0.15, maintenance=0.05,
            labor=1*19.88)
 class DepotAFEX(Preprocessing):
     '''
@@ -516,7 +512,7 @@ class PreprocessingCost:
         for unit in self._units:
             for eqpt, cost in unit.purchase_costs.items():
                 unit_eqpt = f'{unit.ID} - {eqpt}'
-                n = unit.lifetime[eqpt]/operating_hours
+                n = unit._equipment_lifetime[eqpt]/(365*24)*operating_hours
                 sal = unit.salvage[eqpt]
                 frac = i*(1+i)**n/((1+i)**n-1)
                 depreciation_cost[unit_eqpt] = \
@@ -579,11 +575,13 @@ class PreprocessingCost:
         
         dry_mass = self._throughput
         maintenance_cost = {}
+        hr = self.operating_hours
         for unit in self._units:
             for eqpt, cost in unit.purchase_costs.items():
                 unit_eqpt = f'{unit.ID} - {eqpt}'
+                lifetime = unit._equipment_lifetime[eqpt]*hr
                 maintenance_cost[unit_eqpt] = \
-                    unit.maintenance[eqpt]*cost/unit.lifetime[eqpt]/(dry_mass/1e3)
+                    unit.maintenance[eqpt]*cost/lifetime/(dry_mass/1e3)
         return maintenance_cost
     
     def get_labor_cost(self):

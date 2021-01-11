@@ -422,6 +422,7 @@ chems.set_synonym('AmmoniumSulfate', 'NH4SO4')
 chems.set_synonym('Na2SO4', 'SodiumSulfate')
 chems.set_synonym('CalciumDihydroxide', 'Lime')
 chems.set_synonym('CaSO4', 'Gypsum')
+# chems.set_synonym('Z_mobilis', 'FermMicrobe')
 
 
 # %%

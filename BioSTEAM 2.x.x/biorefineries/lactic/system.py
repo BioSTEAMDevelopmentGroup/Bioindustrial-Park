@@ -46,7 +46,6 @@ Processes:
 # %% Setup
 
 import biosteam as bst
-import thermosteam as tmo
 from flexsolve import aitken_secant, IQ_interpolation
 from biosteam import System
 from biosteam.process_tools import UnitGroup
@@ -62,10 +61,8 @@ from biorefineries import BST222
 
 flowsheet = bst.Flowsheet('lactic')
 bst.main_flowsheet.set_flowsheet(flowsheet)
+bst.settings.set_thermo(chems)
 bst.CE = 541.7 # year 2016
-
-# Set default thermo object for the system
-tmo.settings.set_thermo(chems)
 
 # These settings are sufficient to get baseline lactic acid price within $0.002/kg
 # of the final stabilized results
@@ -606,7 +603,7 @@ T606 = units.SpecialStorage('T606', ins=ethanol, tau=7*24, V_wf=0.9,
 T606.line = 'Ethanol storage'
 T606_P = bst.units.Pump('T606_P', ins=T606-0, outs=ethanol_R402)
 
-T607 = units.FireWaterStorage('T607', ins=firewater_in, outs='firewater_out')
+T607 = units.FirewaterStorage('T607', ins=firewater_in, outs='firewater_out')
 
 # Mix solid wastes to CHP
 M601 = bst.units.Mixer('M601', ins=(U101-1, S401-0, S504-1), outs='solids_to_CHP')

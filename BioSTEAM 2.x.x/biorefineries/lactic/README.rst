@@ -6,9 +6,9 @@ Simplified process flow scheme
 ------------------------------
 .. figure:: ./images/lactic_acid_biorefinery.png
 
-The biorefinery is developed for a manuscript in preparation [1]_ for the production
-of lactic acid  via dilute sulfuric acid pretreatment, fermentation, and separation
-processes from lignocellulosic biomass. Part of the script is based on [2]_.
+The biorefinery is developed for Li et al. [1]_ for the production of lactic acid
+via dilute sulfuric acid pretreatment, fermentation, and separation processes
+from lignocellulosic biomass. Part of the script is adopted from [2]_.
 
 
 Getting Started

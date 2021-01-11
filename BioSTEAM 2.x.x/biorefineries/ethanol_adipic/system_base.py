@@ -56,41 +56,46 @@ from thermosteam import Stream
 from biorefineries.ethanol_adipic import _units as units
 from biorefineries.ethanol_adipic import _facilities as facilities 
 from biorefineries.ethanol_adipic._chemicals import chems, chemical_groups, \
-    soluble_organics, combustibles
-from biorefineries.ethanol_adipic._process_settings import price, GWP_CF_stream, GWP_CFs
-from biorefineries.ethanol_adipic._utils import baseline_feedflow, convert_ethanol_wt_2_mol, \
-    find_split, splits_df
+    soluble_organics, solubles, insolubles, COD_chemicals, combustibles
+from biorefineries.ethanol_adipic._process_settings import \
+    price, GWP_CF_stream, GWP_CFs, _labor_2011to2016, set_feedstock_price
+from biorefineries.ethanol_adipic._utils import convert_ethanol_wt_2_mol, \
+    find_split, splits_df    
 from biorefineries.ethanol_adipic._tea import ethanol_adipic_TEA
-from biorefineries import BST222
-flowsheet = bst.Flowsheet('ethanol_adipic')
+
+flowsheet = bst.Flowsheet('AFEX')
 bst.main_flowsheet.set_flowsheet(flowsheet)
-
+bst.settings.set_thermo(chems)
 bst.CE = 541.7 # year 2016
-if BST222:
-    System.default_maxiter = 400
-    System.default_converge_method = 'fixed-point'
-    System.default_molar_tolerance = 0.01
-else:
-    System.maxiter = 400
-    System.converge_method = 'fixed-point'
-    System.molar_tolerance = 0.01
-
-tmo.settings.set_thermo(chems)
+auom = tmo.units_of_measure.AbsoluteUnitsOfMeasure
 
 
 # %%
 
 # =============================================================================
-# Feedstock preprocessing
+# Feedstock preprocessing at the depot
 # =============================================================================
 
-feedstock = Stream('feedstock', baseline_feedflow.copy(),
-                   units='kg/hr', price=price['Feedstock'])
+from biorefineries.ethanol_adipic._preprocessing import \
+    create_default_depot, PreprocessingCost
 
-U101 = units.FeedstockPreprocessing('U101', ins=feedstock)
-# Handling costs/utilities included in feedstock cost thus not considered here
-U101.cost_items['System'].cost = 0
-U101.cost_items['System'].kW = 0
+prep_sys = create_default_depot(kind='HMPP', with_AFEX=False)
+
+prep_sys.simulate()
+
+prep_cost = PreprocessingCost(depot_sys=prep_sys,
+                              labor_adjustment=_labor_2011to2016)
+
+(U101, U102, U103, U104, U105) = sorted(prep_sys.units, key=lambda u: u.ID)
+feedstock, = (i.copy() for i in sorted(prep_sys.products, key=lambda s: s.ID))
+
+# $/Mg
+set_feedstock_price(feedstock, preprocessing=prep_cost.feedstock_unit_price)
+# If want to use the default preprocessing price ($24.35/Mg)
+# set_feedstock_price(feedstock)
+
+# If want to use the price in ref [2], note that the price here is $/dry U.S. ton
+# feedstock.price = price['Feedstock']
 
 
 # %%
@@ -103,7 +108,7 @@ U101.cost_items['System'].kW = 0
 caustic_R201 = Stream('caustic_R201', units='kg/hr')
 water_R201 = Stream('water_R201', units='kg/hr')
 
-R201 = units.DeacetylationReactor('R201', ins=(U101-0, caustic_R201, water_R201))
+R201 = units.DeacetylationReactor('R201', ins=(feedstock, caustic_R201, water_R201))
 P201 = units.BlackLiquorPump('P201', ins=R201-0)
 
 U201 = units.DiscMill('U201', ins=R201-1)
@@ -357,14 +362,16 @@ M601 = bst.units.Mixer('M601', ins=(D402_P-0, S401-1, S501-1, S502-0, ''))
 R601 = units.AerobicDigestion('R601', ins=(M601-0, '', caustic_R601, ammonia_R601,
                                            polymer_R601, air_R601),
                               outs=('aerobic_vent', 'aerobic_treated_water'),
-                              reactants=soluble_organics, need_ammonia=True)
+                              reactants=soluble_organics, need_ammonia=True,
+                              COD_chemicals=COD_chemicals)
 
 S601 = units.MembraneBioreactor('S601', ins=R601-1,
                                 outs=('membrane_treated_water', 'membrane_sludge'),
                                 split=find_split(splits_df.index,
                                                  splits_df['stream_624'],
                                                  splits_df['stream_625'],
-                                                 chemical_groups))
+                                                 chemical_groups),
+                                COD_chemicals=COD_chemicals)
 
 # Recycled sludge stream of memberane bioreactor, the majority of it (96%)
 # goes to aerobic digestion based on ref [1]
@@ -372,9 +379,15 @@ S602 = bst.units.Splitter('S602', ins=S601-1, outs=('to_aerobic_digestion', ''),
                           split=0.96)
 
 S603 = units.BeltThickener('S603', ins=S602-1, outs=('S603_centrate',
-                                                     'S603_solids'))
+                                                     'S603_solids'),
+                           COD_chemicals=COD_chemicals,
+                           solubles=solubles, insolubles=insolubles)
+
 S604 = units.SludgeCentrifuge('S604', ins=S603-1, outs=('S604_centrate',
-                                                        'S604_to_CHP'))
+                                                        'S604_to_CHP'),
+                              COD_chemicals=COD_chemicals,
+                              solubles=solubles, insolubles=insolubles)
+
 # Mix recycles to aerobic digestion
 M602 = bst.units.Mixer('M602', ins=(S602-0, S603-0, S604-0), outs=1-R601)
 
@@ -541,7 +554,7 @@ CIP = facilities.CIP('CIP', ins=CIP_chems_in, outs='CIP_chems_out')
 # =============================================================================
 
 ethanol_adipic_sys = System('ethanol_adipic_sys',
-                        path=(U101, pretreatment_sys, fermentation_sys,
+                        path=(pretreatment_sys, fermentation_sys,
                               ethanol_purification_sys, lignin_sys,
                               wastewater_sys,
                               S701, T701, T702, M701, T703, T704,
@@ -556,11 +569,11 @@ CHP_sys = System('CHP_sys', path=(CHP,))
 # Techno-economic analysis (TEA)
 # =============================================================================
 
+auom = tmo.units_of_measure.AbsoluteUnitsOfMeasure
 _ethanol_V = chems.Ethanol.V('l', 298.15, 101325) # molar volume in m3/mol	
 _ethanol_MW = chems.Ethanol.MW
-_liter_per_gallon = 3.78541
-_ethanol_kg_2_gal = _liter_per_gallon/_ethanol_V*_ethanol_MW/1e6
-_feedstock_factor = 907.185 / (1-0.2)
+_ethanol_kg_2_gal = auom('gal').conversion_factor('liter')/_ethanol_V*_ethanol_MW/1e6
+_feedstock_factor = auom('ton').conversion_factor('kg') / (1-0.2)
 
 ISBL_units = set((*pretreatment_sys.units, *fermentation_sys.units,
                   *ethanol_purification_sys.units, *lignin_sys.units))
