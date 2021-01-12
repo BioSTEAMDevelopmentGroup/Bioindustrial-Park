@@ -764,7 +764,8 @@ class Reactor(Unit, PressureVessel, isabstract=True):
     _units = {**PressureVessel._units,
               'Residence time': 'hr',
               'Total volume': 'm3',
-              'Reactor volume': 'm3'}
+              'Reactor volume': 'm3',
+              'Single reactor volume': 'm3'}
     
     # For a single reactor, based on diameter and length from PressureVessel._bounds,
     # converted from ft3 to m3
@@ -1122,75 +1123,75 @@ class GypsumFilter(SolidsSeparator):
 #         self.purchase_costs['Heat exchangers'] = hx.purchase_cost * N
 #         self.purchase_costs['Amberlyst-15 catalyst'] = self.mcat * price['Amberlyst15']
         
-# class HydrolysisReactor(Reactor):
-#     """
-#     Create a hydrolysis reactor that hydrolyze organic acid esters into 
-#     corresponding acids and ethanol. 
+class HydrolysisReactor(Reactor):
+    """
+    Create a hydrolysis reactor that hydrolyzes organic acid esters into 
+    corresponding acids and methanol. 
     
-#     Parameters
-#     ----------
-#     ins : 
-#         [0] Main broth
-#         [1] Supplementary water
-#         [2] Recycled water stream 1
-#         [3] Recycled water stream 2
+    Parameters
+    ----------
+    ins : 
+        [0] Main broth
+        [1] Supplementary water
+        [2] Recycled water stream 1
+        [3] Recycled water stream 2
     
-#     outs : 
-#         [0] Main effluent
-#         [1] Wastewater stream (discarded recycles)
+    outs : 
+        [0] Main effluent
+        [1] Wastewater stream (discarded recycles)
     
-#     water2esters : float
-#         Water feed to total ester molar ratio.
-#     """
-#     _N_ins = 4
-#     _N_outs = 2
-#     water2esters = 12
+    water2esters : float
+        Water feed to total ester molar ratio.
+    """
+    _N_ins = 4
+    _N_outs = 2
+    water2esters = 12
     
-#     hydrolysis_rxns = ParallelRxn([
-#             #   Reaction definition                                       Reactant   Conversion
-#             Rxn('EthylLactate + H2O -> LacticAcid + Ethanol',         'EthylLactate',   0.8),
-#             Rxn('EthylAcetate + H2O -> AceticAcid + Ethanol',         'EthylAcetate',   0.8),
-#             Rxn('EthylSuccinate + 2 H2O -> SuccinicAcid + 2 Ethanol', 'EthylSuccinate', 0.8),
-#                 ])
+    hydrolysis_rxns = ParallelRxn([
+            #   Reaction definition                                       Reactant   Conversion
+            Rxn('MethylHP + H2O -> HP + Methanol',         'MethylHP',   0.8),
+            Rxn('MethylAcetate + H2O -> AceticAcid + Methanol',         'MethylAcetate',   0.8),
+            Rxn('MethylSuccinate + H2O -> SuccinicAcid + Methanol',         'MethylSuccinate',   0.8),
+            ])
     
-#     def _run(self):
-#         # On weight basis, recycle2 is near 10% EtLA so will always be recycled,
-#         # but recycle1 is >97% water with <1% LA, so will only be used to supply
-#         # water needed for the hydrolysis reaction
-#         feed, water, recycle1, recycle2 = self.ins
-#         effluent, wastewater = self.outs
+    def _run(self):
+        # On weight basis, recycle2 is near 10% EtLA so will always be recycled,
+        # but recycle1 is >97% water with <1% LA, so will only be used to supply
+        # water needed for the hydrolysis reaction
+        feed, water, recycle1, recycle2 = self.ins
+        effluent, wastewater = self.outs
         
-#         esters = ('EthylLactate', 'EthylAcetate', 'EthylSuccinate')
-#         # Succnic acid is a dicarboxylic acid, needs twice as much water
-#         ratios = self.water2esters * np.array([1, 1, 2])
-#         # Have enough water in feed and recycle2, discharge some recycle2
-#         # and all of recycle1
-#         if compute_extra_chemical(feed, recycle2, esters, 'H2O', ratios) > 0:
-#             effluent, recycle2_discarded = \
-#                 adjust_recycle(feed, recycle2, esters, 'H2O', ratios)
-#             wastewater.mix_from([recycle1, recycle2_discarded])
-#             water.empty()        
-#         else:
-#             # Recycle all of recycle2 and combine feed and recycle2 as feed2
-#             feed2 = feed.copy()
-#             feed2.mix_from([feed, recycle2])
-#             # Have enough water in feed2 and recycle1
-#             if compute_extra_chemical(feed2, recycle1, esters, 'H2O', ratios) > 0:
-#                 effluent, recycle1_discarded = \
-#                     adjust_recycle(feed2, recycle1, esters, 'H2O', ratios)
-#                 wastewater = recycle1_discarded
-#                 water.empty()
-#             # Not have enough water in both recycles, need supplementary water
-#             else:
-#                 water.imol['H2O'] = \
-#                     - compute_extra_chemical(feed2, recycle1, esters, 'H2O', ratios)
-#                 effluent.mix_from(self.ins)
-#                 wastewater.empty()
+        esters = ('MethylHP', 'MethylAcetate', 'MethylSuccinate')
+        # Succnic acid is a dicarboxylic acid, needs twice as much water
+        ratios = self.water2esters * np.array([1, 1, 2])
+        # Have enough water in feed and recycle2, discharge some recycle2
+        # and all of recycle1
+        if compute_extra_chemical(feed, recycle2, esters, 'H2O', ratios) > 0:
+            effluent, recycle2_discarded = \
+                adjust_recycle(feed, recycle2, esters, 'H2O', ratios)
+            wastewater.mix_from([recycle1, recycle2_discarded])
+            water.empty()        
+        else:
+            # Recycle all of recycle2 and combine feed and recycle2 as feed2
+            feed2 = feed.copy()
+            feed2.mix_from([feed, recycle2])
+            # Have enough water in feed2 and recycle1
+            if compute_extra_chemical(feed2, recycle1, esters, 'H2O', ratios) > 0:
+                effluent, recycle1_discarded = \
+                    adjust_recycle(feed2, recycle1, esters, 'H2O', ratios)
+                wastewater = recycle1_discarded
+                water.empty()
+            # Not have enough water in both recycles, need supplementary water
+            else:
+                water.imol['H2O'] = \
+                    - compute_extra_chemical(feed2, recycle1, esters, 'H2O', ratios)
+                effluent.mix_from(self.ins)
+                wastewater.empty()
         
-#         rxns = self.hydrolysis_rxns
-#         rxns(effluent.mol)
-#         self.outs[0].copy_like(effluent)
-#         self.outs[1].copy_like(wastewater)
+        rxns = self.hydrolysis_rxns
+        rxns(effluent.mol)
+        self.outs[0].copy_like(effluent)
+        self.outs[1].copy_like(wastewater)
 
 
 # %% 
@@ -1481,8 +1482,12 @@ class DehydrationReactor(Reactor):
     _BM = {**Reactor._BM,
             'TiO2 catalyst': 1,
             'Heat exchangers': 3.17}
-    mcat_frac = (12/1.5) * (1e3)# kg per m3/h
     
+    # WHSV = (1.5/12) * 1e-3 # m3/h.kg
+    mcat_frac = 12/1.5 # kg per kg/h
+    # mcat_frac = 8
+    # !!! TODO: Update TiO2 lifetime
+    _equipment_lifetime = {'TiO2 catalyst': 5,}
     def __init__(self, ID='', ins=None, outs=(), thermo=None, *, T=230+273.15,
                   P=101325, V_wf=0.8, length_to_diameter=2, tau = 1,
                   kW_per_m3=0.0985, # Perry's handbook
@@ -1532,8 +1537,7 @@ class DehydrationReactor(Reactor):
         hu_total.scale(N)
         self.purchase_costs['Heat exchangers'] = hx.purchase_cost * N
         self.purchase_costs['TiO2 catalyst'] =\
-            self.mcat_frac * (sum([stream.F_vol for stream in self.outs])) * price['TiO2']
-        
+            self.mcat_frac * (sum([stream.F_mass for stream in self.ins])) * price['TiO2']
         
         
 compute_HP_titer = lambda effluent: (effluent.imass['HP'] +
@@ -1704,8 +1708,8 @@ class CoFermentation(Reactor):
             self.heat_exchanger.simulate_as_auxiliary_exchanger(duty, _mixture)
         
         elif mode == 'Continuous':
+            Reactor._V_max = 3785.41 # 1 million gallons
             Reactor._design(self)
-
         else:
             raise DesignError(f'Fermentation mode must be either Batch or Continuous, not {mode}')
 
