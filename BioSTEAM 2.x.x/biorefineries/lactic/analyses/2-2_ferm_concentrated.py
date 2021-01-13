@@ -160,7 +160,7 @@ S402.bypass = False
 
 R301.mode = 'Batch'
 # This titer cannot be achieved, the system will find the maximum achievable titer
-R301.titer_limit = 600
+R301.set_titer = 600
 
 # print('\n---------- Regular Strain Batch Limits ----------')
 # # Find the maximum achievable titer without concentration
@@ -168,7 +168,7 @@ R301.titer_limit = 600
 # R301.allow_concentration = False
 # bst.speed_up()
 # for i in yield_range:
-#     R301.yield_limit = i
+#     R301.set_yield = i
 #     set_yield(i, R301, R302)
 #     limits[0][0][i] = simulate_log_results(return_limit=True)
 
@@ -178,7 +178,7 @@ R301.titer_limit = 600
 # E301.bypass = False
 R301.allow_concentration = True
 for i in yield_range:
-    R301.yield_limit = i
+    R301.set_yield = i
     set_yield(i, R301, R302)
     limits[1][0][i] = simulate_log_results(return_limit=True)
 
@@ -192,8 +192,8 @@ regular_limit2 = save_data_clear()
 #     titer_range = np.arange(limits[0][0][i], limits[1][0][i], 10)
 #     titer_range = titer_range.tolist() + [limit]
 #     for j in titer_range:
-#         R301.yield_limit = i
-#         R301.titer_limit = j
+#         R301.set_yield = i
+#         R301.set_titer = j
 #         set_yield(i, R301, R302)
 #         simulate_log_results(return_limit=False)
 
@@ -203,9 +203,9 @@ regular_limit2 = save_data_clear()
 # print('\n---------- Regular Strain Continuous Limits ----------')
 # # Find the maximum achievable titer with concentration in continuous mode
 # R301.mode = 'Continuous'
-# R301.titer_limit = 600
+# R301.set_titer = 600
 # for i in yield_range:
-#     R301.yield_limit = i
+#     R301.set_yield = i
 #     set_yield(i, R301, R302)
 #     limits[2][0][i] = simulate_log_results(return_limit=True)
 
@@ -223,8 +223,8 @@ regular_limit2 = save_data_clear()
 #     titer_range = np.arange(limits[1][0][i], limit, 10)
 #     titer_range = titer_range.tolist() + [limit]
 #     for j in titer_range:
-#         R301.yield_limit = i
-#         R301.titer_limit = j
+#         R301.set_yield = i
+#         R301.set_titer = j
 #         set_yield(i, R301, R302)
 #         simulate_log_results(return_limit=False)
 
@@ -247,14 +247,14 @@ regular_limit2 = save_data_clear()
 # S402.bypass = True
 
 # R301.mode = 'Batch'
-# R301.titer_limit = 600
+# R301.set_titer = 600
 
 # print('\n---------- Acid-resistant Strain Batch Limits ----------')
 # # Find the maximum achievable titer without concentration
 # # E301.bypass = True
 # R301.allow_concentration = False
 # for i in yield_range:
-#     R301.yield_limit = i
+#     R301.set_yield = i
 #     set_yield(i, R301, R302)
 #     limits[0][1][i] = simulate_log_results(return_limit=True)
 
@@ -264,7 +264,7 @@ regular_limit2 = save_data_clear()
 # # E301.bypass = False
 # R301.allow_concentration = True
 # for i in yield_range:
-#     R301.yield_limit = i
+#     R301.set_yield = i
 #     set_yield(i, R301, R302)
 #     limits[1][1][i] = simulate_log_results(return_limit=True)
 
@@ -277,8 +277,8 @@ regular_limit2 = save_data_clear()
 #     titer_range = np.arange(limits[0][1][i], limits[1][1][i], 2.5)
 #     titer_range = titer_range.tolist() + [limit]
 #     for j in titer_range:
-#         R301.yield_limit = i
-#         R301.titer_limit = j
+#         R301.set_yield = i
+#         R301.set_titer = j
 #         set_yield(i, R301, R302)
 #         simulate_log_results(return_limit=False)
 
@@ -287,9 +287,9 @@ regular_limit2 = save_data_clear()
 # print('\n---------- Acid-resistant Strain Continuous Limits ----------')
 # # Find the maximum achievable titer with concentration in continuous mode
 # R301.mode = 'Continuous'
-# R301.titer_limit = 600
+# R301.set_titer = 600
 # for i in yield_range:
-#     R301.yield_limit = i
+#     R301.set_yield = i
 #     set_yield(i, R301, R302)
 #     limits[2][1][i] = simulate_log_results(return_limit=True)
 
@@ -306,8 +306,8 @@ regular_limit2 = save_data_clear()
 #     titer_range = np.arange(limits[1][1][i], limit, 2.5)
 #     titer_range = titer_range.tolist() + [limit]
 #     for j in titer_range:
-#         R301.yield_limit = i
-#         R301.titer_limit = j
+#         R301.set_yield = i
+#         R301.set_titer = j
 #         set_yield(i, R301, R302)
 #         simulate_log_results(return_limit=False)
 

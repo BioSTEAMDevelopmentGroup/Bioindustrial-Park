@@ -50,7 +50,6 @@ from flexsolve import aitken_secant, IQ_interpolation
 from biosteam import System
 from biosteam.process_tools import UnitGroup
 from thermosteam import Stream
-
 from biorefineries.lactic import _units as units
 from biorefineries.lactic import _facilities as facilities
 from biorefineries.lactic._process_settings import price, CFs
@@ -76,7 +75,6 @@ else:
     System.molar_tolerance = 0.02
 
 
-
 # %% 
 
 # =============================================================================
@@ -89,9 +87,6 @@ feedstock = Stream('feedstock', baseline_feedflow.copy(),
 U101 = units.FeedstockPreprocessing('U101', ins=feedstock,
                                     outs=('processed', 'diverted_to_CHP'),
                                     diversion_to_CHP=0)
-# Handling costs/utilities included in feedstock cost thus not considered here
-U101.cost_items['System'].cost = 0
-U101.cost_items['System'].kW = 0
 
 process_groups = []
 feedstock_group = UnitGroup('feedstock_group', units=(U101,))
@@ -186,6 +181,9 @@ water_M301 = Stream('water_M301', units='kg/hr')
 CSL_R301 = Stream('CSL_R301', units='kg/hr')
 # Lime for neutralization of produced acid
 lime_R301 = Stream('lime_R301', units='kg/hr')
+# Water used to dilute the saccharified stream to achieve a lower titer target
+# at a given yield
+water_R301 = Stream('water_R301', units='kg/hr')
 
 # =============================================================================
 # Conversion units
@@ -194,12 +192,10 @@ lime_R301 = Stream('lime_R301', units='kg/hr')
 # Mix enzyme with pretreatment hydrolysate
 M301 = units.EnzymeHydrolysateMixer('M301', ins=(P201-0, enzyme_M301, water_M301))
 
-R301 = units.SaccharificationAndCoFermentation('R301',
-                                               ins=(M301-0, '', CSL_R301, lime_R301),
-                                               outs=('fermentation_effluent', 
-                                                     'sidedraw'),
-                                               neutralization=True,
-                                               set_titer_limit=True)
+R301 = units.SaccharificationAndCoFermentation(
+    'R301', ins=(M301-0, '', CSL_R301, lime_R301, water_R301),
+    outs=('fermentation_effluent', 'sidedraw'),
+    neutralization=True, allow_dilution=False)
 
 R302 = units.SeedTrain('R302', ins=R301-1, outs=('seed',))
 
@@ -207,26 +203,38 @@ T301 = units.SeedHoldTank('T301', ins=R302-0, outs=1-R301)
 
 seed_recycle = System('seed_recycle', path=(R301, R302, T301), recycle=R302-0)
 
-# Adjust titer 
+# Add dilution water to achieve the lower titer
+def titer_at_water(water):
+    water_R301.imass['Water'] = water
+    seed_recycle._run()
+    return R301.effluent_titer-R301.set_titer
+
+# Lower yield to achieve the lower titer
 def titer_at_yield(lactic_yield):
     set_yield(lactic_yield, R301, R302)
     seed_recycle._run()
-    return R301.effluent_titer-R301.titer_limit
+    return R301.effluent_titer-R301.set_titer
 
-def adjust_titer_yield():
-    set_yield(R301.yield_limit, R301, R302)
+def adjust_R301_water():
+    water_R301.empty()
+    set_yield(R301.set_yield, R301, R302)
     seed_recycle._run()
-    if R301.set_titer_limit:
-        if R301.effluent_titer > R301.titer_limit:
+    if R301.effluent_titer > R301.set_titer:
+        if R301.allow_dilution:
+            water_R301.imass['Water'] = IQ_interpolation(
+                f=titer_at_water, x0=0, x1=1e10,
+                xtol=0.1, ytol=0.01, maxiter=50,
+                args=(), checkbounds=False)
+        else:
             lactic_yield = IQ_interpolation(
-                f=titer_at_yield, x0=0, x1=R301.yield_limit,
+                f=titer_at_yield, x0=0, x1=R301.set_yield,
                 xtol=0.001, ytol=0.01, maxiter=50,
                 args=(), checkbounds=False)
             set_yield(lactic_yield, R301, R302)
-            seed_recycle._run()
+        seed_recycle._run()
 
 PS301 = bst.units.ProcessSpecification('PS301', ins=R301-0,
-                                        specification=adjust_titer_yield)
+                                        specification=adjust_R301_water)
 
 conversion_sys = System('conversion_sys',
                         path=(M301, seed_recycle, PS301))
@@ -625,7 +633,7 @@ CT = facilities.CT('CT', ins=('return_cooling_water', cooling_tower_chems,
 # if heating needed, then heating duty required is considered in CHP
 process_water_streams = {
     'pretreatment': (water_M201, water_M202, steam_M203, water_M205),
-    'conversion': (water_M301,),
+    'conversion': (water_M301, water_R301),
     'separation': (water_R403,),
     'facilities': (CHP.ins[-1], CT.ins[-1])
     }
@@ -800,7 +808,7 @@ def simulate_and_print():
 def simulate_fermentation_improvement():
     R301_X = R301.cofermentation_rxns.X
     R302_X = R302.cofermentation_rxns.X
-    R301.yield_limit = 0.95
+    R301.set_yield = 0.95
     R301_X[0] = R301_X[3] = 0.95
     R301_X[1] = R301_X[4] = 0
     R302_X[1] = R302_X[4] = 0
@@ -812,11 +820,6 @@ def simulate_separation_improvement():
     simulate_and_print()
 
 def simulate_operating_improvement():
-    # lps = bst.HeatUtility.get_heating_agent('low_pressure_steam')
-    # mps = bst.HeatUtility.get_heating_agent('medium_pressure_steam')
-    # hps = bst.HeatUtility.get_heating_agent('high_pressure_steam')
-    # for i in (lps, mps, hps):
-    #     i.heat_transfer_efficiency = 1
     U101.diversion_to_CHP = 0.25
     print('\n---------- Simulation Results ----------')
     print(f'MPSP is ${simulate_get_MPSP():.3f}/kg')

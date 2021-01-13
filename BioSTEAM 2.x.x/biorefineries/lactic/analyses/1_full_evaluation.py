@@ -22,7 +22,7 @@ import pandas as pd
 import biosteam as bst
 from biosteam.utils import TicToc
 from biosteam.plots import plot_montecarlo_across_coordinate
-from biorefineries.lactic.system import R301, lactic_sys, simulate_get_MPSP, get_GWP, get_FEC
+from biorefineries.lactic.system import lactic_sys, simulate_get_MPSP, get_GWP, get_FEC
 from biorefineries.lactic.analyses import models
 
 percentiles = [0, 0.05, 0.25, 0.5, 0.75, 0.95, 1]
@@ -40,7 +40,6 @@ timer = TicToc('timer')
 timer.tic()
 
 model = models.model_full
-R301.set_titer_limit = True
 
 # Set seed to make sure each time the same set of random numbers will be used
 np.random.seed(3221)

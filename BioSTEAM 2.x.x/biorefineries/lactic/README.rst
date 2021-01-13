@@ -4,7 +4,11 @@ lactic: Production of Lactic Acid from Lignocellulosic Biomass
 
 Simplified process flow scheme
 ------------------------------
-.. figure:: ./images/lactic_acid_biorefinery.png
+.. figure:: ./images/TOC.png
+
+
+.. figure:: ./images/system_diagram.png
+
 
 The biorefinery is developed for Li et al. [1]_ for the production of lactic acid
 via dilute sulfuric acid pretreatment, fermentation, and separation processes
@@ -147,37 +151,22 @@ titer-yield-productivity analysis for the fermentation process, evaluate feedsto
 of varying carbohydrate contents and at different prices, and evaluate feedstocks
 of varying succinic acid content.
 
+The system contains three different conversion scenarios, the first scenario
+(including baseline) is included in the system.py, and the second and third
+systems are included in the system_concentrated.py.
+
 Note that results used in the manuscript [1]_ were generated using biosteam v2.20.21,
 thermosteam v0.20.26, and dependencies (`commit f56692d <https://github.com/BioSTEAMDevelopmentGroup/Bioindustrial-Park/commit/f56692d3bc06527b57dc77ed7cb929a40b59bc4d>`_).
 
 To reproduce the results, directly run the script of interest, and results will
 be saved as Excel files in the same directory path as the module.
 
-.. note::
-        If running the 2-2_ferm_concentrated script return an error concerning E301 and
-        f(x0) and f(x1) signs, then in biosteam.units._multi_effec_evaporator, change
-    
-    .. code-block:: python
-    
-            self._V1 = flx.IQ_interpolation(compute_overall_vapor_fraction,
-                                            x0, x1, y0, y1, self._V1, 
-                                            xtol=0.000001, ytol=0.0001,
-                                            checkiter=False)
-
-    to
-
-    .. code-block:: python
-    
-            self._V1 = flx.IQ_interpolation(compute_overall_vapor_fraction,
-                                            x0, x1, y0, y1, self._V1, 
-                                            xtol=0.000001, ytol=0.0001,
-                                            checkiter=False, checkbounds=False)
 
 References
 ----------
-.. [1] Li et al., Sustainable Lactic Acid Production from Lignocellulosic
-     Biomass. Accepted 2020.
-    
+.. [1] Li et al., Sustainable Lactic Acid Production from Lignocellulosic Biomass.
+     ACS Sustainable Chem. Eng. 2021.
+     `<https://doi.org/10.1021/acssuschemeng.0c08055>`_    
 .. [2] Cortes-Peña et al., BioSTEAM: A Fast and Flexible Platform for the Design,
     Simulation, and Techno-Economic Analysis of Biorefineries under Uncertainty. 
     ACS Sustainable Chem. Eng. 2020, 8 (8), 3302–3310. 

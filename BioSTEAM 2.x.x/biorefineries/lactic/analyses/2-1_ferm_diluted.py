@@ -21,10 +21,10 @@ import numpy as np
 import pandas as pd
 import biosteam as bst
 from biosteam.utils import TicToc
-from biorefineries.lactic import system_diluted
+from biorefineries.lactic import system
 from biorefineries.lactic._utils import set_yield
 
-system_diluted.simulate_and_print()
+system.simulate_and_print()
 
 
 # %% 
@@ -58,14 +58,14 @@ FECs = {0.89: [],
 yield_range = np.arange(0.3, 1.01, 0.025) - 1e-6
 # yield_range = np.arange(0.3, 1.01, 0.1) - 1e-6
 
-R301 = system_diluted.R301
-R302 = system_diluted.R302
-R401 = system_diluted.R401
-S402 = system_diluted.S402
+R301 = system.R301
+R302 = system.R302
+R401 = system.R401
+S402 = system.S402
 
-lactic_acid = system_diluted.lactic_acid
-lactic_sys = system_diluted.lactic_sys
-lactic_tea = system_diluted.lactic_tea
+lactic_acid = system.lactic_acid
+lactic_sys = system.lactic_sys
+lactic_tea = system.lactic_tea
 
 def solve_TEA():
     lactic_acid.price = 0
@@ -90,8 +90,8 @@ def simulate_log_results(return_limit=False):
             update_productivity(productivity)
             MPSPs[productivity].append(solve_TEA())
             NPVs[productivity].append(lactic_tea.NPV)
-            GWPs[productivity].append(system_diluted.get_GWP())
-            FECs[productivity].append(system_diluted.get_FEC())
+            GWPs[productivity].append(system.get_GWP())
+            FECs[productivity].append(system.get_FEC())
     except:
         limit = np.nan
         lactic_sys.empty_recycles()
@@ -145,7 +145,7 @@ print('\n---------- Regular Strain ----------')
 R301.allow_dilution = False
 yield_with_baseline = [0.76] + yield_range.tolist()
 for i in yield_with_baseline:
-    R301.yield_limit = i
+    R301.set_yield = i
     set_yield(i, R301, R302)
     limits[0][i] = simulate_log_results(return_limit=True)
 
@@ -158,8 +158,8 @@ for i in yield_range:
     # titer_range = np.arange(40, limits[0][i], 10)    
     titer_range = titer_range.tolist() + [limits[0][i]]
     for j in titer_range:
-        R301.yield_limit = i
-        R301.titer_limit = j
+        R301.set_yield = i
+        R301.set_titer = j
         set_yield(i, R301, R302)
         simulate_log_results(return_limit=False)
 
@@ -186,7 +186,7 @@ print('\n---------- Acid-resistant Strain ----------')
 # First determine the maximum achievable titer at a given yield
 R301.allow_dilution = False
 for i in yield_with_baseline:
-    R301.yield_limit = i
+    R301.set_yield = i
     set_yield(i, R301, R302)
     limits[1][i] = simulate_log_results(return_limit=True)
 
@@ -198,8 +198,8 @@ for i in yield_range:
     titer_range = np.arange(40, limits[0][i], 2.5)
     titer_range = titer_range.tolist() + [limits[0][i]]
     for j in titer_range:        
-        R301.yield_limit = i
-        R301.titer_limit = j
+        R301.set_yield = i
+        R301.set_titer = j
         set_yield(i, R301, R302)
         simulate_log_results(return_limit=False)
 

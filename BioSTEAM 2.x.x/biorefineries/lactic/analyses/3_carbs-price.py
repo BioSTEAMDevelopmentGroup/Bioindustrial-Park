@@ -76,7 +76,7 @@ carb_contents1 = carb_contents1.tolist() + [0.589]
 concentrated.R301.allow_dilution = False
 concentrated.R301.allow_concentration = True
 concentrated.R301.mode = 'Batch'
-concentrated.R301.titer_limit = 97.5
+concentrated.R301.set_titer = 97.5
 concentrated.E301.bypass = False
 
 # Using two loops are not optimal, can potentially use Model and Metric to speed up
@@ -101,13 +101,13 @@ for i in carb_contents1:
     print(f'Run #{run_number}: {timer.elapsed_time:.0f} sec')
 
 # Then concentration needed to get to the baseline titer
-from biorefineries.lactic import system_diluted as diluted
+from biorefineries.lactic import system as diluted
 diluted.simulate_and_print()
 
 carb_contents2 = np.arange(0.59, 0.701, 0.01).tolist()
 diluted.R301.allow_dilution = True
 diluted.R301.allow_concentration = False
-diluted.R301.titer_limit = 97.5
+diluted.R301.set_titer = 97.5
 
 bst.speed_up()
 for i in carb_contents2:

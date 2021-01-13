@@ -76,7 +76,7 @@ def compute_lactic_titer(stream, V=None):
     return titer
 
 def set_yield(lactic_yield, R301, R302):
-    if lactic_yield > 1:
+    if not 0<=lactic_yield<=1:
         raise ValueError(f'Lactic acid yield of {lactic_yield:.2f} is infeasible')
     R301_X = R301.cofermentation_rxns.X
     R301_X[0] = R301_X[3] = lactic_yield

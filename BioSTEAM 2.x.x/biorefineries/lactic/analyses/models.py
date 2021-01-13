@@ -536,14 +536,8 @@ D = shape.Triangle(0.55, 0.76, 0.93)
 @param(name='Lactic acid yield', element=R301, kind='coupled', units='g/g',
        baseline=0.76, distribution=D)
 def set_lactic_yield(lactic_yield):
-    R301.yield_limit = lactic_yield
+    R301.set_yield = lactic_yield
     set_yield(lactic_yield, R301, R302)
-    # R301_X = R301.cofermentation_rxns.X
-    # R302_X = R302.cofermentation_rxns.X
-    # R301_X[0] = R301_X[3] = R301.yield_limit = lactic_yield
-    # R301_X[1] = R301_X[4] = min(R301_X[1], 1-1e-6-R301_X[0]-R301_X[2])
-    # R302_X[0] = R302_X[3] = lactic_yield * R302.ferm_ratio
-    # R302_X[1] = R302_X[4] = min(R301_X[1]*R302.ferm_ratio, 1-1e-6-R302_X[0]-R302_X[2])    
 
 D = shape.Triangle(0.33, 0.89, 1.66)
 @param(name='Productivity', element=R301, kind='coupled', units='g/L/hr',

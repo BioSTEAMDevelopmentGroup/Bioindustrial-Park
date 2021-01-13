@@ -51,7 +51,7 @@ from biosteam.units.design_tools import pressure_vessel_material_factors as fact
 from biosteam.units.decorators import cost
 from thermosteam import separations
 from biorefineries.lactic._process_settings import price
-from biorefineries.lactic._chemicals import sugars, COD_chemicals, solubles, insolubles
+from biorefineries.lactic._chemicals import COD_chemicals, solubles, insolubles
 from biorefineries.lactic._utils import CEPCI, baseline_feedflow, compute_lactic_titer, \
     compute_extra_chemical, adjust_recycle, compute_COD
 
@@ -69,8 +69,10 @@ ParallelRxn = tmo.reaction.ParallelReaction
 # Feedstock preprocessing
 # =============================================================================
 
-# Capital and operating costs already considered in 
+# The system as a whole, capital and operating costs already considered in 
 # the cost of feedstock cost
+@cost(basis='Flow rate', ID='System', units='kg/hr',
+      kW=511.3205, cost=13329690, S=94697, CE=CEPCI[2009], n=0.6, BM=1.7)
 class FeedstockPreprocessing(Unit):
     _N_outs = 2
     # 2205 U.S. ton/day (2000 metric tonne/day) as in ref [1]
@@ -372,7 +374,7 @@ class EnzymeHydrolysateMixer(Mixer):
 @cost(basis='Fermenter size', ID='Agitator', units='kg',
       # Scaling basis based on sum of all streams into fermenter
       # (304, 306, 311, and 312 in ref [1])
-      # and total residence time (batch hydrolysis and fermentation)
+      # and total residence time (batch hydrolysis and fermentation),
       kW=268.452, cost=630000, S=(42607+443391+948+116)*(60+36),
       CE=CEPCI[2009], n=1, BM=1.5)
 @cost(basis='Recirculation flow rate', ID='Recirculation pump', units='kg/hr',
@@ -385,7 +387,7 @@ class EnzymeHydrolysateMixer(Mixer):
       # 13 is the duty in MMkca/hr
       cost=85000, S=-8*_Gcal_2_kJ, CE=CEPCI[2010], n=0.7, BM=2.2)
 class SaccharificationAndCoFermentation(Unit):
-    _N_ins = 5
+    _N_ins = 4
     _N_outs = 2
     _N_heat_utilities = 1
     _units= {'Saccharification tank size': 'kg',
@@ -401,26 +403,24 @@ class SaccharificationAndCoFermentation(Unit):
     
     CSL_loading = 10 # g/L (kg/m3)
     
-    set_titer = 130 # in g/L (kg/m3), the maximum titer in collected data
+    titer_limit = 130 # in g/L (kg/m3), the maximum titer in collected data
     
     effluent_titer = 0
     
     productivity = 0.89 # in g/L/hr
     
-    set_yield = 0.76 # in g/g-sugar
-    
-    tau_cofermentation = 0 # will be calculated based on titer and productivity
+    yield_limit = 0.76 # in g/g-sugar
     
     tau_turnaround = 12 # in hr, the same as the seed train in ref [1]
     
     def __init__(self, ID='', ins=None, outs=(), T=50+273.15,
-                 neutralization=True, allow_dilution=False):
+                 neutralization=True, set_titer_limit=True):
         Unit.__init__(self, ID, ins, outs)
         # Same T for saccharificatoin and co-fermentation
         self.T = T
         self.neutralization = neutralization
-        self.allow_dilution = allow_dilution
-        self.saccharified_stream = tmo.Stream()
+        self.set_titer_limit = set_titer_limit
+        self.saccharified_stream = tmo.Stream(None)
         
         self.saccharification_rxns = ParallelRxn([
             #   Reaction definition                   Reactant        Conversion
@@ -441,7 +441,14 @@ class SaccharificationAndCoFermentation(Unit):
         Rxn('Xylose -> 5 FermMicrobe',        'Xylose',    0.02)
         ])
         self._X = self.cofermentation_rxns.X.copy()
-
+        
+        # Used to calculate the titer limited by sugar concentration
+        self._sugar_limited_rxns = ParallelRxn([
+        #      Reaction definition            Reactant  Conversion
+        Rxn('Glucose -> 2 LacticAcid',        'Glucose',   1),
+        Rxn('3 Xylose -> 5 LacticAcid',       'Xylose',    1),
+        ])
+        
         # Neutralization of lactic acid and acetic acid by lime (Ca(OH)2)
         self.neutralization_rxns = ParallelRxn([
         #   Reaction definition                                               Reactant  Conversion
@@ -451,21 +458,19 @@ class SaccharificationAndCoFermentation(Unit):
             ])
 
     def _run(self):
-        feed, inoculum, CSL, lime, water = self.ins
+        feed, inoculum, CSL, lime = self.ins
         effluent, sidedraw = self.outs
         ss = self.saccharified_stream
         
         CSL.imass['CSL'] = feed.F_vol * self.CSL_loading
-        if not self.allow_dilution:
-            water.empty()
-        ss.mix_from((feed, inoculum, CSL, water))
+        ss.mix_from([feed, inoculum, CSL])
         ss.T = sidedraw.T = effluent.T = self.T
         
         self.saccharification_rxns(ss.mol)
         # Sidedraw to SeedTrain
         sidedraw.mol = ss.mol * self.inoculum_ratio
         effluent.mol = ss.mol - sidedraw.mol
-        # effluent_copy = effluent.copy()
+        effluent_copy = effluent.copy()
         
         self.cofermentation_rxns(effluent.mol)
         # Assume all CSL is consumed
@@ -484,18 +489,21 @@ class SaccharificationAndCoFermentation(Unit):
             lime.empty()
         self.effluent_titer = compute_lactic_titer(effluent)
         
+        self._sugar_limited_rxns(effluent_copy.mol)
+        self.sugar_limited_titer = compute_lactic_titer(effluent_copy, V=effluent.F_vol)       
+        
     def _design(self):
         Design = self.design_results
         total_mass_flow = self.ins[0].F_mass + self.ins[1].F_mass
         Design['Saccharification tank size'] = \
             total_mass_flow * self.tau_saccharification
         Design['Slurry flow rate'] = total_mass_flow
-        tau = self.tau_cofermentation = self.effluent_titer/self.productivity
-        Design['Fermenter size'] = self.outs[0].F_mass * (tau+self.tau_turnaround)
+        tau_cofermentation = self.tau_turnaround + self.effluent_titer/self.productivity
+        Design['Fermenter size'] = self.outs[0].F_mass * tau_cofermentation
         Design['Recirculation flow rate'] = total_mass_flow
 
         hu_cooling = self.heat_utilities[0]
-        mixture = tmo.Stream()
+        mixture = tmo.Stream('mixture')
         mixture.mix_from(self.ins[0:3])
         Design['Duty'] = self.saccharified_stream.H  - mixture.H
         hu_cooling(duty=Design['Duty'], T_in=mixture.T)
@@ -507,7 +515,6 @@ class SaccharificationAndCoFermentation(Unit):
         if not self.neutralization:
             self.purchase_costs['Fermenter'] *= _316_over_304
             self.purchase_costs['Agitator'] *= _316_over_304
-
 
 # Saccharification and co-fermentation (both glucose & xylose are used in fermentation)
 # Not including heat exchanger as saccharificatoin and co-fermentation 
@@ -522,9 +529,7 @@ class Saccharification(Unit):
     _units= {'Saccharification tank size': 'kg',
              'Slurry flow rate': 'kg/hr'}
     
-    # Extend saccharification time based on ref [1] as saccharification and
-    # co-fermentation are separated now
-    tau_saccharification = 84 # in hr
+    tau_saccharification = 24 # in hr
     
     def __init__(self, ID='', ins=None, outs=(), T=50+273.15):
         Unit.__init__(self, ID, ins, outs)
@@ -686,7 +691,7 @@ class Reactor(Unit, PressureVessel, isabstract=True):
       # (304, 306, 311, and 312 in ref [1])
       kW=74.57, cost=47200, S=(42607+443391+948+116), CE=CEPCI[2009], n=0.8, BM=2.3)
 class CoFermentation(Reactor):
-    _N_ins = 6
+    _N_ins = 5
     _N_outs = 2
     _units= {**Reactor._units,
             'Fermenter size': 'kg',
@@ -701,22 +706,18 @@ class CoFermentation(Reactor):
     
     # Equals the split of saccharified slurry to seed train
     inoculum_ratio = 0.07
-
+    
     CSL_loading = 10 # g/L (kg/m3)
     
-    set_titer = 130 # in g/L (kg/m3), the maximum titer in collected data
-
+    titer_limit = 130 # in g/L (kg/m3), the maximum titer in collected data
+    
     effluent_titer = 0
     
     productivity = 0.89 # in g/L/hr
     
-    set_yield = 0.76 # in g/g-sugar
+    yield_limit = 0.76 # in g/g-sugar
     
     tau_batch_turnaround = 12 # in hr, the same as the seed train in ref [1]
-    
-    taus = [0, 0] # for initial and concentrated feed
-    
-    max_sugar = 0 # maximum sugar concentration during fermentation
 
     def __init__(self, ID='', ins=None, outs=(), thermo=None, *, T=50+273.15,
                  P=101325, V_wf=0.8, length_to_diameter=0.6,
@@ -725,7 +726,7 @@ class CoFermentation(Reactor):
                  vessel_material='Stainless steel 304',
                  vessel_type='Vertical',
                  neutralization=True,
-                 mode='Batch',
+                 mode='Batch', # Batch or Continuous
                  allow_dilution=False,
                  allow_concentration=False):
         
@@ -739,13 +740,10 @@ class CoFermentation(Reactor):
         self.vessel_material = vessel_material
         self.vessel_type = vessel_type
         self.neutralization = neutralization
-        if not mode in ('Batch', 'Fed-batch', 'Continuous'):
-            raise ValueError('Fermentation mode must be "Batch", "Fed-batch", '\
-                             f'or "Continuous", not "{mode}".')
-        self.mode = mode
+        self.mode = mode        
         self.allow_dilution = allow_dilution
         self.allow_concentration = allow_concentration
-        self.mixed_feed = tmo.Stream()
+        self.mixed_feed = tmo.Stream('mixed_feed')
         self.heat_exchanger = HXutility(None, None, None, T=T) 
         
         # FermMicrobe reaction from ref [1]
@@ -769,55 +767,19 @@ class CoFermentation(Reactor):
             ])
 
     def _run(self):
-        # feed is the dilute one directly after saccharification
-        feed1, inoculum, CSL, lime, water, feed2 = self.ins
+        feed, inoculum, CSL, water, lime = self.ins
         effluent, sidedraw = self.outs
         mixed_feed = self.mixed_feed
-        ferm_rxns = self.cofermentation_rxns
-        productivity = self.productivity
-        mode = self.mode
-        taus = self.taus
         
-        tot_feed = tmo.Stream()
-        tot_feed.mix_from((feed1, feed2))
-        inoculum_r = self.inoculum_ratio
-        CSL.imass['CSL'] = tot_feed.F_vol * self.CSL_loading
-        if not self.allow_dilution:
-            water.empty()
-        
-        mixed_feed.mix_from((tot_feed, inoculum, CSL, water))
+        CSL.imass['CSL'] = feed.F_vol * self.CSL_loading
+        mixed_feed.mix_from([feed, inoculum, CSL, water])
         mixed_feed.T = sidedraw.T = effluent.T = self.T
         
         # Sidedraw to SeedTrain
-        sidedraw.mol = mixed_feed.mol * inoculum_r
+        sidedraw.mol = mixed_feed.mol * self.inoculum_ratio
         effluent.mol = mixed_feed.mol - sidedraw.mol
         
-        feed_r = feed1.F_mass / tot_feed.F_mass
-        if not feed_r >= inoculum_r:
-            raise ValueError('Not enough initial feed for seed inoculum.')
-            
-        if not (mode == 'Fed-batch' and self.allow_concentration and feed2.F_mass>0):
-            self.influent_titer = inf_t = compute_lactic_titer(effluent)
-            self.max_sugar = effluent.imass[sugars].sum()/effluent.F_vol
-            ferm_rxns(effluent.mol)        
-            taus[1] = 0
-        else:
-            sugar1 = feed1.imass[sugars].sum()/feed1.F_vol
-            effluent1, effluent2 = tmo.Stream(), tmo.Stream()
-            #!!! IS THIS SPLIT CORRECT?
-            effluent.split_to(effluent1, effluent2, feed_r-inoculum_r)
-            self.influent_titer = inf_t1 = compute_lactic_titer(effluent1)
-            ferm_rxns(effluent1.mol)
-            eff_t1 = compute_lactic_titer(effluent1)
-            taus[0] = (eff_t1-inf_t1) / productivity
-            # After feeding
-            effluent.mix_from((effluent1, effluent2))
-            self.max_sugar = max(sugar1, effluent.imass[sugars].sum()/effluent.F_vol)
-            inf_t2 = compute_lactic_titer(effluent)
-            ferm_rxns(effluent.mol)
-            # PAUSED! TRY TO FIGURE OUT WHY MAX_SUGAR SO HIGH
-            breakpoint()
-        
+        self.cofermentation_rxns(effluent.mol)
         # Assume all CSL is consumed
         effluent.imass['CSL'] = 0
         
@@ -834,31 +796,30 @@ class CoFermentation(Reactor):
         else:
             self.vessel_material= 'Stainless steel 316'
             lime.empty()
-        self.effluent_titer = eff_t = compute_lactic_titer(effluent)
-        if not (mode == 'Fed-batch' and self.allow_concentration and feed2.F_mass>0):
-            taus[0] = (eff_t-inf_t)/productivity
-        else:
-            taus[1] = (eff_t-inf_t2)/productivity
+        self.effluent_titer = compute_lactic_titer(effluent)
         
     def _design(self):
         mode = self.mode
         Design = self.design_results
         Design.clear()
-        _mixture = self._mixture = tmo.Stream()
-        _mixture.mix_from((*self.ins[0:3], *self.ins[4:]))
+        self.tau = self.effluent_titer / self.productivity
+        _mixture = self._mixture = tmo.Stream(None)
+        _mixture.mix_from(self.ins[0:4])
         duty = Design['Duty'] = self.mixed_feed.H - _mixture.H
 
-        if mode in ('Batch', 'Fed-batch'):
-            tau_tot = self.tau_batch_turnaround + self.tau
-            Design['Fermenter size'] = self.outs[0].F_mass * tau_tot
+        if mode == 'Batch':
+            tau_cofermentation = self.tau_batch_turnaround + self.tau
+            Design['Fermenter size'] = self.outs[0].F_mass * tau_cofermentation
             Design['Recirculation flow rate'] = self.F_mass_in
             self.heat_exchanger.simulate_as_auxiliary_exchanger(duty, _mixture)
-
-        else:
+        
+        elif mode == 'Continuous':
             self._Vmax = 3785.41178 # 1,000,000 gallon from ref [1]
             Reactor._design(self)
             # Include a backup fermenter for cleaning
             Design['Number of reactors'] += 1
+        else:
+            raise DesignError(f'Fermentation mode must be either Batch or Continuous, not {mode}')
 
     def _cost(self):
         Design = self.design_results
@@ -866,17 +827,16 @@ class CoFermentation(Reactor):
         purchase_costs.clear()
         hx = self.heat_exchanger
 
-        if self.mode in ('Batch', 'Fed-batch'):
+        if self.mode == 'Batch':
             Unit._cost()
             self._decorated_cost()
-            #!!! Not needed?
             # purchase_costs['Heat exchanger'] = hx.purchase_cost
             # Adjust fermenter cost for acid-resistant scenario
             if not self.neutralization:
                 purchase_costs['Fermenter'] *= _316_over_304
                 purchase_costs['Agitator'] *= _316_over_304
 
-        else:
+        elif self.mode == 'Continuous':
             if not self.neutralization:
                 self.vessel_material= 'Stainless steel 316'
             Reactor._cost(self)
@@ -890,12 +850,6 @@ class CoFermentation(Reactor):
             hu_single_rx = hx.heat_utilities[0]
             hu_total.copy_like(hu_single_rx)
             hu_total.scale(N)
-    
-    @property
-    def tau(self):
-        '''Residence time (exlucding turnaround time for batch or fed-batch),[hr].'''
-        return sum(i for i in self.taus)
-
 
 # Seed train, 5 stages, 2 trains
 @cost(basis='Seed fermenter size', ID='Stage #1 fermenter', units='kg',
@@ -967,9 +921,9 @@ class SeedTrain(Unit):
 
 # Seed hold tank
 @cost(basis='Flow rate', ID='Tank', units='kg/hr',
-      cost=439000, S=40414, CE=CEPCI[2009], n=0.7, BM=1.8)
+      cost=439000, S=40414*_316_over_304, CE=CEPCI[2009], n=0.7, BM=1.8)
 @cost(basis='Flow rate', ID='Agitator', units='kg/hr',
-      kW=11.1855, cost=31800, S=40414, CE=CEPCI[2009], n=0.5, BM=1.5)
+      kW=11.1855, cost=31800*_316_over_304, S=40414, CE=CEPCI[2009], n=0.5, BM=1.5)
 @cost(basis='Flow rate', ID='Pump', units='kg/hr',
       kW=7.457, cost=8200, S=43149, CE=CEPCI[2009], n=0.8, BM=2.3)
 class SeedHoldTank(Unit): pass
@@ -1249,7 +1203,7 @@ class Esterification(Reactor):
 
     @property
     def tau(self):
-        """Residence time [hr]."""
+        """Residence time (hr)."""
         return self._tau
 
     def _run(self):
