@@ -786,37 +786,33 @@ class CoFermentation(Reactor):
             water.empty()
         
         mixed_feed.mix_from((tot_feed, inoculum, CSL, water))
-        mixed_feed.T = sidedraw.T = effluent.T = self.T
-        
-        # Sidedraw to SeedTrain
+        # For seed preparation
         sidedraw.mol = mixed_feed.mol * inoculum_r
-        effluent.mol = mixed_feed.mol - sidedraw.mol
         
         feed_r = feed1.F_mass / tot_feed.F_mass
         if not feed_r >= inoculum_r:
             raise ValueError('Not enough initial feed for seed inoculum.')
             
         if not (mode == 'Fed-batch' and self.allow_concentration and feed2.F_mass>0):
+            effluent.mol = mixed_feed.mol - sidedraw.mol
             self.influent_titer = inf_t = compute_lactic_titer(effluent)
             self.max_sugar = effluent.imass[sugars].sum()/effluent.F_vol
             ferm_rxns(effluent.mol)        
             taus[1] = 0
         else:
-            sugar1 = feed1.imass[sugars].sum()/feed1.F_vol
-            effluent1, effluent2 = tmo.Stream(), tmo.Stream()
-            #!!! IS THIS SPLIT CORRECT?
-            effluent.split_to(effluent1, effluent2, feed_r-inoculum_r)
-            self.influent_titer = inf_t1 = compute_lactic_titer(effluent1)
-            ferm_rxns(effluent1.mol)
-            eff_t1 = compute_lactic_titer(effluent1)
+            mixed1 = tmo.Stream()
+            mixed1.mix_from(self.ins[:5])
+            mixed1.mol -= sidedraw.mol
+            sugar1 = mixed1.imass[sugars].sum()/mixed1.F_vol
+            self.influent_titer = inf_t1 = compute_lactic_titer(mixed1)
+            ferm_rxns(mixed1.mol)
+            eff_t1 = compute_lactic_titer(mixed1)
             taus[0] = (eff_t1-inf_t1) / productivity
             # After feeding
-            effluent.mix_from((effluent1, effluent2))
+            effluent.mix_from((mixed1, feed2))
             self.max_sugar = max(sugar1, effluent.imass[sugars].sum()/effluent.F_vol)
             inf_t2 = compute_lactic_titer(effluent)
             ferm_rxns(effluent.mol)
-            # PAUSED! TRY TO FIGURE OUT WHY MAX_SUGAR SO HIGH
-            breakpoint()
         
         # Assume all CSL is consumed
         effluent.imass['CSL'] = 0
@@ -839,6 +835,8 @@ class CoFermentation(Reactor):
             taus[0] = (eff_t-inf_t)/productivity
         else:
             taus[1] = (eff_t-inf_t2)/productivity
+        
+        mixed_feed.T = sidedraw.T = effluent.T = self.T
         
     def _design(self):
         mode = self.mode

@@ -220,20 +220,20 @@ E301 = bst.units.MultiEffectEvaporator('E301', ins=S301-1,
                                        V=0.76)
 E301_P = bst.units.Pump('E301_P', ins=E301-0)
 
-S302 = bst.units.Splitter('S302', ins=E301_P-0, split=1,
+S302 = bst.units.Splitter('S302', ins=E301_P-0, split=1-1e-6,
                           outs=('to_fermenter', 'to_E302'))
 
 E302 = bst.units.MultiEffectEvaporator('E302', ins=S302-1,
                                        outs=('E302_solid', 'E302_condensate'),
                                        P=(101325, 73581, 50892, 32777, 20000),
                                        V=0.76)
-E302_old_run = E302._run
-def E302_run():
-    if E302.F_mass_in == 0:
-        E302.V = 0
-    else:
-        E302_old_run()
-E302._run = E302_run
+# E302_old_run = E302._run
+# def E302_run():
+#     if E302.F_mass_in == 0:
+#         E302.V = 0
+#     else:
+#         E302_old_run()
+# E302._run = E302_run
 
 #!!! Does it need stirring?
 E302_T = bst.units.StorageTank('E302_T', ins=E302-0, tau=0, V_wf=0.8)
@@ -314,14 +314,14 @@ def sugar_at_V(V):
 
 def sugar_at_split(split):
     S302._isplit = S302.thermo.chemicals.isplit(split)
-    ferm_loop._run()
+    seed_recycle._run()
     return R301.max_sugar-220
 
 # Adjust how much saccharified stream is diverted to the multi-effect evaporator
 # to achieve the set sugar concentration
 def titer_at_split(split):
     S302._isplit = S302.thermo.chemicals.isplit(split)
-    ferm_loop._run()
+    seed_recycle._run()
     return R301.effluent_titer-R301.set_titer
 
 
@@ -329,7 +329,7 @@ def adjust_ferm_loop():
     water_R301.empty()
     #!!! This can be upadted using newer biosteam
     # S302.split = 1
-    S302._isplit = S302.thermo.chemicals.isplit(1)
+    S302._isplit = S302.thermo.chemicals.isplit(1-1e-6)
     E301.V = E302.V = 0
     set_yield(R301.set_yield, R301, R302)
     ferm_loop._run()
@@ -346,26 +346,18 @@ def adjust_ferm_loop():
             E301.V = IQ_interpolation(f=titer_at_V, x0=0, x1=microbe_max_V,
                                       xtol=0.001, ytol=0.1, maxiter=50, 
                                       args=(), checkbounds=False)
-            # if R301.mode in ('Batch', 'Continuous'):
-            #     E301.V = IQ_interpolation(f=titer_at_V, x0=0, x1=microbe_max_V,
-            #                               xtol=0.001, ytol=0.1, maxiter=50, 
-            #                               args=(), checkbounds=False)
             ferm_loop._run()
             # +1 to allow some rounding error
             if R301.mode == 'Fed-batch' and R301.effluent_titer+1 < R301.set_titer:
-                E301.V = microbe_max_V
-                min_split = R301.inoculum_ratio
-                S302._isplit = S302.thermo.chemicals.isplit(min_split)
-                S302._run()
                 E302.V = IQ_interpolation(f=get_max_V, x0=0, x1=1,
                                           xtol=0.001, ytol=0.1, maxiter=50, 
                                           args=(E302,), checkbounds=False)
-                max_split = IQ_interpolation(f=sugar_at_split,
-                                             x0=min_split, x1=1,
+                min_split = IQ_interpolation(f=sugar_at_split,
+                                             x0=R301.inoculum_ratio, x1=1-1e-6,
                                              xtol=0.001, ytol=0.1, maxiter=50, 
                                              args=(), checkbounds=False)
                 S302_split = IQ_interpolation(f=titer_at_split,
-                                              x0=min_split, x1=max_split,
+                                              x0=min_split, x1=1-1e-6,
                                               xtol=0.001, ytol=0.1, maxiter=50, 
                                               args=(), checkbounds=False)
                 S302._isplit = S302.thermo.chemicals.isplit(S302_split)
