@@ -306,7 +306,7 @@ def sugar_at_V(V):
         sugar_conc = R301.max_sugar
     else:
         sugar_conc = R301.outs[0].imass[sugars].sum()/R301.outs[0].F_vol
-    # Maximum sugar concentration of 220 g/L (initial titer in ref [2],
+    # Maximum sugar concentration of 220 g/L (initial concentration in ref [2],
     # highest from collected papers)
     return sugar_conc-220
 
@@ -344,22 +344,26 @@ def adjust_ferm_loop():
             E301.V = IQ_interpolation(f=titer_at_V, x0=0, x1=microbe_max_V,
                                       xtol=0.001, ytol=0.1, maxiter=50, 
                                       args=(), checkbounds=False)
-            ferm_loop._run()
             # +1 to allow some rounding error
             if R301.mode == 'Fed-batch' and R301.effluent_titer+1 < R301.target_titer:
                 E302.V = IQ_interpolation(f=get_max_V, x0=0, x1=1,
                                           xtol=0.001, ytol=0.1, maxiter=50, 
                                           args=(E302,), checkbounds=False)
-                min_split = IQ_interpolation(f=sugar_at_split,
-                                             x0=R301.inoculum_ratio, x1=1-1e-6,
-                                             xtol=0.001, ytol=0.1, maxiter=50, 
-                                             args=(), checkbounds=False)
-                S302_split = IQ_interpolation(f=titer_at_split,
-                                              x0=min_split, x1=1-1e-6,
-                                              xtol=0.001, ytol=0.1, maxiter=50, 
-                                              args=(), checkbounds=False)
-                S302._isplit = S302.thermo.chemicals.isplit(S302_split)
-                ferm_loop._run()
+                titer_split = IQ_interpolation(f=titer_at_split,
+                                               x0=R301.inoculum_ratio, x1=1-1e-6,
+                                               xtol=1e-4, ytol=0.1, maxiter=50, 
+                                               args=(), checkbounds=False)
+                # print(f'\nSplit is {S302.split.mean()}, titer_split is {titer_split}')
+                S302._isplit = S302.thermo.chemicals.isplit(titer_split)
+                if R301.max_sugar+1 > 220:
+                    # print(R301.max_sugar)
+                    # print(f'Before, split is {S302.split.mean()}, titer is {round(R301.effluent_titer)}')
+                    sugar_split = IQ_interpolation(f=sugar_at_split,
+                                                   x0=titer_split, x1=1-1e-6,
+                                                   xtol=1e-4, ytol=0.1, maxiter=50, 
+                                                   args=(), checkbounds=False)
+                    S302._isplit = S302.thermo.chemicals.isplit(sugar_split)
+                    # print(f'After, split is {S302.split.mean()}, titer is {round(R301.effluent_titer)}')
             
     elif R301.effluent_titer > R301.target_titer:
         if R301.allow_dilution:
@@ -373,7 +377,6 @@ def adjust_ferm_loop():
                 xtol=0.001, ytol=0.01, maxiter=50,
                 args=(), checkbounds=False)
             set_yield(lactic_yield, R301, R302)
-        seed_recycle._run()
         
 PS301 = bst.units.ProcessSpecification('PS301', ins=R301_P1-0,
                                         specification=adjust_ferm_loop)

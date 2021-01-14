@@ -42,8 +42,10 @@ timer = TicToc('timer')
 timer.tic()
 run_number = 0
 sugar_concs = [[], []]
-lactics = {'yield': [],
-           'titer': []}
+lactics = {'target yield': [],
+           'target titer': [],
+           'actual yield': [],
+           'actual titer': []}
 MPSPs = {0.89: [],
          0.18: [],
          1.92: []}
@@ -93,8 +95,8 @@ def simulate_log_results(system, return_limit=False):
             GWPs[productivity].append(GWP)
             FECs[productivity].append(FEC)
             NPVs[productivity].append(lactic_tea.NPV)
-        lactics['yield'].append(R301.lactic_yield)
-        lactics['titer'].append(R301.effluent_titer)
+        lactics['actual yield'].append(R301.lactic_yield)
+        lactics['actual titer'].append(R301.effluent_titer)
     except:
         breakpoint()
     # except:
@@ -114,8 +116,10 @@ def simulate_log_results(system, return_limit=False):
 
 def save_data_clear():
     df = pd.DataFrame({
-        ('Lactic acid', 'Yield [g/g]'): lactics['yield'],
-        ('Lactic acid', 'Titer [g/L]'): lactics['titer'],
+        ('Lactic acid', 'Target Yield [g/g]'): lactics['target yield'],
+        ('Lactic acid', 'Target Titer [g/L]'): lactics['target titer'],
+        ('Lactic acid', 'Actual Yield [g/g]'): lactics['actual yield'],
+        ('Lactic acid', 'Actual Titer [g/L]'): lactics['actual titer'],
         ('0.89 [g/L/hr]', 'MPSP [$/kg]'): MPSPs[0.89],
         ('0.89 [g/L/hr]', 'NPV [$]'): NPVs[0.89],
         ('0.89 [g/L/hr]', 'GWP [kg CO2-eq/kg]'): GWPs[0.89],
@@ -148,11 +152,21 @@ def run_TRY(yield_range, system, mode, if_resistant, titer_range):
     S402.bypass = if_resistant
     for i in yield_range:
         for j in titer_range:
+            lactics['target yield'].append(i)
+            lactics['target titer'].append(j)
             R301.target_yield = i
             R301.target_titer = j
             set_yield(i, R301, R302)
             simulate_log_results(system, return_limit=False)
             if R301.effluent_titer+2<j:
+                n_remained = len(titer_range) - titer_range.index(j) - 1
+                lactics['target yield'].extend([i]*n_remained)
+                lactics['target titer'].extend(titer_range[titer_range.index(j)+1:])
+                lactics['actual yield'].extend([i]*n_remained)
+                lactics['actual titer'].extend(['']*n_remained)
+                for p in (0.89, 0.18, 1.92):
+                    for m in (MPSPs, NPVs,GWPs, FECs):
+                        m[p].extend(['']*n_remained)
                 break
 
 
@@ -164,9 +178,11 @@ def run_TRY(yield_range, system, mode, if_resistant, titer_range):
 
 # yield_range = np.arange(0.3, 1.01, 0.025) - 1e-6
 yield_range = np.arange(0.3, 1.01, 0.1) - 1e-6
+yield_range = yield_range.tolist()
 
 # titer_range = np.arange(50, 250, 1)
-titer_range = np.arange(50, 250, 5)
+titer_range = np.arange(50, 220, 5)
+titer_range = titer_range.tolist()
 
 print('\n---------- SSCF Regular Strain Batch Mode ----------')
 run_TRY(yield_range=yield_range, system=SSCF, mode='Batch', if_resistant=False,
@@ -191,6 +207,9 @@ run_TRY(yield_range=yield_range, system=SHF, mode='Continuous', if_resistant=Fal
         titer_range=titer_range)
 SHF_reg_c = save_data_clear()
 SHF_reg_c.to_excel('SHF_reg_continuous.xlsx')
+
+
+# %%
 
 # print('\n---------- Regular Strain Continuous Limits ----------')
 # # Find the maximum achievable titer with concentration in continuous mode

@@ -659,8 +659,9 @@ class Reactor(Unit, PressureVessel, isabstract=True):
                 Design['Weight'], Design['Diameter'], Design['Length']))
             for i, j in purchase_costs.items():
                 purchase_costs[i] *= Design['Number of reactors']
-            
-            self.power_utility(self.kW_per_m3*Design['Total volume'])
+            N = Design['Number of reactors']
+            # No power need for the back-up reactor
+            self.power_utility(self.kW_per_m3*Design['Single reactor volume']*(N-1))
             
     @property
     def BM(self):
@@ -719,7 +720,7 @@ class CoFermentation(Reactor):
     
     taus = [0, 0] # for initial and concentrated feed
     
-    max_sugar = 0 # maximum sugar concentration during fermentation
+    sugar_concs = [] # sguar conc. during operation
 
     def __init__(self, ID='', ins=None, outs=(), thermo=None, *, T=50+273.15,
                  P=101325, V_wf=0.8, length_to_diameter=0.6,
@@ -780,6 +781,7 @@ class CoFermentation(Reactor):
         productivity = self.productivity
         mode = self.mode
         taus = self.taus
+        sugar_concs = self.sugar_concs = []
         
         tot_feed = tmo.Stream()
         tot_feed.mix_from((feed1, feed2))
@@ -789,6 +791,7 @@ class CoFermentation(Reactor):
             water.empty()
         
         mixed_feed.mix_from((tot_feed, inoculum, CSL, water))
+        effluent.copy_like(mixed_feed)
         # For seed preparation
         sidedraw.mol = mixed_feed.mol * inoculum_r
         
@@ -796,25 +799,26 @@ class CoFermentation(Reactor):
         if not feed_r >= inoculum_r:
             raise ValueError('Not enough initial feed for seed inoculum.')
         
-        # There needs to be a feed2 for MEE to run, so set a minimal mass of 10
-        if not (mode == 'Fed-batch' and self.allow_concentration and feed2.F_mass>10):
+        # There needs to be a feed2 for MEE to run
+        if not (mode == 'Fed-batch' and self.allow_concentration \
+                and feed2.F_mass/feed1.F_mass>1e-6):
             effluent.mol = mixed_feed.mol - sidedraw.mol
             self.influent_titer = inf_t = compute_lactic_titer(effluent)
-            self.max_sugar = effluent.imass[sugars].sum()/effluent.F_vol
+            sugar_concs.append(effluent.imass[sugars].sum()/effluent.F_vol)
             ferm_rxns(effluent.mol)        
             taus[1] = 0
         else:
             mixed1 = tmo.Stream()
-            mixed1.mix_from(self.ins[:5])
+            mixed1.mix_from((*self.ins[:3], self.ins[4]))
             mixed1.mol -= sidedraw.mol
-            sugar1 = mixed1.imass[sugars].sum()/mixed1.F_vol
+            sugar_concs.append(mixed1.imass[sugars].sum()/mixed1.F_vol)
             self.influent_titer = inf_t1 = compute_lactic_titer(mixed1)
             ferm_rxns(mixed1.mol)
             eff_t1 = compute_lactic_titer(mixed1)
             taus[0] = (eff_t1-inf_t1) / productivity
             # After feeding
             effluent.mix_from((mixed1, feed2))
-            self.max_sugar = max(sugar1, effluent.imass[sugars].sum()/effluent.F_vol)
+            sugar_concs.append(effluent.imass[sugars].sum()/effluent.F_vol)
             inf_t2 = compute_lactic_titer(effluent)
             ferm_rxns(effluent.mol)
         
@@ -835,7 +839,8 @@ class CoFermentation(Reactor):
             self.vessel_material= 'Stainless steel 316'
             lime.empty()
         self.effluent_titer = eff_t = compute_lactic_titer(effluent)
-        if not (mode == 'Fed-batch' and self.allow_concentration and feed2.F_mass>10):
+        if not (mode == 'Fed-batch' and self.allow_concentration \
+                and feed2.F_mass/feed1.F_mass>1e-6):
             taus[0] = (eff_t-inf_t)/productivity
         else:
             taus[1] = (eff_t-inf_t2)/productivity
@@ -904,6 +909,9 @@ class CoFermentation(Reactor):
             raise ValueError('Glucose and xylose has different yields.')
         return X[0]
 
+    @property
+    def max_sugar(self):
+        return max(self.sugar_concs)
 
 # Seed train, 5 stages, 2 trains
 @cost(basis='Seed fermenter size', ID='Stage #1 fermenter', units='kg',

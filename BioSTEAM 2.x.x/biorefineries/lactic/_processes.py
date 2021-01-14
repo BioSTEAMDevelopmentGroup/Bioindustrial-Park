@@ -394,7 +394,7 @@ def create_SHF_conversion_sys(flowsheet, process_groups, chems,
             sugar_conc = R301.max_sugar
         else:
             sugar_conc = R301.outs[0].imass[sugars].sum()/R301.outs[0].F_vol
-        # Maximum sugar concentration of 220 g/L (initial titer in ref [2],
+        # Maximum sugar concentration of 220 g/L (initial concentration in ref [2],
         # highest from collected papers)
         return sugar_conc-220
     
