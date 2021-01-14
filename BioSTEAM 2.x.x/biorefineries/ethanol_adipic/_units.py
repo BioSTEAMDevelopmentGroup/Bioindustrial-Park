@@ -9,10 +9,9 @@
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
 # for license details.
 
-"""
-Created on Fri Jun 26 07:33:04 2020
-
-References:
+'''
+References
+----------
 [1] Humbird et al., Process Design and Economics for Biochemical Conversion of 
     Lignocellulosic Biomass to Ethanol: Dilute-Acid Pretreatment and Enzymatic 
     Hydrolysis of Corn Stover; Technical Report NREL/TP-5100-47764; 
@@ -22,14 +21,13 @@ References:
     Biomass to Hydrocarbon Fuels and Coproducts: 2018 Biochemical Design Case Update; 
     NREL/TP-5100-71949; National Renewable Energy Lab (NREL), 2018. 
     https://doi.org/10.2172/1483234
-[4] Davis et al., Process Design and Economics for the Conversion of Lignocellulosic
+[3] Davis et al., Process Design and Economics for the Conversion of Lignocellulosic
     Biomass to Hydrocarbons: Dilute-Acid and Enzymatic Deconstruction of Biomass
     to Sugars and Catalytic Conversion of Sugars to Hydrocarbons;
     NREL/TP-5100-62498; National Renewable Energy Lab (NREL), 2015.
     http://www.nrel.gov/docs/fy15osti/62498.pdf
 
-@author: yalinli_cabbi
-"""
+'''
 
 
 # %% Setup
@@ -38,7 +36,7 @@ import thermosteam as tmo
 from biosteam import Unit
 from biosteam.units import HXutility, Pump
 from biosteam.units.decorators import cost
-from biorefineries.ethanol_adipic._process_settings import price
+from biorefineries.ethanol_adipic._settings import price
 from biorefineries.ethanol_adipic._chemicals import total_solids, solubles, insolubles
 from biorefineries.ethanol_adipic._utils import CEPCI, compute_muconic_titer
 
@@ -541,9 +539,9 @@ class MuconicFermentation(Unit):
             ])
         self._seed_X = self.seed_fermentation_rxns.X.copy()
 
-    # Lower conversions of extratives and lignin than ref [4] to better reflect
+    # Lower conversions of extratives and lignin than ref [3] to better reflect
     # current state of technology, resulting in a titer of ~31.5 g/L for the
-    # composition in ref [4]. Titers from real hydrolysate remains low (< 15 g/L)
+    # composition in ref [3]. Titers from real hydrolysate remains low (< 15 g/L)
     # based on refs [5] and [6]
         self.main_fermentation_rxns = ParallelRxn([
     #                           Reaction definition                                 Reactant        Conversion

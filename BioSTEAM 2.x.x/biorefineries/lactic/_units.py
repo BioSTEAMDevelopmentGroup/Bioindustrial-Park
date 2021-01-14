@@ -10,7 +10,7 @@
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
 # for license details.
 
-"""
+'''
 References
 ----------
 [1] Humbird et al., Process Design and Economics for Biochemical Conversion of 
@@ -33,7 +33,7 @@ References
     NREL/TP-5100-62498; National Renewable Energy Lab (NREL), 2015.
     http://www.nrel.gov/docs/fy15osti/62498.pdf    
 
-"""
+'''
 
 
 # %% Setup
@@ -50,7 +50,7 @@ from biosteam.units.design_tools import PressureVessel
 from biosteam.units.design_tools import pressure_vessel_material_factors as factors
 from biosteam.units.decorators import cost
 from thermosteam import separations
-from biorefineries.lactic._process_settings import price
+from biorefineries.lactic._settings import price
 from biorefineries.lactic._chemicals import sugars, COD_chemicals, solubles, insolubles
 from biorefineries.lactic._utils import CEPCI, baseline_feedflow, compute_lactic_titer, \
     compute_extra_chemical, adjust_recycle, compute_COD
@@ -380,10 +380,6 @@ class EnzymeHydrolysateMixer(Mixer):
       # (304, 306, 311, and 312 in ref [1])
       # Pumps already in SS316
       kW=74.57, cost=47200, S=(42607+443391+948+116), CE=CEPCI[2009], n=0.8, BM=2.3)
-# The HydrolysateCooler in ref [1]
-@cost(basis='Duty', ID='Hydrolysate cooler', units='kJ/hr',
-      # 13 is the duty in MMkca/hr
-      cost=85000, S=-8*_Gcal_2_kJ, CE=CEPCI[2010], n=0.7, BM=2.2)
 class SaccharificationAndCoFermentation(Unit):
     _N_ins = 5
     _N_outs = 2
@@ -401,13 +397,13 @@ class SaccharificationAndCoFermentation(Unit):
     
     CSL_loading = 10 # g/L (kg/m3)
     
-    set_titer = 130 # in g/L (kg/m3), the maximum titer in collected data
+    target_titer = 130 # in g/L (kg/m3), the maximum titer in collected data
     
     effluent_titer = 0
     
     productivity = 0.89 # in g/L/hr
     
-    set_yield = 0.76 # in g/g-sugar
+    target_yield = 0.76 # in g/g-sugar
     
     tau_cofermentation = 0 # will be calculated based on titer and productivity
     
@@ -507,6 +503,13 @@ class SaccharificationAndCoFermentation(Unit):
         if not self.neutralization:
             self.purchase_costs['Fermenter'] *= _316_over_304
             self.purchase_costs['Agitator'] *= _316_over_304
+    
+    @property
+    def lactic_yield(self):
+        X = self.cofermentation_rxns.X
+        if not X[0] == X[3]:
+            raise ValueError('Glucose and xylose has different yields.')
+        return X[0]
 
 
 # Saccharification and co-fermentation (both glucose & xylose are used in fermentation)
@@ -704,13 +707,13 @@ class CoFermentation(Reactor):
 
     CSL_loading = 10 # g/L (kg/m3)
     
-    set_titer = 130 # in g/L (kg/m3), the maximum titer in collected data
+    target_titer = 130 # in g/L (kg/m3), the maximum titer in collected data
 
     effluent_titer = 0
     
     productivity = 0.89 # in g/L/hr
     
-    set_yield = 0.76 # in g/g-sugar
+    target_yield = 0.76 # in g/g-sugar
     
     tau_batch_turnaround = 12 # in hr, the same as the seed train in ref [1]
     
@@ -769,7 +772,7 @@ class CoFermentation(Reactor):
             ])
 
     def _run(self):
-        # feed is the dilute one directly after saccharification
+        # feed2 for fed-batch
         feed1, inoculum, CSL, lime, water, feed2 = self.ins
         effluent, sidedraw = self.outs
         mixed_feed = self.mixed_feed
@@ -792,8 +795,9 @@ class CoFermentation(Reactor):
         feed_r = feed1.F_mass / tot_feed.F_mass
         if not feed_r >= inoculum_r:
             raise ValueError('Not enough initial feed for seed inoculum.')
-            
-        if not (mode == 'Fed-batch' and self.allow_concentration and feed2.F_mass>0):
+        
+        # There needs to be a feed2 for MEE to run, so set a minimal mass of 10
+        if not (mode == 'Fed-batch' and self.allow_concentration and feed2.F_mass>10):
             effluent.mol = mixed_feed.mol - sidedraw.mol
             self.influent_titer = inf_t = compute_lactic_titer(effluent)
             self.max_sugar = effluent.imass[sugars].sum()/effluent.F_vol
@@ -831,12 +835,13 @@ class CoFermentation(Reactor):
             self.vessel_material= 'Stainless steel 316'
             lime.empty()
         self.effluent_titer = eff_t = compute_lactic_titer(effluent)
-        if not (mode == 'Fed-batch' and self.allow_concentration and feed2.F_mass>0):
+        if not (mode == 'Fed-batch' and self.allow_concentration and feed2.F_mass>10):
             taus[0] = (eff_t-inf_t)/productivity
         else:
             taus[1] = (eff_t-inf_t2)/productivity
         
         mixed_feed.T = sidedraw.T = effluent.T = self.T
+
         
     def _design(self):
         mode = self.mode
@@ -867,8 +872,6 @@ class CoFermentation(Reactor):
         if self.mode in ('Batch', 'Fed-batch'):
             Unit._cost()
             self._decorated_cost()
-            #!!! Not needed?
-            # purchase_costs['Heat exchanger'] = hx.purchase_cost
             # Adjust fermenter cost for acid-resistant scenario
             if not self.neutralization:
                 purchase_costs['Fermenter'] *= _316_over_304
@@ -891,8 +894,15 @@ class CoFermentation(Reactor):
     
     @property
     def tau(self):
-        '''Residence time (exlucding turnaround time for batch or fed-batch),[hr].'''
+        '''Residence time (exlucding turnaround time for batch or fed-batch), [hr].'''
         return sum(i for i in self.taus)
+    
+    @property
+    def lactic_yield(self):
+        X = self.cofermentation_rxns.X
+        if not X[0] == X[3]:
+            raise ValueError('Glucose and xylose has different yields.')
+        return X[0]
 
 
 # Seed train, 5 stages, 2 trains

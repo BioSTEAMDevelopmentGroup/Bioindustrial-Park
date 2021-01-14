@@ -9,7 +9,7 @@
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
 # for license details.
 
-"""
+'''
 References
 ----------
 [1] Humbird et al., Process Design and Economics for Biochemical Conversion of 
@@ -25,7 +25,7 @@ References
     and Energy use in Transportation (GREET) Model https://greet.es.anl.gov/
     (accessed Aug 25, 2020).
     
-"""
+'''
 
 
 # %%

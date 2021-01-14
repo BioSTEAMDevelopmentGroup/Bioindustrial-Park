@@ -21,14 +21,14 @@ import numpy as np
 import biosteam as bst
 from biosteam.evaluation import Model, Metric
 from chaospy import distributions as shape
-from biorefineries.lactic._process_settings import CFs
+from biorefineries.lactic._settings import CFs
 from biorefineries.lactic._utils import set_yield
-from biorefineries.lactic import system
+from biorefineries.lactic import system_SSCF as SSCF
 
 _kg_per_ton = 907.18474
 _feedstock_factor = _kg_per_ton / 0.8
 
-system.simulate_and_print()
+SSCF.simulate_and_print()
 
 
 # %% 
@@ -38,22 +38,22 @@ system.simulate_and_print()
 # =============================================================================
 
 # Minimum product selling price of lactic_acid stream
-lactic_acid = system.lactic_acid
-lactic_tea = system.lactic_tea
+lactic_acid = SSCF.lactic_acid
+lactic_tea = SSCF.lactic_tea
 def get_MPSP():
     lactic_acid.price = 0
     for i in range(3):
         MPSP = lactic_acid.price = lactic_tea.solve_price(lactic_acid)
     return MPSP
 
-feedstock = system.feedstock
+feedstock = SSCF.feedstock
 # Yield in 10^6 kg/yr
-lactic_no_CHP_tea = system.lactic_no_CHP_tea
+lactic_no_CHP_tea = SSCF.lactic_no_CHP_tea
 get_annual_factor = lambda: lactic_tea.operating_days*24
 get_total_yield = lambda: lactic_acid.F_mass*get_annual_factor()/1e6
 # Yield in % of dry feedstock
 get_mass_yield = lambda: lactic_acid.F_mass/(feedstock.F_mass-feedstock.imass['Water'])
-R301 = system.R301
+R301 = SSCF.R301
 get_titer = lambda: R301.effluent_titer
 # Purity (%) of LacticAcid in the final product
 get_purity = lambda: lactic_acid.imass['LacticAcid']/lactic_acid.F_mass
@@ -63,15 +63,15 @@ get_recovery = lambda: lactic_acid.imol['LacticAcid'] \
 get_overall_TCI = lambda: lactic_tea.TCI/1e6
 get_lactic_sale = lambda: get_total_yield()*lactic_acid.price
 # Including negative product sales (ash/gypsum disposal) but excluding electricity credit
-gypsum = system.gypsum
+gypsum = SSCF.gypsum
 get_gypsum_sale = lambda: gypsum.F_mass*gypsum.price*get_annual_factor()/1e6
-ash = system.ash
+ash = SSCF.ash
 get_ash_sale = lambda: ash.F_mass*ash.price*get_annual_factor()/1e6
 get_operating_cost = lambda: lactic_tea.AOC/1e6-get_gypsum_sale()-get_ash_sale()
 # Including negative product sales (ash/gypsum disposal) but excluding electricity credit
 get_material_cost = lambda: lactic_tea.material_cost/1e6-get_gypsum_sale()-get_ash_sale()
 # System power usage, individual unit power usage should be positive
-CHP = system.CHP
+CHP = SSCF.CHP
 excess_power = lambda: CHP.electricity_generated
 electricity_price = bst.PowerUtility.price
 # Electricity credit is positive if getting revenue from excess electricity
@@ -94,7 +94,7 @@ metrics = [Metric('MPSP', get_MPSP, '$/kg'),
 # Capital cost breakdown
 # =============================================================================
 
-process_groups = system.process_groups
+process_groups = SSCF.process_groups
 def get_installed_cost(group):
     return lambda: group.get_installed_cost()
 for group in process_groups:
@@ -113,8 +113,8 @@ metrics.append(Metric('Check', check_installed_cost, '10^6 $', 'Installed cost')
 # Material cost and product sale breakdown
 # =============================================================================
 
-TEA_feeds = system.TEA_feeds
-TEA_products = system.TEA_products
+TEA_feeds = SSCF.TEA_feeds
+TEA_products = SSCF.TEA_products
 
 def get_material_cost(feed):
     return lambda: feed.price*feed.F_mass*get_annual_factor()/1e6
@@ -122,10 +122,10 @@ for feed in TEA_feeds:
     metrics.append(Metric(feed.ID, get_material_cost(feed), '10^6 $/yr', 'Material cost'))
 
 # Sulfuric acid used in pretreatment and separation processes
-T602_S = system.T602_S
+T602_S = SSCF.T602_S
 get_pretreatment_sulfuric_acid_ratio = lambda: T602_S.outs[0].F_mass/T602_S.F_mass_out
 # Ammonia used in pretreatment and CHP process
-T603_S = system.T603_S
+T603_S = SSCF.T603_S
 get_pretreatment_ammonia_ratio = lambda: T603_S.outs[0].F_mass/T602_S.F_mass_out
 
 check_material_cost = lambda: sum(get_material_cost(feed)()
@@ -155,7 +155,7 @@ metrics.append(Metric('Check', check_product_sale, '10^6 $/yr', 'Product sale'))
 
 get_system_heating_demand = lambda: CHP.system_heating_demand/1e6
 get_pretreatment_steam_heating_demand = lambda: CHP.side_streams_lps.duty/1e6
-HXN = system.HXN
+HXN = SSCF.HXN
 get_HXN_heating_demand = lambda: sum(i.duty for i in HXN.heat_utilities
                                     if i.flow*i.duty>0)/1e6
 get_CHP_heating_demand = lambda: sum(i.duty for i in CHP.heat_utilities 
@@ -190,7 +190,7 @@ metrics.extend((
 # Cooling demand breakdown (negative if needs cooling)
 # =============================================================================
 
-CT = system.CT
+CT = SSCF.CT
 get_system_cooling_water_duty = lambda: CT.system_cooling_water_duty/1e6
 get_HXN_cooling_demand = lambda: sum(i.duty for i in HXN.heat_utilities 
                                     if i.flow*i.duty<0)/1e6
@@ -220,8 +220,8 @@ metrics.extend((
 # Power demand breakdown (positive if using power)
 # =============================================================================
 
-lactic_sys = system.lactic_sys
-get_electricity_use = system.get_electricity_use
+lactic_sys = SSCF.lactic_sys
+get_electricity_use = SSCF.get_electricity_use
 
 def get_power_demand(group):
     return lambda: sum(i.rate for i in group.power_utilities)
@@ -296,28 +296,28 @@ index_IRR = len(metrics)
 # Metrics for global warming potential
 # =============================================================================
 
-get_GWP = system.get_GWP
-get_FEC = system.get_FEC
+get_GWP = SSCF.get_GWP
+get_FEC = SSCF.get_FEC
 metrics.extend((
     Metric('Total GWP', get_GWP, 'kg CO2-eq/kg', 'LCA'),
     Metric('Total FEC', get_FEC, 'MJ/kg', 'LCA')
     ))
 
-get_material_GWP = system.get_material_GWP
-get_electricity_GWP = system.get_electricity_GWP
+get_material_GWP = SSCF.get_material_GWP
+get_electricity_GWP = SSCF.get_electricity_GWP
 
-natural_gas = system.natural_gas
+natural_gas = SSCF.natural_gas
 get_CH4_production_GWP = lambda: \
     CFs['GWP_CFs']['CH4']*natural_gas.F_mass/lactic_acid.F_mass
 get_CH4_onsite_GWP = lambda: \
      natural_gas.get_atomic_flow('C')*natural_gas.chemicals.CO2.MW/lactic_acid.F_mass
 
-lime = system.lime
-lime_CHP = system.lime_CHP
+lime = SSCF.lime
+lime_CHP = SSCF.lime_CHP
 get_lime_GWP  = lambda: \
     CFs['GWP_CFs']['Lime']*(lime.F_mass+lime_CHP.F_mass)/lactic_acid.F_mass
 
-ethanol = system.ethanol
+ethanol = SSCF.ethanol
 get_ethanol_onsite_GWP = lambda: \
      ethanol.get_atomic_flow('C')*ethanol.chemicals.CO2.MW/lactic_acid.F_mass
 
@@ -337,12 +337,12 @@ metrics.extend((
     Metric('GWP check', check_GWP, 'kg CO2-eq/kg', 'GWP')
     ))
 
-get_electricity_FEC = system.get_electricity_FEC
+get_electricity_FEC = SSCF.get_electricity_FEC
 get_CH4_FEC = lambda: CFs['FEC_CFs']['CH4']*natural_gas.F_mass/lactic_acid.F_mass
 get_lime_FEC = lambda: \
     CFs['FEC_CFs']['Lime']*(lime.F_mass+lime_CHP.F_mass)/lactic_acid.F_mass
 
-get_material_FEC = system.get_material_FEC
+get_material_FEC = SSCF.get_material_FEC
 get_other_materials_FEC = lambda: get_material_FEC()-get_CH4_FEC()-get_lime_FEC()
 
 
@@ -388,7 +388,7 @@ def set_blank_parameter(anything):
 # TEA parameters
 # =============================================================================
 
-# U101 = system.U101
+# U101 = SSCF.U101
 # D = baseline_uniform(2205, 0.1)
 # @param(name='Feedstock flow rate', element=feedstock, kind='coupled', units='dry-ton/day',
 #        baseline=2205, distribution=D)
@@ -422,7 +422,7 @@ D = shape.Triangle(60, 71.3, 83.7)
 def set_feedstock_price(price):
     feedstock.price = price / _feedstock_factor
 
-sulfuric_acid = system.sulfuric_acid
+sulfuric_acid = SSCF.sulfuric_acid
 D = shape.Triangle(0.0910, 0.0948, 0.1046)
 @param(name='Sulfuric acid unit price', element='TEA', kind='isolated', units='$/kg',
        baseline=0.0948, distribution=D)
@@ -459,14 +459,14 @@ def set_electricity_price(price):
 # Pretreatment parameters
 # =============================================================================
 
-M202 = system.M202
+M202 = SSCF.M202
 D = shape.Triangle(0.25, 0.3, 0.4)
 @param(name='Pretreatment solid loading', element=M202, kind='coupled', units='%', 
        baseline=0.3, distribution=D)
 def set_pretreatment_solid_loading(loading): 
     M202.solid_loading = loading
     
-T201 = system.T201
+T201 = SSCF.T201
 D = shape.Triangle(10, 22.1, 35)
 @param(name='Pretreatment sulfuric acid loading', element=T201,
        kind='coupled', units='mg/g', baseline=22.1, distribution=D)
@@ -474,7 +474,7 @@ def set_pretreatment_sulfuric_acid_loading(loading):
     T201.feedstock_dry_mass = feedstock.F_mass - feedstock.imass['H2O']
     T201.acid_loading = loading
 
-R201 = system.R201
+R201 = SSCF.R201
 D = shape.Triangle(0.06, 0.099, 0.12)
 @param(name='Pretreatment glucan-to-glucose', element=R201, kind='coupled', units='%',
        baseline=0.099, distribution=D)
@@ -491,7 +491,7 @@ def set_R201_xylan_conversion(X):
 # Conversion parameters
 # =============================================================================
 
-M301 = system.M301
+M301 = SSCF.M301
 D = shape.Triangle(0.175, 0.2, 0.25)
 @param(name='Enzymatic hydrolysis solid loading', element=M301, kind='coupled', units='%',
        baseline=0.2, distribution=D)
@@ -524,7 +524,7 @@ D = shape.Triangle(5, 10, 15)
 def set_CSL_loading(loading):
     R301.CSL_loading = loading
 
-R302 = system.R302
+R302 = SSCF.R302
 # 1e-6 is to avoid generating tiny negative flow (e.g., 1e-14)
 D = shape.Triangle(0.9, 0.95, 1-1e-6)
 @param(name='Seed train fermentation ratio', element=R302, kind='coupled', units='%',
@@ -536,7 +536,7 @@ D = shape.Triangle(0.55, 0.76, 0.93)
 @param(name='Lactic acid yield', element=R301, kind='coupled', units='g/g',
        baseline=0.76, distribution=D)
 def set_lactic_yield(lactic_yield):
-    R301.set_yield = lactic_yield
+    R301.target_yield = lactic_yield
     set_yield(lactic_yield, R301, R302)
 
 D = shape.Triangle(0.33, 0.89, 1.66)
@@ -566,7 +566,7 @@ def set_inoculum_ratio(ratio):
 # Separation parameters
 # =============================================================================
 
-S402 = system.S402
+S402 = SSCF.S402
 D = shape.Triangle(0.95, 0.995, 1)
 @param(name='Gypsum split', element=S402, kind='coupled', units='',
        baseline=0.995, distribution=D)
@@ -574,21 +574,21 @@ def set_S402_gypsum_split(split):
     gypsum_index = S402.chemicals.index('Gypsum')
     S402.split[gypsum_index] = split
 
-R401 = system.R401
+R401 = SSCF.R401
 D = baseline_triangle(1, 0.1)
 @param(name='Acidulation time', element=R401, kind='coupled', units='hr',
        baseline=1, distribution=D)
 def set_R401_tau(tau):
     R401.tau = tau
 
-R402 = system.R402
+R402 = SSCF.R402
 D = baseline_triangle(1, 0.1)
 @param(name='Esterification conversion factor', element=R402, kind='coupled', units='',
        baseline=1, distribution=D)
 def set_R402_conversion_factor(factor):
     R402.X_factor = factor
     
-R403 = system.R403
+R403 = SSCF.R403
 D = baseline_triangle(0.8, 0.1)
 @param(name='Hydrolysis conversion', element=R403, kind='coupled', units='%',
        baseline=0.8, distribution=D)

@@ -21,11 +21,11 @@ import numpy as np
 import pandas as pd
 import biosteam as bst
 from biosteam.utils import TicToc
-from biorefineries.lactic import system_concentrated
+from biorefineries.lactic import system_SHF as SHF
 from biorefineries.lactic._chemicals import sugars
 from biorefineries.lactic._utils import set_yield
 
-system_concentrated.simulate_and_print()
+SHF.simulate_and_print()
 
 
 # %% 
@@ -65,15 +65,14 @@ yield_range = np.arange(0.3, 1.01, 0.1) - 1e-6
 # simulation cap
 limits = [[{}, {}], [{}, {}], [{}, {}]]
 
-E301 = system_concentrated.E301
-R301 = system_concentrated.R301
-R302 = system_concentrated.R302
-R401 = system_concentrated.R401
-S402 = system_concentrated.S402
+R301 = SHF.R301
+R302 = SHF.R302
+R401 = SHF.R401
+S402 = SHF.S402
 
-lactic_acid = system_concentrated.lactic_acid
-lactic_sys = system_concentrated.lactic_sys
-lactic_tea = system_concentrated.lactic_tea
+lactic_acid = SHF.lactic_acid
+lactic_sys = SHF.lactic_sys
+lactic_tea = SHF.lactic_tea
 
 def compute_sugar_conc(stream):
     return stream.imass[sugars].sum()/stream.F_vol
@@ -100,8 +99,8 @@ def simulate_log_results(return_limit=False):
     for productivity in (0.89, 0.18, 1.92):
         update_productivity(productivity)
         MPSP = solve_TEA()
-        GWP = system_concentrated.get_GWP()
-        FEC = system_concentrated.get_FEC()
+        GWP = SHF.get_GWP()
+        FEC = SHF.get_FEC()
         MPSPs[productivity].append(MPSP)
         GWPs[productivity].append(GWP)
         FECs[productivity].append(FEC)
@@ -160,161 +159,157 @@ S402.bypass = False
 
 R301.mode = 'Batch'
 # This titer cannot be achieved, the system will find the maximum achievable titer
-R301.set_titer = 600
+R301.target_titer = 600
 
-# print('\n---------- Regular Strain Batch Limits ----------')
-# # Find the maximum achievable titer without concentration
-# # E301.bypass = True
-# R301.allow_concentration = False
-# bst.speed_up()
-# for i in yield_range:
-#     R301.set_yield = i
-#     set_yield(i, R301, R302)
-#     limits[0][0][i] = simulate_log_results(return_limit=True)
+print('\n---------- Regular Strain Batch Limits ----------')
+# Find the maximum achievable titer without concentration
+R301.allow_concentration = False
+bst.speed_up()
+for i in yield_range:
+    R301.target_yield = i
+    set_yield(i, R301, R302)
+    limits[0][0][i] = simulate_log_results(return_limit=True)
 
-# regular_limit1 = save_data_clear()
+regular_limit1 = save_data_clear()
 
 # Find the maximum achievable titer with concentration in batch mode
-# E301.bypass = False
 R301.allow_concentration = True
 for i in yield_range:
-    R301.set_yield = i
+    R301.target_yield = i
     set_yield(i, R301, R302)
     limits[1][0][i] = simulate_log_results(return_limit=True)
 
 regular_limit2 = save_data_clear()
 
-# print('\n---------- Regular Strain Batch Mode ----------')
-# # Concentrate the saccharified stream to achieve higher titers in batch mode
-# for i in yield_range:
-#     limit = limits[1][0][i]
-#     # titer_range = np.arange(limits[0][0][i], limits[1][0][i], 2.5)
-#     titer_range = np.arange(limits[0][0][i], limits[1][0][i], 10)
-#     titer_range = titer_range.tolist() + [limit]
-#     for j in titer_range:
-#         R301.set_yield = i
-#         R301.set_titer = j
-#         set_yield(i, R301, R302)
-#         simulate_log_results(return_limit=False)
+print('\n---------- Regular Strain Batch Mode ----------')
+# Concentrate the saccharified stream to achieve higher titers in batch mode
+for i in yield_range:
+    limit = limits[1][0][i]
+    # titer_range = np.arange(limits[0][0][i], limits[1][0][i], 2.5)
+    titer_range = np.arange(limits[0][0][i], limits[1][0][i], 10)
+    titer_range = titer_range.tolist() + [limit]
+    for j in titer_range:
+        R301.target_yield = i
+        R301.target_titer = j
+        set_yield(i, R301, R302)
+        simulate_log_results(return_limit=False)
 
-# regular_batch = save_data_clear()
-# # regular_batch.to_excel('regular_batch.xlsx')
+regular_batch = save_data_clear()
+# regular_batch.to_excel('regular_batch.xlsx')
 
-# print('\n---------- Regular Strain Continuous Limits ----------')
-# # Find the maximum achievable titer with concentration in continuous mode
-# R301.mode = 'Continuous'
-# R301.set_titer = 600
-# for i in yield_range:
-#     R301.set_yield = i
-#     set_yield(i, R301, R302)
-#     limits[2][0][i] = simulate_log_results(return_limit=True)
+print('\n---------- Regular Strain Continuous Limits ----------')
+# Find the maximum achievable titer with concentration in continuous mode
+R301.mode = 'Continuous'
+R301.target_titer = 600
+for i in yield_range:
+    R301.target_yield = i
+    set_yield(i, R301, R302)
+    limits[2][0][i] = simulate_log_results(return_limit=True)
 
-# regular_limit3 = save_data_clear()
-# regular_limits = pd.concat((regular_limit1, regular_limit2, regular_limit3))
+regular_limit3 = save_data_clear()
+regular_limits = pd.concat((regular_limit1, regular_limit2, regular_limit3))
 
-# print('\n---------- Regular Strain Continuous Mode ----------')
-# # Concentrate the saccharified stream to achieve higher titers in continuous mode
-# for i in yield_range:
-#     if limits[2][0][i] is np.nan:
-#         limit = 205
-#     else:
-#         limit = min(limits[2][0][i], 205)
-#     # titer_range = np.arange(limits[1][0][i], limit, 2.5)
-#     titer_range = np.arange(limits[1][0][i], limit, 10)
-#     titer_range = titer_range.tolist() + [limit]
-#     for j in titer_range:
-#         R301.set_yield = i
-#         R301.set_titer = j
-#         set_yield(i, R301, R302)
-#         simulate_log_results(return_limit=False)
+print('\n---------- Regular Strain Continuous Mode ----------')
+# Concentrate the saccharified stream to achieve higher titers in continuous mode
+for i in yield_range:
+    if limits[2][0][i] is np.nan:
+        limit = 205
+    else:
+        limit = min(limits[2][0][i], 205)
+    # titer_range = np.arange(limits[1][0][i], limit, 2.5)
+    titer_range = np.arange(limits[1][0][i], limit, 10)
+    titer_range = titer_range.tolist() + [limit]
+    for j in titer_range:
+        R301.target_yield = i
+        R301.target_titer = j
+        set_yield(i, R301, R302)
+        simulate_log_results(return_limit=False)
 
-# regular_continuous = save_data_clear()
+regular_continuous = save_data_clear()
 
-# # with pd.ExcelWriter('regular-2.xlsx') as writer:
-# #     regular_limits.to_excel(writer, sheet_name='Regular limits')
-# #     regular_batch.to_excel(writer, sheet_name='Regular batch')
-# #     regular_continuous.to_excel(writer, sheet_name='Regular continuous')
-
-
-# # %%
-
-# # =============================================================================
-# # Acid-resistant strain    
-# # =============================================================================
-
-# R301.neutralization = False
-# R401.bypass = True
-# S402.bypass = True
-
-# R301.mode = 'Batch'
-# R301.set_titer = 600
-
-# print('\n---------- Acid-resistant Strain Batch Limits ----------')
-# # Find the maximum achievable titer without concentration
-# # E301.bypass = True
-# R301.allow_concentration = False
-# for i in yield_range:
-#     R301.set_yield = i
-#     set_yield(i, R301, R302)
-#     limits[0][1][i] = simulate_log_results(return_limit=True)
-
-# resistant_limit1 = save_data_clear()
-
-# # Find the maximum achievable titer with concentration in batch mode
-# # E301.bypass = False
-# R301.allow_concentration = True
-# for i in yield_range:
-#     R301.set_yield = i
-#     set_yield(i, R301, R302)
-#     limits[1][1][i] = simulate_log_results(return_limit=True)
-
-# resistant_limit2 = save_data_clear()
-
-# print('\n---------- Acid-resistant Strain Batch Mode ----------')
-# # Concentrate the saccharified stream to achieve higher titers in batch mode
-# for i in yield_range:
-#     limit = limits[1][1][i]
-#     titer_range = np.arange(limits[0][1][i], limits[1][1][i], 2.5)
-#     titer_range = titer_range.tolist() + [limit]
-#     for j in titer_range:
-#         R301.set_yield = i
-#         R301.set_titer = j
-#         set_yield(i, R301, R302)
-#         simulate_log_results(return_limit=False)
-
-# resistant_batch = save_data_clear()
-
-# print('\n---------- Acid-resistant Strain Continuous Limits ----------')
-# # Find the maximum achievable titer with concentration in continuous mode
-# R301.mode = 'Continuous'
-# R301.set_titer = 600
-# for i in yield_range:
-#     R301.set_yield = i
-#     set_yield(i, R301, R302)
-#     limits[2][1][i] = simulate_log_results(return_limit=True)
-
-# resistant_limit3 = save_data_clear()
-# resistant_limits = pd.concat((resistant_limit1, resistant_limit2, resistant_limit3))
-
-# print('\n---------- Acid-resistant Strain Continuous Mode ----------')
-# # Concentrate the saccharified stream to achieve higher titers in continuous mode
-# for i in yield_range:
-#     if limits[2][1][i] is np.nan:
-#         limit = 205
-#     else:
-#         limit = min(limits[2][1][i], 205)
-#     titer_range = np.arange(limits[1][1][i], limit, 2.5)
-#     titer_range = titer_range.tolist() + [limit]
-#     for j in titer_range:
-#         R301.set_yield = i
-#         R301.set_titer = j
-#         set_yield(i, R301, R302)
-#         simulate_log_results(return_limit=False)
-
-# resistant_continuous = save_data_clear()
+# with pd.ExcelWriter('regular-2.xlsx') as writer:
+#     regular_limits.to_excel(writer, sheet_name='Regular limits')
+#     regular_batch.to_excel(writer, sheet_name='Regular batch')
+#     regular_continuous.to_excel(writer, sheet_name='Regular continuous')
 
 
-# # %%
+# %%
+
+# =============================================================================
+# Acid-resistant strain    
+# =============================================================================
+
+R301.neutralization = False
+R401.bypass = True
+S402.bypass = True
+
+R301.mode = 'Batch'
+R301.target_titer = 600
+
+print('\n---------- Acid-resistant Strain Batch Limits ----------')
+# Find the maximum achievable titer without concentration
+R301.allow_concentration = False
+for i in yield_range:
+    R301.target_yield = i
+    set_yield(i, R301, R302)
+    limits[0][1][i] = simulate_log_results(return_limit=True)
+
+resistant_limit1 = save_data_clear()
+
+# Find the maximum achievable titer with concentration in batch mode
+R301.allow_concentration = True
+for i in yield_range:
+    R301.target_yield = i
+    set_yield(i, R301, R302)
+    limits[1][1][i] = simulate_log_results(return_limit=True)
+
+resistant_limit2 = save_data_clear()
+
+print('\n---------- Acid-resistant Strain Batch Mode ----------')
+# Concentrate the saccharified stream to achieve higher titers in batch mode
+for i in yield_range:
+    limit = limits[1][1][i]
+    titer_range = np.arange(limits[0][1][i], limits[1][1][i], 2.5)
+    titer_range = titer_range.tolist() + [limit]
+    for j in titer_range:
+        R301.target_yield = i
+        R301.target_titer = j
+        set_yield(i, R301, R302)
+        simulate_log_results(return_limit=False)
+
+resistant_batch = save_data_clear()
+
+print('\n---------- Acid-resistant Strain Continuous Limits ----------')
+# Find the maximum achievable titer with concentration in continuous mode
+R301.mode = 'Continuous'
+R301.target_titer = 600
+for i in yield_range:
+    R301.target_yield = i
+    set_yield(i, R301, R302)
+    limits[2][1][i] = simulate_log_results(return_limit=True)
+
+resistant_limit3 = save_data_clear()
+resistant_limits = pd.concat((resistant_limit1, resistant_limit2, resistant_limit3))
+
+print('\n---------- Acid-resistant Strain Continuous Mode ----------')
+# Concentrate the saccharified stream to achieve higher titers in continuous mode
+for i in yield_range:
+    if limits[2][1][i] is np.nan:
+        limit = 205
+    else:
+        limit = min(limits[2][1][i], 205)
+    titer_range = np.arange(limits[1][1][i], limit, 2.5)
+    titer_range = titer_range.tolist() + [limit]
+    for j in titer_range:
+        R301.target_yield = i
+        R301.target_titer = j
+        set_yield(i, R301, R302)
+        simulate_log_results(return_limit=False)
+
+resistant_continuous = save_data_clear()
+
+
+# %%
 
 # '''Output to Excel'''
 # with pd.ExcelWriter('2-2_ferm_concentrated.xlsx') as writer:
@@ -325,7 +320,7 @@ regular_limit2 = save_data_clear()
 #     regular_continuous.to_excel(writer, sheet_name='Regular continuous')
 #     resistant_continuous.to_excel(writer, sheet_name='Acid-resistant continuous')
 
-# time = timer.elapsed_time / 60
-# print(f'\nSimulation time for {run_number} runs is: {time:.1f} min')
+time = timer.elapsed_time / 60
+print(f'\nSimulation time for {run_number} runs is: {time:.1f} min')
 
 

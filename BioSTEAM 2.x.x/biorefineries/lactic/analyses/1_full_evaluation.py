@@ -22,7 +22,7 @@ import pandas as pd
 import biosteam as bst
 from biosteam.utils import TicToc
 from biosteam.plots import plot_montecarlo_across_coordinate
-from biorefineries.lactic.system import lactic_sys, simulate_get_MPSP, get_GWP, get_FEC
+from biorefineries.lactic.system_SSCF import lactic_sys, simulate_get_MPSP, get_GWP, get_FEC
 from biorefineries.lactic.analyses import models
 
 percentiles = [0, 0.05, 0.25, 0.5, 0.75, 0.95, 1]

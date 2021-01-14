@@ -9,21 +9,6 @@
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
 # for license details.
 
-"""
-References
-----------
-[1] Humbird et al., Process Design and Economics for Biochemical Conversion of 
-    Lignocellulosic Biomass to Ethanol: Dilute-Acid Pretreatment and Enzymatic 
-    Hydrolysis of Corn Stover; Technical Report NREL/TP-5100-47764; 
-    National Renewable Energy Lab (NREL), 2011.
-    https://www.nrel.gov/docs/fy11osti/47764.pdf
-[2] Davis et al., Process Design and Economics for the Conversion of Lignocellulosic 
-    Biomass to Hydrocarbon Fuels and Coproducts: 2018 Biochemical Design Case Update; 
-    NREL/TP-5100-71949; National Renewable Energy Lab (NREL), 2018. 
-    https://doi.org/10.2172/1483234
-
-"""
-
 
 # %% 
 

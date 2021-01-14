@@ -68,64 +68,63 @@ GWPs = []
 FECs = []
 
 # Configuration 2
-from biorefineries.lactic import system_concentrated as concentrated
-concentrated.simulate_and_print()
+from biorefineries.lactic import system_shf as shf
+shf.simulate_and_print()
 
 carb_contents1 = np.arange(0.25, 0.59, 0.01)
 carb_contents1 = carb_contents1.tolist() + [0.589]
-concentrated.R301.allow_dilution = False
-concentrated.R301.allow_concentration = True
-concentrated.R301.mode = 'Batch'
-concentrated.R301.set_titer = 97.5
-concentrated.E301.bypass = False
+shf.R301.allow_dilution = False
+shf.R301.allow_concentration = True
+shf.R301.mode = 'Batch'
+shf.R301.target_titer = 97.5
 
 # Using two loops are not optimal, can potentially use Model and Metric to speed up
 bst.speed_up()
 for i in carb_contents1:
-    set_carbs(i, concentrated.feedstock)
-    concentrated.lactic_sys.simulate()
-    titers.append(concentrated.R301.effluent_titer)
-    GWPs.append(concentrated.get_GWP())
-    FECs.append(concentrated.get_FEC())
+    set_carbs(i, shf.feedstock)
+    shf.lactic_sys.simulate()
+    titers.append(shf.R301.effluent_titer)
+    GWPs.append(shf.get_GWP())
+    FECs.append(shf.get_FEC())
     for j in prices:
         TEA_carbs.append(i)
         TEA_prices.append(j)
-        concentrated.feedstock.price = j / _feedstock_factor
-        concentrated.lactic_acid.price = 0
+        shf.feedstock.price = j / _feedstock_factor
+        shf.lactic_acid.price = 0
         for m in range(3):
-            MPSP = concentrated.lactic_acid.price = \
-                concentrated.lactic_tea.solve_price(concentrated.lactic_acid)
+            MPSP = shf.lactic_acid.price = \
+                shf.lactic_tea.solve_price(shf.lactic_acid)
         MPSPs.append(MPSP)
-        NPVs.append(concentrated.lactic_tea.NPV)
+        NPVs.append(shf.lactic_tea.NPV)
     run_number += 1
     print(f'Run #{run_number}: {timer.elapsed_time:.0f} sec')
 
 # Then concentration needed to get to the baseline titer
-from biorefineries.lactic import system as diluted
-diluted.simulate_and_print()
+from biorefineries.lactic import system_sscf as sscf
+sscf.simulate_and_print()
 
 carb_contents2 = np.arange(0.59, 0.701, 0.01).tolist()
-diluted.R301.allow_dilution = True
-diluted.R301.allow_concentration = False
-diluted.R301.set_titer = 97.5
+sscf.R301.allow_dilution = True
+sscf.R301.allow_concentration = False
+sscf.R301.target_titer = 97.5
 
 bst.speed_up()
 for i in carb_contents2:
-    set_carbs(i, diluted.feedstock)
-    diluted.lactic_sys.simulate()
-    titers.append(diluted.R301.effluent_titer)
-    GWPs.append(diluted.get_GWP())
-    FECs.append(diluted.get_FEC())
+    set_carbs(i, sscf.feedstock)
+    sscf.lactic_sys.simulate()
+    titers.append(sscf.R301.effluent_titer)
+    GWPs.append(sscf.get_GWP())
+    FECs.append(sscf.get_FEC())
     for j in prices:
         TEA_carbs.append(i)
         TEA_prices.append(j)
-        diluted.feedstock.price = j / _feedstock_factor
-        diluted.lactic_acid.price = 0
+        sscf.feedstock.price = j / _feedstock_factor
+        sscf.lactic_acid.price = 0
         for m in range(3):
-            MPSP = diluted.lactic_acid.price = \
-                diluted.lactic_tea.solve_price(diluted.lactic_acid)
+            MPSP = sscf.lactic_acid.price = \
+                sscf.lactic_tea.solve_price(sscf.lactic_acid)
         MPSPs.append(MPSP)
-        NPVs.append(diluted.lactic_tea.NPV)
+        NPVs.append(sscf.lactic_tea.NPV)
     run_number += 1
     print(f'Run #{run_number}: {timer.elapsed_time:.0f} sec')
 
@@ -143,10 +142,10 @@ LCA_plot_data = pd.DataFrame({
     'FEC [MJ/kg]': FECs
     })
 
-'''Output to Excel'''
-with pd.ExcelWriter('3_carbs-price.xlsx') as writer:
-    TEA_plot_data.to_excel(writer, sheet_name='TEA')
-    LCA_plot_data.to_excel(writer, sheet_name='LCA')
+# '''Output to Excel'''
+# with pd.ExcelWriter('3_carbs-price.xlsx') as writer:
+#     TEA_plot_data.to_excel(writer, sheet_name='TEA')
+#     LCA_plot_data.to_excel(writer, sheet_name='LCA')
 
 time = timer.elapsed_time / 60
 print(f'\nSimulation time for {run_number} runs is: {time:.1f} min')

@@ -723,7 +723,7 @@ class PreprocessingCost:
 # %%
 
 from biorefineries.ethanol_adipic._chemicals import chems
-from biorefineries.ethanol_adipic._process_settings import _labor_2011to2016, price
+from biorefineries.ethanol_adipic._settings import _labor_2011to2016, price
 bst.settings.set_thermo(chems)
 
 sys1 = create_default_depot(kind='CPP', with_AFEX=False)

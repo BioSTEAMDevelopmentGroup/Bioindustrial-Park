@@ -13,18 +13,18 @@
 
 from . import (
     _chemicals,
-    _process_settings,
+    _settings,
     _utils,
     _units,
     _facilities,
     _tea,
-    system,
-    system_concentrated,
+    system_SSCF,
+    system_SHF,
     )
 
 
 from ._chemicals import *
-from ._process_settings import *
+from ._settings import *
 from ._utils import *
 from ._units import *
 from ._facilities import *

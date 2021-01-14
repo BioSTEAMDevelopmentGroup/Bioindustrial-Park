@@ -10,7 +10,7 @@
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
 # for license details.
 
-"""
+'''
 References
 ----------
 [1] Davis et al., Process Design and Economics for the Conversion of Lignocellulosic 
@@ -30,7 +30,7 @@ References
     https://doi.org/10.2172/1615147. 
 [5] ecoinvent 3.6 https://www.ecoinvent.org/home.html (accessed Aug 26, 2020).
 
-"""
+'''
 
 
 # %%

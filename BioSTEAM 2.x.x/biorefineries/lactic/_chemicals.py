@@ -10,7 +10,7 @@
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
 # for license details.
 
-"""
+'''
 References
 ----------
 [1] Humbird et al., Process Design and Economics for Biochemical Conversion of 
@@ -23,7 +23,7 @@ References
     NREL/TP-5100-71949; National Renewable Energy Lab (NREL), 2018. 
     https://doi.org/10.2172/1483234
 
-"""
+'''
 
 # %%  
 

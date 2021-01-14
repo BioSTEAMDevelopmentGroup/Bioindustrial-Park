@@ -9,7 +9,7 @@
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
 # for license details.
 
-"""
+'''
 References
 ----------
 [1] Humbird et al., Process Design and Economics for Biochemical Conversion of 
@@ -45,7 +45,8 @@ Processes:
     600: Wastewater treatment
     700: Facilities
 
-"""
+'''
+
 
 # %%
 
@@ -57,7 +58,7 @@ from biorefineries.ethanol_adipic import _units as units
 from biorefineries.ethanol_adipic import _facilities as facilities
 from biorefineries.ethanol_adipic._chemicals import chems, chemical_groups, \
     soluble_organics, solubles, insolubles, COD_chemicals, combustibles
-from biorefineries.ethanol_adipic._process_settings import \
+from biorefineries.ethanol_adipic._settings import \
     price, GWP_CF_stream, GWP_CFs, _labor_2011to2016, set_feedstock_price
 from biorefineries.ethanol_adipic._utils import convert_ethanol_wt_2_mol, \
     find_split, splits_df
