@@ -410,12 +410,12 @@ def adjust_S404_streams_2():
 S404.specification = adjust_S404_streams_2
 
 
-
+# S404-0-1-R302 # with sugars recycle
 D401 = bst.units.ShortcutColumn('D401', ins=S404-1, outs=('D401_g', 'D401_l'),
                                     LHK=('Octanol', 'HP'),
                                     is_divided=True,
                                     product_specification_format='Recovery',
-                                    Lr=0.995, Hr=0.995, k=1.2, P = 101325/20,
+                                    Lr=0.999, Hr=0.999, k=1.2, P = 101325/20,
                                     vessel_material = 'Stainless steel 316')
 
 # def D402_remove_heat_utilities():
@@ -503,7 +503,7 @@ D402 = bst.units.ShortcutColumn('D402', ins=R402_H-0, outs=('D402_g', 'D402_l'),
                                     LHK=('Water', 'AcrylicAcid'),
                                     is_divided=True,
                                     product_specification_format='Recovery',
-                                    Lr=0.995, Hr=0.995, k=1.2,
+                                    Lr=0.999, Hr=0.999, k=1.2,
                                     vessel_material = 'Stainless steel 316')
 
 # def D402_remove_heat_utilities():
@@ -514,7 +514,7 @@ D402 = bst.units.ShortcutColumn('D402', ins=R402_H-0, outs=('D402_g', 'D402_l'),
 D402_P = units.HPPump('D402_P', ins=D402-1)
 D402_H = bst.units.HXutility('D402_H', ins=D402-0, T = 308.15, rigorous=True)
 
-S406 = bst.units.Splitter('S406', ins = D402_H-0, outs = ('recycled_water', 'waste_water'), split = 0.95)
+# S406 = bst.units.Splitter('S406', ins = D402_H-0, outs = ('recycled_water', 'waste_water'), split = 0.95)
 
 
 # S406-0-1-M402
@@ -584,8 +584,8 @@ aerobic_caustic = Stream('aerobic_caustic', units='kg/hr', T=20+273.15, P=2*1013
 # =============================================================================
 
 # Mix waste liquids for treatment
-M501 = bst.units.Mixer('M501', ins=(F301_P-0, S401-0, S406-1, S404-0)) # without sugars recycle
-# M501 = bst.units.Mixer('M501', ins=(F301_P-0, S401-0, S406-1)) # with sugars recycle
+M501 = bst.units.Mixer('M501', ins=(F301_P-0, S401-0, D402_H-0, S404-0)) # without sugars recycle
+# M501 = bst.units.Mixer('M501', ins=(F301_P-0, D402_H-0)) # with sugars recycle
 
 # This represents the total cost of wastewater treatment system
 WWT_cost = units.WastewaterSystemCost('WWT_cost', ins=M501-0)
