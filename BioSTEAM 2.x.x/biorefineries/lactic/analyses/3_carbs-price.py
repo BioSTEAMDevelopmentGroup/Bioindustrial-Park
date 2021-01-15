@@ -75,7 +75,7 @@ carb_contents1 = np.arange(0.25, 0.59, 0.01)
 carb_contents1 = carb_contents1.tolist() + [0.589]
 shf.R301.allow_dilution = False
 shf.R301.allow_concentration = True
-shf.R301.mode = 'Batch'
+shf.R301.mode = 'batch'
 shf.R301.target_titer = 97.5
 
 # Using two loops are not optimal, can potentially use Model and Metric to speed up
@@ -100,31 +100,31 @@ for i in carb_contents1:
     print(f'Run #{run_number}: {timer.elapsed_time:.0f} sec')
 
 # Then concentration needed to get to the baseline titer
-from biorefineries.lactic import system_sscf as sscf
-sscf.simulate_and_print()
+from biorefineries.lactic import system_SSCF as SSCF
+SSCF.simulate_and_print()
 
 carb_contents2 = np.arange(0.59, 0.701, 0.01).tolist()
-sscf.R301.allow_dilution = True
-sscf.R301.allow_concentration = False
-sscf.R301.target_titer = 97.5
+SSCF.R301.allow_dilution = True
+SSCF.R301.allow_concentration = False
+SSCF.R301.target_titer = 97.5
 
 bst.speed_up()
 for i in carb_contents2:
-    set_carbs(i, sscf.feedstock)
-    sscf.lactic_sys.simulate()
-    titers.append(sscf.R301.effluent_titer)
-    GWPs.append(sscf.get_GWP())
-    FECs.append(sscf.get_FEC())
+    set_carbs(i, SSCF.feedstock)
+    SSCF.lactic_sys.simulate()
+    titers.append(SSCF.R301.effluent_titer)
+    GWPs.append(SSCF.get_GWP())
+    FECs.append(SSCF.get_FEC())
     for j in prices:
         TEA_carbs.append(i)
         TEA_prices.append(j)
-        sscf.feedstock.price = j / _feedstock_factor
-        sscf.lactic_acid.price = 0
+        SSCF.feedstock.price = j / _feedstock_factor
+        SSCF.lactic_acid.price = 0
         for m in range(3):
-            MPSP = sscf.lactic_acid.price = \
-                sscf.lactic_tea.solve_price(sscf.lactic_acid)
+            MPSP = SSCF.lactic_acid.price = \
+                SSCF.lactic_tea.solve_price(SSCF.lactic_acid)
         MPSPs.append(MPSP)
-        NPVs.append(sscf.lactic_tea.NPV)
+        NPVs.append(SSCF.lactic_tea.NPV)
     run_number += 1
     print(f'Run #{run_number}: {timer.elapsed_time:.0f} sec')
 

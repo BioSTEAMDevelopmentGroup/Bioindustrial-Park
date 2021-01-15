@@ -474,7 +474,7 @@ class SaccharificationAndCoFermentation(Unit):
                                 +effluent.imol['AceticAcid']/2/self.neutralization_rxns.X[1] \
                                 +effluent.imol['SuccinicAcid']/self.neutralization_rxns.X[2]) \
                                 * 1.1
-            effluent.mix_from([effluent, lime])
+            effluent.mix_from((effluent, lime))
             self.neutralization_rxns.adiabatic_reaction(effluent)
         else:
             lime.empty()
@@ -563,13 +563,17 @@ class Reactor(Unit, PressureVessel, isabstract=True):
         Inlet.        
     outs : stream
         Outlet.
-    tau=1 : float
+    tau : float
         Residence time [hr].        
-    V_wf=0.8 : float
+    V_wf : float
         Fraction of working volume over total volume.        
-    kW_per_m3=0.0985: float
+    mixing_intensity: float
+        Mechanical mixing intensity, [/s].
+    kW_per_m3: float
         Power usage of agitator
         (converted from 0.5 hp/1000 gal as in [1]).
+        If mixing_intensity is provided, this will be calculated based on
+        the mixing_intensity and viscosity of the influent mixture as in [2]_
     wall_thickness_factor=1: float
         A safety factor to scale up the calculated minimum wall thickness.
     vessel_material : str, optional
@@ -582,6 +586,11 @@ class Reactor(Unit, PressureVessel, isabstract=True):
     .. [1] Seider, W. D.; Lewin, D. R.; Seader, J. D.; Widagdo, S.; Gani, R.; 
         Ng, M. K. Cost Accounting and Capital Cost Estimation. In Product 
         and Process Design Principles; Wiley, 2017; pp 470.
+    .. [2] Shoener et al. Energy Positive Domestic Wastewater Treatment:
+        The Roles of Anaerobic and Phototrophic Technologies.
+        Environ. Sci.: Processes Impacts 2014, 16 (6), 1204–1222.
+        `<https://doi.org/10.1039/C3EM00711A>`_.
+
     '''
     _N_ins = 2
     _N_outs = 1
@@ -599,7 +608,7 @@ class Reactor(Unit, PressureVessel, isabstract=True):
     
     def __init__(self, ID='', ins=None, outs=(), *, 
                  P=101325, tau=0.5, V_wf=0.8,
-                 length_to_diameter=2, kW_per_m3=0.0985,
+                 length_to_diameter=2, mixing_intensity=None, kW_per_m3=0.0985,
                  wall_thickness_factor=1,
                  vessel_material='Stainless steel 316',
                  vessel_type='Vertical'):
@@ -609,6 +618,7 @@ class Reactor(Unit, PressureVessel, isabstract=True):
         self.tau = tau
         self.V_wf = V_wf
         self.length_to_diameter = length_to_diameter
+        self.mixing_intensity = mixing_intensity
         self.kW_per_m3 = kW_per_m3
         self.wall_thickness_factor = wall_thickness_factor
         self.vessel_material = vessel_material
@@ -659,9 +669,8 @@ class Reactor(Unit, PressureVessel, isabstract=True):
                 Design['Weight'], Design['Diameter'], Design['Length']))
             for i, j in purchase_costs.items():
                 purchase_costs[i] *= Design['Number of reactors']
-            N = Design['Number of reactors']
-            # No power need for the back-up reactor
-            self.power_utility(self.kW_per_m3*Design['Single reactor volume']*(N-1))
+            
+            self.power_utility(self.kW_per_m3*Design['Total volume'])
             
     @property
     def BM(self):
@@ -674,6 +683,23 @@ class Reactor(Unit, PressureVessel, isabstract=True):
             return self.BM_horizontal 
         else:
             raise RuntimeError('Invalid vessel type')
+            
+    @property
+    def kW_per_m3(self):
+        G = self.mixing_intensity
+        if G is None:
+            return self._kW_per_m3
+        else:
+            mixture = tmo.Stream()
+            mixture.mix_from(self.ins)
+            kW_per_m3 = mixture.mu*(G**2)/1e3
+            return kW_per_m3
+    @kW_per_m3.setter
+    def kW_per_m3(self, i):
+        if self.mixing_intensity and i is not None:
+            raise AttributeError('mixing_intensity is provided, kw_per_m3 will be calculated.')
+        else:
+            self._kW_per_m3 = i
 
 
 @cost(basis='Fermenter size', ID='Fermenter', units='kg',
@@ -718,18 +744,18 @@ class CoFermentation(Reactor):
     
     tau_batch_turnaround = 12 # in hr, the same as the seed train in ref [1]
     
-    taus = [0, 0] # for initial and concentrated feed
+    tau_cofermentation = 0 # in hr
     
-    sugar_concs = [] # sguar conc. during operation
+    max_sugar = 0 # g/L
 
     def __init__(self, ID='', ins=None, outs=(), thermo=None, *, T=50+273.15,
                  P=101325, V_wf=0.8, length_to_diameter=0.6,
-                 kW_per_m3=0.0985,
+                 kW_per_m3=None, mixing_intensity=300,
                  wall_thickness_factor=1,
                  vessel_material='Stainless steel 304',
                  vessel_type='Vertical',
                  neutralization=True,
-                 mode='Batch',
+                 mode='batch', feed_freq=1,
                  allow_dilution=False,
                  allow_concentration=False):
         
@@ -738,15 +764,14 @@ class CoFermentation(Reactor):
         self.P = P
         self.V_wf = V_wf
         self.length_to_diameter = length_to_diameter
+        self.mixing_intensity = mixing_intensity
         self.kW_per_m3 = kW_per_m3
         self.wall_thickness_factor = wall_thickness_factor
         self.vessel_material = vessel_material
         self.vessel_type = vessel_type
         self.neutralization = neutralization
-        if not mode in ('Batch', 'Fed-batch', 'Continuous'):
-            raise ValueError('Fermentation mode must be "Batch", "Fed-batch", '\
-                             f'or "Continuous", not "{mode}".')
         self.mode = mode
+        self.feed_freq = feed_freq
         self.allow_dilution = allow_dilution
         self.allow_concentration = allow_concentration
         self.mixed_feed = tmo.Stream()
@@ -773,55 +798,54 @@ class CoFermentation(Reactor):
             ])
 
     def _run(self):
-        # feed2 for fed-batch
-        feed1, inoculum, CSL, lime, water, feed2 = self.ins
+        # add_feed for fed-batch
+        init_feed, inoculum, CSL, lime, water, add_feed = self.ins
         effluent, sidedraw = self.outs
         mixed_feed = self.mixed_feed
         ferm_rxns = self.cofermentation_rxns
-        productivity = self.productivity
-        mode = self.mode
-        taus = self.taus
-        sugar_concs = self.sugar_concs = []
+        feed_freq = self.feed_freq
         
         tot_feed = tmo.Stream()
-        tot_feed.mix_from((feed1, feed2))
+        tot_feed.mix_from((init_feed, add_feed))
         inoculum_r = self.inoculum_ratio
         CSL.imass['CSL'] = tot_feed.F_vol * self.CSL_loading
         if not self.allow_dilution:
             water.empty()
         
         mixed_feed.mix_from((tot_feed, inoculum, CSL, water))
-        effluent.copy_like(mixed_feed)
         # For seed preparation
         sidedraw.mol = mixed_feed.mol * inoculum_r
         
-        feed_r = feed1.F_mass / tot_feed.F_mass
-        if not feed_r >= inoculum_r:
+        if not 1/feed_freq >= inoculum_r:
             raise ValueError('Not enough initial feed for seed inoculum.')
         
-        # There needs to be a feed2 for MEE to run
-        if not (mode == 'Fed-batch' and self.allow_concentration \
-                and feed2.F_mass/feed1.F_mass>1e-6):
-            effluent.mol = mixed_feed.mol - sidedraw.mol
-            self.influent_titer = inf_t = compute_lactic_titer(effluent)
-            sugar_concs.append(effluent.imass[sugars].sum()/effluent.F_vol)
-            ferm_rxns(effluent.mol)        
-            taus[1] = 0
-        else:
-            mixed1 = tmo.Stream()
-            mixed1.mix_from((*self.ins[:3], self.ins[4]))
-            mixed1.mol -= sidedraw.mol
-            sugar_concs.append(mixed1.imass[sugars].sum()/mixed1.F_vol)
-            self.influent_titer = inf_t1 = compute_lactic_titer(mixed1)
-            ferm_rxns(mixed1.mol)
-            eff_t1 = compute_lactic_titer(mixed1)
-            taus[0] = (eff_t1-inf_t1) / productivity
-            # After feeding
-            effluent.mix_from((mixed1, feed2))
-            sugar_concs.append(effluent.imass[sugars].sum()/effluent.F_vol)
-            inf_t2 = compute_lactic_titer(effluent)
+        effluent.copy_like(mixed_feed)
+        effluent.mol = mixed_feed.mol - sidedraw.mol
+        self.influent_titer = titer0 = compute_lactic_titer(effluent)
+        if feed_freq == 1:
+            self.max_sugar = effluent.imass[sugars].sum()/effluent.F_vol
             ferm_rxns(effluent.mol)
-        
+        else:
+            init = tmo.Stream()
+            init.mix_from((*self.ins[:3], self.ins[4]))
+            init.mol -= sidedraw.mol
+            ferm_rxns(init.mol)
+            
+            # Before reaction, after reaction, with last feed 
+            single_feed0, single_feed1, last = tmo.Stream(), tmo.Stream(), tmo.Stream()
+            single_feed0.copy_like(add_feed)
+            if single_feed0.F_mass != 0:
+                single_feed0.F_mass /= (feed_freq-1)
+            single_feed1.copy_like(single_feed0)
+            
+            ferm_rxns(single_feed1.mol)
+            last.mix_from((init, *[single_feed1.copy()]*max(0, (feed_freq-2)),
+                           single_feed0))
+            self.max_sugar = last.imass[sugars].sum()/last.F_vol
+            effluent.mix_from((init, *[single_feed1.copy()]*(feed_freq-1)))
+            
+            # breakpoint()
+
         # Assume all CSL is consumed
         effluent.imass['CSL'] = 0
         
@@ -833,18 +857,15 @@ class CoFermentation(Reactor):
                                 +effluent.imol['AceticAcid']/2/self.neutralization_rxns.X[1] \
                                 +effluent.imol['SuccinicAcid']/self.neutralization_rxns.X[2]) \
                                 * 1.1
-            effluent.mix_from([effluent, lime])
+            effluent.mix_from((effluent, lime))
             self.neutralization_rxns.adiabatic_reaction(effluent)
         else:
             self.vessel_material= 'Stainless steel 316'
             lime.empty()
-        self.effluent_titer = eff_t = compute_lactic_titer(effluent)
-        if not (mode == 'Fed-batch' and self.allow_concentration \
-                and feed2.F_mass/feed1.F_mass>1e-6):
-            taus[0] = (eff_t-inf_t)/productivity
-        else:
-            taus[1] = (eff_t-inf_t2)/productivity
-        
+            
+        self.effluent_titer = titer1 = compute_lactic_titer(effluent)
+        self.tau_cofermentation = (titer1-titer0)/self.productivity
+            
         mixed_feed.T = sidedraw.T = effluent.T = self.T
 
         
@@ -856,8 +877,8 @@ class CoFermentation(Reactor):
         _mixture.mix_from((*self.ins[0:3], *self.ins[4:]))
         duty = Design['Duty'] = self.mixed_feed.H - _mixture.H
 
-        if mode in ('Batch', 'Fed-batch'):
-            tau_tot = self.tau_batch_turnaround + self.tau
+        if mode == 'batch':
+            tau_tot = self.tau_batch_turnaround + self.tau_cofermentation
             Design['Fermenter size'] = self.outs[0].F_mass * tau_tot
             Design['Recirculation flow rate'] = self.F_mass_in
             self.heat_exchanger.simulate_as_auxiliary_exchanger(duty, _mixture)
@@ -865,6 +886,7 @@ class CoFermentation(Reactor):
         else:
             self._Vmax = 3785.41178 # 1,000,000 gallon from ref [1]
             Reactor._design(self)
+            self.tau_cofermentation = self.tau
             # Include a backup fermenter for cleaning
             Design['Number of reactors'] += 1
 
@@ -874,7 +896,7 @@ class CoFermentation(Reactor):
         purchase_costs.clear()
         hx = self.heat_exchanger
 
-        if self.mode in ('Batch', 'Fed-batch'):
+        if self.mode == 'batch':
             Unit._cost()
             self._decorated_cost()
             # Adjust fermenter cost for acid-resistant scenario
@@ -887,20 +909,48 @@ class CoFermentation(Reactor):
                 self.vessel_material= 'Stainless steel 316'
             Reactor._cost(self)
             
-            N = Design['Number of reactors']
+            N_work = Design['Number of reactors'] - 1 # subtract the one back-up
             single_rx_effluent = self._mixture.copy()
-            single_rx_effluent.mol[:] /= N
-            hx.simulate_as_auxiliary_exchanger(duty=Design['Duty']/N, 
+            single_rx_effluent.mol[:] /= N_work
+            hx.simulate_as_auxiliary_exchanger(duty=Design['Duty']/N_work, 
                                                stream=single_rx_effluent)
             hu_total = self.heat_utilities[0]
             hu_single_rx = hx.heat_utilities[0]
             hu_total.copy_like(hu_single_rx)
-            hu_total.scale(N)
+            hu_total.scale(N_work)
+            
+            # No power need for the back-up reactor
+            self.power_utility(self.kW_per_m3*Design['Single reactor volume']*N_work)
     
     @property
     def tau(self):
-        '''Residence time (exlucding turnaround time for batch or fed-batch), [hr].'''
-        return sum(i for i in self.taus)
+        return self.tau_cofermentation
+    
+    @property
+    def mode(self):
+        return self._mode
+    @mode.setter
+    def mode(self, i):
+        if i.lower() in ('fed-batch', 'fedbatch', 'fed batch'):
+            raise ValueError('For fed-batch, set fermentation to "batch" and ' \
+                             'change feed_freq.')
+        elif i.lower() in ('batch', 'continuous'):
+            self._mode = i.lower()
+            self.feed_freq = 1
+        else:
+            raise ValueError(f'Mode can only be "batch" or "continuous", not {i}.')
+            
+    @property
+    def feed_freq(self):
+        return self._feed_freq
+    @feed_freq.setter
+    def feed_freq(self, i):
+        if not (int(i)==i and i >0):
+            raise ValueError('feed_freq can only be positive integers.')
+        elif self.mode == 'continuous' and int(i) != 1:
+            raise ValueError('feed_freq can only be 1 for continuous mode.')
+        else:
+            self._feed_freq = int(i)
     
     @property
     def lactic_yield(self):
@@ -909,9 +959,6 @@ class CoFermentation(Reactor):
             raise ValueError('Glucose and xylose has different yields.')
         return X[0]
 
-    @property
-    def max_sugar(self):
-        return max(self.sugar_concs)
 
 # Seed train, 5 stages, 2 trains
 @cost(basis='Seed fermenter size', ID='Stage #1 fermenter', units='kg',
@@ -1174,7 +1221,7 @@ class Esterification(Reactor):
     
     def __init__(self, ID='', ins=None, outs=(), thermo=None, *, 
                  T=351.15, P=101325, tau=None, tau_max=15, 
-                 V_wf=0.8, length_to_diameter=2, kW_per_m3=1.97,
+                 V_wf=0.8, length_to_diameter=2, mixing_intensity=None, kW_per_m3=1.97,
                  X1=None, X2=None, assumeX2equalsX1=True, allow_higher_T=False,
                  wall_thickness_factor=1,
                  vessel_material='Stainless steel 316',
@@ -1187,6 +1234,7 @@ class Esterification(Reactor):
         self.tau_max = tau_max
         self.V_wf = V_wf
         self.length_to_diameter = length_to_diameter
+        self.mixing_intensity = mixing_intensity
         self.kW_per_m3 = kW_per_m3
         self.X1, self.X2, self._tau = X1, X2, tau
         self.assumeX2equalsX1 = assumeX2equalsX1

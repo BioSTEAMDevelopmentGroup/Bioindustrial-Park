@@ -157,7 +157,7 @@ R301.neutralization = True
 R401.bypass = False
 S402.bypass = False
 
-R301.mode = 'Batch'
+R301.mode = 'batch'
 # This titer cannot be achieved, the system will find the maximum achievable titer
 R301.target_titer = 600
 
@@ -199,7 +199,7 @@ regular_batch = save_data_clear()
 
 print('\n---------- Regular Strain Continuous Limits ----------')
 # Find the maximum achievable titer with concentration in continuous mode
-R301.mode = 'Continuous'
+R301.mode = 'continuous'
 R301.target_titer = 600
 for i in yield_range:
     R301.target_yield = i
@@ -243,7 +243,7 @@ R301.neutralization = False
 R401.bypass = True
 S402.bypass = True
 
-R301.mode = 'Batch'
+R301.mode = 'batch'
 R301.target_titer = 600
 
 print('\n---------- Acid-resistant Strain Batch Limits ----------')
@@ -281,7 +281,7 @@ resistant_batch = save_data_clear()
 
 print('\n---------- Acid-resistant Strain Continuous Limits ----------')
 # Find the maximum achievable titer with concentration in continuous mode
-R301.mode = 'Continuous'
+R301.mode = 'continuous'
 R301.target_titer = 600
 for i in yield_range:
     R301.target_yield = i

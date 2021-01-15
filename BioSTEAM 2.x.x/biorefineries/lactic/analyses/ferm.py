@@ -138,13 +138,14 @@ def save_data_clear():
             i[j] = []
     return df
 
-def run_TRY(yield_range, system, mode, if_resistant, titer_range):
+def run_TRY(yield_range, system, mode, feed_freq, if_resistant, titer_range):
     bst.speed_up()
     R301 = system.R301
     R302 = system.R302
     R401 = system.R401
     S402 = system.S402
     R301.mode = mode
+    R301.feed_freq = feed_freq
     R301.allow_dilution = True
     if system is SHF:
         R301.allow_concentration = True
@@ -177,34 +178,29 @@ def run_TRY(yield_range, system, mode, if_resistant, titer_range):
 # =============================================================================
 
 # yield_range = np.arange(0.3, 1.01, 0.025) - 1e-6
-yield_range = np.arange(0.3, 1.01, 0.1) - 1e-6
+yield_range = np.arange(0.3, 1.01, 0.5) - 1e-6
 yield_range = yield_range.tolist()
 
 # titer_range = np.arange(50, 250, 1)
-titer_range = np.arange(50, 220, 5)
+titer_range = np.arange(50, 220, 50)
 titer_range = titer_range.tolist()
 
 print('\n---------- SSCF Regular Strain Batch Mode ----------')
-run_TRY(yield_range=yield_range, system=SSCF, mode='Batch', if_resistant=False,
-        titer_range=titer_range)
+run_TRY(yield_range=yield_range, system=SSCF, mode='batch', feed_freq=1,
+        if_resistant=False, titer_range=titer_range)
 SSCF_reg_b = save_data_clear()
 SSCF_reg_b.to_excel('SSCF_reg_batch.xlsx')
 
-print('\n---------- SHF Regular Strain Batch Mode ----------')
-run_TRY(yield_range=yield_range, system=SHF, mode='Batch', if_resistant=False,
-        titer_range=titer_range)
-SHF_reg_b = save_data_clear()
-SHF_reg_b.to_excel('SHF_reg_batch.xlsx')
-
-print('\n---------- SHF Regular Strain Fed-batch Mode ----------')
-run_TRY(yield_range=yield_range, system=SHF, mode='Fed-batch', if_resistant=False,
-        titer_range=titer_range)
-SHF_reg_fb = save_data_clear()
-SHF_reg_fb.to_excel('SHF_reg_fed_batch.xlsx')
+for i in range(3):
+    print(f'\n---------- SHF Regular Strain Batch Feed {i+1} Times ----------')
+    run_TRY(yield_range=yield_range, system=SHF, mode='batch', feed_freq=i+1,
+            if_resistant=False, titer_range=titer_range)
+    SHF_reg_b = save_data_clear()
+    SHF_reg_b.to_excel(f'SHF_reg_batch{i+1}.xlsx')
 
 print('\n---------- SHF Regular Strain Continuous ----------')
-run_TRY(yield_range=yield_range, system=SHF, mode='Continuous', if_resistant=False,
-        titer_range=titer_range)
+run_TRY(yield_range=yield_range, system=SHF, mode='continuous', feed_freq=1,
+        if_resistant=False, titer_range=titer_range)
 SHF_reg_c = save_data_clear()
 SHF_reg_c.to_excel('SHF_reg_continuous.xlsx')
 
@@ -213,7 +209,7 @@ SHF_reg_c.to_excel('SHF_reg_continuous.xlsx')
 
 # print('\n---------- Regular Strain Continuous Limits ----------')
 # # Find the maximum achievable titer with concentration in continuous mode
-# R301.mode = 'Continuous'
+# R301.mode = 'continuous'
 # R301.target_titer = 600
 # for i in yield_range:
 #     R301.target_yield = i
@@ -257,7 +253,7 @@ SHF_reg_c.to_excel('SHF_reg_continuous.xlsx')
 # R401.bypass = True
 # S402.bypass = True
 
-# R301.mode = 'Batch'
+# R301.mode = 'batch'
 # R301.target_titer = 600
 
 # print('\n---------- Acid-resistant Strain Batch Limits ----------')
@@ -295,7 +291,7 @@ SHF_reg_c.to_excel('SHF_reg_continuous.xlsx')
 
 # print('\n---------- Acid-resistant Strain Continuous Limits ----------')
 # # Find the maximum achievable titer with concentration in continuous mode
-# R301.mode = 'Continuous'
+# R301.mode = 'continuous'
 # R301.target_titer = 600
 # for i in yield_range:
 #     R301.target_yield = i
