@@ -137,6 +137,9 @@ TOA_price = 7.5
 # https://www.alibaba.com/product-detail/Methyl-Trioctyl-Ammonium-Chloride-Aliquat-336-_50039302076.html?spm=a2700.galleryofferlist.normal_offer.d_title.6f3340baJbm4l2
 AQ336_price = 1.115
 
+# https://www.alibaba.com/product-detail/Factory-Supply-High-Purity-Industrial-Grade_1600155716170.html?spm=a2700.galleryofferlist.normal_offer.d_title.68217a2fOdbzfi
+Octanol_price = 1.05
+
 
 # All in 2016$/kg
 price = {'AA': AA_price,
@@ -170,7 +173,8 @@ price = {'AA': AA_price,
          'DAP': 0.1645 * _lb_per_kg,
          'Decanol': Decanol_price,
          'TOA': TOA_price,
-         'AQ336': AQ336_price}
+         'AQ336': AQ336_price,
+         'Octanol': Octanol_price}
     
 
 def load_process_settings():

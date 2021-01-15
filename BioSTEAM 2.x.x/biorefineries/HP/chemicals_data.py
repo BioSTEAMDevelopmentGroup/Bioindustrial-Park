@@ -164,6 +164,9 @@ AQ336.copy_models_from(TOA, ('Psat', 'Hvap', 'V'))
 AQ336._Dortmund = TOA.Dortmund
 
 AQ336.Hfus = TOA.Hfus
+
+Octanol = chemical_database('Octanol')
+
 # AQ336 = chemical_database('N-Methyl-N,N,N-trioctylammonium chloride') 
 IBA = chemical_database('Isobutyraldehyde')
 DPHP = chemical_database('DPHP', search_ID='Dipotassium hydrogen phosphate', phase = 'l')

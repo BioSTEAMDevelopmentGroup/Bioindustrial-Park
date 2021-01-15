@@ -20,8 +20,8 @@ from matplotlib.ticker import AutoMinorLocator as AML
 
 # from biorefineries.HP.system import HP_sys, HP_tea, R302, spec
 # from biorefineries.HP.system import MEK as product
-from biorefineries.HP.system import HP_sys, HP_tea, R302, spec, get_GWP, get_non_bio_GWP, get_FEC, get_SPED
-from biorefineries.HP.system import AA as product
+from biorefineries.HP.system_single_lle import HP_sys, HP_tea, R302, spec, get_GWP, get_non_bio_GWP, get_FEC, get_SPED
+from biorefineries.HP.system_single_lle import AA as product
 
 from matplotlib import pyplot as plt
 from  matplotlib.colors import LinearSegmentedColormap
@@ -299,7 +299,7 @@ spec_1 = np.linspace(0.1,0.99, steps) # yield
 spec_2 = np.linspace(10, 400, steps) # titer
 # spec_1 = np.linspace(0.2, 0.99, steps) # yield
 # spec_2 = np.linspace(45, 225, steps) # titer
-spec_3 = np.array([1.]) # productivity
+spec_3 = np.array([0.87]) # productivity
 spec.load_spec_1 = spec.load_yield
 spec.load_spec_2 = spec.load_titer
 spec.load_spec_3 = spec.load_productivity
