@@ -42,7 +42,7 @@ import numpy as np
 import thermosteam as tmo
 from math import exp, pi, ceil
 from flexsolve import aitken_secant
-from biosteam import Unit
+from biosteam import Stream, Unit
 from biosteam.exceptions import DesignError
 from biosteam.units import Flash, HXutility, Mixer, MixTank, Pump, \
     SolidsSeparator, StorageTank
@@ -416,7 +416,7 @@ class SaccharificationAndCoFermentation(Unit):
         self.T = T
         self.neutralization = neutralization
         self.allow_dilution = allow_dilution
-        self.saccharified_stream = tmo.Stream()
+        self.saccharified_stream = Stream()
         
         self.saccharification_rxns = ParallelRxn([
             #   Reaction definition                   Reactant        Conversion
@@ -491,7 +491,7 @@ class SaccharificationAndCoFermentation(Unit):
         Design['Recirculation flow rate'] = total_mass_flow
 
         hu_cooling = self.heat_utilities[0]
-        mixture = tmo.Stream()
+        mixture = Stream()
         mixture.mix_from(self.ins[0:3])
         Design['Duty'] = self.saccharified_stream.H  - mixture.H
         hu_cooling(duty=Design['Duty'], T_in=mixture.T)
@@ -690,7 +690,7 @@ class Reactor(Unit, PressureVessel, isabstract=True):
         if G is None:
             return self._kW_per_m3
         else:
-            mixture = tmo.Stream()
+            mixture = Stream()
             mixture.mix_from(self.ins)
             kW_per_m3 = mixture.mu*(G**2)/1e3
             return kW_per_m3
@@ -774,7 +774,7 @@ class CoFermentation(Reactor):
         self.feed_freq = feed_freq
         self.allow_dilution = allow_dilution
         self.allow_concentration = allow_concentration
-        self.mixed_feed = tmo.Stream()
+        self.mixed_feed = Stream()
         self.heat_exchanger = HXutility(None, None, None, T=T) 
         
         # FermMicrobe reaction from ref [1]
@@ -805,9 +805,9 @@ class CoFermentation(Reactor):
         ferm_rxns = self.cofermentation_rxns
         feed_freq = self.feed_freq
         
-        tot_feed = tmo.Stream()
+        tot_feed = Stream()
         tot_feed.mix_from((init_feed, add_feed))
-        inoculum_r = self.inoculum_ratio
+        inoculum_r = self.inoculum_ratio - 1e-6 # this is to prevent tiny rounding errors
         CSL.imass['CSL'] = tot_feed.F_vol * self.CSL_loading
         if not self.allow_dilution:
             water.empty()
@@ -826,13 +826,13 @@ class CoFermentation(Reactor):
             self.max_sugar = effluent.imass[sugars].sum()/effluent.F_vol
             ferm_rxns(effluent.mol)
         else:
-            init = tmo.Stream()
+            init = Stream()
             init.mix_from((*self.ins[:3], self.ins[4]))
             init.mol -= sidedraw.mol
             ferm_rxns(init.mol)
             
             # Before reaction, after reaction, with last feed 
-            single_feed0, single_feed1, last = tmo.Stream(), tmo.Stream(), tmo.Stream()
+            single_feed0, single_feed1, last = Stream(), Stream(), Stream()
             single_feed0.copy_like(add_feed)
             if single_feed0.F_mass != 0:
                 single_feed0.F_mass /= (feed_freq-1)
@@ -843,8 +843,6 @@ class CoFermentation(Reactor):
                            single_feed0))
             self.max_sugar = last.imass[sugars].sum()/last.F_vol
             effluent.mix_from((init, *[single_feed1.copy()]*(feed_freq-1)))
-            
-            # breakpoint()
 
         # Assume all CSL is consumed
         effluent.imass['CSL'] = 0
@@ -873,7 +871,7 @@ class CoFermentation(Reactor):
         mode = self.mode
         Design = self.design_results
         Design.clear()
-        _mixture = self._mixture = tmo.Stream()
+        _mixture = self._mixture = Stream()
         _mixture.mix_from((*self.ins[0:3], *self.ins[4:]))
         duty = Design['Duty'] = self.mixed_feed.H - _mixture.H
 
@@ -909,18 +907,18 @@ class CoFermentation(Reactor):
                 self.vessel_material= 'Stainless steel 316'
             Reactor._cost(self)
             
-            N_work = Design['Number of reactors'] - 1 # subtract the one back-up
+            N_working = Design['Number of reactors'] - 1 # subtract the one back-up
             single_rx_effluent = self._mixture.copy()
-            single_rx_effluent.mol[:] /= N_work
-            hx.simulate_as_auxiliary_exchanger(duty=Design['Duty']/N_work, 
+            single_rx_effluent.mol[:] /= N_working
+            hx.simulate_as_auxiliary_exchanger(duty=Design['Duty']/N_working, 
                                                stream=single_rx_effluent)
             hu_total = self.heat_utilities[0]
             hu_single_rx = hx.heat_utilities[0]
             hu_total.copy_like(hu_single_rx)
-            hu_total.scale(N_work)
+            hu_total.scale(N_working)
             
             # No power need for the back-up reactor
-            self.power_utility(self.kW_per_m3*Design['Single reactor volume']*N_work)
+            self.power_utility(self.kW_per_m3*Design['Single reactor volume']*N_working)
     
     @property
     def tau(self):

@@ -21,9 +21,12 @@ import numpy as np
 import pandas as pd
 import biosteam as bst
 from biosteam.utils import TicToc
+from biorefineries.lactic import simulate_and_print, \
+    SSCF_flowsheet, SSCF_funcs, SHF_flowsheet, SHF_funcs
 
 _kg_per_ton = 907.18474
 _feedstock_factor = _kg_per_ton / 0.8
+bst.speed_up()
 
 
 # %%
@@ -57,7 +60,6 @@ prices = np.arange(0, 210, 10)
 # Initiate a timer
 timer = TicToc('timer')
 timer.tic()
-run_number = 0
 
 TEA_carbs = []
 TEA_prices = []
@@ -68,65 +70,68 @@ GWPs = []
 FECs = []
 
 # Configuration 2
-from biorefineries.lactic import system_shf as shf
-shf.simulate_and_print()
-
+simulate_and_print('SHF')
 carb_contents1 = np.arange(0.25, 0.59, 0.01)
 carb_contents1 = carb_contents1.tolist() + [0.589]
-shf.R301.allow_dilution = False
-shf.R301.allow_concentration = True
-shf.R301.mode = 'batch'
-shf.R301.target_titer = 97.5
+R301 = SHF_flowsheet.unit.R301
+R301.allow_dilution = False
+R301.allow_concentration = True
+R301.mode = 'batch'
+R301.feed_freq = 1
+R301.target_titer = 97.5
+
+feedstock = SHF_flowsheet.stream.feedstock
+lactic_acid = SHF_flowsheet.stream.lactic_acid
+lactic_sys = SHF_flowsheet.system.lactic_sys
+lactic_tea = lactic_sys.TEA
 
 # Using two loops are not optimal, can potentially use Model and Metric to speed up
-bst.speed_up()
 for i in carb_contents1:
-    set_carbs(i, shf.feedstock)
-    shf.lactic_sys.simulate()
-    titers.append(shf.R301.effluent_titer)
-    GWPs.append(shf.get_GWP())
-    FECs.append(shf.get_FEC())
+    set_carbs(i, feedstock)
+    lactic_sys.simulate()
+    titers.append(R301.effluent_titer)
+    GWPs.append(SHF_funcs['get_GWP']())
+    FECs.append(SHF_funcs['get_FEC']())
     for j in prices:
         TEA_carbs.append(i)
         TEA_prices.append(j)
-        shf.feedstock.price = j / _feedstock_factor
-        shf.lactic_acid.price = 0
+        feedstock.price = j / _feedstock_factor
+        lactic_acid.price = 0
         for m in range(3):
-            MPSP = shf.lactic_acid.price = \
-                shf.lactic_tea.solve_price(shf.lactic_acid)
+            MPSP = lactic_acid.price = lactic_tea.solve_price(lactic_acid)
         MPSPs.append(MPSP)
-        NPVs.append(shf.lactic_tea.NPV)
-    run_number += 1
-    print(f'Run #{run_number}: {timer.elapsed_time:.0f} sec')
+        NPVs.append(lactic_tea.NPV)
 
 # Then concentration needed to get to the baseline titer
-from biorefineries.lactic import system_SSCF as SSCF
-SSCF.simulate_and_print()
-
+simulate_and_print('SSCF')
 carb_contents2 = np.arange(0.59, 0.701, 0.01).tolist()
-SSCF.R301.allow_dilution = True
-SSCF.R301.allow_concentration = False
-SSCF.R301.target_titer = 97.5
+R301 = SSCF_flowsheet.unit.R301
+R301.allow_dilution = True
+R301.allow_concentration = False
+R301.mode = 'batch'
+R301.feed_freq = 1
+R301.target_titer = 97.5
 
-bst.speed_up()
+feedstock = SSCF_flowsheet.stream.feedstock
+lactic_acid = SSCF_flowsheet.stream.lactic_acid
+lactic_sys = SSCF_flowsheet.system.lactic_sys
+lactic_tea = lactic_sys.TEA
+
 for i in carb_contents2:
-    set_carbs(i, SSCF.feedstock)
-    SSCF.lactic_sys.simulate()
-    titers.append(SSCF.R301.effluent_titer)
-    GWPs.append(SSCF.get_GWP())
-    FECs.append(SSCF.get_FEC())
+    set_carbs(i, feedstock)
+    lactic_sys.simulate()
+    titers.append(R301.effluent_titer)
+    GWPs.append(SSCF_funcs['get_GWP']())
+    FECs.append(SSCF_funcs['get_FEC']())
     for j in prices:
         TEA_carbs.append(i)
         TEA_prices.append(j)
-        SSCF.feedstock.price = j / _feedstock_factor
-        SSCF.lactic_acid.price = 0
+        feedstock.price = j / _feedstock_factor
+        lactic_acid.price = 0
         for m in range(3):
-            MPSP = SSCF.lactic_acid.price = \
-                SSCF.lactic_tea.solve_price(SSCF.lactic_acid)
+            MPSP = lactic_acid.price = lactic_tea.solve_price(lactic_acid)
         MPSPs.append(MPSP)
-        NPVs.append(SSCF.lactic_tea.NPV)
-    run_number += 1
-    print(f'Run #{run_number}: {timer.elapsed_time:.0f} sec')
+        NPVs.append(lactic_tea.NPV)
 
 TEA_plot_data = pd.DataFrame({
     'Carbohydrate content [dw%]': TEA_carbs,
@@ -143,12 +148,11 @@ LCA_plot_data = pd.DataFrame({
     })
 
 # '''Output to Excel'''
-# with pd.ExcelWriter('3_carbs-price.xlsx') as writer:
+# with pd.ExcelWriter('3_feedstock_carb-price.xlsx') as writer:
 #     TEA_plot_data.to_excel(writer, sheet_name='TEA')
 #     LCA_plot_data.to_excel(writer, sheet_name='LCA')
 
-time = timer.elapsed_time / 60
-print(f'\nSimulation time for {run_number} runs is: {time:.1f} min')
+print(f'\nSimulation time is {timer.elapsed_time/60:.1f} min')
 
 
 

@@ -16,7 +16,7 @@
 import numpy as np
 import pandas as pd
 import thermosteam as tmo
-from biorefineries.lactic._chemicals import chems
+from biorefineries.lactic._chemicals import chems, chemical_groups
 
 _kg_per_ton = 907.18474
 
@@ -88,6 +88,9 @@ def set_yield(lactic_yield, R301, R302):
     R302_X = R302.cofermentation_rxns.X
     R302_X[0] = R302_X[3] = R301_X[0] * R302.ferm_ratio
     R302_X[1] = R302_X[4] = min(R301_X[1]*R302.ferm_ratio, 1-1e-6-R302_X[0]-R302_X[2])
+    # Again to round up tiny errors
+    R301.cofermentation_rxns._X = R301_X.round(6)
+    R302.cofermentation_rxns._X = R302_X.round(6)
 
 
 # %% 
@@ -238,6 +241,27 @@ streams['stream_625'] = (1, 2241169, 2, 3, 7,
 splits_df = pd.DataFrame.from_dict(streams)
 splits_df.index = IDs
 
+# 1 is water, changed by moisture content rather than using data from ref [1]
+cell_mass_index = [splits_df.index[0]] + splits_df.index[2:].to_list()
+cell_mass_solid = [splits_df['stream_571'][0]] + splits_df['stream_571'][2:].to_list()
+cell_mass_filtrate = [splits_df['stream_535'][0]] + splits_df['stream_535'][2:].to_list()
+cell_mass_split = find_split(cell_mass_index, cell_mass_solid, cell_mass_filtrate,
+                             chemical_groups)
 
+# Moisture content (20%) and gypsum removal (99.5%) on Page 24 of ref [3]
+gypsum_index = cell_mass_index + ['Gypsum']
+gypsum_solid = cell_mass_solid + [0.995]
+gypsum_filtrate = cell_mass_filtrate + [0.005]
+gypsum_split = find_split(gypsum_index, gypsum_solid, gypsum_filtrate, chemical_groups)
 
+# Anaerobic digestion
+AD_split = find_split(splits_df.index,
+                      splits_df['stream_611'],
+                      splits_df['stream_612'],
+                      chemical_groups)
 
+# Membrane bioreactor
+MB_split = find_split(splits_df.index,
+                      splits_df['stream_624'],
+                      splits_df['stream_625'],
+                      chemical_groups)

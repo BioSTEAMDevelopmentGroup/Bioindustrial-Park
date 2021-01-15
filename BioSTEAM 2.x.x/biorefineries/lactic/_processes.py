@@ -57,25 +57,26 @@ Processes:
 
 import biosteam as bst
 from flexsolve import aitken_secant, IQ_interpolation
-from biosteam import System
+from biosteam import Stream, System
 from biosteam.process_tools import UnitGroup
-from thermosteam import Stream
 from biorefineries.lactic import _units as units
 from biorefineries.lactic import _facilities as facilities
-from biorefineries.lactic._settings import price
-from biorefineries.lactic._utils import baseline_feedflow, set_yield, find_split, splits_df
-from biorefineries.lactic._chemicals import chemical_groups, sugars, soluble_organics, \
+from biorefineries.lactic._settings import price, CFs
+from biorefineries.lactic._utils import baseline_feedflow, set_yield, AD_split, MB_split
+from biorefineries.lactic._chemicals import chems, sugars, soluble_organics, \
     insolubles, combustibles
+from biorefineries.lactic._tea import LacticTEA
 from biorefineries import BST222
 
 __all__ = (
     'update_settings',
-    'create_pretreatment_sys',
-    'create_SSCF_conversion_sys',
-    'create_SHF_conversion_sys',
-    'create_separation_sys',
-    'create_wastewater_sys',
-    'create_facilities'
+    'create_pretreatment_process',
+    'create_SSCF_conversion_process',
+    'create_SHF_conversion_process',
+    'create_separation_process',
+    'create_wastewater_process',
+    'create_facilities',
+    'create_lactic_sys'
     )
 
 
@@ -85,8 +86,7 @@ __all__ = (
 # Used in all processes
 # =============================================================================
 
-def update_settings(flowsheet, chems, CE=541.7):
-    bst.main_flowsheet.set_flowsheet(flowsheet)
+def update_settings(chems, CE=541.7):
     bst.settings.set_thermo(chems)
     bst.CE = CE # year 2016
     
@@ -108,8 +108,8 @@ def update_settings(flowsheet, chems, CE=541.7):
 # Acid pretreatment
 # =============================================================================
 
-def create_pretreatment_sys(flowsheet, chems, CE=541.7):
-    update_settings(flowsheet, chems, CE=541.7)
+def create_pretreatment_process(flowsheet):
+    bst.main_flowsheet.set_flowsheet(flowsheet)
     
     ######################## Streams ########################
     feedstock = Stream('feedstock', baseline_feedflow.copy(),
@@ -135,6 +135,9 @@ def create_pretreatment_sys(flowsheet, chems, CE=541.7):
     U101 = units.FeedstockPreprocessing('U101', ins=feedstock,
                                         outs=('processed', 'diverted_to_CHP'),
                                         diversion_to_CHP=0)
+    # Feedstock flow rate in dry U.S. ton per day
+    get_flow_tpd = lambda: \
+    (feedstock.F_mass-feedstock.imass['H2O'])*24/907.185*(1-U101.diversion_to_CHP)
 
     # Prepare sulfuric acid
     get_feedstock_dry_mass = lambda: \
@@ -183,9 +186,9 @@ def create_pretreatment_sys(flowsheet, chems, CE=541.7):
     feedstock_group = UnitGroup('feedstock_group', units=(U101,))
     pretreatment_group = UnitGroup('pretreatment_group', units=pretreatment_sys.units)
     
-    process_groups = [feedstock_group, pretreatment_group]
+    groups = [feedstock_group, pretreatment_group]
     
-    return flowsheet, process_groups
+    return flowsheet, groups, get_flow_tpd
 
 
 # %%
@@ -195,8 +198,8 @@ def create_pretreatment_sys(flowsheet, chems, CE=541.7):
 # and separate hydrolysis and fermentation (SHF)
 # =============================================================================
 
-def create_SSCF_conversion_sys(flowsheet, process_groups, chems, CE=541.7):
-    update_settings(flowsheet, chems, CE=541.7)
+def create_SSCF_conversion_process(flowsheet, groups):
+    bst.main_flowsheet.set_flowsheet(flowsheet)
     
     ######################## Streams ########################
     # flow updated in EnzymeHydrolysateMixer
@@ -267,19 +270,13 @@ def create_SSCF_conversion_sys(flowsheet, process_groups, chems, CE=541.7):
                             path=(M301, H301, seed_recycle, PS301))
     
     conversion_group = UnitGroup('conversion_group', units=conversion_sys.units)
-    process_groups.append(conversion_group)
+    groups.append(conversion_group)
 
-    return flowsheet, process_groups
-
-S301_index = [splits_df.index[0]] + splits_df.index[2:].to_list()
-S301_cell_mass_split = [splits_df['stream_571'][0]] + splits_df['stream_571'][2:].to_list()
-S301_filtrate_split = [splits_df['stream_535'][0]] + splits_df['stream_535'][2:].to_list()
+    return flowsheet, groups
 
 
-def create_SHF_conversion_sys(flowsheet, process_groups, chems,
-                              cell_split,
-                              CE=541.7):
-    update_settings(flowsheet, chems, CE=541.7)
+def create_SHF_conversion_process(flowsheet, groups, cell_mass_split):
+    bst.main_flowsheet.set_flowsheet(flowsheet)
     
     ######################## Streams ########################
     # flow updated in EnzymeHydrolysateMixer
@@ -305,46 +302,55 @@ def create_SHF_conversion_sys(flowsheet, process_groups, chems,
     
     # Remove solids from saccharified stream
     S301 = units.CellMassFilter('S301', ins=R300-0, outs=('S301_cell_mass', ''),
-                                moisture_content=0.35, split=cell_split)
+                                moisture_content=0.35, split=cell_mass_split)
     
-    E301 = bst.units.MultiEffectEvaporator('E301', ins=S301-1,
+    S302 = bst.units.Splitter('S302', ins=S301-1, split=1-1e-6, # MEE needs something to run
+                              outs=('to_fermenter', 'to_MEE'))
+    
+    E301 = bst.units.MultiEffectEvaporator('E301', ins=S302-1,
                                            outs=('E301_solid', 'E301_condensate'),
                                            P=(101325, 73581, 50892, 32777, 20000),
                                            V=0.76)
-    E301_P = bst.units.Pump('E301_P', ins=E301-0)
     
-    S302 = bst.units.Splitter('S302', ins=E301_P-0, split=1-1e-6,
-                              outs=('to_fermenter', 'to_E302'))
+    E301_T = bst.units.StorageTank('E301_T', ins=E301-0, tau=0, V_wf=0.8)
+    E301_T_old_design = E301_T._design
+    # Total volume to hold is:
+    # (Qtot is for the saccharified stream, Q for the tank, N is the feed_freq)
+    #     Q/Qtot = N/(N-1)
+    #     Q*tau_tank = Qtot/N*tau_ferm/N + Qtot/N*tau_ferm/N*2 + ... + Qtot/N*tau_ferm/N*(N-1)
+    #                = Qtot*tau_ferm*(N-1)/(2*N)
+    #     tau_tank = tau_ferm/2
+    def E301_T_design():
+        E301_T.tau = R301.tau_cofermentation/2
+        E301_T_old_design()
+    E301_T._design = E301_T_design
     
-    E302 = bst.units.MultiEffectEvaporator('E302', ins=S302-1,
-                                           outs=('E302_solid', 'E302_condensate'),
-                                           P=(101325, 73581, 50892, 32777, 20000),
-                                           V=0.76)
-    
-    #!!! Does it need stirring?
-    E302_T = bst.units.StorageTank('E302_T', ins=E302-0, tau=0, V_wf=0.8)
-    E302_T_old_design = E302_T._design
-    def E302_T_design():
-        E302_T.tau = R301.taus[0]
-        E302_T_old_design()
-    E302_T._design = E302_T_design
-    
-    E302_P = bst.units.Pump('E302_P', ins=E302_T-0)
-    E302_P_old_cost = E302_P._cost
-    def E302_P_cost():
-        E302_P_old_cost()
-        if E302_T.tau == 0:
-            E302_P.design_results.clear()
-            E302_P.purchase_costs.clear()
-    E302_P._cost = E302_P_cost
+    E301_P = bst.units.Pump('E301_P', ins=E301_T-0)
+    E301_P_old_cost = E301_P._cost
+    def E301_P_cost():
+        E301_P_old_cost()
+        if E301_T.tau == 0:
+            E301_P.design_results.clear()
+            E301_P.purchase_costs.clear()
+    E301_P._cost = E301_P_cost
     
     R301 = units.CoFermentation('R301',
                                 ins=(S302-0, '', CSL_R301, lime_R301,
-                                     water_R301, E302_P-0),
+                                     water_R301, E301_P-0),
                                 outs=('fermentation_effluent', 'sidedraw'),
-                                neutralization=True, mode='Batch',
+                                neutralization=True, mode='batch',
                                 allow_dilution=False,
                                 allow_concentration=False)
+    def update_split():
+        if R301.feed_freq == 1 and R301.allow_concentration:
+            S302._isplit = S302.thermo.chemicals.isplit(0)
+        else:
+            split = min(1-1e-6, 1/R301.feed_freq)
+            S302._isplit = S302.thermo.chemicals.isplit(split)
+        S302._run()
+        R301._run()
+    R301.specification = update_split
+    
     R301_P1 = bst.units.Pump('R301_P1', ins=R301-0)
     R301_P2 = bst.units.Pump('R301_P2', ins=R301-1)
     
@@ -352,10 +358,10 @@ def create_SHF_conversion_sys(flowsheet, process_groups, chems,
     
     T301 = units.SeedHoldTank('T301', ins=R302-0, outs=1-R301)
     
-    seed_recycle = System('seed_recycle', path=(S302, E302, E302_T, E302_P,
+    seed_recycle = System('seed_recycle', path=(E301, E301_T, E301_P,
                                                 R301, R301_P1, R301_P2, R302, T301),
                           recycle=R302-0)
-    ferm_loop = System('ferm_loop', path=(E301, E301_P, seed_recycle))
+    ferm_loop = System('ferm_loop', path=(S302, seed_recycle))
     
     
     # Add dilution water to achieve the lower titer
@@ -372,10 +378,10 @@ def create_SHF_conversion_sys(flowsheet, process_groups, chems,
     
     #!!! Find a paper on the maximum MEE sugar conc.
     # Adjust V of the multi-effect evaporator to the maximum possible sugar concentration
-    def get_max_V(V, unit):
-        unit.V = V
-        unit._run()
-        sugar_conc = unit.outs[0].imass[sugars].sum()/unit.outs[0].F_vol
+    def get_max_V(V):
+        E301.V = V
+        E301._run()
+        sugar_conc = E301.outs[0].imass[sugars].sum()/E301.outs[0].F_vol
         return sugar_conc-600
     
     # Adjust V of the multi-effect evaporator to achieve the set sugar concentration
@@ -390,7 +396,7 @@ def create_SHF_conversion_sys(flowsheet, process_groups, chems,
         # In continuous mode, incoming sugar is immediately consumed, therefore 
         # sugar concentration is always held at the same level (as effluent sugar
         # concentration in batch mode)
-        if R301.mode in ('Batch', 'Fed-batch'):
+        if R301.mode == 'batch':
             sugar_conc = R301.max_sugar
         else:
             sugar_conc = R301.outs[0].imass[sugars].sum()/R301.outs[0].F_vol
@@ -398,56 +404,25 @@ def create_SHF_conversion_sys(flowsheet, process_groups, chems,
         # highest from collected papers)
         return sugar_conc-220
     
-    def sugar_at_split(split):
-        S302._isplit = S302.thermo.chemicals.isplit(split)
-        seed_recycle._run()
-        return R301.max_sugar-220
-    
-    # Adjust how much saccharified stream is diverted to the multi-effect evaporator
-    # to achieve the set sugar concentration
-    def titer_at_split(split):
-        S302._isplit = S302.thermo.chemicals.isplit(split)
-        seed_recycle._run()
-        return R301.effluent_titer-R301.target_titer
-    
-    
     def adjust_ferm_loop():
         water_R301.empty()
         #!!! This can be upadted using newer biosteam
         # S302.split = 1
         S302._isplit = S302.thermo.chemicals.isplit(1-1e-6)
-        E301.V = E302.V = 0
+        E301.V = 0
         set_yield(R301.target_yield, R301, R302)
         ferm_loop._run()
         if R301.effluent_titer < R301.target_titer:
             if R301.allow_concentration:
-                # When E301.V == 0.76, sugar is 600 g/L in the solids
-                #!!! Maybe this is redudant
                 equip_max_V = IQ_interpolation(f=get_max_V, x0=0, x1=1,
                                                xtol=0.001, ytol=0.1, maxiter=50, 
-                                               args=(E301,), checkbounds=False)
+                                               args=(), checkbounds=False)
                 microbe_max_V = IQ_interpolation(f=sugar_at_V, x0=0, x1=equip_max_V,
                                                  xtol=0.001, ytol=0.1, maxiter=50, 
                                                  args=(), checkbounds=False)
                 E301.V = IQ_interpolation(f=titer_at_V, x0=0, x1=microbe_max_V,
                                           xtol=0.001, ytol=0.1, maxiter=50, 
                                           args=(), checkbounds=False)
-                ferm_loop._run()
-                # +1 to allow some rounding error
-                if R301.mode == 'Fed-batch' and R301.effluent_titer+1 < R301.target_titer:
-                    E302.V = IQ_interpolation(f=get_max_V, x0=0, x1=1,
-                                              xtol=0.001, ytol=0.1, maxiter=50, 
-                                              args=(E302,), checkbounds=False)
-                    min_split = IQ_interpolation(f=sugar_at_split,
-                                                 x0=R301.inoculum_ratio, x1=1-1e-6,
-                                                 xtol=0.001, ytol=0.1, maxiter=50, 
-                                                 args=(), checkbounds=False)
-                    S302_split = IQ_interpolation(f=titer_at_split,
-                                                  x0=min_split, x1=1-1e-6,
-                                                  xtol=0.001, ytol=0.1, maxiter=50, 
-                                                  args=(), checkbounds=False)
-                    S302._isplit = S302.thermo.chemicals.isplit(S302_split)
-                    ferm_loop._run()
                 
         elif R301.effluent_titer > R301.target_titer:
             if R301.allow_dilution:
@@ -471,9 +446,9 @@ def create_SHF_conversion_sys(flowsheet, process_groups, chems,
                             path=(M301, H301, R300, S301, ferm_loop, PS301))
     
     conversion_group = UnitGroup('conversion_group', units=conversion_sys.units)
-    process_groups.append(conversion_group)
+    groups.append(conversion_group)
     
-    return flowsheet, process_groups
+    return flowsheet, groups
 
 
 # %%
@@ -482,10 +457,9 @@ def create_SHF_conversion_sys(flowsheet, process_groups, chems,
 # Separation
 # =============================================================================
 
-def create_separation_sys(flowsheet, process_groups, chems,
-                          cell_split, gypsum_split, kind='SSCF',
-                          CE=541.7):
-    update_settings(flowsheet, chems, CE=541.7)
+def create_separation_process(flowsheet, groups,
+                              cell_mass_split, gypsum_split, kind='SSCF'):
+    bst.main_flowsheet.set_flowsheet(flowsheet)
     
     ######################## Streams ########################
     # flow updated in AcidulationReactor
@@ -502,11 +476,11 @@ def create_separation_sys(flowsheet, process_groups, chems,
     if kind == 'SSCF':
         S401 = units.CellMassFilter('S401', ins=PS301-0, outs=('cell_mass', ''),
                                     moisture_content=0.35,
-                                    split=cell_split)
+                                    split=cell_mass_split)
     else:
         S401 = bst.units.SolidsCentrifuge('S401', ins=PS301-0,
                                           outs=('S401_cell_mass', ''),
-                                          split=cell_split,
+                                          split=cell_mass_split,
                                           solids=insolubles)
     # Ca(LA)2 + H2SO4 --> CaSO4 + 2 LA
     R401 = units.AcidulationReactor('R401', ins=(S401-1, sulfuric_acid_R401),
@@ -681,9 +655,9 @@ def create_separation_sys(flowsheet, process_groups, chems,
                                   F402_H2, F402_P, M401, M401_P,))
     
     separation_group = UnitGroup('separation_group', units=separation_sys.units)
-    process_groups.append(separation_group)
+    groups.append(separation_group)
 
-    return flowsheet, process_groups
+    return flowsheet, groups
 
 
 # %%
@@ -692,11 +666,9 @@ def create_separation_sys(flowsheet, process_groups, chems,
 # Wastewater treatment
 # =============================================================================
 
-def create_wastewater_sys(flowsheet, process_groups, chems, wastewater_streams,
-                          feedstock_tpd,
-                          CE=541.7):
-    update_settings(flowsheet, chems, CE=541.7)
-    # u = flowsheet.u
+def create_wastewater_process(flowsheet, groups,
+                              wastewater_streams, get_flow_tpd):
+    bst.main_flowsheet.set_flowsheet(flowsheet)
     
     ######################## Streams ########################
     caustic_R502 = Stream('caustic_R502', units='kg/hr', price=price['NaOH'])
@@ -713,26 +685,20 @@ def create_wastewater_sys(flowsheet, process_groups, chems, wastewater_streams,
                                     outs=('biogas', 'anaerobic_treated_water', 
                                           'anaerobic_sludge'),
                                     reactants=soluble_organics,
-                                    split=find_split(splits_df.index,
-                                                     splits_df['stream_611'],
-                                                     splits_df['stream_612'],
-                                                     chemical_groups),
+                                    split=AD_split,
                                     T=35+273.15)
     
     R502 = units.AerobicDigestion('R502', ins=(R501-1, '', caustic_R502, 'ammonia_R601',
                                                polymer_R502, air_R502),
                                   outs=(vent_R502, 'aerobic_treated_water'),
                                   reactants=soluble_organics,
-                                  caustic_mass=2252*feedstock_tpd/2205,
+                                  caustic_mass=2252*get_flow_tpd()/2205,
                                   need_ammonia=False)
     
     # Membrane bioreactor to split treated wastewater from R502
     S501 = units.MembraneBioreactor('S501', ins=R502-1,
                                     outs=('membrane_treated_water', 'membrane_sludge'),
-                                    split=find_split(splits_df.index,
-                                                     splits_df['stream_624'],
-                                                     splits_df['stream_625'],
-                                                     chemical_groups))
+                                    split=MB_split)
     
     # Recycled sludge stream of memberane bioreactor, the majority of it (96%)
     # goes to aerobic digestion
@@ -761,9 +727,9 @@ def create_wastewater_sys(flowsheet, process_groups, chems, wastewater_streams,
     
     wastewater_group = UnitGroup('wastewater_group',
                                  units=wastewater_sys.units)
-    process_groups.append(wastewater_group)
+    groups.append(wastewater_group)
     
-    return flowsheet, process_groups
+    return flowsheet, groups
     
     
 # %% 
@@ -772,14 +738,12 @@ def create_wastewater_sys(flowsheet, process_groups, chems, wastewater_streams,
 # Facilities
 # =============================================================================
 
-def create_facilities(flowsheet, process_groups, chems,
-                      feedstock_tpd,
-                      CHP_wastes, CHP_biogas='', CHP_side_streams=(),
-                      process_water_streams={}, recycled_water='',
-                      CE=541.7):
-    update_settings(flowsheet, chems, CE=541.7)
-    u = flowsheet.u
-    s = flowsheet.s
+def create_facilities(flowsheet, groups,
+                      get_flow_tpd, CHP_wastes, CHP_biogas='', CHP_side_streams=(),
+                      process_water_streams={}, recycled_water=''):
+    bst.main_flowsheet.set_flowsheet(flowsheet)
+    s = flowsheet.stream
+    u = flowsheet.unit
     
     ######################## Streams ########################
     # Final product
@@ -795,7 +759,7 @@ def create_facilities(flowsheet, process_groups, chems,
     # Chemicals used/generated in CHP
     lime_CHP = Stream('lime_CHP', units='kg/hr', price=price['Lime'])
     ammonia_CHP = Stream('ammonia_CHP', units='kg/hr',
-                         NH4OH=1054*35.046/17.031*feedstock_tpd/2205)
+                         NH4OH=1054*35.046/17.031*get_flow_tpd()/2205)
     boiler_chems = Stream('boiler_chems', units='kg/hr', price=price['Boiler chems'])
     baghouse_bag = Stream('baghouse_bag', units='kg/hr', price=price['Baghouse bag'])
     # Supplementary natural gas for CHP if produced steam not enough for regenerating
@@ -810,17 +774,17 @@ def create_facilities(flowsheet, process_groups, chems,
     system_makeup_water = Stream('system_makeup_water', price=price['Makeup water'])
     
     firewater_in = Stream('firewater_in', 
-                          Water=8021*feedstock_tpd/2205, units='kg/hr')
+                          Water=8021*get_flow_tpd()/2205, units='kg/hr')
     
     # Clean-in-place
-    CIP_chems_in = Stream('CIP_chems_in', Water=145*feedstock_tpd/2205, 
+    CIP_chems_in = Stream('CIP_chems_in', Water=145*get_flow_tpd()/2205, 
                           units='kg/hr')
     
     # Air needed for multiple processes (including enzyme production that was not included here),
     # not rigorously modeled, only scaled based on plant size
     plant_air_in = Stream('plant_air_in', phase='g', units='kg/hr',
-                          N2=0.79*1372608*feedstock_tpd/2205,
-                          O2=0.21*1372608*feedstock_tpd/2205)
+                          N2=0.79*1372608*get_flow_tpd()/2205,
+                          O2=0.21*1372608*get_flow_tpd()/2205)
 
 
     ######################## Units ########################
@@ -880,7 +844,7 @@ def create_facilities(flowsheet, process_groups, chems,
                          outs=('process_water', 'discharged_water'))
     
     ADP = facilities.ADP('ADP', ins=plant_air_in, outs='plant_air_out',
-                         ratio=feedstock_tpd/2205)
+                         ratio=get_flow_tpd()/2205)
     CIP = facilities.CIP('CIP', ins=CIP_chems_in, outs='CIP_chems_out')
     
     # Heat exchange network
@@ -888,29 +852,163 @@ def create_facilities(flowsheet, process_groups, chems,
     
     ######################## System ########################
     HXN_group = UnitGroup('HXN_group', units=(HXN,))
-    process_groups.append(HXN_group)
+    groups.append(HXN_group)
     
     CHP_group = UnitGroup('CHP_group', units=(CHP,))
-    process_groups.append(CHP_group)
+    groups.append(CHP_group)
     
     CT_group = UnitGroup('CT_group', units=(CT,))
-    process_groups.append(CT_group)
+    groups.append(CT_group)
     
     facilities_no_hu_group = UnitGroup('facilities_no_hu_group',
                                        units=(T601, T601_P, T602, T602_S,
                                               T603, T603_S, T604,
                                               T605, T606, T606_P, T607,
                                               M601, PWC, ADP, CIP))
-    process_groups.append(facilities_no_hu_group)
+    groups.append(facilities_no_hu_group)
     
-    return flowsheet, process_groups
+    return flowsheet, groups
 
 
+# %%
 
+# =============================================================================
+# Overall system and TEA/LCA functions
+# =============================================================================
 
-
-
-
+def create_lactic_sys(flowsheet, groups, get_flow_tpd):
+    bst.main_flowsheet.set_flowsheet(flowsheet)
+    s = flowsheet.stream
+    u = flowsheet.unit
+    sys = flowsheet.system
+    
+    ################## Overall System ##################
+    lactic_sys = System('lactic_sys',
+                        path=(u.U101, sys.pretreatment_sys, sys.conversion_sys,
+                              sys.separation_sys, sys.wastewater_sys,
+                              u.T601, u.T601_P, u.T602_S, u.T602,
+                              u.T603_S, u.T603, u.T604, u.T605,
+                              u.T606, u.T606_P, u.T607, u.M601),
+                        facilities=(u.HXN, u.CHP, u.CT, u.PWC, u.ADP, u.CIP)
+                        )
+    
+    CHP_sys = System('CHP_sys', path=(u.CHP,))
+    
+    ######################## TEA ########################
+    TEA_feeds = set([i for i in lactic_sys.feeds if i.price]+ \
+        [i for i in CHP_sys.feeds if i.price])
+    teas = {'TEA_feeds': TEA_feeds}
+    
+    TEA_products = set([i for i in lactic_sys.products if i.price]+ \
+        [i for i in CHP_sys.products if i.price]+[s.lactic_acid, s.gypsum])
+    teas['TEA_products'] = TEA_products
+    
+    ISBL_units = set((*sys.pretreatment_sys.units, *sys.conversion_sys.units,
+                      *sys.separation_sys.units))
+    OSBL_units = list(lactic_sys.units.difference(ISBL_units))
+    
+    # CHP is not included in this TEA
+    OSBL_units.remove(u.CHP)
+    # biosteam Splitters and Mixers have no cost
+    for i in OSBL_units:
+        if i.__class__ == bst.units.Mixer or i.__class__ == bst.units.Splitter:
+            OSBL_units.remove(i)
+    
+    lactic_no_CHP_tea = LacticTEA(
+            system=lactic_sys, IRR=0.10, duration=(2016, 2046),
+            depreciation='MACRS7', income_tax=0.21, operating_days=0.9*365,
+            lang_factor=None, construction_schedule=(0.08, 0.60, 0.32),
+            startup_months=3, startup_FOCfrac=1, startup_salesfrac=0.5,
+            startup_VOCfrac=0.75, WC_over_FCI=0.05,
+            finance_interest=0.08, finance_years=10, finance_fraction=0.4,
+            OSBL_units=OSBL_units,
+            warehouse=0.04, site_development=0.09, additional_piping=0.045,
+            proratable_costs=0.10, field_expenses=0.10, construction=0.20,
+            contingency=0.10, other_indirect_costs=0.10, 
+            labor_cost=3212962*get_flow_tpd()/2205,
+            labor_burden=0.90, property_insurance=0.007, maintenance=0.03)
+    
+    # Removes units, feeds, and products of CHP_sys to avoid double-counting
+    lactic_no_CHP_tea.units.remove(u.CHP)
+    teas['lactic_no_CHP_tea'] = lactic_no_CHP_tea
+    
+    for i in CHP_sys.feeds:
+        lactic_sys.feeds.remove(i)
+    for i in CHP_sys.products:
+        lactic_sys.products.remove(i)
+    
+    # Changed to MACRS 20 to be consistent with ref [1]
+    CHP_tea = bst.TEA.like(CHP_sys, lactic_no_CHP_tea)
+    CHP_tea.labor_cost = 0
+    CHP_tea.depreciation = 'MACRS20'
+    CHP_tea.OSBL_units = (u.CHP,)
+    teas['CHP_tea'] = CHP_tea
+    
+    lactic_tea = bst.CombinedTEA([lactic_no_CHP_tea, CHP_tea], IRR=0.10)
+    lactic_sys._TEA = lactic_tea
+    teas['lactic_tea'] = lactic_tea
+    
+    # Simulate system and get results
+    def simulate_get_MPSP():
+        s.lactic_acid.price = 0
+        lactic_sys.simulate()
+        for i in range(3):
+            MPSP = s.lactic_acid.price = lactic_tea.solve_price(s.lactic_acid)
+        return MPSP
+    funcs = {'simulate_get_MPSP': simulate_get_MPSP}
+    
+    ######################## LCA ########################
+    # 100-year global warming potential (GWP) from material flows
+    LCA_streams = TEA_feeds.copy()
+    LCA_stream = Stream('LCA_stream', units='kg/hr')
+        
+    def get_material_GWP():
+        LCA_stream.mass = sum(i.mass for i in LCA_streams)
+        chemical_GWP = LCA_stream.mass*CFs['GWP_CF_stream'].mass
+        # feedstock_GWP = s.feedstock.F_mass*CFs['GWP_CFs']['Corn stover']
+        return chemical_GWP.sum()/s.lactic_acid.F_mass
+    funcs['get_material_GWP'] = get_material_GWP
+    
+    # GWP from onsite emission (e.g., combustion) of non-biogenic carbons
+    get_onsite_GWP = lambda: (s.natural_gas.get_atomic_flow('C')+s.ethanol.get_atomic_flow('C')) \
+        * chems.CO2.MW / s.lactic_acid.F_mass
+    funcs['get_onsite_GWP'] = get_onsite_GWP
+    
+    # GWP from electricity
+    get_electricity_use = lambda: sum(i.power_utility.rate for i in lactic_sys.units)
+    funcs['get_electricity_use'] = get_electricity_use
+    get_electricity_GWP = lambda: get_electricity_use()*CFs['GWP_CFs']['Electricity'] \
+        / s.lactic_acid.F_mass
+    funcs['get_electricity_GWP'] = get_electricity_GWP
+    
+    # CO2 fixed in lactic acid product
+    get_fixed_GWP = lambda: \
+        s.lactic_acid.get_atomic_flow('C')*chems.CO2.MW/s.lactic_acid.F_mass
+    funcs['get_fixed_GWP'] = get_fixed_GWP
+    
+    get_GWP = lambda: get_material_GWP()+get_onsite_GWP()+get_electricity_GWP()
+    funcs['get_GWP'] = get_GWP
+    
+    # Fossil energy consumption (FEC) from materials
+    def get_material_FEC():
+        LCA_stream.mass = sum(i.mass for i in LCA_streams)
+        chemical_FEC = LCA_stream.mass*CFs['FEC_CF_stream'].mass
+        # feedstock_FEC = feedstock.F_mass*CFs['FEC_CFs']['Corn stover']
+        return chemical_FEC.sum()/s.lactic_acid.F_mass
+    funcs['get_material_FEC'] = get_material_FEC
+    
+    # FEC from electricity
+    get_electricity_FEC = lambda: \
+        get_electricity_use()*CFs['FEC_CFs']['Electricity']/s.lactic_acid.F_mass
+    funcs['get_electricity_FEC'] = get_electricity_FEC
+    
+    # Total FEC
+    get_FEC = lambda: get_material_FEC()+get_electricity_FEC()
+    funcs['get_FEC'] = get_FEC
+    
+    return flowsheet, teas, funcs
+   
+    
 
 
 
