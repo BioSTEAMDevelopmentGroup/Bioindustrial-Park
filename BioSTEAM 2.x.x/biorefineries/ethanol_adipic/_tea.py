@@ -14,9 +14,9 @@
 
 from biorefineries.cornstover import CellulosicEthanolTEA
 
-__all__ = ('ethanol_adipic_TEA',)
+__all__ = ('EthanolAdipicTEA',)
 
-class ethanol_adipic_TEA(CellulosicEthanolTEA):
+class EthanolAdipicTEA(CellulosicEthanolTEA):
     
     __slots = (*CellulosicEthanolTEA.__slots__, '_TCI_ratio_cached')
     

@@ -12,8 +12,8 @@
 
 from . import (
     _chemicals,
-    _settings,
     _utils,
+    _settings,
     _units,
     _facilities,
     _tea,
@@ -24,8 +24,8 @@ from . import (
 
 
 from ._chemicals import *
-from ._settings import *
 from ._utils import *
+from ._settings import *
 from ._units import *
 from ._facilities import *
 from ._tea import *

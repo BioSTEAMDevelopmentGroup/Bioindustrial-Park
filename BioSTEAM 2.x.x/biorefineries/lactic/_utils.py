@@ -18,7 +18,14 @@ import pandas as pd
 import thermosteam as tmo
 from biorefineries.lactic._chemicals import chems, chemical_groups
 
-_kg_per_ton = 907.18474
+__all__ = ('auom', 'CEPCI', 'get_feedstock_flow', 'dry_composition', 
+           'baseline_feedflow', 'compute_lactic_titer', 'set_yield',
+           'compute_COD', 'find_split', 'splits_df')
+
+auom = tmo.units_of_measure.AbsoluteUnitsOfMeasure
+
+
+# %%
 
 # Chemical Engineering Plant Cost Index from Chemical Engineering Magzine
 # (https://www.chemengonline.com/the-magazine/)
@@ -37,7 +44,8 @@ CEPCI = {1997: 386.5,
 # %% 
 
 # =============================================================================
-# Function to get feedstock flow by giving dry weight composition and moisture content
+# Function to get feedstock flow by giving dry weight composition and moisture
+# content
 # =============================================================================
 
 def get_feedstock_flow(dry_composition, moisture_content, dry_flow):
@@ -51,6 +59,9 @@ dry_composition = dict(
     Glucan=0.3505, Xylan=0.1953, Lignin=0.1576, Ash=0.0493, Acetate=0.0181,
     Protein=0.0310, Arabinan=0.0238, Galactan=0.0143, Mannan=0.0060, 
     Sucrose=0.0077, Extractives=0.1465, SuccinicAcid=0)
+
+_kg_per_ton = auom('ton').conversion_factor('kg')
+_feedstock_factor = _kg_per_ton / 0.8
 
 moisture_content = 0.2
 dry_feedstock_flow = 2205 * _kg_per_ton / 24     
@@ -135,7 +146,7 @@ def adjust_recycle(feed, recycle, reactants_ID, chemical_ID, ratios):
 def compute_COD(IDs, stream):
     unit_COD = []
     if not iter(IDs):
-        raise TypeError(f'{IDs.__class__} is not iterable')
+        raise TypeError(f'{IDs.__class__} is not iterable.')
     if isinstance(IDs, str):
         IDs = (IDs,)
     for i in IDs:

@@ -42,6 +42,9 @@ References
 import biosteam as bst
 import thermosteam as tmo
 from biorefineries.lactic._chemicals import chems
+from biorefineries.lactic._utils import auom
+
+__all__ = ('price', 'CFs')
 
 
 # %%
@@ -76,7 +79,6 @@ for i in (_lps, _mps, _hps, _cooling):
 # =============================================================================
 
 bst.CE = 541.7 # year 2016
-auom = tmo.units_of_measure.AbsoluteUnitsOfMeasure
 _kg_per_ton = auom('ton').conversion_factor('kg')
 _lb_per_kg = auom('kg').conversion_factor('lb')
 _liter_per_gallon = auom('gal').conversion_factor('L')

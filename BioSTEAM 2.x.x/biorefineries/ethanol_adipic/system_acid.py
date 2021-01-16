@@ -287,14 +287,14 @@ S402_H = bst.units.HXutility('S402_H', ins=S402-1, outs='ethanol_to_storage',
                              V=0, T=350)
 
 
-ethanol_purification_recycle = System('ethanol_purification_recycle',
-                                      path=(M403, D402, D402_P, D402_H, S402, S402_H),
-                                      recycle=S402-0)
+ethanol_recycle = System('ethanol_recycle',
+                         path=(M403, D402, D402_P, D402_H, S402, S402_H),
+                         recycle=S402-0)
 
 ethanol_purification_sys = System('ethanol_purification_sys',
                                   path=(M401, U401, M402, T401, H401,
                                         D401, H401, D401_P, H401, S401,
-                                        ethanol_purification_recycle))
+                                        ethanol_recycle))
 
 
 # %%

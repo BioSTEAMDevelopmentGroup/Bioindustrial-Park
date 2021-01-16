@@ -10,48 +10,6 @@
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
 # for license details.
 
-'''
-References
-----------
-[1] Humbird et al., Process Design and Economics for Biochemical Conversion of 
-    Lignocellulosic Biomass to Ethanol: Dilute-Acid Pretreatment and Enzymatic 
-    Hydrolysis of Corn Stover; Technical Report NREL/TP-5100-47764; 
-    National Renewable Energy Lab (NREL), 2011.
-    https://www.nrel.gov/docs/fy11osti/47764.pdf
-[2] Kuo et al., Production of Optically Pure L-Lactic Acid from Lignocellulosic
-    Hydrolysate by Using a Newly Isolated and d-Lactate Dehydrogenase
-    Gene-Deficient Lactobacillus Paracasei Strain.
-    Bioresource Technology 2015, 198, 651–657.
-    https://doi.org/10.1016/j.biortech.2015.09.071.
-[3] Aden et al., Process Design Report for Stover Feedstock: Lignocellulosic
-    Biomass to Ethanol Process Design and Economics Utilizing Co-Current Dilute
-    Acid Prehydrolysis and Enzymatic Hydrolysis for Corn Stover; NREL/TP-510-32438;
-    National Renewable Energy Lab (NREL), 2002.
-    https://doi.org/10.2172/1218326.
-
-Naming conventions:
-    D = Distillation column
-    E = Evaporator
-    F = Flash tank
-    H = Heat exchange
-    M = Mixer
-    P = Pump (including conveying belt)
-    R = Reactor
-    S = Splitter (including solid/liquid separator)
-    T = Tank or bin for storage
-    U = Other units
-    PS = Process specificiation, not physical units, but for adjusting streams
-
-Processes:
-    100: Feedstock preprocessing
-    200: Pretreatment
-    300: Conversion
-    400: Separation
-    500: Wastewater treatment
-    600: Facilities
-
-'''
-
 
 # %%
 
@@ -60,6 +18,7 @@ from biorefineries.lactic._chemicals import chems
 from biorefineries.lactic._utils import cell_mass_split, gypsum_split
 from biorefineries.lactic._processes import (
     update_settings,
+    create_preprocessing_process,
     create_pretreatment_process,
     create_SSCF_conversion_process,
     create_SHF_conversion_process,
@@ -72,6 +31,14 @@ from biorefineries.lactic._processes import (
 bst.speed_up()
 update_settings(chems)
 
+__all__ = (
+    'create_SSCF_sys', 'create_SHF_sys',
+    'SSCF_flowsheet', 'SSCF_groups', 'SSCF_teas', 'SSCF_funcs',
+    'SHF_flowsheet', 'SHF_groups', 'SHF_teas', 'SHF_funcs',
+    'simulate_and_print', 'simulate_separation_improvement',
+    'simulate_separation_improvement', 'simulate_operating_improvement'
+    )
+
 
 # %%
 
@@ -80,8 +47,11 @@ def create_SSCF_sys():
     s = flowsheet.stream
     u = flowsheet.unit
     
-    flowsheet, groups, get_flow_tpd = \
-        create_pretreatment_process(flowsheet)
+    flowsheet, groups, get_feedstock_dry_mass, get_flow_tpd = \
+        create_preprocessing_process(flowsheet)
+    
+    flowsheet, groups = \
+        create_pretreatment_process(flowsheet, groups, u.U101-0, get_feedstock_dry_mass)
     
     flowsheet, groups = \
         create_SSCF_conversion_process(flowsheet, groups)
@@ -117,8 +87,11 @@ def create_SHF_sys():
     s = flowsheet.stream
     u = flowsheet.unit
     
-    flowsheet, groups, get_flow_tpd = \
-        create_pretreatment_process(flowsheet)
+    flowsheet, groups, get_feedstock_dry_mass, get_flow_tpd = \
+        create_preprocessing_process(flowsheet)
+    
+    flowsheet, groups = \
+        create_pretreatment_process(flowsheet, groups, u.U101-0, get_feedstock_dry_mass)
         
     flowsheet, groups = \
         create_SHF_conversion_process(flowsheet, groups, cell_mass_split)
@@ -162,11 +135,15 @@ SHF_flowsheet, SHF_groups, SHF_teas, SHF_funcs  = create_SHF_sys()
 
 def simulate_and_print(system='SSCF'):
     if 'sscf' in str(system).lower():
+        flowsheet = SSCF_flowsheet
         funcs = SSCF_funcs
     elif 'shf' in str(system).lower():
+        flowsheet = SHF_flowsheet
         funcs = SHF_funcs
     else:
         raise ValueError(f'system can only be "SSCF" or "SHF", not {system}.')
+    bst.main_flowsheet.set_flowsheet(flowsheet)
+    
     print('\n---------- Simulation Results ----------')
     print(f'MPSP is ${funcs["simulate_get_MPSP"]():.3f}/kg')
     print(f'GWP is {funcs["get_GWP"]():.3f} kg CO2-eq/kg lactic acid')
@@ -176,11 +153,15 @@ def simulate_and_print(system='SSCF'):
 
 def simulate_fermentation_improvement(system='SSCF'):
     if 'sscf' in str(system).lower():
-        u = SSCF_flowsheet.unit
+        flowsheet = SSCF_flowsheet
     elif 'shf' in str(system).lower():
-        u = SHF_flowsheet.unit
+        flowsheet = SHF_flowsheet
     else:
         raise ValueError(f'system can only be "SSCF" or "SHF", not {system}.')
+    bst.main_flowsheet.set_flowsheet(flowsheet)
+    u = flowsheet.unit
+    flowsheet.system.lactic_sys.simulate()
+    
     R301_X = u.R301.cofermentation_rxns.X
     R302_X = u.R302.cofermentation_rxns.X
     u.R301.target_yield = 0.95
@@ -191,26 +172,33 @@ def simulate_fermentation_improvement(system='SSCF'):
 
 def simulate_separation_improvement(system='SSCF'):
     if 'sscf' in str(system).lower():
-        u = SSCF_flowsheet.unit
+        flowsheet = SSCF_flowsheet
     elif 'shf' in str(system).lower():
-        u = SHF_flowsheet.unit
+        flowsheet = SHF_flowsheet
     else:
         raise ValueError(f'system can only be "SSCF" or "SHF", not {system}.')
+    bst.main_flowsheet.set_flowsheet(flowsheet)
+    u = SHF_flowsheet.unit
+    flowsheet.system.lactic_sys.simulate()
+    
     u.R402.X_factor = 0.9/u.R402.esterification_rxns.X[0]
     u.R403.hydrolysis_rxns.X[:] = 0.9    
     simulate_and_print(system)
 
 def simulate_operating_improvement(system='SSCF'):
     if 'sscf' in str(system).lower():
-        s = SSCF_flowsheet.stream
-        u = SSCF_flowsheet.unit
+        flowsheet = SSCF_flowsheet
         funcs = SSCF_funcs
     elif 'shf' in str(system).lower():
-        s = SSCF_flowsheet.stream
-        u = SHF_flowsheet.unit
+        flowsheet = SHF_flowsheet
         funcs = SHF_funcs
     else:
         raise ValueError(f'system can only be "SSCF" or "SHF", not {system}.')
+    bst.main_flowsheet.set_flowsheet(flowsheet)
+    s = flowsheet.stream
+    u = flowsheet.unit
+    flowsheet.system.lactic_sys.simulate()
+    
     u.U101.diversion_to_CHP = 0.25
     print('\n---------- Simulation Results ----------')
     print(f'MPSP is ${funcs["simulate_get_MPSP"]():.3f}/kg')
@@ -219,10 +207,6 @@ def simulate_operating_improvement(system='SSCF'):
     print(f'GWP is {funcs["get_GWP"]():.3f} kg CO2-eq/kg lactic acid')
     print(f'FEC is {funcs["get_FEC"]():.2f} MJ/kg lactic acid')
     print('------------------------------------------\n')
-
-
-
-
 
 
 

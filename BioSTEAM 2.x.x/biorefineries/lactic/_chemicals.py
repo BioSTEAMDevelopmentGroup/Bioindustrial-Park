@@ -33,8 +33,8 @@ References
 
 import thermosteam as tmo
 
-__all__ = ('chems', 'chemical_groups', 'soluble_organics', 'combustibles',
-           'get_chemical_properties')
+__all__ = ('chems', 'chemical_groups', 'sugars', 'soluble_organics', 'solubles',
+           'insolubles', 'COD_chemicals', 'combustibles', 'get_chemical_properties')
 
 chems = tmo.Chemicals([])
 

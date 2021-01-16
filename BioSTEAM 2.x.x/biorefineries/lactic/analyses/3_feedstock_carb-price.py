@@ -23,9 +23,8 @@ import biosteam as bst
 from biosteam.utils import TicToc
 from biorefineries.lactic import simulate_and_print, \
     SSCF_flowsheet, SSCF_funcs, SHF_flowsheet, SHF_funcs
+from biorefineries.lactic._utils import _feedstock_factor
 
-_kg_per_ton = 907.18474
-_feedstock_factor = _kg_per_ton / 0.8
 bst.speed_up()
 
 

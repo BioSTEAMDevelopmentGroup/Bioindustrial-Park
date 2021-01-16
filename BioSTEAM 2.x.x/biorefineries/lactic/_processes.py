@@ -28,6 +28,10 @@ References
     Acid Prehydrolysis and Enzymatic Hydrolysis for Corn Stover; NREL/TP-510-32438;
     National Renewable Energy Lab (NREL), 2002.
     https://doi.org/10.2172/1218326.
+[4] Davis et al., Process Design and Economics for the Conversion of Lignocellulosic 
+    Biomass to Hydrocarbon Fuels and Coproducts: 2018 Biochemical Design Case Update; 
+    NREL/TP-5100-71949; National Renewable Energy Lab (NREL), 2018. 
+    https://doi.org/10.2172/1483234
 
 Naming conventions:
     D = Distillation column
@@ -43,11 +47,11 @@ Naming conventions:
     PS = Process specificiation, not physical units, but for adjusting streams
 
 Processes:
-    100: Feedstock preprocessing
+    100: Preprocessing
     200: Pretreatment
     300: Conversion
     400: Separation
-    500: Wastewater treatment
+    500: Wastewater
     600: Facilities
 
 '''
@@ -64,12 +68,13 @@ from biorefineries.lactic import _facilities as facilities
 from biorefineries.lactic._settings import price, CFs
 from biorefineries.lactic._utils import baseline_feedflow, set_yield, AD_split, MB_split
 from biorefineries.lactic._chemicals import chems, sugars, soluble_organics, \
-    insolubles, combustibles
+    solubles, insolubles, COD_chemicals, combustibles
 from biorefineries.lactic._tea import LacticTEA
 from biorefineries import BST222
 
 __all__ = (
     'update_settings',
+    'create_preprocessing_process',
     'create_pretreatment_process',
     'create_SSCF_conversion_process',
     'create_SHF_conversion_process',
@@ -83,7 +88,7 @@ __all__ = (
 # %%
 
 # =============================================================================
-# Used in all processes
+# Biorefinery settings
 # =============================================================================
 
 def update_settings(chems, CE=541.7):
@@ -104,17 +109,45 @@ def update_settings(chems, CE=541.7):
 
 # %%
 
-# =============================================================================
-# Acid pretreatment
-# =============================================================================
-
-def create_pretreatment_process(flowsheet):
+def create_preprocessing_process(flowsheet):
     bst.main_flowsheet.set_flowsheet(flowsheet)
     
     ######################## Streams ########################
     feedstock = Stream('feedstock', baseline_feedflow.copy(),
                         units='kg/hr', price=price['Feedstock'])
+    
+    ######################## Units ########################
+    U101 = units.FeedstockPreprocessing('U101', ins=feedstock,
+                                        outs=('processed', 'diverted_to_CHP'),
+                                        diversion_to_CHP=0)
+    
+    # Total processed feedstock
+    get_feedstock_dry_mass = lambda: \
+        (feedstock.F_mass-feedstock.imass['H2O'])*(1-U101.diversion_to_CHP)
+    
+    # Feedstock flow rate in dry U.S. ton per day
+    get_flow_tpd = lambda: \
+    (feedstock.F_mass-feedstock.imass['H2O'])*24/907.185*(1-U101.diversion_to_CHP)
 
+    preprocessing_sys = System('preprocessing_sys',
+                               path=(U101,))
+    preprocessing_group = UnitGroup('preprocessing_group',
+                                    units=preprocessing_sys.units)
+    groups = [preprocessing_group]
+
+    return flowsheet, groups, get_feedstock_dry_mass, get_flow_tpd
+
+
+# %%
+
+# =============================================================================
+# Acid pretreatment
+# =============================================================================
+
+def create_pretreatment_process(flowsheet, groups, feed_in, get_feedstock_dry_mass):
+    bst.main_flowsheet.set_flowsheet(flowsheet)
+    
+    ######################## Streams ########################
     # For pretreatment, 93% purity
     sulfuric_acid_T201 = Stream('sulfuric_acid_T201', units='kg/hr')
     # To be mixed with sulfuric acid, flow updated in SulfuricAcidMixer
@@ -124,7 +157,7 @@ def create_pretreatment_process(flowsheet):
     water_M202 = Stream('water_M202', T=95+273.15, units='kg/hr')
     
     # To be added to the feedstock/sulfuric acid mixture, flow updated by the SteamMixer
-    steam_M203 = Stream('steam_M203', phase='g',T=268+273.15, P=13*101325, units='kg/hr')
+    steam_M203 = Stream('steam_M203', phase='g', T=268+273.15, P=13*101325, units='kg/hr')
     
     # For neutralization of pretreatment hydrolysate
     ammonia_M205 = Stream('ammonia_M205', phase='l', units='kg/hr')
@@ -132,23 +165,14 @@ def create_pretreatment_process(flowsheet):
     water_M205 = Stream('water_M205', units='kg/hr')
     
     ######################## Units ########################
-    U101 = units.FeedstockPreprocessing('U101', ins=feedstock,
-                                        outs=('processed', 'diverted_to_CHP'),
-                                        diversion_to_CHP=0)
-    # Feedstock flow rate in dry U.S. ton per day
-    get_flow_tpd = lambda: \
-    (feedstock.F_mass-feedstock.imass['H2O'])*24/907.185*(1-U101.diversion_to_CHP)
-
     # Prepare sulfuric acid
-    get_feedstock_dry_mass = lambda: \
-        (feedstock.F_mass-feedstock.imass['H2O'])*(1-U101.diversion_to_CHP)
     T201 = units.SulfuricAcidAdditionTank('T201', ins=sulfuric_acid_T201,
                                           feedstock_dry_mass=get_feedstock_dry_mass())
     
     M201 = units.SulfuricAcidMixer('M201', ins=(T201-0, water_M201))
     
     # Mix sulfuric acid and feedstock, adjust water loading for pretreatment
-    M202 = units.PretreatmentMixer('M202', ins=(U101-0, M201-0, water_M202))
+    M202 = units.PretreatmentMixer('M202', ins=(feed_in, M201-0, water_M202))
     
     # Mix feedstock/sulfuric acid mixture and steam
     M203 = units.SteamMixer('M203', ins=(M202-0, steam_M203), P=5.5*101325)
@@ -178,17 +202,15 @@ def create_pretreatment_process(flowsheet):
     T204 = units.AmmoniaAdditionTank('T204', ins=(F201-1, M205-0))
     P201 = units.HydrolysatePump('P201', ins=T204-0)
     
-    ######################## System ########################
+    ######################## Systems ########################
     pretreatment_sys = System('pretreatment_sys',
                               path=(T201, M201, M202, M203, R201,
                                     T202, T203, F201, M204, H201, M205, T204, P201))
-    
-    feedstock_group = UnitGroup('feedstock_group', units=(U101,))
+
     pretreatment_group = UnitGroup('pretreatment_group', units=pretreatment_sys.units)
+    groups.append(pretreatment_group)
     
-    groups = [feedstock_group, pretreatment_group]
-    
-    return flowsheet, groups, get_flow_tpd
+    return flowsheet, groups
 
 
 # %%
@@ -211,7 +233,7 @@ def create_SSCF_conversion_process(flowsheet, groups):
     # Lime for neutralization of produced acid
     lime_R301 = Stream('lime_R301', units='kg/hr')
     # Water used to dilute the saccharified stream to achieve a lower titer target
-    # at a given yield
+    # at a given yield, temperature from stream 516 in ref [1]
     water_R301 = Stream('water_R301', units='kg/hr')
     
     ######################## Units ########################
@@ -265,7 +287,7 @@ def create_SSCF_conversion_process(flowsheet, groups):
     PS301 = bst.units.ProcessSpecification('PS301', ins=R301-0,
                                             specification=adjust_R301_water)
     
-    ######################## System ########################
+    ######################## Systems ########################
     conversion_sys = System('conversion_sys',
                             path=(M301, H301, seed_recycle, PS301))
     
@@ -441,7 +463,7 @@ def create_SHF_conversion_process(flowsheet, groups, cell_mass_split):
     PS301 = bst.units.ProcessSpecification('PS301', ins=R301_P1-0,
                                             specification=adjust_ferm_loop)
     
-    ######################## System ########################
+    ######################## Systems ########################
     conversion_sys = System('conversion_sys',
                             path=(M301, H301, R300, S301, ferm_loop, PS301))
     
@@ -663,7 +685,7 @@ def create_separation_process(flowsheet, groups,
 # %%
 
 # =============================================================================
-# Wastewater treatment
+# Wastewater
 # =============================================================================
 
 def create_wastewater_process(flowsheet, groups,
@@ -686,19 +708,19 @@ def create_wastewater_process(flowsheet, groups,
                                           'anaerobic_sludge'),
                                     reactants=soluble_organics,
                                     split=AD_split,
-                                    T=35+273.15)
+                                    T=35+273.15, COD_chemicals=COD_chemicals)
     
     R502 = units.AerobicDigestion('R502', ins=(R501-1, '', caustic_R502, 'ammonia_R601',
                                                polymer_R502, air_R502),
                                   outs=(vent_R502, 'aerobic_treated_water'),
                                   reactants=soluble_organics,
                                   caustic_mass=2252*get_flow_tpd()/2205,
-                                  need_ammonia=False)
+                                  need_ammonia=False, COD_chemicals=COD_chemicals)
     
     # Membrane bioreactor to split treated wastewater from R502
     S501 = units.MembraneBioreactor('S501', ins=R502-1,
                                     outs=('membrane_treated_water', 'membrane_sludge'),
-                                    split=MB_split)
+                                    split=MB_split, COD_chemicals=COD_chemicals)
     
     # Recycled sludge stream of memberane bioreactor, the majority of it (96%)
     # goes to aerobic digestion
@@ -706,11 +728,17 @@ def create_wastewater_process(flowsheet, groups,
                               split=0.96)
     
     S503 = units.BeltThickener('S503', ins=(R501-2, S502-1),
-                               outs=('S503_centrate', 'S503_solids'))
+                               outs=('S503_centrate', 'S503_solids'),
+                               COD_chemicals=COD_chemicals,
+                               solubles=solubles, insolubles=insolubles)
     
     # Sludge centrifuge to separate water (centrate) from sludge
-    S504 = units.SludgeCentrifuge('S504', ins=S503-1, outs=('S504_centrate',
-                                                            'S504_CHP'))
+    # Ref [1] included polymer addition in process flow diagram, but did not include
+    # in the variable operating cost, thus followed ref [4] to add polymer in AerobicDigestion
+    S504 = units.SludgeCentrifuge('S504', ins=S503-1, 
+                                  outs=('S504_centrate', 'S504_CHP'),
+                                  COD_chemicals=COD_chemicals,
+                                  solubles=solubles, insolubles=insolubles)
     
     # Mix recycles to aerobic digestion
     M502 = bst.units.Mixer('M502', ins=(S502-0, S503-0, S504-0), outs=1-R502)
@@ -850,7 +878,7 @@ def create_facilities(flowsheet, groups,
     # Heat exchange network
     HXN = bst.units.HeatExchangerNetwork('HXN')
     
-    ######################## System ########################
+    ######################## Systems ########################
     HXN_group = UnitGroup('HXN_group', units=(HXN,))
     groups.append(HXN_group)
     

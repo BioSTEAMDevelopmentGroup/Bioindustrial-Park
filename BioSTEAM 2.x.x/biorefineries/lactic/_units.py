@@ -50,14 +50,14 @@ from biosteam.units.design_tools import PressureVessel
 from biosteam.units.design_tools import pressure_vessel_material_factors as factors
 from biosteam.units.decorators import cost
 from thermosteam import separations
-from biorefineries.lactic._settings import price
+from biorefineries.lactic._settings import price, auom
 from biorefineries.lactic._chemicals import sugars, COD_chemicals, solubles, insolubles
 from biorefineries.lactic._utils import CEPCI, baseline_feedflow, compute_lactic_titer, \
     compute_extra_chemical, adjust_recycle, compute_COD
 
-_MGD_2_m3hr = (3.78541*1e6/24) / 1e3
-_GPM_2_m3hr = (3.78541*60) / 1e3
-_Gcal_2_kJ = 4.184 * 1e6 # (also MMkcal/hr)
+_MGD_2_m3hr = auom('gallon').conversion_factor('m3')*1e6/24
+_GPM_2_m3hr = auom('gallon').conversion_factor('m3')*60
+_Gcal_2_kJ = auom('kcal').conversion_factor('kJ')*1e6 # (also MMkcal/hr)
 _316_over_304 = factors['Stainless steel 316'] / factors['Stainless steel 304']
 Rxn = tmo.reaction.Reaction
 ParallelRxn = tmo.reaction.ParallelReaction

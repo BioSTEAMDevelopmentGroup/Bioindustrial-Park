@@ -63,7 +63,7 @@ Naming conventions:
     PS = Process specificiation, not physical units, but for adjusting streams
 
 Processes:
-    100: Feedstock preprocessing
+    100: Preprocessing
 
     200: Pretreatment
 
@@ -71,7 +71,7 @@ Processes:
 
     400: Separation
 
-    500: Wastewater treatment
+    500: Wastewater
 
     600: Facilities
 

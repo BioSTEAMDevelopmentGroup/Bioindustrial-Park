@@ -36,13 +36,29 @@ References
 
 import numpy as np
 import thermosteam as tmo
-from biorefineries.ethanol_adipic._chemicals import chems
+from biorefineries.ethanol_adipic._chemicals import chems, chemical_groups
 from biorefineries.lactic import (
-    CEPCI, # Chemical Engineering Plant Cost Index from Chemical Engineering Magzine
-    get_feedstock_flow, dry_composition, baseline_feedflow,
-    compute_COD,
-    splits_df
+    auom, CEPCI, get_feedstock_flow, dry_composition, baseline_feedflow,
+    compute_COD, splits_df
     )
+
+__all__ = ('auom', 'CEPCI', 'get_feedstock_flow', 'dry_composition', 
+           'baseline_feedflow', 'compute_muconic_titer',
+           #'set_yield',
+           'compute_COD')
+
+
+# %%
+
+# =============================================================================
+# Function to convert ethanol fraction from weight basis to mol basis in an
+# ethanol-water mixture
+# =============================================================================
+
+def convert_ethanol_wt_2_mol(wt):
+    Ethanol_MW = chems.Ethanol.MW
+    Water_MW = chems.Water.MW
+    return (wt/Ethanol_MW) / (wt/Ethanol_MW + (1-wt)/Water_MW)
 
 
 # %%
@@ -61,18 +77,7 @@ def compute_muconic_titer(stream, V=None):
     else: titer = 0
     return titer
 
-
-# %%
-
-# =============================================================================
-# Function to convert ethanol fraction from weight basis to mol basis in an
-# ethanol-water mixture
-# =============================================================================
-
-def convert_ethanol_wt_2_mol(wt):
-    Ethanol_MW = chems.Ethanol.MW
-    Water_MW = chems.Water.MW
-    return (wt/Ethanol_MW) / (wt/Ethanol_MW + (1-wt)/Water_MW)
+#!!! Maybe need a function to set yield for muconic acid?
 
 
 # %% 
@@ -98,5 +103,25 @@ def find_split(IDs, flow0, flow1, chemical_groups):
     # WWTsludge is removed from the cell mass group 
     array[chemicals.index('WWTsludge')] = array[chemicals.index('Z_mobilis')]
     return array
+
+# 1 is water, changed by moisture content rather than using data from ref [1]
+cell_mass_index = [splits_df.index[0]] + splits_df.index[2:].to_list()
+cell_mass_solid = [splits_df['stream_571'][0]] + splits_df['stream_571'][2:].to_list()
+cell_mass_filtrate = [splits_df['stream_535'][0]] + splits_df['stream_535'][2:].to_list()
+cell_mass_split = find_split(cell_mass_index, cell_mass_solid, cell_mass_filtrate,
+                             chemical_groups)
+
+# Anaerobic digestion
+AD_split = find_split(splits_df.index,
+                      splits_df['stream_611'],
+                      splits_df['stream_612'],
+                      chemical_groups)
+
+# Membrane bioreactor
+MB_split = find_split(splits_df.index,
+                      splits_df['stream_624'],
+                      splits_df['stream_625'],
+                      chemical_groups)
+
 
 

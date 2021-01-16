@@ -22,13 +22,10 @@ import biosteam as bst
 from biosteam.evaluation import Model, Metric
 from chaospy import distributions as shape
 from biorefineries.lactic._settings import CFs
-from biorefineries.lactic._utils import set_yield
+from biorefineries.lactic._utils import set_yield, _feedstock_factor
 from biorefineries.lactic import simulate_and_print, \
     SSCF_flowsheet, SSCF_groups, SSCF_teas, SSCF_funcs, \
     SHF_flowsheet, SHF_groups, SHF_teas, SHF_funcs
-
-_kg_per_ton = 907.18474
-_feedstock_factor = _kg_per_ton / 0.8
 
 
 # %% 
@@ -118,7 +115,7 @@ def create_model(system='SSCF'):
     def get_installed_cost(group):
         return lambda: group.get_installed_cost()
     for group in groups:
-        if group.name == 'feedstock_group': continue
+        if group.name == 'preprocessing_group': continue
         metrics.append(
             Metric(group.name, get_installed_cost(group), '10^6 $', 'Installed cost'))
     
@@ -179,7 +176,7 @@ def create_model(system='SSCF'):
         return lambda: group.get_heating_duty()
     
     for group in groups:
-        if group.name in ('feedstock_group', 'HXN_group', 'CHP_group'): continue
+        if group.name in ('preprocessing_group', 'HXN_group', 'CHP_group'): continue
         # The only heating demand for the pretreatment system is the heat needed to
         # generate the side steam
         if group.name == 'pretreatment_group':
@@ -212,7 +209,7 @@ def create_model(system='SSCF'):
         return lambda: -group.get_cooling_duty()
     
     for group in groups:
-        if group.name in ('feedstock_group', 'HXN_group', 'CT_group'): continue
+        if group.name in ('preprocessing_group', 'HXN_group', 'CT_group'): continue
         else: metrics.append(Metric(group.name, get_cooling_demand(group),
                                       '10^9 kJ/yr', 'Cooling demand'))
     
@@ -236,7 +233,7 @@ def create_model(system='SSCF'):
         return lambda: sum(i.rate for i in group.power_utilities)
     
     for group in groups:
-        if group.name == 'feedstock_group': continue
+        if group.name == 'preprocessing_group': continue
         metrics.append(Metric(group.name, get_power_demand(group), 'kW', 'Power demand'))
     
     check_power_demand = lambda: sum(get_power_demand(group)()
@@ -253,7 +250,7 @@ def create_model(system='SSCF'):
         return lambda: sum(i.utility_cost for i in group.units)*get_annual_factor()/1e6
     
     for group in groups:
-        if group.name == 'feedstock_group': continue
+        if group.name == 'preprocessing_group': continue
         metrics.append(Metric(group.name, get_utility_cost(group), '10^6 $/yr', 'Utility cost'))
     
     check_utility_cost = \
@@ -268,7 +265,6 @@ def create_model(system='SSCF'):
     # To see if TEA converges well for each simulation
     get_NPV = lambda: lactic_tea.NPV
     metrics.append(Metric('NPV', get_NPV, '$', 'TEA'))
-    metrics_no_IRRs = metrics.copy()
     
     model_dct = {'index_TEA': len(metrics)}
 
