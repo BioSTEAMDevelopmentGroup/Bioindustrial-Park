@@ -403,45 +403,56 @@ tolerable_loss_fraction = 0.001
 def adjust_S404_Ks_streams():
     feed_octanol, solvent_recycle = M401.ins
     process_stream = S404.ins[0]
+    process_stream_F_mol = process_stream.F_mol
     existing_octanol = solvent_recycle.imol['Octanol'] + process_stream.imol['Octanol']
-    
+    N_stages = S404.N_stages
     K_raffinate = S404.partition_data['K'][0]
+    # K_extract = 1./S404.partition_data['K'][0]
     HP_recovery = 1-tolerable_loss_fraction
-    reqd_octanol = HP_recovery * K_raffinate * process_stream.F_mol
+    reqd_octanol = HP_recovery * K_raffinate * process_stream_F_mol
+    # reqd_octanol = HP_recovery * 0.5 * process_stream.F_mol * ((1.+K_extract)/K_extract) \
+    #         / (1. + (1. - K_extract**-S404.N_stages)/(K_extract-1.))
     prev_reqd_octanol = 0.
-    # count = 0
-    while  abs(prev_reqd_octanol/reqd_octanol - 1) > 1e-3: # !!! TODO: change to check for convergence of reqd_octanol instead
+    count = 0
+    while abs(prev_reqd_octanol/reqd_octanol - 1) > 1e-3: 
         feed_octanol.imol['Octanol'] = max(0, reqd_octanol - existing_octanol)
         M401._run()
-        Ks_new, test_stream = update_Ks(S404)
+        Ks_new = update_Ks(S404)
+        print(Ks_new)
         S404.partition_data['K'] = Ks_new
         K_raffinate = S404.partition_data['K'][0]
-        HP_recovery = 1-tolerable_loss_fraction
+        # K_extract = 1./S404.partition_data['K'][0]
+        HP_recovery = 1.-tolerable_loss_fraction
         prev_reqd_octanol = reqd_octanol
-        reqd_octanol = HP_recovery * K_raffinate * process_stream.F_mol
-        # count += 1
-    # print(count)
+        reqd_octanol = HP_recovery * K_raffinate * process_stream_F_mol
+        # reqd_octanol = HP_recovery * 0.5 * process_stream.F_mol * ((1.+K_extract)/K_extract) \
+        #     / (1. + (1. - K_extract**-N_stages)/(K_extract-1.))
+        
+        print(reqd_octanol)
+        count += 1
+    print(count)
     M401._run()
     S404._run()
 
 def update_Ks(lle_unit, solute_indices = (0,), carrier_indices = (1,), solvent_indices = (2,)):
     IDs = lle_unit.partition_data['IDs']
     Ks = lle_unit.partition_data['K']
+    solute_chemicals = tuple([IDs[index] for index in solute_indices])
     carrier_chemicals = tuple([IDs[index] for index in carrier_indices])
     solvent_chemicals = tuple([IDs[index] for index in solvent_indices])
     process_stream = lle_unit.ins[0]
     solvent_stream = lle_unit.ins[1]
     
     test_stream = bst.Stream('test_stream')
-    test_stream.imol[IDs] = process_stream.imol[IDs]
+    test_stream.imol[solute_chemicals] = process_stream.imol[solute_chemicals]
     test_stream.imol[carrier_chemicals] = process_stream.imol[carrier_chemicals]
     test_stream.imol[solvent_chemicals] = solvent_stream.imol[solvent_chemicals]
     
     test_stream.lle(P=process_stream.P, T=process_stream.T)
-    # test_stream.show()
+    test_stream.show()
     Ks_new = (test_stream['L'].imol[IDs]/test_stream['L'].F_mol)/(test_stream['l'].imol[IDs]/test_stream['l'].F_mol)
     
-    return Ks_new, test_stream
+    return Ks_new
 
 
 S404.specification = adjust_S404_Ks_streams
