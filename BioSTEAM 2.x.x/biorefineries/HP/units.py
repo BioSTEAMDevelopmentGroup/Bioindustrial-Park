@@ -855,9 +855,9 @@ class AcidulationReactor(Reactor):
     
     acidulation_rxns = ParallelRxn([
         #   Reaction definition                                        Reactant        Conversion
-        Rxn('CalciumLactate + H2SO4 -> 2 HP + CaSO4',                 'CalciumLactate',       1),
-        Rxn('CalciumAcetate + H2SO4 -> 2 AceticAcid + CaSO4',         'CalciumAcetate',       1),
-        Rxn('CalciumDihydroxide + H2SO4 -> CaSO4 + 2 H2O',            'CalciumDihydroxide',   1)
+        Rxn('CalciumLactate + H2SO4 -> 2 HP + CaSO4',                 'CalciumLactate',       1.),
+        Rxn('CalciumAcetate + H2SO4 -> 2 AceticAcid + CaSO4',         'CalciumAcetate',       1.),
+        Rxn('CalciumDihydroxide + H2SO4 -> CaSO4 + 2 H2O',            'CalciumDihydroxide',   1.)
     ])
             
     def _run(self):
@@ -877,7 +877,8 @@ class AcidulationReactor(Reactor):
         acid.imol['H2SO4'] = needed_acid * 1.05
         acid.imass['H2O'] = acid.imass['H2SO4'] / 0.93 * 0.07 # 93% purity
         effluent.mix_from([feed, acid])
-        rxns.adiabatic_reaction(effluent)
+        # rxns.adiabatic_reaction(effluent)
+        rxns(effluent)
         
 # Filter to separate gypsum from the acidified fermentation broth
 @cost(basis='Feed flow rate', ID='Hydroclone & rotary drum filter', units='kg/hr',

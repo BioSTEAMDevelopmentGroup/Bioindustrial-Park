@@ -81,6 +81,7 @@ tmo.settings.set_thermo(HP_chemicals)
 System.default_maxiter = 500
 System.default_converge_method = 'fixed-point'
 # System.default_converge_method = 'aitken'
+# System.default_converge_method = 'wegstein'
 System.default_molar_tolerance = 0.5
 
 # %% 
@@ -331,7 +332,9 @@ S401 = bst.units.SolidsCentrifuge('S401', ins=R302-0, outs=('cell_mass', ''),
 R401 = units.AcidulationReactor('R401', ins = (S401-1, separation_sulfuric_acid),
                                 outs = ('acidulated_broth'),
                                 vessel_material='Stainless steel 316')
-R401_P = bst.units.Pump('R401_P', ins=R401-0)
+
+R401_H = bst.units.HXutility('R401_H', ins = R401-0, T = 370, rigorous = False)
+R401_P = bst.units.Pump('R401_P', ins=R401_H-0)
 
 S402_index = S401_index + ['Gypsum']
 S402_gypsum_split = S401_cell_mass_split + [0.995]
@@ -376,7 +379,7 @@ Kds = dict(IDs=('HP', 'Water', 'Octanol'),
            phi = 0.5)
 S404 = bst.units.MultiStageMixerSettlers('S404', ins = (S402-1, M401-0),
                                      outs = ('raffinate', 'extract'),
-                                     N_stages = 40, partition_data = Kds) 
+                                     N_stages = 20, partition_data = Kds,) 
                           
                           
 S404.vol_frac = 0.05
@@ -406,6 +409,7 @@ def adjust_S404_Ks_streams():
     process_stream_F_mol = process_stream.F_mol
     existing_octanol = solvent_recycle.imol['Octanol'] + process_stream.imol['Octanol']
     N_stages = S404.N_stages
+    # S404.T = 340
     K_raffinate = S404.partition_data['K'][0]
     # K_extract = 1./S404.partition_data['K'][0]
     HP_recovery = 1-tolerable_loss_fraction
@@ -425,7 +429,7 @@ def adjust_S404_Ks_streams():
         HP_recovery = 1.-tolerable_loss_fraction
         prev_reqd_octanol = reqd_octanol
         reqd_octanol = HP_recovery * K_raffinate * process_stream_F_mol
-        # reqd_octanol = HP_recovery * 0.5 * process_stream.F_mol * ((1.+K_extract)/K_extract) \
+        # reqd_octanol = HP_recovery * 0.5 *  process_stream.F_mol * ((1.+K_extract)/K_extract) \
         #     / (1. + (1. - K_extract**-N_stages)/(K_extract-1.))
         
         print(reqd_octanol)
@@ -433,7 +437,8 @@ def adjust_S404_Ks_streams():
     print(count)
     M401._run()
     S404._run()
-
+    print('HP loss = %s' %(S404.outs[1].imol['HP']/S404.ins[0].imol['HP'] - 1. + tolerable_loss_fraction))
+    
 def update_Ks(lle_unit, solute_indices = (0,), carrier_indices = (1,), solvent_indices = (2,)):
     IDs = lle_unit.partition_data['IDs']
     Ks = lle_unit.partition_data['K']
@@ -444,11 +449,13 @@ def update_Ks(lle_unit, solute_indices = (0,), carrier_indices = (1,), solvent_i
     solvent_stream = lle_unit.ins[1]
     
     test_stream = bst.Stream('test_stream')
+    test_stream_2 = bst.Stream('test_stream_2')
+    test_stream_2.mix_from([process_stream, solvent_stream])
     test_stream.imol[solute_chemicals] = process_stream.imol[solute_chemicals]
     test_stream.imol[carrier_chemicals] = process_stream.imol[carrier_chemicals]
     test_stream.imol[solvent_chemicals] = solvent_stream.imol[solvent_chemicals]
     
-    test_stream.lle(P=process_stream.P, T=process_stream.T)
+    test_stream.lle(T=process_stream.T)
     test_stream.show()
     Ks_new = (test_stream['L'].imol[IDs]/test_stream['L'].F_mol)/(test_stream['l'].imol[IDs]/test_stream['l'].F_mol)
     
