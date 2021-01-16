@@ -356,20 +356,29 @@ def S402_spec():
 S402.specification = S402_spec
 
 
-M401 = bst.units.Mixer('M401', ins=(separation_octanol, separation_TOA, separation_AQ336,
+M401 = bst.units.Mixer('M401', ins=(separation_octanol,
                                     ''))
 
 
 
 
-Kds = dict(IDs=('HP',),
-           K=np.array([1./8.411]), 
-           raffinate_chemicals = ('Water',),
-           extract_chemicals = ('Octanol'))
+# Kds = dict(IDs=('HP',),
+#            K=np.array([1./8.411, ]), 
+#            raffinate_chemicals = ('Water',),
+#            extract_chemicals = ('Octanol'))
+# S404 = bst.units.MultiStageMixerSettlers('S404', ins = (S402-1, M401-0),
+#                                      outs = ('raffinate', 'extract'),
+#                                      N_stages = 40, partition_data = Kds)      
+
+
+Kds = dict(IDs=('HP', 'Water', 'Octanol'),
+           K=np.array([1./8.411, 3.143, 0.0018]),
+           phi = 0.5)
 S404 = bst.units.MultiStageMixerSettlers('S404', ins = (S402-1, M401-0),
                                      outs = ('raffinate', 'extract'),
-                                     N_stages = 40, partition_data = Kds)
-                                     
+                                     N_stages = 40, partition_data = Kds) 
+                          
+                          
 S404.vol_frac = 0.05
 
 
@@ -391,23 +400,51 @@ tolerable_loss_fraction = 0.001
 #     M401._run()
 #     S404._run()
 
-def adjust_S404_streams_2():
-    feed_octanol, feed_TOA, feed_AQ336, solvent_recycle = M401.ins
+def adjust_S404_Ks_streams():
+    feed_octanol, solvent_recycle = M401.ins
     process_stream = S404.ins[0]
     existing_octanol = solvent_recycle.imol['Octanol'] + process_stream.imol['Octanol']
-    # existing_TOA = solvent_recycle.imol['TOA'] + process_stream.imol['TOA']
-    # existing_AQ336 = solvent_recycle.imol['AQ336'] + process_stream.imol['AQ336']
-    K_raffinate = S404.partition_data['K'][0]
     
+    K_raffinate = S404.partition_data['K'][0]
     HP_recovery = 1-tolerable_loss_fraction
     reqd_octanol = HP_recovery * K_raffinate * process_stream.F_mol
-    # reqd_TOA = reqd_AQ336 = reqd_octanol/8. # decanol:TOA:AQ336 = 0.8:0.1:0.1
-
-    feed_octanol.imol['Octanol'] = max(0, reqd_octanol - existing_octanol)
+    prev_reqd_octanol = 0.
+    # count = 0
+    while  abs(prev_reqd_octanol/reqd_octanol - 1) > 1e-3: # !!! TODO: change to check for convergence of reqd_octanol instead
+        feed_octanol.imol['Octanol'] = max(0, reqd_octanol - existing_octanol)
+        M401._run()
+        Ks_new, test_stream = update_Ks(S404)
+        S404.partition_data['K'] = Ks_new
+        K_raffinate = S404.partition_data['K'][0]
+        HP_recovery = 1-tolerable_loss_fraction
+        prev_reqd_octanol = reqd_octanol
+        reqd_octanol = HP_recovery * K_raffinate * process_stream.F_mol
+        # count += 1
+    # print(count)
     M401._run()
     S404._run()
 
-S404.specification = adjust_S404_streams_2
+def update_Ks(lle_unit, solute_indices = (0,), carrier_indices = (1,), solvent_indices = (2,)):
+    IDs = lle_unit.partition_data['IDs']
+    Ks = lle_unit.partition_data['K']
+    carrier_chemicals = tuple([IDs[index] for index in carrier_indices])
+    solvent_chemicals = tuple([IDs[index] for index in solvent_indices])
+    process_stream = lle_unit.ins[0]
+    solvent_stream = lle_unit.ins[1]
+    
+    test_stream = bst.Stream('test_stream')
+    test_stream.imol[IDs] = process_stream.imol[IDs]
+    test_stream.imol[carrier_chemicals] = process_stream.imol[carrier_chemicals]
+    test_stream.imol[solvent_chemicals] = solvent_stream.imol[solvent_chemicals]
+    
+    test_stream.lle(P=process_stream.P, T=process_stream.T)
+    # test_stream.show()
+    Ks_new = (test_stream['L'].imol[IDs]/test_stream['L'].F_mol)/(test_stream['l'].imol[IDs]/test_stream['l'].F_mol)
+    
+    return Ks_new, test_stream
+
+
+S404.specification = adjust_S404_Ks_streams
 
 
 # S404-0-1-R302 # with sugars recycle
@@ -428,7 +465,7 @@ D401_P = units.HPPump('D401_P', ins=D401-1)
 
 #!!! TODO: Make rigorous=True after implementing Esterification and Hydrolysis
 D401_H = bst.units.HXutility('D401_H', ins=D401-0, V=0., rigorous=False)
-D401_H-0-3-M401
+D401_H-0-1-M401
 # def D401_H_spec():
 #     D401_H._run()
 #     outstream = D401_H.outs[0]
