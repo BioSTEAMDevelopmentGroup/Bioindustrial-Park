@@ -236,7 +236,7 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
             reactor.glucose_to_acetic_acid_rxn.X> 0.999:
             
             remainder = 0.999 - reactor.glucose_to_HP_rxn.X
-            reactor.glucose_to_microbe_rxn.X = .3 * remainder
+            # reactor.glucose_to_microbe_rxn.X = .3 * remainder
             reactor.glucose_to_acetic_acid_rxn.X = .7*remainder
             # print(reactor.glucose_to_VitaminA_rxn.X)
             # print(reactor.glucose_to_microbe_rxn.X)
@@ -245,7 +245,7 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
             reactor.xylose_to_acetic_acid_rxn.X> 0.999:
             
             remainder = 0.999 - reactor.xylose_to_HP_rxn.X
-            reactor.xylose_to_microbe_rxn.X = .3 * remainder
+            # reactor.xylose_to_microbe_rxn.X = .3 * remainder
             reactor.xylose_to_acetic_acid_rxn.X = .7*remainder
             
         

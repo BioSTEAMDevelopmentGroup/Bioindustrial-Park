@@ -140,6 +140,11 @@ AQ336_price = 1.115
 # https://www.alibaba.com/product-detail/Factory-Supply-High-Purity-Industrial-Grade_1600155716170.html?spm=a2700.galleryofferlist.normal_offer.d_title.68217a2fOdbzfi
 Octanol_price = 1.05
 
+# https://www.alibaba.com/product-detail/Best-price-high-quality-Butyl-Acetate_60659284944.html?spm=a2700.galleryofferlist.normal_offer.d_title.8a6f2e61vk4mhP
+Butyl_acetate_price = 0.75
+
+# https://www.alibaba.com/product-detail/1-hexanol-cas-111-27-3_1600063760860.html?spm=a2700.galleryofferlist.normal_offer.d_title.16b44add1yPF8c
+Hexanol_price = 500 /_kg_per_ton
 
 # All in 2016$/kg
 price = {'AA': AA_price,
@@ -174,7 +179,9 @@ price = {'AA': AA_price,
          'Decanol': Decanol_price,
          'TOA': TOA_price,
          'AQ336': AQ336_price,
-         'Octanol': Octanol_price}
+         'Octanol': Octanol_price,
+         'Butyl acetate': Butyl_acetate_price,
+         'Hexanol': Hexanol_price}
     
 
 def load_process_settings():

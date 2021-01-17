@@ -290,7 +290,7 @@ separation_sulfuric_acid = Stream('separation_sulfuric_acid', units='kg/hr')
 
 gypsum = Stream('gypsum', units='kg/hr', price=price['Gypsum'])
 
-separation_octanol = Stream('separation_octanol', units='kg/hr')
+separation_decanol = Stream('separation_decanol', units='kg/hr')
 separation_TOA = Stream('separation_sulfuric_acid', units='kg/hr')
 separation_AQ336 = Stream('separation_sulfuric_acid', units='kg/hr')
 
@@ -333,7 +333,7 @@ R401 = units.AcidulationReactor('R401', ins = (S401-1, separation_sulfuric_acid)
                                 outs = ('acidulated_broth'),
                                 vessel_material='Stainless steel 316')
 
-R401_H = bst.units.HXutility('R401_H', ins = R401-0, T = 370, rigorous = False)
+R401_H = bst.units.HXutility('R401_H', ins = R401-0, T = 320, rigorous = False)
 R401_P = bst.units.Pump('R401_P', ins=R401_H-0)
 
 S402_index = S401_index + ['Gypsum']
@@ -359,7 +359,7 @@ def S402_spec():
 S402.specification = S402_spec
 
 
-M401 = bst.units.Mixer('M401', ins=(separation_octanol,
+M401 = bst.units.Mixer('M401', ins=(separation_decanol, separation_TOA, separation_AQ336,
                                     ''))
 
 
@@ -368,15 +368,16 @@ M401 = bst.units.Mixer('M401', ins=(separation_octanol,
 # Kds = dict(IDs=('HP',),
 #            K=np.array([1./8.411, ]), 
 #            raffinate_chemicals = ('Water',),
-#            extract_chemicals = ('Octanol'))
+#            extract_chemicals = ('Decanol'))
 # S404 = bst.units.MultiStageMixerSettlers('S404', ins = (S402-1, M401-0),
 #                                      outs = ('raffinate', 'extract'),
 #                                      N_stages = 40, partition_data = Kds)      
 
 
-Kds = dict(IDs=('HP', 'Water', 'Octanol'),
-           K=np.array([1./8.411, 3.143, 0.0018]),
+Kds = dict(IDs=('HP', 'Water', 'Decanol', 'TOA', 'AQ336', 'Glucose'),
+           K=np.array([1./122., 3.143, 1e-4, 0., 0., 414.43]),
            phi = 0.5)
+
 S404 = bst.units.MultiStageMixerSettlers('S404', ins = (S402-1, M401-0),
                                      outs = ('raffinate', 'extract'),
                                      N_stages = 20, partition_data = Kds,) 
@@ -387,39 +388,48 @@ S404.vol_frac = 0.05
 
 tolerable_loss_fraction = 0.001
 
-# def adjust_S404_streams():
-#     feed_octanol, feed_TOA, feed_AQ336, solvent_recycle = M401.ins
-#     process_stream = S404.ins[0]
-#     existing_octanol = solvent_recycle.imol['Decanol'] + process_stream.imol['Decanol']
-#     existing_TOA = solvent_recycle.imol['TOA'] + process_stream.imol['TOA']
-#     existing_AQ336 = solvent_recycle.imol['AQ336'] + process_stream.imol['AQ336']
+def adjust_S404_streams():
+    feed_decanol, feed_TOA, feed_AQ336, solvent_recycle = M401.ins
+    process_stream = S404.ins[0]
+    existing_decanol = solvent_recycle.imol['Decanol'] + process_stream.imol['Decanol']
+    existing_TOA = solvent_recycle.imol['TOA'] + process_stream.imol['TOA']
+    existing_AQ336 = solvent_recycle.imol['AQ336'] + process_stream.imol['AQ336']
+    HP_recovery = 1-tolerable_loss_fraction
+    K_extract = 1./S404.partition_data['K'][0]
+    
+    reqd_decanol = HP_recovery * 0.5 * process_stream.F_mol * ((1.+K_extract)/K_extract) \
+            / (1. + (1. - K_extract**-S404.N_stages)/(K_extract-1.))
+    reqd_TOA = reqd_AQ336 = reqd_decanol/8. # decanol:TOA:AQ336 = 0.8:0.1:0.1
 
-#     reqd_octanol = process_stream.F_vol * S404.vol_frac
-#     reqd_TOA = reqd_AQ336 = reqd_octanol/8. # decanol:TOA:AQ336 = 0.8:0.1:0.1
-
-#     feed_octanol.imol['Decanol'] = max(0, reqd_octanol - existing_octanol)
-#     feed_TOA.imol['TOA'] = max(0, reqd_TOA - existing_TOA)
-#     feed_AQ336.imol['AQ336'] = max(0, reqd_AQ336 - existing_AQ336)
-#     M401._run()
-#     S404._run()
+    feed_decanol.imol['Decanol'] = max(0, reqd_decanol - existing_decanol)
+    feed_TOA.imol['TOA'] = max(0, reqd_TOA - existing_TOA)
+    feed_AQ336.imol['AQ336'] = max(0, reqd_AQ336 - existing_AQ336)
+    
+    M401._run()
+    S404._run()
 
 def adjust_S404_Ks_streams():
-    feed_octanol, solvent_recycle = M401.ins
+    feed_decanol, solvent_recycle = M401.ins
     process_stream = S404.ins[0]
     process_stream_F_mol = process_stream.F_mol
-    existing_octanol = solvent_recycle.imol['Octanol'] + process_stream.imol['Octanol']
+    existing_decanol = solvent_recycle.imol['Decanol'] + process_stream.imol['Decanol']
+    existing_TOA = solvent_recycle.imol['TOA'] + process_stream.imol['TOA']
+    existing_AQ336 = solvent_recycle.imol['AQ336'] + process_stream.imol['AQ336']
     N_stages = S404.N_stages
     # S404.T = 340
     K_raffinate = S404.partition_data['K'][0]
     # K_extract = 1./S404.partition_data['K'][0]
     HP_recovery = 1-tolerable_loss_fraction
-    reqd_octanol = HP_recovery * K_raffinate * process_stream_F_mol
-    # reqd_octanol = HP_recovery * 0.5 * process_stream.F_mol * ((1.+K_extract)/K_extract) \
+    reqd_decanol = HP_recovery * K_raffinate * process_stream_F_mol
+    reqd_TOA = reqd_AQ336 = reqd_decanol/8. # decanol:TOA:AQ336 = 0.8:0.1:0.1
+    # reqd_decanol = HP_recovery * 0.5 * process_stream.F_mol * ((1.+K_extract)/K_extract) \
     #         / (1. + (1. - K_extract**-S404.N_stages)/(K_extract-1.))
-    prev_reqd_octanol = 0.
+    prev_reqd_decanol = 0.
     count = 0
-    while abs(prev_reqd_octanol/reqd_octanol - 1) > 1e-3: 
-        feed_octanol.imol['Octanol'] = max(0, reqd_octanol - existing_octanol)
+    while abs(prev_reqd_decanol/reqd_decanol - 1) > 1e-3: 
+        feed_decanol.imol['Decanol'] = max(0, reqd_decanol - existing_decanol)
+        feed_decanol.imol['Decanol'] = max(0, reqd_decanol - existing_decanol)
+        feed_decanol.imol['Decanol'] = max(0, reqd_decanol - existing_decanol)
         M401._run()
         Ks_new = update_Ks(S404)
         print(Ks_new)
@@ -427,19 +437,20 @@ def adjust_S404_Ks_streams():
         K_raffinate = S404.partition_data['K'][0]
         # K_extract = 1./S404.partition_data['K'][0]
         HP_recovery = 1.-tolerable_loss_fraction
-        prev_reqd_octanol = reqd_octanol
-        reqd_octanol = HP_recovery * K_raffinate * process_stream_F_mol
-        # reqd_octanol = HP_recovery * 0.5 *  process_stream.F_mol * ((1.+K_extract)/K_extract) \
+        prev_reqd_decanol = reqd_decanol
+        reqd_decanol = HP_recovery * K_raffinate * process_stream_F_mol
+        reqd_TOA = reqd_AQ336 = reqd_decanol/8. # decanol:TOA:AQ336 = 0.8:0.1:0.1
+        # reqd_decanol = HP_recovery * 0.5 *  process_stream.F_mol * ((1.+K_extract)/K_extract) \
         #     / (1. + (1. - K_extract**-N_stages)/(K_extract-1.))
         
-        print(reqd_octanol)
+        print(reqd_decanol)
         count += 1
     print(count)
     M401._run()
     S404._run()
     print('HP loss = %s' %(S404.outs[1].imol['HP']/S404.ins[0].imol['HP'] - 1. + tolerable_loss_fraction))
     
-def update_Ks(lle_unit, solute_indices = (0,), carrier_indices = (1,), solvent_indices = (2,)):
+def update_Ks(lle_unit, solute_indices = (0,), carrier_indices = (1,), solvent_indices = (2,3,4)):
     IDs = lle_unit.partition_data['IDs']
     Ks = lle_unit.partition_data['K']
     solute_chemicals = tuple([IDs[index] for index in solute_indices])
@@ -462,28 +473,34 @@ def update_Ks(lle_unit, solute_indices = (0,), carrier_indices = (1,), solvent_i
     return Ks_new
 
 
-S404.specification = adjust_S404_Ks_streams
+S404.specification = adjust_S404_streams
 
 
 # S404-0-1-R302 # with sugars recycle
 D401 = bst.units.ShortcutColumn('D401', ins=S404-1, outs=('D401_g', 'D401_l'),
-                                    LHK=('Octanol', 'HP'),
+                                    LHK=('HP', 'Decanol'),
                                     is_divided=True,
                                     product_specification_format='Recovery',
-                                    Lr=0.999, Hr=0.999, k=1.2, P = 101325/20,
+                                    Lr=0.999, Hr=0.999, k=1.2, P = 101325/10,
                                     vessel_material = 'Stainless steel 316')
 
-# def D402_remove_heat_utilities():
-#     D402._run()
-#     D402.heat_utilities = ()
-# D402.specification = D402_remove_heat_utilities
+def D401_specification():
+    heavy_impurity_IDs = ('Glucose', 'Xylose', 'SolubleLignin')
+    heavy_impurity_mol = D401.ins[0].imol[heavy_impurity_IDs]
+    D401.ins[0].imol[heavy_impurity_IDs] = 0
+    D401._run()
+    # D401.ins[0].imol[heavy_impurity_IDs] = heavy_impurity_mol
+    # D401.outs[1].imol[heavy_impurity_IDs] = heavy_impurity_mol
 
-D401_P = units.HPPump('D401_P', ins=D401-1)
+#     
+D401.specification = D401_specification
+
+D401_P = units.HPPump('D401_P', ins=D401-0)
 
 
-#!!! TODO: Make rigorous=True after implementing Esterification and Hydrolysis
-D401_H = bst.units.HXutility('D401_H', ins=D401-0, V=0., rigorous=False)
-D401_H-0-1-M401
+#!!! TODO: Make rigorous=True work
+D401_H = bst.units.HXutility('D401_H', ins=D401-1, V=0., rigorous=False)
+D401_H-0-3-M401
 # def D401_H_spec():
 #     D401_H._run()
 #     outstream = D401_H.outs[0]
@@ -719,7 +736,7 @@ ammonia_fresh = Stream('ammonia_fresh', price=price['AmmoniumHydroxide'])
 CSL_fresh = Stream('CSL_fresh', price=price['CSL'])
 lime_fresh = Stream('lime_fresh', price=price['Lime'])
 
-octanol_fresh = Stream('octanol_fresh', price=price['Octanol'])
+decanol_fresh = Stream('decanol_fresh', price=price['Decanol'])
 TOA_fresh = Stream('TOA_fresh', price=price['TOA'])
 AQ336_fresh = Stream('AQ336_fresh', price=price['AQ336'])
 
@@ -829,8 +846,8 @@ T608 = units.SulfuricAcidStorageTank('T608', ins = sulfuric_acid_fresh2, outs = 
 T608.line = 'Sulfuric acid storage tank'
 
 
-T609 = bst.units.StorageTank('T609', ins = octanol_fresh, outs = separation_octanol)
-T609.line = 'Octanol storage tank'
+T609 = bst.units.StorageTank('T609', ins = decanol_fresh, outs = separation_decanol)
+T609.line = 'Decanol storage tank'
 
 T610 = bst.units.StorageTank('T610', ins = TOA_fresh, outs = separation_TOA)
 T610.line = 'TOA storage tank'

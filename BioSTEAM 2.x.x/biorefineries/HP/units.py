@@ -1625,20 +1625,25 @@ class CoFermentation(Reactor):
         #      Reaction definition            Reactant    Conversion
         Rxn('Glucose -> 2HP',        'Glucose',   .53),
         Rxn('Glucose -> 3 AceticAcid',        'Glucose',   0.07),
-        Rxn('Glucose -> 6 FermMicrobe',       'Glucose',   0.03),
         Rxn('3Xylose -> 5HP',       'Xylose',    0.53*0.8),
         Rxn('2 Xylose -> 5 AceticAcid',       'Xylose',    0.07*0.8),
-        Rxn('Xylose -> 5 FermMicrobe',        'Xylose',    0.03*0.8),
         ])
         
+      
         self.glucose_to_HP_rxn = self.cofermentation_rxns[0]
-        self.xylose_to_HP_rxn = self.cofermentation_rxns[3]
+        self.xylose_to_HP_rxn = self.cofermentation_rxns[2]
         
         self.glucose_to_acetic_acid_rxn = self.cofermentation_rxns[1]
-        self.xylose_to_acetic_acid_rxn = self.cofermentation_rxns[4]
+        self.xylose_to_acetic_acid_rxn = self.cofermentation_rxns[3]
         
-        self.glucose_to_microbe_rxn = self.cofermentation_rxns[2]
-        self.xylose_to_microbe_rxn = self.cofermentation_rxns[5]
+        
+        self.biomass_generation_rxns = ParallelRxn([
+            Rxn('Glucose -> 6 FermMicrobe',       'Glucose',   1.-1e-9),
+            Rxn('Xylose -> 5 FermMicrobe',        'Xylose',    1.-1e-9),
+            ])
+        
+        self.glucose_to_microbe_rxn = self.biomass_generation_rxns[0]
+        self.xylose_to_microbe_rxn = self.biomass_generation_rxns[1]
         
         if 'Sucrose' in self.chemicals:
             self.sucrose_hydrolysis_rxn = Rxn('Sucrose + Water -> 2Glucose', 'Sucrose', 1.-1e-9)
@@ -1668,6 +1673,7 @@ class CoFermentation(Reactor):
         effluent.T = vapor.T = self.T
         CSL.imass['CSL'] = (sugars.F_vol + feed.F_vol) * self.CSL_loading 
         self.cofermentation_rxns(effluent.mol)
+        self.biomass_generation_rxns(effluent.mol)
         vapor.imol['CO2'] = effluent.imol['CO2']
         vapor.phase = 'g'
         
@@ -1687,7 +1693,9 @@ class CoFermentation(Reactor):
                                 # * 1.1
             effluent.imol['Lime'] = lime.imol['Lime']
             # effluent.mix_from([effluent, lime])
-            self.neutralization_rxns.adiabatic_reaction(effluent)
+            # self.neutralization_rxns.adiabatic_reaction(effluent)
+            self.neutralization_rxns(effluent)
+            
         else:
             self.vessel_material= 'Stainless steel 316'
             lime.empty()

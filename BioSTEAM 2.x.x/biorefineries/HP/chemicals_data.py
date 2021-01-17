@@ -166,6 +166,8 @@ AQ336._Dortmund = TOA.Dortmund
 AQ336.Hfus = TOA.Hfus
 
 Octanol = chemical_database('Octanol')
+Hexanol = chemical_database('Hexanol')
+Butyl_acetate = chemical_database('Butyl acetate')
 
 # AQ336 = chemical_database('N-Methyl-N,N,N-trioctylammonium chloride') 
 IBA = chemical_database('Isobutyraldehyde')
@@ -247,8 +249,11 @@ LacticAcid = chemical_database('LacticAcid')
 LacticAcid.Hfus = 11.34e3
 
 
-HP = chemical_copied('HP', LacticAcid)
-
+# HP = chemical_copied('HP', LacticAcid)
+HP = chemical_database('HP', search_ID='3-Hydroxypropionic acid')
+HP.copy_models_from(LacticAcid, names = ['V', 'Hvap', 'Psat', 'mu', 'kappa'])
+HP.Tm = 15 + 273.15 # CAS says < 25 C
+HP.Tb = 179.75 + 273.15 # CAS
 MethylHP = chemical_database('MethylHP', search_ID='6149-41-3')
 MethylLactate = tmo.Chemical('MethylLactate')
 MethylHP.copy_models_from(MethylLactate, ('Psat', 'Hvap', 'V'))
