@@ -355,8 +355,9 @@ def create_default_depot(raw_feedstock='raw_feedstock', kind='CPP',
 
     Returns
     -------
-    prep_sys : biosteam.System
-        Depot system.
+    flowsheet : biosteam.Flowsheet
+        Flowsheet containing the depot system, the preprocessed feedstock can
+        be retrieved as flowsheet.stream.preprocessed.
         
     References
     ----------
@@ -370,6 +371,8 @@ def create_default_depot(raw_feedstock='raw_feedstock', kind='CPP',
 
     '''
     
+    flowsheet = bst.Flowsheet(f'{kind}_depot')
+    bst.main_flowsheet.set_flowsheet(flowsheet)
     feed_ID = 'raw_feedstock'
     if isinstance(raw_feedstock, str):
         chems = bst.settings.get_chemicals()
@@ -401,13 +404,13 @@ def create_default_depot(raw_feedstock='raw_feedstock', kind='CPP',
         U102 = Dryer(f'U{n+2}', kind='CPP', target_moisture=0.2)
         U103 = HammerMill(f'U{n+3}', kind='CPP', ins=U102-0)
         U104 = PelletMill(f'U{n+4}', kind='CPP', ins=U103-0)
-        U105 = Auxiliary(f'U{n+5}', ins=U104-0)
+        U105 = Auxiliary(f'U{n+5}', ins=U104-0, outs='preprocessed')
         
     elif kind == 'HMPP':
         U102 = HammerMill(f'U{n+2}', kind='HMPP')
         U103 = PelletMill(f'U{n+3}', kind='HMPP', ins=U102-0)
         U104 = Dryer(f'U{n+4}', kind='HMPP', target_moisture=0.2, ins=U103-0)
-        U105 = Auxiliary(f'U{n+5}', ins=U104-0)
+        U105 = Auxiliary(f'U{n+5}', ins=U104-0, outs='preprocessed')
         
     else:
         raise ValueError(f'kind can only be CPP or HMPP, not {kind}.')
@@ -420,7 +423,7 @@ def create_default_depot(raw_feedstock='raw_feedstock', kind='CPP',
         U101-0-U102
         prep_sys = bst.System('prep_sys',
                               path=(U101, U102, U103, U104, U105))
-    return prep_sys
+    return flowsheet
 
 
 # %%
@@ -726,29 +729,33 @@ from biorefineries.ethanol_adipic._chemicals import chems
 from biorefineries.ethanol_adipic._settings import _labor_2011to2016, price
 bst.settings.set_thermo(chems)
 
-sys1 = create_default_depot(kind='CPP', with_AFEX=False)
-sys2 = create_default_depot(kind='HMPP', with_AFEX=False)
-sys3 = create_default_depot(kind='CPP', with_AFEX=True,
+flowsheet1 = create_default_depot(kind='CPP', with_AFEX=False)
+flowsheet2 = create_default_depot(kind='HMPP', with_AFEX=False)
+flowsheet3 = create_default_depot(kind='CPP', with_AFEX=True,
                             water_price=price['Makeup water'],
                             ammonia_price=price['NH3'],
                             natural_gas_price=price['Natural gas'])
-sys4 = create_default_depot(kind='HMPP', with_AFEX=True,
+flowsheet4 = create_default_depot(kind='HMPP', with_AFEX=True,
                             water_price=price['Makeup water'],
                             ammonia_price=price['NH3'],
                             natural_gas_price=price['Natural gas'])
 
 
 
-sys1.simulate()
-sys2.simulate()
-sys3.simulate()
-sys4.simulate()
+flowsheet1.system.prep_sys.simulate()
+flowsheet2.system.prep_sys.simulate()
+flowsheet3.system.prep_sys.simulate()
+flowsheet4.system.prep_sys.simulate()
 
 
-cost1 = PreprocessingCost(depot_sys=sys1, labor_adjustment=_labor_2011to2016)
-cost2 = PreprocessingCost(depot_sys=sys2, labor_adjustment=_labor_2011to2016)
-cost3 = PreprocessingCost(depot_sys=sys3, labor_adjustment=_labor_2011to2016)
-cost4 = PreprocessingCost(depot_sys=sys4, labor_adjustment=_labor_2011to2016)
+cost1 = PreprocessingCost(depot_sys=flowsheet1.system.prep_sys,
+                          labor_adjustment=_labor_2011to2016)
+cost2 = PreprocessingCost(depot_sys=flowsheet2.system.prep_sys,
+                          labor_adjustment=_labor_2011to2016)
+cost3 = PreprocessingCost(depot_sys=flowsheet3.system.prep_sys,
+                          labor_adjustment=_labor_2011to2016)
+cost4 = PreprocessingCost(depot_sys=flowsheet4.system.prep_sys,
+                          labor_adjustment=_labor_2011to2016)
 
 
 

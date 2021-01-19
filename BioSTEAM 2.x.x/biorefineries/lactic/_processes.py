@@ -66,7 +66,7 @@ from biosteam.process_tools import UnitGroup
 from biorefineries.lactic import _units as units
 from biorefineries.lactic import _facilities as facilities
 from biorefineries.lactic._settings import price, CFs
-from biorefineries.lactic._utils import baseline_feedflow, set_yield, AD_split, MB_split
+from biorefineries.lactic._utils import baseline_feedflow, _kg_per_ton, set_yield
 from biorefineries.lactic._chemicals import chems, sugars
 from biorefineries.lactic._tea import LacticTEA
 from biorefineries import BST222
@@ -126,7 +126,7 @@ def create_preprocessing_process(flowsheet):
     
     # Feedstock flow rate in dry U.S. ton per day
     get_flow_tpd = lambda: \
-    (feedstock.F_mass-feedstock.imass['H2O'])*24/907.185*(1-U101.diversion_to_CHP)
+        (feedstock.F_mass-feedstock.imass['H2O'])*24/_kg_per_ton*(1-U101.diversion_to_CHP)
 
     preprocessing_sys = System('preprocessing_sys',
                                path=(U101,))
@@ -684,8 +684,8 @@ def create_separation_process(flowsheet, groups, feed, insolubles,
 # Wastewater
 # =============================================================================
 
-def create_wastewater_process(flowsheet, groups, get_flow_tpd,
-                              wastewater_streams, COD_chemicals,
+def create_wastewater_process(flowsheet, groups, get_flow_tpd, wastewater_streams,
+                              AD_split, MB_split, COD_chemicals,
                               soluble_organics, solubles, insolubles,
                               need_ammonia=False,):
     bst.main_flowsheet.set_flowsheet(flowsheet)
@@ -768,7 +768,7 @@ def create_wastewater_process(flowsheet, groups, get_flow_tpd,
 def create_facilities(flowsheet, groups, get_flow_tpd, combustibles,
                       CHP_wastes, CHP_biogas='', CHP_side_streams=(),
                       process_water_streams={}, recycled_water='',
-                      if_HXN=True):
+                      if_HXN=True, if_BDM=False):
     bst.main_flowsheet.set_flowsheet(flowsheet)
     s = flowsheet.stream
     u = flowsheet.unit
@@ -869,7 +869,7 @@ def create_facilities(flowsheet, groups, get_flow_tpd, combustibles,
     process_water_streams['facilities'] = (CHP.ins[-1], CT.ins[-1])
     PWC = facilities.PWC('PWC', ins=(system_makeup_water, recycled_water),
                          process_water_streams=sum(process_water_streams.values(), ()),
-                         recycled_blowdown_streams=None,
+                         recycled_blowdown_streams=(),
                          outs=('process_water', 'discharged_water'))
     
     ADP = facilities.ADP('ADP', ins=plant_air_in, outs='plant_air_out',
@@ -878,7 +878,6 @@ def create_facilities(flowsheet, groups, get_flow_tpd, combustibles,
 
     ######################## Systems ########################
     if if_HXN:
-        # Heat exchange network
         HXN = bst.units.HeatExchangerNetwork('HXN')
         HXN_group = UnitGroup('HXN_group', units=(HXN,))
         groups.append(HXN_group)
@@ -894,6 +893,12 @@ def create_facilities(flowsheet, groups, get_flow_tpd, combustibles,
                                               T603, T603_S, T604,
                                               T605, T606, T606_P, T607,
                                               M601, PWC, ADP, CIP))
+    if if_BDM:
+        BDM = bst.units.BlowdownMixer('BDM',ins=(CHP.outs[-1], CT.outs[-1]),
+                                      outs=u.M501.ins[-1])
+        PWC.recycled_blowdown_streams = BDM.outs
+        facilities_no_hu_group.units = (*facilities_no_hu_group.units, BDM)
+    
     groups.append(facilities_no_hu_group)
     
     return flowsheet, groups
@@ -905,23 +910,26 @@ def create_facilities(flowsheet, groups, get_flow_tpd, combustibles,
 # Overall system and TEA/LCA functions
 # =============================================================================
 
-def create_lactic_sys(flowsheet, groups, get_flow_tpd, if_HXN=True):
+def create_lactic_sys(flowsheet, groups, get_flow_tpd):
     bst.main_flowsheet.set_flowsheet(flowsheet)
     s = flowsheet.stream
     u = flowsheet.unit
     sys = flowsheet.system
     
     ################## Overall System ##################
+    facilities = (u.CHP, u.CT, u.PWC, u.ADP, u.CIP)
+    if hasattr(u, 'HXN'):
+        facilities = (u.HXN, *facilities)
+    if hasattr(u, 'BDM'):
+        facilities = (*facilities, u.BDM)
     lactic_sys = System('lactic_sys',
                         path=(u.U101, sys.pretreatment_sys, sys.conversion_sys,
                               sys.separation_sys, sys.wastewater_sys,
                               u.T601, u.T601_P, u.T602_S, u.T602,
                               u.T603_S, u.T603, u.T604, u.T605,
                               u.T606, u.T606_P, u.T607, u.M601),
-                        facilities=(u.CHP, u.CT, u.PWC, u.ADP, u.CIP)
-                        )
-    if if_HXN:
-        lactic_sys.facilites = (u.HXN, *lactic_sys.facilities)
+                        facilities=facilities,
+                        facility_recycle=u.BDM-0 if hasattr(u, 'BDM') else None)
     
     CHP_sys = System('CHP_sys', path=(u.CHP,))
     

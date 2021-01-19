@@ -35,17 +35,25 @@ References
 '''
 
 import biosteam as bst
-from biorefineries.ethanol_adipic._chemicals import chems
-from biorefineries.ethanol_adipic._utils import auom
+from biorefineries.ethanol_adipic._chemicals import chems, soluble_organics, \
+    solubles, insolubles, COD_chemicals, combustibles
+from biorefineries.ethanol_adipic._utils import _kg_per_ton, _ethanol_kg_2_gal, \
+    cell_mass_split, AD_split, MB_split
 from biorefineries.ethanol_adipic._settings import set_feedstock_price, \
-    price, CFs
+    price, CFs, _feedstock_factor
 from biorefineries.ethanol_adipic._processes import (
     create_preprocessing_process,
+    create_acid_pretreatment_process,
+    create_base_pretreatment_process,
+    create_ethanol_process,
+    create_adipic_process,
+    create_wastewater_process,
+    create_facilities,
+    create_biorefinery
     )
 
 bst.settings.set_thermo(chems)
 bst.CE = 541.7 # year 2016
-_kg_per_ton = auom('ton').conversion_factor('kg')
 
 
 # %%
@@ -72,33 +80,79 @@ HMPP_AFEX_feedstock = HMPP_AFEX_flowsheet.stream.feedstock
 
 # %%
 
-def create_acid_sys(feedstock):
+def create_acid_biorefinery(feedstock):
     flowsheet = bst.Flowsheet('Acid')
     s = flowsheet.stream
     u = flowsheet.unit
     
+    get_feedstock_dry_mass = \
+        lambda: feedstock.F_mass - feedstock.imass['H2O']
     get_flow_tpd = \
         lambda: (feedstock.F_mass-feedstock.imass['H2O'])*24/_kg_per_ton
+    
+    groups = []
+    flowsheet, groups = create_acid_pretreatment_process(
+        flowsheet, groups, feedstock, get_feedstock_dry_mass)
+
+    flowsheet, groups = \
+        create_ethanol_process(flowsheet, groups, u.P201-0, cell_mass_split)
+    
+    # The last one is reserved for blowdown
+    WWT_streams = (u.H201-0, u.D402_P-0, u.S401-1, '')
+    flowsheet, groups = \
+        create_wastewater_process(flowsheet, groups, get_flow_tpd, WWT_streams,
+                                  AD_split, MB_split, COD_chemicals,
+                                  soluble_organics, solubles, insolubles)
+
+    CHP_wastes = (u.S401-0, u.S504-1)
+    CHP_biogas = u.R501-0
+    CHP_side_streams = (s.water_M201, s.water_M202, s.steam_M203)
+    process_water_streams = {
+        'pretreatment': (s.water_M201, s.water_M202, s.steam_M203, s.water_M205),
+        'ethanol process': (s.water_M301, s.water_U401,)
+        }
+    recycled_water = u.S505-0
+    flowsheet, groups = \
+        create_facilities(flowsheet, groups, get_flow_tpd, combustibles,
+                          CHP_wastes, CHP_biogas, CHP_side_streams,
+                          process_water_streams, recycled_water,
+                          False, True)
+
+    flowsheet, teas, funcs = create_biorefinery(flowsheet, groups, get_flow_tpd)
+
+    return flowsheet, groups, teas, funcs
+
+system_dct = dict.fromkeys(('acid', 'base', 'afex'),
+                           dict.fromkeys(('flowsheet', 'groups',
+                                          'teas', 'funcs')))
+
+acid_feedstock = HMPP_feedstock.copy('acid_feedstock')
+acid_feedstock.price = HMPP_feedstock.price
+acid_flowsheet, acid_groups, acid_teas, acid_funcs = create_acid_biorefinery(acid_feedstock)
+system_dct['acid'] = {
+    'flowsheet': acid_flowsheet,
+    'groups': acid_groups,
+    'teas': acid_teas,
+    'funcs': acid_funcs,
+    }
 
 
 
+# %%
 
+# =============================================================================
+# Simulate system and get results
+# =============================================================================
 
+def simulate_and_print(system='acid'):
+    dct = system_dct[system.lower()]
+    funcs = dct['funcs']
+    bst.main_flowsheet.set_flowsheet(dct['flowsheet'])
 
-
-
-
-# Acid:
-M601 = bst.units.Mixer('M601', ins=(H201-0, D402_P-0, S401-1, ''))
-# (last one is blowdown)
-
-
-
-
-
-
-acid_feedstock = CPP_feedstock.copy('acid_feedstock')
-acid_flowsheet = create_acid_sys(acid_feedstock)
+    print(f'\n---------- {system.capitalize()} Biorefinery ----------')
+    print(f'MESP: ${funcs["simulate_get_MESP"]()*_ethanol_kg_2_gal:.2f}/gal')
+    print(f'GWP: {funcs["get_GWP"]():.3f} kg CO2-eq/gal ethanol')
+    print('--------------------------------------')
 
 
 

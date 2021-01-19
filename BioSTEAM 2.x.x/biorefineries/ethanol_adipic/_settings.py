@@ -27,6 +27,11 @@ References
     
 '''
 
+__all__ = (
+    '_feedstock_factor', 'default_costs', 'set_feedstock_price',
+    'price', 'CFs'
+           )
+
 
 # %%
 
@@ -90,7 +95,7 @@ default_costs = {
     }
 
 def set_feedstock_price(feedstock, preprocessing=None):
-    '''Set price for the feedstock stream.'''
+    '''Set price from $/Mg-dry to $/kg-wet for the feedstock stream.'''
     price = sum(i for i in default_costs.values())
     if preprocessing:
         price = price - default_costs['Preprocessing'] + preprocessing
@@ -200,7 +205,7 @@ GWP_CFs['Sodium sulfate'] = 0.47 # from sodium brine
 # # from natural sources, RoW, TRACI
 # GWP_CFs['Sodium sulfate_ecoinvent'] = 0.10829
 
-
+CFs = {'GWP_CFs': GWP_CFs, 'GWP_CF_stream': GWP_CF_stream}
 
 
 

@@ -3,8 +3,7 @@
 # BioSTEAM: The Biorefinery Simulation and Techno-Economic Analysis Modules
 # Copyright (C) 2020, Yoel Cortes-Pena <yoelcortes@gmail.com>
 # Bioindustrial-Park: BioSTEAM's Premier Biorefinery Models and Results
-# Copyright (C) 2020, Yalin Li <yalinli2@illinois.edu>,
-# Sarang Bhagwat <sarangb2@illinois.edu>, and Yoel Cortes-Pena (this biorefinery)
+# Copyright (C) 2020, Yalin Li <yalinli2@illinois.edu> (this biorefinery)
 # 
 # This module is under the UIUC open-source license. See 
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
@@ -52,19 +51,17 @@ Processes:
 # %%
 
 import biosteam as bst
-from flexsolve import aitken_secant, IQ_interpolation
+import flexsolve as fs
 from biosteam import Stream, System
 from biosteam.process_tools import UnitGroup
 from biorefineries.ethanol_adipic import _units as units
 from biorefineries.ethanol_adipic import _facilities as facilities
 from biorefineries.ethanol_adipic._settings import price, CFs, \
     _labor_2011to2016, set_feedstock_price
-from biorefineries.ethanol_adipic._utils import baseline_feedflow, \
-    _ethanol_kg_2_gal, convert_ethanol_wt_2_mol, cell_mass_split, AD_split, MB_split
+from biorefineries.ethanol_adipic._utils import \
+    _ethanol_kg_2_gal, convert_ethanol_wt_2_mol
 from biorefineries.ethanol_adipic._chemicals import chems
 from biorefineries.ethanol_adipic._tea import EthanolAdipicTEA
-
-
 from biorefineries.lactic import (
     create_pretreatment_process as create_acid_pretreatment_process,
     create_wastewater_process,
@@ -80,8 +77,8 @@ __all__ = (
     'create_ethanol_process',
     'create_adipic_process',
     'create_wastewater_process',
-    'create_facilities'
-    # 'create_biorefinery'
+    'create_facilities',
+    'create_biorefinery'
     )
 
 
@@ -99,20 +96,15 @@ TODOs:
 # Preprocessing
 # =============================================================================
 
-#!!! ID of units/streams?
 def create_preprocessing_process(kind='HMPP', with_AFEX=False):
-    flowsheet = bst.Flowsheet(kind)
-    prep_sys = create_default_depot(kind=kind, with_AFEX=with_AFEX)
-
+    flowsheet = create_default_depot(kind=kind, with_AFEX=with_AFEX)
+    prep_sys = flowsheet.system.prep_sys
     prep_sys.simulate()
     
     prep_cost = PreprocessingCost(depot_sys=prep_sys,
                                   labor_adjustment=_labor_2011to2016)
-    
-    # (U101, U102, U103, U104, U105) = sorted(prep_sys.units, key=lambda u: u.ID)
-    feedstock, = (i.copy() for i in sorted(prep_sys.products, key=lambda s: s.ID))
-    feedstock.ID = 'feedstock'
-    
+
+    feedstock = flowsheet.stream.preprocessed.copy('feedstock')
     # $/Mg
     set_feedstock_price(feedstock, preprocessing=prep_cost.feedstock_unit_price)
     
@@ -164,7 +156,7 @@ def create_base_pretreatment_process(flowsheet, groups, feed):
 # Carbohydrate conversion and separation
 # =============================================================================
 
-def create_ethanol_process(flowsheet, groups, feed):
+def create_ethanol_process(flowsheet, groups, feed, cell_mass_split):
     bst.main_flowsheet.set_flowsheet(flowsheet)
 
     ######################## Streams ########################
@@ -288,7 +280,8 @@ def create_ethanol_process(flowsheet, groups, feed):
 
 def create_facilities(flowsheet, groups, get_flow_tpd, combustibles,
                       CHP_wastes, CHP_biogas='', CHP_side_streams=(),
-                      process_water_streams={}, recycled_water=''):
+                      process_water_streams={}, recycled_water='',
+                      if_HXN=False, if_BDM=False):
     bst.main_flowsheet.set_flowsheet(flowsheet)
     s = flowsheet.stream
     u = flowsheet.unit
@@ -384,22 +377,24 @@ def create_facilities(flowsheet, groups, get_flow_tpd, combustibles,
     CWP = facilities.CWP('CWP', ins='return_chilled_water',
                          outs='process_chilled_water')
     
-    BDM = bst.units.BlowdownMixer('BDM',ins=(CHP.outs[-1], CT.outs[-1]),
-                                  outs=M601.ins[-1])
-    
     # All water consumed by the system
     process_water_streams['facilities'] = (CHP.ins[-1], CT.ins[-1])
     
     PWC = facilities.PWC('PWC', ins=(system_makeup_water, recycled_water),
                          process_water_streams=sum(process_water_streams.values(), ()),
-                         recycled_blowdown_streams=None,
+                         recycled_blowdown_streams=(),
                          outs=('process_water', 'discharged_water'))
     
     ADP = facilities.ADP('ADP', ins=plant_air_in, outs='plant_air_out',
                          ratio=get_flow_tpd()/2205)
     CIP = facilities.CIP('CIP', ins=CIP_chems_in, outs='CIP_chems_out')
 
-    ######################## Systems ########################   
+    ######################## Systems ########################
+    if if_HXN:
+        HXN = bst.units.HeatExchangerNetwork('HXN')
+        HXN_group = UnitGroup('HXN_group', units=(HXN,))
+        groups.append(HXN_group)
+    
     CHP_group = UnitGroup('CHP_group', units=(CHP,))
     groups.append(CHP_group)
     
@@ -410,7 +405,13 @@ def create_facilities(flowsheet, groups, get_flow_tpd, combustibles,
                                        units=(T601, T602, M601, T603, T604_S, T604,
                                               T605, T606_S, T606, T607_S, T607,
                                               T608, M602,
-                                              CHP, CT, CWP, PWC, ADP, CIP, BDM))
+                                              CHP, CT, CWP, PWC, ADP, CIP))
+    if if_BDM:
+        BDM = bst.units.BlowdownMixer('BDM',ins=(CHP.outs[-1], CT.outs[-1]),
+                                      outs=u.M501.ins[-1])
+        PWC.recycled_blowdown_streams = BDM.outs
+        facilities_no_hu_group.units = (*facilities_no_hu_group.units, BDM)
+    
     groups.append(facilities_no_hu_group)
     
     return flowsheet, groups
@@ -463,9 +464,9 @@ def create_adipic_process(flowsheet, groups):
         R702._run()
         return R702.effluent_titer-R702.target_titer
     
-    #!!! This needs reviewing, need to compare the no-adjusting yield
+    #!!! This needs reviewing, need to compare the non-adjusting yield
     def adjust_R702_titer():
-        R702.main_fermentation_rxns.X[-1] = IQ_interpolation(
+        R702.main_fermentation_rxns.X[-1] = fs.IQ_interpolation(
             f=titer_at_yield, x0=0, x1=1, xtol=0.001, ytol=0.01, maxiter=50,
             args=(), checkbounds=False)
         R702._run()
@@ -518,14 +519,20 @@ def create_biorefinery(flowsheet, groups, get_flow_tpd):
     sys = flowsheet.system
     
     ################## Overall Biorefinery ##################
+    facilities = (u.CHP, u.CT, u.PWC, u.ADP, u.CIP)
+    if hasattr(u, 'HXN'):
+        facilities = (u.HXN, *facilities)
+    if hasattr(u, 'BDM'):
+        facilities = (*facilities, u.BDM)
+    
     biorefinery = System('biorefinery',
                          path=(sys.pretreatment_sys, sys.ethanol_sys,
                                sys.wastewater_sys,
                                u.T601, u.T602, u.M601, u.T603, u.T604_S, u.T604,
                                u.T605, u.T606_S, u.T606, u.T607_S, u.T607,
-                               u.T708, u.M602),
-                         facilities=(u.CHP, u.CT, u.CWP, u.PWC, u.ADP, u.CIP, u.BDM),
-                         facility_recycle=u.BDM-0)
+                               u.T608, u.M602),
+                         facilities=facilities,
+                         facility_recycle=u.BDM-0 if hasattr(u, 'BDM') else None)
     
     CHP_sys = System('CHP_sys', path=(u.CHP,)) 
 
@@ -573,6 +580,27 @@ def create_biorefinery(flowsheet, groups, get_flow_tpd):
     tea = bst.CombinedTEA([no_CHP_tea, CHP_tea], IRR=0.10)
     biorefinery._TEA = tea
     teas['tea'] = tea
+    
+    # Simulate system and get results
+    def simulate_get_MESP(feedstock_price=None):
+        if feedstock_price:
+            s.feedstock.price = feedstock_price
+        s.ethanol.price = 0
+        biorefinery.simulate()
+        for i in range(3):
+            MESP = s.ethanol.price = tea.solve_price(s.ethanol)
+        return MESP
+    funcs = {'simulate_get_MESP': simulate_get_MESP}
+    
+    def simulate_get_MFPP(ethanol_price=None):
+        if ethanol_price:
+            s.ethanol.price = ethanol_price
+        s.feedstock.price = 0
+        biorefinery.simulate()
+        for i in range(3):
+            MFPP = tea.solve_price(s.feedstock)
+        return MFPP
+    funcs['simulate_get_MFPP'] = simulate_get_MFPP
 
     ######################## LCA ########################
     LCA_streams = set([i for i in biorefinery.feeds if i.price]+ \
@@ -583,7 +611,7 @@ def create_biorefinery(flowsheet, groups, get_flow_tpd):
         LCA_stream.mass = sum(i.mass for i in LCA_streams)
         chemical_GWP = LCA_stream.mass*CFs['GWP_CF_stream'].mass
         return chemical_GWP.sum()/(s.ethanol.F_mass/_ethanol_kg_2_gal)
-    funcs = {'get_material_GWP': get_material_GWP}
+    funcs['get_material_GWP'] = get_material_GWP
     
     # GWP from onsite emission (e.g., combustion) of non-biogenic carbons
     get_onsite_GWP = lambda: s.natural_gas.get_atomic_flow('C')*chems.CO2.MW \

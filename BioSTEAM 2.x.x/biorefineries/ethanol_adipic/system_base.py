@@ -61,7 +61,7 @@ from biorefineries.ethanol_adipic._settings import \
     price, GWP_CF_stream, GWP_CFs, _labor_2011to2016, set_feedstock_price
 from biorefineries.ethanol_adipic._utils import convert_ethanol_wt_2_mol, \
     find_split, splits_df    
-from biorefineries.ethanol_adipic._tea import ethanol_adipic_TEA
+from biorefineries.ethanol_adipic._tea import EthanolAdipicTEA
 
 flowsheet = bst.Flowsheet('AFEX')
 bst.main_flowsheet.set_flowsheet(flowsheet)
@@ -79,15 +79,16 @@ auom = tmo.units_of_measure.AbsoluteUnitsOfMeasure
 from biorefineries.ethanol_adipic._preprocessing import \
     create_default_depot, PreprocessingCost
 
-prep_sys = create_default_depot(kind='HMPP', with_AFEX=False)
+flowsheet = create_default_depot(kind='HMPP', with_AFEX=False)
 
+prep_sys = flowsheet.system.prep_sys
 prep_sys.simulate()
 
 prep_cost = PreprocessingCost(depot_sys=prep_sys,
                               labor_adjustment=_labor_2011to2016)
 
-(U101, U102, U103, U104, U105) = sorted(prep_sys.units, key=lambda u: u.ID)
-feedstock, = (i.copy() for i in sorted(prep_sys.products, key=lambda s: s.ID))
+# (U101, U102, U103, U104, U105) = sorted(prep_sys.units, key=lambda u: u.ID)
+feedstock = flowsheet.stream.preprocessed.copy('feedstock')
 
 # $/Mg
 set_feedstock_price(feedstock, preprocessing=prep_cost.feedstock_unit_price)
@@ -293,8 +294,7 @@ T502 = units.NeutralizationTank('T502', ins=(R501-0, sulfuric_acid_T502))
 R502 = units.MuconicFermentation('R502', ins=(T502-0, water_R502, ammonia_R502,
                                               caustic_R502, CSL_R502, DAP_R502,
                                               air_R502),
-                                 outs=('R502_vent', 'crude_muconic'),
-                                 set_titer_limit=False)
+                                 outs=('R502_vent', 'crude_muconic'))
 
 # Adjusting lignin conversion to meet titer requirement
 def titer_at_yield(lignin_yield):
@@ -586,7 +586,7 @@ for i in OSBL_units:
     if i.__class__ == bst.units.Mixer or i.__class__ == bst.units.Splitter:
         OSBL_units.remove(i)
 
-ethanol_adipic_no_CHP_tea = ethanol_adipic_TEA(
+ethanol_adipic_no_CHP_tea = EthanolAdipicTEA(
         system=ethanol_adipic_sys, IRR=0.10, duration=(2016, 2046),
         depreciation='MACRS7', income_tax=0.21, operating_days=0.9*365,
         lang_factor=None, construction_schedule=(0.08, 0.60, 0.32),

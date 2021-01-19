@@ -62,7 +62,7 @@ from biorefineries.ethanol_adipic._settings import \
     price, GWP_CF_stream, GWP_CFs, _labor_2011to2016, set_feedstock_price
 from biorefineries.ethanol_adipic._utils import convert_ethanol_wt_2_mol, \
     find_split, splits_df
-from biorefineries.ethanol_adipic._tea import ethanol_adipic_TEA
+from biorefineries.ethanol_adipic._tea import EthanolAdipicTEA
 
 bst.CE = 541.7 # year 2016
 flowsheet = bst.Flowsheet('AFEX')
@@ -80,19 +80,20 @@ auom = tmo.units_of_measure.AbsoluteUnitsOfMeasure
 from biorefineries.ethanol_adipic._preprocessing import \
     create_default_depot, PreprocessingCost
 
-prep_sys = create_default_depot(kind='CPP', with_AFEX=True,
+flowsheet = create_default_depot(kind='CPP', with_AFEX=True,
                                 water_price=price['Makeup water'],
                                 ammonia_price=price['NH3'],
                                 natural_gas_price=price['Natural gas'])
 
+prep_sys = flowsheet.system.prep_sys
 prep_sys.simulate()
 
 prep_cost = PreprocessingCost(depot_sys=prep_sys,
                               labor_adjustment=_labor_2011to2016)
 
-(U101, U102, U103, U104, U105, U106) = sorted(prep_sys.units, key=lambda u: u.ID)
-fugative_ammonia, feedstock = (i.copy() for i in sorted(prep_sys.products,
-                                                        key=lambda s: s.ID))
+# (U101, U102, U103, U104, U105, U106) = sorted(prep_sys.units, key=lambda u: u.ID)
+feedstock = flowsheet.stream.preprocessed.copy('feedstock')
+
 
 # $/Mg
 set_feedstock_price(feedstock, preprocessing=prep_cost.feedstock_unit_price)
@@ -468,7 +469,7 @@ for i in OSBL_units:
     if i.__class__ == bst.units.Mixer or i.__class__ == bst.units.Splitter:
         OSBL_units.remove(i)
 
-ethanol_no_CHP_tea = ethanol_adipic_TEA(
+ethanol_no_CHP_tea = EthanolAdipicTEA(
         system=ethanol_sys, IRR=0.10, duration=(2016, 2046),
         depreciation='MACRS7', income_tax=0.21, operating_days=0.96*365,
         lang_factor=None, construction_schedule=(0.08, 0.60, 0.32),

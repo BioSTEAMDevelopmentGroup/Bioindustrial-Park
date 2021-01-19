@@ -16,7 +16,8 @@
 import biosteam as bst
 from biorefineries.lactic._chemicals import chems, sugars, soluble_organics, \
     solubles, insolubles, COD_chemicals, combustibles
-from biorefineries.lactic._utils import cell_mass_split, gypsum_split
+from biorefineries.lactic._utils import cell_mass_split, gypsum_split, \
+    AD_split, MB_split
 from biorefineries.lactic._processes import (
     update_settings,
     create_preprocessing_process,
@@ -61,11 +62,12 @@ def create_SSCF_sys():
         create_separation_process(flowsheet, groups, u.PS301-0, insolubles,
                                   cell_mass_split, gypsum_split, kind='SSCF')    
     
-    WWT_streams = (u.H201-0, u.M401_P-0, u.R402-1, u.R403-1)
+    # The last one is reserved for blowdown
+    WWT_streams = (u.H201-0, u.M401_P-0, u.R402-1, u.R403-1, '')
     flowsheet, groups = \
         create_wastewater_process(flowsheet, groups, get_flow_tpd, WWT_streams,
-                                  COD_chemicals, soluble_organics, solubles,
-                                  insolubles)
+                                  AD_split, MB_split, COD_chemicals,
+                                  soluble_organics, solubles, insolubles)
     
     CHP_wastes = (u.U101-1, u.S401-0, u.S504-1)
     CHP_biogas = u.R501-0
@@ -103,11 +105,12 @@ def create_SHF_sys():
         create_separation_process(flowsheet, groups, u.PS301-0, insolubles,
                                   cell_mass_split, gypsum_split, kind='SHF')
 
-    WWT_streams = (u.H201-0, u.E301-1, u.M401_P-0, u.R402-1, u.R403-1)
+    # The last one is reserved for blowdown
+    WWT_streams = (u.H201-0, u.E301-1, u.M401_P-0, u.R402-1, u.R403-1, '')
     flowsheet, groups = \
         create_wastewater_process(flowsheet, groups, get_flow_tpd, WWT_streams,
-                                  COD_chemicals, soluble_organics, solubles,
-                                  insolubles)
+                                  AD_split, MB_split, COD_chemicals,
+                                  soluble_organics, solubles, insolubles)
         
     CHP_wastes = (u.U101-1, u.S301-0, u.S401-0, u.S504-1)
     CHP_biogas = u.R501-0
