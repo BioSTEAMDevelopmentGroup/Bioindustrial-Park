@@ -517,17 +517,15 @@ class MuconicFermentation(Unit):
     # 2,3-BDO fermentation and past assumption on ethanol fermentation
     inoculum_ratio = 0.1
     
-    titer_limit = (34.5+68.5) / 2 # in g/L (kg/m3)
+    target_titer = 100
+    # target_titer = (34.5+68.5) / 2 # in g/L (kg/m3)
     
     effluent_titer = 0
 
-    def __init__(self, ID='', ins=None, outs=(), T=32+273.15, P=1.34*101325,
-                 set_titer_limit=False):	
+    def __init__(self, ID='', ins=None, outs=(), T=32+273.15, P=1.34*101325):	
         Unit.__init__(self, ID, ins, outs)
         self.T = T
-        self.P = P
-        self.set_titer_limit = set_titer_limit
-        
+        self.P = P        
         self.seed_fermentation_rxns = ParallelRxn([
     #                           Reaction definition                       Reactant    Conversion
     Rxn('Glucose + 0.047 CSL + 0.018 DAP -> 6 P_putidaGrow + 2.4 H2O',    'Glucose',    0.46),

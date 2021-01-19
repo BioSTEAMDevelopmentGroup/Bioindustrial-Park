@@ -50,6 +50,10 @@ __all__ = ('auom', 'CEPCI', 'get_feedstock_flow', 'dry_composition',
 
 # %%
 
+ethanol_V = chems.Ethanol.V('l', 298.15, 101325) # molar volume in m3/mol	
+ethanol_MW = chems.Ethanol.MW
+_ethanol_kg_2_gal = auom('gal').conversion_factor('liter')/ethanol_V*ethanol_MW/1e6
+
 # =============================================================================
 # Function to convert ethanol fraction from weight basis to mol basis in an
 # ethanol-water mixture

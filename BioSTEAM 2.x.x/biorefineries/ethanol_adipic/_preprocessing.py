@@ -59,8 +59,8 @@ class Preprocessing(Unit):
     labor : dict
         Labor cost per hour for each equipment in this unit.
 
-    Notes
-    -----
+    Note
+    ----
     It is more convenient to use the prep_cost decorator to add equipment information.
 
     References

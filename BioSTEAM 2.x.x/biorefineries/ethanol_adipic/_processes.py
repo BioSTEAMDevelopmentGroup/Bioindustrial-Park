@@ -18,16 +18,11 @@ References
     Hydrolysis of Corn Stover; Technical Report NREL/TP-5100-47764; 
     National Renewable Energy Lab (NREL), 2011.
     https://www.nrel.gov/docs/fy11osti/47764.pdf
-[2] Kuo et al., Production of Optically Pure L-Lactic Acid from Lignocellulosic
-    Hydrolysate by Using a Newly Isolated and d-Lactate Dehydrogenase
-    Gene-Deficient Lactobacillus Paracasei Strain.
-    Bioresource Technology 2015, 198, 651–657.
-    https://doi.org/10.1016/j.biortech.2015.09.071.
-[3] Aden et al., Process Design Report for Stover Feedstock: Lignocellulosic
-    Biomass to Ethanol Process Design and Economics Utilizing Co-Current Dilute
-    Acid Prehydrolysis and Enzymatic Hydrolysis for Corn Stover; NREL/TP-510-32438;
-    National Renewable Energy Lab (NREL), 2002.
-    https://doi.org/10.2172/1218326.
+[2] Davis et al., Process Design and Economics for the Conversion of Lignocellulosic 
+    Biomass to Hydrocarbon Fuels and Coproducts: 2018 Biochemical Design Case Update; 
+    NREL/TP-5100-71949; National Renewable Energy Lab (NREL), 2018. 
+    https://doi.org/10.2172/1483234
+
 
 Naming conventions:
     D = Distillation column
@@ -65,30 +60,28 @@ from biorefineries.ethanol_adipic import _facilities as facilities
 from biorefineries.ethanol_adipic._settings import price, CFs, \
     _labor_2011to2016, set_feedstock_price
 from biorefineries.ethanol_adipic._utils import baseline_feedflow, \
-    convert_ethanol_wt_2_mol, cell_mass_split, AD_split, MB_split
-from biorefineries.ethanol_adipic._chemicals import chems, sugars, soluble_organics, \
-    insolubles, combustibles
+    _ethanol_kg_2_gal, convert_ethanol_wt_2_mol, cell_mass_split, AD_split, MB_split
+from biorefineries.ethanol_adipic._chemicals import chems
 from biorefineries.ethanol_adipic._tea import EthanolAdipicTEA
 
 
 from biorefineries.lactic import (
     create_pretreatment_process as create_acid_pretreatment_process,
     create_wastewater_process,
-    create_facilities,
     )
 
 from biorefineries.ethanol_adipic._preprocessing import \
     create_default_depot, PreprocessingCost
 
 __all__ = (
-    'update_settings',
     'create_preprocessing_process',
     'create_acid_pretreatment_process',
-    'create_ethanol_separation_process',
-    'create_adipic_separation_process',
+    'create_base_pretreatment_process',
+    'create_ethanol_process',
+    'create_adipic_process',
     'create_wastewater_process',
-    'create_facilities',
-    'create_biorefinery'
+    'create_facilities'
+    # 'create_biorefinery'
     )
 
 
@@ -100,32 +93,15 @@ TODOs:
 
 
 
-
-
-
-
-
-# %%
-
-# =============================================================================
-# Biorefinery settings
-# =============================================================================
-
-def update_settings(chems, CE=541.7):
-    bst.settings.set_thermo(chems)
-    bst.CE = CE # year 2016
-
-
 # %%
 
 # =============================================================================
 # Preprocessing
 # =============================================================================
 
-#!!! When best to set price?
-# ID of units/streams?
+#!!! ID of units/streams?
 def create_preprocessing_process(kind='HMPP', with_AFEX=False):
-    flowsheet = bst.Flowsheet('preprocessing')
+    flowsheet = bst.Flowsheet(kind)
     prep_sys = create_default_depot(kind=kind, with_AFEX=with_AFEX)
 
     prep_sys.simulate()
@@ -133,19 +109,14 @@ def create_preprocessing_process(kind='HMPP', with_AFEX=False):
     prep_cost = PreprocessingCost(depot_sys=prep_sys,
                                   labor_adjustment=_labor_2011to2016)
     
-    (U101, U102, U103, U104, U105) = sorted(prep_sys.units, key=lambda u: u.ID)
+    # (U101, U102, U103, U104, U105) = sorted(prep_sys.units, key=lambda u: u.ID)
     feedstock, = (i.copy() for i in sorted(prep_sys.products, key=lambda s: s.ID))
     feedstock.ID = 'feedstock'
     
     # $/Mg
     set_feedstock_price(feedstock, preprocessing=prep_cost.feedstock_unit_price)
-    # If want to use the default preprocessing price ($24.35/Mg)
-    # set_feedstock_price(feedstock)
     
-    # If want to use the price in ref [2], note that the price here is $/dry U.S. ton
-    # feedstock.price = price['Feedstock']
-    
-    return flowsheet
+    return flowsheet, prep_cost
 
 
 
@@ -155,7 +126,7 @@ def create_preprocessing_process(kind='HMPP', with_AFEX=False):
 # Base pretreatment
 # =============================================================================
 
-def create_base_pretreatment_process(flowsheet, groups, feed_in):
+def create_base_pretreatment_process(flowsheet, groups, feed):
     bst.main_flowsheet.set_flowsheet(flowsheet)
     
     ######################## Streams ########################
@@ -164,7 +135,7 @@ def create_base_pretreatment_process(flowsheet, groups, feed_in):
     water_R201 = Stream('water_R201', units='kg/hr')
     
     ######################## Units ########################
-    R201 = units.DeacetylationReactor('R201', ins=(feed_in, caustic_R201, water_R201))
+    R201 = units.DeacetylationReactor('R201', ins=(feed, caustic_R201, water_R201))
     P201 = units.BlackLiquorPump('P201', ins=R201-0)
     
     U201 = units.DiscMill('U201', ins=R201-1)
@@ -193,7 +164,7 @@ def create_base_pretreatment_process(flowsheet, groups, feed_in):
 # Carbohydrate conversion and separation
 # =============================================================================
 
-def create_ethanol_process(flowsheet, groups):
+def create_ethanol_process(flowsheet, groups, feed):
     bst.main_flowsheet.set_flowsheet(flowsheet)
 
     ######################## Streams ########################
@@ -214,8 +185,7 @@ def create_ethanol_process(flowsheet, groups):
     water_U401 = Stream('water_U401', units='kg/hr')
     
     ######################## Units ########################
-    M301 = units.EnzymeHydrolysateMixer('M301', ins=(flowsheet.unit.P201-0,
-                                                     enzyme_M301, water_M301),
+    M301 = units.EnzymeHydrolysateMixer('M301', ins=(feed, enzyme_M301, water_M301),
                                         enzyme_loading=20, solid_loading=0.2)
     
     R301 = units.SaccharificationAndCoFermentation(
@@ -301,11 +271,147 @@ def create_ethanol_process(flowsheet, groups):
                                     path=(M401, U401, M402, T401, H401,
                                           D401, H401, D401_P, H401, S401,
                                           ethanol_recycle))
+    ethanol_sys = System('ethanol_sys',
+                         path=(ethanol_production_sys, ethanol_separation_sys))
 
-    ethanol_group = UnitGroup('ethanol_group',
-                              units=ethanol_production_sys.units.union(
-                                      ethanol_separation_sys.units))
+    ethanol_group = UnitGroup('ethanol_group', units=ethanol_sys.units)
     groups.append(ethanol_group)
+    
+    return flowsheet, groups
+
+
+# %%
+
+# =============================================================================
+# Facilities
+# =============================================================================
+
+def create_facilities(flowsheet, groups, get_flow_tpd, combustibles,
+                      CHP_wastes, CHP_biogas='', CHP_side_streams=(),
+                      process_water_streams={}, recycled_water=''):
+    bst.main_flowsheet.set_flowsheet(flowsheet)
+    s = flowsheet.stream
+    u = flowsheet.unit
+
+    ######################## Streams ########################
+    # For products
+    ethanol = Stream('ethanol', units='kg/hr', price=price['Ethanol'])
+    denaturant = Stream('denaturant', units='kg/hr', price=price['Denaturant'])
+    
+    # Process chemicals
+    caustic = Stream('caustic', units='kg/hr', price=price['NaOH'])
+    CSL = Stream('CSL', units='kg/hr', price=price['CSL'])
+    DAP = Stream('DAP', units='kg/hr', price=price['DAP'])
+    ammonia = Stream('ammonia', units='kg/hr', price=price['NH4OH'])
+    sulfuric_acid = Stream('sulfuric_acid', units='kg/hr', price=price['H2SO4'])
+    
+    # Chemicals used/generated in CHP
+    lime_CHP = Stream('lime_CHP', units='kg/hr', price=price['Lime'])
+    # Scaled based on feedstock flow, 1054 from Table 33 in ref [2] as NH3
+    ammonia_CHP = Stream('ammonia_CHP', units='kg/hr',
+                         NH4OH=1054*35.046/17.031*get_flow_tpd()/2205)
+    boiler_chems = Stream('boiler_chems', units='kg/hr', price=price['Boiler chems'])
+    baghouse_bag = Stream('baghouse_bag', units='kg/hr', price=price['Baghouse bag'])
+    # Supplementary natural gas for CHP if produced steam not enough for regenerating
+    # all steam streams required by the system
+    natural_gas = Stream('natural_gas', units='kg/hr', price=price['Natural gas'])
+    vent_CHP = Stream('vent_CHP', phase='g', units='kg/hr')
+    ash = Stream('ash', units='kg/hr', price=price['Ash disposal'])
+    
+    cooling_tower_chems = Stream('cooling_tower_chems', units='kg/hr',
+                                 price=price['Cooling tower chems'])
+    
+    system_makeup_water = Stream('system_makeup_water', units='kg/hr',
+                                 price=price['Makeup water'])
+    
+    # 8021 based on stream 713 in Humbird et al.
+    firewater_in = Stream('firewater_in', 
+                           Water=8021*get_flow_tpd()/2205, units='kg/hr')
+    
+    # # Clean-in-place, 145 based on equipment M-910 (clean-in-place system) in ref [1]
+    CIP_chems_in = Stream('CIP_chems_in', Water=145*get_flow_tpd()/2205, 
+                          units='kg/hr')
+    
+    # 1372608 based on stream 950 in ref [1]
+    # Air needed for multiple processes (including enzyme production that was not included here),
+    # not rigorously modeled, only scaled based on plant size
+    plant_air_in = Stream('plant_air_in', phase='g', units='kg/hr',
+                          N2=0.79*1372608*get_flow_tpd()/2205,
+                          O2=0.21*1372608*get_flow_tpd()/2205)
+
+    ######################## Units ########################
+    # Pure ethanol
+    T601 = units.EthanolStorage('T601', ins=u.S402_H-0)
+    T602 = units.DenaturantStorage('T602', ins=denaturant)
+    
+    # Mix in denaturant for final ethanol product
+    M601 = units.DenaturantMixer('M601', ins=(T601-0, T602-0), outs=ethanol)
+    
+    T603 = units.SulfuricAcidStorage('T603', ins=sulfuric_acid,
+                                     outs=s.sulfuric_acid_T201)
+    
+    T604 = units.AmmoniaStorage('T604', ins=ammonia)
+    T604_S = bst.units.ReversedSplitter('T604_S', ins=T604-0, 
+                                        outs=(s.ammonia_M205, s.ammonia_R501,
+                                              s.ammonia_CHP))
+    
+    T605 = units.CausticStorage('T605', ins=caustic, outs=s.caustic_R502)
+    
+    T606 = units.CSLstorage('T606', ins=CSL)
+    T606_S = bst.units.ReversedSplitter('T606_S', ins=T606-0,
+                                        outs=(s.CSL_R301, s.CSL_R302))
+    
+    T607 = units.DAPstorage('T607', ins=DAP)
+    T607_S = bst.units.ReversedSplitter('T607_S', ins=T607-0,
+                                        outs=(s.DAP_R301, s.DAP_R302))
+    
+    T608 = units.FirewaterStorage('T608', ins=firewater_in, outs='firewater_out')
+    
+    # Mix solids for CHP
+    M602 = bst.units.Mixer('M602', ins=CHP_wastes, outs='wastes_to_CHP')
+    
+    CHP = facilities.CHP('CHP', ins=(M602-0, CHP_biogas, lime_CHP, ammonia_CHP,
+                                     boiler_chems, baghouse_bag, natural_gas,
+                                     'boiler_makeup_water'),
+                         B_eff=0.8, TG_eff=0.85, combustibles=combustibles,
+                         side_streams_to_heat=CHP_side_streams,
+                         outs=(vent_CHP, ash, 'boiler_blowdown'))
+    
+    CT = facilities.CT('CT', ins=('return_cooling_water', cooling_tower_chems,
+                                  'CT_makeup_water'),
+                       outs=('process_cooling_water', 'cooling_tower_blowdown'))
+    
+    CWP = facilities.CWP('CWP', ins='return_chilled_water',
+                         outs='process_chilled_water')
+    
+    BDM = bst.units.BlowdownMixer('BDM',ins=(CHP.outs[-1], CT.outs[-1]),
+                                  outs=M601.ins[-1])
+    
+    # All water consumed by the system
+    process_water_streams['facilities'] = (CHP.ins[-1], CT.ins[-1])
+    
+    PWC = facilities.PWC('PWC', ins=(system_makeup_water, recycled_water),
+                         process_water_streams=sum(process_water_streams.values(), ()),
+                         recycled_blowdown_streams=None,
+                         outs=('process_water', 'discharged_water'))
+    
+    ADP = facilities.ADP('ADP', ins=plant_air_in, outs='plant_air_out',
+                         ratio=get_flow_tpd()/2205)
+    CIP = facilities.CIP('CIP', ins=CIP_chems_in, outs='CIP_chems_out')
+
+    ######################## Systems ########################   
+    CHP_group = UnitGroup('CHP_group', units=(CHP,))
+    groups.append(CHP_group)
+    
+    CT_group = UnitGroup('CT_group', units=(CT,))
+    groups.append(CT_group)
+    
+    facilities_no_hu_group = UnitGroup('facilities_no_hu_group',
+                                       units=(T601, T602, M601, T603, T604_S, T604,
+                                              T605, T606_S, T606, T607_S, T607,
+                                              T608, M602,
+                                              CHP, CT, CWP, PWC, ADP, CIP, BDM))
+    groups.append(facilities_no_hu_group)
     
     return flowsheet, groups
 
@@ -316,7 +422,7 @@ def create_ethanol_process(flowsheet, groups):
 # Lignin conversion and separation
 # =============================================================================
 
-def create_lignin_process(flowsheet, groups):
+def create_adipic_process(flowsheet, groups):
     bst.main_flowsheet.set_flowsheet(flowsheet)
     u = flowsheet.unit
 
@@ -346,25 +452,23 @@ def create_lignin_process(flowsheet, groups):
     R701 = units.PulpingReactor('R701', ins=(T701-0, u.S401-0, caustic_R701))
     T702 = units.NeutralizationTank('T702', ins=(R701-0, sulfuric_acid_T702))
     
-    #!!! Need updating to remove the 'set_titer_limit'
     R702 = units.MuconicFermentation('R702', ins=(T702-0, water_R702, ammonia_R702,
                                                   caustic_R702, CSL_R702, DAP_R702,
                                                   air_R702),
-                                     outs=('R702_vent', 'crude_muconic'),
-                                     set_titer_limit=False)
+                                     outs=('R702_vent', 'crude_muconic'))
     
     # Adjusting lignin conversion to meet titer requirement
     def titer_at_yield(lignin_yield):
         R702.main_fermentation_rxns.X[-1] = lignin_yield
         R702._run()
-        return R702.effluent_titer-R702.titer_limit
+        return R702.effluent_titer-R702.target_titer
     
+    #!!! This needs reviewing, need to compare the no-adjusting yield
     def adjust_R702_titer():
-        if R702.set_titer_limit:
-            R702.main_fermentation_rxns.X[-1] = IQ_interpolation(
-                f=titer_at_yield, x0=0, x1=1, xtol=0.001, ytol=0.01, maxiter=50,
-                args=(), checkbounds=False)
-            R702._run()
+        R702.main_fermentation_rxns.X[-1] = IQ_interpolation(
+            f=titer_at_yield, x0=0, x1=1, xtol=0.001, ytol=0.01, maxiter=50,
+            args=(), checkbounds=False)
+        R702._run()
     PS701 = bst.units.ProcessSpecification(
         'PS701', ins=R702-1, specification=adjust_R702_titer)
     
@@ -391,19 +495,113 @@ def create_lignin_process(flowsheet, groups):
                              path=(T703, R703, adipic_recycle, H701),
                              recycle=H701-0)
     
-    lignin_sys = System('lignin_sys',
+    adipic_sys = System('adipic_sys',
                         path=(T701, R701, T702, R702, PS701, S701, S702,
                               solvent_recycle))
     
-    lignin_group = UnitGroup('lignin_group', units=lignin_sys.units)
-    groups.append(lignin_group)
+    adipic_group = UnitGroup('adipic_group', units=adipic_sys.units)
+    groups.append(adipic_group)
     
     return flowsheet, groups
 
 
 # %%
 
-#!!! Compare wastewater and facilities
+# =============================================================================
+# Overall biorefinery and TEA/LCA functions
+# =============================================================================
+
+def create_biorefinery(flowsheet, groups, get_flow_tpd):
+    bst.main_flowsheet.set_flowsheet(flowsheet)
+    s = flowsheet.stream
+    u = flowsheet.unit
+    sys = flowsheet.system
+    
+    ################## Overall Biorefinery ##################
+    biorefinery = System('biorefinery',
+                         path=(sys.pretreatment_sys, sys.ethanol_sys,
+                               sys.wastewater_sys,
+                               u.T601, u.T602, u.M601, u.T603, u.T604_S, u.T604,
+                               u.T605, u.T606_S, u.T606, u.T607_S, u.T607,
+                               u.T708, u.M602),
+                         facilities=(u.CHP, u.CT, u.CWP, u.PWC, u.ADP, u.CIP, u.BDM),
+                         facility_recycle=u.BDM-0)
+    
+    CHP_sys = System('CHP_sys', path=(u.CHP,)) 
+
+    ######################## TEA ########################
+    ISBL_units = set((*sys.pretreatment_sys.units, *sys.ethanol_sys.units))
+    OSBL_units = list(biorefinery.units.difference(ISBL_units))
+    
+    # CHP is not included in this TEA
+    OSBL_units.remove(u.CHP)
+    # biosteam Splitters and Mixers have no cost
+    for i in OSBL_units:
+        if i.__class__ == bst.units.Mixer or i.__class__ == bst.units.Splitter:
+            OSBL_units.remove(i)
+    
+    no_CHP_tea = EthanolAdipicTEA(
+            system=biorefinery, IRR=0.10, duration=(2016, 2046),
+            depreciation='MACRS7', income_tax=0.21, operating_days=0.96*365,
+            lang_factor=None, construction_schedule=(0.08, 0.60, 0.32),
+            startup_months=3, startup_FOCfrac=1, startup_salesfrac=0.5,
+            startup_VOCfrac=0.75, WC_over_FCI=0.05,
+            finance_interest=0.08, finance_years=10, finance_fraction=0.4,
+            OSBL_units=OSBL_units,
+            warehouse=0.04, site_development=0.09, additional_piping=0.045,
+            proratable_costs=0.10, field_expenses=0.10, construction=0.20,
+            contingency=0.10, other_indirect_costs=0.10, 
+            labor_cost=3212962*get_flow_tpd()/2205,
+            labor_burden=0.90, property_insurance=0.007, maintenance=0.03)
+    teas = {'no_CHP_tea': no_CHP_tea}
+    
+    # Removes units, feeds, and products of CHP_sys to avoid double-counting
+    no_CHP_tea.units.remove(u.CHP)
+    
+    for i in sys.CHP_sys.feeds:
+        biorefinery.feeds.remove(i)
+    for i in sys.CHP_sys.products:
+        biorefinery.products.remove(i)
+    
+    # Changed to MACRS 20 to be consistent with ref [1]
+    CHP_tea = bst.TEA.like(sys.CHP_sys, no_CHP_tea)
+    CHP_tea.labor_cost = 0
+    CHP_tea.depreciation = 'MACRS20'
+    CHP_tea.OSBL_units = (u.CHP,)
+    teas['CHP_tea'] = CHP_tea
+    
+    tea = bst.CombinedTEA([no_CHP_tea, CHP_tea], IRR=0.10)
+    biorefinery._TEA = tea
+    teas['tea'] = tea
+
+    ######################## LCA ########################
+    LCA_streams = set([i for i in biorefinery.feeds if i.price]+ \
+        [i for i in CHP_sys.feeds if i.price])
+    LCA_stream = Stream('LCA_stream', units='kg/hr')
+        
+    def get_material_GWP():
+        LCA_stream.mass = sum(i.mass for i in LCA_streams)
+        chemical_GWP = LCA_stream.mass*CFs['GWP_CF_stream'].mass
+        return chemical_GWP.sum()/(s.ethanol.F_mass/_ethanol_kg_2_gal)
+    funcs = {'get_material_GWP': get_material_GWP}
+    
+    # GWP from onsite emission (e.g., combustion) of non-biogenic carbons
+    get_onsite_GWP = lambda: s.natural_gas.get_atomic_flow('C')*chems.CO2.MW \
+        / (s.ethanol.F_mass/_ethanol_kg_2_gal)
+    funcs['get_onsite_GWP'] = get_onsite_GWP
+    
+    # GWP from electricity
+    get_electricity_use = lambda: sum(i.power_utility.rate for i in biorefinery.units)
+    funcs['get_electricity_use'] = get_electricity_use
+    get_electricity_GWP = lambda: get_electricity_use()*CFs['GWP_CFs']['Electricity'] \
+        / (s.ethanol.F_mass/_ethanol_kg_2_gal)
+    funcs['get_electricity_GWP'] = get_electricity_GWP
+    
+    get_GWP = lambda: get_material_GWP()+get_onsite_GWP()+get_electricity_GWP()
+    funcs['get_GWP'] = get_GWP
+
+    return flowsheet, teas, funcs
+
 
 
 

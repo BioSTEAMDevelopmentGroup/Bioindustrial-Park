@@ -14,7 +14,8 @@
 # %%
 
 import biosteam as bst
-from biorefineries.lactic._chemicals import chems
+from biorefineries.lactic._chemicals import chems, sugars, soluble_organics, \
+    solubles, insolubles, COD_chemicals, combustibles
 from biorefineries.lactic._utils import cell_mass_split, gypsum_split
 from biorefineries.lactic._processes import (
     update_settings,
@@ -54,15 +55,17 @@ def create_SSCF_sys():
         create_pretreatment_process(flowsheet, groups, u.U101-0, get_feedstock_dry_mass)
     
     flowsheet, groups = \
-        create_SSCF_conversion_process(flowsheet, groups)
+        create_SSCF_conversion_process(flowsheet, groups, u.P201-0)
     
     flowsheet, groups = \
-        create_separation_process(flowsheet, groups,
+        create_separation_process(flowsheet, groups, u.PS301-0, insolubles,
                                   cell_mass_split, gypsum_split, kind='SSCF')    
     
     WWT_streams = (u.H201-0, u.M401_P-0, u.R402-1, u.R403-1)
     flowsheet, groups = \
-        create_wastewater_process(flowsheet, groups, WWT_streams, get_flow_tpd)
+        create_wastewater_process(flowsheet, groups, get_flow_tpd, WWT_streams,
+                                  COD_chemicals, soluble_organics, solubles,
+                                  insolubles)
     
     CHP_wastes = (u.U101-1, u.S401-0, u.S504-1)
     CHP_biogas = u.R501-0
@@ -74,8 +77,8 @@ def create_SSCF_sys():
         }
     recycled_water = u.S505-0
     flowsheet, groups = \
-        create_facilities(flowsheet, groups,
-                          get_flow_tpd, CHP_wastes, CHP_biogas, CHP_side_streams,
+        create_facilities(flowsheet, groups, get_flow_tpd, combustibles,
+                          CHP_wastes, CHP_biogas, CHP_side_streams,
                           process_water_streams, recycled_water)
 
     flowsheet, teas, funcs = create_lactic_sys(flowsheet, groups, get_flow_tpd)
@@ -94,15 +97,17 @@ def create_SHF_sys():
         create_pretreatment_process(flowsheet, groups, u.U101-0, get_feedstock_dry_mass)
         
     flowsheet, groups = \
-        create_SHF_conversion_process(flowsheet, groups, cell_mass_split)
+        create_SHF_conversion_process(flowsheet, groups, u.P201-0, cell_mass_split)
 
     flowsheet, groups = \
-        create_separation_process(flowsheet, groups,
+        create_separation_process(flowsheet, groups, u.PS301-0, insolubles,
                                   cell_mass_split, gypsum_split, kind='SHF')
 
     WWT_streams = (u.H201-0, u.E301-1, u.M401_P-0, u.R402-1, u.R403-1)
     flowsheet, groups = \
-        create_wastewater_process(flowsheet, groups, WWT_streams, get_flow_tpd)
+        create_wastewater_process(flowsheet, groups, get_flow_tpd, WWT_streams,
+                                  COD_chemicals, soluble_organics, solubles,
+                                  insolubles)
         
     CHP_wastes = (u.U101-1, u.S301-0, u.S401-0, u.S504-1)
     CHP_biogas = u.R501-0
@@ -114,8 +119,8 @@ def create_SHF_sys():
         }
     recycled_water = u.S505-0
     flowsheet, groups = \
-        create_facilities(flowsheet, groups,
-                          get_flow_tpd, CHP_wastes, CHP_biogas, CHP_side_streams,
+        create_facilities(flowsheet, groups, get_flow_tpd, combustibles,
+                          CHP_wastes, CHP_biogas, CHP_side_streams,
                           process_water_streams, recycled_water)
 
     flowsheet, teas, funcs = create_lactic_sys(flowsheet, groups, get_flow_tpd)
