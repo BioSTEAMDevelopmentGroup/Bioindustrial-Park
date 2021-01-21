@@ -18,27 +18,19 @@ References
     Hydrolysis of Corn Stover; Technical Report NREL/TP-5100-47764; 
     National Renewable Energy Lab (NREL), 2011.
     https://www.nrel.gov/docs/fy11osti/47764.pdf
-[2] Kuo et al., Production of Optically Pure L-Lactic Acid from Lignocellulosic
-    Hydrolysate by Using a Newly Isolated and d-Lactate Dehydrogenase
-    Gene-Deficient Lactobacillus Paracasei Strain.
-    Bioresource Technology 2015, 198, 651–657.
-    https://doi.org/10.1016/j.biortech.2015.09.071.
-[3] Aden et al., Process Design Report for Stover Feedstock: Lignocellulosic
-    Biomass to Ethanol Process Design and Economics Utilizing Co-Current Dilute
-    Acid Prehydrolysis and Enzymatic Hydrolysis for Corn Stover; NREL/TP-510-32438;
-    National Renewable Energy Lab (NREL), 2002.
-    https://doi.org/10.2172/1218326
-[4] Davis et al., Process Design and Economics for the Conversion of Lignocellulosic 
+[2] Davis et al., Process Design and Economics for the Conversion of Lignocellulosic 
     Biomass to Hydrocarbon Fuels and Coproducts: 2018 Biochemical Design Case Update; 
     NREL/TP-5100-71949; National Renewable Energy Lab (NREL), 2018. 
     https://doi.org/10.2172/1483234
+[3] Roni et al., Herbaceous Feedstock 2018 State of Technology Report;
+    INL/EXT-18-51654-Rev000; Idaho National Lab. (INL), 2020.
+    https://doi.org/10.2172/1615147
+
 '''
 
 import biosteam as bst
-from biorefineries.ethanol_adipic._chemicals import chems, soluble_organics, \
-    solubles, insolubles, COD_chemicals, combustibles
-from biorefineries.ethanol_adipic._utils import _kg_per_ton, _ethanol_kg_2_gal, \
-    cell_mass_split, AD_split, MB_split
+from biorefineries.ethanol_adipic._chemicals import chems
+from biorefineries.ethanol_adipic._utils import _kg_per_ton, _ethanol_kg_2_gal
 from biorefineries.ethanol_adipic._settings import set_feedstock_price, \
     price, CFs, _feedstock_factor
 from biorefineries.ethanol_adipic._processes import (
@@ -62,15 +54,63 @@ bst.CE = 541.7 # year 2016
 # Different depot systems
 # =============================================================================
 
-CPP_flowsheet, CPP_cost = create_preprocessing_process(kind='CPP', with_AFEX=False)
-CPP_AFEX_flowsheet, CPP_AFEX_cost = create_preprocessing_process(kind='CPP', with_AFEX=True)
-HMPP_flowsheet, HMPP_cost = create_preprocessing_process(kind='HMPP', with_AFEX=False)
-HMPP_AFEX_flowsheet, HMPP_AFEX_cost = create_preprocessing_process(kind='HMPP', with_AFEX=True)
+depot_dct = {}
 
-CPP_feedstock = CPP_flowsheet.stream.feedstock
-CPP_AFEX_feedstock = CPP_AFEX_flowsheet.stream.feedstock
-HMPP_feedstock = HMPP_flowsheet.stream.feedstock
-HMPP_AFEX_feedstock = HMPP_AFEX_flowsheet.stream.feedstock
+CPP_flowsheet, CPP_cost = create_preprocessing_process(kind='CPP', with_AFEX=False)
+CPP_preprocessed = CPP_flowsheet.stream.preprocessed
+depot_dct['CPP'] = {
+    'flowsheet': CPP_flowsheet,
+    'cost': CPP_cost,
+    'preprocessed': CPP_preprocessed,
+    }
+
+CPP_AFEX_flowsheet, CPP_AFEX_cost = create_preprocessing_process(kind='CPP', with_AFEX=True)
+CPP_AFEX_preprocessed = CPP_AFEX_flowsheet.stream.preprocessed
+depot_dct['CPP_AFEX'] = {
+    'flowsheet': CPP_AFEX_flowsheet,
+    'cost': CPP_AFEX_cost,
+    'preprocessed': CPP_AFEX_preprocessed,
+    }
+
+HMPP_flowsheet, HMPP_cost = create_preprocessing_process(kind='HMPP', with_AFEX=False)
+HMPP_preprocessed = HMPP_flowsheet.stream.preprocessed
+depot_dct['HMPP'] = {
+    'flowsheet': HMPP_flowsheet,
+    'cost': HMPP_cost,
+    'preprocessed': HMPP_preprocessed,
+    }
+
+HMPP_AFEX_flowsheet, HMPP_AFEX_cost = create_preprocessing_process(kind='HMPP', with_AFEX=True)
+HMPP_AFEX_preprocessed = HMPP_AFEX_flowsheet.stream.preprocessed
+depot_dct['HMPP_AFEX'] = {
+    'flowsheet': HMPP_AFEX_flowsheet,
+    'cost': HMPP_AFEX_cost,
+    'preprocessed': HMPP_AFEX_preprocessed,
+    }
+
+
+def get_preprocessing_GWP():
+    GWPs = {}
+    e_CF = CFs['GWP_CFs']['Electricity']
+    NH3_CF = CFs['GWP_CFs']['NH3']
+    CH4_CF = CFs['GWP_CFs']['CH4']
+    e_rates = {}
+    for depot, dct in depot_dct.items():
+        sys = dct['flowsheet'].system.prep_sys
+        e_rates[depot] = \
+            sum(i.power_utility.rate for i in sys.units)/dct['preprocessed'].F_mass
+    # Add electricity
+    for depot in depot_dct.keys():
+        # 69.27 kg CO2-eq/U.S. ton from ref [3] for HMPP
+        GWPs[depot] =  69.27/_kg_per_ton + (e_rates[depot]-e_rates['HMPP'])*e_CF
+    for depot in ('CPP_AFEX', 'HMPP_AFEX'):
+        dct = depot_dct[depot]
+        feedstock_mass = dct['preprocessed'].F_mass
+        GWPs[depot] += dct['flowsheet'].stream.ammonia.F_mass*NH3_CF/feedstock_mass
+        GWPs[depot] += dct['flowsheet'].stream.natural_gas.F_mass*CH4_CF/feedstock_mass
+    return GWPs
+
+feedstock_GWPs = get_preprocessing_GWP()
 
 # # If want to use the default preprocessing price ($24.35/Mg)
 # set_feedstock_price(feedstock)
@@ -80,11 +120,18 @@ HMPP_AFEX_feedstock = HMPP_AFEX_flowsheet.stream.feedstock
 
 # %%
 
-def create_acid_biorefinery(feedstock):
-    flowsheet = bst.Flowsheet('Acid')
+# =============================================================================
+# Acid-pretreatment biorefinery
+# =============================================================================
+
+def create_acid_biorefinery(preprocessed):
+    flowsheet = bst.Flowsheet('acid')
+    bst.main_flowsheet.set_flowsheet(flowsheet)
     s = flowsheet.stream
     u = flowsheet.unit
     
+    feedstock = preprocessed.copy('feedstock')
+    feedstock.price = preprocessed.price
     get_feedstock_dry_mass = \
         lambda: feedstock.F_mass - feedstock.imass['H2O']
     get_flow_tpd = \
@@ -95,14 +142,13 @@ def create_acid_biorefinery(feedstock):
         flowsheet, groups, feedstock, get_feedstock_dry_mass)
 
     flowsheet, groups = \
-        create_ethanol_process(flowsheet, groups, u.P201-0, cell_mass_split)
+        create_ethanol_process(flowsheet, groups, u.P201-0)
     
     # The last one is reserved for blowdown
     WWT_streams = (u.H201-0, u.D402_P-0, u.S401-1, '')
     flowsheet, groups = \
         create_wastewater_process(flowsheet, groups, get_flow_tpd, WWT_streams,
-                                  AD_split, MB_split, COD_chemicals,
-                                  soluble_organics, solubles, insolubles)
+                                  need_ammonia=False)
 
     CHP_wastes = (u.S401-0, u.S504-1)
     CHP_biogas = u.R501-0
@@ -113,27 +159,138 @@ def create_acid_biorefinery(feedstock):
         }
     recycled_water = u.S505-0
     flowsheet, groups = \
-        create_facilities(flowsheet, groups, get_flow_tpd, combustibles,
+        create_facilities(flowsheet, groups, get_flow_tpd,
                           CHP_wastes, CHP_biogas, CHP_side_streams,
                           process_water_streams, recycled_water,
                           False, True)
+    
+    u.T603.outs[0] = s.sulfuric_acid_T201
+    u.T604_S.outs[0] = s.ammonia_M205
 
     flowsheet, teas, funcs = create_biorefinery(flowsheet, groups, get_flow_tpd)
 
     return flowsheet, groups, teas, funcs
 
-system_dct = dict.fromkeys(('acid', 'base', 'afex'),
-                           dict.fromkeys(('flowsheet', 'groups',
-                                          'teas', 'funcs')))
 
-acid_feedstock = HMPP_feedstock.copy('acid_feedstock')
-acid_feedstock.price = HMPP_feedstock.price
-acid_flowsheet, acid_groups, acid_teas, acid_funcs = create_acid_biorefinery(acid_feedstock)
+# %%
+
+# =============================================================================
+# AFEX-pretreatment biorefinery
+# =============================================================================
+
+#!!! Make it possible to reuse lignin?
+def create_AFEX_biorefinery(preprocessed):
+    flowsheet = bst.Flowsheet('AFEX')
+    bst.main_flowsheet.set_flowsheet(flowsheet)
+    s = flowsheet.stream
+    u = flowsheet.unit
+    
+    feedstock = preprocessed.copy('feedstock')
+    feedstock.price = preprocessed.price
+    get_flow_tpd = \
+        lambda: (feedstock.F_mass-feedstock.imass['H2O'])*24/_kg_per_ton
+    
+    groups = []
+    flowsheet, groups = \
+        create_ethanol_process(flowsheet, groups, feedstock)
+    u.M301.T = u.R301.T_saccharification
+    u.R301.C5_saccharification = True
+    
+    # The last one is reserved for blowdown
+    WWT_streams = (u.D402_P-0, u.S401-1, '')
+    flowsheet, groups = \
+        create_wastewater_process(flowsheet, groups, get_flow_tpd, WWT_streams,
+                                  need_ammonia=False)
+    
+    CHP_wastes = (u.S401-0, u.S504-1)
+    CHP_biogas = u.R501-0
+    CHP_side_streams = ()
+    process_water_streams = {
+        'ethanol process': (s.water_M301, s.water_U401,)
+        }
+    recycled_water = u.S505-0
+    flowsheet, groups = \
+        create_facilities(flowsheet, groups, get_flow_tpd,
+                          CHP_wastes, CHP_biogas, CHP_side_streams,
+                          process_water_streams, recycled_water,
+                          False, True)
+
+    # Those aren't linked to anything in the system
+    flowsheet.discard(s.sulfuric_acid)
+    flowsheet.discard(u.T603)
+    
+    flowsheet, teas, funcs = create_biorefinery(flowsheet, groups, get_flow_tpd)
+
+    return flowsheet, groups, teas, funcs
+
+
+# %%
+
+# =============================================================================
+# Base-pretreatment biorefinery
+# =============================================================================
+
+# def create_base_biorefinery(preprocessed):
+#     flowsheet = bst.Flowsheet('base')
+#     bst.main_flowsheet.set_flowsheet(flowsheet)
+#     s = flowsheet.stream
+#     u = flowsheet.unit
+
+#    feedstock = preprocessed.copy('feedstock')
+#    feedstock.price = preprocessed.price
+#     get_flow_tpd = \
+#         lambda: (feedstock.F_mass-feedstock.imass['H2O'])*24/_kg_per_ton
+    
+#     groups = []
+#     flowsheet, groups = \
+#         create_ethanol_process(flowsheet, groups, feedstock)
+    
+#     # The last one is reserved for blowdown
+#     WWT_streams = (u.D402_P-0, u.S401-1, '')
+#     flowsheet, groups = \
+#         create_wastewater_process(flowsheet, groups, get_flow_tpd, WWT_streams,
+#                                   need_ammonia=False)
+    
+#     CHP_wastes = (u.S401-0, u.S504-1)
+#     CHP_biogas = u.R501-0
+#     CHP_side_streams = ()
+#     process_water_streams = {
+#         'ethanol process': (s.water_M301, s.water_U401,)
+#         }
+#     recycled_water = u.S505-0
+#     flowsheet, groups = \
+#         create_facilities(flowsheet, groups, get_flow_tpd,
+#                           CHP_wastes, CHP_biogas, CHP_side_streams,
+#                           process_water_streams, recycled_water,
+#                           False, True)
+
+#     flowsheet, teas, funcs = create_biorefinery(flowsheet, groups, get_flow_tpd)
+
+#     return flowsheet, groups, teas, funcs
+
+
+
+# %%
+
+system_dct = {}
+acid_flowsheet, acid_groups, acid_teas, acid_funcs = \
+    create_acid_biorefinery(HMPP_preprocessed)
+
 system_dct['acid'] = {
     'flowsheet': acid_flowsheet,
     'groups': acid_groups,
     'teas': acid_teas,
-    'funcs': acid_funcs,
+    'funcs': acid_funcs
+    }
+
+AFEX_flowsheet, AFEX_groups, AFEX_teas, AFEX_funcs = \
+    create_AFEX_biorefinery(CPP_AFEX_preprocessed)
+
+system_dct['AFEX'] = {
+    'flowsheet': AFEX_flowsheet,
+    'groups': AFEX_groups,
+    'teas': AFEX_teas,
+    'funcs': AFEX_funcs
     }
 
 
@@ -144,14 +301,20 @@ system_dct['acid'] = {
 # Simulate system and get results
 # =============================================================================
 
-def simulate_and_print(system='acid'):
-    dct = system_dct[system.lower()]
+def simulate_and_print(system='acid', feedstock_depot=None):
+    dct = system_dct[system]
     funcs = dct['funcs']
+    s = dct['flowsheet'].stream
     bst.main_flowsheet.set_flowsheet(dct['flowsheet'])
 
-    print(f'\n---------- {system.capitalize()} Biorefinery ----------')
+    print(f'\n---------- {system if system.isupper() else system.capitalize()} Biorefinery ----------')
     print(f'MESP: ${funcs["simulate_get_MESP"]()*_ethanol_kg_2_gal:.2f}/gal')
-    print(f'GWP: {funcs["get_GWP"]():.3f} kg CO2-eq/gal ethanol')
+    print(f'GWP: {funcs["get_GWP"]():.3f} kg CO2-eq/gal ethanol without feedstock')
+    if feedstock_depot:
+        GWP = funcs['get_GWP']()
+        GWP = funcs['get_GWP']() + (feedstock_GWPs[feedstock_depot]*s.feedstock.F_mass) \
+            / (s.ethanol.F_mass/_ethanol_kg_2_gal)
+    print(f'GWP: {GWP:.3f} kg CO2-eq/gal ethanol with feedstock')
     print('--------------------------------------')
 
 

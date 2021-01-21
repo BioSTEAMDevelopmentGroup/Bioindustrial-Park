@@ -191,7 +191,9 @@ GWP_CF_array = chems.kwarray(GWP_CFs)
 # In kg CO2-eq/kg of material
 GWP_CF_stream = tmo.Stream('GWP_CF_stream', GWP_CF_array, units='kg/hr')
 
-GWP_CFs['Corn stover'] = 44.70/1e3 * 0.8
+GWP_CFs['Corn stover'] = 44.70/1e3
+GWP_CFs['Switchgrass'] = 87.81/1e3
+GWP_CFs['Miscanthus'] = 78.28/1e3
 # In kg CO2-eq/kWh
 GWP_CFs['Electricity'] = 0.48
 # From ref [3]

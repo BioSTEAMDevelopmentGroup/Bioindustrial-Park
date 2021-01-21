@@ -66,8 +66,10 @@ from biosteam.process_tools import UnitGroup
 from biorefineries.lactic import _units as units
 from biorefineries.lactic import _facilities as facilities
 from biorefineries.lactic._settings import price, CFs
-from biorefineries.lactic._utils import baseline_feedflow, _kg_per_ton, set_yield
-from biorefineries.lactic._chemicals import chems, sugars
+from biorefineries.lactic._utils import baseline_feedflow, _kg_per_ton, set_yield, \
+    cell_mass_split, gypsum_split, AD_split, MB_split
+from biorefineries.lactic._chemicals import chems, sugars, soluble_organics, \
+    solubles, insolubles, COD_chemicals, combustibles
 from biorefineries.lactic._tea import LacticTEA
 from biorefineries import BST222
 
@@ -295,7 +297,8 @@ def create_SSCF_conversion_process(flowsheet, groups, feed):
     return flowsheet, groups
 
 
-def create_SHF_conversion_process(flowsheet, groups, feed, cell_mass_split):
+def create_SHF_conversion_process(flowsheet, groups, feed,
+                                  cell_mass_split=cell_mass_split):
     bst.main_flowsheet.set_flowsheet(flowsheet)
     
     ######################## Streams ########################
@@ -476,8 +479,9 @@ def create_SHF_conversion_process(flowsheet, groups, feed, cell_mass_split):
 # Separation
 # =============================================================================
 
-def create_separation_process(flowsheet, groups, feed, insolubles,
-                              cell_mass_split, gypsum_split, kind='SSCF'):
+def create_separation_process(flowsheet, groups, feed, insolubles=insolubles,
+                              cell_mass_split=cell_mass_split,
+                              gypsum_split=gypsum_split, kind='SSCF'):
     bst.main_flowsheet.set_flowsheet(flowsheet)
     
     ######################## Streams ########################
@@ -685,9 +689,11 @@ def create_separation_process(flowsheet, groups, feed, insolubles,
 # =============================================================================
 
 def create_wastewater_process(flowsheet, groups, get_flow_tpd, wastewater_streams,
-                              AD_split, MB_split, COD_chemicals,
-                              soluble_organics, solubles, insolubles,
-                              need_ammonia=False,):
+                              AD_split=AD_split, MB_split=MB_split,
+                              COD_chemicals=COD_chemicals,
+                              soluble_organics=soluble_organics,
+                              solubles=solubles, insolubles=insolubles,
+                              need_ammonia=False):
     bst.main_flowsheet.set_flowsheet(flowsheet)
     
     ######################## Streams ########################
@@ -765,9 +771,10 @@ def create_wastewater_process(flowsheet, groups, get_flow_tpd, wastewater_stream
 # Facilities
 # =============================================================================
 
-def create_facilities(flowsheet, groups, get_flow_tpd, combustibles,
+def create_facilities(flowsheet, groups, get_flow_tpd, 
                       CHP_wastes, CHP_biogas='', CHP_side_streams=(),
                       process_water_streams={}, recycled_water='',
+                      combustibles=combustibles,
                       if_HXN=True, if_BDM=False):
     bst.main_flowsheet.set_flowsheet(flowsheet)
     s = flowsheet.stream

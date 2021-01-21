@@ -195,12 +195,11 @@ class BlackLiquorPump(Unit):
 @cost(basis='Flow rate', ID='Recirculation pump', units='kg/hr',
       kW=74.57, cost=47200, S=421776, CE=CEPCI[2009], n=0.8, BM=2.3)
 @cost(basis='Duty', ID='Hydrolysate cooler', units='kJ/hr',
-      # 13 is the duty in MMkca/hr
       cost=85000, S=-8*_Gcal_2_kJ, CE=CEPCI[2010], n=0.7, BM=2.2)
 class SaccharificationAndCoFermentation(Unit):
     _N_ins = 4
     _N_outs = 3
-    _N_heat_utilities = 3
+    _N_heat_utilities = 2
     
     #: Saccharification temperature (K)
     T_saccharification = 48+273.15
@@ -279,24 +278,21 @@ class SaccharificationAndCoFermentation(Unit):
     
     def _design(self):
         self.design_results['Flow rate'] = self.ins[0].F_mass
-        effluent = self.outs[1]
-        hu_hydrolysate, hu_saccharification, hu_fermentation = self.heat_utilities
+        hu_hydrolysate, hu_saccharification = self.heat_utilities
         mixture = self.thermo.mixture
         ss = self.saccharified_stream
+
         ss_in = ss.copy()
         ss_in.mix_from(self.ins)
-        self.design_results['Duty'] = ss.H-ss_in.H
+        # To cool or heat hydrolysate to the fermentation temperature
         hu_hydrolysate(duty=ss.H-ss_in.H, T_in=ss_in.T)
         
         mol = ss.mol
         duty = (mixture.H('l', mol, self.T_fermentation, 101325.)
                 - mixture.H('l', mol, self.T_saccharification, 101325.))
+        self.design_results['Duty'] = duty
+        # To cool the hydrolysate down to fermentation temperature
         hu_saccharification(duty, self.T_fermentation)
-        ei = effluent.chemicals.index('Ethanol')
-        ethanol = (sum([i.mol[ei] for i in self.outs])
-                   - sum([i.mol[ei] for i in self.ins]))
-        reactor_duty = -5568 * ethanol
-        hu_fermentation(reactor_duty, effluent.T)
 
 
 @cost(basis='Flow rate', ID='Stage #1 reactor', units='kg/hr',

@@ -339,11 +339,16 @@ class EnzymeHydrolysateMixer(Mixer):
     _N_ins = 3	
     _N_outs = 1
     _graphics = Mixer._graphics
+    _N_heat_utilities = 1
+    auxiliary_unit_names = ('heat_exchanger',)
     
-    def __init__(self, ID='', ins=None, outs=(), enzyme_loading=20, solid_loading=0.2):
+    def __init__(self, ID='', ins=None, outs=(),
+                 enzyme_loading=20, solid_loading=0.2, T=None):
         Unit.__init__(self, ID, ins, outs)
         self.enzyme_loading = enzyme_loading
         self.solid_loading = solid_loading
+        self.T = T
+        self.heat_exchanger = HXutility(None, None, None, T=T)
     
     def _run(self): 
         hydrolysate, enzyme, water = self.ins   
@@ -358,6 +363,11 @@ class EnzymeHydrolysateMixer(Mixer):
         water.imass['Water'] = max(0, total_mass-mixture.F_mass)
             
         effluent.mix_from([hydrolysate, enzyme, water])
+        if self.T:
+            effluent.T = self.T
+            self.heat_exchanger.simulate_as_auxiliary_exchanger(
+                duty=self.Hnet, stream=effluent)
+        
 
 # Saccharification and co-fermentation (both glucose & xylose are used in fermentation)
 # Not including heat exchanger as saccharificatoin and co-fermentation 
@@ -775,7 +785,7 @@ class CoFermentation(Reactor):
         self.allow_dilution = allow_dilution
         self.allow_concentration = allow_concentration
         self.mixed_feed = Stream()
-        self.heat_exchanger = HXutility(None, None, None, T=T) 
+        self.heat_exchanger = HXutility(None, None, None, T=T)
         
         # FermMicrobe reaction from ref [1]
         self.cofermentation_rxns = ParallelRxn([

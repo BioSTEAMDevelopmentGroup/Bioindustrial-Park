@@ -14,10 +14,7 @@
 # %%
 
 import biosteam as bst
-from biorefineries.lactic._chemicals import chems, sugars, soluble_organics, \
-    solubles, insolubles, COD_chemicals, combustibles
-from biorefineries.lactic._utils import cell_mass_split, gypsum_split, \
-    AD_split, MB_split
+from biorefineries.lactic._chemicals import chems
 from biorefineries.lactic._processes import (
     update_settings,
     create_preprocessing_process,
@@ -45,7 +42,7 @@ __all__ = (
 # %%
 
 def create_SSCF_sys():
-    flowsheet = bst.Flowsheet('LA_SSCF')
+    flowsheet = bst.Flowsheet('SSCF')
     s = flowsheet.stream
     u = flowsheet.unit
     
@@ -59,15 +56,12 @@ def create_SSCF_sys():
         create_SSCF_conversion_process(flowsheet, groups, u.P201-0)
     
     flowsheet, groups = \
-        create_separation_process(flowsheet, groups, u.PS301-0, insolubles,
-                                  cell_mass_split, gypsum_split, kind='SSCF')    
+        create_separation_process(flowsheet, groups, u.PS301-0, kind='SSCF')    
     
     # The last one is reserved for blowdown
     WWT_streams = (u.H201-0, u.M401_P-0, u.R402-1, u.R403-1, '')
     flowsheet, groups = \
-        create_wastewater_process(flowsheet, groups, get_flow_tpd, WWT_streams,
-                                  AD_split, MB_split, COD_chemicals,
-                                  soluble_organics, solubles, insolubles)
+        create_wastewater_process(flowsheet, groups, get_flow_tpd, WWT_streams)
     
     CHP_wastes = (u.U101-1, u.S401-0, u.S504-1)
     CHP_biogas = u.R501-0
@@ -79,7 +73,7 @@ def create_SSCF_sys():
         }
     recycled_water = u.S505-0
     flowsheet, groups = \
-        create_facilities(flowsheet, groups, get_flow_tpd, combustibles,
+        create_facilities(flowsheet, groups, get_flow_tpd,
                           CHP_wastes, CHP_biogas, CHP_side_streams,
                           process_water_streams, recycled_water)
 
@@ -88,7 +82,7 @@ def create_SSCF_sys():
     return flowsheet, groups, teas, funcs
 
 def create_SHF_sys():
-    flowsheet = bst.Flowsheet('LA_SHF')
+    flowsheet = bst.Flowsheet('SHF')
     s = flowsheet.stream
     u = flowsheet.unit
     
@@ -99,18 +93,15 @@ def create_SHF_sys():
         create_pretreatment_process(flowsheet, groups, u.U101-0, get_feedstock_dry_mass)
         
     flowsheet, groups = \
-        create_SHF_conversion_process(flowsheet, groups, u.P201-0, cell_mass_split)
+        create_SHF_conversion_process(flowsheet, groups, u.P201-0)
 
     flowsheet, groups = \
-        create_separation_process(flowsheet, groups, u.PS301-0, insolubles,
-                                  cell_mass_split, gypsum_split, kind='SHF')
+        create_separation_process(flowsheet, groups, u.PS301-0, kind='SHF')
 
     # The last one is reserved for blowdown
     WWT_streams = (u.H201-0, u.E301-1, u.M401_P-0, u.R402-1, u.R403-1, '')
     flowsheet, groups = \
-        create_wastewater_process(flowsheet, groups, get_flow_tpd, WWT_streams,
-                                  AD_split, MB_split, COD_chemicals,
-                                  soluble_organics, solubles, insolubles)
+        create_wastewater_process(flowsheet, groups, get_flow_tpd, WWT_streams)
         
     CHP_wastes = (u.U101-1, u.S301-0, u.S401-0, u.S504-1)
     CHP_biogas = u.R501-0
@@ -122,7 +113,7 @@ def create_SHF_sys():
         }
     recycled_water = u.S505-0
     flowsheet, groups = \
-        create_facilities(flowsheet, groups, get_flow_tpd, combustibles,
+        create_facilities(flowsheet, groups, get_flow_tpd,
                           CHP_wastes, CHP_biogas, CHP_side_streams,
                           process_water_streams, recycled_water)
 
@@ -142,10 +133,10 @@ SHF_flowsheet, SHF_groups, SHF_teas, SHF_funcs  = create_SHF_sys()
 # =============================================================================
 
 def simulate_and_print(system='SSCF'):
-    if 'sscf' in str(system).lower():
+    if 'SSCF' in str(system).upper():
         flowsheet = SSCF_flowsheet
         funcs = SSCF_funcs
-    elif 'shf' in str(system).lower():
+    elif 'SHF' in str(system).upper():
         flowsheet = SHF_flowsheet
         funcs = SHF_funcs
     else:
@@ -160,9 +151,9 @@ def simulate_and_print(system='SSCF'):
 
 
 def simulate_fermentation_improvement(system='SSCF'):
-    if 'sscf' in str(system).lower():
+    if 'SSCF' in str(system).upper():
         flowsheet = SSCF_flowsheet
-    elif 'shf' in str(system).lower():
+    elif 'SHF' in str(system).upper():
         flowsheet = SHF_flowsheet
     else:
         raise ValueError(f'system can only be "SSCF" or "SHF", not {system}.')
@@ -179,9 +170,9 @@ def simulate_fermentation_improvement(system='SSCF'):
     simulate_and_print(system)
 
 def simulate_separation_improvement(system='SSCF'):
-    if 'sscf' in str(system).lower():
+    if 'SSCF' in str(system).upper():
         flowsheet = SSCF_flowsheet
-    elif 'shf' in str(system).lower():
+    elif 'SHF' in str(system).upper():
         flowsheet = SHF_flowsheet
     else:
         raise ValueError(f'system can only be "SSCF" or "SHF", not {system}.')
@@ -194,10 +185,10 @@ def simulate_separation_improvement(system='SSCF'):
     simulate_and_print(system)
 
 def simulate_operating_improvement(system='SSCF'):
-    if 'sscf' in str(system).lower():
+    if 'SSCF' in str(system).upper():
         flowsheet = SSCF_flowsheet
         funcs = SSCF_funcs
-    elif 'shf' in str(system).lower():
+    elif 'SHF' in str(system).upper():
         flowsheet = SHF_flowsheet
         funcs = SHF_funcs
     else:
