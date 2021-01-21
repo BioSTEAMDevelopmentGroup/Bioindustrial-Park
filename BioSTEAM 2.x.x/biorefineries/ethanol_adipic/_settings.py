@@ -170,7 +170,7 @@ bst.PowerUtility.price = price['Electricity']
 
 # =============================================================================
 # Characterization factors (CFs) for life cycle analysis (LCA), 100-year global
-# warming potential (GWP) in kg CO2-eq/kg
+# warming potential (GWP) in kg CO2-eq/kg, from ref [3] if not 
 # =============================================================================
 
 GWP_CFs = {
@@ -184,7 +184,9 @@ GWP_CFs = {
     'H2': 15.80, # liquid H2 combined
     'CH4': 0.40, # NA NG from shale and conventional recovery
     'Lime': 1.29,
-    'Denaturant': 0.88, # gasoline blendstock from crude oil for use in US refineries
+    'Denaturant': 0.88, # gasoline blendstock from crude oil for use in US refineries,
+    'AdipicAcid': -12.03, # negative as it's a coproduct
+    'SodiumSulfate': -0.47 # negative as it's a coproduct
     }
 
 GWP_CF_array = chems.kwarray(GWP_CFs)
@@ -196,16 +198,13 @@ GWP_CFs['Switchgrass'] = 87.81/1e3
 GWP_CFs['Miscanthus'] = 78.28/1e3
 # In kg CO2-eq/kWh
 GWP_CFs['Electricity'] = 0.48
-# From ref [3]
-GWP_CFs['Adipic acid_fossil'] = 12.03
-GWP_CFs['Sodium sulfate'] = 0.47 # from sodium brine
 
-# [5] ecoinvent 3.6 https://www.ecoinvent.org/home.html (accessed Aug 26, 2020).
-# # From ref [5], cut-off by classification, adipic acid production, RoW, TRACI
-# GWP_CFs['Adipic acid_ecoinvent'] = 14.3
-# # From ref [5], cut-off by classification, sodium sulfate production,
+# [4] ecoinvent 3.6 https://www.ecoinvent.org/home.html (accessed Aug 26, 2020).
+# # From ref [4], cut-off by classification, adipic acid production, RoW, TRACI
+# GWP_CFs['AdipicAid_ecoinvent'] = 14.3
+# # From ref [4], cut-off by classification, sodium sulfate production,
 # # from natural sources, RoW, TRACI
-# GWP_CFs['Sodium sulfate_ecoinvent'] = 0.10829
+# GWP_CFs['SodiumSulfate_ecoinvent'] = 0.10829
 
 CFs = {'GWP_CFs': GWP_CFs, 'GWP_CF_stream': GWP_CF_stream}
 

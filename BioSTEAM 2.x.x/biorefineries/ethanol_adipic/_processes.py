@@ -64,7 +64,7 @@ from biorefineries.ethanol_adipic._utils import convert_ethanol_wt_2_mol, \
     _ethanol_kg_2_gal, cell_mass_split, AD_split, MB_split
 from biorefineries.ethanol_adipic._tea import EthanolAdipicTEA
 
-from biorefineries.lactic import (
+from biorefineries.lactic._processes import (
     create_pretreatment_process as create_acid_pretreatment_process,
     create_wastewater_process as la_create_wastewater_process,
     )
@@ -90,6 +90,7 @@ TODOs:
     Add options of ins/outs for connections between processes
 '''
 
+hasattr = hasattr
 
 
 # %%
@@ -277,319 +278,14 @@ def create_ethanol_process(flowsheet, groups, feed,
 # %%
 
 # =============================================================================
-# Wastewater
-# =============================================================================
-
-def create_wastewater_process(flowsheet, groups, get_flow_tpd, wastewater_streams,
-                              need_ammonia):
-    flowsheet, groups = la_create_wastewater_process(
-        flowsheet, groups, get_flow_tpd, wastewater_streams,
-        AD_split=AD_split, MB_split=MB_split, COD_chemicals=COD_chemicals,
-        soluble_organics=soluble_organics, solubles=solubles, insolubles=insolubles,
-        need_ammonia=need_ammonia)
-    
-    return flowsheet, groups
-
-
-# %%
-
-# =============================================================================
-# Facilities
-# =============================================================================
-
-#!!! PAUSED TO CHECK FOR DIFFERENT SYSTEMS
-def create_facilities(flowsheet, groups, get_flow_tpd,
-                      CHP_wastes, CHP_biogas='', CHP_side_streams=(),
-                      process_water_streams={}, recycled_water='',
-                      if_HXN=False, if_BDM=False):
-    bst.main_flowsheet.set_flowsheet(flowsheet)
-    s = flowsheet.stream
-    u = flowsheet.unit
-
-    ######################## Streams ########################
-    # For products
-    ethanol = Stream('ethanol', units='kg/hr', price=price['Ethanol'])
-    denaturant = Stream('denaturant', units='kg/hr', price=price['Denaturant'])
-    
-    # Process chemicals
-    caustic = Stream('caustic', units='kg/hr', price=price['NaOH'])
-    CSL = Stream('CSL', units='kg/hr', price=price['CSL'])
-    DAP = Stream('DAP', units='kg/hr', price=price['DAP'])
-    ammonia = Stream('ammonia', units='kg/hr', price=price['NH4OH'])
-    sulfuric_acid = Stream('sulfuric_acid', units='kg/hr', price=price['H2SO4'])
-    
-    # Chemicals used/generated in CHP
-    lime_CHP = Stream('lime_CHP', units='kg/hr', price=price['Lime'])
-    # Scaled based on feedstock flow, 1054 from Table 33 in ref [2] as NH3
-    ammonia_CHP = Stream('ammonia_CHP', units='kg/hr',
-                         NH4OH=1054*35.046/17.031*get_flow_tpd()/2205)
-    boiler_chems = Stream('boiler_chems', units='kg/hr', price=price['Boiler chems'])
-    baghouse_bag = Stream('baghouse_bag', units='kg/hr', price=price['Baghouse bag'])
-    # Supplementary natural gas for CHP if produced steam not enough for regenerating
-    # all steam streams required by the system
-    natural_gas = Stream('natural_gas', units='kg/hr', price=price['Natural gas'])
-    vent_CHP = Stream('vent_CHP', phase='g', units='kg/hr')
-    ash = Stream('ash', units='kg/hr', price=price['Ash disposal'])
-    
-    cooling_tower_chems = Stream('cooling_tower_chems', units='kg/hr',
-                                 price=price['Cooling tower chems'])
-    
-    system_makeup_water = Stream('system_makeup_water', units='kg/hr',
-                                 price=price['Makeup water'])
-    
-    # 8021 based on stream 713 in Humbird et al.
-    firewater_in = Stream('firewater_in', 
-                           Water=8021*get_flow_tpd()/2205, units='kg/hr')
-    
-    # # Clean-in-place, 145 based on equipment M-910 (clean-in-place system) in ref [1]
-    CIP_chems_in = Stream('CIP_chems_in', Water=145*get_flow_tpd()/2205, 
-                          units='kg/hr')
-    
-    # 1372608 based on stream 950 in ref [1]
-    # Air needed for multiple processes (including enzyme production that was not included here),
-    # not rigorously modeled, only scaled based on plant size
-    plant_air_in = Stream('plant_air_in', phase='g', units='kg/hr',
-                          N2=0.79*1372608*get_flow_tpd()/2205,
-                          O2=0.21*1372608*get_flow_tpd()/2205)
-
-    ######################## Units ########################
-    # Pure ethanol
-    T601 = units.EthanolStorage('T601', ins=u.S402_H-0)
-    T602 = units.DenaturantStorage('T602', ins=denaturant)
-    
-    # Mix in denaturant for final ethanol product
-    M601 = units.DenaturantMixer('M601', ins=(T601-0, T602-0), outs=ethanol)
-    
-    T603 = units.SulfuricAcidStorage('T603', ins=sulfuric_acid)
-
-    T604 = units.AmmoniaStorage('T604', ins=ammonia)
-    T604_S = bst.units.ReversedSplitter('T604_S', ins=T604-0, 
-                                        outs=('', s.ammonia_R501,
-                                              s.ammonia_CHP))
-    
-    T605 = units.CausticStorage('T605', ins=caustic)
-    T605_S = bst.units.ReversedSplitter('T605_S', ins=T605-0, 
-                                    outs=(s.caustic_R502, '', ''))
-    
-    T606 = units.CSLstorage('T606', ins=CSL)
-    T606_S = bst.units.ReversedSplitter('T606_S', ins=T606-0,
-                                        outs=(s.CSL_R301, s.CSL_R302, ''))
-    
-    T607 = units.DAPstorage('T607', ins=DAP)
-    T607_S = bst.units.ReversedSplitter('T607_S', ins=T607-0,
-                                        outs=(s.DAP_R301, s.DAP_R302, ''))
-    
-    T608 = units.FirewaterStorage('T608', ins=firewater_in, outs='firewater_out')
-    
-    # Mix solids for CHP
-    M602 = bst.units.Mixer('M602', ins=CHP_wastes, outs='wastes_to_CHP')
-    
-    CHP = facilities.CHP('CHP', ins=(M602-0, CHP_biogas, lime_CHP, ammonia_CHP,
-                                     boiler_chems, baghouse_bag, natural_gas,
-                                     'boiler_makeup_water'),
-                         B_eff=0.8, TG_eff=0.85, combustibles=combustibles,
-                         side_streams_to_heat=CHP_side_streams,
-                         outs=(vent_CHP, ash, 'boiler_blowdown'))
-    
-    CT = facilities.CT('CT', ins=('return_cooling_water', cooling_tower_chems,
-                                  'CT_makeup_water'),
-                       outs=('process_cooling_water', 'cooling_tower_blowdown'))
-    
-    CWP = facilities.CWP('CWP', ins='return_chilled_water',
-                         outs='process_chilled_water')
-    
-    # All water consumed by the system
-    process_water_streams['facilities'] = (CHP.ins[-1], CT.ins[-1])
-    
-    PWC = facilities.PWC('PWC', ins=(system_makeup_water, recycled_water),
-                         process_water_streams=sum(process_water_streams.values(), ()),
-                         recycled_blowdown_streams=(),
-                         outs=('process_water', 'discharged_water'))
-    
-    ADP = facilities.ADP('ADP', ins=plant_air_in, outs='plant_air_out',
-                         ratio=get_flow_tpd()/2205)
-    CIP = facilities.CIP('CIP', ins=CIP_chems_in, outs='CIP_chems_out')
-
-    ######################## Systems ########################
-    if if_HXN:
-        HXN = bst.units.HeatExchangerNetwork('HXN')
-        HXN_group = UnitGroup('HXN_group', units=(HXN,))
-        groups.append(HXN_group)
-    
-    CHP_group = UnitGroup('CHP_group', units=(CHP,))
-    groups.append(CHP_group)
-    
-    CT_group = UnitGroup('CT_group', units=(CT,))
-    groups.append(CT_group)
-    
-    facilities_no_hu_group = UnitGroup('facilities_no_hu_group',
-                                       units=(T601, T602, M601, T603, T604_S, T604,
-                                              T605_S, T605, T606_S, T606, T607_S, T607,
-                                              T608, M602, CWP, PWC, ADP, CIP))
-    if if_BDM:
-        BDM = bst.units.BlowdownMixer('BDM',ins=(CHP.outs[-1], CT.outs[-1]),
-                                      outs=u.M501.ins[-1])
-        PWC.recycled_blowdown_streams = BDM.outs
-        facilities_no_hu_group.units = (*facilities_no_hu_group.units, BDM)
-    
-    groups.append(facilities_no_hu_group)
-    
-    return flowsheet, groups
-
-
-
-# def create_facilities(flowsheet, groups, get_flow_tpd,
-#                       CHP_wastes, CHP_biogas='', CHP_side_streams=(),
-#                       process_water_streams={}, recycled_water='',
-#                       if_HXN=False, if_BDM=False):
-#     bst.main_flowsheet.set_flowsheet(flowsheet)
-#     s = flowsheet.stream
-#     u = flowsheet.unit
-
-#     ######################## Streams ########################
-#     # For products
-#     ethanol = Stream('ethanol', units='kg/hr', price=price['Ethanol'])
-#     denaturant = Stream('denaturant', units='kg/hr', price=price['Denaturant'])
-    
-#     # Process chemicals
-#     caustic = Stream('caustic', units='kg/hr', price=price['NaOH'])
-#     CSL = Stream('CSL', units='kg/hr', price=price['CSL'])
-#     DAP = Stream('DAP', units='kg/hr', price=price['DAP'])
-#     ammonia = Stream('ammonia', units='kg/hr', price=price['NH4OH'])
-#     sulfuric_acid = Stream('sulfuric_acid', units='kg/hr', price=price['H2SO4'])
-    
-#     # Chemicals used/generated in CHP
-#     lime_CHP = Stream('lime_CHP', units='kg/hr', price=price['Lime'])
-#     # Scaled based on feedstock flow, 1054 from Table 33 in ref [2] as NH3
-#     ammonia_CHP = Stream('ammonia_CHP', units='kg/hr',
-#                          NH4OH=1054*35.046/17.031*get_flow_tpd()/2205)
-#     boiler_chems = Stream('boiler_chems', units='kg/hr', price=price['Boiler chems'])
-#     baghouse_bag = Stream('baghouse_bag', units='kg/hr', price=price['Baghouse bag'])
-#     # Supplementary natural gas for CHP if produced steam not enough for regenerating
-#     # all steam streams required by the system
-#     natural_gas = Stream('natural_gas', units='kg/hr', price=price['Natural gas'])
-#     vent_CHP = Stream('vent_CHP', phase='g', units='kg/hr')
-#     ash = Stream('ash', units='kg/hr', price=price['Ash disposal'])
-    
-#     cooling_tower_chems = Stream('cooling_tower_chems', units='kg/hr',
-#                                  price=price['Cooling tower chems'])
-    
-#     system_makeup_water = Stream('system_makeup_water', units='kg/hr',
-#                                  price=price['Makeup water'])
-    
-#     # 8021 based on stream 713 in Humbird et al.
-#     firewater_in = Stream('firewater_in', 
-#                            Water=8021*get_flow_tpd()/2205, units='kg/hr')
-    
-#     # # Clean-in-place, 145 based on equipment M-910 (clean-in-place system) in ref [1]
-#     CIP_chems_in = Stream('CIP_chems_in', Water=145*get_flow_tpd()/2205, 
-#                           units='kg/hr')
-    
-#     # 1372608 based on stream 950 in ref [1]
-#     # Air needed for multiple processes (including enzyme production that was not included here),
-#     # not rigorously modeled, only scaled based on plant size
-#     plant_air_in = Stream('plant_air_in', phase='g', units='kg/hr',
-#                           N2=0.79*1372608*get_flow_tpd()/2205,
-#                           O2=0.21*1372608*get_flow_tpd()/2205)
-
-#     ######################## Units ########################
-#     # Pure ethanol
-#     T601 = units.EthanolStorage('T601', ins=u.S402_H-0)
-#     T602 = units.DenaturantStorage('T602', ins=denaturant)
-    
-#     # Mix in denaturant for final ethanol product
-#     M601 = units.DenaturantMixer('M601', ins=(T601-0, T602-0), outs=ethanol)
-    
-#     if not hasattr(s, 'sulfuric_acid_T201'):
-#         sulfuric_acid_T201 = Stream()
-#     T603 = units.SulfuricAcidStorage('T603', ins=sulfuric_acid,
-#                                      outs=s.sulfuric_acid_T201)
-
-#     if not hasattr(s, 'ammonia_M205'):
-#         ammonia_M205 = Stream()
-#     T604 = units.AmmoniaStorage('T604', ins=ammonia)
-#     T604_S = bst.units.ReversedSplitter('T604_S', ins=T604-0, 
-#                                         outs=(s.ammonia_M205, s.ammonia_R501,
-#                                               s.ammonia_CHP))
-    
-#     T605 = units.CausticStorage('T605', ins=caustic, outs=s.caustic_R502)
-    
-#     T606 = units.CSLstorage('T606', ins=CSL)
-#     T606_S = bst.units.ReversedSplitter('T606_S', ins=T606-0,
-#                                         outs=(s.CSL_R301, s.CSL_R302))
-    
-#     T607 = units.DAPstorage('T607', ins=DAP)
-#     T607_S = bst.units.ReversedSplitter('T607_S', ins=T607-0,
-#                                         outs=(s.DAP_R301, s.DAP_R302))
-    
-#     T608 = units.FirewaterStorage('T608', ins=firewater_in, outs='firewater_out')
-    
-#     # Mix solids for CHP
-#     M602 = bst.units.Mixer('M602', ins=CHP_wastes, outs='wastes_to_CHP')
-    
-#     CHP = facilities.CHP('CHP', ins=(M602-0, CHP_biogas, lime_CHP, ammonia_CHP,
-#                                      boiler_chems, baghouse_bag, natural_gas,
-#                                      'boiler_makeup_water'),
-#                          B_eff=0.8, TG_eff=0.85, combustibles=combustibles,
-#                          side_streams_to_heat=CHP_side_streams,
-#                          outs=(vent_CHP, ash, 'boiler_blowdown'))
-    
-#     CT = facilities.CT('CT', ins=('return_cooling_water', cooling_tower_chems,
-#                                   'CT_makeup_water'),
-#                        outs=('process_cooling_water', 'cooling_tower_blowdown'))
-    
-#     CWP = facilities.CWP('CWP', ins='return_chilled_water',
-#                          outs='process_chilled_water')
-    
-#     # All water consumed by the system
-#     process_water_streams['facilities'] = (CHP.ins[-1], CT.ins[-1])
-    
-#     PWC = facilities.PWC('PWC', ins=(system_makeup_water, recycled_water),
-#                          process_water_streams=sum(process_water_streams.values(), ()),
-#                          recycled_blowdown_streams=(),
-#                          outs=('process_water', 'discharged_water'))
-    
-#     ADP = facilities.ADP('ADP', ins=plant_air_in, outs='plant_air_out',
-#                          ratio=get_flow_tpd()/2205)
-#     CIP = facilities.CIP('CIP', ins=CIP_chems_in, outs='CIP_chems_out')
-
-#     ######################## Systems ########################
-#     if if_HXN:
-#         HXN = bst.units.HeatExchangerNetwork('HXN')
-#         HXN_group = UnitGroup('HXN_group', units=(HXN,))
-#         groups.append(HXN_group)
-    
-#     CHP_group = UnitGroup('CHP_group', units=(CHP,))
-#     groups.append(CHP_group)
-    
-#     CT_group = UnitGroup('CT_group', units=(CT,))
-#     groups.append(CT_group)
-    
-#     facilities_no_hu_group = UnitGroup('facilities_no_hu_group',
-#                                        units=(T601, T602, M601, T603, T604_S, T604,
-#                                               T605, T606_S, T606, T607_S, T607,
-#                                               T608, M602,
-#                                               CHP, CT, CWP, PWC, ADP, CIP))
-#     if if_BDM:
-#         BDM = bst.units.BlowdownMixer('BDM',ins=(CHP.outs[-1], CT.outs[-1]),
-#                                       outs=u.M501.ins[-1])
-#         PWC.recycled_blowdown_streams = BDM.outs
-#         facilities_no_hu_group.units = (*facilities_no_hu_group.units, BDM)
-    
-#     groups.append(facilities_no_hu_group)
-    
-#     return flowsheet, groups
-
-
-# %%
-
-# =============================================================================
 # Lignin conversion and separation
 # =============================================================================
 
-def create_adipic_process(flowsheet, groups):
+# This process should be constructed and simulated before the wastewater process
+# and facilities, but numbered in 700-series to keep the consistent 500-series
+# for the wastewater process and 600-series for facilities
+def create_adipic_process(flowsheet, groups, black_liquor, cell_mass):
     bst.main_flowsheet.set_flowsheet(flowsheet)
-    u = flowsheet.unit
 
     ######################## Streams ########################  
     # Used to maintain a minimum of 2 wt% caustic level
@@ -613,8 +309,8 @@ def create_adipic_process(flowsheet, groups):
     hydrogen_R703 = Stream('hydrogen_R703', units='kg/hr', price=price['H2'])
     
     ######################## Units ########################
-    T701 = units.BlackLiquorStorage('T701', ins=u.P201-0)
-    R701 = units.PulpingReactor('R701', ins=(T701-0, u.S401-0, caustic_R701))
+    T701 = units.BlackLiquorStorage('T701', ins=black_liquor)
+    R701 = units.PulpingReactor('R701', ins=(T701-0, cell_mass, caustic_R701))
     T702 = units.NeutralizationTank('T702', ins=(R701-0, sulfuric_acid_T702))
     
     R702 = units.MuconicFermentation('R702', ins=(T702-0, water_R702, ammonia_R702,
@@ -673,10 +369,215 @@ def create_adipic_process(flowsheet, groups):
 # %%
 
 # =============================================================================
+# Wastewater
+# =============================================================================
+
+def create_wastewater_process(flowsheet, groups, get_flow_tpd, wastewater_streams,
+                              need_ammonia, bypass_R501, recover_sodium_sulfate):
+    flowsheet, groups = la_create_wastewater_process(
+        flowsheet, groups, get_flow_tpd, wastewater_streams,
+        AD_split=AD_split, MB_split=MB_split, COD_chemicals=COD_chemicals,
+        soluble_organics=soluble_organics, solubles=solubles, insolubles=insolubles,
+        need_ammonia=need_ammonia, bypass_R501=bypass_R501)
+    
+    if recover_sodium_sulfate:
+        S506 = units.SodiumSulfateRecovery('S506', ins=flowsheet.stream.brine,
+                                           outs=('S506_vent', 'residuals_to_CHP',
+                                                 'sodium_sulfate_to_storage'))
+        wwt_sys = flowsheet.system.wastewater_sys
+        wwt_sys._set_path(path=(*wwt_sys.path, S506))
+        groups[-1].units = (*wwt_sys.units, S506) 
+    
+    return flowsheet, groups
+
+
+# %%
+
+# =============================================================================
+# Facilities
+# =============================================================================
+
+def create_facilities(flowsheet, groups, get_flow_tpd,
+                      CHP_wastes, CHP_biogas='', CHP_side_streams=(),
+                      process_water_streams={}, recycled_water='',
+                      if_HXN=False, if_BDM=False):
+    bst.main_flowsheet.set_flowsheet(flowsheet)
+    s = flowsheet.stream
+    u = flowsheet.unit
+
+    ######################## Streams ########################
+    # For products
+    ethanol = Stream('ethanol', units='kg/hr', price=price['Ethanol'])
+    denaturant = Stream('denaturant', units='kg/hr', price=price['Denaturant'])
+    
+    # Process chemicals
+    caustic = Stream('caustic', units='kg/hr', price=price['NaOH'])
+    CSL = Stream('CSL', units='kg/hr', price=price['CSL'])
+    DAP = Stream('DAP', units='kg/hr', price=price['DAP'])
+    ammonia = Stream('ammonia', units='kg/hr', price=price['NH4OH'])
+    sulfuric_acid = Stream('sulfuric_acid', units='kg/hr', price=price['H2SO4'])
+    
+    # Chemicals used/generated in CHP
+    lime_CHP = Stream('lime_CHP', units='kg/hr', price=price['Lime'])
+    # Scaled based on feedstock flow, 1054 from Table 33 in ref [2] as NH3
+    ammonia_CHP = Stream('ammonia_CHP', units='kg/hr',
+                         NH4OH=1054*35.046/17.031*get_flow_tpd()/2205)
+    boiler_chems = Stream('boiler_chems', units='kg/hr', price=price['Boiler chems'])
+    baghouse_bag = Stream('baghouse_bag', units='kg/hr', price=price['Baghouse bag'])
+    # Supplementary natural gas for CHP if produced steam not enough for regenerating
+    # all steam streams required by the system
+    natural_gas = Stream('natural_gas', units='kg/hr', price=price['Natural gas'])
+    vent_CHP = Stream('vent_CHP', phase='g', units='kg/hr')
+    ash = Stream('ash', units='kg/hr', price=price['Ash disposal'])
+    
+    cooling_tower_chems = Stream('cooling_tower_chems', units='kg/hr',
+                                 price=price['Cooling tower chems'])
+    
+    system_makeup_water = Stream('system_makeup_water', units='kg/hr',
+                                 price=price['Makeup water'])
+    
+    # 8021 based on stream 713 in Humbird et al.
+    firewater_in = Stream('firewater_in', 
+                           Water=8021*get_flow_tpd()/2205, units='kg/hr')
+    
+    # # Clean-in-place, 145 based on equipment M-910 (clean-in-place system) in ref [1]
+    CIP_chems_in = Stream('CIP_chems_in', Water=145*get_flow_tpd()/2205, 
+                          units='kg/hr')
+    
+    # 1372608 based on stream 950 in ref [1]
+    # Air needed for multiple processes (including enzyme production that was not included here),
+    # not rigorously modeled, only scaled based on plant size
+    plant_air_in = Stream('plant_air_in', phase='g', units='kg/hr',
+                          N2=0.79*1372608*get_flow_tpd()/2205,
+                          O2=0.21*1372608*get_flow_tpd()/2205)
+
+    ######################## Units ########################   
+    # Pure ethanol
+    T601 = units.EthanolStorage('T601')
+    T602 = units.DenaturantStorage('T602', ins=denaturant)
+    ethanol_path = (T601,)
+    
+    # Mix in denaturant for final ethanol product
+    M601 = units.DenaturantMixer('M601', ins=(T601-0, T602-0), outs=ethanol)
+    
+    T603 = units.SulfuricAcidStorage('T603', ins=sulfuric_acid)
+
+    T604 = units.AmmoniaStorage('T604', ins=ammonia)
+    T604_S = bst.units.ReversedSplitter('T604_S', ins=T604-0, 
+                                        outs=('', s.ammonia_R502,
+                                              s.ammonia_CHP))
+    
+    T605 = units.CausticStorage('T605', ins=caustic)
+    T605_S = bst.units.ReversedSplitter('T605_S', ins=T605-0, 
+                                    outs=(s.caustic_R502, '', ''))
+    
+    T606 = units.CSLstorage('T606', ins=CSL)
+    T606_S = bst.units.ReversedSplitter('T606_S', ins=T606-0,
+                                        outs=(s.CSL_R301, s.CSL_R302, ''))
+    
+    T607 = units.DAPstorage('T607', ins=DAP)
+    T607_S = bst.units.ReversedSplitter('T607_S', ins=T607-0,
+                                        outs=(s.DAP_R301, s.DAP_R302, ''))
+    
+    T608 = units.FirewaterStorage('T608', ins=firewater_in, outs='firewater_out')
+    
+    # Mix solids for CHP
+    M602 = bst.units.Mixer('M602', ins=CHP_wastes, outs='wastes_to_CHP')
+    
+    CHP = facilities.CHP('CHP', ins=(M602-0, CHP_biogas, lime_CHP, ammonia_CHP,
+                                     boiler_chems, baghouse_bag, natural_gas,
+                                     'boiler_makeup_water'),
+                         B_eff=0.8, TG_eff=0.85, combustibles=combustibles,
+                         side_streams_to_heat=CHP_side_streams,
+                         outs=(vent_CHP, ash, 'boiler_blowdown'))
+    
+    CT = facilities.CT('CT', ins=('return_cooling_water', cooling_tower_chems,
+                                  'CT_makeup_water'),
+                       outs=('process_cooling_water', 'cooling_tower_blowdown'))
+    
+    CWP = facilities.CWP('CWP', ins='return_chilled_water',
+                         outs='process_chilled_water')
+    
+    # All water consumed by the system
+    process_water_streams['facilities'] = (CHP.ins[-1], CT.ins[-1])
+    
+    PWC = facilities.PWC('PWC', ins=(system_makeup_water, recycled_water),
+                         process_water_streams=sum(process_water_streams.values(), ()),
+                         recycled_blowdown_streams=(),
+                         outs=('process_water', 'discharged_water'))
+    
+    ADP = facilities.ADP('ADP', ins=plant_air_in, outs='plant_air_out',
+                         ratio=get_flow_tpd()/2205)
+    CIP = facilities.CIP('CIP', ins=CIP_chems_in, outs='CIP_chems_out')
+
+    # Add option facilities
+    optional_path = ()
+    if hasattr(flowsheet.system, 'adipic_sys'):
+        ethanol_extra = Stream('ethanol_extra', units='kg/hr')
+        # $/kg if adipic acid processed in the CHP
+        # chems.AdipicAcid.LHV/1000*CHP.B_eff*CHP.TG_eff/3600*bst.PowerUtility.price*(1000/chems.AdipicAcid.MW)
+        adipic_acid = Stream('adipic_acid', units='kg/hr', price=price['Adipic acid'])
+        
+        
+        # In the case that supplementary ethanol is needed for adipic_process
+        S601 = bst.units.ReversedSplitter('S601', ins=u.S402_H-0,
+                                          outs=(s.ethanol_T703, ethanol_extra))
+        T601.ins[0] = S601-1
+        def adjust_S601_flow():
+            ethanol_extra.imol['Ethanol'] = \
+                u.S402_H.outs[0].imol['Ethanol'] - s.ethanol_T703.imol['Ethanol']
+            S601._run()
+        S601.specification = adjust_S601_flow
+        T609 = units.CoproductStorage('T609', ins=u.S704-1, outs=adipic_acid)
+        T609.line = 'Adipic acid storage'
+        ethanol_path = (S601, *ethanol_path)
+        optional_path = (*optional_path, T609)
+    else:
+        T601.ins[0]=u.S402_H-0
+    if hasattr(u, 'S506'):
+        sodium_sulfate = Stream('sodium_sulfate', units='kg/hr',
+                                price=price['Sodium sulfate'])
+        T610 = units.CoproductStorage('T610', ins=u.S506-2, outs=sodium_sulfate)
+        T610.line = 'Sodium sulfate storage'
+        optional_path = (*optional_path, T610)
+
+    ######################## Systems ########################
+    if if_HXN:
+        HXN = bst.units.HeatExchangerNetwork('HXN')
+        HXN_group = UnitGroup('HXN_group', units=(HXN,))
+        groups.append(HXN_group)
+    
+    CHP_group = UnitGroup('CHP_group', units=(CHP,))
+    groups.append(CHP_group)
+    
+    CT_group = UnitGroup('CT_group', units=(CT,))
+    groups.append(CT_group)
+    
+    facilities_no_hu_group = UnitGroup('facilities_no_hu_group',
+                                       units=(*ethanol_path,
+                                              T602, M601, T603, T604_S, T604,
+                                              T605_S, T605, T606_S, T606,
+                                              T607_S, T607, T608, M602,
+                                              *optional_path,
+                                              CWP, PWC, ADP, CIP))
+    if if_BDM:
+        BDM = bst.units.BlowdownMixer('BDM',ins=(CHP.outs[-1], CT.outs[-1]),
+                                      outs=u.M501.ins[-1])
+        PWC.recycled_blowdown_streams = BDM.outs
+        facilities_no_hu_group.units = (*facilities_no_hu_group.units, BDM)
+    
+    groups.append(facilities_no_hu_group)
+    
+    return flowsheet, groups
+
+
+# %%
+
+# =============================================================================
 # Overall biorefinery and TEA/LCA functions
 # =============================================================================
 
-def create_biorefinery(flowsheet, groups, get_flow_tpd, kind='acid'):
+def create_biorefinery(flowsheet, groups, get_flow_tpd):
     bst.main_flowsheet.set_flowsheet(flowsheet)
     s = flowsheet.stream
     u = flowsheet.unit
@@ -684,10 +585,16 @@ def create_biorefinery(flowsheet, groups, get_flow_tpd, kind='acid'):
     
     ################## Overall Biorefinery ##################
     path = [sys.ethanol_sys, sys.wastewater_sys]
+    ethanol_path = (u.T601,)
+    optional_path = ()
     if hasattr(sys, 'pretreatment_sys'):
         path = [sys.pretreatment_sys, *path]
     if hasattr(sys, 'adipic_sys'):
         path.append(sys.adipic_sys)
+        ethanol_path = (u.S601, *ethanol_path)
+        optional_path = (u.T609,)
+    if hasattr(u, 'S506'):
+        optional_path = (*optional_path, u.T610)
     
     facilities = (u.CHP, u.CT, u.PWC, u.ADP, u.CIP)
     if hasattr(u, 'HXN'):
@@ -697,9 +604,10 @@ def create_biorefinery(flowsheet, groups, get_flow_tpd, kind='acid'):
     
     biorefinery = System('biorefinery',
                          path=(*path,
-                               u.T601, u.T602, u.M601, u.T603, u.T604_S, u.T604,
+                               *ethanol_path,
+                               u.T602, u.M601, u.T603, u.T604_S, u.T604,
                                u.T605, u.T606_S, u.T606, u.T607_S, u.T607,
-                               u.T608, u.M602),
+                               u.T608, u.M602, *optional_path),
                          facilities=facilities,
                          facility_recycle=u.BDM-0 if hasattr(u, 'BDM') else None)
     
@@ -774,8 +682,9 @@ def create_biorefinery(flowsheet, groups, get_flow_tpd, kind='acid'):
     funcs['simulate_get_MFPP'] = simulate_get_MFPP
 
     ######################## LCA ########################
-    LCA_streams = set([i for i in biorefinery.feeds if i.price]+ \
-        [i for i in CHP_sys.feeds if i.price])
+    LCA_streams = set([i for i in biorefinery.feeds.union(biorefinery.products) if i.price]+ \
+        [i for i in CHP_sys.feeds.union(CHP_sys.products) if i.price])
+    LCA_streams.remove(s.ethanol)
     LCA_stream = Stream('LCA_stream', units='kg/hr')
     funcs['LCA_streams'] = LCA_streams
     funcs['LCA_stream'] = LCA_stream

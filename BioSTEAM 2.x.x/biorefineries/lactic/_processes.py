@@ -693,11 +693,11 @@ def create_wastewater_process(flowsheet, groups, get_flow_tpd, wastewater_stream
                               COD_chemicals=COD_chemicals,
                               soluble_organics=soluble_organics,
                               solubles=solubles, insolubles=insolubles,
-                              need_ammonia=False):
+                              need_ammonia=False, bypass_R501=False):
     bst.main_flowsheet.set_flowsheet(flowsheet)
     
     ######################## Streams ########################
-    ammonia_R501 = Stream('ammonia_R501', units='kg/hr')
+    ammonia_R502 = Stream('ammonia_R502', units='kg/hr')
     caustic_R502 = Stream('caustic_R502', units='kg/hr', price=price['NaOH'])
     polymer_R502 = Stream('polymer_R502', units='kg/hr', price=price['WWT polymer'])
     air_R502 = Stream('air_R502', phase='g', units='kg/hr')
@@ -708,15 +708,24 @@ def create_wastewater_process(flowsheet, groups, get_flow_tpd, wastewater_stream
     # Mix waste liquids for treatment
     M501 = bst.units.Mixer('M501', ins=wastewater_streams)
     
-    R501 = units.AnaerobicDigestion('R501', ins=M501-0,
-                                    outs=('biogas', 'anaerobic_treated_water', 
-                                          'anaerobic_sludge'),
-                                    reactants=soluble_organics,
-                                    split=AD_split,
-                                    T=35+273.15, COD_chemicals=COD_chemicals)
+    if not bypass_R501:
+        R501 = units.AnaerobicDigestion('R501', ins=M501-0,
+                                        outs=('biogas', 'anaerobic_treated_water', 
+                                              'anaerobic_sludge'),
+                                        reactants=soluble_organics,
+                                        split=AD_split,
+                                        T=35+273.15, COD_chemicals=COD_chemicals)
+        R502_ins0 = R501-1
+        S503_ins0 = R501-2
+        pre_aerobic = (M501, R501)
+    else:
+        R502_ins0 = M501-0
+        S503_ins0 = ''
+        pre_aerobic = (M501,)
     
-    R502 = units.AerobicDigestion('R502', ins=(R501-1, '', caustic_R502, ammonia_R501,
-                                               polymer_R502, air_R502),
+    R502 = units.AerobicDigestion('R502',
+                                  ins=(R502_ins0, '', caustic_R502,
+                                       ammonia_R502, polymer_R502, air_R502),
                                   outs=(vent_R502, 'aerobic_treated_water'),
                                   reactants=soluble_organics,
                                   caustic_mass=2252*get_flow_tpd()/2205,
@@ -732,7 +741,7 @@ def create_wastewater_process(flowsheet, groups, get_flow_tpd, wastewater_stream
     S502 = bst.units.Splitter('S502', ins=S501-1, outs=('to_aerobic_digestion', ''),
                               split=0.96)
     
-    S503 = units.BeltThickener('S503', ins=(R501-2, S502-1),
+    S503 = units.BeltThickener('S503', ins=(S503_ins0, S502-1),
                                outs=('S503_centrate', 'S503_solids'),
                                COD_chemicals=COD_chemicals,
                                solubles=solubles, insolubles=insolubles)
@@ -756,7 +765,7 @@ def create_wastewater_process(flowsheet, groups, get_flow_tpd, wastewater_stream
     S505 = units.ReverseOsmosis('S505', ins=S501-0, outs=('recycled_water', brine))
     
     wastewater_sys = System('wastewater_sys',
-                            path=(M501, R501, aerobic_recycle, S505))
+                            path=(*pre_aerobic, aerobic_recycle, S505))
     
     wastewater_group = UnitGroup('wastewater_group',
                                  units=wastewater_sys.units)
@@ -836,7 +845,7 @@ def create_facilities(flowsheet, groups, get_flow_tpd,
     
     T603 = units.AmmoniaStorage('T603', ins=ammonia)
     T603_S = bst.units.ReversedSplitter('T603_S', ins=T603-0,
-                                        outs=(s.ammonia_M205, s.ammonia_R501,
+                                        outs=(s.ammonia_M205, s.ammonia_R502,
                                               ammonia_CHP))
     
     T604 = units.CSLstorage('T604', ins=CSL, outs=s.CSL_R301)

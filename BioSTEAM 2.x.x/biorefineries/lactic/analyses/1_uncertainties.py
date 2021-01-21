@@ -22,29 +22,29 @@ import pandas as pd
 import biosteam as bst
 from biosteam.utils import TicToc
 from biosteam.plots import plot_montecarlo_across_coordinate
-from biorefineries.lactic import \
+from biorefineries.lactic.systems import \
     SSCF_flowsheet, SSCF_funcs, SHF_flowsheet, SHF_funcs
 from biorefineries.lactic.analyses import create_model
 
 
 # %%
 
-def evaluate_uncertainties(system='SSCF', seed=None, N_simulation=1000,
+def evaluate_uncertainties(kind='SSCF', seed=None, N_simulation=1000,
                            sampling_rule='L',
                            percentiles = [0, 0.05, 0.25, 0.5, 0.75, 0.95, 1],
                            if_plot=True, report_name='1_full_evaluation.xlsx'):
-    if 'sscf' in str(system).lower():
+    if 'SSCF' in str(kind).upper():
         flowsheet = SSCF_flowsheet
         funcs = SSCF_funcs
-    elif 'shf' in str(system).lower():
+    elif 'SHF' in str(kind).upper():
         flowsheet = SHF_flowsheet
         funcs = SHF_funcs
     else:
-        raise ValueError(f'system can only be "SSCF" or "SHF", not {system}.')
+        raise ValueError(f'kind can only be "SSCF" or "SHF", not {kind}.')
     
     simulate_get_MPSP = funcs['simulate_get_MPSP']
     simulate_get_MPSP()
-    model_dct = create_model(system)
+    model_dct = create_model(kind)
     model = model_dct['model']
 
     # =============================================================================

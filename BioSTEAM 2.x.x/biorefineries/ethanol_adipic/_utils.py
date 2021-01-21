@@ -37,7 +37,7 @@ References
 import numpy as np
 import thermosteam as tmo
 from biorefineries.ethanol_adipic._chemicals import chems, chemical_groups
-from biorefineries.lactic import (
+from biorefineries.lactic._utils import (
     auom, CEPCI, get_feedstock_flow, dry_composition, baseline_feedflow,
     compute_COD, splits_df
     )

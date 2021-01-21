@@ -23,7 +23,7 @@ from biosteam.evaluation import Model, Metric
 from chaospy import distributions as shape
 from biorefineries.lactic._settings import CFs
 from biorefineries.lactic._utils import set_yield, _feedstock_factor
-from biorefineries.lactic import simulate_and_print, \
+from biorefineries.lactic.systems import simulate_and_print, \
     SSCF_flowsheet, SSCF_groups, SSCF_teas, SSCF_funcs, \
     SHF_flowsheet, SHF_groups, SHF_teas, SHF_funcs
 
@@ -34,26 +34,26 @@ from biorefineries.lactic import simulate_and_print, \
 # Models for uncertainty and sensitivity analyses
 # =============================================================================
 
-def create_model(system='SSCF'):
-    if 'sscf' in str(system).lower():
+def create_model(kind='SSCF'):
+    if 'SSCF' in str(kind).upper():
         flowsheet = SSCF_flowsheet
         groups = SSCF_groups
         teas = SSCF_teas
         funcs = SSCF_funcs
-    elif 'shf' in str(system).lower():
+    elif 'SHF' in str(kind).upper():
         flowsheet = SHF_flowsheet
         groups = SHF_groups
         teas = SHF_teas
         funcs = SHF_funcs
     else:
-        raise ValueError(f'system can only be "SSCF" or "SHF", not {system}.')
+        raise ValueError(f'kind can only be "SSCF" or "SHF", not {kind}.')
 
     bst.main_flowsheet.set_flowsheet(flowsheet)
     s = flowsheet.stream
     u = flowsheet.unit
     sys = flowsheet.system
     
-    simulate_and_print(system)
+    simulate_and_print(kind)
     # =============================================================================
     # Overall biorefinery metrics
     # =============================================================================

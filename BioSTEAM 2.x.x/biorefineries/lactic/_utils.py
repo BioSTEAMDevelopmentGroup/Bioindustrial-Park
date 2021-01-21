@@ -18,7 +18,7 @@ import pandas as pd
 import thermosteam as tmo
 from biorefineries.lactic._chemicals import chems, chemical_groups
 
-__all__ = ('auom', 'CEPCI', 'get_feedstock_flow', 'dry_composition', 
+__all__ = ('auom', 'CEPCI','get_feedstock_flow', 'dry_composition', 
            'baseline_feedflow', 'compute_lactic_titer', 'set_yield',
            'compute_COD', 'find_split', 'splits_df')
 

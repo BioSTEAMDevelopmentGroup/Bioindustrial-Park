@@ -21,7 +21,7 @@ import numpy as np
 import pandas as pd
 import biosteam as bst
 from biosteam.utils import TicToc
-from biorefineries.lactic import simulate_and_print, \
+from biorefineries.lactic.systems import simulate_and_print, \
     SSCF_flowsheet, SSCF_funcs, SHF_flowsheet, SHF_funcs
 from biorefineries.lactic._utils import _feedstock_factor
 

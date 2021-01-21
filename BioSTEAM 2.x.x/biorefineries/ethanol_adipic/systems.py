@@ -148,21 +148,22 @@ def create_acid_biorefinery(preprocessed):
     WWT_streams = (u.H201-0, u.D402_P-0, u.S401-1, '')
     flowsheet, groups = \
         create_wastewater_process(flowsheet, groups, get_flow_tpd, WWT_streams,
-                                  need_ammonia=False)
+                                  need_ammonia=False, bypass_R501=False,
+                                  recover_sodium_sulfate=True)
 
     CHP_wastes = (u.S401-0, u.S504-1)
     CHP_biogas = u.R501-0
     CHP_side_streams = (s.water_M201, s.water_M202, s.steam_M203)
     process_water_streams = {
         'pretreatment': (s.water_M201, s.water_M202, s.steam_M203, s.water_M205),
-        'ethanol process': (s.water_M301, s.water_U401,)
+        'ethanol': (s.water_M301, s.water_U401,)
         }
     recycled_water = u.S505-0
     flowsheet, groups = \
         create_facilities(flowsheet, groups, get_flow_tpd,
                           CHP_wastes, CHP_biogas, CHP_side_streams,
                           process_water_streams, recycled_water,
-                          False, True)
+                          if_HXN=False, if_BDM=True)
     
     u.T603.outs[0] = s.sulfuric_acid_T201
     u.T604_S.outs[0] = s.ammonia_M205
@@ -200,20 +201,21 @@ def create_AFEX_biorefinery(preprocessed):
     WWT_streams = (u.D402_P-0, u.S401-1, '')
     flowsheet, groups = \
         create_wastewater_process(flowsheet, groups, get_flow_tpd, WWT_streams,
-                                  need_ammonia=False)
+                                  need_ammonia=False, bypass_R501=False,
+                                  recover_sodium_sulfate=False)
     
     CHP_wastes = (u.S401-0, u.S504-1)
     CHP_biogas = u.R501-0
     CHP_side_streams = ()
     process_water_streams = {
-        'ethanol process': (s.water_M301, s.water_U401,)
+        'ethanol': (s.water_M301, s.water_U401,)
         }
     recycled_water = u.S505-0
     flowsheet, groups = \
         create_facilities(flowsheet, groups, get_flow_tpd,
                           CHP_wastes, CHP_biogas, CHP_side_streams,
                           process_water_streams, recycled_water,
-                          False, True)
+                          if_HXN=False, if_BDM=True)
 
     # Those aren't linked to anything in the system
     flowsheet.discard(s.sulfuric_acid)
@@ -230,47 +232,63 @@ def create_AFEX_biorefinery(preprocessed):
 # Base-pretreatment biorefinery
 # =============================================================================
 
-# def create_base_biorefinery(preprocessed):
-#     flowsheet = bst.Flowsheet('base')
-#     bst.main_flowsheet.set_flowsheet(flowsheet)
-#     s = flowsheet.stream
-#     u = flowsheet.unit
+def create_base_biorefinery(preprocessed):
+    flowsheet = bst.Flowsheet('base')
+    bst.main_flowsheet.set_flowsheet(flowsheet)
+    s = flowsheet.stream
+    u = flowsheet.unit
 
-#    feedstock = preprocessed.copy('feedstock')
-#    feedstock.price = preprocessed.price
-#     get_flow_tpd = \
-#         lambda: (feedstock.F_mass-feedstock.imass['H2O'])*24/_kg_per_ton
+    feedstock = preprocessed.copy('feedstock')
+    feedstock.price = preprocessed.price
+    get_flow_tpd = \
+        lambda: (feedstock.F_mass-feedstock.imass['H2O'])*24/_kg_per_ton
     
-#     groups = []
-#     flowsheet, groups = \
-#         create_ethanol_process(flowsheet, groups, feedstock)
+    groups = []
+    flowsheet, groups = create_base_pretreatment_process(
+        flowsheet, groups, feedstock)
     
-#     # The last one is reserved for blowdown
-#     WWT_streams = (u.D402_P-0, u.S401-1, '')
-#     flowsheet, groups = \
-#         create_wastewater_process(flowsheet, groups, get_flow_tpd, WWT_streams,
-#                                   need_ammonia=False)
+    flowsheet, groups = \
+        create_ethanol_process(flowsheet, groups, u.P202-0)
+    u.M301.enzyme_load = 10
+    u.M301.solid_loading = 0.25
+    u.R301.C5_saccharification = True
     
-#     CHP_wastes = (u.S401-0, u.S504-1)
-#     CHP_biogas = u.R501-0
-#     CHP_side_streams = ()
-#     process_water_streams = {
-#         'ethanol process': (s.water_M301, s.water_U401,)
-#         }
-#     recycled_water = u.S505-0
-#     flowsheet, groups = \
-#         create_facilities(flowsheet, groups, get_flow_tpd,
-#                           CHP_wastes, CHP_biogas, CHP_side_streams,
-#                           process_water_streams, recycled_water,
-#                           False, True)
+    flowsheet, groups = \
+        create_adipic_process(flowsheet, groups, u.P201-0, u.S401-0)
+    
+    # The last one is reserved for blowdown
+    WWT_streams = (u.D402_P-0, u.S401-1, u.S701-1, u.S702-0, '')
+    flowsheet, groups = \
+        create_wastewater_process(flowsheet, groups, get_flow_tpd, WWT_streams,
+                                  need_ammonia=True, bypass_R501=True,
+                                  recover_sodium_sulfate=True)
+    
+    CHP_wastes = (u.R701-1, u.S504-1, u.S506-1)
+    CHP_biogas = ''
+    CHP_side_streams = ()
+    process_water_streams = {
+        'pretreatment': (s.water_R201,),
+        'ethanol': (s.water_M301, s.water_U401,),
+        'adipid': (s.water_R702,)
+        }
+    recycled_water = u.S505-0
+    flowsheet, groups = \
+        create_facilities(flowsheet, groups, get_flow_tpd,
+                          CHP_wastes, CHP_biogas, CHP_side_streams,
+                          process_water_streams, recycled_water,
+                          if_HXN=False, if_BDM=True)
 
-#     flowsheet, teas, funcs = create_biorefinery(flowsheet, groups, get_flow_tpd)
+    flowsheet, teas, funcs = create_biorefinery(flowsheet, groups, get_flow_tpd)
 
-#     return flowsheet, groups, teas, funcs
+    return flowsheet, groups, teas, funcs
 
 
 
 # %%
+
+# =============================================================================
+# Use functions to create the systems
+# =============================================================================
 
 system_dct = {}
 acid_flowsheet, acid_groups, acid_teas, acid_funcs = \
@@ -291,6 +309,16 @@ system_dct['AFEX'] = {
     'groups': AFEX_groups,
     'teas': AFEX_teas,
     'funcs': AFEX_funcs
+    }
+
+base_flowsheet, base_groups, base_teas, base_funcs = \
+    create_base_biorefinery(HMPP_preprocessed)
+
+system_dct['base'] = {
+    'flowsheet': base_flowsheet,
+    'groups': base_groups,
+    'teas': base_teas,
+    'funcs': base_funcs
     }
 
 

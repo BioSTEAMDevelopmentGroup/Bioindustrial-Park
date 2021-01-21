@@ -150,13 +150,13 @@ def simulate_and_print(system='SSCF'):
     print('------------------------------------------\n')
 
 
-def simulate_fermentation_improvement(system='SSCF'):
-    if 'SSCF' in str(system).upper():
+def simulate_fermentation_improvement(kind='SSCF'):
+    if 'SSCF' in str(kind).upper():
         flowsheet = SSCF_flowsheet
-    elif 'SHF' in str(system).upper():
+    elif 'SHF' in str(kind).upper():
         flowsheet = SHF_flowsheet
     else:
-        raise ValueError(f'system can only be "SSCF" or "SHF", not {system}.')
+        raise ValueError(f'kind can only be "SSCF" or "SHF", not {kind}.')
     bst.main_flowsheet.set_flowsheet(flowsheet)
     u = flowsheet.unit
     flowsheet.system.lactic_sys.simulate()
@@ -167,32 +167,32 @@ def simulate_fermentation_improvement(system='SSCF'):
     R301_X[0] = R301_X[3] = 0.95
     R301_X[1] = R301_X[4] = 0
     R302_X[1] = R302_X[4] = 0
-    simulate_and_print(system)
+    simulate_and_print(kind)
 
-def simulate_separation_improvement(system='SSCF'):
-    if 'SSCF' in str(system).upper():
+def simulate_separation_improvement(kind='SSCF'):
+    if 'SSCF' in str(kind).upper():
         flowsheet = SSCF_flowsheet
-    elif 'SHF' in str(system).upper():
+    elif 'SHF' in str(kind).upper():
         flowsheet = SHF_flowsheet
     else:
-        raise ValueError(f'system can only be "SSCF" or "SHF", not {system}.')
+        raise ValueError(f'kind can only be "SSCF" or "SHF", not {kind}.')
     bst.main_flowsheet.set_flowsheet(flowsheet)
     u = SHF_flowsheet.unit
     flowsheet.system.lactic_sys.simulate()
     
     u.R402.X_factor = 0.9/u.R402.esterification_rxns.X[0]
     u.R403.hydrolysis_rxns.X[:] = 0.9    
-    simulate_and_print(system)
+    simulate_and_print(kind)
 
-def simulate_operating_improvement(system='SSCF'):
-    if 'SSCF' in str(system).upper():
+def simulate_operating_improvement(kind='SSCF'):
+    if 'SSCF' in str(kind).upper():
         flowsheet = SSCF_flowsheet
         funcs = SSCF_funcs
-    elif 'SHF' in str(system).upper():
+    elif 'SHF' in str(kind).upper():
         flowsheet = SHF_flowsheet
         funcs = SHF_funcs
     else:
-        raise ValueError(f'system can only be "SSCF" or "SHF", not {system}.')
+        raise ValueError(f'kind can only be "SSCF" or "SHF", not {kind}.')
     bst.main_flowsheet.set_flowsheet(flowsheet)
     s = flowsheet.stream
     u = flowsheet.unit

@@ -10,6 +10,13 @@
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
 # for license details.
 
+__all__ = (
+    'chems', 'auom', 'CEPCI', 'price', 'CFs', 'update_settings',
+    'load_system', 'flowsheet', 'groups', 'teas', 'funcs'
+    )
+
+import biosteam as bst
+bst.speed_up()
 
 from . import (
     _chemicals,
@@ -22,11 +29,35 @@ from . import (
     systems,
     )
 
+from ._chemicals import chems
+from ._utils import auom, CEPCI
+from ._settings import price, CFs
+from ._processes import update_settings
 
-from ._chemicals import *
-from ._utils import *
-from ._settings import *
-from ._tea import *
-from ._processes import *
-from .systems import *
+getattr = getattr
 
+def load_system(kind='SSCF'):
+    global flowsheet, groups, teas, funcs, lactic_sys, lactic_tea, \
+        simulate_and_print, simulate_fermentation_improvement, \
+        simulate_separation_improvement, simulate_operating_improvement
+    
+    flowsheet = getattr(systems, f'{kind}_flowsheet')
+    groups = getattr(systems, f'{kind}_groups')
+    teas = getattr(systems, f'{kind}_teas')
+    funcs = getattr(systems, f'{kind}_funcs')
+    
+    update_settings(chems)
+    bst.main_flowsheet.set_flowsheet(flowsheet)
+        
+    lactic_sys = flowsheet.system.lactic_sys
+    lactic_tea = teas['lactic_tea']
+    simulate_and_print = lambda : systems.simulate_and_print(kind)
+    simulate_fermentation_improvement = \
+        lambda: systems.simulate_fermentation_improvement(kind)
+    simulate_separation_improvement = \
+        lambda: systems.simulate_separation_improvement(kind)
+    simulate_operating_improvement = \
+        lambda: systems.simulate_operating_improvement(kind)
+
+
+load_system('SSCF')
