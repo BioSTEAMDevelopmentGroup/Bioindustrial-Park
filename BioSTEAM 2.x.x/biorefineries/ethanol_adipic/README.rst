@@ -1,23 +1,23 @@
-=====================================================================================
-ethanol_adipic: Production of Ethanol and Adipic Acid from Lignocellulosic Feedstocks
-=====================================================================================
+==================================================================================
+ethanol_adipic: Production of Ethanol and Adipic Acid from Lignocellulosic Biomass
+==================================================================================
 
 Simplified process flow schemes
 -------------------------------
 
 .. figure:: ./images/acid_pretreatment_biorefinery.png
 
-    Acid-pretreatment biorefinery
+    *Acid-pretreatment biorefinery*
 
 
 .. figure:: ./images/AFEX_pretreatment_biorefinery.png
 
-    AFEX-pretreatment biorefinery
+    *AFEX-pretreatment biorefinery*
 
 
 .. figure:: ./images/base_pretreatment_biorefinery.png
 
-    Base-pretreatment biorefinery
+    *Base-pretreatment biorefinery*
 
 
 This module contains several options for preprocessing and pretreatment of

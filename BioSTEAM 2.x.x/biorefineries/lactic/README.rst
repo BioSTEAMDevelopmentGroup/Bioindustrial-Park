@@ -5,7 +5,7 @@ lactic: Production of Lactic Acid from Lignocellulosic Biomass
 Simplified process flow scheme
 ------------------------------
 .. figure:: ./images/TOC.png
-    :width: 50%
+    :width: 50 %
     :align: center
 
 
@@ -19,7 +19,6 @@ from lignocellulosic biomass. Part of the script is adopted from [2]_.
 
 Getting Started
 ---------------
-
 Two configurations are now included in this biorefinery, one with simultaneous
 saccahrification and co-fermentation (SSCF), one with separate hydrolysis and
 co-fermentation (SHF). You can choose which system to load.
