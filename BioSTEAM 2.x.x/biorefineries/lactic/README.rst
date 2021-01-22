@@ -5,8 +5,9 @@ lactic: Production of Lactic Acid from Lignocellulosic Biomass
 Simplified process flow scheme
 ------------------------------
 .. figure:: ./images/TOC.png
-    :scale: 50%
+    :width: 50%
     :align: center
+
 
 .. figure:: ./images/system_diagram.png
 

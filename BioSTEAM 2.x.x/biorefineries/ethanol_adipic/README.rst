@@ -9,9 +9,11 @@ Simplified process flow schemes
 
     Acid-pretreatment biorefinery
 
+
 .. figure:: ./images/AFEX_pretreatment_biorefinery.png
 
     AFEX-pretreatment biorefinery
+
 
 .. figure:: ./images/base_pretreatment_biorefinery.png
 
