@@ -10,24 +10,6 @@
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
 # for license details.
 
-"""
-Created on Wed Jul 22 19:48:14 2020
-
-Modified from the biorefineries constructed in [1] and [2] for the production of
-lactic acid from lignocellulosic feedstocks
-
-[1] Cortes-Peña et al., BioSTEAM: A Fast and Flexible Platform for the Design, 
-    Simulation, and Techno-Economic Analysis of Biorefineries under Uncertainty. 
-    ACS Sustainable Chem. Eng. 2020, 8 (8), 3302–3310. 
-    https://doi.org/10.1021/acssuschemeng.9b07040
-    
-[2] Li et al., Tailored Pretreatment Processes for the Sustainable Design of
-    Lignocellulosic Biorefineries across the Feedstock Landscape. Submitted,
-    2020.
-
-@author: yalinli_cabbi
-"""
-
 
 # %% 
 
@@ -39,9 +21,11 @@ import numpy as np
 import pandas as pd
 import biosteam as bst
 from biosteam.utils import TicToc
+from biorefineries.lactic.systems import simulate_and_print, \
+    SSCF_flowsheet, SSCF_funcs, SHF_flowsheet, SHF_funcs
+from biorefineries.lactic._utils import _feedstock_factor
 
-_kg_per_ton = 907.18474
-_feedstock_factor = _kg_per_ton / 0.8
+bst.speed_up()
 
 
 # %%
@@ -75,7 +59,6 @@ prices = np.arange(0, 210, 10)
 # Initiate a timer
 timer = TicToc('timer')
 timer.tic()
-run_number = 0
 
 TEA_carbs = []
 TEA_prices = []
@@ -85,63 +68,69 @@ NPVs = []
 GWPs = []
 FECs = []
 
-# Configuration 1
-from biorefineries.lactic import system_concentrated as concentrated
+# Configuration 2
+simulate_and_print('SHF')
 carb_contents1 = np.arange(0.25, 0.59, 0.01)
 carb_contents1 = carb_contents1.tolist() + [0.589]
-concentrated.R301.allow_dilution = False
-concentrated.R301.allow_concentration = True
-concentrated.R301.mode = 'Batch'
-concentrated.R301.titer_limit = 97.5
-concentrated.E301.bypass = False
+R301 = SHF_flowsheet.unit.R301
+R301.allow_dilution = False
+R301.allow_concentration = True
+R301.mode = 'batch'
+R301.feed_freq = 1
+R301.target_titer = 97.5
+
+feedstock = SHF_flowsheet.stream.feedstock
+lactic_acid = SHF_flowsheet.stream.lactic_acid
+lactic_sys = SHF_flowsheet.system.lactic_sys
+lactic_tea = lactic_sys.TEA
 
 # Using two loops are not optimal, can potentially use Model and Metric to speed up
-bst.speed_up()
 for i in carb_contents1:
-    set_carbs(i, concentrated.feedstock)
-    concentrated.lactic_sys.simulate()
-    titers.append(concentrated.R301.effluent_titer)
-    GWPs.append(concentrated.get_GWP())
-    FECs.append(concentrated.get_FEC())
+    set_carbs(i, feedstock)
+    lactic_sys.simulate()
+    titers.append(R301.effluent_titer)
+    GWPs.append(SHF_funcs['get_GWP']())
+    FECs.append(SHF_funcs['get_FEC']())
     for j in prices:
         TEA_carbs.append(i)
         TEA_prices.append(j)
-        concentrated.feedstock.price = j / _feedstock_factor
-        concentrated.lactic_acid.price = 0
+        feedstock.price = j / _feedstock_factor
+        lactic_acid.price = 0
         for m in range(3):
-            MPSP = concentrated.lactic_acid.price = \
-                concentrated.lactic_tea.solve_price(concentrated.lactic_acid)
+            MPSP = lactic_acid.price = lactic_tea.solve_price(lactic_acid)
         MPSPs.append(MPSP)
-        NPVs.append(concentrated.lactic_tea.NPV)
-    run_number += 1
-    print(f'Run #{run_number}: {timer.elapsed_time:.0f} sec')
+        NPVs.append(lactic_tea.NPV)
 
 # Then concentration needed to get to the baseline titer
-from biorefineries.lactic import system_diluted as diluted
+simulate_and_print('SSCF')
 carb_contents2 = np.arange(0.59, 0.701, 0.01).tolist()
-diluted.R301.allow_dilution = True
-diluted.R301.allow_concentration = False
-diluted.R301.titer_limit = 97.5
+R301 = SSCF_flowsheet.unit.R301
+R301.allow_dilution = True
+R301.allow_concentration = False
+R301.mode = 'batch'
+R301.feed_freq = 1
+R301.target_titer = 97.5
 
-bst.speed_up()
+feedstock = SSCF_flowsheet.stream.feedstock
+lactic_acid = SSCF_flowsheet.stream.lactic_acid
+lactic_sys = SSCF_flowsheet.system.lactic_sys
+lactic_tea = lactic_sys.TEA
+
 for i in carb_contents2:
-    set_carbs(i, diluted.feedstock)
-    diluted.lactic_sys.simulate()
-    titers.append(diluted.R301.effluent_titer)
-    GWPs.append(diluted.get_GWP())
-    FECs.append(diluted.get_FEC())
+    set_carbs(i, feedstock)
+    lactic_sys.simulate()
+    titers.append(R301.effluent_titer)
+    GWPs.append(SSCF_funcs['get_GWP']())
+    FECs.append(SSCF_funcs['get_FEC']())
     for j in prices:
         TEA_carbs.append(i)
         TEA_prices.append(j)
-        diluted.feedstock.price = j / _feedstock_factor
-        diluted.lactic_acid.price = 0
+        feedstock.price = j / _feedstock_factor
+        lactic_acid.price = 0
         for m in range(3):
-            MPSP = diluted.lactic_acid.price = \
-                diluted.lactic_tea.solve_price(diluted.lactic_acid)
+            MPSP = lactic_acid.price = lactic_tea.solve_price(lactic_acid)
         MPSPs.append(MPSP)
-        NPVs.append(diluted.lactic_tea.NPV)
-    run_number += 1
-    print(f'Run #{run_number}: {timer.elapsed_time:.0f} sec')
+        NPVs.append(lactic_tea.NPV)
 
 TEA_plot_data = pd.DataFrame({
     'Carbohydrate content [dw%]': TEA_carbs,
@@ -157,13 +146,12 @@ LCA_plot_data = pd.DataFrame({
     'FEC [MJ/kg]': FECs
     })
 
-'''Output to Excel'''
-with pd.ExcelWriter('3_carbs-price.xlsx') as writer:
-    TEA_plot_data.to_excel(writer, sheet_name='TEA')
-    LCA_plot_data.to_excel(writer, sheet_name='LCA')
+# '''Output to Excel'''
+# with pd.ExcelWriter('3_feedstock_carb-price.xlsx') as writer:
+#     TEA_plot_data.to_excel(writer, sheet_name='TEA')
+#     LCA_plot_data.to_excel(writer, sheet_name='LCA')
 
-time = timer.elapsed_time / 60
-print(f'\nSimulation time for {run_number} runs is: {time:.1f} min')
+print(f'\nSimulation time is {timer.elapsed_time/60:.1f} min')
 
 
 
