@@ -9,6 +9,10 @@
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
 # for license details.
 
+
+# %%
+
+
 import biosteam as bst
 bst.speed_up()
 
@@ -28,31 +32,65 @@ from ._chemicals import chems
 from ._utils import auom, CEPCI
 from ._settings import price, CFs
 
-# getattr = getattr
+getattr = getattr
 
-# def load_system(kind='SSCF'):
-#     global flowsheet, groups, teas, funcs, lactic_sys, lactic_tea, \
-#         simulate_and_print, simulate_fermentation_improvement, \
-#         simulate_separation_improvement, simulate_operating_improvement
+def load_system(system_kind='acid', depot_kind='HMPP'):
+    if not depot_kind in ('CPP', 'HMPP', 'AFEX'): \
+        raise ValueError('system_kind can only be "acid", "base", or "AFEX", '
+                         f'not {system_kind}.')
+    if not system_kind in ('acid', 'base', 'AFEX'): \
+        raise ValueError('system_kind can only be "acid", "base", or "AFEX", '
+                         f'not {system_kind}.')
+    global flowsheet, groups, teas, funcs, biorefinery, tea
     
-#     flowsheet = getattr(systems, f'{kind}_flowsheet')
-#     groups = getattr(systems, f'{kind}_groups')
-#     teas = getattr(systems, f'{kind}_teas')
-#     funcs = getattr(systems, f'{kind}_funcs')
+    depot_dct = systems.depot_dct[depot_kind]
+    create_sys = getattr(systems, f'create_{system_kind}_biorefinery')
     
-#     update_settings(chems)
-#     bst.main_flowsheet.set_flowsheet(flowsheet)
-        
-#     lactic_sys = flowsheet.system.lactic_sys
-#     lactic_tea = teas['lactic_tea']
-#     simulate_and_print = lambda : systems.simulate_and_print(kind)
-#     simulate_fermentation_improvement = \
-#         lambda: systems.simulate_fermentation_improvement(kind)
-#     simulate_separation_improvement = \
-#         lambda: systems.simulate_separation_improvement(kind)
-#     simulate_operating_improvement = \
-#         lambda: systems.simulate_operating_improvement(kind)
+    flowsheet, groups, teas, funcs = create_sys(depot_dct['preprocessed'])
+    biorefinery = flowsheet.system.biorefinery
+    tea = teas['tea']
+    
+    bst.settings.set_thermo(chems)
+    bst.main_flowsheet.set_flowsheet(flowsheet)
 
 
-# load_system('SSCF')
-# simulate_and_print()
+load_system('acid', 'HMPP')
+
+
+# %%
+
+# =============================================================================
+# Simulate system and get results
+# =============================================================================
+
+feedstock_GWPs = systems.feedstock_GWPs
+
+def simulate_and_print(depot_for_GWP=None):
+    system_kind = flowsheet.ID
+    s = flowsheet.stream
+    line = system_kind if system_kind.isupper() else system_kind.capitalize()
+
+    print(f'\n---------- {line} Biorefinery ----------')
+    print(f'MESP: ${funcs["simulate_get_MESP"]()*systems._ethanol_kg_2_gal:.2f}/gal')
+    print(f'GWP: {funcs["get_GWP"]():.3f} kg CO2-eq/gal ethanol without feedstock')
+    if depot_for_GWP:
+        GWP = funcs['get_GWP']()
+        GWP = funcs['get_GWP']() + (feedstock_GWPs[depot_for_GWP]*s.feedstock.F_mass) \
+            / (s.ethanol.F_mass/systems._ethanol_kg_2_gal)
+        print(f'GWP: {GWP:.3f} kg CO2-eq/gal ethanol with feedstock')
+    print('--------------------------------------')
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

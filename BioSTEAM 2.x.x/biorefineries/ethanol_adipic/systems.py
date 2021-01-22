@@ -284,68 +284,6 @@ def create_base_biorefinery(preprocessed):
 
 
 
-# %%
-
-# =============================================================================
-# Use functions to create the systems
-# =============================================================================
-
-system_dct = {}
-acid_flowsheet, acid_groups, acid_teas, acid_funcs = \
-    create_acid_biorefinery(HMPP_preprocessed)
-
-system_dct['acid'] = {
-    'flowsheet': acid_flowsheet,
-    'groups': acid_groups,
-    'teas': acid_teas,
-    'funcs': acid_funcs
-    }
-
-AFEX_flowsheet, AFEX_groups, AFEX_teas, AFEX_funcs = \
-    create_AFEX_biorefinery(CPP_AFEX_preprocessed)
-
-system_dct['AFEX'] = {
-    'flowsheet': AFEX_flowsheet,
-    'groups': AFEX_groups,
-    'teas': AFEX_teas,
-    'funcs': AFEX_funcs
-    }
-
-base_flowsheet, base_groups, base_teas, base_funcs = \
-    create_base_biorefinery(HMPP_preprocessed)
-
-system_dct['base'] = {
-    'flowsheet': base_flowsheet,
-    'groups': base_groups,
-    'teas': base_teas,
-    'funcs': base_funcs
-    }
-
-
-
-# %%
-
-# =============================================================================
-# Simulate system and get results
-# =============================================================================
-
-def simulate_and_print(system='acid', feedstock_depot=None):
-    dct = system_dct[system]
-    funcs = dct['funcs']
-    s = dct['flowsheet'].stream
-    bst.main_flowsheet.set_flowsheet(dct['flowsheet'])
-
-    print(f'\n---------- {system if system.isupper() else system.capitalize()} Biorefinery ----------')
-    print(f'MESP: ${funcs["simulate_get_MESP"]()*_ethanol_kg_2_gal:.2f}/gal')
-    print(f'GWP: {funcs["get_GWP"]():.3f} kg CO2-eq/gal ethanol without feedstock')
-    if feedstock_depot:
-        GWP = funcs['get_GWP']()
-        GWP = funcs['get_GWP']() + (feedstock_GWPs[feedstock_depot]*s.feedstock.F_mass) \
-            / (s.ethanol.F_mass/_ethanol_kg_2_gal)
-    print(f'GWP: {GWP:.3f} kg CO2-eq/gal ethanol with feedstock')
-    print('--------------------------------------')
-
-
 
 
 

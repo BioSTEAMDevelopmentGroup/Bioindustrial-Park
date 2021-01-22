@@ -10,10 +10,8 @@
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
 # for license details.
 
-__all__ = (
-    'chems', 'auom', 'CEPCI', 'price', 'CFs', 'update_settings',
-    'load_system', 'flowsheet', 'groups', 'teas', 'funcs'
-    )
+
+# %%
 
 import biosteam as bst
 bst.speed_up()
@@ -37,6 +35,8 @@ from ._processes import update_settings
 getattr = getattr
 
 def load_system(kind='SSCF'):
+    if not kind in ('SSCF', 'SHF'):
+        raise ValueError(f'kind can only be "SSCF" or "SHF", not {kind}.')
     global flowsheet, groups, teas, funcs, lactic_sys, lactic_tea, \
         simulate_and_print, simulate_fermentation_improvement, \
         simulate_separation_improvement, simulate_operating_improvement
