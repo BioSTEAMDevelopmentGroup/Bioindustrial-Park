@@ -37,7 +37,8 @@ getattr = getattr
 def load_system(kind='SSCF'):
     if not kind in ('SSCF', 'SHF'):
         raise ValueError(f'kind can only be "SSCF" or "SHF", not {kind}.')
-    global flowsheet, groups, teas, funcs, lactic_sys, lactic_tea, \
+    global flowsheet, groups, teas, funcs, \
+        lactic_sys, lactic_tea, feedstock, lactic_acid, \
         simulate_and_print, simulate_fermentation_improvement, \
         simulate_separation_improvement, simulate_operating_improvement
     
@@ -51,6 +52,8 @@ def load_system(kind='SSCF'):
         
     lactic_sys = flowsheet.system.lactic_sys
     lactic_tea = teas['lactic_tea']
+    feedstock = flowsheet.stream.feedstock
+    lactic_acid = flowsheet.stream.lactic_acid
     simulate_and_print = lambda : systems.simulate_and_print(kind)
     simulate_fermentation_improvement = \
         lambda: systems.simulate_fermentation_improvement(kind)
