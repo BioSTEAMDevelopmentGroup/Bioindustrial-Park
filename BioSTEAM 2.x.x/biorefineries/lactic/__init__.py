@@ -49,11 +49,12 @@ def load_system(kind='SSCF'):
     
     update_settings(chems)
     bst.main_flowsheet.set_flowsheet(flowsheet)
-        
+
     lactic_sys = flowsheet.system.lactic_sys
-    lactic_tea = teas['lactic_tea']
     feedstock = flowsheet.stream.feedstock
     lactic_acid = flowsheet.stream.lactic_acid
+    lactic_tea = teas['lactic_tea']
+
     simulate_and_print = lambda : systems.simulate_and_print(kind)
     simulate_fermentation_improvement = \
         lambda: systems.simulate_fermentation_improvement(kind)
@@ -61,6 +62,10 @@ def load_system(kind='SSCF'):
         lambda: systems.simulate_separation_improvement(kind)
     simulate_operating_improvement = \
         lambda: systems.simulate_operating_improvement(kind)
+    
+
+    
+
 
 
 load_system('SSCF')

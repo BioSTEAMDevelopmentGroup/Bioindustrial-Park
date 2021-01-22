@@ -35,12 +35,13 @@ from ._settings import price, CFs
 getattr = getattr
 
 def load_system(system_kind='acid', depot_kind='HMPP'):
-    if not depot_kind in ('CPP', 'HMPP', 'AFEX'): \
-        raise ValueError('system_kind can only be "acid", "base", or "AFEX", '
-                         f'not {system_kind}.')
     if not system_kind in ('acid', 'base', 'AFEX'): \
         raise ValueError('system_kind can only be "acid", "base", or "AFEX", '
                          f'not {system_kind}.')
+    if not depot_kind in ('CPP', 'CPP_AFEX', 'HMPP', 'HMPP_AFEX'): \
+        raise ValueError('depot_kind can only be "CPP", "CPP_AFEX", "HMPP", '
+                         f'or "HMPP_AFEX", not {depot_kind}.')
+
     global flowsheet, groups, teas, funcs, biorefinery, tea
     
     depot_dct = systems.depot_dct[depot_kind]

@@ -153,8 +153,8 @@ class Auxiliary(Preprocessing):
     Auxiliary units including conveyor system, dust collection system, surge bin,
     and other miscellaneous equipment.
     
-    Notes
-    -----
+    Note
+    ----
     [1] For conveyor, dust collection, surge bin, and miscellaneous equipment,
         lifetime, salvage, and electricity usage was not explicitly provided in
         Lamers et al., [1]_ thus was back calculated based on the provided information.
@@ -695,8 +695,8 @@ class PreprocessingCost:
         '''
         [biosteam.System] Depot system.
         
-        Notes
-        -----
+        Note
+        ----
         Changing the depot system will not automatically update feedstock.'''
         return self._depot_sys
     @depot_sys.setter

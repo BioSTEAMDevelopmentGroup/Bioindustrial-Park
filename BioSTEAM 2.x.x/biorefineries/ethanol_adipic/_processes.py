@@ -372,10 +372,10 @@ def create_adipic_process(flowsheet, groups, black_liquor, cell_mass):
 # Wastewater
 # =============================================================================
 
-def create_wastewater_process(flowsheet, groups, get_flow_tpd, wastewater_streams,
+def create_wastewater_process(flowsheet, groups, get_flow_tpd, wwt_streams,
                               need_ammonia, bypass_R501, recover_sodium_sulfate):
     flowsheet, groups = la_create_wastewater_process(
-        flowsheet, groups, get_flow_tpd, wastewater_streams,
+        flowsheet, groups, get_flow_tpd, wwt_streams,
         AD_split=AD_split, MB_split=MB_split, COD_chemicals=COD_chemicals,
         soluble_organics=soluble_organics, solubles=solubles, insolubles=insolubles,
         need_ammonia=need_ammonia, bypass_R501=bypass_R501)

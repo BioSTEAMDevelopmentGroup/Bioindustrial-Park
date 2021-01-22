@@ -6,7 +6,7 @@ Simplified process flow scheme
 ------------------------------
 .. figure:: ./images/TOC.png
     :scale: 50%
-    :alighn: center
+    :align: center
 
 .. figure:: ./images/system_diagram.png
 
@@ -52,7 +52,7 @@ co-fermentation (SHF). You can choose which system to load.
 
 Systems
 -------
-The `Flowsheet`, `System`, and `TEA`, objects are `lactic_sys`, `lactic_tea`, and `flowsheet`.
+The `Flowsheet`, `System`, and `TEA`, objects are `flowsheet`, `lactic_sys`, and `lactic_tea`, respectively.
 
 Naming conventions:
     D = Distillation column
@@ -109,8 +109,6 @@ Processes:
     >>> # You can use the flowsheet to access streams, unit operations, and subsystems
     >>> u = la.flowsheet.unit
     >>> u.R301.show()
-    >>> system.R301.show()
-    >>> # Any unit operations and streams can be accessed through the module
     SaccharificationAndCoFermentation: R301
     ins...
     [0] s12  from  HXutility-H301

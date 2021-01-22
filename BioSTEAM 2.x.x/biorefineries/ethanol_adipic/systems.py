@@ -145,9 +145,9 @@ def create_acid_biorefinery(preprocessed):
         create_ethanol_process(flowsheet, groups, u.P201-0)
     
     # The last one is reserved for blowdown
-    WWT_streams = (u.H201-0, u.D402_P-0, u.S401-1, '')
+    wwt_streams = (u.H201-0, u.D402_P-0, u.S401-1, '')
     flowsheet, groups = \
-        create_wastewater_process(flowsheet, groups, get_flow_tpd, WWT_streams,
+        create_wastewater_process(flowsheet, groups, get_flow_tpd, wwt_streams,
                                   need_ammonia=False, bypass_R501=False,
                                   recover_sodium_sulfate=True)
 
@@ -179,8 +179,8 @@ def create_acid_biorefinery(preprocessed):
 # AFEX-pretreatment biorefinery
 # =============================================================================
 
-#!!! Make it possible to reuse lignin?
-def create_AFEX_biorefinery(preprocessed):
+def create_AFEX_biorefinery(preprocessed, include_adipic_process=False,
+                            recover_sodium_sulfate=False):
     flowsheet = bst.Flowsheet('AFEX')
     bst.main_flowsheet.set_flowsheet(flowsheet)
     s = flowsheet.stream
@@ -197,29 +197,40 @@ def create_AFEX_biorefinery(preprocessed):
     u.M301.T = u.R301.T_saccharification
     u.R301.C5_saccharification = True
     
-    # The last one is reserved for blowdown
-    WWT_streams = (u.D402_P-0, u.S401-1, '')
-    flowsheet, groups = \
-        create_wastewater_process(flowsheet, groups, get_flow_tpd, WWT_streams,
-                                  need_ammonia=False, bypass_R501=False,
-                                  recover_sodium_sulfate=False)
+    # An empty filler stream
+    black_liquor = bst.Stream('black_liquor')
     
-    CHP_wastes = (u.S401-0, u.S504-1)
-    CHP_biogas = u.R501-0
+    if include_adipic_process:
+        flowsheet, groups = \
+            create_adipic_process(flowsheet, groups, black_liquor, u.S401-0)
+        wwt_streams = (u.D402_P-0, u.S401-1, u.S701-1, u.S702-0, '')
+        flowsheet, groups = \
+            create_wastewater_process(flowsheet, groups, get_flow_tpd, wwt_streams,
+                                      need_ammonia=True, bypass_R501=True,
+                                      recover_sodium_sulfate=recover_sodium_sulfate)
+        CHP_wastes1 = (u.R701-1, u.S504-1)
+        CHP_biogas = ''
+        process_water_streams = {'adipid': (s.water_R702,)}
+    else:
+        wwt_streams = (u.D402_P-0, u.S401-1, '')
+        flowsheet, groups = \
+            create_wastewater_process(flowsheet, groups, get_flow_tpd, wwt_streams,
+                                      need_ammonia=False, bypass_R501=False,
+                                      recover_sodium_sulfate=recover_sodium_sulfate)
+        CHP_wastes1 = (u.S401-0, u.S504-1)
+        CHP_biogas = u.R501-0
+        process_water_streams = {}
+        
+    CHP_wastes2 = (u.S506-1, ) if recover_sodium_sulfate else ()
+    CHP_wastes = (*CHP_wastes1, *CHP_wastes2)
     CHP_side_streams = ()
-    process_water_streams = {
-        'ethanol': (s.water_M301, s.water_U401,)
-        }
+    process_water_streams['ethanol'] = (s.water_M301, s.water_U401,)
     recycled_water = u.S505-0
     flowsheet, groups = \
         create_facilities(flowsheet, groups, get_flow_tpd,
                           CHP_wastes, CHP_biogas, CHP_side_streams,
                           process_water_streams, recycled_water,
                           if_HXN=False, if_BDM=True)
-
-    # Those aren't linked to anything in the system
-    flowsheet.discard(s.sulfuric_acid)
-    flowsheet.discard(u.T603)
     
     flowsheet, teas, funcs = create_biorefinery(flowsheet, groups, get_flow_tpd)
 
@@ -232,7 +243,8 @@ def create_AFEX_biorefinery(preprocessed):
 # Base-pretreatment biorefinery
 # =============================================================================
 
-def create_base_biorefinery(preprocessed):
+def create_base_biorefinery(preprocessed, include_adipic_process=True,
+                            recover_sodium_sulfate=True):
     flowsheet = bst.Flowsheet('base')
     bst.main_flowsheet.set_flowsheet(flowsheet)
     s = flowsheet.stream
@@ -253,24 +265,32 @@ def create_base_biorefinery(preprocessed):
     u.M301.solid_loading = 0.25
     u.R301.C5_saccharification = True
     
-    flowsheet, groups = \
-        create_adipic_process(flowsheet, groups, u.P201-0, u.S401-0)
-    
-    # The last one is reserved for blowdown
-    WWT_streams = (u.D402_P-0, u.S401-1, u.S701-1, u.S702-0, '')
-    flowsheet, groups = \
-        create_wastewater_process(flowsheet, groups, get_flow_tpd, WWT_streams,
-                                  need_ammonia=True, bypass_R501=True,
-                                  recover_sodium_sulfate=True)
-    
-    CHP_wastes = (u.R701-1, u.S504-1, u.S506-1)
-    CHP_biogas = ''
+    if include_adipic_process:
+        flowsheet, groups = \
+            create_adipic_process(flowsheet, groups, u.P201-0, u.S401-0)
+        wwt_streams = (u.D402_P-0, u.S401-1, u.S701-1, u.S702-0, '')
+        flowsheet, groups = \
+            create_wastewater_process(flowsheet, groups, get_flow_tpd, wwt_streams,
+                                      need_ammonia=True, bypass_R501=True,
+                                      recover_sodium_sulfate=recover_sodium_sulfate)
+        CHP_wastes1 = (u.R701-1, u.S504-1)
+        CHP_biogas = ''
+        process_water_streams = {'adipid': (s.water_R702,)}
+    else:
+        wwt_streams = (u.P201-0, u.D402_P-0, u.S401-1, '')
+        flowsheet, groups = \
+            create_wastewater_process(flowsheet, groups, get_flow_tpd, wwt_streams,
+                                      need_ammonia=False, bypass_R501=False,
+                                      recover_sodium_sulfate=recover_sodium_sulfate)
+        CHP_wastes1 = (u.S401-0, u.S504-1)
+        CHP_biogas = u.R501-0
+        process_water_streams = {}
+        
+    CHP_wastes2 = (u.S506-1, ) if recover_sodium_sulfate else ()
+    CHP_wastes = (*CHP_wastes1, *CHP_wastes2)    
     CHP_side_streams = ()
-    process_water_streams = {
-        'pretreatment': (s.water_R201,),
-        'ethanol': (s.water_M301, s.water_U401,),
-        'adipid': (s.water_R702,)
-        }
+    process_water_streams['pretreatment'] = (s.water_R201,)
+    process_water_streams['ethanol'] = (s.water_M301, s.water_U401,)
     recycled_water = u.S505-0
     flowsheet, groups = \
         create_facilities(flowsheet, groups, get_flow_tpd,

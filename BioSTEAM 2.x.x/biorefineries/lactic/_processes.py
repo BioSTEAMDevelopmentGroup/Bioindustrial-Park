@@ -688,7 +688,7 @@ def create_separation_process(flowsheet, groups, feed, insolubles=insolubles,
 # Wastewater
 # =============================================================================
 
-def create_wastewater_process(flowsheet, groups, get_flow_tpd, wastewater_streams,
+def create_wastewater_process(flowsheet, groups, get_flow_tpd, wwt_streams,
                               AD_split=AD_split, MB_split=MB_split,
                               COD_chemicals=COD_chemicals,
                               soluble_organics=soluble_organics,
@@ -706,7 +706,7 @@ def create_wastewater_process(flowsheet, groups, get_flow_tpd, wastewater_stream
 
     ######################## Units ########################
     # Mix waste liquids for treatment
-    M501 = bst.units.Mixer('M501', ins=wastewater_streams)
+    M501 = bst.units.Mixer('M501', ins=wwt_streams)
     
     if not bypass_R501:
         R501 = units.AnaerobicDigestion('R501', ins=M501-0,
