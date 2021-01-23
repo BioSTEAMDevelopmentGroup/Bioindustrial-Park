@@ -34,14 +34,18 @@ HP acid from lignocellulosic feedstocks
 # =============================================================================
 # Setup
 # =============================================================================
-
+from warnings import filterwarnings
+filterwarnings('ignore')
 import numpy as np
 import pandas as pd
 import biosteam as bst
 from biosteam.utils import TicToc
 from biosteam.plots import plot_montecarlo_across_coordinate
-from biorefineries.HP.system_sugarcane import HP_sys, get_AA_MPSP, get_GWP, get_FEC, R301
+from biorefineries.HP.system_light_lle_vacuum_distillation import HP_sys, get_AA_MPSP, get_GWP, get_FEC, R301
 from biorefineries.HP.analyses import models
+from datetime import datetime
+
+
 
 percentiles = [0, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 1]
 
@@ -62,7 +66,7 @@ R301.set_titer_limit = True
 
 # Set seed to make sure each time the same set of random numbers will be used
 np.random.seed(3221)
-N_simulation = 100 # 1000
+N_simulation = 2000 # 1000
 samples = model.sample(N=N_simulation, rule='L')
 model.load_samples(samples)
 
@@ -74,9 +78,12 @@ model.evaluate()
 
 # Baseline results
 baseline_end = model.metrics_at_baseline()
+dateTimeObj = datetime.now()
+file_to_save = 'HP_%s.%s.%s-%s.%s'%(dateTimeObj.year, dateTimeObj.month, dateTimeObj.day, dateTimeObj.hour, dateTimeObj.minute)
+
 baseline = baseline.append(baseline_end, ignore_index=True)
 baseline.index = ('initial', 'end')
-baseline.to_excel('0_baseline.xlsx')
+baseline.to_excel(file_to_save+'_0_baseline.xlsx')
 
 # Parameters
 parameters = model.get_parameters()
@@ -208,7 +215,7 @@ print(f'\nSimulation time for {run_number} runs is: {time:.1f} min')
 
 #%%
 '''Output to Excel'''
-with pd.ExcelWriter('1_full_evaluation.xlsx') as writer:
+with pd.ExcelWriter(file_to_save+'_1_full_evaluation.xlsx') as writer:
     parameter_values.to_excel(writer, sheet_name='Parameters')
     TEA_results.to_excel(writer, sheet_name='TEA results')
     TEA_percentiles.to_excel(writer, sheet_name='TEA percentiles')

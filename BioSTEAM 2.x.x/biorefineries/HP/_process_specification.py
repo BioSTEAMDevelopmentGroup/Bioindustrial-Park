@@ -9,6 +9,8 @@ import flexsolve as flx
 import numpy as np
 from biosteam.exceptions import InfeasibleRegion
 from biorefineries.HP.units import compute_HP_titer, compute_HP_mass
+from winsound import Beep
+
 # from biosteam.process_tools.reactor_specification import evaluate_across_TRY
 _kg_per_ton = 907.18474
 
@@ -16,19 +18,20 @@ def evaluate_across_specs(spec, system,
             spec_1, spec_2, metrics, spec_3):
     try:
         spec.load_specifications(spec_1=spec_1, spec_2=spec_2)
+        # system.converge_method = 'wegstein'
         # system._setup()
         # for i in range(2): system._converge()
         system.simulate()
     except ValueError as e:# (ValueError, RuntimeError) (ValueError, AssertionError)
         
-        print(e)
+        print('\n\nValueError: %s'%str(e))
         print(spec.titer_inhibitor_specification.reactor.cofermentation_rxns[0].X, spec_1, '\n',
                                compute_HP_titer(spec.titer_inhibitor_specification.reactor.outs[0]), spec_2, '\n',
                                spec.titer_inhibitor_specification.reactor.ins[0].imass[spec.titer_inhibitor_specification.sugars].sum() / spec.titer_inhibitor_specification.reactor.ins[0].F_vol,
                                '\n', spec.titer_inhibitor_specification.mixer.ins[1].F_vol)
         # import pdb
         # pdb.set_trace()
-        raise e
+        # raise e
         return np.nan*np.ones([len(metrics), len(spec_3)])
     except InfeasibleRegion as e:
         # print(spec.titer_inhibitor_specification.reactor.cofermentation_rxns[0].X, spec_1, '\n',
@@ -37,21 +40,97 @@ def evaluate_across_specs(spec, system,
         #                        '\n', spec.titer_inhibitor_specification.mixer.ins[1].F_vol)
         # import pdb
         # pdb.set_trace()
-        print(e)
-        print(spec.titer_inhibitor_specification.reactor.cofermentation_rxns[0].X, spec_1, '\n',
-                               compute_HP_titer(spec.titer_inhibitor_specification.reactor.outs[0]), spec_2, '\n',
-                               spec.titer_inhibitor_specification.reactor.ins[0].imass[spec.titer_inhibitor_specification.sugars].sum() / spec.titer_inhibitor_specification.reactor.ins[0].F_vol,
-                               '\n', spec.titer_inhibitor_specification.mixer.ins[1].F_vol)
-        return np.nan*np.ones([len(metrics), len(spec_3)])
+        str_e = str(e)
+        print('\n\nInfeasibleRegion: %s'%str_e)
+        if 'material flow' in str(e) or 'negative temperature' in str_e:
+            try:
+            # raise e
+                print(e)
+                print('Resetting cache and emptying recycles ...')
+                system.reset_cache()
+                system.empty_recycles()
+                print('Loading and simulating with baseline specifications ...')
+                spec.load_yield(0.49)
+                spec.load_titer(54.8)
+                system.simulate()
+                print('Loading and simulating with required specifications ...')
+                spec.load_specifications(spec_1=spec_1, spec_2=spec_2)
+                system.simulate()
+            except Exception as e:
+                print(e)
+                # Beep(640, 1000)
+                spec.load_specifications(spec_1=spec_1, spec_2=spec_2)
+                try:
+                    system.reset_cache()
+                    system.empty_recycles()
+                    system.converge_method = 'fixedpoint'
+                    print("Trying fixedpoint ...")
+                    system.simulate()
+                    # system.converge_method = 'wegstein'
+                except Exception as e:
+                    print(e)
+                    try:
+                        system.reset_cache()
+                        system.empty_recycles()
+                        system.converge_method = 'aitken'
+                        print("Trying aitken ...")
+                        system.simulate()
+                        # system.converge_method = 'wegstein'
+                    except Exception as e:
+                        print("That didn't work.")
+                        print(e)
+                        # system.converge_method = 'wegstein'
+                        print(spec.titer_inhibitor_specification.reactor.cofermentation_rxns[0].X, spec_1, '\n',
+                                       compute_HP_titer(spec.titer_inhibitor_specification.reactor.outs[0]), spec_2, '\n',
+                                       spec.titer_inhibitor_specification.reactor.ins[0].imass[spec.titer_inhibitor_specification.sugars].sum() / spec.titer_inhibitor_specification.reactor.ins[0].F_vol,
+                                       '\n', spec.titer_inhibitor_specification.mixer.ins[1].F_vol)
+                        # import pdb
+                        # pdb.set_trace()
+                        return np.nan*np.ones([len(metrics), len(spec_3)])
+        else:
+            print(spec.titer_inhibitor_specification.reactor.cofermentation_rxns[0].X, spec_1, '\n',
+                                   compute_HP_titer(spec.titer_inhibitor_specification.reactor.outs[0]), spec_2, '\n',
+                                   spec.titer_inhibitor_specification.reactor.ins[0].imass[spec.titer_inhibitor_specification.sugars].sum() / spec.titer_inhibitor_specification.reactor.ins[0].F_vol,
+                                   '\n', spec.titer_inhibitor_specification.mixer.ins[1].F_vol)
+            return np.nan*np.ones([len(metrics), len(spec_3)])
     except RuntimeError as e:
-        print(e)
+        print('\n\nRuntimeError: %s'%str(e))
         print(spec.titer_inhibitor_specification.reactor.cofermentation_rxns[0].X, spec_1, '\n',
                                compute_HP_titer(spec.titer_inhibitor_specification.reactor.outs[0]), spec_2, '\n',
                                spec.titer_inhibitor_specification.reactor.ins[0].imass[spec.titer_inhibitor_specification.sugars].sum() / spec.titer_inhibitor_specification.reactor.ins[0].F_vol,
                                '\n', spec.titer_inhibitor_specification.mixer.ins[1].F_vol)
-        import pdb
-        pdb.set_trace()
+        try:
+            print('Trying fixedpoint ...')
+            system.converge_method = 'fixedpoint'
+            system.simulate()
+            # system.converge_method = 'wegstein' # reset
+        except RuntimeError as e:
+            print('RuntimeError: %s'%str(e))
+            print('Trying aitken ...')
+            system.converge_method = 'aitken'
+            try:
+                system.simulate()
+                # system.converge_method = 'wegstein' # reset
+            except RuntimeError as e:
+                print("That didn't work.")
+                print('RuntimeError: %s'%str(e))
+                # system.converge_method = 'wegstein'
+                return np.nan*np.ones([len(metrics), len(spec_3)])
+            except Exception as e:
+                print('Exception: %s'%str(e))
+                return np.nan*np.ones([len(metrics), len(spec_3)])
+        except Exception as e:
+            print('Exception: %s'%str(e))
+            return np.nan*np.ones([len(metrics), len(spec_3)])
+        # import pdb
+        # pdb.set_trace()
         return np.nan*np.ones([len(metrics), len(spec_3)])
+    except Exception as e:
+        print('\n\nException: %s'%str(e))
+        return np.nan*np.ones([len(metrics), len(spec_3)])
+    
+    finally:
+        system.converge_method = 'wegstein' # reset
     return spec.evaluate_across_productivity(metrics, spec_3)
     
 evaluate_across_specs = np.vectorize(
@@ -80,9 +159,11 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
                  'byproduct_streams',
                  'feedstock_mass',
                  'pretreatment_reactor',
-                 'titer_inhibitor_specification')
+                 'titer_inhibitor_specification',
+                 'seed_train_system')
     
-    def __init__(self, evaporator, pump, mixer, heat_exchanger, reactor, reaction_name, substrates, products,
+    def __init__(self, evaporator, pump, mixer, heat_exchanger, seed_train_system, 
+                 reactor, reaction_name, substrates, products,
                  spec_1, spec_2, spec_3, xylose_utilization_fraction,
                  feedstock, dehydration_reactor, byproduct_streams, 
                  feedstock_mass=104192.83224417375, pretreatment_reactor = None,
@@ -99,13 +180,14 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
         self.byproduct_streams = byproduct_streams
         self.feedstock_mass = feedstock_mass
         self.pretreatment_reactor = pretreatment_reactor
-       
+        self.seed_train_system = seed_train_system
         self.load_spec_1 = load_spec_1
         self.load_spec_2 = load_spec_2
         self.load_spec_3 = load_spec_3
         
         self.titer_inhibitor_specification =\
-            TiterAndInhibitorsSpecification(evaporator, pump, mixer, heat_exchanger, reactor,
+            TiterAndInhibitorsSpecification(evaporator, pump, mixer, heat_exchanger,
+                                            seed_train_system, reactor,
                  target_titer=100, product=reactor.outs[0])
         
     def load_specifications(self, spec_1=None, spec_2=None, spec_3=None,):
@@ -232,21 +314,21 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
         self.spec_1 = reactor.glucose_to_HP_rxn.X = yield_
         # reactor.xylose_to_HP_rxn.X = self.xylose_utilization_fraction * yield_
         reactor.xylose_to_HP_rxn.X = yield_
-        if reactor.glucose_to_HP_rxn.X+ reactor.glucose_to_microbe_rxn.X +\
+        if reactor.glucose_to_HP_rxn.X +\
             reactor.glucose_to_acetic_acid_rxn.X> 0.999:
             
             remainder = 0.999 - reactor.glucose_to_HP_rxn.X
             # reactor.glucose_to_microbe_rxn.X = .3 * remainder
-            reactor.glucose_to_acetic_acid_rxn.X = .7*remainder
+            reactor.glucose_to_acetic_acid_rxn.X = min(0.07, 1. - reactor.glucose_to_HP_rxn.X)
             # print(reactor.glucose_to_VitaminA_rxn.X)
             # print(reactor.glucose_to_microbe_rxn.X)
             
-        if reactor.xylose_to_HP_rxn.X  + reactor.xylose_to_microbe_rxn.X +\
+        if reactor.xylose_to_HP_rxn.X +\
             reactor.xylose_to_acetic_acid_rxn.X> 0.999:
             
             remainder = 0.999 - reactor.xylose_to_HP_rxn.X
             # reactor.xylose_to_microbe_rxn.X = .3 * remainder
-            reactor.xylose_to_acetic_acid_rxn.X = .7*remainder
+            reactor.xylose_to_acetic_acid_rxn.X = min(0.07*0.8, 1. - reactor.xylose_to_HP_rxn.X)
             
         
             # print(reactor.glucose_to_VitaminA_rxn.X)
@@ -269,14 +351,14 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
         specifications.
         
         """
-        self.reactor.tau_cofermentation = self.spec_2 / productivity
+        self.reactor.tau = self.reactor.tau_cofermentation = self.spec_2 / productivity
         self.spec_3 = productivity
     
     def calculate_titer(self):
         """Return titer in g products / effluent L."""
         reactor = self.reactor
         (reactor.specification or reactor._run)()
-        effluent = self.effluent
+        # effluent = self.effluent
         # F_mass_products = effluent.imass[self.products].sum()
         # if F_mass_products: 
         #     return F_mass_products / effluent.F_vol
@@ -289,7 +371,7 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
         titer_inhibitor_specification.target_titer = titer
         self.spec_2 = titer
         titer_inhibitor_specification.run()
-        self.reactor.tau_cofermentation = titer / self.spec_3
+        self.reactor.tau = self.reactor.tau_cofermentation = titer / self.spec_3
         
     def load_feedstock_price(self, price):
         self.feedstock.price = price / _kg_per_ton * 0.8 # price per dry ton --> price per wet kg
@@ -368,12 +450,12 @@ class TiterAndInhibitorsSpecification:
     
     max_sugar_concentration = 600 # g / L
     
-    def __init__(self, evaporator, pump, mixer, heat_exchanger, reactor,
+    def __init__(self, evaporator, pump, mixer, heat_exchanger, seed_train_system, reactor, 
                  target_titer, product,
                  maximum_inhibitor_concentration=1.,
                  products=('HP',),
                  sugars = ('Glucose', 'Xylose'),
-                 inhibitors = ('AceticAcid', 'HMF', 'Furfural')):
+                 inhibitors = ('AceticAcid', 'HMF', 'Furfural'),):
         self.evaporator = evaporator
         self.pump = pump
         self.mixer = mixer
@@ -386,6 +468,8 @@ class TiterAndInhibitorsSpecification:
         self.target_titer = target_titer
         self.maximum_inhibitor_concentration = maximum_inhibitor_concentration
         self.get_products_mass = compute_HP_mass
+        self.seed_train_system = seed_train_system
+        
     @property
     def feed(self):
         return self.evaporator.ins[0]
@@ -403,6 +487,7 @@ class TiterAndInhibitorsSpecification:
         self.pump._run()
         self.mixer._run()
         self.heat_exchanger._run()
+        self.seed_train_system._converge()
         self.reactor._run()
     
     def calculate_titer(self):
@@ -440,9 +525,10 @@ class TiterAndInhibitorsSpecification:
         self.run_units()
         x_titer = self.calculate_titer()
         V_min = 0.00001
+        V_max = 0.999
         if x_titer < self.target_titer: # Evaporate
             self.evaporator.V = V_min = flx.IQ_interpolation(self.titer_objective_function,
-                                                             V_min, 0.95, ytol=1e-4, maxiter=100) 
+                                                             V_min, V_max, ytol=1e-3, maxiter=100) 
         elif x_titer > self.target_titer: # Dilute
             self.update_dilution_water(x_titer)
             self.mixer._run()
@@ -452,8 +538,12 @@ class TiterAndInhibitorsSpecification:
         self.check_sugar_concentration()
         x_inhibitor = self.calculate_inhibitors()
         if x_inhibitor > self.maximum_inhibitor_concentration:
-            self.evaporator.V = flx.IQ_interpolation(self.inhibitor_objective_function,
-                                                     V_min, 0.95, ytol=1e-4, maxiter=100) 
+            obj_f = self.inhibitor_objective_function
+            y_0 = obj_f(V_min)
+            
+            if y_0 > 0.:
+                self.evaporator.V = flx.IQ_interpolation(obj_f,
+                                                     V_min, V_max, y0 = y_0, ytol=1e-3, maxiter=100) 
         
         # self.check_sugar_concentration()
     

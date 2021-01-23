@@ -1522,7 +1522,7 @@ class DehydrationReactor(Reactor):
         effluent.T = self.T
         # effluent.P = feed.P
         self.dehydration_reactions(effluent.mol)
-        effluent.phase = 'g'
+        effluent.phase = 'l'
    
     def _cost(self):
         super()._cost()
@@ -1585,7 +1585,7 @@ class CoFermentation(Reactor):
     
     effluent_titer = 0
     
-    productivity = 0.89 # in g/L/hr
+    productivity = 0.76 # in g/L/hr
     
     yield_limit = 0.76 # in g/g-sugar
     
@@ -1623,9 +1623,9 @@ class CoFermentation(Reactor):
         # FermMicrobe reaction from Table 14 on Page 31 of Humbird et al.
         self.cofermentation_rxns = ParallelRxn([
         #      Reaction definition            Reactant    Conversion
-        Rxn('Glucose -> 2HP',        'Glucose',   .53),
+        Rxn('Glucose -> 2HP + CO2',        'Glucose',   .53),
         Rxn('Glucose -> 3 AceticAcid',        'Glucose',   0.07),
-        Rxn('3Xylose -> 5HP',       'Xylose',    0.53*0.8),
+        Rxn('3Xylose -> 5HP + 2CO2',       'Xylose',    0.53*0.8),
         Rxn('2 Xylose -> 5 AceticAcid',       'Xylose',    0.07*0.8),
         ])
         
@@ -1657,7 +1657,8 @@ class CoFermentation(Reactor):
         Rxn('2 AceticAcid + CalciumDihydroxide -> CalciumAcetate + 2 H2O',  'AceticAcid',   1),
         # Rxn('SuccinicAcid + CalciumDihydroxide -> CalciumSuccinate + 2H2O', 'SuccinicAcid', 1)
             ])
-
+        self.tau = self.tau_cofermentation = 74 # this value is altered by spec.load_productivity
+        
     def _run(self):
         
         sugars, feed, CSL, lime = self.ins
@@ -1705,7 +1706,7 @@ class CoFermentation(Reactor):
         mode = self.mode
         Design = self.design_results
         Design.clear()
-        self.tau = self.effluent_titer / self.productivity
+        # self.tau = self.effluent_titer / self.productivity
         _mixture = self._mixture = tmo.Stream(None)
         _mixture.mix_from(self.outs[0:2])
         duty = Design['Duty'] = _mixture.H - self.mixed_feed.H

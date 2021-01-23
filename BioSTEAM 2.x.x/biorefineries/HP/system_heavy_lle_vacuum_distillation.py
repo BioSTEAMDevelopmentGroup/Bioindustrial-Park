@@ -58,7 +58,7 @@ from biorefineries.HP.chemicals_data import HP_chemicals, chemical_groups, \
                                 soluble_organics, combustibles
 from biorefineries.HP.tea import HPTEA
 from biosteam.process_tools import UnitGroup
-
+from biosteam.exceptions import InfeasibleRegion
 import matplotlib.pyplot as plt
 # from lactic.hx_network import HX_Network
 
@@ -79,9 +79,9 @@ bst.CE = 541.7
 tmo.settings.set_thermo(HP_chemicals)
 
 System.default_maxiter = 500
-System.default_converge_method = 'fixed-point'
+# System.default_converge_method = 'fixed-point'
 # System.default_converge_method = 'aitken'
-# System.default_converge_method = 'wegstein'
+System.default_converge_method = 'wegstein'
 System.default_molar_tolerance = 0.5
 
 # %% 
@@ -290,7 +290,7 @@ separation_sulfuric_acid = Stream('separation_sulfuric_acid', units='kg/hr')
 
 gypsum = Stream('gypsum', units='kg/hr', price=price['Gypsum'])
 
-separation_decanol = Stream('separation_decanol', units='kg/hr')
+separation_octanediol = Stream('separation_octanediol', units='kg/hr')
 separation_TOA = Stream('separation_sulfuric_acid', units='kg/hr')
 separation_AQ336 = Stream('separation_sulfuric_acid', units='kg/hr')
 
@@ -328,6 +328,14 @@ S401 = bst.units.SolidsCentrifuge('S401', ins=R302-0, outs=('cell_mass', ''),
                                               chemical_groups), solids =\
                                 ['Xylan', 'Glucan', 'Lignin', 'FermMicrobe',\
                                  'Ash', 'Arabinan', 'Galactan', 'Mannan'])
+def S401_moisture_capper():
+    try:
+        S401._run()
+    except:
+        S401.moisture_content *= 0.9
+        S401_moisture_capper()
+    S401.moisture_content = 0.4
+S401.specification = S401_moisture_capper
 
 R401 = units.AcidulationReactor('R401', ins = (S401-1, separation_sulfuric_acid),
                                 outs = ('acidulated_broth'),
@@ -359,28 +367,40 @@ def S402_spec():
 S402.specification = S402_spec
 
 
-M401 = bst.units.Mixer('M401', ins=(separation_decanol, separation_TOA, separation_AQ336,
+M401 = bst.units.Mixer('M401', ins=(separation_octanediol,
                                     ''))
 
+F401 = bst.units.MultiEffectEvaporator('F401', ins=S402-1, outs=('F401_l', 'F401_g'),
+                                        P = (101325, 73581, 50892, 32777, 20000), V = 0.5)
+def F401_specification():
+    instream = F401.ins[0]
+    F401.V = 0.5 * instream.imol['H2O']/instream.F_mol
+    F401._run()
 
+F401.specification = F401_specification
+
+F401_P = bst.units.Pump('F401_P', ins=F401-0)
+# 
+# F401_H = bst.units.HXutility('F401_H', ins=F401-1, V=0, rigorous=True)
 
 
 # Kds = dict(IDs=('HP',),
 #            K=np.array([1./8.411, ]), 
 #            raffinate_chemicals = ('Water',),
-#            extract_chemicals = ('Decanol'))
+#            extract_chemicals = ('Octanediol'))
 # S404 = bst.units.MultiStageMixerSettlers('S404', ins = (S402-1, M401-0),
 #                                      outs = ('raffinate', 'extract'),
 #                                      N_stages = 40, partition_data = Kds)      
 
 
-Kds = dict(IDs=('HP', 'Water', 'Decanol', 'TOA', 'AQ336', 'Glucose'),
-           K=np.array([1./122., 3.143, 1e-4, 0., 0., 414.43]),
+Kds = dict(IDs=('HP', 'Water', 'Octanediol'),
+           K=np.array([1./2.999, 3.384, 0.005476]),
            phi = 0.5)
-
-S404 = bst.units.MultiStageMixerSettlers('S404', ins = (S402-1, M401-0),
+#!!! TODO: try to get S404.specification working with butyl acetate instead of octanediol 
+#          (to avoid heating in R401_H)
+S404 = bst.units.MultiStageMixerSettlers('S404', ins = (F401_P-0, M401-0),
                                      outs = ('raffinate', 'extract'),
-                                     N_stages = 20, partition_data = Kds,) 
+                                     N_stages = 15, partition_data = Kds,) 
                           
                           
 S404.vol_frac = 0.05
@@ -388,69 +408,75 @@ S404.vol_frac = 0.05
 
 tolerable_loss_fraction = 0.001
 
-def adjust_S404_streams():
-    feed_decanol, feed_TOA, feed_AQ336, solvent_recycle = M401.ins
-    process_stream = S404.ins[0]
-    existing_decanol = solvent_recycle.imol['Decanol'] + process_stream.imol['Decanol']
-    existing_TOA = solvent_recycle.imol['TOA'] + process_stream.imol['TOA']
-    existing_AQ336 = solvent_recycle.imol['AQ336'] + process_stream.imol['AQ336']
-    HP_recovery = 1-tolerable_loss_fraction
-    K_extract = 1./S404.partition_data['K'][0]
-    
-    reqd_decanol = HP_recovery * 0.5 * process_stream.F_mol * ((1.+K_extract)/K_extract) \
-            / (1. + (1. - K_extract**-S404.N_stages)/(K_extract-1.))
-    reqd_TOA = reqd_AQ336 = reqd_decanol/8. # decanol:TOA:AQ336 = 0.8:0.1:0.1
+# def adjust_S404_streams():
+#     feed_octanediol, feed_TOA, feed_AQ336, solvent_recycle = M401.ins
+#     process_stream = S404.ins[0]
+#     existing_octanediol = solvent_recycle.imol['Decanol'] + process_stream.imol['Decanol']
+#     existing_TOA = solvent_recycle.imol['TOA'] + process_stream.imol['TOA']
+#     existing_AQ336 = solvent_recycle.imol['AQ336'] + process_stream.imol['AQ336']
 
-    feed_decanol.imol['Decanol'] = max(0, reqd_decanol - existing_decanol)
-    feed_TOA.imol['TOA'] = max(0, reqd_TOA - existing_TOA)
-    feed_AQ336.imol['AQ336'] = max(0, reqd_AQ336 - existing_AQ336)
-    
-    M401._run()
-    S404._run()
+#     reqd_octanediol = process_stream.F_vol * S404.vol_frac
+#     reqd_TOA = reqd_AQ336 = reqd_octanediol/8. # decanol:TOA:AQ336 = 0.8:0.1:0.1
+
+#     feed_octanediol.imol['Decanol'] = max(0, reqd_octanediol - existing_octanediol)
+#     feed_TOA.imol['TOA'] = max(0, reqd_TOA - existing_TOA)
+#     feed_AQ336.imol['AQ336'] = max(0, reqd_AQ336 - existing_AQ336)
+#     M401._run()
+#     S404._run()
 
 def adjust_S404_Ks_streams():
-    feed_decanol, solvent_recycle = M401.ins
+    feed_octanediol, solvent_recycle = M401.ins
     process_stream = S404.ins[0]
     process_stream_F_mol = process_stream.F_mol
-    existing_decanol = solvent_recycle.imol['Decanol'] + process_stream.imol['Decanol']
-    existing_TOA = solvent_recycle.imol['TOA'] + process_stream.imol['TOA']
-    existing_AQ336 = solvent_recycle.imol['AQ336'] + process_stream.imol['AQ336']
-    N_stages = S404.N_stages
+    existing_octanediol = solvent_recycle.imol['Octanediol'] + process_stream.imol['Octanediol']
+    # N_stages = S404.N_stages
     # S404.T = 340
     K_raffinate = S404.partition_data['K'][0]
     # K_extract = 1./S404.partition_data['K'][0]
     HP_recovery = 1-tolerable_loss_fraction
-    reqd_decanol = HP_recovery * K_raffinate * process_stream_F_mol
-    reqd_TOA = reqd_AQ336 = reqd_decanol/8. # decanol:TOA:AQ336 = 0.8:0.1:0.1
-    # reqd_decanol = HP_recovery * 0.5 * process_stream.F_mol * ((1.+K_extract)/K_extract) \
+    reqd_octanediol = HP_recovery * K_raffinate * process_stream_F_mol
+    # reqd_octanediol = HP_recovery * 0.5 * process_stream.F_mol * ((1.+K_extract)/K_extract) \
     #         / (1. + (1. - K_extract**-S404.N_stages)/(K_extract-1.))
-    prev_reqd_decanol = 0.
-    count = 0
-    while abs(prev_reqd_decanol/reqd_decanol - 1) > 1e-3: 
-        feed_decanol.imol['Decanol'] = max(0, reqd_decanol - existing_decanol)
-        feed_decanol.imol['Decanol'] = max(0, reqd_decanol - existing_decanol)
-        feed_decanol.imol['Decanol'] = max(0, reqd_decanol - existing_decanol)
-        M401._run()
-        Ks_new = update_Ks(S404)
-        print(Ks_new)
-        S404.partition_data['K'] = Ks_new
-        K_raffinate = S404.partition_data['K'][0]
-        # K_extract = 1./S404.partition_data['K'][0]
-        HP_recovery = 1.-tolerable_loss_fraction
-        prev_reqd_decanol = reqd_decanol
-        reqd_decanol = HP_recovery * K_raffinate * process_stream_F_mol
-        reqd_TOA = reqd_AQ336 = reqd_decanol/8. # decanol:TOA:AQ336 = 0.8:0.1:0.1
-        # reqd_decanol = HP_recovery * 0.5 *  process_stream.F_mol * ((1.+K_extract)/K_extract) \
-        #     / (1. + (1. - K_extract**-N_stages)/(K_extract-1.))
-        
-        print(reqd_decanol)
-        count += 1
-    print(count)
-    M401._run()
-    S404._run()
-    print('HP loss = %s' %(S404.outs[1].imol['HP']/S404.ins[0].imol['HP'] - 1. + tolerable_loss_fraction))
+    # prev_reqd_octanediol = 0.
+    # count = [0]
     
-def update_Ks(lle_unit, solute_indices = (0,), carrier_indices = (1,), solvent_indices = (2,3,4)):
+    # def solve_for_Ks(reqd_octanediol):
+    # while abs(prev_reqd_octanediol/reqd_octanediol - 1) > 1e-3:
+    feed_octanediol.imol['Octanediol'] = max(0, reqd_octanediol - existing_octanediol)
+    M401._run()
+    Ks_new = update_Ks(S404)
+    # print(Ks_new)
+    if np.any(np.abs(S404.partition_data['K']/ Ks_new - 1) > 1e-1):
+        S404.partition_data['K'] = Ks_new 
+    K_raffinate = S404.partition_data['K'][0]
+    # K_extract = 1./S404.partition_data['K'][0]
+    HP_recovery = 1.-tolerable_loss_fraction
+    # prev_reqd_octanediol = reqd_octanediol
+    reqd_octanediol = HP_recovery * K_raffinate * process_stream_F_mol
+    # print(reqd_octanediol)
+    # reqd_octanediol = HP_recovery * 0.5 *  process_stream.F_mol * ((1.+K_extract)/K_extract) \
+    #     / (1. + (1. - K_extract**-N_stages)/(K_extract-1.))
+    
+    # print(reqd_octanediol)
+    # count[0] += 1
+    # return reqd_octanediol
+    
+    # reqd_octanediol = flx.fixed_point(solve_for_Ks, reqd_octanediol, xtol = 1, checkiter=False, maxiter=10)
+    
+    # print(count[0])
+    feed_octanediol.imol['Octanediol'] = max(0, reqd_octanediol - existing_octanediol)
+    # print(reqd_octanediol)
+    M401._run()
+    # S404._run()
+    S404_run()
+    
+    
+    
+    # print('HP loss = %s' %(S404.outs[0].imol['HP']/S404.ins[0].imol['HP']))
+    # import pdb
+    # pdb.set_trace()
+    
+def update_Ks(lle_unit, solute_indices = (0,), carrier_indices = (1,), solvent_indices = (2,)):
     IDs = lle_unit.partition_data['IDs']
     Ks = lle_unit.partition_data['K']
     solute_chemicals = tuple([IDs[index] for index in solute_indices])
@@ -465,42 +491,72 @@ def update_Ks(lle_unit, solute_indices = (0,), carrier_indices = (1,), solvent_i
     test_stream.imol[solute_chemicals] = process_stream.imol[solute_chemicals]
     test_stream.imol[carrier_chemicals] = process_stream.imol[carrier_chemicals]
     test_stream.imol[solvent_chemicals] = solvent_stream.imol[solvent_chemicals]
-    
-    test_stream.lle(T=process_stream.T)
-    test_stream.show()
+    test_stream.lle(T=process_stream.T, top_chemical = 'Octanediol')
+    # test_stream.show()
     Ks_new = (test_stream['L'].imol[IDs]/test_stream['L'].F_mol)/(test_stream['l'].imol[IDs]/test_stream['l'].F_mol)
     
     return Ks_new
 
+def S404_run():
+    try:
+        S404._run()
+    except:
+        S404.N_stages-=1
+        print('\nReduced S404.N_stages to %s\n'%S404.N_stages)
+        if S404.N_stages == 0:
+            S404.N_stages = 15 # reset
+            raise InfeasibleRegion('number of stages in %s'%(S404.ID))   
+        S404_run()
+    
+        
+S404.specification = adjust_S404_Ks_streams
 
-S404.specification = adjust_S404_streams
-
+ideal_thermo = S404.thermo.ideal()
 
 # S404-0-1-R302 # with sugars recycle
-D401 = bst.units.ShortcutColumn('D401', ins=S404-1, outs=('D401_g', 'D401_l'),
-                                    LHK=('HP', 'Decanol'),
+D401 = bst.units.BinaryDistillation('D401', ins=S404-1, outs=('D401_g', 'D401_l'),
+                                    LHK=('HP', 'Octanediol'),
                                     is_divided=True,
                                     product_specification_format='Recovery',
-                                    Lr=0.999, Hr=0.999, k=1.2, P = 101325/10,
-                                    vessel_material = 'Stainless steel 316')
+                                    Lr=0.999, Hr=0.999, k=1.2, P = 101325/15,
+                                    vessel_material = 'Stainless steel 316', condenser_thermo = ideal_thermo)
 
-def D401_specification():
-    heavy_impurity_IDs = ('Glucose', 'Xylose', 'SolubleLignin')
-    heavy_impurity_mol = D401.ins[0].imol[heavy_impurity_IDs]
-    D401.ins[0].imol[heavy_impurity_IDs] = 0
-    D401._run()
-    # D401.ins[0].imol[heavy_impurity_IDs] = heavy_impurity_mol
-    # D401.outs[1].imol[heavy_impurity_IDs] = heavy_impurity_mol
+# F402 = bst.units.MultiEffectEvaporator('F402', ins=S404-1, outs=('F402_l', 'F402_g'),
+#                                         P = (101325, 73581, 50892, 32777, 20000), V = 0.9)
+# #: [HXutility] Condenser.
+# def F402_spec():
+#     F402.V = F402.ins[0].imol['HP']/F402.ins[0].F_mol
+#     F402._run()
+# F402.specification = F402_spec
 
-#     
-D401.specification = D401_specification
-
-D401_P = units.HPPump('D401_P', ins=D401-0)
+#: [HXutility] Condenser.
 
 
-#!!! TODO: Make rigorous=True work
-D401_H = bst.units.HXutility('D401_H', ins=D401-1, V=0., rigorous=False)
-D401_H-0-3-M401
+# D401.condenser = bst.HXutility(None,
+#                                 ins=tmo.Stream(None, phase='g', thermo=ideal_thermo),
+#                                 outs=tmo.MultiStream(None, thermo=ideal_thermo),
+#                                 thermo=ideal_thermo)
+# D401.heat_utilities = D401.condenser.heat_utilities + D401.boiler.heat_utilities
+
+# def distillate_recoveries_hook(IDs, recoveries):
+#         light_keys = ('H2O',)
+#         index = [n for n, i in enumerate(IDs) if i in light_keys]
+#         recoveries[index] = 1.0
+
+# D401._distillate_recoveries_hook = distillate_recoveries_hook
+
+# def D402_remove_heat_utilities():
+#     D402._run()
+#     D402.heat_utilities = ()
+# D402.specification = D402_remove_heat_utilities
+
+D401_P = units.HPPump('D401_P', ins=D401-1)
+
+
+#!!! TODO: Make rigorous=True after implementing Esterification and Hydrolysis
+D401_H = bst.units.HXutility('D401_H', ins=D401-0, V=0., rigorous=True)
+D401_H_P = units.HPPump('D401_H_P', ins=D401_H-0, P = 101325)
+D401_P-0-1-M401
 # def D401_H_spec():
 #     D401_H._run()
 #     outstream = D401_H.outs[0]
@@ -510,7 +566,7 @@ D401_H-0-3-M401
 #     outstream.imol['Water'] = 7.*outstream.imol['HP']
 # D401_H.specification = D401_H_spec
 
-R402 = units.DehydrationReactor('R402', ins = (D401_P-0),
+R402 = units.DehydrationReactor('R402', ins = (D401_H_P-0),
                                 outs = ('dilute_acryclic_acid'),
                                 tau = 57.34/1.5, # Dishisha et al.
                                 T = 230 + 273.15,
@@ -656,7 +712,7 @@ aerobic_caustic = Stream('aerobic_caustic', units='kg/hr', T=20+273.15, P=2*1013
 # =============================================================================
 
 # Mix waste liquids for treatment
-M501 = bst.units.Mixer('M501', ins=(F301_P-0, S401-0, D402_H-0, S404-0)) # without sugars recycle
+M501 = bst.units.Mixer('M501', ins=(F301_P-0, S401-0, F401-1, D402_H-0, S404-0)) # without sugars recycle
 # M501 = bst.units.Mixer('M501', ins=(F301_P-0, D402_H-0)) # with sugars recycle
 
 # This represents the total cost of wastewater treatment system
@@ -736,7 +792,7 @@ ammonia_fresh = Stream('ammonia_fresh', price=price['AmmoniumHydroxide'])
 CSL_fresh = Stream('CSL_fresh', price=price['CSL'])
 lime_fresh = Stream('lime_fresh', price=price['Lime'])
 
-decanol_fresh = Stream('decanol_fresh', price=price['Decanol'])
+octanediol_fresh = Stream('octanediol_fresh', price=price['Octanediol'])
 TOA_fresh = Stream('TOA_fresh', price=price['TOA'])
 AQ336_fresh = Stream('AQ336_fresh', price=price['AQ336'])
 
@@ -846,8 +902,8 @@ T608 = units.SulfuricAcidStorageTank('T608', ins = sulfuric_acid_fresh2, outs = 
 T608.line = 'Sulfuric acid storage tank'
 
 
-T609 = bst.units.StorageTank('T609', ins = decanol_fresh, outs = separation_decanol)
-T609.line = 'Decanol storage tank'
+T609 = bst.units.StorageTank('T609', ins = octanediol_fresh, outs = separation_octanediol)
+T609.line = 'Octanediol storage tank'
 
 T610 = bst.units.StorageTank('T610', ins = TOA_fresh, outs = separation_TOA)
 T610.line = 'TOA storage tank'
@@ -991,117 +1047,119 @@ HP_sys = bst.main_flowsheet.create_system(
 
 BT_sys = System('BT_sys', path=(BT,))
 
+flowsheet('SYS2').molar_tolerance = 3
+flowsheet('SYS2').maxiter = 100
 
-from scipy.optimize import minimize, rosen_der, least_squares
+# from scipy.optimize import minimize, rosen_der, least_squares
 # from scipy.optimize import LinearConstraint as LinearConstraint
 
 # OK to waste up to 0.6% of produced HP
-acceptable_loss_fraction = 0.005 
-solver_tol = 0.0001
+# acceptable_loss_fraction = 0.005 
+# solver_tol = 0.0001
 
 # import pdb
-def SYS_HP_loss_obj_fn(vol_fracs):
-    S404.vol_frac, S405.vol_frac = vol_fracs
-    SYS.simulate()
-    wasted_HP = S404.outs[0].imol['HP']
-    in_HP = S404.ins[0].imol['HP']
-    # pdb.set_trace()
-    obj = wasted_HP/in_HP - acceptable_loss_fraction
-    global count
-    print(count, [*vol_fracs], obj)
-    count += 1
-    return obj
+# def SYS_HP_loss_obj_fn(vol_fracs):
+#     S404.vol_frac, S405.vol_frac = vol_fracs
+#     SYS.simulate()
+#     wasted_HP = S404.outs[0].imol['HP']
+#     in_HP = S404.ins[0].imol['HP']
+#     # pdb.set_trace()
+#     obj = wasted_HP/in_HP - acceptable_loss_fraction
+#     global count
+#     print(count, [*vol_fracs], obj)
+#     count += 1
+#     return obj
 
 
 # constraints = LinearConstraint([lambda x:x, lambda y:y], [0.001, 0.001], [5., 5.])
-bounds = ((0.01, 0.03), (1., 3.))
+# bounds = ((0.01, 0.03), (1., 3.))
 
-count = 0
-def SYS_spec():
-    global count
-    count = 0
-    # minimize(fun=SYS_HP_loss_obj_fn, x0=[0.05, 2.], method = 'SLSQP',
-    #       jac = rosen_der, bounds = bounds, tol = solver_tol)
-    least_squares(fun=SYS_HP_loss_obj_fn, x0=[0.05, 2.],
-           bounds = bounds, xtol = 1e-6, ftol = solver_tol)
-    SYS.simulate()
+# count = 0
+# def SYS_spec():
+#     global count
+#     count = 0
+#     # minimize(fun=SYS_HP_loss_obj_fn, x0=[0.05, 2.], method = 'SLSQP',
+#     #       jac = rosen_der, bounds = bounds, tol = solver_tol)
+#     least_squares(fun=SYS_HP_loss_obj_fn, x0=[0.05, 2.],
+#            bounds = bounds, xtol = 1e-6, ftol = solver_tol)
+#     SYS.simulate()
 
-def SYS_spec_single():
-    flx.IQ_interpolation(SYS_HP_loss_obj_fn_single_S404, 0.01, 1., ytol=1e-4, maxiter=100)
+# def SYS_spec_single():
+#     flx.IQ_interpolation(SYS_HP_loss_obj_fn_single_S404, 0.01, 1., ytol=1e-4, maxiter=100)
 
-def SYS_HP_loss_obj_fn_single_S404(vf_1):
-    S404.vol_frac = vf_1
-    flx.IQ_interpolation(SYS_HP_loss_obj_fn_single_S405, 0.03, 3., ytol=1e-4, maxiter=100)
-    wasted_HP = S404.outs[0].imol['HP']
-    in_HP = S404.ins[0].imol['HP']
-    # pdb.set_trace()
-    obj = wasted_HP/in_HP - acceptable_loss_fraction
-    # global count
-    # print(count, [*vol_fracs], obj)
-    # count += 1
-    return obj
+# def SYS_HP_loss_obj_fn_single_S404(vf_1):
+#     S404.vol_frac = vf_1
+#     flx.IQ_interpolation(SYS_HP_loss_obj_fn_single_S405, 0.03, 3., ytol=1e-4, maxiter=100)
+#     wasted_HP = S404.outs[0].imol['HP']
+#     in_HP = S404.ins[0].imol['HP']
+#     # pdb.set_trace()
+#     obj = wasted_HP/in_HP - acceptable_loss_fraction
+#     # global count
+#     # print(count, [*vol_fracs], obj)
+#     # count += 1
+#     return obj
 
-def SYS_HP_loss_obj_fn_single_S405(vf_2):
-    S405.vol_frac = vf_2
-    SYS.simulate()
-    wasted_HP = S404.outs[0].imol['HP']
-    in_HP = S404.ins[0].imol['HP']
-    # pdb.set_trace()
-    obj = wasted_HP/in_HP - acceptable_loss_fraction
-    return obj
+# def SYS_HP_loss_obj_fn_single_S405(vf_2):
+#     S405.vol_frac = vf_2
+#     SYS.simulate()
+#     wasted_HP = S404.outs[0].imol['HP']
+#     in_HP = S404.ins[0].imol['HP']
+#     # pdb.set_trace()
+#     obj = wasted_HP/in_HP - acceptable_loss_fraction
+#     return obj
 
 
 #%% 1.13.2021 SYS_specification
-x_target = 0.001
-import pdb
-def calculate_HP_fraction_loss(unit):
-    wasted_HP = unit.outs[0].imol['HP']
-    in_HP = unit.ins[0].imol['HP']
-    return wasted_HP/in_HP
+# x_target = 0.001
+# import pdb
+# def calculate_HP_fraction_loss(unit):
+#     wasted_HP = unit.outs[0].imol['HP']
+#     in_HP = unit.ins[0].imol['HP']
+#     return wasted_HP/in_HP
 
-def real_f():
-    # pdb.set_trace()
-    try:
-        SYS.simulate()
-    except:
-        S405.specification = S405_alternative_specification
-        SYS.simulate()
-    finally:
-        S405.specification = adjust_S405_streams
-        
-    return calculate_HP_fraction_loss(S404) - x_target
-
-# def f1(v1):
-#     S404.vol_frac = v1
-#     x0, x1 = 1.8, 3.
-#     y0, y1 = f2(x0), f2(x1)
-#     print(x0, x1, y0, y1)
+# def real_f():
+#     # pdb.set_trace()
 #     try:
-#         v2 = flx.IQ_interpolation(f2, x0, x1, y0, y1, ytol=1e-6,
-#                                   maxiter=100, checkbounds=True)
+#         SYS.simulate()
 #     except:
-#         return y1
-#     return 0.
+#         S405.specification = S405_alternative_specification
+#         SYS.simulate()
+#     finally:
+#         S405.specification = adjust_S405_streams
+        
+#     return calculate_HP_fraction_loss(S404) - x_target
 
-def SYS_specification():
-    return flx.IQ_interpolation(f2, 0.02, 0.5, f2(0.02), f2(0.5), ytol=1e-6, maxiter=100, checkbounds=True)
+# # def f1(v1):
+# #     S404.vol_frac = v1
+# #     x0, x1 = 1.8, 3.
+# #     y0, y1 = f2(x0), f2(x1)
+# #     print(x0, x1, y0, y1)
+# #     try:
+# #         v2 = flx.IQ_interpolation(f2, x0, x1, y0, y1, ytol=1e-6,
+# #                                   maxiter=100, checkbounds=True)
+# #     except:
+# #         return y1
+# #     return 0.
 
-def f2(v2):
-    S404.vol_frac = v2
-    print(v2)
-    return real_f()
+# def SYS_specification():
+#     return flx.IQ_interpolation(f2, 0.02, 0.5, f2(0.02), f2(0.5), ytol=1e-6, maxiter=100, checkbounds=True)
+
+# def f2(v2):
+#     S404.vol_frac = v2
+#     print(v2)
+#     return real_f()
 
 
-SYS = None
-# path_units = [S404, S405, M401, M402]
+# SYS = None
+# # path_units = [S404, S405, M401, M402]
 
 
-# for system in HP_sys.subsystems:
-#     if all([u in system.units for u in path_units]):
-#         SYS = system
-#         break
-# SYS = flowsheet('SYS3')
-# SYS.specification = SYS_specification
+# # for system in HP_sys.subsystems:
+# #     if all([u in system.units for u in path_units]):
+# #         SYS = system
+# #         break
+# # SYS = flowsheet('SYS3')
+# # SYS.specification = SYS_specification
 
 # %%
 # =============================================================================
@@ -1179,6 +1237,7 @@ spec = ProcessSpecification(
     pump = M304_H_P,
     mixer = M304,
     heat_exchanger = M304_H,
+    seed_train_system = flowsheet('SYS1'),
     reactor= R302,
     reaction_name='fermentation_reaction',
     substrates=('Xylose', 'Glucose'),
@@ -1193,6 +1252,8 @@ spec = ProcessSpecification(
     feedstock_mass = feedstock.F_mass,
     pretreatment_reactor = R201)
 
+spec.load_yield(0.51)
+spec.load_titer(62.6)
 path = (F301, R302)
 @np.vectorize
 def calculate_titer(V):

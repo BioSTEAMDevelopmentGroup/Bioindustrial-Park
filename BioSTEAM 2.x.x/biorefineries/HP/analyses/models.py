@@ -29,7 +29,7 @@ from chaospy import distributions as shape
 from biosteam import main_flowsheet as find
 from biosteam.evaluation import Model, Metric
 from biosteam.evaluation.evaluation_tools.parameter import Setter
-from biorefineries.HP.system import HP_sub_sys, HP_tea, HP_no_BT_tea, flowsheet, unit_groups
+from biorefineries.HP.system_light_lle_vacuum_distillation import HP_sub_sys, HP_tea, HP_no_BT_tea, flowsheet, unit_groups
 from warnings import warn
 
 find.set_flowsheet(flowsheet)
@@ -73,7 +73,7 @@ get_adjusted_yield = lambda: get_yield() * get_purity()
 # Recovery (%) = recovered/amount in fermentation broth
 R301 = find.unit.R301
 get_recovery = lambda: AA.imol['HP'] \
-    /(R301.outs[0].imol['HP']+2*R301.outs[0].imol['CalciumLactate'])
+    /(R302.outs[0].imol['HP']+2*R302.outs[0].imol['CalciumLactate'])
 get_overall_TCI = lambda: HP_tea.TCI/1e6
 # Annual operating cost, note that AOC excludes electricity credit
 get_overall_AOC = lambda: HP_tea.AOC/1e6
@@ -463,7 +463,7 @@ D = shape.Triangle(0.424, 0.53, 0.636) # +/- 20% of baseline
        baseline=0.53, distribution=D)
 def set_R302_HP_yield(X):
     R302_X = R302.cofermentation_rxns.X
-    R302_X[0] = R302_X[3] = X
+    R302_X[0] = R302_X[2] = X
     R303_X = R303.cofermentation_rxns.X
     R303_X[0] = R303_X[3] = X * R303.ferm_ratio
 
@@ -473,11 +473,12 @@ D = shape.Triangle(0.004, 0.07, 0.32)
 def set_R301_acetic_acid_yield(X): 
     # 1e6 is to avoid generating tiny negative flow (e.g., 1e-14) in R301
     R302_X = R302.cofermentation_rxns.X
-    X = min(X, 1-1e-6-R302_X[0]-R302_X[2])
-    R302_X[1] = R302_X[4] = X
+    # X = min(X, 1-1e-6-R302_X[0]-R302_X[2])
+    X = min(X, 1-1e-6-R302_X[0])
+    R302_X[1] = R302_X[3] = X
     R303_X = R303.cofermentation_rxns.X
     X = min(X*R303.ferm_ratio, 1-1e-6-R303_X[0]-R303_X[2])
-    R303_X[1] = R303_X[4] = X
+    R303_X[1] = R303_X[3] = X
 
 D = shape.Uniform(0.05, 0.1)
 @param(name='Innoculum ratio', element=R301, kind='coupled', units='%',

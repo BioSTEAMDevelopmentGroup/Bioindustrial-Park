@@ -7,8 +7,8 @@ Created on Fri Jul 31 13:57:09 2020
 
 # Run this cell first
 from warnings import filterwarnings
-import copy
 filterwarnings('ignore')
+import copy
 from biosteam.process_tools import UnitGroup
 from biosteam.digraph import digraph_from_units, save_digraph
 from biosteam.utils import streams_from_units, filter_out_missing_streams, colors
@@ -20,8 +20,8 @@ from matplotlib.ticker import AutoMinorLocator as AML
 
 # from biorefineries.HP.system import HP_sys, HP_tea, R302, spec
 # from biorefineries.HP.system import MEK as product
-from biorefineries.HP.system_single_lle import HP_sys, HP_tea, R302, spec, get_GWP, get_non_bio_GWP, get_FEC, get_SPED
-from biorefineries.HP.system_single_lle import AA as product
+from biorefineries.HP.system_light_lle_vacuum_distillation import HP_sys, HP_tea, R302, spec, get_GWP, get_non_bio_GWP, get_FEC, get_SPED
+from biorefineries.HP.system_light_lle_vacuum_distillation import AA as product
 
 from matplotlib import pyplot as plt
 from  matplotlib.colors import LinearSegmentedColormap
@@ -62,8 +62,8 @@ def CABBI_green_colormap(N_levels=90):
     #                 colors.CABBI_green.RGBn,
     #                 colors.CABBI_green.shade(30).RGBn)
 
-    CABBI_colors = (colors.CABBI_yellow.tint(10).RGBn,
-                    colors.CABBI_yellow.RGBn,
+    CABBI_colors = (colors.CABBI_yellow.tint(40).RGBn,
+                    colors.CABBI_yellow.shade(5).RGBn,
                     colors.CABBI_green.RGBn,
                     colors.CABBI_teal_green.shade(30).RGBn)
     return LinearSegmentedColormap.from_list('CABBI', CABBI_colors, N_levels)
@@ -288,25 +288,26 @@ get_HP_inhibitors_conc = lambda: 1000*sum(R302.outs[0].imass['AceticAcid', 'Furf
 
 # get_rel_impact_t_y = lambda: rel_impact_fn(steps)
 
+# HP_metrics = [solve_AA_price, get_HP_inhibitors_conc]
 HP_metrics = [solve_AA_price, get_HP_sugars_conc, get_HP_inhibitors_conc]
 # HP_metrics = [solve_AA_price, get_GWP, get_FEC]
 
 # %% Generate 3-specification meshgrid and set specification loading functions
-steps = 10
+steps = 120
 
 # Yield, titer, productivity (rate)
-spec_1 = np.linspace(0.1,0.99, steps) # yield
-spec_2 = np.linspace(10, 400, steps) # titer
+spec_1 = np.linspace(0.1, 0.99, steps) # yield
+spec_2 = np.linspace(30, 330, steps) # titer
 # spec_1 = np.linspace(0.2, 0.99, steps) # yield
 # spec_2 = np.linspace(45, 225, steps) # titer
-spec_3 = np.array([0.87]) # productivity
+spec_3 = np.array([0.79]) # productivity
 spec.load_spec_1 = spec.load_yield
 spec.load_spec_2 = spec.load_titer
 spec.load_spec_3 = spec.load_productivity
 xlabel = "Yield"
 ylabel = 'Titer [$\mathrm{g} \cdot \mathrm{L}^{-1}$]'
 # xticks = [0.33, 0.66, 0.99]
-xticks = [0.2, 0.4, 0.6, 0.8, 1.0]
+xticks = [0., 0.2, 0.4, 0.6, 0.8, 1.0]
 # yticks = [75, 150, 225]
 yticks = [25, 50, 75, 100, 125, 150, 175, 200, 225, 250, 275, 300]
 # xticks = [0.2, 0.6, 0.99]
@@ -351,6 +352,7 @@ spec_3_units = "$\mathrm{g} \cdot \mathrm{L}^{-1} \cdot \mathrm{hr}^{-1}$"
 # xticks = [0, 400, 800, 1200, 1600, 2000]
 # yticks = [40, 80, 120, 160, 200]
 # spec_3_units = "$\mathrm{\$} \cdot \mathrm{dry-ton}^{-1}$"
+
 
 spec_1, spec_2 = np.meshgrid(spec_1, spec_2)
 
@@ -697,8 +699,23 @@ def plot(data, titers, yields, productivities,
 
 
 
-
-
+def plot_two(data, titers, yields, productivities, 
+         Metric_1_tickmarks, Metric_2_tickmarks):
+    metric_bars = (MetricBar('MPSP\n', 
+                             MPSP_units, CABBI_green_colormap(),
+                             Metric_1_tickmarks,
+                             1 + int((max(Metric_1_tickmarks) - min(Metric_1_tickmarks))/125)),
+                   MetricBar('Total inhibitors\n',
+                             FCI_units,
+                              plt.cm.get_cmap('bone_r'),
+                              # plt.cm.get_cmap('cividis_r'),
+                             Metric_2_tickmarks,
+                             1 + int((max(Metric_2_tickmarks) - min(Metric_2_tickmarks))/25)))
+    
+    return plot_contour_2d(titers, yields, productivities, data, 
+                                xlabel, ylabel, xticks, yticks, metric_bars, 
+                                Z_value_format=lambda Z: f"{Z:.1f} [{spec_3_units}]",
+                                fillblack=False)
 
 metric_bars = (MetricBar('MPSP', MPSP_units, CABBI_green_colormap(),
                          Metric_1_tickmarks, 800),
@@ -726,15 +743,15 @@ for i, ax_col in enumerate(axes[:, :len(spec_3)].transpose()):
     MSP_orig = data_1[:, :, 0, i]
     j=0
     for ax in ax_col:
-        
-        plt.sca(ax)
+        if not j==1:
+            plt.sca(ax)
         # ax.set_facecolor('black')
         # ax.patch.set_facecolor(CABBI_brown)
-        ax.xaxis.set_minor_locator(AML())
-        ax.yaxis.set_minor_locator(AML())
-        ax.tick_params(which='both', top=True, bottom=True, left=True, right=True)
-        ax.tick_params(which='minor', direction = 'inout', length = 4)
-        ax.tick_params(which='major', length = 10)
+            ax.xaxis.set_minor_locator(AML())
+            ax.yaxis.set_minor_locator(AML())
+            ax.tick_params(which='both', top=True, bottom=True, left=True, right=True)
+            ax.tick_params(which='minor', direction = 'inout', length = 4)
+            ax.tick_params(which='major', length = 10)
         # ax.tick_params(which='minor', left=True, bottom = True, direction = 'inout')
         if j==0: # MPSP plot only
             Z_infeas_1 = MSP_orig * 0. + 1.
@@ -769,7 +786,7 @@ for i, ax_col in enumerate(axes[:, :len(spec_3)].transpose()):
                         levels=AA_price_range, colors=[linecolor_dark])
             plt.clabel(CS1_lines, levels=AA_price_range, inline_spacing = 0., \
                        fmt=lambda x: format(x,'.0f'), inline=True, fontsize=12,
-                        manual = [(0.925, 255), (0.925, 165)])
+                        manual = [(0.925, 95), (0.925, 75)])
             # CS1_lines = plt.contour(CS1, zorder=1e6, linestyles='dashed', linewidths=1.,
             #             levels=AA_price_range, colors=[linecolor_dark])
             # plt.clabel(CS1_lines, levels=AA_price_range, inline_spacing = 0., 
@@ -796,11 +813,17 @@ for i, ax_col in enumerate(axes[:, :len(spec_3)].transpose()):
             # plt.clabel(CS2a_lines, levels=[150.], inline_spacing = 0., \
             #             fmt=lambda x: format(x,'.0f'), inline=True, fontsize=12)
             
+            
+            
+            
             CS2_lines = plt.contour(spec_1, spec_2, sugars_orig, zorder=1e6, linestyles='solid', linewidths=0.9,
             levels=[3, 4, 5, 10], colors=[linecolor_dark])
             plt.clabel(CS2_lines, levels=[3, 4, 5, 10], inline_spacing = 0.,
                        fmt=lambda x: format(x,'.1f'), inline=True, fontsize=12,
             manual = [(0.925, 200), (0.925, 180), (0.925, 150), (0.925, 64)])
+            
+            
+            
             # CS2a_lines = plt.contour(spec_1, spec_2, sugars_orig, zorder=1e6, linestyles='dashed', linewidths=1.,
             # levels=[150.], colors=[linecolor_light])
             # plt.clabel(CS2a_lines, levels=[150.], inline_spacing = 0., \
@@ -853,7 +876,101 @@ plt.show()
 
 # plt.savefig(fig_to_save, format = 'png', dpi=500)
 
+#%%% Plot just MPSP and inhibitors
+fig, axes = plot_two(data_1_copy, spec_1, spec_2, spec_3, Metric_1_tickmarks, Metric_2_tickmarks)
+# spec_2 = 100 * spec_2
+# index_feas_1 = d1_Metric2[:, :, 0]<150.
+# index_feas_2 = d1_Metric3[:, :, 0]<1000.
+CS1, CS2, CS3, CS4 = 0, 0, 0, 0
+for i, ax_col in enumerate(axes[:, :len(spec_3)].transpose()):
+    MSP = data_1_copy[:, :, 0, i]
+    # sugars_orig = data_1[:, :, 1, i]
+    inhibitors_orig = data_1[:, :, 1, i]
+    MSP_orig = data_1[:, :, 0, i]
+    j=0
+    for ax in ax_col:
+        # if not j==1:
+        plt.sca(ax)
+        # ax.set_facecolor('black')
+        # ax.patch.set_facecolor(CABBI_brown)
+        ax.xaxis.set_minor_locator(AML())
+        ax.yaxis.set_minor_locator(AML())
+        ax.tick_params(which='both', top=True, bottom=True, left=True, right=True)
+        ax.tick_params(which='minor', direction = 'inout', length = 4)
+        ax.tick_params(which='major', length = 10)
+        # ax.tick_params(which='minor', left=True, bottom = True, direction = 'inout')
+        if j==0: # MPSP plot only
+            # Z_infeas_1 = MSP_orig * 0. + 1.
+            # Z_infeas_2 = MSP_orig * 0. + 1.
+            # Z_infeas_3 = MSP_orig * 0. + 1.
+            # # Z_infeas_1[index_infeas_2] = np.nan
+            # # Z_infeas_1[index_infeas_1] = np.nan
+            
+            # Z_infeas_2[index_feas_2] = np.nan
+            # Z_infeas_3[(index_feas_1 | index_feas_2)] = np.nan
+            
+            # CS2 = plt.contourf(spec_1, spec_2, Z_infeas_1, zorder=0,
+            #                   levels=1, colors=[oversaccharine_shadecolor])
+            # CS3 = plt.contourf(spec_1, spec_2, Z_infeas_2, zorder=0,
+            #                   levels=1, colors=[inhibited_shadecolor])
+            # CS4 = plt.contourf(spec_1, spec_2, Z_infeas_3, zorder=0,
+            #                   levels=1, colors=[overlap_color])
+            
 
+                
+                
+            # CS2_lines = plt.contour(CS2, zorder=1e9, linewidths=1000.,
+            #             levels=[0, 2], colors=[oversaccharine_shadecolor])
+            # CS3_lines = plt.contour(CS3, zorder=1e9, linewidths=1000.,
+            #             levels=[0, 2], colors=[inhibited_shadecolor])
+            # make_oversaccharine_region_infeasible()
+            # make_inhibited_region_infeasible()
+            
+            CS1 = plt.contourf(spec_1, spec_2, MSP, zorder=1e6,
+                              levels=AA_price_range, colors=[marketrange_shadecolor])
+            CS1_lines = plt.contour(CS1, zorder=1e6, linestyles='dashed', linewidths=1.,
+                        levels=AA_price_range, colors=[linecolor_dark])
+            plt.clabel(CS1_lines, levels=AA_price_range, inline_spacing = 0., \
+                       fmt=lambda x: format(x,'.0f'), inline=True, fontsize=12,
+                        manual = [(0.925, 95), (0.925, 75)])
+            # CS1_lines = plt.contour(CS1, zorder=1e6, linestyles='dashed', linewidths=1.,
+            #             levels=AA_price_range, colors=[linecolor_dark])
+            # plt.clabel(CS1_lines, levels=AA_price_range, inline_spacing = 0., 
+            #            fmt=lambda x: format(x,'.0f'), inline=True, fontsize=12)
+            
+            # CS1a_lines = plt.contour(CS1, zorder=1e6, linestyles='solid', linewidths=0.9,
+            #             levels=[2500, 3000, 3500], colors=[linecolor_dark],)
+            # plt.clabel(CS1a_lines, levels=[2500, 3000, 3500], inline_spacing = 0., \
+            #            fmt=lambda x: format(x,'.0f'), inline=True, fontsize=12,
+            #            manual = [(0.925, 90), (0.925, 80), (0.925, 70)])
+            CS1b_lines = plt.contour(CS1, zorder=1e6, linestyles='solid', linewidths=0.9,
+                        levels=[1000, 2000, 3000], colors=[linecolor_dark])
+            plt.clabel(CS1b_lines, levels=[1000,  2000, 3000], inline_spacing = 0., \
+                       fmt=lambda x: format(x,'.0f'), inline=True, fontsize=12,
+                        manual = [ (0.925,260), (0.925,110),
+                                  (0.925,75)])
+        
+            
+        j+=1
+        
+add_markers = False
+
+if add_markers:
+    
+    axes_lab_spec_3 = axes[:, 0]
+    for i, ax in enumerate(axes_lab_spec_3):
+        plt.sca(ax)
+        # plt.clabel(CS, fmt=lambda x: format(x,'.0f'), inline=1, fontsize=12)
+        plot_scatter_points([lab_spec_1], [lab_spec_2], marker='^', s=80, color=markercolor,
+                            edgecolor=edgecolor)
+    
+    axes_target_spec_3 = axes[:, 0]
+    for ax in axes_target_spec_3:
+        plt.sca(ax)
+        plot_scatter_points([target_spec_1], [target_spec_2], marker='s', s=80, color=markercolor,
+                            edgecolor=edgecolor)
+    
+plt.show()
 # %% Functions to get relative impact data faster from generated MPSP data
 spec_1_r = np.round(spec_1, 4)
 spec_2_r = np.round(spec_2, 4)

@@ -167,6 +167,7 @@ AQ336.Hfus = TOA.Hfus
 
 Octanol = chemical_database('Octanol')
 Hexanol = chemical_database('Hexanol')
+Octanediol = chemical_database('Octanediol', search_ID='1,8-Octanediol')
 Butyl_acetate = chemical_database('Butyl acetate')
 
 # AQ336 = chemical_database('N-Methyl-N,N,N-trioctylammonium chloride') 
@@ -496,6 +497,7 @@ chems.set_synonym('P4O10', 'PhosphorusPentoxide')
 chems.set_synonym('Na2SO4', 'SodiumSulfate')
 chems.set_synonym('AmmoniumHydroxide', 'NH4OH')
 chems.set_synonym('Isobutyraldehyde', 'IBA')
+
 
 # %% Set all "None" Hfus values to 0
 for chem in HP_chemicals:
