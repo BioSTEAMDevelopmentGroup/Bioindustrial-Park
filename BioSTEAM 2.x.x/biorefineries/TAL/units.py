@@ -67,7 +67,7 @@ class SulfuricAcidAdditionTank(Unit):
     _N_ins = 1
     _N_outs = 1
     
-    # Bseline is (18+4.1) mg/g dry biomass as in Humbird et al., 93% purity
+    # Baseline is (18+4.1) mg/g dry biomass as in Humbird et al., 93% purity
     acid_loading = 22.1
 
     def __init__(self, ID='', ins=None, outs=(), *, feedstock_dry_mass):
@@ -1494,11 +1494,90 @@ class TAL_Separation(Unit):
     def _cost(self): pass
 
 
-            
+class Adsorption(PressureVessel):
+    '''
+    Removal of polar compounds (e.g., amino acids, ions) from the stream. The unit
+    is modeled based on description in [1]_. Freundlich isotherm is assumed for TAL
+    based on the constants of catechol [2]_, whose structure is similar to TAL.
+    
+    .. math:: q_e = K_F * C_e^(1/n)
+    
+    Parameters
+    ----------
+    adsorbents : str
+        Breakthrough time in hr
+    breakthrough_time : float
+        Breakthrough time in hr
+    polars : tuple
+        IDs of polar compounds adsorbed to the column
+    K_F : float
+        Freundlich constant, default at 42.40
+    1/n : float
+        Freundlich exponent, default at 0.205
+    
+    References
+    ----------
+    .. [1] Viswanathan, Process Generalizations and Rules of Thumb for Scaling
+        up Biobased Processes. Graduate Theses and Dissertations 2019.
+        https://lib.dr.iastate.edu/etd/17115
+    .. [2] Kumar et al., Adsorption of Resorcinol and Catechol on Granular
+        Activated Carbon: Equilibrium and Kinetics. Carbon 2003, 41 (15), 3015–3025.
+        https://doi.org/10.1016/S0008-6223(03)00431-7
+    .. [3] Seider, Warren D., et al. (2017). "Cost Accounting and Capital Cost
+        Estimation". In Product and Process Design Principles: Synthesis,
+        Analysis, and Evaluation (pp. 470, 481). New York: Wiley.
+        
+    '''
+    _N_in = 1
+    _N_out = 1
+    
+    #!!! Should choose silica gel
+    # 574, 613
+    
+    # in $/ft3
+    adsorbent_cost = {
+        'Activated alumina': 72,
+        'Activated carbon': 41,
+        'Silica gel': 210,
+        'Molecular sieves': 85,
+        }
+    
+    def __init__(self, ID='', ins=None, outs=(), *,
+                 adsorbent='Activated carbon',
+                 P=101325, tau=0.5, V_wf=0.8,
+                 length_to_diameter=2, kW_per_m3=0.0985,
+                 wall_thickness_factor=1,
+                 vessel_material='Stainless steel 316',
+                 vessel_type='Vertical'):
+
+        self.adsorbent = adsorbent
+
+        self.tau = tau
+        self.P = P
+        self.V_wf = V_wf
+        self.length_to_diameter = length_to_diameter
+        self.vessel_material = vessel_material
+        self.vessel_type = vessel_type
+
+    
+    def _cost(self):
+        Cost = self.purchase_costs
+        Design = self.design_results()
+        
+        # 10 Hp/1,000 gal, or 7.457 kW/3.78541 m3 = 1.97 kW/m3
+        hp = 10*Design['Volume']/3.78541
+        
+        Cost['Agitator'] = 4105*hp**0.57
+        
+        kW = 1.97*Design['Volume']
+        self.power_utility(kW)
+
+
 class Adsorption_and_Centrifugation(Unit):
     _N_outs = 2
     def _run(self): pass
     def _cost(self): pass
+
 
 class HydrogenationReactor(Reactor):
     """

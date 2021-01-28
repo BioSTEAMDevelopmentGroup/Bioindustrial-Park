@@ -34,8 +34,8 @@ database_chemicals_dict = {}
 copied_chemicals_dict = {}
 defined_chemicals_dict = {}
 
-def chemical_database(ID, phase=None, **kwargs):
-    chemical = tmo.Chemical(ID, **kwargs)
+def chemical_database(ID, search_ID=None, phase=None, **kwargs):
+    chemical = tmo.Chemical(ID,search_ID=search_ID, **kwargs)
     if phase:
         chemical.at_state(phase)
         chemical.phase_ref = phase
@@ -154,7 +154,10 @@ Glucose = chemical_database('Glucose', phase = 'l')
 # BSA = chemical_database('Butyl sorbate')
 
 IBA = chemical_database('Isobutyraldehyde')
-DPHP = chemical_database('Dipotassium hydrogen phosphate', phase = 'l')
+DPHP = chemical_database('DipotassiumHydrogenPhosphate',
+                         search_ID='Dipotassium hydrogen phosphate',
+                         phase = 'l')
+# DPHP = chemical_database('Dipotassium hydrogen phosphate', phase = 'l')
 
 # This one is more consistent with others
 # try: Glucose.Cn.l.move_up_model_priority('Dadgostar and Shaw (2011)', 0)
@@ -204,7 +207,9 @@ WWTsludge = chemical_defined('WWTsludge', phase='s',
 Furfural = chemical_database('Furfural')
 
 
-Acetoin = chemical_database('3-Hydroxybutanone', phase = None, Hvap = 44.56*1000) # , V = 89.5e-6
+Acetoin = chemical_database(ID='Acetoin',
+                            search_ID='3-Hydroxybutanone',
+                            phase = None, Hvap = 44.56*1000) # , V = 89.5e-6
 Acetoin.copy_models_from(Furfural, ['Psat', 'Cn', 'mu', 'kappa', 'V'])
 Acetoin.Tb = 145.4 + 273.15
 
@@ -229,11 +234,20 @@ HMF.Dortmund.update(chems.Furfural.Dortmund)
 # KSA = chemical_copied('Potassium sorbate', HMF)
 # BSA = chemical_copied('Butyl sorbate', HMF)
 
-TAL = Triaceticacidlactone = chemical_database('Triacetic acid lactone')
+TAL = Triaceticacidlactone = chemical_database(ID='TAL',
+                                               search_ID='Triacetic acid lactone')
 TAL.copy_models_from(Furfural, ['Psat', 'Hvap']) # doesn't matter, since we never boil TAL
-SA = Sorbicacid =  chemical_database('Sorbic acid')
-KSA = Potassiumsorbate = chemical_database('Potassium sorbate')
-BSA = Butylsorbate = chemical_database('Butyl sorbate')
+# SA = Sorbicacid =  chemical_database('Sorbic acid')
+# KSA = Potassiumsorbate = chemical_database('Potassium sorbate')
+# BSA = Butylsorbate = chemical_database('Butyl sorbate')
+SA = Sorbicacid =  chemical_database(ID='SorbicAcid', search_ID='Sorbic acid')
+KSA = Potassiumsorbate = chemical_database(ID='PotassiumSorbate',
+                                           search_ID='Potassium sorbate',
+                                           phase='l')
+BSA = Butylsorbate = chemical_database(ID='ButylSorbate',
+                                       search_ID='Butyl sorbate',
+                                       phase='l')
+
 HMTHP = chemical_copied('HMTHP', TAL)
 
 TAL.Hfus = Furfural.Hfus/2.18 # !!! matters for solubility; update 
@@ -351,8 +365,8 @@ chemical_groups = dict(
                       'ArabinoseOligomer', 'MannoseOligomer'),
     OrganicSolubleSolids = ('AmmoniumAcetate', 'SolubleLignin', 'Extract', 'CSL',
                             # 'Triacetic acid lactone',
-                            'Sorbic acid', 'HMTHP',
-                            'Potassium sorbate', 'Butyl sorbate', 'VitaminA', 'VitaminD2'),
+                            'SorbicAcid', 'HMTHP',
+                            'PotassiumSorbate', 'ButylSorbate', 'VitaminA', 'VitaminD2'),
                             # 'LacticAcid', 'CalciumLactate', 'CalciumAcetate',
                             # 'EthylLactate', 'EthylAcetate', 'SuccinicAcid',
                             # 'CalciumSuccinate', 'EthylSuccinate', 
@@ -471,16 +485,24 @@ for chemical in chems: chemical.default()
 chems.compile()
 tmo.settings.set_thermo(chems)
 chems.set_synonym('CalciumDihydroxide', 'Lime')
-chems.set_synonym('3-Hydroxybutanone', 'Acetoin')
-chems.set_synonym('Triacetic acid lactone', 'TAL')
-chems.set_synonym('Triacetic acid lactone', 'Triaceticacidlactone')
-chems.set_synonym('Sorbic acid', 'SA')
-chems.set_synonym('Sorbic acid', 'Sorbicacid')
-chems.set_synonym('Potassium sorbate', 'KSA')
-chems.set_synonym('Potassium sorbate', 'Potassiumsorbate')
-chems.set_synonym('Butyl sorbate', 'BSA')
-chems.set_synonym('Butyl sorbate', 'Butylsorbate')
-chems.set_synonym('Dipotassium hydrogen phosphate', 'DPHP')
+# chems.set_synonym('3-Hydroxybutanone', 'Acetoin')
+# chems.set_synonym('Triacetic acid lactone', 'TAL')
+# chems.set_synonym('Triacetic acid lactone', 'Triaceticacidlactone')
+chems.set_synonym('TAL', 'Triaceticacidlactone')
+# chems.set_synonym('Sorbic acid', 'SA')
+# chems.set_synonym('Sorbic acid', 'Sorbicacid')
+# chems.set_synonym('Potassium sorbate', 'KSA')
+# chems.set_synonym('Potassium sorbate', 'Potassiumsorbate')
+# chems.set_synonym('Butyl sorbate', 'BSA')
+# chems.set_synonym('Butyl sorbate', 'Butylsorbate')
+# chems.set_synonym('Dipotassium hydrogen phosphate', 'DPHP')
+chems.set_synonym('SorbicAcid', 'SA')
+chems.set_synonym('SorbicAcid', 'Sorbicacid')
+chems.set_synonym('PotassiumSorbate', 'KSA')
+chems.set_synonym('PotassiumSorbate', 'Potassiumsorbate')
+chems.set_synonym('ButylSorbate', 'BSA')
+chems.set_synonym('ButylSorbate', 'Butylsorbate')
+chems.set_synonym('DipotassiumHydrogenPhosphate', 'DPHP')
 chems.set_synonym('H2O', 'Water')
 chems.set_synonym('H2SO4', 'SulfuricAcid')
 chems.set_synonym('NH3', 'Ammonia')

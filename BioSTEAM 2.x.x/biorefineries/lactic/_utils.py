@@ -10,32 +10,22 @@
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
 # for license details.
 
-"""
-Created on Tue May 19 14:17:17 2020
-
-Modified from the biorefineries constructed in [1] and [2] for the production of
-lactic acid from lignocellulosic feedstocks
-
-[1] Cortes-Peña et al., BioSTEAM: A Fast and Flexible Platform for the Design, 
-    Simulation, and Techno-Economic Analysis of Biorefineries under Uncertainty. 
-    ACS Sustainable Chem. Eng. 2020, 8 (8), 3302–3310. 
-    https://doi.org/10.1021/acssuschemeng.9b07040
-    
-[2] Li et al., Tailored Pretreatment Processes for the Sustainable Design of
-    Lignocellulosic Biorefineries across the Feedstock Landscape. Submitted,
-    2020.
-
-@author: yalinli_cabbi
-"""
-
 
 # %% Setup
 
 import numpy as np
 import pandas as pd
 import thermosteam as tmo
-from biorefineries.lactic._chemicals import chems
-_kg_per_ton = 907.18474
+from biorefineries.lactic._chemicals import chems, chemical_groups
+
+__all__ = ('auom', 'CEPCI','get_feedstock_flow', 'dry_composition', 
+           'baseline_feedflow', 'compute_lactic_titer', 'set_yield',
+           'compute_COD', 'find_split', 'splits_df')
+
+auom = tmo.units_of_measure.AbsoluteUnitsOfMeasure
+
+
+# %%
 
 # Chemical Engineering Plant Cost Index from Chemical Engineering Magzine
 # (https://www.chemengonline.com/the-magazine/)
@@ -54,7 +44,8 @@ CEPCI = {1997: 386.5,
 # %% 
 
 # =============================================================================
-# Function to get feedstock flow by giving dry weight composition and moisture content
+# Function to get feedstock flow by giving dry weight composition and moisture
+# content
 # =============================================================================
 
 def get_feedstock_flow(dry_composition, moisture_content, dry_flow):
@@ -68,6 +59,9 @@ dry_composition = dict(
     Glucan=0.3505, Xylan=0.1953, Lignin=0.1576, Ash=0.0493, Acetate=0.0181,
     Protein=0.0310, Arabinan=0.0238, Galactan=0.0143, Mannan=0.0060, 
     Sucrose=0.0077, Extractives=0.1465, SuccinicAcid=0)
+
+_kg_per_ton = auom('ton').conversion_factor('kg')
+_feedstock_factor = _kg_per_ton / 0.8
 
 moisture_content = 0.2
 dry_feedstock_flow = 2205 * _kg_per_ton / 24     
@@ -93,7 +87,7 @@ def compute_lactic_titer(stream, V=None):
     return titer
 
 def set_yield(lactic_yield, R301, R302):
-    if lactic_yield > 1:
+    if not 0<=lactic_yield<=1:
         raise ValueError(f'Lactic acid yield of {lactic_yield:.2f} is infeasible')
     R301_X = R301.cofermentation_rxns.X
     R301_X[0] = R301_X[3] = lactic_yield
@@ -105,6 +99,9 @@ def set_yield(lactic_yield, R301, R302):
     R302_X = R302.cofermentation_rxns.X
     R302_X[0] = R302_X[3] = R301_X[0] * R302.ferm_ratio
     R302_X[1] = R302_X[4] = min(R301_X[1]*R302.ferm_ratio, 1-1e-6-R302_X[0]-R302_X[2])
+    # Again to round up tiny errors
+    R301.cofermentation_rxns._X = R301_X.round(6)
+    R302.cofermentation_rxns._X = R302_X.round(6)
 
 
 # %% 
@@ -149,7 +146,7 @@ def adjust_recycle(feed, recycle, reactants_ID, chemical_ID, ratios):
 def compute_COD(IDs, stream):
     unit_COD = []
     if not iter(IDs):
-        raise TypeError(f'{IDs.__class__} is not iterable')
+        raise TypeError(f'{IDs.__class__} is not iterable.')
     if isinstance(IDs, str):
         IDs = (IDs,)
     for i in IDs:
@@ -255,6 +252,27 @@ streams['stream_625'] = (1, 2241169, 2, 3, 7,
 splits_df = pd.DataFrame.from_dict(streams)
 splits_df.index = IDs
 
+# 1 is water, changed by moisture content rather than using data from ref [1]
+cell_mass_index = [splits_df.index[0]] + splits_df.index[2:].to_list()
+cell_mass_solid = [splits_df['stream_571'][0]] + splits_df['stream_571'][2:].to_list()
+cell_mass_filtrate = [splits_df['stream_535'][0]] + splits_df['stream_535'][2:].to_list()
+cell_mass_split = find_split(cell_mass_index, cell_mass_solid, cell_mass_filtrate,
+                             chemical_groups)
 
+# Moisture content (20%) and gypsum removal (99.5%) on Page 24 of ref [3]
+gypsum_index = cell_mass_index + ['Gypsum']
+gypsum_solid = cell_mass_solid + [0.995]
+gypsum_filtrate = cell_mass_filtrate + [0.005]
+gypsum_split = find_split(gypsum_index, gypsum_solid, gypsum_filtrate, chemical_groups)
 
+# Anaerobic digestion
+AD_split = find_split(splits_df.index,
+                      splits_df['stream_611'],
+                      splits_df['stream_612'],
+                      chemical_groups)
 
+# Membrane bioreactor
+MB_split = find_split(splits_df.index,
+                      splits_df['stream_624'],
+                      splits_df['stream_625'],
+                      chemical_groups)

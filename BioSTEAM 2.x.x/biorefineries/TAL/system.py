@@ -1231,7 +1231,8 @@ def simulate_and_print():
     # print(f'SPED is {get_SPED():.2f} MJ/kg SA or {get_SPED()/SA_LHV:.2f} MJ/MJ SA')
     # print('--------------------\n')
 
-simulate_and_print()
+# simulate_and_print()
+TAL_sys.simulate()
 
 # %% 
 

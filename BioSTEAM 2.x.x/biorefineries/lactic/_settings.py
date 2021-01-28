@@ -10,44 +10,27 @@
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
 # for license details.
 
-"""
-Created on Mon Dec 30 09:30:10 2019
-
-References:
-[1] Cortes-Peña et al., BioSTEAM: A Fast and Flexible Platform for the Design, 
-    Simulation, and Techno-Economic Analysis of Biorefineries under Uncertainty. 
-    ACS Sustainable Chem. Eng. 2020, 8 (8), 3302–3310. 
-    https://doi.org/10.1021/acssuschemeng.9b07040
-    
-[2] Li et al., Tailored Pretreatment Processes for the Sustainable Design of
-    Lignocellulosic Biorefineries across the Feedstock Landscape. Submitted,
-    2020.
-
-[3] Davis et al., Process Design and Economics for the Conversion of Lignocellulosic 
+'''
+References
+----------
+[1] Davis et al., Process Design and Economics for the Conversion of Lignocellulosic 
     Biomass to Hydrocarbon Fuels and Coproducts: 2018 Biochemical Design Case Update; 
     NREL/TP-5100-71949; National Renewable Energy Lab (NREL), 2018. 
     https://doi.org/10.2172/1483234
-
-[4] Aden et al., Process Design Report for Stover Feedstock: Lignocellulosic
+[2] Aden et al., Process Design Report for Stover Feedstock: Lignocellulosic
     Biomass to Ethanol Process Design and Economics Utilizing Co-Current Dilute
     Acid Prehydrolysis and Enzymatic Hydrolysis for Corn Stover; NREL/TP-510-32438;
     National Renewable Energy Lab (NREL), 2002.
     https://doi.org/10.2172/1218326.
-    
-[5] Argonne National Laboratory. The Greenhouse gases, Regulated Emissions,
+[3] Argonne National Laboratory. The Greenhouse gases, Regulated Emissions,
     and Energy use in Transportation (GREET) Model https://greet.es.anl.gov/
     (accessed Aug 25, 2020).
-
-[6] Roni et al., Herbaceous Feedstock 2018 State of Technology Report;
+[4] Roni et al., Herbaceous Feedstock 2018 State of Technology Report;
     INL/EXT-18-51654-Rev000; Idaho National Lab. (INL), 2020.
-    https://doi.org/10.2172/1615147.
-    
-[7] ecoinvent 3.6 https://www.ecoinvent.org/home.html (accessed Aug 26, 2020).
+    https://doi.org/10.2172/1615147. 
+[5] ecoinvent 3.6 https://www.ecoinvent.org/home.html (accessed Aug 26, 2020).
 
-
-
-@author: yalinli_cabbi
-"""
+'''
 
 
 # %%
@@ -59,6 +42,9 @@ References:
 import biosteam as bst
 import thermosteam as tmo
 from biorefineries.lactic._chemicals import chems
+from biorefineries.lactic._utils import auom
+
+__all__ = ('price', 'CFs')
 
 
 # %%
@@ -89,25 +75,25 @@ for i in (_lps, _mps, _hps, _cooling):
 
 # =============================================================================
 # Prices for techno-economic analysis (TEA), all in $/kg (electricity in $/kWh)
-# and from ref [3] if not noted
+# and from ref [1] if not noted
 # =============================================================================
 
 bst.CE = 541.7 # year 2016
-_kg_per_ton = 907.18474
-_lb_per_kg = 2.20462
-_liter_per_gallon = 3.78541
-_ft3_per_m3 = 35.3147
+_kg_per_ton = auom('ton').conversion_factor('kg')
+_lb_per_kg = auom('kg').conversion_factor('lb')
+_liter_per_gallon = auom('gal').conversion_factor('L')
+_ft3_per_m3 = auom('m3').conversion_factor('ft3')
 _chemical_2020to2016 = 102.5 / 113.8 # average of Jan and Feb
 _GDP_2007to2016 = 1.160
 
 # From USD/dry-ton to USD/kg in 2016$, 20% moisture content,
-# baseline and lower bound (60) from ref [3], upper bound (146.4) from
+# baseline and lower bound (60) from ref [1], upper bound (146.4) from
 # Hartley et al., ACS Sustainable Chem. Eng. 2020, 8 (19), 7267–7277.
 # https://doi.org/10.1021/acssuschemeng.9b06551.
 _feedstock_factor = _kg_per_ton / 0.8
 feedstock_price = 71.3 / _feedstock_factor
 		
-# Baseline from ref [3], lower and upper bounds (96% and 110% of baseline)
+# Baseline from ref [1], lower and upper bounds (96% and 110% of baseline)
 # calculated using the index of sulfuric acid from U.S. Bureau of Labor Statistics
 # (Producer Price Index by Commodity for Chemicals and Allied Products)
 # https://fred.stlouisfed.org/series/WPU0613020T1 (accessed Jul 31, 2020).
@@ -140,10 +126,10 @@ ash_disposal_price = -1.41e6 / (4279*7880)
 # 2019: 8.00 * 1.114 / 1.185 = 7.52
 # (7.90+8.00+7.37+7.99+7.52) / 5 = 7.76 (in metric tonne)
 # For the lower bound (i.e., negative selling price indicating cost), use price from
-# ref [4]: $0.0094/lb in 2000$ = 0.0094*1.114/0.802*2.20462 = $0.0288/kg in 2016$
+# ref [2]: $0.0094/lb in 2000$ = 0.0094*1.114/0.802*2.20462 = $0.0288/kg in 2016$
 gypsum_price = 0
 
-# Baseline from ref [3], lower bound is 2015-2019 average of 	
+# Baseline from ref [1], lower bound is 2015-2019 average of 	
 # hydrate lime in $/ton at plant from Mineral Commodity Summaries 2020.	
 # 2015: 146.40 * (1.114/1.100) / 907.18474 = 0.163	
 # 2016: 145.50 / 907.18474 = 0.160	
@@ -197,9 +183,9 @@ bst.PowerUtility.price = 0.070
 # %%
 
 # =============================================================================
-# Characterization factors (CFs) for life cycle analysis (LCA), all from ref [5] 
+# Characterization factors (CFs) for life cycle analysis (LCA), all from ref [3] 
 # if not noted, note that it is unclear if in-plant receiving and preprocessing
-# (~50% of the total impact per ref [6]) of feedstock is included in ref [5]
+# (~50% of the total impact per ref [4]) of feedstock is included in ref [3]
 # =============================================================================
 
 CFs = {}
@@ -231,7 +217,7 @@ GWP_CFs['Gypsum'] = -4.20/1e3
 GWP_CFs['Electricity'] = 0.48
 # Lactic acid from corn stover
 GWP_CFs['Lactic acid_GREET'] = 1.80
-# From ref [7], lactic acid production, RoW, TRACI global warming,
+# From ref [5], lactic acid production, RoW, TRACI global warming,
 # substitution, consequential, long-term
 GWP_CFs['Lactic acid_fossil'] = 5.2796
 
@@ -257,16 +243,16 @@ FEC_CF_array = chems.kwarray(FEC_CFs)
 # In MJ/kg of material
 FEC_CF_stream = tmo.Stream('FEC_CF_stream', FEC_CF_array, units='kg/hr')
 
-FEC_CFs['Corn stover'] = 688.60/1e3 * 0.8
-FEC_CFs['Switchgrass'] = 892.41/1e3 * 0.8
-FEC_CFs['Miscanthus'] = 569.05/1e3 * 0.8
+FEC_CFs['Corn stover'] = 688.60/1e3
+FEC_CFs['Switchgrass'] = 892.41/1e3
+FEC_CFs['Miscanthus'] = 569.05/1e3
 FEC_CFs['CaCO3'] = 133.19/1e3
 FEC_CFs['Gypsum'] = -44.19/1e3
 # In MJ/kWh
 FEC_CFs['Electricity'] = 5.926
 # From corn stover
 FEC_CFs['Lactic acid'] = 29
-# From ref [7], lactic acid production, RoW, cumulative energy demand, fossil,
+# From ref [5], lactic acid production, RoW, cumulative energy demand, fossil,
 # substitution, consequential, long-term
 FEC_CFs['Lactic acid_fossil'] = 91.265
 
