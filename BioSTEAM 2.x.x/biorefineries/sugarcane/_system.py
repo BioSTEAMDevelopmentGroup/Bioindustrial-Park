@@ -7,7 +7,7 @@ Created on Thu Dec 21 11:05:24 2017
 """
 import numpy as np
 import biosteam as bst
-from biosteam import units, system_defaults
+from biosteam import units, SystemFactory
 
 __all__ = (
     'create_juicing_system',
@@ -18,7 +18,7 @@ __all__ = (
 
 # %% Juicing and evaporation
 
-@system_defaults(
+@SystemFactory(
     ID='juicing_sys',
     ins=[dict(ID='sugarcane',
               Glucose=4027.0413874,
@@ -248,7 +248,7 @@ def create_juicing_system(ID, ins, outs):
         
 # %% Ethanol separation
 
-@system_defaults(
+@SystemFactory(
     ID='ethanol_purification_sys',
     ins=[dict(ID='degassed_beer',
               T=348.34,
@@ -384,7 +384,7 @@ def create_ethanol_purification_system(ID, ins, outs,
 
 # %% Ethanol production section (fermentation and separations)
 
-@system_defaults(
+@SystemFactory(
     ID='ethanol_production_sys',
     ins=[dict(ID='sugar_solution', 
               Glucose=3802,
@@ -495,7 +495,7 @@ def create_sucrose_to_ethanol_system(ID, ins, outs):
 
 # %% Complete system
 
-@system_defaults(
+@SystemFactory(
     ID='sugarcane_sys', 
     ins=[*create_juicing_system.ins,
          create_ethanol_purification_system.ins[1]], # denaturant

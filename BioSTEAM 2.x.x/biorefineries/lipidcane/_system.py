@@ -95,9 +95,9 @@ def create_system(ID='lipidcane_sys', evaporator_and_beer_column_heat_integratio
                                          Hemicellulose=0.92,
                                          Lignin=0.92,
                                          Sucrose=0.04,
-                                         Lipid=0.1,
+                                         Lipid=0.01,
                                          Solids=1),
-                              moisture_content=0.5)
+                              moisture_content=0.6)
     
     # Convey out bagasse
     U202 = units.ConveyingBelt('U202', ins=U201.outs[0], outs='Bagasse')
