@@ -302,6 +302,9 @@ class SaccharificationAndCoFermentation(Unit):
         self.cofermentation(effluent.mol)
         self.CSL_to_constituents(effluent.mass)
         vent.receive_vent(effluent)
+        NH3 = effluent.imol['NH3']
+        vent.imol['NH3'] += NH3
+        effluent.imol['NH3'] = 0.
     
     def _design(self):
         effluent = self.outs[1]

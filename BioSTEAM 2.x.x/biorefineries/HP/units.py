@@ -2,17 +2,13 @@
 # -*- coding: utf-8 -*-
 """
 Created on Sun Aug 23 12:11:15 2020
-
 Modified from the cornstover biorefinery constructed in Cortes-Peña et al., 2020,
 with modification of fermentation system for 2,3-Butanediol instead of the original ethanol
-
 [1] Cortes-Peña et al., BioSTEAM: A Fast and Flexible Platform for the Design, 
     Simulation, and Techno-Economic Analysis of Biorefineries under Uncertainty. 
     ACS Sustainable Chem. Eng. 2020, 8 (8), 3302–3310. 
     https://doi.org/10.1021/acssuschemeng.9b07040.
-
 All units are explicitly defined here for transparency and easy reference
-
 @author: sarangbhagwat
 """
 
@@ -466,7 +462,7 @@ class Saccharification(Unit):
     
     #!!! This needs to be updated
     # Equals the split of saccharified slurry to seed train
-    inoculum_ratio = 0.07
+    # inoculum_ratio = 0.07 # no longer needed since sidedraw is after evaporation and dilution
     
     # CSL_loading = 10 # kg/m3
     
@@ -488,7 +484,7 @@ class Saccharification(Unit):
 
     def _run(self):
         feed = self.ins[0]
-        ss, sidedraw = self.outs
+        ss  = self.outs[0]
         # ss = self.saccharified_stream
         
         ss.copy_like(feed)
@@ -498,8 +494,8 @@ class Saccharification(Unit):
         # ss.mol += CSL.mol
         self.saccharification_rxns(ss.mol)
         # Sidedraw to SeedTrain
-        sidedraw.mol = ss.mol * self.inoculum_ratio
-        ss.mol = ss.mol - sidedraw.mol
+        # sidedraw.mol = ss.mol * self.inoculum_ratio
+        # ss.mol = ss.mol - sidedraw.mol
 
 
         
@@ -729,7 +725,6 @@ class Reactor(Unit, PressureVessel, isabstract=True):
     '''    
     Create an abstract class for reactor unit, purchase cost of the reactor
     is based on volume calculated by residence time.
-
     Parameters
     ----------
     ins : stream
@@ -1516,7 +1511,7 @@ class DehydrationReactor(Reactor):
         effluent.T = self.T
         # effluent.P = feed.P
         self.dehydration_reactions(effluent.mol)
-        
+        effluent.phase = 'g'
    
     def _cost(self):
         super()._cost()
@@ -1750,5 +1745,3 @@ class CoFermentation(Reactor):
 #         # Mixer.__init__()
 #         self.mixer = bst.Mixer(None, thermo=self.thermo)
 #         self.evaporator = bst.MultiEffectEvaporator(None, thermo=self.thermo)
-    
-    

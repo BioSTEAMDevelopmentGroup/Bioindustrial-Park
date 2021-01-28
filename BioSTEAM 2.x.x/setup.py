@@ -11,11 +11,11 @@ setup(
     name='biorefineries',
     packages=['biorefineries'],
     license='MIT',
-    version='2.17.3',
+    version='2.18.1',
     description="Biorefinery models in BioSTEAM",
     long_description=open('README.rst').read(),
     author='Yoel Cortes-Pena',
-    install_requires=['biosteam>=2.22.1'],
+    install_requires=['biosteam>=2.23.1'],
     python_requires=">=3.6",
     package_data=
         {'biorefineries': ['biorefineries/*',

@@ -28,11 +28,11 @@ def get_biodiesel_prodcost():
     return bd
 get_etoh_prodcost = lambda: etoh_prodcost[0]
 get_FCI = lambda: tea._FCI_cached
-get_ethanol_production = lambda: lc.ethanol.F_mass * tea._annual_factor
-get_biodiesel_production = lambda: lc.biodiesel.F_mass * tea._annual_factor
-get_steam = lambda: sum([i.flow for i in lc.BT.steam_utilities])*18.01528*tea._annual_factor/1000
-get_electricity_consumption = lambda: tea._annual_factor * ugroup.get_electricity_consumption()
-get_electricity_production = lambda: tea._annual_factor * ugroup.get_electricity_production()
+get_ethanol_production = lambda: lc.ethanol.F_mass * tea._operating_hours
+get_biodiesel_production = lambda: lc.biodiesel.F_mass * tea._operating_hours
+get_steam = lambda: sum([i.flow for i in lc.BT.steam_utilities]) * 18.01528 * tea._operating_hours/1000
+get_electricity_consumption = lambda: tea._operating_hours * ugroup.get_electricity_consumption()
+get_electricity_production = lambda: tea._operating_hours * ugroup.get_electricity_production()
 get_excess_electricity = lambda: get_electricity_production() - get_electricity_consumption()
 
 metrics = (Metric('Internal rate of return', lc.lipidcane_tea.solve_IRR),

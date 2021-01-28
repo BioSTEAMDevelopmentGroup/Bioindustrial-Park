@@ -24,6 +24,8 @@ def create_chemicals():
     P4O10.at_state(phase='s')
     Glucose.at_state(phase='s')
     Sucrose.at_state(phase='s')
+    Glucose.N_solutes = 1
+    Sucrose.N_solutes = 2
     
     def create_new_chemical(ID, phase='s', **constants):
         solid = tmo.Chemical.blank(ID, phase=phase, **constants)

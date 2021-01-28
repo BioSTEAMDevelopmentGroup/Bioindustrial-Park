@@ -2,17 +2,13 @@
 # -*- coding: utf-8 -*-
 """
 Created on Sun Aug 23 12:11:15 2020
-
 Modified from the cornstover biorefinery constructed in Cortes-Peña et al., 2020,
 with modification of fermentation system for 2,3-Butanediol instead of the original ethanol
-
 [1] Cortes-Peña et al., BioSTEAM: A Fast and Flexible Platform for the Design, 
     Simulation, and Techno-Economic Analysis of Biorefineries under Uncertainty. 
     ACS Sustainable Chem. Eng. 2020, 8 (8), 3302–3310. 
     https://doi.org/10.1021/acssuschemeng.9b07040.
-
 All units are explicitly defined here for transparency and easy reference
-
 @author: sarangbhagwat
 """
 
@@ -93,6 +89,7 @@ SO2 = chemical_database('SO2', phase='g')
 # Soluble inorganics
 # =============================================================================
 
+HCl = chemical_database('HCl')
 H2SO4 = chemical_database('H2SO4', phase='l')
 HNO3 = chemical_database('HNO3', phase='l', Hf=-41406*_cal2joule)
 NaOH = chemical_database('NaOH', phase='l')
@@ -155,7 +152,14 @@ Glucose = chemical_database('Glucose', phase = 'l')
 # HP.Tb = LA.Tb
 
 # MEK = chemical_database('MEK')
+Decanol = chemical_database('Decanol')
 TOA = chemical_database('TOA', search_ID='tri-n-octylamine') 
+AQ336 = chemical_database('AQ336', search_ID='63393-96-4') # aliquat 336
+
+AQ336.copy_models_from(TOA, ('Psat', 'Hvap', 'V'))
+AQ336._Dortmund = TOA.Dortmund
+
+AQ336.Hfus = TOA.Hfus
 # AQ336 = chemical_database('N-Methyl-N,N,N-trioctylammonium chloride') 
 IBA = chemical_database('Isobutyraldehyde')
 DPHP = chemical_database('DPHP', search_ID='Dipotassium hydrogen phosphate', phase = 'l')
@@ -477,8 +481,9 @@ chems.set_synonym('Na2SO4', 'SodiumSulfate')
 chems.set_synonym('AmmoniumHydroxide', 'NH4OH')
 chems.set_synonym('Isobutyraldehyde', 'IBA')
 
-# %%
-
+# %% Set all "None" Hfus values to 0
+for chem in HP_chemicals:
+    if chem.Hfus == None:
+        chem.Hfus = 0
 # from HP.utils import get_chemical_properties	
 # get_chemical_properties(chems, 400, 101325, output=True)
-

@@ -32,17 +32,26 @@ def create_dilute_acid_pretreatment_system(
     feedstock_flow = 104167.0
     chemicals = bst.settings.get_chemicals()
     if isinstance(feedstock, str):
-        dry_composition = chemicals.kwarray(
-            dict(Glucan=0.3505, Xylan=0.1953, Lignin=0.1576,
-                 Ash=0.0493, Acetate=0.0181, Protein=0.0310,
-                 Extract=0.1465, Arabinan=0.0238, Galactan=0.0143,
-                 Mannan=0.0060, Sucrose=0.0077)
+        cornstover_dry_composition = chemicals.kwarray(
+            dict(Glucan=0.319,
+                 Xylan=0.189,
+                 Galactan=0.015, 
+                 Arabinan=0.028, 
+                 Mannan=0.0030, 
+                 Lignin=0.133,
+                 Acetate=0.022,
+                 Protein=0.037,
+                 Extract=0.143, 
+                 Ash=0.07, 
+                 Sucrose=0.036)
         )
-        moisture_content = chemicals.kwarray(
+        cornstover_dry_composition /= cornstover_dry_composition.sum()
+        cellulosic_moisture_content = chemicals.kwarray(
             dict(Water=0.20)
         )
+        cornstover_composition = 0.8 * cornstover_dry_composition + cellulosic_moisture_content
         feedstock = Stream(feedstock,
-                           feedstock_flow * (0.8 * dry_composition + moisture_content),
+                           feedstock_flow * cornstover_composition,
                            units='kg/hr',
                            price=price['Feedstock'])
     elif not isinstance(feedstock, Stream):
@@ -88,7 +97,8 @@ def create_dilute_acid_pretreatment_system(
     U101 = units.FeedStockHandling(f'U{feedstock_area+1}', feedstock)
     U101.cost_items['System'].cost = 0.
     n = pretreatment_area
-    T201 = units.SulfuricAcidTank(f'T{n+1}', sulfuric_acid)
+    H2SO4_storage = units.SulfuricAcidStorageTank('H2SO4_storage', sulfuric_acid)
+    T201 = units.SulfuricAcidTank(f'T{n+1}', H2SO4_storage-0)
     M201 = units.SulfuricAcidMixer(f'M{n+1}', (rectifier_bottoms_product, T201-0))
     M202 = bst.Mixer(f'T{n+2}', (M201-0, warm_process_water, U101-0))
     M203 = bst.SteamMixer(f'M{n+3}', (M202-0, pretreatment_steam), P=5.5*101325)
@@ -98,7 +108,8 @@ def create_dilute_acid_pretreatment_system(
     F201 = units.PretreatmentFlash(f'F{n+1}', T202-0, P=101325, Q=0)
     M204 = bst.Mixer(f'M{n+4}', (R201-0, F201-0))
     H201 = units.WasteVaporCondenser(f'H{n+1}', M204-0, T=99+273.15, V=0)
-    M205 = units.AmmoniaMixer(f'M{n+5}', (ammonia, ammonia_process_water))
+    Ammonia_storage = units.SulfuricAcidStorageTank('Ammonia_storage', ammonia)
+    M205 = units.AmmoniaMixer(f'M{n+5}', (Ammonia_storage-0, ammonia_process_water))
     M206 = bst.Mixer(f'M{n+6}', (F201-1, M205-0))
     T203 = units.AmmoniaAdditionTank(f'T{n+3}', M206-0)
     P202 = units.HydrolyzatePump(f'P{n+2}', T203-0)
@@ -368,7 +379,7 @@ def create_system(ID='cornstover_sys', include_blowdown_recycle=True):
     
     ### Ethanol purification
     ethanol_purification_sys = create_ethanol_purification_system(
-        degassed_beer=u.T302-0,
+        ins=u.T302-0,
         IDs={
             'Beer pump': 'P401',
             'Beer column heat exchange': 'H401',

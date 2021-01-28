@@ -13,13 +13,13 @@ import numpy as np
 import biosteam as bst
 from biosteam import units
 from ._process_settings import price
-from ..sugarcane import create_ethanol_production_system
+from ..sugarcane import create_sucrose_to_ethanol_system
 
 __all__ = ('create_system',)
 
 # %% Pretreatment section
 
-def create_system(ID='lipidcane_sys'):
+def create_system(ID='lipidcane_sys', evaporator_and_beer_column_heat_integration=True):
     chemicals = bst.settings.get_chemicals()
     s = bst.main_flowsheet.stream
     u = bst.main_flowsheet.unit
@@ -197,7 +197,6 @@ def create_system(ID='lipidcane_sys'):
                                             H3PO4=1.0,
                                             Sucrose=0.998,
                                             Water=0.998))
-    sugar = S202-0
     S202.mesh_opening = 2
     
     # Add distilled water to wash lipid
@@ -274,8 +273,7 @@ def create_system(ID='lipidcane_sys'):
     
     ### Input streams ###
     
-    ethanol_production_sys = create_ethanol_production_system(sugar_solution=S202-0)
-    u.M305.ins.append(C203-1)
+    ethanol_production_sys = create_sucrose_to_ethanol_system(ins=S202-0)
     
     ### Biodiesel section ###
     
@@ -464,7 +462,7 @@ def create_system(ID='lipidcane_sys'):
                         LHK=('Water', 'Glycerol'),
                         k=1.25,
                         P=101325,
-                        y_top=0.999,
+                        y_top=0.9999,
                         x_bot=x_water,
                         tray_material='Stainless steel 304',
                         vessel_material='Stainless steel 304')
@@ -555,6 +553,10 @@ def create_system(ID='lipidcane_sys'):
     
     ### Facilities ###
     
+    M305 = bst.Mixer('M305', 
+        ins=(C203-1, S202-1, *ethanol_production_sys-[1, 2, 3])
+    )
+    
     # Burn bagasse from conveyor belt
     BT = units.BoilerTurbogenerator('BT',
                                    (U202-0, '', 'boiler_makeup_water', 'natural_gas', '', ''),
@@ -582,17 +584,20 @@ def create_system(ID='lipidcane_sys'):
                                    makeup_water_streams,
                                    process_water_streams)
     
-    def heat_integration():
-        hu_mee = u.F301.heat_utilities[0]
-        hu_dist = u.D303.heat_utilities[0]
-        actual_duty = hu_mee.duty + hu_dist.duty
-        if actual_duty > 0.:
-            hu_mee(actual_duty, 373.15, 373.15)
-            hu_dist.empty()
-        else:
-            hu_mee.empty()
-            condenser = u.D303.condenser
-            hu_dist(actual_duty, condenser.ins[0].T, condenser.outs[0].T)
+    if evaporator_and_beer_column_heat_integration:
+        def heat_integration():
+            hu_mee = u.F301.heat_utilities[0]
+            hu_dist = u.D303.heat_utilities[0]
+            actual_duty = hu_mee.duty + hu_dist.duty
+            if actual_duty > 0.:
+                hu_mee(actual_duty, 373.15, 373.15)
+                hu_dist.empty()
+            else:
+                hu_mee.empty()
+                condenser = u.D303.condenser
+                hu_dist(actual_duty, condenser.ins[0].T, condenser.outs[0].T)
+    else:
+        heat_integration = lambda: None
     
     return bst.System(ID, 
         [U101,
@@ -664,6 +669,7 @@ def create_system(ID='lipidcane_sys'):
          S401,
          S202,
          ethanol_production_sys,
+         M305,
          T408,
          U202],
         facilities=(heat_integration, CWP, BT, CT, PWC),

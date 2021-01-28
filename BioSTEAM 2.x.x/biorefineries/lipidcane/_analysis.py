@@ -45,7 +45,9 @@ def run_uncertainty(N_spearman_samples = 5000,
         spearman.to_excel("Spearman correlation lipidcane.xlsx")
 
 def run_without_uncertainty(N_coordinates = 40):
-    coordinate = np.linspace(0.15, 0.01, N_coordinates)
+    lc.utils.set_lipid_fraction(0.01)
+    lc.lipidcane_sys.simulate()
+    coordinate = np.linspace(0.01, 0.15, N_coordinates)
     
     # Lipid cane
     sample = model_lc.get_baseline_sample()

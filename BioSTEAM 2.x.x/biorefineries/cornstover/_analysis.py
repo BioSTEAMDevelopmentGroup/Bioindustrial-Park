@@ -14,7 +14,7 @@ from biorefineries.cornstover.model import cornstover_model as model_cs
 # from sklearn.model_selection import KFold, cross_validate
 
 speed_up()
-N_samples = 600
+N_samples = 100
 rule = 'L'
 samples = model_cs.sample(N_samples, rule)
 model_cs.load_samples(samples)

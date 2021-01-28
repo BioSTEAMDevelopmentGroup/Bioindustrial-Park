@@ -57,7 +57,7 @@ def _load_system():
     bst.Stream.unregistered_ticket_number = 0
     bst.settings.set_thermo(chemicals)
     load_process_settings()
-    sugarcane_sys = create_system()
+    sugarcane_sys = create_sugarcane_to_ethanol_system()
     sugarcane_sys.simulate()
     sugarcane_tea = create_tea(sugarcane_sys)
     sugarcane_tea.IRR = sugarcane_tea.solve_IRR()

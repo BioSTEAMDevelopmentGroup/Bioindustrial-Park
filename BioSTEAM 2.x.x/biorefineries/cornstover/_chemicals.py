@@ -234,6 +234,14 @@ def create_chemicals():
     append_chemical_copy('WWTsludge', chems.Biomass)
     append_chemical_copy('Cellulase', chems.Enzyme)
     
+    # New feature in Thermosteam allows salt and solutes to be accounted 
+    # for in VLE; leading to more accurate results. However, it is not included
+    # here as there is no significant difference in results.
+    # for i in chems['Glucose', 'Xylose']:
+    #     i.N_solutes = 1
+    # for i in chems['Sucrose', 'CaSO4', 'AmmoniumSulfate']:
+    #     i.N_solutes = 2
+        
     chems.compile()
     chems.set_synonym('CaO', 'Lime')
     chems.set_synonym('Water', 'H2O')
