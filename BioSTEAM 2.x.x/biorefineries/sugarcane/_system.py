@@ -11,12 +11,21 @@ from biosteam import units, SystemFactory
 
 __all__ = (
     'create_juicing_system',
+    'create_juicing_system_up_to_clarification',
+    'create_juicing_system_with_fiber_screener',
     'create_sucrose_to_ethanol_system',
     'create_ethanol_purification_system',
     'create_sugarcane_to_ethanol_system',
 )
 
+
 # %% Juicing and evaporation
+
+def create_juicing_system(ID=None, ins=None, outs=None, mockup=False, with_fiber_screener=True):
+    if with_fiber_screener:
+        return create_juicing_system_with_fiber_screener(ID, ins, outs, mockup)
+    else:
+        return create_juicing_system_up_to_clarification.f(ID, ins, outs, mockup)
 
 @SystemFactory(
     ID='juicing_sys',
@@ -50,14 +59,13 @@ __all__ = (
               Flocculant=0.83,
               units='kg/hr',
               price=0)],
-    outs=[dict(ID='sugar_solution'),
-          dict(ID='bagasse'),
-          dict(ID='fiber_fines')]
+    outs=[dict(ID='clarified_juice'),
+          dict(ID='bagasse'),]
 )
-def create_juicing_system(ID, ins, outs):
+def create_juicing_system_up_to_clarification(ID, ins, outs):
     ### Streams ###
     sugarcane, enzyme, H3PO4, lime, polymer = ins
-    sugar_solution, bagasse, fiber_fines = outs
+    clarified_juice, bagasse = outs
     
     imbibition_water = bst.Stream('imbibition_water',
                                   Water=87023.35, units='kg/hr',
@@ -70,19 +78,20 @@ def create_juicing_system(ID, ins, outs):
     ### Unit operations ###
     
     # Feed the shredder
-    U101 = units.ConveyingBelt('U101', ins=sugarcane)
+    U101 = units.ConveyingBelt('U101', sugarcane)
     
     # Separate metals
-    U102 = units.MagneticSeparator('U102', ins=U101-0)
+    U102 = units.MagneticSeparator('U102', U101-0)
     
     # Shredded cane
-    U103 = units.Shredder('U103', ins=U102-0)
+    U103 = units.Shredder('U103', U102-0)
     
     # Hydrolyze starch
-    T201 = units.EnzymeTreatment('T201', T=323.15)  # T=50
+    T201 = units.EnzymeTreatment('T201', (U103-0, enzyme), T=323.15)  # T=50
     
     # Finely crush lipid cane
     U201 = units.CrushingMill('U201',
+                              ins=(T201-0, ''),
                               split=dict(Ash=0.92,
                                          Cellulose=0.92,
                                          Glucose=0.04,
@@ -93,13 +102,13 @@ def create_juicing_system(ID, ins, outs):
                               moisture_content=0.5)
     
     # Convey out bagasse
-    U202 = units.ConveyingBelt('U202', ins=U201.outs[0], outs=bagasse)
+    U202 = units.ConveyingBelt('U202', U201-0, bagasse)
     
     # Mix in water
-    M201 = units.Mixer('M201')
+    M201 = units.Mixer('M201', ('', imbibition_water), 1-U201)
     
     # Screen out fibers
-    S201 = units.VibratingScreen('S201',
+    S201 = units.VibratingScreen('S201', U201-1, ('', 0-M201),
                                  split=dict(Ash=0.35,
                                             Cellulose=0.35,
                                             Glucose=0.88,
@@ -110,36 +119,37 @@ def create_juicing_system(ID, ins, outs):
                                             Water=0.88))
     
     # Store juice before treatment
-    T202 = units.StorageTank('T202', tau=4, vessel_material='Carbon steel')
+    T202 = units.StorageTank('T202', S201-0,
+                             tau=4, vessel_material='Carbon steel')
     
     # Heat up before adding acid
-    H201 = units.HXutility('H201', T=343.15)
+    H201 = units.HXutility('H201', T202-0, T=343.15)
     
     # Mix in acid
-    T203 = units.MixTank('T203')
+    T203 = units.MixTank('T203', (H201-0, H3PO4))
     
     # Pump acid solution
-    P201 = units.Pump('P201')
+    P201 = units.Pump('P201', T203-0)
     
     # Mix lime solution
-    T204 = units.MixTank('T204', tau=0.10)
-    P202 = units.Pump('P202')
+    T204 = units.MixTank('T204', lime, tau=0.10)
     
     # Blend acid lipid solution with lime
-    T205 = units.MixTank('T205', tau=0.10)
+    T205 = units.MixTank('T205', (P201-0, T204-0), tau=0.10)
+    P202 = units.Pump('P202', T205-0)
     
     # Mix recycle
-    M202 = units.Mixer('M202')
+    M202 = units.Mixer('M202', (P202-0, ''))
     
     # Heat before adding flocculant
-    H202 = units.HXutility('H202', T=372.15)
+    H202 = units.HXutility('H202', M202-0, T=372.15)
     
     # Mix in flocculant
-    T206 = units.MixTank('T206')
+    T206 = units.MixTank('T206', (H202-0, polymer))
     T206.tau = 0.10
     
     # Separate residual solids
-    C201 = units.Clarifier('C201',
+    C201 = units.Clarifier('C201', T206-0, (clarified_juice, ''),
                            split=dict(Ash=0,
                                       CaO=0,
                                       Cellulose=0,
@@ -152,8 +162,7 @@ def create_juicing_system(ID, ins, outs):
                                       Water=0.522))
     
     # Remove solids as filter cake
-    C202 = units.RVF('C202', 
-                     outs=('filter_cake', ''),
+    C202 = units.RVF('C202', (C201-1, rvf_wash_water), ('filter_cake', ''),
                      moisture_content=0.80,
                      split=dict(Ash=0.85,
                                 CaO=0.85,
@@ -162,22 +171,7 @@ def create_juicing_system(ID, ins, outs):
                                 Hemicellulose=0.85,
                                 Lignin=0.85,
                                 Sucrose=0.01))
-    P203 = units.Pump('P203')
-    
-    
-    # Screen out small fibers from sugar stream
-    S202 = units.VibratingScreen('S202', outs=(sugar_solution, fiber_fines),
-                                 split=dict(Ash=0.998,
-                                            CaO=0.998,
-                                            Cellulose=0.0,
-                                            Flocculant=0.0,
-                                            Glucose=0.998,
-                                            Hemicellulose=0.0,
-                                            Lignin=0.0,
-                                            H3PO4=1.0,
-                                            Sucrose=0.998,
-                                            Water=0.998))
-    S202.mesh_opening = 2
+    P203 = units.Pump('P203', C202-1, 1-M202)
     
     ### Process specifications ###
     
@@ -201,51 +195,33 @@ def create_juicing_system(ID, ins, outs):
         rvf_wash_water.imol['Water'] = 0.0574 * solids
     
     P202.specification = correct_wash_water
-    
-    ### System set-up ###
-    
-    (U103-0, enzyme)-T201
-    (T201-0, M201-0)-U201-1-S201-0-T202
-    (S201-1, imbibition_water)-M201
-    
-    T202-0-H201
-    (H201-0, H3PO4)-T203-P201
-    (P201-0, lime-T204-0)-T205-P202
-    (P202-0, P203-0)-M202-H202
-    (H202-0, polymer)-T206-C201
-    (C201-1, rvf_wash_water)-C202-1-P203
-    C201-0-S202
-    
-    return bst.System(ID,
-        [U101,
-         U102,
-         U103,
-         T201,
-         bst.System("juice_extraction_sys",
-            [U201,
-             S201,
-             M201],
-            recycle=M201-0),
-         T202,
-         H201,
-         T203,
-         P201,
-         T204,
-         T205,
-         P202,
-         bst.System('juice_separation_sys',
-            [M202,
-             H202,
-             T206,
-             C201,
-             C202,
-             P203],
-            recycle=P203-0),
-         S202,
-         U202],
-    )
 
-        
+@SystemFactory(
+    ID='juicing_sys',
+    ins=create_juicing_system_up_to_clarification.ins,
+    outs=[dict(ID='screened_juice'),
+          dict(ID='bagasse'),
+          dict(ID='fiber_fines')]
+)          
+def create_juicing_system_with_fiber_screener(ID, ins, outs):
+    screened_juice, bagasse, fiber_fines = outs
+    sys = create_juicing_system_up_to_clarification(None, ins, ['', bagasse], mockup=True)
+
+    # Screen out small fibers from sugar stream
+    S202 = units.VibratingScreen('S202', sys-0, (screened_juice, fiber_fines),
+                                 split=dict(Ash=0.998,
+                                            CaO=0.998,
+                                            Cellulose=0.0,
+                                            Flocculant=0.0,
+                                            Glucose=0.998,
+                                            Hemicellulose=0.0,
+                                            Lignin=0.0,
+                                            H3PO4=1.0,
+                                            Sucrose=0.998,
+                                            Water=0.998))
+    S202.mesh_opening = 2
+
+
 # %% Ethanol separation
 
 @SystemFactory(
@@ -336,13 +312,7 @@ def create_ethanol_purification_system(ID, ins, outs,
                                outs=('', stillage),
                                phase0='l', phase1='l', U=1.28)
         (degassed_beer-P301-0, P302-0)-H302-0-D302-1-P302
-        beer_column_path = [bst.System('beer_column_heat_integration_sys',
-                    [H302,
-                     D302,
-                     P302],
-                    recycle=P302-0)]
     else:
-        beer_column_path = (D302, P302)
         degassed_beer-P301-0-D302-1-P302
         P302.outs[0] = stillage
         
@@ -362,31 +332,13 @@ def create_ethanol_purification_system(ID, ins, outs,
     denaturant-T303-P305
     (P305-0, P304-0)-M304-T304
     
-    return bst.System('ethanol_purification_sys',
-               [P301,
-                *beer_column_path,
-                bst.System('ethanol_dehydration_sys',
-                    [M303,
-                     D303,
-                     H303,
-                     U301],
-                    recycle=U301-0), 
-                bst.System('ethanol_denaturation_sys',
-                    [H304,
-                     T302, 
-                     P304,
-                     T303, 
-                     P305, 
-                     M304,
-                     T304,
-                     P303])])
 
 
 # %% Ethanol production section (fermentation and separations)
 
 @SystemFactory(
-    ID='ethanol_production_sys',
-    ins=[dict(ID='sugar_solution', 
+    ID='sucrose_to_ethanol_sys',
+    ins=[dict(ID='screened_juice', 
               Glucose=3802,
               Sucrose=4.309e+04,
               Water=2.59e+05,
@@ -398,7 +350,7 @@ def create_ethanol_purification_system(ID, ins, outs,
           dict(ID='evaporator_condensate')]
 )
 def create_sucrose_to_ethanol_system(ID, ins, outs):
-    sugar_solution, denaturant = ins
+    screened_juice, denaturant = ins
     ethanol, stillage, stripper_bottoms_product, evaporator_condensate = outs
     
     ### Streams ###
@@ -415,7 +367,7 @@ def create_sucrose_to_ethanol_system(ID, ins, outs):
     
     # Split sugar solution
     S301 = units.Splitter('S301',
-                        split=0.265)
+                          split=0.265)
     
     # Concentrate sugars
     F301 = units.MultiEffectEvaporator('F301',
@@ -457,7 +409,8 @@ def create_sucrose_to_ethanol_system(ID, ins, outs):
     
     ethanol_purification_sys = create_ethanol_purification_system(
         ins=[M302-0, denaturant], 
-        outs=[ethanol, stillage, stripper_bottoms_product]
+        outs=[ethanol, stillage, stripper_bottoms_product],
+        mockup=True
     )
     
     # Yeast mixing
@@ -468,36 +421,19 @@ def create_sucrose_to_ethanol_system(ID, ins, outs):
     # Multi-effect evaporator pumps
     P306 = units.Pump('P306')
     
-    
     ### Ethanol system set-up ###
     
-    sugar_solution-S301-1-F301-0-P306
+    screened_juice-S301-1-F301-0-P306
     (S301-0, P306-0)-M301-H301
     (H301-0, yeast-T305-0)-R301-1-T301-0-C301
     (C301-1, D301-1)-M302
     
-    ### System ###
-    
-    return bst.System(ID, 
-                [S301, 
-                 F301, 
-                 P306, 
-                 M301, 
-                 H301, 
-                 T305,
-                 R301,
-                 T301, 
-                 C301,
-                 D301,
-                 M302, 
-                 ethanol_purification_sys])
-
 
 # %% Complete system
 
 @SystemFactory(
     ID='sugarcane_sys', 
-    ins=[*create_juicing_system.ins,
+    ins=[*create_juicing_system_with_fiber_screener.ins,
          create_ethanol_purification_system.ins[1]], # denaturant
     outs=[create_ethanol_purification_system.outs[0], # ethanol
           dict(ID='wastewater'),
@@ -516,12 +452,16 @@ def create_sugarcane_to_ethanol_system(ID, ins, outs,
     
     ### Juicing section ###
     
-    juicing_sys = create_juicing_system(ins=[sugarcane, enzyme, H3PO4, lime, polymer])
+    juicing_sys = create_juicing_system_with_fiber_screener(
+        ins=[sugarcane, enzyme, H3PO4, lime, polymer],
+        mockup=True
+    )
     
     ### Ethanol section ###
     
     ethanol_production_sys = create_sucrose_to_ethanol_system(
-        ins=(juicing_sys-0, denaturant), outs=ethanol
+        ins=(juicing_sys-0, denaturant), outs=ethanol,
+        mockup=True
     )
     
     ### Wastewater ###
@@ -556,26 +496,19 @@ def create_sugarcane_to_ethanol_system(ID, ins, outs,
                                    makeup_water_streams,
                                    process_water_streams)
     
+    F301 = u.F301
+    D303 = u.D303
     if evaporator_and_beer_column_heat_integration:
         def heat_integration():
-            hu_mee = u.F301.heat_utilities[0]
-            hu_dist = u.D303.heat_utilities[0]
+            hu_mee = F301.heat_utilities[0]
+            hu_dist = D303.heat_utilities[0]
             actual_duty = hu_mee.duty + hu_dist.duty
             if actual_duty > 0.:
                 hu_mee(actual_duty, 373.15, 373.15)
                 hu_dist.empty()
             else:
                 hu_mee.empty()
-                condenser = u.D303.condenser
+                condenser = D303.condenser
                 hu_dist(actual_duty, condenser.ins[0].T, condenser.outs[0].T)
-    else:
-        heat_integration = lambda: None
+        CWP.specification = heat_integration
         
-    ### System ###
-    
-    return bst.System(ID,
-        [juicing_sys,
-         ethanol_production_sys,
-         M305],
-        facilities=(heat_integration, CWP, BT, CT, PWC),
-    )

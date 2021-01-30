@@ -60,6 +60,8 @@ biorefineries/fattyalcohols/utils.py
 biorefineries/fattyalcohols/units/__init__.py
 biorefineries/fattyalcohols/units/fatty_alcohol_bioreactor.py
 biorefineries/fattyalcohols/units/slle_centrifuge.py
+biorefineries/lipidcane/Monte Carlo across lipid fraction.xlsx
+biorefineries/lipidcane/Monte Carlo sugarcane.xlsx
 biorefineries/lipidcane/README.rst
 biorefineries/lipidcane/__init__.py
 biorefineries/lipidcane/_analysis.py
