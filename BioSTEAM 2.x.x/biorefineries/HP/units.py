@@ -174,11 +174,11 @@ class PretreatmentReactorSystem(Unit):
             Rxn('Glucan + H2O -> Glucose',                   'Glucan',   0.099),
             Rxn('Glucan + H2O -> GlucoseOligomer',           'Glucan',   0.003),
             Rxn('Glucan -> HMF + 2 H2O',                     'Glucan',   0.003),
-            Rxn('Sucrose -> HMF + Glucose + 2H2O',           'Sucrose',  1),
+            Rxn('Sucrose -> HMF + Glucose + 2H2O',           'Sucrose',  1.),
             Rxn('Xylan + H2O -> Xylose',                     'Xylan',    0.9),
             Rxn('Xylan + H2O -> XyloseOligomer',             'Xylan',    0.024),
             Rxn('Xylan -> Furfural + 2 H2O',                 'Xylan',    0.05),
-            Rxn('Acetate -> AceticAcid',                     'Acetate',  1),
+            Rxn('Acetate -> AceticAcid',                     'Acetate',  1.),
             Rxn('Lignin -> SolubleLignin',                   'Lignin',   0.05),
             # Below from Page 106 of Humbird et al.,
             Rxn('Mannan + H2O -> Mannose',                   'Mannan',   0.9),
@@ -190,8 +190,8 @@ class PretreatmentReactorSystem(Unit):
             Rxn('Arabinan + H2O -> Arabinose',               'Arabinan', 0.9),
             Rxn('Arabinan + H2O -> ArabinoseOligomer',       'Arabinan', 0.024),
             Rxn('Arabinan -> Furfural + 2 H2O',              'Arabinan', 0.05),
-            Rxn('Furfural -> Tar',                           'Furfural', 1),
-            Rxn('HMF -> Tar',                                'HMF',      1)
+            Rxn('Furfural -> Tar',                           'Furfural', 1.),
+            Rxn('HMF -> Tar',                                'HMF',      1.)
             ])
     
     def _run(self):
@@ -628,14 +628,26 @@ class SeedTrain(Unit):
         # FermMicrobe reaction from Table 14 on Page 31 of Humbird et al.
         self.cofermentation_rxns =  ParallelRxn([
         #      Reaction definition            Reactant    Conversion
-        Rxn('Glucose -> 2HP',        'Glucose',   .53*ferm_ratio),
+        Rxn('Glucose -> 2 HP',        'Glucose',   .49*ferm_ratio),
         Rxn('Glucose -> 3 AceticAcid',        'Glucose',   0.07*ferm_ratio),
         Rxn('Glucose -> 6 FermMicrobe',       'Glucose',   0.03*ferm_ratio),
-        Rxn('3Xylose -> 5HP',       'Xylose',    0.53*0.8*ferm_ratio),
-        Rxn('2 Xylose -> 5 AceticAcid',       'Xylose',    0.07*0.8*ferm_ratio),
-        Rxn('Xylose -> 5 FermMicrobe',        'Xylose',    0.03*0.8*ferm_ratio),
+        Rxn('3 Xylose -> 5 HP',       'Xylose',    0.49*ferm_ratio),
+        Rxn('2 Xylose -> 5 AceticAcid',       'Xylose',    0.07*ferm_ratio),
+        Rxn('Xylose -> 5 FermMicrobe',        'Xylose',    0.03*ferm_ratio),
         ])
-
+        
+        self.CO2_generation_rxns = ParallelRxn([
+        Rxn('Glucose -> 6 CO2',       'Glucose',   0.5*ferm_ratio),
+        Rxn('Xylose -> 5 CO2',        'Xylose',    0.5*ferm_ratio),
+        ])
+        
+        self.biomass_generation_rxns = ParallelRxn([
+        Rxn('Glucose -> 6 FermMicrobe',       'Glucose',   (1.-1e-9)*ferm_ratio),
+        Rxn('Xylose -> 5 FermMicrobe',        'Xylose',    (1.-1e-9)*ferm_ratio),
+        ])
+        
+        
+        
     def _run(self):
         feed = self.ins[0]
         effluent, CO2 = self.outs
@@ -643,6 +655,9 @@ class SeedTrain(Unit):
         CO2.phase = 'g'
 
         self.cofermentation_rxns(effluent.mol)
+        self.CO2_generation_rxns(effluent.mol)
+        self.biomass_generation_rxns(effluent.mol)
+        
         # Assume all CSL is used up
         effluent.imass['CSL'] = 0 
         
@@ -1623,10 +1638,11 @@ class CoFermentation(Reactor):
         # FermMicrobe reaction from Table 14 on Page 31 of Humbird et al.
         self.cofermentation_rxns = ParallelRxn([
         #      Reaction definition            Reactant    Conversion
-        Rxn('Glucose -> 2HP + CO2',        'Glucose',   .53),
+        Rxn('Glucose -> 2 HP',        'Glucose',   .49),
+        # Rxn('Glucose -> 3 AceticAcid',        'Glucose',   0.07),
         Rxn('Glucose -> 3 AceticAcid',        'Glucose',   0.07),
-        Rxn('3Xylose -> 5HP + 2CO2',       'Xylose',    0.53*0.8),
-        Rxn('2 Xylose -> 5 AceticAcid',       'Xylose',    0.07*0.8),
+        Rxn('3 Xylose -> 5 HP',       'Xylose',    0.49),
+        Rxn('2 Xylose -> 5 AceticAcid',       'Xylose',    0.07),
         ])
         
       
@@ -1636,11 +1652,15 @@ class CoFermentation(Reactor):
         self.glucose_to_acetic_acid_rxn = self.cofermentation_rxns[1]
         self.xylose_to_acetic_acid_rxn = self.cofermentation_rxns[3]
         
+        self.CO2_generation_rxns = ParallelRxn([
+        Rxn('Glucose -> 6 CO2',       'Glucose',   0.5),
+        Rxn('Xylose -> 5 CO2',        'Xylose',    0.5),
+        ])
         
         self.biomass_generation_rxns = ParallelRxn([
-            Rxn('Glucose -> 6 FermMicrobe',       'Glucose',   1.-1e-9),
-            Rxn('Xylose -> 5 FermMicrobe',        'Xylose',    1.-1e-9),
-            ])
+        Rxn('Glucose -> 6 FermMicrobe',       'Glucose',   1.-1e-9),
+        Rxn('Xylose -> 5 FermMicrobe',        'Xylose',    1.-1e-9),
+        ])
         
         self.glucose_to_microbe_rxn = self.biomass_generation_rxns[0]
         self.xylose_to_microbe_rxn = self.biomass_generation_rxns[1]
@@ -1674,6 +1694,7 @@ class CoFermentation(Reactor):
         effluent.T = vapor.T = self.T
         CSL.imass['CSL'] = (sugars.F_vol + feed.F_vol) * self.CSL_loading 
         self.cofermentation_rxns(effluent.mol)
+        self.CO2_generation_rxns(effluent.mol)
         self.biomass_generation_rxns(effluent.mol)
         vapor.imol['CO2'] = effluent.imol['CO2']
         vapor.phase = 'g'

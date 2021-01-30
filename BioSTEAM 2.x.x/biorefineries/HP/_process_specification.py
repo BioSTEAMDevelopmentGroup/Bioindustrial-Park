@@ -10,128 +10,244 @@ import numpy as np
 from biosteam.exceptions import InfeasibleRegion
 from biorefineries.HP.units import compute_HP_titer, compute_HP_mass
 from winsound import Beep
+# from biorefineries.HP import system_light_lle_vacuum_distillation
+
+
 
 # from biosteam.process_tools.reactor_specification import evaluate_across_TRY
 _kg_per_ton = 907.18474
 
 def evaluate_across_specs(spec, system,
             spec_1, spec_2, metrics, spec_3):
+    
+    def reset_and_reload():
+        print('Resetting cache and emptying recycles ...')
+        system.reset_cache()
+        system.empty_recycles()
+        print('Loading and simulating with baseline specifications ...')
+        spec.load_yield(0.49)
+        spec.load_titer(54.8)
+        system.simulate()
+        print('Loading and simulating with required specifications ...')
+        spec.load_specifications(spec_1=spec_1, spec_2=spec_2)
+        system.simulate()
+    
+    def reset_and_switch_solver(solver_ID):
+        system.reset_cache()
+        system.empty_recycles()
+        system.converge_method = solver_ID
+        print(f"Trying {solver_ID} ...")
+        system.simulate()
+        
+    def run_bugfix_barrage():
+        try:
+            reset_and_reload()
+        except Exception as e:
+            print(str(e))
+            try:
+                reset_and_switch_solver('fixedpoint')
+            except Exception as e:
+                print(str(e))
+                try:
+                    reset_and_switch_solver('aitken')
+                except Exception as e:
+                    print(str(e))
+                    print("Bugfix barrage failed.")
+        finally:
+            system.converge_method = 'wegstein'
+    
+    spec.count += 1
+    print(f"\n\n----------\n{spec.count} / {spec.total_iterations}\n")
+    print(f"yield = {format(100*float(spec_1),'.1f')} % theo.,  titer = {format(float(spec_2),'.2f')} g\u00b7L\u207b\u00b9,  prod. = {format(float(spec_3),'.2f')} g\u00b7L\u207b\u00b9\u00b7h\u207b\u00b9\n")
     try:
         spec.load_specifications(spec_1=spec_1, spec_2=spec_2)
-        # system.converge_method = 'wegstein'
-        # system._setup()
-        # for i in range(2): system._converge()
         system.simulate()
-    except ValueError as e:# (ValueError, RuntimeError) (ValueError, AssertionError)
-        
-        print('\n\nValueError: %s'%str(e))
-        print(spec.titer_inhibitor_specification.reactor.cofermentation_rxns[0].X, spec_1, '\n',
-                               compute_HP_titer(spec.titer_inhibitor_specification.reactor.outs[0]), spec_2, '\n',
-                               spec.titer_inhibitor_specification.reactor.ins[0].imass[spec.titer_inhibitor_specification.sugars].sum() / spec.titer_inhibitor_specification.reactor.ins[0].F_vol,
-                               '\n', spec.titer_inhibitor_specification.mixer.ins[1].F_vol)
-        # import pdb
-        # pdb.set_trace()
-        # raise e
-        return np.nan*np.ones([len(metrics), len(spec_3)])
-    except InfeasibleRegion as e:
-        # print(spec.titer_inhibitor_specification.reactor.cofermentation_rxns[0].X, spec_1, '\n',
-        #                        compute_HP_titer(spec.titer_inhibitor_specification.reactor.outs[0]), spec_2, '\n',
-        #                        spec.titer_inhibitor_specification.reactor.ins[0].imass[spec.titer_inhibitor_specification.sugars].sum() / spec.titer_inhibitor_specification.reactor.ins[0].F_vol,
-        #                        '\n', spec.titer_inhibitor_specification.mixer.ins[1].F_vol)
-        # import pdb
-        # pdb.set_trace()
-        str_e = str(e)
-        print('\n\nInfeasibleRegion: %s'%str_e)
-        if 'material flow' in str(e) or 'negative temperature' in str_e:
-            try:
-            # raise e
-                print(e)
-                print('Resetting cache and emptying recycles ...')
-                system.reset_cache()
-                system.empty_recycles()
-                print('Loading and simulating with baseline specifications ...')
-                spec.load_yield(0.49)
-                spec.load_titer(54.8)
-                system.simulate()
-                print('Loading and simulating with required specifications ...')
-                spec.load_specifications(spec_1=spec_1, spec_2=spec_2)
-                system.simulate()
-            except Exception as e:
-                print(e)
-                # Beep(640, 1000)
-                spec.load_specifications(spec_1=spec_1, spec_2=spec_2)
-                try:
-                    system.reset_cache()
-                    system.empty_recycles()
-                    system.converge_method = 'fixedpoint'
-                    print("Trying fixedpoint ...")
-                    system.simulate()
-                    # system.converge_method = 'wegstein'
-                except Exception as e:
-                    print(e)
-                    try:
-                        system.reset_cache()
-                        system.empty_recycles()
-                        system.converge_method = 'aitken'
-                        print("Trying aitken ...")
-                        system.simulate()
-                        # system.converge_method = 'wegstein'
-                    except Exception as e:
-                        print("That didn't work.")
-                        print(e)
-                        # system.converge_method = 'wegstein'
-                        print(spec.titer_inhibitor_specification.reactor.cofermentation_rxns[0].X, spec_1, '\n',
-                                       compute_HP_titer(spec.titer_inhibitor_specification.reactor.outs[0]), spec_2, '\n',
-                                       spec.titer_inhibitor_specification.reactor.ins[0].imass[spec.titer_inhibitor_specification.sugars].sum() / spec.titer_inhibitor_specification.reactor.ins[0].F_vol,
-                                       '\n', spec.titer_inhibitor_specification.mixer.ins[1].F_vol)
-                        # import pdb
-                        # pdb.set_trace()
-                        return np.nan*np.ones([len(metrics), len(spec_3)])
+    except Exception as e1:
+        str_e1 = str(e1)
+        if 'sugar concentration' in str_e1:
+            print('Infeasible sugar concentration (routine infeasible region error).')
+            sugars_tuple = spec.titer_inhibitor_specification.sugars
+            reactor_ins_0 = spec.titer_inhibitor_specification.reactor.ins[0]
+            evaporator_outs_0 = spec.titer_inhibitor_specification.evaporator.outs[0]
+            sugar_conc_reactor = reactor_ins_0.imass[sugars_tuple].sum() / reactor_ins_0.F_vol
+            sugar_conc_evaporator = evaporator_outs_0.imass[sugars_tuple].sum() / evaporator_outs_0.F_vol
+            print(f"[Sugars]evaporator = {format(sugar_conc_evaporator, '0.2f')} g\u00b7L\u207b\u00b9")
+            print(f"[Sugars]reactor = {format(sugar_conc_reactor, '0.2f')} g\u00b7L\u207b\u00b9")
+            return np.nan*np.ones([len(metrics), len(spec_3)])
         else:
-            print(spec.titer_inhibitor_specification.reactor.cofermentation_rxns[0].X, spec_1, '\n',
-                                   compute_HP_titer(spec.titer_inhibitor_specification.reactor.outs[0]), spec_2, '\n',
-                                   spec.titer_inhibitor_specification.reactor.ins[0].imass[spec.titer_inhibitor_specification.sugars].sum() / spec.titer_inhibitor_specification.reactor.ins[0].F_vol,
-                                   '\n', spec.titer_inhibitor_specification.mixer.ins[1].F_vol)
-            return np.nan*np.ones([len(metrics), len(spec_3)])
-    except RuntimeError as e:
-        print('\n\nRuntimeError: %s'%str(e))
-        print(spec.titer_inhibitor_specification.reactor.cofermentation_rxns[0].X, spec_1, '\n',
-                               compute_HP_titer(spec.titer_inhibitor_specification.reactor.outs[0]), spec_2, '\n',
-                               spec.titer_inhibitor_specification.reactor.ins[0].imass[spec.titer_inhibitor_specification.sugars].sum() / spec.titer_inhibitor_specification.reactor.ins[0].F_vol,
-                               '\n', spec.titer_inhibitor_specification.mixer.ins[1].F_vol)
-        try:
-            print('Trying fixedpoint ...')
-            system.converge_method = 'fixedpoint'
-            system.simulate()
-            # system.converge_method = 'wegstein' # reset
-        except RuntimeError as e:
-            print('RuntimeError: %s'%str(e))
-            print('Trying aitken ...')
-            system.converge_method = 'aitken'
+            print(str_e1)
             try:
-                system.simulate()
-                # system.converge_method = 'wegstein' # reset
-            except RuntimeError as e:
-                print("That didn't work.")
-                print('RuntimeError: %s'%str(e))
-                # system.converge_method = 'wegstein'
+                run_bugfix_barrage()
+                Beep(320, 250)
+            except Exception as e2:
+                print(str(e2))
+                Beep(640, 1000)
+                print(f"Point failed; returning metric values as nan.")
                 return np.nan*np.ones([len(metrics), len(spec_3)])
-            except Exception as e:
-                print('Exception: %s'%str(e))
-                return np.nan*np.ones([len(metrics), len(spec_3)])
-        except Exception as e:
-            print('Exception: %s'%str(e))
-            return np.nan*np.ones([len(metrics), len(spec_3)])
-        # import pdb
-        # pdb.set_trace()
-        return np.nan*np.ones([len(metrics), len(spec_3)])
-    except Exception as e:
-        print('\n\nException: %s'%str(e))
-        return np.nan*np.ones([len(metrics), len(spec_3)])
     
-    finally:
-        system.converge_method = 'wegstein' # reset
     return spec.evaluate_across_productivity(metrics, spec_3)
+    
+    # try:
+    #     spec.load_specifications(spec_1=spec_1, spec_2=spec_2)
+    #     system.simulate()
+    # except ValueError as e:# (ValueError, RuntimeError) (ValueError, AssertionError)
+        
+    #     print('\n\nValueError: %s'%str(e))
+    #     print(spec.titer_inhibitor_specification.reactor.cofermentation_rxns[0].X, spec_1, '\n',
+    #                            compute_HP_titer(spec.titer_inhibitor_specification.reactor.outs[0]), spec_2, '\n',
+    #                            spec.titer_inhibitor_specification.reactor.ins[0].imass[spec.titer_inhibitor_specification.sugars].sum() / spec.titer_inhibitor_specification.reactor.ins[0].F_vol,
+    #                            '\n', spec.titer_inhibitor_specification.mixer.ins[1].F_vol)
+    #     # import pdb
+    #     # pdb.set_trace()
+    #     # raise e
+    #     return np.nan*np.ones([len(metrics), len(spec_3)])
+    # except InfeasibleRegion as e:
+    #     # print(spec.titer_inhibitor_specification.reactor.cofermentation_rxns[0].X, spec_1, '\n',
+    #     #                        compute_HP_titer(spec.titer_inhibitor_specification.reactor.outs[0]), spec_2, '\n',
+    #     #                        spec.titer_inhibitor_specification.reactor.ins[0].imass[spec.titer_inhibitor_specification.sugars].sum() / spec.titer_inhibitor_specification.reactor.ins[0].F_vol,
+    #     #                        '\n', spec.titer_inhibitor_specification.mixer.ins[1].F_vol)
+    #     # import pdb
+    #     # pdb.set_trace()
+    #     str_e = str(e)
+            
+    #     if 'material flow' in str_e or 'negative temperature' in str_e:
+    #         try:
+    #         # raise e
+    #             print('Resetting cache and emptying recycles ...')
+    #             system.reset_cache()
+    #             system.empty_recycles()
+    #             print('Loading and simulating with baseline specifications ...')
+    #             spec.load_yield(0.49)
+    #             spec.load_titer(54.8)
+    #             system.simulate()
+    #             print('Loading and simulating with required specifications ...')
+    #             spec.load_specifications(spec_1=spec_1, spec_2=spec_2)
+    #             system.simulate()
+    #         except Exception as e:
+    #             print(e)
+    #             # Beep(640, 1000)
+    #             spec.load_specifications(spec_1=spec_1, spec_2=spec_2)
+    #             try:
+    #                 system.reset_cache()
+    #                 system.empty_recycles()
+    #                 system.converge_method = 'fixedpoint'
+    #                 print("Trying fixedpoint ...")
+    #                 system.simulate()
+    #                 # system.converge_method = 'wegstein'
+    #             except Exception as e:
+    #                 print(e)
+    #                 try:
+    #                     system.reset_cache()
+    #                     system.empty_recycles()
+    #                     system.converge_method = 'aitken'
+    #                     print("Trying aitken ...")
+    #                     system.simulate()
+    #                     # system.converge_method = 'wegstein'
+    #                 except Exception as e:
+    #                     print("That didn't work.")
+    #                     print(e)
+    #                     # system.converge_method = 'wegstein'
+    #                     print(spec.titer_inhibitor_specification.reactor.cofermentation_rxns[0].X, spec_1, '\n',
+    #                                    compute_HP_titer(spec.titer_inhibitor_specification.reactor.outs[0]), spec_2, '\n',
+    #                                    spec.titer_inhibitor_specification.reactor.ins[0].imass[spec.titer_inhibitor_specification.sugars].sum() / spec.titer_inhibitor_specification.reactor.ins[0].F_vol,
+    #                                    '\n', spec.titer_inhibitor_specification.mixer.ins[1].F_vol)
+    #                     # import pdb
+    #                     # pdb.set_trace()
+    #                     return np.nan*np.ones([len(metrics), len(spec_3)])
+        
+    #     elif not 'sugar' in str_e:
+    #         print('\n\nInfeasibleRegion: %s'%str_e)
+    #         print(spec.titer_inhibitor_specification.reactor.cofermentation_rxns[0].X, spec_1, '\n',
+    #                                compute_HP_titer(spec.titer_inhibitor_specification.reactor.outs[0]), spec_2, '\n',
+    #                                spec.titer_inhibitor_specification.reactor.ins[0].imass[spec.titer_inhibitor_specification.sugars].sum() / spec.titer_inhibitor_specification.reactor.ins[0].F_vol,
+    #                                '\n', spec.titer_inhibitor_specification.mixer.ins[1].F_vol)
+    #     return np.nan*np.ones([len(metrics), len(spec_3)])
+    # except RuntimeError as e:
+    #     print('\n\nRuntimeError: %s'%str(e))
+    #     try:
+    #         print('Trying fixedpoint ...')
+    #         system.converge_method = 'fixedpoint'
+    #         system.simulate()
+    #         # system.converge_method = 'wegstein' # reset
+    #     except RuntimeError as e:
+    #         print('RuntimeError: %s'%str(e))
+    #         print('Trying aitken ...')
+    #         system.converge_method = 'aitken'
+    #         try:
+    #             system.simulate()
+    #             # system.converge_method = 'wegstein' # reset
+    #         except RuntimeError as e:
+    #             print("That didn't work.")
+    #             print('RuntimeError: %s'%str(e))
+    #             # system.converge_method = 'wegstein'
+    #             return np.nan*np.ones([len(metrics), len(spec_3)])
+    #         except Exception as e:
+    #             print("That didn't work.")
+    #             print('Exception: %s'%str(e))
+    #             print(spec.titer_inhibitor_specification.reactor.cofermentation_rxns[0].X, spec_1, '\n',
+    #                     compute_HP_titer(spec.titer_inhibitor_specification.reactor.outs[0]), spec_2, '\n',
+    #                     spec.titer_inhibitor_specification.reactor.ins[0].imass[spec.titer_inhibitor_specification.sugars].sum() / spec.titer_inhibitor_specification.reactor.ins[0].F_vol,
+    #                     '\n', spec.titer_inhibitor_specification.mixer.ins[1].F_vol)
+    #             return np.nan*np.ones([len(metrics), len(spec_3)])
+    #     except Exception as e:
+    #         print('Exception: %s'%str(e))
+    #         print(spec.titer_inhibitor_specification.reactor.cofermentation_rxns[0].X, spec_1, '\n',
+    #                            compute_HP_titer(spec.titer_inhibitor_specification.reactor.outs[0]), spec_2, '\n',
+    #                            spec.titer_inhibitor_specification.reactor.ins[0].imass[spec.titer_inhibitor_specification.sugars].sum() / spec.titer_inhibitor_specification.reactor.ins[0].F_vol,
+    #                            '\n', spec.titer_inhibitor_specification.mixer.ins[1].F_vol)
+    #         return np.nan*np.ones([len(metrics), len(spec_3)])
+        
+    #     # import pdb
+    #     # pdb.set_trace()
+    #     # return np.nan*np.ones([len(metrics), len(spec_3)])
+
+    # except Exception as e:
+    #     print('\n\nException: %s'%str(e))
+    #     try:
+    #         print('Resetting cache and emptying recycles ...')
+    #         system.reset_cache()
+    #         system.empty_recycles()
+    #         print('Loading and simulating with baseline specifications ...')
+    #         spec.load_yield(0.49)
+    #         spec.load_titer(54.8)
+    #         system.simulate()
+    #         print('Loading and simulating with required specifications ...')
+    #         spec.load_specifications(spec_1=spec_1, spec_2=spec_2)
+    #         # print('Re-simulating all units ...')
+    #         # for unit in system.unit_path:
+    #         #     unit.simulate()
+    #         system.simulate()
+            
+    #     except Exception as e: 
+    #         print('Exception: %s'%str(e))
+            
+            
+    #         try:
+    #             # print('Creating system anew ...')
+    #             # system.copy_like(system_light_lle_vacuum_distillation.create_HP_sys())
+    #             print('Loading and simulating with baseline specifications ...')
+    #             spec.load_yield(0.49)
+    #             spec.load_titer(54.8)
+    #             system.simulate()
+    #             print('Loading and simulating with required specifications ...')
+    #             spec.load_specifications(spec_1=spec_1, spec_2=spec_2)
+    #             system.simulate()
+    #         except:   
+    #             print('Exception: %s'%str(e))
+    #             print("That didn't work.")
+    #             print(spec.titer_inhibitor_specification.reactor.cofermentation_rxns[0].X, spec_1, '\n',
+    #                                    compute_HP_titer(spec.titer_inhibitor_specification.reactor.outs[0]), spec_2, '\n',
+    #                                    spec.titer_inhibitor_specification.reactor.ins[0].imass[spec.titer_inhibitor_specification.sugars].sum() / spec.titer_inhibitor_specification.reactor.ins[0].F_vol,
+    #                                    '\n', spec.titer_inhibitor_specification.mixer.ins[1].F_vol)
+    #             # import pdb
+    #             # pdb.set_trace()
+    #             return np.nan*np.ones([len(metrics), len(spec_3)])
+        
+
+    
+    # finally:
+    #     system.converge_method = 'wegstein' # reset
+    # return spec.evaluate_across_productivity(metrics, spec_3)
     
 evaluate_across_specs = np.vectorize(
     evaluate_across_specs, 
@@ -160,7 +276,10 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
                  'feedstock_mass',
                  'pretreatment_reactor',
                  'titer_inhibitor_specification',
-                 'seed_train_system')
+                 'seed_train_system',
+                 'count',
+                 'count_exceptions',
+                 'total_iterations')
     
     def __init__(self, evaporator, pump, mixer, heat_exchanger, seed_train_system, 
                  reactor, reaction_name, substrates, products,
@@ -181,6 +300,11 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
         self.feedstock_mass = feedstock_mass
         self.pretreatment_reactor = pretreatment_reactor
         self.seed_train_system = seed_train_system
+        
+        self.count = 0 
+        self.count_exceptions = 0
+        self.total_iterations = 0
+        
         self.load_spec_1 = load_spec_1
         self.load_spec_2 = load_spec_2
         self.load_spec_3 = load_spec_3
@@ -275,6 +399,9 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
         results [Y x T x M x P]
         
         """
+        self.count = 0
+        self.count_exceptions = 0
+        self.total_iterations = len(spec_1) * len(spec_2) * len(spec_3)
         return evaluate_across_specs(self, system, 
                                    spec_1, spec_2, 
                                    metrics, spec_3)

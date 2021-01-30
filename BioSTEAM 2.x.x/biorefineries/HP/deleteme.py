@@ -27,15 +27,27 @@ spec.load_titer(76.55172413793103)
 spec.load_yield(0.1920689655172414)
 spec.load_titer(85.86305365071001)
 
-# %% maximum number of iterations exceeded; root coul not be solved
+# %% maximum number of iterations exceeded; root could not be solved
 spec.load_yield(0.1306896551724138)
 spec.load_titer(178.96799091089662)
+
+# %% HXN maximum number of iterations exceeded; root could not be solved
+spec.load_yield(0.52)
+spec.load_titer(36.74157402306099)
+
+# %% HXN maximum number of iterations exceeded; root could not be solved
+spec.load_yield(0.37)
+spec.load_titer(30.00000090515838)
+
+# %% HXN maximum number of iterations exceeded; root could not be solved
+spec.load_yield(0.98)
+spec.load_titer(33.37078696254725)
 
 # %% simulate
 simulate_and_print()
 
 # %% trial specifications barrage
-steps = 30
+steps = 5
 yields = np.linspace(0.1, 0.99, steps) # yield
 titers = np.linspace(30, 320, steps) # titer
 MPSPs = []

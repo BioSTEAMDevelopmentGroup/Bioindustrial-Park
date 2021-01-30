@@ -289,11 +289,11 @@ get_HP_inhibitors_conc = lambda: 1000*sum(R302.outs[0].imass['AceticAcid', 'Furf
 # get_rel_impact_t_y = lambda: rel_impact_fn(steps)
 
 # HP_metrics = [solve_AA_price, get_HP_inhibitors_conc]
-HP_metrics = [solve_AA_price, get_HP_sugars_conc, get_HP_inhibitors_conc]
-# HP_metrics = [solve_AA_price, get_GWP, get_FEC]
+# HP_metrics = [solve_AA_price, get_HP_sugars_conc, get_HP_inhibitors_conc]
+HP_metrics = [solve_AA_price, get_GWP, get_FEC]
 
 # %% Generate 3-specification meshgrid and set specification loading functions
-steps = 120
+steps = 10
 
 # Yield, titer, productivity (rate)
 spec_1 = np.linspace(0.1, 0.99, steps) # yield
@@ -665,7 +665,7 @@ Metric_3_tickmarks = tickmarks(
 
 # Metric_3_tickmarks = [0.0*1000, 0.24*1000, 0.48*1000, 0.72*1000, 0.96*1000, 1.2*1000]
 
-Metric_1_tickmarks = [500,1000, 1500, 2000, 2500, 3000]
+Metric_1_tickmarks = [500,1000, 1500, 2000, 2500, 3000, 3500]
 # Metric_1_tickmarks = [2000, 2500, 3000, 3500, 4000, 4500]
 # Metric_2_tickmarks = [0, 10, 20, 30, 40, 50]
 # Metric_2_tickmarks = [0, 50, 100, 150, 200, 250, 300, 350, 400]
@@ -1034,8 +1034,8 @@ def get_all_rel_imp_fast(Xs=Xs, Ys=Ys, metric=d1_Metric1, step_size1 = 3, step_s
             all_rel_imp[y][x] = rel_impact_fn_fast(x, y, step_size1, step_size2, metric)
     return all_rel_imp
 
-def get_biorefinery_steepness(rel_impact_data, steps = steps,
-                              slope_invs_to_check = (1.5, 1.2), abs_tol = 0.05):
+def get_biorefinery_steepness(rel_impact_data, steps=steps,
+                              slope_invs_to_check=(1.5, 1.2), abs_tol=0.05):
     # points = {}
     # for ri in RIs_to_check:
     #     points[ri] = []

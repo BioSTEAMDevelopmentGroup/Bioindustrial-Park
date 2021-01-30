@@ -33,24 +33,28 @@ Dioctyl_phthalate = tmo.Chemical('117-81-7')
 Diethyl_sebacate = tmo.Chemical('Diethyl sebacate')
 Diethyl_sebacate.copy_models_from(Water, ['Psat', 'Hvap'])
 Octanediol = tmo.Chemical('1,8-Octanediol')
+AceticAcid = HP_chemicals['AceticAcid']
+Glycerol = tmo.Chemical('Glycerol')
 H2SO4 = tmo.Chemical('H2SO4')
-tmo.settings.set_thermo(['Water', 'H2SO4', 'Cyclohexanol', Octanediol, Diethyl_sebacate, '2-Ethyl hexanol', '117-81-7', 'Cyclohexanone', 'Hexanol', 'Butyl acetate', 'Isoamyl alcohol', 'Dodecanol', 'Trioctylamine', HP_chemicals['Xylose'], HP_chemicals['Glucose'], HP_chemicals['HP']], HP_chemicals['AQ336'])
+tmo.settings.set_thermo(['Water', 'H2SO4', 'Cyclohexanol', Glycerol, AceticAcid, Octanediol, Diethyl_sebacate, '2-Ethyl hexanol', '117-81-7', 'Cyclohexanone', 'Hexanol', 'Butyl acetate', 'Isoamyl alcohol', 'Dodecanol', 'Trioctylamine', HP_chemicals['Xylose'], HP_chemicals['Glucose'], HP_chemicals['HP']], HP_chemicals['AQ336'])
 # %% Streams initialization
 
 T = 320
 process_stream = tmo.Stream('process_stream',
-                            Water = 4000, HP = 250,
+                            Water = 2240, HP = 250,
                             units = 'kmol/hr',
                             T = T)
 
 #
-solvent_chemical = Octanediol # set this
+solvent_chemical = Hexanol # set this
 #
 
 solvent_ID = solvent_chemical.ID
 solvent_stream = tmo.Stream('solvent_stream',
                             T = T)
-solvent_stream.imol[solvent_ID] = 2000
+solvent_stream.imol[solvent_ID] = 1350
+
+solvent_stream.imol['AceticAcid'] = 5.
 # solvent_stream.imol['H2SO4'] = 200
 mixed_stream = tmo.Stream()
 

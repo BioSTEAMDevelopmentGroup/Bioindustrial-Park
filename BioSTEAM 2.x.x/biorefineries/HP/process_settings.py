@@ -28,7 +28,10 @@ _chemical_2020to2016 = 102.5 / 113.8 # average of Jan and Feb
 
 # From USD/dry-ton to USD/kg in 2016$, 20% moisture content
 # changed from Humbird et al., 2011 to Davis et al., 2018
-feedstock_price = 71.26 / _kg_per_ton * 0.8 
+cornstover_price = 71.26 / _kg_per_ton * 0.8 
+
+# https://www.alibaba.com/product-detail/Fresh-sugarcane-Organic-HIGH-QUALITY-LOW_62501985626.html?spm=a2700.galleryofferlist.normal_offer.d_title.58f539c887hNgz
+sugarcane_price = 0.3 # !!! temporary
 
 # 2.18 is the average whole-sale ethanol price between 2010-2019 in 2016 $/gal 	
 # based on Annual Energy Outlook (AEO) from Energy Information Adiministration (EIA)	
@@ -157,7 +160,8 @@ price = {'AA': AA_price,
          'TiO2': TiO2_price,
          'IBA': IBA_price,
          'Acetoin': acetoin_price,
-         'Feedstock': feedstock_price,
+         'Corn stover': cornstover_price,
+         'Sugarcane': sugarcane_price,
          'Sulfuric acid': 0.0430 * _lb_per_kg,	
          # 0.1900 is for NH3	
          'AmmoniumHydroxide': 0.1900 * _lb_per_kg * 17.031/35.046,	
@@ -256,21 +260,29 @@ GWP_CFs['CalciumDihydroxide'] = 1.2105 * 56.0774 / 74.093 # /kg-quicklime conver
 GWP_CFs['Hexanol'] = 3.1891 # currently set to CF of propanol (per kg)
 
 GWP_CF_array = chems.kwarray(GWP_CFs)
+
+
 # In kg CO2-eq/kg of material
 GWP_CF_stream = tmo.Stream('GWP_CF_stream', GWP_CF_array, units='kg/hr')
 
-CFs['GWP_CFs'] = GWP_CFs
-CFs['GWP_CF_stream'] = GWP_CF_stream
 
-GWP_CFs['Corn stover'] = 44.70/1e3 * 0.8
-GWP_CFs['Switchgrass'] = 87.81/1e3 * 0.8
-GWP_CFs['Miscanthus'] = 78.28/1e3 * 0.8
+GWP_CFs['FHT Corn stover'] = 68.82/1000. # Wendt et al. 2018: Techno-Economic Assessment of a Chopped Feedstock Logistics Supply Chain for Corn Stover
+
+
+# GWP_CFs['Corn stover'] = 44.70/1e3 * 0.8
+# GWP_CFs['Switchgrass'] = 87.81/1e3 * 0.8
+# GWP_CFs['Miscanthus'] = 78.28/1e3 * 0.8
 # In kg CO2-eq/kWh
 GWP_CFs['Electricity'] = 0.48
 # From corn stover
 GWP_CFs['LacticAcid_GREET'] = 1.80
 # From ref [7], lactic acid production, RoW, TRACI global warming
 GWP_CFs['LacticAcid_fossil'] = 4.1787
+
+GWP_CFs['Sugarcane'] = 0.12158 # ecoinvent 3.6, sugarcane production, RoW, IPCC 2013 GWP-100a
+
+CFs['GWP_CFs'] = GWP_CFs
+CFs['GWP_CF_stream'] = GWP_CF_stream
 # GWP_CFs['']
 # =============================================================================
 # Fossil energy consumption (FEC), in MJ/kg of material
@@ -304,9 +316,10 @@ FEC_CF_array = chems.kwarray(FEC_CFs)
 # In MJ/kg of material
 FEC_CF_stream = tmo.Stream('FEC_CF_stream', FEC_CF_array, units='kg/hr')
 
-FEC_CFs['Corn stover'] = 688.60/1e3 * 0.8
-FEC_CFs['Switchgrass'] = 892.41/1e3 * 0.8
-FEC_CFs['Miscanthus'] = 569.05/1e3 * 0.8
+FEC_CFs['FHT Corn stover'] = 767.3/1000. # Wendt et al. 2018: Techno-Economic Assessment of a Chopped Feedstock Logistics Supply Chain for Corn Stover
+# FEC_CFs['Corn stover'] = 688.60/1e3 * 0.8
+# FEC_CFs['Switchgrass'] = 892.41/1e3 * 0.8
+# FEC_CFs['Miscanthus'] = 569.05/1e3 * 0.8
 
 CFs['FEC_CFs'] = FEC_CFs
 CFs['FEC_CF_stream'] = FEC_CF_stream
@@ -316,6 +329,8 @@ FEC_CFs['Electricity'] = 5.926
 FEC_CFs['LacticAcid'] = 29
 # From ref [7], lactic acid production, RoW, cumulative energy demand, fossil
 FEC_CFs['LacticAcid_fossil'] = 79.524
+
+FEC_CFs['Sugarcane'] = 0.37338 # ecoinvent 3.6, sugarcane production, RoW, IPCC 2013 GWP-100a
 
 
 
