@@ -78,11 +78,12 @@ def evaluate_across_specs(spec, system,
             print(str_e1)
             try:
                 run_bugfix_barrage()
-                Beep(320, 250)
+                # Beep(320, 250)
             except Exception as e2:
                 print(str(e2))
-                Beep(640, 1000)
-                print(f"Point failed; returning metric values as nan.")
+                Beep(640, 500)
+                spec.count_exceptions += 1
+                print(f"Point failed; returning metric values as np.nan.")
                 return np.nan*np.ones([len(metrics), len(spec_3)])
     
     return spec.evaluate_across_productivity(metrics, spec_3)
@@ -167,9 +168,9 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
         productivity : float, optional
             g products / L effluent / hr
         """
+        self.load_spec_3(spec_3 or self.spec_3)
         self.load_spec_1(spec_1 or self.spec_1)
         self.load_spec_2(spec_2 or self.spec_2)
-        self.load_spec_3(spec_3 or self.spec_3)
 
     def evaluate_across_productivity(self, metrics, spec_3):
         """
@@ -421,7 +422,7 @@ class TiterAndInhibitorsSpecification:
                  target_titer, product,
                  maximum_inhibitor_concentration=1.,
                  products=('HP',),
-                 sugars = ('Glucose', 'Xylose'),
+                 sugars = ('Glucose', 'Xylose', 'Arabinose', 'Sucrose'),
                  inhibitors = ('AceticAcid', 'HMF', 'Furfural'),):
         self.evaporator = evaporator
         self.pump = pump

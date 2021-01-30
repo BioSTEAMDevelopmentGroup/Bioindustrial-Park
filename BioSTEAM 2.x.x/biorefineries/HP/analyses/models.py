@@ -64,6 +64,7 @@ def get_MSP():
 
 # Mass flow rate of HP stream
 AA = find.unit.T606_P-0
+feedstock = find.stream.feedstock
 get_yield = lambda: AA.F_mass*get_annual_factor()/1e6
 # Purity (%) of HP in the final product
 get_purity = lambda: AA.imass['AA']/AA.F_mass
@@ -185,7 +186,8 @@ metrics.extend((Metric('Check', check_product_sale, '10^6 $/yr', 'Product sale')
 # Heating demand breakdown (positive if needs heating)
 # =============================================================================
 
-get_system_heating_demand = lambda: BT.system_heating_demand*get_annual_factor()/1e9
+# get_system_heating_demand = lambda: BT.system_heating_demand*get_annual_factor()/1e9
+get_system_heating_demand = lambda: sum([i.duty for i in BT.steam_utilities])*get_annual_factor()/1e9
 get_pretreatment_steam_heating_demand = lambda: BT.side_streams_lps.duty*get_annual_factor()/1e9
 HXN = find.unit.HXN
 get_HXN_heating_demand = lambda: sum(i.duty for i in HXN.heat_utilities 
@@ -312,7 +314,16 @@ param = HP_model.parameter
 def baseline_uniform(baseline, ratio):
     return shape.Uniform(baseline*(1-ratio), baseline*(1+ratio))
 
+def baseline_triangle(baseline, ratio):
+    return shape.Triangle(baseline*(1-ratio), baseline, baseline*(1+ratio))
 
+D = baseline_uniform(1, 0.1)
+@param(name='Blank parameter', element=feedstock, kind='coupled', units='',
+       baseline=1, distribution=D)
+def set_blank_parameter(anything):
+    # This does nothing
+    feedstock.T = feedstock.T
+    
 # =============================================================================
 # TEA parameters
 # =============================================================================

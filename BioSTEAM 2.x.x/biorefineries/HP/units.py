@@ -91,10 +91,57 @@ class SulfuricAcidMixer(Unit):
     def _run(self):
         acid, water = self.ins
         mixture = self.outs[0]
+        
         # 0.05 is from 1842/36629 from streams 710 and 516 of Humbird et al.
-        water.imass['Water'] = acid.imass['SulfuricAcid'] / 0.05
+        # water.imass['Water'] = acid.imass['SulfuricAcid'] / 0.05
+        # water adjustment currently implemented in H_M201.specification
+        
         mixture.mix_from([water, acid])
 
+
+
+# # Sulfuric acid in-line mixer
+# @cost(basis='Flow rate', ID='Mixer', units='kg/hr',
+#       cost=6000, S=136260, CE=CEPCI[2009], n=0.5, BM=1)
+# class SulfuricAcidMixer(Unit):
+#     _N_ins = 2
+#     _N_outs = 1
+#     _N_heat_utilities = 1
+#     _graphics = Mixer._graphics
+#     _BM = {**Mixer._BM,
+#             'Heat exchangers': 3.17}
+#     def __init__(self, ID='', ins=None, outs=(), T_water = 300, P_water = 101325):
+#         Unit.__init__(self, ID, ins, outs)
+#         self.T_water = T_water
+#         self.P_water = P_water
+#         self.heat_exchanger = HXutility(None, None, None, T=T_water)
+#     def _run(self):
+#         acid, water = self.ins
+#         mixture = self.outs[0]
+#         # 0.05 is from 1842/36629 from streams 710 and 516 of Humbird et al.
+#         water.imass['Water'] = acid.imass['SulfuricAcid'] / 0.05
+        
+#         self.heated_water = heated_water = water.copy()
+#         heated_water.T = self.T_water
+#         heated_water.P = self.P_water
+#         self.water_duty = heated_water.H - water.H
+        
+#         water.T = heated_water.T
+#         water.P = heated_water.P
+        
+#         mixture.mix_from([heated_water, acid])
+#     def _cost(self):
+#         super()._cost()
+#         hx = self.heat_exchanger
+#         original_water = self.ins[1].copy()
+#         heated_water = self.ins[1].copy()
+#         heated_water.T = self.T_water
+#         heated_water.P = self.P_water
+#         hx.simulate_as_auxiliary_exchanger(duty=self.water_duty,
+#                                             stream=original_water.copy())
+#         self.purchase_costs['Heat exchangers'] = hx.purchase_cost
+        
+        
 # Adjust pretreatment water loading, 30% from Table 5 on Page 21 of Humbird et al.
 class PretreatmentMixer(Mixer):
     _N_ins = 3
@@ -109,19 +156,20 @@ class PretreatmentMixer(Mixer):
         mixture = feedstock.copy()
         mixture.mix_from([feedstock, acid])
         
-        total_mass = (mixture.F_mass-mixture.imass['Water'])/self.solid_loading
-        water.imass['Water'] = total_mass - mixture.F_mass
+        # total_mass = (mixture.F_mass-mixture.imass['Water'])/self.solid_loading
+        # water.imass['Water'] = total_mass - mixture.F_mass
+        # water adjustment currently implemented in H_M202.specification
         
         mixture_out.mix_from([mixture, water])
 
 # Steam mixer
-class SteamMixer(Unit):
+class SteamMixer(Mixer):
     """
     Parameters
     ----------
     ins :
         [0] Feed        
-        [1] Steam
+        [1] Water (to be heated by auxillary heat exchanger)
     
     outs : 
         [0] Mixed steam    
@@ -129,10 +177,15 @@ class SteamMixer(Unit):
     """
     _N_ins = 2
     _N_outs = 1
+    _N_heat_utilities = 1
+    _BM = {**Mixer._BM,
+            'Heat exchangers': 3.17}
     
-    def __init__(self, ID='', ins=None, outs=(), *, P):
-        Unit.__init__(self, ID, ins, outs)
+    def __init__(self, ID='', ins=None, outs=(), *, P, T_steam=268.+273.15):
+        Mixer.__init__(self, ID, ins, outs)
         self.P = P
+        self.heat_exchanger = HXutility(None, None, None, T=T_steam)
+        self.T_steam = T_steam
         
     @staticmethod
     def P_at_flow(mol_water, P, steam, mixed, feed):
@@ -143,16 +196,34 @@ class SteamMixer(Unit):
         return P_new-P
     
     def _run(self):
-        feed, steam = self.ins
+        feed, water = self.ins
         mixed = self.outs[0]
-
+        
+        steam = water.copy()
+        steam.T = self.T_steam
+        
         steam_mol = steam.F_mol
+        steam.phase = 'g'
         steam_mol = max(0, aitken_secant(f=self.P_at_flow,
                                   x0=steam_mol, x1=steam_mol+0.1, 
                                   xtol=1e-4, ytol=1e-4,
                                   args=(self.P, steam, mixed, feed)))
+        
+        water.mol[:] = steam.mol[:]
+        water.phase = 'l'
+        water.T = 300.
+        self.dH_steam = steam.H - water.H
+        
         mixed.P = self.P
     
+    def _cost(self):
+        # super()._cost()
+        hx = self.heat_exchanger
+        hx.simulate_as_auxiliary_exchanger(duty=self.dH_steam, 
+                                            stream=self.ins[1].copy())
+        
+        self.purchase_costs['Heat exchangers'] = hx.purchase_cost
+        
 # Pretreatment reactor
 @cost(basis='Dry flow rate', ID='Pretreatment reactor', units='kg/hr',
       kW=5120, cost=19812400, S=83333, CE=CEPCI[2009], n=0.6, BM=1.5)

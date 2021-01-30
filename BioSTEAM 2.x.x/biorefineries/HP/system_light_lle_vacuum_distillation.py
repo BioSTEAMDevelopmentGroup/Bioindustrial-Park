@@ -117,13 +117,13 @@ def create_HP_sys(ID, ins, outs):
     # For pretreatment, 93% purity
     pretreatment_sulfuric_acid = Stream('pretreatment_sulfuric_acid', units='kg/hr')
     # To be mixed with sulfuric acid, flow updated in SulfuricAcidMixer
-    water_M201 = Stream('water_M201', T=114+273.15, units='kg/hr')
+    water_M201 = Stream('water_M201', T=300, units='kg/hr')
     
     # To be used for feedstock conditioning
-    water_M202 = Stream('water_M202', T=95+273.15, units='kg/hr')
+    water_M202 = Stream('water_M202', T=300, units='kg/hr')
     
     # To be added to the feedstock/sulfuric acid mixture, flow updated by the SteamMixer
-    steam_M203 = Stream('steam_M203', phase='g',T=268+273.15, P=13*101325, units='kg/hr')
+    water_M203 = Stream('water_M203', phase='l', T=300, P=13.*101325, units='kg/hr')
     
     # For neutralization of pretreatment hydrolysate
     ammonia_M205 = Stream('ammonia_M205', phase='l', units='kg/hr')
@@ -134,20 +134,61 @@ def create_HP_sys(ID, ins, outs):
     # =============================================================================
     # Pretreatment units
     # =============================================================================
+    H_M201 = bst.units.HXutility('H_M201', ins=water_M201,
+                                     outs='steam_M201',
+                                     T=114+273.15, rigorous=False)
+    def H_M201_specification():
+        T201._run()
+        acid_imass = T201.outs[0].imass['SulfuricAcid']
+        H_M201.ins[0].imass['Water'] = acid_imass / 0.05
+        H_M201._run()
+    H_M201.specification = H_M201_specification
+    
+    H_M202 = bst.units.HXutility('H_M202', ins=water_M202,
+                                     outs='hot_water_M202',
+                                     T=95+273.15, rigorous=False)
+    def H_M202_specification():
+        U101._run()
+        H_M201._specification()
+        M201._run()
+        feedstock, acid = U101.outs[0], M201.outs[0]
+        mixture_F_mass = feedstock.F_mass + acid.F_mass
+        mixture_imass_water = feedstock.imass['Water'] + acid.imass['Water']
+        total_mass = (mixture_F_mass - mixture_imass_water)/M202.solid_loading
+        H_M202.ins[0].imass['Water'] = total_mass - mixture_F_mass
+        H_M202._run()
+    H_M202.specification = H_M202_specification
+    
+    # P_M203 =  bst.units.Pump('P_M203', ins=water_M203, P=13.*101325.)
+    
+    # H_M203 = bst.units.HXutility('H_M203', ins=water_M203,
+    #                                   outs='steam_M203',
+    #                                   T=268.+273.15, rigorous=True)
+    # def H_M203_specification():
+    #     # water_M203.show()
+    #     H_M202._specification()
+    #     M202._run()
+    #     M203._run()
+    #     H_M203.ins[0].mol[:] = M203.ins[1].mol[:]
+    #     H_M203.ins[0].phase = 'l'
+    #     # H_M203.ins[0].T = water_M203.T
+    #     H_M203._run()
+    #     H_M203.outs[0].phase = 'g'
+    # H_M203.specification = H_M203_specification
     
     # Prepare sulfuric acid
     get_feedstock_dry_mass = lambda: feedstock.F_mass - feedstock.imass['H2O']
     T201 = units.SulfuricAcidAdditionTank('T201', ins=pretreatment_sulfuric_acid,
                                           feedstock_dry_mass=get_feedstock_dry_mass())
     
-    M201 = units.SulfuricAcidMixer('M201', ins=(T201-0, water_M201))
+    M201 = units.SulfuricAcidMixer('M201', ins=(T201-0, H_M201-0))
     
     # Mix sulfuric acid and feedstock, adjust water loading for pretreatment
-    M202 = units.PretreatmentMixer('M202', ins=(U101-0, M201-0, water_M202))
+    M202 = units.PretreatmentMixer('M202', ins=(U101-0, M201-0, H_M202-0))
     
     # Mix feedstock/sulfuric acid mixture and steam
-    # M203 = units.SteamMixer('M203', ins=(M202-0, steam_M203), P=5.5*101325)
-    M203 = bst.units.SteamMixer('M203', ins=(M202-0, steam_M203), P=5.5*101325)
+    # M203 = units.SteamMixer('M203', ins=(M202-0, water_M203), P=5.5*101325)
+    M203 = bst.units.SteamMixer('M203', ins=(M202-0, water_M203), P=5.5*101325)
     
     R201 = units.PretreatmentReactorSystem('R201', ins=M203-0, outs=('R201_g', 'R201_l'))
     
@@ -1075,7 +1116,7 @@ def create_HP_sys(ID, ins, outs):
     
     # All water used in the system, here only consider water usage,
     # if heating needed, then heeating duty required is considered in BT
-    process_water_streams = (water_M201, water_M202, steam_M203, water_M205, 
+    process_water_streams = (water_M201, water_M202, water_M203, water_M205, 
                              enzyme_water,
                              dilution_water,
                              aerobic_caustic, 
