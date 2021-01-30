@@ -88,6 +88,7 @@ def evaluate_across_specs(spec, system,
     return spec.evaluate_across_productivity(metrics, spec_3)
     
 
+
 evaluate_across_specs = np.vectorize(
     evaluate_across_specs, 
     excluded=['spec', 'system', 'metrics', 'spec_3'],
