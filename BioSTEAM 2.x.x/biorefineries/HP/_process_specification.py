@@ -59,6 +59,7 @@ def evaluate_across_specs(spec, system,
     spec.count += 1
     print(f"\n\n----------\n{spec.count} / {spec.total_iterations}\n")
     print(f"yield = {format(100*float(spec_1),'.1f')} % theo.,  titer = {format(float(spec_2),'.2f')} g\u00b7L\u207b\u00b9,  prod. = {format(float(spec_3),'.2f')} g\u00b7L\u207b\u00b9\u00b7h\u207b\u00b9\n")
+    
     try:
         spec.load_specifications(spec_1=spec_1, spec_2=spec_2)
         system.simulate()
@@ -85,7 +86,9 @@ def evaluate_across_specs(spec, system,
                 spec.count_exceptions += 1
                 print(f"Point failed; returning metric values as np.nan.")
                 return np.nan*np.ones([len(metrics), len(spec_3)])
-    
+    HXN_Q_bal_percent_error = spec.HXN.energy_balance_percent_error
+    print(f"HXN Q_balance off by {format(HXN_Q_bal_percent_error,'.2f')} %.\n")
+    spec.average_HXN_energy_balance_percent_error += abs(HXN_Q_bal_percent_error)
     return spec.evaluate_across_productivity(metrics, spec_3)
     
 
@@ -118,14 +121,16 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
                  'pretreatment_reactor',
                  'titer_inhibitor_specification',
                  'seed_train_system',
+                 'HXN',
                  'count',
                  'count_exceptions',
-                 'total_iterations')
+                 'total_iterations',
+                 'average_HXN_energy_balance_percent_error')
     
     def __init__(self, evaporator, pump, mixer, heat_exchanger, seed_train_system, 
                  reactor, reaction_name, substrates, products,
                  spec_1, spec_2, spec_3, xylose_utilization_fraction,
-                 feedstock, dehydration_reactor, byproduct_streams, 
+                 feedstock, dehydration_reactor, byproduct_streams, HXN,
                  feedstock_mass=104192.83224417375, pretreatment_reactor = None,
                   load_spec_1=None, load_spec_2=None, load_spec_3=None):
         self.substrates = substrates
@@ -141,10 +146,12 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
         self.feedstock_mass = feedstock_mass
         self.pretreatment_reactor = pretreatment_reactor
         self.seed_train_system = seed_train_system
+        self.HXN = HXN
         
         self.count = 0 
         self.count_exceptions = 0
         self.total_iterations = 0
+        self.average_HXN_energy_balance_percent_error = 0.
         
         self.load_spec_1 = load_spec_1
         self.load_spec_2 = load_spec_2
@@ -243,9 +250,11 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
         self.count = 0
         self.count_exceptions = 0
         self.total_iterations = len(spec_1) * len(spec_2) * len(spec_3)
-        return evaluate_across_specs(self, system, 
+        results = evaluate_across_specs(self, system, 
                                    spec_1, spec_2, 
                                    metrics, spec_3)
+        self.average_HXN_energy_balance_percent_error /= self.total_iterations
+        return results
     
     @property
     def feed(self):
