@@ -29,7 +29,7 @@ from chaospy import distributions as shape
 from biosteam import main_flowsheet as find
 from biosteam.evaluation import Model, Metric
 from biosteam.evaluation.evaluation_tools.parameter import Setter
-from biorefineries.HP.system_light_lle_vacuum_distillation import HP_sub_sys, HP_tea, HP_no_BT_tea, flowsheet, unit_groups
+from biorefineries.HP.system_light_lle_vacuum_distillation import HP_sub_sys, HP_tea, HP_no_BT_tea, flowsheet, unit_groups, get_GWP, get_FEC
 from warnings import warn
 
 find.set_flowsheet(flowsheet)
@@ -85,7 +85,8 @@ get_material_cost = lambda: HP_tea.material_cost/1e6
 get_annual_sale = lambda: HP_tea.sales/1e6
 # System power usage, individual unit power usage should be positive
 BT = find.unit.BT
-excess_power = lambda: BT.electricity_generated
+# excess_power = lambda: BT.electricity_generated
+excess_power = lambda: BT.power_utility.production
 electricity_price = bst.PowerUtility.price
 # Electricity credit is positive if getting revenue from excess electricity
 get_electricity_credit = lambda: (excess_power()*electricity_price*get_annual_factor())/1e6
@@ -188,7 +189,8 @@ metrics.extend((Metric('Check', check_product_sale, '10^6 $/yr', 'Product sale')
 
 # get_system_heating_demand = lambda: BT.system_heating_demand*get_annual_factor()/1e9
 get_system_heating_demand = lambda: sum([i.duty for i in BT.steam_utilities])*get_annual_factor()/1e9
-get_pretreatment_steam_heating_demand = lambda: BT.side_streams_lps.duty*get_annual_factor()/1e9
+# get_pretreatment_steam_heating_demand = lambda: BT.side_streams_lps.duty*get_annual_factor()/1e9
+get_pretreatment_steam_heating_demand = lambda: unit_groups[0].get_heating_duty()*get_annual_factor()/1e3
 HXN = find.unit.HXN
 get_HXN_heating_demand = lambda: sum(i.duty for i in HXN.heat_utilities 
                                     if i.duty*i.cost>0)*get_annual_factor()/1e9
@@ -301,7 +303,16 @@ get_NPV = lambda: HP_tea.NPV
 metrics.extend((Metric('Net present value', get_NPV, '$', 'TEA'), ))
 
 # To check HXN energy balance error
-metrics.append(Metric('HXN energy balance error', lambda: HXN.energy_balance_percent_error))
+# metrics.append(Metric('HXN energy balance error', lambda: HXN.energy_balance_percent_error))
+
+metrics.extend((Metric('HXN energy balance error', lambda: HXN.energy_balance_percent_error, '%', 'TEA'), ))
+
+# LCA
+metrics.extend((
+    Metric('Total GWP', get_GWP, 'kg CO2-eq/kg', 'LCA'),
+    Metric('Total FEC', get_FEC, 'MJ/kg', 'LCA')
+    ))
+
 # %% 
 
 # =============================================================================
@@ -349,14 +360,15 @@ special_price = {
     'CSL_fresh':        ('Uniform',   (0.0673,    0.112)),
     'lime_fresh':       ('Uniform',   (0.160,     0.288)),
     # 'ethanol_fresh':    ('Triangle',  (0.460,     0.978)),
-    'natural_gas':      ('Triangle',  (0.198,     0.304)),
+    # 'hexanol_fresh':    ('Uniform',   (0.551*0.9,     0.551*1.1)),
+    # 'natural_gas':      ('Triangle',  (0.198,     0.304)),
     'gypsum':           ('Uniform',   (-0.0288,   0.00776))
     }
 
 # Prices for boiler_chems, baghouse_bag, and cooling_tower_chems are not included
 # as they are tied to BT/CT duties
 default_price_streams = ('sulfuric_acid_fresh', 'ammonia_fresh', 'enzyme', 
-                         'system_makeup_water', 'aerobic_caustic', 'ash')
+                         'system_makeup_water', 'aerobic_caustic', 'ash', 'hexanol_fresh')
 
 def add_stream_price_param(stream, D):
     param(setter=Setter(stream, 'price'),
@@ -386,6 +398,15 @@ D = shape.Triangle(0.067, 0.070, 0.074)
 def set_electricity_price(price): 
     bst.PowerUtility.price = price
 
+BT = flowsheet('BT')
+natural_gas_price = BT.natural_gas_price
+D = shape.Triangle(natural_gas_price*0.9, natural_gas_price, natural_gas_price*1.1)
+@param(name='Natural gas price', element='TEA', kind='isolated', units='$/kWh',
+       baseline=natural_gas_price, distribution=D)
+def set_natural_gas_price(price): 
+    BT.natural_gas_price = price
+    
+    
 D = baseline_uniform(1, 0.1)
 @param(name='TCI ratio', element='TEA', kind='isolated', units='% of baseline',
        baseline=1, distribution=D)

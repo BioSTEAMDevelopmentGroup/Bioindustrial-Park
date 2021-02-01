@@ -301,6 +301,8 @@ Ash = chemical_database('Ash', search_ID='CaO', phase='s', Hf=-151688*_cal2joule
 # cannot directly use Xylose as Xylose is locked at liquid state now
 Tar = chemical_copied('Tar', Xylose, phase_ref='s')
 
+TiO2 = chemical_database('TiO2')
+
 # =============================================================================
 # Mixtures
 # =============================================================================
@@ -370,7 +372,7 @@ chemical_groups = dict(
     # P4O10 will be generated in the system as no P-containing chemicals 
     # are included in "combustibles"
     OtherInsolubleSolids = ('Tar', 'Ash', 'CalciumDihydroxide', 'CaSO4', 'P4O10',
-                            'BaghouseBag', 'CoolingTowerChems'),
+                            'BaghouseBag', 'CoolingTowerChems', 'TiO2'),
     OtherStructuralCarbohydrates = ('Glucan', 'Xylan', 'Lignin', 'Arabinan', 
                                     'Mannan', 'Galactan'),
     SeparatelyListedOrganics = ('Ethanol', 'Glucose', 'Xylose', 'AceticAcid',

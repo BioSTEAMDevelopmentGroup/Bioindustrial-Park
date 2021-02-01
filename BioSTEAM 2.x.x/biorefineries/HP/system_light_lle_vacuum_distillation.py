@@ -113,6 +113,7 @@ def create_HP_sys(ID, ins, outs):
     
     feedstock_group = UnitGroup('feedstock_group', units=(U101,))
     process_groups.append(feedstock_group)
+    
     # %% 
     
     # =============================================================================
@@ -357,7 +358,8 @@ def create_HP_sys(ID, ins, outs):
     gypsum = Stream('gypsum', units='kg/hr', price=price['Gypsum'])
     
     separation_hexanol = Stream('separation_hexanol', units='kg/hr')
-
+    
+    makeup_TiO2_catalyst = Stream('makeup_TiO2_catalyst', units='kg/hr', price=price['TiO2'])
     
     # =============================================================================
     # Separation units
@@ -624,12 +626,12 @@ def create_HP_sys(ID, ins, outs):
     
     D401_P = units.HPPump('D401_P', ins=M402-0, P=101325*5)
     
-    R402 = units.DehydrationReactor('R402', ins = (D401_P-0),
-                                    outs = ('dilute_acryclic_acid'),
+    R402 = units.DehydrationReactor('R402', ins = (D401_P-0, makeup_TiO2_catalyst),
+                                    outs = ('dilute_acryclic_acid', 'spent_TiO2_catalyst'),
                                     tau = 57.34/1.5, # Dishisha et al.
                                     T = 230 + 273.15,
                                     vessel_material='Stainless steel 316')
-  
+    # spent_TiO2_catalyst is assumed to be sold at 0 $/kg
     
     
     R402_H = bst.units.HXutility('R402_H', ins=R402-0, T = 372.00, rigorous=True)
@@ -766,6 +768,7 @@ def create_HP_sys(ID, ins, outs):
     TOA_fresh = Stream('TOA_fresh', price=price['TOA'])
     AQ336_fresh = Stream('AQ336_fresh', price=price['AQ336'])
     
+    
     # S401_out1_F_mass = S401.outs[1].F_mass
     
     # if not (S401_out1_F_mass == 0):
@@ -828,11 +831,11 @@ def create_HP_sys(ID, ins, outs):
     
 
     
-    T604 = units.LimeStorageBin('T607', ins=lime_fresh, outs=fermentation_lime)
+    T604 = units.LimeStorageBin('T604', ins=lime_fresh, outs=fermentation_lime)
     T604.line = 'Lime storage tank'
     
     
-    T605 = units.SulfuricAcidStorageTank('T608', ins = sulfuric_acid_fresh2, outs = separation_sulfuric_acid)
+    T605 = units.SulfuricAcidStorageTank('T605', ins = sulfuric_acid_fresh2, outs = separation_sulfuric_acid)
     T605.line = 'Sulfuric acid storage tank'
     
 
@@ -845,7 +848,7 @@ def create_HP_sys(ID, ins, outs):
     T606_P = units.HPPump('T606_P', ins=T606-0, outs=AA)
     
     
-    T607 = bst.units.StorageTank('T609', ins = hexanol_fresh, outs = separation_hexanol)
+    T607 = bst.units.StorageTank('T607', ins = hexanol_fresh, outs = separation_hexanol)
     T607.line = 'Hexanol storage tank'
     
     # T610 = bst.units.StorageTank('T610', ins = TOA_fresh, outs = separation_TOA)
@@ -885,7 +888,7 @@ def create_HP_sys(ID, ins, outs):
                                                       'boilerchems'), 
                                                  outs=('gas_emission', 'boiler_blowdown_water', ash),
                                                  turbogenerator_efficiency=0.85)
-
+    
     # Blowdown is discharged
     CT = facilities.CT('CT', ins=('return_cooling_water', cooling_tower_chems,
                                   'CT_makeup_water'),

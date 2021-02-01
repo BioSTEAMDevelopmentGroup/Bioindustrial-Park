@@ -1562,8 +1562,8 @@ class DehydrationReactor(Reactor):
     """
     A dehydration reactor.
     """
-    _N_ins = 1
-    _N_outs = 1
+    _N_ins = 2
+    _N_outs = 2
     
     _N_heat_utilities = 1
     _BM = {**Reactor._BM,
@@ -1573,8 +1573,9 @@ class DehydrationReactor(Reactor):
     # WHSV = (1.5/12) * 1e-3 # m3/h.kg
     mcat_frac = 12/1.5 # kg per kg/h
     # mcat_frac = 8
-    # !!! TODO: Update TiO2 lifetime
-    _equipment_lifetime = {'TiO2 catalyst': 5,}
+    
+    
+    # _equipment_lifetime = {'TiO2 catalyst': 1,}
     def __init__(self, ID='', ins=None, outs=(), thermo=None, *, T=230+273.15,
                   P=101325, V_wf=0.8, length_to_diameter=2, tau = 1,
                   kW_per_m3=0.0985, # Perry's handbook
@@ -1600,8 +1601,8 @@ class DehydrationReactor(Reactor):
             ])     
         HP_to_AA_rxn = dehydration_reactions[0]
     def _run(self):
-        feed = self.ins[0]
-        effluent = self.outs[0]
+        feed, fresh_catalyst = self.ins
+        effluent, spent_catalyst = self.outs
         
         # effluent = feed.copy()
         effluent.mix_from([feed])
@@ -1609,7 +1610,11 @@ class DehydrationReactor(Reactor):
         # effluent.P = feed.P
         self.dehydration_reactions(effluent.mol)
         effluent.phase = 'l'
-   
+        
+        fresh_catalyst.imass['TiO2'] = spent_catalyst.imass['TiO2'] =\
+            self.mcat_frac * self.ins[0].F_mass/(350.*24.) 
+            # assuming a TiO2 lifetime of 1 year
+            
     def _cost(self):
         super()._cost()
         hx = self.heat_exchanger
@@ -1623,8 +1628,9 @@ class DehydrationReactor(Reactor):
         hu_total.copy_like(hu_single_rx)
         hu_total.scale(N)
         self.purchase_costs['Heat exchangers'] = hx.purchase_cost * N
-        self.purchase_costs['TiO2 catalyst'] =\
-            self.mcat_frac * (sum([stream.F_mass for stream in self.ins])) * price['TiO2']
+        self.purchase_costs['TiO2 catalyst'] = self.mcat_frac * self.ins[0].F_mass * price['TiO2']
+            # self.mcat_frac * (sum([stream.F_mass for stream in self.ins])) * price['TiO2']
+            
         
         
 compute_HP_titer = lambda effluent: (effluent.imass['HP'] +

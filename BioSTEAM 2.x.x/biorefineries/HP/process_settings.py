@@ -107,9 +107,11 @@ natural_gas_price = 4.70/1e3*_ft3_per_m3*CH4_V * (1e3/CH4_MW)
 # USD 383.13 for 2.5kg (largest available size order), accessed 06/11/2020
 amberlyst_15_price = 153.252 * _chemical_2020to2016
 
-#https://www.alibaba.com/product-detail/Latest-promotion-price-Hot-selling-high_62503274885.html?spm=a2700.7724857.normalList.7.54351dad5oDzYH&s=p&fullFirstScreen=true
-TiO2_price = 1.784
+# #https://www.alibaba.com/product-detail/Latest-promotion-price-Hot-selling-high_62503274885.html?spm=a2700.7724857.normalList.7.54351dad5oDzYH&s=p&fullFirstScreen=true
+# TiO2_price = 1.784
 
+#https://www.alibaba.com/product-detail/Titanium-Dioxide-Chinese-Tio2-Producer-Supply_1600082019592.html?spm=a2700.galleryofferlist.normal_offer.d_title.a3415562TmEgSy&s=p
+TiO2_price = 2130./_kg_per_ton
 
 # HP_price = 1.88 # initial value
 AA_price = 1.88 # initial value
@@ -259,6 +261,8 @@ GWP_CFs['Gypsum'] = -4.20/1e3
 GWP_CFs['CalciumDihydroxide'] = 1.2105 * 56.0774 / 74.093 # /kg-quicklime converted to kg-slaked_lime assuming CF of 0 for water
 GWP_CFs['Hexanol'] = 3.1891 # currently set to CF of propanol (per kg)
 
+GWP_CFs['TiO2'] = 7.8029 # ecoinvent 3.7.1, market for titanium dioxide [RoW] - IPCC 2013 GWP100a
+
 GWP_CF_array = chems.kwarray(GWP_CFs)
 
 
@@ -267,6 +271,7 @@ GWP_CF_stream = tmo.Stream('GWP_CF_stream', GWP_CF_array, units='kg/hr')
 
 
 GWP_CFs['FHT Corn stover'] = 68.82/1000. # Wendt et al. 2018: Techno-Economic Assessment of a Chopped Feedstock Logistics Supply Chain for Corn Stover
+
 
 
 # GWP_CFs['Corn stover'] = 44.70/1e3 * 0.8
@@ -312,11 +317,16 @@ FEC_CFs['Gypsum'] = -44.19/1e3
 FEC_CFs['CalciumDihydroxide'] = 5.2339  * 56.0774 / 74.093 # /kg-quicklime converted to kg-slaked_lime assuming CF of 0 for water
 FEC_CFs['Hexanol'] = 79.249 # currently set to CF of propanol (per kg)
 
+FEC_CFs['TiO2'] = 82.361 # ecoinvent 3.7.1, market for titanium dioxide [RoW] - CED fossil
+
 FEC_CF_array = chems.kwarray(FEC_CFs)
 # In MJ/kg of material
 FEC_CF_stream = tmo.Stream('FEC_CF_stream', FEC_CF_array, units='kg/hr')
 
 FEC_CFs['FHT Corn stover'] = 767.3/1000. # Wendt et al. 2018: Techno-Economic Assessment of a Chopped Feedstock Logistics Supply Chain for Corn Stover
+
+
+
 # FEC_CFs['Corn stover'] = 688.60/1e3 * 0.8
 # FEC_CFs['Switchgrass'] = 892.41/1e3 * 0.8
 # FEC_CFs['Miscanthus'] = 569.05/1e3 * 0.8

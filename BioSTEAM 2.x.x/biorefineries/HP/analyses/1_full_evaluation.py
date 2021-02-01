@@ -66,7 +66,7 @@ R301.set_titer_limit = True
 
 # Set seed to make sure each time the same set of random numbers will be used
 np.random.seed(3221)
-N_simulation = 2000 # 1000
+N_simulation = 100 # 1000
 samples = model.sample(N=N_simulation, rule='L')
 model.load_samples(samples)
 
@@ -196,7 +196,7 @@ one_p_df = pd.DataFrame({
     ('FEC [MJ/kg]', 'FEC max diff'): FEC_max_diff,
     })
 
-time = timer.elapsed_time / 60
+time = timer.elapsed_time / 60.
 print(f'\nSimulation time for {run_number} runs is: {time:.1f} min')
 
 
