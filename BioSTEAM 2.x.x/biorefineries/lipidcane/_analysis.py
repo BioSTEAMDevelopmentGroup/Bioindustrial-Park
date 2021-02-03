@@ -14,8 +14,8 @@ from biorefineries.lipidcane.model import (lipidcane_model as model_lc,
                                            lipidcane_model_with_lipidfraction_parameter as model_lc_lf)
 from biorefineries.sugarcane.model import sugarcane_model as model_sc
 
-def run_uncertainty(N_spearman_samples = 5000,
-                    N_coordinate_samples = 1000,
+def run_uncertainty(N_spearman_samples = 500,
+                    N_coordinate_samples = 100,
                     N_coordinates = 20):
     np.random.seed(1234)
     rule = 'L'
@@ -24,7 +24,8 @@ def run_uncertainty(N_spearman_samples = 5000,
     coordinate = np.linspace(0.11, 0.01, N_coordinates)
     samples = model_lc.sample(N_coordinate_samples, rule)
     model_lc.load_samples(samples)
-    
+    def raise_exception(e, sample): raise e
+    model_lc.exception_hook = raise_exception
     model_lc.evaluate_across_coordinate('Lipid fraction',
           lc.utils.set_lipid_fraction, coordinate,
           xlfile='Monte Carlo across lipid fraction.xlsx')
@@ -32,6 +33,7 @@ def run_uncertainty(N_spearman_samples = 5000,
     # Sugar cane Monte Carlo    
     samples = model_sc.sample(N_coordinate_samples, rule)
     model_sc.load_samples(samples)
+    model_sc.exception_hook = raise_exception
     model_sc.evaluate()
     model_sc.table.to_excel('Monte Carlo sugarcane.xlsx')
 

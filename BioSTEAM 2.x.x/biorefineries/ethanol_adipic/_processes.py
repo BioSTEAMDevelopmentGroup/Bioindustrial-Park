@@ -682,8 +682,11 @@ def create_biorefinery(flowsheet, groups, get_flow_tpd):
     funcs['simulate_get_MFPP'] = simulate_get_MFPP
 
     ######################## LCA ########################
-    LCA_streams = set([i for i in biorefinery.feeds.union(biorefinery.products) if i.price]+ \
-        [i for i in CHP_sys.feeds.union(CHP_sys.products) if i.price])
+    LCA_streams = (biorefinery.feeds 
+                   + biorefinery.products 
+                   + CHP_sys.feeds 
+                   + CHP_sys.products)
+    LCA_streams = set([i for i in LCA_streams if i.price])
     LCA_streams.remove(s.ethanol)
     LCA_stream = Stream('LCA_stream', units='kg/hr')
     funcs['LCA_streams'] = LCA_streams

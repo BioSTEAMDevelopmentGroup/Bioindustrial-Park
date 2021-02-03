@@ -129,52 +129,28 @@ def create_juicing_and_lipid_extraction_system(ID, ins, outs):
     
 
 @SystemFactory(
-    ID='lipidcane_sys',
-    ins=[*create_juicing_and_lipid_extraction_system.ins,
-         dict(ID='denaturant')],
-    outs=[dict(ID='ethanol', price=price['Ethanol']),
-          dict(ID='biodiesel', price=price['Biodiesel']),
-          dict(ID='crude_glycerol', price=price['Crude glycerol']),
-          dict(ID='wastewater'),
-          dict(ID='emissions'),
-          dict(ID='ash_disposal')]
+    ID="transesterification_and_biodiesel_separation_sys",
+    ins=[dict(ID='oil')],
+    outs=[dict(ID='biodiesel'),
+          dict(ID='crude_glycerol')]
 )
-def create_system(ID, ins, outs, evaporator_and_beer_column_heat_integration=True):
-    
-    lipidcane, enzyme, H3PO4, lime, polymer, denaturant = ins
-    ethanol, biodiesel, crude_glycerol, wastewater, emissions, ash_disposal = outs
-    
-    ### Oil and juice separation ###
-    
-    juicing_and_lipid_extraction_sys =create_juicing_and_lipid_extraction_system(
-        ins=[lipidcane, enzyme, H3PO4, lime, polymer],
-        mockup=True,
-    )
-    
-    ### Ethanol section ###
-    
-    ethanol_production_sys = create_sucrose_to_ethanol_system(
-        ins=[juicing_and_lipid_extraction_sys-0, denaturant],
-        outs=[ethanol],
-        mockup=True,
-    )
-    
-    ### Biodiesel section ###
-    
+def create_transesterification_and_biodiesel_separation_system(ID, ins, outs):
     ### Streams ###
     
-    # Fresh degummed oil
-    oil = juicing_and_lipid_extraction_sys-1
+    oil, = ins
+    biodiesel, crude_glycerol = outs
     
     # Fresh methanol
-    methanol = bst.Stream('methanol', Methanol=1,
+    methanol = bst.Stream('methanol',
+                          Methanol=1,
                           price=price['Methanol'])
     
     # Catalyst
-    catalyst = bst.Stream('catalyst', NaOCH3=0.25,
-                          Methanol=0.75, units='kg/hr',
+    catalyst = bst.Stream('catalyst', 
+                          NaOCH3=0.25,
+                          Methanol=0.75, 
+                          units='kg/hr',
                           price=price['NaOCH3'])
-                      # price=0.25*price['NaOCH3'] + 0.75*Methanol.price)
     
     # Water to remove glycerol
     biodiesel_wash_water = bst.Stream('biodiesel_wash_water', Water=13.6, T=273.15+60, 
@@ -332,7 +308,7 @@ def create_system(ID, ins, outs, evaporator_and_beer_column_heat_integration=Tru
     H402 = units.HXutility('H402', T=353, V=0)
     
     # Glycerol/Water flash (not a distillation column)
-    chemicals = lipidcane.chemicals
+    chemicals = H402.chemicals
     w = 0.20/chemicals.Water.MW
     g = 0.80/chemicals.Glycerol.MW
     x_water = w/(w+g)
@@ -349,7 +325,7 @@ def create_system(ID, ins, outs, evaporator_and_beer_column_heat_integration=Tru
     def startup_water():
         imol = D402.ins[0].imol
         water, glycerol = imol['Water', 'Glycerol']
-        minimum_water = 5 * (w / (w + g)) * glycerol
+        minimum_water = 5 * x_water * glycerol
         if water < minimum_water:
             imol['Water'] = minimum_water
         D402._run()
@@ -430,6 +406,50 @@ def create_system(ID, ins, outs, evaporator_and_beer_column_heat_integration=Tru
     # Initial guess
     D402.outs[0].imol['Methanol', 'Glycerol', 'Water'] = [0.00127, 3.59e-05, 0.0244]
     
+    bst.mark_disjunction(P411-0)
+    
+
+@SystemFactory(
+    ID='lipidcane_sys',
+    ins=[*create_juicing_and_lipid_extraction_system.ins,
+         dict(ID='denaturant')],
+    outs=[dict(ID='ethanol', price=price['Ethanol']),
+          dict(ID='biodiesel', price=price['Biodiesel']),
+          dict(ID='crude_glycerol', price=price['Crude glycerol']),
+          dict(ID='wastewater'),
+          dict(ID='emissions'),
+          dict(ID='ash_disposal')]
+)
+def create_system(ID, ins, outs, evaporator_and_beer_column_heat_integration=True):
+    
+    lipidcane, enzyme, H3PO4, lime, polymer, denaturant = ins
+    ethanol, biodiesel, crude_glycerol, wastewater, emissions, ash_disposal = outs
+    
+    ### Oil and juice separation ###
+    
+    juicing_and_lipid_extraction_sys =create_juicing_and_lipid_extraction_system(
+        ins=[lipidcane, enzyme, H3PO4, lime, polymer],
+        mockup=True,
+    )
+    
+    ### Ethanol section ###
+    
+    ethanol_production_sys = create_sucrose_to_ethanol_system(
+        ins=[juicing_and_lipid_extraction_sys-0, denaturant],
+        outs=[ethanol],
+        mockup=True,
+    )
+    
+    ### Biodiesel section ###
+    
+    # Fresh degummed oil
+    oil = juicing_and_lipid_extraction_sys-1
+    create_transesterification_and_biodiesel_separation_system(
+        ins=oil, 
+        outs=[biodiesel, crude_glycerol],
+        mockup=True,
+    )
+
     ### Facilities ###
     
     s = f.stream

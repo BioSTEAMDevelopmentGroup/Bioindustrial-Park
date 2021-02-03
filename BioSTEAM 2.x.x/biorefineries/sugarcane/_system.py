@@ -25,19 +25,20 @@ def create_juicing_system(ID=None, ins=None, outs=None, mockup=False, with_fiber
     if with_fiber_screener:
         return create_juicing_system_with_fiber_screener(ID, ins, outs, mockup)
     else:
-        return create_juicing_system_up_to_clarification.f(ID, ins, outs, mockup)
+        return create_juicing_system_up_to_clarification(ID, ins, outs, mockup)
 
 @SystemFactory(
     ID='juicing_sys',
     ins=[dict(ID='sugarcane',
-              Glucose=4027.0413874,
-              Lignin=10921.788510199998,
-              Solids=5000.01,
-              Sucrose=45639.757946000005,
-              Ash=2000.0040000000001,
-              Cellulose=20384.4074354,
-              Hemicellulose=12027.357388,
-              Water=233333.8,
+              Water=0.7,
+              Glucose=0.01208,
+              Sucrose=0.1369,
+              Ash=0.006,
+              Cellulose=0.06115,
+              Hemicellulose=0.03608,
+              Lignin=0.03276,
+              Solids=0.015,
+              total_flow=333334.2,
               units='kg/hr',
               price=0.03455),
          dict(ID='enzyme',

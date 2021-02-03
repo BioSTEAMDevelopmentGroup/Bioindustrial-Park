@@ -55,6 +55,9 @@ def _load_system():
     bst.Stream.ticket_name = 's'
     bst.Stream.ticket_number = 0
     bst.Stream.unregistered_ticket_number = 0
+    bst.System.ticket_name = 'SYS'
+    bst.System.ticket_number = 0
+    bst.System.unregistered_ticket_number = 0
     bst.settings.set_thermo(chemicals)
     load_process_settings()
     sugarcane_sys = create_sugarcane_to_ethanol_system()

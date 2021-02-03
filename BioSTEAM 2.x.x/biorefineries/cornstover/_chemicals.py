@@ -247,7 +247,7 @@ def create_chemicals():
     chems.set_synonym('Water', 'H2O')
     chems.set_synonym('H2SO4', 'SulfuricAcid')
     chems.set_synonym('NH3', 'Ammonia')
-    chems.set_synonym('AmmoniumSulfate', 'NH4SO4')
+    chems.set_synonym('AmmoniumSulfate', '(NH4)2SO4')
     chems.set_synonym('Denaturant', 'Octane')
     chems.set_synonym('CO2', 'CarbonDioxide')
     return chems
