@@ -36,6 +36,9 @@ from biosteam.utils import style_axis, style_plot_limits, fill_plot, set_axes_la
 import matplotlib.colors as mcolors
 ig = np.seterr(invalid='ignore')
 bst.speed_up()
+
+_red_highlight_white_text = '\033[1;47;41m'
+_yellow_text = '\033[1;33m'
 # %%Colors
 marketrange_shadecolor = (*colors.neutral.shade(50).RGBn, 0.3)
 
@@ -288,16 +291,147 @@ get_HP_inhibitors_conc = lambda: 1000*sum(R302.outs[0].imass['AceticAcid', 'Furf
 
 # get_rel_impact_t_y = lambda: rel_impact_fn(steps)
 
+
+###############################
+# Bugfix barrage
+###############################
+
+system = HP_sys
+
+def reset_and_reload():
+    print('Resetting cache and emptying recycles ...')
+    system.reset_cache()
+    system.empty_recycles()
+    print('Loading and simulating with baseline specifications ...')
+    spec_1, spec_2 = spec.spec_1, spec.spec_2
+    spec.load_yield(0.49)
+    spec.load_titer(54.8)
+    system.simulate()
+    print('Loading and simulating with required specifications ...')
+    spec.load_specifications(spec_1=spec_1, spec_2=spec_2)
+    system.simulate()
+    
+def reset_and_switch_solver(solver_ID):
+    system.reset_cache()
+    system.empty_recycles()
+    system.converge_method = solver_ID
+    print(f"Trying {solver_ID} ...")
+    system.simulate()
+    
+def run_bugfix_barrage():
+    try:
+        reset_and_reload()
+    except Exception as e:
+        print(str(e))
+        try:
+            reset_and_switch_solver('fixedpoint')
+        except Exception as e:
+            print(str(e))
+            try:
+                reset_and_switch_solver('aitken')
+            except Exception as e:
+                print(str(e))
+                print(_yellow_text+"Bugfix barrage failed.\n")
+                raise e
+###############################
+
+# =============================================================================
+# Financial viability analysis
+# =============================================================================
+
+import pandas as pd
+from biorefineries.HP.analyses import models
+# from datetime import datetime
+
+_kg_per_ton = 907.18474
+
+
+model = models.HP_model
+
+baseline_sample = model.get_baseline_sample()
+
+# setters = model._setters
+
+# Setup
+np.random.seed(3221)
+N_simulation = 100 # number of simulations at each point
+samples = model.sample(N=N_simulation, rule='L')
+model.load_samples(samples)
+
+flowsheet = bst.main_flowsheet
+
+lower_end, upper_end = 1250./_kg_per_ton, 1500./_kg_per_ton
+market_range = np.linspace(lower_end, upper_end, N_simulation)
+
+full_path = HP_sys.path
+evaporator_index = full_path.index(spec.titer_inhibitor_specification.evaporator)
+pre_evaporator_units_path = full_path[0:evaporator_index]
+
+        
+def model_specification():
+    try:
+        model._system._converge()
+        # for unit in pre_evaporator_units_path:
+        #     unit._run()
+        spec.load_specifications(spec_1=spec.spec_1, spec_2=spec.spec_2)
+        model._system.simulate()
+    except Exception as e:
+        str_e = str(e)
+        print('Error in model spec: %s'%str_e)
+        if 'sugar concentration' in str_e:
+            flowsheet('AcrylicAcid').F_mass /= 1000.
+        else:
+            run_bugfix_barrage()
+model.specification = model_specification
+
+def single_MPSP_p_viability(MPSP, market_range): # assumes Uniform distribution
+    return 1. - (MPSP-market_range[0])/(market_range[-1]-market_range[0])
+
+def get_p_financial_viability():
+    # metrics = model.metrics
+    # model.metrics = [metrics[0]]
+    
+    model.evaluate()
+    # except Exception as e:
+    #     str_e = str(e)
+    #     print(str_e)
+    #     if 'sugar concentration' in str_e:
+    #         return np.nan
+    #     if not spec.count in spec.exceptions_dict:
+    #         spec.exceptions_dict[spec.count] = []
+    #     spec.exceptions_dict[spec.count].append(e)
+    #     print("Monte Carlo iteration failed; returning np.nan for all iterations at that point.")
+    #     return np.nan
+    
+    try:
+        # MPSPs = np.array(list(model.table.Biorefinery['Minimum selling price [$/kg]']))
+        MPSPs = model.table.Biorefinery['Minimum selling price [$/kg]'].values
+        MPSPs = MPSPs[~np.isnan(MPSPs)]
+        if MPSPs.size==0:
+            return np.nan
+        micro_viabilities = single_MPSP_p_viability(MPSPs, market_range).clip(min=0.,max=1.)
+        setters = model._setters
+        for f,s in zip(setters, baseline_sample): f(s)
+        return 100.*np.average(micro_viabilities)
+    except:
+        # import pdb
+        # pdb.set_trace()
+        print(_red_highlight_white_text + '\n\nFailed the metric p_financial_viability even after bugfix barrage for each MC iteration.\n\n')
+        setters = model._setters
+        for f,s in zip(setters, baseline_sample): f(s)
+        return np.nan
+# =============================================================================
+
 # HP_metrics = [solve_AA_price, get_HP_inhibitors_conc]
 # HP_metrics = [solve_AA_price, get_HP_sugars_conc, get_HP_inhibitors_conc]
-HP_metrics = [solve_AA_price, get_GWP, get_FEC]
+HP_metrics = [solve_AA_price, get_p_financial_viability, get_FEC]
 
 # %% Generate 3-specification meshgrid and set specification loading functions
-steps = 10
+steps = 20
 
 # Yield, titer, productivity (rate)
 spec_1 = np.linspace(0.1, 0.99, steps) # yield
-spec_2 = np.linspace(30, 330, steps) # titer
+spec_2 = np.linspace(30., 330., steps) # titer
 # spec_1 = np.linspace(0.2, 0.99, steps) # yield
 # spec_2 = np.linspace(45, 225, steps) # titer
 spec_3 = np.array([0.79]) # productivity
@@ -667,7 +801,7 @@ Metric_3_tickmarks = tickmarks(
 
 Metric_1_tickmarks = [500,1000, 1500, 2000, 2500, 3000, 3500]
 # Metric_1_tickmarks = [2000, 2500, 3000, 3500, 4000, 4500]
-# Metric_2_tickmarks = [0, 10, 20, 30, 40, 50]
+Metric_2_tickmarks = [0, 20., 40., 60., 80., 100.]
 # Metric_2_tickmarks = [0, 50, 100, 150, 200, 250, 300, 350, 400]
 # # Metric_3_tickmarks = [60, 70, 80, 90, 100, 110, 120]
 # Metric_3_tickmarks = [0, 100, 200, 300, 400, 500]
@@ -679,12 +813,16 @@ def plot(data, titers, yields, productivities,
                              MPSP_units, CABBI_green_colormap(),
                              Metric_1_tickmarks,
                              1 + int((max(Metric_1_tickmarks) - min(Metric_1_tickmarks))/125)),
-                   MetricBar('Total sugars\n',
-                            VOC_units,
-                            CABBI_blue_colormap(),
-                            # plt.cm.get_cmap('magma_r'),
-                             Metric_2_tickmarks, 
-                             1 + int((max(Metric_2_tickmarks) - min(Metric_2_tickmarks))/1.)),
+                   # MetricBar('Total sugars\n',
+                   #          VOC_units,
+                   #          CABBI_blue_colormap(),
+                   #          # plt.cm.get_cmap('magma_r'),
+                   #           Metric_2_tickmarks, 
+                   #           1 + int((max(Metric_2_tickmarks) - min(Metric_2_tickmarks))/1.)),
+                   
+                   MetricBar('Total sugars', VOC_units, CABBI_blue_colormap(), # plt.cm.get_cmap('magma_r'),
+                         Metric_2_tickmarks, 80),
+                   
                    MetricBar('Total inhibitors\n',
                              FCI_units,
                               plt.cm.get_cmap('bone_r'),

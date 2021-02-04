@@ -490,14 +490,14 @@ D = shape.Uniform(5, 15)
 def set_CSL_loading(loading): R302.CSL_loading = loading
 
 
-D = shape.Triangle(0.424, 0.53, 0.636) # +/- 20% of baseline
-@param(name='3-Hydroxypropionic acid yield', element=R303, kind='coupled', units='% theoretical',
-       baseline=0.53, distribution=D)
-def set_R302_HP_yield(X):
-    R302_X = R302.cofermentation_rxns.X
-    R302_X[0] = R302_X[2] = X
-    R303_X = R303.cofermentation_rxns.X
-    R303_X[0] = R303_X[3] = X * R303.ferm_ratio
+# D = shape.Triangle(0.424, 0.53, 0.636) # +/- 20% of baseline
+# @param(name='3-Hydroxypropionic acid yield', element=R303, kind='coupled', units='% theoretical',
+#        baseline=0.53, distribution=D)
+# def set_R302_HP_yield(X):
+#     R302_X = R302.cofermentation_rxns.X
+#     R302_X[0] = R302_X[2] = X
+#     R303_X = R303.cofermentation_rxns.X
+#     R303_X[0] = R303_X[3] = X * R303.ferm_ratio
 
 D = shape.Triangle(0.004, 0.07, 0.32)
 @param(name='Acetic acid yield', element=R303, kind='coupled', units='% theoretical',
@@ -523,14 +523,14 @@ D = baseline_uniform(36, 0.1)
        baseline=36, distribution=D)
 def set_R303_fermentation_time(tau): R303.tau_batch = tau
 
-D = shape.Triangle(0.8, 0.9, 1)
-@param(name='Seed train yield', element=R302, kind='coupled', units='% of R301',
-       baseline=0.9, distribution=D)
-def set_R303_ratio(ratio):
-    R302_X = R302.cofermentation_rxns.X
-    R303_X = R303.cofermentation_rxns.X
-    ratio = min(ratio, (1-1e-6-R303_X[2])/(R302_X[0]+R302_X[1]))
-    R303.ferm_ratio = ratio
+# D = shape.Triangle(0.8, 0.9, 1)
+# @param(name='Seed train yield', element=R302, kind='coupled', units='% of R301',
+#        baseline=0.9, distribution=D)
+# def set_R303_ratio(ratio):
+#     R302_X = R302.cofermentation_rxns.X
+#     R303_X = R303.cofermentation_rxns.X
+#     ratio = min(ratio, (1-1e-6-R303_X[2])/(R302_X[0]+R302_X[1]))
+#     R303.ferm_ratio = ratio
 
 # =============================================================================
 # Separation parameters

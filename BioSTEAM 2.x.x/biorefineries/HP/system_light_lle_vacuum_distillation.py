@@ -946,8 +946,8 @@ emissions = [i for i in flowsheet.stream
 BT = flowsheet('BT')
 BT_sys = System('BT_sys', path=(BT,))
 
-flowsheet('SYS2').molar_tolerance = 3
-flowsheet('SYS2').maxiter = 100
+# flowsheet('SYS2').molar_tolerance = 3
+# flowsheet('SYS2').maxiter = 100
 
 
 dct = globals() 

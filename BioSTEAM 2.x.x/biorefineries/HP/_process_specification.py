@@ -12,7 +12,8 @@ from biorefineries.HP.units import compute_HP_titer, compute_HP_mass
 from winsound import Beep
 # from biorefineries.HP import system_light_lle_vacuum_distillation
 
-
+_red_highlight_white_text = '\033[1;47;41m'
+_yellow_text = '\033[1;33m'
 
 # from biosteam.process_tools.reactor_specification import evaluate_across_TRY
 _kg_per_ton = 907.18474
@@ -52,10 +53,10 @@ def evaluate_across_specs(spec, system,
                     reset_and_switch_solver('aitken')
                 except Exception as e:
                     print(str(e))
-                    print("Bugfix barrage failed.")
+                    print(_yellow_text+"Bugfix barrage failed.")
         finally:
             system.converge_method = 'wegstein'
-    
+            print('\n')
     spec.count += 1
     print(f"\n\n----------\n{spec.count} / {spec.total_iterations}\n")
     print(f"yield = {format(100*float(spec_1),'.1f')} % theo.,  titer = {format(float(spec_2),'.2f')} g\u00b7L\u207b\u00b9,  prod. = {format(float(spec_3),'.2f')} g\u00b7L\u207b\u00b9\u00b7h\u207b\u00b9\n")
@@ -63,6 +64,8 @@ def evaluate_across_specs(spec, system,
     try:
         spec.load_specifications(spec_1=spec_1, spec_2=spec_2)
         system.simulate()
+        return spec.evaluate_across_productivity(metrics, spec_3)
+    
     except Exception as e1:
         str_e1 = str(e1)
         if 'sugar concentration' in str_e1:
@@ -79,12 +82,14 @@ def evaluate_across_specs(spec, system,
             print(str_e1)
             try:
                 run_bugfix_barrage()
+                return spec.evaluate_across_productivity(metrics, spec_3)
                 # Beep(320, 250)
             except Exception as e2:
                 print(str(e2))
                 Beep(640, 500)
                 spec.count_exceptions += 1
-                print(f"Point failed; returning metric values as np.nan.")
+                print(_red_highlight_white_text+f"Point failed; returning metric values as np.nan.")
+                spec.exceptions_dict[spec.count] = (e1, e2)
                 return np.nan*np.ones([len(metrics), len(spec_3)])
     HXN_Q_bal_percent_error = spec.HXN.energy_balance_percent_error
     print(f"HXN Q_balance off by {format(HXN_Q_bal_percent_error,'.2f')} %.\n")
@@ -125,7 +130,8 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
                  'count',
                  'count_exceptions',
                  'total_iterations',
-                 'average_HXN_energy_balance_percent_error')
+                 'average_HXN_energy_balance_percent_error',
+                 'exceptions_dict')
     
     def __init__(self, evaporator, pump, mixer, heat_exchanger, seed_train_system, 
                  reactor, reaction_name, substrates, products,
@@ -152,6 +158,7 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
         self.count_exceptions = 0
         self.total_iterations = 0
         self.average_HXN_energy_balance_percent_error = 0.
+        self.exceptions_dict = {}
         
         self.load_spec_1 = load_spec_1
         self.load_spec_2 = load_spec_2
@@ -247,8 +254,12 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
         results [Y x T x M x P]
         
         """
-        self.count = 0
+        self.count = 0 
         self.count_exceptions = 0
+        self.total_iterations = 0
+        self.average_HXN_energy_balance_percent_error = 0.
+        self.exceptions_dict = {}
+        
         self.total_iterations = len(spec_1) * len(spec_2) * len(spec_3)
         results = evaluate_across_specs(self, system, 
                                    spec_1, spec_2, 

@@ -41,7 +41,7 @@ import pandas as pd
 import biosteam as bst
 from biosteam.utils import TicToc
 from biosteam.plots import plot_montecarlo_across_coordinate
-from biorefineries.HP.system_light_lle_vacuum_distillation import HP_sys, get_AA_MPSP, get_GWP, get_FEC, R301
+from biorefineries.HP.system_light_lle_vacuum_distillation import spec, HP_sys, get_AA_MPSP, get_GWP, get_FEC, R301
 from biorefineries.HP.analyses import models
 from datetime import datetime
 
@@ -66,7 +66,7 @@ R301.set_titer_limit = True
 
 # Set seed to make sure each time the same set of random numbers will be used
 np.random.seed(3221)
-N_simulation = 100 # 1000
+N_simulation = 5 # 1000
 samples = model.sample(N=N_simulation, rule='L')
 model.load_samples(samples)
 
