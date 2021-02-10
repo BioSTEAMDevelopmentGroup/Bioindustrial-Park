@@ -122,8 +122,8 @@ def create_chemicals():
     
     # As is in data bank
     chems.extend(
-        tmo.Chemicals(['Water', 'Ethanol', 'AceticAcid',
-                       'Furfural', 'Glycerol', 'H2SO4', 'NH3', 
+        tmo.Chemicals([lc.chemicals.Water, lc.chemicals.Ethanol, 'AceticAcid',
+                       'Furfural', lc.chemicals.Glycerol, 'H2SO4', 'NH3', 
                        'LacticAcid', 'SuccinicAcid', lc.chemicals.P4O10])
     )
     chems.H2SO4.at_state('l')

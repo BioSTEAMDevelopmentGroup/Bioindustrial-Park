@@ -236,7 +236,7 @@ def create_system(ID='corn_sys'):
     # return f.create_system('corn_sys', feeds=[i for i in f.stream if i.isfeed()])
     
     System = bst.System
-    globals().update(f.unit.__dict__)
+    globals().update(f.unit.data)
     return System('corn_sys',
         [MH101,
          V102,

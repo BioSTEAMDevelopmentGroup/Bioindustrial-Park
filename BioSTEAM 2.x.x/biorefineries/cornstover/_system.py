@@ -41,16 +41,17 @@ __all__ = ('create_system',
               total_flow=104167.,
               units='kg/hr',
               price=price['Feedstock'])],
-    outs=[dict(ID='hydrolyzate')],
+    outs=[dict(ID='hydrolyzate'),
+          dict(ID='pretreatment_wastewater')],
 )
 def create_dilute_acid_pretreatment_system(
-        ID, ins, outs,
-        feedstock_area=100,
+        ins, outs,
         pretreatment_area=200,
+        include_feedstock_handling=True
     ):
     
     feedstock, = ins
-    hydrolyzate, = outs
+    hydrolyzate, pretreatment_wastewater = outs
     
     warm_process_water = Stream('warm_process_water',
                               T=368.15,
@@ -88,39 +89,41 @@ def create_dilute_acid_pretreatment_system(
                       price=price['Ammonia'])
     
     ### Pretreatment system
-    U101 = units.FeedStockHandling(f'U{feedstock_area+1}', feedstock)
-    U101.cost_items['System'].cost = 0.
     n = pretreatment_area
     H2SO4_storage = units.SulfuricAcidStorageTank('H2SO4_storage', sulfuric_acid)
     T201 = units.SulfuricAcidTank(f'T{n+1}', H2SO4_storage-0)
     M201 = units.SulfuricAcidMixer(f'M{n+1}', (rectifier_bottoms_product, T201-0))
-    M202 = bst.Mixer(f'T{n+2}', (M201-0, warm_process_water, U101-0))
+    M202 = bst.Mixer(f'M{n+2}', (M201-0, warm_process_water, feedstock))
     M203 = bst.SteamMixer(f'M{n+3}', (M202-0, pretreatment_steam), P=5.5*101325)
     R201 = units.PretreatmentReactorSystem(f'R{n+1}', M203-0)
     P201 = units.BlowdownDischargePump(f'P{n+1}', R201-1)
     T202 = units.OligomerConversionTank(f'T{n+2}', P201-0)
     F201 = units.PretreatmentFlash(f'F{n+1}', T202-0, P=101325, Q=0)
     M204 = bst.Mixer(f'M{n+4}', (R201-0, F201-0))
-    H201 = units.WasteVaporCondenser(f'H{n+1}', M204-0, T=99+273.15, V=0)
+    H201 = units.WasteVaporCondenser(f'H{n+1}', M204-0, pretreatment_wastewater, T=99+273.15, V=0)
     Ammonia_storage = units.AmmoniaStorageTank('Ammonia_storage', ammonia)
     M205 = units.AmmoniaMixer(f'M{n+5}', (Ammonia_storage-0, ammonia_process_water))
     T203 = units.AmmoniaAdditionTank(f'T{n+3}', (F201-1, M205-0))
     P202 = units.HydrolyzatePump(f'P{n+2}', T203-0, hydrolyzate)
     
     def update_pretreatment_process_water():
-        warm_process_water.imass['Water'] = 1.343888 * M202.ins[2].F_mass
+        moisture_content = 0.695
+        sulfuric_acid, warm_process_water, feed = M202.ins
+        available_water = feed.imass['Water'] + sulfuric_acid.imass['Water']
+        required_water = (feed.F_mass + sulfuric_acid.F_mass - available_water) * moisture_content / (1 - moisture_content)
+        warm_process_water.imass['Water'] = max(required_water - available_water, 0.)
         M202._run()
     M202.specification = update_pretreatment_process_water
     
-    baseline_feedstock_flow = 104167.
-    sulfuric_acid_over_feed = sulfuric_acid.mol / baseline_feedstock_flow
-    rectifier_bottoms_product_over_feed = rectifier_bottoms_product.mol / baseline_feedstock_flow
+    baseline_dry_feedstock_flow = 104167. * 0.8
+    sulfuric_acid_over_feed = sulfuric_acid.mol / baseline_dry_feedstock_flow
+    rectifier_bottoms_product_over_feed = rectifier_bottoms_product.mol / baseline_dry_feedstock_flow
     def update_sulfuric_acid_loading():
-        F_mass_feedstock = feedstock.F_mass
+        F_mass_dry_feedstock = feedstock.F_mass - feedstock.imass['water']
         sulfuric_acid, = H2SO4_storage.ins
         rectifier_bottoms_product, _ = M201.ins
-        sulfuric_acid.mol[:] = sulfuric_acid_over_feed * F_mass_feedstock
-        rectifier_bottoms_product.mol[:] = rectifier_bottoms_product_over_feed * F_mass_feedstock
+        sulfuric_acid.mol[:] = sulfuric_acid_over_feed * F_mass_dry_feedstock
+        rectifier_bottoms_product.mol[:] = rectifier_bottoms_product_over_feed * F_mass_dry_feedstock
         T201._run()
     T201.specification = update_sulfuric_acid_loading
     
@@ -144,7 +147,7 @@ def create_dilute_acid_pretreatment_system(
     outs=[dict(ID='beer')],
 )
 def create_cellulosic_fermentation_system(
-        ID, ins, outs, feedstock,
+        ins, outs, feedstock,
         fermantation_area=300,
         scrubber_area=None,
         include_scrubber=True,
@@ -176,9 +179,6 @@ def create_cellulosic_fermentation_system(
                     CSL=948,
                     units='kg/hr',
                     price=price['CSL'])
-    stripping_water = Stream('stripping_water',
-                              Water=26836,
-                              units='kg/hr')
     cellulase = Stream('cellulase',
                         units='kg/hr',
                         price=price['Enzyme'])
@@ -267,6 +267,9 @@ def create_cellulosic_fermentation_system(
     T302 = units.BeerTank(f'T{n+2}', outs=beer)
     
     if include_scrubber:
+        stripping_water = Stream('stripping_water',
+                                 Water=26836,
+                                 units='kg/hr')
         if scrubber_area is None or fermantation_area == scrubber_area:
             mixer_ID = f'M{n+4}'
         else:
@@ -347,20 +350,18 @@ def create_facilities(
     outs=[dict(ID='ethanol',
                 price=price['Ethanol'])],
 )
-def create_system(ID, ins, outs, include_blowdown_recycle=False):
+def create_system(ins, outs, include_blowdown_recycle=False):
     feedstock, denaturant = ins
     ethanol, = outs
     f = bst.main_flowsheet
     s = f.stream
     u = f.unit
-    
-    ### Cellulosic pretreatment system
+    U101 = units.FeedStockHandling('U101', feedstock)
+    U101.cost_items['System'].cost = 0.
     pretreatment_sys = create_dilute_acid_pretreatment_system(
-        ins=feedstock,
+        ins=U101-0,
         mockup=True
     )
-    
-    ### Fermentation system
     fermentation_sys = create_cellulosic_fermentation_system(
         ins=pretreatment_sys-0,
         feedstock=feedstock,
@@ -368,53 +369,40 @@ def create_system(ID, ins, outs, include_blowdown_recycle=False):
         scrubber_area=400,
         mockup=True,
     )
-    
-    ### Ethanol purification
     ethanol_purification_sys = create_ethanol_purification_system(
         ins=[fermentation_sys-0, denaturant],
         outs=[ethanol],
         IDs={'Beer pump': 'P401',
-              'Beer column heat exchange': 'H401',
-              'Beer column': 'D402',
-              'Beer column bottoms product pump': 'P402',
-              'Distillation': 'D403',
-              'Distillation bottoms product pump': 'P403',
-              'Ethanol-denaturant mixer': 'M701',
-              'Recycle mixer': 'M402',
-              'Heat exchanger to superheat vapor to molecular sieves': 'H402',
-              'Molecular sieves': 'U401',
-              'Ethanol condenser': 'H403',
-              'Ethanol day tank': 'T701', 
-              'Ethanol day tank pump': 'P701',
-              'Denaturant storage': 'T702', 
-              'Denaturant pump': 'P702', 
-              'Product tank': 'T703'},
+             'Beer column heat exchange': 'H401',
+             'Beer column': 'D402',
+             'Beer column bottoms product pump': 'P402',
+             'Distillation': 'D403',
+             'Distillation bottoms product pump': 'P403',
+             'Ethanol-denaturant mixer': 'M701',
+             'Recycle mixer': 'M402',
+             'Heat exchanger to superheat vapor to molecular sieves': 'H402',
+             'Molecular sieves': 'U401',
+             'Ethanol condenser': 'H403',
+             'Ethanol day tank': 'T701', 
+             'Ethanol day tank pump': 'P701',
+             'Denaturant storage': 'T702', 
+             'Denaturant pump': 'P702', 
+             'Product tank': 'T703'},
         mockup=True,
     )
-    
-    ### Lignin Separation
     recycled_water = tmo.Stream(Water=1,
                                 T=47+273.15,
                                 P=3.9*101325,
                                 units='kg/hr')
-    
-    S401 = bst.PressureFilter('S401', (u.H401-1, recycled_water))
-    
+    S401 = bst.PressureFilter('S401', (ethanol_purification_sys-1, recycled_water))
     if include_blowdown_recycle:
         blowdown_to_wastewater = Stream('blowdown_to_wastewater')
     else:
         blowdown_to_wastewater = None
-        
-    ### Wastewater treatment
     wastewater_treatment_sys = bst.create_wastewater_treatment_system(
-        ins=[S401-1, u.H201-0, blowdown_to_wastewater],
+        ins=[S401-1, pretreatment_sys-1, blowdown_to_wastewater],
         mockup=True,
     )
-    
-    # Workaround to set cooling duty to zero (air cooling is used)
-    # u.D403.heat_utilities[0].heat_transfer_efficiency = 1e6 
-    
-    ### Facilities
     M501 = bst.Mixer('M501', (u.S603-1, S401-0))
     create_facilities(
         solids_to_boiler=M501-0,
@@ -426,7 +414,6 @@ def create_system(ID, ins, outs, include_blowdown_recycle=False):
         RO_water=u.S604-0,
         blowdown_to_wastewater=blowdown_to_wastewater,
     )
-    
     if include_blowdown_recycle:
         blowdown_mixer = bst.BlowdownMixer('blowdown_mixer', 
                                             (u.BT-1, u.CT-1),

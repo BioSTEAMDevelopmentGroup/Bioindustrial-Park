@@ -960,7 +960,7 @@ def create_lactic_sys(flowsheet, groups, get_flow_tpd):
     
     ISBL_units = set((*sys.pretreatment_sys.units, *sys.conversion_sys.units,
                       *sys.separation_sys.units))
-    OSBL_units = list(lactic_sys.units.difference(ISBL_units))
+    OSBL_units = list(set(lactic_sys.units).difference(ISBL_units))
     
     # CHP is not included in this TEA
     OSBL_units.remove(u.CHP)

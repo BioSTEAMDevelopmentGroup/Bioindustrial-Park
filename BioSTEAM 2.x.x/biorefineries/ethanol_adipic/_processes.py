@@ -617,7 +617,7 @@ def create_biorefinery(flowsheet, groups, get_flow_tpd):
     ISBL_units = set()
     for i in path:
         ISBL_units = ISBL_units.union(i.units)
-    OSBL_units = list(biorefinery.units.difference(ISBL_units))
+    OSBL_units = list(set(biorefinery.units).difference(ISBL_units))
     
     # CHP is not included in this TEA
     OSBL_units.remove(u.CHP)

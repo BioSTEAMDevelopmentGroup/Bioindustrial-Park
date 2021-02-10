@@ -11,19 +11,21 @@ The complete lipid-cane biorefinery system is created here.
 """
 import numpy as np
 import biosteam as bst
+from biosteam import main_flowsheet as f
 from biosteam import units, SystemFactory
 from ._process_settings import price
 from ..sugarcane import (
+    create_feedstock_handling_system,
     create_sucrose_to_ethanol_system, 
-    create_juicing_system_up_to_clarification
+    create_juicing_system_up_to_clarification,
 )
 
 __all__ = (
     'create_juicing_and_lipid_extraction_system',
-    'create_system',
+    'create_transesterification_and_biodiesel_separation_system',
+    'create_lipidcane_to_biodiesel_and_conventional_ethanol_system',
 )
 
-from biosteam import main_flowsheet as f
 
 # %% Pretreatment section
 
@@ -48,10 +50,7 @@ from biosteam import main_flowsheet as f
           dict(ID='fiber_fines'),
           dict(ID='spent_oil_wash_water')]
 )
-def create_juicing_and_lipid_extraction_system(ID, ins, outs):
-    
-    ### Streams ###
-    
+def create_juicing_and_lipid_extraction_system(ins, outs):
     lipidcane, enzyme, H3PO4, lime, polymer = ins
     screened_juice, lipid, bagasse, fiber_fines, spent_oil_wash_water = outs
     
@@ -59,13 +58,15 @@ def create_juicing_and_lipid_extraction_system(ID, ins, outs):
                                 Water=1350,
                                 units='kg/hr',
                                 T=358.15)  # to T207
-    
+    feedstock_handling_sys = create_feedstock_handling_system(
+        ins=lipidcane,
+        mockup=True
+    )    
     juicing_sys = create_juicing_system_up_to_clarification(
-        ins=ins, 
+        ins=[feedstock_handling_sys-0, enzyme, H3PO4, lime, polymer], 
         outs=['', bagasse],
         mockup=True,
     )
-    
     u = f.unit
     u.U201.isplit['Lipid'] = 0.01 # Crushing mill
     u.S201.isplit['Lipid'] = 0.88 # Fiber screener 
@@ -134,7 +135,7 @@ def create_juicing_and_lipid_extraction_system(ID, ins, outs):
     outs=[dict(ID='biodiesel'),
           dict(ID='crude_glycerol')]
 )
-def create_transesterification_and_biodiesel_separation_system(ID, ins, outs):
+def create_transesterification_and_biodiesel_separation_system(ins, outs):
     ### Streams ###
     
     oil, = ins
@@ -420,7 +421,7 @@ def create_transesterification_and_biodiesel_separation_system(ID, ins, outs):
           dict(ID='emissions'),
           dict(ID='ash_disposal')]
 )
-def create_system(ID, ins, outs, evaporator_and_beer_column_heat_integration=True):
+def create_lipidcane_to_biodiesel_and_conventional_ethanol_system(ins, outs, evaporator_and_beer_column_heat_integration=True):
     
     lipidcane, enzyme, H3PO4, lime, polymer, denaturant = ins
     ethanol, biodiesel, crude_glycerol, wastewater, emissions, ash_disposal = outs
@@ -507,4 +508,3 @@ def create_system(ID, ins, outs, evaporator_and_beer_column_heat_integration=Tru
                 hu_dist(actual_duty, condenser.ins[0].T, condenser.outs[0].T)
             CWP._run()
         CWP.specification = heat_integration
-    

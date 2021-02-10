@@ -37,7 +37,7 @@ def create_chemicals():
                                     formula="C6H10O5", # Glucose monomer minus water
                                     Hf=-975708.8)
     Hemicellulose = create_new_chemical('Hemicellulose',
-                                        formula="C5H8O5", # Xylose monomer minus water
+                                        formula="C5H8O4", # Xylose monomer minus water
                                         Hf=-761906.4)
     Flocculant = create_new_chemical('Flocculant',
                                      MW=1.)

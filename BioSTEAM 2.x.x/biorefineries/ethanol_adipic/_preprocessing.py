@@ -15,7 +15,7 @@
 import pandas as pd
 import biosteam as bst
 from biosteam import Unit
-from biosteam.utils.misc import format_unit_line
+from biosteam.utils.misc import format_title
 from biosteam.units.decorators import add_cost
 from biorefineries.lactic._utils import CEPCI, dry_composition
 
@@ -108,7 +108,7 @@ class OptionPrep(Preprocessing):
             setattr(self, attr, val) 
 
     def _cost(self):
-        name = format_unit_line(type(self).__name__)
+        name = format_title(type(self).__name__)
         ID = f'{self.kind} {name.lower()}'
         self.cost_items = {ID: self.cost_items[ID]}
         self.purchase_costs.clear()
