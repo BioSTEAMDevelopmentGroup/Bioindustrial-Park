@@ -4,7 +4,6 @@ ethanol_adipic: Production of Ethanol and Adipic Acid from Lignocellulosic Bioma
 
 Simplified process flow schemes
 -------------------------------
-
 .. figure:: ./images/acid_pretreatment_biorefinery.png
 
     *Acid-pretreatment biorefinery*
@@ -35,7 +34,6 @@ feasible to include a process to convert those into adipic acid (default).
 
 Getting Started
 ---------------
-
 First choose which system configuration to load, the default is acid-pretreatment
 biorefinery preprocessed by HMPP.
 

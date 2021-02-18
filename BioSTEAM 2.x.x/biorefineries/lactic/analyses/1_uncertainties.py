@@ -57,7 +57,7 @@ def evaluate_uncertainties(kind='SSCF', seed=None, N_simulation=1000,
 
     # Set seed to make sure each time the same set of random numbers will be used
     if seed:
-        np.random.seed(3221)
+        np.random.seed(seed)
     samples = model.sample(N=N_simulation, rule=sampling_rule)
     model.load_samples(samples)
     

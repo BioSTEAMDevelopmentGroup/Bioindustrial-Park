@@ -63,9 +63,4 @@ def load_system(kind='SSCF'):
     simulate_operating_improvement = \
         lambda: systems.simulate_operating_improvement(kind)
     
-
-    
-
-
-
 load_system('SSCF')

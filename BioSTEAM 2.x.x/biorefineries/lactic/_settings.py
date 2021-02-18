@@ -198,7 +198,7 @@ GWP_CFs = {
     'CSL': 1.55,
     'CH4': 0.40, # NA NG from shale and conventional recovery
     'Enzyme': 2.24,
-    'Lime': 1.29,
+    'Lime': 1.29 * 56.0774/74.093, # CaO to Ca(OH)2
     'NaOH': 2.11,
     'H2SO4': 44.47/1e3,
     'Ethanol': 1.44
@@ -208,9 +208,6 @@ GWP_CF_array = chems.kwarray(GWP_CFs)
 # In kg CO2-eq/kg of material
 GWP_CF_stream = tmo.Stream('GWP_CF_stream', GWP_CF_array, units='kg/hr')
 
-GWP_CFs['Corn stover'] = 44.70/1e3 * 0.8
-GWP_CFs['Switchgrass'] = 87.81/1e3 * 0.8
-GWP_CFs['Miscanthus'] = 78.28/1e3 * 0.8
 GWP_CFs['CaCO3'] = 10.30/1e3
 GWP_CFs['Gypsum'] = -4.20/1e3
 # In kg CO2-eq/kWh
@@ -233,7 +230,7 @@ FEC_CFs = {
     'CSL': 12,
     'CH4': 50, # NA NG from shale and conventional recovery
     'Enzyme': 26,
-    'Lime': 4.896,
+    'Lime': 4.896 * 56.0774/74.093, # CaO to Ca(OH)2
     'NaOH': 29,
     'H2SO4': 568.98/1e3,
     'Ethanol': 16
@@ -243,9 +240,6 @@ FEC_CF_array = chems.kwarray(FEC_CFs)
 # In MJ/kg of material
 FEC_CF_stream = tmo.Stream('FEC_CF_stream', FEC_CF_array, units='kg/hr')
 
-FEC_CFs['Corn stover'] = 688.60/1e3
-FEC_CFs['Switchgrass'] = 892.41/1e3
-FEC_CFs['Miscanthus'] = 569.05/1e3
 FEC_CFs['CaCO3'] = 133.19/1e3
 FEC_CFs['Gypsum'] = -44.19/1e3
 # In MJ/kWh

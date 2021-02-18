@@ -18,8 +18,6 @@ __all__ = ('EthanolAdipicTEA',)
 
 class EthanolAdipicTEA(CellulosicEthanolTEA):
     
-    __slots = (*CellulosicEthanolTEA.__slots__, '_TCI_ratio_cached')
-    
     # For uncertainty analysis
     _TCI_ratio_cached = 1
     
