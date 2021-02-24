@@ -66,9 +66,82 @@ R301.set_titer_limit = True
 
 # Set seed to make sure each time the same set of random numbers will be used
 np.random.seed(3221)
-N_simulation = 5 # 1000
+N_simulation = 1000 # 1000
 samples = model.sample(N=N_simulation, rule='L')
 model.load_samples(samples)
+
+
+###############################
+# Bugfix barrage
+###############################
+
+system = HP_sys
+
+def reset_and_reload():
+    print('Resetting cache and emptying recycles ...')
+    system.reset_cache()
+    system.empty_recycles()
+    print('Loading and simulating with baseline specifications ...')
+    spec_1, spec_2 = spec.spec_1, spec.spec_2
+    spec.load_yield(0.49)
+    spec.load_titer(54.8)
+    system.simulate()
+    print('Loading and simulating with required specifications ...')
+    spec.load_specifications(spec_1=spec_1, spec_2=spec_2)
+    system.simulate()
+    
+def reset_and_switch_solver(solver_ID):
+    system.reset_cache()
+    system.empty_recycles()
+    system.converge_method = solver_ID
+    print(f"Trying {solver_ID} ...")
+    system.simulate()
+    
+def run_bugfix_barrage():
+    try:
+        reset_and_reload()
+    except Exception as e:
+        print(str(e))
+        try:
+            reset_and_switch_solver('fixedpoint')
+        except Exception as e:
+            print(str(e))
+            try:
+                reset_and_switch_solver('aitken')
+            except Exception as e:
+                print(str(e))
+                # print(_yellow_text+"Bugfix barrage failed.\n"+_reset_text)
+                print("Bugfix barrage failed.\n")
+                raise e
+###############################
+
+spec.load_spec_1 = spec.load_yield
+spec.load_spec_2 = spec.load_titer
+spec.load_spec_3 = spec.load_productivity
+
+full_path = HP_sys.path
+evaporator_index = full_path.index(spec.titer_inhibitor_specification.evaporator)
+pre_evaporator_units_path = full_path[0:evaporator_index]
+
+def model_specification():
+    try:
+        # model._system._converge()
+        for unit in pre_evaporator_units_path:
+            unit._run()
+        spec.titer_inhibitor_specification.run_units()
+        spec.load_specifications(spec_1=spec.spec_1, spec_2=spec.spec_2)
+        model._system.simulate()
+    except Exception as e:
+        str_e = str(e)
+        print('Error in model spec: %s'%str_e)
+        # raise e
+        if 'sugar concentration' in str_e:
+            # flowsheet('AcrylicAcid').F_mass /= 1000.
+            raise e
+        else:
+            run_bugfix_barrage()
+            
+model.specification = model_specification
 
 baseline_initial = model.metrics_at_baseline()
 baseline = pd.DataFrame(data=np.array([[i for i in baseline_initial.values],]), 

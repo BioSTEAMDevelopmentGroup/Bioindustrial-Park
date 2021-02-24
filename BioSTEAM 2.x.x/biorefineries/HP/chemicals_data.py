@@ -215,6 +215,7 @@ Enzyme = chemical_defined('Enzyme', phase='l',
 # Properties of fermentation microbes copied from Z_mobilis as in Humbird et al.
 FermMicrobe = chemical_defined('FermMicrobe', phase='l',
                       formula='CH1.8O0.5N0.2', Hf=-31169.39*_cal2joule)
+# FermMicrobe.HHV /= 10.
 WWTsludge = chemical_defined('WWTsludge', phase='s', 
                              formula='CH1.64O0.39N0.23S0.0035', 
                              Hf=-23200.01*_cal2joule)

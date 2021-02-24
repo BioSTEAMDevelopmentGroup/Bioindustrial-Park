@@ -39,6 +39,7 @@ bst.speed_up()
 
 _red_highlight_white_text = '\033[1;47;41m'
 _yellow_text = '\033[1;33m'
+_reset_text = '\033[1;0m'
 # %%Colors
 marketrange_shadecolor = (*colors.neutral.shade(50).RGBn, 0.3)
 
@@ -331,7 +332,7 @@ def run_bugfix_barrage():
                 reset_and_switch_solver('aitken')
             except Exception as e:
                 print(str(e))
-                print(_yellow_text+"Bugfix barrage failed.\n")
+                print(_yellow_text+"Bugfix barrage failed.\n"+_reset_text)
                 raise e
 ###############################
 
@@ -354,7 +355,7 @@ baseline_sample = model.get_baseline_sample()
 
 # Setup
 np.random.seed(3221)
-N_simulation = 100 # number of simulations at each point
+N_simulation = 40 # number of simulations at each point
 samples = model.sample(N=N_simulation, rule='L')
 model.load_samples(samples)
 
@@ -370,16 +371,18 @@ pre_evaporator_units_path = full_path[0:evaporator_index]
         
 def model_specification():
     try:
-        model._system._converge()
-        # for unit in pre_evaporator_units_path:
-        #     unit._run()
+        # model._system._converge()
+        for unit in pre_evaporator_units_path:
+            unit._run()
+        spec.titer_inhibitor_specification.run_units()
         spec.load_specifications(spec_1=spec.spec_1, spec_2=spec.spec_2)
         model._system.simulate()
     except Exception as e:
         str_e = str(e)
         print('Error in model spec: %s'%str_e)
         if 'sugar concentration' in str_e:
-            flowsheet('AcrylicAcid').F_mass /= 1000.
+            # flowsheet('AcrylicAcid').F_mass /= 1000.
+            raise e
         else:
             run_bugfix_barrage()
 model.specification = model_specification
@@ -410,28 +413,34 @@ def get_p_financial_viability():
         if MPSPs.size==0:
             return np.nan
         micro_viabilities = single_MPSP_p_viability(MPSPs, market_range).clip(min=0.,max=1.)
-        setters = model._setters
-        for f,s in zip(setters, baseline_sample): f(s)
-        return 100.*np.average(micro_viabilities)
-    except:
+        metric_val = 100.*np.average(micro_viabilities)
+        
+    except Exception as e:
         # import pdb
         # pdb.set_trace()
-        print(_red_highlight_white_text + '\n\nFailed the metric p_financial_viability even after bugfix barrage for each MC iteration.\n\n')
+        if 'sugar concentration' in str(e):
+            metric_val = 0.
+        print(_red_highlight_white_text+'\n\nFailed the metric p_financial_viability even after bugfix barrage for each MC iteration.\n\n'+_reset_text)
+        metric_val =  np.nan
+        
+    finally:
         setters = model._setters
         for f,s in zip(setters, baseline_sample): f(s)
-        return np.nan
+        
+    return metric_val
 # =============================================================================
 
 # HP_metrics = [solve_AA_price, get_HP_inhibitors_conc]
 # HP_metrics = [solve_AA_price, get_HP_sugars_conc, get_HP_inhibitors_conc]
-HP_metrics = [solve_AA_price, get_p_financial_viability, get_FEC]
+# HP_metrics = [solve_AA_price, get_p_financial_viability, get_FEC]
+HP_metrics = [solve_AA_price, get_GWP, get_FEC]
 
 # %% Generate 3-specification meshgrid and set specification loading functions
-steps = 20
+steps = 60
 
 # Yield, titer, productivity (rate)
 spec_1 = np.linspace(0.1, 0.99, steps) # yield
-spec_2 = np.linspace(30., 330., steps) # titer
+spec_2 = np.linspace(5., 330., steps) # titer
 # spec_1 = np.linspace(0.2, 0.99, steps) # yield
 # spec_2 = np.linspace(45, 225, steps) # titer
 spec_3 = np.array([0.79]) # productivity
@@ -443,7 +452,7 @@ ylabel = 'Titer [$\mathrm{g} \cdot \mathrm{L}^{-1}$]'
 # xticks = [0.33, 0.66, 0.99]
 xticks = [0., 0.2, 0.4, 0.6, 0.8, 1.0]
 # yticks = [75, 150, 225]
-yticks = [25, 50, 75, 100, 125, 150, 175, 200, 225, 250, 275, 300]
+yticks = [0, 25, 50, 75, 100, 125, 150, 175, 200, 225, 250, 275, 300]
 # xticks = [0.2, 0.6, 0.99]
 # yticks = [45, 135, 225]
 spec_3_units = "$\mathrm{g} \cdot \mathrm{L}^{-1} \cdot \mathrm{hr}^{-1}$"
@@ -801,34 +810,44 @@ Metric_3_tickmarks = tickmarks(
 
 Metric_1_tickmarks = [500,1000, 1500, 2000, 2500, 3000, 3500]
 # Metric_1_tickmarks = [2000, 2500, 3000, 3500, 4000, 4500]
-Metric_2_tickmarks = [0, 20., 40., 60., 80., 100.]
-# Metric_2_tickmarks = [0, 50, 100, 150, 200, 250, 300, 350, 400]
+# Metric_2_tickmarks = [0, 20., 40., 60., 80., 100.]
+Metric_2_tickmarks = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
 # # Metric_3_tickmarks = [60, 70, 80, 90, 100, 110, 120]
-# Metric_3_tickmarks = [0, 100, 200, 300, 400, 500]
+Metric_3_tickmarks = [0, 5, 10, 15, 20, 25, 30]
 
+metric_bars = (MetricBar('MPSP', MPSP_units, CABBI_green_colormap(),
+                         Metric_1_tickmarks, 800),
+               MetricBar('GWP', VOC_units, CABBI_blue_colormap(), # plt.cm.get_cmap('magma_r'),
+                         Metric_2_tickmarks, 200),
+               MetricBar("FEC", FCI_units,
+                         plt.cm.get_cmap('BrBG'), # plt.cm.get_cmap('bone_r'),
+                         Metric_3_tickmarks, 100))
 
 def plot(data, titers, yields, productivities, 
-         Metric_1_tickmarks, Metric_2_tickmarks, Metric_3_tickmarks):
-    metric_bars = (MetricBar('MPSP\n', 
-                             MPSP_units, CABBI_green_colormap(),
-                             Metric_1_tickmarks,
-                             1 + int((max(Metric_1_tickmarks) - min(Metric_1_tickmarks))/125)),
-                   # MetricBar('Total sugars\n',
-                   #          VOC_units,
-                   #          CABBI_blue_colormap(),
-                   #          # plt.cm.get_cmap('magma_r'),
-                   #           Metric_2_tickmarks, 
-                   #           1 + int((max(Metric_2_tickmarks) - min(Metric_2_tickmarks))/1.)),
+         Metric_1_tickmarks, Metric_2_tickmarks, Metric_3_tickmarks, metric_bars=metric_bars):
+    # metric_bars = (MetricBar('MPSP\n', 
+    #                          MPSP_units, CABBI_green_colormap(),
+    #                          Metric_1_tickmarks,
+    #                          1 + int((max(Metric_1_tickmarks) - min(Metric_1_tickmarks))/125)),
+    #                # MetricBar('Total sugars\n',
+    #                #          VOC_units,
+    #                #          CABBI_blue_colormap(),
+    #                #          # plt.cm.get_cmap('magma_r'),
+    #                #           Metric_2_tickmarks, 
+    #                #           1 + int((max(Metric_2_tickmarks) - min(Metric_2_tickmarks))/1.)),
                    
-                   MetricBar('Total sugars', VOC_units, CABBI_blue_colormap(), # plt.cm.get_cmap('magma_r'),
-                         Metric_2_tickmarks, 80),
+    #                MetricBar('Total sugars', VOC_units, CABBI_blue_colormap(), # plt.cm.get_cmap('magma_r'),
+    #                      Metric_2_tickmarks, 80),
                    
-                   MetricBar('Total inhibitors\n',
-                             FCI_units,
-                              plt.cm.get_cmap('bone_r'),
-                              # plt.cm.get_cmap('cividis_r'),
-                             Metric_3_tickmarks,
-                             1 + int((max(Metric_3_tickmarks) - min(Metric_3_tickmarks))/25)))
+    #                MetricBar('Total inhibitors', FCI_units, plt.cm.get_cmap('bone_r'), # plt.cm.get_cmap('magma_r'),
+    #                      Metric_3_tickmarks, 80))
+                   
+    #                # MetricBar('Total inhibitors\n',
+    #                #           FCI_units,
+    #                #            plt.cm.get_cmap('bone_r'),
+    #                #            # plt.cm.get_cmap('cividis_r'),
+    #                #           Metric_3_tickmarks,
+    #                #           1 + int((max(Metric_3_tickmarks) - min(Metric_3_tickmarks))/25)))
     
     return plot_contour_2d(titers, yields, productivities, data, 
                                 xlabel, ylabel, xticks, yticks, metric_bars, 
@@ -855,13 +874,7 @@ def plot_two(data, titers, yields, productivities,
                                 Z_value_format=lambda Z: f"{Z:.1f} [{spec_3_units}]",
                                 fillblack=False)
 
-metric_bars = (MetricBar('MPSP', MPSP_units, CABBI_green_colormap(),
-                         Metric_1_tickmarks, 800),
-               MetricBar('Total sugars', VOC_units, CABBI_blue_colormap(), # plt.cm.get_cmap('magma_r'),
-                         Metric_2_tickmarks, 80),
-               MetricBar("Relative impact on MPSP\n[impact of titer : impact of yield]", FCI_units,
-                         plt.cm.get_cmap('BrBG'), # plt.cm.get_cmap('bone_r'),
-                         Metric_3_tickmarks, 100))
+
     
     
 # if HP_metrics[1] is get_HP_sugars_conc:

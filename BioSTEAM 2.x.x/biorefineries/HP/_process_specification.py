@@ -14,6 +14,7 @@ from winsound import Beep
 
 _red_highlight_white_text = '\033[1;47;41m'
 _yellow_text = '\033[1;33m'
+_reset_text = '\033[1;0m'
 
 # from biosteam.process_tools.reactor_specification import evaluate_across_TRY
 _kg_per_ton = 907.18474
@@ -53,7 +54,8 @@ def evaluate_across_specs(spec, system,
                     reset_and_switch_solver('aitken')
                 except Exception as e:
                     print(str(e))
-                    print(_yellow_text+"Bugfix barrage failed.")
+                    print(_yellow_text+"Bugfix barrage failed."+_reset_text)
+                    raise e
         finally:
             system.converge_method = 'wegstein'
             print('\n')
@@ -88,7 +90,7 @@ def evaluate_across_specs(spec, system,
                 print(str(e2))
                 Beep(640, 500)
                 spec.count_exceptions += 1
-                print(_red_highlight_white_text+f"Point failed; returning metric values as np.nan.")
+                print(_red_highlight_white_text+f"Point failed; returning metric values as np.nan."+_reset_text)
                 spec.exceptions_dict[spec.count] = (e1, e2)
                 return np.nan*np.ones([len(metrics), len(spec_3)])
     HXN_Q_bal_percent_error = spec.HXN.energy_balance_percent_error
@@ -167,7 +169,7 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
         self.titer_inhibitor_specification =\
             TiterAndInhibitorsSpecification(evaporator, pump, mixer, heat_exchanger,
                                             seed_train_system, reactor,
-                 target_titer=100, product=reactor.outs[0])
+                 target_titer=100, product=reactor.outs[0], maximum_inhibitor_concentration = 1.)
         
     def load_specifications(self, spec_1=None, spec_2=None, spec_3=None,):
         """
@@ -257,7 +259,7 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
         self.count = 0 
         self.count_exceptions = 0
         self.total_iterations = 0
-        self.average_HXN_energy_balance_percent_error = 0.
+        # self.average_HXN_energy_balance_percent_error = 0.
         self.exceptions_dict = {}
         
         self.total_iterations = len(spec_1) * len(spec_2) * len(spec_3)
@@ -307,7 +309,7 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
             
             remainder = 0.999 - reactor.glucose_to_HP_rxn.X
             # reactor.glucose_to_microbe_rxn.X = .3 * remainder
-            reactor.glucose_to_acetic_acid_rxn.X = min(0.07, 1. - reactor.glucose_to_HP_rxn.X)
+            reactor.glucose_to_acetic_acid_rxn.X = min(0.04, 1. - reactor.glucose_to_HP_rxn.X)
             # print(reactor.glucose_to_VitaminA_rxn.X)
             # print(reactor.glucose_to_microbe_rxn.X)
             
@@ -316,7 +318,7 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
             
             remainder = 0.999 - reactor.xylose_to_HP_rxn.X
             # reactor.xylose_to_microbe_rxn.X = .3 * remainder
-            reactor.xylose_to_acetic_acid_rxn.X = min(0.07*0.8, 1. - reactor.xylose_to_HP_rxn.X)
+            reactor.xylose_to_acetic_acid_rxn.X = min(0.04 , 1. - reactor.xylose_to_HP_rxn.X)
             
         
             # print(reactor.glucose_to_VitaminA_rxn.X)
@@ -453,6 +455,11 @@ class TiterAndInhibitorsSpecification:
         self.products = products
         self.sugars = sugars
         self.inhibitors = inhibitors
+        if not reactor.neutralization:
+            inhibitors = list(inhibitors)
+            inhibitors.remove('AceticAcid')
+            self.inhibitors = tuple(inhibitors)
+            # Assumes acid tolerant strains can tolerate all present acetic acid
         self.target_titer = target_titer
         self.maximum_inhibitor_concentration = maximum_inhibitor_concentration
         self.get_products_mass = compute_HP_mass
@@ -481,7 +488,8 @@ class TiterAndInhibitorsSpecification:
     def calculate_titer(self):
         # product = self.product
         # return product.imass[self.products].sum() / product.F_vol
-        return compute_HP_titer(self.product)
+        # return compute_HP_titer(self.product)
+        return self.reactor.effluent_titer
     
     def calculate_inhibitors(self): # g / L
         product = self.product
@@ -511,9 +519,12 @@ class TiterAndInhibitorsSpecification:
         self.dilution_water.empty()
         self.evaporator.V = 0.
         self.run_units()
+        reactor = self.reactor
         x_titer = self.calculate_titer()
-        V_min = 0.00001
+        # V_min = 0.00001
+        V_min = 0.
         V_max = 0.999
+        
         if x_titer < self.target_titer: # Evaporate
             self.evaporator.V = V_min = flx.IQ_interpolation(self.titer_objective_function,
                                                              V_min, V_max, ytol=1e-3, maxiter=100) 

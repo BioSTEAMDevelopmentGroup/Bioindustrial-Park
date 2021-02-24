@@ -22,6 +22,7 @@ All units are explicitly defined here for transparency and easy reference
 import numpy as np
 import thermosteam as tmo
 from math import exp
+from warnings import warn
 from flexsolve import aitken_secant
 from biosteam import Unit
 from biosteam.units import Flash, HXutility, Mixer, MixTank, Pump, \
@@ -32,6 +33,7 @@ from biorefineries.HP.process_settings import price
 from biorefineries.HP.utils import CEPCI, baseline_feedflow, compute_extra_chemical, adjust_recycle
 from biorefineries.HP.chemicals_data import HP_chemicals
 tmo.settings.set_thermo(HP_chemicals)
+
 _kg_per_ton = 907.18474
 _Gcal_2_kJ = 4.184 * 1e6 # (also MMkcal/hr)
 Rxn = tmo.reaction.Reaction
@@ -48,12 +50,66 @@ ParallelRxn = tmo.reaction.ParallelReaction
 # the cost of feedstock cost
 @cost(basis='Flow rate', ID='System', units='kg/hr',
       kW=511.3205, cost=13329690, S=94697, CE=CEPCI[2009], n=0.6, BM=1.7)
-class FeedstockPreprocessing(Unit):
+class FeedstockPreprocessing(Unit): # not used
     # 2205 U.S. ton/day (2000 metric tonne/day) as in Humbird et al.
     _baseline_flow_rate = baseline_feedflow.sum()
     _cached_flow_rate = 2205
 
 
+class FeedstockSizeReduction(Unit):
+    _N_ins = 1
+    _N_outs = 1
+    _N_power_utilities = 1
+    _BM = {'Hammer mills': 2.45} #!!! TODO: Update _BM
+    _units = {'Throughput per mill': 'ton/hr'}
+
+    _min_throughput_per_mill = 2 # ton/hr
+    _max_throughput_per_mill = 5 # ton/hr
+    
+    # In Seider's Product and Process Design Principles,
+    # Table 16.32 reports a capacity range of 2 - 200 ton/hr
+    # Table 16.28 reports a capacity range of 0.1 - 5 ton/hr
+    # As Table 16.28 is used to get power utility, we 
+    # assume the per-equipment capacity range to be 2 - 5 ton/hr 
+
+    # _kW_per_kg_per_hr = 
+    
+    def __init__(self, ID='', ins=None, outs=(), equipment_type='Hammer mill'):
+        Unit.__init__(self, ID, ins, outs)
+
+    def _run(self):
+        input_feedstock = self.ins[0]
+        milled_feedstock = self.outs[0]
+        milled_feedstock.copy_like(input_feedstock)
+        
+    def _design(self):
+        throughput = self.ins[0].F_mass / _kg_per_ton
+        
+        self.design_results['Number of mills'] = N = np.ceil(throughput/self._max_throughput_per_mill)
+        self.design_results['Throughput per mill'] = tpm = throughput/N
+        
+        if not (tpm>self._min_throughput_per_mill
+                and tpm<self._max_throughput_per_mill):
+            msg = f"CostWarning: {self.__repr__()} Throughput ({format(tpm,'0.2f')} ton/hr) is out of bounds (2 to 5 ton/hr)."
+            warn(msg, UserWarning, stacklevel=2)
+        
+    def _cost(self):
+        N = self.design_results['Number of mills']
+        W = self.design_results['Throughput per mill']
+        purchase_cost = N * 4310. * W**0.78 # Seider's Product and Process Design Principles  > Table 16.32 > "Size reduction equipment" > "Hammer mills"
+        self.purchase_costs['Hammer mills'] = purchase_cost
+        # self.power_utility(100.669)
+        power_utility = self.power_utility
+        power_utility((0.97/0.1) * W * (1 + 1.077*(W-0.1)/4.9)) 
+        power_utility.scale(N)
+        # Interpolating from 'Hammer mills' in Table 16.28
+        # in Seider's Product and Process Design Principles, which reports 
+        # a capacity range of 0.1 - 5 ton/hr and 
+        # a power utility range of 0.97 - 100.7 kW.
+        # This assumes that the bounds of reported capacity and power utility coincide.
+        # The assumption is most conservative at 5 ton/hr per equipment, where the
+        # power utility becomes the highest reported value for power utility.
+        
 # %% 
 
 # =============================================================================
@@ -250,7 +306,7 @@ class PretreatmentReactorSystem(Unit):
             Rxn('Xylan + H2O -> XyloseOligomer',             'Xylan',    0.024),
             Rxn('Xylan -> Furfural + 2 H2O',                 'Xylan',    0.05),
             Rxn('Acetate -> AceticAcid',                     'Acetate',  1.),
-            Rxn('Lignin -> SolubleLignin',                   'Lignin',   0.05),
+            Rxn('Lignin -> 10.125 SolubleLignin',            'Lignin',   0.05),
             # Below from Page 106 of Humbird et al.,
             Rxn('Mannan + H2O -> Mannose',                   'Mannan',   0.9),
             Rxn('Mannan + H2O -> MannoseOligomer',           'Mannan',   0.024),
@@ -700,16 +756,16 @@ class SeedTrain(Unit):
         self.cofermentation_rxns =  ParallelRxn([
         #      Reaction definition            Reactant    Conversion
         Rxn('Glucose -> 2 HP',        'Glucose',   .49*ferm_ratio),
-        Rxn('Glucose -> 3 AceticAcid',        'Glucose',   0.07*ferm_ratio),
+        Rxn('Glucose -> 3 AceticAcid',        'Glucose',   0.04*ferm_ratio),
         Rxn('Glucose -> 6 FermMicrobe',       'Glucose',   0.03*ferm_ratio),
         Rxn('3 Xylose -> 5 HP',       'Xylose',    0.49*ferm_ratio),
-        Rxn('2 Xylose -> 5 AceticAcid',       'Xylose',    0.07*ferm_ratio),
+        Rxn('2 Xylose -> 5 AceticAcid',       'Xylose',    0.04*ferm_ratio),
         Rxn('Xylose -> 5 FermMicrobe',        'Xylose',    0.03*ferm_ratio),
         ])
         
         self.CO2_generation_rxns = ParallelRxn([
-        Rxn('Glucose -> 6 CO2',       'Glucose',   0.5*ferm_ratio),
-        Rxn('Xylose -> 5 CO2',        'Xylose',    0.5*ferm_ratio),
+        Rxn('Glucose -> 6 CO2',       'Glucose',   0.8*ferm_ratio),
+        Rxn('Xylose -> 5 CO2',        'Xylose',    0.8*ferm_ratio),
         ])
         
         self.biomass_generation_rxns = ParallelRxn([
@@ -1683,13 +1739,13 @@ class CoFermentation(Reactor):
     
     tau_batch_turnaround = 12 # in hr, the same as the seed train in ref [3]
 
-    def __init__(self, ID='', ins=None, outs=(), thermo=None, *, T=50+273.15,
+    def __init__(self, ID='', ins=None, outs=(), thermo=None, *, T=30.+273.15,
                   P=101325, V_wf=0.8, length_to_diameter=2,
                   kW_per_m3=0.0985, # Perry's handbook
                   wall_thickness_factor=1,
                   vessel_material='Stainless steel 316',
                   vessel_type='Vertical',
-                  neutralization=False,
+                  neutralization=True,
                   mode='Continuous', # Batch or Continuous
                   allow_dilution=False,
                   allow_concentration=False):
@@ -1717,9 +1773,9 @@ class CoFermentation(Reactor):
         #      Reaction definition            Reactant    Conversion
         Rxn('Glucose -> 2 HP',        'Glucose',   .49),
         # Rxn('Glucose -> 3 AceticAcid',        'Glucose',   0.07),
-        Rxn('Glucose -> 3 AceticAcid',        'Glucose',   0.07),
+        Rxn('Glucose -> 3 AceticAcid',        'Glucose',   0.04),
         Rxn('3 Xylose -> 5 HP',       'Xylose',    0.49),
-        Rxn('2 Xylose -> 5 AceticAcid',       'Xylose',    0.07),
+        Rxn('2 Xylose -> 5 AceticAcid',       'Xylose',    0.04),
         ])
         
       
@@ -1730,8 +1786,8 @@ class CoFermentation(Reactor):
         self.xylose_to_acetic_acid_rxn = self.cofermentation_rxns[3]
         
         self.CO2_generation_rxns = ParallelRxn([
-        Rxn('Glucose -> 6 CO2',       'Glucose',   0.5),
-        Rxn('Xylose -> 5 CO2',        'Xylose',    0.5),
+        Rxn('Glucose -> 6 CO2',       'Glucose',   0.8),
+        Rxn('Xylose -> 5 CO2',        'Xylose',    0.8),
         ])
         
         self.biomass_generation_rxns = ParallelRxn([
@@ -1756,6 +1812,7 @@ class CoFermentation(Reactor):
             ])
         self.tau = self.tau_cofermentation = 74 # this value is altered by spec.load_productivity
         
+        self.get_acetic_acid_conc = lambda: self.outs[0].imass['AceticAcid']/self.outs[0].F_vol
     def _run(self):
         
         sugars, feed, CSL, lime = self.ins
@@ -1773,7 +1830,7 @@ class CoFermentation(Reactor):
         self.cofermentation_rxns(effluent.mol)
         self.CO2_generation_rxns(effluent.mol)
         self.biomass_generation_rxns(effluent.mol)
-        vapor.imol['CO2'] = effluent.imol['CO2']
+        vapor.imol['CO2'] = effluent.imol['CO2'] + CSL.imol['CSL']
         vapor.phase = 'g'
         
         effluent.imol['CO2'] = 0
@@ -1852,15 +1909,3 @@ class CoFermentation(Reactor):
             hu_total.copy_like(hu_single_rx)
             hu_total.scale(N)
 
-# class SugarAndInhibitorSpecification(Unit):
-#     _N_ins = 2
-#     _N_outs = 2
-    
-#     def __init__():
-#         Unit.__init__(self, ID, ins, outs, thermo)
-#         # MEE.__init__()
-#         # Mixer.__init__()
-#         self.mixer = bst.Mixer(None, thermo=self.thermo)
-#         self.evaporator = bst.MultiEffectEvaporator(None, thermo=self.thermo)
-    
-    

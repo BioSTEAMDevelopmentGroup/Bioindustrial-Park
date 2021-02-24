@@ -244,7 +244,7 @@ GWP_CFs = {
     'Enzyme': 2.24,
     'Lime': 1.29,
     'NaOH': 2.11,
-    'H2SO4': 44.47/1e3,
+    'H2SO4': 0.04344,
     'Ethanol': 1.44
     }
 H3PO4_GWP_CF = 2.5426
@@ -258,8 +258,13 @@ GWP_CFs['Gypsum'] = -4.20/1e3
 
 
 # from ecoinvent 3.6 IPCC 2013:
-GWP_CFs['CalciumDihydroxide'] = 1.2105 * 56.0774 / 74.093 # /kg-quicklime converted to kg-slaked_lime assuming CF of 0 for water
-GWP_CFs['Hexanol'] = 3.1891 # currently set to CF of propanol (per kg)
+# GWP_CFs['CalciumDihydroxide'] = 1.2105 * 56.0774 / 74.093 # /kg-quicklime converted to kg-slaked_lime assuming CF of 0 for water
+
+# from GREET 2020 GHG-100:
+GWP_CFs['CalciumDihydroxide'] = 1.29 * 56.0774 / 74.093 # /kg-quicklime converted to kg-slaked_lime assuming CF of 0 for water
+
+# from ecoinvent 3.7 IPCC 2013
+GWP_CFs['Hexanol'] = 0.87409 # currently set to CF of 1,1-dimethylcyclopentane to generic market for solvent, organic (per kg)
 
 GWP_CFs['TiO2'] = 7.8029 # ecoinvent 3.7.1, market for titanium dioxide [RoW] - IPCC 2013 GWP100a
 
@@ -270,9 +275,9 @@ GWP_CF_array = chems.kwarray(GWP_CFs)
 GWP_CF_stream = tmo.Stream('GWP_CF_stream', GWP_CF_array, units='kg/hr')
 
 
-GWP_CFs['FHT Corn stover'] = 68.82/1000. # Wendt et al. 2018: Techno-Economic Assessment of a Chopped Feedstock Logistics Supply Chain for Corn Stover
+# GWP_CFs['FGHTP Corn stover'] = 68.82/1000. # Wendt et al. 2018: Techno-Economic Assessment of a Chopped Feedstock Logistics Supply Chain for Corn Stover
 
-
+GWP_CFs['FGHTP Corn stover'] = 0.10945 # see Feedstock_impacts_YL
 
 # GWP_CFs['Corn stover'] = 44.70/1e3 * 0.8
 # GWP_CFs['Switchgrass'] = 87.81/1e3 * 0.8
@@ -294,14 +299,14 @@ CFs['GWP_CF_stream'] = GWP_CF_stream
 # =============================================================================
 
 FEC_CFs = {
-    'NH4OH': 42 * chems.NH3.MW/chems.NH4OH.MW,
-    'CSL': 12,
-    'CH4': 50, # NA NG from shale and conventional recovery
-    'Enzyme': 26,
+    'NH4OH': 42. * chems.NH3.MW/chems.NH4OH.MW,
+    'CSL': 12.,
+    'CH4': 50., # NA NG from shale and conventional recovery
+    'Enzyme': 26.,
     'Lime': 4.896,
-    'NaOH': 29,
-    'H2SO4': 568.98/1e3,
-    'Ethanol': 16
+    'NaOH': 29.,
+    'H2SO4': 0.56898,
+    'Ethanol': 16.
     }
 H3PO4_FEC_CF = 39.542
 KOH_FEC_CF = 30.421
@@ -315,7 +320,7 @@ FEC_CFs['Gypsum'] = -44.19/1e3
 
 # from ecoinvent 3.6 IPCC 2013:
 FEC_CFs['CalciumDihydroxide'] = 5.2339  * 56.0774 / 74.093 # /kg-quicklime converted to kg-slaked_lime assuming CF of 0 for water
-FEC_CFs['Hexanol'] = 79.249 # currently set to CF of propanol (per kg)
+FEC_CFs['Hexanol'] = 64.652 # currently set to CF of 1,1-dimethylcyclopentane to generic market for solvent, organic (per kg)
 
 FEC_CFs['TiO2'] = 82.361 # ecoinvent 3.7.1, market for titanium dioxide [RoW] - CED fossil
 
@@ -323,9 +328,10 @@ FEC_CF_array = chems.kwarray(FEC_CFs)
 # In MJ/kg of material
 FEC_CF_stream = tmo.Stream('FEC_CF_stream', FEC_CF_array, units='kg/hr')
 
-FEC_CFs['FHT Corn stover'] = 767.3/1000. # Wendt et al. 2018: Techno-Economic Assessment of a Chopped Feedstock Logistics Supply Chain for Corn Stover
+# FEC_CFs['FGHTP Corn stover'] = 767.3/1000. # Wendt et al. 2018: Techno-Economic Assessment of a Chopped Feedstock Logistics Supply Chain for Corn Stover
 
 
+FEC_CFs['FGHTP Corn stover'] = 1.68000 # see Feedstock_impacts_YL
 
 # FEC_CFs['Corn stover'] = 688.60/1e3 * 0.8
 # FEC_CFs['Switchgrass'] = 892.41/1e3 * 0.8
@@ -336,7 +342,7 @@ CFs['FEC_CF_stream'] = FEC_CF_stream
 # In MJ/kWh
 FEC_CFs['Electricity'] = 5.926
 # From corn stover
-FEC_CFs['LacticAcid'] = 29
+FEC_CFs['LacticAcid'] = 29.
 # From ref [7], lactic acid production, RoW, cumulative energy demand, fossil
 FEC_CFs['LacticAcid_fossil'] = 79.524
 

@@ -27,7 +27,7 @@ class HPTEA(TEA):
                  'construction', 'contingency', 'other_indirect_costs', 
                  'labor_cost', 'labor_burden', 'property_insurance',
                  'maintenance', '_ISBL_DPI_cached', '_FCI_cached',
-                 '_utility_cost_cached')
+                 '_utility_cost_cached', '_TCI_ratio_cached')
     
     def __init__(self, system, IRR, duration, depreciation, income_tax,
                  operating_days, lang_factor, construction_schedule,
@@ -56,7 +56,7 @@ class HPTEA(TEA):
         self.labor_burden = labor_burden
         self.property_insurance = property_insurance
         self.maintenance = maintenance
-    
+        self._TCI_ratio_cached = 1.
     @property
     def utility_cost(self):
         self._utility_cost_cached = utility_cost = super().utility_cost

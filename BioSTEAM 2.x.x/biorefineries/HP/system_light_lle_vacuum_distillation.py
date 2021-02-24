@@ -105,9 +105,10 @@ def create_HP_sys(ID, ins, outs):
                         units='kg/hr',
                         price=price[feedstock_ID])
     
-    U101 = units.FeedstockPreprocessing('U101', ins=feedstock)
+    U101 = units.FeedstockPreprocessing('U101', ins=feedstock, outs='milled_feedstock')
+    # U101 = units.FeedstockSizeReduction('U101', ins=feedstock, outs='milled_feedstock')
     
-    # Handling costs/utilities included in feedstock cost thus not considered here
+    # IFF handling costs/utilities are included in feedstock cost and thus not considered here
     U101.cost_items['System'].cost = 0
     U101.cost_items['System'].kW = 0
     
@@ -270,7 +271,7 @@ def create_HP_sys(ID, ins, outs):
     # Saccharification
     R301 = units.Saccharification('R301', 
                                     ins=M301-0,
-                                    outs='saccharification_effluent')
+                                    outs=('saccharification_effluent',''))
     
     # M303 = bst.units.Mixer('M303', ins=(R301-0, ''))
     # M303_P = units.HPPump('M303_P', ins=M303-0)
@@ -313,13 +314,13 @@ def create_HP_sys(ID, ins, outs):
     M304_H = bst.units.HXutility('M304_H', ins=M304-0, T=30+273.15)
     
     # Mix pretreatment hydrolysate/enzyme mixture with fermentation seed
-    M302 = bst.units.Mixer('M302', ins=(M304_H-0, ''))
+    # M302 = bst.units.Mixer('M302', ins=(M304_H-0, ''))
     
     
     # inoculum_ratio = 0.07
     
-    S302 = bst.Splitter('S302', ins=M302-0,
-                        outs = ('to_cofermentation', 'to_seedtrain'),
+    S302 = bst.Splitter('S302', ins=M304_H-0,
+                        outs = ('to_seedtrain', 'to_cofermentation'),
                         split = 0.07) # split = inoculum ratio
     
     # Cofermentationv
@@ -334,16 +335,20 @@ def create_HP_sys(ID, ins, outs):
                                     vessel_material='Stainless steel 316',
                                     neutralization=True)
     
+    def include_seed_CSL_in_cofermentation(): # effluent always has 0 CSL
+        R302._run()
+        R302.ins[2].F_mass*=1./(1-S302.split[0])
+    R302.specification = include_seed_CSL_in_cofermentation
     
     # ferm_ratio is the ratio of conversion relative to the fermenter
     R303 = units.SeedTrain('R303', ins=S302-0, outs=('seed', 'CO2_seedtrain'), ferm_ratio=0.9)
     
-    T301 = units.SeedHoldTank('T301', ins=R303-0, outs=1-M302)
+    T301 = units.SeedHoldTank('T301', ins=R303-0, outs=1-R302)
     
     
     conversion_group = UnitGroup('conversion_group', 
                                    units=(H301, M301, R301, S301, F301, F301_P,
-                                          M304_P, M304, M304_H, M302, S302, R302,
+                                          M304_P, M304, M304_H, S302, R302,
                                           R303, T301))
     process_groups.append(conversion_group)
     
@@ -371,7 +376,7 @@ def create_HP_sys(ID, ins, outs):
     S401_index = [splits_df.index[0]] + splits_df.index[2:].to_list()
     S401_cell_mass_split = [splits_df['stream_571'][0]] + splits_df['stream_571'][2:].to_list()
     S401_filtrate_split = [splits_df['stream_535'][0]] + splits_df['stream_535'][2:].to_list()
-    S401 = bst.units.SolidsCentrifuge('S401', ins=R302-0, outs=('cell_mass', ''),
+    S401 = bst.units.SolidsCentrifuge('S401', ins=(R302-0,''), outs=('cell_mass', ''),
                                 # moisture_content=0.50,
                                 split=find_split(S401_index,
                                                   S401_cell_mass_split,
@@ -914,6 +919,14 @@ def create_HP_sys(ID, ins, outs):
                                    units=(HXN,))
     process_groups.append(HXN_group)
     
+
+    BT_group = UnitGroup('BT_group',
+                                   units=(BT,))
+    process_groups.append(BT_group)
+    
+    CT_group = UnitGroup('CT_group',
+                                   units=(CT,))
+    process_groups.append(CT_group)
     
     facilities_no_hu_group = UnitGroup('facilities_no_hu_group',
                                    units=(T601, T602, T603, T604, T605, 
@@ -921,7 +934,6 @@ def create_HP_sys(ID, ins, outs):
     process_groups.append(facilities_no_hu_group)
 
     globals().update({'process_groups': process_groups})
-
 # %% System setup
 
 # HP_sys = bst.main_flowsheet.create_system(
@@ -946,6 +958,7 @@ emissions = [i for i in flowsheet.stream
 BT = flowsheet('BT')
 BT_sys = System('BT_sys', path=(BT,))
 
+          
 # flowsheet('SYS2').molar_tolerance = 3
 # flowsheet('SYS2').maxiter = 100
 
@@ -954,6 +967,10 @@ dct = globals()
 for i in (flowsheet.unit, flowsheet.system, flowsheet.stream):
     dct.update(i.__dict__)
 
+process_groups_dict = {}
+for i in range(len(process_groups)):
+    group = process_groups[i]
+    process_groups_dict[group.name] = group
 # %%
 # =============================================================================
 # TEA
@@ -1023,6 +1040,7 @@ def get_AA_MPSP():
 
 get_AA_MPSP()
 
+seed_train_system = bst.System('seed_train_system', path=(u.S302, u.R303, u.T301))
 # R301 = F('R301') # Fermentor
 # yearly_production = 125000 # ton/yr
 spec = ProcessSpecification(
@@ -1030,7 +1048,7 @@ spec = ProcessSpecification(
     pump = u.M304_P,
     mixer = u.M304,
     heat_exchanger = u.M304_H,
-    seed_train_system = flowsheet('SYS1'),
+    seed_train_system = seed_train_system,
     reactor= u.R302,
     reaction_name='fermentation_reaction',
     substrates=('Xylose', 'Glucose'),
@@ -1237,13 +1255,18 @@ feed_chem_IDs = [chem.ID for chem in HP_chemicals]
 
 GWP_CF_stream = CFs['GWP_CF_stream']
 FEC_CF_stream = CFs['FEC_CF_stream']
+
 def get_material_GWP():
+    chemical_GWP = get_material_GWP_array()
+    return sum(chemical_GWP)/AA.F_mass
+
+def get_material_GWP_array():
     LCA_stream.mass = sum(i.mass for i in LCA_streams)
     # chemical_GWP = LCA_stream.mass*CFs['GWP_CF_stream'].mass
     chemical_GWP = [LCA_stream.imass[ID] * GWP_CF_stream.imass[ID] for ID in feed_chem_IDs]
     # feedstock_GWP = feedstock.F_mass*CFs['GWP_CFs']['Corn stover']
     # return chemical_GWP.sum()/AA.F_mass
-    return sum(chemical_GWP)/AA.F_mass
+    return chemical_GWP
 
 # Carbon balance
 total_C_in = sum([feed.get_atomic_flow('C') for feed in feeds])
@@ -1251,29 +1274,38 @@ total_C_out = AA.get_atomic_flow('C') + sum([emission.get_atomic_flow('C') for e
 C_bal_error = (total_C_out - total_C_in)/total_C_in
 
 # GWP from combustion of non-biogenic carbons
-get_non_bio_GWP = lambda: (s.natural_gas.get_atomic_flow('C')) * HP_chemicals.CO2.MW / AA.F_mass
+get_non_bio_GWP = get_onsite_gwp =\
+    lambda: (s.natural_gas.get_atomic_flow('C')) * HP_chemicals.CO2.MW / AA.F_mass
                            # +ethanol_fresh.get_atomic_flow('C'))* HP_chemicals.CO2.MW / AA.F_mass
-get_FHT_GWP = lambda: (feedstock.F_mass-feedstock.imass['Water']) \
-    * CFs['GWP_CFs']['FHT %s'%feedstock_ID]/AA.F_mass
-# get_feedstock_GWP = lambda: get_FHT_GWP() - feedstock.get_atomic_flow('C')* HP_chemicals.CO2.MW/AA.F_mass
-get_feedstock_GWP = lambda: get_FHT_GWP()
+
+    
+get_FGHTP_GWP = lambda: (feedstock.F_mass-feedstock.imass['Water']) \
+    * CFs['GWP_CFs']['FGHTP %s'%feedstock_ID]/AA.F_mass
+
+get_feedstock_CO2_capture = lambda: feedstock.get_atomic_flow('C')* HP_chemicals.CO2.MW/AA.F_mass
+get_feedstock_GWP = lambda: get_FGHTP_GWP() - get_feedstock_CO2_capture()
+# get_feedstock_GWP = lambda: get_FGHTP_GWP()
 get_emissions_GWP = lambda: sum([stream.get_atomic_flow('C') for stream in emissions]) * HP_chemicals.CO2.MW / AA.F_mass
+get_direct_emissions_GWP = lambda: get_emissions_GWP() - (get_feedstock_CO2_capture() - get_EOL_GWP())
 # GWP from electricity
 get_electricity_use = lambda: sum(i.power_utility.rate for i in HP_sys.units)
 get_electricity_GWP = lambda: get_electricity_use()*CFs['GWP_CFs']['Electricity'] \
     / AA.F_mass
 
-# CO2 fixed in lactic acid product
-get_fixed_GWP = lambda: \
-    AA.get_atomic_flow('C')*HP_chemicals.CO2.MW/AA.F_mass
+# # CO2 fixed in lactic acid product
+# get_fixed_GWP = lambda: \
+#     AA.get_atomic_flow('C')*HP_chemicals.CO2.MW/AA.F_mass
+
 
 # get_GWP = lambda: get_feedstock_GWP() + get_material_GWP() + get_non_bio_GWP() +\
 #                   get_electricity_GWP() + get_emissions_GWP()
 
-get_GWP = lambda: get_feedstock_GWP() + get_material_GWP() + get_non_bio_GWP() +\
-                  get_electricity_GWP()
+get_EOL_GWP = lambda: AA.get_atomic_flow('C') * HP_chemicals.CO2.MW/AA.F_mass
+
+get_GWP = lambda: get_FGHTP_GWP() + get_material_GWP() + get_non_bio_GWP() +\
+                  get_electricity_GWP() + get_direct_emissions_GWP()
                   
-                  
+get_GWP_by_ID = lambda ID: LCA_stream.imass[ID] * GWP_CF_stream.imass[ID]/AA.F_mass
 # Fossil energy consumption (FEC) from materials
 def get_material_FEC():
     LCA_stream.mass = sum(i.mass for i in LCA_streams)
@@ -1284,16 +1316,40 @@ def get_material_FEC():
     return sum(chemical_FEC)/AA.F_mass
 
 get_feedstock_FEC = lambda: (feedstock.F_mass-feedstock.imass['Water'])\
-    * CFs['FEC_CFs']['FHT %s'%feedstock_ID]/AA.F_mass
+    * CFs['FEC_CFs']['FGHTP %s'%feedstock_ID]/AA.F_mass
 # FEC from electricity
 get_electricity_FEC = lambda: \
     get_electricity_use()*CFs['FEC_CFs']['Electricity']/AA.F_mass
 
+get_FEC_by_ID = lambda ID: LCA_stream.imass[ID] * FEC_CF_stream.imass[ID]/AA.F_mass
+
+get_ng_FEC = lambda: -s.natural_gas.LHV*.001 / AA.F_mass
 # Total FEC
-get_FEC = lambda: get_material_FEC()+get_electricity_FEC()+get_feedstock_FEC()
+get_FEC = lambda: get_material_FEC()+get_electricity_FEC()+get_feedstock_FEC()+get_ng_FEC()
 
 get_SPED = lambda: (-BT.heat_utilities[0].duty)*0.001/AA.F_mass
 AA_LHV = 31.45 # MJ/kg AA
+
+get_material_cost = lambda: sum(get_material_cost_array())
+def get_material_cost_array():
+    material_cost_array = [i.cost for i in feeds]
+    material_cost_array.append(BT.natural_gas_price*BT.natural_gas.F_mass)
+    return material_cost_array
+
+def get_material_cost_breakdown():
+    group_material_costs = {}
+    for group in process_groups:
+        group_material_costs[group.name] = 0
+    for feed in feeds:
+        for group in process_groups:
+            if group.name is not 'facilities_no_hu_group':
+                for unit in group.units:
+                    for instream in unit.ins:
+                        if instream.shares_flow_rate_with(feed):
+                            group_material_costs[group.name] += feed.price*feed.F_mass/AA.F_mass
+    group_material_costs['BT_group'] += BT.natural_gas_price*BT.natural_gas.F_mass/AA.F_mass
+    
+    return group_material_costs
 
 # %% Full analysis
 def simulate_and_print():
@@ -1314,3 +1370,20 @@ import biosteam as bst
 bst.LABEL_PATH_NUMBER_IN_DIAGRAMS = True
 HP_sys.diagram('cluster')
 
+# GREET 2020
+
+# fossil-based acrylic acid
+# FEC: = 114 MJ eq. / kg AA
+# GHG100 = 5.82 kgCO2 eq. / kg AA (7.65 kg CO2 eq. including EOL degradation as CO2)
+
+# bio-based acrylic acid (via 3-HP from glycerol from algal oil)
+# FEC: = 40 MJ eq. / kg AA
+# GHG100 = 3.14 kgCO2 eq. / kg AA
+
+
+## Ecoinvent 3.7.1 ##
+
+# acrylic acid production
+# CED-f = 49.026 MJ eq. / kg AA
+# GWP-100a = 2.245 kg CO2 eq. / kg AA (4.075 including product EOL degradation as CO2)
+# price = 1.4508 in 2005$ per kg
