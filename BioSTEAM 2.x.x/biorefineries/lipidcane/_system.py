@@ -413,7 +413,7 @@ def create_transesterification_and_biodiesel_separation_system(ins, outs):
 @SystemFactory(
     ID='lipidcane_sys',
     ins=[*create_juicing_and_lipid_extraction_system.ins,
-         dict(ID='denaturant')],
+         create_sucrose_to_ethanol_system.ins[1]],
     outs=[dict(ID='ethanol', price=price['Ethanol']),
           dict(ID='biodiesel', price=price['Biodiesel']),
           dict(ID='crude_glycerol', price=price['Crude glycerol']),

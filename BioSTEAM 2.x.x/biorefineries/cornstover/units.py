@@ -69,7 +69,7 @@ class PretreatmentReactorSystem(Unit):
     Rxn('Arabinan + H2O -> ArabinoseOligomer',       'Arabinan', 0.0024),
     Rxn('Arabinan -> Furfural + 2 H2O',              'Arabinan', 0.0050),
     Rxn('Acetate -> AceticAcid',                     'Acetate',  1.0000),
-    Rxn('Lignin -> SolubleLignin',                   'Lignin',   0.0050)])
+    Rxn('Lignin -> SolubleLignin',                   'Lignin',   0.050)])
         vapor, liquid = self.outs
         vapor.phase = 'g'
     
@@ -160,7 +160,7 @@ class SeedTrain(Unit):
         feed = self.ins[0]
         vent, effluent= self.outs
         effluent.copy_flow(feed)
-        self.reactions(effluent.mol)
+        self.reactions(effluent)
         effluent.T = self.T
         vent.phase = 'g'
         vent.copy_flow(effluent, ('CO2', 'NH3', 'O2'), remove=True)
@@ -282,8 +282,9 @@ class SaccharificationAndCoFermentation(Unit):
     ])
     
         self.CSL_to_constituents = Rxn(
-        'CSL -> 0.5 H2O + 0.25 LacticAcid + 0.25 Protein', 'CSL',    1.0000)
-    
+            'CSL -> 0.5 H2O + 0.25 LacticAcid + 0.25 Protein', 'CSL', 1.0000, basis='wt',
+        )
+        self.CSL_to_constituents.basis = 'mol'
         self.saccharified_stream = tmo.Stream(None)
     
     def _run(self):
@@ -295,12 +296,12 @@ class SaccharificationAndCoFermentation(Unit):
         vent.T = effluent.T = self.T_fermentation
         vent.phase = 'g'
         ss.copy_flow(feed)
-        self.saccharification(ss.mol)
+        self.saccharification(ss)
         sidedraw.mol[:] = ss.mol * self.saccharified_slurry_split
         effluent.mol[:] = ss.mol - sidedraw.mol + CSL.mol + DAP.mol + innoculum.mol
-        self.loss(effluent.mol)
-        self.cofermentation(effluent.mol)
-        self.CSL_to_constituents(effluent.mass)
+        self.loss(effluent)
+        self.cofermentation(effluent)
+        self.CSL_to_constituents(effluent)
         vent.receive_vent(effluent)
         NH3 = effluent.imol['NH3']
         vent.imol['NH3'] += NH3

@@ -60,6 +60,18 @@ def _load_system(dct):
     bst.rename_units([u.FT, u.CWP, u.CIP_package, u.ADP, u.CT, u.PWC], 1100)
     bst.rename_units([i for i in lipidcane2g_sys.units if bst.is_storage_unit(i)], 1200)
     unit_groups = UnitGroup.group_by_area(lipidcane2g_sys.units)
+    area_names = ['Feedstock handling', 
+                  'Juicing', 
+                  'Biod. prod.',
+                  'Conv. ferm.', 
+                  'pretreatment',
+                  'Cofementation',
+                  'Ethanol sep.', 
+                  'Wastewater treatment', 
+                  'Boiler turbogenerator',
+                  'Utilities',
+                  'Storage']
+    for i, j in zip(unit_groups, area_names): i.name = j
     lipidcane2g_tea = create_tea(lipidcane2g_sys)
     lipidcane2g_tea.IRR = lipidcane2g_tea.solve_IRR()
     dct.update(flowsheet.to_dict())

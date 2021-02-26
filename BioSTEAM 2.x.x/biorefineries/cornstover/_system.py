@@ -26,19 +26,19 @@ __all__ = ('create_system',
 @bst.SystemFactory(
     ID='dilute_acid_pretreatment_sys',
     ins=[dict(ID='cornstover', # Cornstover composition by default
-              Glucan=0.256482,
-              Xylan=0.151959,
-              Galactan=0.012060,
-              Arabinan=0.022512,
-              Mannan=0.002412,
-              Lignin=0.106934,
-              Acetate=0.017688,
-              Protein=0.029748,
-              Extract=0.114974,
-              Ash=0.056281,
-              Sucrose=0.028944,
+              Glucan=0.28,
+              Xylan=0.1562,
+              Galactan=0.001144,
+              Arabinan=0.01904,
+              Mannan=0.0048,
+              Lignin=0.12608,
+              Acetate=0.01448,
+              Protein=0.0248,
+              Extract=0.1172,
+              Ash=0.03944,
+              Sucrose=0.00616,
               Water=0.2,
-              total_flow=104167.,
+              total_flow=104229.16,
               units='kg/hr',
               price=price['Feedstock'])],
     outs=[dict(ID='hydrolyzate'),
@@ -127,8 +127,7 @@ def create_dilute_acid_pretreatment_system(
         T201._run()
     T201.specification = update_sulfuric_acid_loading
     
-    neutralization_rxn = tmo.Reaction('2 NH3 + H2SO4 -> (NH4)2SO4 + 2 H2O', 'H2SO4', 1)
-    
+    neutralization_rxn = tmo.Reaction('2 NH3 + H2SO4 -> (NH4)2SO4', 'H2SO4', 1)
     def update_ammonia_loading():
         ammonia, ammonia_process_water = M205.ins
         hydrolyzate = F201.outs[1]

@@ -288,16 +288,13 @@ def create_beer_distillation_system(ins, outs,
 def create_ethanol_purification_system_after_beer_column(ins, outs, IDs={}):
     distilled_beer, denaturant = ins
     ethanol, stripper_bottoms_product = outs
-    
-    x_bot = 3.910570816782338e-06
-    y_top = 0.2811210085806504
+  
     
     # Mix ethanol Recycle (Set-up)
     M303 = units.Mixer(IDs.get('Recycle mixer', 'M303'))
     
-    y_top = 0.8080462715940735
     D303 = units.BinaryDistillation(IDs.get('Distillation', 'D303'), P=101325,
-                                y_top=y_top, x_bot=x_bot, k=1.25, Rmin=0.01,
+                                x_bot=3.9106e-06, y_top=0.80805, k=1.25, Rmin=0.01,
                                 LHK=('Ethanol', 'Water'),
                                 tray_material='Stainless steel 304',
                                 vessel_material='Stainless steel 304',
@@ -335,8 +332,6 @@ def create_ethanol_purification_system_after_beer_column(ins, outs, IDs={}):
                              vessel_material='Carbon steel',
                              tau=6.5*24, outs=ethanol)
     
-    
-        
     ### Ethanol system set-up ###
     (distilled_beer, U301-0)-M303-0-D303-0-H303-U301
     D303-1-P303
@@ -347,9 +342,50 @@ def create_ethanol_purification_system_after_beer_column(ins, outs, IDs={}):
         denaturant.imol['Octane'] = 0.022*pure_ethanol.F_mass/114.232
     
     P304.specification = adjust_denaturant
-    U301-1-H304-0-T302-0-P304
-    denaturant-T303-P305
-    (P305-0, P304-0)-M304-T304
+    (denaturant-T303-P305-0, U301-1-H304-0-T302-0-P304-0)-M304-T304
+
+# @SystemFactory(
+#     ID='ethanol_purification_from_distilled_beer_sys',
+#     ins=[dict(ID='distilled_beer'),
+#           dict(ID='denaturant', Octane=230.69, units='kg/hr', price=0.756)],
+#     outs=[dict(ID='ethanol', price=0.789),
+#           dict(ID='stripper_bottoms_product')]
+# )
+# def create_ethanol_purification_system_after_beer_column(ins, outs):
+#     distilled_beer, denaturant = ins
+#     ethanol, stripper_bottoms_product = outs
+#     M303 = units.Mixer('M303')
+#     D303 = units.BinaryDistillation('D303',
+#         P=101325, x_bot=3.9106e-06, y_top=0.80805, k=1.25, Rmin=0.01,
+#         LHK=('Ethanol', 'Water'), tray_material='Stainless steel 304',
+#         vessel_material='Stainless steel 304', is_divided=True
+#     )
+#     D303.boiler.U = 1.85
+#     P303 = units.Pump('P303', outs=stripper_bottoms_product)
+#     H303 = units.HXutility('H303', T=115+273.15, V=1)
+#     U301 = units.MolecularSieve('U301', split=dict(Ethanol=0.162, Water=0.925))
+#     H304 = units.HXutility('H304', V=0, T=340.)
+#     T302 = units.StorageTank('T302', 
+#         tau=12, vessel_type='Floating roof', vessel_material='Carbon steel'
+#     )
+#     P304 = units.Pump('P304')
+#     T303 = units.StorageTank('T303', 
+#         tau=7*24, vessel_type='Floating roof', vessel_material='Carbon steel'
+#     )
+#     P305 = units.Pump('P305'); M304 = units.Mixer('M304')
+#     T304 = units.StorageTank('T304',
+#         vessel_type='Floating roof', vessel_material='Carbon steel',
+#         tau=6.5*24, outs=ethanol
+#     )
+#     def adjust_denaturant():
+#         P304._run()
+#         denaturant.imol['Octane'] = 0.022 * P304.outs[0].F_mass / 114.232
+    
+#     P304.specification = adjust_denaturant
+#     (distilled_beer, U301-0)-M303-0-D303-0-H303-U301
+#     D303-1-P303
+#     (denaturant-T303-P305, U301-1-H304-0-T302-0-P304-0)-M304-T304
+
 
 @SystemFactory(
     ID='ethanol_purification_sys',
