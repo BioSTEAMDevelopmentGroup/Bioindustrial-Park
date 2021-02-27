@@ -20,7 +20,7 @@ from matplotlib.ticker import AutoMinorLocator as AML
 
 # from biorefineries.HP.system import HP_sys, HP_tea, R302, spec
 # from biorefineries.HP.system import MEK as product
-from biorefineries.HP.system_light_lle_vacuum_distillation import HP_sys, HP_tea, R302, spec, get_GWP, get_non_bio_GWP, get_FEC, get_SPED
+from biorefineries.HP.system_light_lle_vacuum_distillation import HP_sys, HP_tea, R302, spec, get_GWP, get_ng_GWP, get_FEC, get_SPED
 from biorefineries.HP.system_light_lle_vacuum_distillation import AA as product
 
 from matplotlib import pyplot as plt

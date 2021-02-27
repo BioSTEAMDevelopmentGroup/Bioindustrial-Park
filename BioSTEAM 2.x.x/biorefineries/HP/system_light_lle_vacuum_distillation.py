@@ -1274,11 +1274,12 @@ total_C_out = AA.get_atomic_flow('C') + sum([emission.get_atomic_flow('C') for e
 C_bal_error = (total_C_out - total_C_in)/total_C_in
 
 # GWP from combustion of non-biogenic carbons
-get_non_bio_GWP = get_onsite_gwp =\
+get_ng_combustion_GWP = get_onsite_gwp =\
     lambda: (s.natural_gas.get_atomic_flow('C')) * HP_chemicals.CO2.MW / AA.F_mass
                            # +ethanol_fresh.get_atomic_flow('C'))* HP_chemicals.CO2.MW / AA.F_mass
 
-    
+get_ng_GWP = lambda: CFs['GWP_CFs']['CH4']*s.natural_gas.F_mass/AA.F_mass
+
 get_FGHTP_GWP = lambda: (feedstock.F_mass-feedstock.imass['Water']) \
     * CFs['GWP_CFs']['FGHTP %s'%feedstock_ID]/AA.F_mass
 
@@ -1297,12 +1298,12 @@ get_electricity_GWP = lambda: get_electricity_use()*CFs['GWP_CFs']['Electricity'
 #     AA.get_atomic_flow('C')*HP_chemicals.CO2.MW/AA.F_mass
 
 
-# get_GWP = lambda: get_feedstock_GWP() + get_material_GWP() + get_non_bio_GWP() +\
+# get_GWP = lambda: get_feedstock_GWP() + get_material_GWP() + get_ng_GWP() +\
 #                   get_electricity_GWP() + get_emissions_GWP()
 
 get_EOL_GWP = lambda: AA.get_atomic_flow('C') * HP_chemicals.CO2.MW/AA.F_mass
 
-get_GWP = lambda: get_FGHTP_GWP() + get_material_GWP() + get_non_bio_GWP() +\
+get_GWP = lambda: get_FGHTP_GWP() + get_material_GWP() + get_ng_GWP() +\
                   get_electricity_GWP() + get_direct_emissions_GWP()
                   
 get_GWP_by_ID = lambda ID: LCA_stream.imass[ID] * GWP_CF_stream.imass[ID]/AA.F_mass
@@ -1323,7 +1324,7 @@ get_electricity_FEC = lambda: \
 
 get_FEC_by_ID = lambda ID: LCA_stream.imass[ID] * FEC_CF_stream.imass[ID]/AA.F_mass
 
-get_ng_FEC = lambda: -s.natural_gas.LHV*.001 / AA.F_mass
+get_ng_FEC = lambda: CFs['FEC_CFs']['CH4']*s.natural_gas.F_mass/AA.F_mass
 # Total FEC
 get_FEC = lambda: get_material_FEC()+get_electricity_FEC()+get_feedstock_FEC()+get_ng_FEC()
 
@@ -1357,7 +1358,7 @@ def simulate_and_print():
     print('\n---------- Simulation Results ----------')
     print(f'MPSP is ${MPSP:.3f}/kg')
     print(f'GWP is {get_GWP():.3f} kg CO2-eq/kg AA')
-    # print(f'Non-bio GWP is {get_non_bio_GWP():.3f} kg CO2-eq/kg AA')
+    # print(f'Non-bio GWP is {get_ng_GWP():.3f} kg CO2-eq/kg AA')
     print(f'FEC is {get_FEC():.2f} MJ/kg AA or {get_FEC()/AA_LHV:.2f} MJ/MJ AA\n')
     print(f'SPED is {get_SPED():.2f} MJ/kg AA or {get_SPED()/AA_LHV:.2f} MJ/MJ AA')
     print('----------------------------------------\n')

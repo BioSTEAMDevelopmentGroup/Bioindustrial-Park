@@ -240,7 +240,7 @@ CFs = {}
 GWP_CFs = {
     'NH4OH': 2.64 * chems.NH3.MW/chems.NH4OH.MW,
     'CSL': 1.55,
-    'CH4': 0.40, # NA NG from shale and conventional recovery
+    'CH4': 0.33, # NA NG from shale and conventional recovery
     'Enzyme': 2.24,
     'Lime': 1.29,
     'NaOH': 2.11,
