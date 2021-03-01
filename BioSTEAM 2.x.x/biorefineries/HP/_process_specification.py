@@ -304,22 +304,25 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
         self.spec_1 = reactor.glucose_to_HP_rxn.X = yield_
         # reactor.xylose_to_HP_rxn.X = self.xylose_utilization_fraction * yield_
         reactor.xylose_to_HP_rxn.X = yield_
+        
         if reactor.glucose_to_HP_rxn.X +\
             reactor.glucose_to_acetic_acid_rxn.X> 0.999:
-            
-            remainder = 0.999 - reactor.glucose_to_HP_rxn.X
-            # reactor.glucose_to_microbe_rxn.X = .3 * remainder
             reactor.glucose_to_acetic_acid_rxn.X = min(0.04, 1. - reactor.glucose_to_HP_rxn.X)
+            
+            # remainder = 0.999 - reactor.glucose_to_HP_rxn.X
+            # reactor.glucose_to_microbe_rxn.X = .43 * remainder
+            # reactor.glucose_to_acetic_acid_rxn.X = .57 * remainder
+            
             # print(reactor.glucose_to_VitaminA_rxn.X)
             # print(reactor.glucose_to_microbe_rxn.X)
             
         if reactor.xylose_to_HP_rxn.X +\
             reactor.xylose_to_acetic_acid_rxn.X> 0.999:
-            
-            remainder = 0.999 - reactor.xylose_to_HP_rxn.X
-            # reactor.xylose_to_microbe_rxn.X = .3 * remainder
             reactor.xylose_to_acetic_acid_rxn.X = min(0.04 , 1. - reactor.xylose_to_HP_rxn.X)
             
+            # remainder = 0.999 - reactor.xylose_to_HP_rxn.X
+            # reactor.xylose_to_microbe_rxn.X = .43 * remainder
+            # reactor.xylose_to_acetic_acid_rxn.X = .57 * remainder
         
             # print(reactor.glucose_to_VitaminA_rxn.X)
             # print(reactor.glucose_to_microbe_rxn.X)

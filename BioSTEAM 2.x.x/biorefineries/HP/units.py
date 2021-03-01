@@ -1778,7 +1778,18 @@ class CoFermentation(Reactor):
         Rxn('2 Xylose -> 5 AceticAcid',       'Xylose',    0.04),
         ])
         
-      
+        
+        # self.cofermentation_rxns = ParallelRxn([
+        # #      Reaction definition            Reactant    Conversion
+        # Rxn('Glucose -> 2 HP',        'Glucose',   .49),
+        # # Rxn('Glucose -> 3 AceticAcid',        'Glucose',   0.07),
+        # Rxn('Glucose -> 3 AceticAcid',        'Glucose',   0.04),
+        # Rxn('3 Xylose -> 5 HP',       'Xylose',    0.49),
+        # Rxn('2 Xylose -> 5 AceticAcid',       'Xylose',    0.04),
+        # Rxn('Glucose -> 6 FermMicrobe',       'Glucose',   0.03),
+        # Rxn('Xylose -> 5 FermMicrobe',        'Xylose',    0.03),
+        # ])
+        
         self.glucose_to_HP_rxn = self.cofermentation_rxns[0]
         self.xylose_to_HP_rxn = self.cofermentation_rxns[2]
         
@@ -1797,6 +1808,9 @@ class CoFermentation(Reactor):
         
         self.glucose_to_microbe_rxn = self.biomass_generation_rxns[0]
         self.xylose_to_microbe_rxn = self.biomass_generation_rxns[1]
+        
+        # self.glucose_to_microbe_rxn = self.cofermentation_rxns[4]
+        # self.xylose_to_microbe_rxn = self.cofermentation_rxns[5]
         
         if 'Sucrose' in self.chemicals:
             self.sucrose_hydrolysis_rxn = Rxn('Sucrose + Water -> 2Glucose', 'Sucrose', 1.-1e-9)

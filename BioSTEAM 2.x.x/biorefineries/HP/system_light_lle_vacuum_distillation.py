@@ -1,21 +1,15 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-
 Created on Sun Aug 23 12:11:15 2020
-
 @author: sarangbhagwat
-
 Modified from the cornstover biorefinery constructed in Cortes-Peña et al., 2020,
 with modification of fermentation system for 3-Hydroxypropionic acid instead of the original ethanol
-
 [1] Cortes-Peña et al., BioSTEAM: A Fast and Flexible Platform for the Design, 
     Simulation, and Techno-Economic Analysis of Biorefineries under Uncertainty. 
     ACS Sustainable Chem. Eng. 2020, 8 (8), 3302–3310. 
     https://doi.org/10.1021/acssuschemeng.9b07040.
-
 All units are explicitly defined here for transparency and easy reference
-
 Naming conventions:
     D = Distillation column
     F = Flash tank
@@ -27,7 +21,6 @@ Naming conventions:
     T = Tank or bin for storage
     U = Other units
     PS = Process specificiation, not physical units, but for adjusting streams
-
 Processes:
     100: Feedstock preprocessing
     200: Pretreatment
@@ -35,8 +28,6 @@ Processes:
     400: Separation
     500: Wastewater treatment
     600: Facilities
-
-
 """
 
 
@@ -91,7 +82,7 @@ feedstock_ID = 'Corn stover'
 
 
 @SystemFactory(ID = 'HP_sys')
-def create_HP_sys(ID, ins, outs):
+def create_HP_sys(ins, outs):
     
     process_groups = []
     # %% 
@@ -962,10 +953,7 @@ BT_sys = System('BT_sys', path=(BT,))
 # flowsheet('SYS2').molar_tolerance = 3
 # flowsheet('SYS2').maxiter = 100
 
-
-dct = globals() 
-for i in (flowsheet.unit, flowsheet.system, flowsheet.stream):
-    dct.update(i.__dict__)
+globals().update(flowsheet.to_dict())
 
 process_groups_dict = {}
 for i in range(len(process_groups)):
@@ -1343,7 +1331,7 @@ def get_material_cost_breakdown():
         group_material_costs[group.name] = 0
     for feed in feeds:
         for group in process_groups:
-            if group.name is not 'facilities_no_hu_group':
+            if group.name != 'facilities_no_hu_group':
                 for unit in group.units:
                     for instream in unit.ins:
                         if instream.shares_flow_rate_with(feed):
