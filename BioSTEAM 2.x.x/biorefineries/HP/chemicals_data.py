@@ -160,6 +160,12 @@ AQ336.copy_models_from(TOA, ('Psat', 'Hvap', 'V'))
 AQ336._Dortmund = TOA.Dortmund
 
 AQ336.Hfus = TOA.Hfus
+
+Octanol = chemical_database('Octanol')
+Hexanol = chemical_database('Hexanol')
+Octanediol = chemical_database('Octanediol', search_ID='1,8-Octanediol')
+Butyl_acetate = chemical_database('Butyl acetate')
+
 # AQ336 = chemical_database('N-Methyl-N,N,N-trioctylammonium chloride') 
 IBA = chemical_database('Isobutyraldehyde')
 DPHP = chemical_database('DPHP', search_ID='Dipotassium hydrogen phosphate', phase = 'l')
@@ -205,6 +211,7 @@ Enzyme = chemical_defined('Enzyme', phase='l',
 # Properties of fermentation microbes copied from Z_mobilis as in Humbird et al.
 FermMicrobe = chemical_defined('FermMicrobe', phase='l',
                       formula='CH1.8O0.5N0.2', Hf=-31169.39*_cal2joule)
+# FermMicrobe.HHV /= 10.
 WWTsludge = chemical_defined('WWTsludge', phase='s', 
                              formula='CH1.64O0.39N0.23S0.0035', 
                              Hf=-23200.01*_cal2joule)
@@ -240,15 +247,22 @@ LacticAcid = chemical_database('LacticAcid')
 LacticAcid.Hfus = 11.34e3
 
 
-HP = chemical_copied('HP', LacticAcid)
+# HP = chemical_copied('HP', LacticAcid)
+HP = chemical_database('HP', search_ID='3-Hydroxypropionic acid')
+HP.copy_models_from(LacticAcid, names = ['V', 'Hvap', 'Psat', 'mu', 'kappa'])
+HP.Tm = 15 + 273.15 # CAS says < 25 C
+HP.Tb = 179.75 + 273.15 # CAS
+MethylHP = chemical_database('MethylHP', search_ID='6149-41-3')
+MethylLactate = tmo.Chemical('MethylLactate')
+MethylHP.copy_models_from(MethylLactate, ('Psat', 'Hvap', 'V'))
 # HP.Tb = 25
 SuccinicAcid = chemical_database('SuccinicAcid', phase_ref='s')
 
-EthylAcetate = chemical_database('EthylAcetate')
+MethylAcetate = chemical_database('MethylAcetate')
 # Hf from DIPPR value in Table 3 of Vatani et al., Int J Mol Sci 2007, 8 (5), 407–432
 EthylLactate = chemical_database('EthylLactate', Hf=-695.08e3)
 
-EthylSuccinate = chemical_database('EthylSuccinate')
+MethylSuccinate = chemical_database('MethylSuccinate')
 # Cannot find data on Hf of CalciumSuccinate, estimate here assuming
 # Hrxn for Ca(OH)2 and SA and Ca(OH)2 and LA are the same 
 CalciumSuccinate.Hf = CalciumLactate.Hf + (SuccinicAcid.Hf-2*LacticAcid.Hf)
@@ -284,6 +298,8 @@ Ash = chemical_database('Ash', search_ID='CaO', phase='s', Hf=-151688*_cal2joule
 # cannot directly use Xylose as Xylose is locked at liquid state now
 Tar = chemical_copied('Tar', Xylose, phase_ref='s')
 
+TiO2 = chemical_database('TiO2')
+
 # =============================================================================
 # Mixtures
 # =============================================================================
@@ -313,12 +329,12 @@ CoolingTowerChems = chemical_copied('CoolingTowerChems', BaghouseBag)
 DAP = chemical_database('DAP', search_ID='DiammoniumPhosphate',
                              phase='l', Hf= -283996*_cal2joule)
 Methanol = chemical_database('Methanol')
-MethylAcetate = chemical_database('MethylAcetate')
+# MethylAcetate = chemical_database('MethylAcetate')
 Denaturant = chemical_database('Denaturant', search_ID='n-Heptane')
 DenaturedEnzyme = chemical_copied('DenaturedEnzyme', Enzyme)
 
 # Hf from DIPPR value in Table 3 of Vatani et al., Int J Mol Sci 2007, 8 (5), 407–432
-MethylLactate = chemical_database('MethylLactate', Hf=-643.1e3)
+# MethylLactate = chemical_database('MethylLactate', Hf=-643.1e3)
 FermMicrobeXyl = chemical_copied('FermMicrobeXyl', FermMicrobe)
 
 
@@ -335,8 +351,8 @@ chemical_groups = dict(
                       'ArabinoseOligomer', 'MannoseOligomer'),
     OrganicSolubleSolids = ('AmmoniumAcetate', 'SolubleLignin', 'Extract', 'CSL'),
                             # 'LacticAcid', 'CalciumLactate', 'CalciumAcetate',
-                            # 'EthylLactate', 'EthylAcetate', 'SuccinicAcid',
-                            # 'CalciumSuccinate', 'EthylSuccinate', 
+                            # 'EthylLactate', 'MethylAcetate', 'SuccinicAcid',
+                            # 'CalciumSuccinate', 'MethylSuccinate', 
                             # 'Methanol', 'MethylLactate', 'MethylAcetate'),
     InorganicSolubleSolids = ('AmmoniumSulfate', 'NaOH', 'HNO3', 'NaNO3',
                               # 'DAP',
@@ -353,7 +369,7 @@ chemical_groups = dict(
     # P4O10 will be generated in the system as no P-containing chemicals 
     # are included in "combustibles"
     OtherInsolubleSolids = ('Tar', 'Ash', 'CalciumDihydroxide', 'CaSO4', 'P4O10',
-                            'BaghouseBag', 'CoolingTowerChems'),
+                            'BaghouseBag', 'CoolingTowerChems', 'TiO2'),
     OtherStructuralCarbohydrates = ('Glucan', 'Xylan', 'Lignin', 'Arabinan', 
                                     'Mannan', 'Galactan'),
     SeparatelyListedOrganics = ('Ethanol', 'Glucose', 'Xylose', 'AceticAcid',
@@ -378,22 +394,22 @@ combustibles = soluble_organics + list(chemical_groups['OtherStructuralCarbohydr
 # combustibles.remove('CalciumLactate')
 # combustibles.remove('CalciumAcetate')
 combustibles.extend(['WWTsludge','NH3', 'NitricOxide', 'CarbonMonoxide', 'H2S', 'CH4'])
-
+combustibles.append('MethylHP')
 # Chemicals that will be modeled in Distallation/Flash units,
 # list is in ascending order of Tb,
 # Xylitol is not included due to high Tm and Tb thus will stay in liquid phase
 
 
-# phase_change_chemicals = ['Methanol', 'Ethanol', 'H2O', 'EthylAcetate', 'Denaturant',
+# phase_change_chemicals = ['Methanol', 'Ethanol', 'H2O', 'MethylAcetate', 'Denaturant',
 #                           'AceticAcid', 'MethylAcetate', 'MethylLactate',
 #                           'EthylLactate', 'Furfural', 'SuccinicAcid', 'LacticAcid', 'HMF']
 
 #!!! Sarang please review and update this, I'm not sure what chemicals are used
 # in the biorefinery, getting rid of unused chemicals (i.e., exclude them from chems)
 # should help reduce simulation time
-phase_change_chemicals = ['Methanol', 'Ethanol', 'H2O', 'EthylAcetate', 'Denaturant',
+phase_change_chemicals = ['Methanol', 'Ethanol', 'H2O', 'MethylAcetate', 'Denaturant',
                           'AceticAcid', 'MethylAcetate', 'MethylLactate',
-                          'EthylLactate', 'Furfural', 'EthylSuccinate',
+                          'EthylLactate', 'Furfural', 'MethylSuccinate',
                           'SuccinicAcid', 'LacticAcid', 'HMF']
 
 for chem in chems:
@@ -480,6 +496,7 @@ chems.set_synonym('P4O10', 'PhosphorusPentoxide')
 chems.set_synonym('Na2SO4', 'SodiumSulfate')
 chems.set_synonym('AmmoniumHydroxide', 'NH4OH')
 chems.set_synonym('Isobutyraldehyde', 'IBA')
+
 
 # %% Set all "None" Hfus values to 0
 for chem in HP_chemicals:

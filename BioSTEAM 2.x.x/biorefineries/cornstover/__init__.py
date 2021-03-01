@@ -43,7 +43,7 @@ from ._tea import *
 
 _system_loaded = False
 _chemicals_loaded = False
-_include_blowdown_recycle = False
+_include_blowdown_recycle = True
 
 def load():
     if not _chemicals_loaded: _load_chemicals()

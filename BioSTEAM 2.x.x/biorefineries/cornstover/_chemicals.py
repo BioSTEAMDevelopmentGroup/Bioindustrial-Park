@@ -127,6 +127,7 @@ def create_chemicals():
                        'LacticAcid', 'SuccinicAcid', lc.chemicals.P4O10])
     )
     chems.H2SO4.at_state('l')
+    append_single_phase_chemical('Lime', 'Ca(OH)2')
     append_single_phase_chemical('HNO3', 'NitricAcid')
     append_single_phase_chemical('Denaturant', 'Octane')
     append_single_phase_chemical('DAP', 'Diammonium Phosphate')
@@ -169,7 +170,6 @@ def create_chemicals():
     chems.Acetate.Hf = -103373
     
     # Chemicals taken from previous study
-    chems.append(lc.chemicals.CaO)
     chems.append(lc.chemicals.Ash)
     chems.append(lc.chemicals.NaOH)
     append_new_single_phase_chemical('Lignin',
@@ -243,7 +243,7 @@ def create_chemicals():
     #     i.N_solutes = 2
         
     chems.compile()
-    chems.set_synonym('CaO', 'Lime')
+    chems.set_synonym('Lime', 'Ca(OH)2')
     chems.set_synonym('Water', 'H2O')
     chems.set_synonym('H2SO4', 'SulfuricAcid')
     chems.set_synonym('NH3', 'Ammonia')

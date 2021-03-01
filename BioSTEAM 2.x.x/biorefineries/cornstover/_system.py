@@ -413,7 +413,3 @@ def create_system(ins, outs, include_blowdown_recycle=False):
         RO_water=u.S604-0,
         blowdown_to_wastewater=blowdown_to_wastewater,
     )
-    if include_blowdown_recycle:
-        blowdown_mixer = bst.BlowdownMixer('blowdown_mixer', 
-                                            (u.BT-1, u.CT-1),
-                                            blowdown_to_wastewater)

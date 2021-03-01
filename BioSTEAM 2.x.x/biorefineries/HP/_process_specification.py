@@ -9,22 +9,97 @@ import flexsolve as flx
 import numpy as np
 from biosteam.exceptions import InfeasibleRegion
 from biorefineries.HP.units import compute_HP_titer, compute_HP_mass
+from winsound import Beep
+# from biorefineries.HP import system_light_lle_vacuum_distillation
+
+_red_highlight_white_text = '\033[1;47;41m'
+_yellow_text = '\033[1;33m'
+_reset_text = '\033[1;0m'
+
 # from biosteam.process_tools.reactor_specification import evaluate_across_TRY
 _kg_per_ton = 907.18474
 
 def evaluate_across_specs(spec, system,
             spec_1, spec_2, metrics, spec_3):
+    
+    def reset_and_reload():
+        print('Resetting cache and emptying recycles ...')
+        system.reset_cache()
+        system.empty_recycles()
+        print('Loading and simulating with baseline specifications ...')
+        spec.load_yield(0.49)
+        spec.load_titer(54.8)
+        system.simulate()
+        print('Loading and simulating with required specifications ...')
+        spec.load_specifications(spec_1=spec_1, spec_2=spec_2)
+        system.simulate()
+    
+    def reset_and_switch_solver(solver_ID):
+        system.reset_cache()
+        system.empty_recycles()
+        system.converge_method = solver_ID
+        print(f"Trying {solver_ID} ...")
+        system.simulate()
+        
+    def run_bugfix_barrage():
+        try:
+            reset_and_reload()
+        except Exception as e:
+            print(str(e))
+            try:
+                reset_and_switch_solver('fixedpoint')
+            except Exception as e:
+                print(str(e))
+                try:
+                    reset_and_switch_solver('aitken')
+                except Exception as e:
+                    print(str(e))
+                    print(_yellow_text+"Bugfix barrage failed."+_reset_text)
+                    raise e
+        finally:
+            system.converge_method = 'wegstein'
+            print('\n')
+    spec.count += 1
+    print(f"\n\n----------\n{spec.count} / {spec.total_iterations}\n")
+    print(f"yield = {format(100*float(spec_1),'.1f')} % theo.,  titer = {format(float(spec_2),'.2f')} g\u00b7L\u207b\u00b9,  prod. = {format(float(spec_3),'.2f')} g\u00b7L\u207b\u00b9\u00b7h\u207b\u00b9\n")
+    
     try:
         spec.load_specifications(spec_1=spec_1, spec_2=spec_2)
-        # system._setup()
-        # for i in range(2): system._converge()
         system.simulate()
-    except ValueError:# (ValueError, RuntimeError) (ValueError, AssertionError)
-        return np.nan*np.ones([len(metrics), len(spec_3)])
-    except InfeasibleRegion:
-        return np.nan*np.ones([len(metrics), len(spec_3)])
+        return spec.evaluate_across_productivity(metrics, spec_3)
+    
+    except Exception as e1:
+        str_e1 = str(e1)
+        if 'sugar concentration' in str_e1:
+            print('Infeasible sugar concentration (routine infeasible region error).')
+            sugars_tuple = spec.titer_inhibitor_specification.sugars
+            reactor_ins_0 = spec.titer_inhibitor_specification.reactor.ins[0]
+            evaporator_outs_0 = spec.titer_inhibitor_specification.evaporator.outs[0]
+            sugar_conc_reactor = reactor_ins_0.imass[sugars_tuple].sum() / reactor_ins_0.F_vol
+            sugar_conc_evaporator = evaporator_outs_0.imass[sugars_tuple].sum() / evaporator_outs_0.F_vol
+            print(f"[Sugars]evaporator = {format(sugar_conc_evaporator, '0.2f')} g\u00b7L\u207b\u00b9")
+            print(f"[Sugars]reactor = {format(sugar_conc_reactor, '0.2f')} g\u00b7L\u207b\u00b9")
+            return np.nan*np.ones([len(metrics), len(spec_3)])
+        else:
+            print(str_e1)
+            try:
+                run_bugfix_barrage()
+                return spec.evaluate_across_productivity(metrics, spec_3)
+                # Beep(320, 250)
+            except Exception as e2:
+                print(str(e2))
+                Beep(640, 500)
+                spec.count_exceptions += 1
+                print(_red_highlight_white_text+f"Point failed; returning metric values as np.nan."+_reset_text)
+                spec.exceptions_dict[spec.count] = (e1, e2)
+                return np.nan*np.ones([len(metrics), len(spec_3)])
+    HXN_Q_bal_percent_error = spec.HXN.energy_balance_percent_error
+    print(f"HXN Q_balance off by {format(HXN_Q_bal_percent_error,'.2f')} %.\n")
+    spec.average_HXN_energy_balance_percent_error += abs(HXN_Q_bal_percent_error)
     return spec.evaluate_across_productivity(metrics, spec_3)
     
+
+
 evaluate_across_specs = np.vectorize(
     evaluate_across_specs, 
     excluded=['spec', 'system', 'metrics', 'spec_3'],
@@ -51,11 +126,19 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
                  'byproduct_streams',
                  'feedstock_mass',
                  'pretreatment_reactor',
-                 'titer_inhibitor_specification')
+                 'titer_inhibitor_specification',
+                 'seed_train_system',
+                 'HXN',
+                 'count',
+                 'count_exceptions',
+                 'total_iterations',
+                 'average_HXN_energy_balance_percent_error',
+                 'exceptions_dict')
     
-    def __init__(self, evaporator, pump, mixer, heat_exchanger, reactor, reaction_name, substrates, products,
+    def __init__(self, evaporator, pump, mixer, heat_exchanger, seed_train_system, 
+                 reactor, reaction_name, substrates, products,
                  spec_1, spec_2, spec_3, xylose_utilization_fraction,
-                 feedstock, dehydration_reactor, byproduct_streams, 
+                 feedstock, dehydration_reactor, byproduct_streams, HXN,
                  feedstock_mass=104192.83224417375, pretreatment_reactor = None,
                   load_spec_1=None, load_spec_2=None, load_spec_3=None):
         self.substrates = substrates
@@ -70,14 +153,23 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
         self.byproduct_streams = byproduct_streams
         self.feedstock_mass = feedstock_mass
         self.pretreatment_reactor = pretreatment_reactor
-       
+        self.seed_train_system = seed_train_system
+        self.HXN = HXN
+        
+        self.count = 0 
+        self.count_exceptions = 0
+        self.total_iterations = 0
+        self.average_HXN_energy_balance_percent_error = 0.
+        self.exceptions_dict = {}
+        
         self.load_spec_1 = load_spec_1
         self.load_spec_2 = load_spec_2
         self.load_spec_3 = load_spec_3
         
         self.titer_inhibitor_specification =\
-            TiterAndInhibitorsSpecification(evaporator, pump, mixer, heat_exchanger, reactor,
-                 target_titer=100, product=reactor.outs[0])
+            TiterAndInhibitorsSpecification(evaporator, pump, mixer, heat_exchanger,
+                                            seed_train_system, reactor,
+                 target_titer=100, product=reactor.outs[0], maximum_inhibitor_concentration = 1.)
         
     def load_specifications(self, spec_1=None, spec_2=None, spec_3=None,):
         """
@@ -92,9 +184,9 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
         productivity : float, optional
             g products / L effluent / hr
         """
+        self.load_spec_3(spec_3 or self.spec_3)
         self.load_spec_1(spec_1 or self.spec_1)
         self.load_spec_2(spec_2 or self.spec_2)
-        self.load_spec_3(spec_3 or self.spec_3)
 
     def evaluate_across_productivity(self, metrics, spec_3):
         """
@@ -164,9 +256,18 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
         results [Y x T x M x P]
         
         """
-        return evaluate_across_specs(self, system, 
+        self.count = 0 
+        self.count_exceptions = 0
+        self.total_iterations = 0
+        # self.average_HXN_energy_balance_percent_error = 0.
+        self.exceptions_dict = {}
+        
+        self.total_iterations = len(spec_1) * len(spec_2) * len(spec_3)
+        results = evaluate_across_specs(self, system, 
                                    spec_1, spec_2, 
                                    metrics, spec_3)
+        self.average_HXN_energy_balance_percent_error /= self.total_iterations
+        return results
     
     @property
     def feed(self):
@@ -201,23 +302,23 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
         # print(yield_)
         reactor = self.reactor
         self.spec_1 = reactor.glucose_to_HP_rxn.X = yield_
-        reactor.xylose_to_HP_rxn.X = self.xylose_utilization_fraction * yield_
-        
-        if reactor.glucose_to_HP_rxn.X+ reactor.glucose_to_microbe_rxn.X +\
+        # reactor.xylose_to_HP_rxn.X = self.xylose_utilization_fraction * yield_
+        reactor.xylose_to_HP_rxn.X = yield_
+        if reactor.glucose_to_HP_rxn.X +\
             reactor.glucose_to_acetic_acid_rxn.X> 0.999:
             
             remainder = 0.999 - reactor.glucose_to_HP_rxn.X
-            reactor.glucose_to_microbe_rxn.X = .3 * remainder
-            reactor.glucose_to_acetic_acid_rxn.X = .7*remainder
+            # reactor.glucose_to_microbe_rxn.X = .3 * remainder
+            reactor.glucose_to_acetic_acid_rxn.X = min(0.04, 1. - reactor.glucose_to_HP_rxn.X)
             # print(reactor.glucose_to_VitaminA_rxn.X)
             # print(reactor.glucose_to_microbe_rxn.X)
             
-        if reactor.xylose_to_HP_rxn.X  + reactor.xylose_to_microbe_rxn.X +\
+        if reactor.xylose_to_HP_rxn.X +\
             reactor.xylose_to_acetic_acid_rxn.X> 0.999:
             
             remainder = 0.999 - reactor.xylose_to_HP_rxn.X
-            reactor.xylose_to_microbe_rxn.X = .3 * remainder
-            reactor.xylose_to_acetic_acid_rxn.X = .7*remainder
+            # reactor.xylose_to_microbe_rxn.X = .3 * remainder
+            reactor.xylose_to_acetic_acid_rxn.X = min(0.04 , 1. - reactor.xylose_to_HP_rxn.X)
             
         
             # print(reactor.glucose_to_VitaminA_rxn.X)
@@ -240,14 +341,14 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
         specifications.
         
         """
-        self.reactor.tau_cofermentation = self.spec_2 / productivity
+        self.reactor.tau = self.reactor.tau_cofermentation = self.spec_2 / productivity
         self.spec_3 = productivity
     
     def calculate_titer(self):
         """Return titer in g products / effluent L."""
         reactor = self.reactor
         (reactor.specification or reactor._run)()
-        effluent = self.effluent
+        # effluent = self.effluent
         # F_mass_products = effluent.imass[self.products].sum()
         # if F_mass_products: 
         #     return F_mass_products / effluent.F_vol
@@ -260,7 +361,7 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
         titer_inhibitor_specification.target_titer = titer
         self.spec_2 = titer
         titer_inhibitor_specification.run()
-        self.reactor.tau_cofermentation = titer / self.spec_3
+        self.reactor.tau = self.reactor.tau_cofermentation = titer / self.spec_3
         
     def load_feedstock_price(self, price):
         self.feedstock.price = price / _kg_per_ton * 0.8 # price per dry ton --> price per wet kg
@@ -339,12 +440,12 @@ class TiterAndInhibitorsSpecification:
     
     max_sugar_concentration = 600 # g / L
     
-    def __init__(self, evaporator, pump, mixer, heat_exchanger, reactor,
+    def __init__(self, evaporator, pump, mixer, heat_exchanger, seed_train_system, reactor, 
                  target_titer, product,
                  maximum_inhibitor_concentration=1.,
                  products=('HP',),
-                 sugars = ('Glucose', 'Xylose'),
-                 inhibitors = ('AceticAcid', 'HMF', 'Furfural')):
+                 sugars = ('Glucose', 'Xylose', 'Arabinose', 'Sucrose'),
+                 inhibitors = ('AceticAcid', 'HMF', 'Furfural'),):
         self.evaporator = evaporator
         self.pump = pump
         self.mixer = mixer
@@ -354,9 +455,16 @@ class TiterAndInhibitorsSpecification:
         self.products = products
         self.sugars = sugars
         self.inhibitors = inhibitors
+        if not reactor.neutralization:
+            inhibitors = list(inhibitors)
+            inhibitors.remove('AceticAcid')
+            self.inhibitors = tuple(inhibitors)
+            # Assumes acid tolerant strains can tolerate all present acetic acid
         self.target_titer = target_titer
         self.maximum_inhibitor_concentration = maximum_inhibitor_concentration
         self.get_products_mass = compute_HP_mass
+        self.seed_train_system = seed_train_system
+        
     @property
     def feed(self):
         return self.evaporator.ins[0]
@@ -374,12 +482,14 @@ class TiterAndInhibitorsSpecification:
         self.pump._run()
         self.mixer._run()
         self.heat_exchanger._run()
+        self.seed_train_system._converge()
         self.reactor._run()
     
     def calculate_titer(self):
         # product = self.product
         # return product.imass[self.products].sum() / product.F_vol
-        return compute_HP_titer(self.product)
+        # return compute_HP_titer(self.product)
+        return self.reactor.effluent_titer
     
     def calculate_inhibitors(self): # g / L
         product = self.product
@@ -409,11 +519,15 @@ class TiterAndInhibitorsSpecification:
         self.dilution_water.empty()
         self.evaporator.V = 0.
         self.run_units()
+        reactor = self.reactor
         x_titer = self.calculate_titer()
+        # V_min = 0.00001
         V_min = 0.
+        V_max = 0.999
+        
         if x_titer < self.target_titer: # Evaporate
             self.evaporator.V = V_min = flx.IQ_interpolation(self.titer_objective_function,
-                                                             V_min, 0.999, ytol=1e-4, maxiter=100) 
+                                                             V_min, V_max, ytol=1e-3, maxiter=100) 
         elif x_titer > self.target_titer: # Dilute
             self.update_dilution_water(x_titer)
             self.mixer._run()
@@ -423,8 +537,12 @@ class TiterAndInhibitorsSpecification:
         self.check_sugar_concentration()
         x_inhibitor = self.calculate_inhibitors()
         if x_inhibitor > self.maximum_inhibitor_concentration:
-            self.evaporator.V = flx.IQ_interpolation(self.inhibitor_objective_function,
-                                                     V_min, 0.999, ytol=1e-4, maxiter=100) 
+            obj_f = self.inhibitor_objective_function
+            y_0 = obj_f(V_min)
+            
+            if y_0 > 0.:
+                self.evaporator.V = flx.IQ_interpolation(obj_f,
+                                                     V_min, V_max, y0 = y_0, ytol=1e-3, maxiter=100) 
         
         # self.check_sugar_concentration()
     
