@@ -34,14 +34,15 @@ __all__ = (
 @SystemFactory(
     ID='lipidcane_sys',
     ins=[create_juicing_and_lipid_extraction_system.ins[0]],
-    outs=create_lipidcane_to_biodiesel_and_conventional_ethanol_system.outs[:3],
+    outs=[*create_lipidcane_to_biodiesel_and_conventional_ethanol_system.outs[:3],
+          dict(ID='vinasse', price=0.01)], # TODO: Find good selling price for vinasse and possibly yeast
 )
 def create_lipidcane_to_biodiesel_and_both_cellulosic_and_conventional_ethanol_system(
         ins, outs, evaporator_and_beer_column_heat_integration=True,
     ):
     
     lipidcane, = ins
-    ethanol, biodiesel, crude_glycerol = outs
+    ethanol, biodiesel, crude_glycerol, vinasse = outs
     juicing_and_lipid_extraction_sys = create_juicing_and_lipid_extraction_system(
         ins=lipidcane,
         mockup=True,
@@ -80,10 +81,12 @@ def create_lipidcane_to_biodiesel_and_both_cellulosic_and_conventional_ethanol_s
         udct=True,
         area=500,
     )
+    f.stream.stripping_water.ID = 'stripping_water_area_500'
+    
     conventional_beer, evaporator_condensate_1 = sucrose_fermentation_sys.outs
     conventional_beer_distillation_sys = create_beer_distillation_system(
-        ins=conventional_beer,
-        outs=[''],
+        ins=conventional_beer, 
+        outs=['', vinasse],
         mockup=True,
         area=500,
     )
@@ -94,6 +97,7 @@ def create_lipidcane_to_biodiesel_and_both_cellulosic_and_conventional_ethanol_s
         mockup=True,
         area=700,
     )
+    f.stream.stripping_water.ID = 'stripping_water_area_700'
     cellulosic_beer, = cellulosic_fermentation_sys.outs
     cellulosic_beer_distillation_sys = create_beer_distillation_system(
         ins=cellulosic_beer,
@@ -127,8 +131,7 @@ def create_lipidcane_to_biodiesel_and_both_cellulosic_and_conventional_ethanol_s
         ins=[PF1-1, 
              *juicing_and_lipid_extraction_sys-[3, 4], 
              dilute_acid_pretreatment_sys-1,
-             ethanol_purification_sys-1,
-             conventional_beer_distillation_sys-1],
+             ethanol_purification_sys-1],
         mockup=True,
         area=900
     )
@@ -142,9 +145,9 @@ def create_lipidcane_to_biodiesel_and_both_cellulosic_and_conventional_ethanol_s
                                s.biodiesel_wash_water,
                                s.oil_wash_water,
                                s.rvf_wash_water,
-                               s.stripping_water,
+                               s.stripping_water_area_500,
+                               s.stripping_water_area_700, 
                                s.caustic, 
-                               # s.stripping_water_2, 
                                s.warm_process_water,
                                s.pretreatment_steam,
                                s.saccharification_water),

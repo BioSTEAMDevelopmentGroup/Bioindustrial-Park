@@ -304,7 +304,7 @@ def create_facilities(
                                                   gas_to_boiler, 
                                                   'boiler_makeup_water',
                                                   'natural_gas',
-                                                  'lime',
+                                                  'FGD_lime',
                                                   'boilerchems'), 
                                               turbogenerator_efficiency=0.85)
     

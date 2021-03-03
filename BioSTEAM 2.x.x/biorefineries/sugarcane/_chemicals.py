@@ -45,7 +45,7 @@ def create_chemicals():
                                  formula='C8H8O3', # Vainillin
                                  Hf=-452909.632)
     Solids = create_new_chemical('Solids', MW=1.)
-    Yeast = create_new_chemical('Yeast', MW=1., CAS='Yeast')
+    Yeast = create_new_chemical('Yeast', MW=1., CAS='Yeast', Hf=Glucose.Hf / Glucose.MW)
     CaO = create_new_chemical('CaO', formula='CaO')
 
     

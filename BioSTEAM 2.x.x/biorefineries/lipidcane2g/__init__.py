@@ -64,7 +64,7 @@ def _load_system(dct):
                   'Juicing', 
                   'Biod. prod.',
                   'Conv. ferm.', 
-                  'pretreatment',
+                  'Pretreatment',
                   'Cofementation',
                   'Ethanol sep.', 
                   'Wastewater treatment', 

@@ -449,9 +449,6 @@ def create_sucrose_fermentation_system(ins, outs):
                                  Water=26836,
                                  units='kg/hr')
     
-    # Yeast
-    yeast = bst.Stream('yeast', Water=24700, DryYeast=10300, units='kg/hr')
-    
     ### Units ###
     
     # Split sugar solution
@@ -488,8 +485,8 @@ def create_sucrose_fermentation_system(ins, outs):
                               gas=('CO2', 'O2'))
     
     # Separate 99% of yeast
-    C301 = units.SolidsCentrifuge('C301', outs=('recycle_yeast', ''),
-                                  split=(1, 0.99999, 1, 0.01),
+    C301 = units.SolidsCentrifuge('C301', 
+                                  split=(1-1e-6, 0.99, 1, 0.01),
                                   order=('Ethanol', 'Glucose', 'H3PO4', 'DryYeast'),
                                   solids=('DryYeast',))
     C301.split[:] = 1. - C301.split
@@ -500,16 +497,26 @@ def create_sucrose_fermentation_system(ins, outs):
     # Yeast mixing
     T305 = units.MixTank('T305')
     T305.tau = 0.1
-    yeast-T305
     
     # Multi-effect evaporator pumps
     P306 = units.Pump('P306')
+    
+    def adjust_yeast_recycle():
+        recycle, beer = C301.outs
+        feed, *_ = C301.ins
+        yeast = 0.1 * feed.F_mass
+        m = C301.moisture_content
+        recycle.imass['Yeast', 'Water'] = [yeast, yeast * m / (1 - m)]
+        beer.mol = feed.mol - recycle.mol
+        beer.mol[beer.mol < 0.] = 0.
+        beer.T = recycle.T = feed.T
+    C301.specification = adjust_yeast_recycle
     
     ### Ethanol system set-up ###
     
     screened_juice-S301-1-F301-0-P306
     (S301-0, P306-0)-M301-H301
-    (H301-0, yeast-T305-0)-R301-1-T301-0-C301
+    (H301-0, C301-0-T305-0)-R301-1-T301-0-C301
     (C301-1, D301-1)-M302
     
 
