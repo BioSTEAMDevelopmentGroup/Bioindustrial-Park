@@ -133,12 +133,15 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
                  'count_exceptions',
                  'total_iterations',
                  'average_HXN_energy_balance_percent_error',
-                 'exceptions_dict')
+                 'exceptions_dict',
+                 'pre_conversion_units',
+                 'baseline_titer')
     
     def __init__(self, evaporator, pump, mixer, heat_exchanger, seed_train_system, 
                  reactor, reaction_name, substrates, products,
                  spec_1, spec_2, spec_3, xylose_utilization_fraction,
                  feedstock, dehydration_reactor, byproduct_streams, HXN,
+                 pre_conversion_units = None, baseline_titer = 54.8,
                  feedstock_mass=104192.83224417375, pretreatment_reactor = None,
                   load_spec_1=None, load_spec_2=None, load_spec_3=None):
         self.substrates = substrates
@@ -155,6 +158,8 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
         self.pretreatment_reactor = pretreatment_reactor
         self.seed_train_system = seed_train_system
         self.HXN = HXN
+        self.pre_conversion_units = pre_conversion_units
+        self.baseline_titer = baseline_titer
         
         self.count = 0 
         self.count_exceptions = 0
@@ -370,20 +375,20 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
         self.feedstock.price = price / _kg_per_ton * 0.8 # price per dry ton --> price per wet kg
         self.spec_2 = price
         
-    def calculate_feedstock_sugar_content(self):
+    def calculate_feedstock_carbohydrate_content(self):
         feedstock = self.feedstock
         return (feedstock.imass['Glucan']+feedstock.imass['Xylan'])/feedstock.F_mass
     
     
-    def feedstock_sugar_content_objective_function(self, multiplier): 
+    def feedstock_carbohydrate_content_objective_function(self, multiplier): 
         feedstock = self.feedstock
         feedstock.imass['Glucan'] *= multiplier
         feedstock.imass['Xylan'] *= multiplier
         feedstock.mol[:]*= self.feedstock_mass/feedstock.F_mass
-        return self.calculate_feedstock_sugar_content() - self.spec_1
+        return self.calculate_feedstock_carbohydrate_content() - self.spec_1
     
-    def load_feedstock_sugar_content_old(self, sugar_content):
-        f = self.feedstock_sugar_content_objective_function
+    def load_feedstock_carbohydrate_content_old(self, sugar_content):
+        f = self.feedstock_carbohydrate_content_objective_function
         self.spec_1 = sugar_content
         flx.IQ_interpolation(f, 0.00001, 30., ytol=1e-4, maxiter=100)
         
@@ -405,7 +410,7 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
             byproduct.price = price / _kg_per_ton
         self.spec_1 = price / _kg_per_ton
     
-    def load_feedstock_sugar_content(self, sugar_content):
+    def load_feedstock_carbohydrate_content(self, sugar_content):
         self.spec_1 = sugar_content
         F_mass = self.feedstock_mass
         sugars_IDs = ('Glucan', 'Xylan')
@@ -417,6 +422,11 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
         feedstock.imass[sugars_IDs] = 0.
         feedstock.F_mass = F_mass - F_mass_sugars
         feedstock.imass[sugars_IDs] = mass_sugars
+        # for unit in self.pre_conversion_units:
+        #     unit.simulate()
+        # # self.load_yield(self.baseline_yield)
+        # self.load_titer(self.baseline_titer)
+        
     # def load_capacity(self, capacity):
         
     def load_pretreatment_conversion_to_xylose(self, conversion):

@@ -17,6 +17,7 @@ from biorefineries.HP.chemicals_data import HP_chemicals
 Water = HP_chemicals['Water']
 Glucose = HP_chemicals['Glucose']
 # HP = HP_chemicals['Triacetic acid lactone']
+Arabitol = tmo.Chemical('Arabitol')
 AQ336 = HP_chemicals['AQ336']
 Octanol = HP_chemicals['Octanol']
 Hexanol = tmo.Chemical('Hexanol')
@@ -40,27 +41,31 @@ Glycerol = tmo.Chemical('Glycerol')
 H2SO4 = tmo.Chemical('H2SO4')
 TAL = tmo.Chemical('Triacetic acid lactone')
 Furfural = tmo.Chemical('Furfural')
-TAL.copy_models_from(Furfural, ['Psat', 'Hvap'])
-TAL.Hfus = Furfural.Hfus/2.18 # !!! matters for solubility; update 
+
+TAL.copy_models_from(Furfural, ['Psat', 'Hvap', 'V'])
+TAL.Hfus = 30883.6698 # !!! from solubility modeling method 4(ii)
 TAL.Tm = 185 + 273.15
 TAL.Tb = 239.1 + 273.15
+
+Arabitol.copy_models_from(Furfural, ['V',])
 
 #%% Set solute and solvents
 solute = TAL
 solvents = [Propyl_acetate, Butyl_acetate, Hexanol, Cyclohexanol, Cyclohexanone, Heptanol, Octanol, Octanediol, te_hexanol, Nonanol, Decanol, Dodecanol, Isoamyl_alcohol, Dioctyl_phthalate, Diethyl_sebacate, Glycerol]
 
 #%% Set thermo
-tmo.settings.set_thermo(solvents + ['Water', 'H2SO4', solute, HP_chemicals['Xylose'], HP_chemicals['Glucose'], HP_chemicals['AceticAcid']])
+tmo.settings.set_thermo(solvents + ['Water', 'H2SO4', Arabitol, solute, HP_chemicals['Xylose'], HP_chemicals['Glucose'], HP_chemicals['AceticAcid']])
 
 # %% Streams initialization
 
-T = 320
+T = 303
 process_stream = tmo.Stream('process_stream',
-                            Water = 2240.,
+                            Water = 224000.,
                             units = 'kmol/hr',
                             T = T)
-process_stream.imol[solute.ID] = 250.
+process_stream.imol[solute.ID] = 250.*12.2/7.7
 process_stream.imol['AceticAcid'] = 5.
+process_stream.imol['Arabitol'] = 5.
 
 solvent_stream = tmo.Stream('solvent_stream',
                             T = T)
@@ -101,14 +106,24 @@ def run_single_test(solvent_chemical, solvent_mol=1350, process_stream=process_s
     T_diff =  solute.Tb - solvent_chemical.Tb
     print(T_diff)
     print('\n')
-    return (mixed_stream.copy(), K_HP_in_solvent, K_Water_in_solvent, K_solvent_in_Water, T_diff)
+    K_acetic_acid_in_solvent = 0.000001
+    K_arabitol_in_solvent = 0.000001
+    try:
+        K_acetic_acid_in_solvent = get_K('AceticAcid', mixed_stream, raffinate_phase, extract_phase)
+    except:
+        pass
+    try:
+        K_arabitol_in_solvent = get_K('Arabitol', mixed_stream, raffinate_phase, extract_phase)
+    except:
+        pass
+    return (mixed_stream.copy(), K_HP_in_solvent, K_Water_in_solvent, K_solvent_in_Water, T_diff, K_acetic_acid_in_solvent, K_arabitol_in_solvent)
 
 def get_results_meeting_constraints(results_list, constraints):
     filtered_results = []
     for result in results_list:
         values = result[1]
         meets_constraints = True
-        for i in range(1,len(values)):
+        for i in range(1,len(constraints)):
             if not (values[i]>constraints[i-1][0] and values[i]<constraints[i-1][1]):
                 meets_constraints = False
                 # print(i)
@@ -160,7 +175,7 @@ inf = float('inf')
 range_K_HP_in_solvent = (20., inf)
 range_K_Water_in_solvent = (0., 0.2)
 range_K_solvent_in_Water = (0., 0.02)
-range_T_diff = (-inf, -25)
+range_T_diff = (25, inf)
 # range_abs_T_diff = (0., inf)
 
 constraints = (range_K_HP_in_solvent, range_K_Water_in_solvent, range_K_solvent_in_Water,
@@ -175,14 +190,20 @@ for result in filtered_results:
     print('\n')
     
 # %% Unit initialization and tests
+solvent_to_run = '1-octanol'
+set_solvent(solvent_to_run)
+partition_data = dict(IDs=('Triacetic acid lactone', 'Water', solvent_to_run,
+                            'AceticAcid', 'Arabitol',), 
+            K=np.array([1./results_dict[solvent_to_run][1],
+                        1/results_dict[solvent_to_run][2],
+                        results_dict[solvent_to_run][3],
+                       results_dict[solvent_to_run][5],
+                       results_dict[solvent_to_run][6]]),
+            phi = 0.5)
 
-# partition_data = dict(IDs=('Triacetic acid lactone', 'Water', 'Isoamyl alcohol'),
-#            K=np.array([1./K_HP_in_solvent, 1/K_Water_in_solvent, K_solvent_in_Water]),
-#            phi = 0.5)
+MS = bst.units.MultiStageMixerSettlers('MS', ins = (process_stream, solvent_stream),
+                                      outs = ('raffinate', 'extract'),
+                                      N_stages = 5, partition_data = partition_data,) 
 
-# MS = bst.units.MultiStageMixerSettlers('MS', ins = (process_stream, solvent_stream),
-#                                      outs = ('raffinate', 'extract'),
-#                                      N_stages = 5, partition_data = partition_data,) 
-
-# MS.simulate()
-# MS.show(N=100, composition=True)
+MS.simulate()
+MS.show(N=100, composition=True, flow='kg/hr')

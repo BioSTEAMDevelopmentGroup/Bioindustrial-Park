@@ -436,26 +436,49 @@ def get_p_financial_viability():
 HP_metrics = [solve_AA_price, get_GWP, get_FEC]
 
 # %% Generate 3-specification meshgrid and set specification loading functions
-steps = 60
+steps = 20
 
-# Yield, titer, productivity (rate)
-spec_1 = np.linspace(0.1, 0.99, steps) # yield
-spec_2 = np.linspace(5., 330., steps) # titer
+# # Yield, titer, productivity (rate)
+# spec_1 = np.linspace(0.1, 0.99, steps) # yield
+# spec_2 = np.linspace(5., 330., steps) # titer
+# # spec_1 = np.linspace(0.2, 0.99, steps) # yield
+# # spec_2 = np.linspace(45, 225, steps) # titer
+# spec_3 = np.array([0.79]) # productivity
+# spec.load_spec_1 = spec.load_yield
+# spec.load_spec_2 = spec.load_titer
+# spec.load_spec_3 = spec.load_productivity
+# xlabel = "Yield"
+# ylabel = 'Titer [$\mathrm{g} \cdot \mathrm{L}^{-1}$]'
+# # xticks = [0.33, 0.66, 0.99]
+# xticks = [0., 0.2, 0.4, 0.6, 0.8, 1.0]
+# # yticks = [75, 150, 225]
+# yticks = [0, 25, 50, 75, 100, 125, 150, 175, 200, 225, 250, 275, 300]
+# # xticks = [0.2, 0.6, 0.99]
+# # yticks = [45, 135, 225]
+# spec_3_units = "$\mathrm{g} \cdot \mathrm{L}^{-1} \cdot \mathrm{hr}^{-1}$"
+
+
+
+# Feedstock carbohydrate %, feedstock price, productivity (rate)
+spec_1 = np.linspace(0.1, 0.99, steps) # feedstock carbohydrate %
+spec_2 = np.linspace(0., 200., steps) # feedstock price
 # spec_1 = np.linspace(0.2, 0.99, steps) # yield
 # spec_2 = np.linspace(45, 225, steps) # titer
 spec_3 = np.array([0.79]) # productivity
-spec.load_spec_1 = spec.load_yield
-spec.load_spec_2 = spec.load_titer
+spec.load_spec_1 = spec.load_feedstock_carbohydrate_content
+spec.load_spec_2 = spec.load_feedstock_price
 spec.load_spec_3 = spec.load_productivity
 xlabel = "Yield"
 ylabel = 'Titer [$\mathrm{g} \cdot \mathrm{L}^{-1}$]'
 # xticks = [0.33, 0.66, 0.99]
 xticks = [0., 0.2, 0.4, 0.6, 0.8, 1.0]
 # yticks = [75, 150, 225]
-yticks = [0, 25, 50, 75, 100, 125, 150, 175, 200, 225, 250, 275, 300]
+yticks = [0, 25, 50, 75, 100, 125, 150, 175, 200]
 # xticks = [0.2, 0.6, 0.99]
 # yticks = [45, 135, 225]
 spec_3_units = "$\mathrm{g} \cdot \mathrm{L}^{-1} \cdot \mathrm{hr}^{-1}$"
+
+
 
 # # Yield, titer, productivity (rate)
 # spec_1 = np.linspace(0.70, 0.90, 10) # yield
@@ -814,6 +837,7 @@ Metric_1_tickmarks = [500,1000, 1500, 2000, 2500, 3000, 3500]
 Metric_2_tickmarks = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
 # # Metric_3_tickmarks = [60, 70, 80, 90, 100, 110, 120]
 Metric_3_tickmarks = [0, 5, 10, 15, 20, 25, 30]
+# Metric_3_tickmarks = [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65]
 
 metric_bars = (MetricBar('MPSP', MPSP_units, CABBI_green_colormap(),
                          Metric_1_tickmarks, 800),

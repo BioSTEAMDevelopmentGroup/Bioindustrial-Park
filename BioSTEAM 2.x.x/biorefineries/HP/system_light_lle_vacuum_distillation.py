@@ -607,20 +607,25 @@ def create_HP_sys(ins, outs):
     def get_concentration_gpL(chem_ID, stream):
         return stream.imass[chem_ID]/stream.F_vol
     
+    def get_mass_percent(chem_ID, stream):
+        return stream.imass[chem_ID]/stream.F_mass
+    
     M402 = bst.units.Mixer('M402', ins=(D401-1,
                                         'dilution_water'))
     
     def M402_objective_fn(Water_imol):
         M402.ins[1].imol['Water'] = Water_imol
         M402._run()
-        return get_concentration_gpL('HP', M402.outs[0]) - 600
+        return get_concentration_gpL('HP', M402.outs[0]) - 600.
+        # return get_concentration_gpL('HP', M402.outs[0]) - 270.1 # Solubility at 25 C
+        # return get_mass_percent('HP', M402.outs[0]) - .15 # Paper
     
     def M402_adjust_water():
         flx.IQ_interpolation(M402_objective_fn, 0., 10000, maxiter=50, ytol=1e-2)
         
     M402.specification = M402_adjust_water
     
-    D401_P = units.HPPump('D401_P', ins=M402-0, P=101325*5)
+    D401_P = units.HPPump('D401_P', ins=M402-0, P=506625*5.4)
     
     R402 = units.DehydrationReactor('R402', ins = (D401_P-0, makeup_TiO2_catalyst),
                                     outs = ('dilute_acryclic_acid', 'spent_TiO2_catalyst'),
@@ -1049,6 +1054,8 @@ spec = ProcessSpecification(
     dehydration_reactor = u.R401,
     byproduct_streams = [],
     HXN = u.HXN,
+    pre_conversion_units = process_groups_dict['feedstock_group'].units + process_groups_dict['pretreatment_group'].units + [u.H301],
+    baseline_titer = 54.8,
     feedstock_mass = feedstock.F_mass,
     pretreatment_reactor = u.R201)
 
@@ -1329,17 +1336,77 @@ def get_material_cost_breakdown():
     group_material_costs = {}
     for group in process_groups:
         group_material_costs[group.name] = 0
+    counted_feeds =[]
     for feed in feeds:
         for group in process_groups:
             if group.name != 'facilities_no_hu_group':
                 for unit in group.units:
                     for instream in unit.ins:
-                        if instream.shares_flow_rate_with(feed):
+                        if instream.shares_flow_rate_with(feed) and not feed in counted_feeds:
                             group_material_costs[group.name] += feed.price*feed.F_mass/AA.F_mass
+                            counted_feeds.append(feed)
     group_material_costs['BT_group'] += BT.natural_gas_price*BT.natural_gas.F_mass/AA.F_mass
     
     return group_material_costs
 
+def get_material_cost_breakdown_fractional():
+    mcb_dict = get_material_cost_breakdown()
+    sum_all = sum([v for k,v in mcb_dict.items()])
+    mcbf_dict = {}
+    for k,v in mcb_dict.items():
+        mcbf_dict[k] = mcb_dict[k]/sum_all
+    return mcbf_dict    
+
+
+def get_main_chem(feed):
+    feed_main_chem = None
+    main_chem_flow = 0.
+    for chem in HP_chemicals:
+        chem_ID = chem.ID
+        feed_imol_chem = feed.imol[chem_ID]
+        if feed_imol_chem>main_chem_flow and not (chem_ID=='H2O' or chem_ID=='Water'):
+            main_chem_flow = feed_imol_chem
+            feed_main_chem = chem_ID
+    return feed_main_chem
+
+def get_material_cost_breakdown_breakdown():
+    group_material_costs = {}
+    for group in process_groups:
+        group_material_costs[group.name] = {}
+    counted_feeds =[]
+    for feed in feeds:
+        for group in process_groups:
+            if group.name != 'facilities_no_hu_group':
+                for unit in group.units:
+                    for instream in unit.ins:
+                        if instream.shares_flow_rate_with(feed) and not feed in counted_feeds:
+                            feed_main_chem = get_main_chem(feed)
+                            # if feed_main_chem == 'Glucan' and group.name=='pretreatment_group':
+                            #     import pdb
+                            #     pdb.set_trace()
+                            group_material_costs[group.name][feed_main_chem]= feed.price*feed.F_mass/AA.F_mass
+                            counted_feeds.append(feed)
+    group_material_costs['BT_group']['NG'] = BT.natural_gas_price*BT.natural_gas.F_mass/AA.F_mass
+    
+    return group_material_costs
+
+def get_material_cost_breakdown_breakdown_fractional():
+    mcbb_dict = get_material_cost_breakdown_breakdown()
+    
+    mcbbf_dict = {}
+    for group in process_groups:
+        mcbbf_dict[group.name] = {}
+    for k1,v1 in mcbb_dict.items():
+        v1_items = v1.items()
+        sum_all = sum([v for k,v in v1_items])
+        for k2, v2 in v1_items:
+            mcbbf_dict[k1][k2] = v2/sum_all
+    return mcbbf_dict    
+# def get_GWP_breakdown():
+#     group_GWPs = {}
+#     for group in process_groups:
+#         group_material_costs[group.name] = 0
+    
 # %% Full analysis
 def simulate_and_print():
     MPSP = get_AA_MPSP()
