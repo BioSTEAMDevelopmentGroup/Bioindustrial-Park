@@ -212,9 +212,13 @@ Protein = chemical_defined('Protein', phase='l',
 Enzyme = chemical_defined('Enzyme', phase='l', 
                            formula='CH1.59O0.42N0.24S0.01', 
                            Hf=-17618*_cal2joule)
-# Properties of fermentation microbes copied from Z_mobilis as in Humbird et al.
+# Properties of fermentation microbes copied from Corynebacterium glutamicum as in
+# Popovic et al. 2019: Thermodynamic properties of microorganisms: determination and
+# analysis of enthalpy, entropy, and Gibbs free energy of biomass, cells and
+# colonies of 32 microorganism species
 FermMicrobe = chemical_defined('FermMicrobe', phase='l',
-                      formula='CH1.8O0.5N0.2', Hf=-31169.39*_cal2joule)
+                       # formula='CH1.8O0.5N0.2', Hf=-31169.39*_cal2joule) # Z. mobilis from Humbird et al.
+                      formula='CH1.78O0.44N0.24', Hf=-103310.)
 # FermMicrobe.HHV /= 10.
 WWTsludge = chemical_defined('WWTsludge', phase='s', 
                              formula='CH1.64O0.39N0.23S0.0035', 
