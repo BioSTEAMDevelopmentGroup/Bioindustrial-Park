@@ -41,7 +41,7 @@ def load_process_settings():
     bst.CE = 525.4
     bst.PowerUtility.price = price['Electricity']
     _ha = bst.HeatUtility.get_heating_agent('low_pressure_steam')
-    _ha.heat_transfer_efficiency = 0.85
+    _ha.heat_transfer_efficiency = 0.90
     _ha.T = 529.2
     _ha.P = 44e5
     _ha.regeneration_price = 0.30626

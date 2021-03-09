@@ -1,21 +1,15 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-
 Created on Sun Aug 23 12:11:15 2020
-
 @author: sarangbhagwat
-
 Modified from the cornstover biorefinery constructed in Cortes-Peña et al., 2020,
 with modification of fermentation system for 3-Hydroxypropionic acid instead of the original ethanol
-
 [1] Cortes-Peña et al., BioSTEAM: A Fast and Flexible Platform for the Design, 
     Simulation, and Techno-Economic Analysis of Biorefineries under Uncertainty. 
     ACS Sustainable Chem. Eng. 2020, 8 (8), 3302–3310. 
     https://doi.org/10.1021/acssuschemeng.9b07040.
-
 All units are explicitly defined here for transparency and easy reference
-
 Naming conventions:
     D = Distillation column
     F = Flash tank
@@ -27,7 +21,6 @@ Naming conventions:
     T = Tank or bin for storage
     U = Other units
     PS = Process specificiation, not physical units, but for adjusting streams
-
 Processes:
     100: Feedstock preprocessing
     200: Pretreatment
@@ -35,8 +28,6 @@ Processes:
     400: Separation
     500: Wastewater treatment
     600: Facilities
-
-
 """
 
 
@@ -64,7 +55,7 @@ import matplotlib.pyplot as plt
 
 # # Do this to be able to show more streams in a diagram
 # bst.units.Mixer._graphics.edge_in *= 2
-bst.speed_up()
+# bst.speed_up()
 flowsheet = bst.Flowsheet('HP')
 bst.main_flowsheet.set_flowsheet(flowsheet)
 
@@ -354,6 +345,87 @@ def S402_spec():
     S402.outs[1].imol['HP'] = 0.
     
 S402.specification = S402_spec
+<<<<<<< HEAD:BioSTEAM 2.x.x/biorefineries/HP/system.py
+
+M401 = bst.units.Mixer('M401', ins=(separation_decanol, separation_TOA, separation_AQ336,
+                                    ''))
+
+
+
+Kds = dict(IDs=('HP',),
+           K=np.array([1./122.9155075014064]),
+           raffinate_chemicals=('Water',),
+           extract_chemicals=('TOA', 'AQ336', 'Decanol'))
+S404 = bst.units.MultiStageMixerSettlers('S404', ins = (S402-1, M401-0),
+                                     outs = ('raffinate', 'extract'),
+                                     N_stages = 20, partition_data = Kds)
+                                     
+
+def adjust_S404_streams():
+    feed_decanol, feed_TOA, feed_AQ336, solvent_recycle = M401.ins
+    process_stream = S404.ins[0]
+    existing_decanol = solvent_recycle.ivol['Decanol'] + process_stream.ivol['Decanol']
+    existing_TOA = solvent_recycle.ivol['TOA'] + process_stream.ivol['TOA']
+    existing_AQ336 = solvent_recycle.ivol['AQ336'] + process_stream.ivol['AQ336']
+    
+    reqd_decanol = process_stream.F_vol
+    reqd_TOA = reqd_AQ336 = reqd_decanol/8. # decanol:TOA:AQ336 = 0.8:0.1:0.1
+    
+    feed_decanol.ivol['Decanol'] = max(0, reqd_decanol - existing_decanol)
+    feed_TOA.ivol['TOA'] = max(0, reqd_TOA - existing_TOA)
+    feed_AQ336.ivol['AQ336'] = max(0, reqd_AQ336 - existing_AQ336)
+    M401._run()
+    S404._run()
+
+S404.specification = adjust_S404_streams
+# D402 = bst.units.BinaryDistillation('D402', ins=S404-1, outs=('D402_g', 'D402_l'),
+#                                     LHK=('HP', 'AQ336'),
+#                                     is_divided=True,
+#                                     product_specification_format='Recovery',
+#                                     Lr=0.9999, Hr=0.9999, k=1.2,
+#                                     P = 101325/100,
+#                                     vessel_material = 'Stainless steel 316')
+
+# D402-1-3-M401
+
+
+M402 = bst.units.Mixer('M402', ins=('separation_water', ''))
+
+Kds = dict(IDs=('HP',),
+           K=np.array([122.9155075014064]),
+           raffinate_chemicals=('TOA', 'AQ336', 'Decanol'),
+           extract_chemicals=('Water',))
+S405 = bst.units.MultiStageMixerSettlers('S405', ins = (S404-1, M402-0),
+                                     outs = ('raffinate', 'extract'),
+                                     N_stages = 25, partition_data = Kds,
+                                     carrier_chemical = 'Decanol')
+          
+S405-0-3-M401
+                           
+def adjust_S405_streams():
+    available_recycle_water, = S406.ins
+    feed_water, water_recycle = M402.ins
+    process_stream = S405.ins[0]
+    available_recycle_water_flow = available_recycle_water.F_vol
+    existing_water = available_recycle_water_flow + process_stream.ivol['Water']
+    reqd_water = process_stream.F_vol * 0.5
+    waste_water_flow = existing_water - reqd_water
+    feed_water.ivol['Water'] = max(0, -waste_water_flow)
+    if waste_water_flow > 0:
+        S406.split[:] = 1. - (waste_water_flow / available_recycle_water_flow)
+        S406._run()
+    M402._run()
+    S405._run()
+    S405_raffinate = S405.outs[0]
+    S405_raffinate.imol['Water'] = 0
+    S405.outs[1].imol['Water'] = S405.ins[0].imol['Water'] + S405.ins[1].imol['Water']
+    if S405_raffinate.imol['HP'] < 0:
+        S405_raffinate.imol['HP'] = 0
+
+S405.specification = adjust_S405_streams
+
+R402 = units.DehydrationReactor('R402', ins = (S405-1),
+=======
 
 M401 = bst.units.Mixer('M401', ins=(separation_decanol, ''))
 
@@ -512,11 +584,15 @@ def D401_H_spec():
 D401_H.specification = D401_H_spec
 
 R402 = units.DehydrationReactor('R402', ins = (D401_H-0),
+>>>>>>> de4a3771bc43026d10bbdefe299a8bb1709502cc:BioSTEAM 2.x.x/biorefineries/HP/system_esterification_lle.py
                                 outs = ('dilute_acryclic_acid'),
                                 tau = 57.34/1.5, # Dishisha et al.
                                 T = 230 + 273.15,
                                 vessel_material='Stainless steel 316')
 
+<<<<<<< HEAD:BioSTEAM 2.x.x/biorefineries/HP/system.py
+
+=======
 # def R402_specification():
 
 #     R402._run()
@@ -525,6 +601,7 @@ R402 = units.DehydrationReactor('R402', ins = (D401_H-0),
 
 
 # R402_H =
+>>>>>>> de4a3771bc43026d10bbdefe299a8bb1709502cc:BioSTEAM 2.x.x/biorefineries/HP/system_esterification_lle.py
 # Separate out the majority of water,
 # no need to include agitator thus using biosteam Flash
 # D401 = bst.units.Flash('D401', ins=S402-1, outs=('D401_g', 'D401_l'),
@@ -570,6 +647,45 @@ D402 = bst.units.ShortcutColumn('D402', ins=R402-0, outs=('D402_g', 'D402_l'),
                                     LHK=('Water', 'AcrylicAcid'),
                                     is_divided=True,
                                     product_specification_format='Recovery',
+<<<<<<< HEAD:BioSTEAM 2.x.x/biorefineries/HP/system.py
+                                    Lr=0.99, Hr=0.99, k=1.1,
+                                    vessel_material = 'Stainless steel 316')
+
+D402_P = units.HPPump('D402_P', ins=D402-1)
+D402_H = bst.units.HXutility('D402_H', ins=D402-0, T = 308.15, rigorous=True)
+
+S406 = bst.units.Splitter('S406', ins = D402_H-0, outs = ('recycled_water', 'waste_water'), split = 0.8)
+
+S406-0-1-M402
+# def D402_spec():
+#     try:
+#         D402._run()
+        
+#     except:
+#         count = 0
+#         feasible = False
+#         while not feasible:
+#             print('Tried ' + str(i))
+#             try:
+#                 D402.Lr-=0.01
+#                 D402._run()
+#                 feasible = True
+#             except:
+#                 feasible = False
+#             count+=1
+#             if count>9:
+#                 break
+
+# def D402_spec():
+#     D402._run()
+#     D402.outs[0].imol['AQ336']=0
+# D402.specification = D402_spec
+
+
+# D402_H = bst.units.HXutility('D402_H', ins=D402-0, V=0, rigorous=True)
+# D402_P = units.HPPump('D402_P', ins=D402-1)
+
+=======
                                     Lr=0.99, Hr=0.99, k=1.2,
                                     vessel_material = 'Stainless steel 316')
 
@@ -612,11 +728,15 @@ D402_H = bst.units.HXutility('D402_H', ins=D402-0, T = 308.15, rigorous=True)
 
 # D402_H = bst.units.HXutility('D402_H', ins=D402-0, V=0, rigorous=True)
 # D402_P = units.HPPump('D402_P', ins=D402-1)
+>>>>>>> de4a3771bc43026d10bbdefe299a8bb1709502cc:BioSTEAM 2.x.x/biorefineries/HP/system_esterification_lle.py
 
 
 
 
+<<<<<<< HEAD:BioSTEAM 2.x.x/biorefineries/HP/system.py
+=======
 
+>>>>>>> de4a3771bc43026d10bbdefe299a8bb1709502cc:BioSTEAM 2.x.x/biorefineries/HP/system_esterification_lle.py
 # # # Condense waste vapor for recycling
 # F401_H = bst.units.HXutility('F401_H', ins=F401-0, V=0, rigorous=True)
 # F401_P = units.HPPump('F401_P', ins=F401-1)
@@ -651,8 +771,12 @@ aerobic_caustic = Stream('aerobic_caustic', units='kg/hr', T=20+273.15, P=2*1013
 # =============================================================================
 
 # Mix waste liquids for treatment
+<<<<<<< HEAD:BioSTEAM 2.x.x/biorefineries/HP/system.py
+M501 = bst.units.Mixer('M501', ins=(F301_P-0, S401-0))
+=======
 M501 = bst.units.Mixer('M501', ins=(F301_P-0, S401-0, S404-0)) # without sugars recycle
 # M501 = bst.units.Mixer('M501', ins=(F301_P-0, S401-0, S406-1)) # with sugars recycle
+>>>>>>> de4a3771bc43026d10bbdefe299a8bb1709502cc:BioSTEAM 2.x.x/biorefineries/HP/system_esterification_lle.py
 
 # This represents the total cost of wastewater treatment system
 WWT_cost = units.WastewaterSystemCost('WWT_cost', ins=M501-0)
@@ -1306,7 +1430,3 @@ def simulate_and_print():
     print('--------------------\n')
 
 simulate_and_print()
-
-
-
-

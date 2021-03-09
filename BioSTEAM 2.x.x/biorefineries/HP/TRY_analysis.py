@@ -20,7 +20,7 @@ from matplotlib.ticker import AutoMinorLocator as AML
 
 # from biorefineries.HP.system import HP_sys, HP_tea, R302, spec
 # from biorefineries.HP.system import MEK as product
-from biorefineries.HP.system_light_lle_vacuum_distillation import HP_sys, HP_tea, R302, spec, get_GWP, get_ng_GWP, get_FEC, get_SPED
+from biorefineries.HP.system_light_lle_vacuum_distillation import HP_sys, HP_tea, R302, spec, get_GWP, get_ng_GWP, get_FEC, get_SPED, F301
 from biorefineries.HP.system_light_lle_vacuum_distillation import AA as product
 
 from matplotlib import pyplot as plt
@@ -532,8 +532,9 @@ spec_1, spec_2 = np.meshgrid(spec_1, spec_2)
 
 # %% Run TRY analysis 
 
+upstream_sys, downstream_sys = HP_sys.split(F301.ins[0])
 data_1 = HP_data = spec.evaluate_across_specs(
-        HP_sys, spec_1, spec_2, HP_metrics, spec_3)
+        downstream_sys, spec_1, spec_2, HP_metrics, spec_3)
 
 # spec.load_spec_1 = spec.load_dehydration_conversion
 # spec.load_spec_2 = spec.load_titer

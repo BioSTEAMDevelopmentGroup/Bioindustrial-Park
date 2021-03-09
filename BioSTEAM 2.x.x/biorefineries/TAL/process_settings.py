@@ -18,7 +18,7 @@ All units are explicitly defined here for transparency and easy reference
 
 import biosteam as bst
 import thermosteam as tmo
-from TAL.chemicals_data import chems
+from biorefineries.TAL.chemicals_data import chems
 
 bst.CE = 541.7 # year 2016
 _kg_per_ton = 907.18474

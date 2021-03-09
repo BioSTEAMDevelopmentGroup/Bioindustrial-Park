@@ -9,12 +9,12 @@
 """
 from biosteam import speed_up
 from biorefineries import cornstover
-cornstover._include_blowdown_recycle = False # For speed
+cornstover._include_blowdown_recycle = True
 from biorefineries.cornstover.model import cornstover_model as model_cs
 # from sklearn.model_selection import KFold, cross_validate
 
 speed_up()
-N_samples = 600
+N_samples = 1000
 rule = 'L'
 samples = model_cs.sample(N_samples, rule)
 model_cs.load_samples(samples)

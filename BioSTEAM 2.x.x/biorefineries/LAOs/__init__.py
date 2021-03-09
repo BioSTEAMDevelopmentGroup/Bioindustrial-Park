@@ -45,9 +45,7 @@ def load():
     if not _chemicals_loaded: _load_chemicals()
     _load_system()
     dct = globals()
-    dct.update(flowsheet.system.__dict__)
-    dct.update(flowsheet.stream.__dict__)
-    dct.update(flowsheet.unit.__dict__)
+    dct.update(flowsheet.to_dict())
 
 def _load_chemicals():
     global chemicals
@@ -99,9 +97,7 @@ if PY37:
             if name == 'chemicals': return chemicals
         if not _system_loaded: _load_system()
         dct = globals()
-        dct.update(flowsheet.system.__dict__)
-        dct.update(flowsheet.stream.__dict__)
-        dct.update(flowsheet.unit.__dict__)
+        dct.update(flowsheet.to_dict())
         if name in dct:
             return dct[name]
         else:

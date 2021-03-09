@@ -11,169 +11,66 @@ The complete lipid-cane biorefinery system is created here.
 """
 import numpy as np
 import biosteam as bst
-from biosteam import units
+from biosteam import main_flowsheet as f
+from biosteam import units, SystemFactory
 from ._process_settings import price
-from ..sugarcane import create_ethanol_production_system
+from ..sugarcane import (
+    create_feedstock_handling_system,
+    create_sucrose_to_ethanol_system, 
+    create_juicing_system_up_to_clarification,
+)
 
-__all__ = ('create_system',)
+__all__ = (
+    'create_juicing_and_lipid_extraction_system',
+    'create_transesterification_and_biodiesel_separation_system',
+    'create_lipidcane_to_biodiesel_and_conventional_ethanol_system',
+)
+
 
 # %% Pretreatment section
 
-def create_system(ID='lipidcane_sys'):
-    chemicals = bst.settings.get_chemicals()
-    s = bst.main_flowsheet.stream
-    u = bst.main_flowsheet.unit
-    
-    ### Streams ###
-    
-    lipidcane = lipidcane = bst.Stream('lipidcane',
-                                       Ash=2000.042,
-                                       Cellulose=26986.69,
-                                       Glucose=2007.067,
-                                       Hemicellulose=15922.734,
-                                       Lignin=14459.241,
-                                       Lipid=10035.334,
-                                       Solids=5017.667,
-                                       Sucrose=22746.761,
-                                       Water=234157.798,
-                                       units='kg/hr',
-                                       price=price['Lipid cane'])
-    
-    enzyme = bst.Stream('enzyme',
-                        Cellulose=100, Water=900, units='kg/hr',
-                        price=price['Protease'])
-    
-    imbibition_water = bst.Stream('imbibition_water',
-                                  Water=87023.35, units='kg/hr',
-                                  T = 338.15)
-    
-    H3PO4 = bst.Stream('H3PO4',
-                       H3PO4=74.23, Water=13.10, units='kg/hr',
-                       price=price['H3PO4'])  # to T203
-    
-    lime = bst.Stream('lime',
-                      CaO=333.00, Water=2200.00, units='kg/hr',
-                      price=price['Lime'])  # to P5
-    
-    polymer = bst.Stream('polymer',
-                         Flocculant=0.83, units='kg/hr',
-                         price=price['Polymer'])  # to T205
-    
-    rvf_wash_water = bst.Stream('rvf_wash_water',
-                                Water=16770, units='kg/hr',
-                                T=363.15)  # to C202
+@SystemFactory(
+    ID='juicing_and_lipid_extraction_sys',
+    ins=[dict(ID='lipidcane',
+              Ash=2000.042,
+              Cellulose=26986.69,
+              Glucose=2007.067,
+              Hemicellulose=15922.734,
+              Lignin=14459.241,
+              Lipid=10035.334,
+              Solids=5017.667,
+              Sucrose=22746.761,
+              Water=234157.798,
+              units='kg/hr',
+              price=price['Lipid cane']),
+         *create_juicing_system_up_to_clarification.ins[1:]],
+    outs=[dict(ID='screened_juice'),
+          dict(ID='lipid'),
+          dict(ID='bagasse'),
+          dict(ID='fiber_fines'),
+          dict(ID='spent_oil_wash_water')]
+)
+def create_juicing_and_lipid_extraction_system(ins, outs):
+    lipidcane, enzyme, H3PO4, lime, polymer = ins
+    screened_juice, lipid, bagasse, fiber_fines, spent_oil_wash_water = outs
     
     oil_wash_water = bst.Stream('oil_wash_water',
-                                Water=1350, units='kg/hr',
+                                Water=1350,
+                                units='kg/hr',
                                 T=358.15)  # to T207
-    
-    ### Unit operations ###
-    
-    bst.Stream.ticket_name = 'd'
-    bst.Stream.ticket_number = 100
-    
-    # Feed the shredder
-    U101 = units.ConveyingBelt('U101', ins=lipidcane)
-    U101.cost_items['Conveying belt'].ub = 5000
-    
-    # Separate metals
-    U102 = units.MagneticSeparator('U102', ins=U101-0)
-    
-    # Shredded cane
-    U103 = units.Shredder('U103', ins=U102-0)
-    
-    bst.Stream.ticket_number = 200
-    
-    # Hydrolyze starch
-    T201 = units.EnzymeTreatment('T201', T=323.15)  # T=50
-    
-    # Finely crush lipid cane
-    U201 = units.CrushingMill('U201',
-                              split=dict(Ash=0.92,
-                                         Cellulose=0.92,
-                                         Glucose=0.04,
-                                         Hemicellulose=0.92,
-                                         Lignin=0.92,
-                                         Sucrose=0.04,
-                                         Lipid=0.1,
-                                         Solids=1),
-                              moisture_content=0.5)
-    
-    # Convey out bagasse
-    U202 = units.ConveyingBelt('U202', ins=U201.outs[0], outs='Bagasse')
-    
-    # Mix in water
-    M201 = units.Mixer('M201')
-    
-    # Screen out fibers
-    S201 = units.VibratingScreen('S201',
-                                 split=dict(Ash=0.35,
-                                            Cellulose=0.35,
-                                            Glucose=0.88,
-                                            Hemicellulose=0.35,
-                                            Lignin=0.35,
-                                            Lipid=0.88,
-                                            Solids=0,
-                                            Sucrose=0.88,
-                                            Water=0.88))
-    
-    # Store juice before treatment
-    T202 = units.StorageTank('T202', tau=4, vessel_material='Carbon steel')
-    
-    # Heat up before adding acid
-    H201 = units.HXutility('H201', T=343.15, V=0)
-    
-    # Mix in acid
-    T203 = units.MixTank('T203')
-    T203.tau = 0.10
-    
-    # Pump acid solution
-    P201 = units.Pump('P201')
-    
-    # Mix lime solution
-    T204 = units.MixTank('T204')
-    T204.tau = 0.10
-    P202 = units.Pump('P202')
-    
-    # Blend acid lipid solution with lime
-    T205 = units.MixTank('T205')
-    
-    # Mix recycle
-    M202 = units.Mixer('M202')
-    
-    # Heat before adding flocculant
-    H202 = units.HXutility('H202', T=372.15, V=0)
-    
-    # Mix in flocculant
-    T206 = units.MixTank('T206')
-    T206.tau = 0.10
-    
-    # Separate residual solids
-    C201 = units.Clarifier('C201',
-                           split=dict(Ash=0,
-                                      CaO=0,
-                                      Cellulose=0,
-                                      Flocculant=0.522,
-                                      Glucose=0.522,
-                                      Hemicellulose=0,
-                                      Lignin=0,
-                                      Lipid=0.98,
-                                      H3PO4=0.522,
-                                      Sucrose=0.522,
-                                      Water=0.522))
-    
-    # Remove solids as filter cake
-    C202 = units.RVF('C202', 
-                     outs=('filter_cake', ''),
-                     moisture_content=0.80,
-                     split=dict(Ash=0.85,
-                                CaO=0.85,
-                                Cellulose=0.85,
-                                Glucose=0.01,
-                                Hemicellulose=0.85,
-                                Lignin=0.85,
-                                Sucrose=0.01))
-    P203 = units.Pump('P203')
+    feedstock_handling_sys = create_feedstock_handling_system(
+        ins=lipidcane,
+        mockup=True
+    )    
+    juicing_sys = create_juicing_system_up_to_clarification(
+        ins=[feedstock_handling_sys-0, enzyme, H3PO4, lime, polymer], 
+        outs=['', bagasse],
+        mockup=True,
+    )
+    u = f.unit
+    u.U201.isplit['Lipid'] = 0.01 # Crushing mill
+    u.S201.isplit['Lipid'] = 0.88 # Fiber screener 
+    u.C201.isplit['Lipid'] = 0.98 # Clarifier
     
     # Separate oil and sugar
     T207 = units.MixTank('T207')
@@ -181,11 +78,12 @@ def create_system(ID='lipidcane_sys'):
                             split=dict(Lipid=1,
                                        Water=1e-4))
     
+    
     # Cool the oil
     H203 = units.HXutility('H203', T=343.15, V=0)
     
     # Screen out small fibers from sugar stream
-    S202 = units.VibratingScreen('S202', outs=('', 'fiber_fines'),
+    S202 = units.VibratingScreen('S202', outs=(screened_juice, fiber_fines),
                                  split=dict(Ash=1.0,
                                             CaO=1.0,
                                             Cellulose=1.0,
@@ -197,7 +95,6 @@ def create_system(ID='lipidcane_sys'):
                                             H3PO4=1.0,
                                             Sucrose=0.998,
                                             Water=0.998))
-    sugar = S202-0
     S202.mesh_opening = 2
     
     # Add distilled water to wash lipid
@@ -206,93 +103,55 @@ def create_system(ID='lipidcane_sys'):
     
     # Centrifuge out water
     C203 = units.LiquidsSplitCentrifuge('C203',
+                                        outs=('', spent_oil_wash_water),
                                         split=dict(Lipid=0.99,
                                                    Water=0.01))
     
     # Vacume out water
     F201 = units.SplitFlash('F201', T=357.15, P=2026.5,
-                            outs=('water_vapor', ''),
+                            outs=('water_vapor', lipid),
                             split=dict(Lipid=0.0001,
                                        Water=0.999))
     
-    ### Process specifications ###
-    def correct_flows():
-        F_mass = lipidcane.F_mass
-        # correct enzyme, lime, phosphoric acid, and imbibition water
-        enzyme.imass['Cellulose', 'Water'] = 0.003 * F_mass * np.array([0.1, 0.9])
-        lime.imass['CaO', 'Water'] = 0.001 * F_mass * np.array([0.046, 0.954])
-        H3PO4.imass['H3PO4', 'Water'] = 0.00025 * F_mass
-        imbibition_water.imass['Water'] = 0.25* F_mass
-        T201._run()
-    
-    T201.specification = correct_flows
-    
     # Specifications within a system
+    clarified_juice = juicing_sys-0
     def correct_lipid_wash_water():
-        oil_wash_water.imol['Water'] = 100/11 * H202.outs[0].imol['Lipid']
+        oil_wash_water.imol['Water'] = 100/11 * clarified_juice.imol['Lipid']
         T208._run()
     
     T208.specification = correct_lipid_wash_water
     
-    def correct_wash_water():
-        P202._run()
-        solids = P202.outs[0].imol['Ash', 'CaO', 'Cellulose', 'Hemicellulose', 'Lignin'].sum()
-        rvf_wash_water.imol['Water'] = 0.0574 * solids
-    
-    P202.specification = correct_wash_water
     
     ### System set-up ###
     
-    (U103-0, enzyme)-T201
-    (T201-0, M201-0)-U201-1-S201-0-T202
-    (S201-1, imbibition_water)-M201
-    
-    T202-0-H201
-    (H201-0, H3PO4)-T203-P201
-    (P201-0, lime-T204-0)-T205-P202
-    (P202-0, P203-0)-M202-H202
-    (H202-0, polymer)-T206-C201
-    (C201-1, rvf_wash_water)-C202-1-P203
-    
-    C201-0-T207-T207_2-0-H203
+    clarified_juice-T207-T207_2-0-H203
     (H203-0, oil_wash_water)-T208-C203-0-F201
     T207-T207_2-1-S202
     
-    lipid = F201-1
-    
-    ### Ethanol section ###
-    
-    ### Utilities ###
-    
-    MW_etoh = chemicals.Ethanol.MW
-    MW_water = chemicals.Water.MW
-    
-    def mass2molar_ethanol_fraction(ethanol_mass_fraction):
-        """Return ethanol mol fraction in a ethanol water mixture"""
-        x = ethanol_mass_fraction
-        return x/MW_etoh / (x/MW_etoh + (1-x)/MW_water)
-    
-    ### Input streams ###
-    
-    ethanol_production_sys = create_ethanol_production_system(sugar_solution=S202-0)
-    u.M305.ins.append(C203-1)
-    
-    ### Biodiesel section ###
-    
+
+@SystemFactory(
+    ID="transesterification_and_biodiesel_separation_sys",
+    ins=[dict(ID='oil')],
+    outs=[dict(ID='biodiesel'),
+          dict(ID='crude_glycerol')]
+)
+def create_transesterification_and_biodiesel_separation_system(ins, outs):
     ### Streams ###
     
-    # Fresh degummed oil
-    oil = lipid
+    oil, = ins
+    biodiesel, crude_glycerol = outs
     
     # Fresh methanol
-    methanol = bst.Stream('methanol', Methanol=1,
+    methanol = bst.Stream('methanol',
+                          Methanol=1,
                           price=price['Methanol'])
     
     # Catalyst
-    catalyst = bst.Stream('catalyst', NaOCH3=0.25,
-                          Methanol=0.75, units='kg/hr',
+    catalyst = bst.Stream('catalyst', 
+                          NaOCH3=0.25,
+                          Methanol=0.75, 
+                          units='kg/hr',
                           price=price['NaOCH3'])
-                      # price=0.25*price['NaOCH3'] + 0.75*Methanol.price)
     
     # Water to remove glycerol
     biodiesel_wash_water = bst.Stream('biodiesel_wash_water', Water=13.6, T=273.15+60, 
@@ -309,12 +168,6 @@ def create_system(ID='lipidcane_sys'):
     
     # Base to neutralize acid before distillation
     NaOH = bst.Stream('NaOH', NaOH=1, price=price['NaOH'])
-    
-    # Products
-    crude_glycerol = bst.Stream('crude_glycerol',
-                                price=price['Crude glycerol'])
-    biodiesel = bst.Stream('biodiesel',
-                           price=price['Biodiesel'])
     
     # Waste
     waste = bst.Stream('waste', price=price['Waste'])
@@ -456,6 +309,7 @@ def create_system(ID='lipidcane_sys'):
     H402 = units.HXutility('H402', T=353, V=0)
     
     # Glycerol/Water flash (not a distillation column)
+    chemicals = H402.chemicals
     w = 0.20/chemicals.Water.MW
     g = 0.80/chemicals.Glycerol.MW
     x_water = w/(w+g)
@@ -464,7 +318,7 @@ def create_system(ID='lipidcane_sys'):
                         LHK=('Water', 'Glycerol'),
                         k=1.25,
                         P=101325,
-                        y_top=0.999,
+                        y_top=0.9999,
                         x_bot=x_water,
                         tray_material='Stainless steel 304',
                         vessel_material='Stainless steel 304')
@@ -472,7 +326,7 @@ def create_system(ID='lipidcane_sys'):
     def startup_water():
         imol = D402.ins[0].imol
         water, glycerol = imol['Water', 'Glycerol']
-        minimum_water = 5 * (w / (w + g)) * glycerol
+        minimum_water = 5 * x_water * glycerol
         if water < minimum_water:
             imol['Water'] = minimum_water
         D402._run()
@@ -553,11 +407,67 @@ def create_system(ID='lipidcane_sys'):
     # Initial guess
     D402.outs[0].imol['Methanol', 'Glycerol', 'Water'] = [0.00127, 3.59e-05, 0.0244]
     
+    bst.mark_disjunction(P411-0)
+    
+
+@SystemFactory(
+    ID='lipidcane_sys',
+    ins=[*create_juicing_and_lipid_extraction_system.ins,
+         create_sucrose_to_ethanol_system.ins[1]],
+    outs=[dict(ID='ethanol', price=price['Ethanol']),
+          dict(ID='biodiesel', price=price['Biodiesel']),
+          dict(ID='crude_glycerol', price=price['Crude glycerol']),
+          dict(ID='wastewater'),
+          dict(ID='emissions'),
+          dict(ID='ash_disposal')]
+)
+def create_lipidcane_to_biodiesel_and_conventional_ethanol_system(ins, outs, evaporator_and_beer_column_heat_integration=True):
+    
+    lipidcane, enzyme, H3PO4, lime, polymer, denaturant = ins
+    ethanol, biodiesel, crude_glycerol, wastewater, emissions, ash_disposal = outs
+    
+    ### Oil and juice separation ###
+    
+    juicing_and_lipid_extraction_sys =create_juicing_and_lipid_extraction_system(
+        ins=[lipidcane, enzyme, H3PO4, lime, polymer],
+        mockup=True,
+    )
+    
+    ### Ethanol section ###
+    
+    ethanol_production_sys = create_sucrose_to_ethanol_system(
+        ins=[juicing_and_lipid_extraction_sys-0, denaturant],
+        outs=[ethanol],
+        mockup=True,
+    )
+    
+    ### Biodiesel section ###
+    
+    # Fresh degummed oil
+    oil = juicing_and_lipid_extraction_sys-1
+    create_transesterification_and_biodiesel_separation_system(
+        ins=oil, 
+        outs=[biodiesel, crude_glycerol],
+        mockup=True,
+    )
+
     ### Facilities ###
+    
+    s = f.stream
+    u = f.unit
+    
+    M305 = bst.Mixer('M305', 
+        ins=(juicing_and_lipid_extraction_sys-4, 
+             juicing_and_lipid_extraction_sys-3,
+             *ethanol_production_sys-[1, 2, 3]),
+        outs=wastewater,
+    )
     
     # Burn bagasse from conveyor belt
     BT = units.BoilerTurbogenerator('BT',
-                                   (U202-0, '', 'boiler_makeup_water', 'natural_gas', '', ''),
+                                   (juicing_and_lipid_extraction_sys-2, '', 
+                                    'boiler_makeup_water', 'natural_gas', '', ''),
+                                   (emissions, 'rejected_water_and_blowdown', ash_disposal),
                                    boiler_efficiency=0.80,
                                    turbogenerator_efficiency=0.85)
     
@@ -567,8 +477,8 @@ def create_system(ID='lipidcane_sys'):
     
     process_water_streams = (s.imbibition_water,
                              s.biodiesel_wash_water,
-                             oil_wash_water,
-                             rvf_wash_water,
+                             s.oil_wash_water,
+                             s.rvf_wash_water,
                              s.stripping_water,
                              *makeup_water_streams)
     
@@ -582,91 +492,19 @@ def create_system(ID='lipidcane_sys'):
                                    makeup_water_streams,
                                    process_water_streams)
     
-    def heat_integration():
-        hu_mee = u.F301.heat_utilities[0]
-        hu_dist = u.D303.heat_utilities[0]
-        actual_duty = hu_mee.duty + hu_dist.duty
-        if actual_duty > 0.:
-            hu_mee(actual_duty, 373.15, 373.15)
-            hu_dist.empty()
-        else:
-            hu_mee.empty()
-            condenser = u.D303.condenser
-            hu_dist(actual_duty, condenser.ins[0].T, condenser.outs[0].T)
-    
-    return bst.System(ID, 
-        [U101,
-         U102,
-         U103,
-         T201,
-         bst.System('juice_extraction_sys',
-            [U201,
-             S201,
-             M201],
-            recycle=M201-0),
-         T202,
-         H201,
-         T203,
-         P201,
-         T204,
-         T205,
-         P202,
-         bst.System('juice_separation_sys',
-            [M202,
-             H202,
-             T206,
-             C201,
-             C202,
-             P203],
-            recycle=P203-0),
-         T207,
-         T207_2,
-         H203,
-         T208,
-         C203,
-         F201,
-         T403,
-         P403,
-         R401,
-         C401,
-         R402,
-         C402,
-         bst.System('methanol_recycle_sys',
-            [T406,
-             P409,
-             C404,
-             T407,
-             P410,
-             H402,
-             D401,
-             D402,
-             H404,
-             P412,
-             T405,
-             P406,
-             C403],
-            recycle=C403-1),
-         F401,
-         P407,
-         T409,
-         H401,
-         P408,
-         P405,
-         B401,
-         H403,
-         P411,
-         T401,
-         P401,
-         T402,
-         P402,
-         T404,
-         P404,
-         S401,
-         S202,
-         ethanol_production_sys,
-         T408,
-         U202],
-        facilities=(heat_integration, CWP, BT, CT, PWC),
-    )
-    
-    
+    F301 = u.F301
+    D303 = u.D303
+    if evaporator_and_beer_column_heat_integration:
+        def heat_integration():
+            hu_mee = F301.heat_utilities[0]
+            hu_dist = D303.heat_utilities[0]
+            actual_duty = hu_mee.duty + hu_dist.duty
+            if actual_duty > 0.:
+                hu_mee(actual_duty, 373.15, 373.15)
+                hu_dist.empty()
+            else:
+                hu_mee.empty()
+                condenser = D303.condenser
+                hu_dist(actual_duty, condenser.ins[0].T, condenser.outs[0].T)
+            CWP._run()
+        CWP.specification = heat_integration

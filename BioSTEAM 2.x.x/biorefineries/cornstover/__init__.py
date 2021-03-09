@@ -49,9 +49,7 @@ def load():
     if not _chemicals_loaded: _load_chemicals()
     _load_system()
     dct = globals()
-    dct.update(flowsheet.system.__dict__)
-    dct.update(flowsheet.stream.__dict__)
-    dct.update(flowsheet.unit.__dict__)
+    dct.update(flowsheet.to_dict())
 
 def _load_chemicals():
     global chemicals, _chemicals_loaded
@@ -89,7 +87,8 @@ def _load_system():
                                     u.U401, u.H403, u.M701, u.S401))
     Area500 = UnitGroup('Area 500', (u.WWTC,))
     Area600 = UnitGroup('Area 600', (u.T701, u.T702, u.P701, u.P702, u.M701, u.FT,
-                                     u.CSL_storage, u.DAP_storage))
+                                     u.CSL_storage, u.DAP_storage, u.T703,
+                                     u.Ammonia_storage, u.H2SO4_storage))
     Area700 = UnitGroup('Area 700', (u.BT,))
     Area800 = UnitGroup('Area 800', (u.CWP, u.CT, u.PWC, u.ADP, u.CIP_package))
     areas = (Area100, Area200, Area300, Area400,
@@ -105,9 +104,7 @@ if PY37:
         if not _system_loaded: 
             _load_system()
             dct = globals()
-            dct.update(flowsheet.system.__dict__)
-            dct.update(flowsheet.stream.__dict__)
-            dct.update(flowsheet.unit.__dict__)
+            dct.update(flowsheet.to_dict())
             if name in dct: return dct[name]
         raise AttributeError(f"module '{__name__}' has no attribute '{name}'")
 else:

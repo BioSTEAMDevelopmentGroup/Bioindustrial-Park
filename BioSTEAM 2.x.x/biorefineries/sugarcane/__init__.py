@@ -37,9 +37,7 @@ def load():
         _load_system()
     finally: 
         dct = globals()
-        dct.update(flowsheet.system.__dict__)
-        dct.update(flowsheet.stream.__dict__)
-        dct.update(flowsheet.unit.__dict__)
+        dct.update(flowsheet.to_dict())
 
 def _load_chemicals():
     global chemicals, _chemicals_loaded
@@ -52,9 +50,15 @@ def _load_system():
     global sugarcane_sys, sugarcane_tea, flowsheet, _system_loaded
     flowsheet = bst.Flowsheet('sugarcane')
     F.set_flowsheet(flowsheet)
+    bst.Stream.ticket_name = 's'
+    bst.Stream.ticket_number = 0
+    bst.Stream.unregistered_ticket_number = 0
+    bst.System.ticket_name = 'SYS'
+    bst.System.ticket_number = 0
+    bst.System.unregistered_ticket_number = 0
     bst.settings.set_thermo(chemicals)
     load_process_settings()
-    sugarcane_sys = create_system()
+    sugarcane_sys = create_sugarcane_to_ethanol_system()
     sugarcane_sys.simulate()
     sugarcane_tea = create_tea(sugarcane_sys)
     sugarcane_tea.IRR = sugarcane_tea.solve_IRR()
@@ -68,9 +72,7 @@ if PY37:
         if not _system_loaded: 
             _load_system()
             dct = globals()
-            dct.update(flowsheet.system.__dict__)
-            dct.update(flowsheet.stream.__dict__)
-            dct.update(flowsheet.unit.__dict__)
+            dct.update(flowsheet.to_dict())
             if name in dct: return dct[name]
         raise AttributeError(f"module '{__name__}' has no attribute '{name}'")
 else: 

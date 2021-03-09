@@ -155,9 +155,8 @@ def create_system(ID='corn_sys'):
     P411 = bst.Pump('P411', MX2-0)
     
     ethanol_purification_sys = create_ethanol_purification_system(
-        degassed_beer=P411-0,
-        ethanol_product=ethanol,
-        denaturant=denaturant,
+        ins=[P411-0, denaturant],
+        outs=ethanol,
         beer_column_heat_integration=False,
         IDs={
             'Beer column': 'T501',
@@ -199,7 +198,7 @@ def create_system(ID='corn_sys'):
     P606 = bst.Pump('P606', V605-0)
     Ev607 = bst.MultiEffectEvaporator('Ev607',
         ins=P606-0,
-        P=(101325, 73581, 50892, 32777),
+        P=(101325, 69682, 47057, 30953),
         V=0.90
     ) 
     C603_2 = bst.LiquidsSplitCentrifuge('C603_2', Ev607-0, (crude_oil, ''), split={'Oil':0.99})
@@ -237,7 +236,7 @@ def create_system(ID='corn_sys'):
     # return f.create_system('corn_sys', feeds=[i for i in f.stream if i.isfeed()])
     
     System = bst.System
-    globals().update(f.unit.__dict__)
+    globals().update(f.unit.data)
     return System('corn_sys',
         [MH101,
          V102,

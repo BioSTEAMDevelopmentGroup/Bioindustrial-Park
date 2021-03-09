@@ -18,10 +18,10 @@ products = (ethanol,)
 
 get_prodcost = lambda: float(tea.production_cost(products))
 get_FCI = lambda: tea._FCI_cached
-get_prod = lambda: ethanol.F_mass * tea._annual_factor
-get_steam = lambda: sum([i.flow for i in sc.BT.steam_utilities])*18.01528*tea._annual_factor/1000
-get_electricity_consumption = lambda: tea._annual_factor * ugroup.get_electricity_consumption()
-get_electricity_production = lambda: tea._annual_factor * ugroup.get_electricity_production()
+get_prod = lambda: ethanol.F_mass * tea._operating_hours
+get_steam = lambda: sum([i.flow for i in sc.BT.steam_utilities])*18.01528*tea._operating_hours/1000
+get_electricity_consumption = lambda: tea._operating_hours * ugroup.get_electricity_consumption()
+get_electricity_production = lambda: tea._operating_hours * ugroup.get_electricity_production()
 get_excess_electricity = lambda: get_electricity_production() - get_electricity_consumption()
 
 metrics = (Metric('Internal rate of return', sc.sugarcane_tea.solve_IRR, '%'),

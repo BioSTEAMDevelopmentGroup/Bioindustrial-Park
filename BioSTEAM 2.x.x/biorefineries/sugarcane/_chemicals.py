@@ -24,6 +24,8 @@ def create_chemicals():
     P4O10.at_state(phase='s')
     Glucose.at_state(phase='s')
     Sucrose.at_state(phase='s')
+    Glucose.N_solutes = 1
+    Sucrose.N_solutes = 2
     
     def create_new_chemical(ID, phase='s', **constants):
         solid = tmo.Chemical.blank(ID, phase=phase, **constants)
@@ -35,7 +37,7 @@ def create_chemicals():
                                     formula="C6H10O5", # Glucose monomer minus water
                                     Hf=-975708.8)
     Hemicellulose = create_new_chemical('Hemicellulose',
-                                        formula="C5H8O5", # Xylose monomer minus water
+                                        formula="C5H8O4", # Xylose monomer minus water
                                         Hf=-761906.4)
     Flocculant = create_new_chemical('Flocculant',
                                      MW=1.)
@@ -43,7 +45,7 @@ def create_chemicals():
                                  formula='C8H8O3', # Vainillin
                                  Hf=-452909.632)
     Solids = create_new_chemical('Solids', MW=1.)
-    Yeast = create_new_chemical('Yeast', MW=1., CAS='Yeast')
+    Yeast = create_new_chemical('Yeast', MW=1., CAS='Yeast', Hf=Glucose.Hf / Glucose.MW)
     CaO = create_new_chemical('CaO', formula='CaO')
 
     

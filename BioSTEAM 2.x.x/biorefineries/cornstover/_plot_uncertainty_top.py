@@ -57,7 +57,7 @@ other_data[:, 1] *= 100./22273.
 other_data[:, 2] *= 100./2.15
 bx_other = plot_montecarlo(other_data,
                            colors.blue_tint.RGBn,
-                           colors.blue_shade.RGBn, positions_other, transpose=False)
+                           colors.blue_shade.RGBn, positions_other)
 
 # %% Plot electricity
 
@@ -76,7 +76,7 @@ electricity_data_humbird_normalized = electricity_data * (100/humbird_electricit
 bx_electricity = plot_montecarlo(electricity_data_humbird_normalized,
                                  colors.orange_tint.RGBn,
                                  colors.orange_shade.RGBn,
-                                 transpose=True, positions=positions_electricity)
+                                 positions=positions_electricity)
 
 # plot_vertical_line(7.5, color=colors.orange_tint.shade(15).RGBn, ls='-.')
 # plot_vertical_line(9.5, color=colors.orange_tint.shade(15).RGBn, ls='-.')
@@ -93,7 +93,7 @@ installed_data = data[installed_cols]
 installed_data_humbird_normalized = installed_data * (100/humbird_installed[1:])
 bx_installed = plot_montecarlo(installed_data_humbird_normalized,
                                   colors.purple_tint.RGBn, colors.purple_shade.RGBn,
-                                  transpose=True, positions=positions_installed)
+                                  positions=positions_installed)
 plot_horizontal_line(100, ls='--')
 u_lb = 0; y_ub = 250
 plt.ylim(0, 250)

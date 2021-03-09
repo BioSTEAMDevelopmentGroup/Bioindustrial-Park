@@ -557,10 +557,16 @@ HP_model = Model(HP_sys, metrics)
 param = HP_model.parameter
 
 def baseline_uniform(baseline, ratio):
-    return shape.Uniform(baseline*(1-ratio), baseline*(1+ratio))
+    lb = baseline*(1-ratio)
+    ub = baseline*(1+ratio)
+    if lb > ub: ub, lb = lb, ub
+    return shape.Uniform(lb, ub)
 
 def baseline_triangle(baseline, ratio):
-    return shape.Triangle(baseline*(1-ratio), baseline, baseline*(1+ratio))
+    lb = baseline*(1-ratio)
+    ub = baseline*(1+ratio)
+    if lb > ub: ub, lb = lb, ub
+    return shape.Triangle(lb, baseline, ub)
 
 D = baseline_uniform(1, 0.1)
 @param(name='Blank parameter', element=feedstock, kind='coupled', units='',

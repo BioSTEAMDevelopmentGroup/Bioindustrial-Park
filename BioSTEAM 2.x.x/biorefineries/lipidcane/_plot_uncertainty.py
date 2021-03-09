@@ -33,7 +33,7 @@ def set_x_axis(with_labels=True):
         
 # Plot metrics across lipid fraction
 
-readxl = lambda sheet: pd.read_excel('Monte Carlo across lipid fraction.xlsx',
+readxl = lambda sheet: pd.read_excel('results/Monte Carlo across lipid fraction.xlsx',
                                      sheet_name=sheet, index_col=0)
 
 fig = plt.figure()
@@ -85,7 +85,7 @@ plot_montecarlo_across_coordinate(lipid_fraction, biodiesel_production_cost,
 
 # Steam
 steam_ax = plt.subplot(3, 2, 5)
-steam = readxl('Steam')/1000
+steam = readxl('Steam')/1000.
 plt.ylabel('Steam [$10^{3} \cdot \mathrm{MT} \cdot \mathrm{yr}^{-1}$]')
 ys = plot_montecarlo_across_coordinate(lipid_fraction, steam)[2]
 annotate_line('Steam', 8, lipid_fraction, ys, 
@@ -113,8 +113,8 @@ annotate_line('Excess electricity', 4, lipid_fraction, ys,
 
 # Plot sugarcane values and SuperPro values
 x_superpro = [0, 2, 5, 10]
-data_sc = pd.read_excel('Monte Carlo sugarcane.xlsx', header=[0,1])
-get_metric = lambda name: np.asarray(data_sc['Biorefinery', name]).flatten()
+data_sc = pd.read_excel('results/Monte Carlo sugarcane.xlsx', header=[0,1])
+get_metric = lambda name: data_sc['Biorefinery', name].values.flatten()
 
 # IRR
 plt.sca(IRR_ax)
@@ -189,12 +189,12 @@ plt.text(0.05, y_text, "E", color=colors.neutral_shade.RGBn,
 # Steam
 plt.sca(steam_ax)
 plot_scatter_points([0, 10], [686.056, 656.000])
-steam = get_metric('Steam [MT/yr]')/1000
+steam = get_metric('Steam [MT/yr]')/1000.
 plot_montecarlo(steam)
 plot_vertical_line(1)
-steam_ub = 900
+steam_ub = 1200
 plt.ylim(0, steam_ub)
-steam_yticks = np.arange(0, 900, 900/5)
+steam_yticks = np.arange(0, steam_ub, steam_ub/5)
 plt.yticks(steam_yticks)
 set_x_axis(True)
 plt.xlabel('Feedstock lipid content [%]')
