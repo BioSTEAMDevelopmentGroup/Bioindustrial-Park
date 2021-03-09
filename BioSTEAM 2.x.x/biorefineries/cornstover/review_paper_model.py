@@ -115,15 +115,20 @@ def set_electricity_price(electricity_price):
     cs.PowerUtility.price = electricity_price
     
 # TODO: Units are wrong
-# 0.5 USD/GJ = 9006 USD/kg
+# 0.5 USD/GJ = 0.0277 USD/kg
 # However, this doesn't affect simulations as 
-# natural gas is not being bought or sold
+# natural gas is not being bought or sold.
+# Perhaps it's better to use a government agency
+# resource like EIA for data on this:
+# https://www.eia.gov/naturalgas/weekly/
 @parameter(
     element='Utilities', 
     distribution=shape.Uniform(0.5, 0.6),
     units='USD/GJ', 
 )
 def set_natural_gas_price(natural_gas_price):
-    cs.BT.natural_gas_price = natural_gas_price / 5.5514553254301405e-05
+    cs.BT.natural_gas_price = 0.0554 * natural_gas_price
     
 
+# TODO: Reaction conversions and enzyme requirements are
+# key parameters that we probably want to add in the analysis.

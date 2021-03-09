@@ -257,7 +257,7 @@ class SaccharificationAndCoFermentation(Unit):
     Rxn('Glucan -> GlucoseOligomer',          'Glucan',   0.0400),
     Rxn('Glucan + 0.5 H2O -> 0.5 Cellobiose', 'Glucan',   0.0120),
     Rxn('Glucan + H2O -> Glucose',            'Glucan',   0.9000),
-    Rxn('Cellobiose + H2O -> Glucose',        'Cellobiose',  1.0000)])
+    Rxn('Cellobiose + H2O -> 2Glucose',        'Cellobiose',  1.0000)])
     
         self.loss = ParallelRxn([
     #   Reaction definition               Reactant    Conversion
