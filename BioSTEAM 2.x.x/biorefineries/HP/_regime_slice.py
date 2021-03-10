@@ -16,7 +16,7 @@ from matplotlib.ticker import AutoMinorLocator as AML
 
 # from biorefineries.HP.system import HP_sys, HP_tea, R302, spec
 # from biorefineries.HP.system import MEK as product
-from biorefineries.HP.system_light_lle_vacuum_distillation import HP_sys, HP_tea, R302, spec, get_GWP, get_FEC
+from biorefineries.HP.system_light_lle_vacuum_distillation import HP_sys, HP_tea, R302, spec, get_GWP, get_FEC, get_electricity_FEC, get_electricity_use
 from biorefineries.HP.system_light_lle_vacuum_distillation import AA as product
 
 from matplotlib import pyplot as plt
@@ -28,11 +28,13 @@ from biosteam.utils import style_plot_limits, set_axes_labels
 import matplotlib.colors as mcolors
 bst.speed_up()
 
+get_product = lambda: product.get_total_flow('kg/s')
+get_electricity_per_product = lambda: get_electricity_use() / product.F_mass
 solve_AA_price = lambda: HP_tea.solve_price(product) * 907.185 # To USD / ton
 get_HP_VOC = lambda: HP_tea.VOC / 1e6 # million USD / yr
 get_HP_FCI = lambda: HP_tea.FCI / 1e6 # million USD
 get_regime = lambda: spec.titer_inhibitor_specification.regime
-HP_metrics = [solve_AA_price, get_GWP, get_FEC, get_regime]
+HP_metrics = [get_product, get_FEC, get_electricity_FEC, get_electricity_per_product, get_regime]
 
 # %% Generate 3-specification meshgrid and set specification loading functions
 steps = 60
@@ -63,9 +65,10 @@ regimes = [
 ]
 
 metric_names = [
-    'MPSP',
-    'GWP',
+    'Production [kg/s]',
     'FEC',
+    'Electricty FEC',
+    'Electricity [J/g]',
     'Regime',
 ]
 
