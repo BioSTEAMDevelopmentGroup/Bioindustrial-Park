@@ -37,7 +37,7 @@ get_regime = lambda: spec.titer_inhibitor_specification.regime
 HP_metrics = [get_product, get_FEC, get_electricity_FEC, get_electricity_per_product, get_regime]
 
 # %% Generate 3-specification meshgrid and set specification loading functions
-steps = 60
+steps = 40
 
 # Yield, titer, productivity (rate)
 spec_1 = all_yields = np.array([0.4, 0.6, 0.8]) # yield

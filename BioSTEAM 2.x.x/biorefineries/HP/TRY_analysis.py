@@ -436,7 +436,7 @@ def get_p_financial_viability():
 HP_metrics = [solve_AA_price, get_GWP, get_FEC]
 
 # %% Generate 3-specification meshgrid and set specification loading functions
-steps = 20
+steps = 40
 
 # # Yield, titer, productivity (rate)
 # spec_1 = np.linspace(0.1, 0.99, steps) # yield

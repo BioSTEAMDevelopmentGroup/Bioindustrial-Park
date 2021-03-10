@@ -75,8 +75,8 @@ tmo.settings.set_thermo(HP_chemicals)
 System.default_maxiter = 100
 # System.default_converge_method = 'fixed-point'
 # System.default_converge_method = 'aitken'
-System.default_converge_method = 'aitken'
-System.default_relative_molar_tolerance = 0.005
+System.default_converge_method = 'wegstein'
+System.default_relative_molar_tolerance = 0.01
 System.default_molar_tolerance = 0.1
 feedstock_ID = 'Corn stover'
 
@@ -531,10 +531,7 @@ def create_HP_sys(ins, outs):
         HP_recovery = 1-tolerable_loss_fraction
         reqd_hexanol = HP_recovery * K_raffinate * process_stream_F_mol
         # S404.reqd_hexanol = reqd_hexanol # for access in S404_run
-        if existing_hexanol > reqd_hexanol:
-            solvent_recycle.imol['Hexanol'] = reqd_hexanol
-        else:
-            feed_hexanol.imol['Hexanol'] = max(0, reqd_hexanol - existing_hexanol)
+        feed_hexanol.imol['Hexanol'] = max(0, reqd_hexanol - existing_hexanol)
     
         M401._run()
         S404_run()
