@@ -75,8 +75,9 @@ tmo.settings.set_thermo(HP_chemicals)
 System.default_maxiter = 500
 # System.default_converge_method = 'fixed-point'
 # System.default_converge_method = 'aitken'
-System.default_converge_method = 'wegstein'
-System.default_molar_tolerance = 0.5
+System.default_converge_method = 'aitken'
+System.default_relative_molar_tolerance = 0.0005
+System.default_molar_tolerance = 0.05
 feedstock_ID = 'Corn stover'
 
 
@@ -577,6 +578,9 @@ def create_HP_sys(ins, outs):
                 S404._setup()
                 print('\nReduced S404.N_stages to %s\n'%S404.N_stages)
             S404_run()
+        else:
+            S404.N_stages = 15
+            S404._setup()
         
     
     def has_negative_flows(unit):

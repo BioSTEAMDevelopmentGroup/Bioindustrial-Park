@@ -1825,9 +1825,9 @@ class CoFermentation(Reactor):
     def _run(self):
         
         sugars, feed, CSL, lime = self.ins
-        
+        CSL.imass['CSL'] = (sugars.F_vol + feed.F_vol) * self.CSL_loading 
         effluent, vapor = self.outs
-        effluent.mix_from([feed, sugars])
+        effluent.mix_from([feed, sugars, CSL])
         
         if 'Sucrose' in effluent.chemicals:
             self.sucrose_hydrolysis_rxn(effluent)
@@ -1835,18 +1835,14 @@ class CoFermentation(Reactor):
         # ss = Stream(None)
         # effluent.copy_like(feed)
         effluent.T = vapor.T = self.T
-        CSL.imass['CSL'] = (sugars.F_vol + feed.F_vol) * self.CSL_loading 
+        
         self.cofermentation_rxns(effluent.mol)
         self.CO2_generation_rxns(effluent.mol)
         self.biomass_generation_rxns(effluent.mol)
-        vapor.imol['CO2'] = effluent.imol['CO2'] + CSL.imol['CSL']
+        vapor.imol['CO2'] = effluent.imol['CO2']
         vapor.phase = 'g'
         
         effluent.imol['CO2'] = 0
-        effluent.imass['CSL'] = 0
-        
-        mixed_feed = self.mixed_feed
-        mixed_feed.mix_from([feed, sugars, CSL])
         
         # Need lime to neutralize produced acid
         if self.neutralization:
@@ -1871,21 +1867,19 @@ class CoFermentation(Reactor):
         Design = self.design_results
         Design.clear()
         # self.tau = self.effluent_titer / self.productivity
-        _mixture = self._mixture = tmo.Stream(None)
-        _mixture.mix_from(self.outs[0:2])
-        duty = Design['Duty'] = _mixture.H - self.mixed_feed.H
+        Design['Duty'] = self.Hnet
 
         if mode == 'Batch':
+            raise NotImplementedError('Batch mode is missing number of fermenters')
             tau_cofermentation = self.tau_batch_turnaround + self.tau
             Design['Fermenter size'] = self.outs[0].F_mass * tau_cofermentation
             Design['Recirculation flow rate'] = self.F_mass_in
-            self.heat_exchanger.simulate_as_auxiliary_exchanger(duty, _mixture)
         
         elif mode == 'Continuous':
             Reactor._V_max = 3785.41 # 1 million gallons
             Reactor._design(self)
         else:
-            raise DesignError(f'Fermentation mode must be either Batch or Continuous, not {mode}')
+            raise DesignError(f"Fermentation mode must be either 'Batch' or 'Continuous', not {mode}")
 
     def _cost(self):
         Design = self.design_results
@@ -1894,6 +1888,7 @@ class CoFermentation(Reactor):
         hx = self.heat_exchanger
 
         if self.mode == 'Batch':
+            raise NotImplementedError('Batch mode is missing number of fermenters')
             Unit._cost()
             self._decorated_cost()
             purchase_costs['Heat exchangers'] = hx.purchase_cost
@@ -1901,19 +1896,22 @@ class CoFermentation(Reactor):
             if not self.neutralization:
                 purchase_costs['Fermenter'] *= _316_over_304
                 purchase_costs['Agitator'] *= _316_over_304
-
+            # TODO: N = ?
         elif self.mode == 'Continuous':
             # if not self.neutralization:
             #     self.vessel_material= 'Stainless steel 316'
-                
             Reactor._cost(self)
-            
             N = Design['Number of reactors']
-            single_rx_effluent = self._mixture.copy()
-            single_rx_effluent.mol[:] /= N
-            hx.simulate_as_auxiliary_exchanger(duty=Design['Duty']/N, 
-                                                stream=single_rx_effluent)
-            hu_total = self.heat_utilities[0]
-            hu_single_rx = hx.heat_utilities[0]
-            hu_total.copy_like(hu_single_rx)
-            hu_total.scale(N)
+        else:
+            raise DesignError(f"mode must be either 'Continuous' or 'Batch'; not {self.mode}")
+            
+        
+        single_rx_effluent = self.outs[0].copy()
+        single_rx_effluent.mol[:] /= N
+        hx.simulate_as_auxiliary_exchanger(duty=Design['Duty']/N, 
+                                            stream=single_rx_effluent)
+        for i in hx.purchase_costs: hx.purchase_costs[i] *= N
+        hu_total = self.heat_utilities[0]
+        hu_single_rx = hx.heat_utilities[0]
+        hu_total.copy_like(hu_single_rx)
+        hu_total.scale(N)

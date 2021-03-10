@@ -436,7 +436,7 @@ def get_p_financial_viability():
 HP_metrics = [solve_AA_price, get_GWP, get_FEC]
 
 # %% Generate 3-specification meshgrid and set specification loading functions
-steps = 20
+steps = 80
 
 # # Yield, titer, productivity (rate)
 # spec_1 = np.linspace(0.1, 0.99, steps) # yield
@@ -460,13 +460,13 @@ steps = 20
 
 
 # Feedstock carbohydrate %, feedstock price, productivity (rate)
-spec_1 = np.linspace(0.1, 0.99, steps) # feedstock carbohydrate %
-spec_2 = np.linspace(0., 200., steps) # feedstock price
-# spec_1 = np.linspace(0.2, 0.99, steps) # yield
-# spec_2 = np.linspace(45, 225, steps) # titer
+# spec_1 = np.linspace(0.01, 0.99, steps) # feedstock carbohydrate %
+# spec_2 = np.linspace(0.01, 200., steps) # feedstock price
+spec_1 = np.linspace(0.1, 0.99, steps) # yield
+spec_2 = np.linspace(20., 300., steps) # titer
 spec_3 = np.array([0.79]) # productivity
-spec.load_spec_1 = spec.load_feedstock_carbohydrate_content
-spec.load_spec_2 = spec.load_feedstock_price
+spec.load_spec_1 = spec.load_yield
+spec.load_spec_2 = spec.load_titer
 spec.load_spec_3 = spec.load_productivity
 xlabel = "Yield"
 ylabel = 'Titer [$\mathrm{g} \cdot \mathrm{L}^{-1}$]'
@@ -548,17 +548,17 @@ data_1 = HP_data = spec.evaluate_across_specs(
 
 
 
-# %% Save generated data
+# # %% Save generated data
 
 
-dateTimeObj = datetime.now()
-file_to_save = 'HP_TRY_%s.%s.%s-%s.%s'%(dateTimeObj.year, dateTimeObj.month, dateTimeObj.day, dateTimeObj.hour, dateTimeObj.minute)
-np.save(file_to_save, data_1)
+# dateTimeObj = datetime.now()
+# file_to_save = 'HP_TRY_%s.%s.%s-%s.%s'%(dateTimeObj.year, dateTimeObj.month, dateTimeObj.day, dateTimeObj.hour, dateTimeObj.minute)
+# np.save(file_to_save, data_1)
 
-# %% Load previously saved data
-file_to_load = file_to_save
-# file_to_load = 'C:/Users/saran/Documents/Academia/Spring 2020/BioSTEAM/Bioindustrial-Park/BioSTEAM 2.x.x/biorefineries/HP/HP_TRY_2020.9.22-16.44'
-data_1 = np.load(file_to_load+'.npy')
+# # %% Load previously saved data
+# file_to_load = file_to_save
+# # file_to_load = 'C:/Users/saran/Documents/Academia/Spring 2020/BioSTEAM/Bioindustrial-Park/BioSTEAM 2.x.x/biorefineries/HP/HP_TRY_2020.9.22-16.44'
+# data_1 = np.load(file_to_load+'.npy')
 data_1_copy = copy.deepcopy(data_1)
 
 data_2 = data_1
