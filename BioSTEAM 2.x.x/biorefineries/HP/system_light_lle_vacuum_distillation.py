@@ -72,12 +72,12 @@ bst.CE = 541.7
 # Set default thermo object for the system
 tmo.settings.set_thermo(HP_chemicals)
 
-System.default_maxiter = 500
+System.default_maxiter = 100
 # System.default_converge_method = 'fixed-point'
 # System.default_converge_method = 'aitken'
 System.default_converge_method = 'aitken'
-System.default_relative_molar_tolerance = 0.0005
-System.default_molar_tolerance = 0.05
+System.default_relative_molar_tolerance = 0.005
+System.default_molar_tolerance = 0.1
 feedstock_ID = 'Corn stover'
 
 
@@ -532,9 +532,9 @@ def create_HP_sys(ins, outs):
         reqd_hexanol = HP_recovery * K_raffinate * process_stream_F_mol
         # S404.reqd_hexanol = reqd_hexanol # for access in S404_run
         if existing_hexanol > reqd_hexanol:
-            solvent_recycle.empty()
-            existing_hexanol = 0
-        feed_hexanol.imol['Hexanol'] = max(0, reqd_hexanol - existing_hexanol)
+            solvent_recycle.imol['Hexanol'] = reqd_hexanol
+        else:
+            feed_hexanol.imol['Hexanol'] = max(0, reqd_hexanol - existing_hexanol)
     
         M401._run()
         S404_run()
@@ -578,9 +578,6 @@ def create_HP_sys(ins, outs):
                 S404._setup()
                 print('\nReduced S404.N_stages to %s\n'%S404.N_stages)
             S404_run()
-        else:
-            S404.N_stages = 15
-            S404._setup()
         
     
     def has_negative_flows(unit):
