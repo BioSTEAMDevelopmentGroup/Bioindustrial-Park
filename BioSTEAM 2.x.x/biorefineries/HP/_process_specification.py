@@ -18,47 +18,50 @@ _reset_text = '\033[1;0m'
 
 # from biosteam.process_tools.reactor_specification import evaluate_across_TRY
 _kg_per_ton = 907.18474
+bugfix = False
+
 
 def evaluate_across_specs(spec, system,
             spec_1, spec_2, metrics, spec_3):
     
-    def reset_and_reload():
-        print('Resetting cache and emptying recycles ...')
-        system.reset_cache()
-        system.empty_recycles()
-        print('Loading and simulating with baseline specifications ...')
-        spec.load_yield(0.49)
-        spec.load_titer(54.8)
-        system.simulate()
-        print('Loading and simulating with required specifications ...')
-        spec.load_specifications(spec_1=spec_1, spec_2=spec_2)
-        system.simulate()
-    
-    def reset_and_switch_solver(solver_ID):
-        system.reset_cache()
-        system.empty_recycles()
-        system.converge_method = solver_ID
-        print(f"Trying {solver_ID} ...")
-        system.simulate()
+    if bugfix:
+        def reset_and_reload():
+            print('Resetting cache and emptying recycles ...')
+            system.reset_cache()
+            system.empty_recycles()
+            print('Loading and simulating with baseline specifications ...')
+            spec.load_yield(0.49)
+            spec.load_titer(54.8)
+            system.simulate()
+            print('Loading and simulating with required specifications ...')
+            spec.load_specifications(spec_1=spec_1, spec_2=spec_2)
+            system.simulate()
         
-    def run_bugfix_barrage():
-        try:
-            reset_and_reload()
-        except Exception as e:
-            print(str(e))
+        def reset_and_switch_solver(solver_ID):
+            system.reset_cache()
+            system.empty_recycles()
+            system.converge_method = solver_ID
+            print(f"Trying {solver_ID} ...")
+            system.simulate()
+            
+        def run_bugfix_barrage():
             try:
-                reset_and_switch_solver('fixedpoint')
+                reset_and_reload()
             except Exception as e:
                 print(str(e))
                 try:
-                    reset_and_switch_solver('aitken')
+                    reset_and_switch_solver('fixedpoint')
                 except Exception as e:
                     print(str(e))
-                    print(_yellow_text+"Bugfix barrage failed."+_reset_text)
-                    raise e
-        finally:
-            system.converge_method = 'wegstein'
-            print('\n')
+                    try:
+                        reset_and_switch_solver('aitken')
+                    except Exception as e:
+                        print(str(e))
+                        print(_yellow_text+"Bugfix barrage failed."+_reset_text)
+                        raise e
+            finally:
+                system.converge_method = 'wegstein'
+                print('\n')
     spec.count += 1
     print(f"\n\n----------\n{spec.count} / {spec.total_iterations}\n")
     print(f"yield = {format(100*float(spec_1),'.1f')} % theo.,  titer = {format(float(spec_2),'.2f')} g\u00b7L\u207b\u00b9,  prod. = {format(float(spec_3),'.2f')} g\u00b7L\u207b\u00b9\u00b7h\u207b\u00b9\n")
@@ -80,7 +83,7 @@ def evaluate_across_specs(spec, system,
             print(f"[Sugars]evaporator = {format(sugar_conc_evaporator, '0.2f')} g\u00b7L\u207b\u00b9")
             print(f"[Sugars]reactor = {format(sugar_conc_reactor, '0.2f')} g\u00b7L\u207b\u00b9")
             return np.nan*np.ones([len(metrics), len(spec_3)])
-        else:
+        elif bugfix:
             print(str_e1)
             try:
                 run_bugfix_barrage()
@@ -93,6 +96,8 @@ def evaluate_across_specs(spec, system,
                 print(_red_highlight_white_text+f"Point failed; returning metric values as np.nan."+_reset_text)
                 spec.exceptions_dict[spec.count] = (e1, e2)
                 return np.nan*np.ones([len(metrics), len(spec_3)])
+        else:
+            return np.nan*np.ones([len(metrics), len(spec_3)])
     HXN_Q_bal_percent_error = spec.HXN.energy_balance_percent_error
     print(f"HXN Q_balance off by {format(HXN_Q_bal_percent_error,'.2f')} %.\n")
     spec.average_HXN_energy_balance_percent_error += abs(HXN_Q_bal_percent_error)
