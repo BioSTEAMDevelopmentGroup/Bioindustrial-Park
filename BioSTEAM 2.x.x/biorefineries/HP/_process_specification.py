@@ -18,9 +18,12 @@ _reset_text = '\033[1;0m'
 
 # from biosteam.process_tools.reactor_specification import evaluate_across_TRY
 _kg_per_ton = 907.18474
-bugfix = False
 skip_infeasible_titers = True
 last_infeasible_simulation = [] # yield, titer
+
+# Bugfix barrage is not needed anymore because hexane recycle is not emptied anymore
+# and Wegstein and Aitken converge much better.
+bugfix = False
 
 def evaluate_across_specs(spec, system,
             spec_1, spec_2, metrics, spec_3):

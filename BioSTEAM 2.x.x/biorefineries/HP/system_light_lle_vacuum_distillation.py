@@ -484,6 +484,10 @@ def create_HP_sys(ins, outs):
         
         reqd_hexanol = HP_recovery * K_raffinate * process_stream_F_mol
         
+        # Not emptying recycle accelerates convergence; 
+        # If recycles are emptied, Wegstein and Aitken both fail due to overshooting
+        # hexane (which leads to the recycle being emptied again).
+        # Wegstein and Aitken allow for lower tolerances.
         feed_hexanol.imol['Hexanol'] = max(0, reqd_hexanol - existing_hexanol)
         M401._run()
         S404_run()
