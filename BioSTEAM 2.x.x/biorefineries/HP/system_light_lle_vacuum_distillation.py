@@ -72,11 +72,11 @@ bst.CE = 541.7
 # Set default thermo object for the system
 tmo.settings.set_thermo(HP_chemicals)
 
-System.default_maxiter = 20
+System.default_maxiter = 200
 # System.default_converge_method = 'fixed-point'
 # System.default_converge_method = 'aitken'
 System.default_converge_method = 'wegstein'
-System.default_relative_molar_tolerance = 0.01
+System.default_relative_molar_tolerance = 0.05
 System.default_molar_tolerance = 0.1
 System.strict_convergence = False
 feedstock_ID = 'Corn stover'

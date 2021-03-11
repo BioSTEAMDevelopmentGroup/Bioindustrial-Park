@@ -65,27 +65,27 @@ HP_metrics = [
     # get_lps, 
     # get_mps, 
     # get_hps,
-    get_cow, 
-    get_chw, 
-    # get_hxn_lps,
-    # get_hxn_mps,
-    # get_hxn_cow,
-    # get_hxn_chw,
+    # get_cow, 
+    # get_chw, 
+    get_hxn_lps,
+    get_hxn_mps,
+    get_hxn_cow,
+    get_hxn_chw,
     # get_ec,
     # get_T_D401,
     # get_T_F301,
     # get_T_F401,
-    get_T_D402,
+    # get_T_D402,
     get_ep, 
     get_regime
 ]
 
 # %% Generate 3-specification meshgrid and set specification loading functions
-steps = 10
+steps = 20
 
 # Yield, titer, productivity (rate)
-spec_1 = all_yields = np.array([0.65, 0.66]) # yield
-spec_2 = all_titers = np.linspace(100., 130, steps) # titer
+spec_1 = all_yields = np.array([0.6, 0.8]) # yield
+spec_2 = all_titers = np.linspace(100., 140, steps) # titer
 spec_3 = np.array([0.79]) # productivity
 spec.load_spec_1 = spec.load_yield
 spec.load_spec_2 = spec.load_titer
@@ -114,17 +114,17 @@ metric_names = [
     # 'LPS',
     # 'MPS',
     # 'HPS',
-    'Co.W',
-    'Ch.W',
-    # 'HXN LPS',
-    # 'HXN MPS',
-    # 'HXN Co.W',
-    # 'HXN Ch.W',
+    # 'Co.W',
+    # 'Ch.W',
+    'HXN LPS',
+    'HXN MPS',
+    'HXN Co.W',
+    'HXN Ch.W',
     # 'EC',
     # 'T-D401',
     # 'T-F301',
     # 'T-F401',
-    'T-D402',
+    # 'T-D402',
     'EP',
     'Regime',
 ]
