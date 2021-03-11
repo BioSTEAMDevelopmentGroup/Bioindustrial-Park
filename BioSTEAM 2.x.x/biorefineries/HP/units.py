@@ -759,15 +759,19 @@ class SeedTrain(Unit):
         Rxn('Xylose -> 5 FermMicrobe',        'Xylose',    0.03*ferm_ratio),
         ])
         
-        self.CO2_generation_rxns = ParallelRxn([
-        Rxn('Glucose -> 6 CO2',       'Glucose',   0.8*ferm_ratio),
-        Rxn('Xylose -> 5 CO2',        'Xylose',    0.8*ferm_ratio),
-        ])
+        # Do not include biomass generation reactions here because part of the
+        # seed should be fermented in the next fermentation tank. Adding
+        # these reactions spends most of the seed without making much product 
+        # (not economical).
+        # self.CO2_generation_rxns = ParallelRxn([
+        # Rxn('Glucose -> 6 CO2 + 6 H2O',       'Glucose',   0.8*ferm_ratio),
+        # Rxn('Xylose -> 5 CO2 + 5 H2O',        'Xylose',    0.8*ferm_ratio),
+        # ])
         
-        self.biomass_generation_rxns = ParallelRxn([
-        Rxn('Glucose -> 6 FermMicrobe',       'Glucose',   (1.-1e-9)*ferm_ratio),
-        Rxn('Xylose -> 5 FermMicrobe',        'Xylose',    (1.-1e-9)*ferm_ratio),
-        ])
+        # self.biomass_generation_rxns = ParallelRxn([
+        # Rxn('Glucose -> 6 FermMicrobe',       'Glucose',   (1.-1e-9)*ferm_ratio),
+        # Rxn('Xylose -> 5 FermMicrobe',        'Xylose',    (1.-1e-9)*ferm_ratio),
+        # ])
         
         
         
@@ -778,8 +782,8 @@ class SeedTrain(Unit):
         CO2.phase = 'g'
 
         self.cofermentation_rxns(effluent.mol)
-        self.CO2_generation_rxns(effluent.mol)
-        self.biomass_generation_rxns(effluent.mol)
+        # self.CO2_generation_rxns(effluent.mol)
+        # self.biomass_generation_rxns(effluent.mol)
         
         # Assume all CSL is used up
         effluent.imass['CSL'] = 0 
@@ -1791,14 +1795,20 @@ class CoFermentation(Reactor):
         self.glucose_to_acetic_acid_rxn = self.cofermentation_rxns[1]
         self.xylose_to_acetic_acid_rxn = self.cofermentation_rxns[3]
         
+        # Include water as a product since cells are burning glucose (also helps atomic balance).
+        # Oxygen is not included here and it's a gap in the assumption that
+        # cells produce this much CO2. The only O2 available is dissolved
+        # oxygen since there is no oxygen vector here.
+        # Probably not a good assumption depending how much glucose is left over.
         self.CO2_generation_rxns = ParallelRxn([
-        Rxn('Glucose -> 6 CO2',       'Glucose',   0.8),
-        Rxn('Xylose -> 5 CO2',        'Xylose',    0.8),
+        Rxn('Glucose -> 6 CO2 + 6 H2O',       'Glucose',   0.5),
+        Rxn('Xylose -> 5 CO2 + 5 H2O',        'Xylose',    0.5),
         ])
         
+        # Exact amount of CSL is ignored (negligible for economics)
         self.biomass_generation_rxns = ParallelRxn([
-        Rxn('Glucose -> 6 FermMicrobe',       'Glucose',   1.-1e-9),
-        Rxn('Xylose -> 5 FermMicrobe',        'Xylose',    1.-1e-9),
+        Rxn('Glucose -> 6 FermMicrobe',       'Glucose',   1 - 1e-3),
+        Rxn('Xylose -> 5 FermMicrobe',        'Xylose',    1 - 1e-3),
         ])
         
         self.glucose_to_microbe_rxn = self.biomass_generation_rxns[0]
@@ -1867,7 +1877,7 @@ class CoFermentation(Reactor):
         Design = self.design_results
         Design.clear()
         # self.tau = self.effluent_titer / self.productivity
-        Design['Duty'] = self.Hnet
+        Design['Duty'] = self.Hnet # Includes heat of reaction
 
         if mode == 'Batch':
             raise NotImplementedError('Batch mode is missing number of fermenters')
@@ -1889,6 +1899,8 @@ class CoFermentation(Reactor):
 
         if self.mode == 'Batch':
             raise NotImplementedError('Batch mode is missing number of fermenters')
+            # TODO: N = ?
+            # Note that this code assumes only one vessel, which is impossible
             Unit._cost()
             self._decorated_cost()
             purchase_costs['Heat exchangers'] = hx.purchase_cost
@@ -1896,7 +1908,6 @@ class CoFermentation(Reactor):
             if not self.neutralization:
                 purchase_costs['Fermenter'] *= _316_over_304
                 purchase_costs['Agitator'] *= _316_over_304
-            # TODO: N = ?
         elif self.mode == 'Continuous':
             # if not self.neutralization:
             #     self.vessel_material= 'Stainless steel 316'
@@ -1905,7 +1916,6 @@ class CoFermentation(Reactor):
         else:
             raise DesignError(f"mode must be either 'Continuous' or 'Batch'; not {self.mode}")
             
-        
         single_rx_effluent = self.outs[0].copy()
         single_rx_effluent.mol[:] /= N
         hx.simulate_as_auxiliary_exchanger(duty=Design['Duty']/N, 
@@ -1915,3 +1925,6 @@ class CoFermentation(Reactor):
         hu_single_rx = hx.heat_utilities[0]
         hu_total.copy_like(hu_single_rx)
         hu_total.scale(N)
+        # Do not include this utility in HXN because this one is scaled by N,
+        # representing N heat exchanged (not just one heat exchanger)
+        hu_total.heat_exchanger = None

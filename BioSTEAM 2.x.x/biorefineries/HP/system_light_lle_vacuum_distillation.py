@@ -72,12 +72,13 @@ bst.CE = 541.7
 # Set default thermo object for the system
 tmo.settings.set_thermo(HP_chemicals)
 
-System.default_maxiter = 100
+System.default_maxiter = 20
 # System.default_converge_method = 'fixed-point'
 # System.default_converge_method = 'aitken'
 System.default_converge_method = 'wegstein'
 System.default_relative_molar_tolerance = 0.01
 System.default_molar_tolerance = 0.1
+System.strict_convergence = False
 feedstock_ID = 'Corn stover'
 
 
@@ -519,7 +520,7 @@ def create_HP_sys(ins, outs):
         
     
     def adjust_S404_streams():
-        S404.N_stages = 15 # reset
+        S404.N_stages = 15  # reset
         S404._setup() # reset
         feed_hexanol, solvent_recycle = M401.ins
         process_stream = S404.ins[0]
@@ -535,6 +536,8 @@ def create_HP_sys(ins, outs):
     
         M401._run()
         S404_run()
+        if S404.N_stages < 15:
+            print('\nReduced S404.N_stages to %s\n'%S404.N_stages)
         
     def update_Ks(lle_unit, solute_indices = (0,), carrier_indices = (1,), solvent_indices = (2,)):
         IDs = lle_unit.partition_data['IDs']
@@ -573,7 +576,6 @@ def create_HP_sys(ins, outs):
                 raise InfeasibleRegion('number of stages in %s'%(S404.ID))   
             else:
                 S404._setup()
-                print('\nReduced S404.N_stages to %s\n'%S404.N_stages)
             S404_run()
         
     
@@ -597,8 +599,8 @@ def create_HP_sys(ins, outs):
                                         condenser_thermo = ideal_thermo,
                                         boiler_thermo = ideal_thermo)
     
-    
-    D401_H = bst.units.HXutility('D401_H', ins=D401-0, V=0., rigorous=True)
+    D401_H = bst.units.HXutility('D401_H', ins=D401-0, V=0., T=310., 
+                                 rigorous=False, thermo=ideal_thermo)
     D401_H_P = units.HPPump('D401_H_P', ins=D401_H-0, P = 101325)
     D401_H_P-0-1-M401
     
@@ -633,7 +635,7 @@ def create_HP_sys(ins, outs):
     # spent_TiO2_catalyst is assumed to be sold at 0 $/kg
     
     
-    R402_H = bst.units.HXutility('R402_H', ins=R402-0, T = 372.00, rigorous=True)
+    R402_H = bst.units.HXutility('R402_H', ins=R402-0, T = 370, rigorous=False)
     
     
     D402 = bst.units.ShortcutColumn('D402', ins=R402_H-0, outs=('D402_g', 'D402_l'),
@@ -644,7 +646,7 @@ def create_HP_sys(ins, outs):
                                         vessel_material = 'Stainless steel 316')
     
     D402_P = units.HPPump('D402_P', ins=D402-1)
-    D402_H = bst.units.HXutility('D402_H', ins=D402-0, T = 308.15, rigorous=True)
+    D402_H = bst.units.HXutility('D402_H', ins=D402-0, T = 308.15, V=0, rigorous=False)
     
     
     

@@ -19,11 +19,16 @@ _reset_text = '\033[1;0m'
 # from biosteam.process_tools.reactor_specification import evaluate_across_TRY
 _kg_per_ton = 907.18474
 bugfix = False
-
+skip_infeasible_titers = True
+last_infeasible_simulation = [] # yield, titer
 
 def evaluate_across_specs(spec, system,
             spec_1, spec_2, metrics, spec_3):
-    
+    spec.count += 1
+    if skip_infeasible_titers and last_infeasible_simulation:
+        yield_, titer = last_infeasible_simulation
+        if spec_1 <= yield_ and spec_2 >= titer:
+            return np.nan*np.ones([len(metrics), len(spec_3)])
     if bugfix:
         def reset_and_reload():
             print('Resetting cache and emptying recycles ...')
@@ -62,10 +67,8 @@ def evaluate_across_specs(spec, system,
             finally:
                 system.converge_method = 'wegstein'
                 print('\n')
-    spec.count += 1
     print(f"\n\n----------\n{spec.count} / {spec.total_iterations}\n")
     print(f"yield = {format(100*float(spec_1),'.1f')} % theo.,  titer = {format(float(spec_2),'.2f')} g\u00b7L\u207b\u00b9,  prod. = {format(float(spec_3),'.2f')} g\u00b7L\u207b\u00b9\u00b7h\u207b\u00b9\n")
-    
     try:
         spec.load_specifications(spec_1=spec_1, spec_2=spec_2)
         system.simulate()
@@ -74,6 +77,7 @@ def evaluate_across_specs(spec, system,
     except Exception as e1:
         str_e1 = str(e1)
         if 'sugar concentration' in str_e1:
+            last_infeasible_simulation[:] = (spec_1, spec_2)
             print('Infeasible sugar concentration (routine infeasible region error).')
             sugars_tuple = spec.titer_inhibitor_specification.sugars
             reactor_ins_0 = spec.titer_inhibitor_specification.reactor.ins[0]

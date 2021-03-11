@@ -20,7 +20,9 @@ from matplotlib.ticker import AutoMinorLocator as AML
 
 # from biorefineries.HP.system import HP_sys, HP_tea, R302, spec
 # from biorefineries.HP.system import MEK as product
-from biorefineries.HP.system_light_lle_vacuum_distillation import HP_sys, HP_tea, R302, spec, get_GWP, get_ng_GWP, get_FEC, get_SPED, F301
+from biorefineries.HP.system_light_lle_vacuum_distillation import (
+    HP_sys, HP_tea, R302, spec, get_GWP, get_ng_GWP, get_FEC, get_SPED, F301, HXN
+)
 from biorefineries.HP.system_light_lle_vacuum_distillation import AA as product
 
 from matplotlib import pyplot as plt
@@ -433,10 +435,16 @@ def get_p_financial_viability():
 # HP_metrics = [solve_AA_price, get_HP_inhibitors_conc]
 # HP_metrics = [solve_AA_price, get_HP_sugars_conc, get_HP_inhibitors_conc]
 # HP_metrics = [solve_AA_price, get_p_financial_viability, get_FEC]
+# HXN makes plots ugly; this ignores HXN
+def mock_hxn():
+        HXN.heat_utilities = tuple([bst.HeatUtility() for i in range(4)])
+        HXN._installed_cost = 0.
+        HXN.purchase_costs.clear()
+HXN._cost = mock_hxn
 HP_metrics = [solve_AA_price, get_GWP, get_FEC]
 
 # %% Generate 3-specification meshgrid and set specification loading functions
-steps = 40
+steps = 80
 
 # # Yield, titer, productivity (rate)
 # spec_1 = np.linspace(0.1, 0.99, steps) # yield
@@ -463,7 +471,7 @@ steps = 40
 # spec_1 = np.linspace(0.01, 0.99, steps) # feedstock carbohydrate %
 # spec_2 = np.linspace(0.01, 200., steps) # feedstock price
 spec_1 = np.linspace(0.1, 0.99, steps) # yield
-spec_2 = np.linspace(20., 300., steps) # titer
+spec_2 = np.linspace(10., 300., steps) # titer
 spec_3 = np.array([0.79]) # productivity
 spec.load_spec_1 = spec.load_yield
 spec.load_spec_2 = spec.load_titer
