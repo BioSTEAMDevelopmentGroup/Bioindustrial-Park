@@ -248,6 +248,8 @@ HMF.Dortmund.update(chems.Furfural.Dortmund)
 # https://webbook.nist.gov/cgi/cbook.cgi?ID=C87990&Mask=4
 Xylitol = chemical_database('Xylitol', phase='l', Hf=-243145*_cal2joule, Hfus=-1118.6e3)
 
+
+Glycerol = chemical_database('Glycerol')
 # Hfus from NIST, accessed 04/07/2020
 # https://webbook.nist.gov/cgi/cbook.cgi?ID=C50215&Mask=4
 # LacticAcid = chemical_database('LacticAcid', Hfus=11.34e3)

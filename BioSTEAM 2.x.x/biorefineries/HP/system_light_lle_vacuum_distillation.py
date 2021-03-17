@@ -75,10 +75,14 @@ tmo.settings.set_thermo(HP_chemicals)
 System.default_maxiter = 500
 # System.default_converge_method = 'fixed-point'
 # System.default_converge_method = 'aitken'
-System.default_converge_method = 'wegstein'
-System.default_molar_tolerance = 0.5
+# System.default_converge_method = 'wegstein'
+# System.default_molar_tolerance = 0.5
 feedstock_ID = 'Corn stover'
 
+System.default_converge_method = 'wegstein'
+System.default_relative_molar_tolerance = 0.005
+System.default_molar_tolerance = 0.1
+System.strict_convergence = True # True => throw exception if system does not converge; false => continue with unconverged system
 
 
 @SystemFactory(ID = 'HP_sys')
@@ -530,9 +534,9 @@ def create_HP_sys(ins, outs):
         HP_recovery = 1-tolerable_loss_fraction
         reqd_hexanol = HP_recovery * K_raffinate * process_stream_F_mol
         # S404.reqd_hexanol = reqd_hexanol # for access in S404_run
-        if existing_hexanol > reqd_hexanol:
-            solvent_recycle.empty()
-            existing_hexanol = 0
+        # if existing_hexanol > reqd_hexanol:
+        #     solvent_recycle.empty()
+        #     existing_hexanol = 0
         feed_hexanol.imol['Hexanol'] = max(0, reqd_hexanol - existing_hexanol)
     
         M401._run()
@@ -581,7 +585,7 @@ def create_HP_sys(ins, outs):
     
     def has_negative_flows(unit):
         for stream in unit.outs + unit.ins:
-            if (stream.mol < 0).any():
+            if (stream.mol < 0.).any():
                 return True
         return False
                 
@@ -600,7 +604,9 @@ def create_HP_sys(ins, outs):
                                         boiler_thermo = ideal_thermo)
     
     
-    D401_H = bst.units.HXutility('D401_H', ins=D401-0, V=0., rigorous=True)
+    # D401_H = bst.units.HXutility('D401_H', ins=D401-0, V=0., rigorous=True)
+    D401_H = bst.units.HXutility('D401_H', ins=D401-0, V=0., rigorous=False,
+                                 thermo=ideal_thermo)
     D401_H_P = units.HPPump('D401_H_P', ins=D401_H-0, P = 101325)
     D401_H_P-0-1-M401
     
@@ -616,9 +622,9 @@ def create_HP_sys(ins, outs):
     def M402_objective_fn(Water_imol):
         M402.ins[1].imol['Water'] = Water_imol
         M402._run()
-        return get_concentration_gpL('HP', M402.outs[0]) - 600.
-        # return get_concentration_gpL('HP', M402.outs[0]) - 270.1 # Solubility at 25 C
-        # return get_mass_percent('HP', M402.outs[0]) - .15 # Paper
+        return get_concentration_gpL('HP', M402.outs[0]) - 600. # predicted "solubility" of 645 g/L at STP https://hmdb.ca/metabolites/HMDB0000700
+        # return get_concentration_gpL('HP', M402.outs[0]) - 270.1 # "Ssolubility "at 25 C # https://www.chemicalbook.com/ChemicalProductProperty_EN_CB6711580.htm
+        # return get_mass_percent('HP', M402.outs[0]) - .15 # Dehydration reaction paper
     
     def M402_adjust_water():
         flx.IQ_interpolation(M402_objective_fn, 0., 10000, maxiter=50, ytol=1e-2)
@@ -646,8 +652,8 @@ def create_HP_sys(ins, outs):
                                         vessel_material = 'Stainless steel 316')
     
     D402_P = units.HPPump('D402_P', ins=D402-1)
-    D402_H = bst.units.HXutility('D402_H', ins=D402-0, T = 308.15, rigorous=True)
-    
+    # D402_H = bst.units.HXutility('D402_H', ins=D402-0, T = 308.15, rigorous=True)
+    D402_H = bst.units.HXutility('D402_H', ins=D402-0, T=308.15, V=0., rigorous=False)
     
     
     separation_group = UnitGroup('separation_group', 
@@ -910,7 +916,10 @@ def create_HP_sys(ins, outs):
     
     # Heat exchange network
     HXN = bst.facilities.HeatExchangerNetwork('HXN')
-    
+    def HXN_no_run_cost():
+        HXN.heat_utilities = tuple()
+        HXN._installed_cost=0.
+    # HXN._cost = HXN_no_run_cost
     HXN_group = UnitGroup('HXN_group', 
                                    units=(HXN,))
     process_groups.append(HXN_group)
@@ -1263,6 +1272,25 @@ def get_material_GWP_array():
     # return chemical_GWP.sum()/AA.F_mass
     return chemical_GWP
 
+def get_material_GWP_breakdown():
+    LCA_stream.mass = sum(i.mass for i in LCA_streams)
+    chemical_GWP_dict = {ID: LCA_stream.imass[ID] * GWP_CF_stream.imass[ID] / AA.F_mass \
+                         for ID in feed_chem_IDs if not LCA_stream.imass[ID] * GWP_CF_stream.imass[ID] == 0.}
+    return chemical_GWP_dict
+
+def get_material_GWP_breakdown_fractional():
+    chemical_GWP_dict = get_material_GWP_breakdown()
+    tot_material_GWP = get_material_GWP()
+    for k,v in chemical_GWP_dict.items():
+        chemical_GWP_dict[k] /= tot_material_GWP
+    return chemical_GWP_dict
+
+def get_material_GWP_breakdown_as_fraction_of_tot_GWP():
+    chemical_GWP_dict = get_material_GWP_breakdown()
+    tot_material_GWP = get_GWP()
+    for k,v in chemical_GWP_dict.items():
+        chemical_GWP_dict[k] /= tot_material_GWP
+    return chemical_GWP_dict
 # Carbon balance
 total_C_in = sum([feed.get_atomic_flow('C') for feed in feeds])
 total_C_out = AA.get_atomic_flow('C') + sum([emission.get_atomic_flow('C') for emission in emissions])
@@ -1304,12 +1332,41 @@ get_GWP = lambda: get_FGHTP_GWP() + get_material_GWP() + get_ng_GWP() +\
 get_GWP_by_ID = lambda ID: LCA_stream.imass[ID] * GWP_CF_stream.imass[ID]/AA.F_mass
 # Fossil energy consumption (FEC) from materials
 def get_material_FEC():
+    # chemical_FEC = LCA_stream.mass*CFs['FEC_CF_stream'].mass
+    chemical_FEC = get_material_FEC_array()
+    # feedstock_FEC = feedstock.F_mass*CFs['FEC_CFs']['Corn stover']
+    # return chemical_FEC.sum()/AA.F_mass
+    return sum(chemical_FEC)/AA.F_mass
+
+def get_material_FEC_array():
     LCA_stream.mass = sum(i.mass for i in LCA_streams)
     # chemical_FEC = LCA_stream.mass*CFs['FEC_CF_stream'].mass
     chemical_FEC = [LCA_stream.imass[ID] * FEC_CF_stream.imass[ID] for ID in feed_chem_IDs]
     # feedstock_FEC = feedstock.F_mass*CFs['FEC_CFs']['Corn stover']
     # return chemical_FEC.sum()/AA.F_mass
-    return sum(chemical_FEC)/AA.F_mass
+    return chemical_FEC
+
+def get_material_FEC_breakdown():
+    LCA_stream.mass = sum(i.mass for i in LCA_streams)
+    chemical_FEC_dict = {ID: LCA_stream.imass[ID] * FEC_CF_stream.imass[ID] / AA.F_mass \
+                         for ID in feed_chem_IDs if not LCA_stream.imass[ID] * FEC_CF_stream.imass[ID] == 0.}
+    return chemical_FEC_dict
+
+def get_material_FEC_breakdown_fractional():
+    chemical_FEC_dict = get_material_FEC_breakdown()
+    tot_material_FEC = get_material_FEC()
+    for k,v in chemical_FEC_dict.items():
+        chemical_FEC_dict[k] /= tot_material_FEC
+    return chemical_FEC_dict
+
+def get_material_FEC_breakdown_as_fraction_of_tot_FEC():
+    chemical_FEC_dict = get_material_FEC_breakdown()
+    tot_material_FEC = get_FEC()
+    for k,v in chemical_FEC_dict.items():
+        chemical_FEC_dict[k] /= tot_material_FEC
+    return chemical_FEC_dict
+
+
 
 get_feedstock_FEC = lambda: (feedstock.F_mass-feedstock.imass['Water'])\
     * CFs['FEC_CFs']['FGHTP %s'%feedstock_ID]/AA.F_mass
@@ -1406,7 +1463,8 @@ def get_material_cost_breakdown_breakdown_fractional():
 #     group_GWPs = {}
 #     for group in process_groups:
 #         group_material_costs[group.name] = 0
-    
+
+  
 # %% Full analysis
 def simulate_and_print():
     MPSP = get_AA_MPSP()

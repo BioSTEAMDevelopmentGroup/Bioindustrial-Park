@@ -74,6 +74,8 @@ cu_group_contributions = {}
 pu_group_contributions = {}
 ic_group_contributions = {}
 mc_group_contributions = {}
+gwp_group_contributions = {}
+fec_group_contributions = {}
 
 MPSPs = []
 

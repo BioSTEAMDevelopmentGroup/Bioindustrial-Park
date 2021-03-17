@@ -29,7 +29,11 @@ from chaospy import distributions as shape
 from biosteam import main_flowsheet as find
 from biosteam.evaluation import Model, Metric
 from biosteam.evaluation.evaluation_tools.parameter import Setter
-from biorefineries.HP.system_light_lle_vacuum_distillation import process_groups_dict, HP_tea, HP_no_BT_tea, flowsheet, unit_groups, get_GWP, get_FEC, CFs, spec, process_groups, process_groups_dict, get_material_cost_breakdown
+from biorefineries.HP.system_light_lle_vacuum_distillation import process_groups_dict, HP_tea, HP_no_BT_tea,\
+flowsheet, unit_groups, get_GWP, get_FEC, CFs, spec, process_groups, process_groups_dict,\
+get_material_cost_breakdown, get_GWP_by_ID, get_FEC_by_ID, get_ng_GWP, get_ng_FEC,\
+get_FGHTP_GWP, get_feedstock_FEC, get_electricity_GWP, get_electricity_FEC,\
+get_direct_emissions_GWP
 from warnings import warn
 
 find.set_flowsheet(flowsheet)
@@ -541,12 +545,99 @@ metrics.extend((Metric('Net present value', get_NPV, '$', 'TEA'), ))
 
 metrics.extend((Metric('HXN energy balance error', lambda: HXN.energy_balance_percent_error, '%', 'TEA'), ))
 
-# LCA
+##### LCA #####
 metrics.extend((
     Metric('Total GWP', get_GWP, 'kg CO2-eq/kg', 'LCA'),
     Metric('Total FEC', get_FEC, 'MJ/kg', 'LCA')
     ))
 
+# Material GWP
+metrics.extend((Metric('GWP - H2SO4',
+                       lambda:get_GWP_by_ID('H2SO4'),
+                       'kg CO2/kg', 'LCA'),))
+metrics.extend((Metric('GWP - NaOH',
+                       lambda:get_GWP_by_ID('NaOH'),
+                       'kg CO2/kg', 'LCA'),))
+metrics.extend((Metric('GWP - AmmoniumHydroxide',
+                       lambda:get_GWP_by_ID('AmmoniumHydroxide'),
+                       'kg CO2/kg', 'LCA'),))
+metrics.extend((Metric('GWP - CalciumDihydroxide',
+                       lambda:get_GWP_by_ID('CalciumDihydroxide'),
+                       'kg CO2/kg', 'LCA'),))
+metrics.extend((Metric('GWP - Hexanol',
+                       lambda:get_GWP_by_ID('Hexanol'),
+                       'kg CO2/kg', 'LCA'),))
+metrics.extend((Metric('GWP - Enzyme',
+                       lambda:get_GWP_by_ID('Enzyme'),
+                       'kg CO2/kg', 'LCA'),))
+metrics.extend((Metric('GWP - TiO2',
+                       lambda:get_GWP_by_ID('TiO2'),
+                       'kg CO2/kg', 'LCA'),))
+metrics.extend((Metric('GWP - CSL',
+                       lambda:get_GWP_by_ID('CSL'),
+                       'kg CO2/kg', 'LCA'),))
+
+# Material FEC
+metrics.extend((Metric('FEC - H2SO4',
+                       lambda:get_FEC_by_ID('H2SO4'),
+                       'kg CO2/kg', 'LCA'),))
+metrics.extend((Metric('FEC - NaOH',
+                       lambda:get_FEC_by_ID('NaOH'),
+                       'kg CO2/kg', 'LCA'),))
+metrics.extend((Metric('FEC - AmmoniumHydroxide',
+                       lambda:get_FEC_by_ID('AmmoniumHydroxide'),
+                       'kg CO2/kg', 'LCA'),))
+metrics.extend((Metric('FEC - CalciumDihydroxide',
+                       lambda:get_FEC_by_ID('CalciumDihydroxide'),
+                       'kg CO2/kg', 'LCA'),))
+metrics.extend((Metric('FEC - Hexanol',
+                       lambda:get_FEC_by_ID('Hexanol'),
+                       'kg CO2/kg', 'LCA'),))
+metrics.extend((Metric('FEC - Enzyme',
+                       lambda:get_FEC_by_ID('Enzyme'),
+                       'kg CO2/kg', 'LCA'),))
+metrics.extend((Metric('FEC - TiO2',
+                       lambda:get_FEC_by_ID('TiO2'),
+                       'kg CO2/kg', 'LCA'),))
+metrics.extend((Metric('FEC - CSL',
+                       lambda:get_FEC_by_ID('CSL'),
+                       'kg CO2/kg', 'LCA'),))
+# Natural gas
+metrics.extend((Metric('GWP - natural gas',
+                       lambda:get_ng_GWP(),
+                       'kg CO2/kg', 'LCA'),))
+metrics.extend((Metric('FEC - natural gas',
+                       lambda:get_ng_FEC(),
+                       'MJ/kg', 'LCA'),))
+
+# Natural gas
+metrics.extend((Metric('GWP - natural gas',
+                       lambda:get_ng_GWP(),
+                       'kg CO2/kg', 'LCA'),))
+metrics.extend((Metric('FEC - natural gas',
+                       lambda:get_ng_FEC(),
+                       'MJ/kg', 'LCA'),))
+
+# Electricity
+metrics.extend((Metric('GWP - electricity',
+                       lambda:get_electricity_GWP(),
+                       'kg CO2/kg', 'LCA'),))
+metrics.extend((Metric('FEC - electricity',
+                       lambda:get_electricity_FEC(),
+                       'MJ/kg', 'LCA'),))
+
+# Feedstock growth, harvesting, transportation, and preprocessing
+metrics.extend((Metric('GWP - Feedstock GHTP',
+                       lambda:get_FGHTP_GWP(),
+                       'kg CO2/kg', 'LCA'),))
+metrics.extend((Metric('FEC - Feedstock GHTP',
+                       lambda:get_feedstock_FEC(),
+                       'MJ/kg', 'LCA'),))
+
+# Direct non-biogenic emissions GWP
+metrics.extend((Metric('GWP - Direct non-bio emmissions',
+                       lambda:get_direct_emissions_GWP(),
+                       'kg CO2/kg', 'LCA'),))
 # %% 
 
 # =============================================================================
@@ -795,6 +886,12 @@ def set_R301_acetic_acid_yield(X):
     X = min(X*R303.ferm_ratio, 1-1e-6-R303_X[0]-R303_X[2])
     R303_X[1] = R303_X[4] = X
 
+D = shape.Uniform(0.4, 0.6)
+@param(name='Unfermented sugars routed to CO2 generation (balance is routed to cell mass generation)', element=R303, kind='coupled', units='% theoretical',
+       baseline=0.5, distribution=D)
+def set_sugars_to_CO2_gen(X): 
+   R302.CO2_generation_rxns.X[0] = R302.CO2_generation_rxns.X[1] = X
+   R303.CO2_generation_rxns.X[0] = R303.CO2_generation_rxns.X[1] = X * R303.ferm_ratio
 # D = shape.Triangle(0.05, 0.07, 0.1)
 # @param(name='Innoculum ratio', element=R301, kind='coupled', units='%',
 #        baseline=0.07, distribution=D)

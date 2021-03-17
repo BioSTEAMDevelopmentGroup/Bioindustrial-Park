@@ -436,7 +436,7 @@ def get_p_financial_viability():
 HP_metrics = [solve_AA_price, get_GWP, get_FEC]
 
 # %% Generate 3-specification meshgrid and set specification loading functions
-steps = 20
+steps = 6
 
 # # Yield, titer, productivity (rate)
 # spec_1 = np.linspace(0.1, 0.99, steps) # yield
@@ -452,7 +452,7 @@ steps = 20
 # # xticks = [0.33, 0.66, 0.99]
 # xticks = [0., 0.2, 0.4, 0.6, 0.8, 1.0]
 # # yticks = [75, 150, 225]
-# yticks = [0, 25, 50, 75, 100, 125, 150, 175, 200, 225, 250, 275, 300]
+# yticks = [0,30,90,120,150,180,210,240,270,300,330]
 # # xticks = [0.2, 0.6, 0.99]
 # # yticks = [45, 135, 225]
 # spec_3_units = "$\mathrm{g} \cdot \mathrm{L}^{-1} \cdot \mathrm{hr}^{-1}$"
@@ -460,16 +460,16 @@ steps = 20
 
 
 # Feedstock carbohydrate %, feedstock price, productivity (rate)
-spec_1 = np.linspace(0.1, 0.99, steps) # feedstock carbohydrate %
+spec_1 = np.linspace(0.1, 0.7, steps) # feedstock carbohydrate %
 spec_2 = np.linspace(0., 200., steps) # feedstock price
-# spec_1 = np.linspace(0.2, 0.99, steps) # yield
-# spec_2 = np.linspace(45, 225, steps) # titer
+spec_1 = np.linspace(0.2, 0.99, steps) # yield
+spec_2 = np.linspace(45, 225, steps) # titer
 spec_3 = np.array([0.79]) # productivity
 spec.load_spec_1 = spec.load_feedstock_carbohydrate_content
 spec.load_spec_2 = spec.load_feedstock_price
 spec.load_spec_3 = spec.load_productivity
-xlabel = "Yield"
-ylabel = 'Titer [$\mathrm{g} \cdot \mathrm{L}^{-1}$]'
+xlabel = "Feedstock carbohydrate fraction"
+ylabel = 'Feedstock price [$\mathrm{$} \cdot \mathrm{ton}^{-1}$]'
 # xticks = [0.33, 0.66, 0.99]
 xticks = [0., 0.2, 0.4, 0.6, 0.8, 1.0]
 # yticks = [75, 150, 225]

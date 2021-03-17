@@ -199,6 +199,8 @@ price = {'AA': AA_price,
     
 
 def load_process_settings():
+    # bst.default()
+    
     bst.CE = 541.7 # year 2016
     bst.PowerUtility.price = price['Electricity']
     
@@ -208,6 +210,11 @@ def load_process_settings():
     _mps.T = 233 + 273.15
     _hps.T = 266 + 273.15
     
+    # _lps.heat_transfer_efficiency = 0.900
+    # # Do this OR bst.default() since both do the same thing:
+    # _lps.T = 412.19
+    # _lps.P = 344738.
+    # 
     _cooling = bst.HeatUtility.get_cooling_agent('cooling_water')
     _chilled = bst.HeatUtility.get_cooling_agent('chilled_water')
     _cooling.regeneration_price = 0
