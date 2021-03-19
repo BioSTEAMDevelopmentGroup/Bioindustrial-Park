@@ -21,10 +21,9 @@ from matplotlib.ticker import AutoMinorLocator as AML
 # from biorefineries.HP.system import HP_sys, HP_tea, R302, spec
 # from biorefineries.HP.system import MEK as product
 from biorefineries.HP.system_light_lle_vacuum_distillation import (
-    HP_sys, HP_tea, R302, spec, get_GWP, get_ng_GWP, get_FEC, get_SPED, F301, HXN
+    HP_sys, HP_tea, R302, spec, get_GWP, get_ng_GWP, get_FEC, get_SPED,
+    HXN, mock_hxn, AA as product
 )
-from biorefineries.HP.system_light_lle_vacuum_distillation import AA as product
-
 from matplotlib import pyplot as plt
 from  matplotlib.colors import LinearSegmentedColormap
 import pandas as pd
@@ -435,16 +434,10 @@ def get_p_financial_viability():
 # HP_metrics = [solve_AA_price, get_HP_inhibitors_conc]
 # HP_metrics = [solve_AA_price, get_HP_sugars_conc, get_HP_inhibitors_conc]
 # HP_metrics = [solve_AA_price, get_p_financial_viability, get_FEC]
-# HXN makes plots ugly; this ignores HXN
-def mock_hxn():
-        HXN.heat_utilities = tuple([bst.HeatUtility() for i in range(4)])
-        HXN._installed_cost = 0.
-        HXN.purchase_costs.clear()
-HXN._cost = mock_hxn
 HP_metrics = [solve_AA_price, get_GWP, get_FEC]
 
 # %% Generate 3-specification meshgrid and set specification loading functions
-steps = 80
+steps = 6
 
 # # Yield, titer, productivity (rate)
 # spec_1 = np.linspace(0.1, 0.99, steps) # yield
@@ -460,46 +453,47 @@ steps = 80
 # # xticks = [0.33, 0.66, 0.99]
 # xticks = [0., 0.2, 0.4, 0.6, 0.8, 1.0]
 # # yticks = [75, 150, 225]
-# yticks = [0, 25, 50, 75, 100, 125, 150, 175, 200, 225, 250, 275, 300]
+# yticks = [0,30,90,120,150,180,210,240,270,300,330]
 # # xticks = [0.2, 0.6, 0.99]
 # # yticks = [45, 135, 225]
 # spec_3_units = "$\mathrm{g} \cdot \mathrm{L}^{-1} \cdot \mathrm{hr}^{-1}$"
 
 
 
-# Feedstock carbohydrate %, feedstock price, productivity (rate)
-# spec_1 = np.linspace(0.01, 0.99, steps) # feedstock carbohydrate %
-# spec_2 = np.linspace(0.01, 200., steps) # feedstock price
-spec_1 = np.linspace(0.1, 0.99, steps) # yield
-spec_2 = np.linspace(10., 300., steps) # titer
-spec_3 = np.array([0.79]) # productivity
+# # Feedstock carbohydrate %, feedstock price, productivity (rate)
+# spec_1 = np.linspace(0.1, 0.7, steps) # feedstock carbohydrate %
+# spec_2 = np.linspace(0., 200., steps) # feedstock price
+# spec_1 = np.linspace(0.2, 0.99, steps) # yield
+# spec_2 = np.linspace(45, 225, steps) # titer
+# spec_3 = np.array([0.79]) # productivity
+# spec.load_spec_1 = spec.load_feedstock_carbohydrate_content
+# spec.load_spec_2 = spec.load_feedstock_price
+# spec.load_spec_3 = spec.load_productivity
+# xlabel = "Feedstock carbohydrate fraction"
+# ylabel = 'Feedstock price [$\mathrm{$} \cdot \mathrm{ton}^{-1}$]'
+# # xticks = [0.33, 0.66, 0.99]
+# xticks = [0., 0.2, 0.4, 0.6, 0.8, 1.0]
+# # yticks = [75, 150, 225]
+# yticks = [0, 25, 50, 75, 100, 125, 150, 175, 200]
+# # xticks = [0.2, 0.6, 0.99]
+# # yticks = [45, 135, 225]
+# spec_3_units = "$\mathrm{g} \cdot \mathrm{L}^{-1} \cdot \mathrm{hr}^{-1}$"
+
+
+
+# Yield, titer, productivity (rate)
+# HXN._cost = mock_hxn
+spec_1 = np.linspace(0.10, 0.90, 40) # yield
+spec_2 = np.linspace(20, 320, 40) # titer
+spec_3 = np.array([1]) # productivity
 spec.load_spec_1 = spec.load_yield
 spec.load_spec_2 = spec.load_titer
 spec.load_spec_3 = spec.load_productivity
 xlabel = "Yield"
 ylabel = 'Titer [$\mathrm{g} \cdot \mathrm{L}^{-1}$]'
-# xticks = [0.33, 0.66, 0.99]
-xticks = [0., 0.2, 0.4, 0.6, 0.8, 1.0]
-# yticks = [75, 150, 225]
-yticks = [0, 25, 50, 75, 100, 125, 150, 175, 200]
-# xticks = [0.2, 0.6, 0.99]
-# yticks = [45, 135, 225]
+xticks = [.1, .3, .5, .7, .9]
+yticks = [20, 70, 120, 170, 220, 270, 320]
 spec_3_units = "$\mathrm{g} \cdot \mathrm{L}^{-1} \cdot \mathrm{hr}^{-1}$"
-
-
-
-# # Yield, titer, productivity (rate)
-# spec_1 = np.linspace(0.70, 0.90, 10) # yield
-# spec_2 = np.linspace(90, 130, 10) # titer
-# spec_3 = np.array([1]) # productivity
-# spec.load_spec_1 = spec.load_yield
-# spec.load_spec_2 = spec.load_titer
-# spec.load_spec_3 = spec.load_productivity
-# xlabel = "Yield"
-# ylabel = 'Titer [$\mathrm{g} \cdot \mathrm{L}^{-1}$]'
-# xticks = [.75, .80, .85, .90]
-# yticks = [90, 100, 110, 120, 130]
-# spec_3_units = "$\mathrm{g} \cdot \mathrm{L}^{-1} \cdot \mathrm{hr}^{-1}$"
 
 # # Dehydration conversion, titer, feedstock price
 # spec_1 = np.linspace(0.50, 0.80, 3)
@@ -540,9 +534,8 @@ spec_1, spec_2 = np.meshgrid(spec_1, spec_2)
 
 # %% Run TRY analysis 
 
-upstream_sys, downstream_sys = HP_sys.split(F301.ins[0])
 data_1 = HP_data = spec.evaluate_across_specs(
-        downstream_sys, spec_1, spec_2, HP_metrics, spec_3)
+        HP_sys, spec_1, spec_2, HP_metrics, spec_3)
 
 # spec.load_spec_1 = spec.load_dehydration_conversion
 # spec.load_spec_2 = spec.load_titer
@@ -556,7 +549,7 @@ data_1 = HP_data = spec.evaluate_across_specs(
 
 
 
-# # %% Save generated data
+# %% Save generated data
 
 
 # dateTimeObj = datetime.now()

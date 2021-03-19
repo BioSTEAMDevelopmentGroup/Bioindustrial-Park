@@ -4,7 +4,6 @@ Created on Fri Jul 31 13:57:09 2020
 
 @author: Yoel Cortes-Pena
 """
-
 # Run this cell first
 from warnings import filterwarnings
 filterwarnings('ignore')
@@ -37,7 +36,6 @@ get_electricity_per_product = lambda: get_electricity_use() / product.F_mass
 solve_AA_price = lambda: HP_tea.solve_price(product) * 907.185 # To USD / ton
 get_HP_VOC = lambda: HP_tea.VOC / 1e6 # million USD / yr
 get_HP_FCI = lambda: HP_tea.FCI / 1e6 # million USD
-get_regime = lambda: spec.titer_inhibitor_specification.regime
 
 ugroup = bst.UnitGroup(None, HP_sys.units)
 lps, mps, hps = bst.HeatUtility.heating_agents
@@ -55,6 +53,7 @@ get_cow = lambda: ugroup.get_utility_duty(cow)
 get_chw = lambda: ugroup.get_utility_duty(chw)
 get_ec = lambda: ugroup.get_electricity_consumption()
 get_ep = lambda: ugroup.get_electricity_production()
+get_nec = lambda: get_ec() - get_ep()
 get_T_D401 = lambda: D401.outs[0].T
 get_T_F301 = lambda: F301.outs[0].T
 get_T_F401 = lambda: F401.outs[0].T
@@ -71,21 +70,21 @@ HP_metrics = [
     get_hxn_mps,
     get_hxn_cow,
     get_hxn_chw,
-    # get_ec,
     # get_T_D401,
     # get_T_F301,
     # get_T_F401,
     # get_T_D402,
-    get_ep, 
-    get_regime
+    get_ec,
+    get_ep,
+    get_nec,
 ]
 
 # %% Generate 3-specification meshgrid and set specification loading functions
-steps = 20
+steps = 80
 
 # Yield, titer, productivity (rate)
 spec_1 = all_yields = np.array([0.6, 0.8]) # yield
-spec_2 = all_titers = np.linspace(100., 140, steps) # titer
+spec_2 = all_titers = np.linspace(30, 300, steps) # titer
 spec_3 = np.array([0.79]) # productivity
 spec.load_spec_1 = spec.load_yield
 spec.load_spec_2 = spec.load_titer
@@ -101,13 +100,6 @@ HP_data = HP_data[..., 0] # Only one productivity
 
 # %% Plot contour slices
 
-regimes = [
-   'None',
-   'Evaporation',
-   'Dilution',
-   'Evaporation and dilution',
-]
-
 metric_names = [
     # 'SC',
     # 'GC',
@@ -120,16 +112,16 @@ metric_names = [
     'HXN MPS',
     'HXN Co.W',
     'HXN Ch.W',
-    # 'EC',
+    'EC',
+    'EP',
+    'nEC',
     # 'T-D401',
     # 'T-F301',
     # 'T-F401',
     # 'T-D402',
-    'EP',
-    'Regime',
 ]
 
-regime_colors = [
+nice_colors = [
     colors.CABBI_blue.RGBn,
     colors.CABBI_teal.RGBn,
     colors.CABBI_orange.RGBn,
@@ -151,28 +143,22 @@ metric_lims = [(i.min(), i.max()) for i in metric_datas]
 
 # Plot all three metrics vs titer for each regime
 for i in range(N_yields):
-    data = HP_data[:, i, :]
-    for j in range(N_regimes):
-        regime = regimes[j]
-        c = regime_colors[j]
-        titers, metrics = regime_data(j, data)
-        for k in range(N_metrics):
-            ax = axes[k, i]
-            plt.sca(ax)
-            plt.xlim(all_titers[0], all_titers[-1])
-            plt.ylim(metric_lims[k])
+    metrics = HP_data[:, i, :]
+    c = colors.CABBI_blue.RGBn
+    for k in range(N_metrics):
+        ax = axes[k, i]
+        plt.sca(ax)
+        plt.xlim(all_titers[0], all_titers[-1])
+        plt.ylim(metric_lims[k])
+        if i == 0:
+            plt.ylabel(metric_names[k])
+        if k == 0:
             if i == 0:
-                plt.ylabel(metric_names[k])
-            if k == 0:
-                if i == 0:
-                    ax.set_title(f"yield: {all_yields[i]}")
-                else:
-                    ax.set_title(str(all_yields[i]))
-            if k == N_metrics - 1:
-                plt.xlabel('Titer')
-            plt.plot(titers, metrics[:, k], color=c)
+                ax.set_title(f"yield: {all_yields[i]}")
+            else:
+                ax.set_title(str(all_yields[i]))
+        if k == N_metrics - 1:
+            plt.xlabel('Titer')
+        plt.plot(all_titers, metrics[:, k], color=c)
 plt.show()
-    
-    
-
 

@@ -16,14 +16,15 @@ _red_highlight_white_text = '\033[1;47;41m'
 _yellow_text = '\033[1;33m'
 _reset_text = '\033[1;0m'
 
-# from biosteam.process_tools.reactor_specification import evaluate_across_TRY
-_kg_per_ton = 907.18474
 skip_infeasible_titers = True
 last_infeasible_simulation = [] # yield, titer
 
 # Bugfix barrage is not needed anymore because hexane recycle is not emptied anymore
 # and Wegstein and Aitken converge much better.
 bugfix = False
+
+# from biosteam.process_tools.reactor_specification import evaluate_across_TRY
+_kg_per_ton = 907.18474
 
 def evaluate_across_specs(spec, system,
             spec_1, spec_2, metrics, spec_3):
@@ -278,7 +279,8 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
         self.total_iterations = 0
         # self.average_HXN_energy_balance_percent_error = 0.
         self.exceptions_dict = {}
-        self.total_iterations = np.prod(spec_1.shape) * spec_3.shape[0]
+        
+        self.total_iterations = len(spec_1) * len(spec_2) * len(spec_3)
         results = evaluate_across_specs(self, system, 
                                    spec_1, spec_2, 
                                    metrics, spec_3)
@@ -379,7 +381,7 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
         titer_inhibitor_specification = self.titer_inhibitor_specification
         titer_inhibitor_specification.target_titer = titer
         self.spec_2 = titer
-        titer_inhibitor_specification.run((self.spec_1, self.spec_2, self.spec_3))
+        titer_inhibitor_specification.run()
         self.reactor.tau = self.reactor.tau_cofermentation = titer / self.spec_3
         
     def load_feedstock_price(self, price):
@@ -539,21 +541,20 @@ class TiterAndInhibitorsSpecification:
         self.run_units()
         return self.calculate_inhibitors() - self.maximum_inhibitor_concentration
     
-    def run(self, key):
+    def run(self):
         self.dilution_water.empty()
         self.evaporator.V = 0.
         self.run_units()
+        reactor = self.reactor
         x_titer = self.calculate_titer()
         # V_min = 0.00001
         V_min = 0.
         V_max = 0.999
-        self.regime = 0
+        
         if x_titer < self.target_titer: # Evaporate
-            self.regime = 1
             self.evaporator.V = V_min = flx.IQ_interpolation(self.titer_objective_function,
-                                                             V_min, V_max, ytol=1e-3, maxiter=100) 
+                                                             V_min, V_max, ytol=1e-3, maxiter=200) 
         elif x_titer > self.target_titer: # Dilute
-            self.regime = 2
             self.update_dilution_water(x_titer)
             self.mixer._run()
             self.heat_exchanger._run()
@@ -562,12 +563,17 @@ class TiterAndInhibitorsSpecification:
         self.check_sugar_concentration()
         x_inhibitor = self.calculate_inhibitors()
         if x_inhibitor > self.maximum_inhibitor_concentration:
-            self.regime = 3
             obj_f = self.inhibitor_objective_function
             y_0 = obj_f(V_min)
+            
             if y_0 > 0.:
                 self.evaporator.V = flx.IQ_interpolation(obj_f,
-                                                     V_min, V_max, y0 = y_0, ytol=1e-3, maxiter=100) 
+                                                     V_min, V_max, y0 = y_0, 
+                                                     xtol=1e-6, 
+                                                     ytol=1e-3,
+                                                     maxiter=200) 
+        
+        # self.check_sugar_concentration()
     
     def update_dilution_water(self, x_titer=None):
         if x_titer is None: x_titer = self.calculate_titer()

@@ -48,6 +48,7 @@ import flexsolve as flx
 import numpy as np
 from biosteam import main_flowsheet as F
 from biosteam.process_tools import BoundedNumericalSpecification
+
 from biosteam import System
 from thermosteam import Stream
 from HP import units, facilities
@@ -893,6 +894,10 @@ HP_sys._TEA = HP_tea
 # =============================================================================
 # Simulate system and get results
 # =============================================================================
+
+System.default_converge_method = 'fixed-point' # aitken isn't stable
+System.default_maxiter = 1500
+System.default_molar_tolerance = 0.1
 
 # def get_HP_MPSP():
 #     HP_sys.simulate()

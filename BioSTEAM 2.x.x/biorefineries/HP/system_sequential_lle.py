@@ -1216,10 +1216,7 @@ HP_sys._TEA = HP_tea
 # Simulate system and get results
 # =============================================================================
 
-<<<<<<< HEAD:BioSTEAM 2.x.x/biorefineries/HP/system_vacuum_dist.py
-=======
 
->>>>>>> de4a3771bc43026d10bbdefe299a8bb1709502cc:BioSTEAM 2.x.x/biorefineries/HP/system_sequential_lle.py
 # def get_HP_MPSP():
 #     HP_sys.simulate()
     

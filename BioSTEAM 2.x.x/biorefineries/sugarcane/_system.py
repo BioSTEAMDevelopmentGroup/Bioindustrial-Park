@@ -7,6 +7,7 @@ Created on Thu Dec 21 11:05:24 2017
 """
 import numpy as np
 import biosteam as bst
+import flexsolve as flx
 from biosteam import units, SystemFactory
 from biosteam import main_flowsheet as f
 
@@ -453,19 +454,34 @@ def create_sucrose_fermentation_system(ins, outs):
     
     # Split sugar solution
     S301 = units.Splitter('S301',
-                          split=0.265)
+                          split=0.20)
     
     # Concentrate sugars
     F301 = units.MultiEffectEvaporator('F301',
                                        P=(101325, 69682, 47057, 30953, 19781),
                                        outs=('', evaporator_condensate),
-                                       V=0.85) # fraction evaporated
-    
+                                       V_definition='First-effect',
+                                       V=0.3) # fraction evaporated
+    F301.specification = lambda: None
     # Note: value of steam ~ 6.86 for the following 
     # (101325, 73580.467, 50891.17, 32777.406, 19999.925, 11331.5),
     
     # Mix sugar solutions
     M301 = units.Mixer('M301')
+    
+    def sugar_concentration_objective(V):
+        F301.V = V
+        F301._run()
+        M301._run()
+        s = M301.outs[0]
+        sugar_concentration = s.imass['Glucose', 'Sucrose'].sum() / s.F_mass
+        return F301.sugar_concentration - sugar_concentration
+    
+    def adjust_glucose_concentration():
+        F301.V = flx.IQ_interpolation(sugar_concentration_objective, 0., 1., x=F301.V, ytol=1e-5)
+        
+    F301.sugar_concentration = 0.23 # wt. % sugar
+    M301.specification = adjust_glucose_concentration
     
     # Cool for fermentation
     H301 = units.HXutility('H301', T=295.15)

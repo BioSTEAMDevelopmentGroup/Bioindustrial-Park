@@ -8,7 +8,6 @@ Created on Sun Jan 31 14:33:03 2021
 import numpy as np
 from warnings import filterwarnings
 import pandas as pd 
-import matplotlib as plt
 filterwarnings('ignore')
 from biorefineries.HP.system_light_lle_vacuum_distillation import HP_sys, process_groups, spec, get_AA_MPSP, AA, HXN, get_material_cost_breakdown
 
@@ -59,25 +58,24 @@ def run_bugfix_barrage():
         print('\n')
         
 # %% Setup
-spec.load_spec_1 = spec.load_yield
-spec.load_spec_2 = spec.load_titer
-spec.load_spec_3 = spec.load_productivity
 spec.load_productivity(0.79)
 spec.load_yield(0.49)
 spec.load_titer(54.8)
 
-steps = 50
+steps = 2
 
-titers = np.linspace(15., 250., steps)
+# titers = np.linspace(15., 150., steps)
 # yields = 100.*np.linspace(0.1, 0.99, steps)
 
-# titers = np.array([54.8, 54.8])
+titers = np.array([54.8, 54.8])
 
 hu_group_contributions = {}
 cu_group_contributions = {}
 pu_group_contributions = {}
 ic_group_contributions = {}
 mc_group_contributions = {}
+gwp_group_contributions = {}
+fec_group_contributions = {}
 
 MPSPs = []
 
@@ -88,6 +86,7 @@ MPSPs = []
 # process_groups[4].name = 'Wastewater treatment'
 # process_groups[5].name = 'Heat exchanger network'
 # process_groups[6].name = 'Non-HX facilities'
+
 
 parameters = titers
 
@@ -107,12 +106,11 @@ for group in process_groups:
     mc_group_contributions[group.name] = []
     
 # for titer in titers:
-total_pus = []
 for parameter in parameters:
+    spec.load_titer(parameter)
     # spec.load_yield(parameter/100.)
     
     try:
-        spec.load_specifications(spec_1=spec.spec_1, spec_2=parameter, spec_3=spec.spec_3)
         HP_sys.simulate()
     except:
         run_bugfix_barrage()
@@ -128,14 +126,13 @@ for parameter in parameters:
         # hu_group_contributions[group.name].append(group.get_heating_duty()/AA.F_mass)
         hu_group_contributions[group.name].append(0.001*get_group_heating_demand(group)/AA.F_mass)
         cu_group_contributions[group.name].append(0.001*get_group_cooling_demand(group)/AA.F_mass)
-        pu_group_contributions[group.name].append((group.get_electricity_consumption() - group.get_electricity_production())/AA.F_mass)
+        pu_group_contributions[group.name].append(group.get_electricity_consumption()/AA.F_mass)
         ic_group_contributions[group.name].append(group.get_installed_cost()/AA.F_mass)
         mc_group_contributions[group.name].append(mc_dict[group.name])
-    total_pus.append(sum([sum(pu_group_contributions[i.name]) for i in process_groups]))
 
 MPSPs_dict = {'MPSP':MPSPs}
 MPSPs_df = pd.DataFrame(MPSPs_dict, index = parameters)
-total_pus_df = pd.DataFrame(total_pus, index = parameters)
+
 # hu_group_contributions['MPSP'] = MPSPs
 # pu_group_contributions_df['MPSP'] = MPSPs
 # ic_group_contributions_df['MPSP'] = MPSPs
@@ -146,12 +143,12 @@ pu_group_contributions_df = pd.DataFrame(pu_group_contributions, index = paramet
 ic_group_contributions_df = pd.DataFrame(ic_group_contributions, index = parameters)
 mc_group_contributions_df = pd.DataFrame(mc_group_contributions, index = parameters)
 
+
 # %% Plot contributions
-contributions_to_plot = pu_group_contributions_df
+contributions_to_plot = hu_group_contributions_df
 
 ax = contributions_to_plot.plot.area()
-# MPSPs_df.plot.line(ax=ax, secondary_y  = ['MPSP'], color = 'blue')
-total_pus_df.plot.line(ax=ax, secondary_y  = ['HU'], color = 'blue')
+MPSPs_df.plot.line(ax=ax, secondary_y  = ['MPSP'], color = 'blue')
 
 # %% Save as excel file
 dateTimeObj = datetime.now()

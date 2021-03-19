@@ -188,11 +188,16 @@ class CellulosicEthanolTEA(TEA):
                 + self.labor_cost * (1 + self.labor_burden)) * self.operating_days / 365
     
 def create_tea(sys, OSBL_units, ignored_units=()):
-    BT = tmo.utils.get_instance(OSBL_units, bst.facilities.BoilerTurbogenerator)
+    BT = tmo.utils.get_instance(OSBL_units, bst.BoilerTurbogenerator)
     OSBL_units = list(OSBL_units)
     OSBL_units.remove(BT)
+    sys_no_BT = bst.System(
+        None, sys.path, 
+        facilities=[i for i in sys.facilities
+                    if not isinstance(i, bst.BoilerTurbogenerator)]
+    )
     ethanol_tea = CellulosicEthanolTEA(
-        system=sys, 
+        system=sys_no_BT, 
         IRR=0.10, 
         duration=(2007, 2037),
         depreciation='MACRS7', 
@@ -222,7 +227,6 @@ def create_tea(sys, OSBL_units, ignored_units=()):
         property_insurance=0.007, 
         maintenance=0.03)
     for i in ignored_units: ethanol_tea.units.remove(i)
-    ethanol_tea.units.remove(BT)
     Area700 = bst.TEA.like(bst.System('Area700', (BT,)), ethanol_tea)
     Area700.labor_cost = 0
     Area700.depreciation = 'MACRS20'

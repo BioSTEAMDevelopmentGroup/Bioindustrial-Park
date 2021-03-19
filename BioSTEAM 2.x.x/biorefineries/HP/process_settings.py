@@ -2,13 +2,17 @@
 # -*- coding: utf-8 -*-
 """
 Created on Sun Aug 23 12:11:15 2020
+
 Modified from the cornstover biorefinery constructed in Cortes-Peña et al., 2020,
 with modification of fermentation system for 2,3-Butanediol instead of the original ethanol
+
 [1] Cortes-Peña et al., BioSTEAM: A Fast and Flexible Platform for the Design, 
     Simulation, and Techno-Economic Analysis of Biorefineries under Uncertainty. 
     ACS Sustainable Chem. Eng. 2020, 8 (8), 3302–3310. 
     https://doi.org/10.1021/acssuschemeng.9b07040.
+
 All units are explicitly defined here for transparency and easy reference
+
 @author: sarangbhagwat
 """
 import thermosteam as tmo
@@ -195,6 +199,11 @@ price = {'AA': AA_price,
     
 
 def load_process_settings():
+    from biorefineries.cornstover import load_process_settings
+    load_process_settings()
+    
+    # bst.default()
+    
     bst.CE = 541.7 # year 2016
     bst.PowerUtility.price = price['Electricity']
     
@@ -204,6 +213,11 @@ def load_process_settings():
     _mps.T = 233 + 273.15
     _hps.T = 266 + 273.15
     
+    # _lps.heat_transfer_efficiency = 0.900
+    # # Do this OR bst.default() since both do the same thing:
+    # _lps.T = 412.19
+    # _lps.P = 344738.
+    # 
     _cooling = bst.HeatUtility.get_cooling_agent('cooling_water')
     _chilled = bst.HeatUtility.get_cooling_agent('chilled_water')
     _cooling.regeneration_price = 0
@@ -343,3 +357,6 @@ FEC_CFs['LacticAcid'] = 29.
 FEC_CFs['LacticAcid_fossil'] = 79.524
 
 FEC_CFs['Sugarcane'] = 0.37338 # ecoinvent 3.6, sugarcane production, RoW, IPCC 2013 GWP-100a
+
+
+

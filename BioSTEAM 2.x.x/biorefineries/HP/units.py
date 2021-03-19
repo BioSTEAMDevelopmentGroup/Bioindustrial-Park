@@ -2,13 +2,17 @@
 # -*- coding: utf-8 -*-
 """
 Created on Sun Aug 23 12:11:15 2020
+
 Modified from the cornstover biorefinery constructed in Cortes-Peña et al., 2020,
 with modification of fermentation system for 2,3-Butanediol instead of the original ethanol
+
 [1] Cortes-Peña et al., BioSTEAM: A Fast and Flexible Platform for the Design, 
     Simulation, and Techno-Economic Analysis of Biorefineries under Uncertainty. 
     ACS Sustainable Chem. Eng. 2020, 8 (8), 3302–3310. 
     https://doi.org/10.1021/acssuschemeng.9b07040.
+
 All units are explicitly defined here for transparency and easy reference
+
 @author: sarangbhagwat
 """
 
@@ -753,25 +757,23 @@ class SeedTrain(Unit):
         #      Reaction definition            Reactant    Conversion
         Rxn('Glucose -> 2 HP',        'Glucose',   .49*ferm_ratio),
         Rxn('Glucose -> 3 AceticAcid',        'Glucose',   0.04*ferm_ratio),
-        Rxn('Glucose -> 6 FermMicrobe',       'Glucose',   0.03*ferm_ratio),
+        # Rxn('Glucose -> 6 FermMicrobe',       'Glucose',   0.03*ferm_ratio),
         Rxn('3 Xylose -> 5 HP',       'Xylose',    0.49*ferm_ratio),
         Rxn('2 Xylose -> 5 AceticAcid',       'Xylose',    0.04*ferm_ratio),
-        Rxn('Xylose -> 5 FermMicrobe',        'Xylose',    0.03*ferm_ratio),
+        # Rxn('Xylose -> 5 FermMicrobe',        'Xylose',    0.03*ferm_ratio),
+        Rxn('Glucose -> 2 Glycerol',        'Glucose',     0.04),
+        Rxn('3 Xylose -> 5 Glycerol',       'Xylose',    0.04),
         ])
         
-        # Do not include biomass generation reactions here because part of the
-        # seed should be fermented in the next fermentation tank. Adding
-        # these reactions spends most of the seed without making much product 
-        # (not economical).
-        # self.CO2_generation_rxns = ParallelRxn([
-        # Rxn('Glucose -> 6 CO2 + 6 H2O',       'Glucose',   0.8*ferm_ratio),
-        # Rxn('Xylose -> 5 CO2 + 5 H2O',        'Xylose',    0.8*ferm_ratio),
-        # ])
+        self.CO2_generation_rxns = ParallelRxn([
+        Rxn('Glucose -> 6 CO2 + 6H2O',       'Glucose',   0.5*ferm_ratio),
+        Rxn('Xylose -> 5 CO2 + 5H2O',        'Xylose',    0.5*ferm_ratio),
+        ])
         
-        # self.biomass_generation_rxns = ParallelRxn([
-        # Rxn('Glucose -> 6 FermMicrobe',       'Glucose',   (1.-1e-9)*ferm_ratio),
-        # Rxn('Xylose -> 5 FermMicrobe',        'Xylose',    (1.-1e-9)*ferm_ratio),
-        # ])
+        self.biomass_generation_rxns = ParallelRxn([
+        Rxn('Glucose -> 6 FermMicrobe',       'Glucose',   (1.-1e-9)*ferm_ratio),
+        Rxn('Xylose -> 5 FermMicrobe',        'Xylose',    (1.-1e-9)*ferm_ratio),
+        ])
         
         
         
@@ -782,8 +784,8 @@ class SeedTrain(Unit):
         CO2.phase = 'g'
 
         self.cofermentation_rxns(effluent.mol)
-        # self.CO2_generation_rxns(effluent.mol)
-        # self.biomass_generation_rxns(effluent.mol)
+        self.CO2_generation_rxns(effluent.mol)
+        self.biomass_generation_rxns(effluent.mol)
         
         # Assume all CSL is used up
         effluent.imass['CSL'] = 0 
@@ -871,6 +873,7 @@ class Reactor(Unit, PressureVessel, isabstract=True):
     '''    
     Create an abstract class for reactor unit, purchase cost of the reactor
     is based on volume calculated by residence time.
+
     Parameters
     ----------
     ins : stream
@@ -1775,6 +1778,8 @@ class CoFermentation(Reactor):
         Rxn('Glucose -> 3 AceticAcid',        'Glucose',   0.04),
         Rxn('3 Xylose -> 5 HP',       'Xylose',    0.49),
         Rxn('2 Xylose -> 5 AceticAcid',       'Xylose',    0.04),
+        Rxn('Glucose -> 2 Glycerol',        'Glucose',     0.04),
+        Rxn('3 Xylose -> 5 Glycerol',       'Xylose',    0.04),
         ])
         
         
@@ -1795,20 +1800,17 @@ class CoFermentation(Reactor):
         self.glucose_to_acetic_acid_rxn = self.cofermentation_rxns[1]
         self.xylose_to_acetic_acid_rxn = self.cofermentation_rxns[3]
         
-        # Include water as a product since cells are burning glucose (also helps atomic balance).
-        # Oxygen is not included here and it's a gap in the assumption that
-        # cells produce this much CO2. The only O2 available is dissolved
-        # oxygen since there is no oxygen vector here.
-        # Probably not a good assumption depending how much glucose is left over.
+        self.glucose_to_glycerol_rxn = self.cofermentation_rxns[4]
+        self.xylose_to_glycerol_rxn = self.cofermentation_rxns[5]
+        
         self.CO2_generation_rxns = ParallelRxn([
-        Rxn('Glucose -> 6 CO2 + 6 H2O',       'Glucose',   0.5),
-        Rxn('Xylose -> 5 CO2 + 5 H2O',        'Xylose',    0.5),
+        Rxn('Glucose -> 6 CO2 + 6H2O',       'Glucose',   0.5),
+        Rxn('Xylose -> 5 CO2 + 5H2O',        'Xylose',    0.5),
         ])
         
-        # Exact amount of CSL is ignored (negligible for economics)
         self.biomass_generation_rxns = ParallelRxn([
-        Rxn('Glucose -> 6 FermMicrobe',       'Glucose',   1 - 1e-3),
-        Rxn('Xylose -> 5 FermMicrobe',        'Xylose',    1 - 1e-3),
+        Rxn('Glucose -> 6 FermMicrobe',       'Glucose',   1.-1e-9),
+        Rxn('Xylose -> 5 FermMicrobe',        'Xylose',    1.-1e-9),
         ])
         
         self.glucose_to_microbe_rxn = self.biomass_generation_rxns[0]
@@ -1835,7 +1837,7 @@ class CoFermentation(Reactor):
     def _run(self):
         
         sugars, feed, CSL, lime = self.ins
-        CSL.imass['CSL'] = (sugars.F_vol + feed.F_vol) * self.CSL_loading 
+        
         effluent, vapor = self.outs
         effluent.mix_from([feed, sugars, CSL])
         
@@ -1845,14 +1847,19 @@ class CoFermentation(Reactor):
         # ss = Stream(None)
         # effluent.copy_like(feed)
         effluent.T = vapor.T = self.T
-        
+        CSL.imass['CSL'] = (sugars.F_vol + feed.F_vol) * self.CSL_loading 
         self.cofermentation_rxns(effluent.mol)
         self.CO2_generation_rxns(effluent.mol)
         self.biomass_generation_rxns(effluent.mol)
+        # vapor.imol['CO2'] = effluent.imol['CO2'] + CSL.imol['CSL']
         vapor.imol['CO2'] = effluent.imol['CO2']
         vapor.phase = 'g'
         
         effluent.imol['CO2'] = 0
+        effluent.imass['CSL'] = 0
+        
+        mixed_feed = self.mixed_feed
+        mixed_feed.mix_from([feed, sugars, CSL])
         
         # Need lime to neutralize produced acid
         if self.neutralization:
@@ -1877,19 +1884,24 @@ class CoFermentation(Reactor):
         Design = self.design_results
         Design.clear()
         # self.tau = self.effluent_titer / self.productivity
-        Design['Duty'] = self.Hnet # Includes heat of reaction
-
+        _mixture = self._mixture = tmo.Stream(None)
+        _mixture.mix_from(self.outs[0:2])
+        # duty = Design['Duty'] = _mixture.H - self.mixed_feed.H
+        duty = Design['Duty'] = self.Hnet
         if mode == 'Batch':
             raise NotImplementedError('Batch mode is missing number of fermenters')
+            # TODO: N = ?
+            # Note that this code assumes only one vessel, which is impossible
             tau_cofermentation = self.tau_batch_turnaround + self.tau
             Design['Fermenter size'] = self.outs[0].F_mass * tau_cofermentation
             Design['Recirculation flow rate'] = self.F_mass_in
+            self.heat_exchanger.simulate_as_auxiliary_exchanger(duty, _mixture)
         
         elif mode == 'Continuous':
             Reactor._V_max = 3785.41 # 1 million gallons
             Reactor._design(self)
         else:
-            raise DesignError(f"Fermentation mode must be either 'Batch' or 'Continuous', not {mode}")
+            raise DesignError(f'Fermentation mode must be either Batch or Continuous, not {mode}')
 
     def _cost(self):
         Design = self.design_results
@@ -1908,23 +1920,25 @@ class CoFermentation(Reactor):
             if not self.neutralization:
                 purchase_costs['Fermenter'] *= _316_over_304
                 purchase_costs['Agitator'] *= _316_over_304
+
         elif self.mode == 'Continuous':
             # if not self.neutralization:
             #     self.vessel_material= 'Stainless steel 316'
+                
             Reactor._cost(self)
-            N = Design['Number of reactors']
-        else:
-            raise DesignError(f"mode must be either 'Continuous' or 'Batch'; not {self.mode}")
             
-        single_rx_effluent = self.outs[0].copy()
-        single_rx_effluent.mol[:] /= N
-        hx.simulate_as_auxiliary_exchanger(duty=Design['Duty']/N, 
+            N = Design['Number of reactors']
+            single_rx_effluent = self._mixture.copy()
+            hx.simulate_as_auxiliary_exchanger(duty=Design['Duty']/N, 
                                             stream=single_rx_effluent)
-        for i in hx.purchase_costs: hx.purchase_costs[i] *= N
-        hu_total = self.heat_utilities[0]
-        hu_single_rx = hx.heat_utilities[0]
-        hu_total.copy_like(hu_single_rx)
-        hu_total.scale(N)
-        # Do not include this utility in HXN because this one is scaled by N,
-        # representing N heat exchanged (not just one heat exchanger)
-        hu_total.heat_exchanger = None
+            self.auxiliary_unit_names = names = tuple([f'heat_exchanger_{i}' for i in range(N)])
+            for i in names: setattr(self, i, hx)
+            hu_total = self.heat_utilities[0]
+            hu_single_rx = hx.heat_utilities[0]
+            hu_total.copy_like(hu_single_rx)
+            self.heat_utilities = tuple([self.heat_utilities[0]] * N)
+            # Do not include this utility in HXN because this one is scaled by N,
+            # representing N heat exchanged (not just one heat exchanger)
+            hu_total.heat_exchanger = None
+            # for i in hx.purchase_costs: hx.purchase_costs[i] *= N
+

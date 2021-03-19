@@ -84,7 +84,7 @@ tmo.settings.set_thermo(HP_chemicals)
 # else:
 
 System.default_maxiter = 1500
-System.default_converge_method = 'aitken'
+System.default_converge_method = 'fixed-point'
 System.default_molar_tolerance = 0.02
     
 # %% 
@@ -661,20 +661,6 @@ D402_H = bst.units.HXutility('D402_H', ins=D402-0, T = 308.15, rigorous=True)
 # F401_P = units.HPPump('F401_P', ins=F401-1)
 
 
-<<<<<<< HEAD
-S403 = bst.units.Splitter('S403', ins=F401_P-0, outs=('to_fermentor', 
-                                                      'to_M501'),
-                                                      split=0.96)
-
-S403-0-1-R302
-# D401 = bst.units.ShortcutColumn('D401', ins=F403_P-0,
-#                                     outs=('D401_g', 'D401_l'),
-#                                     LHK=('Ethanol', 'HP'),
-#                                     is_divided=True,
-#                                     product_specification_format='Recovery',
-#                                     Lr=0.9995, Hr=0.9995, k=1.2,
-#                                     vessel_material = 'Stainless steel 316')
-=======
 # S403 = bst.units.Splitter('S403', ins=F401_P-0, outs=('to_fermentor', 
 #                                                       'to_M501'),
 #                                                       split=0.96)
@@ -769,7 +755,6 @@ S504.line = 'Reverse osmosis'
 # Mix solid wastes to boiler turbogeneration
 M505 = bst.units.Mixer('M505', ins=(S503-1, S301-0, S401-0), 
                         outs='wastes_to_boiler_turbogenerator')
->>>>>>> de4a3771bc43026d10bbdefe299a8bb1709502cc
 
 
 # %% 
@@ -1216,8 +1201,6 @@ HP_sys._TEA = HP_tea
 # =============================================================================
 # Simulate system and get results
 # =============================================================================
-<<<<<<< HEAD
-=======
 
 
 # def get_HP_MPSP():
@@ -1226,7 +1209,6 @@ HP_sys._TEA = HP_tea
 #     for i in range(3):
 #         HP.price = HP_tea.solve_price(HP, HP_no_BT_tea)
 #     return HP.price
->>>>>>> de4a3771bc43026d10bbdefe299a8bb1709502cc
 
 num_sims = 1
 num_solve_tea = 3
