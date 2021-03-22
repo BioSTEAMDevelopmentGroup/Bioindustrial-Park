@@ -949,9 +949,11 @@ def create_HP_sys(ins, outs):
     def HXN_no_run_cost():
         HXN.heat_utilities = tuple()
         HXN._installed_cost = 0.
+        
     HXN._cost = HXN_no_run_cost
     HXN.energy_balance_percent_error = 0.
     HXN.new_HXs = HXN.new_HX_utils = []
+    
     HXN_group = UnitGroup('HXN_group', 
                                    units=(HXN,))
     process_groups.append(HXN_group)
@@ -1099,7 +1101,8 @@ spec = ProcessSpecification(
     dehydration_reactor = u.R401,
     byproduct_streams = [],
     HXN = u.HXN,
-    pre_conversion_units = process_groups_dict['feedstock_group'].units + process_groups_dict['pretreatment_group'].units + [u.H301],
+    # pre_conversion_units = process_groups_dict['feedstock_group'].units + process_groups_dict['pretreatment_group'].units + [u.H301],
+    pre_conversion_units = HP_sys.split(F301.ins[0])[0],
     baseline_titer = 54.8,
     feedstock_mass = feedstock.F_mass,
     pretreatment_reactor = u.R201)

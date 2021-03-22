@@ -208,6 +208,7 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
         """
         self.load_spec_1(spec_1 or self.spec_1)
         self.load_spec_2(spec_2 or self.spec_2)
+        self.spec_2 = spec_2
         
         self.load_spec_3(spec_3 or self.spec_3)
 
@@ -390,7 +391,7 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
     def load_titer(self, titer):
         titer_inhibitor_specification = self.titer_inhibitor_specification
         titer_inhibitor_specification.target_titer = titer
-        self.spec_2 = titer
+        # self.spec_2 = titer
         titer_inhibitor_specification.run()
         self.reactor.tau = self.reactor.tau_cofermentation = titer / self.spec_3
         
@@ -447,8 +448,9 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
         feedstock.imass[sugars_IDs] = 0.
         feedstock.F_mass = F_mass - F_mass_sugars
         feedstock.imass[sugars_IDs] = mass_sugars
-        for unit in self.pre_conversion_units:
-            unit.simulate()
+        # for unit in self.pre_conversion_units:
+        #     unit.simulate()
+        self.pre_conversion_units._converge()
         self.load_yield(self.baseline_yield)
         self.load_titer(self.baseline_titer)
         
@@ -457,7 +459,7 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
     def load_feedstock_sugar_content(self, sugar_content):
         self.spec_1 = sugar_content
         F_mass = self.feedstock_mass
-        sugars_IDs = ('Glucose', 'Xylose')
+        sugars_IDs = ('Glucose', 'Sucrose')
         feedstock = self.feedstock
         sugars = feedstock.imass[sugars_IDs]
         z_sugars = sugar_content * sugars / sugars.sum()
@@ -466,8 +468,9 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
         feedstock.imass[sugars_IDs] = 0.
         feedstock.F_mass = F_mass - F_mass_sugars
         feedstock.imass[sugars_IDs] = mass_sugars
-        for unit in self.pre_conversion_units:
-            unit.simulate()
+        # for unit in self.pre_conversion_units:
+        #     unit.simulate()
+        self.pre_conversion_units._converge()
         self.load_yield(self.baseline_yield)
         self.load_titer(self.baseline_titer)
 
@@ -586,9 +589,10 @@ class TiterAndInhibitorsSpecification:
                                                              V_min, V_max, ytol=1e-3, maxiter=100) 
         elif x_titer > self.target_titer: # Dilute
             self.update_dilution_water(x_titer)
-            self.mixer._run()
-            self.heat_exchanger._run()
-            self.reactor._run()
+            # self.mixer._run()
+            # self.heat_exchanger._run()
+            # self.reactor._run()
+            self.run_units()
         
         self.check_sugar_concentration()
         x_inhibitor = self.calculate_inhibitors()
