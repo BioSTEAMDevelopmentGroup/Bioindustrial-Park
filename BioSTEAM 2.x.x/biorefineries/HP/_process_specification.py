@@ -19,6 +19,9 @@ _reset_text = '\033[1;0m'
 # from biosteam.process_tools.reactor_specification import evaluate_across_TRY
 _kg_per_ton = 907.18474
 
+def get_IDs(units_list):
+    return [i.ID for i in units_list]
+
 def evaluate_across_specs(spec, system,
             spec_1, spec_2, metrics, spec_3):
     
@@ -66,6 +69,12 @@ def evaluate_across_specs(spec, system,
     try:
         spec.load_specifications(spec_1=spec_1, spec_2=spec_2)
         system.simulate()
+        HXN = spec.HXN
+        HXN_Q_bal_percent_error = HXN.energy_balance_percent_error
+        print(f"HXN Q_balance off by {format(HXN_Q_bal_percent_error,'.2f')} %.\n")
+        spec.average_HXN_energy_balance_percent_error += abs(HXN_Q_bal_percent_error)
+        spec.HXN_new_HXs[(spec_1,spec_2)] = get_IDs(HXN.new_HXs)
+        spec.HXN_new_HX_utils[(spec_1,spec_2)] = get_IDs(HXN.new_HX_utils)
         return spec.evaluate_across_productivity(metrics, spec_3)
     
     except Exception as e1:
@@ -93,9 +102,8 @@ def evaluate_across_specs(spec, system,
                 print(_red_highlight_white_text+f"Point failed; returning metric values as np.nan."+_reset_text)
                 spec.exceptions_dict[spec.count] = (e1, e2)
                 return np.nan*np.ones([len(metrics), len(spec_3)])
-    HXN_Q_bal_percent_error = spec.HXN.energy_balance_percent_error
-    print(f"HXN Q_balance off by {format(HXN_Q_bal_percent_error,'.2f')} %.\n")
-    spec.average_HXN_energy_balance_percent_error += abs(HXN_Q_bal_percent_error)
+    
+    
     return spec.evaluate_across_productivity(metrics, spec_3)
     
 
@@ -135,13 +143,18 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
                  'average_HXN_energy_balance_percent_error',
                  'exceptions_dict',
                  'pre_conversion_units',
-                 'baseline_titer')
+                 'juicing_sys',
+                 'baseline_yield',
+                 'baseline_titer',
+                 'HXN_new_HXs',
+                 'HXN_new_HX_utils')
     
     def __init__(self, evaporator, pump, mixer, heat_exchanger, seed_train_system, 
                  reactor, reaction_name, substrates, products,
                  spec_1, spec_2, spec_3, xylose_utilization_fraction,
                  feedstock, dehydration_reactor, byproduct_streams, HXN,
-                 pre_conversion_units = None, baseline_titer = 54.8,
+                 pre_conversion_units = None, juicing_sys=None, baseline_yield =0.49, baseline_titer = 54.8,
+                 HXN_new_HXs={}, HXN_new_HX_utils={},
                  feedstock_mass=104192.83224417375, pretreatment_reactor = None,
                   load_spec_1=None, load_spec_2=None, load_spec_3=None):
         self.substrates = substrates
@@ -159,7 +172,11 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
         self.seed_train_system = seed_train_system
         self.HXN = HXN
         self.pre_conversion_units = pre_conversion_units
+        self.juicing_sys = juicing_sys
+        self.baseline_yield = baseline_yield
         self.baseline_titer = baseline_titer
+        self.HXN_new_HXs = HXN_new_HXs
+        self.HXN_new_HX_utils = HXN_new_HX_utils
         
         self.count = 0 
         self.count_exceptions = 0
@@ -189,9 +206,10 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
         productivity : float, optional
             g products / L effluent / hr
         """
-        self.load_spec_3(spec_3 or self.spec_3)
         self.load_spec_1(spec_1 or self.spec_1)
         self.load_spec_2(spec_2 or self.spec_2)
+        
+        self.load_spec_3(spec_3 or self.spec_3)
 
     def evaluate_across_productivity(self, metrics, spec_3):
         """
@@ -312,8 +330,11 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
         
         if reactor.glucose_to_HP_rxn.X +\
             reactor.glucose_to_acetic_acid_rxn.X> 0.999:
-            reactor.glucose_to_acetic_acid_rxn.X = min(0.04, 1. - reactor.glucose_to_HP_rxn.X)
-            
+            rem_glucose = min (0.08, 1. - reactor.glucose_to_HP_rxn.X)
+            reactor.glucose_to_acetic_acid_rxn.X = 0.5 * rem_glucose
+            reactor.glucose_to_glycerol_rxn.X = 0.5 * rem_glucose
+            # reactor.glucose_to_acetic_acid_rxn.X = min(0.04, 1. - reactor.glucose_to_HP_rxn.X)
+            # reactor.glucose_to_glycerol_rxn.X = min(0.04, 1. - reactor.glucose_to_HP_rxn.X)
             # remainder = 0.999 - reactor.glucose_to_HP_rxn.X
             # reactor.glucose_to_microbe_rxn.X = .43 * remainder
             # reactor.glucose_to_acetic_acid_rxn.X = .57 * remainder
@@ -323,7 +344,9 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
             
         if reactor.xylose_to_HP_rxn.X +\
             reactor.xylose_to_acetic_acid_rxn.X> 0.999:
-            reactor.xylose_to_acetic_acid_rxn.X = min(0.04 , 1. - reactor.xylose_to_HP_rxn.X)
+            rem_xylose = min (0.08, 1. - reactor.xylose_to_HP_rxn.X)
+            reactor.xylose_to_acetic_acid_rxn.X = 0.5 * rem_xylose
+            reactor.xylose_to_glycerol_rxn.X = 0.5 * rem_xylose
             
             # remainder = 0.999 - reactor.xylose_to_HP_rxn.X
             # reactor.xylose_to_microbe_rxn.X = .43 * remainder
@@ -372,7 +395,9 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
         self.reactor.tau = self.reactor.tau_cofermentation = titer / self.spec_3
         
     def load_feedstock_price(self, price):
-        self.feedstock.price = price / _kg_per_ton * 0.8 # price per dry ton --> price per wet kg
+        feedstock = self.feedstock
+        mc = feedstock.imass['Water']/feedstock.F_mass
+        self.feedstock.price = price / _kg_per_ton * (1-mc) # price per dry ton --> price per wet kg
         self.spec_2 = price
         
     def calculate_feedstock_carbohydrate_content(self):
@@ -387,12 +412,12 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
         feedstock.mol[:]*= self.feedstock_mass/feedstock.F_mass
         return self.calculate_feedstock_carbohydrate_content() - self.spec_1
     
-    def load_feedstock_carbohydrate_content_old(self, sugar_content):
+    def load_feedstock_carbohydrate_content_old(self, carbohydrate_content):
         f = self.feedstock_carbohydrate_content_objective_function
-        self.spec_1 = sugar_content
+        self.spec_1 = carbohydrate_content
         flx.IQ_interpolation(f, 0.00001, 30., ytol=1e-4, maxiter=100)
         
-        # self.curr_sugar_content = sugar_content
+        # self.curr_carbohydrate_content = carbohydrate_content
         
     def get_substrates_conc(self, stream):
         substrates = self.substrates
@@ -410,10 +435,29 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
             byproduct.price = price / _kg_per_ton
         self.spec_1 = price / _kg_per_ton
     
-    def load_feedstock_carbohydrate_content(self, sugar_content):
-        self.spec_1 = sugar_content
+    def load_feedstock_carbohydrate_content(self, carbohydrate_content):
+        self.spec_1 = carbohydrate_content
         F_mass = self.feedstock_mass
         sugars_IDs = ('Glucan', 'Xylan')
+        feedstock = self.feedstock
+        sugars = feedstock.imass[sugars_IDs]
+        z_sugars = carbohydrate_content * sugars / sugars.sum()
+        mass_sugars = F_mass * z_sugars
+        F_mass_sugars = mass_sugars.sum()
+        feedstock.imass[sugars_IDs] = 0.
+        feedstock.F_mass = F_mass - F_mass_sugars
+        feedstock.imass[sugars_IDs] = mass_sugars
+        for unit in self.pre_conversion_units:
+            unit.simulate()
+        self.load_yield(self.baseline_yield)
+        self.load_titer(self.baseline_titer)
+        
+    # def load_capacity(self, capacity):
+    
+    def load_feedstock_sugar_content(self, sugar_content):
+        self.spec_1 = sugar_content
+        F_mass = self.feedstock_mass
+        sugars_IDs = ('Glucose', 'Xylose')
         feedstock = self.feedstock
         sugars = feedstock.imass[sugars_IDs]
         z_sugars = sugar_content * sugars / sugars.sum()
@@ -422,12 +466,11 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
         feedstock.imass[sugars_IDs] = 0.
         feedstock.F_mass = F_mass - F_mass_sugars
         feedstock.imass[sugars_IDs] = mass_sugars
-        # for unit in self.pre_conversion_units:
-        #     unit.simulate()
-        # # self.load_yield(self.baseline_yield)
-        # self.load_titer(self.baseline_titer)
-        
-    # def load_capacity(self, capacity):
+        for unit in self.pre_conversion_units:
+            unit.simulate()
+        self.load_yield(self.baseline_yield)
+        self.load_titer(self.baseline_titer)
+
         
     def load_pretreatment_conversion_to_xylose(self, conversion):
         self.spec_2 = conversion
@@ -564,7 +607,7 @@ class TiterAndInhibitorsSpecification:
         water = self.water_required_to_dilute_to_set_titer(x_titer)
         product = self.product
         molar_volume = product.chemicals.Water.V('l', product.T, product.P) # m3 / mol
-        self.dilution_water.imol['Water'] += water / molar_volume / 1000
+        self.dilution_water.imol['Water'] += water / molar_volume / 1000.
         
     def water_required_to_dilute_to_set_titer(self, current_titer):
         return (1./self.target_titer - 1./current_titer) * self.get_products_mass(self.product)

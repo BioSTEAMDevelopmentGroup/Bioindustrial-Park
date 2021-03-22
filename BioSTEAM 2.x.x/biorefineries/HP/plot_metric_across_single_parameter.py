@@ -66,8 +66,8 @@ steps = 3
 
 # titers = np.linspace(15., 150., steps)
 # yields = 100.*np.linspace(0.1, 0.99, steps)
-
-titers = np.array([54.8, 54.8])
+carbs = np.linspace(0.1, 0.99, steps)
+# titers = np.array([54.8, 54.8])
 
 carbs = np.linspace(0.1, 0.7, steps)
 hu_group_contributions = {}
@@ -105,13 +105,17 @@ def get_group_cooling_demand(group):
 # for titer in titers:
 for parameter in parameters:
     spec.load_feedstock_carbohydrate_content(parameter)
-    # spec.load_yield(parameter/100.)
+    # spec.load_titer(parameter)
     
     try:
-        spec.load_titer(54.8)
+        
+        # spec.load_titer(54.8)
         HP_sys.simulate()
+        # results = spec.evaluate_across_specs(self, system, 
+        #                            spec.spec_1, spec.spec_2, 
+        #                            metrics, spec.spec_3)
     except:
-        spec.load_titer(54.8)
+        # spec.load_titer(54.8)
         run_bugfix_barrage()
                    
     HP_sys.converge_method = 'wegstein'

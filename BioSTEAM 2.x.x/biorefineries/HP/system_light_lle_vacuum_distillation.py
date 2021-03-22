@@ -138,17 +138,20 @@ def create_HP_sys(ins, outs):
     # =============================================================================
     H_M201 = bst.units.HXutility('H_M201', ins=water_M201,
                                      outs='steam_M201',
-                                     T=114+273.15, rigorous=False)
+                                     T=114+273.15, rigorous=True)
     def H_M201_specification():
         T201._run()
         acid_imass = T201.outs[0].imass['SulfuricAcid']
         H_M201.ins[0].imass['Water'] = acid_imass / 0.05
+        # H_M201.ins[0].imass['H2SO4'] = H_M201.ins[0].imass['Water']/1000.
         H_M201._run()
     H_M201.specification = H_M201_specification
-    
+    # H_M201._cost = lambda: None
+    # H_M201._design = lambda: None
+    # H_M201.heat_utilities[0].heat_exchanger = None
     H_M202 = bst.units.HXutility('H_M202', ins=water_M202,
                                      outs='hot_water_M202',
-                                     T=95+273.15, rigorous=False)
+                                     T=95+273.15, rigorous=True)
     def H_M202_specification():
         U101._run()
         H_M201._specification()
@@ -158,9 +161,12 @@ def create_HP_sys(ins, outs):
         mixture_imass_water = feedstock.imass['Water'] + acid.imass['Water']
         total_mass = (mixture_F_mass - mixture_imass_water)/M202.solid_loading
         H_M202.ins[0].imass['Water'] = total_mass - mixture_F_mass
+        # H_M202.ins[0].imass['H2SO4'] = H_M202.ins[0].imass['Water']/1000.
         H_M202._run()
     H_M202.specification = H_M202_specification
-    
+    # H_M202._cost = lambda: None
+    # H_M202._design = lambda: None
+    # H_M202.heat_utilities[0].heat_exchanger = None
     # P_M203 =  bst.units.Pump('P_M203', ins=water_M203, P=13.*101325.)
     
     # H_M203 = bst.units.HXutility('H_M203', ins=water_M203,
@@ -521,6 +527,27 @@ def create_HP_sys(ins, outs):
         S404_run()
         
     
+    # def adjust_S404_streams():
+    #     S404.N_stages = 15 # reset
+    #     S404._setup() # reset
+    #     feed_hexanol, solvent_recycle = M401.ins
+    #     process_stream = S404.ins[0]
+    #     process_stream_F_mol = process_stream.F_mol
+    #     existing_hexanol = solvent_recycle.imol['Hexanol'] + process_stream.imol['Hexanol']
+    
+    #     K_raffinate = S404.partition_data['K'][0]
+    
+    #     HP_recovery = 1-tolerable_loss_fraction
+    #     reqd_hexanol = HP_recovery * K_raffinate * process_stream_F_mol
+    #     # S404.reqd_hexanol = reqd_hexanol # for access in S404_run
+    #     # if existing_hexanol > reqd_hexanol:
+    #     #     solvent_recycle.empty()
+    #     #     existing_hexanol = 0
+    #     feed_hexanol.imol['Hexanol'] = max(0, reqd_hexanol - existing_hexanol)
+    
+    #     M401._run()
+    #     S404_run()
+
     def adjust_S404_streams():
         S404.N_stages = 15 # reset
         S404._setup() # reset
@@ -532,15 +559,18 @@ def create_HP_sys(ins, outs):
         K_raffinate = S404.partition_data['K'][0]
     
         HP_recovery = 1-tolerable_loss_fraction
-        reqd_hexanol = HP_recovery * K_raffinate * process_stream_F_mol
-        # S404.reqd_hexanol = reqd_hexanol # for access in S404_run
-        # if existing_hexanol > reqd_hexanol:
-        #     solvent_recycle.empty()
-        #     existing_hexanol = 0
-        feed_hexanol.imol['Hexanol'] = max(0, reqd_hexanol - existing_hexanol)
-    
+        reqd_hexanol =  HP_recovery * K_raffinate * process_stream_F_mol
+        if existing_hexanol > reqd_hexanol:
+            solvent_recycle.imol['Hexanol'] = reqd_hexanol
+        else:
+            feed_hexanol.imol['Hexanol'] = max(0, reqd_hexanol - existing_hexanol)
+        
         M401._run()
         S404_run()
+        
+        if existing_hexanol > reqd_hexanol:
+            feed_hexanol.imol['Hexanol'] = S404.outs[0].imol['Hexanol']
+            
         
     def update_Ks(lle_unit, solute_indices = (0,), carrier_indices = (1,), solvent_indices = (2,)):
         IDs = lle_unit.partition_data['IDs']
@@ -617,7 +647,7 @@ def create_HP_sys(ins, outs):
         return stream.imass[chem_ID]/stream.F_mass
     
     M402 = bst.units.Mixer('M402', ins=(D401-1,
-                                        'dilution_water'))
+                                        'dilution_water2'))
     
     def M402_objective_fn(Water_imol):
         M402.ins[1].imol['Water'] = Water_imol
@@ -918,8 +948,10 @@ def create_HP_sys(ins, outs):
     HXN = bst.facilities.HeatExchangerNetwork('HXN')
     def HXN_no_run_cost():
         HXN.heat_utilities = tuple()
-        HXN._installed_cost=0.
-    # HXN._cost = HXN_no_run_cost
+        HXN._installed_cost = 0.
+    HXN._cost = HXN_no_run_cost
+    HXN.energy_balance_percent_error = 0.
+    HXN.new_HXs = HXN.new_HX_utils = []
     HXN_group = UnitGroup('HXN_group', 
                                    units=(HXN,))
     process_groups.append(HXN_group)
@@ -952,8 +984,9 @@ AA = s.AcrylicAcid
 get_flow_tpd = lambda: (feedstock.F_mass-feedstock.imass['H2O'])*24/907.185
 
 
-feeds = [i for i in flowsheet.stream
-                            if i.sink and not i.source]
+# feeds = [i for i in flowsheet.stream
+#                             if i.sink and not i.source]
+feeds = HP_sys.feeds
 
 products = [AA] # Don't include gypsum since we want to add carbon impurities to GWP
 
@@ -978,9 +1011,12 @@ for i in range(len(process_groups)):
 # TEA
 # =============================================================================
 
-#!!! Income tax was changed from 0.35 to 0.21 based on Davis et al., 2018 (new legistration)
+HP_no_BT_sys = bst.System('HP_no_BT_sys', path = HP_sys.path, facilities = tuple([i for i in HP_sys.facilities if not i.ID=='BT']))
+
+
+#!!! Income tax was changed from 0.35 to 0.21 based on Davis et al., 2018 (new legislation)
 HP_no_BT_tea = HPTEA(
-        system=HP_sys, IRR=0.10, duration=(2016, 2046),
+        system=HP_no_BT_sys, IRR=0.10, duration=(2016, 2046),
         depreciation='MACRS7', income_tax=0.21, operating_days=0.9*365,
         lang_factor=None, construction_schedule=(0.08, 0.60, 0.32),
         startup_months=3, startup_FOCfrac=1, startup_salesfrac=0.5,
@@ -998,7 +1034,7 @@ HP_no_BT_tea = HPTEA(
         labor_cost=3212962*get_flow_tpd()/2205,
         labor_burden=0.90, property_insurance=0.007, maintenance=0.03)
 
-HP_no_BT_tea.units.remove(BT)
+# HP_no_BT_tea.units.remove(BT)
 
 # # Removed because there is not double counting anyways.
 # # Removes feeds/products of BT_sys from HP_sys to avoid double-counting
