@@ -62,14 +62,14 @@ spec.load_productivity(0.79)
 spec.load_yield(0.49)
 spec.load_titer(54.8)
 
-steps = 3
+steps = 8
 
 # titers = np.linspace(15., 150., steps)
 # yields = 100.*np.linspace(0.1, 0.99, steps)
 carbs = np.linspace(0.1, 0.99, steps)
 # titers = np.array([54.8, 54.8])
 
-carbs = np.linspace(0.1, 0.7, steps)
+# carbs = np.linspace(0.1, 0.7, steps)
 hu_group_contributions = {}
 cu_group_contributions = {}
 pu_group_contributions = {}

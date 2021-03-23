@@ -439,7 +439,7 @@ HP_metrics = [solve_AA_price, get_GWP, get_FEC]
 
 # HP_metrics = [solve_AA_price, lambda:0, lambda:0]
 # %% Generate 3-specification meshgrid and set specification loading functions
-steps = 12
+steps = 60
 
 # Yield, titer, productivity (rate)
 spec_1 = np.linspace(0.1, 0.99, steps) # yield
@@ -463,8 +463,8 @@ spec_3_units = "$\mathrm{g} \cdot \mathrm{L}^{-1} \cdot \mathrm{hr}^{-1}$"
 
 
 # # Feedstock carbohydrate or sugar %, feedstock price, productivity (rate)
-# spec_1 = np.linspace(0.1, 0.7, steps) # feedstock carbohydrate %
-# spec_2 = np.linspace(0., 200., steps) # feedstock price
+# spec_1 = np.linspace(0.1, 0.99, steps) # feedstock carbohydrate %
+# spec_2 = np.linspace(1., 200., steps) # feedstock price
 # # spec_1 = np.linspace(0.2, 0.99, steps) # yield
 # # spec_2 = np.linspace(45, 225, steps) # titer
 # spec_3 = np.array([0.79]) # productivity

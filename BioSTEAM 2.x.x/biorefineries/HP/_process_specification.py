@@ -71,7 +71,13 @@ def evaluate_across_specs(spec, system,
         system.simulate()
         HXN = spec.HXN
         HXN_Q_bal_percent_error = HXN.energy_balance_percent_error
+        tolerable_HXN_energy_balance_percent_error = spec.tolerable_HXN_energy_balance_percent_error
         print(f"HXN Q_balance off by {format(HXN_Q_bal_percent_error,'.2f')} %.\n")
+        if abs(HXN_Q_bal_percent_error) >= tolerable_HXN_energy_balance_percent_error:
+            # Beep(320, 500)
+            spec.HXN_intolerable_points.append((spec_1, spec_2, spec_3))
+            print(_red_highlight_white_text+f"That's higher than {tolerable_HXN_energy_balance_percent_error}% on an absolute basis, so returning metrics at this point as np.nan."+_reset_text)
+            return np.nan*np.ones([len(metrics), len(spec_3)])
         spec.average_HXN_energy_balance_percent_error += abs(HXN_Q_bal_percent_error)
         spec.HXN_new_HXs[(spec_1,spec_2)] = get_IDs(HXN.new_HXs)
         spec.HXN_new_HX_utils[(spec_1,spec_2)] = get_IDs(HXN.new_HX_utils)
@@ -141,6 +147,8 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
                  'count_exceptions',
                  'total_iterations',
                  'average_HXN_energy_balance_percent_error',
+                 'tolerable_HXN_energy_balance_percent_error',
+                 'HXN_intolerable_points',
                  'exceptions_dict',
                  'pre_conversion_units',
                  'juicing_sys',
@@ -154,6 +162,7 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
                  spec_1, spec_2, spec_3, xylose_utilization_fraction,
                  feedstock, dehydration_reactor, byproduct_streams, HXN,
                  pre_conversion_units = None, juicing_sys=None, baseline_yield =0.49, baseline_titer = 54.8,
+                 tolerable_HXN_energy_balance_percent_error=1.5, HXN_intolerable_points=[],
                  HXN_new_HXs={}, HXN_new_HX_utils={},
                  feedstock_mass=104192.83224417375, pretreatment_reactor = None,
                   load_spec_1=None, load_spec_2=None, load_spec_3=None):
@@ -177,6 +186,8 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
         self.baseline_titer = baseline_titer
         self.HXN_new_HXs = HXN_new_HXs
         self.HXN_new_HX_utils = HXN_new_HX_utils
+        self.tolerable_HXN_energy_balance_percent_error = tolerable_HXN_energy_balance_percent_error
+        self.HXN_intolerable_points = HXN_intolerable_points
         
         self.count = 0 
         self.count_exceptions = 0
@@ -399,6 +410,7 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
         feedstock = self.feedstock
         mc = feedstock.imass['Water']/feedstock.F_mass
         self.feedstock.price = price / _kg_per_ton * (1-mc) # price per dry ton --> price per wet kg
+        # self.feedstock.price = price / _kg_per_ton 
         self.spec_2 = price
         
     def calculate_feedstock_carbohydrate_content(self):
