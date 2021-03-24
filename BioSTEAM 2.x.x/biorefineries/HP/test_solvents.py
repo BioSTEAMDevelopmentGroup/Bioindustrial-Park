@@ -50,7 +50,7 @@ TAL.Tb = 239.1 + 273.15
 Arabitol.copy_models_from(Furfural, ['V',])
 
 #%% Set solute and solvents
-solute = TAL
+solute = HP_chemicals['HP']
 solvents = [Propyl_acetate, Butyl_acetate, Hexanol, Cyclohexanol, Cyclohexanone, Heptanol, Octanol, Octanediol, te_hexanol, Nonanol, Decanol, Dodecanol, Isoamyl_alcohol, Dioctyl_phthalate, Diethyl_sebacate, Glycerol]
 
 #%% Set thermo
@@ -58,14 +58,14 @@ tmo.settings.set_thermo(solvents + ['Water', 'H2SO4', Arabitol, solute, HP_chemi
 
 # %% Streams initialization
 
-T = 303
+T = 350
 process_stream = tmo.Stream('process_stream',
-                            Water = 224000.,
-                            units = 'kmol/hr',
+                            Water = 4.88e4,
+                            units = 'kg/hr',
                             T = T)
-process_stream.imol[solute.ID] = 250.*12.2/7.7
-process_stream.imol['AceticAcid'] = 5.
-process_stream.imol['Arabitol'] = 5.
+process_stream.imass[solute.ID] = 2.12e+04
+# process_stream.imol['AceticAcid'] = 5.
+# process_stream.imol['Arabitol'] = 5.
 
 solvent_stream = tmo.Stream('solvent_stream',
                             T = T)
@@ -79,14 +79,14 @@ raffinate_phase = 'L'
 def get_K(chem_ID, stream, phase_1, phase_2):
     return (stream[phase_1].imol[chem_ID]/stream[phase_1].F_mol)/(stream[phase_2].imol[chem_ID]/stream[phase_2].F_mol)
 
-def set_solvent(solvent_chemical, solvent_mol=1350, solvent_stream=solvent_stream):
+def set_solvent(solvent_chemical, solvent_mol=1314, solvent_stream=solvent_stream):
     solvent_stream.empty()
     if type(solvent_chemical) is str:
         solvent_chemical = tmo.Chemical(solvent_chemical)
     solvent_ID = solvent_chemical.ID
     solvent_stream.imol[solvent_ID] = solvent_mol
     
-def run_single_test(solvent_chemical, solvent_mol=1350, process_stream=process_stream, solvent_stream=solvent_stream):
+def run_single_test(solvent_chemical, solvent_mol=1314, process_stream=process_stream, solvent_stream=solvent_stream):
     mixed_stream.empty()
     set_solvent(solvent_chemical, solvent_mol, solvent_stream)
     solvent_ID = solvent_chemical.ID
@@ -192,7 +192,7 @@ for result in filtered_results:
 # %% Unit initialization and tests
 solvent_to_run = '1-octanol'
 set_solvent(solvent_to_run)
-partition_data = dict(IDs=('Triacetic acid lactone', 'Water', solvent_to_run,
+partition_data = dict(IDs=(solute.ID, 'Water', solvent_to_run,
                             'AceticAcid', 'Arabitol',), 
             K=np.array([1./results_dict[solvent_to_run][1],
                         1/results_dict[solvent_to_run][2],

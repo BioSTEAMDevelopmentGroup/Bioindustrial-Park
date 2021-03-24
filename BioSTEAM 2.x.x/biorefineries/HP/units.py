@@ -771,8 +771,8 @@ class SeedTrain(Unit):
         ])
         
         self.biomass_generation_rxns = ParallelRxn([
-        Rxn('Glucose -> 6 FermMicrobe',       'Glucose',   (1.-1e-9)*ferm_ratio),
-        Rxn('Xylose -> 5 FermMicrobe',        'Xylose',    (1.-1e-9)*ferm_ratio),
+        Rxn('Glucose -> 6 FermMicrobe + 2.4 H2O',       'Glucose',   (1.-1e-9)*ferm_ratio),
+        Rxn('Xylose -> 5 FermMicrobe + 2 H2O',        'Xylose',    (1.-1e-9)*ferm_ratio),
         ])
         
         
@@ -1809,8 +1809,8 @@ class CoFermentation(Reactor):
         ])
         
         self.biomass_generation_rxns = ParallelRxn([
-        Rxn('Glucose -> 6 FermMicrobe',       'Glucose',   1.-1e-9),
-        Rxn('Xylose -> 5 FermMicrobe',        'Xylose',    1.-1e-9),
+        Rxn('Glucose -> 6 FermMicrobe + 2.4 H2O',       'Glucose',   1.-1e-9),
+        Rxn('Xylose -> 5 FermMicrobe + 2 H2O',        'Xylose',    1.-1e-9),
         ])
         
         self.glucose_to_microbe_rxn = self.biomass_generation_rxns[0]

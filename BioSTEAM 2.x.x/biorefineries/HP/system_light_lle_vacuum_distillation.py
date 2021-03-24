@@ -451,7 +451,8 @@ def create_HP_sys(ins, outs):
 
     
     Kds = dict(IDs=('HP', 'Water', 'Hexanol'),
-               K=np.array([1./1.941747572815534, 3.606, 0.006]),
+               # K=np.array([1./1.941747572815534, 3.606, 0.006]),
+               K=np.array([1./1.897092617355942, 3.690183610720956, 0.0060176892697821486]), # T = 330.6 K
                phi = 0.5)
     
     S404 = bst.units.MultiStageMixerSettlers('S404', ins = (F401_P-0, M401-0),
@@ -631,11 +632,12 @@ def create_HP_sys(ins, outs):
                                         Lr=0.999, Hr=0.999, k=1.2, P = 101325/15,
                                         vessel_material = 'Stainless steel 316',
                                         condenser_thermo = ideal_thermo,
-                                        boiler_thermo = ideal_thermo)
+                                        boiler_thermo = ideal_thermo,
+                                        thermo=ideal_thermo)
     
     
     # D401_H = bst.units.HXutility('D401_H', ins=D401-0, V=0., rigorous=True)
-    D401_H = bst.units.HXutility('D401_H', ins=D401-0, V=0., rigorous=False,
+    D401_H = bst.units.HXutility('D401_H', ins=D401-0, V=0., rigorous=True,
                                  thermo=ideal_thermo)
     D401_H_P = units.HPPump('D401_H_P', ins=D401_H-0, P = 101325)
     D401_H_P-0-1-M401
@@ -683,7 +685,7 @@ def create_HP_sys(ins, outs):
     
     D402_P = units.HPPump('D402_P', ins=D402-1)
     # D402_H = bst.units.HXutility('D402_H', ins=D402-0, T = 308.15, rigorous=True)
-    D402_H = bst.units.HXutility('D402_H', ins=D402-0, T=308.15, V=0., rigorous=False)
+    D402_H = bst.units.HXutility('D402_H', ins=D402-0, T=308.15, rigorous=True)
     
     
     separation_group = UnitGroup('separation_group', 
