@@ -41,9 +41,9 @@ ugroup = bst.UnitGroup(None, HP_sys.units)
 lps, mps, hps = bst.HeatUtility.heating_agents
 cow, chw, _ = bst.HeatUtility.cooling_agents
 get_hxn_lps = lambda: HXN.heat_utilities[0].duty
-get_hxn_mps = lambda: HXN.heat_utilities[1].duty
-get_hxn_cow = lambda: HXN.heat_utilities[2].duty
-get_hxn_chw = lambda: HXN.heat_utilities[3].duty
+# get_hxn_mps = lambda: 0.
+get_hxn_cow = lambda: HXN.heat_utilities[1].duty
+get_hxn_chw = lambda: HXN.heat_utilities[2].duty
 get_sc = lambda: BT.ins[0].LHV
 get_gc = lambda: BT.ins[1].LHV
 get_lps = lambda: ugroup.get_utility_duty(lps)
@@ -67,7 +67,7 @@ HP_metrics = [
     # get_cow, 
     # get_chw, 
     get_hxn_lps,
-    get_hxn_mps,
+    # get_hxn_mps,
     get_hxn_cow,
     get_hxn_chw,
     # get_T_D401,
@@ -80,7 +80,7 @@ HP_metrics = [
 ]
 
 # %% Generate 3-specification meshgrid and set specification loading functions
-steps = 80
+steps = 20
 
 # Yield, titer, productivity (rate)
 spec_1 = all_yields = np.array([0.6, 0.8]) # yield
@@ -109,7 +109,7 @@ metric_names = [
     # 'Co.W',
     # 'Ch.W',
     'HXN LPS',
-    'HXN MPS',
+    # 'HXN MPS',
     'HXN Co.W',
     'HXN Ch.W',
     'EC',

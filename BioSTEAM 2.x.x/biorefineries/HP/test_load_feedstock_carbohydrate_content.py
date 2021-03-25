@@ -20,6 +20,10 @@ def mass(x):
     spec.load_feedstock_carbohydrate_content(x)
     return feedstock.imass['Xylan', 'Glucan'].value
     
-x = np.array([mass(i) for i in carbs])
-y = np.array([mass(i) for i in carbs])
-assert np.abs(x-y).sum() <= 1e-6
+def comp(x):
+    spec.load_feedstock_carbohydrate_content(x)
+    return feedstock.imass['Xylan', 'Glucan'].sum() / feedstock.F_mass
+
+# x = np.array([mass(i) for i in carbs])
+# y = np.array([mass(i) for i in carbs])
+# assert np.abs(x-y).sum() <= 1e-6

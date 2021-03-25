@@ -137,7 +137,7 @@ def create_HP_sys(ins, outs):
     # Pretreatment units
     # =============================================================================
     H_M201 = bst.units.HXutility('H_M201', ins=water_M201,
-                                     outs='steam_M201',
+                                     outs='steam_M201', V=1.,
                                      T=114+273.15, rigorous=False)
     def H_M201_specification():
         T201._run()
@@ -536,7 +536,7 @@ def create_HP_sys(ins, outs):
             solvent_recycle.imol['Hexanol'] = reqd_hexanol
         else:
             feed_hexanol.imol['Hexanol'] = max(0, reqd_hexanol - existing_hexanol)
-    
+        
         M401._run()
         S404_run()
         
@@ -595,7 +595,7 @@ def create_HP_sys(ins, outs):
     ideal_thermo = S404.thermo.ideal()
     
     # S404-0-1-R302 # with sugars recycle
-    D401 = bst.units.BinaryDistillation('D401', ins=S404-1, outs=('D401_g', 'D401_l'),
+    D401 = bst.units.ShortcutColumn('D401', ins=S404-1, outs=('D401_g', 'D401_l'),
                                         LHK=('Hexanol', 'HP'),
                                         is_divided=True,
                                         product_specification_format='Recovery',
@@ -604,20 +604,22 @@ def create_HP_sys(ins, outs):
                                         thermo=ideal_thermo,
                                         condenser_thermo = ideal_thermo,
                                         boiler_thermo = ideal_thermo)
-    
-    D401_2 = bst.units.BinaryDistillation('D401_2', ins=D401-0, 
-                                          LHK=('Water', 'Hexanol'),
-                                          is_divided=True,
-                                          product_specification_format='Recovery',
-                                          Lr=0.999, Hr=0.999, k=1.2, P = 101325/15,
-                                          vessel_material = 'Stainless steel 316',
-                                          thermo=ideal_thermo,
-                                          condenser_thermo = ideal_thermo,
-                                          boiler_thermo = ideal_thermo)
-    D401_2_H = bst.units.HXutility('D401_2_H', ins=D401_2-0, V=0., 
-                                 thermo=ideal_thermo, rigorous=True)
-    D401_2_H_P = units.HPPump('D401_2_H_P', ins=D401_2_H-0, P = 101325)
-    D401_H_P = units.HPPump('D401_H_P', ins=D401_2-1, P = 101325)
+    D401_H = bst.units.HXutility('D401_H', ins=D401-0, V=0., T=310., 
+                              rigorous=False, thermo=ideal_thermo)
+    D401_H_P = units.HPPump('D401_H_P', ins=D401_H-0, P = 101325)
+    # D401_2 = bst.units.BinaryDistillation('D401_2', ins=D401-0, 
+    #                                       LHK=('Water', 'Hexanol'),
+    #                                       is_divided=True,
+    #                                       product_specification_format='Recovery',
+    #                                       Lr=0.9, Hr=0.999, k=1.05, P = 101325/15,
+    #                                       vessel_material = 'Stainless steel 316',
+    #                                       thermo=ideal_thermo,
+    #                                       condenser_thermo = ideal_thermo,
+    #                                       boiler_thermo = ideal_thermo)
+    # D401_2_H = bst.units.HXutility('D401_2_H', ins=D401_2-0, V=0., 
+    #                              thermo=ideal_thermo, rigorous=True)
+    # D401_2_H_P = units.HPPump('D401_2_H_P', ins=D401_2_H-0, P = 101325)
+    # D401_H_P = units.HPPump('D401_H_P', ins=D401_2-1, P = 101325)
     D401_H_P-0-1-M401
     
     def get_concentration_gpL(chem_ID, stream):
@@ -667,8 +669,8 @@ def create_HP_sys(ins, outs):
     
     separation_group = UnitGroup('separation_group', 
                                    units=(S401, R401, R401_H, R401_P, S402,
-                                          F401, F401_P, M401, S404, D401, D401_2,
-                                          D401_2_H, D401_2_H_P, D401_H_P, D401_P, M402, 
+                                          F401, F401_P, M401, S404, D401, 
+                                          D401_H, D401_H_P, D401_P, M402, 
                                           R402, R402_H, D402, D402_H, D402_P))
     process_groups.append(separation_group)
     
@@ -692,7 +694,7 @@ def create_HP_sys(ins, outs):
     # =============================================================================
     
     # Mix waste liquids for treatment
-    M501 = bst.units.Mixer('M501', ins=(F301_P-0,  D402_H-0, F401-1, S404-0, D401_2_H_P-0)) # without sugars recycle
+    M501 = bst.units.Mixer('M501', ins=(F301_P-0,  D402_H-0, F401-1, S404-0)) # without sugars recycle
     # M501 = bst.units.Mixer('M501', ins=(F301_P-0, D402_H-0)) # with sugars recycle
     
     # This represents the total cost of wastewater treatment system

@@ -21,7 +21,7 @@ last_infeasible_simulation = [] # yield, titer
 
 # Bugfix barrage is not needed anymore because hexane recycle is not emptied anymore
 # and Wegstein and Aitken converge much better.
-bugfix = False
+bugfix = True
 
 # from biosteam.process_tools.reactor_specification import evaluate_across_TRY
 _kg_per_ton = 907.18474
@@ -76,6 +76,12 @@ def evaluate_across_specs(spec, system,
     try:
         spec.load_specifications(spec_1=spec_1, spec_2=spec_2)
         system.simulate()
+        HXN_Q_bal_percent_error = spec.HXN.energy_balance_percent_error
+        print(f"HXN Q_balance off by {format(HXN_Q_bal_percent_error,'.2f')} %.\n")
+        if abs(HXN_Q_bal_percent_error) > 5: 
+            print('-IGNORED-')
+            return np.nan*np.ones([len(metrics), len(spec_3)])
+        spec.average_HXN_energy_balance_percent_error += abs(HXN_Q_bal_percent_error)
         return spec.evaluate_across_productivity(metrics, spec_3)
     
     except Exception as e1:
@@ -106,9 +112,6 @@ def evaluate_across_specs(spec, system,
                 return np.nan*np.ones([len(metrics), len(spec_3)])
         else:
             return np.nan*np.ones([len(metrics), len(spec_3)])
-    HXN_Q_bal_percent_error = spec.HXN.energy_balance_percent_error
-    print(f"HXN Q_balance off by {format(HXN_Q_bal_percent_error,'.2f')} %.\n")
-    spec.average_HXN_energy_balance_percent_error += abs(HXN_Q_bal_percent_error)
     return spec.evaluate_across_productivity(metrics, spec_3)
     
 
