@@ -657,6 +657,7 @@ def baseline_triangle(baseline, ratio):
     if lb > ub: ub, lb = lb, ub
     return shape.Triangle(lb, mid, ub)
 
+
 D = baseline_uniform(1, 0.1)
 @param(name='Blank parameter', element=feedstock, kind='coupled', units='',
        baseline=1, distribution=D)
@@ -890,12 +891,15 @@ def set_R301_acetic_acid_yield(X):
     X = min(X*R303.ferm_ratio, 1-1e-6-R303_X[0]-R303_X[2])
     R303_X[1] = R303_X[4] = X
 
-D = shape.Uniform(0.4, 0.6)
-@param(name='Unfermented sugars routed to CO2 generation (balance is routed to cell mass generation)', element=R303, kind='coupled', units='% theoretical',
-       baseline=0.5, distribution=D)
-def set_sugars_to_CO2_gen(X): 
-   R302.CO2_generation_rxns.X[0] = R302.CO2_generation_rxns.X[1] = X
-   R303.CO2_generation_rxns.X[0] = R303.CO2_generation_rxns.X[1] = X * R303.ferm_ratio
+# D = shape.Uniform(0.4, 0.6)
+# @param(name='Unfermented sugars routed to CO2 generation (balance is routed to cell mass generation)', element=R303, kind='coupled', units='% theoretical',
+#        baseline=0.5, distribution=D)
+# def set_sugars_to_CO2_gen(X): 
+#    R302.CO2_generation_rxns.X[0] = R302.CO2_generation_rxns.X[1] = X
+#    R303.CO2_generation_rxns.X[0] = R303.CO2_generation_rxns.X[1] = X * R303.ferm_ratio
+   
+   
+   
 # D = shape.Triangle(0.05, 0.07, 0.1)
 # @param(name='Innoculum ratio', element=R301, kind='coupled', units='%',
 #        baseline=0.07, distribution=D)

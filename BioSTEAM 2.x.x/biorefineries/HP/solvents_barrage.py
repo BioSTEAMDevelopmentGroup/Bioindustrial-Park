@@ -7,50 +7,146 @@ Created on Sat Jan 16 19:09:17 2021
 # %% Imports and chemicals initialization
 
 import numpy as np
-import thermosteam as tmo
-import biosteam as bst
+# import thermosteam as tmo
+# import biosteam as bst
 
 from biorefineries.HP.chemicals_data import HP_chemicals
 
 # tmo.settings.set_thermo(['Water', 'octanol', 'hexanol', 'butyl acetate', HP_chemicals['Xylose'], HP_chemicals['Glucose'], HP_chemicals['Triacetic acid lactone'], 'isoamyl alcohol'])
 
-Water = HP_chemicals['Water']
-Glucose = HP_chemicals['Glucose']
-# HP = HP_chemicals['Triacetic acid lactone']
-Arabitol = tmo.Chemical('Arabitol')
-AQ336 = HP_chemicals['AQ336']
-Octanol = HP_chemicals['Octanol']
-Hexanol = tmo.Chemical('Hexanol')
-Heptanol = tmo.Chemical('Heptanol')
-Butyl_acetate = tmo.Chemical('Butyl acetate')
-Propyl_acetate = tmo.Chemical('Propyl acetate')
-Isoamyl_alcohol = tmo.Chemical('Isoamyl alcohol')
-TOA = tmo.Chemical('Trioctylamine')
-Decanol = tmo.Chemical('Decanol')
-Dodecanol = tmo.Chemical('Dodecanol')
-Nonanol = tmo.Chemical('Nonanol')
-te_hexanol = tmo.Chemical('2-Ethyl hexanol')
-Cyclohexanol = tmo.Chemical('Cyclohexanol')
-Cyclohexanone = tmo.Chemical('Cyclohexanone')
-Dioctyl_phthalate = tmo.Chemical('117-81-7')
-Diethyl_sebacate = tmo.Chemical('Diethyl sebacate')
-Diethyl_sebacate.copy_models_from(Water, ['Psat', 'Hvap'])
-Octanediol = tmo.Chemical('1,8-Octanediol')
-AceticAcid = HP_chemicals['AceticAcid']
-Glycerol = tmo.Chemical('Glycerol')
-H2SO4 = tmo.Chemical('H2SO4')
-TAL = tmo.Chemical('Triacetic acid lactone')
-Furfural = tmo.Chemical('Furfural')
+class Metric():
+    
+    def __init__(self, metric_name, metric_getter=lambda:None):
+        self.name = metric_name
+        self.getter = metric_getter
+    
+    def get():
+        return self.getter()
 
-TAL.copy_models_from(Furfural, ['Psat', 'Hvap', 'V'])
-TAL.Hfus = 30883.6698 # !!! from solubility modeling method 4(ii)
-TAL.Tm = 185 + 273.15
-TAL.Tb = 239.1 + 273.15
+# class Metrics():
+    
+#     def __init__(self, name='Metrics', metrics_dict={}):
+#         self.name = name,
+#         self.metrics = metrics_dict
+    
+#     def add_metric(metric_name, metric_getter=lambda:None):
+#         self.metrics[metric_name] = Metric(metric_name, metric_getter)
+#         print (f'Added metric "{metric_name}" to {self.name}.')
 
-Arabitol.copy_models_from(Furfural, ['V',])
+class Criterion():
+    
+    def __init__(self, criterion_name, criterion_metric=None, criterion_range=(-np.inf, np.inf)):
+        self.name = criterion_name
+        self.metric = criterion_metric
+        self.range = criterion_range
+        
+    def get_metric():
+        return self.metric.get()
+    
+    def test():
+        gotten_metric = self.get_metric()
+        lb, ub = self.range
+        return gotten_metric>lb and gotten_metric<ub
+    
+class Criteria():
+    
+    def __init__(self, name='Criteria', criteria_list=[]):
+        self.name = name,
+        self.criteria = []
+    
+    def add_criterion(criterion_name, criterion_metric=None, criterion_range=(-np.inf, np.inf)):
+        self.criteria.append(Criterion(criterion_name, criterion_metric, criterion_range))
+        print (f'Added criterion to {self.name} for "{criterion_metric.name}" to be within range {criterion_range}.')
+    
+    def test_all():
+        criteria = self.criteria
+        return [criterion.test() for criterion in criteria]
+    
+class SolventsBarrage():
+    
 
+    def __init__(self, solute, water, solvents_list, T_range, process_stream,
+                 extract_phase, raffinate_phase,
+                 additional_criteria=[],
+                 get_concentration=lambda:None,
+                 get_K=lambda:None,
+                 get_name_from_chemical=lambda:None,
+                 get_chemical_from_name=lambda:None,
+                 get_all_chemicals_in_stream=lambda:None):
+        self.solute = solute
+        self.solute_name = solute_name = get_name_from_chemical(solute)
+        self.water = water
+        self.water_name = water_name = get_name_from_chemical(water)
+        
+        self.solvents_list = solvents_list
+        self.T_range = T_range
+        self.extract_phase = extract_phase
+        self.raffinate_phase = raffinate_phase
+        
+        self.partition_criteria = partition_criteria = Criteria('Partition criteria')
+        
+        get_K_solute_in_extract = lambda: get_K(self.solute_name, self.mixed_stream, 
+                                                self.extract_phase, self.raffinate_phase)
+        
+        partition_criteria.add_criterion('K_solute_in_extract', get_K(solute, ))
+        self.process_stream = None
+        self.solvent_streams_dict = {}
+        self.mixed_streams_dict = {}
+        self.current_mixed_stream = None
+        self.results = {}
+        
+        self.get_concentration = get_concentration
+        self.get_K = get_K
+        self.get_name_from_chemical = get_name_from_chemical
+        self.get_chemical_from_name = get_chemical_from_name
+        self.get_all_chemicals_in_stream = get_all_chemicals_in_stream
+
+
+        solute_name = get_name_from_chemical(self.solute)
+        water_name = get_name_from_chemical(self.water)
+
+    def get_impurities(stream):
+        impurities_dict = {}
+        chemicals_in_stream = get_all_chemicals_in_stream(stream)
+        solute_name = self.solute_name
+        water_name = self.water_name
+        
+        for chemical in chemicals_in_stream:
+            chemical_name = get_name_from_chemical(chemical)
+            if not chemical_name==water_name and not chemical_name==solute_name:
+                chemical_concentration = get_concentration(chemical, stream)
+                if chemical_concentration>0.:
+                    impurities_dict[chemical_name] = chemical_concentration
+        
+        return impurities_dict
+    
+        # return {get_name_from_chemical(chemical): get_concentration(chemical) \
+        #         for chemical in stream.chemicals \
+        #         if not (get_name_from_chemical(chemical)==solute \
+        #                 and not get_name_from_chemical(chemical)==get_name_from_chemical(water)) \
+        #             and get_concentration(get_name_from_chemical(chemical))>0.}
+            
+    def set_process_stream(process_stream):
+        self.process_stream = process_stream
+        self.process_stream_impurities = get_impurities(process_stream)
+        
+    def set_solvent_stream(solvent_name, solvent_mol, water_mol, solvent_stream=None):
+        if solvent_stream:
+            self.solvent_stream = solvent_stream
+        else:
+            
+    def get_results(mixed_stream, )
+    def run_single_test(solvent_chemical, solvent_mol, T):
+        process_stream_impurities = self.process_stream_impurities
+        solvent_stream = get_solvent_stream(solvent_chemical, solvent_mol)
+        mixed_stream = get_mixed_stream(self.process_stream, solvent_stream, T)
+        extract_phase = self.extract_phase
+        raffinate_phase = self.raffinate_phase
+        
+        # Ks = [get_K(solute, mixed_stream, extract_phase, raffinate_phase)] \
+        #     + [get_K(chemical, stream, phase_1, phase_2) for chemical in process_stream_impurities.keys()]
 #%% Set solute and solvents
-solute = HP_chemicals['HP']
+solute = TAL
 solvents = [Propyl_acetate, Butyl_acetate, Hexanol, Cyclohexanol, Cyclohexanone, Heptanol, Octanol, Octanediol, te_hexanol, Nonanol, Decanol, Dodecanol, Isoamyl_alcohol, Dioctyl_phthalate, Diethyl_sebacate, Glycerol]
 
 #%% Set thermo
@@ -58,14 +154,14 @@ tmo.settings.set_thermo(solvents + ['Water', 'H2SO4', Arabitol, solute, HP_chemi
 
 # %% Streams initialization
 
-T = 350
+T = 303
 process_stream = tmo.Stream('process_stream',
-                            Water = 4.88e4,
-                            units = 'kg/hr',
+                            Water = 224000.,
+                            units = 'kmol/hr',
                             T = T)
-process_stream.imass[solute.ID] = 2.12e+04
+process_stream.imol[solute.ID] = 250.*12.2/7.7
 process_stream.imol['AceticAcid'] = 5.
-process_stream.imol['Glycerol'] = 5.
+process_stream.imol['Arabitol'] = 5.
 
 solvent_stream = tmo.Stream('solvent_stream',
                             T = T)
@@ -79,14 +175,14 @@ raffinate_phase = 'L'
 def get_K(chem_ID, stream, phase_1, phase_2):
     return (stream[phase_1].imol[chem_ID]/stream[phase_1].F_mol)/(stream[phase_2].imol[chem_ID]/stream[phase_2].F_mol)
 
-def set_solvent(solvent_chemical, solvent_mol=1314, solvent_stream=solvent_stream):
+def set_solvent(solvent_chemical, solvent_mol=1350, solvent_stream=solvent_stream):
     solvent_stream.empty()
     if type(solvent_chemical) is str:
         solvent_chemical = tmo.Chemical(solvent_chemical)
     solvent_ID = solvent_chemical.ID
     solvent_stream.imol[solvent_ID] = solvent_mol
     
-def run_single_test(solvent_chemical, solvent_mol=1314, process_stream=process_stream, solvent_stream=solvent_stream):
+def run_single_test(solvent_chemical, solvent_mol=1350, process_stream=process_stream, solvent_stream=solvent_stream):
     mixed_stream.empty()
     set_solvent(solvent_chemical, solvent_mol, solvent_stream)
     solvent_ID = solvent_chemical.ID
@@ -192,7 +288,7 @@ for result in filtered_results:
 # %% Unit initialization and tests
 solvent_to_run = '1-octanol'
 set_solvent(solvent_to_run)
-partition_data = dict(IDs=(solute.ID, 'Water', solvent_to_run,
+partition_data = dict(IDs=('Triacetic acid lactone', 'Water', solvent_to_run,
                             'AceticAcid', 'Arabitol',), 
             K=np.array([1./results_dict[solvent_to_run][1],
                         1/results_dict[solvent_to_run][2],

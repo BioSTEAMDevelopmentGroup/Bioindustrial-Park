@@ -20,10 +20,9 @@ from matplotlib.ticker import AutoMinorLocator as AML
 
 # from biorefineries.HP.system import HP_sys, HP_tea, R302, spec
 # from biorefineries.HP.system import MEK as product
-from biorefineries.HP.system_light_lle_vacuum_distillation import (
-    HP_sys, HP_tea, R302, spec, get_GWP, get_ng_GWP, get_FEC, get_SPED,
-    HXN, mock_hxn, AA as product
-)
+from biorefineries.HP.system_light_lle_vacuum_distillation import HP_sys, HP_tea, R302, spec, get_GWP, get_ng_GWP, get_FEC, get_SPED
+from biorefineries.HP.system_light_lle_vacuum_distillation import AA as product
+
 from matplotlib import pyplot as plt
 from  matplotlib.colors import LinearSegmentedColormap
 import pandas as pd
@@ -214,6 +213,7 @@ AA_price_range = [1250, 1500]
 
 
 solve_AA_price = lambda: HP_tea.solve_price(product) * 907.185 # To USD / ton
+# solve_AA_price = lambda: HP_tea.solve_price(product)
 get_HP_VOC = lambda: HP_tea.VOC / 1e6 # million USD / yr
 get_HP_FCI = lambda: HP_tea.FCI / 1e6 # million USD
 
@@ -434,38 +434,41 @@ def get_p_financial_viability():
 # HP_metrics = [solve_AA_price, get_HP_inhibitors_conc]
 # HP_metrics = [solve_AA_price, get_HP_sugars_conc, get_HP_inhibitors_conc]
 # HP_metrics = [solve_AA_price, get_p_financial_viability, get_FEC]
+
+
 HP_metrics = [solve_AA_price, get_GWP, get_FEC]
 
+# HP_metrics = [solve_AA_price, lambda:0, lambda:0]
 # %% Generate 3-specification meshgrid and set specification loading functions
-steps = 6
+steps = 20
 
-# # Yield, titer, productivity (rate)
-# spec_1 = np.linspace(0.1, 0.99, steps) # yield
-# spec_2 = np.linspace(5., 330., steps) # titer
-# # spec_1 = np.linspace(0.2, 0.99, steps) # yield
-# # spec_2 = np.linspace(45, 225, steps) # titer
-# spec_3 = np.array([0.79]) # productivity
-# spec.load_spec_1 = spec.load_yield
-# spec.load_spec_2 = spec.load_titer
-# spec.load_spec_3 = spec.load_productivity
-# xlabel = "Yield"
-# ylabel = 'Titer [$\mathrm{g} \cdot \mathrm{L}^{-1}$]'
-# # xticks = [0.33, 0.66, 0.99]
-# xticks = [0., 0.2, 0.4, 0.6, 0.8, 1.0]
-# # yticks = [75, 150, 225]
-# yticks = [0,30,90,120,150,180,210,240,270,300,330]
-# # xticks = [0.2, 0.6, 0.99]
-# # yticks = [45, 135, 225]
-# spec_3_units = "$\mathrm{g} \cdot \mathrm{L}^{-1} \cdot \mathrm{hr}^{-1}$"
-
-
-
-# # Feedstock carbohydrate %, feedstock price, productivity (rate)
-# spec_1 = np.linspace(0.1, 0.7, steps) # feedstock carbohydrate %
-# spec_2 = np.linspace(0., 200., steps) # feedstock price
+# Yield, titer, productivity (rate)
+spec_1 = np.linspace(0.1, 0.95, steps) # yield
+spec_2 = np.linspace(5., 330., steps) # titer
 # spec_1 = np.linspace(0.2, 0.99, steps) # yield
 # spec_2 = np.linspace(45, 225, steps) # titer
-# spec_3 = np.array([0.79]) # productivity
+spec_3 = np.array([0.76]) # productivity
+spec.load_spec_1 = spec.load_yield
+spec.load_spec_2 = spec.load_titer
+spec.load_spec_3 = spec.load_productivity
+xlabel = "Yield"
+ylabel = 'Titer [$\mathrm{g} \cdot \mathrm{L}^{-1}$]'
+# xticks = [0.33, 0.66, 0.99]
+xticks = [0., 0.2, 0.4, 0.6, 0.8, 1.0]
+# yticks = [75, 150, 225]
+yticks = [0,30,60,90,120,150,180,210,240,270,300,330]
+# xticks = [0.2, 0.6, 0.99]
+# yticks = [45, 135, 225]
+spec_3_units = "$\mathrm{g} \cdot \mathrm{L}^{-1} \cdot \mathrm{hr}^{-1}$"
+
+
+
+# # Feedstock carbohydrate or sugar %, feedstock price, productivity (rate)
+# spec_1 = np.linspace(0.1, 0.99, steps) # feedstock carbohydrate %
+# spec_2 = np.linspace(1., 200., steps) # feedstock price
+# # spec_1 = np.linspace(0.2, 0.99, steps) # yield
+# # spec_2 = np.linspace(45, 225, steps) # titer
+# spec_3 = np.array([0.76]) # productivity
 # spec.load_spec_1 = spec.load_feedstock_carbohydrate_content
 # spec.load_spec_2 = spec.load_feedstock_price
 # spec.load_spec_3 = spec.load_productivity
@@ -481,19 +484,18 @@ steps = 6
 
 
 
-# Yield, titer, productivity (rate)
-# HXN._cost = mock_hxn
-spec_1 = np.linspace(0.10, 0.90, 60) # yield
-spec_2 = np.linspace(20, 320, 60) # titer
-spec_3 = np.array([1]) # productivity
-spec.load_spec_1 = spec.load_yield
-spec.load_spec_2 = spec.load_titer
-spec.load_spec_3 = spec.load_productivity
-xlabel = "Yield"
-ylabel = 'Titer [$\mathrm{g} \cdot \mathrm{L}^{-1}$]'
-xticks = [.1, .3, .5, .7, .9]
-yticks = [20, 70, 120, 170, 220, 270, 320]
-spec_3_units = "$\mathrm{g} \cdot \mathrm{L}^{-1} \cdot \mathrm{hr}^{-1}$"
+# # Yield, titer, productivity (rate)
+# spec_1 = np.linspace(0.70, 0.90, 10) # yield
+# spec_2 = np.linspace(90, 130, 10) # titer
+# spec_3 = np.array([1]) # productivity
+# spec.load_spec_1 = spec.load_yield
+# spec.load_spec_2 = spec.load_titer
+# spec.load_spec_3 = spec.load_productivity
+# xlabel = "Yield"
+# ylabel = 'Titer [$\mathrm{g} \cdot \mathrm{L}^{-1}$]'
+# xticks = [.75, .80, .85, .90]
+# yticks = [90, 100, 110, 120, 130]
+# spec_3_units = "$\mathrm{g} \cdot \mathrm{L}^{-1} \cdot \mathrm{hr}^{-1}$"
 
 # # Dehydration conversion, titer, feedstock price
 # spec_1 = np.linspace(0.50, 0.80, 3)
@@ -552,14 +554,14 @@ data_1 = HP_data = spec.evaluate_across_specs(
 # %% Save generated data
 
 
-# dateTimeObj = datetime.now()
-# file_to_save = 'HP_TRY_%s.%s.%s-%s.%s'%(dateTimeObj.year, dateTimeObj.month, dateTimeObj.day, dateTimeObj.hour, dateTimeObj.minute)
-# np.save(file_to_save, data_1)
+dateTimeObj = datetime.now()
+file_to_save = 'HP_TRY_%s.%s.%s-%s.%s'%(dateTimeObj.year, dateTimeObj.month, dateTimeObj.day, dateTimeObj.hour, dateTimeObj.minute)
+np.save(file_to_save, data_1)
 
-# # %% Load previously saved data
-# file_to_load = file_to_save
-# # file_to_load = 'C:/Users/saran/Documents/Academia/Spring 2020/BioSTEAM/Bioindustrial-Park/BioSTEAM 2.x.x/biorefineries/HP/HP_TRY_2020.9.22-16.44'
-# data_1 = np.load(file_to_load+'.npy')
+# %% Load previously saved data
+file_to_load = file_to_save
+# file_to_load = 'C:/Users/saran/Documents/Academia/Spring 2020/BioSTEAM/Bioindustrial-Park/BioSTEAM 2.x.x/biorefineries/HP/HP_TRY_2020.9.22-16.44'
+data_1 = np.load(file_to_load+'.npy')
 data_1_copy = copy.deepcopy(data_1)
 
 data_2 = data_1
@@ -838,7 +840,7 @@ Metric_1_tickmarks = [500,1000, 1500, 2000, 2500, 3000, 3500]
 # Metric_2_tickmarks = [0, 20., 40., 60., 80., 100.]
 Metric_2_tickmarks = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
 # # Metric_3_tickmarks = [60, 70, 80, 90, 100, 110, 120]
-Metric_3_tickmarks = [0, 10, 20, 30, 40, 50, 60, 70, 80]
+Metric_3_tickmarks = [20, 30, 40, 50, 60, 70, 80, 90, 100]
 # Metric_3_tickmarks = [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65]
 
 metric_bars = (MetricBar('MPSP', MPSP_units, CABBI_green_colormap(),

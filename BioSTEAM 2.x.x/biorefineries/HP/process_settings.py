@@ -199,9 +199,6 @@ price = {'AA': AA_price,
     
 
 def load_process_settings():
-    from biorefineries.cornstover import load_process_settings
-    load_process_settings()
-    
     # bst.default()
     
     bst.CE = 541.7 # year 2016
@@ -294,6 +291,7 @@ GWP_CFs['FGHTP Corn stover'] = 0.10945 # see Feedstock_impacts_YL
 # GWP_CFs['Miscanthus'] = 78.28/1e3 * 0.8
 # In kg CO2-eq/kWh
 GWP_CFs['Electricity'] = 0.48
+# GWP_CFs['Electricity'] = 0.
 # From corn stover
 GWP_CFs['LacticAcid_GREET'] = 1.80
 # From ref [7], lactic acid production, RoW, TRACI global warming
@@ -351,6 +349,7 @@ CFs['FEC_CFs'] = FEC_CFs
 CFs['FEC_CF_stream'] = FEC_CF_stream
 # In MJ/kWh
 FEC_CFs['Electricity'] = 5.926
+# FEC_CFs['Electricity'] = 0.
 # From corn stover
 FEC_CFs['LacticAcid'] = 29.
 # From ref [7], lactic acid production, RoW, cumulative energy demand, fossil

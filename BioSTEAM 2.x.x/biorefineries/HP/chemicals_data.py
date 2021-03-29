@@ -393,7 +393,6 @@ soluble_groups = ('OtherSugars', 'SugarOligomers', 'OrganicSolubleSolids',
                   'SeparatelyListedOrganics')
 soluble_organics = list(sum([chemical_groups[i] for i in soluble_groups], ()))
 soluble_organics.remove('WWTsludge')
-
 solubles = tuple(soluble_organics) + chemical_groups['InorganicSolubleSolids'] + ('H2SO4',)
 
 insoluble_groups = ('OtherInsolubleSolids', 'OtherStructuralCarbohydrates')
