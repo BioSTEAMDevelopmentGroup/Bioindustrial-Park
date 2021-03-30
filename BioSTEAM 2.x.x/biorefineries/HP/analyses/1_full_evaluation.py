@@ -82,12 +82,13 @@ def reset_and_reload():
     system.reset_cache()
     system.empty_recycles()
     print('Loading and simulating with baseline specifications ...')
-    spec_1, spec_2 = spec.spec_1, spec.spec_2
+    spec_1, spec_2, spec_3 = spec.spec_1, spec.spec_2, spec.spec_3
     spec.load_yield(0.49)
     spec.load_titer(54.8)
+    spec.load_productivity(0.76)
     system.simulate()
     print('Loading and simulating with required specifications ...')
-    spec.load_specifications(spec_1=spec_1, spec_2=spec_2)
+    spec.load_specifications(spec_1=spec_1, spec_2=spec_2, spec_3=spec_3)
     system.simulate()
     
 def reset_and_switch_solver(solver_ID):
@@ -129,7 +130,7 @@ def model_specification():
         for unit in pre_evaporator_units_path:
             unit._run()
         spec.titer_inhibitor_specification.run_units()
-        spec.load_specifications(spec_1=spec.spec_1, spec_2=spec.spec_2)
+        spec.load_specifications(spec_1=spec.spec_1, spec_2=spec.spec_2, spec_3=spec.spec_3)
         model._system.simulate()
     except Exception as e:
         str_e = str(e)
@@ -222,7 +223,10 @@ for p in parameters:
     # pdb.set_trace()
     # [p_min], [p_max] = p.distribution.range().tolist()
     p_dist = p.distribution
-    [p_min], [p_max] = p_dist.lower.tolist(), p_dist.upper.tolist()
+    # import pdb
+    # pdb.set_trace()
+    # [p_min], [p_max] = p_dist.lower.tolist(), p_dist.upper.tolist()
+    [p_min], [p_max] = p_dist.range()[0], p_dist.range()[1]
     p_baseline = p.baseline
     p_value = (p_min, p_max, p_baseline)
     p.system = HP_sys
@@ -297,7 +301,7 @@ with pd.ExcelWriter(file_to_save+'_1_full_evaluation.xlsx') as writer:
     LCA_results.to_excel(writer, sheet_name='LCA results')
     LCA_percentiles.to_excel(writer, sheet_name='LCA percentiles')
     spearman_results.to_excel(writer, sheet_name='Spearman')
-    one_p_df.to_excel(writer, sheet_name='One-parameter')
+    # one_p_df.to_excel(writer, sheet_name='One-parameter')
     model.table.to_excel(writer, sheet_name='Raw data')
 
 

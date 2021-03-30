@@ -64,8 +64,8 @@ process_stream = tmo.Stream('process_stream',
                             units = 'kg/hr',
                             T = T)
 process_stream.imass[solute.ID] = 2.12e+04
-# process_stream.imol['AceticAcid'] = 5.
-# process_stream.imol['Arabitol'] = 5.
+process_stream.imol['AceticAcid'] = 5.
+process_stream.imol['Glycerol'] = 5.
 
 solvent_stream = tmo.Stream('solvent_stream',
                             T = T)

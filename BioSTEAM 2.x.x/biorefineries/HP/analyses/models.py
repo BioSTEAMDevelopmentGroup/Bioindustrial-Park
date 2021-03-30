@@ -648,10 +648,15 @@ HP_model = Model(HP_sys, metrics)
 param = HP_model.parameter
 
 def baseline_uniform(baseline, ratio):
-    return shape.Uniform(baseline*(1-ratio), baseline*(1+ratio))
+    lb, ub = baseline*(1-ratio), baseline*(1+ratio)
+    if lb > ub: ub, lb = lb, ub
+    return shape.Uniform(lb, ub)
 
 def baseline_triangle(baseline, ratio):
-    return shape.Triangle(baseline*(1-ratio), baseline, baseline*(1+ratio))
+    lb, mid, ub = baseline*(1-ratio), baseline, baseline*(1+ratio)
+    if lb > ub: ub, lb = lb, ub
+    return shape.Triangle(lb, mid, ub)
+
 
 D = baseline_uniform(1, 0.1)
 @param(name='Blank parameter', element=feedstock, kind='coupled', units='',
@@ -792,7 +797,9 @@ D = shape.Triangle(0.25, 0.3, 0.4)
        baseline=0.3, distribution=D)
 def set_pretreatment_solid_loading(loading): 
     M202.solid_loading = loading
-    
+
+
+# baseline imass discrepancy
 pretreatment_sulfuric_acid = find.stream.pretreatment_sulfuric_acid
 D = shape.Triangle(10, 22.1, 35)
 @param(name='Pretreatment sulfuric acid loading', element=pretreatment_sulfuric_acid,
@@ -850,9 +857,9 @@ def set_R301_glucan_conversion(X): R301.saccharification_rxns[2].X = X
 # def set_R302_fermentation_time(tau): R302.tau_cofermentation = tau
 
 
-D = shape.Triangle(0.293, 0.79, 1.473)
+D = shape.Triangle(0.38, 0.76, 1.52)
 @param(name='Productivity', element=R301, kind='coupled', units='g/L/hr',
-       baseline=0.79, distribution=D)
+       baseline=0.76, distribution=D)
 def set_HP_productivity(productivity):
     # R301.productivity = productivity
     # R302.productivity = productivity * R302.ferm_ratio
@@ -873,25 +880,52 @@ def set_CSL_loading(loading): R302.CSL_loading = loading
 #     R303_X = R303.cofermentation_rxns.X
 #     R303_X[0] = R303_X[3] = X * R303.ferm_ratio
 
-D = shape.Triangle(0.036, 0.04, 0.044)
+
+
+
+D = shape.Triangle(0.030, 0.040, 0.050)
 @param(name='Acetic acid yield', element=R303, kind='coupled', units='% theoretical',
-       baseline=0.07, distribution=D)
+        baseline=0.040, distribution=D)
 def set_R301_acetic_acid_yield(X): 
     # 1e6 is to avoid generating tiny negative flow (e.g., 1e-14) in R301
-    R302_X = R302.cofermentation_rxns.X
-    # X = min(X, 1-1e-6-R302_X[0]-R302_X[2])
-    X = min(X, 1-1e-6-R302_X[0])
-    R302_X[1] = R302_X[3] = X
-    R303_X = R303.cofermentation_rxns.X
-    X = min(X*R303.ferm_ratio, 1-1e-6-R303_X[0]-R303_X[2])
-    R303_X[1] = R303_X[4] = X
+    # R302_X = R302.cofermentation_rxns.X
+    ferm_ratio = R303.ferm_ratio
+    
+    X1 = min(X, 1-1e-6-R302.glucose_to_HP_rxn.X-R302.glucose_to_biomass_rxn.X)
+    X2 = min(X, 1-1e-6-R302.xylose_to_HP_rxn.X-R302.xylose_to_biomass_rxn.X)
+    
+    R302.glucose_to_acetic_acid_rxn.X = X1
+    R303.glucose_to_acetic_acid_rxn.X = X1 * ferm_ratio
+    
+    R302.xylose_to_acetic_acid_rxn.X = X2
+    R303.xylose_to_acetic_acid_rxn.X = X2 * ferm_ratio
+    
+    X1_glycerol = (0.08 - X1) if X1==X else 0.
+    X2_glycerol = (0.08 - X2) if X2==X else 0.  
+    
+    R302.glucose_to_glycerol_rxn.X = X1_glycerol
+    R303.glucose_to_glycerol_rxn.X = X1_glycerol * ferm_ratio
+    
+    R302.xylose_to_glycerol_rxn.X = X2_glycerol
+    R303.xylose_to_glycerol_rxn.X = X2_glycerol * ferm_ratio
+    
+    # R302_X[1] = R302_X[3] = X
+    # R303_X = R303.cofermentation_rxns.X
+    # X = min(X*R303.ferm_ratio, 1-1e-6-R303_X[0]-R303_X[2])
+    # R303_X[1] = R303_X[3] = X
 
-D = shape.Uniform(0.4, 0.6)
-@param(name='Unfermented sugars routed to CO2 generation (balance is routed to cell mass generation)', element=R303, kind='coupled', units='% theoretical',
-       baseline=0.5, distribution=D)
-def set_sugars_to_CO2_gen(X): 
-   R302.CO2_generation_rxns.X[0] = R302.CO2_generation_rxns.X[1] = X
-   R303.CO2_generation_rxns.X[0] = R303.CO2_generation_rxns.X[1] = X * R303.ferm_ratio
+
+
+
+# D = shape.Uniform(0.4, 0.6)
+# @param(name='Unfermented sugars routed to CO2 generation (balance is routed to cell mass generation)', element=R303, kind='coupled', units='% theoretical',
+#        baseline=0.5, distribution=D)
+# def set_sugars_to_CO2_gen(X): 
+#    R302.CO2_generation_rxns.X[0] = R302.CO2_generation_rxns.X[1] = X
+#    R303.CO2_generation_rxns.X[0] = R303.CO2_generation_rxns.X[1] = X * R303.ferm_ratio
+   
+   
+   
 # D = shape.Triangle(0.05, 0.07, 0.1)
 # @param(name='Innoculum ratio', element=R301, kind='coupled', units='%',
 #        baseline=0.07, distribution=D)
@@ -923,7 +957,7 @@ def set_sugars_to_CO2_gen(X):
 # =============================================================================
 
 S402 = find.unit.S402
-D = shape.Triangle(0.95, 0.995, 1)
+D = shape.Triangle(0.95, 0.995, 1.)
 @param(name='Gypsum split', element=S402, kind='coupled', units='',
        baseline=0.995, distribution=D)
 def set_S402_gypsum_split(split):
@@ -931,14 +965,15 @@ def set_S402_gypsum_split(split):
     S402.split[gypsum_index] = split
 
 R401 = find.unit.R401
-D = baseline_triangle(1, 0.1)
+D = baseline_triangle(1., 0.1)
 @param(name='Acidulation time', element=R401, kind='coupled', units='hr',
        baseline=1., distribution=D)
 def set_R401_tau(tau):
     R401.tau = tau
 
 R402 = find.unit.R402
-D = baseline_triangle(0.95, 0.05)
+# D = baseline_triangle(0.95, 0.05)
+D = shape.Triangle(0.995, 0.9975, 0.9999)
 @param(name='Dehydration conversion', element=R402, kind='coupled', units='',
        baseline=0.95, distribution=D)
 def set_R402_conversion(X):

@@ -58,9 +58,9 @@ def run_bugfix_barrage():
         print('\n')
         
 # %% Setup
-spec.load_productivity(0.79)
 spec.load_yield(0.49)
 spec.load_titer(54.8)
+spec.load_productivity(0.76)
 
 steps = 8
 

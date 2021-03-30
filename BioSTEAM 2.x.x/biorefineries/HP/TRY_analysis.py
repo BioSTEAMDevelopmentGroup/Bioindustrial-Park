@@ -213,6 +213,7 @@ AA_price_range = [1250, 1500]
 
 
 solve_AA_price = lambda: HP_tea.solve_price(product) * 907.185 # To USD / ton
+# solve_AA_price = lambda: HP_tea.solve_price(product)
 get_HP_VOC = lambda: HP_tea.VOC / 1e6 # million USD / yr
 get_HP_FCI = lambda: HP_tea.FCI / 1e6 # million USD
 
@@ -439,14 +440,14 @@ HP_metrics = [solve_AA_price, get_GWP, get_FEC]
 
 # HP_metrics = [solve_AA_price, lambda:0, lambda:0]
 # %% Generate 3-specification meshgrid and set specification loading functions
-steps = 40
+steps = 20
 
 # Yield, titer, productivity (rate)
-spec_1 = np.linspace(0.1, 0.99, steps) # yield
+spec_1 = np.linspace(0.1, 0.95, steps) # yield
 spec_2 = np.linspace(5., 330., steps) # titer
 # spec_1 = np.linspace(0.2, 0.99, steps) # yield
 # spec_2 = np.linspace(45, 225, steps) # titer
-spec_3 = np.array([0.79]) # productivity
+spec_3 = np.array([0.76]) # productivity
 spec.load_spec_1 = spec.load_yield
 spec.load_spec_2 = spec.load_titer
 spec.load_spec_3 = spec.load_productivity
@@ -467,8 +468,8 @@ spec_3_units = "$\mathrm{g} \cdot \mathrm{L}^{-1} \cdot \mathrm{hr}^{-1}$"
 # spec_2 = np.linspace(1., 200., steps) # feedstock price
 # # spec_1 = np.linspace(0.2, 0.99, steps) # yield
 # # spec_2 = np.linspace(45, 225, steps) # titer
-# spec_3 = np.array([0.79]) # productivity
-# spec.load_spec_1 = spec.load_feedstock_sugar_content
+# spec_3 = np.array([0.76]) # productivity
+# spec.load_spec_1 = spec.load_feedstock_carbohydrate_content
 # spec.load_spec_2 = spec.load_feedstock_price
 # spec.load_spec_3 = spec.load_productivity
 # xlabel = "Feedstock carbohydrate fraction"
@@ -839,7 +840,7 @@ Metric_1_tickmarks = [500,1000, 1500, 2000, 2500, 3000, 3500]
 # Metric_2_tickmarks = [0, 20., 40., 60., 80., 100.]
 Metric_2_tickmarks = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
 # # Metric_3_tickmarks = [60, 70, 80, 90, 100, 110, 120]
-Metric_3_tickmarks = [0, 5, 10, 15, 20, 25, 30, 40, 50, 60, 70]
+Metric_3_tickmarks = [20, 30, 40, 50, 60, 70, 80, 90, 100]
 # Metric_3_tickmarks = [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65]
 
 metric_bars = (MetricBar('MPSP', MPSP_units, CABBI_green_colormap(),

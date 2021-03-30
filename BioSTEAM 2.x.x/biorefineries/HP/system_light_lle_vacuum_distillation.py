@@ -58,6 +58,10 @@ from biosteam import SystemFactory
 
 # # Do this to be able to show more streams in a diagram
 # bst.units.Mixer._graphics.edge_in *= 2
+
+Rxn = tmo.reaction.Reaction
+ParallelRxn = tmo.reaction.ParallelReaction
+
 bst.speed_up()
 flowsheet = bst.Flowsheet('HP')
 bst.main_flowsheet.set_flowsheet(flowsheet)
@@ -72,7 +76,7 @@ bst.CE = 541.7
 # Set default thermo object for the system
 tmo.settings.set_thermo(HP_chemicals)
 
-System.default_maxiter = 500
+System.default_maxiter = 100
 # System.default_converge_method = 'fixed-point'
 # System.default_converge_method = 'aitken'
 # System.default_converge_method = 'wegstein'
@@ -80,7 +84,7 @@ System.default_maxiter = 500
 feedstock_ID = 'Corn stover'
 
 System.default_converge_method = 'wegstein'
-System.default_relative_molar_tolerance = 0.005
+System.default_relative_molar_tolerance = 0.0001
 System.default_molar_tolerance = 0.1
 System.strict_convergence = True # True => throw exception if system does not converge; false => continue with unconverged system
 
@@ -256,7 +260,7 @@ def create_HP_sys(ins, outs):
     # =============================================================================
     
     # Cool hydrolysate down to fermentation temperature at 50°C
-    H301 = bst.units.HXutility('H301', ins=P201-0, T=50+273.15)
+    H301 = bst.units.HXutility('H301', ins=P201-0, T=50+273.15, rigorous=True)
     
     # Mix enzyme with the cooled pretreatment hydrolysate
     M301 = units.EnzymeHydrolysateMixer('M301', ins=(H301-0, enzyme, enzyme_water))
@@ -273,7 +277,12 @@ def create_HP_sys(ins, outs):
     R301 = units.Saccharification('R301', 
                                     ins=M301-0,
                                     outs=('saccharification_effluent',''))
+    R301.tau_saccharification = 24. # !!! 24 or 84 h?
     
+    def fix_split(isplit, ID):
+        isplit['Glycerol', 'Hexanol', 'HP', 'AcrylicAcid', 'Acetate', 'AceticAcid'] = isplit[ID]
+                           
+        
     # M303 = bst.units.Mixer('M303', ins=(R301-0, ''))
     # M303_P = units.HPPump('M303_P', ins=M303-0)
     # Remove solids from fermentation broth, modified from the pressure filter in Humbird et al.
@@ -286,7 +295,7 @@ def create_HP_sys(ins, outs):
                                                   S301_cell_mass_split,
                                                   S301_filtrate_split,
                                                   chemical_groups))
-    
+    fix_split(S301.isplit, 'Glucose')
     # S302 = bst.units.Splitter('S302', ins=S301-1, outs=('to_cofermentation', 
     #                                                     'to_evaporator'),
     #                           split=0.2)
@@ -312,7 +321,7 @@ def create_HP_sys(ins, outs):
     M304 = bst.units.Mixer('M304', ins=(M304_P-0, dilution_water))
     # M304 = bst.units.Mixer('M304', ins=(S301-1, dilution_water, ''))
     
-    M304_H = bst.units.HXutility('M304_H', ins=M304-0, T=30+273.15)
+    M304_H = bst.units.HXutility('M304_H', ins=M304-0, T=30+273.15, rigorous=True)
     
     # Mix pretreatment hydrolysate/enzyme mixture with fermentation seed
     # M302 = bst.units.Mixer('M302', ins=(M304_H-0, ''))
@@ -371,32 +380,36 @@ def create_HP_sys(ins, outs):
     # Separation units
     # =============================================================================
     
-    
-                                    
+             
     # Remove solids from fermentation broth, modified from the pressure filter in Humbird et al.
     S401_index = [splits_df.index[0]] + splits_df.index[2:].to_list()
     S401_cell_mass_split = [splits_df['stream_571'][0]] + splits_df['stream_571'][2:].to_list()
     S401_filtrate_split = [splits_df['stream_535'][0]] + splits_df['stream_535'][2:].to_list()
     S401 = bst.units.SolidsCentrifuge('S401', ins=(R302-0,''), outs=('cell_mass', ''),
-                                # moisture_content=0.50,
+                                moisture_content=0.50,
                                 split=find_split(S401_index,
                                                   S401_cell_mass_split,
                                                   S401_filtrate_split,
                                                   chemical_groups), solids =\
                                     ['Xylan', 'Glucan', 'Lignin', 'FermMicrobe',\
                                      'Ash', 'Arabinan', 'Galactan', 'Mannan'])
-    def S401_moisture_capper():
-        try:
-            S401._run()
-        except:
-            S401.moisture_content *= 0.9
-            S401_moisture_capper()
-        S401.moisture_content = 0.4
-    S401.specification = S401_moisture_capper
+    fix_split(S401.isplit, 'Glucose')
+    # NOTE: if there is not enough moisture content, it's impossible to pump
+    # the fluid into the centrifuge. In fact, the centrifuge would not be able
+    # to separate anything.
+    # def S401_moisture_capper():
+    #     try:
+    #         S401._run()
+    #     except:
+    #         S401.moisture_content *= 0.9
+    #         S401_moisture_capper()
+    #     S401.moisture_content = 0.4
+    # S401.specification = S401_moisture_capper
     
     R401 = units.AcidulationReactor('R401', ins = (S401-1, separation_sulfuric_acid),
                                     outs = ('acidulated_broth'),
-                                    vessel_material='Stainless steel 316')
+                                    vessel_material='Stainless steel 316',
+                                    tau = 1.)
     
     R401_H = bst.units.HXutility('R401_H', ins = R401-0, T = 320, rigorous = False)
     R401_P = bst.units.Pump('R401_P', ins=R401_H-0)
@@ -562,6 +575,7 @@ def create_HP_sys(ins, outs):
         HP_recovery = 1-tolerable_loss_fraction
         reqd_hexanol =  HP_recovery * K_raffinate * process_stream_F_mol
         if existing_hexanol > reqd_hexanol:
+            feed_hexanol.imol['Hexanol'] = 0.
             solvent_recycle.imol['Hexanol'] = reqd_hexanol
         else:
             feed_hexanol.imol['Hexanol'] = max(0, reqd_hexanol - existing_hexanol)
@@ -595,6 +609,15 @@ def create_HP_sys(ins, outs):
         return Ks_new
     
     def S404_run():
+        # mixer = S404.mixer
+        # mixer._run()
+        # mixed = mixer-0
+        # raffinate, extract = S404.outs
+        # raffinate.copy_like(mixed)
+        # raffinate.imol['H2O', 'Hexanol', 'HP'] *= [0.812, 0.007, 0.001]
+        # extract.mol = mixed.mol - raffinate.mol
+        # extract.T = raffinate.T = mixed.T
+        # extract.P = raffinate.P = mixed.P
         try:
             S404._run()
             
@@ -631,15 +654,12 @@ def create_HP_sys(ins, outs):
                                         product_specification_format='Recovery',
                                         Lr=0.999, Hr=0.999, k=1.2, P = 101325/15,
                                         vessel_material = 'Stainless steel 316',
+                                        partial_condenser = False,
                                         condenser_thermo = ideal_thermo,
                                         boiler_thermo = ideal_thermo,
                                         thermo=ideal_thermo)
-    
-    
     # D401_H = bst.units.HXutility('D401_H', ins=D401-0, V=0., rigorous=True)
-    D401_H = bst.units.HXutility('D401_H', ins=D401-0, V=0., rigorous=True,
-                                 thermo=ideal_thermo)
-    D401_H_P = units.HPPump('D401_H_P', ins=D401_H-0, P = 101325)
+    D401_H_P = units.HPPump('D401_H_P', ins=D401-0, P = 101325)
     D401_H_P-0-1-M401
     
     def get_concentration_gpL(chem_ID, stream):
@@ -685,14 +705,12 @@ def create_HP_sys(ins, outs):
     
     D402_P = units.HPPump('D402_P', ins=D402-1)
     # D402_H = bst.units.HXutility('D402_H', ins=D402-0, T = 308.15, rigorous=True)
-    D402_H = bst.units.HXutility('D402_H', ins=D402-0, T=308.15, rigorous=True)
-    
     
     separation_group = UnitGroup('separation_group', 
                                    units=(S401, R401, R401_H, R401_P, S402,
                                           F401, F401_P, M401, S404, D401,
-                                          D401_H, D401_H_P, D401_P, M402, 
-                                          R402, R402_H, D402, D402_H, D402_P))
+                                          D401_H_P, D401_P, M402, 
+                                          R402, R402_H, D402, D402_P))
     process_groups.append(separation_group)
     
     # %% 
@@ -715,7 +733,7 @@ def create_HP_sys(ins, outs):
     # =============================================================================
     
     # Mix waste liquids for treatment
-    M501 = bst.units.Mixer('M501', ins=(F301_P-0,  D402_H-0, F401-1, S404-0)) # without sugars recycle
+    M501 = bst.units.Mixer('M501', ins=(F301_P-0,  D402-0, F401-1, S404-0)) # without sugars recycle
     # M501 = bst.units.Mixer('M501', ins=(F301_P-0, D402_H-0)) # with sugars recycle
     
     # This represents the total cost of wastewater treatment system
@@ -724,12 +742,28 @@ def create_HP_sys(ins, outs):
     R501 = units.AnaerobicDigestion('R501', ins=WWT_cost-0,
                                     outs=('biogas', 'anaerobic_treated_water', 
                                           'anaerobic_sludge'),
-                                    reactants=soluble_organics,
+                                    reactants=soluble_organics + ['Glycerol', 'HP', 'Hexanol', 'AcrylicAcid'],
                                     split=find_split(splits_df.index,
                                                      splits_df['stream_611'],
                                                      splits_df['stream_612'],
                                                      chemical_groups),
                                     T=35+273.15)
+    fix_split(R501.isplit, 'Glucose')
+    
+    # !!! Make sure to state and explain this conservative assumption
+    # Explanation: In TRY analysis, we aren't looking at the implications of varying yield of byproducts on 
+    # sugars, but solely that of 3-HP. 
+    # Just show the implications of the extremes of the assumption.
+    
+    R501.byproducts_combustion_rxns = ParallelRxn([
+        Rxn('AceticAcid -> 3 CO2 + H2O + O2', 'AceticAcid', 1.-1e-6, correct_atomic_balance=True),
+        Rxn('Glycerol -> 3 CO2 + H2O + O2', 'Glycerol', 1.-1e-6, correct_atomic_balance=True)])
+    for i in R501.byproducts_combustion_rxns:
+        i.istoichiometry['O2'] = 0.
+    def R501_specification():
+        R501.byproducts_combustion_rxns(R501.ins[0])
+        R501._run()
+    R501.specification = R501_specification # Comment this out for anything other than TRY analysis
     
     get_flow_tpd = lambda: (feedstock.F_mass-feedstock.imass['H2O'])*24/907.185
     
@@ -737,7 +771,7 @@ def create_HP_sys(ins, outs):
     M502 = bst.units.Mixer('M502', ins=(R501-1, ''))
     R502 = units.AerobicDigestion('R502', ins=(M502-0, air_lagoon, aerobic_caustic),
                                   outs=('aerobic_vent', 'aerobic_treated_water'),
-                                  reactants=soluble_organics,
+                                  reactants=soluble_organics + ['Glycerol', 'HP', 'Hexanol', 'AcrylicAcid'],
                                   ratio=get_flow_tpd()/2205)
     
     # Membrane bioreactor to split treated wastewater from R502
@@ -749,7 +783,7 @@ def create_HP_sys(ins, outs):
                                                chemical_groups))
     
     S501.line = 'Membrane bioreactor'
-    
+    fix_split(S501.isplit, 'Glucose')
     # Recycled sludge stream of memberane bioreactor, the majority of it (96%)
     # goes to aerobic digestion and the rest to sludge holding tank then to BT
     S502 = bst.units.Splitter('S502', ins=S501-1, outs=('to_aerobic_digestion', 
@@ -767,6 +801,7 @@ def create_HP_sys(ins, outs):
                                                splits_df['stream_616'],
                                                splits_df['stream_623'],
                                                chemical_groups))
+    fix_split(S503.isplit, 'Glucose')
     S503.line = 'Sludge centrifuge'
     
     # Reverse osmosis to treat membrane separated water
@@ -980,6 +1015,7 @@ def create_HP_sys(ins, outs):
 # HP_sys = bst.main_flowsheet.create_system(
 #     'HP_sys', feeds=feeds)
 HP_sys = create_HP_sys()
+HP_sys.subsystems[-1].relative_molar_tolerance = 0.005
 
 u = flowsheet.unit
 s = flowsheet.stream
@@ -1095,9 +1131,12 @@ spec = ProcessSpecification(
     reaction_name='fermentation_reaction',
     substrates=('Xylose', 'Glucose'),
     products=('HP','CalciumLactate'),
-    spec_1=100,
-    spec_2=0.909,
-    spec_3=18.5,
+    # spec_1=100,
+    # spec_2=0.909,
+    # spec_3=18.5,
+    spec_1=0.49,
+    spec_2=54.8,
+    spec_3=0.76,
     xylose_utilization_fraction = 0.80,
     feedstock = feedstock,
     dehydration_reactor = u.R401,
@@ -1110,11 +1149,16 @@ spec = ProcessSpecification(
     pretreatment_reactor = u.R201)
 
 # Load baseline specifications
-spec.load_productivity(0.79)
-spec.load_yield(0.49)
-spec.load_titer(54.8)
 
+spec.load_spec_1 = spec.load_yield
+spec.load_spec_2 = spec.load_titer
+spec.load_spec_3 = spec.load_productivity
 
+# spec.load_yield(0.49)
+# spec.load_titer(54.8)
+# spec.load_productivity(0.76)
+
+spec.load_specifications(spec_1 = 0.49, spec_2 = 54.8, spec_3 = 0.76)
 
 
 path = (u.F301, u.R302)

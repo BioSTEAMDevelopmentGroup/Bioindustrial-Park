@@ -15,8 +15,7 @@ All units are explicitly defined here for transparency and easy reference
 
 @author: Sarang Bhagwat and Yoel Cortes-Pena
 """
-
-from .. import PY37
+from biorefineries import PY37
 from . import (
     process_settings, 
     chemicals_data, 
