@@ -80,6 +80,7 @@ def evaluate_across_specs(spec, system,
         HXN_Q_bal_percent_error = HXN.energy_balance_percent_error
         tolerable_HXN_energy_balance_percent_error = spec.tolerable_HXN_energy_balance_percent_error
         print(f"HXN Q_balance off by {format(HXN_Q_bal_percent_error,'.2f')} %.\n")
+        spec.HXN_Q_bal_percent_error_dict[str((spec_1, spec_2, spec_3))] = HXN_Q_bal_percent_error
         if abs(HXN_Q_bal_percent_error) >= tolerable_HXN_energy_balance_percent_error:
             # Beep(320, 500)
             spec.HXN_intolerable_points.append((spec_1, spec_2, spec_3))
@@ -175,15 +176,16 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
                  'baseline_yield',
                  'baseline_titer',
                  'HXN_new_HXs',
-                 'HXN_new_HX_utils')
+                 'HXN_new_HX_utils',
+                 'HXN_Q_bal_percent_error_dict',)
     
     def __init__(self, evaporator, pump, mixer, heat_exchanger, seed_train_system, 
                  reactor, reaction_name, substrates, products,
                  spec_1, spec_2, spec_3, xylose_utilization_fraction,
                  feedstock, dehydration_reactor, byproduct_streams, HXN,
                  pre_conversion_units = None, juicing_sys=None, baseline_yield =0.49, baseline_titer = 54.8,
-                 tolerable_HXN_energy_balance_percent_error=5., HXN_intolerable_points=[],
-                 HXN_new_HXs={}, HXN_new_HX_utils={},
+                 tolerable_HXN_energy_balance_percent_error=2., HXN_intolerable_points=[],
+                 HXN_new_HXs={}, HXN_new_HX_utils={}, HXN_Q_bal_percent_error_dict = {},
                  feedstock_mass=104192.83224417375, pretreatment_reactor = None,
                   load_spec_1=None, load_spec_2=None, load_spec_3=None):
         self.substrates = substrates
@@ -208,6 +210,7 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
         self.HXN_new_HX_utils = HXN_new_HX_utils
         self.tolerable_HXN_energy_balance_percent_error = tolerable_HXN_energy_balance_percent_error
         self.HXN_intolerable_points = HXN_intolerable_points
+        self.HXN_Q_bal_percent_error_dict = HXN_Q_bal_percent_error_dict
         
         self.count = 0 
         self.count_exceptions = 0
@@ -242,7 +245,15 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
         self.spec_2 = spec_2
         
         self.load_spec_3(spec_3 or self.spec_3)
-
+    
+    # def load_baseline_TRY(self):
+    #     self.load_yield(spec.baseline_yield)
+    #     spec.spec_1
+    #     self.load_titer(spec.baseline_titer)
+    #     self.spec_2 = spec.baseline_titer
+        
+    #     self.load_productivity(pec.baseline_yield)
+        
     def evaluate_across_productivity(self, metrics, spec_3):
         """
         Evaluate metrics across productivities and return an array with the all
@@ -371,14 +382,15 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
         # reactor.xylose_to_biomass_rxn.X = (50./130.) * rem_xylose
         
         reactor.xylose_to_HP_rxn.X = yield_
-        rem_glucose = min(0.08, 0.95 - reactor.glucose_to_HP_rxn.X)
-        reactor.glucose_to_acetic_acid_rxn.X = (55./80.) * rem_glucose
-        reactor.glucose_to_glycerol_rxn.X = (25./80.) * rem_glucose
+        
+        rem_glucose = min(0.08, (1. - reactor.glucose_to_biomass_rxn.X) - reactor.glucose_to_HP_rxn.X)
+        reactor.glucose_to_acetic_acid_rxn.X = (40./80.) * rem_glucose
+        reactor.glucose_to_glycerol_rxn.X = (40./80.) * rem_glucose
         # reactor.glucose_to_biomass_rxn.X = (50./130.) * rem_glucose
         
-        rem_xylose = min(0.08, 0.95 - reactor.xylose_to_HP_rxn.X)
-        reactor.xylose_to_acetic_acid_rxn.X = (55./80.) * rem_xylose
-        reactor.xylose_to_glycerol_rxn.X = (25./80.) * rem_xylose
+        rem_xylose = min(0.08, (1. - reactor.glucose_to_biomass_rxn.X) - reactor.xylose_to_HP_rxn.X)
+        reactor.xylose_to_acetic_acid_rxn.X = (40./80.) * rem_xylose
+        reactor.xylose_to_glycerol_rxn.X = (40./80.) * rem_xylose
         # reactor.xylose_to_biomass_rxn.X = (50./130.) * rem_glucose
         
     def load_productivity(self, productivity):
@@ -414,7 +426,7 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
     def load_titer(self, titer):
         titer_inhibitor_specification = self.titer_inhibitor_specification
         titer_inhibitor_specification.target_titer = titer
-        # self.spec_2 = titer
+        self.spec_2 = titer
         titer_inhibitor_specification.run()
         self.reactor.tau = self.reactor.tau_cofermentation = titer / self.spec_3
         

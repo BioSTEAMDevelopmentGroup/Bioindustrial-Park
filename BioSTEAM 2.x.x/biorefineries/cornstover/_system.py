@@ -18,10 +18,14 @@ import thermosteam.reaction as rxn
 import numpy as np
 
 
-__all__ = ('create_system',
-           'create_facilities',
-           'create_dilute_acid_pretreatment_system',
-           'create_cellulosic_fermentation_system')
+__all__ = (
+    'create_system',
+    'create_facilities',
+    'create_dilute_acid_pretreatment_system',
+    'create_continuous_saccharification_system',
+    'create_saccharification_and_cofermentation_system',
+    'create_cellulosic_fermentation_system',
+)
 
 @bst.SystemFactory(
     ID='dilute_acid_pretreatment_sys',
@@ -83,7 +87,6 @@ def create_dilute_acid_pretreatment_system(
                     Water=24534+3490,
                     units='kg/hr')
     ammonia = Stream('ammonia',
-                      Ammonia=1051,
                       units='kg/hr',
                       phase='l',
                       price=price['Ammonia'])
@@ -127,12 +130,12 @@ def create_dilute_acid_pretreatment_system(
         T201._run()
     T201.specification = update_sulfuric_acid_loading
     
-    neutralization_rxn = tmo.Reaction('2 NH3 + H2SO4 -> (NH4)2SO4', 'H2SO4', 1)
+    neutralization_rxn = tmo.Reaction('2 NH4OH + H2SO4 -> (NH4)2SO4 + 2 H2O', 'H2SO4', 1)
     def update_ammonia_loading():
         ammonia, ammonia_process_water = M205.ins
         hydrolyzate = F201.outs[1]
-        ammonia.imol['Ammonia'] = 2. * hydrolyzate.imol['H2SO4']
-        ammonia_process_water.imass['Water'] = 143.016175 * ammonia.imass['Ammonia']
+        ammonia.imol['NH4OH'] = 2. * hydrolyzate.imol['H2SO4']
+        ammonia_process_water.imass['Water'] = 2435.6 * ammonia.imol['NH4OH']
         M205._run()
     M205.specification = update_ammonia_loading
     
@@ -141,26 +144,70 @@ def create_dilute_acid_pretreatment_system(
     T203.specification = neutralization
 
 @bst.SystemFactory(
-    ID='cellulosic_fermentation_sys',
-    ins=[dict(ID='hydrolyzate')],
-    outs=[dict(ID='beer')],
+    ID='saccharification_sys',
+    ins=[dict(ID='hydrolyzate'),
+         dict(ID='cellulase',
+              units='kg/hr',
+              price=price['Enzyme']),
+         dict(ID='saccharification_water')],
+    outs=[dict(ID='saccharified_slurry')],
 )
-def create_cellulosic_fermentation_system(
-        ins, outs, feedstock,
-        fermantation_area=300,
-        scrubber_area=None,
-        include_scrubber=True,
-        SeedTrain=None,
-        SaccharificationAndCoFermentation=None,
-        # Saccharification=None,
-        # CoFermentation=None,
-        # inhibitor_control=False,
-        other_seed_train_feeds=(),
-        other_fermentation_feeds=(),
-    ):
+def create_continuous_saccharification_system(ins, outs):
+    hydrolyzate, cellulase, saccharification_water = ins
+    saccharified_slurry, = outs
+     
+    enzyme_over_cellulose = 0.4 # (20 g enzyme / 1000 g cellulose) / (50 g cellulase / 1000g enzyme)
+    z_mass_cellulase_mixture = np.array([0.95, 0.05])
+    def update_cellulase_loading():
+        hydrolyzate, cellulase, water = M301.ins
+        # Note: An additional 10% is produced for the media glucose/sophorose mixture
+        # Humbird (2011) pg. 37 
+        cellulase.imass['Water', 'Cellulase'] = (
+            enzyme_over_cellulose
+            * z_mass_cellulase_mixture
+            * 1.1 * (hydrolyzate.imass['Glucan', 'GlucoseOligomer'].sum() * 1.1
+                     + hydrolyzate.imass['Glucose'])
+        )
     
-    hydrolyzate, = ins
-    beer, = outs
+    def update_moisture_content():
+        hydrolyzate, cellulase, water = M301.ins
+        chemicals = M301.chemicals
+        mass = chemicals.MW * (hydrolyzate.mol + cellulase.mol)
+        indices = chemicals.indices(['Water', 'Ethanol', 'AceticAcid',
+                                     'Furfural', 'H2SO4', 'NH3', 'HMF'])
+        mass_moisture = mass[indices].sum()
+        solids_loading = M301.solids_loading
+        water_over_solids = (1 - solids_loading) / solids_loading
+        missing_water = max(water_over_solids * (mass.sum() - mass_moisture) - mass_moisture, 0.)
+        saccharification_water.imass['Water'] = missing_water
+    
+    def hydrosylate_mixer_specification():
+        for i in M301.all_specifications: i()
+        M301._run()
+    
+    H301 = units.HydrolysateCooler('H301', hydrolyzate, T=48+273.15)
+    M301 = units.EnzymeHydrolysateMixer('M301', (H301-0, cellulase, saccharification_water))
+    M301.specification = hydrosylate_mixer_specification
+    M301.all_specifications = [update_cellulase_loading, update_moisture_content]
+    M301.solids_loading = 0.2
+    R301 = units.ContinuousSaccharification('R301', M301-0, saccharified_slurry)
+
+@bst.SystemFactory(
+    ID='cofermentation_sys',
+    ins=[dict(ID='saccharified_slurry'),
+         dict(ID='DAP',
+              price=price['DAP']),
+         dict(ID='CSL',
+              price=price['CSL'])],
+    outs=[dict(ID='vent'),
+          dict(ID='beer')],
+)
+def create_saccharification_and_cofermentation_system(
+        ins, outs, SaccharificationAndCoFermentation=None, SeedTrain=None,
+        include_scrubber=True
+    ):
+    saccharified_slurry, DAP, CSL = ins
+    vent, beer = outs
     
     DAP1 = Stream('DAP1',
                     DAP=26,
@@ -178,107 +225,47 @@ def create_cellulosic_fermentation_system(
                     CSL=948,
                     units='kg/hr',
                     price=price['CSL'])
-    cellulase = Stream('cellulase',
-                        units='kg/hr',
-                        price=price['Enzyme'])
-    saccharification_water = Stream('saccharification_water') 
-    baseline_hydrolyzate_flow = 451077.22446428984
-    DAP1_over_hydrolyzate = DAP1.mol / baseline_hydrolyzate_flow
-    DAP2_over_hydrolyzate = DAP2.mol / baseline_hydrolyzate_flow
-    CSL1_over_hydrolyzate = CSL1.mol / baseline_hydrolyzate_flow
-    CSL2_over_hydrolyzate = CSL2.mol / baseline_hydrolyzate_flow
     
-    def update_nutrient_loading():
-        cooled_hydrolyzate = H301.outs[0]
-        F_mass_cooled_hydrolyzate = cooled_hydrolyzate.F_mass
-        DAP1.mol[:] = DAP1_over_hydrolyzate * F_mass_cooled_hydrolyzate
-        DAP2.mol[:] = DAP2_over_hydrolyzate * F_mass_cooled_hydrolyzate
-        CSL1.mol[:] = CSL1_over_hydrolyzate * F_mass_cooled_hydrolyzate
-        CSL2.mol[:] = CSL2_over_hydrolyzate * F_mass_cooled_hydrolyzate
-        S301.ins[0].mix_from(S301._outs)
-        S302.ins[0].mix_from(S302._outs)
-    
-    enzyme_over_cellulose = 0.4 # (20 g enzyme / 1000 g cellulose) / (50 g cellulase / 1000g enzyme)
-    z_mass_cellulase_mixture = np.array([0.95, 0.05])
-    def update_cellulase_loading():
-        # Note: An additional 10% is produced for the media glucose/sophorose mixture
-        # Humbird (2011) pg. 37 
-        cellulase.imass['Water', 'Cellulase'] = (enzyme_over_cellulose
-                                                  * z_mass_cellulase_mixture
-                                                  * feedstock.imass['Glucan'] * 1.1)
-    
-    def update_moisture_content():
-        hydrolyzate, cellulase, water = M301.ins
-        chemicals = M301.chemicals
-        mass = chemicals.MW * (hydrolyzate.mol + cellulase.mol)
-        indices = chemicals.indices(['Water', 'Ethanol', 'AceticAcid',
-                                      'Furfural', 'H2SO4', 'NH3', 'HMF'])
-        mass_moisture = mass[indices].sum()
-        solids_loading = M301.solids_loading
-        water_over_solids = (1 - solids_loading) / solids_loading
-        missing_water = max(water_over_solids * (mass.sum() - mass_moisture) - mass_moisture, 0.)
-        saccharification_water.imass['Water'] = missing_water
-    
-    def hydrosylate_mixer_specification():
-        for i in M301.all_specifications: i()
-        M301._run()
-    
-    n = fermantation_area
-    H301 = units.HydrolysateCooler(f'H{n+1}', hydrolyzate, T=48+273.15)
-    M301 = units.EnzymeHydrolysateMixer(f'M{n+1}', (H301-0, cellulase, saccharification_water))
-    M301.specification = hydrosylate_mixer_specification
-    M301.all_specifications = [update_nutrient_loading, 
-                                update_cellulase_loading, 
-                                update_moisture_content]
-    M301.solids_loading = 0.2
-    DAP_storage = units.DAPTank('DAP_storage', Stream('DAP_fresh'), outs='DAP')
-    S301 = bst.FakeSplitter(f'S{n+1}', DAP_storage-0, outs=(DAP1, DAP2))
-    CSL_storage = units.CSLTank('CSL_storage', Stream('CSL_fresh'), outs='CSL')
-    S302 = bst.FakeSplitter(f'S{n+2}', CSL_storage-0, outs=(CSL1, CSL2))
-    # TODO: Implement this in another, refractored SystemFactory and test!    
-    # if inhibitor_control:        
-    #     # Saccharification, pressure filter, multi-effect evaportator, dilution water mixing
-    #     sugar_dilution_water = bst.Stream('sugar_dilution_water', Water=1)
-    #     R301 = Saccharification(f'R{n+1}', M301-0)
-    #     S303 = bst.PressureFilter(f'S{n+3}', (R301-0, None))
-    #     S304 = bst.Splitter(f'S{n+4}', S303-1, split=0.93)
-    #     F301 = bst.MultiEffectEvaporator(f'F{n+1}', S304-0,
-    #                                      P = (101325, 70108, 47363, 31169, 19928),
-    #                                      V = 0.)
-    #     P301 = bst.Pump(f'P{n+1}', F301-1)
-    #     H302 = bst.HXutility(f'H{n+2}', F301-0, T=273.15 + 30)
-    #     fermentation = R302 = CoFermentation(f'R{n+2}', (H302-0, None, CSL2, DAP2, *other_fermentation_feeds))
-    #     M302 = bst.Mixer(f'M{n+2}', (S304-1, CSL1, DAP1, *other_seed_train_feeds))
-    #     R303 = SeedTrain(f'R{n+3}', M302-0)
-    #     T301 = units.SeedHoldTank(f'T{n+1}', R303-1)
-    #     T301-0-1-R302
-    #     M303 = bst.Mixer(f'M{n+3}', (R302-0, R303-0))
-    # else:
-    if not SaccharificationAndCoFermentation: SaccharificationAndCoFermentation = units.SaccharificationAndCoFermentation
-    fermentation = R301 = SaccharificationAndCoFermentation(f'R{n+1}', (M301-0, None, CSL2, DAP2, *other_fermentation_feeds))
-    M302 = bst.Mixer(f'M{n+2}', (R301-2, CSL1, DAP1, *other_seed_train_feeds))
+    DAP_storage = units.DAPStorageTank('DAP_storage', DAP)
+    S301 = bst.FakeSplitter('S301', DAP_storage-0, outs=(DAP1, DAP2))
+    CSL_storage = units.CSLStorageTank('CSL_storage', CSL)
+    S302 = bst.FakeSplitter('S302', CSL_storage-0, outs=(CSL1, CSL2))
+    S303 = bst.Splitter('S303', saccharified_slurry, split=0.1)
+    if not SaccharificationAndCoFermentation:
+        SaccharificationAndCoFermentation = units.SaccharificationAndCoFermentation
     if not SeedTrain: SeedTrain = units.SeedTrain
-    R302 = SeedTrain(f'R{n+2}', M302-0)
-    T301 = units.SeedHoldTank(f'T{n+1}', R302-1)
-    T301-0-1-R301
-    M303 = bst.Mixer(f'M{n+3}', (R301-0, R302-0))
+    R302 = SeedTrain('R302', (S303-0, CSL1, DAP1))
     
-    T302 = units.BeerTank(f'T{n+2}', outs=beer)
+    def adjust_CSL_and_DAP_feed_to_seed_train():
+        feed, CSL1, DAP1 = R302.ins
+        CSL1.imass['CSL'] = 0.0050 * feed.F_mass
+        DAP1.imass['DAP'] = 0.33 * feed.F_vol
+        S301.ins[0].mix_from(S301.outs)
+        R302._run()
+    
+    R302.specification = adjust_CSL_and_DAP_feed_to_seed_train
+    T301 = units.SeedHoldTank('T301', R302-1)
+    R303 = SaccharificationAndCoFermentation('R303', (S303-1, T301-0, CSL2, DAP2))
+    
+    def adjust_CSL_and_DAP_feed_to_fermentation():
+        feed, seed, CSL2, DAP2 = R303.ins
+        CSL2.imass['CSL'] = 0.0025 * feed.F_mass
+        DAP2.imass['DAP'] = 0.33 * feed.F_vol
+        S302.ins[0].mix_from(S302.outs)
+        R303._run()
+    
+    R303.specification = adjust_CSL_and_DAP_feed_to_fermentation
+    M304 = bst.Mixer('M304', (R302-0, R303-0))
+    T302 = units.BeerTank('T302', outs=beer)
     
     if include_scrubber:
         stripping_water = Stream('stripping_water',
                                  Water=26836,
                                  units='kg/hr')
-        if scrubber_area is None or fermantation_area == scrubber_area:
-            mixer_ID = f'M{n+4}'
-        else:
-            n = scrubber_area
-            mixer_ID = f'M{n+1}'
-        M401 = bst.Mixer(mixer_ID, (fermentation-1, None))
-        M401-0-T302
-        D401 = bst.VentScrubber(f'D{n+1}', (stripping_water, M303-0),
+        M401 = bst.Mixer('M401', (R303-1, None))
+        D401 = bst.VentScrubber('D401', (stripping_water, M304-0), (vent, ''),
                                 gas=('CO2', 'NH3', 'O2'))
-        D401-1-1-M401
+        D401-1-1-M401-0-T302
     
         stripping_water_over_vent = stripping_water.mol / 21202.490455845436
         def update_stripping_water():
@@ -287,7 +274,39 @@ def create_cellulosic_fermentation_system(
             D401._run()
         D401.specification = update_stripping_water
     else:
-        fermentation-1-T302
+        M304.outs[0] = vent
+        R303-1-T302
+ 
+@bst.SystemFactory(
+    ID='cellulosic_fermentation_sys',
+    ins=[dict(ID='hydrolyzate'),
+         dict(ID='cellulase',
+              units='kg/hr',
+              price=price['Enzyme']),
+         dict(ID='saccharification_water'),
+         dict(ID='DAP',
+              price=price['DAP']),
+         dict(ID='CSL',
+              price=price['CSL'])],
+    outs=[dict(ID='vent'),
+          dict(ID='beer')],
+)
+def create_cellulosic_fermentation_system(
+        ins, outs,
+        include_scrubber=True,
+    ):
+    vent, beer = outs
+    hydrolyzate, cellulase, saccharification_water, DAP, CSL = ins
+    
+    saccharification_sys = create_continuous_saccharification_system(
+        ins=[hydrolyzate, cellulase, saccharification_water],
+        mockup=True
+    )
+    cofermentation_sys = create_saccharification_and_cofermentation_system(
+        ins=[saccharification_sys-0, DAP, CSL],
+        outs=[vent, beer],
+        mockup=True
+    )
 
 def create_facilities(
         solids_to_boiler, 
@@ -333,7 +352,7 @@ def create_facilities(
     ADP = bst.facilities.AirDistributionPackage('ADP', plant_air)
     ADP.specification = adjust_plant_air
     fire_water = Stream('fire_water', Water=8343, units='kg/hr')
-    FT = units.FireWaterTank('FT', fire_water)
+    FT = units.FireWaterStorageTank('FT', fire_water)
     
     ### Complete system
     hxn_facilities = (bst.facilities.HeatExchangerNetwork('HXN'),) if include_hxn else ()
@@ -363,13 +382,10 @@ def create_system(ins, outs, include_blowdown_recycle=False):
     )
     fermentation_sys = create_cellulosic_fermentation_system(
         ins=pretreatment_sys-0,
-        feedstock=feedstock,
-        fermantation_area=300,
-        scrubber_area=400,
         mockup=True,
     )
     ethanol_purification_sys = create_ethanol_purification_system(
-        ins=[fermentation_sys-0, denaturant],
+        ins=[fermentation_sys-1, denaturant],
         outs=[ethanol],
         IDs={'Beer pump': 'P401',
              'Beer column heat exchange': 'H401',

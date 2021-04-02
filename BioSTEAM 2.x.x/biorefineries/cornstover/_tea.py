@@ -107,7 +107,6 @@ class FOCTableBuilder:
         )
     
         
-
 class CellulosicEthanolTEA(TEA):
     
     __slots__ = ('OSBL_units', 'warehouse', 'site_development',
@@ -187,10 +186,16 @@ class CellulosicEthanolTEA(TEA):
                 + self._ISBL_DPI_cached * self.maintenance
                 + self.labor_cost * (1 + self.labor_burden)) * self.operating_days / 365
     
-def create_tea(sys, OSBL_units, ignored_units=()):
-    BT = tmo.utils.get_instance(OSBL_units, bst.BoilerTurbogenerator)
-    OSBL_units = list(OSBL_units)
-    OSBL_units.remove(BT)
+def create_tea(sys, OSBL_units=None, ignored_units=()):
+    if OSBL_units is None:
+        OSBL_units = bst.get_OSBL(sys.units)
+    try:
+        BT = tmo.utils.get_instance(OSBL_units, bst.BoilerTurbogenerator)
+    except:
+        pass
+    else:
+        OSBL_units = list(OSBL_units)
+        OSBL_units.remove(BT)
     sys_no_BT = bst.System(
         None, sys.path, 
         facilities=[i for i in sys.facilities
@@ -266,7 +271,7 @@ def capex_table(tea):
 
 def voc_table(system, tea, main_products):
     voc = VOCTableBuilder(tea.operating_days)
-    for i in system.feeds | system.products: 
+    for i in system.feeds + system.products: 
         if i in main_products: continue
         if i.price and not i.isempty(): voc.entry(i)
     isa = isinstance

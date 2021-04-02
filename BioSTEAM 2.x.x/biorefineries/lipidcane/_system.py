@@ -417,6 +417,7 @@ def create_transesterification_and_biodiesel_separation_system(ins, outs):
     outs=[dict(ID='ethanol', price=price['Ethanol']),
           dict(ID='biodiesel', price=price['Biodiesel']),
           dict(ID='crude_glycerol', price=price['Crude glycerol']),
+          dict(ID='vinasse'),
           dict(ID='wastewater'),
           dict(ID='emissions'),
           dict(ID='ash_disposal')]
@@ -424,7 +425,7 @@ def create_transesterification_and_biodiesel_separation_system(ins, outs):
 def create_lipidcane_to_biodiesel_and_conventional_ethanol_system(ins, outs, evaporator_and_beer_column_heat_integration=True):
     
     lipidcane, enzyme, H3PO4, lime, polymer, denaturant = ins
-    ethanol, biodiesel, crude_glycerol, wastewater, emissions, ash_disposal = outs
+    ethanol, biodiesel, crude_glycerol, vinasse, wastewater, emissions, ash_disposal = outs
     
     ### Oil and juice separation ###
     
@@ -437,7 +438,7 @@ def create_lipidcane_to_biodiesel_and_conventional_ethanol_system(ins, outs, eva
     
     ethanol_production_sys = create_sucrose_to_ethanol_system(
         ins=[juicing_and_lipid_extraction_sys-0, denaturant],
-        outs=[ethanol],
+        outs=[ethanol, vinasse],
         mockup=True,
     )
     

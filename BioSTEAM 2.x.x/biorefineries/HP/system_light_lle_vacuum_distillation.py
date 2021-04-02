@@ -58,6 +58,10 @@ from biosteam import SystemFactory
 
 # # Do this to be able to show more streams in a diagram
 # bst.units.Mixer._graphics.edge_in *= 2
+
+Rxn = tmo.reaction.Reaction
+ParallelRxn = tmo.reaction.ParallelReaction
+
 bst.speed_up()
 flowsheet = bst.Flowsheet('HP')
 bst.main_flowsheet.set_flowsheet(flowsheet)
@@ -273,7 +277,12 @@ def create_HP_sys(ins, outs):
     R301 = units.Saccharification('R301', 
                                     ins=M301-0,
                                     outs=('saccharification_effluent',''))
+    R301.tau_saccharification = 24. # !!! 24 or 84 h?
     
+    def fix_split(isplit, ID):
+        isplit['Glycerol', 'Hexanol', 'HP', 'AcrylicAcid', 'Acetate', 'AceticAcid'] = isplit[ID]
+                           
+        
     # M303 = bst.units.Mixer('M303', ins=(R301-0, ''))
     # M303_P = units.HPPump('M303_P', ins=M303-0)
     # Remove solids from fermentation broth, modified from the pressure filter in Humbird et al.
@@ -286,7 +295,7 @@ def create_HP_sys(ins, outs):
                                                   S301_cell_mass_split,
                                                   S301_filtrate_split,
                                                   chemical_groups))
-    
+    fix_split(S301.isplit, 'Glucose')
     # S302 = bst.units.Splitter('S302', ins=S301-1, outs=('to_cofermentation', 
     #                                                     'to_evaporator'),
     #                           split=0.2)
@@ -371,9 +380,7 @@ def create_HP_sys(ins, outs):
     # Separation units
     # =============================================================================
     
-    def fix_split(isplit, ID):
-        isplit['Glycerol', 'Hexanol', 'HP', 'AcrylicAcid', 'Acetate', 'AceticAcid'] = isplit[ID]
-                                    
+             
     # Remove solids from fermentation broth, modified from the pressure filter in Humbird et al.
     S401_index = [splits_df.index[0]] + splits_df.index[2:].to_list()
     S401_cell_mass_split = [splits_df['stream_571'][0]] + splits_df['stream_571'][2:].to_list()
@@ -401,7 +408,8 @@ def create_HP_sys(ins, outs):
     
     R401 = units.AcidulationReactor('R401', ins = (S401-1, separation_sulfuric_acid),
                                     outs = ('acidulated_broth'),
-                                    vessel_material='Stainless steel 316')
+                                    vessel_material='Stainless steel 316',
+                                    tau = 1.)
     
     R401_H = bst.units.HXutility('R401_H', ins = R401-0, T = 320, rigorous = False)
     R401_P = bst.units.Pump('R401_P', ins=R401_H-0)
@@ -741,6 +749,22 @@ def create_HP_sys(ins, outs):
                                                      chemical_groups),
                                     T=35+273.15)
     fix_split(R501.isplit, 'Glucose')
+    
+    # !!! Make sure to state and explain this conservative assumption
+    # Explanation: In TRY analysis, we aren't looking at the implications of varying yield of byproducts on 
+    # sugars, but solely that of 3-HP. 
+    # Just show the implications of the extremes of the assumption.
+    
+    R501.byproducts_combustion_rxns = ParallelRxn([
+        Rxn('AceticAcid -> 3 CO2 + H2O + O2', 'AceticAcid', 1.-1e-6, correct_atomic_balance=True),
+        Rxn('Glycerol -> 3 CO2 + H2O + O2', 'Glycerol', 1.-1e-6, correct_atomic_balance=True)])
+    for i in R501.byproducts_combustion_rxns:
+        i.istoichiometry['O2'] = 0.
+    def R501_specification():
+        R501.byproducts_combustion_rxns(R501.ins[0])
+        R501._run()
+    R501.specification = R501_specification # Comment this out for anything other than TRY analysis
+    
     get_flow_tpd = lambda: (feedstock.F_mass-feedstock.imass['H2O'])*24/907.185
     
     # Mix recycled stream and wastewater after R501
@@ -1107,9 +1131,12 @@ spec = ProcessSpecification(
     reaction_name='fermentation_reaction',
     substrates=('Xylose', 'Glucose'),
     products=('HP','CalciumLactate'),
-    spec_1=100,
-    spec_2=0.909,
-    spec_3=18.5,
+    # spec_1=100,
+    # spec_2=0.909,
+    # spec_3=18.5,
+    spec_1=0.49,
+    spec_2=54.8,
+    spec_3=0.76,
     xylose_utilization_fraction = 0.80,
     feedstock = feedstock,
     dehydration_reactor = u.R401,
@@ -1122,11 +1149,16 @@ spec = ProcessSpecification(
     pretreatment_reactor = u.R201)
 
 # Load baseline specifications
-spec.load_yield(0.49)
-spec.load_titer(54.8)
-spec.load_productivity(0.76)
 
+spec.load_spec_1 = spec.load_yield
+spec.load_spec_2 = spec.load_titer
+spec.load_spec_3 = spec.load_productivity
 
+# spec.load_yield(0.49)
+# spec.load_titer(54.8)
+# spec.load_productivity(0.76)
+
+spec.load_specifications(spec_1 = 0.49, spec_2 = 54.8, spec_3 = 0.76)
 
 
 path = (u.F301, u.R302)

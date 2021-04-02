@@ -199,6 +199,8 @@ price = {'AA': AA_price,
     
 
 def load_process_settings():
+    from biorefineries.cornstover import load_process_settings
+    load_process_settings()
     # bst.default()
     
     bst.CE = 541.7 # year 2016

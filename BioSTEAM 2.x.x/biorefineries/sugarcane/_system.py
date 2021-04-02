@@ -21,10 +21,31 @@ __all__ = (
     'create_sucrose_to_ethanol_system',
     'create_ethanol_purification_system',
     'create_sugarcane_to_ethanol_system',
+    'create_bagasse_pelleting_system',
 )
 
 
 # %% Juicing and evaporation
+
+@SystemFactory(
+    ID='bagasse_pelleting_sys',
+    ins=[dict(ID='bagasse')],
+    outs=[dict(ID='bagasse_pellets')]
+)
+def create_bagasse_pelleting_system(ins, outs):
+    bagasse, = ins
+    bagasse_pellets, = outs
+    U401 = units.ConveyingBelt('U401', bagasse)
+    U402 = units.HammerMill('U402', U401-0)
+    U403 = units.DrumDryer('U403', 
+        (U402-0, 'dryer_air', 'dryer_natural_gas'), 
+        ('', '', 'dryer_emissions'),
+        moisture_content=0.18, split=0.,
+    )
+    X401 = bst.ThermalOxidizer('X401', (U403-1, 'oxidizer_air'), 'oxidizer_emissions')
+    U404 = units.ScrewFeeder('U404', U403-0)
+    U405 = units.BagassePelletMill('U405', U404-0)
+    U406 = units.ConveyingBelt('U406', U405-0, bagasse_pellets)
 
 @SystemFactory(
     ID='feedstock_handling_sys',
@@ -74,7 +95,7 @@ def create_feedstock_handling_system(ins, outs):
     outs=[dict(ID='clarified_juice'),
           dict(ID='bagasse')]
 )
-def create_juicing_system_up_to_clarification(ins, outs):
+def create_juicing_system_up_to_clarification(ins, outs, pellet_bagasse=True):
     ### Streams ###
     sugarcane, enzyme, H3PO4, lime, polymer = ins
     clarified_juice, bagasse = outs
@@ -106,8 +127,7 @@ def create_juicing_system_up_to_clarification(ins, outs):
                                          Solids=1),
                               moisture_content=0.5)
     
-    # Convey out bagasse
-    U202 = units.ConveyingBelt('U202', U201-0, bagasse)
+    bagasse_pelleting_sys = create_bagasse_pelleting_system(None, U201-0, bagasse, mockup=True)
     
     # Mix in water
     M201 = units.Mixer('M201', ('', imbibition_water), 1-U201)
@@ -241,7 +261,7 @@ def create_juicing_system_with_fiber_screener(ins, outs):
               Yeast=103,
               units='kg/hr')],
     outs=[dict(ID='distilled_beer'),
-          dict(ID='stillage')]
+          dict(ID='stillage')] # TODO: Find good selling price for stillage/vinasse and possibly yeast
 )
 def create_beer_distillation_system(ins, outs,
                                     beer_column_heat_integration=True,
@@ -294,11 +314,12 @@ def create_ethanol_purification_system_after_beer_column(ins, outs, IDs={}):
     # Mix ethanol Recycle (Set-up)
     M303 = units.Mixer(IDs.get('Recycle mixer', 'M303'))
     
-    D303 = units.BinaryDistillation(IDs.get('Distillation', 'D303'), P=101325,
+    D303 = units.BinaryDistillation(IDs.get('Distillation', 'D303'), 
                                 x_bot=3.9106e-06, y_top=0.80805, k=1.25, Rmin=0.01,
                                 LHK=('Ethanol', 'Water'),
                                 tray_material='Stainless steel 304',
                                 vessel_material='Stainless steel 304',
+                                P=1013250.,
                                 is_divided=True)
     D303.boiler.U = 1.85
     P303 = units.Pump(IDs.get('Distillation bottoms product pump', 'P303'), 
@@ -569,6 +590,7 @@ def create_sucrose_to_ethanol_system(ins, outs):
     ins=[*create_juicing_system_with_fiber_screener.ins,
          create_ethanol_purification_system.ins[1]], # denaturant
     outs=[create_ethanol_purification_system.outs[0], # ethanol
+          dict(ID='vinasse'),
           dict(ID='wastewater'),
           dict(ID='emissions'),
           dict(ID='ash_disposal')]
@@ -580,7 +602,7 @@ def create_sugarcane_to_ethanol_system(ins, outs,
     u = f.unit
     
     sugarcane, enzyme, H3PO4, lime, polymer, denaturant = ins
-    ethanol, wastewater, emissions, ash_disposal = outs
+    ethanol, vinasse, wastewater, emissions, ash_disposal = outs
     
     feedstock_handling_sys = create_feedstock_handling_system(
         ins=[sugarcane],
@@ -591,7 +613,7 @@ def create_sugarcane_to_ethanol_system(ins, outs,
         mockup=True
     )
     ethanol_production_sys = create_sucrose_to_ethanol_system(
-        ins=(juicing_sys-0, denaturant), outs=ethanol,
+        ins=(juicing_sys-0, denaturant), outs=(ethanol, vinasse),
         mockup=True
     )
     M305 = units.Mixer('M305', 
@@ -625,6 +647,7 @@ def create_sugarcane_to_ethanol_system(ins, outs,
     
     F301 = u.F301
     D303 = u.D303
+    # HXN = bst.HeatExchangerNetwork('HXN')
     if evaporator_and_beer_column_heat_integration:
         def heat_integration():
             hu_mee = F301.heat_utilities[0]

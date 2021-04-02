@@ -107,6 +107,7 @@ class SeedTrain(Unit):
     _N_heat_utilities = 1
     _N_ins = 1
     _N_outs = 2
+    _ins_size_is_fixed = False
     
     _units= {'Flow rate': 'kg/hr',
              'Stage #1 reactor volume': 'm3',
@@ -157,9 +158,8 @@ class SeedTrain(Unit):
     Rxn('3 Xylose + 5 CO2 -> 5 SuccinicAcid + 2.5 O2',  'Xylose',    0.0090)])
     
     def _run(self):
-        feed = self.ins[0]
         vent, effluent= self.outs
-        effluent.copy_flow(feed)
+        effluent.mix_from(self.ins, energy_balance=False)
         self.reactions(effluent)
         effluent.T = self.T
         vent.phase = 'g'
@@ -190,6 +190,59 @@ class SeedTrain(Unit):
 
 # %% Saccharification and fermentation
 
+@cost('Flow rate', 'Transfer pumps', kW=58, S=352*_gpm2m3hr,
+      cost=47200/5, CE=522, n=0.8, BM=2.3, N='N_transfer_pumps')
+@cost('Tank volume', 'Tanks', cost=3840e3/8, S=250e3*_gal2m3, 
+      CE=522, n=0.7, BM=2.0, N='N_tanks')
+class ContinuousSaccharification(Unit):
+    _N_ins = 1
+    _N_outs = 1
+    _N_heat_utilities = 1
+    
+    #: Residence time of countinuous saccharification tanks (hr)
+    tau_tank = 24
+    
+    #: Number of continuous saccharification tanks
+    N_tanks = 8
+    
+    #: Number of transfer pumps
+    N_transfer_pumps = 5
+    
+    #: Working volume fraction (filled tank to total tank volume)
+    V_wf = 0.9
+    
+    _units = {'Flow rate': 'm3/hr',
+              'Tank volume': 'm3'}
+    
+    def __init__(self, ID='', ins=None, outs=(), P=101325):
+        Unit.__init__(self, ID, ins, outs)
+        self.P = P
+        
+        #: [ParallelReaction] Enzymatic hydrolysis reactions including from 
+        #: downstream batch tank in co-fermentation.
+        self.saccharification = ParallelRxn([
+            Rxn('Glucan -> GlucoseOligomer',          'Glucan',   0.0400),
+            Rxn('Glucan + 0.5 H2O -> 0.5 Cellobiose', 'Glucan',   0.0120),
+            Rxn('Glucan + H2O -> Glucose',            'Glucan',   0.9000),
+            Rxn('Cellobiose + H2O -> 2Glucose',       'Cellobiose',  1.0000)]
+        )
+        
+    def _run(self):
+        inlet = self.ins[0]
+        outlet = self.outs[0]
+        outlet.copy_flow(inlet)
+        outlet.T = inlet.T
+        outlet.P = self.P
+        self.saccharification.adiabatic_reaction(outlet)
+        
+    def _design(self):
+        outlet = self.outs[0]
+        v_0 = outlet.F_vol
+        Design = self.design_results
+        Design['Tank volume'] = v_0 * self.tau_tank / self.V_wf / self.N_tanks
+        Design['Flow rate'] = v_0 / self.N_transfer_pumps
+
+
 @cost('Flow rate', 'Recirculation pumps', kW=30, S=340*_gpm2m3hr,
       cost=47200, n=0.8, BM=2.3, CE=522, N='N_recirculation_pumps')
 @cost('Reactor duty', 'Heat exchangers', CE=522, cost=23900,
@@ -198,23 +251,17 @@ class SeedTrain(Unit):
       S=1e6*_gal2m3, n=0.5, kW=90, BM=1.5, N='N_reactors')
 @cost('Reactor volume', 'Reactors', CE=522, cost=844000,
       S=1e6*_gal2m3, n=0.5, BM=1.5, N='N_reactors')
-@cost('Flow rate', 'Transfer pumps', kW=58, S=352*_gpm2m3hr,
-      cost=47200/5, CE=522, n=0.8, BM=2.3, N='N_transfer_pumps')
-@cost('Tank volume', 'Tanks', cost=3840e3/8, S=250e3*_gal2m3, 
-      CE=522, n=0.7, BM=2.0, N='N_tanks')
 class SaccharificationAndCoFermentation(Unit):
-    _N_ins = 4
-    _N_outs = 3
-    _N_heat_utilities = 2
-    
+    _N_ins = 1
+    _N_outs = 2
+    _ins_size_is_fixed = False
+    _N_heat_utilities = 1
+        
     #: Saccharification temperature (K)
     T_saccharification = 48+273.15
     
     #: Fermentation temperature (K)
     T_fermentation = 32+273.15
-    
-    #: Residence time of countinuous saccharification tanks (hr)
-    tau_tank = 24
     
     #: Saccharification time (hr)
     tau_saccharification = 60
@@ -231,34 +278,16 @@ class SaccharificationAndCoFermentation(Unit):
     #: Number of reactors
     N_reactors = 12
     
-    #: Number of continuous saccharification tanks
-    N_tanks = 8
-    
-    #: Number of transfer pumps
-    N_transfer_pumps = 5
-    
     #: Number of recirculation pumps
     N_recirculation_pumps = 5
     
     _units = {'Flow rate': 'm3/hr',
-              'Tank volume': 'm3',
               'Reactor volume': 'm3',
               'Reactor duty': 'kJ/hr'}
-    
-    # Split to outs[2]
-    saccharified_slurry_split = 0.1
     
     def __init__(self, ID='', ins=None, outs=(), P=101325):
         Unit.__init__(self, ID, ins, outs)
         self.P = P
-        #: [ParallelReaction] Enzymatic hydrolysis reactions including from downstream batch tank in co-fermentation.
-        self.saccharification = ParallelRxn([
-    #   Reaction definition                   Reactant    Conversion
-    Rxn('Glucan -> GlucoseOligomer',          'Glucan',   0.0400),
-    Rxn('Glucan + 0.5 H2O -> 0.5 Cellobiose', 'Glucan',   0.0120),
-    Rxn('Glucan + H2O -> Glucose',            'Glucan',   0.9000),
-    Rxn('Cellobiose + H2O -> 2Glucose',        'Cellobiose',  1.0000)])
-    
         self.loss = ParallelRxn([
     #   Reaction definition               Reactant    Conversion
     Rxn('Glucose -> 2 LacticAcid',       'Glucose',   0.0300),
@@ -285,54 +314,32 @@ class SaccharificationAndCoFermentation(Unit):
             'CSL -> 0.5 H2O + 0.25 LacticAcid + 0.25 Protein', 'CSL', 1.0000, basis='wt',
         )
         self.CSL_to_constituents.basis = 'mol'
-        self.saccharified_stream = tmo.Stream(None)
-    
+        
     def _run(self):
-        feed, innoculum, CSL, DAP = self.ins
-        vent, effluent, sidedraw = self.outs
-        vent.P = effluent.P = sidedraw.P = self.P
-        ss = self.saccharified_stream
-        ss.T = sidedraw.T = self.T_saccharification
+        vent, effluent = self.outs
+        vent.P = effluent.P = self.P
         vent.T = effluent.T = self.T_fermentation
         vent.phase = 'g'
-        ss.copy_flow(feed)
-        self.saccharification(ss)
-        sidedraw.mol[:] = ss.mol * self.saccharified_slurry_split
-        effluent.mol[:] = ss.mol - sidedraw.mol + CSL.mol + DAP.mol + innoculum.mol
+        effluent.mix_from(self.ins, energy_balance=False)
         self.loss(effluent)
         self.cofermentation(effluent)
         self.CSL_to_constituents(effluent)
         vent.receive_vent(effluent)
-        NH3 = effluent.imol['NH3']
-        vent.imol['NH3'] += NH3
-        effluent.imol['NH3'] = 0.
-    
+
     def _design(self):
         effluent = self.outs[1]
         v_0 = effluent.F_vol
         Design = self.design_results
-        Design['Tank volume'] = v_0*self.tau_tank/self.V_wf/self.N_tanks
-        Design['Flow rate'] = v_0/self.N_transfer_pumps
+        Design['Flow rate'] = v_0 / self.N_recirculation_pumps
         tau = self.tau_saccharification + self.tau_cofermentation
         Design.update(size_batch(v_0, tau, self.tau_0, self.N_reactors, self.V_wf))
-        hu_cooling, hu_fermentation = self.heat_utilities
-        mixture = self.thermo.mixture
-        ss = self.saccharified_stream
-        mol = ss.mol
-        duty = (mixture.H('l', mol, self.T_fermentation, 101325.)
-                - mixture.H('l', mol, self.T_saccharification, 101325.))
-        # feed, innoculum, CSL, DAP = self.ins
-        # vent, effluent, sidedraw = self.outs
-        # print(duty, ss.Hnet - feed.Hnet)
-        hu_cooling(duty,
-                   self.T_fermentation)
+        hu_fermentation, = self.heat_utilities
         ei = effluent.chemicals.index('Ethanol')
         ethanol = (sum([i.mol[ei] for i in self.outs])
                    - sum([i.mol[ei] for i in self.ins]))
-        reactor_duty = ethanol*-5568
-        # print(duty, effluent.Hnet + vent.Hnet - (ss.Hnet - sidedraw.Hnet + CSL.Hnet + DAP.Hnet))
+        reactor_duty = -5568 * ethanol + self.H_out - self.H_in
         hu_fermentation(reactor_duty, effluent.T)
-        Design['Reactor duty'] = -duty
+        Design['Reactor duty'] = - reactor_duty
         
    
 # %% Lignin separation

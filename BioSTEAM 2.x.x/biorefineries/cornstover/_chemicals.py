@@ -129,6 +129,7 @@ def create_chemicals():
     chems.H2SO4.at_state('l')
     append_single_phase_chemical('Lime', 'Ca(OH)2')
     append_single_phase_chemical('HNO3', 'NitricAcid')
+    append_single_phase_chemical('NH4OH')
     append_single_phase_chemical('Denaturant', 'Octane')
     append_single_phase_chemical('DAP', 'Diammonium Phosphate')
     append_single_phase_chemical('AmmoniumAcetate')

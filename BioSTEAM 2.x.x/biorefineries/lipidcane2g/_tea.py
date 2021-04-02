@@ -7,6 +7,7 @@
 # for license details.
 """
 """
-from biorefineries.sugarcane import ConventionalEthanolTEA, create_tea
+from biorefineries.cornstover._tea import *
+from biorefineries.cornstover import _tea 
 
-__all__ = ('ConventionalEthanolTEA', 'create_tea')
+__all__ = _tea.__all__

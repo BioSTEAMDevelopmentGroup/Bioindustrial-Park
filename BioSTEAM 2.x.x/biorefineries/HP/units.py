@@ -18,6 +18,7 @@ All units are explicitly defined here for transparency and easy reference
 
 
 # %% Setup
+
 import numpy as np
 import thermosteam as tmo
 from math import exp
@@ -755,13 +756,13 @@ class SeedTrain(Unit):
         self.cofermentation_rxns =  ParallelRxn([
         #      Reaction definition            Reactant    Conversion
         Rxn('Glucose -> 2 HP',        'Glucose',   .49*ferm_ratio),
-        Rxn('Glucose -> 3 AceticAcid',        'Glucose',   0.055*ferm_ratio),
+        Rxn('Glucose -> 3 AceticAcid',        'Glucose',   0.040*ferm_ratio),
         # Rxn('Glucose -> 6 FermMicrobe',       'Glucose',   0.03*ferm_ratio),
         Rxn('3 Xylose -> 5 HP',       'Xylose',    0.49*ferm_ratio),
-        Rxn('2 Xylose -> 5 AceticAcid',       'Xylose',    0.055*ferm_ratio),
+        Rxn('2 Xylose -> 5 AceticAcid',       'Xylose',    0.040*ferm_ratio),
         # Rxn('Xylose -> 5 FermMicrobe',        'Xylose',    0.03*ferm_ratio),
-        Rxn('2 H2O + Glucose -> 2 Glycerol',        'Glucose',     0.025*ferm_ratio),
-        Rxn('1.67 H2O + Xylose -> 1.67 Glycerol',       'Xylose',    0.025*ferm_ratio),
+        Rxn('Glucose -> 1.61 Glycerol',        'Glucose',     0.040*ferm_ratio),
+        Rxn('Xylose -> 1.34 Glycerol',       'Xylose',    0.040*ferm_ratio),
         Rxn('Glucose -> 6 FermMicrobe + 2.4 H2O',       'Glucose',   0.05*ferm_ratio),
         Rxn('Xylose -> 5 FermMicrobe + 2 H2O',        'Xylose',    0.05*ferm_ratio),
         ])
@@ -779,6 +780,16 @@ class SeedTrain(Unit):
         # Rxn('Glucose -> 6 FermMicrobe + 2.4 H2O',       'Glucose',   (1.-1e-9)*ferm_ratio),
         # Rxn('Xylose -> 5 FermMicrobe + 2 H2O',        'Xylose',    (1.-1e-9)*ferm_ratio),
         # ])
+        
+        self.glucose_to_HP_rxn = self.cofermentation_rxns[0]
+        self.xylose_to_HP_rxn = self.cofermentation_rxns[2]
+        
+        self.glucose_to_acetic_acid_rxn = self.cofermentation_rxns[1]
+        self.xylose_to_acetic_acid_rxn = self.cofermentation_rxns[3]
+        
+        self.glucose_to_glycerol_rxn = self.cofermentation_rxns[4]
+        self.xylose_to_glycerol_rxn = self.cofermentation_rxns[5]
+        
         self.glucose_to_biomass_rxn = self.cofermentation_rxns[6]
         self.xylose_to_biomass_rxn = self.cofermentation_rxns[7]
         self.biomass_generation_rxns = [self.glucose_to_biomass_rxn, self.xylose_to_biomass_rxn]
@@ -1647,7 +1658,7 @@ class DehydrationReactor(Reactor):
                   kW_per_m3=0.0985, # Perry's handbook
                   wall_thickness_factor=1,
                   vessel_material='Stainless steel 304',
-                  vessel_type='Vertical', X = 0.999):  # Dishisha et al. 2015
+                  vessel_type='Vertical', X = 0.995):  # Dishisha et al. 2015 reports ~ 99.9%
         Unit.__init__(self, ID, ins, outs)
         
         self.T = T
@@ -1783,11 +1794,11 @@ class CoFermentation(Reactor):
         #      Reaction definition            Reactant    Conversion
         Rxn('Glucose -> 2 HP',        'Glucose',   .49),
         # Rxn('Glucose -> 3 AceticAcid',        'Glucose',   0.07),
-        Rxn('Glucose -> 3 AceticAcid',        'Glucose',   0.055),
+        Rxn('Glucose -> 3 AceticAcid',        'Glucose',   0.040),
         Rxn('3 Xylose -> 5 HP',       'Xylose',    0.49),
-        Rxn('2 Xylose -> 5 AceticAcid',       'Xylose',    0.055),
-        Rxn('2 H2O + Glucose -> 2 Glycerol',        'Glucose',     0.025),
-        Rxn('1.67 H2O + Xylose -> 1.67 Glycerol',       'Xylose',    0.025),
+        Rxn('2 Xylose -> 5 AceticAcid',       'Xylose',    0.040),
+        Rxn('Glucose + 2 H2O -> 2 Glycerol',        'Glucose',     0.040),
+        Rxn('3Xylose + 5 H2O -> 5 Glycerol',       'Xylose',    0.040),
         Rxn('Glucose -> 6 FermMicrobe + 2.4 H2O',       'Glucose',   0.05), # for consistency with Dunn et al. 2015, which has 5% conversion of algal glycerol to cell mass
         Rxn('Xylose -> 5 FermMicrobe + 2 H2O',        'Xylose',    0.05), # for consistency with Dunn et al. 2015, which has 5% conversion of algal glycerol to cell mass
         ])
