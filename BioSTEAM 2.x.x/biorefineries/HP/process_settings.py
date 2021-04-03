@@ -211,6 +211,7 @@ def load_process_settings():
     _hps.T = 266 + 273.15
     
     # _lps.heat_transfer_efficiency = 0.900
+    # _lps.heat_transfer_efficiency = 0.950
     # # Do this OR bst.default() since both do the same thing:
     # _lps.T = 412.19
     # _lps.P = 344738.

@@ -16,7 +16,7 @@ _red_highlight_white_text = '\033[1;47;41m'
 _yellow_text = '\033[1;33m'
 _reset_text = '\033[1;0m'
 
-skip_infeasible_titers = True
+skip_infeasible_titers = False
 last_infeasible_simulation = [] # yield, titer
 
 def get_IDs(units_list):
@@ -46,7 +46,7 @@ def evaluate_across_specs(spec, system,
             spec.load_titer(54.8)
             system.simulate()
             print('Loading and simulating with required specifications ...')
-            spec.load_specifications(spec_1=spec_1, spec_2=spec_2)
+            spec.load_specifications(spec_1=spec_1, spec_2=spec_2, spec_3=spec_3)
             system.simulate()
         
         def reset_and_switch_solver(solver_ID):

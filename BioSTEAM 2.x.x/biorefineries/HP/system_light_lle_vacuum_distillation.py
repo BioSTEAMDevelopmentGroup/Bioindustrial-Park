@@ -142,7 +142,9 @@ def create_HP_sys(ins, outs):
     # =============================================================================
     H_M201 = bst.units.HXutility('H_M201', ins=water_M201,
                                      outs='steam_M201',
-                                     T=114+273.15, rigorous=True)
+                                     T=99.+273.15, rigorous=True)
+    
+    H_M201.heat_utilities[0].heat_transfer_efficiency = 1.
     def H_M201_specification():
         T201._run()
         acid_imass = T201.outs[0].imass['SulfuricAcid']
@@ -155,14 +157,17 @@ def create_HP_sys(ins, outs):
     # H_M201.heat_utilities[0].heat_exchanger = None
     H_M202 = bst.units.HXutility('H_M202', ins=water_M202,
                                      outs='hot_water_M202',
-                                     T=95+273.15, rigorous=True)
+                                     T=99.+273.15, rigorous=True)
+    H_M202.heat_utilities[0].heat_transfer_efficiency = 1.
     def H_M202_specification():
         U101._run()
         H_M201._specification()
         M201._run()
         feedstock, acid = U101.outs[0], M201.outs[0]
+        recycled_water = H201.outs[0]
         mixture_F_mass = feedstock.F_mass + acid.F_mass
-        mixture_imass_water = feedstock.imass['Water'] + acid.imass['Water']
+        mixture_imass_water = feedstock.imass['Water'] + acid.imass['Water'] + \
+            recycled_water.imass['Water']
         total_mass = (mixture_F_mass - mixture_imass_water)/M202.solid_loading
         H_M202.ins[0].imass['Water'] = total_mass - mixture_F_mass
         # H_M202.ins[0].imass['H2SO4'] = H_M202.ins[0].imass['Water']/1000.
@@ -196,11 +201,12 @@ def create_HP_sys(ins, outs):
     M201 = units.SulfuricAcidMixer('M201', ins=(T201-0, H_M201-0))
     
     # Mix sulfuric acid and feedstock, adjust water loading for pretreatment
-    M202 = units.PretreatmentMixer('M202', ins=(U101-0, M201-0, H_M202-0))
+    M202 = units.PretreatmentMixer('M202', ins=(U101-0, M201-0, H_M202-0, ''))
     
     # Mix feedstock/sulfuric acid mixture and steam
     # M203 = units.SteamMixer('M203', ins=(M202-0, water_M203), P=5.5*101325)
     M203 = bst.units.SteamMixer('M203', ins=(M202-0, water_M203), P=5.5*101325)
+    M203.heat_utilities[0].heat_transfer_efficiency = 1.
     
     R201 = units.PretreatmentReactorSystem('R201', ins=M203-0, outs=('R201_g', 'R201_l'))
     
@@ -214,8 +220,8 @@ def create_HP_sys(ins, outs):
     M204 = bst.units.Mixer('M204', ins=(R201-0, F201-0))
     H201 = bst.units.HXutility('H201', ins=M204-0,
                                      outs='condensed_pretreatment_waste_vapor',
-                                     V=0, rigorous=True)
-    
+                                     V=0., rigorous=True)
+    H201-0-3-M202
     # Neutralize pretreatment hydrolysate
     M205 = units.AmmoniaMixer('M205', ins=(ammonia_M205, water_M205))
     def update_ammonia_and_mix():
@@ -491,7 +497,7 @@ def create_HP_sys(ins, outs):
         # K_extract = 1./S404.partition_data['K'][0]
         HP_recovery = 1-tolerable_loss_fraction
         reqd_hexanol = HP_recovery * K_raffinate * process_stream_F_mol
-            
+        
         feed_hexanol.imol['Hexanol'] = max(0, reqd_hexanol - existing_hexanol)
         M401._run()
         Ks_new = update_Ks(S404)
@@ -652,7 +658,7 @@ def create_HP_sys(ins, outs):
                                         LHK=('Hexanol', 'HP'),
                                         is_divided=True,
                                         product_specification_format='Recovery',
-                                        Lr=0.999, Hr=0.999, k=1.2, P = 101325/15,
+                                        Lr=0.999, Hr=0.999, k=1.05, P = 101325/20,
                                         vessel_material = 'Stainless steel 316',
                                         partial_condenser = False,
                                         condenser_thermo = ideal_thermo,
@@ -674,9 +680,11 @@ def create_HP_sys(ins, outs):
     def M402_objective_fn(Water_imol):
         M402.ins[1].imol['Water'] = Water_imol
         M402._run()
-        return get_concentration_gpL('HP', M402.outs[0]) - 600. # predicted "solubility" of 645 g/L at STP https://hmdb.ca/metabolites/HMDB0000700
+        # return get_concentration_gpL('HP', M402.outs[0]) - 600. # predicted "solubility" of 645 g/L at STP https://hmdb.ca/metabolites/HMDB0000700
         # return get_concentration_gpL('HP', M402.outs[0]) - 270.1 # "Ssolubility "at 25 C # https://www.chemicalbook.com/ChemicalProductProperty_EN_CB6711580.htm
         # return get_mass_percent('HP', M402.outs[0]) - .15 # Dehydration reaction paper
+        # return get_mass_percent('HP', M402.outs[0]) - .35 # 30-35 wt% in https://patents.google.com/patent/WO2013192451A1/en
+        return get_mass_percent('HP', M402.outs[0]) - .30 # 30wt% with 80% conversion in Dunn et al. 2015 LCA of Bioproducts in GREET
     
     def M402_adjust_water():
         flx.IQ_interpolation(M402_objective_fn, 0., 10000, maxiter=50, ytol=1e-2)
@@ -685,11 +693,13 @@ def create_HP_sys(ins, outs):
     
     D401_P = units.HPPump('D401_P', ins=M402-0, P=506625*5.4)
     
-    R402 = units.DehydrationReactor('R402', ins = (D401_P-0, makeup_TiO2_catalyst),
+    R402 = units.DehydrationReactor('R402', ins = (D401_P-0, makeup_TiO2_catalyst, '', ''),
                                     outs = ('dilute_acryclic_acid', 'spent_TiO2_catalyst'),
                                     tau = 57.34/1.5, # Dishisha et al.
-                                    T = 230 + 273.15,
+                                    T = 230. + 273.15,
                                     vessel_material='Stainless steel 316')
+    R402.heat_utilities[0].heat_transfer_efficiency = 1. # this doesn't seem to be changing duty
+    
     # spent_TiO2_catalyst is assumed to be sold at 0 $/kg
     
     
@@ -700,17 +710,38 @@ def create_HP_sys(ins, outs):
                                         LHK=('Water', 'AcrylicAcid'),
                                         is_divided=True,
                                         product_specification_format='Recovery',
-                                        Lr=0.999, Hr=0.999, k=1.2, P=101325,
+                                        Lr=0.999, Hr=0.999, k=1.05, P=101325,
+                                        partial_condenser=False,
                                         vessel_material = 'Stainless steel 316')
     
+    D402_t_H = bst.units.HXutility('D402_H', ins=D402-0, T = 330., rigorous=True)
+    
+    # recycling water makes system convergence fail
+    # D402-0-3-R402
+    
     D402_P = units.HPPump('D402_P', ins=D402-1)
-    # D402_H = bst.units.HXutility('D402_H', ins=D402-0, T = 308.15, rigorous=True)
+    
+    
+    # D402_H = bst.units.HXutility('D402_H', ins=D402_P-0, T = 330., rigorous=True)
+    
+    
+    D403 = bst.units.ShortcutColumn('D403', ins=D402_P-0, outs=('D403_g', 'D403_l'),
+                                        LHK=('AcrylicAcid', 'HP'),
+                                        is_divided=True,
+                                        product_specification_format='Recovery',
+                                        Lr=0.9995, Hr=0.9995, k=1.05, P=101325./7.,
+                                        partial_condenser=False,
+                                        vessel_material = 'Stainless steel 316')
+    
+    D403-1-2-R402
+    
+    D403_P = units.HPPump('D403_P', ins=D403-0)
     
     separation_group = UnitGroup('separation_group', 
                                    units=(S401, R401, R401_H, R401_P, S402,
                                           F401, F401_P, M401, S404, D401,
                                           D401_H_P, D401_P, M402, 
-                                          R402, R402_H, D402, D402_P))
+                                          R402, R402_H, D402, D402_t_H, D402_P, D403, D403_P))
     process_groups.append(separation_group)
     
     # %% 
@@ -733,7 +764,7 @@ def create_HP_sys(ins, outs):
     # =============================================================================
     
     # Mix waste liquids for treatment
-    M501 = bst.units.Mixer('M501', ins=(F301_P-0,  D402-0, F401-1, S404-0)) # without sugars recycle
+    M501 = bst.units.Mixer('M501', ins=(F301_P-0, D402_t_H-0, F401-1, S404-0)) # without sugars recycle
     # M501 = bst.units.Mixer('M501', ins=(F301_P-0, D402_H-0)) # with sugars recycle
     
     # This represents the total cost of wastewater treatment system
@@ -914,7 +945,7 @@ def create_HP_sys(ins, outs):
     
 
     # 7-day storage time, similar to ethanol's in Humbird et al.
-    T606 = units.HPStorageTank('T606', ins=D402_P-0, tau=7*24, V_wf=0.9,
+    T606 = units.HPStorageTank('T606', ins=D403_P-0, tau=7*24, V_wf=0.9,
                                          vessel_type='Floating roof',
                                          vessel_material='Stainless steel')
    
@@ -1381,6 +1412,9 @@ total_C_in = sum([feed.get_atomic_flow('C') for feed in feeds])
 total_C_out = AA.get_atomic_flow('C') + sum([emission.get_atomic_flow('C') for emission in emissions])
 C_bal_error = (total_C_out - total_C_in)/total_C_in
 
+def get_unit_atomic_balance(unit, atom='C'):
+    return (sum([i.get_atomic_flow(atom) for i in unit.ins]), 
+            sum([i.get_atomic_flow(atom) for i in unit.outs]))
 # GWP from combustion of non-biogenic carbons
 get_ng_combustion_GWP = get_onsite_gwp =\
     lambda: (s.natural_gas.get_atomic_flow('C')) * HP_chemicals.CO2.MW / AA.F_mass

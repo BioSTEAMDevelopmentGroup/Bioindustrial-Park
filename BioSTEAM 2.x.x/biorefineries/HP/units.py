@@ -200,13 +200,13 @@ class SulfuricAcidMixer(Unit):
         
 # Adjust pretreatment water loading, 30% from Table 5 on Page 21 of Humbird et al.
 class PretreatmentMixer(Mixer):
-    _N_ins = 3
+    _N_ins = 4
     _N_outs = 1
     
     solid_loading = 0.3
         
     def _run(self):
-        feedstock, acid, water = self.ins
+        feedstock, acid, water, recycled_water = self.ins
         mixture_out = self.outs[0]
         
         mixture = feedstock.copy()
@@ -216,7 +216,7 @@ class PretreatmentMixer(Mixer):
         # water.imass['Water'] = total_mass - mixture.F_mass
         # water adjustment currently implemented in H_M202.specification
         
-        mixture_out.mix_from([mixture, water])
+        mixture_out.mix_from([mixture, water, recycled_water])
 
 # Steam mixer
 class SteamMixer(Mixer):
@@ -1639,7 +1639,7 @@ class DehydrationReactor(Reactor):
     """
     A dehydration reactor.
     """
-    _N_ins = 2
+    _N_ins = 4
     _N_outs = 2
     
     _N_heat_utilities = 1
@@ -1658,7 +1658,7 @@ class DehydrationReactor(Reactor):
                   kW_per_m3=0.0985, # Perry's handbook
                   wall_thickness_factor=1,
                   vessel_material='Stainless steel 304',
-                  vessel_type='Vertical', X = 0.995):  # Dishisha et al. 2015 reports ~ 99.9%
+                  vessel_type='Vertical', X = 0.80):  # Li et al. 2018 reports ~ 99.9% with silica gel
         Unit.__init__(self, ID, ins, outs)
         
         self.T = T
@@ -1678,11 +1678,11 @@ class DehydrationReactor(Reactor):
             ])     
         HP_to_AA_rxn = dehydration_reactions[0]
     def _run(self):
-        feed, fresh_catalyst = self.ins
+        feed, fresh_catalyst, recycled_HP, recycled_water = self.ins
         effluent, spent_catalyst = self.outs
         
         # effluent = feed.copy()
-        effluent.mix_from([feed])
+        effluent.mix_from([feed, recycled_HP, recycled_water])
         effluent.T = self.T
         # effluent.P = feed.P
         self.dehydration_reactions(effluent.mol)
@@ -1696,7 +1696,7 @@ class DehydrationReactor(Reactor):
         super()._cost()
         hx = self.heat_exchanger
         N = self.design_results['Number of reactors']
-        single_rx_effluent = self.ins[0].copy()
+        single_rx_effluent = self.outs[0].copy()
         single_rx_effluent.mol[:] /= N
         hx.simulate_as_auxiliary_exchanger(duty=(self.outs[0].H - self.ins[0].H)/N, 
                                             stream=single_rx_effluent)
