@@ -95,7 +95,7 @@ def create_feedstock_handling_system(ins, outs):
     outs=[dict(ID='clarified_juice'),
           dict(ID='bagasse')]
 )
-def create_juicing_system_up_to_clarification(ins, outs, pellet_bagasse=True):
+def create_juicing_system_up_to_clarification(ins, outs, pellet_bagasse=False):
     ### Streams ###
     sugarcane, enzyme, H3PO4, lime, polymer = ins
     clarified_juice, bagasse = outs
@@ -127,7 +127,10 @@ def create_juicing_system_up_to_clarification(ins, outs, pellet_bagasse=True):
                                          Solids=1),
                               moisture_content=0.5)
     
-    bagasse_pelleting_sys = create_bagasse_pelleting_system(None, U201-0, bagasse, mockup=True)
+    if pellet_bagasse:
+        bagasse_pelleting_sys = create_bagasse_pelleting_system(None, U201-0, bagasse, mockup=True)
+    else:
+        U202 = units.ConveyingBelt('U202', U201-0, bagasse)
     
     # Mix in water
     M201 = units.Mixer('M201', ('', imbibition_water), 1-U201)
@@ -475,7 +478,7 @@ def create_sucrose_fermentation_system(ins, outs):
     
     # Split sugar solution
     S301 = units.Splitter('S301',
-                          split=0.20)
+                          split=0.15)
     
     # Concentrate sugars
     F301 = units.MultiEffectEvaporator('F301',

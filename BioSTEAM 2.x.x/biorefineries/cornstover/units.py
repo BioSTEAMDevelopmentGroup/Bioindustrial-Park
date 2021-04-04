@@ -178,7 +178,7 @@ class SeedTrain(Unit):
     def _cost(self):
         N = self.N_trains
         D = self.design_results
-        C = self.purchase_costs
+        C = self.baseline_purchase_costs
         kW = 0
         for i, x in self.cost_items.items():
             S = D[x._basis]
@@ -236,8 +236,8 @@ class ContinuousSaccharification(Unit):
         self.saccharification.adiabatic_reaction(outlet)
         
     def _design(self):
-        outlet = self.outs[0]
-        v_0 = outlet.F_vol
+        inlet = self.ins[0]
+        v_0 = inlet.F_vol
         Design = self.design_results
         Design['Tank volume'] = v_0 * self.tau_tank / self.V_wf / self.N_tanks
         Design['Flow rate'] = v_0 / self.N_transfer_pumps
@@ -246,7 +246,9 @@ class ContinuousSaccharification(Unit):
 @cost('Flow rate', 'Recirculation pumps', kW=30, S=340*_gpm2m3hr,
       cost=47200, n=0.8, BM=2.3, CE=522, N='N_recirculation_pumps')
 @cost('Reactor duty', 'Heat exchangers', CE=522, cost=23900,
-      S=5*_Gcal2kJ, n=0.7, BM=2.2, N='N_reactors') # Based on a similar heat exchanger
+      S=-5*_Gcal2kJ, n=0.7, BM=2.2, N='N_reactors') # Based on a similar heat exchanger
+@cost('Batch duty', 'Fermentor batch cooler', CE=522, cost=86928,
+      S=-5*_Gcal2kJ, n=0.7, BM=1.8) # Based on a similar heat exchanger
 @cost('Reactor volume', 'Agitators', CE=522, cost=52500,
       S=1e6*_gal2m3, n=0.5, kW=90, BM=1.5, N='N_reactors')
 @cost('Reactor volume', 'Reactors', CE=522, cost=844000,
@@ -283,6 +285,7 @@ class SaccharificationAndCoFermentation(Unit):
     
     _units = {'Flow rate': 'm3/hr',
               'Reactor volume': 'm3',
+              'Batch duty': 'kJ/hr',
               'Reactor duty': 'kJ/hr'}
     
     def __init__(self, ID='', ins=None, outs=(), P=101325):
@@ -337,13 +340,12 @@ class SaccharificationAndCoFermentation(Unit):
         ei = effluent.chemicals.index('Ethanol')
         ethanol = (sum([i.mol[ei] for i in self.outs])
                    - sum([i.mol[ei] for i in self.ins]))
-        reactor_duty = -5568 * ethanol + self.H_out - self.H_in
-        hu_fermentation(reactor_duty, effluent.T)
-        Design['Reactor duty'] = - reactor_duty
-        
+        Design['Batch duty'] = batch_duty = self.H_out - self.H_in
+        Design['Reactor duty'] = reactor_duty = self.Hf_out - self.Hf_in
+        hu_fermentation(reactor_duty + batch_duty, effluent.T)
    
-# %% Lignin separation
 
+# %% Lignin separation
 
 @cost('Flow rate', units='kg/hr',
       S=63, cost=421e3, CE=522, BM=1.8, n=0.6)

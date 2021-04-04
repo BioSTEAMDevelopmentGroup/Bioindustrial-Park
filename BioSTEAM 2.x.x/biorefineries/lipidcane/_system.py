@@ -50,7 +50,7 @@ __all__ = (
           dict(ID='fiber_fines'),
           dict(ID='spent_oil_wash_water')]
 )
-def create_juicing_and_lipid_extraction_system(ins, outs):
+def create_juicing_and_lipid_extraction_system(ins, outs, pellet_bagasse=False):
     lipidcane, enzyme, H3PO4, lime, polymer = ins
     screened_juice, lipid, bagasse, fiber_fines, spent_oil_wash_water = outs
     
@@ -63,6 +63,7 @@ def create_juicing_and_lipid_extraction_system(ins, outs):
         mockup=True
     )    
     juicing_sys = create_juicing_system_up_to_clarification(
+        pellet_bagasse=pellet_bagasse,
         ins=[feedstock_handling_sys-0, enzyme, H3PO4, lime, polymer], 
         outs=['', bagasse],
         mockup=True,
@@ -224,7 +225,7 @@ def create_transesterification_and_biodiesel_separation_system(ins, outs):
     
     def adjust_feed_to_reactors():
         R402._run()
-        S401.ins[0].sum(S401.outs)
+        S401.ins[0].mix_from(S401.outs)
     
     R402.specification = adjust_feed_to_reactors
     

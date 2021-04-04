@@ -78,13 +78,14 @@ def _load_system():
     ethanol_price_gal = ethanol.price * ethanol_density_kggal
     UnitGroup = bst.process_tools.UnitGroup
     Area100 = UnitGroup('Area 100', (u.U101,))
-    Area200 = UnitGroup('Area 200', (u.T201, u.M201, u.R201, u.P201,
-                                    u.T202, u.F201, u.H201, u.T203))
+    Area200 = UnitGroup('Area 200', (u.T201, u.M201, u.R201, u.P201, u.P202,
+                                    u.T202, u.F201, u.H201, u.T203, u.M205))
     Area300 = UnitGroup('Area 300', (u.H301, u.M301, u.R301,
-                                    u.R302, u.T301, u.T302))                 
+                                     u.R302, u.R303, u.T301, u.T302))                 
     Area400 = UnitGroup('Area 400', (u.D401, u.H401, u.D402, u.P401,
                                     u.M402, u.D403, u.P402, u.H402,
-                                    u.U401, u.H403, u.M701, u.S401))
+                                    u.U401, u.H403, u.M701, u.S401,
+                                    u.P403))
     Area500 = UnitGroup('Area 500', (u.WWTC,))
     Area600 = UnitGroup('Area 600', (u.T701, u.T702, u.P701, u.P702, u.M701, u.FT,
                                      u.CSL_storage, u.DAP_storage, u.T703,

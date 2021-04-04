@@ -299,5 +299,5 @@ class PlantAir_CIP_WasteWater_Facilities(bst.Facility):
         pass
         
     def _cost(self):
-        C = self.purchase_costs
+        C = self.baseline_purchase_costs
         C['Facilities'] = 6e5 * (self.corn.F_mass / 46211.6723)**0.6
