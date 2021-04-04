@@ -973,6 +973,7 @@ class Reactor(Unit, PressureVessel, isabstract=True):
         Design['Total volume'] = V_total
         Design['Single reactor volume'] = V_reactor
         Design['Number of reactors'] = N
+        P, D, L = float(P), float(D), float(L)
         Design.update(self._vessel_design(P, D, L))
         if wall_thickness_factor == 1: pass
         elif wall_thickness_factor < 1:
