@@ -7,6 +7,7 @@
 # for license details.
 """
 """
+import biosteam as bst
 from .. import PY37
 from . import (utils,
                _process_settings,
@@ -92,24 +93,42 @@ def load(name):
         bst.rename_units([i for i in lipidcane_sys.units if bst.is_storage_unit(i)], 1200)
     elif name == '1g':
         lipidcane_sys = create_lipidcane_to_biodiesel_and_ethanol_1g()
+    elif name == 'sugarcane 2g':
+        global sugarcane_sys
+        sugarcane_sys = create_sugarcane_to_ethanol_2g()
     else:
         raise NotImplementedError(name)
     unit_groups = UnitGroup.group_by_area(lipidcane_sys.units)
     if '2g' in name:
+        # lipidcane_tea = create_tea(lipidcane_sys)
+        # for i in lipidcane_tea.TEAs: i.operating_days = 200
+        # lipidcane_sys.simulate()
         for i, j in zip(unit_groups, area_names): i.name = j
-        lipidcane_tea = create_tea(lipidcane_sys)
-    else:
-        lipidcane_tea = create_tea(lipidcane_sys)
-    lipidcane_tea.operating_days = 200
-    try: 
+        partial_lipidcane_tea = create_tea(lipidcane_sys)
+        partial_lipidcane_tea.operating_days = 200
+        cornstover_sys = trim_to_cornstover_hot_water_cellulosic_ethanol(lipidcane_sys)
+        partial_cornstover_tea = create_tea(cornstover_sys)
+        partial_cornstover_tea.operating_days = 130
+        lipidcane_tea = bst.AgileTEA([partial_lipidcane_tea, partial_cornstover_tea], 0.1)
         lipidcane_sys.simulate()
-    except Exception as e:
-        raise e
-    else:
+        lipidcane_tea.save_scenario(0)
+        cornstover_sys.simulate()
+        lipidcane_tea.save_scenario(1)
+        dct.update(flowsheet.to_dict())
         lipidcane_tea.IRR = 0.10
         s.ethanol.price = lipidcane_tea.solve_price(s.ethanol)
-    finally:
-        dct.update(flowsheet.to_dict())
+    else:
+        lipidcane_tea = create_tea(lipidcane_sys)
+        for i in lipidcane_tea.TEAs: i.operating_days = 200
+        try: 
+            lipidcane_sys.simulate()
+        except Exception as e:
+            raise e
+        else:
+            lipidcane_tea.IRR = 0.10
+            s.ethanol.price = lipidcane_tea.solve_price(s.ethanol)
+        finally:
+            dct.update(flowsheet.to_dict())
 
 
 def ethanol_price():

@@ -21,11 +21,85 @@ import numpy as np
 __all__ = (
     'create_system',
     'create_facilities',
+    'create_hot_water_pretreatment_system',
     'create_dilute_acid_pretreatment_system',
     'create_continuous_saccharification_system',
     'create_saccharification_and_cofermentation_system',
     'create_cellulosic_fermentation_system',
 )
+
+@bst.SystemFactory(
+    ID='hot_water_pretreatment_sys',
+    ins=[dict(ID='cornstover', # Cornstover composition by default
+              Glucan=0.28,
+              Xylan=0.1562,
+              Galactan=0.001144,
+              Arabinan=0.01904,
+              Mannan=0.0048,
+              Lignin=0.12608,
+              Acetate=0.01448,
+              Protein=0.0248,
+              Extract=0.1172,
+              Ash=0.03944,
+              Sucrose=0.00616,
+              Water=0.2,
+              total_flow=104229.16,
+              units='kg/hr',
+              price=price['Feedstock'])],
+    outs=[dict(ID='hydrolyzate'),
+          dict(ID='pretreatment_wastewater')],
+)
+def create_hot_water_pretreatment_system(
+        ins, outs,
+        pretreatment_area=200,
+        include_feedstock_handling=True
+    ):
+    
+    feedstock, = ins
+    hydrolyzate, pretreatment_wastewater = outs
+    
+    warm_process_water = Stream('warm_process_water',
+                              T=368.15,
+                              P=4.7*101325,
+                              Water=1)
+    rectifier_bottoms_product = Stream('',
+                                       T=100+273.15,
+                                       P=101325,
+                                       Ethanol=18,
+                                       Water=36629,
+                                       Furfural=72,
+                                       HMF=100,
+                                       units='kg/hr')
+    pretreatment_steam = Stream('pretreatment_steam',
+                    phase='g',
+                    T=268+273.15,
+                    P=13*101325,
+                    Water=24534+3490,
+                    units='kg/hr')
+    
+    ### Pretreatment system
+    n = pretreatment_area
+    M202 = bst.Mixer(f'M{n+2}', (rectifier_bottoms_product, warm_process_water, feedstock))
+    M203 = bst.SteamMixer(f'M{n+3}', (M202-0, pretreatment_steam), P=5.5*101325)
+    R201 = units.PretreatmentReactorSystem(f'R{n+1}', M203-0)
+    P201 = units.BlowdownDischargePump(f'P{n+1}', R201-1)
+    T202 = units.OligomerConversionTank(f'T{n+2}', P201-0)
+    F201 = units.PretreatmentFlash(f'F{n+1}', T202-0, P=101325, Q=0)
+    M204 = bst.Mixer(f'M{n+4}', (R201-0, F201-0))
+    H201 = units.WasteVaporCondenser(f'H{n+1}', M204-0, pretreatment_wastewater, V=0)
+    P202 = units.HydrolyzatePump(f'P{n+2}', F201-1, hydrolyzate)
+    
+    def update_pretreatment_process_water():
+        moisture_content = 0.695
+        recycle_water, warm_process_water, *other_feeds = M202.ins
+        F_mass_feed = sum([i.F_mass for i in other_feeds if i])
+        feed_water = sum([i.imass['Water'] for i in other_feeds if i])
+        available_water = feed_water + recycle_water.imass['Water']
+        required_water = (F_mass_feed + recycle_water.F_mass - available_water) * moisture_content / (1 - moisture_content)
+        warm_process_water.imass['Water'] = max(required_water - available_water, 0.)
+        M202._run()
+    M202.specification = update_pretreatment_process_water
+    
 
 @bst.SystemFactory(
     ID='dilute_acid_pretreatment_sys',
@@ -103,7 +177,7 @@ def create_dilute_acid_pretreatment_system(
     T202 = units.OligomerConversionTank(f'T{n+2}', P201-0)
     F201 = units.PretreatmentFlash(f'F{n+1}', T202-0, P=101325, Q=0)
     M204 = bst.Mixer(f'M{n+4}', (R201-0, F201-0))
-    H201 = units.WasteVaporCondenser(f'H{n+1}', M204-0, pretreatment_wastewater, T=99+273.15, V=0)
+    H201 = units.WasteVaporCondenser(f'H{n+1}', M204-0, pretreatment_wastewater, T=373.15, V=0)
     Ammonia_storage = units.AmmoniaStorageTank('Ammonia_storage', ammonia)
     M205 = units.AmmoniaMixer(f'M{n+5}', (Ammonia_storage-0, ammonia_process_water))
     T203 = units.AmmoniaAdditionTank(f'T{n+3}', (F201-1, M205-0))

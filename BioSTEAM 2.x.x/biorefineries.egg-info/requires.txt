@@ -1,1 +1,1 @@
-biosteam>=2.24.8
+biosteam>=2.25.1

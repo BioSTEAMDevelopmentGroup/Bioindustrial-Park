@@ -423,7 +423,7 @@ def create_transesterification_and_biodiesel_separation_system(ins, outs):
           dict(ID='emissions'),
           dict(ID='ash_disposal')]
 )
-def create_lipidcane_to_biodiesel_and_conventional_ethanol_system(ins, outs, evaporator_and_beer_column_heat_integration=True):
+def create_lipidcane_to_biodiesel_and_conventional_ethanol_system(ins, outs):
     
     lipidcane, enzyme, H3PO4, lime, polymer, denaturant = ins
     ethanol, biodiesel, crude_glycerol, vinasse, wastewater, emissions, ash_disposal = outs
@@ -496,17 +496,4 @@ def create_lipidcane_to_biodiesel_and_conventional_ethanol_system(ins, outs, eva
     
     F301 = u.F301
     D303 = u.D303
-    if evaporator_and_beer_column_heat_integration:
-        def heat_integration():
-            hu_mee = F301.heat_utilities[0]
-            hu_dist = D303.heat_utilities[0]
-            actual_duty = hu_mee.duty + hu_dist.duty
-            if actual_duty > 0.:
-                hu_mee(actual_duty, 373.15, 373.15)
-                hu_dist.empty()
-            else:
-                hu_mee.empty()
-                condenser = D303.condenser
-                hu_dist(actual_duty, condenser.ins[0].T, condenser.outs[0].T)
-            CWP._run()
-        CWP.specification = heat_integration
+    HXN = bst.HeatExchangerNetwork('HXN', units=[F301, D303])

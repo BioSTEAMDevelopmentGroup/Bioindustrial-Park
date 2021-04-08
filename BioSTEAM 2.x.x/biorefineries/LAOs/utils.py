@@ -36,7 +36,7 @@ def get_LAOs_MPSP():
     sales = sum([i.cost for i in products])
     F_mass_LAOs = sum([i.F_mass for i in products])
     LAOs_tea = LAOs.LAOs_tea
-    return (LAOs_tea.solve_incentive() / LAOs_tea.operating_days / 24  + sales) / F_mass_LAOs * 907.185 # To USD / ton
+    return (LAOs_tea.solve_sales() / LAOs_tea.operating_days / 24  + sales) / F_mass_LAOs * 907.185 # To USD / ton
 
 def set_LAOs_MPSP(MPSP):
     """Set product price in USD/ton."""

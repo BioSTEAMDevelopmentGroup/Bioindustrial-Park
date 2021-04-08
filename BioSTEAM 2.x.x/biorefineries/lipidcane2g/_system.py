@@ -31,6 +31,7 @@ __all__ = (
     'create_lipidcane_to_biodiesel_and_ethanol_divided_1_and_2g_front_end_oil_separation',
     'create_lipidcane_to_biodiesel_and_ethanol_divided_1_and_2g_hydrolyzate_oil_separation',
     'create_lipidcane_to_biodiesel_and_ethanol_combined_1_and_2g_post_fermentation_oil_separation',
+    'trim_to_cornstover_hot_water_cellulosic_ethanol',
 )
 
 @SystemFactory(
@@ -148,20 +149,7 @@ def create_lipidcane_to_biodiesel_and_ethanol_1g(
     
     F301 = u.F301
     D303 = u.D303
-    if evaporator_and_beer_column_heat_integration:
-        def heat_integration():
-            hu_mee = F301.heat_utilities[0]
-            hu_dist = D303.heat_utilities[0]
-            actual_duty = hu_mee.duty + hu_dist.duty
-            if actual_duty > 0.:
-                hu_mee(actual_duty, 373.15, 373.15)
-                hu_dist.empty()
-            else:
-                hu_mee.empty()
-                condenser = D303.condenser
-                hu_dist(actual_duty, condenser.ins[0].T, condenser.outs[0].T)
-            CWP._run()
-        CWP.specification = heat_integration
+    HXN = bst.HeatExchangerNetwork('HXN', units=[F301, D303])
 
 @SystemFactory(
     ID='lipidcane_sys',
@@ -201,16 +189,32 @@ def create_lipidcane_to_biodiesel_and_ethanol_divided_1_and_2g_hydrolyzate_oil_s
     def convert_hemicellulose():
         conveying_belt._run()
         bagasse = juicing_and_lipid_extraction_sys.outs[2]
+        cellulose_rxn(bagasse)
         hemicellulose_rxn(bagasse)
         
     conveying_belt = bagasse.source
     conveying_belt.specification = convert_hemicellulose
-    dilute_acid_pretreatment_sys = brf.cornstover.create_dilute_acid_pretreatment_system(
+    hot_water_pretreatment_sys, hw_dct = brf.cornstover.create_hot_water_pretreatment_system(
         ins=bagasse,
         mockup=True,
         area=600,
+        udct=True,
     )
-    hydrolyzate, pretreatment_wastewater = dilute_acid_pretreatment_sys.outs
+    mixer = hw_dct['M202']
+    cornstover = bst.Stream(**brf.cornstover.create_hot_water_pretreatment_system.ins[0])
+    z_mass_cornstover = cornstover.z_mass
+    update_pretreatment_process_water = mixer.specification
+    mixer.ins.append(cornstover)
+    def update_cornstover_flow_and_pretreatment_process_water():
+        *_, bagasse, cornstover = mixer.ins
+        if bagasse:
+            cornstover.empty()
+        else:
+            cornstover.mass = mixer.F_biomass * z_mass_cornstover
+        update_pretreatment_process_water()
+    mixer.F_biomass = 146880.20
+    mixer.specification = update_cornstover_flow_and_pretreatment_process_water
+    hydrolyzate, pretreatment_wastewater = hot_water_pretreatment_sys.outs
     
     sucrose_fermentation_sys, sf_dct = create_sucrose_fermentation_system(
         ins=screened_juice,
@@ -280,7 +284,7 @@ def create_lipidcane_to_biodiesel_and_ethanol_divided_1_and_2g_hydrolyzate_oil_s
     wastewater_treatment_sys = bst.create_wastewater_treatment_system(
         ins=[PF1-1, 
              *juicing_and_lipid_extraction_sys-[3, 4], 
-             dilute_acid_pretreatment_sys-1,
+             pretreatment_wastewater,
              ethanol_purification_sys-1],
         mockup=True,
         area=900
@@ -305,21 +309,24 @@ def create_lipidcane_to_biodiesel_and_ethanol_divided_1_and_2g_hydrolyzate_oil_s
     F301 = sf_dct['F301']
     D303 = ep_dct['D303']
     CWP = u.CWP
-    # HXN = bst.HXN('HXN')
-    if evaporator_and_beer_column_heat_integration:
-        def heat_integration():
-            hu_mee = F301.heat_utilities[0]
-            hu_dist = D303.heat_utilities[0]
-            actual_duty = hu_mee.duty + hu_dist.duty
-            if actual_duty > 0.:
-                hu_mee(actual_duty, 373.15, 373.15)
-                hu_dist.empty()
-            else:
-                hu_mee.empty()
-                condenser = D303.condenser
-                hu_dist(actual_duty, condenser.ins[0].T, condenser.outs[0].T)
-        CWP.specification = heat_integration
+    HXN = bst.HeatExchangerNetwork('HXN', units=[F301, D303])
 
+@bst.utils.piping.ignore_docking_warnings
+def trim_to_cornstover_hot_water_cellulosic_ethanol(lipidcane_sys):
+    u = lipidcane_sys.flowsheet.unit
+    u.M601.ins[2] = None
+    u.M601.show(data=False)
+    u.U701-0-u.S703
+    for index, stream in enumerate(u.M801.outs):
+        if stream in u.M802.ins: break
+    u.D701-0-index-u.M802
+    for index, stream in enumerate(u.M901.ins):
+        if stream in u.C201.outs or stream in u.U210.outs:
+            u.M901.ins[index] = None
+    units = (list(u.M601.neighborhood(radius=int(1e6), facilities=False))
+             + [i for i in lipidcane_sys.facilities if not isinstance(i, bst.HeatExchangerNetwork)])
+    return bst.System.from_units('cornstover_sys', units)
+    
 @SystemFactory(
     ID='lipidcane_sys',
     ins=create_lipidcane_to_biodiesel_and_ethanol_1g.ins,
@@ -452,18 +459,5 @@ def create_lipidcane_to_biodiesel_and_ethanol_divided_1_and_2g_front_end_oil_sep
     F301 = sf_dct['F301']
     D303 = ep_dct['D303']
     CWP = u.CWP
-    # HXN = bst.HXN('HXN')
-    if evaporator_and_beer_column_heat_integration:
-        def heat_integration():
-            hu_mee = F301.heat_utilities[0]
-            hu_dist = D303.heat_utilities[0]
-            actual_duty = hu_mee.duty + hu_dist.duty
-            if actual_duty > 0.:
-                hu_mee(actual_duty, 373.15, 373.15)
-                hu_dist.empty()
-            else:
-                hu_mee.empty()
-                condenser = D303.condenser
-                hu_dist(actual_duty, condenser.ins[0].T, condenser.outs[0].T)
-        CWP.specification = heat_integration
+    HXN = bst.HeatExchangerNetwork('HXN', units=[F301, D303])
         
