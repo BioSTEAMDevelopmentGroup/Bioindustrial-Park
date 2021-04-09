@@ -45,9 +45,7 @@ def load():
     if not _chemicals_loaded: _load_chemicals()
     _load_system()
     dct = globals()
-    dct.update(flowsheet.system.__dict__)
-    dct.update(flowsheet.stream.__dict__)
-    dct.update(flowsheet.unit.__dict__)
+    dct.update(flowsheet.to_dict())
 
 def _load_chemicals():
     global chemicals
@@ -67,8 +65,8 @@ def _load_system():
                   F.unit.T103, F.unit.T104, F.unit.T107, F.unit.T108, 
                   F.unit.T109, F.unit.T110)
     LAOs_tea = create_tea(LAOs_sys, OSBL_units)
-    for i in LAOs_tea.TEAs: i.duration = (2017, 2047)
-    for i in LAOs_tea.TEAs: i.contingency = 0.3
+    LAOs_tea.duration = (2017, 2047)
+    LAOs_tea.contingency = 0.3
     specs = LAOsProcessSpecifications(LAOs_sys, LAOs_tea)
     UnitGroup = bst.process_tools.UnitGroup
     name_types = {
@@ -99,9 +97,7 @@ if PY37:
             if name == 'chemicals': return chemicals
         if not _system_loaded: _load_system()
         dct = globals()
-        dct.update(flowsheet.system.__dict__)
-        dct.update(flowsheet.stream.__dict__)
-        dct.update(flowsheet.unit.__dict__)
+        dct.update(flowsheet.to_dict())
         if name in dct:
             return dct[name]
         else:

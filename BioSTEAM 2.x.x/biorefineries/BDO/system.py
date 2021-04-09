@@ -42,18 +42,17 @@ import thermosteam as tmo
 import flexsolve as flx
 import numpy as np
 from biosteam import main_flowsheet as F
-
+from biorefineries import BST222
 from biosteam import System
 from thermosteam import Stream
-from BDO import units, facilities
-from BDO._process_specification import ProcessSpecification
-from BDO.process_settings import price
-from BDO.utils import find_split, splits_df, baseline_feedflow
-from BDO.chemicals import BDO_chemicals, chemical_groups, \
+from biorefineries.BDO import units, facilities
+from biorefineries.BDO._process_specification import ProcessSpecification
+from biorefineries.BDO.process_settings import price
+from biorefineries.BDO.utils import find_split, splits_df, baseline_feedflow
+from biorefineries.BDO.chemicals_data import BDO_chemicals, chemical_groups, \
                                 soluble_organics, combustibles
-from BDO.tea import BDOTEA
-# Do this to be able to show more streams in a diagram
-bst.units.Mixer._graphics.edge_in *= 2
+from biorefineries.BDO.tea import BDOTEA
+
 bst.speed_up()
 flowsheet = bst.Flowsheet('BDO')
 bst.main_flowsheet.set_flowsheet(flowsheet)
@@ -889,12 +888,6 @@ BDO_sys._TEA = BDO_tea
 # =============================================================================
 # Simulate system and get results
 # =============================================================================
-
-# These settings are sufficient to get lactic acid price error below $0.001/kg
-# after three simulations
-System.default_converge_method = 'fixed-point' # aitken isn't stable
-System.default_maxiter = 1500
-System.default_molar_tolerance = 0.1
 
 def get_BDO_MPSP():
     BDO_sys.simulate()

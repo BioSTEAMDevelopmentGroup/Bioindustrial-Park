@@ -10,15 +10,62 @@
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
 # for license details.
 
-"""
-Created on Mon Dec 30 09:28:03 2019
 
-@author: yalinli_cabbi
-"""
+# %%
+
+import biosteam as bst
+bst.speed_up()
+
+from . import (
+    _chemicals,
+    _utils,
+    _settings,
+    _units,
+    _facilities,
+    _tea,
+    _processes,
+    systems,
+    )
+
+from ._chemicals import chems
+from ._utils import auom, CEPCI
+from ._settings import price, CFs
+from ._processes import update_settings
+
+getattr = getattr
+
+def load_system(kind='SSCF'):
+    if not kind in ('SSCF', 'SHF'):
+        raise ValueError(f'kind can only be "SSCF" or "SHF", not {kind}.')
+    global flowsheet, groups, teas, funcs, \
+        lactic_sys, lactic_tea, feedstock, lactic_acid, \
+        simulate_and_print, simulate_fermentation_improvement, \
+        simulate_separation_improvement, simulate_operating_improvement
+    
+    flowsheet = getattr(systems, f'{kind}_flowsheet')
+    groups = getattr(systems, f'{kind}_groups')
+    teas = getattr(systems, f'{kind}_teas')
+    funcs = getattr(systems, f'{kind}_funcs')
+    
+    update_settings(chems)
+    bst.main_flowsheet.set_flowsheet(flowsheet)
+
+    lactic_sys = flowsheet.system.lactic_sys
+    feedstock = flowsheet.stream.feedstock
+    lactic_acid = flowsheet.stream.lactic_acid
+    lactic_tea = teas['lactic_tea']
+
+    simulate_and_print = lambda : systems.simulate_and_print(kind)
+    simulate_fermentation_improvement = \
+        lambda: systems.simulate_fermentation_improvement(kind)
+    simulate_separation_improvement = \
+        lambda: systems.simulate_separation_improvement(kind)
+    simulate_operating_improvement = \
+        lambda: systems.simulate_operating_improvement(kind)
+    
+
+    
 
 
-__all__ = []
 
-from lazypkg import LazyPkg
-LazyPkg(__name__, ['_chemicals', '_process_settings', '_units', '_facilities',
-                   'system', '_tea_lca'])
+load_system('SSCF')

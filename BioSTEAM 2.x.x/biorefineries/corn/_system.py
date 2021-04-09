@@ -155,9 +155,8 @@ def create_system(ID='corn_sys'):
     P411 = bst.Pump('P411', MX2-0)
     
     ethanol_purification_sys = create_ethanol_purification_system(
-        degassed_beer=P411-0,
-        ethanol_product=ethanol,
-        denaturant=denaturant,
+        ins=[P411-0, denaturant],
+        outs=ethanol,
         beer_column_heat_integration=False,
         IDs={
             'Beer column': 'T501',
@@ -179,6 +178,7 @@ def create_system(ID='corn_sys'):
     f = cn.flowsheet
     fu = f.unit
     fu.P502-0-1-E413
+    fu.P502.P = 101325
     V601 = bst.MixTank('V601', E413-1)
     P602 = bst.Pump('P602', V601-0)
     C603 = u.DDGSCentrifuge('C603', P602-0,
@@ -199,15 +199,15 @@ def create_system(ID='corn_sys'):
     P606 = bst.Pump('P606', V605-0)
     Ev607 = bst.MultiEffectEvaporator('Ev607',
         ins=P606-0,
-        P=(101325, 73581, 50892, 32777),
+        P=(101325, 69682, 47057, 30953),
         V=0.90
     ) 
     C603_2 = bst.LiquidsSplitCentrifuge('C603_2', Ev607-0, (crude_oil, ''), split={'Oil':0.99})
     
     MX5 = bst.Mixer('MX5', (Ev607-1, P410-0, fu.P508-0))
     MX6 = bst.Mixer('MX6', (C603_2-1, MH604-0))
-    D610 = u.DDGSDryer('D610', (MX6-0, 'dryer_air', 'natural_gas'), moisture_content=0.10, split=dict(Ethanol=1.0))
-    X611 = u.ThermalOxidizer('X611', (D610-1, 'oxidizer_air'))
+    D610 = bst.DrumDryer('D610', (MX6-0, 'dryer_air', 'natural_gas'), moisture_content=0.10, split=dict(Ethanol=1.0))
+    X611 = bst.ThermalOxidizer('X611', (D610-1, 'oxidizer_air'))
     MH612 = u.DDGSHandling('MH612', D610-0, DDGS)
     T608 = bst.facilities.ProcessWaterCenter(
         'T608', 
@@ -218,26 +218,12 @@ def create_system(ID='corn_sys'):
         (recycled_process_water,)
     )
     other_facilities = u.PlantAir_CIP_WasteWater_Facilities('other_facilities', corn)
-    
-    def heat_integration():
-        other_facilities._run()
-        hu_mee = fu.Ev607.heat_utilities[0]
-        hu_dist = fu.T503_T507.heat_utilities[0]
-        actual_duty = hu_mee.duty + hu_dist.duty
-        if actual_duty > 0.:
-            hu_mee(actual_duty, 373.15, 373.15)
-            hu_dist.empty()
-        else:
-            hu_mee.empty()
-            condenser = fu.T503_T507.condenser
-            hu_dist(actual_duty, condenser.ins[0].T, condenser.outs[0].T)
-    
-    other_facilities.specification = heat_integration
+    HXN = bst.HeatExchangerNetwork('HXN', units=[fu.Ev607, fu.T503_T507])
     
     # return f.create_system('corn_sys', feeds=[i for i in f.stream if i.isfeed()])
     
     System = bst.System
-    globals().update(f.unit.__dict__)
+    globals().update(f.unit.data)
     return System('corn_sys',
         [MH101,
          V102,
@@ -324,5 +310,6 @@ def create_system(ID='corn_sys'):
          P410,
          MH604],
         facilities=[other_facilities,
-         T608])
+         T608,
+         HXN])
                         

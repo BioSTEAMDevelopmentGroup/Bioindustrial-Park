@@ -5,13 +5,14 @@ Created on Thu Aug  1 21:48:12 2019
 @author: yoelr
 """
 
-from biosteam import TEA
+from biosteam import TEA, AgileTEA
 import thermosteam as tmo
 import biosteam as bst
 import pandas as pd
 import numpy as np
 
-__all__ = ('CellulosicEthanolTEA', 'create_tea',
+__all__ = ('CellulosicEthanolTEA', 'AgileCellulosicEthanolTEA', 
+           'create_tea', 'create_agile_tea',
            'capex_table', 'voc_table', 'foc_table')
 
 class CAPEXTableBuilder:
@@ -107,7 +108,6 @@ class FOCTableBuilder:
         )
     
         
-
 class CellulosicEthanolTEA(TEA):
     
     __slots__ = ('OSBL_units', 'warehouse', 'site_development',
@@ -115,7 +115,9 @@ class CellulosicEthanolTEA(TEA):
                  'construction', 'contingency', 'other_indirect_costs', 
                  'labor_cost', 'labor_burden', 'property_insurance',
                  'maintenance', '_ISBL_DPI_cached', '_FCI_cached',
-                 '_utility_cost_cached')
+                 '_utility_cost_cached', '_steam_power_depreciation',
+                 '_steam_power_depreciation_array',
+                 'boiler_turbogenerator')
     
     def __init__(self, system, IRR, duration, depreciation, income_tax,
                  operating_days, lang_factor, construction_schedule,
@@ -125,7 +127,8 @@ class CellulosicEthanolTEA(TEA):
                  site_development, additional_piping, proratable_costs,
                  field_expenses, construction, contingency,
                  other_indirect_costs, labor_cost, labor_burden,
-                 property_insurance, maintenance):
+                 property_insurance, maintenance, steam_power_depreciation,
+                 boiler_turbogenerator):
         super().__init__(system, IRR, duration, depreciation, income_tax,
                          operating_days, lang_factor, construction_schedule,
                          startup_months, startup_FOCfrac, startup_VOCfrac,
@@ -144,11 +147,20 @@ class CellulosicEthanolTEA(TEA):
         self.labor_burden = labor_burden
         self.property_insurance = property_insurance
         self.maintenance = maintenance
+        self.steam_power_depreciation = steam_power_depreciation
+        self.boiler_turbogenerator = boiler_turbogenerator
     
     @property
-    def utility_cost(self):
-        self._utility_cost_cached = utility_cost = super().utility_cost
-        return utility_cost
+    def steam_power_depreciation(self):
+        """[str] 'MACRS' + number of years (e.g. 'MACRS7')."""
+        return self._steam_power_depreciation
+    @steam_power_depreciation.setter
+    def steam_power_depreciation(self, depreciation):
+        try:
+            self._steam_power_depreciation_array = self.depreciation_schedules[depreciation]
+        except KeyError:
+            raise ValueError(f"depreciation must be either 'MACRS5', 'MACRS7', 'MACRS10' or 'MACRS15 (not {repr(depreciation)})")
+        self._steam_power_depreciation = depreciation
     
     @property
     def ISBL_installed_equipment_cost(self):
@@ -157,16 +169,30 @@ class CellulosicEthanolTEA(TEA):
     @property
     def OSBL_installed_equipment_cost(self):
         if self.lang_factor:
-            return sum([i.purchase_cost for i in self.OSBL_units]) * self.lang_factor
+            raise NotImplementedError('lang factor cannot yet be used')
         else:
             return sum([i.installed_cost for i in self.OSBL_units])
+    
+    def _fill_depreciation_array(self, D, start, years, TDC):
+        depreciation_array = self._depreciation_array
+        N_depreciation_years = depreciation_array.size
+        if N_depreciation_years > years:
+            raise RuntimeError('depreciation schedule is longer than plant lifetime')
+        BT_TDC = self.boiler_turbogenerator.installed_cost 
+        D[start:start + N_depreciation_years] = (TDC - BT_TDC) * depreciation_array
+        
+        depreciation_array = self._steam_power_depreciation_array
+        N_depreciation_years = depreciation_array.size
+        if N_depreciation_years > years:
+            raise RuntimeError('steam power depreciation schedule is longer than plant lifetime')
+        D[start:start + N_depreciation_years] += BT_TDC * depreciation_array
     
     def _ISBL_DPI(self, installed_equipment_cost):
         """Direct permanent investment of units inside battery limits."""
         if self.lang_factor:
-            self._ISBL_DPI_cached = installed_equipment_cost - sum([i.purchase_cost for i in self.OSBL_units]) * self.lang_factor
+            raise NotImplementedError('lang factor cannot yet be used')
         else:
-            self._ISBL_DPI_cached = installed_equipment_cost - sum([i.installed_cost for i in self.OSBL_units])
+            self._ISBL_DPI_cached = installed_equipment_cost - self.OSBL_installed_equipment_cost
         return self._ISBL_DPI_cached
         
     def _DPI(self, installed_equipment_cost):
@@ -187,11 +213,115 @@ class CellulosicEthanolTEA(TEA):
                 + self._ISBL_DPI_cached * self.maintenance
                 + self.labor_cost * (1 + self.labor_burden)) * self.operating_days / 365
     
-def create_tea(sys, OSBL_units, ignored_units=()):
-    BT = tmo.utils.get_instance(OSBL_units, bst.facilities.BoilerTurbogenerator)
-    OSBL_units = list(OSBL_units)
-    OSBL_units.remove(BT)
-    ethanol_tea = CellulosicEthanolTEA(
+class AgileCellulosicEthanolTEA(AgileTEA):
+    
+    __slots__ = CellulosicEthanolTEA.__slots__
+    steam_power_depreciation = CellulosicEthanolTEA.steam_power_depreciation
+    ISBL_installed_equipment_cost = CellulosicEthanolTEA.ISBL_installed_equipment_cost
+    _ISBL_DPI = CellulosicEthanolTEA._ISBL_DPI
+    _DPI = CellulosicEthanolTEA._DPI
+    _indirect_costs = CellulosicEthanolTEA._indirect_costs
+    _FCI = CellulosicEthanolTEA._FCI
+    _FOC = CellulosicEthanolTEA._FOC
+    
+    def __init__(self, scenarios, IRR, duration, depreciation, income_tax,
+                 lang_factor, construction_schedule,
+                 startup_months, startup_FOCfrac, startup_VOCfrac,
+                 startup_salesfrac, WC_over_FCI,  finance_interest,
+                 finance_years, finance_fraction, OSBL_units, warehouse,
+                 site_development, additional_piping, proratable_costs,
+                 field_expenses, construction, contingency,
+                 other_indirect_costs, labor_cost, labor_burden,
+                 property_insurance, maintenance, steam_power_depreciation,
+                 boiler_turbogenerator):
+        super().__init__(IRR, duration, depreciation, income_tax,
+                         lang_factor, construction_schedule,
+                         startup_months, startup_FOCfrac, startup_VOCfrac,
+                         startup_salesfrac, WC_over_FCI,  finance_interest,
+                         finance_years, finance_fraction, scenarios=scenarios)
+        self.OSBL_units = OSBL_units
+        self.warehouse = warehouse
+        self.site_development = site_development
+        self.additional_piping = additional_piping
+        self.proratable_costs = proratable_costs
+        self.field_expenses = field_expenses
+        self.construction = construction
+        self.contingency = contingency
+        self.other_indirect_costs = other_indirect_costs
+        self.labor_cost = labor_cost
+        self.labor_burden = labor_burden
+        self.property_insurance = property_insurance
+        self.maintenance = maintenance
+        self.steam_power_depreciation = steam_power_depreciation
+        self.boiler_turbogenerator = boiler_turbogenerator
+    
+    @property
+    def OSBL_installed_equipment_cost(self):
+        if self.lang_factor:
+            raise NotImplementedError('lang factor cannot yet be used')
+        else:
+            units = self.units
+            OSBL_units = self.OSBL_units
+            return sum([i.installed_cost for i in units if i.unit in OSBL_units])
+    
+    def _fill_depreciation_array(self, D, start, years, TDC):
+        depreciation_array = self._depreciation_array
+        N_depreciation_years = depreciation_array.size
+        if N_depreciation_years > years:
+            raise RuntimeError('depreciation schedule is longer than plant lifetime')
+        for BT in self.units:
+            if BT.unit is self.boiler_turbogenerator: break
+        BT_TDC = BT.installed_cost 
+        D[start:start + N_depreciation_years] = (TDC - BT_TDC) * depreciation_array
+        depreciation_array = self._steam_power_depreciation_array
+        N_depreciation_years = depreciation_array.size
+        if N_depreciation_years > years:
+            raise RuntimeError('steam power depreciation schedule is longer than plant lifetime')
+        D[start:start + N_depreciation_years] += BT_TDC * depreciation_array
+    
+    
+def create_agile_tea(scenarios, OSBL_units=None, ignored_units=()):
+    units = set(sum([list(i.unit_capital_costs) for i in scenarios], []))
+    for i in ignored_units: units.remove(i)
+    if OSBL_units is None: OSBL_units = bst.get_OSBL(units)
+    BT = tmo.utils.get_instance(OSBL_units, bst.BoilerTurbogenerator)
+    tea = AgileCellulosicEthanolTEA( 
+        scenarios=scenarios,
+        IRR=0.10, 
+        duration=(2007, 2037),
+        depreciation='MACRS7', 
+        income_tax=0.35,
+        lang_factor=None, 
+        construction_schedule=(0.08, 0.60, 0.32),
+        startup_months=3, 
+        startup_FOCfrac=1,
+        startup_salesfrac=0.5,
+        startup_VOCfrac=0.75,
+        WC_over_FCI=0.05,
+        finance_interest=0.08,
+        finance_years=10,
+        finance_fraction=0.4,
+        OSBL_units=OSBL_units, # BT not included
+        warehouse=0.04, 
+        site_development=0.09, 
+        additional_piping=0.045,
+        proratable_costs=0.10,
+        field_expenses=0.10,
+        construction=0.20,
+        contingency=0.10,
+        other_indirect_costs=0.10, 
+        labor_cost=2.5e6,
+        labor_burden=0.90,
+        property_insurance=0.007, 
+        maintenance=0.03,
+        steam_power_depreciation='MACRS20',
+        boiler_turbogenerator=BT)
+    return tea
+
+def create_tea(sys, OSBL_units=None, ignored_units=()):
+    if OSBL_units is None: OSBL_units = bst.get_OSBL(sys.units)
+    BT = tmo.utils.get_instance(OSBL_units, bst.BoilerTurbogenerator)
+    tea = CellulosicEthanolTEA(
         system=sys, 
         IRR=0.10, 
         duration=(2007, 2037),
@@ -220,49 +350,43 @@ def create_tea(sys, OSBL_units, ignored_units=()):
         labor_cost=2.5e6,
         labor_burden=0.90,
         property_insurance=0.007, 
-        maintenance=0.03)
-    for i in ignored_units: ethanol_tea.units.remove(i)
-    ethanol_tea.units.remove(BT)
-    Area700 = bst.TEA.like(bst.System('Area700', (BT,)), ethanol_tea)
-    Area700.labor_cost = 0
-    Area700.depreciation = 'MACRS20'
-    Area700.OSBL_units = (BT,)
-    tea = bst.CombinedTEA([ethanol_tea, Area700], IRR=0.10)
-    sys._TEA = tea
+        maintenance=0.03,
+        steam_power_depreciation='MACRS20',
+        boiler_turbogenerator=BT)
+    for i in ignored_units: tea.units.remove(i)
     return tea
 
 def capex_table(tea):
     capex = CAPEXTableBuilder()
-    etea, btea = tea.TEAs
-    ISBL_installed_equipment_cost = etea.ISBL_installed_equipment_cost / 1e6
-    OSBL_installed_equipment_cost = (etea.OSBL_installed_equipment_cost + btea.OSBL_installed_equipment_cost)/ 1e6
+    ISBL_installed_equipment_cost = tea.ISBL_installed_equipment_cost / 1e6
+    OSBL_installed_equipment_cost = tea.OSBL_installed_equipment_cost / 1e6
     capex.entry('ISBL installed equipment cost', ISBL_installed_equipment_cost)
     capex.entry('OSBL installed equipment cost', OSBL_installed_equipment_cost)
     ISBL_factor_entry = lambda name, value: capex.entry(name, ISBL_installed_equipment_cost * value, f"{value:.1%} of ISBL")
-    ISBL_factor_entry('Warehouse', etea.warehouse)
-    ISBL_factor_entry('Site development', etea.site_development)
-    ISBL_factor_entry('Additional piping', etea.additional_piping)
+    ISBL_factor_entry('Warehouse', tea.warehouse)
+    ISBL_factor_entry('Site development', tea.site_development)
+    ISBL_factor_entry('Additional piping', tea.additional_piping)
     TDC = sum(capex.cost)
     capex.entry('Total direct cost (TDC)', TDC)
     TDC_factor_entry = lambda name, value: capex.entry(name, TDC * value, f"{value:.1%} of TDC")
-    TDC_factor_entry('Proratable costs', etea.proratable_costs)
-    TDC_factor_entry('Field expenses', etea.field_expenses)
-    TDC_factor_entry('Construction', etea.construction)
-    TDC_factor_entry('Contingency', etea.contingency)
-    TDC_factor_entry('Other indirect costs (start-up, permits, etc.)', etea.other_indirect_costs)
+    TDC_factor_entry('Proratable costs', tea.proratable_costs)
+    TDC_factor_entry('Field expenses', tea.field_expenses)
+    TDC_factor_entry('Construction', tea.construction)
+    TDC_factor_entry('Contingency', tea.contingency)
+    TDC_factor_entry('Other indirect costs (start-up, permits, etc.)', tea.other_indirect_costs)
     TIC = sum(capex.cost) - 2 * TDC
     capex.entry('Total indirect cost', TIC)
     FCI = TDC + TIC
     capex.entry('Fixed capital investment (FCI)', FCI)
-    working_capital = FCI * etea.WC_over_FCI
-    capex.entry('Working capital', working_capital, f"{etea.WC_over_FCI:.1%} of FCI")
+    working_capital = FCI * tea.WC_over_FCI
+    capex.entry('Working capital', working_capital, f"{tea.WC_over_FCI:.1%} of FCI")
     TCI = FCI + working_capital
     capex.entry('Total capital investment (TCI)', TCI)
     return capex.table()
 
 def voc_table(system, tea, main_products):
     voc = VOCTableBuilder(tea.operating_days)
-    for i in system.feeds | system.products: 
+    for i in system.feeds + system.products: 
         if i in main_products: continue
         if i.price and not i.isempty(): voc.entry(i)
     isa = isinstance

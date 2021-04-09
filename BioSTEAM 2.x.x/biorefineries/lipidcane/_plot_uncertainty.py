@@ -33,14 +33,14 @@ def set_x_axis(with_labels=True):
         
 # Plot metrics across lipid fraction
 
-readxl = lambda sheet: pd.read_excel('Monte Carlo across lipid fraction.xlsx',
+readxl = lambda sheet: pd.read_excel('results/Monte Carlo across lipid fraction.xlsx',
                                      sheet_name=sheet, index_col=0)
 
 fig = plt.figure()
 
 # IRR
 IRR_ax = plt.subplot(3, 2, 1)
-IRR = readxl('Internal rate of return') * 100 # To percent
+IRR = readxl('Bior. Inte. rate of retu.') * 100 # To percent
 lipid_fraction = np.array(IRR.columns) * 100
 plt.ylabel('Internal rate of return [%]')
 ys = plot_montecarlo_across_coordinate(lipid_fraction, IRR)[2] # p50
@@ -49,7 +49,7 @@ annotate_line('IRR', 3, lipid_fraction, ys,
 
 # TCI
 TCI_ax = plt.subplot(3, 2, 3)
-TCI = readxl('Fixed capital investment') * 1.05 / 1e6 # Account for working capital
+TCI = readxl('Bior. Fixed capi. inve.') * 1.05 / 1e6 # Account for working capital
 plt.ylabel('Total capital investment [$10^6 \cdot \mathrm{USD}$]')
 ys = plot_montecarlo_across_coordinate(lipid_fraction, TCI)[2]
 annotate_line('TCI', 3, lipid_fraction, ys, 
@@ -57,8 +57,8 @@ annotate_line('TCI', 3, lipid_fraction, ys,
 
 # Production
 production_ax = plt.subplot(3, 2, 2)
-ethanol_production = readxl('Ethanol production') / (1e6*rho_etoh)
-biodiesel_production = readxl('Biodiesel production') / (1e6*rho_bd)
+ethanol_production = readxl('Biorefinery Ethanol production') / (1e6*rho_etoh)
+biodiesel_production = readxl('Bior. Biod. prod.') / (1e6*rho_bd)
 plt.ylabel('Production [$10^6 \cdot \mathrm{litter} \cdot \mathrm{yr}^{-1}$]')
 ys = plot_montecarlo_across_coordinate(lipid_fraction, ethanol_production,
                                        colors.orange_tint.RGBn,
@@ -73,8 +73,8 @@ annotate_line('Biodiesel', 4, lipid_fraction, ys,
 
 # Production cost
 production_cost_ax = plt.subplot(3, 2, 4)
-ethanol_production_cost = readxl('Ethanol production cost') / ethanol_production / 1e6
-biodiesel_production_cost = readxl('Biodiesel production cost') / biodiesel_production / 1e6
+ethanol_production_cost = readxl('Bior. Etha. prod. cost') / ethanol_production / 1e6
+biodiesel_production_cost = readxl('Bior. Biod. prod. cost') / biodiesel_production / 1e6
 plt.ylabel('Production cost [$\mathrm{USD} \cdot \mathrm{liter}^{-1}$]')
 plot_montecarlo_across_coordinate(lipid_fraction, ethanol_production_cost,
                                   colors.orange_tint.RGBn,
@@ -85,7 +85,7 @@ plot_montecarlo_across_coordinate(lipid_fraction, biodiesel_production_cost,
 
 # Steam
 steam_ax = plt.subplot(3, 2, 5)
-steam = readxl('Steam')/1000
+steam = readxl('Biorefinery Steam')/1000.
 plt.ylabel('Steam [$10^{3} \cdot \mathrm{MT} \cdot \mathrm{yr}^{-1}$]')
 ys = plot_montecarlo_across_coordinate(lipid_fraction, steam)[2]
 annotate_line('Steam', 8, lipid_fraction, ys, 
@@ -94,8 +94,8 @@ annotate_line('Steam', 8, lipid_fraction, ys,
 
 # Electricity
 electricity_ax = plt.subplot(3, 2, 6)
-consumed_electricity = readxl('Consumed electricity')/1000
-excess_electricity = readxl('Excess electricity')/1000
+consumed_electricity = readxl('Bior. Cons. elec.')/1000
+excess_electricity = readxl('Biorefinery Excess electricity')/1000
 plt.ylabel('Electricity [$\mathrm{GWhr} \cdot \mathrm{yr}^{-1}$]')
 ys = plot_montecarlo_across_coordinate(lipid_fraction, consumed_electricity,
                                        colors.purple_tint.RGBn,
@@ -113,8 +113,8 @@ annotate_line('Excess electricity', 4, lipid_fraction, ys,
 
 # Plot sugarcane values and SuperPro values
 x_superpro = [0, 2, 5, 10]
-data_sc = pd.read_excel('Monte Carlo sugarcane.xlsx', header=[0,1])
-get_metric = lambda name: np.asarray(data_sc['Biorefinery', name]).flatten()
+data_sc = pd.read_excel('results/Monte Carlo sugarcane.xlsx', header=[0,1])
+get_metric = lambda name: data_sc['Biorefinery', name].values.flatten()
 
 # IRR
 plt.sca(IRR_ax)
@@ -189,12 +189,12 @@ plt.text(0.05, y_text, "E", color=colors.neutral_shade.RGBn,
 # Steam
 plt.sca(steam_ax)
 plot_scatter_points([0, 10], [686.056, 656.000])
-steam = get_metric('Steam [MT/yr]')/1000
+steam = get_metric('Steam [MT/yr]')/1000.
 plot_montecarlo(steam)
 plot_vertical_line(1)
-steam_ub = 900
+steam_ub = 1200
 plt.ylim(0, steam_ub)
-steam_yticks = np.arange(0, 900, 900/5)
+steam_yticks = np.arange(0, steam_ub, steam_ub/5)
 plt.yticks(steam_yticks)
 set_x_axis(True)
 plt.xlabel('Feedstock lipid content [%]')

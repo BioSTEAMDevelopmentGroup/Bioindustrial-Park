@@ -81,9 +81,9 @@ def create_fattyalcohol_production_sys(ID='fattyalcohol_production_sys',
     T101 = units.StorageTank('T101', glucose, tau=one_week)
     T102 = units.StorageTank('T102', M101-0, tau=0.25)
     P102 = units.Pump('P102', T102-0)
-    T103 = fa_units.CSLTank('T103', CSL)
+    T103 = fa_units.CSLStorageTank('T103', CSL)
     T104 = units.StorageTank('T104', salt, tau=one_week)
-    T106 = fa_units.DAPTank('T106', DAP)
+    T106 = fa_units.DAPStorageTank('T106', DAP)
         
     def balance_feeds_to_bioreactor():
         feed_imol = mixed_bioreactor_feed.imol

@@ -122,12 +122,14 @@ def create_chemicals():
     
     # As is in data bank
     chems.extend(
-        tmo.Chemicals(['Water', 'Ethanol', 'AceticAcid',
-                       'Furfural', 'Glycerol', 'H2SO4', 'NH3', 
+        tmo.Chemicals([lc.chemicals.Water, lc.chemicals.Ethanol, 'AceticAcid',
+                       'Furfural', lc.chemicals.Glycerol, 'H2SO4', 'NH3', 
                        'LacticAcid', 'SuccinicAcid', lc.chemicals.P4O10])
     )
     chems.H2SO4.at_state('l')
+    append_single_phase_chemical('Lime', 'Ca(OH)2')
     append_single_phase_chemical('HNO3', 'NitricAcid')
+    append_single_phase_chemical('NH4OH')
     append_single_phase_chemical('Denaturant', 'Octane')
     append_single_phase_chemical('DAP', 'Diammonium Phosphate')
     append_single_phase_chemical('AmmoniumAcetate')
@@ -169,7 +171,6 @@ def create_chemicals():
     chems.Acetate.Hf = -103373
     
     # Chemicals taken from previous study
-    chems.append(lc.chemicals.CaO)
     chems.append(lc.chemicals.Ash)
     chems.append(lc.chemicals.NaOH)
     append_new_single_phase_chemical('Lignin',
@@ -234,12 +235,20 @@ def create_chemicals():
     append_chemical_copy('WWTsludge', chems.Biomass)
     append_chemical_copy('Cellulase', chems.Enzyme)
     
+    # New feature in Thermosteam allows salt and solutes to be accounted 
+    # for in VLE; leading to more accurate results. However, it is not included
+    # here as there is no significant difference in results.
+    # for i in chems['Glucose', 'Xylose']:
+    #     i.N_solutes = 1
+    # for i in chems['Sucrose', 'CaSO4', 'AmmoniumSulfate']:
+    #     i.N_solutes = 2
+        
     chems.compile()
-    chems.set_synonym('CaO', 'Lime')
+    chems.set_synonym('Lime', 'Ca(OH)2')
     chems.set_synonym('Water', 'H2O')
     chems.set_synonym('H2SO4', 'SulfuricAcid')
     chems.set_synonym('NH3', 'Ammonia')
-    chems.set_synonym('AmmoniumSulfate', 'NH4SO4')
+    chems.set_synonym('AmmoniumSulfate', '(NH4)2SO4')
     chems.set_synonym('Denaturant', 'Octane')
     chems.set_synonym('CO2', 'CarbonDioxide')
     return chems

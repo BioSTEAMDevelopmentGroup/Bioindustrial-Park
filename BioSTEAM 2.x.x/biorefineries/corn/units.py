@@ -35,10 +35,8 @@ __all__ = (
     'Saccharification',
     'YeastTank',
     'WetDDGSConveyor',
-    'DDGSDryer',
     'Liquefaction',
     'SimultaneousSaccharificationFermentation', 'SSF',
-    'ThermalOxidizer',
     'DDGSHandling',
     'DDGSCentrifuge',
     'PlantAir_CIP_WasteWater_Facilities',
@@ -159,113 +157,6 @@ YeastTank = tank_factory('YeastTank', kW_per_m3=0.5,
 
 @cost('Flow rate', S=24158., n=0.6, units='kg/hr', CE=CE2007, kW=13.1, cost=55700.)
 class WetDDGSConveyor(bst.Unit): pass
-
-@cost('Peripheral drum area', CE=CE2007, ub=7854.0,
-      S=1235.35, units='m2', n=0.6, cost=MF52 * 2268000., kW=938.866)
-class DDGSDryer(bst.Unit):
-    """
-    Create a DDGSDryer to dry dried distillers grains with solubles (DDGS) by passing
-    hot air (heated by burning natural gas).
-    
-    Parameters
-    ----------
-    ins : stream sequence
-        [0] Wet DDGS.
-        [1] Air.
-        [2] Natural gas.
-    outs : stream sequence
-        [0] Dried DDGS
-        [1] Hot air
-        [2] Emissions
-    split : dict[str, float]
-        Component splits to hot air (stream [1]).
-    R : float, optional
-        Flow of hot air over evaporation. Defaults to 1.4 wt gas / wt evap.
-    H : float, optional
-        Specific evaporation rate [kg/hr/m3]. Defaults to 20. 
-    length_to_diameter : float, optional
-        Note that the drum is horizontal. Defaults to 25.
-    T : float, optional
-        Operating temperature [K]. Defaults to 343.15.
-    natural_gas_price : float
-        Price of natural gas [USD/kg]. Defaults to 0.218.
-    moisture_content : float
-        Moisutre content of DDGS [wt / wt]. Defaults to 0.10.
-        
-    Notes
-    -----
-    The flow rate for air in the inlet is varied to meet the `R` specification
-    (i.e. flow of hot air over flow rate evaporated). The flow rate of inlet natural
-    gas is also altered to meet the heat demand.
-    
-    
-    """
-    _units = {'Evaporation': 'kg/hr',
-              'Peripheral drum area': 'm2',
-              'Diameter': 'm'}
-    _N_ins = 3
-    _N_outs = 3
-    
-    @property
-    def isplit(self):
-        """[ChemicalIndexer] Componentwise split of feed to 0th outlet stream."""
-        return self._isplit
-    @property
-    def split(self):
-        """[Array] Componentwise split of feed to 0th outlet stream."""
-        return self._isplit._data
-    
-    @property
-    def natural_gas(self):
-        """[Stream] Natural gas to satisfy steam and electricity requirements."""
-        return self.ins[2]
-    
-    @property
-    def utility_cost(self):
-        return super().utility_cost + self.natural_gas_cost
-    
-    @property
-    def natural_gas_cost(self):
-        return self.natural_gas_price * self.natural_gas.F_mass
-    
-    def __init__(self, ID="", ins=None, outs=(), thermo=None, *,
-                 split, R=1.4, H=20., length_to_diameter=25, T=343.15,
-                 natural_gas_price=0.289, moisture_content=0.10):
-        super().__init__(ID, ins, outs, thermo)
-        self._isplit = self.chemicals.isplit(split)
-        self.T = T
-        self.R = R
-        self.H = H
-        self.length_to_diameter = length_to_diameter
-        self.natural_gas_price = natural_gas_price
-        self.moisture_content = moisture_content
-        
-    def _run(self):
-        wet_solids, air, natural_gas = self.ins
-        dry_solids, hot_air, emissions = self.outs
-        tmo.separations.split(wet_solids, hot_air, dry_solids, self.split)
-        tmo.separations.adjust_moisture_content(dry_solids, hot_air, self.moisture_content)
-        design_results = self.design_results
-        design_results['Evaporation'] = evaporation = hot_air.F_mass
-        air.imass['N2', 'O2'] = np.array([0.78, 0.32]) * self.R * evaporation
-        hot_air.mol += air.mol
-        dry_solids.T = hot_air.T = self.T
-        duty = (dry_solids.H + hot_air.H) - (wet_solids.H + air.H)
-        natural_gas.empty()
-        CO2 = CH4 = duty / self.chemicals.CH4.LHV
-        H2O = 2. * CH4
-        natural_gas.imol['CH4'] = CH4
-        emissions.imol['CO2', 'H2O'] = [CO2, H2O]
-        emissions.T = self.T + 30.
-        emissions.phase = air.phase = natural_gas.phase = hot_air.phase = 'g'
-        
-    def _design(self):
-        length_to_diameter = self.length_to_diameter
-        design_results = self.design_results
-        design_results['Volume'] = volume = design_results['Evaporation'] / self.H 
-        design_results['Diameter'] = diameter = cylinder_diameter_from_volume(volume, length_to_diameter)
-        design_results['Length'] = length = diameter * length_to_diameter
-        design_results['Peripheral drum area'] = cylinder_area(diameter, length)
 
 LiquefactionTank = tank_factory('LiquefactionTank', 
     CE=CE2007, cost=160900., S=141.3, tau=0.9, n=0.6, V_wf=0.90, V_max=500., kW_per_m3=0.6,
@@ -392,69 +283,6 @@ SSF = SimultaneousSaccharificationFermentation
 @copy_algorithm(bst.SolidLiquidsSplitCentrifuge, run=False)
 class DDGSCentrifuge(bst.Splitter): pass
     
-class ThermalOxidizer(bst.Unit):
-    """
-    Create a ThermalOxidizer that burns any remaining combustibles.
-    
-    Parameters
-    ----------
-    ins : stream sequence
-        [0] Feed gas
-        [1] Air
-    outs : stream
-        Emissions.
-    
-    Notes
-    -----
-    Adiabatic operation is assummed. Simulation and cost is based on [1]_.
-    
-    References
-    ----------
-    .. [1] Kwiatkowski, J. R.; McAloon, A. J.; Taylor, F.; Johnston, D. B. 
-        Modeling the Process and Costs of Fuel Ethanol Production by the Corn 
-        Dry-Grind Process. Industrial Crops and Products 2006, 23 (3), 288–296.
-        https://doi.org/10.1016/j.indcrop.2005.08.004.
-
-    """
-    _N_ins = 2
-    _N_outs = 1
-    max_volume = 20. # m3
-    
-    def __init__(self, *args, tau=0.00014, kW_per_m3=18.47, V_wf=0.95, **kwargs):
-        bst.Unit.__init__(self, *args, **kwargs)
-        self.tau = tau
-        self.kW_per_m3 = kW_per_m3
-        self.V_wf = V_wf
-
-    def _run(self):
-        feed, air = self.ins
-        emissions, = self.outs
-        emissions.copy_like(feed)
-        combustion_rxns = self.chemicals.get_combustion_reactions()
-        combustion_rxns.force_reaction(emissions)
-        O2 = max(-emissions.imol['O2'], 0.)
-        emissions.copy_like(feed)
-        air.imol['N2', 'O2'] = [0.78/0.32 * O2, O2]
-        emissions.mol += air.mol
-        combustion_rxns.adiabatic_reaction(emissions)
-        
-    def _design(self):
-        design_results = self.design_results
-        volume = self.tau * self.outs[0].F_vol / self.V_wf
-        V_max = self.max_volume
-        design_results['Number of vessels'] = N = np.ceil(volume / V_max)
-        design_results['Vessel volume'] = volume / N
-        design_results['Total volume'] = volume
-        
-    def _cost(self):
-        design_results = self.design_results
-        total_volume = design_results['Total volume']
-        N = design_results['Number of vessels']
-        vessel_volume = design_results['Vessel volume']
-        self.power_utility.consumption = total_volume * self.kW_per_m3
-        purchase_costs = self.purchase_costs
-        purchase_costs['Vessels'] = N * 918300. * (vessel_volume / 13.18)**0.6
-        
 
 @cost('Flow rate', units='kg/hr', CE=CE2007, cost=122800, S=15303.5346, kW=37.3, n=0.6)
 class DDGSHandling(bst.Unit): pass
@@ -471,5 +299,5 @@ class PlantAir_CIP_WasteWater_Facilities(bst.Facility):
         pass
         
     def _cost(self):
-        C = self.purchase_costs
+        C = self.baseline_purchase_costs
         C['Facilities'] = 6e5 * (self.corn.F_mass / 46211.6723)**0.6
