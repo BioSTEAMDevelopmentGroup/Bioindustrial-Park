@@ -25,11 +25,13 @@ def reset_and_reload():
     print('Loading and simulating with baseline specifications ...')
     spec_1 = spec.spec_1
     spec_2 = spec.spec_2
+    spec_3 = spec.spec_3
     spec.load_yield(0.49)
     spec.load_titer(54.8)
+    spec.load_productivity(0.76)
     system.simulate()
     print('Loading and simulating with required specifications ...')
-    spec.load_specifications(spec_1=spec_1, spec_2=spec_2)
+    spec.load_specifications(spec_1=spec_1, spec_2=spec_2, spec_3=spec_3)
     system.simulate()
 
 def reset_and_switch_solver(solver_ID):
@@ -109,7 +111,7 @@ for group in process_groups:
 for parameter in parameters:
     spec.load_titer(parameter)
     # spec.load_yield(parameter/100.)
-    
+    spec.load_specifications(spec_1=spec.spec_1, spec_2=parameter, spec_3=spec.spec_3)
     try:
         HP_sys.simulate()
     except:

@@ -77,7 +77,7 @@ ash_disposal_price = -1.41e6 / (4279*7880)
 # For the lower bound (i.e., negative selling price indicating cost), use price from
 # Aden et al., 2002: $0.0094/lb in 2000$ = 0.0094*1.114/0.802*2.20462 = $0.0288/kg
 # in 2016$
-gypsum_price = 0
+gypsum_price = 0.
 
 # Baseline from Davis et al., 2018, lower bound is 2015-2019 average of 	
 # hydrate lime in $/ton at plant from Mineral Commodity Summaries 2020.	

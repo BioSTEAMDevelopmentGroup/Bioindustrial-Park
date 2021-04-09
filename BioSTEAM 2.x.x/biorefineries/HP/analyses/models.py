@@ -680,7 +680,7 @@ D = shape.Triangle(0.84, 0.9, 0.96)
 @param(name='Plant uptime', element='TEA', kind='isolated', units='%',
        baseline=0.9, distribution=D)
 def set_operating_days(uptime):
-    HP_tea.operating_days = 365 * uptime
+    HP_tea.operating_days = 365. * uptime
 
 
 # D = baseline_triangle(1, 0.25)
@@ -744,7 +744,7 @@ for stream_ID in default_price_streams:
     D = baseline_triangle(baseline, 0.1)
     add_stream_price_param(stream, D)
 
-D = shape.Triangle(0.067, 0.070, 0.074)
+D = shape.Triangle(0.067, 0.070, 0.073)
 @param(name='Electricity price', element='TEA', kind='isolated', units='$/kWh',
        baseline=0.070, distribution=D)
 def set_electricity_price(price): 
@@ -857,13 +857,16 @@ def set_R301_glucan_conversion(X): R301.saccharification_rxns[2].X = X
 # def set_R302_fermentation_time(tau): R302.tau_cofermentation = tau
 
 
-D = shape.Triangle(0.38, 0.76, 1.52)
-@param(name='Productivity', element=R301, kind='coupled', units='g/L/hr',
+D = shape.Triangle(0.684, 0.76, 0.8360000000000001)
+@param(name='Productivity', element=R302, kind='coupled', units='g/L/hr',
        baseline=0.76, distribution=D)
 def set_HP_productivity(productivity):
     # R301.productivity = productivity
     # R302.productivity = productivity * R302.ferm_ratio
-    spec.load_productivity(productivity)
+    # spec.load_productivity(productivity)
+    # spec.load_specifications(spec_1=spec.spec_1, spec_2=spec.spec_2, spec_3=productivity)
+    
+    spec.spec_3 = productivity
     
 D = shape.Triangle(5, 10, 15)
 @param(name='CSL loading', element=R301, kind='coupled', units='g/L',
@@ -871,17 +874,34 @@ D = shape.Triangle(5, 10, 15)
 def set_CSL_loading(loading): R302.CSL_loading = loading
 
 
-# D = shape.Triangle(0.424, 0.53, 0.636) # +/- 20% of baseline
-# @param(name='3-Hydroxypropionic acid yield', element=R303, kind='coupled', units='% theoretical',
-#        baseline=0.53, distribution=D)
-# def set_R302_HP_yield(X):
-#     R302_X = R302.cofermentation_rxns.X
-#     R302_X[0] = R302_X[2] = X
-#     R303_X = R303.cofermentation_rxns.X
-#     R303_X[0] = R303_X[3] = X * R303.ferm_ratio
 
+########################### COMMENT Y,T OUT FOR TRY P_MC ANALYSIS ############################
 
+D = shape.Triangle(0.49*0.9, 0.49, 0.49*1.1) # +/- 10% of baseline
+@param(name='3-Hydroxypropionic acid yield', element=R302, kind='coupled', units='% theoretical',
+        baseline=0.49, distribution=D)
+def set_R302_HP_yield(X):
+    # R302_X = R302.cofermentation_rxns.X
+    # R302_X[0] = R302_X[2] = X
+    # R303_X = R303.cofermentation_rxns.X
+    # R303_X[0] = R303_X[3] = X * R303.ferm_ratio
+    # spec.load_specifications(spec_1=X, spec_2=spec.spec_2, spec_3=spec.spec_3)
+    # spec.load_yield(X)
+    spec.spec_1 = X
 
+D = shape.Triangle(54.8*0.9, 54.8, 54.8*1.1) # +/- 10% of baseline
+@param(name='3-Hydroxypropionic acid titer', element=R302, kind='coupled', units='g/L',
+        baseline=54.8, distribution=D)
+def set_R302_HP_titer(X):
+    # R302_X = R302.cofermentation_rxns.X
+    # R302_X[0] = R302_X[2] = X
+    # R303_X = R303.cofermentation_rxns.X
+    # R303_X[0] = R303_X[3] = X * R303.ferm_ratio
+    # spec.load_specifications(spec_1=spec.spec_1, spec_2=X, spec_3=spec.spec_3)
+    # spec.load_titer(X)
+    spec.spec_2 = X
+    
+##############################################################################################
 
 D = shape.Triangle(0.030, 0.040, 0.050)
 @param(name='Acetic acid yield', element=R303, kind='coupled', units='% theoretical',
@@ -908,6 +928,15 @@ def set_R301_acetic_acid_yield(X):
     
     R302.xylose_to_glycerol_rxn.X = X2_glycerol
     R303.xylose_to_glycerol_rxn.X = X2_glycerol * ferm_ratio
+    
+    
+    
+    
+    
+    
+    
+    
+    
     
     # R302_X[1] = R302_X[3] = X
     # R303_X = R303.cofermentation_rxns.X
@@ -973,9 +1002,9 @@ def set_R401_tau(tau):
 
 R402 = find.unit.R402
 # D = baseline_triangle(0.95, 0.05)
-D = shape.Triangle(0.995, 0.9975, 0.9999)
+D = shape.Triangle(0.7, 0.8, 0.9)
 @param(name='Dehydration conversion', element=R402, kind='coupled', units='',
-       baseline=0.95, distribution=D)
+       baseline=0.8, distribution=D)
 def set_R402_conversion(X):
     R402.dehydration_reactions[0].X = X
     

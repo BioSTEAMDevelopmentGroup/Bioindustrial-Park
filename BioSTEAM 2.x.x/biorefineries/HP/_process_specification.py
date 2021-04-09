@@ -624,7 +624,7 @@ class TiterAndInhibitorsSpecification:
         
         if x_titer < self.target_titer: # Evaporate
             self.evaporator.V = V_min = flx.IQ_interpolation(self.titer_objective_function,
-                                                             V_min, V_max, ytol=1e-3, maxiter=100) 
+                                                             V_min, V_max, ytol=1e-3, maxiter=200) 
         elif x_titer > self.target_titer: # Dilute
             self.update_dilution_water(x_titer)
             # self.mixer._run()
@@ -640,7 +640,7 @@ class TiterAndInhibitorsSpecification:
             
             if y_0 > 0.:
                 self.evaporator.V = flx.IQ_interpolation(obj_f,
-                                                     V_min, V_max, y0 = y_0, ytol=1e-3, maxiter=100) 
+                                                     V_min, V_max, y0 = y_0, ytol=1e-3, maxiter=200) 
         
         # self.check_sugar_concentration()
     

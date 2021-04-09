@@ -339,7 +339,7 @@ def create_HP_sys(ins, outs):
                         outs = ('to_seedtrain', 'to_cofermentation'),
                         split = 0.07) # split = inoculum ratio
     
-    # Cofermentationv
+    # Cofermentation
     # R302 = units.CoFermentation_original('R302', 
     #                                 ins=(M304_H_P-0, '', CSL),
     #                                 outs=('fermentation_effluent', 'CO2'))
@@ -351,7 +351,7 @@ def create_HP_sys(ins, outs):
                                     vessel_material='Stainless steel 316',
                                     neutralization=True)
     
-    def include_seed_CSL_in_cofermentation(): # effluent always has 0 CSL
+    def include_seed_CSL_in_cofermentation(): # note: effluent always has 0 CSL
         R302._run()
         R302.ins[2].F_mass*=1./(1-S302.split[0])
     R302.specification = include_seed_CSL_in_cofermentation
@@ -449,7 +449,6 @@ def create_HP_sys(ins, outs):
                                             P = (101325, 73581, 50892, 32777, 20000), V = 0.5)
     # target_water_x = 0.35
     target_HP_x = 0.10
-    
     def get_x(chem_ID, stream):
         return stream.imol[chem_ID]/sum(stream.imol['AceticAcid', 'Furfural', 'HMF', 'HP', 'Water'])
     
@@ -463,8 +462,15 @@ def create_HP_sys(ins, outs):
         F401._run()
         # import pdb
         # pdb.set_trace()
-        
+    
     F401.specification = F401_specification
+    
+    
+    def F401_no_run_cost():
+        F401.heat_utilities = tuple()
+        F401._installed_cost = 0.
+    # F401._cost = F401_no_run_cost
+        
     
     F401_P = bst.units.Pump('F401_P', ins=F401-0)
 
@@ -782,9 +788,9 @@ def create_HP_sys(ins, outs):
     fix_split(R501.isplit, 'Glucose')
     
     # !!! Make sure to state and explain this conservative assumption
-    # Explanation: In TRY analysis, we aren't looking at the implications of varying yield of byproducts on 
+    # Working explanation: In TRY analysis, we aren't looking at the implications of varying yield of byproducts on 
     # sugars, but solely that of 3-HP. 
-    # Just show the implications of the extremes of the assumption.
+    # Just show the implications of the extremes of the assumption to show it doesn't affect results much.
     
     R501.byproducts_combustion_rxns = ParallelRxn([
         Rxn('AceticAcid -> 3 CO2 + H2O + O2', 'AceticAcid', 1.-1e-6, correct_atomic_balance=True),
