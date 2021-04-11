@@ -52,17 +52,21 @@ def load(name):
     dct = globals()
     u = flowsheet.unit
     s = flowsheet.stream
-    sugarcane_sys = create_sugarcane_to_ethanol_2g()
+    sugarcane_sys = create_sugarcane_to_ethanol_2g(operating_hours=200 * 24)
     if name == 'sugarcane2g':
         # sugarcane_tea = create_tea(sugarcane_sys)
         # sugarcane_tea.operating_days = 200
         # sugarcane_sys.simulate()
+        sugarcane_tea = create_agile_tea(sugarcane_sys.units)
         sugarcane_sys.simulate()
-        scenario_a = sugarcane_sys.get_scenario_costs(200 * 24.)
-        cornstover_sys = trim_to_cornstover_hot_water_cellulosic_ethanol(sugarcane_sys)
+        scenario_a = sugarcane_tea.create_scenario(sugarcane_sys)
+        cornstover_sys = trim_to_cornstover_hot_water_cellulosic_ethanol(
+            sugarcane_sys,
+            operating_hours=130 * 24,
+        )
         cornstover_sys.simulate()
-        scenario_b = cornstover_sys.get_scenario_costs(130 * 24.)
-        sugarcane_tea = create_agile_tea([scenario_a, scenario_b])
+        scenario_b = sugarcane_tea.create_scenario(cornstover_sys)
+        sugarcane_tea.compile_scenarios([scenario_a, scenario_b])
         # sugarcane_tea.IRR = 0.1
         dct.update(flowsheet.to_dict())
         # s.ethanol.price = sugarcane_tea.solve_price(s.ethanol)

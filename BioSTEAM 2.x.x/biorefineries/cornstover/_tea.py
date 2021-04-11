@@ -224,7 +224,7 @@ class AgileCellulosicEthanolTEA(AgileTEA):
     _FCI = CellulosicEthanolTEA._FCI
     _FOC = CellulosicEthanolTEA._FOC
     
-    def __init__(self, scenarios, IRR, duration, depreciation, income_tax,
+    def __init__(self, IRR, duration, depreciation, income_tax,
                  lang_factor, construction_schedule,
                  startup_months, startup_FOCfrac, startup_VOCfrac,
                  startup_salesfrac, WC_over_FCI,  finance_interest,
@@ -238,7 +238,7 @@ class AgileCellulosicEthanolTEA(AgileTEA):
                          lang_factor, construction_schedule,
                          startup_months, startup_FOCfrac, startup_VOCfrac,
                          startup_salesfrac, WC_over_FCI,  finance_interest,
-                         finance_years, finance_fraction, scenarios=scenarios)
+                         finance_years, finance_fraction)
         self.OSBL_units = OSBL_units
         self.warehouse = warehouse
         self.site_development = site_development
@@ -280,13 +280,11 @@ class AgileCellulosicEthanolTEA(AgileTEA):
         D[start:start + N_depreciation_years] += BT_TDC * depreciation_array
     
     
-def create_agile_tea(scenarios, OSBL_units=None, ignored_units=()):
-    units = set(sum([list(i.unit_capital_costs) for i in scenarios], []))
+def create_agile_tea(units, OSBL_units=None, ignored_units=()):
     for i in ignored_units: units.remove(i)
     if OSBL_units is None: OSBL_units = bst.get_OSBL(units)
     BT = tmo.utils.get_instance(OSBL_units, bst.BoilerTurbogenerator)
     tea = AgileCellulosicEthanolTEA( 
-        scenarios=scenarios,
         IRR=0.10, 
         duration=(2007, 2037),
         depreciation='MACRS7', 
@@ -320,7 +318,7 @@ def create_agile_tea(scenarios, OSBL_units=None, ignored_units=()):
 
 def create_tea(sys, OSBL_units=None, ignored_units=()):
     if OSBL_units is None: OSBL_units = bst.get_OSBL(sys.units)
-    BT = tmo.utils.get_instance(OSBL_units, bst.BoilerTurbogenerator)
+    BT = tmo.utils.get_instance(OSBL_units, (bst.BoilerTurbogenerator, bst.Boiler))
     tea = CellulosicEthanolTEA(
         system=sys, 
         IRR=0.10, 

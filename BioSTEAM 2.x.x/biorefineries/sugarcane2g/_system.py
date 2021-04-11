@@ -171,7 +171,7 @@ def create_sugarcane_to_ethanol_2g(
     HXN = bst.HeatExchangerNetwork('HXN', units=[F301, D303])
 
 @bst.utils.piping.ignore_docking_warnings
-def trim_to_cornstover_hot_water_cellulosic_ethanol(sugarcane_sys):
+def trim_to_cornstover_hot_water_cellulosic_ethanol(sugarcane_sys, operating_hours=None):
     u = sugarcane_sys.flowsheet.unit
     u.M601.ins[2] = None
     for index, stream in enumerate(u.M901.ins):
@@ -182,7 +182,7 @@ def trim_to_cornstover_hot_water_cellulosic_ethanol(sugarcane_sys):
     u.D701-0-index-u.M802
     units = (list(u.M601.neighborhood(radius=int(1e6), facilities=False))
              + [i for i in sugarcane_sys.facilities if not isinstance(i, bst.HeatExchangerNetwork)])
-    cornstover_sys = bst.System.from_units('cornstover_sys', units)
+    cornstover_sys = bst.System.from_units('cornstover_sys', units, operating_hours=operating_hours)
     return cornstover_sys
 
         

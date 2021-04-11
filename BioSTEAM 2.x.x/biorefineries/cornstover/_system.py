@@ -393,13 +393,12 @@ def create_facilities(
     ):
     
     BT = bst.facilities.BoilerTurbogenerator('BT',
-                                              ins=(solids_to_boiler,
+                                             ins=(solids_to_boiler,
                                                   gas_to_boiler, 
                                                   'boiler_makeup_water',
                                                   'natural_gas',
                                                   'FGD_lime',
-                                                  'boilerchems'), 
-                                              turbogenerator_efficiency=0.85)
+                                                  'boilerchems'))
     
     CWP = bst.facilities.ChilledWaterPackage('CWP')
     CT = bst.facilities.CoolingTower('CT')
