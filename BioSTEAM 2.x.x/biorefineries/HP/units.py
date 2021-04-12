@@ -60,7 +60,7 @@ class FeedstockSizeReduction(Unit):
     _N_ins = 1
     _N_outs = 1
     _N_power_utilities = 1
-    _BM = {'Hammer mills': 2.45} #!!! TODO: Update _BM
+    _F_BM_default = {'Hammer mills': 2.45} #!!! TODO: Update _F_BM_default
     _units = {'Throughput per mill': 'ton/hr'}
 
     _min_throughput_per_mill = 2 # ton/hr
@@ -97,7 +97,7 @@ class FeedstockSizeReduction(Unit):
         N = self.design_results['Number of mills']
         W = self.design_results['Throughput per mill']
         purchase_cost = N * 4310. * W**0.78 # Seider's Product and Process Design Principles  > Table 16.32 > "Size reduction equipment" > "Hammer mills"
-        self.purchase_costs['Hammer mills'] = purchase_cost
+        self.baseline_purchase_costs['Hammer mills'] = purchase_cost
         # self.power_utility(100.669)
         power_utility = self.power_utility
         power_utility((0.97/0.1) * W * (1 + 1.077*(W-0.1)/4.9)) 
@@ -164,7 +164,7 @@ class SulfuricAcidMixer(Unit):
 #     _N_outs = 1
 #     _N_heat_utilities = 1
 #     _graphics = Mixer._graphics
-#     _BM = {**Mixer._BM,
+#     _F_BM_default = {**Mixer._F_BM_default,
 #             'Heat exchangers': 3.17}
 #     def __init__(self, ID='', ins=None, outs=(), T_water = 300, P_water = 101325):
 #         Unit.__init__(self, ID, ins, outs)
@@ -195,7 +195,7 @@ class SulfuricAcidMixer(Unit):
 #         heated_water.P = self.P_water
 #         hx.simulate_as_auxiliary_exchanger(duty=self.water_duty,
 #                                             stream=original_water.copy())
-#         self.purchase_costs['Heat exchangers'] = hx.purchase_cost
+#         self.baseline_purchase_costs['Heat exchangers'] = hx.purchase_cost
         
         
 # Adjust pretreatment water loading, 30% from Table 5 on Page 21 of Humbird et al.
@@ -218,67 +218,67 @@ class PretreatmentMixer(Mixer):
         
         mixture_out.mix_from([mixture, water])
 
-# Steam mixer
-class SteamMixer(Mixer):
-    """
-    Parameters
-    ----------
-    ins :
-        [0] Feed        
-        [1] Water (to be heated by auxillary heat exchanger)
+# # Steam mixer
+# class SteamMixer(Mixer):
+#     """
+#     Parameters
+#     ----------
+#     ins :
+#         [0] Feed        
+#         [1] Water (to be heated by auxillary heat exchanger)
     
-    outs : 
-        [0] Mixed steam    
+#     outs : 
+#         [0] Mixed steam    
         
-    """
-    _N_ins = 2
-    _N_outs = 1
-    _N_heat_utilities = 1
-    _BM = {**Mixer._BM,
-            'Heat exchangers': 3.17}
+#     """
+#     _N_ins = 2
+#     _N_outs = 1
+#     _N_heat_utilities = 1
+#     _F_BM_default = {**Mixer._F_BM_default,
+#             'Heat exchangers': 3.17}
     
-    def __init__(self, ID='', ins=None, outs=(), *, P, T_steam=268.+273.15):
-        Mixer.__init__(self, ID, ins, outs)
-        self.P = P
-        self.heat_exchanger = HXutility(None, None, None, T=T_steam)
-        self.T_steam = T_steam
+#     def __init__(self, ID='', ins=None, outs=(), *, P, T_steam=268.+273.15):
+#         Mixer.__init__(self, ID, ins, outs)
+#         self.P = P
+#         self.heat_exchanger = HXutility(None, None, None, T=T_steam)
+#         self.T_steam = T_steam
         
-    @staticmethod
-    def P_at_flow(mol_water, P, steam, mixed, feed):
-        steam.imol['Water'] = mol_water
-        mixed.mol = steam.mol + feed.mol
-        mixed.H = feed.H + steam.H
-        P_new = mixed.chemicals.Water.Psat(mixed.T)
-        return P_new-P
+#     @staticmethod
+#     def P_at_flow(mol_water, P, steam, mixed, feed):
+#         steam.imol['Water'] = mol_water
+#         mixed.mol = steam.mol + feed.mol
+#         mixed.H = feed.H + steam.H
+#         P_new = mixed.chemicals.Water.Psat(mixed.T)
+#         return P_new-P
     
-    def _run(self):
-        feed, water = self.ins
-        mixed = self.outs[0]
+#     def _run(self):
+#         feed, water = self.ins
+#         mixed = self.outs[0]
         
-        steam = water.copy()
-        steam.T = self.T_steam
+#         steam = water.copy()
+#         steam.T = self.T_steam
         
-        steam_mol = steam.F_mol
-        steam.phase = 'g'
-        steam_mol = max(0, aitken_secant(f=self.P_at_flow,
-                                  x0=steam_mol, x1=steam_mol+0.1, 
-                                  xtol=1e-4, ytol=1e-4,
-                                  args=(self.P, steam, mixed, feed)))
+#         steam_mol = steam.F_mol
+#         steam.phase = 'g'
+#         steam_mol = max(0, aitken_secant(f=self.P_at_flow,
+#                                   x0=steam_mol, x1=steam_mol+0.1, 
+#                                   xtol=1e-4, ytol=1e-4,
+#                                   args=(self.P, steam, mixed, feed)))
         
-        water.mol[:] = steam.mol[:]
-        water.phase = 'l'
-        water.T = 300.
-        self.dH_steam = steam.H - water.H
+#         water.mol[:] = steam.mol[:]
+#         water.phase = 'l'
+#         water.T = 300.
+#         self.dH_steam = steam.H - water.H
         
-        mixed.P = self.P
+#         mixed.P = self.P
     
-    def _cost(self):
-        # super()._cost()
-        hx = self.heat_exchanger
-        hx.simulate_as_auxiliary_exchanger(duty=self.dH_steam, 
-                                            stream=self.ins[1].copy())
+#     def _cost(self):
+#         # super()._cost()
+#         hx = self.heat_exchanger
+#         hx.simulate_as_auxiliary_exchanger(duty=self.dH_steam, 
+#                                             stream=self.ins[1].copy())
         
-        self.purchase_costs['Heat exchangers'] = hx.purchase_cost
+#         self.purchase_costs['Heat exchangers'] = hx.purchase_cost
         
 # Pretreatment reactor
 @cost(basis='Dry flow rate', ID='Pretreatment reactor', units='kg/hr',
@@ -984,32 +984,19 @@ class Reactor(Unit, PressureVessel, isabstract=True):
             
     def _cost(self):
         Design = self.design_results
-        purchase_costs = self.purchase_costs
+        baseline_purchase_costs = self.baseline_purchase_costs
         
         if Design['Total volume'] == 0:
-            for i, j in purchase_costs.items():
-                purchase_costs[i] = 0
+            for i, j in baseline_purchase_costs.items():
+                baseline_purchase_costs[i] = 0
         
         else:
-            purchase_costs.update(self._vessel_purchase_cost(
+            baseline_purchase_costs.update(self._vessel_purchase_cost(
                 Design['Weight'], Design['Diameter'], Design['Length']))
-            for i, j in purchase_costs.items():
-                purchase_costs[i] *= Design['Number of reactors']
+            for i, j in baseline_purchase_costs.items():
+                baseline_purchase_costs[i] *= Design['Number of reactors']
             
             self.power_utility(self.kW_per_m3 * Design['Total volume'])
-    # def _run(self):
-    #     PressureVessel._run()
-    @property
-    def BM(self):
-        vessel_type = self.vessel_type
-        if not vessel_type:
-            raise AttributeError('vessel_type not defined')
-        elif vessel_type == 'Vertical':
-            return self.BM_vertical
-        elif vessel_type == 'Horizontal':
-            return self.BM_horizontal 
-        else:
-            raise RuntimeError("invalid vessel type")
 
 class AcidulationReactor(Reactor):
     _N_ins = 2
@@ -1089,7 +1076,7 @@ class GypsumFilter(SolidsSeparator):
 #     _N_outs = 2
 #     _N_heat_utilities = 1
 
-#     _BM = {**Reactor._BM,
+#     _F_BM_default = {**Reactor._F_BM_default,
 #            'Heat exchangers': 3.17,
 #            'Amberlyst-15 catalyst': 1}
     
@@ -1604,7 +1591,7 @@ class HPStorageTank(StorageTank):
     def _cost(self):
         if self.ins[0].F_mol == 0:
             self.design_results['Number of tanks'] = 0
-            self.purchase_costs['Tanks'] = 0
+            self.baseline_purchase_costs['Tanks'] = 0
         else: StorageTank._cost(self)
 
 # Modified from bst.units.Pump, which won't simulate for 0 flow 
@@ -1624,7 +1611,7 @@ class HPPump(Pump):
       
     def _cost(self):
         if self.ins[0].F_mol == 0:
-            Cost = self.purchase_costs
+            Cost = self.baseline_purchase_costs
             Cost['Pump'] = 0
             Cost['Motor'] = 0
         else: Pump._cost(self)
@@ -1643,7 +1630,7 @@ class DehydrationReactor(Reactor):
     _N_outs = 2
     
     _N_heat_utilities = 1
-    _BM = {**Reactor._BM,
+    _F_BM_default = {**Reactor._F_BM_default,
             'TiO2 catalyst': 1,
             'Heat exchangers': 3.17}
     
@@ -1704,8 +1691,11 @@ class DehydrationReactor(Reactor):
         hu_single_rx = hx.heat_utilities[0]
         hu_total.copy_like(hu_single_rx)
         hu_total.scale(N)
+        
         self.purchase_costs['Heat exchangers'] = hx.purchase_cost * N
-        self.purchase_costs['TiO2 catalyst'] = self.mcat_frac * self.ins[0].F_mass * price['TiO2']
+        self.baseline_purchase_costs['Heat exchangers'] = hx.baseline_purchase_cost * N
+        self.installed_costs['Heat exchangers'] = hx.installed_cost * N
+        self.baseline_purchase_costs['TiO2 catalyst'] = self.mcat_frac * self.ins[0].F_mass * price['TiO2']
             # self.mcat_frac * (sum([stream.F_mass for stream in self.ins])) * price['TiO2']
             
         
@@ -1740,7 +1730,7 @@ class CoFermentation(Reactor):
             'Fermenter size': 'kg',
             'Recirculation flow rate': 'kg/hr',
             'Duty': 'kJ/hr'}
-    _BM = {**Reactor._BM,
+    _F_BM_default = {**Reactor._F_BM_default,
             'Heat exchangers': 3.17}
 
     auxiliary_unit_names = ('heat_exchanger',)
@@ -1936,12 +1926,11 @@ class CoFermentation(Reactor):
 
     def _cost(self):
         Design = self.design_results
-        purchase_costs = self.purchase_costs
-        purchase_costs.clear()
         hx = self.heat_exchanger
 
         if self.mode == 'Batch':
             raise NotImplementedError('Batch mode is missing number of fermenters')
+            purchase_costs = self.purchase_costs
             # TODO: N = ?
             # Note that this code assumes only one vessel, which is impossible
             Unit._cost()
