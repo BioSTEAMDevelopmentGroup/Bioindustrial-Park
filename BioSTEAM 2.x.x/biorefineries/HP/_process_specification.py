@@ -479,11 +479,18 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
         feedstock = self.feedstock
         sugars = feedstock.imass[sugars_IDs]
         z_sugars = carbohydrate_content * sugars / sugars.sum()
-        mass_sugars = F_mass * z_sugars
+        F_mass_water = float(feedstock.imass['Water'])
+        feedstock.imass['Water'] = 0.
+        F_mass_dw =  feedstock.F_mass
+        
+        mass_sugars = F_mass_dw * z_sugars
         F_mass_sugars = mass_sugars.sum()
         feedstock.imass[sugars_IDs] = 0.
-        feedstock.F_mass = F_mass - F_mass_sugars
+       
+        # F_mass_dw = feedstock.F_mass - feedstock.imass['Water']
+        feedstock.F_mass = F_mass - F_mass_sugars - F_mass_water
         feedstock.imass[sugars_IDs] = mass_sugars
+        feedstock.imass['Water'] = F_mass_water
         # for unit in self.pre_conversion_units:
         #     unit.simulate()
         self.pre_conversion_units._converge()
@@ -500,11 +507,18 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
         feedstock = self.feedstock
         sugars = feedstock.imass[sugars_IDs]
         z_sugars = sugar_content * sugars / sugars.sum()
-        mass_sugars = F_mass * z_sugars
+        F_mass_water = float(feedstock.imass['Water'])
+        feedstock.imass['Water'] = 0.
+        F_mass_dw =  feedstock.F_mass
+        
+        mass_sugars = F_mass_dw * z_sugars
         F_mass_sugars = mass_sugars.sum()
         feedstock.imass[sugars_IDs] = 0.
-        feedstock.F_mass = F_mass - F_mass_sugars
+       
+        # F_mass_dw = feedstock.F_mass - feedstock.imass['Water']
+        feedstock.F_mass = F_mass - F_mass_sugars - F_mass_water
         feedstock.imass[sugars_IDs] = mass_sugars
+        feedstock.imass['Water'] = F_mass_water
         # for unit in self.pre_conversion_units:
         #     unit.simulate()
         self.pre_conversion_units._converge()

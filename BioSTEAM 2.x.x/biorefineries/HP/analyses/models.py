@@ -64,8 +64,7 @@ system_products.append(gypsum)
 # Minimum selling price of AA stream
 def get_MSP():
     for i in range(3):
-        AA.price = HP_tea.solve_price(AA,
-                                                      HP_no_BT_tea)
+        AA.price = HP_tea.solve_price(AA)
     return AA.price
 
 # Mass flow rate of HP stream
@@ -877,7 +876,7 @@ def set_CSL_loading(loading): R302.CSL_loading = loading
 
 ########################### COMMENT Y,T OUT FOR TRY P_MC ANALYSIS ############################
 
-D = shape.Triangle(0.49*0.9, 0.49, 0.49*1.1) # +/- 10% of baseline
+D = shape.Triangle(0.49*0.8, 0.49, 0.49*1.2) # +/- 20% of baseline
 @param(name='3-Hydroxypropionic acid yield', element=R302, kind='coupled', units='% theoretical',
         baseline=0.49, distribution=D)
 def set_R302_HP_yield(X):
@@ -889,7 +888,7 @@ def set_R302_HP_yield(X):
     # spec.load_yield(X)
     spec.spec_1 = X
 
-D = shape.Triangle(54.8*0.9, 54.8, 54.8*1.1) # +/- 10% of baseline
+D = shape.Triangle(54.8*0.8, 54.8, 54.8*1.2) # +/- 20% of baseline
 @param(name='3-Hydroxypropionic acid titer', element=R302, kind='coupled', units='g/L',
         baseline=54.8, distribution=D)
 def set_R302_HP_titer(X):

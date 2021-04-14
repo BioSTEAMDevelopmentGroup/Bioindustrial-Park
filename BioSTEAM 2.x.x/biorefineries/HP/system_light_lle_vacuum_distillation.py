@@ -52,7 +52,7 @@ from biosteam.process_tools import UnitGroup
 from biosteam.exceptions import InfeasibleRegion
 import matplotlib.pyplot as plt
 import copy
-
+from biorefineries.cornstover import CellulosicEthanolTEA
 from biosteam import SystemFactory
 # from lactic.hx_network import HX_Network
 
@@ -84,7 +84,7 @@ System.default_maxiter = 100
 feedstock_ID = 'Corn stover'
 
 System.default_converge_method = 'wegstein'
-System.default_relative_molar_tolerance = 0.0001
+System.default_relative_molar_tolerance = 0.0001 # supersedes absolute tolerance
 System.default_molar_tolerance = 0.1
 System.strict_convergence = True # True => throw exception if system does not converge; false => continue with unconverged system
 
@@ -990,15 +990,15 @@ def create_HP_sys(ins, outs):
     #                                 side_streams_to_heat=(water_M201, water_M202, steam_M203),
     #                                 outs=('gas_emission', ash, 'boiler_blowdown_water'))
     
-    BT = bst.facilities.BoilerTurbogenerator('BT',
+    BT = bst.facilities.Boiler('BT',
                                                  ins=(M505-0,
                                                       R501-0, 
                                                       'boiler_makeup_water',
                                                       'natural_gas',
                                                       'lime',
                                                       'boilerchems'), 
-                                                 outs=('gas_emission', 'boiler_blowdown_water', ash),
-                                                 turbogenerator_efficiency=0.85)
+                                                 outs=('gas_emission', 'boiler_blowdown_water', ash),)
+                                                 # turbogenerator_efficiency=0.85)
     
     # Blowdown is discharged
     CT = facilities.CT('CT', ins=('return_cooling_water', cooling_tower_chems,
@@ -1092,8 +1092,47 @@ HP_no_BT_sys = bst.System('HP_no_BT_sys', path = HP_sys.path, facilities = tuple
 
 
 #!!! Income tax was changed from 0.35 to 0.21 based on Davis et al., 2018 (new legislation)
-HP_no_BT_tea = HPTEA(
-        system=HP_no_BT_sys, IRR=0.10, duration=(2016, 2046),
+# HP_no_BT_tea = HPTEA(
+#         system=HP_no_BT_sys, IRR=0.10, duration=(2016, 2046),
+#         depreciation='MACRS7', income_tax=0.21, operating_days=0.9*365,
+#         lang_factor=None, construction_schedule=(0.08, 0.60, 0.32),
+#         startup_months=3, startup_FOCfrac=1, startup_salesfrac=0.5,
+#         startup_VOCfrac=0.75, WC_over_FCI=0.05,
+#         finance_interest=0.08, finance_years=10, finance_fraction=0.4,
+#         # biosteam Splitters and Mixers have no cost, 
+#         # cost of all wastewater treatment units are included in WWT_cost,
+#         # BT is not included in this TEA
+#         OSBL_units=(u.U101, u.WWT_cost,
+#                     u.T601, u.T602, u.T603, u.T606, u.T606_P,
+#                     u.CWP, u.CT, u.PWC, u.CIP, u.ADP, u.FWT),
+#         warehouse=0.04, site_development=0.09, additional_piping=0.045,
+#         proratable_costs=0.10, field_expenses=0.10, construction=0.20,
+#         contingency=0.10, other_indirect_costs=0.10, 
+#         labor_cost=3212962*get_flow_tpd()/2205,
+#         labor_burden=0.90, property_insurance=0.007, maintenance=0.03)
+
+# # HP_no_BT_tea.units.remove(BT)
+
+# # # Removed because there is not double counting anyways.
+# # # Removes feeds/products of BT_sys from HP_sys to avoid double-counting
+# # for i in BT_sys.feeds:
+# #     HP_sys.feeds.remove(i)
+# # for i in BT_sys.products:
+# #     HP_sys.products.remove(i)
+
+# # Boiler turbogenerator potentially has different depreciation schedule
+# BT_tea = bst.TEA.like(BT_sys, HP_no_BT_tea)
+# BT_tea.labor_cost = 0
+
+# # Changed to MACRS 20 to be consistent with Humbird
+# BT_tea.depreciation = 'MACRS20'
+# BT_tea.OSBL_units = (BT,)
+
+# HP_tea = bst.CombinedTEA([HP_no_BT_tea, BT_tea], IRR=0.10)
+# HP_sys._TEA = HP_tea
+
+
+HP_tea = CellulosicEthanolTEA(system=HP_sys, IRR=0.10, duration=(2016, 2046),
         depreciation='MACRS7', income_tax=0.21, operating_days=0.9*365,
         lang_factor=None, construction_schedule=(0.08, 0.60, 0.32),
         startup_months=3, startup_FOCfrac=1, startup_salesfrac=0.5,
@@ -1104,33 +1143,15 @@ HP_no_BT_tea = HPTEA(
         # BT is not included in this TEA
         OSBL_units=(u.U101, u.WWT_cost,
                     u.T601, u.T602, u.T603, u.T606, u.T606_P,
-                    u.CWP, u.CT, u.PWC, u.CIP, u.ADP, u.FWT),
+                    u.CWP, u.CT, u.PWC, u.CIP, u.ADP, u.FWT, u.BT),
         warehouse=0.04, site_development=0.09, additional_piping=0.045,
         proratable_costs=0.10, field_expenses=0.10, construction=0.20,
         contingency=0.10, other_indirect_costs=0.10, 
         labor_cost=3212962*get_flow_tpd()/2205,
-        labor_burden=0.90, property_insurance=0.007, maintenance=0.03)
+        labor_burden=0.90, property_insurance=0.007, maintenance=0.03,
+        steam_power_depreciation='MACRS20', boiler_turbogenerator=u.BT)
 
-# HP_no_BT_tea.units.remove(BT)
-
-# # Removed because there is not double counting anyways.
-# # Removes feeds/products of BT_sys from HP_sys to avoid double-counting
-# for i in BT_sys.feeds:
-#     HP_sys.feeds.remove(i)
-# for i in BT_sys.products:
-#     HP_sys.products.remove(i)
-
-# Boiler turbogenerator potentially has different depreciation schedule
-BT_tea = bst.TEA.like(BT_sys, HP_no_BT_tea)
-BT_tea.labor_cost = 0
-
-# Changed to MACRS 20 to be consistent with Humbird
-BT_tea.depreciation = 'MACRS20'
-BT_tea.OSBL_units = (BT,)
-
-HP_tea = bst.CombinedTEA([HP_no_BT_tea, BT_tea], IRR=0.10)
-HP_sys._TEA = HP_tea
-
+HP_no_BT_tea = HP_tea
 # %% 
 # =============================================================================
 # Simulate system and get results
@@ -1150,7 +1171,8 @@ def get_AA_MPSP():
     for i in range(num_sims):
         HP_sys.simulate()
     for i in range(num_solve_tea):
-        AA.price = HP_tea.solve_price(AA, HP_no_BT_tea)
+        # AA.price = HP_tea.solve_price(AA, HP_no_BT_tea)
+        AA.price = HP_tea.solve_price(AA)
     return AA.price
 
 get_AA_MPSP()

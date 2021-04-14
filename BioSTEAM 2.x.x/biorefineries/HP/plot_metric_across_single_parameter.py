@@ -93,7 +93,7 @@ FECs = []
 # process_groups[6].name = 'Non-HX facilities'
 
 
-parameters = yields
+parameters = carbs
 
 # %% Utils
 def get_group_heating_demand(group):
@@ -106,10 +106,10 @@ def get_group_cooling_demand(group):
 
 # for titer in titers:
 for parameter in parameters:
-    # spec.load_feedstock_carbohydrate_content(parameter)
-    # spec.load_titer(parameter)
+    spec.load_feedstock_carbohydrate_content(parameter)
+    spec.load_titer(parameter)
     # spec.load_specifications(spec_1=spec.spec_1, spec_2=parameter, spec_3=spec.spec_3)
-    spec.load_specifications(spec_1=parameter/100., spec_2=spec.spec_2, spec_3=spec.spec_3)
+    # spec.load_specifications(spec_1=parameter/100., spec_2=spec.spec_2, spec_3=spec.spec_3)
     try:
         
         # spec.load_titer(54.8)
