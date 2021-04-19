@@ -42,7 +42,7 @@ def load_chemicals():
 def load(name):
     import biosteam as bst
     from biosteam import main_flowsheet as F, UnitGroup
-    global sugarcane_sys, sugarcane_tea, specs, flowsheet, _system_loaded
+    global sugarcane_sys, sugarcane_tea, specs, flowsheet, _system_loaded, agile_sugarcane_sys
     global unit_groups
     if not _chemicals_loaded: load_chemicals()
     flowsheet = bst.Flowsheet('sugarcane2g')
@@ -58,11 +58,14 @@ def load(name):
         # sugarcane_tea.operating_days = 200
         # sugarcane_sys.simulate()
         sugarcane_tea = create_agile_tea(sugarcane_sys.units)
-        sugarcane_sys.simulate()
-        scenario_a = sugarcane_tea.create_scenario(sugarcane_sys)
+        agile_sugarcane_sys = AgileSugarcaneSystem(
+            sugarcane_sys, [3.3e5, 3.3e5], [2400, 2400], s.sugarcane
+        )
+        agile_sugarcane_sys.simulate()
+        scenario_a = sugarcane_tea.create_scenario(agile_sugarcane_sys)
         cornstover_sys = trim_to_cornstover_hot_water_cellulosic_ethanol(
             sugarcane_sys,
-            operating_hours=130 * 24,
+            operating_hours=2400.,
         )
         cornstover_sys.simulate()
         scenario_b = sugarcane_tea.create_scenario(cornstover_sys)

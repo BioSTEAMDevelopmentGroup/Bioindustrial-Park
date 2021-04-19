@@ -42,7 +42,7 @@ def load_chemicals():
     _chemicals_loaded = True
 
 
-def load(name):
+def load(name, agile=False):
     import biosteam as bst
     from biosteam import main_flowsheet as F, UnitGroup
     global lipidcane_sys, lipidcane_tea, specs, flowsheet, _system_loaded
@@ -55,8 +55,16 @@ def load(name):
     dct = globals()
     u = flowsheet.unit
     s = flowsheet.stream
+    operating_hours = 24 * 200
+    area_names = None
+    def rename_units(BT=1000, facilities=1100, storage=1200):
+        bst.rename_unit(u.BT, 1000)
+        bst.rename_units([u.FT, u.CWP, u.CIP_package, u.ADP, u.CT, u.PWC], 1100)
+        bst.rename_units([i for i in lipidcane_sys.units if bst.is_storage_unit(i)], 1200)
     if name == 'divided 1 and 2g front end oil separation':
-        lipidcane_sys = create_lipidcane_to_biodiesel_and_ethanol_divided_1_and_2g_front_end_oil_separation()
+        lipidcane_sys = create_lipidcane_to_biodiesel_and_ethanol_divided_1_and_2g_front_end_oil_separation(
+            operating_hours=operating_hours,    
+        )
         area_names = [
             'Feedstock handling', 
             'Juicing', 
@@ -70,66 +78,78 @@ def load(name):
             'Utilities',
             'Storage'
         ]
-        bst.rename_unit(u.BT, 1000)
-        bst.rename_units([u.FT, u.CWP, u.CIP_package, u.ADP, u.CT, u.PWC], 1100)
-        bst.rename_units([i for i in lipidcane_sys.units if bst.is_storage_unit(i)], 1200)
+        rename_units()
     elif name == 'divided 1 and 2g hydrolyzate oil separation':
-        area_names = [
-            'Feedstock handling', 
-            'Juicing', 
-            'Biod. prod.',
-            'Conv. ferm.', 
-            'Pretreatment',
-            'Cofementation',
-            'Ethanol sep.', 
-            'Wastewater treatment', 
-            'Boiler turbogenerator',
-            'Utilities',
-            'Storage'
-        ]
-        lipidcane_sys = create_lipidcane_to_biodiesel_and_ethanol_divided_1_and_2g_hydrolyzate_oil_separation()
-        bst.rename_unit(u.BT, 1000)
-        bst.rename_units([u.FT, u.CWP, u.CIP_package, u.ADP, u.CT, u.PWC], 1100)
-        bst.rename_units([i for i in lipidcane_sys.units if bst.is_storage_unit(i)], 1200)
+        # area_names = [
+        #     'Feedstock handling', 
+        #     'Juicing', 
+        #     'Biod. prod.', 
+        #     'Conv. ferm.', 
+        #     'Pretreatment', 
+        #     'Cofementation',
+        #     'Ethanol sep.', 
+        #     'Wastewater treatment', 
+        #     'Boiler turbogenerator',
+        #     'Utilities',
+        #     'Storage'
+        # ]
+        lipidcane_sys = create_lipidcane_to_biodiesel_and_ethanol_divided_1_and_2g_hydrolyzate_oil_separation(
+            operating_hours=operating_hours,
+        )
+        rename_units()
+    elif name == 'divided 1 and 2g post fermentation oil separation':
+        # area_names = [
+        #     'Feedstock handling', 
+        #     'Juicing', 
+        #     'Biod. prod.', 
+        #     'Conv. ferm.', 
+        #     'Pretreatment', 
+        #     'Cofementation',
+        #     'Ethanol sep.', 
+        #     'Wastewater treatment', 
+        #     'Boiler turbogenerator',
+        #     'Utilities',
+        #     'Storage'
+        # ]
+        lipidcane_sys = create_lipidcane_to_biodiesel_and_ethanol_divided_1_and_2g_post_fermentation_oil_separation(
+            operating_hours=operating_hours,
+        )
+        rename_units()
     elif name == '1g':
-        lipidcane_sys = create_lipidcane_to_biodiesel_and_ethanol_1g()
-    elif name == 'sugarcane 2g':
-        global sugarcane_sys
-        sugarcane_sys = create_sugarcane_to_ethanol_2g()
+        lipidcane_sys = create_lipidcane_to_biodiesel_and_ethanol_1g(
+            operating_hours=operating_hours,
+        )
     else:
         raise NotImplementedError(name)
     unit_groups = UnitGroup.group_by_area(lipidcane_sys.units)
     if '2g' in name:
-        # lipidcane_tea = create_tea(lipidcane_sys)
-        # for i in lipidcane_tea.TEAs: i.operating_days = 200
-        # lipidcane_sys.simulate()
-        for i, j in zip(unit_groups, area_names): i.name = j
-        partial_lipidcane_tea = create_tea(lipidcane_sys)
-        partial_lipidcane_tea.operating_days = 200
-        cornstover_sys = trim_to_cornstover_hot_water_cellulosic_ethanol(lipidcane_sys)
-        partial_cornstover_tea = create_tea(cornstover_sys)
-        partial_cornstover_tea.operating_days = 130
-        lipidcane_tea = bst.AgileTEA([partial_lipidcane_tea, partial_cornstover_tea], 0.1)
-        lipidcane_sys.simulate()
-        lipidcane_tea.save_scenario(0)
-        cornstover_sys.simulate()
-        lipidcane_tea.save_scenario(1)
-        dct.update(flowsheet.to_dict())
-        lipidcane_tea.IRR = 0.10
-        s.ethanol.price = lipidcane_tea.solve_price(s.ethanol)
-    else:
-        lipidcane_tea = create_tea(lipidcane_sys)
-        for i in lipidcane_tea.TEAs: i.operating_days = 200
-        try: 
+        if area_names:
+            for i, j in zip(unit_groups, area_names): i.name = j
+        if agile:
+            lipidcane_tea = create_agile_tea(lipidcane_sys.units)
             lipidcane_sys.simulate()
-        except Exception as e:
-            raise e
-        else:
+            scenario_a = sugarcane_tea.create_scenario(lipidcane_sys)
+            cornstover_sys = trim_to_cornstover_hot_water_cellulosic_ethanol(
+                lipidcane_sys,
+                operating_hours=24 * 100,
+            )
+            cornstover_sys.simulate()
+            scenario_b = lipidcane_tea.create_scenario(cornstover_sys)
+            sugarcane_tea.compile_scenarios([scenario_a, scenario_b])
+            dct.update(flowsheet.to_dict())
             lipidcane_tea.IRR = 0.10
             s.ethanol.price = lipidcane_tea.solve_price(s.ethanol)
-        finally:
-            dct.update(flowsheet.to_dict())
-
+            return
+    lipidcane_tea = create_tea(lipidcane_sys)
+    try: 
+        lipidcane_sys.simulate()
+    except Exception as e:
+        raise e
+    else:
+        lipidcane_tea.IRR = 0.10
+        s.ethanol.price = lipidcane_tea.solve_price(s.ethanol)
+    finally:
+        dct.update(flowsheet.to_dict())
 
 def ethanol_price():
     return lipidcane_tea.solve_price(flowsheet.stream.ethanol) * 2.98668849

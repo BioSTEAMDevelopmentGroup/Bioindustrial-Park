@@ -158,6 +158,7 @@ def create_system(ID='corn_sys'):
         ins=[P411-0, denaturant],
         outs=ethanol,
         beer_column_heat_integration=False,
+        mockup=True,
         IDs={
             'Beer column': 'T501',
             'Beer column bottoms product pump': 'P502',

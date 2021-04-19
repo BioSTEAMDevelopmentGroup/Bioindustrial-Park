@@ -26,9 +26,22 @@ from ..sugarcane import (
 import biorefineries as brf
 
 __all__ = (
+    'AgileSugarcaneSystem',
     'create_sugarcane_to_ethanol_2g',
     'trim_to_cornstover_hot_water_cellulosic_ethanol',
 )
+
+class AgileSugarcaneSystem(bst.AgileSystem):
+    
+    __slots__ = ('feedstock',)
+    
+    def __init__(self, system, samples, operating_hours, feedstock):
+        super().__init__(system, samples, operating_hours)
+        self.feedstock = feedstock
+    
+    def set_parameters(self, sample):
+        self.feedstock.F_mass = sample
+
 
 @SystemFactory(
     ID='sugarcane_sys',
@@ -88,7 +101,7 @@ def create_sugarcane_to_ethanol_2g(
         else:
             cornstover.mass = mixer.F_biomass * z_mass_cornstover
         update_pretreatment_process_water()
-    mixer.F_biomass = 146880.20
+    mixer.F_biomass = 101642.80
     mixer.specification = update_cornstover_flow_and_pretreatment_process_water
     hydrolyzate, pretreatment_wastewater = hot_water_pretreatment_sys.outs
     

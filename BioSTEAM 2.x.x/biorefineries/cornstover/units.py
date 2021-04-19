@@ -188,13 +188,13 @@ class SeedTrain(Unit):
         self.power_utility(kW)
         
 
-# %% Saccharification and fermentation
+# %% Saccharification and fermentation (consolidated bioprocess)
 
 @cost('Flow rate', 'Transfer pumps', kW=58, S=352*_gpm2m3hr,
       cost=47200/5, CE=522, n=0.8, BM=2.3, N='N_transfer_pumps')
 @cost('Tank volume', 'Tanks', cost=3840e3/8, S=250e3*_gal2m3, 
       CE=522, n=0.7, BM=2.0, N='N_tanks')
-class ContinuousSaccharification(Unit):
+class ContinuousPresaccharification(Unit):
     _N_ins = 1
     _N_outs = 1
     _N_heat_utilities = 1

@@ -211,7 +211,7 @@ class CellulosicEthanolTEA(TEA):
     def _FOC(self, FCI):
         return (FCI * self.property_insurance
                 + self._ISBL_DPI_cached * self.maintenance
-                + self.labor_cost * (1 + self.labor_burden)) * self.operating_days / 365
+                + self.labor_cost * (1 + self.labor_burden)) * self.operating_hours / 8760
     
 class AgileCellulosicEthanolTEA(AgileTEA):
     
