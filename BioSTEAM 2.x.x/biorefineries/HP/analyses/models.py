@@ -29,16 +29,22 @@ from chaospy import distributions as shape
 from biosteam import main_flowsheet as find
 from biosteam.evaluation import Model, Metric
 from biosteam.evaluation.evaluation_tools.parameter import Setter
-from biorefineries.HP.system import HP_sub_sys, HP_tea, HP_no_BT_tea, flowsheet, unit_groups
+from biorefineries.HP.system_light_lle_vacuum_distillation import process_groups_dict, HP_tea, HP_no_BT_tea,\
+flowsheet, unit_groups, get_GWP, get_FEC, CFs, spec, process_groups, process_groups_dict,\
+get_material_cost_breakdown, get_GWP_by_ID, get_FEC_by_ID, get_ng_GWP, get_ng_FEC,\
+get_FGHTP_GWP, get_feedstock_FEC, get_electricity_GWP, get_electricity_FEC,\
+get_direct_emissions_GWP
 from warnings import warn
 
 find.set_flowsheet(flowsheet)
 # get_annual_factor = lambda: HP_no_BT_tea._annual_factor
 get_annual_factor = lambda: 1
 _kg_per_ton = 907.18474
+_feedstock_factor = _kg_per_ton / 0.8
 
 HP_sys = find.system.HP_sys
 BT_sys = find.system.BT_sys
+HXN = find.unit.HXN
 
 system_feeds = [i for i in HP_sys.feeds if i.price] + \
     [i for i in BT_sys.feeds if i.price]
@@ -64,6 +70,7 @@ def get_MSP():
 
 # Mass flow rate of HP stream
 AA = find.unit.T606_P-0
+feedstock = find.stream.feedstock
 get_yield = lambda: AA.F_mass*get_annual_factor()/1e6
 # Purity (%) of HP in the final product
 get_purity = lambda: AA.imass['AA']/AA.F_mass
@@ -73,7 +80,7 @@ get_adjusted_yield = lambda: get_yield() * get_purity()
 # Recovery (%) = recovered/amount in fermentation broth
 R301 = find.unit.R301
 get_recovery = lambda: AA.imol['HP'] \
-    /(R301.outs[0].imol['HP']+2*R301.outs[0].imol['CalciumLactate'])
+    /(R302.outs[0].imol['HP']+2*R302.outs[0].imol['CalciumLactate'])
 get_overall_TCI = lambda: HP_tea.TCI/1e6
 # Annual operating cost, note that AOC excludes electricity credit
 get_overall_AOC = lambda: HP_tea.AOC/1e6
@@ -84,7 +91,8 @@ get_material_cost = lambda: HP_tea.material_cost/1e6
 get_annual_sale = lambda: HP_tea.sales/1e6
 # System power usage, individual unit power usage should be positive
 BT = find.unit.BT
-excess_power = lambda: BT.electricity_generated
+# excess_power = lambda: BT.electricity_generated
+excess_power = lambda: BT.power_utility.production
 electricity_price = bst.PowerUtility.price
 # Electricity credit is positive if getting revenue from excess electricity
 get_electricity_credit = lambda: (excess_power()*electricity_price*get_annual_factor())/1e6
@@ -125,25 +133,256 @@ metrics = Metrics([Metric('Minimum selling price', get_MSP, '$/kg'),
            Metric('Annual electricity credit', get_electricity_credit, '10^6 $/yr')
            ])
 
-for unit_group in unit_groups:
-    metrics.extend((Metric('%s - heating duty'%unit_group.name,
-                          unit_group.get_heating_duty, 'kJ/kg'),))
-# =============================================================================
-# Capital cost breakdown
-# =============================================================================
+# %% Breakdowns by process groups
+def get_group_heating_demand(group):
+    return sum([sum([hu.duty for hu in unit.heat_utilities if hu.duty*hu.flow>0.]) for unit in group.units])
 
-def get_installed_equipment_cost(system):
-    return lambda: sum(i.installed_equipment_cost for i in HP_sub_sys[system])/1e6
-for system in HP_sub_sys.keys():
-    if system == 'feedstock_sys': continue
-    metrics.extend(
-        (Metric(system, get_installed_equipment_cost(system), '10^6 $', 'Installed cost'),))
+def get_group_cooling_demand(group):
+    return sum([sum([hu.duty for hu in unit.heat_utilities if hu.duty*hu.flow<0.]) for unit in group.units])
 
-# All checks should be ~0
-check_installed_equipment_cost = \
-    lambda: sum(get_installed_equipment_cost(system)() 
-                for system in HP_sub_sys.keys()) - HP_tea.installed_equipment_cost/1e6
-metrics.extend((Metric('Check', check_installed_equipment_cost, '10^6 $', 'Installed cost'),))
+# Heating duty
+
+metrics.extend((Metric('feedstock_group - heating demand',
+                       lambda: 0.001*sum([sum([hu.duty for hu in unit.heat_utilities \
+                                               if hu.duty*hu.flow>0.]) for unit in \
+                                          process_groups_dict['feedstock_group'].units])/AA.F_mass,
+                       'MJ/kg'),))
+
+metrics.extend((Metric('pretreatment_group - heating demand',
+                       lambda: 0.001*sum([sum([hu.duty for hu in unit.heat_utilities \
+                                               if hu.duty*hu.flow>0.]) for unit in \
+                                          process_groups_dict['pretreatment_group'].units])/AA.F_mass,
+                       'MJ/kg'),))
+
+metrics.extend((Metric('conversion_group - heating demand',
+                       lambda: 0.001*sum([sum([hu.duty for hu in unit.heat_utilities \
+                                               if hu.duty*hu.flow>0.]) for unit in \
+                                          process_groups_dict['conversion_group'].units])/AA.F_mass,
+                       'MJ/kg'),))
+
+metrics.extend((Metric('separation_group - heating demand',
+                       lambda: 0.001*sum([sum([hu.duty for hu in unit.heat_utilities \
+                                               if hu.duty*hu.flow>0.]) for unit in \
+                                          process_groups_dict['separation_group'].units])/AA.F_mass,
+                       'MJ/kg'),))
+
+metrics.extend((Metric('WWT_group - heating demand',
+                       lambda: 0.001*sum([sum([hu.duty for hu in unit.heat_utilities \
+                                               if hu.duty*hu.flow>0.]) for unit in \
+                                          process_groups_dict['WWT_group'].units])/AA.F_mass,
+                       'MJ/kg'),))
+
+metrics.extend((Metric('HXN_group - heating demand',
+                       lambda: 0.001*sum([sum([hu.duty for hu in unit.heat_utilities \
+                                               if hu.duty*hu.flow>0.]) for unit in \
+                                          process_groups_dict['HXN_group'].units])/AA.F_mass,
+                       'MJ/kg'),))
+
+metrics.extend((Metric('BT_group - heating demand',
+                       lambda: 0.001*sum([sum([hu.duty for hu in unit.heat_utilities \
+                                               if hu.duty*hu.flow>0.]) for unit in \
+                                          process_groups_dict['BT_group'].units])/AA.F_mass,
+                       'MJ/kg'),))
+
+metrics.extend((Metric('CT_group - heating demand',
+                       lambda: 0.001*sum([sum([hu.duty for hu in unit.heat_utilities \
+                                               if hu.duty*hu.flow>0.]) for unit in \
+                                          process_groups_dict['CT_group'].units])/AA.F_mass,
+                       'MJ/kg'),))
+
+metrics.extend((Metric('facilities_no_hu_group - heating demand',
+                       lambda: 0.001*sum([sum([hu.duty for hu in unit.heat_utilities \
+                                               if hu.duty*hu.flow>0.]) for unit in \
+                                          process_groups_dict['facilities_no_hu_group'].units])/AA.F_mass,
+                       'MJ/kg'),))
+
+# Cooling duty
+
+metrics.extend((Metric('feedstock_group - cooling demand',
+                       lambda: 0.001*sum([sum([hu.duty for hu in unit.heat_utilities \
+                                               if hu.duty*hu.flow<0.]) for unit in \
+                                          process_groups_dict['feedstock_group'].units])/AA.F_mass,
+                       'MJ/kg'),))
+
+metrics.extend((Metric('pretreatment_group - cooling demand',
+                       lambda: 0.001*sum([sum([hu.duty for hu in unit.heat_utilities \
+                                               if hu.duty*hu.flow<0.]) for unit in \
+                                          process_groups_dict['pretreatment_group'].units])/AA.F_mass,
+                       'MJ/kg'),))
+
+metrics.extend((Metric('conversion_group - cooling demand',
+                       lambda: 0.001*sum([sum([hu.duty for hu in unit.heat_utilities \
+                                               if hu.duty*hu.flow<0.]) for unit in \
+                                          process_groups_dict['conversion_group'].units])/AA.F_mass,
+                       'MJ/kg'),))
+
+metrics.extend((Metric('separation_group - cooling demand',
+                       lambda: 0.001*sum([sum([hu.duty for hu in unit.heat_utilities \
+                                               if hu.duty*hu.flow<0.]) for unit in \
+                                          process_groups_dict['separation_group'].units])/AA.F_mass,
+                       'MJ/kg'),))
+
+metrics.extend((Metric('WWT_group - cooling demand',
+                       lambda: 0.001*sum([sum([hu.duty for hu in unit.heat_utilities \
+                                               if hu.duty*hu.flow<0.]) for unit in \
+                                          process_groups_dict['WWT_group'].units])/AA.F_mass,
+                       'MJ/kg'),))
+
+metrics.extend((Metric('HXN_group - cooling demand',
+                       lambda: 0.001*sum([sum([hu.duty for hu in unit.heat_utilities \
+                                               if hu.duty*hu.flow<0.]) for unit in \
+                                          process_groups_dict['HXN_group'].units])/AA.F_mass,
+                       'MJ/kg'),))
+
+metrics.extend((Metric('BT_group - cooling demand',
+                       lambda: 0.001*sum([sum([hu.duty for hu in unit.heat_utilities \
+                                               if hu.duty*hu.flow<0.]) for unit in \
+                                          process_groups_dict['BT_group'].units])/AA.F_mass,
+                       'MJ/kg'),))
+
+metrics.extend((Metric('CT_group - cooling demand',
+                       lambda: 0.001*sum([sum([hu.duty for hu in unit.heat_utilities \
+                                               if hu.duty*hu.flow<0.]) for unit in \
+                                          process_groups_dict['CT_group'].units])/AA.F_mass,
+                       'MJ/kg'),))
+
+metrics.extend((Metric('facilities_no_hu_group - cooling demand',
+                       lambda: 0.001*sum([sum([hu.duty for hu in unit.heat_utilities \
+                                               if hu.duty*hu.flow<0.]) for unit in \
+                                          process_groups_dict['facilities_no_hu_group'].units])/AA.F_mass,
+                       'MJ/kg'),))  
+
+
+# Installed equipment cost
+
+metrics.extend((Metric('feedstock_group - installed equipment cost',
+                       lambda:process_groups_dict['feedstock_group'].get_installed_cost(),
+                       '10^6 $'),))
+
+metrics.extend((Metric('pretreatment_group - installed equipment cost',
+                       lambda:process_groups_dict['pretreatment_group'].get_installed_cost(),
+                       '10^6 $'),))
+
+metrics.extend((Metric('conversion_group - installed equipment cost',
+                       lambda:process_groups_dict['conversion_group'].get_installed_cost(),
+                       '10^6 $'),))
+
+metrics.extend((Metric('separation_group - installed equipment cost',
+                       lambda:process_groups_dict['separation_group'].get_installed_cost(),
+                       '10^6 $'),))
+
+metrics.extend((Metric('WWT_group - installed equipment cost',
+                       lambda:process_groups_dict['WWT_group'].get_installed_cost(),
+                       '10^6 $'),))
+
+metrics.extend((Metric('HXN_group - installed equipment cost',
+                       lambda:process_groups_dict['HXN_group'].get_installed_cost(),
+                       '10^6 $'),))
+
+metrics.extend((Metric('BT_group - installed equipment cost',
+                       lambda:process_groups_dict['BT_group'].get_installed_cost(),
+                       '10^6 $'),))
+
+metrics.extend((Metric('CT_group - installed equipment cost',
+                       lambda:process_groups_dict['CT_group'].get_installed_cost(),
+                       '10^6 $'),))
+
+metrics.extend((Metric('facilities_no_hu_group - installed equipment cost',
+                       lambda:process_groups_dict['facilities_no_hu_group'].get_installed_cost(),
+                       '10^6 $'),))  
+
+# Power utility demand
+
+metrics.extend((Metric('feedstock_group - power utility demand',
+                       lambda:process_groups_dict['feedstock_group'].get_electricity_consumption()/AA.F_mass,
+                       'MW/kg'),))
+
+metrics.extend((Metric('pretreatment_group - power utility demand',
+                       lambda:process_groups_dict['pretreatment_group'].get_electricity_consumption()/AA.F_mass,
+                       'MW/kg'),))
+
+metrics.extend((Metric('conversion_group - power utility demand',
+                       lambda:process_groups_dict['conversion_group'].get_electricity_consumption()/AA.F_mass,
+                       'MW/kg'),))
+
+metrics.extend((Metric('separation_group - power utility demand',
+                       lambda:process_groups_dict['separation_group'].get_electricity_consumption()/AA.F_mass,
+                       'MW/kg'),))
+
+metrics.extend((Metric('WWT_group - power utility demand',
+                       lambda:process_groups_dict['WWT_group'].get_electricity_consumption()/AA.F_mass,
+                       'MW/kg'),))
+
+metrics.extend((Metric('HXN_group - power utility demand',
+                       lambda:process_groups_dict['HXN_group'].get_electricity_consumption()/AA.F_mass,
+                       'MW/kg'),))
+
+metrics.extend((Metric('BT_group - power utility demand',
+                       lambda:process_groups_dict['BT_group'].get_electricity_consumption()/AA.F_mass,
+                       'MW/kg'),))
+
+metrics.extend((Metric('CT_group - power utility demand',
+                       lambda:process_groups_dict['CT_group'].get_electricity_consumption()/AA.F_mass,
+                       'MW/kg'),))
+
+metrics.extend((Metric('facilities_no_hu_group - power utility demand',
+                       lambda:process_groups_dict['facilities_no_hu_group'].get_electricity_consumption()/AA.F_mass,
+                       'MW/kg'),))  
+
+# Material cost
+
+metrics.extend((Metric('feedstock_group - material cost',
+                       lambda:get_material_cost_breakdown()['feedstock_group'],
+                       '$/kg'),))
+
+metrics.extend((Metric('pretreatment_group - material cost',
+                       lambda:get_material_cost_breakdown()['pretreatment_group'],
+                       '$/kg'),))
+
+metrics.extend((Metric('conversion_group - material cost',
+                       lambda:get_material_cost_breakdown()['conversion_group'],
+                       '$/kg'),))
+
+metrics.extend((Metric('separation_group - material cost',
+                       lambda:get_material_cost_breakdown()['separation_group'],
+                       '$/kg'),))
+
+metrics.extend((Metric('WWT_group - material cost',
+                       lambda:get_material_cost_breakdown()['WWT_group'],
+                       '$/kg'),))
+
+metrics.extend((Metric('HXN_group - material cost',
+                       lambda:get_material_cost_breakdown()['HXN_group'],
+                       '$/kg'),))
+
+metrics.extend((Metric('BT_group - material cost',
+                       lambda:get_material_cost_breakdown()['BT_group'],
+                       '$/kg'),))
+
+metrics.extend((Metric('CT_group - material cost',
+                       lambda:get_material_cost_breakdown()['CT_group'],
+                       '$/kg'),))
+
+metrics.extend((Metric('facilities_no_hu_group - material cost',
+                       lambda:get_material_cost_breakdown()['facilities_no_hu_group'],
+                       '$/kg'),))
+# # =============================================================================
+# # Capital cost breakdown
+# # =============================================================================
+
+# def get_installed_equipment_cost(group):
+#     # return lambda: sum(i.installed_equipment_cost for i in process_groups_dict[system])/1e6
+#     return process_groups_dict[group].get_installed_cost()/AA.F_mass
+# for system in process_groups_dict.keys():
+#     # if system == 'feedstock_sys': continue
+#     metrics.extend(
+#         (Metric(system, get_installed_equipment_cost(system), '10^6 $', 'Installed cost'),))
+
+# # All checks should be ~0
+# check_installed_equipment_cost = \
+#     lambda: sum(get_installed_equipment_cost(system)() 
+#                 for system in process_groups_dict.keys()) - HP_tea.installed_equipment_cost/1e6
+# metrics.extend((Metric('Check', check_installed_equipment_cost, '10^6 $', 'Installed cost'),))
 
 
 # =============================================================================
@@ -156,20 +395,20 @@ for feed in system_feeds:
     metrics.extend((Metric(feed.ID, get_material_cost(feed), '10^6 $/yr', 'Material cost'),))
 fermentation_lime = find.stream.fermentation_lime
 FGD_lime = find.stream.FGD_lime
-get_fermentation_lime_ratio = lambda: fermentation_lime.imol['Lime'] \
-    / (fermentation_lime.imol['Lime']+FGD_lime.imol['Lime']) 
+# get_fermentation_lime_ratio = lambda: fermentation_lime.imol['Lime'] \
+#     / (fermentation_lime.imol['Lime']+FGD_lime.imol['Lime']) 
 # S601 = find.unit.S601
 # get_separation_sulfuric_acid_ratio = lambda: S601.outs[1].imol['H2SO4']/S601.ins[0].imol['H2SO4']
 # get_separation_sulfuric_acid_ratio = 
 check_material_cost = lambda: sum(get_material_cost(feed)()
                                   for feed in system_feeds) - HP_tea.material_cost/1e6
 
-metrics.extend((
-    Metric('Fermentation lime ratio', get_fermentation_lime_ratio, 
-           '%', 'Material cost'),
-    # Metric('Separation sulfuric acid ratio', get_separation_sulfuric_acid_ratio, 
-    #        '%', 'Material cost'),
-    Metric('Check', check_material_cost, '10^6 $/yr', 'Material cost')))
+# metrics.extend((
+#     Metric('Fermentation lime ratio', get_fermentation_lime_ratio, 
+#            '%', 'Material cost'),
+#     # Metric('Separation sulfuric acid ratio', get_separation_sulfuric_acid_ratio, 
+#     #        '%', 'Material cost'),
+#     Metric('Check', check_material_cost, '10^6 $/yr', 'Material cost')))
 
 def get_product_sale(stream):
     return lambda: stream.price*stream.F_mass*get_annual_factor()/1e6
@@ -181,125 +420,224 @@ check_product_sale= \
 metrics.extend((Metric('Check', check_product_sale, '10^6 $/yr', 'Product sale'),))
 
 
-# =============================================================================
-# Heating demand breakdown (positive if needs heating)
-# =============================================================================
+# # =============================================================================
+# # Heating demand breakdown (positive if needs heating)
+# # =============================================================================
 
-get_system_heating_demand = lambda: BT.system_heating_demand*get_annual_factor()/1e9
-get_pretreatment_steam_heating_demand = lambda: BT.side_streams_lps.duty*get_annual_factor()/1e9
-HXN = find.unit.HXN
-get_HXN_heating_demand = lambda: sum(i.duty for i in HXN.heat_utilities 
-                                    if i.duty*i.cost>0)*get_annual_factor()/1e9
-get_BT_heating_demand = lambda: sum(i.duty for i in BT.heat_utilities 
-                                    if i.duty*i.cost>0)*get_annual_factor()/1e9
+# # get_system_heating_demand = lambda: BT.system_heating_demand*get_annual_factor()/1e9
+# get_system_heating_demand = lambda: sum([i.duty for i in BT.steam_utilities])*get_annual_factor()/1e9
+# # get_pretreatment_steam_heating_demand = lambda: BT.side_streams_lps.duty*get_annual_factor()/1e9
+# get_pretreatment_steam_heating_demand = lambda: unit_groups[0].get_heating_duty()*get_annual_factor()/1e3
 
-def get_heating_demand(system):
-    heat_utilities = sum([i.heat_utilities for i in HP_sub_sys[system]], ())
-    return lambda: sum([i.duty for i in heat_utilities
-                        if i.duty*i.cost>0])*get_annual_factor()/1e9
+# get_HXN_heating_demand = lambda: sum(i.duty for i in HXN.heat_utilities 
+#                                     if i.duty*i.cost>0)*get_annual_factor()/1e9
+# get_BT_heating_demand = lambda: sum(i.duty for i in BT.heat_utilities 
+#                                     if i.duty*i.cost>0)*get_annual_factor()/1e9
 
-for system in HP_sub_sys.keys():
-    if system in ('feedstock_sys', 'HXN', 'BT'): continue
-    # The only heating demand for the pretreatment system is the heat needed to
-    # generate the side steam
-    if system == 'pretreatment_sys':
-        metrics.extend((Metric(system, get_pretreatment_steam_heating_demand, '10^9 kJ/yr', 
-                                'Heating demand'),))
-    else: metrics.extend((Metric(system, get_heating_demand(system), '10^9 kJ/yr', 
-                                  'Heating demand'),))
+# def get_heating_demand(system):
+#     heat_utilities = sum([i.heat_utilities for i in process_groups_dict[system]], ())
+#     return lambda: sum([i.duty for i in heat_utilities
+#                         if i.duty*i.cost>0])*get_annual_factor()/1e9
 
-check_heating_demand = \
-    lambda: sum((get_heating_demand(system)() for system in HP_sub_sys.keys()), 
-                get_pretreatment_steam_heating_demand())
+# for system in process_groups_dict.keys():
+#     if system in ('feedstock_sys', 'HXN', 'BT'): continue
+#     # The only heating demand for the pretreatment system is the heat needed to
+#     # generate the side steam
+#     if system == 'pretreatment_sys':
+#         metrics.extend((Metric(system, get_pretreatment_steam_heating_demand, '10^9 kJ/yr', 
+#                                 'Heating demand'),))
+#     else: metrics.extend((Metric(system, get_heating_demand(system), '10^9 kJ/yr', 
+#                                   'Heating demand'),))
+
+# check_heating_demand = \
+#     lambda: sum((get_heating_demand(system)() for system in process_groups_dict.keys()), 
+#                 get_pretreatment_steam_heating_demand())
                                             
-metrics.extend((
-    Metric('HXN', get_HXN_heating_demand, '10^9 kJ/yr', 'Heating demand'),
-    Metric('BT', get_BT_heating_demand, '10^9 kJ/yr', 'Heating demand'),    
-    Metric('Sum', get_system_heating_demand, '10^9 kJ/yr', 'Heating demand'),
-    Metric('Check', check_heating_demand, '10^9 kJ/yr', 'Heating demand')
-    ))
+# metrics.extend((
+#     Metric('HXN', get_HXN_heating_demand, '10^9 kJ/yr', 'Heating demand'),
+#     Metric('BT', get_BT_heating_demand, '10^9 kJ/yr', 'Heating demand'),    
+#     Metric('Sum', get_system_heating_demand, '10^9 kJ/yr', 'Heating demand'),
+#     Metric('Check', check_heating_demand, '10^9 kJ/yr', 'Heating demand')
+#     ))
 
-# =============================================================================
-# Cooling demand breakdown (negative if needs cooling)
-# =============================================================================
+# # =============================================================================
+# # Cooling demand breakdown (negative if needs cooling)
+# # =============================================================================
 
-CT = find.unit.CT
-get_system_cooling_water_duty = lambda: CT.system_cooling_water_duty*get_annual_factor()/1e9
-get_HXN_cooling_demand = lambda: sum(i.duty for i in HXN.heat_utilities 
-                                    if i.duty*i.cost<0)*get_annual_factor()/1e9
-get_CT_cooling_demand = lambda: sum(i.duty for i in CT.heat_utilities 
-                                    if i.duty*i.cost<0)*get_annual_factor()/1e9
+# CT = find.unit.CT
+# get_system_cooling_water_duty = lambda: CT.system_cooling_water_duty*get_annual_factor()/1e9
+# get_HXN_cooling_demand = lambda: sum(i.duty for i in HXN.heat_utilities 
+#                                     if i.duty*i.cost<0)*get_annual_factor()/1e9
+# get_CT_cooling_demand = lambda: sum(i.duty for i in CT.heat_utilities 
+#                                     if i.duty*i.cost<0)*get_annual_factor()/1e9
 
-def get_cooling_demand(system):
-    heat_utilities = sum((i.heat_utilities for i in HP_sub_sys[system]), ())
-    return lambda: sum([i.duty for i in heat_utilities
-                        if i.duty*i.cost<0])*get_annual_factor()/1e9
+# def get_cooling_demand(system):
+#     heat_utilities = sum((i.heat_utilities for i in process_groups_dict[system]), ())
+#     return lambda: sum([i.duty for i in heat_utilities
+#                         if i.duty*i.cost<0])*get_annual_factor()/1e9
 
-for system in HP_sub_sys.keys():
-    if system in ('feedstock_sys', 'HXN', 'CT'): continue
-    else: metrics.extend((Metric(system, get_cooling_demand(system),
-                                  '10^9 kJ/yr', 'Cooling demand'),))
+# for system in process_groups_dict.keys():
+#     if system in ('feedstock_sys', 'HXN', 'CT'): continue
+#     else: metrics.extend((Metric(system, get_cooling_demand(system),
+#                                   '10^9 kJ/yr', 'Cooling demand'),))
 
-check_cooling_demand = \
-    lambda: sum(get_cooling_demand(system)() for system in HP_sub_sys.keys())
+# check_cooling_demand = \
+#     lambda: sum(get_cooling_demand(system)() for system in process_groups_dict.keys())
 
-metrics.extend((
-    Metric('HXN', get_HXN_cooling_demand, '10^9 kJ/yr', 'Cooling demand'),
-    Metric('CT', get_CT_cooling_demand, '10^9 kJ/yr', 'Cooling demand'),    
-    Metric('Sum', get_system_cooling_water_duty, '10^9 kJ/yr', 'Cooling demand'),
-    Metric('Check', check_cooling_demand, '10^9 kJ/yr', 'Cooling demand')
-    ))
+# metrics.extend((
+#     Metric('HXN', get_HXN_cooling_demand, '10^9 kJ/yr', 'Cooling demand'),
+#     Metric('CT', get_CT_cooling_demand, '10^9 kJ/yr', 'Cooling demand'),    
+#     Metric('Sum', get_system_cooling_water_duty, '10^9 kJ/yr', 'Cooling demand'),
+#     Metric('Check', check_cooling_demand, '10^9 kJ/yr', 'Cooling demand')
+#     ))
 
-# =============================================================================
-# Power demand breakdown (positive if using power)
-# =============================================================================
+# # =============================================================================
+# # Power demand breakdown (positive if using power)
+# # =============================================================================
 
-get_system_power_demand = lambda: sum(i.power_utility.rate for i in HP_sys.units
-                                      if i.power_utility)
+# get_system_power_demand = lambda: sum(i.power_utility.rate for i in HP_sys.units
+#                                       if i.power_utility)
 
-def get_power_demand(system):
-    power_utilities = [i.power_utility for i in HP_sub_sys[system]]
-    return lambda: sum(i.rate for i in power_utilities)
+# def get_power_demand(system):
+#     power_utilities = [i.power_utility for i in process_groups_dict[system]]
+#     return lambda: sum(i.rate for i in power_utilities)
 
-for system in HP_sub_sys.keys():
-    if system == 'feedstock_sys': continue
-    metrics.extend((Metric(system, get_power_demand(system), 'kW', 'Power demand'),))
+# for system in process_groups_dict.keys():
+#     if system == 'feedstock_sys': continue
+#     metrics.extend((Metric(system, get_power_demand(system), 'kW', 'Power demand'),))
 
-check_power_demand = lambda: sum(get_power_demand(system)()
-                                 for system in HP_sub_sys.keys()) - get_system_power_demand()
-metrics.extend((
-    Metric('Sum', get_system_power_demand, 'kW', 'Power demand'),
-    Metric('Check', check_power_demand, 'kW', 'Power demand')
-    ))
+# check_power_demand = lambda: sum(get_power_demand(system)()
+#                                  for system in process_groups_dict.keys()) - get_system_power_demand()
+# metrics.extend((
+#     Metric('Sum', get_system_power_demand, 'kW', 'Power demand'),
+#     Metric('Check', check_power_demand, 'kW', 'Power demand')
+#     ))
 
-# =============================================================================
-# Utility cost breakdown (including heating, cooling, and power)
-# =============================================================================
+# # =============================================================================
+# # Utility cost breakdown (including heating, cooling, and power)
+# # =============================================================================
 
-get_system_utility_cost = lambda: HP_tea.utility_cost/1e6
+# get_system_utility_cost = lambda: HP_tea.utility_cost/1e6
 
-def get_utility_cost(system):
-    return lambda: sum(i.utility_cost for i in HP_sub_sys[system])*get_annual_factor()/1e6
+# def get_utility_cost(system):
+#     return lambda: sum(i.utility_cost for i in process_groups_dict[system])*get_annual_factor()/1e6
 
-for system in HP_sub_sys.keys():
-    if system == 'feedstock_sys': continue
-    metrics.extend((Metric(system, get_utility_cost(system), '10^6 $/yr', 'Utility cost'),))
+# for system in process_groups_dict.keys():
+#     if system == 'feedstock_sys': continue
+#     metrics.extend((Metric(system, get_utility_cost(system), '10^6 $/yr', 'Utility cost'),))
 
-check_utility_cost = \
-    lambda: sum(get_utility_cost(system)() for system in HP_sub_sys.keys()) \
-        - get_system_utility_cost()
+# check_utility_cost = \
+#     lambda: sum(get_utility_cost(system)() for system in process_groups_dict.keys()) \
+#         - get_system_utility_cost()
 
-metrics.extend((
-    Metric('Sum', get_system_utility_cost, '10^6 $/yr', 'Utility cost'),
-    Metric('Check', check_utility_cost, '10^6 $/yr', 'Utility cost')
-    ))
+# metrics.extend((
+#     Metric('Sum', get_system_utility_cost, '10^6 $/yr', 'Utility cost'),
+#     Metric('Check', check_utility_cost, '10^6 $/yr', 'Utility cost')
+#     ))
+
 
 # To see if TEA converges well for each simulation
 get_NPV = lambda: HP_tea.NPV
 metrics.extend((Metric('Net present value', get_NPV, '$', 'TEA'), ))
 
 # To check HXN energy balance error
-metrics.append(Metric('HXN energy balance error', lambda: HXN.energy_balance_percent_error))
+# metrics.append(Metric('HXN energy balance error', lambda: HXN.energy_balance_percent_error))
+
+metrics.extend((Metric('HXN energy balance error', lambda: HXN.energy_balance_percent_error, '%', 'TEA'), ))
+
+##### LCA #####
+metrics.extend((
+    Metric('Total GWP', get_GWP, 'kg CO2-eq/kg', 'LCA'),
+    Metric('Total FEC', get_FEC, 'MJ/kg', 'LCA')
+    ))
+
+# Material GWP
+metrics.extend((Metric('GWP - H2SO4',
+                       lambda:get_GWP_by_ID('H2SO4'),
+                       'kg CO2/kg', 'LCA'),))
+metrics.extend((Metric('GWP - NaOH',
+                       lambda:get_GWP_by_ID('NaOH'),
+                       'kg CO2/kg', 'LCA'),))
+metrics.extend((Metric('GWP - AmmoniumHydroxide',
+                       lambda:get_GWP_by_ID('AmmoniumHydroxide'),
+                       'kg CO2/kg', 'LCA'),))
+metrics.extend((Metric('GWP - CalciumDihydroxide',
+                       lambda:get_GWP_by_ID('CalciumDihydroxide'),
+                       'kg CO2/kg', 'LCA'),))
+metrics.extend((Metric('GWP - Hexanol',
+                       lambda:get_GWP_by_ID('Hexanol'),
+                       'kg CO2/kg', 'LCA'),))
+metrics.extend((Metric('GWP - Enzyme',
+                       lambda:get_GWP_by_ID('Enzyme'),
+                       'kg CO2/kg', 'LCA'),))
+metrics.extend((Metric('GWP - TiO2',
+                       lambda:get_GWP_by_ID('TiO2'),
+                       'kg CO2/kg', 'LCA'),))
+metrics.extend((Metric('GWP - CSL',
+                       lambda:get_GWP_by_ID('CSL'),
+                       'kg CO2/kg', 'LCA'),))
+
+# Material FEC
+metrics.extend((Metric('FEC - H2SO4',
+                       lambda:get_FEC_by_ID('H2SO4'),
+                       'kg CO2/kg', 'LCA'),))
+metrics.extend((Metric('FEC - NaOH',
+                       lambda:get_FEC_by_ID('NaOH'),
+                       'kg CO2/kg', 'LCA'),))
+metrics.extend((Metric('FEC - AmmoniumHydroxide',
+                       lambda:get_FEC_by_ID('AmmoniumHydroxide'),
+                       'kg CO2/kg', 'LCA'),))
+metrics.extend((Metric('FEC - CalciumDihydroxide',
+                       lambda:get_FEC_by_ID('CalciumDihydroxide'),
+                       'kg CO2/kg', 'LCA'),))
+metrics.extend((Metric('FEC - Hexanol',
+                       lambda:get_FEC_by_ID('Hexanol'),
+                       'kg CO2/kg', 'LCA'),))
+metrics.extend((Metric('FEC - Enzyme',
+                       lambda:get_FEC_by_ID('Enzyme'),
+                       'kg CO2/kg', 'LCA'),))
+metrics.extend((Metric('FEC - TiO2',
+                       lambda:get_FEC_by_ID('TiO2'),
+                       'kg CO2/kg', 'LCA'),))
+metrics.extend((Metric('FEC - CSL',
+                       lambda:get_FEC_by_ID('CSL'),
+                       'kg CO2/kg', 'LCA'),))
+# Natural gas
+metrics.extend((Metric('GWP - natural gas',
+                       lambda:get_ng_GWP(),
+                       'kg CO2/kg', 'LCA'),))
+metrics.extend((Metric('FEC - natural gas',
+                       lambda:get_ng_FEC(),
+                       'MJ/kg', 'LCA'),))
+
+# Natural gas
+metrics.extend((Metric('GWP - natural gas',
+                       lambda:get_ng_GWP(),
+                       'kg CO2/kg', 'LCA'),))
+metrics.extend((Metric('FEC - natural gas',
+                       lambda:get_ng_FEC(),
+                       'MJ/kg', 'LCA'),))
+
+# Electricity
+metrics.extend((Metric('GWP - electricity',
+                       lambda:get_electricity_GWP(),
+                       'kg CO2/kg', 'LCA'),))
+metrics.extend((Metric('FEC - electricity',
+                       lambda:get_electricity_FEC(),
+                       'MJ/kg', 'LCA'),))
+
+# Feedstock growth, harvesting, transportation, and preprocessing
+metrics.extend((Metric('GWP - Feedstock GHTP',
+                       lambda:get_FGHTP_GWP(),
+                       'kg CO2/kg', 'LCA'),))
+metrics.extend((Metric('FEC - Feedstock GHTP',
+                       lambda:get_feedstock_FEC(),
+                       'MJ/kg', 'LCA'),))
+
+# Direct non-biogenic emissions GWP
+metrics.extend((Metric('GWP - Direct non-bio emmissions',
+                       lambda:get_direct_emissions_GWP(),
+                       'kg CO2/kg', 'LCA'),))
 # %% 
 
 # =============================================================================
@@ -310,42 +648,79 @@ HP_model = Model(HP_sys, metrics)
 param = HP_model.parameter
 
 def baseline_uniform(baseline, ratio):
-    return shape.Uniform(baseline*(1-ratio), baseline*(1+ratio))
+    lb, ub = baseline*(1-ratio), baseline*(1+ratio)
+    if lb > ub: ub, lb = lb, ub
+    return shape.Uniform(lb, ub)
+
+def baseline_triangle(baseline, ratio):
+    lb, mid, ub = baseline*(1-ratio), baseline, baseline*(1+ratio)
+    if lb > ub: ub, lb = lb, ub
+    return shape.Triangle(lb, mid, ub)
 
 
+D = baseline_uniform(1, 0.1)
+@param(name='Blank parameter', element=feedstock, kind='coupled', units='',
+       baseline=1, distribution=D)
+def set_blank_parameter(anything):
+    # This does nothing
+    feedstock.T = feedstock.T
+    
 # =============================================================================
 # TEA parameters
 # =============================================================================
 
-U101 = find.unit.U101
-D = baseline_uniform(2205, 0.1)
-@param(name='Flow rate', element=U101, kind='coupled', units='U.S. ton/day',
-       baseline=2205, distribution=D)
-def set_feedstock_flow_rate(rate):
-    U101.feedstock_flow_rate = rate
+# U101 = find.unit.U101
+# D = baseline_uniform(2205, 0.1)
+# @param(name='Flow rate', element=U101, kind='coupled', units='U.S. ton/day',
+#        baseline=2205, distribution=D)
+# def set_feedstock_flow_rate(rate):
+#     U101.feedstock_flow_rate = rate
 
-D = baseline_uniform(0.9, 0.1)
+D = shape.Triangle(0.84, 0.9, 0.96)
 @param(name='Plant uptime', element='TEA', kind='isolated', units='%',
        baseline=0.9, distribution=D)
 def set_operating_days(uptime):
     HP_tea.operating_days = 365 * uptime
 
+
+# D = baseline_triangle(1, 0.25)
+# @param(name='TCI ratio', element='TEA', kind='isolated', units='% of baseline',
+#         baseline=1, distribution=D)
+# def set_TCI_ratio(new_ratio):
+#     old_ratio = HP_no_BT_tea._TCI_ratio_cached
+#     for unit in HP_sys.units:
+#         if hasattr(unit, 'cost_items'):
+#             for item in unit.cost_items:
+#                 unit.cost_items[item].cost /= old_ratio
+#                 unit.cost_items[item].cost *= new_ratio
+#     HP_no_BT_tea._TCI_ratio_cached = new_ratio
+
+
+feedstock = find('feedstock')
+D = shape.Triangle(60, 71.3, 83.7)
+@param(name='Feedstock unit price', element='TEA', kind='isolated', units='$/dry-ton',
+       baseline=71.3, distribution=D)
+def set_feedstock_price(price):
+    feedstock.price = price / _feedstock_factor
+
+
 # Impactful parameters are set to triangular distribution based on literature,
 # less important ones are set to ±10% of baseline value
 special_price = {
-#     stream           distribution     min        max
-    'feedstock':        ('Uniform',   (0.0529,    0.117)),
-    'CSL_fresh':        ('Uniform',   (0.0673,    0.112)),
-    'lime_fresh':       ('Uniform',   (0.160,     0.288)),
+#     stream           distribution     min  mid   max
+    # 'feedstock':        ('Triangle',   (60, 71.3, 83.7)),
+    # 'CSL_fresh':        ('Uniform',   (0.0673,    0.112)),
+    'lime_fresh':       ('Triangle',   (0.160, 0.262, 0.288)),
     # 'ethanol_fresh':    ('Triangle',  (0.460,     0.978)),
-    'natural_gas':      ('Triangle',  (0.198,     0.304)),
+    # 'hexanol_fresh':    ('Uniform',   (0.551*0.9,     0.551*1.1)),
+    # 'natural_gas':      ('Triangle',  (0.198,     0.304)),
     'gypsum':           ('Uniform',   (-0.0288,   0.00776))
     }
 
 # Prices for boiler_chems, baghouse_bag, and cooling_tower_chems are not included
 # as they are tied to BT/CT duties
 default_price_streams = ('sulfuric_acid_fresh', 'ammonia_fresh', 'enzyme', 
-                         'system_makeup_water', 'aerobic_caustic', 'ash')
+                         'system_makeup_water', 'aerobic_caustic', 'ash', 'hexanol_fresh')
 
 def add_stream_price_param(stream, D):
     param(setter=Setter(stream, 'price'),
@@ -366,7 +741,7 @@ for stream_ID in special_price.keys():
 for stream_ID in default_price_streams:
     stream = getattr(find.stream, stream_ID)
     baseline = stream.price
-    D = baseline_uniform(baseline, 0.1)
+    D = baseline_triangle(baseline, 0.1)
     add_stream_price_param(stream, D)
 
 D = shape.Triangle(0.067, 0.070, 0.074)
@@ -375,29 +750,58 @@ D = shape.Triangle(0.067, 0.070, 0.074)
 def set_electricity_price(price): 
     bst.PowerUtility.price = price
 
-D = baseline_uniform(1, 0.1)
+BT = flowsheet('BT')
+natural_gas_price = BT.natural_gas_price
+D = shape.Triangle(natural_gas_price*0.9, natural_gas_price, natural_gas_price*1.1)
+@param(name='Natural gas price', element='TEA', kind='isolated', units='$/kWh',
+       baseline=natural_gas_price, distribution=D)
+def set_natural_gas_price(price): 
+    BT.natural_gas_price = price
+    
+
+# HP_sys._cached_TCI_ratio = 1.
+# new_ratio = 1.
+D = baseline_triangle(1., 0.25)
 @param(name='TCI ratio', element='TEA', kind='isolated', units='% of baseline',
-       baseline=1, distribution=D)
+        baseline=1., distribution=D)
 def set_TCI_ratio(ratio): 
     for unit in HP_sys.units:
         if hasattr(unit, 'cost_items'):
             for item in unit.cost_items:
-                unit.cost_items[item].cost *= ratio
+                unit.cost_items[item].cost *= ratio/HP_no_BT_tea._TCI_ratio_cached
+                HP_no_BT_tea._TCI_ratio_cached = ratio
 
+# =============================================================================
+# LCA parameters
+# =============================================================================
 
+D = shape.Uniform(0.09646, 0.12894) # see Feedstock_impacts_YL
+@param(name='Feedstock GHTP GWP100 CF', element='LCA', kind='isolated', units='kg-CO2eq. / dry-kg',
+       baseline=0.10945, distribution=D)
+def set_feedstock_GWP_CF(CF):
+    CFs['GWP_CFs']['FGHTP Corn stover'] = CF
+    
+D = shape.Uniform(1.32576, 1.75741) # see Feedstock_impacts_YL
+@param(name='Feedstock GHTP FEC CF', element='LCA', kind='isolated', units='MJeq. / dry-kg',
+       baseline=1.68, distribution=D)
+def set_feedstock_FEC_CF(CF):
+    CFs['FEC_CFs']['FGHTP Corn stover'] = CF
+    
 # =============================================================================
 # Pretreatment parameters
 # =============================================================================
 
 M202 = find.unit.M202
-D = shape.Uniform(0.25, 0.4)
+D = shape.Triangle(0.25, 0.3, 0.4)
 @param(name='Pretreatment solid loading', element=M202, kind='coupled', units='%', 
        baseline=0.3, distribution=D)
 def set_pretreatment_solid_loading(loading): 
     M202.solid_loading = loading
-    
+
+
+# baseline imass discrepancy
 pretreatment_sulfuric_acid = find.stream.pretreatment_sulfuric_acid
-D = shape.Uniform(10, 35)
+D = shape.Triangle(10, 22.1, 35)
 @param(name='Pretreatment sulfuric acid loading', element=pretreatment_sulfuric_acid,
        kind='coupled', units='mg/g-dry feedstock', baseline=22.1, distribution=D)
 def set_pretreatment_sulfuric_acid_loading(loading): 
@@ -406,12 +810,12 @@ def set_pretreatment_sulfuric_acid_loading(loading):
     pretreatment_sulfuric_acid.imass['H2O'] = feedstock_dry_mass*loading/1000*0.07
 
 R201 = find.unit.R201
-D = shape.Uniform(0.06, 0.12)
+D = shape.Triangle(0.06, 0.099, 0.12)
 @param(name='Pretreatment glucan-to-glucose', element=R201, kind='coupled', units='%',
        baseline=0.099, distribution=D)
 def set_R201_glucan_conversion(X): R201.pretreatment_rxns[0].X = X    
 
-D = shape.Uniform(0.8, 0.92)
+D = shape.Triangle(0.8, 0.9, 0.92)
 @param(name='Pretreatment xylan-to-xylose', element=R201, kind='coupled', units='%',
        baseline=0.9, distribution=D)
 def set_R201_xylan_conversion(X): R201.pretreatment_rxns[4].X = X        
@@ -425,86 +829,135 @@ M301 = find.unit.M301
 R302 = find.unit.R302
 R303 = find.unit.R303
 
-D = shape.Uniform(0.175, 0.25)
+D = shape.Triangle(0.175, 0.2, 0.25)
 @param(name='Enzymatic hydrolysis solid loading', element=M301, kind='coupled', units='%',
        baseline=0.2, distribution=D)
 def set_R301_hydrolysis_solid_loading(loading): M301.solid_loading = loading
 
-D = shape.Uniform(10, 30)
+D = shape.Triangle(10, 20, 30)
 @param(name='Enzyme loading', element=M301, kind='coupled', units='mg/g glucan',
        baseline=20, distribution=D)
 def set_R301_enzyme_loading(loading): M301.enzyme_loading = loading
 
 # Enzymatic hydrolysis
-D = baseline_uniform(24, 0.1)
+D = shape.Triangle(0, 24, 56)
 @param(name='Enzymatic hydrolysis time', element=R301, kind='coupled', units='hr',
        baseline=24, distribution=D)
 def set_R301_hydrolysis_time(tau): R301.tau_saccharification = tau
 
-D = shape.Uniform(0.75, 0.9)
+D = shape.Triangle(0.75, 0.9, 0.948-1e-6)
 @param(name='Enzymatic hydrolysis glucan-to-glucose', element=R301, kind='coupled', units='%',
-       baseline=0.85, distribution=D)
+       baseline=0.9, distribution=D)
 def set_R301_glucan_conversion(X): R301.saccharification_rxns[2].X = X
 
 # Fermentation
-D = shape.Triangle(76, 120, 145)
-@param(name='Fermentation time', element=R302, kind='coupled', units='hr',
-       baseline=120, distribution=D)
-def set_R302_fermentation_time(tau): R302.tau_cofermentation = tau
+# D = shape.Triangle(76, 120, 145)
+# @param(name='Fermentation time', element=R302, kind='coupled', units='hr',
+#        baseline=120, distribution=D)
+# def set_R302_fermentation_time(tau): R302.tau_cofermentation = tau
 
-D = shape.Uniform(5, 15)
+
+D = shape.Triangle(0.38, 0.76, 1.52)
+@param(name='Productivity', element=R301, kind='coupled', units='g/L/hr',
+       baseline=0.76, distribution=D)
+def set_HP_productivity(productivity):
+    # R301.productivity = productivity
+    # R302.productivity = productivity * R302.ferm_ratio
+    spec.load_productivity(productivity)
+    
+D = shape.Triangle(5, 10, 15)
 @param(name='CSL loading', element=R301, kind='coupled', units='g/L',
        baseline=10, distribution=D)
 def set_CSL_loading(loading): R302.CSL_loading = loading
 
 
-D = shape.Triangle(0.424, 0.53, 0.636) # +/- 20% of baseline
-@param(name='3-Hydroxypropionic acid yield', element=R303, kind='coupled', units='% theoretical',
-       baseline=0.53, distribution=D)
-def set_R302_HP_yield(X):
-    R302_X = R302.cofermentation_rxns.X
-    R302_X[0] = R302_X[3] = X
-    R303_X = R303.cofermentation_rxns.X
-    R303_X[0] = R303_X[3] = X * R303.ferm_ratio
+# D = shape.Triangle(0.424, 0.53, 0.636) # +/- 20% of baseline
+# @param(name='3-Hydroxypropionic acid yield', element=R303, kind='coupled', units='% theoretical',
+#        baseline=0.53, distribution=D)
+# def set_R302_HP_yield(X):
+#     R302_X = R302.cofermentation_rxns.X
+#     R302_X[0] = R302_X[2] = X
+#     R303_X = R303.cofermentation_rxns.X
+#     R303_X[0] = R303_X[3] = X * R303.ferm_ratio
 
-D = shape.Triangle(0.004, 0.07, 0.32)
+
+
+
+D = shape.Triangle(0.030, 0.040, 0.050)
 @param(name='Acetic acid yield', element=R303, kind='coupled', units='% theoretical',
-       baseline=0.07, distribution=D)
+        baseline=0.040, distribution=D)
 def set_R301_acetic_acid_yield(X): 
     # 1e6 is to avoid generating tiny negative flow (e.g., 1e-14) in R301
-    R302_X = R302.cofermentation_rxns.X
-    X = min(X, 1-1e-6-R302_X[0]-R302_X[2])
-    R302_X[1] = R302_X[4] = X
-    R303_X = R303.cofermentation_rxns.X
-    X = min(X*R303.ferm_ratio, 1-1e-6-R303_X[0]-R303_X[2])
-    R303_X[1] = R303_X[4] = X
+    # R302_X = R302.cofermentation_rxns.X
+    ferm_ratio = R303.ferm_ratio
+    
+    X1 = min(X, 1-1e-6-R302.glucose_to_HP_rxn.X-R302.glucose_to_biomass_rxn.X)
+    X2 = min(X, 1-1e-6-R302.xylose_to_HP_rxn.X-R302.xylose_to_biomass_rxn.X)
+    
+    R302.glucose_to_acetic_acid_rxn.X = X1
+    R303.glucose_to_acetic_acid_rxn.X = X1 * ferm_ratio
+    
+    R302.xylose_to_acetic_acid_rxn.X = X2
+    R303.xylose_to_acetic_acid_rxn.X = X2 * ferm_ratio
+    
+    X1_glycerol = (0.08 - X1) if X1==X else 0.
+    X2_glycerol = (0.08 - X2) if X2==X else 0.  
+    
+    R302.glucose_to_glycerol_rxn.X = X1_glycerol
+    R303.glucose_to_glycerol_rxn.X = X1_glycerol * ferm_ratio
+    
+    R302.xylose_to_glycerol_rxn.X = X2_glycerol
+    R303.xylose_to_glycerol_rxn.X = X2_glycerol * ferm_ratio
+    
+    # R302_X[1] = R302_X[3] = X
+    # R303_X = R303.cofermentation_rxns.X
+    # X = min(X*R303.ferm_ratio, 1-1e-6-R303_X[0]-R303_X[2])
+    # R303_X[1] = R303_X[3] = X
 
-D = shape.Uniform(0.05, 0.1)
-@param(name='Innoculum ratio', element=R301, kind='coupled', units='%',
-       baseline=0.07, distribution=D)
-def set_innoculum_ratio(ratio): R301.inoculum_ratio = ratio
+
+
+
+# D = shape.Uniform(0.4, 0.6)
+# @param(name='Unfermented sugars routed to CO2 generation (balance is routed to cell mass generation)', element=R303, kind='coupled', units='% theoretical',
+#        baseline=0.5, distribution=D)
+# def set_sugars_to_CO2_gen(X): 
+#    R302.CO2_generation_rxns.X[0] = R302.CO2_generation_rxns.X[1] = X
+#    R303.CO2_generation_rxns.X[0] = R303.CO2_generation_rxns.X[1] = X * R303.ferm_ratio
+   
+   
+   
+# D = shape.Triangle(0.05, 0.07, 0.1)
+# @param(name='Innoculum ratio', element=R301, kind='coupled', units='%',
+#        baseline=0.07, distribution=D)
+# def set_innoculum_ratio(ratio): R301.inoculum_ratio = ratio
+
+
 
 # Seed train fermentation yield as a ratio of the main fermenter
-D = baseline_uniform(36, 0.1)
-@param(name='Seed train time', element=R303, kind='coupled', units='hr',
-       baseline=36, distribution=D)
-def set_R303_fermentation_time(tau): R303.tau_batch = tau
+# D = baseline_uniform(36, 0.1)
+# @param(name='Seed train time', element=R303, kind='coupled', units='hr',
+#        baseline=36, distribution=D)
+# def set_R303_fermentation_time(tau): R303.tau_batch = tau
 
-D = shape.Triangle(0.8, 0.9, 1)
-@param(name='Seed train yield', element=R302, kind='coupled', units='% of R301',
-       baseline=0.9, distribution=D)
-def set_R303_ratio(ratio):
-    R302_X = R302.cofermentation_rxns.X
-    R303_X = R303.cofermentation_rxns.X
-    ratio = min(ratio, (1-1e-6-R303_X[2])/(R302_X[0]+R302_X[1]))
-    R303.ferm_ratio = ratio
+
+
+
+
+# D = shape.Triangle(0.8, 0.9, 1)
+# @param(name='Seed train yield', element=R302, kind='coupled', units='% of R301',
+#        baseline=0.9, distribution=D)
+# def set_R303_ratio(ratio):
+#     R302_X = R302.cofermentation_rxns.X
+#     R303_X = R303.cofermentation_rxns.X
+#     ratio = min(ratio, (1-1e-6-R303_X[2])/(R302_X[0]+R302_X[1]))
+#     R303.ferm_ratio = ratio
 
 # =============================================================================
 # Separation parameters
 # =============================================================================
 
 S402 = find.unit.S402
-D = shape.Triangle(0.95, 0.995, 1)
+D = shape.Triangle(0.95, 0.995, 1.)
 @param(name='Gypsum split', element=S402, kind='coupled', units='',
        baseline=0.995, distribution=D)
 def set_S402_gypsum_split(split):
@@ -512,14 +965,15 @@ def set_S402_gypsum_split(split):
     S402.split[gypsum_index] = split
 
 R401 = find.unit.R401
-D = baseline_uniform(0.5, 0.1)
+D = baseline_triangle(1., 0.1)
 @param(name='Acidulation time', element=R401, kind='coupled', units='hr',
-       baseline=0.5, distribution=D)
+       baseline=1., distribution=D)
 def set_R401_tau(tau):
     R401.tau = tau
 
 R402 = find.unit.R402
-D = baseline_uniform(0.95, 0.05)
+# D = baseline_triangle(0.95, 0.05)
+D = shape.Triangle(0.995, 0.9975, 0.9999)
 @param(name='Dehydration conversion', element=R402, kind='coupled', units='',
        baseline=0.95, distribution=D)
 def set_R402_conversion(X):
@@ -542,7 +996,7 @@ D = baseline_uniform(0.8, 0.1)
 @param(name='BT combustion efficiency', element=BT, kind='coupled', units='%',
        baseline=0.8, distribution=D)
 def set_BT_combustion_efficiency(efficiency):
-    BT.B_eff = efficiency
+    BT.boiler_efficiency = efficiency
 
 # All parameters
 parameters = HP_model.get_parameters()
@@ -682,3 +1136,5 @@ HP_model_HXN_T_min_app.set_parameters(parameters)
 # model.load_samples(samples)
 # model.evaluate()
 # model.table # All evaluations are stored as a pandas DataFrame
+
+

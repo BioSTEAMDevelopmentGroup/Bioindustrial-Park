@@ -16,8 +16,8 @@ class AdiabaticFixedbedGasReactor(bst.design_tools.PressureVessel, bst.Unit):
     _units = {**bst.design_tools.PressureVessel._units,
               'Volume': 'ft^3',
               'Catalyst weight': 'kg'}
-    _BM = {**bst.design_tools.PressureVessel._BM,
-           'Catalyst': 1.0}
+    _F_BM_default = {**bst.design_tools.PressureVessel._F_BM_default,
+                     'Catalyst': 1.0}
     
     def __init__(self, ID="", ins=None, outs=(), thermo=None, *,
                  reaction, catalyst_density, catalyst_price, WHSV,

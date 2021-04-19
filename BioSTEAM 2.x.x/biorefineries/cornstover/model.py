@@ -8,7 +8,7 @@ from biosteam.evaluation import evaluation_tools as tools
 from biosteam.evaluation import Model, Metric
 from biorefineries.cornstover import \
     cornstover_sys, cornstover_tea, \
-    ethanol, cornstover, R301, ethanol_density_kggal, \
+    ethanol, cornstover, R301, R303, ethanol_density_kggal, \
     areas, BT, Area700, AllAreas
 
 cornstover_sys.simulate()
@@ -50,20 +50,20 @@ def set_saccharification_conversion(saccharification_conversion):
     saccharification_reaction.X = saccharification_conversion
 
 # Add ethanol conversion as a parameter
-ethanol_reaction = R301.cofermentation[0]
+ethanol_reaction = R303.cofermentation[0]
 X = tools.bounded_triang(ethanol_reaction.X, addition=0.02)
 @param(element=R301, kind='coupled', distribution=X, baseline=ethanol_reaction.X)
 def set_ethanol_conversion(ethanol_conversion):
     ethanol_reaction.X = ethanol_conversion
     
 # Add saccharification time as a parameter
-X = tools.triang(R301.tau_saccharification)
-@param(element=R301, kind='isolated', distribution=X, baseline=R301.tau_saccharification)
+X = tools.triang(R303.tau_saccharification)
+@param(element=R303, kind='isolated', distribution=X, baseline=R303.tau_saccharification)
 def set_saccharification_time(saccharification_time):
-    R301.tau_saccharification= saccharification_time
+    R303.tau_saccharification= saccharification_time
     
 # Add fermentation time as a parameter
-X = tools.triang(R301.tau_cofermentation)
-@param(element=R301, kind='isolated',  distribution=X, baseline=R301.tau_cofermentation)
+X = tools.triang(R303.tau_cofermentation)
+@param(element=R303, kind='isolated',  distribution=X, baseline=R303.tau_cofermentation)
 def set_fermentation_time(fermentation_time):
-    R301.tau_cofermentation = fermentation_time
+    R303.tau_cofermentation = fermentation_time

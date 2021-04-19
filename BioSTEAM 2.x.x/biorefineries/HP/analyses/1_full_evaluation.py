@@ -34,14 +34,18 @@ HP acid from lignocellulosic feedstocks
 # =============================================================================
 # Setup
 # =============================================================================
-
+from warnings import filterwarnings
+filterwarnings('ignore')
 import numpy as np
 import pandas as pd
 import biosteam as bst
 from biosteam.utils import TicToc
 from biosteam.plots import plot_montecarlo_across_coordinate
-from biorefineries.HP.system_sugarcane import HP_sys, get_AA_MPSP, get_GWP, get_FEC, R301
+from biorefineries.HP.system_light_lle_vacuum_distillation import spec, HP_sys, get_AA_MPSP, get_GWP, get_FEC, R301
 from biorefineries.HP.analyses import models
+from datetime import datetime
+
+
 
 percentiles = [0, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 1]
 
@@ -62,9 +66,83 @@ R301.set_titer_limit = True
 
 # Set seed to make sure each time the same set of random numbers will be used
 np.random.seed(3221)
-N_simulation = 100 # 1000
+N_simulation = 1000 # 1000
 samples = model.sample(N=N_simulation, rule='L')
 model.load_samples(samples)
+
+
+###############################
+# Bugfix barrage
+###############################
+
+system = HP_sys
+
+def reset_and_reload():
+    print('Resetting cache and emptying recycles ...')
+    system.reset_cache()
+    system.empty_recycles()
+    print('Loading and simulating with baseline specifications ...')
+    spec_1, spec_2, spec_3 = spec.spec_1, spec.spec_2, spec.spec_3
+    spec.load_yield(0.49)
+    spec.load_titer(54.8)
+    spec.load_productivity(0.76)
+    system.simulate()
+    print('Loading and simulating with required specifications ...')
+    spec.load_specifications(spec_1=spec_1, spec_2=spec_2, spec_3=spec_3)
+    system.simulate()
+    
+def reset_and_switch_solver(solver_ID):
+    system.reset_cache()
+    system.empty_recycles()
+    system.converge_method = solver_ID
+    print(f"Trying {solver_ID} ...")
+    system.simulate()
+    
+def run_bugfix_barrage():
+    try:
+        reset_and_reload()
+    except Exception as e:
+        print(str(e))
+        try:
+            reset_and_switch_solver('fixedpoint')
+        except Exception as e:
+            print(str(e))
+            try:
+                reset_and_switch_solver('aitken')
+            except Exception as e:
+                print(str(e))
+                # print(_yellow_text+"Bugfix barrage failed.\n"+_reset_text)
+                print("Bugfix barrage failed.\n")
+                raise e
+###############################
+
+spec.load_spec_1 = spec.load_yield
+spec.load_spec_2 = spec.load_titer
+spec.load_spec_3 = spec.load_productivity
+
+full_path = HP_sys.path
+evaporator_index = full_path.index(spec.titer_inhibitor_specification.evaporator)
+pre_evaporator_units_path = full_path[0:evaporator_index]
+
+def model_specification():
+    try:
+        # model._system._converge()
+        for unit in pre_evaporator_units_path:
+            unit._run()
+        spec.titer_inhibitor_specification.run_units()
+        spec.load_specifications(spec_1=spec.spec_1, spec_2=spec.spec_2, spec_3=spec.spec_3)
+        model._system.simulate()
+    except Exception as e:
+        str_e = str(e)
+        print('Error in model spec: %s'%str_e)
+        # raise e
+        if 'sugar concentration' in str_e:
+            # flowsheet('AcrylicAcid').F_mass /= 1000.
+            raise e
+        else:
+            run_bugfix_barrage()
+            
+model.specification = model_specification
 
 baseline_initial = model.metrics_at_baseline()
 baseline = pd.DataFrame(data=np.array([[i for i in baseline_initial.values],]), 
@@ -74,9 +152,12 @@ model.evaluate()
 
 # Baseline results
 baseline_end = model.metrics_at_baseline()
+dateTimeObj = datetime.now()
+file_to_save = 'HP_%s.%s.%s-%s.%s'%(dateTimeObj.year, dateTimeObj.month, dateTimeObj.day, dateTimeObj.hour, dateTimeObj.minute)
+
 baseline = baseline.append(baseline_end, ignore_index=True)
 baseline.index = ('initial', 'end')
-baseline.to_excel('0_baseline.xlsx')
+baseline.to_excel(file_to_save+'_0_baseline.xlsx')
 
 # Parameters
 parameters = model.get_parameters()
@@ -142,7 +223,10 @@ for p in parameters:
     # pdb.set_trace()
     # [p_min], [p_max] = p.distribution.range().tolist()
     p_dist = p.distribution
-    [p_min], [p_max] = p_dist.lower.tolist(), p_dist.upper.tolist()
+    # import pdb
+    # pdb.set_trace()
+    # [p_min], [p_max] = p_dist.lower.tolist(), p_dist.upper.tolist()
+    [p_min], [p_max] = p_dist.range()[0], p_dist.range()[1]
     p_baseline = p.baseline
     p_value = (p_min, p_max, p_baseline)
     p.system = HP_sys
@@ -189,7 +273,7 @@ one_p_df = pd.DataFrame({
     ('FEC [MJ/kg]', 'FEC max diff'): FEC_max_diff,
     })
 
-time = timer.elapsed_time / 60
+time = timer.elapsed_time / 60.
 print(f'\nSimulation time for {run_number} runs is: {time:.1f} min')
 
 
@@ -208,7 +292,7 @@ print(f'\nSimulation time for {run_number} runs is: {time:.1f} min')
 
 #%%
 '''Output to Excel'''
-with pd.ExcelWriter('1_full_evaluation.xlsx') as writer:
+with pd.ExcelWriter(file_to_save+'_1_full_evaluation.xlsx') as writer:
     parameter_values.to_excel(writer, sheet_name='Parameters')
     TEA_results.to_excel(writer, sheet_name='TEA results')
     TEA_percentiles.to_excel(writer, sheet_name='TEA percentiles')
@@ -217,7 +301,7 @@ with pd.ExcelWriter('1_full_evaluation.xlsx') as writer:
     LCA_results.to_excel(writer, sheet_name='LCA results')
     LCA_percentiles.to_excel(writer, sheet_name='LCA percentiles')
     spearman_results.to_excel(writer, sheet_name='Spearman')
-    one_p_df.to_excel(writer, sheet_name='One-parameter')
+    # one_p_df.to_excel(writer, sheet_name='One-parameter')
     model.table.to_excel(writer, sheet_name='Raw data')
 
 

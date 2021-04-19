@@ -7,6 +7,7 @@ Created on Thu Dec 21 11:05:24 2017
 """
 import numpy as np
 import biosteam as bst
+import flexsolve as flx
 from biosteam import units, SystemFactory
 from biosteam import main_flowsheet as f
 
@@ -20,10 +21,31 @@ __all__ = (
     'create_sucrose_to_ethanol_system',
     'create_ethanol_purification_system',
     'create_sugarcane_to_ethanol_system',
+    'create_bagasse_pelleting_system',
 )
 
 
 # %% Juicing and evaporation
+
+@SystemFactory(
+    ID='bagasse_pelleting_sys',
+    ins=[dict(ID='bagasse')],
+    outs=[dict(ID='bagasse_pellets')]
+)
+def create_bagasse_pelleting_system(ins, outs):
+    bagasse, = ins
+    bagasse_pellets, = outs
+    U401 = units.ConveyingBelt('U401', bagasse)
+    U402 = units.HammerMill('U402', U401-0)
+    U403 = units.DrumDryer('U403', 
+        (U402-0, 'dryer_air', 'dryer_natural_gas'), 
+        ('', '', 'dryer_emissions'),
+        moisture_content=0.18, split=0.,
+    )
+    X401 = bst.ThermalOxidizer('X401', (U403-1, 'oxidizer_air'), 'oxidizer_emissions')
+    U404 = units.ScrewFeeder('U404', U403-0)
+    U405 = units.BagassePelletMill('U405', U404-0)
+    U406 = units.ConveyingBelt('U406', U405-0, bagasse_pellets)
 
 @SystemFactory(
     ID='feedstock_handling_sys',
@@ -73,7 +95,7 @@ def create_feedstock_handling_system(ins, outs):
     outs=[dict(ID='clarified_juice'),
           dict(ID='bagasse')]
 )
-def create_juicing_system_up_to_clarification(ins, outs):
+def create_juicing_system_up_to_clarification(ins, outs, pellet_bagasse=False):
     ### Streams ###
     sugarcane, enzyme, H3PO4, lime, polymer = ins
     clarified_juice, bagasse = outs
@@ -105,8 +127,10 @@ def create_juicing_system_up_to_clarification(ins, outs):
                                          Solids=1),
                               moisture_content=0.5)
     
-    # Convey out bagasse
-    U202 = units.ConveyingBelt('U202', U201-0, bagasse)
+    if pellet_bagasse:
+        bagasse_pelleting_sys = create_bagasse_pelleting_system(None, U201-0, bagasse, mockup=True)
+    else:
+        U202 = units.ConveyingBelt('U202', U201-0, bagasse)
     
     # Mix in water
     M201 = units.Mixer('M201', ('', imbibition_water), 1-U201)
@@ -240,7 +264,7 @@ def create_juicing_system_with_fiber_screener(ins, outs):
               Yeast=103,
               units='kg/hr')],
     outs=[dict(ID='distilled_beer'),
-          dict(ID='stillage')]
+          dict(ID='stillage')] # TODO: Find good selling price for stillage/vinasse and possibly yeast
 )
 def create_beer_distillation_system(ins, outs,
                                     beer_column_heat_integration=True,
@@ -288,19 +312,17 @@ def create_beer_distillation_system(ins, outs,
 def create_ethanol_purification_system_after_beer_column(ins, outs, IDs={}):
     distilled_beer, denaturant = ins
     ethanol, stripper_bottoms_product = outs
-    
-    x_bot = 3.910570816782338e-06
-    y_top = 0.2811210085806504
+  
     
     # Mix ethanol Recycle (Set-up)
     M303 = units.Mixer(IDs.get('Recycle mixer', 'M303'))
     
-    y_top = 0.8080462715940735
-    D303 = units.BinaryDistillation(IDs.get('Distillation', 'D303'), P=101325,
-                                y_top=y_top, x_bot=x_bot, k=1.25, Rmin=0.01,
+    D303 = units.BinaryDistillation(IDs.get('Distillation', 'D303'), 
+                                x_bot=3.9106e-06, y_top=0.80805, k=1.25, Rmin=0.01,
                                 LHK=('Ethanol', 'Water'),
                                 tray_material='Stainless steel 304',
                                 vessel_material='Stainless steel 304',
+                                P=1013250.,
                                 is_divided=True)
     D303.boiler.U = 1.85
     P303 = units.Pump(IDs.get('Distillation bottoms product pump', 'P303'), 
@@ -335,8 +357,6 @@ def create_ethanol_purification_system_after_beer_column(ins, outs, IDs={}):
                              vessel_material='Carbon steel',
                              tau=6.5*24, outs=ethanol)
     
-    
-        
     ### Ethanol system set-up ###
     (distilled_beer, U301-0)-M303-0-D303-0-H303-U301
     D303-1-P303
@@ -347,9 +367,50 @@ def create_ethanol_purification_system_after_beer_column(ins, outs, IDs={}):
         denaturant.imol['Octane'] = 0.022*pure_ethanol.F_mass/114.232
     
     P304.specification = adjust_denaturant
-    U301-1-H304-0-T302-0-P304
-    denaturant-T303-P305
-    (P305-0, P304-0)-M304-T304
+    (denaturant-T303-P305-0, U301-1-H304-0-T302-0-P304-0)-M304-T304
+
+# @SystemFactory(
+#     ID='ethanol_purification_from_distilled_beer_sys',
+#     ins=[dict(ID='distilled_beer'),
+#           dict(ID='denaturant', Octane=230.69, units='kg/hr', price=0.756)],
+#     outs=[dict(ID='ethanol', price=0.789),
+#           dict(ID='stripper_bottoms_product')]
+# )
+# def create_ethanol_purification_system_after_beer_column(ins, outs):
+#     distilled_beer, denaturant = ins
+#     ethanol, stripper_bottoms_product = outs
+#     M303 = units.Mixer('M303')
+#     D303 = units.BinaryDistillation('D303',
+#         P=101325, x_bot=3.9106e-06, y_top=0.80805, k=1.25, Rmin=0.01,
+#         LHK=('Ethanol', 'Water'), tray_material='Stainless steel 304',
+#         vessel_material='Stainless steel 304', is_divided=True
+#     )
+#     D303.boiler.U = 1.85
+#     P303 = units.Pump('P303', outs=stripper_bottoms_product)
+#     H303 = units.HXutility('H303', T=115+273.15, V=1)
+#     U301 = units.MolecularSieve('U301', split=dict(Ethanol=0.162, Water=0.925))
+#     H304 = units.HXutility('H304', V=0, T=340.)
+#     T302 = units.StorageTank('T302', 
+#         tau=12, vessel_type='Floating roof', vessel_material='Carbon steel'
+#     )
+#     P304 = units.Pump('P304')
+#     T303 = units.StorageTank('T303', 
+#         tau=7*24, vessel_type='Floating roof', vessel_material='Carbon steel'
+#     )
+#     P305 = units.Pump('P305'); M304 = units.Mixer('M304')
+#     T304 = units.StorageTank('T304',
+#         vessel_type='Floating roof', vessel_material='Carbon steel',
+#         tau=6.5*24, outs=ethanol
+#     )
+#     def adjust_denaturant():
+#         P304._run()
+#         denaturant.imol['Octane'] = 0.022 * P304.outs[0].F_mass / 114.232
+    
+#     P304.specification = adjust_denaturant
+#     (distilled_beer, U301-0)-M303-0-D303-0-H303-U301
+#     D303-1-P303
+#     (denaturant-T303-P305, U301-1-H304-0-T302-0-P304-0)-M304-T304
+
 
 @SystemFactory(
     ID='ethanol_purification_sys',
@@ -413,26 +474,38 @@ def create_sucrose_fermentation_system(ins, outs):
                                  Water=26836,
                                  units='kg/hr')
     
-    # Yeast
-    yeast = bst.Stream('yeast', Water=24700, DryYeast=10300, units='kg/hr')
-    
     ### Units ###
     
     # Split sugar solution
     S301 = units.Splitter('S301',
-                          split=0.265)
+                          split=0.15)
     
     # Concentrate sugars
     F301 = units.MultiEffectEvaporator('F301',
                                        P=(101325, 69682, 47057, 30953, 19781),
                                        outs=('', evaporator_condensate),
-                                       V=0.85) # fraction evaporated
-    
+                                       V_definition='First-effect',
+                                       V=0.3) # fraction evaporated
+    F301.specification = lambda: None
     # Note: value of steam ~ 6.86 for the following 
     # (101325, 73580.467, 50891.17, 32777.406, 19999.925, 11331.5),
     
     # Mix sugar solutions
     M301 = units.Mixer('M301')
+    
+    def sugar_concentration_objective(V):
+        F301.V = V
+        F301._run()
+        M301._run()
+        s = M301.outs[0]
+        sugar_concentration = s.imass['Glucose', 'Sucrose'].sum() / s.F_mass
+        return F301.sugar_concentration - sugar_concentration
+    
+    def adjust_glucose_concentration():
+        F301.V = flx.IQ_interpolation(sugar_concentration_objective, 0., 1., x=F301.V, ytol=1e-5)
+        
+    F301.sugar_concentration = 0.23 # wt. % sugar
+    M301.specification = adjust_glucose_concentration
     
     # Cool for fermentation
     H301 = units.HXutility('H301', T=295.15)
@@ -452,8 +525,8 @@ def create_sucrose_fermentation_system(ins, outs):
                               gas=('CO2', 'O2'))
     
     # Separate 99% of yeast
-    C301 = units.SolidsCentrifuge('C301', outs=('recycle_yeast', ''),
-                                  split=(1, 0.99999, 1, 0.01),
+    C301 = units.SolidsCentrifuge('C301', 
+                                  split=(1-1e-6, 0.99, 1, 0.01),
                                   order=('Ethanol', 'Glucose', 'H3PO4', 'DryYeast'),
                                   solids=('DryYeast',))
     C301.split[:] = 1. - C301.split
@@ -464,16 +537,26 @@ def create_sucrose_fermentation_system(ins, outs):
     # Yeast mixing
     T305 = units.MixTank('T305')
     T305.tau = 0.1
-    yeast-T305
     
     # Multi-effect evaporator pumps
     P306 = units.Pump('P306')
+    
+    def adjust_yeast_recycle():
+        recycle, beer = C301.outs
+        feed, *_ = C301.ins
+        yeast = 0.1 * feed.F_mass
+        m = C301.moisture_content
+        recycle.imass['Yeast', 'Water'] = [yeast, yeast * m / (1 - m)]
+        beer.mol = feed.mol - recycle.mol
+        beer.mol[beer.mol < 0.] = 0.
+        beer.T = recycle.T = feed.T
+    C301.specification = adjust_yeast_recycle
     
     ### Ethanol system set-up ###
     
     screened_juice-S301-1-F301-0-P306
     (S301-0, P306-0)-M301-H301
-    (H301-0, yeast-T305-0)-R301-1-T301-0-C301
+    (H301-0, C301-0-T305-0)-R301-1-T301-0-C301
     (C301-1, D301-1)-M302
     
 
@@ -510,18 +593,18 @@ def create_sucrose_to_ethanol_system(ins, outs):
     ins=[*create_juicing_system_with_fiber_screener.ins,
          create_ethanol_purification_system.ins[1]], # denaturant
     outs=[create_ethanol_purification_system.outs[0], # ethanol
+          dict(ID='vinasse'),
           dict(ID='wastewater'),
           dict(ID='emissions'),
           dict(ID='ash_disposal')]
 )
 def create_sugarcane_to_ethanol_system(ins, outs,
-        evaporator_and_beer_column_heat_integration=True
     ):
     s = f.stream
     u = f.unit
     
     sugarcane, enzyme, H3PO4, lime, polymer, denaturant = ins
-    ethanol, wastewater, emissions, ash_disposal = outs
+    ethanol, vinasse, wastewater, emissions, ash_disposal = outs
     
     feedstock_handling_sys = create_feedstock_handling_system(
         ins=[sugarcane],
@@ -532,7 +615,7 @@ def create_sugarcane_to_ethanol_system(ins, outs,
         mockup=True
     )
     ethanol_production_sys = create_sucrose_to_ethanol_system(
-        ins=(juicing_sys-0, denaturant), outs=ethanol,
+        ins=(juicing_sys-0, denaturant), outs=(ethanol, vinasse),
         mockup=True
     )
     M305 = units.Mixer('M305', 
@@ -566,18 +649,6 @@ def create_sugarcane_to_ethanol_system(ins, outs,
     
     F301 = u.F301
     D303 = u.D303
-    if evaporator_and_beer_column_heat_integration:
-        def heat_integration():
-            hu_mee = F301.heat_utilities[0]
-            hu_dist = D303.heat_utilities[0]
-            actual_duty = hu_mee.duty + hu_dist.duty
-            if actual_duty > 0.:
-                hu_mee(actual_duty, 373.15, 373.15)
-                hu_dist.empty()
-            else:
-                hu_mee.empty()
-                condenser = D303.condenser
-                hu_dist(actual_duty, condenser.ins[0].T, condenser.outs[0].T)
-        CWP.specification = heat_integration
+    HXN = bst.HeatExchangerNetwork('HXN', units=[F301, D303])
         
         

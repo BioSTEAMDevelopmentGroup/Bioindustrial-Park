@@ -31,6 +31,12 @@ Chemicals:
   P4O10:
     phase: solid
     default: True
+  Ca(OH)2:
+    phase: solid
+    default: True
+  CaSO4:
+    phase: solid
+    default: True
   SO2:
     phase: gas
   N2:

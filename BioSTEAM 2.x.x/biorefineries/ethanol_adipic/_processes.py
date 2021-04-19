@@ -619,14 +619,12 @@ def create_biorefinery(flowsheet, groups, get_flow_tpd):
         ISBL_units = ISBL_units.union(i.units)
     OSBL_units = list(set(biorefinery.units).difference(ISBL_units))
     
-    # CHP is not included in this TEA
-    OSBL_units.remove(u.CHP)
     # biosteam Splitters and Mixers have no cost
     for i in OSBL_units:
         if i.__class__ == bst.units.Mixer or i.__class__ == bst.units.Splitter:
             OSBL_units.remove(i)
     
-    no_CHP_tea = EthanolAdipicTEA(
+    tea = EthanolAdipicTEA(
             system=biorefinery, IRR=0.10, duration=(2016, 2046),
             depreciation='MACRS7', income_tax=0.21, operating_days=0.96*365,
             lang_factor=None, construction_schedule=(0.08, 0.60, 0.32),
@@ -638,27 +636,11 @@ def create_biorefinery(flowsheet, groups, get_flow_tpd):
             proratable_costs=0.10, field_expenses=0.10, construction=0.20,
             contingency=0.10, other_indirect_costs=0.10, 
             labor_cost=3212962*get_flow_tpd()/2205,
-            labor_burden=0.90, property_insurance=0.007, maintenance=0.03)
-    teas = {'no_CHP_tea': no_CHP_tea}
-    
-    # Removes units, feeds, and products of CHP_sys to avoid double-counting
-    no_CHP_tea.units.remove(u.CHP)
-    
-    for i in sys.CHP_sys.feeds:
-        biorefinery.feeds.remove(i)
-    for i in sys.CHP_sys.products:
-        biorefinery.products.remove(i)
-    
-    # Changed to MACRS 20 to be consistent with ref [1]
-    CHP_tea = bst.TEA.like(sys.CHP_sys, no_CHP_tea)
-    CHP_tea.labor_cost = 0
-    CHP_tea.depreciation = 'MACRS20'
-    CHP_tea.OSBL_units = (u.CHP,)
-    teas['CHP_tea'] = CHP_tea
-    
-    tea = bst.CombinedTEA([no_CHP_tea, CHP_tea], IRR=0.10)
-    biorefinery._TEA = tea
-    teas['tea'] = tea
+            labor_burden=0.90, property_insurance=0.007, maintenance=0.03,
+            steam_power_depreciation='MACRS20',
+            boiler_turbogenerator=u.CHP,
+    )
+    teas = {'tea': tea}
     
     # Simulate system and get results
     def simulate_get_MESP(feedstock_price=None):

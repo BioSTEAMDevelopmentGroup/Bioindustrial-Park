@@ -962,14 +962,12 @@ def create_lactic_sys(flowsheet, groups, get_flow_tpd):
                       *sys.separation_sys.units))
     OSBL_units = list(set(lactic_sys.units).difference(ISBL_units))
     
-    # CHP is not included in this TEA
-    OSBL_units.remove(u.CHP)
     # biosteam Splitters and Mixers have no cost
     for i in OSBL_units:
         if i.__class__ == bst.units.Mixer or i.__class__ == bst.units.Splitter:
             OSBL_units.remove(i)
     
-    lactic_no_CHP_tea = LacticTEA(
+    lactic_tea = LacticTEA(
             system=lactic_sys, IRR=0.10, duration=(2016, 2046),
             depreciation='MACRS7', income_tax=0.21, operating_days=0.9*365,
             lang_factor=None, construction_schedule=(0.08, 0.60, 0.32),
@@ -981,23 +979,10 @@ def create_lactic_sys(flowsheet, groups, get_flow_tpd):
             proratable_costs=0.10, field_expenses=0.10, construction=0.20,
             contingency=0.10, other_indirect_costs=0.10, 
             labor_cost=3212962*get_flow_tpd()/2205,
-            labor_burden=0.90, property_insurance=0.007, maintenance=0.03)
-    
-    # Removes units, feeds, and products of CHP_sys to avoid double-counting
-    lactic_no_CHP_tea.units.remove(u.CHP)
-    teas['lactic_no_CHP_tea'] = lactic_no_CHP_tea
-    
-    # Changed to MACRS 20 to be consistent with ref [1]
-    CHP_tea = bst.TEA.like(CHP_sys, lactic_no_CHP_tea)
-    CHP_tea.labor_cost = 0
-    CHP_tea.depreciation = 'MACRS20'
-    CHP_tea.OSBL_units = (u.CHP,)
-    teas['CHP_tea'] = CHP_tea
-    
-    lactic_tea = bst.CombinedTEA([lactic_no_CHP_tea, CHP_tea], IRR=0.10)
-    lactic_no_CHP_tea.feeds = {i for i in lactic_no_CHP_tea.feeds if i not in CHP_tea.feeds}
-    lactic_no_CHP_tea.products = {i for i in lactic_no_CHP_tea.products if i not in CHP_tea.products}
-    lactic_sys._TEA = lactic_tea
+            labor_burden=0.90, property_insurance=0.007, maintenance=0.03,
+            steam_power_depreciation='MACRS20',
+            boiler_turbogenerator=u.CHP,
+            )
     teas['lactic_tea'] = lactic_tea
     
     # Simulate system and get results

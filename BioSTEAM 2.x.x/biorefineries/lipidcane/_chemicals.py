@@ -11,7 +11,7 @@ __all__ = ('create_chemicals',)
 
 def create_chemicals():
     from biorefineries import sugarcane as sc
-    (Water, Ethanol, Glucose, Sucrose, H3PO4, P4O10, CO2, Octane, O2, CH4, 
+    (Water, Ethanol, Glucose, Sucrose, H3PO4, P4O10, CO2, Octane, O2, N2, CH4, 
      Ash, Cellulose, Hemicellulose, Flocculant, Lignin, Solids, DryYeast, CaO) = sc.chemicals
     
     

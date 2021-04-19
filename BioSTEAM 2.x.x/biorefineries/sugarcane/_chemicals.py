@@ -13,11 +13,12 @@ from thermosteam import functional as fn
 __all__ = ('create_chemicals',)
 
 def create_chemicals():
-    (Water, Ethanol, Glucose, Sucrose, H3PO4, P4O10, CO2, Octane, O2, CH4) = chemicals = tmo.Chemicals(
+    (Water, Ethanol, Glucose, Sucrose, H3PO4, P4O10, CO2, Octane, O2, N2, CH4) = chemicals = tmo.Chemicals(
         ['Water', 'Ethanol', 'Glucose', 'Sucrose', 'H3PO4', 'P4O10',
-         'CO2', 'Octane', 'O2', 'CH4']
+         'CO2', 'Octane', 'O2', 'N2', 'CH4']
     )
     O2.at_state(phase='g')
+    N2.at_state(phase='g')
     CH4.at_state(phase='g')
     CO2.at_state(phase='g')
     H3PO4.at_state(phase='s')
@@ -45,7 +46,7 @@ def create_chemicals():
                                  formula='C8H8O3', # Vainillin
                                  Hf=-452909.632)
     Solids = create_new_chemical('Solids', MW=1.)
-    Yeast = create_new_chemical('Yeast', MW=1., CAS='Yeast')
+    Yeast = create_new_chemical('Yeast', MW=1., CAS='Yeast', Hf=Glucose.Hf / Glucose.MW)
     CaO = create_new_chemical('CaO', formula='CaO')
 
     

@@ -2,13 +2,17 @@
 # -*- coding: utf-8 -*-
 """
 Created on Sun Aug 23 12:11:15 2020
+
 Modified from the cornstover biorefinery constructed in Cortes-Peña et al., 2020,
 with modification of fermentation system for 2,3-Butanediol instead of the original ethanol
+
 [1] Cortes-Peña et al., BioSTEAM: A Fast and Flexible Platform for the Design, 
     Simulation, and Techno-Economic Analysis of Biorefineries under Uncertainty. 
     ACS Sustainable Chem. Eng. 2020, 8 (8), 3302–3310. 
     https://doi.org/10.1021/acssuschemeng.9b07040.
+
 All units are explicitly defined here for transparency and easy reference
+
 @author: sarangbhagwat
 """
 
@@ -18,6 +22,7 @@ All units are explicitly defined here for transparency and easy reference
 import numpy as np
 import thermosteam as tmo
 from math import exp
+from warnings import warn
 from flexsolve import aitken_secant
 from biosteam import Unit
 from biosteam.units import Flash, HXutility, Mixer, MixTank, Pump, \
@@ -28,6 +33,7 @@ from biorefineries.HP.process_settings import price
 from biorefineries.HP.utils import CEPCI, baseline_feedflow, compute_extra_chemical, adjust_recycle
 from biorefineries.HP.chemicals_data import HP_chemicals
 tmo.settings.set_thermo(HP_chemicals)
+
 _kg_per_ton = 907.18474
 _Gcal_2_kJ = 4.184 * 1e6 # (also MMkcal/hr)
 Rxn = tmo.reaction.Reaction
@@ -44,12 +50,66 @@ ParallelRxn = tmo.reaction.ParallelReaction
 # the cost of feedstock cost
 @cost(basis='Flow rate', ID='System', units='kg/hr',
       kW=511.3205, cost=13329690, S=94697, CE=CEPCI[2009], n=0.6, BM=1.7)
-class FeedstockPreprocessing(Unit):
+class FeedstockPreprocessing(Unit): # not used
     # 2205 U.S. ton/day (2000 metric tonne/day) as in Humbird et al.
     _baseline_flow_rate = baseline_feedflow.sum()
     _cached_flow_rate = 2205
 
 
+class FeedstockSizeReduction(Unit):
+    _N_ins = 1
+    _N_outs = 1
+    _N_power_utilities = 1
+    _F_BM_default = {'Hammer mills': 2.45} #!!! TODO: Update _F_BM_default
+    _units = {'Throughput per mill': 'ton/hr'}
+
+    _min_throughput_per_mill = 2 # ton/hr
+    _max_throughput_per_mill = 5 # ton/hr
+    
+    # In Seider's Product and Process Design Principles,
+    # Table 16.32 reports a capacity range of 2 - 200 ton/hr
+    # Table 16.28 reports a capacity range of 0.1 - 5 ton/hr
+    # As Table 16.28 is used to get power utility, we 
+    # assume the per-equipment capacity range to be 2 - 5 ton/hr 
+
+    # _kW_per_kg_per_hr = 
+    
+    def __init__(self, ID='', ins=None, outs=(), equipment_type='Hammer mill'):
+        Unit.__init__(self, ID, ins, outs)
+
+    def _run(self):
+        input_feedstock = self.ins[0]
+        milled_feedstock = self.outs[0]
+        milled_feedstock.copy_like(input_feedstock)
+        
+    def _design(self):
+        throughput = self.ins[0].F_mass / _kg_per_ton
+        
+        self.design_results['Number of mills'] = N = np.ceil(throughput/self._max_throughput_per_mill)
+        self.design_results['Throughput per mill'] = tpm = throughput/N
+        
+        if not (tpm>self._min_throughput_per_mill
+                and tpm<self._max_throughput_per_mill):
+            msg = f"CostWarning: {self.__repr__()} Throughput ({format(tpm,'0.2f')} ton/hr) is out of bounds (2 to 5 ton/hr)."
+            warn(msg, UserWarning, stacklevel=2)
+        
+    def _cost(self):
+        N = self.design_results['Number of mills']
+        W = self.design_results['Throughput per mill']
+        purchase_cost = N * 4310. * W**0.78 # Seider's Product and Process Design Principles  > Table 16.32 > "Size reduction equipment" > "Hammer mills"
+        self.baseline_purchase_costs['Hammer mills'] = purchase_cost
+        # self.power_utility(100.669)
+        power_utility = self.power_utility
+        power_utility((0.97/0.1) * W * (1 + 1.077*(W-0.1)/4.9)) 
+        power_utility.scale(N)
+        # Interpolating from 'Hammer mills' in Table 16.28
+        # in Seider's Product and Process Design Principles, which reports 
+        # a capacity range of 0.1 - 5 ton/hr and 
+        # a power utility range of 0.97 - 100.7 kW.
+        # This assumes that the bounds of reported capacity and power utility coincide.
+        # The assumption is most conservative at 5 ton/hr per equipment, where the
+        # power utility becomes the highest reported value for power utility.
+        
 # %% 
 
 # =============================================================================
@@ -87,10 +147,57 @@ class SulfuricAcidMixer(Unit):
     def _run(self):
         acid, water = self.ins
         mixture = self.outs[0]
+        
         # 0.05 is from 1842/36629 from streams 710 and 516 of Humbird et al.
-        water.imass['Water'] = acid.imass['SulfuricAcid'] / 0.05
+        # water.imass['Water'] = acid.imass['SulfuricAcid'] / 0.05
+        # water adjustment currently implemented in H_M201.specification
+        
         mixture.mix_from([water, acid])
 
+
+
+# # Sulfuric acid in-line mixer
+# @cost(basis='Flow rate', ID='Mixer', units='kg/hr',
+#       cost=6000, S=136260, CE=CEPCI[2009], n=0.5, BM=1)
+# class SulfuricAcidMixer(Unit):
+#     _N_ins = 2
+#     _N_outs = 1
+#     _N_heat_utilities = 1
+#     _graphics = Mixer._graphics
+#     _F_BM_default = {**Mixer._F_BM_default,
+#             'Heat exchangers': 3.17}
+#     def __init__(self, ID='', ins=None, outs=(), T_water = 300, P_water = 101325):
+#         Unit.__init__(self, ID, ins, outs)
+#         self.T_water = T_water
+#         self.P_water = P_water
+#         self.heat_exchanger = HXutility(None, None, None, T=T_water)
+#     def _run(self):
+#         acid, water = self.ins
+#         mixture = self.outs[0]
+#         # 0.05 is from 1842/36629 from streams 710 and 516 of Humbird et al.
+#         water.imass['Water'] = acid.imass['SulfuricAcid'] / 0.05
+        
+#         self.heated_water = heated_water = water.copy()
+#         heated_water.T = self.T_water
+#         heated_water.P = self.P_water
+#         self.water_duty = heated_water.H - water.H
+        
+#         water.T = heated_water.T
+#         water.P = heated_water.P
+        
+#         mixture.mix_from([heated_water, acid])
+#     def _cost(self):
+#         super()._cost()
+#         hx = self.heat_exchanger
+#         original_water = self.ins[1].copy()
+#         heated_water = self.ins[1].copy()
+#         heated_water.T = self.T_water
+#         heated_water.P = self.P_water
+#         hx.simulate_as_auxiliary_exchanger(duty=self.water_duty,
+#                                             stream=original_water.copy())
+#         self.baseline_purchase_costs['Heat exchangers'] = hx.purchase_cost
+        
+        
 # Adjust pretreatment water loading, 30% from Table 5 on Page 21 of Humbird et al.
 class PretreatmentMixer(Mixer):
     _N_ins = 3
@@ -105,50 +212,74 @@ class PretreatmentMixer(Mixer):
         mixture = feedstock.copy()
         mixture.mix_from([feedstock, acid])
         
-        total_mass = (mixture.F_mass-mixture.imass['Water'])/self.solid_loading
-        water.imass['Water'] = total_mass - mixture.F_mass
+        # total_mass = (mixture.F_mass-mixture.imass['Water'])/self.solid_loading
+        # water.imass['Water'] = total_mass - mixture.F_mass
+        # water adjustment currently implemented in H_M202.specification
         
         mixture_out.mix_from([mixture, water])
 
-# Steam mixer
-class SteamMixer(Unit):
-    """
-    Parameters
-    ----------
-    ins :
-        [0] Feed        
-        [1] Steam
+# # Steam mixer
+# class SteamMixer(Mixer):
+#     """
+#     Parameters
+#     ----------
+#     ins :
+#         [0] Feed        
+#         [1] Water (to be heated by auxillary heat exchanger)
     
-    outs : 
-        [0] Mixed steam    
+#     outs : 
+#         [0] Mixed steam    
         
-    """
-    _N_ins = 2
-    _N_outs = 1
+#     """
+#     _N_ins = 2
+#     _N_outs = 1
+#     _N_heat_utilities = 1
+#     _F_BM_default = {**Mixer._F_BM_default,
+#             'Heat exchangers': 3.17}
     
-    def __init__(self, ID='', ins=None, outs=(), *, P):
-        Unit.__init__(self, ID, ins, outs)
-        self.P = P
+#     def __init__(self, ID='', ins=None, outs=(), *, P, T_steam=268.+273.15):
+#         Mixer.__init__(self, ID, ins, outs)
+#         self.P = P
+#         self.heat_exchanger = HXutility(None, None, None, T=T_steam)
+#         self.T_steam = T_steam
         
-    @staticmethod
-    def P_at_flow(mol_water, P, steam, mixed, feed):
-        steam.imol['Water'] = mol_water
-        mixed.mol = steam.mol + feed.mol
-        mixed.H = feed.H + steam.H
-        P_new = mixed.chemicals.Water.Psat(mixed.T)
-        return P_new-P
+#     @staticmethod
+#     def P_at_flow(mol_water, P, steam, mixed, feed):
+#         steam.imol['Water'] = mol_water
+#         mixed.mol = steam.mol + feed.mol
+#         mixed.H = feed.H + steam.H
+#         P_new = mixed.chemicals.Water.Psat(mixed.T)
+#         return P_new-P
     
-    def _run(self):
-        feed, steam = self.ins
-        mixed = self.outs[0]
-
-        steam_mol = steam.F_mol
-        steam_mol = max(0, aitken_secant(f=self.P_at_flow,
-                                  x0=steam_mol, x1=steam_mol+0.1, 
-                                  xtol=1e-4, ytol=1e-4,
-                                  args=(self.P, steam, mixed, feed)))
-        mixed.P = self.P
+#     def _run(self):
+#         feed, water = self.ins
+#         mixed = self.outs[0]
+        
+#         steam = water.copy()
+#         steam.T = self.T_steam
+        
+#         steam_mol = steam.F_mol
+#         steam.phase = 'g'
+#         steam_mol = max(0, aitken_secant(f=self.P_at_flow,
+#                                   x0=steam_mol, x1=steam_mol+0.1, 
+#                                   xtol=1e-4, ytol=1e-4,
+#                                   args=(self.P, steam, mixed, feed)))
+        
+#         water.mol[:] = steam.mol[:]
+#         water.phase = 'l'
+#         water.T = 300.
+#         self.dH_steam = steam.H - water.H
+        
+#         mixed.P = self.P
     
+#     def _cost(self):
+#         # super()._cost()
+#         hx = self.heat_exchanger
+#         hx.simulate_as_auxiliary_exchanger(duty=self.dH_steam, 
+#                                             stream=self.ins[1].copy())
+        
+#         self.purchase_costs['Heat exchangers'] = hx.purchase_cost
+        
 # Pretreatment reactor
 @cost(basis='Dry flow rate', ID='Pretreatment reactor', units='kg/hr',
       kW=5120, cost=19812400, S=83333, CE=CEPCI[2009], n=0.6, BM=1.5)
@@ -170,12 +301,12 @@ class PretreatmentReactorSystem(Unit):
             Rxn('Glucan + H2O -> Glucose',                   'Glucan',   0.099),
             Rxn('Glucan + H2O -> GlucoseOligomer',           'Glucan',   0.003),
             Rxn('Glucan -> HMF + 2 H2O',                     'Glucan',   0.003),
-            Rxn('Sucrose -> HMF + Glucose + 2H2O',           'Sucrose',  1),
+            Rxn('Sucrose -> HMF + Glucose + 2H2O',           'Sucrose',  1.),
             Rxn('Xylan + H2O -> Xylose',                     'Xylan',    0.9),
             Rxn('Xylan + H2O -> XyloseOligomer',             'Xylan',    0.024),
             Rxn('Xylan -> Furfural + 2 H2O',                 'Xylan',    0.05),
-            Rxn('Acetate -> AceticAcid',                     'Acetate',  1),
-            Rxn('Lignin -> SolubleLignin',                   'Lignin',   0.05),
+            Rxn('Acetate -> AceticAcid',                     'Acetate',  1.),
+            Rxn('Lignin -> 10.125 SolubleLignin',            'Lignin',   0.05),
             # Below from Page 106 of Humbird et al.,
             Rxn('Mannan + H2O -> Mannose',                   'Mannan',   0.9),
             Rxn('Mannan + H2O -> MannoseOligomer',           'Mannan',   0.024),
@@ -186,8 +317,8 @@ class PretreatmentReactorSystem(Unit):
             Rxn('Arabinan + H2O -> Arabinose',               'Arabinan', 0.9),
             Rxn('Arabinan + H2O -> ArabinoseOligomer',       'Arabinan', 0.024),
             Rxn('Arabinan -> Furfural + 2 H2O',              'Arabinan', 0.05),
-            Rxn('Furfural -> Tar',                           'Furfural', 1),
-            Rxn('HMF -> Tar',                                'HMF',      1)
+            Rxn('Furfural -> Tar',                           'Furfural', 1.),
+            Rxn('HMF -> Tar',                                'HMF',      1.)
             ])
     
     def _run(self):
@@ -541,9 +672,9 @@ class CoFermentation_original(Unit):
         self.cofermentation_rxns = ParallelRxn([
         #      Reaction definition            Reactant    Conversion
         Rxn('Glucose -> 2HP + CO2',        'Glucose',   .80),
-        Rxn('Glucose -> 6 FermMicrobe',       'Glucose',   0.03),
+        Rxn('Glucose -> 6 FermMicrobe + 2.4 H2O',       'Glucose',   0.03),
         Rxn('Xylose -> 2HP + CO2',       'Xylose',    0.64),
-        Rxn('Xylose -> 5 FermMicrobe',        'Xylose',    0.024),
+        Rxn('Xylose -> 5 FermMicrobe + 2 H2O',        'Xylose',    0.024),
         ])
         
         self.glucose_to_HP_rxn = self.cofermentation_rxns[0]
@@ -624,14 +755,46 @@ class SeedTrain(Unit):
         # FermMicrobe reaction from Table 14 on Page 31 of Humbird et al.
         self.cofermentation_rxns =  ParallelRxn([
         #      Reaction definition            Reactant    Conversion
-        Rxn('Glucose -> 2HP',        'Glucose',   .53*ferm_ratio),
-        Rxn('Glucose -> 3 AceticAcid',        'Glucose',   0.07*ferm_ratio),
-        Rxn('Glucose -> 6 FermMicrobe',       'Glucose',   0.03*ferm_ratio),
-        Rxn('3Xylose -> 5HP',       'Xylose',    0.53*0.8*ferm_ratio),
-        Rxn('2 Xylose -> 5 AceticAcid',       'Xylose',    0.07*0.8*ferm_ratio),
-        Rxn('Xylose -> 5 FermMicrobe',        'Xylose',    0.03*0.8*ferm_ratio),
+        Rxn('Glucose -> 2 HP',        'Glucose',   .49*ferm_ratio),
+        Rxn('Glucose -> 3 AceticAcid',        'Glucose',   0.040*ferm_ratio),
+        # Rxn('Glucose -> 6 FermMicrobe',       'Glucose',   0.03*ferm_ratio),
+        Rxn('3 Xylose -> 5 HP',       'Xylose',    0.49*ferm_ratio),
+        Rxn('2 Xylose -> 5 AceticAcid',       'Xylose',    0.040*ferm_ratio),
+        # Rxn('Xylose -> 5 FermMicrobe',        'Xylose',    0.03*ferm_ratio),
+        Rxn('Glucose -> 1.61 Glycerol',        'Glucose',     0.040*ferm_ratio),
+        Rxn('Xylose -> 1.34 Glycerol',       'Xylose',    0.040*ferm_ratio),
+        Rxn('Glucose -> 6 FermMicrobe + 2.4 H2O',       'Glucose',   0.05*ferm_ratio),
+        Rxn('Xylose -> 5 FermMicrobe + 2 H2O',        'Xylose',    0.05*ferm_ratio),
         ])
-
+        
+        self.CO2_generation_rxns = ParallelRxn([
+        Rxn('Glucose -> 6 CO2 + 6H2O',       'Glucose',   1.-1e-9),
+        Rxn('Xylose -> 5 CO2 + 5H2O',        'Xylose',    1.-1e-9),
+        ])
+        # self.CO2_generation_rxns = ParallelRxn([
+        # Rxn('Glucose -> 6 CO2 + 6H2O',       'Glucose',   0.5*ferm_ratio),
+        # Rxn('Xylose -> 5 CO2 + 5H2O',        'Xylose',    0.5*ferm_ratio),
+        # ])
+        
+        # self.biomass_generation_rxns = ParallelRxn([
+        # Rxn('Glucose -> 6 FermMicrobe + 2.4 H2O',       'Glucose',   (1.-1e-9)*ferm_ratio),
+        # Rxn('Xylose -> 5 FermMicrobe + 2 H2O',        'Xylose',    (1.-1e-9)*ferm_ratio),
+        # ])
+        
+        self.glucose_to_HP_rxn = self.cofermentation_rxns[0]
+        self.xylose_to_HP_rxn = self.cofermentation_rxns[2]
+        
+        self.glucose_to_acetic_acid_rxn = self.cofermentation_rxns[1]
+        self.xylose_to_acetic_acid_rxn = self.cofermentation_rxns[3]
+        
+        self.glucose_to_glycerol_rxn = self.cofermentation_rxns[4]
+        self.xylose_to_glycerol_rxn = self.cofermentation_rxns[5]
+        
+        self.glucose_to_biomass_rxn = self.cofermentation_rxns[6]
+        self.xylose_to_biomass_rxn = self.cofermentation_rxns[7]
+        self.biomass_generation_rxns = [self.glucose_to_biomass_rxn, self.xylose_to_biomass_rxn]
+        
+        
     def _run(self):
         feed = self.ins[0]
         effluent, CO2 = self.outs
@@ -639,6 +802,9 @@ class SeedTrain(Unit):
         CO2.phase = 'g'
 
         self.cofermentation_rxns(effluent.mol)
+        self.CO2_generation_rxns(effluent.mol)
+        # self.biomass_generation_rxns(effluent.mol)
+        
         # Assume all CSL is used up
         effluent.imass['CSL'] = 0 
         
@@ -725,6 +891,7 @@ class Reactor(Unit, PressureVessel, isabstract=True):
     '''    
     Create an abstract class for reactor unit, purchase cost of the reactor
     is based on volume calculated by residence time.
+
     Parameters
     ----------
     ins : stream
@@ -759,7 +926,8 @@ class Reactor(Unit, PressureVessel, isabstract=True):
     _units = {**PressureVessel._units,
               'Residence time': 'hr',
               'Total volume': 'm3',
-              'Reactor volume': 'm3'}
+              'Reactor volume': 'm3',
+              'Single reactor volume': 'm3'}
     
     # For a single reactor, based on diameter and length from PressureVessel._bounds,
     # converted from ft3 to m3
@@ -816,32 +984,19 @@ class Reactor(Unit, PressureVessel, isabstract=True):
             
     def _cost(self):
         Design = self.design_results
-        purchase_costs = self.purchase_costs
+        baseline_purchase_costs = self.baseline_purchase_costs
         
         if Design['Total volume'] == 0:
-            for i, j in purchase_costs.items():
-                purchase_costs[i] = 0
+            for i, j in baseline_purchase_costs.items():
+                baseline_purchase_costs[i] = 0
         
         else:
-            purchase_costs.update(self._vessel_purchase_cost(
+            baseline_purchase_costs.update(self._vessel_purchase_cost(
                 Design['Weight'], Design['Diameter'], Design['Length']))
-            for i, j in purchase_costs.items():
-                purchase_costs[i] *= Design['Number of reactors']
+            for i, j in baseline_purchase_costs.items():
+                baseline_purchase_costs[i] *= Design['Number of reactors']
             
             self.power_utility(self.kW_per_m3 * Design['Total volume'])
-    # def _run(self):
-    #     PressureVessel._run()
-    @property
-    def BM(self):
-        vessel_type = self.vessel_type
-        if not vessel_type:
-            raise AttributeError('vessel_type not defined')
-        elif vessel_type == 'Vertical':
-            return self.BM_vertical
-        elif vessel_type == 'Horizontal':
-            return self.BM_horizontal 
-        else:
-            raise RuntimeError("invalid vessel type")
 
 class AcidulationReactor(Reactor):
     _N_ins = 2
@@ -849,9 +1004,9 @@ class AcidulationReactor(Reactor):
     
     acidulation_rxns = ParallelRxn([
         #   Reaction definition                                        Reactant        Conversion
-        Rxn('CalciumLactate + H2SO4 -> 2 HP + CaSO4',                 'CalciumLactate',       1),
-        Rxn('CalciumAcetate + H2SO4 -> 2 AceticAcid + CaSO4',         'CalciumAcetate',       1),
-        Rxn('CalciumDihydroxide + H2SO4 -> CaSO4 + 2 H2O',            'CalciumDihydroxide',   1)
+        Rxn('CalciumLactate + H2SO4 -> 2 HP + CaSO4',                 'CalciumLactate',       1.),
+        Rxn('CalciumAcetate + H2SO4 -> 2 AceticAcid + CaSO4',         'CalciumAcetate',       1.),
+        Rxn('CalciumDihydroxide + H2SO4 -> CaSO4 + 2 H2O',            'CalciumDihydroxide',   1.)
     ])
             
     def _run(self):
@@ -871,7 +1026,8 @@ class AcidulationReactor(Reactor):
         acid.imol['H2SO4'] = needed_acid * 1.05
         acid.imass['H2O'] = acid.imass['H2SO4'] / 0.93 * 0.07 # 93% purity
         effluent.mix_from([feed, acid])
-        rxns.adiabatic_reaction(effluent)
+        # rxns.adiabatic_reaction(effluent)
+        rxns(effluent)
         
 # Filter to separate gypsum from the acidified fermentation broth
 @cost(basis='Feed flow rate', ID='Hydroclone & rotary drum filter', units='kg/hr',
@@ -920,7 +1076,7 @@ class GypsumFilter(SolidsSeparator):
 #     _N_outs = 2
 #     _N_heat_utilities = 1
 
-#     _BM = {**Reactor._BM,
+#     _F_BM_default = {**Reactor._F_BM_default,
 #            'Heat exchangers': 3.17,
 #            'Amberlyst-15 catalyst': 1}
     
@@ -1117,75 +1273,75 @@ class GypsumFilter(SolidsSeparator):
 #         self.purchase_costs['Heat exchangers'] = hx.purchase_cost * N
 #         self.purchase_costs['Amberlyst-15 catalyst'] = self.mcat * price['Amberlyst15']
         
-# class HydrolysisReactor(Reactor):
-#     """
-#     Create a hydrolysis reactor that hydrolyze organic acid esters into 
-#     corresponding acids and ethanol. 
+class HydrolysisReactor(Reactor):
+    """
+    Create a hydrolysis reactor that hydrolyzes organic acid esters into 
+    corresponding acids and methanol. 
     
-#     Parameters
-#     ----------
-#     ins : 
-#         [0] Main broth
-#         [1] Supplementary water
-#         [2] Recycled water stream 1
-#         [3] Recycled water stream 2
+    Parameters
+    ----------
+    ins : 
+        [0] Main broth
+        [1] Supplementary water
+        [2] Recycled water stream 1
+        [3] Recycled water stream 2
     
-#     outs : 
-#         [0] Main effluent
-#         [1] Wastewater stream (discarded recycles)
+    outs : 
+        [0] Main effluent
+        [1] Wastewater stream (discarded recycles)
     
-#     water2esters : float
-#         Water feed to total ester molar ratio.
-#     """
-#     _N_ins = 4
-#     _N_outs = 2
-#     water2esters = 12
+    water2esters : float
+        Water feed to total ester molar ratio.
+    """
+    _N_ins = 4
+    _N_outs = 2
+    water2esters = 12
     
-#     hydrolysis_rxns = ParallelRxn([
-#             #   Reaction definition                                       Reactant   Conversion
-#             Rxn('EthylLactate + H2O -> LacticAcid + Ethanol',         'EthylLactate',   0.8),
-#             Rxn('EthylAcetate + H2O -> AceticAcid + Ethanol',         'EthylAcetate',   0.8),
-#             Rxn('EthylSuccinate + 2 H2O -> SuccinicAcid + 2 Ethanol', 'EthylSuccinate', 0.8),
-#                 ])
+    hydrolysis_rxns = ParallelRxn([
+            #   Reaction definition                                       Reactant   Conversion
+            Rxn('MethylHP + H2O -> HP + Methanol',         'MethylHP',   0.8),
+            Rxn('MethylAcetate + H2O -> AceticAcid + Methanol',         'MethylAcetate',   0.8),
+            Rxn('MethylSuccinate + H2O -> SuccinicAcid + Methanol',         'MethylSuccinate',   0.8),
+            ])
     
-#     def _run(self):
-#         # On weight basis, recycle2 is near 10% EtLA so will always be recycled,
-#         # but recycle1 is >97% water with <1% LA, so will only be used to supply
-#         # water needed for the hydrolysis reaction
-#         feed, water, recycle1, recycle2 = self.ins
-#         effluent, wastewater = self.outs
+    def _run(self):
+        # On weight basis, recycle2 is near 10% EtLA so will always be recycled,
+        # but recycle1 is >97% water with <1% LA, so will only be used to supply
+        # water needed for the hydrolysis reaction
+        feed, water, recycle1, recycle2 = self.ins
+        effluent, wastewater = self.outs
         
-#         esters = ('EthylLactate', 'EthylAcetate', 'EthylSuccinate')
-#         # Succnic acid is a dicarboxylic acid, needs twice as much water
-#         ratios = self.water2esters * np.array([1, 1, 2])
-#         # Have enough water in feed and recycle2, discharge some recycle2
-#         # and all of recycle1
-#         if compute_extra_chemical(feed, recycle2, esters, 'H2O', ratios) > 0:
-#             effluent, recycle2_discarded = \
-#                 adjust_recycle(feed, recycle2, esters, 'H2O', ratios)
-#             wastewater.mix_from([recycle1, recycle2_discarded])
-#             water.empty()        
-#         else:
-#             # Recycle all of recycle2 and combine feed and recycle2 as feed2
-#             feed2 = feed.copy()
-#             feed2.mix_from([feed, recycle2])
-#             # Have enough water in feed2 and recycle1
-#             if compute_extra_chemical(feed2, recycle1, esters, 'H2O', ratios) > 0:
-#                 effluent, recycle1_discarded = \
-#                     adjust_recycle(feed2, recycle1, esters, 'H2O', ratios)
-#                 wastewater = recycle1_discarded
-#                 water.empty()
-#             # Not have enough water in both recycles, need supplementary water
-#             else:
-#                 water.imol['H2O'] = \
-#                     - compute_extra_chemical(feed2, recycle1, esters, 'H2O', ratios)
-#                 effluent.mix_from(self.ins)
-#                 wastewater.empty()
+        esters = ('MethylHP', 'MethylAcetate', 'MethylSuccinate')
+        # Succnic acid is a dicarboxylic acid, needs twice as much water
+        ratios = self.water2esters * np.array([1, 1, 2])
+        # Have enough water in feed and recycle2, discharge some recycle2
+        # and all of recycle1
+        if compute_extra_chemical(feed, recycle2, esters, 'H2O', ratios) > 0:
+            effluent, recycle2_discarded = \
+                adjust_recycle(feed, recycle2, esters, 'H2O', ratios)
+            wastewater.mix_from([recycle1, recycle2_discarded])
+            water.empty()        
+        else:
+            # Recycle all of recycle2 and combine feed and recycle2 as feed2
+            feed2 = feed.copy()
+            feed2.mix_from([feed, recycle2])
+            # Have enough water in feed2 and recycle1
+            if compute_extra_chemical(feed2, recycle1, esters, 'H2O', ratios) > 0:
+                effluent, recycle1_discarded = \
+                    adjust_recycle(feed2, recycle1, esters, 'H2O', ratios)
+                wastewater = recycle1_discarded
+                water.empty()
+            # Not have enough water in both recycles, need supplementary water
+            else:
+                water.imol['H2O'] = \
+                    - compute_extra_chemical(feed2, recycle1, esters, 'H2O', ratios)
+                effluent.mix_from(self.ins)
+                wastewater.empty()
         
-#         rxns = self.hydrolysis_rxns
-#         rxns(effluent.mol)
-#         self.outs[0].copy_like(effluent)
-#         self.outs[1].copy_like(wastewater)
+        rxns = self.hydrolysis_rxns
+        rxns(effluent.mol)
+        self.outs[0].copy_like(effluent)
+        self.outs[1].copy_like(wastewater)
 
 
 # %% 
@@ -1226,7 +1382,8 @@ class AnaerobicDigestion(Unit):
     def __init__(self, ID='', ins=None, outs=(), *, reactants, split=(), T=35+273.15):	
         Unit.__init__(self, ID, ins, outs)	
         self.reactants = reactants	
-        self.split = split	
+        self.isplit = isplit = self.thermo.chemicals.isplit(split, None)
+        self.split = isplit.data
         self.multi_stream = MultiStream(None)
         self.T = T
         self.heat_exchanger = hx = HXutility(None, None, None, T=T) 
@@ -1434,7 +1591,7 @@ class HPStorageTank(StorageTank):
     def _cost(self):
         if self.ins[0].F_mol == 0:
             self.design_results['Number of tanks'] = 0
-            self.purchase_costs['Tanks'] = 0
+            self.baseline_purchase_costs['Tanks'] = 0
         else: StorageTank._cost(self)
 
 # Modified from bst.units.Pump, which won't simulate for 0 flow 
@@ -1454,7 +1611,7 @@ class HPPump(Pump):
       
     def _cost(self):
         if self.ins[0].F_mol == 0:
-            Cost = self.purchase_costs
+            Cost = self.baseline_purchase_costs
             Cost['Pump'] = 0
             Cost['Motor'] = 0
         else: Pump._cost(self)
@@ -1469,21 +1626,26 @@ class DehydrationReactor(Reactor):
     """
     A dehydration reactor.
     """
-    _N_ins = 1
-    _N_outs = 1
+    _N_ins = 2
+    _N_outs = 2
     
     _N_heat_utilities = 1
-    _BM = {**Reactor._BM,
+    _F_BM_default = {**Reactor._F_BM_default,
             'TiO2 catalyst': 1,
             'Heat exchangers': 3.17}
-    mcat_frac = (12/1.5) * (1e3)# kg per m3/h
     
+    # WHSV = (1.5/12) * 1e-3 # m3/h.kg
+    mcat_frac = 12/1.5 # kg per kg/h
+    # mcat_frac = 8
+    
+    
+    # _equipment_lifetime = {'TiO2 catalyst': 1,}
     def __init__(self, ID='', ins=None, outs=(), thermo=None, *, T=230+273.15,
                   P=101325, V_wf=0.8, length_to_diameter=2, tau = 1,
                   kW_per_m3=0.0985, # Perry's handbook
                   wall_thickness_factor=1,
                   vessel_material='Stainless steel 304',
-                  vessel_type='Vertical', X = 0.999):  # Dishisha et al. 2015
+                  vessel_type='Vertical', X = 0.995):  # Dishisha et al. 2015 reports ~ 99.9%
         Unit.__init__(self, ID, ins, outs)
         
         self.T = T
@@ -1503,32 +1665,39 @@ class DehydrationReactor(Reactor):
             ])     
         HP_to_AA_rxn = dehydration_reactions[0]
     def _run(self):
-        feed = self.ins[0]
-        effluent = self.outs[0]
+        feed, fresh_catalyst = self.ins
+        effluent, spent_catalyst = self.outs
         
         # effluent = feed.copy()
         effluent.mix_from([feed])
         effluent.T = self.T
         # effluent.P = feed.P
         self.dehydration_reactions(effluent.mol)
-        effluent.phase = 'g'
-   
+        effluent.phase = 'l'
+        
+        fresh_catalyst.imass['TiO2'] = spent_catalyst.imass['TiO2'] =\
+            self.mcat_frac * self.ins[0].F_mass/(350.*24.) 
+            # assuming a TiO2 lifetime of 1 year
+            
     def _cost(self):
         super()._cost()
         hx = self.heat_exchanger
         N = self.design_results['Number of reactors']
         single_rx_effluent = self.ins[0].copy()
         single_rx_effluent.mol[:] /= N
-        hx.simulate_as_auxiliary_exchanger(duty=self.Hnet/N, 
+        hx.simulate_as_auxiliary_exchanger(duty=(self.outs[0].H - self.ins[0].H)/N, 
                                             stream=single_rx_effluent)
         hu_total = self.heat_utilities[0]
         hu_single_rx = hx.heat_utilities[0]
         hu_total.copy_like(hu_single_rx)
         hu_total.scale(N)
-        self.purchase_costs['Heat exchangers'] = hx.purchase_cost * N
-        self.purchase_costs['TiO2 catalyst'] =\
-            self.mcat_frac * (sum([stream.F_vol for stream in self.outs])) * price['TiO2']
         
+        self.purchase_costs['Heat exchangers'] = hx.purchase_cost * N
+        self.baseline_purchase_costs['Heat exchangers'] = hx.baseline_purchase_cost * N
+        self.installed_costs['Heat exchangers'] = hx.installed_cost * N
+        self.baseline_purchase_costs['TiO2 catalyst'] = self.mcat_frac * self.ins[0].F_mass * price['TiO2']
+            # self.mcat_frac * (sum([stream.F_mass for stream in self.ins])) * price['TiO2']
+            
         
         
 compute_HP_titer = lambda effluent: (effluent.imass['HP'] +
@@ -1561,7 +1730,7 @@ class CoFermentation(Reactor):
             'Fermenter size': 'kg',
             'Recirculation flow rate': 'kg/hr',
             'Duty': 'kJ/hr'}
-    _BM = {**Reactor._BM,
+    _F_BM_default = {**Reactor._F_BM_default,
             'Heat exchangers': 3.17}
 
     auxiliary_unit_names = ('heat_exchanger',)
@@ -1575,19 +1744,19 @@ class CoFermentation(Reactor):
     
     effluent_titer = 0
     
-    productivity = 0.89 # in g/L/hr
+    productivity = 0.76 # in g/L/hr
     
     yield_limit = 0.76 # in g/g-sugar
     
     tau_batch_turnaround = 12 # in hr, the same as the seed train in ref [3]
 
-    def __init__(self, ID='', ins=None, outs=(), thermo=None, *, T=50+273.15,
+    def __init__(self, ID='', ins=None, outs=(), thermo=None, *, T=30.+273.15,
                   P=101325, V_wf=0.8, length_to_diameter=2,
                   kW_per_m3=0.0985, # Perry's handbook
                   wall_thickness_factor=1,
                   vessel_material='Stainless steel 316',
                   vessel_type='Vertical',
-                  neutralization=False,
+                  neutralization=True,
                   mode='Continuous', # Batch or Continuous
                   allow_dilution=False,
                   allow_concentration=False):
@@ -1613,22 +1782,62 @@ class CoFermentation(Reactor):
         # FermMicrobe reaction from Table 14 on Page 31 of Humbird et al.
         self.cofermentation_rxns = ParallelRxn([
         #      Reaction definition            Reactant    Conversion
-        Rxn('Glucose -> 2HP',        'Glucose',   .53),
-        Rxn('Glucose -> 3 AceticAcid',        'Glucose',   0.07),
-        Rxn('Glucose -> 6 FermMicrobe',       'Glucose',   0.03),
-        Rxn('3Xylose -> 5HP',       'Xylose',    0.53*0.8),
-        Rxn('2 Xylose -> 5 AceticAcid',       'Xylose',    0.07*0.8),
-        Rxn('Xylose -> 5 FermMicrobe',        'Xylose',    0.03*0.8),
+        Rxn('Glucose -> 2 HP',        'Glucose',   .49),
+        # Rxn('Glucose -> 3 AceticAcid',        'Glucose',   0.07),
+        Rxn('Glucose -> 3 AceticAcid',        'Glucose',   0.040),
+        Rxn('3 Xylose -> 5 HP',       'Xylose',    0.49),
+        Rxn('2 Xylose -> 5 AceticAcid',       'Xylose',    0.040),
+        Rxn('Glucose + 2 H2O -> 2 Glycerol',        'Glucose',     0.040),
+        Rxn('3Xylose + 5 H2O -> 5 Glycerol',       'Xylose',    0.040),
+        Rxn('Glucose -> 6 FermMicrobe + 2.4 H2O',       'Glucose',   0.05), # for consistency with Dunn et al. 2015, which has 5% conversion of algal glycerol to cell mass
+        Rxn('Xylose -> 5 FermMicrobe + 2 H2O',        'Xylose',    0.05), # for consistency with Dunn et al. 2015, which has 5% conversion of algal glycerol to cell mass
         ])
         
+        
+        # self.cofermentation_rxns = ParallelRxn([
+        # #      Reaction definition            Reactant    Conversion
+        # Rxn('Glucose -> 2 HP',        'Glucose',   .49),
+        # # Rxn('Glucose -> 3 AceticAcid',        'Glucose',   0.07),
+        # Rxn('Glucose -> 3 AceticAcid',        'Glucose',   0.04),
+        # Rxn('3 Xylose -> 5 HP',       'Xylose',    0.49),
+        # Rxn('2 Xylose -> 5 AceticAcid',       'Xylose',    0.04),
+        # Rxn('Glucose -> 6 FermMicrobe',       'Glucose',   0.03),
+        # Rxn('Xylose -> 5 FermMicrobe',        'Xylose',    0.03),
+        # ])
+        
         self.glucose_to_HP_rxn = self.cofermentation_rxns[0]
-        self.xylose_to_HP_rxn = self.cofermentation_rxns[3]
+        self.xylose_to_HP_rxn = self.cofermentation_rxns[2]
         
         self.glucose_to_acetic_acid_rxn = self.cofermentation_rxns[1]
-        self.xylose_to_acetic_acid_rxn = self.cofermentation_rxns[4]
+        self.xylose_to_acetic_acid_rxn = self.cofermentation_rxns[3]
         
-        self.glucose_to_microbe_rxn = self.cofermentation_rxns[2]
-        self.xylose_to_microbe_rxn = self.cofermentation_rxns[5]
+        self.glucose_to_glycerol_rxn = self.cofermentation_rxns[4]
+        self.xylose_to_glycerol_rxn = self.cofermentation_rxns[5]
+        
+        self.CO2_generation_rxns = ParallelRxn([
+        Rxn('Glucose -> 6 CO2 + 6H2O',       'Glucose',   1.-1e-9),
+        Rxn('Xylose -> 5 CO2 + 5H2O',        'Xylose',    1.-1e-9),
+        ])
+        
+        self.glucose_to_biomass_rxn = self.cofermentation_rxns[6]
+        self.xylose_to_biomass_rxn = self.cofermentation_rxns[7]
+        self.biomass_generation_rxns = [self.glucose_to_biomass_rxn, self.xylose_to_biomass_rxn]
+        
+        # self.CO2_generation_rxns = ParallelRxn([
+        # Rxn('Glucose -> 6 CO2 + 6H2O',       'Glucose',   0.5),
+        # Rxn('Xylose -> 5 CO2 + 5H2O',        'Xylose',    0.5),
+        # ])
+                
+        # self.biomass_generation_rxns = ParallelRxn([
+        # Rxn('Glucose -> 6 FermMicrobe + 2.4 H2O',       'Glucose',   1.-1e-9),
+        # Rxn('Xylose -> 5 FermMicrobe + 2 H2O',        'Xylose',    1.-1e-9),
+        # ])
+        
+        self.glucose_to_microbe_rxn = self.biomass_generation_rxns[0]
+        self.xylose_to_microbe_rxn = self.biomass_generation_rxns[1]
+        
+        # self.glucose_to_microbe_rxn = self.cofermentation_rxns[4]
+        # self.xylose_to_microbe_rxn = self.cofermentation_rxns[5]
         
         if 'Sucrose' in self.chemicals:
             self.sucrose_hydrolysis_rxn = Rxn('Sucrose + Water -> 2Glucose', 'Sucrose', 1.-1e-9)
@@ -1638,17 +1847,19 @@ class CoFermentation(Reactor):
         # Neutralization of lactic acid and acetic acid by lime (Ca(OH)2)
         self.neutralization_rxns = ParallelRxn([
         #   Reaction definition                                               Reactant  Conversion
-        Rxn('2 HP + CalciumDihydroxide -> CalciumLactate + 2 H2O',  'HP',   1.),
-        Rxn('2 AceticAcid + CalciumDihydroxide -> CalciumAcetate + 2 H2O',  'AceticAcid',   1),
+        Rxn('2 HP + CalciumDihydroxide -> CalciumLactate + 2 H2O',  'HP',   1.-1e-9),
+        Rxn('2 AceticAcid + CalciumDihydroxide -> CalciumAcetate + 2 H2O',  'AceticAcid',   1-1e-9),
         # Rxn('SuccinicAcid + CalciumDihydroxide -> CalciumSuccinate + 2H2O', 'SuccinicAcid', 1)
             ])
-
+        self.tau = self.tau_cofermentation = 74 # this value is altered by spec.load_productivity
+        
+        self.get_acetic_acid_conc = lambda: self.outs[0].imass['AceticAcid']/self.outs[0].F_vol
     def _run(self):
         
         sugars, feed, CSL, lime = self.ins
         
         effluent, vapor = self.outs
-        effluent.mix_from([feed, sugars])
+        effluent.mix_from([feed, sugars, CSL])
         
         if 'Sucrose' in effluent.chemicals:
             self.sucrose_hydrolysis_rxn(effluent)
@@ -1658,6 +1869,10 @@ class CoFermentation(Reactor):
         effluent.T = vapor.T = self.T
         CSL.imass['CSL'] = (sugars.F_vol + feed.F_vol) * self.CSL_loading 
         self.cofermentation_rxns(effluent.mol)
+        self.CO2_generation_rxns(effluent.mol)
+        # self.biomass_generation_rxns(effluent.mol)
+        
+        # vapor.imol['CO2'] = effluent.imol['CO2'] + CSL.imol['CSL']
         vapor.imol['CO2'] = effluent.imol['CO2']
         vapor.phase = 'g'
         
@@ -1677,7 +1892,9 @@ class CoFermentation(Reactor):
                                 # * 1.1
             effluent.imol['Lime'] = lime.imol['Lime']
             # effluent.mix_from([effluent, lime])
-            self.neutralization_rxns.adiabatic_reaction(effluent)
+            # self.neutralization_rxns.adiabatic_reaction(effluent)
+            self.neutralization_rxns(effluent)
+            
         else:
             self.vessel_material= 'Stainless steel 316'
             lime.empty()
@@ -1687,30 +1904,35 @@ class CoFermentation(Reactor):
         mode = self.mode
         Design = self.design_results
         Design.clear()
-        self.tau = self.effluent_titer / self.productivity
+        # self.tau = self.effluent_titer / self.productivity
         _mixture = self._mixture = tmo.Stream(None)
         _mixture.mix_from(self.outs[0:2])
-        duty = Design['Duty'] = _mixture.H - self.mixed_feed.H
-
+        # duty = Design['Duty'] = _mixture.H - self.mixed_feed.H
+        duty = Design['Duty'] = self.Hnet
         if mode == 'Batch':
+            raise NotImplementedError('Batch mode is missing number of fermenters')
+            # TODO: N = ?
+            # Note that this code assumes only one vessel, which is impossible
             tau_cofermentation = self.tau_batch_turnaround + self.tau
             Design['Fermenter size'] = self.outs[0].F_mass * tau_cofermentation
             Design['Recirculation flow rate'] = self.F_mass_in
             self.heat_exchanger.simulate_as_auxiliary_exchanger(duty, _mixture)
         
         elif mode == 'Continuous':
+            Reactor._V_max = 3785.41 # 1 million gallons
             Reactor._design(self)
-
         else:
             raise DesignError(f'Fermentation mode must be either Batch or Continuous, not {mode}')
 
     def _cost(self):
         Design = self.design_results
-        purchase_costs = self.purchase_costs
-        purchase_costs.clear()
         hx = self.heat_exchanger
 
         if self.mode == 'Batch':
+            raise NotImplementedError('Batch mode is missing number of fermenters')
+            purchase_costs = self.purchase_costs
+            # TODO: N = ?
+            # Note that this code assumes only one vessel, which is impossible
             Unit._cost()
             self._decorated_cost()
             purchase_costs['Heat exchangers'] = hx.purchase_cost
@@ -1727,21 +1949,16 @@ class CoFermentation(Reactor):
             
             N = Design['Number of reactors']
             single_rx_effluent = self._mixture.copy()
-            single_rx_effluent.mol[:] /= N
             hx.simulate_as_auxiliary_exchanger(duty=Design['Duty']/N, 
-                                                stream=single_rx_effluent)
+                                            stream=single_rx_effluent)
+            self.auxiliary_unit_names = names = tuple([f'heat_exchanger_{i}' for i in range(N)])
+            for i in names: setattr(self, i, hx)
             hu_total = self.heat_utilities[0]
             hu_single_rx = hx.heat_utilities[0]
             hu_total.copy_like(hu_single_rx)
-            hu_total.scale(N)
+            self.heat_utilities = tuple([self.heat_utilities[0]] * N)
+            # Do not include this utility in HXN because this one is scaled by N,
+            # representing N heat exchanged (not just one heat exchanger)
+            hu_total.heat_exchanger = None
+            # for i in hx.purchase_costs: hx.purchase_costs[i] *= N
 
-# class SugarAndInhibitorSpecification(Unit):
-#     _N_ins = 2
-#     _N_outs = 2
-    
-#     def __init__():
-#         Unit.__init__(self, ID, ins, outs, thermo)
-#         # MEE.__init__()
-#         # Mixer.__init__()
-#         self.mixer = bst.Mixer(None, thermo=self.thermo)
-#         self.evaporator = bst.MultiEffectEvaporator(None, thermo=self.thermo)

@@ -28,10 +28,10 @@ __all__ = ('prep_cost', 'Preprocessing', 'OptionPrep',
 
 def prep_cost(basis, ID=None, *, CE, cost, n,
               lifetime, salvage, maintenance, labor,
-              S=1, ub=0, kW=0, BM=1, units=None, fsize=None, N=None):
+              S=1, lb=None, ub=None, kW=0, BM=1, units=None, f=None, N=None):
     
     def add_param(cls):
-        add_cost(cls, ID, basis, units, S, ub, CE, cost, n, kW, BM, N, lifetime, fsize)
+        add_cost(cls, ID, basis, units, S, lb, ub, CE, cost, n, kW, BM, N, lifetime, f)
         cls.salvage[ID] = salvage
         cls.maintenance[ID] = maintenance
         cls.labor[ID] = labor
