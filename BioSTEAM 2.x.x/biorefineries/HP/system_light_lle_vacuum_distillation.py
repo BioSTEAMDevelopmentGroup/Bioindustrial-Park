@@ -349,7 +349,7 @@ def create_HP_sys(ins, outs):
                                     ins=(S302-1, '', CSL, fermentation_lime),
                                     outs=('fermentation_effluent', 'CO2_fermentation'),
                                     vessel_material='Stainless steel 316',
-                                    neutralization=True)
+                                    neutralization=False)
     
     def include_seed_CSL_in_cofermentation(): # note: effluent always has 0 CSL
         R302._run()
@@ -800,7 +800,7 @@ def create_HP_sys(ins, outs):
     def R501_specification():
         R501.byproducts_combustion_rxns(R501.ins[0])
         R501._run()
-    R501.specification = R501_specification # Comment this out for anything other than TRY analysis
+    # R501.specification = R501_specification # Comment this out for anything other than TRY analysis
     
     get_flow_tpd = lambda: (feedstock.F_mass-feedstock.imass['H2O'])*24/907.185
     
@@ -990,15 +990,25 @@ def create_HP_sys(ins, outs):
     #                                 side_streams_to_heat=(water_M201, water_M202, steam_M203),
     #                                 outs=('gas_emission', ash, 'boiler_blowdown_water'))
     
-    BT = bst.facilities.Boiler('BT',
+    # BT = bst.facilities.Boiler('BT',
+    #                                              ins=(M505-0,
+    #                                                   R501-0, 
+    #                                                   'boiler_makeup_water',
+    #                                                   'natural_gas',
+    #                                                   'lime',
+    #                                                   'boilerchems'), 
+    #                                              outs=('gas_emission', 'boiler_blowdown_water', ash, '', ''),)
+    #                                              # turbogenerator_efficiency=0.85)
+    
+    BT = bst.facilities.BoilerTurbogenerator('BT',
                                                  ins=(M505-0,
                                                       R501-0, 
                                                       'boiler_makeup_water',
                                                       'natural_gas',
                                                       'lime',
                                                       'boilerchems'), 
-                                                 outs=('gas_emission', 'boiler_blowdown_water', ash),)
-                                                 # turbogenerator_efficiency=0.85)
+                                                 outs=('gas_emission', 'boiler_blowdown_water', ash,),
+                                                  turbogenerator_efficiency=0.85)
     
     # Blowdown is discharged
     CT = facilities.CT('CT', ins=('return_cooling_water', cooling_tower_chems,
@@ -1519,7 +1529,7 @@ get_feedstock_FEC = lambda: (feedstock.F_mass-feedstock.imass['Water'])\
     * CFs['FEC_CFs']['FGHTP %s'%feedstock_ID]/AA.F_mass
 # FEC from electricity
 get_electricity_FEC = lambda: \
-    get_electricity_use()*CFs['FEC_CFs']['Electricity']/AA.F_mass
+    (get_electricity_use()*CFs['FEC_CFs']['Electricity'])/AA.F_mass
 
 get_FEC_by_ID = lambda ID: LCA_stream.imass[ID] * FEC_CF_stream.imass[ID]/AA.F_mass
 

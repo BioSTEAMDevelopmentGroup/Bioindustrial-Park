@@ -433,8 +433,8 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
     def load_feedstock_price(self, price):
         feedstock = self.feedstock
         mc = feedstock.imass['Water']/feedstock.F_mass
-        # self.feedstock.price = price / _kg_per_ton * (1-mc) # price per dry ton --> price per wet kg
-        self.feedstock.price = price / _kg_per_ton 
+        self.feedstock.price = price / _kg_per_ton * (1-mc) # price per dry ton --> price per wet kg
+        # self.feedstock.price = price / _kg_per_ton 
         self.spec_2 = price
         
     def calculate_feedstock_carbohydrate_content(self):

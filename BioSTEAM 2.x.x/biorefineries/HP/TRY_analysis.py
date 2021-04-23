@@ -444,7 +444,7 @@ HP_metrics = [solve_AA_price, get_GWP, get_FEC]
 steps = 50
 
 # Yield, titer, productivity (rate)
-spec_1 = np.linspace(0.1, 0.95, steps) # yield
+spec_1 = np.linspace(0.05, 0.95, steps) # yield
 spec_2 = np.linspace(5., 330., steps) # titer
 # spec_1 = np.linspace(0.2, 0.99, steps) # yield
 # spec_2 = np.linspace(45, 225, steps) # titer
@@ -465,7 +465,7 @@ spec_3_units = "$\mathrm{g} \cdot \mathrm{L}^{-1} \cdot \mathrm{hr}^{-1}$"
 
 
 # # Feedstock carbohydrate or sugar %, feedstock price, productivity (rate)
-# spec_1 = np.linspace(0.1, 0.99, steps) # feedstock carbohydrate %
+# spec_1 = np.linspace(0.25, 0.99, steps) # feedstock carbohydrate %
 # spec_2 = np.linspace(1., 200., steps) # feedstock price
 # # spec_1 = np.linspace(0.2, 0.99, steps) # yield
 # # spec_2 = np.linspace(45, 225, steps) # titer
