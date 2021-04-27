@@ -52,7 +52,8 @@ __all__ = (
 def create_hot_water_pretreatment_system(
         ins, outs,
         pretreatment_area=200,
-        include_feedstock_handling=True
+        include_feedstock_handling=True,
+        solids_loading=0.305
     ):
     
     feedstock, = ins
@@ -81,16 +82,15 @@ def create_hot_water_pretreatment_system(
     H201 = units.WasteVaporCondenser(f'H{n+1}', M204-0, pretreatment_wastewater, V=0)
     P202 = units.HydrolyzatePump(f'P{n+2}', F201-1, hydrolyzate)
     
+    M202.solids_loading = solids_loading
+    @M202.add_specification(run=True)
     def update_pretreatment_process_water():
-        moisture_content = 0.695
+        solids_loading = M202.solids_loading
         warm_process_water, *other_feeds = M202.ins
         F_mass_feed = sum([i.F_mass for i in other_feeds if i])
         available_water = sum([i.imass['Water'] for i in other_feeds if i])
-        required_water = (F_mass_feed - available_water) * moisture_content / (1 - moisture_content)
+        required_water = (F_mass_feed - available_water) * (1. - solids_loading) / solids_loading
         warm_process_water.imass['Water'] = max(required_water - available_water, 0.)
-        M202._run()
-    M202.specification = update_pretreatment_process_water
-    
 
 @bst.SystemFactory(
     ID='dilute_acid_pretreatment_sys',
@@ -116,7 +116,8 @@ def create_hot_water_pretreatment_system(
 def create_dilute_acid_pretreatment_system(
         ins, outs,
         pretreatment_area=200,
-        include_feedstock_handling=True
+        include_feedstock_handling=True,
+        solids_loading=0.205,
     ):
     
     feedstock, = ins
@@ -167,32 +168,30 @@ def create_dilute_acid_pretreatment_system(
     T203 = units.AmmoniaAdditionTank(f'T{n+3}', (F201-1, M205-0))
     P202 = units.HydrolyzatePump(f'P{n+2}', T203-0, hydrolyzate)
     
+    M202.solids_loading = solids_loading
+    @M202.add_specification(run=True)
     def update_pretreatment_process_water():
-        moisture_content = 0.695
         sulfuric_acid, warm_process_water, feed = M202.ins
         available_water = feed.imass['Water'] + sulfuric_acid.imass['Water']
-        required_water = (feed.F_mass + sulfuric_acid.F_mass - available_water) * moisture_content / (1 - moisture_content)
+        solids_loading = M202.solids_loading
+        required_water = (feed.F_mass + sulfuric_acid.F_mass - available_water) * (1. - solids_loading) / solids_loading
         warm_process_water.imass['Water'] = max(required_water - available_water, 0.)
-        M202._run()
-    M202.specification = update_pretreatment_process_water
     
+    @T201.add_specification(run=True)
     def update_sulfuric_acid_loading():
         F_mass_dry_feedstock = feedstock.F_mass - feedstock.imass['water']
         sulfuric_acid, = H2SO4_storage.ins
         warm_water, _ = M201.ins
         sulfuric_acid.F_mass = 0.02316 * F_mass_dry_feedstock
         warm_water.F_mass = 0.282 * F_mass_dry_feedstock
-        T201._run()
-    T201.specification = update_sulfuric_acid_loading
     
     neutralization_rxn = tmo.Reaction('2 NH4OH + H2SO4 -> (NH4)2SO4 + 2 H2O', 'H2SO4', 1)
+    @M205.add_specification(run=True)
     def update_ammonia_loading():
         ammonia, ammonia_process_water = M205.ins
         hydrolyzate = F201.outs[1]
         ammonia.imol['NH4OH'] = 2. * hydrolyzate.imol['H2SO4']
         ammonia_process_water.imass['Water'] = 2435.6 * ammonia.imol['NH4OH']
-        M205._run()
-    M205.specification = update_ammonia_loading
     
     def neutralization():
         T203._run(); neutralization_rxn.adiabatic_reaction(T203.outs[0])
@@ -210,9 +209,14 @@ def create_dilute_acid_pretreatment_system(
 def create_continuous_saccharification_system(ins, outs):
     hydrolyzate, cellulase, saccharification_water = ins
     saccharified_slurry, = outs
-     
+    
+    H301 = units.HydrolysateCooler('H301', hydrolyzate, T=48+273.15)
+    M301 = units.EnzymeHydrolysateMixer('M301', (H301-0, cellulase, saccharification_water))
+    M301.solids_loading = 0.2
+    
     enzyme_over_cellulose = 0.4 # (20 g enzyme / 1000 g cellulose) / (50 g cellulase / 1000g enzyme)
     z_mass_cellulase_mixture = np.array([0.95, 0.05])
+    @M301.add_specification
     def update_cellulase_loading():
         hydrolyzate, cellulase, water = M301.ins
         # Note: An additional 10% is produced for the media glucose/sophorose mixture
@@ -224,6 +228,7 @@ def create_continuous_saccharification_system(ins, outs):
                      + hydrolyzate.imass['Glucose'])
         )
     
+    @M301.add_specification(run=True)
     def update_moisture_content():
         hydrolyzate, cellulase, water = M301.ins
         chemicals = M301.chemicals
@@ -236,15 +241,6 @@ def create_continuous_saccharification_system(ins, outs):
         missing_water = max(water_over_solids * (mass.sum() - mass_moisture) - mass_moisture, 0.)
         saccharification_water.imass['Water'] = missing_water
     
-    def hydrosylate_mixer_specification():
-        for i in M301.all_specifications: i()
-        M301._run()
-    
-    H301 = units.HydrolysateCooler('H301', hydrolyzate, T=48+273.15)
-    M301 = units.EnzymeHydrolysateMixer('M301', (H301-0, cellulase, saccharification_water))
-    M301.specification = hydrosylate_mixer_specification
-    M301.all_specifications = [update_cellulase_loading, update_moisture_content]
-    M301.solids_loading = 0.2
     R301 = units.ContinuousPresaccharification('R301', M301-0, saccharified_slurry)
 
 @bst.SystemFactory(
@@ -372,9 +368,11 @@ def create_facilities(
         recycle_process_water='',
         blowdown_to_wastewater=None,
         include_hxn=False,
+        BT_area=None,
+        area=None,
     ):
     
-    BT = bst.facilities.BoilerTurbogenerator('BT',
+    BT = bst.facilities.BoilerTurbogenerator(BT_area or area or 'BT',
                                              ins=(solids_to_boiler,
                                                   gas_to_boiler, 
                                                   'boiler_makeup_water',
@@ -382,15 +380,15 @@ def create_facilities(
                                                   'FGD_lime',
                                                   'boilerchems'))
     
-    CWP = bst.facilities.ChilledWaterPackage('CWP')
-    CT = bst.facilities.CoolingTower('CT')
+    CWP = bst.facilities.ChilledWaterPackage(area or 'CWP')
+    CT = bst.facilities.CoolingTower(area or 'CT')
     
     process_water_streams = (*process_water_streams,
                               BT-1, CT-1)
             
     makeup_water = Stream('makeup_water', price=price['Makeup water'])
     
-    PWC = bst.facilities.ProcessWaterCenter('PWC',
+    PWC = bst.facilities.ProcessWaterCenter(area or 'PWC',
                                             (RO_water, makeup_water, recycle_process_water),
                                             (),
                                             None,
@@ -398,21 +396,21 @@ def create_facilities(
                                             process_water_streams)
     
     CIP = Stream('CIP', Water=126, units='kg/hr')
-    CIP_package = bst.facilities.CIPpackage('CIP_package', CIP)
+    CIP_package = bst.facilities.CIPpackage(area or 'CIP_package', CIP)
     plant_air = Stream('plant_air', N2=83333, units='kg/hr')
     def adjust_plant_air():
         plant_air.imass['N2'] = 0.8 * feedstock.F_mass
         ADP._run()
         
-    ADP = bst.facilities.AirDistributionPackage('ADP', plant_air)
+    ADP = bst.facilities.AirDistributionPackage(area or 'ADP', plant_air)
     ADP.specification = adjust_plant_air
     fire_water = Stream('fire_water', Water=8343, units='kg/hr')
-    FT = units.FireWaterStorageTank('FT', fire_water)
+    FT = units.FireWaterStorageTank(area or 'FT', fire_water)
     
     ### Complete system
-    hxn_facilities = (bst.facilities.HeatExchangerNetwork('HXN'),) if include_hxn else ()
+    hxn_facilities = (bst.facilities.HeatExchangerNetwork(area or 'HXN'),) if include_hxn else ()
     if blowdown_to_wastewater:
-        blowdown_mixer = bst.BlowdownMixer('blowdown_mixer', (BT-1, CT-1), blowdown_to_wastewater)
+        blowdown_mixer = bst.BlowdownMixer(area or 'blowdown_mixer', (BT-1, CT-1), blowdown_to_wastewater)
 
 @bst.SystemFactory(
     ID='cornstover_sys',

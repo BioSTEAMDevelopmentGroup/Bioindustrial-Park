@@ -40,7 +40,7 @@ def create_bagasse_pelleting_system(ins, outs):
     U403 = units.DrumDryer('U403', 
         (U402-0, 'dryer_air', 'dryer_natural_gas'), 
         ('', '', 'dryer_emissions'),
-        moisture_content=0.18, split=0.,
+        moisture_content=0.15, split=0.,
     )
     X401 = bst.ThermalOxidizer('X401', (U403-1, 'oxidizer_air'), 'oxidizer_emissions')
     U404 = units.ScrewFeeder('U404', U403-0)
@@ -77,43 +77,29 @@ def create_feedstock_handling_system(ins, outs):
               Cellulose=100,
               Water=900,
               units='kg/hr',
-              price=0.5),
-         dict(ID='H3PO4',
-              H3PO4=74.23,
-              Water=13.1,
-              units='kg/hr',
-              price=0),
-         dict(ID='lime',
-              CaO=333.0,
-              Water=2200.0,
-              units='kg/hr',
-              price=0.077),
-         dict(ID='polymer',
-              Flocculant=0.83,
-              units='kg/hr',
-              price=0)],
-    outs=[dict(ID='clarified_juice'),
+              price=0.5),],
+    outs=[dict(ID='untreated_juice'),
           dict(ID='bagasse')]
 )
-def create_juicing_system_up_to_clarification(ins, outs, pellet_bagasse=False):
+def create_juicing_system_without_treatment(ins, outs, pellet_bagasse=None):
+    if pellet_bagasse is None: pellet_bagasse = True
+    
     ### Streams ###
-    sugarcane, enzyme, H3PO4, lime, polymer = ins
-    clarified_juice, bagasse = outs
+    sugarcane, enzyme = ins
+    untreated_juice, bagasse = outs
     
     imbibition_water = bst.Stream('imbibition_water',
                                   Water=87023.35, units='kg/hr',
                                   T = 338.15)
     
-    rvf_wash_water = bst.Stream('rvf_wash_water',
-                                Water=16770, units='kg/hr',
-                                T=363.15)  # to C202
-    
-    ### Unit operations ###
-    
-    
-    
     # Hydrolyze starch
     T201 = units.EnzymeTreatment('T201', (sugarcane, enzyme), T=323.15)  # T=50
+    
+    @T201.add_specification(run=True)
+    def update_enzyme_and_imbibition_water():
+        F_mass = T201.ins[0].F_mass
+        enzyme.imass['Cellulose', 'Water'] = 0.003 * F_mass * np.array([0.1, 0.9])
+        imbibition_water.imass['Water'] = 0.25 * F_mass
     
     # Finely crush lipid cane
     U201 = units.CrushingMill('U201',
@@ -147,11 +133,50 @@ def create_juicing_system_up_to_clarification(ins, outs, pellet_bagasse=False):
                                             Water=0.88))
     
     # Store juice before treatment
-    T202 = units.StorageTank('T202', S201-0,
+    T202 = units.StorageTank('T202', S201-0, untreated_juice,
                              tau=4, vessel_material='Carbon steel')
+
+
+@SystemFactory(
+    ID='juicing_sys',
+    ins=[*create_juicing_system_without_treatment.ins,
+         dict(ID='H3PO4',
+              H3PO4=74.23,
+              Water=13.1,
+              units='kg/hr',
+              price=0),
+         dict(ID='lime',
+              CaO=333.0,
+              Water=2200.0,
+              units='kg/hr',
+              price=0.077),
+         dict(ID='polymer',
+              Flocculant=0.83,
+              units='kg/hr',
+              price=0)],
+    outs=[dict(ID='clarified_juice'),
+          dict(ID='bagasse')]
+)
+def create_juicing_system_up_to_clarification(ins, outs, pellet_bagasse=None):
+    
+    ### Streams ###
+    sugarcane, enzyme, H3PO4, lime, polymer = ins
+    clarified_juice, bagasse = outs
+    
+    rvf_wash_water = bst.Stream('rvf_wash_water',
+                                Water=16770, units='kg/hr',
+                                T=363.15)  # to C202
+    
+    juicing_sys_without_treatment = create_juicing_system_without_treatment(
+        ins=(sugarcane, enzyme),
+        outs=('', bagasse),
+        mockup=True,
+        pellet_bagasse=pellet_bagasse,
+    )
+    T201 = f.unit.T201
     
     # Heat up before adding acid
-    H201 = units.HXutility('H201', T202-0, T=343.15)
+    H201 = units.HXutility('H201', juicing_sys_without_treatment-0, T=343.15)
     
     # Mix in acid
     T203 = units.MixTank('T203', (H201-0, H3PO4))
@@ -207,10 +232,8 @@ def create_juicing_system_up_to_clarification(ins, outs, pellet_bagasse=False):
     def correct_flows():
         F_mass = T201.ins[0].F_mass
         # correct enzyme, lime, phosphoric acid, and imbibition water
-        enzyme.imass['Cellulose', 'Water'] = 0.003 * F_mass * np.array([0.1, 0.9])
         lime.imass['CaO', 'Water'] = 0.001 * F_mass * np.array([0.046, 0.954])
         H3PO4.imass['H3PO4', 'Water'] = 0.00025 * F_mass
-        imbibition_water.imass['Water'] = 0.25* F_mass
         T201._run()
     
     T201.specification = correct_flows
@@ -231,10 +254,13 @@ def create_juicing_system_up_to_clarification(ins, outs, pellet_bagasse=False):
           dict(ID='bagasse'),
           dict(ID='fiber_fines')]
 )          
-def create_juicing_system_with_fiber_screener(ins, outs):
+def create_juicing_system_with_fiber_screener(ins, outs, pellet_bagasse=None):
     screened_juice, bagasse, fiber_fines = outs
-    sys = create_juicing_system_up_to_clarification(None, ins, ['', bagasse], mockup=True)
-
+    sys = create_juicing_system_up_to_clarification(
+        None, ins, ['', bagasse],
+        mockup=True,
+        pellet_bagasse=pellet_bagasse
+    )
     # Screen out small fibers from sugar stream
     S202 = units.VibratingScreen('S202', sys-0, (screened_juice, fiber_fines),
                                  split=dict(Ash=0.998,
@@ -461,11 +487,12 @@ def create_ethanol_purification_system(ins, outs,
               units='kg/hr',
               T=372)],
     outs=[dict(ID='beer'),
-          dict(ID='evaporator_condensate')],
+          dict(ID='evaporator_condensate'),
+          dict(ID='vent')],
 )
 def create_sucrose_fermentation_system(ins, outs):
     screened_juice, = ins
-    beer, evaporator_condensate = outs
+    beer, evaporator_condensate, vent = outs
     
     ### Streams ###
     
@@ -521,7 +548,7 @@ def create_sucrose_fermentation_system(ins, outs):
         stripping_water.mol[:] = stripping_water_over_vent * vent.F_mass
     
     D301 = units.VentScrubber('D301', ins=(stripping_water, R301-0), 
-                              outs=('vent', ''),
+                              outs=(vent, ''),
                               gas=('CO2', 'O2'))
     
     # Separate 99% of yeast
@@ -565,7 +592,7 @@ def create_sucrose_fermentation_system(ins, outs):
     ins=[create_sucrose_fermentation_system.ins[0],
          create_ethanol_purification_system.ins[1]], # denaturant
     outs=[*create_ethanol_purification_system.outs,
-          create_sucrose_fermentation_system.outs[0]]
+          create_sucrose_fermentation_system.outs[1]]
 )
 def create_sucrose_to_ethanol_system(ins, outs):
     screened_juice, denaturant = ins
@@ -619,7 +646,7 @@ def create_sugarcane_to_ethanol_system(ins, outs,
         mockup=True
     )
     M305 = units.Mixer('M305', 
-        ins=(juicing_sys-2, *ethanol_production_sys-[1, 2, 3]),
+        ins=(juicing_sys-2, *ethanol_production_sys-[2, 3]),
         outs=wastewater
     )
     
