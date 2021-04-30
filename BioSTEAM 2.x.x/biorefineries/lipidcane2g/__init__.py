@@ -63,7 +63,7 @@ def load(name, agile=False):
     def rename_storage_units(storage):
         bst.rename_units([i for i in lipidcane_sys.units if bst.is_storage_unit(i)], storage)
     
-    if name == 4 or name == 'divided 1 and 2g front end oil separation':
+    if name == 5 or name == 'divided 1 and 2g front end oil separation':
         lipidcane_sys = create_lipidcane_to_biodiesel_and_ethanol_combined_1_and_2g_post_fermentation_oil_separation(
             operating_hours=operating_hours,    
         )
@@ -81,7 +81,7 @@ def load(name, agile=False):
             'Storage'
         ]
         rename_storage_units()
-    elif name == 3 or name == 'divided 1 and 2g hydrolyzate oil separation':
+    elif name == 4 or name == 'divided 1 and 2g hydrolyzate oil separation':
         area_names = [
             'Feedstock handling', 
             'Juicing', 
@@ -99,7 +99,7 @@ def load(name, agile=False):
             operating_hours=operating_hours,
         )
         rename_storage_units()
-    elif name == 2 or name == 'combined 1 and 2g post fermentation oil separation':
+    elif name == 3 or name == 'combined 1 and 2g post fermentation oil separation':
         area_names = [
             'Feedstock handling', 
             'Juicing', 
@@ -117,7 +117,7 @@ def load(name, agile=False):
             operating_hours=operating_hours,
         )
         rename_storage_units(1200)
-    elif name == 1 or name == 'divided 1 and 2g post fermentation oil separation':
+    elif name == 2 or name == 'divided 1 and 2g post fermentation oil separation':
         area_names = [
             'Feedstock handling', 
             'Juicing', 
@@ -136,6 +136,24 @@ def load(name, agile=False):
             operating_hours=operating_hours,
         )
         rename_storage_units(1300)
+    elif name == 1 or name == 'divided 1 and 2g bagasse expression':
+        area_names = [
+            'Feedstock handling', 
+            'Juicing', 
+            'Conv. ferm.',
+            'Oil ext.',
+            'Pretreatment',
+            'Cofementation',
+            'Wastewater treatment',
+            'CH&P',
+            'Ethanol sep.', 
+            'Biod. prod.',
+            'Utilities',
+            'Storage'
+        ]
+        lipidcane_sys = create_lipidcane_to_biodiesel_and_ethanol_1_and_2g_bagasse_expression(
+            operating_hours=operating_hours,
+        )
     elif name == 0 or name == '1g':
         lipidcane_sys = create_lipidcane_to_biodiesel_and_ethanol_1g(
             operating_hours=operating_hours,
@@ -156,7 +174,7 @@ def load(name, agile=False):
     unit_groups = UnitGroup.group_by_area(lipidcane_sys.units)
     if area_names:
             for i, j in zip(unit_groups, area_names): i.name = j
-    if name in (1, 2, 3) if isinstance(name, int) else '2g' in name:
+    if name in (1, 2, 3, 4) if isinstance(name, int) else '2g' in name:
         if agile:
             lipidcane_tea = create_agile_tea(lipidcane_sys.units)
             lipidcane_sys.simulate()

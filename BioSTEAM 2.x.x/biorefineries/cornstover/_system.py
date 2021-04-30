@@ -117,7 +117,7 @@ def create_dilute_acid_pretreatment_system(
         ins, outs,
         pretreatment_area=200,
         include_feedstock_handling=True,
-        solids_loading=0.205,
+        solids_loading=0.305,
     ):
     
     feedstock, = ins
@@ -206,13 +206,13 @@ def create_dilute_acid_pretreatment_system(
          dict(ID='saccharification_water')],
     outs=[dict(ID='saccharified_slurry')],
 )
-def create_continuous_saccharification_system(ins, outs):
+def create_continuous_saccharification_system(ins, outs, solids_loading=None):
     hydrolyzate, cellulase, saccharification_water = ins
     saccharified_slurry, = outs
-    
+    if solids_loading is None: solids_loading = 0.2
     H301 = units.HydrolysateCooler('H301', hydrolyzate, T=48+273.15)
     M301 = units.EnzymeHydrolysateMixer('M301', (H301-0, cellulase, saccharification_water))
-    M301.solids_loading = 0.2
+    M301.solids_loading = solids_loading
     
     enzyme_over_cellulose = 0.4 # (20 g enzyme / 1000 g cellulose) / (50 g cellulase / 1000g enzyme)
     z_mass_cellulase_mixture = np.array([0.95, 0.05])
@@ -345,13 +345,15 @@ def create_saccharification_and_cofermentation_system(
 def create_cellulosic_fermentation_system(
         ins, outs,
         include_scrubber=True,
+        solids_loading=None,
     ):
     vent, beer = outs
     hydrolyzate, cellulase, saccharification_water, DAP, CSL = ins
     
     saccharification_sys = create_continuous_saccharification_system(
         ins=[hydrolyzate, cellulase, saccharification_water],
-        mockup=True
+        mockup=True,
+        solids_loading=solids_loading,
     )
     cofermentation_sys = create_saccharification_and_cofermentation_system(
         ins=[saccharification_sys-0, DAP, CSL],
