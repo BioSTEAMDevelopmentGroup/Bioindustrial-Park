@@ -119,8 +119,10 @@ def create_lipid_wash_system(ins, outs):
     # Cool the oil
     H203 = units.HXutility('H203', lipid, T=343.15, V=0, cool_only=True)
     
+    recycle = bst.Stream()
+    
     # Add water to wash lipid
-    T208 = units.MixTank('T208', (H203-0, lipid_wash_water))
+    T208 = units.MixTank('T208', (H203-0, lipid_wash_water, recycle))
     T208.tau = 0.10
     
     # Centrifuge out water
@@ -133,18 +135,19 @@ def create_lipid_wash_system(ins, outs):
     # Vacume out water
     F201 = units.SplitFlash('F201', T=357.15, P=2026.5,
                             ins=C203-0,
-                            outs=('water_vapor', washed_lipid),
+                            outs=('', washed_lipid),
                             split=dict(Lipid=0.0001,
                                        Water=0.999))
     
+    H204 = units.HXutility('H204', ins=F201-0, T=320, V=0)
+    P204 = units.Pump('P204', H204-0, recycle, P=101325)
+    
     # Specifications within a system
+    @T208.add_specification(run=True)
     def correct_lipid_wash_water():
         ins = T208.ins
-        lipid_wash_water = ins[1]
-        lipid_wash_water.imol['Water'] = 0.185 * sum([i.imass['Lipid'] for i in ins])
-        T208._run()
-    
-    T208.specification = correct_lipid_wash_water
+        lipid, lipid_wash_water, recycle, *others = ins
+        lipid_wash_water.imol['Water'] = 0.185 * sum([i.imass['Lipid'] for i in ins]) - recycle.imol['Water']
     
 @SystemFactory(
     ID='juicing_sys',

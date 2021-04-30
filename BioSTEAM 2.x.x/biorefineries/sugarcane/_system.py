@@ -501,11 +501,13 @@ def create_sucrose_fermentation_system(ins, outs):
                                  Water=26836,
                                  units='kg/hr')
     
+    dilution_water = bst.Stream('dilution_water')
+    
     ### Units ###
     
     # Split sugar solution
     S301 = units.Splitter('S301',
-                          split=0.15)
+                          split=0.10)
     
     # Concentrate sugars
     F301 = units.MultiEffectEvaporator('F301',
@@ -520,19 +522,37 @@ def create_sucrose_fermentation_system(ins, outs):
     # Mix sugar solutions
     M301 = units.Mixer('M301')
     
-    def sugar_concentration_objective(V):
+    def get_sugar_concentration():
+        s = M301.outs[0]
+        return s.imass['Glucose', 'Sucrose'].sum() / s.F_mass
+    
+    def sugar_concentration_at_fraction_evaporated(V):
         F301.V = V
         F301._run()
         M301._run()
-        s = M301.outs[0]
-        sugar_concentration = s.imass['Glucose', 'Sucrose'].sum() / s.F_mass
-        return F301.sugar_concentration - sugar_concentration
+        return F301.sugar_concentration - get_sugar_concentration()
     
+    def get_dilution_water():
+        F301.V = 0
+        F301._run()
+        M301._run()
+        target = F301.sugar_concentration
+        current = get_sugar_concentration()
+        return (1./target - 1./current) * sum([i.imass['Glucose', 'Sucrose'].sum() for i in M301.ins])
+    
+    @M301.add_specification(run=False)
     def adjust_glucose_concentration():
-        F301.V = flx.IQ_interpolation(sugar_concentration_objective, 0., 1., x=F301.V, ytol=1e-5)
-        
+        V_guess = F301.V
+        dilution_water = get_dilution_water()
+        if dilution_water < 0:
+            F301.V = flx.IQ_interpolation(
+                sugar_concentration_at_fraction_evaporated,
+                0., 1., x=V_guess, ytol=1e-5
+            )
+        else:
+            M301.ins[2].imass['Water'] = dilution_water
+            
     F301.sugar_concentration = 0.23 # wt. % sugar
-    M301.specification = adjust_glucose_concentration
     
     # Cool for fermentation
     H301 = units.HXutility('H301', T=295.15)
@@ -582,7 +602,7 @@ def create_sucrose_fermentation_system(ins, outs):
     ### Ethanol system set-up ###
     
     screened_juice-S301-1-F301-0-P306
-    (S301-0, P306-0)-M301-H301
+    (S301-0, P306-0, dilution_water)-M301-H301
     (H301-0, C301-0-T305-0)-R301-1-T301-0-C301
     (C301-1, D301-1)-M302
     
