@@ -15,7 +15,7 @@ setup(
     description="Biorefinery models in BioSTEAM",
     long_description=open('README.rst').read(),
     author='Yoel Cortes-Pena',
-    install_requires=['biosteam>=2.27.3'],
+    install_requires=['biosteam>=2.28.1'],
     python_requires=">=3.6",
     package_data=
         {'biorefineries': ['biorefineries/*',
