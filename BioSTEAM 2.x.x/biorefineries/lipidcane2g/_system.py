@@ -20,6 +20,9 @@ from ..sugarcane import (
     create_ethanol_purification_system_after_beer_column,
 )
 from ..lipidcane import (
+    create_feedstock_handling_system,
+    create_juicing_system,
+    create_lipid_wash_system,
     create_juicing_and_lipid_extraction_system,
     create_transesterification_and_biodiesel_separation_system,
     create_lipidcane_to_biodiesel_and_conventional_ethanol_system,
@@ -31,6 +34,8 @@ __all__ = (
     'create_lipidcane_to_biodiesel_and_ethanol_divided_1_and_2g_front_end_oil_separation',
     'create_lipidcane_to_biodiesel_and_ethanol_divided_1_and_2g_hydrolyzate_oil_separation',
     'create_lipidcane_to_biodiesel_and_ethanol_divided_1_and_2g_post_fermentation_oil_separation',
+    'create_lipidcane_to_biodiesel_and_ethanol_combined_1_and_2g_post_fermentation_oil_separation',
+    'create_lipidcane_to_biodiesel_and_ethanol_1_and_2g_bagasse_expression',
     'trim_to_cornstover_hot_water_cellulosic_ethanol',
 )
 
@@ -55,7 +60,11 @@ def create_lipid_expression_system(ins, outs):
     bagasse_pellets, = ins
     lipid, pressed_bagasse = outs
     U801 = bst.ScrewPress('U801', bagasse_pellets, (lipid, pressed_bagasse),
-                          split={'Lipid': 0.90}, moisture_content=0.15)
+                          split={'Lipid': 0.90}, moisture_content=0.14)
+    U801.cost_items = U801.cost_items.copy() 
+    U801.cost_items['Screw press'] = cost_item = U801.cost_items['Screw press'].copy()
+    cost_item.ub = 24000
+    U801.tag = "lipid extraction efficiency"
 
 @SystemFactory(
     ID='post_fermentation_lipid_separation_sys',
@@ -74,8 +83,10 @@ def create_post_fermentation_lipid_separation_system(ins, outs):
         P=(101325, 69682, 47057, 30953),
         V=0.90
     ) 
-    C603_2 = bst.LiquidsSplitCentrifuge('C603_2', Ev607-0, (lipid, wastewater), 
+    P607 = bst.Pump('P607', Ev607-0)
+    C603_2 = bst.LiquidsSplitCentrifuge('C603_2', P607-0, (lipid, wastewater), 
                                         split={'Lipid':0.99})
+    C603_2.tag = "lipid extraction efficiency"
     
 
 @SystemFactory(
@@ -85,47 +96,80 @@ def create_post_fermentation_lipid_separation_system(ins, outs):
 )
 def create_lipidcane_to_biodiesel_and_ethanol_1g(
         ins, outs,
-        evaporator_and_beer_column_heat_integration=True
+        evaporator_and_beer_column_heat_integration=True,
+        front_end_oil_separation=False,
     ):
     lipidcane, = ins
     ethanol, biodiesel, crude_glycerol, vinasse = outs
     
+    feedstock_handling_sys = create_feedstock_handling_system(
+        ins=lipidcane,
+        outs='',
+        mockup=True,
+        area=100
+    )
+    
     ### Oil and juice separation ###
     
-    juicing_and_lipid_extraction_sys, udct = create_juicing_and_lipid_extraction_system(
-        ins=lipidcane,
-        mockup=True,
-        udct=True,
-        area=200,
-    )
-    screened_juice, lipid, pelleted_bagasse, fiber_fines, spent_oil_wash_water = juicing_and_lipid_extraction_sys.outs
-    lipid.ID = 'lipid'
+    if front_end_oil_separation:
+        juicing_and_lipid_extraction_sys, udct = create_juicing_and_lipid_extraction_system(
+            ins=feedstock_handling_sys-0,
+            pellet_bagasse=True,
+            mockup=True,
+            udct=True,
+            area=200,
+        )
+        screened_juice, lipid, pelleted_bagasse, fiber_fines, spent_oil_wash_water = juicing_and_lipid_extraction_sys.outs
+        lipid.ID = 'lipid'
+    else:
+        juicing_sys, udct = create_juicing_system(
+            ins=feedstock_handling_sys-0,
+            pellet_bagasse=True,
+            mockup=True,
+            udct=True,
+            area=200,
+        )
+        screened_juice, pelleted_bagasse, fiber_fines = juicing_sys.outs
     
     lipid_expression_sys = create_lipid_expression_system(
         ins=pelleted_bagasse,
-        mockup=True
+        mockup=True,
+        area=400
     )
     bagasse_lipid, pressed_bagasse = lipid_expression_sys.outs
     bagasse_lipid.ID = 'bagasse_lipid'
-    udct['T208'].ins.append(bagasse_lipid)
     crushing_mill = udct['U201']
+    crushing_mill.tag = "bagasse lipid retention"
     crushing_mill.isplit['Lipid'] = 0.95
+    
+    if front_end_oil_separation:
+        udct['T208'].ins.append(bagasse_lipid)
+    else:
+        lipid_wash_sys = create_lipid_wash_system(
+            ins=bagasse_lipid,
+            mockup=True,
+            area=400,
+        )
+        lipid, spent_oil_wash_water = lipid_wash_sys.outs
     
     ### Ethanol section ###
     
-    ethanol_production_sys = create_sucrose_to_ethanol_system(
+    ethanol_production_sys, udct = create_sucrose_to_ethanol_system(
         ins=[screened_juice, 'denaturant'],
         outs=[ethanol, vinasse],
         mockup=True,
+        area=300,
+        udct=True,
     )
     
     ### Biodiesel section ###
     
     # Fresh degummed oil
-    create_transesterification_and_biodiesel_separation_system(
+    transesterification_and_biodiesel_separation_sys = create_transesterification_and_biodiesel_separation_system(
         ins=lipid, 
         outs=[biodiesel, crude_glycerol],
         mockup=True,
+        area=600,
     )
 
     ### Facilities ###
@@ -133,21 +177,21 @@ def create_lipidcane_to_biodiesel_and_ethanol_1g(
     s = f.stream
     u = f.unit
     
-    MX1 = bst.Mixer('MX1', 
+    MX1 = bst.Mixer(800, 
         ins=(fiber_fines,
              spent_oil_wash_water,
-             *ethanol_production_sys-[1, 2, 3]),
+             *ethanol_production_sys-[2, 3]),
     )
     
     # Burn bagasse from conveyor belt
-    BT = bst.BoilerTurbogenerator('BT',
+    BT = bst.BoilerTurbogenerator(700,
                                    (pressed_bagasse, '', 
                                     'boiler_makeup_water', 'natural_gas', '', ''),
                                    ('emissions', 'rejected_water_and_blowdown', 'ash_disposal'),
                                    boiler_efficiency=0.80,
                                    turbogenerator_efficiency=0.85)
     
-    CT = bst.CoolingTower('CT')
+    CT = bst.CoolingTower(800)
     makeup_water_streams = (s.cooling_tower_makeup_water,
                             s.boiler_makeup_water)
     
@@ -160,17 +204,214 @@ def create_lipidcane_to_biodiesel_and_ethanol_1g(
     
     makeup_water = bst.Stream('makeup_water', price=0.000254)
     
-    CWP = bst.ChilledWaterPackage('CWP')
-    PWC = bst.ProcessWaterCenter('PWC',
-                                   (bst.Stream(), makeup_water),
-                                   (),
-                                   None,
-                                   makeup_water_streams,
-                                   process_water_streams)
+    CWP = bst.ChilledWaterPackage(800)
+    PWC = bst.ProcessWaterCenter(800,
+                                 (bst.Stream(), makeup_water),
+                                 (),
+                                 None,
+                                 makeup_water_streams,
+                                 process_water_streams)
+    F301 = udct['F301']
+    D303 = udct['D303']
+    HXN = bst.HeatExchangerNetwork(800, units=[F301, D303]) # ignored=transesterification_and_biodiesel_separation_sys.units)
+
+@SystemFactory(
+    ID='lipidcane_sys',
+    ins=[create_juicing_and_lipid_extraction_system.ins[0]],
+    outs=create_lipidcane_to_biodiesel_and_conventional_ethanol_system.outs[:4], 
+)
+def create_lipidcane_to_biodiesel_and_ethanol_1_and_2g_bagasse_expression(
+        ins, outs,
+        evaporator_and_beer_column_heat_integration=True,
+        front_end_oil_separation=False,
+    ):
+    lipidcane, = ins
+    ethanol, biodiesel, crude_glycerol, vinasse = outs
     
-    F301 = u.F301
-    D303 = u.D303
-    HXN = bst.HeatExchangerNetwork('HXN', units=[F301, D303])
+    feedstock_handling_sys = create_feedstock_handling_system(
+        ins=lipidcane,
+        outs='',
+        mockup=True,
+        area=100
+    )
+    
+    ### Oil and juice separation ###
+    
+    if front_end_oil_separation:
+        juicing_sys, udct = create_juicing_and_lipid_extraction_system(
+            ins=feedstock_handling_sys-0,
+            pellet_bagasse=True,
+            mockup=True,
+            udct=True,
+            area=200,
+        )
+        screened_juice, lipid, pelleted_bagasse, fiber_fines, spent_oil_wash_water = juicing_sys.outs
+        lipid.ID = 'lipid'
+    else:
+        juicing_sys, udct = create_juicing_system(
+            ins=feedstock_handling_sys-0,
+            pellet_bagasse=True,
+            mockup=True,
+            udct=True,
+            area=200,
+        )
+        screened_juice, pelleted_bagasse, fiber_fines = juicing_sys.outs
+    
+    lipid_expression_sys = create_lipid_expression_system(
+        ins=pelleted_bagasse,
+        mockup=True,
+        area=400
+    )
+    bagasse_lipid, pressed_bagasse = lipid_expression_sys.outs
+    bagasse_lipid.ID = 'bagasse_lipid'
+    crushing_mill = udct['U201']
+    crushing_mill.tag = "bagasse lipid retention"
+    crushing_mill.isplit['Lipid'] = 0.95
+    
+    if front_end_oil_separation:
+        udct['T208'].ins.append(bagasse_lipid)
+    else:
+        lipid_wash_sys = create_lipid_wash_system(
+            ins=bagasse_lipid,
+            mockup=True,
+            area=400,
+        )
+        lipid, spent_oil_wash_water = lipid_wash_sys.outs
+    
+    ### Biodiesel section ###
+    
+    # Fresh degummed oil
+    transesterification_and_biodiesel_separation_sys = create_transesterification_and_biodiesel_separation_system(
+        ins=lipid, 
+        outs=[biodiesel, crude_glycerol],
+        mockup=True,
+        area=1100,
+    )
+
+    ### Cellulosic ###
+    
+    cellulose_rxn = tmo.Reaction('Cellulose -> Glucan', 'Cellulose', 1.0, basis='wt')
+    cellulose_rxn.basis = 'mol'
+    # Bagasse composition https://www.sciencedirect.com/science/article/pii/S0144861710005072
+    # South american; by HPLC
+    # Glucan: 41.3%
+    # Xylan: 24.9%
+    # Galactan: 0.6%
+    # Arabinan: 1.7%
+    # Lignin: 23.2%
+    # Acetyl: 3.0%
+    hemicellulose_rxn = tmo.Reaction('30.2 Hemicellulose -> 24.9 Xylan + 1.7 Arabinan + 0.6 Galactan + 3 Acetate', 'Hemicellulose', 1.0, basis='wt')
+    hemicellulose_rxn.basis = 'mol'
+    def convert_hemicellulose():
+        conveying_belt._run()
+        cellulose_rxn(pelleted_bagasse)
+        hemicellulose_rxn(pelleted_bagasse)
+    
+    conveying_belt = pressed_bagasse.source
+    conveying_belt.specification = convert_hemicellulose
+    hot_water_pretreatment_sys, hw_dct = brf.cornstover.create_hot_water_pretreatment_system(
+        ins=pressed_bagasse,
+        mockup=True,
+        area=500,
+        udct=True,
+        solids_loading=0.55,
+    )
+    mixer = hw_dct['M202']
+    cornstover = bst.Stream(**brf.cornstover.create_hot_water_pretreatment_system.ins[0])
+    z_mass_cornstover = cornstover.z_mass
+    mixer.ins.append(cornstover)
+    @mixer.add_specification(run=True)
+    def update_cornstover_flow_and_pretreatment_process_water():
+        *_, bagasse, cornstover = mixer.ins
+        if bagasse:
+            cornstover.empty()
+        else:
+            cornstover.mass = mixer.F_biomass * z_mass_cornstover
+    mixer.F_biomass = 101642.80
+    hydrolyzate, pretreatment_wastewater = hot_water_pretreatment_sys.outs
+    
+    sucrose_fermentation_sys, sf_dct = create_sucrose_fermentation_system(
+        ins=screened_juice,
+        outs=['conventional_beer', '', 'vent_1'],
+        mockup=True,
+        udct=True,
+        area=300,
+    )
+    f.stream.stripping_water.ID = 'stripping_water_area_500'
+    
+    conventional_beer, evaporator_condensate, vent_1 = sucrose_fermentation_sys.outs
+    conventional_beer_distillation_sys = create_beer_distillation_system(
+        ins=conventional_beer, 
+        outs=['', vinasse],
+        mockup=True,
+        area=300,
+    )
+    cellulosic_fermentation_sys = brf.cornstover.create_cellulosic_fermentation_system(
+        ins=hydrolyzate,
+        outs=['vent_2', 'cellulosic_beer'],
+        mockup=True,
+        area=600,
+    )
+    f.stream.stripping_water.ID = 'stripping_water_area_700'
+    vent_2, cellulosic_beer = cellulosic_fermentation_sys.outs
+    cellulosic_beer_distillation_sys = create_beer_distillation_system(
+        ins=cellulosic_beer,
+        outs=[''],
+        mockup=True,
+        area=600,
+    )
+    MX_beer = bst.Mixer(900,
+        ins=(conventional_beer_distillation_sys-0, 
+             cellulosic_beer_distillation_sys-0)
+    )
+    stripper_process_water = bst.Stream('')
+    ethanol_purification_sys, ep_dct = create_ethanol_purification_system_after_beer_column(
+        ins=MX_beer-0,
+        outs=[ethanol, stripper_process_water],
+        mockup=True,
+        udct=True,
+        area=900,
+    )
+    recycled_water = tmo.Stream(Water=1,
+                                T=47+273.15,
+                                P=3.9*101325,
+                                units='kg/hr')
+    PF1 = bst.PressureFilter(600, (cellulosic_beer_distillation_sys-1, recycled_water))
+    MX_process_water = bst.Mixer(1200, (evaporator_condensate, stripper_process_water),
+                                 'recycle_process_water')
+    wastewater_treatment_sys = bst.create_wastewater_treatment_system(
+        ins=[PF1-1, 
+             fiber_fines,
+             spent_oil_wash_water, 
+             pretreatment_wastewater],
+        mockup=True,
+        area=700,
+    )
+    s = f.stream
+    u = f.unit
+    M501 = bst.Mixer(800, (wastewater_treatment_sys-1, PF1-0))
+    brf.cornstover.create_facilities(
+        solids_to_boiler=M501-0,
+        gas_to_boiler=wastewater_treatment_sys-0,
+        process_water_streams=(s.imbibition_water,
+                               s.biodiesel_wash_water,
+                               s.oil_wash_water,
+                               s.rvf_wash_water,
+                               s.stripping_water_area_500,
+                               s.stripping_water_area_700, 
+                               s.caustic, 
+                               s.warm_process_water,
+                               s.pretreatment_steam,
+                               s.saccharification_water),
+        feedstock=pressed_bagasse,
+        RO_water=wastewater_treatment_sys-2,
+        recycle_process_water=MX_process_water-0,
+        BT_area=800,
+        area=1200,
+    )
+    F301 = sf_dct['F301']
+    D303 = ep_dct['D303']
+    HXN = bst.HeatExchangerNetwork(1200, units=[F301, D303]) # ignored=transesterification_and_biodiesel_separation_sys.units)
 
 @SystemFactory(
     ID='lipidcane_sys',
@@ -185,14 +426,23 @@ def create_lipidcane_to_biodiesel_and_ethanol_divided_1_and_2g_hydrolyzate_oil_s
     u = f.unit
     lipidcane, = ins
     ethanol, biodiesel, crude_glycerol, vinasse = outs
-    juicing_and_lipid_extraction_sys, jle_dct = create_juicing_and_lipid_extraction_system(
+    
+    feedstock_handling_sys = create_feedstock_handling_system(
         ins=lipidcane,
+        outs='',
+        mockup=True,
+        area=100,
+    )
+    
+    juicing_and_lipid_extraction_sys, jle_dct = create_juicing_and_lipid_extraction_system(
+        ins=feedstock_handling_sys-0,
         mockup=True,
         udct=True,
         area=200,
     )
     crushing_mill = jle_dct['U201']
     crushing_mill.isplit['Lipid'] = 0.95
+    crushing_mill.tag = "bagasse lipid retention"
     screened_juice, frontend_lipid, bagasse, fiber_fines, spent_oil_wash_water = juicing_and_lipid_extraction_sys.outs
     frontend_lipid.ID = 'frontend_lipid'
     cellulose_rxn = tmo.Reaction('Cellulose -> Glucan', 'Cellulose', 1.0, basis='wt')
@@ -220,21 +470,20 @@ def create_lipidcane_to_biodiesel_and_ethanol_divided_1_and_2g_hydrolyzate_oil_s
         mockup=True,
         area=600,
         udct=True,
+        solids_loading=0.55,
     )
     mixer = hw_dct['M202']
     cornstover = bst.Stream(**brf.cornstover.create_hot_water_pretreatment_system.ins[0])
     z_mass_cornstover = cornstover.z_mass
-    update_pretreatment_process_water = mixer.specification
     mixer.ins.append(cornstover)
+    @mixer.run_specification(run=True)
     def update_cornstover_flow_and_pretreatment_process_water():
         *_, bagasse, cornstover = mixer.ins
         if bagasse:
             cornstover.empty()
         else:
             cornstover.mass = mixer.F_biomass * z_mass_cornstover
-        update_pretreatment_process_water()
     mixer.F_biomass = 146880.20
-    mixer.specification = update_cornstover_flow_and_pretreatment_process_water
     hydrolyzate, pretreatment_wastewater = hot_water_pretreatment_sys.outs
     
     sucrose_fermentation_sys, sf_dct = create_sucrose_fermentation_system(
@@ -329,8 +578,7 @@ def create_lipidcane_to_biodiesel_and_ethanol_divided_1_and_2g_hydrolyzate_oil_s
     )
     F301 = sf_dct['F301']
     D303 = ep_dct['D303']
-    CWP = u.CWP
-    HXN = bst.HeatExchangerNetwork('HXN', units=[F301, D303])
+    HXN = bst.HeatExchangerNetwork('HXN', units=[F301, D303]) # ignored=transesterification_and_biodiesel_separation_sys.units)
 
 @bst.utils.piping.ignore_docking_warnings
 def trim_to_cornstover_hot_water_cellulosic_ethanol(lipidcane_sys, operating_hours):
@@ -351,21 +599,40 @@ def trim_to_cornstover_hot_water_cellulosic_ethanol(lipidcane_sys, operating_hou
 @SystemFactory(
     ID='lipidcane_sys',
     ins=create_lipidcane_to_biodiesel_and_ethanol_1g.ins,
-    outs=(create_lipidcane_to_biodiesel_and_ethanol_1g.outs),
+    outs=create_lipidcane_to_biodiesel_and_ethanol_1g.outs,
 )
-def create_lipidcane_to_biodiesel_and_ethanol_divided_1_and_2g_post_fermentation_oil_separation(ins, outs):
+def create_lipidcane_to_biodiesel_and_ethanol_divided_1_and_2g_post_fermentation_oil_separation(ins, outs, front_end_oil_separation=False):
     lipidcane, = ins
     ethanol, biodiesel, crude_glycerol, vinasse = outs
-    juicing_and_lipid_extraction_sys, jle_dct = create_juicing_and_lipid_extraction_system(
+    
+    feedstock_handling_sys = create_feedstock_handling_system(
         ins=lipidcane,
-        area=200,
+        outs='',
         mockup=True,
-        udct=True,
+        area=100
     )
-    crushing_mill = jle_dct['U201']
+    
+    if front_end_oil_separation:
+        juicing_and_lipid_extraction_sys, udct = create_juicing_and_lipid_extraction_system(
+            ins=feedstock_handling_sys-0,
+            mockup=True,
+            udct=True,
+            area=200,
+        )
+        screened_juice, lipid, bagasse, fiber_fines, spent_oil_wash_water = juicing_and_lipid_extraction_sys.outs
+        lipid.ID = 'lipid'
+    else:
+        juicing_sys, udct = create_juicing_system(
+            ins=feedstock_handling_sys-0,
+            mockup=True,
+            udct=True,
+            area=200,
+        )
+        screened_juice, bagasse, fiber_fines = juicing_sys.outs
+    
+    crushing_mill = udct['U201']
+    crushing_mill.tag = "bagasse lipid retention"
     crushing_mill.isplit['Lipid'] = 0.95
-    screened_juice, frontend_lipid, bagasse, fiber_fines, spent_oil_wash_water = juicing_and_lipid_extraction_sys.outs
-    frontend_lipid.ID = 'frontend_lipid'
     cellulose_rxn = tmo.Reaction('Cellulose -> Glucan', 'Cellulose', 1.0, basis='wt')
     cellulose_rxn.basis = 'mol'
     # Bagasse composition https://www.sciencedirect.com/science/article/pii/S0144861710005072
@@ -380,7 +647,7 @@ def create_lipidcane_to_biodiesel_and_ethanol_divided_1_and_2g_post_fermentation
     hemicellulose_rxn.basis = 'mol'
     def convert_hemicellulose():
         conveying_belt._run()
-        bagasse = juicing_and_lipid_extraction_sys.outs[2]
+        *_, bagasse, cornstover = mixer.ins
         hemicellulose_rxn(bagasse)
         
     conveying_belt = bagasse.source
@@ -388,56 +655,55 @@ def create_lipidcane_to_biodiesel_and_ethanol_divided_1_and_2g_post_fermentation
     hot_water_pretreatment_sys, hw_dct = brf.cornstover.create_hot_water_pretreatment_system(
         ins=bagasse,
         mockup=True,
-        area=600,
+        area=400,
         udct=True,
+        solids_loading=0.55,
     )
     mixer = hw_dct['M202']
     cornstover = bst.Stream(**brf.cornstover.create_hot_water_pretreatment_system.ins[0])
     z_mass_cornstover = cornstover.z_mass
-    update_pretreatment_process_water = mixer.specification
     mixer.ins.append(cornstover)
+    @mixer.add_specification(run=True)
     def update_cornstover_flow_and_pretreatment_process_water():
         *_, bagasse, cornstover = mixer.ins
         if bagasse:
             cornstover.empty()
         else:
             cornstover.mass = mixer.F_biomass * z_mass_cornstover
-        update_pretreatment_process_water()
     mixer.F_biomass = 101642.80
-    mixer.specification = update_cornstover_flow_and_pretreatment_process_water
     hydrolyzate, pretreatment_wastewater = hot_water_pretreatment_sys.outs
     
     sucrose_fermentation_sys, sf_dct = create_sucrose_fermentation_system(
         ins=screened_juice,
-        outs=['conventional_beer', ''],
+        outs=['conventional_beer', '', 'vent_1'],
         mockup=True,
         udct=True,
-        area=500,
+        area=300,
     )
     f.stream.stripping_water.ID = 'stripping_water_area_500'
     
-    conventional_beer, evaporator_condensate_1 = sucrose_fermentation_sys.outs
+    conventional_beer, evaporator_condensate_1, vent_1 = sucrose_fermentation_sys.outs
     conventional_beer_distillation_sys = create_beer_distillation_system(
         ins=conventional_beer, 
         outs=['', vinasse],
         mockup=True,
-        area=500,
+        area=300,
     )
     cellulosic_fermentation_sys = brf.cornstover.create_cellulosic_fermentation_system(
         ins=hydrolyzate,
-        outs=['cellulosic_beer'],
+        outs=['vent_2', 'cellulosic_beer'],
         mockup=True,
-        area=700,
+        area=500,
     )
     f.stream.stripping_water.ID = 'stripping_water_area_700'
-    vent, cellulosic_beer = cellulosic_fermentation_sys.outs
+    vent_2, cellulosic_beer = cellulosic_fermentation_sys.outs
     cellulosic_beer_distillation_sys = create_beer_distillation_system(
         ins=cellulosic_beer,
         outs=[''],
         mockup=True,
-        area=700,
+        area=500,
     )
-    MX_beer = bst.Mixer(800,
+    MX_beer = bst.Mixer(900,
         ins=(conventional_beer_distillation_sys-0, 
              cellulosic_beer_distillation_sys-0)
     )
@@ -447,39 +713,50 @@ def create_lipidcane_to_biodiesel_and_ethanol_divided_1_and_2g_post_fermentation
         outs=[ethanol, stripper_process_water],
         mockup=True,
         udct=True,
-        area=800,
+        area=900,
     )
     recycled_water = tmo.Stream(Water=1,
                                 T=47+273.15,
                                 P=3.9*101325,
                                 units='kg/hr')
-    PF1 = bst.PressureFilter(800, (cellulosic_beer_distillation_sys-1, recycled_water))
+    PF1 = bst.PressureFilter(500, (cellulosic_beer_distillation_sys-1, recycled_water))
     post_fermentation_lipid_separation_sys = create_post_fermentation_lipid_separation_system(
         ins=PF1-1,
-        mockup=True
+        mockup=True,
+        area=700,
     )
-    backend_lipid, wastewater, evaporator_condensate = post_fermentation_lipid_separation_sys.outs
+    backend_lipid, wastewater, evaporator_condensate_2 = post_fermentation_lipid_separation_sys.outs
     backend_lipid.ID = 'backend_lipid'
-    MX_process_water = bst.Mixer(800, (evaporator_condensate, stripper_process_water),
+    MX_process_water = bst.Mixer(1200, (evaporator_condensate_1, evaporator_condensate_2, stripper_process_water),
                                  'recycle_process_water')
-    MX_lipid = bst.Mixer(400, (frontend_lipid, backend_lipid), 'lipid')
+    if front_end_oil_separation:
+        udct['T208'].ins.append(backend_lipid)
+    else:
+        lipid_wash_sys = create_lipid_wash_system(
+            ins=backend_lipid,
+            mockup=True,
+            area=700
+        )
+        lipid, spent_oil_wash_water = lipid_wash_sys.outs
+    
     transesterification_and_biodiesel_separation_sys = create_transesterification_and_biodiesel_separation_system(
-        ins=MX_lipid-0, 
+        ins=lipid, 
         outs=[biodiesel, crude_glycerol],
         mockup=True,
-        area=400,
+        area=1100,
     )
     
     wastewater_treatment_sys = bst.create_wastewater_treatment_system(
         ins=[wastewater, 
-             *juicing_and_lipid_extraction_sys-[3, 4], 
+             fiber_fines,
+             spent_oil_wash_water, 
              pretreatment_wastewater],
         mockup=True,
-        area=900
+        area=600,
     )
     s = f.stream
     u = f.unit
-    M501 = bst.Mixer(1000, (wastewater_treatment_sys-1, PF1-0))
+    M501 = bst.Mixer(800, (wastewater_treatment_sys-1, PF1-0))
     brf.cornstover.create_facilities(
         solids_to_boiler=M501-0,
         gas_to_boiler=wastewater_treatment_sys-0,
@@ -496,11 +773,204 @@ def create_lipidcane_to_biodiesel_and_ethanol_divided_1_and_2g_post_fermentation
         feedstock=bagasse,
         RO_water=wastewater_treatment_sys-2,
         recycle_process_water=MX_process_water-0,
+        BT_area=800,
+        area=1200,
     )
     F301 = sf_dct['F301']
     D303 = ep_dct['D303']
-    CWP = u.CWP
-    HXN = bst.HeatExchangerNetwork('HXN', units=[F301, D303])
+    HXN = bst.HeatExchangerNetwork(1200, units=[F301, D303]) # ignored=transesterification_and_biodiesel_separation_sys.units)
+
+@SystemFactory(
+    ID='lipidcane_sys',
+    ins=create_lipidcane_to_biodiesel_and_ethanol_1g.ins,
+    outs=create_lipidcane_to_biodiesel_and_ethanol_1g.outs[:-1],
+)
+def create_lipidcane_to_biodiesel_and_ethanol_combined_1_and_2g_post_fermentation_oil_separation(ins, outs, front_end_oil_separation=False):
+    lipidcane, = ins
+    ethanol, biodiesel, crude_glycerol = outs
+    
+    feedstock_handling_sys = create_feedstock_handling_system(
+        ins=lipidcane,
+        outs='',
+        mockup=True,
+        area=100
+    )
+    
+    if front_end_oil_separation:
+        juicing_and_lipid_extraction_sys, udct = create_juicing_and_lipid_extraction_system(
+            ins=feedstock_handling_sys-0,
+            mockup=True,
+            udct=True,
+            area=200,
+            pellet_bagasse=False,
+        )
+        screened_juice, lipid, bagasse, fiber_fines, spent_oil_wash_water = juicing_and_lipid_extraction_sys.outs
+        lipid.ID = 'lipid'
+    else:
+        juicing_sys, udct = create_juicing_system(
+            ins=feedstock_handling_sys-0,
+            mockup=True,
+            udct=True,
+            area=200,
+        )
+        screened_juice, bagasse, fiber_fines = juicing_sys.outs
+    
+    crushing_mill = udct['U201']
+    crushing_mill.tag = "bagasse lipid retention"
+    crushing_mill.isplit['Lipid'] = 0.95
+    cellulose_rxn = tmo.Reaction('Cellulose -> Glucan', 'Cellulose', 1.0, basis='wt')
+    cellulose_rxn.basis = 'mol'
+    # Bagasse composition https://www.sciencedirect.com/science/article/pii/S0144861710005072
+    # South american; by HPLC
+    # Glucan: 41.3%
+    # Xylan: 24.9%
+    # Galactan: 0.6%
+    # Arabinan: 1.7%
+    # Lignin: 23.2%
+    # Acetyl: 3.0%
+    hemicellulose_rxn = tmo.Reaction('30.2 Hemicellulose -> 24.9 Xylan + 1.7 Arabinan + 0.6 Galactan + 3 Acetate', 'Hemicellulose', 1.0, basis='wt')
+    hemicellulose_rxn.basis = 'mol'
+    def convert_hemicellulose():
+        conveying_belt._run()
+        *_, bagasse, cornstover = mixer.ins
+        hemicellulose_rxn(bagasse)
+        
+    conveying_belt = bagasse.source
+    conveying_belt.specification = convert_hemicellulose
+    hot_water_pretreatment_sys, hw_dct = brf.cornstover.create_hot_water_pretreatment_system(
+        ins=bagasse,
+        mockup=True,
+        area=300,
+        udct=True,
+        solids_loading=0.55,
+    )
+    mixer = hw_dct['M202']
+    cornstover = bst.Stream(**brf.cornstover.create_hot_water_pretreatment_system.ins[0])
+    z_mass_cornstover = cornstover.z_mass
+    mixer.ins.append(cornstover)
+    @mixer.add_specification(run=True)
+    def update_cornstover_flow_and_pretreatment_process_water():
+        *_, bagasse, cornstover = mixer.ins
+        if bagasse:
+            cornstover.empty()
+        else:
+            cornstover.mass = mixer.F_biomass * z_mass_cornstover
+    mixer.F_biomass = 101642.80
+    hydrolyzate, pretreatment_wastewater = hot_water_pretreatment_sys.outs
+    
+    
+    # # Split sugar solution
+    # S301 = bst.Splitter(400, ins=screened_juice, split=0.3)
+    
+    # # Concentrate sugars
+    # F301 = bst.MultiEffectEvaporator(400,
+    #                                  ins=S301-0,
+    #                                  P=(101325, 69682, 47057, 30953, 19781),
+    #                                  V_definition='First-effect',
+    #                                  V=0.1) # fraction evaporated
+    # # Note: value of steam ~ 6.86 for the following 
+    # # (101325, 73580.467, 50891.17, 32777.406, 19999.925, 11331.5),
+    
+    # M301 = bst.Mixer(400, ins=(F301-0, S301-1))
+    
+    MX1 = bst.Mixer(400, ins=(screened_juice, hydrolyzate))
+    sucrose_hydrolysis_reaction = tmo.Reaction(
+        'Sucrose + Water -> 2Glucose', 'Sucrose', 1.00
+    )
+    
+    @MX1.add_specification(run=True)
+    def hydrolysis():
+        sucrose_hydrolysis_reaction(MX1.ins[0])
+    
+    cellulosic_fermentation_sys, cf_dct = brf.cornstover.create_cellulosic_fermentation_system(
+        ins=MX1-0,
+        outs=['vent', 'cellulosic_beer'],
+        mockup=True,
+        area=400,
+        udct=True,
+    )
+    cf_dct['R303'].tau_saccharification = 0.
+    cf_dct['R303'].tau_fermentation = 60
+    vent, cellulosic_beer = cellulosic_fermentation_sys.outs
+    cellulosic_beer_distillation_sys = create_beer_distillation_system(
+        ins=cellulosic_beer,
+        outs=[''],
+        mockup=True,
+        area=400,
+    )
+    stripper_process_water = bst.Stream('')
+    ethanol_purification_sys, ep_dct = create_ethanol_purification_system_after_beer_column(
+        ins=cellulosic_beer_distillation_sys-0,
+        outs=[ethanol, stripper_process_water],
+        mockup=True,
+        udct=True,
+        area=800,
+    )
+    recycled_water = tmo.Stream(Water=1,
+                                T=47+273.15,
+                                P=3.9*101325,
+                                units='kg/hr')
+    PF1 = bst.PressureFilter(400, (cellulosic_beer_distillation_sys-1, recycled_water))
+    post_fermentation_lipid_separation_sys, pfls_dct = create_post_fermentation_lipid_separation_system(
+        ins=PF1-1,
+        mockup=True,
+        area=600,
+        udct=True,
+    )
+    backend_lipid, wastewater, evaporator_condensate = post_fermentation_lipid_separation_sys.outs
+    backend_lipid.ID = 'backend_lipid'
+    MX_process_water = bst.Mixer(1100, (evaporator_condensate, stripper_process_water),
+                                 'recycle_process_water')
+    if front_end_oil_separation:
+        udct['T208'].ins.append(backend_lipid)
+    else:
+        lipid_wash_sys = create_lipid_wash_system(
+            ins=backend_lipid,
+            mockup=True,
+            area=600
+        )
+        lipid, spent_oil_wash_water = lipid_wash_sys.outs
+    
+    transesterification_and_biodiesel_separation_sys = create_transesterification_and_biodiesel_separation_system(
+        ins=lipid, 
+        outs=[biodiesel, crude_glycerol],
+        mockup=True,
+        area=1000,
+    )
+    
+    wastewater_treatment_sys = bst.create_wastewater_treatment_system(
+        ins=[wastewater,
+             fiber_fines,
+             spent_oil_wash_water, 
+             pretreatment_wastewater],
+        mockup=True,
+        area=500,
+    )
+    s = f.stream
+    u = f.unit
+    M501 = bst.Mixer(700, (wastewater_treatment_sys-1, PF1-0))
+    brf.cornstover.create_facilities(
+        solids_to_boiler=M501-0,
+        gas_to_boiler=wastewater_treatment_sys-0,
+        process_water_streams=(s.imbibition_water,
+                               s.biodiesel_wash_water,
+                               s.oil_wash_water,
+                               s.rvf_wash_water,
+                               s.stripping_water,
+                               s.caustic, 
+                               s.warm_process_water,
+                               s.pretreatment_steam,
+                               s.saccharification_water),
+        feedstock=bagasse,
+        RO_water=wastewater_treatment_sys-2,
+        recycle_process_water=MX_process_water-0,
+        BT_area=700,
+        area=1100,
+    )
+    Ev607 = pfls_dct['Ev607']
+    D303 = ep_dct['D303']
+    HXN = bst.HeatExchangerNetwork(1100, units=[Ev607, D303]) # ignored=transesterification_and_biodiesel_separation_sys.units)
+
 
 @SystemFactory(
     ID='lipidcane_sys',
@@ -511,9 +981,19 @@ def create_lipidcane_to_biodiesel_and_ethanol_divided_1_and_2g_front_end_oil_sep
         ins, outs, evaporator_and_beer_column_heat_integration=True):
     lipidcane, = ins
     ethanol, biodiesel, crude_glycerol, vinasse = outs
-    juicing_and_lipid_extraction_sys = create_juicing_and_lipid_extraction_system(
+    
+    feedstock_handling_sys = create_feedstock_handling_system(
         ins=lipidcane,
+        outs='',
         mockup=True,
+        area=100
+    )
+    
+    juicing_and_lipid_extraction_sys = create_juicing_and_lipid_extraction_system(
+        ins=feedstock_handling_sys-0,
+        mockup=True,
+        area=200,
+        pellet_bagasse=False,
     )
     screened_juice, lipid, bagasse, fiber_fines, spent_oil_wash_water = juicing_and_lipid_extraction_sys.outs
     cellulose_rxn = tmo.Reaction('Cellulose -> Glucan', 'Cellulose', 1.0, basis='wt')
@@ -547,6 +1027,7 @@ def create_lipidcane_to_biodiesel_and_ethanol_divided_1_and_2g_front_end_oil_sep
         mockup=True,
         area=600,
         udct=True,
+        solids_loading=0.55,
     )
     mixer = hw_dct['M202']
     cornstover = bst.Stream(**brf.cornstover.create_hot_water_pretreatment_system.ins[0])
@@ -566,26 +1047,30 @@ def create_lipidcane_to_biodiesel_and_ethanol_divided_1_and_2g_front_end_oil_sep
     
     sucrose_fermentation_sys, sf_dct = create_sucrose_fermentation_system(
         ins=screened_juice,
-        outs=['conventional_beer', ''],
+        outs=['conventional_beer', 'vent_1'],
         mockup=True,
         udct=True,
         area=500,
     )
     f.stream.stripping_water.ID = 'stripping_water_area_500'
     
-    conventional_beer, evaporator_condensate_1 = sucrose_fermentation_sys.outs
+    conventional_beer, evaporator_condensate, vent_1 = sucrose_fermentation_sys.outs
     conventional_beer_distillation_sys = create_beer_distillation_system(
         ins=conventional_beer, 
         outs=['', vinasse],
         mockup=True,
         area=500,
     )
-    cellulosic_fermentation_sys = brf.cornstover.create_cellulosic_fermentation_system(
+    cellulosic_fermentation_sys, cf_dct = brf.cornstover.create_cellulosic_fermentation_system(
         ins=hydrolyzate,
-        outs=['cellulosic_beer'],
+        outs=['vent_2', 'cellulosic_beer'],
         mockup=True,
         area=700,
+        udct=True,
     )
+    cf_dct['R303'].tau_saccharification = 0.
+    cf_dct['R303'].tau_fermentation = 60
+    
     f.stream.stripping_water.ID = 'stripping_water_area_700'
     vent, cellulosic_beer = cellulosic_fermentation_sys.outs
     cellulosic_beer_distillation_sys = create_beer_distillation_system(
@@ -643,9 +1128,11 @@ def create_lipidcane_to_biodiesel_and_ethanol_divided_1_and_2g_front_end_oil_sep
         feedstock=bagasse,
         RO_water=wastewater_treatment_sys-2,
         recycle_process_water=recycle_process_water,
+        BT_area=800,
+        area=1100,
     )
     F301 = sf_dct['F301']
     D303 = ep_dct['D303']
     CWP = u.CWP
-    HXN = bst.HeatExchangerNetwork('HXN', units=[F301, D303])
+    HXN = bst.HeatExchangerNetwork('HXN', units=[F301, D303])#, ignored=transesterification_and_biodiesel_separation_sys.units)
         

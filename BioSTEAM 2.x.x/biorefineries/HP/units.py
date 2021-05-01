@@ -200,13 +200,13 @@ class SulfuricAcidMixer(Unit):
         
 # Adjust pretreatment water loading, 30% from Table 5 on Page 21 of Humbird et al.
 class PretreatmentMixer(Mixer):
-    _N_ins = 3
+    _N_ins = 4
     _N_outs = 1
     
     solid_loading = 0.3
         
     def _run(self):
-        feedstock, acid, water = self.ins
+        feedstock, acid, water, recycled_water = self.ins
         mixture_out = self.outs[0]
         
         mixture = feedstock.copy()
@@ -216,7 +216,7 @@ class PretreatmentMixer(Mixer):
         # water.imass['Water'] = total_mass - mixture.F_mass
         # water adjustment currently implemented in H_M202.specification
         
-        mixture_out.mix_from([mixture, water])
+        mixture_out.mix_from([mixture, water, recycled_water])
 
 # # Steam mixer
 # class SteamMixer(Mixer):
@@ -236,6 +236,7 @@ class PretreatmentMixer(Mixer):
 #     _N_heat_utilities = 1
 #     _F_BM_default = {**Mixer._F_BM_default,
 #             'Heat exchangers': 3.17}
+#     """
     
 #     def __init__(self, ID='', ins=None, outs=(), *, P, T_steam=268.+273.15):
 #         Mixer.__init__(self, ID, ins, outs)
@@ -264,12 +265,10 @@ class PretreatmentMixer(Mixer):
 #                                   x0=steam_mol, x1=steam_mol+0.1, 
 #                                   xtol=1e-4, ytol=1e-4,
 #                                   args=(self.P, steam, mixed, feed)))
-        
 #         water.mol[:] = steam.mol[:]
 #         water.phase = 'l'
 #         water.T = 300.
 #         self.dH_steam = steam.H - water.H
-        
 #         mixed.P = self.P
     
 #     def _cost(self):
@@ -277,8 +276,7 @@ class PretreatmentMixer(Mixer):
 #         hx = self.heat_exchanger
 #         hx.simulate_as_auxiliary_exchanger(duty=self.dH_steam, 
 #                                             stream=self.ins[1].copy())
-        
-#         self.purchase_costs['Heat exchangers'] = hx.purchase_cost
+#         self.baseline_purchase_costs['Heat exchangers'] = hx.purchase_cost
         
 # Pretreatment reactor
 @cost(basis='Dry flow rate', ID='Pretreatment reactor', units='kg/hr',
@@ -747,7 +745,7 @@ class SeedTrain(Unit):
     
     # ferm_ratio is the ratio of conversion relative to the fermenter
     #!!! Should this T be changed to 30°C?
-    def __init__(self, ID='', ins=None, outs=(), T=50+273.15, ferm_ratio=0.9):
+    def __init__(self, ID='', ins=None, outs=(), T=30.+273.15, ferm_ratio=0.9):
         Unit.__init__(self, ID, ins, outs)
         self.T = T
         self.ferm_ratio = ferm_ratio
@@ -973,6 +971,7 @@ class Reactor(Unit, PressureVessel, isabstract=True):
         Design['Total volume'] = V_total
         Design['Single reactor volume'] = V_reactor
         Design['Number of reactors'] = N
+        P, D, L = float(P), float(D), float(L)
         Design.update(self._vessel_design(P, D, L))
         if wall_thickness_factor == 1: pass
         elif wall_thickness_factor < 1:
@@ -1002,12 +1001,14 @@ class AcidulationReactor(Reactor):
     _N_ins = 2
     _N_outs = 1
     
-    acidulation_rxns = ParallelRxn([
-        #   Reaction definition                                        Reactant        Conversion
-        Rxn('CalciumLactate + H2SO4 -> 2 HP + CaSO4',                 'CalciumLactate',       1.),
-        Rxn('CalciumAcetate + H2SO4 -> 2 AceticAcid + CaSO4',         'CalciumAcetate',       1.),
-        Rxn('CalciumDihydroxide + H2SO4 -> CaSO4 + 2 H2O',            'CalciumDihydroxide',   1.)
-    ])
+    def _setup(self):
+        super()._setup()
+        self.acidulation_rxns = ParallelRxn([
+            #   Reaction definition                                        Reactant        Conversion
+            Rxn('CalciumLactate + H2SO4 -> 2 HP + CaSO4',                 'CalciumLactate',       1.),
+            Rxn('CalciumAcetate + H2SO4 -> 2 AceticAcid + CaSO4',         'CalciumAcetate',       1.),
+            Rxn('CalciumDihydroxide + H2SO4 -> CaSO4 + 2 H2O',            'CalciumDihydroxide',   1.)
+        ])
             
     def _run(self):
         feed, acid = self.ins
@@ -1270,8 +1271,8 @@ class GypsumFilter(SolidsSeparator):
 #         hu_single_rx = hx.heat_utilities[0]
 #         hu_total.copy_like(hu_single_rx)
 #         hu_total.scale(N)
-#         self.purchase_costs['Heat exchangers'] = hx.purchase_cost * N
-#         self.purchase_costs['Amberlyst-15 catalyst'] = self.mcat * price['Amberlyst15']
+#         self.baseline_purchase_costs['Heat exchangers'] = hx.purchase_cost * N
+#         self.baseline_purchase_costs['Amberlyst-15 catalyst'] = self.mcat * price['Amberlyst15']
         
 class HydrolysisReactor(Reactor):
     """
@@ -1626,7 +1627,7 @@ class DehydrationReactor(Reactor):
     """
     A dehydration reactor.
     """
-    _N_ins = 2
+    _N_ins = 4
     _N_outs = 2
     
     _N_heat_utilities = 1
@@ -1645,7 +1646,7 @@ class DehydrationReactor(Reactor):
                   kW_per_m3=0.0985, # Perry's handbook
                   wall_thickness_factor=1,
                   vessel_material='Stainless steel 304',
-                  vessel_type='Vertical', X = 0.995):  # Dishisha et al. 2015 reports ~ 99.9%
+                  vessel_type='Vertical', X = 0.80):  # Li et al. 2018 reports ~ 99.9% with silica gel
         Unit.__init__(self, ID, ins, outs)
         
         self.T = T
@@ -1665,11 +1666,11 @@ class DehydrationReactor(Reactor):
             ])     
         HP_to_AA_rxn = dehydration_reactions[0]
     def _run(self):
-        feed, fresh_catalyst = self.ins
+        feed, fresh_catalyst, recycled_HP, recycled_water = self.ins
         effluent, spent_catalyst = self.outs
         
         # effluent = feed.copy()
-        effluent.mix_from([feed])
+        effluent.mix_from([feed, recycled_HP, recycled_water])
         effluent.T = self.T
         # effluent.P = feed.P
         self.dehydration_reactions(effluent.mol)
@@ -1683,7 +1684,7 @@ class DehydrationReactor(Reactor):
         super()._cost()
         hx = self.heat_exchanger
         N = self.design_results['Number of reactors']
-        single_rx_effluent = self.ins[0].copy()
+        single_rx_effluent = self.outs[0].copy()
         single_rx_effluent.mol[:] /= N
         hx.simulate_as_auxiliary_exchanger(duty=(self.outs[0].H - self.ins[0].H)/N, 
                                             stream=single_rx_effluent)
@@ -1926,6 +1927,9 @@ class CoFermentation(Reactor):
 
     def _cost(self):
         Design = self.design_results
+        # baseline_purchase_costs = self.baseline_purchase_costs
+        baseline_purchase_costs = self.baseline_purchase_costs
+
         hx = self.heat_exchanger
 
         if self.mode == 'Batch':
@@ -1935,11 +1939,11 @@ class CoFermentation(Reactor):
             # Note that this code assumes only one vessel, which is impossible
             Unit._cost()
             self._decorated_cost()
-            purchase_costs['Heat exchangers'] = hx.purchase_cost
+            baseline_purchase_costs['Heat exchangers'] = hx.purchase_cost
             # Adjust fermenter cost for acid-resistant scenario
             if not self.neutralization:
-                purchase_costs['Fermenter'] *= _316_over_304
-                purchase_costs['Agitator'] *= _316_over_304
+                baseline_purchase_costs['Fermenter'] *= _316_over_304
+                baseline_purchase_costs['Agitator'] *= _316_over_304
 
         elif self.mode == 'Continuous':
             # if not self.neutralization:
@@ -1960,5 +1964,5 @@ class CoFermentation(Reactor):
             # Do not include this utility in HXN because this one is scaled by N,
             # representing N heat exchanged (not just one heat exchanger)
             hu_total.heat_exchanger = None
-            # for i in hx.purchase_costs: hx.purchase_costs[i] *= N
+            # for i in hx.baseline_purchase_costs: hx.baseline_purchase_costs[i] *= N
 

@@ -732,7 +732,7 @@ class CoFermentation(Reactor):
             'Fermenter size': 'kg',
             'Recirculation flow rate': 'kg/hr',
             'Duty': 'kJ/hr'}
-    _BM = {**Reactor._BM,
+    _F_BM_default = {**Reactor._F_BM_default,
            'Heat exchangers': 3.17}
 
     _N_heat_utilities = 1
@@ -1213,7 +1213,7 @@ class Esterification(Reactor):
     _N_outs = 2
     _N_heat_utilities = 1
 
-    _BM = {**Reactor._BM,
+    _F_BM_default = {**Reactor._F_BM_default,
            'Heat exchangers': 3.17,
            'Amberlyst-15 catalyst': 1}
     

@@ -515,7 +515,7 @@ class PreprocessingCost:
         for unit in self._units:
             for eqpt, cost in unit.purchase_costs.items():
                 unit_eqpt = f'{unit.ID} - {eqpt}'
-                n = unit._equipment_lifetime[eqpt]/(365*24)*operating_hours
+                n = unit.equipment_lifetime[eqpt]/(365*24)*operating_hours
                 sal = unit.salvage[eqpt]
                 frac = i*(1+i)**n/((1+i)**n-1)
                 depreciation_cost[unit_eqpt] = \
@@ -582,7 +582,7 @@ class PreprocessingCost:
         for unit in self._units:
             for eqpt, cost in unit.purchase_costs.items():
                 unit_eqpt = f'{unit.ID} - {eqpt}'
-                lifetime = unit._equipment_lifetime[eqpt]*hr
+                lifetime = unit.equipment_lifetime[eqpt]*hr
                 maintenance_cost[unit_eqpt] = \
                     unit.maintenance[eqpt]*cost/lifetime/(dry_mass/1e3)
         return maintenance_cost

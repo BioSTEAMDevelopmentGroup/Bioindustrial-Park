@@ -52,7 +52,7 @@ from biosteam.process_tools import UnitGroup
 from biosteam.exceptions import InfeasibleRegion
 import matplotlib.pyplot as plt
 import copy
-
+from biorefineries.cornstover import CellulosicEthanolTEA
 from biosteam import SystemFactory
 # from lactic.hx_network import HX_Network
 
@@ -84,7 +84,7 @@ System.default_maxiter = 100
 feedstock_ID = 'Corn stover'
 
 System.default_converge_method = 'wegstein'
-System.default_relative_molar_tolerance = 0.0001
+System.default_relative_molar_tolerance = 0.0001 # supersedes absolute tolerance
 System.default_molar_tolerance = 0.1
 System.strict_convergence = True # True => throw exception if system does not converge; false => continue with unconverged system
 
@@ -142,7 +142,9 @@ def create_HP_sys(ins, outs):
     # =============================================================================
     H_M201 = bst.units.HXutility('H_M201', ins=water_M201,
                                      outs='steam_M201',
-                                     T=114+273.15, rigorous=True)
+                                     T=99.+273.15, rigorous=True)
+    
+    H_M201.heat_utilities[0].heat_transfer_efficiency = 1.
     def H_M201_specification():
         T201._run()
         acid_imass = T201.outs[0].imass['SulfuricAcid']
@@ -155,14 +157,17 @@ def create_HP_sys(ins, outs):
     # H_M201.heat_utilities[0].heat_exchanger = None
     H_M202 = bst.units.HXutility('H_M202', ins=water_M202,
                                      outs='hot_water_M202',
-                                     T=95+273.15, rigorous=True)
+                                     T=99.+273.15, rigorous=True)
+    H_M202.heat_utilities[0].heat_transfer_efficiency = 1.
     def H_M202_specification():
         U101._run()
-        H_M201._specification()
+        H_M201.run()
         M201._run()
         feedstock, acid = U101.outs[0], M201.outs[0]
+        recycled_water = H201.outs[0]
         mixture_F_mass = feedstock.F_mass + acid.F_mass
-        mixture_imass_water = feedstock.imass['Water'] + acid.imass['Water']
+        mixture_imass_water = feedstock.imass['Water'] + acid.imass['Water'] + \
+            recycled_water.imass['Water']
         total_mass = (mixture_F_mass - mixture_imass_water)/M202.solid_loading
         H_M202.ins[0].imass['Water'] = total_mass - mixture_F_mass
         # H_M202.ins[0].imass['H2SO4'] = H_M202.ins[0].imass['Water']/1000.
@@ -196,11 +201,12 @@ def create_HP_sys(ins, outs):
     M201 = units.SulfuricAcidMixer('M201', ins=(T201-0, H_M201-0))
     
     # Mix sulfuric acid and feedstock, adjust water loading for pretreatment
-    M202 = units.PretreatmentMixer('M202', ins=(U101-0, M201-0, H_M202-0))
+    M202 = units.PretreatmentMixer('M202', ins=(U101-0, M201-0, H_M202-0, ''))
     
     # Mix feedstock/sulfuric acid mixture and steam
     # M203 = units.SteamMixer('M203', ins=(M202-0, water_M203), P=5.5*101325)
     M203 = bst.units.SteamMixer('M203', ins=(M202-0, water_M203), P=5.5*101325)
+    M203.heat_utilities[0].heat_transfer_efficiency = 1.
     
     R201 = units.PretreatmentReactorSystem('R201', ins=M203-0, outs=('R201_g', 'R201_l'))
     
@@ -214,8 +220,8 @@ def create_HP_sys(ins, outs):
     M204 = bst.units.Mixer('M204', ins=(R201-0, F201-0))
     H201 = bst.units.HXutility('H201', ins=M204-0,
                                      outs='condensed_pretreatment_waste_vapor',
-                                     V=0, rigorous=True)
-    
+                                     V=0., rigorous=True)
+    H201-0-3-M202
     # Neutralize pretreatment hydrolysate
     M205 = units.AmmoniaMixer('M205', ins=(ammonia_M205, water_M205))
     def update_ammonia_and_mix():
@@ -333,7 +339,7 @@ def create_HP_sys(ins, outs):
                         outs = ('to_seedtrain', 'to_cofermentation'),
                         split = 0.07) # split = inoculum ratio
     
-    # Cofermentationv
+    # Cofermentation
     # R302 = units.CoFermentation_original('R302', 
     #                                 ins=(M304_H_P-0, '', CSL),
     #                                 outs=('fermentation_effluent', 'CO2'))
@@ -345,7 +351,7 @@ def create_HP_sys(ins, outs):
                                     vessel_material='Stainless steel 316',
                                     neutralization=True)
     
-    def include_seed_CSL_in_cofermentation(): # effluent always has 0 CSL
+    def include_seed_CSL_in_cofermentation(): # note: effluent always has 0 CSL
         R302._run()
         R302.ins[2].F_mass*=1./(1-S302.split[0])
     R302.specification = include_seed_CSL_in_cofermentation
@@ -443,7 +449,6 @@ def create_HP_sys(ins, outs):
                                             P = (101325, 73581, 50892, 32777, 20000), V = 0.5)
     # target_water_x = 0.35
     target_HP_x = 0.10
-    
     def get_x(chem_ID, stream):
         return stream.imol[chem_ID]/sum(stream.imol['AceticAcid', 'Furfural', 'HMF', 'HP', 'Water'])
     
@@ -457,8 +462,15 @@ def create_HP_sys(ins, outs):
         F401._run()
         # import pdb
         # pdb.set_trace()
-        
+    
     F401.specification = F401_specification
+    
+    
+    def F401_no_run_cost():
+        F401.heat_utilities = tuple()
+        F401._installed_cost = 0.
+    # F401._cost = F401_no_run_cost
+        
     
     F401_P = bst.units.Pump('F401_P', ins=F401-0)
 
@@ -491,7 +503,7 @@ def create_HP_sys(ins, outs):
         # K_extract = 1./S404.partition_data['K'][0]
         HP_recovery = 1-tolerable_loss_fraction
         reqd_hexanol = HP_recovery * K_raffinate * process_stream_F_mol
-            
+        
         feed_hexanol.imol['Hexanol'] = max(0, reqd_hexanol - existing_hexanol)
         M401._run()
         Ks_new = update_Ks(S404)
@@ -652,7 +664,7 @@ def create_HP_sys(ins, outs):
                                         LHK=('Hexanol', 'HP'),
                                         is_divided=True,
                                         product_specification_format='Recovery',
-                                        Lr=0.999, Hr=0.999, k=1.2, P = 101325/15,
+                                        Lr=0.999, Hr=0.999, k=1.05, P = 101325/20,
                                         vessel_material = 'Stainless steel 316',
                                         partial_condenser = False,
                                         condenser_thermo = ideal_thermo,
@@ -674,9 +686,11 @@ def create_HP_sys(ins, outs):
     def M402_objective_fn(Water_imol):
         M402.ins[1].imol['Water'] = Water_imol
         M402._run()
-        return get_concentration_gpL('HP', M402.outs[0]) - 600. # predicted "solubility" of 645 g/L at STP https://hmdb.ca/metabolites/HMDB0000700
+        # return get_concentration_gpL('HP', M402.outs[0]) - 600. # predicted "solubility" of 645 g/L at STP https://hmdb.ca/metabolites/HMDB0000700
         # return get_concentration_gpL('HP', M402.outs[0]) - 270.1 # "Ssolubility "at 25 C # https://www.chemicalbook.com/ChemicalProductProperty_EN_CB6711580.htm
         # return get_mass_percent('HP', M402.outs[0]) - .15 # Dehydration reaction paper
+        # return get_mass_percent('HP', M402.outs[0]) - .35 # 30-35 wt% in https://patents.google.com/patent/WO2013192451A1/en
+        return get_mass_percent('HP', M402.outs[0]) - .30 # 30wt% with 80% conversion in Dunn et al. 2015 LCA of Bioproducts in GREET
     
     def M402_adjust_water():
         flx.IQ_interpolation(M402_objective_fn, 0., 10000, maxiter=50, ytol=1e-2)
@@ -685,11 +699,13 @@ def create_HP_sys(ins, outs):
     
     D401_P = units.HPPump('D401_P', ins=M402-0, P=506625*5.4)
     
-    R402 = units.DehydrationReactor('R402', ins = (D401_P-0, makeup_TiO2_catalyst),
+    R402 = units.DehydrationReactor('R402', ins = (D401_P-0, makeup_TiO2_catalyst, '', ''),
                                     outs = ('dilute_acryclic_acid', 'spent_TiO2_catalyst'),
                                     tau = 57.34/1.5, # Dishisha et al.
-                                    T = 230 + 273.15,
+                                    T = 230. + 273.15,
                                     vessel_material='Stainless steel 316')
+    R402.heat_utilities[0].heat_transfer_efficiency = 1. # this doesn't seem to be changing duty
+    
     # spent_TiO2_catalyst is assumed to be sold at 0 $/kg
     
     
@@ -700,17 +716,40 @@ def create_HP_sys(ins, outs):
                                         LHK=('Water', 'AcrylicAcid'),
                                         is_divided=True,
                                         product_specification_format='Recovery',
-                                        Lr=0.999, Hr=0.999, k=1.2, P=101325,
+                                        Lr=0.999, Hr=0.999, k=1.05, P=101325,
+                                        partial_condenser=False,
                                         vessel_material = 'Stainless steel 316')
     
+    D402_t_H = bst.units.HXutility('D402_H', ins=D402-0, T = 330., rigorous=True)
+    
+    # recycling water makes system convergence fail
+    # D402-0-3-R402
+    
+    
     D402_P = units.HPPump('D402_P', ins=D402-1)
-    # D402_H = bst.units.HXutility('D402_H', ins=D402-0, T = 308.15, rigorous=True)
+    
+    
+    # D402_H = bst.units.HXutility('D402_H', ins=D402_P-0, T = 330., rigorous=True)
+    
+    
+    D403 = bst.units.ShortcutColumn('D403', ins=D402_P-0, outs=('D403_g', 'D403_l'),
+                                        LHK=('AcrylicAcid', 'HP'),
+                                        is_divided=True,
+                                        product_specification_format='Recovery',
+                                        Lr=0.9995, Hr=0.9995, k=1.05, P=101325./7.,
+                                        partial_condenser=False,
+                                        vessel_material = 'Stainless steel 316')
+    
+    D403-1-2-R402
+    
+    D403_H = bst.units.HXutility('D403_H', ins=D403-0, T = 25.+273.15, rigorous=True)
+    D403_P = units.HPPump('D403_P', ins=D403_H-0)
     
     separation_group = UnitGroup('separation_group', 
                                    units=(S401, R401, R401_H, R401_P, S402,
                                           F401, F401_P, M401, S404, D401,
                                           D401_H_P, D401_P, M402, 
-                                          R402, R402_H, D402, D402_P))
+                                          R402, R402_H, D402, D402_t_H, D402_P, D403, D403_P))
     process_groups.append(separation_group)
     
     # %% 
@@ -733,7 +772,7 @@ def create_HP_sys(ins, outs):
     # =============================================================================
     
     # Mix waste liquids for treatment
-    M501 = bst.units.Mixer('M501', ins=(F301_P-0,  D402-0, F401-1, S404-0)) # without sugars recycle
+    M501 = bst.units.Mixer('M501', ins=(F301_P-0, D402_t_H-0, F401-1, S404-0)) # without sugars recycle
     # M501 = bst.units.Mixer('M501', ins=(F301_P-0, D402_H-0)) # with sugars recycle
     
     # This represents the total cost of wastewater treatment system
@@ -751,9 +790,9 @@ def create_HP_sys(ins, outs):
     fix_split(R501.isplit, 'Glucose')
     
     # !!! Make sure to state and explain this conservative assumption
-    # Explanation: In TRY analysis, we aren't looking at the implications of varying yield of byproducts on 
+    # Working explanation: In TRY analysis, we aren't looking at the implications of varying yield of byproducts on 
     # sugars, but solely that of 3-HP. 
-    # Just show the implications of the extremes of the assumption.
+    # Just show the implications of the extremes of the assumption to show it doesn't affect results much.
     
     R501.byproducts_combustion_rxns = ParallelRxn([
         Rxn('AceticAcid -> 3 CO2 + H2O + O2', 'AceticAcid', 1.-1e-6, correct_atomic_balance=True),
@@ -914,7 +953,7 @@ def create_HP_sys(ins, outs):
     
 
     # 7-day storage time, similar to ethanol's in Humbird et al.
-    T606 = units.HPStorageTank('T606', ins=D402_P-0, tau=7*24, V_wf=0.9,
+    T606 = units.HPStorageTank('T606', ins=D403_P-0, tau=7*24, V_wf=0.9,
                                          vessel_type='Floating roof',
                                          vessel_material='Stainless steel')
    
@@ -953,15 +992,25 @@ def create_HP_sys(ins, outs):
     #                                 side_streams_to_heat=(water_M201, water_M202, steam_M203),
     #                                 outs=('gas_emission', ash, 'boiler_blowdown_water'))
     
+    # BT = bst.facilities.Boiler('BT',
+    #                                               ins=(M505-0,
+    #                                                   R501-0, 
+    #                                                   'boiler_makeup_water',
+    #                                                   'natural_gas',
+    #                                                   'lime',
+    #                                                   'boilerchems'), 
+    #                                               outs=('gas_emission', 'boiler_blowdown_water', ash, '', ''),)
+    #                                               # turbogenerator_efficiency=0.85)
+    
     BT = bst.facilities.BoilerTurbogenerator('BT',
-                                                 ins=(M505-0,
+                                                  ins=(M505-0,
                                                       R501-0, 
                                                       'boiler_makeup_water',
                                                       'natural_gas',
                                                       'lime',
                                                       'boilerchems'), 
-                                                 outs=('gas_emission', 'boiler_blowdown_water', ash),
-                                                 turbogenerator_efficiency=0.85)
+                                                  outs=('gas_emission', 'boiler_blowdown_water', ash,),
+                                                  turbogenerator_efficiency=0.85)
     
     # Blowdown is discharged
     CT = facilities.CT('CT', ins=('return_cooling_water', cooling_tower_chems,
@@ -1055,8 +1104,47 @@ HP_no_BT_sys = bst.System('HP_no_BT_sys', path = HP_sys.path, facilities = tuple
 
 
 #!!! Income tax was changed from 0.35 to 0.21 based on Davis et al., 2018 (new legislation)
-HP_no_BT_tea = HPTEA(
-        system=HP_no_BT_sys, IRR=0.10, duration=(2016, 2046),
+# HP_no_BT_tea = HPTEA(
+#         system=HP_no_BT_sys, IRR=0.10, duration=(2016, 2046),
+#         depreciation='MACRS7', income_tax=0.21, operating_days=0.9*365,
+#         lang_factor=None, construction_schedule=(0.08, 0.60, 0.32),
+#         startup_months=3, startup_FOCfrac=1, startup_salesfrac=0.5,
+#         startup_VOCfrac=0.75, WC_over_FCI=0.05,
+#         finance_interest=0.08, finance_years=10, finance_fraction=0.4,
+#         # biosteam Splitters and Mixers have no cost, 
+#         # cost of all wastewater treatment units are included in WWT_cost,
+#         # BT is not included in this TEA
+#         OSBL_units=(u.U101, u.WWT_cost,
+#                     u.T601, u.T602, u.T603, u.T606, u.T606_P,
+#                     u.CWP, u.CT, u.PWC, u.CIP, u.ADP, u.FWT),
+#         warehouse=0.04, site_development=0.09, additional_piping=0.045,
+#         proratable_costs=0.10, field_expenses=0.10, construction=0.20,
+#         contingency=0.10, other_indirect_costs=0.10, 
+#         labor_cost=3212962*get_flow_tpd()/2205,
+#         labor_burden=0.90, property_insurance=0.007, maintenance=0.03)
+
+# # HP_no_BT_tea.units.remove(BT)
+
+# # # Removed because there is not double counting anyways.
+# # # Removes feeds/products of BT_sys from HP_sys to avoid double-counting
+# # for i in BT_sys.feeds:
+# #     HP_sys.feeds.remove(i)
+# # for i in BT_sys.products:
+# #     HP_sys.products.remove(i)
+
+# # Boiler turbogenerator potentially has different depreciation schedule
+# BT_tea = bst.TEA.like(BT_sys, HP_no_BT_tea)
+# BT_tea.labor_cost = 0
+
+# # Changed to MACRS 20 to be consistent with Humbird
+# BT_tea.depreciation = 'MACRS20'
+# BT_tea.OSBL_units = (BT,)
+
+# HP_tea = bst.CombinedTEA([HP_no_BT_tea, BT_tea], IRR=0.10)
+# HP_sys._TEA = HP_tea
+
+
+HP_tea = CellulosicEthanolTEA(system=HP_sys, IRR=0.10, duration=(2016, 2046),
         depreciation='MACRS7', income_tax=0.21, operating_days=0.9*365,
         lang_factor=None, construction_schedule=(0.08, 0.60, 0.32),
         startup_months=3, startup_FOCfrac=1, startup_salesfrac=0.5,
@@ -1067,33 +1155,15 @@ HP_no_BT_tea = HPTEA(
         # BT is not included in this TEA
         OSBL_units=(u.U101, u.WWT_cost,
                     u.T601, u.T602, u.T603, u.T606, u.T606_P,
-                    u.CWP, u.CT, u.PWC, u.CIP, u.ADP, u.FWT),
+                    u.CWP, u.CT, u.PWC, u.CIP, u.ADP, u.FWT, u.BT),
         warehouse=0.04, site_development=0.09, additional_piping=0.045,
         proratable_costs=0.10, field_expenses=0.10, construction=0.20,
         contingency=0.10, other_indirect_costs=0.10, 
         labor_cost=3212962*get_flow_tpd()/2205,
-        labor_burden=0.90, property_insurance=0.007, maintenance=0.03)
+        labor_burden=0.90, property_insurance=0.007, maintenance=0.03,
+        steam_power_depreciation='MACRS20', boiler_turbogenerator=u.BT)
 
-# HP_no_BT_tea.units.remove(BT)
-
-# # Removed because there is not double counting anyways.
-# # Removes feeds/products of BT_sys from HP_sys to avoid double-counting
-# for i in BT_sys.feeds:
-#     HP_sys.feeds.remove(i)
-# for i in BT_sys.products:
-#     HP_sys.products.remove(i)
-
-# Boiler turbogenerator potentially has different depreciation schedule
-BT_tea = bst.TEA.like(BT_sys, HP_no_BT_tea)
-BT_tea.labor_cost = 0
-
-# Changed to MACRS 20 to be consistent with Humbird
-BT_tea.depreciation = 'MACRS20'
-BT_tea.OSBL_units = (BT,)
-
-HP_tea = bst.CombinedTEA([HP_no_BT_tea, BT_tea], IRR=0.10)
-HP_sys._TEA = HP_tea
-
+HP_no_BT_tea = HP_tea
 # %% 
 # =============================================================================
 # Simulate system and get results
@@ -1113,7 +1183,8 @@ def get_AA_MPSP():
     for i in range(num_sims):
         HP_sys.simulate()
     for i in range(num_solve_tea):
-        AA.price = HP_tea.solve_price(AA, HP_no_BT_tea)
+        # AA.price = HP_tea.solve_price(AA, HP_no_BT_tea)
+        AA.price = HP_tea.solve_price(AA)
     return AA.price
 
 get_AA_MPSP()
@@ -1345,6 +1416,21 @@ feed_chem_IDs = [chem.ID for chem in HP_chemicals]
 GWP_CF_stream = CFs['GWP_CF_stream']
 FEC_CF_stream = CFs['FEC_CF_stream']
 
+
+# Carbon balance
+total_C_in = sum([feed.get_atomic_flow('C') for feed in feeds])
+total_C_out = AA.get_atomic_flow('C') + sum([emission.get_atomic_flow('C') for emission in emissions])
+C_bal_error = (total_C_out - total_C_in)/total_C_in
+
+def get_unit_atomic_balance(unit, atom='C'):
+    return (sum([i.get_atomic_flow(atom) for i in unit.ins]), 
+            sum([i.get_atomic_flow(atom) for i in unit.outs]))
+
+
+
+
+############################# GWP ###################################
+
 def get_material_GWP():
     chemical_GWP = get_material_GWP_array()
     return sum(chemical_GWP)/AA.F_mass
@@ -1376,10 +1462,7 @@ def get_material_GWP_breakdown_as_fraction_of_tot_GWP():
     for k,v in chemical_GWP_dict.items():
         chemical_GWP_dict[k] /= tot_material_GWP
     return chemical_GWP_dict
-# Carbon balance
-total_C_in = sum([feed.get_atomic_flow('C') for feed in feeds])
-total_C_out = AA.get_atomic_flow('C') + sum([emission.get_atomic_flow('C') for emission in emissions])
-C_bal_error = (total_C_out - total_C_in)/total_C_in
+
 
 # GWP from combustion of non-biogenic carbons
 get_ng_combustion_GWP = get_onsite_gwp =\
@@ -1395,11 +1478,37 @@ get_feedstock_CO2_capture = lambda: feedstock.get_atomic_flow('C')* HP_chemicals
 get_feedstock_GWP = lambda: get_FGHTP_GWP() - get_feedstock_CO2_capture()
 # get_feedstock_GWP = lambda: get_FGHTP_GWP()
 get_emissions_GWP = lambda: sum([stream.get_atomic_flow('C') for stream in emissions]) * HP_chemicals.CO2.MW / AA.F_mass
-get_direct_emissions_GWP = lambda: get_emissions_GWP() - (get_feedstock_CO2_capture() - get_EOL_GWP())
 # GWP from electricity
-get_electricity_use = lambda: sum(i.power_utility.rate for i in HP_sys.units)
-get_electricity_GWP = lambda: get_electricity_use()*CFs['GWP_CFs']['Electricity'] \
+get_net_electricity = lambda: sum(i.power_utility.rate for i in HP_sys.units)
+get_net_electricity_GWP = lambda: get_net_electricity()*CFs['GWP_CFs']['Electricity'] \
     / AA.F_mass
+
+
+get_total_electricity_demand = get_electricity_use = lambda: -BT.power_utility.rate
+get_cooling_electricity_demand = lambda: u.CT.power_utility.rate + CWP.power_utility.rate
+
+get_BT_steam_kJph_heating = lambda: sum([i.duty for i in BT.steam_utilities])
+get_BT_steam_kJph_turbogen = lambda: 3600*BT.electricity_demand/BT.turbogenerator_efficiency
+get_BT_steam_kJph_total = lambda: get_BT_steam_kJph_heating() + get_BT_steam_kJph_turbogen()
+
+get_steam_frac_heating = lambda: get_BT_steam_kJph_heating()/get_BT_steam_kJph_total()
+get_steam_frac_turbogen = lambda: get_BT_steam_kJph_turbogen()/get_BT_steam_kJph_total()
+get_steam_frac_cooling = lambda: get_steam_frac_turbogen() * get_cooling_electricity_demand()/get_total_electricity_demand()
+get_steam_frac_electricity_non_cooling = lambda: get_steam_frac_turbogen() * (1-(get_cooling_electricity_demand()/get_total_electricity_demand()))
+
+get_non_cooling_electricity_demand = lambda: get_electricity_demand() - get_cooling_electricity_demand()
+
+
+get_BT_direct_emissions_GWP = lambda: sum([i.get_atomic_flow('C') for i in BT.outs])*HP_chemicals['CO2'].MW / AA.F_mass
+
+get_non_BT_direct_emissions_GWP = lambda: get_emissions_GWP() - get_BT_direct_emissions_GWP()\
+                        - (get_feedstock_CO2_capture() - get_EOL_GWP())
+get_direct_emissions_GWP = lambda: get_non_BT_direct_emissions_GWP() + get_BT_direct_emissions_GWP()
+get_total_steam_GWP = lambda: get_ng_GWP() + get_BT_direct_emissions_GWP()
+get_heating_demand_GWP = lambda: get_steam_frac_heating() * get_total_steam_GWP()
+get_cooling_demand_GWP = lambda: get_steam_frac_cooling() * get_total_steam_GWP()
+get_electricity_demand_non_cooling_GWP = lambda: get_steam_frac_electricity_non_cooling() * get_total_steam_GWP() + get_net_electricity_GWP()
+
 
 # # CO2 fixed in lactic acid product
 # get_fixed_GWP = lambda: \
@@ -1412,9 +1521,16 @@ get_electricity_GWP = lambda: get_electricity_use()*CFs['GWP_CFs']['Electricity'
 get_EOL_GWP = lambda: AA.get_atomic_flow('C') * HP_chemicals.CO2.MW/AA.F_mass
 
 get_GWP = lambda: get_FGHTP_GWP() + get_material_GWP() + get_ng_GWP() +\
-                  get_electricity_GWP() + get_direct_emissions_GWP()
-                  
+                  get_net_electricity_GWP() + get_direct_emissions_GWP()
+
+get_GWP_alternative = lambda: get_FGHTP_GWP() + get_material_GWP() +\
+                    get_non_BT_direct_emissions_GWP() + get_heating_demand_GWP() + get_cooling_demand_GWP() +\
+                        get_electricity_demand_non_cooling_GWP()
+                        
 get_GWP_by_ID = lambda ID: LCA_stream.imass[ID] * GWP_CF_stream.imass[ID]/AA.F_mass
+
+
+############################## FEC #################################
 # Fossil energy consumption (FEC) from materials
 def get_material_FEC():
     # chemical_FEC = LCA_stream.mass*CFs['FEC_CF_stream'].mass
@@ -1451,24 +1567,37 @@ def get_material_FEC_breakdown_as_fraction_of_tot_FEC():
         chemical_FEC_dict[k] /= tot_material_FEC
     return chemical_FEC_dict
 
+get_net_electricity_FEC = lambda: \
+    (get_net_electricity()*CFs['FEC_CFs']['Electricity'])/AA.F_mass
 
+get_total_steam_FEC = lambda: get_ng_FEC()
+get_heating_demand_FEC = lambda: get_steam_frac_heating() * get_total_steam_FEC()
+get_cooling_demand_FEC = lambda: get_steam_frac_cooling() * get_total_steam_FEC()
+get_electricity_demand_non_cooling_FEC = lambda: get_steam_frac_electricity_non_cooling() * get_total_steam_FEC() + get_net_electricity_FEC()
 
 get_feedstock_FEC = lambda: (feedstock.F_mass-feedstock.imass['Water'])\
     * CFs['FEC_CFs']['FGHTP %s'%feedstock_ID]/AA.F_mass
 # FEC from electricity
-get_electricity_FEC = lambda: \
-    get_electricity_use()*CFs['FEC_CFs']['Electricity']/AA.F_mass
 
 get_FEC_by_ID = lambda ID: LCA_stream.imass[ID] * FEC_CF_stream.imass[ID]/AA.F_mass
 
 get_ng_FEC = lambda: CFs['FEC_CFs']['CH4']*s.natural_gas.F_mass/AA.F_mass
 # Total FEC
-get_FEC = lambda: get_material_FEC()+get_electricity_FEC()+get_feedstock_FEC()+get_ng_FEC()
+get_FEC = lambda: get_material_FEC()+get_net_electricity_FEC()+get_feedstock_FEC()+get_ng_FEC()
+
+get_FEC_alternative = lambda: get_material_FEC() + get_feedstock_FEC() + get_heating_demand_FEC() +\
+    get_cooling_demand_FEC() + get_electricity_demand_non_cooling_FEC()
+    
+    
 
 get_SPED = lambda: (-BT.heat_utilities[0].duty)*0.001/AA.F_mass
 AA_LHV = 31.45 # MJ/kg AA
 
 get_material_cost = lambda: sum(get_material_cost_array())
+
+
+
+
 def get_material_cost_array():
     material_cost_array = [i.cost for i in feeds]
     material_cost_array.append(BT.natural_gas_price*BT.natural_gas.F_mass)

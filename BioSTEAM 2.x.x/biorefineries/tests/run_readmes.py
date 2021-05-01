@@ -37,7 +37,7 @@ def run_cornstover_readme():
 
 def run_laos_readme():
     from biorefineries import LAOs as laos
-    runfile(get_readme(laos))
+    testfile(get_readme(laos))
     
 def run_lactic_readme():
     from biorefineries import lactic

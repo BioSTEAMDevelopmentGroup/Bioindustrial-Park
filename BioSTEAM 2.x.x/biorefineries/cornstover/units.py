@@ -340,7 +340,7 @@ class SaccharificationAndCoFermentation(Unit):
         ei = effluent.chemicals.index('Ethanol')
         ethanol = (sum([i.mol[ei] for i in self.outs])
                    - sum([i.mol[ei] for i in self.ins]))
-        Design['Batch duty'] = batch_duty = self.H_out - self.H_in
+        Design['Batch duty'] = batch_duty = min(0, self.H_out - self.H_in)
         Design['Reactor duty'] = reactor_duty = self.Hf_out - self.Hf_in
         hu_fermentation(reactor_duty + batch_duty, effluent.T)
    
