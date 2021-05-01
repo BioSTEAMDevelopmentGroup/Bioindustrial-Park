@@ -175,6 +175,7 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
                  'juicing_sys',
                  'baseline_yield',
                  'baseline_titer',
+                 'baseline_productivity',
                  'HXN_new_HXs',
                  'HXN_new_HX_utils',
                  'HXN_Q_bal_percent_error_dict',)
@@ -184,7 +185,7 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
                  spec_1, spec_2, spec_3, xylose_utilization_fraction,
                  feedstock, dehydration_reactor, byproduct_streams, HXN,
                  pre_conversion_units = None, juicing_sys=None, baseline_yield =0.49, baseline_titer = 54.8,
-                 tolerable_HXN_energy_balance_percent_error=2., HXN_intolerable_points=[],
+                 baseline_productivity=0.76, tolerable_HXN_energy_balance_percent_error=2., HXN_intolerable_points=[],
                  HXN_new_HXs={}, HXN_new_HX_utils={}, HXN_Q_bal_percent_error_dict = {},
                  feedstock_mass=104192.83224417375, pretreatment_reactor = None,
                   load_spec_1=None, load_spec_2=None, load_spec_3=None):
@@ -206,6 +207,7 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
         self.juicing_sys = juicing_sys
         self.baseline_yield = baseline_yield
         self.baseline_titer = baseline_titer
+        self.baseline_productivity = baseline_productivity
         self.HXN_new_HXs = HXN_new_HXs
         self.HXN_new_HX_utils = HXN_new_HX_utils
         self.tolerable_HXN_energy_balance_percent_error = tolerable_HXN_energy_balance_percent_error

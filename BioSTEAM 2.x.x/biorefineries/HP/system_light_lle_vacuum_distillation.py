@@ -349,7 +349,7 @@ def create_HP_sys(ins, outs):
                                     ins=(S302-1, '', CSL, fermentation_lime),
                                     outs=('fermentation_effluent', 'CO2_fermentation'),
                                     vessel_material='Stainless steel 316',
-                                    neutralization=False)
+                                    neutralization=True)
     
     def include_seed_CSL_in_cofermentation(): # note: effluent always has 0 CSL
         R302._run()
@@ -725,6 +725,7 @@ def create_HP_sys(ins, outs):
     # recycling water makes system convergence fail
     # D402-0-3-R402
     
+    
     D402_P = units.HPPump('D402_P', ins=D402-1)
     
     
@@ -741,7 +742,8 @@ def create_HP_sys(ins, outs):
     
     D403-1-2-R402
     
-    D403_P = units.HPPump('D403_P', ins=D403-0)
+    D403_H = bst.units.HXutility('D403_H', ins=D403-0, T = 25.+273.15, rigorous=True)
+    D403_P = units.HPPump('D403_P', ins=D403_H-0)
     
     separation_group = UnitGroup('separation_group', 
                                    units=(S401, R401, R401_H, R401_P, S402,
@@ -800,7 +802,7 @@ def create_HP_sys(ins, outs):
     def R501_specification():
         R501.byproducts_combustion_rxns(R501.ins[0])
         R501._run()
-    # R501.specification = R501_specification # Comment this out for anything other than TRY analysis
+    R501.specification = R501_specification # Comment this out for anything other than TRY analysis
     
     get_flow_tpd = lambda: (feedstock.F_mass-feedstock.imass['H2O'])*24/907.185
     
@@ -991,23 +993,23 @@ def create_HP_sys(ins, outs):
     #                                 outs=('gas_emission', ash, 'boiler_blowdown_water'))
     
     # BT = bst.facilities.Boiler('BT',
-    #                                              ins=(M505-0,
+    #                                               ins=(M505-0,
     #                                                   R501-0, 
     #                                                   'boiler_makeup_water',
     #                                                   'natural_gas',
     #                                                   'lime',
     #                                                   'boilerchems'), 
-    #                                              outs=('gas_emission', 'boiler_blowdown_water', ash, '', ''),)
-    #                                              # turbogenerator_efficiency=0.85)
+    #                                               outs=('gas_emission', 'boiler_blowdown_water', ash, '', ''),)
+    #                                               # turbogenerator_efficiency=0.85)
     
     BT = bst.facilities.BoilerTurbogenerator('BT',
-                                                 ins=(M505-0,
+                                                  ins=(M505-0,
                                                       R501-0, 
                                                       'boiler_makeup_water',
                                                       'natural_gas',
                                                       'lime',
                                                       'boilerchems'), 
-                                                 outs=('gas_emission', 'boiler_blowdown_water', ash,),
+                                                  outs=('gas_emission', 'boiler_blowdown_water', ash,),
                                                   turbogenerator_efficiency=0.85)
     
     # Blowdown is discharged
@@ -1414,6 +1416,21 @@ feed_chem_IDs = [chem.ID for chem in HP_chemicals]
 GWP_CF_stream = CFs['GWP_CF_stream']
 FEC_CF_stream = CFs['FEC_CF_stream']
 
+
+# Carbon balance
+total_C_in = sum([feed.get_atomic_flow('C') for feed in feeds])
+total_C_out = AA.get_atomic_flow('C') + sum([emission.get_atomic_flow('C') for emission in emissions])
+C_bal_error = (total_C_out - total_C_in)/total_C_in
+
+def get_unit_atomic_balance(unit, atom='C'):
+    return (sum([i.get_atomic_flow(atom) for i in unit.ins]), 
+            sum([i.get_atomic_flow(atom) for i in unit.outs]))
+
+
+
+
+############################# GWP ###################################
+
 def get_material_GWP():
     chemical_GWP = get_material_GWP_array()
     return sum(chemical_GWP)/AA.F_mass
@@ -1445,14 +1462,8 @@ def get_material_GWP_breakdown_as_fraction_of_tot_GWP():
     for k,v in chemical_GWP_dict.items():
         chemical_GWP_dict[k] /= tot_material_GWP
     return chemical_GWP_dict
-# Carbon balance
-total_C_in = sum([feed.get_atomic_flow('C') for feed in feeds])
-total_C_out = AA.get_atomic_flow('C') + sum([emission.get_atomic_flow('C') for emission in emissions])
-C_bal_error = (total_C_out - total_C_in)/total_C_in
 
-def get_unit_atomic_balance(unit, atom='C'):
-    return (sum([i.get_atomic_flow(atom) for i in unit.ins]), 
-            sum([i.get_atomic_flow(atom) for i in unit.outs]))
+
 # GWP from combustion of non-biogenic carbons
 get_ng_combustion_GWP = get_onsite_gwp =\
     lambda: (s.natural_gas.get_atomic_flow('C')) * HP_chemicals.CO2.MW / AA.F_mass
@@ -1467,11 +1478,37 @@ get_feedstock_CO2_capture = lambda: feedstock.get_atomic_flow('C')* HP_chemicals
 get_feedstock_GWP = lambda: get_FGHTP_GWP() - get_feedstock_CO2_capture()
 # get_feedstock_GWP = lambda: get_FGHTP_GWP()
 get_emissions_GWP = lambda: sum([stream.get_atomic_flow('C') for stream in emissions]) * HP_chemicals.CO2.MW / AA.F_mass
-get_direct_emissions_GWP = lambda: get_emissions_GWP() - (get_feedstock_CO2_capture() - get_EOL_GWP())
 # GWP from electricity
-get_electricity_use = lambda: sum(i.power_utility.rate for i in HP_sys.units)
-get_electricity_GWP = lambda: get_electricity_use()*CFs['GWP_CFs']['Electricity'] \
+get_net_electricity = lambda: sum(i.power_utility.rate for i in HP_sys.units)
+get_net_electricity_GWP = lambda: get_net_electricity()*CFs['GWP_CFs']['Electricity'] \
     / AA.F_mass
+
+
+get_total_electricity_demand = get_electricity_use = lambda: -BT.power_utility.rate
+get_cooling_electricity_demand = lambda: u.CT.power_utility.rate + CWP.power_utility.rate
+
+get_BT_steam_kJph_heating = lambda: sum([i.duty for i in BT.steam_utilities])
+get_BT_steam_kJph_turbogen = lambda: 3600*BT.electricity_demand/BT.turbogenerator_efficiency
+get_BT_steam_kJph_total = lambda: get_BT_steam_kJph_heating() + get_BT_steam_kJph_turbogen()
+
+get_steam_frac_heating = lambda: get_BT_steam_kJph_heating()/get_BT_steam_kJph_total()
+get_steam_frac_turbogen = lambda: get_BT_steam_kJph_turbogen()/get_BT_steam_kJph_total()
+get_steam_frac_cooling = lambda: get_steam_frac_turbogen() * get_cooling_electricity_demand()/get_total_electricity_demand()
+get_steam_frac_electricity_non_cooling = lambda: get_steam_frac_turbogen() * (1-(get_cooling_electricity_demand()/get_total_electricity_demand()))
+
+get_non_cooling_electricity_demand = lambda: get_electricity_demand() - get_cooling_electricity_demand()
+
+
+get_BT_direct_emissions_GWP = lambda: sum([i.get_atomic_flow('C') for i in BT.outs])*HP_chemicals['CO2'].MW / AA.F_mass
+
+get_non_BT_direct_emissions_GWP = lambda: get_emissions_GWP() - get_BT_direct_emissions_GWP()\
+                        - (get_feedstock_CO2_capture() - get_EOL_GWP())
+get_direct_emissions_GWP = lambda: get_non_BT_direct_emissions_GWP() + get_BT_direct_emissions_GWP()
+get_total_steam_GWP = lambda: get_ng_GWP() + get_BT_direct_emissions_GWP()
+get_heating_demand_GWP = lambda: get_steam_frac_heating() * get_total_steam_GWP()
+get_cooling_demand_GWP = lambda: get_steam_frac_cooling() * get_total_steam_GWP()
+get_electricity_demand_non_cooling_GWP = lambda: get_steam_frac_electricity_non_cooling() * get_total_steam_GWP() + get_net_electricity_GWP()
+
 
 # # CO2 fixed in lactic acid product
 # get_fixed_GWP = lambda: \
@@ -1484,9 +1521,16 @@ get_electricity_GWP = lambda: get_electricity_use()*CFs['GWP_CFs']['Electricity'
 get_EOL_GWP = lambda: AA.get_atomic_flow('C') * HP_chemicals.CO2.MW/AA.F_mass
 
 get_GWP = lambda: get_FGHTP_GWP() + get_material_GWP() + get_ng_GWP() +\
-                  get_electricity_GWP() + get_direct_emissions_GWP()
-                  
+                  get_net_electricity_GWP() + get_direct_emissions_GWP()
+
+get_GWP_alternative = lambda: get_FGHTP_GWP() + get_material_GWP() +\
+                    get_non_BT_direct_emissions_GWP() + get_heating_demand_GWP() + get_cooling_demand_GWP() +\
+                        get_electricity_demand_non_cooling_GWP()
+                        
 get_GWP_by_ID = lambda ID: LCA_stream.imass[ID] * GWP_CF_stream.imass[ID]/AA.F_mass
+
+
+############################## FEC #################################
 # Fossil energy consumption (FEC) from materials
 def get_material_FEC():
     # chemical_FEC = LCA_stream.mass*CFs['FEC_CF_stream'].mass
@@ -1523,24 +1567,37 @@ def get_material_FEC_breakdown_as_fraction_of_tot_FEC():
         chemical_FEC_dict[k] /= tot_material_FEC
     return chemical_FEC_dict
 
+get_net_electricity_FEC = lambda: \
+    (get_net_electricity()*CFs['FEC_CFs']['Electricity'])/AA.F_mass
 
+get_total_steam_FEC = lambda: get_ng_FEC()
+get_heating_demand_FEC = lambda: get_steam_frac_heating() * get_total_steam_FEC()
+get_cooling_demand_FEC = lambda: get_steam_frac_cooling() * get_total_steam_FEC()
+get_electricity_demand_non_cooling_FEC = lambda: get_steam_frac_electricity_non_cooling() * get_total_steam_FEC() + get_net_electricity_FEC()
 
 get_feedstock_FEC = lambda: (feedstock.F_mass-feedstock.imass['Water'])\
     * CFs['FEC_CFs']['FGHTP %s'%feedstock_ID]/AA.F_mass
 # FEC from electricity
-get_electricity_FEC = lambda: \
-    (get_electricity_use()*CFs['FEC_CFs']['Electricity'])/AA.F_mass
 
 get_FEC_by_ID = lambda ID: LCA_stream.imass[ID] * FEC_CF_stream.imass[ID]/AA.F_mass
 
 get_ng_FEC = lambda: CFs['FEC_CFs']['CH4']*s.natural_gas.F_mass/AA.F_mass
 # Total FEC
-get_FEC = lambda: get_material_FEC()+get_electricity_FEC()+get_feedstock_FEC()+get_ng_FEC()
+get_FEC = lambda: get_material_FEC()+get_net_electricity_FEC()+get_feedstock_FEC()+get_ng_FEC()
+
+get_FEC_alternative = lambda: get_material_FEC() + get_feedstock_FEC() + get_heating_demand_FEC() +\
+    get_cooling_demand_FEC() + get_electricity_demand_non_cooling_FEC()
+    
+    
 
 get_SPED = lambda: (-BT.heat_utilities[0].duty)*0.001/AA.F_mass
 AA_LHV = 31.45 # MJ/kg AA
 
 get_material_cost = lambda: sum(get_material_cost_array())
+
+
+
+
 def get_material_cost_array():
     material_cost_array = [i.cost for i in feeds]
     material_cost_array.append(BT.natural_gas_price*BT.natural_gas.F_mass)
