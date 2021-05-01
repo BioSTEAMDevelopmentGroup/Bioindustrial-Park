@@ -54,7 +54,7 @@ __all__ = (
           dict(ID='fiber_fines'),
           dict(ID='spent_oil_wash_water')]
 )
-def create_juicing_and_lipid_extraction_system(ins, outs, pellet_bagasse=False):
+def create_juicing_and_lipid_extraction_system(ins, outs, pellet_bagasse=None):
     lipidcane, enzyme, H3PO4, lime, polymer = ins
     screened_juice, lipid, bagasse, fiber_fines, spent_oil_wash_water = outs
     
@@ -156,7 +156,7 @@ def create_lipid_wash_system(ins, outs):
           dict(ID='bagasse'),
           dict(ID='fiber_fines')]
 )
-def create_juicing_system(ins, outs, pellet_bagasse=False):
+def create_juicing_system(ins, outs, pellet_bagasse=None):
     lipidcane, enzyme, H3PO4, lime, polymer = ins
     screened_juice, bagasse, fiber_fines = outs
     

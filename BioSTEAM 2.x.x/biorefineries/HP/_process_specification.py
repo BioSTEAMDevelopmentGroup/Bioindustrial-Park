@@ -16,7 +16,7 @@ _red_highlight_white_text = '\033[1;47;41m'
 _yellow_text = '\033[1;33m'
 _reset_text = '\033[1;0m'
 
-skip_infeasible_titers = True
+skip_infeasible_titers = False
 last_infeasible_simulation = [] # yield, titer
 
 def get_IDs(units_list):
@@ -46,7 +46,7 @@ def evaluate_across_specs(spec, system,
             spec.load_titer(54.8)
             system.simulate()
             print('Loading and simulating with required specifications ...')
-            spec.load_specifications(spec_1=spec_1, spec_2=spec_2)
+            spec.load_specifications(spec_1=spec_1, spec_2=spec_2, spec_3=spec_3)
             system.simulate()
         
         def reset_and_switch_solver(solver_ID):
@@ -175,6 +175,7 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
                  'juicing_sys',
                  'baseline_yield',
                  'baseline_titer',
+                 'baseline_productivity',
                  'HXN_new_HXs',
                  'HXN_new_HX_utils',
                  'HXN_Q_bal_percent_error_dict',)
@@ -184,7 +185,7 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
                  spec_1, spec_2, spec_3, xylose_utilization_fraction,
                  feedstock, dehydration_reactor, byproduct_streams, HXN,
                  pre_conversion_units = None, juicing_sys=None, baseline_yield =0.49, baseline_titer = 54.8,
-                 tolerable_HXN_energy_balance_percent_error=2., HXN_intolerable_points=[],
+                 baseline_productivity=0.76, tolerable_HXN_energy_balance_percent_error=2., HXN_intolerable_points=[],
                  HXN_new_HXs={}, HXN_new_HX_utils={}, HXN_Q_bal_percent_error_dict = {},
                  feedstock_mass=104192.83224417375, pretreatment_reactor = None,
                   load_spec_1=None, load_spec_2=None, load_spec_3=None):
@@ -206,6 +207,7 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
         self.juicing_sys = juicing_sys
         self.baseline_yield = baseline_yield
         self.baseline_titer = baseline_titer
+        self.baseline_productivity = baseline_productivity
         self.HXN_new_HXs = HXN_new_HXs
         self.HXN_new_HX_utils = HXN_new_HX_utils
         self.tolerable_HXN_energy_balance_percent_error = tolerable_HXN_energy_balance_percent_error
@@ -433,8 +435,8 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
     def load_feedstock_price(self, price):
         feedstock = self.feedstock
         mc = feedstock.imass['Water']/feedstock.F_mass
-        # self.feedstock.price = price / _kg_per_ton * (1-mc) # price per dry ton --> price per wet kg
-        self.feedstock.price = price / _kg_per_ton 
+        self.feedstock.price = price / _kg_per_ton * (1-mc) # price per dry ton --> price per wet kg
+        # self.feedstock.price = price / _kg_per_ton 
         self.spec_2 = price
         
     def calculate_feedstock_carbohydrate_content(self):
@@ -479,11 +481,18 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
         feedstock = self.feedstock
         sugars = feedstock.imass[sugars_IDs]
         z_sugars = carbohydrate_content * sugars / sugars.sum()
-        mass_sugars = F_mass * z_sugars
+        F_mass_water = float(feedstock.imass['Water'])
+        feedstock.imass['Water'] = 0.
+        F_mass_dw =  feedstock.F_mass
+        
+        mass_sugars = F_mass_dw * z_sugars
         F_mass_sugars = mass_sugars.sum()
         feedstock.imass[sugars_IDs] = 0.
-        feedstock.F_mass = F_mass - F_mass_sugars
+       
+        # F_mass_dw = feedstock.F_mass - feedstock.imass['Water']
+        feedstock.F_mass = F_mass - F_mass_sugars - F_mass_water
         feedstock.imass[sugars_IDs] = mass_sugars
+        feedstock.imass['Water'] = F_mass_water
         # for unit in self.pre_conversion_units:
         #     unit.simulate()
         self.pre_conversion_units._converge()
@@ -500,11 +509,18 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
         feedstock = self.feedstock
         sugars = feedstock.imass[sugars_IDs]
         z_sugars = sugar_content * sugars / sugars.sum()
-        mass_sugars = F_mass * z_sugars
+        F_mass_water = float(feedstock.imass['Water'])
+        feedstock.imass['Water'] = 0.
+        F_mass_dw =  feedstock.F_mass
+        
+        mass_sugars = F_mass_dw * z_sugars
         F_mass_sugars = mass_sugars.sum()
         feedstock.imass[sugars_IDs] = 0.
-        feedstock.F_mass = F_mass - F_mass_sugars
+       
+        # F_mass_dw = feedstock.F_mass - feedstock.imass['Water']
+        feedstock.F_mass = F_mass - F_mass_sugars - F_mass_water
         feedstock.imass[sugars_IDs] = mass_sugars
+        feedstock.imass['Water'] = F_mass_water
         # for unit in self.pre_conversion_units:
         #     unit.simulate()
         self.pre_conversion_units._converge()
@@ -624,7 +640,7 @@ class TiterAndInhibitorsSpecification:
         
         if x_titer < self.target_titer: # Evaporate
             self.evaporator.V = V_min = flx.IQ_interpolation(self.titer_objective_function,
-                                                             V_min, V_max, ytol=1e-3, maxiter=100) 
+                                                             V_min, V_max, ytol=1e-3, maxiter=200) 
         elif x_titer > self.target_titer: # Dilute
             self.update_dilution_water(x_titer)
             # self.mixer._run()
@@ -640,7 +656,7 @@ class TiterAndInhibitorsSpecification:
             
             if y_0 > 0.:
                 self.evaporator.V = flx.IQ_interpolation(obj_f,
-                                                     V_min, V_max, y0 = y_0, ytol=1e-3, maxiter=100) 
+                                                     V_min, V_max, y0 = y_0, ytol=1e-3, maxiter=200) 
         
         # self.check_sugar_concentration()
     

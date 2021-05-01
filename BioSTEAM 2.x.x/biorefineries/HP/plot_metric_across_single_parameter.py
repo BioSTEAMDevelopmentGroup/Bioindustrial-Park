@@ -25,11 +25,13 @@ def reset_and_reload():
     print('Loading and simulating with baseline specifications ...')
     spec_1 = spec.spec_1
     spec_2 = spec.spec_2
+    spec_3 = spec.spec_3
     spec.load_yield(0.49)
     spec.load_titer(54.8)
+    spec.load_productivity(0.76)
     system.simulate()
     print('Loading and simulating with required specifications ...')
-    spec.load_specifications(spec_1=spec_1, spec_2=spec_2)
+    spec.load_specifications(spec_1=spec_1, spec_2=spec_2, spec_3=spec_3)
     system.simulate()
 
 def reset_and_switch_solver(solver_ID):
@@ -65,9 +67,9 @@ spec.load_productivity(0.76)
 steps = 8
 
 # titers = np.linspace(15., 150., steps)
-# yields = 100.*np.linspace(0.1, 0.99, steps)
+yields = 100.*np.linspace(0.5, 0.95, steps)
 carbs = np.linspace(0.1, 0.99, steps)
-# titers = np.array([54.8, 54.8])
+titers = np.array([54.8, 54.8])
 
 # carbs = np.linspace(0.1, 0.7, steps)
 hu_group_contributions = {}
@@ -105,8 +107,9 @@ def get_group_cooling_demand(group):
 # for titer in titers:
 for parameter in parameters:
     spec.load_feedstock_carbohydrate_content(parameter)
-    # spec.load_titer(parameter)
-    
+    spec.load_titer(parameter)
+    # spec.load_specifications(spec_1=spec.spec_1, spec_2=parameter, spec_3=spec.spec_3)
+    # spec.load_specifications(spec_1=parameter/100., spec_2=spec.spec_2, spec_3=spec.spec_3)
     try:
         
         # spec.load_titer(54.8)

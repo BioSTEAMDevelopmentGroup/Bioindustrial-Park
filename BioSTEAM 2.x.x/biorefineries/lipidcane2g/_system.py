@@ -114,6 +114,7 @@ def create_lipidcane_to_biodiesel_and_ethanol_1g(
     if front_end_oil_separation:
         juicing_and_lipid_extraction_sys, udct = create_juicing_and_lipid_extraction_system(
             ins=feedstock_handling_sys-0,
+            pellet_bagasse=True,
             mockup=True,
             udct=True,
             area=200,
@@ -123,6 +124,7 @@ def create_lipidcane_to_biodiesel_and_ethanol_1g(
     else:
         juicing_sys, udct = create_juicing_system(
             ins=feedstock_handling_sys-0,
+            pellet_bagasse=True,
             mockup=True,
             udct=True,
             area=200,
@@ -238,6 +240,7 @@ def create_lipidcane_to_biodiesel_and_ethanol_1_and_2g_bagasse_expression(
     if front_end_oil_separation:
         juicing_sys, udct = create_juicing_and_lipid_extraction_system(
             ins=feedstock_handling_sys-0,
+            pellet_bagasse=True,
             mockup=True,
             udct=True,
             area=200,
@@ -247,6 +250,7 @@ def create_lipidcane_to_biodiesel_and_ethanol_1_and_2g_bagasse_expression(
     else:
         juicing_sys, udct = create_juicing_system(
             ins=feedstock_handling_sys-0,
+            pellet_bagasse=True,
             mockup=True,
             udct=True,
             area=200,

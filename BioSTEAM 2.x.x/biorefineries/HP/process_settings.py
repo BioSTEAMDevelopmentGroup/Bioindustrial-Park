@@ -77,7 +77,7 @@ ash_disposal_price = -1.41e6 / (4279*7880)
 # For the lower bound (i.e., negative selling price indicating cost), use price from
 # Aden et al., 2002: $0.0094/lb in 2000$ = 0.0094*1.114/0.802*2.20462 = $0.0288/kg
 # in 2016$
-gypsum_price = 0
+gypsum_price = 0.
 
 # Baseline from Davis et al., 2018, lower bound is 2015-2019 average of 	
 # hydrate lime in $/ton at plant from Mineral Commodity Summaries 2020.	
@@ -199,9 +199,8 @@ price = {'AA': AA_price,
     
 
 def load_process_settings():
-    from biorefineries.cornstover import load_process_settings
-    load_process_settings()
-    # bst.default()
+    from biorefineries import cornstover as cs
+    cs.load_process_settings()
     
     bst.CE = 541.7 # year 2016
     bst.PowerUtility.price = price['Electricity']
@@ -213,6 +212,7 @@ def load_process_settings():
     _hps.T = 266 + 273.15
     
     # _lps.heat_transfer_efficiency = 0.900
+    # _lps.heat_transfer_efficiency = 0.950
     # # Do this OR bst.default() since both do the same thing:
     # _lps.T = 412.19
     # _lps.P = 344738.

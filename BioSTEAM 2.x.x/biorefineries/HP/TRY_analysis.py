@@ -310,7 +310,7 @@ def reset_and_reload():
     spec.load_titer(54.8)
     system.simulate()
     print('Loading and simulating with required specifications ...')
-    spec.load_specifications(spec_1=spec_1, spec_2=spec_2)
+    spec.load_specifications(spec_1=spec_1, spec_2=spec_2, spec_3=spec_3)
     system.simulate()
     
 def reset_and_switch_solver(solver_ID):
@@ -356,7 +356,7 @@ baseline_sample = model.get_baseline_sample()
 
 # Setup
 np.random.seed(3221)
-N_simulation = 40 # number of simulations at each point
+N_simulation = 30 # number of simulations at each point
 samples = model.sample(N=N_simulation, rule='L')
 model.load_samples(samples)
 
@@ -376,7 +376,7 @@ def model_specification():
         for unit in pre_evaporator_units_path:
             unit._run()
         spec.titer_inhibitor_specification.run_units()
-        spec.load_specifications(spec_1=spec.spec_1, spec_2=spec.spec_2)
+        spec.load_specifications(spec_1=spec.spec_1, spec_2=spec.spec_2, spec_3=spec.spec_3)
         model._system.simulate()
     except Exception as e:
         str_e = str(e)
@@ -433,6 +433,7 @@ def get_p_financial_viability():
 
 # HP_metrics = [solve_AA_price, get_HP_inhibitors_conc]
 # HP_metrics = [solve_AA_price, get_HP_sugars_conc, get_HP_inhibitors_conc]
+
 # HP_metrics = [solve_AA_price, get_p_financial_viability, get_FEC]
 
 
@@ -440,14 +441,14 @@ HP_metrics = [solve_AA_price, get_GWP, get_FEC]
 
 # HP_metrics = [solve_AA_price, lambda:0, lambda:0]
 # %% Generate 3-specification meshgrid and set specification loading functions
-steps = 20
+steps = 50
 
 # Yield, titer, productivity (rate)
-spec_1 = np.linspace(0.1, 0.95, steps) # yield
+spec_1 = np.linspace(0.05, 0.95, steps) # yield
 spec_2 = np.linspace(5., 330., steps) # titer
 # spec_1 = np.linspace(0.2, 0.99, steps) # yield
 # spec_2 = np.linspace(45, 225, steps) # titer
-spec_3 = np.array([0.76]) # productivity
+spec_3 = np.array([0.87]) # productivity
 spec.load_spec_1 = spec.load_yield
 spec.load_spec_2 = spec.load_titer
 spec.load_spec_3 = spec.load_productivity
@@ -464,7 +465,7 @@ spec_3_units = "$\mathrm{g} \cdot \mathrm{L}^{-1} \cdot \mathrm{hr}^{-1}$"
 
 
 # # Feedstock carbohydrate or sugar %, feedstock price, productivity (rate)
-# spec_1 = np.linspace(0.1, 0.99, steps) # feedstock carbohydrate %
+# spec_1 = np.linspace(0.25, 0.99, steps) # feedstock carbohydrate %
 # spec_2 = np.linspace(1., 200., steps) # feedstock price
 # # spec_1 = np.linspace(0.2, 0.99, steps) # yield
 # # spec_2 = np.linspace(45, 225, steps) # titer

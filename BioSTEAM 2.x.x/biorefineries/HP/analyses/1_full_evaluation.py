@@ -55,7 +55,7 @@ percentiles = [0, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 1]
 # =============================================================================
 # Evaluate and organize results for Monte Carlo analysis
 # =============================================================================
-
+spec.load_specifications(spec_1=0.49, spec_2=54.8, spec_3=0.76)
 # Initiate a timer
 timer = TicToc('timer')
 timer.tic()
@@ -127,11 +127,15 @@ pre_evaporator_units_path = full_path[0:evaporator_index]
 def model_specification():
     try:
         # model._system._converge()
+        spec.pre_conversion_units.simulate()
         for unit in pre_evaporator_units_path:
             unit._run()
         spec.titer_inhibitor_specification.run_units()
         spec.load_specifications(spec_1=spec.spec_1, spec_2=spec.spec_2, spec_3=spec.spec_3)
-        model._system.simulate()
+        
+        for i in range(2):
+            model._system.simulate()
+        
     except Exception as e:
         str_e = str(e)
         print('Error in model spec: %s'%str_e)
@@ -183,8 +187,9 @@ LCA_results = \
 LCA_percentiles = LCA_results.quantile(q=percentiles)
 
 # Spearman's rank correlation
-spearman_metrics = model.metrics[0:2] + model.metrics[6:8] + \
-    model.metrics[models.index_IRR:models.index_IRR+2]
+spearman_metrics = model.metrics[0:3] + model.metrics[6:8] + \
+    (model.metrics[-25],) + (model.metrics[-24],)
+    # model.metrics[models.index_IRR:models.index_IRR+2]
     
 model.table = model.table.dropna()
 spearman_parameters = parameters
