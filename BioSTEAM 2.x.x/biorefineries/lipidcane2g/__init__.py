@@ -154,6 +154,7 @@ def load(name, agile=False):
         lipidcane_sys = create_lipidcane_to_biodiesel_and_ethanol_1_and_2g_bagasse_expression(
             operating_hours=operating_hours,
         )
+        rename_storage_units(1300)
     elif name == 0 or name == '1g':
         lipidcane_sys = create_lipidcane_to_biodiesel_and_ethanol_1g(
             operating_hours=operating_hours,
@@ -202,12 +203,12 @@ def load(name, agile=False):
         dct.update(flowsheet.to_dict())
     
     for i in lipidcane_sys.units:
-        if getattr(i, 'tag', None) == 'lipid extraction efficiency unit a':
+        if getattr(i, 'tag', None) == 'lipid extraction efficiency':
             isplit_a = i.isplit
             break
     
     for i in lipidcane_sys.units:
-        if getattr(i, 'tag', None) == 'lipid extraction efficiency unit b':
+        if getattr(i, 'tag', None) == 'bagasse lipid retention':
             isplit_b = i.isplit
             break
     

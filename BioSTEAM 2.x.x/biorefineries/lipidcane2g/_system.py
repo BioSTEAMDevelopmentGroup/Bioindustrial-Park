@@ -64,7 +64,7 @@ def create_lipid_expression_system(ins, outs):
     U801.cost_items = U801.cost_items.copy() 
     U801.cost_items['Screw press'] = cost_item = U801.cost_items['Screw press'].copy()
     cost_item.ub = 24000
-    U801.tag = "lipid extraction efficiency unit b"
+    U801.tag = "lipid extraction efficiency"
 
 @SystemFactory(
     ID='post_fermentation_lipid_separation_sys',
@@ -86,7 +86,7 @@ def create_post_fermentation_lipid_separation_system(ins, outs):
     P607 = bst.Pump('P607', Ev607-0)
     C603_2 = bst.LiquidsSplitCentrifuge('C603_2', P607-0, (lipid, wastewater), 
                                         split={'Lipid':0.99})
-    C603_2.tag = "lipid extraction efficiency unit b"
+    C603_2.tag = "lipid extraction efficiency"
     
 
 @SystemFactory(
@@ -137,7 +137,7 @@ def create_lipidcane_to_biodiesel_and_ethanol_1g(
     bagasse_lipid, pressed_bagasse = lipid_expression_sys.outs
     bagasse_lipid.ID = 'bagasse_lipid'
     crushing_mill = udct['U201']
-    crushing_mill.tag = "lipid extraction efficiency unit a"
+    crushing_mill.tag = "bagasse lipid retention"
     crushing_mill.isplit['Lipid'] = 0.95
     
     if front_end_oil_separation:
@@ -261,7 +261,7 @@ def create_lipidcane_to_biodiesel_and_ethanol_1_and_2g_bagasse_expression(
     bagasse_lipid, pressed_bagasse = lipid_expression_sys.outs
     bagasse_lipid.ID = 'bagasse_lipid'
     crushing_mill = udct['U201']
-    crushing_mill.tag = "lipid extraction efficiency unit a"
+    crushing_mill.tag = "bagasse lipid retention"
     crushing_mill.isplit['Lipid'] = 0.95
     
     if front_end_oil_separation:
@@ -438,7 +438,7 @@ def create_lipidcane_to_biodiesel_and_ethanol_divided_1_and_2g_hydrolyzate_oil_s
     )
     crushing_mill = jle_dct['U201']
     crushing_mill.isplit['Lipid'] = 0.95
-    crushing_mill.tag = "lipid extraction efficiency unit a"
+    crushing_mill.tag = "bagasse lipid retention"
     screened_juice, frontend_lipid, bagasse, fiber_fines, spent_oil_wash_water = juicing_and_lipid_extraction_sys.outs
     frontend_lipid.ID = 'frontend_lipid'
     cellulose_rxn = tmo.Reaction('Cellulose -> Glucan', 'Cellulose', 1.0, basis='wt')
@@ -627,7 +627,7 @@ def create_lipidcane_to_biodiesel_and_ethanol_divided_1_and_2g_post_fermentation
         screened_juice, bagasse, fiber_fines = juicing_sys.outs
     
     crushing_mill = udct['U201']
-    crushing_mill.tag = "lipid extraction efficiency unit a"
+    crushing_mill.tag = "bagasse lipid retention"
     crushing_mill.isplit['Lipid'] = 0.95
     cellulose_rxn = tmo.Reaction('Cellulose -> Glucan', 'Cellulose', 1.0, basis='wt')
     cellulose_rxn.basis = 'mol'
@@ -812,7 +812,7 @@ def create_lipidcane_to_biodiesel_and_ethanol_combined_1_and_2g_post_fermentatio
         screened_juice, bagasse, fiber_fines = juicing_sys.outs
     
     crushing_mill = udct['U201']
-    crushing_mill.tag = "lipid extraction efficiency unit a"
+    crushing_mill.tag = "bagasse lipid retention"
     crushing_mill.isplit['Lipid'] = 0.95
     cellulose_rxn = tmo.Reaction('Cellulose -> Glucan', 'Cellulose', 1.0, basis='wt')
     cellulose_rxn.basis = 'mol'
