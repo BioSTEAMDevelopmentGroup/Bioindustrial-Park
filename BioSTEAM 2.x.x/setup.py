@@ -24,6 +24,7 @@ setup(
                            'cornstover/*', 
                            'corn/*',
                            'cornstover/_humbird2011.xlsx',
+                           'lactic/*,
                            'sugarcane/*',
                            'fattyalcohols/*',
                            'fattyalcohols/units/*',
