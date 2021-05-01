@@ -45,7 +45,6 @@ from biorefineries.lactic._units import (
     SulfuricAcidAdditionTank,
     SulfuricAcidMixer,
     PretreatmentMixer,
-    SteamMixer,
     AcidPretreatment,
     BlowdownTank,
     OligomerConversionTank,
