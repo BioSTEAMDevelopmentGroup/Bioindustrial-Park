@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 # BioSTEAM: The Biorefinery Simulation and Techno-Economic Analysis Modules
-# Copyright (C) 2020, Yoel Cortes-Pena <yoelcortes@gmail.com>
+# Copyright (C) 2020-2021, Yoel Cortes-Pena <yoelcortes@gmail.com>
 # Bioindustrial-Park: BioSTEAM's Premier Biorefinery Models and Results
-# Copyright (C) 2020, Yalin Li <yalinli2@illinois.edu>,
+# Copyright (C) 2020-2021, Yalin Li <yalinli2@illinois.edu>,
 # Sarang Bhagwat <sarangb2@illinois.edu>, and Yoel Cortes-Pena (this biorefinery)
 # 
 # This module is under the UIUC open-source license. See 
@@ -22,9 +22,8 @@ import pandas as pd
 import biosteam as bst
 from biosteam.utils import TicToc
 from biosteam.plots import plot_montecarlo_across_coordinate
-from biorefineries.lactic.systems import \
+from biorefineries.lactic import create_model, \
     SSCF_flowsheet, SSCF_funcs, SHF_flowsheet, SHF_funcs
-from biorefineries.lactic.analyses import create_model
 
 
 # %%
@@ -71,7 +70,7 @@ def evaluate_uncertainties(kind='SSCF', seed=None, N_simulation=1000,
     baseline_end = model.metrics_at_baseline()
     baseline = baseline.append(baseline_end, ignore_index=True)
     baseline.index = ('initial', 'end')
-    baseline.to_excel('0_baseline.xlsx')
+    # baseline.to_excel('0_baseline.xlsx')
     
     # Parameters
     parameters = model.get_parameters()
@@ -101,7 +100,7 @@ def evaluate_uncertainties(kind='SSCF', seed=None, N_simulation=1000,
         
     model.table = model.table.dropna()
     spearman_parameters = parameters
-    spearman_results = model.spearman(spearman_parameters, spearman_metrics)
+    spearman_results = model.spearman_r(spearman_parameters, spearman_metrics)[0]
     spearman_results.columns = pd.Index([i.name_with_units for i in spearman_metrics])
     
     # Calculate the cumulative probabilitie of each parameter
@@ -205,12 +204,8 @@ def evaluate_uncertainties(kind='SSCF', seed=None, N_simulation=1000,
             one_p_df.to_excel(writer, sheet_name='One-parameter')
             model.table.to_excel(writer, sheet_name='Raw data')
 
-
-
-
-
-
-
-
+evaluate_uncertainties(kind='SSCF', seed=None, N_simulation=1000, sampling_rule='L',
+                       percentiles = [0, 0.05, 0.25, 0.5, 0.75, 0.95, 1],
+                       if_plot=True, report_name='1_full_evaluation.xlsx')
 
 

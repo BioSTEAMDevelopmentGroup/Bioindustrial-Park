@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 # BioSTEAM: The Biorefinery Simulation and Techno-Economic Analysis Modules
-# Copyright (C) 2020, Yoel Cortes-Pena <yoelcortes@gmail.com>
+# Copyright (C) 2020-2021, Yoel Cortes-Pena <yoelcortes@gmail.com>
 # Bioindustrial-Park: BioSTEAM's Premier Biorefinery Models and Results
-# Copyright (C) 2020, Yalin Li <yalinli2@illinois.edu>,
+# Copyright (C) 2020-2021, Yalin Li <yalinli2@illinois.edu>,
 # Sarang Bhagwat <sarangb2@illinois.edu>, and Yoel Cortes-Pena (this biorefinery)
 # 
 # This module is under the UIUC open-source license. See 
@@ -33,7 +33,7 @@ from biosteam.units.decorators import cost
 from thermosteam import Stream
 from thermosteam.reaction import Reaction as Rxn
 from thermosteam.reaction import ParallelReaction as ParallelRxn
-from biorefineries.lactic._utils import CEPCI
+from ._utils import CEPCI
 
 __all__ = ('ADP', 'CIP', 'CT', 'PWC', 'CHP')
 
@@ -367,7 +367,7 @@ class CHP(Facility):
             if not side_streams_lps:
                 side_streams_lps = self.side_streams_lps = HeatUtility()
                 side_streams_lps.load_agent(lps)
-            side_streams_lps(duty=sum([i.H for i in side_streams_to_heat]), 
+            side_streams_lps(unit_duty=sum([i.H for i in side_streams_to_heat]), 
                              T_in=298.15)
             system_heating_utilities['CHP - side_streams_lps'] = side_streams_lps
 
@@ -388,7 +388,7 @@ class CHP(Facility):
             # Take the opposite for cooling duty (i.e., cooling duty should be negative)
             # this is to condense the unused steam
             cooling_need = self.cooling_need = -(CHP_heat_surplus-electricity_generated*3600)
-            hu_cooling(duty=cooling_need, T_in=lps.T)
+            hu_cooling(unit_duty=cooling_need, T_in=lps.T)
             natural_gas.empty()
             
         # CHP cannot meet system heating/steam demand, supplement with natural gas

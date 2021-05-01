@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 # BioSTEAM: The Biorefinery Simulation and Techno-Economic Analysis Modules
-# Copyright (C) 2020, Yoel Cortes-Pena <yoelcortes@gmail.com>
+# Copyright (C) 2020-2021, Yoel Cortes-Pena <yoelcortes@gmail.com>
 # Bioindustrial-Park: BioSTEAM's Premier Biorefinery Models and Results
-# Copyright (C) 2020, Yalin Li <yalinli2@illinois.edu>,
+# Copyright (C) 2020-2021, Yalin Li <yalinli2@illinois.edu>,
 # Sarang Bhagwat <sarangb2@illinois.edu>, and Yoel Cortes-Pena (this biorefinery)
 # 
 # This module is under the UIUC open-source license. See 
@@ -21,11 +21,13 @@ import numpy as np
 import biosteam as bst
 from biosteam.evaluation import Model, Metric
 from chaospy import distributions as shape
-from biorefineries.lactic._settings import CFs
-from biorefineries.lactic._utils import set_yield, _feedstock_factor
-from biorefineries.lactic.systems import simulate_and_print, \
+from ._settings import CFs
+from ._utils import set_yield, _feedstock_factor
+from .systems import simulate_and_print, \
     SSCF_flowsheet, SSCF_groups, SSCF_teas, SSCF_funcs, \
     SHF_flowsheet, SHF_groups, SHF_teas, SHF_funcs
+
+__all__ = ('create_model',)
 
 
 # %% 
@@ -69,7 +71,7 @@ def create_model(kind='SSCF'):
     
     feedstock = s.feedstock
     # Yield in 10^6 kg/yr
-    lactic_no_CHP_tea = teas['lactic_no_CHP_tea']
+    # lactic_no_CHP_tea = teas['lactic_no_CHP_tea']
     get_annual_factor = lambda: lactic_tea.operating_days*24
     get_total_yield = lambda: lactic_acid.F_mass*get_annual_factor()/1e6
     # Yield in % of dry feedstock
@@ -390,13 +392,15 @@ def create_model(kind='SSCF'):
     @param(name='TCI ratio', element='TEA', kind='isolated', units='% of baseline',
             baseline=1, distribution=D)
     def set_TCI_ratio(new_ratio):
-        old_ratio = lactic_no_CHP_tea._TCI_ratio_cached
+        old_ratio = lactic_tea._TCI_ratio_cached
+        # old_ratio = lactic_no_CHP_tea._TCI_ratio_cached
         for unit in lactic_sys.units:
             if hasattr(unit, 'cost_items'):
                 for item in unit.cost_items:
                     unit.cost_items[item].cost /= old_ratio
                     unit.cost_items[item].cost *= new_ratio
-        lactic_no_CHP_tea._TCI_ratio_cached = new_ratio
+        lactic_tea._TCI_ratio_cached = new_ratio
+        # lactic_no_CHP_tea._TCI_ratio_cached = new_ratio
     
     # Only include materials that account for >5% of total annual material cost,
     # enzyme not included as it's cost is more affected by the loading (considered later)

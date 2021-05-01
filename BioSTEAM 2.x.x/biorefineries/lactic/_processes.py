@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 # BioSTEAM: The Biorefinery Simulation and Techno-Economic Analysis Modules
-# Copyright (C) 2020, Yoel Cortes-Pena <yoelcortes@gmail.com>
+# Copyright (C) 2020-2021, Yoel Cortes-Pena <yoelcortes@gmail.com>
 # Bioindustrial-Park: BioSTEAM's Premier Biorefinery Models and Results
-# Copyright (C) 2020, Yalin Li <yalinli2@illinois.edu>,
+# Copyright (C) 2020-2021, Yalin Li <yalinli2@illinois.edu>,
 # Sarang Bhagwat <sarangb2@illinois.edu>, and Yoel Cortes-Pena (this biorefinery)
 # 
 # This module is under the UIUC open-source license. See 
@@ -63,15 +63,20 @@ import biosteam as bst
 from flexsolve import aitken_secant, IQ_interpolation
 from biosteam import Stream, System
 from biosteam.process_tools import UnitGroup
-from biorefineries.lactic import _units as units
-from biorefineries.lactic import _facilities as facilities
-from biorefineries.lactic._settings import price, CFs
-from biorefineries.lactic._utils import baseline_feedflow, _kg_per_ton, set_yield, \
-    cell_mass_split, gypsum_split, AD_split, MB_split
-from biorefineries.lactic._chemicals import chems, sugars, soluble_organics, \
-    solubles, insolubles, COD_chemicals, combustibles
-from biorefineries.lactic._tea import LacticTEA
 from biorefineries import BST222
+
+from . import (
+    _units as units,
+    _facilities as facilities
+    )
+
+from ._settings import price, CFs
+from ._utils import baseline_feedflow, _kg_per_ton, set_yield, \
+    cell_mass_split, gypsum_split, AD_split, MB_split
+from ._chemicals import chems, sugars, soluble_organics, \
+    solubles, insolubles, COD_chemicals, combustibles
+from ._tea import LacticTEA
+
 
 __all__ = (
     'update_settings',
@@ -176,7 +181,7 @@ def create_pretreatment_process(flowsheet, groups, feed, get_feedstock_dry_mass)
     M202 = units.PretreatmentMixer('M202', ins=(feed, M201-0, water_M202))
     
     # Mix feedstock/sulfuric acid mixture and steam
-    M203 = units.SteamMixer('M203', ins=(M202-0, steam_M203), P=5.5*101325)
+    M203 = bst.SteamMixer('M203', ins=(M202-0, steam_M203), P=5.5*101325)
     R201 = units.AcidPretreatment('R201', ins=M203-0, outs=('R201_g', 'R201_l'))
     
     # Pump bottom of the pretreatment products to the oligomer conversion tank

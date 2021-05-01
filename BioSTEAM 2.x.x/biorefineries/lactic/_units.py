@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 # BioSTEAM: The Biorefinery Simulation and Techno-Economic Analysis Modules
-# Copyright (C) 2020, Yoel Cortes-Pena <yoelcortes@gmail.com>
+# Copyright (C) 2020-2021, Yoel Cortes-Pena <yoelcortes@gmail.com>
 # Bioindustrial-Park: BioSTEAM's Premier Biorefinery Models and Results
-# Copyright (C) 2020, Yalin Li <yalinli2@illinois.edu>,
+# Copyright (C) 2020-2021, Yalin Li <yalinli2@illinois.edu>,
 # Sarang Bhagwat <sarangb2@illinois.edu>, and Yoel Cortes-Pena (this biorefinery)
 # 
 # This module is under the UIUC open-source license. See 
@@ -50,9 +50,9 @@ from biosteam.units.design_tools import PressureVessel
 from biosteam.units.design_tools import pressure_vessel_material_factors as factors
 from biosteam.units.decorators import cost
 from thermosteam import separations
-from biorefineries.lactic._settings import price, auom
-from biorefineries.lactic._chemicals import sugars, COD_chemicals, solubles, insolubles
-from biorefineries.lactic._utils import CEPCI, baseline_feedflow, compute_lactic_titer, \
+from ._settings import price, auom
+from ._chemicals import sugars, COD_chemicals, solubles, insolubles
+from ._utils import CEPCI, baseline_feedflow, compute_lactic_titer, \
     compute_extra_chemical, adjust_recycle, compute_COD
 
 _MGD_2_m3hr = auom('gallon').conversion_factor('m3')*1e6/24
@@ -151,33 +151,6 @@ class PretreatmentMixer(Mixer):
         
         mixture_out.mix_from([mixture, water])
 
-# Mix steams for pretreatment reactor heating
-class SteamMixer(Unit):
-    _N_ins = 2
-    _N_outs = 1
-    
-    def __init__(self, ID='', ins=None, outs=(), *, P):
-        Unit.__init__(self, ID, ins, outs)
-        self.P = P
-        
-    @staticmethod
-    def P_at_flow(mol_water, P, steam, mixed, feed):
-        steam.imol['Water'] = mol_water
-        mixed.mol = steam.mol + feed.mol
-        mixed.H = feed.H + steam.H
-        P_new = mixed.chemicals.Water.Psat(mixed.T)
-        return P_new-P
-    
-    def _run(self):
-        feed, steam = self.ins
-        mixed = self.outs[0]
-
-        steam_mol = steam.F_mol
-        steam_mol = aitken_secant(f=self.P_at_flow,
-                                  x0=steam_mol, x1=steam_mol+0.1, 
-                                  xtol=1e-4, ytol=1e-4,
-                                  args=(self.P, steam, mixed, feed))
-        mixed.P = self.P
 
 @cost(basis='Dry flow rate', ID='Pretreatment reactor', units='kg/hr',
       kW=5120, cost=19812400, S=83333, CE=CEPCI[2009], n=0.6, BM=1.5)
@@ -264,7 +237,7 @@ class PretreatmentFlash(Flash):
         influent = self.ins[0]
         vapor, liquid = self.outs
         
-        ms = tmo.MultiStream('ms')
+        ms = tmo.MultiStream()
         ms.copy_like(influent)
         ms.vle(P=101325, H=ms.H)
         
@@ -314,7 +287,7 @@ class WasteVaporCondenser(HXutility):
     
     def _design(self):
         self.heat_utilities[0](self.Hnet, self.ins[0].T, self.outs[0].T)
-        self.Q = self.design_results['Duty'] = self.Hnet
+        self.design_results['Duty'] = self.Hnet
 
 # Transport hydrolysate to enzymatic hydrolysis and fermentation
 @cost(basis='Flow rate', ID='Pump', units='kg/hr',
@@ -504,15 +477,15 @@ class SaccharificationAndCoFermentation(Unit):
         mixture = Stream()
         mixture.mix_from(self.ins[0:3])
         Design['Duty'] = self.saccharified_stream.H  - mixture.H
-        hu_cooling(duty=Design['Duty'], T_in=mixture.T)
+        hu_cooling(unit_duty=Design['Duty'], T_in=mixture.T)
     
     def _cost(self):
         super()._cost()
         self._decorated_cost()
         # Adjust fermenter cost for acid-resistant scenario
         if not self.neutralization:
-            self.purchase_costs['Fermenter'] *= _316_over_304
-            self.purchase_costs['Agitator'] *= _316_over_304
+            self.baseline_purchase_costs['Fermenter'] *= _316_over_304
+            self.baseline_purchase_costs['Agitator'] *= _316_over_304
     
     @property
     def lactic_yield(self):
@@ -668,7 +641,7 @@ class Reactor(Unit, PressureVessel, isabstract=True):
             
     def _cost(self):
         Design = self.design_results
-        purchase_costs = self.purchase_costs
+        purchase_costs = self.baseline_purchase_costs
         
         if Design['Total volume'] == 0:
             for i, j in purchase_costs.items():
@@ -900,7 +873,7 @@ class CoFermentation(Reactor):
 
     def _cost(self):
         Design = self.design_results
-        purchase_costs = self.purchase_costs
+        purchase_costs = self.baseline_purchase_costs
         purchase_costs.clear()
         hx = self.heat_exchanger
 
@@ -1148,7 +1121,7 @@ class AcidulationReactor(Reactor):
     
     def _cost(self):
         if self.bypass:
-            self.purchase_costs.clear()
+            self.baseline_purchase_costs.clear()
         else: super()._cost()
         
 # Filter to separate gypsum from the acidified fermentation broth
@@ -1182,7 +1155,7 @@ class GypsumFilter(SolidsSeparator):
 
     def _cost(self):
         if self.bypass:
-            self.purchase_costs.clear()
+            self.baseline_purchase_costs.clear()
         else: self._decorated_cost()
 
 class Esterification(Reactor):
@@ -1408,8 +1381,8 @@ class Esterification(Reactor):
         hu_single_rx = hx.heat_utilities[0]
         hu_total.copy_like(hu_single_rx)
         hu_total.scale(N)
-        self.purchase_costs['Heat exchangers'] = hx.purchase_cost * N
-        self.purchase_costs['Amberlyst-15 catalyst'] = self.mcat * price['Amberlyst15']
+        self.baseline_purchase_costs['Heat exchangers'] = hx.purchase_cost * N
+        self.baseline_purchase_costs['Amberlyst-15 catalyst'] = self.mcat * price['Amberlyst15']
         
 class HydrolysisReactor(Reactor):
     """
@@ -1828,7 +1801,7 @@ class SpecialStorage(StorageTank):
     def _cost(self):
         if self.ins[0].F_mol == 0:
             self.design_results['Number of tanks'] = 0
-            self.purchase_costs['Tanks'] = 0
+            self.baseline_purchase_costs['Tanks'] = 0
         else: StorageTank._cost(self)
 
 @cost(basis='Flow rate', ID='Tank', units='kg/hr',

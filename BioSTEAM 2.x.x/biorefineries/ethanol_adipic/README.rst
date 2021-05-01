@@ -183,14 +183,3 @@ Processes:
                         Glucose            16.6
                         GlucoseOligomer    0.78
                         ...
-
-
-Analyses
---------
-Work ongoing, coming soon...
-
-
-
-
-
-

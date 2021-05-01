@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 # BioSTEAM: The Biorefinery Simulation and Techno-Economic Analysis Modules
-# Copyright (C) 2020, Yoel Cortes-Pena <yoelcortes@gmail.com>
+# Copyright (C) 2020-2021, Yoel Cortes-Pena <yoelcortes@gmail.com>
 # Bioindustrial-Park: BioSTEAM's Premier Biorefinery Models and Results
-# Copyright (C) 2020, Yalin Li <yalinli2@illinois.edu> (this biorefinery)
+# Copyright (C) 2020-2021, Yalin Li <yalinli2@illinois.edu> (this biorefinery)
 # 
 # This module is under the UIUC open-source license. See 
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
@@ -146,7 +146,7 @@ class DeacetylationReactor(Unit):
     def _design(self):
         # Use Hnet (as opposed to H_out-H_in when there are reactions/change of materials)
         duty = self.Hnet
-        self.heat_utilities[0](duty=duty, T_in=self.ins[0].T)
+        self.heat_utilities[0](unit_duty=duty, T_in=self.ins[0].T)
         self.design_results['Duty'] = duty
         self.design_results['Dry flow'] = \
             self.ins[0].imass[insolubles].sum()
@@ -285,7 +285,7 @@ class SaccharificationAndCoFermentation(Unit):
         ss_in = ss.copy()
         ss_in.mix_from(self.ins)
         # To cool or heat hydrolysate to the fermentation temperature
-        hu_hydrolysate(duty=ss.H-ss_in.H, T_in=ss_in.T)
+        hu_hydrolysate(unit_duty=ss.H-ss_in.H, T_in=ss_in.T)
         
         mol = ss.mol
         duty = (mixture.H('l', mol, self.T_fermentation, 101325.)
@@ -448,7 +448,7 @@ class PulpingReactor(Unit):
         
     def _design(self):
         duty = self.Hnet
-        self.heat_utilities[0](duty=duty, T_in=self.T_in)
+        self.heat_utilities[0](unit_duty=duty, T_in=self.T_in)
         self.design_results['Flow rate'] = self.F_mass_out
 
 
@@ -617,7 +617,7 @@ class MuconicFermentation(Unit):
         mixture = self.ins[0].copy()
         mixture.mix_from(self.ins)
         duty = self.Hnet
-        self.heat_utilities[0](duty=duty, T_in=mixture.T)
+        self.heat_utilities[0](unit_duty=duty, T_in=mixture.T)
         self.design_results['Flow rate'] = self.outs[1].F_mass
 
 
@@ -707,7 +707,7 @@ class MuconicCrystallizer(Unit):
         
     def _design(self):
         duty = self.H_out - self.H_in
-        self.heat_utilities[0](duty=duty, T_in=self.T_in)
+        self.heat_utilities[0](unit_duty=duty, T_in=self.T_in)
         Design = self.design_results
         Design['Volumetric flow in'] = self.F_vol_in
         Design['Volumetric flow crystal'] = self.outs[1].F_vol
@@ -792,7 +792,7 @@ class MuconicHydrogenation(Unit):
         adipic.T = self.T
         adipic.P = self.P
         duty = adipic.H - adipic_cold.H
-        self.heat_utilities[0](duty=duty, T_in=adipic.T)
+        self.heat_utilities[0](unit_duty=duty, T_in=adipic.T)
         self.hydrogenation_rxn(adipic)
         
     def _design(self):
@@ -806,9 +806,9 @@ class MuconicHydrogenation(Unit):
     # but was stated in text/table
     def _cost(self):
         self._decorated_cost()
-        self._BM['Ru/C catalyst'] = 1
+        self._F_BM_default['Ru/C catalyst'] = 1
         # WHSV (feed mass flow/catalyst mass=5/hr)
-        self.purchase_costs['Ru/C catalyst'] = self.ins[0].F_mass/5 \
+        self.baseline_purchase_costs['Ru/C catalyst'] = self.ins[0].F_mass/5 \
             * price['Hydrogenation catalyst']
 
 
@@ -841,7 +841,7 @@ class AdipicEvaporator(Unit):
         ethanol.T = adipic_concentrated.T = adipic_total.T
 
         duty = self.design_results['Duty'] = self.H_out - self.H_in
-        self.heat_utilities[0](duty=duty, T_in=adipic_total.T)
+        self.heat_utilities[0](unit_duty=duty, T_in=adipic_total.T)
         self.design_results['Flow rate'] = self.F_mass_in
         
 
@@ -880,7 +880,7 @@ class AdipicCrystallizer(Unit):
         Design['Volumetric flow'] = self.outs[1].F_vol
         Design['Crystal flow'] = self.outs[1].F_mass
         duty = self.H_out - self.H_in
-        self.heat_utilities[0](duty=duty, T_in=self.ins[0].T)
+        self.heat_utilities[0](unit_duty=duty, T_in=self.ins[0].T)
         
 @cost(basis='Duty', ID='Condenser', units='kJ/hr',
       # -23 is the duty in MMkca/hr
@@ -938,7 +938,7 @@ class SodiumSulfateRecovery(Unit):
     
     def _design(self):
         Design = self.design_results
-        self.heat_utilities[0](duty=self.design_results['Duty'], T_in=self.ins[0].T)
+        self.heat_utilities[0](unit_duty=self.design_results['Duty'], T_in=self.ins[0].T)
         Design['Flow rate'] = self.F_mass_in
         Design['Salt flow'] = (self.F_mass_out-self.outs[0].F_mass)
         # Based on equipment sizing in ref [2]
