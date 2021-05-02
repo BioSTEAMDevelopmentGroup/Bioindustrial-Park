@@ -618,11 +618,11 @@ metrics.extend((Metric('FEC - natural gas',
                        'MJ/kg', 'LCA'),))
 
 # Electricity
-metrics.extend((Metric('GWP - electricity',
-                       lambda:get_electricity_GWP(),
+metrics.extend((Metric('GWP - electricity non-cooling',
+                       lambda:get_electricity_demand_non_cooling_GWP(),
                        'kg CO2/kg', 'LCA'),))
-metrics.extend((Metric('FEC - electricity',
-                       lambda:get_electricity_FEC(),
+metrics.extend((Metric('FEC - electricity non-cooling',
+                       lambda:get_electricity_demand_non_cooling_FEC(),
                        'MJ/kg', 'LCA'),))
 
 # Feedstock growth, harvesting, transportation, and preprocessing
@@ -902,8 +902,8 @@ def set_R302_HP_titer(X):
     
 ##############################################################################################
 
-D = shape.Triangle(0.030, 0.040, 0.050)
-@param(name='Acetic acid yield', element=R303, kind='coupled', units='% theoretical',
+D = shape.Triangle(0.032, 0.040, 0.048)
+@param(name='Acetic acid and glycerol yield', element=R303, kind='coupled', units='% theoretical',
         baseline=0.040, distribution=D)
 def set_R301_acetic_acid_yield(X): 
     # 1e6 is to avoid generating tiny negative flow (e.g., 1e-14) in R301
@@ -1001,7 +1001,7 @@ def set_R401_tau(tau):
 
 R402 = find.unit.R402
 # D = baseline_triangle(0.95, 0.05)
-D = shape.Triangle(0.7, 0.8, 0.9)
+D = shape.Triangle(0.64, 0.8, 0.96)
 @param(name='Dehydration conversion', element=R402, kind='coupled', units='',
        baseline=0.8, distribution=D)
 def set_R402_conversion(X):

@@ -444,8 +444,9 @@ def create_HP_sys(ins, outs):
     M401 = bst.units.Mixer('M401', ins=(separation_hexanol,
                                         ''))
     
-    F401 = bst.units.MultiEffectEvaporator('F401', ins=S402-1, outs=('F401_l', 'F401_g'),
+    M401_H = bst.units.HXutility('M401_H', ins = M401-0, T = 80. + 273.15, rigorous = False)
     
+    F401 = bst.units.MultiEffectEvaporator('F401', ins=S402-1, outs=('F401_l', 'F401_g'),
                                             P = (101325, 73581, 50892, 32777, 20000), V = 0.5)
     # target_water_x = 0.35
     target_HP_x = 0.10
@@ -471,16 +472,16 @@ def create_HP_sys(ins, outs):
         F401._installed_cost = 0.
     # F401._cost = F401_no_run_cost
         
-    
-    F401_P = bst.units.Pump('F401_P', ins=F401-0)
+    F401_H = bst.units.HXutility('F401_H', ins = F401-0, T = 80. + 273.15, rigorous = False)
+    F401_P = bst.units.Pump('F401_P', ins=F401_H-0)
 
     
-    Kds = dict(IDs=('HP', 'Water', 'Hexanol'),
+    Kds = dict(IDs=('HP', 'Water', 'Hexanol', 'AceticAcid'),
                # K=np.array([1./1.941747572815534, 3.606, 0.006]),
-               K=np.array([1./1.897092617355942, 3.690183610720956, 0.0060176892697821486]), # T = 330.6 K
+               K=np.array([1./1.9379484051844278, 3.690183610720956, 0.0060176892697821486, 1./0.4867537504125923]), # T = 80. + 273.15 K
                phi = 0.5)
     
-    S404 = bst.units.MultiStageMixerSettlers('S404', ins = (F401_P-0, M401-0),
+    S404 = bst.units.MultiStageMixerSettlers('S404', ins = (F401_P-0, M401_H-0),
                                          outs = ('raffinate', 'extract'),
                                          N_stages = 15, partition_data = Kds,) 
                               
@@ -593,6 +594,7 @@ def create_HP_sys(ins, outs):
             feed_hexanol.imol['Hexanol'] = max(0, reqd_hexanol - existing_hexanol)
         
         M401._run()
+        M401_H._run()
         S404_run()
         
         if existing_hexanol > reqd_hexanol:
