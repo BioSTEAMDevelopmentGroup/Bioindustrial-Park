@@ -71,6 +71,9 @@ biorefineries/lactic/_units.py
 biorefineries/lactic/_utils.py
 biorefineries/lactic/models.py
 biorefineries/lactic/systems.py
+biorefineries/lactic/analyses/1_uncertainties.py
+biorefineries/lactic/analyses/2_fermentation_TRY.py
+biorefineries/lactic/analyses/3_feedstock_carb-price.py
 biorefineries/lipidcane/README.rst
 biorefineries/lipidcane/__init__.py
 biorefineries/lipidcane/_analysis.py
