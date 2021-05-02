@@ -60,6 +60,17 @@ biorefineries/fattyalcohols/utils.py
 biorefineries/fattyalcohols/units/__init__.py
 biorefineries/fattyalcohols/units/fatty_alcohol_bioreactor.py
 biorefineries/fattyalcohols/units/slle_centrifuge.py
+biorefineries/lactic/README.rst
+biorefineries/lactic/__init__.py
+biorefineries/lactic/_chemicals.py
+biorefineries/lactic/_facilities.py
+biorefineries/lactic/_processes.py
+biorefineries/lactic/_settings.py
+biorefineries/lactic/_tea.py
+biorefineries/lactic/_units.py
+biorefineries/lactic/_utils.py
+biorefineries/lactic/models.py
+biorefineries/lactic/systems.py
 biorefineries/lipidcane/README.rst
 biorefineries/lipidcane/__init__.py
 biorefineries/lipidcane/_analysis.py
