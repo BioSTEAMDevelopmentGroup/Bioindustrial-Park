@@ -89,6 +89,7 @@ Processes:
 
     >>> # You can directly access the Flowsheet, System, and TEA objects
     >>> la.load_system('SSCF')
+    >>> la.simulate_and_print()
     >>> la.flowsheet
     <Flowsheet: SSCF>
     >>> la.lactic_sys.show()
