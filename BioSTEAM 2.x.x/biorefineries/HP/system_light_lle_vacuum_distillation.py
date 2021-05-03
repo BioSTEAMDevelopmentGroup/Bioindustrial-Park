@@ -804,7 +804,7 @@ def create_HP_sys(ins, outs):
     def R501_specification():
         R501.byproducts_combustion_rxns(R501.ins[0])
         R501._run()
-    R501.specification = R501_specification # Comment this out for anything other than TRY analysis
+    # R501.specification = R501_specification # Comment this out for anything other than TRY analysis
     
     get_flow_tpd = lambda: (feedstock.F_mass-feedstock.imass['H2O'])*24/907.185
     
@@ -1038,9 +1038,9 @@ def create_HP_sys(ins, outs):
         HXN.heat_utilities = tuple()
         HXN._installed_cost = 0.
         
-    # HXN._cost = HXN_no_run_cost
-    # HXN.energy_balance_percent_error = 0.
-    # HXN.new_HXs = HXN.new_HX_utils = []
+    HXN._cost = HXN_no_run_cost
+    HXN.energy_balance_percent_error = 0.
+    HXN.new_HXs = HXN.new_HX_utils = []
     
     HXN_group = UnitGroup('HXN_group', 
                                    units=(HXN,))
@@ -1433,7 +1433,7 @@ def get_unit_atomic_balance(unit, atom='C'):
 
 ############################# GWP ###################################
 
-def get_material_GWP():
+def get_material_GWP(): # does not include natural gas as it is an invisible BT stream BT.natural_gas with price BT.natural_gas_price
     chemical_GWP = get_material_GWP_array()
     return sum(chemical_GWP)/AA.F_mass
 
@@ -1501,11 +1501,16 @@ get_steam_frac_electricity_non_cooling = lambda: get_steam_frac_turbogen() * (1-
 get_non_cooling_electricity_demand = lambda: get_electricity_demand() - get_cooling_electricity_demand()
 
 
-get_BT_direct_emissions_GWP = lambda: sum([i.get_atomic_flow('C') for i in BT.outs])*HP_chemicals['CO2'].MW / AA.F_mass
+get_EOL_GWP = lambda: AA.get_atomic_flow('C') * HP_chemicals.CO2.MW/AA.F_mass
 
-get_non_BT_direct_emissions_GWP = lambda: get_emissions_GWP() - get_BT_direct_emissions_GWP()\
-                        - (get_feedstock_CO2_capture() - get_EOL_GWP())
-get_direct_emissions_GWP = lambda: get_non_BT_direct_emissions_GWP() + get_BT_direct_emissions_GWP()
+get_direct_emissions_GWP = lambda: get_emissions_GWP() - (get_feedstock_CO2_capture() - get_EOL_GWP())
+
+get_BT_direct_emissions_GWP = lambda: ((sum([i.get_atomic_flow('C') for i in BT.outs])*HP_chemicals['CO2'].MW / AA.F_mass)\
+    /get_emissions_GWP()) * get_direct_emissions_GWP()
+
+get_non_BT_direct_emissions_GWP = lambda: get_direct_emissions_GWP() - get_BT_direct_emissions_GWP()
+                        # - (get_feedstock_CO2_capture() - get_EOL_GWP())
+# get_direct_emissions_GWP = lambda: get_non_BT_direct_emissions_GWP() + get_BT_direct_emissions_GWP()
 get_total_steam_GWP = lambda: get_ng_GWP() + get_BT_direct_emissions_GWP()
 get_heating_demand_GWP = lambda: get_steam_frac_heating() * get_total_steam_GWP()
 get_cooling_demand_GWP = lambda: get_steam_frac_cooling() * get_total_steam_GWP()
@@ -1520,7 +1525,6 @@ get_electricity_demand_non_cooling_GWP = lambda: get_steam_frac_electricity_non_
 # get_GWP = lambda: get_feedstock_GWP() + get_material_GWP() + get_ng_GWP() +\
 #                   get_electricity_GWP() + get_emissions_GWP()
 
-get_EOL_GWP = lambda: AA.get_atomic_flow('C') * HP_chemicals.CO2.MW/AA.F_mass
 
 get_GWP = lambda: get_FGHTP_GWP() + get_material_GWP() + get_ng_GWP() +\
                   get_net_electricity_GWP() + get_direct_emissions_GWP()
@@ -1598,7 +1602,21 @@ AA_LHV = 31.45 # MJ/kg AA
 get_material_cost = lambda: sum(get_material_cost_array())
 
 
+# Demand TEA contributions
 
+get_net_electricity_VOC = lambda: HP_tea.operating_hours*sum(i.power_utility.cost for i in HP_sys.units)
+
+get_total_steam_VOC = get_ng_cost = lambda: HP_tea.operating_hours*BT.natural_gas_price*BT.natural_gas.F_mass
+
+get_heating_demand_VOC = lambda: get_steam_frac_heating() * get_total_steam_VOC()
+get_cooling_demand_VOC = lambda: get_steam_frac_cooling() * get_total_steam_VOC()
+get_electricity_demand_non_cooling_VOC = lambda: get_steam_frac_electricity_non_cooling() * get_total_steam_VOC() + get_net_electricity_VOC()
+
+def get_VOC():
+    for i in range(2):
+        # AA.price = HP_tea.solve_price(AA, HP_no_BT_tea)
+        HP_tea.solve_price(AA)
+    return HP_tea.VOC
 
 def get_material_cost_array():
     material_cost_array = [i.cost for i in feeds]
