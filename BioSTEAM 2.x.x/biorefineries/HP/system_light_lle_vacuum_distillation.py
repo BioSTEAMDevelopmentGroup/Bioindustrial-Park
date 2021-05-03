@@ -804,7 +804,7 @@ def create_HP_sys(ins, outs):
     def R501_specification():
         R501.byproducts_combustion_rxns(R501.ins[0])
         R501._run()
-    # R501.specification = R501_specification # Comment this out for anything other than TRY analysis
+    R501.specification = R501_specification # Comment this out for anything other than TRY analysis
     
     get_flow_tpd = lambda: (feedstock.F_mass-feedstock.imass['H2O'])*24/907.185
     
@@ -1038,9 +1038,9 @@ def create_HP_sys(ins, outs):
         HXN.heat_utilities = tuple()
         HXN._installed_cost = 0.
         
-    HXN._cost = HXN_no_run_cost
-    HXN.energy_balance_percent_error = 0.
-    HXN.new_HXs = HXN.new_HX_utils = []
+    # HXN._cost = HXN_no_run_cost
+    # HXN.energy_balance_percent_error = 0.
+    # HXN.new_HXs = HXN.new_HX_utils = []
     
     HXN_group = UnitGroup('HXN_group', 
                                    units=(HXN,))

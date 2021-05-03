@@ -54,6 +54,7 @@ def evaluate_across_specs(spec, system,
             system.empty_recycles()
             system.converge_method = solver_ID
             print(f"Trying {solver_ID} ...")
+            spec.load_specifications(spec_1=spec_1, spec_2=spec_2, spec_3=spec_3)
             system.simulate()
             
         def run_bugfix_barrage():
@@ -641,6 +642,7 @@ class TiterAndInhibitorsSpecification:
         if x_titer < self.target_titer: # Evaporate
             self.evaporator.V = V_min = flx.IQ_interpolation(self.titer_objective_function,
                                                              V_min, V_max, ytol=1e-3, maxiter=200) 
+            self.titer_objective_function(V_min)
         elif x_titer > self.target_titer: # Dilute
             self.update_dilution_water(x_titer)
             # self.mixer._run()

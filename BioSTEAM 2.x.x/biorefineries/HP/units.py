@@ -1902,6 +1902,7 @@ class CoFermentation(Reactor):
         self.effluent_titer = compute_HP_titer(effluent)
         
     def _design(self):
+        super()._setup()
         mode = self.mode
         Design = self.design_results
         Design.clear()

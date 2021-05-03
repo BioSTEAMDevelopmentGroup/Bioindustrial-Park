@@ -441,7 +441,7 @@ HP_metrics = [solve_AA_price, get_GWP, get_FEC]
 
 # HP_metrics = [solve_AA_price, lambda:0, lambda:0]
 # %% Generate 3-specification meshgrid and set specification loading functions
-steps = 50
+steps = 10
 
 # Yield, titer, productivity (rate)
 spec_1 = np.linspace(0.05, 0.95, steps) # yield
