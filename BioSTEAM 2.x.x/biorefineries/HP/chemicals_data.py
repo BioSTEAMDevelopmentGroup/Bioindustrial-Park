@@ -117,7 +117,6 @@ CaSO4.Cn.move_up_model_priority('Lastovka solid', 0)
 # =============================================================================
 
 Ethanol = chemical_database('Ethanol')
-Acetate = chemical_database('Acetate', phase='l', Hf=-108992*_cal2joule)
 AmmoniumAcetate = chemical_database('AmmoniumAcetate', phase='l', 
                                          Hf=-154701*_cal2joule)
 
@@ -144,6 +143,9 @@ CalciumSuccinate = chemical_database('CalciumSuccinate', phase='l')
 # =============================================================================
 
 AceticAcid = chemical_database('AceticAcid')
+
+Acetate = chemical_database('Acetate', phase='l', Hf=-108992*_cal2joule)
+
 AcrylicAcid = chemical_database('AcrylicAcid')
 Glucose = chemical_database('Glucose', phase = 'l')
 
@@ -167,9 +169,10 @@ AQ336.Hfus = TOA.Hfus
 
 Octanol = chemical_database('Octanol')
 Hexanol = chemical_database('Hexanol')
+MethylButanol = chemical_database('3-methyl-1-butanol')
 Octanediol = chemical_database('Octanediol', search_ID='1,8-Octanediol')
 Butyl_acetate = chemical_database('Butyl acetate')
-
+Toluene = chemical_database('Toluene')
 # AQ336 = chemical_database('N-Methyl-N,N,N-trioctylammonium chloride') 
 IBA = chemical_database('Isobutyraldehyde')
 DPHP = chemical_database('DPHP', search_ID='Dipotassium hydrogen phosphate', phase = 'l')
@@ -505,7 +508,8 @@ chems.set_synonym('P4O10', 'PhosphorusPentoxide')
 chems.set_synonym('Na2SO4', 'SodiumSulfate')
 chems.set_synonym('AmmoniumHydroxide', 'NH4OH')
 chems.set_synonym('Isobutyraldehyde', 'IBA')
-
+chems.set_synonym('Octanediol', '1,8-Octanediol')
+# chems.set_synonym('Acetate', 'AceticAcid')
 
 # %% Set all "None" Hfus values to 0
 for chem in HP_chemicals:

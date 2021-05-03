@@ -444,8 +444,9 @@ def create_HP_sys(ins, outs):
     M401 = bst.units.Mixer('M401', ins=(separation_hexanol,
                                         ''))
     
-    F401 = bst.units.MultiEffectEvaporator('F401', ins=S402-1, outs=('F401_l', 'F401_g'),
+    M401_H = bst.units.HXutility('M401_H', ins = M401-0, T = 80. + 273.15, rigorous = False)
     
+    F401 = bst.units.MultiEffectEvaporator('F401', ins=S402-1, outs=('F401_l', 'F401_g'),
                                             P = (101325, 73581, 50892, 32777, 20000), V = 0.5)
     # target_water_x = 0.35
     target_HP_x = 0.10
@@ -471,16 +472,16 @@ def create_HP_sys(ins, outs):
         F401._installed_cost = 0.
     # F401._cost = F401_no_run_cost
         
-    
-    F401_P = bst.units.Pump('F401_P', ins=F401-0)
+    F401_H = bst.units.HXutility('F401_H', ins = F401-0, T = 80. + 273.15, rigorous = False)
+    F401_P = bst.units.Pump('F401_P', ins=F401_H-0)
 
     
-    Kds = dict(IDs=('HP', 'Water', 'Hexanol'),
+    Kds = dict(IDs=('HP', 'Water', 'Hexanol', 'AceticAcid'),
                # K=np.array([1./1.941747572815534, 3.606, 0.006]),
-               K=np.array([1./1.897092617355942, 3.690183610720956, 0.0060176892697821486]), # T = 330.6 K
+               K=np.array([1./1.9379484051844278, 3.690183610720956, 0.0060176892697821486, 1./0.4867537504125923]), # T = 80. + 273.15 K
                phi = 0.5)
     
-    S404 = bst.units.MultiStageMixerSettlers('S404', ins = (F401_P-0, M401-0),
+    S404 = bst.units.MultiStageMixerSettlers('S404', ins = (F401_P-0, M401_H-0),
                                          outs = ('raffinate', 'extract'),
                                          N_stages = 15, partition_data = Kds,) 
                               
@@ -593,6 +594,7 @@ def create_HP_sys(ins, outs):
             feed_hexanol.imol['Hexanol'] = max(0, reqd_hexanol - existing_hexanol)
         
         M401._run()
+        M401_H._run()
         S404_run()
         
         if existing_hexanol > reqd_hexanol:
@@ -1036,9 +1038,9 @@ def create_HP_sys(ins, outs):
         HXN.heat_utilities = tuple()
         HXN._installed_cost = 0.
         
-    # HXN._cost = HXN_no_run_cost
-    # HXN.energy_balance_percent_error = 0.
-    # HXN.new_HXs = HXN.new_HX_utils = []
+    HXN._cost = HXN_no_run_cost
+    HXN.energy_balance_percent_error = 0.
+    HXN.new_HXs = HXN.new_HX_utils = []
     
     HXN_group = UnitGroup('HXN_group', 
                                    units=(HXN,))
@@ -1431,7 +1433,7 @@ def get_unit_atomic_balance(unit, atom='C'):
 
 ############################# GWP ###################################
 
-def get_material_GWP():
+def get_material_GWP(): # does not include natural gas as it is an invisible BT stream BT.natural_gas with price BT.natural_gas_price
     chemical_GWP = get_material_GWP_array()
     return sum(chemical_GWP)/AA.F_mass
 
@@ -1499,11 +1501,16 @@ get_steam_frac_electricity_non_cooling = lambda: get_steam_frac_turbogen() * (1-
 get_non_cooling_electricity_demand = lambda: get_electricity_demand() - get_cooling_electricity_demand()
 
 
-get_BT_direct_emissions_GWP = lambda: sum([i.get_atomic_flow('C') for i in BT.outs])*HP_chemicals['CO2'].MW / AA.F_mass
+get_EOL_GWP = lambda: AA.get_atomic_flow('C') * HP_chemicals.CO2.MW/AA.F_mass
 
-get_non_BT_direct_emissions_GWP = lambda: get_emissions_GWP() - get_BT_direct_emissions_GWP()\
-                        - (get_feedstock_CO2_capture() - get_EOL_GWP())
-get_direct_emissions_GWP = lambda: get_non_BT_direct_emissions_GWP() + get_BT_direct_emissions_GWP()
+get_direct_emissions_GWP = lambda: get_emissions_GWP() - (get_feedstock_CO2_capture() - get_EOL_GWP())
+
+get_BT_direct_emissions_GWP = lambda: ((sum([i.get_atomic_flow('C') for i in BT.outs])*HP_chemicals['CO2'].MW / AA.F_mass)\
+    /get_emissions_GWP()) * get_direct_emissions_GWP()
+
+get_non_BT_direct_emissions_GWP = lambda: get_direct_emissions_GWP() - get_BT_direct_emissions_GWP()
+                        # - (get_feedstock_CO2_capture() - get_EOL_GWP())
+# get_direct_emissions_GWP = lambda: get_non_BT_direct_emissions_GWP() + get_BT_direct_emissions_GWP()
 get_total_steam_GWP = lambda: get_ng_GWP() + get_BT_direct_emissions_GWP()
 get_heating_demand_GWP = lambda: get_steam_frac_heating() * get_total_steam_GWP()
 get_cooling_demand_GWP = lambda: get_steam_frac_cooling() * get_total_steam_GWP()
@@ -1518,7 +1525,6 @@ get_electricity_demand_non_cooling_GWP = lambda: get_steam_frac_electricity_non_
 # get_GWP = lambda: get_feedstock_GWP() + get_material_GWP() + get_ng_GWP() +\
 #                   get_electricity_GWP() + get_emissions_GWP()
 
-get_EOL_GWP = lambda: AA.get_atomic_flow('C') * HP_chemicals.CO2.MW/AA.F_mass
 
 get_GWP = lambda: get_FGHTP_GWP() + get_material_GWP() + get_ng_GWP() +\
                   get_net_electricity_GWP() + get_direct_emissions_GWP()
@@ -1596,7 +1602,21 @@ AA_LHV = 31.45 # MJ/kg AA
 get_material_cost = lambda: sum(get_material_cost_array())
 
 
+# Demand TEA contributions
 
+get_net_electricity_VOC = lambda: HP_tea.operating_hours*sum(i.power_utility.cost for i in HP_sys.units)
+
+get_total_steam_VOC = get_ng_cost = lambda: HP_tea.operating_hours*BT.natural_gas_price*BT.natural_gas.F_mass
+
+get_heating_demand_VOC = lambda: get_steam_frac_heating() * get_total_steam_VOC()
+get_cooling_demand_VOC = lambda: get_steam_frac_cooling() * get_total_steam_VOC()
+get_electricity_demand_non_cooling_VOC = lambda: get_steam_frac_electricity_non_cooling() * get_total_steam_VOC() + get_net_electricity_VOC()
+
+def get_VOC():
+    for i in range(2):
+        # AA.price = HP_tea.solve_price(AA, HP_no_BT_tea)
+        HP_tea.solve_price(AA)
+    return HP_tea.VOC
 
 def get_material_cost_array():
     material_cost_array = [i.cost for i in feeds]

@@ -33,12 +33,14 @@ from biorefineries.HP.system_light_lle_vacuum_distillation import process_groups
 flowsheet, unit_groups, get_GWP, get_FEC, CFs, spec, process_groups, process_groups_dict,\
 get_material_cost_breakdown, get_GWP_by_ID, get_FEC_by_ID, get_ng_GWP, get_ng_FEC,\
 get_FGHTP_GWP, get_feedstock_FEC, get_electricity_demand_non_cooling_GWP, get_electricity_demand_non_cooling_FEC,\
-get_direct_emissions_GWP
+get_direct_emissions_GWP, get_net_electricity_GWP, get_net_electricity_FEC,\
+get_heating_demand_GWP, get_heating_demand_FEC,\
+get_cooling_demand_GWP, get_cooling_demand_FEC, get_heating_demand_VOC, get_cooling_demand_VOC, get_electricity_demand_non_cooling_VOC, get_VOC
 from warnings import warn
 
 find.set_flowsheet(flowsheet)
 # get_annual_factor = lambda: HP_no_BT_tea._annual_factor
-get_annual_factor = lambda: 1
+get_annual_factor = lambda: 1.
 _kg_per_ton = 907.18474
 _feedstock_factor = _kg_per_ton / 0.8
 
@@ -618,11 +620,11 @@ metrics.extend((Metric('FEC - natural gas',
                        'MJ/kg', 'LCA'),))
 
 # Electricity
-metrics.extend((Metric('GWP - electricity',
-                       lambda:get_electricity_GWP(),
+metrics.extend((Metric('GWP - electricity, net',
+                       lambda:get_net_electricity_GWP(),
                        'kg CO2/kg', 'LCA'),))
-metrics.extend((Metric('FEC - electricity',
-                       lambda:get_electricity_FEC(),
+metrics.extend((Metric('FEC - electricity, net',
+                       lambda:get_net_electricity_FEC(),
                        'MJ/kg', 'LCA'),))
 
 # Feedstock growth, harvesting, transportation, and preprocessing
@@ -634,9 +636,51 @@ metrics.extend((Metric('FEC - Feedstock GHTP',
                        'MJ/kg', 'LCA'),))
 
 # Direct non-biogenic emissions GWP
-metrics.extend((Metric('GWP - Direct non-bio emmissions',
+metrics.extend((Metric('GWP - Other direct non-bio emmissions',
                        lambda:get_direct_emissions_GWP(),
                        'kg CO2/kg', 'LCA'),))
+
+metrics.extend((Metric('GWP - Other direct non-bio emmissions',
+                       lambda:get_direct_emissions_GWP(),
+                       'kg CO2/kg', 'LCA'),))
+
+# Demand LCA contributions
+metrics.extend((Metric('cGWP - System heating demand',
+                       lambda:get_heating_demand_GWP()/get_GWP(),
+                       '%', 'LCA'),))
+
+metrics.extend((Metric('cGWP - System cooling demand',
+                       lambda:get_cooling_demand_GWP()/get_GWP(),
+                       '%', 'LCA'),))
+
+metrics.extend((Metric('cGWP - System non-cooling electricity demand',
+                       lambda:get_electricity_demand_non_cooling_GWP()/get_GWP(),
+                       '%', 'LCA'),))
+
+metrics.extend((Metric('cFEC - System heating demand',
+                       lambda:get_heating_demand_FEC()/get_FEC(),
+                       '%', 'LCA'),))
+
+metrics.extend((Metric('cFEC - System cooling demand',
+                       lambda:get_cooling_demand_FEC()/get_FEC(),
+                       '%', 'LCA'),))
+
+metrics.extend((Metric('cFEC - System non-cooling electricity demand',
+                       lambda:get_electricity_demand_non_cooling_FEC()/get_FEC(),
+                       '%', 'LCA'),))
+
+# Demand TEA contributions
+metrics.extend((Metric('cVOC - System heating demand',
+                       lambda:get_heating_demand_VOC()/get_VOC(),
+                       '%', 'LCA'),))
+
+metrics.extend((Metric('cVOC - System cooling demand',
+                       lambda:get_cooling_demand_VOC()/get_VOC(),
+                       '%', 'LCA'),))
+
+metrics.extend((Metric('cVOC - System non-cooling electricity demand',
+                       lambda:get_electricity_demand_non_cooling_VOC()/get_VOC(),
+                       '%', 'LCA'),))
 # %% 
 
 # =============================================================================
@@ -902,8 +946,8 @@ def set_R302_HP_titer(X):
     
 ##############################################################################################
 
-D = shape.Triangle(0.030, 0.040, 0.050)
-@param(name='Acetic acid yield', element=R303, kind='coupled', units='% theoretical',
+D = shape.Triangle(0.032, 0.040, 0.048)
+@param(name='Acetic acid and glycerol yield', element=R303, kind='coupled', units='% theoretical',
         baseline=0.040, distribution=D)
 def set_R301_acetic_acid_yield(X): 
     # 1e6 is to avoid generating tiny negative flow (e.g., 1e-14) in R301
@@ -919,8 +963,8 @@ def set_R301_acetic_acid_yield(X):
     R302.xylose_to_acetic_acid_rxn.X = X2
     R303.xylose_to_acetic_acid_rxn.X = X2 * ferm_ratio
     
-    X1_glycerol = (0.08 - X1) if X1==X else 0.
-    X2_glycerol = (0.08 - X2) if X2==X else 0.  
+    X1_glycerol = X1 if X1==X else 0.
+    X2_glycerol = X2 if X2==X else 0.  
     
     R302.glucose_to_glycerol_rxn.X = X1_glycerol
     R303.glucose_to_glycerol_rxn.X = X1_glycerol * ferm_ratio
@@ -1001,7 +1045,7 @@ def set_R401_tau(tau):
 
 R402 = find.unit.R402
 # D = baseline_triangle(0.95, 0.05)
-D = shape.Triangle(0.7, 0.8, 0.9)
+D = shape.Triangle(0.64, 0.8, 0.96)
 @param(name='Dehydration conversion', element=R402, kind='coupled', units='',
        baseline=0.8, distribution=D)
 def set_R402_conversion(X):
