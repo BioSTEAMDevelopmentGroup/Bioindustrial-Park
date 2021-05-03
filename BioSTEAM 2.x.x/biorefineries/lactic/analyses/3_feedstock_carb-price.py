@@ -155,7 +155,8 @@ TEA_data = pd.DataFrame({
     'Target carb content [dw%]': TEA_set_carbs,
     'Actual carb content [dw%]': TEA_actual_carbs,
     'Price [$/dry-ton]': TEA_prices,
-    'Titers [g/L]': TEA_titers,
+    'Titer [g/L]': TEA_titers,
+    'Yield [dw%]': TEA_yields,
     'MPSP [$/kg]': MPSPs,
     'NPVs [$]': NPVs
     })
@@ -163,7 +164,8 @@ TEA_data = pd.DataFrame({
 LCA_data = pd.DataFrame({
     'Target carb content [dw%]': carb_contents1+carb_contents2,
     'Actual carb content [dw%]': LCA_actual_carbs,
-    'Titers [g/L]': LCA_titers,
+    'Titer [g/L]': LCA_titers,
+    'Yield [dw%]': LCA_yields,
     'GWP [kg CO2-eq/kg]': GWPs,
     'FEC [MJ/kg]': FECs
     })

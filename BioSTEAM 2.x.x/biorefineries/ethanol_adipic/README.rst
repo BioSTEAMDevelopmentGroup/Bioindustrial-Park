@@ -46,8 +46,8 @@ biorefinery preprocessed by HMPP.
     >>> ea.simulate_and_print()
     
     ---------- Acid Biorefinery ----------
-    MESP: $3.15/gal
-    GWP: -0.392 kg CO2-eq/gal ethanol without feedstock
+    MESP: $3.40/gal
+    GWP: 1.016 kg CO2-eq/gal ethanol without feedstock
     --------------------------------------
     >>> ea.chems.show()
     CompiledChemicals([H2O, O2, N2, CH4, CO, CO2, NH3, NO, NO2, H2S, SO2, H2, H2SO4, HNO3, NH4OH, CalciumDihydroxide, AmmoniumSulfate, NaNO3, CaSO4, NaOH, Na2SO4, DAP, AceticAcid, Glucose, GlucoseOligomer, Extractives, Xylose, XyloseOligomer, Sucrose, Cellobiose, Mannose, MannoseOligomer, Galactose, GalactoseOligomer, Arabinose, ArabinoseOligomer, SolubleLignin, Protein, Enzyme, FermMicrobe, WWTsludge, Furfural, HMF, Xylitol, LacticAcid, SuccinicAcid, Ethanol, Glycerol, P_putida, P_putidaGrow, Denaturant, AdipicAcid, MuconicAcid, MonoSodiumMuconate, Acetate, AmmoniumAcetate, Glucan, Mannan, Galactan, Xylan, Arabinan, Lignin, P4O10, Ash, Tar, CSL, BoilerChems, Polymer, BaghouseBag, CoolingTowerChems])
@@ -59,9 +59,9 @@ biorefinery preprocessed by HMPP.
     >>> ea.simulate_and_print('CPP_AFEX')
     
     ---------- AFEX Biorefinery ----------
-    MESP: $2.82/gal
-    GWP: -3.597 kg CO2-eq/gal ethanol without feedstock
-    GWP: -1.435 kg CO2-eq/gal ethanol with feedstock
+    MESP: $2.83/gal
+    GWP: -3.583 kg CO2-eq/gal ethanol without feedstock
+    GWP: -1.418 kg CO2-eq/gal ethanol with feedstock
     --------------------------------------
 
 
@@ -109,25 +109,198 @@ Processes:
 .. code-block:: python
 
     >>> # You can directly access the Flowsheet, System, and TEA objects
+    >>> ea.load_system('acid', 'HMPP')
+    >>> ea.simulate_and_print()
     >>> ea.flowsheet
     <Flowsheet: acid>
     >>> ea.biorefinery.show()
     System: biorefinery
-     path: (pretreatment_sys, ethanol_sys,
-            wastewater_sys, T601, T602, M601,
-            T603, T604_S, T604, T605, T606_S,
-            T606, T607_S, T607, T608, M602, T610)
-     facilities: (CHP, CT, PWC, ADP, CIP, BDM)
+    ins...
+    [0] water_M201
+        phase: 'l', T: 387.15 K, P: 101325 Pa
+        flow (kmol/hr): H2O  2.04e+03
+    [1] feedstock
+        phase: 'l', T: 298.15 K, P: 101325 Pa
+        flow (kmol/hr): H2O          1.16e+03
+                        Extractives  62.2
+                        Sucrose      1.87
+                        Protein      113
+                        Acetate      25.1
+                        Glucan       180
+                        Mannan       3.08
+                        ...
+    [2] water_M202
+        phase: 'l', T: 368.15 K, P: 101325 Pa
+        flow (kmol/hr): H2O  7.82e+03
+    [3] steam_M203
+        phase: 'g', T: 506.15 K, P: 1.041e+06 Pa
+        flow (kmol/hr): H2O  1.75e+03
+    [4] water_M205
+        phase: 'l', T: 298.15 K, P: 101325 Pa
+        flow (kmol/hr): H2O  723
+    [5] enzyme_M301
+        phase: 'l', T: 298.15 K, P: 101325 Pa
+        flow (kmol/hr): Enzyme  23.9
+    [6] water_M301
+        phase: 'l', T: 298.15 K, P: 101325 Pa
+        flow (kmol/hr): H2O  7.69e+03
+    [7] water_U401
+        phase: 'l', T: 298.15 K, P: 101325 Pa
+        flow (kmol/hr): H2O  1.43e+03
+    [8] caustic_R502  from  ReversedSplitter-T605_S
+        phase: 'l', T: 298.15 K, P: 101325 Pa
+        flow (kmol/hr): NaOH  56.3
+    [9] polymer_R502
+        phase: 'l', T: 298.15 K, P: 101325 Pa
+        flow (kmol/hr): Polymer  2.42
+    [10] air_R502
+        phase: 'g', T: 298.15 K, P: 101325 Pa
+        flow (kmol/hr): O2  2.07e+03
+                        N2  7.79e+03
+    [11] denaturant
+        phase: 'l', T: 298.15 K, P: 101325 Pa
+        flow (kmol/hr): Denaturant  4.57
+    [12] sulfuric_acid
+        phase: 'l', T: 298.15 K, P: 101325 Pa
+        flow (kmol/hr): H2O    7.7
+                        H2SO4  18.8
+    [13] ammonia
+        phase: 'l', T: 298.15 K, P: 101325 Pa
+        flow (kmol/hr): NH4OH  103
+    [14] caustic
+        phase: 'l', T: 298.15 K, P: 101325 Pa
+        flow: 0
+    [15] CSL
+        phase: 'l', T: 298.15 K, P: 101325 Pa
+        flow (kmol/hr): CSL  36.2
+    [16] DAP
+        phase: 'l', T: 298.15 K, P: 101325 Pa
+        flow (kmol/hr): DAP  1.19
+    [17] firewater_in
+        phase: 'l', T: 298.15 K, P: 101325 Pa
+        flow (kmol/hr): H2O  445
+    [18] plant_air_in
+        phase: 'g', T: 298.15 K, P: 101325 Pa
+        flow (kmol/hr): O2  9.01e+03
+                        N2  3.87e+04
+    [19] lime_CHP
+        phase: 'l', T: 298.15 K, P: 101325 Pa
+        flow (kmol/hr): CalciumDihydroxide  22.2
+    [20] boiler_chems
+        phase: 'l', T: 298.15 K, P: 101325 Pa
+        flow (kmol/hr): BoilerChems  0.00135
+    [21] baghouse_bag
+        phase: 'l', T: 298.15 K, P: 101325 Pa
+        flow (kmol/hr): BaghouseBag  0.722
+    [22] natural_gas
+        phase: 'l', T: 298.15 K, P: 101325 Pa
+        flow: 0
+    [23] boiler_makeup_water
+        phase: 'l', T: 298.15 K, P: 101325 Pa
+        flow (kmol/hr): H2O  440
+    [24] CIP_chems_in
+        phase: 'l', T: 298.15 K, P: 101325 Pa
+        flow (kmol/hr): H2O  8.05
+    [25] return_cooling_water
+        phase: 'l', T: 310.15 K, P: 101325 Pa
+        flow (kmol/hr): H2O  4.11e+05
+    [26] cooling_tower_chems
+        phase: 'l', T: 298.15 K, P: 101325 Pa
+        flow (kmol/hr): CoolingTowerChems  1.37
+    [27] CT_makeup_water
+        phase: 'l', T: 298.15 K, P: 101325 Pa
+        flow (kmol/hr): H2O  637
+    [28] system_makeup_water
+        phase: 'l', T: 298.15 K, P: 101325 Pa
+        flow (kmol/hr): H2O  769
+    outs...
+    [0] U401_vent
+        phase: 'g', T: 304.51 K, P: 101325 Pa
+        flow (kmol/hr): O2   5.22
+                        CO2  456
+    [1] vent_R502
+        phase: 'g', T: 308.05 K, P: 101325 Pa
+        flow (kmol/hr): H2O  257
+                        O2   2.01e+03
+                        N2   7.79e+03
+                        CO2  59.6
+    [2] S506_vent
+        phase: 'g', T: 373.12 K, P: 101325 Pa
+        flow (kmol/hr): H2O  274
+                        SO2  0.00755
+    [3] residuals_to_CHP
+        phase: 'l', T: 373.12 K, P: 101325 Pa
+        flow (kmol/hr): NaNO3              3.52
+                        NaOH               51.6
+                        DAP                1.94
+                        AceticAcid         0.0271
+                        Glucose            5.22e-09
+                        GlucoseOligomer    0.00358
+                        Extractives        0.0322
+                        ...
+    [4] ethanol
+        phase: 'l', T: 349.14 K, P: 101325 Pa
+        flow (kmol/hr): H2O         6.85
+                        Ethanol     464
+                        Denaturant  4.57
+    [5] s292  to  ReversedSplitter-T605_S
+        phase: 'l', T: 298.15 K, P: 101325 Pa
+        flow: 0
+    [6] s296
+        phase: 'l', T: 298.15 K, P: 101325 Pa
+        flow: 0
+    [7] s298
+        phase: 'l', T: 298.15 K, P: 101325 Pa
+        flow: 0
+    [8] firewater_out
+        phase: 'l', T: 298.15 K, P: 101325 Pa
+        flow (kmol/hr): H2O  445
+    [9] sodium_sulfate
+        phase: 's', T: 373.12 K, P: 101325 Pa
+        flow: 0
+    [10] plant_air_out
+        phase: 'g', T: 298.15 K, P: 101325 Pa
+        flow (kmol/hr): O2  9.01e+03
+                        N2  3.87e+04
+    [11] vent_CHP
+        phase: 'g', T: 539.15 K, P: 101325 Pa
+        flow (kmol/hr): H2O  1.36e+03
+                        N2   49.1
+                        CO2  1.76e+03
+                        NH3  63.2
+                        SO2  1.55
+    [12] ash
+        phase: 's', T: 539.15 K, P: 101325 Pa
+        flow (kmol/hr): CalciumDihydroxide  3.69
+                        AmmoniumSulfate     0.0558
+                        NaNO3               0.0721
+                        CaSO4               18.5
+                        NaOH                1.06
+                        DAP                 0.129
+                        Ash                 73.2
+                        ...
+    [13] CIP_chems_out
+        phase: 'l', T: 298.15 K, P: 101325 Pa
+        flow (kmol/hr): H2O  8.05
+    [14] process_cooling_water
+        phase: 'l', T: 301.15 K, P: 101325 Pa
+        flow (kmol/hr): H2O  4.11e+05
+    [15] process_water
+        phase: 'l', T: 298.15 K, P: 101325 Pa
+        flow (kmol/hr): H2O  2.25e+04
+    [16] discharged_water
+        phase: 'l', T: 298.15 K, P: 101325 Pa
+        flow: 0
     >>> ea.tea.show()
-    CombinedTEA: biorefinery, CHP_sys
-     NPV: -538 USD at 10.0% IRR
+    EthanolAdipicTEA: biorefinery
+     NPV: -579 USD at 10.0% IRR
     >>> # You can use the flowsheet to access streams, unit operations, and subsystems
     >>> u = ea.flowsheet.unit
     >>> u.R301.show()
     SaccharificationAndCoFermentation: R301
     ins...
-    [0] s347  from  EnzymeHydrolysateMixer-M301
-        phase: 'l', T: 346.79 K, P: 101325 Pa
+    [0] s268  from  EnzymeHydrolysateMixer-M301
+        phase: 'l', T: 346.95 K, P: 101325 Pa
         flow (kmol/hr): H2O                1.96e+04
                         NH4OH              3.76
                         AmmoniumSulfate    18.8
@@ -136,7 +309,7 @@ Processes:
                         Glucose            19.7
                         GlucoseOligomer    0.54
                         ...
-    [1] s348  from  SeedHoldTank-T301
+    [1] s269  from  SeedHoldTank-T301
         phase: 'l', T: 305.15 K, P: 101325 Pa
         flow (kmol/hr): H2O                2.16e+03
                         NH4OH              0.417
@@ -158,10 +331,10 @@ Processes:
         flow (kmol/hr): H2O           19.7
                         O2            4.68
                         CO2           411
-                        AceticAcid    0.0406
-                        Furfural      0.0225
-                        HMF           0.00954
-                        LacticAcid    1.13e-05
+                        AceticAcid    0.0405
+                        Furfural      0.0223
+                        HMF           0.0095
+                        LacticAcid    1.14e-05
                         ...
     [1] effluent  to  Mixer-M402
         phase: 'l', T: 305.15 K, P: 101325 Pa
@@ -178,7 +351,7 @@ Processes:
         flow (kmol/hr): H2O                2.16e+03
                         NH4OH              0.417
                         AmmoniumSulfate    2.09
-                        DAP                0.449
+                        DAP                0.448
                         AceticAcid         2.28
                         Glucose            16.6
                         GlucoseOligomer    0.78
