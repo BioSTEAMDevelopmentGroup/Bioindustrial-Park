@@ -136,7 +136,22 @@ def load(name, agile=False):
             operating_hours=operating_hours,
         )
         rename_storage_units(1300)
-    elif name == 1 or name == 'divided 1 and 2g bagasse expression':
+    elif name == 1 or name == '1g':
+        lipidcane_sys = create_lipidcane_to_biodiesel_and_ethanol_1g(
+            operating_hours=operating_hours,
+        )
+        area_names = [
+            'Feedstock handling', 
+            'Juicing', 
+            'EtOH prod.', 
+            'Oil ext.',
+            'Biod. prod.', 
+            'CH&P',
+            'Utilities',
+            'Storage',
+        ]
+        rename_storage_units(900)
+    elif name == 0 or name == 'divided 1 and 2g bagasse expression':
         area_names = [
             'Feedstock handling', 
             'Juicing', 
@@ -155,21 +170,7 @@ def load(name, agile=False):
             operating_hours=operating_hours,
         )
         rename_storage_units(1300)
-    elif name == 0 or name == '1g':
-        lipidcane_sys = create_lipidcane_to_biodiesel_and_ethanol_1g(
-            operating_hours=operating_hours,
-        )
-        area_names = [
-            'Feedstock handling', 
-            'Juicing', 
-            'EtOH prod.', 
-            'Oil ext.',
-            'Biod. prod.', 
-            'CH&P',
-            'Utilities',
-            'Storage',
-        ]
-        rename_storage_units(900)
+    
     else:
         raise NotImplementedError(name)
     unit_groups = UnitGroup.group_by_area(lipidcane_sys.units)

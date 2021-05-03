@@ -429,6 +429,7 @@ def create_lipidcane_to_biodiesel_and_ethanol_divided_1_and_2g_hydrolyzate_oil_s
     
     feedstock_handling_sys = create_feedstock_handling_system(
         ins=lipidcane,
+        pellet_bagasse=False,
         outs='',
         mockup=True,
         area=100,
@@ -436,6 +437,7 @@ def create_lipidcane_to_biodiesel_and_ethanol_divided_1_and_2g_hydrolyzate_oil_s
     
     juicing_and_lipid_extraction_sys, jle_dct = create_juicing_and_lipid_extraction_system(
         ins=feedstock_handling_sys-0,
+        pellet_bagasse=False,
         mockup=True,
         udct=True,
         area=200,
@@ -615,6 +617,7 @@ def create_lipidcane_to_biodiesel_and_ethanol_divided_1_and_2g_post_fermentation
     if front_end_oil_separation:
         juicing_and_lipid_extraction_sys, udct = create_juicing_and_lipid_extraction_system(
             ins=feedstock_handling_sys-0,
+            pellet_bagasse=False,
             mockup=True,
             udct=True,
             area=200,
@@ -624,6 +627,7 @@ def create_lipidcane_to_biodiesel_and_ethanol_divided_1_and_2g_post_fermentation
     else:
         juicing_sys, udct = create_juicing_system(
             ins=feedstock_handling_sys-0,
+            pellet_bagasse=False,
             mockup=True,
             udct=True,
             area=200,
@@ -812,6 +816,7 @@ def create_lipidcane_to_biodiesel_and_ethanol_combined_1_and_2g_post_fermentatio
             mockup=True,
             udct=True,
             area=200,
+            pellet_bagasse=False,
         )
         screened_juice, bagasse, fiber_fines = juicing_sys.outs
     
