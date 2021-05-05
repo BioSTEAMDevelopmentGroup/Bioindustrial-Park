@@ -7,9 +7,11 @@
 # for license details.
 
 import flexsolve as flx
+from scipy.optimize import minimize_scalar
 import numpy as np
 from thermosteam.exceptions import InfeasibleRegion
 from biorefineries.lipidcane import set_lipid_fraction
+import flexsolve as flx
 import thermosteam as tmo
 
 __all__ = ('LipidExtractionSpecification',)
@@ -82,6 +84,33 @@ class LipidExtractionSpecification:
         self.lipid_retention = lipid_retention #: [float] Lipid extraction lipid retention
         self.lipid_content = lipid_content #: [float] Lipid content of feedstock [dry wt. %].
         
+    def MFPP(self):
+        return self.system.TEA.solve_price(self.feedstock)
+        
+    def dMFPP_over_dlipid_content_at_efficiency(self, efficiency, dlipid_content=0.01):
+        lipid_content = self.lipid_content
+        system = self.system
+        self.load_efficiency(efficiency)   
+        self.load_lipid_content(lipid_content + dlipid_content)
+        system.simulate()
+        MFPP1 = self.MFPP()
+        self.load_lipid_content(lipid_content)
+        system.simulate()
+        MFPP0 = self.MFPP()
+        return (MFPP1 - MFPP0) / dlipid_content
+        
+    def solve_MFPP_inflection(self, lipid_retention=None, lipid_content=None):
+        if lipid_content is not None: self.load_lipid_content(lipid_content)
+        if lipid_retention is not None: self.load_lipid_retention(lipid_retention)
+        f = self.dMFPP_over_dlipid_content_at_efficiency
+        x0 = 0.1
+        x1 = 1.
+        y0 = f(x0)
+        y1 = f(x1)
+        if not y0 < 0. < y1: return np.nan
+        return flx.IQ_interpolation(f, 0.1, 1., y0, y1, xtol=1e-4, ytol=1e-4, checkiter=False,
+                                    maxiter=10)
+    
     def load_lipid_content(self, lipid_content):
         set_lipid_fraction(lipid_content, self.feedstock)
         self.lipid_content = lipid_content

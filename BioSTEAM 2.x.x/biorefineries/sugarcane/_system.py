@@ -90,7 +90,7 @@ def create_juicing_system_without_treatment(ins, outs, pellet_bagasse=None):
     
     imbibition_water = bst.Stream('imbibition_water',
                                   Water=87023.35, units='kg/hr',
-                                  T = 338.15)
+                                  T = 350.15)
     
     # Hydrolyze starch
     T201 = units.EnzymeTreatment('T201', (sugarcane, enzyme), T=323.15)  # T=50

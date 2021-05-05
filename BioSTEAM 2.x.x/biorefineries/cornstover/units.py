@@ -141,7 +141,7 @@ class SeedTrain(Unit):
     # #: Diammonium phosphate loading in g/L of fermentation broth
     # DAP = 0.67 
     
-    def __init__(self, ID='', ins=None, outs=()):
+    def __init__(self, ID='', ins=None, outs=(), saccharification=False):
         Unit.__init__(self, ID, ins, outs)
         self.reactions = ParallelRxn([
     #   Reaction definition                             Reactant    Conversion
@@ -156,10 +156,20 @@ class SeedTrain(Unit):
     Rxn('3 Xylose + 5 H2O -> 5 Glycerol + 2.5 O2',      'Xylose',    0.0030),
     Rxn('Xylose + H2O -> Xylitol + 0.5 O2',             'Xylose',    0.0460),
     Rxn('3 Xylose + 5 CO2 -> 5 SuccinicAcid + 2.5 O2',  'Xylose',    0.0090)])
+        
+        if saccharification:
+            self.saccharification = ParallelRxn([
+                Rxn('Glucan -> GlucoseOligomer',          'Glucan',   0.0400),
+                Rxn('Glucan + 0.5 H2O -> 0.5 Cellobiose', 'Glucan',   0.0120),
+                Rxn('Glucan + H2O -> Glucose',            'Glucan',   0.9000),
+                Rxn('Cellobiose + H2O -> 2Glucose',       'Cellobiose',  1.0000)]
+            )
     
     def _run(self):
         vent, effluent= self.outs
         effluent.mix_from(self.ins, energy_balance=False)
+        if self.saccharification:
+            self.saccharification(effluent)
         self.reactions(effluent)
         effluent.T = self.T
         vent.phase = 'g'
@@ -218,22 +228,13 @@ class ContinuousPresaccharification(Unit):
         Unit.__init__(self, ID, ins, outs)
         self.P = P
         
-        #: [ParallelReaction] Enzymatic hydrolysis reactions including from 
-        #: downstream batch tank in co-fermentation.
-        self.saccharification = ParallelRxn([
-            Rxn('Glucan -> GlucoseOligomer',          'Glucan',   0.0400),
-            Rxn('Glucan + 0.5 H2O -> 0.5 Cellobiose', 'Glucan',   0.0120),
-            Rxn('Glucan + H2O -> Glucose',            'Glucan',   0.9000),
-            Rxn('Cellobiose + H2O -> 2Glucose',       'Cellobiose',  1.0000)]
-        )
-        
     def _run(self):
         inlet = self.ins[0]
         outlet = self.outs[0]
         outlet.copy_flow(inlet)
         outlet.T = inlet.T
         outlet.P = self.P
-        self.saccharification.adiabatic_reaction(outlet)
+        # self.saccharification.adiabatic_reaction(outlet)
         
     def _design(self):
         inlet = self.ins[0]
@@ -255,7 +256,7 @@ class ContinuousPresaccharification(Unit):
       S=1e6*_gal2m3, n=0.5, BM=1.5, N='N_reactors')
 class SaccharificationAndCoFermentation(Unit):
     _N_ins = 1
-    _N_outs = 2
+    _N_outs = 3
     _ins_size_is_fixed = False
     _N_heat_utilities = 1
         
@@ -288,9 +289,20 @@ class SaccharificationAndCoFermentation(Unit):
               'Batch duty': 'kJ/hr',
               'Reactor duty': 'kJ/hr'}
     
-    def __init__(self, ID='', ins=None, outs=(), P=101325):
+    def __init__(self, ID='', ins=None, outs=(), P=101325, saccharification_split=0.1):
         Unit.__init__(self, ID, ins, outs)
         self.P = P
+        self.saccharification_split = saccharification_split
+        
+        #: [ParallelReaction] Enzymatic hydrolysis reactions including from 
+        #: downstream batch tank in co-fermentation.
+        self.saccharification = ParallelRxn([
+            Rxn('Glucan -> GlucoseOligomer',          'Glucan',   0.0400),
+            Rxn('Glucan + 0.5 H2O -> 0.5 Cellobiose', 'Glucan',   0.0120),
+            Rxn('Glucan + H2O -> Glucose',            'Glucan',   0.9000),
+            Rxn('Cellobiose + H2O -> 2Glucose',       'Cellobiose',  1.0000)]
+        )
+        
         self.loss = ParallelRxn([
     #   Reaction definition               Reactant    Conversion
     Rxn('Glucose -> 2 LacticAcid',       'Glucose',   0.0300),
@@ -319,11 +331,18 @@ class SaccharificationAndCoFermentation(Unit):
         self.CSL_to_constituents.basis = 'mol'
         
     def _run(self):
-        vent, effluent = self.outs
+        feed, *other = self.ins
+        vent, effluent, sidedraw = self.outs
         vent.P = effluent.P = self.P
         vent.T = effluent.T = self.T_fermentation
         vent.phase = 'g'
-        effluent.mix_from(self.ins, energy_balance=False)
+        effluent.copy_like(feed)
+        self.saccharification(effluent)
+        self._batch_duty = effluent.Hnet - feed.Hnet
+        sidedraw.copy_like(effluent)
+        sidedraw.mol *= self.saccharification_split
+        effluent.mol -= sidedraw.mol
+        effluent.mix_from([effluent, *other], energy_balance=False)
         self.loss(effluent)
         self.cofermentation(effluent)
         self.CSL_to_constituents(effluent)
@@ -337,13 +356,113 @@ class SaccharificationAndCoFermentation(Unit):
         tau = self.tau_saccharification + self.tau_cofermentation
         Design.update(size_batch(v_0, tau, self.tau_0, self.N_reactors, self.V_wf))
         hu_fermentation, = self.heat_utilities
-        ei = effluent.chemicals.index('Ethanol')
-        ethanol = (sum([i.mol[ei] for i in self.outs])
-                   - sum([i.mol[ei] for i in self.ins]))
-        Design['Batch duty'] = batch_duty = min(0, self.H_out - self.H_in)
-        Design['Reactor duty'] = reactor_duty = self.Hf_out - self.Hf_in
+        Design['Batch duty'] = batch_duty = self._batch_duty
+        Design['Reactor duty'] = reactor_duty = self.Hnet - batch_duty
         hu_fermentation(reactor_duty + batch_duty, effluent.T)
    
+
+
+@cost('Flow rate', 'Recirculation pumps', kW=30, S=340*_gpm2m3hr,
+      cost=47200, n=0.8, BM=2.3, CE=522, N='N_recirculation_pumps')
+@cost('Reactor duty', 'Heat exchangers', CE=522, cost=23900,
+      S=-5*_Gcal2kJ, n=0.7, BM=2.2, N='N_reactors') # Based on a similar heat exchanger
+@cost('Reactor volume', 'Agitators', CE=522, cost=52500,
+      S=1e6*_gal2m3, n=0.5, kW=90, BM=1.5, N='N_reactors')
+@cost('Reactor volume', 'Reactors', CE=522, cost=844000,
+      S=1e6*_gal2m3, n=0.5, BM=1.5, N='N_reactors')
+class SimultaneousSaccharificationAndCoFermentation(Unit):
+    _N_ins = 1
+    _N_outs = 2
+    _ins_size_is_fixed = False
+    _N_heat_utilities = 1
+        
+    #: Saccharification temperature (K)
+    T_saccharification = 48+273.15
+    
+    #: Fermentation temperature (K)
+    T_fermentation = 32+273.15
+    
+    #: Saccharification and Co-Fermentation time (hr)
+    tau = 60
+    
+    #: Unload and clean up time (hr)
+    tau_0 = 4
+    
+    #: Working volume fraction (filled tank to total tank volume)
+    V_wf = 0.9
+    
+    #: Number of reactors
+    N_reactors = 12
+    
+    #: Number of recirculation pumps
+    N_recirculation_pumps = 5
+    
+    _units = {'Flow rate': 'm3/hr',
+              'Reactor volume': 'm3',
+              'Batch duty': 'kJ/hr',
+              'Reactor duty': 'kJ/hr'}
+    
+    def __init__(self, ID='', ins=None, outs=(), P=101325):
+        Unit.__init__(self, ID, ins, outs)
+        self.P = P
+        
+        #: [ParallelReaction] Enzymatic hydrolysis reactions including from 
+        #: downstream batch tank in co-fermentation.
+        self.saccharification = ParallelRxn([
+            Rxn('Glucan -> GlucoseOligomer',          'Glucan',   0.0400),
+            Rxn('Glucan + 0.5 H2O -> 0.5 Cellobiose', 'Glucan',   0.0120),
+            Rxn('Glucan + H2O -> Glucose',            'Glucan',   0.9000),
+            Rxn('Cellobiose + H2O -> 2Glucose',       'Cellobiose',  1.0000)
+        ])
+        
+        self.loss = ParallelRxn([
+        #   Reaction definition               Reactant    Conversion
+        Rxn('Glucose -> 2 LacticAcid',       'Glucose',   0.0300),
+        Rxn('3 Xylose -> 5 LacticAcid',      'Xylose',    0.0300),
+        Rxn('3 Arabinose -> 5 LacticAcid',   'Arabinose', 0.0300),
+        Rxn('Galactose -> 2 LacticAcid',     'Galactose', 0.0300),
+        Rxn('Mannose -> 2 LacticAcid',       'Mannose',   0.0300),])
+        
+        self.cofermentation = ParallelRxn([
+        #   Reaction definition                                          Reactant    Conversion
+        Rxn('Glucose -> 2 Ethanol + 2 CO2',                             'Glucose',   0.9500),
+        Rxn('Glucose + 0.047 CSL + 0.018 DAP -> 6 Z_mobilis + 2.4 H2O', 'Glucose',   0.0200),
+        Rxn('Glucose + 2 H2O -> 2 Glycerol + O2',                       'Glucose',   0.0040),
+        Rxn('Glucose + 2 CO2 -> 2 SuccinicAcid + O2',                   'Glucose',   0.0060),
+        Rxn('3 Xylose -> 5 Ethanol + 5 CO2',                            'Xylose',    0.8500),
+        Rxn('Xylose + 0.039 CSL + 0.015 DAP -> 5 Z_mobilis + 2 H2O',
+                                                                        'Xylose',    0.0190),
+        Rxn('3 Xylose + 5 H2O -> 5 Glycerol + 2.5 O2',                  'Xylose',    0.0030),
+        Rxn('Xylose + H2O -> Xylitol + 0.5 O2',                         'Xylose',    0.0460),
+        Rxn('3 Xylose + 5 CO2 -> 5 SuccinicAcid + 2.5 O2',              'Xylose',    0.0090),
+        ])
+    
+        self.CSL_to_constituents = Rxn(
+            'CSL -> 0.5 H2O + 0.25 LacticAcid + 0.25 Protein', 'CSL', 1.0000, basis='wt',
+        )
+        self.CSL_to_constituents.basis = 'mol'
+        
+    def _run(self):
+        vent, effluent = self.outs
+        vent.P = effluent.P = self.P
+        vent.T = effluent.T = self.T_fermentation
+        vent.phase = 'g'
+        effluent.mix_from(self.ins, energy_balance=False)
+        self.saccharification(effluent)
+        self.loss(effluent)
+        self.cofermentation(effluent)
+        self.CSL_to_constituents(effluent)
+        vent.receive_vent(effluent)
+
+    def _design(self):
+        effluent = self.outs[1]
+        v_0 = effluent.F_vol
+        Design = self.design_results
+        Design['Flow rate'] = v_0 / self.N_recirculation_pumps
+        Design.update(size_batch(v_0, self.tau, self.tau_0, self.N_reactors, self.V_wf))
+        hu_fermentation, = self.heat_utilities
+        Design['Reactor duty'] = reactor_duty = self.Hnet
+        hu_fermentation(reactor_duty, effluent.T)
 
 # %% Lignin separation
 
