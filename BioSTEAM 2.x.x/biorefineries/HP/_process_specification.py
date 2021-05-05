@@ -16,7 +16,7 @@ _red_highlight_white_text = '\033[1;47;41m'
 _yellow_text = '\033[1;33m'
 _reset_text = '\033[1;0m'
 
-skip_infeasible_titers = False
+skip_infeasible_titers = True
 last_infeasible_simulation = [] # yield, titer
 
 def get_IDs(units_list):
@@ -24,7 +24,9 @@ def get_IDs(units_list):
 
 # Bugfix barrage is not needed anymore because hexane recycle is not emptied anymore
 # and Wegstein and Aitken converge much better.
-bugfix = True
+bugfix = False
+
+error = False
 
 # from biosteam.process_tools.reactor_specification import evaluate_across_TRY
 _kg_per_ton = 907.18474
@@ -105,6 +107,7 @@ def evaluate_across_specs(spec, system,
         system.simulate()
         return get_metrics()
     except Exception as e1:
+        if error: raise e1
         str_e1 = str(e1)
         if 'sugar concentration' in str_e1:
             last_infeasible_simulation[:] = (spec_1, spec_2)

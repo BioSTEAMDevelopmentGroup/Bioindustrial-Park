@@ -1001,8 +1001,8 @@ class AcidulationReactor(Reactor):
     _N_ins = 2
     _N_outs = 1
     
-    def _setup(self):
-        super()._setup()
+    def __init__(self, *args, **kwargs):
+        Reactor.__init__(self, *args, **kwargs)
         self.acidulation_rxns = ParallelRxn([
             #   Reaction definition                                        Reactant        Conversion
             Rxn('CalciumLactate + H2SO4 -> 2 HP + CaSO4',                 'CalciumLactate',       1.),
@@ -1863,7 +1863,8 @@ class CoFermentation(Reactor):
         effluent.mix_from([feed, sugars, CSL])
         
         if 'Sucrose' in effluent.chemicals:
-            self.sucrose_hydrolysis_rxn(effluent)
+            self.sucrose_hydrolysis_rxn.force_reaction(effluent)
+            if effluent.imol['Water'] < 0.: effluent.imol['Water'] = 0.
         
         # ss = Stream(None)
         # effluent.copy_like(feed)
