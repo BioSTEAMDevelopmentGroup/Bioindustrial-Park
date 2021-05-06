@@ -232,6 +232,7 @@ def create_juicing_system_up_to_clarification(ins, outs, pellet_bagasse=None):
     def correct_flows():
         F_mass = T201.ins[0].F_mass
         # correct enzyme, lime, phosphoric acid, and imbibition water
+        enzyme.F_mass *= F_mass / 333334.2
         lime.imass['CaO', 'Water'] = 0.001 * F_mass * np.array([0.046, 0.954])
         H3PO4.imass['H3PO4', 'Water'] = 0.00025 * F_mass
         T201._run()
