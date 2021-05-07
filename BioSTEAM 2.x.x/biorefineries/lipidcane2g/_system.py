@@ -60,7 +60,7 @@ def create_lipid_expression_system(ins, outs):
     bagasse_pellets, = ins
     lipid, pressed_bagasse = outs
     U801 = bst.ScrewPress('U801', bagasse_pellets, (lipid, pressed_bagasse),
-                          split={'Lipid': 0.90}, moisture_content=0.14)
+                          split={'Lipid': 0.75}, moisture_content=0.14)
     U801.cost_items = U801.cost_items.copy() 
     U801.cost_items['Screw press'] = cost_item = U801.cost_items['Screw press'].copy()
     cost_item.ub = 24000
@@ -140,7 +140,7 @@ def create_lipidcane_to_biodiesel_and_ethanol_1g(
     bagasse_lipid.ID = 'bagasse_lipid'
     crushing_mill = udct['U201']
     crushing_mill.tag = "bagasse lipid retention"
-    crushing_mill.isplit['Lipid'] = 0.95
+    crushing_mill.isplit['Lipid'] = 0.80
     
     if front_end_oil_separation:
         udct['T208'].ins.append(bagasse_lipid)
@@ -265,7 +265,7 @@ def create_lipidcane_to_biodiesel_and_ethanol_1_and_2g_bagasse_expression(
     bagasse_lipid.ID = 'bagasse_lipid'
     crushing_mill = udct['U201']
     crushing_mill.tag = "bagasse lipid retention"
-    crushing_mill.isplit['Lipid'] = 0.95
+    crushing_mill.isplit['Lipid'] = 0.80
     
     if front_end_oil_separation:
         udct['T208'].ins.append(bagasse_lipid)
@@ -445,7 +445,7 @@ def create_lipidcane_to_biodiesel_and_ethanol_divided_1_and_2g_hydrolyzate_oil_s
         area=200,
     )
     crushing_mill = jle_dct['U201']
-    crushing_mill.isplit['Lipid'] = 0.95
+    crushing_mill.isplit['Lipid'] = 0.80
     crushing_mill.tag = "bagasse lipid retention"
     screened_juice, frontend_lipid, bagasse, fiber_fines, spent_oil_wash_water = juicing_and_lipid_extraction_sys.outs
     frontend_lipid.ID = 'frontend_lipid'
@@ -638,7 +638,7 @@ def create_lipidcane_to_biodiesel_and_ethanol_divided_1_and_2g_post_fermentation
     
     crushing_mill = udct['U201']
     crushing_mill.tag = "bagasse lipid retention"
-    crushing_mill.isplit['Lipid'] = 0.95
+    crushing_mill.isplit['Lipid'] = 0.80
     cellulose_rxn = tmo.Reaction('Cellulose -> Glucan', 'Cellulose', 1.0, basis='wt')
     cellulose_rxn.basis = 'mol'
     # Bagasse composition https://www.sciencedirect.com/science/article/pii/S0144861710005072
@@ -826,7 +826,7 @@ def create_lipidcane_to_biodiesel_and_ethanol_combined_1_and_2g_post_fermentatio
     
     crushing_mill = udct['U201']
     crushing_mill.tag = "bagasse lipid retention"
-    crushing_mill.isplit['Lipid'] = 0.95
+    crushing_mill.isplit['Lipid'] = 0.80
     cellulose_rxn = tmo.Reaction('Cellulose -> Glucan', 'Cellulose', 1.0, basis='wt')
     cellulose_rxn.basis = 'mol'
     # Bagasse composition https://www.sciencedirect.com/science/article/pii/S0144861710005072

@@ -229,6 +229,7 @@ def create_juicing_system_up_to_clarification(ins, outs, pellet_bagasse=None):
     ### Process specifications ###
     
     # Specifications dependent on lipid cane flow rate
+    @T201.add_specification(run=True)
     def correct_flows():
         F_mass = T201.ins[0].F_mass
         # correct enzyme, lime, phosphoric acid, and imbibition water
@@ -236,8 +237,6 @@ def create_juicing_system_up_to_clarification(ins, outs, pellet_bagasse=None):
         lime.imass['CaO', 'Water'] = 0.001 * F_mass * np.array([0.046, 0.954])
         H3PO4.imass['H3PO4', 'Water'] = 0.00025 * F_mass
         T201._run()
-    
-    T201.specification = correct_flows
     
     # Specifications within a system
     def correct_wash_water():
