@@ -123,7 +123,7 @@ def create_HP_sys(ins, outs):
     juice, bagasse, fiber_fines = juicing_sys.outs
     feedstock = juicing_sys.ins[0]
     feedstock.ID = 'feedstock'
-    
+    # feedstock.F_mass = 104192.83224417378 # Too small, use original
     F301 = bst.units.MultiEffectEvaporator('F301', ins=juice, outs=('F301_l', 'F301_g'),
                                             P = (101325, 73581, 50892, 32777, 20000), V = 0.813)
                                             # P = (101325, 73581, 50892, 32777, 20000), V = 0.001)
@@ -946,7 +946,7 @@ HP_no_BT_sys = bst.System('HP_no_BT_sys', path = HP_sys.path, facilities = tuple
 
 
 HP_tea = CellulosicEthanolTEA(system=HP_sys, IRR=0.10, duration=(2016, 2046),
-        depreciation='MACRS7', income_tax=0.21, operating_days=0.9*365,
+        depreciation='MACRS7', income_tax=0.21, operating_days=200,
         lang_factor=None, construction_schedule=(0.08, 0.60, 0.32),
         startup_months=3, startup_FOCfrac=1, startup_salesfrac=0.5,
         startup_VOCfrac=0.75, WC_over_FCI=0.05,
@@ -990,33 +990,32 @@ def get_AA_MPSP():
 get_AA_MPSP()
 
 seed_train_system = bst.System('seed_train_system', path=(u.S302, u.R303, u.T301))
-# R301 = F('R301') # Fermentor
-# yearly_production = 125000 # ton/yr
-# spec = ProcessSpecification(
-#     evaporator = u.F301,
-#     pump = u.M304_P,
-#     mixer = u.M304,
-#     heat_exchanger = u.M304_H,
-#     seed_train_system = seed_train_system,
-#     reactor= u.R302,
-#     reaction_name='fermentation_reaction',
-#     substrates=('Xylose', 'Glucose'),
-#     products=('HP','CalciumLactate'),
-#     # spec_1=100,
-#     # spec_2=0.909,
-#     # spec_3=18.5,
-#     spec_1=0.49,
-#     spec_2=54.8,
-#     spec_3=0.76,
-#     xylose_utilization_fraction = 0.80,
-#     feedstock = feedstock,
-#     dehydration_reactor = u.R401,
-#     byproduct_streams = [],
-#     HXN = u.HXN,
-#     # pre_conversion_units = process_groups_dict['feedstock_group'].units + process_groups_dict['pretreatment_group'].units + [u.H301],
-#     pre_conversion_units = HP_sys.split(F301.ins[0])[0],
-#     baseline_titer = 54.8,
-#     feedstock_mass = feedstock.F_mass)
+yearly_production = 125000 # ton/yr
+spec = ProcessSpecification(
+    evaporator = u.F301,
+    pump = u.M304_P,
+    mixer = u.M304,
+    heat_exchanger = u.M304_H,
+    seed_train_system = seed_train_system,
+    reactor= u.R302,
+    reaction_name='fermentation_reaction',
+    substrates=('Xylose', 'Glucose', 'Sucrose'),
+    products=('HP','CalciumLactate'),
+    # spec_1=100,
+    # spec_2=0.909,
+    # spec_3=18.5,
+    spec_1=0.49,
+    spec_2=54.8,
+    spec_3=0.76,
+    xylose_utilization_fraction = 0.80,
+    feedstock = feedstock,
+    dehydration_reactor = u.R401,
+    byproduct_streams = [],
+    HXN = u.HXN,
+    # pre_conversion_units = process_groups_dict['feedstock_group'].units + process_groups_dict['pretreatment_group'].units + [u.H301],
+    pre_conversion_units = HP_sys.split(F301.ins[0])[0],
+    baseline_titer = 54.8,
+    feedstock_mass = feedstock.F_mass)
 
 # Load baseline specifications
 

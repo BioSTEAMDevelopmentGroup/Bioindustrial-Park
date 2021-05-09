@@ -20,9 +20,14 @@ from matplotlib.ticker import AutoMinorLocator as AML
 
 # from biorefineries.HP.system import HP_sys, HP_tea, R302, spec
 # from biorefineries.HP.system import MEK as product
-from biorefineries.HP.system_light_lle_vacuum_distillation import HP_sys, HP_tea, R302, spec, get_GWP, get_ng_GWP, get_FEC, get_SPED
-from biorefineries.HP.system_light_lle_vacuum_distillation import AA as product
-
+from biorefineries.HP.system_sugarcane import (
+    HP_sys, HP_tea, R302, spec, get_GWP, get_ng_GWP, get_FEC, get_SPED,
+    AA as product
+)
+# from biorefineries.HP.system_light_lle_vacuum_distillation import (
+#     HP_sys, HP_tea, R302, spec, get_GWP, get_ng_GWP, get_FEC, get_SPED,
+#     AA as product
+# )
 from matplotlib import pyplot as plt
 from  matplotlib.colors import LinearSegmentedColormap
 import pandas as pd
@@ -441,7 +446,7 @@ HP_metrics = [solve_AA_price, get_GWP, get_FEC]
 
 # HP_metrics = [solve_AA_price, lambda:0, lambda:0]
 # %% Generate 3-specification meshgrid and set specification loading functions
-steps = 50
+steps = 10
 
 # Yield, titer, productivity (rate)
 spec_1 = np.linspace(0.05, 0.95, steps) # yield
@@ -821,22 +826,22 @@ FCI_units = r"$\mathrm{mg} \cdot \mathrm{L}^{-1}$"
 # FCI_units = r"$\mathrm{MJ eq.} \cdot \mathrm{kg AA}^{-1}$"
 # data_1_copy = copy.deepcopy(data_1)
 
-Metric_1_tickmarks = tickmarks(
-    dmin = min(d1_Metric1[~np.isnan(d1_Metric1)].min(), d2_Metric1[~np.isnan(d2_Metric1)].min()),
-    dmax = max(d1_Metric1[~np.isnan(d1_Metric1)].max(), d2_Metric1[~np.isnan(d2_Metric1)].max())
-)
-Metric_2_tickmarks = tickmarks(
-    dmin = min(d1_Metric2[~np.isnan(d1_Metric2)].min(), d2_Metric2[~np.isnan(d2_Metric2)].min()),
-    dmax = max(d1_Metric2[~np.isnan(d1_Metric2)].max(), d2_Metric2[~np.isnan(d2_Metric2)].max())
-)
-Metric_3_tickmarks = tickmarks(
-    dmin = min(d1_Metric3[~np.isnan(d1_Metric3)].min(), d2_Metric3[~np.isnan(d2_Metric3)].min()),
-    dmax = max(d1_Metric3[~np.isnan(d1_Metric3)].max(), d2_Metric3[~np.isnan(d2_Metric3)].max())
-)
+# Metric_1_tickmarks = tickmarks(
+#     dmin = min(d1_Metric1[~np.isnan(d1_Metric1)].min(), d2_Metric1[~np.isnan(d2_Metric1)].min()),
+#     dmax = max(d1_Metric1[~np.isnan(d1_Metric1)].max(), d2_Metric1[~np.isnan(d2_Metric1)].max())
+# )
+# Metric_2_tickmarks = tickmarks(
+#     dmin = min(d1_Metric2[~np.isnan(d1_Metric2)].min(), d2_Metric2[~np.isnan(d2_Metric2)].min()),
+#     dmax = max(d1_Metric2[~np.isnan(d1_Metric2)].max(), d2_Metric2[~np.isnan(d2_Metric2)].max())
+# )
+# Metric_3_tickmarks = tickmarks(
+#     dmin = min(d1_Metric3[~np.isnan(d1_Metric3)].min(), d2_Metric3[~np.isnan(d2_Metric3)].min()),
+#     dmax = max(d1_Metric3[~np.isnan(d1_Metric3)].max(), d2_Metric3[~np.isnan(d2_Metric3)].max())
+# )
 
 # Metric_3_tickmarks = [0.0*1000, 0.24*1000, 0.48*1000, 0.72*1000, 0.96*1000, 1.2*1000]
 
-Metric_1_tickmarks = [500,1000, 1500, 2000, 2500, 3000, 3500]
+Metric_1_tickmarks = [0, 2500, 5000, 7500, 10000, 12500, 15000]
 # Metric_1_tickmarks = [2000, 2500, 3000, 3500, 4000, 4500]
 # Metric_2_tickmarks = [0, 20., 40., 60., 80., 100.]
 Metric_2_tickmarks = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]

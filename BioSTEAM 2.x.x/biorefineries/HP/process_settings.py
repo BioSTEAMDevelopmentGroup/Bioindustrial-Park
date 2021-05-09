@@ -18,7 +18,7 @@ All units are explicitly defined here for transparency and easy reference
 import thermosteam as tmo
 import biosteam as bst
 from biorefineries.HP.chemicals_data import HP_chemicals as chems
-
+tmo.settings.set_thermo(chems)
 _kg_per_ton = 907.18474
 _lb_per_kg = 2.20462
 _liter_per_gallon = 3.78541
@@ -201,7 +201,7 @@ price = {'AA': AA_price,
 def load_process_settings():
     from biorefineries import cornstover as cs
     cs.load_process_settings()
-    
+    # tmo.settings.set_thermo(chems)
     bst.CE = 541.7 # year 2016
     bst.PowerUtility.price = price['Electricity']
     
