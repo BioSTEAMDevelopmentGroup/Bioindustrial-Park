@@ -301,8 +301,8 @@ def create_beer_distillation_system(ins, outs,
     P301 = units.Pump(IDs.get('Beer pump', 'P301'))
     
     # Beer column
-    x_bot = 3.910570816782338e-06
-    y_top = 0.2811210085806504
+    x_bot = 3.91e-06
+    y_top = 0.28
     D302 = units.BinaryDistillation(IDs.get('Beer column', 'D302'), P=2. * 101325,
                                     outs=(distilled_beer, ''),
                                 y_top=y_top, x_bot=x_bot, k=1.1, Rmin=0.001,
