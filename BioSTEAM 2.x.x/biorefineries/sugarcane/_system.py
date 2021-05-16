@@ -35,17 +35,16 @@ __all__ = (
 def create_bagasse_pelleting_system(ins, outs):
     bagasse, = ins
     bagasse_pellets, = outs
-    U401 = units.ConveyingBelt('U401', bagasse)
-    U402 = units.HammerMill('U402', U401-0)
-    U403 = units.DrumDryer('U403', 
-        (U402-0, 'dryer_air', 'dryer_natural_gas'), 
-        ('', '', 'dryer_emissions'),
+    U401 = units.HammerMill('U401', bagasse)
+    U402 = units.DrumDryer('U402', 
+        (U401-0, 'dryer_air', 'dryer_natural_gas'), 
+        ('', 'dryer_outlet_air', 'dryer_emissions'),
         moisture_content=0.15, split=0.,
     )
-    X401 = bst.ThermalOxidizer('X401', (U403-1, 'oxidizer_air'), 'oxidizer_emissions')
-    U404 = units.ScrewFeeder('U404', U403-0)
-    U405 = units.BagassePelletMill('U405', U404-0)
-    U406 = units.ConveyingBelt('U406', U405-0, bagasse_pellets)
+    # X401 = bst.ThermalOxidizer('X401', (U403-1, 'oxidizer_air'), 'oxidizer_emissions')
+    U403 = units.ScrewFeeder('U403', U402-0)
+    U404 = units.BagassePelletMill('U404', U403-0)
+    U405 = units.ConveyingBelt('U405', U404-0, bagasse_pellets)
 
 @SystemFactory(
     ID='feedstock_handling_sys',
@@ -112,11 +111,10 @@ def create_juicing_system_without_treatment(ins, outs, pellet_bagasse=None):
                                          Sucrose=0.04,
                                          Solids=1),
                               moisture_content=0.5)
+    U202 = units.ConveyingBelt('U202', U201-0, '' if pellet_bagasse else bagasse)
     
     if pellet_bagasse:
         bagasse_pelleting_sys = create_bagasse_pelleting_system(None, U201-0, bagasse, mockup=True)
-    else:
-        U202 = units.ConveyingBelt('U202', U201-0, bagasse)
     
     # Mix in water
     M201 = units.Mixer('M201', ('', imbibition_water), 1-U201)
@@ -490,16 +488,9 @@ def create_ethanol_purification_system(ins, outs,
           dict(ID='evaporator_condensate'),
           dict(ID='vent')],
 )
-def create_sucrose_fermentation_system(ins, outs):
+def create_sucrose_fermentation_system(ins, outs, scrubber=True):
     screened_juice, = ins
     beer, evaporator_condensate, vent = outs
-    
-    ### Streams ###
-    
-    # Fresh water
-    stripping_water = bst.Stream('stripping_water',
-                                 Water=26836,
-                                 units='kg/hr')
     
     dilution_water = bst.Stream('dilution_water')
     
@@ -558,28 +549,33 @@ def create_sucrose_fermentation_system(ins, outs):
     H301 = units.HXutility('H301', T=295.15)
     
     # Ethanol Production
-    R301 = units.Fermentation('R301', outs=('CO2', ''), tau=9, efficiency=0.90, N=4) 
+    R301 = units.Fermentation('R301', outs=(('CO2' if scrubber else vent), ''), tau=9, efficiency=0.90, N=4) 
     T301 = units.StorageTank('T301', tau=4, vessel_material='Carbon steel')
     T301.line = 'Beer tank'
     
-    stripping_water_over_vent = stripping_water.mol / 21202.490455845436
-    def update_stripping_water():
-        stripping_water, vent = D301.ins
-        stripping_water.mol[:] = stripping_water_over_vent * vent.F_mass
-    
-    D301 = units.VentScrubber('D301', ins=(stripping_water, R301-0), 
-                              outs=(vent, ''),
-                              gas=('CO2', 'O2'))
+    if scrubber:
+        stripping_water = bst.Stream('stripping_water',
+                                     Water=26836,
+                                     units='kg/hr')
+        stripping_water_over_vent = stripping_water.mol / 21202.490455845436
+        def update_stripping_water():
+            stripping_water, vent = D301.ins
+            stripping_water.mol[:] = stripping_water_over_vent * vent.F_mass
+        
+        D301 = units.VentScrubber('D301', ins=(stripping_water, R301-0), 
+                                  outs=(vent, ''),
+                                  gas=('CO2', 'O2'))
+        M302 = units.Mixer('M302', outs=beer)
     
     # Separate 99% of yeast
     C301 = units.SolidsCentrifuge('C301', 
+                                  outs=('', '' if scrubber else beer),
                                   split=(1-1e-6, 0.99, 1, 0.01),
                                   order=('Ethanol', 'Glucose', 'H3PO4', 'DryYeast'),
                                   solids=('DryYeast',))
     C301.split[:] = 1. - C301.split
     
-    # Mix in Water
-    M302 = units.Mixer('M302', outs=beer)
+    S302 = units.FakeSplitter('S302', None, ('', 'Yeast'))
     
     # Yeast mixing
     T305 = units.MixTank('T305')
@@ -589,22 +585,22 @@ def create_sucrose_fermentation_system(ins, outs):
     P306 = units.Pump('P306')
     
     def adjust_yeast_recycle():
-        recycle, beer = C301.outs
-        feed, *_ = C301.ins
+        recycle, beer = S302.outs
+        feed, = S302.ins
         yeast = 0.1 * feed.F_mass
         m = C301.moisture_content
         recycle.imass['Yeast', 'Water'] = [yeast, yeast * m / (1 - m)]
         beer.mol = feed.mol - recycle.mol
         beer.mol[beer.mol < 0.] = 0.
         beer.T = recycle.T = feed.T
-    C301.specification = adjust_yeast_recycle
+    S302.specification = adjust_yeast_recycle
     
     ### Ethanol system set-up ###
     
     screened_juice-S301-1-F301-0-P306
     (S301-0, P306-0, dilution_water)-M301-H301
-    (H301-0, C301-0-T305-0)-R301-1-T301-0-C301
-    (C301-1, D301-1)-M302
+    (H301-0, C301-0-S302-0)-R301-1-T301-0-C301-0-S302
+    if scrubber: (C301-1, D301-1)-M302
     
 
 @SystemFactory(

@@ -19,6 +19,7 @@ from . import (utils,
                _system,
                _tea,
                _lipid_extraction_specification,
+               _distributions,
 )
 
 __all__ = [*utils.__all__,
@@ -27,6 +28,7 @@ __all__ = [*utils.__all__,
            *_system.__all__,
            *_tea.__all__,
            *_lipid_extraction_specification.__all__,
+           *_distributions.__all__,
            'lipidcane_sys',
            'lipidcane_tea', 
            'flowsheet',
@@ -38,6 +40,7 @@ from ._chemicals import *
 from ._system import *
 from ._tea import *
 from ._lipid_extraction_specification import *
+from ._distributions import *
 from biorefineries.sugarcane import create_tea as create_conventional_ethanol_tea
 
 _system_loaded = False
@@ -83,80 +86,7 @@ def load(name, agile=False, cache={}):
     def rename_storage_units(storage):
         bst.rename_units([i for i in lipidcane_sys.units if bst.is_storage_unit(i)], storage)
     
-    if name == 5:
-        lipidcane_sys = create_lipidcane_to_biodiesel_and_ethanol_combined_1_and_2g_post_fermentation_oil_separation(
-            operating_hours=operating_hours,    
-        )
-        area_names = [
-            'Feedstock handling', 
-            'Juicing', 
-            'Biod. prod.',
-            'Conv. ferm.', 
-            'Pretreatment',
-            'Cofementation',
-            'Ethanol sep.', 
-            'Wastewater treatment', 
-            'Boiler turbogenerator',
-            'Utilities',
-            'Storage'
-        ]
-        rename_storage_units()
-    elif name == 4:
-        area_names = [
-            'Feedstock handling', 
-            'Juicing', 
-            'Biod. prod.', 
-            'Conv. ferm.', 
-            'Pretreatment', 
-            'Cofementation',
-            'Ethanol sep.', 
-            'Wastewater treatment', 
-            'Boiler turbogenerator',
-            'Utilities',
-            'Storage'
-        ]
-        lipidcane_sys = create_lipidcane_to_biodiesel_and_ethanol_divided_1_and_2g_hydrolyzate_oil_separation(
-            operating_hours=operating_hours,
-        )
-        rename_storage_units()
-    elif name == 3:
-        area_names = [
-            'Feedstock handling', 
-            'Juicing', 
-            'Pretreatment',
-            'Cofementation',
-            'Wastewater treatment',
-            'Oil ext.',
-            'CH&P',
-            'Ethanol sep.', 
-            'Biod. prod.',
-            'Utilities',
-            'Storage'
-        ]
-        lipidcane_sys = create_lipidcane_to_biodiesel_and_ethanol_combined_1_and_2g_post_fermentation_oil_separation(
-            operating_hours=operating_hours,
-        )
-        rename_storage_units(1200)
-    elif name == 2:
-        area_names = [
-            'Feedstock handling', 
-            'Juicing', 
-            'Conv. ferm.',
-            'Pretreatment',
-            'Cofementation',
-            'Wastewater treatment',
-            'Oil ext.',
-            'CH&P',
-            'Ethanol sep.', 
-            'Biod. prod.',
-            'Utilities',
-            'Storage'
-        ]
-        lipidcane_sys = create_lipidcane_to_biodiesel_and_ethanol_divided_1_and_2g_post_fermentation_oil_separation(
-            operating_hours=operating_hours,
-        )
-        rename_storage_units(1300)
-    elif name == 1:
+    if name == 1:
         lipidcane_sys = create_lipidcane_to_biodiesel_and_ethanol_1g(
             operating_hours=operating_hours,
         )
@@ -171,26 +101,23 @@ def load(name, agile=False, cache={}):
             'Storage',
         ]
         rename_storage_units(900)
-    elif name == 0:
+    elif name == 2:
         area_names = [
             'Feedstock handling', 
             'Juicing', 
-            'Conv. ferm.',
-            'Oil ext.',
             'Pretreatment',
-            'Cofementation',
+            'EtOH prod.',
             'Wastewater treatment',
-            'CH&P',
-            'Ethanol sep.', 
+            'Oil ext.',
+            'CH&P', 
             'Biod. prod.',
             'Utilities',
             'Storage'
         ]
-        lipidcane_sys = create_lipidcane_to_biodiesel_and_ethanol_1_and_2g_bagasse_expression(
+        lipidcane_sys = create_lipidcane_to_biodiesel_and_ethanol_combined_1_and_2g_post_fermentation_oil_separation(
             operating_hours=operating_hours,
         )
-        rename_storage_units(1300)
-    
+        rename_storage_units(1000)
     else:
         raise NotImplementedError(name)
     unit_groups = UnitGroup.group_by_area(lipidcane_sys.units)
@@ -199,7 +126,7 @@ def load(name, agile=False, cache={}):
     
     ## Not currently used; agile for next study
     
-    if name in (1, 2, 3, 4) if isinstance(name, int) else '2g' in name:
+    if name in (1, 2) if isinstance(name, int) else '2g' in name:
         if agile:
             lipidcane_tea = create_agile_tea(lipidcane_sys.units)
             lipidcane_sys.simulate()
@@ -251,18 +178,17 @@ def load(name, agile=False, cache={}):
     system = lipidcane_sys
     model = bst.Model(system)
     parameter = model.parameter
-    ethanol_price = ethanol.price * 2.98668849 # USD/gal
-    biodiesel_price = biodiesel.price * 3.3036 # USD/gal
     
     def uniform(lb, ub, *args, **kwargs):
         return parameter(*args, distribution=shape.Uniform(lb, ub), bounds=(lb, ub), **kwargs)
     
+    # Currently at ~5%, but total lipid content is past 10%
     uniform(0.05, 0.10, lipid_extraction_specification.load_lipid_content,
             element=lipidcane, units='dry wt. %')
-    if name in (0, 1):
+    if name == 1:
         lb = 0.45
         ub = 0.55
-    elif name in (2, 3):
+    elif name == 2:
         lb = 0.75
         ub = 0.85
     else:
@@ -273,22 +199,33 @@ def load(name, agile=False, cache={}):
     uniform(0.6, 0.99, lipid_extraction_specification.load_lipid_retention,
             element=lipidcane, units='%')
 
-    @uniform(0.9 * ethanol_price, 1.1 * ethanol_price, element=ethanol, units='USD/gal')
-    def set_ethanol_price(price):
+    # USDA ERS historical price data
+    @parameter(distribution=ethanol_price_distribution, element=ethanol, units='USD/gal')
+    def set_ethanol_price(price): # Triangular distribution fitted over the past 10 years Sep 2009 to Nov 2020
         ethanol.price = price / 2.98668849
 
-    @uniform(0.9 * biodiesel_price, 1.1 * biodiesel_price, element=biodiesel, units='USD/gal')
-    def set_biodiesel_price(price):
+    # USDA ERS historical price data
+    @parameter(distribution=biodiesel_price_distribution, element=biodiesel, units='USD/gal')
+    def set_biodiesel_price(price): # Triangular distribution fitted over the past 10 years Sep 2009 to March 2021
         biodiesel.price = price / 3.3111
 
+    # https://www.eia.gov/energyexplained/natural-gas/prices.php
+    @parameter(distribution=natural_gas_price_distribution, element=natural_gas, units='USD/cf')
+    def set_natural_gas_price(price): # Triangular distribution fitted over the past 10 years Sep 2009 to March 2021
+        biodiesel.price = 1000. * price / 51.92624700383502
+
+    # From Emma's literature search; EIA electricity prices vary much too widely across states.
+    # Best use prices similar to previous TEAs for a more accurate comparison.
     @uniform(0.0572, 0.07014, units='USD/kWh')
-    def set_electricity_price(electricity_price):
+    def set_electricity_price(electricity_price): 
         bst.PowerUtility.price = electricity_price
         
+    # From Huang's 2016 paper
     @uniform(6 * 30, 7 * 30, units='day/yr')
     def set_operating_days(operating_days):
         lipidcane_tea.operating_days = operating_days
     
+    # 10% is suggested for waste reducing, but 15% is suggested for investment
     @uniform(10., 15., units='%')
     def set_IRR(IRR):
         lipidcane_tea.IRR = IRR / 100.
@@ -304,9 +241,25 @@ def load(name, agile=False, cache={}):
     def TCI():
         return lipidcane_tea.TCI / 1e6 # 10^6*$
 
-    @metric(units='10^6*USD')
-    def installed_equipment_cost():
-        return lipidcane_tea.installed_equipment_cost / 1e6 # 10^6*$
+    @metric(units='gal/ton')
+    def biodiesel_production():
+        return biodiesel.F_mass / 3.3111 / lipidcane.get_total_flow('ton/hr')
+    
+    @metric(units='gal/ton')
+    def ethanol_production():
+        return ethanol.F_mass / 2.98668849 / lipidcane.get_total_flow('ton/hr')
+        
+    @metric(units='kWhr/ton')
+    def electricity_production():
+        return - sum([i.rate for i in lipidcane_sys.power_utilities]) / lipidcane.get_total_flow('ton/hr')
+    
+    @metric(units='cf/ton')
+    def natural_gas_consumption():
+        return natural_gas.get_total_flow('ft3/hr') / lipidcane.get_total_flow('ton/hr')
+    
+    natural_gas.set_property('T', 60, 'degF')
+    natural_gas.set_property('P', 14.73, 'psi')
+    natural_gas.get_total_flow('ft3/hr')
     
     @metric(units='GGE/ton')
     def productivity():
@@ -363,7 +316,7 @@ def plot_spearman_MFPP():
     from biosteam.utils import CABBI_wheel
     folder = os.path.dirname(__file__)
     MFPPs = []
-    for name in (1, 2, 3):
+    for name in (1, 2):
         file = os.path.join(folder, f'lipidcane_spearman_{name}.xlsx')
         try: 
             df = pd.read_excel(file, header=[0, 1], index_col=[0, 1])
@@ -392,7 +345,7 @@ def plot_spearman_MFPP():
         handles=[
             mpatches.Patch(color=CABBI_wheel[0].RGBn, label='Configuration I'),
             mpatches.Patch(color=CABBI_wheel[1].RGBn, label='Configuration II'),
-            mpatches.Patch(color=CABBI_wheel[2].RGBn, label='Configuration III'),
+            # mpatches.Patch(color=CABBI_wheel[2].RGBn, label='Configuration III'),
         ], 
         # loc='upper left'
     )
