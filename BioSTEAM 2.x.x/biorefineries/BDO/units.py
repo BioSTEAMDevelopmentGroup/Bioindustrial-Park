@@ -926,7 +926,7 @@ class Reactor(Unit, PressureVessel, isabstract=True):
 #     _N_outs = 2
 #     _N_heat_utilities = 1
 
-#     _BM = {**Reactor._BM,
+#     _F_BM = {**Reactor._F_BM,
 #            'Heat exchangers': 3.17,
 #            'Amberlyst-15 catalyst': 1}
     
@@ -1483,7 +1483,7 @@ class DehydrationReactor(Reactor):
     # !!! ADD heating to 300 C
     _N_ins = 2
     _N_outs = 1
-    _BM = {**Reactor._BM,
+    _F_BM = {**Reactor._F_BM,
             'TCP catalyst': 1}
     mcat_frac = 0.03 # fraction of catalyst by weight in relation to the reactant (BDO)
     dehydration_rxns = ParallelRxn([
@@ -1533,7 +1533,7 @@ class CoFermentation(Reactor):
             'Fermenter size': 'kg',
             'Recirculation flow rate': 'kg/hr',
             'Duty': 'kJ/hr'}
-    _BM = {**Reactor._BM,
+    _F_BM = {**Reactor._F_BM,
             'Heat exchangers': 3.17}
 
     auxiliary_unit_names = ('heat_exchanger',)
@@ -1709,7 +1709,7 @@ class HydrogenationReactor(Reactor):
     _N_outs = 1
     
     _N_heat_utilities = 1
-    _BM = {**Reactor._BM,
+    _F_BM = {**Reactor._F_BM,
             'Kie-CMC-Ni catalyst': 1,
             'Heat exchangers': 3.17}
     mcat_frac = 0.05 # kg per m3/h
