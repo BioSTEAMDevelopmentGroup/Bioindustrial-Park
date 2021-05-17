@@ -759,8 +759,8 @@ class SeedTrain(Unit):
         Rxn('3 Xylose -> 5 HP',       'Xylose',    0.49*ferm_ratio),
         Rxn('2 Xylose -> 5 AceticAcid',       'Xylose',    0.040*ferm_ratio),
         # Rxn('Xylose -> 5 FermMicrobe',        'Xylose',    0.03*ferm_ratio),
-        Rxn('Glucose -> 1.61 Glycerol',        'Glucose',     0.040*ferm_ratio),
-        Rxn('Xylose -> 1.34 Glycerol',       'Xylose',    0.040*ferm_ratio),
+       Rxn('Glucose + 2 H2O -> 2 Glycerol',        'Glucose',     0.040*ferm_ratio),
+        Rxn('3Xylose + 5 H2O -> 5 Glycerol',       'Xylose',    0.040*ferm_ratio),
         Rxn('Glucose -> 6 FermMicrobe + 2.4 H2O',       'Glucose',   0.05*ferm_ratio),
         Rxn('Xylose -> 5 FermMicrobe + 2 H2O',        'Xylose',    0.05*ferm_ratio),
         ])
@@ -778,6 +778,12 @@ class SeedTrain(Unit):
         # Rxn('Glucose -> 6 FermMicrobe + 2.4 H2O',       'Glucose',   (1.-1e-9)*ferm_ratio),
         # Rxn('Xylose -> 5 FermMicrobe + 2 H2O',        'Xylose',    (1.-1e-9)*ferm_ratio),
         # ])
+        
+        
+        
+        if 'Sucrose' in self.chemicals:
+            self.sucrose_hydrolysis_rxn = Rxn('Sucrose + Water -> 2Glucose', 'Sucrose', 1.-1e-9)
+            
         
         self.glucose_to_HP_rxn = self.cofermentation_rxns[0]
         self.xylose_to_HP_rxn = self.cofermentation_rxns[2]
@@ -798,7 +804,8 @@ class SeedTrain(Unit):
         effluent, CO2 = self.outs
         effluent.copy_like(feed)
         CO2.phase = 'g'
-
+        
+        self.sucrose_hydrolysis_rxn(effluent.mol)
         self.cofermentation_rxns(effluent.mol)
         self.CO2_generation_rxns(effluent.mol)
         # self.biomass_generation_rxns(effluent.mol)

@@ -804,7 +804,7 @@ def create_HP_sys(ins, outs):
     def R501_specification():
         R501.byproducts_combustion_rxns(R501.ins[0])
         R501._run()
-    R501.specification = R501_specification # Comment this out for anything other than TRY analysis
+    # R501.specification = R501_specification # Comment this out for anything other than TRY analysis
     
     get_flow_tpd = lambda: (feedstock.F_mass-feedstock.imass['H2O'])*24/907.185
     
@@ -1490,7 +1490,7 @@ get_total_electricity_demand = get_electricity_use = lambda: -BT.power_utility.r
 get_cooling_electricity_demand = lambda: u.CT.power_utility.rate + CWP.power_utility.rate
 
 get_BT_steam_kJph_heating = lambda: sum([i.duty for i in BT.steam_utilities])
-get_BT_steam_kJph_turbogen = lambda: 3600*BT.electricity_demand/BT.turbogenerator_efficiency
+get_BT_steam_kJph_turbogen = lambda: 3600.*BT.electricity_demand/BT.turbogenerator_efficiency
 get_BT_steam_kJph_total = lambda: get_BT_steam_kJph_heating() + get_BT_steam_kJph_turbogen()
 
 get_steam_frac_heating = lambda: get_BT_steam_kJph_heating()/get_BT_steam_kJph_total()

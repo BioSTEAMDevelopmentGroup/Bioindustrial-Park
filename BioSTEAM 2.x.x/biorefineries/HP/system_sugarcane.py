@@ -123,6 +123,15 @@ def create_HP_sys(ins, outs):
     juice, bagasse, fiber_fines = juicing_sys.outs
     feedstock = juicing_sys.ins[0]
     feedstock.ID = 'feedstock'
+    
+    T201 = flowsheet('T201')
+    @T201.add_specification(run=True)
+    def T201_enzyme_change_specification():
+        T201_enzyme_feed = T201.ins[1]
+        if T201_enzyme_feed.imass['Enzyme']==0.:
+             T201_enzyme_feed.imass['Enzyme'] = float(T201_enzyme_feed.imass['Cellulose'])
+        T201_enzyme_feed.imass['Cellulose'] = 0.
+        
     # feedstock.F_mass = 104192.83224417378 # Too small, use original
     F301 = bst.units.MultiEffectEvaporator('F301', ins=juice, outs=('F301_l', 'F301_g'),
                                             P = (101325, 73581, 50892, 32777, 20000), V = 0.813)
@@ -607,7 +616,7 @@ def create_HP_sys(ins, outs):
     def R501_specification():
         R501.byproducts_combustion_rxns(R501.ins[0])
         R501._run()
-    R501.specification = R501_specification # Comment this out for anything other than TRY analysis
+    # R501.specification = R501_specification # Comment this out for anything other than TRY analysis
     
     get_flow_tpd = lambda: (feedstock.F_mass-feedstock.imass['H2O'])*24/907.185
     
@@ -873,7 +882,10 @@ feedstock = s.feedstock
 AA = s.AcrylicAcid
 get_flow_tpd = lambda: (feedstock.F_mass-feedstock.imass['H2O'])*24/907.185
 
-
+for unit in u:
+    if hasattr(unit, 'isplit'):
+        unit.isplit['Enzyme'] = unit.isplit['Cellulose']
+        
 # feeds = [i for i in flowsheet.stream
 #                             if i.sink and not i.source]
 feeds = HP_sys.feeds

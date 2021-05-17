@@ -164,7 +164,8 @@ class SeedTrain(Unit):
                 Rxn('Glucan + H2O -> Glucose',            'Glucan',   0.9000),
                 Rxn('Cellobiose + H2O -> 2Glucose',       'Cellobiose',  1.0000)]
             )
-    
+        else:
+            self.saccharification = False
     def _run(self):
         vent, effluent= self.outs
         effluent.mix_from(self.ins, energy_balance=False)

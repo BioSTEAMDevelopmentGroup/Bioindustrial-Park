@@ -24,7 +24,7 @@ def get_IDs(units_list):
 
 # Bugfix barrage is not needed anymore because hexane recycle is not emptied anymore
 # and Wegstein and Aitken converge much better.
-bugfix = False
+bugfix = True
 
 error = False
 
