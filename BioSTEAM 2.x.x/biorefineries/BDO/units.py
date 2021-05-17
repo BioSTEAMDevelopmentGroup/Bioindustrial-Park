@@ -820,7 +820,7 @@ class Reactor(Unit, PressureVessel, isabstract=True):
             
     def _cost(self):
         Design = self.design_results
-        purchase_costs = self.purchase_costs
+        purchase_costs = self.baseline_purchase_costs
         
         if Design['Total volume'] == 0:
             for i, j in purchase_costs.items():
@@ -926,7 +926,8 @@ class Reactor(Unit, PressureVessel, isabstract=True):
 #     _N_outs = 2
 #     _N_heat_utilities = 1
 
-#     _F_BM = {**Reactor._F_BM,
+
+#     _F_BM_default = {**Reactor._F_BM_default,
 #            'Heat exchangers': 3.17,
 #            'Amberlyst-15 catalyst': 1}
     
@@ -1120,8 +1121,8 @@ class Reactor(Unit, PressureVessel, isabstract=True):
 #         hu_single_rx = hx.heat_utilities[0]
 #         hu_total.copy_like(hu_single_rx)
 #         hu_total.scale(N)
-#         self.purchase_costs['Heat exchangers'] = hx.purchase_cost * N
-#         self.purchase_costs['Amberlyst-15 catalyst'] = self.mcat * price['Amberlyst15']
+#         self.baseline_purchase_costs['Heat exchangers'] = hx.purchase_cost * N
+#         self.baseline_purchase_costs['Amberlyst-15 catalyst'] = self.mcat * price['Amberlyst15']
         
 # class HydrolysisReactor(Reactor):
 #     """
@@ -1445,7 +1446,7 @@ class BDOStorageTank(StorageTank):
     def _cost(self):
         if self.ins[0].F_mol == 0:
             self.design_results['Number of tanks'] = 0
-            self.purchase_costs['Tanks'] = 0
+            self.baseline_purchase_costs['Tanks'] = 0
         else: StorageTank._cost(self)
 
 # Modified from bst.units.Pump, which won't simulate for 0 flow 
@@ -1465,7 +1466,7 @@ class BDOPump(Pump):
       
     def _cost(self):
         if self.ins[0].F_mol == 0:
-            Cost = self.purchase_costs
+            Cost = self.baseline_purchase_costs
             Cost['Pump'] = 0
             Cost['Motor'] = 0
         else: Pump._cost(self)
@@ -1483,7 +1484,9 @@ class DehydrationReactor(Reactor):
     # !!! ADD heating to 300 C
     _N_ins = 2
     _N_outs = 1
-    _F_BM = {**Reactor._F_BM,
+
+    _F_BM_default = {**Reactor._F_BM_default,
+
             'TCP catalyst': 1}
     mcat_frac = 0.03 # fraction of catalyst by weight in relation to the reactant (BDO)
     dehydration_rxns = ParallelRxn([
@@ -1507,7 +1510,7 @@ class DehydrationReactor(Reactor):
         
     def _cost(self):
         super()._cost()
-        self.purchase_costs['TCP catalyst'] =\
+        self.baseline_purchase_costs['TCP catalyst'] =\
             self.mcat_frac * self.ins[0].imass['BDO'] * price['TCP']
             
 compute_BDO_titer = lambda effluent: effluent.imass['BDO']/effluent.F_vol
@@ -1533,7 +1536,8 @@ class CoFermentation(Reactor):
             'Fermenter size': 'kg',
             'Recirculation flow rate': 'kg/hr',
             'Duty': 'kJ/hr'}
-    _F_BM = {**Reactor._F_BM,
+
+    _F_BM_default = {**Reactor._F_BM_default,
             'Heat exchangers': 3.17}
 
     auxiliary_unit_names = ('heat_exchanger',)
@@ -1673,7 +1677,7 @@ class CoFermentation(Reactor):
 
     def _cost(self):
         Design = self.design_results
-        purchase_costs = self.purchase_costs
+        purchase_costs = self.baseline_purchase_costs
         purchase_costs.clear()
         hx = self.heat_exchanger
 
@@ -1709,7 +1713,8 @@ class HydrogenationReactor(Reactor):
     _N_outs = 1
     
     _N_heat_utilities = 1
-    _F_BM = {**Reactor._F_BM,
+
+    _F_BM_default = {**Reactor._F_BM_default,
             'Kie-CMC-Ni catalyst': 1,
             'Heat exchangers': 3.17}
     mcat_frac = 0.05 # kg per m3/h
@@ -1764,7 +1769,7 @@ class HydrogenationReactor(Reactor):
         hu_single_rx = hx.heat_utilities[0]
         hu_total.copy_like(hu_single_rx)
         hu_total.scale(N)
-        self.purchase_costs['Heat exchangers'] = hx.purchase_cost * N
-        self.purchase_costs['Kie-CMC-Ni catalyst'] =\
+        self.baseline_purchase_costs['Heat exchangers'] = hx.purchase_cost * N
+        self.baseline_purchase_costs['Kie-CMC-Ni catalyst'] =\
             self.mcat_frac * (sum([stream.F_vol for stream in self.outs])) * price['Hydrogenation catalyst']
         

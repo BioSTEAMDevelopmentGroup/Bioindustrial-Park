@@ -29,9 +29,9 @@ def create_chemicals():
     Sucrose.N_solutes = 2
     
     def create_new_chemical(ID, phase='s', **constants):
-        solid = tmo.Chemical.blank(ID, phase=phase, **constants)
-        chemicals.append(solid)
-        return solid
+        chemical = tmo.Chemical(ID, phase=phase, phase_ref=phase, search_db=False, **constants)
+        chemicals.append(chemical)
+        return chemical
     
     Ash = create_new_chemical('Ash', MW=1.)
     Cellulose = create_new_chemical('Cellulose',
@@ -46,7 +46,13 @@ def create_chemicals():
                                  formula='C8H8O3', # Vainillin
                                  Hf=-452909.632)
     Solids = create_new_chemical('Solids', MW=1.)
-    Yeast = create_new_chemical('Yeast', MW=1., CAS='Yeast', Hf=Glucose.Hf / Glucose.MW)
+    Yeast = create_new_chemical(
+        'Yeast', 
+        formula='CH1.61O0.56N0.16',
+        rho=1540,
+        default=True,
+        Hf=-130412.73,
+    )
     CaO = create_new_chemical('CaO', formula='CaO')
 
     

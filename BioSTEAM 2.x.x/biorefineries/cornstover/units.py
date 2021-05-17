@@ -57,16 +57,16 @@ class PretreatmentReactorSystem(Unit):
     Rxn('Glucan + H2O -> Glucose',                   'Glucan',   0.0990),
     Rxn('Glucan + H2O -> GlucoseOligomer',           'Glucan',   0.0030),
     Rxn('Glucan -> HMF + 2 H2O',                     'Glucan',   0.0030),
-    Rxn('Galactan + H2O -> GalactoseOligomer',       'Galactan', 0.0030),
+    Rxn('Galactan + H2O -> GalactoseOligomer',       'Galactan', 0.0240),
     Rxn('Galactan -> HMF + 2 H2O',                   'Galactan', 0.0030),
     Rxn('Mannan + H2O -> MannoseOligomer',           'Mannan',   0.0030),
     Rxn('Mannan -> HMF + 2 H2O',                     'Mannan',   0.0030),
     Rxn('Sucrose -> HMF + Glucose + 2H2O',           'Sucrose',  1.0000),
     Rxn('Xylan + H2O -> Xylose',                     'Xylan',    0.9000),
-    Rxn('Xylan + H2O -> XyloseOligomer',             'Xylan',    0.0024),
+    Rxn('Xylan + H2O -> XyloseOligomer',             'Xylan',    0.0240),
     Rxn('Xylan -> Furfural + 2 H2O',                 'Xylan',    0.0500),
     Rxn('Arabinan + H2O -> Arabinose',               'Arabinan', 0.9000),
-    Rxn('Arabinan + H2O -> ArabinoseOligomer',       'Arabinan', 0.0024),
+    Rxn('Arabinan + H2O -> ArabinoseOligomer',       'Arabinan', 0.0240),
     Rxn('Arabinan -> Furfural + 2 H2O',              'Arabinan', 0.0050),
     Rxn('Acetate -> AceticAcid',                     'Acetate',  1.0000),
     Rxn('Lignin -> SolubleLignin',                   'Lignin',   0.050)])
@@ -165,7 +165,9 @@ class SeedTrain(Unit):
                 Rxn('Cellobiose + H2O -> 2Glucose',       'Cellobiose',  1.0000)]
             )
         else:
+
             self.saccharification = False
+
     def _run(self):
         vent, effluent= self.outs
         effluent.mix_from(self.ins, energy_balance=False)

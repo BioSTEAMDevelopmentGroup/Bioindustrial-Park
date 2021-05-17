@@ -28,9 +28,8 @@ __all__ = (
     'create_cellulosic_fermentation_system',
 )
 
-default_liquids = ['Water', 'Ethanol', 'AceticAcid',
-                   'Furfural', 'H2SO4', 'NH3', 'HMF',
-                   'Lipid']
+default_nonsolids = ['Water', 'Ethanol', 'AceticAcid', 
+                     'Furfural', 'H2SO4', 'NH3', 'HMF']
 
 @bst.SystemFactory(
     ID='hot_water_pretreatment_sys',
@@ -58,7 +57,7 @@ def create_hot_water_pretreatment_system(
         pretreatment_area=200,
         include_feedstock_handling=True,
         solids_loading=0.305,
-        liquids=default_liquids,
+        nonsolids=['Water'],
     ):
     
     feedstock, = ins
@@ -88,7 +87,7 @@ def create_hot_water_pretreatment_system(
     
     chemicals = M203.chemicals
     M203.solids_loading = solids_loading
-    indices = chemicals.available_indices(liquids)
+    indices = chemicals.available_indices(nonsolids)
     @M203.add_specification(run=True)
     def update_pretreatment_process_water():
         solids_loading = M203.solids_loading
@@ -124,7 +123,7 @@ def create_dilute_acid_pretreatment_system(
         pretreatment_area=200,
         include_feedstock_handling=True,
         solids_loading=0.3,
-        liquids=default_liquids,
+        nonsolids=default_nonsolids,
     ):
     
     feedstock, = ins
@@ -177,7 +176,7 @@ def create_dilute_acid_pretreatment_system(
     
     M202.solids_loading = solids_loading
     chemicals  = M202.chemicals 
-    indices = chemicals.available_indices(default_liquids)
+    indices = chemicals.available_indices(default_nonsolids)
     @M202.add_specification(run=True)
     def update_pretreatment_process_water():
         sulfuric_acid, warm_process_water, feed = M202.ins
@@ -217,7 +216,7 @@ def create_dilute_acid_pretreatment_system(
 )
 def create_continuous_saccharification_system(
         ins, outs, solids_loading=None,
-        liquids=default_liquids,
+        nonsolids=default_nonsolids,
     ):
     hydrolyzate, cellulase, saccharification_water = ins
     slurry, = outs
@@ -236,21 +235,20 @@ def create_continuous_saccharification_system(
         cellulase.imass['Water', 'Cellulase'] = (
             enzyme_over_cellulose
             * z_mass_cellulase_mixture
-            * 1.1 * (hydrolyzate.imass['Glucan', 'GlucoseOligomer'].sum() * 1.1
-                     + hydrolyzate.imass['Glucose'])
+            * 1.1 * (hydrolyzate.imass['Glucan', 'GlucoseOligomer'].sum() * 1.1)
         )
     
     chemicals = M301.chemicals
-    indices = chemicals.available_indices(liquids)
+    indices = chemicals.available_indices(nonsolids)
     @M301.add_specification(run=True)
     def update_moisture_content():
-        hydrolyzate, cellulase, water = M301.ins
+        hydrolyzate, cellulase, saccharification_water = M301.ins
         mass = chemicals.MW * (hydrolyzate.mol + cellulase.mol)
         mass_moisture = mass[indices].sum()
         solids_loading = M301.solids_loading
         water_over_solids = (1 - solids_loading) / solids_loading
-        missing_water = max(water_over_solids * (mass.sum() - mass_moisture) - mass_moisture, 0.)
-        saccharification_water.imass['Water'] = missing_water
+        M301.required_saccharification_water = water_over_solids * (mass.sum() - mass_moisture) - mass_moisture
+        saccharification_water.imass['Water'] = max(M301.required_saccharification_water, 0.)
     
     R301 = units.ContinuousPresaccharification('R301', M301-0, slurry)
 
@@ -445,7 +443,7 @@ def create_cellulosic_fermentation_system(
         ins, outs,
         include_scrubber=True,
         solids_loading=None,
-        liquids=('Water', 'Lipid'),
+        nonsolids=default_nonsolids,
         kind=0, 
         # 0 for Integrated Bioprocess(IB)
         # 1 for Simultaneous Saccharification and Co-fermentation (SSCF) 
@@ -457,7 +455,7 @@ def create_cellulosic_fermentation_system(
         ins=[hydrolyzate, cellulase, saccharification_water],
         mockup=True,
         solids_loading=solids_loading,
-        liquids=liquids,
+        nonsolids=nonsolids,
     )
     if kind == 0:
         cofermentation_sys = create_saccharification_and_cofermentation_system(

@@ -84,6 +84,7 @@ feedstock = Stream('feedstock',
                     price=price['Feedstock'])
 
 U101 = units.FeedstockPreprocessing('U101', ins=feedstock)
+U101.feedstock_flow_rate = feedstock.F_mass # TODO: Check this
 
 # Handling costs/utilities included in feedstock cost thus not considered here
 U101.cost_items['System'].cost = 0
@@ -102,7 +103,7 @@ pretreatment_feedstock_water = Stream('pretreatment_feedstock_water',
 
 # For pretreatment, baseline is (18+4.1) mg/g dry biomass
 # based on P21 in Humbird et al., 93% purity
-feedstock_dry_mass = feedstock.F_mass - feedstock.imass['H2O']
+feedstock_dry_mass = feedstock.F_mass - feedstock.imass['H2O'] # TODO: Check this
 pretreatment_sulfuric_acid = Stream('pretreatment_sulfuric_acid', 
                                     H2SO4=feedstock_dry_mass*22.1/1000*0.93,
                                     H2O=feedstock_dry_mass*22.1/1000*0.07,
@@ -129,7 +130,8 @@ pretreatment_ammonia_water = Stream('pretreatment_ammonia_water', units='kg/hr')
 # =============================================================================
 
 # Prepare sulfuric acid
-T201 = units.SulfuricAcidAdditionTank('T201', ins=pretreatment_sulfuric_acid)
+T201 = units.SulfuricAcidAdditionTank('T201', ins=pretreatment_sulfuric_acid,
+                                      feedstock_dry_mass=feedstock.F_mass - feedstock.imass['Water'])
 M201 = units.SulfuricAcidMixer('M201', ins=(T201-0, pretreatment_acid_water))
 
 # Mix sulfuric acid and feedstock, adjust water loading
@@ -622,7 +624,7 @@ DPHP_fresh = Stream('DPHP_fresh', DPHP = feedstock_dry_mass*50*22.1/1000*0.93, u
 system_makeup_water = Stream('system_makeup_water', price=price['Makeup water'])
 
 # Final product, not pure acid (which should be the case in reality)
-BDO = Stream('BDO', units='kg/hr', price=price['BDO'])
+BDO = Stream('BDO', units='kg/hr', price=price.get('BDO', 1.0)) # TODO: Check this
 
 # Acetoin product
 Acetoin = Stream('Acetoin', units='kg/hr', price=price['Acetoin'])
@@ -677,7 +679,7 @@ T604.line = 'DPHP storage tank'
 T604_P = bst.units.ConveyingBelt('T604_P', ins=T604-0)
 
 # 7-day storage time, similar to ethanol's in Humbird et al.
-T605 = units.EthanolStorageTank('T605', ins=ethanol_fresh,
+T605 = bst.units.StorageTank('T605', ins=ethanol_fresh,
                                      tau=7*24, V_wf=0.9,
                                      vessel_type='Floating roof',
                                      vessel_material='Carbon steel')
