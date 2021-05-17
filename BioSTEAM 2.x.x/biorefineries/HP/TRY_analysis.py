@@ -20,14 +20,21 @@ from matplotlib.ticker import AutoMinorLocator as AML
 
 # from biorefineries.HP.system import HP_sys, HP_tea, R302, spec
 # from biorefineries.HP.system import MEK as product
-from biorefineries.HP.system_sugarcane import (
-    HP_sys, HP_tea, R302, spec, get_GWP, get_ng_GWP, get_FEC, get_SPED,
-    AA as product
-)
-# from biorefineries.HP.system_light_lle_vacuum_distillation import (
+
+
+
+# from biorefineries.HP.system_sugarcane import (
 #     HP_sys, HP_tea, R302, spec, get_GWP, get_ng_GWP, get_FEC, get_SPED,
 #     AA as product
 # )
+
+
+from biorefineries.HP.system_light_lle_vacuum_distillation import (
+    HP_sys, HP_tea, R302, spec, get_GWP, get_ng_GWP, get_FEC, get_SPED,
+    AA as product
+)
+
+
 from matplotlib import pyplot as plt
 from  matplotlib.colors import LinearSegmentedColormap
 import pandas as pd
@@ -448,45 +455,45 @@ HP_metrics = [solve_AA_price, get_GWP, get_FEC]
 # %% Generate 3-specification meshgrid and set specification loading functions
 steps = 10
 
-# Yield, titer, productivity (rate)
-spec_1 = np.linspace(0.05, 0.95, steps) # yield
-spec_2 = np.linspace(5., 330., steps) # titer
-# spec_1 = np.linspace(0.2, 0.99, steps) # yield
-# spec_2 = np.linspace(45, 225, steps) # titer
-spec_3 = np.array([0.152]) # productivity
-spec.load_spec_1 = spec.load_yield
-spec.load_spec_2 = spec.load_titer
-spec.load_spec_3 = spec.load_productivity
-xlabel = "Yield"
-ylabel = 'Titer [$\mathrm{g} \cdot \mathrm{L}^{-1}$]'
-# xticks = [0.33, 0.66, 0.99]
-xticks = [0., 0.2, 0.4, 0.6, 0.8, 1.0]
-# yticks = [75, 150, 225]
-yticks = [0,30,60,90,120,150,180,210,240,270,300,330]
-# xticks = [0.2, 0.6, 0.99]
-# yticks = [45, 135, 225]
-spec_3_units = "$\mathrm{g} \cdot \mathrm{L}^{-1} \cdot \mathrm{hr}^{-1}$"
-
-
-
-# # Feedstock carbohydrate or sugar %, feedstock price, productivity (rate)
-# spec_1 = np.linspace(0.25, 0.99, steps) # feedstock carbohydrate %
-# spec_2 = np.linspace(1., 200., steps) # feedstock price
+# # Yield, titer, productivity (rate)
+# spec_1 = np.linspace(0.05, 0.95, steps) # yield
+# spec_2 = np.linspace(5., 330., steps) # titer
 # # spec_1 = np.linspace(0.2, 0.99, steps) # yield
 # # spec_2 = np.linspace(45, 225, steps) # titer
-# spec_3 = np.array([0.76]) # productivity
-# spec.load_spec_1 = spec.load_feedstock_carbohydrate_content
-# spec.load_spec_2 = spec.load_feedstock_price
+# spec_3 = np.array([0.152]) # productivity
+# spec.load_spec_1 = spec.load_yield
+# spec.load_spec_2 = spec.load_titer
 # spec.load_spec_3 = spec.load_productivity
-# xlabel = "Feedstock carbohydrate fraction"
-# ylabel = 'Feedstock price [$\mathrm{$} \cdot \mathrm{ton}^{-1}$]'
+# xlabel = "Yield"
+# ylabel = 'Titer [$\mathrm{g} \cdot \mathrm{L}^{-1}$]'
 # # xticks = [0.33, 0.66, 0.99]
 # xticks = [0., 0.2, 0.4, 0.6, 0.8, 1.0]
 # # yticks = [75, 150, 225]
-# yticks = [0, 25, 50, 75, 100, 125, 150, 175, 200]
+# yticks = [0,30,60,90,120,150,180,210,240,270,300,330]
 # # xticks = [0.2, 0.6, 0.99]
 # # yticks = [45, 135, 225]
 # spec_3_units = "$\mathrm{g} \cdot \mathrm{L}^{-1} \cdot \mathrm{hr}^{-1}$"
+
+
+
+# Feedstock carbohydrate or sugar %, feedstock price, productivity (rate)
+spec_1 = np.linspace(0.25, 0.99, steps) # feedstock carbohydrate %
+spec_2 = np.linspace(1., 200., steps) # feedstock price
+# spec_1 = np.linspace(0.2, 0.99, steps) # yield
+# spec_2 = np.linspace(45, 225, steps) # titer
+spec_3 = np.array([0.76]) # productivity
+spec.load_spec_1 = spec.load_feedstock_carbohydrate_content
+spec.load_spec_2 = spec.load_feedstock_price
+spec.load_spec_3 = spec.load_productivity
+xlabel = "Feedstock carbohydrate fraction"
+ylabel = 'Feedstock price [$\mathrm{$} \cdot \mathrm{ton}^{-1}$]'
+# xticks = [0.33, 0.66, 0.99]
+xticks = [0., 0.2, 0.4, 0.6, 0.8, 1.0]
+# yticks = [75, 150, 225]
+yticks = [0, 25, 50, 75, 100, 125, 150, 175, 200]
+# xticks = [0.2, 0.6, 0.99]
+# yticks = [45, 135, 225]
+spec_3_units = "$\mathrm{g} \cdot \mathrm{L}^{-1} \cdot \mathrm{hr}^{-1}$"
 
 
 
@@ -841,8 +848,8 @@ FCI_units = r"$\mathrm{mg} \cdot \mathrm{L}^{-1}$"
 
 # Metric_3_tickmarks = [0.0*1000, 0.24*1000, 0.48*1000, 0.72*1000, 0.96*1000, 1.2*1000]
 
-Metric_1_tickmarks = [0, 2500, 5000, 7500, 10000, 12500, 15000]
-# Metric_1_tickmarks = [2000, 2500, 3000, 3500, 4000, 4500]
+# Metric_1_tickmarks = [0, 2500, 5000, 7500, 10000, 12500, 15000]
+Metric_1_tickmarks = [1000, 2000, 2500, 3000, 3500, 4000, 4500]
 # Metric_2_tickmarks = [0, 20., 40., 60., 80., 100.]
 Metric_2_tickmarks = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
 # # Metric_3_tickmarks = [60, 70, 80, 90, 100, 110, 120]

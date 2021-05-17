@@ -199,8 +199,8 @@ price = {'AA': AA_price,
     
 
 def load_process_settings():
-    from biorefineries import cornstover as cs
-    cs.load_process_settings()
+    # from biorefineries import cornstover as cs
+    # cs.load_process_settings()
     # tmo.settings.set_thermo(chems)
     bst.CE = 541.7 # year 2016
     bst.PowerUtility.price = price['Electricity']
@@ -287,6 +287,7 @@ GWP_CF_stream = tmo.Stream('GWP_CF_stream', GWP_CF_array, units='kg/hr')
 # GWP_CFs['FGHTP Corn stover'] = 68.82/1000. # Wendt et al. 2018: Techno-Economic Assessment of a Chopped Feedstock Logistics Supply Chain for Corn Stover
 
 GWP_CFs['FGHTP Corn stover'] = 0.10945 # see Feedstock_impacts_YL
+GWP_CFs['FGHTP Sugarcane'] = 0.10945 # placeholder
 
 # GWP_CFs['Corn stover'] = 44.70/1e3 * 0.8
 # GWP_CFs['Switchgrass'] = 87.81/1e3 * 0.8
@@ -342,6 +343,7 @@ FEC_CF_stream = tmo.Stream('FEC_CF_stream', FEC_CF_array, units='kg/hr')
 
 
 FEC_CFs['FGHTP Corn stover'] = 1.68000 # see Feedstock_impacts_YL
+FEC_CFs['FGHTP Sugarcane'] = 1.68000 # placeholder
 
 # FEC_CFs['Corn stover'] = 688.60/1e3 * 0.8
 # FEC_CFs['Switchgrass'] = 892.41/1e3 * 0.8
