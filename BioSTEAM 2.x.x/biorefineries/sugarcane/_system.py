@@ -111,10 +111,11 @@ def create_juicing_system_without_treatment(ins, outs, pellet_bagasse=None):
                                          Sucrose=0.04,
                                          Solids=1),
                               moisture_content=0.5)
-    U202 = units.ConveyingBelt('U202', U201-0, '' if pellet_bagasse else bagasse)
+    U202 = units.ConveyingBelt('U202', U201-0, [''] if pellet_bagasse else [bagasse])
     
     if pellet_bagasse:
-        bagasse_pelleting_sys = create_bagasse_pelleting_system(None, U201-0, bagasse, mockup=True)
+        breakpoint()
+        bagasse_pelleting_sys = create_bagasse_pelleting_system(None, ins=U202-0, outs=bagasse, mockup=True)
     
     # Mix in water
     M201 = units.Mixer('M201', ('', imbibition_water), 1-U201)
