@@ -22,7 +22,7 @@ with modification of fermentation system for TAL instead of the original ethanol
 
 import thermosteam as tmo
 from thermosteam import functional as fn
-
+# from biorefineries import sugarcane as sc
 __all__ = ('TAL_chemicals', 'chemical_groups', 'soluble_organics', 'combustibles')
 
 # chems is the object containing all chemicals used in this biorefinery
@@ -236,7 +236,7 @@ HMF.Dortmund.update(chems.Furfural.Dortmund)
 
 TAL = Triaceticacidlactone = chemical_database(ID='TAL',
                                                search_ID='Triacetic acid lactone')
-TAL.copy_models_from(Furfural, ['Psat', 'Hvap']) # doesn't matter, since we never boil TAL
+TAL.copy_models_from(Furfural, ['Psat', 'Hvap', 'V']) # doesn't matter, since we never boil TAL in significant amounts
 # SA = Sorbicacid =  chemical_database('Sorbic acid')
 # KSA = Potassiumsorbate = chemical_database('Potassium sorbate')
 # BSA = Butylsorbate = chemical_database('Butyl sorbate')
@@ -310,6 +310,7 @@ Lignin.Hf = -108248*_cal2joule/tmo.Chemical('Vanillin').MW*Lignin.MW
 P4O10 = chemical_database('P4O10', phase='s', Hf=-713.2*_cal2joule)
 Ash = chemical_database('Ash', search_ID='CaO', phase='s', Hf=-151688*_cal2joule,
                         HHV=0, LHV=0)
+CaSO4 = chemical_database('CaSO4')
 # This is to copy the solid state of Xylose,
 # cannot directly use Xylose as Xylose is locked at liquid state now
 Tar = chemical_copied('Tar', Xylose, phase_ref='s')

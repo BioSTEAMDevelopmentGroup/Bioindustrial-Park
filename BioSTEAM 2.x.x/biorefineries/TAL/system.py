@@ -53,6 +53,7 @@ from biosteam import main_flowsheet as F
 from copy import deepcopy
 from biosteam import System
 from thermosteam import Stream
+from biorefineries.cornstover import CellulosicEthanolTEA
 from biorefineries.TAL import units, facilities
 from biorefineries.TAL._process_specification import ProcessSpecification
 from biorefineries.TAL.process_settings import price, CFs
@@ -107,13 +108,13 @@ U101.cost_items['System'].kW = 0
 # For pretreatment, 93% purity
 sulfuric_acid_T201 = Stream('sulfuric_acid_T201', units='kg/hr')
 # To be mixed with sulfuric acid, flow updated in SulfuricAcidMixer
-water_M201 = Stream('water_M201', T=114+273.15, units='kg/hr')
-
+water_M201 = Stream('water_M201', T=300, units='kg/hr')
+    
 # To be used for feedstock conditioning
-water_M202 = Stream('water_M202', T=95+273.15, units='kg/hr')
+water_M202 = Stream('water_M202', T=300, units='kg/hr')
 
 # To be added to the feedstock/sulfuric acid mixture, flow updated by the SteamMixer
-steam_M203 = Stream('steam_M203', phase='g',T=268+273.15, P=13*101325, units='kg/hr')
+water_M203 = Stream('water_M203', phase='l', T=300, P=13.*101325, units='kg/hr')
 
 # For neutralization of pretreatment hydrolysate
 ammonia_M205 = Stream('ammonia_M205', phase='l', units='kg/hr')
@@ -124,19 +125,55 @@ water_M205 = Stream('water_M205', units='kg/hr')
 # =============================================================================
 # Pretreatment units
 # =============================================================================
+H_M201 = bst.units.HXutility('H_M201', ins=water_M201,
+                                 outs='steam_M201',
+                                 T=99.+273.15, rigorous=True)
+
+H_M201.heat_utilities[0].heat_transfer_efficiency = 1.
+def H_M201_specification():
+    T201._run()
+    acid_imass = T201.outs[0].imass['SulfuricAcid']
+    H_M201.ins[0].imass['Water'] = acid_imass / 0.05
+    # H_M201.ins[0].imass['H2SO4'] = H_M201.ins[0].imass['Water']/1000.
+    H_M201._run()
+H_M201.specification = H_M201_specification
+# H_M201._cost = lambda: None
+# H_M201._design = lambda: None
+# H_M201.heat_utilities[0].heat_exchanger = None
+H_M202 = bst.units.HXutility('H_M202', ins=water_M202,
+                                 outs='hot_water_M202',
+                                 T=99.+273.15, rigorous=True)
+H_M202.heat_utilities[0].heat_transfer_efficiency = 1.
+def H_M202_specification():
+    U101._run()
+    H_M201.run()
+    M201._run()
+    feedstock, acid = U101.outs[0], M201.outs[0]
+    recycled_water = H201.outs[0]
+    mixture_F_mass = feedstock.F_mass + acid.F_mass
+    mixture_imass_water = feedstock.imass['Water'] + acid.imass['Water'] + \
+        recycled_water.imass['Water']
+    total_mass = (mixture_F_mass - mixture_imass_water)/M202.solid_loading
+    H_M202.ins[0].imass['Water'] = total_mass - mixture_F_mass
+    # H_M202.ins[0].imass['H2SO4'] = H_M202.ins[0].imass['Water']/1000.
+    H_M202._run()
+H_M202.specification = H_M202_specification
+
 
 # Prepare sulfuric acid
 get_feedstock_dry_mass = lambda: feedstock.F_mass - feedstock.imass['H2O']
 T201 = units.SulfuricAcidAdditionTank('T201', ins=sulfuric_acid_T201,
                                       feedstock_dry_mass=get_feedstock_dry_mass())
 
-M201 = units.SulfuricAcidMixer('M201', ins=(T201-0, water_M201))
-
+M201 = units.SulfuricAcidMixer('M201', ins=(T201-0, H_M201-0))
+    
 # Mix sulfuric acid and feedstock, adjust water loading for pretreatment
-M202 = units.PretreatmentMixer('M202', ins=(U101-0, M201-0, water_M202))
+M202 = units.PretreatmentMixer('M202', ins=(U101-0, M201-0, H_M202-0, ''))
 
 # Mix feedstock/sulfuric acid mixture and steam
-M203 = units.SteamMixer('M203', ins=(M202-0, steam_M203), P=5.5*101325)
+# M203 = units.SteamMixer('M203', ins=(M202-0, water_M203), P=5.5*101325)
+M203 = bst.units.SteamMixer('M203', ins=(M202-0, water_M203), P=5.5*101325)
+M203.heat_utilities[0].heat_transfer_efficiency = 1.
 R201 = units.PretreatmentReactorSystem('R201', ins=M203-0, outs=('R201_g', 'R201_l'))
 
 # Pump bottom of the pretreatment products to the oligomer conversion tank
@@ -349,7 +386,7 @@ S402 = bst.units.MultiStageMixerSettlers('S402', ins = (S401-1, M402-0),
         },
         N_stages = 2)
 def S402_spec():
-    M402.specification()
+    M402.run()
     S402._run()
 S402.specification = S402_spec
 
@@ -381,7 +418,7 @@ def adjust_r_S402_recovery():
     duty = H2 - H1
     hu(duty, instream.T, TAL_chemicals[solvent].Tb)
     splitter._N_heat_utilities=1
-    splitter.heat_utilities = np.array([hu])
+    splitter.heat_utilities = tuple([hu])
     
 r_S402.specification = adjust_r_S402_recovery
 r_S402-0-1-M402
@@ -408,7 +445,7 @@ S403 = bst.units.MultiStageMixerSettlers('S403', ins = (S402-0, M403-0),
         },
         N_stages = 2)
 def S403_spec():
-    M403.specification()
+    M403.run()
     S403._run()
 S403.specification = S403_spec
 
@@ -439,7 +476,7 @@ def adjust_r_S403_recovery():
     duty = H2 - H1
     hu(duty, instream.T, TAL_chemicals[solvent].Tb)
     splitter._N_heat_utilities=1
-    splitter.heat_utilities = np.array([hu])
+    splitter.heat_utilities = tuple([hu])
     
 r_S403.specification = adjust_r_S403_recovery
 r_S403-0-1-M403
@@ -512,8 +549,14 @@ S406 = bst.units.SolidsCentrifuge('S406', ins=R403-0, outs=('K_sorbate', ''),
                             solids = ['KSA'])
 # !!! splits for moisture content (negligible in feed), hexanol content 
 def S406_spec():
-    S406._run()
-
+    try:
+        S406._run()
+    except:
+        moisture_content = S406.moisture_content
+        # S406.ins[0].imol['Water'] = 0.
+        S406.moisture_content/= 5.
+        S406._run()
+        S406.moisture_content = moisture_content
 
 S406.specification = S406_spec
 
@@ -523,7 +566,7 @@ S407 = units.Crystallization_Decantation('S407', ins = (S406-0, HCl, ''), outs =
 
 def S407_spec():
     S407._run()
-    # S408.specification()
+    # S408.run()
 S407.specification = S407_spec
 
 R404 = units.HClKOHRecovery('R404', ins = (S407-1, 'water'),
@@ -808,15 +851,24 @@ CWP = facilities.CWP('CWP', ins='return_chilled_water',
                      outs='process_chilled_water')
 
 # M505-0 is the liquid/solid mixture, R501-0 is the biogas, blowdown is discharged
-BT = facilities.BT('BT', ins=(M505-0, R501-0, 
-                                          FGD_lime, boiler_chems,
-                                          baghouse_bag, natural_gas,
-                                          'BT_makeup_water'),
-                                B_eff=0.8, TG_eff=0.85,
-                                combustibles=combustibles,
-                                side_streams_to_heat=(water_M201, water_M202, steam_M203),
-                                outs=('gas_emission', ash, 'boiler_blowdown_water'))
+# BT = facilities.BT('BT', ins=(M505-0, R501-0, 
+#                                           FGD_lime, boiler_chems,
+#                                           baghouse_bag, natural_gas,
+#                                           'BT_makeup_water'),
+#                                 B_eff=0.8, TG_eff=0.85,
+#                                 combustibles=combustibles,
+#                                 side_streams_to_heat=(water_M201, water_M202, steam_M203),
+#                                 outs=('gas_emission', ash, 'boiler_blowdown_water'))
 
+BT = bst.facilities.BoilerTurbogenerator('BT',
+                                                  ins=(M505-0,
+                                                      R501-0, 
+                                                      'boiler_makeup_water',
+                                                      'natural_gas',
+                                                      'lime',
+                                                      'boilerchems'), 
+                                                  outs=('gas_emission', 'boiler_blowdown_water', ash,),
+                                                  turbogenerator_efficiency=0.85)
 
 # BT = bst.BDunits.BoilerTurbogenerator('BT',
 #                                    ins=(M505-0, R501-0, 'boiler_makeup_water', 'natural_gas', FGD_lime, boiler_chems),
@@ -830,7 +882,7 @@ CT = facilities.CT('CT', ins=('return_cooling_water', cooling_tower_chems,
 
 # All water used in the system, here only consider water usage,
 # if heating needed, then heeating duty required is considered in BT
-process_water_streams = (water_M201, water_M202, steam_M203, water_M205, 
+process_water_streams = (water_M201, water_M202, water_M203, water_M205, 
                          enzyme_water,
                          aerobic_caustic, 
                          CIP.ins[-1], BT.ins[-1], CT.ins[-1])
@@ -930,124 +982,125 @@ HXN = bst.facilities.HeatExchangerNetwork('HXN')
 
 f = bst.main_flowsheet
 
-TAL_sys = System('TAL_sys', path =
-    [U101,
-      T601,
-      T201,
-      M201,
-      M202,
-      M203,
-      R201,
-      T202,
-      T203,
-      F201,
-      T602,
-      M205,
-      T204,
-      P201,
-      H301,
-      M301,
-      System('a', path =
-        [M302,
-          R301,
-          R303,
-          T301],
-        recycle=T301.outs[0]),
-      M303,
-      S301,
-      F301,
-      F301_P,
-      M304,
-      M304_H,
-      M304_H_P,
-      T603,
-      R302,
-      S401,
-      System('b', path =
-        [S402,
-          r_S402,
-          T606,
-          T606_P,
-          M402],
-        recycle=f('toluene_solvent')),
-      System('c', path = 
-        [S403,
-          r_S403,
-          T605,
-          T605_P,
-          M403],
-        recycle=f('heptane_solvent')),
-      M501,
-      WWT_cost,
-      R501,
-      System('d', path =
-        [M502,
-          R502,
-          S501,
-          S502,
-          M503,
-          M504,
-          S503],
-        recycle=M503.outs[0]),
-      M505,
-      T604,
-      T604_P,
-      M404,
-      S404,
-      S405,
-      T607,
-      R401,
-      R402,
-      R403,
-      S406,
-      S407,
-      S408,
-      T620,
-      System('e', path =
-        [T609,
-          R403,
-          S406,
-          System('f', path =
-            [T608,
-              S407,
-              R404],
-            recycle=f('HCl_recycle'))],
-        recycle=f('KOH_recycle')),
-      T620, T620_P,
-      S504,
-      M204,
-      H201,
-      System('g', path =
-        [T609,
-          R403,
-          S406,
-          System('h', path =
-            [T608,
-              S407,
-              R404],
-            recycle=f('HCl_recycle'))],
-        recycle=f('KOH_recycle')),
-      System('i', path =
-        [M502,
-          R502,
-          S501,
-          S502,
-          M503,
-          M504,
-          S503],
-        recycle=M503.outs[0]),
-      ],
-    facilities = (BT, CT, FWT, PWC, ADP, CIP))
+# TAL_sys = System('TAL_sys', path =
+#     [U101,
+#       T601,
+#       T201,
+#       M201,
+#       M202,
+#       M203,
+#       R201,
+#       T202,
+#       T203,
+#       F201,
+#       T602,
+#       M205,
+#       T204,
+#       P201,
+#       H301,
+#       M301,
+#       System('a', path =
+#         [M302,
+#           R301,
+#           R303,
+#           T301],
+#         recycle=T301.outs[0]),
+#       M303,
+#       S301,
+#       F301,
+#       F301_P,
+#       M304,
+#       M304_H,
+#       M304_H_P,
+#       T603,
+#       R302,
+#       S401,
+#       System('b', path =
+#         [S402,
+#           r_S402,
+#           T606,
+#           T606_P,
+#           M402],
+#         recycle=f('toluene_solvent')),
+#       System('c', path = 
+#         [S403,
+#           r_S403,
+#           T605,
+#           T605_P,
+#           M403],
+#         recycle=f('heptane_solvent')),
+#       M501,
+#       WWT_cost,
+#       R501,
+#       System('d', path =
+#         [M502,
+#           R502,
+#           S501,
+#           S502,
+#           M503,
+#           M504,
+#           S503],
+#         recycle=M503.outs[0]),
+#       M505,
+#       T604,
+#       T604_P,
+#       M404,
+#       S404,
+#       S405,
+#       T607,
+#       R401,
+#       R402,
+#       R403,
+#       S406,
+#       S407,
+#       S408,
+#       T620,
+#       System('e', path =
+#         [T609,
+#           R403,
+#           S406,
+#           System('f', path =
+#             [T608,
+#               S407,
+#               R404],
+#             recycle=f('HCl_recycle'))],
+#         recycle=f('KOH_recycle')),
+#       T620, T620_P,
+#       S504,
+#       M204,
+#       H201,
+#       System('g', path =
+#         [T609,
+#           R403,
+#           S406,
+#           System('h', path =
+#             [T608,
+#               S407,
+#               R404],
+#             recycle=f('HCl_recycle'))],
+#         recycle=f('KOH_recycle')),
+#       System('i', path =
+#         [M502,
+#           R502,
+#           S501,
+#           S502,
+#           M503,
+#           M504,
+#           S503],
+#         recycle=M503.outs[0]),
+#       ],
+#     facilities = (BT, CT, FWT, PWC, ADP, CIP))
 
+TAL_sys = bst.main_flowsheet.create_system('TAL_sys')
 
 BT_sys = System('BT_sys', path=(BT,))
 
 
 TEA_feeds = set([i for i in TAL_sys.feeds if i.price]+ \
-    [i for i in BT_sys.feeds if i.price])
+    [i for i in TAL_sys.feeds if i.price])
 
 TEA_products = set([i for i in TAL_sys.products if i.price]+ \
-    [i for i in BT_sys.products if i.price]+[SA])
+    [i for i in TAL_sys.products if i.price]+[SA])
 # %%
 # =============================================================================
 # TEA
@@ -1086,14 +1139,35 @@ TAL_no_BT_tea.units.remove(BT)
 #     TAL_sys.products.remove(i)
 
 # Boiler turbogenerator potentially has different depreciation schedule
-BT_tea = bst.TEA.like(BT_sys, TAL_no_BT_tea)
-BT_tea.labor_cost = 0
+# BT_tea = bst.TEA.like(BT_sys, TAL_no_BT_tea)
+# BT_tea.labor_cost = 0
 
 # Changed to MACRS 20 to be consistent with Humbird
-BT_tea.depreciation = 'MACRS20'
-BT_tea.OSBL_units = (BT,)
+# BT_tea.depreciation = 'MACRS20'
+# BT_tea.OSBL_units = (BT,)
 
-TAL_tea = bst.CombinedTEA([TAL_no_BT_tea, BT_tea], IRR=0.10)
+TAL_tea = CellulosicEthanolTEA(system=TAL_sys, IRR=0.10, duration=(2016, 2046),
+        depreciation='MACRS7', income_tax=0.21, operating_days=0.9*365,
+        lang_factor=None, construction_schedule=(0.08, 0.60, 0.32),
+        startup_months=3, startup_FOCfrac=1, startup_salesfrac=0.5,
+        startup_VOCfrac=0.75, WC_over_FCI=0.05,
+        finance_interest=0.08, finance_years=10, finance_fraction=0.4,
+        # biosteam Splitters and Mixers have no cost, 
+        # cost of all wastewater treatment units are included in WWT_cost,
+        # BT is not included in this TEA
+        OSBL_units=(U101, WWT_cost,
+                    T601, T602, T603, T604, T604_P, 
+                    T605, T605_P, T606, T606_P,
+                    T607,
+                    T620, T620_P,
+                    CWP, CT, PWC, CIP, ADP, FWT),
+        warehouse=0.04, site_development=0.09, additional_piping=0.045,
+        proratable_costs=0.10, field_expenses=0.10, construction=0.20,
+        contingency=0.10, other_indirect_costs=0.10, 
+        labor_cost=3212962*get_flow_tpd()/2205,
+        labor_burden=0.90, property_insurance=0.007, maintenance=0.03,
+        steam_power_depreciation='MACRS20', boiler_turbogenerator=BT)
+
 TAL_sys._TEA = TAL_tea
 
 # %% 
@@ -1115,7 +1189,7 @@ def get_SA_MPSP():
         except:
             pass
     for i in range(3):
-        SA.price = TAL_tea.solve_price(SA, TAL_no_BT_tea)
+        SA.price = TAL_tea.solve_price(SA)
     return SA.price
 
 def get_titer():

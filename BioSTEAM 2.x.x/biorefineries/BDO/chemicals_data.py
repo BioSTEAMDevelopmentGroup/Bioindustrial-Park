@@ -20,6 +20,7 @@ All units are explicitly defined here for transparency and easy reference
 
 import thermosteam as tmo
 from thermosteam import functional as fn
+from biorefineries import sugarcane as sc
 
 __all__ = ('BDO_chemicals', 'chemical_groups', 'soluble_organics', 'combustibles')
 
@@ -265,6 +266,7 @@ Ash = chemical_database('Ash', search_ID='CaO', phase='s', Hf=-151688*_cal2joule
 # This is to copy the solid state of Xylose,
 # cannot directly use Xylose as Xylose is locked at liquid state now
 Tar = chemical_copied('Tar', Xylose, phase_ref='s')
+CaSO4 = chemical_database('CaSO4', phase='s', Hf=-342531*_cal2joule)
 
 # =============================================================================
 # Mixtures

@@ -67,7 +67,7 @@ class SulfuricAcidAdditionTank(Unit):
     _N_ins = 1
     _N_outs = 1
     
-    # Baseline is (18+4.1) mg/g dry biomass as in Humbird et al., 93% purity
+    # Bseline is (18+4.1) mg/g dry biomass as in Humbird et al., 93% purity
     acid_loading = 22.1
 
     def __init__(self, ID='', ins=None, outs=(), *, feedstock_dry_mass):
@@ -86,32 +86,36 @@ class SulfuricAcidMixer(Unit):
     _N_ins = 2
     _N_outs = 1
     _graphics = Mixer._graphics
-    
+        
     def _run(self):
         acid, water = self.ins
         mixture = self.outs[0]
+        
         # 0.05 is from 1842/36629 from streams 710 and 516 of Humbird et al.
-        water.imass['Water'] = acid.imass['SulfuricAcid'] / 0.05
+        # water.imass['Water'] = acid.imass['SulfuricAcid'] / 0.05
+        # water adjustment currently implemented in H_M201.specification
+        
         mixture.mix_from([water, acid])
 
 # Adjust pretreatment water loading, 30% from Table 5 on Page 21 of Humbird et al.
 class PretreatmentMixer(Mixer):
-    _N_ins = 3
+    _N_ins = 4
     _N_outs = 1
     
     solid_loading = 0.3
         
     def _run(self):
-        feedstock, acid, water = self.ins
+        feedstock, acid, water, recycled_water = self.ins
         mixture_out = self.outs[0]
         
         mixture = feedstock.copy()
         mixture.mix_from([feedstock, acid])
         
-        total_mass = (mixture.F_mass-mixture.imass['Water'])/self.solid_loading
-        water.imass['Water'] = total_mass - mixture.F_mass
+        # total_mass = (mixture.F_mass-mixture.imass['Water'])/self.solid_loading
+        # water.imass['Water'] = total_mass - mixture.F_mass
+        # water adjustment currently implemented in H_M202.specification
         
-        mixture_out.mix_from([mixture, water])
+        mixture_out.mix_from([mixture, water, recycled_water])
 
 # Steam mixer
 class SteamMixer(Unit):
@@ -948,7 +952,7 @@ class Reactor(Unit, PressureVessel, isabstract=True):
 #     _N_outs = 2
 #     _N_heat_utilities = 1
 
-#     _BM = {**Reactor._BM,
+#     _F_BM_default = {**Reactor._F_BM_default,
 #            'Heat exchangers': 3.17,
 #            'Amberlyst-15 catalyst': 1}
     
@@ -1585,7 +1589,7 @@ class HydrogenationReactor(Reactor):
     """
     _N_ins = 3
     _N_outs = 1
-    _BM = {**Reactor._BM,
+    _F_BM_default = {**Reactor._F_BM_default,
             'AuPd catalyst': 1}
     mcat_frac = 0.00001 # fraction of catalyst by weight in relation to the reactant (TAL)
     dehydration_rxns = ParallelRxn([
@@ -1618,7 +1622,7 @@ class DehydrationRingOpeningReactor(Reactor):
     """
     _N_ins = 2
     _N_outs = 1
-    _BM = {**Reactor._BM,
+    _F_BM_default = {**Reactor._F_BM_default,
             'RaneyNi catalyst': 1}
     mcat_frac = 0.01 # fraction of catalyst by weight in relation to the reactant (TAL)
     dehydration_rxns = ParallelRxn([
@@ -1650,7 +1654,7 @@ class HydrolysisReactor(Reactor):
     """
     _N_ins = 3
     _N_outs = 1
-    _BM = {**Reactor._BM,
+    _F_BM_default = {**Reactor._F_BM_default,
             'Amberlyst15 catalyst': 1}
     mcat_frac = 0.01 # fraction of catalyst by weight in relation to the reactant (TAL)
     dehydration_rxns = ParallelRxn([
@@ -1680,7 +1684,7 @@ class HydrolysisReactor(Reactor):
 class Crystallization_Decantation(Reactor):
     N_ins = 3
     _N_outs = 2
-    _BM = {**Reactor._BM}
+    _F_BM_default = {**Reactor._F_BM_default}
     dehydration_rxns = ParallelRxn([
             #   Reaction definition                                       Reactant   Conversion
             Rxn('KSA + HCl -> SA + KCl',         'KSA',   0.98)
@@ -1716,7 +1720,7 @@ class Crystallization_Decantation(Reactor):
 class HClKOHRecovery(Reactor):
     N_ins = 2
     _N_outs = 2
-    _BM = {**Reactor._BM}
+    _F_BM_default = {**Reactor._F_BM_default}
     dehydration_rxns = ParallelRxn([
             #   Reaction definition                                       Reactant   Conversion
             Rxn('KCl + H2O -> HCl + KOH',         'KCl',   1.)

@@ -90,28 +90,33 @@ class SulfuricAcidMixer(Unit):
     def _run(self):
         acid, water = self.ins
         mixture = self.outs[0]
+        
         # 0.05 is from 1842/36629 from streams 710 and 516 of Humbird et al.
-        water.imass['Water'] = acid.imass['SulfuricAcid'] / 0.05
+        # water.imass['Water'] = acid.imass['SulfuricAcid'] / 0.05
+        # water adjustment currently implemented in H_M201.specification
+        
         mixture.mix_from([water, acid])
+
 
 # Adjust pretreatment water loading, 30% from Table 5 on Page 21 of Humbird et al.
 class PretreatmentMixer(Mixer):
-    _N_ins = 3
+    _N_ins = 4
     _N_outs = 1
     
     solid_loading = 0.3
         
     def _run(self):
-        feedstock, acid, water = self.ins
+        feedstock, acid, water, recycled_water = self.ins
         mixture_out = self.outs[0]
         
         mixture = feedstock.copy()
         mixture.mix_from([feedstock, acid])
         
-        total_mass = (mixture.F_mass-mixture.imass['Water'])/self.solid_loading
-        water.imass['Water'] = total_mass - mixture.F_mass
+        # total_mass = (mixture.F_mass-mixture.imass['Water'])/self.solid_loading
+        # water.imass['Water'] = total_mass - mixture.F_mass
+        # water adjustment currently implemented in H_M202.specification
         
-        mixture_out.mix_from([mixture, water])
+        mixture_out.mix_from([mixture, water, recycled_water])
 
 # Steam mixer
 class SteamMixer(Unit):
