@@ -259,8 +259,8 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
         mixer.water_multiplier = X
         # evaporator._run()
         # evaporator_pump._run()
-        mixer.specification()
-        for i in self.path: (i.specification or i._run)()
+        mixer.run()
+        for i in self.path: (i.run or i._run)()
         return self.calculate_titer() - self.spec_2
     
     def load_titer(self, titer):
