@@ -117,7 +117,7 @@ class CellulosicEthanolTEA(TEA):
                  'maintenance', '_ISBL_DPI_cached', '_FCI_cached',
                  '_utility_cost_cached', '_steam_power_depreciation',
                  '_steam_power_depreciation_array',
-                 'boiler_turbogenerator')
+                 'boiler_turbogenerator', '_TCI_ratio_cached')
     
     def __init__(self, system, IRR, duration, depreciation, income_tax,
                  operating_days, lang_factor, construction_schedule,
@@ -128,7 +128,7 @@ class CellulosicEthanolTEA(TEA):
                  field_expenses, construction, contingency,
                  other_indirect_costs, labor_cost, labor_burden,
                  property_insurance, maintenance, steam_power_depreciation,
-                 boiler_turbogenerator):
+                 boiler_turbogenerator, _TCI_ratio_cached=1.):
         super().__init__(system, IRR, duration, depreciation, income_tax,
                          operating_days, lang_factor, construction_schedule,
                          startup_months, startup_FOCfrac, startup_VOCfrac,
@@ -149,7 +149,8 @@ class CellulosicEthanolTEA(TEA):
         self.maintenance = maintenance
         self.steam_power_depreciation = steam_power_depreciation
         self.boiler_turbogenerator = boiler_turbogenerator
-    
+        self._TCI_ratio_cached = _TCI_ratio_cached
+        
     @property
     def steam_power_depreciation(self):
         """[str] 'MACRS' + number of years (e.g. 'MACRS7')."""

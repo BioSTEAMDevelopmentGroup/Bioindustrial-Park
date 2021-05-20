@@ -546,15 +546,15 @@ class CoFermentation(Unit):
 
         self.cofermentation_rxns = ParallelRxn([
         #      Reaction definition            Reactant    Conversion
-        Rxn('Glucose -> TAL',        'Glucose',   .5), 
+        Rxn('Glucose -> TAL',        'Glucose',   .25), 
         Rxn('Glucose -> VitaminA',               'Glucose',   0.1), # retinol
         Rxn('Glucose -> VitaminD2',               'Glucose',   0.1), # ergosterol
         Rxn('Glucose -> 6 FermMicrobe',       'Glucose',   0.1),
         
-        Rxn('Xylose -> TAL',       'Xylose',    0.5*0.8),
-        Rxn('Xylose -> VitaminA',       'Xylose',    0.1*0.8),
-        Rxn('Xylose -> VitaminD2',       'Xylose',    0.1*0.8),
-        Rxn('Xylose -> 5 FermMicrobe',        'Xylose',    0.1*0.8),
+        Rxn('Xylose -> TAL',       'Xylose',    0.25),
+        Rxn('Xylose -> VitaminA',       'Xylose',    0.1),
+        Rxn('Xylose -> VitaminD2',       'Xylose',    0.1),
+        Rxn('Xylose -> 5 FermMicrobe',        'Xylose',    0.1),
         ])
         
         # self.cofermentation_rxns = ParallelRxn([
@@ -569,7 +569,11 @@ class CoFermentation(Unit):
         # Rxn('Xylose -> VitaminD2',       'Xylose',    0.001*0.8),
         # Rxn('Xylose -> 5 FermMicrobe',        'Xylose',    0.00025*0.8),
         # ])
-                
+        
+        self.CO2_generation_rxns = ParallelRxn([
+            Rxn('Glucose -> 6CO2 + 6H2O', 'Glucose', 1.),
+            Rxn('Xylose -> 5CO2 + 5H2O', 'Xylose', 1.)])
+        
         self.glucose_to_TAL_rxn = self.cofermentation_rxns[0]
         self.xylose_to_TAL_rxn = self.cofermentation_rxns[4]
         
@@ -581,6 +585,9 @@ class CoFermentation(Unit):
         
         self.glucose_to_microbe_rxn = self.cofermentation_rxns[3]
         self.xylose_to_microbe_rxn = self.cofermentation_rxns[7]
+        
+        self.glucose_to_CO2_rxn = self.CO2_generation_rxns[0]
+        self.xylose_to_CO2_rxn = self.CO2_generation_rxns[1]
         
         # self.cofermentation_rxns[1].X = \
         #     max(0, 1- (.07 + self.cofermentation_rxns[0].X + self.cofermentation_rxns[2].X))
@@ -606,6 +613,9 @@ class CoFermentation(Unit):
         vapor.imol['CO2'] = effluent.imol['CO2']
         vapor.phase = 'g'
         
+        self.CO2_generation_rxns(effluent.mol)
+        
+        vapor = effluent.imol['CO2']
         effluent.imol['CO2'] = 0
         effluent.imass['CSL'] = 0
         

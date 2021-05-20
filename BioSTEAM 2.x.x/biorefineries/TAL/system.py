@@ -45,10 +45,12 @@ Processes:
 
 # %% Setup
 
+
 import biosteam as bst
 import thermosteam as tmo
 import flexsolve as flx
 import numpy as np
+from math import exp as math_exp
 from biosteam import main_flowsheet as F
 from copy import deepcopy
 from biosteam import System
@@ -79,8 +81,20 @@ bst.CE = 541.7
 # Set default thermo object for the system
 tmo.settings.set_thermo(TAL_chemicals)
 
+# %% Utils
+R = 8.314
+TAL_Hm = 30883.66976 # by Dannenfelser-Yalkowsky method
+TAL_Tm = TAL_chemicals['TAL'].Tm # 458.15 K
+TAL_c = 6056.69421768496 # fitted parameter
+TAL_c_by_R = TAL_c/R
+TAL_Hm_by_R = TAL_Hm/R
 
+def get_TAL_solubility_in_water(T): # mol TAL : mol (TAL+water)
+    return math_exp(-(TAL_Hm_by_R) * (1/T - 1/TAL_Tm))/math_exp(TAL_c_by_R/T) 
 
+def get_mol_TAL_dissolved(T, mol_water):
+    TAL_x = get_TAL_solubility_in_water(T)
+    return mol_water*TAL_x/(1-TAL_x)
 # %% 
 
 # =============================================================================
@@ -351,6 +365,17 @@ S401 = bst.units.SolidsCentrifuge('S401', ins=R302-0, outs=('cell_mass', ''),
                                 ['Xylan', 'Glucan', 'Lignin', 'FermMicrobe',\
                                   'Ash', 'Arabinan', 'Galactan', 'Mannan'])
 
+def S401_TAL_split_spec():
+    S401._run()
+    S401_ins_0 = S401.ins[0]
+    TOT_TAL = S401_ins_0.imol['TAL']
+    dissolved_TAL = get_mol_TAL_dissolved(S401_ins_0.T, S401_ins_0.imol['Water'])
+    
+    S401.outs[0].imol['TAL'] = TOT_TAL - dissolved_TAL # crystallized TAL
+    S401.outs[1].imol['TAL'] = dissolved_TAL
+
+S401.specification = S401_TAL_split_spec
+
 # S402 = units.TAL_Separation('S402', ins = S401-1, outs = ('', '')
 
 # def adjust_S402():
@@ -390,9 +415,14 @@ def S402_spec():
     S402._run()
 S402.specification = S402_spec
 
-r_S402 = bst.units.Splitter('r_S402', ins = S402-1, 
-                            outs = ('recycled_solvent', 'isolated_extract'), split = 0.5)
-r_S402.line = 'Toluene recovery'
+F402 = bst.units.MultiEffectEvaporator('F402', ins=S402-1, outs=('F402_l', 'F402_g'),
+                                            P = (101325, 73581, 50892, 32777, 20000), V = 0.95)
+                                            # P = (101325, 73581, 50892, 32777, 20000), V = 0.001)
+
+
+r_S402 = bst.units.Splitter('r_S402', ins = F402-0, 
+                            outs = ('recycled_toluene', 'isolated_nonpolar_solids'), split = 0.5)
+r_S402.line = 'Drum dryer'
 
 def adjust_r_S402_recovery():
     splitter = r_S402
@@ -421,7 +451,9 @@ def adjust_r_S402_recovery():
     splitter.heat_utilities = tuple([hu])
     
 r_S402.specification = adjust_r_S402_recovery
-r_S402-0-1-M402
+
+pre_M402 = bst.units.Mixer('pre_M402', ins=(F402-1, r_S402-0), outs='mixed_recycled_toluene')
+pre_M402-0-1-M402
 
 
 
@@ -449,9 +481,15 @@ def S403_spec():
     S403._run()
 S403.specification = S403_spec
 
-r_S403 = bst.units.Splitter('r_S403', ins = S403-1,
-                            outs = ('recycled_solvent', 'isolated_extract'), split = 0.5)
-r_S403.line = 'Heptane recovery'
+
+F403 = bst.units.MultiEffectEvaporator('F403', ins=S403-1, outs=('F403_l', 'F403_g'),
+                                            P = (101325, 73581, 50892, 32777, 20000), V = 0.90)
+                                            # P = (101325, 73581, 50892, 32777, 20000), V = 0.001)
+
+
+r_S403 = bst.units.Splitter('r_S403', ins = F403-0,
+                            outs = ('recycled_heptane', 'isolated_nonpolar_solids'), split = 0.5)
+r_S403.line = 'Drum dryer'
 
 def adjust_r_S403_recovery():
     splitter = r_S403
@@ -479,7 +517,9 @@ def adjust_r_S403_recovery():
     splitter.heat_utilities = tuple([hu])
     
 r_S403.specification = adjust_r_S403_recovery
-r_S403-0-1-M403
+
+pre_M403 = bst.units.Mixer('pre_M403', ins=(F403-1, r_S403-0), outs='mixed_recycled_toluene')
+pre_M403-0-1-M403
 
 
 
@@ -1091,7 +1131,9 @@ f = bst.main_flowsheet
 #       ],
 #     facilities = (BT, CT, FWT, PWC, ADP, CIP))
 
-TAL_sys = bst.main_flowsheet.create_system('TAL_sys')
+TAL_sys = bst.main_flowsheet.create_system('TAL_sys',
+                            feeds=[i for i in bst.main_flowsheet.stream
+                            if i.sink and not i.source])
 
 BT_sys = System('BT_sys', path=(BT,))
 

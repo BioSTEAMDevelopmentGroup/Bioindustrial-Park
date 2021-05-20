@@ -647,40 +647,40 @@ metrics.extend((Metric('GWP - Other direct non-bio emmissions',
 # Demand LCA contributions
 metrics.extend((Metric('cGWP - System heating demand',
                        lambda:get_heating_demand_GWP()/get_GWP(),
-                       '%', 'LCA'),))
+                       'frac', 'LCA'),))
 
 metrics.extend((Metric('cGWP - System cooling demand',
                        lambda:get_cooling_demand_GWP()/get_GWP(),
-                       '%', 'LCA'),))
+                       'frac', 'LCA'),))
 
 metrics.extend((Metric('cGWP - System non-cooling electricity demand',
                        lambda:get_electricity_demand_non_cooling_GWP()/get_GWP(),
-                       '%', 'LCA'),))
+                       'frac', 'LCA'),))
 
 metrics.extend((Metric('cFEC - System heating demand',
                        lambda:get_heating_demand_FEC()/get_FEC(),
-                       '%', 'LCA'),))
+                       'frac', 'LCA'),))
 
 metrics.extend((Metric('cFEC - System cooling demand',
                        lambda:get_cooling_demand_FEC()/get_FEC(),
-                       '%', 'LCA'),))
+                       'frac', 'LCA'),))
 
 metrics.extend((Metric('cFEC - System non-cooling electricity demand',
                        lambda:get_electricity_demand_non_cooling_FEC()/get_FEC(),
-                       '%', 'LCA'),))
+                       'frac', 'LCA'),))
 
 # Demand TEA contributions
 metrics.extend((Metric('cVOC - System heating demand',
                        lambda:get_heating_demand_VOC()/get_VOC(),
-                       '%', 'LCA'),))
+                       'frac', 'LCA'),))
 
 metrics.extend((Metric('cVOC - System cooling demand',
                        lambda:get_cooling_demand_VOC()/get_VOC(),
-                       '%', 'LCA'),))
+                       'frac', 'LCA'),))
 
 metrics.extend((Metric('cVOC - System non-cooling electricity demand',
                        lambda:get_electricity_demand_non_cooling_VOC()/get_VOC(),
-                       '%', 'LCA'),))
+                       'frac', 'LCA'),))
 # %% 
 
 # =============================================================================
@@ -762,7 +762,8 @@ special_price = {
 
 # Prices for boiler_chems, baghouse_bag, and cooling_tower_chems are not included
 # as they are tied to BT/CT duties
-default_price_streams = ('sulfuric_acid_fresh', 'ammonia_fresh', 'enzyme', 
+default_price_streams = ('sulfuric_acid_fresh',
+                         'makeup_TiO2_catalyst', 'ammonia_fresh', 'enzyme', 
                          'system_makeup_water', 'aerobic_caustic', 'ash', 'hexanol_fresh')
 
 def add_stream_price_param(stream, D):
