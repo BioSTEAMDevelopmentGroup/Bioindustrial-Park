@@ -287,34 +287,63 @@ S301 = units.CellMassFilter('S301', ins=M303-0, outs=('solids', ''),
 
 
 
-F301 = bst.units.MultiEffectEvaporator('F301', ins=S301-1, outs=('F301_l', 'F301_g'),
-                                        P = (101325, 73581, 50892, 32777, 20000), V = 0.7)
-# # F301.V = 0.797 for sugars concentration of 591.25 g/L (599.73 g/L after cooling to 30 C)
 
 
-F301_P = units.TALPump('F301_P', ins=F301-0)
+
+# F301 = bst.units.MultiEffectEvaporator('F301', ins=S301-1, outs=('F301_l', 'F301_g'),
+#                                         P = (101325, 73581, 50892, 32777, 20000), V = 0.7)
+# # # F301.V = 0.797 for sugars concentration of 591.25 g/L (599.73 g/L after cooling to 30 C)
 
 
-def adjust_M304_water():
-    M304.ins[1].imol['Water'] = (M304.water_multiplier - 1) * M304.ins[0].imol['Water']
-    M304._run()
+# F301_P = units.TALPump('F301_P', ins=F301-0)
+
+
+# def adjust_M304_water():
+#     M304.ins[1].imol['Water'] = (M304.water_multiplier - 1) * M304.ins[0].imol['Water']
+#     M304._run()
     
-M304 = bst.units.Mixer('M304', ins=(F301_P-0, dilution_water, ''))
-M304.water_multiplier = 4.
-M304.specification = adjust_M304_water
-M304_H = bst.units.HXutility('M304_H', ins=M304-0, T=30+273.15)
-M304_H_P = units.TALPump('M304_H_P', ins=M304_H-0)
+# M304 = bst.units.Mixer('M304', ins=(F301_P-0, dilution_water, ''))
+# M304.water_multiplier = 4.
+# M304.specification = adjust_M304_water
+# M304_H = bst.units.HXutility('M304_H', ins=M304-0, T=30+273.15)
+# M304_H_P = units.TALPump('M304_H_P', ins=M304_H-0)
 
 
 
+
+F301 = bst.units.MultiEffectEvaporator('F301', ins=S301-1, outs=('F301_l', 'F301_g'),
+                                            P = (101325, 73581, 50892, 32777, 20000), V = 0.813)
+                                            # P = (101325, 73581, 50892, 32777, 20000), V = 0.001)
+F301.V = 0.797 #for sugars concentration of 591.25 g/L (599.73 g/L after cooling to 30 C)
+
+
+F301_P = units.TALPump('F301_P', ins=F301-1)
+# F301_H = bst.units.HXutility('F301_H', ins=F301-0, V = 0.)
+
+    
+M304_P = units.TALPump('M304_P', ins=F301-0)
+M304 = bst.units.Mixer('M304', ins=(M304_P-0, dilution_water))
+# M304 = bst.units.Mixer('M304', ins=(S301-1, dilution_water, ''))
+
+M304_H = bst.units.HXutility('M304_H', ins=M304-0, T=30+273.15, rigorous=True)
+
+# Mix pretreatment hydrolysate/enzyme mixture with fermentation seed
+# M302 = bst.units.Mixer('M302', ins=(M304_H-0, ''))
+
+
+# inoculum_ratio = 0.07
+
+S302 = bst.Splitter('S302', ins=M304_H-0,
+                    outs = ('to_seedtrain', 'to_cofermentation'),
+                    split = 0.07) # split = inoculum ratio
 # Cofermentation
 R302 = units.CoFermentation('R302', 
-                                ins=('', M304_H_P-0, CSL),
+                                ins=('', S302-1, CSL),
                                 outs=('fermentation_effluent', 'CO2'))
 
 
 # ferm_ratio is the ratio of conversion relative to the fermenter
-R303 = units.SeedTrain('R303', ins=R301-1, outs=('seed',), ferm_ratio=0.9)
+R303 = units.SeedTrain('R303', ins=S302-0, outs=('seed',), ferm_ratio=0.9)
 
 T301 = units.SeedHoldTank('T301', ins=R303-0, outs=1-M302)
 
@@ -544,28 +573,21 @@ M404_s.specification = adjust_M404_s_solvent
 S404_s = bst.units.MultiStageMixerSettlers('S404_s', ins = (S403_s-0, M404_s-0),
                                          outs = ('raffinate', 'extract'),
         partition_data={
-        'K': np.array([1/7, 10., 10., 10., 10., 10., 1/7., 10., 10.,
-                       10., 10., 10., 1/7., 10., 10., 10000, .0001, 100., 10000.]),
+        'K': np.array([1/7, 1/10, 1/10, 1/10, 1/10, 1/10, 1/10, 1/10, 1/10,
+                       1/10, 1/10, 1/10, 1/10, 1/10, 1/10, 10000, .0001, 10000]),
         'IDs': ('TAL', 'Glucose', 'GlucoseOligomer', 'Xylose', 'XyloseOligomer', 
                 'Protein', 'HMF', 'Mannose', 'Galactose', 'GalactoseOligomer',
                 'Arabinose', 'ArabinoseOligomer', 'Furfural', 'AceticAcid', 'FermMicrobe',
-                'Cellobiose', 'Hexanol', 'Water', 'FermMicrobe'),
+                'Cellobiose', 'Hexanol', 'Water'),
         'phi' : 0.5,
         },
         N_stages = 12)
 S404_s.overall_hexanol_retention_frac = 0.2
-S404_s.cellmass_TAL_retention_gpg = 0.2
-
 def S404_s_spec():
     S404_s._run()
-    
     total_hexanol = S404_s.ins[1].imol['Hexanol']
     S404_s.outs[0].imol['Hexanol'] = S404_s.overall_hexanol_retention_frac * total_hexanol
     S404_s.outs[1].imol['Hexanol'] = total_hexanol - S404_s.outs[0].imol['Hexanol']
-    
-    total_TAL = S404_s.ins[0].imass['TAL']
-    S404_s.outs[0].imass['TAL'] = S404_s.cellmass_TAL_retention_gpg * S404_s.ins[0].imass['FermMicrobe']
-    S404_s.outs[1].imass['TAL'] = total_TAL - S404_s.outs[0].imass['TAL']
     
 S404_s.specification = S404_s_spec   
 
@@ -749,8 +771,8 @@ M404.specification = adjust_M404_solvent
 S404 = bst.units.MultiStageMixerSettlers('S404', ins = (S403-0, M404-0),
                                          outs = ('raffinate', 'extract'),
         partition_data={
-        'K': np.array([1/7, 10., 10., 10., 10., 10., 1./7., 10., 10.,
-                       10., 10., 10., 1./7., 10., 10., 10000, .0001, 100.]),
+        'K': np.array([1/7, 1/10, 1/10, 1/10, 1/10, 1/10, 1/10, 1/10, 1/10,
+                       1/10, 1/10, 1/10, 1/10, 1/10, 1/10, 10000, .0001, 10000]),
         'IDs': ('TAL', 'Glucose', 'GlucoseOligomer', 'Xylose', 'XyloseOligomer', 
                 'Protein', 'HMF', 'Mannose', 'Galactose', 'GalactoseOligomer',
                 'Arabinose', 'ArabinoseOligomer', 'Furfural', 'AceticAcid', 'FermMicrobe',
@@ -1504,22 +1526,54 @@ def set_titer(titer):
 
 # R301 = F('R301') # Fermentor
 # yearly_production = 125000 # ton/yr
+
+
+seed_train_system = bst.System('seed_train_system', path=(S302,))
+# R301 = F('R301') # Fermentor
+# yearly_production = 125000 # ton/yr
 spec = ProcessSpecification(
     evaporator = F301,
+    pump = M304_P,
     mixer = M304,
-    reactor=R302,
+    heat_exchanger = M304_H,
+    seed_train_system = seed_train_system,
+    reactor= R302,
     reaction_name='fermentation_reaction',
     substrates=('Xylose', 'Glucose'),
-    products=('TAL',),
-    spec_1=100,
-    spec_2=0.909,
-    spec_3=18.5,
-    path = (M304_H, M304_H_P),
+    products=('HP','CalciumLactate'),
+    # spec_1=100,
+    # spec_2=0.909,
+    # spec_3=18.5,
+    spec_1=0.49,
+    spec_2=54.8,
+    spec_3=0.76,
     xylose_utilization_fraction = 0.80,
     feedstock = feedstock,
-    dehydration_reactor = None,
-    byproduct_streams = None,
-    evaporator_pump = F301_P)
+    byproduct_streams = [],
+    HXN = HXN,
+    # pre_conversion_units = process_groups_dict['feedstock_group'].units + process_groups_dict['pretreatment_group'].units + [u.H301],
+    pre_conversion_units = TAL_sys.split(F301.ins[0])[0],
+    baseline_titer = 54.8,
+    feedstock_mass = feedstock.F_mass,
+    pretreatment_reactor = R201)
+
+
+# spec = ProcessSpecification(
+#     evaporator = F301,
+#     mixer = M304,
+#     reactor=R302,
+#     reaction_name='fermentation_reaction',
+#     substrates=('Xylose', 'Glucose'),
+#     products=('TAL',),
+#     spec_1=100,
+#     spec_2=0.909,
+#     spec_3=18.5,
+#     path = (M304_H, M304_H_P),
+#     xylose_utilization_fraction = 0.80,
+#     feedstock = feedstock,
+#     dehydration_reactor = None,
+#     byproduct_streams = None,
+#     evaporator_pump = F301_P)
 
 # path = (F301, R302)
 # @np.vectorize

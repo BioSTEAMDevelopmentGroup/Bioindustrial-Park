@@ -469,7 +469,7 @@ class Saccharification(Unit):
     
     #!!! This needs to be updated
     # Equals the split of saccharified slurry to seed train
-    inoculum_ratio = 0.07
+    inoculum_ratio = 0.0 # this ratio not used
     
     # CSL_loading = 10 # kg/m3
     
@@ -646,7 +646,7 @@ class CoFermentation(Unit):
       kW=59.656, cost=24300, S=43149, CE=CEPCI[2009], n=0.8, BM=2.3)
 class SeedTrain(Unit):
     _N_ins = 1
-    _N_outs = 1
+    _N_outs = 2
     _units= {'Seed fermenter size': 'kg',
              'Flow rate': 'kg/hr'}
     
