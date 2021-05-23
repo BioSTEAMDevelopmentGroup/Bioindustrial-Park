@@ -199,8 +199,8 @@ price = {'AA': AA_price,
     
 
 def load_process_settings():
-    # from biorefineries import cornstover as cs
-    # cs.load_process_settings()
+    from biorefineries import cornstover as cs
+    cs.load_process_settings()
     # tmo.settings.set_thermo(chems)
     bst.CE = 541.7 # year 2016
     bst.PowerUtility.price = price['Electricity']

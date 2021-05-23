@@ -66,7 +66,7 @@ class LipidExtractionSpecification:
     
     __slots__ = (
         'system',
-        'feedstock',
+        'feedstocks',
         'isplit_efficiency',
         'isplit_lipid_retention',
         'efficiency',
@@ -74,10 +74,10 @@ class LipidExtractionSpecification:
         'lipid_content',
     )
     
-    def __init__(self, system, feedstock, isplit_efficiency, isplit_lipid_retention, 
+    def __init__(self, system, feedstocks, isplit_efficiency, isplit_lipid_retention, 
                  efficiency=0.9, lipid_retention=0.9, lipid_content=0.1):
         self.system = system #: [System] System associated to feedstock
-        self.feedstock = feedstock #: [Stream] Lipidcane feedstock
+        self.feedstocks = feedstocks #: tuple[Stream] Lipid feedstocks
         self.isplit_efficiency = isplit_efficiency #: [ChemicalIndexer] Defines extraction efficiency as a material split.
         self.isplit_lipid_retention = isplit_lipid_retention #: [ChemicalIndexer] Defines bagasse lipid retention as a material split.
         self.efficiency = efficiency #: [float] Lipid extraction efficiency b
@@ -85,7 +85,7 @@ class LipidExtractionSpecification:
         self.lipid_content = lipid_content #: [float] Lipid content of feedstock [dry wt. %].
         
     def MFPP(self):
-        return self.system.TEA.solve_price(self.feedstock)
+        return self.system.TEA.solve_price(self.feedstocks)
         
     def dMFPP_over_dlipid_content_at_efficiency(self, efficiency, dlipid_content=0.01):
         lipid_content = self.lipid_content
@@ -112,7 +112,7 @@ class LipidExtractionSpecification:
                                     maxiter=10)
     
     def load_lipid_content(self, lipid_content):
-        set_lipid_fraction(lipid_content, self.feedstock)
+        for i in self.feedstocks: set_lipid_fraction(lipid_content, i)
         self.lipid_content = lipid_content
       
     def load_efficiency(self, efficiency):

@@ -31,6 +31,11 @@ __all__ = (
 default_nonsolids = ['Water', 'Ethanol', 'AceticAcid', 
                      'Furfural', 'H2SO4', 'NH3', 'HMF']
 
+default_insoluble_solids = ['Glucan', 'Mannan', 'Xylan', 
+                            'Arabinan', 'Galactan', 'Lignin']
+
+default_ignored = ['Lipid']
+
 @bst.SystemFactory(
     ID='hot_water_pretreatment_sys',
     ins=[dict(ID='cornstover', # Cornstover composition by default
@@ -215,16 +220,23 @@ def create_dilute_acid_pretreatment_system(
     outs=[dict(ID='slurry')],
 )
 def create_continuous_saccharification_system(
-        ins, outs, solids_loading=None,
-        nonsolids=default_nonsolids,
+        ins, outs, solids_loading=None, 
+        nonsolids=None,
+        insoluble_solids=None,
+        insoluble_solids_loading=None,
+        ignored=None,
     ):
     hydrolyzate, cellulase, saccharification_water = ins
     slurry, = outs
+    if nonsolids is None: nonsolids = default_nonsolids
+    if insoluble_solids is None: insoluble_solids = default_insoluble_solids
+    if insoluble_solids_loading is None: insoluble_solids_loading = 10.3
     if solids_loading is None: solids_loading = 0.2
-    H301 = units.HydrolysateCooler('H301', hydrolyzate, T=48+273.15)
-    M301 = units.EnzymeHydrolysateMixer('M301', (H301-0, cellulase, saccharification_water))
+    if ignored is None: ignored = default_ignored
+    M301 = units.EnzymeHydrolysateMixer('M301', (hydrolyzate, cellulase, saccharification_water))
+    H301 = units.HydrolysateHeatExchanger('H301', M301-0, T=48+273.15)
     M301.solids_loading = solids_loading
-    
+    M301.insoluble_solids_loading = insoluble_solids_loading
     enzyme_over_cellulose = 0.4 # (20 g enzyme / 1000 g cellulose) / (50 g cellulase / 1000g enzyme)
     z_mass_cellulase_mixture = np.array([0.95, 0.05])
     @M301.add_specification
@@ -239,18 +251,32 @@ def create_continuous_saccharification_system(
         )
     
     chemicals = M301.chemicals
-    indices = chemicals.available_indices(nonsolids)
+    
     @M301.add_specification(run=True)
     def update_moisture_content():
-        hydrolyzate, cellulase, saccharification_water = M301.ins
-        mass = chemicals.MW * (hydrolyzate.mol + cellulase.mol)
-        mass_moisture = mass[indices].sum()
+        hydrolyzate, cellulase, saccharification_water, *other = M301.ins
+        mass = chemicals.MW * sum([i.mol for i in [hydrolyzate, cellulase] + other]) 
         solids_loading = M301.solids_loading
+        insoluble_solids_loading = M301.insoluble_solids_loading
+        indices = chemicals.available_indices(nonsolids)
+        mass_moisture = mass[indices].sum()
+        indices = chemicals.available_indices(insoluble_solids)
+        mass_insoluble = mass[indices].sum()
+        indices = chemicals.available_indices(ignored)
+        if indices:
+            mass_ignored = mass[indices].sum()
+        else:
+            mass_ignored = 0.
+        total_mass = mass.sum() - mass_ignored
         water_over_solids = (1 - solids_loading) / solids_loading
-        M301.required_saccharification_water = water_over_solids * (mass.sum() - mass_moisture) - mass_moisture
+        water_over_insoluble_solids = (1 - insoluble_solids_loading) / insoluble_solids_loading
+        M301.required_saccharification_water = max(
+            water_over_solids * (total_mass - mass_moisture) - mass_moisture,
+            water_over_insoluble_solids * mass_insoluble - (total_mass - mass_insoluble)
+        )
         saccharification_water.imass['Water'] = max(M301.required_saccharification_water, 0.)
     
-    R301 = units.ContinuousPresaccharification('R301', M301-0, slurry)
+    R301 = units.ContinuousPresaccharification('R301', H301-0, slurry)
 
 @bst.SystemFactory(
     ID='cofermentation_sys',
@@ -443,7 +469,9 @@ def create_cellulosic_fermentation_system(
         ins, outs,
         include_scrubber=True,
         solids_loading=None,
-        nonsolids=default_nonsolids,
+        insoluble_solids_loading=None,
+        nonsolids=None,
+        insoluble_solids=None,
         kind=0, 
         # 0 for Integrated Bioprocess(IB)
         # 1 for Simultaneous Saccharification and Co-fermentation (SSCF) 
@@ -455,7 +483,9 @@ def create_cellulosic_fermentation_system(
         ins=[hydrolyzate, cellulase, saccharification_water],
         mockup=True,
         solids_loading=solids_loading,
+        insoluble_solids_loading=insoluble_solids_loading,
         nonsolids=nonsolids,
+        insoluble_solids=insoluble_solids,
     )
     if kind == 0:
         cofermentation_sys = create_saccharification_and_cofermentation_system(

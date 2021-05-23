@@ -26,9 +26,9 @@ def set_lipid_fraction(lipid_fraction, stream=None, data={}):
         fiber_IDs = ('Lignin', 'Cellulose', 'Hemicellulose')
         lipid_IDs = ('Lipid',)
         
-        carbs   = Stream('Carbs', thermo=stream.thermo)
-        fiber   = Stream('Fiber', thermo=stream.thermo)
-        lipid   = Stream('Lipid', thermo=stream.thermo)
+        carbs   = Stream(None, thermo=stream.thermo)
+        fiber   = Stream(None, thermo=stream.thermo)
+        lipid   = Stream(None, thermo=stream.thermo)
         carbs.imol[carbs_IDs] = stream.imol[carbs_IDs]
         fiber.imol[fiber_IDs] = stream.imol[fiber_IDs]
         lipid.imol[lipid_IDs] = stream.imol[lipid_IDs]

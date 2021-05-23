@@ -7,14 +7,15 @@
 # for license details.
 """
 """
+import biosteam as bst
+from biosteam import main_flowsheet, UnitGroup
 from chaospy import distributions as shape
 from warnings import warn
 import pandas as pd
-import biosteam as bst
 import numpy as np
+from ..lipidcane import set_lipid_fraction, get_lipid_fraction
 from .. import PY37
-from . import (utils,
-               _process_settings,
+from . import (_process_settings,
                _chemicals,
                _system,
                _tea,
@@ -22,8 +23,7 @@ from . import (utils,
                _distributions,
 )
 
-__all__ = [*utils.__all__,
-           *_process_settings.__all__,
+__all__ = [*_process_settings.__all__,
            *_chemicals.__all__,
            *_system.__all__,
            *_tea.__all__,
@@ -34,7 +34,6 @@ __all__ = [*utils.__all__,
            'flowsheet',
 ]
 
-from .utils import *
 from ._process_settings import *
 from ._chemicals import *
 from ._system import *
@@ -47,12 +46,8 @@ _system_loaded = False
 _chemicals_loaded = False
 
 name_keys = {
-    'divided 1 and 2g front end oil separation': 5,
-    'divided 1 and 2g hydrolyzate oil separation': 4,
-    'combined 1 and 2g post fermentation oil separation': 3,
-    'divided 1 and 2g post fermentation oil separation': 2,
+    'combined 1 and 2g post fermentation oil separation': 2,
     '1g': 1,
-    'divided 1 and 2g bagasse expression': 0,
 }
 
 def load_chemicals():
@@ -61,17 +56,15 @@ def load_chemicals():
     _chemicals_loaded = True
 
 def load(name, agile=False, cache={}):
-    if name in cache:
-        globals().update(cache[name])
+    if (name, agile) in cache:
+        globals().update(cache[name, agile])
         return
-    import biosteam as bst
-    from biosteam import main_flowsheet as F, UnitGroup
     global lipidcane_sys, lipidcane_tea, specs, flowsheet, _system_loaded
     global lipid_extraction_specification, model, unit_groups
     global MFPP, TCI, installed_equipment_cost, productivity
     if not _chemicals_loaded: load_chemicals()
     flowsheet = bst.Flowsheet('lipidcane2g')
-    F.set_flowsheet(flowsheet)
+    main_flowsheet.set_flowsheet(flowsheet)
     bst.settings.set_thermo(chemicals)
     load_process_settings()
     dct = globals()
@@ -124,79 +117,82 @@ def load(name, agile=False, cache={}):
     if area_names:
         for i, j in zip(unit_groups, area_names): i.name = j
     
-    ## Not currently used; agile for next study
-    
-    if name in (1, 2) if isinstance(name, int) else '2g' in name:
-        if agile:
-            lipidcane_tea = create_agile_tea(lipidcane_sys.units)
-            lipidcane_sys.simulate()
-            scenario_a = sugarcane_tea.create_scenario(lipidcane_sys)
-            cornstover_sys = trim_to_cornstover_hot_water_cellulosic_ethanol(
-                lipidcane_sys,
-                operating_hours=24 * 100,
-            )
-            cornstover_sys.simulate()
-            scenario_b = lipidcane_tea.create_scenario(cornstover_sys)
-            sugarcane_tea.compile_scenarios([scenario_a, scenario_b])
-            dct.update(flowsheet.to_dict())
-            lipidcane_tea.IRR = 0.10
-            s.ethanol.price = lipidcane_tea.solve_price(s.ethanol)
-            return
+    for BT in lipidcane_sys.units:
+        if isinstance(BT, bst.BoilerTurbogenerator): break
     
     ## TEA
-    lipidcane_tea = create_tea(lipidcane_sys)
-    lipidcane_tea.operating_days = 200
-    
-    ## Simulation
-    try: 
-        lipidcane_sys.simulate()
-    except Exception as e:
-        raise e
+    lipidcane_sys.set_tolerance(rmol=1e-3)
+    units = lipidcane_sys.units
+    dct.update(flowsheet.to_dict())
+    if agile: 
+        dct['lipidsorghum'] = lipidsorghum = lipidsorghum_feedstock(lipidcane)
+        original_lipidcane = lipidcane.copy()
+        
+        class AgileLipidcaneSystem(bst.AgileSystem):
+            
+            def set_parameters(self, switch2sorghum):
+                F_mass_original = lipidcane.F_mass
+                lipid_content = get_lipid_fraction(lipidcane)
+                if switch2sorghum:
+                    lipidcane.copy_like(lipidsorghum)
+                else:
+                    lipidcane.copy_like(original_lipidcane)
+                set_lipid_fraction(lipid_content, lipidcane)
+                lipidcane.F_mass = F_mass_original
+                np.testing.assert_allclose(get_lipid_fraction(lipidcane), lipid_content)
+                
+        lipidcane_tea = create_agile_tea(lipidcane_sys.units)        
+        lipidcane_sys = AgileLipidcaneSystem(lipidcane_sys, [0, 1], [200 * 24, 60 * 24],
+                                             tea=lipidcane_tea)
     else:
-        lipidcane_tea.IRR = 0.10
-    finally:
-        dct.update(flowsheet.to_dict())
+        lipidcane_tea = create_tea(lipidcane_sys)
+        lipidcane_sys.operating_hours = 24 * 200
+    feedstocks = [lipidcane]
     
     ## Specification for analysis
     
-    for i in lipidcane_sys.units:
+    for i in units:
         if getattr(i, 'tag', None) == 'lipid extraction efficiency':
             isplit_a = i.isplit
             break
     
-    for i in lipidcane_sys.units:
+    for i in units:
         if getattr(i, 'tag', None) == 'bagasse lipid retention':
             isplit_b = i.isplit
             break
     
     lipid_extraction_specification = LipidExtractionSpecification(
-            lipidcane_sys, lipidcane, isplit_a, isplit_b,
+            lipidcane_sys, feedstocks, isplit_a, isplit_b,
         )
     
     ## Model
-        
-    system = lipidcane_sys
-    model = bst.Model(system)
+    
+    kg_per_ton = 907.18474
+    model = bst.Model(lipidcane_sys, exception_hook='raise')
     parameter = model.parameter
+    metric = model.metric
     
     def uniform(lb, ub, *args, **kwargs):
         return parameter(*args, distribution=shape.Uniform(lb, ub), bounds=(lb, ub), **kwargs)
     
+    capacity = lipidcane.F_mass / kg_per_ton
+    @uniform(0.5 * capacity, 2. * capacity, units='ton/hr', element=lipidcane)
+    def set_plant_capacity(capacity):
+        lipidcane.F_mass = kg_per_ton * capacity
+    
     # Currently at ~5%, but total lipid content is past 10%
-    uniform(0.05, 0.10, lipid_extraction_specification.load_lipid_content,
+    
+    set_feedstock_lipid_content = uniform(0.05, 0.10, lipid_extraction_specification.load_lipid_content,
             element=lipidcane, units='dry wt. %')
     if name == 1:
-        lb = 0.45
-        ub = 0.55
+        lb = 0.475
+        ub = 0.525
     elif name == 2:
         lb = 0.75
-        ub = 0.85
-    else:
-        lb = 0.2
-        ub = 1.0
-    uniform(lb, ub, lipid_extraction_specification.load_efficiency,
+        ub = 0.80
+    set_lipid_extraction_efficiency = uniform(lb, ub, lipid_extraction_specification.load_efficiency,
             element=lipidcane, units='%')
-    uniform(0.6, 0.99, lipid_extraction_specification.load_lipid_retention,
+    set_bagasse_lipid_retention = uniform(0.80, 0.90, lipid_extraction_specification.load_lipid_retention,
             element=lipidcane, units='%')
 
     # USDA ERS historical price data
@@ -212,7 +208,7 @@ def load(name, agile=False, cache={}):
     # https://www.eia.gov/energyexplained/natural-gas/prices.php
     @parameter(distribution=natural_gas_price_distribution, element=natural_gas, units='USD/cf')
     def set_natural_gas_price(price): # Triangular distribution fitted over the past 10 years Sep 2009 to March 2021
-        biodiesel.price = 1000. * price / 51.92624700383502
+        BT.natural_gas_price = 51.92624700383502 * price / 1000. 
 
     # From Emma's literature search; EIA electricity prices vary much too widely across states.
     # Best use prices similar to previous TEAs for a more accurate comparison.
@@ -223,101 +219,174 @@ def load(name, agile=False, cache={}):
     # From Huang's 2016 paper
     @uniform(6 * 30, 7 * 30, units='day/yr')
     def set_operating_days(operating_days):
-        lipidcane_tea.operating_days = operating_days
+        if agile:
+            lipidcane_sys.time_steps[0] = operating_days * 24
+        else:
+            lipidcane_tea.operating_days = operating_days
     
     # 10% is suggested for waste reducing, but 15% is suggested for investment
     @uniform(10., 15., units='%')
     def set_IRR(IRR):
         lipidcane_tea.IRR = IRR / 100.
 
-    metric = model.metric
-    kg_per_ton = 907.18474
+    # Initial solids loading in Humbird is 20% (includes both dissolved and insoluble solids)
+    @uniform(20, 25, units='%', element='Fermentation')
+    def set_fermentation_solids_loading(solids_loading):
+        if name == 2: M402.solids_loading = solids_loading / 100.
+    
+    natural_gas.phase = 'g'
+    natural_gas.set_property('T', 60, 'degF')
+    natural_gas.set_property('P', 14.73, 'psi')
+    original_value = natural_gas.imol['CH4']
+    natural_gas.imass['CH4'] = 1 
+    V_ng = natural_gas.get_total_flow('ft3/hr')
+    natural_gas.imol['CH4'] = original_value
+    
+    if agile:
+        feedstock_flow = lambda: lipidcane_sys.flow_rates[lipidcane] / kg_per_ton # ton/yr
+        biodiesel_flow = lambda: lipidcane_sys.flow_rates[biodiesel] / 3.3111 # gal/yr
+        ethanol_flow = lambda: lipidcane_sys.flow_rates[ethanol] / 2.98668849 # gal/yr
+        natural_gas_flow = lambda: lipidcane_sys.flow_rates[natural_gas] * V_ng # cf/yr
+        if name == 1:
+            electricity = lambda: lipidcane_sys.utility_cost / bst.PowerUtility.price
+        elif name == 2:
+            electricity = lambda: 0.
+    else:
+        feedstock_flow = lambda: lipidcane_sys.operating_hours * lipidcane.F_mass / kg_per_ton
+        biodiesel_flow = lambda: lipidcane_sys.operating_hours * biodiesel.F_mass / 3.3111 # gal/yr
+        ethanol_flow = lambda: lipidcane_sys.operating_hours * ethanol.F_mass / 2.98668849 # gal/yr
+        natural_gas_flow = lambda: lipidcane_sys.operating_hours * natural_gas.F_mass * V_ng # cf/yr
+        if name == 1:
+            electricity = lambda: lipidcane_sys.operating_hours * sum([i.rate for i in lipidcane_sys.power_utilities])
+        elif name == 2:
+            electricity = lambda: 0.
     
     @metric(units='USD/ton')
     def MFPP():
         return kg_per_ton * lipidcane_tea.solve_price(lipidcane)
+    
+    @metric(units='gal/ton')
+    def biodiesel_production():
+        return biodiesel_flow() / feedstock_flow()
+    
+    @metric(units='gal/ton')
+    def ethanol_production():
+        return ethanol_flow() / feedstock_flow()
+    
+    @metric(units='kWhr/ton')
+    def electricity_production():
+        return - electricity() / feedstock_flow()
+    
+    @metric(units='cf/ton')
+    def natural_gas_consumption():
+        return natural_gas_flow() / feedstock_flow()
+    
+    @metric(units='GGE/ton')
+    def productivity():
+        GGE = (ethanol_flow() / 1.5
+           + biodiesel_flow() / 0.9536
+           - electricity() * 3600 / 131760
+           - natural_gas_flow() / 126.67)
+        return GGE / feedstock_flow()
 
     @metric(units='10^6*USD')
     def TCI():
         return lipidcane_tea.TCI / 1e6 # 10^6*$
-
-    @metric(units='gal/ton')
-    def biodiesel_production():
-        return biodiesel.F_mass / 3.3111 / lipidcane.get_total_flow('ton/hr')
     
-    @metric(units='gal/ton')
-    def ethanol_production():
-        return ethanol.F_mass / 2.98668849 / lipidcane.get_total_flow('ton/hr')
-        
-    @metric(units='kWhr/ton')
-    def electricity_production():
-        return - sum([i.rate for i in lipidcane_sys.power_utilities]) / lipidcane.get_total_flow('ton/hr')
+    # # Single point evaluation for detailed design results
+    set_feedstock_lipid_content(0.10) # Consistent with SI of Huang's 2016 paper
+    if name == 1: 
+        efficiency = 0.5
+    elif name == 2: 
+        efficiency = 0.775
+    set_lipid_extraction_efficiency(efficiency) # Middle point
+    set_bagasse_lipid_retention(0.9)  # Middle point
+    set_fermentation_solids_loading(20) # Same as Humbird
+    set_ethanol_price(2.356) # Consistent with Huang's 2016 paper
+    set_biodiesel_price(4.569) # Consistent with Huang's 2016 paper
+    set_natural_gas_price(4.198) # Consistent with Humbird's 2012 paper
+    set_electricity_price(0.0572) # Consistent with Humbird's 2012 paper
+    set_operating_days(200) # Consistent with Huang's 2016 paper
     
-    @metric(units='cf/ton')
-    def natural_gas_consumption():
-        return natural_gas.get_total_flow('ft3/hr') / lipidcane.get_total_flow('ton/hr')
+    for i in model.parameters + model.metrics:
+        dct[i.name] = i
+    cache[name, agile] = dct.copy()
     
-    natural_gas.set_property('T', 60, 'degF')
-    natural_gas.set_property('P', 14.73, 'psi')
-    natural_gas.get_total_flow('ft3/hr')
-    
-    @metric(units='GGE/ton')
-    def productivity():
-        feedstock = lipidcane.get_total_flow('ton/hr')
-        GGE = (ethanol.F_mass * 2.98668849 / 1.5
-           + biodiesel.get_total_flow('gal/hr') / 0.9536
-           - sum([i.rate for i in lipidcane_sys.power_utilities]) * 3600 / feedstock / 131760
-           - natural_gas.get_total_flow('ft3/hr') / 126.67)
-        return GGE / feedstock
-    
-    cache[name] = dct.copy()
+    ## Simulation
+    try: 
+        lipidcane_sys.simulate()
+    except Exception as e:
+        raise e
+    finally:
+        lipidcane_tea.IRR = 0.10
 
 def evaluate_across_configurations(
-        efficiency, lipid_content, lipid_retention, metrics, configurations,
+        efficiency, lipid_content, lipid_retention, agile, configurations, metrics,
     ):
+    A = len(agile)
+    C = len(configurations)
     M = len(metrics)
-    P = len(configurations)
-    data = np.zeros([M, P])
-    for i in range(P):
-        load(int(configurations[i]))
-        lipid_extraction_specification.load_specifications(
-            efficiency=efficiency, 
-            lipid_content=lipid_content, 
-            lipid_retention=lipid_retention
-        )
-        lipid_extraction_specification.system.simulate()
-        data[:, i] = [j() for j in metrics]
+    data = np.zeros([A, C, M])
+    for ia in range(A):
+        for ic in range(C):    
+            load(int(configurations[ic]), agile[ia])
+            lipid_extraction_specification.load_specifications(
+                efficiency=efficiency, 
+                lipid_content=lipid_content, 
+                lipid_retention=lipid_retention
+            )
+            lipid_extraction_specification.system.simulate()
+            data[ia, ic, :] = [j() for j in metrics]
     return data
 
 evaluate_across_configurations = np.vectorize(
     evaluate_across_configurations, 
-    excluded=['metrics', 'configurations'],
-    signature='(),(),(),(m),(p)->(m,p)'
+    excluded=['agile', 'configurations', 'metrics'],
+    signature='(),(),(),(a),(c),(m)->(a,c,m)'
 )       
 
-def run_uncertainty_and_sensitivity(name, N, rule='L'):
+def spearman_file(name, agile):
     import os
     folder = os.path.dirname(__file__)
-    file = os.path.join(folder, f'lipidcane_monte_carlo_{name}.xlsx')
-    load(name)
+    filename = f'lipidcane_spearman_{name}'
+    if agile: filename += '_agile'
+    filename += '.xlsx'
+    return os.path.join(folder, filename)
+
+def monte_carlo_file(name, agile):
+    import os
+    folder = os.path.dirname(__file__)
+    filename = f'lipidcane_monte_carlo_{name}'
+    if agile: filename += '_agile'
+    filename += '.xlsx'
+    return os.path.join(folder, filename)
+
+def run_uncertainty_and_sensitivity(name, agile, N, rule='L'):
+    import os
+    from warnings import filterwarnings
+    filterwarnings('ignore', category=bst.utils.DesignWarning)
+    load(name, agile)
     samples = model.sample(N, rule)
     model.load_samples(samples)
     model.evaluate()
+    file = monte_carlo_file(name, agile)
     model.table.to_excel(file)
     rho, p = model.spearman_r()
-    file = os.path.join(folder, f'lipidcane_spearman_{name}.xlsx')
+    file = spearman_file(name, agile)
     rho.to_excel(file)
+    
+def run_all(N, rule='L'):
+    for name, agile in ((1, False), (2, False), (1, True), (2, True)):
+        run_uncertainty_and_sensitivity(name, agile, N, rule)
 
 def plot_spearman_MFPP():
-    import os
     import matplotlib.pyplot as plt
     from thermosteam.units_of_measure import format_units
     import matplotlib.patches as mpatches
     from biosteam.utils import CABBI_wheel
-    folder = os.path.dirname(__file__)
     MFPPs = []
-    for name in (1, 2):
-        file = os.path.join(folder, f'lipidcane_spearman_{name}.xlsx')
+    for name, agile in ((1, False), (2, False), (1, True), (2, True)):
+        file = spearman_file(name, agile)
         try: 
             df = pd.read_excel(file, header=[0, 1], index_col=[0, 1])
         except: 
@@ -326,30 +395,34 @@ def plot_spearman_MFPP():
             continue
         MFPPs.append(df['Biorefinery', 'MFPP [USD/ton]'])
     stream_price = format_units('USD/gal')
+    ng_price = format_units('USD/cf')
     electricity_price = format_units('USD/kWhr')
     operating_days = format_units('day/yr')
+    capacity = format_units('ton/hr')
     index = [
-        f'Feedstock lipid content [5 $-$ 10 dry wt. %]',
-        f'*Lipid extraction efficiency [45 $-$ 55; 75 $-$ 80 %]',
-        f'Bagasse lipid retention [60 $-$ 99 %]',
-        f'Ethanol price [2.12 $-$ 2.59 {stream_price}]',
-        f'Biodiesel price [4.10 $-$ 5.01 {stream_price}]',
+        f'Plant capacity [330 $-$ 404 {capacity}]',
+          'Feedstock lipid content [5 $-$ 10 dry wt. %]',
+          '$^b$Lipid extraction efficiency [47.5 $-$ 52.5; 75 $-$ 80 %]',
+          'Bagasse lipid retention [80 $-$ 90 %]',
+        f'Ethanol price [0.89, 2.17, 3.18 {stream_price}]',
+        f'Biodiesel price [2.55, 3.62, 5.74 {stream_price}]',
+        f'Natural gas price [3.71, 4.73, 6.18 {ng_price}]',
         f'Electricity price [0.0572 $-$ 0.07 {electricity_price}]',
         f'Operating days [180 $-$ 210 {operating_days}]',
-         'IRR [10 $-$ 15 %]',
+          'IRR [10 $-$ 15 %]',
+          '$^a$Fermentation solids loading [20% $-$ 25%]',
     ]
-    CABBI_wheel = tuple(CABBI_wheel)
-    fig, ax = bst.plots.plot_spearman_2d(MFPPs, index=index, color_wheel=CABBI_wheel,
+    color_wheel = tuple(CABBI_wheel)
+    fig, ax = bst.plots.plot_spearman_2d(MFPPs, index=index, 
+                                         color_wheel=color_wheel,
                                          name='MFPP')
     plt.legend(
         handles=[
-            mpatches.Patch(color=CABBI_wheel[0].RGBn, label='Configuration I'),
-            mpatches.Patch(color=CABBI_wheel[1].RGBn, label='Configuration II'),
-            # mpatches.Patch(color=CABBI_wheel[2].RGBn, label='Configuration III'),
+            mpatches.Patch(color=color_wheel[0].RGBn, label='Configuration I'),
+            mpatches.Patch(color=color_wheel[1].RGBn, label='Configuration II'),
+            mpatches.Patch(color=color_wheel[2].RGBn, label='Agile Configuration I'),
+            mpatches.Patch(color=color_wheel[3].RGBn, label='Agile Configuration II'),
         ], 
         # loc='upper left'
     )
     return fig, ax
-
-def ethanol_price():
-    return lipidcane_tea.solve_price(flowsheet.stream.ethanol) * 2.98668849

@@ -299,7 +299,7 @@ def create_agile_tea(units, OSBL_units=None, ignored_units=()):
         finance_interest=0.08,
         finance_years=10,
         finance_fraction=0.4,
-        OSBL_units=OSBL_units, # BT not included
+        OSBL_units=OSBL_units, 
         warehouse=0.04, 
         site_development=0.09, 
         additional_piping=0.045,
@@ -336,7 +336,7 @@ def create_tea(sys, OSBL_units=None, ignored_units=()):
         finance_interest=0.08,
         finance_years=10,
         finance_fraction=0.4,
-        OSBL_units=OSBL_units, # BT not included
+        OSBL_units=OSBL_units,
         warehouse=0.04, 
         site_development=0.09, 
         additional_piping=0.045,

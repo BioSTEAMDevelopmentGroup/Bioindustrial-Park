@@ -28,6 +28,7 @@ from ..lipidcane import (
     create_juicing_and_lipid_extraction_system,
     create_transesterification_and_biodiesel_separation_system,
     create_lipidcane_to_biodiesel_and_conventional_ethanol_system,
+    set_lipid_fraction,
 )
 import biorefineries as brf
 
@@ -38,6 +39,7 @@ __all__ = (
     'create_lipidcane_to_biodiesel_and_ethanol_divided_1_and_2g_post_fermentation_oil_separation',
     'create_lipidcane_to_biodiesel_and_ethanol_combined_1_and_2g_post_fermentation_oil_separation',
     # 'create_lipidcane_to_biodiesel_and_ethanol_1_and_2g_bagasse_expression',
+    'lipidsorghum_feedstock',
     'trim_to_cornstover_hot_water_cellulosic_ethanol',
 )
 
@@ -115,7 +117,7 @@ def create_lipidcane_to_biodiesel_and_ethanol_1g(
     
     if front_end_oil_separation:
         raise NotImplementedError('front end oil separation not implemented yet')
-        juicing_and_lipid_extraction_sys, udct = create_juicing_and_lipid_extraction_system(
+        juicing_and_lipid_extraction_sys, jdct = create_juicing_and_lipid_extraction_system(
             ins=feedstock_handling_sys-0,
             pellet_bagasse=True,
             mockup=True,
@@ -125,7 +127,7 @@ def create_lipidcane_to_biodiesel_and_ethanol_1g(
         screened_juice, lipid, pelleted_bagasse, fiber_fines, spent_oil_wash_water = juicing_and_lipid_extraction_sys.outs
         lipid.ID = 'lipid'
     else:
-        juicing_sys, udct = create_juicing_system(
+        juicing_sys, jdct = create_juicing_system(
             ins=feedstock_handling_sys-0,
             outs=['', '', 'fiber_fines'],
             pellet_bagasse=False,
@@ -145,13 +147,13 @@ def create_lipidcane_to_biodiesel_and_ethanol_1g(
     bagasse_lipid, pressed_bagasse = lipid_expression_sys.outs
     bagasse_lipid.ID = 'bagasse_lipid'
     PX = bst.Pump(400, bagasse_lipid)
-    vibrating_screen = udct['S201'].isplit['Lipid'] = 1.
-    crushing_mill = udct['U201']
+    vibrating_screen = jdct['S201'].isplit['Lipid'] = 1.
+    crushing_mill = jdct['U201']
     crushing_mill.tag = "bagasse lipid retention"
     crushing_mill.isplit['Lipid'] = 0.90
     
     if front_end_oil_separation:
-        udct['T208'].ins.append(PX-0)
+        jdct['T208'].ins.append(PX-0)
     else:
         lipid_wash_sys = create_lipid_wash_system(
             ins=PX-0,
@@ -162,7 +164,7 @@ def create_lipidcane_to_biodiesel_and_ethanol_1g(
     
     ### Ethanol section ###
     
-    ethanol_production_sys, udct = create_sucrose_to_ethanol_system(
+    ethanol_production_sys, epdct = create_sucrose_to_ethanol_system(
         ins=[screened_juice, 'denaturant'],
         outs=[ethanol, vinasse],
         mockup=True,
@@ -173,11 +175,12 @@ def create_lipidcane_to_biodiesel_and_ethanol_1g(
     ### Biodiesel section ###
     
     # Fresh degummed oil
-    transesterification_and_biodiesel_separation_sys = create_transesterification_and_biodiesel_separation_system(
+    transesterification_and_biodiesel_separation_sys, tbdct = create_transesterification_and_biodiesel_separation_system(
         ins=lipid, 
         outs=[biodiesel, crude_glycerol],
         mockup=True,
         area=600,
+        udct=True,
     )
 
     ### Facilities ###
@@ -219,9 +222,20 @@ def create_lipidcane_to_biodiesel_and_ethanol_1g(
                                  None,
                                  makeup_water_streams,
                                  process_water_streams)
-    F301 = udct['F301']
-    D303 = udct['D303']
-    HXN = bst.HeatExchangerNetwork(800, units=[F301, D303]) # ignored=transesterification_and_biodiesel_separation_sys.units)
+    # HXN = bst.HeatExchangerNetwork(800, 
+    #     units=[
+    #         tbdct['D401'].condenser, epdct['D303'],
+    #         jdct['H201'], epdct['H303'], epdct['D302']
+    #     ],
+    #     Qmin=1e5,
+    # ) 
+    HXN = bst.HeatExchangerNetwork(800, 
+        units=[
+            epdct['F301'], epdct['D303'],
+        ],
+        Qmin=1e5,
+    ) # ignored=transesterification_and_biodiesel_separation_sys.units)
+    # HXN = bst.HeatExchangerNetwork(800, ignored=[tbdct['D401'].boiler, tbdct['D402'].boiler])
 
 # @SystemFactory(
 #     ID='lipidcane_sys',
@@ -888,31 +902,17 @@ def create_lipidcane_to_biodiesel_and_ethanol_combined_1_and_2g_post_fermentatio
                                     P=(101325, 69682, 47057, 30953, 19781),
                                     V_definition='First-effect',
                                     V=0.05) # fraction evaporated
-    @EvX.add_specification(run=True)
-    def evaporation():
-        def f(V):
-            EvX.V = V
-            hydrolysate_cooler = MX1.outs[0].sink
-            enzyme_mixer = hydrolysate_cooler.outs[0].sink
-            units = (EvX, PX, MX1, hydrolysate_cooler)
-            for i in units: i._run()
-            enzyme_mixer.run()
-            return enzyme_mixer.required_saccharification_water
-        y0 = f(0)
-        if y0 > 0: return
-        y1 = f(1)
-        if y1 < 0: raise RuntimeError('infeasible to evaporate all water')
-        EvX.V = flx.IQ_interpolation(f, 0, 1, y0, y1, x=EvX.V, ytol=1e-2, xtol=1e-6)
-    
     PX = bst.Pump(400, ins=EvX-0)
     MX1 = bst.Mixer(400, ins=(PX-0, hydrolyzate))
     sucrose_hydrolysis_reaction = tmo.Reaction(
         'Sucrose + Water -> 2Glucose', 'Sucrose', 1.00
     )
-    
+
     @MX1.add_specification(run=True)
     def hydrolysis():
-        sucrose_hydrolysis_reaction(MX1.ins[0])
+        feed = MX1.ins[0]
+        sucrose_hydrolysis_reaction.force_reaction(feed)
+        if feed.imol['Water'] < 0: feed.imol['Water'] = 0.
     
     cellulosic_fermentation_sys, cf_dct = brf.cornstover.create_cellulosic_fermentation_system(
         ins=MX1-0,
@@ -921,8 +921,27 @@ def create_lipidcane_to_biodiesel_and_ethanol_combined_1_and_2g_post_fermentatio
         area=400,
         udct=True,
         kind=1,
-        solids_loading=0.2
+        insoluble_solids_loading=0.10,
+        solids_loading=0.20,
     )
+    
+    enzyme_mixer = MX1.outs[0].sink
+    hydrolysate_cooler = enzyme_mixer.outs[0].sink
+    @hydrolysate_cooler.add_specification(run=True)
+    def evaporation():
+        def f(V):
+            EvX.V = V
+            EvX.run()
+            PX.run()
+            MX1.run()
+            enzyme_mixer.run()
+            return enzyme_mixer.required_saccharification_water
+        y0 = f(0)
+        if y0 > 0: return
+        y1 = f(1)
+        if y1 < 0: raise RuntimeError('infeasible to evaporate all water')
+        EvX.V = flx.IQ_interpolation(f, 0, 1, y0, y1, x=EvX.V, ytol=1e-2, xtol=1e-6)
+    
     cf_dct['R301'].replace_with(None, discard=True)
     cf_dct['R303'].tau = 60
     vent, cellulosic_beer = cellulosic_fermentation_sys.outs
@@ -1161,3 +1180,12 @@ def create_lipidcane_to_biodiesel_and_ethanol_divided_1_and_2g_front_end_oil_sep
     CWP = u.CWP
     HXN = bst.HeatExchangerNetwork('HXN', units=[F301, D303])#, ignored=transesterification_and_biodiesel_separation_sys.units)
         
+def lipidsorghum_feedstock(lipidcane):
+    lipidcane = lipidcane.copy()
+    set_lipid_fraction(0, lipidcane)
+    lipidsorghum = lipidcane.copy('lipidsorghum')
+    lipidsorghum.imass['Cellulose', 'Hemicellulose', 'Lignin'] *= 1.0923
+    dsugar = lipidcane.F_mass - lipidsorghum.F_mass
+    sugars_key = ('Glucose', 'Sucrose')
+    lipidsorghum.imass[sugars_key] += dsugar * lipidsorghum.get_normalized_mass(sugars_key) 
+    return lipidsorghum

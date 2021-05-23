@@ -386,7 +386,7 @@ class SimultaneousSaccharificationAndCoFermentation(Unit):
     T_fermentation = 32+273.15
     
     #: Saccharification and Co-Fermentation time (hr)
-    tau = 60
+    tau = 72
     
     #: Unload and clean up time (hr)
     tau_0 = 4

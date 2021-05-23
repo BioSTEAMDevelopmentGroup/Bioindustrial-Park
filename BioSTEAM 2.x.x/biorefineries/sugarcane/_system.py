@@ -114,7 +114,6 @@ def create_juicing_system_without_treatment(ins, outs, pellet_bagasse=None):
     U202 = units.ConveyingBelt('U202', U201-0, [''] if pellet_bagasse else [bagasse])
     
     if pellet_bagasse:
-        breakpoint()
         bagasse_pelleting_sys = create_bagasse_pelleting_system(None, ins=U202-0, outs=bagasse, mockup=True)
     
     # Mix in water
@@ -516,17 +515,23 @@ def create_sucrose_fermentation_system(ins, outs, scrubber=True):
     
     def get_sugar_concentration():
         s = M301.outs[0]
-        return s.imass['Glucose', 'Sucrose'].sum() / s.F_mass
+        if 'Lipid' in s.chemicals:
+            ignored = float(s.imass['Lipid'])
+        else:
+            ignored = 0.
+        return s.imass['Glucose', 'Sucrose'].sum() / (s.F_mass - ignored)
     
     def sugar_concentration_at_fraction_evaporated(V):
         F301.V = V
         F301._run()
+        P306._run()
         M301._run()
         return F301.sugar_concentration - get_sugar_concentration()
     
     def get_dilution_water():
         F301.V = 0
         F301._run()
+        P306._run()
         M301._run()
         target = F301.sugar_concentration
         current = get_sugar_concentration()
@@ -535,14 +540,30 @@ def create_sucrose_fermentation_system(ins, outs, scrubber=True):
     @M301.add_specification(run=False)
     def adjust_glucose_concentration():
         V_guess = F301.V
+        s_dilution_water = M301.ins[2]
+        s_dilution_water.empty()
         dilution_water = get_dilution_water()
-        if dilution_water < 0:
+        if dilution_water < 0.:
+            y0 = sugar_concentration_at_fraction_evaporated(0.)
+            y1 = sugar_concentration_at_fraction_evaporated(1.)
+            if y1 > 0.: 
+                S301.split = 0.05
+                S301._run()
+                y1 = sugar_concentration_at_fraction_evaporated(1.)
+                if y1 > 0.: 
+                    S301.split = 0.
+                    S301._run()
+                    y1 = sugar_concentration_at_fraction_evaporated(1.)
+                    if y1 > 0.:
+                        breakpoint()
+                        raise RuntimeError('cannot evaporate to target sugar concentration')
             F301.V = flx.IQ_interpolation(
                 sugar_concentration_at_fraction_evaporated,
                 0., 1., x=V_guess, ytol=1e-5
             )
         else:
-            M301.ins[2].imass['Water'] = dilution_water
+            s_dilution_water.imass['Water'] = dilution_water
+        S301.split = 0.10
             
     F301.sugar_concentration = 0.23 # wt. % sugar
     
@@ -575,6 +596,7 @@ def create_sucrose_fermentation_system(ins, outs, scrubber=True):
                                   order=('Ethanol', 'Glucose', 'H3PO4', 'DryYeast'),
                                   solids=('DryYeast',))
     C301.split[:] = 1. - C301.split
+    if 'Lipid' in C301.chemicals: C301.isplit['Lipid'] = 0.
     
     S302 = units.FakeSplitter('S302', None, ('', 'Yeast'))
     
