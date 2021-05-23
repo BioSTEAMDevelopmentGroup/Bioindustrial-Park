@@ -51,6 +51,7 @@ import flexsolve as flx
 import numpy as np
 from biosteam import main_flowsheet as F
 from biorefineries import BST222
+from biorefineries.cornstover import CellulosicEthanolTEA
 from biosteam import System
 from thermosteam import Stream
 from biorefineries.BDO import units, facilities
@@ -104,13 +105,13 @@ U101.cost_items['System'].kW = 0
 # For pretreatment, 93% purity
 sulfuric_acid_T201 = Stream('sulfuric_acid_T201', units='kg/hr')
 # To be mixed with sulfuric acid, flow updated in SulfuricAcidMixer
-water_M201 = Stream('water_M201', T=114+273.15, units='kg/hr')
-
+water_M201 = Stream('water_M201', T=300, units='kg/hr')
+    
 # To be used for feedstock conditioning
-water_M202 = Stream('water_M202', T=95+273.15, units='kg/hr')
+water_M202 = Stream('water_M202', T=300, units='kg/hr')
 
 # To be added to the feedstock/sulfuric acid mixture, flow updated by the SteamMixer
-steam_M203 = Stream('steam_M203', phase='g',T=268+273.15, P=13*101325, units='kg/hr')
+water_M203 = Stream('water_M203', phase='l', T=300, P=13.*101325, units='kg/hr')
 
 # For neutralization of pretreatment hydrolysate
 ammonia_M205 = Stream('ammonia_M205', phase='l', units='kg/hr')
@@ -121,19 +122,55 @@ water_M205 = Stream('water_M205', units='kg/hr')
 # =============================================================================
 # Pretreatment units
 # =============================================================================
+H_M201 = bst.units.HXutility('H_M201', ins=water_M201,
+                                 outs='steam_M201',
+                                 T=99.+273.15, rigorous=True)
+
+H_M201.heat_utilities[0].heat_transfer_efficiency = 1.
+def H_M201_specification():
+    T201._run()
+    acid_imass = T201.outs[0].imass['SulfuricAcid']
+    H_M201.ins[0].imass['Water'] = acid_imass / 0.05
+    # H_M201.ins[0].imass['H2SO4'] = H_M201.ins[0].imass['Water']/1000.
+    H_M201._run()
+H_M201.specification = H_M201_specification
+# H_M201._cost = lambda: None
+# H_M201._design = lambda: None
+# H_M201.heat_utilities[0].heat_exchanger = None
+H_M202 = bst.units.HXutility('H_M202', ins=water_M202,
+                                 outs='hot_water_M202',
+                                 T=99.+273.15, rigorous=True)
+H_M202.heat_utilities[0].heat_transfer_efficiency = 1.
+def H_M202_specification():
+    U101._run()
+    H_M201.run()
+    M201._run()
+    feedstock, acid = U101.outs[0], M201.outs[0]
+    recycled_water = H201.outs[0]
+    mixture_F_mass = feedstock.F_mass + acid.F_mass
+    mixture_imass_water = feedstock.imass['Water'] + acid.imass['Water'] + \
+        recycled_water.imass['Water']
+    total_mass = (mixture_F_mass - mixture_imass_water)/M202.solid_loading
+    H_M202.ins[0].imass['Water'] = total_mass - mixture_F_mass
+    # H_M202.ins[0].imass['H2SO4'] = H_M202.ins[0].imass['Water']/1000.
+    H_M202._run()
+H_M202.specification = H_M202_specification
+
 
 # Prepare sulfuric acid
 get_feedstock_dry_mass = lambda: feedstock.F_mass - feedstock.imass['H2O']
 T201 = units.SulfuricAcidAdditionTank('T201', ins=sulfuric_acid_T201,
                                       feedstock_dry_mass=get_feedstock_dry_mass())
 
-M201 = units.SulfuricAcidMixer('M201', ins=(T201-0, water_M201))
-
+M201 = units.SulfuricAcidMixer('M201', ins=(T201-0, H_M201-0))
+    
 # Mix sulfuric acid and feedstock, adjust water loading for pretreatment
-M202 = units.PretreatmentMixer('M202', ins=(U101-0, M201-0, water_M202))
+M202 = units.PretreatmentMixer('M202', ins=(U101-0, M201-0, H_M202-0, ''))
 
 # Mix feedstock/sulfuric acid mixture and steam
-M203 = units.SteamMixer('M203', ins=(M202-0, steam_M203), P=5.5*101325)
+# M203 = units.SteamMixer('M203', ins=(M202-0, water_M203), P=5.5*101325)
+M203 = bst.units.SteamMixer('M203', ins=(M202-0, water_M203), P=5.5*101325)
+M203.heat_utilities[0].heat_transfer_efficiency = 1.
 R201 = units.PretreatmentReactorSystem('R201', ins=M203-0, outs=('R201_g', 'R201_l'))
 
 # Pump bottom of the pretreatment products to the oligomer conversion tank
@@ -334,7 +371,7 @@ M401_b = bst.units.Mixer('M401_b', ins=('', ''))
 def adjust_M401_b_ethanol():
     # import pdb
     # pdb.set_trace()
-    M401.specification()
+    M401.run()
     feed_ethanol, recycle_ethanol  = M401_b.ins 
     feed, feed_DPHP, recycle_DPHP = all_ins = M401.ins[0:3] # yes, M401
     tot_mass = sum([i.F_mass - i.imass['DPHP'] - i.imass['Ethanol'] for i in all_ins])
@@ -353,7 +390,7 @@ S402 = bst.units.MultiStageMixerSettlers('S402', ins = (M401_P_H-0, M401_b-0),
         N_stages = 5)
 
 def adjust_S402_split():
-    M401_b.specification()
+    M401_b.run()
     S402._run()
 
     
@@ -817,15 +854,24 @@ CWP = facilities.CWP('CWP', ins='return_chilled_water',
                      outs='process_chilled_water')
 
 # M505-0 is the liquid/solid mixture, R501-0 is the biogas, blowdown is discharged
-BT = facilities.BT('BT', ins=(M505-0, R501-0, 
-                                          FGD_lime, boiler_chems,
-                                          baghouse_bag, natural_gas,
-                                          'BT_makeup_water'),
-                                B_eff=0.8, TG_eff=0.85,
-                                combustibles=combustibles,
-                                side_streams_to_heat=(water_M201, water_M202, steam_M203),
-                                outs=('gas_emission', ash, 'boiler_blowdown_water'))
+# BT = facilities.BT('BT', ins=(M505-0, R501-0, 
+#                                           FGD_lime, boiler_chems,
+#                                           baghouse_bag, natural_gas,
+#                                           'BT_makeup_water'),
+#                                 B_eff=0.8, TG_eff=0.85,
+#                                 combustibles=combustibles,
+#                                 side_streams_to_heat=(water_M201, water_M202, water_M203),
+#                                 outs=('gas_emission', ash, 'boiler_blowdown_water'))
 
+BT = bst.facilities.BoilerTurbogenerator('BT',
+                                                  ins=(M505-0,
+                                                      R501-0, 
+                                                      'boiler_makeup_water',
+                                                      'natural_gas',
+                                                      'lime',
+                                                      'boilerchems'), 
+                                                  outs=('gas_emission', 'boiler_blowdown_water', ash,),
+                                                  turbogenerator_efficiency=0.85)
 
 # BT = bst.BDunits.BoilerTurbogenerator('BT',
 #                                    ins=(M505-0, R501-0, 'boiler_makeup_water', 'natural_gas', FGD_lime, boiler_chems),
@@ -839,7 +885,7 @@ CT = facilities.CT('CT', ins=('return_cooling_water', cooling_tower_chems,
 
 # All water used in the system, here only consider water usage,
 # if heating needed, then heeating duty required is considered in BT
-process_water_streams = (water_M201, water_M202, steam_M203, water_M205, 
+process_water_streams = (water_M201, water_M202, water_M203, water_M205, 
                          enzyme_water,
                          aerobic_caustic, 
                          CIP.ins[-1], BT.ins[-1], CT.ins[-1])
@@ -987,7 +1033,26 @@ BT_tea.labor_cost = 0
 BT_tea.depreciation = 'MACRS20'
 BT_tea.OSBL_units = (BT,)
 
-BDO_tea = bst.CombinedTEA([BDO_no_BT_tea, BT_tea], IRR=0.10)
+# BDO_tea = bst.CombinedTEA([BDO_no_BT_tea, BT_tea], IRR=0.10)
+BDO_tea = CellulosicEthanolTEA(system=BDO_sys, IRR=0.10, duration=(2016, 2046),
+        depreciation='MACRS7', income_tax=0.21, operating_days=0.9*365,
+        lang_factor=None, construction_schedule=(0.08, 0.60, 0.32),
+        startup_months=3, startup_FOCfrac=1, startup_salesfrac=0.5,
+        startup_VOCfrac=0.75, WC_over_FCI=0.05,
+        finance_interest=0.08, finance_years=10, finance_fraction=0.4,
+        # biosteam Splitters and Mixers have no cost, 
+        # cost of all wastewater treatment units are included in WWT_cost,
+        # BT is not included in this TEA
+        OSBL_units=(U101, WWT_cost,
+                    T601, T602, T603, T604, T604_P, T605, T605_P, T606, T606_P, T607,
+                    CWP, CT, PWC, CIP, ADP, FWT),
+        warehouse=0.04, site_development=0.09, additional_piping=0.045,
+        proratable_costs=0.10, field_expenses=0.10, construction=0.20,
+        contingency=0.10, other_indirect_costs=0.10, 
+        labor_cost=3212962*get_flow_tpd()/2205,
+        labor_burden=0.90, property_insurance=0.007, maintenance=0.03,
+        steam_power_depreciation='MACRS20', boiler_turbogenerator=BT)
+
 BDO_sys._TEA = BDO_tea
 
 # %% 
@@ -1006,7 +1071,7 @@ def get_MEK_MPSP():
     BDO_sys.simulate()
     
     for i in range(3):
-        MEK.price = BDO_tea.solve_price(MEK, BDO_no_BT_tea)
+        MEK.price = BDO_tea.solve_price(MEK)
     return MEK.price
 
 # get_MEK_MPSP()

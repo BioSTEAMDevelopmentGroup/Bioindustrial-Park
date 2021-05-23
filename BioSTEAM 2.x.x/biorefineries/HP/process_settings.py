@@ -149,7 +149,7 @@ Octanol_price = 1.05
 Butyl_acetate_price = 0.75
 
 # https://www.alibaba.com/product-detail/1-hexanol-cas-111-27-3_1600063760860.html?spm=a2700.galleryofferlist.normal_offer.d_title.16b44add1yPF8c
-Hexanol_price = 500 /_kg_per_ton
+Hexanol_price = 500. /_kg_per_ton
 
 # https://www.alibaba.com/product-detail/1-6-Hexanediol-99-5-1_1600163052618.html?spm=a2700.galleryofferlist.normal_offer.d_title.4f596babnJcGBc
 Hexanediol_price = 2.9

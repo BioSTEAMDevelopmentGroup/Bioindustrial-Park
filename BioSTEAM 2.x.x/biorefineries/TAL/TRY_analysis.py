@@ -18,10 +18,11 @@ import biosteam as bst
 from biosteam.utils import colors
 from matplotlib.ticker import AutoMinorLocator as AML
 
-# from TAL.system import TAL_sys, TAL_tea, R302, spec
-# from TAL.system import MEK as product
-from TAL.system import TAL_sys, TAL_tea, R302, spec, get_GWP, get_non_bio_GWP, get_FEC, get_SPED
-from TAL.system import SA as product
+# from TAL.system_split import TAL_sys, TAL_tea, R302, spec
+# from TAL.system_split import MEK as product
+from TAL.system_split import TAL_sys, TAL_tea, R302, spec
+# get_GWP, get_non_bio_GWP, get_FEC, get_SPED
+from TAL.system_split import SA as product
 
 from matplotlib import pyplot as plt
 from  matplotlib.colors import LinearSegmentedColormap
@@ -291,23 +292,23 @@ TAL_metrics = [get_SA_MPSP, get_TAL_sugars_conc, get_TAL_inhibitors_conc]
 # TAL_metrics = [get_TAL_MPSP, get_GWP, get_FEC]
 
 # %% Generate 3-specification meshgrid and set specification loading functions
-steps = 20
+steps = 8
 
 # Yield, titer, productivity (rate)
-spec_1 = np.linspace(0.2,0.99, steps) # yield
-spec_2 = np.linspace(20, 100, steps) # titer
+spec_1 = np.linspace(0.15, 0.95, steps) # yield
+spec_2 = np.linspace(10, 100, steps) # titer
 # spec_1 = np.linspace(0.2, 0.99, steps) # yield
 # spec_2 = np.linspace(45, 225, steps) # titer
-spec_3 = np.array([0.2, 5.]) # productivity
+spec_3 = np.array([1.,]) # productivity
 spec.load_spec_1 = spec.load_yield
 spec.load_spec_2 = spec.load_titer
 spec.load_spec_3 = spec.load_productivity
 xlabel = "Yield"
 ylabel = 'Titer [$\mathrm{g} \cdot \mathrm{L}^{-1}$]'
 # xticks = [0.33, 0.66, 0.99]
-xticks = [0.2, 0.4, 0.6, 0.8, 1.0]
+xticks = [0.0, 0.2, 0.4, 0.6, 0.8, 1.0]
 # yticks = [75, 150, 225]
-yticks = [20, 30, 40, 50, 60, 70, 80, 90, 100]
+yticks = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100]
 # xticks = [0.2, 0.6, 0.99]
 # yticks = [45, 135, 225]
 spec_3_units = "$\mathrm{g} \cdot \mathrm{L}^{-1} \cdot \mathrm{hr}^{-1}$"
@@ -662,7 +663,7 @@ Metric_3_tickmarks = tickmarks(
 
 # Metric_3_tickmarks = [0.0*1000, 0.24*1000, 0.48*1000, 0.72*1000, 0.96*1000, 1.2*1000]
 
-Metric_1_tickmarks = [3000, 4500, 6000, 7500, 9000, 10500, 12000, 13500]
+# Metric_1_tickmarks = [3000, 4500, 6000, 7500, 9000, 10500, 12000, 13500]
 # Metric_1_tickmarks = [2000, 2500, 3000, 3500, 4000, 4500]
 # Metric_2_tickmarks = [4, 5, 6, 7, 8, 9, 10]
 Metric_2_tickmarks = [0, 50, 100, 150, 200, 250, 300]

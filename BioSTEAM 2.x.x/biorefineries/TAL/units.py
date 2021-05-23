@@ -67,7 +67,7 @@ class SulfuricAcidAdditionTank(Unit):
     _N_ins = 1
     _N_outs = 1
     
-    # Baseline is (18+4.1) mg/g dry biomass as in Humbird et al., 93% purity
+    # Bseline is (18+4.1) mg/g dry biomass as in Humbird et al., 93% purity
     acid_loading = 22.1
 
     def __init__(self, ID='', ins=None, outs=(), *, feedstock_dry_mass):
@@ -86,32 +86,36 @@ class SulfuricAcidMixer(Unit):
     _N_ins = 2
     _N_outs = 1
     _graphics = Mixer._graphics
-    
+        
     def _run(self):
         acid, water = self.ins
         mixture = self.outs[0]
+        
         # 0.05 is from 1842/36629 from streams 710 and 516 of Humbird et al.
-        water.imass['Water'] = acid.imass['SulfuricAcid'] / 0.05
+        # water.imass['Water'] = acid.imass['SulfuricAcid'] / 0.05
+        # water adjustment currently implemented in H_M201.specification
+        
         mixture.mix_from([water, acid])
 
 # Adjust pretreatment water loading, 30% from Table 5 on Page 21 of Humbird et al.
 class PretreatmentMixer(Mixer):
-    _N_ins = 3
+    _N_ins = 4
     _N_outs = 1
     
     solid_loading = 0.3
         
     def _run(self):
-        feedstock, acid, water = self.ins
+        feedstock, acid, water, recycled_water = self.ins
         mixture_out = self.outs[0]
         
         mixture = feedstock.copy()
         mixture.mix_from([feedstock, acid])
         
-        total_mass = (mixture.F_mass-mixture.imass['Water'])/self.solid_loading
-        water.imass['Water'] = total_mass - mixture.F_mass
+        # total_mass = (mixture.F_mass-mixture.imass['Water'])/self.solid_loading
+        # water.imass['Water'] = total_mass - mixture.F_mass
+        # water adjustment currently implemented in H_M202.specification
         
-        mixture_out.mix_from([mixture, water])
+        mixture_out.mix_from([mixture, water, recycled_water])
 
 # Steam mixer
 class SteamMixer(Unit):
@@ -465,7 +469,7 @@ class Saccharification(Unit):
     
     #!!! This needs to be updated
     # Equals the split of saccharified slurry to seed train
-    inoculum_ratio = 0.07
+    inoculum_ratio = 0.0 # this ratio not used
     
     # CSL_loading = 10 # kg/m3
     
@@ -542,15 +546,15 @@ class CoFermentation(Unit):
 
         self.cofermentation_rxns = ParallelRxn([
         #      Reaction definition            Reactant    Conversion
-        Rxn('Glucose -> TAL',        'Glucose',   .5), 
+        Rxn('Glucose -> TAL',        'Glucose',   .25), 
         Rxn('Glucose -> VitaminA',               'Glucose',   0.1), # retinol
         Rxn('Glucose -> VitaminD2',               'Glucose',   0.1), # ergosterol
         Rxn('Glucose -> 6 FermMicrobe',       'Glucose',   0.1),
         
-        Rxn('Xylose -> TAL',       'Xylose',    0.5*0.8),
-        Rxn('Xylose -> VitaminA',       'Xylose',    0.1*0.8),
-        Rxn('Xylose -> VitaminD2',       'Xylose',    0.1*0.8),
-        Rxn('Xylose -> 5 FermMicrobe',        'Xylose',    0.1*0.8),
+        Rxn('Xylose -> TAL',       'Xylose',    0.25),
+        Rxn('Xylose -> VitaminA',       'Xylose',    0.1),
+        Rxn('Xylose -> VitaminD2',       'Xylose',    0.1),
+        Rxn('Xylose -> 5 FermMicrobe',        'Xylose',    0.1),
         ])
         
         # self.cofermentation_rxns = ParallelRxn([
@@ -565,7 +569,11 @@ class CoFermentation(Unit):
         # Rxn('Xylose -> VitaminD2',       'Xylose',    0.001*0.8),
         # Rxn('Xylose -> 5 FermMicrobe',        'Xylose',    0.00025*0.8),
         # ])
-                
+        
+        self.CO2_generation_rxns = ParallelRxn([
+            Rxn('Glucose -> 6CO2 + 6H2O', 'Glucose', 1.),
+            Rxn('Xylose -> 5CO2 + 5H2O', 'Xylose', 1.)])
+        
         self.glucose_to_TAL_rxn = self.cofermentation_rxns[0]
         self.xylose_to_TAL_rxn = self.cofermentation_rxns[4]
         
@@ -577,6 +585,9 @@ class CoFermentation(Unit):
         
         self.glucose_to_microbe_rxn = self.cofermentation_rxns[3]
         self.xylose_to_microbe_rxn = self.cofermentation_rxns[7]
+        
+        self.glucose_to_CO2_rxn = self.CO2_generation_rxns[0]
+        self.xylose_to_CO2_rxn = self.CO2_generation_rxns[1]
         
         # self.cofermentation_rxns[1].X = \
         #     max(0, 1- (.07 + self.cofermentation_rxns[0].X + self.cofermentation_rxns[2].X))
@@ -602,6 +613,9 @@ class CoFermentation(Unit):
         vapor.imol['CO2'] = effluent.imol['CO2']
         vapor.phase = 'g'
         
+        self.CO2_generation_rxns(effluent.mol)
+        
+        vapor = effluent.imol['CO2']
         effluent.imol['CO2'] = 0
         effluent.imass['CSL'] = 0
         
@@ -632,7 +646,7 @@ class CoFermentation(Unit):
       kW=59.656, cost=24300, S=43149, CE=CEPCI[2009], n=0.8, BM=2.3)
 class SeedTrain(Unit):
     _N_ins = 1
-    _N_outs = 1
+    _N_outs = 2
     _units= {'Seed fermenter size': 'kg',
              'Flow rate': 'kg/hr'}
     
@@ -948,7 +962,7 @@ class Reactor(Unit, PressureVessel, isabstract=True):
 #     _N_outs = 2
 #     _N_heat_utilities = 1
 
-#     _BM = {**Reactor._BM,
+#     _F_BM_default = {**Reactor._F_BM_default,
 #            'Heat exchangers': 3.17,
 #            'Amberlyst-15 catalyst': 1}
     
@@ -1585,7 +1599,7 @@ class HydrogenationReactor(Reactor):
     """
     _N_ins = 3
     _N_outs = 1
-    _BM = {**Reactor._BM,
+    _F_BM_default = {**Reactor._F_BM_default,
             'AuPd catalyst': 1}
     mcat_frac = 0.00001 # fraction of catalyst by weight in relation to the reactant (TAL)
     dehydration_rxns = ParallelRxn([
@@ -1618,7 +1632,7 @@ class DehydrationRingOpeningReactor(Reactor):
     """
     _N_ins = 2
     _N_outs = 1
-    _BM = {**Reactor._BM,
+    _F_BM_default = {**Reactor._F_BM_default,
             'RaneyNi catalyst': 1}
     mcat_frac = 0.01 # fraction of catalyst by weight in relation to the reactant (TAL)
     dehydration_rxns = ParallelRxn([
@@ -1650,7 +1664,7 @@ class HydrolysisReactor(Reactor):
     """
     _N_ins = 3
     _N_outs = 1
-    _BM = {**Reactor._BM,
+    _F_BM_default = {**Reactor._F_BM_default,
             'Amberlyst15 catalyst': 1}
     mcat_frac = 0.01 # fraction of catalyst by weight in relation to the reactant (TAL)
     dehydration_rxns = ParallelRxn([
@@ -1680,7 +1694,7 @@ class HydrolysisReactor(Reactor):
 class Crystallization_Decantation(Reactor):
     N_ins = 3
     _N_outs = 2
-    _BM = {**Reactor._BM}
+    _F_BM_default = {**Reactor._F_BM_default}
     dehydration_rxns = ParallelRxn([
             #   Reaction definition                                       Reactant   Conversion
             Rxn('KSA + HCl -> SA + KCl',         'KSA',   0.98)
@@ -1716,7 +1730,7 @@ class Crystallization_Decantation(Reactor):
 class HClKOHRecovery(Reactor):
     N_ins = 2
     _N_outs = 2
-    _BM = {**Reactor._BM}
+    _F_BM_default = {**Reactor._F_BM_default}
     dehydration_rxns = ParallelRxn([
             #   Reaction definition                                       Reactant   Conversion
             Rxn('KCl + H2O -> HCl + KOH',         'KCl',   1.)

@@ -230,8 +230,8 @@ for p in parameters:
     p_dist = p.distribution
     # import pdb
     # pdb.set_trace()
-    # [p_min], [p_max] = p_dist.lower.tolist(), p_dist.upper.tolist()
-    [p_min], [p_max] = p_dist.range()[0], p_dist.range()[1]
+    [p_min], [p_max] = p_dist.lower.tolist(), p_dist.upper.tolist()
+    # [p_min], [p_max] = p_dist.range()[0], p_dist.range()[1]
     p_baseline = p.baseline
     p_value = (p_min, p_max, p_baseline)
     p.system = HP_sys
