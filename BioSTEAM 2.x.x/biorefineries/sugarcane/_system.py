@@ -60,7 +60,7 @@ def create_bagasse_pelleting_system(ins, outs):
               total_flow=333334.2,
               units='kg/hr',
               price=0.03455)],
-    outs=[dict(ID='shreaded_cane')]
+    outs=[dict(ID='shredded_cane')]
 )
 def create_feedstock_handling_system(ins, outs):
     sugarcane, = ins
@@ -664,8 +664,7 @@ def create_sucrose_to_ethanol_system(ins, outs):
           dict(ID='emissions'),
           dict(ID='ash_disposal')]
 )
-def create_sugarcane_to_ethanol_system(ins, outs,
-    ):
+def create_sugarcane_to_ethanol_system(ins, outs):
     s = f.stream
     u = f.unit
     
@@ -716,5 +715,17 @@ def create_sugarcane_to_ethanol_system(ins, outs,
     F301 = u.F301
     D303 = u.D303
     HXN = bst.HeatExchangerNetwork('HXN', units=[F301, D303])
+    
+    # if vinasse_to_wastewater:
+    #     plant_air = bst.Stream('plant_air', N2=83333, units='kg/hr')
+    #     ADP = bst.facilities.AirDistributionPackage('ADP', plant_air)
+    #     @ADP.add_specification(run=True)
+    #     def adjust_plant_air():
+    #         plant_air.imass['N2'] = 0.8 * feedstock_handling_sys.ins[0].F_mass
+            
+    #     wastewater_treatment_sys = bst.create_wastewater_treatment_system(
+    #         ins=[vinasse],
+    #         mockup=True,
+    #     )
         
         
