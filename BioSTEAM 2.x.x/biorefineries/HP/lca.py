@@ -12,6 +12,7 @@ from copy import copy as copy_
 from numba import njit
 from math import floor
 from warnings import warn
+import thermosteam as tmo
 from thermosteam import Stream
 
 
@@ -150,6 +151,7 @@ class LCA:
         self.main_product = main_product
         
         self.FU_factor = 1. if FU==1. else 1.
+        tmo.settings.set_thermo(system_chemicals)
         self.LCA_stream = Stream('LCA_stream', units='kg/hr')
         
         self.has_turbogenerator = has_turbogenerator
@@ -188,7 +190,8 @@ class LCA:
     
     @property
     def material_GWP_array(self):
-        self.LCA_stream.mass = sum(i.mass for i in self.LCA_streams)
+        # self.LCA_stream.mass = sum(i.mass for i in self.LCA_streams)
+        self.LCA_stream.mix_from(self.LCA_streams)
         # chemical_GWP = self.LCA_stream.mass*CFs['self.GWP_CF_stream'].mass
         chemical_GWP = [self.LCA_stream.imass[ID] * self.GWP_CF_stream.imass[ID] for ID in self.chem_IDs]
         # feedstock_GWP = feedstock.F_mass*CFs['GWP_CFs']['Corn stover']
@@ -202,7 +205,8 @@ class LCA:
 
     @property
     def material_GWP_breakdown(self):
-        self.LCA_stream.mass = sum(i.mass for i in self.LCA_streams)
+        # self.LCA_stream.mass = sum(i.mass for i in self.LCA_streams)
+        self.LCA_stream.mix_from(self.LCA_streams)
         chemical_GWP_dict = {ID: self.LCA_stream.imass[ID] * self.GWP_CF_stream.imass[ID] / self.main_product.F_mass \
                              for ID in self.chem_IDs if not self.LCA_stream.imass[ID] * self.GWP_CF_stream.imass[ID] == 0.}
         return chemical_GWP_dict
@@ -389,7 +393,8 @@ class LCA:
     
     @property
     def material_FEC_array(self):
-        self.LCA_stream.mass = sum(i.mass for i in self.LCA_streams)
+        # self.LCA_stream.mass = sum(i.mass for i in self.LCA_streams)
+        self.LCA_stream.mix_from(self.LCA_streams)
         # chemical_FEC = self.LCA_stream.mass*CFs['FEC_CF_stream'].mass
         chemical_FEC = [self.LCA_stream.imass[ID] * self.FEC_CF_stream.imass[ID] for ID in self.chem_IDs]
         # feedstock_FEC = self.feedstock.F_mass*CFs['FEC_CFs']['Corn stover']
@@ -398,7 +403,8 @@ class LCA:
     
     @property
     def material_FEC_breakdown(self):
-        self.LCA_stream.mass = sum(i.mass for i in self.LCA_streams)
+        # self.LCA_stream.mass = sum(i.mass for i in self.LCA_streams)
+        self.LCA_stream.mix_from(self.LCA_streams)
         FEC_CF_stream = self.FEC_CF_stream
         chemical_FEC_dict = {ID: self.LCA_stream.imass[ID] * FEC_CF_stream.imass[ID] / self.main_product.F_mass \
                               for ID in self.chem_IDs if not self.LCA_stream.imass[ID] * FEC_CF_stream.imass[ID] == 0.}

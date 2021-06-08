@@ -61,6 +61,7 @@ from biorefineries.BDO.utils import find_split, splits_df, baseline_feedflow
 from biorefineries.BDO.chemicals_data import BDO_chemicals, chemical_groups, \
                                 soluble_organics, combustibles
 from biorefineries.BDO.tea import BDOTEA
+from biorefineries.HP.lca import LCA
 
 bst.speed_up()
 flowsheet = bst.Flowsheet('BDO')
@@ -83,6 +84,8 @@ tmo.settings.set_thermo(BDO_chemicals)
 # =============================================================================
 # Feedstock
 # =============================================================================
+
+feedstock_ID = 'Corn stover'
 
 feedstock = Stream('feedstock',
                     baseline_feedflow.copy(),
@@ -186,16 +189,35 @@ H201 = bst.units.HXutility('H201', ins=M204-0,
                                  V=0, rigorous=True)
 
 # Neutralize pretreatment hydrolysate
-M205 = units.AmmoniaMixer('M205', ins=(ammonia_M205, water_M205))
-def update_ammonia_and_mix():
-    hydrolysate = F201.outs[1]
-    # Load 10% extra
-    ammonia_M205.imol['NH4OH'] = (2*hydrolysate.imol['H2SO4']) * 1.1
-    M205._run()
-M205.specification = update_ammonia_and_mix
+# M205 = units.AmmoniaMixer('M205', ins=(ammonia_M205, water_M205))
 
-T204 = units.AmmoniaAdditionTank('T204', ins=(F201-1, M205-0))
-P201 = units.HydrolysatePump('P201', ins=T204-0)
+
+# def update_ammonia_and_mix():
+#     hydrolysate = F201.outs[1]
+#     # Load 10% extra
+#     ammonia_M205.imol['NH4OH'] = (2*hydrolysate.imol['H2SO4']) * 1.1
+#     M205._run()
+
+    
+# M205.specification = update_ammonia_and_mix
+
+T204 = units.LimeAdditionTank('T204', ins=(F201-1, ''))
+
+    
+@T204.add_specification(run=True)
+def update_lime_and_mix():
+    hydrolysate = F201.outs[1]
+    T204.ins[1].imol['CaO'] = hydrolysate.imol['H2SO4'] * 1.
+    # T204._run()
+# T204.specification = update_lime_and_mix
+
+gypsum_split={'CaSO4':1.}
+S201 = units.GypsumFilter('S201', ins=T204-0, outs=('gypsum', ''), split = gypsum_split,
+                          moisture_content=0.2)
+
+P201 = units.HydrolysatePump('P201', ins=S201-1)
+
+# R202 = units.AmmoniumSulfateNeutralizationTank('R202', ins = P201-0)
 
 
 # %% 
@@ -383,8 +405,11 @@ M401_b.specification = adjust_M401_b_ethanol
 S402 = bst.units.MultiStageMixerSettlers('S402', ins = (M401_P_H-0, M401_b-0),
                                          # model = 'partition_coefficients',
                                          partition_data={
-        'K': np.array([1/28.34, 1/0.046, 1/10000, 10000, 1/28.34, 1/0.046]),
-        'IDs': ('2,3-Butanediol', 'Glucose', 'Ethanol', 'Water', 'Acetoin', 'Xylose'),
+        'K': np.array([1/28.34, 1/0.046, 1/10000, 10000, 1/28.34, 1/0.046,
+                       1/0.046, 1/0.046, 1/0.046, 1/0.046, 1/0.046, 1/0.046, 1/0.046]),
+        'IDs': ('2,3-Butanediol', 'Glucose', 'Ethanol', 'Water', 'Acetoin', 'Xylose',
+                'GlucoseOligomer', 'Extract', 'XyloseOligomer', 'Arabinose', 'ArabinoseOligomer', 'SolubleLignin',
+                'Enzyme'),
         'phi' : 0.5,
         },
         N_stages = 5)
@@ -727,7 +752,7 @@ sulfuric_acid_fresh = Stream('sulfuric_acid_fresh',  price=price['Sulfuric acid'
 
 ammonia_fresh = Stream('ammonia_fresh', price=price['AmmoniumHydroxide'])
 CSL_fresh = Stream('CSL_fresh', price=price['CSL'])
-# lime_fresh = Stream('lime_fresh', price=price['Lime'])
+lime_fresh = Stream('lime_fresh', price=price['Lime'])
 
 # S401_out1_F_mass = S401.outs[1].F_mass
 
@@ -790,8 +815,10 @@ T601.line = 'Sulfuric acid storage tank'
 # T608-0-3-R401
 # T608.line = 'Tricalcium diphosphate storage tank'
 #
-T602 = units.AmmoniaStorageTank('T602', ins=ammonia_fresh, outs=ammonia_M205)
-T602.line = 'Ammonia storage tank'
+T602 = units.DPHPStorageTank('T602', ins=lime_fresh, outs='lime_T204')
+T602.line = 'Lime storage tank'
+
+T602-0-1-T204
 
 T603 = units.CSLstorageTank('T603', ins=CSL_fresh, outs=CSL)
 T603.line = 'CSL storage tank'
@@ -810,7 +837,6 @@ T605 = bst.units.StorageTank('T605', ins=ethanol_fresh,
                                      vessel_material='Carbon steel')
 T605.line = 'Ethanol storage tank'
 T605_P = units.BDOPump('T605_P', ins=T605-0)
-
 
 
 # Connections to ATPE Mixer
@@ -986,11 +1012,6 @@ BDO_sys = bst.main_flowsheet.create_system(
 BT_sys = System('BT_sys', path=(BT,))
 
 
-TEA_feeds = set([i for i in BDO_sys.feeds if i.price]+ \
-    [i for i in BT_sys.feeds if i.price])
-
-TEA_products = set([i for i in BDO_sys.products if i.price]+ \
-    [i for i in BT_sys.products if i.price]+[MEK])
 # %%
 # =============================================================================
 # TEA
@@ -1067,6 +1088,13 @@ BDO_sys._TEA = BDO_tea
 #         BDO.price = BDO_tea.solve_price(BDO, BDO_no_BT_tea)
 #     return BDO.price
 
+
+TEA_feeds = set([i for i in BDO_sys.feeds if i.price]+ \
+    [i for i in BT_sys.feeds if i.price])
+
+TEA_products = set([i for i in BDO_sys.products if i.price]+ \
+    [i for i in BT_sys.products if i.price]+[MEK])
+    
 def get_MEK_MPSP():
     BDO_sys.simulate()
     
@@ -1085,9 +1113,9 @@ spec = ProcessSpecification(
     reaction_name='fermentation_reaction',
     substrates=('Xylose', 'Glucose'),
     products=('BDO',),
-    spec_1=100,
-    spec_2=0.909,
-    spec_3=18.5,
+    spec_1=0.8,
+    spec_2=109.9,
+    spec_3=1.,
     path = (M304_H, M304_H_P),
     xylose_utilization_fraction = 0.80,
     feedstock = feedstock,
@@ -1170,15 +1198,17 @@ get_FEC = lambda: get_material_FEC()+get_electricity_FEC() - get_Isobutanol_FEC(
 get_SPED = lambda: BT.system_heating_demand*0.001/MEK.F_mass
 MEK_LHV = 31.45 # MJ/kg MEK
 
+BDO_lca = LCA(BDO_sys, BDO_chemicals, CFs, feedstock, 'Corn stover', MEK, [CT, CWP])
+
 # %% Full analysis
 def simulate_and_print():
     get_MEK_MPSP()
     print('\n---------- Simulation Results ----------')
     print(f'MPSP is ${get_MEK_MPSP():.3f}/kg')
-    print(f'GWP is {get_GWP():.3f} kg CO2-eq/kg MEK')
-    print(f'Non-bio GWP is {get_non_bio_GWP():.3f} kg CO2-eq/kg MEK')
-    print(f'FEC is {get_FEC():.2f} MJ/kg MEK or {get_FEC()/MEK_LHV:.2f} MJ/MJ MEK')
-    print(f'SPED is {get_SPED():.2f} MJ/kg MEK or {get_SPED()/MEK_LHV:.2f} MJ/MJ MEK')
+    print(f'GWP is {BDO_lca.GWP:.3f} kg CO2-eq/kg MEK')
+    # print(f'Non-bio GWP is {():.3f} kg CO2-eq/kg MEK')
+    print(f'FEC is {BDO_lca.FEC:.2f} MJ/kg MEK or {get_FEC()/MEK_LHV:.2f} MJ/MJ MEK')
+    # print(f'SPED is {get_SPED():.2f} MJ/kg MEK or {get_SPED()/MEK_LHV:.2f} MJ/MJ MEK')
     print('--------------------\n')
 
 simulate_and_print()

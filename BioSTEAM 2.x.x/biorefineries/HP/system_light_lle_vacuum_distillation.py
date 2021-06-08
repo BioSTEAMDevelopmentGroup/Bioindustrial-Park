@@ -37,6 +37,7 @@ import biosteam as bst
 import thermosteam as tmo
 import flexsolve as flx
 import numpy as np
+from numba import njit
 from biosteam import main_flowsheet as F
 from biosteam.process_tools import BoundedNumericalSpecification
 from biosteam import System
@@ -681,6 +682,10 @@ def create_HP_sys(ins, outs):
     
     def get_mass_percent(chem_ID, stream):
         return stream.imass[chem_ID]/stream.F_mass
+    
+    @njit(cache=True)
+    def mass_percent_helper(chemmass, totmass):
+        return chemmass/totmass
     
     M402 = bst.units.Mixer('M402', ins=(D401-1,
                                         'dilution_water2'))
