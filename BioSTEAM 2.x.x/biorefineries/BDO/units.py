@@ -288,6 +288,19 @@ class AmmoniaAdditionTank(MixTank):
         MixTank._run(self)   
         self.neutralization_rxn.adiabatic_reaction(self.outs[0])
 
+@cost(basis='Flow rate', ID='Tank', units='kg/hr',
+      cost=236000, S=410369, CE=CEPCI[2009], n=0.7, BM=2)
+@cost(basis='Flow rate', ID='Agitator', units='kg/hr',
+      kW=7.457, cost=21900, S=410369, CE=CEPCI[2009], n=0.5, BM=1.5)
+class LimeAdditionTank(MixTank):
+    def _run(self):
+        #                                      Reaction definition      Reactant Conversion
+        self.neutralization_rxn = Rxn('CaO + H2SO4 -> CaSO4 + H2O', 'H2SO4', 1)
+        
+        MixTank._run(self)   
+        self.neutralization_rxn.adiabatic_reaction(self.outs[0])
+
+
 @cost(basis='Flow rate', ID='Pump', units='kg/hr',
       kW=74.57, cost=22500, S=402194, CE=CEPCI[2009], n=0.8, BM=2.3)
 class HydrolysatePump(Unit):
@@ -885,23 +898,23 @@ class Reactor(Unit, PressureVessel, isabstract=True):
 #         rxns.adiabatic_reaction(effluent)
         
 # # Filter to separate gypsum from the acidified fermentation broth
-# @cost(basis='Feed flow rate', ID='Hydroclone & rotary drum filter', units='kg/hr',
-#       # Size based on stream 239 in Aden et al.,
-#       # no power as Centrifuge in AerobicDigestion in Humbird et al. has no power
-#       cost=187567, S=272342, CE=389.5, n=0.39, BM=1.4)
-# @cost(basis='Filtrate flow rate', ID='Filtered hydrolysate pump', units='kg/hr',
-#       # Size based on stream 230 in Aden et al.,
-#       # power based on SaccharificationAndCoFermentation Filtrate Saccharification transfer pumps
-#       kW=74.57*265125/421776, cost=31862, S=265125, CE=386.5, n=0.79, BM=2.8)
-# class GypsumFilter(SolidsSeparator):
-#     _N_ins = 1
-#     _units = {'Feed flow rate': 'kg/hr',
-#               'Filtrate flow rate': 'kg/hr'}
+@cost(basis='Feed flow rate', ID='Hydroclone & rotary drum filter', units='kg/hr',
+      # Size based on stream 239 in Aden et al.,
+      # no power as Centrifuge in AerobicDigestion in Humbird et al. has no power
+      cost=187567, S=272342, CE=389.5, n=0.39, BM=1.4)
+@cost(basis='Filtrate flow rate', ID='Filtered hydrolysate pump', units='kg/hr',
+      # Size based on stream 230 in Aden et al.,
+      # power based on SaccharificationAndCoFermentation Filtrate Saccharification transfer pumps
+      kW=74.57*265125/421776, cost=31862, S=265125, CE=386.5, n=0.79, BM=2.8)
+class GypsumFilter(SolidsSeparator):
+    _N_ins = 1
+    _units = {'Feed flow rate': 'kg/hr',
+              'Filtrate flow rate': 'kg/hr'}
     
-#     def _design(self):
-#         Design = self.design_results
-#         Design['Feed flow rate'] = self.ins[0].F_mass
-#         Design['Filtrate flow rate'] = self.outs[1].F_mass
+    def _design(self):
+        Design = self.design_results
+        Design['Feed flow rate'] = self.ins[0].F_mass
+        Design['Filtrate flow rate'] = self.outs[1].F_mass
 
 # class Esterification(Reactor):
 #     """

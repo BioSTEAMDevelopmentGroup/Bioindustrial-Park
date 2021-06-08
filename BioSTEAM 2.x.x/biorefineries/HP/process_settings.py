@@ -199,8 +199,8 @@ price = {'AA': AA_price,
     
 
 def load_process_settings():
-    from biorefineries import cornstover as cs
-    cs.load_process_settings()
+    # from biorefineries import cornstover as cs
+    # cs.load_process_settings()
     # tmo.settings.set_thermo(chems)
     bst.CE = 541.7 # year 2016
     bst.PowerUtility.price = price['Electricity']
@@ -281,6 +281,9 @@ GWP_CF_array = chems.kwarray(GWP_CFs)
 
 
 # In kg CO2-eq/kg of material
+# print(tmo.settings.get_thermo())
+# import pdb
+# pdb.set_trace()
 GWP_CF_stream = tmo.Stream('GWP_CF_stream', GWP_CF_array, units='kg/hr')
 
 

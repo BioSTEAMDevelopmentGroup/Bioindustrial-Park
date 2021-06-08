@@ -188,7 +188,7 @@ LCA_percentiles = LCA_results.quantile(q=percentiles)
 
 # Spearman's rank correlation
 spearman_metrics = model.metrics[0:3] + model.metrics[6:8] + \
-    (model.metrics[-25],) + (model.metrics[-24],)
+    (model.metrics[-34],) + (model.metrics[-33],)
     # model.metrics[models.index_IRR:models.index_IRR+2]
     
 model.table = model.table.dropna()

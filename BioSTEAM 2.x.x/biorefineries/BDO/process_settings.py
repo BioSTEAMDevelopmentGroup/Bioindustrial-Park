@@ -231,7 +231,7 @@ GWP_CF_array = chems.kwarray(GWP_CFs)
 # In kg CO2-eq/kg of material
 GWP_CF_stream = tmo.Stream('GWP_CF_stream', GWP_CF_array, units='kg/hr')
 
-GWP_CFs['Corn stover'] = 44.70/1e3 * 0.8
+GWP_CFs['FGHTP Corn stover'] = 44.70/1e3 * 0.8
 GWP_CFs['Switchgrass'] = 87.81/1e3 * 0.8
 GWP_CFs['Miscanthus'] = 78.28/1e3 * 0.8
 GWP_CFs['CaCO3'] = 10.30/1e3
@@ -270,7 +270,7 @@ FEC_CF_array = chems.kwarray(FEC_CFs)
 # In MJ/kg of material
 FEC_CF_stream = tmo.Stream('FEC_CF_stream', FEC_CF_array, units='kg/hr')
 
-FEC_CFs['Corn stover'] = 688.60/1e3 * 0.8
+FEC_CFs['FGHTP Corn stover'] = 688.60/1e3 * 0.8
 FEC_CFs['Switchgrass'] = 892.41/1e3 * 0.8
 FEC_CFs['Miscanthus'] = 569.05/1e3 * 0.8
 FEC_CFs['CaCO3'] = 133.19/1e3

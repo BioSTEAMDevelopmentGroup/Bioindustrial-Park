@@ -37,6 +37,7 @@ import biosteam as bst
 import thermosteam as tmo
 import flexsolve as flx
 import numpy as np
+from numba import njit
 from biosteam import main_flowsheet as F
 from biosteam.process_tools import BoundedNumericalSpecification
 from biosteam import System
@@ -682,6 +683,10 @@ def create_HP_sys(ins, outs):
     def get_mass_percent(chem_ID, stream):
         return stream.imass[chem_ID]/stream.F_mass
     
+    @njit(cache=True)
+    def mass_percent_helper(chemmass, totmass):
+        return chemmass/totmass
+    
     M402 = bst.units.Mixer('M402', ins=(D401-1,
                                         'dilution_water2'))
     
@@ -982,7 +987,9 @@ def create_HP_sys(ins, outs):
     
     #!!! M304_H uses chilled water, thus requiring CWP
     CWP = facilities.CWP('CWP', ins='return_chilled_water',
-                         outs='process_chilled_water')
+                          outs='process_chilled_water')
+    
+    # CWP = bst.facilities.ChilledWaterPackage('CWP')
     
     # M505-0 is the liquid/solid mixture, R501-0 is the biogas, blowdown is discharged
     # BT = facilities.BT('BT', ins=(M505-0, R501-0, 
@@ -1216,7 +1223,7 @@ spec = ProcessSpecification(
     byproduct_streams = [],
     HXN = u.HXN,
     # pre_conversion_units = process_groups_dict['feedstock_group'].units + process_groups_dict['pretreatment_group'].units + [u.H301],
-    pre_conversion_units = HP_sys.split(F301.ins[0])[0],
+    pre_conversion_units = HP_sys.split(u.F301.ins[0])[0],
     baseline_titer = 54.8,
     feedstock_mass = feedstock.F_mass,
     pretreatment_reactor = u.R201)
@@ -1401,7 +1408,7 @@ HP_sub_sys = {
 # %%
 
 # =============================================================================
-# Life cycle analysis (LCA), waste disposal emission not included
+# Life cycle analysis (LCA), waste emission C assumed to be entirely CO2
 # =============================================================================
 
 TEA_feeds = set([i for i in HP_sys.feeds if i.price]+ \
