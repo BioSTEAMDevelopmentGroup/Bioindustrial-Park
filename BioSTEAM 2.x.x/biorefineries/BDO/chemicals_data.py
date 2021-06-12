@@ -21,6 +21,7 @@ All units are explicitly defined here for transparency and easy reference
 import thermosteam as tmo
 from thermosteam import functional as fn
 from biorefineries import sugarcane as sc
+from chemicals import Antoine_AB_coeffs_from_point
 
 __all__ = ('BDO_chemicals', 'chemical_groups', 'soluble_organics', 'combustibles')
 
@@ -146,6 +147,22 @@ BDO = chemical_database('2,3-Butanediol')
 
 MEK = chemical_database('MEK')
 
+OleylAlcohol = chemical_database('OleylAlcohol', search_ID='143-28-2')
+# Tb 195 °C at 8 mm Hg; 182-184 °C at 1.5 mm Hg; 9.3X10-5 mm Hg at 25 °C
+# dPdT = 133.322 * (8 - 1.5)  / (195 - 183)
+# T = 195 + 273.15
+# P = 8 * 133.322
+# A, B = Antoine_AB_coeffs_from_point(T, P, dPdT)
+# C = 0
+# OleylAlcohol.Psat.add_model(tmo.functors.Antoine(A, B, C), Tmax=OleylAlcohol.Tc)
+# OleylAlcohol.Tb = OleylAlcohol.Tsat(101325)
+from thermo import Chemical as TChemical
+Octyldodecanol = TChemical('Octyldodecanol')
+OleylAlcohol.Psat.add_model(Octyldodecanol.VaporPressure, Tmax=OleylAlcohol.Tc)
+OleylAlcohol.Tb = OleylAlcohol.Tsat(101325)
+OleylAlcohol.mu.l.add_model(Octyldodecanol.ViscosityLiquid)
+OleylAlcohol.mu.g.add_model(Octyldodecanol.ViscosityGas)
+OleylAlcohol.sigma.add_model(Octyldodecanol.SurfaceTension)
 IBA = chemical_database('Isobutyraldehyde')
 IB = chemical_database('Isobutanol')
 DPHP = chemical_database('Dipotassium hydrogen phosphate', phase = 'l')
@@ -453,7 +470,6 @@ chems.set_synonym('Na2SO4', 'SodiumSulfate')
 chems.set_synonym('AmmoniumHydroxide', 'NH4OH')
 chems.set_synonym('Isobutyraldehyde', 'IBA')
 
-# %%
-
+# %% 
 # from BDO.utils import get_chemical_properties	
 # get_chemical_properties(chems, 400, 101325, output=True)

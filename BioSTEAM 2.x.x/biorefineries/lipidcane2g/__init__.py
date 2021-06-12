@@ -121,6 +121,18 @@ MFPP, TCI, ethanol_production, biodiesel_production = metric_mockups = (
     bst.Variable('Biodiesel production', 'MMGal/yr', 'Biorefinery'),
 )
 
+all_metric_mockups = (
+    MFPP,
+    biodiesel_production,
+    ethanol_production,
+    bst.Variable('Electricity production', 'MMWhr/yr', 'Biorefinery'),
+    bst.Variable('Natural gas consumption', 'MMcf/yr', 'Biorefinery'),
+    bst.Variable('Productivity', 'MMcf/yr', 'Biorefinery'),
+    TCI,
+    bst.Variable('Heat exchanger network error', 'MMGGE/yr', 'Biorefinery'),
+)
+
+
 def asconfiguration(x):
     number, agile = x
     return Configuration(int(number), bool(agile))
@@ -304,12 +316,13 @@ def load(name, cache={}):
                 lipidcane.F_mass = F_mass_original
                 np.testing.assert_allclose(get_lipid_fraction(lipidcane), lipid_content)
                 
-        lipidcane_tea = create_agile_tea(lipidcane_sys.units)        
+        lipidcane_tea = create_agile_tea(lipidcane_sys.units)      
         lipidcane_sys = AgileLipidcaneSystem(lipidcane_sys, [0, 1], [200 * 24, 60 * 24],
                                              tea=lipidcane_tea)
     else:
         lipidcane_tea = create_tea(lipidcane_sys)
         lipidcane_sys.operating_hours = 24 * 200
+    lipidcane_tea.income_tax = 0.21 # Davis et al. 2018; https://www.nrel.gov/docs/fy19osti/71949.pdf
     feedstocks = [lipidcane]
     
     ## Specification for analysis
@@ -500,11 +513,11 @@ def load(name, cache={}):
         lipidcane_tea.IRR = 0.10
 
 def evaluate_configurations_across_extraction_efficiency_and_lipid_content(
-        efficiency, lipid_content, lipid_retention, agile, configurations, metrics,
+        efficiency, lipid_content, lipid_retention, agile, configurations,
     ):
     A = len(agile)
     C = len(configurations)
-    M = len(metrics)
+    M = 8
     data = np.zeros([A, C, M])
     for ia in range(A):
         for ic in range(C):    
@@ -515,13 +528,13 @@ def evaluate_configurations_across_extraction_efficiency_and_lipid_content(
                 lipid_retention=lipid_retention
             )
             lipid_extraction_specification.system.simulate()
-            data[ia, ic, :] = [j() for j in metrics]
+            data[ia, ic, :] = [j() for j in model.metrics]
     return data
 
 evaluate_configurations_across_extraction_efficiency_and_lipid_content = np.vectorize(
     evaluate_configurations_across_extraction_efficiency_and_lipid_content, 
-    excluded=['agile', 'configurations', 'metrics'],
-    signature='(),(),(),(a),(c),(m)->(a,c,m)'
+    excluded=['agile', 'configurations'],
+    signature='(),(),(),(a),(c)->(a,c,8)'
 )       
 
 def evaluate_across_ethanol_and_biodiesel_prices(ethanol_price, biodiesel_price):

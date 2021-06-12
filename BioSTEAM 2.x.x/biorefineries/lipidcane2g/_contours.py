@@ -58,7 +58,7 @@ colormaps = [
     plt.cm.get_cmap('inferno_r'),
     plt.cm.get_cmap('copper_r'),
     plt.cm.get_cmap('bone_r'),
-]
+] * 2
 
 def plot_ethanol_and_biodiesel_price_contours(N=30):
     ethanol_price = np.linspace(1., 3., N)
@@ -103,23 +103,21 @@ def plot_ethanol_and_biodiesel_price_contours(N=30):
     
 def plot_extraction_efficiency_and_lipid_content_contours(load=False, metric_index=0):
     # Generate contour data
-    x = np.linspace(0.3, 1., 20)
-    y = np.linspace(0.05, 0.15, 20)
+    x = np.linspace(0.4, 1., 10)
+    y = np.linspace(0.05, 0.15, 10)
     X, Y = np.meshgrid(x, y)
     # dollar_per_mt = format_units(r'\$/MT')
     metric = bst.metric
     kg_per_ton = 907.18474
     
     # NG = None
-    @metric(units=format_units(r'$/ton'))
-    def MFPP():
-        return kg_per_ton * lc.lipidcane_tea.solve_price(lc.lipidcane)
+    # @metric(units=format_units(r'$/ton'))
+    # def MFPP():
+    #     return kg_per_ton * lc.lipidcane_tea.solve_price(lc.lipidcane)
 
-    @metric(units=format_units(r'10^6*$'))
-    def TCI():
-        return lc.lipidcane_tea.TCI / 1e6 # 10^6*$
-    
-    metrics = [MFPP, TCI]
+    # @metric(units=format_units(r'10^6*$'))
+    # def TCI():
+    #     return lc.lipidcane_tea.TCI / 1e6 # 10^6*$
     folder = os.path.dirname(__file__)
     file = 'lipid_extraction_analysis.npy'
     file = os.path.join(folder, file)
@@ -129,7 +127,7 @@ def plot_extraction_efficiency_and_lipid_content_contours(load=False, metric_ind
         data = np.load(file)
     else:
         data = lc.evaluate_configurations_across_extraction_efficiency_and_lipid_content(
-            X, Y, 0.875, agile, configurations, metrics
+            X, Y, 0.875, agile, configurations, 
         )
     np.save(file, data)
     data = data[:, :, :, :, metric_index]
@@ -139,10 +137,10 @@ def plot_extraction_efficiency_and_lipid_content_contours(load=False, metric_ind
     ylabel = "Lipid content [dry wt. %]"
     ylabels = [f'Lipid-cane only\n{ylabel}',
                f'Lipid-cane & lipid-sorghum\n{ylabel}']
-    xticks = [30, 40, 60, 80, 100]
+    xticks = [40, 60, 80, 100]
     yticks = [5, 7.5, 10, 12.5, 15]
-    metric = metrics[metric_index]
-    metric_bar = MetricBar(metric.name, metric.units, colormaps[metric_index], tickmarks(data, 5, 5), 18)
+    metric = lc.all_metric_mockups[metric_index]
+    metric_bar = MetricBar(metric.name, format_units(metric.units), colormaps[metric_index], tickmarks(data, 5, 5), 18)
     fig, axes, CSs, CB = plot_contour_single_metric(
         100.*X, 100.*Y, data, xlabel, ylabels, xticks, yticks, metric_bar, 
         fillblack=False, styleaxiskw=dict(xtick0=False), label=True,

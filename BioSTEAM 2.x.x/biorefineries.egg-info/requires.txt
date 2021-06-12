@@ -1,1 +1,1 @@
-biosteam>=2.29.0
+biosteam>=2.29.1

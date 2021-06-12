@@ -631,7 +631,7 @@ class CoFermentation_original(Unit):
       kW=59.656, cost=24300, S=43149, CE=CEPCI[2009], n=0.8, BM=2.3)
 class SeedTrain(Unit):
     _N_ins = 1
-    _N_outs = 1
+    _N_outs = 2
     _units= {'Seed fermenter size': 'kg',
              'Flow rate': 'kg/hr'}
     
@@ -658,12 +658,13 @@ class SeedTrain(Unit):
 
     def _run(self):
         feed = self.ins[0]
-        effluent = self.outs[0]
+        effluent, vent = self.outs
         effluent.copy_like(feed)
 
         self.cofermentation_rxns(effluent.mol)
+        vent.copy_flow(effluent, 'CO2', remove=True)
         # Assume all CSL is used up
-        effluent.imass['CSL'] = 0 
+        effluent.imol['CSL'] = 0 
         
         effluent.T = self.T
 
@@ -1636,40 +1637,23 @@ class CoFermentation(Reactor):
 
     def _run(self):
         
-        sugars, feed, CSL = self.ins
+        *feeds, CSL = self.ins
         
         effluent, vapor = self.outs
-        effluent.mix_from([feed, sugars])
+        effluent.mix_from(feeds)
         
-        # ss = Stream(None)
-        # effluent.copy_like(feed)
         effluent.T = vapor.T = self.T
-        CSL.imass['CSL'] = (sugars.F_vol + feed.F_vol) * self.CSL_loading 
+        CSL.imass['CSL'] = sum([i.F_vol for i in feeds]) * self.CSL_loading 
         
         self.cofermentation_rxns(effluent.mol)
-        vapor.imol['CO2'] = effluent.imol['CO2']
         vapor.phase = 'g'
-        
-        effluent.imol['CO2'] = 0
+        vapor.copy_flow(effluent, 'CO2', remove=True)
         effluent.imass['CSL'] = 0
         
         mixed_feed = self.mixed_feed
-        mixed_feed.mix_from([feed, sugars, CSL])
+        mixed_feed.mix_from(self.ins)
         
-        # Need lime to neutralize produced acid
-        # if self.neutralization:
-        #     self.vessel_material= 'Stainless steel 304'
-        #     # Set feed lime mol to match rate of acids production, add 10% extra
-        #     lime.imol['Lime'] = (effluent.imol['BDO']/2/self.neutralization_rxns.X[0]) * 1.1
-        #                         # +effluent.imol['AceticAcid']/2/self.neutralization_rxns.X[1] \
-        #                         # +effluent.imol['SuccinicAcid']/self.neutralization_rxns.X[2]) \
-        #                         # * 1.1
-        #     effluent.imol['Lime'] = lime.imol['Lime']
-        #     # effluent.mix_from([effluent, lime])
-        #     self.neutralization_rxns.adiabatic_reaction(effluent)
-        # else:
-        self.vessel_material= 'Stainless steel 316'
-            # lime.empty()
+        self.vessel_material = 'Stainless steel 316'
         self.effluent_titer = compute_BDO_titer(effluent)
         
     def _design(self):
