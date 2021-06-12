@@ -78,6 +78,9 @@ bst.CE = 541.7
 tmo.settings.set_thermo(BDO_chemicals)
 
 BDO_sys = bdo.create_system_oleyl_alcohol()
+u = flowsheet.unit
+u.M305.ins[0] = None
+u.M305.ins[1] = None
 feedstock = BDO_sys.ins[0]
 MEK, isobutanol = BDO_sys.outs
 get_flow_tpd = lambda: (feedstock.F_mass-feedstock.imass['H2O'])*24/907.185

@@ -115,7 +115,9 @@ def create_system_oleyl_alcohol(ins, outs):
         feedstock=feedstock,
         RO_water=treated_water,
     )
-    
+    # u.M305.ins[0] = None
+    # u.M305.ins[1] = None
+    # u.M601.ins[1] = None
     HXN = bst.facilities.HeatExchangerNetwork('HXN')
 
 @bst.SystemFactory(
@@ -172,6 +174,7 @@ def create_system_DPHP(ins, outs):
         flow (kmol/hr): MEK               0.0632
                         Isobutyraldehyde  0.0149
                         Isobutanol        18.3
+    
     """
     feedstock,  = ins
     MEK, isobutanol = outs
@@ -215,5 +218,6 @@ def create_system_DPHP(ins, outs):
         feedstock=feedstock,
         RO_water=treated_water,
     )
-    
+    # u.M305.ins[0] = None
+    # u.M305.ins[1] = None
     HXN = bst.facilities.HeatExchangerNetwork('HXN')
