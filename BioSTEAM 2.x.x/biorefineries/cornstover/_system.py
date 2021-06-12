@@ -510,7 +510,6 @@ def create_facilities(
         RO_water='',
         recycle_process_water='',
         blowdown_to_wastewater=None,
-        include_hxn=False,
         BT_area=None,
         area=None,
     ):
@@ -551,7 +550,6 @@ def create_facilities(
     FT = units.FireWaterStorageTank(area or 'FT', fire_water)
     
     ### Complete system
-    hxn_facilities = (bst.facilities.HeatExchangerNetwork(area or 'HXN'),) if include_hxn else ()
     if blowdown_to_wastewater:
         blowdown_mixer = bst.BlowdownMixer(area or 'blowdown_mixer', (BT-1, CT-1), blowdown_to_wastewater)
 

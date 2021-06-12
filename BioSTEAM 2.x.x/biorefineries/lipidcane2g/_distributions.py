@@ -7,20 +7,21 @@ Created on Fri May 14 22:48:34 2021
 from matplotlib import pyplot as plt
 import numpy as np
 from chaospy import distributions as shape
+from math import sqrt
 
 __all__ = ('ethanol_price_distribution', 
            'biodiesel_price_distribution',
            'natural_gas_price_distribution')
 
-ethanol_prices = [ # USD / gal
-    1.97, 2.02, 2.23, 2.11, 2.17, 2.54, 3.18, 3.01, 2.81, 2.76, 3.13, 2.86,
-    2.87, 2.89, 3.06, 2.97, 2.77, 2.72, 2.92, 2.84, 2.46, 1.64, 1.97, 2.28,
-    1.76, 1.18, 1.59, 1.72, 1.67, 1.72, 1.78, 1.72, 1.96, 1.99, 2.18, 2.24, 
-    2.1, 1.59, 1.59, 1.98, 1.93, 1.81, 0.94, 1.34, 0.89
+ethanol_prices = [ # USD / gal Dec 2009 - Nov 2019
+    2.08, 1.66, 1.71, 2.33, 2.37, 2.67, 2.87, 2.83, 2.30, 2.26, 2.47,
+    2.48, 2.39, 2.58, 2.57, 2.31, 2.19, 2.76, 2.28, 2.16, 1.83, 1.63, 1.64,
+    1.61, 1.47, 1.52, 1.59, 1.58, 1.57, 1.60, 1.62, 1.24, 1.02, 1.30, 1.37, 
+    1.20, 1.09, 1.09, 1.32, 1.35
 ]
 
-biodiesel_prices = [ # USD / gal
-    3.02, 3.12, 3.38, 3.38, 3.27, 3.3, 3.32, 3.33, 3.21, 3.18, 3.18, 3.3, 
+biodiesel_prices = [ # USD / gal Dec 2009 - Nov 2019
+    3.38, 3.27, 3.3, 3.32, 3.33, 3.21, 3.18, 3.18, 3.3, 
     3.35, 3.66, 3.9, 4.25, 4.49, 4.6, 4.82, 5.07, 5.23, 5.4, 5.45, 5.44, 5.74, 
     5.58, 5.34, 4.92, 4.67, 4.67, 4.79, 4.97, 4.76, 4.4, 4.39, 4.47, 4.53,
     4.49, 4.12, 3.94, 4.37, 4.51, 4.73, 4.75, 4.84, 4.85, 5.01, 4.9, 4.84,
@@ -30,8 +31,7 @@ biodiesel_prices = [ # USD / gal
     3.37, 3.49, 3.64, 3.52, 3.45, 3.14, 3.11, 3.18, 3.13, 3.23, 3.31, 3.33,
     3.3, 3.34, 3.23, 3.45, 3.16, 3.04, 3.02, 3.13, 3.11, 3.02, 3.01, 3.04,
     3.09, 3.09, 3.06, 3.12, 3.24, 3.08, 2.98, 2.86, 2.87, 2.91, 2.99, 3.06, 
-    3.13, 3.21, 3.26, 3.33, 3.11, 2.97, 2.77, 2.74, 2.87, 2.9, 3.07, 3.02,
-    3.02, 3.47, 3.61, 3.85, 4.92, 5.0
+    3.13, 3.21, 
 ]
 
 natural_gas_prices = [ # City gate [USD / cf] 2010 to 2019
@@ -43,10 +43,27 @@ def triangular_distribution(x):
     a, b, c = fit_triangular_distribution(x)
     return shape.Triangle(a, c, b)
 
-def fit_triangular_distribution(x):
+def triangular_distribution_median(a, b, c):
+    if c >= (a + b) / 2: 
+        return a + sqrt((b - a) * (c - a) * 0.5)
+    else:
+        return b - sqrt((b - a) * (b - c) * 0.5)
+
+def fit_triangular_distribution(x, median=False):
     a = min(x)
     b = max(x)
-    c = np.mean(x)
+    if median:
+        median = np.median(x)
+        if median >= (a + b) / 2: 
+            dummy = a - median
+            c = a + 2 * dummy * dummy / (b - a)
+        else:
+            dummy = b - median
+            c = b - 2 * dummy * dummy / (b - a)
+        assert triangular_distribution_median(a, b, c) == median 
+        assert a <= c <= b
+    else:
+        c = 3 * np.mean(x) - (a + b)
     return a, b, c
 
 def plot_triangular_distribution(a, b, c):

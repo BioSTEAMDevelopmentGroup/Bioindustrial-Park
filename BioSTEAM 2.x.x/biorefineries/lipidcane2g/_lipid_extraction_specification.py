@@ -17,7 +17,7 @@ import thermosteam as tmo
 __all__ = ('LipidExtractionSpecification',)
 
 def evaluate_across_lipid_content(spec, efficiency, lipid_retention, 
-                                   metrics, lipid_content):
+                                  metrics, lipid_content):
     spec.load_specifications(efficiency=efficiency, lipid_retention=lipid_retention)
     return spec._evaluate_across_lipid_content(metrics, lipid_content)
     
@@ -72,6 +72,7 @@ class LipidExtractionSpecification:
         'efficiency',
         'lipid_retention',
         'lipid_content',
+        'locked_lipid_content',
     )
     
     def __init__(self, system, feedstocks, isplit_efficiency, isplit_lipid_retention, 
@@ -83,6 +84,7 @@ class LipidExtractionSpecification:
         self.efficiency = efficiency #: [float] Lipid extraction efficiency b
         self.lipid_retention = lipid_retention #: [float] Lipid extraction lipid retention
         self.lipid_content = lipid_content #: [float] Lipid content of feedstock [dry wt. %].
+        self.locked_lipid_content = False
         
     def MFPP(self):
         return self.system.TEA.solve_price(self.feedstocks)
@@ -112,14 +114,17 @@ class LipidExtractionSpecification:
                                     maxiter=10)
     
     def load_lipid_content(self, lipid_content):
+        if self.locked_lipid_content: return
         for i in self.feedstocks: set_lipid_fraction(lipid_content, i)
         self.lipid_content = lipid_content
       
     def load_efficiency(self, efficiency):
+        if self.isplit_efficiency is None: return
         self.efficiency = efficiency
         self.isplit_efficiency['Lipid'] = efficiency
     
     def load_lipid_retention(self, lipid_retention):
+        if self.isplit_efficiency is None: return
         self.lipid_retention = lipid_retention
         self.isplit_lipid_retention['Lipid'] = lipid_retention    
     

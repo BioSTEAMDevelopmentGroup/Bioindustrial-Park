@@ -173,8 +173,8 @@ def create_juicing_system(ins, outs, pellet_bagasse=None):
     u = f.unit
     u.U201.isplit['Lipid'] = 0.01 # Crushing mill
     u.S201.isplit['Lipid'] = 0.88 # Fiber screener #1
-    u.C201.isplit['Lipid'] = 0.98 # Clarifier
-    u.S202.isplit['Lipid'] = 0.99  # Fiber screener #2
+    u.C201.isplit['Lipid'] = 0.99 # Clarifier
+    u.S202.isplit['Lipid'] = 0.999  # Fiber screener #2
     
 
 @SystemFactory(
@@ -346,7 +346,7 @@ def create_transesterification_and_biodiesel_separation_system(ins, outs):
     # assume all the lipid, free_lipid and biodiesel is washed out
     C404 = units.LiquidsSplitCentrifuge('C404', outs=('', waste),
                                          order=('Methanol', 'Glycerol', 'Water'),
-                                         split=(0.999, 0.999, 0.999))
+                                         split=(0.999, 0.999, 0.99))
     
     # Add and mix NaOH
     T407 = units.MixTank('T407')
@@ -357,6 +357,7 @@ def create_transesterification_and_biodiesel_separation_system(ins, outs):
                       LHK=('Methanol', 'Water'), P=101325,
                       y_top=0.99999, x_bot=0.0001, k=2.5,
                       is_divided=True,
+                      partial_condenser=False,
                       vessel_material='Stainless steel 304',
                       tray_material='Stainless steel 304')
     
@@ -368,7 +369,7 @@ def create_transesterification_and_biodiesel_separation_system(ins, outs):
     w = 0.20/chemicals.Water.MW
     g = 0.80/chemicals.Glycerol.MW
     x_water = w/(w+g)
-    
+    ideal_thermo = D401.thermo.ideal()
     D402 = units.BinaryDistillation('D402',
                         LHK=('Water', 'Glycerol'),
                         k=1.25,
@@ -376,7 +377,10 @@ def create_transesterification_and_biodiesel_separation_system(ins, outs):
                         y_top=0.9999,
                         x_bot=x_water,
                         tray_material='Stainless steel 304',
-                        vessel_material='Stainless steel 304')
+                        vessel_material='Stainless steel 304',
+                        partial_condenser=False,
+                        condenser_thermo=ideal_thermo,
+                        boiler_thermo=ideal_thermo)
     
     def startup_water():
         imol = D402.ins[0].imol
