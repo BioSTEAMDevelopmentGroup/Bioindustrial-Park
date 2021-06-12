@@ -43,6 +43,7 @@ from biosteam.process_tools import BoundedNumericalSpecification
 from biosteam import System
 from thermosteam import Stream
 from biorefineries.HP import units, facilities
+from biorefineries.HP.lca import LCA
 from biorefineries.HP._process_specification import ProcessSpecification
 from biorefineries.HP.process_settings import price, CFs
 from biorefineries.HP.utils import find_split, splits_df, baseline_feedflow
@@ -698,7 +699,7 @@ def create_HP_sys(ins, outs):
         # return get_mass_percent('HP', M402.outs[0]) - .15 # Dehydration reaction paper
         # return get_mass_percent('HP', M402.outs[0]) - .35 # 30-35 wt% in https://patents.google.com/patent/WO2013192451A1/en
         return get_mass_percent('HP', M402.outs[0]) - .30 # 30wt% with 80% conversion in Dunn et al. 2015 LCA of Bioproducts in GREET
-    
+        # return get_mass_percent('HP', M402.outs[0]) - .99 # ideal
     def M402_adjust_water():
         flx.IQ_interpolation(M402_objective_fn, 0., 10000, maxiter=50, ytol=1e-2)
         
@@ -711,19 +712,19 @@ def create_HP_sys(ins, outs):
                                     tau = 57.34/1.5, # Dishisha et al.
                                     T = 230. + 273.15,
                                     vessel_material='Stainless steel 316')
-    R402.heat_utilities[0].heat_transfer_efficiency = 1. # this doesn't seem to be changing duty
+    R402.heat_utilities[0].heat_transfer_efficiency = 1. 
     
     # spent_TiO2_catalyst is assumed to be sold at 0 $/kg
     
     
-    R402_H = bst.units.HXutility('R402_H', ins=R402-0, T = 372.00, rigorous=True)
+    R402_H = bst.units.HXutility('R402_H', ins=R402-0, T = 89. + 273.15, rigorous=True)
     
     
     D402 = bst.units.ShortcutColumn('D402', ins=R402_H-0, outs=('D402_g', 'D402_l'),
                                         LHK=('Water', 'AcrylicAcid'),
                                         is_divided=True,
                                         product_specification_format='Recovery',
-                                        Lr=0.999, Hr=0.999, k=1.05, P=101325,
+                                        Lr=0.999, Hr=0.999, k=1.05, P=101325/10.,
                                         partial_condenser=False,
                                         vessel_material = 'Stainless steel 316')
     
@@ -743,7 +744,7 @@ def create_HP_sys(ins, outs):
                                         LHK=('AcrylicAcid', 'HP'),
                                         is_divided=True,
                                         product_specification_format='Recovery',
-                                        Lr=0.9995, Hr=0.9995, k=1.05, P=101325./7.,
+                                        Lr=0.9995, Hr=0.9995, k=1.05, P=101325/20.,
                                         partial_condenser=False,
                                         vessel_material = 'Stainless steel 316')
     
@@ -809,7 +810,7 @@ def create_HP_sys(ins, outs):
     def R501_specification():
         R501.byproducts_combustion_rxns(R501.ins[0])
         R501._run()
-    # R501.specification = R501_specification # Comment this out for anything other than TRY analysis
+    R501.specification = R501_specification # Comment this out for anything other than TRY analysis
     
     get_flow_tpd = lambda: (feedstock.F_mass-feedstock.imass['H2O'])*24/907.185
     
@@ -1186,7 +1187,7 @@ HP_no_BT_tea = HP_tea
 #         HP.price = HP_tea.solve_price(HP, HP_no_BT_tea)
 #     return HP.price
 
-num_sims = 1
+num_sims = 3
 num_solve_tea = 3
 def get_AA_MPSP():
     for i in range(num_sims):
@@ -1222,6 +1223,7 @@ spec = ProcessSpecification(
     dehydration_reactor = u.R401,
     byproduct_streams = [],
     HXN = u.HXN,
+    maximum_inhibitor_concentration = 1.,
     # pre_conversion_units = process_groups_dict['feedstock_group'].units + process_groups_dict['pretreatment_group'].units + [u.H301],
     pre_conversion_units = HP_sys.split(u.F301.ins[0])[0],
     baseline_titer = 54.8,
@@ -1705,15 +1707,19 @@ def get_material_cost_breakdown_breakdown_fractional():
 #     for group in process_groups:
 #         group_material_costs[group.name] = 0
 
-  
+
+HP_lca = LCA(HP_sys, HP_chemicals, CFs, feedstock, feedstock_ID, AA, [CT, CWP])
+
 # %% Full analysis
 def simulate_and_print():
-    MPSP = get_AA_MPSP()
+    MPSP, GWP, FEC = get_AA_MPSP(), HP_lca.GWP, HP_lca.FEC
     print('\n---------- Simulation Results ----------')
     print(f'MPSP is ${MPSP:.3f}/kg')
-    print(f'GWP is {get_GWP():.3f} kg CO2-eq/kg AA')
+    # print(f'GWP is {get_GWP():.3f} kg CO2-eq/kg AA')
+    print(f'GWP is {GWP:.3f} kg CO2-eq/kg AA')
     # print(f'Non-bio GWP is {get_ng_GWP():.3f} kg CO2-eq/kg AA')
-    print(f'FEC is {get_FEC():.2f} MJ/kg AA or {get_FEC()/AA_LHV:.2f} MJ/MJ AA\n')
+    # print(f'FEC is {get_FEC():.2f} MJ/kg AA or {get_FEC()/AA_LHV:.2f} MJ/MJ AA\n')
+    print(f'FEC is {FEC:.2f} MJ/kg AA or {FEC/AA_LHV:.2f} MJ/MJ AA\n')
     print(f'SPED is {get_SPED():.2f} MJ/kg AA or {get_SPED()/AA_LHV:.2f} MJ/MJ AA')
     print('----------------------------------------\n')
 

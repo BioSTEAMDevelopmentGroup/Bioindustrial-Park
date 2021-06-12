@@ -168,6 +168,7 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
                  'titer_inhibitor_specification',
                  'seed_train_system',
                  'HXN',
+                 'maximum_inhibitor_concentration',
                  'count',
                  'count_exceptions',
                  'total_iterations',
@@ -187,7 +188,7 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
     def __init__(self, evaporator, pump, mixer, heat_exchanger, seed_train_system, 
                  reactor, reaction_name, substrates, products,
                  spec_1, spec_2, spec_3, xylose_utilization_fraction,
-                 feedstock, dehydration_reactor, byproduct_streams, HXN,
+                 feedstock, dehydration_reactor, byproduct_streams, HXN, maximum_inhibitor_concentration=1.,
                  pre_conversion_units = None, juicing_sys=None, baseline_yield =0.49, baseline_titer = 54.8,
                  baseline_productivity=0.76, tolerable_HXN_energy_balance_percent_error=2., HXN_intolerable_points=[],
                  HXN_new_HXs={}, HXN_new_HX_utils={}, HXN_Q_bal_percent_error_dict = {},
@@ -224,6 +225,8 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
         self.average_HXN_energy_balance_percent_error = 0.
         self.exceptions_dict = {}
         
+        # self._maximum_inhibitor_concentration = maximum_inhibitor_concentration
+        
         self.load_spec_1 = load_spec_1
         self.load_spec_2 = load_spec_2
         self.load_spec_3 = load_spec_3
@@ -231,8 +234,17 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
         self.titer_inhibitor_specification =\
             TiterAndInhibitorsSpecification(evaporator, pump, mixer, heat_exchanger,
                                             seed_train_system, reactor,
-                 target_titer=100, product=reactor.outs[0], maximum_inhibitor_concentration = 1.)
-        
+                 target_titer=100, product=reactor.outs[0], maximum_inhibitor_concentration=maximum_inhibitor_concentration)
+    
+    # @maximum_inhibitor_concentration.getter
+    def get_maximum_inhibitor_concentration(self):
+        return self.titer_inhibitor_specification.maximum_inhibitor_concentration
+    
+    # @maximum_inhibitor_concentration.setter
+    def load_maximum_inhibitor_concentration(self, value):
+        self.titer_inhibitor_specification.maximum_inhibitor_concentration = value
+        self.load_specifications(spec_1=self.spec_1, spec_2=self.spec_2, spec_3=self.spec_3)
+    
     def load_specifications(self, spec_1=None, spec_2=None, spec_3=None,):
         """
         Load ferementation specifications.
@@ -640,7 +652,7 @@ class TiterAndInhibitorsSpecification:
         x_titer = self.calculate_titer()
         # V_min = 0.00001
         V_min = 0.
-        V_max = 0.999
+        V_max = 0.9999
         
         if x_titer < self.target_titer: # Evaporate
             self.evaporator.V = V_min = flx.IQ_interpolation(self.titer_objective_function,

@@ -1797,8 +1797,8 @@ class CoFermentation(Reactor):
         Rxn('2 Xylose -> 5 AceticAcid',       'Xylose',    0.040),
         Rxn('Glucose + 2 H2O -> 2 Glycerol',        'Glucose',     0.040),
         Rxn('3Xylose + 5 H2O -> 5 Glycerol',       'Xylose',    0.040),
-        Rxn('Glucose -> 6 FermMicrobe + 2.4 H2O',       'Glucose',   0.05), # for consistency with Dunn et al. 2015, which has 5% conversion of algal glycerol to cell mass
-        Rxn('Xylose -> 5 FermMicrobe + 2 H2O',        'Xylose',    0.05), # for consistency with Dunn et al. 2015, which has 5% conversion of algal glycerol to cell mass
+        Rxn('Glucose -> 6 FermMicrobe + 2.4 H2O',       'Glucose',   0.05-1e-9), # for consistency with Dunn et al. 2015, which has 5% conversion of algal glycerol to cell mass
+        Rxn('Xylose -> 5 FermMicrobe + 2 H2O',        'Xylose',    0.05-1e-9), # for consistency with Dunn et al. 2015, which has 5% conversion of algal glycerol to cell mass
         ])
         
         
