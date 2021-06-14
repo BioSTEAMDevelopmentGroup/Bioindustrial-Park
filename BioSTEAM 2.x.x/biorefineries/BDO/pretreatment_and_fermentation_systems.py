@@ -7,7 +7,8 @@ Created on Tue Jun  8 03:54:05 2021
 import biosteam as bst
 from biosteam import Stream
 from biosteam.process_tools import SystemFactory
-from biorefineries.BDO import units, facilities
+from biorefineries import HP as hp
+import biorefineries.BDO as bdo 
 from biorefineries.BDO.process_settings import price
 from biorefineries.BDO.utils import find_split, splits_df, baseline_feedflow
 from biorefineries.BDO.chemicals_data import BDO_chemicals, chemical_groups, \
@@ -112,7 +113,7 @@ def create_pretreatment_and_fermentation_system(ins, outs):
     # Feedstock
     # =============================================================================
     
-    U101 = units.FeedstockPreprocessing('U101', ins=feedstock)
+    U101 = hp.units.FeedstockPreprocessing('U101', ins=feedstock)
     
     # Handling costs/utilities included in feedstock cost thus not considered here
     U101.cost_items['System'].cost = 0
@@ -142,7 +143,7 @@ def create_pretreatment_and_fermentation_system(ins, outs):
     # =============================================================================
     # Pretreatment units
     # =============================================================================
-    H_M201 = bst.units.HXutility('H_M201', ins=water_M201,
+    H_M201 = bst.HXutility('H_M201', ins=water_M201,
                                      outs='steam_M201',
                                      T=99.+273.15, rigorous=True)
     
@@ -157,7 +158,7 @@ def create_pretreatment_and_fermentation_system(ins, outs):
     # H_M201._cost = lambda: None
     # H_M201._design = lambda: None
     # H_M201.heat_utilities[0].heat_exchanger = None
-    H_M202 = bst.units.HXutility('H_M202', ins=water_M202,
+    H_M202 = bst.HXutility('H_M202', ins=water_M202,
                                      outs='hot_water_M202',
                                      T=99.+273.15, rigorous=True)
     H_M202.heat_utilities[0].heat_transfer_efficiency = 1.
@@ -179,32 +180,31 @@ def create_pretreatment_and_fermentation_system(ins, outs):
     
     # Prepare sulfuric acid
     get_feedstock_dry_mass = lambda: feedstock.F_mass - feedstock.imass['H2O']
-    T201 = units.SulfuricAcidAdditionTank('T201', ins=sulfuric_acid_T201,
+    T201 = hp.units.SulfuricAcidAdditionTank('T201', ins=sulfuric_acid_T201,
                                           feedstock_dry_mass=get_feedstock_dry_mass())
     
-    M201 = units.SulfuricAcidMixer('M201', ins=(T201-0, H_M201-0))
+    M201 = hp.units.SulfuricAcidMixer('M201', ins=(T201-0, H_M201-0))
         
     # Mix sulfuric acid and feedstock, adjust water loading for pretreatment
-    M202 = units.PretreatmentMixer('M202', ins=(U101-0, M201-0, H_M202-0, ''))
+    M202 = hp.units.PretreatmentMixer('M202', ins=(U101-0, M201-0, H_M202-0, ''))
     
     # Mix feedstock/sulfuric acid mixture and steam
-    # M203 = units.SteamMixer('M203', ins=(M202-0, water_M203), P=5.5*101325)
-    M203 = bst.units.SteamMixer('M203', ins=(M202-0, water_M203), P=5.5*101325)
+    M203 = bst.SteamMixer('M203', ins=(M202-0, water_M203), P=5.5*101325)
     M203.heat_utilities[0].heat_transfer_efficiency = 1.
-    R201 = units.PretreatmentReactorSystem('R201', ins=M203-0, outs=('R201_g', 'R201_l'))
+    R201 = hp.units.PretreatmentReactorSystem('R201', ins=M203-0, outs=('R201_g', 'R201_l'))
     
     # Pump bottom of the pretreatment products to the oligomer conversion tank
-    T202 = units.BlowdownTank('T202', ins=R201-1)
-    T203 = units.OligomerConversionTank('T203', ins=T202-0)
-    F201 = units.PretreatmentFlash('F201', ins=T203-0,
+    T202 = hp.units.BlowdownTank('T202', ins=R201-1)
+    T203 = hp.units.OligomerConversionTank('T203', ins=T202-0)
+    F201 = hp.units.PretreatmentFlash('F201', ins=T203-0,
                                    outs=('F201_waste_vapor', 'F201_to_fermentation'),
                                    P=101325, Q=0)
-    H201 = bst.units.HXutility('H201', ins=F201-0,
+    H201 = bst.HXutility('H201', ins=F201-0,
                               V=0, rigorous=True)
-    H202 = bst.units.HXutility('H202', ins=R201-0,
+    H202 = bst.HXutility('H202', ins=R201-0,
                               V=0, rigorous=True)
     
-    T204 = units.LimeAdditionTank('T204', ins=(F201-1, ''))
+    T204 = bdo.units.LimeAdditionTank('T204', ins=(F201-1, ''))
     
         
     @T204.add_specification(run=True)
@@ -213,10 +213,10 @@ def create_pretreatment_and_fermentation_system(ins, outs):
         T204.ins[1].imol['CaO'] = hydrolysate.imol['H2SO4'] * 1.
     
     gypsum_split={'CaSO4':1.}
-    S201 = units.GypsumFilter('S201', ins=T204-0, outs=('gypsum', ''), split = gypsum_split,
+    S201 = hp.units.GypsumFilter('S201', ins=T204-0, outs=('gypsum', ''), split = gypsum_split,
                               moisture_content=0.2)
     
-    P201 = units.HydrolysatePump('P201', ins=S201-1)
+    P201 = hp.units.HydrolysatePump('P201', ins=S201-1)
     
     # =============================================================================
     # Conversion streams
@@ -239,54 +239,55 @@ def create_pretreatment_and_fermentation_system(ins, outs):
     # =============================================================================
     
     # Cool hydrolysate down to fermentation temperature at 50°C
-    H301 = bst.units.HXutility('H301', ins=P201-0, T=50+273.15)
+    H301 = bst.HXutility('H301', ins=P201-0, T=50+273.15, rigorous=True)
     
     # Mix enzyme with the cooled pretreatment hydrolysate
-    M301 = units.EnzymeHydrolysateMixer('M301', ins=(H301-0, enzyme, enzyme_water))
-    
-    # Mix pretreatment hydrolysate/enzyme mixture with fermentation seed
-    M302 = bst.units.Mixer('M302', ins=(M301-0, ''))
+    M301 = hp.units.EnzymeHydrolysateMixer('M301', ins=(H301-0, enzyme, enzyme_water))
     
     # Saccharification
-    R301 = units.Saccharification('R301', 
-                                    ins=M302-0,
-                                    outs=('saccharification_effluent', 
-                                          'sidedraw'))
+    R301 = hp.units.Saccharification('R301', 
+                                    ins=M301-0,
+                                    outs='saccharification_effluent')
     M303_P = bst.Pump('M303_P', ins=R301-0)
     # Remove solids from fermentation broth, modified from the pressure filter in Humbird et al.
     S301_index = [splits_df.index[0]] + splits_df.index[2:].to_list()
     S301_cell_mass_split = [splits_df['stream_571'][0]] + splits_df['stream_571'][2:].to_list()
     S301_filtrate_split = [splits_df['stream_535'][0]] + splits_df['stream_535'][2:].to_list()
-    S301 = units.CellMassFilter('S301', ins=M303_P-0, 
+    S301 = hp.units.CellMassFilter('S301', ins=M303_P-0, 
                                 moisture_content=0.35,
                                 split=find_split(S301_index,
                                                   S301_cell_mass_split,
                                                   S301_filtrate_split,
                                                   chemical_groups))
-    F301 = bst.units.MultiEffectEvaporator('F301', ins=S301-1, outs=('F301_l', 'F301_g'),
-                                           P = (101325, 73581, 50892, 32777, 20000), V = 0.793)
-    M204 = bst.units.Mixer('M204', ins=(H202-0, H201-0, F301-1), outs=wastewater)
-    F301_P = units.BDOPump('F301_P', ins=F301-0)
+    F301 = bst.MultiEffectEvaporator('F301', ins=S301-1, outs=('F301_l', 'F301_g'),
+                                     P = (101325, 73581, 50892, 32777, 20000), V = 0.793)
+    M204 = bst.Mixer('M204', ins=(H202-0, H201-0, F301-1), outs=wastewater)
+    F301_P = bst.Pump('F301_P', ins=F301-0)
     
     def adjust_M304_water():
         M304.ins[1].imol['Water'] = (M304.water_multiplier - 1) * M304.ins[0].imol['Water']
         M304._run()
         
-    M304 = bst.units.Mixer('M304', ins=(F301_P-0, dilution_water, ''))
+    M304 = bst.Mixer('M304', ins=(F301_P-0, dilution_water, ''))
     M304.water_multiplier = 1.
     M304.specification = adjust_M304_water
-    M304_H = bst.units.HXutility('M304_H', ins=M304-0, T=30+273.15)
+    M304_H = bst.HXutility('M304_H', ins=M304-0, T=30+273.15, rigorous=True)
     M304_H_P = bst.Pump('M304_H_P', ins=M304_H-0)
-    
-    # Cofermentation
-    R302 = units.CoFermentation('R302', 
-                                ins=(recycle_acetoin, M304_H_P-0, CSL),
-                                outs=('fermentation_effluent', 'CO2'))
+    S302 = bst.Splitter('S302', 
+                        ins=M304_H_P-0, 
+                        outs=('to_seedtrain', 'to_cofermentation'),
+                        split=0.07)
     
     # ferm_ratio is the ratio of conversion relative to the fermenter
-    R303 = units.SeedTrain('R303', ins=R301-1, outs=('seed', ''), ferm_ratio=0.9)
+    R303 = bdo.units.SeedTrain('R303', ins=S302-0, outs=('seed', ''), ferm_ratio=0.9)
     
-    T301 = units.SeedHoldTank('T301', ins=R303-0, outs=1-M302)
+    T301 = hp.units.SeedHoldTank('T301', ins=R303-0)
+    
+    # Cofermentation
+    R302 = bdo.units.CoFermentation('R302', 
+                                    ins=(recycle_acetoin, S302-1, T301-0, CSL),
+                                    outs=('fermentation_effluent', 'CO2'))
+    
     
     # =============================================================================
     # Separation units
@@ -296,7 +297,7 @@ def create_pretreatment_and_fermentation_system(ins, outs):
     S401_index = [splits_df.index[0]] + splits_df.index[2:].to_list()
     S401_cell_mass_split = [splits_df['stream_571'][0]] + splits_df['stream_571'][2:].to_list()
     S401_filtrate_split = [splits_df['stream_535'][0]] + splits_df['stream_535'][2:].to_list()
-    S401 = bst.units.SolidsCentrifuge('S401', ins=R302-0, 
+    S401 = bst.SolidsCentrifuge('S401', ins=R302-0, 
                                       outs=('cell_mass', filtered_fermentation_effluent),
                                     # moisture_content=0.50,
                                     split=find_split(S401_index,

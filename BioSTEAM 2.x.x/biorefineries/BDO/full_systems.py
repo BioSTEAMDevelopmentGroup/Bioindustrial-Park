@@ -118,7 +118,7 @@ def create_system_oleyl_alcohol(ins, outs):
     # u.M305.ins[0] = None
     # u.M305.ins[1] = None
     # u.M601.ins[1] = None
-    HXN = bst.facilities.HeatExchangerNetwork('HXN')
+    HXN = bst.facilities.HeatExchangerNetwork('HXN', ignored=[u.D404.boiler])
 
 @bst.SystemFactory(
     ID='BDO_sys',
