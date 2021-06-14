@@ -151,23 +151,58 @@ def get_MEK_MPSP():
 # get_MEK_MPSP()
 
 # R301 = F('R301') # Fermentor
+seed_train_system = bst.System('seed_train_system', path=(u.S302, u.R303, u.T301))
+
 # yearly_production = 125000 # ton/yr
 spec = ProcessSpecification(
     evaporator = u.F301,
+    pump = u.M304_H_P,
     mixer = u.M304,
-    reactor=u.R302,
+    heat_exchanger = u.M304_H,
+    seed_train_system = seed_train_system,
+    reactor= u.R302,
     reaction_name='fermentation_reaction',
     substrates=('Xylose', 'Glucose'),
     products=('BDO',),
-    spec_1=0.8,
+    spec_1=0.4,
     spec_2=109.9,
     spec_3=1.,
-    path = (u.M304_H, u.M304_H_P),
     xylose_utilization_fraction = 0.80,
     feedstock = feedstock,
     dehydration_reactor = u.R401,
-    byproduct_streams = [s.isobutanol],
-    evaporator_pump = u.F301_P)
+    byproduct_streams = [],
+    HXN = u.HXN,
+    maximum_inhibitor_concentration = 1.,
+    # pre_conversion_units = process_groups_dict['feedstock_group'].units + process_groups_dict['pretreatment_group'].units + [u.H301], # if the line below does not work (depends on BioSTEAM version)
+    pre_conversion_units = BDO_sys.split(u.F301.ins[0])[0],
+    baseline_titer = 54.8,
+    feedstock_mass = feedstock.F_mass,
+    pretreatment_reactor = u.R201)
+
+
+
+spec.load_spec_1 = spec.load_yield
+spec.load_spec_2 = spec.load_titer
+spec.load_spec_3 = spec.load_productivity
+
+spec.load_specifications(0.49, 109.9, 1.)
+
+# spec = ProcessSpecification(
+#     evaporator = u.F301,
+#     mixer = u.M304,
+#     reactor=u.R302,
+#     reaction_name='fermentation_reaction',
+#     substrates=('Xylose', 'Glucose'),
+#     products=('BDO',),
+#     spec_1=0.8,
+#     spec_2=109.9,
+#     spec_3=1.,
+#     path = (u.M304_H, u.M304_H_P),
+#     xylose_utilization_fraction = 0.80,
+#     feedstock = feedstock,
+#     dehydration_reactor = u.R401,
+#     byproduct_streams = [s.isobutanol],
+#     evaporator_pump = u.F301_P)
 
 path = (u.F301, u.R302)
 @np.vectorize

@@ -9,9 +9,9 @@ import biosteam as bst
 import flexsolve as flx
 import numpy as np
 from biosteam.exceptions import InfeasibleRegion
-from biorefineries.HP.units import compute_HP_titer, compute_HP_mass
+# from biorefineries.BDO.units import compute_BDO_titer, compute_BDO_mass
 from winsound import Beep
-# from biorefineries.HP import system_light_lle_vacuum_distillation
+# from biorefineries.BDO import system_light_lle_vacuum_distillation
 
 _red_highlight_white_text = '\033[1;47;41m'
 _yellow_text = '\033[1;33m'
@@ -387,29 +387,27 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
         """
         # print(yield_)
         reactor = self.reactor
-        self.spec_1 = reactor.glucose_to_HP_rxn.X = reactor.xylose_to_HP_rxn.X = yield_
+        self.spec_1 = reactor.glucose_to_BDO_rxn.X = reactor.xylose_to_BDO_rxn.X = yield_
         
-        reactor.xylose_to_HP_rxn.X = yield_
-        # rem_glucose = min(0.13, 1. - reactor.glucose_to_HP_rxn.X)
-        # reactor.glucose_to_acetic_acid_rxn.X = (55./130.) * rem_glucose
-        # reactor.glucose_to_glycerol_rxn.X = (25./130.) * rem_glucose
+        reactor.xylose_to_BDO_rxn.X = yield_
+        # rem_glucose = min(0.13, 1. - reactor.glucose_to_BDO_rxn.X)
+        # reactor.glucose_to_acetoin_rxn.X = (55./130.) * rem_glucose
+        # reactor.glucose_to_IBA_rxn.X = (25./130.) * rem_glucose
         # reactor.glucose_to_biomass_rxn.X = (50./130.) * rem_glucose
         
-        # rem_xylose = min(0.13, 1. - reactor.xylose_to_HP_rxn.X)
-        # reactor.xylose_to_acetic_acid_rxn.X = (55./130.) * rem_xylose
-        # reactor.xylose_to_glycerol_rxn.X = (25./130.) * rem_xylose
+        # rem_xylose = min(0.13, 1. - reactor.xylose_to_BDO_rxn.X)
+        # reactor.xylose_to_acetoin_rxn.X = (55./130.) * rem_xylose
+        # reactor.xylose_to_IBA_rxn.X = (25./130.) * rem_xylose
         # reactor.xylose_to_biomass_rxn.X = (50./130.) * rem_xylose
         
-        reactor.xylose_to_HP_rxn.X = yield_
+        reactor.xylose_to_BDO_rxn.X = yield_
         
-        rem_glucose = min(0.08, (1. - reactor.glucose_to_biomass_rxn.X) - reactor.glucose_to_HP_rxn.X)
-        reactor.glucose_to_acetic_acid_rxn.X = (40./80.) * rem_glucose
-        reactor.glucose_to_glycerol_rxn.X = (40./80.) * rem_glucose
+        rem_glucose = min(0.0065, (1. - reactor.glucose_to_biomass_rxn.X) - reactor.glucose_to_BDO_rxn.X)
+        reactor.glucose_to_acetoin_rxn.X =  rem_glucose
         # reactor.glucose_to_biomass_rxn.X = (50./130.) * rem_glucose
         
-        rem_xylose = min(0.08, (1. - reactor.glucose_to_biomass_rxn.X) - reactor.xylose_to_HP_rxn.X)
-        reactor.xylose_to_acetic_acid_rxn.X = (40./80.) * rem_xylose
-        reactor.xylose_to_glycerol_rxn.X = (40./80.) * rem_xylose
+        rem_xylose = min(0.0065, (1. - reactor.glucose_to_biomass_rxn.X) - reactor.xylose_to_BDO_rxn.X)
+        reactor.xylose_to_acetoin_rxn.X =   rem_xylose
         # reactor.xylose_to_biomass_rxn.X = (50./130.) * rem_glucose
         
     def load_productivity(self, productivity):
@@ -481,10 +479,10 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
     
     def load_dehydration_conversion(self, conversion):
         dr = self.dehydration_reactor
-        self.spec_1 = dr.HP_to_MEK_rxn.X = conversion
-        dr.HP_to_IBA_rxn.X = 0.5 * conversion # original conversions are 0.52 and 0.26, maintain ratio
-        if dr.HP_to_MEK_rxn.X + dr.HP_to_IBA_rxn.X > 0.999:
-            dr.HP_to_IBA_rxn.X = 0.999 - conversion
+        self.spec_1 = dr.BDO_to_MEK_rxn.X = conversion
+        dr.BDO_to_IBA_rxn.X = 0.5 * conversion # original conversions are 0.52 and 0.26, maintain ratio
+        if dr.BDO_to_MEK_rxn.X + dr.BDO_to_IBA_rxn.X > 0.999:
+            dr.BDO_to_IBA_rxn.X = 0.999 - conversion
         
     def load_byproducts_price(self, price):
         for byproduct in self.byproduct_streams:
@@ -568,7 +566,7 @@ Created on Thu Dec 24 15:31:18 2020
 
 class TiterAndInhibitorsSpecification:
     
-    max_sugar_concentration = 600 # g / L
+    max_sugar_concentration = 600. # g / L
     
     def __init__(self, evaporator, pump, mixer, heat_exchanger, seed_train_system, reactor, 
                  target_titer, product,
@@ -585,14 +583,14 @@ class TiterAndInhibitorsSpecification:
         self.products = products
         self.sugars = sugars
         self.inhibitors = inhibitors
-        if not reactor.neutralization:
-            inhibitors = list(inhibitors)
-            inhibitors.remove('AceticAcid')
-            self.inhibitors = tuple(inhibitors)
+        # if not reactor.neutralization:
+        #     inhibitors = list(inhibitors)
+        #     inhibitors.remove('AceticAcid')
+        #     self.inhibitors = tuple(inhibitors)
             # Assumes acid tolerant strains can tolerate all present acetic acid
         self.target_titer = target_titer
         self.maximum_inhibitor_concentration = maximum_inhibitor_concentration
-        self.get_products_mass = compute_HP_mass
+        # self.get_products_mass = compute_BDO_mass
         self.seed_train_system = seed_train_system
         
     @property
@@ -618,7 +616,7 @@ class TiterAndInhibitorsSpecification:
     def calculate_titer(self):
         # product = self.product
         # return product.imass[self.products].sum() / product.F_vol
-        # return compute_HP_titer(self.product)
+        # return compute_BDO_titer(self.product)
         return self.reactor.effluent_titer
     
     def calculate_inhibitors(self): # g / L

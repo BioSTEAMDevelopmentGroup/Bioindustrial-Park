@@ -527,90 +527,6 @@ class Saccharification(Unit):
         Design['Slurry flow rate'] = total_mass_flow
         
 
-@cost(basis='Fermenter size', ID='Fermentors', units='kg',
-      cost=10128000, S=(42607+443391+948+116)*(60+36), CE=CEPCI[2009], n=1, BM=1.5)
-@cost(basis='Fermenter size', ID='Agitators', units='kg',
-      # Scaling basis based on sum of all streams into fermenter
-      # (304, 306, 311, and 312 in Humbird et al.)
-      # and total residence time (batch hydrolysis and fermentation)
-      kW=22.371, cost=52500, S=(42607+443391+948+116)*(60+36), CE=CEPCI[2009], n=1, BM=1.5)
-@cost(basis='Recirculation flow rate', ID='Recirculation pumps', units='kg/hr',
-      # Scaling basis based on sum of all streams into fermenter
-      # (304, 306, 311, and 312 in Humbird et al.)
-      kW=74.57, cost=47200, S=(42607+443391+948+116), CE=CEPCI[2009], n=0.8, BM=2.3)
-
-class CoFermentation_original(Unit):    
-    _N_ins = 3
-    _N_outs = 2
-    _units= {'Fermenter size': 'kg',
-              'Recirculation flow rate': 'kg/hr'}             
-
-    _316_over_304 = 316/304
-    # Co-Fermentation time (hr)
-    tau_cofermentation = 120
-    
-
-    CSL_loading = 10 # kg/m3
-    
-    def __init__(self, ID='', ins=None, outs=(), T=30+273.15, mode = 'Continuous'):
-        Unit.__init__(self, ID, ins, outs)
-        # Same T for saccharificatoin and co-fermentation
-        self.T = T
-        
-
-        # FermMicrobe reaction from Table 14 on Page 31 of Humbird et al.
-        self.cofermentation_rxns = ParallelRxn([
-        #      Reaction definition            Reactant    Conversion
-        Rxn('Glucose -> BDO + 2CO2',        'Glucose',   .99), 
-        Rxn('Glucose -> Acetoin + 2CO2',               'Glucose',   0.0065),
-        Rxn('Glucose -> 6 FermMicrobe',       'Glucose',   0.003),
-        Rxn('Xylose -> BDO + 2CO2',       'Xylose',    0.99),
-        Rxn('Xylose -> Acetoin + 2CO2',       'Xylose',    0.0052),
-        Rxn('Xylose -> 5 FermMicrobe',        'Xylose',    0.0024),
-        ])
-        
-        self.glucose_to_BDO_rxn = self.cofermentation_rxns[0]
-        self.xylose_to_BDO_rxn = self.cofermentation_rxns[3]
-        
-        self.glucose_to_acetoin_rxn = self.cofermentation_rxns[1]
-        self.xylose_to_acetoin_rxn = self.cofermentation_rxns[4]
-        
-        self.glucose_to_microbe_rxn = self.cofermentation_rxns[2]
-        self.xylose_to_microbe_rxn = self.cofermentation_rxns[5]
-        
-        # self.cofermentation_rxns[1].X = \
-        #     max(0, 1- (.07 + self.cofermentation_rxns[0].X + self.cofermentation_rxns[2].X))
-        # Neutralization of lactic acid and acetic acid by lime (Ca(OH)2)
-        # self.neutralization_rxns = ParallelRxn([
-        # #   Reaction definition                                               Reactant  Conversion
-        # Rxn('2 LacticAcid + CalciumDihydroxide -> CalciumLactate + 2 H2O',  'LacticAcid',   1),
-        # Rxn('2 AceticAcid + CalciumDihydroxide -> CalciumAcetate + 2 H2O',  'AceticAcid',   1),
-        # Rxn('SuccinicAcid + CalciumDihydroxide -> CalciumSuccinate + 2H2O', 'SuccinicAcid', 1)
-        #     ])
-
-    def _run(self):
-        sugars, feed, CSL = self.ins
-        
-        effluent, vapor = self.outs
-        effluent.mix_from([feed, sugars])
-        # ss = Stream(None)
-        # effluent.copy_like(feed)
-        effluent.T = vapor.T = self.T
-        CSL.imass['CSL'] = (sugars.F_vol + feed.F_vol) * self.CSL_loading 
-        
-        self.cofermentation_rxns(effluent.mol)
-        vapor.imol['CO2'] = effluent.imol['CO2']
-        vapor.phase = 'g'
-        
-        effluent.imol['CO2'] = 0
-        effluent.imass['CSL'] = 0
-        
-    def _design(self):
-        Design = self.design_results
-        total_mass_flow = sum([instream.F_mass for instream in self.ins])
-        Design['Fermenter size'] = self.outs[0].F_mass * self.tau_cofermentation
-        Design['Recirculation flow rate'] = total_mass_flow
-    
 # Seed train, 5 stages, 2 trains
 @cost(basis='Seed fermenter size', ID='Stage #1 fermenters', units='kg',
       # 44339, 211, and 26 are streams 303, 309, and 310 in Humbird et al.
@@ -1624,8 +1540,8 @@ class CoFermentation(Reactor):
         Rxn('Glucose -> Acetoin + 2CO2',               'Glucose',   0.0065),
         Rxn('Glucose -> 6 FermMicrobe',       'Glucose',   0.003),
         Rxn('Xylose -> BDO + 2CO2',       'Xylose',    0.80),
-        Rxn('Xylose -> Acetoin + 2CO2',       'Xylose',    0.0052),
-        Rxn('Xylose -> 5 FermMicrobe',        'Xylose',    0.0024), 
+        Rxn('Xylose -> Acetoin + 2CO2',       'Xylose',    0.0065),
+        Rxn('Xylose -> 5 FermMicrobe',        'Xylose',    0.003), 
         Rxn('Acetoin -> BDO',               'Acetoin',      .9)
         ])
         
@@ -1636,6 +1552,9 @@ class CoFermentation(Reactor):
         
         self.glucose_to_CO2_rxn = self.CO2_generation_rxns[0]
         self.xylose_to_CO2_rxn = self.CO2_generation_rxns[1]
+        
+        self.glucose_to_biomass_rxn = self.cofermentation_rxns[2]
+        self.xylose_to_biomass_rxn = self.cofermentation_rxns[5]
         
         self.glucose_to_BDO_rxn = self.cofermentation_rxns[0]
         self.xylose_to_BDO_rxn = self.cofermentation_rxns[3]
