@@ -66,7 +66,7 @@ R301.set_titer_limit = True
 
 # Set seed to make sure each time the same set of random numbers will be used
 np.random.seed(3221)
-N_simulation = 1000 # 1000
+N_simulation = 2000 # 1000
 samples = model.sample(N=N_simulation, rule='L')
 model.load_samples(samples)
 
@@ -96,6 +96,7 @@ def reset_and_switch_solver(solver_ID):
     system.empty_recycles()
     system.converge_method = solver_ID
     print(f"Trying {solver_ID} ...")
+    spec.load_specifications(spec_1=spec.spec_1, spec_2=spec.spec_2, spec_3=spec.spec_3)
     system.simulate()
     
 def run_bugfix_barrage():
@@ -137,7 +138,7 @@ def model_specification():
             model._system.simulate()
         
     except Exception as e:
-        str_e = str(e)
+        str_e = str(e).lower()
         print('Error in model spec: %s'%str_e)
         # raise e
         if 'sugar concentration' in str_e:
@@ -147,6 +148,8 @@ def model_specification():
             run_bugfix_barrage()
             
 model.specification = model_specification
+
+model.exception_hook = 'warn'
 
 baseline_initial = model.metrics_at_baseline()
 baseline = pd.DataFrame(data=np.array([[i for i in baseline_initial.values],]), 
