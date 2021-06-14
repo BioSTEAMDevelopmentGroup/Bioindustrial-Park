@@ -280,6 +280,98 @@ def get_sugar_conc(stream, sugars=()):
     return fermentable_sugar_conc
 
 
+# %% Given a unit, get all units that are upstream or recycle (directly/indirectly) to
+# upstream units; i.e., all units that affect a given unit.
 
+def get_units_influencing(unit, all_units,
+                          # excluded_area='600'):
+                          excluded_area=None):
+    # all_units = list(flowsheet.unit)
+    orig_unit = unit
+    influencing_units = helper_get_units_influencing(unit, orig_unit,
+                          influencing_units=[], all_units=all_units,
+                          excluded_area=excluded_area)
+    return influencing_units
 
+def helper_get_units_influencing(unit, orig_unit=None,
+                          influencing_units=[], all_units=None,
+                          # excluded_area='600'):
+                          excluded_area=None):
+    unit_ins = unit.ins
+    
+    excluded_area_100s_place = None
+    if excluded_area:
+        excluded_area_100s_place = excluded_area[0]
+    for u in all_units:
+        for stream in unit_ins:
+            if stream in u.outs:
+                if u==orig_unit or u.ID[-3]==excluded_area_100s_place:
+                    pass
+                else:
+                    # import pdb
+                    # pdb.set_trace()
+                    if u in influencing_units:
+                        pass
+                    else:
+                        influencing_units.append(u)
+                        helper_get_units_influencing(u, orig_unit, influencing_units, 
+                                                     all_units, excluded_area)
+                        
+    return influencing_units
+
+# %% Given a unit, get all units that are downstream or recycle (directly/indirectly) from
+# downstream units, or which feed into those units; i.e., all units affected by a given unit.
+def get_units_influenced_by(unit, all_units, orig_unit=None,
+                         include_directly_feeding_sourceless_units=False,
+                         include_all_facilities_and_sourcless_units=False):
+    # all_units = list(flowsheet.unit)
+    orig_unit = unit
+    influenced_units = helper_get_units_influenced_by(unit, all_units, 
+                                                   orig_unit, influenced_units=[])
+    other_influenced_facilities_and_sourceless_units = []
+    
+    if include_directly_feeding_sourceless_units:
+        for u in all_units:
+                for i in influenced_units:
+                    for u_out in u.outs:
+                        for i_in in i.ins:
+                            if u_out == i_in:
+                                other_influenced_facilities_and_sourceless_units.append(u)
+    if include_all_facilities_and_sourcless_units:
+        for u in all_units:
+            for u_in in u.ins:
+                if not u_in.source:
+                    other_influenced_facilities_and_sourceless_units.append(u)
+                    
+        other_influenced_facilities_and_sourceless_units =\
+            set(other_influenced_facilities_and_sourceless_units) - set(influenced_units)
+            
+        influenced_units.extend(list(other_influenced_facilities_and_sourceless_units))
+    # del memo
+    return influenced_units
+
+def helper_get_units_influenced_by(unit, all_units, orig_unit=None, influenced_units=[]):
+                          # excluded_area='600'):
+                          # excluded_area=None):
+    unit_outs = unit.outs
+    
+    # excluded_area_100s_place = None
+    # if excluded_area:
+    #     excluded_area_100s_place = excluded_area[0]
+    for u in all_units:
+        for stream in unit_outs:
+            if stream in u.ins:
+                if u==orig_unit:
+                    # or u.ID[-3]==excluded_area_100s_place:
+                    pass
+                else:
+                    # import pdb
+                    # pdb.set_trace()
+                    if u in influenced_units:
+                        pass
+                    else:
+                        influenced_units.append(u)
+                        helper_get_units_influenced_by(u, all_units, orig_unit, influenced_units)
+
+    return influenced_units
 

@@ -1610,11 +1610,20 @@ class CoFermentation(Reactor):
         Rxn('Glucose -> BDO + 2CO2',        'Glucose',   .80), 
         Rxn('Glucose -> Acetoin + 2CO2',               'Glucose',   0.0065),
         Rxn('Glucose -> 6 FermMicrobe',       'Glucose',   0.003),
-        Rxn('Xylose -> BDO + 2CO2',       'Xylose',    0.8*0.8),
+        Rxn('Xylose -> BDO + 2CO2',       'Xylose',    0.80),
         Rxn('Xylose -> Acetoin + 2CO2',       'Xylose',    0.0052),
         Rxn('Xylose -> 5 FermMicrobe',        'Xylose',    0.0024), 
         Rxn('Acetoin -> BDO',               'Acetoin',      .9)
         ])
+        
+        self.CO2_generation_rxns = ParallelRxn([
+        Rxn('Glucose -> 6 CO2 + 6H2O',       'Glucose',   1.-1e-9),
+        Rxn('Xylose -> 5 CO2 + 5H2O',        'Xylose',    1.-1e-9),
+        ])
+        
+        
+        self.glucose_to_CO2_rxn = self.CO2_generation_rxns[0]
+        self.xylose_to_CO2_rxn = self.CO2_generation_rxns[1]
         
         self.glucose_to_BDO_rxn = self.cofermentation_rxns[0]
         self.xylose_to_BDO_rxn = self.cofermentation_rxns[3]
@@ -1646,6 +1655,7 @@ class CoFermentation(Reactor):
         CSL.imass['CSL'] = sum([i.F_vol for i in feeds]) * self.CSL_loading 
         
         self.cofermentation_rxns(effluent.mol)
+        self.CO2_generation_rxns(effluent.mol)
         vapor.phase = 'g'
         vapor.copy_flow(effluent, 'CO2', remove=True)
         effluent.imass['CSL'] = 0

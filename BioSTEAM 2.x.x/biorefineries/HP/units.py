@@ -582,7 +582,7 @@ class EnzymeHydrolysateMixer(Mixer):
       kW=74.57, cost=47200, S=421776*24, CE=CEPCI[2009], n=0.8, BM=2.3)
 class Saccharification(Unit):    
     _N_ins = 1
-    _N_outs = 2
+    _N_outs = 1
     _units= {'Saccharification tank size': 'kg',
              'Slurry flow rate': 'kg/hr'}             
     
