@@ -177,25 +177,24 @@ price = {'MEK': MEK_price,
 
 bst.PowerUtility.price = price['Electricity']
 
-_lps = bst.HeatUtility.get_heating_agent('low_pressure_steam')
-_mps = bst.HeatUtility.get_heating_agent('medium_pressure_steam')
-_hps = bst.HeatUtility.get_heating_agent('high_pressure_steam')
-_mps.T = 233 + 273.15
-_hps.T = 266 + 273.15
-
-_cooling = bst.HeatUtility.get_cooling_agent('cooling_water')
-_chilled = bst.HeatUtility.get_cooling_agent('chilled_water')
-_cooling.regeneration_price = 0
-_cooling.T = 28 + 273.15
-_cooling.T_limit = _cooling.T + 9
+_ha = bst.HeatUtility.get_heating_agent('low_pressure_steam')
+_ha.heat_transfer_efficiency = 0.90
+_ha.T = 529.2
+_ha.P = 44e5
+_ha.regeneration_price = 0.30626
+_CW = bst.HeatUtility.get_cooling_agent('cooling_water')
+_CW.T = 28 + 273.15
+_CW.T_limit = _CW.T + 9
+_CW.regeneration_price = 0
+bst.HeatUtility.get_cooling_agent('chilled_water').heat_transfer_price = 0
 
 # Side steam in CHP not a heat utility, thus will cause problem in TEA utility
 # cost calculation if price not set to 0 here, costs for regeneration of heating
 # and cooling utilities will be considered as CAPEX and OPEX of CHP and CT, respectively
-for i in (_lps, _mps, _hps, _cooling, _chilled):
-    i.heat_transfer_price = i.regeneration_price = 0
-    # if i == _cooling: continue
-    # i.heat_transfer_efficiency = 0.85
+# for i in (_lps, _mps, _hps, _cooling, _chilled):
+#     i.heat_transfer_price = i.regeneration_price = 0
+#     # if i == _cooling: continue
+#     # i.heat_transfer_efficiency = 0.85
 
 
 # %%

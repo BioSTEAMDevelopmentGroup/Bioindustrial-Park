@@ -655,13 +655,23 @@ class SeedTrain(Unit):
         Rxn('Xylose -> Acetoin + CO2',       'Xylose',    0.052*.8),
         Rxn('Xylose -> 5 FermMicrobe',        'Xylose',    0.024*.8),
         ])
+        
+        self.CO2_generation_rxns = ParallelRxn([
+        Rxn('Glucose -> 6 CO2 + 6H2O',       'Glucose',   1.-1e-9),
+        Rxn('Xylose -> 5 CO2 + 5H2O',        'Xylose',    1.-1e-9),
+        ])
+        
+        self.glucose_to_CO2_rxn = self.CO2_generation_rxns[0]
+        self.xylose_to_CO2_rxn = self.CO2_generation_rxns[1]
+
 
     def _run(self):
         feed = self.ins[0]
         effluent, vent = self.outs
         effluent.copy_like(feed)
 
-        self.cofermentation_rxns(effluent.mol)
+        self.cofermentation_rxns(effluent)
+        self.CO2_generation_rxns(effluent)
         vent.copy_flow(effluent, 'CO2', remove=True)
         # Assume all CSL is used up
         effluent.imol['CSL'] = 0 
@@ -1508,13 +1518,16 @@ class DehydrationReactor(Reactor):
 
             'TCP catalyst': 1}
     mcat_frac = 0.03 # fraction of catalyst by weight in relation to the reactant (BDO)
-    dehydration_rxns = ParallelRxn([
-            #   Reaction definition                                       Reactant   Conversion
+    
+    def _setup(self):
+        super()._setup()
+        self.dehydration_rxns = ParallelRxn([
+            #   Reaction definition         Reactant   Conversion
             Rxn('BDO -> MEK + H2O',         'BDO',   0.81),
             Rxn('BDO -> IBA + H2O',         'BDO',   0.09)
-                ])
-    BDO_to_MEK_rxn = dehydration_rxns[0]
-    BDO_to_IBA_rxn = dehydration_rxns[1]
+        ])
+        self.BDO_to_MEK_rxn = self.dehydration_rxns[0]
+        self.BDO_to_IBA_rxn = self.dehydration_rxns[1]
     
     def _run(self):
         feed, recycle = self.ins
@@ -1549,7 +1562,7 @@ _316_over_304 = 316/304
       # (304, 306, 311, and 312 in ref [3])
       kW=74.57, cost=47200, S=(42607+443391+948+116), CE=CEPCI[2009], n=0.8, BM=2.3)  
 class CoFermentation(Reactor):
-    _N_ins = 3
+    _N_ins = 4
     _N_outs = 2
     _units= {**Reactor._units,
             'Fermenter size': 'kg',
@@ -1620,7 +1633,6 @@ class CoFermentation(Reactor):
         Rxn('Glucose -> 6 CO2 + 6H2O',       'Glucose',   1.-1e-9),
         Rxn('Xylose -> 5 CO2 + 5H2O',        'Xylose',    1.-1e-9),
         ])
-        
         
         self.glucose_to_CO2_rxn = self.CO2_generation_rxns[0]
         self.xylose_to_CO2_rxn = self.CO2_generation_rxns[1]
@@ -1716,6 +1728,7 @@ class CoFermentation(Reactor):
             hu_single_rx = hx.heat_utilities[0]
             hu_total.copy_like(hu_single_rx)
             hu_total.scale(N)
+
             
 class HydrogenationReactor(Reactor):
     """
@@ -1730,11 +1743,6 @@ class HydrogenationReactor(Reactor):
             'Kie-CMC-Ni catalyst': 1,
             'Heat exchangers': 3.17}
     mcat_frac = 0.05 # kg per m3/h
-    hydrgenation_rxns = ParallelRxn([
-            #   Reaction definition                                       Reactant   Conversion
-            Rxn('IBA + H2 -> Isobutanol',         'IBA',   0.86) # Zhou et al. 2003: Hydrogenation of aldehydes catalyzed by kieselguhr-supported carboxymethylcellulose-nickel complex
-                ])                                      
-    IBA_to_IBO_rxn = hydrgenation_rxns[0]
     
     def __init__(self, ID='', ins=None, outs=(), thermo=None, *, T=25+273.15,
                   P=101325, V_wf=0.8, length_to_diameter=2, tau = 2,
@@ -1754,6 +1762,11 @@ class HydrogenationReactor(Reactor):
         self.vessel_type = vessel_type
         self.heat_exchanger = HXutility(None, None, None, T=T)
         self.tau = tau
+        self.hydrgenation_rxns = ParallelRxn([
+            #   Reaction definition                                       Reactant   Conversion
+            Rxn('IBA + H2 -> Isobutanol',         'IBA',   0.86) # Zhou et al. 2003: Hydrogenation of aldehydes catalyzed by kieselguhr-supported carboxymethylcellulose-nickel complex
+                ])                                      
+        self.IBA_to_IBO_rxn = self.hydrgenation_rxns[0]
         self.X = self.hydrgenation_rxns[0].X = X
         
     def _run(self):

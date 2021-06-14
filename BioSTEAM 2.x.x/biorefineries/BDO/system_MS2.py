@@ -111,6 +111,25 @@ BDO_tea = CellulosicEthanolTEA(system=BDO_sys, IRR=0.10, duration=(2016, 2046),
         labor_burden=0.90, property_insurance=0.007, maintenance=0.03,
         steam_power_depreciation='MACRS20', boiler_turbogenerator=u.BT)
 
+# sub_units = BDO_sys.units[:BDO_sys.units.index(u.R401)]
+# sub_sys = bst.System(sub_units)
+# sub_tea = CellulosicEthanolTEA(system=sub_sys, IRR=0.10, duration=(2016, 2046),
+#         depreciation='MACRS7', income_tax=0.21, operating_days=0.9*365,
+#         lang_factor=None, construction_schedule=(0.08, 0.60, 0.32),
+#         startup_months=3, startup_FOCfrac=1, startup_salesfrac=0.5,
+#         startup_VOCfrac=0.75, WC_over_FCI=0.05,
+#         finance_interest=0.08, finance_years=10, finance_fraction=0.4,
+#         # biosteam Splitters and Mixers have no cost, 
+#         # cost of all wastewater treatment units are included in WWT_cost,
+#         # BT is not included in this TEA
+#         OSBL_units=bst.get_OSBL(sub_sys.units),
+#         warehouse=0.04, site_development=0.09, additional_piping=0.045,
+#         proratable_costs=0.10, field_expenses=0.10, construction=0.20,
+#         contingency=0.10, other_indirect_costs=0.10, 
+#         labor_cost=3212962*get_flow_tpd()/2205,
+#         labor_burden=0.90, property_insurance=0.007, maintenance=0.03,
+#         steam_power_depreciation='MACRS20', boiler_turbogenerator=u.BT)
+
 BDO_sys._TEA = BDO_tea
 
 # %% 
