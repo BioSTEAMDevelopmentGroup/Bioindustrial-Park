@@ -164,7 +164,7 @@ spec = ProcessSpecification(
     reaction_name='fermentation_reaction',
     substrates=('Xylose', 'Glucose'),
     products=('BDO',),
-    spec_1=0.4,
+    spec_1=0.36,
     spec_2=109.9,
     spec_3=1.,
     xylose_utilization_fraction = 0.80,
@@ -185,7 +185,6 @@ spec.load_spec_1 = spec.load_yield
 spec.load_spec_2 = spec.load_titer
 spec.load_spec_3 = spec.load_productivity
 
-spec.load_specifications(0.49, 109.9, 1.)
 
 # spec = ProcessSpecification(
 #     evaporator = u.F301,
@@ -295,6 +294,7 @@ def simulate_and_print():
 
 simulate_and_print()
 
+spec.load_specifications(0.36, 109.9, 1.)
 # %% 
 
 # =============================================================================

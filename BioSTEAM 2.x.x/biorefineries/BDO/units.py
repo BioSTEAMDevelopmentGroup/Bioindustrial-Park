@@ -564,18 +564,21 @@ class SeedTrain(Unit):
         # FermMicrobe reaction from Table 14 on Page 31 of Humbird et al.
         self.cofermentation_rxns = ParallelRxn([
         #      Reaction definition            Reactant    Conversion
-        Rxn('Glucose -> BDO + 2CO2',        'Glucose',   .90*.8), # .9099
+        Rxn('Glucose -> 2 BDO',        'Glucose',   .36*.8), # .9099
         Rxn('Glucose -> Acetoin + 2CO2',               'Glucose',   0.065*.8),
         Rxn('Glucose -> 6 FermMicrobe',       'Glucose',   0.03*.8),
-        Rxn('Xylose -> BDO + CO2',       'Xylose',    0.72*.8),
-        Rxn('Xylose -> Acetoin + CO2',       'Xylose',    0.052*.8),
-        Rxn('Xylose -> 5 FermMicrobe',        'Xylose',    0.024*.8),
+        Rxn('3 Xylose -> 5 BDO',       'Xylose',    0.36*.8),
+        Rxn('Xylose -> Acetoin + CO2',       'Xylose',    0.065*.8),
+        Rxn('Xylose -> 5 FermMicrobe',        'Xylose',    0.03*.8),
         ])
         
         self.CO2_generation_rxns = ParallelRxn([
         Rxn('Glucose -> 6 CO2 + 6H2O',       'Glucose',   1.-1e-9),
         Rxn('Xylose -> 5 CO2 + 5H2O',        'Xylose',    1.-1e-9),
         ])
+        
+        self.glucose_to_biomass_rxn = self.cofermentation_rxns[2]
+        self.xylose_to_biomass_rxn = self.cofermentation_rxns[5]
         
         self.glucose_to_CO2_rxn = self.CO2_generation_rxns[0]
         self.xylose_to_CO2_rxn = self.CO2_generation_rxns[1]
@@ -1536,10 +1539,10 @@ class CoFermentation(Reactor):
         # FermMicrobe reaction from Table 14 on Page 31 of Humbird et al.
         self.cofermentation_rxns = ParallelRxn([
         #      Reaction definition            Reactant    Conversion
-        Rxn('Glucose -> BDO + 2CO2',        'Glucose',   .80), 
+        Rxn('Glucose -> 2 BDO',        'Glucose',   .36), 
         Rxn('Glucose -> Acetoin + 2CO2',               'Glucose',   0.0065),
         Rxn('Glucose -> 6 FermMicrobe',       'Glucose',   0.003),
-        Rxn('Xylose -> BDO + 2CO2',       'Xylose',    0.80),
+        Rxn('3 Xylose -> 5 BDO',       'Xylose',    0.36),
         Rxn('Xylose -> Acetoin + 2CO2',       'Xylose',    0.0065),
         Rxn('Xylose -> 5 FermMicrobe',        'Xylose',    0.003), 
         Rxn('Acetoin -> BDO',               'Acetoin',      .9)

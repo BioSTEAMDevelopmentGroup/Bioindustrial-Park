@@ -20,7 +20,7 @@ from matplotlib.ticker import AutoMinorLocator as AML
 
 # from BDO.system import BDO_sys, BDO_tea, R302, spec
 # from BDO.system import MEK as product
-from BDO.system_MS2 import BDO_sys, BDO_tea, R302, spec, get_GWP, get_non_bio_GWP, get_FEC, get_SPED
+from BDO.system_MS2 import BDO_sys, BDO_tea, BDO_lca, spec, u
 from BDO.system_MS2 import MEK as product
 
 from matplotlib import pyplot as plt
@@ -37,6 +37,7 @@ import matplotlib.colors as mcolors
 ig = np.seterr(invalid='ignore')
 bst.speed_up()
 
+R302 = u.R302
 # %%Colors
 marketrange_shadecolor = (*colors.neutral.RGBn, 0.)
 
@@ -285,7 +286,7 @@ get_BDO_inhibitors_conc = lambda: 1000*sum(R302.outs[0].imass['AceticAcid', 'Fur
 # get_rel_impact_t_y = lambda: rel_impact_fn(steps)
 
 # BDO_metrics = [get_BDO_MPSP, get_BDO_sugars_conc, get_BDO_inhibitors_conc]
-BDO_metrics = [get_BDO_MPSP, get_GWP, get_FEC]
+BDO_metrics = [get_BDO_MPSP, lambda: BDO_lca.GWP, lambda: BDO_lca.FEC]
 
 
 
@@ -303,23 +304,23 @@ BDO_metrics = [get_BDO_MPSP, get_GWP, get_FEC]
 
 
 # %% Generate 3-specification meshgrid and set specification loading functions
-steps = 60
+steps = 5
 
 # Yield, titer, productivity (rate)
-spec_1 = np.linspace(0.4,0.99, steps) # yield
-spec_2 = np.linspace(90, 225, steps) # titer
+spec_1 = np.linspace(0.1,0.8, steps) # yield
+spec_2 = np.linspace(20, 200, steps) # titer
 # spec_1 = np.linspace(0.2, 0.99, steps) # yield
 # spec_2 = np.linspace(45, 225, steps) # titer
-spec_3 = np.array([1]) # productivity
+spec_3 = np.array([1.]) # productivity
 spec.load_spec_1 = spec.load_yield
 spec.load_spec_2 = spec.load_titer
 spec.load_spec_3 = spec.load_productivity
 xlabel = "Yield"
 ylabel = 'Titer [$\mathrm{g} \cdot \mathrm{L}^{-1}$]'
 # xticks = [0.33, 0.66, 0.99]
-xticks = [.4, 0.6, 0.8, 1.0]
+xticks = [.0, 0.25, 0.5, 0.75, 1.0]
 # yticks = [75, 150, 225]
-yticks = [90, 135, 180, 225]
+yticks = [0, 50, 100, 150, 200]
 # xticks = [0.2, 0.6, 0.99]
 # yticks = [45, 135, 225]
 spec_3_units = "$\mathrm{g} \cdot \mathrm{L}^{-1} \cdot \mathrm{hr}^{-1}$"

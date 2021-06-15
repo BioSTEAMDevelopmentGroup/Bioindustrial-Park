@@ -46,7 +46,7 @@ def evaluate_across_specs(spec, system,
             system.empty_recycles()
             print('Loading and simulating with baseline specifications ...')
             spec.load_yield(0.49)
-            spec.load_titer(54.8)
+            spec.load_titer(109.9)
             system.simulate()
             print('Loading and simulating with required specifications ...')
             spec.load_specifications(spec_1=spec_1, spec_2=spec_2, spec_3=spec_3)

@@ -20,6 +20,8 @@ import biosteam as bst
 import thermosteam as tmo
 from biorefineries.BDO.chemicals_data import chems
 
+tmo.settings.set_thermo(chems)
+
 bst.CE = 541.7 # year 2016
 _kg_per_ton = 907.18474
 _lb_per_kg = 2.20462

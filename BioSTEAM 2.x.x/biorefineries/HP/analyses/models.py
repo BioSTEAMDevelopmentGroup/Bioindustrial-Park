@@ -30,7 +30,7 @@ from biosteam import main_flowsheet as find
 from biosteam.evaluation import Model, Metric
 from biosteam.evaluation.evaluation_tools.parameter import Setter
 from biorefineries.HP.system_light_lle_vacuum_distillation import process_groups_dict, HP_tea, HP_no_BT_tea,\
-flowsheet, unit_groups, get_GWP, get_FEC, CFs, spec, process_groups, process_groups_dict,\
+flowsheet, get_GWP, get_FEC, CFs, spec, process_groups, process_groups_dict,\
 get_material_cost_breakdown, get_GWP_by_ID, get_FEC_by_ID, get_ng_GWP, get_ng_FEC,\
 get_FGHTP_GWP, get_feedstock_FEC, get_electricity_demand_non_cooling_GWP, get_electricity_demand_non_cooling_FEC,\
 get_direct_emissions_GWP, get_net_electricity_GWP, get_net_electricity_FEC,\
