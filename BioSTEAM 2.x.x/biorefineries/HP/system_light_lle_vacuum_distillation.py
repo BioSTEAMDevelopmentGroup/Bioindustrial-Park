@@ -931,7 +931,7 @@ HP_no_BT_tea = HP_tea
 # Simulate system and get results
 # =============================================================================
 
-num_sims = 2
+num_sims = 3
 num_solve_tea = 3
 def get_AA_MPSP():
     for i in range(num_sims):

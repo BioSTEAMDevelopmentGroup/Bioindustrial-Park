@@ -30,7 +30,7 @@ from matplotlib.ticker import AutoMinorLocator as AML
 
 
 from biorefineries.HP.system_light_lle_vacuum_distillation import (
-    HP_sys, HP_tea, HP_lca, R302, spec, get_GWP, get_ng_GWP, get_FEC, get_SPED,
+    HP_sys, HP_tea, HP_lca, R302, spec, get_GWP, get_ng_GWP, get_FEC, get_SPED, get_AA_MPSP,
     AA as product
 )
 
@@ -455,10 +455,10 @@ HP_metrics = [solve_AA_price, lambda: HP_lca.GWP, lambda: HP_lca.FEC]
  
 # HP_metrics = [solve_AA_price, lambda:0, lambda:0]
 # %% Generate 3-specification meshgrid and set specification loading functions
-steps = 30
+steps = 20
 
 # Yield, titer, productivity (rate)
-spec_1 = np.linspace(0.05, 0.95, steps) # yield
+spec_1 = np.linspace(0.05, 0.87, steps) # yield
 spec_2 = np.linspace(5., 330., steps) # titer
 # spec_1 = np.linspace(0.2, 0.99, steps) # yield
 # spec_2 = np.linspace(45, 225, steps) # titer
@@ -850,8 +850,8 @@ Metric_3_tickmarks = tickmarks(
 
 # Metric_3_tickmarks = [0.0*1000, 0.24*1000, 0.48*1000, 0.72*1000, 0.96*1000, 1.2*1000]
 
-# Metric_1_tickmarks = [0, 2500, 5000, 7500, 10000, 12500, 15000]
-Metric_1_tickmarks = [1000, 2000, 2500, 3000, 3500,]
+Metric_1_tickmarks = [0, 500, 1000, 1500, 2000, 2500, 3000, 3500, 4000]
+# Metric_1_tickmarks = [0., 0.5, 1., 1.5, 2., 2.5, 3.]
 # Metric_2_tickmarks = [0, 20., 40., 60., 80., 100.]
 Metric_2_tickmarks = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
 # # Metric_3_tickmarks = [60, 70, 80, 90, 100, 110, 120]

@@ -546,12 +546,12 @@ class CoFermentation(Unit):
 
         self.cofermentation_rxns = ParallelRxn([
         #      Reaction definition            Reactant    Conversion
-        Rxn('Glucose -> TAL',        'Glucose',   .25), 
+        Rxn('Glucose -> 1.42856 TAL',        'Glucose',   .25), 
         Rxn('Glucose -> VitaminA',               'Glucose',   0.1), # retinol
         Rxn('Glucose -> VitaminD2',               'Glucose',   0.1), # ergosterol
         Rxn('Glucose -> 6 FermMicrobe',       'Glucose',   0.1),
         
-        Rxn('Xylose -> TAL',       'Xylose',    0.25),
+        Rxn('Xylose -> 1.42856 TAL',       'Xylose',    0.25),
         Rxn('Xylose -> VitaminA',       'Xylose',    0.1),
         Rxn('Xylose -> VitaminD2',       'Xylose',    0.1),
         Rxn('Xylose -> 5 FermMicrobe',        'Xylose',    0.1),
@@ -607,7 +607,7 @@ class CoFermentation(Unit):
         # ss = Stream(None)
         # effluent.copy_like(feed)
         effluent.T = vapor.T = self.T
-        CSL.imass['CSL'] = feed.F_vol * self.CSL_loading 
+        CSL.imass['CSL'] = (sugars.F_vol+feed.F_vol) * self.CSL_loading 
         
         self.cofermentation_rxns(effluent.mol)
         vapor.imol['CO2'] = effluent.imol['CO2']
@@ -663,15 +663,15 @@ class SeedTrain(Unit):
         # FermMicrobe reaction from Table 14 on Page 31 of Humbird et al.
         self.cofermentation_rxns = ParallelRxn([
         #      Reaction definition            Reactant    Conversion
-        Rxn('Glucose -> TAL',        'Glucose',   .5*ferm_ratio), 
+        Rxn('Glucose -> 1.42856 TAL',        'Glucose',   .5*ferm_ratio), 
         Rxn('Glucose -> VitaminA',               'Glucose',   0.1*ferm_ratio), # retinol
         Rxn('Glucose -> VitaminD2',               'Glucose',   0.1*ferm_ratio), # ergosterol
         Rxn('Glucose -> 6 FermMicrobe',       'Glucose',   0.1*ferm_ratio),
         
-        Rxn('Xylose -> TAL',       'Xylose',    0.5*0.8*ferm_ratio),
-        Rxn('Xylose -> VitaminA',       'Xylose',    0.1*0.8*ferm_ratio),
-        Rxn('Xylose -> VitaminD2',       'Xylose',    0.1*0.8*ferm_ratio),
-        Rxn('Xylose -> 5 FermMicrobe',        'Xylose',    0.1*0.8*ferm_ratio),
+        Rxn('Xylose -> 1.42856 TAL',       'Xylose',    0.5*ferm_ratio),
+        Rxn('Xylose -> VitaminA',       'Xylose',    0.1*ferm_ratio),
+        Rxn('Xylose -> VitaminD2',       'Xylose',    0.1*ferm_ratio),
+        Rxn('Xylose -> 5 FermMicrobe',        'Xylose',    0.1*ferm_ratio),
         ])
 
     def _run(self):

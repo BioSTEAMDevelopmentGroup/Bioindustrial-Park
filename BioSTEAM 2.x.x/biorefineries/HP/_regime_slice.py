@@ -15,11 +15,16 @@ from matplotlib.ticker import AutoMinorLocator as AML
 
 # from biorefineries.HP.system import HP_sys, HP_tea, R302, spec
 # from biorefineries.HP.system import MEK as product
+# from biorefineries.HP.system_light_lle_vacuum_distillation import (
+#     HP_sys, HP_tea, R302, spec, get_GWP, get_FEC, get_electricity_FEC, get_electricity_use,
+#     get_material_FEC, get_electricity_FEC, get_feedstock_FEC, get_ng_FEC,
+#     BT, HXN, D401, F301, F401, D402
+# )
+
 from biorefineries.HP.system_light_lle_vacuum_distillation import (
-    HP_sys, HP_tea, R302, spec, get_GWP, get_FEC, get_electricity_FEC, get_electricity_use,
-    get_material_FEC, get_electricity_FEC, get_feedstock_FEC, get_ng_FEC,
-    BT, HXN, D401, F301, F401, D402
+    HP_sys, HP_tea, R302, spec, BT, HXN, D401, F301, F401, D402 
 )
+
 from biorefineries.HP.system_light_lle_vacuum_distillation import AA as product
 
 from matplotlib import pyplot as plt
@@ -61,15 +66,15 @@ get_T_D402 = lambda: D402.outs[0].T
 HP_metrics = [
     # get_sc, 
     # get_gc, 
-    # get_lps, 
-    # get_mps, 
+    get_lps, 
+    get_mps, 
     # get_hps,
     # get_cow, 
     # get_chw, 
     get_hxn_lps,
     get_hxn_mps,
-    get_hxn_cow,
-    get_hxn_chw,
+    # get_hxn_cow,
+    # get_hxn_chw,
     # get_T_D401,
     # get_T_F301,
     # get_T_F401,
@@ -80,10 +85,10 @@ HP_metrics = [
 ]
 
 # %% Generate 3-specification meshgrid and set specification loading functions
-steps = 80
+steps = 20
 
 # Yield, titer, productivity (rate)
-spec_1 = all_yields = np.array([0.6, 0.8]) # yield
+spec_1 = all_yields = np.array([0.6, 0.8, 0.95]) # yield
 spec_2 = all_titers = np.linspace(30, 300, steps) # titer
 spec_3 = np.array([0.79]) # productivity
 spec.load_spec_1 = spec.load_yield
@@ -103,15 +108,15 @@ HP_data = HP_data[..., 0] # Only one productivity
 metric_names = [
     # 'SC',
     # 'GC',
-    # 'LPS',
-    # 'MPS',
+    'LPS',
+    'MPS',
     # 'HPS',
     # 'Co.W',
     # 'Ch.W',
     'HXN LPS',
     'HXN MPS',
-    'HXN Co.W',
-    'HXN Ch.W',
+    # 'HXN Co.W',
+    # 'HXN Ch.W',
     'EC',
     'EP',
     'nEC',

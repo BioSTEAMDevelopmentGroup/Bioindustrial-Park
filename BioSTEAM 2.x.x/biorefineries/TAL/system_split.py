@@ -1511,15 +1511,18 @@ spec = ProcessSpecification(
     reaction_name='fermentation_reaction',
     substrates=('Xylose', 'Glucose'),
     products=('TAL',),
-    spec_1=100,
-    spec_2=0.909,
-    spec_3=18.5,
+    spec_1=0.203,
+    spec_2=35.9,
+    spec_3=0.21,
     path = (M304_H, M304_H_P),
     xylose_utilization_fraction = 0.80,
     feedstock = feedstock,
     dehydration_reactor = None,
     byproduct_streams = None,
     evaporator_pump = F301_P)
+spec.load_spec_1 = spec.load_yield
+spec.load_spec_2 = spec.load_titer
+spec.load_spec_3 = spec.load_productivity
 
 # path = (F301, R302)
 # @np.vectorize
@@ -1606,7 +1609,10 @@ def simulate_and_print():
     # print('--------------------\n')
 
 # simulate_and_print()
-TAL_sys.simulate()
+# TAL_sys.simulate()
+get_SA_MPSP()
+spec.load_specifications(0.203, 35.9, 0.21)
+simulate_and_print()
 
 # %% 
 

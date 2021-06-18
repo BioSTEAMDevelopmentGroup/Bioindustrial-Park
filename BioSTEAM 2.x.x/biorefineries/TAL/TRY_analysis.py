@@ -292,14 +292,14 @@ TAL_metrics = [get_SA_MPSP, get_TAL_sugars_conc, get_TAL_inhibitors_conc]
 # TAL_metrics = [get_TAL_MPSP, get_GWP, get_FEC]
 
 # %% Generate 3-specification meshgrid and set specification loading functions
-steps = 8
+steps = 5
 
 # Yield, titer, productivity (rate)
 spec_1 = np.linspace(0.15, 0.95, steps) # yield
 spec_2 = np.linspace(10, 100, steps) # titer
 # spec_1 = np.linspace(0.2, 0.99, steps) # yield
 # spec_2 = np.linspace(45, 225, steps) # titer
-spec_3 = np.array([1.,]) # productivity
+spec_3 = np.array([0.21,]) # productivity
 spec.load_spec_1 = spec.load_yield
 spec.load_spec_2 = spec.load_titer
 spec.load_spec_3 = spec.load_productivity

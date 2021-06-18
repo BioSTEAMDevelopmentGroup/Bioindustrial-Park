@@ -386,7 +386,7 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
         """
         # print(yield_)
         reactor = self.reactor
-        self.spec_1 = reactor.glucose_to_HP_rxn.X = reactor.xylose_to_HP_rxn.X = yield_
+        self.spec_1 = reactor.glucose_to_HP_rxn.X = yield_
         
         reactor.xylose_to_HP_rxn.X = yield_
         # rem_glucose = min(0.13, 1. - reactor.glucose_to_HP_rxn.X)
@@ -399,14 +399,14 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
         # reactor.xylose_to_glycerol_rxn.X = (25./130.) * rem_xylose
         # reactor.xylose_to_biomass_rxn.X = (50./130.) * rem_xylose
         
-        reactor.xylose_to_HP_rxn.X = yield_
+        # reactor.xylose_to_HP_rxn.X = yield_
         
         rem_glucose = min(0.08, (1. - reactor.glucose_to_biomass_rxn.X) - reactor.glucose_to_HP_rxn.X)
         reactor.glucose_to_acetic_acid_rxn.X = (40./80.) * rem_glucose
         reactor.glucose_to_glycerol_rxn.X = (40./80.) * rem_glucose
         # reactor.glucose_to_biomass_rxn.X = (50./130.) * rem_glucose
         
-        rem_xylose = min(0.08, (1. - reactor.glucose_to_biomass_rxn.X) - reactor.xylose_to_HP_rxn.X)
+        rem_xylose = min(0.08, (1. - reactor.xylose_to_biomass_rxn.X) - reactor.xylose_to_HP_rxn.X)
         reactor.xylose_to_acetic_acid_rxn.X = (40./80.) * rem_xylose
         reactor.xylose_to_glycerol_rxn.X = (40./80.) * rem_xylose
         # reactor.xylose_to_biomass_rxn.X = (50./130.) * rem_glucose
@@ -451,7 +451,7 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
     def load_feedstock_price(self, price):
         feedstock = self.feedstock
         mc = feedstock.imass['Water']/feedstock.F_mass
-        self.feedstock.price = price / _kg_per_ton * (1-mc) # price per dry ton --> price per wet kg
+        self.feedstock.price = price * (1-mc) / _kg_per_ton # price per dry ton --> price per wet kg
         # self.feedstock.price = price / _kg_per_ton 
         self.spec_2 = price
         
@@ -493,21 +493,21 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
     def load_feedstock_carbohydrate_content(self, carbohydrate_content):
         self.spec_1 = carbohydrate_content
         F_mass = self.feedstock_mass
-        sugars_IDs = ('Glucan', 'Xylan')
+        carbohydrate_IDs = ('Glucan', 'Xylan')
         feedstock = self.feedstock
-        sugars = feedstock.imass[sugars_IDs]
-        z_sugars = carbohydrate_content * sugars / sugars.sum()
+        carbohydrate = feedstock.imass[carbohydrate_IDs]
+        z_carbohydrate = carbohydrate_content * carbohydrate / carbohydrate.sum()
         F_mass_water = float(feedstock.imass['Water'])
         feedstock.imass['Water'] = 0.
         F_mass_dw =  feedstock.F_mass
         
-        mass_sugars = F_mass_dw * z_sugars
-        F_mass_sugars = mass_sugars.sum()
-        feedstock.imass[sugars_IDs] = 0.
+        mass_carbohydrate = F_mass_dw * z_carbohydrate
+        F_mass_carbohydrate = mass_carbohydrate.sum()
+        feedstock.imass[carbohydrate_IDs] = 0.
        
         # F_mass_dw = feedstock.F_mass - feedstock.imass['Water']
-        feedstock.F_mass = F_mass - F_mass_sugars - F_mass_water
-        feedstock.imass[sugars_IDs] = mass_sugars
+        feedstock.F_mass = F_mass - F_mass_carbohydrate - F_mass_water
+        feedstock.imass[carbohydrate_IDs] = mass_carbohydrate
         feedstock.imass['Water'] = F_mass_water
         # for unit in self.pre_conversion_units:
         #     unit.simulate()
