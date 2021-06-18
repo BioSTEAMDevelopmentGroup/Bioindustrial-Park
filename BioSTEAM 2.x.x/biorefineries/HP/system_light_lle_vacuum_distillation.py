@@ -408,16 +408,17 @@ def create_HP_sys(ins, outs):
         F401.heat_utilities = tuple()
         F401._installed_cost = 0.
     # F401._cost = F401_no_run_cost
-        
-    F401_H = bst.units.HXutility('F401_H', ins = F401-0, T = 80. + 273.15, rigorous = False)
-    F401_P = bst.units.Pump('F401_P', ins=F401_H-0)
+    
+    F401_P = bst.units.Pump('F401_P', ins=F401-0, P=101325.)    
+    F401_H = bst.units.HXutility('F401_H', ins = F401_P-0, T = 80. + 273.15, rigorous = False)
+    
 
     
     Kds = dict(IDs=('HP', 'Water', 'Hexanol', 'AceticAcid'),
                K=np.array([1./1.9379484051844278, 3.690183610720956, 0.0060176892697821486, 1./0.4867537504125923]), # T = 80. + 273.15 K
                phi = 0.5)
     
-    S404 = bst.units.MultiStageMixerSettlers('S404', ins = (F401_P-0, M401_H-0),
+    S404 = bst.units.MultiStageMixerSettlers('S404', ins = (F401_H-0, M401_H-0),
                                          outs = ('raffinate', 'extract'),
                                          N_stages = 15, partition_data = Kds,) 
                               
@@ -528,7 +529,9 @@ def create_HP_sys(ins, outs):
     def mass_percent_helper(chemmass, totmass):
         return chemmass/totmass
     
-    M402 = bst.units.Mixer('M402', ins=(D401-1,
+    D401_bP = bst.Pump('D401_bP', ins=D401-1, P=101325.)
+    
+    M402 = bst.units.Mixer('M402', ins=(D401_bP-0,
                                         'dilution_water2'))
     
     def M402_objective_fn(Water_imol):
@@ -567,13 +570,12 @@ def create_HP_sys(ins, outs):
                                         partial_condenser=False,
                                         vessel_material = 'Stainless steel 316')
     
-    D402_t_H = bst.units.HXutility('D402_H', ins=D402-0, T = 330., rigorous=True)
-    
+    D402_dP = bst.Pump('D402_dP', ins=D402-0, P=101325.)
     # recycling water makes system convergence fail
     # D402-0-3-R402
     
     
-    D402_P = units.HPPump('D402_P', ins=D402-1)
+    D402_P = units.HPPump('D402_P', ins=D402-1, P=101325.)
     
     
     # D402_H = bst.units.HXutility('D402_H', ins=D402_P-0, T = 330., rigorous=True)
@@ -586,17 +588,18 @@ def create_HP_sys(ins, outs):
                                         Lr=0.9995, Hr=0.9995, k=1.05, P=101325/20.,
                                         partial_condenser=False,
                                         vessel_material = 'Stainless steel 316')
+    D403_dP = units.HPPump('D403_dP', ins=D403-0, P=101325.)
+    D403_bP = units.HPPump('D403_bP', ins=D403-1, P=101325.)
+    D403_bP-0-2-R402
     
-    D403-1-2-R402
-    
-    D403_H = bst.units.HXutility('D403_H', ins=D403-0, T = 25.+273.15, rigorous=True)
+    D403_H = bst.units.HXutility('D403_H', ins=D403_dP-0, T = 25.+273.15, rigorous=True)
     D403_P = units.HPPump('D403_P', ins=D403_H-0)
     
     separation_group = UnitGroup('separation_group', 
                                    units=(S401, R401, R401_H, R401_P, S402,
                                           F401, F401_P, M401, S404, D401,
-                                          D401_H_P, D401_P, M402, 
-                                          R402, R402_H, D402, D402_t_H, D402_P, D403, D403_P))
+                                          D403_dP, D403_bP, D402_dP, D401_H_P, D401_P, M402, 
+                                          R402, R402_H, D402, D402_P, D403, D403_P))
     process_groups.append(separation_group)
     
     # %% 
@@ -619,7 +622,7 @@ def create_HP_sys(ins, outs):
     # =============================================================================
     
     # Mix waste liquids for treatment
-    M501 = bst.units.Mixer('M501', ins=(F301_P-0, D402_t_H-0, F401-1, S404-0)) # without sugars recycle
+    M501 = bst.units.Mixer('M501', ins=(F301_P-0, D402_dP-0, F401-1, S404-0)) # without sugars recycle
     
     # This represents the total cost of wastewater treatment system
     WWT_cost = units.WastewaterSystemCost('WWT_cost', ins=M501-0)
