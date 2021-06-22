@@ -327,14 +327,14 @@ def create_agile_tea(units, OSBL_units=None, ignored_units=()):
         boiler_turbogenerator=BT)
     return tea
 
-def create_tea(sys, OSBL_units=None, ignored_units=(), TEA=None):
+def create_tea(sys, OSBL_units=None, ignored_units=(), cls=None):
     if OSBL_units is None: OSBL_units = bst.get_OSBL(sys.units)
     try:
         BT = tmo.utils.get_instance(OSBL_units, (bst.BoilerTurbogenerator, bst.Boiler))
     except:
         BT = None
-    if TEA is None: TEA = CellulosicEthanolTEA
-    tea = TEA(
+    if cls is None: cls = CellulosicEthanolTEA
+    tea = cls(
         system=sys, 
         IRR=0.10, 
         duration=(2007, 2037),
