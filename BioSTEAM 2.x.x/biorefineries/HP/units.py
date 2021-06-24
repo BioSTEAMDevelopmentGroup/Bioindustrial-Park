@@ -1679,7 +1679,7 @@ class DehydrationReactor(Reactor):
         # effluent = feed.copy()
         effluent.mix_from([feed, recycled_HP, recycled_water])
         effluent.T = self.T
-        # effluent.P = feed.P
+        effluent.P = feed.P
         self.dehydration_reactions(effluent.mol)
         effluent.phase = 'l'
         
@@ -1693,7 +1693,8 @@ class DehydrationReactor(Reactor):
         N = self.design_results['Number of reactors']
         single_rx_effluent = self.outs[0].copy()
         single_rx_effluent.mol[:] /= N
-        hx.simulate_as_auxiliary_exchanger(duty=(self.outs[0].H - self.ins[0].H)/N, 
+        
+        hx.simulate_as_auxiliary_exchanger(duty=(self.Hnet)/N, 
                                             stream=single_rx_effluent)
         hu_total = self.heat_utilities[0]
         hu_single_rx = hx.heat_utilities[0]
