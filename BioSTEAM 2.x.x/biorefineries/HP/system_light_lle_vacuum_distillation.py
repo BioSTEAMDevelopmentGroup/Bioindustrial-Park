@@ -554,6 +554,7 @@ def create_HP_sys(ins, outs):
                                     outs = ('dilute_acryclic_acid', 'spent_TiO2_catalyst'),
                                     tau = 57.34/1.5, # Dishisha et al.
                                     T = 230. + 273.15,
+                                    P = D401_P.P,
                                     vessel_material='Stainless steel 316')
     R402.heat_utilities[0].heat_transfer_efficiency = 1. 
     
@@ -649,7 +650,7 @@ def create_HP_sys(ins, outs):
     def R501_specification():
         R501.byproducts_combustion_rxns(R501.ins[0])
         R501._run()
-    R501.specification = R501_specification # Comment this out for anything other than TRY analysis
+    # R501.specification = R501_specification # Comment this out for anything other than TRY analysis
     
     get_flow_tpd = lambda: (feedstock.F_mass-feedstock.imass['H2O'])*24/907.185
     
@@ -810,6 +811,8 @@ def create_HP_sys(ins, outs):
     CWP = facilities.CWP('CWP', ins='return_chilled_water',
                           outs='process_chilled_water')
     
+    # H_M202, H_M201, H301
+    
     BT = bst.facilities.BoilerTurbogenerator('BT',
                                                   ins=(M505-0,
                                                       R501-0, 
@@ -839,7 +842,8 @@ def create_HP_sys(ins, outs):
                          outs=('process_water', 'discharged_water'))
     
     # Heat exchange network
-    HXN = bst.facilities.HeatExchangerNetwork('HXN')
+    HXN = bst.facilities.HeatExchangerNetwork('HXN', 
+                                              ignored=[D401, D403])
     def HXN_no_run_cost():
         HXN.heat_utilities = tuple()
         HXN._installed_cost = 0.

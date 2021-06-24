@@ -22,8 +22,6 @@ last_infeasible_simulation = [] # yield, titer
 def get_IDs(units_list):
     return [i.ID for i in units_list]
 
-# Bugfix barrage is not needed anymore because hexane recycle is not emptied anymore
-# and Wegstein and Aitken converge much better.
 bugfix = True
 
 error = False

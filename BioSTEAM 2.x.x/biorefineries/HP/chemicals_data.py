@@ -265,6 +265,7 @@ HP = chemical_database('HP', search_ID='3-Hydroxypropionic acid')
 HP.copy_models_from(LacticAcid, names = ['V', 'Hvap', 'Psat', 'mu', 'kappa'])
 HP.Tm = 15 + 273.15 # CAS says < 25 C
 HP.Tb = 179.75 + 273.15 # CAS
+HP.Hf = LacticAcid.Hf
 MethylHP = chemical_database('MethylHP', search_ID='6149-41-3')
 MethylLactate = tmo.Chemical('MethylLactate')
 MethylHP.copy_models_from(MethylLactate, ('Psat', 'Hvap', 'V'))
