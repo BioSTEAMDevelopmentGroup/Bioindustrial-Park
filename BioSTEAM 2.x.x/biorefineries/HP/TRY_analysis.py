@@ -458,7 +458,7 @@ HP_metrics = [solve_AA_price, lambda: HP_lca.GWP, lambda: HP_lca.FEC]
 steps = 20
 
 # Yield, titer, productivity (rate)
-spec_1 = np.linspace(0.05, 0.87, steps) # yield
+spec_1 = np.linspace(0.05, 0.95, steps) # yield
 spec_2 = np.linspace(5., 330., steps) # titer
 # spec_1 = np.linspace(0.2, 0.99, steps) # yield
 # spec_2 = np.linspace(45, 225, steps) # titer

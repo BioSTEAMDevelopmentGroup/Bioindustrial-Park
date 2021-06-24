@@ -845,9 +845,9 @@ def create_HP_sys(ins, outs):
         HXN._installed_cost = 0.
     
     # To simulate without HXN, uncomment the following 3 lines:
-    # HXN._cost = HXN_no_run_cost
-    # HXN.energy_balance_percent_error = 0.
-    # HXN.new_HXs = HXN.new_HX_utils = []
+    HXN._cost = HXN_no_run_cost
+    HXN.energy_balance_percent_error = 0.
+    HXN.new_HXs = HXN.new_HX_utils = []
     
     HXN_group = UnitGroup('HXN_group', 
                                    units=(HXN,))
