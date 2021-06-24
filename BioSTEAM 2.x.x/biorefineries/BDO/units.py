@@ -1432,11 +1432,16 @@ class DehydrationReactor(Reactor):
     # !!! ADD heating to 300 C
     _N_ins = 2
     _N_outs = 1
+    _N_heat_utilities = 1
 
     _F_BM_default = {**Reactor._F_BM_default,
 
             'TCP catalyst': 1}
     mcat_frac = 0.03 # fraction of catalyst by weight in relation to the reactant (BDO)
+    
+    def __init__(self, *args, T=200+273.15, **kwargs):
+        Reactor.__init__(self, *args, **kwargs)
+        self.T = T
     
     def _setup(self):
         super()._setup()
@@ -1458,8 +1463,10 @@ class DehydrationReactor(Reactor):
         # effluent.P = feed.P
         
         self.dehydration_rxns(effluent.mol)
+        effluent.T = self.T
         
     def _cost(self):
+        self.heat_utilities[0](self.Hnet, self.T)
         super()._cost()
         self.baseline_purchase_costs['TCP catalyst'] =\
             self.mcat_frac * self.ins[0].imass['BDO'] * price['TCP']
@@ -1594,9 +1601,6 @@ class CoFermentation(Reactor):
         vapor.copy_flow(effluent, 'CO2', remove=True)
         effluent.imass['CSL'] = 0
         
-        mixed_feed = self.mixed_feed
-        mixed_feed.mix_from(self.ins)
-        
         self.vessel_material = 'Stainless steel 316'
         self.effluent_titer = compute_BDO_titer(effluent)
         
@@ -1605,19 +1609,20 @@ class CoFermentation(Reactor):
         Design = self.design_results
         Design.clear()
         self.tau = self.effluent_titer / self.productivity
-        _mixture = self._mixture = tmo.Stream(None)
-        _mixture.mix_from(self.outs[0:2])
-        duty = Design['Duty'] = _mixture.H - self.mixed_feed.H
+        mixture = self._mixture = tmo.Stream(None)
+        mixture.copy_like(self.outs[0])
+        duty = Design['Duty'] = self.Hnet + self.ins[-1].Hnet
 
         if mode == 'Batch':
+            raise RuntimeError('number of reactors not implemented for batch mode')
             tau_cofermentation = self.tau_batch_turnaround + self.tau
             Design['Fermenter size'] = self.outs[0].F_mass * tau_cofermentation
             Design['Recirculation flow rate'] = self.F_mass_in
-            self.heat_exchanger.simulate_as_auxiliary_exchanger(duty, _mixture)
+            self.heat_exchanger.simulate_as_auxiliary_exchanger(duty, mixture)
         
         elif mode == 'Continuous':
             Reactor._design(self)
-
+            self._V_max = 3785.41 # 1 million gallons
         else:
             raise DesignError(f'Fermentation mode must be either Batch or Continuous, not {mode}')
 
@@ -1642,8 +1647,7 @@ class CoFermentation(Reactor):
             Reactor._cost(self)
             
             N = Design['Number of reactors']
-            single_rx_effluent = self._mixture.copy()
-            single_rx_effluent.mol[:] /= N
+            single_rx_effluent = self._mixture
             hx.simulate_as_auxiliary_exchanger(duty=Design['Duty']/N, 
                                                 stream=single_rx_effluent)
             hu_total = self.heat_utilities[0]
@@ -1683,6 +1687,7 @@ class HydrogenationReactor(Reactor):
         self.vessel_material = vessel_material
         self.vessel_type = vessel_type
         self.heat_exchanger = HXutility(None, None, None, T=T)
+        self.heat_utilities = self.heat_exchanger.heat_utilities
         self.tau = tau
         self.hydrgenation_rxns = ParallelRxn([
             #   Reaction definition                                       Reactant   Conversion

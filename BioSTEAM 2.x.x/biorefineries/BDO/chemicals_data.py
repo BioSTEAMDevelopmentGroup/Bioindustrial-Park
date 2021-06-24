@@ -144,6 +144,11 @@ AceticAcid = chemical_database('AceticAcid')
 Glucose = chemical_database('Glucose', phase = 'l')
 
 BDO = chemical_database('2,3-Butanediol')
+# Hf_acetic_acid = -483.52
+# Hf_bdo_diacetate = -916.3
+# Hf_h2o = -285.83
+# Hrxn = 
+BDO.Hf = -544.8	* 1000 # https://webbook.nist.gov/cgi/cbook.cgi?ID=C513859&Mask=FFF
 
 MEK = chemical_database('MEK')
 
@@ -217,6 +222,8 @@ Furfural = chemical_database('Furfural')
 
 Acetoin = chemical_database('3-Hydroxybutanone', phase = None, Hvap = 44.56*1000) # , V = 89.5e-6
 Acetoin.copy_models_from(Furfural, ['Psat', 'Cn', 'mu', 'kappa', 'V'])
+
+Acetoin.Hf = BDO.Hf + (745 - (358 + 467)) * 1000 # Based on bond energies
 Acetoin.Tb = 145.4 + 273.15
 
 
