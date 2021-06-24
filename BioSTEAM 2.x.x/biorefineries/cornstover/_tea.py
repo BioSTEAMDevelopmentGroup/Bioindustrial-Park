@@ -179,14 +179,24 @@ class CellulosicEthanolTEA(TEA):
         N_depreciation_years = depreciation_array.size
         if N_depreciation_years > years:
             raise RuntimeError('depreciation schedule is longer than plant lifetime')
-        BT_TDC = self.boiler_turbogenerator.installed_cost 
-        D[start:start + N_depreciation_years] = (TDC - BT_TDC) * depreciation_array
-        
-        depreciation_array = self._steam_power_depreciation_array
-        N_depreciation_years = depreciation_array.size
-        if N_depreciation_years > years:
-            raise RuntimeError('steam power depreciation schedule is longer than plant lifetime')
-        D[start:start + N_depreciation_years] += BT_TDC * depreciation_array
+        BT = self.boiler_turbogenerator
+        if BT is None:
+            try:
+                D[start:start + N_depreciation_years] = TDC * depreciation_array
+            except:
+                print(D)
+                print(D[start:start + N_depreciation_years].shape)
+                print((TDC * depreciation_array).shape)
+                breakpoint()
+        else:
+            BT_TDC = BT.installed_cost 
+            D[start:start + N_depreciation_years] = (TDC - BT_TDC) * depreciation_array
+            
+            depreciation_array = self._steam_power_depreciation_array
+            N_depreciation_years = depreciation_array.size
+            if N_depreciation_years > years:
+                raise RuntimeError('steam power depreciation schedule is longer than plant lifetime')
+            D[start:start + N_depreciation_years] += BT_TDC * depreciation_array
     
     def _ISBL_DPI(self, installed_equipment_cost):
         """Direct permanent investment of units inside battery limits."""
@@ -317,10 +327,14 @@ def create_agile_tea(units, OSBL_units=None, ignored_units=()):
         boiler_turbogenerator=BT)
     return tea
 
-def create_tea(sys, OSBL_units=None, ignored_units=()):
+def create_tea(sys, OSBL_units=None, ignored_units=(), cls=None):
     if OSBL_units is None: OSBL_units = bst.get_OSBL(sys.units)
-    BT = tmo.utils.get_instance(OSBL_units, (bst.BoilerTurbogenerator, bst.Boiler))
-    tea = CellulosicEthanolTEA(
+    try:
+        BT = tmo.utils.get_instance(OSBL_units, (bst.BoilerTurbogenerator, bst.Boiler))
+    except:
+        BT = None
+    if cls is None: cls = CellulosicEthanolTEA
+    tea = cls(
         system=sys, 
         IRR=0.10, 
         duration=(2007, 2037),
