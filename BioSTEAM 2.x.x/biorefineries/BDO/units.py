@@ -548,6 +548,7 @@ class Saccharification(Unit):
 class SeedTrain(Unit):
     _N_ins = 1
     _N_outs = 2
+    _N_heat_utilities = 1
     _units= {'Seed fermenter size': 'kg',
              'Flow rate': 'kg/hr'}
     
@@ -556,9 +557,10 @@ class SeedTrain(Unit):
     
     # ferm_ratio is the ratio of conversion relative to the fermenter
     #!!! Should this T be changed to 30°C?
-    def __init__(self, ID='', ins=None, outs=(), T=50+273.15, ferm_ratio=0.9):
+    def __init__(self, ID='', ins=None, outs=(), T=32+273.15, ferm_ratio=0.9):
         Unit.__init__(self, ID, ins, outs)
         self.T = T
+        
         self.ferm_ratio = ferm_ratio
 
         # FermMicrobe reaction from Table 14 on Page 31 of Humbird et al.
@@ -588,7 +590,7 @@ class SeedTrain(Unit):
         feed = self.ins[0]
         effluent, vent = self.outs
         effluent.copy_like(feed)
-
+        
         self.cofermentation_rxns(effluent)
         self.CO2_generation_rxns(effluent)
         vent.copy_flow(effluent, 'CO2', remove=True)
@@ -598,6 +600,7 @@ class SeedTrain(Unit):
         effluent.T = self.T
 
     def _design(self):
+        self.heat_utilities[0](self.Hnet, self.T)
         Design = self.design_results
         Design['Flow rate'] = self.outs[0].F_mass
         Design['Seed fermenter size'] = self.outs[0].F_mass * self.tau_batch
@@ -1447,7 +1450,7 @@ class DehydrationReactor(Reactor):
         super()._setup()
         self.dehydration_rxns = ParallelRxn([
             #   Reaction definition         Reactant   Conversion
-            Rxn('BDO -> MEK + H2O',         'BDO',   0.81),
+            Rxn('BDO -> MEK + H2O',         'BDO',   0.50),
             Rxn('BDO -> IBA + H2O',         'BDO',   0.09)
         ])
         self.BDO_to_MEK_rxn = self.dehydration_rxns[0]
@@ -1471,7 +1474,7 @@ class DehydrationReactor(Reactor):
         self.baseline_purchase_costs['TCP catalyst'] =\
             self.mcat_frac * self.ins[0].imass['BDO'] * price['TCP']
             
-compute_BDO_titer = lambda effluent: effluent.imass['BDO']/effluent.F_vol
+compute_BDO_titer = lambda effluent: float(effluent.imass['BDO'])/effluent.F_vol
 _316_over_304 = 316/304
 
 @cost(basis='Fermenter size', ID='Fermenter', units='kg',
@@ -1500,6 +1503,8 @@ class CoFermentation(Reactor):
 
     auxiliary_unit_names = ('heat_exchanger',)
     
+    tau = 13.7
+    
     # Equals the split of saccharified slurry to seed train
     inoculum_ratio = 0.07
     
@@ -1515,7 +1520,7 @@ class CoFermentation(Reactor):
     
     tau_batch_turnaround = 12 # in hr, the same as the seed train in ref [3]
 
-    def __init__(self, ID='', ins=None, outs=(), thermo=None, *, T=50+273.15,
+    def __init__(self, ID='', ins=None, outs=(), thermo=None, *, T=32+273.15,
                   P=101325, V_wf=0.8, length_to_diameter=2,
                   kW_per_m3=0.0985, # Perry's handbook
                   wall_thickness_factor=1,
@@ -1608,7 +1613,7 @@ class CoFermentation(Reactor):
         mode = self.mode
         Design = self.design_results
         Design.clear()
-        self.tau = self.effluent_titer / self.productivity
+        # self.tau = self.effluent_titer / self.productivity
         mixture = self._mixture = tmo.Stream(None)
         mixture.copy_like(self.outs[0])
         duty = Design['Duty'] = self.Hnet + self.ins[-1].Hnet
@@ -1619,7 +1624,6 @@ class CoFermentation(Reactor):
             Design['Fermenter size'] = self.outs[0].F_mass * tau_cofermentation
             Design['Recirculation flow rate'] = self.F_mass_in
             self.heat_exchanger.simulate_as_auxiliary_exchanger(duty, mixture)
-        
         elif mode == 'Continuous':
             Reactor._design(self)
             self._V_max = 3785.41 # 1 million gallons

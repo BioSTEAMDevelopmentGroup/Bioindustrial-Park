@@ -52,6 +52,10 @@ CABBI_colors_x = (colors.CABBI_blue_light.tint(90).RGBn,
                   colors.CABBI_teal_green.tint(40).shade(15).RGBn,
                   colors.CABBI_teal_green.shade(45).RGBn)
 
+diverging_colormaps = [
+    plt.cm.get_cmap('RdYlGn')
+]
+
 colormaps = [
     LinearSegmentedColormap.from_list('CABBI', CABBI_colors, 25),
     LinearSegmentedColormap.from_list('CABBI', CABBI_colors_x, 25),
@@ -60,30 +64,45 @@ colormaps = [
     plt.cm.get_cmap('bone_r'),
 ] * 2
 
-def plot_ethanol_and_biodiesel_price_contours(N=30):
+def plot_ethanol_and_biodiesel_price_contours(N=30, benefit=False, cache={}):
     ethanol_price = np.linspace(1., 3., N)
     biodiesel_price = np.linspace(2, 6, N)
     lipid_content = [5, 10, 15]
     N_rows = len(lipid_content)
-    configuration = ['I', 'I*', 'II', 'II*']
+    configuration = ['L1', 'L1*', 'L2', 'L2*']
     N_cols = len(configuration)
-    Z = np.zeros([N, N, N_rows, N_cols])
-    for i in range(N_rows):
-        for j in range(N_cols):
-            lc.load(configuration[j])
-            lc.set_feedstock_lipid_content.setter(lipid_content[i])
-            lc.lipidcane_sys.simulate()
-            X, Y = np.meshgrid(ethanol_price, biodiesel_price)
-            Z[:, :, i, j] = lc.evaluate_across_ethanol_and_biodiesel_prices(X, Y)
+    if (N, benefit) in cache:
+        Z = cache[N, benefit]
+    else:
+        Z = np.zeros([N, N, N_rows, N_cols])
+        for i in range(N_rows):
+            for j in range(N_cols):
+                lc.load(configuration[j])
+                lc.set_feedstock_lipid_content.setter(lipid_content[i])
+                lc.lipidcane_sys.simulate()
+                X, Y = np.meshgrid(ethanol_price, biodiesel_price)
+                if benefit:
+                    Z[:, :, i, j] = lc.evaluate_MFPP_benefit_across_ethanol_and_biodiesel_prices(X, Y)
+                else:
+                    Z[:, :, i, j] = lc.evaluate_MFPP_across_ethanol_and_biodiesel_prices(X, Y)
     xlabel = f"Ethanol price [{format_units('$/gal')}]"
     ylabels = [f"Biodiesel price [{format_units('$/gal')}]"] * 4
     xticks = [1., 1.5, 2.0, 2.5, 3.0]
     yticks = [2, 3, 4, 5, 6]
-    metric_bar = MetricBar('MFPP', format_units('$/ton'), colormaps[0], tickmarks(Z, 5, 5), 12)
+    marks = tickmarks(Z, 5, 5, center=0.) if benefit else tickmarks(Z, 5, 5)
+    colormap = (diverging_colormaps if benefit else colormaps)[0]
+    metric_bar = MetricBar('MFPP', format_units('$/ton'), colormap, marks, 12,
+                           center=0.)
+    if benefit:
+        baseline = ['S1', 'S1*', 'S2', 'S2*']
+        titles = [f"{lc.format_name(i)} - {lc.format_name(j)}"
+                  for i, j in  zip(configuration, baseline)]
+    else:
+        titles = [lc.format_name(i) for i in configuration]
     fig, axes, CSs, CB = plot_contour_single_metric(
         X, Y, Z, xlabel, ylabels, xticks, yticks, metric_bar, 
         fillblack=False, styleaxiskw=dict(xtick0=False), label=True,
-        titles=[lc.format_name(i) for i in configuration],
+        titles=titles,
     )
     for i in range(N_rows):
         for j in range(N_cols):
@@ -103,8 +122,8 @@ def plot_ethanol_and_biodiesel_price_contours(N=30):
     
 def plot_extraction_efficiency_and_lipid_content_contours(load=False, metric_index=0):
     # Generate contour data
-    x = np.linspace(0.4, 1., 10)
-    y = np.linspace(0.05, 0.15, 10)
+    x = np.linspace(0.4, 1., 5)
+    y = np.linspace(0.05, 0.15, 5)
     X, Y = np.meshgrid(x, y)
     # dollar_per_mt = format_units(r'\$/MT')
     metric = bst.metric
@@ -127,7 +146,7 @@ def plot_extraction_efficiency_and_lipid_content_contours(load=False, metric_ind
         data = np.load(file)
     else:
         data = lc.evaluate_configurations_across_extraction_efficiency_and_lipid_content(
-            X, Y, 0.875, agile, configurations, 
+            X, Y, 0.70, agile, configurations, 
         )
     np.save(file, data)
     data = data[:, :, :, :, metric_index]

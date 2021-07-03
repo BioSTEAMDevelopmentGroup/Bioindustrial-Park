@@ -66,7 +66,7 @@ from biorefineries.HP.lca import LCA
 
 flowsheet = bst.Flowsheet('BDO')
 bst.main_flowsheet.set_flowsheet(flowsheet)
-
+bst.System.default_relative_molar_tolerance = 1e-4
 # Speeds up ShortcutDistillation
 bst.units.ShortcutColumn.minimum_guess_distillate_recovery = 0
 
@@ -79,8 +79,6 @@ tmo.settings.set_thermo(BDO_chemicals)
 
 BDO_sys = bdo.create_system_oleyl_alcohol()
 u = flowsheet.unit
-u.M305.ins[0] = None
-u.M305.ins[1] = None
 feedstock = BDO_sys.ins[0]
 MEK, isobutanol = BDO_sys.outs
 get_flow_tpd = lambda: (feedstock.F_mass-feedstock.imass['H2O'])*24/907.185
@@ -156,6 +154,7 @@ seed_train_system = bst.System('seed_train_system', path=(u.S302, u.R303, u.T301
 # yearly_production = 125000 # ton/yr
 spec = ProcessSpecification(
     evaporator = u.F301,
+    evaporator_pump = u.F301_P,
     pump = u.M304_H_P,
     mixer = u.M304,
     heat_exchanger = u.M304_H,
@@ -172,9 +171,10 @@ spec = ProcessSpecification(
     dehydration_reactor = u.R401,
     byproduct_streams = [],
     HXN = u.HXN,
+    tolerable_HXN_energy_balance_percent_error=10,
     maximum_inhibitor_concentration = 1.,
     # pre_conversion_units = process_groups_dict['feedstock_group'].units + process_groups_dict['pretreatment_group'].units + [u.H301], # if the line below does not work (depends on BioSTEAM version)
-    pre_conversion_units = BDO_sys.split(u.F301.ins[0])[0],
+    # pre_conversion_units = BDO_sys.split(u.F301.ins[0])[0],
     baseline_titer = 54.8,
     feedstock_mass = feedstock.F_mass,
     pretreatment_reactor = u.R201)
@@ -274,7 +274,7 @@ get_electricity_FEC = lambda: \
     get_electricity_use()*CFs['FEC_CFs']['Electricity']/MEK.F_mass
 
 # Total FEC
-get_FEC = lambda: get_material_FEC()+get_electricity_FEC() - get_Isobutanol_FEC()
+get_FEC = lambda: get_material_FEC() + get_electricity_FEC() - get_Isobutanol_FEC()
 
 get_SPED = lambda: u.BT.system_heating_demand*0.001/MEK.F_mass
 MEK_LHV = 31.45 # MJ/kg MEK
@@ -282,9 +282,29 @@ MEK_LHV = 31.45 # MJ/kg MEK
 BDO_lca = LCA(BDO_sys, BDO_chemicals, CFs, feedstock, 'Corn stover', MEK, [u.CT, u.CWP])
 
 # %% Full analysis
+get_MEK_MPSP()
+spec.load_specifications(0.36, 109.9, 1.0)
+
+def print_recycles():
+    sys = BDO_sys.copy()
+    sys.flatten()
+    for i in sys.recycle:
+        print(i, i.imass['OleylAlcohol'] / 1e3)
+
+def print_capital_cost():
+    print('TCI', BDO_tea.TCI / 1e6, 'MM$')
+    print('Fermentation installed cost', u.R302.installed_cost / 1e6, 'MM$')
+    print(u.R302.results())
+
+def print_specs():
+    print(spec.spec_1, spec.spec_2, spec.spec_3)
+
 def simulate_and_print():
     get_MEK_MPSP()
     print('\n---------- Simulation Results ----------')
+    # print_recycles()
+    # print_specs()
+    # print_capital_cost()
     print(f'MPSP is ${get_MEK_MPSP():.3f}/kg')
     print(f'GWP is {BDO_lca.GWP:.3f} kg CO2-eq/kg MEK')
     # print(f'Non-bio GWP is {():.3f} kg CO2-eq/kg MEK')
@@ -293,9 +313,17 @@ def simulate_and_print():
     print('--------------------\n')
 
 simulate_and_print()
+# spec.load_specifications(0.36, 13.7, 1.0)
+# simulate_and_print()
+# spec.load_specifications(0.36, 109.9, 1.0)
+# simulate_and_print()
 
-spec.load_specifications(0.36, 109.9, 1.)
-# %% 
+# %% Maximum BDO titer (given by maximum sugar concentration)
+
+
+
+
+# %%
 
 # =============================================================================
 # For Monte Carlo and analyses

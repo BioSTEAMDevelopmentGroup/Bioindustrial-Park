@@ -296,7 +296,7 @@ def create_beer_distillation_system(ins, outs,
     beer, = ins
     distilled_beer, stillage = outs
     
-    P301 = units.Pump(IDs.get('Beer pump', 'P301'))
+    P301 = units.Pump(IDs.get('Beer pump', 'P301'), P=2. * 101325)
     
     # Beer column
     x_bot = 3.91e-06
@@ -308,7 +308,7 @@ def create_beer_distillation_system(ins, outs,
     D302.tray_material = 'Stainless steel 304'
     D302.vessel_material = 'Stainless steel 304'
     D302.boiler.U = 1.85
-    P302 = units.Pump(IDs.get('Beer column bottoms product pump', 'P302'))
+    P302 = units.Pump(IDs.get('Beer column bottoms product pump', 'P302'), P=101325.)
     
     # Heat up before beer column
     # Exchange heat with stillage    
@@ -674,6 +674,7 @@ def create_sugarcane_to_ethanol_system(ins, outs):
     feedstock_handling_sys = create_feedstock_handling_system(
         ins=[sugarcane],
         outs=[''],
+        mockup=True,
     )
     juicing_sys = create_juicing_system_with_fiber_screener(
         ins=[feedstock_handling_sys-0, enzyme, H3PO4, lime, polymer],

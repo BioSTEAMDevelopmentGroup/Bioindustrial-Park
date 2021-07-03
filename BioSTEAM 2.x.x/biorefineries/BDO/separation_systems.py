@@ -315,8 +315,24 @@ def create_separation_system_oleyl_alcohol(ins, outs):
     
     M402 = bst.Mixer('M402', ins=(T605_P-0, solvent_recycle))
     
+    preheated_stream = bst.Stream()
+    D407 = bst.ShortcutColumn('D407', 
+        ins=preheated_stream,
+        LHK=('Water', 'BDO'),
+        partial_condenser=False,
+        k=1.2,
+        y_top=0.999,
+        x_bot=0.90,
+    )
+    D407_Pb = bst.Pump('D407_Pb', D407-1, P=101325.)
+    
+    H407_b = bst.HXprocess('H407_b', 
+        ins=[filtered_fermentation_effluent, D407_Pb-0],
+        outs=[preheated_stream, ''],
+    )
+    
     S402 = bst.units.MultiStageMixerSettlers('S402',
-        ins = (filtered_fermentation_effluent, M402-0),
+        ins = (H407_b-1, M402-0),
         partition_data={
             'K': np.array([1/6.52, 1/0.37, 1/0.37, 1/6.52, 1/10000,
                            10000, 10000, 10000, 10000, 
@@ -326,22 +342,24 @@ def create_separation_system_oleyl_alcohol(ins, outs):
                     'Arabinose', 'ArabinoseOligomer', 'SolubleLignin', 'Enzyme'),
             'phi' : 0.5,
         },
-        N_stages = 15,
+        N_stages = 10,
     )
     
     @S402.add_specification(run=True)
     def adjust_S402_split():
         feed = S402.ins[0]
         Water = feed.imass['Water']
+        required_solvent = 1.2 * Water
         oleyl_alcohol, recycle = M402.ins
-        oleyl_alcohol.imass['OleylAlcohol'] = max(0, Water - recycle.imass['OleylAlcohol'])
+        oleyl_alcohol.imass['OleylAlcohol'] = max(0, required_solvent- recycle.imass['OleylAlcohol'])
+        if recycle.imass['OleylAlcohol'] > required_solvent:
+            recycle.imass['OleylAlcohol'] = required_solvent
         M402._run()
     
     S402_Pr = bst.Pump('S402_Pr', ins=S402-0, P=101325)
     S402_Pe = bst.Pump('S402_Pe', ins=S402-1, P=101325)
     
     D401_H = bst.HXprocess('D401_H', ins=[S402_Pe-0, None], outs=['', solvent_recycle])
-    
     D401 = bst.units.ShortcutColumn('D401', ins=D401_H-0,
                                     outs=('D401_g', 'D401_l'),
                                     LHK=('BDO', 'OleylAlcohol'),
@@ -353,7 +371,6 @@ def create_separation_system_oleyl_alcohol(ins, outs):
                                     vessel_material = 'Stainless steel 316')
     D401_Pb = bst.Pump('D401_Pb', ins=D401-1, P=101325)
     D401_Pb-0-1-D401_H
-    
     D402 = bst.units.ShortcutColumn('D402', ins=D401-0,
                                     outs=('D402_g', 'D402_l'),
                                     LHK=('Water', 'Acetoin'),
@@ -367,8 +384,7 @@ def create_separation_system_oleyl_alcohol(ins, outs):
     D402_Pd = bst.Pump('D402_Pd', D402-0, P=101325)
     D402_Pb = bst.Pump('D402_Pb', D402-1, P=101325)
     
-    M403 = bst.Mixer('M403', [S402_Pr-0, D402_Pd-0], wastewater)
-    
+    M403 = bst.Mixer('M403', [S402_Pr-0, D402_Pd-0, D407-0], wastewater)
     D403x = bst.units.ShortcutColumn('D403x', ins=D402_Pb-0,
                                     outs=('D403x_g', 'D403x_l'),
                                     LHK=('Acetoin', 'BDO'),
@@ -378,7 +394,7 @@ def create_separation_system_oleyl_alcohol(ins, outs):
                                     product_specification_format='Recovery',
                                     Lr=0.9995, Hr=0.9995, k=1.2,
                                     vessel_material = 'Stainless steel 316')
-    
-    D403x_Pd = bst.Pump('D403x_Pd', D403x-0, unreacted_acetoin, P=101325)
+    D403x_H = bst.HXutility('D403x_H', D403x-0, T=305.15, rigorous=True)
+    D403x_Pd = bst.Pump('D403x_Pd', D403x_H-0, unreacted_acetoin, P=101325)
     D403x_Pb = bst.Pump('D403x_Pb', D403x-1, BDO, P=101325)
     

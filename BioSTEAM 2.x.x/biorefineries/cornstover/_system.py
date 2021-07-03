@@ -23,8 +23,10 @@ __all__ = (
     'create_facilities',
     'create_hot_water_pretreatment_system',
     'create_dilute_acid_pretreatment_system',
-    'create_continuous_saccharification_system',
-    'create_saccharification_and_cofermentation_system',
+    'create_saccharification_system',
+    'create_cofermentation_system',
+    'create_simultaneous_saccharification_and_cofermentation_system',
+    'create_integrated_bioprocess_saccharification_and_cofermentation_system',
     'create_cellulosic_fermentation_system',
 )
 
@@ -219,12 +221,13 @@ def create_dilute_acid_pretreatment_system(
          dict(ID='saccharification_water')],
     outs=[dict(ID='slurry')],
 )
-def create_continuous_saccharification_system(
+def create_saccharification_system(
         ins, outs, solids_loading=None, 
         nonsolids=None,
         insoluble_solids=None,
         insoluble_solids_loading=None,
         ignored=None,
+        Saccharification=None,
     ):
     hydrolyzate, cellulase, saccharification_water = ins
     slurry, = outs
@@ -276,7 +279,9 @@ def create_continuous_saccharification_system(
         )
         saccharification_water.imass['Water'] = max(M301.required_saccharification_water, 0.)
     
-    R301 = units.ContinuousPresaccharification('R301', H301-0, slurry)
+    if Saccharification is None:
+        Saccharification = units.ContinuousPresaccharification
+    R301 = Saccharification('R301', H301-0, slurry)
 
 @bst.SystemFactory(
     ID='cofermentation_sys',
@@ -375,7 +380,7 @@ def create_simultaneous_saccharification_and_cofermentation_system(
     outs=[dict(ID='vent'),
           dict(ID='beer')],
 )
-def create_saccharification_and_cofermentation_system(
+def create_integrated_bioprocess_saccharification_and_cofermentation_system(
         ins, outs, SaccharificationAndCoFermentation=None, SeedTrain=None,
         include_scrubber=True
     ):
@@ -452,6 +457,91 @@ def create_saccharification_and_cofermentation_system(
         R303-1-T302
  
 @bst.SystemFactory(
+    ID='cofermentation_sys',
+    ins=[dict(ID='slurry'),
+         dict(ID='DAP',
+              price=price['DAP']),
+         dict(ID='CSL',
+              price=price['CSL'])],
+    outs=[dict(ID='vent'),
+          dict(ID='beer'),
+          dict(ID='lignin')],
+)
+def create_cofermentation_system(
+        ins, outs, CoFermentation=None, SeedTrain=None,
+        include_scrubber=True
+    ):
+    slurry, DAP, CSL = ins
+    vent, beer, lignin = outs
+    
+    DAP1 = Stream('DAP1',
+                    DAP=26,
+                    units='kg/hr',
+                    price=price['DAP'])
+    DAP2 = Stream('DAP2',
+                    DAP=116,
+                    units='kg/hr',
+                    price=price['DAP'])
+    CSL1 = Stream('CSL1',
+                    CSL=211,
+                    units='kg/hr',
+                    price=price['CSL'])
+    CSL2 = Stream('CSL2',
+                    CSL=948,
+                    units='kg/hr',
+                    price=price['CSL'])
+    
+    DAP_storage = units.DAPStorageTank('DAP_storage', DAP)
+    S301 = bst.FakeSplitter('S301', DAP_storage-0, outs=(DAP1, DAP2))
+    CSL_storage = units.CSLStorageTank('CSL_storage', CSL)
+    S302 = bst.FakeSplitter('S302', CSL_storage-0, outs=(CSL1, CSL2))
+    S303 = bst.PressureFilter('S303', slurry, (lignin, ''))
+    S304 = bst.Splitter('S304', S303-1, split=0.1)
+    if not SeedTrain: SeedTrain = units.SeedTrain
+    R302 = SeedTrain('R302', (S304-0, CSL1, DAP1))
+    
+    @R302.add_specification(run=True)
+    def adjust_CSL_and_DAP_feed_to_seed_train():
+        feed, CSL1, DAP1 = R302.ins
+        CSL1.imass['CSL'] = 0.0050 * feed.F_mass
+        DAP1.imass['DAP'] = 0.33 * feed.F_vol
+        S301.ins[0].mix_from(S301.outs)
+    
+    T301 = units.SeedHoldTank('T301', R302-1)
+    if not CoFermentation: CoFermentation = units.CoFermentation
+    R303 = CoFermentation('R303', (S304-1, T301-0, CSL2, DAP2),
+                          outs=('', ''))
+    
+    @R303.add_specification(run=True)
+    def adjust_CSL_and_DAP_feed_to_fermentation():
+        feed, seed, CSL2, DAP2, *other = R303.ins
+        CSL2.imass['CSL'] = 0.0025 * feed.F_mass
+        DAP2.imass['DAP'] = 0.33 * feed.F_vol
+        S302.ins[0].mix_from(S302.outs)
+    
+    M304 = bst.Mixer('M304', (R302-0, R303-0))
+    T302 = units.BeerTank('T302', outs=beer)
+    
+    if include_scrubber:
+        stripping_water = Stream('stripping_water',
+                                 Water=26836,
+                                 units='kg/hr')
+        M401 = bst.Mixer('M401', (R303-1, None))
+        D401 = bst.VentScrubber('D401', (stripping_water, M304-0), (vent, ''),
+                                gas=('CO2', 'NH3', 'O2'))
+        D401-1-1-M401-0-T302
+    
+        stripping_water_over_vent = stripping_water.mol / 21202.490455845436
+        def update_stripping_water():
+            stripping_water, vent = D401.ins
+            stripping_water.mol[:] = stripping_water_over_vent * vent.F_mass
+            D401._run()
+        D401.specification = update_stripping_water
+    else:
+        M304.outs[0] = vent
+        R303-1-T302   
+ 
+@bst.SystemFactory(
     ID='cellulosic_fermentation_sys',
     ins=[dict(ID='hydrolyzate'),
          dict(ID='cellulase',
@@ -463,7 +553,9 @@ def create_saccharification_and_cofermentation_system(
          dict(ID='CSL',
               price=price['CSL'])],
     outs=[dict(ID='vent'),
-          dict(ID='beer')],
+          dict(ID='beer'),
+          dict(ID='lignin')],
+    optional_outs_index=[2],
 )
 def create_cellulosic_fermentation_system(
         ins, outs,
@@ -476,19 +568,20 @@ def create_cellulosic_fermentation_system(
         # 0 for Integrated Bioprocess(IB)
         # 1 for Simultaneous Saccharification and Co-fermentation (SSCF) 
     ):
-    vent, beer = outs
+    vent, beer, lignin = outs
     hydrolyzate, cellulase, saccharification_water, DAP, CSL = ins
     
-    saccharification_sys = create_continuous_saccharification_system(
+    saccharification_sys = create_saccharification_system(
         ins=[hydrolyzate, cellulase, saccharification_water],
         mockup=True,
         solids_loading=solids_loading,
         insoluble_solids_loading=insoluble_solids_loading,
         nonsolids=nonsolids,
         insoluble_solids=insoluble_solids,
+        Saccharification=(units.Saccharification if kind == 2 else units.ContinuousPresaccharification),
     )
     if kind == 0:
-        cofermentation_sys = create_saccharification_and_cofermentation_system(
+        cofermentation_sys = create_integrated_bioprocess_saccharification_and_cofermentation_system(
             ins=[saccharification_sys-0, DAP, CSL],
             outs=[vent, beer],
             mockup=True
@@ -497,6 +590,13 @@ def create_cellulosic_fermentation_system(
         cofermentation_sys = create_simultaneous_saccharification_and_cofermentation_system(
             ins=[saccharification_sys-0, DAP, CSL],
             outs=[vent, beer],
+            mockup=True
+        )
+    elif kind == 2:
+        T303 = bst.StorageTank('T303', saccharification_sys-0, tau=4)
+        cofermentation_sys = create_cofermentation_system(
+            ins=[T303-0, DAP, CSL],
+            outs=[vent, beer, lignin],
             mockup=True
         )
     else:

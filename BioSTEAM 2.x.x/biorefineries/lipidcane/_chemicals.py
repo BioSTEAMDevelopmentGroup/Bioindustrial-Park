@@ -47,7 +47,6 @@ def create_chemicals():
     # Assume properties are similar for trioleate and tripalmitin
     Tripalmitin = tmo.Chemical('Tripalmitin').at_state(phase='l', copy=True)
     Lipid.copy_models_from(Tripalmitin, ['V', 'sigma', 'kappa', 'Cn'])
-    
     # Assume a constant volume for lipid
     lipid_molar_volume = fn.rho_to_V(rho=900, MW=Lipid.MW)
     Lipid.V.add_model(lipid_molar_volume)
@@ -63,8 +62,16 @@ def create_chemicals():
     
     for chemical in lipidcane_chemicals: chemical.default()
     
+    lipidcane_chemicals.extend([
+        # tmo.Chemical('Beta-Sitosterol', search_ID='83-46-5',
+        #              phase='l', Hf=-1000. * (533.79 + 93.90),
+        #              synonyms=['Sterol', 'PolarLipid']),
+        # tmo.Chemical('Oleic acid', phase='l', synonyms=['FFA']),
+        tmo.Chemical('Acetone')
+    ])
     lipidcane_chemicals.compile()
     lipidcane_chemicals.set_synonym('Water', 'H2O')
     lipidcane_chemicals.set_synonym('Yeast', 'DryYeast')
+    lipidcane_chemicals.set_synonym('Lipid', 'TAG')
     return lipidcane_chemicals
 

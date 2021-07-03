@@ -14,7 +14,7 @@ from biorefineries.lipidcane import set_lipid_fraction
 import flexsolve as flx
 import thermosteam as tmo
 
-__all__ = ('LipidExtractionSpecification',)
+__all__ = ('LipidExtractionSpecification', 'MockExtractionSpecification')
 
 def evaluate_across_lipid_content(spec, efficiency, lipid_retention, 
                                   metrics, lipid_content):
@@ -37,6 +37,24 @@ evaluate_across_lipid_retention = np.vectorize(
     excluded=['spec', 'metrics', 'lipid_retention'],
     signature='(),(),(),(m),(p)->(m,p)'
 )       
+
+class MockExtractionSpecification:
+    
+    def load_lipid_content(self, lipid_content):
+        pass
+      
+    def load_efficiency(self, efficiency):
+        pass
+    
+    def load_lipid_retention(self, lipid_retention):
+        pass
+    
+    def load_specifications(self, 
+            efficiency=None,
+            lipid_retention=None,
+            lipid_content=None,
+        ):
+        pass
 
 class LipidExtractionSpecification:
     """
@@ -73,14 +91,17 @@ class LipidExtractionSpecification:
         'lipid_retention',
         'lipid_content',
         'locked_lipid_content',
+        'isplit_efficiency_is_reversed',
     )
     
     def __init__(self, system, feedstocks, isplit_efficiency, isplit_lipid_retention, 
-                 efficiency=0.9, lipid_retention=0.9, lipid_content=0.1):
+                 isplit_efficiency_is_reversed=False, efficiency=0.9, 
+                 lipid_retention=0.9, lipid_content=0.1):
         self.system = system #: [System] System associated to feedstock
         self.feedstocks = feedstocks #: tuple[Stream] Lipid feedstocks
         self.isplit_efficiency = isplit_efficiency #: [ChemicalIndexer] Defines extraction efficiency as a material split.
         self.isplit_lipid_retention = isplit_lipid_retention #: [ChemicalIndexer] Defines bagasse lipid retention as a material split.
+        self.isplit_efficiency_is_reversed = isplit_efficiency_is_reversed #: [bool] Whether lipid extraction efficiency is 1 - split.
         self.efficiency = efficiency #: [float] Lipid extraction efficiency b
         self.lipid_retention = lipid_retention #: [float] Lipid extraction lipid retention
         self.lipid_content = lipid_content #: [float] Lipid content of feedstock [dry wt. %].
@@ -121,7 +142,10 @@ class LipidExtractionSpecification:
     def load_efficiency(self, efficiency):
         if self.isplit_efficiency is None: return
         self.efficiency = efficiency
-        self.isplit_efficiency['Lipid'] = efficiency
+        if self.isplit_efficiency_is_reversed:
+            self.isplit_efficiency['Lipid'] = 1. - efficiency
+        else:
+            self.isplit_efficiency['Lipid'] = efficiency
     
     def load_lipid_retention(self, lipid_retention):
         if self.isplit_efficiency is None: return
@@ -149,8 +173,8 @@ class LipidExtractionSpecification:
         if efficiency is None: efficiency = self.efficiency
         if lipid_retention is None: lipid_retention = self.lipid_retention
         if lipid_content is None: lipid_content = self.lipid_content
-        self.load_efficiency(efficiency)
         self.load_lipid_retention(lipid_retention)
+        self.load_efficiency(efficiency)
         self.load_lipid_content(lipid_content)
 
     def _evaluate_across_lipid_content(self, metrics, lipid_content):

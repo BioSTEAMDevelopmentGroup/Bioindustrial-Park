@@ -118,15 +118,17 @@ def create_system_oleyl_alcohol(ins, outs):
     # u.M305.ins[0] = None
     # u.M305.ins[1] = None
     # u.M601.ins[1] = None
-    HXN = bst.facilities.HeatExchangerNetwork('HXN', ignored=[u.D404.boiler])
-    def HXN_no_run_cost():
-        HXN.heat_utilities = tuple()
-        HXN._installed_cost = 0.
+    HXN = bst.facilities.HeatExchangerNetwork('HXN', 
+        ignored=[u.D404.boiler, u.D407.boiler]
+    )
+    # def HXN_no_run_cost():
+    #     HXN.heat_utilities = tuple()
+    #     HXN._installed_cost = 0.
     
-    # To simulate without HXN, uncomment the following 3 lines:
-    HXN._cost = HXN_no_run_cost
-    HXN.energy_balance_percent_error = 0.
-    HXN.new_HXs = HXN.new_HX_utils = []
+    # # To simulate without HXN, uncomment the following 3 lines:
+    # HXN._cost = HXN_no_run_cost
+    # HXN.energy_balance_percent_error = 0.
+    # HXN.new_HXs = HXN.new_HX_utils = []
 
 @bst.SystemFactory(
     ID='BDO_sys',
@@ -229,3 +231,11 @@ def create_system_DPHP(ins, outs):
     # u.M305.ins[0] = None
     # u.M305.ins[1] = None
     HXN = bst.facilities.HeatExchangerNetwork('HXN')
+    # def HXN_no_run_cost():
+    #     HXN.heat_utilities = tuple()
+    #     HXN._installed_cost = 0.
+    
+    # # To simulate without HXN, uncomment the following 3 lines:
+    # HXN._cost = HXN_no_run_cost
+    # HXN.energy_balance_percent_error = 0.
+    # HXN.new_HXs = HXN.new_HX_utils = []

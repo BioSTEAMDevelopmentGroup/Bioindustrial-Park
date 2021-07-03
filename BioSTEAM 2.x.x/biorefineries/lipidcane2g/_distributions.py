@@ -34,6 +34,19 @@ biodiesel_prices = [ # USD / gal Dec 2009 - Nov 2019
     3.13, 3.21, 
 ]
 
+mean_biodiesel_price_10yr = np.mean(biodiesel_prices)
+mean_biodiesel_price_5yr = np.mean(biodiesel_prices[-int(len(biodiesel_prices)/2):])
+mean_ethanol_price_10yr = np.mean(ethanol_prices)
+mean_ethanol_price_5yr = np.mean(ethanol_prices[-int(len(ethanol_prices)/2):])
+# print(mean_ethanol_price_10yr, mean_ethanol_price_5yr)
+# print(mean_biodiesel_price_10yr, mean_biodiesel_price_5yr)
+
+x_ethanol = np.arange(len(ethanol_prices))
+x_biodiesel = np.arange(len(biodiesel_prices)) / 3
+
+# plt.plot(x_ethanol, ethanol_prices, label='ethanol')
+# plt.plot(x_biodiesel, biodiesel_prices, label='biodiesel')
+# plt.legend()
 natural_gas_prices = [ # City gate [USD / cf] 2010 to 2019
     6.18, 5.63, 4.73, 4.88, 5.71, 4.26, 3.71, 4.16, 4.23, 3.81,
 ]

@@ -127,6 +127,7 @@ def create_conversion_system(ins, outs):
                                         partial_condenser=False,
                                         is_divided=True,
                                         P=0.2 * 101325,
+                                        thermo=ideal_thermo,
                                         product_specification_format='Recovery',
                                         Lr=0.9995, Hr=0.9995, k=1.2,
                                         vessel_material = 'Stainless steel 316')

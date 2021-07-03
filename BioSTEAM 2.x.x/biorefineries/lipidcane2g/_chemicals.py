@@ -12,5 +12,7 @@ __all__ = ('create_chemicals',)
 def create_chemicals():
     from biorefineries import lipidcane as lc
     from biorefineries import cornstover as cs
-    return tmo.Chemicals([*lc.chemicals, *cs.chemicals])
+    return tmo.Chemicals([
+        *lc.chemicals, *cs.chemicals, 
+    ])
     
