@@ -1427,6 +1427,7 @@ class DPHP_Separation(Unit):
     _N_outs = 2
     def _run(self): pass
     def _cost(self): pass
+
 class DehydrationReactor(Reactor):
     """
     A dehydration reactor.
@@ -1450,8 +1451,8 @@ class DehydrationReactor(Reactor):
         super()._setup()
         self.dehydration_rxns = ParallelRxn([
             #   Reaction definition         Reactant   Conversion
-            Rxn('BDO -> MEK + H2O',         'BDO',   0.50),
-            Rxn('BDO -> IBA + H2O',         'BDO',   0.09)
+            Rxn('BDO -> MEK + H2O',         'BDO',   0.765),
+            Rxn('BDO -> IBA + H2O',         'BDO',   0.085)
         ])
         self.BDO_to_MEK_rxn = self.dehydration_rxns[0]
         self.BDO_to_IBA_rxn = self.dehydration_rxns[1]

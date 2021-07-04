@@ -141,6 +141,10 @@ hydrogenation_catalyst_price = 1.3 + 0.18*20
 # https://www.alibaba.com/product-detail/Gas-Hydrogen-45kg-Lpg-Gas-Cylinder_62018626105.html?spm=a2700.galleryofferlist.topad_creative.d_title.4a5c7ce2MUN3cm
 h2_price = 1.03
 
+# market for fatty alcohol, GLO, ecoinvent 3.7.1; show that 10% - 1000% of this assumed value has negligible effect on MPSP
+oleyl_alcohol_price = 2.97 # 2.1 euro per kg in 2005; adjusted for inflation and conversion to USD 
+
+
 # All in 2016$/kg
 price = {'MEK': MEK_price,
          'TCP': TCP_price,
@@ -148,6 +152,7 @@ price = {'MEK': MEK_price,
          'Acetoin': acetoin_price,
          'Feedstock': feedstock_price,
          'H2': h2_price,
+         'OleylAlcohol': oleyl_alcohol_price,
          'Isobutanol': isobutanol_price,
          'Sulfuric acid': 0.0430 * _lb_per_kg,	
          'Hydrogenation catalyst': hydrogenation_catalyst_price,
@@ -222,7 +227,8 @@ GWP_CFs = {
     'H2SO4': 44.47/1e3,
     'Ethanol': 1.44,
     'Isobutanol': 3.7703,
-    'H2' : 	1.5907
+    'H2' : 	1.5907,
+    'OleylAlcohol': 3.022 # market for fatty alcohol, GLO, ecoinvent 3.7.1
     }
 H3PO4_GWP_CF = 2.5426
 KOH_GWP_CF = 2.299
@@ -261,7 +267,8 @@ FEC_CFs = {
     'H2SO4': 568.98/1e3,
     'Ethanol': 16,
     'Isobutanol': 85.597,
-    'H2' : 148.23
+    'H2' : 148.23,
+    'OleylAlcohol': 49.29 # market for fatty alcohol, GLO, ecoinvent 3.7.1
     }
 H3PO4_FEC_CF = 39.542
 KOH_FEC_CF = 30.421

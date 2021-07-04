@@ -434,7 +434,7 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
         """Return titer in g products / effluent L."""
         reactor = self.reactor
         reactor_effluent = reactor.outs[0]
-        (reactor.specification or reactor._run)()
+        reactor.run()
         effluent = reactor.outs[0]
         F_mass_products = effluent.imass[self.products].sum()
         if F_mass_products: 
@@ -611,17 +611,15 @@ class TiterAndInhibitorsSpecification:
     def run_units(self):
         self.evaporator._run()
         self.evaporator_pump._run()
-        self.pump._run()
         self.mixer._run()
         self.heat_exchanger._run()
+        self.pump._run()
         self.seed_train_system._converge()
         self.reactor._run()
     
     def calculate_titer(self):
-        # product = self.product
-        # return product.imass[self.products].sum() / product.F_vol
-        # return compute_BDO_titer(self.product)
-        return self.reactor.effluent_titer
+        product = self.product
+        return product.imass[self.products].sum() / product.F_vol
     
     def calculate_inhibitors(self): # g / L
         product = self.product
@@ -656,7 +654,7 @@ class TiterAndInhibitorsSpecification:
         # V_min = 0.00001
         V_min = 0.
         V_max = 0.9999
-        
+        # breakpoint()
         if x_titer < self.target_titer: # Evaporate
             self.evaporator.V = V_min = flx.IQ_interpolation(self.titer_objective_function,
                                                              V_min, V_max, ytol=1e-3, maxiter=200) 
@@ -686,7 +684,8 @@ class TiterAndInhibitorsSpecification:
         water = self.water_required_to_dilute_to_set_titer(x_titer)
         product = self.product
         molar_volume = product.chemicals.Water.V('l', product.T, product.P) # m3 / mol
-        self.dilution_water.imol['Water'] += water / molar_volume / 1000.
+        new_water = water / molar_volume / 1000.
+        self.dilution_water.imol['Water'] = self.dilution_water.imol['Water'] + new_water
         
     def water_required_to_dilute_to_set_titer(self, current_titer):
         return (1./self.target_titer - 1./current_titer) * self.product.imass[self.products].sum()
