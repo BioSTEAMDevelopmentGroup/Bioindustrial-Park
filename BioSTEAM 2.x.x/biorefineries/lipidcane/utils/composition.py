@@ -21,11 +21,10 @@ __all__ = ('set_lipid_fraction',
 def set_lipid_fraction(lipid_fraction, stream=None, data={}):
     """Adjust composition of lipid cane to achieve desired oil fraction (dry weight)."""
     if not stream: stream = f.stream.lipidcane
+    carbs_IDs = ('Glucose', 'Sucrose')
+    fiber_IDs = ('Lignin', 'Cellulose', 'Hemicellulose')
+    lipid_IDs = ('PL', 'FFA', 'MAG', 'DAG', 'TAG')
     if not data:
-        carbs_IDs = ('Glucose', 'Sucrose')
-        fiber_IDs = ('Lignin', 'Cellulose', 'Hemicellulose')
-        lipid_IDs = ('Lipid',)
-        
         carbs   = Stream(None, thermo=stream.thermo)
         fiber   = Stream(None, thermo=stream.thermo)
         lipid   = Stream(None, thermo=stream.thermo)
@@ -52,6 +51,7 @@ def set_lipid_fraction(lipid_fraction, stream=None, data={}):
         # Relative composition
         data['r_mass_carbs'] = array(carbs_mass/carbs_massnet)
         data['r_mass_fiber'] = array(fiber_mass/fiber_massnet)
+        data['r_mass_lipid'] = array(lipid_mass/lipid_massnet)
         
     z_mass_lipid = lipid_fraction
     F_mass = stream.F_mass
@@ -60,12 +60,12 @@ def set_lipid_fraction(lipid_fraction, stream=None, data={}):
     z_mass_carbs = 0.149 - z_mass_lipid * data['LHV_lipid_over_carbs']
     z_mass_fiber = z_dry - z_mass_carbs - z_mass_lipid - 0.006 - 0.015
     imass = stream.imass
-    imass['Water'] = F_mass*0.7
-    imass['Ash'] = F_mass*0.006
-    imass['Solids'] = F_mass*0.015
-    imass['Lipid'] = z_mass_lipid * F_mass
-    imass['Glucose', 'Sucrose'] = data['r_mass_carbs'] * z_mass_carbs * F_mass
-    imass['Lignin', 'Cellulose', 'Hemicellulose'] = data['r_mass_fiber'] * z_mass_fiber * F_mass
+    imass['Water'] = F_mass * 0.7
+    imass['Ash'] = F_mass * 0.006
+    imass['Solids'] = F_mass * 0.015
+    imass[lipid_IDs] = data['r_mass_lipid'] * z_mass_lipid * F_mass
+    imass[carbs_IDs] = data['r_mass_carbs'] * z_mass_carbs * F_mass
+    imass[fiber_IDs] = data['r_mass_fiber'] * z_mass_fiber * F_mass
     if any(stream.mol < 0):
         raise ValueError(f'lipid cane oil composition of {z_mass_lipid*100:.0f}% dry weight is infeasible')
 

@@ -380,6 +380,14 @@ class CoFermentation(Unit):
         )
         self.CSL_to_constituents.basis = 'mol'
         
+        if all([i in self.chemicals for i in ('FFA', 'DAG', 'TAG', 'Glycerol')]):
+            self.lipid_reaction = ParallelRxn([
+                Rxn('TAG + 3Water -> 3FFA + Glycerol', 'TAG', 0.23),
+                Rxn('TAG + Water -> FFA + DAG', 'TAG', 0.02)
+            ])
+        else:
+            self.lipid_reaction = None
+        
     def _run(self):
         feeds = self.ins
         vent, effluent = self.outs
@@ -390,6 +398,7 @@ class CoFermentation(Unit):
         self.loss(effluent)
         self.cofermentation(effluent)
         self.CSL_to_constituents(effluent)
+        if self.lipid_reaction: self.lipid_reaction(effluent)
         vent.receive_vent(effluent)
 
     def _design(self):

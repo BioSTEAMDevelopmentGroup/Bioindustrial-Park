@@ -17,6 +17,6 @@ BST_MAJOR, BST_MINOR = int(version_components[0]), int(version_components[1])
 BST222 = (BST_MAJOR, BST_MINOR) >= (2, 22)
 del sys, version_components, PY_MAJOR, PY_MINOR, BST_MAJOR, BST_MINOR
 
-__version__ = '2.21.8'
+__version__ = '2.22.0'
 
 

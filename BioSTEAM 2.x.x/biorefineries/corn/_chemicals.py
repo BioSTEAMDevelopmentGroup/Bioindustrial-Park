@@ -16,7 +16,7 @@ def create_chemicals():
     from biorefineries import lipidcane as lc, cornstover as cs
     chemicals = lc.chemicals['Water', 'Ethanol', 'Glucose', 'H3PO4', 'P4O10', 
                              'CO2', 'Octane', 'O2', 'CH4', 'Ash', 
-                             'Yeast', 'CaO', 'Lipid', 'Cellulose']
+                             'Yeast', 'CaO', 'TAG', 'Cellulose']
     chemicals += cs.chemicals['H2SO4', 'N2', 'SO2']
     chemicals = tmo.Chemicals([*chemicals, 'NH3'])
     Starch = chemicals.Cellulose.copy('Starch')
@@ -27,6 +27,7 @@ def create_chemicals():
     chemicals.NH3.at_state('l')
     chemicals.NH3.V[0].Tmax = 500.
     chemicals.compile()
-    chemicals.set_synonym('Lipid', 'Oil')
+    chemicals.set_synonym('TAG', 'Oil')
+    chemicals.set_synonym('TAG', 'Lipid')
     chemicals.set_synonym('Water', 'H2O')
     return chemicals

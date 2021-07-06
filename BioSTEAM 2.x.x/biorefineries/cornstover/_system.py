@@ -36,7 +36,7 @@ default_nonsolids = ['Water', 'Ethanol', 'AceticAcid',
 default_insoluble_solids = ['Glucan', 'Mannan', 'Xylan', 
                             'Arabinan', 'Galactan', 'Lignin']
 
-default_ignored = ['Lipid']
+default_ignored = ['TAG', 'DAG', 'MAG', 'FFA', 'PL']
 
 @bst.SystemFactory(
     ID='hot_water_pretreatment_sys',
