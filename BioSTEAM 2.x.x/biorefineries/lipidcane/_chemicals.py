@@ -15,9 +15,11 @@ def create_acyl_olein(N_acyl):
     Hf_oleic_acid = -764.80e3
     Hf_triolein = -1776e3
     Hf_water = -285.825e3
-    Hf_glycerol = -668600.0
-    Hf_tag_to_ffa = (Hf_glycerol + 3 * Hf_oleic_acid) - (Hf_oleic_acid + 3 * Hf_water)
-    Hf_minus_one_acyl = Hf_tag_to_ffa / 3.
+    Hf_glycerol = -668.6e3
+    # TAG + 3H2O -> GLY + 3FFA
+    # Hrxn = (GLY + 3FFA) - (TAG + 3H2O)
+    Hf_tag_to_ffa = (Hf_glycerol + 3 * Hf_oleic_acid) - (Hf_triolein + 3 * Hf_water)
+    Hf_minus_one_acyl = Hf_tag_to_ffa / 3. 
     if N_acyl == 0:
         ID_model = 'Palmitic acid'
         ID = 'OleicAcid'
@@ -25,12 +27,17 @@ def create_acyl_olein(N_acyl):
     elif N_acyl == 1:
         ID_model = 'Monopalmitin'
         ID = 'MonoOlein'
-        Hf = Hf_triolein - 2 * Hf_minus_one_acyl
+        # TAG + 2H2O -> MAG + 2FFA
+        # Hrxn = MAG + 2FFA - (TAG + 2H2O) # Assume to be Hf_tag_to_ffa * 2 / 3
+        # MAG = Hrxn - 2FFA + TAG + 2H2O
+        Hf = 2 * Hf_minus_one_acyl - 2 * Hf_oleic_acid + Hf_triolein + 2 * Hf_water
     elif N_acyl == 2:
         ID_model = 'Dipalmitin'
         ID = 'DiOlein'
-        Hf = Hf_triolein - Hf_oleic_acid
-        Hf = Hf_triolein - Hf_minus_one_acyl
+        # TAG + H2O -> DAG + FFA
+        # Hrxn = DAG + FFA - (TAG + H2O) # Assume to be Hf_tag_to_ffa / 3
+        # DAG = Hrxn - FFA + TAG + H2O
+        Hf = Hf_minus_one_acyl - Hf_oleic_acid + Hf_triolein + Hf_water
     elif N_acyl == 3:
         ID_model = 'Tripalmitin'
         ID = 'TriOlein'

@@ -91,6 +91,7 @@ biorefineries/lipidcane/_tea.py
 biorefineries/lipidcane/_webapp_model.py
 biorefineries/lipidcane/model.py
 biorefineries/lipidcane/sankey_plot.ipynb
+biorefineries/lipidcane/units.py
 biorefineries/lipidcane/utils/__init__.py
 biorefineries/lipidcane/utils/composition.py
 biorefineries/sugarcane/README.rst

@@ -67,7 +67,7 @@ def set_lipid_fraction(lipid_fraction, stream=None, data={}):
     imass[carbs_IDs] = data['r_mass_carbs'] * z_mass_carbs * F_mass
     imass[fiber_IDs] = data['r_mass_fiber'] * z_mass_fiber * F_mass
     if any(stream.mol < 0):
-        raise ValueError(f'lipid cane oil composition of {z_mass_lipid*100:.0f}% dry weight is infeasible')
+        raise ValueError(f'lipid cane oil composition of {z_mass_lipid/z_dry*100:.0f}% dry weight is infeasible')
 
 def get_lipid_fraction(stream=None):
     if not stream: stream = f.stream.lipidcane

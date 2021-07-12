@@ -160,7 +160,6 @@ def create_lipidcane_to_biodiesel_and_ethanol_1g(
         ins=MX-0,
         mockup=True,
         area=600,
-        FFA_fraction=0.2,
     )
     lipid, polar_lipids = lipid_pretreatment_sys.outs
     
@@ -180,11 +179,6 @@ def create_lipidcane_to_biodiesel_and_ethanol_1g(
     
     s = f.stream
     u = f.unit
-    
-    MX1 = bst.Mixer(800, 
-        ins=(fiber_fines,
-             *ethanol_production_sys-[2, 3]),
-    )
     
     MX2 = bst.Mixer(700,
         [polar_lipids, pressed_bagasse]
@@ -297,8 +291,10 @@ def create_lipidcane_to_biodiesel_and_ethanol_combined_1_and_2g_post_fermentatio
     S303 = cf_dct['S303'] # Pressure filter
     S303.tag = "lipid extraction efficiency"
     S303.isplit['Lipid'] = 1. - 0.7
-    sink = S303.outs[1].sink
-    MX = bst.Mixer(400, [S303-1, screened_juice])
+    lipid = S303.outs[1]
+    sink = lipid.sink
+    sink.ins[0] = None
+    MX = bst.Mixer(400, [lipid, screened_juice])
     EvX = bst.MultiEffectEvaporator(400, ins=MX-0,
                                     P=(101325, 69682, 47057, 30953, 19781),
                                     V_definition='First-effect',
@@ -366,7 +362,6 @@ def create_lipidcane_to_biodiesel_and_ethanol_combined_1_and_2g_post_fermentatio
         ins=backend_lipid,
         mockup=True,
         area=800,
-        FFA_fraction=0.9,
     )
     lipid, polar_lipids = lipid_pretreatment_sys.outs
     

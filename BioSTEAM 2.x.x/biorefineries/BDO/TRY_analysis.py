@@ -304,14 +304,11 @@ BDO_metrics = [get_BDO_MPSP, lambda: BDO_lca.GWP, lambda: BDO_lca.FEC]
 
 
 # %% Generate 3-specification meshgrid and set specification loading functions
-steps = 10
-
+steps = 40
 # Yield, titer, productivity (rate)
-spec_1 = np.linspace(0.1, 0.8, steps) # yield
-spec_2 = np.linspace(20, 200, steps) # titer
-# spec_1 = np.linspace(0.2, 0.99, steps) # yield
-# spec_2 = np.linspace(45, 225, steps) # titer
-spec_3 = np.array([1.]) # productivity
+spec_1 = np.linspace(0.05, 0.95, steps) # yield
+spec_2 = np.linspace(5., 330., steps) # titer
+spec_3 = np.array([1.00]) # productivity
 spec.load_spec_1 = spec.load_yield
 spec.load_spec_2 = spec.load_titer
 spec.load_spec_3 = spec.load_productivity
@@ -395,8 +392,14 @@ data_1 = BDO_data = spec.evaluate_across_specs(
 
 
 dateTimeObj = datetime.now()
-file_to_save = 'BDO_TRY_%s.%s.%s-%s.%s'%(dateTimeObj.year, dateTimeObj.month, dateTimeObj.day, dateTimeObj.hour, dateTimeObj.minute)
+date = [dateTimeObj.year, dateTimeObj.month, dateTimeObj.day, dateTimeObj.hour, dateTimeObj.minute]
+date = '.'.join([str(i) for i in date])
+file_to_save = 'BDO_TRY_' + date
 np.save(file_to_save, data_1)
+
+np.savetxt(f"MPSP_40_TRY_1.00_glH_{date}.csv", data_1[:, :, 0, 0], delimiter=",")
+np.savetxt(f"GWP_40_TRY_1.00_glH_{date}.csv", data_1[:, :, 1, 0], delimiter=",")
+np.savetxt(f"FEC_40_TRY_1.00_glH_{date}.csv", data_1[:, :, 2, 0], delimiter=",")
 
 # %% Load previously saved data
 file_to_load = file_to_save

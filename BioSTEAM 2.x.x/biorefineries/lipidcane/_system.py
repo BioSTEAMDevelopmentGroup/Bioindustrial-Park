@@ -186,11 +186,12 @@ def create_juicing_system(ins, outs, pellet_bagasse=None):
               PL=0.1),
          dict(ID='acetone',
               price=0.80),
-         dict(ID='pure_glycerine')],
+         dict(ID='pure_glycerine',
+              price=0.65)],
     outs=[dict(ID='degummed_oil'),
           dict(ID='polar_lipids')]
 )
-def create_lipid_pretreatment_system(ins, outs, FFA_fraction=None):
+def create_lipid_pretreatment_system(ins, outs):
     crude_vegetable_oil, acetone, pure_glycerine = ins
     degummed_oil, polar_lipids = outs
     T1 = bst.StorageTank('T1', acetone, tau=7*24)
@@ -236,7 +237,10 @@ def create_lipid_pretreatment_system(ins, outs, FFA_fraction=None):
     @R1.add_specification(run=True)
     def adjust_feed_flow_rates():
         lipid = R1.ins[0]
-        T2.ins[0].imol['Glycerol'] = 6.0 * lipid.imol['Lipid'] - M2.ins[1].imol['Glycerol']
+        T2.ins[0].imol['Glycerol'] = 1.5 * (
+            + lipid.imol['FFA']
+            + lipid.imol['TAG']
+        ) - M2.ins[1].imol['Glycerol']
         R1.ins[2].ivol['N2'] = lipid.F_vol
         T2._run()
         P2._run()
