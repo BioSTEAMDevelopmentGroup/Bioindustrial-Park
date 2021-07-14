@@ -97,10 +97,9 @@ configuration_names = (
 )
 comparison_names = (
     # 'I - ∅', 
-    'L1* - L1', 
-    'L2* - L2', 
+    'L1 - S1', 
+    'L2 - S2', 
     'L2 - L1', 
-    'L2* - L1*', 
 )
 
 across_lipid_content_names = (
@@ -115,24 +114,42 @@ across_lipid_content_comparison_names = (
     'L2 - L1', 'L2* - L1*',
 )
 
-MFPP, TCI, ethanol_production, biodiesel_production = metric_mockups = (
-    bst.Variable('MFPP', 'USD/ton', 'Biorefinery'),
-    bst.Variable('TCI', '10^6*USD', 'Biorefinery'),
-    bst.Variable('Ethanol production', 'MMGal/yr', 'Biorefinery'),
-    bst.Variable('Biodiesel production', 'MMGal/yr', 'Biorefinery'),
+(set_feedstock_lipid_content, set_bagasse_lipid_retention, 
+ set_bagasse_lipid_extraction_efficiency, 
+ set_plant_capacity, set_ethanol_price,
+ set_biodiesel_price, set_natural_gas_price, 
+ set_electricity_price, set_operating_days, 
+ set_IRR) = all_parameter_mockups = (
+    bst.MockVariable('Lipid content', 'dry wt. %', 'Stream-sugarcane'),
+    bst.MockVariable('Lipid retention', '%', 'Stream-sugarcane'),
+    bst.MockVariable('Bagasse lipid extraction efficiency', '%', 'Stream-sugarcane'),
+    bst.MockVariable('Capacity', 'ton/hr', 'Stream-sugarcane'),
+    bst.MockVariable('Price', 'USD/gal', 'Stream-ethanol'),
+    bst.MockVariable('Price', 'USD/gal', 'Stream-biodiesel'),
+    bst.MockVariable('Price', 'USD/cf', 'Stream-natural gas'),
+    bst.MockVariable('Electricity price', 'USD/kWh', 'biorefinery'),
+    bst.MockVariable('Operating days', 'day/yr', 'biorefinery'),
+    bst.MockVariable('IRR', '%', 'biorefinery'),
+)
+(MFPP, biodiesel_production, ethanol_production, 
+ electricity_production, natural_gas_consumption, 
+ TCI, heat_exchanger_network_error, feedstock_consumption) = all_metric_mockups = (
+    bst.MockVariable('MFPP', 'USD/ton', 'Biorefinery'),
+    bst.MockVariable('Biodiesel production', 'MMGal/yr', 'Biorefinery'),
+    bst.MockVariable('Ethanol production', 'MMGal/yr', 'Biorefinery'),
+    bst.MockVariable('Electricity production', 'MMWhr/yr', 'Biorefinery'),
+    bst.MockVariable('Natural gas consumption', 'MMcf/yr', 'Biorefinery'),
+    bst.MockVariable('TCI', '10^6*USD', 'Biorefinery'),
+    bst.MockVariable('Heat exchanger network error', '%', 'Biorefinery'),
+    bst.MockVariable('Feedstock consumption', 'ton/yr', 'Biorefinery'),
 )
 
-all_metric_mockups = (
-    MFPP,
-    biodiesel_production,
-    ethanol_production,
-    bst.Variable('Electricity production', 'MMWhr/yr', 'Biorefinery'),
-    bst.Variable('Natural gas consumption', 'MMcf/yr', 'Biorefinery'),
-    bst.Variable('Productivity', 'MMcf/yr', 'Biorefinery'),
+metric_mockups = (
+    MFPP, 
     TCI,
-    bst.Variable('Heat exchanger network error', 'MMGGE/yr', 'Biorefinery'),
+    ethanol_production,
+    biodiesel_production
 )
-
 
 def asconfiguration(x):
     number, agile = x
@@ -331,13 +348,13 @@ def load(name, cache={}):
             
             def set_parameters(self, switch2sorghum):
                 F_mass_original = lipidcane.F_mass
-                if number != 0:
+                if number >= 0:
                     lipid_content = get_lipid_fraction(lipidcane)
                 if switch2sorghum:
                     lipidcane.copy_like(lipidsorghum)
                 else:
                     lipidcane.copy_like(original_lipidcane)
-                if number != 0:
+                if number >= 0:
                     set_lipid_fraction(lipid_content, lipidcane)
                     np.testing.assert_allclose(get_lipid_fraction(lipidcane), lipid_content)
                 lipidcane.F_mass = F_mass_original
@@ -381,6 +398,9 @@ def load(name, cache={}):
     def uniform(lb, ub, *args, **kwargs):
         return parameter(*args, distribution=shape.Uniform(lb, ub), bounds=(lb, ub), **kwargs)
     
+    def triangular(lb, mid, ub, *args, **kwargs):
+        return parameter(*args, distribution=shape.Triangle(lb, mid, ub), bounds=(lb, ub), **kwargs)
+    
     # Currently at ~5%, but total lipid content is past 10%
     
     @uniform(5., 15., element=lipidcane, units='dry wt. %', kind='coupled')
@@ -416,18 +436,19 @@ def load(name, cache={}):
         ethanol.price = price / 2.98668849
 
     # USDA ERS historical price data
-    @parameter(distribution=biodiesel_price_distribution, element=biodiesel, units='USD/gal')
+    @parameter(distribution=biodiesel_minus_ethanol_price_distribution, element=biodiesel, units='USD/gal',
+               hook=lambda x: ethanol.price * 2.98668849 + x)
     def set_biodiesel_price(price): # Triangular distribution fitted over the past 10 years Sep 2009 to March 2021
-            biodiesel.price = price / 3.3111
+        biodiesel.price = price / 3.3111
 
     # https://www.eia.gov/energyexplained/natural-gas/prices.php
     @parameter(distribution=natural_gas_price_distribution, element=natural_gas, units='USD/cf')
     def set_natural_gas_price(price): # Triangular distribution fitted over the past 10 years Sep 2009 to March 2021
         BT.natural_gas_price = 51.92624700383502 * price / 1000. 
 
-    # From Emma's literature search; EIA electricity prices vary much too widely across states.
-    # Best use prices similar to previous TEAs for a more accurate comparison.
-    @uniform(0.0572, 0.07014, units='USD/kWh')
+    # https://www.eia.gov/outlooks/aeo/pdf/00%20AEO2021%20Chart%20Library.pdf
+    # Data from historical prices, 2010-2020
+    @triangular(0.0583, 0.065, 0.069, units='USD/kWh')
     def set_electricity_price(electricity_price): 
         bst.PowerUtility.price = electricity_price
         
@@ -467,7 +488,7 @@ def load(name, cache={}):
         elif number == 2:
             electricity = lambda: 0.
     else:
-        feedstock_flow = lambda: lipidcane_sys.operating_hours * lipidcane.F_mass / kg_per_ton
+        feedstock_flow = lambda: lipidcane_sys.operating_hours * lipidcane.F_mass / kg_per_ton # ton/yr
         biodiesel_flow = lambda: lipidcane_sys.operating_hours * biodiesel.F_mass / 3.3111 # gal/yr
         ethanol_flow = lambda: lipidcane_sys.operating_hours * ethanol.F_mass / 2.98668849 # gal/yr
         natural_gas_flow = lambda: lipidcane_sys.operating_hours * natural_gas.F_mass * V_ng # cf/yr
@@ -475,7 +496,11 @@ def load(name, cache={}):
             electricity = lambda: lipidcane_sys.operating_hours * sum([i.rate for i in lipidcane_sys.power_utilities])
         elif number == 2:
             electricity = lambda: 0.
-    
+    dct['flows'] = flows = {'feedstock': feedstock_flow,
+                            'biodiesel': biodiesel_flow,
+                            'ethanol': ethanol_flow,
+                            'natural_gas': natural_gas_flow,
+                            'electricity': electricity}
     @metric(units='USD/ton')
     def MFPP():
         return kg_per_ton * lipidcane_tea.solve_price(lipidcane)
@@ -508,6 +533,10 @@ def load(name, cache={}):
     def TCI():
         return lipidcane_tea.TCI / 1e6 # 10^6*$
     
+    @metric(units='ton/yr')
+    def feedstock_consumption():
+        return feedstock_flow()
+    
     @metric(units='%')
     def heat_exchanger_network_error():
         return HXN.energy_balance_percent_error if HXN else 0.
@@ -532,7 +561,7 @@ def load(name, cache={}):
     for i in model.parameters:
         dct[i.setter.__name__] = i
     for i in model.metrics:
-        dct[i.getter.__name__] = 1
+        dct[i.getter.__name__] = i
     cache[number, agile] = dct.copy()
     
     ## Simulation
@@ -568,11 +597,38 @@ evaluate_configurations_across_extraction_efficiency_and_lipid_content = np.vect
     signature='(),(),(),(a),(c)->(a,c,8)'
 )       
 
+def evaluate_MFPP_uncertainty_across_ethanol_and_biodiesel_prices(name, ethanol_price, biodiesel_price):
+    table = get_monte_carlo(name)
+    lipidcane_price = table[MFPP.index].to_numpy()[:, np.newaxis] # USD/ton
+    biodiesel_flow = table[biodiesel_production.index].to_numpy()[:, np.newaxis] * 1e6 # gal/yr
+    ethanol_price_baseline = table[set_ethanol_price.index].to_numpy()[:, np.newaxis]
+    biodiesel_price_baseline = table[set_biodiesel_price.index].to_numpy()[:, np.newaxis]
+    ethanol_flow = table[ethanol_production.index].to_numpy()[:, np.newaxis] * 1e6 # gal/yr
+    feedstock_flow = table[feedstock_consumption.index].to_numpy()[:, np.newaxis] # ton/yr
+    baseline_price = (
+        lipidcane_price
+        - (ethanol_price_baseline * ethanol_flow + biodiesel_price_baseline * biodiesel_flow) / feedstock_flow
+    )
+    return (
+        baseline_price 
+        + (ethanol_price[np.newaxis, :] * ethanol_flow + biodiesel_price[np.newaxis, :] * biodiesel_flow) / feedstock_flow
+    )
+
+def evaluate_MFPP_benefit_uncertainty_across_ethanol_and_biodiesel_prices(name, ethanol_price, biodiesel_price, baseline=None):
+    if baseline is None:
+        configuration = parse(name)
+        number, agile = configuration
+        assert number > 0
+        baseline = Configuration(-number, agile)
+    MFPP_baseline = evaluate_MFPP_uncertainty_across_ethanol_and_biodiesel_prices(name, ethanol_price, biodiesel_price)
+    MFPP = evaluate_MFPP_uncertainty_across_ethanol_and_biodiesel_prices(baseline, ethanol_price, biodiesel_price)
+    return MFPP - MFPP_baseline
+
 def evaluate_MFPP_across_ethanol_and_biodiesel_prices(ethanol_price, biodiesel_price, configuration=None):
     if configuration is not None: load(configuration)
-    feedstock_flow = lipidcane.F_mass
-    biodiesel_flow = biodiesel.F_mass
-    ethanol_flow = ethanol.F_mass
+    feedstock_flow = flows['feedstock']
+    biodiesel_flow = flows['biodiesel']
+    ethanol_flow = flows['ethanol']
     baseline_price = (
         lipidcane_tea.solve_price(lipidcane)
         - (ethanol.price * ethanol_flow + biodiesel.price * biodiesel_flow) / feedstock_flow
@@ -790,8 +846,7 @@ def plot_monte_carlo(comparison=False):
     MFPP, TCI, *production = metric_mockups
     rows = metrics = [
         MFPP, 
-        # TCI, 
-        production
+        TCI, 
     ]
     N_rows = len(rows)
     fig, axes = plt.subplots(ncols=1, nrows=N_rows)
@@ -802,8 +857,8 @@ def plot_monte_carlo(comparison=False):
     color_wheel = CABBI_colors.wheel()
     ylabels = [
         f"MFPP [{format_units('USD/ton')}]",
-        # f"TCI [{format_units('10^6*USD')}]",
-        f"Production [{format_units('MMGal/yr')}]"
+        f"TCI [{format_units('10^6*USD')}]",
+        # f"Production [{format_units('MMGal/yr')}]"
     ]
     def get_data(metric, name):
         if isinstance(metric, bst.Variable):
@@ -827,11 +882,7 @@ def plot_monte_carlo(comparison=False):
     
     data = np.zeros([N_rows, N_cols], dtype=object)
     data = np.array([[get_data(i, j) for j in columns] for i in rows])
-    try:
-        tickmarks = [bst.plots.rounded_tickmarks_from_data(i, step_min=15, N_ticks=5, lb_max=0) for i in data]
-    except:
-        breakpoint()
-    
+    tickmarks = [bst.plots.rounded_tickmarks_from_data(i, step_min=30, N_ticks=5, lb_max=0) for i in data]
     color_wheel = CABBI_colors.wheel()
     for j in range(N_cols):
         color_wheel.restart()

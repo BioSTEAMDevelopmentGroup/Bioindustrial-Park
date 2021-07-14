@@ -11,16 +11,17 @@ from math import sqrt
 
 __all__ = ('ethanol_price_distribution', 
            'biodiesel_price_distribution',
+           'biodiesel_minus_ethanol_price_distribution',
            'natural_gas_price_distribution')
 
-ethanol_prices = [ # USD / gal Dec 2009 - Nov 2019
+ethanol_prices = [ # USD / gal Dec 2009 - Nov 2019, by quarter
     2.08, 1.66, 1.71, 2.33, 2.37, 2.67, 2.87, 2.83, 2.30, 2.26, 2.47,
     2.48, 2.39, 2.58, 2.57, 2.31, 2.19, 2.76, 2.28, 2.16, 1.83, 1.63, 1.64,
     1.61, 1.47, 1.52, 1.59, 1.58, 1.57, 1.60, 1.62, 1.24, 1.02, 1.30, 1.37, 
     1.20, 1.09, 1.09, 1.32, 1.35
 ]
 
-biodiesel_prices = [ # USD / gal Dec 2009 - Nov 2019
+biodiesel_prices = [ # USD / gal Dec 2009 - Nov 2019, by month
     3.38, 3.27, 3.3, 3.32, 3.33, 3.21, 3.18, 3.18, 3.3, 
     3.35, 3.66, 3.9, 4.25, 4.49, 4.6, 4.82, 5.07, 5.23, 5.4, 5.45, 5.44, 5.74, 
     5.58, 5.34, 4.92, 4.67, 4.67, 4.79, 4.97, 4.76, 4.4, 4.39, 4.47, 4.53,
@@ -34,19 +35,18 @@ biodiesel_prices = [ # USD / gal Dec 2009 - Nov 2019
     3.13, 3.21, 
 ]
 
-mean_biodiesel_price_10yr = np.mean(biodiesel_prices)
-mean_biodiesel_price_5yr = np.mean(biodiesel_prices[-int(len(biodiesel_prices)/2):])
-mean_ethanol_price_10yr = np.mean(ethanol_prices)
-mean_ethanol_price_5yr = np.mean(ethanol_prices[-int(len(ethanol_prices)/2):])
-# print(mean_ethanol_price_10yr, mean_ethanol_price_5yr)
-# print(mean_biodiesel_price_10yr, mean_biodiesel_price_5yr)
+N_quarters = int(len(biodiesel_prices)/3)
+biodiesel_prices_quarter = [ # By quarter
+    np.mean(biodiesel_prices[3*i: 3*i+3]) for i in range(N_quarters)
+]
 
-x_ethanol = np.arange(len(ethanol_prices))
-x_biodiesel = np.arange(len(biodiesel_prices)) / 3
+biodiesel_minus_ethanol_prices = [i - j for i, j in zip(biodiesel_prices, ethanol_prices)]
 
-# plt.plot(x_ethanol, ethanol_prices, label='ethanol')
-# plt.plot(x_biodiesel, biodiesel_prices, label='biodiesel')
-# plt.legend()
+# mean_biodiesel_price_10yr = np.mean(biodiesel_prices)
+# mean_biodiesel_price_5yr = np.mean(biodiesel_prices[-int(len(biodiesel_prices)/2):])
+# mean_ethanol_price_10yr = np.mean(ethanol_prices)
+# mean_ethanol_price_5yr = np.mean(ethanol_prices[-int(len(ethanol_prices)/2):])
+
 natural_gas_prices = [ # City gate [USD / cf] 2010 to 2019
     6.18, 5.63, 4.73, 4.88, 5.71, 4.26, 3.71, 4.16, 4.23, 3.81,
 ]
@@ -87,4 +87,5 @@ def plot_histogram(x, *args, bins=10, density=True, **kwargs):
 
 ethanol_price_distribution = triangular_distribution(ethanol_prices)
 biodiesel_price_distribution = triangular_distribution(biodiesel_prices)
+biodiesel_minus_ethanol_price_distribution = triangular_distribution(biodiesel_minus_ethanol_prices)
 natural_gas_price_distribution = triangular_distribution(natural_gas_prices)
