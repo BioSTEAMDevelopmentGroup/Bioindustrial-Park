@@ -412,7 +412,6 @@ def voc_table(system, tea, main_products):
 
 def foc_table(tea):
     foc = FOCTableBuilder(tea.operating_days)
-    tea, _ = tea.TEAs
     ISBL = tea.ISBL_installed_equipment_cost / 1e6
     labor_cost = tea.labor_cost / 1e6
     foc.entry('Labor salary', labor_cost)

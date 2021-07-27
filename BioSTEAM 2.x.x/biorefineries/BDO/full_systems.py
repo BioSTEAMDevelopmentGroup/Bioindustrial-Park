@@ -16,6 +16,18 @@ __all__ = (
     'create_system_oleyl_alcohol',
 )
 
+def rename_storage_units(units, number):
+    
+    def is_storage_unit(unit):
+        return (
+            ('storage' in unit.line.lower() 
+             or isinstance(unit, bst.StorageTank)
+             or 'storage' in unit.__class__.__name__.lower()) 
+        )
+    
+    bst.rename_units([i for i in units if is_storage_unit(i)], number)
+
+
 @bst.SystemFactory(
     ID='BDO_sys',
     ins=[dict(ID='feedstock', phase='l', T=298.15, P=101325,
@@ -100,6 +112,7 @@ def create_system_oleyl_alcohol(ins, outs):
     wastewater_treatment_sys = bst.create_wastewater_treatment_system(
         ins=[wastewater_a, wastewater_b, wastewater_c],
         mockup=True,
+        area=500,
     )
     methane, sludge, treated_water, waste_brine = wastewater_treatment_sys.outs
     solids.source.ins.append(sludge)
@@ -118,9 +131,19 @@ def create_system_oleyl_alcohol(ins, outs):
     # u.M305.ins[0] = None
     # u.M305.ins[1] = None
     # u.M601.ins[1] = None
-    HXN = bst.facilities.HeatExchangerNetwork('HXN', 
+    HXN = bst.facilities.HeatExchangerNetwork(1000, 
         ignored=[u.D404.boiler, u.D407.boiler]
     )
+    u.FT.ID = 900
+    BT = u.BT
+    CT = u.CT
+    BT.ID = 700
+    CT.ID = 800
+    excluded = (HXN, BT, CT)
+    for i in list(u):
+        if isinstance(i, bst.Facility) and i not in excluded:
+            i.ID = 900
+    rename_storage_units(u, 600)
     # def HXN_no_run_cost():
     #     HXN.heat_utilities = tuple()
     #     HXN._installed_cost = 0.
@@ -212,6 +235,7 @@ def create_system_DPHP(ins, outs):
     
     wastewater_treatment_sys = bst.create_wastewater_treatment_system(
         ins=[wastewater_a, wastewater_b, wastewater_c],
+        area=500,
         mockup=True,
     )
     methane, sludge, treated_water, waste_brine = wastewater_treatment_sys.outs
@@ -230,7 +254,15 @@ def create_system_DPHP(ins, outs):
     )
     # u.M305.ins[0] = None
     # u.M305.ins[1] = None
-    HXN = bst.facilities.HeatExchangerNetwork('HXN')
+    HXN = bst.facilities.HeatExchangerNetwork(1000)
+    u.FT.ID = 900
+    u.BT.ID = 700
+    u.CT.ID = 800
+    excluded = (HXN, u.BT, u.CT)
+    for i in u:
+        if isinstance(i, bst.Facility) and i not in excluded:
+            i.ID = 900
+    rename_storage_units(u, 600)
     # def HXN_no_run_cost():
     #     HXN.heat_utilities = tuple()
     #     HXN._installed_cost = 0.

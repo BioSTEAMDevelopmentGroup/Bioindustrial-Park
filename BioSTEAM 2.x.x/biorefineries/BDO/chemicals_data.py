@@ -152,7 +152,7 @@ BDO.Hf = -544.8	* 1000 # https://webbook.nist.gov/cgi/cbook.cgi?ID=C513859&Mask=
 
 MEK = chemical_database('MEK')
 
-OleylAlcohol = chemical_database('OleylAlcohol', search_ID='143-28-2')
+OleylAlcohol = chemical_database('OleylAlcohol', search_ID='143-28-2') # Octyldodecanol
 # Tb 195 °C at 8 mm Hg; 182-184 °C at 1.5 mm Hg; 9.3X10-5 mm Hg at 25 °C
 # dPdT = 133.322 * (8 - 1.5)  / (195 - 183)
 # T = 195 + 273.15
@@ -161,13 +161,18 @@ OleylAlcohol = chemical_database('OleylAlcohol', search_ID='143-28-2')
 # C = 0
 # OleylAlcohol.Psat.add_model(tmo.functors.Antoine(A, B, C), Tmax=OleylAlcohol.Tc)
 # OleylAlcohol.Tb = OleylAlcohol.Tsat(101325)
-from thermo import Chemical as TChemical
-Octyldodecanol = TChemical('Octyldodecanol')
-OleylAlcohol.Psat.add_model(Octyldodecanol.VaporPressure, Tmax=OleylAlcohol.Tc)
-OleylAlcohol.Tb = OleylAlcohol.Tsat(101325)
-OleylAlcohol.mu.l.add_model(Octyldodecanol.ViscosityLiquid)
-OleylAlcohol.mu.g.add_model(Octyldodecanol.ViscosityGas)
-OleylAlcohol.sigma.add_model(Octyldodecanol.SurfaceTension)
+if tmo.__version__[0] == '1':
+    Octyldodecanol = tmo.Chemical('Octyldodecanol')
+    OleylAlcohol.copy_models_from(Octyldodecanol, ['Psat', 'mu', 'sigma'])
+    OleylAlcohol.Tb = Octyldodecanol.Tb
+else:
+    from thermo import Chemical as TChemical
+    Octyldodecanol = TChemical('Octyldodecanol')
+    OleylAlcohol.Psat.add_model(Octyldodecanol.VaporPressure, Tmax=OleylAlcohol.Tc)
+    OleylAlcohol.Tb = OleylAlcohol.Tsat(101325)
+    OleylAlcohol.mu.l.add_model(Octyldodecanol.ViscosityLiquid)
+    OleylAlcohol.mu.g.add_model(Octyldodecanol.ViscosityGas)
+    OleylAlcohol.sigma.add_model(Octyldodecanol.SurfaceTension)
 IBA = chemical_database('Isobutyraldehyde')
 IB = chemical_database('Isobutanol')
 DPHP = chemical_database('Dipotassium hydrogen phosphate', phase = 'l')

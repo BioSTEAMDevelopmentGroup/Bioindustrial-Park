@@ -346,7 +346,7 @@ def create_ethanol_purification_system_after_beer_column(ins, outs, IDs={}):
                                 LHK=('Ethanol', 'Water'),
                                 tray_material='Stainless steel 304',
                                 vessel_material='Stainless steel 304',
-                                P=101325.,
+                                P=1013250.,
                                 is_divided=True)
     D303.boiler.U = 1.85
     P303 = units.Pump(IDs.get('Distillation bottoms product pump', 'P303'), 
@@ -354,7 +354,7 @@ def create_ethanol_purification_system_after_beer_column(ins, outs, IDs={}):
     
     # Superheat vapor for mol sieve
     H303 = units.HXutility(IDs.get('Heat exchanger to superheat vapor to molecular sieves', 'H303'),
-                           T=115+273.15, V=1)
+                           T=115+273.15, V=1, heat_only=True)
     
     # Molecular sieve
     U301 = units.MolecularSieve(IDs.get('Molecular sieves', 'U301'),
@@ -664,7 +664,7 @@ def create_sucrose_to_ethanol_system(ins, outs):
           dict(ID='emissions'),
           dict(ID='ash_disposal')]
 )
-def create_sugarcane_to_ethanol_system(ins, outs):
+def create_sugarcane_to_ethanol_system(ins, outs, use_area_convention=False):
     s = f.stream
     u = f.unit
     
@@ -672,32 +672,36 @@ def create_sugarcane_to_ethanol_system(ins, outs):
     ethanol, vinasse, wastewater, emissions, ash_disposal = outs
     
     feedstock_handling_sys = create_feedstock_handling_system(
+        area=100 if use_area_convention else None,
         ins=[sugarcane],
         outs=[''],
         mockup=True,
     )
     juicing_sys = create_juicing_system_with_fiber_screener(
+        area=200 if use_area_convention else None,
         ins=[feedstock_handling_sys-0, enzyme, H3PO4, lime, polymer],
         mockup=True
     )
-    ethanol_production_sys = create_sucrose_to_ethanol_system(
+    ethanol_production_sys, edct = create_sucrose_to_ethanol_system(
+        area=300 if use_area_convention else None,
+        udct=True,
         ins=(juicing_sys-0, denaturant), outs=(ethanol, vinasse),
         mockup=True
     )
-    M305 = units.Mixer('M305', 
+    M305 = units.Mixer(400 if use_area_convention else 'M305', 
         ins=(juicing_sys-2, *ethanol_production_sys-[2, 3]),
         outs=wastewater
     )
     
     ### Facilities ###    
     
-    BT = units.BoilerTurbogenerator('BT',
+    BT = units.BoilerTurbogenerator(400 if use_area_convention else 'BT',
         (juicing_sys-1, '', 'boiler_makeup_water', 'natural_gas', '', ''),
         outs=(emissions, 'rejected_water_and_blowdown', ash_disposal),
         boiler_efficiency=0.80,
         turbogenerator_efficiency=0.85
     )
-    CT = units.CoolingTower('CT')
+    CT = units.CoolingTower(500 if use_area_convention else 'CT')
     makeup_water_streams = (s.cooling_tower_makeup_water,
                             s.boiler_makeup_water)
     process_water_streams = (s.imbibition_water,
@@ -705,17 +709,18 @@ def create_sugarcane_to_ethanol_system(ins, outs):
                              s.stripping_water,
                              *makeup_water_streams)
     makeup_water = bst.Stream('makeup_water', price=0.000254)
-    CWP = units.ChilledWaterPackage('CWP')
-    PWC = units.ProcessWaterCenter('PWC',
+    CWP = units.ChilledWaterPackage(500 if use_area_convention else 'CWP')
+    PWC = units.ProcessWaterCenter(500 if use_area_convention else 'PWC',
                                    (bst.Stream(), makeup_water),
                                    (),
                                    None,
                                    makeup_water_streams,
                                    process_water_streams)
     
-    F301 = u.F301
-    D303 = u.D303
-    HXN = bst.HeatExchangerNetwork('HXN', units=[F301, D303])
+    F301 = edct['F301']
+    D303 = edct['D303']
+    HXN = bst.HeatExchangerNetwork(600 if use_area_convention else 'HXN',
+                                   units=[F301, D303.condenser])
     
     # if vinasse_to_wastewater:
     #     plant_air = bst.Stream('plant_air', N2=83333, units='kg/hr')

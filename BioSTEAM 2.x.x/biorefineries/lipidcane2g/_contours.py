@@ -181,12 +181,12 @@ def plot_extraction_efficiency_and_lipid_content_contours(load=False, metric_ind
             ax.clabel(CS, levels=CS.levels, inline=True, fmt=lambda x: f'{round(x):,}',
                       fontsize=10, colors=[linecolor], zorder=1e16)
             if j == 0:
-                lb = 47.5
-                ub = 52.5
+                lb = 60.0
+                ub = 80.0
             else:
-                lb = 75
-                ub = 80
-            baseline = (lb + ub) / 2.
+                lb = 70.0
+                ub = 90.0
+            baseline = lb
             plt.fill_between([lb, ub], [2], [20], 
                              color=shadecolor,
                              linewidth=1)

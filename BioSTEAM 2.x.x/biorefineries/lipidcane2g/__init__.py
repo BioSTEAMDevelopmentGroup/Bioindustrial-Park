@@ -58,7 +58,7 @@ _system_loaded = False
 _chemicals_loaded = False
 
 kg_per_ton = 907.18474
-lipid_content = np.linspace(0.02, 0.15, 14)
+lipid_content = np.linspace(0.15, 0.05, 4)
 
 area_colors = {
     'Feedstock handling': CABBI_colors.teal, 
@@ -93,13 +93,16 @@ palette = Palette(**area_colors)
 
 
 configuration_names = (
-    'S2', 'S2*', 'S1', 'S1*', 'L1', 'L1*', 'L2', 'L2*',
+    'S1', 'L1', 'S1*', 'L1*', 'S2', 'L2', 'S2*', 'L2*',
 )
 comparison_names = (
     # 'I - ∅', 
     'L1 - S1', 
     'L2 - S2', 
     'L2 - L1', 
+    'L1* - S1*', 
+    'L2* - S2*', 
+    'L2* - L1*', 
 )
 
 across_lipid_content_names = (
@@ -107,11 +110,11 @@ across_lipid_content_names = (
 )
 
 across_lipid_content_agile_names = (
-    'L1* - L1', 'L2* - L2', 
+    'L1*', 'L2*', 
 )
 
 across_lipid_content_comparison_names = (
-    'L2 - L1', 'L2* - L1*',
+    'L1 - S1', 'L2 - S2', 'L2 - L1', 
 )
 
 (set_feedstock_lipid_content, set_bagasse_lipid_retention, 
@@ -169,7 +172,7 @@ class ConfigurationComparison(NamedTuple):
 
 def name_to_configuration(name):
     name = name.replace(' ', '')
-    return Configuration((-1 if name.startswith('S') else 1) * int(name[1]), '*' in i)
+    return Configuration((-1 if name.startswith('S') else 1) * int(name[1]), '*' in name)
 
 def parse(x):
     try:
@@ -270,12 +273,35 @@ def load(name, cache={}):
         # bst.settings.set_thermo(starting_chemicals)
         lipidcane_sys = create_sugarcane_to_ethanol_system(
             operating_hours=operating_hours,
+            use_area_convention=True,
         )
+        area_names = [
+            'Feedstock handling', 
+            'Juicing', 
+            'EtOH prod.', 
+            'CH&P',
+            'Utilities',
+            'HXN',
+            'Storage',
+        ]
+        rename_storage_units(700)
     elif number == -2:
         isplit_efficiency_is_reversed = None
         lipidcane_sys = create_sugarcane_to_ethanol_combined_1_and_2g(
             operating_hours=operating_hours,
         )
+        area_names = [
+            'Feedstock handling', 
+            'Juicing', 
+            'Pretreatment',
+            'EtOH prod.',
+            'Wastewater treatment',
+            'CH&P', 
+            'Utilities',
+            'HXN',
+            'Storage',
+        ]
+        rename_storage_units(900)
     elif number == 1:
         isplit_efficiency_is_reversed = False
         lipidcane_sys = create_lipidcane_to_biodiesel_and_ethanol_1g(
@@ -319,26 +345,22 @@ def load(name, cache={}):
     if number < 0:
         dct['lipidcane'] = sugarcane
         dct['lipidcane_sys'] = lipidcane_sys
-        for BT in sugarcane_sys.units:
-            if isinstance(BT, bst.BoilerTurbogenerator): break
-        for HXN in sugarcane_sys.units:
-            if isinstance(HXN, bst.HeatExchangerNetwork): break
-    else:
-        unit_groups = UnitGroup.group_by_area(lipidcane_sys.units)
-        if area_names:
-            for i, j in zip(unit_groups, area_names): i.name = j
-        for i in unit_groups: i.autofill_metrics(shorthand=True)
-        
-        for BT in lipidcane_sys.units:
-            if isinstance(BT, bst.BoilerTurbogenerator): break
+    unit_groups = UnitGroup.group_by_area(lipidcane_sys.units)
+    if area_names:
+        for i, j in zip(unit_groups, area_names): i.name = j
+    for i in unit_groups: i.autofill_metrics(shorthand=True)
     
-        HXN = None
-        for HXN_group in unit_groups:
-            if HXN_group.name == 'HXN':
-                HXN_group.filter_savings = False
-                HXN = HXN_group.units[0]
-                assert isinstance(HXN, bst.HeatExchangerNetwork)
+    for BT in lipidcane_sys.units:
+        if isinstance(BT, bst.BoilerTurbogenerator): break
+
+    HXN = None
+    for HXN_group in unit_groups:
+        if HXN_group.name == 'HXN':
+            HXN_group.filter_savings = False
+            HXN = HXN_group.units[0]
+            assert isinstance(HXN, bst.HeatExchangerNetwork)
     
+    unit_groups[-1].metrics[-1].getter = lambda: 0.    
     
     if agile: 
         dct['lipidsorghum'] = lipidsorghum = sorghum_feedstock(lipidcane, ID='lipidsorghum')
@@ -419,7 +441,7 @@ def load(name, cache={}):
         elif number == 2:
             return 70.0 + x
     
-    @uniform(0., 25, units='%', element=lipidcane, kind='coupled', 
+    @uniform(0., 20, units='%', element=lipidcane, kind='coupled', 
              hook=lipid_extraction_efficiency_hook)
     def set_bagasse_lipid_extraction_efficiency(bagasse_lipid_extraction_efficiency):
         lipid_extraction_specification.load_efficiency(bagasse_lipid_extraction_efficiency / 100.)
@@ -521,13 +543,13 @@ def load(name, cache={}):
     def natural_gas_consumption():
         return natural_gas_flow() / 1e6
     
-    @metric(units='MMGGE/yr')
-    def productivity():
-        GGE = (ethanol_flow() / 1.5
-           + biodiesel_flow() / 0.9536
-           - electricity() * 3600 / 131760
-           - natural_gas_flow() / 126.67)
-        return GGE / 1e6
+    # @metric(units='MMGGE/yr')
+    # def productivity():
+    #     GGE = (ethanol_flow() / 1.5
+    #        + biodiesel_flow() / 0.9536
+    #        - electricity() * 3600 / 131760
+    #        - natural_gas_flow() / 126.67)
+    #     return GGE / 1e6
 
     @metric(units='10^6*USD')
     def TCI():
@@ -545,17 +567,17 @@ def load(name, cache={}):
     lipid_extraction_specification.load_lipid_retention(0.70)
     lipid_extraction_specification.load_lipid_content(0.10)
     set_bagasse_lipid_extraction_efficiency(0.)
-    set_ethanol_price.setter(1.8) 
-    set_biodiesel_price.setter(2.72)
+    set_ethanol_price.setter(1.898) 
+    set_biodiesel_price.setter(4.363)
     set_natural_gas_price.setter(4.3)
-    set_electricity_price.setter(0.0572)
+    set_electricity_price.setter(0.0641)
     if number == 2: M402.solids_loading = 0.20
     # set_fermentation_solids_loading(20) # Same as Humbird
-    set_feedstock_lipid_content(10) # Consistent with SI of Huang's 2016 paper
-    set_ethanol_price(2.356) # Consistent with Huang's 2016 paper
-    set_biodiesel_price(4.569) # Consistent with Huang's 2016 paper
-    set_natural_gas_price(4.198) # Consistent with Humbird's 2012 paper
-    set_electricity_price(0.0572) # Consistent with Humbird's 2012 paper
+    # set_feedstock_lipid_content(10) # Consistent with SI of Huang's 2016 paper
+    # set_ethanol_price(2.356) # Consistent with Huang's 2016 paper
+    # set_biodiesel_price(4.569) # Consistent with Huang's 2016 paper
+    # set_natural_gas_price(4.198) # Consistent with Humbird's 2012 paper
+    # set_electricity_price(0.0572) # Consistent with Humbird's 2012 paper
     set_operating_days(200) # Consistent with Huang's 2016 paper
     
     for i in model.parameters:
@@ -577,7 +599,7 @@ def evaluate_configurations_across_extraction_efficiency_and_lipid_content(
     ):
     A = len(agile)
     C = len(configurations)
-    M = 8
+    M = len(all_metric_mockups)
     data = np.zeros([A, C, M])
     for ia in range(A):
         for ic in range(C):    
@@ -620,22 +642,22 @@ def evaluate_MFPP_benefit_uncertainty_across_ethanol_and_biodiesel_prices(name, 
         number, agile = configuration
         assert number > 0
         baseline = Configuration(-number, agile)
-    MFPP_baseline = evaluate_MFPP_uncertainty_across_ethanol_and_biodiesel_prices(name, ethanol_price, biodiesel_price)
-    MFPP = evaluate_MFPP_uncertainty_across_ethanol_and_biodiesel_prices(baseline, ethanol_price, biodiesel_price)
+    MFPP_baseline = evaluate_MFPP_uncertainty_across_ethanol_and_biodiesel_prices(baseline, ethanol_price, biodiesel_price)
+    MFPP = evaluate_MFPP_uncertainty_across_ethanol_and_biodiesel_prices(name, ethanol_price, biodiesel_price)
     return MFPP - MFPP_baseline
 
 def evaluate_MFPP_across_ethanol_and_biodiesel_prices(ethanol_price, biodiesel_price, configuration=None):
     if configuration is not None: load(configuration)
-    feedstock_flow = flows['feedstock']
-    biodiesel_flow = flows['biodiesel']
-    ethanol_flow = flows['ethanol']
+    feedstock_flow = flows['feedstock']()
+    biodiesel_flow = flows['biodiesel']()
+    ethanol_flow = flows['ethanol']()
     baseline_price = (
-        lipidcane_tea.solve_price(lipidcane)
-        - (ethanol.price * ethanol_flow + biodiesel.price * biodiesel_flow) / feedstock_flow
+        lipidcane_tea.solve_price(lipidcane) * kg_per_ton
+        - (ethanol.price * ethanol_flow  * 2.98668849 + biodiesel.price * 3.3111 * biodiesel_flow) / feedstock_flow
     )
-    return kg_per_ton * (
+    return (
         baseline_price 
-        + (ethanol_price / 2.98668849 * ethanol_flow + biodiesel_price / 3.3111 * biodiesel_flow) / feedstock_flow
+        + (ethanol_price * ethanol_flow + biodiesel_price * biodiesel_flow) / feedstock_flow
     )
 
 def evaluate_MFPP_benefit_across_ethanol_and_biodiesel_prices(ethanol_price, biodiesel_price, baseline=None, configuration=None):
@@ -680,18 +702,29 @@ def run_uncertainty_and_sensitivity(name, N, rule='L',
     model.load_samples(samples)
     file = monte_carlo_file(name, across_lipid_content)
     if across_lipid_content:
-        def f(x):
-            lipid_extraction_specification.locked_lipid_content = False
-            lipid_extraction_specification.load_lipid_content(x)
-            lipid_extraction_specification.locked_lipid_content = True
-        model.evaluate_across_coordinate(
-            name='Lipid content',
-            f_coordinate=f,
-            coordinate=lipid_content,
-            notify=int(N/10), 
-            notify_coordinate=True,
-            xlfile=file,
-        )
+        if parse(name).number < 0:
+            model.evaluate_across_coordinate(
+                name='Lipid content',
+                f_coordinate=lambda x: None,
+                coordinate=lipid_content,
+                notify=int(N/10), 
+                notify_coordinate=True,
+                xlfile=file,
+                f_evaluate=lambda: None,
+            )
+        else:
+            def f(x):
+                lipid_extraction_specification.locked_lipid_content = False
+                lipid_extraction_specification.load_lipid_content(x)
+                lipid_extraction_specification.locked_lipid_content = True
+            model.evaluate_across_coordinate(
+                name='Lipid content',
+                f_coordinate=f,
+                coordinate=lipid_content,
+                notify=int(N/10), 
+                notify_coordinate=True,
+                xlfile=file,
+            )
     else:
         model.evaluate(notify=int(N/10))
         model.table.to_excel(file)
@@ -699,8 +732,9 @@ def run_uncertainty_and_sensitivity(name, N, rule='L',
         file = spearman_file(name)
         rho.to_excel(file)
     
-def run_all(N, across_lipid_content=False, rule='L'):
-    for name in configuration_names:
+def run_all(N, across_lipid_content=False, rule='L', configurations=None):
+    if configurations is None: configurations = configuration_names
+    for name in configurations:
         run_uncertainty_and_sensitivity(
             name, N, rule, across_lipid_content,
         )
@@ -809,7 +843,7 @@ def plot_monte_carlo_across_lipid_content(kind=0):
             if xticklabels: plt.xlabel('Lipid content [dry wt. %]')
             if yticklabels: plt.ylabel(ylabels[i])
             bst.plots.style_axis(ax,  
-                                 xticks = [2, 5, 10, 15],
+                                 xticks = [5, 10, 15],
                                  yticks = tickmarks[i],
                                  xticklabels= xticklabels, 
                                  yticklabels= yticklabels,
@@ -829,16 +863,25 @@ def monte_carlo_box_plot(data, positions, light_color, dark_color):
                                    'markeredgecolor': dark_color,
                                    'markersize':6})
 
-def print_monte_carlo_results():
-    info = ""
+def monte_carlo_results():
+    results = {}
     for name in configuration_names:
         df = get_monte_carlo(name)
-        info += f"Configuration {name}:\n"
+        results[name] = dct = {}
         for metric in metric_mockups:
             index = metric.index
             data = df[index].values
-            info += f" {index[1]}: {np.mean(data):.3g} ± {np.std(data):.3g}\n"
-    print(info)
+            q05, q25, q50, q75, q95 = percentiles = np.percentile(data, [5,25,50,75,95], axis=0)
+            dct[index[1]] = subdct = {
+                'mean': np.mean(data),
+                'std': np.std(data),
+                'q05': q05,
+                'q25': q25,
+                'q50': q50,
+                'q75': q75,
+                'q95': q95,
+            }
+    return results
 
 def plot_monte_carlo(comparison=False):
     columns = configurations = comparison_names if comparison else configuration_names
@@ -847,6 +890,7 @@ def plot_monte_carlo(comparison=False):
     rows = metrics = [
         MFPP, 
         TCI, 
+        production
     ]
     N_rows = len(rows)
     fig, axes = plt.subplots(ncols=1, nrows=N_rows)
@@ -858,7 +902,7 @@ def plot_monte_carlo(comparison=False):
     ylabels = [
         f"MFPP [{format_units('USD/ton')}]",
         f"TCI [{format_units('10^6*USD')}]",
-        # f"Production [{format_units('MMGal/yr')}]"
+        f"Production [{format_units('MMGal/yr')}]"
     ]
     def get_data(metric, name):
         if isinstance(metric, bst.Variable):
@@ -927,6 +971,7 @@ def plot_monte_carlo(comparison=False):
 
 def plot_spearman_MFPP(top=None):
     MFPPs = []
+    configuration_names = ['L1', 'L2', 'L1*', 'L2*']
     for name in configuration_names:
         file = spearman_file(name)
         try: 
@@ -943,13 +988,13 @@ def plot_spearman_MFPP(top=None):
     capacity = format_units('ton/hr')
     index = [
          'Feedstock lipid content [5 $-$ 15 dry wt. %]',
-         'Bagasse lipid retention [85 $-$ 90 %]',
-         '$^a$Lipid extraction efficiency [baseline + 0 $-$ 5 %]',
+         'Bagasse lipid retention [50 $-$ 70 %]',
+         '$^a$Lipid extraction efficiency [baseline + 0 $-$ 25 %]',
         f'Plant capacity [330 $-$ 404 {capacity}]',
-        f'Ethanol price [1.02, 1.90, 2.87 {stream_price}]',
-        f'Biodiesel price [2.55, 3.67, 5.74 {stream_price}]',
+        f'Ethanol price [1.02, 1.80, 2.87 {stream_price}]',
+        f'Biodiesel minus ethanol price [0.31, 2.98, 4.11 {stream_price}]',
         f'Natural gas price [3.71, 4.73, 6.18 {ng_price}]',
-        f'Electricity price [0.0572 $-$ 0.07 {electricity_price}]',
+        f'Electricity price [0.0583, 0.065, 0.069 {electricity_price}]',
         f'Operating days [180 $-$ 210 {operating_days}]',
          'IRR [10 $-$ 15 %]',
        # '$^a$Fermentation solids loading [20% $-$ 25%]',

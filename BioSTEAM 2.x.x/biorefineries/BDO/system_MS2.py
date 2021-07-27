@@ -107,7 +107,7 @@ BDO_tea = CellulosicEthanolTEA(system=BDO_sys, IRR=0.10, duration=(2016, 2046),
         contingency=0.10, other_indirect_costs=0.10, 
         labor_cost=3212962*get_flow_tpd()/2205,
         labor_burden=0.90, property_insurance=0.007, maintenance=0.03,
-        steam_power_depreciation='MACRS20', boiler_turbogenerator=u.BT)
+        steam_power_depreciation='MACRS20', boiler_turbogenerator=u.BT701)
 
 # sub_units = BDO_sys.units[:BDO_sys.units.index(u.R401)]
 # sub_sys = bst.System(sub_units)
@@ -129,6 +129,35 @@ BDO_tea = CellulosicEthanolTEA(system=BDO_sys, IRR=0.10, duration=(2016, 2046),
 #         steam_power_depreciation='MACRS20', boiler_turbogenerator=u.BT)
 
 BDO_sys._TEA = BDO_tea
+area_names = [
+    'feedstock',
+    'pretreatment',
+    'conversion',
+    'separation',
+    'wastewater',
+    'storage',
+    'co-heat and power',
+    'cooling tower',
+    'other facilities',
+    'heat exchanger network',
+]
+unit_groups = bst.UnitGroup.group_by_area(BDO_sys.units)
+for i, j in zip(unit_groups, area_names): i.name = j
+for i in unit_groups: i.autofill_metrics(shorthand=True, material_cost=True)
+for i in unit_groups:
+    if i.name == 'storage':
+        i.metrics[-1].getter = lambda: 0. # Material cost
+
+HXN = None
+for HXN_group in unit_groups:
+    if HXN_group.name == 'heat exchanger network':
+        HXN_group.filter_savings = False
+        HXN = HXN_group.units[0]
+        assert isinstance(HXN, bst.HeatExchangerNetwork)
+
+CT = u.CT801
+BT = u.BT701
+CWP = u.CWP901
 
 # %% 
 # =============================================================================
@@ -170,7 +199,7 @@ spec = ProcessSpecification(
     feedstock = feedstock,
     dehydration_reactor = u.R401,
     byproduct_streams = [],
-    HXN = u.HXN,
+    HXN = u.HXN1001,
     tolerable_HXN_energy_balance_percent_error=10,
     maximum_inhibitor_concentration = 1.,
     # pre_conversion_units = process_groups_dict['feedstock_group'].units + process_groups_dict['pretreatment_group'].units + [u.H301], # if the line below does not work (depends on BioSTEAM version)
@@ -279,7 +308,29 @@ get_FEC = lambda: get_material_FEC() + get_electricity_FEC() - get_Isobutanol_FE
 get_SPED = lambda: u.BT.system_heating_demand*0.001/MEK.F_mass
 MEK_LHV = 31.45 # MJ/kg MEK
 
-BDO_lca = LCA(BDO_sys, BDO_chemicals, CFs, feedstock, 'Corn stover', MEK, [u.CT, u.CWP])
+BDO_lca = LCA(BDO_sys, BDO_chemicals, CFs, feedstock, 'Corn stover', MEK, [CT, CWP], BT=BT, CT=CT)
+
+# %% LCA breakdown
+
+def FEC_breakdown():
+    return {
+        'feedstock': BDO_lca.feedstock_FEC,
+        'heating demand': BDO_lca.heating_demand_FEC,
+        'cooling demand': BDO_lca.cooling_demand_FEC,
+        'electricity demand (non-cooling)': BDO_lca.electricity_demand_non_cooling_FEC,
+        'other materials': BDO_lca.material_FEC,
+    }
+
+def GWP_breakdown():
+    return {
+        'feedstock': BDO_lca.FGHTP_GWP,
+        'heating demand': BDO_lca.heating_demand_GWP,
+        'cooling demand': BDO_lca.cooling_demand_GWP,
+        'electricity demand (non-cooling)': BDO_lca.electricity_demand_non_cooling_GWP,
+        'other direct non-biogenic emissions': BDO_lca.non_BT_direct_emissions_GWP,
+        'other materials': BDO_lca.material_GWP,
+    }
+
 
 # %% Full analysis
 get_MEK_MPSP()

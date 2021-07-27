@@ -43,16 +43,16 @@ lipidcane_dct['TAG'] = 0.93 * TAG
 lipidcane_dct['PL'] = 0.05 * TAG
 lipidcane_dct['FFA'] = 0.02 * TAG
 
-@SystemFactory(
-    ID='saccharified_slurry_lipid_separation_sys',
-    ins=[dict(ID='saccharified_slurry')],
-    outs=[dict(ID='backend_lipid'),
-          dict(ID='lipid_free_slurry')],
-)
-def create_saccharified_slurry_lipid_separation_system(ins, outs):
-    # HX701 = bst.HXutility('HX701', ins, T=330)
-    C701 = bst.LiquidsSplitCentrifuge('C701', ins, outs,
-                                      split={'Lipid': 0.80})
+# @SystemFactory(
+#     ID='saccharified_slurry_lipid_separation_sys',
+#     ins=[dict(ID='saccharified_slurry')],
+#     outs=[dict(ID='backend_lipid'),
+#           dict(ID='lipid_free_slurry')],
+# )
+# def create_saccharified_slurry_lipid_separation_system(ins, outs):
+#     # HX701 = bst.HXutility('HX701', ins, T=330)
+#     C701 = bst.LiquidsSplitCentrifuge('C701', ins, outs,
+#                                       split={'Lipid': 0.80})
 
 @SystemFactory(
     ID='lipid_expression_sys',
@@ -89,7 +89,8 @@ def create_post_fermentation_lipid_separation_system(ins, outs):
     )
     P607 = bst.Pump('P607', Ev607-0, P=101325.)
     C603_2 = bst.LiquidsSplitCentrifuge('C603_2', P607-0, (lipid, wastewater), 
-                                        split={'Lipid':0.99})
+                                        split={'Lipid': 0.99,
+                                               'Water': 0.0001})
     
 
 @SystemFactory(
@@ -159,9 +160,10 @@ def create_lipidcane_to_biodiesel_and_ethanol_1g(
     lipid_pretreatment_sys = create_lipid_pretreatment_system(
         ins=MX-0,
         mockup=True,
+        outs=['', 'polar_lipids', ''],
         area=600,
     )
-    lipid, polar_lipids = lipid_pretreatment_sys.outs
+    lipid, polar_lipids, wastewater = lipid_pretreatment_sys.outs
     
     
     ### Biodiesel section ###
@@ -360,10 +362,11 @@ def create_lipidcane_to_biodiesel_and_ethanol_combined_1_and_2g_post_fermentatio
                                  'recycle_process_water')
     lipid_pretreatment_sys = create_lipid_pretreatment_system(
         ins=backend_lipid,
+        outs=['', 'polar_lipids', ''],
         mockup=True,
         area=800,
     )
-    lipid, polar_lipids = lipid_pretreatment_sys.outs
+    lipid, polar_lipids, wastewater_small = lipid_pretreatment_sys.outs
     
     transesterification_and_biodiesel_separation_sys = create_transesterification_and_biodiesel_separation_system(
         ins=lipid, 
@@ -375,7 +378,8 @@ def create_lipidcane_to_biodiesel_and_ethanol_combined_1_and_2g_post_fermentatio
     wastewater_treatment_sys = bst.create_wastewater_treatment_system(
         ins=[wastewater,
              fiber_fines,
-             pretreatment_wastewater],
+             pretreatment_wastewater,
+             wastewater_small],
         mockup=True,
         area=500,
     )

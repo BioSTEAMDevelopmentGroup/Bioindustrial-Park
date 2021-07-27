@@ -25,7 +25,6 @@ def create_chemicals():
     InsolubleProtein = chemicals.Cellulose.copy('InsolubleProtein')
     chemicals.extend([Starch, Fiber, SolubleProtein, InsolubleProtein])
     chemicals.NH3.at_state('l')
-    chemicals.NH3.V[0].Tmax = 500.
     chemicals.compile()
     chemicals.set_synonym('TAG', 'Oil')
     chemicals.set_synonym('TAG', 'Lipid')

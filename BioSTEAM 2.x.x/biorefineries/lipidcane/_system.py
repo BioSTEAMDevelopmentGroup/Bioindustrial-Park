@@ -150,7 +150,7 @@ def create_lipid_wash_system(ins, outs):
         ins = T208.ins
         lipid, lipid_wash_water, recycle, *others = ins
         lipid_wash_water.imol['Water'] = 0.185 * sum([i.imass['Lipid'] for i in ins]) - recycle.imol['Water']
-    
+
 @SystemFactory(
     ID='juicing_sys',
     ins=create_juicing_and_lipid_extraction_system.ins,
@@ -189,11 +189,21 @@ def create_juicing_system(ins, outs, pellet_bagasse=None):
          dict(ID='pure_glycerine',
               price=0.65)],
     outs=[dict(ID='degummed_oil'),
-          dict(ID='polar_lipids')]
+          dict(ID='polar_lipids'),
+          dict(ID='wastewater')]
 )
 def create_lipid_pretreatment_system(ins, outs):
     crude_vegetable_oil, acetone, pure_glycerine = ins
-    degummed_oil, polar_lipids = outs
+    degummed_oil, polar_lipids, wastewater = outs
+    
+    # Vacume out water
+    F3 = units.SplitFlash('F3', T=357.15, P=2026.5,
+                          ins=crude_vegetable_oil,
+                          split=dict(Lipid=0.0001,
+                                     Water=1.0),)
+    P10 = units.Pump('P10', F3-1, P=101325)
+    H5 = units.HXutility('H5', ins=F3-0, T=320, V=0)
+    P9 = units.Pump('P9', H5-0, wastewater, P=101325)
     T1 = bst.StorageTank('T1', acetone, tau=7*24)
     P1 = bst.Pump('P1', T1-0, P=101325.)
     T2 = bst.StorageTank('T2', pure_glycerine, tau=7*24)
@@ -201,13 +211,13 @@ def create_lipid_pretreatment_system(ins, outs):
     N2 = bst.Stream('N2', phase='g')
     acetone_recycle = bst.Stream()
     T3 = BlendingTankWithSkimming('T3', 
-        [crude_vegetable_oil, acetone_recycle], 
+        [P10-0, acetone_recycle], 
     )
     @T3.add_specification(run=True)
     def adjust_acetone_flow_rate():
         total_acetone_required = T3.ins[0].F_vol
-        recycle_acetone = sum([i.outs[0].ivol['Acetone'] for i in (P5, P6)])
         fresh_acetone = T1.ins[0]
+        recycle_acetone = sum([i.outs[0].ivol['Acetone'] for i in (P5, P6)])
         acetone_required = total_acetone_required - recycle_acetone
         if acetone_required < 0.:
             fresh_acetone.ivol['Acetone'] = 0.
@@ -217,15 +227,16 @@ def create_lipid_pretreatment_system(ins, outs):
         T1._run()
         P1._run()
         M1._run()
-        
+    
     P3 = bst.Pump('P3', T3-1, P=101325)
-    F1 = bst.Flash('F1', P3-0, T=373.15, P=101325)
+    F1 = bst.Flash('F1', P3-0, V=1., P=101325)
     H1 = bst.HXutility('H1', F1-0, V=0, rigorous=True)
     P5 = bst.Pump('P5', H1-0, P=101325)
-    F2 = bst.Flash('F2', T3-0, ['', polar_lipids], T=350, P=101325)
+    F2 = bst.Flash('F2', T3-0, ['', polar_lipids], V=1.0, P=101325)
     H2 = bst.HXutility('H2', F2-0, V=0, rigorous=True)
     P6 = bst.Pump('P6', H2-0, P=101325)
     M1 = bst.Mixer('M1', [P1-0, P5-0, P6-0], acetone_recycle)
+    bst.mark_disjunction(acetone_recycle)
     P4 = bst.Pump('P4', F1-1, P=101325)
     hx_stream = bst.Stream()
     H3 = bst.HXprocess('H3', [P4-0, hx_stream])

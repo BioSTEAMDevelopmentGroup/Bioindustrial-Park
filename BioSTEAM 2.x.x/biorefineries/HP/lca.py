@@ -14,7 +14,12 @@ from math import floor
 from warnings import warn
 import thermosteam as tmo
 from thermosteam import Stream
+import biosteam as bst
 
+def get_instance(objs, type):
+    isa = isinstance
+    for i in objs:
+        if isa(i, type): return i 
 
 def get_unit_atomic_balance(unit, atom='C'):
     return (sum([i.get_atomic_flow(atom) for i in unit.ins]), 
@@ -133,7 +138,7 @@ class LCA:
     def __init__(self, system, system_chemicals, CFs, feedstock, feedstock_ID, main_product,
                  cooling_and_chilled_water_production_units,
                  FU='1 kg', has_turbogenerator=True, demand_allocation_method='steam pool',
-                 BT_sys = None):
+                 BT_sys = None, BT=None, CT=None, CWP=None):
         #: [System] System being evaluated.
         self.system = system
         self.system_chemicals = system_chemicals
@@ -159,10 +164,15 @@ class LCA:
         
         self.BT_sys = BT_sys # for older biorefineries
         
-        self.BT = self.units.BT
+        self.BT = BT or get_instance(self.units, bst.BoilerTurbogenerator)
+        self.CT = CT or get_instance(self.units, bst.CoolingTower)
+        self.CWP = CWP or get_instance(self.units, bst.ChilledWaterPackage)
         self.cooling_and_chilled_water_production_units = cooling_and_chilled_water_production_units
-        
         system._LCA = self
+
+    @property
+    def electricity_demand(self):
+        return sum([i.power_utility.consumption for i in self.units])
 
     @property
     def LCA_streams(self):
@@ -249,7 +259,7 @@ class LCA:
     
     @property
     def feedstock_GWP(self): 
-        return self.FGHTP_GWP() - self.feedstock_CO2_capture()
+        return self.FGHTP_GWP - self.feedstock_CO2_capture
     #  feedstock_GWP(self): return  FGHTP_GWP()
     
     @property

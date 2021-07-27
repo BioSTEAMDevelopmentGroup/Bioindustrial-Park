@@ -48,6 +48,8 @@ style_axis(ax1,
 configuration_settings = {
     'L1': (colors.neutral_tint.RGBn, colors.neutral_shade.RGBn),
     'L2': (colors.orange_tint.RGBn, colors.orange_shade.RGBn),
+    'L1*': (colors.CABBI_blue_light.RGBn, colors.CABBI_blue.RGBn),
+    'L2*': (colors.green_tint.RGBn, colors.green_shade.RGBn),
 }
 
 # plt.plot(t, natural_gas_price, label='natural gas')
