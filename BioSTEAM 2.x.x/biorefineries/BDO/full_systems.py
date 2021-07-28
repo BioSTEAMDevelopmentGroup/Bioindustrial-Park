@@ -123,7 +123,6 @@ def create_system_oleyl_alcohol(ins, outs):
                                s.water_M201, 
                                s.water_M202, 
                                s.water_M203, 
-                               s.water_M205, 
                                s.enzyme_water),
         feedstock=feedstock,
         RO_water=treated_water,

@@ -124,7 +124,7 @@ def create_pretreatment_and_fermentation_system(ins, outs):
     # =============================================================================
     
     # For pretreatment, 93% purity
-    sulfuric_acid_T201 = Stream('sulfuric_acid_T201', units='kg/hr')
+    sulfuric_acid_T201 = Stream('sulfuric_acid_T201', price=price['Sulfuric acid'],units='kg/hr')
     # To be mixed with sulfuric acid, flow updated in SulfuricAcidMixer
     water_M201 = Stream('water_M201', T=300, units='kg/hr')
         
@@ -133,11 +133,6 @@ def create_pretreatment_and_fermentation_system(ins, outs):
     
     # To be added to the feedstock/sulfuric acid mixture, flow updated by the SteamMixer
     water_M203 = Stream('water_M203', phase='l', T=300, P=13.*101325, units='kg/hr')
-    
-    # For neutralization of pretreatment hydrolysate
-    ammonia_M205 = Stream('ammonia_M205', phase='l', units='kg/hr')
-    # To be used for ammonia addition, flow updated by AmmoniaMixer
-    water_M205 = Stream('water_M205', units='kg/hr')
     
     
     # =============================================================================
@@ -204,7 +199,7 @@ def create_pretreatment_and_fermentation_system(ins, outs):
     H202 = bst.HXutility('H202', ins=R201-0,
                               V=0, rigorous=True)
     
-    T204 = bdo.units.LimeAdditionTank('T204', ins=(F201-1, ''))
+    T204 = bdo.units.LimeAdditionTank('T204', ins=(F201-1, 'lime_fresh'))
     
         
     @T204.add_specification(run=True)

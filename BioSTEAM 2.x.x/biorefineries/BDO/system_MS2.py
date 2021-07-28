@@ -277,7 +277,7 @@ def get_material_GWP():
 
 # GWP from combustion of non-biogenic carbons
 get_non_bio_GWP = lambda: (s.natural_gas.get_atomic_flow('C') 
-                           + s.ethanol_fresh.get_atomic_flow('C')) \
+                           + s.oleyl_alcohol.get_atomic_flow('C')) \
                            * BDO_chemicals.CO2.MW / MEK.F_mass
 
 # GWP from electricity
@@ -412,18 +412,6 @@ simulate_and_print()
 #                          T606, T606_P,
 #                          PWC, CIP, ADP, FWT)
     # }
-
-# for unit in sum(BDO_sub_sys.values(), ()):
-#     if not unit in BDO_sys.units:
-#         print(f'{unit.ID} not in BDO_sys.units')
-
-# for unit in BDO_sys.units:
-#     if not unit in sum(BDO_sub_sys.values(), ()):
-#         print(f'{unit.ID} not in BDO_sub_sys')
-
-
-
-
 
 
 

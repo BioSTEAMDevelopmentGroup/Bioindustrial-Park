@@ -703,6 +703,7 @@ def run_uncertainty_and_sensitivity(name, N, rule='L',
     file = monte_carlo_file(name, across_lipid_content)
     if across_lipid_content:
         if parse(name).number < 0:
+            model.evaluate(notify=int(N/10))
             model.evaluate_across_coordinate(
                 name='Lipid content',
                 f_coordinate=lambda x: None,
@@ -710,7 +711,7 @@ def run_uncertainty_and_sensitivity(name, N, rule='L',
                 notify=int(N/10), 
                 notify_coordinate=True,
                 xlfile=file,
-                f_evaluate=lambda: None,
+                re_evaluate=False,
             )
         else:
             def f(x):
@@ -971,7 +972,7 @@ def plot_monte_carlo(comparison=False):
 
 def plot_spearman_MFPP(top=None):
     MFPPs = []
-    configuration_names = ['L1', 'L2', 'L1*', 'L2*']
+    configuration_names = ['L1', 'L1*', 'L2', 'L2*']
     for name in configuration_names:
         file = spearman_file(name)
         try: 
@@ -988,11 +989,11 @@ def plot_spearman_MFPP(top=None):
     capacity = format_units('ton/hr')
     index = [
          'Feedstock lipid content [5 $-$ 15 dry wt. %]',
-         'Bagasse lipid retention [50 $-$ 70 %]',
+         'Bagasse lipid retention [65 $-$ 75 %]',
          '$^a$Lipid extraction efficiency [baseline + 0 $-$ 25 %]',
         f'Plant capacity [330 $-$ 404 {capacity}]',
         f'Ethanol price [1.02, 1.80, 2.87 {stream_price}]',
-        f'Biodiesel minus ethanol price [0.31, 2.98, 4.11 {stream_price}]',
+        f'Biodiesel price relative to ethanol [0.31, 2.98, 4.11 {stream_price}]',
         f'Natural gas price [3.71, 4.73, 6.18 {ng_price}]',
         f'Electricity price [0.0583, 0.065, 0.069 {electricity_price}]',
         f'Operating days [180 $-$ 210 {operating_days}]',
