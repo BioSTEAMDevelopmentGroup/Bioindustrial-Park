@@ -175,16 +175,16 @@ def test_corn():
     product = module.ethanol
     tea = module.corn_tea
     units = UnitGroup('Biorefinery', tea.units)
-    assert np.allclose(tea.IRR, 0.03989508733609, rtol=1e-2)
+    assert np.allclose(tea.IRR, 0.03298799233084029, rtol=1e-2)
     assert np.allclose(feedstock.price, 0.13227735731092652, rtol=1e-2)
     assert np.allclose(product.price, 0.48547915353569393, rtol=1e-2)
-    assert np.allclose(tea.sales, 73909879.42964743, rtol=1e-2)
-    assert np.allclose(tea.material_cost, 54229305.139442496, rtol=1e-2)
-    assert np.allclose(tea.installed_equipment_cost, 67980658.30941775, rtol=1e-2)
-    assert np.allclose(tea.utility_cost, 8136250.075012307, rtol=1e-2)
-    assert np.allclose(units.get_heating_duty(), 135.8019116579886, rtol=1e-2)
-    assert np.allclose(units.get_cooling_duty(), 139.05181894956826, rtol=1e-2)
-    assert np.allclose(units.get_electricity_consumption(), 2.33924346153039, rtol=1e-2)
+    assert np.allclose(tea.sales, 73909866.22750998, rtol=1e-2)
+    assert np.allclose(tea.material_cost, 54229443.77929443, rtol=1e-2)
+    assert np.allclose(tea.installed_equipment_cost, 68224237.45034625, rtol=1e-2)
+    assert np.allclose(tea.utility_cost, 8520748.202713203, rtol=1e-2)
+    assert np.allclose(units.get_heating_duty(), 138.1526868191502, rtol=1e-2)
+    assert np.allclose(units.get_cooling_duty(), 138.97638931681118, rtol=1e-2)
+    assert np.allclose(units.get_electricity_consumption(), 2.3181240311942704, rtol=1e-2)
     assert np.allclose(units.get_electricity_production(), 0.0, rtol=1e-2)
     bst.process_tools.default()
     
@@ -197,17 +197,17 @@ def test_lipidcane():
     product = module.ethanol
     tea = module.lipidcane_tea
     units = UnitGroup('Biorefinery', tea.units)
-    assert np.allclose(tea.IRR, 0.21047391367462487, rtol=1e-2)
+    assert np.allclose(tea.IRR, 0.21024278792493273, rtol=1e-2)
     assert np.allclose(feedstock.price, 0.03455, rtol=1e-2)
     assert np.allclose(product.price, 0.789, rtol=1e-2)
-    assert np.allclose(tea.sales, 108715833.87257311, rtol=1e-2)
-    assert np.allclose(tea.material_cost, 59023796.119482465, rtol=1e-2)
-    assert np.allclose(tea.installed_equipment_cost, 239038533.43349013, rtol=1e-2)
-    assert np.allclose(tea.utility_cost, -34582229.25333484, rtol=1e-2)
-    assert np.allclose(units.get_heating_duty(), 245.92023657075794, rtol=1e-2)
-    assert np.allclose(units.get_cooling_duty(), 280.75554419221567, rtol=1e-2)
-    assert np.allclose(units.get_electricity_consumption(), 16.42156294204761, rtol=1e-2)
-    assert np.allclose(units.get_electricity_production(), 126.51505024946395, rtol=1e-2)
+    assert np.allclose(tea.sales, 108715833.13259251, rtol=1e-2)
+    assert np.allclose(tea.material_cost, 59024019.24635524, rtol=1e-2)
+    assert np.allclose(tea.installed_equipment_cost, 238991746.84975895, rtol=1e-2)
+    assert np.allclose(tea.utility_cost, -34475508.919748984, rtol=1e-2)
+    assert np.allclose(units.get_heating_duty(), 247.56554210922624, rtol=1e-2)
+    assert np.allclose(units.get_cooling_duty(), 282.28173011841363, rtol=1e-2)
+    assert np.allclose(units.get_electricity_consumption(), 16.426389969130604, rtol=1e-2)
+    assert np.allclose(units.get_electricity_production(), 126.1746782701549, rtol=1e-2)
     bst.process_tools.default()
     
 def test_cornstover():
@@ -221,15 +221,15 @@ def test_cornstover():
     units = UnitGroup('Biorefinery', tea.units)
     assert np.allclose(tea.IRR, 0.1, rtol=1e-2)
     assert np.allclose(feedstock.price, 0.05158816935126135, rtol=1e-2)
-    assert np.allclose(product.price, 0.7141047799147656, rtol=1e-2)
-    assert np.allclose(tea.sales, 131519594.87222457, rtol=1e-2)
-    assert np.allclose(tea.material_cost, 82696666.93499637, rtol=1e-2)
-    assert np.allclose(tea.installed_equipment_cost, 213729761.48123008, rtol=1e-2)
-    assert np.allclose(tea.utility_cost, -12216823.378096422, rtol=1e-2)
-    assert np.allclose(units.get_heating_duty(), 308.3841985204103, rtol=1e-2)
-    assert np.allclose(units.get_cooling_duty(), 298.4404395355398, rtol=1e-2)
-    assert np.allclose(units.get_electricity_consumption(), 21.456532820335028, rtol=1e-2)
-    assert np.allclose(units.get_electricity_production(), 46.85379645812982, rtol=1e-2)
+    assert np.allclose(product.price, 0.7133201255781593, rtol=1e-2)
+    assert np.allclose(tea.sales, 131373421.81905136, rtol=1e-2)
+    assert np.allclose(tea.material_cost, 82683209.77450919, rtol=1e-2)
+    assert np.allclose(tea.installed_equipment_cost, 213595026.96580598, rtol=1e-2)
+    assert np.allclose(tea.utility_cost, -12306910.436670016, rtol=1e-2)
+    assert np.allclose(units.get_heating_duty(), 308.17100803518133, rtol=1e-2)
+    assert np.allclose(units.get_cooling_duty(), 298.2613636003886, rtol=1e-2)
+    assert np.allclose(units.get_electricity_consumption(), 21.39121651294895, rtol=1e-2)
+    assert np.allclose(units.get_electricity_production(), 46.97575999478642, rtol=1e-2)
     bst.process_tools.default()
     
 def test_sugarcane():
@@ -241,110 +241,63 @@ def test_sugarcane():
     product = module.ethanol
     tea = module.sugarcane_tea
     units = UnitGroup('Biorefinery', tea.units)
-    assert np.allclose(tea.IRR, 0.12659387829384772, rtol=1e-2)
+    assert np.allclose(tea.IRR, 0.12646982418909067, rtol=1e-2)
     assert np.allclose(feedstock.price, 0.03455, rtol=1e-2)
     assert np.allclose(product.price, 0.789, rtol=1e-2)
-    assert np.allclose(tea.sales, 88129976.99654803, rtol=1e-2)
-    assert np.allclose(tea.material_cost, 59842659.397153035, rtol=1e-2)
-    assert np.allclose(tea.installed_equipment_cost, 205172809.39941, rtol=1e-2)
-    assert np.allclose(tea.utility_cost, -19201338.64548274, rtol=1e-2)
-    assert np.allclose(units.get_heating_duty(), 284.23468528204995, rtol=1e-2)
-    assert np.allclose(units.get_cooling_duty(), 304.1271932338852, rtol=1e-2)
-    assert np.allclose(units.get_electricity_consumption(), 15.82128374128548, rtol=1e-2)
-    assert np.allclose(units.get_electricity_production(), 76.76409793701727, rtol=1e-2)
+    assert np.allclose(tea.sales, 88129976.2588142, rtol=1e-2)
+    assert np.allclose(tea.material_cost, 59842642.214537114, rtol=1e-2)
+    assert np.allclose(tea.installed_equipment_cost, 205370354.54048756, rtol=1e-2)
+    assert np.allclose(tea.utility_cost, -19209491.09359198, rtol=1e-2)
+    assert np.allclose(units.get_heating_duty(), 284.2331382599185, rtol=1e-2)
+    assert np.allclose(units.get_cooling_duty(), 304.0238881702307, rtol=1e-2)
+    assert np.allclose(units.get_electricity_consumption(), 15.79546241575601, rtol=1e-2)
+    assert np.allclose(units.get_electricity_production(), 76.76440625286358, rtol=1e-2)
     bst.process_tools.default()
-
-if tmo.__version__[0] == '0':
-    def test_LAOs():
-        bst.process_tools.default()
-        from biorefineries import LAOs as module
-        try: module.load()
-        except: pass
-        feedstock = module.glucose
-        product = module.octene
-        tea = module.LAOs_tea
-        units = UnitGroup('Biorefinery', tea.units)
-        assert np.allclose(tea.IRR, 0.1, rtol=1e-2)
-        assert np.allclose(feedstock.price, 0.265, rtol=1e-2)
-        assert np.allclose(product.price, 1.3269049845098067, rtol=1e-2)
-        assert np.allclose(tea.sales, 161335906.29907194, rtol=1e-2)
-        assert np.allclose(tea.material_cost, 135661164.88724267, rtol=1e-2)
-        assert np.allclose(tea.installed_equipment_cost, 57347781.65516735, rtol=1e-2)
-        assert np.allclose(tea.utility_cost, 1554844.4698447809, rtol=1e-2)
-        assert np.allclose(units.get_heating_duty(), 39.587331392856626, rtol=1e-2)
-        assert np.allclose(units.get_cooling_duty(), 127.39469106251019, rtol=1e-2)
-        assert np.allclose(units.get_electricity_consumption(), 3.5306112844050603, rtol=1e-2)
-        assert np.allclose(units.get_electricity_production(), 7.271296144805024, rtol=1e-2)
-        bst.process_tools.default()
-        
-    def test_lactic():
-        bst.process_tools.default()
-        from biorefineries import lactic as module
-        module.load_system('SSCF')
-        feedstock = module.feedstock
-        product = module.lactic_acid
-        tea = module.lactic_tea
-        units = UnitGroup('Biorefinery', tea.units)
-        module.lactic_sys.simulate()
-        assert np.allclose(tea.IRR, 0.1, rtol=1e-2)
-        assert np.allclose(feedstock.price, 0.06287583717512708, rtol=1e-2)
-        assert np.allclose(tea.solve_price(product), 1.237548148885074, rtol=1e-2)
-        assert np.allclose(tea.sales, 54143215.78374311, rtol=1e-2)
-        assert np.allclose(tea.material_cost, 219104068.95373908, rtol=1e-2)
-        assert np.allclose(tea.installed_equipment_cost, 320073822.05670184, rtol=1e-2)
-        assert np.allclose(tea.utility_cost, 22275814.89016047, rtol=1e-2)
-        assert np.allclose(units.get_heating_duty(), 1827.5926437830065, rtol=1e-2)
-        assert np.allclose(units.get_cooling_duty(), 1895.6520852552394, rtol=1e-2)
-        assert np.allclose(units.get_electricity_consumption(), 40.363511796333356, rtol=1e-2)
-        assert np.allclose(units.get_electricity_production(), 0.0, rtol=1e-2)
-        bst.process_tools.default()
-        
-        
-elif tmo.__version__[0] == '1':
-    def test_LAOs():
-        bst.process_tools.default()
-        from biorefineries import LAOs as module
-        try: module.load()
-        except: pass
-        feedstock = module.glucose
-        product = module.octene
-        tea = module.LAOs_tea
-        units = UnitGroup('Biorefinery', tea.units)
-        assert np.allclose(tea.IRR, 0.1, rtol=1e-2)
-        assert np.allclose(feedstock.price, 0.265, rtol=1e-2)
-        assert np.allclose(product.price, 1.315749058194074, rtol=1e-2)
-        assert np.allclose(tea.sales, 159929529.96061248, rtol=1e-2)
-        assert np.allclose(tea.material_cost, 135657144.36670703, rtol=1e-2)
-        assert np.allclose(tea.installed_equipment_cost, 56938608.67764597, rtol=1e-2)
-        assert np.allclose(tea.utility_cost, 300705.8888297375, rtol=1e-2)
-        assert np.allclose(units.get_heating_duty(), 37.86679109202445, rtol=1e-2)
-        assert np.allclose(units.get_cooling_duty(), 125.79138190687648, rtol=1e-2)
-        assert np.allclose(units.get_electricity_consumption(), 3.526012187287935, rtol=1e-2)
-        assert np.allclose(units.get_electricity_production(), 7.252967734286649, rtol=1e-2)
-        bst.process_tools.default()
     
-    def test_lactic():
-        bst.process_tools.default()
-        from biorefineries import lactic as module
-        module.load_system('SSCF')
-        feedstock = module.feedstock
-        product = module.lactic_acid
-        tea = module.lactic_tea
-        units = UnitGroup('Biorefinery', tea.units)
-        module.lactic_sys.simulate()
-        product.price = product_price = tea.solve_price(product)
-        assert np.allclose(tea.IRR, 0.1, rtol=1e-2)
-        assert np.allclose(feedstock.price, 0.06287583717512708, rtol=1e-2)
-        assert np.allclose(product.price, 1.365160205800196, rtol=1e-2)
-        assert np.allclose(tea.sales, 297352245.8641948, rtol=1e-2)
-        assert np.allclose(tea.material_cost, 202146016.56312773, rtol=1e-2)
-        assert np.allclose(tea.installed_equipment_cost, 282073346.9023893, rtol=1e-2)
-        assert np.allclose(tea.utility_cost, 20669375.58387342, rtol=1e-2)
-        assert np.allclose(units.get_heating_duty(), 1842.5273042407728, rtol=1e-2)
-        assert np.allclose(units.get_cooling_duty(), 1786.5220868424758, rtol=1e-2)
-        assert np.allclose(units.get_electricity_consumption(), 37.452662868510195, rtol=1e-2)
-        assert np.allclose(units.get_electricity_production(), 0.0, rtol=1e-2)
-        bst.process_tools.default()
+def test_LAOs():
+    bst.process_tools.default()
+    from biorefineries import LAOs as module
+    try: module.load()
+    except: pass
+    feedstock = module.glucose
+    product = module.octene
+    tea = module.LAOs_tea
+    units = UnitGroup('Biorefinery', tea.units)
+    assert np.allclose(tea.IRR, 0.1, rtol=1e-2)
+    assert np.allclose(feedstock.price, 0.265, rtol=1e-2)
+    assert np.allclose(product.price, 1.315725712761379, rtol=1e-2)
+    assert np.allclose(tea.sales, 159926582.80666912, rtol=1e-2)
+    assert np.allclose(tea.material_cost, 135657144.37824363, rtol=1e-2)
+    assert np.allclose(tea.installed_equipment_cost, 56930067.049457684, rtol=1e-2)
+    assert np.allclose(tea.utility_cost, 300711.90499419434, rtol=1e-2)
+    assert np.allclose(units.get_heating_duty(), 37.830529776838524, rtol=1e-2)
+    assert np.allclose(units.get_cooling_duty(), 125.84537221272032, rtol=1e-2)
+    assert np.allclose(units.get_electricity_consumption(), 3.5261809541636118, rtol=1e-2)
+    assert np.allclose(units.get_electricity_production(), 7.253112843006865, rtol=1e-2)
+    bst.process_tools.default()
+        
+def test_lactic():
+    bst.process_tools.default()
+    from biorefineries import lactic as module
+    module.load_system('SSCF')
+    feedstock = module.feedstock
+    product = module.lactic_acid
+    tea = module.lactic_tea
+    units = UnitGroup('Biorefinery', tea.units)
+    module.lactic_sys.simulate()
+    product.price = product_price = tea.solve_price(product)
+    assert np.allclose(tea.IRR, 0.1, rtol=1e-2)
+    assert np.allclose(feedstock.price, 0.06287583717512708, rtol=1e-2)
+    assert np.allclose(product.price, 1.365160205800196, rtol=1e-2)
+    assert np.allclose(tea.sales, 297352245.8641948, rtol=1e-2)
+    assert np.allclose(tea.material_cost, 202146016.56312773, rtol=1e-2)
+    assert np.allclose(tea.installed_equipment_cost, 282073346.9023893, rtol=1e-2)
+    assert np.allclose(tea.utility_cost, 20669375.58387342, rtol=1e-2)
+    assert np.allclose(units.get_heating_duty(), 1842.5273042407728, rtol=1e-2)
+    assert np.allclose(units.get_cooling_duty(), 1786.5220868424758, rtol=1e-2)
+    assert np.allclose(units.get_electricity_consumption(), 37.452662868510195, rtol=1e-2)
+    assert np.allclose(units.get_electricity_production(), 0.0, rtol=1e-2)
+    bst.process_tools.default()
 
 # Work is ongoing, at this stage, it is fine as long as these modules can load
 # and systems can be simulated

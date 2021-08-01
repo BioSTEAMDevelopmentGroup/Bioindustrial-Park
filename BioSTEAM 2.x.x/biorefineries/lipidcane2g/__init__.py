@@ -93,16 +93,15 @@ palette = Palette(**area_colors)
 
 
 configuration_names = (
-    'S1', 'L1', 'S1*', 'L1*', 'S2', 'L2', 'S2*', 'L2*',
+    'S1', 'L1', 'S2', 'L2', 'S1*', 'L1*', 'S2*', 'L2*',
 )
 comparison_names = (
     # 'I - ∅', 
     'L1 - S1', 
     'L2 - S2', 
     'L2 - L1', 
-    'L1* - S1*', 
-    'L2* - S2*', 
-    'L2* - L1*', 
+    'L1* - L1', 
+    'L2* - L2',  
 )
 
 across_lipid_content_names = (
@@ -115,6 +114,14 @@ across_lipid_content_agile_names = (
 
 across_lipid_content_comparison_names = (
     'L1 - S1', 'L2 - S2', 'L2 - L1', 
+)
+
+across_lipid_content_agile_direct_comparison_names = (
+    'L1* - L1', 'L2* - L2', 
+)
+
+across_lipid_content_agile_comparison_names = (
+    'L1* - S1*', 'L2* - S2*', 'L2* - L1*', 
 )
 
 (set_feedstock_lipid_content, set_bagasse_lipid_retention, 
@@ -370,25 +377,23 @@ def load(name, cache={}):
             
             def set_parameters(self, switch2sorghum):
                 F_mass_original = lipidcane.F_mass
-                if number >= 0:
-                    lipid_content = get_lipid_fraction(lipidcane)
                 if switch2sorghum:
                     lipidcane.copy_like(lipidsorghum)
+                    if number >= 0: set_lipid_fraction(self.sorghum_lipid_content, lipidcane)
                 else:
                     lipidcane.copy_like(original_lipidcane)
-                if number >= 0:
-                    set_lipid_fraction(lipid_content, lipidcane)
-                    np.testing.assert_allclose(get_lipid_fraction(lipidcane), lipid_content)
+                    if number >= 0: set_lipid_fraction(self.cane_lipid_content, lipidcane)
                 lipidcane.F_mass = F_mass_original
                 
         lipidcane_tea = create_agile_tea(lipidcane_sys.units)      
         lipidcane_sys = AgileLipidcaneSystem(lipidcane_sys, [0, 1], [200 * 24, 60 * 24],
                                              tea=lipidcane_tea)
+        lipidcane_sys.cane_lipid_content = 0.1
+        lipidcane_sys.sorghum_lipid_content = 0.07
     else:
         lipidcane_tea = create_tea(lipidcane_sys)
         lipidcane_sys.operating_hours = 24 * 200
     lipidcane_tea.income_tax = 0.21 # Davis et al. 2018; https://www.nrel.gov/docs/fy19osti/71949.pdf
-    feedstocks = [lipidcane]
     
     ## Specification for analysis
     if number < 0:
@@ -408,7 +413,7 @@ def load(name, cache={}):
                 break
         
         lipid_extraction_specification = LipidExtractionSpecification(
-            lipidcane_sys, feedstocks, isplit_a, isplit_b, isplit_efficiency_is_reversed
+            lipidcane_sys, lipidcane, isplit_a, isplit_b, isplit_efficiency_is_reversed
         )
     
     ## Model
@@ -426,8 +431,16 @@ def load(name, cache={}):
     # Currently at ~5%, but total lipid content is past 10%
     
     @uniform(5., 15., element=lipidcane, units='dry wt. %', kind='coupled')
-    def set_feedstock_lipid_content(lipid_content):
-        lipid_extraction_specification.load_lipid_content(lipid_content / 100.)
+    def set_cane_lipid_content(cane_lipid_content):
+        if agile:
+            lipidcane_sys.cane_lipid_content = cane_lipid_content / 100.
+        else:
+            lipid_extraction_specification.load_lipid_content(cane_lipid_content / 100.)
+    
+    @uniform(-3., 0., element=lipidcane, units='dry wt. %', kind='coupled')
+    def set_relative_sorghum_lipid_content(relative_sorghum_lipid_content):
+        if agile:
+            lipidcane_sys.sorghum_lipid_content = lipidcane_sys.cane_lipid_content + relative_sorghum_lipid_content / 100.
     
     @uniform(65, 75., element=lipidcane, units='%', kind='coupled')
     def set_bagasse_lipid_retention(lipid_retention):
@@ -736,6 +749,7 @@ def run_uncertainty_and_sensitivity(name, N, rule='L',
 def run_all(N, across_lipid_content=False, rule='L', configurations=None):
     if configurations is None: configurations = configuration_names
     for name in configurations:
+        print(f"Running {name}:")
         run_uncertainty_and_sensitivity(
             name, N, rule, across_lipid_content,
         )
@@ -763,7 +777,15 @@ def get_monte_carlo(name):
         return pd.read_excel(file, header=[0, 1], index_col=[0])
     elif isinstance(key, ConfigurationComparison):
         index = [i.index for i in metric_mockups]
-        return get_monte_carlo(key.a)[index] - get_monte_carlo(key.b)[index] 
+        df_a = get_monte_carlo(key.a)[index]
+        df_b = get_monte_carlo(key.b)[index]
+        row_a = df_a.shape[0]
+        row_b = df_b.shape[0]
+        if row_a != row_b:
+            length = min(row_a, row_b)
+            return df_a.iloc[:length] - df_b.iloc[:length]
+        else:
+            return df_a - df_b
     else:
         raise Exception('unknown error')
 
@@ -780,16 +802,17 @@ def plot_monte_carlo_across_coordinate(coordinate, data, color_wheel):
 
 def plot_monte_carlo_across_lipid_content(kind=0):
     MFPP, TCI, *production = metric_mockups
-    
+    rows = [MFPP, TCI, production]
     if kind == 0:
         columns = across_lipid_content_names
-        rows = [MFPP, TCI, production]
     elif kind == 1:
         columns = across_lipid_content_agile_names
-        rows = [MFPP, production]
     elif kind == 2:
         columns = across_lipid_content_comparison_names
-        rows = [MFPP, TCI, production]
+    elif kind == 3:
+        columns = across_lipid_content_agile_comparison_names
+    elif kind == 4:
+        columns = across_lipid_content_agile_direct_comparison_names
     else:
         raise NotImplementedError(str(kind))
     
@@ -820,10 +843,14 @@ def plot_monte_carlo_across_lipid_content(kind=0):
         diff = 0.1 * (ub - lb)
         ub += diff
         if rows[r] is MFPP:
-            if kind == 1 or kind == 2:
-                tickmarks[r] = [-20, -10, 0, 10, 20]
-            else:
+            if kind == 0 or kind == 1:
                 tickmarks[r] = [-20, 0, 20, 40, 60]
+            elif kind == 2:
+                tickmarks[r] = [-20, -10, 0, 10, 20]
+            elif kind == 3:
+                tickmarks[r] = [-10, 0, 10, 20, 30]
+            elif kind == 4:
+                tickmarks[r] = [-5, 0, 5, 10, 15]
             continue
         lb = floor(lb / 15) * 15
         ub = ceil(ub / 15) * 15
@@ -866,7 +893,7 @@ def monte_carlo_box_plot(data, positions, light_color, dark_color):
 
 def monte_carlo_results():
     results = {}
-    for name in configuration_names:
+    for name in configuration_names + comparison_names :
         df = get_monte_carlo(name)
         results[name] = dct = {}
         for metric in metric_mockups:
@@ -884,8 +911,8 @@ def monte_carlo_results():
             }
     return results
 
-def plot_monte_carlo(comparison=False):
-    columns = configurations = comparison_names if comparison else configuration_names
+def plot_monte_carlo():
+    columns = configurations = configuration_names + comparison_names 
     N_cols = len(columns)
     MFPP, TCI, *production = metric_mockups
     rows = metrics = [
@@ -896,7 +923,7 @@ def plot_monte_carlo(comparison=False):
     N_rows = len(rows)
     fig, axes = plt.subplots(ncols=1, nrows=N_rows)
     axes = axes.flatten()
-    xtext = [format_name(i) for i in configurations]
+    xtext = [format_name(i).replace(' ', '') for i in configurations]
     N_marks = len(xtext)
     xticks = tuple(range(N_marks))
     color_wheel = CABBI_colors.wheel()
@@ -908,7 +935,8 @@ def plot_monte_carlo(comparison=False):
     def get_data(metric, name):
         if isinstance(metric, bst.Variable):
             df = get_monte_carlo(name)
-            return df[metric.index].values
+            values = df[metric.index].values
+            return values
         else:
             return [get_data(i, name) for i in metric]
     
@@ -929,6 +957,16 @@ def plot_monte_carlo(comparison=False):
     data = np.array([[get_data(i, j) for j in columns] for i in rows])
     tickmarks = [bst.plots.rounded_tickmarks_from_data(i, step_min=30, N_ticks=5, lb_max=0) for i in data]
     color_wheel = CABBI_colors.wheel()
+
+    x0 = len(configuration_names) - 0.5
+    xf = len(columns) - 0.5
+    for i in range(N_rows):
+        ax = axes[i]
+        plt.sca(ax)
+        bst.plots.plot_vertical_line(x0)
+        ax.axvspan(x0, xf, color=colors.purple_tint.tint(60).RGBn)
+        plt.xlim(-0.5, xf)
+
     for j in range(N_cols):
         color_wheel.restart()
         for i in range(N_rows):
@@ -950,7 +988,7 @@ def plot_monte_carlo(comparison=False):
             xticklabels= xtext, 
             ytickf=False,
         )
-        
+    
     fig.align_ylabels(axes)
     plt.subplots_adjust(hspace=0)
     plt.sca(axes[1])
@@ -988,7 +1026,8 @@ def plot_spearman_MFPP(top=None):
     operating_days = format_units('day/yr')
     capacity = format_units('ton/hr')
     index = [
-         'Feedstock lipid content [5 $-$ 15 dry wt. %]',
+         'Cane lipid content [5 $-$ 15 dry wt. %]',
+         'Relative sorghum lipid content [-2 $-$ 0 dry wt. %]',
          'Bagasse lipid retention [65 $-$ 75 %]',
          '$^a$Lipid extraction efficiency [baseline + 0 $-$ 25 %]',
         f'Plant capacity [330 $-$ 404 {capacity}]',
