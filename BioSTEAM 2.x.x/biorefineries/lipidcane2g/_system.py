@@ -157,11 +157,12 @@ def create_lipidcane_to_biodiesel_and_ethanol_1g(
     )
     lipid, wastewater, evaporator_condensate_b = post_fermentation_lipid_separation_sys.outs
     MX = bst.Mixer(400, [PX-0, lipid])
-    lipid_pretreatment_sys = create_lipid_pretreatment_system(
+    lipid_pretreatment_sys, lipid_pretreatment_dct = create_lipid_pretreatment_system(
         ins=MX-0,
         mockup=True,
         outs=['', 'polar_lipids', ''],
         area=600,
+        udct=True,
     )
     lipid, polar_lipids, wastewater = lipid_pretreatment_sys.outs
     
@@ -218,7 +219,7 @@ def create_lipidcane_to_biodiesel_and_ethanol_1g(
                                  process_water_streams)
     
     HXN = bst.HeatExchangerNetwork(900, 
-        ignored=[u.D601.boiler, u.D602.boiler, u.H601, u.H602, u.H603, u.H604],
+        ignored=[u.D601.boiler, u.D602.boiler, u.H601, u.H602, u.H603, u.H604, lipid_pretreatment_dct['F3']],
         Qmin=1e5,
     )
     HXN.acceptable_energy_balance_error = 0.01
@@ -360,11 +361,12 @@ def create_lipidcane_to_biodiesel_and_ethanol_combined_1_and_2g_post_fermentatio
     backend_lipid.ID = 'backend_lipid'
     MX_process_water = bst.Mixer(900, (evaporator_condensate, stripper_process_water),
                                  'recycle_process_water')
-    lipid_pretreatment_sys = create_lipid_pretreatment_system(
+    lipid_pretreatment_sys, lipid_pretreatment_dct = create_lipid_pretreatment_system(
         ins=backend_lipid,
         outs=['', 'polar_lipids', ''],
         mockup=True,
         area=800,
+        udct=True
     )
     lipid, polar_lipids, wastewater_small = lipid_pretreatment_sys.outs
     
@@ -408,10 +410,11 @@ def create_lipidcane_to_biodiesel_and_ethanol_combined_1_and_2g_post_fermentatio
     Ev607 = pfls_dct['Ev607']
     D303 = ep_dct['D303']
     HXN = bst.HeatExchangerNetwork(1000,
-        ignored=[u.D801.boiler, u.D802.boiler, u.H803, u.H802, u.H801, u.H804],
+        ignored=[u.D801.boiler, u.D802.boiler, u.H803, u.H802, u.H801, u.H804, lipid_pretreatment_dct['F3']],
         Qmin=1e3,
     )
     HXN.acceptable_energy_balance_error = 0.01
+    # HXN.raise_energy_balance_error = True
     # ignored=transesterification_and_biodiesel_separation_sys.units)
 
 @SystemFactory(
@@ -560,3 +563,4 @@ def create_sugarcane_to_ethanol_combined_1_and_2g(ins, outs):
         Qmin=1e3,
     )
     HXN.acceptable_energy_balance_error = 0.01
+    # HXN.raise_energy_balance_error = True

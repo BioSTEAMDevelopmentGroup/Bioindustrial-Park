@@ -58,7 +58,7 @@ _system_loaded = False
 _chemicals_loaded = False
 
 kg_per_ton = 907.18474
-lipid_content = np.linspace(0.15, 0.05, 4)
+lipid_content = np.linspace(0.05, 0.15, 5)
 
 area_colors = {
     'Feedstock handling': CABBI_colors.teal, 
@@ -104,6 +104,10 @@ comparison_names = (
     'L2* - L2',  
 )
 
+other_comparison_names = (
+    'L1* - S1*', 'L2* - S2*', 
+)
+
 across_lipid_content_names = (
     'L1', 'L2', 
 )
@@ -143,22 +147,42 @@ across_lipid_content_agile_comparison_names = (
 )
 (MFPP, biodiesel_production, ethanol_production, 
  electricity_production, natural_gas_consumption, 
- TCI, heat_exchanger_network_error, feedstock_consumption) = all_metric_mockups = (
+ TCI, feedstock_consumption, heat_exchanger_network_error,
+ MFPP_derivative, biodiesel_production_derivative, ethanol_production_derivative, 
+ electricity_production_derivative, natural_gas_consumption_derivative, 
+ TCI_derivative) = all_metric_mockups = (
     bst.MockVariable('MFPP', 'USD/ton', 'Biorefinery'),
-    bst.MockVariable('Biodiesel production', 'MMGal/yr', 'Biorefinery'),
-    bst.MockVariable('Ethanol production', 'MMGal/yr', 'Biorefinery'),
-    bst.MockVariable('Electricity production', 'MMWhr/yr', 'Biorefinery'),
-    bst.MockVariable('Natural gas consumption', 'MMcf/yr', 'Biorefinery'),
+    bst.MockVariable('Biodiesel production', 'Gal/ton', 'Biorefinery'),
+    bst.MockVariable('Ethanol production', 'Gal/ton', 'Biorefinery'),
+    bst.MockVariable('Electricity production', 'kWhr/ton', 'Biorefinery'),
+    bst.MockVariable('Natural gas consumption', 'cf/ton', 'Biorefinery'),
     bst.MockVariable('TCI', '10^6*USD', 'Biorefinery'),
-    bst.MockVariable('Heat exchanger network error', '%', 'Biorefinery'),
     bst.MockVariable('Feedstock consumption', 'ton/yr', 'Biorefinery'),
+    bst.MockVariable('Heat exchanger network error', '%', 'Biorefinery'),
+    bst.MockVariable('MFPP derivative', 'USD/ton', 'Biorefinery'),
+    bst.MockVariable('Biodiesel production derivative', 'Gal/ton', 'Biorefinery'),
+    bst.MockVariable('Ethanol production derivative', 'Gal/ton', 'Biorefinery'),
+    bst.MockVariable('Electricity production derivative', 'kWhr/ton', 'Biorefinery'),
+    bst.MockVariable('Natural gas consumption derivative', 'cf/ton', 'Biorefinery'),
+    bst.MockVariable('TCI derivative', '10^6*USD', 'Biorefinery'),
 )
 
 metric_mockups = (
     MFPP, 
     TCI,
     ethanol_production,
-    biodiesel_production
+    biodiesel_production,
+    electricity_production,
+    natural_gas_consumption
+)
+
+derivative_metric_mockups = (
+    MFPP_derivative, 
+    TCI_derivative,
+    ethanol_production_derivative,
+    biodiesel_production_derivative,
+    electricity_production_derivative,
+    natural_gas_consumption_derivative,
 )
 
 def asconfiguration(x):
@@ -418,7 +442,7 @@ def load(name, cache={}):
     
     ## Model
     
-    model = bst.Model(lipidcane_sys, exception_hook='raise')
+    model = bst.Model(lipidcane_sys, exception_hook='raise', retry_evaluation=False)
     parameter = model.parameter
     metric = model.metric
     
@@ -540,30 +564,24 @@ def load(name, cache={}):
     def MFPP():
         return kg_per_ton * lipidcane_tea.solve_price(lipidcane)
     
-    @metric(units='MMGal/yr')
+    @metric(units='Gal/ton')
     def biodiesel_production():
-        return biodiesel_flow() / 1e6
+        return biodiesel_flow() / feedstock_flow()
     
-    @metric(units='MMGal/yr')
+    @metric(units='Gal/ton')
     def ethanol_production():
-        return ethanol_flow() / 1e6
+        return ethanol_flow() / feedstock_flow()
     
-    @metric(units='MMWhr/yr')
+    @metric(units='kWhr/ton')
     def electricity_production():
-        return - electricity() / 1e3
+        value = - electricity() / feedstock_flow() 
+        if value < 0.: value = 0.
+        return value
     
-    @metric(units='MMcf/yr')
+    @metric(units='cf/ton')
     def natural_gas_consumption():
-        return natural_gas_flow() / 1e6
+        return natural_gas_flow() / feedstock_flow()
     
-    # @metric(units='MMGGE/yr')
-    # def productivity():
-    #     GGE = (ethanol_flow() / 1.5
-    #        + biodiesel_flow() / 0.9536
-    #        - electricity() * 3600 / 131760
-    #        - natural_gas_flow() / 126.67)
-    #     return GGE / 1e6
-
     @metric(units='10^6*USD')
     def TCI():
         return lipidcane_tea.TCI / 1e6 # 10^6*$
@@ -574,11 +592,72 @@ def load(name, cache={}):
     
     @metric(units='%')
     def heat_exchanger_network_error():
-        return HXN.energy_balance_percent_error if HXN else 0.
+        return HXN.energy_balance_percent_error if HXN else 0.    
+    
+    # @metric(units='MMGGE/yr')
+    # def productivity():
+    #     GGE = (ethanol_flow() / 1.5
+    #        + biodiesel_flow() / 0.9536
+    #        - electricity() * 3600 / 131760
+    #        - natural_gas_flow() / 126.67)
+    #     return GGE / 1e6
+    
+    @metric(units='USD/ton')
+    def MFPP_derivative():
+        if number < 0: return 0.
+        if agile:
+            lipidcane_sys.cane_lipid_content += 0.01
+            lipidcane_sys.sorghum_lipid_content += 0.01
+        else:
+            lipid_extraction_specification.load_lipid_content(lipid_extraction_specification.lipid_content + 0.01)
+        lipidcane_sys.simulate()  
+        value = (kg_per_ton * lipidcane_tea.solve_price(lipidcane) - MFPP.cache) / 1.
+        lipidcane.price = lipidcane_tea.solve_price(lipidcane)
+        # print('--------------------')
+        # print('MFPP derivative', value)
+        # print('NPV', lipidcane_tea.NPV)
+        return (kg_per_ton * lipidcane_tea.solve_price(lipidcane) - MFPP.cache) / 1.
+    
+    @metric(units='Gal/ton')
+    def biodiesel_production_derivative():
+        if number < 0: return 0.
+        value = (biodiesel_flow() / feedstock_flow() - biodiesel_production.cache) / 1.
+        # print('biodiesel production derivative', value)
+        return value
+    
+    @metric(units='Gal/ton')
+    def ethanol_production_derivative():
+        if number < 0: return 0.
+        value = (ethanol_flow() / feedstock_flow() - ethanol_production.cache) / 1.
+        # print('ethanol production derivative', value)
+        return value
+    
+    @metric(units='kWhr/ton')
+    def electricity_production_derivative():
+        if number < 0: return 0.
+        value = (- electricity() / feedstock_flow() - electricity_production.cache) / 1.
+        # print('electricity production derivative', value)
+        return value
+    
+    @metric(units='cf/ton')
+    def natural_gas_consumption_derivative():
+        if number < 0: return 0.
+        value =(natural_gas_flow() / feedstock_flow() - natural_gas_consumption.cache) / 1.
+        # print('natural gas production derivative', value)
+        return value
+    
+    @metric(units='10^6*USD')
+    def TCI_derivative():
+        if number < 0: return 0.
+        value = (lipidcane_tea.TCI / 1e6  - TCI.cache) / 1. # 10^6*$
+        # print('TCI production derivative', value)
+        return value
+        
+    
     
     # # Single point evaluation for detailed design results
     lipid_extraction_specification.load_lipid_retention(0.70)
-    lipid_extraction_specification.load_lipid_content(0.10)
+    lipid_extraction_specification.load_lipid_content(0.05)
     set_bagasse_lipid_extraction_efficiency(0.)
     set_ethanol_price.setter(1.898) 
     set_biodiesel_price.setter(4.363)
@@ -622,7 +701,9 @@ def evaluate_configurations_across_extraction_efficiency_and_lipid_content(
                 lipid_content=lipid_content, 
                 lipid_retention=lipid_retention
             )
-            lipid_extraction_specification.system.simulate()
+            if agile[ia]:
+                lipidcane_sys.cane_lipid_content = lipidcane_sys.sorghum_lipid_content = lipid_content
+            lipidcane_sys.simulate()
             data[ia, ic, :] = [j() for j in model.metrics]
     return data
 
@@ -754,21 +835,27 @@ def run_all(N, across_lipid_content=False, rule='L', configurations=None):
             name, N, rule, across_lipid_content,
         )
 
-def get_monte_carlo_across_lipid_content(name, metric):
+def get_monte_carlo_across_lipid_content(name, metric, derivative=False):
     key = parse(name)
     if isinstance(key, Configuration):
-        return pd.read_excel(
+        df = pd.read_excel(
             monte_carlo_file(key, True),
             sheet_name=metric if isinstance(metric, str) else metric.short_description,
             index_col=0
         )
     elif isinstance(key, ConfigurationComparison):
-        return (
+        df = (
             get_monte_carlo_across_lipid_content(key.a, metric)
             - get_monte_carlo_across_lipid_content(key.b, metric)
         )
     else:
         raise Exception('unknown error')
+    if derivative: 
+        arr = np.diff(df.values) / np.diff(df.columns.values) / 100.
+    else:
+        arr = df.values
+    return arr
+        
 
 def get_monte_carlo(name):
     key = parse(name)
@@ -776,7 +863,7 @@ def get_monte_carlo(name):
         file = monte_carlo_file(key)
         return pd.read_excel(file, header=[0, 1], index_col=[0])
     elif isinstance(key, ConfigurationComparison):
-        index = [i.index for i in metric_mockups]
+        index = [i.index for i in metric_mockups + derivative_metric_mockups]
         df_a = get_monte_carlo(key.a)[index]
         df_b = get_monte_carlo(key.b)[index]
         row_a = df_a.shape[0]
@@ -800,8 +887,8 @@ def plot_monte_carlo_across_coordinate(coordinate, data, color_wheel):
             dark_color=color.shade(50).RGBn,
         )
 
-def plot_monte_carlo_across_lipid_content(kind=0):
-    MFPP, TCI, *production = metric_mockups
+def plot_monte_carlo_across_lipid_content(kind=0, derivative=False):
+    MFPP, TCI, *production, electricity_production, natural_gas_consumption = metric_mockups
     rows = [MFPP, TCI, production]
     if kind == 0:
         columns = across_lipid_content_names
@@ -815,12 +902,20 @@ def plot_monte_carlo_across_lipid_content(kind=0):
         columns = across_lipid_content_agile_direct_comparison_names
     else:
         raise NotImplementedError(str(kind))
-    
-    ylabels = [
-        f"MFPP [{format_units('USD/ton')}]",
-        f"TCI [{format_units('10^6*USD')}]",
-        f"Production [{format_units('gal/ton')}]"
-    ]
+    if derivative:
+        x = 100 * (lipid_content[:-1] + np.diff(lipid_content) / 2.)
+        ylabels = [
+            f"MFPP der. [{format_units('USD/ton')}]",
+            f"TCI der. [{format_units('10^6*USD')}]",
+            f"Production der. [{format_units('gal/ton')}]"
+        ]
+    else:
+        x = 100 * lipid_content
+        ylabels = [
+            f"MFPP$\backprime$ [{format_units('USD/ton')}]",
+            f"TCI [{format_units('10^6*USD')}]",
+            f"Production [{format_units('gal/ton')}]"
+        ]
     N_cols = len(columns)
     N_rows = len(rows)
     fig, axes = plt.subplots(ncols=N_cols, nrows=N_rows)
@@ -828,7 +923,7 @@ def plot_monte_carlo_across_lipid_content(kind=0):
     
     def get_data(metric, name):
         if isinstance(metric, bst.Variable):
-            return get_monte_carlo_across_lipid_content(name, metric).values
+            return get_monte_carlo_across_lipid_content(name, metric, derivative)
         else:
             return [get_data(i, name) for i in metric]
     
@@ -842,21 +937,26 @@ def plot_monte_carlo_across_lipid_content(kind=0):
         ub = max([get_max(i) for i in data[r, :]])
         diff = 0.1 * (ub - lb)
         ub += diff
-        if rows[r] is MFPP:
-            if kind == 0 or kind == 1:
-                tickmarks[r] = [-20, 0, 20, 40, 60]
-            elif kind == 2:
-                tickmarks[r] = [-20, -10, 0, 10, 20]
-            elif kind == 3:
-                tickmarks[r] = [-10, 0, 10, 20, 30]
-            elif kind == 4:
-                tickmarks[r] = [-5, 0, 5, 10, 15]
-            continue
-        lb = floor(lb / 15) * 15
-        ub = ceil(ub / 15) * 15
-        step = (ub - lb) / (N_ticks - 1)
-        tickmarks[r] = [0, 1] if step == 0 else [int(lb + step * i) for i in range(N_ticks)]
-        
+        if derivative:
+            lb = floor(lb)
+            ub = ceil(ub)
+            step = (ub - lb) / (N_ticks - 1)
+            tickmarks[r] = [0, 1] if step == 0 else [int(lb + step * i) for i in range(N_ticks)]
+        else:
+            if rows[r] is MFPP:
+                if kind == 0 or kind == 1:
+                    tickmarks[r] = [-20, 0, 20, 40, 60]
+                elif kind == 2:
+                    tickmarks[r] = [-20, -10, 0, 10, 20]
+                elif kind == 3:
+                    tickmarks[r] = [-10, 0, 10, 20, 30]
+                elif kind == 4:
+                    tickmarks[r] = [-5, 0, 5, 10, 15]
+                continue
+            lb = floor(lb / 15) * 15
+            ub = ceil(ub / 15) * 15
+            step = (ub - lb) / (N_ticks - 1)
+            tickmarks[r] = [0, 1] if step == 0 else [int(lb + step * i) for i in range(N_ticks)]
     color_wheel = CABBI_colors.wheel()
     for j in range(N_cols):
         color_wheel.restart()
@@ -864,7 +964,7 @@ def plot_monte_carlo_across_lipid_content(kind=0):
             arr = data[i, j]
             ax = axes[i, j]
             plt.sca(ax)
-            percentiles = plot_monte_carlo_across_coordinate(100 * lipid_content, arr, color_wheel)
+            percentiles = plot_monte_carlo_across_coordinate(x, arr, color_wheel)
             if i == 0: ax.set_title(format_name(columns[j]))
             xticklabels = i == N_rows - 1
             yticklabels = j == 0
@@ -893,10 +993,10 @@ def monte_carlo_box_plot(data, positions, light_color, dark_color):
 
 def monte_carlo_results():
     results = {}
-    for name in configuration_names + comparison_names :
+    for name in configuration_names + comparison_names + other_comparison_names:
         df = get_monte_carlo(name)
         results[name] = dct = {}
-        for metric in metric_mockups:
+        for metric in metric_mockups + derivative_metric_mockups:
             index = metric.index
             data = df[index].values
             q05, q25, q50, q75, q95 = percentiles = np.percentile(data, [5,25,50,75,95], axis=0)
@@ -911,14 +1011,21 @@ def monte_carlo_results():
             }
     return results
 
-def plot_monte_carlo():
-    columns = configurations = configuration_names + comparison_names 
+def plot_monte_carlo(derivative=False):
+    if derivative:
+        columns = configurations = ['L1', 'L1*', 'L1* - L1']
+        # columns = configurations = ['L1', 'L2', 'L1*', 'L2*', 'L2 - L1', 'L2* - L2', 'L1* - L1']
+        MFPP, TCI, *production, electricity_production, natural_gas_consumption = derivative_metric_mockups
+    else:
+        columns = configurations = configuration_names + comparison_names
+        MFPP, TCI, *production, electricity_production, natural_gas_consumption = metric_mockups
     N_cols = len(columns)
-    MFPP, TCI, *production = metric_mockups
     rows = metrics = [
         MFPP, 
         TCI, 
-        production
+        production,
+        electricity_production,
+        natural_gas_consumption,
     ]
     N_rows = len(rows)
     fig, axes = plt.subplots(ncols=1, nrows=N_rows)
@@ -928,10 +1035,14 @@ def plot_monte_carlo():
     xticks = tuple(range(N_marks))
     color_wheel = CABBI_colors.wheel()
     ylabels = [
-        f"MFPP [{format_units('USD/ton')}]",
-        f"TCI [{format_units('10^6*USD')}]",
-        f"Production [{format_units('MMGal/yr')}]"
+        f"MFPP\n[{format_units('USD/ton')}]",
+        f"TCI\n[{format_units('10^6*USD')}]",
+        f"Production\n[{format_units('Gal/ton')}]",
+        f"Elec. prod.\n[{format_units('kWhr/ton')}]",
+        f"NG cons.\n[{format_units('cf/ton')}]"
     ]
+    if derivative:
+        ylabels = [i.replace("\n[", " der. \n[") for i in ylabels]
     def get_data(metric, name):
         if isinstance(metric, bst.Variable):
             df = get_monte_carlo(name)
@@ -955,7 +1066,8 @@ def plot_monte_carlo():
     
     data = np.zeros([N_rows, N_cols], dtype=object)
     data = np.array([[get_data(i, j) for j in columns] for i in rows])
-    tickmarks = [bst.plots.rounded_tickmarks_from_data(i, step_min=30, N_ticks=5, lb_max=0) for i in data]
+    step_min = 1 if derivative else 30
+    tickmarks = [bst.plots.rounded_tickmarks_from_data(i, step_min=step_min, N_ticks=5, lb_max=0) for i in data]
     color_wheel = CABBI_colors.wheel()
 
     x0 = len(configuration_names) - 0.5
@@ -1027,7 +1139,7 @@ def plot_spearman_MFPP(top=None):
     capacity = format_units('ton/hr')
     index = [
          'Cane lipid content [5 $-$ 15 dry wt. %]',
-         'Relative sorghum lipid content [-2 $-$ 0 dry wt. %]',
+         'Relative sorghum lipid content [-3 $-$ 0 dry wt. %]',
          'Bagasse lipid retention [65 $-$ 75 %]',
          '$^a$Lipid extraction efficiency [baseline + 0 $-$ 25 %]',
         f'Plant capacity [330 $-$ 404 {capacity}]',

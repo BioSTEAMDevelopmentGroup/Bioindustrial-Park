@@ -161,18 +161,9 @@ OleylAlcohol = chemical_database('OleylAlcohol', search_ID='143-28-2') # Octyldo
 # C = 0
 # OleylAlcohol.Psat.add_model(tmo.functors.Antoine(A, B, C), Tmax=OleylAlcohol.Tc)
 # OleylAlcohol.Tb = OleylAlcohol.Tsat(101325)
-if tmo.__version__[0] == '1':
-    Octyldodecanol = tmo.Chemical('Octyldodecanol')
-    OleylAlcohol.copy_models_from(Octyldodecanol, ['Psat', 'mu', 'sigma'])
-    OleylAlcohol.Tb = Octyldodecanol.Tb
-else:
-    from thermo import Chemical as TChemical
-    Octyldodecanol = TChemical('Octyldodecanol')
-    OleylAlcohol.Psat.add_model(Octyldodecanol.VaporPressure, Tmax=OleylAlcohol.Tc)
-    OleylAlcohol.Tb = OleylAlcohol.Tsat(101325)
-    OleylAlcohol.mu.l.add_model(Octyldodecanol.ViscosityLiquid)
-    OleylAlcohol.mu.g.add_model(Octyldodecanol.ViscosityGas)
-    OleylAlcohol.sigma.add_model(Octyldodecanol.SurfaceTension)
+Octyldodecanol = tmo.Chemical('Octyldodecanol')
+OleylAlcohol.copy_models_from(Octyldodecanol, ['Psat', 'mu', 'sigma'])
+OleylAlcohol.Tb = Octyldodecanol.Tb
 IBA = chemical_database('Isobutyraldehyde')
 IB = chemical_database('Isobutanol')
 DPHP = chemical_database('Dipotassium hydrogen phosphate', phase = 'l')

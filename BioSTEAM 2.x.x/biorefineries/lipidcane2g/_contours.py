@@ -122,8 +122,8 @@ def plot_ethanol_and_biodiesel_price_contours(N=30, benefit=False, cache={}):
     
 def plot_extraction_efficiency_and_lipid_content_contours(load=False, metric_index=0):
     # Generate contour data
-    x = np.linspace(0.4, 1., 5)
-    y = np.linspace(0.05, 0.15, 5)
+    x = np.linspace(0.4, 1., 8)
+    y = np.linspace(0.05, 0.15, 8)
     X, Y = np.meshgrid(x, y)
     # dollar_per_mt = format_units(r'\$/MT')
     metric = bst.metric
@@ -159,7 +159,8 @@ def plot_extraction_efficiency_and_lipid_content_contours(load=False, metric_ind
     xticks = [40, 60, 80, 100]
     yticks = [5, 7.5, 10, 12.5, 15]
     metric = lc.all_metric_mockups[metric_index]
-    metric_bar = MetricBar(metric.name, format_units(metric.units), colormaps[metric_index], tickmarks(data, 5, 5), 18)
+    units = metric.units if metric.units == '%' else format_units(metric.units)
+    metric_bar = MetricBar(metric.name, units, colormaps[metric_index], tickmarks(data, 5, 5), 18)
     fig, axes, CSs, CB = plot_contour_single_metric(
         100.*X, 100.*Y, data, xlabel, ylabels, xticks, yticks, metric_bar, 
         fillblack=False, styleaxiskw=dict(xtick0=False), label=True,
@@ -186,7 +187,6 @@ def plot_extraction_efficiency_and_lipid_content_contours(load=False, metric_ind
             else:
                 lb = 70.0
                 ub = 90.0
-            baseline = lb
             plt.fill_between([lb, ub], [2], [20], 
                              color=shadecolor,
                              linewidth=1)
@@ -196,7 +196,9 @@ def plot_extraction_efficiency_and_lipid_content_contours(load=False, metric_ind
             plot_vertical_line(ub, ls='-.',
                                color=linecolor,
                                linewidth=1.0)
-            plot_scatter_points([baseline], [10], marker='*', s=125, color=markercolor,
-                                edgecolor=edgecolor)
+            # plot_scatter_points([lb], [5], marker='v', s=125, color=markercolor,
+            #                     edgecolor=edgecolor)
+            # plot_scatter_points([ub], [15], marker='^', s=125, color=markercolor,
+            #                     edgecolor=edgecolor)
 
     plt.show()
