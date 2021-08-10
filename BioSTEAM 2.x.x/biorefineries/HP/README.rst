@@ -152,8 +152,8 @@ different aspects for [1]_, including: full Monte Carlo simulation (1_full_evalu
 titer-yield-productivity analysis (TRY_analysis.py) for the fermentation performance space, targeted improvements (system_targeted_improvements.py),
 and evaluating feedstocks of varying carbohydrate contents, sugar contents, and prices (TRY_analysis.py).
 
-Note that results used in the manuscript [1]_ were generated using biosteam v2.20.21,
-thermosteam v0.20.26, and dependencies (`commit f56692d <https://github.com/BioSTEAMDevelopmentGroup/Bioindustrial-Park/commit/f56692d3bc06527b57dc77ed7cb929a40b59bc4d>`_).
+Note that results used in the manuscript [1]_ were generated using biosteam (HP_sys branch),
+thermosteam (HP_sys branch), and dependencies (`commit f8b55e2 <https://github.com/BioSTEAMDevelopmentGroup/Bioindustrial-Park/commit/f8b55e286a4b249953759eda89d4a8cffe72f2ed>`_).
 
 To reproduce the results, directly run the script of interest, and results will
 be saved as Excel files in the same directory path as the module.
@@ -162,12 +162,12 @@ be saved as Excel files in the same directory path as the module.
 References
 ----------
 
-.. [1] Bhagwat et al., Sustainable Production of Acrylic Acid via 3-Hydroxypropionic Acid from Lignocellulosic Biomass.
+.. [1] Bhagwat et al., Sustainable Production of Acrylic Acid via 3-Hydroxypropionic Acid from Lignocellulosic Biomass. 
     Pending submittal.
 
 .. [2] Li et al., Sustainable Lactic Acid Production from Lignocellulosic Biomass.
-    ACS Sustainable Chem. Eng. 2021, 9 (3), 1341–1351.
-     `<https://doi.org/10.1021/acssuschemeng.0c08055>`_
+    ACS Sustainable Chem. Eng. 2021, 9 (3), 1341–1351. 
+    `<https://doi.org/10.1021/acssuschemeng.0c08055>`_
      
 .. [3] Cortes-Peña et al., BioSTEAM: A Fast and Flexible Platform for the Design,
     Simulation, and Techno-Economic Analysis of Biorefineries under Uncertainty. 
