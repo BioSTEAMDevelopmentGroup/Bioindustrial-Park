@@ -2,7 +2,7 @@
 HP: Production of Acrylic Acid via 3-Hydroxypropionic Acid from Lignocellulosic Biomass
 =======================================================================================
 
-Simplified process flow scheme
+Process flow scheme
 ------------------------------
 .. figure:: ./images/system_diagram.png
 
@@ -47,7 +47,7 @@ You can choose which system to load.
 
 Systems
 -------
-The `Flowsheet`, `System`, and `TEA`, objects are `flowsheet`, `lactic_sys`, and `lactic_tea`, respectively.
+The `Flowsheet`, `System`, and `TEA`, objects are `flowsheet`, `system`, and `HP_tea`, respectively.
 
 Naming conventions:
     D = Distillation column
