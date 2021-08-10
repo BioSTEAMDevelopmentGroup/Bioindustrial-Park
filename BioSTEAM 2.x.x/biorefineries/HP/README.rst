@@ -89,8 +89,8 @@ Processes:
 
     >>> # You can directly access the Flowsheet, System, and TEA objects
     >>> HP.load_system('lignocellulosic')
-    >>> la.simulate_and_print()
-    >>> la.flowsheet
+    >>> HP.simulate_and_print()
+    >>> HP.flowsheet
     <Flowsheet: HP>
     >>> HP.system
     System: HP_sys
@@ -147,8 +147,8 @@ Processes:
 
 Analyses
 --------
-Multiple analysis modules were used to evaluate the biorefinery
-from different aspects for [1]_, including: full Monte Carlo simulation (1_full_evaluation.py in ./analyses),
+Multiple analysis modules were used to evaluate the biorefinery's
+different aspects for [1]_, including: full Monte Carlo simulation (1_full_evaluation.py in ./analyses),
 titer-yield-productivity analysis (TRY_analysis.py) for the fermentation performance space, targeted improvements (system_targeted_improvements.py),
 and evaluating feedstocks of varying carbohydrate contents, sugar contents, and prices (TRY_analysis.py).
 
@@ -163,6 +163,7 @@ References
 ----------
 
 .. [1] Bhagwat et al., Sustainable Production of Acrylic Acid via 3-Hydroxypropionic Acid from Lignocellulosic Biomass.
+    Pending submittal.
 
 .. [2] Li et al., Sustainable Lactic Acid Production from Lignocellulosic Biomass.
     ACS Sustainable Chem. Eng. 2021, 9 (3), 1341–1351.
