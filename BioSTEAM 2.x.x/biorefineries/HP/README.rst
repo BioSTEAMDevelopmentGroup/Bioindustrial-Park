@@ -149,8 +149,8 @@ Analyses
 --------
 Multiple analysis modules were used to evaluate the biorefinery
 from different aspects for [1]_, including: full Monte Carlo simulation (1_full_evaluation.py in ./analyses),
-titer-yield-productivity analysis (TRY_analysis.py) for the fermentation performance space,
-and evaluate feedstocks of varying carbohydrate contents, sugar contents, and prices (TRY_analysis.py).
+titer-yield-productivity analysis (TRY_analysis.py) for the fermentation performance space, targeted improvements (system_targeted_improvements.py),
+and evaluating feedstocks of varying carbohydrate contents, sugar contents, and prices (TRY_analysis.py).
 
 Note that results used in the manuscript [1]_ were generated using biosteam v2.20.21,
 thermosteam v0.20.26, and dependencies (`commit f56692d <https://github.com/BioSTEAMDevelopmentGroup/Bioindustrial-Park/commit/f56692d3bc06527b57dc77ed7cb929a40b59bc4d>`_).
