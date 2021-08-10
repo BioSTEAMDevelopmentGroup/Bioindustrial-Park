@@ -58,7 +58,7 @@ denaturant_price = 2.86 / 2.819
 
 # 1.41e6 is $/yr and 4279 in kg/hr from Table 33 of Davis et al., 2018 (HP scenario)
 # 7880 is operating hours/yr on Page 10 of Davis et al., 2018,
-# cost is negative because it's a product stream
+# price is negative because it's a product stream
 ash_disposal_price = -1.41e6 / (4279*7880)
 
 # Assums no cost/credit for baseline, the same as ash disposal for the lower bound,	
@@ -348,9 +348,6 @@ FEC_CF_stream = tmo.Stream('FEC_CF_stream', FEC_CF_array, units='kg/hr')
 FEC_CFs['FGHTP Corn stover'] = 1.68000 # see Feedstock_impacts_YL
 FEC_CFs['FGHTP Sugarcane'] = 1.68000 # placeholder
 
-# FEC_CFs['Corn stover'] = 688.60/1e3 * 0.8
-# FEC_CFs['Switchgrass'] = 892.41/1e3 * 0.8
-# FEC_CFs['Miscanthus'] = 569.05/1e3 * 0.8
 
 CFs['FEC_CFs'] = FEC_CFs
 CFs['FEC_CF_stream'] = FEC_CF_stream

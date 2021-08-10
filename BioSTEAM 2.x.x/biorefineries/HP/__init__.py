@@ -1,21 +1,25 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""
-Created on Sun Aug 23 12:11:15 2020
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+# BioSTEAM: The Biorefinery Simulation and Techno-Economic Analysis Modules
+# Copyright (C) 2020-2021, Yoel Cortes-Pena <yoelcortes@gmail.com>
+# Bioindustrial-Park: BioSTEAM's Premier Biorefinery Models and Results
+# Copyright (C) 2020-2021, Sarang Bhagwat <sarangb2@illinois.edu>,
+# Yalin Li <yalinli2@illinois.edu>, and Yoel Cortes-Pena (yoelcortes@gmail.com)
+# 
+# This module is under the UIUC open-source license. See 
+# github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
+# for license details.
 
-Modified from the cornstover biorefinery constructed in Cortes-Peña et al., 2020,
-with modification of fermentation system for 2,3-Butanediol instead of the original ethanol
 
-[1] Cortes-Peña et al., BioSTEAM: A Fast and Flexible Platform for the Design, 
-    Simulation, and Techno-Economic Analysis of Biorefineries under Uncertainty. 
-    ACS Sustainable Chem. Eng. 2020, 8 (8), 3302–3310. 
-    https://doi.org/10.1021/acssuschemeng.9b07040.
-
-All units are explicitly defined here for transparency and easy reference
-
-@author: Sarang Bhagwat and Yoel Cortes-Pena
-"""
 from biorefineries import PY37
+from warnings import filterwarnings
+from numpy import seterr
+
+filterwarnings('ignore')
+ig = seterr(invalid='ignore')
+
 from . import (
     process_settings, 
     chemicals_data, 
@@ -29,36 +33,45 @@ from .tea import *
 from .units import *
 from .facilities import *
 
-__all__ = [
-    'process_settings', 
-    'chemicals_data', 
-    'tea', 
-    'units', 
-    'facilities',
-]
+# __all__ = [
+#     'system_light_lle_vacuum_distillation',
+#     'system_targeted_improvements',
+#     'system_sugarcane',
+#     'TRY_analysis',
+#     'test_solvents',
+#     'process_settings', 
+#     'chemicals_data', 
+#     'tea', 
+#     'lca',
+#     'units', 
+#     'facilities',
+# ]
 
 _system_loaded = False
 _chemicals_loaded = False
 
-default_configuration = 'cellulosic'
+default_configuration = 'lignocellulosic'
 
-def load(configuration=None):
+def load_system(configuration=None):
+    if not configuration in ('lignocellulosic', 'sugarcane'):
+        raise ValueError(f'configuration can only be "lignocellulosic" or "sugarcane", not "{configuration}".')
     if not _chemicals_loaded: _load_chemicals()
     _load_system(configuration)
     dct = globals()
-    dct.update(flowsheet.system.__dict__)
-    dct.update(flowsheet.stream.__dict__)
-    dct.update(flowsheet.unit.__dict__)
+    dct.update(flowsheet.to_dict())
+    # dct.update(flowsheet.system.__dir__())
+    # dct.update(flowsheet.stream.__dir__())
+    # dct.update(flowsheet.unit.__dir__())
 
 def _load_system(configuration=None):
     load_process_settings()
     if not configuration: configuration = default_configuration
-    if configuration == 'cellulosic':
-        _load_celluloic_system()
+    if configuration == 'lignocellulosic':
+        _load_lignocellulosic_system()
     elif configuration == 'sugarcane':
         _load_sugarcane_system()
     else:
-        raise ValueError("configuration must be either 'cellulosic' or 'sugarcane'; "
+        raise ValueError("configuration must be either 'lignocellulosic' or 'sugarcane'; "
                         f"not '{configuration}'")
 
 def _load_chemicals():
@@ -67,37 +80,17 @@ def _load_chemicals():
     chemicals = HP_chemicals
     _chemicals_loaded = True
 
-def _load_celluloic_system():
-    global HP_sys, HP_tea, flowsheet, _system_loaded
-    from .system import HP_sys, HP_tea, flowsheet
+def _load_lignocellulosic_system():
+    global system, HP_tea, flowsheet, _system_loaded, simulate_and_print
+    from .system_light_lle_vacuum_distillation import HP_tea, flowsheet, simulate_and_print
+    from .system_light_lle_vacuum_distillation import HP_sys as system
     _system_loaded = True
 
 def _load_sugarcane_system():
-    global HP_sys, HP_tea, flowsheet, _system_loaded
-    from .system_sugarcane import HP_sys, HP_tea, flowsheet
+    global system, HP_tea, flowsheet, _system_loaded, simulate_and_print
+    from .system_sugarcane import HP_tea, flowsheet, simulate_and_print
+    from .system_sugarcane import HP_sys as system
     _system_loaded = True
 
-if PY37:    
-    def __getattr__(name):
-        if not _chemicals_loaded:
-            _load_chemicals()
-            if name == 'chemicals': return chemicals
-        if not _system_loaded: 
-            try:
-                _load_system()
-            finally:
-                dct = globals()
-                dct.update(flowsheet.system.__dict__)
-                dct.update(flowsheet.stream.__dict__)
-                dct.update(flowsheet.unit.__dict__)
-            if name in dct: return dct[name]
-        raise AttributeError(f"module '{__name__}' has no attribute '{name}'")
-else:
-    try:
-        from lazypkg import LazyPkg
-    except:
-        from warnings import warn
-        warn('Python 3.7 or newer is required to lazy load biorefinery; import '
-             'and run the load function to load a biorefinery')
-    else:
-        LazyPkg(__name__, ['system'])
+
+load_system('lignocellulosic')

@@ -122,7 +122,7 @@ def create_HP_sys(ins, outs):
     
     # For pretreatment, 93% purity
     pretreatment_sulfuric_acid = Stream('pretreatment_sulfuric_acid', units='kg/hr')
-    # To be mixed with sulfuric acid, flow updated in SulfuricAcidMixer
+    # To be mixed with sulfuric acid, flow updated in H_M201
     water_M201 = Stream('water_M201', T=300, units='kg/hr')
     
     # To be used for feedstock conditioning
@@ -148,7 +148,7 @@ def create_HP_sys(ins, outs):
     def H_M201_specification():
         T201._run()
         acid_imass = T201.outs[0].imass['SulfuricAcid']
-        H_M201.ins[0].imass['Water'] = acid_imass / 0.05
+        H_M201.ins[0].imass['Water'] = acid_imass / 0.05 # 0.05 is from 1842/36629 from streams 710 and 516 of Humbird et al.
         H_M201._run()
     H_M201.specification = H_M201_specification
     H_M202 = bst.units.HXutility('H_M202', ins=water_M202,
@@ -252,7 +252,7 @@ def create_HP_sys(ins, outs):
     R301 = units.Saccharification('R301', 
                                     ins=M301-0,
                                     outs=('saccharification_effluent'))
-    R301.tau_saccharification = 24. # !!! 24 or 84 h?
+    R301.tau_saccharification = 24. 
     
     def fix_split(isplit, ID):
         isplit['Glycerol', 'Hexanol', 'HP', 'AcrylicAcid', 'Acetate', 'AceticAcid'] = isplit[ID]
@@ -509,7 +509,7 @@ def create_HP_sys(ins, outs):
                                         LHK=('Hexanol', 'HP'),
                                         is_divided=True,
                                         product_specification_format='Recovery',
-                                        Lr=0.999, Hr=0.999, k=1.05, P = 101325/20,
+                                        Lr=0.999, Hr=0.999, k=1.05, P = 101325./20.,
                                         vessel_material = 'Stainless steel 316',
                                         partial_condenser = False,
                                         condenser_thermo = ideal_thermo,
@@ -534,6 +534,8 @@ def create_HP_sys(ins, outs):
     M402 = bst.units.Mixer('M402', ins=(D401_bP-0,
                                         'dilution_water2'))
     
+    M402.HP_wt_frac = 0.3
+    
     def M402_objective_fn(Water_imol):
         M402.ins[1].imol['Water'] = Water_imol
         M402._run()
@@ -541,14 +543,17 @@ def create_HP_sys(ins, outs):
         # return get_concentration_gpL('HP', M402.outs[0]) - 270.1 # "Solubility "at 25 C # https://www.chemicalbook.com/ChemicalProductProperty_EN_CB6711580.htm
         # return get_mass_percent('HP', M402.outs[0]) - .15 # Dehydration reaction paper
         # return get_mass_percent('HP', M402.outs[0]) - .35 # 30-35 wt% in https://patents.google.com/patent/WO2013192451A1/en
-        return get_mass_percent('HP', M402.outs[0]) - .30 # 30wt% with 80% conversion in Dunn et al. 2015 LCA of Bioproducts in GREET
+        # return get_mass_percent('HP', M402.outs[0]) - .30 # 30wt% with 80% conversion in Dunn et al. 2015 LCA of Bioproducts in GREET
         # return get_mass_percent('HP', M402.outs[0]) - .99 # ideal
+        
+        return get_mass_percent('HP', M402.outs[0]) - M402.HP_wt_frac
+    
     def M402_adjust_water():
         flx.IQ_interpolation(M402_objective_fn, 0., 10000, maxiter=50, ytol=1e-2)
         
     M402.specification = M402_adjust_water
     
-    D401_P = units.HPPump('D401_P', ins=M402-0, P=506625*5.4)
+    D401_P = units.HPPump('D401_P', ins=M402-0, P=506625.*5.4)
     
     R402 = units.DehydrationReactor('R402', ins = (D401_P-0, makeup_TiO2_catalyst, '', ''),
                                     outs = ('dilute_acryclic_acid', 'spent_TiO2_catalyst'),
@@ -567,7 +572,7 @@ def create_HP_sys(ins, outs):
                                         LHK=('Water', 'AcrylicAcid'),
                                         is_divided=True,
                                         product_specification_format='Recovery',
-                                        Lr=0.999, Hr=0.999, k=1.05, P=101325/10.,
+                                        Lr=0.999, Hr=0.999, k=1.05, P=101325./10.,
                                         partial_condenser=False,
                                         vessel_material = 'Stainless steel 316')
     
@@ -600,7 +605,7 @@ def create_HP_sys(ins, outs):
                                    units=(S401, R401, R401_H, R401_P, S402,
                                           F401, F401_P, M401, S404, D401,
                                           D403_dP, D403_bP, D402_dP, D401_H_P, D401_P, M402, 
-                                          R402, R402_H, D402, D402_P, D403, D403_P))
+                                          R402, R402_H, D402, D402_P, D403, D403_H, D403_P))
     process_groups.append(separation_group)
     
     # %% 
@@ -728,10 +733,10 @@ def create_HP_sys(ins, outs):
     TOA_fresh = Stream('TOA_fresh', price=price['TOA'])
     AQ336_fresh = Stream('AQ336_fresh', price=price['AQ336'])
     
-   
+    
     # Water used to keep system water usage balanced
     system_makeup_water = Stream('system_makeup_water', price=price['Makeup water'])
-
+    
     # AA product
     AA = Stream('AcrylicAcid', units='kg/hr', price=price['AA'])
     # Acetoin product
@@ -778,7 +783,6 @@ def create_HP_sys(ins, outs):
     T603 = units.CSLstorageTank('T603', ins=CSL_fresh, outs=CSL)
     T603.line = 'CSL storage tank'
     
-
     
     T604 = units.LimeStorageBin('T604', ins=lime_fresh, outs=fermentation_lime)
     T604.line = 'Lime storage tank'
@@ -821,7 +825,15 @@ def create_HP_sys(ins, outs):
                                                       'lime',
                                                       'boilerchems'), 
                                                   outs=('gas_emission', 'boiler_blowdown_water', ash,),
-                                                  turbogenerator_efficiency=0.85)
+                                                   turbogenerator_efficiency=0.85)
+    # BT = bst.facilities.Boiler('BT',
+    #                                               ins=(M505-0,
+    #                                                   R501-0, 
+    #                                                   'boiler_makeup_water',
+    #                                                   'natural_gas',
+    #                                                   'lime',
+    #                                                   'boilerchems'), 
+    #                                               outs=('gas_emission', 'boiler_blowdown_water', ash,'rfs','rfg'),)
     
     # Blowdown is discharged
     CT = facilities.CT('CT', ins=('return_cooling_water', cooling_tower_chems,
@@ -903,6 +915,7 @@ process_groups_dict = {}
 for i in range(len(process_groups)):
     group = process_groups[i]
     process_groups_dict[group.name] = group
+    
 # %%
 # =============================================================================
 # TEA
@@ -911,7 +924,7 @@ for i in range(len(process_groups)):
 HP_no_BT_sys = bst.System('HP_no_BT_sys', path = HP_sys.path, facilities = tuple([i for i in HP_sys.facilities if not i.ID=='BT']))
 
 
-#!!! Income tax was changed from 0.35 to 0.21 based on Davis et al., 2018 (new legislation)
+# Income tax was changed from 0.35 to 0.21 based on Davis et al., 2018 (new legislation)
 
 HP_tea = CellulosicEthanolTEA(system=HP_sys, IRR=0.10, duration=(2016, 2046),
         depreciation='MACRS7', income_tax=0.21, operating_days=0.9*365,
@@ -1303,6 +1316,8 @@ def get_material_cost_breakdown_breakdown_fractional():
 HP_lca = LCA(HP_sys, HP_chemicals, CFs, feedstock, feedstock_ID, AA, [CT, CWP])
 
 # %% Full analysis
+p11, p22, p33 = get_AA_MPSP(), HP_lca.GWP, HP_lca.FEC
+
 def simulate_and_print():
     MPSP, GWP, FEC = get_AA_MPSP(), HP_lca.GWP, HP_lca.FEC
     print('\n---------- Simulation Results ----------')
@@ -1311,32 +1326,18 @@ def simulate_and_print():
     print(f'GWP is {GWP:.3f} kg CO2-eq/kg AA')
     # print(f'Non-bio GWP is {get_ng_GWP():.3f} kg CO2-eq/kg AA')
     # print(f'FEC is {get_FEC():.2f} MJ/kg AA or {get_FEC()/AA_LHV:.2f} MJ/MJ AA\n')
-    print(f'FEC is {FEC:.2f} MJ/kg AA or {FEC/AA_LHV:.2f} MJ/MJ AA\n')
-    print(f'SPED is {get_SPED():.2f} MJ/kg AA or {get_SPED()/AA_LHV:.2f} MJ/MJ AA')
+    print(f'FEC is {FEC:.2f} MJ/kg AA or {FEC/AA_LHV:.2f} MJ/MJ AA')
+    # print(f'SPED is {get_SPED():.2f} MJ/kg AA or {get_SPED()/AA_LHV:.2f} MJ/MJ AA')
     print('----------------------------------------\n')
 
-simulate_and_print()
+# simulate_and_print()
 
-
+def load_simulate_print(HP_yield=0.49, HP_titer=54.8, HP_productivity=0.76):
+    spec.load_specifications(spec_1=HP_yield, spec_2=HP_titer, spec_3=HP_productivity)
+    simulate_and_print()
+    
 # %% Diagram
 import biosteam as bst
 bst.LABEL_PATH_NUMBER_IN_DIAGRAMS = True
 HP_sys.diagram('cluster')
 
-# GREET 2020
-
-# fossil-based acrylic acid
-# FEC: = 114 MJ eq. / kg AA
-# GHG100 = 5.82 kgCO2 eq. / kg AA (7.65 kg CO2 eq. including EOL degradation as CO2)
-
-# bio-based acrylic acid (via 3-HP from glycerol from algal oil)
-# FEC: = 40 MJ eq. / kg AA
-# GHG100 = 3.14 kgCO2 eq. / kg AA
-
-
-## Ecoinvent 3.7.1 ##
-
-# acrylic acid production
-# CED-f = 49.026 MJ eq. / kg AA
-# GWP-100a = 2.245 kg CO2 eq. / kg AA (4.075 including product EOL degradation as CO2)
-# price = 1.4508 in 2005$ per kg

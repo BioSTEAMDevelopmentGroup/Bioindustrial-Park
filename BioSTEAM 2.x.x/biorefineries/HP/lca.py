@@ -103,16 +103,7 @@ class LCA:
     :doc:`tutorial/Techno-economic_analysis` 
 
     """
-    # __slots__ = ('system', 'income_tax', 'lang_factor', 'WC_over_FCI',
-    #              'finance_interest', 'finance_years', 'finance_fraction',
-    #              'feeds', 'products', '_construction_schedule', '_startup_time',
-    #              'startup_FOCfrac', 'startup_VOCfrac', 'startup_salesfrac',
-    #              'units', '_startup_schedule', '_operating_days',
-    #              '_duration', '_depreciation_array', '_depreciation', '_years',
-    #              '_duration', '_start',  'IRR', '_IRR', '_sales',
-    #              '_duration_array_cache')
-    
-    
+ 
     def __init_subclass__(cls, isabstract=False):
         if isabstract: return
         for method in ('_DPI', '_TDC', '_FCI', '_FOC'):
@@ -204,8 +195,6 @@ class LCA:
         self.LCA_stream.mix_from(self.LCA_streams)
         # chemical_GWP = self.LCA_stream.mass*CFs['self.GWP_CF_stream'].mass
         chemical_GWP = [self.LCA_stream.imass[ID] * self.GWP_CF_stream.imass[ID] for ID in self.chem_IDs]
-        # feedstock_GWP = feedstock.F_mass*CFs['GWP_CFs']['Corn stover']
-        # return chemical_GWP.sum()/self.main_product.F_mass
         return chemical_GWP
     
     @property
@@ -278,7 +267,7 @@ class LCA:
     
     
     @property
-    def total_electricity_demand(self): 
+    def electricity_demand(self): 
         return -self.BT.power_utility.rate
     @property
     def electricity_use(self): # redundant
@@ -311,11 +300,11 @@ class LCA:
     
     @property
     def steam_frac_cooling(self): 
-        return  self.steam_frac_turbogen * self.cooling_electricity_demand / self.total_electricity_demand 
+        return  self.steam_frac_turbogen * self.cooling_electricity_demand / self.electricity_demand 
     
     @property
     def steam_frac_electricity_non_cooling(self):
-        return  self.steam_frac_turbogen * (1-(self.cooling_electricity_demand / self.total_electricity_demand))
+        return  self.steam_frac_turbogen * (1-(self.cooling_electricity_demand / self.electricity_demand))
     
     @property
     def non_cooling_electricity_demand(self): 
@@ -364,16 +353,7 @@ class LCA:
     def electricity_demand_non_cooling_GWP(self): 
         return  self.steam_frac_electricity_non_cooling * self.total_steam_GWP + self.electricity_frac_non_cooling * self.net_electricity_GWP
     
-    
-    # # CO2 fixed in lactic acid product
-    #  fixed_GWP(self): return \
-    #     self.main_product.get_atomic_flow('C')*system_chemicals.CO2.MW/self.main_product.F_mass
-    
-    
-    #  GWP(self): return  feedstock_GWP + material_GWP + ng_GWP +\
-    #                    electricity_GWP + emissions_GWP 
-    
-    
+  
     @property
     def GWP(self): 
         return  self.FGHTP_GWP + self.material_GWP + self.ng_GWP +\
@@ -408,7 +388,6 @@ class LCA:
         # chemical_FEC = self.LCA_stream.mass*CFs['FEC_CF_stream'].mass
         chemical_FEC = [self.LCA_stream.imass[ID] * self.FEC_CF_stream.imass[ID] for ID in self.chem_IDs]
         # feedstock_FEC = self.feedstock.F_mass*CFs['FEC_CFs']['Corn stover']
-        # return chemical_FEC.sum /main_product.F_mass
         return chemical_FEC
     
     @property
@@ -483,160 +462,11 @@ class LCA:
         self.cooling_demand_FEC + self.electricity_demand_non_cooling_FEC 
 
 
-    def get_cashflow_table(self):
-        """Return DataFrame of the cash flow analysis."""
-        # Cash flow data and parameters
-        # index: Year since construction until end of venture
-        # C_D: Depreciable capital
-        # C_FC: Fixed capital
-        # C_WC: Working capital
-        # D: Depreciation
-        # L: Loan revenue
-        # LI: Loan interest payment
-        # LP: Loan payment
-        # LPl: Loan principal
-        # C: Annual operating cost (excluding depreciation)
-        # S: Sales
-        # T: Tax
-        # I: Incentives
-        # NE: Net earnings
-        # CF: Cash flow
-        # DF: Discount factor
-        # NPV: Net present value
-        # CNPV: Cumulative NPV
-        TDC = self.TDC
-        FCI = self._FCI(TDC)
-        start = self._start
-        years = self._years
-        FOC = self._FOC(FCI)
-        VOC = self.VOC
-        sales = self.sales
-        length = start + years
-        C_D, C_FC, C_WC, D, L, LI, LP, LPl, C, S, T, I, NE, CF, DF, NPV, CNPV = data = np.zeros((17, length))
-        self._fill_depreciation_array(D, start, years, TDC)
-        w0 = self._startup_time
-        w1 = 1. - w0
-        C[start] = (w0*self.startup_VOCfrac*VOC + w1*VOC
-                  + w0*self.startup_FOCfrac*FOC + w1*FOC)
-        S[start] = w0*self.startup_salesfrac*sales + w1*sales
-        start1 = start + 1
-        C[start1:] = VOC + FOC
-        S[start1:] = sales
-        WC = self.WC_over_FCI * FCI
-        C_D[:start] = TDC*self._construction_schedule
-        C_FC[:start] = FCI*self._construction_schedule
-        C_WC[start-1] = WC
-        C_WC[-1] = -WC
-        lang_factor = self.lang_factor
-        for i in self.units: add_all_replacement_costs_to_cashflow_array(i, C_FC, years, start, lang_factor)
-        if self.finance_interest:
-            interest = self.finance_interest
-            years = self.finance_years
-            end = start + years
-            L[:start] = loan = self.finance_fraction*(C_FC[:start]+C_WC[:start])
-            f_interest = (1. + interest)
-            LP[start:end] = solve_payment(loan.sum()/years * f_interest,
-                                          loan, interest, years)
-            loan_principal = 0
-            for i in range(end):
-                LI[i] = li = (loan_principal + L[i]) * interest 
-                LPl[i] = loan_principal = loan_principal - LP[i] + li + L[i]
-            taxable_cashflow = S - C - D - LP
-            nontaxable_cashflow = D + L - C_FC - C_WC
-        else:
-            taxable_cashflow = S - C - D
-            nontaxable_cashflow = D - C_FC - C_WC
-        self._fill_tax_and_incentives(I, taxable_cashflow, nontaxable_cashflow, T)
-        NE[:] = taxable_cashflow + I - T
-        CF[:] = NE + nontaxable_cashflow
-        DF[:] = 1/(1.+self.IRR)**self._get_duration_array()
-        NPV[:] = CF*DF
-        CNPV[:] = NPV.cumsum()
-        DF *= 1e6
-        data /= 1e6
-        return pd.DataFrame(data.transpose(),
-                            index=np.arange(self._duration[0]-start, self._duration[1]),
-                            columns=cashflow_columns)
-    @property
-    def NPV(self):
-        """Net present value."""
-        taxable_cashflow, nontaxable_cashflow = self._taxable_and_nontaxable_cashflow_arrays()
-        tax = np.zeros_like(taxable_cashflow)
-        incentives = tax.copy()
-        self._fill_tax_and_incentives(incentives, taxable_cashflow, nontaxable_cashflow, tax)
-        cashflow = nontaxable_cashflow + taxable_cashflow + incentives - tax
-        return NPV_at_IRR(self.IRR, cashflow, self._get_duration_array())
-    
-    
-    
-    def solve_IRR(self):
-        """Return the IRR at the break even point (NPV = 0) through cash flow analysis."""
-        IRR = self._IRR
-        if not IRR or np.isnan(IRR) or IRR < 0.: IRR = self.IRR
-        if not IRR or np.isnan(IRR) or IRR < 0.: IRR = 0.10
-        args = (self.cashflow_array, self._get_duration_array())
-        IRR = flx.aitken_secant(NPV_at_IRR,
-                                IRR, 1.0001 * IRR + 1e-3, xtol=1e-6, ytol=10.,
-                                maxiter=200, args=args, checkiter=False)
-        self._IRR = IRR
-        return IRR
-    
-    
-    def solve_price(self, stream):
-        """
-        Return the price (USD/kg) of stream at the break even point (NPV = 0)
-        through cash flow analysis. 
-        
-        Parameters
-        ----------
-        stream : :class:`~thermosteam.Stream`
-            Stream with variable selling price.
-            
-        """
-        sales = self.solve_sales()
-        price2cost = self._price2cost(stream)
-        if price2cost == 0.:
-            return np.inf
-        elif stream.sink:
-            return stream.price - sales / price2cost
-        elif stream.source:
-            return stream.price + sales / price2cost
-        else:
-            raise ValueError("stream must be either a feed or a product")
-    
-    def solve_sales(self):
-        """
-        Return the required additional salse (USD) to reach the break even 
-        point (NPV = 0) through cash flow analysis. 
-        
-        """
-        discount_factors = (1 + self.IRR)**self._get_duration_array()
-        sales_coefficients = np.ones_like(discount_factors)
-        start = self._start
-        sales_coefficients[:start] = 0
-        w0 = self._startup_time
-        sales_coefficients[self._start] =  w0*self.startup_VOCfrac + (1-w0)
-        sales = self._sales
-        if not sales or np.isnan(sales): sales = 0.
-        taxable_cashflow, nontaxable_cashflow = self._taxable_and_nontaxable_cashflow_arrays()
-        args = (taxable_cashflow, 
-                nontaxable_cashflow, 
-                sales_coefficients,
-                discount_factors,
-                self._fill_tax_and_incentives)
-        sales = flx.aitken_secant(NPV_with_sales,
-                                  sales, 1.0001 * sales + 1e-4, xtol=1e-6, ytol=10.,
-                                  maxiter=300, args=args, checkiter=False)
-        self._sales = sales
-        return sales
     
     def __repr__(self):
         return f'{type(self).__name__}({self.system.ID}, ...)'
     
-    def _info(self):
-        return (f'{type(self).__name__}: {self.system.ID}\n'
-                f' NPV: {self.NPV:,.0f} USD at {self.IRR:.1%} IRR')
-    
+
     def show(self):
         """Prints information on unit."""
         print(self._info())
