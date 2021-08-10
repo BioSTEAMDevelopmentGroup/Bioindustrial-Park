@@ -199,9 +199,19 @@ price = {'AA': AA_price,
     
 
 def load_process_settings():
-    # from biorefineries import cornstover as cs
-    # cs.load_process_settings()
-    # tmo.settings.set_thermo(chems)
+    import sys
+    if sys.version_info.major==3:
+        if sys.version_info.minor==6:
+            pass
+        elif sys.version_info.minor>6:
+            from biorefineries import cornstover as cs
+            cs.load_process_settings()
+            tmo.settings.set_thermo(chems)
+        else:
+            print('Fatal Error: Python version must be 3.6 (recommended) or higher (within the v3 release).')
+    else:
+        print('Fatal Error: Python version must be 3.6 (recommended) or higher (within the v3 release).')
+        
     bst.CE = 541.7 # year 2016
     bst.PowerUtility.price = price['Electricity']
     
@@ -211,12 +221,6 @@ def load_process_settings():
     _mps.T = 233 + 273.15
     _hps.T = 266 + 273.15
     
-    # _lps.heat_transfer_efficiency = 0.900
-    # _lps.heat_transfer_efficiency = 0.950
-    # # Do this OR bst.default() since both do the same thing:
-    # _lps.T = 412.19
-    # _lps.P = 344738.
-    # 
     _cooling = bst.HeatUtility.get_cooling_agent('cooling_water')
     _chilled = bst.HeatUtility.get_cooling_agent('chilled_water')
     _cooling.regeneration_price = 0
