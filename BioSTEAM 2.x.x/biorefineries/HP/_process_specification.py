@@ -229,6 +229,7 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
         self.load_spec_2 = load_spec_2
         self.load_spec_3 = load_spec_3
         
+                 
         self.titer_inhibitor_specification =\
             TiterAndInhibitorsSpecification(evaporator, pump, mixer, heat_exchanger,
                                             seed_train_system, reactor,
@@ -519,7 +520,7 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
     def load_feedstock_sugar_content(self, sugar_content):
         self.spec_1 = sugar_content
         F_mass = self.feedstock_mass
-        sugars_IDs = ('Glucose', 'Sucrose')
+        sugars_IDs = ('Glucose', 'Xylose', 'Sucrose')
         feedstock = self.feedstock
         sugars = feedstock.imass[sugars_IDs]
         z_sugars = sugar_content * sugars / sugars.sum()
@@ -565,7 +566,7 @@ Created on Thu Dec 24 15:31:18 2020
 
 class TiterAndInhibitorsSpecification:
     
-    max_sugar_concentration = 600 # g / L
+    max_sugar_concentration = 600. # g / L
     
     def __init__(self, evaporator, pump, mixer, heat_exchanger, seed_train_system, reactor, 
                  target_titer, product,

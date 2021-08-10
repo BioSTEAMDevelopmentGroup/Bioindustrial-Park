@@ -25,7 +25,7 @@ HP acid from lignocellulosic feedstocks
     Lignocellulosic Biorefineries across the Feedstock Landscape. Submitted,
     2020.
 
-@author: yalinli_cabbi
+@author: sarangbhagwat
 """
 
 
@@ -42,7 +42,10 @@ import biosteam as bst
 from biosteam.utils import TicToc
 from biosteam.plots import plot_montecarlo_across_coordinate
 from biorefineries.HP.system_light_lle_vacuum_distillation import spec, HP_sys, get_AA_MPSP, get_GWP, get_FEC, R301
-from biorefineries.HP.analyses import models
+
+from biorefineries.HP.analyses import models # for the baseline biorefinery
+# from biorefineries.HP.analyses import models_targeted_improvements as models # for a biorefinery with targeted improvements over the baseline biorefinery
+
 from datetime import datetime
 
 
@@ -132,6 +135,7 @@ def model_specification():
         for unit in pre_evaporator_units_path:
             unit._run()
         spec.titer_inhibitor_specification.run_units()
+        
         spec.load_specifications(spec_1=spec.spec_1, spec_2=spec.spec_2, spec_3=spec.spec_3)
         
         for i in range(2):
@@ -311,37 +315,5 @@ with pd.ExcelWriter(file_to_save+'_1_full_evaluation.xlsx') as writer:
     spearman_results.to_excel(writer, sheet_name='Spearman')
     # one_p_df.to_excel(writer, sheet_name='One-parameter')
     model.table.to_excel(writer, sheet_name='Raw data')
-
-
-# %%
-
-# =============================================================================
-# Temporary codes for debugging
-# =============================================================================
-
-# import numpy as np
-# from HP.analyses import models
-
-# model = models.model_full
-# np.random.seed(3221)
-
-# try: parameter = [parameters[-2]]
-# except: parameter = parameters
-# model.set_parameters(parameter)
-
-# N_simulation = 20 # 1000
-# # samples = model.sample(N=N_simulation, rule='L')
-# samples = np.ones(N_simulation)
-# samples *= 0.070
-
-# model.load_samples(samples)
-# model.evaluate()
-
-# model.table.to_clipboard()
-
-
-
-
-
 
 

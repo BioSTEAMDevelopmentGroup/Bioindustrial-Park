@@ -120,6 +120,7 @@ Ethanol = chemical_database('Ethanol')
 AmmoniumAcetate = chemical_database('AmmoniumAcetate', phase='l', 
                                          Hf=-154701*_cal2joule)
 
+# Calcium 3-hydroxypropionate modeled as Calcium lactate
 # Hf from a Ph.D. dissertation (Lactic Acid Production from Agribusiness Waste Starch
 # Fermentation with Lactobacillus Amylophilus and Its Cradle-To-Gate Life 
 # Cycle Assessment as A Precursor to Poly-L-Lactide, by Andréanne Harbec)
@@ -149,15 +150,7 @@ Acetate = chemical_database('Acetate', phase='l', Hf=-108992*_cal2joule)
 AcrylicAcid = chemical_database('AcrylicAcid')
 Glucose = chemical_database('Glucose', phase = 'l')
 
-# HP = chemical_database('3-Hydroxypropionic acid')
-# 3-hydroxypropionic acid modeled as isomer lactic acid (thermal properties are not significant for this biorefinery)
-# LA = chemical_database('Lactic acid') 
-# HP = chemical_database('3-Hydroxypropionic acid')
 
-# HP.copy_models_from(LA, ['Hvap', 'Psat', 'Cn', 'mu'])
-# HP.Tb = LA.Tb
-
-# MEK = chemical_database('MEK')
 Decanol = chemical_database('Decanol')
 TOA = chemical_database('TOA', search_ID='tri-n-octylamine') 
 AQ336 = chemical_database('AQ336', search_ID='63393-96-4') # aliquat 336
@@ -220,8 +213,7 @@ Enzyme = chemical_defined('Enzyme', phase='l',
 # analysis of enthalpy, entropy, and Gibbs free energy of biomass, cells and
 # colonies of 32 microorganism species
 FermMicrobe = chemical_defined('FermMicrobe', phase='l',
-                       # formula='CH1.8O0.5N0.2', Hf=-31169.39*_cal2joule) # Z. mobilis from Humbird et al.
-                      formula='CH1.78O0.44N0.24', Hf=-103310.)
+                      formula='CH1.78O0.44N0.24', Hf=-103310.) # C. glutamicum
 # FermMicrobe.HHV /= 10.
 WWTsludge = chemical_defined('WWTsludge', phase='s', 
                              formula='CH1.64O0.39N0.23S0.0035', 

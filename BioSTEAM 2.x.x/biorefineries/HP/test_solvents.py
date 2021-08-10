@@ -13,9 +13,6 @@ import copy
 
 from biorefineries.HP.chemicals_data import HP_chemicals
 from biorefineries.HP.system_light_lle_vacuum_distillation import S404
-# tmo.settings.set_thermo(['Water', 'octanol', 'hexanol', 'butyl acetate', HP_chemicals['Xylose'], HP_chemicals['Glucose'], HP_chemicals['Triacetic acid lactone'], 'isoamyl alcohol'])
-
-# tmo.settings.set_thermo(HP_chemicals)
 
 Water = HP_chemicals['Water']
 # Glucose = HP_chemicals['Glucose']
@@ -66,13 +63,6 @@ tmo.settings.set_thermo(list(HP_chemicals.tuple) + solvents)
 # %% Streams initialization
 
 T = 80. + 273.15
-# process_stream = tmo.Stream('process_stream',
-#                             Water = 4.88e4,
-#                             units = 'kg/hr',
-#                             T = T)
-# process_stream.imass[solute.ID] = 2.12e+04
-# process_stream.imol['AceticAcid'] = 5.
-# process_stream.imol['Glycerol'] = 5.
 
 process_stream = S404.ins[0].copy()
 process_stream.T = T
