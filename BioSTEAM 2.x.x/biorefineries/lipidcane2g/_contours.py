@@ -30,6 +30,7 @@ from warnings import filterwarnings
 import os
 
 __all__ = ('plot_extraction_efficiency_and_lipid_content_contours',
+           'plot_relative_sorghum_lipid_content_and_cane_lipid_content_contours',
            'plot_ethanol_and_biodiesel_price_contours')
 
 filterwarnings('ignore', category=bst.utils.DesignWarning)
@@ -120,23 +121,61 @@ def plot_ethanol_and_biodiesel_price_contours(N=30, benefit=False, cache={}):
 
     plt.show()
     
+def plot_relative_sorghum_lipid_content_and_cane_lipid_content_contours(load=False, metric_index=0):
+    # Generate contour data
+    x = np.linspace(-0.03, 0., 4)
+    y = np.linspace(0.05, 0.15, 4)
+    X, Y = np.meshgrid(x, y)
+    metric = bst.metric
+    folder = os.path.dirname(__file__)
+    file = 'lipid_content_analysis.npy'
+    file = os.path.join(folder, file)
+    configurations = [1, 2]
+    if load:
+        data = np.load(file)
+    else:
+        data = lc.evaluate_configurations_across_sorghum_and_cane_lipid_content(
+            X, Y, configurations, 
+        )
+    np.save(file, data)
+    data = data[:, :, np.newaxis, :, metric_index]
+    
+    # Plot contours
+    xlabel = "Cane lipid content\n[dry wt. %]"
+    ylabel = 'Sorghum lipid content\n[dry wt. %]'
+    xticks = [-3, -2, -1, 0.]
+    yticks = [5, 7.5, 10, 12.5, 15]
+    metric = lc.all_metric_mockups[metric_index]
+    units = metric.units if metric.units == '%' else format_units(metric.units)
+    metric_bar = MetricBar(metric.name, units, colormaps[metric_index], tickmarks(data, 5, 5), 18)
+    fig, axes, CSs, CB = plot_contour_single_metric(
+        100.*X, 100.*Y, data, xlabel, ylabel, xticks, yticks, metric_bar, 
+        fillblack=False, styleaxiskw=dict(xtick0=False), label=True,
+        titles=['Configuration I*', 'Configuration II*'],
+    )
+    M = len(configurations)
+    for i in range(M):
+        for j in range(1):
+            ax = axes[i, j]
+            CS = CSs[i, j]
+            plt.sca(ax)
+            metric_data = data[:, :, i, j]
+            lb = metric_data.min()
+            ub = metric_data.max()
+            levels = [i for i in CS.levels if lb <= i <= ub]
+            CS = plt.contour(100.*X, 100.*Y, data=metric_data, zorder=1e16, linestyles='dashed', linewidths=1.,
+                             levels=levels, colors=[linecolor])
+            ax.clabel(CS, levels=CS.levels, inline=True, fmt=lambda x: f'{round(x):,}',
+                      fontsize=10, colors=[linecolor], zorder=1e16)
+
+    plt.show()
+    
 def plot_extraction_efficiency_and_lipid_content_contours(load=False, metric_index=0):
     # Generate contour data
     x = np.linspace(0.4, 1., 8)
     y = np.linspace(0.05, 0.15, 8)
     X, Y = np.meshgrid(x, y)
-    # dollar_per_mt = format_units(r'\$/MT')
     metric = bst.metric
-    kg_per_ton = 907.18474
-    
-    # NG = None
-    # @metric(units=format_units(r'$/ton'))
-    # def MFPP():
-    #     return kg_per_ton * lc.lipidcane_tea.solve_price(lc.lipidcane)
-
-    # @metric(units=format_units(r'10^6*$'))
-    # def TCI():
-    #     return lc.lipidcane_tea.TCI / 1e6 # 10^6*$
     folder = os.path.dirname(__file__)
     file = 'lipid_extraction_analysis.npy'
     file = os.path.join(folder, file)

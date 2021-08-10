@@ -373,6 +373,10 @@ def load(name, cache={}):
         raise NotImplementedError(number)
     lipidcane_sys.set_tolerance(rmol=1e-3)
     dct.update(flowsheet.to_dict())
+    if number == 1:
+        lipidcane_sys.prioritize_unit(T608)
+    elif number == 2:
+        lipidcane_sys.prioritize_unit(T808)
     if number < 0:
         dct['lipidcane'] = sugarcane
         dct['lipidcane_sys'] = lipidcane_sys
@@ -562,7 +566,8 @@ def load(name, cache={}):
                             'electricity': electricity}
     @metric(units='USD/ton')
     def MFPP():
-        return kg_per_ton * lipidcane_tea.solve_price(lipidcane)
+        lipidcane.price = price = lipidcane_tea.solve_price(lipidcane)
+        return kg_per_ton * price
     
     @metric(units='Gal/ton')
     def biodiesel_production():
@@ -610,11 +615,23 @@ def load(name, cache={}):
             lipidcane_sys.sorghum_lipid_content += 0.01
         else:
             lipid_extraction_specification.load_lipid_content(lipid_extraction_specification.lipid_content + 0.01)
-        lipidcane_sys.simulate()  
-        value = (kg_per_ton * lipidcane_tea.solve_price(lipidcane) - MFPP.cache) / 1.
-        lipidcane.price = lipidcane_tea.solve_price(lipidcane)
         # print('--------------------')
-        # print('MFPP derivative', value)
+        # print('BEFORE')
+        # print('Sorghum lipid content', lipidcane_sys.sorghum_lipid_content)
+        # print('cane lipid content', lipidcane_sys.cane_lipid_content)
+        # print('MFPP', MFPP.cache)
+        # print('VOC', lipidcane_tea.VOC / 1e3)
+        # print('TCI', lipidcane_tea.TCI / 1e6)
+        # print('sales', lipidcane_tea.sales / 1e3)
+        # print('NPV', lipidcane_tea.NPV)
+        lipidcane_sys.simulate()  
+        # value = (kg_per_ton * lipidcane_tea.solve_price(lipidcane) - MFPP.cache) / 1.
+        # lipidcane.price = lipidcane_tea.solve_price(lipidcane)
+        # print('AFTER')
+        # print('MFPP', kg_per_ton * lipidcane_tea.solve_price(lipidcane))
+        # print('VOC', lipidcane_tea.VOC / 1e3)
+        # print('TCI', lipidcane_tea.TCI / 1e6)
+        # print('sales', lipidcane_tea.sales / 1e3)
         # print('NPV', lipidcane_tea.NPV)
         return (kg_per_ton * lipidcane_tea.solve_price(lipidcane) - MFPP.cache) / 1.
     
@@ -707,11 +724,32 @@ def evaluate_configurations_across_extraction_efficiency_and_lipid_content(
             data[ia, ic, :] = [j() for j in model.metrics]
     return data
 
+N_metrics = len(all_metric_mockups)
 evaluate_configurations_across_extraction_efficiency_and_lipid_content = np.vectorize(
     evaluate_configurations_across_extraction_efficiency_and_lipid_content, 
     excluded=['lipid_retention', 'agile', 'configurations'],
-    signature='(),(),(),(a),(c)->(a,c,8)'
-)       
+    signature=f'(),(),(),(a),(c)->(a,c,{N_metrics})'
+)
+
+def evaluate_configurations_across_sorghum_and_cane_lipid_content(
+        relative_sorghum_lipid_content, cane_lipid_content, configurations,
+    ):
+    C = len(configurations)
+    M = len(all_metric_mockups)
+    data = np.zeros([C, M])
+    for ic in range(C):    
+        load([int(configurations[ic]), True])
+        set_cane_lipid_content(cane_lipid_content)
+        set_relative_sorghum_lipid_content(relative_sorghum_lipid_content)
+        lipidcane_sys.simulate()
+        data[ic, :] = [j() for j in model.metrics]
+    return data
+
+evaluate_configurations_across_sorghum_and_cane_lipid_content = np.vectorize(
+    evaluate_configurations_across_sorghum_and_cane_lipid_content, 
+    excluded=['relative_sorghum_lipid_content', 'cane_lipid_content', 'configurations'],
+    signature=f'(),(),(c)->(c,{N_metrics})'
+)              
 
 def evaluate_MFPP_uncertainty_across_ethanol_and_biodiesel_prices(name, ethanol_price, biodiesel_price):
     table = get_monte_carlo(name)
