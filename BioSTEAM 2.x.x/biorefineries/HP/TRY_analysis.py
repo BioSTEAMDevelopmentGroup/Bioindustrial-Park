@@ -311,22 +311,14 @@ def get_p_financial_viability():
     return metric_val
 # =============================================================================
 
-# HP_metrics = [solve_AA_price, get_HP_inhibitors_conc]
-# HP_metrics = [solve_AA_price, get_HP_sugars_conc, get_HP_inhibitors_conc]
 
-HP_metrics = [solve_AA_price, get_p_financial_viability, lambda: HP_lca.FEC]
-
-
-# HP_metrics = [solve_AA_price, get_GWP, get_FEC]
-# HP_metrics = [solve_AA_price, lambda: HP_lca.GWP, lambda: HP_lca.FEC]
- 
- 
-# HP_metrics = [solve_AA_price, lambda:0, lambda:0]
+HP_metrics = [solve_AA_price, lambda: HP_lca.GWP, lambda: HP_lca.FEC]
+# HP_metrics = [solve_AA_price, get_p_financial_viability, lambda: HP_lca.FEC]
 
 
     
 # %% Generate 3-specification meshgrid and set specification loading functions
-steps = 15
+steps = 5
 # Yield, titer, productivity (rate)
 spec_1 = np.linspace(0.05, 0.95, steps) # yield
 spec_2 = np.linspace(5., 330., steps) # titer
@@ -448,7 +440,9 @@ Metric_3_tickmarks = tickmarks(
 
 # Metric_3_tickmarks = [0.0*1000, 0.24*1000, 0.48*1000, 0.72*1000, 0.96*1000, 1.2*1000]
 
-Metric_1_tickmarks = [0, 500, 1000, 1500, 2000, 2500, 3000, 3500, 4000]
+Metric_1_tickmarks = [0, 500, 1000, 1500, 2000, 2500, 3000, 3500, 4000, 4500, 5000, 5500, 6000, 6500, 7000,
+                      7500, 8000, 8500, 9000, 9500, 10000]
+
 Metric_3_tickmarks = [20, 30, 40, 50, 60, 70, 80, 90, 100]
 
 metric_bars = (MetricBar('MPSP', MPSP_units, CABBI_green_colormap(),
