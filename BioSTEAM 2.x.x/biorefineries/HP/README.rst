@@ -164,7 +164,7 @@ References
 
 .. [1] Bhagwat et al., Sustainable Production of Acrylic Acid via 3-Hydroxypropionic Acid from Lignocellulosic Biomass. 
     ACS Sustainable Chem. Eng. 2021.
-    Submitted August 8, 2021.
+    Submitted August 10, 2021.
 
 .. [2] Li et al., Sustainable Lactic Acid Production from Lignocellulosic Biomass.
     ACS Sustainable Chem. Eng. 2021, 9 (3), 1341–1351. 
