@@ -57,6 +57,7 @@ __all__ = [*_process_settings.__all__,
 _system_loaded = False
 _chemicals_loaded = False
 
+derivative_disabled = True
 kg_per_ton = 907.18474
 lipid_content = np.linspace(0.05, 0.15, 5)
 
@@ -128,13 +129,14 @@ across_lipid_content_agile_comparison_names = (
     'L1* - S1*', 'L2* - S2*', 'L2* - L1*', 
 )
 
-(set_feedstock_lipid_content, set_bagasse_lipid_retention, 
+(set_cane_lipid_content, set_relative_sorghum_lipid_content, set_bagasse_lipid_retention, 
  set_bagasse_lipid_extraction_efficiency, 
  set_plant_capacity, set_ethanol_price,
  set_biodiesel_price, set_natural_gas_price, 
  set_electricity_price, set_operating_days, 
  set_IRR) = all_parameter_mockups = (
-    bst.MockVariable('Lipid content', 'dry wt. %', 'Stream-sugarcane'),
+    bst.MockVariable('Cane lipid content', 'dry wt. %', 'Stream-sugarcane'),
+    bst.MockVariable('Relative sorghum lipid content', 'dry wt. %', 'Stream-sugarcane'),
     bst.MockVariable('Lipid retention', '%', 'Stream-sugarcane'),
     bst.MockVariable('Bagasse lipid extraction efficiency', '%', 'Stream-sugarcane'),
     bst.MockVariable('Capacity', 'ton/hr', 'Stream-sugarcane'),
@@ -372,6 +374,7 @@ def load(name, cache={}):
     else:
         raise NotImplementedError(number)
     lipidcane_sys.set_tolerance(rmol=1e-3)
+    lipidcane_sys.N_runs = 3
     dct.update(flowsheet.to_dict())
     if number == 1:
         lipidcane_sys.prioritize_unit(T608)
@@ -606,24 +609,16 @@ def load(name, cache={}):
     #        - electricity() * 3600 / 131760
     #        - natural_gas_flow() / 126.67)
     #     return GGE / 1e6
-    
+
     @metric(units='USD/ton')
     def MFPP_derivative():
         if number < 0: return 0.
+        if derivative_disabled: return None
         if agile:
             lipidcane_sys.cane_lipid_content += 0.01
             lipidcane_sys.sorghum_lipid_content += 0.01
         else:
             lipid_extraction_specification.load_lipid_content(lipid_extraction_specification.lipid_content + 0.01)
-        # print('--------------------')
-        # print('BEFORE')
-        # print('Sorghum lipid content', lipidcane_sys.sorghum_lipid_content)
-        # print('cane lipid content', lipidcane_sys.cane_lipid_content)
-        # print('MFPP', MFPP.cache)
-        # print('VOC', lipidcane_tea.VOC / 1e3)
-        # print('TCI', lipidcane_tea.TCI / 1e6)
-        # print('sales', lipidcane_tea.sales / 1e3)
-        # print('NPV', lipidcane_tea.NPV)
         lipidcane_sys.simulate()  
         # value = (kg_per_ton * lipidcane_tea.solve_price(lipidcane) - MFPP.cache) / 1.
         # lipidcane.price = lipidcane_tea.solve_price(lipidcane)
@@ -638,6 +633,7 @@ def load(name, cache={}):
     @metric(units='Gal/ton')
     def biodiesel_production_derivative():
         if number < 0: return 0.
+        if derivative_disabled: return None
         value = (biodiesel_flow() / feedstock_flow() - biodiesel_production.cache) / 1.
         # print('biodiesel production derivative', value)
         return value
@@ -645,6 +641,7 @@ def load(name, cache={}):
     @metric(units='Gal/ton')
     def ethanol_production_derivative():
         if number < 0: return 0.
+        if derivative_disabled: return None
         value = (ethanol_flow() / feedstock_flow() - ethanol_production.cache) / 1.
         # print('ethanol production derivative', value)
         return value
@@ -652,6 +649,7 @@ def load(name, cache={}):
     @metric(units='kWhr/ton')
     def electricity_production_derivative():
         if number < 0: return 0.
+        if derivative_disabled: return None
         value = (- electricity() / feedstock_flow() - electricity_production.cache) / 1.
         # print('electricity production derivative', value)
         return value
@@ -659,6 +657,7 @@ def load(name, cache={}):
     @metric(units='cf/ton')
     def natural_gas_consumption_derivative():
         if number < 0: return 0.
+        if derivative_disabled: return None
         value =(natural_gas_flow() / feedstock_flow() - natural_gas_consumption.cache) / 1.
         # print('natural gas production derivative', value)
         return value
@@ -666,6 +665,7 @@ def load(name, cache={}):
     @metric(units='10^6*USD')
     def TCI_derivative():
         if number < 0: return 0.
+        if derivative_disabled: return None
         value = (lipidcane_tea.TCI / 1e6  - TCI.cache) / 1. # 10^6*$
         # print('TCI production derivative', value)
         return value
@@ -732,23 +732,26 @@ evaluate_configurations_across_extraction_efficiency_and_lipid_content = np.vect
 )
 
 def evaluate_configurations_across_sorghum_and_cane_lipid_content(
-        relative_sorghum_lipid_content, cane_lipid_content, configurations,
+        sorghum_lipid_content, cane_lipid_content, configurations, relative,
     ):
     C = len(configurations)
     M = len(all_metric_mockups)
     data = np.zeros([C, M])
-    for ic in range(C):    
+    for ic in range(C):
         load([int(configurations[ic]), True])
-        set_cane_lipid_content(cane_lipid_content)
-        set_relative_sorghum_lipid_content(relative_sorghum_lipid_content)
+        lipidcane_sys.cane_lipid_content = cane_lipid_content
+        if relative:
+            lipidcane_sys.sorghum_lipid_content = cane_lipid_content + sorghum_lipid_content
+        else:
+            lipidcane_sys.sorghum_lipid_content = sorghum_lipid_content
         lipidcane_sys.simulate()
         data[ic, :] = [j() for j in model.metrics]
     return data
 
 evaluate_configurations_across_sorghum_and_cane_lipid_content = np.vectorize(
     evaluate_configurations_across_sorghum_and_cane_lipid_content, 
-    excluded=['relative_sorghum_lipid_content', 'cane_lipid_content', 'configurations'],
-    signature=f'(),(),(c)->(c,{N_metrics})'
+    excluded=['configurations', 'relative'],
+    signature=f'(),(),(c),()->(c,{N_metrics})'
 )              
 
 def evaluate_MFPP_uncertainty_across_ethanol_and_biodiesel_prices(name, ethanol_price, biodiesel_price):
@@ -1049,14 +1052,15 @@ def monte_carlo_results():
             }
     return results
 
-def plot_monte_carlo(derivative=False):
+def plot_monte_carlo(derivative=False, configuration_names=configuration_names, comparison_names=comparison_names):
     if derivative:
-        columns = configurations = ['L1', 'L1*', 'L1* - L1']
-        # columns = configurations = ['L1', 'L2', 'L1*', 'L2*', 'L2 - L1', 'L2* - L2', 'L1* - L1']
+        # columns = configurations = ['L1', 'L1*', 'L1* - L1']
+        configuration_names = ['L1', 'L2', 'L1*', 'L2*']
+        comparison_names = ['L2 - L1', 'L2* - L2', 'L1* - L1']
         MFPP, TCI, *production, electricity_production, natural_gas_consumption = derivative_metric_mockups
     else:
-        columns = configurations = configuration_names + comparison_names
         MFPP, TCI, *production, electricity_production, natural_gas_consumption = metric_mockups
+    columns = configurations = configuration_names + comparison_names
     N_cols = len(columns)
     rows = metrics = [
         MFPP, 

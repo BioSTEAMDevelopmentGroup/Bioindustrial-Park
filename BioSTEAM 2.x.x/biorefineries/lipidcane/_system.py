@@ -442,7 +442,7 @@ def create_transesterification_and_biodiesel_separation_system(ins, outs):
     # Methanol/Water distillation column
     D401 = units.BinaryDistillation('D401',
                       LHK=('Methanol', 'Water'), P=101325,
-                      y_top=0.99999, x_bot=0.0001, k=2.5,
+                      Lr=0.999, Hr=0.99999, k=2.5,
                       is_divided=True,
                       partial_condenser=False,
                       vessel_material='Stainless steel 304',

@@ -79,7 +79,8 @@ def plot_ethanol_and_biodiesel_price_contours(N=30, benefit=False, cache={}):
         for i in range(N_rows):
             for j in range(N_cols):
                 lc.load(configuration[j])
-                lc.set_feedstock_lipid_content.setter(lipid_content[i])
+                lc.set_cane_lipid_content(lipid_content[i])
+                lc.set_relative_sorghum_lipid_content(0)
                 lc.lipidcane_sys.simulate()
                 X, Y = np.meshgrid(ethanol_price, biodiesel_price)
                 if benefit:
@@ -121,30 +122,32 @@ def plot_ethanol_and_biodiesel_price_contours(N=30, benefit=False, cache={}):
 
     plt.show()
     
-def plot_relative_sorghum_lipid_content_and_cane_lipid_content_contours(load=False, metric_index=0):
+def plot_relative_sorghum_lipid_content_and_cane_lipid_content_contours(load=False, metric_index=0, relative=True):
     # Generate contour data
-    x = np.linspace(-0.03, 0., 4)
-    y = np.linspace(0.05, 0.15, 4)
+    y = np.linspace(0.05, 0.15, 5)
+    x = np.linspace(-0.03, 0., 5) if relative else np.linspace(0.02, 0.15, 5)
     X, Y = np.meshgrid(x, y)
     metric = bst.metric
     folder = os.path.dirname(__file__)
     file = 'lipid_content_analysis.npy'
+    if relative: file = 'relative_' + file
     file = os.path.join(folder, file)
     configurations = [1, 2]
     if load:
         data = np.load(file)
     else:
         data = lc.evaluate_configurations_across_sorghum_and_cane_lipid_content(
-            X, Y, configurations, 
+            X, Y, configurations, relative,
         )
     np.save(file, data)
     data = data[:, :, np.newaxis, :, metric_index]
     
     # Plot contours
-    xlabel = "Cane lipid content\n[dry wt. %]"
-    ylabel = 'Sorghum lipid content\n[dry wt. %]'
-    xticks = [-3, -2, -1, 0.]
+    xlabel = "Sorghum lipid content\n[dry wt. %]" 
+    if relative: xlabel = ('relative ' + xlabel).capitalize()
+    ylabel = 'Cane lipid content\n[dry wt. %]'
     yticks = [5, 7.5, 10, 12.5, 15]
+    xticks = [-3, -2, -1, 0] if relative else [2, 5, 10, 15]
     metric = lc.all_metric_mockups[metric_index]
     units = metric.units if metric.units == '%' else format_units(metric.units)
     metric_bar = MetricBar(metric.name, units, colormaps[metric_index], tickmarks(data, 5, 5), 18)
@@ -154,8 +157,8 @@ def plot_relative_sorghum_lipid_content_and_cane_lipid_content_contours(load=Fal
         titles=['Configuration I*', 'Configuration II*'],
     )
     M = len(configurations)
-    for i in range(M):
-        for j in range(1):
+    for i in range(1):
+        for j in range(M):
             ax = axes[i, j]
             CS = CSs[i, j]
             plt.sca(ax)
@@ -207,8 +210,8 @@ def plot_extraction_efficiency_and_lipid_content_contours(load=False, metric_ind
     )
     M = len(configurations)
     N = len(agile)
-    for i in range(M):
-        for j in range(N):
+    for i in range(N):
+        for j in range(M):
             ax = axes[i, j]
             CS = CSs[i, j]
             plt.sca(ax)
