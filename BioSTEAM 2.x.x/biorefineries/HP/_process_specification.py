@@ -9,7 +9,7 @@ import flexsolve as flx
 import numpy as np
 from biosteam.exceptions import InfeasibleRegion
 from biorefineries.HP.units import compute_HP_titer, compute_HP_mass
-from winsound import Beep
+# from winsound import Beep
 # from biorefineries.HP import system_light_lle_vacuum_distillation
 
 _red_highlight_white_text = '\033[1;47;41m'
@@ -126,7 +126,7 @@ def evaluate_across_specs(spec, system,
                 # Beep(320, 250)
             except Exception as e2:
                 print(str(e2))
-                Beep(640, 500)
+                # Beep(640, 500)
                 spec.count_exceptions += 1
                 print(_red_highlight_white_text+f"Point failed; returning metric values as np.nan."+_reset_text)
                 spec.exceptions_dict[spec.count] = (e1, e2)
