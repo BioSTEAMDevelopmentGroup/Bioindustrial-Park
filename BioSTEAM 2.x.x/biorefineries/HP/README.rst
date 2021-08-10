@@ -152,8 +152,8 @@ different aspects for [1]_, including: full Monte Carlo simulation (1_full_evalu
 titer-yield-productivity analysis for the fermentation performance space (TRY_analysis.py), targeted improvements (system_targeted_improvements.py),
 and evaluating feedstocks of varying carbohydrate contents, sugar contents, and prices (TRY_analysis.py).
 
-Note that results used in the manuscript [1]_ were generated using `biosteam (HP_sys branch <https://github.com/BioSTEAMDevelopmentGroup/biosteam/tree/HP_sys>)`_,
-`thermosteam (HP_sys branch <https://github.com/BioSTEAMDevelopmentGroup/thermosteam/tree/HP_sys>)`_, and dependencies (`commit fcc4b50 <https://github.com/BioSTEAMDevelopmentGroup/Bioindustrial-Park/commit/fcc4b5080c097f2fa74804344b11c02ed51399b8>`_).
+Note that results used in the manuscript [1]_ were generated using biosteam (`HP_sys branch <https://github.com/BioSTEAMDevelopmentGroup/biosteam/tree/HP_sys>`_),
+thermosteam (`HP_sys branch <https://github.com/BioSTEAMDevelopmentGroup/thermosteam/tree/HP_sys>`_), and dependencies (`commit fcc4b50 <https://github.com/BioSTEAMDevelopmentGroup/Bioindustrial-Park/commit/fcc4b5080c097f2fa74804344b11c02ed51399b8>`_).
 
 To reproduce the results, directly run the script of interest, and results will
 be saved as Excel files in the same directory path as the module.
@@ -174,10 +174,4 @@ References
     Simulation, and Techno-Economic Analysis of Biorefineries under Uncertainty. 
     ACS Sustainable Chem. Eng. 2020, 8 (8), 3302–3310. 
     `<https://doi.org/10.1021/acssuschemeng.9b07040>`_
-
-
-
-
-
-
 
