@@ -149,11 +149,11 @@ Analyses
 --------
 Multiple analysis modules were used to evaluate the biorefinery's
 different aspects for [1]_, including: full Monte Carlo simulation (1_full_evaluation.py in ./analyses),
-titer-yield-productivity analysis (TRY_analysis.py) for the fermentation performance space, targeted improvements (system_targeted_improvements.py),
+titer-yield-productivity analysis for the fermentation performance space (TRY_analysis.py), targeted improvements (system_targeted_improvements.py),
 and evaluating feedstocks of varying carbohydrate contents, sugar contents, and prices (TRY_analysis.py).
 
 Note that results used in the manuscript [1]_ were generated using biosteam (HP_sys branch),
-thermosteam (HP_sys branch), and dependencies (`commit f122509 <https://github.com/BioSTEAMDevelopmentGroup/Bioindustrial-Park/commit/f122509903da89ad07e2ea1842b79672d88fc245>`_).
+thermosteam (HP_sys branch), and dependencies (`commit fcc4b50 <https://github.com/BioSTEAMDevelopmentGroup/Bioindustrial-Park/commit/fcc4b5080c097f2fa74804344b11c02ed51399b8>`_).
 
 To reproduce the results, directly run the script of interest, and results will
 be saved as Excel files in the same directory path as the module.
@@ -163,7 +163,8 @@ References
 ----------
 
 .. [1] Bhagwat et al., Sustainable Production of Acrylic Acid via 3-Hydroxypropionic Acid from Lignocellulosic Biomass. 
-    Pending submittal.
+    ACS Sustainable Chem. Eng. 2021.
+    Submitted August 8, 2021.
 
 .. [2] Li et al., Sustainable Lactic Acid Production from Lignocellulosic Biomass.
     ACS Sustainable Chem. Eng. 2021, 9 (3), 1341–1351. 
