@@ -113,66 +113,7 @@ def CABBI_blue_colormap(N_levels=25):
                     colors.CABBI_green_dirty.shade(75).RGBn)
     return LinearSegmentedColormap.from_list('CABBI', CABBI_colors, N_levels)
 
-#%% 
-# def plot_contour_2d(X_grid, Y_grid, Z_1d, data, 
-#                     xlabel, ylabel, xticks, yticks, 
-#                     metric_bars, Z_label=None,
-#                     Z_value_format=lambda Z: str(Z),
-#                     fillblack=True):
-#     """Create contour plots and return the figure and the axes."""
-#     nrows = len(metric_bars)
-#     ncols = len(Z_1d)
-#     assert data.shape == (*X_grid.shape, nrows, ncols), (
-#         "data shape must be (X, Y, M, Z), where (X, Y) is the shape of both X_grid and Y_grid, "
-#         "M is the number of metrics, and Z is the number of elements in Z_1d"
-#     )
-#     widths = np.ones(ncols + 1)
-#     widths[-1] /= 4
-#     gs_kw = dict(width_ratios=widths)
-#     fig, axes = plt.subplots(ncols=ncols + 1, nrows=nrows, gridspec_kw=gs_kw)
-#     row_counter = 0
-#     for row in range(nrows):
-#         if row  == 2:
-#             metric_bar = metric_bars[row]
-#             for col in range(ncols):
-#                 ax = axes[row, col]
-#                 plt.sca(ax)
-#                 style_plot_limits(xticks, yticks)
-#                 yticklabels = col == 0
-#                 xticklabels = row == nrows - 1
-#                 if fillblack: fill_plot()
-#             #     cp = plt.contourf(X_grid, Y_grid, data[:, :, row, col],
-#             #                       levels=metric_bar.levels,
-#             #                       cmap=metric_bar.cmap)
-#             cbar_ax = axes[row, -1]
-#             # style_axis(ax, xticks, yticks, xticklabels, yticklabels)
-#             # # Only if you want a log-scale colorbar
-            
-#             # pcm = ax.pcolormesh(X_grid, Y_grid, data[:, :, row, col],
-#             #            norm=mcolors.SymLogNorm(linthresh=0.003, linscale=1,
-#             #                                   vmin=-4, vmax=4, base=10),
-#             #            cmap=metric_bar.cmap)
-#             pcm = plt.contourf(X_grid, Y_grid, data[:, :, row, col],
-#                        norm=mcolors.SymLogNorm(linthresh=0.003, linscale=1,
-#                             levels=metric_bar.levels, vmin=-4, vmax=4, base=10),
-#                        cmap=metric_bar.cmap)
-#             fig.colorbar(pcm, ax=cbar_ax, shrink = 0.8)
-#             # else:
-#             #     metric_bar.colorbar(fig, cbar_ax, colorplot = cp, shrink=0.8)
-#         # plt.clim()
-#     for col in range(ncols):
-#         if not col and Z_label:
-#             title = f"{Z_label}: {Z_value_format(Z_1d[col])}"
-#         else:
-#             title = Z_value_format(Z_1d[col])
-#         ax = axes[0, col]
-#         ax.set_title(title)
-#     for ax in axes[:, -1]:
-#         plt.sca(ax)
-#         plt.axis('off')
-#     set_axes_labels(axes[:, :-1], xlabel, ylabel)
-#     plt.subplots_adjust(hspace=0.1, wspace=0.1)
-#     return fig, axes
+
 
 million_dollar = r"\mathrm{MM\$}"
 MPSP_units = r"$\mathrm{\$} \cdot \mathrm{ton}^{-1}$"
@@ -196,17 +137,6 @@ def tickmarks(dmin, dmax, accuracy=50, N_points=5):
     step = (dmax - dmin) / (N_points - 1)
     return [dmin + step * i for i in range(N_points)]
 
-# areas = {
-#     'Fermentation': (ol.T102, ol.P102, ol.M102, ol.H101, ol.R101, ol.T105, ol.P104),
-#     '3-Phase Decanter': (ol.C101, ol.P107),
-#     'Dehydration': (ol.H102, ol.M103, ol.H103, ol.R102, ol.T106),
-#     'Separation': (ol.H105, ol.P105, ol.C102, ol.P106, ol.H104, ol.D101,
-#                    ol.D102, ol.M104, ol.M105, ol.P108, ol.P109, ol.H106),
-#     'OSBL': (ol.T101, ol.T104, ol.T103, ol.T108,
-#              ol.CT, ol.BT, ol.CWP, ol.T107),
-# }
-# area_groups = [UnitGroup(i, j) for i,j in areas.items()]
-# area_groups.append(UnitGroup('Total', sum(areas.values(), ())))
 
 # Contour stuff
 
@@ -217,12 +147,6 @@ lab_spec_1 = .80
 lab_spec_2 = 109.9
 lab_spec_3 = 1
 
-# target_spec_2 = 180
-# target_spec_1 = 1451.496
-# target_spec_3 = 7.126
-# lab_spec_2 = 109.9
-# lab_spec_1 = 30
-# lab_spec_3 = 71.26
 
 # HP_price_range = [2.3 * 907.185, 3.2 * 907.185] 
 AA_price_range = [1.40*907.185, 1.65*907.185]
@@ -236,124 +160,20 @@ get_HP_FCI = lambda: HP_tea.FCI / 1e6 # million USD
 
 
 
-# def rel_impact_fn(steps):
-#     rel_impact_yield_titer = None
-#     lower_bound = 1/10
-#     upper_bound = 10
-#     middle = 1
-#     rel_impact_titer_yield = None
-#     max_theoretical_yield = 1
-#     max_theoretical_titer = 300
-#     d_MPSP_d_yield, d_MPSP_d_titer = None, None
-    
-#     fermentor = spec.reactor
-#     curr_MPSP = HP_tea.solve_price(product) * 907.185
-#     curr_yield = fermentor.glucose_to_HP_rxn.X
-#     curr_titer = fermentor.outs[0].imass['HP']/fermentor.outs[0].F_vol
-    
-#     multi_for_yield = 1
-#     # d_yield = multi_for_yield * rel_step * max_theoretical_yield
-    
-#     multi_for_titer = 1
-#     # d_titer = multi_for_titer * rel_step * max_theoretical_titer
-    
-#     d_yield, d_titer = (0.99-0.30)/steps, (210-70)/steps
-#     next_yield = curr_yield + d_yield
-#     next_titer = curr_titer + d_titer
-    
-#     # if (next_yield, next_titer) in TYM_dict.keys():
-#     #     return 1
-#     try:
-#         if (curr_yield + d_yield > max_theoretical_yield - 0.01
-#             and not curr_titer + d_titer > max_theoretical_titer):
-#             if steps > 80:
-#                 rel_impact_yield_titer = upper_bound
-#             else:
-#                 return rel_impact_fn(1.1*steps)
-#         elif (curr_titer + d_titer > max_theoretical_titer
-#             and not curr_yield + d_yield > max_theoretical_yield - 0.01):
-#             if steps > 80:
-#                 rel_impact_yield_titer = lower_bound
-#             else:
-#                 return rel_impact_fn(1.1*steps)
-#         elif (curr_yield + d_yield > max_theoretical_yield - 0.01
-#             and curr_titer + d_titer > max_theoretical_titer):
-#             rel_impact_yield_titer = middle
-#         else:
-#             # d_yield = multi_for_yield * rel_step * max_theoretical_yield
-#             spec.load_yield(curr_yield + d_yield)
-#             HP_sys.simulate()
-#             MPSP_d_yield = HP_tea.solve_price(product) * 907.185
-#             d_MPSP_d_yield = (MPSP_d_yield - curr_MPSP) * multi_for_yield
-#             spec.load_yield(curr_yield)
-#             # d_titer = multi_for_titer * rel_step * max_theoretical_titer
-#             spec.load_titer(curr_titer + d_titer)
-#             HP_sys.simulate()
-#             MPSP_d_titer = HP_tea.solve_price(product) * 907.185
-#             d_MPSP_d_titer = (MPSP_d_titer - curr_MPSP) * multi_for_titer
-            
-#             rel_impact_yield_titer = d_MPSP_d_yield / d_MPSP_d_titer
-#             rel_impact_titer_yield = 1/rel_impact_yield_titer
-#             spec.load_titer(curr_titer)
-#     except ValueError: # inadequate yield for given titer
-#         rel_impact_titer_yield = lower_bound
-#     if (rel_impact_titer_yield == None or rel_impact_titer_yield == np.nan
-#         or rel_impact_titer_yield<0):
-#         return rel_impact_fn(1.1*steps)
-#     print(curr_yield, curr_titer, d_MPSP_d_yield, d_MPSP_d_titer, rel_impact_titer_yield)
-#     # return 1 + log(rel_impact_yield_titer, 10)
-#     return rel_impact_titer_yield
-
 get_HP_sugars_conc = lambda: sum(R302.outs[0].imass['Glucose', 'Xylose'])/R302.outs[0].F_vol
 
 get_HP_inhibitors_conc = lambda: 1000*sum(R302.outs[0].imass['AceticAcid', 'Furfural', 'HMF'])/R302.outs[0].F_vol
+#
+
+system = HP_sys
+
 
 # get_rel_impact_t_y = lambda: rel_impact_fn(steps)
 
 
 ###############################
 # Bugfix barrage
-###############################
-
-system = HP_sys
-
-# def reset_and_reload():
-#     print('Resetting cache and emptying recycles ...')
-#     system.reset_cache()
-#     system.empty_recycles()
-#     print('Loading and simulating with baseline specifications ...')
-#     spec_1, spec_2 = spec.spec_1, spec.spec_2
-#     spec.load_yield(0.49)
-#     spec.load_titer(54.8)
-#     system.simulate()
-#     print('Loading and simulating with required specifications ...')
-#     spec.load_specifications(spec_1=spec_1, spec_2=spec_2, spec_3=spec_3)
-#     system.simulate()
-    
-# def reset_and_switch_solver(solver_ID):
-#     system.reset_cache()
-#     system.empty_recycles()
-#     system.converge_method = solver_ID
-#     print(f"Trying {solver_ID} ...")
-#     system.simulate()
-    
-# def run_bugfix_barrage():
-#     try:
-#         reset_and_reload()
-#     except Exception as e:
-#         print(str(e))
-#         try:
-#             reset_and_switch_solver('fixedpoint')
-#         except Exception as e:
-#             print(str(e))
-#             try:
-#                 reset_and_switch_solver('aitken')
-#             except Exception as e:
-#                 print(str(e))
-#                 print(_yellow_text+"Bugfix barrage failed.\n"+_reset_text)
-#                 raise e
-
-
+##############################
 
 def reset_and_reload():
     print('Resetting cache and emptying recycles ...')
@@ -431,23 +251,7 @@ evaporator_index = full_path.index(spec.titer_inhibitor_specification.evaporator
 pre_evaporator_units_path = full_path[0:evaporator_index]
 
         
-# def model_specification():
-#     try:
-#         # model._system._converge()
-#         for unit in pre_evaporator_units_path:
-#             unit._run()
-#         spec.titer_inhibitor_specification.run_units()
-#         spec.load_specifications(spec_1=spec.spec_1, spec_2=spec.spec_2, spec_3=spec.spec_3)
-#         model._system.simulate()
-#     except Exception as e:
-#         str_e = str(e)
-#         print('Error in model spec: %s'%str_e)
-#         if 'sugar concentration' in str_e:
-#             # flowsheet('AcrylicAcid').F_mass /= 1000.
-#             raise e
-#         else:
-#             run_bugfix_barrage()
-            
+          
 def model_specification():
     try:
         # model._system._converge()
@@ -480,17 +284,6 @@ def get_p_financial_viability():
     # metrics = model.metrics
     # model.metrics = [metrics[0]]
     HP_models.lock_yield, HP_models.lock_titer, HP_models.lock_productivity = True, True, True
-    
-    # except Exception as e:
-    #     str_e = str(e)
-    #     print(str_e)
-    #     if 'sugar concentration' in str_e:
-    #         return np.nan
-    #     if not spec.count in spec.exceptions_dict:
-    #         spec.exceptions_dict[spec.count] = []
-    #     spec.exceptions_dict[spec.count].append(e)
-    #     print("Monte Carlo iteration failed; returning np.nan for all iterations at that point.")
-    #     return np.nan
     
     try:
         
