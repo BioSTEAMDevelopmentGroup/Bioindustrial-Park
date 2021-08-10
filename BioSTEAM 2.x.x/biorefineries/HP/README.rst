@@ -13,7 +13,7 @@ in a biorefinery comprising sulfuric acid pretreatment, fermentation,
 and separation processes. Part of the script is adopted from [2]_ and [3]_.
 
 
-Getting Started
+Getting started
 ---------------
 Two configurations are now included in this biorefinery, one with corn stover
 ('lignocellulosic') and one with sugarcane ('sugarcane') as the feedstock.
@@ -153,7 +153,7 @@ titer-yield-productivity analysis (TRY_analysis.py) for the fermentation perform
 and evaluating feedstocks of varying carbohydrate contents, sugar contents, and prices (TRY_analysis.py).
 
 Note that results used in the manuscript [1]_ were generated using biosteam (HP_sys branch),
-thermosteam (HP_sys branch), and dependencies (`commit f8b55e2 <https://github.com/BioSTEAMDevelopmentGroup/Bioindustrial-Park/commit/f8b55e286a4b249953759eda89d4a8cffe72f2ed>`_).
+thermosteam (HP_sys branch), and dependencies (`commit f122509 <https://github.com/BioSTEAMDevelopmentGroup/Bioindustrial-Park/commit/f122509903da89ad07e2ea1842b79672d88fc245>`_).
 
 To reproduce the results, directly run the script of interest, and results will
 be saved as Excel files in the same directory path as the module.
