@@ -1054,7 +1054,6 @@ def monte_carlo_results():
 
 def plot_monte_carlo(derivative=False, configuration_names=configuration_names, comparison_names=comparison_names):
     if derivative:
-        # columns = configurations = ['L1', 'L1*', 'L1* - L1']
         configuration_names = ['L1', 'L2', 'L1*', 'L2*']
         comparison_names = ['L2 - L1', 'L2* - L2', 'L1* - L1']
         MFPP, TCI, *production, electricity_production, natural_gas_consumption = derivative_metric_mockups
@@ -1084,7 +1083,14 @@ def plot_monte_carlo(derivative=False, configuration_names=configuration_names, 
         f"NG cons.\n[{format_units('cf/ton')}]"
     ]
     if derivative:
-        ylabels = [i.replace("\n[", " der. \n[") for i in ylabels]
+        ylabels = [
+            r"$\Delta$" + format_units(r"MFPP/LC").replace('cdot', r'cdot \Delta') + f"\n[{format_units('USD/ton')}]",
+            r"$\Delta$" + format_units(r"TCI/LC").replace('cdot', r'cdot \Delta') + f"\n[{format_units('10^6*USD')}]",
+            r"$\Delta$" + format_units(r"Prod./LC").replace('cdot', r'cdot \Delta') + f"\n[{format_units('Gal/ton')}]",
+            r"$\Delta$" + format_units(r"EP/LC").replace('cdot', r'cdot \Delta') + f"\n[{format_units('kWhr/ton')}]",
+            r"$\Delta$" + format_units(r"NGC/LC").replace('cdot', r'cdot \Delta') + f"\n[{format_units('cf/ton')}]"
+        ]
+        print(ylabels)
     def get_data(metric, name):
         if isinstance(metric, bst.Variable):
             df = get_monte_carlo(name)
@@ -1183,7 +1189,7 @@ def plot_spearman_MFPP(top=None):
          'Cane lipid content [5 $-$ 15 dry wt. %]',
          'Relative sorghum lipid content [-3 $-$ 0 dry wt. %]',
          'Bagasse lipid retention [65 $-$ 75 %]',
-         '$^a$Lipid extraction efficiency [baseline + 0 $-$ 25 %]',
+         '$^a$Lipid extraction efficiency [baseline + 0 $-$ 20 %]',
         f'Plant capacity [330 $-$ 404 {capacity}]',
         f'Ethanol price [1.02, 1.80, 2.87 {stream_price}]',
         f'Biodiesel price relative to ethanol [0.31, 2.98, 4.11 {stream_price}]',
