@@ -10,13 +10,12 @@ import numpy as np
 from biosteam.exceptions import InfeasibleRegion
 from biorefineries.HP.units import compute_HP_titer, compute_HP_mass
 # from winsound import Beep
-# from biorefineries.HP import system_light_lle_vacuum_distillation
 
 _red_highlight_white_text = '\033[1;47;41m'
 _yellow_text = '\033[1;33m'
 _reset_text = '\033[1;0m'
 
-skip_infeasible_titers = True
+skip_infeasible_titers = True # if running feedstock carbohydrate/sugar content analysis, set this to False
 last_infeasible_simulation = [] # yield, titer
 
 def get_IDs(units_list):

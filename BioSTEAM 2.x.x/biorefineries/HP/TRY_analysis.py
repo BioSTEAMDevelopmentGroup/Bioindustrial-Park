@@ -19,17 +19,14 @@ from matplotlib.ticker import AutoMinorLocator as AML
 
 import biorefineries.HP.analyses.models as HP_models
 
-# from biorefineries.HP.system import HP_sys, HP_tea, R302, spec
-# from biorefineries.HP.system import MEK as product
 
-
-
+# # Comment this out to run feedstock sugar content-price analysis
 # from biorefineries.HP.system_sugarcane import (
 #     HP_sys, HP_tea, R302, spec, get_GWP, get_ng_GWP, get_FEC, get_SPED,
 #     AA as product
 # )
 
-
+# Comment this out to run titer-yield-productivity or feedstock carbohydrate content-price analysis
 from biorefineries.HP.system_light_lle_vacuum_distillation import (
     HP_sys, HP_tea, HP_lca, R302, spec, get_AA_MPSP,
     AA as product
@@ -78,11 +75,6 @@ def CABBI_green_colormap(N_levels=90):
     that serves as CABBI's green colormap theme for contour plots.
     
     """
-    # CABBI_colors = (colors.CABBI_yellow.tint(50).RGBn,
-    #                 colors.CABBI_yellow.shade(10).RGBn,
-    #                 colors.CABBI_green.RGBn,
-    #                 colors.CABBI_green.shade(30).RGBn)
-
     CABBI_colors = (colors.CABBI_yellow.tint(40).RGBn,
                     colors.CABBI_yellow.shade(5).RGBn,
                     colors.CABBI_green.RGBn,
@@ -318,7 +310,8 @@ HP_metrics = [solve_AA_price, lambda: HP_lca.GWP, lambda: HP_lca.FEC]
 
     
 # %% Generate 3-specification meshgrid and set specification loading functions
-steps = 5
+steps = 20
+
 # Yield, titer, productivity (rate)
 spec_1 = np.linspace(0.05, 0.95, steps) # yield
 spec_2 = np.linspace(5., 330., steps) # titer
@@ -371,14 +364,13 @@ data_1 = HP_data = spec.evaluate_across_specs(
         HP_sys, spec_1, spec_2, HP_metrics, spec_3)
 
 
-# %% Save generated data
-
+# %% Save generated data as .npy
 
 dateTimeObj = datetime.now()
 file_to_save = 'HP_TRY_%s.%s.%s-%s.%s'%(dateTimeObj.year, dateTimeObj.month, dateTimeObj.day, dateTimeObj.hour, dateTimeObj.minute)
 np.save(file_to_save, data_1)
 
-# %% Load previously saved data
+# %% Reload data
 file_to_load = file_to_save
 # file_to_load = 'C:/Users/saran/Documents/Academia/Spring 2020/BioSTEAM/Bioindustrial-Park/BioSTEAM 2.x.x/biorefineries/HP/HP_TRY_2020.9.22-16.44'
 data_1 = np.load(file_to_load+'.npy')
@@ -412,7 +404,7 @@ def make_inhibited_region_infeasible():
 
 
 
-# %% Plot contours2
+# %% Plot contours
 # data_2 = data_1
 MPSP_units = r"$\mathrm{\$} \cdot \mathrm{ton}^{-1}$"
 

@@ -285,23 +285,18 @@ GWP_CF_array = chems.kwarray(GWP_CFs)
 
 
 # In kg CO2-eq/kg of material
-# print(tmo.settings.get_thermo())
-# import pdb
-# pdb.set_trace()
+
+
 GWP_CF_stream = tmo.Stream('GWP_CF_stream', GWP_CF_array, units='kg/hr')
 
 
-# GWP_CFs['FGHTP Corn stover'] = 68.82/1000. # Wendt et al. 2018: Techno-Economic Assessment of a Chopped Feedstock Logistics Supply Chain for Corn Stover
-
-GWP_CFs['FGHTP Corn stover'] = 0.10945 # see Feedstock_impacts_YL
+GWP_CFs['FGHTP Corn stover'] = 0.10945 # see Table S4 of the SI
 GWP_CFs['FGHTP Sugarcane'] = 0.10945 # placeholder
 
-# GWP_CFs['Corn stover'] = 44.70/1e3 * 0.8
-# GWP_CFs['Switchgrass'] = 87.81/1e3 * 0.8
-# GWP_CFs['Miscanthus'] = 78.28/1e3 * 0.8
+
 # In kg CO2-eq/kWh
 GWP_CFs['Electricity'] = 0.48
-# GWP_CFs['Electricity'] = 0.
+
 # From corn stover
 GWP_CFs['LacticAcid_GREET'] = 1.80
 # From ref [7], lactic acid production, RoW, TRACI global warming
@@ -346,10 +341,8 @@ FEC_CF_array = chems.kwarray(FEC_CFs)
 # In MJ/kg of material
 FEC_CF_stream = tmo.Stream('FEC_CF_stream', FEC_CF_array, units='kg/hr')
 
-# FEC_CFs['FGHTP Corn stover'] = 767.3/1000. # Wendt et al. 2018: Techno-Economic Assessment of a Chopped Feedstock Logistics Supply Chain for Corn Stover
 
-
-FEC_CFs['FGHTP Corn stover'] = 1.68000 # see Feedstock_impacts_YL
+FEC_CFs['FGHTP Corn stover'] = 1.68000 # see Table S4 in the SI
 FEC_CFs['FGHTP Sugarcane'] = 1.68000 # placeholder
 
 
