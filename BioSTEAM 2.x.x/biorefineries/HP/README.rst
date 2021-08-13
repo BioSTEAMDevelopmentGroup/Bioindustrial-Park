@@ -153,7 +153,7 @@ titer-yield-productivity analysis for the fermentation performance space (TRY_an
 and evaluating feedstocks of varying carbohydrate contents, sugar contents, and prices (TRY_analysis.py).
 
 Note that results used in the manuscript [1]_ were generated using biosteam (`HP_sys branch <https://github.com/BioSTEAMDevelopmentGroup/biosteam/tree/HP_sys>`_),
-thermosteam (`HP_sys branch <https://github.com/BioSTEAMDevelopmentGroup/thermosteam/tree/HP_sys>`_), and dependencies (`commit fcc4b50 <https://github.com/BioSTEAMDevelopmentGroup/Bioindustrial-Park/commit/fcc4b5080c097f2fa74804344b11c02ed51399b8>`_).
+thermosteam (`HP_sys branch <https://github.com/BioSTEAMDevelopmentGroup/thermosteam/tree/HP_sys>`_), and dependencies (`commit 427ec9a <https://github.com/BioSTEAMDevelopmentGroup/Bioindustrial-Park/commit/427ec9ad260de62d97f1591cb46891207af8951a>`_).
 
 To reproduce the results, directly run the script of interest, and results will
 be saved as Excel files in the same directory path as the module.
