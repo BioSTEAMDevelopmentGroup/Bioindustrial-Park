@@ -933,10 +933,10 @@ class DehydrationReactor(Reactor):
             ])     
         HP_to_AA_rxn = dehydration_reactions[0]
         
-        feed, fresh_catalyst, recycled_HP, recycled_water = self.ins
+        feed, fresh_catalyst, recycled_HP = self.ins
         effluent, spent_catalyst = self.outs
   
-        effluent.mix_from([feed, recycled_HP, recycled_water])
+        effluent.mix_from([feed, recycled_HP])
         effluent.T = self.T
         effluent.P = feed.P
         self.dehydration_reactions(effluent.mol)

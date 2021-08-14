@@ -339,7 +339,7 @@ def create_HP_sys(ins, outs):
     S401_index = [splits_df.index[0]] + splits_df.index[2:].to_list()
     S401_cell_mass_split = [splits_df['stream_571'][0]] + splits_df['stream_571'][2:].to_list()
     S401_filtrate_split = [splits_df['stream_535'][0]] + splits_df['stream_535'][2:].to_list()
-    S401 = bst.units.SolidsCentrifuge('S401', ins=(R302-0,''), outs=('cell_mass', ''),
+    S401 = bst.units.SolidsCentrifuge('S401', ins=(R302-0,), outs=('cell_mass', ''),
                                 moisture_content=0.50,
                                 split=find_split(S401_index,
                                                   S401_cell_mass_split,
@@ -555,7 +555,7 @@ def create_HP_sys(ins, outs):
     
     D401_P = units.HPPump('D401_P', ins=M402-0, P=506625.*5.4)
     
-    R402 = units.DehydrationReactor('R402', ins = (D401_P-0, makeup_TiO2_catalyst, '', ''),
+    R402 = units.DehydrationReactor('R402', ins = (D401_P-0, makeup_TiO2_catalyst, '',),
                                     outs = ('dilute_acryclic_acid', 'spent_TiO2_catalyst'),
                                     tau = 57.34/1.5, # Dishisha et al.
                                     T = 230. + 273.15,
@@ -576,7 +576,7 @@ def create_HP_sys(ins, outs):
                                         partial_condenser=False,
                                         vessel_material = 'Stainless steel 316')
     
-    D402_dP = bst.Pump('D402_dP', ins=D402-0, P=101325.)
+    D402_dP = bst.Pump('D402_dP', ins=D402-0, outs=('D402_wastewater',), P=101325.)
     # recycling water makes system convergence fail
     # D402-0-3-R402
     
