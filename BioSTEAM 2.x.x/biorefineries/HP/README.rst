@@ -2,7 +2,7 @@
 HP: Production of Acrylic Acid via 3-Hydroxypropionic Acid from Lignocellulosic Biomass
 =======================================================================================
 
-Process flow scheme
+Simplified process flow scheme
 ------------------------------
 .. figure:: ./images/system_diagram.png
 
