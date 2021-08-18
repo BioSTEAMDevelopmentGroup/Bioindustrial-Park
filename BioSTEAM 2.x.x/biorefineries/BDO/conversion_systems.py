@@ -91,13 +91,13 @@ def create_conversion_system(ins, outs):
                         ...
 
     """
-    BDO, = ins
-    MEK, isobutanol, wastewater = outs
+    BDO, = ins # !!! need to add make-up catalyst streams (and their prices in process_settings)
+    MEK, isobutanol, wastewater = outs # !!! need to add spent catalyst streams (priced at 0)
     
     H2_fresh = Stream('H2_fresh', price = price['H2'])
     
-    R401 = units.DehydrationReactor('R401', ins = (BDO, ''),
-                                    tau = 5,
+    R401 = units.DehydrationReactor('R401', ins = (BDO, ''), # !!! need to add make-up catalyst stream
+                                    tau = 0.5, # Emerson et al. https://doi.org/10.1021/i300007a025
                                     vessel_material='Stainless steel 316')
     
     D403 = bst.units.ShortcutColumn('D403', ins=R401-0,
@@ -139,8 +139,8 @@ def create_conversion_system(ins, outs):
     
     M404 = bst.Mixer('M404', ins=(D405-0, S404-1), outs=wastewater)
     
-    R402 = units.HydrogenationReactor('R402', ins = (D403-0, '', ''),
-                                    tau = 2,
+    R402 = units.HydrogenationReactor('R402', ins = (D403-0, '', ''), # !!! need to add make-up catalyst stream
+                                    tau = 16, # Zhou et al. https://doi.org/10.1002/pat.441
                                     vessel_material = 'Stainless steel 316')
     
     D406 = bst.units.BinaryDistillation('D406', ins=R402-0,
