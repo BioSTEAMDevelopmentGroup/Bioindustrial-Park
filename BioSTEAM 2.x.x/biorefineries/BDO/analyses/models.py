@@ -80,6 +80,8 @@ special_price = {
     # 'natural_gas':      ('Triangle',  (0.198,     0.304)),
     'gypsum':           ('Uniform',   (-0.0288,   0.00776))
     }
+# !!! Need to add just 2 more streams and their default price distributions here
+# (make-up catalyst streams for dehydration and hydrogenation)
 
 # Prices for boiler_chems, baghouse_bag, and cooling_tower_chems are not included
 # as they are tied to BT/CT duties
@@ -103,7 +105,7 @@ for ID in special_price:
 for ID in default_price_streams:
     stream = flowsheet.stream[ID]
     baseline = stream.price
-    D = baseline_uniform(baseline, 0.1)
+    D = baseline_triangle(baseline, 0.1)
     add_stream_price_param(stream, D)
 
 D = shape.Triangle(0.067, 0.070, 0.073)
@@ -213,13 +215,13 @@ def set_CSL_loading(loading): R302.CSL_loading = loading
 ########################### COMMENT Y,T OUT FOR TRY P_MC ANALYSIS ############################
 
 D = shape.Triangle(0.36*0.8, 0.36, 0.36*1.2) # +/- 20% of baseline
-@param(name='3-Hydroxypropionic acid yield', element=R302, kind='coupled', units='% theoretical',
+@param(name='2,3-BDO yield', element=R302, kind='coupled', units='% theoretical',
         baseline=0.36, distribution=D)
 def set_R302_BDO_yield(X):
     spec.spec_1 = X
 
 D = shape.Triangle(109.9*0.8, 109.9, 109.9*1.2) # +/- 20% of baseline
-@param(name='3-Hydroxypropionic acid titer', element=R302, kind='coupled', units='g/L',
+@param(name='2,3-BDO titer', element=R302, kind='coupled', units='g/L',
         baseline=109.9, distribution=D)
 def set_R302_BDO_titer(X):
     spec.spec_2 = X
@@ -317,6 +319,67 @@ def set_R302_BDO_titer(X):
 # def set_R403_conversion_factor(X):
 #     R403.hydrolysis_rxns.X[:] = X
     
+# =============================================================================
+# Separation parameters
+# =============================================================================
+
+# Dehydration (BDO to MEK and IBA)
+R401 = flowsheet.unit.R401
+D = baseline_triangle(0.9, 0.1)
+@param(name='dehydration overall 2,3-BDO conversion', element=R401, kind='coupled', units='%',
+       baseline=0.9, distribution=D)
+def set_dehydration_overall_conversion(X):
+    prev_overall_conversion = float(R401.overall_BDO_conversion)
+    R401.overall_BDO_conversion = X
+    R401.BDO_to_MEK_rxn.X = X * R401.BDO_to_MEK_selectivity
+    R401.BDO_to_MEK_rxn.X = X * R401.BDO_to_IBA_selectivity
+
+D = shape.Triangle(0.813, 0.9, 0.96) # lb: https://doi.org/10.1039/C5RA23251A ; m: https://doi.org/10.1021/acs.iecr.6b03678; ub: https://doi.org/10.1021/i300007a025
+@param(name='dehydration 2,3-BDO -> MEK selectivity', element=R401, kind='coupled', units='%',
+   baseline=0.9, distribution=D)
+def set_dehydration_MEK_selectivity(S):
+    R401.BDO_to_MEK_selectivity = S
+    R401.BDO_to_MEK_rxn.X = R401.overall_BDO_conversion * S
+
+D = baseline_triangle(0.1, 0.1) # m: https://doi.org/10.1021/acs.iecr.6b03678;
+@param(name='dehydration 2,3-BDO -> IBA selectivity', element=R401, kind='coupled', units='%',
+       baseline=0.1, distribution=D)
+def set_dehydration_IBA_selectivity(S):
+    R401.BDO_to_IBA_selectivity = S
+    R401.BDO_to_IBA_rxn.X = min(R401.overall_BDO_conversion - 1e-6 - R401.BDO_to_MEK_rxn.X, 
+                                R401.overall_BDO_conversion * S)
+    
+D = baseline_triangle(0.5, 0.1) # m: https://doi.org/10.1021/i300007a025
+@param(name='dehydration residence time', element=R401, kind='coupled', units='h',
+       baseline=0.5, distribution=D)
+def set_dehydration_residence_time(tau):
+    R401.tau = tau
+
+D = shape.Triangle(180., 200., 200.*1.1) # m: https://doi.org/10.1021/acs.iecr.6b03678 & https://doi.org/10.1039/C5RA23251A; lb: https://doi.org/10.1021/i300007a025
+@param(name='dehydration temperature', element=R401, kind='coupled', units='Celsius',
+       baseline=200., distribution=D)
+def set_dehydration_temperature(T):
+    R401.T = T + 273.15
+    
+# Hydrogenation (IBA to IBO)
+R402 = flowsheet.unit.R402
+D = baseline_triangle(0.86, 0.1)
+@param(name='hydrogenation IBA -> IBO conversion', element=R402, kind='coupled', units='%',
+       baseline=0.86, distribution=D)
+def set_hydrogenation_conversion(X):
+    R402.hydrogenation_rxns[0].X = X
+
+D = baseline_triangle(16., 0.1) 
+@param(name='dehydration residence time', element=R402, kind='coupled', units='h',
+       baseline=16., distribution=D)
+def set_hydrogenation_residence_time(tau):
+    R402.tau = tau
+
+D = baseline_triangle(25., 0.1) 
+@param(name='hydrogenation temperature', element=R402, kind='coupled', units='Celsius',
+       baseline=25., distribution=D)
+def set_hydrogenation_temperature(T):
+    R402.T = T + 273.15
 
 # =============================================================================
 # Facilities parameters

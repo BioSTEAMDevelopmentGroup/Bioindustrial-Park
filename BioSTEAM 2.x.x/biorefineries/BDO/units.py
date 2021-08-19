@@ -566,12 +566,14 @@ class SeedTrain(Unit):
         # FermMicrobe reaction from Table 14 on Page 31 of Humbird et al.
         self.cofermentation_rxns = ParallelRxn([
         #      Reaction definition            Reactant    Conversion
-        Rxn('Glucose -> 2 BDO',        'Glucose',   .36*.8), # .9099
+        Rxn('Glucose -> BDO + H2 + 2 CO2',        'Glucose',   2*.36*.8), # .9099
         Rxn('Glucose -> Acetoin + 2CO2',               'Glucose',   0.065*.8),
         Rxn('Glucose -> 6 FermMicrobe',       'Glucose',   0.03*.8),
-        Rxn('3 Xylose -> 5 BDO',       'Xylose',    0.36*.8),
+        Rxn('3 Xylose -> 2.5 BDO + 2.5 H2 + 5 CO2',       'Xylose',    2*0.36*.8),
         Rxn('Xylose -> Acetoin + CO2',       'Xylose',    0.065*.8),
         Rxn('Xylose -> 5 FermMicrobe',        'Xylose',    0.03*.8),
+        Rxn('Glucose + 2 H2O → 2 Glycerol + O2', 'Glucose', 0.0001*.8),
+        Rxn('3 Xylose + 5 H2O → 5 Glycerol + 2.5 O2', 'Glucose', 0.0001*.8)
         ])
         
         self.CO2_generation_rxns = ParallelRxn([
@@ -585,7 +587,15 @@ class SeedTrain(Unit):
         self.glucose_to_CO2_rxn = self.CO2_generation_rxns[0]
         self.xylose_to_CO2_rxn = self.CO2_generation_rxns[1]
 
-
+        self.glucose_to_BDO_rxn = self.cofermentation_rxns[0]
+        self.xylose_to_BDO_rxn = self.cofermentation_rxns[3]
+        
+        self.glucose_to_acetoin_rxn = self.cofermentation_rxns[1]
+        self.xylose_to_acetoin_rxn = self.cofermentation_rxns[4]
+        
+        self.glucose_to_microbe_rxn = self.cofermentation_rxns[2]
+        self.xylose_to_microbe_rxn = self.cofermentation_rxns[5]
+        
     def _run(self):
         feed = self.ins[0]
         effluent, vent = self.outs
@@ -594,6 +604,7 @@ class SeedTrain(Unit):
         self.cofermentation_rxns(effluent)
         self.CO2_generation_rxns(effluent)
         vent.copy_flow(effluent, 'CO2', remove=True)
+        vent.copy_flow(effluent, 'O2', remove=True)
         # Assume all CSL is used up
         effluent.imol['CSL'] = 0 
         
@@ -1432,8 +1443,15 @@ class DehydrationReactor(Reactor):
     """
     A dehydration reactor.
     """
+    # Conversion, selectivities, and T based on:
+    # Daniel Penner,† Christian Redepenning, Alexander Mitsos, and Jörn Viell
+    # Conceptual Design of Methyl Ethyl Ketone Production via 2,3-Butanediol for Fuels and Chemicals
+    # ACS Industrial & Engineering Chemistry Research (2017)
+    # https://doi.org/10.1021/acs.iecr.6b03678
     
-    # !!! ADD heating to 300 C
+    # Tau based on:
+    # Emerson et al. https://doi.org/10.1021/i300007a025
+    
     _N_ins = 2
     _N_outs = 1
     _N_heat_utilities = 1
@@ -1443,17 +1461,23 @@ class DehydrationReactor(Reactor):
             'TCP catalyst': 1}
     mcat_frac = 0.03 # fraction of catalyst by weight in relation to the reactant (BDO)
     
-    def __init__(self, *args, T=200+273.15, **kwargs):
+    def __init__(self, *args, T=200+273.15, tau=0.5, **kwargs):
         Reactor.__init__(self, *args, **kwargs)
         self.T = T
-    
+        self.tau = tau
+        
     def _setup(self):
         super()._setup()
+        self.overall_BDO_conversion = overall_BDO_conversion = 0.9
+        self.BDO_to_MEK_selectivity = BDO_to_MEK_selectivity = 0.9
+        self.BDO_to_IBA_selectivity = BDO_to_IBA_selectivity = 0.1
+        
         self.dehydration_rxns = ParallelRxn([
             #   Reaction definition         Reactant   Conversion
-            Rxn('BDO -> MEK + H2O',         'BDO',   0.765),
-            Rxn('BDO -> IBA + H2O',         'BDO',   0.085)
+            Rxn('BDO -> MEK + H2O',         'BDO',   BDO_to_MEK_selectivity*overall_BDO_conversion), # 0.81
+            Rxn('BDO -> IBA + H2O',         'BDO',   BDO_to_IBA_selectivity*overall_BDO_conversion) # 0.09
         ])
+        
         self.BDO_to_MEK_rxn = self.dehydration_rxns[0]
         self.BDO_to_IBA_rxn = self.dehydration_rxns[1]
     
@@ -1504,18 +1528,20 @@ class CoFermentation(Reactor):
 
     auxiliary_unit_names = ('heat_exchanger',)
     
-    tau = 13.7
+    tau = 13.7 # overwritten by spec.load_specifications
     
     # Equals the split of saccharified slurry to seed train
     inoculum_ratio = 0.07
     
     CSL_loading = 10 # g/L (kg/m3)
     
+    DAP_loading = 0.3 # g/L broth (kg/m3)
+    
     titer_limit = 130 # in g/L (kg/m3), the maximum titer in collected data
     
     effluent_titer = 0
     
-    productivity = 0.89 # in g/L/hr
+    # productivity = 0.89 # in g/L/hr
     
     yield_limit = 0.76 # in g/g-sugar
     
@@ -1552,13 +1578,15 @@ class CoFermentation(Reactor):
         # FermMicrobe reaction from Table 14 on Page 31 of Humbird et al.
         self.cofermentation_rxns = ParallelRxn([
         #      Reaction definition            Reactant    Conversion
-        Rxn('Glucose -> 2 BDO',        'Glucose',   .36), 
+        Rxn('Glucose -> BDO + H2 + 2CO2',        'Glucose',   2*.36), 
         Rxn('Glucose -> Acetoin + 2CO2',               'Glucose',   0.0065),
-        Rxn('Glucose -> 6 FermMicrobe',       'Glucose',   0.003),
-        Rxn('3 Xylose -> 5 BDO',       'Xylose',    0.36),
+        Rxn('Glucose -> 6 FermMicrobe',       'Glucose',   0.02),
+        Rxn('3 Xylose -> 2.5 BDO + 2.5 H2 + 5 CO2',       'Xylose',    2*0.36),
         Rxn('Xylose -> Acetoin + 2CO2',       'Xylose',    0.0065),
-        Rxn('Xylose -> 5 FermMicrobe',        'Xylose',    0.003), 
-        Rxn('Acetoin -> BDO',               'Acetoin',      .9)
+        Rxn('Xylose -> 5 FermMicrobe',        'Xylose',    0.02), 
+        Rxn('Acetoin -> BDO',               'Acetoin',      .9),
+        Rxn('Glucose + 2 H2O → 2 Glycerol + O2', 'Glucose', 0.0001),
+        Rxn('3 Xylose + 5 H2O → 5 Glycerol + 2.5 O2', 'Glucose', 0.0001)
         ])
         
         self.CO2_generation_rxns = ParallelRxn([
@@ -1664,6 +1692,7 @@ class CoFermentation(Reactor):
 class HydrogenationReactor(Reactor):
     """
     A dehydration reactor.
+    Conversion, T, and tau from Zhou et al. (https://doi.org/10.1002/pat.441)
     """
     _N_ins = 2
     _N_outs = 1
@@ -1675,8 +1704,8 @@ class HydrogenationReactor(Reactor):
             'Heat exchangers': 3.17}
     mcat_frac = 0.05 # kg per m3/h
     
-    def __init__(self, ID='', ins=None, outs=(), thermo=None, *, T=25+273.15,
-                  P=101325, V_wf=0.8, length_to_diameter=2, tau = 2,
+    def __init__(self, ID='', ins=None, outs=(), thermo=None, *, T=25.+273.15, 
+                  P=101325, V_wf=0.8, length_to_diameter=2, tau = 16., 
                   kW_per_m3=0.0985, # Perry's handbook
                   wall_thickness_factor=1,
                   vessel_material='Stainless steel 304',
@@ -1696,7 +1725,7 @@ class HydrogenationReactor(Reactor):
         self.tau = tau
         self.hydrgenation_rxns = ParallelRxn([
             #   Reaction definition                                       Reactant   Conversion
-            Rxn('IBA + H2 -> Isobutanol',         'IBA',   0.86) # Zhou et al. 2003: Hydrogenation of aldehydes catalyzed by kieselguhr-supported carboxymethylcellulose-nickel complex
+            Rxn('IBA + H2 -> Isobutanol',         'IBA',   0.86) 
                 ])                                      
         self.IBA_to_IBO_rxn = self.hydrgenation_rxns[0]
         self.X = self.hydrgenation_rxns[0].X = X
