@@ -204,75 +204,76 @@ run_number = samples.shape[0]
 
 # %%
 
-# # TODO: Note that this code does not take into account titer specifications.
-
 # =============================================================================
 # Evaluate the min/max of one parameter each time to ensure the parameter can
 # independently affect the system
 # =============================================================================
 
-# p_values = [[], [], []]
-# MPSPs = [[], [], []]
-# GWPs = [[], [], []]
-# FECs = [[], [], []]
+p_values = [[], [], []]
+MPSPs = [[], [], []]
+GWPs = [[], [], []]
+FECs = [[], [], []]
 
-# # import pdb
-# for p in parameters:
-#     # pdb.set_trace()
-#     # [p_min], [p_max] = p.distribution.range().tolist()
-#     p_dist = p.distribution
-#     # import pdb
-#     # pdb.set_trace()
-#     [p_min], [p_max] = p_dist.lower.tolist(), p_dist.upper.tolist()
-#     # [p_min], [p_max] = p_dist.range()[0], p_dist.range()[1]
-#     p_baseline = p.baseline
-#     p_value = (p_min, p_max, p_baseline)
-#     p.system = BDO_sys
-#     for i in range(len(p_value)):
-#         p.setter(p_value[i])
-#         p_values[i].append(p_value[i])
-#         MPSP = get_MEK_MPSP()
-#         MPSPs[i].append(MPSP)
-#         GWPs[i].append(get_GWP())
-#         FECs[i].append(get_FEC())
-#         run_number += 1
+# import pdb
+for p in parameters:
+    # pdb.set_trace()
+    # [p_min], [p_max] = p.distribution.range().tolist()
+    p_dist = p.distribution
+    # import pdb
+    # pdb.set_trace()
+    [p_min], [p_max] = p_dist.lower.tolist(), p_dist.upper.tolist()
+    # [p_min], [p_max] = p_dist.range()[0], p_dist.range()[1]
+    p_baseline = p.baseline
+    p_value = (p_min, p_max, p_baseline)
+    p.system = BDO_sys
+    for i in range(len(p_value)):
+        p.setter(p_value[i])
+        p_values[i].append(p_value[i])
+        model._system._converge()
+        spec.titer_inhibitor_specification.run_units()
+        spec.load_specifications(spec_1=spec.spec_1, spec_2=spec.spec_2, spec_3=spec.spec_3)
+        MPSP = get_MEK_MPSP()
+        MPSPs[i].append(MPSP)
+        GWPs[i].append(get_GWP())
+        FECs[i].append(get_FEC())
+        run_number += 1
 
-# MPSP_baseline = np.asarray(MPSPs[2])
-# MPSP_min_diff = np.asarray(MPSPs[0]) - MPSP_baseline
-# MPSP_max_diff = np.asarray(MPSPs[1]) - MPSP_baseline
+MPSP_baseline = np.asarray(MPSPs[2])
+MPSP_min_diff = np.asarray(MPSPs[0]) - MPSP_baseline
+MPSP_max_diff = np.asarray(MPSPs[1]) - MPSP_baseline
 
-# GWP_baseline = np.asarray(GWPs[2])
-# GWP_min_diff = np.asarray(GWPs[0]) - GWP_baseline
-# GWP_max_diff = np.asarray(GWPs[1]) - GWP_baseline
+GWP_baseline = np.asarray(GWPs[2])
+GWP_min_diff = np.asarray(GWPs[0]) - GWP_baseline
+GWP_max_diff = np.asarray(GWPs[1]) - GWP_baseline
 
-# FEC_baseline = np.asarray(FECs[2])
-# FEC_min_diff = np.asarray(FECs[0]) - FEC_baseline
-# FEC_max_diff = np.asarray(FECs[1]) - FEC_baseline
+FEC_baseline = np.asarray(FECs[2])
+FEC_min_diff = np.asarray(FECs[0]) - FEC_baseline
+FEC_max_diff = np.asarray(FECs[1]) - FEC_baseline
 
-# one_p_df = pd.DataFrame({
-#     ('Parameter', 'Name'): [i.name_with_units for i in parameters],
-#     ('Parameter', 'Baseline'): p_values[2],
-#     ('Parameter', 'Min'): p_values[0],
-#     ('Parameter', 'Max'): p_values[1],
-#     ('MPSP [$/kg]', 'MPSP baseline'): MPSP_baseline,
-#     ('MPSP [$/kg]', 'MPSP min'): MPSPs[0],
-#     ('MPSP [$/kg]', 'MPSP min diff'): MPSP_min_diff,
-#     ('MPSP [$/kg]', 'MPSP max'): MPSPs[1],
-#     ('MPSP [$/kg]', 'MPSP max diff'): MPSP_max_diff,
-#     ('GWP [kg CO2-eq/kg]', 'GWP baseline'): GWP_baseline,
-#     ('GWP [kg CO2-eq/kg]', 'GWP min'): GWPs[0],
-#     ('GWP [kg CO2-eq/kg]', 'GWP min diff'): GWP_min_diff,
-#     ('GWP [kg CO2-eq/kg]', 'GWP max'): GWPs[1],
-#     ('GWP [kg CO2-eq/kg]', 'GWP max diff'): GWP_max_diff,
-#     ('FEC [MJ/kg]', 'FEC baseline'): FEC_baseline,
-#     ('FEC [MJ/kg]', 'FEC min'): FECs[0],
-#     ('FEC [MJ/kg]', 'FEC min diff'): FEC_min_diff,
-#     ('FEC [MJ/kg]', 'FEC max'): FECs[1],
-#     ('FEC [MJ/kg]', 'FEC max diff'): FEC_max_diff,
-#     })
+one_p_df = pd.DataFrame({
+    ('Parameter', 'Name'): [i.name_with_units for i in parameters],
+    ('Parameter', 'Baseline'): p_values[2],
+    ('Parameter', 'Min'): p_values[0],
+    ('Parameter', 'Max'): p_values[1],
+    ('MPSP [$/kg]', 'MPSP baseline'): MPSP_baseline,
+    ('MPSP [$/kg]', 'MPSP min'): MPSPs[0],
+    ('MPSP [$/kg]', 'MPSP min diff'): MPSP_min_diff,
+    ('MPSP [$/kg]', 'MPSP max'): MPSPs[1],
+    ('MPSP [$/kg]', 'MPSP max diff'): MPSP_max_diff,
+    ('GWP [kg CO2-eq/kg]', 'GWP baseline'): GWP_baseline,
+    ('GWP [kg CO2-eq/kg]', 'GWP min'): GWPs[0],
+    ('GWP [kg CO2-eq/kg]', 'GWP min diff'): GWP_min_diff,
+    ('GWP [kg CO2-eq/kg]', 'GWP max'): GWPs[1],
+    ('GWP [kg CO2-eq/kg]', 'GWP max diff'): GWP_max_diff,
+    ('FEC [MJ/kg]', 'FEC baseline'): FEC_baseline,
+    ('FEC [MJ/kg]', 'FEC min'): FECs[0],
+    ('FEC [MJ/kg]', 'FEC min diff'): FEC_min_diff,
+    ('FEC [MJ/kg]', 'FEC max'): FECs[1],
+    ('FEC [MJ/kg]', 'FEC max diff'): FEC_max_diff,
+    })
 
-# time = timer.elapsed_time / 60.
-# print(f'\nSimulation time for {run_number} runs is: {time:.1f} min')
+time = timer.elapsed_time / 60.
+print(f'\nSimulation time for {run_number} runs is: {time:.1f} min')
 
 
 # %%
