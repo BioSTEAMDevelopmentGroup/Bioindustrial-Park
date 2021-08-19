@@ -256,6 +256,7 @@ EthylSuccinate = chemical_database('EthylSuccinate')
 # Hrxn for Ca(OH)2 and SA and Ca(OH)2 and LA are the same 
 CalciumSuccinate.Hf = CalciumLactate.Hf + (SuccinicAcid.Hf-2*LacticAcid.Hf)
 
+Glycerol = chemical_database('Glycerol')
 
 # =============================================================================
 # Insoluble organics
@@ -347,7 +348,7 @@ chemical_groups = dict(
                               'BoilerChems', 'Na2SO4', 'AmmoniumHydroxide'),
     Furfurals = ('Furfural', 'HMF'),
     #!!! I suspect you want to add some chemicals here
-    OtherOrganics = ('Denaturant', 'Xylitol'),
+    OtherOrganics = ('Denaturant', 'Xylitol', 'Glycerol'),
     COSOxNOxH2S = ('NitricOxide', 'NO2', 'SO2', 'CarbonMonoxide', 'H2S'),
     Proteins = ('Protein', 'Enzyme', 'DenaturedEnzyme'),
     CellMass = ('WWTsludge', 'FermMicrobe'),

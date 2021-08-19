@@ -572,8 +572,8 @@ class SeedTrain(Unit):
         Rxn('3 Xylose -> 2.5 BDO + 2.5 H2 + 5 CO2',       'Xylose',    2*0.36*.8),
         Rxn('Xylose -> Acetoin + CO2',       'Xylose',    0.065*.8),
         Rxn('Xylose -> 5 FermMicrobe',        'Xylose',    0.03*.8),
-        Rxn('Glucose + 2 H2O → 2 Glycerol + O2', 'Glucose', 0.0001*.8),
-        Rxn('3 Xylose + 5 H2O → 5 Glycerol + 2.5 O2', 'Glucose', 0.0001*.8)
+        Rxn('Glucose + 2 H2O -> 2 Glycerol + O2', 'Glucose', 0.0001*.8),
+        Rxn('3 Xylose + 5 H2O -> 5 Glycerol + 2.5 O2', 'Xylose', 0.0001*.8)
         ])
         
         self.CO2_generation_rxns = ParallelRxn([
@@ -1585,8 +1585,8 @@ class CoFermentation(Reactor):
         Rxn('Xylose -> Acetoin + 2CO2',       'Xylose',    0.0065),
         Rxn('Xylose -> 5 FermMicrobe',        'Xylose',    0.02), 
         Rxn('Acetoin -> BDO',               'Acetoin',      .9),
-        Rxn('Glucose + 2 H2O → 2 Glycerol + O2', 'Glucose', 0.0001),
-        Rxn('3 Xylose + 5 H2O → 5 Glycerol + 2.5 O2', 'Glucose', 0.0001)
+        Rxn('Glucose + 2 H2O -> 2 Glycerol + O2', 'Glucose', 0.0001),
+        Rxn('3 Xylose + 5 H2O -> 5 Glycerol + 2.5 O2', 'Xylose', 0.0001)
         ])
         
         self.CO2_generation_rxns = ParallelRxn([
@@ -1632,7 +1632,7 @@ class CoFermentation(Reactor):
         self.cofermentation_rxns(effluent.mol)
         self.CO2_generation_rxns(effluent.mol)
         vapor.phase = 'g'
-        vapor.copy_flow(effluent, 'CO2', remove=True)
+        vapor.copy_flow(effluent, ('CO2', 'O2', 'H2'), remove=True)
         effluent.imass['CSL'] = 0
         
         self.vessel_material = 'Stainless steel 316'
@@ -1723,24 +1723,24 @@ class HydrogenationReactor(Reactor):
         self.heat_exchanger = HXutility(None, None, None, T=T)
         self.heat_utilities = self.heat_exchanger.heat_utilities
         self.tau = tau
-        self.hydrgenation_rxns = ParallelRxn([
+        self.hydrogenation_rxns = ParallelRxn([
             #   Reaction definition                                       Reactant   Conversion
             Rxn('IBA + H2 -> Isobutanol',         'IBA',   0.86) 
                 ])                                      
-        self.IBA_to_IBO_rxn = self.hydrgenation_rxns[0]
-        self.X = self.hydrgenation_rxns[0].X = X
+        self.IBA_to_IBO_rxn = self.hydrogenation_rxns[0]
+        self.X = self.hydrogenation_rxns[0].X = X
         
     def _run(self):
         feed, h2, recycle = self.ins
         effluent = self.outs[0]
-        hydrgenation_rxns = self.hydrgenation_rxns
-        h2.imol['H2'] = (feed.imol['IBA'] + recycle.imol['IBA'])* hydrgenation_rxns[0].X
+        hydrogenation_rxns = self.hydrogenation_rxns
+        h2.imol['H2'] = (feed.imol['IBA'] + recycle.imol['IBA'])* hydrogenation_rxns[0].X
         # effluent = feed.copy()
         effluent.mix_from([feed, h2, recycle])
         effluent.T = self.T
         # effluent.P = feed.P
         
-        hydrgenation_rxns(effluent.mol)
+        hydrogenation_rxns(effluent)
         
    
     def _cost(self):

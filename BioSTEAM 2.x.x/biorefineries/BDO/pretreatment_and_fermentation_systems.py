@@ -26,6 +26,7 @@ import numpy as np
               Ash=4109, units='kg/hr'),
          dict(ID='recycle_acetoin')],
     outs=[dict(ID='filtered_fermentation_effluent'),
+          dict(ID='vent'),
           dict(ID='solids'),
           dict(ID='wastewater')],
 )
@@ -107,7 +108,7 @@ def create_pretreatment_and_fermentation_system(ins, outs):
     """
 
     feedstock, recycle_acetoin = ins
-    filtered_fermentation_effluent, solids, wastewater = outs
+    filtered_fermentation_effluent, vent, solids, wastewater = outs
 
     # =============================================================================
     # Feedstock
@@ -281,7 +282,7 @@ def create_pretreatment_and_fermentation_system(ins, outs):
     # Cofermentation
     R302 = bdo.units.CoFermentation('R302', 
                                     ins=(recycle_acetoin, S302-1, T301-0, CSL),
-                                    outs=('fermentation_effluent', 'CO2'))
+                                    outs=('fermentation_effluent', vent))
     
     
     # =============================================================================

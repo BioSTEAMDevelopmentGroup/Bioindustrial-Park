@@ -656,6 +656,7 @@ class TiterAndInhibitorsSpecification:
         V_max = 0.9999
         # breakpoint()
         if x_titer < self.target_titer: # Evaporate
+            f = self.titer_objective_function
             self.evaporator.V = V_min = flx.IQ_interpolation(self.titer_objective_function,
                                                              V_min, V_max, ytol=1e-3, maxiter=200) 
             self.titer_objective_function(V_min)

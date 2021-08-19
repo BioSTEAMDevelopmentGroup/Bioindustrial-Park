@@ -213,10 +213,10 @@ def set_CSL_loading(loading): R302.CSL_loading = loading
 
 
 ########################### COMMENT Y,T OUT FOR TRY P_MC ANALYSIS ############################
-
-D = shape.Triangle(0.36*0.8, 0.36, 0.36*1.2) # +/- 20% of baseline
+baseline_R302_BDO_yield = spec.spec_1
+D = shape.Triangle(baseline_R302_BDO_yield*0.8, baseline_R302_BDO_yield, baseline_R302_BDO_yield*1.2) # +/- 20% of baseline
 @param(name='2,3-BDO yield', element=R302, kind='coupled', units='% theoretical',
-        baseline=0.36, distribution=D)
+        baseline=baseline_R302_BDO_yield, distribution=D)
 def set_R302_BDO_yield(X):
     spec.spec_1 = X
 
