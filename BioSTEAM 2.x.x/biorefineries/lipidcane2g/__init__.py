@@ -13,6 +13,7 @@ import os
 import biosteam as bst
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
+import thermosteam as tmo
 from biorefineries.sugarcane import create_sugarcane_to_ethanol_system
 from biorefineries.lipidcane import (
     create_chemicals as create_starting_chemicals,
@@ -42,6 +43,7 @@ from ._tea import *
 from ._lipid_extraction_specification import *
 from ._distributions import *
 from biorefineries.sugarcane import create_tea as create_conventional_ethanol_tea
+from biorefineries import cornstover as cs
 import numpy as np
 
 __all__ = [*_process_settings.__all__,
@@ -57,6 +59,8 @@ __all__ = [*_process_settings.__all__,
 _system_loaded = False
 _chemicals_loaded = False
 
+PRS = cs.PretreatmentReactorSystem
+PRS_cost_item = PRS.cost_items['Pretreatment reactor system']
 derivative_disabled = True
 kg_per_ton = 907.18474
 lipid_content = np.linspace(0.05, 0.15, 5)
@@ -134,7 +138,10 @@ across_lipid_content_agile_comparison_names = (
  set_plant_capacity, set_ethanol_price,
  set_biodiesel_price, set_natural_gas_price, 
  set_electricity_price, set_operating_days, 
- set_IRR) = all_parameter_mockups = (
+ set_IRR, set_crude_glycerol_price, set_pure_glycerol_price,
+ set_cellulase_price, set_cellulase_loading, set_reactor_base_cost,
+ set_glucose_yield, set_xylose_yield, set_glucose_to_ethanol_yield,
+ set_xylose_to_ethanol_yield) = all_parameter_mockups = (
     bst.MockVariable('Cane lipid content', 'dry wt. %', 'Stream-sugarcane'),
     bst.MockVariable('Relative sorghum lipid content', 'dry wt. %', 'Stream-sugarcane'),
     bst.MockVariable('Lipid retention', '%', 'Stream-sugarcane'),
@@ -146,6 +153,16 @@ across_lipid_content_agile_comparison_names = (
     bst.MockVariable('Electricity price', 'USD/kWh', 'biorefinery'),
     bst.MockVariable('Operating days', 'day/yr', 'biorefinery'),
     bst.MockVariable('IRR', '%', 'biorefinery'),
+    bst.MockVariable('Price', 'USD/kg', 'Stream-crude glycerol'),
+    bst.MockVariable('Price', 'USD/kg', 'Stream-pure glycerol'),
+    bst.MockVariable('Price', 'USD/kg', 'Stream-cellulase'),
+    bst.MockVariable('Cellulase loading', 'wt. % cellulose', 'Stream-cellulase'),
+    bst.MockVariable('Base cost', 'million USD', 'Pretreatment reactor system'),
+    bst.MockVariable('Glucose yield', '%', 'Pretreatment and saccharification'),
+    bst.MockVariable('Xylose yield', '%', 'Pretreatment and saccharification'),
+    bst.MockVariable('Glucose to ethanol yield', '%', 'Cofermentation'),
+    bst.MockVariable('Xylose to ethanol yield', '%', 'Cofermentation'),
+    
 )
 (MFPP, biodiesel_production, ethanol_production, 
  electricity_production, natural_gas_consumption, 
@@ -491,7 +508,7 @@ def load(name, cache={}):
         lipid_extraction_specification.load_efficiency(bagasse_lipid_extraction_efficiency / 100.)
 
     capacity = lipidcane.F_mass / kg_per_ton
-    @uniform(0.9 * capacity, 1.1 * capacity, units='ton/hr',
+    @uniform(0.75 * capacity, 1.25 * capacity, units='ton/hr',
              element=lipidcane, kind='coupled')
     def set_plant_capacity(capacity):
         lipidcane.F_mass = kg_per_ton * capacity
@@ -530,6 +547,109 @@ def load(name, cache={}):
     @uniform(10., 15., units='%')
     def set_IRR(IRR):
         lipidcane_tea.IRR = IRR / 100.
+    
+    crude_glycerol = dct.get('crude_glycerol') or bst.Stream('crude_glycerol')
+    @uniform(0.10, 0.22, units='USD/kg', element=crude_glycerol)
+    def set_crude_glycerol_price(price):
+        crude_glycerol.price = price
+
+    pure_glycerine = dct.get('pure_glycerine') or bst.Stream('pure_glycerine')
+    pure_glycerine_base_price = 0.65
+    @uniform(0.75 * pure_glycerine_base_price, 1.25 * pure_glycerine_base_price,
+             units='USD/kg', element=pure_glycerine)
+    def set_pure_glycerol_price(price):
+        pure_glycerine.price = price
+    
+    cellulase_base_cost = 0.212
+    cellulase = dct.get('cellulase') or bst.Stream('cellulase')
+    @uniform(0.75 * cellulase_base_cost, 1.25 * cellulase_base_cost, units='USD/kg', element=cellulase)
+    def set_cellulase_price(price):
+        if abs(number) == 2: cellulase.price = price
+    
+    cellulase_loading = 0.02
+    @uniform(0.75 * cellulase_loading, 1.25 * cellulase_loading, units='wt. % cellulose', element=cellulase)
+    def set_cellulase_loading(cellulase_loading):
+        if abs(number) == 2: M302.cellulase_loading = cellulase_loading
+    
+    PRS_base_cost = PRS_cost_item.cost
+    @uniform(0.75 * PRS_base_cost, 1.25 * PRS_base_cost, units='million USD', element='Pretreatment reactor system')
+    def set_reactor_base_cost(base_cost):
+        PRS_cost_item.cost = base_cost
+
+    @uniform(85, 97.5, units='%', element='Pretreatment and saccharification')
+    def set_glucose_yield(glucose_yield):
+        if abs(number) == 2:
+            glucose_yield *= 0.01
+            X1 = prs.reactions[0].X
+            X1_side = prs.reactions[1:3].X.sum()
+            X2_side = saccharification.saccharification[:2].X.sum()
+            saccharification.saccharification[2].X = X2 = (glucose_yield - X1) / (1 - X1_side)
+            X_excess = (X2_side + X2) - 1
+            if X_excess > 0: breakpoint()
+    
+    @uniform(65, 97.5, units='%', element='Pretreatment and saccharification')
+    def set_xylose_yield(xylose_yield):
+        if abs(number) == 2:
+            xylose_yield *= 0.01
+            X1_side = prs.reactions[9:11].X.sum()
+            prs.reactions[8].X = X1 = xylose_yield
+            X_excess = (X1_side + X1) - 1
+            if X_excess > 0.: breakpoint()
+                
+    @uniform(90, 95, units='%', element='Cofermenation')
+    def set_glucose_to_ethanol_yield(glucose_to_ethanol_yield):
+        if abs(number) == 2:
+            glucose_to_ethanol_yield *= 0.01
+            # fermentor.cofermentation[2].X = 0.004 # Baseline
+            # fermentor.cofermentation[3].X = 0.006 # Baseline
+            # fermentor.loss[0].X = 0.03 # Baseline
+            split = np.mean(S403.split)
+            X1 = split * seed_train.reactions[0].X
+            X1_side = split * seed_train.reactions[1:4].X.sum()
+            X2_side = fermentor.loss[0].X
+            X3_side = fermentor.cofermentation[1:4].X.sum()
+            X3 = (glucose_to_ethanol_yield - X1) / (1 - X1_side - X2_side / (1 - X1 - X1_side)) 
+            X_excess = (X3 + X3_side) - 1
+            if X_excess > 0.: breakpoint()
+            fermentor.cofermentation[0].X = X3
+    
+    @uniform(85, 95, units='%', element='Cofermenation')
+    def set_xylose_to_ethanol_yield(xylose_to_ethanol_yield):
+        if abs(number) == 2:
+            # fermentor.cofermentation[6].X = 0.004 # Baseline
+            # fermentor.cofermentation[7].X = 0.046 # Baseline
+            # fermentor.cofermentation[8].X = 0.009 # Baseline
+            # fermentor.loss[1].X = 0.03 # Baseline
+            xylose_to_ethanol_yield *= 0.01
+            split = np.mean(S403.split)
+            X1 = split * seed_train.reactions[4].X
+            X1_side = split * seed_train.reactions[6:].X.sum()
+            X2_side = fermentor.loss[1].X
+            X3_side = fermentor.cofermentation[5:].X.sum()
+            X3 = (xylose_to_ethanol_yield - X1) / (1 - X1_side - X2_side / (1 - X1 - X1_side)) 
+            X_excess = (X3 + X3_side) - 1
+            if X_excess > 0.: breakpoint()
+            fermentor.cofermentation[0].X = X3
+
+    if abs(number) == 2:
+        prs, = flowsheet(cs.units.PretreatmentReactorSystem)
+        saccharification, = flowsheet(cs.units.Saccharification)
+        seed_train, = flowsheet(cs.units.SeedTrain)
+        fermentor, = flowsheet(cs.units.CoFermentation)
+        dct['pretreatment_rxnsys'] = tmo.ReactionSystem(
+            prs.reactions, saccharification.saccharification
+        )
+        dct['fermentation_rxnsys'] = tmo.ReactionSystem(
+            seed_train.reactions, fermentor.loss, fermentor.cofermentation
+        )
+        dct['cellulosic_rxnsys'] = tmo.ReactionSystem(
+            prs.reactions, saccharification.saccharification,
+            seed_train.reactions, fermentor.loss, fermentor.cofermentation
+        )
+        saccharification.saccharification[0].X = 0.0 # Baseline
+        prs.reactions[10].X = 0.0 # baseline
+        fermentor.cofermentation[1:4].X[:] = fermentor.loss[0].X = 0.
+        fermentor.cofermentation[5:].X[:] = fermentor.loss[1].X = 0.
 
     # # Initial solids loading in Humbird is 20% (includes both dissolved and insoluble solids)
     # @uniform(20, 25, units='%', element='Fermentation')
@@ -613,7 +733,7 @@ def load(name, cache={}):
     @metric(units='USD/ton')
     def MFPP_derivative():
         if number < 0: return 0.
-        if derivative_disabled: return None
+        if derivative_disabled: return np.nan
         if agile:
             lipidcane_sys.cane_lipid_content += 0.01
             lipidcane_sys.sorghum_lipid_content += 0.01
@@ -633,7 +753,7 @@ def load(name, cache={}):
     @metric(units='Gal/ton')
     def biodiesel_production_derivative():
         if number < 0: return 0.
-        if derivative_disabled: return None
+        if derivative_disabled: return np.nan
         value = (biodiesel_flow() / feedstock_flow() - biodiesel_production.cache) / 1.
         # print('biodiesel production derivative', value)
         return value
@@ -641,7 +761,7 @@ def load(name, cache={}):
     @metric(units='Gal/ton')
     def ethanol_production_derivative():
         if number < 0: return 0.
-        if derivative_disabled: return None
+        if derivative_disabled: return np.nan
         value = (ethanol_flow() / feedstock_flow() - ethanol_production.cache) / 1.
         # print('ethanol production derivative', value)
         return value
@@ -649,7 +769,7 @@ def load(name, cache={}):
     @metric(units='kWhr/ton')
     def electricity_production_derivative():
         if number < 0: return 0.
-        if derivative_disabled: return None
+        if derivative_disabled: return np.nan
         value = (- electricity() / feedstock_flow() - electricity_production.cache) / 1.
         # print('electricity production derivative', value)
         return value
@@ -657,7 +777,7 @@ def load(name, cache={}):
     @metric(units='cf/ton')
     def natural_gas_consumption_derivative():
         if number < 0: return 0.
-        if derivative_disabled: return None
+        if derivative_disabled: return np.nan
         value =(natural_gas_flow() / feedstock_flow() - natural_gas_consumption.cache) / 1.
         # print('natural gas production derivative', value)
         return value
@@ -665,17 +785,19 @@ def load(name, cache={}):
     @metric(units='10^6*USD')
     def TCI_derivative():
         if number < 0: return 0.
-        if derivative_disabled: return None
+        if derivative_disabled: return np.nan
         value = (lipidcane_tea.TCI / 1e6  - TCI.cache) / 1. # 10^6*$
         # print('TCI production derivative', value)
         return value
-        
-    
     
     # # Single point evaluation for detailed design results
+    set_glucose_yield.setter(85)
+    set_xylose_yield.setter(65)
+    set_glucose_to_ethanol_yield.setter(90)
+    set_xylose_to_ethanol_yield.setter(85)
     lipid_extraction_specification.load_lipid_retention(0.70)
     lipid_extraction_specification.load_lipid_content(0.05)
-    set_bagasse_lipid_extraction_efficiency(0.)
+    set_bagasse_lipid_extraction_efficiency.setter(0.)
     set_ethanol_price.setter(1.898) 
     set_biodiesel_price.setter(4.363)
     set_natural_gas_price.setter(4.3)
@@ -822,9 +944,15 @@ def monte_carlo_file(name, across_lipid_content=False):
     filename += '.xlsx'
     return os.path.join(folder, filename)
 
+def autoload_file_name(name):
+    folder = os.path.dirname(__file__)
+    filename = name.replace('*', '_agile')
+    return os.path.join(folder, filename)
+
 def run_uncertainty_and_sensitivity(name, N, rule='L',
                                     across_lipid_content=False, 
-                                    sample_cache={}):
+                                    sample_cache={},
+                                    autoload=True):
     np.random.seed(1)
     from warnings import filterwarnings
     filterwarnings('ignore', category=bst.utils.DesignWarning)
@@ -862,11 +990,17 @@ def run_uncertainty_and_sensitivity(name, N, rule='L',
                 xlfile=file,
             )
     else:
-        model.evaluate(notify=int(N/10))
+        N = min(int(N/10), 50)
+        model.evaluate(notify=N,
+                       autosave=N,
+                       autoload=autoload,
+                       file=autoload_file_name(name))
         model.table.to_excel(file)
         rho, p = model.spearman_r()
         file = spearman_file(name)
         rho.to_excel(file)
+
+run = run_uncertainty_and_sensitivity
     
 def run_all(N, across_lipid_content=False, rule='L', configurations=None):
     if configurations is None: configurations = configuration_names
@@ -1090,7 +1224,7 @@ def plot_monte_carlo(derivative=False, configuration_names=configuration_names, 
             r"$\Delta$" + format_units(r"EP/LC").replace('cdot', r'cdot \Delta') + f"\n[{format_units('kWhr/ton')}]",
             r"$\Delta$" + format_units(r"NGC/LC").replace('cdot', r'cdot \Delta') + f"\n[{format_units('cf/ton')}]"
         ]
-        print(ylabels)
+        ylabels
     def get_data(metric, name):
         if isinstance(metric, bst.Variable):
             df = get_monte_carlo(name)
@@ -1168,19 +1302,9 @@ def plot_monte_carlo(derivative=False, configuration_names=configuration_names, 
     # )
     # legend.get_frame().set_linewidth(0.0)
 
-def plot_spearman_MFPP(top=None):
-    MFPPs = []
-    configuration_names = ['L1', 'L1*', 'L2', 'L2*']
-    for name in configuration_names:
-        file = spearman_file(name)
-        try: 
-            df = pd.read_excel(file, header=[0, 1], index_col=[0, 1])
-        except: 
-            warning = RuntimeWarning(f"file '{file}' not found")
-            warn(warning)
-            continue
-        MFPPs.append(df['Biorefinery', 'MFPP [USD/ton]'])
+def plot_spearman_MFPP(configuration, top=None, agile=True):
     stream_price = format_units('USD/gal')
+    USD_ton = format_units('USD/ton')
     ng_price = format_units('USD/cf')
     electricity_price = format_units('USD/kWhr')
     operating_days = format_units('day/yr')
@@ -1197,11 +1321,38 @@ def plot_spearman_MFPP(top=None):
         f'Electricity price [0.0583, 0.065, 0.069 {electricity_price}]',
         f'Operating days [180 $-$ 210 {operating_days}]',
          'IRR [10 $-$ 15 %]',
+        f'Crude glycerol price [91 $-$ 200 {USD_ton}]',
+        f'Pure glycerol price [501 $-$ 678 {USD_ton}]',
+        f'Cellulase price [144 $-$ 240 {USD_ton}]',
+        f'Cellulase loading [1.5 $-$ 2.5 wt. % cellulose]',
+        f'Pretreatment reactor system base cost [14.9 $-$ 24.7 MMUSD]',
+        f'Glucose yield [85 $-$ 97.5 %]',
+        f'Xylose yield [65 $-$ 97.5 %]',
+        f'Glucose to ethanol yield [90 $-$ 95 %]',
+        f'Xylose to ethanol yield [85 $-$ 95 %]',
        # '$^a$Fermentation solids loading [20% $-$ 25%]',
     ]
+    ignored = {
+        'S1': set([0, 1, 2, 3, 6, 7, 11, 12, 13, 14, 15, 16, 17, 18, 19]),
+        'L1': set([7, 11, 12, 13, 14, 15, 16, 17, 18, 19]),
+        'S2': set([0, 1, 2, 3, 6, 8]),
+        'L2': set([8]),
+    }
+    configuration_names = (configuration, configuration + '*') if agile else (configuration,)
+    MFPPs = []
+    for name in configuration_names:
+        file = spearman_file(name)
+        try: 
+            df = pd.read_excel(file, header=[0, 1], index_col=[0, 1])
+        except: 
+            warning = RuntimeWarning(f"file '{file}' not found")
+            warn(warning)
+            continue
+        MFPPs.append(df['Biorefinery', 'MFPP [USD/ton]'])
     color_wheel = CABBI_colors.wheel()
     fig, ax = bst.plots.plot_spearman_2d(MFPPs, top=top, index=index, 
                                          color_wheel=color_wheel,
+                                         ignored=ignored[configuration],
                                          name='MFPP')
     plt.legend(
         handles=[

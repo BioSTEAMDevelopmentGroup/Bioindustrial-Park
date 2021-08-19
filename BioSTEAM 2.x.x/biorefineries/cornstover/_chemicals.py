@@ -136,7 +136,7 @@ def create_chemicals():
     append_single_phase_chemical('AmmoniumSulfate')
     append_single_phase_chemical('NaNO3', 'SodiumNitrate')
     append_single_phase_chemical('Oil', 'Oleic acid')
-    append_single_phase_chemical('HMF')
+    append_single_phase_chemical('HMF', 'Hydroxymethylfurfural', phase='l')
     
     # Will remain in the vapor phase
     extend_single_phase_chemicals(['N2', 'O2', 'CH4', 'H2S', 'SO2'])

@@ -65,6 +65,8 @@ def create_hot_water_pretreatment_system(
         include_feedstock_handling=True,
         solids_loading=0.305,
         nonsolids=['Water'],
+        milling=False,
+        T_pretreatment_reactor=273.15 + 130.
     ):
     
     feedstock, = ins
@@ -83,21 +85,25 @@ def create_hot_water_pretreatment_system(
     
     ### Pretreatment system
     n = pretreatment_area
-    M203 = bst.SteamMixer(f'M{n+2}', (feedstock, pretreatment_steam, warm_process_water), P=5.5*101325)
-    R201 = units.PretreatmentReactorSystem(f'R{n+1}', M203-0)
+    P = pretreatment_steam.chemicals['H2O'].Psat(T_pretreatment_reactor + 25)
+    M203 = bst.SteamMixer(f'M{n+2}', (feedstock, pretreatment_steam, warm_process_water), P=P)
+    R201 = units.PretreatmentReactorSystem(f'R{n+1}', M203-0, T=T_pretreatment_reactor)
     P201 = units.BlowdownDischargePump(f'P{n+1}', R201-1)
-    T202 = units.OligomerConversionTank(f'T{n+2}', P201-0)
-    F201 = units.PretreatmentFlash(f'F{n+1}', T202-0, P=101325, Q=0)
+    F201 = units.PretreatmentFlash(f'F{n+1}', P201-0, P=101325, Q=0)
     M204 = bst.Mixer(f'M{n+3}', (R201-0, F201-0))
     H201 = units.WasteVaporCondenser(f'H{n+1}', M204-0, pretreatment_wastewater, V=0)
-    P202 = units.HydrolyzatePump(f'P{n+2}', F201-1, hydrolyzate)
-    
-    chemicals = M203.chemicals
+    P202 = units.HydrolyzatePump(f'P{n+2}', F201-1, None)
+    if milling:
+        U201 = bst.HammerMill(f'U{n+1}', P202-0, hydrolyzate)
+        P202.outs[0].materialize_connection
+    else:
+        P202.outs[0] = hydrolyzate
     M203.solids_loading = solids_loading
-    indices = chemicals.available_indices(nonsolids)
     @M203.add_specification(run=True)
     def update_pretreatment_process_water():
         solids_loading = M203.solids_loading
+        chemicals = M203.chemicals
+        indices = chemicals.available_indices(nonsolids)
         *other_feeds, warm_process_water = M203.ins
         F_mass_feed = sum([i.F_mass for i in other_feeds if i])
         available_water = (chemicals.MW[indices] * sum([i.mol[indices] for i in other_feeds if i])).sum()
@@ -182,10 +188,10 @@ def create_dilute_acid_pretreatment_system(
     P202 = units.HydrolyzatePump(f'P{n+2}', T203-0, hydrolyzate)
     
     M202.solids_loading = solids_loading
-    chemicals  = M202.chemicals 
-    indices = chemicals.available_indices(default_nonsolids)
     @M202.add_specification(run=True)
     def update_pretreatment_process_water():
+        chemicals  = M202.chemicals 
+        indices = chemicals.available_indices(default_nonsolids)
         sulfuric_acid, warm_process_water, feed = M202.ins
         available_water = (chemicals.MW[indices] * (feed.mol[indices] + sulfuric_acid.mol[indices])).sum()
         solids_loading = M202.solids_loading
@@ -240,24 +246,28 @@ def create_saccharification_system(
     H301 = units.HydrolysateHeatExchanger('H301', M301-0, T=48+273.15)
     M301.solids_loading = solids_loading
     M301.insoluble_solids_loading = insoluble_solids_loading
-    enzyme_over_cellulose = 0.4 # (20 g enzyme / 1000 g cellulose) / (50 g cellulase / 1000g enzyme)
-    z_mass_cellulase_mixture = np.array([0.95, 0.05])
+    M301.enzyme_loading = 0.02 # (20 g enzyme / 1000 g cellulose mixture) 
+    M301.enzyme_concentration = 0.05 # (50 g cellulase / 1000g enzyme) 
+    
     @M301.add_specification
     def update_cellulase_loading():
         hydrolyzate, cellulase, water = M301.ins
-        # Note: An additional 10% is produced for the media glucose/sophorose mixture
+        # Note: An additional 10% is produced to produce sophorose
         # Humbird (2011) pg. 37 
+        enzyme_concentration = M301.enzyme_concentration
+        enzyme_over_cellulose = M301.enzyme_loading / enzyme_concentration
+        z_mass_cellulase_mixture = np.array([1 - enzyme_concentration , enzyme_concentration], float)
         cellulase.imass['Water', 'Cellulase'] = (
             enzyme_over_cellulose
             * z_mass_cellulase_mixture
-            * 1.1 * (hydrolyzate.imass['Glucan', 'GlucoseOligomer'].sum() * 1.1)
+            * 1.2 * (hydrolyzate.imass['Glucan', 'GlucoseOligomer'].sum())
         )
     
-    chemicals = M301.chemicals
     
     @M301.add_specification(run=True)
     def update_moisture_content():
         hydrolyzate, cellulase, saccharification_water, *other = M301.ins
+        chemicals = M301.chemicals
         mass = chemicals.MW * sum([i.mol for i in [hydrolyzate, cellulase] + other]) 
         solids_loading = M301.solids_loading
         insoluble_solids_loading = M301.insoluble_solids_loading

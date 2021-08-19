@@ -467,6 +467,8 @@ def create_sugarcane_to_ethanol_combined_1_and_2g(ins, outs):
         area=300,
         udct=True,
         solids_loading=0.50,
+        T_pretreatment_reactor=273.15 + 180,
+        milling=True
     )
     hydrolyzate, pretreatment_wastewater = hot_water_pretreatment_sys.outs
     
