@@ -195,7 +195,7 @@ class SeedTrain(Unit):
         self.reactions(effluent)
         effluent.T = self.T
         vent.phase = 'g'
-        vent.copy_flow(effluent, ('CO2', 'NH3', 'O2'), remove=True)
+        vent.copy_flow(effluent, ('CO2', 'O2'), remove=True)
 
     def _design(self): 
         maxvol = self.outs[1].F_vol*self.tau_turnover
@@ -306,7 +306,6 @@ class Saccharification(Unit):
         self.P = P
         self._load_components()
         
-        
     def _load_components(self):
         chemicals = self.chemicals
         #: [ParallelReaction] Enzymatic hydrolysis reactions including from 
@@ -388,7 +387,6 @@ class CoFermentation(Unit):
     Rxn('3 Arabinose -> 5 LacticAcid',   'Arabinose', 0.0300, chemicals),
     Rxn('Galactose -> 2 LacticAcid',     'Galactose', 0.0300, chemicals),
     Rxn('Mannose -> 2 LacticAcid',       'Mannose',   0.0300, chemicals),])
-    
         self.cofermentation = ParallelRxn([
     #   Reaction definition                                          Reactant    Conversion
     Rxn('Glucose -> 2 Ethanol + 2 CO2',                             'Glucose',   0.9500, chemicals),
@@ -493,6 +491,7 @@ class SaccharificationAndCoFermentation(Unit):
         Unit.__init__(self, ID, ins, outs, thermo)
         self.P = P
         self.saccharification_split = saccharification_split
+        self._load_components()
     
     def _load_components(self):
         chemicals = self.chemicals
@@ -504,7 +503,6 @@ class SaccharificationAndCoFermentation(Unit):
             Rxn('Glucan + H2O -> Glucose',            'Glucan',   0.9000, chemicals),
             Rxn('Cellobiose + H2O -> 2Glucose',       'Cellobiose',  1.0000, chemicals)]
         )
-        
         self.loss = ParallelRxn([
     #   Reaction definition               Reactant    Conversion
     Rxn('Glucose -> 2 LacticAcid',       'Glucose',   0.0300, chemicals),
@@ -512,7 +510,6 @@ class SaccharificationAndCoFermentation(Unit):
     Rxn('3 Arabinose -> 5 LacticAcid',   'Arabinose', 0.0300, chemicals),
     Rxn('Galactose -> 2 LacticAcid',     'Galactose', 0.0300, chemicals),
     Rxn('Mannose -> 2 LacticAcid',       'Mannose',   0.0300, chemicals),])
-    
         self.cofermentation = ParallelRxn([
     #   Reaction definition                                          Reactant    Conversion
     Rxn('Glucose -> 2 Ethanol + 2 CO2',                             'Glucose',   0.9500, chemicals),
@@ -526,7 +523,6 @@ class SaccharificationAndCoFermentation(Unit):
     Rxn('Xylose + H2O -> Xylitol + 0.5 O2',                         'Xylose',    0.0460, chemicals),
     Rxn('3 Xylose + 5 CO2 -> 5 SuccinicAcid + 2.5 O2',              'Xylose',    0.0090, chemicals),
     ])
-    
         self.CSL_to_constituents = Rxn(
             'CSL -> 0.5 H2O + 0.25 LacticAcid + 0.25 Protein', 'CSL', 1.0000, chemicals, basis='wt',
         )
@@ -607,40 +603,38 @@ class SimultaneousSaccharificationAndCoFermentation(Unit):
     def __init__(self, ID='', ins=None, outs=(), P=101325, thermo=None):
         Unit.__init__(self, ID, ins, outs, thermo)
         self.P = P
+        self._load_components()
         
     def _load_components(self):
         chemicals = self.chemicals
         #: [ParallelReaction] Enzymatic hydrolysis reactions including from 
         #: downstream batch tank in co-fermentation.
         self.saccharification = ParallelRxn([
-            Rxn('Glucan -> GlucoseOligomer',          'Glucan',   0.0400),
-            Rxn('Glucan + 0.5 H2O -> 0.5 Cellobiose', 'Glucan',   0.0120),
-            Rxn('Glucan + H2O -> Glucose',            'Glucan',   0.9000),
-            Rxn('Cellobiose + H2O -> 2Glucose',       'Cellobiose',  1.0000)
+            Rxn('Glucan -> GlucoseOligomer',          'Glucan',   0.0400, chemicals),
+            Rxn('Glucan + 0.5 H2O -> 0.5 Cellobiose', 'Glucan',   0.0120, chemicals),
+            Rxn('Glucan + H2O -> Glucose',            'Glucan',   0.9000, chemicals),
+            Rxn('Cellobiose + H2O -> 2Glucose',       'Cellobiose',  1.0000, chemicals)
         ])
-        
         self.loss = ParallelRxn([
         #   Reaction definition               Reactant    Conversion
-        Rxn('Glucose -> 2 LacticAcid',       'Glucose',   0.0300),
-        Rxn('3 Xylose -> 5 LacticAcid',      'Xylose',    0.0300),
-        Rxn('3 Arabinose -> 5 LacticAcid',   'Arabinose', 0.0300),
-        Rxn('Galactose -> 2 LacticAcid',     'Galactose', 0.0300),
-        Rxn('Mannose -> 2 LacticAcid',       'Mannose',   0.0300),])
-        
+        Rxn('Glucose -> 2 LacticAcid',       'Glucose',   0.0300, chemicals),
+        Rxn('3 Xylose -> 5 LacticAcid',      'Xylose',    0.0300, chemicals),
+        Rxn('3 Arabinose -> 5 LacticAcid',   'Arabinose', 0.0300, chemicals),
+        Rxn('Galactose -> 2 LacticAcid',     'Galactose', 0.0300, chemicals),
+        Rxn('Mannose -> 2 LacticAcid',       'Mannose',   0.0300, chemicals),])
         self.cofermentation = ParallelRxn([
         #   Reaction definition                                          Reactant    Conversion
-        Rxn('Glucose -> 2 Ethanol + 2 CO2',                             'Glucose',   0.9500),
-        Rxn('Glucose + 0.047 CSL + 0.018 DAP -> 6 Z_mobilis + 2.4 H2O', 'Glucose',   0.0200),
-        Rxn('Glucose + 2 H2O -> 2 Glycerol + O2',                       'Glucose',   0.0040),
-        Rxn('Glucose + 2 CO2 -> 2 SuccinicAcid + O2',                   'Glucose',   0.0060),
-        Rxn('3 Xylose -> 5 Ethanol + 5 CO2',                            'Xylose',    0.8500),
+        Rxn('Glucose -> 2 Ethanol + 2 CO2',                             'Glucose',   0.9500, chemicals),
+        Rxn('Glucose + 0.047 CSL + 0.018 DAP -> 6 Z_mobilis + 2.4 H2O', 'Glucose',   0.0200, chemicals),
+        Rxn('Glucose + 2 H2O -> 2 Glycerol + O2',                       'Glucose',   0.0040, chemicals),
+        Rxn('Glucose + 2 CO2 -> 2 SuccinicAcid + O2',                   'Glucose',   0.0060, chemicals),
+        Rxn('3 Xylose -> 5 Ethanol + 5 CO2',                            'Xylose',    0.8500, chemicals),
         Rxn('Xylose + 0.039 CSL + 0.015 DAP -> 5 Z_mobilis + 2 H2O',
-                                                                        'Xylose',    0.0190),
-        Rxn('3 Xylose + 5 H2O -> 5 Glycerol + 2.5 O2',                  'Xylose',    0.0030),
-        Rxn('Xylose + H2O -> Xylitol + 0.5 O2',                         'Xylose',    0.0460),
-        Rxn('3 Xylose + 5 CO2 -> 5 SuccinicAcid + 2.5 O2',              'Xylose',    0.0090),
+                                                                        'Xylose',    0.0190, chemicals),
+        Rxn('3 Xylose + 5 H2O -> 5 Glycerol + 2.5 O2',                  'Xylose',    0.0030, chemicals),
+        Rxn('Xylose + H2O -> Xylitol + 0.5 O2',                         'Xylose',    0.0460, chemicals),
+        Rxn('3 Xylose + 5 CO2 -> 5 SuccinicAcid + 2.5 O2',              'Xylose',    0.0090, chemicals),
         ])
-    
         self.CSL_to_constituents = Rxn(
             'CSL -> 0.5 H2O + 0.25 LacticAcid + 0.25 Protein', 'CSL', 1.0000, basis='wt',
         )

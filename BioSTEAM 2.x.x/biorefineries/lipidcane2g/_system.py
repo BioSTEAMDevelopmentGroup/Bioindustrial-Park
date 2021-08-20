@@ -441,8 +441,9 @@ def create_sugarcane_to_ethanol_combined_1_and_2g(ins, outs):
         pellet_bagasse=False,
     )
     screened_juice, bagasse, fiber_fines = juicing_sys.outs
-    cellulose_rxn = tmo.Reaction('Cellulose -> Glucan', 'Cellulose', 1.0, basis='wt')
-    cellulose_rxn.basis = 'mol'
+    conveying_belt = bagasse.source
+    conveying_belt.cellulose_rxn = tmo.Reaction('Cellulose -> Glucan', 'Cellulose', 1.0, basis='wt')
+    conveying_belt.cellulose_rxn.basis = 'mol'
     # Bagasse composition https://www.sciencedirect.com/science/article/pii/S0144861710005072
     # South american; by HPLC
     # Glucan: 41.3%
@@ -451,16 +452,14 @@ def create_sugarcane_to_ethanol_combined_1_and_2g(ins, outs):
     # Arabinan: 1.7%
     # Lignin: 23.2%
     # Acetyl: 3.0%
-    hemicellulose_rxn = tmo.Reaction('30.2 Hemicellulose -> 24.9 Xylan + 1.7 Arabinan + 0.6 Galactan + 3 Acetate', 'Hemicellulose', 1.0, basis='wt')
-    hemicellulose_rxn.basis = 'mol'
+    conveying_belt.hemicellulose_rxn = tmo.Reaction('30.2 Hemicellulose -> 24.9 Xylan + 1.7 Arabinan + 0.6 Galactan + 3 Acetate', 'Hemicellulose', 1.0, basis='wt')
+    conveying_belt.hemicellulose_rxn.basis = 'mol'
+    @conveying_belt.add_specification
     def convert_hemicellulose():
         conveying_belt._run()
         bagasse = conveying_belt.outs[0]
-        cellulose_rxn(bagasse)
-        hemicellulose_rxn(bagasse)
-        
-    conveying_belt = bagasse.source
-    conveying_belt.specification = convert_hemicellulose
+        conveying_belt.cellulose_rxn(bagasse)
+        conveying_belt.hemicellulose_rxn(bagasse)
     hot_water_pretreatment_sys, hw_dct = brf.cornstover.create_hot_water_pretreatment_system(
         ins=bagasse,
         mockup=True,
@@ -492,14 +491,14 @@ def create_sugarcane_to_ethanol_combined_1_and_2g(ins, outs):
     PX = bst.Pump(400, ins=EvX-0, P=101325.)
     HX = bst.HXutility(400, PX-0, T=305.15)
     HX-0-sink
-    sucrose_hydrolysis_reaction = tmo.Reaction(
+    PX.sucrose_hydrolysis_reaction = tmo.Reaction(
         'Sucrose + Water -> 2Glucose', 'Sucrose', 1.00
     )
 
     @PX.add_specification(run=True)
     def hydrolysis():
         feed = PX.ins[0]
-        sucrose_hydrolysis_reaction.force_reaction(feed)
+        PX.sucrose_hydrolysis_reaction.force_reaction(feed)
         if feed.imol['Water'] < 0: feed.imol['Water'] = 0.
     
     EvX.solids_loading = 0.20

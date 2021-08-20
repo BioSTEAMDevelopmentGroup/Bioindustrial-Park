@@ -268,7 +268,8 @@ def create_saccharification_system(
     def update_moisture_content():
         hydrolyzate, cellulase, saccharification_water, *other = M301.ins
         chemicals = M301.chemicals
-        mass = chemicals.MW * sum([i.mol for i in [hydrolyzate, cellulase] + other]) 
+        s_mix = Stream.sum([hydrolyzate, cellulase], None, M301.thermo, energy_balance=False)
+        mass = s_mix.mol * chemicals.MW
         solids_loading = M301.solids_loading
         insoluble_solids_loading = M301.insoluble_solids_loading
         indices = chemicals.available_indices(nonsolids)
@@ -541,10 +542,10 @@ def create_cofermentation_system(
                                 gas=('CO2', 'NH3', 'O2'))
         D401-1-1-M401-0-T302
     
-        stripping_water_over_vent = stripping_water.mol / 21202.490455845436
+        stripping_water_over_vent = stripping_water.imol['Water'] / 21202.490455845436
         def update_stripping_water():
             stripping_water, vent = D401.ins
-            stripping_water.mol[:] = stripping_water_over_vent * vent.F_mass
+            stripping_water.imol['Water'] = stripping_water_over_vent * vent.F_mass
             D401._run()
         D401.specification = update_stripping_water
     else:

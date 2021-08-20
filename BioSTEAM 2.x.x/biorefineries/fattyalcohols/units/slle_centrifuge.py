@@ -52,7 +52,7 @@ class SLLECentrifuge(bst.Unit):
     def _run(self):
         top, bottom, solids = self.outs
         sep.lle(self.ins[0], top, bottom, self.top_chemical, self.efficiency)
-        sep.split(bottom, solids, bottom, self.solids_split)
+        bottom.split_to(solids, bottom, self.solids_split)
         sep.adjust_moisture_content(solids, bottom, self.moisture_content)
 
 
@@ -106,6 +106,6 @@ class SolidLiquidsSplitCentrifuge(bst.Unit):
 
     def _run(self):
         top, bottom, solids = self.outs
-        sep.split(self.ins[0], top, bottom, self.liquids_split)
-        sep.split(bottom, solids, bottom, self.solids_split)
+        self.ins[0].split_to(top, bottom, self.liquids_split)
+        bottom.split_to(solids, bottom, self.solids_split)
         sep.adjust_moisture_content(solids, bottom, self.moisture_content)

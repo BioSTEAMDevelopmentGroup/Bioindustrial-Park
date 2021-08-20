@@ -523,15 +523,13 @@ def create_sucrose_fermentation_system(ins, outs, scrubber=True):
     
     def sugar_concentration_at_fraction_evaporated(V):
         F301.V = V
-        F301._run()
-        P306._run()
+        for i in F301.path_until(M301): i._run()
         M301._run()
         return F301.sugar_concentration - get_sugar_concentration()
     
     def get_dilution_water():
         F301.V = 0
-        F301._run()
-        P306._run()
+        for i in F301.path_until(M301): i._run()
         M301._run()
         target = F301.sugar_concentration
         current = get_sugar_concentration()
@@ -544,7 +542,6 @@ def create_sucrose_fermentation_system(ins, outs, scrubber=True):
         s_dilution_water.empty()
         dilution_water = get_dilution_water()
         if dilution_water < 0.:
-            y0 = sugar_concentration_at_fraction_evaporated(0.)
             y1 = sugar_concentration_at_fraction_evaporated(1.)
             if y1 > 0.: 
                 S301.split = 0.05
@@ -555,7 +552,6 @@ def create_sucrose_fermentation_system(ins, outs, scrubber=True):
                     S301._run()
                     y1 = sugar_concentration_at_fraction_evaporated(1.)
                     if y1 > 0.:
-                        breakpoint()
                         raise RuntimeError('cannot evaporate to target sugar concentration')
             F301.V = flx.IQ_interpolation(
                 sugar_concentration_at_fraction_evaporated,
@@ -613,7 +609,8 @@ def create_sucrose_fermentation_system(ins, outs, scrubber=True):
         yeast = 0.1 * feed.F_mass
         m = C301.moisture_content
         recycle.imass['Yeast', 'Water'] = [yeast, yeast * m / (1 - m)]
-        beer.mol = feed.mol - recycle.mol
+        beer.copy_like(feed)
+        beer.separate_out(recycle, energy_balance=False)
         beer.mol[beer.mol < 0.] = 0.
         beer.T = recycle.T = feed.T
     S302.specification = adjust_yeast_recycle

@@ -81,7 +81,8 @@ special_price = {
     'gypsum':           ('Uniform',   (-0.0288,   0.00776))
     }
 # !!! Need to add just 2 more streams and their default price distributions here
-# (make-up catalyst streams for dehydration and hydrogenation)
+# (make-up and spent catalyst streams for dehydration and hydrogenation)
+
 
 # Prices for boiler_chems, baghouse_bag, and cooling_tower_chems are not included
 # as they are tied to BT/CT duties
