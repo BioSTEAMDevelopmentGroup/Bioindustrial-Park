@@ -55,10 +55,6 @@ class PretreatmentReactorSystem(Unit):
         vapor, liquid = self.outs
         vapor.phase = 'g'
         self.T = T
-        
-    def _load_components(self):
-        thermo = self.thermo
-        self._multistream = MultiStream(None, thermo=thermo)
         chemicals = self.chemicals
         self.reactions = ParallelRxn([
     #            Reaction definition                 Reactant    Conversion
@@ -83,6 +79,10 @@ class PretreatmentReactorSystem(Unit):
         self.xylan_to_xylose = self.reactions[8]
         self.glucose_to_byproducts = self.reactions[1:3]
         self.xylose_to_byproducts = self.reactions[9:12]
+        
+    def _load_components(self):
+        thermo = self.thermo
+        self._multistream = MultiStream(None, thermo=thermo)
     
     def _run(self):
         ms = self._multistream
@@ -155,9 +155,6 @@ class SeedTrain(Unit):
     def __init__(self, ID='', ins=None, outs=(), thermo=None, saccharification=False):
         Unit.__init__(self, ID, ins, outs, thermo)
         self.saccharification = saccharification
-        self._load_components()
-
-    def _load_components(self):
         chemicals = self.chemicals
         self.reactions = ParallelRxn([
     #   Reaction definition                             Reactant    Conversion
@@ -304,9 +301,6 @@ class Saccharification(Unit):
     def __init__(self, ID='', ins=None, outs=(), thermo=None, P=101325):
         Unit.__init__(self, ID, ins, outs, thermo)
         self.P = P
-        self._load_components()
-        
-    def _load_components(self):
         chemicals = self.chemicals
         #: [ParallelReaction] Enzymatic hydrolysis reactions including from 
         #: downstream batch tank in co-fermentation.
@@ -376,9 +370,6 @@ class CoFermentation(Unit):
     def __init__(self, ID='', ins=None, outs=(), thermo=None, P=101325):
         Unit.__init__(self, ID, ins, outs, thermo)
         self.P = P
-        self._load_components()
-        
-    def _load_components(self):
         chemicals = self.chemicals
         self.loss = ParallelRxn([
     #   Reaction definition               Reactant    Conversion
@@ -491,9 +482,6 @@ class SaccharificationAndCoFermentation(Unit):
         Unit.__init__(self, ID, ins, outs, thermo)
         self.P = P
         self.saccharification_split = saccharification_split
-        self._load_components()
-    
-    def _load_components(self):
         chemicals = self.chemicals
         #: [ParallelReaction] Enzymatic hydrolysis reactions including from 
         #: downstream batch tank in co-fermentation.
@@ -603,9 +591,6 @@ class SimultaneousSaccharificationAndCoFermentation(Unit):
     def __init__(self, ID='', ins=None, outs=(), P=101325, thermo=None):
         Unit.__init__(self, ID, ins, outs, thermo)
         self.P = P
-        self._load_components()
-        
-    def _load_components(self):
         chemicals = self.chemicals
         #: [ParallelReaction] Enzymatic hydrolysis reactions including from 
         #: downstream batch tank in co-fermentation.

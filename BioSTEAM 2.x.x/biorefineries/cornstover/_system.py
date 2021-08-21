@@ -268,7 +268,7 @@ def create_saccharification_system(
     def update_moisture_content():
         hydrolyzate, cellulase, saccharification_water, *other = M301.ins
         chemicals = M301.chemicals
-        s_mix = Stream.sum([hydrolyzate, cellulase], None, M301.thermo, energy_balance=False)
+        s_mix = Stream.sum([hydrolyzate, cellulase], None, M301.outs[0].thermo, energy_balance=False)
         mass = s_mix.mol * chemicals.MW
         solids_loading = M301.solids_loading
         insoluble_solids_loading = M301.insoluble_solids_loading

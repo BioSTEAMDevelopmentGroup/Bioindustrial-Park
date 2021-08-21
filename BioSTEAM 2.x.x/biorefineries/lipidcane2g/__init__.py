@@ -390,7 +390,7 @@ def load(name, cache={}):
         rename_storage_units(1100)
     else:
         raise NotImplementedError(number)
-    lipidcane_sys.set_tolerance(rmol=1e-3)
+    lipidcane_sys.set_tolerance(rmol=1e-3, subsystems=True)
     lipidcane_sys.N_runs = 3
     dct.update(flowsheet.to_dict())
     if number == 1:
@@ -580,10 +580,10 @@ def load(name, cache={}):
     def set_glucose_yield(glucose_yield):
         if abs(number) == 2:
             glucose_yield *= 0.01
-            X1 = prs.reactions[0].X
-            X1_side = prs.reactions[1:3].X.sum()
-            X2_side = saccharification.saccharification[:2].X.sum()
-            saccharification.saccharification[2].X = X2 = (glucose_yield - X1) / (1 - X1_side)
+            X1 = prs.reactions.X[0]
+            X1_side = prs.reactions.X[1:3].sum()
+            X2_side = saccharification.saccharification.X[:2].sum()
+            saccharification.saccharification.X[2] = X2 = (glucose_yield - X1) / (1 - X1_side)
             X_excess = (X2_side + X2) - 1
             if X_excess > 0: breakpoint()
     
@@ -591,8 +591,8 @@ def load(name, cache={}):
     def set_xylose_yield(xylose_yield):
         if abs(number) == 2:
             xylose_yield *= 0.01
-            X1_side = prs.reactions[9:11].X.sum()
-            prs.reactions[8].X = X1 = xylose_yield
+            X1_side = prs.reactions.X[9:11].sum()
+            prs.reactions.X[8] = X1 = xylose_yield
             X_excess = (X1_side + X1) - 1
             if X_excess > 0.: breakpoint()
                 
@@ -604,14 +604,14 @@ def load(name, cache={}):
             # fermentor.cofermentation[3].X = 0.006 # Baseline
             # fermentor.loss[0].X = 0.03 # Baseline
             split = np.mean(S403.split)
-            X1 = split * seed_train.reactions[0].X
-            X1_side = split * seed_train.reactions[1:4].X.sum()
-            X2_side = fermentor.loss[0].X
-            X3_side = fermentor.cofermentation[1:4].X.sum()
+            X1 = split * seed_train.reactions.X[0]
+            X1_side = split * seed_train.reactions.X[1:4].sum()
+            X2_side = fermentor.loss.X[0]
+            X3_side = fermentor.cofermentation.X[1:4].sum()
             X3 = (glucose_to_ethanol_yield - X1) / (1 - X1_side - X2_side / (1 - X1 - X1_side)) 
             X_excess = (X3 + X3_side) - 1
             if X_excess > 0.: breakpoint()
-            fermentor.cofermentation[0].X = X3
+            fermentor.cofermentation.X[0] = X3
     
     @uniform(85, 95, units='%', element='Cofermenation')
     def set_xylose_to_ethanol_yield(xylose_to_ethanol_yield):
@@ -622,14 +622,14 @@ def load(name, cache={}):
             # fermentor.loss[1].X = 0.03 # Baseline
             xylose_to_ethanol_yield *= 0.01
             split = np.mean(S403.split)
-            X1 = split * seed_train.reactions[4].X
-            X1_side = split * seed_train.reactions[6:].X.sum()
-            X2_side = fermentor.loss[1].X
-            X3_side = fermentor.cofermentation[5:].X.sum()
+            X1 = split * seed_train.reactions.X[4]
+            X1_side = split * seed_train.reactions.X[6:].sum()
+            X2_side = fermentor.loss.X[1]
+            X3_side = fermentor.cofermentation.X[5:].sum()
             X3 = (xylose_to_ethanol_yield - X1) / (1 - X1_side - X2_side / (1 - X1 - X1_side)) 
             X_excess = (X3 + X3_side) - 1
             if X_excess > 0.: breakpoint()
-            fermentor.cofermentation[0].X = X3
+            fermentor.cofermentation.X[0] = X3
 
     if abs(number) == 2:
         prs, = flowsheet(cs.units.PretreatmentReactorSystem)
@@ -824,6 +824,7 @@ def load(name, cache={}):
         raise e
     finally:
         lipidcane_tea.IRR = 0.10
+    lipidcane_sys.reduce_chemicals()
 
 def evaluate_configurations_across_extraction_efficiency_and_lipid_content(
         efficiency, lipid_content, lipid_retention, agile, configurations,

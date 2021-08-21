@@ -224,8 +224,7 @@ def create_lipid_pretreatment_system(ins, outs):
             P5.outs[0].ivol['Acetone'] = total_acetone_required
         else:
             fresh_acetone.ivol['Acetone'] = acetone_required
-        T1._run()
-        P1._run()
+        for i in T1.path_until(M1): i._run()
         M1._run()
     
     P3 = bst.Pump('P3', T3-1, P=101325)
@@ -253,8 +252,7 @@ def create_lipid_pretreatment_system(ins, outs):
             + lipid.imol['TAG']
         ) - M2.ins[1].imol['Glycerol']
         R1.ins[2].ivol['N2'] = lipid.F_vol
-        T2._run()
-        P2._run()
+        for i in T2.path_until(M2): i._run()
         M2._run()
         
     H4 = bst.HXutility('H4', H3-1, T=333.15, V=0)
@@ -361,8 +359,9 @@ def create_transesterification_and_biodiesel_separation_system(ins, outs):
     
     def adjust_feed_to_reactors():
         R402._run()
+        for i in S401.outs:
+            if isinstance(i, bst.Junction): i._run()
         S401.ins[0].mix_from(S401.outs)
-    
     R402.specification = adjust_feed_to_reactors
     
     # Centrifuge to remove glycerol

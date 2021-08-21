@@ -219,7 +219,7 @@ def create_lipidcane_to_biodiesel_and_ethanol_1g(
                                  process_water_streams)
     
     HXN = bst.HeatExchangerNetwork(900, 
-        ignored=[u.E301, u.D601.boiler, u.D602.boiler, u.H601, u.H602, u.H603, u.H604, lipid_pretreatment_dct['F3']],
+        ignored=lambda: [u.E301, u.D601.boiler, u.D602.boiler, u.H601, u.H602, u.H603, u.H604, lipid_pretreatment_dct['F3']],
         Qmin=1e5,
     )
     HXN.acceptable_energy_balance_error = 0.01
@@ -252,8 +252,9 @@ def create_lipidcane_to_biodiesel_and_ethanol_combined_1_and_2g_post_fermentatio
     crushing_mill = udct['U201']
     crushing_mill.tag = "bagasse lipid retention"
     crushing_mill.isplit['Lipid'] = 0.90
-    cellulose_rxn = tmo.Reaction('Cellulose -> Glucan', 'Cellulose', 1.0, basis='wt')
-    cellulose_rxn.basis = 'mol'
+    conveying_belt = bagasse.source
+    conveying_belt.cellulose_rxn = tmo.Reaction('Cellulose -> Glucan', 'Cellulose', 1.0, basis='wt')
+    conveying_belt.cellulose_rxn.basis = 'mol'
     # Bagasse composition https://www.sciencedirect.com/science/article/pii/S0144861710005072
     # South american; by HPLC
     # Glucan: 41.3%
@@ -262,15 +263,14 @@ def create_lipidcane_to_biodiesel_and_ethanol_combined_1_and_2g_post_fermentatio
     # Arabinan: 1.7%
     # Lignin: 23.2%
     # Acetyl: 3.0%
-    hemicellulose_rxn = tmo.Reaction('30.2 Hemicellulose -> 24.9 Xylan + 1.7 Arabinan + 0.6 Galactan + 3 Acetate', 'Hemicellulose', 1.0, basis='wt')
-    hemicellulose_rxn.basis = 'mol'
+    conveying_belt.hemicellulose_rxn = tmo.Reaction('30.2 Hemicellulose -> 24.9 Xylan + 1.7 Arabinan + 0.6 Galactan + 3 Acetate', 'Hemicellulose', 1.0, basis='wt')
+    conveying_belt.hemicellulose_rxn.basis = 'mol'
     def convert_hemicellulose():
         conveying_belt._run()
         bagasse = conveying_belt.outs[0]
-        cellulose_rxn(bagasse)
-        hemicellulose_rxn(bagasse)
+        conveying_belt.cellulose_rxn(bagasse)
+        conveying_belt.hemicellulose_rxn(bagasse)
         
-    conveying_belt = bagasse.source
     conveying_belt.specification = convert_hemicellulose
     hot_water_pretreatment_sys, hw_dct = brf.cornstover.create_hot_water_pretreatment_system(
         ins=bagasse,
@@ -305,14 +305,14 @@ def create_lipidcane_to_biodiesel_and_ethanol_combined_1_and_2g_post_fermentatio
     PX = bst.Pump(400, ins=EvX-0, P=101325.)
     HX = bst.HXutility(400, PX-0, T=305.15)
     HX-0-sink
-    sucrose_hydrolysis_reaction = tmo.Reaction(
+    PX.sucrose_hydrolysis_reaction = tmo.Reaction(
         'Sucrose + Water -> 2Glucose', 'Sucrose', 1.00
     )
 
     @PX.add_specification(run=True)
     def hydrolysis():
         feed = PX.ins[0]
-        sucrose_hydrolysis_reaction.force_reaction(feed)
+        PX.sucrose_hydrolysis_reaction.force_reaction(feed)
         if feed.imol['Water'] < 0: feed.imol['Water'] = 0.
     
     EvX.solids_loading = 0.20
@@ -410,7 +410,7 @@ def create_lipidcane_to_biodiesel_and_ethanol_combined_1_and_2g_post_fermentatio
     Ev607 = pfls_dct['Ev607']
     D303 = ep_dct['D303']
     HXN = bst.HeatExchangerNetwork(1000,
-        ignored=[u.D801.boiler, u.D802.boiler, u.H803, u.H802, u.H801, u.H804, lipid_pretreatment_dct['F3']],
+        ignored=lambda: [u.D801.boiler, u.D802.boiler, u.H803, u.H802, u.H801, u.H804, lipid_pretreatment_dct['F3']],
         Qmin=1e3,
     )
     HXN.acceptable_energy_balance_error = 0.01
