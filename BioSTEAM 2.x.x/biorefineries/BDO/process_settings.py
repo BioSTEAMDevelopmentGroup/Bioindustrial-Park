@@ -136,7 +136,7 @@ isobutanol_price = 1.3
 
 # https://www.alibaba.com/product-detail/Carboxy-Methyl-Cellulose-CAS-9000-11_62593143048.html?spm=a2700.galleryofferlist.normal_offer.d_title.714574f8fNXgfq&s=p
 # https://www.alibaba.com/product-detail/hydrogenation-catalyst-HT-40-nickel-catalyst_507577301.html?spm=a2700.galleryofferlist.normal_offer.d_title.61e474d0VtlyjV&s=p
-hydrogenation_catalyst_price = 1.3 + 0.18*20
+KieCNi_price = 1.3 + 0.18*20
 
 # https://www.alibaba.com/product-detail/Gas-Hydrogen-45kg-Lpg-Gas-Cylinder_62018626105.html?spm=a2700.galleryofferlist.topad_creative.d_title.4a5c7ce2MUN3cm
 h2_price = 1.03
@@ -148,6 +148,7 @@ oleyl_alcohol_price = 2.97 # 2.1 euro per kg in 2005; adjusted for inflation and
 # All in 2016$/kg
 price = {'MEK': MEK_price,
          'TCP': TCP_price,
+         'Kie-CMC-Ni':KieCNi_price,
          'IBA': IBA_price,
          'Acetoin': acetoin_price,
          'Feedstock': feedstock_price,
@@ -155,7 +156,6 @@ price = {'MEK': MEK_price,
          'OleylAlcohol': oleyl_alcohol_price,
          'Isobutanol': isobutanol_price,
          'Sulfuric acid': 0.0430 * _lb_per_kg,	
-         'Hydrogenation catalyst': hydrogenation_catalyst_price,
          # 0.1900 is for NH3	
          'AmmoniumHydroxide': 0.1900 * _lb_per_kg * 17.031/35.046,	
          'CSL': 0.0339 * _lb_per_kg,
@@ -178,7 +178,7 @@ price = {'MEK': MEK_price,
          'Gypsum': gypsum_price,
          'Denaturant': denaturant_price,
          'Amberlyst15': amberlyst_15_price,
-         'DAP': 0.1645 * _lb_per_kg}
+         'DAP': 0.1645 * _lb_per_kg,}
     
 
 

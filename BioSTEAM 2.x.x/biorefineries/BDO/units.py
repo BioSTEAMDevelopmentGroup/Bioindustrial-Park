@@ -1763,5 +1763,5 @@ class HydrogenationReactor(Reactor):
         hu_total.scale(N)
         self.baseline_purchase_costs['Heat exchangers'] = hx.purchase_cost * N
         self.baseline_purchase_costs['Kie-CMC-Ni catalyst'] =\
-            self.mcat_frac * (sum([stream.F_vol for stream in self.outs])) * price['Hydrogenation catalyst']
+            self.mcat_frac * (sum([stream.F_vol for stream in self.outs])) * price['Kie-CMC-Ni']
         

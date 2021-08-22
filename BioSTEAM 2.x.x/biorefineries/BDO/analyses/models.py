@@ -87,7 +87,8 @@ special_price = {
 # Prices for boiler_chems, baghouse_bag, and cooling_tower_chems are not included
 # as they are tied to BT/CT duties
 default_price_streams = ('sulfuric_acid_T201', 'enzyme', 
-                         'makeup_water', 'caustic', 'ash_disposal', 'oleyl_alcohol')
+                         'makeup_water', 'caustic', 'ash_disposal', 'oleyl_alcohol',
+                         'makeup_TCP_catalyst', 'makeup_KieCNi_catalyst')
 
 def add_stream_price_param(stream, D):
     param(setter=lambda price: setattr(stream, 'price', price),

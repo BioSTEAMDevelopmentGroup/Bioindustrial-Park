@@ -99,7 +99,7 @@ def create_conversion_system(ins, outs):
     MEK, isobutanol, wastewater, spent_TCP_catalyst, spent_KieCNi_catalyst = outs # !!! need to add spent catalyst streams (priced at 0)
     
     makeup_TCP_catalyst = bst.Stream('makeup_TCP_catalyst', price=price.get('TCP', 0.))
-    makeup_KieCNi_catalyst = bst.Stream('makeup_KieCNi_catalyst', price=price.get('Kie-CMC-Ni catalyst', 0.))
+    makeup_KieCNi_catalyst = bst.Stream('makeup_KieCNi_catalyst', price=price.get('Kie-CMC-Ni', 0.))
     
     H2_fresh = Stream('H2_fresh', price = price['H2'])
     
