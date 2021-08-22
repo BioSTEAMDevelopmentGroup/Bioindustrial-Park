@@ -25,6 +25,7 @@ def set_lipid_fraction(lipid_fraction, stream=None, data={}):
     fiber_IDs = ('Lignin', 'Cellulose', 'Hemicellulose')
     lipid_IDs = ('PL', 'FFA', 'MAG', 'DAG', 'TAG')
     if not data:
+        data['thermo'] = thermo = stream.thermo
         carbs   = Stream(None, thermo=stream.thermo)
         fiber   = Stream(None, thermo=stream.thermo)
         lipid   = Stream(None, thermo=stream.thermo)
@@ -47,14 +48,17 @@ def set_lipid_fraction(lipid_fraction, stream=None, data={}):
         LHV_lipid_kg = lipid.LHV/lipid_massnet
         data['LHV_lipid_over_carbs'] = LHV_lipid_kg / LHV_carbs_kg
         
-        
         # Relative composition
         data['r_mass_carbs'] = array(carbs_mass/carbs_massnet)
         data['r_mass_fiber'] = array(fiber_mass/fiber_massnet)
         data['r_mass_lipid'] = array(lipid_mass/lipid_massnet)
-        
-    z_mass_lipid = lipid_fraction
+    else:
+        thermo = data['thermo']
+    chemicals = thermo.chemicals
+    old_chemicals = stream.chemicals
     F_mass = stream.F_mass
+    container = None if old_chemicals is chemicals else stream._imol.reset_chemicals(chemicals)
+    z_mass_lipid = lipid_fraction
     z_dry = 0.3
     z_mass_lipid = z_mass_lipid * z_dry 
     z_mass_carbs = 0.149 - z_mass_lipid * data['LHV_lipid_over_carbs']
@@ -66,6 +70,7 @@ def set_lipid_fraction(lipid_fraction, stream=None, data={}):
     imass[lipid_IDs] = data['r_mass_lipid'] * z_mass_lipid * F_mass
     imass[carbs_IDs] = data['r_mass_carbs'] * z_mass_carbs * F_mass
     imass[fiber_IDs] = data['r_mass_fiber'] * z_mass_fiber * F_mass
+    if container is not None: stream._imol.reset_chemicals(old_chemicals, container)
     if any(stream.mol < 0):
         raise ValueError(f'lipid cane oil composition of {z_mass_lipid/z_dry*100:.0f}% dry weight is infeasible')
 

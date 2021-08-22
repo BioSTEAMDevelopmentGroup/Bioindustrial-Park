@@ -595,6 +595,7 @@ class TiterAndInhibitorsSpecification:
         self.maximum_inhibitor_concentration = maximum_inhibitor_concentration
         # self.get_products_mass = compute_BDO_mass
         self.seed_train_system = seed_train_system
+        self._V_cache_a = self._V_cache_b = None
         
     @property
     def feed(self):
@@ -657,8 +658,9 @@ class TiterAndInhibitorsSpecification:
         # breakpoint()
         if x_titer < self.target_titer: # Evaporate
             f = self.titer_objective_function
-            self.evaporator.V = V_min = flx.IQ_interpolation(self.titer_objective_function,
-                                                             V_min, V_max, ytol=1e-3, maxiter=200) 
+            self.evaporator.V = V_min = self._V_cache_a = flx.IQ_interpolation(
+                self.titer_objective_function, V_min, V_max, 
+                x=self._V_cache_a, ytol=1e-3, maxiter=200) 
             self.titer_objective_function(V_min)
         elif x_titer > self.target_titer: # Dilute
             self.update_dilution_water(x_titer)
@@ -674,8 +676,10 @@ class TiterAndInhibitorsSpecification:
             y_0 = obj_f(V_min)
             
             if y_0 > 0.:
-                self.evaporator.V = flx.IQ_interpolation(obj_f,
-                    V_min, V_max, y0 = y_0, ytol=1e-2, maxiter=100,
+                self.evaporator.V = self._V_cache_b = flx.IQ_interpolation(obj_f,
+                    V_min, V_max, y0 = y_0, 
+                    x=self._V_cache_b,
+                    ytol=1e-2, maxiter=100,
                 ) 
         
         # self.check_sugar_concentration()

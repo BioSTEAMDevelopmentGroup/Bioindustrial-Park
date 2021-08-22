@@ -135,7 +135,7 @@ def create_lipid_wash_system(ins, outs):
                                                    Water=0.01))
     
     # Vacume out water
-    F201 = units.SplitFlash('F201', T=357.15, P=2026.5,
+    F201 = units.SplitFlash('F201', T=357.15, P=5000,
                             ins=C203-0,
                             outs=('', washed_lipid),
                             split=dict(Lipid=0.0001,
@@ -197,7 +197,7 @@ def create_lipid_pretreatment_system(ins, outs):
     degummed_oil, polar_lipids, wastewater = outs
     
     # Vacume out water
-    F3 = units.SplitFlash('F3', T=357.15, P=2026.5,
+    F3 = units.SplitFlash('F3', T=357.15, P=5000,
                           ins=crude_vegetable_oil,
                           split=dict(Lipid=0.0001,
                                      Water=1.0),)

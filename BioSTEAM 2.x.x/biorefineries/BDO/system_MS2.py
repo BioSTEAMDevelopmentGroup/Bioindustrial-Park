@@ -155,6 +155,7 @@ for HXN_group in unit_groups:
         HXN = HXN_group.units[0]
         assert isinstance(HXN, bst.HeatExchangerNetwork)
 
+# HXN.force_ideal_thermo = True
 CT = u.CT801
 BT = u.BT701
 CWP = u.CWP901

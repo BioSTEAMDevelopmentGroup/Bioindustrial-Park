@@ -200,19 +200,7 @@ def create_pretreatment_and_fermentation_system(ins, outs):
     H202 = bst.HXutility('H202', ins=R201-0,
                               V=0, rigorous=True)
     
-    T204 = bdo.units.LimeAdditionTank('T204', ins=(F201-1, 'lime_fresh'))
-    
-        
-    @T204.add_specification(run=True)
-    def update_lime_and_mix():
-        hydrolysate = F201.outs[1]
-        T204.ins[1].imol['CaO'] = hydrolysate.imol['H2SO4'] * 1.
-    
-    gypsum_split={'CaSO4':1.}
-    S201 = hp.units.GypsumFilter('S201', ins=T204-0, outs=('gypsum', ''), split = gypsum_split,
-                              moisture_content=0.2)
-    
-    P201 = hp.units.HydrolysatePump('P201', ins=S201-1)
+    P201 = hp.units.HydrolysatePump('P201', ins=F201-1)
     
     # =============================================================================
     # Conversion streams
@@ -235,10 +223,22 @@ def create_pretreatment_and_fermentation_system(ins, outs):
     # =============================================================================
     
     # Cool hydrolysate down to fermentation temperature at 50°C
-    H301 = bst.HXutility('H301', ins=P201-0, T=50+273.15, rigorous=True)
+    H301 = bst.HXutility('H301', ins=P201-0, T=45+273.15, rigorous=True)
+    
+    T204 = bdo.units.LimeAdditionTank('T204', ins=(H301-0, 'lime_fresh'))
+    
+    @T204.add_specification(run=True)
+    def update_lime_and_mix():
+        hydrolysate = F201.outs[1]
+        T204.ins[1].imol['CaO'] = hydrolysate.imol['H2SO4'] * 1.
+    
+    gypsum_split={'CaSO4':1.}
+    S201 = hp.units.GypsumFilter('S201', ins=T204-0, outs=('gypsum', ''), split = gypsum_split,
+                              moisture_content=0.2)
+    
     
     # Mix enzyme with the cooled pretreatment hydrolysate
-    M301 = hp.units.EnzymeHydrolysateMixer('M301', ins=(H301-0, enzyme, enzyme_water))
+    M301 = hp.units.EnzymeHydrolysateMixer('M301', ins=(S201-1, enzyme, enzyme_water))
     
     # Saccharification
     R301 = hp.units.Saccharification('R301', 

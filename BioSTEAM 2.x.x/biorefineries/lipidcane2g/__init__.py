@@ -824,7 +824,10 @@ def load(name, cache={}):
         raise e
     finally:
         lipidcane_tea.IRR = 0.10
-    lipidcane_sys.reduce_chemicals()
+    if agile:
+        lipidcane_sys.system.reduce_chemicals()
+    else:
+        lipidcane_sys.reduce_chemicals()
 
 def evaluate_configurations_across_extraction_efficiency_and_lipid_content(
         efficiency, lipid_content, lipid_retention, agile, configurations,

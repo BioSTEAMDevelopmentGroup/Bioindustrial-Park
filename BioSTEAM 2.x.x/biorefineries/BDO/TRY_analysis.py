@@ -304,7 +304,7 @@ BDO_metrics = [get_BDO_MPSP, lambda: BDO_lca.GWP, lambda: BDO_lca.FEC]
 
 
 # %% Generate 3-specification meshgrid and set specification loading functions
-steps = 40
+steps = 20
 # Yield, titer, productivity (rate)
 spec_1 = np.linspace(0.05, 0.95, steps) # yield
 spec_2 = np.linspace(5., 330., steps) # titer
@@ -679,10 +679,10 @@ Metric_3_tickmarks = tickmarks(
 # Metric_3_tickmarks = [0.0*1000, 0.24*1000, 0.48*1000, 0.72*1000, 0.96*1000, 1.2*1000]
 
 # Metric_1_tickmarks = [2100, 2800, 3500, 4200, 4900, 5600, 6300]
-# Metric_1_tickmarks = [1500, 2000, 2500, 3000, 3500, 4000]
-# Metric_2_tickmarks = [4, 6, 8, 10, 12, 14, 16, 18]
+Metric_1_tickmarks = [1000, 2000, 3000, 4000, 5000, 6000]
+Metric_2_tickmarks = [0, 6, 12, 18, 24, 30, 36]
 # Metric_2_tickmarks = [0, 100, 200, 300, 400]
-# Metric_3_tickmarks = [60, 80, 100, 120, 140, 160, 180, 200, 220]
+Metric_3_tickmarks = [0, 40, 80, 120, 160, 200, 240]
 # Metric_3_tickmarks = [200, 400, 600, 800, 1000, 1200]
 
 
