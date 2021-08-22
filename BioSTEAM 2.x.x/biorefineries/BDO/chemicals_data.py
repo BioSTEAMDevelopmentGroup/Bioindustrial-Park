@@ -289,6 +289,8 @@ Ash = chemical_database('Ash', search_ID='CaO', phase='s', Hf=-151688*_cal2joule
 Tar = chemical_copied('Tar', Xylose, phase_ref='s')
 CaSO4 = chemical_database('CaSO4', phase='s', Hf=-342531*_cal2joule)
 
+TCP = chemical_database('Tricalcium phosphate', phase='s')
+KieCNi = chemical_database(ID='KieCNi', search_ID='Nickel', phase='s')
 # =============================================================================
 # Mixtures
 # =============================================================================
@@ -473,7 +475,8 @@ chems.set_synonym('P4O10', 'PhosphorusPentoxide')
 chems.set_synonym('Na2SO4', 'SodiumSulfate')
 chems.set_synonym('AmmoniumHydroxide', 'NH4OH')
 chems.set_synonym('Isobutyraldehyde', 'IBA')
-
+chems.set_synonym('Tricalcium phosphate', 'TCP')
+# chems.set_synonym('Nickel', 'KieCNi')
 # %% 
 # from BDO.utils import get_chemical_properties	
 # get_chemical_properties(chems, 400, 101325, output=True)

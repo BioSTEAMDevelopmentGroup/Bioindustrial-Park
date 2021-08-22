@@ -1480,10 +1480,10 @@ class DehydrationReactor(Reactor):
         
         self.BDO_to_MEK_rxn = self.dehydration_rxns[0]
         self.BDO_to_IBA_rxn = self.dehydration_rxns[1]
-    
+        
     def _run(self):
-        feed, recycle = self.ins
-        effluent = self.outs[0]
+        feed, recycle, fresh_catalyst = self.ins
+        effluent, spent_catalyst = self.outs
         
         # effluent = feed.copy()
         effluent.mix_from([feed, recycle])
@@ -1493,6 +1493,10 @@ class DehydrationReactor(Reactor):
         self.dehydration_rxns(effluent.mol)
         effluent.T = self.T
         
+        fresh_catalyst.imass['TCP'] = spent_catalyst.imass['TCP'] =\
+            self.mcat_frac * self.ins[0].F_mass/(350.*24.) 
+            # assuming a TCP lifetime of 1 year
+            
     def _cost(self):
         self.heat_utilities[0](self.Hnet, self.T)
         super()._cost()
@@ -1731,8 +1735,8 @@ class HydrogenationReactor(Reactor):
         self.X = self.hydrogenation_rxns[0].X = X
         
     def _run(self):
-        feed, h2, recycle = self.ins
-        effluent = self.outs[0]
+        feed, h2, recycle, fresh_catalyst = self.ins
+        effluent, spent_catalyst = self.outs
         hydrogenation_rxns = self.hydrogenation_rxns
         h2.imol['H2'] = (feed.imol['IBA'] + recycle.imol['IBA'])* hydrogenation_rxns[0].X
         # effluent = feed.copy()
@@ -1741,7 +1745,9 @@ class HydrogenationReactor(Reactor):
         # effluent.P = feed.P
         
         hydrogenation_rxns(effluent)
-        
+        fresh_catalyst.imass['KieCNi'] = spent_catalyst.imass['KieCNi'] =\
+            self.mcat_frac * self.ins[0].F_mass/(350.*24.) 
+            
    
     def _cost(self):
         super()._cost()

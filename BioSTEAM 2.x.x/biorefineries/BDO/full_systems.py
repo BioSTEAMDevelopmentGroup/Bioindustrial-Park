@@ -101,10 +101,10 @@ def create_system_oleyl_alcohol(ins, outs):
     BDO, recycle_acetoin, wastewater_b = separation_sys.outs
     conversion_sys = bdo.create_conversion_system(
         ins=BDO,
-        outs=[MEK, isobutanol, ''],
+        outs=[MEK, isobutanol, '',],
         mockup=True,
     )
-    MEK, isobutanol, wastewater_c = conversion_sys.outs
+    MEK, isobutanol, wastewater_c, spent_TCP_catalyst, spent_KieCNi_catalyst = conversion_sys.outs
     # u.S404.split = 0.6
     # M405 = bst.Mixer('M405', ins=u.S404-1)
     # M405.insert(u.S402_Pe-0)

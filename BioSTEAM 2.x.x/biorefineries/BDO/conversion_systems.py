@@ -26,10 +26,14 @@ __all__ = (
               BDO=184.3, GlucoseOligomer=0.0509, Extract=0.4919, 
               Xylose=0.2659, XyloseOligomer=0.02146, Arabinose=0.09811, 
               ArabinoseOligomer=0.08989, SolubleLignin=0.1082, 
-              Enzyme=6.445, Acetoin=1.41, units='kmol/hr')],
+              Enzyme=6.445, Acetoin=1.41, units='kmol/hr'),],
     outs=[dict(ID='MEK', price=price['MEK']),
           dict(ID='isobutanol', price=price['Isobutanol']),
-          dict(ID='wastewater')],
+          dict(ID='wastewater'),
+          dict(ID='spent_TCP_catalyst', phase='s', T=293.15, P=101325,
+               TCP=50, units='kmol/hr'),
+          dict(ID='spent_KieCNi_catalyst', phase='s', T=293.15, P=101325,
+               KieCNi=50, units='kmol/hr'),],
 )
 def create_conversion_system(ins, outs):
     """
@@ -91,12 +95,16 @@ def create_conversion_system(ins, outs):
                         ...
 
     """
-    BDO, = ins # !!! need to add make-up catalyst streams (and their prices in process_settings)
-    MEK, isobutanol, wastewater = outs # !!! need to add spent catalyst streams (priced at 0)
+    BDO, = ins
+    MEK, isobutanol, wastewater, spent_TCP_catalyst, spent_KieCNi_catalyst = outs # !!! need to add spent catalyst streams (priced at 0)
+    
+    makeup_TCP_catalyst = bst.Stream('makeup_TCP_catalyst', price=price.get('TCP', 0.))
+    makeup_KieCNi_catalyst = bst.Stream('makeup_KieCNi_catalyst', price=price.get('Kie-CMC-Ni catalyst', 0.))
     
     H2_fresh = Stream('H2_fresh', price = price['H2'])
     
-    R401 = units.DehydrationReactor('R401', ins = (BDO, ''), # !!! need to add make-up catalyst stream
+    R401 = units.DehydrationReactor('R401', ins=(BDO, '', ''), 
+                                    outs=('R401_effluent', ''), # !!! need to add make-up catalyst stream
                                     tau = 0.5, # Emerson et al. https://doi.org/10.1021/i300007a025
                                     vessel_material='Stainless steel 316')
     
@@ -139,7 +147,8 @@ def create_conversion_system(ins, outs):
     
     M404 = bst.Mixer('M404', ins=(D405-0, S404-1), outs=wastewater)
     
-    R402 = units.HydrogenationReactor('R402', ins = (D403-0, '', ''), # !!! need to add make-up catalyst stream
+    R402 = units.HydrogenationReactor('R402', ins = (D403-0, '', '', ''), # !!! need to add make-up catalyst stream
+                                    outs=('R402_effluent', ''),
                                     tau = 16, # Zhou et al. https://doi.org/10.1002/pat.441
                                     vessel_material = 'Stainless steel 316')
     
@@ -179,3 +188,39 @@ def create_conversion_system(ins, outs):
     T608.line = 'IsobutanolStorageTank'
     T608_P = bst.Pump('T608_P', ins=T608-0, outs=isobutanol, P=101325)
 
+    T609 = bst.StorageTank('T609', ins=makeup_TCP_catalyst,
+                           tau=30*24, V_wf=0.9,
+                           vessel_type='Field erected',
+                           vessel_material='Carbon steel')
+    T609.line = 'Makeup TCP catalyst storage tank'
+    T609_P = bst.Pump('T609_P', ins=T609-0, P=101325)
+    T609_P-0-2-R401
+    
+    T610 = bst.StorageTank('T610', ins=R401-1,
+                           outs=(spent_TCP_catalyst,),
+                           tau=30*24, V_wf=0.9,
+                           vessel_type='Field erected',
+                           vessel_material='Carbon steel')
+    T610.line = 'Spent TCP catalyst storage tank'
+    T610_P = bst.Pump('T610_P', ins=T610-0, P=101325)
+    
+    
+    
+    T611 = bst.StorageTank('T611', ins=makeup_KieCNi_catalyst,
+                           tau=30*24, V_wf=0.9,
+                           vessel_type='Field erected',
+                           vessel_material='Carbon steel')
+    T611.line = 'Makeup KieCNi catalyst storage tank'
+    T611_P = bst.Pump('T611_P', ins=T611-0, P=101325)
+    T611_P-0-2-R401
+    
+    T612 = bst.StorageTank('T612', ins=R401-1,
+                           outs=(spent_KieCNi_catalyst,),
+                           tau=30*24, V_wf=0.9,
+                           vessel_type='Field erected',
+                           vessel_material='Carbon steel')
+    T612.line = 'Spent KieCNi catalyst storage tank'
+    T612_P = bst.Pump('T612_P', ins=T612-0, P=101325)
+    
+    
+    
