@@ -360,7 +360,7 @@ def create_separation_system_oleyl_alcohol(ins, outs):
     S402_Pe = bst.Pump('S402_Pe', ins=S402-1, P=101325)
     
     D401_H = bst.HXprocess('D401_H', ins=[S402_Pe-0, None], outs=['', solvent_recycle])
-    D401 = bst.units.ShortcutColumn('D401', ins=D401_H-0,
+    D401 = bst.units.BinaryDistillation('D401', ins=D401_H-0,
                                     outs=('D401_g', 'D401_l'),
                                     LHK=('BDO', 'OleylAlcohol'),
                                     partial_condenser=True,
@@ -385,7 +385,7 @@ def create_separation_system_oleyl_alcohol(ins, outs):
     D402_Pb = bst.Pump('D402_Pb', D402-1, P=101325)
     
     M403 = bst.Mixer('M403', [S402_Pr-0, D402_Pd-0, D407-0], wastewater)
-    D403x = bst.units.ShortcutColumn('D403x', ins=D402_Pb-0,
+    D403x = bst.units.BinaryDistillation('D403x', ins=D402_Pb-0,
                                     outs=('D403x_g', 'D403x_l'),
                                     LHK=('Acetoin', 'BDO'),
                                     partial_condenser=False,

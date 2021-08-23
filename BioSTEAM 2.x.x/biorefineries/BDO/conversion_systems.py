@@ -108,7 +108,7 @@ def create_conversion_system(ins, outs):
                                     tau = 0.5, # Emerson et al. https://doi.org/10.1021/i300007a025
                                     vessel_material='Stainless steel 316')
     
-    D403 = bst.units.ShortcutColumn('D403', ins=R401-0,
+    D403 = bst.units.BinaryDistillation('D403', ins=R401-0,
                                         outs=('IBA', 'D403_l'),
                                         LHK=('IBA', 'MEK'),
                                         is_divided=True,
@@ -118,7 +118,7 @@ def create_conversion_system(ins, outs):
                                         vessel_material = 'Stainless steel 316')
     D403_P = bst.Pump('D403_P', ins=D403-1, P=101325)
     ideal_thermo = D403.thermo.ideal()
-    D404 = bst.units.ShortcutColumn('D404', ins=D403_P-0,
+    D404 = bst.units.BinaryDistillation('D404', ins=D403_P-0,
                                         outs=('D404_g', 'D404_l'),
                                         LHK=('MEK', 'H2O'),
                                         partial_condenser=False,
@@ -129,7 +129,7 @@ def create_conversion_system(ins, outs):
                                         vessel_material = 'Stainless steel 316')
     D404_P = bst.Pump('D404_P', ins=D404-1, P=101325)
     
-    D405 = bst.units.ShortcutColumn('D405', ins=D404_P-0,
+    D405 = bst.units.BinaryDistillation('D405', ins=D404_P-0,
                                         outs=('D405_g', 'D405_l'),
                                         LHK=('H2O', 'BDO'),
                                         partial_condenser=False,
