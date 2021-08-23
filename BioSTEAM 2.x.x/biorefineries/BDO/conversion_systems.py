@@ -114,7 +114,7 @@ def create_conversion_system(ins, outs):
                                         is_divided=True,
                                         partial_condenser=False,
                                         product_specification_format='Recovery',
-                                        Lr=0.9995, Hr=0.9995, k=1.2, P=101325/30,
+                                        Lr=0.9995, Hr=0.9995, k=1.2, P=101325/75,
                                         vessel_material = 'Stainless steel 316')
     D403_P = bst.Pump('D403_P', ins=D403-1, P=101325)
     ideal_thermo = D403.thermo.ideal()
