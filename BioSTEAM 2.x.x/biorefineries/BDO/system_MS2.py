@@ -335,7 +335,12 @@ def GWP_breakdown():
 
 # %% Full analysis
 get_MEK_MPSP()
-spec.load_specifications(0.36*2, 109.9, 1.0)
+
+# Overall yield assuming yield on xylose is 80% of yield on glucose:
+# (0.64*0.36+0.36*0.8*0.36) * 2 = 0.33408 * 2
+# saccharified stream mass ratio of glucose:xylose is 0.64:0.36
+
+spec.load_specifications(0.33408*2, 109.9, 1.0)
 
 def print_recycles():
     sys = BDO_sys.copy()
