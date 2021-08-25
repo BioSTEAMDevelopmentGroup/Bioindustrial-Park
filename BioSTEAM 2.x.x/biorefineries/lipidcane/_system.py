@@ -135,7 +135,7 @@ def create_lipid_wash_system(ins, outs):
                                                    Water=0.01))
     
     # Vacume out water
-    F201 = units.SplitFlash('F201', T=357.15, P=5000,
+    F201 = units.SplitFlash('F201', T=357.15, P=10000.,
                             ins=C203-0,
                             outs=('', washed_lipid),
                             split=dict(Lipid=0.0001,
@@ -197,7 +197,7 @@ def create_lipid_pretreatment_system(ins, outs):
     degummed_oil, polar_lipids, wastewater = outs
     
     # Vacume out water
-    F3 = units.SplitFlash('F3', T=357.15, P=5000,
+    F3 = units.SplitFlash('F3', T=357.15, P=10000.,
                           ins=crude_vegetable_oil,
                           split=dict(Lipid=0.0001,
                                      Water=1.0),)
@@ -247,10 +247,15 @@ def create_lipid_pretreatment_system(ins, outs):
     @R1.add_specification(run=True)
     def adjust_feed_flow_rates():
         lipid = R1.ins[0]
-        T2.ins[0].imol['Glycerol'] = 1.5 * (
+        required_glycerol = 1.5 * (
             + lipid.imol['FFA']
             + lipid.imol['TAG']
         ) - M2.ins[1].imol['Glycerol']
+        if required_glycerol < 0.:
+            T2.ins[0].imol['Glycerol'] = 0.
+            M2.ins[1].imol['Glycerol'] += required_glycerol
+        else:
+            T2.ins[0].imol['Glycerol'] = required_glycerol
         R1.ins[2].ivol['N2'] = lipid.F_vol
         for i in T2.path_until(M2): i._run()
         M2._run()
@@ -413,7 +418,7 @@ def create_transesterification_and_biodiesel_separation_system(ins, outs):
     F401 = units.SplitFlash('F401',
                     order=('Water', 'Methanol', 'Biodiesel'),
                     split=(0.9999, 0.9999, 0.00001),
-                    P=2026.5, T=331.5, Q=0)
+                    P=10000., T=331.5, Q=0)
     F401.line = 'Vacuum dryer'
     F401.material = 'Stainless steel 304'
     P407 = units.Pump('P407', P=101325.)
@@ -460,7 +465,7 @@ def create_transesterification_and_biodiesel_separation_system(ins, outs):
                         LHK=('Water', 'Glycerol'),
                         k=1.25,
                         P=101325,
-                        y_top=0.9999,
+                        y_top=0.999999,
                         x_bot=x_water,
                         tray_material='Stainless steel 304',
                         vessel_material='Stainless steel 304',
