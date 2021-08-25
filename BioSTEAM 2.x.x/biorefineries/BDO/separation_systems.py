@@ -316,14 +316,23 @@ def create_separation_system_oleyl_alcohol(ins, outs):
     M402 = bst.Mixer('M402', ins=(T605_P-0, solvent_recycle))
     
     preheated_stream = bst.Stream()
-    D407 = bst.ShortcutColumn('D407', 
+    D407 = bst.BinaryDistillation('D407', 
         ins=preheated_stream,
         LHK=('Water', 'BDO'),
         partial_condenser=False,
         k=1.2,
-        y_top=0.999,
-        x_bot=0.90,
-    )
+        product_specification_format='Recovery',
+        Lr = 0.5, Hr = 0.999)
+    target_BDO_x = 0.06
+    def get_x(chem_ID, stream):
+        return stream.imol[chem_ID]/sum(stream.imol['AceticAcid', 'Furfural', 'HMF', 'BDO', 'Water'])
+    def D407_f(Lr):
+        D407.Hr = 0.999
+        D407.Lr = Lr
+        D407._run()
+        return get_x('BDO', D407.outs[1]) - target_BDO_x
+    D407.specification = bst.BoundedNumericalSpecification(D407_f, 0.001, 0.999)
+    
     D407_Pb = bst.Pump('D407_Pb', D407-1, P=101325.)
     
     H407_b = bst.HXprocess('H407_b', 

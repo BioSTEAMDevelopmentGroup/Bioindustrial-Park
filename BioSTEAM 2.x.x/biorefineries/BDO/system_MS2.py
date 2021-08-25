@@ -379,6 +379,14 @@ simulate_and_print()
 
 
 
+# %%% MEK environmental impacts
+
+# GREET 2020:
+#     GHG100 = 1.04 kgCO2-eq/kg
+#     FEC = 43 MJ/kg
+# Ecoinvent 3.7.1:
+#     IPCC 2013 GWP100 = 1.9166 kgCO2-eq/kg
+#     CED-f = 58.707 MJ/kg
 
 # %%
 
