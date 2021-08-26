@@ -420,7 +420,8 @@ class CoFermentation(Unit):
         self.cofermentation(effluent)
         self.CSL_to_constituents(effluent)
         if self.lipid_reaction: self.lipid_reaction(effluent)
-        vent.receive_vent(effluent)
+        vent.empty()
+        vent.receive_vent(effluent, energy_balance=False)
 
     def _design(self):
         effluent = self.outs[1]

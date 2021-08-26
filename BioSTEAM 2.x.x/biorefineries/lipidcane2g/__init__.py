@@ -393,8 +393,8 @@ def load(name, cache={}):
         rename_storage_units(1100)
     else:
         raise NotImplementedError(number)
-    lipidcane_sys.set_tolerance(rmol=1e-5, subsystems=True)
-    lipidcane_sys.N_runs = 2
+    lipidcane_sys.set_tolerance(rmol=1e-5, mol=1e-3, subsystems=True)
+    # lipidcane_sys.N_runs = 2
     dct.update(flowsheet.to_dict())
     if number == 1:
         lipidcane_sys.prioritize_unit(T608)
