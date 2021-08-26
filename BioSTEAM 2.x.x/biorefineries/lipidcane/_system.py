@@ -235,7 +235,7 @@ def create_lipid_pretreatment_system(ins, outs):
     H2 = bst.HXutility('H2', F2-0, V=0, rigorous=True)
     P6 = bst.Pump('P6', H2-0, P=101325)
     M1 = bst.Mixer('M1', [P1-0, P5-0, P6-0], acetone_recycle)
-    bst.mark_disjunction(acetone_recycle)
+    # bst.mark_disjunction(acetone_recycle)
     P4 = bst.Pump('P4', F1-1, P=101325)
     hx_stream = bst.Stream()
     H3 = bst.HXprocess('H3', [P4-0, hx_stream])

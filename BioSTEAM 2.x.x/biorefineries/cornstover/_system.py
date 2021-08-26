@@ -342,7 +342,6 @@ def create_simultaneous_saccharification_and_cofermentation_system(
         feed, CSL1, DAP1 = R302.ins
         CSL1.imass['CSL'] = 0.0050 * feed.F_mass
         DAP1.imass['DAP'] = 0.33 * feed.F_vol
-        S301.ins[0].mix_from(S301.outs)
         R302._run()
     
     R302.specification = adjust_CSL_and_DAP_feed_to_seed_train
@@ -355,7 +354,10 @@ def create_simultaneous_saccharification_and_cofermentation_system(
         feed, seed, CSL2, DAP2 = R303.ins
         CSL2.imass['CSL'] = 0.0025 * feed.F_mass
         DAP2.imass['DAP'] = 0.33 * feed.F_vol
+        S301.ins[0].mix_from(S301.outs)
         S302.ins[0].mix_from(S302.outs)
+        DAP_storage.ins[0].copy_like(DAP_storage.outs[0])
+        CSL_storage.ins[0].copy_like(CSL_storage.outs[0])
         R303._run()
     
     R303.specification = adjust_CSL_and_DAP_feed_to_fermentation
@@ -429,7 +431,6 @@ def create_integrated_bioprocess_saccharification_and_cofermentation_system(
         feed, CSL1, DAP1 = R302.ins
         CSL1.imass['CSL'] = 0.0050 * feed.F_mass
         DAP1.imass['DAP'] = 0.33 * feed.F_vol
-        S301.ins[0].mix_from(S301.outs)
         R302._run()
     
     R302.specification = adjust_CSL_and_DAP_feed_to_seed_train
@@ -441,7 +442,10 @@ def create_integrated_bioprocess_saccharification_and_cofermentation_system(
         feed, seed, CSL2, DAP2 = R303.ins
         CSL2.imass['CSL'] = 0.0025 * feed.F_mass
         DAP2.imass['DAP'] = 0.33 * feed.F_vol
+        S301.ins[0].mix_from(S301.outs)
         S302.ins[0].mix_from(S302.outs)
+        DAP_storage.ins[0].copy_like(DAP_storage.outs[0])
+        CSL_storage.ins[0].copy_like(CSL_storage.outs[0])
         R303._run()
     
     R303.specification = adjust_CSL_and_DAP_feed_to_fermentation
@@ -516,7 +520,6 @@ def create_cofermentation_system(
         feed, CSL1, DAP1 = R302.ins
         CSL1.imass['CSL'] = 0.0050 * feed.F_mass
         DAP1.imass['DAP'] = 0.33 * feed.F_vol
-        S301.ins[0].mix_from(S301.outs)
     
     T301 = units.SeedHoldTank('T301', R302-1)
     if not CoFermentation: CoFermentation = units.CoFermentation
@@ -528,7 +531,10 @@ def create_cofermentation_system(
         feed, seed, CSL2, DAP2, *other = R303.ins
         CSL2.imass['CSL'] = 0.0025 * feed.F_mass
         DAP2.imass['DAP'] = 0.33 * feed.F_vol
+        S301.ins[0].mix_from(S301.outs)
         S302.ins[0].mix_from(S302.outs)
+        DAP_storage.ins[0].copy_like(DAP_storage.outs[0])
+        CSL_storage.ins[0].copy_like(CSL_storage.outs[0])
     
     M304 = bst.Mixer('M304', (R302-0, R303-0))
     T302 = units.BeerTank('T302', outs=beer)

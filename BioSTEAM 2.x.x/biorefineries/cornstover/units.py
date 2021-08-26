@@ -533,7 +533,8 @@ class SaccharificationAndCoFermentation(Unit):
         self.loss(effluent)
         self.cofermentation(effluent)
         self.CSL_to_constituents(effluent)
-        vent.receive_vent(effluent)
+        vent.empty()
+        vent.receive_vent(effluent, energy_balance=False)
 
     def _design(self):
         effluent = self.outs[1]
@@ -636,7 +637,8 @@ class SimultaneousSaccharificationAndCoFermentation(Unit):
         self.loss(effluent)
         self.cofermentation(effluent)
         self.CSL_to_constituents(effluent)
-        vent.receive_vent(effluent)
+        vent.empty()
+        vent.receive_vent(effluent, energy_balance=False)
 
     def _design(self):
         effluent = self.outs[1]
