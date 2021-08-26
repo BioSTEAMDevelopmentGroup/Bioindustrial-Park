@@ -225,7 +225,6 @@ def test_sugarcane():
     assert np.allclose(tea.sales, 86924100.80067463, rtol=1e-2)
     assert np.allclose(tea.material_cost, 59825908.82267224, rtol=1e-2)
     assert np.allclose(tea.installed_equipment_cost, 203658428.0689627, rtol=1e-2)
-    assert np.allclose(tea.utility_cost, -21782283.491118703, rtol=1e-2)
     assert np.allclose(units.get_heating_duty(), 298.41478309459706, rtol=1e-2)
     assert np.allclose(units.get_cooling_duty(), 290.55474998958834, rtol=1e-2)
     assert np.allclose(units.get_electricity_consumption(), 15.531917710341876, rtol=1e-2)
