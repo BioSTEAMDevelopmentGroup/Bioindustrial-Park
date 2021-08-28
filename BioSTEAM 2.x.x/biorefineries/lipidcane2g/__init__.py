@@ -61,7 +61,6 @@ _chemicals_loaded = False
 
 PRS = cs.PretreatmentReactorSystem
 PRS_cost_item = PRS.cost_items['Pretreatment reactor system']
-derivative_disabled = True
 kg_per_ton = 907.18474
 lipid_content = np.linspace(0.05, 0.15, 5)
 
@@ -293,6 +292,10 @@ def sorghum_feedstock(sugarcane, ID):
         Solids=5000, units='kg/hr'
     )
 
+def disable_derivative(disable=True): _derivative_disabled = disable
+def enable_derivative(enable=True): _derivative_disabled = not enable
+_derivative_disabled = True
+
 def load(name, cache={}):
     dct = globals()
     number, agile = dct['configuration'] = parse(name)
@@ -390,8 +393,7 @@ def load(name, cache={}):
         rename_storage_units(1100)
     else:
         raise NotImplementedError(number)
-    lipidcane_sys.set_tolerance(rmol=1e-3, subsystems=True)
-    lipidcane_sys.N_runs = 3
+    lipidcane_sys.set_tolerance(rmol=1e-5, mol=1e-3, subsystems=True)
     dct.update(flowsheet.to_dict())
     if number == 1:
         lipidcane_sys.prioritize_unit(T608)
@@ -613,7 +615,7 @@ def load(name, cache={}):
             if X_excess > 0.: breakpoint()
             fermentor.cofermentation.X[0] = X3
     
-    @uniform(85, 95, units='%', element='Cofermenation')
+    @uniform(70, 95, units='%', element='Cofermenation')
     def set_xylose_to_ethanol_yield(xylose_to_ethanol_yield):
         if abs(number) == 2:
             # fermentor.cofermentation[6].X = 0.004 # Baseline
@@ -733,7 +735,7 @@ def load(name, cache={}):
     @metric(units='USD/ton')
     def MFPP_derivative():
         if number < 0: return 0.
-        if derivative_disabled: return np.nan
+        if _derivative_disabled: return np.nan
         if agile:
             lipidcane_sys.cane_lipid_content += 0.01
             lipidcane_sys.sorghum_lipid_content += 0.01
@@ -753,7 +755,7 @@ def load(name, cache={}):
     @metric(units='Gal/ton')
     def biodiesel_production_derivative():
         if number < 0: return 0.
-        if derivative_disabled: return np.nan
+        if _derivative_disabled: return np.nan
         value = (biodiesel_flow() / feedstock_flow() - biodiesel_production.cache) / 1.
         # print('biodiesel production derivative', value)
         return value
@@ -761,7 +763,7 @@ def load(name, cache={}):
     @metric(units='Gal/ton')
     def ethanol_production_derivative():
         if number < 0: return 0.
-        if derivative_disabled: return np.nan
+        if _derivative_disabled: return np.nan
         value = (ethanol_flow() / feedstock_flow() - ethanol_production.cache) / 1.
         # print('ethanol production derivative', value)
         return value
@@ -769,7 +771,7 @@ def load(name, cache={}):
     @metric(units='kWhr/ton')
     def electricity_production_derivative():
         if number < 0: return 0.
-        if derivative_disabled: return np.nan
+        if _derivative_disabled: return np.nan
         value = (- electricity() / feedstock_flow() - electricity_production.cache) / 1.
         # print('electricity production derivative', value)
         return value
@@ -777,7 +779,7 @@ def load(name, cache={}):
     @metric(units='cf/ton')
     def natural_gas_consumption_derivative():
         if number < 0: return 0.
-        if derivative_disabled: return np.nan
+        if _derivative_disabled: return np.nan
         value =(natural_gas_flow() / feedstock_flow() - natural_gas_consumption.cache) / 1.
         # print('natural gas production derivative', value)
         return value
@@ -785,7 +787,7 @@ def load(name, cache={}):
     @metric(units='10^6*USD')
     def TCI_derivative():
         if number < 0: return 0.
-        if derivative_disabled: return np.nan
+        if _derivative_disabled: return np.nan
         value = (lipidcane_tea.TCI / 1e6  - TCI.cache) / 1. # 10^6*$
         # print('TCI production derivative', value)
         return value
@@ -794,7 +796,7 @@ def load(name, cache={}):
     set_glucose_yield.setter(85)
     set_xylose_yield.setter(65)
     set_glucose_to_ethanol_yield.setter(90)
-    set_xylose_to_ethanol_yield.setter(85)
+    set_xylose_to_ethanol_yield.setter(70)
     lipid_extraction_specification.load_lipid_retention(0.70)
     lipid_extraction_specification.load_lipid_content(0.05)
     set_bagasse_lipid_extraction_efficiency.setter(0.)
@@ -957,52 +959,56 @@ def run_uncertainty_and_sensitivity(name, N, rule='L',
                                     across_lipid_content=False, 
                                     sample_cache={},
                                     autoload=True):
-    np.random.seed(1)
-    from warnings import filterwarnings
-    filterwarnings('ignore', category=bst.utils.DesignWarning)
-    load(name)
-    key = (N, rule)
-    if key in sample_cache:
-        samples = sample_cache[key]
-    else:
-        sample_cache[key] = samples = model.sample(N, rule)
-    model.load_samples(samples)
-    file = monte_carlo_file(name, across_lipid_content)
-    if across_lipid_content:
-        if parse(name).number < 0:
-            model.evaluate(notify=int(N/10))
-            model.evaluate_across_coordinate(
-                name='Lipid content',
-                f_coordinate=lambda x: None,
-                coordinate=lipid_content,
-                notify=int(N/10), 
-                notify_coordinate=True,
-                xlfile=file,
-                re_evaluate=False,
-            )
+    enable_derivative()
+    try:
+        np.random.seed(1)
+        from warnings import filterwarnings
+        filterwarnings('ignore', category=bst.utils.DesignWarning)
+        load(name)
+        key = (N, rule)
+        if key in sample_cache:
+            samples = sample_cache[key]
         else:
-            def f(x):
-                lipid_extraction_specification.locked_lipid_content = False
-                lipid_extraction_specification.load_lipid_content(x)
-                lipid_extraction_specification.locked_lipid_content = True
-            model.evaluate_across_coordinate(
-                name='Lipid content',
-                f_coordinate=f,
-                coordinate=lipid_content,
-                notify=int(N/10), 
-                notify_coordinate=True,
-                xlfile=file,
-            )
-    else:
-        N = min(int(N/10), 50)
-        model.evaluate(notify=N,
-                       autosave=N,
-                       autoload=autoload,
-                       file=autoload_file_name(name))
-        model.table.to_excel(file)
-        rho, p = model.spearman_r()
-        file = spearman_file(name)
-        rho.to_excel(file)
+            sample_cache[key] = samples = model.sample(N, rule)
+        model.load_samples(samples)
+        file = monte_carlo_file(name, across_lipid_content)
+        if across_lipid_content:
+            if parse(name).number < 0:
+                model.evaluate(notify=int(N/10))
+                model.evaluate_across_coordinate(
+                    name='Lipid content',
+                    f_coordinate=lambda x: None,
+                    coordinate=lipid_content,
+                    notify=int(N/10), 
+                    notify_coordinate=True,
+                    xlfile=file,
+                    re_evaluate=False,
+                )
+            else:
+                def f(x):
+                    lipid_extraction_specification.locked_lipid_content = False
+                    lipid_extraction_specification.load_lipid_content(x)
+                    lipid_extraction_specification.locked_lipid_content = True
+                model.evaluate_across_coordinate(
+                    name='Lipid content',
+                    f_coordinate=f,
+                    coordinate=lipid_content,
+                    notify=int(N/10), 
+                    notify_coordinate=True,
+                    xlfile=file,
+                )
+        else:
+            N = min(int(N/10), 50)
+            model.evaluate(notify=N,
+                           autosave=N,
+                           autoload=autoload,
+                           file=autoload_file_name(name))
+            model.table.to_excel(file)
+            rho, p = model.spearman_r()
+            file = spearman_file(name)
+            rho.to_excel(file)
+    finally:
+        disable_derivative()
 
 run = run_uncertainty_and_sensitivity
     
@@ -1333,12 +1339,12 @@ def plot_spearman_MFPP(configuration, top=None, agile=True):
         f'Glucose yield [85 $-$ 97.5 %]',
         f'Xylose yield [65 $-$ 97.5 %]',
         f'Glucose to ethanol yield [90 $-$ 95 %]',
-        f'Xylose to ethanol yield [85 $-$ 95 %]',
+        f'Xylose to ethanol yield [70 $-$ 95 %]',
        # '$^a$Fermentation solids loading [20% $-$ 25%]',
     ]
     ignored = {
         'S1': set([0, 1, 2, 3, 6, 7, 11, 12, 13, 14, 15, 16, 17, 18, 19]),
-        'L1': set([7, 11, 12, 13, 14, 15, 16, 17, 18, 19]),
+        'L1': set([7, 13, 14, 15, 16, 17, 18, 19]),
         'S2': set([0, 1, 2, 3, 6, 8]),
         'L2': set([8]),
     }
