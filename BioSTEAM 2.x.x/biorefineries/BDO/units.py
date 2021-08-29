@@ -566,10 +566,10 @@ class SeedTrain(Unit):
         # FermMicrobe reaction from Table 14 on Page 31 of Humbird et al.
         self.cofermentation_rxns = ParallelRxn([
         #      Reaction definition            Reactant    Conversion
-        Rxn('Glucose -> BDO + H2 + 2 CO2',        'Glucose',   2*.36*.8), # .9099
+        Rxn('Glucose -> BDO + H2 + 2 CO2',        'Glucose',   2*.36*.8), 
         Rxn('Glucose -> Acetoin + 2CO2',               'Glucose',   0.065*.8),
         Rxn('Glucose -> 6 FermMicrobe',       'Glucose',   0.03*.8),
-        Rxn('3 Xylose -> 2.5 BDO + 2.5 H2 + 5 CO2',       'Xylose',    2*0.36*.8),
+        Rxn('3 Xylose -> 2.5 BDO + 2.5 H2 + 5 CO2',       'Xylose',    2*0.36*.8*.8),
         Rxn('Xylose -> Acetoin + CO2',       'Xylose',    0.065*.8),
         Rxn('Xylose -> 5 FermMicrobe',        'Xylose',    0.03*.8),
         Rxn('Glucose + 2 H2O -> 2 Glycerol + O2', 'Glucose', 0.0001*.8),

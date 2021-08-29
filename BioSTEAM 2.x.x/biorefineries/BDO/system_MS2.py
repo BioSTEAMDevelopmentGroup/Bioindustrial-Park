@@ -80,6 +80,7 @@ tmo.settings.set_thermo(BDO_chemicals)
 BDO_sys = bdo.create_system_oleyl_alcohol()
 u = flowsheet.unit
 feedstock = BDO_sys.ins[0]
+# feedstock.mol[:] = baseline_feedflow[:]
 MEK, isobutanol = BDO_sys.outs
 get_flow_tpd = lambda: (feedstock.F_mass-feedstock.imass['H2O'])*24/907.185
 u = F.unit
@@ -137,17 +138,25 @@ area_names = [
     'wastewater',
     'storage',
     'co-heat and power',
-    'cooling tower',
+    'cooling tower and chilled water package',
     'other facilities',
     'heat exchanger network',
 ]
+# u.CWP901.ID = 'CWP802' 
+for ui in u:
+    if type(ui) == bst.ChilledWaterPackage:
+        ui.ID = 'CWP802' # group with CT for system cooling demand
+        break
 unit_groups = bst.UnitGroup.group_by_area(BDO_sys.units)
 for i, j in zip(unit_groups, area_names): i.name = j
-for i in unit_groups: i.autofill_metrics(shorthand=True, material_cost=True)
+for i in unit_groups: i.autofill_metrics(shorthand=True, 
+                                         electricity_production=True, 
+                                         material_cost=True)
 for i in unit_groups:
-    if i.name == 'storage':
+    if i.name == 'storage' or i.name=='other facilities' or i.name == 'cooling tower and chilled water package':
         i.metrics[-1].getter = lambda: 0. # Material cost
-
+    if i.name == 'cooling tower and chilled water package':
+        i.metrics[1].getter = lambda: 0. # Cooling duty
 HXN = None
 for HXN_group in unit_groups:
     if HXN_group.name == 'heat exchanger network':
@@ -155,10 +164,13 @@ for HXN_group in unit_groups:
         HXN = HXN_group.units[0]
         assert isinstance(HXN, bst.HeatExchangerNetwork)
 
+unit_groups_dict = {}
+for i in unit_groups:
+    unit_groups_dict[i.name] = i
 # HXN.force_ideal_thermo = True
 CT = u.CT801
 BT = u.BT701
-CWP = u.CWP901
+CWP = u.CWP802
 
 # %% 
 # =============================================================================
@@ -201,7 +213,7 @@ spec = ProcessSpecification(
     dehydration_reactor = u.R401,
     byproduct_streams = [],
     HXN = u.HXN1001,
-    tolerable_HXN_energy_balance_percent_error=10,
+    tolerable_HXN_energy_balance_percent_error=5,
     maximum_inhibitor_concentration = 1.,
     # pre_conversion_units = process_groups_dict['feedstock_group'].units + process_groups_dict['pretreatment_group'].units + [u.H301], # if the line below does not work (depends on BioSTEAM version)
     # pre_conversion_units = BDO_sys.split(u.F301.ins[0])[0],
@@ -311,6 +323,27 @@ MEK_LHV = 31.45 # MJ/kg MEK
 
 BDO_lca = LCA(BDO_sys, BDO_chemicals, CFs, feedstock, 'Corn stover', MEK, [CT, CWP], BT=BT, CT=CT)
 
+#%% TEA breakdown
+def TEA_breakdown():
+    metric_breakdowns = {i.name: {} for i in unit_groups[0].metrics}
+    for ug in unit_groups:
+        for metric in ug.metrics:
+            # storage_metric_val = None
+            if not ug.name=='storage':
+                if ug.name=='other facilities':
+                    metric_breakdowns[metric.name]['storage and ' + ug.name] = metric() + unit_groups[5].metrics[ug.metrics.index(metric)]()
+                else:
+                    metric_breakdowns[metric.name][ug.name] = metric()
+            # else:
+            #     storage_metric_val = metric()
+                
+    # return metric_breakdowns
+    for i in unit_groups[0].metrics:
+        print(f"\n\n----- {i.name} ({i.units}) -----")
+        metric_breakdowns_i = metric_breakdowns[i.name]
+        for j in metric_breakdowns_i.keys():
+            print(f"{j}: {format(metric_breakdowns_i[j], '.3f')}")
+
 # %% LCA breakdown
 
 def FEC_breakdown():
@@ -340,6 +373,8 @@ get_MEK_MPSP()
 # (0.64*0.36+0.36*0.8*0.36) * 2 = 0.33408 * 2
 # saccharified stream mass ratio of glucose:xylose is 0.64:0.36
 
+
+# to achieve $1.98/kg: spec_1=0.353*2
 spec.load_specifications(0.33408*2, 109.9, 1.0)
 
 def print_recycles():

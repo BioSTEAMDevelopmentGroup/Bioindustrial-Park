@@ -320,9 +320,9 @@ def create_separation_system_oleyl_alcohol(ins, outs):
         ins=preheated_stream,
         LHK=('Water', 'BDO'),
         partial_condenser=False,
-        k=1.2,
-        product_specification_format='Recovery',
-        Lr = 0.5, Hr = 0.999)
+        k=1.1,
+        product_specification_format='Composition',
+        y_top=0.99999, x_bot=0.94)
     target_BDO_x = 0.06
     def get_x(chem_ID, stream):
         return stream.imol[chem_ID]/sum(stream.imol['AceticAcid', 'Furfural', 'HMF', 'BDO', 'Water'])
@@ -331,7 +331,7 @@ def create_separation_system_oleyl_alcohol(ins, outs):
         D407.Lr = Lr
         D407._run()
         return get_x('BDO', D407.outs[1]) - target_BDO_x
-    D407.specification = bst.BoundedNumericalSpecification(D407_f, 0.001, 0.999)
+    # D407.specification = bst.BoundedNumericalSpecification(D407_f, 0.001, 0.999)
     
     D407_Pb = bst.Pump('D407_Pb', D407-1, P=101325.)
     
@@ -343,7 +343,7 @@ def create_separation_system_oleyl_alcohol(ins, outs):
     S402 = bst.units.MultiStageMixerSettlers('S402',
         ins = (H407_b-1, M402-0),
         partition_data={
-            'K': np.array([1/6.52, 1/0.37, 1/0.37, 1/6.52, 1/10000,
+            'K': np.array([1/1.940224889932903, 1/0.16864361850509718, 1/0.37, 1/1.940224889932903, 1/10000,
                            10000, 10000, 10000, 10000, 
                            10000, 10000, 10000, 10000]),
             'IDs': ('2,3-Butanediol', 'Water', 'Ethanol', 'Acetoin', 'OleylAlcohol',
@@ -351,14 +351,14 @@ def create_separation_system_oleyl_alcohol(ins, outs):
                     'Arabinose', 'ArabinoseOligomer', 'SolubleLignin', 'Enzyme'),
             'phi' : 0.5,
         },
-        N_stages = 10,
+        N_stages = 20,
     )
     
     @S402.add_specification(run=True)
     def adjust_S402_split():
         feed = S402.ins[0]
         Water = feed.imass['Water']
-        required_solvent = 1.2 * Water
+        required_solvent = 8 * Water
         oleyl_alcohol, recycle = M402.ins
         oleyl_alcohol.imass['OleylAlcohol'] = max(0, required_solvent- recycle.imass['OleylAlcohol'])
         if recycle.imass['OleylAlcohol'] > required_solvent:
@@ -368,14 +368,14 @@ def create_separation_system_oleyl_alcohol(ins, outs):
     S402_Pr = bst.Pump('S402_Pr', ins=S402-0, P=101325)
     S402_Pe = bst.Pump('S402_Pe', ins=S402-1, P=101325)
     
-    D401_H = bst.HXprocess('D401_H', ins=[S402_Pe-0, None], outs=['', solvent_recycle])
+    D401_H = bst.HXprocess('D401_H', ins=[S402_Pe-0, None], outs=['', solvent_recycle], dT=15.)
     D401 = bst.units.BinaryDistillation('D401', ins=D401_H-0,
                                     outs=('D401_g', 'D401_l'),
                                     LHK=('BDO', 'OleylAlcohol'),
                                     partial_condenser=True,
                                     is_divided=True,
                                     product_specification_format='Recovery',
-                                    Lr=0.9995, Hr=0.9999, k=1.2,
+                                    Lr=0.9995, Hr=0.9999, k=1.1,
                                     P=0.06 * 101325,
                                     vessel_material = 'Stainless steel 316')
     D401_Pb = bst.Pump('D401_Pb', ins=D401-1, P=101325)

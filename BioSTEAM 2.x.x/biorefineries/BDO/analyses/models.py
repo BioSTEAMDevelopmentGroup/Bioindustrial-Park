@@ -28,7 +28,7 @@ import biosteam as bst
 from chaospy import distributions as shape
 from biosteam import main_flowsheet as flowsheet
 from biosteam.evaluation import Model, Metric
-from biorefineries.BDO.system_MS2 import BDO_sys, BDO_tea, spec, feedstock, MEK, BT, BDO_lca
+from biorefineries.BDO.system_MS2 import BDO_sys, BDO_tea, spec, feedstock, MEK, BT, BDO_lca, unit_groups_dict
 from biorefineries.BDO.process_settings import CFs
 
 _kg_per_ton = 907.18474
@@ -456,55 +456,55 @@ metrics = [Metric('Minimum selling price', lambda: BDO_tea.solve_price(MEK), '$/
 # metrics.extend((Metric('feedstock_group - heating demand',
 #                        lambda: 0.001*sum([sum([hu.duty for hu in unit.heat_utilities \
 #                                                if hu.duty*hu.flow>0.]) for unit in \
-#                                           process_groups_dict['feedstock_group'].units])/AA.F_mass,
+#                                           unit_groups_dict['feedstock_group'].units])/AA.F_mass,
 #                        'MJ/kg'),))
 
 # metrics.extend((Metric('pretreatment_group - heating demand',
 #                        lambda: 0.001*sum([sum([hu.duty for hu in unit.heat_utilities \
 #                                                if hu.duty*hu.flow>0.]) for unit in \
-#                                           process_groups_dict['pretreatment_group'].units])/AA.F_mass,
+#                                           unit_groups_dict['pretreatment_group'].units])/AA.F_mass,
 #                        'MJ/kg'),))
 
 # metrics.extend((Metric('conversion_group - heating demand',
 #                        lambda: 0.001*sum([sum([hu.duty for hu in unit.heat_utilities \
 #                                                if hu.duty*hu.flow>0.]) for unit in \
-#                                           process_groups_dict['conversion_group'].units])/AA.F_mass,
+#                                           unit_groups_dict['conversion_group'].units])/AA.F_mass,
 #                        'MJ/kg'),))
 
 # metrics.extend((Metric('separation_group - heating demand',
 #                        lambda: 0.001*sum([sum([hu.duty for hu in unit.heat_utilities \
 #                                                if hu.duty*hu.flow>0.]) for unit in \
-#                                           process_groups_dict['separation_group'].units])/AA.F_mass,
+#                                           unit_groups_dict['separation_group'].units])/AA.F_mass,
 #                        'MJ/kg'),))
 
 # metrics.extend((Metric('WWT_group - heating demand',
 #                        lambda: 0.001*sum([sum([hu.duty for hu in unit.heat_utilities \
 #                                                if hu.duty*hu.flow>0.]) for unit in \
-#                                           process_groups_dict['WWT_group'].units])/AA.F_mass,
+#                                           unit_groups_dict['WWT_group'].units])/AA.F_mass,
 #                        'MJ/kg'),))
 
 # metrics.extend((Metric('HXN_group - heating demand',
 #                        lambda: 0.001*sum([sum([hu.duty for hu in unit.heat_utilities \
 #                                                if hu.duty*hu.flow>0.]) for unit in \
-#                                           process_groups_dict['HXN_group'].units])/AA.F_mass,
+#                                           unit_groups_dict['HXN_group'].units])/AA.F_mass,
 #                        'MJ/kg'),))
 
 # metrics.extend((Metric('BT_group - heating demand',
 #                        lambda: 0.001*sum([sum([hu.duty for hu in unit.heat_utilities \
 #                                                if hu.duty*hu.flow>0.]) for unit in \
-#                                           process_groups_dict['BT_group'].units])/AA.F_mass,
+#                                           unit_groups_dict['BT_group'].units])/AA.F_mass,
 #                        'MJ/kg'),))
 
 # metrics.extend((Metric('CT_group - heating demand',
 #                        lambda: 0.001*sum([sum([hu.duty for hu in unit.heat_utilities \
 #                                                if hu.duty*hu.flow>0.]) for unit in \
-#                                           process_groups_dict['CT_group'].units])/AA.F_mass,
+#                                           unit_groups_dict['CT_group'].units])/AA.F_mass,
 #                        'MJ/kg'),))
 
 # metrics.extend((Metric('facilities_no_hu_group - heating demand',
 #                        lambda: 0.001*sum([sum([hu.duty for hu in unit.heat_utilities \
 #                                                if hu.duty*hu.flow>0.]) for unit in \
-#                                           process_groups_dict['facilities_no_hu_group'].units])/AA.F_mass,
+#                                           unit_groups_dict['facilities_no_hu_group'].units])/AA.F_mass,
 #                        'MJ/kg'),))
 
 # # Cooling duty
@@ -512,132 +512,132 @@ metrics = [Metric('Minimum selling price', lambda: BDO_tea.solve_price(MEK), '$/
 # metrics.extend((Metric('feedstock_group - cooling demand',
 #                        lambda: 0.001*sum([sum([hu.duty for hu in unit.heat_utilities \
 #                                                if hu.duty*hu.flow<0.]) for unit in \
-#                                           process_groups_dict['feedstock_group'].units])/AA.F_mass,
+#                                           unit_groups_dict['feedstock_group'].units])/AA.F_mass,
 #                        'MJ/kg'),))
 
 # metrics.extend((Metric('pretreatment_group - cooling demand',
 #                        lambda: 0.001*sum([sum([hu.duty for hu in unit.heat_utilities \
 #                                                if hu.duty*hu.flow<0.]) for unit in \
-#                                           process_groups_dict['pretreatment_group'].units])/AA.F_mass,
+#                                           unit_groups_dict['pretreatment_group'].units])/AA.F_mass,
 #                        'MJ/kg'),))
 
 # metrics.extend((Metric('conversion_group - cooling demand',
 #                        lambda: 0.001*sum([sum([hu.duty for hu in unit.heat_utilities \
 #                                                if hu.duty*hu.flow<0.]) for unit in \
-#                                           process_groups_dict['conversion_group'].units])/AA.F_mass,
+#                                           unit_groups_dict['conversion_group'].units])/AA.F_mass,
 #                        'MJ/kg'),))
 
 # metrics.extend((Metric('separation_group - cooling demand',
 #                        lambda: 0.001*sum([sum([hu.duty for hu in unit.heat_utilities \
 #                                                if hu.duty*hu.flow<0.]) for unit in \
-#                                           process_groups_dict['separation_group'].units])/AA.F_mass,
+#                                           unit_groups_dict['separation_group'].units])/AA.F_mass,
 #                        'MJ/kg'),))
 
 # metrics.extend((Metric('WWT_group - cooling demand',
 #                        lambda: 0.001*sum([sum([hu.duty for hu in unit.heat_utilities \
 #                                                if hu.duty*hu.flow<0.]) for unit in \
-#                                           process_groups_dict['WWT_group'].units])/AA.F_mass,
+#                                           unit_groups_dict['WWT_group'].units])/AA.F_mass,
 #                        'MJ/kg'),))
 
 # metrics.extend((Metric('HXN_group - cooling demand',
 #                        lambda: 0.001*sum([sum([hu.duty for hu in unit.heat_utilities \
 #                                                if hu.duty*hu.flow<0.]) for unit in \
-#                                           process_groups_dict['HXN_group'].units])/AA.F_mass,
+#                                           unit_groups_dict['HXN_group'].units])/AA.F_mass,
 #                        'MJ/kg'),))
 
 # metrics.extend((Metric('BT_group - cooling demand',
 #                        lambda: 0.001*sum([sum([hu.duty for hu in unit.heat_utilities \
 #                                                if hu.duty*hu.flow<0.]) for unit in \
-#                                           process_groups_dict['BT_group'].units])/AA.F_mass,
+#                                           unit_groups_dict['BT_group'].units])/AA.F_mass,
 #                        'MJ/kg'),))
 
 # metrics.extend((Metric('CT_group - cooling demand',
 #                        lambda: 0.001*sum([sum([hu.duty for hu in unit.heat_utilities \
 #                                                if hu.duty*hu.flow<0.]) for unit in \
-#                                           process_groups_dict['CT_group'].units])/AA.F_mass,
+#                                           unit_groups_dict['CT_group'].units])/AA.F_mass,
 #                        'MJ/kg'),))
 
 # metrics.extend((Metric('facilities_no_hu_group - cooling demand',
 #                        lambda: 0.001*sum([sum([hu.duty for hu in unit.heat_utilities \
 #                                                if hu.duty*hu.flow<0.]) for unit in \
-#                                           process_groups_dict['facilities_no_hu_group'].units])/AA.F_mass,
+#                                           unit_groups_dict['facilities_no_hu_group'].units])/AA.F_mass,
 #                        'MJ/kg'),))  
 
 
 # # Installed equipment cost
 
 # metrics.extend((Metric('feedstock_group - installed equipment cost',
-#                        lambda:process_groups_dict['feedstock_group'].get_installed_cost(),
+#                        lambda:unit_groups_dict['feedstock_group'].get_installed_cost(),
 #                        '10^6 $'),))
 
 # metrics.extend((Metric('pretreatment_group - installed equipment cost',
-#                        lambda:process_groups_dict['pretreatment_group'].get_installed_cost(),
+#                        lambda:unit_groups_dict['pretreatment_group'].get_installed_cost(),
 #                        '10^6 $'),))
 
 # metrics.extend((Metric('conversion_group - installed equipment cost',
-#                        lambda:process_groups_dict['conversion_group'].get_installed_cost(),
+#                        lambda:unit_groups_dict['conversion_group'].get_installed_cost(),
 #                        '10^6 $'),))
 
 # metrics.extend((Metric('separation_group - installed equipment cost',
-#                        lambda:process_groups_dict['separation_group'].get_installed_cost(),
+#                        lambda:unit_groups_dict['separation_group'].get_installed_cost(),
 #                        '10^6 $'),))
 
 # metrics.extend((Metric('WWT_group - installed equipment cost',
-#                        lambda:process_groups_dict['WWT_group'].get_installed_cost(),
+#                        lambda:unit_groups_dict['WWT_group'].get_installed_cost(),
 #                        '10^6 $'),))
 
 # metrics.extend((Metric('HXN_group - installed equipment cost',
-#                        lambda:process_groups_dict['HXN_group'].get_installed_cost(),
+#                        lambda:unit_groups_dict['HXN_group'].get_installed_cost(),
 #                        '10^6 $'),))
 
 # metrics.extend((Metric('BT_group - installed equipment cost',
-#                        lambda:process_groups_dict['BT_group'].get_installed_cost(),
+#                        lambda:unit_groups_dict['BT_group'].get_installed_cost(),
 #                        '10^6 $'),))
 
 # metrics.extend((Metric('CT_group - installed equipment cost',
-#                        lambda:process_groups_dict['CT_group'].get_installed_cost(),
+#                        lambda:unit_groups_dict['CT_group'].get_installed_cost(),
 #                        '10^6 $'),))
 
 # metrics.extend((Metric('facilities_no_hu_group - installed equipment cost',
-#                        lambda:process_groups_dict['facilities_no_hu_group'].get_installed_cost(),
+#                        lambda:unit_groups_dict['facilities_no_hu_group'].get_installed_cost(),
 #                        '10^6 $'),))  
 
 # # Power utility demand
 
 # metrics.extend((Metric('feedstock_group - power utility demand',
-#                        lambda:process_groups_dict['feedstock_group'].get_electricity_consumption()/AA.F_mass,
+#                        lambda:unit_groups_dict['feedstock_group'].get_electricity_consumption()/AA.F_mass,
 #                        'MW/kg'),))
 
 # metrics.extend((Metric('pretreatment_group - power utility demand',
-#                        lambda:process_groups_dict['pretreatment_group'].get_electricity_consumption()/AA.F_mass,
+#                        lambda:unit_groups_dict['pretreatment_group'].get_electricity_consumption()/AA.F_mass,
 #                        'MW/kg'),))
 
 # metrics.extend((Metric('conversion_group - power utility demand',
-#                        lambda:process_groups_dict['conversion_group'].get_electricity_consumption()/AA.F_mass,
+#                        lambda:unit_groups_dict['conversion_group'].get_electricity_consumption()/AA.F_mass,
 #                        'MW/kg'),))
 
 # metrics.extend((Metric('separation_group - power utility demand',
-#                        lambda:process_groups_dict['separation_group'].get_electricity_consumption()/AA.F_mass,
+#                        lambda:unit_groups_dict['separation_group'].get_electricity_consumption()/AA.F_mass,
 #                        'MW/kg'),))
 
 # metrics.extend((Metric('WWT_group - power utility demand',
-#                        lambda:process_groups_dict['WWT_group'].get_electricity_consumption()/AA.F_mass,
+#                        lambda:unit_groups_dict['WWT_group'].get_electricity_consumption()/AA.F_mass,
 #                        'MW/kg'),))
 
 # metrics.extend((Metric('HXN_group - power utility demand',
-#                        lambda:process_groups_dict['HXN_group'].get_electricity_consumption()/AA.F_mass,
+#                        lambda:unit_groups_dict['HXN_group'].get_electricity_consumption()/AA.F_mass,
 #                        'MW/kg'),))
 
 # metrics.extend((Metric('BT_group - power utility demand',
-#                        lambda:process_groups_dict['BT_group'].get_electricity_consumption()/AA.F_mass,
+#                        lambda:unit_groups_dict['BT_group'].get_electricity_consumption()/AA.F_mass,
 #                        'MW/kg'),))
 
 # metrics.extend((Metric('CT_group - power utility demand',
-#                        lambda:process_groups_dict['CT_group'].get_electricity_consumption()/AA.F_mass,
+#                        lambda:unit_groups_dict['CT_group'].get_electricity_consumption()/AA.F_mass,
 #                        'MW/kg'),))
 
 # metrics.extend((Metric('facilities_no_hu_group - power utility demand',
-#                        lambda:process_groups_dict['facilities_no_hu_group'].get_electricity_consumption()/AA.F_mass,
+#                        lambda:unit_groups_dict['facilities_no_hu_group'].get_electricity_consumption()/AA.F_mass,
 #                        'MW/kg'),))  
 
 # # Material cost
@@ -682,9 +682,9 @@ metrics = [Metric('Minimum selling price', lambda: BDO_tea.solve_price(MEK), '$/
 # # # =============================================================================
 
 # # def get_installed_equipment_cost(group):
-# #     # return lambda: sum(i.installed_equipment_cost for i in process_groups_dict[system])/1e6
-# #     return process_groups_dict[group].get_installed_cost()/AA.F_mass
-# # for system in process_groups_dict.keys():
+# #     # return lambda: sum(i.installed_equipment_cost for i in unit_groups_dict[system])/1e6
+# #     return unit_groups_dict[group].get_installed_cost()/AA.F_mass
+# # for system in unit_groups_dict.keys():
 # #     # if system == 'feedstock_sys': continue
 # #     metrics.extend(
 # #         (Metric(system, get_installed_equipment_cost(system), '10^6 $', 'Installed cost'),))
@@ -692,7 +692,7 @@ metrics = [Metric('Minimum selling price', lambda: BDO_tea.solve_price(MEK), '$/
 # # # All checks should be ~0
 # # check_installed_equipment_cost = \
 # #     lambda: sum(get_installed_equipment_cost(system)() 
-# #                 for system in process_groups_dict.keys()) - HP_tea.installed_equipment_cost/1e6
+# #                 for system in unit_groups_dict.keys()) - HP_tea.installed_equipment_cost/1e6
 # # metrics.extend((Metric('Check', check_installed_equipment_cost, '10^6 $', 'Installed cost'),))
 
 
