@@ -277,7 +277,7 @@ def create_lipidcane_to_biodiesel_and_ethanol_combined_1_and_2g_post_fermentatio
         mockup=True,
         area=300,
         udct=True,
-        solids_loading=0.50,
+        solids_loading=0.33333, # 50% solids content
     )
     hydrolyzate, pretreatment_wastewater = hot_water_pretreatment_sys.outs
     
@@ -289,7 +289,7 @@ def create_lipidcane_to_biodiesel_and_ethanol_combined_1_and_2g_post_fermentatio
         udct=True,
         kind=2,
         insoluble_solids_loading=0.10,
-        solids_loading=0.20,
+        solids_loading=0.23, # 30% solids content in saccharification
     )
     S303 = cf_dct['S303'] # Pressure filter
     S303.tag = "lipid extraction efficiency"
@@ -465,7 +465,7 @@ def create_sugarcane_to_ethanol_combined_1_and_2g(ins, outs):
         mockup=True,
         area=300,
         udct=True,
-        solids_loading=0.50,
+        solids_loading=0.3333,
         T_pretreatment_reactor=273.15 + 180,
         milling=True
     )
@@ -478,8 +478,8 @@ def create_sugarcane_to_ethanol_combined_1_and_2g(ins, outs):
         area=400,
         udct=True,
         kind=2,
-        insoluble_solids_loading=0.10,
-        solids_loading=0.20,
+        insoluble_solids_loading=0.15,
+        solids_loading=0.23,
     )
     S303 = cf_dct['S303'] # Pressure filter
     sink = S303.outs[1].sink
