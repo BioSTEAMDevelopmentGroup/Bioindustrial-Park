@@ -64,9 +64,13 @@ from biorefineries.BDO.chemicals_data import BDO_chemicals, chemical_groups, \
 from biorefineries.BDO.tea import BDOTEA
 from biorefineries.HP.lca import LCA
 
+bst.speed_up()
 flowsheet = bst.Flowsheet('BDO')
 bst.main_flowsheet.set_flowsheet(flowsheet)
 bst.System.default_relative_molar_tolerance = 1e-4
+bst.System.default_maxiter = 100
+bst.System.default_molar_tolerance = 0.1
+
 # Speeds up ShortcutDistillation
 bst.units.ShortcutColumn.minimum_guess_distillate_recovery = 0
 

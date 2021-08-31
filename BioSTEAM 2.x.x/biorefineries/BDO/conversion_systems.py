@@ -104,7 +104,7 @@ def create_conversion_system(ins, outs):
     H2_fresh = Stream('H2_fresh', price = price['H2'])
     
     R401 = units.DehydrationReactor('R401', ins=(BDO, '', ''), 
-                                    outs=('R401_effluent', ''), # !!! need to add make-up catalyst stream
+                                    outs=('R401_effluent', ''),
                                     tau = 0.5, # Emerson et al. https://doi.org/10.1021/i300007a025
                                     vessel_material='Stainless steel 316')
     
@@ -114,7 +114,7 @@ def create_conversion_system(ins, outs):
                                         is_divided=True,
                                         partial_condenser=False,
                                         product_specification_format='Recovery',
-                                        Lr=0.9995, Hr=0.9995, k=1.2, P=101325/55,
+                                        Lr=0.9995, Hr=0.9995, k=1.2, P=101325,
                                         vessel_material = 'Stainless steel 316')
     D403_P = bst.Pump('D403_P', ins=D403-1, P=101325)
     ideal_thermo = D403.thermo.ideal()
@@ -125,8 +125,9 @@ def create_conversion_system(ins, outs):
                                         is_divided=True,
                                         product_specification_format='Recovery',
                                         thermo=ideal_thermo,
-                                        Lr=0.9995, Hr=0.9995, k=1.2, P=101325/75,
+                                        Lr=0.9995, Hr=0.9995, k=1.2, P=101325,
                                         vessel_material = 'Stainless steel 316')
+    D404_H = bst.HXutility('D404_H', ins=D404-0, outs=('condensed_MEK'), T=273.15+20.)
     D404_P = bst.Pump('D404_P', ins=D404-1, P=101325)
     
     D405 = bst.units.BinaryDistillation('D405', ins=D404_P-0,
@@ -142,12 +143,12 @@ def create_conversion_system(ins, outs):
     
     D405_P = bst.Pump('D405_P', ins=D405-1, P=101325)
     
-    S404 = bst.units.Splitter('S404', ins = D405_P-0, split = 0.92)
+    S404 = bst.units.Splitter('S404', ins = D405_P-0, split = 0.99) # 0.92
     S404-0-1-R401
     
     M404 = bst.Mixer('M404', ins=(D405-0, S404-1), outs=wastewater)
     
-    R402 = units.HydrogenationReactor('R402', ins = (D403-0, '', '', ''), # !!! need to add make-up catalyst stream
+    R402 = units.HydrogenationReactor('R402', ins = (D403-0, '', '', ''),
                                     outs=('R402_effluent', ''),
                                     tau = 16, # Zhou et al. https://doi.org/10.1002/pat.441
                                     vessel_material = 'Stainless steel 316')
@@ -166,7 +167,7 @@ def create_conversion_system(ins, outs):
     D406-0-2-R402
     
     # 7-day storage time, similar to ethanol's in Humbird et al.
-    T606 = units.BDOStorageTank('T606', ins=D404-0, tau=7*24, V_wf=0.9,
+    T606 = units.BDOStorageTank('T606', ins=D404_H-0, tau=7*24, V_wf=0.9,
                                          vessel_type='Floating roof',
                                          vessel_material='Stainless steel')
     

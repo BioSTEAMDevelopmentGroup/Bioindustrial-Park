@@ -404,11 +404,11 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
         
         reactor.xylose_to_BDO_rxn.X = yield_
         
-        rem_glucose = min(0.0065, (1. - reactor.glucose_to_biomass_rxn.X) - reactor.glucose_to_BDO_rxn.X)
+        rem_glucose = min(0.055, (1. - reactor.glucose_to_biomass_rxn.X) - reactor.glucose_to_BDO_rxn.X)
         reactor.glucose_to_acetoin_rxn.X =  rem_glucose
         # reactor.glucose_to_biomass_rxn.X = (50./130.) * rem_glucose
         
-        rem_xylose = min(0.0065, (1. - reactor.glucose_to_biomass_rxn.X) - reactor.xylose_to_BDO_rxn.X)
+        rem_xylose = min(0.055, (1. - reactor.glucose_to_biomass_rxn.X) - reactor.xylose_to_BDO_rxn.X)
         reactor.xylose_to_acetoin_rxn.X =   rem_xylose
         # reactor.xylose_to_biomass_rxn.X = (50./130.) * rem_glucose
         
