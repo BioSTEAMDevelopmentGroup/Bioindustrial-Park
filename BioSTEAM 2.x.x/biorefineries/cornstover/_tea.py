@@ -223,8 +223,8 @@ class CellulosicEthanolTEA(TEA):
                 + self.labor_cost * (1 + self.labor_burden))
 
 
-def create_tea(sys, units=None, OSBL_units=None, cls=None):
-    if OSBL_units is None: OSBL_units = bst.get_OSBL(sys.units)
+def create_tea(sys, OSBL_units=None, cls=None):
+    if OSBL_units is None: OSBL_units = bst.get_OSBL(sys.cost_units)
     try:
         BT = tmo.utils.get_instance(OSBL_units, (bst.BoilerTurbogenerator, bst.Boiler))
     except:

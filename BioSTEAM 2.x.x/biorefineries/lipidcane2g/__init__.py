@@ -520,12 +520,12 @@ def load(name, cache={}):
         isplit_b = None
         lipid_extraction_specification = MockExtractionSpecification()
     else:
-        for i in lipidcane_sys.units:
+        for i in lipidcane_sys.cost_units:
             if getattr(i, 'tag', None) == 'lipid extraction efficiency':
                 isplit_a = i.isplit
                 break
         
-        for i in lipidcane_sys.units:
+        for i in lipidcane_sys.cost_units:
             if getattr(i, 'tag', None) == 'bagasse lipid retention':
                 isplit_b = i.isplit
                 break
@@ -892,8 +892,8 @@ def load(name, cache={}):
     set_natural_gas_price.setter(4.3)
     set_electricity_price.setter(0.0641)
     if number > 0:
-        set_cane_PL_fraction(10)
-        set_cane_FFA_fraction(10)
+        set_cane_PL_fraction.setter(10)
+        set_cane_FFA_fraction.setter(10)
     # set_fermentation_solids_loading(20) # Same as Humbird
     # set_feedstock_lipid_content(10) # Consistent with SI of Huang's 2016 paper
     # set_ethanol_price(2.356) # Consistent with Huang's 2016 paper
@@ -1105,12 +1105,12 @@ def run_uncertainty_and_sensitivity(name, N, rule='L',
 
 run = run_uncertainty_and_sensitivity
     
-def run_all(N, across_lipid_content=False, rule='L', configurations=None):
+def run_all(N, across_lipid_content=False, rule='L', configurations=None, **kwargs):
     if configurations is None: configurations = configuration_names
     for name in configurations:
         print(f"Running {name}:")
         run_uncertainty_and_sensitivity(
-            name, N, rule, across_lipid_content,
+            name, N, rule, across_lipid_content, **kwargs
         )
 
 def get_monte_carlo_across_lipid_content(name, metric, derivative=False):
