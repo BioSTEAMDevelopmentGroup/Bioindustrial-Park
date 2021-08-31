@@ -72,7 +72,7 @@ def _load_system():
     OSBL_units = (u.WWTC, u.CWP, u.CT, u.PWC, u.ADP,
                   u.T701, u.T702, u.P701, u.P702, u.M701, u.FT,
                   u.CSL_storage, u.DAP_storage, u.BT)
-    cornstover_tea = create_tea(cornstover_sys, OSBL_units, [u.U101])
+    cornstover_tea = create_tea(cornstover_sys, OSBL_units=OSBL_units)
     ethanol = F.stream.ethanol
     ethanol.price = cornstover_tea.solve_price(ethanol)
     ethanol_price_gal = ethanol.price * ethanol_density_kggal

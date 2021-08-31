@@ -92,9 +92,13 @@ def create_chemicals():
     LiquidMethanol = Methanol.at_state(phase='l', copy=True)
     NaOCH3.copy_models_from(LiquidMethanol, ['V', 'sigma', 'kappa', 'Cn'])
     lipidcane_chemicals.extend([
-        tmo.Chemical('BetaSitosterol', search_ID='83-46-5',
-                      phase='l', Hf=-1000. * (533.79 + 93.90),
-                      synonyms=['Sterol', 'PolarLipid', 'PL']),
+        tmo.Chemical('Phosphatidylinositol', formula='C47H83O13P',
+                     search_db=False, CAS='383907-36-6', default=True,
+                     Hf=-1.779e6, # Assume same as TAG on a weight basis
+                     synonyms={'PL', 'PolarLipid'}, phase='l'),
+        # tmo.Chemical('BetaSitosterol', search_ID='83-46-5',
+        #               phase='l', Hf=-1000. * (533.79 + 93.90),
+        #               synonyms=['Sterol']),
         create_acyl_olein(0),
         create_acyl_olein(1),
         create_acyl_olein(2),

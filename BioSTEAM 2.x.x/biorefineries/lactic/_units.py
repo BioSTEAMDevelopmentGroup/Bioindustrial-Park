@@ -863,7 +863,6 @@ class CoFermentation(Reactor):
             Design['Fermenter size'] = self.outs[0].F_mass * tau_tot
             Design['Recirculation flow rate'] = self.F_mass_in
             self.heat_exchanger.simulate_as_auxiliary_exchanger(duty, _mixture)
-
         else:
             self._Vmax = 3785.41178 # 1,000,000 gallon from ref [1]
             Reactor._design(self)

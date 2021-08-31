@@ -385,12 +385,11 @@ def create_ethanol_purification_system_after_beer_column(ins, outs, IDs={}):
     (distilled_beer, U301-0)-M303-0-D303-0-H303-U301
     D303-1-P303
     
+    @P304.add_specification(run=True)
     def adjust_denaturant():
-        P304._run()
-        pure_ethanol = P304.outs[0]
+        pure_ethanol = P304.ins[0]
         denaturant.imol['Octane'] = 0.022*pure_ethanol.F_mass/114.232
     
-    P304.specification = adjust_denaturant
     (denaturant-T303-P305-0, U301-1-H304-0-T302-0-P304-0)-M304-T304
 
 # @SystemFactory(

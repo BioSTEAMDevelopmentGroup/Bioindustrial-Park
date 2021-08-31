@@ -18,59 +18,52 @@ from numpy import array
 __all__ = ('set_lipid_fraction',
            'get_lipid_fraction')
 
-def set_lipid_fraction(lipid_fraction, stream=None, data={}):
+def set_lipid_fraction(lipid_fraction, stream=None):
     """Adjust composition of lipid cane to achieve desired oil fraction (dry weight)."""
     if not stream: stream = f.stream.lipidcane
+    thermo = stream.thermo
     carbs_IDs = ('Glucose', 'Sucrose')
     fiber_IDs = ('Lignin', 'Cellulose', 'Hemicellulose')
-    lipid_IDs = ('PL', 'FFA', 'MAG', 'DAG', 'TAG')
-    if not data:
-        data['thermo'] = thermo = stream.thermo
-        carbs   = Stream(None, thermo=stream.thermo)
-        fiber   = Stream(None, thermo=stream.thermo)
-        lipid   = Stream(None, thermo=stream.thermo)
-        carbs.imol[carbs_IDs] = stream.imol[carbs_IDs]
-        fiber.imol[fiber_IDs] = stream.imol[fiber_IDs]
-        lipid.imol[lipid_IDs] = stream.imol[lipid_IDs]
-        
-        # Mass property arrays
-        carbs_mass = stream.imass[carbs_IDs]
-        fiber_mass = stream.imass[fiber_IDs]
-        lipid_mass = stream.imass[lipid_IDs]
-        
-        # Net weight
-        carbs_massnet = carbs_mass.sum()
-        fiber_massnet = fiber_mass.sum()
-        lipid_massnet = lipid_mass.sum()
-        
-        # Heats of combustion per kg
-        LHV_carbs_kg = carbs.LHV/carbs_massnet
-        LHV_lipid_kg = lipid.LHV/lipid_massnet
-        data['LHV_lipid_over_carbs'] = LHV_lipid_kg / LHV_carbs_kg
-        
-        # Relative composition
-        data['r_mass_carbs'] = array(carbs_mass/carbs_massnet)
-        data['r_mass_fiber'] = array(fiber_mass/fiber_massnet)
-        data['r_mass_lipid'] = array(lipid_mass/lipid_massnet)
-    else:
-        thermo = data['thermo']
-    chemicals = thermo.chemicals
-    old_chemicals = stream.chemicals
+    lipid_IDs = tuple([i for i in ('PL', 'FFA', 'MAG', 'DAG', 'TAG') if i in thermo.chemicals])
+    carbs = Stream(None, thermo=thermo)
+    fiber = Stream(None, thermo=thermo)
+    lipid = Stream(None, thermo=thermo)
+    carbs.imol[carbs_IDs] = stream.imol[carbs_IDs]
+    fiber.imol[fiber_IDs] = stream.imol[fiber_IDs]
+    lipid.imol[lipid_IDs] = stream.imol[lipid_IDs]
+    
+    # Mass property arrays
+    carbs_mass = stream.imass[carbs_IDs].value
+    fiber_mass = stream.imass[fiber_IDs].value
+    lipid_mass = stream.imass[lipid_IDs].value
+    
+    # Net weight
+    carbs_massnet = carbs_mass.sum()
+    fiber_massnet = fiber_mass.sum()
+    lipid_massnet = lipid_mass.sum()
+    
+    # Heats of combustion per kg
+    LHV_carbs_kg = carbs.LHV / carbs_massnet
+    LHV_lipid_kg = lipid.LHV / lipid_massnet
+    LHV_lipid_over_carbs = LHV_lipid_kg / LHV_carbs_kg
+    
+    # Relative composition
+    r_mass_lipid = lipid_mass / lipid_massnet
+    r_mass_carbs = carbs_mass / carbs_massnet
+    r_mass_fiber = fiber_mass / fiber_massnet
     F_mass = stream.F_mass
-    container = None if old_chemicals is chemicals else stream._imol.reset_chemicals(chemicals)
     z_mass_lipid = lipid_fraction
     z_dry = 0.3
     z_mass_lipid = z_mass_lipid * z_dry 
-    z_mass_carbs = 0.149 - z_mass_lipid * data['LHV_lipid_over_carbs']
+    z_mass_carbs = 0.149 - z_mass_lipid * LHV_lipid_over_carbs
     z_mass_fiber = z_dry - z_mass_carbs - z_mass_lipid - 0.006 - 0.015
     imass = stream.imass
     imass['Water'] = F_mass * 0.7
     imass['Ash'] = F_mass * 0.006
     imass['Solids'] = F_mass * 0.015
-    imass[lipid_IDs] = data['r_mass_lipid'] * z_mass_lipid * F_mass
-    imass[carbs_IDs] = data['r_mass_carbs'] * z_mass_carbs * F_mass
-    imass[fiber_IDs] = data['r_mass_fiber'] * z_mass_fiber * F_mass
-    if container is not None: stream._imol.reset_chemicals(old_chemicals, container)
+    imass[lipid_IDs] = r_mass_lipid * z_mass_lipid * F_mass
+    imass[carbs_IDs] = r_mass_carbs * z_mass_carbs * F_mass
+    imass[fiber_IDs] = r_mass_fiber * z_mass_fiber * F_mass
     if any(stream.mol < 0):
         raise ValueError(f'lipid cane oil composition of {z_mass_lipid/z_dry*100:.0f}% dry weight is infeasible')
 
