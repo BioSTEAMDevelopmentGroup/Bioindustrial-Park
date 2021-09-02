@@ -65,15 +65,15 @@ class LipidExtractionSpecification:
     Parameters
     ----------
     system : System
-        System associated to feedstock.
-    feedstock : Stream
-        Lipidcane feedstock.
+        System associated to feedstocks.
+    feedstocks : Stream
+        Lipidcane feedstocks.
     isplit_efficiency : ChemicalIndexer
         Defines extraction efficiency as a material split.
     isplit_lipid_retention : ChemicalIndexer
         Defines bagasse lipid retention as a material split.
     lipid_content : float 
-        Lipid content of feedstock [dry wt. %].
+        Lipid content of feedstocks [dry wt. %].
         
     Notes
     -----
@@ -85,7 +85,7 @@ class LipidExtractionSpecification:
     
     __slots__ = (
         'system',
-        'feedstock',
+        'feedstocks',
         'isplit_efficiency',
         'isplit_lipid_retention',
         'efficiency',
@@ -93,23 +93,28 @@ class LipidExtractionSpecification:
         'lipid_content',
         'locked_lipid_content',
         'isplit_efficiency_is_reversed',
+        'FFA_fraction',
+        'PL_fraction',
     )
     
-    def __init__(self, system, feedstock, isplit_efficiency, isplit_lipid_retention, 
+    def __init__(self, system, feedstocks, isplit_efficiency, isplit_lipid_retention, 
                  isplit_efficiency_is_reversed=False, efficiency=0.9, 
-                 lipid_retention=0.9, lipid_content=0.1):
-        self.system = system #: [System] System associated to feedstock
-        self.feedstock = feedstock #: Stream Lipid feedstock
+                 lipid_retention=0.9, lipid_content=0.1, FFA_fraction=0.1,
+                 PL_fraction=0.1):
+        self.system = system #: [System] System associated to feedstocks
+        self.feedstocks = feedstocks #: Stream Lipid feedstocks
         self.isplit_efficiency = isplit_efficiency #: [ChemicalIndexer] Defines extraction efficiency as a material split.
         self.isplit_lipid_retention = isplit_lipid_retention #: [ChemicalIndexer] Defines bagasse lipid retention as a material split.
         self.isplit_efficiency_is_reversed = isplit_efficiency_is_reversed #: [bool] Whether lipid extraction efficiency is 1 - split.
         self.efficiency = efficiency #: [float] Lipid extraction efficiency b
         self.lipid_retention = lipid_retention #: [float] Lipid extraction lipid retention
-        self.lipid_content = lipid_content #: [float] Lipid content of feedstock [dry wt. %].
+        self.lipid_content = lipid_content #: [float] Lipid content of feedstocks [dry wt. %].
         self.locked_lipid_content = False
+        self.FFA_fraction = FFA_fraction
+        self.PL_fraction = PL_fraction
         
     def MFPP(self):
-        return self.system.TEA.solve_price(self.feedstock)
+        return self.system.TEA.solve_price(self.feedstocks)
         
     def dMFPP_over_dlipid_content_at_efficiency(self, efficiency, dlipid_content=0.01):
         lipid_content = self.lipid_content
@@ -137,7 +142,11 @@ class LipidExtractionSpecification:
     
     def load_lipid_content(self, lipid_content):
         if self.locked_lipid_content: return
-        set_lipid_fraction(lipid_content, self.feedstock)
+        for i in self.feedstocks: 
+            set_lipid_fraction(
+                lipid_content, i, PL_fraction=self.PL_fraction, 
+                FFA_fraction=self.FFA_fraction
+            )
         self.lipid_content = lipid_content
       
     def load_efficiency(self, efficiency):
@@ -168,7 +177,7 @@ class LipidExtractionSpecification:
         lipid_retention : float, optional
             Lipid extraction efficiency b.
         lipid_content : float, optional
-            Lipid content of feedstock [dry wt. %].
+            Lipid content of feedstocks [dry wt. %].
 
         """
         if efficiency is None: efficiency = self.efficiency
@@ -249,7 +258,7 @@ class LipidExtractionSpecification:
         metrics : Iterable[Callable; M elements]
             Should return a number given no parameters.
         lipid_content : array_like[P elements]
-            Lipid content of feedstock [dry wt. %].
+            Lipid content of feedstocks [dry wt. %].
         
         Returns
         -------
@@ -284,7 +293,7 @@ class LipidExtractionSpecification:
         efficiency : float
             Lipid extraction efficiency.
         lipid_content : float
-            Lipid content of feedstock [dry wt. %].
+            Lipid content of feedstocks [dry wt. %].
         metrics : Iterable[Callable; M elements]
             Should return a number given no parameters.
         lipid_retention : array_like[P elements]

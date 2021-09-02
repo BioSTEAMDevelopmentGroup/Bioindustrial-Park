@@ -96,7 +96,8 @@ def create_post_fermentation_lipid_separation_system(ins, outs):
 @SystemFactory(
     ID='lipidcane_sys',
     ins=[lipidcane_dct],
-    outs=create_lipidcane_to_biodiesel_and_conventional_ethanol_system.outs[:4], 
+    outs=[*create_lipidcane_to_biodiesel_and_conventional_ethanol_system.outs[:3],
+          dict(ID='vinasse')], 
 )
 def create_lipidcane_to_biodiesel_and_ethanol_1g(
         ins, outs,
@@ -160,7 +161,7 @@ def create_lipidcane_to_biodiesel_and_ethanol_1g(
     lipid_pretreatment_sys, lipid_pretreatment_dct = create_lipid_pretreatment_system(
         ins=MX-0,
         mockup=True,
-        outs=['', 'polar_lipids', ''],
+        outs=['', 'polar_lipids', 'wastewater'],
         area=600,
         udct=True,
     )

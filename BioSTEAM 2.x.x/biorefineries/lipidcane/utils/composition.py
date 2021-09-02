@@ -18,7 +18,12 @@ from numpy import array
 __all__ = ('set_lipid_fraction',
            'get_lipid_fraction')
 
-def set_lipid_fraction(lipid_fraction, stream=None):
+def set_lipid_fraction(lipid_fraction, stream=None,
+                       PL_fraction=0.,
+                       FFA_fraction=0.,
+                       z_mass_carbs_baseline=0.149,
+                       z_mass_ash_baseline=0.006,
+                       z_mass_solids_baseline=0.015):
     """Adjust composition of lipid cane to achieve desired oil fraction (dry weight)."""
     if not stream: stream = f.stream.lipidcane
     thermo = stream.thermo
@@ -27,15 +32,18 @@ def set_lipid_fraction(lipid_fraction, stream=None):
     lipid_IDs = tuple([i for i in ('PL', 'FFA', 'MAG', 'DAG', 'TAG') if i in thermo.chemicals])
     carbs = Stream(None, thermo=thermo)
     fiber = Stream(None, thermo=thermo)
-    lipid = Stream(None, thermo=thermo)
+    lipid = Stream(None, TAG=1.0 - PL_fraction - FFA_fraction, units='kg/hr', thermo=thermo)
+    if PL_fraction: lipid.imass['PL'] = PL_fraction
+    if FFA_fraction: lipid.imass['FFA'] = FFA_fraction
+    
     carbs.imol[carbs_IDs] = stream.imol[carbs_IDs]
     fiber.imol[fiber_IDs] = stream.imol[fiber_IDs]
-    lipid.imol[lipid_IDs] = stream.imol[lipid_IDs]
     
     # Mass property arrays
     carbs_mass = stream.imass[carbs_IDs].value
     fiber_mass = stream.imass[fiber_IDs].value
-    lipid_mass = stream.imass[lipid_IDs].value
+    lipid_mass = lipid.imass[lipid_IDs].value
+    
     
     # Net weight
     carbs_massnet = carbs_mass.sum()
@@ -55,12 +63,12 @@ def set_lipid_fraction(lipid_fraction, stream=None):
     z_mass_lipid = lipid_fraction
     z_dry = 0.3
     z_mass_lipid = z_mass_lipid * z_dry 
-    z_mass_carbs = 0.149 - z_mass_lipid * LHV_lipid_over_carbs
-    z_mass_fiber = z_dry - z_mass_carbs - z_mass_lipid - 0.006 - 0.015
+    z_mass_carbs = z_mass_carbs_baseline - z_mass_lipid * LHV_lipid_over_carbs
+    z_mass_fiber = z_dry - z_mass_carbs - z_mass_lipid - z_mass_ash_baseline - z_mass_solids_baseline
     imass = stream.imass
     imass['Water'] = F_mass * 0.7
-    imass['Ash'] = F_mass * 0.006
-    imass['Solids'] = F_mass * 0.015
+    imass['Ash'] = F_mass * z_mass_ash_baseline
+    imass['Solids'] = F_mass * z_mass_solids_baseline
     imass[lipid_IDs] = r_mass_lipid * z_mass_lipid * F_mass
     imass[carbs_IDs] = r_mass_carbs * z_mass_carbs * F_mass
     imass[fiber_IDs] = r_mass_fiber * z_mass_fiber * F_mass

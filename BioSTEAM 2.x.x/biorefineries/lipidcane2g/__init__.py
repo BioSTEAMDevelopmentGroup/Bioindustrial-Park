@@ -27,7 +27,6 @@ import pandas as pd
 import numpy as np
 from typing import NamedTuple
 from ..lipidcane import set_lipid_fraction, get_lipid_fraction
-from .. import PY37
 from . import (_process_settings,
                _chemicals,
                _system,
@@ -52,8 +51,8 @@ __all__ = [*_process_settings.__all__,
            *_tea.__all__,
            *_lipid_extraction_specification.__all__,
            *_distributions.__all__,
-           'lipidcane_sys',
-           'lipidcane_tea', 
+           'sys',
+           'tea', 
            'flowsheet',
 ]
 _system_loaded = False
@@ -302,13 +301,13 @@ def enable_derivative(enable=True):
     
 _derivative_disabled = True
 
-def load(name, cache={}):
+def load(name, cache={}, reduce_chemicals=True):
     dct = globals()
     number, agile = dct['configuration'] = parse(name)
     if (number, agile) in cache:
         dct.update(cache[number, agile])
         return
-    global lipidcane_sys, lipidcane_tea, specs, flowsheet, _system_loaded
+    global lipidcane_sys, sys, tea, specs, flowsheet, _system_loaded
     global lipid_extraction_specification, model, unit_groups
     global HXN, BT
     if not _chemicals_loaded: load_chemicals()
@@ -406,9 +405,10 @@ def load(name, cache={}):
     elif number == 2:
         lipidcane_sys.prioritize_unit(T808)
     if number < 0:
-        dct['lipidcane'] = sugarcane
+        dct['lipidcane'] = lipidcane = sugarcane
         dct['lipidcane_sys'] = lipidcane_sys
-    dct['feedstock'] = feedstock = lipidcane
+    else:
+        lipidcane = dct['lipidcane']
     unit_groups = UnitGroup.group_by_area(lipidcane_sys.units)
     if area_names:
         for i, j in zip(unit_groups, area_names): i.name = j
@@ -445,18 +445,6 @@ def load(name, cache={}):
         prs.reactions[10].X = 0.0 # baseline
         fermentor.cofermentation[1:4].X[:] = fermentor.loss[0].X = 0.
         fermentor.cofermentation[5:].X[:] = fermentor.loss[1].X = 0.
-    
-    def set_FFA_fraction(FFA_fraction):
-        if number > 0:
-            lipid = float(feedstock.imass['Lipid'])
-            feedstock.imass['FFA'] = FFA_fraction * lipid
-            feedstock.imass['TAG'] += lipid - feedstock.imass['Lipid']
-            
-    def set_PL_fraction(PL_fraction):
-        if number > 0:
-            lipid = float(feedstock.imass['Lipid'])
-            feedstock.imass['PL'] = PL_fraction * lipid
-            feedstock.imass['TAG'] += lipid - feedstock.imass['Lipid']
             
     def set_glucose_yield(glucose_yield):
         if abs(number) == 2:
@@ -478,40 +466,41 @@ def load(name, cache={}):
     
     if agile: 
         dct['lipidsorghum'] = lipidsorghum = sorghum_feedstock(ID='lipidsorghum')
-        original_lipidcane = lipidcane.copy()
-        not_agile_sys = lipidcane_sys
-        lipidcane_sys = bst.AgileSystem()
-        @lipidcane_sys.operation_parameter
-        def switch_feedstock(sorghum):
-            F_mass_original = feedstock.F_mass
-            if sorghum:
-                feedstock.copy_flow(lipidsorghum, ('PL', 'FFA', 'MAG', 'DAG', 'TAG'), exclude=True)
+        sys = agile_sys = bst.AgileSystem()
+        @agile_sys.operation_parameter(mode_dependent=True)
+        def set_lipid_content(lipid_content, mode):
+            if number > 0: set_lipid_fraction(lipid_content, lipidcane,
+                                               FFA_fraction=mode.FFA_fraction,
+                                               z_mass_carbs_baseline=mode.z_mass_carbs_baseline,
+                                               PL_fraction=mode.PL_fraction)
             else:
-                feedstock.copy_like(original_lipidcane)
-            feedstock.F_mass = F_mass_original
-            
-        @lipidcane_sys.operation_parameter
-        def set_feedstock_lipid_content(lipid_content):
-            if number >= 0: set_lipid_fraction(lipid_content, feedstock)
+                F_mass = lipidcane.F_mass
+                lipidcane.copy_flow(mode.feedstock)
+                lipidcane.F_mass = F_mass
+        agile_sys.operation_parameter(set_glucose_yield)
+        agile_sys.operation_parameter(set_xylose_yield)
         
-        lipidcane_sys.operation_parameter(set_glucose_yield)
-        lipidcane_sys.operation_parameter(set_xylose_yield)
-        lipidcane_sys.operation_parameter(set_FFA_fraction)
-        lipidcane_sys.operation_parameter(set_PL_fraction)
-        
-        cane_operation_mode = lipidcane_sys.operation_mode(not_agile_sys,
-            operating_hours=200*24, sorghum=False, lipid_content=0.10,
-            glucose_yield=85, xylose_yield=65, FFA_fraction=0.10, PL_fraction=0.05
+        dct['cane_mode'] = cane_mode = agile_sys.operation_mode(lipidcane_sys,
+            operating_hours=200*24, lipid_content=0.10, feedstock=lipidcane.copy(),
+            z_mass_carbs_baseline=0.1491, glucose_yield=85, xylose_yield=65, 
+            FFA_fraction=0.10, PL_fraction=0.05
         )
-        sorghum_operation_mode = lipidcane_sys.operation_mode(not_agile_sys,
-            operating_hours=60*24, sorghum=True, lipid_content=0.07,
-            glucose_yield=79, xylose_yield=86, FFA_fraction=0.10, PL_fraction=0.05
+        dct['sorghum_mode'] = sorghum_mode = agile_sys.operation_mode(lipidcane_sys, 
+            operating_hours=60*24, lipid_content=0.07, glucose_yield=79, xylose_yield=86,
+            feedstock=lipidsorghum,
+            z_mass_carbs_baseline=0.1371, FFA_fraction=0.10, PL_fraction=0.05,
         )
-        
+        feedstocks = [lipidcane]
+        tea = create_tea(sys)
+        tea.operating_days = 260 
+        tea.IRR = 0.10
     else:
-        lipidcane_sys.operating_hours = 24 * 200
-    lipidcane_tea = create_tea(lipidcane_sys)
-    lipidcane_tea.income_tax = 0.21 # Davis et al. 2018; https://www.nrel.gov/docs/fy19osti/71949.pdf
+        sys = lipidcane_sys
+        tea = create_tea(sys)
+        tea.operating_days = 200
+        tea.IRR = 0.10
+        feedstocks = [lipidcane]
+    tea.income_tax = 0.21 # Davis et al. 2018; https://www.nrel.gov/docs/fy19osti/71949.pdf
     
     ## Specification for analysis
     if number < 0:
@@ -531,12 +520,12 @@ def load(name, cache={}):
                 break
         
         lipid_extraction_specification = LipidExtractionSpecification(
-            lipidcane_sys, feedstock, isplit_a, isplit_b, isplit_efficiency_is_reversed
+            sys, feedstocks, isplit_a, isplit_b, isplit_efficiency_is_reversed
         )
     
     ## Model
     
-    model = bst.Model(lipidcane_sys, exception_hook='raise', retry_evaluation=False)
+    model = bst.Model(sys, exception_hook='raise', retry_evaluation=False)
     parameter = model.parameter
     metric = model.metric
     
@@ -553,19 +542,7 @@ def load(name, cache={}):
     
     # Currently at ~5%, but total lipid content is past 10%
     
-    @uniform(5., 15., element=feedstock, units='dry wt. %', kind='coupled')
-    def set_cane_lipid_content(cane_lipid_content):
-        if agile:
-            cane_operation_mode.lipid_content = cane_lipid_content / 100.
-        else:
-            lipid_extraction_specification.load_lipid_content(cane_lipid_content / 100.)
-    
-    @uniform(-3., 0., element=feedstock, units='dry wt. %', kind='coupled')
-    def set_relative_sorghum_lipid_content(relative_sorghum_lipid_content):
-        if agile:
-            sorghum_operation_mode.lipid_content = cane_operation_mode.lipid_content + relative_sorghum_lipid_content / 100.
-    
-    @uniform(41, 61., element=feedstock, units='%', kind='coupled')
+    @uniform(41, 61, units='%', kind='coupled')
     def set_bagasse_lipid_retention(lipid_retention):
         lipid_extraction_specification.load_lipid_retention(lipid_retention / 100.)
     
@@ -577,16 +554,16 @@ def load(name, cache={}):
         elif number == 2:
             return 70.0 + x
     
-    @uniform(0., 20, units='%', element=feedstock, kind='coupled', 
+    @uniform(0., 20, units='%', kind='coupled', 
              hook=lipid_extraction_efficiency_hook)
     def set_bagasse_lipid_extraction_efficiency(bagasse_lipid_extraction_efficiency):
         lipid_extraction_specification.load_efficiency(bagasse_lipid_extraction_efficiency / 100.)
 
-    capacity = feedstock.F_mass / kg_per_ton
-    @uniform(0.75 * capacity, 1.25 * capacity, units='ton/hr',
-             element=feedstock, kind='coupled')
+    capacity = lipidcane.F_mass / kg_per_ton
+    @uniform(0.75 * capacity, 1.25 * capacity, units='ton/hr', kind='coupled')
     def set_plant_capacity(capacity):
-        feedstock.F_mass = kg_per_ton * capacity
+        lipidcane.F_mass = F_mass = kg_per_ton * capacity
+        if agile: lipidsorghum.F_mass = F_mass
 
     # USDA ERS historical price data
     @parameter(distribution=ethanol_price_distribution, element=ethanol, units='USD/gal')
@@ -614,14 +591,14 @@ def load(name, cache={}):
     @uniform(6 * 30, 7 * 30, units='day/yr')
     def set_operating_days(operating_days):
         if agile:
-            cane_operation_mode.operating_hours = operating_days * 24
+            cane_mode.operating_hours = operating_days * 24
         else:
-            lipidcane_tea.operating_days = operating_days
+            tea.operating_days = operating_days
     
     # 10% is suggested for waste reducing, but 15% is suggested for investment
     @uniform(10., 15., units='%')
     def set_IRR(IRR):
-        lipidcane_tea.IRR = IRR / 100.
+        tea.IRR = IRR / 100.
     
     crude_glycerol = dct.get('crude_glycerol') or bst.Stream('crude_glycerol')
     @uniform(0.10, 0.22, units='USD/kg', element=crude_glycerol)
@@ -636,13 +613,12 @@ def load(name, cache={}):
         pure_glycerine.price = price
     
     cellulase_base_cost = 0.212
-    cellulase = dct.get('cellulase') or bst.Stream('cellulase')
-    @uniform(0.75 * cellulase_base_cost, 1.25 * cellulase_base_cost, units='USD/kg', element=cellulase)
+    @uniform(0.75 * cellulase_base_cost, 1.25 * cellulase_base_cost, units='USD/kg', element='cellulase')
     def set_cellulase_price(price):
         if abs(number) == 2: cellulase.price = price
     
     cellulase_loading = 0.02
-    @uniform(0.75 * cellulase_loading, 1.25 * cellulase_loading, units='wt. % cellulose', element=cellulase)
+    @uniform(0.75 * cellulase_loading, 1.25 * cellulase_loading, units='wt. % cellulose', element='cellulase')
     def set_cellulase_loading(cellulase_loading):
         if abs(number) == 2: M302.cellulase_loading = cellulase_loading
     
@@ -654,26 +630,26 @@ def load(name, cache={}):
     @uniform(85, 97.5, units='%', element='Pretreatment and saccharification')
     def set_cane_glucose_yield(cane_glucose_yield):
         if agile:
-            cane_operation_mode.glucose_yield = cane_glucose_yield
+            cane_mode.glucose_yield = cane_glucose_yield
         elif abs(number) == 2:
             set_glucose_yield(cane_glucose_yield)
     
     @uniform(79, 97.5, units='%', element='Pretreatment and saccharification')
     def set_sorghum_glucose_yield(sorghum_glucose_yield):
         if not agile: return
-        sorghum_operation_mode.glucose_yield = sorghum_glucose_yield
+        sorghum_mode.glucose_yield = sorghum_glucose_yield
         
     @uniform(65, 97.5, units='%', element='Pretreatment and saccharification')
     def set_cane_xylose_yield(cane_xylose_yield):
         if agile:
-            cane_operation_mode.xylose_yield = cane_xylose_yield
+            cane_mode.xylose_yield = cane_xylose_yield
         elif abs(number) == 2:
             set_xylose_yield(cane_xylose_yield)
     
     @uniform(86, 97.5, units='%', element='Pretreatment and saccharification')
     def set_sorghum_xylose_yield(sorghum_xylose_yield):
         if not agile: return
-        sorghum_operation_mode.xylose_yield = sorghum_xylose_yield
+        sorghum_mode.xylose_yield = sorghum_xylose_yield
     
     @uniform(90, 95, units='%', element='Cofermenation')
     def set_glucose_to_ethanol_yield(glucose_to_ethanol_yield):
@@ -710,29 +686,38 @@ def load(name, cache={}):
             if X_excess > 0.: breakpoint()
             fermentor.cofermentation.X[0] = X3
 
-    @default(10, element=feedstock, units='% lipid', kind='coupled')
+    @default(10, element='lipidcane', units='% lipid', kind='coupled')
     def set_cane_PL_fraction(cane_PL):
-        if agile:
-            cane_operation_mode.PL_fraction = cane_PL / 100.
-        else:
-            set_PL_fraction(cane_PL / 100.)
+        if agile: cane_mode.PL_fraction = cane_PL / 100.
+        else: lipid_extraction_specification.PL_fraction = cane_PL / 100.
     
-    @default(10, element=feedstock, units='% lipid', kind='coupled')
+    @default(10, element='lipidsorghum', units='% lipid', kind='coupled')
     def set_sorghum_PL_fraction(sorghum_PL):
-        if agile: sorghum_operation_mode.PL_fraction = sorghum_PL / 100.
+        if agile: sorghum_mode.PL_fraction = sorghum_PL / 100.
     
-    @default(10, element=feedstock, units='% lipid', kind='coupled')
+    @default(10, element='lipidcane', units='% lipid', kind='coupled')
     def set_cane_FFA_fraction(cane_FFA):
-        if agile:
-            cane_operation_mode.FFA_fraction = cane_FFA / 100.
-        else:
-            set_FFA_fraction(cane_FFA / 100.)
+        if agile: cane_mode.FFA_fraction = cane_FFA / 100.
+        else: lipid_extraction_specification.FFA_fraction = cane_FFA / 100.
     
-    @default(10, element=feedstock, units='% lipid', kind='coupled')
+    @default(10, element='lipidsorghum', units='% lipid', kind='coupled')
     def set_sorghum_FFA_fraction(sorghum_FFA):
-        if agile: sorghum_operation_mode.FFA_fraction = sorghum_FFA / 100. 
+        if agile: sorghum_mode.FFA_fraction = sorghum_FFA / 100. 
 
-    @default(10, element=feedstock, units='% lipid', kind='coupled')
+    @uniform(5., 15., element='lipidcane', units='dry wt. %', kind='coupled')
+    def set_cane_lipid_content(cane_lipid_content):
+        if agile:
+            cane_mode.lipid_content = cane_lipid_content / 100.
+        else:
+            lipid_extraction_specification.load_lipid_content(cane_lipid_content / 100.)
+
+    @uniform(-3., 0., element='lipidsorghum', units='dry wt. %', kind='coupled')
+    def set_relative_sorghum_lipid_content(relative_sorghum_lipid_content):
+        if agile:
+            sorghum_mode.lipid_content = cane_mode.lipid_content + relative_sorghum_lipid_content / 100.
+    
+
+    @default(10, units='% lipid', kind='coupled')
     def set_TAG_to_FFA_conversion(TAG_to_FFA_conversion):
         if number == 1:
             R301.lipid_reaction.X[0] = TAG_to_FFA_conversion / 100.
@@ -753,21 +738,21 @@ def load(name, cache={}):
     natural_gas.imol['CH4'] = original_value
     
     if agile:
-        feedstock_flow = lambda: lipidcane_sys.flow_rates[feedstock] / kg_per_ton # ton/yr
-        biodiesel_flow = lambda: lipidcane_sys.flow_rates.get(biodiesel, 0.) / 3.3111 # gal/yr
-        ethanol_flow = lambda: lipidcane_sys.flow_rates[ethanol] / 2.98668849 # gal/yr
-        natural_gas_flow = lambda: lipidcane_sys.flow_rates[natural_gas] * V_ng # cf/yr
+        feedstock_flow = lambda: sum([sys.flow_rates[i] for i in feedstocks]) / kg_per_ton # ton/yr
+        biodiesel_flow = lambda: sys.flow_rates.get(biodiesel, 0.) / 3.3111 # gal/yr
+        ethanol_flow = lambda: sys.flow_rates[ethanol] / 2.98668849 # gal/yr
+        natural_gas_flow = lambda: sys.flow_rates[natural_gas] * V_ng # cf/yr
         if number <= 1:
-            electricity = lambda: lipidcane_sys.utility_cost / bst.PowerUtility.price
+            electricity = lambda: sys.utility_cost / bst.PowerUtility.price
         elif number == 2:
             electricity = lambda: 0.
     else:
-        feedstock_flow = lambda: lipidcane_sys.operating_hours * feedstock.F_mass / kg_per_ton # ton/yr
-        biodiesel_flow = lambda: lipidcane_sys.operating_hours * biodiesel.F_mass / 3.3111 # gal/yr
-        ethanol_flow = lambda: lipidcane_sys.operating_hours * ethanol.F_mass / 2.98668849 # gal/yr
-        natural_gas_flow = lambda: lipidcane_sys.operating_hours * natural_gas.F_mass * V_ng # cf/yr
+        feedstock_flow = lambda: sys.operating_hours * lipidcane.F_mass / kg_per_ton # ton/yr
+        biodiesel_flow = lambda: sys.operating_hours * biodiesel.F_mass / 3.3111 # gal/yr
+        ethanol_flow = lambda: sys.operating_hours * ethanol.F_mass / 2.98668849 # gal/yr
+        natural_gas_flow = lambda: sys.operating_hours * natural_gas.F_mass * V_ng # cf/yr
         if number <= 1:
-            electricity = lambda: lipidcane_sys.operating_hours * sum([i.rate for i in lipidcane_sys.power_utilities])
+            electricity = lambda: sys.operating_hours * sum([i.rate for i in lipidcane_sys.power_utilities])
         elif number == 2:
             electricity = lambda: 0.
     dct['flows'] = flows = {'feedstock': feedstock_flow,
@@ -777,7 +762,7 @@ def load(name, cache={}):
                             'electricity': electricity}
     @metric(units='USD/ton')
     def MFPP():
-        feedstock.price = price = lipidcane_tea.solve_price(feedstock)
+        price = tea.solve_price(feedstocks)
         return kg_per_ton * price
     
     @metric(units='Gal/ton')
@@ -800,7 +785,7 @@ def load(name, cache={}):
     
     @metric(units='10^6*USD')
     def TCI():
-        return lipidcane_tea.TCI / 1e6 # 10^6*$
+        return tea.TCI / 1e6 # 10^6*$
     
     @metric(units='ton/yr')
     def feedstock_consumption():
@@ -823,20 +808,20 @@ def load(name, cache={}):
         if number < 0: return 0.
         if _derivative_disabled: return np.nan
         if agile:
-            cane_operation_mode.lipid_content += 0.01
-            sorghum_operation_mode.lipid_content += 0.01
+            cane_mode.lipid_content += 0.01
+            sorghum_mode.lipid_content += 0.01
         else:
             lipid_extraction_specification.load_lipid_content(lipid_extraction_specification.lipid_content + 0.01)
-        lipidcane_sys.simulate()  
-        # value = (kg_per_ton * lipidcane_tea.solve_price(feedstock) - MFPP.cache)
-        # feedstock.price = lipidcane_tea.solve_price(feedstock)
+        sys.simulate()  
+        # value = (kg_per_ton * tea.solve_price(lipidcane) - MFPP.cache)
+        # lipidcane.price = tea.solve_price(lipidcane)
         # print('AFTER')
-        # print('MFPP', kg_per_ton * lipidcane_tea.solve_price(feedstock))
-        # print('VOC', lipidcane_tea.VOC / 1e3)
-        # print('TCI', lipidcane_tea.TCI / 1e6)
-        # print('sales', lipidcane_tea.sales / 1e3)
-        # print('NPV', lipidcane_tea.NPV)
-        return (kg_per_ton * lipidcane_tea.solve_price(feedstock) - MFPP.cache)
+        # print('MFPP', kg_per_ton * tea.solve_price(lipidcane))
+        # print('VOC', tea.VOC / 1e3)
+        # print('TCI', tea.TCI / 1e6)
+        # print('sales', tea.sales / 1e3)
+        # print('NPV', tea.NPV)
+        return (kg_per_ton * tea.solve_price(feedstocks) - MFPP.cache)
     
     @metric(units='Gal/ton')
     def biodiesel_production_derivative():
@@ -874,7 +859,7 @@ def load(name, cache={}):
     def TCI_derivative():
         if number < 0: return 0.
         if _derivative_disabled: return np.nan
-        value = (lipidcane_tea.TCI / 1e6  - TCI.cache) # 10^6*$
+        value = (tea.TCI / 1e6  - TCI.cache) # 10^6*$
         # print('TCI production derivative', value)
         return value
     
@@ -900,25 +885,22 @@ def load(name, cache={}):
     # set_biodiesel_price(4.569) # Consistent with Huang's 2016 paper
     # set_natural_gas_price(4.198) # Consistent with Humbird's 2012 paper
     # set_electricity_price(0.0572) # Consistent with Humbird's 2012 paper
-    set_operating_days(200) # Consistent with Huang's 2016 paper
+    # set_operating_days(200) # Consistent with Huang's 2016 paper
     
-    for i in model.parameters:
+    for i in model._parameters:
         dct[i.setter.__name__] = i
-    for i in model.metrics:
+    for i in model._metrics:
         dct[i.getter.__name__] = i
     cache[number, agile] = dct.copy()
     
     ## Simulation
     try: 
-        lipidcane_sys.simulate()
+        sys.simulate()
     except Exception as e:
         raise e
-    finally:
-        lipidcane_tea.IRR = 0.10
-    if agile:
-        not_agile_sys.reduce_chemicals()
-    else:
+    if reduce_chemicals:
         lipidcane_sys.reduce_chemicals()
+    lipidcane_sys._load_stream_links()
     HXN.force_ideal_thermo = True
     HXN.cache_network = True
     HXN.simulate()
@@ -933,14 +915,17 @@ def evaluate_configurations_across_extraction_efficiency_and_lipid_content(
     for ia in range(A):
         for ic in range(C):    
             load([int(configurations[ic]), agile[ia]])
-            lipid_extraction_specification.load_specifications(
-                efficiency=efficiency, 
-                lipid_content=lipid_content, 
-                lipid_retention=lipid_retention
-            )
             if agile[ia]:
-                cane_operation_mode.lipid_content = sorghum_operation_mode.lipid_content = lipid_content
-            lipidcane_sys.simulate()
+                cane_mode.lipid_content = sorghum_mode.lipid_content = lipid_content
+                lipid_extraction_specification.load_efficiency(efficiency)
+                lipid_extraction_specification.load_lipid_retention(lipid_retention)
+            else:
+                lipid_extraction_specification.load_specifications(
+                    efficiency=efficiency, 
+                    lipid_content=lipid_content, 
+                    lipid_retention=lipid_retention
+                )
+            sys.simulate()
             data[ia, ic, :] = [j() for j in model.metrics]
     return data
 
@@ -959,12 +944,12 @@ def evaluate_configurations_across_sorghum_and_cane_lipid_content(
     data = np.zeros([C, M])
     for ic in range(C):
         load([int(configurations[ic]), True])
-        lipidcane_sys.cane_lipid_content = cane_lipid_content
+        cane_mode.lipid_content = cane_lipid_content
         if relative:
-            lipidcane_sys.sorghum_lipid_content = cane_lipid_content + sorghum_lipid_content
+            sorghum_mode.lipid_content = cane_lipid_content + sorghum_lipid_content
         else:
-            lipidcane_sys.sorghum_lipid_content = sorghum_lipid_content
-        lipidcane_sys.simulate()
+            sorghum_mode.lipid_content = sorghum_lipid_content
+        sys.simulate()
         data[ic, :] = [j() for j in model.metrics]
     return data
 
@@ -1007,7 +992,7 @@ def evaluate_MFPP_across_ethanol_and_biodiesel_prices(ethanol_price, biodiesel_p
     biodiesel_flow = flows['biodiesel']()
     ethanol_flow = flows['ethanol']()
     baseline_price = (
-        lipidcane_tea.solve_price(feedstock) * kg_per_ton
+        tea.solve_price(lipidcane) * kg_per_ton
         - (ethanol.price * ethanol_flow  * 2.98668849 + biodiesel.price * 3.3111 * biodiesel_flow) / feedstock_flow
     )
     return (

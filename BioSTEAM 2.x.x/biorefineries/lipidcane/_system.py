@@ -257,8 +257,7 @@ def create_lipid_pretreatment_system(ins, outs):
         else:
             T2.ins[0].imol['Glycerol'] = required_glycerol
         R1.ins[2].ivol['N2'] = lipid.F_vol
-        for i in T2.path_until(M2): i._run()
-        M2._run()
+        for i in T2.path_until(R1): i._run()
         
     H4 = bst.HXutility('H4', H3-1, T=333.15, V=0)
     C1 = bst.LiquidsSplitCentrifuge('C1', H4-0, ['', glycerol_recycle],

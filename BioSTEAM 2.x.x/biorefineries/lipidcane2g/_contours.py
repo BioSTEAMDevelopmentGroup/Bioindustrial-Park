@@ -17,6 +17,7 @@ from biosteam.plots import (
     MetricBar,
     plot_scatter_points,
     plot_contour_single_metric,
+    plot_contour_1d,
     plot_vertical_line,
     rounded_tickmarks_from_data as tickmarks
 )
@@ -122,12 +123,11 @@ def plot_ethanol_and_biodiesel_price_contours(N=30, benefit=False, cache={}):
 
     plt.show()
     
-def plot_relative_sorghum_lipid_content_and_cane_lipid_content_contours(load=False, metric_index=0, relative=True):
+def relative_sorghum_lipid_content_and_cane_lipid_content_data(load, relative):
     # Generate contour data
-    y = np.linspace(0.05, 0.15, 5)
-    x = np.linspace(-0.03, 0., 5) if relative else np.linspace(0.02, 0.15, 5)
+    y = np.linspace(0.05, 0.15, 10)
+    x = np.linspace(-0.03, 0., 10) if relative else np.linspace(0.02, 0.15, 10)
     X, Y = np.meshgrid(x, y)
-    metric = bst.metric
     folder = os.path.dirname(__file__)
     file = 'lipid_content_analysis.npy'
     if relative: file = 'relative_' + file
@@ -140,43 +140,36 @@ def plot_relative_sorghum_lipid_content_and_cane_lipid_content_contours(load=Fal
             X, Y, configurations, relative,
         )
     np.save(file, data)
-    data = data[:, :, np.newaxis, :, metric_index]
+    return X, Y, data
+    
+def plot_relative_sorghum_lipid_content_and_cane_lipid_content_contours(load=False, configuration_index=0, relative=False):
+    # Generate contour data
+    X, Y, data = relative_sorghum_lipid_content_and_cane_lipid_content_data(load, relative)
+    data = data[:, :, configuration_index, [0, 5]]
     
     # Plot contours
     xlabel = "Sorghum lipid content\n[dry wt. %]" 
     if relative: xlabel = ('relative ' + xlabel).capitalize()
     ylabel = 'Cane lipid content\n[dry wt. %]'
     yticks = [5, 7.5, 10, 12.5, 15]
-    xticks = [-3, -2, -1, 0] if relative else [2, 5, 10, 15]
-    metric = lc.all_metric_mockups[metric_index]
-    units = metric.units if metric.units == '%' else format_units(metric.units)
-    metric_bar = MetricBar(metric.name, units, colormaps[metric_index], tickmarks(data, 5, 5), 18)
-    fig, axes, CSs, CB = plot_contour_single_metric(
-        100.*X, 100.*Y, data, xlabel, ylabel, xticks, yticks, metric_bar, 
-        fillblack=False, styleaxiskw=dict(xtick0=False), label=True,
-        titles=['Configuration I*', 'Configuration II*'],
+    xticks = [-3, -2, -1, 0] if relative else [2, 5, 7.5, 10, 12.5, 15]
+    MFPP = lc.all_metric_mockups[0]
+    TCI = lc.all_metric_mockups[5]
+    metric_bars = [
+        MetricBar(MFPP.name, format_units(MFPP.units), colormaps[0], tickmarks(data[:, :, 0], 5, 5), 15, 1),
+        MetricBar(TCI.name, format_units(MFPP.units), colormaps[1], tickmarks(data[:, :, 1], 5, 5), 10)
+    ]
+    Z = np.array([f"Configuration {'I'*(configuration_index + 1)}*"])
+    fig, axes, CSs, CB = plot_contour_2d(
+        100.*X, 100.*Y, Z, data[:, :, :, np.newaxis], xlabel, ylabel, xticks, yticks, metric_bars, 
+        fillblack=False, styleaxiskw=dict(xtick0=True), label=True,
     )
-    M = len(configurations)
-    for i in range(1):
-        for j in range(M):
-            ax = axes[i, j]
-            CS = CSs[i, j]
-            plt.sca(ax)
-            metric_data = data[:, :, i, j]
-            lb = metric_data.min()
-            ub = metric_data.max()
-            levels = [i for i in CS.levels if lb <= i <= ub]
-            CS = plt.contour(100.*X, 100.*Y, data=metric_data, zorder=1e16, linestyles='dashed', linewidths=1.,
-                             levels=levels, colors=[linecolor])
-            ax.clabel(CS, levels=CS.levels, inline=True, fmt=lambda x: f'{round(x):,}',
-                      fontsize=10, colors=[linecolor], zorder=1e16)
-
     plt.show()
     
 def plot_extraction_efficiency_and_lipid_content_contours(load=False, metric_index=0):
     # Generate contour data
-    x = np.linspace(0.4, 1., 8)
-    y = np.linspace(0.05, 0.15, 8)
+    x = np.linspace(0.4, 1., 10)
+    y = np.linspace(0.05, 0.15, 10)
     X, Y = np.meshgrid(x, y)
     metric = bst.metric
     folder = os.path.dirname(__file__)
