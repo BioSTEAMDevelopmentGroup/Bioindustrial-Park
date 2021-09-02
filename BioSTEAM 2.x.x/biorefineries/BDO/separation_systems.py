@@ -321,17 +321,20 @@ def create_separation_system_oleyl_alcohol(ins, outs):
         LHK=('Water', 'BDO'),
         partial_condenser=False,
         k=1.1,
-        product_specification_format='Composition',
-        y_top=0.99999, x_bot=0.94)
-    target_BDO_x = 0.06
+        # product_specification_format='Composition',
+        # y_top=0.99999, x_bot=0.94)
+        product_specification_format='Recovery',
+        Lr=0.5, Hr=0.999)
+    D407.target_BDO_x = 0.07
     def get_x(chem_ID, stream):
         return stream.imol[chem_ID]/sum(stream.imol['AceticAcid', 'Furfural', 'HMF', 'BDO', 'Water'])
     def D407_f(Lr):
         D407.Hr = 0.999
         D407.Lr = Lr
         D407._run()
-        return get_x('BDO', D407.outs[1]) - target_BDO_x
-    # D407.specification = bst.BoundedNumericalSpecification(D407_f, 0.001, 0.999)
+        BDO_x = get_x('BDO', D407.outs[1])
+        return  get_x('BDO', D407.outs[1]) - max(get_x('BDO', D407.ins[0]), D407.target_BDO_x)
+    D407.specification = bst.BoundedNumericalSpecification(D407_f, 0.001, 0.999)
     
     D407_Pb = bst.Pump('D407_Pb', D407-1, P=101325.)
     
@@ -387,7 +390,7 @@ def create_separation_system_oleyl_alcohol(ins, outs):
                                     is_divided=True,
                                     P=0.2 * 101325,
                                     product_specification_format='Recovery',
-                                    Lr=0.9995, Hr=0.9995, k=1.2,
+                                    Lr=0.9995, Hr=0.9995, k=1.1,
                                     vessel_material = 'Stainless steel 316')
     
     D402_Pd = bst.Pump('D402_Pd', D402-0, P=101325)
@@ -401,7 +404,7 @@ def create_separation_system_oleyl_alcohol(ins, outs):
                                     is_divided=True,
                                     P=0.2 * 101325,
                                     product_specification_format='Recovery',
-                                    Lr=0.9995, Hr=0.9995, k=1.2,
+                                    Lr=0.995, Hr=0.999, k=1.2,
                                     vessel_material = 'Stainless steel 316')
     D403x_H = bst.HXutility('D403x_H', D403x-0, T=305.15, rigorous=True)
     D403x_Pd = bst.Pump('D403x_Pd', D403x_H-0, unreacted_acetoin, P=101325)
