@@ -66,23 +66,24 @@ colormaps = [
     plt.cm.get_cmap('bone_r'),
 ] * 2
 
-def plot_ethanol_and_biodiesel_price_contours(N=30, benefit=False, cache={}):
+def plot_ethanol_and_biodiesel_price_contours(N=30, benefit=False, cache={}, 
+                                              enhanced_cellulosic_performance=False):
     ethanol_price = np.linspace(1., 3., N)
     biodiesel_price = np.linspace(2, 6, N)
     lipid_content = [5, 10, 15]
     N_rows = len(lipid_content)
     configuration = ['L1', 'L1*', 'L2', 'L2*']
     N_cols = len(configuration)
-    if (N, benefit) in cache:
-        Z = cache[N, benefit]
+    if (N, benefit, enhanced_cellulosic_performance) in cache:
+        Z = cache[N, benefit, enhanced_cellulosic_performance]
     else:
         Z = np.zeros([N, N, N_rows, N_cols])
         for i in range(N_rows):
             for j in range(N_cols):
-                lc.load(configuration[j])
+                lc.load(configuration[j], enhanced_cellulosic_performance=enhanced_cellulosic_performance)
                 lc.set_cane_lipid_content(lipid_content[i])
                 lc.set_relative_sorghum_lipid_content(0)
-                lc.lipidcane_sys.simulate()
+                lc.sys.simulate()
                 X, Y = np.meshgrid(ethanol_price, biodiesel_price)
                 if benefit:
                     Z[:, :, i, j] = lc.evaluate_MFPP_benefit_across_ethanol_and_biodiesel_prices(X, Y)

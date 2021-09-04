@@ -278,7 +278,7 @@ def create_lipidcane_to_biodiesel_and_ethanol_combined_1_and_2g_post_fermentatio
         mockup=True,
         area=300,
         udct=True,
-        solids_loading=0.33333, # 50% solids content
+        solids_loading=0.50, # 50 wt/wt % solids content
     )
     hydrolyzate, pretreatment_wastewater = hot_water_pretreatment_sys.outs
     
@@ -289,13 +289,17 @@ def create_lipidcane_to_biodiesel_and_ethanol_combined_1_and_2g_post_fermentatio
         area=400,
         udct=True,
         kind=2,
-        insoluble_solids_loading=0.10,
-        solids_loading=0.23, # 30% solids content in saccharification
+        insoluble_solids_loading=0.23,
+        solids_loading=0.23, # 30 wt/vol % solids content in saccharification
     )
-    S303 = cf_dct['S303'] # Pressure filter
-    S303.tag = "lipid extraction efficiency"
-    S303.isplit['Lipid'] = 1. - 0.7
-    lipid = S303.outs[1]
+    DAP_storage = cf_dct['DAP_storage']
+    CSL_storage = cf_dct['CSL_storage']
+    seedtrain = cf_dct['R302'] # Seed train
+    cofermentation = cf_dct['R303'] # Cofermentation
+    pressurefilter = cf_dct['S303'] # Pressure filter
+    pressurefilter.tag = "lipid extraction efficiency"
+    pressurefilter.isplit['Lipid'] = 1. - 0.7
+    lipid = pressurefilter.outs[1]
     sink = lipid.sink
     sink.ins[0] = None
     MX = bst.Mixer(400, [lipid, screened_juice])
@@ -304,7 +308,8 @@ def create_lipidcane_to_biodiesel_and_ethanol_combined_1_and_2g_post_fermentatio
                                     V_definition='First-effect',
                                     V=0.05) # fraction evaporated
     PX = bst.Pump(400, ins=EvX-0, P=101325.)
-    HX = bst.HXutility(400, PX-0, T=305.15)
+    MX = bst.Mixer(400, [PX-0, 'dilution_water'])
+    HX = bst.HXutility(400, MX-0, T=305.15)
     HX-0-sink
     PX.sucrose_hydrolysis_reaction = tmo.Reaction(
         'Sucrose + Water -> 2Glucose', 'Sucrose', 1.00
@@ -316,20 +321,39 @@ def create_lipidcane_to_biodiesel_and_ethanol_combined_1_and_2g_post_fermentatio
         PX.sucrose_hydrolysis_reaction.force_reaction(feed)
         if feed.imol['Water'] < 0: feed.imol['Water'] = 0.
     
-    EvX.solids_loading = 0.20
+    cofermentation.titer = 68.5
+    cofermentation.productivity = 1.05
     @EvX.add_specification(run=True)
     def evaporation():
+        evaporator_to_seedtrain = EvX.path_until(seedtrain)
+        DAP_to_seedtrain = DAP_storage.path_until(seedtrain)
+        CSL_to_seedtrain = CSL_storage.path_until(seedtrain)
+        seedtrain_to_cofermentation = seedtrain.path_until(cofermentation)
+        path = (*evaporator_to_seedtrain[1:],
+                *DAP_to_seedtrain,
+                *CSL_to_seedtrain,
+                *seedtrain_to_cofermentation)
+        beer = cofermentation.outs[1]
+        target_titer = cofermentation.titer
         def f(V):
             EvX.V = V
             EvX._run()
-            slurry = EvX.outs[0]
-            solids_loading = 1 - slurry.imass['Water', 'Lipid', 'AceticAcid', 'Furfural'].sum() / slurry.F_mass
-            return solids_loading - EvX.solids_loading
+            for unit in path: unit.run()
+            cofermentation.run()
+            return target_titer - beer.imass['Ethanol'] / beer.F_vol
+        
         y0 = f(0)
-        if y0 > 0: raise RuntimeError('dilution required, but not yet implemented')
-        y1 = f(1)
-        if y1 < 0: raise RuntimeError('infeasible to evaporate all water')
-        EvX.V = flx.IQ_interpolation(f, 0, 1, y0, y1, x=EvX.V, ytol=1e-2, xtol=1e-6)
+        if y0 < 0.:
+            ethanol = float(beer.imass['Ethanol'])
+            current_titer = ethanol / beer.F_vol
+            required_water = (1./target_titer - 1./current_titer) * ethanol
+            MX.ins[1].imass['Water'] = max(required_water, 0)
+        else:
+            y1 = f(0.1)
+            MX.ins[1].imass['Water'] = 0.
+            if y1 > 0: raise RuntimeError('infeasible to evaporate any more water')
+            EvX.V = flx.IQ_interpolation(f, 0, 0.1, y0, y1, x=EvX.V, ytol=1e-5, xtol=1e-6)
+        cofermentation.tau_cofermentation = target_titer / cofermentation.productivity 
     
     vent, cellulosic_beer, lignin = cellulosic_fermentation_sys.outs
     cellulosic_beer_distillation_sys = create_beer_distillation_system(
@@ -482,9 +506,9 @@ def create_sugarcane_to_ethanol_combined_1_and_2g(ins, outs):
         insoluble_solids_loading=0.15,
         solids_loading=0.23,
     )
-    S303 = cf_dct['S303'] # Pressure filter
-    sink = S303.outs[1].sink
-    MX = bst.Mixer(400, [S303-1, screened_juice])
+    pressurefilter = cf_dct['S303'] # Pressure filter
+    sink = pressurefilter.outs[1].sink
+    MX = bst.Mixer(400, [pressurefilter-1, screened_juice])
     EvX = bst.MultiEffectEvaporator(400, ins=MX-0,
                                     P=(101325, 69682, 47057, 30953, 19781),
                                     V_definition='First-effect',

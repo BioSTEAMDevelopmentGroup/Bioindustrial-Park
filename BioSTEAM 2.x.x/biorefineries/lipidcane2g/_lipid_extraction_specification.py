@@ -93,14 +93,14 @@ class LipidExtractionSpecification:
         'lipid_content',
         'locked_lipid_content',
         'isplit_efficiency_is_reversed',
-        'FFA_fraction',
-        'PL_fraction',
+        'FFA_content',
+        'PL_content',
     )
     
     def __init__(self, system, feedstocks, isplit_efficiency, isplit_lipid_retention, 
                  isplit_efficiency_is_reversed=False, efficiency=0.9, 
-                 lipid_retention=0.9, lipid_content=0.1, FFA_fraction=0.1,
-                 PL_fraction=0.1):
+                 lipid_retention=0.9, lipid_content=0.1, FFA_content=0.1,
+                 PL_content=0.1):
         self.system = system #: [System] System associated to feedstocks
         self.feedstocks = feedstocks #: Stream Lipid feedstocks
         self.isplit_efficiency = isplit_efficiency #: [ChemicalIndexer] Defines extraction efficiency as a material split.
@@ -110,8 +110,8 @@ class LipidExtractionSpecification:
         self.lipid_retention = lipid_retention #: [float] Lipid extraction lipid retention
         self.lipid_content = lipid_content #: [float] Lipid content of feedstocks [dry wt. %].
         self.locked_lipid_content = False
-        self.FFA_fraction = FFA_fraction
-        self.PL_fraction = PL_fraction
+        self.FFA_content = FFA_content
+        self.PL_content = PL_content
         
     def MFPP(self):
         return self.system.TEA.solve_price(self.feedstocks)
@@ -144,8 +144,8 @@ class LipidExtractionSpecification:
         if self.locked_lipid_content: return
         for i in self.feedstocks: 
             set_lipid_fraction(
-                lipid_content, i, PL_fraction=self.PL_fraction, 
-                FFA_fraction=self.FFA_fraction
+                lipid_content, i, PL_fraction=self.PL_content, 
+                FFA_fraction=self.FFA_content
             )
         self.lipid_content = lipid_content
       

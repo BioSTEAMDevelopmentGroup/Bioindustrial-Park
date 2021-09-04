@@ -138,10 +138,12 @@ across_lipid_content_agile_comparison_names = (
  set_electricity_price, set_operating_days, 
  set_IRR, set_crude_glycerol_price, set_pure_glycerol_price,
  set_cellulase_price, set_cellulase_loading, set_reactor_base_cost,
- set_glucose_yield, set_xylose_yield, set_glucose_to_ethanol_yield,
- set_xylose_to_ethanol_yield) = all_parameter_mockups = (
-    bst.MockVariable('Cane lipid content', 'dry wt. %', 'Stream-sugarcane'),
-    bst.MockVariable('Relative sorghum lipid content', 'dry wt. %', 'Stream-sugarcane'),
+ set_cane_glucose_yield, set_cane_xylose_yield, 
+ set_sorghum_glucose_yield, set_sorghum_xylose_yield, 
+ set_glucose_to_ethanol_yield, set_xylose_to_ethanol_yield,
+ set_cane_PL_content, set_sorghum_PL_content, set_cane_FFA_content,
+ set_sorghum_FFA_content, set_TAG_to_FFA_conversion,
+ ) = all_parameter_mockups = (
     bst.MockVariable('Lipid retention', '%', 'Stream-sugarcane'),
     bst.MockVariable('Bagasse lipid extraction efficiency', '%', 'Stream-sugarcane'),
     bst.MockVariable('Capacity', 'ton/hr', 'Stream-sugarcane'),
@@ -156,12 +158,21 @@ across_lipid_content_agile_comparison_names = (
     bst.MockVariable('Price', 'USD/kg', 'Stream-cellulase'),
     bst.MockVariable('Cellulase loading', 'wt. % cellulose', 'Stream-cellulase'),
     bst.MockVariable('Base cost', 'million USD', 'Pretreatment reactor system'),
-    bst.MockVariable('Glucose yield', '%', 'Pretreatment and saccharification'),
-    bst.MockVariable('Xylose yield', '%', 'Pretreatment and saccharification'),
+    bst.MockVariable('Cane glucose yield', '%', 'Pretreatment and saccharification'),
+    bst.MockVariable('Sorghum glucose yield', '%', 'Pretreatment and saccharification'),
+    bst.MockVariable('Cane xylose yield', '%', 'Pretreatment and saccharification'),
+    bst.MockVariable('Sorghum xylose yield', '%', 'Pretreatment and saccharification'),
     bst.MockVariable('Glucose to ethanol yield', '%', 'Cofermentation'),
     bst.MockVariable('Xylose to ethanol yield', '%', 'Cofermentation'),
-    
+    bst.MockVariable('Cane PL content', '% lipid', 'lipidcane'),
+    bst.MockVariable('Sorghum PL content', '% lipid', 'lipidsorghum'),
+    bst.MockVariable('Cane FFA content', '% lipid', 'lipidcane'),
+    bst.MockVariable('Sorghum FFA content', '% lipid', 'lipidsorghum'),    
+    bst.MockVariable('Cane lipid content', 'dry wt. %', 'Stream-sugarcane'),
+    bst.MockVariable('Relative sorghum lipid content', 'dry wt. %', 'Stream-sugarcane'),
+    bst.MockVariable('TAG to FFA conversion', '% lipid', 'Biorefinery'),    
 )
+     
 (MFPP, biodiesel_production, ethanol_production, 
  electricity_production, natural_gas_consumption, 
  TCI, feedstock_consumption, heat_exchanger_network_error,
@@ -301,7 +312,7 @@ def enable_derivative(enable=True):
     
 _derivative_disabled = True
 
-def load(name, cache={}, reduce_chemicals=True):
+def load(name, cache={}, reduce_chemicals=True, enhanced_cellulosic_performance=False):
     dct = globals()
     number, agile = dct['configuration'] = parse(name)
     if (number, agile) in cache:
@@ -470,9 +481,9 @@ def load(name, cache={}, reduce_chemicals=True):
         @agile_sys.operation_parameter(mode_dependent=True)
         def set_lipid_content(lipid_content, mode):
             if number > 0: set_lipid_fraction(lipid_content, lipidcane,
-                                               FFA_fraction=mode.FFA_fraction,
+                                               FFA_fraction=mode.FFA_content,
                                                z_mass_carbs_baseline=mode.z_mass_carbs_baseline,
-                                               PL_fraction=mode.PL_fraction)
+                                               PL_fraction=mode.PL_content)
             else:
                 F_mass = lipidcane.F_mass
                 lipidcane.copy_flow(mode.feedstock)
@@ -481,14 +492,14 @@ def load(name, cache={}, reduce_chemicals=True):
         agile_sys.operation_parameter(set_xylose_yield)
         
         dct['cane_mode'] = cane_mode = agile_sys.operation_mode(lipidcane_sys,
-            operating_hours=200*24, lipid_content=0.10, feedstock=lipidcane.copy(),
+            operating_hours=200*24, lipid_content=0.05, feedstock=lipidcane.copy(),
             z_mass_carbs_baseline=0.1491, glucose_yield=85, xylose_yield=65, 
-            FFA_fraction=0.10, PL_fraction=0.05
+            FFA_content=0.10, PL_content=0.10
         )
         dct['sorghum_mode'] = sorghum_mode = agile_sys.operation_mode(lipidcane_sys, 
-            operating_hours=60*24, lipid_content=0.07, glucose_yield=79, xylose_yield=86,
+            operating_hours=60*24, lipid_content=0.05, glucose_yield=79, xylose_yield=86,
             feedstock=lipidsorghum,
-            z_mass_carbs_baseline=0.1371, FFA_fraction=0.10, PL_fraction=0.05,
+            z_mass_carbs_baseline=0.1371, FFA_content=0.10, PL_content=0.10,
         )
         feedstocks = [lipidcane]
         tea = create_tea(sys)
@@ -542,7 +553,7 @@ def load(name, cache={}, reduce_chemicals=True):
     
     # Currently at ~5%, but total lipid content is past 10%
     
-    @uniform(41, 61, units='%', kind='coupled')
+    @uniform(40, 70, units='%', kind='coupled')
     def set_bagasse_lipid_retention(lipid_retention):
         lipid_extraction_specification.load_lipid_retention(lipid_retention / 100.)
     
@@ -684,25 +695,25 @@ def load(name, cache={}, reduce_chemicals=True):
             X3 = (xylose_to_ethanol_yield - X1) / (1 - X1_side - X2_side / (1 - X1 - X1_side)) 
             X_excess = (X3 + X3_side) - 1
             if X_excess > 0.: breakpoint()
-            fermentor.cofermentation.X[0] = X3
+            fermentor.cofermentation.X[4] = X3
 
     @default(10, element='lipidcane', units='% lipid', kind='coupled')
-    def set_cane_PL_fraction(cane_PL):
-        if agile: cane_mode.PL_fraction = cane_PL / 100.
-        else: lipid_extraction_specification.PL_fraction = cane_PL / 100.
+    def set_cane_PL_content(cane_PL_content):
+        if agile: cane_mode.PL_content = cane_PL_content / 100.
+        else: lipid_extraction_specification.PL_content = cane_PL_content / 100.
     
     @default(10, element='lipidsorghum', units='% lipid', kind='coupled')
-    def set_sorghum_PL_fraction(sorghum_PL):
-        if agile: sorghum_mode.PL_fraction = sorghum_PL / 100.
+    def set_sorghum_PL_content(sorghum_PL_content):
+        if agile: sorghum_mode.PL_content = sorghum_PL_content / 100.
     
     @default(10, element='lipidcane', units='% lipid', kind='coupled')
-    def set_cane_FFA_fraction(cane_FFA):
-        if agile: cane_mode.FFA_fraction = cane_FFA / 100.
-        else: lipid_extraction_specification.FFA_fraction = cane_FFA / 100.
+    def set_cane_FFA_content(cane_FFA_content):
+        if agile: cane_mode.FFA_content = cane_FFA_content / 100.
+        else: lipid_extraction_specification.FFA_content = cane_FFA_content / 100.
     
     @default(10, element='lipidsorghum', units='% lipid', kind='coupled')
-    def set_sorghum_FFA_fraction(sorghum_FFA):
-        if agile: sorghum_mode.FFA_fraction = sorghum_FFA / 100. 
+    def set_sorghum_FFA_content(sorghum_FFA_content):
+        if agile: sorghum_mode.FFA_content = sorghum_FFA_content / 100. 
 
     @uniform(5., 15., element='lipidcane', units='dry wt. %', kind='coupled')
     def set_cane_lipid_content(cane_lipid_content):
@@ -717,7 +728,7 @@ def load(name, cache={}, reduce_chemicals=True):
             sorghum_mode.lipid_content = cane_mode.lipid_content + relative_sorghum_lipid_content / 100.
     
 
-    @default(10, units='% lipid', kind='coupled')
+    @default(23, units='% lipid', kind='coupled')
     def set_TAG_to_FFA_conversion(TAG_to_FFA_conversion):
         if number == 1:
             R301.lipid_reaction.X[0] = TAG_to_FFA_conversion / 100.
@@ -781,7 +792,10 @@ def load(name, cache={}, reduce_chemicals=True):
     
     @metric(units='cf/ton')
     def natural_gas_consumption():
-        return natural_gas_flow() / feedstock_flow()
+        value = natural_gas_flow() / feedstock_flow()
+        if value < 0.:
+            breakpoint()
+        return value
     
     @metric(units='10^6*USD')
     def TCI():
@@ -863,22 +877,32 @@ def load(name, cache={}, reduce_chemicals=True):
         # print('TCI production derivative', value)
         return value
     
-    # # Single point evaluation for detailed design results
+    # Single point evaluation for detailed design results
     if abs(number) == 2:
-        set_glucose_yield(85)
-        set_xylose_yield(65)
-    set_glucose_to_ethanol_yield.setter(90)
-    set_xylose_to_ethanol_yield.setter(70)
+        if enhanced_cellulosic_performance:
+            set_sorghum_glucose_yield.setter(95)
+            set_sorghum_xylose_yield.setter(95)
+            set_cane_glucose_yield.setter(95)
+            set_cane_xylose_yield.setter(95)
+            set_glucose_to_ethanol_yield.setter(95)
+            set_xylose_to_ethanol_yield.setter(95)
+        else:
+            set_sorghum_glucose_yield.setter(79)
+            set_sorghum_xylose_yield.setter(86)
+            set_cane_glucose_yield.setter(85)
+            set_cane_xylose_yield.setter(65)
+            set_glucose_to_ethanol_yield.setter(90.8)
+            set_xylose_to_ethanol_yield.setter(73.7)
     lipid_extraction_specification.load_lipid_retention(0.70)
     lipid_extraction_specification.load_lipid_content(0.05)
-    set_bagasse_lipid_extraction_efficiency.setter(0.)
+    set_bagasse_lipid_extraction_efficiency.setter(lipid_extraction_efficiency_hook(0.))
     set_ethanol_price.setter(1.898) 
     set_biodiesel_price.setter(4.363)
     set_natural_gas_price.setter(4.3)
     set_electricity_price.setter(0.0641)
     if number > 0:
-        set_cane_PL_fraction.setter(10)
-        set_cane_FFA_fraction.setter(10)
+        set_cane_PL_content.setter(10)
+        set_cane_FFA_content.setter(10)
     # set_fermentation_solids_loading(20) # Same as Humbird
     # set_feedstock_lipid_content(10) # Consistent with SI of Huang's 2016 paper
     # set_ethanol_price(2.356) # Consistent with Huang's 2016 paper
@@ -1398,9 +1422,7 @@ def plot_spearman_MFPP(configuration, top=None, agile=True):
     operating_days = format_units('day/yr')
     capacity = format_units('ton/hr')
     index = [
-         'Cane lipid content [5 $-$ 15 dry wt. %]',
-         'Relative sorghum lipid content [-3 $-$ 0 dry wt. %]',
-         'Bagasse lipid retention [65 $-$ 75 %]',
+         'Bagasse lipid retention [40 $-$ 70 %]',
          '$^a$Lipid extraction efficiency [baseline + 0 $-$ 20 %]',
         f'Plant capacity [330 $-$ 404 {capacity}]',
         f'Ethanol price [1.02, 1.80, 2.87 {stream_price}]',
@@ -1412,19 +1434,28 @@ def plot_spearman_MFPP(configuration, top=None, agile=True):
         f'Crude glycerol price [91 $-$ 200 {USD_ton}]',
         f'Pure glycerol price [501 $-$ 678 {USD_ton}]',
         f'Cellulase price [144 $-$ 240 {USD_ton}]',
-        f'Cellulase loading [1.5 $-$ 2.5 wt. % cellulose]',
-        f'Pretreatment reactor system base cost [14.9 $-$ 24.7 MMUSD]',
-        f'Glucose yield [85 $-$ 97.5 %]',
-        f'Xylose yield [65 $-$ 97.5 %]',
-        f'Glucose to ethanol yield [90 $-$ 95 %]',
-        f'Xylose to ethanol yield [70 $-$ 95 %]',
+         'Cellulase loading [1.5 $-$ 2.5 wt. % cellulose]',
+         'Pretreatment reactor system base cost [14.9 $-$ 24.7 MMUSD]',
+         'Cane glucose yield [85 $-$ 97.5 %]',
+         'Cane xylose yield [65 $-$ 97.5 %]',
+         'Sorghum glucose yield [85 $-$ 97.5 %]',
+         'Sorghum xylose yield [65 $-$ 97.5 %]',
+         'Glucose to ethanol yield [90 $-$ 95 %]',
+         'Xylose to ethanol yield [70 $-$ 95 %]',
+         'Cane PL content [3.75 $-$ 6.25 %]',
+         'Sorghum PL content [3.75 $-$ 6.25 %]',
+         'Cane FFA content [7.5 $-$ 12.5 %]',
+         'Sorghum FFA content [7.5 $-$ 12.5 %]',
+         'Cane lipid content [5 $-$ 15 dry wt. %]',
+         'Relative sorghum lipid content [-3 $-$ 0 dry wt. %]',
+         'TAG to FFA conversion [17.25 $-$ 28.75 %]',
        # '$^a$Fermentation solids loading [20% $-$ 25%]',
     ]
     ignored = {
-        'S1': set([0, 1, 2, 3, 6, 7, 11, 12, 13, 14, 15, 16, 17, 18, 19]),
-        'L1': set([7, 13, 14, 15, 16, 17, 18, 19]),
-        'S2': set([0, 1, 2, 3, 6, 8]),
-        'L2': set([8]),
+        'S1': set([0, 1, 4, 5, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26]),
+        'L1': set([5, 11, 12, 13, 14, 15, 16, 17, 18, 19]),
+        'S2': set([0, 1, 4, 6, 9, 10, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26]),
+        'L2': set([6]),
     }
     configuration_names = (configuration, configuration + '*') if agile else (configuration,)
     MFPPs = []
@@ -1437,7 +1468,7 @@ def plot_spearman_MFPP(configuration, top=None, agile=True):
             warn(warning)
             continue
         MFPPs.append(df['Biorefinery', 'MFPP [USD/ton]'])
-    color_wheel = CABBI_colors.wheel()
+    color_wheel = [CABBI_colors.orange, CABBI_colors.green_soft]
     fig, ax = bst.plots.plot_spearman_2d(MFPPs, top=top, index=index, 
                                          color_wheel=color_wheel,
                                          ignored=ignored[configuration],
