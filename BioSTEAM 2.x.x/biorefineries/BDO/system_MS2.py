@@ -133,7 +133,6 @@ BDO_tea = CellulosicEthanolTEA(system=BDO_sys, IRR=0.10, duration=(2016, 2046),
 #         labor_burden=0.90, property_insurance=0.007, maintenance=0.03,
 #         steam_power_depreciation='MACRS20', boiler_turbogenerator=u.BT)
 
-BDO_sys._TEA = BDO_tea
 area_names = [
     'feedstock',
     'pretreatment',

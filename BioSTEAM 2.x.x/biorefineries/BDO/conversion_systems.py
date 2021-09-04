@@ -198,12 +198,11 @@ def create_conversion_system(ins, outs):
     T609_P-0-2-R401
     
     T610 = bst.StorageTank('T610', ins=R401-1,
-                           outs=(spent_TCP_catalyst,),
                            tau=30*24, V_wf=0.9,
                            vessel_type='Field erected',
                            vessel_material='Carbon steel')
     T610.line = 'Spent TCP catalyst storage tank'
-    T610_P = bst.Pump('T610_P', ins=T610-0, P=101325)
+    T610_P = bst.Pump('T610_P', ins=T610-0, outs=spent_TCP_catalyst, P=101325)
     
     
     
@@ -216,12 +215,11 @@ def create_conversion_system(ins, outs):
     T611_P-0-2-R401
     
     T612 = bst.StorageTank('T612', ins=R401-1,
-                           outs=(spent_KieCNi_catalyst,),
                            tau=30*24, V_wf=0.9,
                            vessel_type='Field erected',
                            vessel_material='Carbon steel')
     T612.line = 'Spent KieCNi catalyst storage tank'
-    T612_P = bst.Pump('T612_P', ins=T612-0, P=101325)
+    T612_P = bst.Pump('T612_P', ins=T612-0, outs=spent_KieCNi_catalyst, P=101325)
     
     
     

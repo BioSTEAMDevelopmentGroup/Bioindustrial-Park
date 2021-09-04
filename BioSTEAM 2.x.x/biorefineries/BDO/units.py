@@ -18,7 +18,7 @@ All units are explicitly defined here for transparency and easy reference
 
 
 # %% Setup
-
+import biosteam as bst
 import numpy as np
 import thermosteam as tmo
 from math import exp
@@ -30,7 +30,8 @@ from biosteam.units.decorators import cost
 from thermosteam import Stream, MultiStream
 from biorefineries.BDO.process_settings import price
 from biorefineries.BDO.utils import CEPCI, baseline_feedflow, compute_extra_chemical, adjust_recycle
-
+from biosteam.units.design_tools import size_batch
+import flexsolve as flx
 _kg_per_ton = 907.18474
 _Gcal_2_kJ = 4.184 * 1e6 # (also MMkcal/hr)
 Rxn = tmo.reaction.Reaction
@@ -526,34 +527,52 @@ class Saccharification(Unit):
         Design['Saccharification tank size'] = total_mass_flow * self.tau_saccharification
         Design['Slurry flow rate'] = total_mass_flow
         
+_gal2m3 = 0.003785
 
-# Seed train, 5 stages, 2 trains
-@cost(basis='Seed fermenter size', ID='Stage #1 fermenters', units='kg',
-      # 44339, 211, and 26 are streams 303, 309, and 310 in Humbird et al.
-      cost=75400, S=(44339+211+26)*36, CE=CEPCI[2009], n=0.7, BM=1.8)
-@cost(basis='Seed fermenter size', ID='Stage #2 fermenters', units='kg',
-      cost=116600, S=(44339+211+26)*36, CE=CEPCI[2009], n=0.7, BM=1.8)
-@cost(basis='Seed fermenter size', ID='Stage #3 fermenters', units='kg',
-      cost=157600, S=(44339+211+26)*36, CE=CEPCI[2009], n=0.7, BM=1.8)
-@cost(basis='Seed fermenter size', ID='Stage #4 fermenters', units='kg',
-      cost=352000, S=(44339+211+26)*36, CE=CEPCI[2009], n=0.7, BM=2)
-@cost(basis='Seed fermenter size', ID='Stage #4 agitators', units='kg',
-      kW=11.1855, cost=26000, S=(44339+211+26)*36, CE=CEPCI[2009], n=0.5, BM=1.5)
-@cost(basis='Seed fermenter size', ID='Stage #5 fermenters', units='kg',
-      cost=1180000, S=(44339+211+26)*36, CE=CEPCI[2009], n=0.7, BM=2)
-@cost(basis='Seed fermenter size', ID='Stage #5 agitators', units='kg',
-      kW=14.914, cost=43000, S=(44339+211+26)*36, CE=CEPCI[2009], n=0.5, BM=1.5)
-@cost(basis='Flow rate', ID='Pumps', units='kg/hr',
-      kW=59.656, cost=24300, S=43149, CE=CEPCI[2009], n=0.8, BM=2.3)
+@cost('Flow rate', 'Pumps',
+      S=43149, CE=522, cost=24800, n=0.8, kW=40, BM=2.3)
+@cost('Stage #1 reactor volume', 'Stage #1 reactors',
+      cost=37700, S=20*_gal2m3, CE=522, n=0.7, BM=1.8)
+@cost('Stage #2 reactor volume', 'Stage #2 reactors',
+      cost=58300, S=200*_gal2m3, CE=522, n=0.7, BM=1.8)
+@cost('Stage #3 reactor volume', 'Stage #3 reactors',
+      cost=78800, S=2e3*_gal2m3, CE=522, n=0.7, BM=1.8)
+@cost('Stage #4 reactor volume', 'Stage #4 reactors',
+      cost=176e3, S=20e3*_gal2m3, CE=522, n=0.7, BM=1.8)
+@cost('Stage #4 reactor volume', 'Stage #4 agitators',
+      cost=26e3/2, S=20e3*_gal2m3, kW=7.5, CE=522, n=0.5, BM=1.5)
+@cost('Stage #5 reactor volume', 'Stage #5 reactors',
+      cost=590e3, S=200e3*_gal2m3, CE=522, n=0.7, BM=1.8)
+@cost('Stage #5 reactor volume', 'Stage #5 agitators',
+      cost=43e3/2, S=200e3*_gal2m3, kW=10, CE=522, n=0.5, BM=1.5)
 class SeedTrain(Unit):
+    _N_heat_utilities = 1
     _N_ins = 1
     _N_outs = 2
-    _N_heat_utilities = 1
-    _units= {'Seed fermenter size': 'kg',
-             'Flow rate': 'kg/hr'}
+    _ins_size_is_fixed = False
     
-    # Cycle time for each batch (hr), including 12 hr turnaround time 
-    tau_batch = 36
+    _units= {'Flow rate': 'kg/hr',
+             'Stage #1 reactor volume': 'm3',
+             'Stage #2 reactor volume': 'm3',
+             'Stage #3 reactor volume': 'm3',
+             'Stage #4 reactor volume': 'm3',
+             'Stage #5 reactor volume': 'm3'}
+    
+    @property
+    def N_stages(self): 
+        """Number of stages in series."""
+        return 5
+    
+    #: Number of parallel seed trains
+    N_trains = 2
+    
+    #: Cycle time for each batch (hr)
+    tau_batch = 24
+    
+    @property
+    def tau_turnover(self):
+        """Turnover time (hr) calculated by batch time divided by number of trains."""
+        return self.tau_batch/self.N_trains
     
     # ferm_ratio is the ratio of conversion relative to the fermenter
     #!!! Should this T be changed to 30°C?
@@ -610,11 +629,27 @@ class SeedTrain(Unit):
         
         effluent.T = self.T
 
-    def _design(self):
-        self.heat_utilities[0](self.Hnet, self.T)
+    def _design(self): 
+        maxvol = self.outs[1].F_vol*self.tau_turnover
+        vol = maxvol*10**-self.N_stages
         Design = self.design_results
-        Design['Flow rate'] = self.outs[0].F_mass
-        Design['Seed fermenter size'] = self.outs[0].F_mass * self.tau_batch
+        for i in range(1, self.N_stages+1):
+            Design[f'Stage #{i} reactor volume'] = vol
+            vol *= 10 
+        Design['Flow rate'] = sum([i.F_mass for i in self.outs])
+        self.heat_utilities[0](self.Hnet, self.T)
+
+    def _cost(self):
+        N = self.N_trains
+        D = self.design_results
+        C = self.baseline_purchase_costs
+        kW = 0
+        for i, x in self.cost_items.items():
+            S = D[x._basis]
+            q = S/x.S
+            C[i] = N*bst.CE/x.CE*x.cost*q**x.n
+            kW += N*x.kW*q
+        self.power_utility(kW)
 
 # Seed hold tank
 @cost(basis='Flow rate', ID='Tank', units='kg/hr',
@@ -769,7 +804,7 @@ class Reactor(Unit, PressureVessel, isabstract=True):
 
         Design['Residence time'] = self.tau
         Design['Total volume'] = V_total
-        Design['Single reactor volume'] = V_reactor
+        Design['Reactor volume'] = V_reactor
         Design['Number of reactors'] = N
         Design.update(self._vessel_design(P, D, L))
         if wall_thickness_factor == 1: pass
@@ -1505,51 +1540,49 @@ class DehydrationReactor(Reactor):
             
 compute_BDO_titer = lambda effluent: float(effluent.imass['BDO'])/effluent.F_vol
 _316_over_304 = 316/304
+_gpm2m3hr = 0.227124
+_Gcal2kJ = 4184e3
 
-@cost(basis='Fermenter size', ID='Fermenter', units='kg',
-      cost=10128000, S=(42607+443391+948+116)*(60+36),
-      CE=CEPCI[2009], n=1, BM=1.5)
-@cost(basis='Fermenter size', ID='Agitator', units='kg',
-      # Scaling basis based on sum of all streams into fermenter
-      # (304, 306, 311, and 312 in ref [3])
-      # and total residence time (batch hydrolysis and fermentation)
-      kW=268.452, cost=630000, S=(42607+443391+948+116)*(60+36),
-      CE=CEPCI[2009], n=1, BM=1.5)
-@cost(basis='Recirculation flow rate', ID='Recirculation pump', units='kg/hr',
-      # Scaling basis based on sum of all streams into fermenter
-      # (304, 306, 311, and 312 in ref [3])
-      kW=74.57, cost=47200, S=(42607+443391+948+116), CE=CEPCI[2009], n=0.8, BM=2.3)  
+@cost('Flow rate', 'Recirculation pumps', kW=30, S=340*_gpm2m3hr,
+      cost=47200, n=0.8, BM=2.3, CE=522, N='N_recirculation_pumps')
+@cost('Reactor duty', 'Heat exchangers', CE=522, cost=23900,
+      S=-5*_Gcal2kJ, n=0.7, BM=2.2, N='Number of reactors') # Based on a similar heat exchanger
+@cost('Reactor volume', 'Agitators', CE=522, cost=52500,
+      S=1e6*_gal2m3, n=0.5, kW=90, BM=1.5, N='Number of reactors')
+@cost('Reactor volume', 'Reactors', CE=522, cost=844000,
+      S=1e6*_gal2m3, n=0.5, BM=1.5, N='Number of reactors')
 class CoFermentation(Reactor):
     _N_ins = 4
     _N_outs = 2
-    _units= {**Reactor._units,
-            'Fermenter size': 'kg',
-            'Recirculation flow rate': 'kg/hr',
-            'Duty': 'kJ/hr'}
-
+    _N_heat_utilities = 1
+    #: Unload and clean up time (hr)
+    tau_0 = 4
+    
+    #: Number of reactors
+    N_reactors = 12
+    
+    #: Number of recirculation pumps
+    N_recirculation_pumps = 5
+    
+    _units = {'Flow rate': 'm3/hr',
+              'Reactor volume': 'm3',
+              'Reactor duty': 'kJ/hr'}
+    
+    
     _F_BM_default = {**Reactor._F_BM_default,
             'Heat exchangers': 3.17}
 
     auxiliary_unit_names = ('heat_exchanger',)
     
-    tau = 13.7 # overwritten by spec.load_specifications
-    
-    # Equals the split of saccharified slurry to seed train
-    inoculum_ratio = 0.07
+    tau = 36 # overwritten by spec.load_specifications
     
     CSL_loading = 10 # g/L (kg/m3)
     
     DAP_loading = 0.3 # g/L broth (kg/m3)
     
-    titer_limit = 130 # in g/L (kg/m3), the maximum titer in collected data
-    
-    effluent_titer = 0
-    
-    # productivity = 0.89 # in g/L/hr
-    
     yield_limit = 0.76 # in g/g-sugar
     
-    tau_batch_turnaround = 12 # in hr, the same as the seed train in ref [3]
+    tau_batch_turnaround = 4 # in hr, 
 
     def __init__(self, ID='', ins=None, outs=(), thermo=None, *, T=32+273.15,
                   P=101325, V_wf=0.8, length_to_diameter=2,
@@ -1648,51 +1681,33 @@ class CoFermentation(Reactor):
         mode = self.mode
         Design = self.design_results
         Design.clear()
-        # self.tau = self.effluent_titer / self.productivity
-        mixture = self._mixture = tmo.Stream(None)
-        mixture.copy_like(self.outs[0])
-        duty = Design['Duty'] = self.Hnet + self.ins[-1].Hnet
+        duty = Design['Reactor duty'] = self.Hnet + self.ins[-1].Hnet
 
         if mode == 'Batch':
-            raise RuntimeError('number of reactors not implemented for batch mode')
-            tau_cofermentation = self.tau_batch_turnaround + self.tau
-            Design['Fermenter size'] = self.outs[0].F_mass * tau_cofermentation
-            Design['Recirculation flow rate'] = self.F_mass_in
-            self.heat_exchanger.simulate_as_auxiliary_exchanger(duty, mixture)
+            effluent = self.outs[1]
+            v_0 = effluent.F_vol
+            Design = self.design_results
+            Design['Flow rate'] = v_0 / self.N_recirculation_pumps
+            tau = self.tau
+            tau_0 = self.tau_batch_turnaround
+            V_wf = self.V_wf
+            f = lambda N: v_0 / N / self.V_wf * (tau + tau_0) / (1 - 1 / N) - self.V
+            N_min = 2
+            N_max = 32
+            N_reactors = flx.IQ_interpolation(f, N_min, N_max,
+                                     xtol=0.01, ytol=0.5, checkbounds=False)
+            Design['Number of reactors'] = N_reactors = ceil(N_reactors)
+            Design.update(size_batch(v_0, tau, tau_0, N_reactors, V_wf))
+            hu_fermentation, = self.heat_utilities
+            hu_fermentation(duty, effluent.T)
         elif mode == 'Continuous':
+            effluent = self.outs[1]
+            v_0 = effluent.F_vol
+            Design = self.design_results
+            Design['Flow rate'] = v_0 / self.N_recirculation_pumps
             Reactor._design(self)
-            self._V_max = 3785.41 # 1 million gallons
         else:
             raise DesignError(f'Fermentation mode must be either Batch or Continuous, not {mode}')
-
-    def _cost(self):
-        Design = self.design_results
-        purchase_costs = self.baseline_purchase_costs
-        purchase_costs.clear()
-        hx = self.heat_exchanger
-
-        if self.mode == 'Batch':
-            Unit._cost()
-            self._decorated_cost()
-            purchase_costs['Heat exchangers'] = hx.purchase_cost
-            # Adjust fermenter cost for acid-resistant scenario
-            if not self.neutralization:
-                purchase_costs['Fermenter'] *= _316_over_304
-                purchase_costs['Agitator'] *= _316_over_304
-
-        elif self.mode == 'Continuous':
-            if not self.neutralization:
-                self.vessel_material= 'Stainless steel 316'
-            Reactor._cost(self)
-            
-            N = Design['Number of reactors']
-            single_rx_effluent = self._mixture
-            hx.simulate_as_auxiliary_exchanger(duty=Design['Duty']/N, 
-                                                stream=single_rx_effluent)
-            hu_total = self.heat_utilities[0]
-            hu_single_rx = hx.heat_utilities[0]
-            hu_total.copy_like(hu_single_rx)
-            hu_total.scale(N)
 
             
 class HydrogenationReactor(Reactor):

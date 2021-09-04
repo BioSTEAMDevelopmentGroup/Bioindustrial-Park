@@ -159,7 +159,6 @@ class LCA:
         self.CT = CT or get_instance(self.units, bst.CoolingTower)
         self.CWP = CWP or get_instance(self.units, bst.ChilledWaterPackage)
         self.cooling_and_chilled_water_production_units = cooling_and_chilled_water_production_units
-        system._LCA = self
 
     @property
     def electricity_demand(self):

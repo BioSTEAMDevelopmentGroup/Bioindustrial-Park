@@ -141,6 +141,7 @@ across_lipid_content_agile_comparison_names = (
  set_cane_glucose_yield, set_cane_xylose_yield, 
  set_sorghum_glucose_yield, set_sorghum_xylose_yield, 
  set_glucose_to_ethanol_yield, set_xylose_to_ethanol_yield,
+ set_cofermentation_titer, set_cofermentation_productivity,
  set_cane_PL_content, set_sorghum_PL_content, set_cane_FFA_content,
  set_sorghum_FFA_content, set_TAG_to_FFA_conversion,
  ) = all_parameter_mockups = (
@@ -164,6 +165,8 @@ across_lipid_content_agile_comparison_names = (
     bst.MockVariable('Sorghum xylose yield', '%', 'Pretreatment and saccharification'),
     bst.MockVariable('Glucose to ethanol yield', '%', 'Cofermentation'),
     bst.MockVariable('Xylose to ethanol yield', '%', 'Cofermentation'),
+    bst.MockVariable('Titer', 'g/L', 'Cofermentation'),
+    bst.MockVariable('Productivity', 'g/L/hr', 'Cofermentation'),
     bst.MockVariable('Cane PL content', '% lipid', 'lipidcane'),
     bst.MockVariable('Sorghum PL content', '% lipid', 'lipidsorghum'),
     bst.MockVariable('Cane FFA content', '% lipid', 'lipidcane'),
@@ -697,6 +700,14 @@ def load(name, cache={}, reduce_chemicals=True, enhanced_cellulosic_performance=
             if X_excess > 0.: breakpoint()
             fermentor.cofermentation.X[4] = X3
 
+    @uniform(68.5, 137, units='g/L', element='Cofermentation')
+    def set_cofermentation_titer(titer):
+        if abs(number) == 2: fermentor.titer = titer
+
+    @uniform(0.951, 1.902, units='g/L', element='Cofermentation')
+    def set_cofermentation_productivity(productivity):
+        if abs(number) == 2: fermentor.productivity = productivity
+
     @default(10, element='lipidcane', units='% lipid', kind='coupled')
     def set_cane_PL_content(cane_PL_content):
         if agile: cane_mode.PL_content = cane_PL_content / 100.
@@ -734,11 +745,6 @@ def load(name, cache={}, reduce_chemicals=True, enhanced_cellulosic_performance=
             R301.lipid_reaction.X[0] = TAG_to_FFA_conversion / 100.
         elif number == 2:
             R401.lipid_reaction.X[0] = TAG_to_FFA_conversion / 100.
-            
-    # # Initial solids loading in Humbird is 20% (includes both dissolved and insoluble solids)
-    # @uniform(20, 25, units='%', element='Fermentation')
-    # def set_fermentation_solids_loading(solids_loading):
-    #     if number == 2: M402.solids_loading = solids_loading / 100.
     
     natural_gas.phase = 'g'
     natural_gas.set_property('T', 60, 'degF')
@@ -1421,6 +1427,8 @@ def plot_spearman_MFPP(configuration, top=None, agile=True):
     electricity_price = format_units('USD/kWhr')
     operating_days = format_units('day/yr')
     capacity = format_units('ton/hr')
+    titer = format_units('g/L')
+    productivity = format_units('g/L/hr')
     index = [
          'Bagasse lipid retention [40 $-$ 70 %]',
          '$^a$Lipid extraction efficiency [baseline + 0 $-$ 20 %]',
@@ -1441,6 +1449,9 @@ def plot_spearman_MFPP(configuration, top=None, agile=True):
          'Sorghum glucose yield [85 $-$ 97.5 %]',
          'Sorghum xylose yield [65 $-$ 97.5 %]',
          'Glucose to ethanol yield [90 $-$ 95 %]',
+         'Xylose to ethanol yield [70 $-$ 95 %]',
+         'Titer [65 $-$ 130 {titer}]',
+         'Productivity [1.0 $-$ 2.0 {productivity}]',
          'Xylose to ethanol yield [70 $-$ 95 %]',
          'Cane PL content [3.75 $-$ 6.25 %]',
          'Sorghum PL content [3.75 $-$ 6.25 %]',

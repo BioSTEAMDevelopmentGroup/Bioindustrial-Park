@@ -322,7 +322,7 @@ def create_lipidcane_to_biodiesel_and_ethanol_combined_1_and_2g_post_fermentatio
         if feed.imol['Water'] < 0: feed.imol['Water'] = 0.
     
     cofermentation.titer = 68.5
-    cofermentation.productivity = 1.05
+    cofermentation.productivity = 0.95
     @EvX.add_specification(run=True)
     def evaporation():
         evaporator_to_seedtrain = EvX.path_until(seedtrain)
@@ -349,10 +349,14 @@ def create_lipidcane_to_biodiesel_and_ethanol_combined_1_and_2g_post_fermentatio
             required_water = (1./target_titer - 1./current_titer) * ethanol
             MX.ins[1].imass['Water'] = max(required_water, 0)
         else:
-            y1 = f(0.1)
             MX.ins[1].imass['Water'] = 0.
-            if y1 > 0: raise RuntimeError('infeasible to evaporate any more water')
-            EvX.V = flx.IQ_interpolation(f, 0, 0.1, y0, y1, x=EvX.V, ytol=1e-5, xtol=1e-6)
+            x = 0.1
+            y1 = 1
+            while y1 > 0:
+                x += 0.03
+                y1 = f(x)
+                if x > 0.95: raise RuntimeError('infeasible to evaporate any more water')
+            EvX.V = flx.IQ_interpolation(f, 0, x, y0, y1, x=EvX.V, ytol=1e-5, xtol=1e-6)
         cofermentation.tau_cofermentation = target_titer / cofermentation.productivity 
     
     vent, cellulosic_beer, lignin = cellulosic_fermentation_sys.outs
