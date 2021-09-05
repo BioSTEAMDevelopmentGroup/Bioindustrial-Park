@@ -182,7 +182,7 @@ class CT(Facility):
             if u is self: continue
             if hasattr(u, 'heat_utilities'):
                 for hu in u.heat_utilities:
-                    if hu.agent is agent:
+                    if hu.agent and hu.agent.ID == agent.ID:
                         system_cooling_water_utilities[f'#{number}: {u.ID} - {hu.ID}'] = hu
                         number += 1
                         total_duty -= hu.duty

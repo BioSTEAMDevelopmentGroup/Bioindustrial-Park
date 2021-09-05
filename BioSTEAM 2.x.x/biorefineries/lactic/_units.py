@@ -1510,7 +1510,6 @@ class AnaerobicDigestion(Unit):
         sludge.copy_flow(wastewater)	
         self.digestion_rxns(sludge.mol)
         self.sulfate_rxns(sludge.mol)
-        
         ms = self._multi_stream
         ms.copy_flow(sludge)
         ms.vle(P=101325, T=T)
@@ -1518,8 +1517,7 @@ class AnaerobicDigestion(Unit):
         biogas.phase = 'g'
         liquid_mol = ms.imol['l']
         treated_water.mol = liquid_mol * self.split
-        sludge.mol = liquid_mol - treated_water.mol	
-        biogas.receive_vent(treated_water, accumulate=True)
+        sludge.mol = liquid_mol * (1 - self.split)
         biogas.T = treated_water.T = sludge.T = T
         
     def _design(self):
@@ -1650,7 +1648,7 @@ class MembraneBioreactor(Unit):
     def _run(self):        
         mixture = self.ins[0].copy()
         mixture.mix_from(self.ins)
-        separations.split(mixture, *self.outs, self.split)
+        mixture.split_to(*self.outs, self.split)
 
     def _design(self):
         self.design_results['Volumetric flow'] = self.outs[0].F_vol
