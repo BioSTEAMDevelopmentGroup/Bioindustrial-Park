@@ -1517,6 +1517,7 @@ class AnaerobicDigestion(Unit):
         biogas.phase = 'g'
         liquid_mol = ms.imol['l']
         treated_water.mol = liquid_mol * self.split
+        biogas.receive_vent(treated_water)
         sludge.mol = liquid_mol * (1 - self.split)
         biogas.T = treated_water.T = sludge.T = T
         
