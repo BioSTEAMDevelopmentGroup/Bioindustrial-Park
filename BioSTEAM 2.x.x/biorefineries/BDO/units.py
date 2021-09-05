@@ -1543,8 +1543,8 @@ _316_over_304 = 316/304
 _gpm2m3hr = 0.227124
 _Gcal2kJ = 4184e3
 
-@cost('Flow rate', 'Recirculation pumps', kW=30, S=340*_gpm2m3hr,
-      cost=47200, n=0.8, BM=2.3, CE=522, N='N_recirculation_pumps')
+@cost('Recirculation flow rate', 'Recirculation pumps', kW=30, S=340*_gpm2m3hr,
+      cost=47200, n=0.8, BM=2.3, CE=522, N='Number of reactors')
 @cost('Reactor duty', 'Heat exchangers', CE=522, cost=23900,
       S=-5*_Gcal2kJ, n=0.7, BM=2.2, N='Number of reactors') # Based on a similar heat exchanger
 @cost('Reactor volume', 'Agitators', CE=522, cost=52500,
@@ -1558,13 +1558,7 @@ class CoFermentation(Reactor):
     #: Unload and clean up time (hr)
     tau_0 = 4
     
-    #: Number of reactors
-    N_reactors = 12
-    
-    #: Number of recirculation pumps
-    N_recirculation_pumps = 5
-    
-    _units = {'Flow rate': 'm3/hr',
+    _units = {'Recirculation flow rate': 'm3/hr',
               'Reactor volume': 'm3',
               'Reactor duty': 'kJ/hr'}
     
@@ -1583,6 +1577,8 @@ class CoFermentation(Reactor):
     yield_limit = 0.76 # in g/g-sugar
     
     tau_batch_turnaround = 4 # in hr, 
+
+    _V_max = 3785.4118
 
     def __init__(self, ID='', ins=None, outs=(), thermo=None, *, T=32+273.15,
                   P=101325, V_wf=0.8, length_to_diameter=2,
@@ -1687,7 +1683,7 @@ class CoFermentation(Reactor):
             effluent = self.outs[1]
             v_0 = effluent.F_vol
             Design = self.design_results
-            Design['Flow rate'] = v_0 / self.N_recirculation_pumps
+            Design['Recirculation flow rate'] = v_0 / self.N_recirculation_pumps
             tau = self.tau
             tau_0 = self.tau_batch_turnaround
             V_wf = self.V_wf
@@ -1704,12 +1700,13 @@ class CoFermentation(Reactor):
             effluent = self.outs[1]
             v_0 = effluent.F_vol
             Design = self.design_results
-            Design['Flow rate'] = v_0 / self.N_recirculation_pumps
             Reactor._design(self)
+            Design['Recirculation flow rate'] = v_0 / Design['Number of reactors']
+            Design['Number of reactors'] = ceil(1.2 * Design['Number of reactors'])
         else:
             raise DesignError(f'Fermentation mode must be either Batch or Continuous, not {mode}')
-
             
+
 class HydrogenationReactor(Reactor):
     """
     A dehydration reactor.

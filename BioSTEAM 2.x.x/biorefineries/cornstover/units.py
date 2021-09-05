@@ -15,6 +15,7 @@ from thermosteam import MultiStream
 from biosteam import Unit
 from biosteam.units.decorators import cost, design
 from biosteam.units.design_tools import size_batch
+from math import ceil
 import thermosteam as tmo
 import biosteam as bst
 
@@ -264,7 +265,7 @@ class ContinuousPresaccharification(Unit):
 
 
 @cost('Flow rate', 'Recirculation pumps', kW=30, S=340*_gpm2m3hr,
-      cost=47200, n=0.8, BM=2.3, CE=522, N='N_recirculation_pumps')
+      cost=47200, n=0.8, BM=2.3, CE=522, N='N_reactors')
 @cost('Reactor duty', 'Heat exchangers', CE=522, cost=23900,
       S=-5*_Gcal2kJ, n=0.7, BM=2.2, N='N_reactors') # Based on a similar heat exchanger
 @cost('Reactor volume', 'Agitators', CE=522, cost=52500,
@@ -290,9 +291,6 @@ class Saccharification(Unit):
     
     #: Number of reactors
     N_reactors = 12
-    
-    #: Number of recirculation pumps
-    N_recirculation_pumps = 5
     
     _units = {'Flow rate': 'm3/hr',
               'Reactor volume': 'm3',
@@ -324,51 +322,29 @@ class Saccharification(Unit):
         effluent, = self.outs
         v_0 = effluent.F_vol
         Design = self.design_results
-        Design['Flow rate'] = v_0 / self.N_recirculation_pumps
+        Design['Flow rate'] = v_0 / self.N_reactors
         tau = self.tau_saccharification
         Design.update(size_batch(v_0, tau, self.tau_0, self.N_reactors, self.V_wf))
         hu_fermentation, = self.heat_utilities
         Design['Reactor duty'] = reactor_duty = self.Hnet 
         hu_fermentation(reactor_duty, effluent.T)
 
-@cost('Flow rate', 'Recirculation pumps', kW=30, S=340*_gpm2m3hr,
-      cost=47200, n=0.8, BM=2.3, CE=522, N='N_recirculation_pumps')
-@cost('Reactor duty', 'Heat exchangers', CE=522, cost=23900,
-      S=-5*_Gcal2kJ, n=0.7, BM=2.2, N='N_reactors') # Based on a similar heat exchanger
-@cost('Reactor volume', 'Agitators', CE=522, cost=52500,
-      S=1e6*_gal2m3, n=0.5, kW=90, BM=1.5, N='N_reactors')
-@cost('Reactor volume', 'Reactors', CE=522, cost=844000,
-      S=1e6*_gal2m3, n=0.5, BM=1.5, N='N_reactors')
-class CoFermentation(Unit):
+
+class CoFermentation(bst.BatchBioreactor):
     _N_ins = 1
-    _N_outs = 2
     _ins_size_is_fixed = False
-    _N_heat_utilities = 1
         
-    #: Fermentation temperature (K)
-    T_fermentation = 32+273.15
-    
-    #: Co-Fermentation time (hr)
-    tau_cofermentation = 36
-    
     #: Unload and clean up time (hr)
     tau_0 = 4
-    
-    #: Working volume fraction (filled tank to total tank volume)
-    V_wf = 0.9
-    
-    #: Number of reactors
-    N_reactors = 12
-    
-    #: Number of recirculation pumps
-    N_recirculation_pumps = 5
     
     _units = {'Flow rate': 'm3/hr',
               'Reactor volume': 'm3',
               'Reactor duty': 'kJ/hr'}
     
-    def __init__(self, ID='', ins=None, outs=(), thermo=None, P=101325):
-        Unit.__init__(self, ID, ins, outs, thermo)
+    def __init__(self, ID='', ins=None, outs=(), thermo=None,
+                 tau=36, N=None, V=3785.4118, T=305.15, P=101325,
+                 Nmin=2, Nmax=36):
+        bst.BatchBioreactor.__init__(self, ID, ins, outs, thermo, tau, N, V, T, P, Nmin, Nmax)
         self.P = P
         chemicals = self.chemicals
         self.loss = ParallelRxn([
@@ -413,7 +389,7 @@ class CoFermentation(Unit):
         feeds = self.ins
         vent, effluent = self.outs
         vent.P = effluent.P = self.P
-        vent.T = effluent.T = self.T_fermentation
+        vent.T = effluent.T = self.T
         vent.phase = 'g'
         effluent.mix_from(feeds, energy_balance=False)
         self.loss(effluent)
@@ -422,20 +398,10 @@ class CoFermentation(Unit):
         if self.lipid_reaction: self.lipid_reaction(effluent)
         vent.empty()
         vent.receive_vent(effluent, energy_balance=False)
-
-    def _design(self):
-        effluent = self.outs[1]
-        v_0 = effluent.F_vol
-        Design = self.design_results
-        Design['Flow rate'] = v_0 / self.N_recirculation_pumps
-        tau = self.tau_cofermentation
-        Design.update(size_batch(v_0, tau, self.tau_0, self.N_reactors, self.V_wf))
-        hu_fermentation, = self.heat_utilities
-        Design['Reactor duty'] = reactor_duty = self.Hnet
-        hu_fermentation(reactor_duty, effluent.T)
+        
 
 @cost('Flow rate', 'Recirculation pumps', kW=30, S=340*_gpm2m3hr,
-      cost=47200, n=0.8, BM=2.3, CE=522, N='N_recirculation_pumps')
+      cost=47200, n=0.8, BM=2.3, CE=522, N='N_reactors')
 @cost('Reactor duty', 'Heat exchangers', CE=522, cost=23900,
       S=-5*_Gcal2kJ, n=0.7, BM=2.2, N='N_reactors') # Based on a similar heat exchanger
 @cost('Batch duty', 'Fermentor batch cooler', CE=522, cost=86928,
@@ -470,9 +436,6 @@ class SaccharificationAndCoFermentation(Unit):
     
     #: Number of reactors
     N_reactors = 12
-    
-    #: Number of recirculation pumps
-    N_recirculation_pumps = 5
     
     _units = {'Flow rate': 'm3/hr',
               'Reactor volume': 'm3',
@@ -540,7 +503,7 @@ class SaccharificationAndCoFermentation(Unit):
         effluent = self.outs[1]
         v_0 = effluent.F_vol
         Design = self.design_results
-        Design['Flow rate'] = v_0 / self.N_recirculation_pumps
+        Design['Flow rate'] = v_0 / self.N_reactors
         tau = self.tau_saccharification + self.tau_cofermentation
         Design.update(size_batch(v_0, tau, self.tau_0, self.N_reactors, self.V_wf))
         hu_fermentation, = self.heat_utilities
@@ -551,7 +514,7 @@ class SaccharificationAndCoFermentation(Unit):
 
 
 @cost('Flow rate', 'Recirculation pumps', kW=30, S=340*_gpm2m3hr,
-      cost=47200, n=0.8, BM=2.3, CE=522, N='N_recirculation_pumps')
+      cost=47200, n=0.8, BM=2.3, CE=522, N='N_reactors')
 @cost('Reactor duty', 'Heat exchangers', CE=522, cost=23900,
       S=-5*_Gcal2kJ, n=0.7, BM=2.2, N='N_reactors') # Based on a similar heat exchanger
 @cost('Reactor volume', 'Agitators', CE=522, cost=52500,
@@ -581,9 +544,6 @@ class SimultaneousSaccharificationAndCoFermentation(Unit):
     
     #: Number of reactors
     N_reactors = 12
-    
-    #: Number of recirculation pumps
-    N_recirculation_pumps = 5
     
     _units = {'Flow rate': 'm3/hr',
               'Reactor volume': 'm3',
@@ -644,7 +604,7 @@ class SimultaneousSaccharificationAndCoFermentation(Unit):
         effluent = self.outs[1]
         v_0 = effluent.F_vol
         Design = self.design_results
-        Design['Flow rate'] = v_0 / self.N_recirculation_pumps
+        Design['Flow rate'] = v_0 / self.N_reactors
         Design.update(size_batch(v_0, self.tau, self.tau_0, self.N_reactors, self.V_wf))
         hu_fermentation, = self.heat_utilities
         Design['Reactor duty'] = reactor_duty = self.Hnet

@@ -357,7 +357,7 @@ def create_lipidcane_to_biodiesel_and_ethanol_combined_1_and_2g_post_fermentatio
                 y1 = f(x)
                 if x > 0.95: raise RuntimeError('infeasible to evaporate any more water')
             EvX.V = flx.IQ_interpolation(f, 0, x, y0, y1, x=EvX.V, ytol=1e-5, xtol=1e-6)
-        cofermentation.tau_cofermentation = target_titer / cofermentation.productivity 
+        cofermentation.tau = target_titer / cofermentation.productivity 
     
     vent, cellulosic_beer, lignin = cellulosic_fermentation_sys.outs
     cellulosic_beer_distillation_sys = create_beer_distillation_system(
