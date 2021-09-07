@@ -190,7 +190,8 @@ class SeedTrain(Unit):
         effluent.mix_from(self.ins, energy_balance=False)
         if self.saccharification:
             self.saccharification(effluent)
-        self.reactions(effluent)
+        self.reactions.force_reaction(effluent)
+        effluent.mol[effluent.mol < 0.] = 0.
         effluent.T = self.T
         vent.phase = 'g'
         vent.copy_flow(effluent, ('CO2', 'O2'), remove=True)
