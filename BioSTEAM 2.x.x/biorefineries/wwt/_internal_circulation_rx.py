@@ -171,7 +171,7 @@ class InternalCirculationRx(bst.MixTank):
                                                X_biogas, 0., 'WWTsludge')
         self._growth_rxns = get_digestion_rxns(self.ins[0], self.biodegradability,
                                                0., X_growth, 'WWTsludge')
-        self._i_rm = self._biogas_rxns.X_net.data + self._growth_rxns.X_net.data
+        self._i_rm = self._biogas_rxns.X + self._growth_rxns.X
 
 
     @staticmethod

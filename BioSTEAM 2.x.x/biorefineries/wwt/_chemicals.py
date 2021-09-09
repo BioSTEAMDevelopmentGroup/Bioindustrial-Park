@@ -82,7 +82,7 @@ def add_wwt_chemicals(chemicals):
     chemical_database('CitricAcid', phase='l', Hf=-347.1e3)
     chemical_database('Bisulfite', phase='l')
 
-    chems.CaSO4.Cn.move_up_model_priority('Lastovka solid', 0)
+    chems.CaSO4.Cn.move_up_model_priority('LASTOVKA_S', 0)
 
     chemical_defined('WWTsludge', phase='s',
                      formula='CH1.64O0.39N0.23S0.0035', Hf=-23200.01*_cal2joule)

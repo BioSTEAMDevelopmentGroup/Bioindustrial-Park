@@ -144,7 +144,7 @@ wwt_units = [i for i in u if i.ID[1:3]=='60']
 OSBL_units = (*wwt_units, u.CWP, u.CT, u.PWC, u.ADP,
               u.T701, u.T702, u.P701, u.P702, u.M701, u.FT,
               u.CSL_storage, u.DAP_storage, u.BT)
-cornstover_tea = cs.create_tea(cornstover_sys, OSBL_units, [u.U101])
+cornstover_tea = cs.create_tea(cornstover_sys, OSBL_units)
 ethanol = F.stream.ethanol
 
 # Compare MESP
@@ -233,7 +233,7 @@ def adjust_methane():
                   u_ch4.T701, u_ch4.T702, u_ch4.P701, u_ch4.P702, u_ch4.M701, u_ch4.FT,
                   u_ch4.CSL_storage, u_ch4.DAP_storage, u_ch4.BT)
 
-    cornstover_tea_ch4 = cs.create_tea(cornstover_sys_ch4, OSBL_units, [u_ch4.U101])
+    cornstover_tea_ch4 = cs.create_tea(cornstover_sys_ch4, OSBL_units)
 
     BD_dct = {k.ID: 1. for k in get_digestable_chemicals(chems)}
     u_ch4.R601.biodegradability = BD_dct

@@ -343,7 +343,8 @@ class AnMBR(bst.Unit):
         # Effluents
         self.growth_rxns(inf.mol)
         self.biogas_rxns(inf.mol)
-        tmo.separations.split(inf, perm, sludge, self._isplit.data)
+        inf.split_to(perm, sludge, self._isplit.data)
+        # tmo.separations.split(inf, perm, sludge, self._isplit.data)
 
         sludge_conc = self._sludge_conc
         insolubles = tuple(i.ID for i in self.chemicals if i.ID in default_insolubles)

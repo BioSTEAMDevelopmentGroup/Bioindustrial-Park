@@ -32,6 +32,14 @@ def get_cs_GWP(lca_stream, flowsheet, ratio):
         'H2SO4': 0.04344,
         # 'Ethanol': 1.44,
         'Denaturant': 0.84, # gasoline blendstock from crude oil for use in US refineries
+        # CFs for NaOCl, citric acid, and bisulfite from ecoinvent 3.7.1,
+        # allocation at the point of substitution
+        # Market for sodium hypochlorite, without water, in 15% solution state, RoW
+        'NaOCl': 2.5165*0.125, # converted to 12.5 wt% solution (15 vol%)
+        # Market for citric acid, GLO
+        'CitricAcid': 5.9272,
+        # Sodium hydrogen sulfite production, RoW
+        'Bisulfite': 1.3065*0.38, # converted to 38% solution
         }
 
     # This makes the CF into an array

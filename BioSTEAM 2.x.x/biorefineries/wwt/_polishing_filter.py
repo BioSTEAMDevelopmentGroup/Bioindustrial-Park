@@ -148,7 +148,7 @@ class PolishingFilter(bst.Unit):
                                                X_decomp, 0., 'WWTsludge')
         self._growth_rxns = get_digestion_rxns(self.ins[0], 1.,
                                                0., X_growth, 'WWTsludge')
-        self._i_rm = self._decomp_rxns.X_net.data + self._growth_rxns.X_net.data
+        self._i_rm = self._decomp_rxns.X + self._growth_rxns.X
 
 
     @staticmethod
@@ -176,7 +176,8 @@ class PolishingFilter(bst.Unit):
 
         self.growth_rxns(inf.mol)
         self.decomp_rxns.force_reaction(inf.mol)
-        tmo.separations.split(inf, eff, waste, self._isplit.data)
+        inf.split_to(eff, waste, self._isplit.data)
+        # tmo.separations.split(inf, eff, waste, self._isplit.data)
 
         sludge_conc = self._sludge_conc
         insolubles = tuple(i.ID for i in self.chemicals if i.ID in default_insolubles)
