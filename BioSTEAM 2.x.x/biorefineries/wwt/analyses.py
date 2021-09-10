@@ -9,23 +9,33 @@
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
 # for license details.
 
+
 import os, pandas as pd
-from qsdsan.utils import time_printer
+from qsdsan.utils import time_printer, copy_samples
 from __init__ import results_path
-from models import cs_model_new
+from models import model_cs, model_cs_wwt
+
+N = 1000
 
 @time_printer
-def evaluate(model, N=1000, seed=3221, spearman=True,
+def evaluate(model, copy_samples_from=None,
+             N=1000, seed=3221, spearman=True,
              percentiles=(0, 0.05, 0.25, 0.5, 0.75, 0.95, 1),
-             file_path='', exception_hook='warn'):
+             file_path='', exception_hook='warn',
+             **spearman_kwargs):
     model.exception_hook = exception_hook
 
     samples = model.sample(N, rule='L', seed=seed)
     model.load_samples(samples)
+
+    if copy_samples_from is not None:
+        copy_samples(copy_samples_from, model)
+
     model.evaluate()
 
+    spearman_results = None
     if spearman:
-        spearman_results = model.spearman_r(model.parameters)[0]
+        spearman_results = model.spearman_r(model.parameters, **spearman_kwargs)[0]
 
     dct = {}
     index_p = len(model.parameters)
@@ -51,6 +61,8 @@ def evaluate(model, N=1000, seed=3221, spearman=True,
 
 
 if __name__ == '__main__':
-    file_path = os.path.join(results_path, 'cs_model_new.xlsx')
-    evaluate(cs_model_new, N=1000,
-             file_path=os.path.join(results_path, 'cs_model_new.xlsx'))
+    evaluate(model_cs, N=N, filter='omit nan',
+              file_path=os.path.join(results_path, 'cs_model.xlsx'))
+
+    evaluate(model_cs_wwt, copy_samples_from=model_cs, N=N, filter='omit nan',
+              file_path=os.path.join(results_path, 'cs_model_wwt.xlsx'))

@@ -148,16 +148,16 @@ def create_cs_system(ins, outs, include_blowdown_recycle=True,
 # Create the system, do TEA and LCA
 # =============================================================================
 
-flowsheet = bst.Flowsheet('cs_new')
+flowsheet = bst.Flowsheet('cs_wwt')
 F.set_flowsheet(flowsheet)
-cornstover_sys = create_cs_system(include_blowdown_recycle=True, default_BD=True)
+sys_wwt = create_cs_system(include_blowdown_recycle=True, default_BD=True)
 
 u = F.unit
 wwt_units = [i for i in u if i.ID[1:3]=='60']
 OSBL_units = (*wwt_units, u.CWP, u.CT, u.PWC, u.ADP,
               u.T701, u.T702, u.P701, u.P702, u.M701, u.FT,
               u.CSL_storage, u.DAP_storage, u.BT)
-cornstover_tea = cs.create_tea(cornstover_sys, OSBL_units)
+tea_wwt = cs.create_tea(sys_wwt, OSBL_units)
 
 s = F.stream
 ethanol = s.ethanol
@@ -179,7 +179,7 @@ lca_streams_cs = [
     cs.emissions,
     ]
 
-lca_streams = [
+lca_streams_wwt = [
     s.CSL,
     s.DAP,
     s.FGD_lime,
@@ -195,7 +195,7 @@ lca_streams = [
 
 # Use one stream to represent all chemicals/emissions
 lca_stream_cs = bst.Stream('lca_stream_cs')
-lca_stream = bst.Stream('lca_stream')
+lca_stream_wwt = bst.Stream('lca_stream_wwt')
 
 
 # Util functions
@@ -207,8 +207,8 @@ def get_GWP(system):
         streams = lca_streams_cs
         stream = lca_stream_cs
     else:
-        streams = lca_streams
-        stream = lca_stream
+        streams = lca_streams_wwt
+        stream = lca_stream_wwt
     stream.mix_from(streams)
     return get_cs_GWP(stream, f, get_ratio(s.cornstover, s.ethanol))
 
@@ -232,7 +232,7 @@ def get_WWT_power(system, ratio=False):
         wwt_units = [i for i in u if i.ID[1:3]=='60']
         power = sum(i.power_utility.rate for i in wwt_units)
     if not ratio:
-        return power/1e3 # in MWh
+        return power # in kWh
     tot = sum(i.power_utility.rate for i in u)
     return power/tot
 
@@ -241,11 +241,11 @@ def get_WWT_power(system, ratio=False):
 
 if __name__ == '__main__':
     # Print MESP and GWP
-    print(f'\n\nIRR = {cornstover_tea.IRR:.0%}')
+    print(f'\n\nIRR = {tea_wwt.IRR:.0%}')
     print_MESP(cs.ethanol, cs.cornstover_tea, 'old cs sys')
-    print_MESP(ethanol, cornstover_tea, 'new cs sys')
+    print_MESP(ethanol, tea_wwt, 'new cs sys')
     print(f'Total GWP for the original cs sys is {get_GWP(cs.cornstover_sys):.2f} kg CO2-eq/gal ethanol.')
-    print(f'Total GWP for new cs sys is {get_GWP(cornstover_sys):.2f} kg CO2-eq/gal ethanol.')
+    print(f'Total GWP for new cs sys is {get_GWP(sys_wwt):.2f} kg CO2-eq/gal ethanol.')
 
 
 # %%
