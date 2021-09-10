@@ -18,6 +18,8 @@ https://github.com/BioSTEAMDevelopmentGroup/Bioindustrial-Park/blob/master/BioST
 '''
 
 import thermosteam as tmo
+# from . import sc_chems, lc_chems, cs_chems
+from __init__ import sc_chems, lc_chems, cs_chems
 
 __all__ = (
     'default_insolubles',
@@ -125,7 +127,7 @@ def create_cs_chemicals():
     Create compiled chemicals for the cornstover biorefinery with the new
     wastewater treatment process.
     '''
-    from biorefineries.cornstover import chemicals as cs_chems
+    # from biorefineries.cornstover import chemicals as cs_chems
 
     if cs_chems.CSL.formula is None:
         # CSL stream is modeled as 50% water, 25% protein, and 25% lactic acid,
@@ -149,7 +151,7 @@ def create_sc_chemicals():
     Create compiled chemicals for the sugarcane biorefinery with the new
     wastewater treatment process.
     '''
-    from biorefineries.sugarcane import chemicals as sc_chems
+    # from biorefineries.sugarcane import chemicals as sc_chems
     new_chems = add_wwt_chemicals(sc_chems)
     new_chems.compile()
     new_chems = set_synonym_grp(new_chems)
@@ -162,7 +164,7 @@ def create_lc_chemicals():
     Create compiled chemicals for the lipidcane biorefinery with the new
     wastewater treatment process.
     '''
-    from biorefineries.lipidcane import chemicals as lc_chems
+    # from biorefineries.lipidcane import chemicals as lc_chems
     new_chems = add_wwt_chemicals(lc_chems)
     new_chems.compile()
     new_chems = set_synonym_grp(new_chems)

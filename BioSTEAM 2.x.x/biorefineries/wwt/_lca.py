@@ -27,10 +27,9 @@ def get_cs_GWP(lca_stream, flowsheet, ratio):
         'CSL': 1.55,
         'CH4': 0.33, # NA NG from shale and conventional recovery
         'Cellulase': 2.24, # enzyme
-        'Lime': 1.29,
+        'Lime': 1.29 * 56.0774/74.093, # 1.29 is for CaO, need to convert to those of Ca(OH)2
         'NaOH': 2.11,
         'H2SO4': 0.04344,
-        # 'Ethanol': 1.44,
         'Denaturant': 0.84, # gasoline blendstock from crude oil for use in US refineries
         # CFs for NaOCl, citric acid, and bisulfite from ecoinvent 3.7.1,
         # allocation at the point of substitution
@@ -40,19 +39,24 @@ def get_cs_GWP(lca_stream, flowsheet, ratio):
         'CitricAcid': 5.9272,
         # Sodium hydrogen sulfite production, RoW
         'Bisulfite': 1.3065*0.38, # converted to 38% solution
+        # Biogenic-CO2 should not be included
+        # 'CO2': 1,
+        # 'Ethanol': 1.44,
         }
 
     # This makes the CF into an array
     GWP_CF_array = chems.kwarray(GWP_CFs)
-    GWP_CF_stream = tmo.Stream('GWP_CF_stream', GWP_CF_array, units='kg/hr')
+    GWP_CF_stream = tmo.Stream('', GWP_CF_array, units='kg/hr')
 
     GWP_CFs['Electricity'] = 0.48 # kg CO2-eq/kWh
 
     GWP_CFs['Cornstover'] = 0.096470588 * (1-0.2)
 
     ethanol, BT = flowsheet.stream.ethanol, flowsheet.unit.BT
+    # ratio is ethanol (gal) to dry corn stover (kg)
     feedstock_GWP = GWP_CFs['Cornstover'] / ratio
     material_GWP = (GWP_CF_stream.mass*lca_stream.mass).sum()/ethanol.F_mass
+    # Rate is negative when the biorefinery generates more electricity than needed
     power_GWP = BT.power_utility.rate*GWP_CFs['Electricity']/ethanol.F_mass
 
     return feedstock_GWP+material_GWP+power_GWP

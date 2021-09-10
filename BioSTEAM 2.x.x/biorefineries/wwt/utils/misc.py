@@ -17,7 +17,9 @@ from biosteam.utils import (
     remove_undefined_chemicals,
     default_chemical_dict
     )
-from biorefineries.cornstover import ethanol_density_kggal
+# from . import ethanol_density_kggal
+# from ._chemicals import default_insolubles
+from __init__ import ethanol_density_kggal
 from _chemicals import default_insolubles
 
 __all__ = (
@@ -26,7 +28,7 @@ __all__ = (
     'format_str',
     'remove_undefined_chemicals',
     'get_split_dct',
-    'get_MESP',
+    'print_MESP',
     'kph_to_tpd',
     )
 
@@ -87,7 +89,7 @@ def get_split_dct(chemicals, **split):
     return split_dct
 
 
-def get_MESP(ethanol, tea, tea_name=''):
+def print_MESP(ethanol, tea, tea_name=''):
     bst.settings.set_thermo(ethanol.chemicals)
     tea.system.simulate()
     ethanol.price = tea.solve_price(ethanol)

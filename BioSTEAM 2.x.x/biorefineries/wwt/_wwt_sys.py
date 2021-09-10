@@ -28,8 +28,6 @@ https://doi.org/10.2172/1483234
 
 '''
 TODO:
-    - Use Brian's GBT and BioSTEAM's centrifuge since the scaling basis in NREL
-    ones changed significantly (~80% reduction) from earlier to the 2018 report
     - Think of ways to handle the no-power usage thing for the cornstover biorefinery
 '''
 

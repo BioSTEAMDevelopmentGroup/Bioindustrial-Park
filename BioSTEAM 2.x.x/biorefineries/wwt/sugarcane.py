@@ -15,18 +15,19 @@
 
 import biosteam  as bst
 from biosteam import main_flowsheet as F
-from biorefineries import sugarcane as sc
 
 # from biorefineries.wwt import (
+#     sc
 #     create_sc_chemicals,
 #     new_price, load_cs_settings,
 #     create_wastewater_treatment_system
 #     )
 # from biorefineries.utils import get_MESP
+from __init__ import sc
 from _chemicals import create_sc_chemicals
 from _settings import new_price, load_sc_settings
 from _wwt_sys import create_wastewater_treatment_system
-from utils import get_MESP
+from utils import print_MESP
 
 
 # %%
@@ -141,19 +142,19 @@ original_IRR = 0.1267
 sugarcane_tea.IRR = sc.sugarcane_tea.IRR = original_IRR
 print(f'\n\nIRR = {original_IRR:.0%}')
 sc.wastewater.price = 0.
-MESP_old = get_MESP(sc.ethanol, sc.sugarcane_tea, 'old sc sys w/o ww cost')
+MESP_old = print_MESP(sc.ethanol, sc.sugarcane_tea, 'old sc sys w/o ww cost')
 sc.wastewater.price = new_price['Wastewater']
-MESP_old = get_MESP(sc.ethanol, sc.sugarcane_tea, 'old sc sys w ww cost')
-MESP_new = get_MESP(ethanol, sugarcane_tea, 'new sc sys')
+MESP_old = print_MESP(sc.ethanol, sc.sugarcane_tea, 'old sc sys w ww cost')
+MESP_new = print_MESP(ethanol, sugarcane_tea, 'new sc sys')
 
 sugarcane_tea.IRR = sc.sugarcane_tea.IRR = 0.1
 assert(sugarcane_tea.IRR==sc.sugarcane_tea.IRR)
 print(f'\n\nIRR = {sugarcane_tea.IRR:.0%}')
 sc.wastewater.price = 0.
-MESP_old = get_MESP(sc.ethanol, sc.sugarcane_tea, 'old sc sys w/o ww cost')
+MESP_old = print_MESP(sc.ethanol, sc.sugarcane_tea, 'old sc sys w/o ww cost')
 sc.wastewater.price = new_price['Wastewater']
-MESP_old = get_MESP(sc.ethanol, sc.sugarcane_tea, 'old sc sys w ww cost')
-MESP_new = get_MESP(ethanol, sugarcane_tea, 'new sc sys')
+MESP_old = print_MESP(sc.ethanol, sc.sugarcane_tea, 'old sc sys w ww cost')
+MESP_new = print_MESP(ethanol, sugarcane_tea, 'new sc sys')
 
 
 # %%

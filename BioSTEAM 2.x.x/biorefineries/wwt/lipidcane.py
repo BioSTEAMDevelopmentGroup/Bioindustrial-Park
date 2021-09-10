@@ -20,15 +20,17 @@ from biorefineries import (
     )
 
 # from biorefineries.wwt import (
+#     sc, cs,
 #     create_lc_chemicals,
 #     lc_price, new_price, load_cs_settings,
 #     create_wastewater_treatment_system
 #     )
 # from biorefineries.utils import get_MESP
+from __init__ import sc, lc
 from _chemicals import create_lc_chemicals
 from _settings import lc_price, new_price, load_lc_settings
 from _wwt_sys import create_wastewater_treatment_system
-from utils import get_MESP
+from utils import print_MESP
 
 
 # %%
@@ -162,20 +164,20 @@ original_IRR = 0.2108
 lipidcane_tea.IRR = lc.lipidcane_tea.IRR = original_IRR
 print(f'\n\nIRR = {original_IRR:.0%}')
 lc.wastewater.price = 0.
-MESP_old = get_MESP(lc.ethanol, lc.lipidcane_tea, 'old lc sys w/o ww cost')
+MESP_old = print_MESP(lc.ethanol, lc.lipidcane_tea, 'old lc sys w/o ww cost')
 lc.wastewater.price = new_price['Wastewater']
-MESP_old = get_MESP(lc.ethanol, lc.lipidcane_tea, 'old lc sys w ww cost')
-MESP_new = get_MESP(ethanol, lipidcane_tea, 'new lc sys')
+MESP_old = print_MESP(lc.ethanol, lc.lipidcane_tea, 'old lc sys w ww cost')
+MESP_new = print_MESP(ethanol, lipidcane_tea, 'new lc sys')
 
 lipidcane_tea.IRR = lc.lipidcane_tea.IRR = 0.1
 ethanol.price = lc.ethanol.price = lc_price['Ethanol']
 assert(lipidcane_tea.IRR==lc.lipidcane_tea.IRR)
 print(f'\n\nIRR = {lipidcane_tea.IRR:.0%}')
 lc.wastewater.price = 0.
-MESP_old = get_MESP(lc.ethanol, lc.lipidcane_tea, 'old lc sys w/o ww cost')
+MESP_old = print_MESP(lc.ethanol, lc.lipidcane_tea, 'old lc sys w/o ww cost')
 lc.wastewater.price = new_price['Wastewater']
-MESP_old = get_MESP(lc.ethanol, lc.lipidcane_tea, 'old lc sys w ww cost')
-MESP_new = get_MESP(ethanol, lipidcane_tea, 'new lc sys')
+MESP_old = print_MESP(lc.ethanol, lc.lipidcane_tea, 'old lc sys w ww cost')
+MESP_new = print_MESP(ethanol, lipidcane_tea, 'new lc sys')
 
 
 # %%

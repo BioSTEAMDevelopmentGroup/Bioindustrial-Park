@@ -15,23 +15,21 @@
 
 import biosteam as bst
 from biosteam import main_flowsheet as F
-from biorefineries import (
-    cornstover as cs,
-    sugarcane as sc
-    )
 
 # from biorefineries.wwt import (
+#     sc, cs,
 #     create_cs_chemicals,
 #     cs_price, load_cs_settings,
 #     create_wastewater_treatment_system,
 #     get_cs_GWP,
 #     )
-# from biorefineries.utils import get_MESP
+# from biorefineries.utils import get_MESP, get_digestable_chemicals
+from __init__ import sc, cs, ethanol_density_kggal
 from _chemicals import create_cs_chemicals
 from _settings import cs_price, load_cs_settings
 from _wwt_sys import create_wastewater_treatment_system
 from _lca import get_cs_GWP
-from utils import get_MESP
+from utils import print_MESP, get_digestable_chemicals
 
 
 # %%
@@ -52,7 +50,8 @@ bst.settings.set_thermo(chems)
                price=cs_price['Denaturant'])],
     outs=[dict(ID='ethanol', price=cs_price['Ethanol'])],
 )
-def create_cs_system(ins, outs, include_blowdown_recycle=True, **wwt_kwargs):
+def create_cs_system(ins, outs, include_blowdown_recycle=True,
+                     default_BD=True, wwt_kwargs={}):
     feedstock, denaturant = ins
     ethanol, = outs
     f = bst.main_flowsheet
@@ -103,6 +102,10 @@ def create_cs_system(ins, outs, include_blowdown_recycle=True, **wwt_kwargs):
     else:
         blowdown_to_wastewater = None
 
+    if default_BD:
+        skip_R603 = wwt_kwargs.get('skip_R603')
+        wwt_kwargs['skip_R603'] = True if skip_R603 is None else skip_R603
+
     create_wastewater_treatment_system(
         ins=[S401-1, pretreatment_sys-1, blowdown_to_wastewater],
         outs=['biogas', 'sludge_S603', 'recycled_water', 'brine'],
@@ -111,6 +114,16 @@ def create_cs_system(ins, outs, include_blowdown_recycle=True, **wwt_kwargs):
         R602_kwargs={'HRT': 35},
         **wwt_kwargs,
     )
+
+    # Using the default organic biodegradability as in Humbird et al.
+    # Methane production is  5481, vs. 5681 from Humbird (u.R601.outs[0].imass['CH4']),
+    # which is about 3-4% less,
+    # This might be due to the different CH4/CO2 ratios in the biogas production reaction,
+    # Humbird assumed 51%:49% (1.04) CH4:CO2 on a molar basis, here is about 1
+    if default_BD:
+        BD_dct = {k.ID: 1. for k in get_digestable_chemicals(chems)}
+        u.R601.biodegradability = BD_dct
+        u.R601._refresh_rxns(X_biogas=0.86, X_growth=0.05)
 
     M501 = bst.Mixer('M501', (u.S603-1, S401-0))
 
@@ -132,12 +145,12 @@ def create_cs_system(ins, outs, include_blowdown_recycle=True, **wwt_kwargs):
 # %%
 
 # =============================================================================
-# Create the system
+# Create the system, do TEA and LCA
 # =============================================================================
 
-flowsheet = bst.Flowsheet('wwt_cornstover')
+flowsheet = bst.Flowsheet('cs_new')
 F.set_flowsheet(flowsheet)
-cornstover_sys = create_cs_system(include_blowdown_recycle=True)
+cornstover_sys = create_cs_system(include_blowdown_recycle=True, default_BD=True)
 
 u = F.unit
 wwt_units = [i for i in u if i.ID[1:3]=='60']
@@ -145,164 +158,143 @@ OSBL_units = (*wwt_units, u.CWP, u.CT, u.PWC, u.ADP,
               u.T701, u.T702, u.P701, u.P702, u.M701, u.FT,
               u.CSL_storage, u.DAP_storage, u.BT)
 cornstover_tea = cs.create_tea(cornstover_sys, OSBL_units)
-ethanol = F.stream.ethanol
-
-# Compare MESP
-assert(cornstover_tea.IRR==cs.cornstover_tea.IRR==0.1)
-print(f'\n\nIRR = {cornstover_tea.IRR:.0%}')
-MESP_old = get_MESP(cs.ethanol, cs.cornstover_tea, 'old cs sys')
-MESP_new = get_MESP(ethanol, cornstover_tea, 'new cs sys')
-
-
-# %%
-
-# =============================================================================
-# Util functions for result comparison
-# =============================================================================
-
-# Old system
-cs_wwt_units = [i for i in cs.cornstover_sys.units if i.ID[1:3]=='60']
-old_capex = cs.WWTC.installed_cost / 1e6
-old_capex_ratio = old_capex/(cs.cornstover_tea.installed_equipment_cost/1e6)
-
-old_power_wwt = cs.WWTC.power_utility.rate
-old_power_tot = sum(i.power_utility.consumption for i in cs.cornstover_sys.units)
-old_power_ratio = old_power_wwt / old_power_tot
-
-old_power_net = sum(i.power_utility.rate for i in cs.cornstover_sys.units)
-
-# New system
-new_capexes = {i.ID: i.installed_cost/1e6 for i in wwt_units}
-new_capex = sum(i for i in new_capexes.values())
-new_capex_ratio = new_capex/(cornstover_tea.installed_equipment_cost/1e6)
-
-new_powers_wwt = {i.ID: i.power_utility.rate/1e3 for i in wwt_units}
-new_power_wwt = sum(i for i in new_powers_wwt.values())
-new_power_tot = sum(i.power_utility.consumption for i in cornstover_sys.units)/1e3
-new_power_ratio = new_power_wwt / new_power_tot
-
-new_power_net = sum(i.power_utility.rate for i in cornstover_sys.units)/1e3
 
 s = F.stream
-# Hf in kJ/hr
-net_e = s.ethanol.Hf/3600/1e3 + u.BT.power_utility.rate/1e3
-net_e_ratio = net_e/(s.cornstover.Hf/3600/1e3)
+ethanol = s.ethanol
 
-# Water
-# water_usage = (u.PWC.F_mass_in+s.cornstover.imass['Water'])/s.ethanol.F_mass # 18 kg/kg
-water_usage = u.PWC.F_mass_in/s.ethanol.F_mass # 17 kg/kg
-# water_consumption = (u.PWC.ins[1].F_mass-u.PWC.outs[1].F_mass+s.cornstover.imass['Water']) / \
-#     s.ethanol.F_mass # about 1.7 kg/kg
-water_consumption = (u.PWC.ins[1].F_mass-u.PWC.outs[1].F_mass) / \
-    s.ethanol.F_mass # about 0.8 kg/kg
-
-# Wastewater
-from utils import compute_stream_COD
-wastewater = u.M601.F_mass_in/s.ethanol.F_mass # about 18 kg/kg
-COD = compute_stream_COD(u.M601.outs[0]) # about 54 g COD/L
-
-# OLR
-from utils import auom
-_ft_to_m3 = auom('ft3').conversion_factor('m3')
-old_OLR_R601 = compute_stream_COD(cs.R601.ins[0])*cs.R601.ins[0].F_vol / \
-    (4*31*1e6*auom('gal').conversion_factor('m3')) * 24 # 1.4 g COD/L/d
-old_OLR_R602 = compute_stream_COD(cs.R602.ins[0])*cs.R602.ins[0].F_vol / \
-    (3*25*115*344*_ft_to_m3) * 24 # 0.7 g COD/L/d
-
-new_OLR_R601 = compute_stream_COD(u.R601.ins[0])*u.R601.ins[0].F_vol / \
-    (u.R601.Vliq) * 24 # 30 g COD/L/d
-V_R602 = u.R602.D_tank*u.R602.W_tank*u.R602.L_CSTR*u.R602.N_train * \
-    _ft_to_m3
-new_OLR_R602 = compute_stream_COD(u.R602.ins[0])*u.R602.ins[0].F_vol / \
-    V_R602 * 24 # 10.3 g COD/L/d
-# new_OLR_R603 = compute_stream_COD(u.R603._inf)*u.R603._inf.F_vol / \
-#     (u.R603.design_results['Volume [ft3]']*_ft_to_m3) * 24 # 2.25 g COD/L/d
-new_OLR_R603 = u.R603.OLR # 2.25 g COD/L/d
-
-
-# Adjust methane production
-def adjust_methane():
-    from utils import get_digestable_chemicals
-    flowsheet_ch4 = bst.Flowsheet('wwt_cornstover_ch4')
-    F.set_flowsheet(flowsheet_ch4)
-    cornstover_sys_ch4 = create_cs_system(include_blowdown_recycle=True,
-                                          skip_R603=True)
-    u_ch4 = F.unit
-    wwt_units = [i for i in u if i.ID[1:3]=='60']
-    OSBL_units = (*wwt_units, u_ch4.CWP, u_ch4.CT, u_ch4.PWC, u_ch4.ADP,
-                  u_ch4.T701, u_ch4.T702, u_ch4.P701, u_ch4.P702, u_ch4.M701, u_ch4.FT,
-                  u_ch4.CSL_storage, u_ch4.DAP_storage, u_ch4.BT)
-
-    cornstover_tea_ch4 = cs.create_tea(cornstover_sys_ch4, OSBL_units)
-
-    BD_dct = {k.ID: 1. for k in get_digestable_chemicals(chems)}
-    u_ch4.R601.biodegradability = BD_dct
-    u_ch4.R601._refresh_rxns(X_biogas=0.86, X_growth=0.05)
-    # About 5481, vs. 5681 from Humbird, about 3-4% less,
-    # might be due to the different CH4/CO2 ratios in the biogas production reaction,
-    # Humbird assumed 51%:49% (1.04) CH4:CO2 on a molar basis, here is about 1
-    # print(u.R601.outs[0].imass['CH4'])
-    return flowsheet_ch4, cornstover_sys_ch4, cornstover_tea_ch4
-
-flowsheet_ch4, cornstover_sys_ch4, cornstover_tea_ch4 = adjust_methane()
-
-get_MESP(F.stream.ethanol, cornstover_tea_ch4, 'new cs sys with higher BD')
-
-
-# %%
-
+# Get the ratio of ethanol-to-dry-cornstover
 get_ratio = lambda cornstover, ethanol: \
-    ethanol.F_mass/cs.ethanol_density_kggal/(cornstover.F_mass-cornstover.imass['Water'])
+    ethanol.F_mass/ethanol_density_kggal/(cornstover.F_mass-cornstover.imass['Water'])
 
+# Input chemicals/generated emissions with impacts
 lca_streams_cs = [
-    cs.denaturant,
-    cs.cellulase,
-    cs.sulfuric_acid,
-    cs.DAP,
     cs.CSL,
-    cs.ammonia,
+    cs.DAP,
     cs.FGD_lime,
+    cs.ammonia,
     cs.caustic,
+    cs.cellulase,
+    cs.denaturant,
+    cs.sulfuric_acid,
     cs.emissions,
     ]
 
-# One stream that representing all chemicals
-lca_stream_cs = bst.Stream('lca_stream_cs')
-lca_stream_cs.mix_from(lca_streams_cs)
-
-GWP_cs = get_cs_GWP(lca_stream_cs, cs.flowsheet,
-                    get_ratio(cs.cornstover, cs.ethanol))
-
-# Get the gross results
-print(f'Total GWP for original cs sys is {GWP_cs:.2f} kg CO2-eq/gal ethanol.')
-
-s_ch4 = flowsheet_ch4.stream
-lca_streams_ch4 = [
-    s_ch4.denaturant,
-    s_ch4.cellulase,
-    s_ch4.sulfuric_acid,
-    s_ch4.DAP,
-    s_ch4.CSL,
-    s_ch4.ammonia,
-    s_ch4.FGD_lime,
-    s_ch4.emissions,
+lca_streams = [
+    s.CSL,
+    s.DAP,
+    s.FGD_lime,
+    s.ammonia,
+    s.bisulfite,
+    s.cellulase,
+    s.citric_R602,
+    s.denaturant,
+    s.naocl_R602,
+    s.sulfuric_acid,
+    s.emissions,
     ]
 
-# One stream that representing all chemicals
-lca_stream_ch4 = bst.Stream('lca_stream_ch4')
-lca_stream_ch4.mix_from(lca_streams_ch4)
-
-GWP_ch4 = get_cs_GWP(lca_stream_ch4, flowsheet_ch4,
-                    get_ratio(s_ch4.cornstover, s_ch4.ethanol))
-
-# Get the gross results
-print(f'Total GWP for new cs sys with higher BD is {GWP_ch4:.3f} kg CO2-eq/gal ethanol.')
+# Use one stream to represent all chemicals/emissions
+lca_stream_cs = bst.Stream('lca_stream_cs')
+lca_stream = bst.Stream('lca_stream')
 
 
+# Util functions
+def get_GWP(system):
+    f = system.flowsheet
+    u = f.unit
+    s = f.stream
+    if hasattr(u, 'WWTC'):
+        streams = lca_streams_cs
+        stream = lca_stream_cs
+    else:
+        streams = lca_streams
+        stream = lca_stream
+    stream.mix_from(streams)
+    return get_cs_GWP(stream, f, get_ratio(s.cornstover, s.ethanol))
+
+
+def get_WWT_CAPEX(system, ratio=False):
+    u = system.flowsheet.unit
+    if hasattr(u, 'WWTC'): # Humbird et al.
+        capex = u.WWTC.installed_cost
+    else:
+        wwt_units = [i for i in u if i.ID[1:3]=='60']
+        capex = sum(i.installed_cost for i in wwt_units)
+    if not ratio:
+        return capex/1e6 # in MM$
+    return capex/system.TEA.installed_equipment_cost
+
+def get_WWT_power(system, ratio=False):
+    u = system.flowsheet.unit
+    if hasattr(u, 'WWTC'): # Humbird et al.
+        power = cs.WWTC.power_utility.rate
+    else:
+        wwt_units = [i for i in u if i.ID[1:3]=='60']
+        power = sum(i.power_utility.rate for i in wwt_units)
+    if not ratio:
+        return power/1e3 # in MWh
+    tot = sum(i.power_utility.rate for i in u)
+    return power/tot
 
 
 # %%
+
+if __name__ == '__main__':
+    # Print MESP and GWP
+    print(f'\n\nIRR = {cornstover_tea.IRR:.0%}')
+    print_MESP(cs.ethanol, cs.cornstover_tea, 'old cs sys')
+    print_MESP(ethanol, cornstover_tea, 'new cs sys')
+    print(f'Total GWP for the original cs sys is {get_GWP(cs.cornstover_sys):.2f} kg CO2-eq/gal ethanol.')
+    print(f'Total GWP for new cs sys is {get_GWP(cornstover_sys):.2f} kg CO2-eq/gal ethanol.')
+
+
+# %%
+
+# =============================================================================
+# Legacy codes
+# =============================================================================
+
+# from utils import compute_stream_COD
 
 # # C/N ratio
 # from _utils import get_CN_ratio
 # R601_CN = get_CN_ratio(u.R601._inf)
+
+
+# # Water usage
+# # water_usage = (u.PWC.F_mass_in+s.cornstover.imass['Water'])/s.ethanol.F_mass # 18 kg/kg
+# water_usage = u.PWC.F_mass_in/s.ethanol.F_mass # 17 kg/kg
+# # water_consumption = (u.PWC.ins[1].F_mass-u.PWC.outs[1].F_mass+s.cornstover.imass['Water']) / \
+# #     s.ethanol.F_mass # about 1.7 kg/kg
+# water_consumption = (u.PWC.ins[1].F_mass-u.PWC.outs[1].F_mass) / \
+#     s.ethanol.F_mass # about 0.8 kg/kg
+
+
+# # Wastewater generated
+# wastewater = u.M601.F_mass_in/s.ethanol.F_mass # about 18 kg/kg
+# COD = compute_stream_COD(u.M601.outs[0]) # about 54 g COD/L
+
+
+# # OLR
+# from utils import auom
+# _ft_to_m3 = auom('ft3').conversion_factor('m3')
+# old_OLR_R601 = compute_stream_COD(cs.R601.ins[0])*cs.R601.ins[0].F_vol / \
+#     (4*31*1e6*auom('gal').conversion_factor('m3')) * 24 # 1.4 g COD/L/d
+# old_OLR_R602 = compute_stream_COD(cs.R602.ins[0])*cs.R602.ins[0].F_vol / \
+#     (3*25*115*344*_ft_to_m3) * 24 # 0.7 g COD/L/d
+
+# new_OLR_R601 = compute_stream_COD(u.R601.ins[0])*u.R601.ins[0].F_vol / \
+#     (u.R601.Vliq) * 24 # 30 g COD/L/d
+# V_R602 = u.R602.D_tank*u.R602.W_tank*u.R602.L_CSTR*u.R602.N_train * \
+#     _ft_to_m3
+# new_OLR_R602 = compute_stream_COD(u.R602.ins[0])*u.R602.ins[0].F_vol / \
+#     V_R602 * 24 # 10.3 g COD/L/d
+# # new_OLR_R603 = compute_stream_COD(u.R603._inf)*u.R603._inf.F_vol / \
+# #     (u.R603.design_results['Volume [ft3]']*_ft_to_m3) * 24 # 2.25 g COD/L/d
+# new_OLR_R603 = u.R603.OLR # 2.25 g COD/L/d
+
+
+# # Energy recovery
+# # Hf in kJ/hr
+# net_e = s.ethanol.Hf/3600/1e3 + u.BT.power_utility.rate/1e3
+# net_e_ratio = net_e/(s.cornstover.Hf/3600/1e3)
