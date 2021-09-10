@@ -28,7 +28,6 @@ https://doi.org/10.1039/C5EE03715H.
 
 import math
 import biosteam as bst
-import thermosteam as tmo
 # from collections.abc import Iterable
 from biosteam.exceptions import DesignError
 
@@ -97,6 +96,8 @@ class AnMBR(bst.Unit):
         for any of the membrane types ("hollow fiber", "flat sheet", "multi-tube"),
         or "sintered steel" for "flat sheet",
         or "ceramic" for "multi-tube".
+    membrane_unit_cost : float
+        Cost of membrane, [$/ft2]
     include_aerobic_filter : bool
         Whether to include an aerobic filtration process in this AnMBR,
         can only be True in "AF" (not "CSTR") reactor.
@@ -180,17 +181,17 @@ class AnMBR(bst.Unit):
     _constr_access = 3
 
     # Operation-related parameters
-    _HRT = 24
+    _HRT = 10
     _J_max = 12
     _TMP_dct = {
         'cross-flow': 2.5,
         'submerged': 2.5,
         }
     _TMP_aerobic = None
-    _recir_ratio = 2.25
-    _v_cross_flow = 1.2
+    _recir_ratio = 2.25 # from the 0.5-4 uniform range in ref [1]
+    _v_cross_flow = 1.2 # from the 0.4-2 uniform range in ref [1]
     _v_GAC = 8
-    _SGD = 0.625
+    _SGD = 0.625 # from the 0.05-1.2 uniform range in ref [1]
     _AFF = 3.33
     _sludge_conc = 10.5
 
@@ -207,10 +208,12 @@ class AnMBR(bst.Unit):
                  membrane_configuration='cross-flow',
                  membrane_type='multi-tube',
                  membrane_material='ceramic',
+                 membrane_unit_cost=8,
                  include_aerobic_filter=False,
                  add_GAC=False,
                  include_degassing_membrane=True,
-                 biodegradability={}, Y=0.05, split=None,
+                 biodegradability={}, Y=0.05, # from the 0.02-0.08 uniform range in ref [1]
+                 split=None,
                  T=35+273.15,
                  include_pump_building_cost=False,
                  include_excavation_cost=False,
@@ -221,6 +224,7 @@ class AnMBR(bst.Unit):
         self.membrane_configuration = membrane_configuration
         self.membrane_type = membrane_type
         self.membrane_material = membrane_material
+        self.membrane_unit_cost = membrane_unit_cost
         self.add_GAC = add_GAC
         self.include_degassing_membrane = include_degassing_membrane
         self.biodegradability = \
@@ -344,7 +348,6 @@ class AnMBR(bst.Unit):
         self.growth_rxns(inf.mol)
         self.biogas_rxns(inf.mol)
         inf.split_to(perm, sludge, self._isplit.data)
-        # tmo.separations.split(inf, perm, sludge, self._isplit.data)
 
         sludge_conc = self._sludge_conc
         insolubles = tuple(i.ID for i in self.chemicals if i.ID in default_insolubles)
@@ -708,9 +711,7 @@ class AnMBR(bst.Unit):
         C['Slab concrete'] = VSC / 27 * 350
 
         # Membrane
-        # TODO: now assume $8/ft2 for all membrane materials,
-        # maybe check the price for different materials
-        C['Membrane'] = 8 * D['Membrane [m3]'] / _ft2_to_m2
+        C['Membrane'] = self.membrane_unit_cost * D['Membrane [m3]'] / _ft2_to_m2
         F_BM['Membrane'] = 1 + 0.15 # assume 15% for replacement labor
         lifetime['Membrane'] = 10
 

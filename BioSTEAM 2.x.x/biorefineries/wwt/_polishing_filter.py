@@ -116,7 +116,8 @@ class PolishingFilter(bst.Unit):
 
     def __init__(self, ID='', ins=None, outs=(), thermo=None, *,
                  filter_type='aerobic',
-                 OLR=2.25, HLR=0.275,
+                 OLR=(0.5+4)/24, # from the 0.5-4 kg/m3/d uniform range in ref [1]
+                 HLR=(0.11+0.44)/2, # from the 0.11-0.44  uniform range in ref [1]
                  X_decomp=0.74, X_growth=0.22, # X_decomp & X_growth from ref[2]
                  split=None, T=30+273.15,
                  include_degassing_membrane=False,
