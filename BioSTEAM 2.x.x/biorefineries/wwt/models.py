@@ -11,7 +11,7 @@
 
 '''
 TODO:
-    - Add model for Humbird et al.
+    - Use a systematic way of adding uncertainty parameters and its range
     - Add uncertainty parameters for (if using the relevant element):
         - AF: OL_AF, HL
         - GAC: HRT_for_GAC, GAC concentration
