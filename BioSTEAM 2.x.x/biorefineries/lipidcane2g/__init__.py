@@ -43,6 +43,8 @@ from ._lipid_extraction_specification import *
 from ._distributions import *
 from biorefineries.sugarcane import create_tea as create_conventional_ethanol_tea
 from biorefineries import cornstover as cs
+from . import units
+from .units import *
 import numpy as np
 
 __all__ = [*_process_settings.__all__,
@@ -449,16 +451,14 @@ def load(name, cache={}, reduce_chemicals=True, enhanced_cellulosic_performance=
             prs.reactions, saccharification.saccharification
         )
         dct['fermentation_rxnsys'] = tmo.ReactionSystem(
-            seed_train.reactions, fermentor.loss, fermentor.cofermentation
+            seed_train.reactions, fermentor.cofermentation
         )
         dct['cellulosic_rxnsys'] = tmo.ReactionSystem(
             prs.reactions, saccharification.saccharification,
-            seed_train.reactions, fermentor.loss, fermentor.cofermentation
+            seed_train.reactions, fermentor.cofermentation
         )
-        saccharification.saccharification[0].X = 0.0 # Baseline
-        prs.reactions[10].X = 0.0 # baseline
-        fermentor.cofermentation[1:4].X[:] = fermentor.loss[0].X = 0.
-        fermentor.cofermentation[5:].X[:] = fermentor.loss[1].X = 0.
+        saccharification.saccharification.X[0] = 0.0 # Baseline
+        prs.reactions.X[10] = 0.0 # baseline
             
     def set_glucose_yield(glucose_yield):
         if abs(number) == 2:
@@ -674,11 +674,8 @@ def load(name, cache={}, reduce_chemicals=True, enhanced_cellulosic_performance=
             # fermentor.loss[0].X = 0.03 # Baseline
             split = np.mean(S403.split)
             X1 = split * seed_train.reactions.X[0]
-            X1_side = split * seed_train.reactions.X[1:4].sum()
-            X2_side = fermentor.loss.X[0]
-            X3_side = fermentor.cofermentation.X[1:4].sum()
-            X3 = (glucose_to_ethanol_yield - X1) / (1 - X1_side - X2_side / (1 - X1 - X1_side)) 
-            X_excess = (X3 + X3_side) - 1
+            X3 = (glucose_to_ethanol_yield - X1) / (1 / (1 - X1)) 
+            X_excess = X3 - 1
             if X_excess > 0.: breakpoint()
             fermentor.cofermentation.X[0] = X3
     
@@ -691,14 +688,11 @@ def load(name, cache={}, reduce_chemicals=True, enhanced_cellulosic_performance=
             # fermentor.loss[1].X = 0.03 # Baseline
             xylose_to_ethanol_yield *= 0.01
             split = np.mean(S403.split)
-            X1 = split * seed_train.reactions.X[4]
-            X1_side = split * seed_train.reactions.X[6:].sum()
-            X2_side = fermentor.loss.X[1]
-            X3_side = fermentor.cofermentation.X[5:].sum()
-            X3 = (xylose_to_ethanol_yield - X1) / (1 - X1_side - X2_side / (1 - X1 - X1_side)) 
-            X_excess = (X3 + X3_side) - 1
+            X1 = split * seed_train.reactions.X[1]
+            X3 = (xylose_to_ethanol_yield - X1) / (1 / (1 - X1)) 
+            X_excess = X3 - 1
             if X_excess > 0.: breakpoint()
-            fermentor.cofermentation.X[4] = X3
+            fermentor.cofermentation.X[1] = X3
 
     @uniform(68.5, 137, units='g/L', element='Cofermentation')
     def set_cofermentation_titer(titer):
@@ -1287,7 +1281,11 @@ def monte_carlo_box_plot(data, positions, light_color, dark_color):
 def monte_carlo_results():
     results = {}
     for name in configuration_names + comparison_names + other_comparison_names:
-        df = get_monte_carlo(name)
+        try: 
+            df = get_monte_carlo(name)
+        except:
+            warn(f'could not load {name}', RuntimeWarning)
+            continue
         results[name] = dct = {}
         for metric in metric_mockups + derivative_metric_mockups:
             index = metric.index
@@ -1304,14 +1302,24 @@ def monte_carlo_results():
             }
     return results
 
-def plot_monte_carlo(derivative=False, configuration_names=configuration_names, comparison_names=comparison_names):
+def plot_monte_carlo(derivative=False, absolute=True, comparison=True,
+                     configuration_names=configuration_names, comparison_names=comparison_names,
+                     labels=None):
     if derivative:
         configuration_names = ['L1', 'L2', 'L1*', 'L2*']
         comparison_names = ['L2 - L1', 'L2* - L2', 'L1* - L1']
         MFPP, TCI, *production, electricity_production, natural_gas_consumption = derivative_metric_mockups
     else:
         MFPP, TCI, *production, electricity_production, natural_gas_consumption = metric_mockups
-    columns = configurations = configuration_names + comparison_names
+    combined = absolute and comparison
+    if combined:
+        columns = configurations = configuration_names + comparison_names
+    elif absolute:
+        columns = configurations = configuration_names
+    elif comparison:
+        columns = configurations = comparison_names
+    else:
+        columns = configurations = []
     N_cols = len(columns)
     rows = metrics = [
         MFPP, 
@@ -1323,7 +1331,7 @@ def plot_monte_carlo(derivative=False, configuration_names=configuration_names, 
     N_rows = len(rows)
     fig, axes = plt.subplots(ncols=1, nrows=N_rows)
     axes = axes.flatten()
-    xtext = [format_name(i).replace(' ', '') for i in configurations]
+    xtext = labels or [format_name(i).replace(' ', '') for i in configurations]
     N_marks = len(xtext)
     xticks = tuple(range(N_marks))
     color_wheel = CABBI_colors.wheel()
@@ -1342,7 +1350,6 @@ def plot_monte_carlo(derivative=False, configuration_names=configuration_names, 
             r"$\Delta$" + format_units(r"EP/LC").replace('cdot', r'cdot \Delta') + f"\n[{format_units('kWhr/ton')}]",
             r"$\Delta$" + format_units(r"NGC/LC").replace('cdot', r'cdot \Delta') + f"\n[{format_units('cf/ton')}]"
         ]
-        ylabels
     def get_data(metric, name):
         if isinstance(metric, bst.Variable):
             df = get_monte_carlo(name)
@@ -1375,8 +1382,9 @@ def plot_monte_carlo(derivative=False, configuration_names=configuration_names, 
     for i in range(N_rows):
         ax = axes[i]
         plt.sca(ax)
-        bst.plots.plot_vertical_line(x0)
-        ax.axvspan(x0, xf, color=colors.purple_tint.tint(60).RGBn)
+        if combined:
+            bst.plots.plot_vertical_line(x0)
+            ax.axvspan(x0, xf, color=colors.purple_tint.tint(60).RGBn)
         plt.xlim(-0.5, xf)
 
     for j in range(N_cols):
@@ -1420,7 +1428,7 @@ def plot_monte_carlo(derivative=False, configuration_names=configuration_names, 
     # )
     # legend.get_frame().set_linewidth(0.0)
 
-def plot_spearman_MFPP(configuration, top=None, agile=True):
+def plot_spearman_MFPP(configuration, top=None, agile=True, labels=None):
     stream_price = format_units('USD/gal')
     USD_ton = format_units('USD/ton')
     ng_price = format_units('USD/cf')
@@ -1445,14 +1453,13 @@ def plot_spearman_MFPP(configuration, top=None, agile=True):
          'Cellulase loading [1.5 $-$ 2.5 wt. % cellulose]',
          'Pretreatment reactor system base cost [14.9 $-$ 24.7 MMUSD]',
          'Cane glucose yield [85 $-$ 97.5 %]',
-         'Cane xylose yield [65 $-$ 97.5 %]',
          'Sorghum glucose yield [85 $-$ 97.5 %]',
+         'Cane xylose yield [65 $-$ 97.5 %]',
          'Sorghum xylose yield [65 $-$ 97.5 %]',
          'Glucose to ethanol yield [90 $-$ 95 %]',
          'Xylose to ethanol yield [70 $-$ 95 %]',
-         'Titer [65 $-$ 130 {titer}]',
-         'Productivity [1.0 $-$ 2.0 {productivity}]',
-         'Xylose to ethanol yield [70 $-$ 95 %]',
+        f'Titer [65 $-$ 130 {titer}]',
+        f'Productivity [1.0 $-$ 2.0 {productivity}]',
          'Cane PL content [3.75 $-$ 6.25 %]',
          'Sorghum PL content [3.75 $-$ 6.25 %]',
          'Cane FFA content [7.5 $-$ 12.5 %]',
@@ -1464,7 +1471,7 @@ def plot_spearman_MFPP(configuration, top=None, agile=True):
     ]
     ignored = {
         'S1': set([0, 1, 4, 5, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26]),
-        'L1': set([5, 11, 12, 13, 14, 15, 16, 17, 18, 19]),
+        'L1': set([5, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21]),
         'S2': set([0, 1, 4, 6, 9, 10, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26]),
         'L2': set([6]),
     }
@@ -1488,7 +1495,7 @@ def plot_spearman_MFPP(configuration, top=None, agile=True):
         handles=[
             mpatches.Patch(
                 color=color_wheel[i].RGBn, 
-                label=format_name(configuration_names[i])
+                label=labels[i] if labels else format_name(configuration_names[i])
             )
             for i in range(len(configuration_names))
         ], 
@@ -1509,10 +1516,30 @@ def plot_configuration_breakdown(name, across_coordinate=False, **kwargs):
             **kwargs,
         )
     else:
+        def format_total(x):
+            if x < 1e3:
+                return format(x, '.3g')
+            else:
+                x = int(x)
+                n = 10 ** (len(str(x)) - 3)
+                value = int(round(x / n) * n)
+                return value
+        
         return bst.plots.plot_unit_groups(
             unit_groups,
             colors=[area_colors[i.name].RGBn for i in unit_groups],
             hatches=[area_hatches[i.name] for i in unit_groups],
+            format_total=format_total,
             fraction=True,
             **kwargs,
         )
+    
+    # DO NOT DELETE: For removing ylable and yticklabels and combine plots
+    # import biorefineries.lipidcane2g as lc
+    # import matplotlib.pyplot as plt
+    # lc.plot_configuration_breakdown('L2')
+    # ax, *_ = plt.gcf().get_axes()
+    # yticks = ax.get_yticks()
+    # plt.yticks(yticks, ['']*len(yticks))
+    # plt.ylabel('')
+    # plt.show()

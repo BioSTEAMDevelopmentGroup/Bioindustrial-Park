@@ -219,9 +219,7 @@ def create_chemicals():
     append_new_single_phase_chemical('Cellobiose', formula="C12H22O11",
                                      Hf=-480900*cal2joule)
     append_new_single_phase_chemical('CSL', 
-                                     MW=(chems.Protein.MW / 4 
-                                         + chems.Water.MW / 2  
-                                         + chems.LacticAcid.MW / 4),
+                                     formula='H2.8925O1.3275C1N0.0725S0.00175',
                                      Hf=(chems.Protein.Hf/4
                                          + chems.Water.Hf/2
                                          + chems.LacticAcid.Hf/4))

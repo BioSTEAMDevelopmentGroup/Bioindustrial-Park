@@ -30,6 +30,7 @@ from ..lipidcane import (
     create_lipidcane_to_biodiesel_and_conventional_ethanol_system,
 )
 import biorefineries as brf
+from biorefineries.lipidcane2g import units
 
 __all__ = (
     'create_lipidcane_to_biodiesel_and_ethanol_1g',
@@ -290,6 +291,8 @@ def create_lipidcane_to_biodiesel_and_ethanol_combined_1_and_2g_post_fermentatio
         udct=True,
         kind=2,
         insoluble_solids_loading=0.23,
+        SeedTrain=units.SeedTrain,
+        CoFermentation=units.CoFermentation,
         solids_loading=0.23, # 30 wt/vol % solids content in saccharification
     )
     DAP_storage = cf_dct['DAP_storage']

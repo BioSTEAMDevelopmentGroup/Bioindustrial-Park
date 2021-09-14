@@ -160,7 +160,12 @@ def plot_relative_sorghum_lipid_content_and_cane_lipid_content_contours(load=Fal
         MetricBar(MFPP.name, format_units(MFPP.units), colormaps[0], tickmarks(data[:, :, 0], 5, 5), 15, 1),
         MetricBar(TCI.name, format_units(MFPP.units), colormaps[1], tickmarks(data[:, :, 1], 5, 5), 10)
     ]
-    Z = np.array([f"Configuration {'I'*(configuration_index + 1)}*"])
+    if configuration_index == 0:
+        Z = np.array([f"AGILE-CONVENTIONAL"])
+    elif configuration_index == 1:
+        Z = np.array([f"AGILE-CELLULOSIC"])
+    else:
+        raise ValueError('configuration index must be either 0 or 1')
     fig, axes, CSs, CB = plot_contour_2d(
         100.*X, 100.*Y, Z, data[:, :, :, np.newaxis], xlabel, ylabel, xticks, yticks, metric_bars, 
         fillblack=False, styleaxiskw=dict(xtick0=True), label=True,
@@ -200,7 +205,7 @@ def plot_extraction_efficiency_and_lipid_content_contours(load=False, metric_ind
     fig, axes, CSs, CB = plot_contour_single_metric(
         100.*X, 100.*Y, data, xlabel, ylabels, xticks, yticks, metric_bar, 
         fillblack=False, styleaxiskw=dict(xtick0=False), label=True,
-        titles=['Configuration I', 'Configuration II'],
+        titles=['CONVENTIONAL', 'CELLULOSIC'],
     )
     M = len(configurations)
     N = len(agile)

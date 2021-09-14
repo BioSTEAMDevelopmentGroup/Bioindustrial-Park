@@ -354,7 +354,8 @@ class CoFermentation(bst.BatchBioreactor):
     Rxn('3 Xylose -> 5 LacticAcid',      'Xylose',    0.0300, chemicals),
     Rxn('3 Arabinose -> 5 LacticAcid',   'Arabinose', 0.0300, chemicals),
     Rxn('Galactose -> 2 LacticAcid',     'Galactose', 0.0300, chemicals),
-    Rxn('Mannose -> 2 LacticAcid',       'Mannose',   0.0300, chemicals),])
+    Rxn('Mannose -> 2 LacticAcid',       'Mannose',   0.0300, chemicals),
+        ])
         self.cofermentation = ParallelRxn([
     #   Reaction definition                                          Reactant    Conversion
     Rxn('Glucose -> 2 Ethanol + 2 CO2',                             'Glucose',   0.9500, chemicals),
@@ -393,7 +394,6 @@ class CoFermentation(bst.BatchBioreactor):
         vent.T = effluent.T = self.T
         vent.phase = 'g'
         effluent.mix_from(feeds, energy_balance=False)
-        self.loss(effluent)
         self.cofermentation(effluent)
         self.CSL_to_constituents(effluent)
         if self.lipid_reaction: self.lipid_reaction(effluent)
