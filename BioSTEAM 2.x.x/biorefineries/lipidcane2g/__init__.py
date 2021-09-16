@@ -626,6 +626,10 @@ def load(name, cache={}, reduce_chemicals=True, enhanced_cellulosic_performance=
     def set_pure_glycerol_price(price):
         pure_glycerine.price = price
     
+    @default(72)
+    def set_saccharification_time(tau):
+        if abs(number) == 2: saccharification.tau = tau
+    
     cellulase_base_cost = 0.212
     @uniform(0.75 * cellulase_base_cost, 1.25 * cellulase_base_cost, units='USD/kg', element='cellulase')
     def set_cellulase_price(price):
@@ -679,7 +683,7 @@ def load(name, cache={}, reduce_chemicals=True, enhanced_cellulosic_performance=
             if X_excess > 0.: breakpoint()
             fermentor.cofermentation.X[0] = X3
     
-    @uniform(70, 95, units='%', element='Cofermenation')
+    @uniform(50, 95, units='%', element='Cofermenation')
     def set_xylose_to_ethanol_yield(xylose_to_ethanol_yield):
         if abs(number) == 2:
             # fermentor.cofermentation[6].X = 0.004 # Baseline
