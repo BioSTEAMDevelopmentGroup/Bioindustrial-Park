@@ -512,6 +512,8 @@ def create_sugarcane_to_ethanol_combined_1_and_2g(ins, outs):
         kind=2,
         insoluble_solids_loading=0.15,
         solids_loading=0.23,
+        SeedTrain=units.SeedTrain,
+        CoFermentation=units.CoFermentation,
     )
     pressurefilter = cf_dct['S303'] # Pressure filter
     sink = pressurefilter.outs[1].sink

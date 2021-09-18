@@ -173,8 +173,8 @@ def create_juicing_system(ins, outs, pellet_bagasse=None):
         mockup=True,
     )
     u = f.unit
-    u.U201.isplit['Lipid'] = 0.01 # Crushing mill
-    u.S201.isplit['Lipid'] = 0.88 # Fiber screener #1
+    u.U201.isplit['Lipid'] = 0.90 # Crushing mill
+    u.S201.isplit['Lipid'] = 1.0 # Fiber screener #1
     u.C201.isplit['Lipid'] = 0.99 # Clarifier
     u.S202.isplit['Lipid'] = 0.999  # Fiber screener #2
     
