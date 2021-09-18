@@ -30,8 +30,8 @@ from biosteam import Metric
 from warnings import filterwarnings
 import os
 
-__all__ = ('plot_extraction_efficiency_and_lipid_content_contours',
-           'plot_relative_sorghum_lipid_content_and_cane_lipid_content_contours',
+__all__ = ('plot_extraction_efficiency_and_oil_content_contours',
+           'plot_relative_sorghum_oil_content_and_cane_oil_content_contours',
            'plot_ethanol_and_biodiesel_price_contours')
 
 filterwarnings('ignore', category=bst.utils.DesignWarning)
@@ -70,8 +70,8 @@ def plot_ethanol_and_biodiesel_price_contours(N=30, benefit=False, cache={},
                                               enhanced_cellulosic_performance=False):
     ethanol_price = np.linspace(1., 3., N)
     biodiesel_price = np.linspace(2, 6, N)
-    lipid_content = [5, 10, 15]
-    N_rows = len(lipid_content)
+    oil_content = [5, 10, 15]
+    N_rows = len(oil_content)
     configuration = ['L1', 'L1*', 'L2', 'L2*']
     N_cols = len(configuration)
     if (N, benefit, enhanced_cellulosic_performance) in cache:
@@ -81,8 +81,8 @@ def plot_ethanol_and_biodiesel_price_contours(N=30, benefit=False, cache={},
         for i in range(N_rows):
             for j in range(N_cols):
                 oc.load(configuration[j], enhanced_cellulosic_performance=enhanced_cellulosic_performance)
-                oc.set_cane_lipid_content(lipid_content[i])
-                oc.set_relative_sorghum_lipid_content(0)
+                oc.set_cane_oil_content(oil_content[i])
+                oc.set_relative_sorghum_oil_content(0)
                 oc.sys.simulate()
                 X, Y = np.meshgrid(ethanol_price, biodiesel_price)
                 if benefit:
@@ -124,28 +124,28 @@ def plot_ethanol_and_biodiesel_price_contours(N=30, benefit=False, cache={},
 
     plt.show()
     
-def relative_sorghum_lipid_content_and_cane_lipid_content_data(load, relative):
+def relative_sorghum_oil_content_and_cane_oil_content_data(load, relative):
     # Generate contour data
     y = np.linspace(0.05, 0.15, 10)
     x = np.linspace(-0.03, 0., 10) if relative else np.linspace(0.02, 0.15, 10)
     X, Y = np.meshgrid(x, y)
     folder = os.path.dirname(__file__)
-    file = 'lipid_content_analysis.npy'
+    file = 'oil_content_analysis.npy'
     if relative: file = 'relative_' + file
     file = os.path.join(folder, file)
     configurations = [1, 2]
     if load:
         data = np.load(file)
     else:
-        data = oc.evaluate_configurations_across_sorghum_and_cane_lipid_content(
+        data = oc.evaluate_configurations_across_sorghum_and_cane_oil_content(
             X, Y, configurations, relative,
         )
     np.save(file, data)
     return X, Y, data
     
-def plot_relative_sorghum_lipid_content_and_cane_lipid_content_contours(load=False, configuration_index=0, relative=False):
+def plot_relative_sorghum_oil_content_and_cane_oil_content_contours(load=False, configuration_index=0, relative=False):
     # Generate contour data
-    X, Y, data = relative_sorghum_lipid_content_and_cane_lipid_content_data(load, relative)
+    X, Y, data = relative_sorghum_oil_content_and_cane_oil_content_data(load, relative)
     data = data[:, :, configuration_index, [0, 5]]
     
     # Plot contours
@@ -172,21 +172,21 @@ def plot_relative_sorghum_lipid_content_and_cane_lipid_content_contours(load=Fal
     )
     plt.show()
     
-def plot_extraction_efficiency_and_lipid_content_contours(load=False, metric_index=0):
+def plot_extraction_efficiency_and_oil_content_contours(load=False, metric_index=0):
     # Generate contour data
     x = np.linspace(0.4, 1., 10)
     y = np.linspace(0.05, 0.15, 10)
     X, Y = np.meshgrid(x, y)
     metric = bst.metric
     folder = os.path.dirname(__file__)
-    file = 'lipid_extraction_analysis.npy'
+    file = 'oil_extraction_analysis.npy'
     file = os.path.join(folder, file)
     configurations = [1, 2]
     agile = [False, True]
     if load:
         data = np.load(file)
     else:
-        data = oc.evaluate_configurations_across_extraction_efficiency_and_lipid_content(
+        data = oc.evaluate_configurations_across_extraction_efficiency_and_oil_content(
             X, Y, 0.70, agile, configurations, 
         )
     np.save(file, data)

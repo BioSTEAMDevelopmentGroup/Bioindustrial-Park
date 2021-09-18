@@ -6,7 +6,7 @@
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
 # for license details.
 """
-The complete lipid-cane biorefinery system is created here.
+The complete oilcane biorefinery system is created here.
 
 """
 import flexsolve as flx
@@ -24,62 +24,53 @@ from ..sugarcane import (
 from ..lipidcane import (
     create_feedstock_handling_system,
     create_juicing_system,
-    create_lipid_pretreatment_system,
-    create_juicing_and_lipid_extraction_system,
+    create_lipid_pretreatment_system as create_oil_pretreatment_system,
+    create_juicing_and_lipid_extraction_system as create_juicing_and_oil_extraction_system,
     create_transesterification_and_biodiesel_separation_system,
-    create_lipidcane_to_biodiesel_and_conventional_ethanol_system,
+    create_lipidcane_to_biodiesel_and_conventional_ethanol_system as create_oilcane_to_biodiesel_and_conventional_ethanol_system,
 )
 import biorefineries as brf
-from biorefineries.lipidcane2g import units
+from biorefineries.oilcane import units
 
 __all__ = (
-    'create_lipidcane_to_biodiesel_and_ethanol_1g',
-    'create_lipidcane_to_biodiesel_and_ethanol_combined_1_and_2g_post_fermentation_oil_separation',
+    'create_oilcane_to_biodiesel_and_ethanol_1g',
+    'create_oilcane_to_biodiesel_and_ethanol_combined_1_and_2g_post_fermentation_oil_separation',
     'create_sugarcane_to_ethanol_combined_1_and_2g',
 )
 
-lipidcane_dct = create_juicing_and_lipid_extraction_system.ins[0].copy()
-TAG = lipidcane_dct['TAG']
-lipidcane_dct['TAG'] = 0.93 * TAG
-lipidcane_dct['PL'] = 0.05 * TAG
-lipidcane_dct['FFA'] = 0.02 * TAG
+oilcane_dct = create_juicing_and_oil_extraction_system.ins[0].copy()
+oilcane_dct['ID'] = 'oilcane'
+TAG = oilcane_dct['TAG']
+oilcane_dct['TAG'] = 0.80 * TAG
+oilcane_dct['PL'] = 0.10 * TAG
+oilcane_dct['FFA'] = 0.10 * TAG
 
-# @SystemFactory(
-#     ID='saccharified_slurry_lipid_separation_sys',
-#     ins=[dict(ID='saccharified_slurry')],
-#     outs=[dict(ID='backend_lipid'),
-#           dict(ID='lipid_free_slurry')],
-# )
-# def create_saccharified_slurry_lipid_separation_system(ins, outs):
-#     # HX701 = bst.HXutility('HX701', ins, T=330)
-#     C701 = bst.LiquidsSplitCentrifuge('C701', ins, outs,
-#                                       split={'Lipid': 0.80})
 
 @SystemFactory(
-    ID='lipid_expression_sys',
+    ID='oil_expression_sys',
     ins=[dict(ID='bagasse_pellets')],
-    outs=[dict(ID='lipid'),
+    outs=[dict(ID='oil'),
           dict(ID='pressed_bagasse')], 
 )
-def create_lipid_expression_system(ins, outs):
+def create_oil_expression_system(ins, outs):
     bagasse_pellets, = ins
-    lipid, pressed_bagasse = outs
-    U801 = bst.ScrewPress('U801', bagasse_pellets, (lipid, pressed_bagasse),
+    oil, pressed_bagasse = outs
+    U801 = bst.ScrewPress('U801', bagasse_pellets, (oil, pressed_bagasse),
                           split={'Lipid': 0.55}, moisture_content=0.14)
     U801.cost_items = U801.cost_items.copy() 
     U801.cost_items['Screw press'] = cost_item = U801.cost_items['Screw press'].copy()
     cost_item.ub = 24000
-    U801.tag = "lipid extraction efficiency"
+    U801.tag = "oil extraction efficiency"
 
 @SystemFactory(
-    ID='post_fermentation_lipid_separation_sys',
+    ID='post_fermentation_oil_separation_sys',
     ins=[dict(ID='solids_free_stillage')],
-    outs=[dict(ID='lipid'),
+    outs=[dict(ID='oil'),
           dict(ID='wastewater'),
           dict(ID='evaporator_condensate')], 
 )
-def create_post_fermentation_lipid_separation_system(ins, outs):
-    lipid, wastewater, evaporator_condensate = outs
+def create_post_fermentation_oil_separation_system(ins, outs):
+    oil, wastewater, evaporator_condensate = outs
     V605 = bst.MixTank('V605', ins)
     P606 = bst.Pump('P606', V605-0)
     Ev607 = bst.MultiEffectEvaporator('Ev607',
@@ -89,26 +80,26 @@ def create_post_fermentation_lipid_separation_system(ins, outs):
         V=0.90
     )
     P607 = bst.Pump('P607', Ev607-0, P=101325.)
-    C603_2 = bst.LiquidsSplitCentrifuge('C603_2', P607-0, (lipid, wastewater), 
+    C603_2 = bst.LiquidsSplitCentrifuge('C603_2', P607-0, (oil, wastewater), 
                                         split={'Lipid': 0.99,
                                                'Water': 0.0001})
     
 
 @SystemFactory(
-    ID='lipidcane_sys',
-    ins=[lipidcane_dct],
-    outs=[*create_lipidcane_to_biodiesel_and_conventional_ethanol_system.outs[:3],
+    ID='oilcane_sys',
+    ins=[oilcane_dct],
+    outs=[*create_oilcane_to_biodiesel_and_conventional_ethanol_system.outs[:3],
           dict(ID='vinasse')], 
 )
-def create_lipidcane_to_biodiesel_and_ethanol_1g(
+def create_oilcane_to_biodiesel_and_ethanol_1g(
         ins, outs,
         evaporator_and_beer_column_heat_integration=True,
     ):
-    lipidcane, = ins
+    oilcane, = ins
     ethanol, biodiesel, crude_glycerol, vinasse = outs
     
     feedstock_handling_sys = create_feedstock_handling_system(
-        ins=lipidcane,
+        ins=oilcane,
         outs='',
         mockup=True,
         area=100
@@ -128,17 +119,17 @@ def create_lipidcane_to_biodiesel_and_ethanol_1g(
     bagasse_pelleting_sys = create_bagasse_pelleting_system(None, bagasse, area=400, mockup=True)
     pelleted_bagasse, = bagasse_pelleting_sys.outs
     
-    lipid_expression_sys = create_lipid_expression_system(
+    oil_expression_sys = create_oil_expression_system(
         ins=pelleted_bagasse,
         mockup=True,
         area=400
     )
-    bagasse_lipid, pressed_bagasse = lipid_expression_sys.outs
-    bagasse_lipid.ID = ''
-    PX = bst.Pump(400, bagasse_lipid)
+    bagasse_oil, pressed_bagasse = oil_expression_sys.outs
+    bagasse_oil.ID = ''
+    PX = bst.Pump(400, bagasse_oil)
     vibrating_screen = jdct['S201'].isplit['Lipid'] = 1.
     crushing_mill = jdct['U201']
-    crushing_mill.tag = "bagasse lipid retention"
+    crushing_mill.tag = "bagasse oil retention"
     crushing_mill.isplit['Lipid'] = 0.90
     
     ### Ethanol section ###
@@ -151,29 +142,29 @@ def create_lipidcane_to_biodiesel_and_ethanol_1g(
         udct=True,
     )
     ethanol, stillage, stripper_bottoms_product, evaporator_condensate_a = ethanol_production_sys.outs
-    post_fermentation_lipid_separation_sys = create_post_fermentation_lipid_separation_system(
+    post_fermentation_oil_separation_sys = create_post_fermentation_oil_separation_system(
         ins=stillage,
         outs=['', vinasse, ''],
         mockup=True,
         area=400,
     )
-    lipid, wastewater, evaporator_condensate_b = post_fermentation_lipid_separation_sys.outs
-    MX = bst.Mixer(400, [PX-0, lipid])
-    lipid_pretreatment_sys, lipid_pretreatment_dct = create_lipid_pretreatment_system(
+    oil, wastewater, evaporator_condensate_b = post_fermentation_oil_separation_sys.outs
+    MX = bst.Mixer(400, [PX-0, oil])
+    oil_pretreatment_sys, oil_pretreatment_dct = create_oil_pretreatment_system(
         ins=MX-0,
         mockup=True,
-        outs=['', 'polar_lipids', 'wastewater'],
+        outs=['', 'polar_oils', 'wastewater'],
         area=600,
         udct=True,
     )
-    lipid, polar_lipids, wastewater = lipid_pretreatment_sys.outs
+    oil, polar_oils, wastewater = oil_pretreatment_sys.outs
     
     
     ### Biodiesel section ###
     
     # Fresh degummed oil
     transesterification_and_biodiesel_separation_sys, tbdct = create_transesterification_and_biodiesel_separation_system(
-        ins=lipid, 
+        ins=oil, 
         outs=[biodiesel, crude_glycerol],
         mockup=True,
         area=600,
@@ -186,7 +177,7 @@ def create_lipidcane_to_biodiesel_and_ethanol_1g(
     u = f.unit
     
     MX2 = bst.Mixer(700,
-        [polar_lipids, pressed_bagasse]
+        [polar_oils, pressed_bagasse]
     )
     
     # Burn bagasse from conveyor belt
@@ -221,22 +212,22 @@ def create_lipidcane_to_biodiesel_and_ethanol_1g(
                                  process_water_streams)
     
     HXN = bst.HeatExchangerNetwork(900, 
-        ignored=lambda: [u.E301, u.D601.boiler, u.D602.boiler, u.H601, u.H602, u.H603, u.H604, lipid_pretreatment_dct['F3']],
+        ignored=lambda: [u.E301, u.D601.boiler, u.D602.boiler, u.H601, u.H602, u.H603, u.H604, oil_pretreatment_dct['F3']],
         Qmin=1e5,
     )
     HXN.acceptable_energy_balance_error = 0.01
 
 @SystemFactory(
-    ID='lipidcane_sys',
-    ins=create_lipidcane_to_biodiesel_and_ethanol_1g.ins,
-    outs=create_lipidcane_to_biodiesel_and_ethanol_1g.outs[:-1],
+    ID='oilcane_sys',
+    ins=create_oilcane_to_biodiesel_and_ethanol_1g.ins,
+    outs=create_oilcane_to_biodiesel_and_ethanol_1g.outs[:-1],
 )
-def create_lipidcane_to_biodiesel_and_ethanol_combined_1_and_2g_post_fermentation_oil_separation(ins, outs, front_end_oil_separation=False):
-    lipidcane, = ins
+def create_oilcane_to_biodiesel_and_ethanol_combined_1_and_2g_post_fermentation_oil_separation(ins, outs, front_end_oil_separation=False):
+    oilcane, = ins
     ethanol, biodiesel, crude_glycerol = outs
     
     feedstock_handling_sys = create_feedstock_handling_system(
-        ins=lipidcane,
+        ins=oilcane,
         outs='',
         mockup=True,
         area=100
@@ -252,7 +243,7 @@ def create_lipidcane_to_biodiesel_and_ethanol_combined_1_and_2g_post_fermentatio
     
     vibrating_screen = udct['S201'].isplit['Lipid'] = 1.
     crushing_mill = udct['U201']
-    crushing_mill.tag = "bagasse lipid retention"
+    crushing_mill.tag = "bagasse oil retention"
     crushing_mill.isplit['Lipid'] = 0.90
     conveying_belt = bagasse.source
     conveying_belt.cellulose_rxn = tmo.Reaction('Cellulose -> Glucan', 'Cellulose', 1.0, basis='wt')
@@ -300,12 +291,12 @@ def create_lipidcane_to_biodiesel_and_ethanol_combined_1_and_2g_post_fermentatio
     seedtrain = cf_dct['R302'] # Seed train
     cofermentation = cf_dct['R303'] # Cofermentation
     pressurefilter = cf_dct['S303'] # Pressure filter
-    pressurefilter.tag = "lipid extraction efficiency"
+    pressurefilter.tag = "oil extraction efficiency"
     pressurefilter.isplit['Lipid'] = 1. - 0.7
-    lipid = pressurefilter.outs[1]
-    sink = lipid.sink
+    oil = pressurefilter.outs[1]
+    sink = oil.sink
     sink.ins[0] = None
-    MX = bst.Mixer(400, [lipid, screened_juice])
+    MX = bst.Mixer(400, [oil, screened_juice])
     EvX = bst.MultiEffectEvaporator(400, ins=MX-0,
                                     P=(101325, 69682, 47057, 30953, 19781),
                                     V_definition='First-effect',
@@ -383,27 +374,27 @@ def create_lipidcane_to_biodiesel_and_ethanol_combined_1_and_2g_post_fermentatio
                                 P=3.9*101325,
                                 units='kg/hr')
     ethanol_purification_sys.outs
-    post_fermentation_lipid_separation_sys, pfls_dct = create_post_fermentation_lipid_separation_system(
+    post_fermentation_oil_separation_sys, pfls_dct = create_post_fermentation_oil_separation_system(
         ins=stillage,
         mockup=True,
         area=600,
         udct=True,
     )
-    backend_lipid, wastewater, evaporator_condensate = post_fermentation_lipid_separation_sys.outs
-    backend_lipid.ID = 'backend_lipid'
+    backend_oil, wastewater, evaporator_condensate = post_fermentation_oil_separation_sys.outs
+    backend_oil.ID = 'backend_oil'
     MX_process_water = bst.Mixer(900, (evaporator_condensate, stripper_process_water),
                                  'recycle_process_water')
-    lipid_pretreatment_sys, lipid_pretreatment_dct = create_lipid_pretreatment_system(
-        ins=backend_lipid,
-        outs=['', 'polar_lipids', ''],
+    oil_pretreatment_sys, oil_pretreatment_dct = create_oil_pretreatment_system(
+        ins=backend_oil,
+        outs=['', 'polar_oils', ''],
         mockup=True,
         area=800,
         udct=True
     )
-    lipid, polar_lipids, wastewater_small = lipid_pretreatment_sys.outs
+    oil, polar_oils, wastewater_small = oil_pretreatment_sys.outs
     
     transesterification_and_biodiesel_separation_sys = create_transesterification_and_biodiesel_separation_system(
-        ins=lipid, 
+        ins=oil, 
         outs=[biodiesel, crude_glycerol],
         mockup=True,
         area=800,
@@ -419,7 +410,7 @@ def create_lipidcane_to_biodiesel_and_ethanol_combined_1_and_2g_post_fermentatio
     )
     s = f.stream
     u = f.unit
-    M501 = bst.Mixer(700, (wastewater_treatment_sys-1, lignin, polar_lipids, f.stream.filter_cake))
+    M501 = bst.Mixer(700, (wastewater_treatment_sys-1, lignin, polar_oils, f.stream.filter_cake))
     brf.cornstover.create_facilities(
         solids_to_boiler=M501-0,
         gas_to_boiler=wastewater_treatment_sys-0,
@@ -442,7 +433,7 @@ def create_lipidcane_to_biodiesel_and_ethanol_combined_1_and_2g_post_fermentatio
     Ev607 = pfls_dct['Ev607']
     D303 = ep_dct['D303']
     HXN = bst.HeatExchangerNetwork(1000,
-        ignored=lambda: [u.D801.boiler, u.D802.boiler, u.H803, u.H802, u.H801, u.H804, lipid_pretreatment_dct['F3']],
+        ignored=lambda: [u.D801.boiler, u.D802.boiler, u.H803, u.H802, u.H801, u.H804, oil_pretreatment_dct['F3']],
         Qmin=1e3,
     )
     HXN.acceptable_energy_balance_error = 0.01

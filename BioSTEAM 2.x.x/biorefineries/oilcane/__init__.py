@@ -1044,6 +1044,7 @@ def evaluate_MFPP_benefit_across_ethanol_and_biodiesel_prices(ethanol_price, bio
 def spearman_file(name):
     number, agile = parse(name)
     folder = os.path.dirname(__file__)
+    folder = os.path.join(folder, 'results')
     filename = f'oilcane_spearman_{number}'
     if agile: filename += '_agile'
     filename += '.xlsx'
@@ -1052,6 +1053,7 @@ def spearman_file(name):
 def monte_carlo_file(name, across_oil_content=False):
     number, agile = parse(name)
     folder = os.path.dirname(__file__)
+    folder = os.path.join(folder, 'results')
     filename = f'oilcane_monte_carlo_{number}'
     if agile: filename += '_agile'
     if across_oil_content: filename += '_across_oil_content'
@@ -1060,6 +1062,7 @@ def monte_carlo_file(name, across_oil_content=False):
 
 def autoload_file_name(name):
     folder = os.path.dirname(__file__)
+    folder = os.path.join(folder, 'results')
     filename = name.replace('*', '_agile')
     return os.path.join(folder, filename)
 

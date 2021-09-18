@@ -10,7 +10,7 @@ import flexsolve as flx
 from scipy.optimize import minimize_scalar
 import numpy as np
 from thermosteam.exceptions import InfeasibleRegion
-from biorefineries.lipidcane import set_oil_fraction
+from biorefineries.lipidcane import set_lipid_fraction as set_oil_fraction
 import flexsolve as flx
 import thermosteam as tmo
 import biosteam as bst

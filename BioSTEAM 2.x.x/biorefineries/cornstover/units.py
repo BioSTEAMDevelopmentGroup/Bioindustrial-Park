@@ -362,12 +362,12 @@ class CoFermentation(bst.BatchBioreactor):
         self.CSL_to_constituents.basis = 'mol'
         
         if all([i in self.chemicals for i in ('FFA', 'DAG', 'TAG', 'Glycerol')]):
-            self.lipid_reaction = ParallelRxn([
+            self.oil_reaction = self.lipid_reaction = ParallelRxn([
                 Rxn('TAG + 3Water -> 3FFA + Glycerol', 'TAG', 0.23, chemicals),
                 Rxn('TAG + Water -> FFA + DAG', 'TAG', 0.02, chemicals)
             ])
         else:
-            self.lipid_reaction = None
+            self.oil_reaction = self.lipid_reaction = None
         
     def _run(self):
         feeds = self.ins
