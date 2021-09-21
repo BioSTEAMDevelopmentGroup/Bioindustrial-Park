@@ -144,20 +144,21 @@ def create_oilcane_to_biodiesel_and_ethanol_1g(
     ethanol, stillage, stripper_bottoms_product, evaporator_condensate_a = ethanol_production_sys.outs
     post_fermentation_oil_separation_sys = create_post_fermentation_oil_separation_system(
         ins=stillage,
-        outs=['', vinasse, ''],
+        outs=['', '', ''],
         mockup=True,
         area=400,
     )
-    oil, wastewater, evaporator_condensate_b = post_fermentation_oil_separation_sys.outs
+    oil, thick_vinasse, evaporator_condensate_b = post_fermentation_oil_separation_sys.outs
     MX = bst.Mixer(400, [PX-0, oil])
     oil_pretreatment_sys, oil_pretreatment_dct = create_oil_pretreatment_system(
         ins=MX-0,
         mockup=True,
-        outs=['', 'polar_oils', 'wastewater'],
+        outs=['', 'polar_lipids', ''],
         area=600,
         udct=True,
     )
-    oil, polar_oils, wastewater = oil_pretreatment_sys.outs
+    MX = bst.Mixer(400, [thick_vinasse, evaporator_condensate_a], vinasse)
+    oil, polar_lipids, wastewater = oil_pretreatment_sys.outs
     
     
     ### Biodiesel section ###
@@ -165,11 +166,13 @@ def create_oilcane_to_biodiesel_and_ethanol_1g(
     # Fresh degummed oil
     transesterification_and_biodiesel_separation_sys, tbdct = create_transesterification_and_biodiesel_separation_system(
         ins=oil, 
-        outs=[biodiesel, crude_glycerol],
+        outs=[biodiesel, crude_glycerol, ''],
         mockup=True,
         area=600,
         udct=True,
     )
+
+    MX = bst.Mixer(600, [transesterification_and_biodiesel_separation_sys-2, wastewater], 'wastewater')
 
     ### Facilities ###
     
@@ -177,7 +180,7 @@ def create_oilcane_to_biodiesel_and_ethanol_1g(
     u = f.unit
     
     MX2 = bst.Mixer(700,
-        [polar_oils, pressed_bagasse]
+        [polar_lipids, pressed_bagasse]
     )
     
     # Burn bagasse from conveyor belt
@@ -199,9 +202,9 @@ def create_oilcane_to_biodiesel_and_ethanol_1g(
                              s.stripping_water,
                              *makeup_water_streams)
     
-    MX = bst.Mixer(800, [evaporator_condensate_a, evaporator_condensate_b])
-    
     makeup_water = bst.Stream('makeup_water', price=0.000254)
+    
+    MX = bst.Mixer(800, [evaporator_condensate_b, stripper_bottoms_product], 'recycle_process_water')
     
     CWP = bst.ChilledWaterPackage(800)
     PWC = bst.ProcessWaterCenter(800,
@@ -386,31 +389,32 @@ def create_oilcane_to_biodiesel_and_ethanol_combined_1_and_2g_post_fermentation_
                                  'recycle_process_water')
     oil_pretreatment_sys, oil_pretreatment_dct = create_oil_pretreatment_system(
         ins=backend_oil,
-        outs=['', 'polar_oils', ''],
+        outs=['', 'polar_lipids', ''],
         mockup=True,
         area=800,
         udct=True
     )
-    oil, polar_oils, wastewater_small = oil_pretreatment_sys.outs
+    oil, polar_lipids, wastewater_small = oil_pretreatment_sys.outs
     
     transesterification_and_biodiesel_separation_sys = create_transesterification_and_biodiesel_separation_system(
         ins=oil, 
-        outs=[biodiesel, crude_glycerol],
+        outs=[biodiesel, crude_glycerol, ''],
         mockup=True,
         area=800,
     )
-    
     wastewater_treatment_sys = bst.create_wastewater_treatment_system(
         ins=[wastewater,
              fiber_fines,
              pretreatment_wastewater,
-             wastewater_small],
+             wastewater_small,
+             transesterification_and_biodiesel_separation_sys-2,
+             EvX.outs[1]],
         mockup=True,
         area=500,
     )
     s = f.stream
     u = f.unit
-    M501 = bst.Mixer(700, (wastewater_treatment_sys-1, lignin, polar_oils, f.stream.filter_cake))
+    M501 = bst.Mixer(700, (wastewater_treatment_sys-1, lignin, polar_lipids, f.stream.filter_cake))
     brf.cornstover.create_facilities(
         solids_to_boiler=M501-0,
         gas_to_boiler=wastewater_treatment_sys-0,
@@ -422,8 +426,7 @@ def create_oilcane_to_biodiesel_and_ethanol_combined_1_and_2g_post_fermentation_
                                s.caustic, 
                                s.warm_process_water,
                                s.pretreatment_steam,
-                               s.saccharification_water,
-                               EvX.outs[1]),
+                               s.saccharification_water),
         feedstock=bagasse,
         RO_water=wastewater_treatment_sys-2,
         recycle_process_water=MX_process_water-0,
@@ -561,7 +564,8 @@ def create_sugarcane_to_ethanol_combined_1_and_2g(ins, outs):
     wastewater_treatment_sys = bst.create_wastewater_treatment_system(
         ins=[stillage,
              fiber_fines,
-             pretreatment_wastewater],
+             pretreatment_wastewater,
+             EvX.outs[1]],
         mockup=True,
         area=500,
     )
@@ -577,8 +581,7 @@ def create_sugarcane_to_ethanol_combined_1_and_2g(ins, outs):
                                s.caustic, 
                                s.warm_process_water,
                                s.pretreatment_steam,
-                               s.saccharification_water,
-                               EvX.outs[1]),
+                               s.saccharification_water),
         feedstock=bagasse,
         RO_water=wastewater_treatment_sys-2,
         recycle_process_water=stripper_process_water,

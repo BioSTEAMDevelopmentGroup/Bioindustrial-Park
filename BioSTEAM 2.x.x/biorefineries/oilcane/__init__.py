@@ -105,7 +105,7 @@ comparison_names = (
     # 'I - ∅', 
     'O1 - S1', 
     'O2 - S2', 
-    'O2 - O1', 
+    'O1 - O2', 
     'O1* - O1', 
     'O2* - O2',  
 )
@@ -123,7 +123,7 @@ across_oil_content_agile_names = (
 )
 
 across_oil_content_comparison_names = (
-    'O1 - S1', 'O2 - S2', 'O2 - O1', 
+    'O1 - S1', 'O2 - S2', 'O1 - O2', 
 )
 
 across_oil_content_agile_direct_comparison_names = (
@@ -323,8 +323,16 @@ _derivative_disabled = True
 def load(name, cache={}, reduce_chemicals=True, enhanced_cellulosic_performance=False):
     dct = globals()
     number, agile = dct['configuration'] = parse(name)
-    if (number, agile) in cache:
-        dct.update(cache[number, agile])
+    key = (number, agile, enhanced_cellulosic_performance)
+    if key in cache:
+        dct.update(cache[key])
+        if abs(number) == 2 and enhanced_cellulosic_performance:
+            set_sorghum_glucose_yield.setter(95)
+            set_sorghum_xylose_yield.setter(95)
+            set_cane_glucose_yield.setter(95)
+            set_cane_xylose_yield.setter(95)
+            set_glucose_to_ethanol_yield.setter(95)
+            set_xylose_to_ethanol_yield.setter(95)
         return
     global oilcane_sys, sys, tea, specs, flowsheet, _system_loaded
     global oil_extraction_specification, model, unit_groups
@@ -898,8 +906,8 @@ def load(name, cache={}, reduce_chemicals=True, enhanced_cellulosic_performance=
             set_sorghum_xylose_yield.setter(86)
             set_cane_glucose_yield.setter(85)
             set_cane_xylose_yield.setter(65)
-            set_glucose_to_ethanol_yield.setter(90.8)
-            set_xylose_to_ethanol_yield.setter(73.7)
+            set_glucose_to_ethanol_yield.setter(91)
+            set_xylose_to_ethanol_yield.setter(50.)
     oil_extraction_specification.load_oil_retention(0.70)
     oil_extraction_specification.load_oil_content(0.05)
     set_bagasse_oil_extraction_efficiency.setter(oil_extraction_efficiency_hook(0.))
@@ -1288,7 +1296,7 @@ def monte_carlo_box_plot(data, positions, light_color, dark_color):
                                    'markeredgecolor': dark_color,
                                    'markersize':6})
 
-def monte_carlo_results():
+def monte_carlo_results(with_units=False):
     results = {}
     for name in configuration_names + comparison_names + other_comparison_names:
         try: 
@@ -1301,7 +1309,8 @@ def monte_carlo_results():
             index = metric.index
             data = df[index].values
             q05, q25, q50, q75, q95 = percentiles = np.percentile(data, [5,25,50,75,95], axis=0)
-            dct[index[1]] = subdct = {
+            if not with_units: key = index[1].split(' [')[0]
+            dct[key] = subdct = {
                 'mean': np.mean(data),
                 'std': np.std(data),
                 'q05': q05,
@@ -1314,10 +1323,10 @@ def monte_carlo_results():
 
 def plot_monte_carlo(derivative=False, absolute=True, comparison=True,
                      configuration_names=configuration_names, comparison_names=comparison_names,
-                     labels=None):
+                     labels=None, tickmarks=None):
     if derivative:
-        configuration_names = ['O1', 'O2', 'O1*', 'O2*']
-        comparison_names = ['O2 - O1', 'O2* - O2', 'O1* - O1']
+        configuration_names = ['O1', 'O2']
+        comparison_names = ['O1 - O2']
         MFPP, TCI, *production, electricity_production, natural_gas_consumption = derivative_metric_mockups
     else:
         MFPP, TCI, *production, electricity_production, natural_gas_consumption = metric_mockups
@@ -1360,6 +1369,8 @@ def plot_monte_carlo(derivative=False, absolute=True, comparison=True,
             r"$\Delta$" + format_units(r"EP/LC").replace('cdot', r'cdot \Delta') + f"\n[{format_units('kWhr/ton')}]",
             r"$\Delta$" + format_units(r"NGC/LC").replace('cdot', r'cdot \Delta') + f"\n[{format_units('cf/ton')}]"
         ]
+    elif comparison and not absolute:
+        ylabels = [r"$\Delta$" + i for i in ylabels]
     def get_data(metric, name):
         if isinstance(metric, bst.Variable):
             df = get_monte_carlo(name)
@@ -1384,7 +1395,13 @@ def plot_monte_carlo(derivative=False, absolute=True, comparison=True,
     data = np.zeros([N_rows, N_cols], dtype=object)
     data = np.array([[get_data(i, j) for j in columns] for i in rows])
     step_min = 1 if derivative else 30
-    tickmarks = [bst.plots.rounded_tickmarks_from_data(i, step_min=step_min, N_ticks=5, lb_max=0) for i in data]
+    if tickmarks is None: 
+        tickmarks = [
+            bst.plots.rounded_tickmarks_from_data(
+                i, step_min=step_min, N_ticks=5, lb_max=0, center=0
+            ) 
+            for i in data
+        ]
     color_wheel = CABBI_colors.wheel()
 
     x0 = len(configuration_names) - 0.5
@@ -1416,6 +1433,7 @@ def plot_monte_carlo(derivative=False, absolute=True, comparison=True,
             xticks = xticks,
             yticks = yticks,
             xticklabels= xtext, 
+            ytick0=False,
             ytickf=False,
         )
     
@@ -1447,45 +1465,52 @@ def plot_spearman_MFPP(configuration, top=None, agile=True, labels=None):
     capacity = format_units('ton/hr')
     titer = format_units('g/L')
     productivity = format_units('g/L/hr')
-    index = [
-         'Bagasse oil retention [40 $-$ 70 %]',
-         '$^a$Oil extraction efficiency [baseline + 0 $-$ 20 %]',
-        f'Plant capacity [330 $-$ 404 {capacity}]',
-        f'Ethanol price [1.02, 1.80, 2.87 {stream_price}]',
-        f'Biodiesel price relative to ethanol [0.31, 2.98, 4.11 {stream_price}]',
-        f'Natural gas price [3.71, 4.73, 6.18 {ng_price}]',
-        f'Electricity price [0.0583, 0.065, 0.069 {electricity_price}]',
-        f'Operating days [180 $-$ 210 {operating_days}]',
-         'IRR [10 $-$ 15 %]',
-        f'Crude glycerol price [91 $-$ 200 {USD_ton}]',
-        f'Pure glycerol price [501 $-$ 678 {USD_ton}]',
-         'Saccharification reaction time [54 $-$ 90 hr]',
-        f'Cellulase price [144 $-$ 240 {USD_ton}]',
-         'Cellulase loading [1.5 $-$ 2.5 wt. % cellulose]',
-         'Pretreatment reactor system base cost [14.9 $-$ 24.7 MMUSD]',
-         'Cane glucose yield [85 $-$ 97.5 %]',
-         'Sorghum glucose yield [85 $-$ 97.5 %]',
-         'Cane xylose yield [65 $-$ 97.5 %]',
-         'Sorghum xylose yield [65 $-$ 97.5 %]',
-         'Glucose to ethanol yield [90 $-$ 95 %]',
-         'Xylose to ethanol yield [70 $-$ 95 %]',
-        f'Titer [65 $-$ 130 {titer}]',
-        f'Productivity [1.0 $-$ 2.0 {productivity}]',
-         'Cane PL content [3.75 $-$ 6.25 %]',
-         'Sorghum PL content [3.75 $-$ 6.25 %]',
-         'Cane FFA content [7.5 $-$ 12.5 %]',
-         'Sorghum FFA content [7.5 $-$ 12.5 %]',
-         'Cane oil content [5 $-$ 15 dry wt. %]',
-         'Relative sorghum oil content [-3 $-$ 0 dry wt. %]',
-         'TAG to FFA conversion [17.25 $-$ 28.75 % theoretical]',
+    index, ignored_list = zip(*[
+         ('Bagasse oil retention [40 $-$ 70 %]', ['S2', 'S1', 'S2*', 'S1*']),
+         ('Oil extraction efficiency [baseline + 0 $-$ 20 %]', ['S2', 'S1', 'S2*', 'S1*']),
+        (f'Plant capacity [330 $-$ 404 {capacity}]', []),
+        (f'Ethanol price [1.02, 1.80, 2.87 {stream_price}]', []),
+        (f'Biodiesel price relative to ethanol [0.31, 2.98, 4.11 {stream_price}]', []),
+        (f'Natural gas price [3.71, 4.73, 6.18 {ng_price}]', ['S1', 'O1', 'S1*', 'O1*']),
+        (f'Electricity price [0.0583, 0.065, 0.069 {electricity_price}]', ['S2', 'O2', 'S2*', 'O2*']),
+        (f'Operating days [180 $-$ 210 {operating_days}]', []),
+         ('IRR [10 $-$ 15 %]', []),
+        (f'Crude glycerol price [91 $-$ 200 {USD_ton}]', ['S2', 'S1', 'S2*', 'S1*']),
+        (f'Pure glycerol price [501 $-$ 678 {USD_ton}]', ['S2', 'S1', 'S2*', 'S1*']),
+         ('Saccharification reaction time [54 $-$ 90 hr]', ['S1', 'O1', 'S1*', 'O1*']),
+        (f'Cellulase price [144 $-$ 240 {USD_ton}]', ['S1', 'O1', 'S1*', 'O1*']),
+         ('Cellulase loading [1.5 $-$ 2.5 wt. % cellulose]', ['S1', 'O1', 'S1*', 'O1*']),
+         ('Pretreatment reactor system base cost [14.9 $-$ 24.7 MMUSD]', ['S1', 'O1', 'S1*', 'O1*']),
+         ('Cane glucose yield [85 $-$ 97.5 %]', ['S1', 'O1', 'S1*', 'O1*']),
+         ('Sorghum glucose yield [85 $-$ 97.5 %]', ['S1', 'O1', 'S1*', 'O1*']),
+         ('Cane xylose yield [65 $-$ 97.5 %]', ['S1', 'O1', 'S1*', 'O1*']),
+         ('Sorghum xylose yield [65 $-$ 97.5 %]', ['S1', 'O1', 'S1*', 'O1*']),
+         ('Glucose to ethanol yield [90 $-$ 95 %]', ['S1', 'O1', 'S1*', 'O1*']),
+         ('Xylose to ethanol yield [50 $-$ 95 %]', ['S1', 'O1', 'S1*', 'O1*']),
+        (f'Titer [65 $-$ 130 {titer}]', ['S1', 'O1', 'S1*', 'O1*']),
+        (f'Productivity [1.0 $-$ 2.0 {productivity}]', ['S1', 'O1', 'S1*', 'O1*']),
+         ('Cane PL content [7.5 $-$ 12.5 %]', ['S2', 'S1', 'S2*', 'S1*']),
+         ('Sorghum PL content [7.5 $-$ 12.5 %]', ['S2', 'S1', 'S2*', 'S1*']),
+         ('Cane FFA content [7.5 $-$ 12.5 %]', ['S2', 'S1', 'S2*', 'S1*']),
+         ('Sorghum FFA content [7.5 $-$ 12.5 %]', ['S2', 'S1', 'S2*', 'S1*']),
+         ('Cane oil content [5 $-$ 15 dry wt. %]', ['S2', 'S1', 'S2*', 'S1*']),
+         ('Relative sorghum oil content [-3 $-$ 0 dry wt. %]', ['S2', 'S1', 'S2*', 'S1*', 'O2', 'O1']),
+         ('TAG to FFA conversion [17.25 $-$ 28.75 % theoretical]', ['S1', 'O1', 'S1*', 'O1*']),
        # '$^a$Fermentation solids loading [20% $-$ 25%]',
-    ]
-    ignored = {
-        'S1': set(),
-        'O1': set(),
-        'S2': set(),
-        'O2': set(),
+    ])
+    ignored_dct = {
+        'S1': [],
+        'O1': [],
+        'S2': [],
+        'O2': [],
+        'S1*': [],
+        'O1*': [],
+        'S2*': [],
+        'O2*': [],
     }
+    for i, ignored in enumerate(ignored_list):
+        for name in ignored: ignored_dct[name].append(i)
+    
     configuration_names = (configuration, configuration + '*') if agile else (configuration,)
     MFPPs = []
     for name in configuration_names:
@@ -1496,11 +1521,12 @@ def plot_spearman_MFPP(configuration, top=None, agile=True, labels=None):
             warning = RuntimeWarning(f"file '{file}' not found")
             warn(warning)
             continue
-        MFPPs.append(df['Biorefinery', 'MFPP [USD/ton]'])
+        s = df['Biorefinery', 'MFPP [USD/ton]']
+        s.iloc[ignored_dct[name]] =0.
+        MFPPs.append(s)
     color_wheel = [CABBI_colors.orange, CABBI_colors.green_soft]
     fig, ax = bst.plots.plot_spearman_2d(MFPPs, top=top, index=index, 
                                          color_wheel=color_wheel,
-                                         ignored=ignored[configuration],
                                          name='MFPP')
     plt.legend(
         handles=[
@@ -1534,7 +1560,11 @@ def plot_configuration_breakdown(name, across_coordinate=False, **kwargs):
                 x = int(x)
                 n = 10 ** (len(str(x)) - 3)
                 value = int(round(x / n) * n)
-                return value
+                return format(value, ',')
+        for i in unit_groups: 
+            i.metrics[0].name = 'Inst. eq.\ncost'
+            i.metrics[3].name = 'Elec.\ncons.'
+            i.metrics[4].name = 'Mat.\ncost'
         
         return bst.plots.plot_unit_groups(
             unit_groups,
@@ -1545,12 +1575,25 @@ def plot_configuration_breakdown(name, across_coordinate=False, **kwargs):
             **kwargs,
         )
     
-    # DO NOT DELETE: For removing ylable and yticklabels and combine plots
-    # import biorefineries.oilcane as oc
-    # import matplotlib.pyplot as plt
-    # oc.plot_configuration_breakdown('O2')
-    # ax, *_ = plt.gcf().get_axes()
-    # yticks = ax.get_yticks()
-    # plt.yticks(yticks, ['']*len(yticks))
-    # plt.ylabel('')
-    # plt.show()
+# DO NOT DELETE: For removing ylabel and yticklabels and combine plots
+# import biorefineries.oilcane as oc
+# import matplotlib.pyplot as plt
+# oc.plot_configuration_breakdown('O2')
+# ax, *_ = plt.gcf().get_axes()
+# yticks = ax.get_yticks()
+# plt.yticks(yticks, ['']*len(yticks))
+# plt.ylabel('')
+# plt.show()
+
+# DO NOT DELETE: For better tickmarks
+# import biorefineries.oilcane as oc
+# import numpy as np
+# oc.plot_monte_carlo(derivative=True, comparison=False,
+# tickmarks=np.array([
+#     [-2.5, -1.25, 0, 1.25, 2.5, 3.75],
+#     [-5, -2.5, 0, 2.5, 5.0, 7.5],
+#     [-1.5, -0.75, 0, 0.75, 1.5],
+#     [-10, 0, 10, 20, 30],
+#     [-40, -30, -20, -10, 0, 10]
+# ]),
+# labels=['Conventional', 'Cellulosic'])

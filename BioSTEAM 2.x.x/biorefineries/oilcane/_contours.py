@@ -67,12 +67,13 @@ colormaps = [
 ] * 2
 
 def plot_ethanol_and_biodiesel_price_contours(N=30, benefit=False, cache={}, 
-                                              enhanced_cellulosic_performance=False):
+                                              enhanced_cellulosic_performance=False,
+                                              titles=None):
     ethanol_price = np.linspace(1., 3., N)
     biodiesel_price = np.linspace(2, 6, N)
     oil_content = [5, 10, 15]
     N_rows = len(oil_content)
-    configuration = ['L1', 'L1*', 'L2', 'L2*']
+    configuration = ['O1', 'O2']
     N_cols = len(configuration)
     if (N, benefit, enhanced_cellulosic_performance) in cache:
         Z = cache[N, benefit, enhanced_cellulosic_performance]
@@ -89,8 +90,8 @@ def plot_ethanol_and_biodiesel_price_contours(N=30, benefit=False, cache={},
                     Z[:, :, i, j] = oc.evaluate_MFPP_benefit_across_ethanol_and_biodiesel_prices(X, Y)
                 else:
                     Z[:, :, i, j] = oc.evaluate_MFPP_across_ethanol_and_biodiesel_prices(X, Y)
-    xlabel = f"Ethanol price [{format_units('$/gal')}]"
-    ylabels = [f"Biodiesel price [{format_units('$/gal')}]"] * 4
+    xlabel = f"Ethanol price\n[{format_units('$/gal')}]"
+    ylabels = [f"Biodiesel price\n[{format_units('$/gal')}]"] * 4
     xticks = [1., 1.5, 2.0, 2.5, 3.0]
     yticks = [2, 3, 4, 5, 6]
     marks = tickmarks(Z, 5, 5, center=0.) if benefit else tickmarks(Z, 5, 5)
@@ -98,10 +99,11 @@ def plot_ethanol_and_biodiesel_price_contours(N=30, benefit=False, cache={},
     metric_bar = MetricBar('MFPP', format_units('$/ton'), colormap, marks, 12,
                            center=0.)
     if benefit:
-        baseline = ['S1', 'S1*', 'S2', 'S2*']
-        titles = [f"{oc.format_name(i)} - {oc.format_name(j)}"
-                  for i, j in  zip(configuration, baseline)]
-    else:
+        baseline = ['S1', 'S2']
+        if titles is None:
+            titles = [f"{oc.format_name(i)} - {oc.format_name(j)}"
+                      for i, j in  zip(configuration, baseline)]
+    elif titles is None:
         titles = [oc.format_name(i) for i in configuration]
     fig, axes, CSs, CB = plot_contour_single_metric(
         X, Y, Z, xlabel, ylabels, xticks, yticks, metric_bar, 
@@ -126,8 +128,8 @@ def plot_ethanol_and_biodiesel_price_contours(N=30, benefit=False, cache={},
     
 def relative_sorghum_oil_content_and_cane_oil_content_data(load, relative):
     # Generate contour data
-    y = np.linspace(0.05, 0.15, 10)
-    x = np.linspace(-0.03, 0., 10) if relative else np.linspace(0.02, 0.15, 10)
+    y = np.linspace(0.05, 0.15, 20)
+    x = np.linspace(-0.03, 0., 20) if relative else np.linspace(0.02, 0.15, 20)
     X, Y = np.meshgrid(x, y)
     folder = os.path.dirname(__file__)
     file = 'oil_content_analysis.npy'
@@ -143,9 +145,12 @@ def relative_sorghum_oil_content_and_cane_oil_content_data(load, relative):
     np.save(file, data)
     return X, Y, data
     
-def plot_relative_sorghum_oil_content_and_cane_oil_content_contours(load=False, configuration_index=0, relative=False):
+def plot_relative_sorghum_oil_content_and_cane_oil_content_contours(
+        load=False, configuration_index=0, relative=False
+    ):
     # Generate contour data
     X, Y, data = relative_sorghum_oil_content_and_cane_oil_content_data(load, relative)
+    
     data = data[:, :, configuration_index, [0, 5]]
     
     # Plot contours
@@ -156,26 +161,31 @@ def plot_relative_sorghum_oil_content_and_cane_oil_content_contours(load=False, 
     xticks = [-3, -2, -1, 0] if relative else [2, 5, 7.5, 10, 12.5, 15]
     MFPP = oc.all_metric_mockups[0]
     TCI = oc.all_metric_mockups[5]
-    metric_bars = [
-        MetricBar(MFPP.name, format_units(MFPP.units), colormaps[0], tickmarks(data[:, :, 0], 5, 5), 15, 1),
-        MetricBar(TCI.name, format_units(MFPP.units), colormaps[1], tickmarks(data[:, :, 1], 5, 5), 10)
-    ]
     if configuration_index == 0:
-        Z = np.array([f"AGILE-CONVENTIONAL"])
+        Z = np.array(["AGILE-CONVENTIONAL"])
+        data = data[:, :, :, np.newaxis]
     elif configuration_index == 1:
-        Z = np.array([f"AGILE-CELLULOSIC"])
+        Z = np.array(["AGILE-CELLULOSIC"])
+        data = data[:, :, :, np.newaxis]
+    elif configuration_index == ...:
+        Z = np.array(["AGILE-CONVENTIONAL", "AGILE-CELLULOSIC"])
+        data = np.swapaxes(data, 2, 3)
     else:
         raise ValueError('configuration index must be either 0 or 1')
+    metric_bars = [
+        MetricBar(MFPP.name, format_units(MFPP.units), colormaps[0], tickmarks(data[:, :, 0], 5, 5), 20, 1),
+        MetricBar(TCI.name, format_units(MFPP.units), colormaps[1], tickmarks(data[:, :, 1], 5, 5), 20)
+    ]
     fig, axes, CSs, CB = plot_contour_2d(
-        100.*X, 100.*Y, Z, data[:, :, :, np.newaxis], xlabel, ylabel, xticks, yticks, metric_bars, 
+        100.*X, 100.*Y, Z, data, xlabel, ylabel, xticks, yticks, metric_bars, 
         fillblack=False, styleaxiskw=dict(xtick0=True), label=True,
     )
     plt.show()
     
 def plot_extraction_efficiency_and_oil_content_contours(load=False, metric_index=0):
     # Generate contour data
-    x = np.linspace(0.4, 1., 10)
-    y = np.linspace(0.05, 0.15, 10)
+    x = np.linspace(0.4, 1., 20)
+    y = np.linspace(0.05, 0.15, 20)
     X, Y = np.meshgrid(x, y)
     metric = bst.metric
     folder = os.path.dirname(__file__)
