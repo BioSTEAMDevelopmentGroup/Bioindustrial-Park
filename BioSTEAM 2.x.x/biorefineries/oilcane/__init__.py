@@ -930,7 +930,7 @@ def load(name, cache={}, reduce_chemicals=True, enhanced_cellulosic_performance=
         dct[i.setter.__name__] = i
     for i in model._metrics:
         dct[i.getter.__name__] = i
-    cache[number, agile] = dct.copy()
+    cache[key] = dct.copy()
     
     ## Simulation
     try: 
