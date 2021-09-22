@@ -1,96 +1,131 @@
-=================================================================
-lipidcane: Co-production of Ethanol and Biodiesel from Lipid-cane
-=================================================================
+=============================================
+oilcane: Oilcane Biorefineries and Benchmarks
+=============================================
 
-.. figure:: ./images/lipidcane_areas.png
+This module contains oilcane biorefinery configurations and "benchmark" 
+sugarcane biorifinery configurations, as discussed in [1]_. Two configurations
+are currently available: (I) conventional oil extraction by the expression of 
+bagasse and centrifugation of vinasse from juice fermentation, and (II) oil 
+extraction after an integrated, single-step co-fermentation of both the juice 
+and bagasse hydrolysate. In contrast to the `biorefineries.lipidcane` module,
+mass balances around oil separation are based on experimental results and
+the oil composition is accounted for. Note that the name "oilcane" is prefered 
+over lipid-cane, as it resonates better with non-scientific audience and is more
+consistent with how we talk about vegetable oils.
 
-The lipidcane biorefinery design for the co-production of ethanol and biodiesel
-follows all assumptions from a study by Huang et. al. executed with SuperPro 
-Designer [1]_. As discussed in the original BioSTEAM manuscript [2]_, the 
-lipid-cane biorefinery can be divided into six main areas: feedstock handling, 
-oil/sugar separation, ethanol production, biodiesel production, boiler and 
-turbo-generator system, and utilities. During oil and sugar 
-separation (Area 200), the cane juice is extracted and the oil is separated 
-from the juice by a settler. The bagasse is burned to produce steam 
-and electricity for the plant (Area 500), with excess electricity sold to the 
-grid. The sugar solution is fermented and distilled (Area 300). The oil is 
-trans-esterified with methanol and sodium methoxide catalyst to produce 
-biodiesel and glycerol (Area 400). The glycerol is distilled to 80 wt % and 
-sold as crude glycerol. The utility area includes on-site recirculation of 
-cooling water and chilled water (Area 600).
+.. figure:: ./images/oilcane_areas.png
+
+All configurations share the same feedstock handling, juicing, and biodiesel 
+production systems. In the juicing system, the oilcane is crushed, the juice 
+is treated and filtered to remove impurities, and the bagasse is conveyed out 
+at a moisture content of 50%. The bagasse is assumed to retain 40-70% of the 
+total oil present in oilcane. In the biodiesel production area, the oil is 
+first pretreated to remove polar lipids and convert any free fatty acids 
+(FFAs) to acyl glycerides via glycerolysis.14–16 Once pretreated, the oil is 
+trans-esterified with excess methanol and sodium methoxide catalyst to produce 
+biodiesel and glycerol. The biodiesel is centrifuged out, washed, and vacuum 
+dried. The glycerol is distilled to 80 wt % and sold as crude glycerol. 
+
+The conventional oil separation configuration can be divided into nine areas: 
+feedstock handling, juicing, ethanol production, oil extraction, 
+biodiesel production, combined heat and power, utilities, 
+heat exchanger network (HXN), and storage. The oil-rich bagasse is pelleted to 
+reduce the moisture content and volume to extract 50 to 70% of the oil by 
+screw pressing (Area 400). Then, the bagasse is burned to produce steam and 
+electricity for the plant (Area 600), with excess electricity sold to the 
+grid. The juice is fermented and distilled (Area 300). The vinasse is also 
+sent to the oil extraction area (Area 400), where it is concentrated by 
+evaporation then centrifuged to extract the oil. The utility area includes 
+on-site recirculation of cooling water and chilled water (Area 700).
+
+The cellulosic oil extraction configuration can be divided into eleven areas: 
+feedstock handling, juicing, pretreatment and conditioning, ethanol production, 
+wastewater treatment, oil extraction, combined heat and power, biodiesel 
+production, utilities, HXN, and storage. In contrast to the conventional 
+configuration, no drying or pelleting is necessary as the solids loading 
+(i.e., the mass fraction of soluble and insoluble solids) for the pretreatment 
+reactor is 50% and the bagasse is assumed to be at 50% moisture content. High 
+pressure and temperature liquid hot water is used to pretreat the bagasse and 
+facilitate enzymatic hydrolysis (Area 300). Both the hydrolysate and the juice 
+are sent to Area 400, where it is saccharified at a solids loading of 23 wt. %, 
+filter-pressed to remove lignin, and fermented. The vinasse is concentrated by 
+evaporation and centrifuged to extract 99% of the oil (Area 600). The syrup is 
+sent to wastewater treatment to produce biogas (Area 500). Both the biogas and 
+lignin are sent to burn at the combined-heat and power system (Area 700) to 
+produce steam and electricity. 
+
+Two sugarcane biorefinery configurations are also included in this module
+as benchmarks to compare the economic benefit of processing oil-producing 
+feedstocks over their non-oil counterparts. The conventional and cellulosic 
+ethanol sugarcane biorefineries are non-oil processing counterparts to the 
+conventional and cellulosic configurations of the oilcane biorefineries, 
+respectively, and follow the same assumptions and overall configurations with 
+the exception of no oil extraction or biodiesel production areas.
+
+.. figure:: ./images/sugarcane_areas.png
+
+Integrated oilsorghum processing is also implemented in this module using
+BioSTEAM's agile system simulation features. Because oilsorghum can be 
+harvested for 2 months when oilcane is not in season, an idle oilcane 
+biorefinery could potentially increase biofuel production by processing 
+oilsorghum.
 
 Getting Started
 ---------------
 
-To load the biorefinery, simply import it. All data and variables
-are lazy loaded by the module:
+Four biorefineries can be loaded using the names detailed in the following table:
+
+|           |                         | Conventional | Cellulosic |
+| --------- | ----------------------- | ------------ | ---------- |
+| Oilcane   | Single feedstock        | O1           | O2         |
+|           | With sorghum processing | O1\*         | O2\*       |
+| Sugarcane | Single feedstock        | S1           | S2         |
+|           | With sorghum processing | S1\*         | S2\*       |
+
+Here are a few examples:
 
 .. code-block:: python
 
-    >>> from biorefineries import lipidcane as lc
-    >>> # This is optional; it forces the biorefinery to load
-    >>> # Otherwise, first time accessing will take a bit to load.
-    >>> lc.load()
-    >>> lc.chemicals # All chemicals used by the biorefinery.
-    CompiledChemicals([Water, Ethanol, Glucose, Sucrose, H3PO4, P4O10, CO2, Octane, O2, CH4, Ash, Cellulose, Hemicellulose, Flocculant, Lignin, Solids, Yeast, CaO, Biodiesel, Methanol, Glycerol, HCl, NaOH, NaOCH3, Lipid])
-    >>> lc.lipidcane_sys.show() # The complete biorefinery system
-    System: lipidcane_sys
-     path: (U101, U102, U103, T201,
-            juice_extraction_sys, T202, H201,
-            T203, P201, T204, T205, P202,
-            juice_separation_sys, T207,
-            T207_2, H203, T208, C203, F201,
-            T403, P403, R401, C401, R402,
-            C402, methanol_recycle_sys, F401,
-            P407, T409, H401, P408, P405,
-            B401, H403, P411, T401, P401,
-            T402, P402, T404, P404, S401,
-            S202, ethanol_production_sys,
-            T408, U202)
-     facilities: (CWP, BT, CT, PWC)
-    >>> lc.lipidcane_tea.show() # The TEA object
-    ConventionalEthanolTEA: lipidcane_sys
-     NPV: 2 USD at 17.8% IRR
-    >>> lc.flowsheet # The complete flowsheet
-    <Flowsheet: lipidcane>
-    >>> lc.R301.show() # Any unit operations and streams can be accessed through the module
-    Fermentation: R301
+    >>> import biorefineries.oilcane as oc
+    >>> oc.load('S1') # Load conventional sugarcane system
+    >>> oc.sys.show(data=False) # Full system
+    System: sugarcane_sys
     ins...
-    [0] d235  from  HXutility-H301
-        phase: 'l', T: 295.15 K, P: 101325 Pa
-        flow (kmol/hr): Water    4.11e+03
-                        Glucose  10.5
-                        Sucrose  62.7
-                        H3PO4    0.85
-    [1] d260  from  MixTank-T305
-        phase: 'l', T: 298.15 K, P: 101325 Pa
-        flow (kmol/hr): Water  1.37e+03
-                        Yeast  1.03e+04
+    [0] sugarcane
+    [1] enzyme
+    [2] H3PO4
+    [3] lime
+    [4] polymer
+    [5] denaturant
     outs...
-    [0] CO2  to  VentScrubber-D301
-        phase: 'g', T: 305.15 K, P: 101325 Pa
-        flow (kmol/hr): Water    1.83
-                        Ethanol  0.456
-                        CO2      245
-    [1] d236  to  StorageTank-T301
-        phase: 'l', T: 296.06 K, P: 101325 Pa
-        flow (kmol/hr): Water    5.42e+03
-                        Ethanol  244
-                        Glucose  13.6
-                        H3PO4    0.85
-                        Yeast    1.03e+04
+    [0] ethanol
+    [1] vinasse
+    [2] wastewater
+    [3] emissions
+    [4] ash_disposal
+    
+    >>> oc.tea.solve_price(oc.sugarcane) # Solve MFPP in USD/kg
+    0.02848
+    
+    >>> oc.load('O1') # Load conventional oilcane system
+    >>> oc.sys.show(data=False)
+    System: oilcane_sys
+    ins...
+    [0] oilcane
+    outs...
+    [0] ethanol
+    [1] biodiesel
+    [2] crude_glycerol
+    [3] vinasse
+    
+    >>> oc.tea.solve_price(oc.oilcane) # Solve MFPP in USD/kg
+    0.02966
 
 
 References
 ----------
-.. [1] Huang, H.; Long, S.; Singh, V. Techno-Economic Analysis of Biodiesel and 
-    Ethanol Co-Production from Lipid-Producing Sugarcane: Biodiesel and Ethanol
-    Co-Production from Lipid-Producing Sugarcane. Biofuels, Bioprod. Bioref. 
-    2016, 10 (3), 299–315. https://doi.org/10.1002/bbb.1640.
-
-.. [2] Cortes-Peña, Y.; Kumar, D.; Singh, V.; Guest, J. S.
-    BioSTEAM: A Fast and Flexible Platform for the Design, Simulation, and 
-    Techno-Economic Analysis of Biorefineries under Uncertainty. 
-    ACS Sustainable Chem. Eng. 2020. https://doi.org/10.1021/acssuschemeng.9b07040.
-
+.. [1] Cortes-Pena, YR.; Kurambhatti CV.; Eilts K.; Singh, V.; Guest, JS. 
+    Techno-Economic Implications of Integrating Cellulosic Ethanol Production 
+    and Seasonal Oilsorghum Processing at an Oilcane Biorefinery Co-Producing 
+    Ethanol and Biodiesel. In Preparation.
 

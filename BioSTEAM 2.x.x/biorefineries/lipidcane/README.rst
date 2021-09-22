@@ -4,8 +4,8 @@ lipidcane: Co-production of Ethanol and Biodiesel from Lipid-cane
 
 .. figure:: ./images/lipidcane_areas.png
 
-The lipidcane biorefinery design for the co-production of ethanol and biodiesel
-follows all assumptions from a study by Huang et. al. executed with SuperPro 
+The lipid-cane biorefinery design for the co-production of ethanol and biodiesel
+follows all assumptions from a study by Huang et al. executed with SuperPro 
 Designer [1]_. As discussed in the original BioSTEAM manuscript [2]_, the 
 lipid-cane biorefinery can be divided into six main areas: feedstock handling, 
 oil/sugar separation, ethanol production, biodiesel production, boiler and 
@@ -19,11 +19,18 @@ biodiesel and glycerol (Area 400). The glycerol is distilled to 80 wt % and
 sold as crude glycerol. The utility area includes on-site recirculation of 
 cooling water and chilled water (Area 600).
 
+This biorefinery module makes preliminary assumptions on the lipid mass balance
+throughout the process and assumes that the lipid is 100% tri-acylglyceride. 
+For a more accurate assessment of lipid-cane biorefinery configuration, 
+checkout the biorefineries.oilcane module, which relieves assumptions around 
+the lipid mass balance and compostion. Note that the name "oilcane" is prefered 
+over lipid-cane, as it resonates better with non-scientific audience and is more
+consistent with how we talk about vegetable oils.
+
 Getting Started
 ---------------
 
-To load the biorefinery, simply import it. All data and variables
-are lazy loaded by the module:
+To load the biorefinery, simply import it and run the load function.
 
 .. code-block:: python
 
@@ -32,53 +39,59 @@ are lazy loaded by the module:
     >>> # Otherwise, first time accessing will take a bit to load.
     >>> lc.load()
     >>> lc.chemicals # All chemicals used by the biorefinery.
-    CompiledChemicals([Water, Ethanol, Glucose, Sucrose, H3PO4, P4O10, CO2, Octane, O2, CH4, Ash, Cellulose, Hemicellulose, Flocculant, Lignin, Solids, Yeast, CaO, Biodiesel, Methanol, Glycerol, HCl, NaOH, NaOCH3, Lipid])
+    CompiledChemicals(
+        [Water, Ethanol, Glucose, Sucrose, H3PO4, P4O10, CO2, Octane, O2, N2,
+         CH4, Ash, Cellulose, Hemicellulose, Flocculant, Lignin, Solids, Yeast,
+         CaO, Biodiesel, Methanol, Glycerol, HCl, NaOH, NaOCH3, Phosphatidylinositol,
+         OleicAcid, MonoOlein, DiOlein, TriOlein, Acetone]
+    )
     >>> lc.lipidcane_sys.show() # The complete biorefinery system
     System: lipidcane_sys
-     path: (U101, U102, U103, T201,
-            juice_extraction_sys, T202, H201,
-            T203, P201, T204, T205, P202,
-            juice_separation_sys, T207,
-            T207_2, H203, T208, C203, F201,
-            T403, P403, R401, C401, R402,
-            C402, methanol_recycle_sys, F401,
-            P407, T409, H401, P408, P405,
-            B401, H403, P411, T401, P401,
-            T402, P402, T404, P404, S401,
-            S202, ethanol_production_sys,
-            T408, U202)
-     facilities: (CWP, BT, CT, PWC)
+    ins...
+    [0] lipidcane
+    [1] enzyme
+    [2] H3PO4
+    [3] lime
+    [4] polymer
+    [5] denaturant
+    outs...
+    [0] ethanol
+    [1] biodiesel
+    [2] crude_glycerol
+    [3] wastewater
+    [4] emissions
+    [5] ash_disposal
     >>> lc.lipidcane_tea.show() # The TEA object
     ConventionalEthanolTEA: lipidcane_sys
-     NPV: 2 USD at 17.8% IRR
+     NPV: -0 USD at 20.7% IRR
     >>> lc.flowsheet # The complete flowsheet
     <Flowsheet: lipidcane>
-    >>> lc.R301.show() # Any unit operations and streams can be accessed through the module
+    >>> lc.R301.show() # Unit operations and streams can be accessed through the module
     Fermentation: R301
     ins...
-    [0] d235  from  HXutility-H301
+    [0] s164  from  HXutility-H301
         phase: 'l', T: 295.15 K, P: 101325 Pa
-        flow (kmol/hr): Water    4.11e+03
+        flow (kmol/hr): Water    4.34e+03
                         Glucose  10.5
                         Sucrose  62.7
                         H3PO4    0.85
-    [1] d260  from  MixTank-T305
-        phase: 'l', T: 298.15 K, P: 101325 Pa
-        flow (kmol/hr): Water  1.37e+03
-                        Yeast  1.03e+04
+    [1] s170  from  MockSplitter-S302
+        phase: 'l', T: 294.19 K, P: 101325 Pa
+        flow (kmol/hr): Water  12.6
+                        Yeast  13.7
     outs...
     [0] CO2  to  VentScrubber-D301
-        phase: 'g', T: 305.15 K, P: 101325 Pa
-        flow (kmol/hr): Water    1.83
-                        Ethanol  0.456
+        phase: 'g', T: 294.19 K, P: 101325 Pa
+        flow (kmol/hr): Water    5.35
+                        Ethanol  2.75
                         CO2      245
-    [1] d236  to  StorageTank-T301
-        phase: 'l', T: 296.06 K, P: 101325 Pa
-        flow (kmol/hr): Water    5.42e+03
-                        Ethanol  244
-                        Glucose  13.6
+    [1] s165  to  StorageTank-T301
+        phase: 'l', T: 294.19 K, P: 101325 Pa
+        flow (kmol/hr): Water    4.28e+03
+                        Ethanol  242
+                        Glucose  4.08
                         H3PO4    0.85
-                        Yeast    1.03e+04
+                        Yeast    82.8
 
 
 References
