@@ -76,7 +76,7 @@ Getting Started
 Four biorefineries can be loaded using the names detailed in the following table:
 
 .. csv-table:: 
-   :file: ./load_keys.png
+   :file: ./load_keys.csv
 
 Here are a few examples:
 
