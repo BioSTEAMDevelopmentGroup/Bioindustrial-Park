@@ -69,21 +69,57 @@ def create_oil_expression_system(ins, outs):
           dict(ID='wastewater'),
           dict(ID='evaporator_condensate')], 
 )
-def create_post_fermentation_oil_separation_system(ins, outs):
+def create_post_fermentation_oil_separation_system(ins, outs, wastewater_concentration=None):
     oil, wastewater, evaporator_condensate = outs
     V605 = bst.MixTank('V605', ins)
     P606 = bst.Pump('P606', V605-0)
     Ev607 = bst.MultiEffectEvaporator('Ev607',
         ins=P606-0,
-        outs=('', evaporator_condensate),
         P=(101325, 69682, 47057, 30953),
-        V=0.90
+        V=0.90, V_definition='First-effect',
     )
+    Ev607.target_oil_content = 60. # kg / m3
+    @Ev607.add_specification
+    def adjust_evaporation():
+        def x_oil(V):
+            Ev607.V = V
+            Ev607._run()
+            effluent = Ev607.outs[0]
+            return Ev607.target_oil_content - effluent.imass['Oil'] / effluent.F_vol
+        x0 = 0.
+        x1 = 0.9
+        y0 = x_oil(x0)
+        if y0 < 0.:
+            Ev607.V = x0
+            return
+        y1 = x_oil(x1)
+        if y1 > 0.:
+            Ev607.V = x1
+            return
+        Ev607.V = flx.IQ_interpolation(x_oil, x0, x1, y0, y1, x=Ev607.V, xtol=0.001, ytol=0.01)
+        
     P607 = bst.Pump('P607', Ev607-0, P=101325.)
-    C603_2 = bst.LiquidsSplitCentrifuge('C603_2', P607-0, (oil, wastewater), 
+    C603_2 = bst.LiquidsSplitCentrifuge('C603_2', P607-0, (oil, ''), 
                                         split={'Lipid': 0.99,
                                                'Water': 0.0001})
-    
+    S601 = bst.Splitter('S601', ins=Ev607-1, outs=['', evaporator_condensate], split=0.5)
+    M601 = bst.Mixer('M601', [S601-0, C603_2-1], wastewater)
+    M601.target_wastewater_concentration = 60. # kg / m3
+    @M601.add_specification(run=True)
+    def adjust_wastewater_concentration():
+        concentrated_wastewater = C603_2.outs[1]
+        waste = concentrated_wastewater.F_mass - concentrated_wastewater.imass['Water'] 
+        current_concentration = waste / concentrated_wastewater.F_vol
+        required_water = (1./M601.target_wastewater_concentration - 1./current_concentration) * waste * 1000.
+        F_mass = S601.ins[0].F_mass
+        if F_mass:
+            split = required_water / F_mass
+            if split < 0:
+                split = 0.
+            elif split > 1.:
+                split = 1.
+            S601.split[:] = split
+            for i in S601.path_until(M601): i._run()
 
 @SystemFactory(
     ID='oilcane_sys',
@@ -343,7 +379,7 @@ def create_oilcane_to_biodiesel_and_ethanol_combined_1_and_2g_post_fermentation_
         if y0 < 0.:
             ethanol = float(beer.imass['Ethanol'])
             current_titer = ethanol / beer.F_vol
-            required_water = (1./target_titer - 1./current_titer) * ethanol
+            required_water = (1./target_titer - 1./current_titer) * ethanol * 1000.
             MX.ins[1].imass['Water'] = max(required_water, 0)
         else:
             MX.ins[1].imass['Water'] = 0.
@@ -385,7 +421,7 @@ def create_oilcane_to_biodiesel_and_ethanol_combined_1_and_2g_post_fermentation_
     )
     backend_oil, wastewater, evaporator_condensate = post_fermentation_oil_separation_sys.outs
     backend_oil.ID = 'backend_oil'
-    MX_process_water = bst.Mixer(900, (EvX.outs[1], stripper_process_water),
+    MX_process_water = bst.Mixer(900, (EvX.outs[1], evaporator_condensate, stripper_process_water),
                                  'recycle_process_water')
     oil_pretreatment_sys, oil_pretreatment_dct = create_oil_pretreatment_system(
         ins=backend_oil,

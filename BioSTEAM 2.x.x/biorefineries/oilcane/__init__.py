@@ -739,7 +739,6 @@ def load(name, cache={}, reduce_chemicals=True, enhanced_cellulosic_performance=
     def set_relative_sorghum_oil_content(relative_sorghum_oil_content):
         if agile:
             sorghum_mode.oil_content = cane_mode.oil_content + relative_sorghum_oil_content / 100.
-    
 
     @default(23, units='% oil', kind='coupled')
     def set_TAG_to_FFA_conversion(TAG_to_FFA_conversion):
