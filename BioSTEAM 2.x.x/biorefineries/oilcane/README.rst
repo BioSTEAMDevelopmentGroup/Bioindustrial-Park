@@ -75,12 +75,8 @@ Getting Started
 
 Four biorefineries can be loaded using the names detailed in the following table:
 
-|           |                         | Conventional | Cellulosic |
-| --------- | ----------------------- | ------------ | ---------- |
-| Oilcane   | Single feedstock        | O1           | O2         |
-|           | With sorghum processing | O1\*         | O2\*       |
-| Sugarcane | Single feedstock        | S1           | S2         |
-|           | With sorghum processing | S1\*         | S2\*       |
+.. csv-table:: 
+   :file: ./load_keys.png
 
 Here are a few examples:
 
