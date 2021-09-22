@@ -1,9 +1,7 @@
-=============================================
-oilcane: Oilcane Biorefineries and Benchmarks
-=============================================
+# oilcane: Oilcane Biorefineries and Benchmarks
 
 This module contains oilcane biorefinery configurations and "benchmark" 
-sugarcane biorifinery configurations, as discussed in [1]_. Two configurations
+sugarcane biorifinery configurations, as discussed in [[1]](#1). Two configurations
 are currently available: (I) conventional oil extraction by the expression of 
 bagasse and centrifugation of vinasse from juice fermentation, and (II) oil 
 extraction after an integrated, single-step co-fermentation of both the juice 
@@ -13,7 +11,7 @@ the oil composition is accounted for. Note that the name "oilcane" is prefered
 over lipid-cane, as it resonates better with non-scientific audience and is more
 consistent with how we talk about vegetable oils.
 
-.. figure:: ./images/oilcane_areas.png
+![Oilcane Biorefinery Areas](./images/oilcane_areas.png)
 
 All configurations share the same feedstock handling, juicing, and biodiesel 
 production systems. In the juicing system, the oilcane is crushed, the juice 
@@ -62,7 +60,7 @@ conventional and cellulosic configurations of the oilcane biorefineries,
 respectively, and follow the same assumptions and overall configurations with 
 the exception of no oil extraction or biodiesel production areas.
 
-.. figure:: ./images/sugarcane_areas.png
+![Sugarcane Biorefinery Areas](./images/sugarcane_areas.png)
 
 Integrated oilsorghum processing is also implemented in this module using
 BioSTEAM's agile system simulation features. Because oilsorghum can be 
@@ -84,47 +82,48 @@ Four biorefineries can be loaded using the names detailed in the following table
 
 Here are a few examples:
 
-.. code-block:: python
+```python
 
-    >>> import biorefineries.oilcane as oc
-    >>> oc.load('S1') # Load conventional sugarcane system
-    >>> oc.sys.show(data=False) # Full system
-    System: sugarcane_sys
-    ins...
-    [0] sugarcane
-    [1] enzyme
-    [2] H3PO4
-    [3] lime
-    [4] polymer
-    [5] denaturant
-    outs...
-    [0] ethanol
-    [1] vinasse
-    [2] wastewater
-    [3] emissions
-    [4] ash_disposal
-    
-    >>> oc.tea.solve_price(oc.sugarcane) # Solve MFPP in USD/kg
-    0.02848
-    
-    >>> oc.load('O1') # Load conventional oilcane system
-    >>> oc.sys.show(data=False)
-    System: oilcane_sys
-    ins...
-    [0] oilcane
-    outs...
-    [0] ethanol
-    [1] biodiesel
-    [2] crude_glycerol
-    [3] vinasse
-    
-    >>> oc.tea.solve_price(oc.oilcane) # Solve MFPP in USD/kg
-    0.02966
+>>> import biorefineries.oilcane as oc
+>>> oc.load('S1') # Load conventional sugarcane system
+>>> oc.sys.show(data=False) # Full system
+System: sugarcane_sys
+ins...
+[0] sugarcane
+[1] enzyme
+[2] H3PO4
+[3] lime
+[4] polymer
+[5] denaturant
+outs...
+[0] ethanol
+[1] vinasse
+[2] wastewater
+[3] emissions
+[4] ash_disposal
 
+>>> oc.tea.solve_price(oc.sugarcane) # Solve MFPP in USD/kg
+0.02848
 
-References
-----------
-.. [1] Cortes-Pena, YR.; Kurambhatti CV.; Eilts K.; Singh, V.; Guest, JS. 
+>>> oc.load('O1') # Load conventional oilcane system
+>>> oc.sys.show(data=False)
+System: oilcane_sys
+ins...
+[0] oilcane
+outs...
+[0] ethanol
+[1] biodiesel
+[2] crude_glycerol
+[3] vinasse
+
+>>> oc.tea.solve_price(oc.oilcane) # Solve MFPP in USD/kg
+0.02966
+
+```
+
+## References
+<a id="1">[1]</a> 
+    Cortes-Pena, YR.; Kurambhatti CV.; Eilts K.; Singh, V.; Guest, JS. 
     Techno-Economic Implications of Integrating Cellulosic Ethanol Production 
     and Seasonal Oilsorghum Processing at an Oilcane Biorefinery Co-Producing 
     Ethanol and Biodiesel. In Preparation.
