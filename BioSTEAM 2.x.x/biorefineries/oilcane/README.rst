@@ -75,11 +75,12 @@ Getting Started
 
 Four biorefineries can be loaded using the names detailed in the following table.
 
-.. csv-table:: Biorefinery load keys
-   :file: ./load_keys.csv
-   :widths: 30, 70
-   :header-rows: 1
-   :header-cols: 2
+|           |                         | Conventional | Cellulosic |
+| --------- | ----------------------- | ------------ | ---------- |
+| Oilcane   | Single feedstock        | O1           | O2         |
+|           | With sorghum processing | O1\*         | O2\*       |
+| Sugarcane | Single feedstock        | S1           | S2         |
+|           | With sorghum processing | S1\*         | S2\*       |
 
 Here are a few examples:
 
