@@ -146,7 +146,7 @@ def relative_sorghum_oil_content_and_cane_oil_content_data(load, relative):
     return X, Y, data
     
 def plot_relative_sorghum_oil_content_and_cane_oil_content_contours(
-        load=False, configuration_index=0, relative=False
+        load=False, configuration_index=..., relative=False
     ):
     # Generate contour data
     X, Y, data = relative_sorghum_oil_content_and_cane_oil_content_data(load, relative)

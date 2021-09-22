@@ -326,13 +326,6 @@ def load(name, cache={}, reduce_chemicals=True, enhanced_cellulosic_performance=
     key = (number, agile, enhanced_cellulosic_performance)
     if key in cache:
         dct.update(cache[key])
-        if abs(number) == 2 and enhanced_cellulosic_performance:
-            set_sorghum_glucose_yield.setter(95)
-            set_sorghum_xylose_yield.setter(95)
-            set_cane_glucose_yield.setter(95)
-            set_cane_xylose_yield.setter(95)
-            set_glucose_to_ethanol_yield.setter(95)
-            set_xylose_to_ethanol_yield.setter(95)
         return
     global oilcane_sys, sys, tea, specs, flowsheet, _system_loaded
     global oil_extraction_specification, model, unit_groups
@@ -901,6 +894,8 @@ def load(name, cache={}, reduce_chemicals=True, enhanced_cellulosic_performance=
             set_cane_xylose_yield.setter(95)
             set_glucose_to_ethanol_yield.setter(95)
             set_xylose_to_ethanol_yield.setter(95)
+            set_cofermentation_titer.setter(120.)
+            set_cofermentation_productivity.setter(2.0)
         else:
             set_sorghum_glucose_yield.setter(79)
             set_sorghum_xylose_yield.setter(86)
