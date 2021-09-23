@@ -1357,11 +1357,11 @@ def plot_monte_carlo(derivative=False, absolute=True, comparison=True,
     ]
     if derivative:
         ylabels = [
-            r"$\Delta$" + format_units(r"MFPP/LC").replace('cdot', r'cdot \Delta') + f"\n[{format_units('USD/ton')}]",
-            r"$\Delta$" + format_units(r"TCI/LC").replace('cdot', r'cdot \Delta') + f"\n[{format_units('10^6*USD')}]",
-            r"$\Delta$" + format_units(r"Prod./LC").replace('cdot', r'cdot \Delta') + f"\n[{format_units('Gal/ton')}]",
-            r"$\Delta$" + format_units(r"EP/LC").replace('cdot', r'cdot \Delta') + f"\n[{format_units('kWhr/ton')}]",
-            r"$\Delta$" + format_units(r"NGC/LC").replace('cdot', r'cdot \Delta') + f"\n[{format_units('cf/ton')}]"
+            r"$\Delta$" + format_units(r"MFPP/OC").replace('cdot', r'cdot \Delta') + f"\n[{format_units('USD/ton')}]",
+            r"$\Delta$" + format_units(r"TCI/OC").replace('cdot', r'cdot \Delta') + f"\n[{format_units('10^6*USD')}]",
+            r"$\Delta$" + format_units(r"Prod./OC").replace('cdot', r'cdot \Delta') + f"\n[{format_units('Gal/ton')}]",
+            r"$\Delta$" + format_units(r"EP/OC").replace('cdot', r'cdot \Delta') + f"\n[{format_units('kWhr/ton')}]",
+            r"$\Delta$" + format_units(r"NGC/OC").replace('cdot', r'cdot \Delta') + f"\n[{format_units('cf/ton')}]"
         ]
     elif comparison and not absolute:
         ylabels = [r"$\Delta$" + i for i in ylabels]

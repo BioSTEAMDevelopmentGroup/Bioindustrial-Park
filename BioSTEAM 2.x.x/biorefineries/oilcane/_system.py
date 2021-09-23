@@ -87,7 +87,7 @@ def create_post_fermentation_oil_separation_system(ins, outs, wastewater_concent
             effluent = Ev607.outs[0]
             return Ev607.target_oil_content - effluent.imass['Oil'] / effluent.F_vol
         x0 = 0.
-        x1 = 0.9
+        x1 = 0.5
         y0 = x_oil(x0)
         if y0 < 0.:
             Ev607.V = x0
@@ -545,6 +545,10 @@ def create_sugarcane_to_ethanol_combined_1_and_2g(ins, outs):
         SeedTrain=units.SeedTrain,
         CoFermentation=units.CoFermentation,
     )
+    DAP_storage = cf_dct['DAP_storage']
+    CSL_storage = cf_dct['CSL_storage']
+    seedtrain = cf_dct['R302'] # Seed train
+    cofermentation = cf_dct['R303'] # Cofermentation
     pressurefilter = cf_dct['S303'] # Pressure filter
     sink = pressurefilter.outs[1].sink
     MX = bst.Mixer(400, [pressurefilter-1, screened_juice])
@@ -565,20 +569,43 @@ def create_sugarcane_to_ethanol_combined_1_and_2g(ins, outs):
         PX.sucrose_hydrolysis_reaction.force_reaction(feed)
         if feed.imol['Water'] < 0: feed.imol['Water'] = 0.
     
-    EvX.solids_loading = 0.20
+    cofermentation.titer = 68.5
+    cofermentation.productivity = 0.95
     @EvX.add_specification(run=True)
     def evaporation():
+        evaporator_to_seedtrain = EvX.path_until(seedtrain)
+        DAP_to_seedtrain = DAP_storage.path_until(seedtrain)
+        CSL_to_seedtrain = CSL_storage.path_until(seedtrain)
+        seedtrain_to_cofermentation = seedtrain.path_until(cofermentation)
+        path = (*evaporator_to_seedtrain[1:],
+                *DAP_to_seedtrain,
+                *CSL_to_seedtrain,
+                *seedtrain_to_cofermentation)
+        beer = cofermentation.outs[1]
+        target_titer = cofermentation.titer
         def f(V):
             EvX.V = V
             EvX._run()
-            slurry = EvX.outs[0]
-            solids_loading = 1 - slurry.imass['Water', 'AceticAcid', 'Furfural'].sum() / slurry.F_mass
-            return solids_loading - EvX.solids_loading
+            for unit in path: unit.run()
+            cofermentation.run()
+            return target_titer - beer.imass['Ethanol'] / beer.F_vol
+        
         y0 = f(0)
-        if y0 > 0: raise RuntimeError('dilution required, but not yet implemented')
-        y1 = f(1)
-        if y1 < 0: raise RuntimeError('infeasible to evaporate all water')
-        EvX.V = flx.IQ_interpolation(f, 0, 1, y0, y1, x=EvX.V, ytol=1e-2, xtol=1e-6)
+        if y0 < 0.:
+            ethanol = float(beer.imass['Ethanol'])
+            current_titer = ethanol / beer.F_vol
+            required_water = (1./target_titer - 1./current_titer) * ethanol * 1000.
+            MX.ins[1].imass['Water'] = max(required_water, 0)
+        else:
+            MX.ins[1].imass['Water'] = 0.
+            x = 0.1
+            y1 = 1
+            while y1 > 0:
+                x += 0.03
+                y1 = f(x)
+                if x > 0.95: raise RuntimeError('infeasible to evaporate any more water')
+            EvX.V = flx.IQ_interpolation(f, 0, x, y0, y1, x=EvX.V, ytol=1e-5, xtol=1e-6)
+        cofermentation.tau = target_titer / cofermentation.productivity 
     
     vent, cellulosic_beer, lignin = cellulosic_fermentation_sys.outs
     cellulosic_beer_distillation_sys = create_beer_distillation_system(
