@@ -472,7 +472,7 @@ def create_oilcane_to_biodiesel_and_ethanol_combined_1_and_2g_post_fermentation_
     Ev607 = pfls_dct['Ev607']
     D303 = ep_dct['D303']
     HXN = bst.HeatExchangerNetwork(1000,
-        ignored=lambda: [u.D801.boiler, u.D802.boiler, u.H803, u.H802, u.H801, u.H804, oil_pretreatment_dct['F3']],
+        ignored=lambda: [u.D801.boiler, u.D802.boiler, u.H803, u.H802, u.H801, u.H804, u.H806, u.H809, oil_pretreatment_dct['F3']],
         Qmin=1e3,
     )
     HXN.acceptable_energy_balance_error = 0.01

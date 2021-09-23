@@ -1538,8 +1538,8 @@ def plot_configuration_breakdown(name, across_coordinate=False, **kwargs):
     load(name)
     if across_coordinate:
         return bst.plots.plot_unit_groups_across_coordinate(
-            set_feedstock_oil_content,
-            [5, 10, 15],
+            set_cane_oil_content,
+            [5, 7.5, 10, 12.5],
             'Feedstock oil content [dry wt. %]',
             unit_groups,
             colors=[area_colors[i.name].RGBn for i in unit_groups],
@@ -1568,7 +1568,31 @@ def plot_configuration_breakdown(name, across_coordinate=False, **kwargs):
             fraction=True,
             **kwargs,
         )
+
+def plot_TCI_areas_across_oil_content(configuration='O2'):
+    load(configuration)
+    data = {i.name: [] for i in unit_groups}
+    increasing_areas = []
+    decreasing_areas = []
+    oil_contents = np.linspace(5, 15, 10)
+    for i in oil_contents:
+        set_cane_oil_content(i)
+        sys.simulate()
+        for i in unit_groups: data[i.name].append(i.get_installed_cost())
+    for name, group_data in data.items():
+        lb, *_, ub = group_data
+        if ub > lb: 
+            increasing_areas.append(group_data)
+        else:
+            decreasing_areas.append(group_data)
+    increasing_values = np.sum(increasing_areas, axis=0)
+    increasing_values -= increasing_values[0]
+    decreasing_values = np.sum(decreasing_areas, axis=0)
+    decreasing_values -= decreasing_values[-1]
+    plt.plot(oil_contents, increasing_values, label='Oil & fiber areas')
+    plt.plot(oil_contents, decreasing_values, label='Sugar areas')
     
+
 # DO NOT DELETE: For removing ylabel and yticklabels and combine plots
 # import biorefineries.oilcane as oc
 # import matplotlib.pyplot as plt

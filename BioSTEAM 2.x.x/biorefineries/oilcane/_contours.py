@@ -184,8 +184,8 @@ def plot_relative_sorghum_oil_content_and_cane_oil_content_contours(
     
 def plot_extraction_efficiency_and_oil_content_contours(load=False, metric_index=0):
     # Generate contour data
-    x = np.linspace(0.4, 1., 20)
-    y = np.linspace(0.05, 0.15, 20)
+    x = np.linspace(0.4, 1., 10)
+    y = np.linspace(0.05, 0.15, 10)
     X, Y = np.meshgrid(x, y)
     metric = bst.metric
     folder = os.path.dirname(__file__)
@@ -233,8 +233,8 @@ def plot_extraction_efficiency_and_oil_content_contours(load=False, metric_index
             ax.clabel(CS, levels=CS.levels, inline=True, fmt=lambda x: f'{round(x):,}',
                       fontsize=10, colors=[linecolor], zorder=1e16)
             if j == 0:
-                lb = 60.0
-                ub = 80.0
+                lb = 50.0
+                ub = 70.0
             else:
                 lb = 70.0
                 ub = 90.0
