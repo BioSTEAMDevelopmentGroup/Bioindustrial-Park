@@ -14,6 +14,7 @@ import biosteam as bst
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 import thermosteam as tmo
+import biorefineries.cornstover as cs
 from biorefineries.sugarcane import create_sugarcane_to_ethanol_system
 from biorefineries.lipidcane import (
     create_chemicals as create_starting_chemicals,
@@ -105,7 +106,7 @@ comparison_names = (
     # 'I - ∅', 
     'O1 - S1', 
     'O2 - S2', 
-    'O1 - O2', 
+    'O2 - O1', 
     'O1* - O1', 
     'O2* - O2',  
 )
@@ -123,7 +124,7 @@ across_oil_content_agile_names = (
 )
 
 across_oil_content_comparison_names = (
-    'O1 - S1', 'O2 - S2', 'O1 - O2', 
+    'O1 - S1', 'O2 - S2', 'O2 - O1', 
 )
 
 across_oil_content_agile_direct_comparison_names = (
@@ -1292,6 +1293,7 @@ def monte_carlo_box_plot(data, positions, light_color, dark_color):
 
 def monte_carlo_results(with_units=False):
     results = {}
+    ethanol_over_biodiesel = bst.MockVariable('Ethanol over biodiesel', 'Gal/ton', 'Biorefinery')
     for name in configuration_names + comparison_names + other_comparison_names:
         try: 
             df = get_monte_carlo(name)
@@ -1299,11 +1301,10 @@ def monte_carlo_results(with_units=False):
             warn(f'could not load {name}', RuntimeWarning)
             continue
         results[name] = dct = {}
-        for metric in metric_mockups + derivative_metric_mockups:
-            index = metric.index
-            data = df[index].values
-            q05, q25, q50, q75, q95 = percentiles = np.percentile(data, [5,25,50,75,95], axis=0)
-            if not with_units: key = index[1].split(' [')[0]
+        if name in ('O1', 'O2'):
+            index = ethanol_over_biodiesel.index
+            key = index[1] if with_units else index[1].split(' [')[0]
+            data = df[ethanol_production.index].values / df[biodiesel_production.index].values
             dct[key] = subdct = {
                 'mean': np.mean(data),
                 'std': np.std(data),
@@ -1313,6 +1314,37 @@ def monte_carlo_results(with_units=False):
                 'q75': q75,
                 'q95': q95,
             }
+        for metric in metric_mockups + derivative_metric_mockups:
+            index = metric.index
+            data = df[index].values
+            q05, q25, q50, q75, q95 = percentiles = np.percentile(data, [5,25,50,75,95], axis=0)
+            key = index[1] if with_units else index[1].split(' [')[0]
+            dct[key] = subdct = {
+                'mean': np.mean(data),
+                'std': np.std(data),
+                'q05': q05,
+                'q25': q25,
+                'q50': q50,
+                'q75': q75,
+                'q95': q95,
+            }
+    results['(O2 - O1) / O1'] = relative_results = {}
+    df_O2O1 = get_monte_carlo('O2 - O1')
+    df_O1 = get_monte_carlo('O1')
+    for metric in (biodiesel_production, ethanol_production):
+        index = metric.index
+        key = index[1] if with_units else index[1].split(' [')[0]
+        data = (df_O2O1[index].values / df_O1[index].values)
+        q05, q25, q50, q75, q95 = percentiles = np.percentile(data, [5,25,50,75,95], axis=0)
+        relative_results[key] = subdct = {
+            'mean': np.mean(data),
+            'std': np.std(data),
+            'q05': q05,
+            'q25': q25,
+            'q50': q50,
+            'q75': q75,
+            'q95': q95,
+        }
     return results
 
 def plot_monte_carlo(derivative=False, absolute=True, comparison=True,
@@ -1320,7 +1352,7 @@ def plot_monte_carlo(derivative=False, absolute=True, comparison=True,
                      labels=None, tickmarks=None):
     if derivative:
         configuration_names = ['O1', 'O2']
-        comparison_names = ['O1 - O2']
+        comparison_names = ['O2 - O1']
         MFPP, TCI, *production, electricity_production, natural_gas_consumption = derivative_metric_mockups
     else:
         MFPP, TCI, *production, electricity_production, natural_gas_consumption = metric_mockups
@@ -1592,6 +1624,20 @@ def plot_TCI_areas_across_oil_content(configuration='O2'):
     plt.plot(oil_contents, increasing_values, label='Oil & fiber areas')
     plt.plot(oil_contents, decreasing_values, label='Sugar areas')
     
+def save_detailed_expenditure_tables(name):
+    number, agile = parse(name)
+    folder = os.path.dirname(__file__)
+    folder = os.path.join(folder, 'results')
+    filename = f'expenditures_{number}'
+    if agile: filename += '_agile'
+    filename += '.xlsx'
+    file = os.path.join(folder, filename)
+    writer = pd.ExcelWriter(file)
+    load(name)
+    cs.voc_table(sys, tea, [ethanol, biodiesel]).to_excel(writer, 'VOC', startrow=1)
+    cs.foc_table(tea).to_excel(writer, 'FOC', startrow=1)
+    cs.capex_table(tea).to_excel(writer, 'CAPEX', startrow=1)
+    writer.save()
 
 # DO NOT DELETE: For removing ylabel and yticklabels and combine plots
 # import biorefineries.oilcane as oc
@@ -1607,11 +1653,23 @@ def plot_TCI_areas_across_oil_content(configuration='O2'):
 # import biorefineries.oilcane as oc
 # import numpy as np
 # oc.plot_monte_carlo(derivative=True, comparison=False,
-# tickmarks=np.array([
-#     [-2.5, -1.25, 0, 1.25, 2.5, 3.75],
-#     [-5, -2.5, 0, 2.5, 5.0, 7.5],
-#     [-1.5, -0.75, 0, 0.75, 1.5],
-#     [-10, 0, 10, 20, 30],
-#     [-40, -30, -20, -10, 0, 10]
-# ]),
-# labels=['Conventional', 'Cellulosic'])
+#     tickmarks=np.array([
+#         [-3.0, -1.5, 0, 1.5, 3.0, 4.5],
+#         [-6, -3, 0, 3, 6, 9],
+#         [-2.25, -1.5, -0.75, 0, 0.75, 1.5],
+#         [-10, 0, 10, 20, 30, 40],
+#         [-300, -225, -150, -75, 0, 75]
+#     ]),
+#     labels=['Conventional', 'Cellulosic']
+# )
+
+# DO NOT DELETE: For SI Monte Carlo
+# import biorefineries.oilcane as oc
+# import numpy as np
+# oc.plot_monte_carlo(
+#     absolute=True, comparison=False,
+#     labels=['Sugarcane\nconventional', 'Oilcane\nconventional',
+#             'Sugarcane\ncellulosic', 'Oilcane\ncellulosic',
+#             'Sugarcane\nconventional\nagile', 'Oilcane\nconventional\nagile',
+#             'Sugarcane\ncellulosic\nagile', 'Oilcane\ncellulosic\nagile'],
+# )
