@@ -391,7 +391,7 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
         reactor = self.reactor
         self.spec_1 = reactor.glucose_to_BDO_rxn.X = reactor.xylose_to_BDO_rxn.X = yield_
         
-        reactor.xylose_to_BDO_rxn.X = yield_
+        # reactor.xylose_to_BDO_rxn.X = yield_
         # rem_glucose = min(0.13, 1. - reactor.glucose_to_BDO_rxn.X)
         # reactor.glucose_to_acetoin_rxn.X = (55./130.) * rem_glucose
         # reactor.glucose_to_IBA_rxn.X = (25./130.) * rem_glucose
@@ -402,14 +402,18 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
         # reactor.xylose_to_IBA_rxn.X = (25./130.) * rem_xylose
         # reactor.xylose_to_biomass_rxn.X = (50./130.) * rem_xylose
         
-        reactor.xylose_to_BDO_rxn.X = yield_
+        # reactor.xylose_to_BDO_rxn.X = yield_
         
-        rem_glucose = min(0.055, (1. - reactor.glucose_to_biomass_rxn.X) - reactor.glucose_to_BDO_rxn.X)
-        reactor.glucose_to_acetoin_rxn.X =  rem_glucose
+        rem_glucose = min(0.0552, (1. - reactor.glucose_to_biomass_rxn.X) - reactor.glucose_to_BDO_rxn.X - 1e-12)
+        reactor.glucose_to_acetoin_rxn.X =  (0.055/0.0552) * rem_glucose
+        reactor.glucose_to_glycerol_rxn.X =  (0.0001/0.0552) * rem_glucose
+        reactor.glucose_to_ethanol_rxn.X =  (0.0001/0.0552) * rem_glucose
         # reactor.glucose_to_biomass_rxn.X = (50./130.) * rem_glucose
         
-        rem_xylose = min(0.055, (1. - reactor.glucose_to_biomass_rxn.X) - reactor.xylose_to_BDO_rxn.X)
-        reactor.xylose_to_acetoin_rxn.X =   rem_xylose
+        rem_xylose = min(0.0552, (1. - reactor.glucose_to_biomass_rxn.X) - reactor.xylose_to_BDO_rxn.X - 1e-12)
+        reactor.xylose_to_acetoin_rxn.X =   (0.055/0.0552) * rem_xylose
+        reactor.xylose_to_glycerol_rxn.X =  (0.0001/0.0552) * rem_xylose
+        reactor.xylose_to_ethanol_rxn.X =  (0.0001/0.0552) * rem_xylose
         # reactor.xylose_to_biomass_rxn.X = (50./130.) * rem_glucose
         
     def load_productivity(self, productivity):
