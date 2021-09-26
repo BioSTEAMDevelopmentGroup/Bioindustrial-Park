@@ -183,6 +183,13 @@ class InternalCirculationRx(bst.MixTank):
 
     @staticmethod
     def compute_COD(stream):
+        r'''
+        Compute the chemical oxygen demand (COD) of a given stream in kg-O2/m3
+        by summing the COD of each chemical in the stream using:
+
+        .. math::
+            COD [\frac{kg}{m^3}] = mol_{chemical} [\frac{kmol}{m^3}] * \frac{g O_2}{mol chemical}
+        '''
         return compute_stream_COD(stream)
 
 

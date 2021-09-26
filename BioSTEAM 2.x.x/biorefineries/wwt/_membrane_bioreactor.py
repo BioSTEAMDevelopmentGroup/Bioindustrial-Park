@@ -14,7 +14,6 @@
 TODO:
     - Add algorithms for other configurations
     (AF, submerged, sparging, GAC, flat sheet, hollow fiber)
-    - Add OLR and volume calculation
     - Maybe add AeMBR as well (make an MBR superclass)
         - AeMBR can use higher flux and allows for lower transmembrane pressure
 
@@ -294,6 +293,13 @@ class AnMBR(bst.Unit):
 
     @staticmethod
     def compute_COD(stream):
+        r'''
+        Compute the chemical oxygen demand (COD) of a given stream in kg-O2/m3
+        by summing the COD of each chemical in the stream using:
+
+        .. math::
+            COD [\frac{kg}{m^3}] = mol_{chemical} [\frac{kmol}{m^3}] * \frac{g O_2}{mol chemical}
+        '''
         return compute_stream_COD(stream)
 
 
@@ -510,6 +516,9 @@ class AnMBR(bst.Unit):
 
         # Step D: Degassing membrane
         D['Degassing membrane'] = self.N_degasser
+
+        # Total volume
+        D['Total volume [ft3]'] = self.V_tot
 
 
     ### Step A functions ###
@@ -1043,22 +1052,18 @@ class AnMBR(bst.Unit):
         '''
         return self.t_wall+2/12
 
+    @property
+    def V_tot(self):
+        '''[float] Total volume of the unit, [ft3].'''
+        return  self.D_tank*self.W_tank*self.L_CSTR*self.N_train
+
+    @property
+    def OLR(self):
+        '''[float] Organic loading rate, [kg COD/m3/hr].'''
+        return  self.compute_COD(self.ins[0])*self.ins[0].F_vol/(self.V_tot*_ft3_to_m3)
+
 
     ### Pump/blower ###
-    # @property
-    # def pump_dct(self):
-    #     '''
-    #     [dict] All pumps included in this unit, will be automatically updated
-    #     during simulation.
-    #     Keys are "permeate", "retentate", "recirculation", "lift",
-    #     and "chemical" (chemical storage included),
-    #     values are :class:`WWTpump` objects (or None if not applicable).
-    #     Note that the value for "chemical" is a tuple of two :class:`WWTpump`,
-    #     the first one is for NaOCl and the second one is for citric acid
-    #     (both used for membrane cleaning).
-    #     '''
-    #     return self._pump_dct
-
     @property
     def N_blower(self):
         '''

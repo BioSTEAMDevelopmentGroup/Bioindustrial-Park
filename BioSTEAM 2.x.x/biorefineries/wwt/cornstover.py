@@ -150,7 +150,7 @@ def create_cs_system(ins, outs, include_blowdown_recycle=True,
 
 flowsheet = bst.Flowsheet('cs_wwt')
 F.set_flowsheet(flowsheet)
-sys_wwt = create_cs_system(include_blowdown_recycle=True, default_BD=True)
+sys_wwt = create_cs_system(include_blowdown_recycle=True, default_BD=False)
 
 u = F.unit
 wwt_units = [i for i in u if i.ID[1:3]=='60']
@@ -277,20 +277,20 @@ if __name__ == '__main__':
 
 # # OLR
 # from utils import auom
-# _ft_to_m3 = auom('ft3').conversion_factor('m3')
+# _ft3_to_m3 = auom('ft3').conversion_factor('m3')
 # old_OLR_R601 = compute_stream_COD(cs.R601.ins[0])*cs.R601.ins[0].F_vol / \
 #     (4*31*1e6*auom('gal').conversion_factor('m3')) * 24 # 1.4 g COD/L/d
 # old_OLR_R602 = compute_stream_COD(cs.R602.ins[0])*cs.R602.ins[0].F_vol / \
-#     (3*25*115*344*_ft_to_m3) * 24 # 0.7 g COD/L/d
+#     (3*25*115*344*_ft3_to_m3) * 24 # 0.7 g COD/L/d
 
 # new_OLR_R601 = compute_stream_COD(u.R601.ins[0])*u.R601.ins[0].F_vol / \
 #     (u.R601.Vliq) * 24 # 30 g COD/L/d
 # V_R602 = u.R602.D_tank*u.R602.W_tank*u.R602.L_CSTR*u.R602.N_train * \
-#     _ft_to_m3
+#     _ft3_to_m3
 # new_OLR_R602 = compute_stream_COD(u.R602.ins[0])*u.R602.ins[0].F_vol / \
 #     V_R602 * 24 # 10.3 g COD/L/d
 # # new_OLR_R603 = compute_stream_COD(u.R603._inf)*u.R603._inf.F_vol / \
-# #     (u.R603.design_results['Volume [ft3]']*_ft_to_m3) * 24 # 2.25 g COD/L/d
+# #     (u.R603.design_results['Volume [ft3]']*_ft3_to_m3) * 24 # 2.25 g COD/L/d
 # new_OLR_R603 = u.R603.OLR # 2.25 g COD/L/d
 
 
