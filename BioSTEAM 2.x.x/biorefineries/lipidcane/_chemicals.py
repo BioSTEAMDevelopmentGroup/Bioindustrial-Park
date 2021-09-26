@@ -112,6 +112,7 @@ def create_chemicals():
     lipidcane_chemicals.set_synonym('DiOlein', 'DAG')
     lipidcane_chemicals.set_synonym('TriOlein', 'TAG')
     lipidcane_chemicals.define_group('Lipid', ('PL', 'FFA', 'MAG', 'DAG', 'TAG'))
+    lipidcane_chemicals.define_group('Oil', ('PL', 'FFA', 'MAG', 'DAG', 'TAG'))
     lipidcane_chemicals.set_synonym('Water', 'H2O')
     lipidcane_chemicals.set_synonym('Yeast', 'DryYeast')
     return lipidcane_chemicals

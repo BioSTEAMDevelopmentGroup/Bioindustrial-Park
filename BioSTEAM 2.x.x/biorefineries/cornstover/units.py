@@ -265,41 +265,25 @@ class ContinuousPresaccharification(Unit):
         Design['Flow rate'] = v_0 / self.N_transfer_pumps
 
 
-@cost('Flow rate', 'Recirculation pumps', kW=30, S=340*_gpm2m3hr,
-      cost=47200, n=0.8, BM=2.3, CE=522, N='N_reactors')
-@cost('Reactor duty', 'Heat exchangers', CE=522, cost=23900,
-      S=-5*_Gcal2kJ, n=0.7, BM=2.2, N='N_reactors') # Based on a similar heat exchanger
-@cost('Reactor volume', 'Agitators', CE=522, cost=52500,
-      S=1e6*_gal2m3, n=0.5, kW=90, BM=1.5, N='N_reactors')
-@cost('Reactor volume', 'Reactors', CE=522, cost=844000,
-      S=1e6*_gal2m3, n=0.5, BM=1.5, N='N_reactors')
-class Saccharification(Unit):
+class Saccharification(bst.BatchBioreactor):
     _N_ins = 1
     _N_outs = 1
     _N_heat_utilities = 1
         
-    #: Saccharification temperature (K)
-    T_saccharification = 48+273.15
-    
-    #: Saccharification time (hr)
-    tau_saccharification = 72
-    
     #: Unload and clean up time (hr)
     tau_0 = 4
     
     #: Working volume fraction (filled tank to total tank volume)
     V_wf = 0.9
     
-    #: Number of reactors
-    N_reactors = 12
-    
     _units = {'Flow rate': 'm3/hr',
               'Reactor volume': 'm3',
               'Reactor duty': 'kJ/hr'}
     
-    def __init__(self, ID='', ins=None, outs=(), thermo=None, P=101325):
-        Unit.__init__(self, ID, ins, outs, thermo)
-        self.P = P
+    def __init__(self, ID='', ins=None, outs=(), thermo=None, 
+                 tau=72, N=None, V=3785.4118, T=48+273.15, P=101325,
+                 Nmin=2, Nmax=36):
+        bst.BatchBioreactor.__init__(self, ID, ins, outs, thermo, tau, N, V, T, P, Nmin, Nmax)
         chemicals = self.chemicals
         #: [ParallelReaction] Enzymatic hydrolysis reactions including from 
         #: downstream batch tank in co-fermentation.
@@ -309,26 +293,24 @@ class Saccharification(Unit):
             Rxn('Glucan + H2O -> Glucose',            'Glucan',   0.9000, chemicals),
             Rxn('Cellobiose + H2O -> 2Glucose',       'Cellobiose',  1.0000, chemicals)]
         )
-        self.glucan_to_glucose = self.saccharification[3]
+        
+    def _setup(self): pass
+        
+    @property
+    def vent(self):
+        return None
+    @property
+    def effluent(self):
+        return self.outs[0]
         
     def _run(self):
         feed, = self.ins
         effluent, = self.outs
         effluent.copy_flow(feed)
-        effluent.T = self.T_saccharification
+        effluent.T = self.T
         effluent.P = self.P
         self.saccharification(effluent)
 
-    def _design(self):
-        effluent, = self.outs
-        v_0 = effluent.F_vol
-        Design = self.design_results
-        Design['Flow rate'] = v_0 / self.N_reactors
-        tau = self.tau_saccharification
-        Design.update(size_batch(v_0, tau, self.tau_0, self.N_reactors, self.V_wf))
-        hu_fermentation, = self.heat_utilities
-        Design['Reactor duty'] = reactor_duty = self.Hnet 
-        hu_fermentation(reactor_duty, effluent.T)
 
 
 class CoFermentation(bst.BatchBioreactor):
@@ -354,7 +336,8 @@ class CoFermentation(bst.BatchBioreactor):
     Rxn('3 Xylose -> 5 LacticAcid',      'Xylose',    0.0300, chemicals),
     Rxn('3 Arabinose -> 5 LacticAcid',   'Arabinose', 0.0300, chemicals),
     Rxn('Galactose -> 2 LacticAcid',     'Galactose', 0.0300, chemicals),
-    Rxn('Mannose -> 2 LacticAcid',       'Mannose',   0.0300, chemicals),])
+    Rxn('Mannose -> 2 LacticAcid',       'Mannose',   0.0300, chemicals),
+        ])
         self.cofermentation = ParallelRxn([
     #   Reaction definition                                          Reactant    Conversion
     Rxn('Glucose -> 2 Ethanol + 2 CO2',                             'Glucose',   0.9500, chemicals),
@@ -379,12 +362,12 @@ class CoFermentation(bst.BatchBioreactor):
         self.CSL_to_constituents.basis = 'mol'
         
         if all([i in self.chemicals for i in ('FFA', 'DAG', 'TAG', 'Glycerol')]):
-            self.lipid_reaction = ParallelRxn([
+            self.oil_reaction = self.lipid_reaction = ParallelRxn([
                 Rxn('TAG + 3Water -> 3FFA + Glycerol', 'TAG', 0.23, chemicals),
                 Rxn('TAG + Water -> FFA + DAG', 'TAG', 0.02, chemicals)
             ])
         else:
-            self.lipid_reaction = None
+            self.oil_reaction = self.lipid_reaction = None
         
     def _run(self):
         feeds = self.ins
@@ -393,7 +376,6 @@ class CoFermentation(bst.BatchBioreactor):
         vent.T = effluent.T = self.T
         vent.phase = 'g'
         effluent.mix_from(feeds, energy_balance=False)
-        self.loss(effluent)
         self.cofermentation(effluent)
         self.CSL_to_constituents(effluent)
         if self.lipid_reaction: self.lipid_reaction(effluent)

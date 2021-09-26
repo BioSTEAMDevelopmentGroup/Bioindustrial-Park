@@ -18,50 +18,55 @@ are lazy loaded by the module:
 .. code-block:: python
 
     >>> from biorefineries import sugarcane as sc
-    >>> # This is optional; it forces the biorefinery to load
-    >>> # Otherwise, first time accessing will take a bit to load.
-    >>> sc.load()
+    >>> sc.load() # This is optional; it forces the biorefinery to load
     >>> sc.chemicals # All chemicals used by the biorefinery.
-    CompiledChemicals([Water, Ethanol, Glucose, Sucrose, H3PO4, P4O10, CO2, Octane, O2, CH4, Ash, Cellulose, Hemicellulose, Flocculant, Lignin, Solids, Yeast, CaO])
-    >>> sc.sugarcane_sys.show() # The complete biorefinery system
+    CompiledChemicals([Water, Ethanol, Glucose, Sucrose, H3PO4, P4O10, CO2, Octane, O2, N2, CH4, Ash, Cellulose, Hemicellulose, Flocculant, Lignin, Solids, Yeast, CaO])
+    >>> sc.sugarcane_sys.show(data=False) # The complete biorefinery system
     System: sugarcane_sys
-     path: (U101, U102, U103, T201,
-            juice_extraction_sys, T202, H201,
-            T203, P201, T204, T205, P202,
-            juice_separation_sys, S202,
-            ethanol_production_sys, U202)
-     facilities: (CWP, BT, CT, PWC)
+    ins...
+    [0] sugarcane
+    [1] enzyme
+    [2] H3PO4
+    [3] lime
+    [4] polymer
+    [5] denaturant
+    outs...
+    [0] ethanol
+    [1] vinasse
+    [2] wastewater
+    [3] emissions
+    [4] ash_disposal
     >>> sc.sugarcane_tea.show() # The TEA object
     ConventionalEthanolTEA: sugarcane_sys
-     NPV: 0 USD at 10.3% IRR
+     NPV: -3 USD at 11.9% IRR
     >>> sc.flowsheet # The complete flowsheet
     <Flowsheet: sugarcane>
     >>> sc.R301.show() # Any unit operations and streams can be accessed through the module
     Fermentation: R301
     ins...
-    [0] s30  from  HXutility-H301
+    [0] s35  from  HXutility-H301
         phase: 'l', T: 295.15 K, P: 101325 Pa
-        flow (kmol/hr): Water    4.34e+03
+        flow (kmol/hr): Water    8.71e+03
                         Glucose  21.1
                         Sucrose  126
                         H3PO4    0.85
-    [1] s55  from  MixTank-T305
-        phase: 'l', T: 298.15 K, P: 101325 Pa
-        flow (kmol/hr): Water  1.37e+03
-                        Yeast  1.03e+04
+    [1] s41  from  MockSplitter-S302
+        phase: 'l', T: 294.19 K, P: 101325 Pa
+        flow (kmol/hr): Water  25.3
+                        Yeast  27.5
     outs...
     [0] CO2  to  VentScrubber-D301
-        phase: 'g', T: 305.15 K, P: 101325 Pa
-        flow (kmol/hr): Water    4.1
-                        Ethanol  1.73
+        phase: 'g', T: 294.19 K, P: 101325 Pa
+        flow (kmol/hr): Water    10.7
+                        Ethanol  5.52
                         CO2      491
-    [1] s31  to  StorageTank-T301
-        phase: 'l', T: 295.98 K, P: 101325 Pa
-        flow (kmol/hr): Water    5.58e+03
-                        Ethanol  489
-                        Glucose  27.3
+    [1] s36  to  StorageTank-T301
+        phase: 'l', T: 294.19 K, P: 101325 Pa
+        flow (kmol/hr): Water    8.6e+03
+                        Ethanol  486
+                        Glucose  8.19
                         H3PO4    0.85
-                        Yeast    1.03e+04
+                        Yeast    166
 
 
 References

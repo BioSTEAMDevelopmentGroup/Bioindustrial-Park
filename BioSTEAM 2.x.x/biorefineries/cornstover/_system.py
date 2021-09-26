@@ -584,6 +584,12 @@ def create_cellulosic_fermentation_system(
         kind=0, 
         # 0 for Integrated Bioprocess(IB)
         # 1 for Simultaneous Saccharification and Co-fermentation (SSCF) 
+        # 2 for Saccharification and Co-fermentation (SCF)
+        Saccharification=None,
+        ContinuousPresaccharification=None,
+        SeedTrain=None,
+        CoFermentation=None,
+        SaccharificationAndCoFermentation=None,
     ):
     vent, beer, lignin = outs
     hydrolyzate, cellulase, saccharification_water, DAP, CSL = ins
@@ -595,13 +601,15 @@ def create_cellulosic_fermentation_system(
         insoluble_solids_loading=insoluble_solids_loading,
         nonsolids=nonsolids,
         insoluble_solids=insoluble_solids,
-        Saccharification=(units.Saccharification if kind == 2 else units.ContinuousPresaccharification),
+        Saccharification=(Saccharification or units.Saccharification if kind == 2 else ContinuousPresaccharification or units.ContinuousPresaccharification),
     )
     if kind == 0:
         cofermentation_sys = create_integrated_bioprocess_saccharification_and_cofermentation_system(
             ins=[saccharification_sys-0, DAP, CSL],
             outs=[vent, beer],
-            mockup=True
+            mockup=True,
+            SaccharificationAndCoFermentation=SaccharificationAndCoFermentation,
+            SeedTrain=SeedTrain,
         )
     elif kind == 1:
         cofermentation_sys = create_simultaneous_saccharification_and_cofermentation_system(
@@ -614,7 +622,9 @@ def create_cellulosic_fermentation_system(
         cofermentation_sys = create_cofermentation_system(
             ins=[T303-0, DAP, CSL],
             outs=[vent, beer, lignin],
-            mockup=True
+            mockup=True,
+            SeedTrain=SeedTrain,
+            CoFermentation=CoFermentation,
         )
     else:
         raise ValueError("invalid 'kind'")

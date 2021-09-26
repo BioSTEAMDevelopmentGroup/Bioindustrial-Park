@@ -304,7 +304,7 @@ BDO_metrics = [get_BDO_MPSP, lambda: BDO_lca.GWP, lambda: BDO_lca.FEC]
 
 
 # %% Generate 3-specification meshgrid and set specification loading functions
-steps = 10
+steps = 20
 # Yield, titer, productivity (rate)
 spec_1 = np.linspace(0.05, 0.95, steps) # yield
 spec_2 = np.linspace(5., 210., steps) # titer

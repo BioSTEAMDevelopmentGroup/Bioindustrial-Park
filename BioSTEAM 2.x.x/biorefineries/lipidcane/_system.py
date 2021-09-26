@@ -173,8 +173,8 @@ def create_juicing_system(ins, outs, pellet_bagasse=None):
         mockup=True,
     )
     u = f.unit
-    u.U201.isplit['Lipid'] = 0.01 # Crushing mill
-    u.S201.isplit['Lipid'] = 0.88 # Fiber screener #1
+    u.U201.isplit['Lipid'] = 0.90 # Crushing mill
+    u.S201.isplit['Lipid'] = 1.0 # Fiber screener #1
     u.C201.isplit['Lipid'] = 0.99 # Clarifier
     u.S202.isplit['Lipid'] = 0.999  # Fiber screener #2
     
@@ -270,13 +270,15 @@ def create_lipid_pretreatment_system(ins, outs):
               Water=0.0184,
               TAG=11.1)],
     outs=[dict(ID='biodiesel'),
-          dict(ID='crude_glycerol')]
+          dict(ID='crude_glycerol'),
+          dict(ID='wastewater',
+               price=price['Waste'])]
 )
 def create_transesterification_and_biodiesel_separation_system(ins, outs):
     ### Streams ###
     
     oil, = ins
-    biodiesel, crude_glycerol = outs
+    biodiesel, crude_glycerol, wastewater = outs
     
     # Fresh methanol
     methanol = bst.Stream('methanol',
@@ -307,9 +309,6 @@ def create_transesterification_and_biodiesel_separation_system(ins, outs):
     
     # Base to neutralize acid before distillation
     NaOH = bst.Stream('NaOH', NaOH=1, price=price['NaOH'])
-    
-    # Waste
-    waste = bst.Stream('waste', price=price['Waste'])
     
     ### Units ###
     
@@ -434,7 +433,7 @@ def create_transesterification_and_biodiesel_separation_system(ins, outs):
     
     # Centrifuge out waste fat
     # assume all the lipid, free_lipid and biodiesel is washed out
-    C404 = units.LiquidsSplitCentrifuge('C404', outs=('', waste),
+    C404 = units.LiquidsSplitCentrifuge('C404', outs=('', wastewater),
                                          order=('Methanol', 'Glycerol', 'Water'),
                                          split=(0.999, 0.999, 0.99))
     

@@ -586,13 +586,15 @@ class SeedTrain(Unit):
         self.cofermentation_rxns = ParallelRxn([
         #      Reaction definition            Reactant    Conversion
         Rxn('Glucose -> BDO + H2 + 2 CO2',        'Glucose',   2*.36*.8), 
-        Rxn('Glucose -> Acetoin + 2CO2',               'Glucose',   0.055*.8),
+        Rxn('Glucose -> Acetoin + 2 CO2',               'Glucose',   0.055*.8),
         Rxn('Glucose -> 6 FermMicrobe',       'Glucose',   0.03*.8),
         Rxn('3 Xylose -> 2.5 BDO + 2.5 H2 + 5 CO2',       'Xylose',    2*0.36*.8*.8),
-        Rxn('Xylose -> Acetoin + CO2',       'Xylose',    0.055*.8),
+        Rxn('3 Xylose -> 2.5 Acetoin + 5 CO2',       'Xylose',    0.055*.8),
         Rxn('Xylose -> 5 FermMicrobe',        'Xylose',    0.03*.8),
         Rxn('Glucose + 2 H2O -> 2 Glycerol + O2', 'Glucose', 0.0001*.8),
-        Rxn('3 Xylose + 5 H2O -> 5 Glycerol + 2.5 O2', 'Xylose', 0.0001*.8)
+        Rxn('3 Xylose + 5 H2O -> 5 Glycerol + 2.5 O2', 'Xylose', 0.0001*.8),
+        Rxn('Glucose -> 2 Ethanol + 2 CO2', 'Glucose', 0.0001*.8),
+        Rxn('3 Xylose -> 5 Ethanol + 5 CO2', 'Xylose', 0.0001*.8),
         ])
         
         self.CO2_generation_rxns = ParallelRxn([
@@ -614,6 +616,13 @@ class SeedTrain(Unit):
         
         self.glucose_to_microbe_rxn = self.cofermentation_rxns[2]
         self.xylose_to_microbe_rxn = self.cofermentation_rxns[5]
+                
+
+        self.glucose_to_glycerol_rxn = self.cofermentation_rxns[6]
+        self.xylose_to_glycerol_rxn = self.cofermentation_rxns[7]
+        
+        self.glucose_to_ethanol_rxn = self.cofermentation_rxns[8]
+        self.xylose_to_ethanol_rxn = self.cofermentation_rxns[9]
         
     def _run(self):
         feed = self.ins[0]
@@ -1611,15 +1620,17 @@ class CoFermentation(Reactor):
         # FermMicrobe reaction from Table 10 on Page 31 of Davis et al.
         self.cofermentation_rxns = ParallelRxn([
         #      Reaction definition            Reactant    Conversion
-        Rxn('Glucose -> BDO + H2 + 2CO2',        'Glucose',   2*.36), 
-        Rxn('Glucose -> Acetoin + 2CO2',               'Glucose',   0.055),
+        Rxn('Glucose -> BDO + H2 + 2 CO2',        'Glucose',   2*.36), 
+        Rxn('Glucose -> Acetoin + 2 CO2',               'Glucose',   0.055),
         Rxn('Glucose -> 6 FermMicrobe',       'Glucose',   0.02),
         Rxn('3 Xylose -> 2.5 BDO + 2.5 H2 + 5 CO2',       'Xylose',    2*0.36*0.8),
-        Rxn('Xylose -> Acetoin + 2CO2',       'Xylose',    0.055),
+        Rxn('3 Xylose -> 2.5 Acetoin + 5 CO2',       'Xylose',    0.055),
         Rxn('Xylose -> 5 FermMicrobe',        'Xylose',    0.02), 
         Rxn('Acetoin -> BDO',               'Acetoin',      .9),
         Rxn('Glucose + 2 H2O -> 2 Glycerol + O2', 'Glucose', 0.0001),
-        Rxn('3 Xylose + 5 H2O -> 5 Glycerol + 2.5 O2', 'Xylose', 0.0001)
+        Rxn('3 Xylose + 5 H2O -> 5 Glycerol + 2.5 O2', 'Xylose', 0.0001),
+        Rxn('Glucose -> 2 Ethanol + 2 CO2', 'Glucose', 0.0001),
+        Rxn('3 Xylose -> 5 Ethanol + 5 CO2', 'Xylose', 0.0001),
         ])
         
         self.CO2_generation_rxns = ParallelRxn([
@@ -1643,6 +1654,12 @@ class CoFermentation(Reactor):
         self.xylose_to_microbe_rxn = self.cofermentation_rxns[5]
         
         self.acetoin_to_BDO_rxn = self.cofermentation_rxns[6]
+        
+        self.glucose_to_glycerol_rxn = self.cofermentation_rxns[7]
+        self.xylose_to_glycerol_rxn = self.cofermentation_rxns[8]
+        
+        self.glucose_to_ethanol_rxn = self.cofermentation_rxns[9]
+        self.xylose_to_ethanol_rxn = self.cofermentation_rxns[10]
         
         self._X = self.cofermentation_rxns.X.copy()
         
