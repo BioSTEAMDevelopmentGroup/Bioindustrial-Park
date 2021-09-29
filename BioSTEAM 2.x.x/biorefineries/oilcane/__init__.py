@@ -485,6 +485,7 @@ def load(name, cache={}, reduce_chemicals=True, enhanced_cellulosic_performance=
     
     if agile: 
         dct['oilsorghum'] = oilsorghum = sorghum_feedstock(ID='oilsorghum')
+        
         sys = agile_sys = bst.AgileSystem()
         @agile_sys.operation_parameter(mode_dependent=True)
         def set_oil_content(oil_content, mode):
@@ -499,6 +500,11 @@ def load(name, cache={}, reduce_chemicals=True, enhanced_cellulosic_performance=
                 oilcane.F_mass = F_mass
         agile_sys.operation_parameter(set_glucose_yield)
         agile_sys.operation_parameter(set_xylose_yield)
+        
+        @agile_sys.operation_metric(annualize=True)
+        def direct_emissions(mode):
+            products = mode.system.products
+            return 44 * sum([i.imol['CO2'] for i in products], -oilcane.get_atomic_flow('C'))
         
         dct['cane_mode'] = cane_mode = agile_sys.operation_mode(oilcane_sys,
             operating_hours=200*24, oil_content=0.05, feedstock=oilcane.copy(),
@@ -520,6 +526,11 @@ def load(name, cache={}, reduce_chemicals=True, enhanced_cellulosic_performance=
         tea.operating_days = 200
         tea.IRR = 0.10
         feedstocks = [oilcane]
+        
+        def direct_emissions():
+            products = sys.products
+            return 44 * sum([i.imol['CO2'] for i in products], -oilcane.get_atomic_flow('C')) * sys.operating_hours
+        
     tea.income_tax = 0.21 # Davis et al. 2018; https://www.nrel.gov/docs/fy19osti/71949.pdf
     
     ## Specification for analysis
@@ -544,31 +555,25 @@ def load(name, cache={}, reduce_chemicals=True, enhanced_cellulosic_performance=
         )
     
     ## LCA
-    # characterization_factors = {
-    #     'feedstock': 0.46,
-    # }
-    # feeds = sys.feeds
-    # material_cradle_to_gate_key = ('GWP100', 'cradle-to-gate')
-    # coproduct_gate_to_grave = ('GWP100', 'gate-to-grave')
-    # electricity_key = ('GWP100', 'cradle-to-gate')
-    
-    # # First set values of everything to 0., then input important factors
-    # for feed in sys.feeds:
-    #     feed.characterization_factors[material_cradle_to_gate_key] = 0.
-    # for product in sys.products:
-    #     product.characterization_factors[coproduct_gate_to_grave] = 0.
+    characterization_factors = {
+        'feedstock': 0.46,
+    }
+    feeds = sys.feeds
+    material_cradle_to_gate_key = ('GWP100', 'cradle-to-gate')
+    coproduct_gate_to_grave = ('GWP100', 'gate-to-grave')
+    electricity_key = ('GWP100', 'cradle-to-gate')
         
-    # # Set non-negligible characterization factors
-    # dw = 1. - sc.sugarcane.get_mass_composition('Water')
-    # sc.sugarcane.characterization_factors[material_cradle_to_gate_key] = 0.46 * dw # https://www.osti.gov/servlets/purl/1337146
-    # bst.PowerUtility.characterization_factors[electricity_key] = 0.48 # https://greet.es.anl.gov/
-    # # Assume fertirrigation of vinasse offsets NO2 emissions from fertilizers, so GWP from NO2 does not need to be added.
-    # # However, the high COD leads to CH4 production equivalent to 345 kg–CO2–eq m3 EtOH
-    # # https://doi.org/10.1016/j.biombioe.2007.12.006
-    # sc.vinasse.characterization_factors[coproduct_gate_to_grave] = 345 / 789 * sc.ethanol.F_mass / sc.vinasse.F_mass # kg–CO2–eq kg 
-    # sc.enzyme.characterization_factors[material_cradle_to_gate_key] = 2.24 # General enzyme
-    # sc.H3PO4.characterization_factors[material_cradle_to_gate_key] = 0. # TODO
-    # sc.lime.characterization_factors[material_cradle_to_gate_key] = 1.29
+    # Set non-negligible characterization factors
+    dw = 1. - sc.sugarcane.get_mass_composition('Water')
+    sc.sugarcane.characterization_factors[material_cradle_to_gate_key] = 0.46 * dw # https://www.osti.gov/servlets/purl/1337146
+    bst.PowerUtility.characterization_factors[electricity_key] = 0.48 # https://greet.es.anl.gov/
+    # Assume fertirrigation of vinasse offsets NO2 emissions from fertilizers, so GWP from NO2 does not need to be added.
+    # However, the high COD leads to CH4 production equivalent to 345 kg–CO2–eq m3 EtOH
+    # https://doi.org/10.1016/j.biombioe.2007.12.006
+    sc.vinasse.characterization_factors[coproduct_gate_to_grave] = 345 / 789 * sc.ethanol.F_mass / sc.vinasse.F_mass # kg–CO2–eq kg 
+    sc.enzyme.characterization_factors[material_cradle_to_gate_key] = 2.24 # General enzyme
+    sc.H3PO4.characterization_factors[material_cradle_to_gate_key] = 0. # TODO
+    sc.lime.characterization_factors[material_cradle_to_gate_key] = 1.29
     
     ## Model
     model = bst.Model(sys, exception_hook='raise', retry_evaluation=False)
@@ -912,30 +917,30 @@ def load(name, cache={}, reduce_chemicals=True, enhanced_cellulosic_performance=
     #         - natural_gas_flow() / 126.67)
     #     return GGE / 1e6
     
-    # @metric(units='kg CO2-eq / gge')
-    # def GWP(): # Cradle to gate
-    #     net_electricity = bst.PowerUtility(production=sys.utility_cost / bst.PowerUtility.price)
-    #     GWP_material = sum([s.get_impact(material_cradle_to_gate_key) for s in feeds])
-    #     biogenic_CO2 = oilcane.get_atomic_flow('C')*44 # in kg CO2/hr
-    #     GWP_direct_emissions = sum([i.imass['CO2'] for i in sys.products if 'CO2' in i.chemicals]) - biogenic_CO2
-    #     GWP_electricity_production = net_electricity.get_impact(production_key=electricity_key)
-    #     GWP_coproducts = sum([s.get_impact(coproduct_gate_to_grave) for s in feeds])
-    #     GWP_total = GWP_material + GWP_direct_emissions + GWP_electricity_production + GWP_coproducts # kg CO2 eq. / hr
+    @metric(units='kg CO2-eq / gge')
+    def GWP(): # Cradle to gate
+        GWP_material = sys.get_total_feeds_impact(material_cradle_to_gate_key)
+        biogenic_CO2 = oilcane.get_atomic_flow('C')*44 # in kg CO2/hr
+        # TODO
+        # GWP_direct_emissions = 
+        GWP_electricity_production = sys.get_electricity_impact(production_key=electricity_key)
+        GWP_coproducts = sum([s.get_impact(coproduct_gate_to_grave) for s in feeds])
+        GWP_total = GWP_material + GWP_direct_emissions + GWP_electricity_production + GWP_coproducts # kg CO2 eq. / hr
         
-    #     if agile:
-    #         biodiesel_flow = sys.flow_rates.get(biodiesel, 0.) / 3.3111 # gal/yr
-    #         ethanol_flow = sys.flow_rates[ethanol] / 2.98668849 # gal/yr
-    #     natural_gas_flow = lambda: sys.flow_rates[natural_gas] * V_ng # cf/yr
-    #     if number <= 1:
-    #         electricity = lambda: sys.utility_cost / bst.PowerUtility.price
-    #     elif number == 2:
-    #         electricity = lambda: 0.
-    # else:
-    #     feedstock_flow = lambda: sys.operating_hours * oilcane.F_mass / kg_per_ton # ton/yr
-    #     biodiesel_flow = lambda: sys.operating_hours * biodiesel.F_mass / 3.3111 # gal/yr
-    #     ethanol_flow = lambda: sys.operating_hours * ethanol.F_mass / 2.98668849 # gal/yr
+        if agile:
+            biodiesel_flow = sys.flow_rates.get(biodiesel, 0.) / 3.3111 # gal/yr
+            ethanol_flow = sys.flow_rates[ethanol] / 2.98668849 # gal/yr
+        natural_gas_flow = lambda: sys.flow_rates[natural_gas] * V_ng # cf/yr
+        if number <= 1:
+            electricity = lambda: sys.utility_cost / bst.PowerUtility.price
+        elif number == 2:
+            electricity = lambda: 0.
+    else:
+        feedstock_flow = lambda: sys.operating_hours * oilcane.F_mass / kg_per_ton # ton/yr
+        biodiesel_flow = lambda: sys.operating_hours * biodiesel.F_mass / 3.3111 # gal/yr
+        ethanol_flow = lambda: sys.operating_hours * ethanol.F_mass / 2.98668849 # gal/yr
         
-    #     return GWP_total / productivity # kg CO2 eq. / gge
+        return GWP_total / productivity # kg CO2 eq. / gge
     
     # Single point evaluation for detailed design results
     if abs(number) == 2:
