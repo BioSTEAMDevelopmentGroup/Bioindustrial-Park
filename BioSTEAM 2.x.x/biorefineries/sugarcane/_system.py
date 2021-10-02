@@ -96,9 +96,10 @@ def create_juicing_system_without_treatment(ins, outs, pellet_bagasse=None):
     
     @T201.add_specification(run=True)
     def update_enzyme_and_imbibition_water():
-        F_mass = T201.ins[0].F_mass
+        sugarcane = T201.ins[0]
+        F_mass = sugarcane.F_mass
         enzyme.imass['Cellulose', 'Water'] = 0.003 * F_mass * np.array([0.1, 0.9])
-        imbibition_water.imass['Water'] = 0.25 * F_mass
+        imbibition_water.imass['Water'] = 1.47 * (F_mass - sugarcane.imass['Water', 'Cellulose', 'Hemicellulose', 'Lignin'].sum())
     
     # Finely crush lipid cane
     U201 = units.CrushingMill('U201',
