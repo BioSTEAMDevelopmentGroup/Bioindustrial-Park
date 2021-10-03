@@ -28,7 +28,7 @@ import biosteam as bst
 from chaospy import distributions as shape
 from biosteam import main_flowsheet as flowsheet
 from biosteam.evaluation import Model, Metric
-from biorefineries.BDO.system_MS2 import BDO_sys, BDO_tea, spec, feedstock, MEK, BT, BDO_lca, unit_groups_dict
+from biorefineries.BDO.system_MS3 import BDO_sys, BDO_tea, spec, feedstock, MEK, BT, BDO_lca, unit_groups_dict
 from biorefineries.BDO.process_settings import CFs
 
 _kg_per_ton = 907.18474

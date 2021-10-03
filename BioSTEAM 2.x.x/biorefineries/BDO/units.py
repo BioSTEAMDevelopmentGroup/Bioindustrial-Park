@@ -1680,11 +1680,14 @@ class CoFermentation(Reactor):
         
         effluent.T = vapor.T = self.T
         CSL.imass['CSL'] = sum([i.F_vol for i in feeds]) * self.CSL_loading 
-        
-        self.cofermentation_rxns(effluent.mol)
-        self.CO2_generation_rxns(effluent.mol)
-        vapor.phase = 'g'
-        vapor.copy_flow(effluent, ('CO2', 'O2', 'H2'), remove=True)
+        try:
+            self.cofermentation_rxns(effluent.mol)
+            self.CO2_generation_rxns(effluent.mol)
+        except:
+            pass
+        finally:
+            vapor.phase = 'g'
+            vapor.copy_flow(effluent, ('CO2', 'O2', 'H2'), remove=True)
         effluent.imass['CSL'] = 0
         
         self.vessel_material = 'Stainless steel 316'
@@ -1694,7 +1697,7 @@ class CoFermentation(Reactor):
         mode = self.mode
         Design = self.design_results
         Design.clear()
-        duty = Design['Reactor duty'] = self.Hnet + self.ins[-1].Hnet
+        duty = Design['Reactor duty'] = - abs(self.Hnet + self.ins[-1].Hnet)
 
         if mode == 'Batch':
             effluent = self.outs[1]

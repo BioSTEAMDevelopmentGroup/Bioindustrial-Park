@@ -1,0 +1,67 @@
+,Path,N_calls,Mean_time_per_call [s],Cumulative_time [s]
+get_MEK_MPSP,"""C:\Users\saran\Documents\Academia\Spring 2020\BioSTEAM\Bioindustrial-Park\BioSTEAM 2.x.x\biorefineries\BDO\system_MS3.py"", line 187",1,5.6879985,5.6879985
+try_method_with_object_stamp,"""C:\Users\saran\Documents\Academia\Spring 2020\BioSTEAM\thermosteam\thermosteam\exceptions.py"", line 72",361,0.015733447091412743,5.6797744
+_converge,"""C:\Users\saran\Documents\Academia\Spring 2020\BioSTEAM\biosteam\biosteam\_system.py"", line 1327",26,0.1727147153846154,4.490582600000001
+_run,"""C:\Users\saran\Documents\Academia\Spring 2020\BioSTEAM\biosteam\biosteam\units\heat_exchange.py"", line 387",54,0.005059442592592593,0.2732099
+run,"""C:\Users\saran\Documents\Academia\Spring 2020\BioSTEAM\biosteam\biosteam\_unit.py"", line 746",240,0.018693122083333336,4.4863493000000005
+converge_system_in_path,"""C:\Users\saran\Documents\Academia\Spring 2020\BioSTEAM\biosteam\biosteam\_system.py"", line 77",24,0.16681950833333334,4.0036682
+_aitken,"""C:\Users\saran\Documents\Academia\Spring 2020\BioSTEAM\biosteam\biosteam\_system.py"", line 1300",24,0.16681891250000003,4.003653900000001
+_solve,"""C:\Users\saran\Documents\Academia\Spring 2020\BioSTEAM\biosteam\biosteam\_system.py"", line 1304",24,0.16681864166666668,4.0036474
+conditional_aitken,"""C:\Users\saran\Anaconda3\envs\bioenv\lib\site-packages\flexsolve\iterative_solvers.py"", line 131",24,0.16681617083333333,4.0035881
+_iter_run,"""C:\Users\saran\Documents\Academia\Spring 2020\BioSTEAM\biosteam\biosteam\_system.py"", line 1179",43,0.09310652093023257,4.003580400000001
+__call__,"""C:\Users\saran\Documents\Academia\Spring 2020\BioSTEAM\thermosteam\thermosteam\equilibrium\dew_point.py"", line 172",35,0.004537408571428572,0.15880930000000001
+S402_spec,"""C:\Users\saran\Documents\Academia\Spring 2020\BioSTEAM\Bioindustrial-Park\BioSTEAM 2.x.x\biorefineries\BDO\separation_systems.py"", line 633",18,0.17920690555555555,3.2257243
+IQ_interpolation,"""C:\Users\saran\Anaconda3\envs\bioenv\lib\site-packages\flexsolve\bounded_solvers.py"", line 176",12837,0.000248689771753525,3.1924306000000002
+set_PH,"""C:\Users\saran\Documents\Academia\Spring 2020\BioSTEAM\thermosteam\thermosteam\equilibrium\vle.py"", line 743",278,0.008575175179856115,2.3838987
+wegstein,"""C:\Users\saran\Anaconda3\envs\bioenv\lib\site-packages\flexsolve\iterative_solvers.py"", line 52",2958,0.0007539559161595673,2.2302016
+_run_counter_current_heat_exchange,"""C:\Users\saran\Documents\Academia\Spring 2020\BioSTEAM\biosteam\biosteam\units\heat_exchange.py"", line 718",145,0.014805607586206897,2.1468131
+counter_current_heat_exchange,"""C:\Users\saran\Documents\Academia\Spring 2020\BioSTEAM\biosteam\biosteam\units\design_tools\heat_transfer.py"", line 87",145,0.014796215862068965,2.1454513
+aitken,"""C:\Users\saran\Anaconda3\envs\bioenv\lib\site-packages\flexsolve\iterative_solvers.py"", line 101",2357,0.000760041960118795,1.7914189
+_solve_v,"""C:\Users\saran\Documents\Academia\Spring 2020\BioSTEAM\thermosteam\thermosteam\equilibrium\vle.py"", line 917",1675,0.000987554208955224,1.6541533000000002
+simulate_multi_stage_lle_without_side_draws,"""C:\Users\saran\Documents\Academia\Spring 2020\BioSTEAM\thermosteam\thermosteam\separations.py"", line 1061",18,0.08973800000000001,1.6152840000000002
+S402_f,"""C:\Users\saran\Documents\Academia\Spring 2020\BioSTEAM\Bioindustrial-Park\BioSTEAM 2.x.x\biorefineries\BDO\separation_systems.py"", line 593",108,0.014895917592592593,1.6087591
+_y_iter,"""C:\Users\saran\Documents\Academia\Spring 2020\BioSTEAM\thermosteam\thermosteam\equilibrium\vle.py"", line 882",1675,0.0009532014925373134,1.5966125
+_summary,"""C:\Users\saran\Documents\Academia\Spring 2020\BioSTEAM\biosteam\biosteam\_unit.py"", line 765",133,0.011915675939849624,1.5847849
+_H_hat_err_at_T,"""C:\Users\saran\Documents\Academia\Spring 2020\BioSTEAM\thermosteam\thermosteam\equilibrium\vle.py"", line 864",1452,0.0010662525482093665,1.5481987000000001
+multi_stage_lle_without_side_draws_iter,"""C:\Users\saran\Documents\Academia\Spring 2020\BioSTEAM\thermosteam\thermosteam\separations.py"", line 1111",144,0.010470974305555556,1.5078203000000001
+simulate_unit_in_path,"""C:\Users\saran\Documents\Academia\Spring 2020\BioSTEAM\biosteam\biosteam\_system.py"", line 85",8,0.186534375,1.492275
+simulate,"""C:\Users\saran\Documents\Academia\Spring 2020\BioSTEAM\biosteam\biosteam\_unit.py"", line 832",8,0.18653198750000002,1.4922559000000002
+_cost,"""C:\Users\saran\Documents\Academia\Spring 2020\BioSTEAM\biosteam\biosteam\units\facilities\hxn\_heat_exchanger_network.py"", line 153",1,1.4848342,1.4848342
+solve_phase_fraction_Rashford_Rice,"""C:\Users\saran\Documents\Academia\Spring 2020\BioSTEAM\thermosteam\thermosteam\equilibrium\binary_phase_fraction.py"", line 132",12748,0.00011065696579855664,1.410655
+xV_iter,"""C:\Users\saran\Documents\Academia\Spring 2020\BioSTEAM\thermosteam\thermosteam\equilibrium\vle.py"", line 28",9742,0.0001231944980496818,1.2001608000000001
+synthesize_network,"""C:\Users\saran\Documents\Academia\Spring 2020\BioSTEAM\biosteam\biosteam\units\facilities\hxn\hxn_synthesis.py"", line 237",1,1.0630543000000001,1.0630543000000001
+aitken_secant,"""C:\Users\saran\Anaconda3\envs\bioenv\lib\site-packages\flexsolve\open_solvers.py"", line 53",1684,0.0005470335510688837,0.9212045000000001
+partition,"""C:\Users\saran\Documents\Academia\Spring 2020\BioSTEAM\thermosteam\thermosteam\separations.py"", line 449",3006,0.00026332944111776447,0.7915683
+set_thermal_condition,"""C:\Users\saran\Documents\Academia\Spring 2020\BioSTEAM\thermosteam\thermosteam\equilibrium\vle.py"", line 561",632,0.001289057594936709,0.8146844000000001
+_solve_x,"""C:\Users\saran\Documents\Academia\Spring 2020\BioSTEAM\thermosteam\thermosteam\equilibrium\dew_point.py"", line 126",2938,0.0002463770251872022,0.7238557
+solve_x,"""C:\Users\saran\Documents\Academia\Spring 2020\BioSTEAM\thermosteam\thermosteam\equilibrium\dew_point.py"", line 41",2938,0.00024342280462899934,0.7151762
+flow_rates_for_multi_stage_extration_without_side_draws,"""C:\Users\saran\Documents\Academia\Spring 2020\BioSTEAM\thermosteam\thermosteam\separations.py"", line 1172",162,0.004039053086419754,0.6543266000000001
+<listcomp>,"""C:\Users\saran\Documents\Academia\Spring 2020\BioSTEAM\thermosteam\thermosteam\mixture\mixture.py"", line 346",3790,0.00013728364116094986,0.520305
+phase_fraction,"""C:\Users\saran\Documents\Academia\Spring 2020\BioSTEAM\thermosteam\thermosteam\equilibrium\binary_phase_fraction.py"", line 39",3006,0.00020043692614770463,0.6025134000000001
+heat_exchange_to_condition,"""C:\Users\saran\Documents\Academia\Spring 2020\BioSTEAM\biosteam\biosteam\units\design_tools\heat_transfer.py"", line 26",290,0.0019510603448275863,0.5658075
+solve_Tx,"""C:\Users\saran\Documents\Academia\Spring 2020\BioSTEAM\thermosteam\thermosteam\equilibrium\dew_point.py"", line 183",231,0.0024143705627705627,0.5577196
+temperature_interval_pinch_analysis,"""C:\Users\saran\Documents\Academia\Spring 2020\BioSTEAM\biosteam\biosteam\units\facilities\hxn\hxn_synthesis.py"", line 122",1,0.5295682,0.5295682
+xH,"""C:\Users\saran\Documents\Academia\Spring 2020\BioSTEAM\thermosteam\thermosteam\mixture\mixture.py"", line 343",3790,0.0001391581530343008,0.5274094
+_T_error,"""C:\Users\saran\Documents\Academia\Spring 2020\BioSTEAM\thermosteam\thermosteam\equilibrium\bubble_point.py"", line 110",2663,5.708370259106272e-05,0.1520139
+T_dependent_property_integral,"""C:\Users\saran\Anaconda3\envs\bioenv\lib\site-packages\thermo\utils\t_dependent_property.py"", line 2530",78831,5.531417843234261e-06,0.4360472
+<built-in method numpy.core._multiarray_umath.implement_array_function>,,35853.0,1.0531280506512706e-05,0.377578
+x_iter,"""C:\Users\saran\Documents\Academia\Spring 2020\BioSTEAM\thermosteam\thermosteam\equilibrium\dew_point.py"", line 24",10670,3.4673889409559515e-05,0.36997040000000003
+solve_Px,"""C:\Users\saran\Documents\Academia\Spring 2020\BioSTEAM\thermosteam\thermosteam\equilibrium\dew_point.py"", line 240",539,0.000661513172541744,0.35655560000000003
+gamma_modified_UNIFAC,"""C:\Users\saran\Documents\Academia\Spring 2020\BioSTEAM\thermosteam\thermosteam\equilibrium\activity_coefficients.py"", line 152",23948,1.3410197093703024e-05,0.3211474
+_P_error,"""C:\Users\saran\Documents\Academia\Spring 2020\BioSTEAM\thermosteam\thermosteam\equilibrium\dew_point.py"", line 146",1853,0.0001732507825148408,0.32103370000000003
+mix_from,"""C:\Users\saran\Documents\Academia\Spring 2020\BioSTEAM\thermosteam\thermosteam\_stream.py"", line 1253",3333,9.567419741974198e-05,0.3188821
+_run_binary_distillation_mass_balance,"""C:\Users\saran\Documents\Academia\Spring 2020\BioSTEAM\biosteam\biosteam\units\distillation.py"", line 538",47,0.006705193617021278,0.31514410000000004
+solve_Ty,"""C:\Users\saran\Documents\Academia\Spring 2020\BioSTEAM\thermosteam\thermosteam\equilibrium\bubble_point.py"", line 161",381,0.0008206866141732284,0.3126816
+<method 'reduce' of 'numpy.ufunc' objects>,,100954.0,2.9896645997186837e-06,0.3018186
+T_dependent_property,"""C:\Users\saran\Anaconda3\envs\bioenv\lib\site-packages\thermo\utils\t_dependent_property.py"", line 1895",67204,4.008242068924468e-06,0.2693699
+calculate_integral,"""C:\Users\saran\Anaconda3\envs\bioenv\lib\site-packages\thermo\heat_capacity.py"", line 996",59895,4.443836714249937e-06,0.2661636
+Enthalpy,"""C:\Users\saran\Documents\Academia\Spring 2020\BioSTEAM\thermosteam\thermosteam\free_energy.py"", line 16",47210,5.122512179622961e-06,0.24183380000000002
+roll,"""C:\Users\saran\Anaconda3\envs\bioenv\lib\site-packages\numpy\core\numeric.py"", line 1146",17236,1.2524129728475286e-05,0.21586590000000003
+xsolve_T,"""C:\Users\saran\Documents\Academia\Spring 2020\BioSTEAM\thermosteam\thermosteam\mixture\mixture.py"", line 333",408,0.0005456632352941177,0.2226306
+_update_distillate_and_bottoms_temperature,"""C:\Users\saran\Documents\Academia\Spring 2020\BioSTEAM\biosteam\biosteam\units\distillation.py"", line 584",47,0.0038805617021276597,0.1823864
+mean,"""<__array_function__ internals>"", line 2",8682,1.757719419488597e-05,0.1526052
+phase_fraction_objective_function,"""C:\Users\saran\Documents\Academia\Spring 2020\BioSTEAM\thermosteam\thermosteam\equilibrium\binary_phase_fraction.py"", line 157",179953,9.290464732457921e-07,0.16718470000000002
+xiter_temperature,"""C:\Users\saran\Documents\Academia\Spring 2020\BioSTEAM\thermosteam\thermosteam\mixture\mixture.py"", line 64",960,0.00017255239583333334,0.1656503
+dew_point_at_P,"""C:\Users\saran\Documents\Academia\Spring 2020\BioSTEAM\thermosteam\thermosteam\_stream.py"", line 1909",35,0.00457992,0.1602972
+<method 'sum' of 'numpy.ndarray' objects>,,33605.0,4.272045826513912e-06,0.1435621
+_Ty_ideal,"""C:\Users\saran\Documents\Academia\Spring 2020\BioSTEAM\thermosteam\thermosteam\equilibrium\bubble_point.py"", line 129",372,0.0003701760752688172,0.1377055

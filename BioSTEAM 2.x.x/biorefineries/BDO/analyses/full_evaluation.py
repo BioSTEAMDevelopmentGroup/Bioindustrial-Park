@@ -41,7 +41,7 @@ import pandas as pd
 import biosteam as bst
 from biosteam.utils import TicToc
 from biosteam.plots import plot_montecarlo_across_coordinate
-from biorefineries.BDO.system_MS2 import (
+from biorefineries.BDO.system_MS3 import (
     spec, BDO_sys, get_MEK_MPSP, get_GWP, get_FEC, flowsheet, BDO_tea
 )
 from biorefineries.BDO.analyses import models
@@ -68,7 +68,7 @@ R301.set_titer_limit = True
 
 # Set seed to make sure each time the same set of random numbers will be used
 np.random.seed(3221)
-N_simulation = 2000 # 1000
+N_simulation = 500 # 1000
 
 samples = model.sample(N=N_simulation, rule='L')
 model.load_samples(samples)
@@ -328,6 +328,39 @@ with pd.ExcelWriter(file_to_save+'_1_full_evaluation.xlsx') as writer:
 
 # model.table.to_clipboard()
 
+#%% Evaluate MC across glycerol yield
+import numpy as np
+import os 
+from biosteam.plots import plot_montecarlo_across_coordinate
+
+
+# model = models.BDO_model
+# spec = models.spec
+
+prefix = os.path.dirname(__file__)
+yield_gly_setter = spec.load_yield_glycerol
+
+
+ygs = np.linspace(0.0001, 0.25, 20)
+
+model.evaluate_across_coordinate('Yield glycerol [% theo]', yield_gly_setter, ygs, 
+                                 xlfile = os.path.join(prefix, 'mc_across_glycerol_yield.xlsx'),
+                                 notify = 50)
+
+#%% Plot MC across glycerol yield
+import pandas as pd
+
+MC_across_gly_yield_df = pd.read_excel('mc_across_glycerol_yield_2.xlsx', 'Bior. Mini. sell. price')
+
+
+MC_across_gly_yield_df_array = np.array(MC_across_gly_yield_df)
+y_list = []
+
+for i in MC_across_gly_yield_df_array:
+    y_list.append(i[1:])
+
+MC_across_gly_yield = np.array(y_list)
+mcac = plot_montecarlo_across_coordinate(ygs, MC_across_gly_yield)
 
 
 
