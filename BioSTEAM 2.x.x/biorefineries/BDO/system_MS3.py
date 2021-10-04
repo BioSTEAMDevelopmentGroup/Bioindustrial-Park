@@ -81,7 +81,7 @@ bst.CE = 541.7
 # Set default thermo object for the system
 tmo.settings.set_thermo(BDO_chemicals)
 
-BDO_sys = bdo.create_system_oleyl_alcohol()
+BDO_sys = bdo.full_systems.create_system_oleyl_alcohol_3()
 u = flowsheet.unit
 feedstock = BDO_sys.ins[0]
 # feedstock.mol[:] = baseline_feedflow[:]

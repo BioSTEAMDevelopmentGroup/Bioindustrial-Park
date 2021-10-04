@@ -2,7 +2,7 @@
 """
 Created on Fri Jul 31 12:00:51 2020
 
-@author: saran
+@author: sarangbhagwat
 """
 
 import biosteam as bst
@@ -404,17 +404,40 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
         
         # reactor.xylose_to_BDO_rxn.X = yield_
         
-        rem_glucose = min(0.0552, (1. - reactor.glucose_to_biomass_rxn.X) - reactor.glucose_to_BDO_rxn.X - 1e-12)
-        reactor.glucose_to_acetoin_rxn.X =  (0.055/0.0552) * rem_glucose
-        reactor.glucose_to_glycerol_rxn.X =  (0.0001/0.0552) * rem_glucose
-        reactor.glucose_to_ethanol_rxn.X =  (0.0001/0.0552) * rem_glucose
+        yield_glycerol_glucose = reactor.glucose_to_glycerol_rxn.X
+        yield_glycerol_xylose = reactor.xylose_to_glycerol_rxn.X
+        
+        max_rem_glucose = 0.0551 + yield_glycerol_glucose
+        rem_glucose = min(max_rem_glucose, (1. - reactor.glucose_to_biomass_rxn.X) - reactor.glucose_to_BDO_rxn.X - 1e-12)
+        reactor.glucose_to_acetoin_rxn.X =  (0.055/max_rem_glucose) * rem_glucose
+        # if reset_glycerol_yield:
+        reactor.glucose_to_glycerol_rxn.X =  (yield_glycerol_glucose/max_rem_glucose) * rem_glucose
+        reactor.glucose_to_ethanol_rxn.X =  (0.0001/max_rem_glucose) * rem_glucose
         # reactor.glucose_to_biomass_rxn.X = (50./130.) * rem_glucose
         
-        rem_xylose = min(0.0552, (1. - reactor.glucose_to_biomass_rxn.X) - reactor.xylose_to_BDO_rxn.X - 1e-12)
-        reactor.xylose_to_acetoin_rxn.X =   (0.055/0.0552) * rem_xylose
-        reactor.xylose_to_glycerol_rxn.X =  (0.0001/0.0552) * rem_xylose
-        reactor.xylose_to_ethanol_rxn.X =  (0.0001/0.0552) * rem_xylose
+        max_rem_xylose = 0.0551 + yield_glycerol_xylose
+        rem_xylose = min(max_rem_xylose, (1. - reactor.xylose_to_biomass_rxn.X) - reactor.xylose_to_BDO_rxn.X - 1e-12)
+        reactor.xylose_to_acetoin_rxn.X =   (0.055/max_rem_xylose) * rem_xylose
+        # if reset_glycerol_yield:
+        reactor.xylose_to_glycerol_rxn.X =  (yield_glycerol_xylose/max_rem_xylose) * rem_xylose
+        reactor.xylose_to_ethanol_rxn.X =  (0.0001/max_rem_xylose) * rem_xylose
         # reactor.xylose_to_biomass_rxn.X = (50./130.) * rem_glucose
+    
+    def load_yield_glycerol(self, yield_glycerol):
+        # self.load_spec_1(self.spec_1)
+        # self.load_spec_2(self.spec_2)
+        # self.load_spec_3(self.spec_3)
+        self.load_specifications(spec_1 = self.spec_1, spec_2 = self.spec_2, spec_3 = self.spec_3)
+        reactor = self.reactor
+        reactor.glucose_to_glycerol_rxn.X = reactor.xylose_to_glycerol_rxn.X = yield_glycerol
+        self.load_specifications(spec_1 = self.spec_1, spec_2 = self.spec_2, spec_3 = self.spec_3)
+        # self.load_spec_1(self.spec_1)
+        # self.load_spec_2(self.spec_2)
+        # self.load_spec_3(self.spec_3)
+    
+    def load_yield_glycerol_short(self, yield_glycerol):
+        reactor = self.reactor
+        reactor.glucose_to_glycerol_rxn.X = reactor.xylose_to_glycerol_rxn.X = yield_glycerol
         
     def load_productivity(self, productivity):
         """
