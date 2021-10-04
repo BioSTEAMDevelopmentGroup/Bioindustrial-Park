@@ -448,8 +448,30 @@ def load(name, cache={}, reduce_chemicals=True, enhanced_cellulosic_performance=
         raise NotImplementedError(number)
     oilcane_sys.set_tolerance(rmol=1e-5, mol=1e-3, subsystems=True)
     dct.update(flowsheet.to_dict())
-    crude_glycerol = dct.get('crude_glycerol') or bst.Stream('crude_glycerol')
-    pure_glycerine = dct.get('pure_glycerine') or bst.Stream('pure_glycerine')
+    class MockStream:
+        __slots__ = ('ID', 'price',)
+        line = 'Stream'
+        characterization_factors = {}
+        
+        def __init__(self, ID): 
+            dct[ID] = self
+            self.price = 0.
+            self.ID = ID
+            
+        @property
+        def F_vol(self): return 0.
+        @property
+        def F_mass(self): return 0.
+        @property
+        def F_mol(self): return 0.
+        @property
+        def cost(self): return 0.
+    
+    def get_stream(ID):
+        return dct.get(ID) or MockStream(ID)
+    
+    crude_glycerol = get_stream('crude_glycerol')
+    pure_glycerine = get_stream('pure_glycerine')
     if number == 1:
         oilcane_sys.prioritize_unit(T608)
     elif number == 2:
@@ -584,7 +606,6 @@ def load(name, cache={}, reduce_chemicals=True, enhanced_cellulosic_performance=
         )
     
     ## LCA
-    # Value from GREET 2020, natural gas well to gate (no transmission); https://greet.es.anl.gov/
     GWP_characterization_factors = { # Material GWP cradle-to-gate [kg*CO2*eq / kg]
         'sugarcane': 0.02931 * 0.30 / 0.25, # GREET, modified from moisture content of 0.75 to 0.70
         'sweet sorghum': 0.02821 * 0.30 / 0.25, # GREET, modified from moisture content of 0.75 to 0.70
@@ -616,42 +637,32 @@ def load(name, cache={}, reduce_chemicals=True, enhanced_cellulosic_performance=
     bst.PowerUtility.characterization_factors[GWP] = GWP_characterization_factors['Electricity']
     
     # Set non-negligible characterization factors
+    if abs(number) != 2:
+        for i in ('FGD_lime', 'cellulase', 'DAP', 'CSL', 'caustic'): MockStream(i)
+    if number < 0:
+        for i in ('catalyst', 'methanol', 'HCl', 'NaOH', 'crude_glycerol', 'pure_glycerine'): MockStream(i)
+    if abs(number) != 1:
+        MockStream(('dryer_natural_gas'))
     oilcane.characterization_factors[GWP] = GWP_characterization_factors['sugarcane'] 
     enzyme.characterization_factors[GWP] = GWP_characterization_factors['protease'] * 0.10
     H3PO4.characterization_factors[GWP] = GWP_characterization_factors['H3PO4']
     lime.characterization_factors[GWP] = GWP_characterization_factors['lime'] * 0.046 # Diluted with water
     denaturant.characterization_factors[GWP] = GWP_characterization_factors['gasoline']
     natural_gas.characterization_factors[GWP] = GWP_characterization_factors['CH4']
+    FGD_lime.characterization_factors[GWP] = GWP_characterization_factors['lime'] * 0.451 # Diluted with water
+    cellulase.characterization_factors[GWP] = GWP_characterization_factors['cellulase'] * 0.02
+    DAP.characterization_factors[GWP] = GWP_characterization_factors['DAP']
+    CSL.characterization_factors[GWP] = GWP_characterization_factors['CSL']
+    caustic.characterization_factors[GWP] = GWP_characterization_factors['NaOH'] * 0.5
+    catalyst.characterization_factors[GWP] = GWP_characterization_factors['methanol'] * 0.75 + GWP_characterization_factors['NaOH'] * 0.25
+    methanol.characterization_factors[GWP] = GWP_characterization_factors['methanol']
+    HCl.characterization_factors[GWP] = GWP_characterization_factors['HCl']
+    NaOH.characterization_factors[GWP] = GWP_characterization_factors['NaOH']
+    crude_glycerol.characterization_factors[GWP] = GWP_characterization_factors['crude-glycerol']
+    pure_glycerine.characterization_factors[GWP] = GWP_characterization_factors['pure-glycerol']
+    dryer_natural_gas.characterization_factors[GWP] = GWP_characterization_factors['CH4']
     natural_gas_streams = [natural_gas]
-    # gwp_objects = [bst.PowerUtility, oilcane, enzyme, H3PO4, lime, denaturant, natural_gas]
-    if abs(number) == 2:
-        FGD_lime.characterization_factors[GWP] = GWP_characterization_factors['lime'] * 0.451 # Diluted with water
-        cellulase.characterization_factors[GWP] = GWP_characterization_factors['cellulase'] * 0.02
-        DAP.characterization_factors[GWP] = GWP_characterization_factors['DAP']
-        CSL.characterization_factors[GWP] = GWP_characterization_factors['CSL']
-        caustic.characterization_factors[GWP] = GWP_characterization_factors['NaOH'] * 0.5
-        # gwp_objects.extend([FGD_lime, cellulase, DAP, CSL, caustic])
-    else:
-        pass
-        # gwp_objects.extend(['FGD_lime', 'cellulase', 'DAP', 'CSL', 'caustic'])
-    if number > 0:
-        catalyst.characterization_factors[GWP] = GWP_characterization_factors['methanol'] * 0.75 + GWP_characterization_factors['NaOH'] * 0.25
-        methanol.characterization_factors[GWP] = GWP_characterization_factors['methanol']
-        HCl.characterization_factors[GWP] = GWP_characterization_factors['HCl']
-        NaOH.characterization_factors[GWP] = GWP_characterization_factors['NaOH']
-        crude_glycerol.characterization_factors[GWP] = GWP_characterization_factors['crude-glycerol']
-        pure_glycerine.characterization_factors[GWP] = GWP_characterization_factors['pure-glycerol']
-        # gwp_objects.extend([catalyst, methanol, HCl, NaOH, crude_glycerol, pure_glycerine])
-    else:
-        pass
-        # gwp_objects.extend(['catalyst', 'methanol', 'HCl', 'NaOH', 'crude_glycerol', 'pure_glycerine'])
-    if abs(number) == 1:
-        dryer_natural_gas.characterization_factors[GWP] = GWP_characterization_factors['CH4']
-        natural_gas_streams.append(dryer_natural_gas)
-        # gwp_objects.append(dryer_natural_gas)
-    else:
-        pass
-        # gwp_objects.append('dryer_natural_gas')
+    if abs(number) == 1: natural_gas_streams.append(dryer_natural_gas)
     
     ## Model
     model = bst.Model(sys, exception_hook='raise', retry_evaluation=False)
@@ -874,6 +885,26 @@ def load(name, cache={}, reduce_chemicals=True, enhanced_cellulosic_performance=
              element=oilcane, units='kg*CO2-eq/kg')
     def set_oilcane_GWP(value):
         oilcane.characterization_factors[GWP] = value
+    
+    @default(methanol.characterization_factors[GWP], name='GWP', 
+             element=methanol, units='kg*CO2-eq/kg')
+    def set_methanol_GWP(value):
+        methanol.characterization_factors[GWP] = value
+    
+    @default(crude_glycerol.characterization_factors[GWP], name='GWP', 
+             element=crude_glycerol, units='kg*CO2-eq/kg')
+    def set_crude_glycerol_GWP(value):
+        crude_glycerol.characterization_factors[GWP] = value
+    
+    @default(pure_glycerine.characterization_factors[GWP], name='GWP', 
+             element=pure_glycerine, units='kg*CO2-eq/kg')
+    def set_pure_glycerine_GWP(value):
+        pure_glycerine.characterization_factors[GWP] = value
+    
+    @default(cellulase.characterization_factors[GWP], name='GWP', 
+             element=cellulase, units='kg*CO2-eq/kg')
+    def set_cellulase_GWP(value):
+        cellulase.characterization_factors[GWP] = value
     
     natural_gas.phase = 'g'
     natural_gas.set_property('T', 60, 'degF')
@@ -1554,6 +1585,7 @@ def plot_monte_carlo(derivative=False, absolute=True, comparison=True,
         production,
         electricity_production,
         natural_gas_consumption,
+        GWP_biofuel_allocation,
     ]
     N_rows = len(rows)
     fig, axes = plt.subplots(ncols=1, nrows=N_rows)
@@ -1567,7 +1599,8 @@ def plot_monte_carlo(derivative=False, absolute=True, comparison=True,
         f"TCI\n[{format_units('10^6*USD')}]",
         f"Production\n[{format_units('Gal/ton')}]",
         f"Elec. prod.\n[{format_units('kWhr/ton')}]",
-        f"NG cons.\n[{format_units('cf/ton')}]"
+        f"NG cons.\n[{format_units('cf/ton')}]",
+        f"GWP\n[{format_units('kg CO2-eq/GGE')}]",
     ]
     if derivative:
         ylabels = [
@@ -1576,6 +1609,7 @@ def plot_monte_carlo(derivative=False, absolute=True, comparison=True,
             r"$\Delta$" + format_units(r"Prod./OC").replace('cdot', r'cdot \Delta') + f"\n[{format_units('Gal/ton')}]",
             r"$\Delta$" + format_units(r"EP/OC").replace('cdot', r'cdot \Delta') + f"\n[{format_units('kWhr/ton')}]",
             r"$\Delta$" + format_units(r"NGC/OC").replace('cdot', r'cdot \Delta') + f"\n[{format_units('cf/ton')}]"
+            r"$\Delta$" + format_units(r"GWP/OC").replace('cdot', r'cdot \Delta') + f"\n[{format_units('kg CO2-eq/GGE')}]"
         ]
     elif comparison and not absolute:
         ylabels = [r"$\Delta$" + i for i in ylabels]
@@ -1664,7 +1698,13 @@ def plot_monte_carlo(derivative=False, absolute=True, comparison=True,
     # )
     # legend.get_frame().set_linewidth(0.0)
 
-def plot_spearman(configuration, top=None, agile=True, labels=None, metric=MFPP):
+def plot_spearman(configuration, top=None, agile=True, labels=None, metric=None):
+    if metric is None:
+        metric = MFPP
+    elif metric == 'MFPP':
+        metric = MFPP
+    elif metric == 'GWP':
+        metric = GWP_biofuel_allocation
     stream_price = format_units('USD/gal')
     USD_ton = format_units('USD/ton')
     ng_price = format_units('USD/cf')
@@ -1673,7 +1713,6 @@ def plot_spearman(configuration, top=None, agile=True, labels=None, metric=MFPP)
     capacity = format_units('ton/hr')
     titer = format_units('g/L')
     productivity = format_units('g/L/hr')
-    electricity_GWP = format_units('kg*CO2-eq/kWhr')
     material_GWP = format_units('kg*CO2-eq/kg')
     index, ignored_list = zip(*[
          ('Bagasse oil retention [40 $-$ 70 %]', ['S2', 'S1', 'S2*', 'S1*']),
@@ -1707,7 +1746,6 @@ def plot_spearman(configuration, top=None, agile=True, labels=None, metric=MFPP)
          ('Relative sorghum oil content [-3 $-$ 0 dry wt. %]', ['S2', 'S1', 'S2*', 'S1*', 'O2', 'O1']),
          ('TAG to FFA conversion [17.25 $-$ 28.75 % theoretical]', ['S1', 'O1', 'S1*', 'O1*']),
         (f'Feedstock GWP [0.0263 $-$ 0.0440 {material_GWP}]', []),
-       # '$^a$Fermentation solids loading [20% $-$ 25%]',
     ])
     ignored_dct = {
         'S1': [],
@@ -1738,7 +1776,7 @@ def plot_spearman(configuration, top=None, agile=True, labels=None, metric=MFPP)
     color_wheel = [CABBI_colors.orange, CABBI_colors.green_soft]
     fig, ax = bst.plots.plot_spearman_2d(rhos, top=top, index=index, 
                                          color_wheel=color_wheel,
-                                         name='MFPP')
+                                         name=metric.name)
     plt.legend(
         handles=[
             mpatches.Patch(
