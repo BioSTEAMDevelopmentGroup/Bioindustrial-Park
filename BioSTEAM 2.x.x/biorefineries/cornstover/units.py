@@ -8,6 +8,7 @@ Humbird, D., Davis, R., Tao, L., Kinchin, C., Hsu, D., Aden, A., Dudgeon, D. (20
 
 @author: yoelr
 """
+from biosteam.units.design_tools.geometry import cylinder_diameter_from_volume
 import os
 import sys
 import flexsolve as flx
@@ -45,12 +46,18 @@ _Gcal2kJ = 4184e3
 class HydrolysatePump(Unit): pass
 
 @cost('Dry flow rate', 'Pretreatment reactor system', units='kg/hr',
-      S=83333, CE=522, cost=19812400, n=0.6, kW=4578, BM=1.5)
-class PretreatmentReactorSystem(Unit):
+      S=83333, CE=522, cost=19812400 * 0.993, n=0.6, kW=4578, BM=1.5)
+class PretreatmentReactorSystem(Unit, bst.units.design_tools.PressureVessel):
     _N_ins = 1
     _N_outs = 2
     _graphics = bst.Flash._graphics
-    def __init__(self, ID='', ins=None, outs=(), T=130+273.15, thermo=None):
+    _units = {'Residence time': 'hr',
+              'Reactor volume': 'm3'}
+    
+    def __init__(self, ID='', ins=None, outs=(), T=130+273.15, thermo=None, 
+                 tau=0.166, V_wf=0.8, length_to_diameter=2, 
+                 vessel_material='Stainless steel 316', 
+                 vessel_type='Horizontal'):
         Unit.__init__(self, ID, ins, outs, thermo)
         self._load_components()
         vapor, liquid = self.outs
@@ -80,6 +87,11 @@ class PretreatmentReactorSystem(Unit):
         self.xylan_to_xylose = self.reactions[8]
         self.glucose_to_byproducts = self.reactions[1:3]
         self.xylose_to_byproducts = self.reactions[9:12]
+        self.tau = tau
+        self.V_wf = V_wf
+        self.length_to_diameter = length_to_diameter
+        self.vessel_material = vessel_material
+        self.vessel_type = vessel_type
         
     def _load_components(self):
         thermo = self.thermo
@@ -98,6 +110,27 @@ class PretreatmentReactorSystem(Unit):
         vapor.T = liquid.T = ms.T
         vapor.P = liquid.P = ms.P
 
+    def _design(self):
+        Design = self.design_results
+        ins_F_vol = self.F_vol_in
+        V_reactor = ins_F_vol * self.tau / self.V_wf
+        P = self.outs[0].P * 0.000145038 # Pa to psi
+        length_to_diameter = self.length_to_diameter
+        D = cylinder_diameter_from_volume(V_reactor, self.length_to_diameter)
+        D *= 3.28084 # convert from m to ft
+        L = D * length_to_diameter
+        Design['Residence time'] = self.tau
+        Design['Reactor volume'] = V_reactor
+        Design.update(self._vessel_design(float(P), float(D), float(L)))
+        self._decorated_design()
+            
+    def _cost(self):
+        Design = self.design_results
+        self.baseline_purchase_costs.update(self._vessel_purchase_cost(
+            Design['Weight'], Design['Diameter'], Design['Length'])
+        )
+        self._decorated_cost()
+    
 
 @cost('Flow rate', 'Pumps',
       S=43149, CE=522, cost=24800, n=0.8, kW=40, BM=2.3)

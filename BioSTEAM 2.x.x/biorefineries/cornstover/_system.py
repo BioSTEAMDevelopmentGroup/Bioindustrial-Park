@@ -38,24 +38,28 @@ default_insoluble_solids = ['Glucan', 'Mannan', 'Xylan',
 
 default_ignored = ['TAG', 'DAG', 'MAG', 'FFA', 'PL']
 
+cornstover_dct = dict(
+    ID='cornstover', # Cornstover composition by default
+    Glucan=0.28,
+    Xylan=0.1562,
+    Galactan=0.001144,
+    Arabinan=0.01904,
+    Mannan=0.0048,
+    Lignin=0.12608,
+    Acetate=0.01448,
+    Protein=0.0248,
+    Extract=0.1172,
+    Ash=0.03944,
+    Sucrose=0.00616,
+    Water=0.2,
+    total_flow=104229.16,
+    units='kg/hr',
+    price=price['Feedstock']
+)
+
 @bst.SystemFactory(
     ID='hot_water_pretreatment_sys',
-    ins=[dict(ID='cornstover', # Cornstover composition by default
-              Glucan=0.28,
-              Xylan=0.1562,
-              Galactan=0.001144,
-              Arabinan=0.01904,
-              Mannan=0.0048,
-              Lignin=0.12608,
-              Acetate=0.01448,
-              Protein=0.0248,
-              Extract=0.1172,
-              Ash=0.03944,
-              Sucrose=0.00616,
-              Water=0.2,
-              total_flow=104229.16,
-              units='kg/hr',
-              price=price['Feedstock'])],
+    ins=[cornstover_dct],
     outs=[dict(ID='hydrolyzate'),
           dict(ID='pretreatment_wastewater')],
 )
@@ -110,24 +114,81 @@ def create_hot_water_pretreatment_system(
         required_water = (F_mass_feed - available_water) * (1. - solids_loading) / solids_loading
         warm_process_water.imass['Water'] = max(required_water - available_water, 0.)
 
+# @bst.SystemFactory(
+#     ID='AFEX_pretreatment_sys',
+#     ins=[dict(ID='cornstover', # Cornstover composition by default
+#               Glucan=0.28,
+#               Xylan=0.1562,
+#               Galactan=0.001144,
+#               Arabinan=0.01904,
+#               Mannan=0.0048,
+#               Lignin=0.12608,
+#               Acetate=0.01448,
+#               Protein=0.0248,
+#               Extract=0.1172,
+#               Ash=0.03944,
+#               Sucrose=0.00616,
+#               Water=0.2,
+#               total_flow=104229.16,
+#               units='kg/hr',
+#               price=price['Feedstock'])],
+#     outs=[dict(ID='hydrolyzate'),
+#           dict(ID='pretreatment_wastewater')],
+# )
+# def create_ammonia_fiber_expansion_pretreatment_system(
+#         ins, outs,
+#         include_feedstock_handling=True,
+#         solids_loading=0.625,
+#         ammonia_loading=0.555,
+#         T_pretreatment_reactor=273.15 + 100.,
+#         residence_time=0.5,
+#     ):
+    
+#     feedstock, = ins
+#     hydrolyzate, pretreatment_wastewater = outs
+    
+#     warm_process_water = Stream('warm_process_water',
+#                               T=368.15,
+#                               P=4.7*101325,
+#                               Water=1)
+#     pretreatment_steam = Stream('pretreatment_steam',
+#                     phase='g',
+#                     T=268+273.15,
+#                     P=13*101325,
+#                     Water=24534+3490,
+#                     units='kg/hr')
+    
+#     ### Pretreatment system
+#     n = pretreatment_area
+#     P = pretreatment_steam.chemicals['H2O'].Psat(T_pretreatment_reactor + 25)
+#     M203 = bst.SteamMixer(f'M{n+2}', (feedstock, pretreatment_steam, warm_process_water), P=P)
+#     R201 = units.PretreatmentReactorSystem(f'R{n+1}', M203-0, T=T_pretreatment_reactor)
+#     P201 = units.BlowdownDischargePump(f'P{n+1}', R201-1)
+#     F201 = units.PretreatmentFlash(f'F{n+1}', P201-0, P=101325, Q=0)
+#     M204 = bst.Mixer(f'M{n+3}', (R201-0, F201-0))
+#     H201 = units.WasteVaporCondenser(f'H{n+1}', M204-0, pretreatment_wastewater, V=0)
+#     P202 = units.HydrolyzatePump(f'P{n+2}', F201-1, None)
+#     if milling:
+#         U201 = bst.HammerMill(f'U{n+1}', P202-0, hydrolyzate)
+#         P202.outs[0].materialize_connection
+#     else:
+#         P202.outs[0] = hydrolyzate
+#     M203.solids_loading = solids_loading
+#     @M203.add_specification(run=True)
+#     def update_pretreatment_process_water():
+#         solids_loading = M203.solids_loading
+#         chemicals = M203.chemicals
+#         indices = chemicals.available_indices(nonsolids)
+#         *other_feeds, warm_process_water = M203.ins
+#         F_mass_feed = sum([i.F_mass for i in other_feeds if i])
+#         available_water = (chemicals.MW[indices] * sum([i.mol[indices] for i in other_feeds if i])).sum()
+#         required_water = (F_mass_feed - available_water) * (1. - solids_loading) / solids_loading
+#         warm_process_water.imass['Water'] = max(required_water - available_water, 0.)
+
+
 @bst.SystemFactory(
     ID='dilute_acid_pretreatment_sys',
-    ins=[dict(ID='cornstover', # Cornstover composition by default
-              Glucan=0.28,
-              Xylan=0.1562,
-              Galactan=0.001144,
-              Arabinan=0.01904,
-              Mannan=0.0048,
-              Lignin=0.12608,
-              Acetate=0.01448,
-              Protein=0.0248,
-              Extract=0.1172,
-              Ash=0.03944,
-              Sucrose=0.00616,
-              Water=0.2,
-              total_flow=104229.16,
-              units='kg/hr',
-              price=price['Feedstock'])],
+    ins=[cornstover_dct],
     outs=[dict(ID='hydrolyzate'),
           dict(ID='pretreatment_wastewater')],
 )
