@@ -129,7 +129,7 @@ def create_ammonia_fiber_expansion_pretreatment_system(
         ammonia_loading=0.555,
         T_pretreatment_reactor=273.15 + 100.,
         residence_time=0.5,
-        pretreatment_reactions=None
+        pretreatment_reactions=None,
     ):
     
     feedstock, = ins
@@ -631,7 +631,6 @@ def create_cellulosic_fermentation_system(
         SeedTrain=None,
         CoFermentation=None,
         SaccharificationAndCoFermentation=None,
-        include_scruber=True,
     ):
     vent, beer, lignin = outs
     hydrolyzate, cellulase, saccharification_water, DAP, CSL = ins
@@ -652,14 +651,14 @@ def create_cellulosic_fermentation_system(
             mockup=True,
             SaccharificationAndCoFermentation=SaccharificationAndCoFermentation,
             SeedTrain=SeedTrain,
-            include_scruber=include_scruber,
+            include_scrubber=include_scrubber,
         )
     elif kind == 1:
         cofermentation_sys = create_simultaneous_saccharification_and_cofermentation_system(
             ins=[saccharification_sys-0, DAP, CSL],
             outs=[vent, beer],
             mockup=True,
-            include_scruber=include_scruber,
+            include_scrubber=include_scrubber,
         )
     elif kind == 2:
         T303 = bst.StorageTank('T303', saccharification_sys-0, tau=4)
@@ -669,7 +668,7 @@ def create_cellulosic_fermentation_system(
             mockup=True,
             SeedTrain=SeedTrain,
             CoFermentation=CoFermentation,
-            include_scruber=include_scruber,
+            include_scrubber=include_scrubber,
         )
     else:
         raise ValueError("invalid 'kind'")
