@@ -332,10 +332,10 @@ def create_oilcane_to_biodiesel_and_ethanol_combined_1_and_2g_post_fermentation_
     pressurefilter = cf_dct['S303'] # Pressure filter
     pressurefilter.tag = "oil extraction efficiency"
     pressurefilter.isplit['Lipid'] = 1. - 0.7
-    oil = pressurefilter.outs[1]
-    sink = oil.sink
+    hydrolysate = pressurefilter.outs[1]
+    sink = hydrolysate.sink
     sink.ins[0] = None
-    MX = bst.Mixer(400, [oil, screened_juice])
+    MX = bst.Mixer(400, [hydrolysate, screened_juice])
     EvX = bst.MultiEffectEvaporator(400, ins=MX-0,
                                     P=(101325, 69682, 47057, 30953, 19781),
                                     V_definition='First-effect',

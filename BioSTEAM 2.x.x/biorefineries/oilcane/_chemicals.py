@@ -4,7 +4,6 @@ Created on Tue Feb  4 06:42:02 2020
 
 @author: yoelr
 """
-from thermosteam import functional as fn
 import thermosteam as tmo
 
 __all__ = ('create_chemicals',)

@@ -28,6 +28,7 @@ __all__ = (
     'create_simultaneous_saccharification_and_cofermentation_system',
     'create_integrated_bioprocess_saccharification_and_cofermentation_system',
     'create_cellulosic_fermentation_system',
+    'create_ammonia_fiber_expansion_pretreatment_system',
 )
 
 default_nonsolids = ['Water', 'Ethanol', 'AceticAcid', 
@@ -165,7 +166,8 @@ def create_ammonia_fiber_expansion_pretreatment_system(
                                            T=T_pretreatment_reactor, thermo=ideal,
                                            reactions=pretreatment_reactions)
     P201 = units.BlowdownDischargePump('P201', R201-1, thermo=ideal)
-    F201 = units.PretreatmentFlash('F201', (P201-0, air), P=101325, Q=0, thermo=ideal)
+    M205 = bst.Mixer('M205', (P201-0, air))
+    F201 = bst.Flash('F201', M205-0, P=101325, Q=0, thermo=ideal)
     @F201.add_specification(run=True)
     def update_air():
         feed, air = F201.ins
@@ -275,6 +277,7 @@ def create_saccharification_system(
         insoluble_solids_loading=None,
         ignored=None,
         Saccharification=None,
+        saccharification_reactions=None,
     ):
     hydrolyzate, cellulase, saccharification_water = ins
     slurry, = outs
@@ -333,7 +336,7 @@ def create_saccharification_system(
     
     if Saccharification is None:
         Saccharification = units.ContinuousPresaccharification
-    R301 = Saccharification('R301', H301-0, slurry)
+    R301 = Saccharification('R301', H301-0, slurry, reactions=saccharification_reactions)
 
 @bst.SystemFactory(
     ID='cofermentation_sys',
@@ -347,6 +350,9 @@ def create_saccharification_system(
 )
 def create_simultaneous_saccharification_and_cofermentation_system(
         ins, outs, SimultaneousSaccharificationAndCoFermentation=None, SeedTrain=None,
+        saccharification_reactions=None,
+        seed_train_reactions=None,
+        cofermentaion_reactions=None,
         include_scrubber=True
     ):
     slurry, DAP, CSL = ins
@@ -377,7 +383,9 @@ def create_simultaneous_saccharification_and_cofermentation_system(
     if not SimultaneousSaccharificationAndCoFermentation:
         SimultaneousSaccharificationAndCoFermentation = units.SimultaneousSaccharificationAndCoFermentation
     if not SeedTrain: SeedTrain = units.SeedTrain
-    R302 = SeedTrain('R302', (S303-0, CSL1, DAP1), saccharification=True)
+    R302 = SeedTrain('R302', (S303-0, CSL1, DAP1), 
+                     reactions=seed_train_reactions,
+                     saccharification=saccharification_reactions or True)
     
     def adjust_CSL_and_DAP_feed_to_seed_train():
         feed, CSL1, DAP1 = R302.ins
@@ -388,7 +396,9 @@ def create_simultaneous_saccharification_and_cofermentation_system(
     R302.specification = adjust_CSL_and_DAP_feed_to_seed_train
     T301 = units.SeedHoldTank('T301', R302-1)
     R303 = SimultaneousSaccharificationAndCoFermentation(
-        'R303', (S303-1, T301-0, CSL2, DAP2),
+        'R303', (S303-1, T301-0, CSL2, DAP2), 
+        saccharification=saccharification_reactions,
+        cofermentaion=cofermentaion_reactions,
     )
     
     def adjust_CSL_and_DAP_feed_to_fermentation():
@@ -436,6 +446,9 @@ def create_simultaneous_saccharification_and_cofermentation_system(
 )
 def create_integrated_bioprocess_saccharification_and_cofermentation_system(
         ins, outs, SaccharificationAndCoFermentation=None, SeedTrain=None,
+        saccharification_reactions=None,
+        seed_train_reactions=None,
+        cofermentation_reactions=None,
         include_scrubber=True
     ):
     slurry, DAP, CSL = ins
@@ -466,7 +479,8 @@ def create_integrated_bioprocess_saccharification_and_cofermentation_system(
         SaccharificationAndCoFermentation = units.SaccharificationAndCoFermentation
     if not SeedTrain: SeedTrain = units.SeedTrain
     recycle = bst.Stream()
-    R302 = SeedTrain('R302', (recycle, CSL1, DAP1))
+    R302 = SeedTrain('R302', (recycle, CSL1, DAP1), 
+                     reactions=seed_train_reactions)
     
     def adjust_CSL_and_DAP_feed_to_seed_train():
         feed, CSL1, DAP1 = R302.ins
@@ -476,8 +490,11 @@ def create_integrated_bioprocess_saccharification_and_cofermentation_system(
     
     R302.specification = adjust_CSL_and_DAP_feed_to_seed_train
     T301 = units.SeedHoldTank('T301', R302-1)
-    R303 = SaccharificationAndCoFermentation('R303', (slurry, T301-0, CSL2, DAP2),
-                                             outs=('', '', recycle))
+    R303 = SaccharificationAndCoFermentation(
+        'R303', (slurry, T301-0, CSL2, DAP2), outs=('', '', recycle), 
+        cofermentation=cofermentation_reactions,
+        saccharification=saccharification_reactions,
+    )
     
     def adjust_CSL_and_DAP_feed_to_fermentation():
         feed, seed, CSL2, DAP2 = R303.ins
@@ -525,7 +542,9 @@ def create_integrated_bioprocess_saccharification_and_cofermentation_system(
 )
 def create_cofermentation_system(
         ins, outs, CoFermentation=None, SeedTrain=None,
-        include_scrubber=True
+        include_scrubber=True,
+        seed_train_reactions=None,
+        cofermentation_reactions=None,
     ):
     slurry, DAP, CSL = ins
     vent, beer, lignin = outs
@@ -554,7 +573,7 @@ def create_cofermentation_system(
     S303 = bst.PressureFilter('S303', slurry, (lignin, ''))
     S304 = bst.Splitter('S304', S303-1, split=0.1)
     if not SeedTrain: SeedTrain = units.SeedTrain
-    R302 = SeedTrain('R302', (S304-0, CSL1, DAP1))
+    R302 = SeedTrain('R302', (S304-0, CSL1, DAP1), reactions=seed_train_reactions)
     
     @R302.add_specification(run=True)
     def adjust_CSL_and_DAP_feed_to_seed_train():
@@ -565,7 +584,7 @@ def create_cofermentation_system(
     T301 = units.SeedHoldTank('T301', R302-1)
     if not CoFermentation: CoFermentation = units.CoFermentation
     R303 = CoFermentation('R303', (S304-1, T301-0, CSL2, DAP2),
-                          outs=('', ''))
+                          outs=('', ''), cofermentation=cofermentation_reactions)
     
     @R303.add_specification(run=True)
     def adjust_CSL_and_DAP_feed_to_fermentation():
@@ -631,6 +650,9 @@ def create_cellulosic_fermentation_system(
         SeedTrain=None,
         CoFermentation=None,
         SaccharificationAndCoFermentation=None,
+        saccharification_reactions=None,
+        seed_train_reactions=None,
+        cofermentation_reactions=None,
     ):
     vent, beer, lignin = outs
     hydrolyzate, cellulase, saccharification_water, DAP, CSL = ins
@@ -643,6 +665,7 @@ def create_cellulosic_fermentation_system(
         nonsolids=nonsolids,
         insoluble_solids=insoluble_solids,
         Saccharification=(Saccharification or units.Saccharification if kind == 2 else ContinuousPresaccharification or units.ContinuousPresaccharification),
+        saccharification_reactions=saccharification_reactions,
     )
     if kind == 0:
         cofermentation_sys = create_integrated_bioprocess_saccharification_and_cofermentation_system(
@@ -652,6 +675,8 @@ def create_cellulosic_fermentation_system(
             SaccharificationAndCoFermentation=SaccharificationAndCoFermentation,
             SeedTrain=SeedTrain,
             include_scrubber=include_scrubber,
+            seed_train_reactions=seed_train_reactions,
+            cofermentation_reactions=cofermentation_reactions,
         )
     elif kind == 1:
         cofermentation_sys = create_simultaneous_saccharification_and_cofermentation_system(
@@ -659,6 +684,8 @@ def create_cellulosic_fermentation_system(
             outs=[vent, beer],
             mockup=True,
             include_scrubber=include_scrubber,
+            seed_train_reactions=seed_train_reactions,
+            cofermentation_reactions=cofermentation_reactions,
         )
     elif kind == 2:
         T303 = bst.StorageTank('T303', saccharification_sys-0, tau=4)
@@ -669,6 +696,8 @@ def create_cellulosic_fermentation_system(
             SeedTrain=SeedTrain,
             CoFermentation=CoFermentation,
             include_scrubber=include_scrubber,
+            seed_train_reactions=seed_train_reactions,
+            cofermentation_reactions=cofermentation_reactions,
         )
     else:
         raise ValueError("invalid 'kind'")

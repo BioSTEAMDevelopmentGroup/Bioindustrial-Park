@@ -5,6 +5,7 @@ Chemicals:
   Acetone:
   LacticAcid:
   PhosphoricAcid:
+    synonyms: H3PO4
     phase: liquid
     default: True
   Tridecane:
@@ -40,8 +41,10 @@ Chemicals:
   SO2:
     phase: gas
   N2:
+    synonyms: Nitrogen
     phase: gas
   O2:
+    synonyms: Oxygen
     phase: gas
   CO2:
     phase: gas
@@ -54,10 +57,12 @@ Chemicals:
     default: True
     rho: 1.0e+6
   DiammoniumPhosphate:
+    synonyms: DAP
     phase: solid
     rho: 1.0e+6
     default: True 
   CornSteepLiquor:
+    synonyms: CSL
     search_db: False
     phase: liquid
     MW: 37.24
@@ -69,6 +74,7 @@ Chemicals:
     default: True
   Cells:
     formula: CH1.61O0.56N0.16 # Yeast
+    synonyms: Yeast
     search_db: False
     phase_ref: solid
     phase: solid
@@ -83,16 +89,7 @@ Chemicals:
     phase: solid
     default: True
   CellExtract:
+    synonyms: YeastExtract
     Copy of: Cells
   Tryptone:
     Copy of: Cells    
-Synonyms: 
-  Methane: CH4
-  Water: H2O
-  Cells: Yeast
-  CellExtract: YeastExtract
-  CornSteepLiquor: CSL
-  DiammoniumPhosphate: DAP
-  PhosphoricAcid: H3PO4
-  N2: Nitrogen
-  O2: Oxygen

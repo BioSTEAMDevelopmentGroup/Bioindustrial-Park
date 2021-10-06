@@ -30,4 +30,7 @@ IDs = ['Arabinan', 'Galactan', 'Glucan',
        'Extractives']
 dw = 0.8
 switchgrass_composition_dct = {i: float(j) * dw for i,j in zip(IDs, composition)}
+acetate = 0.008966261808367074
+switchgrass_composition_dct['Extractives'] -= acetate
+switchgrass_composition_dct['Acetate'] = acetate
 switchgrass_composition_dct['Water'] = 0.2
