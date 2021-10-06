@@ -168,9 +168,9 @@ def create_ammonia_fiber_expansion_pretreatment_system(
     P201 = units.BlowdownDischargePump('P201', R201-1, thermo=ideal)
     M205 = bst.Mixer('M205', (P201-0, air))
     F201 = bst.Flash('F201', M205-0, P=101325, Q=0, thermo=ideal)
-    @F201.add_specification(run=True)
+    @M205.add_specification(run=True)
     def update_air():
-        feed, air = F201.ins
+        feed, air = M205.ins
         flow = feed.F_vol
         air.imol['O2', 'N2'] = [flow * 0.23, flow * 0.77] # Assume equal volumes is enough
     
@@ -304,7 +304,7 @@ def create_saccharification_system(
         cellulase.imass['Water', 'Cellulase'] = (
             enzyme_over_cellulose
             * z_mass_cellulase_mixture
-            * 1.2 * (hydrolyzate.imass['Glucan', 'GlucoseOligomer'].sum())
+            * 1.2 * (hydrolyzate.imass['Glucan'])
         )
     
     

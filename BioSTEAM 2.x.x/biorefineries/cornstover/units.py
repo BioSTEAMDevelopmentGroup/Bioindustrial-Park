@@ -291,7 +291,7 @@ class ContinuousPresaccharification(Unit):
     def __init__(self, ID='', ins=None, outs=(), P=101325, reactions=None):
         Unit.__init__(self, ID, ins, outs)
         self.P = P
-        self.reactions
+        self.reactions = reactions 
         
     def _run(self):
         inlet = self.ins[0]

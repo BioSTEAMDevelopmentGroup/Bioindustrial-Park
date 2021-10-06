@@ -53,6 +53,8 @@ def create_cellulosic_chemicals():
     HMF.Dortmund.set_group_counts_by_name({'FURFURAL': 1, 'CH2':1, 'OH(P)':1})
     chemicals.append(create_acetyl_diolein())
     chemicals.append(create_acyl_olein(3))
+    chemicals.compile()
+    chemicals.define_group('Products', ['AcetylDiOlein', 'TriOlein'], [0.5, 0.5], wt=True)
     return chemicals
     
 def create_conventional_chemicals():
@@ -65,6 +67,8 @@ def create_conventional_chemicals():
     )
     chemicals.append(create_acetyl_diolein())
     chemicals.append(create_acyl_olein(3))
+    chemicals.compile()
+    chemicals.define_group('Products', ['AcetylDiOlein', 'TriOlein'], [0.5, 0.5], wt=True)
     return chemicals
 
 

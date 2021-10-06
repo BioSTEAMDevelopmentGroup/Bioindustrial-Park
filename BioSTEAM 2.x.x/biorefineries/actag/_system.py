@@ -40,11 +40,11 @@ __all__ = (
               Water=0.2,
               total_flow=104229.16,
               units='kg/hr')],
-    outs=[dict(ID='acTAG')],
+    outs=[dict(ID='product')],
 )
 def create_cellulosic_acTAG_system(ins, outs):
     feedstock, = ins
-    acTAG, = outs
+    product, = outs
     chemicals = feedstock.chemicals
     U101 = FeedStockHandling(100, feedstock)
     AFEX_sys, AFEX_dct = create_ammonia_fiber_expansion_pretreatment_system(
@@ -74,7 +74,7 @@ def create_cellulosic_acTAG_system(ins, outs):
     )
     hydrolysate, pretreatment_wastewater = AFEX_sys.outs
     cofermentation_sys, cf_dct = create_cellulosic_fermentation_system('cofermentation_sys',
-        hydrolysate, 
+        hydrolysate, ['', product, ''],
         area=300,
         udct=True,
         mockup=True,
@@ -99,8 +99,6 @@ def create_cellulosic_acTAG_system(ins, outs):
     seedtrain = cf_dct['R302'] # Seed train
     cofermentation = cf_dct['R303'] # Cofermentation
     pressurefilter = cf_dct['S303'] # Pressure filter
-    pressurefilter.tag = "oil extraction efficiency"
-    pressurefilter.isplit['Lipid'] = 1. - 0.7
     hydrolysate = pressurefilter.outs[1]
     sink = hydrolysate.sink
     sink.ins[0] = None
@@ -112,12 +110,6 @@ def create_cellulosic_acTAG_system(ins, outs):
     MX = bst.Mixer(400, [PX-0, 'dilution_water'])
     HX = bst.HXutility(400, MX-0, T=305.15)
     HX-0-sink
-
-    @PX.add_specification(run=True)
-    def hydrolysis():
-        feed = PX.ins[0]
-        PX.sucrose_hydrolysis_reaction.force_reaction(feed)
-        if feed.imol['Water'] < 0: feed.imol['Water'] = 0.
     
     cofermentation.titer = 68.5
     cofermentation.productivity = 0.95
@@ -138,11 +130,11 @@ def create_cellulosic_acTAG_system(ins, outs):
             EvX._run()
             for unit in path: unit.run()
             cofermentation.run()
-            return target_titer - beer.imass['Ethanol'] / beer.F_vol
+            return target_titer - beer.imass['Products'] / beer.F_vol
         
         y0 = f(0)
         if y0 < 0.:
-            ethanol = float(beer.imass['Ethanol'])
+            ethanol = float(beer.imass['Products'])
             current_titer = ethanol / beer.F_vol
             required_water = (1./target_titer - 1./current_titer) * ethanol * 1000.
             MX.ins[1].imass['Water'] = max(required_water, 0)
@@ -157,8 +149,7 @@ def create_cellulosic_acTAG_system(ins, outs):
             EvX.V = flx.IQ_interpolation(f, 0, x, y0, y1, x=EvX.V, ytol=1e-5, xtol=1e-6)
         cofermentation.tau = target_titer / cofermentation.productivity 
     
-    vent, cellulosic_beer, lignin = cellulosic_fermentation_sys.outs
-    breakpoint()
+    vent, cellulosic_beer, lignin = cofermentation_sys.outs
     
 
 @SystemFactory(
