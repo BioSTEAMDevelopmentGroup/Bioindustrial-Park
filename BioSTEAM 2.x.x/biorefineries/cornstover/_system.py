@@ -120,23 +120,29 @@ def create_hot_water_pretreatment_system(
               total_flow=104229.16,
               units='kg/hr',
               price=price['Feedstock'])],
-    outs=[dict(ID='hydrolyzate'),
-          dict(ID='pretreatment_wastewater')],
+    outs=[dict(ID='hydrolyzate'),],
 )
 def create_ammonia_fiber_expansion_pretreatment_system(
         ins, outs,
         include_feedstock_handling=True,
         solids_loading=0.625,
-        ammonia_loading=0.555,
+        ammonia_loading=2, # g ammonia / g dry feedstock
         T_pretreatment_reactor=273.15 + 100.,
         residence_time=0.5,
         pretreatment_reactions=None,
     ):
     
     feedstock, = ins
-    hydrolyzate, pretreatment_wastewater = outs
+    hydrolyzate, = outs
     
-    ammonia = Stream('ammonia', NH3=1, P=12 * 101325)
+    ammonia = Stream('ammonia', NH3=1, P=12 * 101325, price=price['Ammonia'])
+    sulfuric_acid = Stream('sulfuric_acid',
+                            P=5.4*101325,
+                            T=294.15,
+                            Water=130,
+                            H2SO4=1800,
+                            units='kg/hr',
+                            price=price['Sulfuric acid'])
     warm_process_water = Stream('warm_process_water',
                               T=368.15,
                               P=4.7*101325,
@@ -153,15 +159,11 @@ def create_ammonia_fiber_expansion_pretreatment_system(
     ideal = ammonia.thermo.ideal()
     T201 = bst.StorageTank('T201', ammonia, tau=7, thermo=ideal)
     T201.ammonia_loading = ammonia_loading
-    @T201.add_specification(run=True)
-    def adjust_ammonia():
-        ammonia = T201.ins[0]
-        ammonia.imass['NH3'] = T201.ammonia_loading * (feedstock.F_mass - feedstock.imass['Water'])
-    
+    recycle = bst.Stream()
     P = pretreatment_steam.chemicals['H2O'].Psat(T_pretreatment_reactor + 25)
     M202 = bst.SteamMixer('M202', (feedstock, pretreatment_steam, warm_process_water), 
                           P=P, solids_loading=solids_loading, thermo=ideal)
-    M203 = bst.Mixer('M203', (M202-0, T201-0), thermo=ideal)
+    M203 = bst.Mixer('M203', (M202-0, recycle), thermo=ideal)
     R201 = units.PretreatmentReactorSystem('R201', M203-0, tau=residence_time,
                                            T=T_pretreatment_reactor, thermo=ideal,
                                            reactions=pretreatment_reactions)
@@ -175,9 +177,38 @@ def create_ammonia_fiber_expansion_pretreatment_system(
         air.imol['O2', 'N2'] = [flow * 0.23, flow * 0.77] # Assume equal volumes is enough
     
     M204 = bst.Mixer('M204', (R201-0, F201-0), thermo=ideal)
-    H201 = units.WasteVaporCondenser('H201', M204-0, pretreatment_wastewater, V=0, thermo=ideal)
-    P202 = units.HydrolyzatePump('P202', F201-1, hydrolyzate, thermo=ideal)
-
+    F202 = bst.Flash('F202', M204-0, V=0, P=101325, thermo=ideal)
+    P203 = bst.Pump('P203', F202-1, P=10*101325)
+    M205 = bst.Mixer('M205', (P203-0, T201-0), recycle)
+    
+    @M205.add_specification(run=True)
+    def adjust_ammonia():
+        recycle = M205.ins[0]
+        fresh_ammonia = T201.ins[0]
+        required_ammonia = T201.ammonia_loading * (feedstock.F_mass - feedstock.imass['Water']) - recycle.imass['NH3']
+        if required_ammonia < 0.:
+            recycle.imass['NH3'] -= required_ammonia
+            fresh_ammonia.empty()
+        else:
+            fresh_ammonia.imass['NH3'] = required_ammonia
+        for i in T201.path_until(M205): i.run()
+            
+    
+    P202 = units.HydrolyzatePump('P202', F201-1, thermo=ideal)
+    H2SO4_storage = units.SulfuricAcidStorageTank('H2SO4_storage', sulfuric_acid)
+    T202 = units.SulfuricAcidTank('T202', H2SO4_storage-0)
+    M206 = bst.Mixer('M206', (T202-0, P202-0), hydrolyzate)
+    
+    M206.neutralization_rxn = tmo.Reaction('2 NH3 + H2SO4 -> (NH4)2SO4', 'H2SO4', 1)
+    @M206.add_specification
+    def update_sulfuric_acid_loading():
+        _, feed = M206.ins
+        fresh_sulfuric_acid = H2SO4_storage.ins[0]
+        fresh_sulfuric_acid.imol['H2SO4'] = feed.imol['NH3'] / 2
+        for i in H2SO4_storage.path_until(M206): i.run()
+        M206._run()
+        M206.neutralization_rxn.adiabatic_reaction(M206.outs[0])
+    
 
 @bst.SystemFactory(
     ID='dilute_acid_pretreatment_sys',

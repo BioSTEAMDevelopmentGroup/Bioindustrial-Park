@@ -42,6 +42,7 @@ def load(configuration):
             load_conventional_chemicals()
             chemicals = conventional_chemicals
         flowsheet = bst.Flowsheet('conventional_acTAG')
+        bst.main_flowsheet.set_flowsheet(flowsheet)
         bst.settings.set_thermo(chemicals)
         sys = create_conventional_acTAG_system()
     elif configuration == 2:
@@ -49,11 +50,11 @@ def load(configuration):
             load_cellulosic_chemicals()
             chemicals = cellulosic_chemicals
         flowsheet = bst.Flowsheet('cellulosic_acTAG')
+        bst.main_flowsheet.set_flowsheet(flowsheet)
         bst.settings.set_thermo(chemicals)
         sys = create_cellulosic_acTAG_system()
     else:
         raise ValueError(f"invalid configuration '{configuration}'; only 1 and 2 are valid")
-    bst.main_flowsheet.set_flowsheet(flowsheet)
     u = flowsheet.unit
     s = flowsheet.stream
     load_process_settings()

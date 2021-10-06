@@ -32,12 +32,18 @@ Chemicals:
     synonyms: H3PO4
     phase: liquid
     default: True
+  SulfuricAcid:
+    synonyms: H2SO4
+    phase: liquid
+    default: True
   # Salts
   AmmoniumAcetate:
     phase: solid
+    default: True
   AmmoniumSulfate:
     synonyms: (NH4)2SO4
     phase: solid
+    default: True
   NaOH:
     phase: solid
     default: True

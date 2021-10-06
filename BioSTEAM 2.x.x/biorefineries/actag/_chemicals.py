@@ -37,7 +37,7 @@ def create_cellulosic_chemicals():
     chemical_data = tmo.ThermoData.from_yaml(chemical_data_path)
     chemicals = chemical_data.create_chemicals(
         ['Water', 'AceticAcid', 'Furfural', 'NH3', 'LacticAcid', 
-         'Methane', 'N2', 'O2', 'H2S', 'SO2', 'CO2', 
+         'Methane', 'SulfuricAcid', 'N2', 'O2', 'H2S', 'SO2', 'CO2', 
          'CornSteepLiquor', 'PhosphoricAcid', 'AmmoniumAcetate', 
          'AmmoniumSulfate', 'NaOH', 'NaNO3', 'P4O10', 'Lime', 'CaSO4', 
          'DiammoniumPhosphate', 'Glucose', 'Xylose', 'Sucrose', 'Mannose', 
@@ -48,7 +48,7 @@ def create_cellulosic_chemicals():
     )
     HMF = chemicals.HMF
     Furfural = chemicals.Furfural
-    HMF.copy_models_from(Furfural, ['Psat', 'Hvap', 'V'])
+    HMF.copy_models_from(Furfural, ['Psat', 'Hvap', 'V', 'mu', 'sigma'])
     HMF.Tb = Furfural.Tb
     HMF.Dortmund.set_group_counts_by_name({'FURFURAL': 1, 'CH2':1, 'OH(P)':1})
     chemicals.append(create_acetyl_diolein())
