@@ -58,7 +58,8 @@ class PretreatmentReactorSystem(Unit, bst.units.design_tools.PressureVessel):
                  tau=0.166, V_wf=0.8, length_to_diameter=2, 
                  vessel_material='Stainless steel 316', 
                  vessel_type='Horizontal',
-                 reactions=None):
+                 reactions=None,
+                 run_vle=True):
         Unit.__init__(self, ID, ins, outs, thermo)
         self._load_components()
         vapor, liquid = self.outs
@@ -96,23 +97,27 @@ class PretreatmentReactorSystem(Unit, bst.units.design_tools.PressureVessel):
         self.length_to_diameter = length_to_diameter
         self.vessel_material = vessel_material
         self.vessel_type = vessel_type
+        self.run_vle = run_vle
         
     def _load_components(self):
         thermo = self.thermo
         self._multistream = MultiStream(None, thermo=thermo)
     
     def _run(self):
-        ms = self._multistream
         feed = self.ins[0]
         vapor, liquid = self.outs
         liquid.copy_like(feed)
         self.reactions.adiabatic_reaction(liquid) 
-        ms.copy_like(liquid)
-        ms.vle(T=self.T, H=ms.H)
-        vapor.mol[:] = ms.imol['g']
-        liquid.mol[:] = ms.imol['l']
-        vapor.T = liquid.T = ms.T
-        vapor.P = liquid.P = ms.P
+        if self.run_vle:
+            ms = self._multistream
+            ms.copy_like(liquid)
+            ms.vle(T=self.T, H=ms.H)
+            vapor.mol[:] = ms.imol['g']
+            liquid.mol[:] = ms.imol['l']
+            vapor.T = liquid.T = ms.T
+            vapor.P = liquid.P = ms.P
+        else:
+            liquid.T = self.T
 
     def _design(self):
         Design = self.design_results

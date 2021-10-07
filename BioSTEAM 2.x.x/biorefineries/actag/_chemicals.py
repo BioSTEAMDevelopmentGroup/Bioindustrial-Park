@@ -28,7 +28,8 @@ def create_acetyl_diolein():
     chemical._Dortmund = group_counts = model.Dortmund.copy()
     group_counts.set_group_counts_by_name({'CH=CH': 2, 'CH':1, 'CH2': 28, 'CH3': 3, 'CH2COO': 2, 'COOH': 1}, reset=True)
     chemical.V.add_model(fn.rho_to_V(rho=900, MW=chemical.MW))
-    chemical.Cn.add_model(model.Cp(298.15) * chemical.MW)
+    chemical.mu.add_method(900 * 20.3e-6)
+    chemical.Cn.add_method(model.Cp(298.15) * chemical.MW)
     chemical.copy_models_from(model, ['sigma', 'kappa'])
     return chemical
 
@@ -51,10 +52,15 @@ def create_cellulosic_chemicals():
     HMF.copy_models_from(Furfural, ['Psat', 'Hvap', 'V', 'mu', 'sigma'])
     HMF.Tb = Furfural.Tb
     HMF.Dortmund.set_group_counts_by_name({'FURFURAL': 1, 'CH2':1, 'OH(P)':1})
+    HMF.Hf = Furfural.Hf + chemicals.Glucose.Hf - chemicals.Xylose.Hf
     chemicals.append(create_acetyl_diolein())
     chemicals.append(create_acyl_olein(3))
     chemicals.compile()
     chemicals.define_group('Products', ['AcetylDiOlein', 'TriOlein'], [0.5, 0.5], wt=True)
+    chemicals.define_group('Oil', ['AcetylDiOlein', 'TriOlein'], [0.5, 0.5], wt=True)
+    chemicals.define_group('Lipid', ['AcetylDiOlein', 'TriOlein'], [0.5, 0.5], wt=True)
+    chemicals.TriOlein.Hfus = 148.83e3 # kJ / kmol
+    chemicals.AcetylDiOlein.V.method_P = chemicals.TriOlein.V.method_P = None
     return chemicals
     
 def create_conventional_chemicals():
@@ -69,6 +75,10 @@ def create_conventional_chemicals():
     chemicals.append(create_acyl_olein(3))
     chemicals.compile()
     chemicals.define_group('Products', ['AcetylDiOlein', 'TriOlein'], [0.5, 0.5], wt=True)
+    chemicals.define_group('Oil', ['AcetylDiOlein', 'TriOlein'], [0.5, 0.5], wt=True)
+    chemicals.define_group('Lipid', ['AcetylDiOlein', 'TriOlein'], [0.5, 0.5], wt=True)
+    chemicals.TriOlein.Hfus = 148.83e3 # kJ / kmol
+    chemicals.AcetylDiOlein.V.method_P = chemicals.TriOlein.V.method_P = None
     return chemicals
 
 

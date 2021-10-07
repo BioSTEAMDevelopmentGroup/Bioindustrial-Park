@@ -100,7 +100,7 @@ def create_post_fermentation_oil_separation_system(ins, outs, wastewater_concent
         
     P607 = bst.Pump('P607', Ev607-0, P=101325.)
     C603_2 = bst.LiquidsSplitCentrifuge('C603_2', P607-0, (oil, ''), 
-                                        split={'Lipid': 0.99,
+                                        split={'Oil': 0.99,
                                                'Water': 0.0001})
     S601 = bst.Splitter('S601', ins=Ev607-1, outs=['', evaporator_condensate], split=0.5)
     M601 = bst.Mixer('M601', [S601-0, C603_2-1], wastewater)

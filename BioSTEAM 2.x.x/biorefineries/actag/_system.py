@@ -13,18 +13,55 @@ from ..cornstover import (
 )
 from ..lipidcane import (
     create_feedstock_handling_system,
+    create_lipid_wash_system,
     create_juicing_system,
     create_lipid_pretreatment_system as create_oil_pretreatment_system,
     create_transesterification_and_biodiesel_separation_system,
 )
+from ..oilcane._system import (
+    create_post_fermentation_oil_separation_system
+)
 import biorefineries as brf
 from biorefineries.cornstover.units import FeedStockHandling
 from thermosteam import Rxn, PRxn
+from ._units import OleinCrystallizer
 
 __all__ = (
-    'create_cellulosic_acTAG_system',
+    'create_acTAG_separation_system',
     'create_conventional_acTAG_system',
 )
+
+@bst.SystemFactory(
+    ID='acTAG_separation_sys',
+    ins=[dict(ID='lipid')],
+    outs=[dict(ID='acTAG'),
+          dict(ID='TAG')],
+)
+def create_acTAG_separation_system(ins, outs):
+    lipid, = ins
+    acTAG, TAG = outs
+    M1 = bst.Mixer('M1', (lipid, None))
+    C1 = OleinCrystallizer('C1', M1-0, T=273.15 - 10)
+    PF1 = bst.PressureFilter('PF1', C1-0, (TAG, ''), split=0.5, moisture_content=0.)
+    @PF1.add_specification
+    def split_phases():
+        feed = PF1.ins[0]
+        solid, liquid = PF1.outs
+        solid.copy_like(feed['s'])
+        liquid.copy_like(feed['l'])
+    
+    C2 = OleinCrystallizer('C2', PF1-1, T=273.15 - 20)
+    PF2 = bst.PressureFilter('PF2', C2-0, ('', acTAG), split=0.5, moisture_content=0.)
+    
+    @PF2.add_specification
+    def split_phases():
+        feed = PF2.ins[0]
+        solid, liquid = PF2.outs
+        solid.copy_like(feed['s'])
+        liquid.copy_like(feed['l'])
+    
+    M1.ins[1] = PF2.outs[0]
+    
 
 @bst.SystemFactory(
     ID='cellulosic_acTAG_sys',
@@ -40,11 +77,12 @@ __all__ = (
               Water=0.2,
               total_flow=104229.16,
               units='kg/hr')],
-    outs=[dict(ID='product')],
+    outs=[dict(ID='acTAG'),
+          dict(ID='TAG')],
 )
 def create_cellulosic_acTAG_system(ins, outs):
     feedstock, = ins
-    product, = outs
+    acTAG, TAG = outs
     chemicals = feedstock.chemicals
     U101 = FeedStockHandling(100, feedstock)
     AFEX_sys, AFEX_dct = create_ammonia_fiber_expansion_pretreatment_system(
@@ -54,7 +92,7 @@ def create_cellulosic_acTAG_system(ins, outs):
         area=200,
         udct=True,
         include_feedstock_handling=True,
-        solids_loading=0.625,
+        solids_loading=0.20,
         ammonia_loading=2,
         T_pretreatment_reactor=273.15 + 100.,
         residence_time=0.5,
@@ -68,13 +106,12 @@ def create_cellulosic_acTAG_system(ins, outs):
         Rxn('Xylan -> Furfural + 2 H2O',                 'Xylan',    0.0500, chemicals),
         Rxn('Arabinan + H2O -> Arabinose',               'Arabinan', 0.9000, chemicals),
         Rxn('Arabinan -> Furfural + 2 H2O',              'Arabinan', 0.0050, chemicals),
-        Rxn('Acetate -> AceticAcid',                     'Acetate',  1.0000, chemicals),
         Rxn('Lignin -> SolubleLignin',                   'Lignin',   0.0500, chemicals)
             ]),
     )
     hydrolysate = AFEX_sys.outs
     cofermentation_sys, cf_dct = create_cellulosic_fermentation_system('cofermentation_sys',
-        hydrolysate, ['', product, ''],
+        hydrolysate, 
         area=300,
         udct=True,
         mockup=True,
@@ -150,6 +187,40 @@ def create_cellulosic_acTAG_system(ins, outs):
         cofermentation.tau = target_titer / cofermentation.productivity 
     
     vent, cellulosic_beer, lignin = cofermentation_sys.outs
+    oil_separation_sys = create_post_fermentation_oil_separation_system(
+        'oil_separation_sys', cellulosic_beer,
+        mockup=True, area=400,
+    )
+    oil, wastewater, condensate = oil_separation_sys.outs
+    oil_wash_sys = create_lipid_wash_system(
+        'oil_wash_sys', oil, mockup=True, area=400
+    )
+    washed_lipid, spent_wash_water = oil_wash_sys.outs
+    acTAG_separation_sys = create_acTAG_separation_system(
+        'acTAG_separation_sys', washed_lipid, [acTAG, TAG], mockup=True, area=400,
+    )
+    wastewater_treatment_sys = bst.create_wastewater_treatment_system(
+        ins=[wastewater, spent_wash_water],
+        area=500,
+        mockup=True,
+    )
+    
+    methane, sludge, treated_water, waste_brine = wastewater_treatment_sys.outs
+    M601 = bst.Mixer(600, (lignin, sludge))
+    s = bst.main_flowsheet.stream
+    brf.cornstover.create_facilities(
+        solids_to_boiler=M601-0,
+        gas_to_boiler=methane,
+        process_water_streams=(s.caustic, 
+                               s.warm_process_water,
+                               s.pretreatment_steam,
+                               s.saccharification_water),
+        feedstock=feedstock,
+        RO_water=treated_water,
+        recycle_process_water=condensate,
+        BT_area=600,
+        area=700,
+    )
     
 
 @SystemFactory(
