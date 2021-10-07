@@ -169,7 +169,7 @@ def create_ammonia_fiber_expansion_pretreatment_system(
                                            run_vle=False)
     P201 = units.BlowdownDischargePump('P201', R201-1, thermo=ideal)
     M205 = bst.Mixer('M205', (P201-0, air))
-    F201 = bst.Flash('F201', M205-0, P=101325, Q=0, thermo=ideal)
+    F201 = bst.Flash('F201', M205-0, P=101325, T=310, thermo=ideal)
     @M205.add_specification(run=True)
     def update_air():
         feed, air = M205.ins

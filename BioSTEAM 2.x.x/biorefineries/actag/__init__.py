@@ -2,6 +2,7 @@
 """
 """
 import biosteam as bst
+from biorefineries.cornstover import create_tea
 from ._chemicals import create_conventional_chemicals, create_cellulosic_chemicals
 from ._system import (
     create_cellulosic_acTAG_system,
@@ -36,6 +37,7 @@ def load_cellulosic_chemicals():
     _cellulosic_chemicals_loaded = True
 
 def load(configuration):
+    global tea, sys
     configuration = int(configuration)
     if configuration == 1:
         if not _conventional_chemicals_loaded: 
@@ -57,5 +59,8 @@ def load(configuration):
         raise ValueError(f"invalid configuration '{configuration}'; only 1 and 2 are valid")
     u = flowsheet.unit
     s = flowsheet.stream
+    sys.set_tolerance(rmol=1e-5, mol=1e-3, subsystems=True)
+    dct = globals()
+    dct.update(flowsheet.to_dict())
     load_process_settings()
-    return sys
+    tea = create_tea(sys)

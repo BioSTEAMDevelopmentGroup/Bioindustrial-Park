@@ -76,9 +76,11 @@ def create_acTAG_separation_system(ins, outs):
               Extractives=0.08457040035987407,
               Water=0.2,
               total_flow=104229.16,
+              price=0.08,
               units='kg/hr')],
     outs=[dict(ID='acTAG'),
-          dict(ID='TAG')],
+          dict(ID='TAG', 
+               price=1.10)], # Rapeseed oil 2007
 )
 def create_cellulosic_acTAG_system(ins, outs):
     feedstock, = ins
@@ -221,6 +223,7 @@ def create_cellulosic_acTAG_system(ins, outs):
         BT_area=600,
         area=700,
     )
+    R1 = bst.RefrigerationPackage(700)
     
 
 @SystemFactory(

@@ -95,8 +95,6 @@ def set_mixed_cornstover_miscanthus_feedstock(x_cornstover):
     composition = (x_cornstover * cornstover_composition
                    + x_miscanthus * miscanthus_composition)
     cs.cornstover.mass = cs.cornstover.F_mass * composition
-    cs.cornstover.price = (price_cornstover * x_cornstover 
-                           + price_miscanthus * x_miscanthus)
 
 # %% Functional ABM TEA model for legacy purposes
 
