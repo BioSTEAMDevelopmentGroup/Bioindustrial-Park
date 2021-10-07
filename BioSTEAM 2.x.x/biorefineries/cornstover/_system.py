@@ -179,34 +179,34 @@ def create_ammonia_fiber_expansion_pretreatment_system(
     M204 = bst.Mixer('M204', (R201-0, F201-0), thermo=ideal)
     F202 = bst.Flash('F202', M204-0, V=0, P=101325, thermo=ideal)
     P203 = bst.Pump('P203', F202-1, P=10*101325)
-    M205 = bst.Mixer('M205', (P203-0, T201-0), recycle)
+    M206 = bst.Mixer('M206', (P203-0, T201-0), recycle)
     
-    @M205.add_specification(run=True)
+    @M206.add_specification(run=True)
     def adjust_ammonia():
-        recycle = M205.ins[0]
+        recycle = M206.ins[0]
         fresh_ammonia = T201.ins[0]
         required_ammonia = T201.ammonia_loading * (feedstock.F_mass - feedstock.imass['Water']) - recycle.imass['NH3']
         if required_ammonia < 0.:
-            recycle.imass['NH3'] -= required_ammonia
+            recycle.imass['NH3'] += required_ammonia
             fresh_ammonia.empty()
         else:
             fresh_ammonia.imass['NH3'] = required_ammonia
-        for i in T201.path_until(M205): i.run()
+        for i in T201.path_until(M206): i.run()
     
     P202 = units.HydrolyzatePump('P202', F201-1, thermo=ideal)
     H2SO4_storage = units.SulfuricAcidStorageTank('H2SO4_storage', sulfuric_acid)
     T202 = units.SulfuricAcidTank('T202', H2SO4_storage-0)
-    M206 = bst.Mixer('M206', (T202-0, P202-0), hydrolyzate)
+    M207 = bst.Mixer('M207', (T202-0, P202-0), hydrolyzate)
     
-    M206.neutralization_rxn = tmo.Reaction('2 NH3 + H2SO4 -> (NH4)2SO4', 'H2SO4', 1)
-    @M206.add_specification
+    M207.neutralization_rxn = tmo.Reaction('2 NH3 + H2SO4 -> (NH4)2SO4', 'H2SO4', 1)
+    @M207.add_specification
     def update_sulfuric_acid_loading():
-        _, feed = M206.ins
+        _, feed = M207.ins
         fresh_sulfuric_acid = H2SO4_storage.ins[0]
         fresh_sulfuric_acid.imol['H2SO4'] = feed.imol['NH3'] / 2
-        for i in H2SO4_storage.path_until(M206): i.run()
-        M206._run()
-        M206.neutralization_rxn(M206.outs[0])
+        for i in H2SO4_storage.path_until(M207): i.run()
+        M207._run()
+        M207.neutralization_rxn(M207.outs[0])
     
 
 @bst.SystemFactory(
