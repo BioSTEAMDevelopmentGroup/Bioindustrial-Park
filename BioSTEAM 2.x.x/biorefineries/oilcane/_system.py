@@ -382,13 +382,15 @@ def create_oilcane_to_biodiesel_and_ethanol_combined_1_and_2g_post_fermentation_
             required_water = (1./target_titer - 1./current_titer) * ethanol * 1000.
             MX.ins[1].imass['Water'] = max(required_water, 0)
         else:
-            x = 0.1
+            x0 = 0.
+            x1 = 0.1
             y1 = 1
             while y1 > 0:
-                x += 0.03
-                y1 = f(x)
-                if x > 0.95: raise RuntimeError('infeasible to evaporate any more water')
-            EvX.V = flx.IQ_interpolation(f, 0, x, y0, y1, x=EvX.V, ytol=1e-5, xtol=1e-6)
+                x0 = x1            
+                x1 += 0.1
+                if x1 > 0.9: raise RuntimeError('infeasible to evaporate any more water')
+                y1 = f(x1)
+            EvX.V = flx.IQ_interpolation(f, x0, x1, y0, y1, x=EvX.V, ytol=1e-5, xtol=1e-6)
         cofermentation.tau = target_titer / cofermentation.productivity 
     
     vent, cellulosic_beer, lignin = cellulosic_fermentation_sys.outs
@@ -597,13 +599,15 @@ def create_sugarcane_to_ethanol_combined_1_and_2g(ins, outs):
             required_water = (1./target_titer - 1./current_titer) * ethanol * 1000.
             MX.ins[1].imass['Water'] = max(required_water, 0)
         else:
-            x = 0.1
+            x0 = 0.
+            x1 = 0.1
             y1 = 1
             while y1 > 0:
-                x += 0.03
-                y1 = f(x)
-                if x > 0.95: raise RuntimeError('infeasible to evaporate any more water')
-            EvX.V = flx.IQ_interpolation(f, 0, x, y0, y1, x=EvX.V, ytol=1e-5, xtol=1e-6)
+                x0 = x1            
+                x1 += 0.1
+                if x1 > 0.9: raise RuntimeError('infeasible to evaporate any more water')
+                y1 = f(x1)
+            EvX.V = flx.IQ_interpolation(f, x0, x1, y0, y1, x=EvX.V, ytol=1e-5, xtol=1e-6)
         cofermentation.tau = target_titer / cofermentation.productivity 
     
     vent, cellulosic_beer, lignin = cellulosic_fermentation_sys.outs

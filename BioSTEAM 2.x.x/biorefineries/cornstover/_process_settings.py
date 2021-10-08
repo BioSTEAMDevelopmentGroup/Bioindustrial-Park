@@ -9,7 +9,7 @@
 """
 import biosteam as bst
 
-__all__ = ('load_process_settings', 'ethanol_density_kggal')
+__all__ = ('load_process_settings', 'ethanol_density_kggal', 'price')
 
 factor = 1./907.18474 # ton/hr to kg/hr
 ethanol_density_kgL = 0.789 # kg/L

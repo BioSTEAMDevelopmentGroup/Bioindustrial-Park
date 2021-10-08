@@ -69,7 +69,8 @@ def create_conventional_chemicals():
     chemicals = chemical_data.create_chemicals(
         ['Water', 'Glucose', 'Sucrose', 'PhosphoricAcid', 'P4O10', 'CO2', 'O2', 
          'N2', 'Methane', 'Ash', 'Cellulose', 'Hemicellulose', 'Flocculant', 
-         'Lignin', 'Solids', 'Cells', 'Lime']
+         'Lignin', 'Solids', 'Cells', 'Lime', 'DiammoniumPhosphate', 'CornSteepLiquor',
+         'SO2', 'CaSO4', 'LacticAcid', 'Protein']
     )
     chemicals.append(create_acetyl_diolein())
     chemicals.append(create_acyl_olein(3))
@@ -79,6 +80,7 @@ def create_conventional_chemicals():
     chemicals.define_group('Lipid', ['AcetylDiOlein', 'TriOlein'], [0.5, 0.5], wt=True)
     chemicals.TriOlein.Hfus = 148.83e3 # kJ / kmol
     chemicals.AcetylDiOlein.V.method_P = chemicals.TriOlein.V.method_P = None
+    chemicals.set_synonym('Lime', 'CaO')
     return chemicals
 
 

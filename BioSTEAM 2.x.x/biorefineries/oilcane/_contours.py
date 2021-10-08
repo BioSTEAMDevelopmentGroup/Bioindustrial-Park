@@ -44,7 +44,8 @@ edgecolor = (*colors.CABBI_black.RGBn, 1)
 CABBI_colors = (colors.CABBI_yellow.tint(75).RGBn, 
                 colors.CABBI_yellow.RGBn,
                 colors.CABBI_green.RGBn,
-                colors.CABBI_teal_green.shade(60).RGBn)
+                colors.CABBI_teal_green.shade(60).RGBn,
+                colors.CABBI_teal_green.shade(90).RGBn)
 
 CABBI_colors_x = (colors.CABBI_blue_light.tint(90).RGBn,
                   colors.CABBI_blue_light.tint(40).RGBn, 

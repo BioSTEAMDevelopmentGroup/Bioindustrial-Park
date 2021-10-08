@@ -14,17 +14,20 @@ from ..cornstover import (
 from ..lipidcane import (
     create_feedstock_handling_system,
     create_lipid_wash_system,
-    create_juicing_system,
     create_lipid_pretreatment_system as create_oil_pretreatment_system,
     create_transesterification_and_biodiesel_separation_system,
 )
 from ..oilcane._system import (
     create_post_fermentation_oil_separation_system
 )
+from ..sugarcane._system import (
+    create_juicing_system_with_fiber_screener,
+)
+from biorefineries.cornstover import price
 import biorefineries as brf
 from biorefineries.cornstover.units import FeedStockHandling
 from thermosteam import Rxn, PRxn
-from ._units import OleinCrystallizer
+from ._units import OleinCrystallizer, Fermentation
 
 __all__ = (
     'create_acTAG_separation_system',
@@ -125,12 +128,14 @@ def create_cellulosic_acTAG_system(ins, outs):
         CoFermentation=None,
         saccharification_reactions=Rxn('Glucan + H2O -> Glucose', 'Glucan', 0.8768, chemicals),
         seed_train_reactions=PRxn([
-        Rxn('Glucose -> 2.04 Water + 1.67 CO2 + 0.106 AcetylDiOlein', 'Glucose', 0., chemicals),
-        Rxn('Glucose -> 2.1 Water + 1.72 CO2 + 0.075 TriOlein', 'Glucose', 0., chemicals),
+        Rxn('Glucose -> 2.04 Water + 1.67 CO2 + 0.106 AcetylDiOlein', 'Glucose', 0.156, chemicals),
+        Rxn('Glucose -> 2.1 Water + 1.72 CO2 + 0.075 TriOlein', 'Glucose', 0.165, chemicals),
+        Rxn('Glucose -> Cells', 'Glucose', 0.05, chemicals, basis='wt').copy(basis='mol'),
             ]),
         cofermentation_reactions=PRxn([
         Rxn('Glucose -> 2.04 Water + 1.67 CO2 + 0.106 AcetylDiOlein', 'Glucose', 0.156, chemicals),
         Rxn('Glucose -> 2.1 Water + 1.72 CO2 + 0.075 TriOlein', 'Glucose', 0.165, chemicals),
+        Rxn('Glucose -> Cells', 'Glucose', 0.05, chemicals, basis='wt').copy(basis='mol'),
             ]),
         )
     DAP_storage = cf_dct['DAP_storage']
@@ -141,13 +146,13 @@ def create_cellulosic_acTAG_system(ins, outs):
     hydrolysate = pressurefilter.outs[1]
     sink = hydrolysate.sink
     sink.ins[0] = None
-    EvX = bst.MultiEffectEvaporator(400, ins=hydrolysate,
+    EvX = bst.MultiEffectEvaporator(300, ins=hydrolysate,
                                     P=(101325, 69682, 47057, 30953, 19781),
                                     V_definition='First-effect',
                                     V=0.05) # fraction evaporated
-    PX = bst.Pump(400, ins=EvX-0, P=101325.)
-    MX = bst.Mixer(400, [PX-0, 'dilution_water'])
-    HX = bst.HXutility(400, MX-0, T=305.15)
+    PX = bst.Pump(300, ins=EvX-0, P=101325.)
+    MX = bst.Mixer(300, [PX-0, 'dilution_water'])
+    HX = bst.HXutility(300, MX-0, T=305.15)
     HX-0-sink
     
     cofermentation.titer = 5.5
@@ -179,13 +184,15 @@ def create_cellulosic_acTAG_system(ins, outs):
             required_water = (1./target_titer - 1./current_titer) * product * 1000.
             MX.ins[1].imass['Water'] = max(required_water, 0)
         else:
-            x = 0.1
+            x0 = 0.
+            x1 = 0.1
             y1 = 1
             while y1 > 0:
-                x += 0.03
-                y1 = f(x)
-                if x > 0.95: raise RuntimeError('infeasible to evaporate any more water')
-            EvX.V = flx.IQ_interpolation(f, 0, x, y0, y1, x=EvX.V, ytol=1e-5, xtol=1e-6)
+                x0 = x1            
+                x1 += 0.05
+                if x1 > 0.9: raise RuntimeError('infeasible to evaporate any more water')
+                y1 = f(x1)
+            EvX.V = flx.IQ_interpolation(f, x0, x1, y0, y1, x=EvX.V, ytol=1e-5, xtol=1e-6)
         cofermentation.tau = target_titer / cofermentation.productivity 
     
     vent, cellulosic_beer, lignin = cofermentation_sys.outs
@@ -240,10 +247,113 @@ def create_cellulosic_acTAG_system(ins, outs):
               total_flow=333334.2,
               units='kg/hr',
               price=0.03455)],
-    outs=[dict(ID='acTAG')]
+    outs=[dict(ID='acTAG'),
+          dict(ID='TAG', 
+               price=1.10)], # Rapeseed oil 2007
 )
 def create_conventional_acTAG_system(ins, outs):
     feedstock, = ins
-    acTAG, = outs
-    create_feedstock_handling_system,
-    create_juicing_system,
+    acTAG, TAG = outs
+    chemicals = feedstock.chemicals
+    feedstock_handling_sys = create_feedstock_handling_system(
+        'feedstock_handling_sys', feedstock, mockup=True, area=100
+    )
+    juicing_sys = create_juicing_system_with_fiber_screener(
+        'juicing_sys', feedstock_handling_sys-0, mockup=True, area=200
+    )
+    screened_juice, bagasse, fiber_fines = juicing_sys.outs
+    EvX = bst.MultiEffectEvaporator(300, ins=screened_juice,
+                                    P=(101325, 69682, 47057, 30953, 19781),
+                                    V_definition='First-effect',
+                                    V=0.05) # fraction evaporated
+    PX = bst.Pump(300, ins=EvX-0, P=101325.)
+    
+    DAP = bst.Stream('DAP',
+                    DAP=26,
+                    units='kg/hr',
+                    price=price['DAP'])
+    CSL = bst.Stream('CSL',
+                    CSL=211,
+                    units='kg/hr',
+                    price=price['CSL'])
+    
+    DAP_storage = brf.cornstover.units.DAPStorageTank('DAP_storage', DAP)
+    CSL_storage = brf.cornstover.units.CSLStorageTank('CSL_storage', CSL)
+    MX = bst.Mixer(300, [PX-0, 'dilution_water', DAP_storage-0, CSL_storage-0])
+    HX = bst.HXutility(300, MX-0, T=305.15)
+    RX = Fermentation(300, HX-0, tau=10, V=3753)
+    RX.titer = 5.5
+    RX.productivity = 0.033
+    @EvX.add_specification(run=True)
+    def evaporation():
+        MX.ins[1].imass['Water'] = 0.
+        path = EvX.path_until(RX)[1:]
+        nutrient_path = DAP_storage.path_until(RX) + CSL_storage.path_until(RX)
+        feed = RX.ins[0]
+        beer = RX.outs[1]
+        target_titer = RX.titer
+        def f(V):
+            EvX.V = V
+            EvX._run()
+            for unit in path: unit.run()
+            CSL.imass['CSL'] = 0.0025 * feed.F_mass
+            DAP.imass['DAP'] = 0.33 * feed.F_vol
+            for unit in nutrient_path: unit.run()
+            RX.run()
+            return target_titer - beer.imass['Products'] / beer.F_vol
+        
+        y0 = f(0)
+        if y0 < 0.:
+            product = float(beer.imass['Products'])
+            current_titer = product / beer.F_vol
+            required_water = (1./target_titer - 1./current_titer) * product * 1000.
+            MX.ins[1].imass['Water'] = max(required_water, 0)
+        else:
+            x0 = 0.
+            x1 = 0.1
+            y1 = 1
+            while y1 > 0:
+                x0 = x1            
+                x1 += 0.05
+                if x1 > 0.9: raise RuntimeError('infeasible to evaporate any more water')
+                y1 = f(x1)
+            EvX.V = flx.IQ_interpolation(f, x0, x1, y0, y1, x=EvX.V, ytol=1e-5, xtol=1e-6)
+        RX.tau = target_titer / RX.productivity
+    TX = bst.StorageTank(300, RX-1, tau=4)
+    oil_separation_sys = create_post_fermentation_oil_separation_system(
+        'oil_separation_sys', TX-0,
+        mockup=True, area=400,
+    )
+    oil, wastewater, condensate = oil_separation_sys.outs
+    oil_wash_sys = create_lipid_wash_system(
+        'oil_wash_sys', oil, mockup=True, area=400
+    )
+    washed_lipid, spent_wash_water = oil_wash_sys.outs
+    acTAG_separation_sys = create_acTAG_separation_system(
+        'acTAG_separation_sys', washed_lipid, [acTAG, TAG], mockup=True, area=400,
+    )
+    # wastewater_treatment_sys = bst.create_wastewater_treatment_system(
+    #     ins=[wastewater, spent_wash_water],
+    #     area=500,
+    #     mockup=True,
+    # )
+    
+    # methane, sludge, treated_water, waste_brine = wastewater_treatment_sys.outs
+    
+    CX = bst.SolidsCentrifuge(400, wastewater, split=dict(Cells=0.99), solids=('Cells',))
+    # M601 = bst.Mixer(600, (bagasse, sludge))
+    s = bst.main_flowsheet.stream
+    brf.cornstover.create_facilities(
+        # solids_to_boiler=M601-0,
+        solids_to_boiler=bagasse,
+        gas_to_boiler=None,
+        # gas_to_boiler=methane,
+        process_water_streams=(s.imbibition_water,
+                               s.rvf_wash_water,),
+        feedstock=feedstock,
+        # RO_water=treated_water,
+        recycle_process_water=condensate,
+        BT_area=600,
+        area=700,
+    )
+    R1 = bst.RefrigerationPackage(700)
