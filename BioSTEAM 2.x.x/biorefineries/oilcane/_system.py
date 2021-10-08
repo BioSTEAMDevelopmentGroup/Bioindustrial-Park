@@ -374,7 +374,7 @@ def create_oilcane_to_biodiesel_and_ethanol_combined_1_and_2g_post_fermentation_
             for unit in path: unit.run()
             cofermentation.run()
             return target_titer - beer.imass['Ethanol'] / beer.F_vol
-        
+        MX.ins[1].imass['Water'] = 0.
         y0 = f(0)
         if y0 < 0.:
             ethanol = float(beer.imass['Ethanol'])
@@ -382,7 +382,6 @@ def create_oilcane_to_biodiesel_and_ethanol_combined_1_and_2g_post_fermentation_
             required_water = (1./target_titer - 1./current_titer) * ethanol * 1000.
             MX.ins[1].imass['Water'] = max(required_water, 0)
         else:
-            MX.ins[1].imass['Water'] = 0.
             x = 0.1
             y1 = 1
             while y1 > 0:
@@ -583,6 +582,7 @@ def create_sugarcane_to_ethanol_combined_1_and_2g(ins, outs):
                 *seedtrain_to_cofermentation)
         beer = cofermentation.outs[1]
         target_titer = cofermentation.titer
+        MX.ins[1].imass['Water'] = 0.
         def f(V):
             EvX.V = V
             EvX._run()
@@ -597,7 +597,6 @@ def create_sugarcane_to_ethanol_combined_1_and_2g(ins, outs):
             required_water = (1./target_titer - 1./current_titer) * ethanol * 1000.
             MX.ins[1].imass['Water'] = max(required_water, 0)
         else:
-            MX.ins[1].imass['Water'] = 0.
             x = 0.1
             y1 = 1
             while y1 > 0:

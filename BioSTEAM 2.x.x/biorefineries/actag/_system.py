@@ -154,6 +154,7 @@ def create_cellulosic_acTAG_system(ins, outs):
     cofermentation.productivity = 0.033
     @EvX.add_specification(run=True)
     def evaporation():
+        MX.ins[1].imass['Water'] = 0.
         evaporator_to_seedtrain = EvX.path_until(seedtrain)
         DAP_to_seedtrain = DAP_storage.path_until(seedtrain)
         CSL_to_seedtrain = CSL_storage.path_until(seedtrain)
@@ -178,7 +179,6 @@ def create_cellulosic_acTAG_system(ins, outs):
             required_water = (1./target_titer - 1./current_titer) * product * 1000.
             MX.ins[1].imass['Water'] = max(required_water, 0)
         else:
-            MX.ins[1].imass['Water'] = 0.
             x = 0.1
             y1 = 1
             while y1 > 0:
