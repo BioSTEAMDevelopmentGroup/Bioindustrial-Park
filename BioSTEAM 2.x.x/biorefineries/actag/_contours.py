@@ -31,7 +31,8 @@ from warnings import filterwarnings
 import os
 from thermosteam.units_of_measure import format_units
 
-__all__ = ('plot_titer_yield_selectivity_productivity_contours',)
+__all__ = ('plot_yield_selectivity_titer_productivity_contours',
+           'plot_purity_across_selectivity')
 
 shadecolor = (*colors.neutral.RGBn, 0.20)
 linecolor = (*colors.neutral_shade.RGBn, 0.85)
@@ -41,7 +42,8 @@ edgecolor = (*colors.CABBI_black.RGBn, 1)
 CABBI_colors = (colors.CABBI_yellow.tint(75).RGBn, 
                 colors.CABBI_yellow.RGBn,
                 colors.CABBI_green.RGBn,
-                colors.CABBI_teal_green.shade(60).RGBn)
+                colors.CABBI_teal_green.shade(60).RGBn,
+                colors.CABBI_teal_green.shade(90).RGBn)
 
 CABBI_colors_x = (colors.CABBI_blue_light.tint(90).RGBn,
                   colors.CABBI_blue_light.tint(40).RGBn, 
@@ -63,20 +65,42 @@ colormaps = [
     plt.cm.get_cmap('bone_r'),
 ] * 2
 
-def plot_titer_yield_selectivity_productivity_contours(configuration=1, load=True):
+def plot_yield_selectivity_titer_productivity_contours(configuration=1, load=True):
     # Generate contour data
     X, Y, z, w, data = actag.fermentation_data(configuration, load)
     
     data = data[:, :, :, :, 0]
     
     # Plot contours
-    xlabel = f"Titer\n[{format_units('g/L')}]" 
-    ylabel = "Yield\n[% theoretical]" 
-    xticks = [5, 10, 20, 30, 40]
-    yticks = [40, 50, 60, 70, 80, 90]
-    metric_bar = MetricBar('MFPP', format_units('$/ton'), colormaps[0], tickmarks(data, 5, 5), 12)
+    xlabel = "Yield\n[% theoretical]" 
+    ylabel = f"Selectivity\n[%]"
+    xticks = [40, 50, 60, 70, 80, 90]
+    yticks = [50, 60, 70, 80, 90]
+    metric_bar = MetricBar('MFPP', format_units('$/ton'), colormaps[0], tickmarks(data, 5, 5), 15)
     fig, axes, CSs, CB = plot_contour_single_metric(
         X[:, :, 0], Y[:, :, 0], data, xlabel, ylabel, xticks, yticks, metric_bar, 
         fillblack=False, styleaxiskw=dict(xtick0=False), label=False,
     )
     plt.show()
+
+def plot_purity_across_selectivity(configuration=1):
+    actag.load(configuration)
+    x = np.linspace(50, 90, 20)
+    def simulate_purity(selectivity):
+        actag.set_selectivity(selectivity)
+        actag.sys.simulate()
+        return actag.acTAG.imass['AcetylDiOlein'] / actag.acTAG.F_mass
+    y = [simulate_purity(i) for i in x]
+    plt.plot(x, y)
+    
+def plot_recovery_across_selectivity(configuration=1):
+    actag.load(configuration)
+    x = np.linspace(50, 90, 20)
+    def simulate_recovery(selectivity):
+        actag.set_selectivity(selectivity)
+        actag.sys.simulate()
+        recovered = actag.acTAG.imass['AcetylDiOlein']
+        total = actag.fermentation.outs[1].imass['AcetylDiOlein']
+        return recovered / total
+    y = [simulate_recovery(i) for i in x]
+    plt.plot(x, y)

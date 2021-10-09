@@ -20,6 +20,8 @@ from biosteam.plots import (
     plot_contour_single_metric,
 )
 
+# TODO: find composition for minimum product specification (24 mm2/s viscosity)
+
 MPSP, TCI = all_metric_mockups = (
     bst.MockVariable('MPSP', 'USD/ton', 'Biorefinery'),
     bst.MockVariable('TCI', '10^6*USD', 'Biorefinery'),
@@ -87,7 +89,7 @@ def load(configuration, cache={}):
     dct.update(flowsheet.to_dict())
     load_process_settings()
     fermentation = u.R301
-    
+    fermentation.product_yield = 0.06
     ## Model
     model = bst.Model(sys, exception_hook='raise', retry_evaluation=False)
     parameter = model.parameter
@@ -95,12 +97,13 @@ def load(configuration, cache={}):
     
     @parameter
     def set_selectivity(selectivity):
+        selectivity /= 100.
         if configuration == 1:
             X = fermentation.fermentation_reaction.X
         elif configuration == 2:
             X = fermentation.cofermentation.X
         X[0] = fermentation.product_yield * selectivity
-        X[1] = fermentation.product_yield * (1 - selectivity)
+        X[1] = fermentation.product_yield * (1. - selectivity)
     
     @metric(units='USD/ton')
     def MPSP(): return tea.solve_price(s.acTAG) * kg_per_ton
@@ -114,7 +117,7 @@ def load(configuration, cache={}):
         dct[i.getter.__name__] = i
     cache[configuration] = dct.copy()
     
-def evaluate_across_titer_yield_selectivity_and_productivity(titer, product_yield, selectivity, productivities, configuration):
+def evaluate_across_yield_selectivity_titer_and_productivity(product_yield, selectivity, titer, productivities, configuration):
     load(configuration)
     metrics = model.metrics
     P = len(productivities)
@@ -122,7 +125,7 @@ def evaluate_across_titer_yield_selectivity_and_productivity(titer, product_yiel
     data = np.zeros([P, M])
     fermentation.titer = titer
     fermentation.product_yield = product_yield / 100.
-    set_selectivity(selectivity / 100.)
+    set_selectivity(selectivity)
     sys.simulate()
     for i in range(P):
         fermentation.tau = titer / productivities[i]
@@ -131,18 +134,18 @@ def evaluate_across_titer_yield_selectivity_and_productivity(titer, product_yiel
             data[i, j] = metrics[j]()
     return data
 
-evaluate_across_titer_yield_selectivity_and_productivity = np.vectorize(
-    evaluate_across_titer_yield_selectivity_and_productivity, 
+evaluate_across_yield_selectivity_titer_and_productivity = np.vectorize(
+    evaluate_across_yield_selectivity_titer_and_productivity, 
     excluded=['productivities', 'configuration'],
     signature=f'(),(),(),(p),()->(p,{N_metrics})'
 )
 
 def fermentation_data(configuration, load):
     # Generate contour data
-    x = np.linspace(5, 40, 15)
-    y = np.linspace(40, 90, 15)
-    z = np.array([50, 70, 90])
-    w = np.array([0.01, 0.10, 1.00])
+    x = np.linspace(40, 90, 15)
+    y = np.linspace(50, 90, 15)
+    z = np.array([5, 10, 20])
+    w = np.array([0.033, 1.00])
     X, Y, Z = np.meshgrid(x, y, z)
     folder = os.path.dirname(__file__)
     file = f'fermentation_data_{configuration}.npy'
@@ -150,9 +153,11 @@ def fermentation_data(configuration, load):
     if load:
         data = np.load(file)
     else:
-        data = evaluate_across_titer_yield_selectivity_and_productivity(
+        data = evaluate_across_yield_selectivity_titer_and_productivity(
             X, Y, Z, w, configuration
         )
     np.save(file, data)
     return X, Y, z, w, data
+    
+
     
