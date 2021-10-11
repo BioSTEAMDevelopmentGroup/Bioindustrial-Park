@@ -385,11 +385,13 @@ def create_ethanol_purification_system_after_beer_column(ins, outs, IDs={}):
     ### Ethanol system set-up ###
     (distilled_beer, U301-0)-M303-0-D303-0-H303-U301
     D303-1-P303
+    M304.denaturant_fraction = 0.022
     
-    @P304.add_specification(run=True)
+    @M304.add_specification(run=True)
     def adjust_denaturant():
-        pure_ethanol = P304.ins[0]
-        denaturant.imol['Octane'] = 0.022*pure_ethanol.F_mass/114.232
+        pure_ethanol = M304.ins[1]
+        denaturant.imol['Octane'] = M304.denaturant_fraction * pure_ethanol.F_mass / 114.232
+        for i in T303.path_until(M304): i._run()
     
     (denaturant-T303-P305-0, U301-1-H304-0-T302-0-P304-0)-M304-T304
 

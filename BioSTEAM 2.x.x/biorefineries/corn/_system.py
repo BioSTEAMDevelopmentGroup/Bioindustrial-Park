@@ -24,7 +24,7 @@ SLURRY_LIME_LOADING = 0.00012   # g Lime / g dry Corn
 LIQUEFACTION_ALPHA_AMYLASE_LOADING = 0.0007    # g Enzyme / g dry Corn
 SACCHARIFICATION_SULFURIC_ACID_LOADING = 0.001 # g Enzyme / g dry Corn
 SACCHARIFICATION_GLUCO_AMYLASE_LOADING = 0.002 # g H2SO4 / g dry Corn
-SCRUBBER_WASH_WATER_OVER_VENT = 1.39 # g Water / g Vent
+SCRUBBER_WASH_WATER_OVER_VENT = 1.21 # g Water / g Vent
 
 def create_system(ID='corn_sys'):
     ### Streams ###
@@ -83,17 +83,17 @@ def create_system(ID='corn_sys'):
     ### Process specifications ###
     
     def refresh_feed_specifications():
-        F_mass_dry_corn = 0.85 * corn.F_mass
-        recycled_process_water.F_mass = F_mass_dry_corn * (1. - SLURRY_SOLIDS_CONTENT) / SLURRY_SOLIDS_CONTENT
-        lime.F_mass = F_mass_dry_corn * SLURRY_LIME_LOADING
-        ammonia.F_mass = F_mass_dry_corn * SLURRY_AMMONIA_LOADING
-        alpha_amylase.F_mass = F_mass_dry_corn * LIQUEFACTION_ALPHA_AMYLASE_LOADING
-        sulfuric_acid.F_mass = F_mass_dry_corn * SACCHARIFICATION_SULFURIC_ACID_LOADING
-        gluco_amylase.F_mass = F_mass_dry_corn * SACCHARIFICATION_GLUCO_AMYLASE_LOADING
+        MH101._F_mass_dry_corn = F_mass_dry_corn = corn.F_mass - corn.imass['Water']
+        lime.F_mass = F_mass_lime = F_mass_dry_corn * SLURRY_LIME_LOADING
+        ammonia.F_mass = F_mass_ammonia = F_mass_dry_corn * SLURRY_AMMONIA_LOADING
+        alpha_amylase.F_mass = F_mass_aa = F_mass_dry_corn * LIQUEFACTION_ALPHA_AMYLASE_LOADING
+        sulfuric_acid.F_mass = F_mass_sa = F_mass_dry_corn * SACCHARIFICATION_SULFURIC_ACID_LOADING
+        gluco_amylase.F_mass = F_mass_ga = F_mass_dry_corn * SACCHARIFICATION_GLUCO_AMYLASE_LOADING
+        MH101._F_mass_others = (F_mass_lime + F_mass_ammonia + F_mass_aa + F_mass_sa + F_mass_ga)
         MH101._run()
     
     def update_scrubber_wash_water():
-        scrubber_water.F_mass =  MX1.outs[0].F_mass * SCRUBBER_WASH_WATER_OVER_VENT
+        scrubber_water.F_mass =  V409.ins[1].F_mass * SCRUBBER_WASH_WATER_OVER_VENT
         V409._run()
         
     ### Units ###
@@ -113,6 +113,11 @@ def create_system(ID='corn_sys'):
     P304 = bst.Pump('P304', V303-0)
     V305 = u.LimeHopper('V305', lime)
     V307 = u.SlurryMixTank('V307', (V107-0, P302-0, P304-0, V305-0, recycled_process_water, backwater))
+    @V307.add_specification(run=True)
+    def correct_recycle_dilution_water():
+        F_mass_others = MH101._F_mass_others + backwater.F_mass
+        F_mass_dry_corn = MH101._F_mass_dry_corn
+        recycled_process_water.F_mass = F_mass_dry_corn * (1. - SLURRY_SOLIDS_CONTENT) / SLURRY_SOLIDS_CONTENT - F_mass_others
     
     P311 = bst.Pump('P311', V307-0, P=1e6)
     E312 = bst.HXprocess('E312', (P311-0, None), U=0.56783, ft=1.0, T_lim0=410.)
@@ -140,19 +145,17 @@ def create_system(ID='corn_sys'):
     P404 = bst.Pump('P404', V403-0)
     V405 = u.SSF('V405', (E402-0, P404-0), outs=('CO2', ''), V=1.9e3)
     P406 = bst.Pump('P406', V405-1)
-    P406-0-1-E401
     P407 = bst.Pump('P407', E401-1)
     P407-0-1-E316
-    V412 = bst.Flash('V412', E316-1, V=0.005, P=101325)
-    E408 = bst.HXutility('E408', V412-0, V=0.99, rigorous=True)
-    E408_2 = bst.PhaseSplitter('E408_2', E408-0)
-    MX1 = bst.Mixer('MX1', (V405-0, E408_2-0))
-    V409 = bst.VentScrubber('V409', (scrubber_water, MX1-0), gas=('CO2', 'O2'))
+    V412 = bst.StorageTank('V412', E316-1, tau=4)
+    PX = bst.Pump('PX', V412-0)
+    V409 = bst.VentScrubber('V409', (scrubber_water, V405-0), gas=('CO2', 'O2'))
     V409.specification = update_scrubber_wash_water
     P410 = bst.Pump('P410', V409-1)
-    E413 = bst.HXprocess('E413', (V412-1, None), U=0.79496, ft=1.0)
-    MX2 = bst.Mixer('MX2', (E408_2-1, E413-0))
-    P411 = bst.Pump('P411', MX2-0)
+    MX = bst.Mixer('MX', [P410-0, P406-0])
+    MX-0-1-E401
+    E413 = bst.HXprocess('E413', (PX-0, None), U=0.79496, ft=1.0)
+    P411 = bst.Pump('P411', E413-0)
     
     ethanol_purification_sys = create_ethanol_purification_system(
         ins=[P411-0, denaturant],
@@ -178,8 +181,11 @@ def create_system(ID='corn_sys'):
     )
     f = cn.flowsheet
     fu = f.unit
+    fu.T501.Rmin = 0.0001
+    fu.T503_T507.k = 1.05
+    fu.T501.P = 101325
     fu.P502-0-1-E413
-    fu.P502.P = 101325
+    fu.MX4.denaturant_fraction = 0.04345
     V601 = bst.MixTank('V601', E413-1)
     P602 = bst.Pump('P602', V601-0)
     C603 = u.DDGSCentrifuge('C603', P602-0,
@@ -219,7 +225,9 @@ def create_system(ID='corn_sys'):
         (recycled_process_water,)
     )
     other_facilities = u.PlantAir_CIP_WasteWater_Facilities('other_facilities', corn)
-    HXN = bst.HeatExchangerNetwork('HXN', units=[fu.Ev607, fu.T503_T507])
+    HXN = bst.HeatExchangerNetwork('HXN', 
+        units=lambda: [fu.Ev607.components['evaporators'][0], fu.T503_T507.condenser]
+    )
     globals().update(f.unit.data)
     return f.create_system('corn_sys', feeds=[i for i in f.stream if i.isfeed()])
     

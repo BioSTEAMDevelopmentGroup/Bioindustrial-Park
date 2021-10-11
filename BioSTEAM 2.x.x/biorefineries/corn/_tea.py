@@ -29,8 +29,8 @@ def tea_summary():
     ug = UnitGroup('biorefinery', cn.corn_tea.units)
     power_utilities = ug.power_utilities
     heat_utilities = ug.heat_utilities
-    heating_utilities = [i for i in heat_utilities if i.duty > 0]
-    cooling_utilities = [i for i in heat_utilities if i.duty < 0]
+    heating_utilities = [i for i in heat_utilities if i.duty * i.flow > 0]
+    cooling_utilities = [i for i in heat_utilities if i.duty * i.flow < 0]
     FCI = cn.corn_tea.FCI
     FOC = cn.corn_tea.FOC
     maintenance = cn.corn_tea.maintenance * FCI
