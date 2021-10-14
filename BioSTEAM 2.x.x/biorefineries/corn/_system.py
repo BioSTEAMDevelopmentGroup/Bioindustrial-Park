@@ -181,6 +181,7 @@ def create_system(ID='corn_sys'):
     )
     f = cn.flowsheet
     fu = f.unit
+    fu.X504.approx_duty = False
     fu.T501.Rmin = 0.0001
     fu.T503_T507.k = 1.05
     fu.T501.P = 101325
