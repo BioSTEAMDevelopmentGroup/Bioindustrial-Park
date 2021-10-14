@@ -34,7 +34,7 @@ _chemicals_loaded = False
 def load(pellet_bagasse=False):
     if not _chemicals_loaded: _load_chemicals()
     try: 
-        _load_system()
+        _load_system(pellet_bagasse)
     finally: 
         dct = globals()
         dct.update(flowsheet.to_dict())
