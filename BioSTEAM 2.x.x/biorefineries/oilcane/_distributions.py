@@ -75,9 +75,9 @@ def fit_triangular_distribution(x, median=False):
             dummy = b - median
             c = b - 2 * dummy * dummy / (b - a)
         assert triangular_distribution_median(a, b, c) == median 
-        assert a <= c <= b
     else:
         c = 3 * np.mean(x) - (a + b)
+        if c < a: c = a + 1e-6
     return a, b, c
 
 def plot_triangular_distribution(a, b, c):
@@ -86,6 +86,11 @@ def plot_triangular_distribution(a, b, c):
 def plot_histogram(x, *args, bins=10, density=True, **kwargs):
     return plt.hist(x, *args, **kwargs)
 
+# index = int(len(ethanol_prices)/2)
+# print(np.mean(ethanol_prices[index:]),
+#       np.std(ethanol_prices[index:]))
+# print(np.mean(biodiesel_prices[index:]),
+#       np.std(biodiesel_prices[index:]))
 ethanol_price_distribution = triangular_distribution(ethanol_prices)
 biodiesel_price_distribution = triangular_distribution(biodiesel_prices)
 biodiesel_minus_ethanol_price_distribution = triangular_distribution(biodiesel_minus_ethanol_prices)

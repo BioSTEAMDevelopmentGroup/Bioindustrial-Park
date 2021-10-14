@@ -75,4 +75,5 @@ def tea_summary():
                                         dct['Co-product credit'],
                                         dct['Fixed operating cost']]) 
     dct['Production cost [USD/gal]'] = x / dct['Production']['Ethanol [MMgal / yr]'] / 1e6
+    dct['Operating cost [USD/gal]'] = (x - dct['Depreciation']) / dct['Production']['Ethanol [MMgal / yr]'] / 1e6
     return dct

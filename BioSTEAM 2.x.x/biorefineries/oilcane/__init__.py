@@ -616,7 +616,7 @@ def load(name, cache={}, reduce_chemicals=True, enhanced_cellulosic_performance=
         'H3PO4': 1.00, # GREET
         'lime': 1.164, # GREET
         'pure-glycerol': 1.6678, # Ecoinvent, TRACI, market for glycerine, RoW; 
-        'crude-glycerol': 0.36, # GREET
+        'crude-glycerol': 0.28, # GREET
         'DAP': 1.66, # GREET
         'CSL': 1.56, # GREET
         'HCl': 1.96, # GREET
@@ -885,7 +885,8 @@ def load(name, cache={}, reduce_chemicals=True, enhanced_cellulosic_performance=
     @default(oilcane.characterization_factors[GWP], name='GWP', 
              element=oilcane, units='kg*CO2-eq/kg')
     def set_oilcane_GWP(value):
-        oilcane.characterization_factors[GWP] = value
+        if number > 1:
+            oilcane.characterization_factors[GWP] = value
     
     @default(methanol.characterization_factors[GWP], name='GWP', 
              element=methanol, units='kg*CO2-eq/kg')
