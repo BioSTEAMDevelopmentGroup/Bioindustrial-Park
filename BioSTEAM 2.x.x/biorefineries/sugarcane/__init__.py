@@ -31,7 +31,7 @@ from ._tea import *
 _system_loaded = False
 _chemicals_loaded = False
 
-def load():
+def load(pellet_bagasse=False):
     if not _chemicals_loaded: _load_chemicals()
     try: 
         _load_system()
@@ -44,7 +44,7 @@ def _load_chemicals():
     chemicals = create_chemicals()
     _chemicals_loaded = True
 
-def _load_system():
+def _load_system(pellet_bagasse=None):
     import biosteam as bst
     from biosteam import main_flowsheet as F
     global sugarcane_sys, sugarcane_tea, flowsheet, _system_loaded
@@ -58,7 +58,7 @@ def _load_system():
     bst.System.unregistered_ticket_number = 0
     bst.settings.set_thermo(chemicals)
     load_process_settings()
-    sugarcane_sys = create_sugarcane_to_ethanol_system()
+    sugarcane_sys = create_sugarcane_to_ethanol_system(pellet_bagasse=pellet_bagasse)
     sugarcane_sys.simulate()
     sugarcane_tea = create_tea(sugarcane_sys)
     sugarcane_tea.IRR = sugarcane_tea.solve_IRR()

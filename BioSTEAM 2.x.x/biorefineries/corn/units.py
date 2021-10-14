@@ -277,7 +277,7 @@ class SimultaneousSaccharificationFermentation(bst.BatchBioreactor):
         self.reaction(effluent)
         self.growth(effluent)
         effluent.imass['Yeast'] += effluent.imass['NH3']
-        effluent.imass['Glucose', 'NH3'] = 0.
+        effluent.imol['NH3'] = 0.
         vent.empty()
         vent.receive_vent(effluent)
         

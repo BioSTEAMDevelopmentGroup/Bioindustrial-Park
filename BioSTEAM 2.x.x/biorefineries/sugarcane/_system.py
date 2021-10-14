@@ -39,7 +39,7 @@ def create_bagasse_pelleting_system(ins, outs):
     U402 = units.DrumDryer('U402', 
         (U401-0, 'dryer_air', 'dryer_natural_gas'), 
         ('', 'dryer_outlet_air', 'dryer_emissions'),
-        moisture_content=0.15, split=0.,
+        moisture_content=0.18, split=0.,
     )
     # X401 = bst.ThermalOxidizer('X401', (U403-1, 'oxidizer_air'), 'oxidizer_emissions')
     U403 = units.ScrewFeeder('U403', U402-0)
@@ -663,7 +663,9 @@ def create_sucrose_to_ethanol_system(ins, outs):
           dict(ID='emissions'),
           dict(ID='ash_disposal')]
 )
-def create_sugarcane_to_ethanol_system(ins, outs, use_area_convention=False):
+def create_sugarcane_to_ethanol_system(ins, outs, 
+                                       use_area_convention=False,
+                                       pellet_bagasse=None):
     s = f.stream
     u = f.unit
     
@@ -679,6 +681,7 @@ def create_sugarcane_to_ethanol_system(ins, outs, use_area_convention=False):
     juicing_sys = create_juicing_system_with_fiber_screener(
         area=200 if use_area_convention else None,
         ins=[feedstock_handling_sys-0, enzyme, H3PO4, lime, polymer],
+        pellet_bagasse=pellet_bagasse,
         mockup=True
     )
     ethanol_production_sys, edct = create_sucrose_to_ethanol_system(
