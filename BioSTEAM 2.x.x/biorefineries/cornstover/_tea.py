@@ -4,7 +4,6 @@ Created on Thu Aug  1 21:48:12 2019
 
 @author: yoelr
 """
-
 from biosteam import TEA
 import thermosteam as tmo
 import biosteam as bst
@@ -155,10 +154,9 @@ class CellulosicEthanolTEA(TEA):
         return self._steam_power_depreciation
     @steam_power_depreciation.setter
     def steam_power_depreciation(self, depreciation):
-        try:
-            self._steam_power_depreciation_array = self.depreciation_schedules[depreciation]
-        except KeyError:
-            raise ValueError(f"depreciation must be either 'MACRS5', 'MACRS7', 'MACRS10' or 'MACRS15 (not {repr(depreciation)})")
+        self._steam_power_depreciation_array = self._depreciation_array_from_key(
+            self._depreciation_key_from_name(depreciation)
+        )
         self._steam_power_depreciation = depreciation
     
     @property
@@ -177,7 +175,7 @@ class CellulosicEthanolTEA(TEA):
             return sum([i.installed_cost for i in self.OSBL_units])
     
     def _fill_depreciation_array(self, D, start, years, TDC):
-        depreciation_array = self._depreciation_array
+        depreciation_array = self._get_depreciation_array()
         N_depreciation_years = depreciation_array.size
         if N_depreciation_years > years:
             raise RuntimeError('depreciation schedule is longer than plant lifetime')

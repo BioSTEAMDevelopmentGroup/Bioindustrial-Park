@@ -380,6 +380,7 @@ def load(name, cache={}, reduce_chemicals=True, enhanced_cellulosic_performance=
         oilcane_sys = create_sugarcane_to_ethanol_system(
             operating_hours=operating_hours,
             use_area_convention=True,
+            pellet_bagasse=True,
         )
         area_names = [
             'Feedstock handling', 
