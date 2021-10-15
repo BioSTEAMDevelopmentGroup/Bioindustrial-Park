@@ -157,7 +157,7 @@ def create_cellulosic_acTAG_system(ins, outs):
     
     cofermentation.titer = 5.5
     cofermentation.productivity = 0.033
-    @EvX.add_specification(run=True)
+    @EvX.add_specification(run=False)
     def evaporation():
         MX.ins[1].imass['Water'] = 0.
         evaporator_to_seedtrain = EvX.path_until(seedtrain)
@@ -170,6 +170,7 @@ def create_cellulosic_acTAG_system(ins, outs):
                 *seedtrain_to_cofermentation)
         beer = cofermentation.outs[1]
         target_titer = cofermentation.titer
+        V_last = EvX.V
         def f(V):
             EvX.V = V
             EvX._run()
@@ -184,15 +185,31 @@ def create_cellulosic_acTAG_system(ins, outs):
             required_water = (1./target_titer - 1./current_titer) * product * 1000.
             MX.ins[1].imass['Water'] = max(required_water, 0)
         else:
+            P_original = P = tuple(EvX.P)
+            EvX.P = list(P)
+            EvX._load_components()
+            for i in range(EvX._N_evap-1):
+                if f(1e-6) < 0.:
+                    EvX.P.pop()
+                    EvX._reload_components = True
+                else:
+                    break    
             x0 = 0.
             x1 = 0.1
-            y1 = 1
+            y1 = f(x1)
             while y1 > 0:
+                if x1 > 0.9: raise RuntimeError('infeasible to evaporate any more water')
                 x0 = x1            
                 x1 += 0.05
-                if x1 > 0.9: raise RuntimeError('infeasible to evaporate any more water')
                 y1 = f(x1)
-            EvX.V = flx.IQ_interpolation(f, x0, x1, y0, y1, x=EvX.V, ytol=1e-5, xtol=1e-6)
+            EvX.V = flx.IQ_interpolation(f, x0, x1, y0, y1, x=V_last, ytol=1e-5, xtol=1e-6)
+            try:
+                assert abs(f(EvX.V)) < 0.01
+            except:
+                breakpoint()
+            EvX.P = P_original
+            EvX._reload_components = True
+            
         cofermentation.tau = target_titer / cofermentation.productivity 
     
     vent, cellulosic_beer, lignin = cofermentation_sys.outs
@@ -324,7 +341,7 @@ def create_conventional_acTAG_system(ins, outs):
         'oil_separation_sys', TX-0,
         mockup=True, area=400,
     )
-    oil, wastewater, condensate = oil_separation_sys.outs
+    oil, cellmass, wastewater, condensate = oil_separation_sys.outs
     oil_wash_sys = create_lipid_wash_system(
         'oil_wash_sys', oil, mockup=True, area=400
     )
@@ -340,12 +357,11 @@ def create_conventional_acTAG_system(ins, outs):
     
     # methane, sludge, treated_water, waste_brine = wastewater_treatment_sys.outs
     
-    CX = bst.SolidsCentrifuge(400, wastewater, split=dict(Cells=0.99), solids=('Cells',))
-    # M601 = bst.Mixer(600, (bagasse, sludge))
+    M601 = bst.Mixer(600, (bagasse, cellmass))
     s = bst.main_flowsheet.stream
     brf.cornstover.create_facilities(
-        # solids_to_boiler=M601-0,
-        solids_to_boiler=bagasse,
+        solids_to_boiler=M601-0,
+        # solids_to_boiler=bagasse,
         gas_to_boiler=None,
         # gas_to_boiler=methane,
         process_water_streams=(s.imbibition_water,

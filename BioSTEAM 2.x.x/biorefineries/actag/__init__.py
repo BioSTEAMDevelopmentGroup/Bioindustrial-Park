@@ -144,7 +144,7 @@ def fermentation_data(configuration, load):
     # Generate contour data
     x = np.linspace(40, 90, 15)
     y = np.linspace(50, 90, 15)
-    z = np.array([5, 10, 20])
+    z = np.array([5, 30, 80])
     w = np.array([0.033, 1.00])
     X, Y, Z = np.meshgrid(x, y, z)
     folder = os.path.dirname(__file__)

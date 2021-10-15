@@ -65,7 +65,14 @@ colormaps = [
     plt.cm.get_cmap('bone_r'),
 ] * 2
 
-def plot_yield_selectivity_titer_productivity_contours(configuration=1, load=True):
+### Defaults
+rho = 0.900 # kg / L
+f = 1 / rho * 907.1847 # L / ton
+lubricating_oil_market_price = (0.92 * f, 1.35 * f) # USD / L to USD / ton
+
+def plot_yield_selectivity_titer_productivity_contours(
+        configuration=1, load=True, price_ranges=[lubricating_oil_market_price],
+    ):
     # Generate contour data
     X, Y, z, w, data = actag.fermentation_data(configuration, load)
     
@@ -76,11 +83,33 @@ def plot_yield_selectivity_titer_productivity_contours(configuration=1, load=Tru
     ylabel = f"Selectivity\n[%]"
     xticks = [40, 50, 60, 70, 80, 90]
     yticks = [50, 60, 70, 80, 90]
-    metric_bar = MetricBar('MFPP', format_units('$/ton'), colormaps[0], tickmarks(data, 5, 5), 15)
+    metric_bar = MetricBar('MSP', format_units('$/ton'), colormaps[0], tickmarks(data, 5, 5), 15)
+    X = X[:, :, 0]
+    Y = Y[:, :, 0]
     fig, axes, CSs, CB = plot_contour_single_metric(
-        X[:, :, 0], Y[:, :, 0], data, xlabel, ylabel, xticks, yticks, metric_bar, 
+        X, Y, data, xlabel, ylabel, xticks, yticks, metric_bar, 
         fillblack=False, styleaxiskw=dict(xtick0=False), label=False,
     )
+    *_, nrows, ncols = data.shape
+    colors = [linecolor]
+    hatches = ['//', r'\\']
+    if price_ranges:
+        for i, price_range in enumerate(price_ranges):
+            for row in range(nrows):
+                for col in range(ncols):
+                    ax = axes[row, col]
+                    plt.sca(ax)
+                    metric_data = data[:, :, row, col]
+                    # csf = ax.contourf(X, Y, metric_data, hatches=hatches[i],
+                    #                  levels=np.linspace(*price_range, 5), colors='none')
+                    # # For each level, set the color of its hatch 
+                    # for collection in csf.collections: collection.set_edgecolor(colors[i])
+                    # # Doing this also colors in the box around each level
+                    # # We can remove the colored line around the levels by setting the linewidth to 0
+                    # for collection in csf.collections: collection.set_linewidth(0.)
+                    cs = plt.contour(X, Y, metric_data, zorder=1e6, linestyles='dashed', linewidths=1.,
+                                     levels=price_range, colors=[linecolor])
+    
     plt.show()
 
 def plot_purity_across_selectivity(configuration=1):

@@ -66,11 +66,12 @@ def create_oil_expression_system(ins, outs):
     ID='post_fermentation_oil_separation_sys',
     ins=[dict(ID='solids_free_stillage')],
     outs=[dict(ID='oil'),
+          dict(ID='cellmass'),
           dict(ID='wastewater'),
           dict(ID='evaporator_condensate')], 
 )
 def create_post_fermentation_oil_separation_system(ins, outs, wastewater_concentration=None):
-    oil, wastewater, evaporator_condensate = outs
+    oil, cellmass, wastewater, evaporator_condensate = outs
     V605 = bst.MixTank('V605', ins)
     P606 = bst.Pump('P606', V605-0)
     Ev607 = bst.MultiEffectEvaporator('Ev607',
@@ -103,7 +104,9 @@ def create_post_fermentation_oil_separation_system(ins, outs, wastewater_concent
                                         split={'Oil': 0.99,
                                                'Water': 0.0001})
     S601 = bst.Splitter('S601', ins=Ev607-1, outs=['', evaporator_condensate], split=0.5)
-    M601 = bst.Mixer('M601', [S601-0, C603_2-1], wastewater)
+    C603_3 = bst.SolidsCentrifuge('C603_3', C603_2-1, (cellmass, ''), 
+                                  split={'Cellmass': 0.99}, solids=('Cellmass',))
+    M601 = bst.Mixer('M601', [S601-0, C603_3-1], wastewater)
     M601.target_wastewater_concentration = 60. # kg / m3
     @M601.add_specification(run=True)
     def adjust_wastewater_concentration():
@@ -184,7 +187,7 @@ def create_oilcane_to_biodiesel_and_ethanol_1g(
         mockup=True,
         area=400,
     )
-    oil, thick_vinasse, evaporator_condensate_b = post_fermentation_oil_separation_sys.outs
+    oil, cellmass, thick_vinasse, evaporator_condensate_b = post_fermentation_oil_separation_sys.outs
     MX = bst.Mixer(400, [PX-0, oil])
     oil_pretreatment_sys, oil_pretreatment_dct = create_oil_pretreatment_system(
         ins=MX-0,
@@ -216,7 +219,7 @@ def create_oilcane_to_biodiesel_and_ethanol_1g(
     u = f.unit
     
     MX2 = bst.Mixer(700,
-        [polar_lipids, pressed_bagasse]
+        [polar_lipids, pressed_bagasse, cellmass]
     )
     
     # Burn bagasse from conveyor belt
@@ -384,11 +387,11 @@ def create_oilcane_to_biodiesel_and_ethanol_combined_1_and_2g_post_fermentation_
         else:
             x0 = 0.
             x1 = 0.1
-            y1 = 1
+            y1 = f(x1)
             while y1 > 0:
+                if x1 > 0.9: raise RuntimeError('infeasible to evaporate any more water')
                 x0 = x1            
                 x1 += 0.1
-                if x1 > 0.9: raise RuntimeError('infeasible to evaporate any more water')
                 y1 = f(x1)
             EvX.V = flx.IQ_interpolation(f, x0, x1, y0, y1, x=EvX.V, ytol=1e-5, xtol=1e-6)
         cofermentation.tau = target_titer / cofermentation.productivity 
@@ -420,7 +423,7 @@ def create_oilcane_to_biodiesel_and_ethanol_combined_1_and_2g_post_fermentation_
         area=600,
         udct=True,
     )
-    backend_oil, wastewater, evaporator_condensate = post_fermentation_oil_separation_sys.outs
+    backend_oil, cellmass, wastewater, evaporator_condensate = post_fermentation_oil_separation_sys.outs
     backend_oil.ID = 'backend_oil'
     MX_process_water = bst.Mixer(900, (EvX.outs[1], evaporator_condensate, stripper_process_water),
                                  'recycle_process_water')
@@ -451,7 +454,7 @@ def create_oilcane_to_biodiesel_and_ethanol_combined_1_and_2g_post_fermentation_
     )
     s = f.stream
     u = f.unit
-    M501 = bst.Mixer(700, (wastewater_treatment_sys-1, lignin, polar_lipids, f.stream.filter_cake))
+    M501 = bst.Mixer(700, (wastewater_treatment_sys-1, lignin, polar_lipids, cellmass, f.stream.filter_cake))
     brf.cornstover.create_facilities(
         solids_to_boiler=M501-0,
         gas_to_boiler=wastewater_treatment_sys-0,
@@ -601,11 +604,11 @@ def create_sugarcane_to_ethanol_combined_1_and_2g(ins, outs):
         else:
             x0 = 0.
             x1 = 0.1
-            y1 = 1
+            y1 = f(x1)
             while y1 > 0:
-                x0 = x1            
-                x1 += 0.1
                 if x1 > 0.9: raise RuntimeError('infeasible to evaporate any more water')
+                x0 = x1
+                x1 += 0.1
                 y1 = f(x1)
             EvX.V = flx.IQ_interpolation(f, x0, x1, y0, y1, x=EvX.V, ytol=1e-5, xtol=1e-6)
         cofermentation.tau = target_titer / cofermentation.productivity 
@@ -626,9 +629,10 @@ def create_sugarcane_to_ethanol_combined_1_and_2g(ins, outs):
         udct=True,
         area=400,
     )
-    ethanol_purification_sys.outs
+    C603_3 = bst.SolidsCentrifuge(400, stillage, 
+                                  split={'Cellmass': 0.99}, solids=('Cellmass',))
     wastewater_treatment_sys = bst.create_wastewater_treatment_system(
-        ins=[stillage,
+        ins=[C603_3-1,
              fiber_fines,
              pretreatment_wastewater],
         mockup=True,
@@ -636,7 +640,7 @@ def create_sugarcane_to_ethanol_combined_1_and_2g(ins, outs):
     )
     s = f.stream
     u = f.unit
-    M501 = bst.Mixer(700, (wastewater_treatment_sys-1, lignin, f.stream.filter_cake))
+    M501 = bst.Mixer(700, (wastewater_treatment_sys-1, lignin, C603_3-0, s.filter_cake))
     MX = bst.Mixer(400, [EvX.outs[1], stripper_process_water])
     brf.cornstover.create_facilities(
         solids_to_boiler=M501-0,

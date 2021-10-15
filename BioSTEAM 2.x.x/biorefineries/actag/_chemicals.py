@@ -61,6 +61,7 @@ def create_cellulosic_chemicals():
     chemicals.define_group('Lipid', ['AcetylDiOlein', 'TriOlein'], [0.5, 0.5], wt=True)
     chemicals.TriOlein.Hfus = 148.83e3 # kJ / kmol
     chemicals.AcetylDiOlein.V.method_P = chemicals.TriOlein.V.method_P = None
+    chemicals.set_synonym('Cells', 'Cellmass')
     return chemicals
     
 def create_conventional_chemicals():
@@ -81,6 +82,7 @@ def create_conventional_chemicals():
     chemicals.TriOlein.Hfus = 148.83e3 # kJ / kmol
     chemicals.AcetylDiOlein.V.method_P = chemicals.TriOlein.V.method_P = None
     chemicals.set_synonym('Lime', 'CaO')
+    chemicals.set_synonym('Cells', 'Cellmass')
     return chemicals
 
 

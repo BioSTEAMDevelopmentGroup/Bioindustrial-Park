@@ -62,7 +62,7 @@ class Fermentation(bst.BatchBioreactor):
         self.fermentation_reaction = PRxn([
         Rxn('Glucose -> 2.04 Water + 1.67 CO2 + 0.106 AcetylDiOlein', 'Glucose', 0.156, chemicals),
         Rxn('Glucose -> 2.1 Water + 1.72 CO2 + 0.075 TriOlein', 'Glucose', 0.165, chemicals),
-        Rxn('Glucose -> Cells', 'Glucose', 0.05, chemicals, basis='wt').copy(basis='mol'),
+        Rxn('Glucose -> Cells', 'Glucose', 0.10, chemicals, basis='wt').copy(basis='mol'),
             ])
         self.CSL_to_constituents = Rxn(
             'CSL -> 0.5 H2O + 0.25 LacticAcid + 0.25 Protein', 'CSL', 1.0000, chemicals, basis='wt',

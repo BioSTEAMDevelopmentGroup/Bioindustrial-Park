@@ -18,5 +18,6 @@ def create_chemicals():
     chemicals.compile()
     chemicals.define_group('Lipid', ['PL', 'FFA', 'MAG', 'DAG', 'TAG'])
     chemicals.define_group('Oil', ['PL', 'FFA', 'MAG', 'DAG', 'TAG'])
+    chemicals.set_synonym('DryYeast', 'Cellmass')
     return chemicals
     

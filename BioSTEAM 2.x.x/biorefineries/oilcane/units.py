@@ -18,9 +18,11 @@ class SeedTrain(SeedTrain):
         self.saccharification = saccharification
         chemicals = self.chemicals
         self.reactions = reactions or PRxn([
-    #   Reaction definition                             Reactant    Conversion
-    Rxn('Glucose -> 2 Ethanol + 2 CO2',                 'Glucose',   0.9000, chemicals),
-    Rxn('3 Xylose -> 5 Ethanol + 5 CO2',                'Xylose',    0.8000, chemicals),
+    #   Reaction definition                   Reactant    Conversion
+    Rxn('Glucose -> 2 Ethanol + 2 CO2',       'Glucose',   0.9000, chemicals),
+    Rxn('3 Xylose -> 5 Ethanol + 5 CO2',      'Xylose',    0.8000, chemicals),
+    Rxn('Glucose -> Cellmass',                'Glucose',  0.05, chemicals),
+    Rxn('Xylose -> Cellmass',                 'Xylose',  0.05, chemicals),
         ])
         
     def _setup(self):
@@ -44,9 +46,11 @@ class CoFermentation(CoFermentation):
         self.P = P
         chemicals = self.chemicals
         self.cofermentation = cofermentation or PRxn([
-    #   Reaction definition                                          Reactant    Conversion
-    Rxn('Glucose -> 2 Ethanol + 2 CO2',                             'Glucose',   0.9500, chemicals),
-    Rxn('3 Xylose -> 5 Ethanol + 5 CO2',                            'Xylose',    0.8500, chemicals),
+    #   Reaction definition                   Reactant    Conversion
+    Rxn('Glucose -> 2 Ethanol + 2 CO2',       'Glucose',   0.9500, chemicals),
+    Rxn('3 Xylose -> 5 Ethanol + 5 CO2',      'Xylose',    0.8500, chemicals),
+    Rxn('Glucose -> Cellmass',                'Glucose',  0.05, chemicals),
+    Rxn('Xylose -> Cellmass',                 'Xylose',  0.05, chemicals),
         ])
     
         self.CSL_to_constituents = Rxn(
