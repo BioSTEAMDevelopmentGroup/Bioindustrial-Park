@@ -19,7 +19,7 @@ from biosteam.plots import (
     plot_contour_single_metric,
     plot_contour_1d,
     plot_vertical_line,
-    rounded_tickmarks_from_data as tickmarks
+    rounded_tickmarks_from_data as tickmarks,
 )
 from math import floor, ceil
 from biosteam import plots
@@ -31,8 +31,11 @@ from warnings import filterwarnings
 import os
 from thermosteam.units_of_measure import format_units
 
-__all__ = ('plot_yield_selectivity_titer_productivity_contours',
-           'plot_purity_across_selectivity')
+__all__ = ('plot_yield_titer_selectivity_productivity_contours',
+           'plot_purity_across_selectivity',
+           'plot_metrics_across_titer',
+           'plot_tea_across_titer',
+           'plot_MPSP_across_titer_and_yield')
 
 shadecolor = (*colors.neutral.RGBn, 0.20)
 linecolor = (*colors.neutral_shade.RGBn, 0.85)
@@ -70,20 +73,44 @@ rho = 0.900 # kg / L
 f = 1 / rho * 907.1847 # L / ton
 lubricating_oil_market_price = (0.92 * f, 1.35 * f) # USD / L to USD / ton
 
-def plot_yield_selectivity_titer_productivity_contours(
+def plot_yield_titer_selectivity_productivity_contours(
         configuration=1, load=True, price_ranges=[lubricating_oil_market_price],
+        metric_index=0,
     ):
     # Generate contour data
     X, Y, z, w, data = actag.fermentation_data(configuration, load)
     
-    data = data[:, :, :, :, 0]
+    data = data[:, :, :, :, metric_index]
     
     # Plot contours
     xlabel = "Yield\n[% theoretical]" 
-    ylabel = f"Selectivity\n[%]"
+    ylabel = f"Titer\n[{format_units('g/L')}]"
     xticks = [40, 50, 60, 70, 80, 90]
-    yticks = [50, 60, 70, 80, 90]
-    metric_bar = MetricBar('MSP', format_units('$/ton'), colormaps[0], tickmarks(data, 5, 5), 15)
+    yticks = [5, 20, 35, 50, 65, 80]
+    if metric_index == 0:
+        metric_bar = MetricBar(
+            'MSP', format_units('$/ton'), 
+            colormaps[metric_index],
+            tickmarks(data, 5, 5), 15
+        )
+    elif metric_index == 1:
+        metric_bar = MetricBar(
+            'TCI', format_units('10^6*$'), 
+            colormaps[metric_index], 
+            tickmarks(data, 5, 5), 15
+        )
+    elif metric_index == 2:
+        metric_bar = MetricBar(
+            'Heating', format_units('GJ/hr'), 
+            colormaps[metric_index], 
+            tickmarks(data, 5, 5), 15
+        )
+    elif metric_index == 3:
+        metric_bar = MetricBar(
+            'Cooling', format_units('GJ/hr'), 
+            colormaps[metric_index], 
+            tickmarks(data, 5, 5), 15
+        )
     X = X[:, :, 0]
     Y = Y[:, :, 0]
     fig, axes, CSs, CB = plot_contour_single_metric(
@@ -121,6 +148,62 @@ def plot_purity_across_selectivity(configuration=1):
         return actag.acTAG.imass['AcetylDiOlein'] / actag.acTAG.F_mass
     y = [simulate_purity(i) for i in x]
     plt.plot(x, y)
+    
+def plot_metrics_across_titer(configuration=1):
+    actag.load(configuration)
+    x = np.linspace(5, 80, 20)
+    def simulate_titer(titer):
+        actag.fermentation.titer = titer
+        actag.sys.simulate()
+        return [i() for i in actag.model.metrics]
+    data = np.array([simulate_titer(i) for i in x])
+    M, N = data.shape
+    fig, axes = plt.subplots(N)
+    for i in range(N):
+        ax = axes[i]
+        y = data[:, i]
+        plt.sca(ax)
+        plt.plot(x, y)
+    plt.show()
+    
+def plot_tea_across_titer(configuration=1):
+    actag.load(configuration)
+    x = np.linspace(5, 80, 30)
+    actag.fermentation.product_yield = 0.70
+    def simulate_titer(titer):
+        actag.fermentation.titer = titer
+        actag.sys.simulate()
+        return [actag.MPSP(), actag.acTAG.F_mass / 1e3, actag.tea.TCI / 1e6, actag.tea.VOC / 1e6]
+    data = np.array([simulate_titer(i) for i in x])
+    M, N = data.shape
+    fig, axes = plt.subplots(N)
+    for i in range(N):
+        ax = axes[i]
+        y = data[:, i]
+        plt.sca(ax)
+        plt.plot(x, y)
+    plt.show()
+    
+def plot_MPSP_across_titer_and_yield(configuration=1):
+    actag.load(configuration)
+    x = np.linspace(5, 80, 20)
+    def simulate_titer(titer):
+        actag.fermentation.titer = titer
+        values = []
+        for i in [0.50, 0.70, 0.90]:
+            actag.fermentation.product_yield = i
+            actag.sys.simulate()
+            values.append(actag.MPSP())
+        return values
+    data = np.array([simulate_titer(i) for i in x])
+    M, N = data.shape
+    fig, axes = plt.subplots(N)
+    for i in range(N):
+        ax = axes[i]
+        y = data[:, i]
+        plt.sca(ax)
+        plt.plot(x, y)
+    plt.show()
     
 def plot_recovery_across_selectivity(configuration=1):
     actag.load(configuration)

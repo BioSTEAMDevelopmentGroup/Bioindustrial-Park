@@ -9,27 +9,13 @@ __all__ = ('OleinCrystallizer', 'Fermentation')
 class OleinCrystallizer(bst.BatchCrystallizer):
     
     def __init__(self, ID='', ins=None, outs=(), thermo=None, *, 
-                 T,
-                 split={'TriOlein': 0.90, 'AcetylDiOlein': 0.05},
+                 T, crystal_TAG_purity=0.95, melt_AcTAG_purity=0.90,
                  order=None):
         bst.BatchCrystallizer.__init__(self, ID, ins, outs, thermo,
                                        tau=5, V=1e6, T=T)
-        self._isplit = self.thermo.chemicals.isplit(split, order)
+        self.melt_AcTAG_purity = melt_AcTAG_purity
+        self.crystal_TAG_purity = crystal_TAG_purity
 
-    @property
-    def isplit(self):
-        """[ChemicalIndexer] Componentwise split of feed to 0th outlet stream."""
-        return self._isplit
-    @property
-    def split(self):
-        """[Array] Componentwise split of feed to 0th outlet stream."""
-        return self._isplit._data
-    @split.setter
-    def split(self, values):
-        split = self.split
-        if split is not values:
-            split[:] = values
-     
     @property
     def Hnet(self):
         feed = self.ins[0]
@@ -45,7 +31,26 @@ class OleinCrystallizer(bst.BatchCrystallizer):
     def _run(self):
         outlet = self.outs[0]
         outlet.phases = ('s', 'l')
-        self.ins[0].split_to(outlet['s'], outlet['l'], self.split, energy_balance=False)
+        crystal_TAG_purity = self.crystal_TAG_purity
+        melt_AcTAG_purity = self.melt_AcTAG_purity
+        feed = self.ins[0]
+        TAG, AcTAG = feed.imass['TAG', 'AcTAG'].value
+        total = TAG + AcTAG
+        minimum_melt_purity = AcTAG / total
+        minimum_crystal_purity = TAG / total
+        outlet.empty()
+        if crystal_TAG_purity < minimum_crystal_purity:
+            outlet.imol['s'] = feed.mol
+        elif melt_AcTAG_purity < minimum_melt_purity:
+            outlet.imol['l'] = feed.mol
+        else: # Lever rule
+            crystal_AcTAG_purity = (1. - crystal_TAG_purity)
+            melt_fraction = (minimum_melt_purity - crystal_AcTAG_purity) / (melt_AcTAG_purity - crystal_AcTAG_purity)
+            melt = melt_fraction * total
+            AcTAG_melt = melt * melt_AcTAG_purity
+            TAG_melt = melt - AcTAG
+            outlet.imass['l', ('AcTAG', 'TAG')] = [AcTAG_melt, TAG_melt]
+            outlet.imol['s'] = feed.mol - outlet.imol['l']
         outlet.T = self.T
         
         
@@ -72,7 +77,8 @@ class Fermentation(bst.BatchBioreactor):
         vent, effluent = self.outs
         effluent.mix_from(self.ins)
         self.CSL_to_constituents(effluent)
-        self.hydrolysis_reaction(effluent)
+        self.hydrolysis_reaction.force_reaction(effluent)
+        effluent.mol[effluent.mol < 0.] = 0.
         self.fermentation_reaction(effluent)
         vent.empty()
         vent.receive_vent(effluent)

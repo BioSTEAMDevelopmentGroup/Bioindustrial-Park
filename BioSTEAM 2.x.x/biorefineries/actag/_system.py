@@ -28,6 +28,7 @@ import biorefineries as brf
 from biorefineries.cornstover.units import FeedStockHandling
 from thermosteam import Rxn, PRxn
 from ._units import OleinCrystallizer, Fermentation
+from collections import deque
 
 __all__ = (
     'create_acTAG_separation_system',
@@ -44,7 +45,11 @@ def create_acTAG_separation_system(ins, outs):
     lipid, = ins
     acTAG, TAG = outs
     M1 = bst.Mixer('M1', (lipid, None))
-    C1 = OleinCrystallizer('C1', M1-0, T=273.15 - 10)
+    C1 = OleinCrystallizer(
+        'C1', M1-0, T=273.15 - 10,
+        crystal_TAG_purity=0.95, 
+        melt_AcTAG_purity=0.90,
+    )
     PF1 = bst.PressureFilter('PF1', C1-0, (TAG, ''), split=0.5, moisture_content=0.)
     @PF1.add_specification
     def split_phases():
@@ -53,7 +58,11 @@ def create_acTAG_separation_system(ins, outs):
         solid.copy_like(feed['s'])
         liquid.copy_like(feed['l'])
     
-    C2 = OleinCrystallizer('C2', PF1-1, T=273.15 - 20)
+    C2 = OleinCrystallizer(
+        'C2', PF1-1, T=273.15 - 20,
+        crystal_TAG_purity=0.90, 
+        melt_AcTAG_purity=0.95,
+    )
     PF2 = bst.PressureFilter('PF2', C2-0, ('', acTAG), split=0.5, moisture_content=0.)
     
     @PF2.add_specification
@@ -157,6 +166,7 @@ def create_cellulosic_acTAG_system(ins, outs):
     
     cofermentation.titer = 5.5
     cofermentation.productivity = 0.033
+    P_original = tuple(EvX.P)
     @EvX.add_specification(run=False)
     def evaporation():
         MX.ins[1].imass['Water'] = 0.
@@ -170,27 +180,32 @@ def create_cellulosic_acTAG_system(ins, outs):
                 *seedtrain_to_cofermentation)
         beer = cofermentation.outs[1]
         target_titer = cofermentation.titer
+        selectivity = cofermentation.selectivity
+        product_yield = cofermentation.product_yield
+        cofermentation.cofermentation.X[0] = product_yield * selectivity
+        cofermentation.cofermentation.X[1] = product_yield * (1. - selectivity)
         V_last = EvX.V
+        EvX.P = P_original
+        EvX._reload_components = True
         def f(V):
             EvX.V = V
             EvX._run()
             for unit in path: unit.run()
             cofermentation.run()
-            return target_titer - beer.imass['Products'] / beer.F_vol
+            return target_titer - beer.imass['Products'] / beer.ivol['Products', 'Water'].sum()
         
         y0 = f(0)
         if y0 < 0.:
             product = float(beer.imass['Products'])
-            current_titer = product / beer.F_vol
+            current_titer = product / beer.ivol['Products', 'Water'].sum()
             required_water = (1./target_titer - 1./current_titer) * product * 1000.
             MX.ins[1].imass['Water'] = max(required_water, 0)
         else:
-            P_original = P = tuple(EvX.P)
-            EvX.P = list(P)
+            EvX.P = deque(P_original)
             EvX._load_components()
             for i in range(EvX._N_evap-1):
                 if f(1e-6) < 0.:
-                    EvX.P.pop()
+                    EvX.P.popleft()
                     EvX._reload_components = True
                 else:
                     break    
@@ -207,8 +222,6 @@ def create_cellulosic_acTAG_system(ins, outs):
                 assert abs(f(EvX.V)) < 0.01
             except:
                 breakpoint()
-            EvX.P = P_original
-            EvX._reload_components = True
             
         cofermentation.tau = target_titer / cofermentation.productivity 
     
@@ -216,8 +229,9 @@ def create_cellulosic_acTAG_system(ins, outs):
     oil_separation_sys = create_post_fermentation_oil_separation_system(
         'oil_separation_sys', cellulosic_beer,
         mockup=True, area=400,
+        target_oil_content=120,
     )
-    oil, wastewater, condensate = oil_separation_sys.outs
+    oil, cellmass, wastewater, condensate = oil_separation_sys.outs
     oil_wash_sys = create_lipid_wash_system(
         'oil_wash_sys', oil, mockup=True, area=400
     )
@@ -301,6 +315,7 @@ def create_conventional_acTAG_system(ins, outs):
     RX = Fermentation(300, HX-0, tau=10, V=3753)
     RX.titer = 5.5
     RX.productivity = 0.033
+    P_original = tuple(EvX.P)
     @EvX.add_specification(run=True)
     def evaporation():
         MX.ins[1].imass['Water'] = 0.
@@ -308,7 +323,13 @@ def create_conventional_acTAG_system(ins, outs):
         nutrient_path = DAP_storage.path_until(RX) + CSL_storage.path_until(RX)
         feed = RX.ins[0]
         beer = RX.outs[1]
+        selectivity = RX.selectivity
+        product_yield = RX.product_yield
+        RX.fermentation_reaction.X[0] = product_yield * selectivity
+        RX.fermentation_reaction.X[1] = product_yield * (1. - selectivity)
         target_titer = RX.titer
+        EvX.P = P_original
+        EvX._reload_components = True
         def f(V):
             EvX.V = V
             EvX._run()
@@ -317,29 +338,43 @@ def create_conventional_acTAG_system(ins, outs):
             DAP.imass['DAP'] = 0.33 * feed.F_vol
             for unit in nutrient_path: unit.run()
             RX.run()
-            return target_titer - beer.imass['Products'] / beer.F_vol
+            return target_titer - beer.imass['Products'] / beer.ivol['Products', 'Water'].sum()
         
         y0 = f(0)
         if y0 < 0.:
             product = float(beer.imass['Products'])
-            current_titer = product / beer.F_vol
+            current_titer = product / beer.ivol['Products', 'Water'].sum()
             required_water = (1./target_titer - 1./current_titer) * product * 1000.
             MX.ins[1].imass['Water'] = max(required_water, 0)
         else:
+            V_last = EvX.V
+            EvX.P = deque(P_original)
+            EvX._load_components()
+            for i in range(EvX._N_evap-1):
+                if f(1e-6) < 0.:
+                    EvX.P.popleft()
+                    EvX._reload_components = True
+                else:
+                    break    
             x0 = 0.
             x1 = 0.1
-            y1 = 1
+            y1 = f(x1)
             while y1 > 0:
+                if x1 > 0.9: raise RuntimeError('infeasible to evaporate any more water')
                 x0 = x1            
                 x1 += 0.05
-                if x1 > 0.9: raise RuntimeError('infeasible to evaporate any more water')
                 y1 = f(x1)
-            EvX.V = flx.IQ_interpolation(f, x0, x1, y0, y1, x=EvX.V, ytol=1e-5, xtol=1e-6)
+            EvX.V = flx.IQ_interpolation(f, x0, x1, y0, y1, x=V_last, ytol=1e-5, xtol=1e-6)
+            try:
+                assert abs(f(EvX.V)) < 0.01
+            except:
+                breakpoint()
         RX.tau = target_titer / RX.productivity
     TX = bst.StorageTank(300, RX-1, tau=4)
     oil_separation_sys = create_post_fermentation_oil_separation_system(
         'oil_separation_sys', TX-0,
         mockup=True, area=400,
+        target_oil_content=120,
     )
     oil, cellmass, wastewater, condensate = oil_separation_sys.outs
     oil_wash_sys = create_lipid_wash_system(

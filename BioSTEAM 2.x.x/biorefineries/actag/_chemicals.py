@@ -62,6 +62,8 @@ def create_cellulosic_chemicals():
     chemicals.TriOlein.Hfus = 148.83e3 # kJ / kmol
     chemicals.AcetylDiOlein.V.method_P = chemicals.TriOlein.V.method_P = None
     chemicals.set_synonym('Cells', 'Cellmass')
+    chemicals.set_synonym('AcetylDiOlein', 'AcTAG')
+    chemicals.set_synonym('TriOlein', 'TAG')
     return chemicals
     
 def create_conventional_chemicals():
@@ -83,6 +85,8 @@ def create_conventional_chemicals():
     chemicals.AcetylDiOlein.V.method_P = chemicals.TriOlein.V.method_P = None
     chemicals.set_synonym('Lime', 'CaO')
     chemicals.set_synonym('Cells', 'Cellmass')
+    chemicals.set_synonym('AcetylDiOlein', 'AcTAG')
+    chemicals.set_synonym('TriOlein', 'TAG')
     return chemicals
 
 
