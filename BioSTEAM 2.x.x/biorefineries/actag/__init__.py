@@ -186,8 +186,8 @@ evaluate_across_yield_titer_selectivity_and_productivity = np.vectorize(
 
 def fermentation_data(configuration, load):
     # Generate contour data
-    x = np.linspace(40, 90, 20)
-    y = np.linspace(5, 80, 20)
+    x = np.linspace(30, 90, 20)
+    y = np.linspace(5, 100, 20)
     z = np.array([50, 75, 100])
     w = np.array([0.033, 1.00])
     X, Y, Z = np.meshgrid(x, y, z)

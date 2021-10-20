@@ -37,6 +37,7 @@ __all__ = ('plot_yield_titer_selectivity_productivity_contours',
            'plot_tea_across_titer',
            'plot_MPSP_across_titer_and_yield')
 
+baselinecolor = (*colors.red.RGBn, 1)
 shadecolor = (*colors.neutral.RGBn, 0.20)
 linecolor = (*colors.neutral_shade.RGBn, 0.85)
 markercolor = (*colors.orange_tint.RGBn, 1)
@@ -77,6 +78,13 @@ def plot_yield_titer_selectivity_productivity_contours(
         configuration=1, load=True, price_ranges=[lubricating_oil_market_price],
         metric_index=0,
     ):
+    if configuration == 1:
+        baseline = [[2 * 17], [12]]
+        target = [[80], [75]]
+    elif configuration == 2:
+        baseline = [[2 * 17], [12]] # TODO: Update with actual experimental values
+        target = [[80], [75]]
+    
     # Generate contour data
     X, Y, z, w, data = actag.fermentation_data(configuration, load)
     
@@ -85,8 +93,8 @@ def plot_yield_titer_selectivity_productivity_contours(
     # Plot contours
     xlabel = "Yield\n[% theoretical]" 
     ylabel = f"Titer\n[{format_units('g/L')}]"
-    xticks = [40, 50, 60, 70, 80, 90]
-    yticks = [5, 20, 35, 50, 65, 80]
+    xticks = [30, 45, 60, 75, 90]
+    yticks = [5, 25, 50, 75, 100]
     if metric_index == 0:
         metric_bar = MetricBar(
             'MSP', format_units('$/ton'), 
@@ -117,9 +125,10 @@ def plot_yield_titer_selectivity_productivity_contours(
         X, Y, data, xlabel, ylabel, xticks, yticks, metric_bar, 
         fillblack=False, styleaxiskw=dict(xtick0=False), label=False,
     )
+    
     *_, nrows, ncols = data.shape
-    colors = [linecolor]
-    hatches = ['//', r'\\']
+    # colors = [linecolor]
+    # hatches = ['//', r'\\']
     if price_ranges:
         for i, price_range in enumerate(price_ranges):
             for row in range(nrows):
@@ -136,8 +145,12 @@ def plot_yield_titer_selectivity_productivity_contours(
                     # for collection in csf.collections: collection.set_linewidth(0.)
                     cs = plt.contour(X, Y, metric_data, zorder=1e6, linestyles='dashed', linewidths=1.,
                                      levels=price_range, colors=[linecolor])
-    
+    plt.sca(axes[0, 0])
+    plt.scatter(*baseline, color=baselinecolor, marker='o', s=75, edgecolor='black', zorder=1e6)
+    plt.sca(axes[1, 1])
+    plt.scatter(*target, color=baselinecolor, marker='*', s=125, edgecolor='black', zorder=1e6)
     plt.show()
+    # breakpoint()
 
 def plot_purity_across_selectivity(configuration=1):
     actag.load(configuration)
