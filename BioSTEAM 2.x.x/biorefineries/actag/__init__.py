@@ -3,6 +3,7 @@
 """
 import biosteam as bst
 import numpy as np
+import pandas as pd
 import os
 from biorefineries.cornstover import create_tea
 from ._chemicals import create_conventional_chemicals, create_cellulosic_chemicals
@@ -20,6 +21,31 @@ from biosteam.plots import (
     plot_contour_single_metric,
 )
 
+# %% Baseline and targets
+
+baseline = {
+    1: {'Yield': 34.,
+        'Titer': 12.,
+        'Selectivity': 50.,
+        'Productivity': 0.033},
+    2: {'Yield': 34., # TODO: Update with actual experimental values
+        'Titer': 12.,
+        'Selectivity': 50.,
+        'Productivity': 0.033}
+}
+target = {
+    1: {'Yield': 80.,
+        'Titer': 75.,
+        'Selectivity': 75.,
+        'Productivity': 1.0},
+    2: {'Yield': 80.,
+        'Titer': 75.,
+        'Selectivity': 75.,
+        'Productivity': 1.0},
+}
+
+# %% Mock variables and settings
+
 # TODO: find composition for minimum product specification (24 mm2/s viscosity)
 
 MPSP, TCI, heating_duty, cooling_duty = all_metric_mockups = (
@@ -32,6 +58,8 @@ N_metrics = len(all_metric_mockups)
 kg_per_ton = 907.18474
 _conventional_chemicals_loaded = False
 _cellulosic_chemicals_loaded = False
+
+# %% System loading
 
 def load_process_settings():
     bst.process_tools.default_utilities()
@@ -56,12 +84,13 @@ def load_cellulosic_chemicals():
     cellulosic_chemicals = create_cellulosic_chemicals()
     _cellulosic_chemicals_loaded = True
 
-def load(configuration, cache={}):
+def load(configuration, simulate=None, cache={}):
     global tea, sys, sys_no_dry_fractionation, fermentation, model, set_selectivity
     configuration = int(configuration)
+    key = (configuration, simulate)
     dct = globals()
-    if configuration in cache:
-        dct.update(cache[configuration])
+    if key in cache:
+        dct.update(cache[key])
         return
     if configuration == 1:
         if not _conventional_chemicals_loaded: 
@@ -145,7 +174,22 @@ def load(configuration, cache={}):
         dct[i.setter.__name__] = i
     for i in model._metrics:
         dct[i.getter.__name__] = i
-    cache[configuration] = dct.copy()
+    cache[key] = dct.copy()
+    
+    if simulate == 'baseline':
+        dct = baseline[configuration]
+    elif simulate == 'target':
+        dct = target[configuration]
+    elif simulate is None:
+        return
+    else:
+        raise ValueError(f"simulate must be 'target' or 'baseline'; not {simulate}")
+    
+    fermentation.selectivity = dct['Selectivity'] / 100.
+    fermentation.productivity = dct['Productivity']
+    fermentation.titer = dct['Titer']
+    fermentation.product_yield = dct['Yield'] / 100.
+    sys.simulate()
     
 def evaluate_across_yield_titer_selectivity_and_productivity(product_yield, titer, selectivity, productivities, configuration):
     load(configuration)
@@ -206,6 +250,35 @@ def fermentation_data(configuration, load):
     #         if 
     np.save(file, data)
     return X, Y, z, w, data
-    
 
+def save_tables():
+    import biorefineries.actag as actag
+    import biorefineries.cornstover as cs
+    import biosteam as bst
+    actag.load(1, 'baseline')
+    tea1_baseline = actag.tea
+    sys1_baseline = actag.sys
+    actag.load(1, 'target')
+    tea1_target = actag.tea
+    sys1_target = actag.sys
+    actag.load(2, 'baseline')
+    tea2_baseline = actag.tea
+    sys2_baseline = actag.sys
+    actag.load(2, 'target')
+    tea2_target = actag.tea
+    sys2_target = actag.sys
+    folder = os.path.dirname(__file__)
+    file = f'tables.xlsx'
+    file = os.path.join(folder, file)
+    writer = pd.ExcelWriter(file)
+    bst.report.voc_table(
+        [sys1_baseline, sys1_target, sys2_baseline, sys2_target], 
+        ['TAG', 'acTAG'],
+        ['Baseline conventional', 'Target conventional',
+         'Baseline cellulosic', 'Target cellulosic']).to_excel(writer, 'VOC')
+    cs.capex_table(
+        [tea1_baseline, tea1_target, tea2_baseline, tea2_target], 
+        ['Baseline conventional', 'Target conventional',
+         'Baseline cellulosic', 'Target cellulosic']).to_excel(writer, 'CAPEX')
+    writer.save()
     

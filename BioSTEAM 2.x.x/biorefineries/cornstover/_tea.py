@@ -14,23 +14,25 @@ __all__ = ('CellulosicEthanolTEA', 'create_tea',
            'capex_table', 'voc_table', 'foc_table')
 
 class CAPEXTableBuilder:
-    __slots__ = ('index', 'cost', 'notes')
+    __slots__ = ('index', 'data')
     
     def __init__(self):
         self.index = []
-        self.cost = []
-        self.notes = []
+        self.data =[]
     
-    def entry(self, index: str, cost: float, notes: str = '-'):
+    def entry(self, index: str, cost: list, notes: str = '-'):
         self.index.append(index)
-        self.cost.append(cost)
-        self.notes.append(notes)
+        self.data.append([notes, *cost])
+
+    @property
+    def total_costs(self):
+        N = len(self.data[0])
+        return [sum([i[index] for i in self.data]) for index in range(1, N)]
     
-    def table(self):
-        data = tuple(zip(self.notes, self.cost))
-        return pd.DataFrame(data, 
+    def table(self, names):
+        return pd.DataFrame(self.data, 
                             index=self.index,
-                            columns=('Notes', 'Cost [MM$]')
+                            columns=('Notes', *[i + '\n[MM$]' for i in names])
         )
 
 
@@ -262,17 +264,19 @@ def create_tea(sys, OSBL_units=None, cls=None):
         boiler_turbogenerator=BT)
     return tea
 
-def capex_table(tea):
+def capex_table(teas, names=None):
+    if isinstance(teas, bst.TEA): teas = [teas]
     capex = CAPEXTableBuilder()
-    ISBL_installed_equipment_cost = tea.ISBL_installed_equipment_cost / 1e6
-    OSBL_installed_equipment_cost = tea.OSBL_installed_equipment_cost / 1e6
-    capex.entry('ISBL installed equipment cost', ISBL_installed_equipment_cost)
-    capex.entry('OSBL installed equipment cost', OSBL_installed_equipment_cost)
-    ISBL_factor_entry = lambda name, value: capex.entry(name, ISBL_installed_equipment_cost * value, f"{value:.1%} of ISBL")
+    tea, *_ = teas
+    ISBL_installed_equipment_costs = np.array([i.ISBL_installed_equipment_cost / 1e6 for i in teas])
+    OSBL_installed_equipment_costs = np.array([i.OSBL_installed_equipment_cost / 1e6 for i in teas])
+    capex.entry('ISBL installed equipment cost', ISBL_installed_equipment_costs)
+    capex.entry('OSBL installed equipment cost', OSBL_installed_equipment_costs)
+    ISBL_factor_entry = lambda name, value: capex.entry(name, ISBL_installed_equipment_costs * value, f"{value:.1%} of ISBL")
     ISBL_factor_entry('Warehouse', tea.warehouse)
     ISBL_factor_entry('Site development', tea.site_development)
     ISBL_factor_entry('Additional piping', tea.additional_piping)
-    TDC = sum(capex.cost)
+    TDC = np.array(capex.total_costs)
     capex.entry('Total direct cost (TDC)', TDC)
     TDC_factor_entry = lambda name, value: capex.entry(name, TDC * value, f"{value:.1%} of TDC")
     TDC_factor_entry('Proratable costs', tea.proratable_costs)
@@ -280,7 +284,7 @@ def capex_table(tea):
     TDC_factor_entry('Construction', tea.construction)
     TDC_factor_entry('Contingency', tea.contingency)
     TDC_factor_entry('Other indirect costs (start-up, permits, etc.)', tea.other_indirect_costs)
-    TIC = sum(capex.cost) - 2 * TDC
+    TIC = np.array(capex.total_costs) - 2 * TDC
     capex.entry('Total indirect cost', TIC)
     FCI = TDC + TIC
     capex.entry('Fixed capital investment (FCI)', FCI)
@@ -288,7 +292,8 @@ def capex_table(tea):
     capex.entry('Working capital', working_capital, f"{tea.WC_over_FCI:.1%} of FCI")
     TCI = FCI + working_capital
     capex.entry('Total capital investment (TCI)', TCI)
-    return capex.table()
+    if names is None: names = [i.system.ID for i in teas]
+    return capex.table(names)
 
 def voc_table(system, tea, main_products):
     voc = VOCTableBuilder(tea.operating_days)

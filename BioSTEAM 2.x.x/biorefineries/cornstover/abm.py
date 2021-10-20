@@ -45,6 +45,8 @@ Name: (Corn stover, Price [USD/kg]), dtype: float64
 """
 from biorefineries import cornstover as cs
 import biosteam as bst
+import os
+import pandas as pd
 
 __all__ = ('ABM_TEA_model',)
 

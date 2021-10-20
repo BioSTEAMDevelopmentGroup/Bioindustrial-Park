@@ -78,12 +78,10 @@ def plot_yield_titer_selectivity_productivity_contours(
         configuration=1, load=True, price_ranges=[lubricating_oil_market_price],
         metric_index=0,
     ):
-    if configuration == 1:
-        baseline = [[2 * 17], [12]]
-        target = [[80], [75]]
-    elif configuration == 2:
-        baseline = [[2 * 17], [12]] # TODO: Update with actual experimental values
-        target = [[80], [75]]
+    baseline = actag.baseline[configuration]
+    target = actag.target[configuration]
+    baseline = [[baseline['Yield']], [baseline['Titer']]]
+    target  = [[target['Yield']], [target['Titer']]]
     
     # Generate contour data
     X, Y, z, w, data = actag.fermentation_data(configuration, load)
