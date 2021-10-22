@@ -79,33 +79,6 @@ class VOCTableBuilder:
         return pd.DataFrame(data, 
                             index=index,
                             columns=('Price [$/ton]', 'Cost [MM$ / yr]'))
-
-
-class FOCTableBuilder:
-    __slots__ = ('operating_days', 'index', 'price', 'notes')
-    
-    def __init__(self, operating_days):
-        self.operating_days = operating_days
-        self.index = []
-        self.price = []
-        self.notes = []
-        
-    def entry(self, index, cost, notes='-'):
-        self.index.append(index)
-        self.price.append(cost)
-        self.notes.append(notes)
-    
-    def table(self):
-        yearly_cost = np.array(self.price) * self.operating_days / 365.
-        data = tuple(zip(self.notes, self.price, yearly_cost))
-        return pd.DataFrame(data, 
-                            index=self.index,
-                            columns=(
-                                'Notes',
-                                'Price [MM$ / yr]',
-                                'Cost [MM$ / yr]',
-                            )
-        )
     
         
 class CellulosicEthanolTEA(TEA):
@@ -295,25 +268,14 @@ def capex_table(teas, names=None):
     if names is None: names = [i.system.ID for i in teas]
     return capex.table(names)
 
-def voc_table(system, tea, main_products):
-    voc = VOCTableBuilder(tea.operating_days)
-    for i in system.feeds + system.products: 
-        if i in main_products: continue
-        if i.price and not i.isempty(): voc.entry(i)
-    isa = isinstance
-    for i in set(system.facilities):
-        if isa(i, bst.BoilerTurbogenerator):
-            natural_gas = i.ins[3]
-            if natural_gas.isempty(): continue
-            voc.entry(natural_gas, price=i.natural_gas_price * 907.185)
-    return voc.table()
+voc_table = bst.report.voc_table
 
 def foc_table(tea):
-    foc = FOCTableBuilder(tea.operating_days)
+    foc = bst.report.FOCTableBuilder()
     ISBL = tea.ISBL_installed_equipment_cost / 1e6
     labor_cost = tea.labor_cost / 1e6
     foc.entry('Labor salary', labor_cost)
     foc.entry('Labor burden', tea.labor_burden * labor_cost, '90% of labor salary')
     foc.entry('Maintenance', tea.maintenance * ISBL, f'{tea.maintenance:.1%} of ISBL')
-    foc.entry('Property insurance', tea.property_insurance * ISBL, f'{tea.maintenance:.1%} of ISBL')
+    foc.entry('Property insurance', tea.property_insurance * ISBL, f'{tea.property_insurance:.1%} of ISBL')
     return foc.table()

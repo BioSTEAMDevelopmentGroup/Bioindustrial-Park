@@ -50,6 +50,9 @@ import pandas as pd
 
 __all__ = ('ABM_TEA_model',)
 
+cs.load()
+bst.CE = 607.5
+
 # %% Composition utilities
 
 # From NREL/TP-5100-47764
