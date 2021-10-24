@@ -13,7 +13,6 @@ from biorefineries import (
 )
 
 cn.load()
-cs.load()
 bst.CE = 607.5
 
 folder = os.path.dirname(__file__)
@@ -25,6 +24,9 @@ bst.report.voc_table(cn.corn_sys, ['ethanol'], ['Corn Ethanol Biorefinery']).to_
 sc.foc_table(cn.corn_tea).to_excel(writer, 'FOC')
 sc.capex_table(cn.corn_tea).to_excel(writer, 'CAPEX')
 writer.save()
+
+cs.load()
+bst.CE = 607.5
 
 file = f'cornstover_tables.xlsx'
 file = os.path.join(folder, file)
