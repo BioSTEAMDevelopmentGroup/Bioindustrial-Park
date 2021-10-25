@@ -81,7 +81,7 @@ class SolidLiquidsSplitCentrifuge(bst.Unit):
     
     def __init__(self, ID='', ins=None, outs=(), thermo=None, *,
                  liquids_split, solids_split, 
-                 top_chemical=None, efficiency=1.0,
+                 top_chemical=None,
                  moisture_content=0.5):
         bst.Unit.__init__(self, ID, ins, outs, thermo)
         
@@ -95,10 +95,6 @@ class SolidLiquidsSplitCentrifuge(bst.Unit):
         #: If none given, the "liquid" phase will the lightest and the "LIQUID"
         #: phase will be the heaviest.
         self.top_chemical = top_chemical
-        
-        #: Fraction of feed in liquid-liquid equilibrium.
-        #: The rest of the feed is divided equally between phases.
-        self.efficiency = efficiency 
         
         #: Moisture content of retentate
         self.moisture_content = moisture_content

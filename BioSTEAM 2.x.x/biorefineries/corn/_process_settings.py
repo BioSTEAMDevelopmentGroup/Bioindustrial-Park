@@ -22,6 +22,8 @@ def load_process_settings():
     lps.P = Water.Psat(lps.T)
     lps.heat_transfer_efficiency = 1.0
     lps.regeneration_price = price['Steam'] * Water.MW
+    for agent in HeatUtility.heating_agents:
+        agent.regeneration_price = price['Steam'] * Water.MW
     cw = HeatUtility.get_agent('cooling_water')
     cw.regeneration_price = 0.073e-3 * Water.MW
     cw.T = 25. + 273.15
@@ -32,7 +34,7 @@ price = {
     'Ethanol': 0.48547915353569393, 
     'Corn': 0.13227735731092652, # Value from Chinmay's report; 0.08476585075177462 in original
     'DDGS': 0.12026, # Value from Chinmay's report; 0.09687821462905594, in original
-    'Yeast': 0.907310526171629, # 1.86 in Chinmay's report;
+    'Yeast': 1.86, #* 3.045 / (63.335 + 3.045), # 1.86 in Chinmay's report; 0.907310526171629 in original
     'Enzyme': 2.25, # Value from Chinmay's report; 3.20739717428309 in original
     'Denaturant': 0.4355069727002459,
     'Sulfuric acid': 0.08971711759613593,

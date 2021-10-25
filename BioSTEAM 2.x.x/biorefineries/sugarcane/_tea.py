@@ -7,11 +7,12 @@
 # for license details.
 """
 """
-from biosteam import TEA
+import biosteam as bst
+import pandas as pd
 
-__all__ = ('ConventionalEthanolTEA', 'create_tea')
+__all__ = ('ConventionalEthanolTEA', 'create_tea', 'capex_table', 'foc_table')
 
-class ConventionalEthanolTEA(TEA):
+class ConventionalEthanolTEA(bst.TEA):
     """
     Create a ConventionalEthanolTEA object for techno-economic analysis of a
     biorefinery [1]_.
@@ -101,3 +102,34 @@ def create_tea(system, cls=ConventionalEthanolTEA):
                labor_cost=2.5e6, fringe_benefits=0.4,
                property_tax=0.001, property_insurance=0.005,
                supplies=0.20, maintenance=0.01, administration=0.005)
+
+def capex_table(tea):
+    purchase_cost = tea.purchase_cost /1e6
+    lang_factor = tea.lang_factor
+    FCI = lang_factor * purchase_cost
+    working_capital = FCI * tea.WC_over_FCI
+    TCI = FCI + working_capital
+    index = ('Purchase cost',
+             'Fixed capital investment', 
+             'Working capital', 
+             'Total capital investment')
+    data = [
+        ['', purchase_cost],
+        [f"Purchase cost x {lang_factor}", FCI],
+        [f"{tea.WC_over_FCI:.1%} of FCI", working_capital],
+        ['', TCI],
+    ]
+    return pd.DataFrame(data, index=index, columns=['Notes', 'Cost [MM$]'])
+
+def foc_table(tea):
+    foc = bst.report.FOCTableBuilder()
+    FCI = tea.FCI / 1e6
+    labor_cost = tea.labor_cost / 1e6
+    labor_burden = tea.fringe_benefits + tea.supplies
+    foc.entry('Labor salary', labor_cost)
+    foc.entry('Labor burden', labor_cost * labor_burden, f'{labor_burden:.0%} of labor salary')
+    foc.entry('Maintenance', tea.maintenance * FCI, f'{tea.maintenance:.0%} of FCI')
+    foc.entry('Administration', tea.administration * FCI, f'{tea.administration:.1%} of FCI')
+    foc.entry('Property tax', tea.property_tax * FCI, f'{tea.property_tax:.1%} of FCI')
+    foc.entry('Property insurance', tea.property_insurance * FCI, f'{tea.property_insurance:.1%} of FCI')
+    return foc.table()

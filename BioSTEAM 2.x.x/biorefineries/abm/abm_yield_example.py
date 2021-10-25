@@ -3,8 +3,8 @@
 Example module for calculating ethanol yield
 
 """
-from biorefineries.cornstover.abm import ABM_TEA_model as lignocellulose_model
-from biorefineries.corn.abm import ABM_TEA_model as corn_model
+from biorefineries.abm.cornstover import ABM_TEA_model as lignocellulose_model
+from biorefineries.abm.corn import ABM_TEA_model as corn_model
 
 lignocellulosic_capacity = 876072883.4242561
 corn_capacity = 876072883.4242561

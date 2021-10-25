@@ -45,8 +45,13 @@ Name: (Corn stover, Price [USD/kg]), dtype: float64
 """
 from biorefineries import cornstover as cs
 import biosteam as bst
+import os
+import pandas as pd
 
 __all__ = ('ABM_TEA_model',)
+
+cs.load()
+bst.CE = 607.5
 
 # %% Composition utilities
 
@@ -95,8 +100,6 @@ def set_mixed_cornstover_miscanthus_feedstock(x_cornstover):
     composition = (x_cornstover * cornstover_composition
                    + x_miscanthus * miscanthus_composition)
     cs.cornstover.mass = cs.cornstover.F_mass * composition
-    cs.cornstover.price = (price_cornstover * x_cornstover 
-                           + price_miscanthus * x_miscanthus)
 
 # %% Functional ABM TEA model for legacy purposes
 
