@@ -368,7 +368,7 @@ def create_concentration_evaporator_sys(ins, outs):
         instream = F401.ins[0]
         # ratio = target_water_x/get_x('Water', instream)
         ratio = get_x('BDO', instream)/F401.target_BDO_x
-        # no need to check for ratio>1 becasue our target_water_x is consistently lower than the max possible titer
+        # no need to check for ratio>1 because our target_water_x is consistently lower than the max possible titer
         F401.V = max(1e-5, 1. - ratio)
         F401._run()
     

@@ -40,7 +40,6 @@ import numpy as np
 import pandas as pd
 import biosteam as bst
 from biosteam.utils import TicToc
-from biosteam.plots import plot_montecarlo_across_coordinate
 from biorefineries.BDO.system_MS3 import (
     spec, BDO_sys, get_MEK_MPSP, get_GWP, get_FEC, flowsheet, BDO_tea
 )
@@ -64,10 +63,10 @@ timer.tic()
 
 # model = models.model_full
 model = models.BDO_model
-R301.set_titer_limit = True
+# R301.set_titer_limit = True
 
 # Set seed to make sure each time the same set of random numbers will be used
-np.random.seed(3221)
+np.random.seed(3222) # 3221
 N_simulation = 500 # 1000
 
 samples = model.sample(N=N_simulation, rule='L')
@@ -184,9 +183,15 @@ LCA_results = \
 LCA_percentiles = LCA_results.quantile(q=percentiles)
 
 # # Spearman's rank correlation
+
+table = model.table
+
 model.table = model.table.dropna()
+
 spearman_results = model.spearman()
 spearman_results.columns = pd.Index([i.name_with_units for i in model.metrics])
+
+model.table = table
 
 # Calculate the cumulative probabilitie of each parameter
 probabilities = {}
@@ -328,6 +333,11 @@ with pd.ExcelWriter(file_to_save+'_1_full_evaluation.xlsx') as writer:
 
 # model.table.to_clipboard()
 
+
+
+
+
+
 #%% Evaluate MC across glycerol yield
 import numpy as np
 import os 
@@ -342,15 +352,21 @@ yield_gly_setter = spec.load_yield_glycerol
 
 
 ygs = np.linspace(0.0001, 0.25, 20)
-
+spec.TRY_analysis = False
 model.evaluate_across_coordinate('Yield glycerol [% theo]', yield_gly_setter, ygs, 
-                                 xlfile = os.path.join(prefix, 'mc_across_glycerol_yield.xlsx'),
-                                 notify = 50)
+                                  xlfile = os.path.join(prefix, 'mc_across_glycerol_yield_2.xlsx'),
+                                  notify = 50)
 
 #%% Plot MC across glycerol yield
 import pandas as pd
+from biosteam.plots import plot_montecarlo_across_coordinate
+import os
+import numpy as np
 
-MC_across_gly_yield_df = pd.read_excel('mc_across_glycerol_yield_2.xlsx', 'Bior. Mini. sell. price')
+# ygs = np.linspace(0.0001, 0.25, 5)
+prefix = os.path.dirname(__file__)
+MC_across_gly_yield_df = pd.read_excel(os.path.join(prefix, 'mc_across_glycerol_yield_2.xlsx'),
+                                                'Bior. Mini. sell. price')
 
 
 MC_across_gly_yield_df_array = np.array(MC_across_gly_yield_df)
@@ -360,6 +376,9 @@ for i in MC_across_gly_yield_df_array:
     y_list.append(i[1:])
 
 MC_across_gly_yield = np.array(y_list)
+
+MC_across_gly_yield = MC_across_gly_yield[~np.isnan(MC_across_gly_yield).any(axis=1), :] # filter out nans
+ 
 mcac = plot_montecarlo_across_coordinate(ygs, MC_across_gly_yield)
 
 

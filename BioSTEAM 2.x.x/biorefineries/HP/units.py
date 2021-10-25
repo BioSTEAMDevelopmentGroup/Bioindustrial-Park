@@ -1040,7 +1040,8 @@ class AnaerobicDigestion(Unit):
         liquid_mol = self.multi_stream.imol['l']	
         treated_water.mol = liquid_mol * self.split	
         sludge.mol = liquid_mol - treated_water.mol	
-        biogas.receive_vent(treated_water, accumulate=True)	
+        # biogas.receive_vent(treated_water, accumulate=True)	
+        biogas.receive_vent(treated_water)
         biogas.T = treated_water.T = sludge.T = T
         
     def _design(self):

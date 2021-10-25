@@ -185,7 +185,8 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
                  'baseline_productivity',
                  'HXN_new_HXs',
                  'HXN_new_HX_utils',
-                 'HXN_Q_bal_percent_error_dict',)
+                 'HXN_Q_bal_percent_error_dict',
+                 'TRY_analysis')
     
     def __init__(self, evaporator, evaporator_pump, pump, mixer, heat_exchanger, seed_train_system, 
                  reactor, reaction_name, substrates, products,
@@ -195,7 +196,7 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
                  baseline_productivity=0.76, tolerable_HXN_energy_balance_percent_error=2., HXN_intolerable_points=[],
                  HXN_new_HXs={}, HXN_new_HX_utils={}, HXN_Q_bal_percent_error_dict = {},
                  feedstock_mass=104192.83224417375, pretreatment_reactor = None,
-                  load_spec_1=None, load_spec_2=None, load_spec_3=None):
+                  load_spec_1=None, load_spec_2=None, load_spec_3=None, TRY_analysis=True):
         self.evaporator_pump = evaporator_pump
         self.substrates = substrates
         self.reactor = reactor #: [Unit] Reactor unit operation
@@ -227,6 +228,7 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
         self.total_iterations = 0
         self.average_HXN_energy_balance_percent_error = 0.
         self.exceptions_dict = {}
+        self.TRY_analysis = TRY_analysis
         
         # self._maximum_inhibitor_concentration = maximum_inhibitor_concentration
         
@@ -389,8 +391,10 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
         """
         # print(yield_)
         reactor = self.reactor
-        self.spec_1 = reactor.glucose_to_BDO_rxn.X = reactor.xylose_to_BDO_rxn.X = yield_
-        
+        yield_ = max(1e-9, yield_)
+        self.spec_1 = reactor.glucose_to_BDO_rxn.X = reactor.xylose_to_BDO_rxn.X =\
+            min(yield_, 1.-1e-9 - reactor.glucose_to_biomass_rxn.X - reactor.glucose_to_glycerol_rxn.X)
+        # print(yield_, 1.-1e-9 - reactor.glucose_to_biomass_rxn.X - reactor.glucose_to_glycerol_rxn.X)
         # reactor.xylose_to_BDO_rxn.X = yield_
         # rem_glucose = min(0.13, 1. - reactor.glucose_to_BDO_rxn.X)
         # reactor.glucose_to_acetoin_rxn.X = (55./130.) * rem_glucose
@@ -411,7 +415,7 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
         rem_glucose = min(max_rem_glucose, (1. - reactor.glucose_to_biomass_rxn.X) - reactor.glucose_to_BDO_rxn.X - 1e-12)
         reactor.glucose_to_acetoin_rxn.X =  (0.055/max_rem_glucose) * rem_glucose
         # if reset_glycerol_yield:
-        reactor.glucose_to_glycerol_rxn.X =  (yield_glycerol_glucose/max_rem_glucose) * rem_glucose
+            
         reactor.glucose_to_ethanol_rxn.X =  (0.0001/max_rem_glucose) * rem_glucose
         # reactor.glucose_to_biomass_rxn.X = (50./130.) * rem_glucose
         
@@ -419,7 +423,9 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
         rem_xylose = min(max_rem_xylose, (1. - reactor.xylose_to_biomass_rxn.X) - reactor.xylose_to_BDO_rxn.X - 1e-12)
         reactor.xylose_to_acetoin_rxn.X =   (0.055/max_rem_xylose) * rem_xylose
         # if reset_glycerol_yield:
-        reactor.xylose_to_glycerol_rxn.X =  (yield_glycerol_xylose/max_rem_xylose) * rem_xylose
+        if self.TRY_analysis:
+            reactor.glucose_to_glycerol_rxn.X =  (yield_glycerol_glucose/max_rem_glucose) * rem_glucose
+            reactor.xylose_to_glycerol_rxn.X =  (yield_glycerol_xylose/max_rem_xylose) * rem_xylose
         reactor.xylose_to_ethanol_rxn.X =  (0.0001/max_rem_xylose) * rem_xylose
         # reactor.xylose_to_biomass_rxn.X = (50./130.) * rem_glucose
     
@@ -427,7 +433,7 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
         # self.load_spec_1(self.spec_1)
         # self.load_spec_2(self.spec_2)
         # self.load_spec_3(self.spec_3)
-        self.load_specifications(spec_1 = self.spec_1, spec_2 = self.spec_2, spec_3 = self.spec_3)
+        # self.load_specifications(spec_1 = self.spec_1, spec_2 = self.spec_2, spec_3 = self.spec_3)
         reactor = self.reactor
         reactor.glucose_to_glycerol_rxn.X = reactor.xylose_to_glycerol_rxn.X = yield_glycerol
         self.load_specifications(spec_1 = self.spec_1, spec_2 = self.spec_2, spec_3 = self.spec_3)
