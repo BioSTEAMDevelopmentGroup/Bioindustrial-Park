@@ -19,6 +19,7 @@ __all__ = (
     'mean_biodiesel_price',
     'mean_natural_gas_price',
     'mean_electricity_price',
+    'mean_soymeal_price',
 )
 
 ethanol_prices = [ # USD / gal Dec 2009 - Nov 2020, by quarter
@@ -102,3 +103,4 @@ mean_ethanol_price = np.mean(ethanol_prices)
 mean_biodiesel_price = np.mean(biodiesel_prices)
 mean_natural_gas_price = np.mean(natural_gas_prices)
 mean_electricity_price = sum([0.0583, 0.065, 0.069]) / 3.
+mean_soymeal_price = 0.33 # 10 yr average; https://markets.businessinsider.com/commodities/soybean-meal-price?op=1
