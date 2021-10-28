@@ -112,7 +112,8 @@ BDO_tea = CellulosicEthanolTEA(system=BDO_sys, IRR=0.10, duration=(2016, 2046),
         contingency=0.10, other_indirect_costs=0.10, 
         labor_cost=3212962*get_flow_tpd()/2205,
         labor_burden=0.90, property_insurance=0.007, maintenance=0.03,
-        steam_power_depreciation='MACRS20', boiler_turbogenerator=u.BT701)
+        steam_power_depreciation='MACRS5', boiler_turbogenerator=u.BT701)
+        # boiler_turbogenerator=u.BT701)
 
 # sub_units = BDO_sys.units[:BDO_sys.units.index(u.R401)]
 # sub_sys = bst.System(sub_units)
@@ -377,8 +378,8 @@ get_MEK_MPSP()
 # saccharified stream mass ratio of glucose:xylose is 0.64:0.36
 
 
-# to achieve $1.98/kg: spec_1=0.353*2
 spec.load_specifications(0.33408*2, 109.9, 1.0)
+# spec.load_specifications(0.418*2, 109.9, 1.3)
 
 def print_recycles():
     sys = BDO_sys.copy()
@@ -406,6 +407,10 @@ def simulate_and_print():
     print(f'FEC is {BDO_lca.FEC:.2f} MJ/kg MEK or {get_FEC()/MEK_LHV:.2f} MJ/MJ MEK')
     # print(f'SPED is {get_SPED():.2f} MJ/kg MEK or {get_SPED()/MEK_LHV:.2f} MJ/MJ MEK')
     print('--------------------\n')
+
+def get_MPSP_at_glycerol_yield(yg):
+    spec.load_yield_glycerol(yg)
+    return get_MEK_MPSP()
 
 simulate_and_print()
 # spec.load_specifications(0.36, 13.7, 1.0)
