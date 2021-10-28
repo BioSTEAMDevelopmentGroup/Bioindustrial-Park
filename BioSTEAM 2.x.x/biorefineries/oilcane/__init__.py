@@ -148,7 +148,7 @@ across_oil_content_agile_comparison_names = (
  set_glucose_to_ethanol_yield, set_xylose_to_ethanol_yield,
  set_cofermentation_titer, set_cofermentation_productivity,
  set_cane_PL_content, set_sorghum_PL_content, set_cane_FFA_content,
- set_sorghum_FFA_content, set_TAG_to_FFA_conversion,
+ set_sorghum_FFA_content, set_TAG_to_FFA_conversion, set_oilcane_GWP
  ) = all_parameter_mockups = (
     bst.MockVariable('Oil retention', '%', 'Stream-sugarcane'),
     bst.MockVariable('Bagasse oil extraction efficiency', '%', 'Stream-sugarcane'),
@@ -179,15 +179,36 @@ across_oil_content_agile_comparison_names = (
     bst.MockVariable('Sorghum FFA content', '% oil', 'oilsorghum'),    
     bst.MockVariable('Cane oil content', 'dry wt. %', 'Stream-sugarcane'),
     bst.MockVariable('Relative sorghum oil content', 'dry wt. %', 'Stream-sugarcane'),
-    bst.MockVariable('TAG to FFA conversion', '% theoretical', 'Biorefinery'),    
+    bst.MockVariable('TAG to FFA conversion', '% theoretical', 'Biorefinery'), 
+    # bst.MockVariable('GWP-CF', 'kg CO2-eq/kWhr', 'Power utility'),
+    bst.MockVariable('GWP', 'kg*CO2-eq/kg', 'Stream-oilcane'),
+    # bst.MockVariable('GWP-CF', 'kg*CO2-eq/kg', 'Stream-enzyme'),
+    # bst.MockVariable('GWP-CF', 'kg*CO2-eq/kg', 'Stream-H3PO4'),
+    # bst.MockVariable('GWP-CF', 'kg*CO2-eq/kg', 'Stream-lime'),
+    # bst.MockVariable('GWP-CF', 'kg*CO2-eq/kg', 'Stream-denaturant'),
+    # bst.MockVariable('GWP-CF', 'kg*CO2-eq/kg', 'Stream-natural gas'),
+    # bst.MockVariable('GWP-CF', 'kg*CO2-eq/kg', 'Stream-FGD lime'),
+    # bst.MockVariable('GWP-CF', 'kg*CO2-eq/kg', 'Stream-cellulase'),
+    # bst.MockVariable('GWP-CF', 'kg*CO2-eq/kg', 'Stream-DAP'),
+    # bst.MockVariable('GWP-CF', 'kg*CO2-eq/kg', 'Stream-CSL'),
+    # bst.MockVariable('GWP-CF', 'kg*CO2-eq/kg', 'Stream-caustic'),
+    # bst.MockVariable('GWP-CF', 'kg*CO2-eq/kg', 'Stream-catalyst'),
+    # bst.MockVariable('GWP-CF', 'kg*CO2-eq/kg', 'Stream-methanol'),
+    # bst.MockVariable('GWP-CF', 'kg*CO2-eq/kg', 'Stream-HCl'),
+    # bst.MockVariable('GWP-CF', 'kg*CO2-eq/kg', 'Stream-NaOH'),
+    # bst.MockVariable('GWP-CF', 'kg*CO2-eq/kg', 'Stream-crude glycerol'),
+    # bst.MockVariable('GWP-CF', 'kg*CO2-eq/kg', 'Stream-pure glycerine'),
+    # bst.MockVariable('GWP-CF', 'kg*CO2-eq/kg', 'Stream-dryer natural gas'),
 )
      
-(MFPP, biodiesel_production, ethanol_production, 
- electricity_production, natural_gas_consumption, 
- TCI, feedstock_consumption, heat_exchanger_network_error,
- MFPP_derivative, biodiesel_production_derivative, ethanol_production_derivative, 
+(MFPP, biodiesel_production, ethanol_production, electricity_production, 
+ natural_gas_consumption, TCI, feedstock_consumption, 
+ heat_exchanger_network_error, MFPP_derivative,
+ biodiesel_production_derivative, ethanol_production_derivative, 
  electricity_production_derivative, natural_gas_consumption_derivative, 
- TCI_derivative) = all_metric_mockups = (
+ TCI_derivative, GWP_biofuel_displacement, GWP_ethanol_displacement,
+ GWP_biodiesel_displacement, GWP_biofuel_allocation, GWP_ethanol_allocation, 
+ GWP_biodiesel_allocation) = all_metric_mockups = (
     bst.MockVariable('MFPP', 'USD/ton', 'Biorefinery'),
     bst.MockVariable('Biodiesel production', 'Gal/ton', 'Biorefinery'),
     bst.MockVariable('Ethanol production', 'Gal/ton', 'Biorefinery'),
@@ -202,6 +223,12 @@ across_oil_content_agile_comparison_names = (
     bst.MockVariable('Electricity production derivative', 'kWhr/ton', 'Biorefinery'),
     bst.MockVariable('Natural gas consumption derivative', 'cf/ton', 'Biorefinery'),
     bst.MockVariable('TCI derivative', '10^6*USD', 'Biorefinery'),
+    bst.MockVariable('GWP', 'kg*CO2*eq / GGE', 'Biofuel displacement'),
+    bst.MockVariable('GWP', 'kg*CO2*eq / (ethanol*gal)', 'Ethanol displacement'),
+    bst.MockVariable('GWP', 'kg*CO2*eq / (biodiesel*gal)', 'Biodiesel displacement'),
+    bst.MockVariable('GWP', 'kg*CO2*eq / GGE', 'Biofuel allocation'),
+    bst.MockVariable('GWP', 'kg*CO2*eq / (ethanol*gal)', 'Ethanol allocation'),
+    bst.MockVariable('GWP', 'kg*CO2*eq / (biodiesel*gal)', 'Biodiesel allocation'),
 )
 
 metric_mockups = (
@@ -353,6 +380,7 @@ def load(name, cache={}, reduce_chemicals=True, enhanced_cellulosic_performance=
         oilcane_sys = create_sugarcane_to_ethanol_system(
             operating_hours=operating_hours,
             use_area_convention=True,
+            pellet_bagasse=True,
         )
         area_names = [
             'Feedstock handling', 
@@ -421,6 +449,30 @@ def load(name, cache={}, reduce_chemicals=True, enhanced_cellulosic_performance=
         raise NotImplementedError(number)
     oilcane_sys.set_tolerance(rmol=1e-5, mol=1e-3, subsystems=True)
     dct.update(flowsheet.to_dict())
+    class MockStream:
+        __slots__ = ('ID', 'price',)
+        line = 'Stream'
+        characterization_factors = {}
+        
+        def __init__(self, ID): 
+            dct[ID] = self
+            self.price = 0.
+            self.ID = ID
+            
+        @property
+        def F_vol(self): return 0.
+        @property
+        def F_mass(self): return 0.
+        @property
+        def F_mol(self): return 0.
+        @property
+        def cost(self): return 0.
+    
+    def get_stream(ID):
+        return dct.get(ID) or MockStream(ID)
+    
+    crude_glycerol = get_stream('crude_glycerol')
+    pure_glycerine = get_stream('pure_glycerine')
     if number == 1:
         oilcane_sys.prioritize_unit(T608)
     elif number == 2:
@@ -485,19 +537,26 @@ def load(name, cache={}, reduce_chemicals=True, enhanced_cellulosic_performance=
     
     if agile: 
         dct['oilsorghum'] = oilsorghum = sorghum_feedstock(ID='oilsorghum')
+        
         sys = agile_sys = bst.AgileSystem()
         @agile_sys.operation_parameter(mode_dependent=True)
         def set_oil_content(oil_content, mode):
-            if number > 0: set_oil_fraction(oil_content, oilcane,
-                                               FFA_fraction=mode.FFA_content,
-                                               z_mass_carbs_baseline=mode.z_mass_carbs_baseline,
-                                               PL_fraction=mode.PL_content)
+            if number > 0: 
+                set_oil_fraction(oil_content, oilcane,
+                                 FFA_fraction=mode.FFA_content,
+                                 z_mass_carbs_baseline=mode.z_mass_carbs_baseline,
+                                 PL_fraction=mode.PL_content)
             else:
                 F_mass = oilcane.F_mass
                 oilcane.copy_flow(mode.feedstock)
                 oilcane.F_mass = F_mass
         agile_sys.operation_parameter(set_glucose_yield)
         agile_sys.operation_parameter(set_xylose_yield)
+        
+        @agile_sys.operation_metric(annualize=True)
+        def electricity_GWP(mode):
+            power_utility = bst.PowerUtility.sum([i.power_utility for i in mode.system.cost_units])
+            return power_utility.get_impact(production_key=GWP)
         
         dct['cane_mode'] = cane_mode = agile_sys.operation_mode(oilcane_sys,
             operating_hours=200*24, oil_content=0.05, feedstock=oilcane.copy(),
@@ -519,6 +578,11 @@ def load(name, cache={}, reduce_chemicals=True, enhanced_cellulosic_performance=
         tea.operating_days = 200
         tea.IRR = 0.10
         feedstocks = [oilcane]
+        
+        def electricity_GWP():
+            power_utility = bst.PowerUtility.sum([i.power_utility for i in sys.cost_units])
+            return power_utility.get_impact(production_key=GWP) * sys.operating_hours
+        
     tea.income_tax = 0.21 # Davis et al. 2018; https://www.nrel.gov/docs/fy19osti/71949.pdf
     
     ## Specification for analysis
@@ -542,8 +606,66 @@ def load(name, cache={}, reduce_chemicals=True, enhanced_cellulosic_performance=
             sys, feedstocks, isplit_a, isplit_b, isplit_efficiency_is_reversed
         )
     
-    ## Model
+    ## LCA
+    GWP_characterization_factors = { # Material GWP cradle-to-gate [kg*CO2*eq / kg]
+        'sugarcane': 0.02931 * 0.30 / 0.25, # GREET, modified from moisture content of 0.75 to 0.70
+        'sweet sorghum': 0.02821 * 0.30 / 0.25, # GREET, modified from moisture content of 0.75 to 0.70
+        #'feedstock': 0.0607, # dry basis, Ecoinvent 2021
+        'protease': 8.07, # Assume same as cellulase
+        'cellulase': 8.07, # GREET
+        'H3PO4': 1.00, # GREET
+        'lime': 1.164, # GREET
+        'pure-glycerol': 1.6678, # Ecoinvent, TRACI, market for glycerine, RoW; 
+        'crude-glycerol': 0.28, # GREET
+        'DAP': 1.66, # GREET
+        'CSL': 1.56, # GREET
+        'HCl': 1.96, # GREET
+        'NaOH': 2.01, # GREET
+        'gasoline': 0.88, # GREET
+        'methanol': 0.45, # GREET, Natural gas to methanol
+        'NaOCH3': 1.5871, # Ecoinvent, TRACI, sodium methoxide
+        'CH4': 0.33, # Natural gas from shell conventional recovery, GREET
+        # from thermosteam.units_of_measure import convert, Chemical
+        # CH4 = Chemical('CH4')
+        # CO2 = Chemical('CO2')
+        # electricty_produced_per_kg_CH4 = - convert(0.8 * 0.85 * CH4.LHV / CH4.MW, 'kJ', 'kWhr')
+        # GWP_per_kg_CH4 = 0.33 + CO2.MW / CH4.MW
+        # GWP_per_kWhr = electricty_produced_per_kg_CH4 / GWP_per_kg_CH4
+        'Electricity': 0.325 # [kg*CO2*eq / kWhr] Based on balance above
+    }
+    GWP = ('GWP', 'cradle-to-gate')
+    FEC = ('FEC', 'cradle-to-gate')
+    bst.PowerUtility.characterization_factors[GWP] = GWP_characterization_factors['Electricity']
     
+    # Set non-negligible characterization factors
+    if abs(number) != 2:
+        for i in ('FGD_lime', 'cellulase', 'DAP', 'CSL', 'caustic'): MockStream(i)
+    if number < 0:
+        for i in ('catalyst', 'methanol', 'HCl', 'NaOH', 'crude_glycerol', 'pure_glycerine'): MockStream(i)
+    if abs(number) != 1:
+        MockStream(('dryer_natural_gas'))
+    oilcane.characterization_factors[GWP] = GWP_characterization_factors['sugarcane'] 
+    enzyme.characterization_factors[GWP] = GWP_characterization_factors['protease'] * 0.10
+    H3PO4.characterization_factors[GWP] = GWP_characterization_factors['H3PO4']
+    lime.characterization_factors[GWP] = GWP_characterization_factors['lime'] * 0.046 # Diluted with water
+    denaturant.characterization_factors[GWP] = GWP_characterization_factors['gasoline']
+    natural_gas.characterization_factors[GWP] = GWP_characterization_factors['CH4']
+    FGD_lime.characterization_factors[GWP] = GWP_characterization_factors['lime'] * 0.451 # Diluted with water
+    cellulase.characterization_factors[GWP] = GWP_characterization_factors['cellulase'] * 0.02
+    DAP.characterization_factors[GWP] = GWP_characterization_factors['DAP']
+    CSL.characterization_factors[GWP] = GWP_characterization_factors['CSL']
+    caustic.characterization_factors[GWP] = GWP_characterization_factors['NaOH'] * 0.5
+    catalyst.characterization_factors[GWP] = GWP_characterization_factors['methanol'] * 0.75 + GWP_characterization_factors['NaOH'] * 0.25
+    methanol.characterization_factors[GWP] = GWP_characterization_factors['methanol']
+    HCl.characterization_factors[GWP] = GWP_characterization_factors['HCl']
+    NaOH.characterization_factors[GWP] = GWP_characterization_factors['NaOH']
+    crude_glycerol.characterization_factors[GWP] = GWP_characterization_factors['crude-glycerol']
+    pure_glycerine.characterization_factors[GWP] = GWP_characterization_factors['pure-glycerol']
+    dryer_natural_gas.characterization_factors[GWP] = GWP_characterization_factors['CH4']
+    natural_gas_streams = [natural_gas]
+    if abs(number) == 1: natural_gas_streams.append(dryer_natural_gas)
+    
+    ## Model
     model = bst.Model(sys, exception_hook='raise', retry_evaluation=False)
     parameter = model.parameter
     metric = model.metric
@@ -558,6 +680,20 @@ def load(name, cache={}, reduce_chemicals=True, enhanced_cellulosic_performance=
     
     def triangular(lb, mid, ub, *args, **kwargs):
         return parameter(*args, distribution=shape.Triangle(lb, mid, ub), bounds=(lb, ub), **kwargs)
+    
+    # def default_gwp(obj, units='kg*CO2-eq/kg'):
+    #     if isinstance(obj, str):
+    #         def f(value): pass
+    #         return parameter(f, distribution=shape.Uniform(0, 1), bounds=(0, 1),
+    #                          element=bst.Stream(obj), name='GWP-CF', units=units)
+    #     else:
+    #         def f(value): obj.characterization_factors[GWP] = value
+    #         # f.__name__ = 'set_' + obj.ID + '_GWPCF'
+    #         baseline = obj.characterization_factors[GWP]
+    #         lb = 0.75 * baseline
+    #         ub = 1.25 * baseline
+    #         return parameter(f, distribution=shape.Uniform(lb, ub), bounds=(lb, ub),
+    #                          element=obj, name='GWP-CF', units=units)
     
     # Currently at ~5%, but total oil content is past 10%
     
@@ -619,12 +755,10 @@ def load(name, cache={}, reduce_chemicals=True, enhanced_cellulosic_performance=
     def set_IRR(IRR):
         tea.IRR = IRR / 100.
     
-    crude_glycerol = dct.get('crude_glycerol') or bst.Stream('crude_glycerol')
     @uniform(0.10, 0.22, units='USD/kg', element=crude_glycerol)
     def set_crude_glycerol_price(price):
         crude_glycerol.price = price
 
-    pure_glycerine = dct.get('pure_glycerine') or bst.Stream('pure_glycerine')
     pure_glycerine_base_price = 0.65
     @uniform(0.75 * pure_glycerine_base_price, 1.25 * pure_glycerine_base_price,
              units='USD/kg', element=pure_glycerine)
@@ -741,12 +875,38 @@ def load(name, cache={}, reduce_chemicals=True, enhanced_cellulosic_performance=
         if agile:
             sorghum_mode.oil_content = cane_mode.oil_content + relative_sorghum_oil_content / 100.
 
-    @default(23, units='% oil', kind='coupled')
+    @default(23, units='% oil', kind='coupled', name='TAG to FFA conversion')
     def set_TAG_to_FFA_conversion(TAG_to_FFA_conversion):
         if number == 1:
             R301.oil_reaction.X[0] = TAG_to_FFA_conversion / 100.
         elif number == 2:
             R401.oil_reaction.X[0] = TAG_to_FFA_conversion / 100.
+    
+    @default(oilcane.characterization_factors[GWP], name='GWP', 
+             element=oilcane, units='kg*CO2-eq/kg')
+    def set_oilcane_GWP(value):
+        if number > 1:
+            oilcane.characterization_factors[GWP] = value
+    
+    @default(methanol.characterization_factors[GWP], name='GWP', 
+             element=methanol, units='kg*CO2-eq/kg')
+    def set_methanol_GWP(value):
+        methanol.characterization_factors[GWP] = value
+    
+    @default(crude_glycerol.characterization_factors[GWP], name='GWP', 
+             element=crude_glycerol, units='kg*CO2-eq/kg')
+    def set_crude_glycerol_GWP(value):
+        crude_glycerol.characterization_factors[GWP] = value
+    
+    @default(pure_glycerine.characterization_factors[GWP], name='GWP', 
+             element=pure_glycerine, units='kg*CO2-eq/kg')
+    def set_pure_glycerine_GWP(value):
+        pure_glycerine.characterization_factors[GWP] = value
+    
+    @default(cellulase.characterization_factors[GWP], name='GWP', 
+             element=cellulase, units='kg*CO2-eq/kg')
+    def set_cellulase_GWP(value):
+        cellulase.characterization_factors[GWP] = value
     
     natural_gas.phase = 'g'
     natural_gas.set_property('T', 60, 'degF')
@@ -816,14 +976,6 @@ def load(name, cache={}, reduce_chemicals=True, enhanced_cellulosic_performance=
     @metric(units='%')
     def heat_exchanger_network_error():
         return HXN.energy_balance_percent_error if HXN else 0.    
-    
-    # @metric(units='MMGGE/yr')
-    # def productivity():
-    #     GGE = (ethanol_flow() / 1.5
-    #        + biodiesel_flow() / 0.9536
-    #        - electricity() * 3600 / 131760
-    #        - natural_gas_flow() / 126.67)
-    #     return GGE / 1e6
 
     @metric(units='USD/ton')
     def MFPP_derivative():
@@ -884,6 +1036,69 @@ def load(name, cache={}, reduce_chemicals=True, enhanced_cellulosic_performance=
         value = (tea.TCI / 1e6  - TCI.cache) # 10^6*$
         # print('TCI production derivative', value)
         return value
+    
+    # @metric(units='MMGGE/yr')
+    # def productivity():
+    #     GGE = (ethanol_flow() / 1.5
+    #         + biodiesel_flow() / 0.9536
+    #         - electricity() * 3600 / 131760
+    #         - natural_gas_flow() / 126.67)
+    #     return GGE / 1e6
+    
+    @metric(name='GWP', element='Biofuel displacement', units='kg*CO2*eq / GGE')
+    def GWP_biofuel_displacement(): # Cradle to gate
+        GWP_material = sys.get_total_feeds_impact(GWP)
+        GWP_electricity_consumption = electricity_GWP()
+        GWP_coproducts = sys.get_total_products_impact(GWP)
+        GWP_total = GWP_material + GWP_electricity_consumption - GWP_coproducts # kg CO2 eq. / yr
+        GGE_biodiesel_annual = biodiesel_flow() / 0.9536
+        GGE_ethanol_annual = ethanol_flow() / 1.5
+        return GWP_total / (GGE_biodiesel_annual + GGE_ethanol_annual)
+    
+    @metric(name='GWP', element='Ethanol displacement', units='kg*CO2*eq / (ethanol*gal)')
+    def GWP_ethanol_displacement(): # Cradle to gate
+        try:
+            return GWP_biofuel_displacement.cache / 1.5
+        except:
+            return GWP_biofuel_displacement() / 1.5
+    
+    @metric(name='GWP', element='Biodiesel displacement', units='kg*CO2*eq / (biodiesel*gal)')
+    def GWP_biodiesel_displacement(): # Cradle to gate
+        if number > 0:
+            try:
+                return GWP_biofuel_displacement.cache / 0.9536
+            except:
+                return GWP_biofuel_displacement() / 0.9536
+        else:
+            return 0.
+    
+    @metric(name='GWP', element='Biofuel allocation', units='kg*CO2*eq / GGE')
+    def GWP_biofuel_allocation(): # Cradle to gate
+        GWP_material = sys.get_total_feeds_impact(GWP)
+        GWP_coproducts = sys.get_total_products_impact(GWP)
+        GWP_fossil_emissions = sum([sys.get_mass_flow(i) for i in natural_gas_streams]) * 2.7433136813182024
+        GWP_total = GWP_material + GWP_fossil_emissions - GWP_coproducts # kg CO2 eq. / yr
+        GGE_biodiesel_annual = biodiesel_flow() / 0.9536
+        GGE_ethanol_annual = ethanol_flow() / 1.5
+        GEE_electricity_production = max(-electricity() * 3600 / 131760, 0.)
+        return GWP_total / (GGE_biodiesel_annual + GGE_ethanol_annual + GEE_electricity_production)
+    
+    @metric(name='GWP', element='Ethanol allocation', units='kg*CO2*eq / (ethanol*gal)')
+    def GWP_ethanol_allocation(): # Cradle to gate
+        try:
+            return GWP_biofuel_allocation.cache / 1.5
+        except:
+            return GWP_biofuel_allocation() / 1.5
+    
+    @metric(name='GWP', element='Biodiesel allocation', units='kg*CO2*eq / (biodiesel*gal)')
+    def GWP_biodiesel_allocation(): # Cradle to gate
+        if number > 0:
+            try:
+                return GWP_biofuel_allocation.cache / 0.9536
+            except:
+                return GWP_biofuel_allocation() / 0.9536
+        else:
+            return 0.
     
     # Single point evaluation for detailed design results
     if abs(number) == 2:
@@ -1372,6 +1587,7 @@ def plot_monte_carlo(derivative=False, absolute=True, comparison=True,
         production,
         electricity_production,
         natural_gas_consumption,
+        GWP_biofuel_allocation,
     ]
     N_rows = len(rows)
     fig, axes = plt.subplots(ncols=1, nrows=N_rows)
@@ -1385,7 +1601,8 @@ def plot_monte_carlo(derivative=False, absolute=True, comparison=True,
         f"TCI\n[{format_units('10^6*USD')}]",
         f"Production\n[{format_units('Gal/ton')}]",
         f"Elec. prod.\n[{format_units('kWhr/ton')}]",
-        f"NG cons.\n[{format_units('cf/ton')}]"
+        f"NG cons.\n[{format_units('cf/ton')}]",
+        f"GWP\n[{format_units('kg CO2-eq/GGE')}]",
     ]
     if derivative:
         ylabels = [
@@ -1394,6 +1611,7 @@ def plot_monte_carlo(derivative=False, absolute=True, comparison=True,
             r"$\Delta$" + format_units(r"Prod./OC").replace('cdot', r'cdot \Delta') + f"\n[{format_units('Gal/ton')}]",
             r"$\Delta$" + format_units(r"EP/OC").replace('cdot', r'cdot \Delta') + f"\n[{format_units('kWhr/ton')}]",
             r"$\Delta$" + format_units(r"NGC/OC").replace('cdot', r'cdot \Delta') + f"\n[{format_units('cf/ton')}]"
+            r"$\Delta$" + format_units(r"GWP/OC").replace('cdot', r'cdot \Delta') + f"\n[{format_units('kg CO2-eq/GGE')}]"
         ]
     elif comparison and not absolute:
         ylabels = [r"$\Delta$" + i for i in ylabels]
@@ -1482,7 +1700,13 @@ def plot_monte_carlo(derivative=False, absolute=True, comparison=True,
     # )
     # legend.get_frame().set_linewidth(0.0)
 
-def plot_spearman_MFPP(configuration, top=None, agile=True, labels=None):
+def plot_spearman(configuration, top=None, agile=True, labels=None, metric=None):
+    if metric is None:
+        metric = MFPP
+    elif metric == 'MFPP':
+        metric = MFPP
+    elif metric == 'GWP':
+        metric = GWP_biofuel_allocation
     stream_price = format_units('USD/gal')
     USD_ton = format_units('USD/ton')
     ng_price = format_units('USD/cf')
@@ -1491,6 +1715,7 @@ def plot_spearman_MFPP(configuration, top=None, agile=True, labels=None):
     capacity = format_units('ton/hr')
     titer = format_units('g/L')
     productivity = format_units('g/L/hr')
+    material_GWP = format_units('kg*CO2-eq/kg')
     index, ignored_list = zip(*[
          ('Bagasse oil retention [40 $-$ 70 %]', ['S2', 'S1', 'S2*', 'S1*']),
          ('Oil extraction efficiency [baseline + 0 $-$ 20 %]', ['S2', 'S1', 'S2*', 'S1*']),
@@ -1522,7 +1747,7 @@ def plot_spearman_MFPP(configuration, top=None, agile=True, labels=None):
          ('Cane oil content [5 $-$ 15 dry wt. %]', ['S2', 'S1', 'S2*', 'S1*']),
          ('Relative sorghum oil content [-3 $-$ 0 dry wt. %]', ['S2', 'S1', 'S2*', 'S1*', 'O2', 'O1']),
          ('TAG to FFA conversion [17.25 $-$ 28.75 % theoretical]', ['S1', 'O1', 'S1*', 'O1*']),
-       # '$^a$Fermentation solids loading [20% $-$ 25%]',
+        (f'Feedstock GWP [0.0263 $-$ 0.0440 {material_GWP}]', []),
     ])
     ignored_dct = {
         'S1': [],
@@ -1538,7 +1763,7 @@ def plot_spearman_MFPP(configuration, top=None, agile=True, labels=None):
         for name in ignored: ignored_dct[name].append(i)
     
     configuration_names = (configuration, configuration + '*') if agile else (configuration,)
-    MFPPs = []
+    rhos = []
     for name in configuration_names:
         file = spearman_file(name)
         try: 
@@ -1547,13 +1772,13 @@ def plot_spearman_MFPP(configuration, top=None, agile=True, labels=None):
             warning = RuntimeWarning(f"file '{file}' not found")
             warn(warning)
             continue
-        s = df['Biorefinery', 'MFPP [USD/ton]']
-        s.iloc[ignored_dct[name]] =0.
-        MFPPs.append(s)
+        s = df[metric.index]
+        s.iloc[ignored_dct[name]] = 0.
+        rhos.append(s)
     color_wheel = [CABBI_colors.orange, CABBI_colors.green_soft]
-    fig, ax = bst.plots.plot_spearman_2d(MFPPs, top=top, index=index, 
+    fig, ax = bst.plots.plot_spearman_2d(rhos, top=top, index=index, 
                                          color_wheel=color_wheel,
-                                         name='MFPP')
+                                         name=metric.name)
     plt.legend(
         handles=[
             mpatches.Patch(

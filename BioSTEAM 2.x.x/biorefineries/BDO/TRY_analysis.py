@@ -20,8 +20,8 @@ from matplotlib.ticker import AutoMinorLocator as AML
 
 # from BDO.system import BDO_sys, BDO_tea, R302, spec
 # from BDO.system import MEK as product
-from biorefineries.BDO.system_MS2 import BDO_sys, BDO_tea, BDO_lca, spec, u
-from biorefineries.BDO.system_MS2 import MEK as product
+from biorefineries.BDO.system_MS3 import BDO_sys, BDO_tea, BDO_lca, spec, u
+from biorefineries.BDO.system_MS3 import MEK as product
 
 from matplotlib import pyplot as plt
 from  matplotlib.colors import LinearSegmentedColormap
@@ -304,7 +304,7 @@ BDO_metrics = [get_BDO_MPSP, lambda: BDO_lca.GWP, lambda: BDO_lca.FEC]
 
 
 # %% Generate 3-specification meshgrid and set specification loading functions
-steps = 20
+steps = 40
 # Yield, titer, productivity (rate)
 spec_1 = np.linspace(0.05, 0.95, steps) # yield
 spec_2 = np.linspace(5., 210., steps) # titer

@@ -4,7 +4,6 @@ Created on Tue Feb  4 06:42:02 2020
 
 @author: yoelr
 """
-from thermosteam import functional as fn
 import thermosteam as tmo
 
 __all__ = ('create_chemicals',)
@@ -19,5 +18,6 @@ def create_chemicals():
     chemicals.compile()
     chemicals.define_group('Lipid', ['PL', 'FFA', 'MAG', 'DAG', 'TAG'])
     chemicals.define_group('Oil', ['PL', 'FFA', 'MAG', 'DAG', 'TAG'])
+    chemicals.set_synonym('DryYeast', 'Cellmass')
     return chemicals
     

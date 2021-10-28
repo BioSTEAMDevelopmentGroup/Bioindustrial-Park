@@ -9,7 +9,7 @@
 """
 import biosteam as bst
 
-__all__ = ('load_process_settings', 'ethanol_density_kggal')
+__all__ = ('load_process_settings', 'ethanol_density_kggal', 'price')
 
 factor = 1./907.18474 # ton/hr to kg/hr
 ethanol_density_kgL = 0.789 # kg/L
@@ -44,9 +44,9 @@ def load_process_settings():
     _ha.heat_transfer_efficiency = 0.90
     _ha.T = 529.2
     _ha.P = 44e5
-    _ha.regeneration_price = 0.30626
+    _ha.regeneration_price = 0.
     _CW = bst.HeatUtility.get_cooling_agent('cooling_water')
     _CW.T = 28 + 273.15
     _CW.T_limit = _CW.T + 9
-    _CW.regeneration_price = 0
+    _CW.regeneration_price = 0.
     bst.HeatUtility.get_cooling_agent('chilled_water').heat_transfer_price = 0

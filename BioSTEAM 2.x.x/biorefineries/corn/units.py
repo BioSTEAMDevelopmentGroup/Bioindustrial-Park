@@ -267,16 +267,25 @@ class SimultaneousSaccharificationFermentation(bst.BatchBioreactor):
         bst.BatchBioreactor.__init__(self, ID, ins, outs, thermo,
             tau=tau, N=N, V=V, T=T, P=P, Nmin=Nmin, Nmax=Nmax
         )
-        self.reaction = tmo.reaction.Reaction('Glucose -> 2Ethanol + 2CO2',  'Glucose', yield_)
+        self.reaction = tmo.Rxn('Glucose -> 2Ethanol + 2CO2',  'Glucose', yield_)
+        self.growth = tmo.Rxn('Glucose -> Yeast',  'Glucose', 1.0)
         self.V_wf = V_wf
     
     def _run(self):
         vent, effluent = self.outs
         effluent.mix_from(self.ins)
         self.reaction(effluent)
-        effluent.imass['Yeast'] += effluent.imass['Glucose', 'NH3'].sum()
-        effluent.imass['Glucose', 'NH3'] = 0.
+        self.growth(effluent)
+        effluent.imass['Yeast'] += effluent.imass['NH3']
+        effluent.imol['NH3'] = 0.
+        vent.empty()
         vent.receive_vent(effluent)
+        
+    @property
+    def Hnet(self):
+        X = self.reaction.X
+        glucose = self.ins[0].imol['Glucose']
+        return self.reaction.dH * glucose + self.growth.dH * (1 - X) + self.H_out - self.H_in
     
 SSF = SimultaneousSaccharificationFermentation
 

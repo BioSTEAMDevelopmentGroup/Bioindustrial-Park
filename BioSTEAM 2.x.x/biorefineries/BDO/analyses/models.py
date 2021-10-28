@@ -28,7 +28,7 @@ import biosteam as bst
 from chaospy import distributions as shape
 from biosteam import main_flowsheet as flowsheet
 from biosteam.evaluation import Model, Metric
-from biorefineries.BDO.system_MS2 import BDO_sys, BDO_tea, spec, feedstock, MEK, BT, BDO_lca, unit_groups_dict
+from biorefineries.BDO.system_MS3 import BDO_sys, BDO_tea, spec, feedstock, MEK, BT, BDO_lca, unit_groups_dict
 from biorefineries.BDO.process_settings import CFs
 
 _kg_per_ton = 907.18474
@@ -80,16 +80,15 @@ special_price = {
     # 'natural_gas':      ('Triangle',  (0.198,     0.304)),
     'gypsum':           ('Uniform',   (-0.0288,   0.00776))
     }
-# !!! Need to add just 2 more streams and their default price distributions here
-# (make-up and spent catalyst streams for dehydration and hydrogenation)
+
 
 
 # Prices for boiler_chems, baghouse_bag, and cooling_tower_chems are not included
 # as they are tied to BT/CT duties
 default_price_streams = ('sulfuric_acid_T201', 'enzyme', 
                          'makeup_water', 'caustic', 'ash_disposal', 'oleyl_alcohol',
-                         'makeup_TCP_catalyst', 'makeup_KieCNi_catalyst')
-
+                         'makeup_TCP_catalyst', 'makeup_KieCNi_catalyst', 'H2_fresh')
+# add isobutanol
 def add_stream_price_param(stream, D):
     param(setter=lambda price: setattr(stream, 'price', price),
           name=f'{stream.ID} price', element='TEA', kind='isolated', units='$/kg',

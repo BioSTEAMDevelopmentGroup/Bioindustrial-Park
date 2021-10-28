@@ -381,7 +381,7 @@ def GWP_breakdown():
 get_conc_aqueous_broth_MPSP()
 
 R302 = flowsheet('R302')
-set_target_BDO_x(get_x('BDO', R302.outs[0]))
+set_target_BDO_x(250e-6)
 # Overall yield assuming yield on xylose is 80% of yield on glucose:
 # (0.64*0.36+0.36*0.8*0.36) * 2 = 0.33408 * 2
 # saccharified stream mass ratio of glucose:xylose is 0.64:0.36

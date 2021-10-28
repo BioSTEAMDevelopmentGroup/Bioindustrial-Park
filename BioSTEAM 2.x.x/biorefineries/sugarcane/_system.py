@@ -39,7 +39,7 @@ def create_bagasse_pelleting_system(ins, outs):
     U402 = units.DrumDryer('U402', 
         (U401-0, 'dryer_air', 'dryer_natural_gas'), 
         ('', 'dryer_outlet_air', 'dryer_emissions'),
-        moisture_content=0.15, split=0.,
+        moisture_content=0.18, split=0.,
     )
     # X401 = bst.ThermalOxidizer('X401', (U403-1, 'oxidizer_air'), 'oxidizer_emissions')
     U403 = units.ScrewFeeder('U403', U402-0)
@@ -96,9 +96,10 @@ def create_juicing_system_without_treatment(ins, outs, pellet_bagasse=None):
     
     @T201.add_specification(run=True)
     def update_enzyme_and_imbibition_water():
-        F_mass = T201.ins[0].F_mass
+        sugarcane = T201.ins[0]
+        F_mass = sugarcane.F_mass
         enzyme.imass['Cellulose', 'Water'] = 0.003 * F_mass * np.array([0.1, 0.9])
-        imbibition_water.imass['Water'] = 0.25 * F_mass
+        imbibition_water.imass['Water'] = 1.47 * (F_mass - sugarcane.imass['Water', 'Cellulose', 'Hemicellulose', 'Lignin'].sum())
     
     # Finely crush lipid cane
     U201 = units.CrushingMill('U201',
@@ -384,11 +385,13 @@ def create_ethanol_purification_system_after_beer_column(ins, outs, IDs={}):
     ### Ethanol system set-up ###
     (distilled_beer, U301-0)-M303-0-D303-0-H303-U301
     D303-1-P303
+    M304.denaturant_fraction = 0.022
     
-    @P304.add_specification(run=True)
+    @M304.add_specification(run=True)
     def adjust_denaturant():
-        pure_ethanol = P304.ins[0]
-        denaturant.imol['Octane'] = 0.022*pure_ethanol.F_mass/114.232
+        pure_ethanol = M304.ins[1]
+        denaturant.imol['Octane'] = M304.denaturant_fraction * pure_ethanol.F_mass / 114.232
+        for i in T303.path_until(M304): i._run()
     
     (denaturant-T303-P305-0, U301-1-H304-0-T302-0-P304-0)-M304-T304
 
@@ -660,7 +663,9 @@ def create_sucrose_to_ethanol_system(ins, outs):
           dict(ID='emissions'),
           dict(ID='ash_disposal')]
 )
-def create_sugarcane_to_ethanol_system(ins, outs, use_area_convention=False):
+def create_sugarcane_to_ethanol_system(ins, outs, 
+                                       use_area_convention=False,
+                                       pellet_bagasse=None):
     s = f.stream
     u = f.unit
     
@@ -676,6 +681,7 @@ def create_sugarcane_to_ethanol_system(ins, outs, use_area_convention=False):
     juicing_sys = create_juicing_system_with_fiber_screener(
         area=200 if use_area_convention else None,
         ins=[feedstock_handling_sys-0, enzyme, H3PO4, lime, polymer],
+        pellet_bagasse=pellet_bagasse,
         mockup=True
     )
     ethanol_production_sys, edct = create_sucrose_to_ethanol_system(

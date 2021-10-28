@@ -53,7 +53,7 @@ def create_acyl_olein(N_acyl):
     group_counts.set_group_counts_by_name({'CH=CH': N_acyl}, reset=False)
     chemical.V.add_model(fn.rho_to_V(rho=900, MW=chemical.MW))
     chemical.Cn.add_model(model.Cp(298.15) * chemical.MW)
-    chemical.copy_models_from(model, ['sigma', 'kappa'])
+    chemical.copy_models_from(model, ['mu', 'sigma', 'kappa'])
     return chemical
 
 def create_chemicals():

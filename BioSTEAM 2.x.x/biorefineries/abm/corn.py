@@ -48,6 +48,9 @@ import biosteam as bst
 
 __all__ = ('ABM_TEA_model',)
 
+cn.load()
+bst.CE = 607.5
+
 # %% Functional ABM TEA model for legacy purposes
 
 def ABM_TEA_function(

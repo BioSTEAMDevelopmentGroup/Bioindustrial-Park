@@ -13,14 +13,16 @@ from biorefineries.cornstover.units import (
 
 class SeedTrain(SeedTrain):
     
-    def __init__(self, ID='', ins=None, outs=(), thermo=None, saccharification=False):
+    def __init__(self, ID='', ins=None, outs=(), thermo=None, reactions=None, saccharification=False):
         Unit.__init__(self, ID, ins, outs, thermo)
         self.saccharification = saccharification
         chemicals = self.chemicals
-        self.reactions = PRxn([
-    #   Reaction definition                             Reactant    Conversion
-    Rxn('Glucose -> 2 Ethanol + 2 CO2',                 'Glucose',   0.9000, chemicals),
-    Rxn('3 Xylose -> 5 Ethanol + 5 CO2',                'Xylose',    0.8000, chemicals),
+        self.reactions = reactions or PRxn([
+    #   Reaction definition                   Reactant    Conversion
+    Rxn('Glucose -> 2 Ethanol + 2 CO2',       'Glucose',   0.9000, chemicals),
+    Rxn('3 Xylose -> 5 Ethanol + 5 CO2',      'Xylose',    0.8000, chemicals),
+    Rxn('Glucose -> Cellmass',                'Glucose',  0.05, chemicals),
+    Rxn('Xylose -> Cellmass',                 'Xylose',  0.05, chemicals),
         ])
         
     def _setup(self):
@@ -39,14 +41,16 @@ class CoFermentation(CoFermentation):
     
     def __init__(self, ID='', ins=None, outs=(), thermo=None,
                  tau=36, N=None, V=3785.4118, T=305.15, P=101325,
-                 Nmin=2, Nmax=36):
+                 Nmin=2, Nmax=36, cofermentation=None):
         BatchBioreactor.__init__(self, ID, ins, outs, thermo, tau, N, V, T, P, Nmin, Nmax)
         self.P = P
         chemicals = self.chemicals
-        self.cofermentation = PRxn([
-    #   Reaction definition                                          Reactant    Conversion
-    Rxn('Glucose -> 2 Ethanol + 2 CO2',                             'Glucose',   0.9500, chemicals),
-    Rxn('3 Xylose -> 5 Ethanol + 5 CO2',                            'Xylose',    0.8500, chemicals),
+        self.cofermentation = cofermentation or PRxn([
+    #   Reaction definition                   Reactant    Conversion
+    Rxn('Glucose -> 2 Ethanol + 2 CO2',       'Glucose',   0.9500, chemicals),
+    Rxn('3 Xylose -> 5 Ethanol + 5 CO2',      'Xylose',    0.8500, chemicals),
+    Rxn('Glucose -> Cellmass',                'Glucose',  0.05, chemicals),
+    Rxn('Xylose -> Cellmass',                 'Xylose',  0.05, chemicals),
         ])
     
         self.CSL_to_constituents = Rxn(

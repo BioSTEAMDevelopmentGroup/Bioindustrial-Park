@@ -104,7 +104,7 @@ def create_concentration_evaporator_sys(ins, outs):
     
     F401 = bst.units.MultiEffectEvaporator('F401', ins=filtered_fermentation_effluent, outs=('F401_0', 'wastewater_b'),
         P = (101325, 73581, 50892, 32777, 20000), V = 0.5)
-    target_BDO_x = 0.10
+    target_BDO_x = 0.03
     def get_x(chem_ID, stream):
         return stream.imol[chem_ID]/sum(stream.imol[[i.ID for i in stream.vle_chemicals]])
     

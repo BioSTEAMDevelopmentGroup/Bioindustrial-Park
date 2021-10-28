@@ -28,6 +28,7 @@ biorefineries/corn/_process_settings.py
 biorefineries/corn/_system.py
 biorefineries/corn/_tea.py
 biorefineries/corn/abm.py
+biorefineries/corn/deleteme.xlsx
 biorefineries/corn/units.py
 biorefineries/corn/utils.py
 biorefineries/cornstover/README.rst
@@ -41,6 +42,7 @@ biorefineries/cornstover/_plot_spearman.py
 biorefineries/cornstover/_plot_uncertainty_top.py
 biorefineries/cornstover/_process_settings.py
 biorefineries/cornstover/_sankey.py
+biorefineries/cornstover/_switchgrass.py
 biorefineries/cornstover/_system.py
 biorefineries/cornstover/_tea.py
 biorefineries/cornstover/abm.py

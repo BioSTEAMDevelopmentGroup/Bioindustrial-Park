@@ -44,7 +44,8 @@ edgecolor = (*colors.CABBI_black.RGBn, 1)
 CABBI_colors = (colors.CABBI_yellow.tint(75).RGBn, 
                 colors.CABBI_yellow.RGBn,
                 colors.CABBI_green.RGBn,
-                colors.CABBI_teal_green.shade(60).RGBn)
+                colors.CABBI_teal_green.shade(60).RGBn,
+                colors.CABBI_teal_green.shade(90).RGBn)
 
 CABBI_colors_x = (colors.CABBI_blue_light.tint(90).RGBn,
                   colors.CABBI_blue_light.tint(40).RGBn, 
@@ -151,7 +152,7 @@ def plot_relative_sorghum_oil_content_and_cane_oil_content_contours(
     # Generate contour data
     X, Y, data = relative_sorghum_oil_content_and_cane_oil_content_data(load, relative)
     
-    data = data[:, :, configuration_index, [0, 5]]
+    data = data[:, :, configuration_index, [0, 5, -6]]
     
     # Plot contours
     xlabel = "Sorghum oil content\n[dry wt. %]" 
@@ -161,6 +162,7 @@ def plot_relative_sorghum_oil_content_and_cane_oil_content_contours(
     xticks = [-3, -2, -1, 0] if relative else [2, 5, 7.5, 10, 12.5, 15]
     MFPP = oc.all_metric_mockups[0]
     TCI = oc.all_metric_mockups[5]
+    GWP_biofuel_displacement = oc.all_metric_mockups[-6]
     if configuration_index == 0:
         Z = np.array(["AGILE-CONVENTIONAL"])
         data = data[:, :, :, np.newaxis]
@@ -174,7 +176,8 @@ def plot_relative_sorghum_oil_content_and_cane_oil_content_contours(
         raise ValueError('configuration index must be either 0 or 1')
     metric_bars = [
         MetricBar(MFPP.name, format_units(MFPP.units), colormaps[0], tickmarks(data[:, :, 0], 5, 5), 15, 1),
-        MetricBar(TCI.name, format_units(MFPP.units), colormaps[1], tickmarks(data[:, :, 1], 5, 5), 29)
+        MetricBar(TCI.name, format_units(MFPP.units), colormaps[1], tickmarks(data[:, :, 1], 5, 5), 29),
+        MetricBar('GWP', format_units(GWP_biofuel_displacement.units), colormaps[2], tickmarks(data[:, :, 2], 5, 5), 29)
     ]
     fig, axes, CSs, CB = plot_contour_2d(
         100.*X, 100.*Y, Z, data, xlabel, ylabel, xticks, yticks, metric_bars, 
@@ -182,10 +185,10 @@ def plot_relative_sorghum_oil_content_and_cane_oil_content_contours(
     )
     plt.show()
     
-def plot_extraction_efficiency_and_oil_content_contours(load=False, metric_index=0):
+def plot_extraction_efficiency_and_oil_content_contours(load=False, metric_index=0, N_decimals=0):
     # Generate contour data
-    x = np.linspace(0.4, 1., 10)
-    y = np.linspace(0.05, 0.15, 10)
+    x = np.linspace(0.4, 1., 8)
+    y = np.linspace(0.05, 0.15, 8)
     X, Y = np.meshgrid(x, y)
     metric = bst.metric
     folder = os.path.dirname(__file__)
@@ -211,7 +214,7 @@ def plot_extraction_efficiency_and_oil_content_contours(load=False, metric_index
     yticks = [5, 7.5, 10, 12.5, 15]
     metric = oc.all_metric_mockups[metric_index]
     units = metric.units if metric.units == '%' else format_units(metric.units)
-    metric_bar = MetricBar(metric.name, units, colormaps[metric_index], tickmarks(data, 5, 5), 18)
+    metric_bar = MetricBar(metric.name, units, colormaps[metric_index], tickmarks(data, 5, 5), 18, N_decimals=N_decimals)
     fig, axes, CSs, CB = plot_contour_single_metric(
         100.*X, 100.*Y, data, xlabel, ylabels, xticks, yticks, metric_bar, 
         fillblack=False, styleaxiskw=dict(xtick0=False), label=True,
