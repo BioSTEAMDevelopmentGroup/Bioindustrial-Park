@@ -156,7 +156,7 @@ across_oil_content_agile_comparison_names = (
     bst.MockVariable('Price', 'USD/gal', 'Stream-ethanol'),
     bst.MockVariable('Price', 'USD/gal', 'Stream-biodiesel'),
     bst.MockVariable('Price', 'USD/cf', 'Stream-natural gas'),
-    bst.MockVariable('Electricity price', 'USD/kWh', 'biorefinery'),
+    bst.MockVariable('Electricity price', 'USD/kWhr', 'biorefinery'),
     bst.MockVariable('Operating days', 'day/yr', 'biorefinery'),
     bst.MockVariable('IRR', '%', 'biorefinery'),
     bst.MockVariable('Price', 'USD/kg', 'Stream-crude glycerol'),
@@ -203,11 +203,11 @@ across_oil_content_agile_comparison_names = (
      
 (MFPP, biodiesel_production, ethanol_production, electricity_production, 
  natural_gas_consumption, TCI, feedstock_consumption, 
- heat_exchanger_network_error, MFPP_derivative,
+ heat_exchanger_network_error, GWP_economic, GWP_ethanol, GWP_biodiesel, 
+ GWP_crude_glycerol, GWP_electricity, MFPP_derivative,
  biodiesel_production_derivative, ethanol_production_derivative, 
  electricity_production_derivative, natural_gas_consumption_derivative, 
- TCI_derivative, GWP_economic, GWP_ethanol, GWP_biodiesel, 
- GWP_crude_glycerol, GWP_electricity, GWP_economic_derivative, 
+ TCI_derivative, GWP_economic_derivative, 
  GWP_biodiesel_derivative, GWP_ethanol_derivative, GWP_electricity_derivative, 
  GWP_crude_glycerol_derivative,
  ) = all_metric_mockups = (
@@ -220,10 +220,10 @@ across_oil_content_agile_comparison_names = (
     bst.MockVariable('Feedstock consumption', 'ton/yr', 'Biorefinery'),
     bst.MockVariable('Heat exchanger network error', '%', 'Biorefinery'),
     bst.MockVariable('GWP', 'kg*CO2*eq / USD', 'Economic allocation'),
-    bst.MockVariable('GWP', 'kg*CO2*eq / (ethanol*gal)', 'Ethanol'),
-    bst.MockVariable('GWP', 'kg*CO2*eq / (biodiesel*gal)', 'Biodiesel'),
-    bst.MockVariable('GWP', 'kg*CO2*eq / (crude-glycerol*gal)', 'Crude glycerol'),
-    bst.MockVariable('GWP', 'kg*CO2*eq / kWhr', 'Electricity'),
+    bst.MockVariable('Ethanol GWP', 'kg*CO2*eq / gal', 'Ethanol'),
+    bst.MockVariable('Biodiesel GWP', 'kg*CO2*eq / gal', 'Biodiesel'),
+    bst.MockVariable('Crude glycerol GWP', 'kg*CO2*eq / kg', 'Crude glycerol'),
+    bst.MockVariable('Electricity GWP', 'kg*CO2*eq / kWhr', 'Electricity'),
     bst.MockVariable('MFPP derivative', 'USD/ton', 'Biorefinery'),
     bst.MockVariable('Biodiesel production derivative', 'Gal/ton', 'Biorefinery'),
     bst.MockVariable('Ethanol production derivative', 'Gal/ton', 'Biorefinery'),
@@ -231,9 +231,9 @@ across_oil_content_agile_comparison_names = (
     bst.MockVariable('Natural gas consumption derivative', 'cf/ton', 'Biorefinery'),
     bst.MockVariable('TCI derivative', '10^6*USD', 'Biorefinery'),
     bst.MockVariable('GWP derivative', 'kg*CO2*eq / USD', 'Economic allocation'),
-    bst.MockVariable('Ethanol GWP derivative', 'kg*CO2*eq / (ethanol*gal)', 'Ethanol'),
-    bst.MockVariable('Biodiesel GWP derivative', 'kg*CO2*eq / (biodiesel*gal)', 'Biodiesel'),
-    bst.MockVariable('Crude glycerol GWP derivative', 'kg*CO2*eq / (crude-glycerol*gal)', 'Crude glycerol'),
+    bst.MockVariable('Ethanol GWP derivative', 'kg*CO2*eq / gal', 'Ethanol'),
+    bst.MockVariable('Biodiesel GWP derivative', 'kg*CO2*eq / gal', 'Biodiesel'),
+    bst.MockVariable('Crude glycerol GWP derivative', 'kg*CO2*eq / kg', 'Crude glycerol'),
     bst.MockVariable('Electricity GWP derivative', 'kg*CO2*eq / kWhr', 'Electricity'),
 )
 
@@ -754,7 +754,7 @@ def load(name, cache={}, reduce_chemicals=True, enhanced_cellulosic_performance=
 
     # https://www.eia.gov/outlooks/aeo/pdf/00%20AEO2021%20Chart%20Library.pdf
     # Data from historical prices, 2010-2020
-    @triangular(0.0583, 0.065, 0.069, units='USD/kWh')
+    @triangular(0.0583, 0.065, 0.069, units='USD/kWhr')
     def set_electricity_price(electricity_price): 
         bst.PowerUtility.price = electricity_price
         
@@ -1006,14 +1006,14 @@ def load(name, cache={}, reduce_chemicals=True, enhanced_cellulosic_performance=
         )
         return GWP_material / sales
 
-    @metric(name='Ethanol GWP', element='Ethanol', units='kg*CO2*eq / (ethanol*gal)')
+    @metric(name='Ethanol GWP', element='Ethanol', units='kg*CO2*eq / gal')
     def GWP_ethanol(): # Cradle to gate
         try:
             return GWP_economic.cache * mean_ethanol_price
         except:
             return GWP_economic() * mean_ethanol_price
     
-    @metric(name='Biodiesel GWP', element='Biodiesel', units='kg*CO2*eq / (biodiesel*gal)')
+    @metric(name='Biodiesel GWP', element='Biodiesel', units='kg*CO2*eq / gal')
     def GWP_biodiesel(): # Cradle to gate
         if number > 0:
             try:
@@ -1023,7 +1023,7 @@ def load(name, cache={}, reduce_chemicals=True, enhanced_cellulosic_performance=
         else:
             return 0.
     
-    @metric(name='Crude glycerol GWP', element='Crude glycerol', units='kg*CO2*eq / (crude-glycerol*gal)')
+    @metric(name='Crude glycerol GWP', element='Crude glycerol', units='kg*CO2*eq / kg')
     def GWP_crude_glycerol(): # Cradle to gate
         if number > 0:
             try:
@@ -1033,7 +1033,7 @@ def load(name, cache={}, reduce_chemicals=True, enhanced_cellulosic_performance=
         else:
             return 0.
     
-    @metric(name='Electricity GWP', element='Electricity', units='kg*CO2*eq / (biodiesel*gal)')
+    @metric(name='Electricity GWP', element='Electricity', units='kg*CO2*eq / kWhr')
     def GWP_electricity(): # Cradle to gate
         if abs(number) == 1:
             try:
@@ -1100,14 +1100,14 @@ def load(name, cache={}, reduce_chemicals=True, enhanced_cellulosic_performance=
         if _derivative_disabled: return np.nan
         return GWP_economic.difference()
 
-    @metric(name='Ethanol GWP derivative', element='Ethanol', units='kg*CO2*eq / (ethanol*gal)')
+    @metric(name='Ethanol GWP derivative', element='Ethanol', units='kg*CO2*eq / gal')
     def GWP_ethanol_derivative(): # Cradle to gate
         try:
             return GWP_economic_derivative.cache * mean_ethanol_price
         except:
             return GWP_economic_derivative() * mean_ethanol_price
     
-    @metric(name='Biodiesel GWP derivative', element='Biodiesel', units='kg*CO2*eq / (biodiesel*gal)')
+    @metric(name='Biodiesel GWP derivative', element='Biodiesel', units='kg*CO2*eq / gal')
     def GWP_biodiesel_derivative(): # Cradle to gate
         if number > 0:
             try:
@@ -1117,7 +1117,7 @@ def load(name, cache={}, reduce_chemicals=True, enhanced_cellulosic_performance=
         else:
             return 0.
     
-    @metric(name='Crude glycerol GWP derivative', element='Crude glycerol', units='kg*CO2*eq / (crude-glycerol*gal)')
+    @metric(name='Crude glycerol GWP derivative', element='Crude glycerol', units='kg*CO2*eq / kg')
     def GWP_crude_glycerol_derivative(): # Cradle to gate
         if number > 0:
             try:
@@ -1127,7 +1127,7 @@ def load(name, cache={}, reduce_chemicals=True, enhanced_cellulosic_performance=
         else:
             return 0.
     
-    @metric(name='Electricity GWP derivative', element='Electricity', units='kg*CO2*eq / (biodiesel*gal)')
+    @metric(name='Electricity GWP derivative', element='Electricity', units='kg*CO2*eq / kWhr')
     def GWP_electricity_derivative(): # Cradle to gate
         if abs(number) == 1:
             try:
@@ -1418,24 +1418,44 @@ def get_monte_carlo_across_oil_content(name, metric, derivative=False):
     return arr
         
 
-def get_monte_carlo(name):
+def get_monte_carlo(name, variables=None, cache={}):
     key = parse(name)
     if isinstance(key, Configuration):
-        file = monte_carlo_file(key)
-        return pd.read_excel(file, header=[0, 1], index_col=[0])
+        if key in cache:
+            df = cache[key]
+        else:
+            file = monte_carlo_file(key)
+            cache[key] = df = pd.read_excel(file, header=[0, 1], index_col=[0])
+        if variables is None:
+            mc = df
+        elif isinstance(variables, bst.Variable):
+            mc = df[variables.index]
+        else:
+            mc = df[[i.index for i in variables]]
     elif isinstance(key, ConfigurationComparison):
-        index = [i.index for i in tea_monte_carlo_metric_mockups + tea_monte_carlo_derivative_metric_mockups]
+        if variables is None:
+            variables = (
+                *tea_monte_carlo_metric_mockups, 
+                *tea_monte_carlo_derivative_metric_mockups,
+                *lca_monte_carlo_metric_mockups, 
+                *lca_monte_carlo_derivative_metric_mockups
+            )
+        if isinstance(variables, bst.Variable):
+            index = variables.index
+        else:
+            index = [i.index for i in variables]
         df_a = get_monte_carlo(key.a)[index]
         df_b = get_monte_carlo(key.b)[index]
         row_a = df_a.shape[0]
         row_b = df_b.shape[0]
         if row_a != row_b:
             length = min(row_a, row_b)
-            return df_a.iloc[:length] - df_b.iloc[:length]
+            mc = df_a.iloc[:length] - df_b.iloc[:length]
         else:
-            return df_a - df_b
+            mc = df_a - df_b
     else:
         raise Exception('unknown error')
+    return mc
 
 def plot_monte_carlo_across_coordinate(coordinate, data, color_wheel):
     if isinstance(data, list):
@@ -1630,13 +1650,12 @@ def plot_monte_carlo(derivative=False, absolute=True, comparison=True,
         else:
             columns = configurations = []
         N_cols = len(columns)
-        rows = metrics = [
+        rows = [
             MFPP, 
             TCI, 
             production,
             electricity_production,
             natural_gas_consumption,
-            GWP_biofuel_allocation,
         ]
         N_rows = len(rows)
         fig, axes = plt.subplots(ncols=1, nrows=N_rows)
@@ -1651,7 +1670,6 @@ def plot_monte_carlo(derivative=False, absolute=True, comparison=True,
             f"Production\n[{format_units('Gal/ton')}]",
             f"Elec. prod.\n[{format_units('kWhr/ton')}]",
             f"NG cons.\n[{format_units('cf/ton')}]",
-            f"GWP\n[{format_units('kg CO2-eq/GGE')}]",
         ]
         if derivative:
             ylabels = [
@@ -1660,24 +1678,65 @@ def plot_monte_carlo(derivative=False, absolute=True, comparison=True,
                 r"$\Delta$" + format_units(r"Prod./OC").replace('cdot', r'cdot \Delta') + f"\n[{format_units('Gal/ton')}]",
                 r"$\Delta$" + format_units(r"EP/OC").replace('cdot', r'cdot \Delta') + f"\n[{format_units('kWhr/ton')}]",
                 r"$\Delta$" + format_units(r"NGC/OC").replace('cdot', r'cdot \Delta') + f"\n[{format_units('cf/ton')}]"
-                r"$\Delta$" + format_units(r"GWP/OC").replace('cdot', r'cdot \Delta') + f"\n[{format_units('kg CO2-eq/GGE')}]"
             ]
         elif comparison and not absolute:
             ylabels = [r"$\Delta$" + i for i in ylabels]
+        step_min = 1 if derivative else 30
+        color_wheel = CABBI_colors.wheel()
     elif kind == 'LCA':
-        pass
+        if derivative:
+            configuration_names = ['O1', 'O2']
+            comparison_names = ['O2 - O1']
+            GWP_biodiesel, GWP_ethanol, GWP_electricity, GWP_crude_glycerol, = lca_monte_carlo_derivative_metric_mockups
+        else:
+            GWP_biodiesel, GWP_ethanol, GWP_electricity, GWP_crude_glycerol, = lca_monte_carlo_metric_mockups
+        combined = absolute and comparison
+        if combined:
+            columns = configurations = configuration_names + comparison_names
+        elif absolute:
+            columns = configurations = configuration_names
+        elif comparison:
+            columns = configurations = comparison_names
+        else:
+            columns = configurations = []
+        N_cols = len(columns)
+        rows = [
+            GWP_ethanol,
+            GWP_biodiesel,
+            GWP_electricity,
+            GWP_crude_glycerol,
+        ]
+        N_rows = len(rows)
+        fig, axes = plt.subplots(ncols=1, nrows=N_rows)
+        axes = axes.flatten()
+        xtext = labels or [format_name(i).replace(' ', '') for i in configurations]
+        N_marks = len(xtext)
+        xticks = tuple(range(N_marks))
+        ylabels = [
+            f"Ethanol GWP\n[{format_units('kg CO2-eq / gal')}]",
+            f"Biodiesel GWP\n[{format_units('kg CO2-eq / gal')}]",
+            f"Crude glycerol GWP\n[{format_units('kg CO2-eq / kg')}]",
+            f"Electricity GWP\n[{format_units('kg CO2-eq / kWhr')}]",
+        ]
+        if derivative:
+            ylabels = [
+                r"Ethanol $\Delta$" + format_units(r"GWP/OC").replace('cdot', r'cdot \Delta') + f"\n[{format_units('kg CO2-eq / gal')}]",
+                r"Biodiesel $\Delta$" + format_units(r"GWP/OC").replace('cdot', r'cdot \Delta') + f"\n[{format_units('kg CO2-eq / gal')}]",
+                r"Crude glycerol $\Delta$" + format_units(r"GWP/OC").replace('cdot', r'cdot \Delta') + f"\n[{format_units('kg CO2-eq / kg')}]",
+                r"Electricity $\Delta$" + format_units(r"GWP/OC").replace('cdot', r'cdot \Delta') + f"\n[{format_units('kg CO2-eq / kg')}]",
+            ]
+        step_min = 0.01 if derivative else 0.1
+        color_list = list(CABBI_colors)
+        color_wheel = CABBI_colors.wheel([color_list[i].ID for i in [2, 3, 0, 1]])
         
     def get_data(metric, name):
-        if isinstance(metric, bst.Variable):
-            df = get_monte_carlo(name)
-            values = df[metric.index].values
-            return values
-        else:
-            return [get_data(i, name) for i in metric]
+        df = get_monte_carlo(name, metric)
+        values = df.values
+        return values
     
     def plot(arr, position):
-        if isinstance(arr, list):
-            return [plot(i, position) for i in arr]
+        if arr.ndim == 2:
+            return [plot(arr[:, i], position) for i in range(arr.shape[1])]
         else:
             color = color_wheel.next()
             light_color = color.RGBn
@@ -1689,8 +1748,7 @@ def plot_monte_carlo(derivative=False, absolute=True, comparison=True,
             )
     
     data = np.zeros([N_rows, N_cols], dtype=object)
-    data = np.array([[get_data(i, j) for j in columns] for i in rows])
-    step_min = 1 if derivative else 30
+    data[:] =[[get_data(i, j) for j in columns] for i in rows]
     if tickmarks is None: 
         tickmarks = [
             bst.plots.rounded_tickmarks_from_data(
@@ -1698,7 +1756,6 @@ def plot_monte_carlo(derivative=False, absolute=True, comparison=True,
             ) 
             for i in data
         ]
-    color_wheel = CABBI_colors.wheel()
 
     x0 = len(configuration_names) - 0.5
     xf = len(columns) - 0.5
