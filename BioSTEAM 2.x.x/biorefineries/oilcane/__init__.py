@@ -937,6 +937,7 @@ def load(name, cache={}, reduce_chemicals=True, enhanced_cellulosic_performance=
         biodiesel_flow = lambda: sys.flow_rates.get(biodiesel, 0.) / 3.3111 # gal/yr
         ethanol_flow = lambda: sys.flow_rates[ethanol] / 2.98668849 # gal/yr
         natural_gas_flow = lambda: sum([sys.flow_rates[i] for i in natural_gas_streams]) * V_ng # cf/yr
+        crude_glycerol_flow = lambda: sys.flow_rates.get(crude_glycerol, 0.) # kg/yr
         
         @sys.operation_metric(annualize=True)
         def electricity(mode):
