@@ -148,7 +148,8 @@ across_oil_content_agile_comparison_names = (
  set_glucose_to_ethanol_yield, set_xylose_to_ethanol_yield,
  set_cofermentation_titer, set_cofermentation_productivity,
  set_cane_PL_content, set_sorghum_PL_content, set_cane_FFA_content,
- set_sorghum_FFA_content, set_TAG_to_FFA_conversion, set_oilcane_GWP
+ set_sorghum_FFA_content, set_TAG_to_FFA_conversion, set_oilcane_GWP,
+ set_methanol_GWP, set_pure_glycerine_GWP, set_cellulase_GWP,
  ) = all_parameter_mockups = (
     bst.MockVariable('Oil retention', '%', 'Stream-sugarcane'),
     bst.MockVariable('Bagasse oil extraction efficiency', '%', 'Stream-sugarcane'),
