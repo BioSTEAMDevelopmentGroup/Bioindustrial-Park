@@ -379,7 +379,10 @@ def load(name, cache={}, reduce_chemicals=True, enhanced_cellulosic_performance=
     global oil_extraction_specification, model, unit_groups
     global HXN, BT
     if not _chemicals_loaded: load_chemicals()
-    flowsheet = bst.Flowsheet('oilcane')
+    flowsheet_name = f'oilcane_{name}'
+    if enhanced_cellulosic_performance:
+        flowsheet_name += '_enhanced_fermentation'
+    flowsheet = bst.Flowsheet(flowsheet_name)
     main_flowsheet.set_flowsheet(flowsheet)
     bst.settings.set_thermo(chemicals)
     load_process_settings()
@@ -489,7 +492,10 @@ def load(name, cache={}, reduce_chemicals=True, enhanced_cellulosic_performance=
         def cost(self): return 0.
     
     def get_stream(ID):
-        return dct.get(ID) or MockStream(ID)
+        if ID in flowsheet.stream:
+            return flowsheet.stream[ID]
+        else:
+            return MockStream(ID)
     
     crude_glycerol = get_stream('crude_glycerol')
     pure_glycerine = get_stream('pure_glycerine')
@@ -1631,7 +1637,7 @@ def monte_carlo_results(with_units=False):
 
 def plot_monte_carlo(derivative=False, absolute=True, comparison=True,
                      configuration_names=configuration_names, comparison_names=comparison_names,
-                     labels=None, tickmarks=None, kind=None):
+                     labels=None, tickmarks=None, kind=None, agile=True):
     if kind is None: kind = 'TEA'
     if kind == 'TEA':
         if derivative:
@@ -1640,16 +1646,6 @@ def plot_monte_carlo(derivative=False, absolute=True, comparison=True,
             MFPP, TCI, *production, electricity_production, natural_gas_consumption = tea_monte_carlo_derivative_metric_mockups
         else:
             MFPP, TCI, *production, electricity_production, natural_gas_consumption = tea_monte_carlo_metric_mockups
-        combined = absolute and comparison
-        if combined:
-            columns = configurations = configuration_names + comparison_names
-        elif absolute:
-            columns = configurations = configuration_names
-        elif comparison:
-            columns = configurations = comparison_names
-        else:
-            columns = configurations = []
-        N_cols = len(columns)
         rows = [
             MFPP, 
             TCI, 
@@ -1690,16 +1686,6 @@ def plot_monte_carlo(derivative=False, absolute=True, comparison=True,
             GWP_biodiesel, GWP_ethanol, GWP_electricity, GWP_crude_glycerol, = lca_monte_carlo_derivative_metric_mockups
         else:
             GWP_biodiesel, GWP_ethanol, GWP_electricity, GWP_crude_glycerol, = lca_monte_carlo_metric_mockups
-        combined = absolute and comparison
-        if combined:
-            columns = configurations = configuration_names + comparison_names
-        elif absolute:
-            columns = configurations = configuration_names
-        elif comparison:
-            columns = configurations = comparison_names
-        else:
-            columns = configurations = []
-        N_cols = len(columns)
         rows = [
             GWP_ethanol,
             GWP_biodiesel,
@@ -1709,9 +1695,6 @@ def plot_monte_carlo(derivative=False, absolute=True, comparison=True,
         N_rows = len(rows)
         fig, axes = plt.subplots(ncols=1, nrows=N_rows)
         axes = axes.flatten()
-        xtext = labels or [format_name(i).replace(' ', '') for i in configurations]
-        N_marks = len(xtext)
-        xticks = tuple(range(N_marks))
         ylabels = [
             f"Ethanol GWP\n[{format_units('kg CO2-eq / gal')}]",
             f"Biodiesel GWP\n[{format_units('kg CO2-eq / gal')}]",
@@ -1728,7 +1711,24 @@ def plot_monte_carlo(derivative=False, absolute=True, comparison=True,
         step_min = 0.01 if derivative else 0.1
         color_list = list(CABBI_colors)
         color_wheel = CABBI_colors.wheel([color_list[i].ID for i in [2, 3, 0, 1]])
-        
+    
+    combined = absolute and comparison
+    if not agile:
+        configuration_names = [i for i in configuration_names if '*' not in i]
+        comparison_names = [i for i in comparison_names if '*' not in i]
+    if combined:
+        columns = configurations = configuration_names + comparison_names
+    elif absolute:
+        columns = configurations = configuration_names
+    elif comparison:
+        columns = configurations = comparison_names
+    else:
+        columns = configurations = []
+    N_cols = len(columns)    
+    xtext = labels or [format_name(i).replace(' ', '') for i in configurations]
+    N_marks = len(xtext)
+    xticks = tuple(range(N_marks))
+    
     def get_data(metric, name):
         df = get_monte_carlo(name, metric)
         values = df.values
