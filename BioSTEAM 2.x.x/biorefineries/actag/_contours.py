@@ -143,9 +143,9 @@ def plot_yield_titer_selectivity_productivity_contours(
                     # for collection in csf.collections: collection.set_linewidth(0.)
                     cs = plt.contour(X, Y, metric_data, zorder=1e6, linestyles='dashed', linewidths=1.,
                                      levels=price_range, colors=[linecolor])
-                    clabels = ax.clabel(cs, levels=cs.levels, inline=True, fmt=metric_bar.fmt,
-                                        fontsize=12, colors=['k'], zorder=1e16)
-                    for i in clabels: i.set_rotation(0)
+                    # clabels = ax.clabel(cs, levels=cs.levels, inline=True, fmt=metric_bar.fmt,
+                    #                     fontsize=12, colors=['k'], zorder=1e16)
+                    # for i in clabels: i.set_rotation(0)
     plt.sca(axes[0, 0])
     plt.scatter(*baseline, color=baselinecolor, marker='o', s=75, edgecolor='black', zorder=1e6)
     plt.sca(axes[1, 1])
