@@ -619,7 +619,7 @@ def load(name, cache={}, reduce_chemicals=True, enhanced_cellulosic_performance=
         'sugarcane': 0.02931 * 0.30 / 0.25, # GREET, modified from moisture content of 0.75 to 0.70
         'sweet sorghum': 0.02821 * 0.30 / 0.25, # GREET, modified from moisture content of 0.75 to 0.70
         #'feedstock': 0.0607, # dry basis, Ecoinvent 2021
-        'protease': 8.07, # Assume same as cellulase
+        # 'protease': 8.07, # Assume same as cellulase
         'cellulase': 8.07, # GREET
         'H3PO4': 1.00, # GREET
         'lime': 1.164, # GREET
@@ -633,13 +633,14 @@ def load(name, cache={}, reduce_chemicals=True, enhanced_cellulosic_performance=
         'methanol': 0.45, # GREET, Natural gas to methanol
         'NaOCH3': 1.5871, # Ecoinvent, TRACI, sodium methoxide
         'CH4': 0.33 + chemicals.CO2.MW / chemicals.CH4.MW, # Natural gas from shell conventional recovery, GREET
-        # from thermosteam.units_of_measure import convert, Chemical
+        # from thermosteam.units_of_measure import convert
+        # from thermosteam import Chemical
         # CH4 = Chemical('CH4')
         # CO2 = Chemical('CO2')
         # electricty_produced_per_kg_CH4 = - convert(0.8 * 0.85 * CH4.LHV / CH4.MW, 'kJ', 'kWhr')
         # GWP_per_kg_CH4 = 0.33 + CO2.MW / CH4.MW
-        # GWP_per_kWhr = electricty_produced_per_kg_CH4 / GWP_per_kg_CH4
-        # 'Electricity': 0.325 # [kg*CO2*eq / kWhr] Based on balance above
+        # GWP_per_kWhr = GWP_per_kg_CH4 / electricty_produced_per_kg_CH4
+        'Electricity': 0.35 # [kg*CO2*eq / kWhr] From GREET; NG-Fired Simple-Cycle Gas Turbine CHP Plant
     }
     GWP = 'GWP'
     # bst.PowerUtility.characterization_factors[GWP] = GWP_characterization_factors['Electricity']
@@ -652,7 +653,6 @@ def load(name, cache={}, reduce_chemicals=True, enhanced_cellulosic_performance=
     if abs(number) != 1:
         MockStream(('dryer_natural_gas'))
     oilcane.characterization_factors[GWP] = GWP_characterization_factors['sugarcane'] 
-    enzyme.characterization_factors[GWP] = GWP_characterization_factors['protease'] * 0.10
     H3PO4.characterization_factors[GWP] = GWP_characterization_factors['H3PO4']
     lime.characterization_factors[GWP] = GWP_characterization_factors['lime'] * 0.046 # Diluted with water
     denaturant.characterization_factors[GWP] = GWP_characterization_factors['gasoline']
@@ -986,6 +986,21 @@ def load(name, cache={}, reduce_chemicals=True, enhanced_cellulosic_performance=
     @metric(units='%')
     def heat_exchanger_network_error():
         return HXN.energy_balance_percent_error if HXN else 0.    
+
+    def GWP_displacement(): # Cradle to gate
+        GWP_total = sys.get_total_feeds_impact(GWP) + min(electricity(), 0) * GWP_characterization_factors['Electricity'] # kg CO2 eq. / yr
+        sales = (
+            biodiesel_flow() * mean_biodiesel_price
+            + ethanol_flow() * mean_ethanol_price
+            + crude_glycerol_flow() * mean_glycerol_price
+        )
+        GWP_per_USD = GWP_total / sales
+        return {
+            'Ethanol': GWP_per_USD * mean_ethanol_price,
+            'Biodiesel': GWP_per_USD * mean_biodiesel_price,
+            'Crude glycerol': GWP_per_USD * mean_glycerol_price,
+        }
+    dct['GWP_displacement'] = GWP_displacement
 
     @metric(name='GWP', element='Economic allocation', units='kg*CO2*eq / USD')
     def GWP_economic(): # Cradle to gate
