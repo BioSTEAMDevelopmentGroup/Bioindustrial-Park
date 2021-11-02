@@ -120,7 +120,7 @@ def create_hot_water_pretreatment_system(
               total_flow=104229.16,
               units='kg/hr',
               price=price['Feedstock'])],
-    outs=[dict(ID='hydrolyzate'),],
+    outs=[dict(ID='pretreated_biomass'),],
 )
 def create_ammonia_fiber_expansion_pretreatment_system(
         ins, outs,

@@ -9,10 +9,18 @@ import numpy as np
 from chaospy import distributions as shape
 from math import sqrt
 
-__all__ = ('ethanol_price_distribution', 
-           'biodiesel_price_distribution',
-           'biodiesel_minus_ethanol_price_distribution',
-           'natural_gas_price_distribution')
+__all__ = (
+    'ethanol_price_distribution', 
+    'biodiesel_price_distribution',
+    'biodiesel_minus_ethanol_price_distribution',
+    'natural_gas_price_distribution',
+    'mean_glycerol_price',
+    'mean_ethanol_price',
+    'mean_biodiesel_price',
+    'mean_natural_gas_price',
+    'mean_electricity_price',
+    'mean_soymeal_price',
+)
 
 ethanol_prices = [ # USD / gal Dec 2009 - Nov 2020, by quarter
     2.08, 1.66, 1.71, 2.33, 2.37, 2.67, 2.87, 2.83, 2.30, 2.26, 2.47,
@@ -42,11 +50,6 @@ biodiesel_prices_quarter = [ # By quarter
 ]
 
 biodiesel_minus_ethanol_prices = [i - j for i, j in zip(biodiesel_prices, ethanol_prices)]
-
-# mean_biodiesel_price_10yr = np.mean(biodiesel_prices)
-# mean_biodiesel_price_5yr = np.mean(biodiesel_prices[-int(len(biodiesel_prices)/2):])
-# mean_ethanol_price_10yr = np.mean(ethanol_prices)
-# mean_ethanol_price_5yr = np.mean(ethanol_prices[-int(len(ethanol_prices)/2):])
 
 natural_gas_prices = [ # City gate [USD / cf] 2010 to 2019
     6.18, 5.63, 4.73, 4.88, 5.71, 4.26, 3.71, 4.16, 4.23, 3.81,
@@ -86,12 +89,18 @@ def plot_triangular_distribution(a, b, c):
 def plot_histogram(x, *args, bins=10, density=True, **kwargs):
     return plt.hist(x, *args, **kwargs)
 
-# index = int(len(ethanol_prices)/2)
-# print(np.mean(ethanol_prices[index:]),
-#       np.std(ethanol_prices[index:]))
-# print(np.mean(biodiesel_prices[index:]),
-#       np.std(biodiesel_prices[index:]))
+
+# https://www.eia.gov/outlooks/aeo/pdf/00%20AEO2021%20Chart%20Library.pdf
+# Data from historical prices, 2010-2020
+electricity_price_distribution = shape.Triangle(0.0583, 0.065, 0.069)
 ethanol_price_distribution = triangular_distribution(ethanol_prices)
 biodiesel_price_distribution = triangular_distribution(biodiesel_prices)
 biodiesel_minus_ethanol_price_distribution = triangular_distribution(biodiesel_minus_ethanol_prices)
 natural_gas_price_distribution = triangular_distribution(natural_gas_prices)
+
+mean_glycerol_price = (0.10 + 0.22) * 0.5 
+mean_ethanol_price = np.mean(ethanol_prices)
+mean_biodiesel_price = np.mean(biodiesel_prices)
+mean_natural_gas_price = np.mean(natural_gas_prices)
+mean_electricity_price = sum([0.0583, 0.065, 0.069]) / 3.
+mean_soymeal_price = 0.33 # 10 yr average; https://markets.businessinsider.com/commodities/soybean-meal-price?op=1

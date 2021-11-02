@@ -104,11 +104,11 @@ def create_post_fermentation_oil_separation_system(ins, outs, wastewater_concent
             Ev607.V = x0
             return
         else:
-            EvX.P = deque(P_original)
+            EvX.P = list(P_original)
             EvX._load_components()
             for i in range(EvX._N_evap-1):
                 if x_oil(1e-6) < 0.:
-                    EvX.P.popleft()
+                    EvX.P.pop()
                     EvX._reload_components = True
                 else:
                     break    
@@ -405,11 +405,11 @@ def create_oilcane_to_biodiesel_and_ethanol_combined_1_and_2g_post_fermentation_
             required_water = (1./target_titer - 1./current_titer) * ethanol * 1000.
             MX.ins[1].imass['Water'] = max(required_water, 0)
         else:
-            EvX.P = deque(P_original)
+            EvX.P = list(P_original)
             EvX._load_components()
             for i in range(EvX._N_evap-1):
                 if f(1e-6) < 0.:
-                    EvX.P.popleft()
+                    EvX.P.pop()
                     EvX._reload_components = True
                 else:
                     break  
@@ -631,11 +631,11 @@ def create_sugarcane_to_ethanol_combined_1_and_2g(ins, outs):
             MX.ins[1].imass['Water'] = max(required_water, 0)
         else:
             P_original = P = tuple(EvX.P)
-            EvX.P = deque(P)
+            EvX.P = list(P)
             EvX._load_components()
             for i in range(EvX._N_evap-1):
                 if f(1e-6) < 0.:
-                    EvX.P.popleft()
+                    EvX.P.pop()
                     EvX._reload_components = True
                 else:
                     break  

@@ -46,7 +46,7 @@ def create_acTAG_separation_system(ins, outs):
     acTAG, TAG = outs
     M1 = bst.Mixer('M1', (lipid, None))
     C1 = OleinCrystallizer(
-        'C1', M1-0, T=273.15 - 10,
+        'C1', M1-0, T=273.15 - 20,
         crystal_TAG_purity=0.95, 
         melt_AcTAG_purity=0.90,
     )
@@ -61,7 +61,7 @@ def create_acTAG_separation_system(ins, outs):
         liquid.copy_like(feed['l'])
     
     C2 = OleinCrystallizer(
-        'C2', PF1-1, T=273.15 - 20,
+        'C2', PF1-1, T=273.15 - 35,
         crystal_TAG_purity=0.90, 
         melt_AcTAG_purity=0.95,
     )
@@ -264,7 +264,7 @@ def create_cellulosic_acTAG_system(ins, outs):
         BT_area=600,
         area=700,
     )
-    R1 = bst.RefrigerationPackage(700)
+    # R1 = bst.RefrigerationPackage(700)
     
 
 @SystemFactory(
@@ -410,4 +410,4 @@ def create_conventional_acTAG_system(ins, outs):
         BT_area=600,
         area=700,
     )
-    R1 = bst.RefrigerationPackage(700)
+    # R1 = bst.RefrigerationPackage(700)

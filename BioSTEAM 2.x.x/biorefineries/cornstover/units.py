@@ -239,7 +239,7 @@ class SeedTrain(Unit):
         if self.saccharification:
             self.saccharification(effluent)
         self.reactions.force_reaction(effluent)
-        effluent.mol[effluent.mol < 0.] = 0.
+        effluent.empty_negative_flows()
         effluent.T = self.T
         vent.phase = 'g'
         vent.copy_flow(effluent, ('CO2', 'O2'), remove=True)
@@ -417,7 +417,7 @@ class CoFermentation(bst.BatchBioreactor):
         
         if all([i in self.chemicals for i in ('FFA', 'DAG', 'TAG', 'Glycerol')]):
             self.oil_reaction = self.lipid_reaction = ParallelRxn([
-                Rxn('TAG + 3Water -> 3FFA + Glycerol', 'TAG', 0.23, chemicals),
+                Rxn('TAG + 3 Water -> 3FFA + Glycerol', 'TAG', 0.23, chemicals),
                 Rxn('TAG + Water -> FFA + DAG', 'TAG', 0.02, chemicals)
             ])
         else:
@@ -432,7 +432,9 @@ class CoFermentation(bst.BatchBioreactor):
         effluent.mix_from(feeds, energy_balance=False)
         self.cofermentation(effluent)
         self.CSL_to_constituents(effluent)
-        if self.lipid_reaction: self.lipid_reaction(effluent)
+        if self.lipid_reaction: 
+            self.lipid_reaction.force_reaction(effluent)
+            effluent.empty_negative_flows()
         vent.empty()
         vent.receive_vent(effluent, energy_balance=False)
         
