@@ -632,7 +632,7 @@ def load(name, cache={}, reduce_chemicals=True, enhanced_cellulosic_performance=
         'gasoline': 0.88, # GREET
         'methanol': 0.45, # GREET, Natural gas to methanol
         'NaOCH3': 1.5871, # Ecoinvent, TRACI, sodium methoxide
-        'CH4': 0.33 + chemicals.CO2.MW / chemicals.CH4.MW, # Natural gas from shell conventional recovery, GREET
+        'CH4': 0.33 + chemicals.CO2.MW / chemicals.CH4.MW, # Natural gas from shell conventional recovery, GREET; includes non-biogenic emissions
         # from thermosteam.units_of_measure import convert
         # from thermosteam import Chemical
         # CH4 = Chemical('CH4')
@@ -640,7 +640,7 @@ def load(name, cache={}, reduce_chemicals=True, enhanced_cellulosic_performance=
         # electricty_produced_per_kg_CH4 = - convert(0.8 * 0.85 * CH4.LHV / CH4.MW, 'kJ', 'kWhr')
         # GWP_per_kg_CH4 = 0.33 + CO2.MW / CH4.MW
         # GWP_per_kWhr = GWP_per_kg_CH4 / electricty_produced_per_kg_CH4
-        'Electricity': 0.35 # [kg*CO2*eq / kWhr] From GREET; NG-Fired Simple-Cycle Gas Turbine CHP Plant
+        'Electricity': 0.36 # [kg*CO2*eq / kWhr] From GREET; NG-Fired Simple-Cycle Gas Turbine CHP Plant
     }
     GWP = 'GWP'
     # bst.PowerUtility.characterization_factors[GWP] = GWP_characterization_factors['Electricity']

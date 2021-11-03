@@ -13,7 +13,6 @@ from biorefineries.oilcane._distributions import (
     mean_soymeal_price,
 )
 
-
 # soybean biorefinery; cradle to biorefinery gate (no transportation)
 glycerol_mass = 0.09 # kg
 biodiesel_mass = 1.0 # kg
@@ -45,7 +44,7 @@ electricity_production = 113 # kWh
 kWh_per_gal_ethanol = electricity_production / ethanol
 ethanol_allocation = 0.5083 + 0.3778
 electricity_allocation = 0.3778
-GWP_ethanol_ecoinvent = 0.57074 * ethanol_density_kggal # kg CO2 eq. / gal-ethanol
+GWP_ethanol_ecoinvent = 0.42413 / 0.95 * ethanol_density_kggal # kg CO2 eq. / gal-ethanol
 # sugarcane_GWP_fraction = 0.5266
 # GWP_ethanol_adjusted = (
 #     GWP_ethanol_ecoinvent * (1. - sugarcane_GWP_fraction)
@@ -60,3 +59,5 @@ GWP_economic = GWP_total / total_economic # kg CO2 eq. / USD
 GWP_ethanol_economic = GWP_economic * mean_ethanol_price # kg CO2 eq. / gal-ethanol
 GWP_electricity_economic = GWP_economic * mean_electricity_price # kg CO2 eq. / kWhr
 
+
+GWP_ethanol_displacement = GWP_total - kWh_per_gal_ethanol * 0.36

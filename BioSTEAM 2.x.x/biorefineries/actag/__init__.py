@@ -131,7 +131,7 @@ def load(configuration, simulate=None, cache={}):
     tea.operating_hours = tea_no_dry_fractionation.operating_hours = operating_hours
     load_process_settings()
     fermentation = u.R301
-    fermentation.product_yield = 0.06
+    fermentation.product_yield = 0.34
     fermentation.selectivity = 0.5
     ## Model
     model = bst.Model(sys, exception_hook='raise', retry_evaluation=False)
@@ -282,3 +282,11 @@ def save_tables():
          'Baseline cellulosic', 'Target cellulosic']).to_excel(writer, 'CAPEX')
     writer.save()
     
+def save_plots(load=True):
+    import matplotlib.pyplot as plt
+    set_plot_style()
+    plot_yield_titer_selectivity_productivity_contours([1, 2], load=load)
+    folder = os.path.dirname(__file__)
+    file = 'contour_plots.png'
+    file = os.path.join(folder, file)
+    plt.savefig(file, transparent=True)
