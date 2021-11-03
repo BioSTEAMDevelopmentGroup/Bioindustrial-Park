@@ -119,7 +119,7 @@ def create_hot_water_pretreatment_system(
               Water=0.2,
               total_flow=104229.16,
               units='kg/hr',
-              price=price['Feedstock'])],
+              price=0.08)], # Price of switchgrass, table 4, Madhu Khanna et al. (Costs of producing miscanthus and switchgrass for bioenergy in Illinois);  https://www.sciencedirect.com/science/article/pii/S096195340700205X?casa_token=KfYfzJtDwv0AAAAA:OqeJmpofk1kIgFk2DcUvXNG35qYwlWvPKZ7ENI3R6RUKeoahiTDpOhhd_mpLtRthTGuXJKDzMOc
     outs=[dict(ID='pretreated_biomass'),],
 )
 def create_ammonia_fiber_expansion_pretreatment_system(

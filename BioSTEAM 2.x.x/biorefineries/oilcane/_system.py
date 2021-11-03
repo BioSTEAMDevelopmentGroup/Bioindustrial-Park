@@ -72,7 +72,7 @@ def create_oil_expression_system(ins, outs):
           dict(ID='evaporator_condensate')], 
 )
 def create_post_fermentation_oil_separation_system(ins, outs, wastewater_concentration=None,
-                                                   target_oil_content=60):
+                                                   target_oil_content=60, pop_last_evaporator=True):
     oil, cellmass, wastewater, evaporator_condensate = outs
     V605 = bst.MixTank('V605', ins)
     P606 = bst.Pump('P606', V605-0)
@@ -82,6 +82,7 @@ def create_post_fermentation_oil_separation_system(ins, outs, wastewater_concent
         V=0.90, V_definition='First-effect',
     )
     Ev607.target_oil_content = target_oil_content # kg / kg
+    Ev607.pop_last_evaporator = pop_last_evaporator
     P_original = tuple(Ev607.P)
     @Ev607.add_specification(run=False)
     def adjust_evaporation():
@@ -101,14 +102,21 @@ def create_post_fermentation_oil_separation_system(ins, outs, wastewater_concent
         EvX.P = P_original
         EvX._reload_components = True
         if y0 < 0.:
-            Ev607.V = x0
+            EvX.V = x0
             return
         else:
-            EvX.P = list(P_original)
+            pop_last_evaporator = EvX.pop_last_evaporator
+            if pop_last_evaporator:
+                EvX.P = list(P_original)
+            else:
+                EvX.P = deque(P_original)
             EvX._load_components()
             for i in range(EvX._N_evap-1):
                 if x_oil(1e-6) < 0.:
-                    EvX.P.pop()
+                    if pop_last_evaporator:
+                        EvX.P.pop()
+                    else:
+                        EvX.P.popleft()
                     EvX._reload_components = True
                 else:
                     break    

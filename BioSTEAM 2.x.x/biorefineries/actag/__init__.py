@@ -34,12 +34,12 @@ baseline = {
         'Productivity': 0.033}
 }
 target = {
-    1: {'Yield': 80.,
-        'Titer': 75.,
+    1: {'Yield': 85.,
+        'Titer': 90.,
         'Selectivity': 75.,
         'Productivity': 1.0},
-    2: {'Yield': 80.,
-        'Titer': 75.,
+    2: {'Yield': 85.,
+        'Titer': 90.,
         'Selectivity': 75.,
         'Productivity': 1.0},
 }
@@ -67,7 +67,7 @@ def load_process_settings():
     bst.PowerUtility.price = 0.065
     HeatUtility = bst.HeatUtility
     steam_utility = HeatUtility.get_agent('low_pressure_steam')
-    steam_utility.heat_transfer_efficiency = 0.9
+    steam_utility.heat_transfer_efficiency = 1.0
     steam_utility.regeneration_price = 0.30626
     steam_utility.T = 529.2
     steam_utility.P = 44e5
@@ -129,6 +129,8 @@ def load(configuration, simulate=None, cache={}):
     tea = create_tea(sys)
     tea_no_dry_fractionation = create_tea(sys_no_dry_fractionation)
     tea.operating_hours = tea_no_dry_fractionation.operating_hours = operating_hours
+    tea.income_tax = 0.21
+    tea_no_dry_fractionation.income_tax = 0.21
     load_process_settings()
     fermentation = u.R301
     fermentation.product_yield = 0.34
@@ -272,14 +274,18 @@ def save_tables():
     file = os.path.join(folder, file)
     writer = pd.ExcelWriter(file)
     bst.report.voc_table(
-        [sys1_baseline, sys1_target, sys2_baseline, sys2_target], 
+        [sys1_baseline, sys2_baseline, sys1_target, sys2_target], 
         ['TAG', 'acTAG'],
-        ['Baseline conventional', 'Target conventional',
-         'Baseline cellulosic', 'Target cellulosic']).to_excel(writer, 'VOC')
+        ['Baseline conventional', 'Baseline cellulosic', 
+         'Target conventional', 'Target cellulosic']).to_excel(writer, 'VOC')
     cs.capex_table(
-        [tea1_baseline, tea1_target, tea2_baseline, tea2_target], 
-        ['Baseline conventional', 'Target conventional',
-         'Baseline cellulosic', 'Target cellulosic']).to_excel(writer, 'CAPEX')
+        [tea1_baseline, tea2_baseline, tea1_target, tea2_target], 
+        ['Baseline conventional', 'Baseline cellulosic', 
+         'Target conventional', 'Target cellulosic']).to_excel(writer, 'CAPEX')
+    cs.foc_table(
+        [tea1_baseline, tea2_baseline, tea1_target, tea2_target], 
+        ['Baseline conventional', 'Baseline cellulosic', 
+         'Target conventional', 'Target cellulosic']).to_excel(writer, 'FOC')
     writer.save()
     
 def save_plots(load=True):
