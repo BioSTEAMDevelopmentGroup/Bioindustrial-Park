@@ -173,7 +173,7 @@ def create_ammonia_fiber_expansion_pretreatment_system(
     @M205.add_specification(run=True)
     def update_air():
         feed, air = M205.ins
-        flow = feed.F_vol
+        flow = 100 * feed.F_vol
         air.imol['O2', 'N2'] = [flow * 0.23, flow * 0.77] # Assume equal volumes is enough
     
     M204 = bst.Mixer('M204', (R201-0, F201-0), thermo=ideal)
@@ -185,12 +185,9 @@ def create_ammonia_fiber_expansion_pretreatment_system(
     def adjust_ammonia():
         recycle = M206.ins[0]
         fresh_ammonia = T201.ins[0]
-        required_ammonia = T201.ammonia_loading * (feedstock.F_mass - feedstock.imass['Water']) - recycle.imass['NH3']
-        if required_ammonia < 0.:
-            recycle.imass['NH3'] += required_ammonia
-            fresh_ammonia.empty()
-        else:
-            fresh_ammonia.imass['NH3'] = required_ammonia
+        fresh_ammonia.imass['NH3'] = NH3_loss = F202.outs[0].imass['NH3'] + F201.outs[1].imass['NH3']
+        required_ammonia = T201.ammonia_loading * (feedstock.F_mass - feedstock.imass['Water'])
+        recycle.imass['NH3'] = required_ammonia - NH3_loss
         for i in T201.path_until(M206): i.run()
     
     P202 = units.HydrolyzatePump('P202', F201-1, thermo=ideal)
