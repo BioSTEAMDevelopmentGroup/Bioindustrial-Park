@@ -7,26 +7,17 @@ Created on Fri Jun  4 23:44:10 2021
 from biorefineries import oilcane as oc
 import biosteam as bst
 import numpy as np
-import pandas as pd
 from biosteam.utils import colors
 from matplotlib.colors import LinearSegmentedColormap
 import matplotlib.pyplot as plt
-from biosteam.utils import colors
 from biosteam.plots import (
     plot_contour_2d,
     MetricBar,
-    plot_scatter_points,
     plot_contour_single_metric,
-    plot_contour_1d,
     plot_vertical_line,
     rounded_tickmarks_from_data as tickmarks
 )
-from math import floor, ceil
-from biosteam import plots
-from biosteam.utils import CABBI_colors
 from thermosteam.units_of_measure import format_units
-from biosteam.plots.utils import style_axis, style_plot_limits, fill_plot, set_axes_labels
-from biosteam import Metric
 from warnings import filterwarnings
 import os
 

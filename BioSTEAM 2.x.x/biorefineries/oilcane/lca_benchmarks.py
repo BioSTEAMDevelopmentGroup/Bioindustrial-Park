@@ -43,7 +43,6 @@ ethanol = (51.4 * 0.93 / 0.98 + 36.6 * 0.996 / 0.98)  / liter_per_gallon # gal;
 electricity_production = 113 # kWh
 kWh_per_gal_ethanol = electricity_production / ethanol
 ethanol_allocation = 0.5083 + 0.3778
-electricity_allocation = 0.3778
 GWP_ethanol_ecoinvent = 0.42413 / 0.95 * ethanol_density_kggal # kg CO2 eq. / gal-ethanol
 # sugarcane_GWP_fraction = 0.5266
 # GWP_ethanol_adjusted = (
