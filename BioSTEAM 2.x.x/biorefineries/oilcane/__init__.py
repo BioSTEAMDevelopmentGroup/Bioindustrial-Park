@@ -279,7 +279,7 @@ def load(name, cache={}, reduce_chemicals=True, enhanced_cellulosic_performance=
         dct['feedstock'] = feedstock = s.sugarcane
         dct['oilcane_sys'] = oilcane_sys
     else:
-        feedstock = dct['feedstock']
+        dct['feedstock'] = feedstock = s.oilcane
     unit_groups = UnitGroup.group_by_area(oilcane_sys.units)
     if area_names:
         for i, j in zip(unit_groups, area_names): i.name = j
