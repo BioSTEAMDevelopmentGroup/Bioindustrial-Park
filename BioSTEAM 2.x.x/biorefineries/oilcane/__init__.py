@@ -106,6 +106,43 @@ PRS = cs.PretreatmentReactorSystem
 PRS_cost_item = PRS.cost_items['Pretreatment reactor system']
 kg_per_ton = 907.18474
 
+
+configuration_names = (
+    'S1', 'O1', 'S2', 'O2', 'S1*', 'O1*', 'S2*', 'O2*',
+)
+comparison_names = (
+    # 'I - ∅', 
+    'O1 - S1', 
+    'O2 - S2', 
+    'O2 - O1', 
+    'O1* - O1', 
+    'O2* - O2',  
+)
+
+other_comparison_names = (
+    'O1* - S1*', 'O2* - S2*', 
+)
+
+across_oil_content_names = (
+    'O1', 'O2', 
+)
+
+across_oil_content_agile_names = (
+    'O1*', 'O2*', 
+)
+
+across_oil_content_comparison_names = (
+    'O1 - S1', 'O2 - S2', 'O2 - O1', 
+)
+
+across_oil_content_agile_direct_comparison_names = (
+    'O1* - O1', 'O2* - O2', 
+)
+
+across_oil_content_agile_comparison_names = (
+    'O1* - S1*', 'O2* - S2*', 'O2* - O1*', 
+)
+
 def load_chemicals():
     global chemicals, _chemicals_loaded
     chemicals = create_chemicals()

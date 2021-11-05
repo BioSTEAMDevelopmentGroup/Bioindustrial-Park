@@ -70,44 +70,6 @@ area_hatches = {
 for i in area_colors: area_colors[i] = area_colors[i].tint(20)
 palette = Palette(**area_colors)
 
-
-configuration_names = (
-    'S1', 'O1', 'S2', 'O2', 'S1*', 'O1*', 'S2*', 'O2*',
-)
-comparison_names = (
-    # 'I - ∅', 
-    'O1 - S1', 
-    'O2 - S2', 
-    'O2 - O1', 
-    'O1* - O1', 
-    'O2* - O2',  
-)
-
-other_comparison_names = (
-    'O1* - S1*', 'O2* - S2*', 
-)
-
-across_oil_content_names = (
-    'O1', 'O2', 
-)
-
-across_oil_content_agile_names = (
-    'O1*', 'O2*', 
-)
-
-across_oil_content_comparison_names = (
-    'O1 - S1', 'O2 - S2', 'O2 - O1', 
-)
-
-across_oil_content_agile_direct_comparison_names = (
-    'O1* - O1', 'O2* - O2', 
-)
-
-across_oil_content_agile_comparison_names = (
-    'O1* - S1*', 'O2* - S2*', 'O2* - O1*', 
-)
-
-
 def plot_monte_carlo_across_coordinate(coordinate, data, color_wheel):
     if isinstance(data, list):
         return [plot_monte_carlo_across_coordinate(coordinate, i, color_wheel) for i in data]
@@ -134,7 +96,7 @@ def monte_carlo_box_plot(data, positions, light_color, dark_color):
 def monte_carlo_results(with_units=False):
     results = {}
     ethanol_over_biodiesel = bst.MockVariable('Ethanol over biodiesel', 'Gal/ton', 'Biorefinery')
-    for name in configuration_names + comparison_names + other_comparison_names:
+    for name in oc.configuration_names + oc.comparison_names + oc.other_comparison_names:
         try: 
             df = get_monte_carlo(name)
         except:
@@ -190,9 +152,11 @@ def monte_carlo_results(with_units=False):
     return results
 
 def plot_monte_carlo(derivative=False, absolute=True, comparison=True,
-                     configuration_names=configuration_names, comparison_names=comparison_names,
+                     configuration_names=None, comparison_names=None,
                      labels=None, tickmarks=None, kind=None, agile=True):
     if kind is None: kind = 'TEA'
+    if configuration_names is None: configuration_names = oc.configuration_names
+    if comparison_names is None: comparison_names = oc.comparison_names
     if kind == 'TEA':
         if derivative:
             configuration_names = ['O1', 'O2']
