@@ -13,7 +13,7 @@ from biorefineries.cornstover.units import (
 
 __all__ = ('SeedTrain', 'CoFermentation')
 
-class SeedTrain(SeedTrain, CoFermentation):
+class SeedTrain(SeedTrain):
     
     def __init__(self, ID='', ins=None, outs=(), thermo=None, reactions=None, saccharification=False):
         Unit.__init__(self, ID, ins, outs, thermo)

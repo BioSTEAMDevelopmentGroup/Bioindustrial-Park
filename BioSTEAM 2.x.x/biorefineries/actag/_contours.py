@@ -37,7 +37,7 @@ __all__ = ('plot_yield_titer_selectivity_productivity_contours',
            'plot_MPSP_across_titer_and_yield',
            'set_plot_style')
 
-baselinecolor = (*colors.red.RGBn, 1)
+scatter_color = (*colors.purple.tint(15).RGBn, 1)
 shadecolor = (*colors.neutral.RGBn, 0.20)
 linecolor = (*colors.neutral_shade.RGBn, 0.85)
 markercolor = (*colors.orange_tint.RGBn, 1)
@@ -69,11 +69,17 @@ colormaps = [
     plt.cm.get_cmap('bone_r'),
 ] * 2
 
+market_price_colors = [
+    colors.CABBI_blue.shade(30).RGBn,
+    colors.red.RGBn,
+]
+
 ### Defaults
 rho = 0.900 # kg / L
-f = 1 / rho * 907.1847 # L / ton
-lubricating_oil_market_price = (0.92 * f, 1.35 * f) # USD / L to USD / ton
-
+kg_per_ton = 907.1847 
+invrho = 1 / rho * kg_per_ton # L / ton
+lubricating_oil_market_price = (0.92 * invrho, 1.35 * invrho) # USD / L to USD / ton
+emulsifier_food_additive_market_price = (2.05 * kg_per_ton, 2.95 * kg_per_ton)
 
 def set_plot_style():
     import matplotlib
@@ -89,7 +95,9 @@ def set_plot_style():
     
 
 def plot_yield_titer_selectivity_productivity_contours(
-        configurations=(1,), load=True, price_ranges=[lubricating_oil_market_price],
+        configurations=(1,), load=True, 
+        price_ranges=[lubricating_oil_market_price, 
+                      emulsifier_food_additive_market_price],
         metric_index=0,
     ):
     N_configurations = len(configurations)
@@ -114,7 +122,7 @@ def plot_yield_titer_selectivity_productivity_contours(
         metric_bar = MetricBar(
             'MSP', format_units('$/ton'), 
             colormaps[metric_index],
-            tickmarks(data, 5, 5, ub_max=8000), 15,
+            tickmarks(data, 5, 5, ub_max=8000), 20,
             ub=True,
         )
         fillcolor = CABBI_colors[-1]
@@ -122,19 +130,19 @@ def plot_yield_titer_selectivity_productivity_contours(
         metric_bar = MetricBar(
             'TCI', format_units('10^6*$'), 
             colormaps[metric_index], 
-            tickmarks(data, 5, 5), 15
+            tickmarks(data, 5, 5), 20
         )
     elif metric_index == 2:
         metric_bar = MetricBar(
             'Heating', format_units('GJ/hr'), 
             colormaps[metric_index], 
-            tickmarks(data, 5, 5), 15
+            tickmarks(data, 5, 5), 20
         )
     elif metric_index == 3:
         metric_bar = MetricBar(
             'Cooling', format_units('GJ/hr'), 
             colormaps[metric_index], 
-            tickmarks(data, 5, 5), 15
+            tickmarks(data, 5, 5), 20
         )
     X = X[:, :, 0]
     Y = Y[:, :, 0]
@@ -160,8 +168,8 @@ def plot_yield_titer_selectivity_productivity_contours(
                     # # Doing this also colors in the box around each level
                     # # We can remove the colored line around the levels by setting the linewidth to 0
                     # for collection in csf.collections: collection.set_linewidth(0.)
-                    cs = plt.contour(X, Y, metric_data, zorder=1e6, linestyles='dashed', linewidths=1.,
-                                     levels=price_range, colors=[linecolor])
+                    cs = plt.contour(X, Y, metric_data, zorder=1e6, linestyles='dashed', 
+                                     levels=price_range, colors=[market_price_colors[i]])
                     # clabels = ax.clabel(cs, levels=cs.levels, inline=True, fmt=metric_bar.fmt,
                     #                     fontsize=12, colors=['k'], zorder=1e16)
                     # for i in clabels: i.set_rotation(0)
@@ -173,9 +181,9 @@ def plot_yield_titer_selectivity_productivity_contours(
         target  = [[target['Yield']], [target['Titer']]]
         col = (i - 1) * 2
         plt.sca(axes[0, col])
-        plt.scatter(*baseline, color=baselinecolor, marker='o', s=75, edgecolor='black', zorder=1e6)
+        plt.scatter(*baseline, color=scatter_color, marker='o', s=75, edgecolor='black', zorder=1e6)
         plt.sca(axes[1, 1 + col])
-        plt.scatter(*target, color=baselinecolor, marker='*', s=125, edgecolor='black', zorder=1e6)
+        plt.scatter(*target, color=scatter_color, marker='*', s=125, edgecolor='black', zorder=1e6)
     plt.show()
     # breakpoint()
 
