@@ -47,6 +47,7 @@ class CoFermentation(CoFermentation):
         BatchBioreactor.__init__(self, ID, ins, outs, thermo, tau, N, V, T, P, Nmin, Nmax)
         self.P = P
         chemicals = self.chemicals
+        self.loss = None
         self.cofermentation = cofermentation or PRxn([
     #   Reaction definition                   Reactant    Conversion
     Rxn('Glucose -> 2 Ethanol + 2 CO2',       'Glucose',   0.9500, chemicals),

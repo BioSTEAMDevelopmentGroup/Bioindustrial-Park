@@ -114,13 +114,13 @@ def plot_yield_titer_selectivity_productivity_contours(
     
     # Plot contours
     xlabel = "Yield\n[% theoretical]" 
-    ylabel = f"Titer\n[{format_units('g/L')}]"
+    ylabel = "Titer\n[g / L]"
     xticks = [30, 45, 60, 75, 90]
     yticks = [5, 25, 50, 75, 100]
     fillcolor = None
     if metric_index == 0:
         metric_bar = MetricBar(
-            'MSP', format_units('$/ton'), 
+            'MSP', '$ / ton', 
             colormaps[metric_index],
             tickmarks(data, 5, 5, ub_max=8000), 20,
             ub=True,

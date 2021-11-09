@@ -44,6 +44,17 @@ target = {
         'Productivity': 1.0},
 }
 
+best = {
+    1: {'Yield': 90.,
+        'Titer': 100.,
+        'Selectivity': 100.,
+        'Productivity': 1.0},
+    2: {'Yield': 90.,
+        'Titer': 100.,
+        'Selectivity': 100.,
+        'Productivity': 1.0},
+}
+
 # %% Mock variables and settings
 
 # TODO: find composition for minimum product specification (24 mm2/s viscosity)
@@ -182,16 +193,21 @@ def load(configuration, simulate=None, cache={}):
         dct = baseline[configuration]
     elif simulate == 'target':
         dct = target[configuration]
+    elif simulate == 'best':
+        dct = best[configuration]
     elif simulate is None:
         return
     else:
         raise ValueError(f"simulate must be 'target' or 'baseline'; not {simulate}")
     
-    fermentation.selectivity = dct['Selectivity'] / 100.
+    fermentation.selectivity = selectivity = dct['Selectivity'] / 100.
     fermentation.productivity = dct['Productivity']
     fermentation.titer = dct['Titer']
     fermentation.product_yield = dct['Yield'] / 100.
-    sys.simulate()
+    if selectivity == 1.:
+        sys_no_dry_fractionation.simulate()
+    else:
+        sys.simulate()
     
 def evaluate_across_yield_titer_selectivity_and_productivity(product_yield, titer, selectivity, productivities, configuration):
     load(configuration)

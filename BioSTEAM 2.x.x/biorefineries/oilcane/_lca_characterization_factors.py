@@ -26,7 +26,8 @@ GWP_characterization_factors = { # Material GWP cradle-to-gate [kg*CO2*eq / kg]
     'H3PO4': 1.00, # GREET
     'lime': 1.164, # GREET
     'pure-glycerol': 1.6678, # Ecoinvent, TRACI, market for glycerine, RoW; 
-    # 'crude-glycerol': 0.36, # GREET
+    'crude-glycerol': 0.36, # GREET
+    'biodiesel': 1.13, # GREET
     'DAP': 1.66, # GREET
     'CSL': 1.56, # GREET
     'HCl': 1.96, # GREET

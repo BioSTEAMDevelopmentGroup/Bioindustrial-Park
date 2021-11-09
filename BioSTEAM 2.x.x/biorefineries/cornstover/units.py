@@ -430,6 +430,7 @@ class CoFermentation(bst.BatchBioreactor):
         vent.T = effluent.T = self.T
         vent.phase = 'g'
         effluent.mix_from(feeds, energy_balance=False)
+        if self.loss: self.loss(effluent)
         self.cofermentation(effluent)
         self.CSL_to_constituents(effluent)
         if self.lipid_reaction: 

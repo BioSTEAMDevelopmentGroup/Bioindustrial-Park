@@ -414,10 +414,10 @@ def load(name, cache={}, reduce_chemicals=True, enhanced_cellulosic_performance=
         
     set_GWPCF(feedstock, 'sugarcane')
     set_GWPCF(s.H3PO4, 'H3PO4')
-    set_GWPCF(s.lime, 'lime', 0.046) # Diluted with water
+    set_GWPCF(s.lime, 'lime', dilution=0.046) # Diluted with water
     set_GWPCF(s.denaturant, 'gasoline')
-    set_GWPCF(s.FGD_lime, 'lime', 0.451) # Diluted with water
-    set_GWPCF(s.cellulase, 'cellulase', 0.02) # Diluted with water
+    set_GWPCF(s.FGD_lime, 'lime', dilution=0.451)
+    set_GWPCF(s.cellulase, 'cellulase', dilution=0.02) 
     set_GWPCF(s.DAP, 'DAP', 0.02)
     set_GWPCF(s.CSL, 'CSL')
     set_GWPCF(s.caustic, 'NaOH', 0.5)
@@ -428,6 +428,8 @@ def load(name, cache={}, reduce_chemicals=True, enhanced_cellulosic_performance=
     set_GWPCF(s.NaOH, 'NaOH')
     set_GWPCF(s.pure_glycerine, 'pure-glycerol')
     set_GWPCF(s.dryer_natural_gas, 'CH4')
+    set_GWPCF(s.crude_glycerol, 'crude-glycerol', dilution=0.80)
+    set_GWPCF(s.biodiesel, 'biodiesel')
     natural_gas_streams = [s.natural_gas]
     if abs(number) == 1: natural_gas_streams.append(s.dryer_natural_gas)
     for stream in natural_gas_streams:
@@ -573,6 +575,7 @@ def load(name, cache={}, reduce_chemicals=True, enhanced_cellulosic_performance=
             X_excess = X3 - 1
             if X_excess > 0.: breakpoint()
             fermentor.cofermentation.X[0] = X3
+            fermentor.cofermentation.X[2] = X3 * 0.0526 # 95% towards ethanol, the other 5% goes towards cell mass
     
     @uniform(50, 95, units='%', element='Cofermenation')
     def set_xylose_to_ethanol_yield(xylose_to_ethanol_yield):
@@ -588,6 +591,7 @@ def load(name, cache={}, reduce_chemicals=True, enhanced_cellulosic_performance=
             X_excess = X3 - 1
             if X_excess > 0.: breakpoint()
             fermentor.cofermentation.X[1] = X3
+            fermentor.cofermentation.X[3] = X3 * 0.0526 # 95% towards ethanol, the other 5% goes towards cell mass
 
     @uniform(68.5, 137, units='g/L', element='Cofermentation')
     def set_cofermentation_titer(titer):
@@ -695,6 +699,7 @@ def load(name, cache={}, reduce_chemicals=True, enhanced_cellulosic_performance=
         'biodiesel': biodiesel_flow,
         'ethanol': ethanol_flow,
         'natural_gas': natural_gas_flow,
+        'crude_glycerol': crude_glycerol_flow,
         'electricity': electricity
     }
     @metric(units='USD/ton')
@@ -702,32 +707,32 @@ def load(name, cache={}, reduce_chemicals=True, enhanced_cellulosic_performance=
         price = tea.solve_price(feedstock)
         return kg_per_ton * price
     
+    @metric(units='ton/yr')
+    def feedstock_consumption():
+        return feedstock_flow()
+    
     @metric(units='Gal/ton')
     def biodiesel_production():
-        return biodiesel_flow() / feedstock_flow()
+        return biodiesel_flow() / feedstock_consumption.get()
     
     @metric(units='Gal/ton')
     def ethanol_production():
-        return ethanol_flow() / feedstock_flow()
+        return ethanol_flow() / feedstock_consumption.get()
     
     @metric(units='kWhr/ton')
     def electricity_production():
-        value = - electricity() / feedstock_flow() 
+        value = - electricity() / feedstock_consumption.get()
         if value < 0.: value = 0.
         return value
     
     @metric(units='cf/ton')
     def natural_gas_consumption():
-        value = natural_gas_flow() / feedstock_flow()
+        value = natural_gas_flow() / feedstock_consumption.get()
         return value
     
     @metric(units='10^6*USD')
     def TCI():
         return tea.TCI / 1e6 # 10^6*$
-    
-    @metric(units='ton/yr')
-    def feedstock_consumption():
-        return feedstock_flow()
     
     @metric(units='%')
     def heat_exchanger_network_error():
@@ -759,40 +764,70 @@ def load(name, cache={}, reduce_chemicals=True, enhanced_cellulosic_performance=
         )
         return GWP_material / sales
 
-    @metric(name='Ethanol GWP', element='Ethanol', units='kg*CO2*eq / gal')
+    @metric(name='Ethanol GWP', element='Economic allocation', units='kg*CO2*eq / gal')
     def GWP_ethanol(): # Cradle to gate
-        try:
-            return GWP_economic.cache * mean_ethanol_price
-        except:
-            return GWP_economic() * mean_ethanol_price
+        return GWP_economic.get() * mean_ethanol_price
     
-    @metric(name='Biodiesel GWP', element='Biodiesel', units='kg*CO2*eq / gal')
+    @metric(name='Biodiesel GWP', element='Economic allocation', units='kg*CO2*eq / gal')
     def GWP_biodiesel(): # Cradle to gate
         if number > 0:
-            try:
-                return GWP_economic.cache * mean_biodiesel_price
-            except:
-                return GWP_economic() * mean_biodiesel_price
+            return GWP_economic.get() * mean_biodiesel_price
         else:
             return 0.
     
-    @metric(name='Crude glycerol GWP', element='Crude glycerol', units='kg*CO2*eq / kg')
+    @metric(name='Crude glycerol GWP', element='Economic allocation', units='kg*CO2*eq / kg')
     def GWP_crude_glycerol(): # Cradle to gate
         if number > 0:
-            try:
-                return GWP_economic.cache * mean_glycerol_price
-            except:
-                return GWP_economic() * mean_glycerol_price
+            return GWP_economic.get() * mean_glycerol_price
         else:
             return 0.
     
-    @metric(name='Electricity GWP', element='Electricity', units='kg*CO2*eq / MWhr')
+    @metric(name='Electricity GWP', element='Economic allocation', units='kg*CO2*eq / MWhr')
     def GWP_electricity(): # Cradle to gate
         if abs(number) == 1:
-            try:
-                return GWP_economic.cache * mean_electricity_price * 1000.
-            except:
-                return GWP_economic() * mean_electricity_price * 1000.
+            return GWP_economic.get() * mean_electricity_price * 1000.
+        else:
+            return 0.
+
+    @metric(name='Ethanol GWP', element='Displacement allocation', units='kg*CO2*eq / GGE')
+    def GWP_ethanol_displacement(): # Cradle to gate
+        GWP_material = sys.get_total_feeds_impact(GWP)
+        GWP_electricity_production = GWP_characterization_factors['Electricity'] * electricity_production.get() * feedstock_consumption.get()
+        GWP_coproducts = sys.get_total_products_impact(GWP)
+        GWP_total = GWP_material - GWP_electricity_production - GWP_coproducts # kg CO2 eq. / yr
+        return GWP_total / (ethanol_production.get() * feedstock_consumption.get())
+    
+    # import thermosteam as tmo
+    # glycerol = tmo.Chemical('Glycerol')
+    # ethanol = tmo.Chemical('Ethanol')
+    # glycerol_GGE = 0.80 * (glycerol.LHV / glycerol.MW) / 121300 # 0.1059 GGE / kg crude-glycerol
+    
+    @metric(name='Biofuel GWP', element='Energy allocation', units='kg*CO2*eq / GGE')
+    def GWP_biofuel_allocation(): # Cradle to gate
+        GWP_material = sys.get_total_feeds_impact(GWP)
+        GWP_coproducts = sys.get_total_products_impact(GWP)
+        GWP_total = GWP_material - GWP_coproducts # kg CO2 eq. / yr
+        GGE_biodiesel_annual = (biodiesel_production.get() * feedstock_consumption.get()) / 0.9536
+        GGE_ethanol_annual = (ethanol_production.get() * feedstock_consumption.get()) / 1.5
+        GEE_electricity_production = max(-electricity() * 3600 / 131760, 0.) 
+        GEE_crude_glycerol = crude_glycerol_flow() * 0.1059
+        return GWP_total / (GGE_biodiesel_annual + GGE_ethanol_annual + GEE_electricity_production + GEE_crude_glycerol)
+    
+    @metric(name='Ethanol GWP', element='Energy allocation', units='kg*CO2*eq / gal')
+    def GWP_ethanol_allocation(): # Cradle to gate
+        return GWP_biofuel_allocation.get() / 1.5
+    
+    @metric(name='Biodiesel GWP', element='Energy allocation', units='kg*CO2*eq / gal')
+    def GWP_biodiesel_allocation(): # Cradle to gate
+        if number > 0:
+            return GWP_biofuel_allocation.get() / 0.9536
+        else:
+            return 0.
+    
+    @metric(name='Crude-glycerol GWP', element='Energy allocation', units='kg*CO2*eq / kg')
+    def GWP_crude_glycerol_allocation(): # Cradle to gate
+        if number > 0:
+            return GWP_biofuel_allocation.get() * 0.1059
         else:
             return 0.
 
@@ -855,38 +890,26 @@ def load(name, cache={}, reduce_chemicals=True, enhanced_cellulosic_performance=
 
     @metric(name='Ethanol GWP derivative', element='Ethanol', units='kg*CO2*eq / gal')
     def GWP_ethanol_derivative(): # Cradle to gate
-        try:
-            return GWP_economic_derivative.cache * mean_ethanol_price
-        except:
-            return GWP_economic_derivative() * mean_ethanol_price
+        return GWP_economic_derivative.get() * mean_ethanol_price
     
     @metric(name='Biodiesel GWP derivative', element='Biodiesel', units='kg*CO2*eq / gal')
     def GWP_biodiesel_derivative(): # Cradle to gate
         if number > 0:
-            try:
-                return GWP_economic_derivative.cache * mean_biodiesel_price
-            except:
-                return GWP_economic_derivative() * mean_biodiesel_price
+            return GWP_economic_derivative.get() * mean_biodiesel_price
         else:
             return 0.
     
     @metric(name='Crude glycerol GWP derivative', element='Crude glycerol', units='kg*CO2*eq / kg')
     def GWP_crude_glycerol_derivative(): # Cradle to gate
         if number > 0:
-            try:
-                return GWP_economic_derivative.cache * mean_glycerol_price
-            except:
-                return GWP_economic_derivative() * mean_glycerol_price
+            return GWP_economic_derivative.get() * mean_glycerol_price
         else:
             return 0.
     
     @metric(name='Electricity GWP derivative', element='Electricity', units='kg*CO2*eq / MWhr')
     def GWP_electricity_derivative(): # Cradle to gate
         if abs(number) == 1:
-            try:
-                return GWP_economic_derivative.cache * mean_electricity_price * 1000.
-            except:
-                return GWP_economic_derivative() * mean_electricity_price * 1000.
+            return GWP_economic_derivative.get() * mean_electricity_price * 1000.
         else:
             return 0.
     
@@ -999,3 +1022,16 @@ def load(name, cache={}, reduce_chemicals=True, enhanced_cellulosic_performance=
 #             'Sugarcane\nconventional\nagile', 'Oilcane\nconventional\nagile',
 #             'Sugarcane\ncellulosic\nagile', 'Oilcane\ncellulosic\nagile'],
 # )
+
+# # Calculate xylose conversion based on net conversion of sugars
+# import biosteam as bst
+# import biorefineries.oilcane as oc
+# oc.load('L2')
+# feed = bst.Stream.sum(oc.R401.ins)
+# total_glucose, total_xylose = feed.imass['Glucose', 'Xylose'] + feed.imass['Glucan', 'Xylan'] * 1.11
+# total_sugars = total_glucose + total_xylose
+# glucose = 0.91 * total_glucose
+# xylose = total_xylose
+# sugar_conversion = 0.83 * 0.95 
+# xylose_conversion = (sugar_conversion * total_sugars - 0.95 * glucose) / xylose
+# print(xylose_conversion)
