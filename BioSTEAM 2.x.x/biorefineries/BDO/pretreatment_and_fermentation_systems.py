@@ -185,7 +185,7 @@ def create_pretreatment_and_fermentation_system(ins, outs):
     M202 = hp.units.PretreatmentMixer('M202', ins=(U101-0, M201-0, H_M202-0, ''))
     
     # Mix feedstock/sulfuric acid mixture and steam
-    M203 = bst.SteamMixer('M203', ins=(M202-0, water_M203), P=5.5*101325)
+    M203 = bst.SteamMixer('M203', ins=(M202-0, '', water_M203), P=5.5*101325)
     M203.heat_utilities[0].heat_transfer_efficiency = 1.
     R201 = hp.units.PretreatmentReactorSystem('R201', ins=M203-0, outs=('R201_g', 'R201_l'))
     
