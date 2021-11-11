@@ -418,7 +418,7 @@ def load(name, cache={}, reduce_chemicals=True, enhanced_cellulosic_performance=
     set_GWPCF(s.denaturant, 'gasoline')
     set_GWPCF(s.FGD_lime, 'lime', dilution=0.451)
     set_GWPCF(s.cellulase, 'cellulase', dilution=0.02) 
-    set_GWPCF(s.DAP, 'DAP', 0.02)
+    set_GWPCF(s.DAP, 'DAP')
     set_GWPCF(s.CSL, 'CSL')
     set_GWPCF(s.caustic, 'NaOH', 0.5)
     set_GWPCF(s.catalyst, 'NaOH', 0.5)
@@ -430,6 +430,7 @@ def load(name, cache={}, reduce_chemicals=True, enhanced_cellulosic_performance=
     set_GWPCF(s.dryer_natural_gas, 'CH4')
     set_GWPCF(s.crude_glycerol, 'crude-glycerol', dilution=0.80)
     set_GWPCF(s.biodiesel, 'biodiesel')
+    bst.PowerUtility.characterization_factors[GWP] = GWP_characterization_factors['Electricity']
     natural_gas_streams = [s.natural_gas]
     if abs(number) == 1: natural_gas_streams.append(s.dryer_natural_gas)
     for stream in natural_gas_streams:
@@ -691,7 +692,7 @@ def load(name, cache={}, reduce_chemicals=True, enhanced_cellulosic_performance=
         crude_glycerol_flow = lambda: sys.operating_hours * s.crude_glycerol.F_mass # kg/yr
         natural_gas_flow = lambda: sum([i.F_mass for i in natural_gas_streams]) * sys.operating_hours * V_ng # cf/yr
         if number <= 1:
-            electricity = lambda: sys.operating_hours * sum([i.rate for i in oilcane_sys.power_utilities])
+            electricity = lambda: sys.operating_hours * sum([i.rate for i in sys.power_utilities])
         elif number == 2:
             electricity = lambda: 0.
     dct['flows'] = {
@@ -789,7 +790,7 @@ def load(name, cache={}, reduce_chemicals=True, enhanced_cellulosic_performance=
         else:
             return 0.
 
-    @metric(name='Ethanol GWP', element='Displacement allocation', units='kg*CO2*eq / GGE')
+    @metric(name='Ethanol GWP', element='Displacement allocation', units='kg*CO2*eq / ga;')
     def GWP_ethanol_displacement(): # Cradle to gate
         GWP_material = sys.get_total_feeds_impact(GWP)
         GWP_electricity_production = GWP_characterization_factors['Electricity'] * electricity_production.get() * feedstock_consumption.get()

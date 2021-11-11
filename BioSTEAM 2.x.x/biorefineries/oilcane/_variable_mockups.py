@@ -84,7 +84,7 @@ from biosteam import MockVariable
     MockVariable('Biodiesel GWP', 'kg*CO2*eq / gal', 'Economic allocation'),
     MockVariable('Crude glycerol GWP', 'kg*CO2*eq / kg', 'Economic allocation'),
     MockVariable('Electricity GWP', 'kg*CO2*eq / MWhr', 'Economic allocation'),
-    MockVariable('Ethanol GWP', 'kg*CO2*eq / GGE', 'Displacement allocation'),
+    MockVariable('Ethanol GWP', 'kg*CO2*eq / gal', 'Displacement allocation'),
     MockVariable('Biofuel GWP', 'kg*CO2*eq / GGE', 'Energy allocation'),
     MockVariable('Ethanol GWP', 'kg*CO2*eq / gal', 'Energy allocation'),
     MockVariable('Biodiesel GWP', 'kg*CO2*eq / gal', 'Energy allocation'),
