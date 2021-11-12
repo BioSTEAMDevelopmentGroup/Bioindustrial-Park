@@ -325,7 +325,9 @@ get_FEC = lambda: get_material_FEC() + get_electricity_FEC() - get_Isobutanol_FE
 get_SPED = lambda: u.BT.system_heating_demand*0.001/MEK.F_mass
 MEK_LHV = 31.45 # MJ/kg MEK
 
-BDO_lca = LCA(BDO_sys, BDO_chemicals, CFs, feedstock, 'Corn stover', MEK, [CT, CWP], BT=BT, CT=CT)
+BDO_lca = LCA(BDO_sys, BDO_chemicals, CFs, feedstock, 'Corn stover', MEK, [CT, CWP], 
+              flowsheet('isobutanol'), {'GWP':(1.73+2.26)/2., 'FEC':(50.+52.)/2.}, # GWP100 and FEC from GREET 2020, average of Isobutanol from Fossil Energy "with Syngas from Coal" and "with Syngas from Natural Gas"
+              BT=BT, CT=CT)
 
 #%% TEA breakdown
 def TEA_breakdown():
@@ -422,7 +424,7 @@ simulate_and_print()
 
 
 
-# %%% MEK environmental impacts
+# %%% Conventional MEK environmental impacts (without adding EOL GWP)
 
 # GREET 2020:
 #     GHG100 = 1.04 kgCO2-eq/kg

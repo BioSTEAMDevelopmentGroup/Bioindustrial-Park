@@ -2,7 +2,7 @@
 """
 Created on Sun Sep 26 22:17:26 2021
 
-@author: saran
+@author: sarangbhagwat, yrc2
 """
 import numpy as np
 from scipy import interpolate

@@ -25,7 +25,7 @@ BDO from lignocellulosic feedstocks
     Lignocellulosic Biorefineries across the Feedstock Landscape. Submitted,
     2020.
 
-@author: yalinli_cabbi
+@author: sarangbhagwat
 """
 
 
@@ -67,7 +67,7 @@ model = models.BDO_model
 
 # Set seed to make sure each time the same set of random numbers will be used
 np.random.seed(3222) # 3221
-N_simulation = 500 # 1000
+N_simulation = 2000 # 1000
 
 samples = model.sample(N=N_simulation, rule='L')
 model.load_samples(samples)

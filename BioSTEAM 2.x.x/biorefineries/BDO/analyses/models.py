@@ -13,7 +13,7 @@ with modification of fermentation system for 2,3-Butanediol instead of the origi
 
 All units are explicitly defined here for transparency and easy reference
 
-@author: yalinli_cabbi
+@author: sarangbhagwat
 """
 
 
