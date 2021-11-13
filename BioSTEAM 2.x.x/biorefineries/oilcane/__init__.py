@@ -572,8 +572,10 @@ def load(name, cache={}, reduce_chemicals=True, enhanced_cellulosic_performance=
             # fermentor.loss[0].X = 0.03 # Baseline
             split = np.mean(u.S403.split)
             X1 = split * seed_train.reactions.X[0]
-            X3 = (glucose_to_ethanol_yield - X1) / (1 / (1 - X1)) 
-            X_excess = X3 - 1
+            X2 = split * seed_train.reactions.X[2]
+            X3 = (glucose_to_ethanol_yield - X1) / (1 - X1 - X2)
+            split = np.mean(u.S403.split)
+            X_excess = X3 * 1.0526 - 1
             if X_excess > 0.: breakpoint()
             fermentor.cofermentation.X[0] = X3
             fermentor.cofermentation.X[2] = X3 * 0.0526 # 95% towards ethanol, the other 5% goes towards cell mass
@@ -588,8 +590,9 @@ def load(name, cache={}, reduce_chemicals=True, enhanced_cellulosic_performance=
             xylose_to_ethanol_yield *= 0.01
             split = np.mean(u.S403.split)
             X1 = split * seed_train.reactions.X[1]
-            X3 = (xylose_to_ethanol_yield - X1) / (1 / (1 - X1)) 
-            X_excess = X3 - 1
+            X2 = split * seed_train.reactions.X[3]
+            X3 = (xylose_to_ethanol_yield - X1) / (1 - X1 - X2)
+            X_excess = X3 * 1.0526 - 1
             if X_excess > 0.: breakpoint()
             fermentor.cofermentation.X[1] = X3
             fermentor.cofermentation.X[3] = X3 * 0.0526 # 95% towards ethanol, the other 5% goes towards cell mass
@@ -926,10 +929,10 @@ def load(name, cache={}, reduce_chemicals=True, enhanced_cellulosic_performance=
     # Single point evaluation for detailed design results
     if abs(number) == 2:
         if enhanced_cellulosic_performance:
-            set_sorghum_glucose_yield.setter(95)
-            set_sorghum_xylose_yield.setter(95)
-            set_cane_glucose_yield.setter(95)
-            set_cane_xylose_yield.setter(95)
+            set_sorghum_glucose_yield.setter(97.5)
+            set_sorghum_xylose_yield.setter(97.5)
+            set_cane_glucose_yield.setter(97.5)
+            set_cane_xylose_yield.setter(97.5)
             set_glucose_to_ethanol_yield.setter(95)
             set_xylose_to_ethanol_yield.setter(95)
             set_cofermentation_titer.setter(120.)
@@ -937,10 +940,10 @@ def load(name, cache={}, reduce_chemicals=True, enhanced_cellulosic_performance=
         else:
             set_sorghum_glucose_yield.setter(79)
             set_sorghum_xylose_yield.setter(86)
-            set_cane_glucose_yield.setter(85)
-            set_cane_xylose_yield.setter(65)
-            set_glucose_to_ethanol_yield.setter(91)
-            set_xylose_to_ethanol_yield.setter(50.)
+            set_cane_glucose_yield.setter(91.0)
+            set_cane_xylose_yield.setter(97.5)
+            set_glucose_to_ethanol_yield.setter(92)
+            set_xylose_to_ethanol_yield.setter(42)
     oil_extraction_specification.load_oil_retention(0.70)
     oil_extraction_specification.load_oil_content(0.05)
     set_bagasse_oil_extraction_efficiency.setter(oil_extraction_efficiency_hook(0.))

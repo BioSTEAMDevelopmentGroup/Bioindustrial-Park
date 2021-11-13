@@ -114,7 +114,7 @@ def plot_ethanol_and_biodiesel_price_contours(N=30, benefit=False, cache={},
             CS = plt.contour(X, Y, data=data, zorder=1e16, linestyles='dashed', linewidths=1.,
                              levels=levels, colors=[linecolor])
             ax.clabel(CS, levels=CS.levels, inline=True, fmt=lambda x: f'{round(x):,}',
-                      fontsize=10, colors=[linecolor], zorder=1e16)
+                      colors=[linecolor], zorder=1e16)
 
     plt.show()
     
@@ -225,7 +225,7 @@ def plot_extraction_efficiency_and_oil_content_contours(load=False, metric_index
             CS = plt.contour(100.*X, 100.*Y, data=metric_data, zorder=1e16, linestyles='dashed', linewidths=1.,
                              levels=levels, colors=[linecolor])
             ax.clabel(CS, levels=CS.levels, inline=True, fmt=lambda x: f'{round(x):,}',
-                      fontsize=10, colors=[linecolor], zorder=1e16)
+                      colors=[linecolor], zorder=1e16)
             if j == 0:
                 lb = 50.0
                 ub = 70.0

@@ -23,8 +23,8 @@ class SeedTrain(SeedTrain):
     #   Reaction definition                   Reactant    Conversion
     Rxn('Glucose -> 2 Ethanol + 2 CO2',       'Glucose',   0.9000, chemicals),
     Rxn('3 Xylose -> 5 Ethanol + 5 CO2',      'Xylose',    0.8000, chemicals),
-    Rxn('Glucose -> Cellmass',                'Glucose',  0.05, chemicals),
-    Rxn('Xylose -> Cellmass',                 'Xylose',  0.05, chemicals),
+    Rxn('Glucose -> Cellmass',                'Glucose',  0.0473, chemicals),
+    Rxn('Xylose -> Cellmass',                 'Xylose',  0.0421, chemicals),
         ])
         
     def _setup(self):
