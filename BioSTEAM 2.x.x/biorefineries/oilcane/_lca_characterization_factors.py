@@ -32,7 +32,7 @@ GWP_characterization_factors = { # Material GWP cradle-to-gate [kg*CO2*eq / kg]
     'CSL': 1.56, # GREET
     'HCl': 1.96, # GREET
     'NaOH': 2.01, # GREET
-    'gasoline': 0.88, # GREET
+    'gasoline': 0.84, # GREET
     'methanol': 0.45, # GREET, Natural gas to methanol
     'NaOCH3': 1.5871, # Ecoinvent, TRACI, sodium methoxide
     'CH4': 0.33 + CO2.MW / CH4.MW, # Natural gas from shell conventional recovery, GREET; includes non-biogenic emissions
