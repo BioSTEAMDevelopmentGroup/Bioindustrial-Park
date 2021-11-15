@@ -27,10 +27,11 @@ from biosteam import Unit
 from biosteam.units import Flash, HXutility, Mixer, MixTank, Pump, \
     SolidsSeparator, StorageTank, LiquidsSplitSettler
 from biosteam.units.decorators import cost
-from biosteam.units.design_tools import CEPCI_by_year
+from biosteam.units.design_tools import CEPCI_by_year as CEPCI
 from thermosteam import Stream, MultiStream
 from biorefineries.TAL.process_settings import price
-from biorefineries.TAL.utils import CEPCI, baseline_feedflow, compute_extra_chemical, adjust_recycle
+# from biorefineries.TAL.utils import CEPCI, baseline_feedflow, compute_extra_chemical, adjust_recycle
+from biorefineries.TAL.utils import baseline_feedflow, compute_extra_chemical, adjust_recycle
 
 _kg_per_ton = 907.18474
 _Gcal_2_kJ = 4.184 * 1e6 # (also MMkcal/hr)
@@ -891,7 +892,7 @@ class Reactor(Unit, PressureVessel, isabstract=True):
 # 4. Look into n
 # 5. Look into BM (bare module factor)
 @cost(basis='Flow rate', ID='Decanter', units='m3/s',
-      cost=190000, S=0.0012, CE=CEPCI_by_year[2008], n=1, BM=2.3)
+      cost=190000, S=0.0012, CE=CEPCI[2008], n=1, BM=2.3)
 class Decantation(Unit):
     '''
     A decanter to separate the sorbic acid crystal from the broth.
