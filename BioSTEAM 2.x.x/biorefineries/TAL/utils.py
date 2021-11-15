@@ -27,6 +27,7 @@ _kg_per_ton = 907.18474
 
 # Chemical Engineering Plant Cost Index from Chemical Engineering Magzine
 # (https://www.chemengonline.com/the-magazine/)
+#!!! BioSTEAM has it all: `bst.units.design_tools.CEPCI_by_year`
 CEPCI = {1997: 386.5,
          1998: 389.5,
          2007: 525.4,
@@ -278,8 +279,3 @@ def get_sugar_conc(stream, sugars=()):
         fermentable_sugar += stream.imass[sugar]
     fermentable_sugar_conc = fermentable_sugar/stream.F_vol    
     return fermentable_sugar_conc
-
-
-
-
-
