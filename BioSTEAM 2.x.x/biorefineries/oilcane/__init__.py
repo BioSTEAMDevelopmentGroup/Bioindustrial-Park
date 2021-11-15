@@ -793,7 +793,7 @@ def load(name, cache={}, reduce_chemicals=True, enhanced_cellulosic_performance=
         else:
             return 0.
 
-    @metric(name='Ethanol GWP', element='Displacement allocation', units='kg*CO2*eq / ga;')
+    @metric(name='Ethanol GWP', element='Displacement allocation', units='kg*CO2*eq / gal')
     def GWP_ethanol_displacement(): # Cradle to gate
         GWP_material = sys.get_total_feeds_impact(GWP)
         GWP_electricity_production = GWP_characterization_factors['Electricity'] * electricity_production.get() * feedstock_consumption.get()
@@ -813,7 +813,7 @@ def load(name, cache={}, reduce_chemicals=True, enhanced_cellulosic_performance=
         GWP_total = GWP_material - GWP_coproducts # kg CO2 eq. / yr
         GGE_biodiesel_annual = (biodiesel_production.get() * feedstock_consumption.get()) / 0.9536
         GGE_ethanol_annual = (ethanol_production.get() * feedstock_consumption.get()) / 1.5
-        GEE_electricity_production = max(-electricity() * 3600 / 131760, 0.) 
+        GEE_electricity_production = max(-electricity() * 3600 / 121300, 0.) 
         GEE_crude_glycerol = crude_glycerol_flow() * 0.1059
         return GWP_total / (GGE_biodiesel_annual + GGE_ethanol_annual + GEE_electricity_production + GEE_crude_glycerol)
     
