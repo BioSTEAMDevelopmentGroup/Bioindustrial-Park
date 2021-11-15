@@ -36,51 +36,6 @@ class CAPEXTableBuilder:
         )
 
 
-class VOCTableBuilder:
-    __slots__ = ('index', 'price', 'cost', 'operating_days')
-    
-    def __init__(self, operating_days):
-        self.operating_days = operating_days
-        self.index = []
-        self.price = []
-        self.cost = []
-        
-    def entry(self, stream, name=None, price=None):
-        if not name:
-            name = stream.ID.replace('_', ' ')
-        if name.islower(): name= name.capitalize()
-        if price: 
-            cost = price * self.operating_days * stream.get_total_flow('ton/day') / 1e6
-        else:
-            price = stream.price * 907.185
-            cost = stream.cost * self.operating_days * 24. / 1e6
-        if stream.isfeed():
-            index = ('Raw materials', name)
-        elif stream.isproduct():
-            index = ('By-products and credits', name)
-        else:
-            raise ValueError('stream must be either a feed or a product')
-        self.index.append(index)
-        self.price.append(price)
-        self.cost.append(cost)
-        
-    def table(self):
-        VOC = 0.
-        for index, cost in zip(self.index, self.cost):
-            kind = index[0]
-            if kind == 'Raw materials':
-                VOC += cost
-            elif kind == 'By-products and credits':
-                VOC += -cost
-            else:
-                raise RuntimeError(f"invalid index '{kind}'")
-        data = (*zip(self.price, self.cost), ('', VOC))
-        index = pd.MultiIndex.from_tuples(self.index + [('Total variable operating cost', '')])
-        return pd.DataFrame(data, 
-                            index=index,
-                            columns=('Price [$/ton]', 'Cost [MM$ / yr]'))
-    
-        
 class CellulosicEthanolTEA(TEA):
     
     __slots__ = ('OSBL_units', 'warehouse', 'site_development',
@@ -270,12 +225,15 @@ def capex_table(teas, names=None):
 
 voc_table = bst.report.voc_table
 
-def foc_table(tea):
+def foc_table(teas, names=None):
+    if isinstance(teas, bst.TEA): teas = [teas]
+    tea, *_ = teas
     foc = bst.report.FOCTableBuilder()
-    ISBL = tea.ISBL_installed_equipment_cost / 1e6
-    labor_cost = tea.labor_cost / 1e6
+    ISBL = np.array([i.ISBL_installed_equipment_cost / 1e6 for i in teas])
+    labor_cost = np.array([i.labor_cost / 1e6 for i in teas])
     foc.entry('Labor salary', labor_cost)
     foc.entry('Labor burden', tea.labor_burden * labor_cost, '90% of labor salary')
     foc.entry('Maintenance', tea.maintenance * ISBL, f'{tea.maintenance:.1%} of ISBL')
     foc.entry('Property insurance', tea.property_insurance * ISBL, f'{tea.property_insurance:.1%} of ISBL')
-    return foc.table()
+    if names is None: names = [i.system.ID for i in teas]
+    return foc.table(names)

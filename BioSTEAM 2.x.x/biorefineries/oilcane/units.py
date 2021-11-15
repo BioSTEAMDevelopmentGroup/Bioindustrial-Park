@@ -11,6 +11,8 @@ from biorefineries.cornstover.units import (
     CoFermentation
 )
 
+__all__ = ('SeedTrain', 'CoFermentation')
+
 class SeedTrain(SeedTrain):
     
     def __init__(self, ID='', ins=None, outs=(), thermo=None, reactions=None, saccharification=False):
@@ -21,8 +23,8 @@ class SeedTrain(SeedTrain):
     #   Reaction definition                   Reactant    Conversion
     Rxn('Glucose -> 2 Ethanol + 2 CO2',       'Glucose',   0.9000, chemicals),
     Rxn('3 Xylose -> 5 Ethanol + 5 CO2',      'Xylose',    0.8000, chemicals),
-    Rxn('Glucose -> Cellmass',                'Glucose',  0.05, chemicals),
-    Rxn('Xylose -> Cellmass',                 'Xylose',  0.05, chemicals),
+    Rxn('Glucose -> Cellmass',                'Glucose',  0.0473, chemicals),
+    Rxn('Xylose -> Cellmass',                 'Xylose',  0.0421, chemicals),
         ])
         
     def _setup(self):
@@ -45,6 +47,7 @@ class CoFermentation(CoFermentation):
         BatchBioreactor.__init__(self, ID, ins, outs, thermo, tau, N, V, T, P, Nmin, Nmax)
         self.P = P
         chemicals = self.chemicals
+        self.loss = None
         self.cofermentation = cofermentation or PRxn([
     #   Reaction definition                   Reactant    Conversion
     Rxn('Glucose -> 2 Ethanol + 2 CO2',       'Glucose',   0.9500, chemicals),

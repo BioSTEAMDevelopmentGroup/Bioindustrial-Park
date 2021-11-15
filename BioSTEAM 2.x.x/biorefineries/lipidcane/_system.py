@@ -588,7 +588,7 @@ def create_lipidcane_to_biodiesel_and_conventional_ethanol_system(ins, outs):
     )
     
     # Hydrolyze lipid bodies
-    T201 = units.EnzymeTreatment('T201', (lipidcane, enzyme), T=323.15)  # T=50
+    T201 = units.EnzymeTreatment('T201', (feedstock_handling_sys-0, enzyme), T=323.15)  # T=50
     
     @T201.add_specification(run=True)
     def update_enzyme():

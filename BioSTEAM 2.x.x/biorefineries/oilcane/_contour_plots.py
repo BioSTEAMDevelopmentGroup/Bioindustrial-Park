@@ -7,26 +7,17 @@ Created on Fri Jun  4 23:44:10 2021
 from biorefineries import oilcane as oc
 import biosteam as bst
 import numpy as np
-import pandas as pd
 from biosteam.utils import colors
 from matplotlib.colors import LinearSegmentedColormap
 import matplotlib.pyplot as plt
-from biosteam.utils import colors
 from biosteam.plots import (
     plot_contour_2d,
     MetricBar,
-    plot_scatter_points,
     plot_contour_single_metric,
-    plot_contour_1d,
     plot_vertical_line,
     rounded_tickmarks_from_data as tickmarks
 )
-from math import floor, ceil
-from biosteam import plots
-from biosteam.utils import CABBI_colors
 from thermosteam.units_of_measure import format_units
-from biosteam.plots.utils import style_axis, style_plot_limits, fill_plot, set_axes_labels
-from biosteam import Metric
 from warnings import filterwarnings
 import os
 
@@ -123,7 +114,7 @@ def plot_ethanol_and_biodiesel_price_contours(N=30, benefit=False, cache={},
             CS = plt.contour(X, Y, data=data, zorder=1e16, linestyles='dashed', linewidths=1.,
                              levels=levels, colors=[linecolor])
             ax.clabel(CS, levels=CS.levels, inline=True, fmt=lambda x: f'{round(x):,}',
-                      fontsize=10, colors=[linecolor], zorder=1e16)
+                      colors=[linecolor], zorder=1e16)
 
     plt.show()
     
@@ -234,7 +225,7 @@ def plot_extraction_efficiency_and_oil_content_contours(load=False, metric_index
             CS = plt.contour(100.*X, 100.*Y, data=metric_data, zorder=1e16, linestyles='dashed', linewidths=1.,
                              levels=levels, colors=[linecolor])
             ax.clabel(CS, levels=CS.levels, inline=True, fmt=lambda x: f'{round(x):,}',
-                      fontsize=10, colors=[linecolor], zorder=1e16)
+                      colors=[linecolor], zorder=1e16)
             if j == 0:
                 lb = 50.0
                 ub = 70.0
