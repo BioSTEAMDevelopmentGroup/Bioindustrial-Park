@@ -90,12 +90,17 @@ from ._distributions import (
     mean_biodiesel_price,
     mean_ethanol_price,
     mean_glycerol_price,
+    mean_natural_gas_price,
     mean_electricity_price,
 )
 from ._lca_characterization_factors import (
     GWP_characterization_factors,
     set_GWPCF,
     GWP,
+)
+from ._tables import (
+    save_detailed_expenditure_tables, 
+    save_detailed_life_cycle_tables
 )
 from biorefineries import cornstover as cs
 
@@ -434,7 +439,7 @@ def load(name, cache={}, reduce_chemicals=True, enhanced_cellulosic_performance=
     natural_gas_streams = [s.natural_gas]
     if abs(number) == 1: natural_gas_streams.append(s.dryer_natural_gas)
     for stream in natural_gas_streams:
-        set_GWPCF(s.dryer_natural_gas, 'CH4')
+        set_GWPCF(stream, 'CH4')
     
     ## Model
     model = bst.Model(sys, exception_hook='raise', retry_evaluation=False)
@@ -813,7 +818,7 @@ def load(name, cache={}, reduce_chemicals=True, enhanced_cellulosic_performance=
         GWP_total = GWP_material - GWP_coproducts # kg CO2 eq. / yr
         GGE_biodiesel_annual = (biodiesel_production.get() * feedstock_consumption.get()) / 0.9536
         GGE_ethanol_annual = (ethanol_production.get() * feedstock_consumption.get()) / 1.5
-        GEE_electricity_production = max(-electricity() * 3600 / 121300, 0.) 
+        GEE_electricity_production = max(-electricity() * 3600 / 114000, 0.) 
         GEE_crude_glycerol = crude_glycerol_flow() * 0.1059
         return GWP_total / (GGE_biodiesel_annual + GGE_ethanol_annual + GEE_electricity_production + GEE_crude_glycerol)
     
@@ -942,15 +947,16 @@ def load(name, cache={}, reduce_chemicals=True, enhanced_cellulosic_performance=
             set_sorghum_xylose_yield.setter(86)
             set_cane_glucose_yield.setter(91.0)
             set_cane_xylose_yield.setter(97.5)
-            set_glucose_to_ethanol_yield.setter(92)
+            set_glucose_to_ethanol_yield.setter(90)
             set_xylose_to_ethanol_yield.setter(42)
     oil_extraction_specification.load_oil_retention(0.70)
     oil_extraction_specification.load_oil_content(0.05)
     set_bagasse_oil_extraction_efficiency.setter(oil_extraction_efficiency_hook(0.))
-    set_ethanol_price.setter(1.898) 
-    set_biodiesel_price.setter(4.363)
-    set_natural_gas_price.setter(4.3)
-    set_electricity_price.setter(0.0641)
+    set_ethanol_price.setter(mean_ethanol_price) 
+    set_crude_glycerol_price.setter(mean_glycerol_price)
+    set_biodiesel_price.setter(mean_biodiesel_price)
+    set_natural_gas_price.setter(mean_natural_gas_price)
+    set_electricity_price.setter(mean_electricity_price)
     if number > 0:
         set_cane_PL_content.setter(10)
         set_cane_FFA_content.setter(10)
@@ -1026,6 +1032,21 @@ def load(name, cache={}, reduce_chemicals=True, enhanced_cellulosic_performance=
 #             'Sugarcane\nconventional\nagile', 'Oilcane\nconventional\nagile',
 #             'Sugarcane\ncellulosic\nagile', 'Oilcane\ncellulosic\nagile'],
 # )
+
+# # DO NOT DELETE: For GWP tables
+# from biorefineries import oilcane as oc
+# import biosteam as bst
+# def get_sys(ID):
+#     oc.load(ID)
+#     return oc.sys
+# def get_ethanol(ID):
+#     oc.load(ID)
+#     return oc.ethanol
+# IDs = ('S1', 'S2', 'O1', 'O2')
+# systems = [get_sys(i) for i in IDs]
+# items = [get_ethanol(i) for i in IDs]
+# bst.settings.define_impact_indicator('GWP', 'kg*CO2e')
+# bst.report.lca_table_displacement_allocation(systems, 'GWP', items, 'ethanol', system_names=IDs)
 
 # # Calculate xylose conversion based on net conversion of sugars
 # import biosteam as bst
