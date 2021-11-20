@@ -770,24 +770,13 @@ def create_TAL_sys(ins, outs):
     
     M405 = bst.units.Mixer('M405', ins = (S404_s-1, S404-1), outs = 'mixed_extract')
     
-    S405 = units.Adsorption_and_Centrifugation('S405', ins = M405-0, outs = ('diluteTAL', 'polarcompounds'))
-    
-    def S405_spec():
-        S405._run()
-        sep_factor = 10
-        polars = ('Glucose', 'GlucoseOligomer', 'Xylose', 'XyloseOligomer', 
-                    'Protein', 'HMF', 'Mannose', 'Galactose', 'GalactoseOligomer',
-                    'Arabinose', 'ArabinoseOligomer', 'Furfural', 'AceticAcid', 'FermMicrobe',
-                    'Cellobiose', 'Water')
-        instream = S405.ins[0]
-        out0 = S405.outs[0]
-        out1 = S405.outs[1]
-        out0.copy_like(instream)
-        for polar in polars:
-            molpolar = instream.imol[polar]
-            out0.imol[polar] = instream.imol[polar]/sep_factor
-            out1.imol[polar] = molpolar - out0.imol[polar]
-    S405.specification = S405_spec    
+    S405 = bst.AdsorptionColumnTSA(
+        'S405', ins=(M405-0, ''), 
+        outs=('diluteTAL', 'polarcompounds'),
+        split=1.,
+        adsorbate_ID='PolarComponents',
+    )
+    S405.isplit['PolarComponents'] = 0.1
     
     R401 = units.HydrogenationReactor('R401', ins = (S405-0, '', Hydrogen), outs = 'HMTHP',
                                       vessel_material='Stainless steel 316',)
