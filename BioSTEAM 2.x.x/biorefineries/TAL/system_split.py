@@ -206,9 +206,12 @@ def create_TAL_sys(ins, outs):
                                    P=101325, Q=0)
     
     M204 = bst.units.Mixer('M204', ins=(R201-0, F201-0))
+    @M204.add_specification(run=True)
+    def valve():
+        M204.ins[0].P = 101325
     H201 = bst.units.HXutility('H201', ins=M204-0,
-                                     outs='condensed_pretreatment_waste_vapor',
-                                     V=0, rigorous=True)
+                               outs='condensed_pretreatment_waste_vapor',
+                               V=0, rigorous=True)
     
     # Neutralize pretreatment hydrolysate
     M205 = units.AmmoniaMixer('M205', ins=(ammonia_M205, water_M205))
@@ -1279,10 +1282,7 @@ TAL_no_BT_tea = TAL_tea
 
 def get_SA_MPSP():
     for i in range(3):
-        try:
-            TAL_sys.simulate()
-        except:
-            pass
+        TAL_sys.simulate()
     for i in range(3):
         SA.price = TAL_tea.solve_price(SA)
     return SA.price

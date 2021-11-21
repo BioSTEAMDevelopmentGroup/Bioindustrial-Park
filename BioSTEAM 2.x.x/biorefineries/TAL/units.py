@@ -1293,17 +1293,16 @@ class AnaerobicDigestion(Unit):
         wastewater = self.ins[0]	
         biogas, treated_water, sludge = self.outs	
         T = self.T	
-
         sludge.copy_flow(wastewater)	
         self.digestion_rxns(sludge.mol)	
         self.multi_stream.copy_flow(sludge)	
-        self.multi_stream.vle(P=101325, T=T)	
+        self.multi_stream.vle(P=101325, H=self.multi_stream.H)
         biogas.mol = self.multi_stream.imol['g']	
         biogas.phase = 'g'	
         liquid_mol = self.multi_stream.imol['l']	
         treated_water.mol = liquid_mol * self.split	
         sludge.mol = liquid_mol - treated_water.mol	
-        biogas.receive_vent(treated_water, accumulate=True)	
+        biogas.receive_vent(treated_water)	
         biogas.T = treated_water.T = sludge.T = T
         
     def _design(self):
