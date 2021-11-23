@@ -166,7 +166,7 @@ _derivative_disabled = True
 
 def load(name, cache={}, reduce_chemicals=True, enhanced_cellulosic_performance=False):
     dct = globals()
-    number, agile = dct['configuration'] = parse(name)
+    number, agile = dct['configuration'] = configuration = parse(name)
     key = (number, agile, enhanced_cellulosic_performance)
     if key in cache:
         dct.update(cache[key])
@@ -175,7 +175,7 @@ def load(name, cache={}, reduce_chemicals=True, enhanced_cellulosic_performance=
     global oil_extraction_specification, model, unit_groups
     global HXN, BT
     if not _chemicals_loaded: load_chemicals()
-    flowsheet_name = format_configuration(name)
+    flowsheet_name = format_configuration(configuration)
     if enhanced_cellulosic_performance:
         flowsheet_name += '_enhanced_fermentation'
     flowsheet = bst.Flowsheet(flowsheet_name)
