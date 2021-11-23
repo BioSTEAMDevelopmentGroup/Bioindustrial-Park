@@ -36,6 +36,7 @@ from ._contour_plots import *
 from ._lca_characterization_factors import *
 from ._load_data import *
 from ._parse_configuration import *
+from ._variable_mockups import *
 
 __all__ = (
     units.__all__,
@@ -455,6 +456,11 @@ def load(name, cache={}, reduce_chemicals=True, enhanced_cellulosic_performance=
         ub = 1.25*baseline
         return parameter(*args, distribution=shape.Uniform(lb, ub), bounds=(lb, ub), **kwargs)
     
+    def default_gwp(baseline, *args, **kwargs):
+        lb = 0.90*baseline
+        ub = 1.10*baseline
+        return parameter(*args, distribution=shape.Uniform(lb, ub), bounds=(lb, ub), **kwargs)
+    
     def triangular(lb, mid, ub, *args, **kwargs):
         return parameter(*args, distribution=shape.Triangle(lb, mid, ub), bounds=(lb, ub), **kwargs)
     
@@ -648,14 +654,14 @@ def load(name, cache={}, reduce_chemicals=True, enhanced_cellulosic_performance=
         elif number == 2:
             u.R401.oil_reaction.X[0] = TAG_to_FFA_conversion / 100.
     
-    @default(feedstock.characterization_factors[GWP], name='GWP', 
+    @default_gwp(feedstock.characterization_factors[GWP], name='GWP', 
              element=feedstock, units='kg*CO2-eq/kg')
     def set_feedstock_GWP(value):
-        if number > 1:
+        if number > 0:
             feedstock.characterization_factors[GWP] = value
     
-    @default(s.methanol.characterization_factors[GWP], name='GWP', 
-             element=s.methanol, units='kg*CO2-eq/kg')
+    @default_gwp(s.methanol.characterization_factors[GWP], name='GWP', 
+                 element=s.methanol, units='kg*CO2-eq/kg')
     def set_methanol_GWP(value):
         s.methanol.characterization_factors[GWP] = value
     
@@ -664,14 +670,19 @@ def load(name, cache={}, reduce_chemicals=True, enhanced_cellulosic_performance=
     # def set_crude_glycerol_GWP(value):
     #     crude_glycerol.characterization_factors[GWP] = value
     
-    @default(s.pure_glycerine.characterization_factors[GWP], name='GWP', 
-             element=pure_glycerine, units='kg*CO2-eq/kg')
+    @default_gwp(s.pure_glycerine.characterization_factors[GWP], name='GWP', 
+                 element=pure_glycerine, units='kg*CO2-eq/kg')
     def set_pure_glycerine_GWP(value):
         s.pure_glycerine.characterization_factors[GWP] = value
     
-    @default(s.cellulase.characterization_factors[GWP], name='GWP', 
-             element=s.cellulase, units='kg*CO2-eq/kg')
+    @default_gwp(s.cellulase.characterization_factors[GWP], name='GWP', 
+                 element=s.cellulase, units='kg*CO2-eq/kg')
     def set_cellulase_GWP(value):
+        s.cellulase.characterization_factors[GWP] = value
+    
+    @default_gwp(s.natural_gas.characterization_factors[GWP], name='GWP', 
+                 element=s.natural_gas, units='kg*CO2-eq/kg')
+    def set_natural_gas_GWP(value):
         s.cellulase.characterization_factors[GWP] = value
     
     s.natural_gas.phase = 'g'

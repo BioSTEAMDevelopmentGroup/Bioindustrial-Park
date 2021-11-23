@@ -208,7 +208,7 @@ def plot_extraction_efficiency_and_oil_content_contours(load=False, metric_index
     metric_bar = MetricBar(metric.name, units, colormaps[metric_index], tickmarks(data, 5, 5), 18, N_decimals=N_decimals)
     fig, axes, CSs, CB = plot_contour_single_metric(
         100.*X, 100.*Y, data, xlabel, ylabels, xticks, yticks, metric_bar, 
-        fillblack=False, styleaxiskw=dict(xtick0=False), label=True,
+        fillcolor=None, styleaxiskw=dict(xtick0=False), label=True,
         titles=['CONVENTIONAL', 'CELLULOSIC'],
     )
     M = len(configurations)

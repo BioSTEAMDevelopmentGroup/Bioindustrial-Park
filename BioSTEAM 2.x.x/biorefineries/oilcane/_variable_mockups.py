@@ -20,7 +20,7 @@ from biosteam import MockVariable
  set_cofermentation_titer, set_cofermentation_productivity,
  set_cane_PL_content, set_sorghum_PL_content, set_cane_FFA_content,
  set_sorghum_FFA_content, set_TAG_to_FFA_conversion, set_oilcane_GWP,
- set_methanol_GWP, set_pure_glycerine_GWP, set_cellulase_GWP,
+ set_methanol_GWP, set_pure_glycerine_GWP, set_cellulase_GWP, set_natural_gas_GWP
  ) = all_parameter_mockups = (
     MockVariable('Oil retention', '%', 'Stream-sugarcane'),
     MockVariable('Bagasse oil extraction efficiency', '%', 'Stream-sugarcane'),
@@ -56,6 +56,7 @@ from biosteam import MockVariable
     MockVariable('GWP', 'kg*CO2-eq/kg', 'Stream-methanol'),
     MockVariable('GWP', 'kg*CO2-eq/kg', 'Stream-pure glycerine'),
     MockVariable('GWP', 'kg*CO2-eq/kg', 'Stream-cellulase'),
+    MockVariable('GWP', 'kg*CO2-eq/kg', 'Stream-natural gas'),
 )
      
 (MFPP, feedstock_consumption, biodiesel_production, ethanol_production, 

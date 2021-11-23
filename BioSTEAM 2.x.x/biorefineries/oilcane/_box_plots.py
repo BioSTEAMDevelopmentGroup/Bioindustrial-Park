@@ -20,7 +20,7 @@ from ._variable_mockups import (
     lca_monte_carlo_metric_mockups, 
     lca_monte_carlo_derivative_metric_mockups,
     MFPP, ethanol_production, biodiesel_production,
-    GWP_ethanol
+    GWP_economic
 )
 from ._load_data import (
     get_monte_carlo,
@@ -331,11 +331,16 @@ def plot_monte_carlo(derivative=False, absolute=True, comparison=True,
 def plot_spearman(configuration, top=None, agile=True, labels=None, metric=None,
                   kind='TEA'):
     if metric is None:
-        metric = MFPP
+        if kind == 'TEA':
+            metric = MFPP
+        elif kind == 'LCA':
+            metric = GWP_economic
+        else:
+            raise ValueError(f"invalid kind '{kind}'")
     elif metric == 'MFPP':
         metric = MFPP
     elif metric == 'GWP':
-        metric = GWP_ethanol
+        metric = GWP_economic
     stream_price = format_units('USD/gal')
     USD_ton = format_units('USD/ton')
     ng_price = format_units('USD/cf')
@@ -376,10 +381,12 @@ def plot_spearman(configuration, top=None, agile=True, labels=None, metric=None,
          ('Cane oil content [5 $-$ 15 dry wt. %]', ['S2', 'S1', 'S2*', 'S1*']),
          ('Relative sorghum oil content [-3 $-$ 0 dry wt. %]', ['S2', 'S1', 'S2*', 'S1*', 'O2', 'O1']),
          ('TAG to FFA conversion [17.25 $-$ 28.75 % theoretical]', ['S1', 'O1', 'S1*', 'O1*']),
-        (f'Feedstock GWP [0.0263 $-$ 0.0440 {material_GWP}]', ['S1', 'S2', 'S1*', 'S2*']),
-        (f'Methanol GWP [0.338 $-$ 0.563 {material_GWP}]', ['S1', 'S2', 'S1*', 'S2*']),
-        (f'Pure glycerine [1.25 $-$ 2.08 {material_GWP}]', ['S1', 'S2', 'S1*', 'S2*']),
-        (f'Cellulase [6.05 $-$ 10.1 {material_GWP}]', ['S1', 'O1', 'S1*', 'O1*']),
+        # TODO: change lower upper values to baseline +- 10%
+        (f'Feedstock GWPCF [0.0263 $-$ 0.0440 {material_GWP}]', ['S1', 'S2', 'S1*', 'S2*']),
+        (f'Methanol GWPCF [0.338 $-$ 0.563 {material_GWP}]', ['S1', 'S2', 'S1*', 'S2*']),
+        (f'Pure glycerine GWPCF [1.25 $-$ 2.08 {material_GWP}]', ['S1', 'S2', 'S1*', 'S2*']),
+        (f'Cellulase GWPCF [6.05 $-$ 10.1 {material_GWP}]', ['S1', 'O1', 'S1*', 'O1*']),
+        (f'Natural gas GWPCF [2.30 $-$ 3.84 {material_GWP}]', ['S1', 'O1', 'S1*', 'O1*']),
     ])
     ignored_dct = {
         'S1': [],
@@ -395,11 +402,13 @@ def plot_spearman(configuration, top=None, agile=True, labels=None, metric=None,
         for name in ignored: ignored_dct[name].append(i)
         index_name = index[i]
         if kind == 'LCA':
-            if ('cost' in index_name or 'price' in index_name):
-                for i in ignored_dct: ignored_dct[i].append(i)
+            for term in ('cost', 'price', 'IRR', 'time', 'capacity'):
+                if term in index_name:
+                    for name in ignored_dct: ignored_dct[name].append(i)
+                    break
         elif kind == 'TEA':
             if 'GWP' in index_name:
-                for i in ignored_dct: ignored_dct[i].append(i)
+                for name in ignored_dct: ignored_dct[name].append(i)
         else:
             raise ValueError(f"invalid kind '{kind}'")
     
