@@ -132,23 +132,27 @@ def monte_carlo_results(with_units=False):
                 'q75': q75,
                 'q95': q95,
             }
-    results['(O2 - O1) / O1'] = relative_results = {}
-    df_O2O1 = get_monte_carlo('O2 - O1')
-    df_O1 = get_monte_carlo('O1')
-    for metric in (biodiesel_production, ethanol_production):
-        index = metric.index
-        key = index[1] if with_units else index[1].split(' [')[0]
-        data = (df_O2O1[index].values / df_O1[index].values)
-        q05, q25, q50, q75, q95 = np.percentile(data, [5,25,50,75,95], axis=0)
-        relative_results[key] = {
-            'mean': np.mean(data),
-            'std': np.std(data),
-            'q05': q05,
-            'q25': q25,
-            'q50': q50,
-            'q75': q75,
-            'q95': q95,
-        }
+    try:
+        df_O2O1 = get_monte_carlo('O2 - O1')
+        df_O1 = get_monte_carlo('O1')
+    except:
+        warn('could not load O2 - O1', RuntimeWarning)
+    else:
+        results['(O2 - O1) / O1'] = relative_results = {}
+        for metric in (biodiesel_production, ethanol_production):
+            index = metric.index
+            key = index[1] if with_units else index[1].split(' [')[0]
+            data = (df_O2O1[index].values / df_O1[index].values)
+            q05, q25, q50, q75, q95 = np.percentile(data, [5,25,50,75,95], axis=0)
+            relative_results[key] = {
+                'mean': np.mean(data),
+                'std': np.std(data),
+                'q05': q05,
+                'q25': q25,
+                'q50': q50,
+                'q75': q75,
+                'q95': q95,
+            }
     return results
 
 def plot_monte_carlo(derivative=False, absolute=True, comparison=True,

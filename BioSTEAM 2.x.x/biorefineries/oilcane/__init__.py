@@ -75,6 +75,7 @@ from ._system import (
 )
 from ._parse_configuration import (
     parse,
+    format_configuration,
 )
 from ._tea import (
     create_tea,
@@ -174,7 +175,7 @@ def load(name, cache={}, reduce_chemicals=True, enhanced_cellulosic_performance=
     global oil_extraction_specification, model, unit_groups
     global HXN, BT
     if not _chemicals_loaded: load_chemicals()
-    flowsheet_name = name
+    flowsheet_name = format_configuration(name)
     if enhanced_cellulosic_performance:
         flowsheet_name += '_enhanced_fermentation'
     flowsheet = bst.Flowsheet(flowsheet_name)
