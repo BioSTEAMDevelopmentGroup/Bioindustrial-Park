@@ -4,7 +4,6 @@ Created on Thu Nov  4 14:28:33 2021
 
 @author: yrc2
 """
-from thermosteam import Chemical
 
 __all__ = (
     'GWP_characterization_factors',
@@ -12,8 +11,6 @@ __all__ = (
     'GWP',
 )
 
-CO2 = Chemical('CO2', cache=True)
-CH4 = Chemical('CH4', cache=True)
 GWP = 'GWP'
 
 # All values in cradle-to-gate except for CH4, which is in cradle-to-grave
@@ -35,7 +32,7 @@ GWP_characterization_factors = { # Material GWP cradle-to-gate [kg*CO2*eq / kg]
     'gasoline': 0.84, # GREET
     'methanol': 0.45, # GREET, Natural gas to methanol
     'NaOCH3': 1.5871, # Ecoinvent, TRACI, sodium methoxide
-    'CH4': 0.33 + CO2.MW / CH4.MW, # Natural gas from shell conventional recovery, GREET; includes non-biogenic emissions
+    'CH4': 0.33, # Natural gas from shell conventional recovery, GREET; includes non-biogenic emissions
     'Electricity': 0.36 # [kg*CO2*eq / kWhr] From GREET; NG-Fired Simple-Cycle Gas Turbine CHP Plant
 }
 

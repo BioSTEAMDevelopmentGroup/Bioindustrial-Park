@@ -438,7 +438,7 @@ def load(name, cache={}, reduce_chemicals=True, enhanced_cellulosic_performance=
     set_GWPCF(s.crude_glycerol, 'crude-glycerol', dilution=0.80)
     set_GWPCF(s.biodiesel, 'biodiesel')
     bst.PowerUtility.characterization_factors[GWP] = GWP_characterization_factors['Electricity']
-    natural_gas_streams = [s.natural_gas]
+    dct['natural_gas_streams'] = natural_gas_streams = [s.natural_gas]
     if abs(number) == 1: natural_gas_streams.append(s.dryer_natural_gas)
     for stream in natural_gas_streams:
         set_GWPCF(stream, 'CH4')
@@ -683,7 +683,8 @@ def load(name, cache={}, reduce_chemicals=True, enhanced_cellulosic_performance=
     @default_gwp(s.natural_gas.characterization_factors[GWP], name='GWP', 
                  element=s.natural_gas, units='kg*CO2-eq/kg')
     def set_natural_gas_GWP(value):
-        s.cellulase.characterization_factors[GWP] = value
+        for ng in natural_gas_streams:
+            ng.characterization_factors[GWP] = value
     
     s.natural_gas.phase = 'g'
     s.natural_gas.set_property('T', 60, 'degF')
@@ -705,16 +706,30 @@ def load(name, cache={}, reduce_chemicals=True, enhanced_cellulosic_performance=
             power_utility = bst.PowerUtility.sum([i.power_utility for i in mode.system.cost_units])
             return power_utility.rate
         
+        @sys.operation_metric(annualize=True)
+        def direct_nonbiogenic_emissions(mode):
+            return sum([i.F_mol for i in natural_gas_streams]) * chemicals.CO2.MW
+        
     else:
         feedstock_flow = lambda: sys.operating_hours * feedstock.F_mass / kg_per_ton # ton/yr
         biodiesel_flow = lambda: sys.operating_hours * s.biodiesel.F_mass / 3.3111 # gal/yr
         ethanol_flow = lambda: sys.operating_hours * s.ethanol.F_mass / 2.98668849 # gal/yr
         crude_glycerol_flow = lambda: sys.operating_hours * s.crude_glycerol.F_mass # kg/yr
         natural_gas_flow = lambda: sum([i.F_mass for i in natural_gas_streams]) * sys.operating_hours * V_ng # cf/yr
+        direct_nonbiogenic_emissions = lambda: sum([i.F_mol for i in natural_gas_streams]) * chemicals.CO2.MW * sys.operating_hours
         if number <= 1:
             electricity = lambda: sys.operating_hours * sum([i.rate for i in sys.power_utilities])
         elif number == 2:
             electricity = lambda: 0.
+    
+    sys.define_process_impact(
+        key=GWP,
+        name='Direct non-biogenic emissions',
+        basis='kg',
+        inventory=direct_nonbiogenic_emissions,
+        CF=1.,
+    )
+    
     dct['flows'] = {
         'feedstock': feedstock_flow,
         'biodiesel': biodiesel_flow,
@@ -777,13 +792,14 @@ def load(name, cache={}, reduce_chemicals=True, enhanced_cellulosic_performance=
     @metric(name='GWP', element='Economic allocation', units='kg*CO2*eq / USD')
     def GWP_economic(): # Cradle to gate
         GWP_material = sys.get_total_feeds_impact(GWP) # kg CO2 eq. / yr
+        GWP_emissions = sys.get_process_impact(GWP) # kg CO2 eq. / yr
         sales = (
             biodiesel_flow() * mean_biodiesel_price
             + ethanol_flow() * mean_ethanol_price
             + crude_glycerol_flow() * mean_glycerol_price
             + max(-electricity(), 0) * mean_electricity_price
         )
-        return GWP_material / sales
+        return (GWP_material + GWP_emissions) / sales
 
     @metric(name='Ethanol GWP', element='Economic allocation', units='kg*CO2*eq / gal')
     def GWP_ethanol(): # Cradle to gate
@@ -815,7 +831,8 @@ def load(name, cache={}, reduce_chemicals=True, enhanced_cellulosic_performance=
         GWP_material = sys.get_total_feeds_impact(GWP)
         GWP_electricity_production = GWP_characterization_factors['Electricity'] * electricity_production.get() * feedstock_consumption.get()
         GWP_coproducts = sys.get_total_products_impact(GWP)
-        GWP_total = GWP_material - GWP_electricity_production - GWP_coproducts # kg CO2 eq. / yr
+        GWP_emissions = sys.get_process_impact(GWP) # kg CO2 eq. / yr
+        GWP_total = GWP_material + GWP_emissions - GWP_electricity_production - GWP_coproducts # kg CO2 eq. / yr
         return GWP_total / (ethanol_production.get() * feedstock_consumption.get())
     
     # import thermosteam as tmo
@@ -826,8 +843,8 @@ def load(name, cache={}, reduce_chemicals=True, enhanced_cellulosic_performance=
     @metric(name='Biofuel GWP', element='Energy allocation', units='kg*CO2*eq / GGE')
     def GWP_biofuel_allocation(): # Cradle to gate
         GWP_material = sys.get_total_feeds_impact(GWP)
-        GWP_coproducts = sys.get_total_products_impact(GWP)
-        GWP_total = GWP_material - GWP_coproducts # kg CO2 eq. / yr
+        GWP_emissions = sys.get_process_impact(GWP) # kg CO2 eq. / yr
+        GWP_total = GWP_material + GWP_emissions # kg CO2 eq. / yr
         GGE_biodiesel_annual = (biodiesel_production.get() * feedstock_consumption.get()) / 0.9536
         GGE_ethanol_annual = (ethanol_production.get() * feedstock_consumption.get()) / 1.5
         GEE_electricity_production = max(-electricity() * 3600 / 114000, 0.) 

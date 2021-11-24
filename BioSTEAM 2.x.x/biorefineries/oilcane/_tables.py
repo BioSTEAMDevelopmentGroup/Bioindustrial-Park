@@ -73,7 +73,6 @@ def save_detailed_life_cycle_tables():
         )
     except:
         pass
-    
     def get(configuration, name):
         oc.load(configuration)
         return getattr(oc, name)
