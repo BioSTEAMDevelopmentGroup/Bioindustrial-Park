@@ -386,7 +386,7 @@ def plot_spearman(configuration, top=None, agile=True, labels=None, metric=None,
         (f'Methanol GWPCF [0.338 $-$ 0.563 {material_GWP}]', ['S1', 'S2', 'S1*', 'S2*']),
         (f'Pure glycerine GWPCF [1.25 $-$ 2.08 {material_GWP}]', ['S1', 'S2', 'S1*', 'S2*']),
         (f'Cellulase GWPCF [6.05 $-$ 10.1 {material_GWP}]', ['S1', 'O1', 'S1*', 'O1*']),
-        (f'Natural gas GWPCF [2.30 $-$ 3.84 {material_GWP}]', ['S1', 'O1', 'S1*', 'O1*']),
+        (f'Natural gas GWPCF [0.297 $-$ 0.363 {material_GWP}]', ['S1', 'O1', 'S1*', 'O1*']),
     ])
     ignored_dct = {
         'S1': [],

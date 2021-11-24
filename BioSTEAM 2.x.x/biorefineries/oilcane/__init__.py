@@ -678,7 +678,7 @@ def load(name, cache={}, reduce_chemicals=True, enhanced_cellulosic_performance=
     @default_gwp(s.cellulase.characterization_factors[GWP], name='GWP', 
                  element=s.cellulase, units='kg*CO2-eq/kg')
     def set_cellulase_GWP(value):
-        s.cellulase.characterization_factors[GWP] = value
+        s.cellulase.characterization_factors[GWP] = value * 0.02
     
     @default_gwp(s.natural_gas.characterization_factors[GWP], name='GWP', 
                  element=s.natural_gas, units='kg*CO2-eq/kg')
