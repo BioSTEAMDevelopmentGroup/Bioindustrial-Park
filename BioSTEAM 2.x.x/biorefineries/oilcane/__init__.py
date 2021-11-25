@@ -718,7 +718,7 @@ def load(name, cache={}, reduce_chemicals=True, enhanced_cellulosic_performance=
         natural_gas_flow = lambda: sum([i.F_mass for i in natural_gas_streams]) * sys.operating_hours * V_ng # cf/yr
         direct_nonbiogenic_emissions = lambda: sum([i.F_mol for i in natural_gas_streams]) * chemicals.CO2.MW * sys.operating_hours
         if number <= 1:
-            electricity = lambda: sys.operating_hours * sum([i.rate for i in sys.power_utilities])
+            electricity = lambda: sys.operating_hours * sys.power_utility.rate
         elif number == 2:
             electricity = lambda: 0.
     
