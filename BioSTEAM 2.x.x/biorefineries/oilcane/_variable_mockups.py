@@ -69,8 +69,8 @@ from biosteam import MockVariable
  biodiesel_production_derivative, ethanol_production_derivative, 
  electricity_production_derivative, natural_gas_consumption_derivative, 
  TCI_derivative, GWP_economic_derivative, 
- GWP_biodiesel_derivative, GWP_ethanol_derivative, GWP_electricity_derivative, 
- GWP_crude_glycerol_derivative,
+ GWP_ethanol_derivative, GWP_biodiesel_derivative,
+ GWP_crude_glycerol_derivative, GWP_electricity_derivative
  ) = all_metric_mockups = (
     MockVariable('MFPP', 'USD/ton', 'Biorefinery'),
     MockVariable('Feedstock consumption', 'ton/yr', 'Biorefinery'),

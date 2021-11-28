@@ -161,12 +161,15 @@ def plot_monte_carlo(derivative=False, absolute=True, comparison=True,
     if kind is None: kind = 'TEA'
     if configuration_names is None: configuration_names = oc.configuration_names
     if comparison_names is None: comparison_names = oc.comparison_names
+    factors = []
     if kind == 'TEA':
         if derivative:
             configuration_names = ['O1', 'O2']
             comparison_names = ['O2 - O1']
             MFPP, TCI, *production, electricity_production, natural_gas_consumption = tea_monte_carlo_derivative_metric_mockups
+            GWP_economic = lca_monte_carlo_derivative_metric_mockups[0]
         else:
+            GWP_economic = lca_monte_carlo_metric_mockups[0]
             MFPP, TCI, *production, electricity_production, natural_gas_consumption = tea_monte_carlo_metric_mockups
         rows = [
             MFPP, 
@@ -174,6 +177,7 @@ def plot_monte_carlo(derivative=False, absolute=True, comparison=True,
             production,
             electricity_production,
             natural_gas_consumption,
+            GWP_economic,
         ]
         N_rows = len(rows)
         fig, axes = plt.subplots(ncols=1, nrows=N_rows)
@@ -185,6 +189,7 @@ def plot_monte_carlo(derivative=False, absolute=True, comparison=True,
             f"Production\n[{format_units('Gal/ton')}]",
             f"Elec. prod.\n[{format_units('kWhr/ton')}]",
             f"NG cons.\n[{format_units('cf/ton')}]",
+            f"Unallocated GWP\n[{format_units('g CO2-eq / USD')}]",
         ]
         if derivative:
             ylabels = [
@@ -193,23 +198,25 @@ def plot_monte_carlo(derivative=False, absolute=True, comparison=True,
                 r"$\Delta$" + format_units(r"Prod./OC").replace('cdot', r'cdot \Delta') + f"\n[{format_units('Gal/ton')}]",
                 r"$\Delta$" + format_units(r"EP/OC").replace('cdot', r'cdot \Delta') + f"\n[{format_units('kWhr/ton')}]",
                 r"$\Delta$" + format_units(r"NGC/OC").replace('cdot', r'cdot \Delta') + f"\n[{format_units('cf/ton')}]"
+                r"$\Delta$" + format_units(r"GWP/OC").replace('cdot', r'cdot \Delta') + f"\n[{format_units('g CO2-eq / USD')}]",
             ]
         elif comparison and not absolute:
             ylabels = [r"$\Delta$" + i for i in ylabels]
         step_min = 1 if derivative else 30
         color_wheel = CABBI_colors.wheel()
+        factors = [(-1, 1000)]
     elif kind == 'LCA':
         if derivative:
             configuration_names = ['O1', 'O2']
             comparison_names = ['O2 - O1']
-            GWP_biodiesel, GWP_ethanol, GWP_crude_glycerol, GWP_electricity, = lca_monte_carlo_derivative_metric_mockups
+            GWP_economic, GWP_biodiesel, GWP_ethanol, GWP_crude_glycerol, GWP_electricity, = lca_monte_carlo_derivative_metric_mockups
         else:
-            GWP_biodiesel, GWP_ethanol, GWP_crude_glycerol, GWP_electricity, = lca_monte_carlo_metric_mockups
+            GWP_economic, GWP_biodiesel, GWP_ethanol, GWP_crude_glycerol, GWP_electricity, = lca_monte_carlo_metric_mockups
         rows = [
             GWP_ethanol,
             GWP_biodiesel,
-            GWP_electricity,
-            GWP_crude_glycerol,
+            # GWP_electricity,
+            # GWP_crude_glycerol,
         ]
         N_rows = len(rows)
         fig, axes = plt.subplots(ncols=1, nrows=N_rows)
@@ -217,19 +224,22 @@ def plot_monte_carlo(derivative=False, absolute=True, comparison=True,
         ylabels = [
             f"Ethanol GWP\n[{format_units('kg CO2-eq / gal')}]",
             f"Biodiesel GWP\n[{format_units('kg CO2-eq / gal')}]",
-            f"Crude glycerol GWP\n[{format_units('kg CO2-eq / kg')}]",
-            f"Electricity GWP\n[{format_units('kg CO2-eq / MWhr')}]",
+            # f"Crude glycerol GWP\n[{format_units('kg CO2-eq / kg')}]",
+            # f"Electricity GWP\n[{format_units('kg CO2-eq / MWhr')}]",
         ]
         if derivative:
             ylabels = [
                 r"Ethanol $\Delta$" + format_units(r"GWP/OC").replace('cdot', r'cdot \Delta') + f"\n[{format_units('kg CO2-eq / gal')}]",
                 r"Biodiesel $\Delta$" + format_units(r"GWP/OC").replace('cdot', r'cdot \Delta') + f"\n[{format_units('kg CO2-eq / gal')}]",
-                r"Crude glycerol $\Delta$" + format_units(r"GWP/OC").replace('cdot', r'cdot \Delta') + f"\n[{format_units('kg CO2-eq / kg')}]",
-                r"Electricity $\Delta$" + format_units(r"GWP/OC").replace('cdot', r'cdot \Delta') + f"\n[{format_units('kg CO2-eq / kg')}]",
+                # r"Crude glycerol $\Delta$" + format_units(r"GWP/OC").replace('cdot', r'cdot \Delta') + f"\n[{format_units('kg CO2-eq / kg')}]",
+                # r"Electricity $\Delta$" + format_units(r"GWP/OC").replace('cdot', r'cdot \Delta') + f"\n[{format_units('kg CO2-eq / kg')}]",
             ]
         step_min = 0.01 if derivative else 0.1
         color_list = list(CABBI_colors)
-        color_wheel = CABBI_colors.wheel([color_list[i].ID for i in [2, 3, 0, 1]])
+        color_index = [
+            2, 3, # 0, 1
+        ]
+        color_wheel = CABBI_colors.wheel([color_list[i].ID for i in color_index])
     
     combined = absolute and comparison
     if not agile:
@@ -267,7 +277,8 @@ def plot_monte_carlo(derivative=False, absolute=True, comparison=True,
             )
     
     data = np.zeros([N_rows, N_cols], dtype=object)
-    data[:] =[[get_data(i, j) for j in columns] for i in rows]
+    data[:] = [[get_data(i, j) for j in columns] for i in rows]
+    for i, j in factors: data[i, :] *= j
     if tickmarks is None: 
         tickmarks = [
             bst.plots.rounded_tickmarks_from_data(
