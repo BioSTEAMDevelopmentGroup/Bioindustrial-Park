@@ -702,11 +702,6 @@ def load(name, cache={}, reduce_chemicals=True, enhanced_cellulosic_performance=
         crude_glycerol_flow = lambda: sys.flow_rates.get(s.crude_glycerol, 0.) # kg/yr
         
         @sys.operation_metric(annualize=True)
-        def electricity(mode):
-            power_utility = bst.PowerUtility.sum([i.power_utility for i in mode.system.cost_units])
-            return power_utility.rate
-        
-        @sys.operation_metric(annualize=True)
         def direct_nonbiogenic_emissions(mode):
             return sum([i.F_mol for i in natural_gas_streams]) * chemicals.CO2.MW
         
@@ -717,10 +712,7 @@ def load(name, cache={}, reduce_chemicals=True, enhanced_cellulosic_performance=
         crude_glycerol_flow = lambda: sys.operating_hours * s.crude_glycerol.F_mass # kg/yr
         natural_gas_flow = lambda: sum([i.F_mass for i in natural_gas_streams]) * sys.operating_hours * V_ng # cf/yr
         direct_nonbiogenic_emissions = lambda: sum([i.F_mol for i in natural_gas_streams]) * chemicals.CO2.MW * sys.operating_hours
-        if number <= 1:
-            electricity = lambda: sys.operating_hours * sys.power_utility.rate
-        elif number == 2:
-            electricity = lambda: 0.
+    electricity = lambda: sys.operating_hours * sys.power_utility.rate
     
     sys.define_process_impact(
         key=GWP,
@@ -1014,7 +1006,7 @@ def load(name, cache={}, reduce_chemicals=True, enhanced_cellulosic_performance=
     HXN.force_ideal_thermo = True
     HXN.cache_network = True
     HXN.simulate()
-    
+
 # DO NOT DELETE: For removing ylabel and yticklabels and combine plots
 # import biorefineries.oilcane as oc
 # import matplotlib.pyplot as plt
