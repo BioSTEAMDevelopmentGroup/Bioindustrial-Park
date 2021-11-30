@@ -20,7 +20,7 @@ from biosteam import MockVariable
  set_cofermentation_titer, set_cofermentation_productivity,
  set_cane_PL_content, set_sorghum_PL_content, set_cane_FFA_content,
  set_sorghum_FFA_content, set_TAG_to_FFA_conversion, set_oilcane_GWP,
- set_methanol_GWP, set_pure_glycerine_GWP, set_cellulase_GWP,
+ set_methanol_GWP, set_pure_glycerine_GWP, set_cellulase_GWP, set_natural_gas_GWP
  ) = all_parameter_mockups = (
     MockVariable('Oil retention', '%', 'Stream-sugarcane'),
     MockVariable('Bagasse oil extraction efficiency', '%', 'Stream-sugarcane'),
@@ -56,6 +56,7 @@ from biosteam import MockVariable
     MockVariable('GWP', 'kg*CO2-eq/kg', 'Stream-methanol'),
     MockVariable('GWP', 'kg*CO2-eq/kg', 'Stream-pure glycerine'),
     MockVariable('GWP', 'kg*CO2-eq/kg', 'Stream-cellulase'),
+    MockVariable('GWP', 'kg*CO2-eq/kg', 'Stream-natural gas'),
 )
      
 (MFPP, feedstock_consumption, biodiesel_production, ethanol_production, 
@@ -68,8 +69,8 @@ from biosteam import MockVariable
  biodiesel_production_derivative, ethanol_production_derivative, 
  electricity_production_derivative, natural_gas_consumption_derivative, 
  TCI_derivative, GWP_economic_derivative, 
- GWP_biodiesel_derivative, GWP_ethanol_derivative, GWP_electricity_derivative, 
- GWP_crude_glycerol_derivative,
+ GWP_ethanol_derivative, GWP_biodiesel_derivative,
+ GWP_crude_glycerol_derivative, GWP_electricity_derivative
  ) = all_metric_mockups = (
     MockVariable('MFPP', 'USD/ton', 'Biorefinery'),
     MockVariable('Feedstock consumption', 'ton/yr', 'Biorefinery'),
@@ -121,6 +122,7 @@ tea_monte_carlo_derivative_metric_mockups = (
 )
 
 lca_monte_carlo_metric_mockups = (
+    GWP_economic,
     GWP_biodiesel, 
     GWP_ethanol,
     GWP_electricity,
@@ -128,6 +130,7 @@ lca_monte_carlo_metric_mockups = (
 )
 
 lca_monte_carlo_derivative_metric_mockups = (
+    GWP_economic_derivative,
     GWP_biodiesel_derivative, 
     GWP_ethanol_derivative,
     GWP_electricity_derivative,

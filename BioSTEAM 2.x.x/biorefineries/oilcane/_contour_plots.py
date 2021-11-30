@@ -114,7 +114,7 @@ def plot_ethanol_and_biodiesel_price_contours(N=30, benefit=False, cache={},
             CS = plt.contour(X, Y, data=data, zorder=1e16, linestyles='dashed', linewidths=1.,
                              levels=levels, colors=[linecolor])
             ax.clabel(CS, levels=CS.levels, inline=True, fmt=lambda x: f'{round(x):,}',
-                      fontsize=10, colors=[linecolor], zorder=1e16)
+                      colors=[linecolor], zorder=1e16)
 
     plt.show()
     
@@ -208,7 +208,7 @@ def plot_extraction_efficiency_and_oil_content_contours(load=False, metric_index
     metric_bar = MetricBar(metric.name, units, colormaps[metric_index], tickmarks(data, 5, 5), 18, N_decimals=N_decimals)
     fig, axes, CSs, CB = plot_contour_single_metric(
         100.*X, 100.*Y, data, xlabel, ylabels, xticks, yticks, metric_bar, 
-        fillblack=False, styleaxiskw=dict(xtick0=False), label=True,
+        fillcolor=None, styleaxiskw=dict(xtick0=False), label=True,
         titles=['CONVENTIONAL', 'CELLULOSIC'],
     )
     M = len(configurations)
@@ -225,7 +225,7 @@ def plot_extraction_efficiency_and_oil_content_contours(load=False, metric_index
             CS = plt.contour(100.*X, 100.*Y, data=metric_data, zorder=1e16, linestyles='dashed', linewidths=1.,
                              levels=levels, colors=[linecolor])
             ax.clabel(CS, levels=CS.levels, inline=True, fmt=lambda x: f'{round(x):,}',
-                      fontsize=10, colors=[linecolor], zorder=1e16)
+                      colors=[linecolor], zorder=1e16)
             if j == 0:
                 lb = 50.0
                 ub = 70.0

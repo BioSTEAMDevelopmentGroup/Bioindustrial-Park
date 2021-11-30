@@ -36,6 +36,7 @@ from ._contour_plots import *
 from ._lca_characterization_factors import *
 from ._load_data import *
 from ._parse_configuration import *
+from ._variable_mockups import *
 
 __all__ = (
     units.__all__,
@@ -75,6 +76,7 @@ from ._system import (
 )
 from ._parse_configuration import (
     parse,
+    format_configuration,
 )
 from ._tea import (
     create_tea,
@@ -90,12 +92,17 @@ from ._distributions import (
     mean_biodiesel_price,
     mean_ethanol_price,
     mean_glycerol_price,
+    mean_natural_gas_price,
     mean_electricity_price,
 )
 from ._lca_characterization_factors import (
     GWP_characterization_factors,
     set_GWPCF,
     GWP,
+)
+from ._tables import (
+    save_detailed_expenditure_tables, 
+    save_detailed_life_cycle_tables
 )
 from biorefineries import cornstover as cs
 
@@ -160,7 +167,7 @@ _derivative_disabled = True
 
 def load(name, cache={}, reduce_chemicals=True, enhanced_cellulosic_performance=False):
     dct = globals()
-    number, agile = dct['configuration'] = parse(name)
+    number, agile = dct['configuration'] = configuration = parse(name)
     key = (number, agile, enhanced_cellulosic_performance)
     if key in cache:
         dct.update(cache[key])
@@ -169,7 +176,7 @@ def load(name, cache={}, reduce_chemicals=True, enhanced_cellulosic_performance=
     global oil_extraction_specification, model, unit_groups
     global HXN, BT
     if not _chemicals_loaded: load_chemicals()
-    flowsheet_name = name
+    flowsheet_name = format_configuration(configuration)
     if enhanced_cellulosic_performance:
         flowsheet_name += '_enhanced_fermentation'
     flowsheet = bst.Flowsheet(flowsheet_name)
@@ -431,10 +438,10 @@ def load(name, cache={}, reduce_chemicals=True, enhanced_cellulosic_performance=
     set_GWPCF(s.crude_glycerol, 'crude-glycerol', dilution=0.80)
     set_GWPCF(s.biodiesel, 'biodiesel')
     bst.PowerUtility.characterization_factors[GWP] = GWP_characterization_factors['Electricity']
-    natural_gas_streams = [s.natural_gas]
+    dct['natural_gas_streams'] = natural_gas_streams = [s.natural_gas]
     if abs(number) == 1: natural_gas_streams.append(s.dryer_natural_gas)
     for stream in natural_gas_streams:
-        set_GWPCF(s.dryer_natural_gas, 'CH4')
+        set_GWPCF(stream, 'CH4')
     
     ## Model
     model = bst.Model(sys, exception_hook='raise', retry_evaluation=False)
@@ -447,6 +454,11 @@ def load(name, cache={}, reduce_chemicals=True, enhanced_cellulosic_performance=
     def default(baseline, *args, **kwargs):
         lb = 0.75*baseline
         ub = 1.25*baseline
+        return parameter(*args, distribution=shape.Uniform(lb, ub), bounds=(lb, ub), **kwargs)
+    
+    def default_gwp(baseline, *args, **kwargs):
+        lb = 0.90*baseline
+        ub = 1.10*baseline
         return parameter(*args, distribution=shape.Uniform(lb, ub), bounds=(lb, ub), **kwargs)
     
     def triangular(lb, mid, ub, *args, **kwargs):
@@ -572,8 +584,10 @@ def load(name, cache={}, reduce_chemicals=True, enhanced_cellulosic_performance=
             # fermentor.loss[0].X = 0.03 # Baseline
             split = np.mean(u.S403.split)
             X1 = split * seed_train.reactions.X[0]
-            X3 = (glucose_to_ethanol_yield - X1) / (1 / (1 - X1)) 
-            X_excess = X3 - 1
+            X2 = split * seed_train.reactions.X[2]
+            X3 = (glucose_to_ethanol_yield - X1) / (1 - X1 - X2)
+            split = np.mean(u.S403.split)
+            X_excess = X3 * 1.0526 - 1
             if X_excess > 0.: breakpoint()
             fermentor.cofermentation.X[0] = X3
             fermentor.cofermentation.X[2] = X3 * 0.0526 # 95% towards ethanol, the other 5% goes towards cell mass
@@ -588,8 +602,9 @@ def load(name, cache={}, reduce_chemicals=True, enhanced_cellulosic_performance=
             xylose_to_ethanol_yield *= 0.01
             split = np.mean(u.S403.split)
             X1 = split * seed_train.reactions.X[1]
-            X3 = (xylose_to_ethanol_yield - X1) / (1 / (1 - X1)) 
-            X_excess = X3 - 1
+            X2 = split * seed_train.reactions.X[3]
+            X3 = (xylose_to_ethanol_yield - X1) / (1 - X1 - X2)
+            X_excess = X3 * 1.0526 - 1
             if X_excess > 0.: breakpoint()
             fermentor.cofermentation.X[1] = X3
             fermentor.cofermentation.X[3] = X3 * 0.0526 # 95% towards ethanol, the other 5% goes towards cell mass
@@ -639,14 +654,14 @@ def load(name, cache={}, reduce_chemicals=True, enhanced_cellulosic_performance=
         elif number == 2:
             u.R401.oil_reaction.X[0] = TAG_to_FFA_conversion / 100.
     
-    @default(feedstock.characterization_factors[GWP], name='GWP', 
+    @default_gwp(feedstock.characterization_factors[GWP], name='GWP', 
              element=feedstock, units='kg*CO2-eq/kg')
     def set_feedstock_GWP(value):
-        if number > 1:
+        if number > 0:
             feedstock.characterization_factors[GWP] = value
     
-    @default(s.methanol.characterization_factors[GWP], name='GWP', 
-             element=s.methanol, units='kg*CO2-eq/kg')
+    @default_gwp(s.methanol.characterization_factors[GWP], name='GWP', 
+                 element=s.methanol, units='kg*CO2-eq/kg')
     def set_methanol_GWP(value):
         s.methanol.characterization_factors[GWP] = value
     
@@ -655,15 +670,21 @@ def load(name, cache={}, reduce_chemicals=True, enhanced_cellulosic_performance=
     # def set_crude_glycerol_GWP(value):
     #     crude_glycerol.characterization_factors[GWP] = value
     
-    @default(s.pure_glycerine.characterization_factors[GWP], name='GWP', 
-             element=pure_glycerine, units='kg*CO2-eq/kg')
+    @default_gwp(s.pure_glycerine.characterization_factors[GWP], name='GWP', 
+                 element=pure_glycerine, units='kg*CO2-eq/kg')
     def set_pure_glycerine_GWP(value):
         s.pure_glycerine.characterization_factors[GWP] = value
     
-    @default(s.cellulase.characterization_factors[GWP], name='GWP', 
-             element=s.cellulase, units='kg*CO2-eq/kg')
+    @default_gwp(s.cellulase.characterization_factors[GWP], name='GWP', 
+                 element=s.cellulase, units='kg*CO2-eq/kg')
     def set_cellulase_GWP(value):
-        s.cellulase.characterization_factors[GWP] = value
+        s.cellulase.characterization_factors[GWP] = value * 0.02
+    
+    @default_gwp(s.natural_gas.characterization_factors[GWP], name='GWP', 
+                 element=s.natural_gas, units='kg*CO2-eq/kg')
+    def set_natural_gas_GWP(value):
+        for ng in natural_gas_streams:
+            ng.characterization_factors[GWP] = value
     
     s.natural_gas.phase = 'g'
     s.natural_gas.set_property('T', 60, 'degF')
@@ -681,9 +702,8 @@ def load(name, cache={}, reduce_chemicals=True, enhanced_cellulosic_performance=
         crude_glycerol_flow = lambda: sys.flow_rates.get(s.crude_glycerol, 0.) # kg/yr
         
         @sys.operation_metric(annualize=True)
-        def electricity(mode):
-            power_utility = bst.PowerUtility.sum([i.power_utility for i in mode.system.cost_units])
-            return power_utility.rate
+        def direct_nonbiogenic_emissions(mode):
+            return sum([i.F_mol for i in natural_gas_streams]) * chemicals.CO2.MW
         
     else:
         feedstock_flow = lambda: sys.operating_hours * feedstock.F_mass / kg_per_ton # ton/yr
@@ -691,10 +711,17 @@ def load(name, cache={}, reduce_chemicals=True, enhanced_cellulosic_performance=
         ethanol_flow = lambda: sys.operating_hours * s.ethanol.F_mass / 2.98668849 # gal/yr
         crude_glycerol_flow = lambda: sys.operating_hours * s.crude_glycerol.F_mass # kg/yr
         natural_gas_flow = lambda: sum([i.F_mass for i in natural_gas_streams]) * sys.operating_hours * V_ng # cf/yr
-        if number <= 1:
-            electricity = lambda: sys.operating_hours * sum([i.rate for i in sys.power_utilities])
-        elif number == 2:
-            electricity = lambda: 0.
+        direct_nonbiogenic_emissions = lambda: sum([i.F_mol for i in natural_gas_streams]) * chemicals.CO2.MW * sys.operating_hours
+    electricity = lambda: sys.operating_hours * sys.power_utility.rate
+    
+    sys.define_process_impact(
+        key=GWP,
+        name='Direct non-biogenic emissions',
+        basis='kg',
+        inventory=direct_nonbiogenic_emissions,
+        CF=1.,
+    )
+    
     dct['flows'] = {
         'feedstock': feedstock_flow,
         'biodiesel': biodiesel_flow,
@@ -757,13 +784,14 @@ def load(name, cache={}, reduce_chemicals=True, enhanced_cellulosic_performance=
     @metric(name='GWP', element='Economic allocation', units='kg*CO2*eq / USD')
     def GWP_economic(): # Cradle to gate
         GWP_material = sys.get_total_feeds_impact(GWP) # kg CO2 eq. / yr
+        GWP_emissions = sys.get_process_impact(GWP) # kg CO2 eq. / yr
         sales = (
             biodiesel_flow() * mean_biodiesel_price
             + ethanol_flow() * mean_ethanol_price
             + crude_glycerol_flow() * mean_glycerol_price
             + max(-electricity(), 0) * mean_electricity_price
         )
-        return GWP_material / sales
+        return (GWP_material + GWP_emissions) / sales
 
     @metric(name='Ethanol GWP', element='Economic allocation', units='kg*CO2*eq / gal')
     def GWP_ethanol(): # Cradle to gate
@@ -790,12 +818,13 @@ def load(name, cache={}, reduce_chemicals=True, enhanced_cellulosic_performance=
         else:
             return 0.
 
-    @metric(name='Ethanol GWP', element='Displacement allocation', units='kg*CO2*eq / ga;')
+    @metric(name='Ethanol GWP', element='Displacement allocation', units='kg*CO2*eq / gal')
     def GWP_ethanol_displacement(): # Cradle to gate
         GWP_material = sys.get_total_feeds_impact(GWP)
         GWP_electricity_production = GWP_characterization_factors['Electricity'] * electricity_production.get() * feedstock_consumption.get()
         GWP_coproducts = sys.get_total_products_impact(GWP)
-        GWP_total = GWP_material - GWP_electricity_production - GWP_coproducts # kg CO2 eq. / yr
+        GWP_emissions = sys.get_process_impact(GWP) # kg CO2 eq. / yr
+        GWP_total = GWP_material + GWP_emissions - GWP_electricity_production - GWP_coproducts # kg CO2 eq. / yr
         return GWP_total / (ethanol_production.get() * feedstock_consumption.get())
     
     # import thermosteam as tmo
@@ -806,11 +835,11 @@ def load(name, cache={}, reduce_chemicals=True, enhanced_cellulosic_performance=
     @metric(name='Biofuel GWP', element='Energy allocation', units='kg*CO2*eq / GGE')
     def GWP_biofuel_allocation(): # Cradle to gate
         GWP_material = sys.get_total_feeds_impact(GWP)
-        GWP_coproducts = sys.get_total_products_impact(GWP)
-        GWP_total = GWP_material - GWP_coproducts # kg CO2 eq. / yr
+        GWP_emissions = sys.get_process_impact(GWP) # kg CO2 eq. / yr
+        GWP_total = GWP_material + GWP_emissions # kg CO2 eq. / yr
         GGE_biodiesel_annual = (biodiesel_production.get() * feedstock_consumption.get()) / 0.9536
         GGE_ethanol_annual = (ethanol_production.get() * feedstock_consumption.get()) / 1.5
-        GEE_electricity_production = max(-electricity() * 3600 / 131760, 0.) 
+        GEE_electricity_production = max(-electricity() * 3600 / 114000, 0.) 
         GEE_crude_glycerol = crude_glycerol_flow() * 0.1059
         return GWP_total / (GGE_biodiesel_annual + GGE_ethanol_annual + GEE_electricity_production + GEE_crude_glycerol)
     
@@ -926,10 +955,10 @@ def load(name, cache={}, reduce_chemicals=True, enhanced_cellulosic_performance=
     # Single point evaluation for detailed design results
     if abs(number) == 2:
         if enhanced_cellulosic_performance:
-            set_sorghum_glucose_yield.setter(95)
-            set_sorghum_xylose_yield.setter(95)
-            set_cane_glucose_yield.setter(95)
-            set_cane_xylose_yield.setter(95)
+            set_sorghum_glucose_yield.setter(97.5)
+            set_sorghum_xylose_yield.setter(97.5)
+            set_cane_glucose_yield.setter(97.5)
+            set_cane_xylose_yield.setter(97.5)
             set_glucose_to_ethanol_yield.setter(95)
             set_xylose_to_ethanol_yield.setter(95)
             set_cofermentation_titer.setter(120.)
@@ -937,17 +966,18 @@ def load(name, cache={}, reduce_chemicals=True, enhanced_cellulosic_performance=
         else:
             set_sorghum_glucose_yield.setter(79)
             set_sorghum_xylose_yield.setter(86)
-            set_cane_glucose_yield.setter(85)
-            set_cane_xylose_yield.setter(65)
-            set_glucose_to_ethanol_yield.setter(91)
-            set_xylose_to_ethanol_yield.setter(50.)
+            set_cane_glucose_yield.setter(91.0)
+            set_cane_xylose_yield.setter(97.5)
+            set_glucose_to_ethanol_yield.setter(90)
+            set_xylose_to_ethanol_yield.setter(42)
     oil_extraction_specification.load_oil_retention(0.70)
     oil_extraction_specification.load_oil_content(0.05)
     set_bagasse_oil_extraction_efficiency.setter(oil_extraction_efficiency_hook(0.))
-    set_ethanol_price.setter(1.898) 
-    set_biodiesel_price.setter(4.363)
-    set_natural_gas_price.setter(4.3)
-    set_electricity_price.setter(0.0641)
+    set_ethanol_price.setter(mean_ethanol_price) 
+    set_crude_glycerol_price.setter(mean_glycerol_price)
+    set_biodiesel_price.setter(mean_biodiesel_price)
+    set_natural_gas_price.setter(mean_natural_gas_price)
+    set_electricity_price.setter(mean_electricity_price)
     if number > 0:
         set_cane_PL_content.setter(10)
         set_cane_FFA_content.setter(10)
@@ -976,7 +1006,7 @@ def load(name, cache={}, reduce_chemicals=True, enhanced_cellulosic_performance=
     HXN.force_ideal_thermo = True
     HXN.cache_network = True
     HXN.simulate()
-    
+
 # DO NOT DELETE: For removing ylabel and yticklabels and combine plots
 # import biorefineries.oilcane as oc
 # import matplotlib.pyplot as plt
@@ -1023,6 +1053,21 @@ def load(name, cache={}, reduce_chemicals=True, enhanced_cellulosic_performance=
 #             'Sugarcane\nconventional\nagile', 'Oilcane\nconventional\nagile',
 #             'Sugarcane\ncellulosic\nagile', 'Oilcane\ncellulosic\nagile'],
 # )
+
+# # DO NOT DELETE: For GWP tables
+# from biorefineries import oilcane as oc
+# import biosteam as bst
+# def get_sys(ID):
+#     oc.load(ID)
+#     return oc.sys
+# def get_ethanol(ID):
+#     oc.load(ID)
+#     return oc.ethanol
+# IDs = ('S1', 'S2', 'O1', 'O2')
+# systems = [get_sys(i) for i in IDs]
+# items = [get_ethanol(i) for i in IDs]
+# bst.settings.define_impact_indicator('GWP', 'kg*CO2e')
+# bst.report.lca_table_displacement_allocation(systems, 'GWP', items, 'ethanol', system_names=IDs)
 
 # # Calculate xylose conversion based on net conversion of sugars
 # import biosteam as bst
