@@ -23,7 +23,7 @@ import numpy as np
 import thermosteam as tmo
 from math import exp
 from flexsolve import aitken_secant
-from biosteam import Unit
+from biosteam import Unit, BatchCrystallizer
 from biosteam.units import Flash, HXutility, Mixer, MixTank, Pump, \
     SolidsSeparator, StorageTank, LiquidsSplitSettler
 from biosteam.units.decorators import cost
@@ -706,6 +706,54 @@ class SeedHoldTank(Unit): pass
 # Separation
 # =============================================================================
 
+
+class SorbicAcidCrystallizer(BatchCrystallizer):
+    
+    def __init__(self, ID='', ins=None, outs=(), thermo=None, *, 
+                 T=250., crystal_SA_purity=0.98, melt_water_purity=0.90,
+                 order=None):
+        BatchCrystallizer.__init__(self, ID, ins, outs, thermo,
+                                       tau=5, V=1e6, T=T)
+        self.melt_AcTAG_purity = melt_AcTAG_purity
+        self.crystal_TAG_purity = crystal_TAG_purity
+
+    @property
+    def Hnet(self):
+        feed = self.ins[0]
+        effluent = self.outs[0]
+        if 's' in feed.phases:
+            H_in = - sum([i.Hfus * j for i,j in zip(self.chemicals, feed['s'].mol) if i.Hfus])
+        else:
+            H_in = 0.
+        solids = effluent['s']
+        H_out = - sum([i.Hfus * j for i,j in zip(self.chemicals, solids.mol) if i.Hfus])
+        return H_out - H_in
+        
+    def _run(self):
+        outlet = self.outs[0]
+        outlet.phases = ('s', 'l')
+        crystal_TAG_purity = self.crystal_TAG_purity
+        melt_AcTAG_purity = self.melt_AcTAG_purity
+        feed = self.ins[0]
+        TAG, AcTAG = feed.imass['TAG', 'AcTAG'].value
+        total = TAG + AcTAG
+        minimum_melt_purity = AcTAG / total
+        minimum_crystal_purity = TAG / total
+        outlet.empty()
+        if crystal_TAG_purity < minimum_crystal_purity:
+            outlet.imol['s'] = feed.mol
+        elif melt_AcTAG_purity < minimum_melt_purity:
+            outlet.imol['l'] = feed.mol
+        else: # Lever rule
+            crystal_AcTAG_purity = (1. - crystal_TAG_purity)
+            melt_fraction = (minimum_melt_purity - crystal_AcTAG_purity) / (melt_AcTAG_purity - crystal_AcTAG_purity)
+            melt = melt_fraction * total
+            AcTAG_melt = melt * melt_AcTAG_purity
+            TAG_melt = melt - AcTAG
+            outlet.imass['l', ('AcTAG', 'TAG')] = [AcTAG_melt, TAG_melt]
+            outlet.imol['s'] = feed.mol - outlet.imol['l']
+        outlet.T = self.T
+        
 # Filter to separate fermentation broth into products liquid and solid
 @cost(basis='Solids flow rate', ID='Feed tank', units='kg/hr',
       cost=174800, S=31815, CE=CEPCI[2010], n=0.7, BM=2.0)
@@ -1293,17 +1341,16 @@ class AnaerobicDigestion(Unit):
         wastewater = self.ins[0]	
         biogas, treated_water, sludge = self.outs	
         T = self.T	
-
         sludge.copy_flow(wastewater)	
         self.digestion_rxns(sludge.mol)	
         self.multi_stream.copy_flow(sludge)	
-        self.multi_stream.vle(P=101325, T=T)	
+        self.multi_stream.vle(P=101325, H=self.multi_stream.H)
         biogas.mol = self.multi_stream.imol['g']	
         biogas.phase = 'g'	
         liquid_mol = self.multi_stream.imol['l']	
         treated_water.mol = liquid_mol * self.split	
         sludge.mol = liquid_mol - treated_water.mol	
-        biogas.receive_vent(treated_water, accumulate=True)	
+        biogas.receive_vent(treated_water)	
         biogas.T = treated_water.T = sludge.T = T
         
     def _design(self):
