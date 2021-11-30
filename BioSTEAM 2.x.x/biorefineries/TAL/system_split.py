@@ -1238,6 +1238,27 @@ for ui in u:
 # TEA
 # =============================================================================
 
+# TAL_tea = CellulosicEthanolTEA(system=TAL_sys, IRR=0.10, duration=(2016, 2046),
+#         depreciation='MACRS7', income_tax=0.21, operating_days=0.9*365,
+#         lang_factor=None, construction_schedule=(0.08, 0.60, 0.32),
+#         startup_months=3, startup_FOCfrac=1, startup_salesfrac=0.5,
+#         startup_VOCfrac=0.75, WC_over_FCI=0.05,
+#         finance_interest=0.08, finance_years=10, finance_fraction=0.4,
+#         # biosteam Splitters and Mixers have no cost, 
+#         # cost of all wastewater treatment units are included in WWT_cost,
+#         # BT is not included in this TEA
+#         OSBL_units=(u.U101, u.WWT_cost,
+#                     u.T601, u.T602, u.T603, u.T606, u.T606_P,
+#                     u.CWP, u.CT, u.PWC, u.CIP, u.ADP, u.FWT, u.BT),
+#         warehouse=0.04, site_development=0.09, additional_piping=0.045,
+#         proratable_costs=0.10, field_expenses=0.10, construction=0.20,
+#         contingency=0.10, other_indirect_costs=0.10, 
+#         labor_cost=3212962*get_flow_tpd()/2205,
+#         labor_burden=0.90, property_insurance=0.007, maintenance=0.03,
+#         steam_power_depreciation='MACRS20', boiler_turbogenerator=u.BT)
+
+# TAL_no_BT_tea = TAL_tea
+
 TAL_tea = CellulosicEthanolTEA(system=TAL_sys, IRR=0.10, duration=(2016, 2046),
         depreciation='MACRS7', income_tax=0.21, operating_days=0.9*365,
         lang_factor=None, construction_schedule=(0.08, 0.60, 0.32),
@@ -1258,7 +1279,6 @@ TAL_tea = CellulosicEthanolTEA(system=TAL_sys, IRR=0.10, duration=(2016, 2046),
         steam_power_depreciation='MACRS20', boiler_turbogenerator=u.BT)
 
 TAL_no_BT_tea = TAL_tea
-
 
 # # Removed because there is not double counting anyways.
 # # Removes feeds/products of BT_sys from TAL_sys to avoid double-counting
