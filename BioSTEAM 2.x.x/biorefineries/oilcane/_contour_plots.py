@@ -38,10 +38,11 @@ markercolor = (*colors.orange_tint.RGBn, 1)
 edgecolor = (*colors.CABBI_black.RGBn, 1)
     
 CABBI_colors = (colors.CABBI_yellow.tint(75).RGBn, 
+                colors.CABBI_yellow.tint(30).RGBn,
                 colors.CABBI_yellow.RGBn,
-                colors.CABBI_green.RGBn,
-                colors.CABBI_teal_green.shade(60).RGBn,
-                colors.CABBI_teal_green.shade(90).RGBn)
+                colors.CABBI_green.tint(5).RGBn,
+                colors.CABBI_teal_green.shade(40).RGBn,
+                colors.CABBI_teal_green.shade(60).RGBn)
 
 CABBI_colors_x = (colors.CABBI_blue_light.tint(90).RGBn,
                   colors.CABBI_blue_light.tint(40).RGBn, 
@@ -70,8 +71,10 @@ letter_color = colors.neutral.shade(25).RGBn
 def plot_extraction_efficiency_and_oil_content_contours_manuscript():
     set_font(size=8)
     set_figure_size()
-    plot_extraction_efficiency_and_oil_content_contours(True)
-    plt.subplots_adjust(right=0.92, wspace=0.1, top=0.9, bottom=0.05)
+    plot_extraction_efficiency_and_oil_content_contours(
+        True,
+        letters=np.array([['A', 'C'], ['B', 'D']]))
+    plt.subplots_adjust(right=0.92, wspace=0.1, top=0.9, bottom=0.10)
     file = os.path.join(images_folder, 'montecarlo_main_manuscript.svg')
     plt.savefig(file, transparent=True)
 
@@ -194,7 +197,8 @@ def plot_relative_sorghum_oil_content_and_cane_oil_content_contours(
     )
     return fig, axes
     
-def plot_extraction_efficiency_and_oil_content_contours(load=False, metric_index=0, N_decimals=0, letters='ABCDEFG'):
+def plot_extraction_efficiency_and_oil_content_contours(load=False, metric_index=0, N_decimals=0,
+                                                        letters=None):
     # Generate contour data
     x = np.linspace(0.4, 1., 8)
     y = np.linspace(0.05, 0.15, 8)
@@ -235,6 +239,7 @@ def plot_extraction_efficiency_and_oil_content_contours(load=False, metric_index
     )
     M = len(configurations)
     N = len(agile)
+    letter_index = 0
     for i in range(N):
         for j in range(M):
             ax = axes[i, j]
@@ -267,11 +272,11 @@ def plot_extraction_efficiency_and_oil_content_contours(load=False, metric_index
             #                     edgecolor=edgecolor)
             # plot_scatter_points([ub], [15], marker='^', s=125, color=markercolor,
             #                     edgecolor=edgecolor)
-            if letters:
-                letter = letters[(j+1)*(i+1) + i - 1]
+            if letters is not None:
+                letter = letters[i, j]
                 xlb, xub = ax.get_xlim()
                 ylb, yub = ax.get_ylim()
-                ax.text((xlb + xub) * 0.65, (yub + ylb) * 0.30, letter, color=letter_color * 2,
+                ax.text((xlb + xub) * 0.68, (yub + ylb) * 0.70, letter, color=letter_color * 2.4,
                          horizontalalignment='center',verticalalignment='center',
                          fontsize=12, fontweight='bold', zorder=1e17)
     return fig, axes
