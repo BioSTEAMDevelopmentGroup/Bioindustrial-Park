@@ -329,6 +329,7 @@ BDO_lca = LCA(BDO_sys, BDO_chemicals, CFs, feedstock, 'Corn stover', MEK, [CT, C
               flowsheet('isobutanol'), {'GWP':(1.73+2.26)/2., 'FEC':(50.+52.)/2.}, # GWP100 and FEC from GREET 2020, average of Isobutanol from Fossil Energy "with Syngas from Coal" and "with Syngas from Natural Gas"
               BT=BT, CT=CT)
 
+
 #%% TEA breakdown
 def TEA_breakdown():
     metric_breakdowns = {i.name: {} for i in unit_groups[0].metrics}
