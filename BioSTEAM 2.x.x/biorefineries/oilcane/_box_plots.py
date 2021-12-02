@@ -186,7 +186,7 @@ def plot_spearman_tea_main_manuscript():
 
 def plot_spearman_lca_main_manuscript():
     set_font(size=8)
-    set_figure_size(aspect_ratio=0.80)
+    set_figure_size(aspect_ratio=0.65)
     plot_spearman(
         configurations=[
             'O1', 'O1*',
@@ -199,7 +199,7 @@ def plot_spearman_lca_main_manuscript():
         cutoff=0.03,
         kind='LCA',
     )
-    plt.subplots_adjust(left=0.45, right=0.975, top=0.98, bottom=0.08)
+    plt.subplots_adjust(left=0.45, right=0.975, top=0.98, bottom=0.10)
     file = os.path.join(images_folder, 'spearman_lca_main_manuscript.svg')
     plt.savefig(file, transparent=True)
 
