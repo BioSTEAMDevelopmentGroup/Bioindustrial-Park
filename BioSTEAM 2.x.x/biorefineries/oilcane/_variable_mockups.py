@@ -123,16 +123,16 @@ tea_monte_carlo_derivative_metric_mockups = (
 
 lca_monte_carlo_metric_mockups = (
     GWP_economic,
-    GWP_biodiesel, 
     GWP_ethanol,
+    GWP_biodiesel,
     GWP_electricity,
     GWP_crude_glycerol,
 )
 
 lca_monte_carlo_derivative_metric_mockups = (
     GWP_economic_derivative,
-    GWP_biodiesel_derivative, 
     GWP_ethanol_derivative,
+    GWP_biodiesel_derivative, 
     GWP_electricity_derivative,
     GWP_crude_glycerol_derivative,
 )

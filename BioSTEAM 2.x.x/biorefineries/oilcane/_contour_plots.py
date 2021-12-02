@@ -18,12 +18,17 @@ from biosteam.plots import (
     rounded_tickmarks_from_data as tickmarks
 )
 from thermosteam.units_of_measure import format_units
+from thermosteam.utils import set_figure_size, set_font
+from biorefineries.oilcane._load_data import images_folder
 from warnings import filterwarnings
 import os
 
-__all__ = ('plot_extraction_efficiency_and_oil_content_contours',
-           'plot_relative_sorghum_oil_content_and_cane_oil_content_contours',
-           'plot_ethanol_and_biodiesel_price_contours')
+__all__ = (
+    'plot_extraction_efficiency_and_oil_content_contours_manuscript',
+    'plot_extraction_efficiency_and_oil_content_contours',
+    'plot_relative_sorghum_oil_content_and_cane_oil_content_contours',
+    'plot_ethanol_and_biodiesel_price_contours'
+)
 
 filterwarnings('ignore', category=bst.utils.DesignWarning)
     
@@ -57,6 +62,20 @@ colormaps = [
     plt.cm.get_cmap('copper_r'),
     plt.cm.get_cmap('bone_r'),
 ] * 2
+
+letter_color = colors.neutral.shade(25).RGBn
+
+# %% Plot functions for publication
+
+def plot_extraction_efficiency_and_oil_content_contours_manuscript():
+    set_font(size=8)
+    set_figure_size()
+    plot_extraction_efficiency_and_oil_content_contours(True)
+    plt.subplots_adjust(right=0.92, wspace=0.1, top=0.9, bottom=0.05)
+    file = os.path.join(images_folder, 'montecarlo_main_manuscript.svg')
+    plt.savefig(file, transparent=True)
+
+# %%
 
 def plot_ethanol_and_biodiesel_price_contours(N=30, benefit=False, cache={}, 
                                               enhanced_cellulosic_performance=False,
@@ -115,8 +134,7 @@ def plot_ethanol_and_biodiesel_price_contours(N=30, benefit=False, cache={},
                              levels=levels, colors=[linecolor])
             ax.clabel(CS, levels=CS.levels, inline=True, fmt=lambda x: f'{round(x):,}',
                       colors=[linecolor], zorder=1e16)
-
-    plt.show()
+    return fig, axes
     
 def relative_sorghum_oil_content_and_cane_oil_content_data(load, relative):
     # Generate contour data
@@ -174,9 +192,9 @@ def plot_relative_sorghum_oil_content_and_cane_oil_content_contours(
         100.*X, 100.*Y, Z, data, xlabel, ylabel, xticks, yticks, metric_bars, 
         fillblack=False, styleaxiskw=dict(xtick0=True), label=True,
     )
-    plt.show()
+    return fig, axes
     
-def plot_extraction_efficiency_and_oil_content_contours(load=False, metric_index=0, N_decimals=0):
+def plot_extraction_efficiency_and_oil_content_contours(load=False, metric_index=0, N_decimals=0, letters='ABCDEFG'):
     # Generate contour data
     x = np.linspace(0.4, 1., 8)
     y = np.linspace(0.05, 0.15, 8)
@@ -205,7 +223,11 @@ def plot_extraction_efficiency_and_oil_content_contours(load=False, metric_index
     yticks = [5, 7.5, 10, 12.5, 15]
     metric = oc.all_metric_mockups[metric_index]
     units = metric.units if metric.units == '%' else format_units(metric.units)
-    metric_bar = MetricBar(metric.name, units, colormaps[metric_index], tickmarks(data, 5, 5), 18, N_decimals=N_decimals)
+    metric_bar = MetricBar(
+        metric.name, units, colormaps[metric_index], 
+        tickmarks(data, 5, 5), 18, N_decimals=N_decimals,
+        forced_size=0.3
+    )
     fig, axes, CSs, CB = plot_contour_single_metric(
         100.*X, 100.*Y, data, xlabel, ylabels, xticks, yticks, metric_bar, 
         fillcolor=None, styleaxiskw=dict(xtick0=False), label=True,
@@ -222,10 +244,10 @@ def plot_extraction_efficiency_and_oil_content_contours(load=False, metric_index
             lb = metric_data.min()
             ub = metric_data.max()
             levels = [i for i in CS.levels if lb <= i <= ub]
-            CS = plt.contour(100.*X, 100.*Y, data=metric_data, zorder=1e16, linestyles='dashed', linewidths=1.,
+            CS = plt.contour(100.*X, 100.*Y, data=metric_data, zorder=1, linestyles='dashed', linewidths=1.,
                              levels=levels, colors=[linecolor])
-            ax.clabel(CS, levels=CS.levels, inline=True, fmt=lambda x: f'{round(x):,}',
-                      colors=[linecolor], zorder=1e16)
+            # ax.clabel(CS, levels=CS.levels, inline=True, fmt=lambda x: f'{round(x):,}',
+            #           colors=[linecolor], zorder=1e16)
             if j == 0:
                 lb = 50.0
                 ub = 70.0
@@ -245,5 +267,11 @@ def plot_extraction_efficiency_and_oil_content_contours(load=False, metric_index
             #                     edgecolor=edgecolor)
             # plot_scatter_points([ub], [15], marker='^', s=125, color=markercolor,
             #                     edgecolor=edgecolor)
-
-    plt.show()
+            if letters:
+                letter = letters[(j+1)*(i+1) + i - 1]
+                xlb, xub = ax.get_xlim()
+                ylb, yub = ax.get_ylim()
+                ax.text((xlb + xub) * 0.65, (yub + ylb) * 0.30, letter, color=letter_color * 2,
+                         horizontalalignment='center',verticalalignment='center',
+                         fontsize=12, fontweight='bold', zorder=1e17)
+    return fig, axes
