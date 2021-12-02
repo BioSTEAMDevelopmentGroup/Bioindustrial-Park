@@ -75,8 +75,22 @@ def plot_extraction_efficiency_and_oil_content_contours_manuscript():
         True,
         letters=np.array([['A', 'C'], ['B', 'D']]))
     plt.subplots_adjust(right=0.92, wspace=0.1, top=0.9, bottom=0.10)
-    file = os.path.join(images_folder, 'montecarlo_main_manuscript.svg')
+    file = os.path.join(images_folder, 'extraction_efficiency_and_oil_content_contours.svg')
     plt.savefig(file, transparent=True)
+
+
+def plot_relative_sorghum_oil_content_and_cane_oil_content_contours_manuscript():
+    set_font(size=8)
+    set_figure_size()
+    plot_relative_sorghum_oil_content_and_cane_oil_content_contours(
+        True,
+        letters=np.array([['A', 'C'], ['B', 'D']]))
+    plt.subplots_adjust(right=0.92, wspace=0.1, top=0.9, bottom=0.10)
+    file = os.path.join(images_folder, 'extraction_efficiency_and_oil_content_contours.svg')
+    plt.savefig(file, transparent=True)
+
+
+
 
 # %%
 
@@ -164,7 +178,7 @@ def plot_relative_sorghum_oil_content_and_cane_oil_content_contours(
     # Generate contour data
     X, Y, data = relative_sorghum_oil_content_and_cane_oil_content_data(load, relative)
     
-    data = data[:, :, configuration_index, [0, 5, -6]]
+    data = data[:, :, configuration_index, [0, 6]]
     
     # Plot contours
     xlabel = "Sorghum oil content\n[dry wt. %]" 
@@ -173,8 +187,7 @@ def plot_relative_sorghum_oil_content_and_cane_oil_content_contours(
     yticks = [5, 7.5, 10, 12.5, 15]
     xticks = [-3, -2, -1, 0] if relative else [2, 5, 7.5, 10, 12.5, 15]
     MFPP = oc.all_metric_mockups[0]
-    TCI = oc.all_metric_mockups[5]
-    GWP_biofuel_displacement = oc.all_metric_mockups[-6]
+    TCI = oc.all_metric_mockups[6]
     if configuration_index == 0:
         Z = np.array(["AGILE-CONVENTIONAL"])
         data = data[:, :, :, np.newaxis]
@@ -188,12 +201,11 @@ def plot_relative_sorghum_oil_content_and_cane_oil_content_contours(
         raise ValueError('configuration index must be either 0 or 1')
     metric_bars = [
         MetricBar(MFPP.name, format_units(MFPP.units), colormaps[0], tickmarks(data[:, :, 0], 5, 5), 15, 1),
-        MetricBar(TCI.name, format_units(MFPP.units), colormaps[1], tickmarks(data[:, :, 1], 5, 5), 29),
-        MetricBar('GWP', format_units(GWP_biofuel_displacement.units), colormaps[2], tickmarks(data[:, :, 2], 5, 5), 29)
+        MetricBar(TCI.name, format_units(TCI.units), colormaps[1], tickmarks(data[:, :, 1], 5, 5), 29),
     ]
     fig, axes, CSs, CB = plot_contour_2d(
         100.*X, 100.*Y, Z, data, xlabel, ylabel, xticks, yticks, metric_bars, 
-        fillblack=False, styleaxiskw=dict(xtick0=True), label=True,
+        styleaxiskw=dict(xtick0=True), label=True,
     )
     return fig, axes
     
