@@ -4,6 +4,7 @@ Created on Thu Aug  1 21:48:12 2019
 
 @author: yoelr
 """
+
 from biosteam import TEA
 import thermosteam as tmo
 import biosteam as bst
@@ -14,25 +15,23 @@ __all__ = ('CellulosicEthanolTEA', 'create_tea',
            'capex_table', 'voc_table', 'foc_table')
 
 class CAPEXTableBuilder:
-    __slots__ = ('index', 'data')
+    __slots__ = ('index', 'cost', 'notes')
     
     def __init__(self):
         self.index = []
-        self.data =[]
+        self.cost = []
+        self.notes = []
     
-    def entry(self, index: str, cost: list, notes: str = '-'):
+    def entry(self, index: str, cost: float, notes: str = '-'):
         self.index.append(index)
-        self.data.append([notes, *cost])
-
-    @property
-    def total_costs(self):
-        N = len(self.data[0])
-        return [sum([i[index] for i in self.data]) for index in range(1, N)]
+        self.cost.append(cost)
+        self.notes.append(notes)
     
-    def table(self, names):
-        return pd.DataFrame(self.data, 
+    def table(self):
+        data = tuple(zip(self.notes, self.cost))
+        return pd.DataFrame(data, 
                             index=self.index,
-                            columns=('Notes', *[i + '\n[MM$]' for i in names])
+                            columns=('Notes', 'Cost [MM$]')
         )
 
 
@@ -79,6 +78,33 @@ class VOCTableBuilder:
         return pd.DataFrame(data, 
                             index=index,
                             columns=('Price [$/ton]', 'Cost [MM$ / yr]'))
+
+
+class FOCTableBuilder:
+    __slots__ = ('operating_days', 'index', 'price', 'notes')
+    
+    def __init__(self, operating_days):
+        self.operating_days = operating_days
+        self.index = []
+        self.price = []
+        self.notes = []
+        
+    def entry(self, index, cost, notes='-'):
+        self.index.append(index)
+        self.price.append(cost)
+        self.notes.append(notes)
+    
+    def table(self):
+        yearly_cost = np.array(self.price) * self.operating_days / 365.
+        data = tuple(zip(self.notes, self.price, yearly_cost))
+        return pd.DataFrame(data, 
+                            index=self.index,
+                            columns=(
+                                'Notes',
+                                'Price [MM$ / yr]',
+                                'Cost [MM$ / yr]',
+                            )
+        )
     
         
 class CellulosicEthanolTEA(TEA):
@@ -129,9 +155,10 @@ class CellulosicEthanolTEA(TEA):
         return self._steam_power_depreciation
     @steam_power_depreciation.setter
     def steam_power_depreciation(self, depreciation):
-        self._steam_power_depreciation_array = self._depreciation_array_from_key(
-            self._depreciation_key_from_name(depreciation)
-        )
+        try:
+            self._steam_power_depreciation_array = self.depreciation_schedules[depreciation]
+        except KeyError:
+            raise ValueError(f"depreciation must be either 'MACRS5', 'MACRS7', 'MACRS10' or 'MACRS15 (not {repr(depreciation)})")
         self._steam_power_depreciation = depreciation
     
     @property
@@ -150,7 +177,7 @@ class CellulosicEthanolTEA(TEA):
             return sum([i.installed_cost for i in self.OSBL_units])
     
     def _fill_depreciation_array(self, D, start, years, TDC):
-        depreciation_array = self._get_depreciation_array()
+        depreciation_array = self._depreciation_array
         N_depreciation_years = depreciation_array.size
         if N_depreciation_years > years:
             raise RuntimeError('depreciation schedule is longer than plant lifetime')
@@ -237,19 +264,17 @@ def create_tea(sys, OSBL_units=None, cls=None):
         boiler_turbogenerator=BT)
     return tea
 
-def capex_table(teas, names=None):
-    if isinstance(teas, bst.TEA): teas = [teas]
+def capex_table(tea):
     capex = CAPEXTableBuilder()
-    tea, *_ = teas
-    ISBL_installed_equipment_costs = np.array([i.ISBL_installed_equipment_cost / 1e6 for i in teas])
-    OSBL_installed_equipment_costs = np.array([i.OSBL_installed_equipment_cost / 1e6 for i in teas])
-    capex.entry('ISBL installed equipment cost', ISBL_installed_equipment_costs)
-    capex.entry('OSBL installed equipment cost', OSBL_installed_equipment_costs)
-    ISBL_factor_entry = lambda name, value: capex.entry(name, ISBL_installed_equipment_costs * value, f"{value:.1%} of ISBL")
+    ISBL_installed_equipment_cost = tea.ISBL_installed_equipment_cost / 1e6
+    OSBL_installed_equipment_cost = tea.OSBL_installed_equipment_cost / 1e6
+    capex.entry('ISBL installed equipment cost', ISBL_installed_equipment_cost)
+    capex.entry('OSBL installed equipment cost', OSBL_installed_equipment_cost)
+    ISBL_factor_entry = lambda name, value: capex.entry(name, ISBL_installed_equipment_cost * value, f"{value:.1%} of ISBL")
     ISBL_factor_entry('Warehouse', tea.warehouse)
     ISBL_factor_entry('Site development', tea.site_development)
     ISBL_factor_entry('Additional piping', tea.additional_piping)
-    TDC = np.array(capex.total_costs)
+    TDC = sum(capex.cost)
     capex.entry('Total direct cost (TDC)', TDC)
     TDC_factor_entry = lambda name, value: capex.entry(name, TDC * value, f"{value:.1%} of TDC")
     TDC_factor_entry('Proratable costs', tea.proratable_costs)
@@ -257,7 +282,7 @@ def capex_table(teas, names=None):
     TDC_factor_entry('Construction', tea.construction)
     TDC_factor_entry('Contingency', tea.contingency)
     TDC_factor_entry('Other indirect costs (start-up, permits, etc.)', tea.other_indirect_costs)
-    TIC = np.array(capex.total_costs) - 2 * TDC
+    TIC = sum(capex.cost) - 2 * TDC
     capex.entry('Total indirect cost', TIC)
     FCI = TDC + TIC
     capex.entry('Fixed capital investment (FCI)', FCI)
@@ -265,17 +290,27 @@ def capex_table(teas, names=None):
     capex.entry('Working capital', working_capital, f"{tea.WC_over_FCI:.1%} of FCI")
     TCI = FCI + working_capital
     capex.entry('Total capital investment (TCI)', TCI)
-    if names is None: names = [i.system.ID for i in teas]
-    return capex.table(names)
+    return capex.table()
 
-voc_table = bst.report.voc_table
+def voc_table(system, tea, main_products):
+    voc = VOCTableBuilder(tea.operating_days)
+    for i in system.feeds + system.products: 
+        if i in main_products: continue
+        if i.price and not i.isempty(): voc.entry(i)
+    isa = isinstance
+    for i in set(system.facilities):
+        if isa(i, bst.BoilerTurbogenerator):
+            natural_gas = i.ins[3]
+            if natural_gas.isempty(): continue
+            voc.entry(natural_gas, price=i.natural_gas_price * 907.185)
+    return voc.table()
 
 def foc_table(tea):
-    foc = bst.report.FOCTableBuilder()
+    foc = FOCTableBuilder(tea.operating_days)
     ISBL = tea.ISBL_installed_equipment_cost / 1e6
     labor_cost = tea.labor_cost / 1e6
     foc.entry('Labor salary', labor_cost)
     foc.entry('Labor burden', tea.labor_burden * labor_cost, '90% of labor salary')
     foc.entry('Maintenance', tea.maintenance * ISBL, f'{tea.maintenance:.1%} of ISBL')
-    foc.entry('Property insurance', tea.property_insurance * ISBL, f'{tea.property_insurance:.1%} of ISBL')
+    foc.entry('Property insurance', tea.property_insurance * ISBL, f'{tea.maintenance:.1%} of ISBL')
     return foc.table()

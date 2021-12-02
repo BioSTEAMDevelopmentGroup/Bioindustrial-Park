@@ -90,6 +90,10 @@ get_flow_tpd = lambda: (feedstock.F_mass-feedstock.imass['H2O'])*24/907.185
 u = F.unit
 s = F.stream
 # globals().update(F.to_dict())
+exclude_product_storage_costs = True
+if exclude_product_storage_costs:
+    u.T601._cost = lambda: None
+    
 
 # %%
 # =============================================================================
