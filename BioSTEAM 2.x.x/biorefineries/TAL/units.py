@@ -886,11 +886,12 @@ class Reactor(Unit, PressureVessel, isabstract=True):
             raise RuntimeError("invalid vessel type")
 
 #TODO:
-# 1. Find a source for recovery
-# 2. Do we need a backup reactor?
-# 3. Need electricity?
-# 4. Look into n
-# 5. Look into BM (bare module factor)
+# 1. Find a source for recovery - the only thing I found for this is in Woods 2007 section 5.3.1 "allow both phases to have > 20% of the diameter and no less than 0.2 m to ensure that the exit phases do not become cross-contaminated"
+# 2. Do we need a backup reactor? - need to discuss
+# 3. Need electricity? - I think so but I don't know how to account for this? Let's discuss.
+# 4. Look into n - mothi's thesis uses n=1, I canot find where I had previously found a value of 0.84
+# 5. Look into BM (bare module factor) - Sieder et al 2016 Table 16.11 use 4.16 for  a vertical pressure vessel
+# I also had in my notes to check the decanter usable % and I believe that is 90% but it already accounted for in the height sizing of adding an additional 10% to the height.
 @cost(basis='Flow rate', ID='Decanter', units='m3/s',
       cost=190000, S=0.0012, CE=CEPCI[2008], n=1, BM=2.3)
 class Decantation(Unit):
@@ -911,6 +912,10 @@ class Decantation(Unit):
     ----------
     1. Towler, G., & Sinnott, R. K. (2008). Chemical engineering design: principles, practice and economics of plant and process design.
     2. Peters, M. S., Timmerhaus, K. D., West, R. E., Timmerhaus, K., & West, R. (2003). Plant design and economics for chemical engineers (Vol. 4).
+    3. Density: https://pubchem.ncbi.nlm.nih.gov/compound/Sorbic-acid#section=Solubility
+    4. Seider, W. D., Lewin, D. R., Seader, J. D., Widagdo, S., Gani, R., Ming Ng, K. (2017) Product and Process Design Principles: Synthesis, Analysis, and Evaluation (4th Edition) Wiley.
+    5. M. Viswanathan. (2019) Process generalizations and rules of thumb for scaling up biobased processes.
+    6. Woods, D. R. (2007) Rules of Thumb in Engineering Practice, Wiley.
     '''
 
     _N_ins = 1
