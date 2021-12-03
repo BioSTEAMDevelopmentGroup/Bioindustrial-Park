@@ -18,7 +18,7 @@ from biosteam.units.design_tools.tank_design import (
     TankPurchaseCostAlgorithm
     )
 
-__all__ = ('IC_purchase_cost_algorithms', 'select_pipe',)
+__all__ = ('IC_purchase_cost_algorithms', 'select_pipe', 'cost_pump')
 
 
 # =============================================================================
@@ -95,6 +95,7 @@ pipe_dct = {
     48  : (48.000, 0.312)
     }
 
+
 def select_pipe(Q, v):
     '''Select pipe based on Q (flow in ft3/s) and velocity (ft/s)'''
     A = Q / v # cross-section area
@@ -105,3 +106,39 @@ def select_pipe(Q, v):
     OD, t = pipe_dct[boundaries[d_index]]
     ID = OD - 2*t # inner diameter, [in]
     return OD, t, ID
+
+
+def cost_pump(unit):
+    '''
+    Calculate the cost of the pump and pump building for a unit
+    based on its `Q_mgd` (hydraulic flow in million gallons per day),
+    `recir_ratio` (recirculation ratio) attributes.
+    '''
+
+    Q_mgd, recir_ratio = unit.Q_mgd, unit.recir_ratio
+
+    # Installed pump cost, this is a fitted curve
+    pumps = 2.065e5 + 7.721*1e4*Q_mgd
+
+    # Design capacity of intermediate pumps, gpm,
+    # 2 is the excess capacity factor to handle peak flows
+    GPMI = 2 * Q_mgd * 1e6 / 24 / 60
+
+    # Design capacity of recirculation pumps, gpm
+    GPMR = recir_ratio * Q_mgd * 1e6 / 24 / 60
+
+    building = 0.
+    for GPM in (GPMI, GPMR):
+        if GPM == 0:
+            N = 0
+        else:
+            N = 1 # number of buildings
+            GPMi = GPM
+            while GPMi > 80000:
+                N += 1
+                GPMi = GPM / N
+
+        PBA = N * (0.0284*GPM+640) # pump building area, [ft]
+        building += 90 * PBA
+
+    return pumps, building

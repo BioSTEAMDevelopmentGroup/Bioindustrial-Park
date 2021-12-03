@@ -184,7 +184,7 @@ lca_streams_wwt = [
     s.DAP,
     s.FGD_lime,
     s.ammonia,
-    s.bisulfite,
+    s.bisulfite_R602,
     s.cellulase,
     s.citric_R602,
     s.denaturant,

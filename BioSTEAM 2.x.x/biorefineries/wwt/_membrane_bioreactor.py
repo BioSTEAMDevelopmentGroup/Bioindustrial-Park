@@ -47,14 +47,13 @@ from biosteam.exceptions import DesignError
 from _chemicals import default_insolubles
 from _internal_circulation_rx import InternalCirculationRx
 from _wwt_pump import WWTpump
-from _polishing_filter import PolishingFilter
-from _settings import new_price
 from utils import (
     auom,
     compute_stream_COD,
     format_str,
     get_BD_dct,
     get_split_dct,
+    cost_pump,
     )
 
 __all__ = ('AnMBR',)
@@ -319,28 +318,20 @@ class AnMBR(bst.Unit):
         inf.mix_from((raw, recycled))
         self._inf = inf.copy() # this stream will be preserved (i.e., no reaction)
 
-        # Chemicals for cleaning
-        # Assume both chemicals are used up
+        # Chemicals for cleaning, assume all chemicals will be used up
         # 2.2 L/yr/cmd of 12.5 wt% solution (15% vol)
-        naocl_solution = (2.2/1e3/365/24) * (inf.F_vol*24) # m3/hr solution
         naocl.empty()
         naocl.imass['NaOCl', 'Water'] = [0.125, 1-0.125]
-        naocl.F_vol = naocl_solution
-        # Convert the price from $/L in the `new_price` dict to $/kg
-        naocl.price = (naocl.F_mass/naocl.F_vol) * new_price['NaOCl']
+        naocl.F_vol = (2.2/1e3/365/24) * (inf.F_vol*24) # m3/hr solution
 
         # 0.6 L/yr/cmd of 100 wt% solution, 13.8 lb/kg
-        citric_solution = (0.6/1e3/365/24) * (inf.F_vol*24) # m3/hr pure
         citric.empty()
-        citric.ivol['CitricAcid'] = citric_solution
-        citric.price = (citric.F_mass/citric.F_vol) * new_price['CitricAcid']
+        citric.ivol['CitricAcid'] = (0.6/1e3/365/24) * (inf.F_vol*24) # m3/hr pure
 
         # 0.35 L/yr/cmd of 38% solution, 3.5 lb/gal
-        bisulfite_solution = (0.35/1e3/365/24) * (inf.F_vol*24) # m3/hr solution
         bisulfite.empty()
         bisulfite.imass['Bisulfite', 'Water'] = [0.38, 1-0.38]
-        bisulfite.F_vol = bisulfite_solution
-        bisulfite.price = (bisulfite.F_mass/bisulfite.F_vol) * new_price['Bisulfite']
+        bisulfite.F_vol = (0.35/1e3/365/24) * (inf.F_vol*24) # m3/hr solution
 
         # For pump design
         self._compute_mod_case_tank_N()
@@ -740,7 +731,7 @@ class AnMBR(bst.Unit):
         # Note that maintenance and operating costs are included as a lumped
         # number in the biorefinery thus not included here
         # TODO: considering adding the O&M and letting user choose if to include
-        pumps, building = self._cost_pump()
+        pumps, building = cost_pump(self)
         C['Pumps'] = pumps
         C['Pump building'] = building if self.include_pump_building_cost else 0.
         C['Pump excavation'] = VEX/27*0.3 if self.include_excavation_cost else 0.
@@ -803,10 +794,6 @@ class AnMBR(bst.Unit):
         degassing = 3 * self.N_degasser # assume each uses 3 kW
 
         self.power_utility.rate = sparging + degassing + pumping + loss
-
-
-    # Called by _cost
-    _cost_pump = PolishingFilter._cost_pump
 
 
     # Called by _cost

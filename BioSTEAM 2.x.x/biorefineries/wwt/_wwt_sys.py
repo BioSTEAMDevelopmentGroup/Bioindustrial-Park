@@ -53,6 +53,7 @@ from _internal_circulation_rx import InternalCirculationRx
 from _polishing_filter import PolishingFilter
 from _membrane_bioreactor import AnMBR
 from _sludge_handling import BeltThickener, SludgeCentrifuge
+from _settings import new_price
 
 _mgd_to_cmh = auom('gallon').conversion_factor('m3')*1e6/24
 _gpm_to_cmh = auom('gallon').conversion_factor('m3')*60
@@ -216,8 +217,16 @@ def create_wastewater_treatment_units(ins, outs,
     if skip_R602:
         R602 = Skipped('R602', ins=R601-1, outs=R602_outs)
     else:
-        R602 = AnMBR('R602', ins=(R601-1, '', 'naocl_R602', 'citric_R602',
-                                  'bisulfite', 'air_R602'),
+        # Just setting the prices, flows will be updated upon simulation
+        naocl_R602 = tmo.Stream('naocl_R602', NaOCl=0.125, Water=1-0.125, units='kg/hr')
+        naocl_R602.price = (naocl_R602.F_mass/naocl_R602.F_vol/1000)*new_price['NaOCl'] # $/L to $/kg
+        citric_R602 = tmo.Stream('citric_R602', CitricAcid=1, units='kg/hr')
+        citric_R602.price = (citric_R602.F_mass/citric_R602.F_vol/1000)*new_price['CitricAcid'] # $/L to $/kg      
+        bisulfite_R602 = tmo.Stream('bisulfite_R602', Bisulfite=0.38, Water=1-0.38, units='kg/hr')
+        bisulfite_R602.price = (bisulfite_R602.F_mass/bisulfite_R602.F_vol/1000)*new_price['Bisulfite'] # $/L to $/kg           
+        
+        R602 = AnMBR('R602', ins=(R601-1, '', naocl_R602, citric_R602,
+                                  bisulfite_R602, 'air_R602'),
                      outs=R602_outs,
                      reactor_type='CSTR',
                      membrane_configuration='cross-flow',

@@ -28,7 +28,8 @@ from utils import (
     auom,
     compute_stream_COD,
     get_digestion_rxns,
-    get_split_dct
+    get_split_dct,
+    cost_pump,
     )
 
 __all__ = ('PolishingFilter',)
@@ -119,7 +120,7 @@ class PolishingFilter(bst.Unit):
                  OLR=(0.5+4)/24, # from the 0.5-4 kg/m3/d uniform range in ref [1]
                  HLR=(0.11+0.44)/2, # from the 0.11-0.44  uniform range in ref [1]
                  X_decomp=0.74, X_growth=0.22, # X_decomp & X_growth from ref[2]
-                 split=None, T=30+273.15,
+                 split={}, T=30+273.15,
                  include_degassing_membrane=False,
                  include_pump_building_cost=False,
                  include_excavation_cost=False):
@@ -396,7 +397,7 @@ class PolishingFilter(bst.Unit):
         # Note that maintenance and operating costs are included as a lumped
         # number in the biorefinery thus not included here
         # TODO: considering adding the O&M and letting user choose if to include
-        pumps, building = self._cost_pump()
+        pumps, building = cost_pump(self)
         C['Pumps'] = pumps
         C['Pump building'] = building if self.include_pump_building_cost else 0.
         C['Pump excavation'] = VEX/27*0.3 if self.include_excavation_cost else 0.
@@ -449,36 +450,6 @@ class PolishingFilter(bst.Unit):
         degassing = 3 * self.N_degasser # assume each uses 3 kW
 
         self.power_utility.rate = loss + pumping + degassing
-
-
-    def _cost_pump(self):
-        Q_mgd, recir_ratio = self.Q_mgd, self.recir_ratio
-
-        # Installed pump cost, this is a fitted curve
-        pumps = 2.065e5 + 7.721*1e4*Q_mgd
-
-        # Design capacity of intermediate pumps, gpm,
-        # 2 is the excess capacity factor to handle peak flows
-        GPMI = 2 * Q_mgd * 1e6 / 24 / 60
-
-        # Design capacity of recirculation pumps, gpm
-        GPMR = recir_ratio * Q_mgd * 1e6 / 24 / 60
-
-        building = 0.
-        for GPM in (GPMI, GPMR):
-            if GPM == 0:
-                N = 0
-            else:
-                N = 1 # number of buildings
-                GPMi = GPM
-                while GPMi > 80000:
-                    N += 1
-                    GPMi = GPM / N
-
-            PBA = N * (0.0284*GPM+640) # pump building area, [ft]
-            building += 90 * PBA
-
-        return pumps, building
 
 
     @property
