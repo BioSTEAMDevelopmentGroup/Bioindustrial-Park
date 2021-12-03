@@ -8,7 +8,8 @@ from ._variable_mockups import (
     tea_monte_carlo_metric_mockups, 
     tea_monte_carlo_derivative_metric_mockups,
     lca_monte_carlo_metric_mockups, 
-    lca_monte_carlo_derivative_metric_mockups
+    lca_monte_carlo_derivative_metric_mockups,
+    GWP_ethanol_displacement
 )
 from ._parse_configuration import parse, Configuration, ConfigurationComparison
 import os
@@ -17,6 +18,8 @@ import numpy as np
 import biosteam as bst
 
 __all__ = (
+    'images_folder',
+    'results_folder',
     'spearman_file',
     'monte_carlo_file',
     'autoload_file_name',
@@ -24,30 +27,27 @@ __all__ = (
     'get_monte_carlo',
 )
 
+results_folder = os.path.join(os.path.dirname(__file__), 'results')
+images_folder = os.path.join(os.path.dirname(__file__), 'images')
+
 def spearman_file(name):
     number, agile = parse(name)
-    folder = os.path.dirname(__file__)
-    folder = os.path.join(folder, 'results')
     filename = f'oilcane_spearman_{number}'
     if agile: filename += '_agile'
     filename += '.xlsx'
-    return os.path.join(folder, filename)
+    return os.path.join(results_folder, filename)
 
-def monte_carlo_file(name, across_oil_content=False):
+def monte_carlo_file(name, across_oil_content=False, extention='xlsx'):
     number, agile = parse(name)
-    folder = os.path.dirname(__file__)
-    folder = os.path.join(folder, 'results')
     filename = f'oilcane_monte_carlo_{number}'
     if agile: filename += '_agile'
     if across_oil_content: filename += '_across_oil_content'
-    filename += '.xlsx'
-    return os.path.join(folder, filename)
+    filename += '.' + extention
+    return os.path.join(results_folder, filename)
 
 def autoload_file_name(name):
-    folder = os.path.dirname(__file__)
-    folder = os.path.join(folder, 'results')
     filename = name.replace('*', '_agile')
-    return os.path.join(folder, filename)
+    return os.path.join(results_folder, filename)
 
 def get_monte_carlo_across_oil_content(name, metric, derivative=False):
     key = parse(name)
@@ -91,7 +91,8 @@ def get_monte_carlo(name, variables=None, cache={}):
                 *tea_monte_carlo_metric_mockups, 
                 *tea_monte_carlo_derivative_metric_mockups,
                 *lca_monte_carlo_metric_mockups, 
-                *lca_monte_carlo_derivative_metric_mockups
+                *lca_monte_carlo_derivative_metric_mockups,
+                GWP_ethanol_displacement,
             )
         if isinstance(variables, bst.Variable):
             index = variables.index

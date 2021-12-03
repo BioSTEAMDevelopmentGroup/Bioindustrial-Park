@@ -129,7 +129,7 @@ def evaluate_MFPP_across_ethanol_and_biodiesel_prices(ethanol_price, biodiesel_p
     )
 
 def evaluate_MFPP_benefit_across_ethanol_and_biodiesel_prices(ethanol_price, biodiesel_price, baseline=None, configuration=None):
-    if configuration is None: configuration = globals()['configuration']
+    if configuration is None: configuration = oc.configuration
     if baseline is None:
         number, agile = configuration
         assert number > 0
