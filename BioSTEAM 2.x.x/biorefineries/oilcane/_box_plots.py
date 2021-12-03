@@ -119,7 +119,7 @@ def plot_montecarlo_main_manuscript():
     
 def plot_montecarlo_derivative_main_manuscript():
     set_font(size=8)
-    set_figure_size(width=3.3071, aspect_ratio=1.618)
+    set_figure_size(width=3.3071, aspect_ratio=1.85)
     fig, axes = plot_monte_carlo(
         derivative=True, absolute=True, 
         comparison=False, agile=False,
@@ -277,7 +277,8 @@ def monte_carlo_results(with_units=False):
                 'q95': q95,
             }
         for metric in (*tea_monte_carlo_metric_mockups, *tea_monte_carlo_derivative_metric_mockups,
-                       *lca_monte_carlo_metric_mockups, *lca_monte_carlo_derivative_metric_mockups):
+                       *lca_monte_carlo_metric_mockups, *lca_monte_carlo_derivative_metric_mockups,
+                       variables.GWP_ethanol_displacement):
             index = metric.index
             data = df[index].values
             q05, q25, q50, q75, q95 = np.percentile(data, [5,25,50,75,95], axis=0)
@@ -333,18 +334,10 @@ def plot_monte_carlo(derivative=False, absolute=True, comparison=True,
             production,
             electricity_production,
             natural_gas_consumption,
-            # GWP_economic,
+            GWP_economic,
         ]
-        # GWP_units_economic = '$\\mathrm{g} \\cdot \\mathrm{CO}_{2}\\mathrm{eq} \\cdot \\mathrm{USD}^{-1}$'
-        ylabels = [
-            f"MFPP\n[{format_units('USD/ton')}]",
-            f"TCI\n[{format_units('10^6*USD')}]",
-            f"Production\n[{format_units('Gal/ton')}]",
-            f"Elec. prod.\n[{format_units('kWhr/ton')}]",
-            f"NG cons.\n[{format_units('cf/ton')}]",
-            # "GWP$_{\\mathrm{economic}}$" f"\n[{GWP_units_economic}]",
-        ]
-        factors = [] # For changing units of measure; not currently in use
+        GWP_units_economic = '$\\mathrm{g} \\cdot \\mathrm{CO}_{2}\\mathrm{eq} \\cdot \\mathrm{USD}^{-1}$'
+        factors = [(-1, 1000)] # For changing units of measure; not currently in use
     else:
         GWP_economic, *GWP_main_products, GWP_electricity, GWP_crude_glycerol, = lca_monte_carlo_metric_mockups
         MFPP, TCI, *production, electricity_production, natural_gas_consumption = tea_monte_carlo_metric_mockups
@@ -387,7 +380,7 @@ def plot_monte_carlo(derivative=False, absolute=True, comparison=True,
             r"$\Delta$" + format_units(r"Prod./OC").replace('cdot', r'cdot \Delta') + f"\n[{format_units('Gal/ton')}]",
             r"$\Delta$" + format_units(r"EP/OC").replace('cdot', r'cdot \Delta') + f"\n[{format_units('kWhr/ton')}]",
             r"$\Delta$" + format_units(r"NGC/OC").replace('cdot', r'cdot \Delta') + f"\n[{format_units('cf/ton')}]",
-            # r"$\Delta$" + r"GWP$_{\mathrm{economic}} \cdot \Delta \mathrm{OC}^{-1}$" f"\n[{GWP_units_economic}]",
+            r"$\Delta$" + r"GWP$_{\mathrm{econ.}} \cdot \Delta \mathrm{OC}^{-1}$" f"\n[{GWP_units_economic}]",
         ]
     elif comparison and not absolute:
         ylabels = [r"$\Delta$" + i for i in ylabels]
