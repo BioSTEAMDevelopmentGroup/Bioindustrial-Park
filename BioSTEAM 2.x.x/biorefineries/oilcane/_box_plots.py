@@ -146,7 +146,7 @@ def plot_montecarlo_derivative_main_manuscript():
 
 def plot_montecarlo_SI():
     set_font(size=8)
-    set_figure_size(aspect_ratio=1)
+    set_figure_size(aspect_ratio=0.9)
     fig, axes = plot_monte_carlo(
         absolute=True, comparison=False, split=True,
         expand=0.1, allocated=True,
@@ -278,9 +278,12 @@ def monte_carlo_results(with_units=False):
             }
         for metric in (*tea_monte_carlo_metric_mockups, *tea_monte_carlo_derivative_metric_mockups,
                        *lca_monte_carlo_metric_mockups, *lca_monte_carlo_derivative_metric_mockups,
-                       variables.GWP_ethanol_displacement):
+                       variables.GWP_ethanol_displacement, variables.GWP_ethanol_allocation):
             index = metric.index
-            data = df[index].values
+            try:
+                data = df[index].values
+            except:
+                breakpoint()
             q05, q25, q50, q75, q95 = np.percentile(data, [5,25,50,75,95], axis=0)
             key = index[1] if with_units else index[1].split(' [')[0]
             if key in dct: key = f'{key}, {index[0]}'
@@ -323,10 +326,13 @@ def plot_monte_carlo(derivative=False, absolute=True, comparison=True,
     if configuration_names is None: configuration_names = oc.configuration_names
     if comparison_names is None: comparison_names = oc.comparison_names
     factors = []
+    GWP_units_gal = '$\\mathrm{kg} \\cdot \\mathrm{CO}_{2}\\mathrm{eq} \\cdot \\mathrm{gal}^{-1}$'
+    # GWP_units_economic = '$\\mathrm{g} \\cdot \\mathrm{CO}_{2}\\mathrm{eq} \\cdot \\mathrm{USD}^{-1}$'
+    # GWP_units_energy = GWP_units_economic.replace('USD', 'GGE')
     if derivative:
         configuration_names = ['O1', 'O2']
         comparison_names = ['O2 - O1']
-        GWP_economic, *GWP_main_products, GWP_electricity, GWP_crude_glycerol, = lca_monte_carlo_derivative_metric_mockups
+        GWP_economic, GWP_ethanol, GWP_biodiesel, GWP_electricity, GWP_crude_glycerol, = lca_monte_carlo_derivative_metric_mockups
         MFPP, TCI, *production, electricity_production, natural_gas_consumption = tea_monte_carlo_derivative_metric_mockups
         rows = [
             MFPP, 
@@ -334,15 +340,14 @@ def plot_monte_carlo(derivative=False, absolute=True, comparison=True,
             production,
             electricity_production,
             natural_gas_consumption,
-            GWP_economic,
+            GWP_ethanol,
         ]
-        GWP_units_economic = '$\\mathrm{g} \\cdot \\mathrm{CO}_{2}\\mathrm{eq} \\cdot \\mathrm{USD}^{-1}$'
         factors = [(-1, 1000)] # For changing units of measure; not currently in use
     else:
-        GWP_economic, *GWP_main_products, GWP_electricity, GWP_crude_glycerol, = lca_monte_carlo_metric_mockups
+        GWP_economic, GWP_ethanol, GWP_biodiesel, GWP_electricity, GWP_crude_glycerol, = lca_monte_carlo_metric_mockups
         MFPP, TCI, *production, electricity_production, natural_gas_consumption = tea_monte_carlo_metric_mockups
         GWP_ethanol_displacement = variables.GWP_ethanol_displacement
-        GWP_biofuel_allocation = variables.GWP_biofuel_allocation
+        GWP_ethanol_allocation = variables.GWP_ethanol_allocation
         rows = [
             MFPP, 
             TCI, 
@@ -350,12 +355,9 @@ def plot_monte_carlo(derivative=False, absolute=True, comparison=True,
             electricity_production,
             natural_gas_consumption,
             GWP_ethanol_displacement,
-            GWP_biofuel_allocation,
-            GWP_economic,
+            GWP_ethanol_allocation,
+            GWP_ethanol, # economic
         ]
-        GWP_units_gal = '$\\mathrm{kg} \\cdot \\mathrm{CO}_{2}\\mathrm{eq} \\cdot \\mathrm{gal}^{-1}$'
-        GWP_units_economic = '$\\mathrm{kg} \\cdot \\mathrm{CO}_{2}\\mathrm{eq} \\cdot \\mathrm{USD}^{-1}$'
-        GWP_units_energy = GWP_units_economic.replace('USD', 'GGE')
         ylabels = [
             f"MFPP\n[{format_units('USD/ton')}]",
             f"TCI\n[{format_units('10^6*USD')}]",
@@ -363,16 +365,13 @@ def plot_monte_carlo(derivative=False, absolute=True, comparison=True,
             f"Elec. prod.\n[{format_units('kWhr/ton')}]",
             f"NG cons.\n[{format_units('cf/ton')}]",
             "GWP$_{\\mathrm{displacement}}$" f"\n[{GWP_units_gal}]",
-            "GWP$_{\\mathrm{economic}}$" f"\n[{GWP_units_economic}]",
-            "GWP$_\\mathrm{{energy}}$" f"\n[{GWP_units_energy}]",
+            "GWP$_{\\mathrm{energy}}$" f"\n[{GWP_units_gal}]",
+            "GWP$_{\\mathrm{economic}}$" f"\n[{GWP_units_gal}]",
         ]
         if allocated:
             GWP_economic = [variables.GWP_ethanol, variables.GWP_biodiesel]
             GWP_energy = [variables.GWP_ethanol_allocation, variables.GWP_biodiesel_allocation]
-            rows.append(GWP_economic)
-            rows.append(GWP_energy)
-            ylabels.append("Allocated GWP$_{\\mathrm{economic}}$" f"\n[{GWP_units_gal}]")
-            ylabels.append("Allocated GWP$_\\mathrm{{energy}}$" f"\n[{GWP_units_gal}]")
+            rows[-2:] = [GWP_economic, GWP_energy]
     if derivative:
         ylabels = [
             r"$\Delta$" + format_units(r"MFPP/OC").replace('cdot', r'cdot \Delta') + f"\n[{format_units('USD/ton')}]",
@@ -380,13 +379,20 @@ def plot_monte_carlo(derivative=False, absolute=True, comparison=True,
             r"$\Delta$" + format_units(r"Prod./OC").replace('cdot', r'cdot \Delta') + f"\n[{format_units('Gal/ton')}]",
             r"$\Delta$" + format_units(r"EP/OC").replace('cdot', r'cdot \Delta') + f"\n[{format_units('kWhr/ton')}]",
             r"$\Delta$" + format_units(r"NGC/OC").replace('cdot', r'cdot \Delta') + f"\n[{format_units('cf/ton')}]",
-            r"$\Delta$" + r"GWP$_{\mathrm{econ.}} \cdot \Delta \mathrm{OC}^{-1}$" f"\n[{GWP_units_economic}]",
+            r"$\Delta$" + r"GWP$_{\mathrm{econ.}} \cdot \Delta \mathrm{OC}^{-1}$" f"\n[{GWP_units_gal.replace('kg','g')}]",
         ]
     elif comparison and not absolute:
         ylabels = [r"$\Delta$" + i for i in ylabels]
-    color_wheel = CABBI_colors.wheel(['blue_light', 'green_dirty', 'orange', 'green',
-                                      'teal', 'brown', 'orange', 'grey', 'green_soft',
-                                      'orange', 'green', 'orange', 'green'])
+    if allocated:
+        color_wheel = CABBI_colors.wheel([
+            'blue_light', 'green_dirty', 'orange', 'green', 'teal', 'brown', 
+            'orange', 'orange', 'green', 'orange', 'green'
+        ])
+    else:
+        color_wheel = CABBI_colors.wheel([
+            'blue_light', 'green_dirty', 'orange', 'green', 'teal', 'brown', 
+            'orange', 'orange', 'orange'
+        ])
     
     N_rows = len(rows)
     if split:
@@ -418,9 +424,6 @@ def plot_monte_carlo(derivative=False, absolute=True, comparison=True,
     xticks = tuple(range(N_marks))
     
     def get_data(metric, name):
-        if metric is GWP_main_products and name in ('O1 - S1', 'O2 - S2'):
-            metric = GWP_main_products[0] # GWP ethanol
-            return get_data(metric, name)
         try:
             df = get_monte_carlo(name, metric)
         except:

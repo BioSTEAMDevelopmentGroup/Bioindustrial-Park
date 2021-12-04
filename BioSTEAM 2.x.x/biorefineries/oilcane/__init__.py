@@ -165,7 +165,9 @@ def enable_derivative(enable=True):
     
 _derivative_disabled = True
 
-def load(name, cache={}, reduce_chemicals=True, enhanced_cellulosic_performance=False):
+def load(name, cache={}, reduce_chemicals=True, 
+         enhanced_cellulosic_performance=False,
+         enhanced_biodiesel_production=False):
     dct = globals()
     number, agile = dct['configuration'] = configuration = parse(name)
     key = (number, agile, enhanced_cellulosic_performance)
@@ -970,9 +972,14 @@ def load(name, cache={}, reduce_chemicals=True, enhanced_cellulosic_performance=
             set_cane_xylose_yield.setter(97.5)
             set_glucose_to_ethanol_yield.setter(90)
             set_xylose_to_ethanol_yield.setter(42)
-    oil_extraction_specification.load_oil_retention(0.70)
-    oil_extraction_specification.load_oil_content(0.05)
-    set_bagasse_oil_extraction_efficiency.setter(oil_extraction_efficiency_hook(0.))
+    if number == 1 and enhanced_biodiesel_production:
+        oil_extraction_specification.load_oil_content(0.15)
+        set_bagasse_oil_extraction_efficiency.setter(oil_extraction_efficiency_hook(20))
+        oil_extraction_specification.load_oil_retention(0.40)
+    else:
+        oil_extraction_specification.load_oil_content(0.05)
+        set_bagasse_oil_extraction_efficiency.setter(oil_extraction_efficiency_hook(0.))
+        oil_extraction_specification.load_oil_retention(0.70)
     set_ethanol_price.setter(mean_ethanol_price) 
     set_crude_glycerol_price.setter(mean_glycerol_price)
     set_biodiesel_price.setter(mean_biodiesel_price)
