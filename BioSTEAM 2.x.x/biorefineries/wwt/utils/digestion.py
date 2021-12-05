@@ -53,7 +53,7 @@ def get_COD_stoichiometry(chemical):
 
     .. math::
         C_nH_aO_bN_cS_dP_e + \frac{2n+0.5a-b-1.5c+3d+2.5e}{2}O_2
-        -> nCO_2 + \frac{a-3c-2d}{2}H_2O + cNH_3 + dH_2SO_4 + \frac{e}{4}P_4O_10
+        -> nCO_2 + \frac{a-3c-2d}{2}H_2O + cNH_3 + dH_2SO_4 + \frac{e}{4}P_4O_{10}
     '''
     Xs = nC, nH, nO, nN, nS, nP = get_CHONSP(chemical)
 
@@ -63,7 +63,7 @@ def get_COD_stoichiometry(chemical):
         return dict.fromkeys(excluded, 0)
 
     dct = {
-        chemical.ID: -1. if sum(Xs)!=0 else 0.,
+        chemical.ID: -1. if sum([abs(i) for i in Xs])!=0 else 0.,
         'O2': -(nC+0.25*nH-0.5*nO-0.75*nN+1.5*nS+1.25*nP),
         'CO2': nC,
         'H2O': 0.5*nH-1.5*nN-nS, # assume one water reacts with SO3 to H2SO4
@@ -88,17 +88,17 @@ def get_BMP_stoichiometry(chemical):
 
     .. math::
         C_vH_wO_xN_yS_z + \frac{4v-w-2x+3y+2z}{2}H2O ->
-        \frac{4v+w-2x-3y-2z}{8}CH4 + \frac{(4v-w+2x+3y+2z}{8}CO2 + yNH_3 + zH_2S
+        \frac{4v+w-2x-3y-2z}{8}CH4 + \frac{(4v-w+2x+3y+2z)}{8}CO2 + yNH_3 + zH_2S
     '''
     Xs = nC, nH, nO, nN, nS, nP = get_CHONSP(chemical)
 
     excluded = ('H2O', 'CH4', 'CO2', 'NH3', 'H2S',
-                   *default_insolubles)
+                *default_insolubles)
     if chemical.ID in excluded or chemical.locked_state=='g':
         return dict.fromkeys(excluded, 0)
 
     dct = {
-        chemical.ID: -1. if sum(Xs)!=0 else 0.,
+        chemical.ID: -1. if sum([abs(i) for i in Xs])!=0 else 0.,
         'H2O': -(nC-0.25*nH-0.5*nO+0.75*nN+0.5*nS),
         'CH4': 0.5*nC+0.125*nH-0.25*nO-0.375*nN-0.25*nS,
         'CO2': 0.5*nC-0.125*nH+0.25*nO+0.375*nN+0.25*nS,

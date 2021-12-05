@@ -211,7 +211,7 @@ class AnMBR(bst.Unit):
                  add_GAC=False,
                  include_degassing_membrane=True,
                  biodegradability={}, Y=0.05, # from the 0.02-0.08 uniform range in ref [1]
-                 split=None,
+                 split={},
                  T=35+273.15,
                  include_pump_building_cost=False,
                  include_excavation_cost=False,

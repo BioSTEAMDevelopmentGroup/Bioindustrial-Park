@@ -188,7 +188,7 @@ class InternalCirculationRx(bst.MixTank):
         by summing the COD of each chemical in the stream using:
 
         .. math::
-            COD [\frac{kg}{m^3}] = mol_{chemical} [\frac{kmol}{m^3}] * \frac{g O_2}{mol chemical}
+            COD [\frac{kg}{m^3}] = mol_{chemical} [\frac{kmol}{m^3}] * \frac{g O_2}{mol\ chemical}
         '''
         return compute_stream_COD(stream)
 
@@ -211,7 +211,7 @@ class InternalCirculationRx(bst.MixTank):
 
         gas = tmo.Stream(phase='g')
         degassing(gas, inf)
-        Se = compute_stream_COD(inf)
+        Se = self.compute_COD(inf)
 
         Qi, Si, Xi, Qe, Y = self.Qi, self.Si, self.Xi, self.Qe, self.Y
         method = self.method.lower()
