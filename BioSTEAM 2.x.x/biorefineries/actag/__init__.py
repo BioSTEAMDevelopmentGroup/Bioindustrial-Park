@@ -96,7 +96,7 @@ def load_cellulosic_chemicals():
     _cellulosic_chemicals_loaded = True
 
 def load(configuration, simulate=None, cache={}):
-    global tea, sys, sys_no_dry_fractionation, fermentation, model, set_selectivity
+    global tea, sys, sys_no_dry_fractionation, model, set_selectivity
     configuration = int(configuration)
     key = (configuration, simulate)
     dct = globals()
@@ -143,7 +143,7 @@ def load(configuration, simulate=None, cache={}):
     tea.income_tax = 0.21
     tea_no_dry_fractionation.income_tax = 0.21
     load_process_settings()
-    fermentation = u.R301
+    dct['fermentation'] = fermentation = u.R301
     fermentation.product_yield = 0.34
     fermentation.selectivity = 0.5
     ## Model
@@ -220,10 +220,10 @@ def evaluate_across_yield_titer_selectivity_and_productivity(product_yield, tite
     fermentation.selectivity = selectivity / 100.
     try:
         if selectivity == 100.:
-            sys_no_dry_fractionation.empty_recycles()
+            # sys_no_dry_fractionation.empty_recycles()
             sys_no_dry_fractionation.simulate()
         else:
-            sys.empty_recycles()
+            # sys.empty_recycles()
             sys.simulate()
     except RuntimeError as e:
         if str(e) == 'infeasible to evaporate any more water':
@@ -234,8 +234,9 @@ def evaluate_across_yield_titer_selectivity_and_productivity(product_yield, tite
             raise e
         
     for i in range(P):
+        fermentation.productivity = productivities[i]
         fermentation.tau = titer / productivities[i]
-        fermentation._summary()
+        fermentation._reevaluate()
         for j in range(M):
             data[i, j] = metrics[j]()
     return data
@@ -268,6 +269,27 @@ def fermentation_data(configuration, load):
     #         if 
     np.save(file, data)
     return X, Y, z, w, data
+
+def save_contour_plot_data(configuration):
+    X, Y, selectivities, productivities, data = fermentation_data(configuration, load)
+    yields = np.linspace(30, 90, 20)
+    titers = np.linspace(5, 100, 20)
+    MPSP_data = data[:, :, :, :, 0]
+    folder = os.path.dirname(__file__)
+    if configuration == 1:
+        configuration_name = 'sugarcane'
+    elif configuration == 2:
+        configuration_name = 'switchgrass'
+    for i, selectivity in enumerate(selectivities):
+        for j, productivity in enumerate(productivities):
+            file = f'{configuration_name}_biorefinery_selectivity_{selectivity}_productivity_{productivity}.xlsx'
+            file = os.path.join(folder, file)
+            pd.DataFrame(
+                data=MPSP_data[:, :, i, j],
+                index=pd.MultiIndex.from_tuples([(i,) for i in yields], names=['Yield [% theoretical]']),
+                columns=pd.MultiIndex.from_tuples([(i,) for i in titers], names=['Titer [g / L]']),
+            ).to_excel(file, startrow=1)
+    
 
 def save_tables():
     import biorefineries.actag as actag
@@ -304,11 +326,32 @@ def save_tables():
          'Target conventional', 'Target cellulosic']).to_excel(writer, 'FOC')
     writer.save()
     
-def save_plots(load=True):
+def save_plots(load=True, single_bar=False):
     import matplotlib.pyplot as plt
-    set_plot_style()
-    plot_yield_titer_selectivity_productivity_contours([1, 2], load=load)
-    folder = os.path.dirname(__file__)
-    file = 'contour_plots.png'
-    file = os.path.join(folder, file)
-    plt.savefig(file, transparent=True)
+    if single_bar:
+        set_plot_style()
+        plot_yield_titer_selectivity_productivity_contours([1, 2], load=load)
+        folder = os.path.dirname(__file__)
+        file = 'contour_plots.svg'
+        file = os.path.join(folder, file)
+        plt.savefig(file, transparent=True)
+    else:
+        set_plot_style(half=True)
+        folder = os.path.dirname(__file__)
+        fig0, axes0 = plot_yield_titer_selectivity_productivity_contours(1, load=load)
+        plt.subplots_adjust(left=0.17, right=0.86)
+        # plt.tight_layout()
+        # fig0.set_constrained_layout_pads(hspace=0.02, wspace=0.02)
+        file = 'contour_plots_left.svg'
+        file = os.path.join(folder, file)
+        plt.savefig(file, transparent=True)
+        fig1, axes1 = plot_yield_titer_selectivity_productivity_contours(2, load=load)
+        plt.subplots_adjust(left=0.17, right=0.86)
+        # plt.tight_layout()
+        # fig1.set_constrained_layout_pads(hspace=0.02, wspace=0.02)
+        file = 'contour_plots_right.svg'
+        file = os.path.join(folder, file)
+        plt.show()
+        plt.savefig(file, transparent=True)
+        
+    

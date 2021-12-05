@@ -1,7 +1,7 @@
+LICENSE.txt
 README.rst
 setup.py
 biorefineries/__init__.py
-biorefineries/abm_yield_example.py
 biorefineries.egg-info/PKG-INFO
 biorefineries.egg-info/SOURCES.txt
 biorefineries.egg-info/dependency_links.txt
@@ -27,7 +27,6 @@ biorefineries/corn/_chemicals.py
 biorefineries/corn/_process_settings.py
 biorefineries/corn/_system.py
 biorefineries/corn/_tea.py
-biorefineries/corn/abm.py
 biorefineries/corn/deleteme.xlsx
 biorefineries/corn/units.py
 biorefineries/corn/utils.py
@@ -45,7 +44,6 @@ biorefineries/cornstover/_sankey.py
 biorefineries/cornstover/_switchgrass.py
 biorefineries/cornstover/_system.py
 biorefineries/cornstover/_tea.py
-biorefineries/cornstover/abm.py
 biorefineries/cornstover/model.py
 biorefineries/cornstover/specifications.py
 biorefineries/cornstover/units.py

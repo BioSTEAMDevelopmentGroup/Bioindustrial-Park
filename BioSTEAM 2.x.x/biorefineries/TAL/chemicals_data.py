@@ -518,6 +518,15 @@ chems.set_synonym('Na2SO4', 'SodiumSulfate')
 chems.set_synonym('AmmoniumHydroxide', 'NH4OH')
 chems.set_synonym('Isobutyraldehyde', 'IBA')
 
+
+chems.define_group(
+    name='PolarComponents',
+    IDs=('Glucose', 'GlucoseOligomer', 'Xylose', 'XyloseOligomer', 
+         'Protein', 'HMF', 'Mannose', 'Galactose', 'GalactoseOligomer',
+         'Arabinose', 'ArabinoseOligomer', 'Furfural', 'AceticAcid', 'FermMicrobe',
+         'Cellobiose', 'Water'),
+)
+
 # %%
 
 # from TAL.utils import get_chemical_properties	

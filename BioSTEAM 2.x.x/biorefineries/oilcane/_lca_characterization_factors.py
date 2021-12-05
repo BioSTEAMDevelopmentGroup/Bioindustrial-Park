@@ -4,7 +4,6 @@ Created on Thu Nov  4 14:28:33 2021
 
 @author: yrc2
 """
-from thermosteam import Chemical
 
 __all__ = (
     'GWP_characterization_factors',
@@ -12,8 +11,6 @@ __all__ = (
     'GWP',
 )
 
-CO2 = Chemical('CO2', cache=True)
-CH4 = Chemical('CH4', cache=True)
 GWP = 'GWP'
 
 # All values in cradle-to-gate except for CH4, which is in cradle-to-grave
@@ -27,7 +24,7 @@ GWP_characterization_factors = { # Material GWP cradle-to-gate [kg*CO2*eq / kg]
     'lime': 1.164, # GREET
     'pure-glycerol': 1.6678, # Ecoinvent, TRACI, market for glycerine, RoW; 
     'crude-glycerol': 0.36, # GREET
-    'biodiesel': 1.13, # GREET
+    'biodiesel': 1.13, # Soybean biodiesel GREET
     'DAP': 1.66, # GREET
     'CSL': 1.56, # GREET
     'HCl': 1.96, # GREET
@@ -35,8 +32,11 @@ GWP_characterization_factors = { # Material GWP cradle-to-gate [kg*CO2*eq / kg]
     'gasoline': 0.84, # GREET
     'methanol': 0.45, # GREET, Natural gas to methanol
     'NaOCH3': 1.5871, # Ecoinvent, TRACI, sodium methoxide
-    'CH4': 0.33 + CO2.MW / CH4.MW, # Natural gas from shell conventional recovery, GREET; includes non-biogenic emissions
-    'Electricity': 0.36 # [kg*CO2*eq / kWhr] From GREET; NG-Fired Simple-Cycle Gas Turbine CHP Plant
+    'CH4': 0.33, # Natural gas from shell conventional recovery, GREET; includes non-biogenic emissions
+    'Electricity': 0.36, # [kg*CO2*eq / kWhr] From GREET; NG-Fired Simple-Cycle Gas Turbine CHP Plant
+    # 0.66 is the GWP from producing diesel from GREET; Conventional diesel from crude oil for US Refineries.
+    # Downstream fuel emissions are added in. Accounts for how biodiesel has less energy than diesel.
+    'biodiesel displacement': 0.92 * (0.66 +  (12 * 12.01 + 24 * 16) / (12 * 12.01 + 23 * 1.008)) 
 }
 
 GWP_characterization_factors['methanol catalyst mixture'] = (
