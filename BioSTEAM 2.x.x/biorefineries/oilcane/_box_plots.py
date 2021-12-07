@@ -141,7 +141,7 @@ def plot_montecarlo_main_manuscript():
             line.set_clip_on(False)
             ax.add_line(line)
             
-            plt.text(2.17, ylb - (yub - ylb) * 0.26, 
+            plt.text(2.18, ylb - (yub - ylb) * 0.26, 
                      'Impact of integrating\ncellulosic ethanol\nproduction', 
                      horizontalalignment='center',verticalalignment='center',
                      fontsize=8)
