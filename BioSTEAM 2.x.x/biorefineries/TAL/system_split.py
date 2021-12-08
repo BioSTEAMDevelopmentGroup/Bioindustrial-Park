@@ -838,7 +838,7 @@ def create_TAL_sys(ins, outs):
     S406_splitter.specification = S406_splitter_specification
     
     
-    S407 = units.Crystallization_Decantation('S407', ins = (S406-0, HCl, ''), outs = ('wet_SorbicAcid_crystals', 'KCl'))
+    S407 = units.Crystallization('S407', ins = (S406-0, HCl, ''), outs = ('wet_SorbicAcid_crystals', 'KCl'))
     
     def S407_spec():
         S407._run()
@@ -852,16 +852,21 @@ def create_TAL_sys(ins, outs):
     R404-0-2-S407
     R404-1-1-R403
     
-    S408 = bst.units.Flash('S408', ins = S407-0, outs = ('water', 'SorbicAcid_crystals'),
-                           V = 1., P = 101325)
+    S408 = units.Decantation('S408', ins=S407-0,
+                             outs=('S408_to_wwt', 'SorbicAcid_crystals'),
+                             recovery=0.9, V_wf=0.9)
     
     
-    def S408_spec():
-        instream = S408.ins[0]
-        S408.V = 0.99*instream.imol['H2O']/instream.F_mol
-        S408._run()
-    S408.specification = S408_spec
-    S408.line = 'Drying'
+    # S408 = bst.units.Flash('S408', ins = S407-0, outs = ('water', 'SorbicAcid_crystals'),
+    #                        V = 1., P = 101325)
+    
+    
+    # def S408_spec():
+    #     instream = S408.ins[0]
+    #     S408.V = 0.99*instream.imol['H2O']/instream.F_mol
+    #     S408._run()
+    # S408.specification = S408_spec
+    # S408.line = 'Drying'
     
     # S415 = units.TAL_Separation('S415', ins = S407-0, outs = ('', ''))
     # def adjust_S415():
@@ -1475,11 +1480,3 @@ TAL_sub_sys = {
 # for unit in TAL_sys.units:
 #     if not unit in sum(TAL_sub_sys.values(), ()):
 #         print(f'{unit.ID} not in TAL_sub_sys')
-
-
-
-
-
-
-
-
