@@ -439,7 +439,7 @@ def load(name, cache={}, reduce_chemicals=True,
     set_GWPCF(s.dryer_natural_gas, 'CH4')
     set_GWPCF(s.crude_glycerol, 'crude-glycerol', dilution=0.80)
     set_GWPCF(s.biodiesel, 'biodiesel displacement')
-    bst.PowerUtility.characterization_factors[GWP] = GWP_characterization_factors['Electricity']
+    bst.PowerUtility.set_CF(GWP, GWP_characterization_factors['Electricity'])
     dct['natural_gas_streams'] = natural_gas_streams = [s.natural_gas]
     if abs(number) == 1: natural_gas_streams.append(s.dryer_natural_gas)
     for stream in natural_gas_streams:
