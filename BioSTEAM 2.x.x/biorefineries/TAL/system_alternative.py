@@ -517,7 +517,7 @@ S406-1-1-M404
 S406.specification = S406_spec
 
 
-S407 = units.Crystallization_Decantation('S407', ins = (S406-0, HCl, ''), outs = ('wet_SorbicAcid_crystals', 'KCl'))
+S407 = units.Crystallization('S407', ins = (S406-0, HCl, ''), outs = ('wet_SorbicAcid_crystals', 'KCl'))
 
 def S407_spec():
     S407._run()
@@ -1275,11 +1275,3 @@ TAL_sub_sys = {
 # for unit in TAL_sys.units:
 #     if not unit in sum(TAL_sub_sys.values(), ()):
 #         print(f'{unit.ID} not in TAL_sub_sys')
-
-
-
-
-
-
-
-

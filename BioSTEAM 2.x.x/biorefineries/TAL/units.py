@@ -21,15 +21,17 @@ All units are explicitly defined here for transparency and easy reference
 
 import numpy as np
 import thermosteam as tmo
-from math import exp
+from math import exp, pi
 from flexsolve import aitken_secant
 from biosteam import Unit, BatchCrystallizer
 from biosteam.units import Flash, HXutility, Mixer, MixTank, Pump, \
     SolidsSeparator, StorageTank, LiquidsSplitSettler
 from biosteam.units.decorators import cost
+from biosteam.units.design_tools import CEPCI_by_year as CEPCI
 from thermosteam import Stream, MultiStream
 from biorefineries.TAL.process_settings import price
-from biorefineries.TAL.utils import CEPCI, baseline_feedflow, compute_extra_chemical, adjust_recycle
+# from biorefineries.TAL.utils import CEPCI, baseline_feedflow, compute_extra_chemical, adjust_recycle
+from biorefineries.TAL.utils import baseline_feedflow, compute_extra_chemical, adjust_recycle
 
 _kg_per_ton = 907.18474
 _Gcal_2_kJ = 4.184 * 1e6 # (also MMkcal/hr)
@@ -931,6 +933,74 @@ class Reactor(Unit, PressureVessel, isabstract=True):
         else:
             raise RuntimeError("invalid vessel type")
 
+#TODO:
+# 1. Find a source for recovery - the only thing I found for this is in Woods 2007 section 5.3.1 "allow both phases to have > 20% of the diameter and no less than 0.2 m to ensure that the exit phases do not become cross-contaminated"
+# 2. Do we need a backup reactor? - need to discuss
+# 3. Need electricity? - I think so but I don't know how to account for this? Let's discuss.
+# 4. Look into n - mothi's thesis uses n=1, I canot find where I had previously found a value of 0.84
+# 5. Look into BM (bare module factor) - Sieder et al 2016 Table 16.11 use 4.16 for  a vertical pressure vessel
+# I also had in my notes to check the decanter usable % and I believe that is 90% but it already accounted for in the height sizing of adding an additional 10% to the height.
+@cost(basis='Flow rate', ID='Decanter', units='m3/s',
+      cost=190000, S=0.0012, CE=CEPCI[2008], n=1, BM=2.3)
+class Decantation(Unit):
+    '''
+    A decanter to separate the sorbic acid crystal from the broth.
+
+    Using Stokes’ Law to calculate settling velocity and the desired volumetric flow rate
+    of the solution into the decanter.
+
+    Parameters
+    ----------
+    recovery : float
+        Recovery of the crystal.
+    V_wf : float
+        Working fraction of the decanter.
+
+    References
+    ----------
+    1. Towler, G., & Sinnott, R. K. (2008). Chemical engineering design: principles, practice and economics of plant and process design.
+    2. Peters, M. S., Timmerhaus, K. D., West, R. E., Timmerhaus, K., & West, R. (2003). Plant design and economics for chemical engineers (Vol. 4).
+    3. Density: https://pubchem.ncbi.nlm.nih.gov/compound/Sorbic-acid#section=Solubility
+    4. Seider, W. D., Lewin, D. R., Seader, J. D., Widagdo, S., Gani, R., Ming Ng, K. (2017) Product and Process Design Principles: Synthesis, Analysis, and Evaluation (4th Edition) Wiley.
+    5. M. Viswanathan. (2019) Process generalizations and rules of thumb for scaling up biobased processes.
+    6. Woods, D. R. (2007) Rules of Thumb in Engineering Practice, Wiley.
+    '''
+
+    _N_ins = 1
+    _N_outs = 2
+
+    _units={
+        'Settling velocity': 'm/s',
+        'Area': 'm2',
+        'Diameter': 'm',
+        'Length': 'm',
+        'Volume': 'm3',
+        }
+
+    def __init__(self, ID='', ins=None, outs=(), recovery=0.9, V_wf=0.9):
+        Unit.__init__(self, ID, ins, outs)
+        self.recovery = recovery
+        self.V_wf = V_wf
+
+    def _run(self):
+        feed = self.ins[0]
+        to_wwt, crystal = self.outs
+        crystal.imass['SorbicAcid'] = feed.imass['SorbicAcid']*self.recovery
+        to_wwt.copy_like(feed)
+        to_wwt.imass['SorbicAcid'] -= crystal.imass['SorbicAcid']
+
+
+    def _design(self):
+        feed = self.ins[0]
+        D = self.design_results
+        D['Flow rate'] = feed.F_vol/3600
+        D['Settling velocity'] = v_settling = 0.00015*9.81*(1204-1000)/(18*0.001) # m/s
+        D['Area'] = A_decanter = feed.F_vol*0.00028/v_settling # m2
+        D['Diameter'] = D_decanter = (A_decanter/pi)**(1/2) # m
+        D['Length'] = L_decanter = 2.2*D_decanter # m
+        D['Volume'] = V_decanter = (pi*D_decanter*L_decanter)/(2*self.V_wf)
+
+
 # class AcidulationReactor(Reactor):
 #     _N_ins = 2
 #     _N_outs = 1
@@ -1738,7 +1808,7 @@ class HydrolysisReactor(Reactor):
             self.mcat_frac * self.ins[0].imass['SA'] * price['Amberlyst15']
             
 
-class Crystallization_Decantation(Reactor):
+class Crystallization(Reactor):
     N_ins = 3
     _N_outs = 2
     _F_BM_default = {**Reactor._F_BM_default}
