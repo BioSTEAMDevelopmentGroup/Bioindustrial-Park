@@ -838,7 +838,7 @@ def create_TAL_sys(ins, outs):
     S406_splitter.specification = S406_splitter_specification
     
     
-    S407 = units.Crystallization('S407', ins = (S406-0, HCl, ''), outs = ('wet_SorbicAcid_crystals', 'KCl'))
+    S407 = units.Crystallization('S407', ins = (S406-0, HCl, '', ''), outs = ('wet_SorbicAcid_crystals', 'KCl'))
     
     def S407_spec():
         S407._run()
@@ -853,9 +853,9 @@ def create_TAL_sys(ins, outs):
     R404-1-1-R403
     
     S408 = units.Decantation('S408', ins=S407-0,
-                             outs=('S408_to_wwt', 'SorbicAcid_crystals'),
-                             recovery=0.9, V_wf=0.9)
-    
+                             outs=('dissolved_SorbicAcid_to_evaporative_crystallization', 'SorbicAcid_crystals'),
+                             forced_recovery=None, V_wf=0.9)
+    # S408-0-3-S407
     
     # S408 = bst.units.Flash('S408', ins = S407-0, outs = ('water', 'SorbicAcid_crystals'),
     #                        V = 1., P = 101325)
@@ -1091,7 +1091,7 @@ def create_TAL_sys(ins, outs):
     
     T604_s = units.DPHPStorageTank('T604_s', ins=hexanol_fresh_s)
     T604_s.line = 'Hexanol storage tank s'
-    T604_s_P = bst.units.ConveyingBelt('T604_s_P', ins=T604_s-0, outs = Hexanol_s)
+    T604_s_P = units.TALPump('T604_s_P', ins=T604_s-0, outs = Hexanol_s)
     
     # 7-day storage time, similar to ethanol's in Humbird et al.
     T605_s = units.DPHPStorageTank('T605_s', ins=heptane_fresh_s)

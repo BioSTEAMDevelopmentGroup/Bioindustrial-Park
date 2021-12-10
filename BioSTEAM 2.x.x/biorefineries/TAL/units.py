@@ -21,7 +21,7 @@ All units are explicitly defined here for transparency and easy reference
 
 import numpy as np
 import thermosteam as tmo
-from math import exp, pi
+from math import exp, pi, log
 from flexsolve import aitken_secant
 from biosteam import Unit, BatchCrystallizer
 from biosteam.units import Flash, HXutility, Mixer, MixTank, Pump, \
@@ -977,29 +977,41 @@ class Decantation(Unit):
         'Volume': 'm3',
         }
 
-    def __init__(self, ID='', ins=None, outs=(), recovery=0.9, V_wf=0.9):
+    def __init__(self, ID='', ins=None, outs=(), forced_recovery=None, V_wf=0.9, T=293.15):
         Unit.__init__(self, ID, ins, outs)
-        self.recovery = recovery
+        self.forced_recovery = forced_recovery
         self.V_wf = V_wf
-
+        self.T = T
+        
+    def get_SA_solubility(self, T): # mol SA/ (mol SA + mol water)
+        return exp(-157.137 + 3505.81/T + 24.1015*log(T)) # Modified Apelblat Equation
+    
     def _run(self):
         feed = self.ins[0]
-        to_wwt, crystal = self.outs
-        crystal.imass['SorbicAcid'] = feed.imass['SorbicAcid']*self.recovery
-        to_wwt.copy_like(feed)
-        to_wwt.imass['SorbicAcid'] -= crystal.imass['SorbicAcid']
+        dil_SA, crystal = self.outs
+        dil_SA.copy_like(feed)
+        if self.forced_recovery:
+            crystal.imass['SorbicAcid'] = feed.imass['SorbicAcid']*self.forced_recovery
+            dil_SA.imass['SorbicAcid'] -= crystal.imass['SorbicAcid']
+        else:
+            sol_SA = self.get_SA_solubility(self.T)
+            still_dissolved_SA = sol_SA * feed.imol['Water'] / (1-sol_SA)
+            dil_SA.imass['SorbicAcid'] = still_dissolved_SA
+            crystal.imass['SorbicAcid'] = feed.imass['SorbicAcid'] - dil_SA.imass['SorbicAcid']
+        
 
 
     def _design(self):
         feed = self.ins[0]
         D = self.design_results
-        D['Flow rate'] = feed.F_vol/3600
+        D['Flow rate'] = feed.F_vol/3600.
         D['Settling velocity'] = v_settling = 0.00015*9.81*(1204-1000)/(18*0.001) # m/s
         D['Area'] = A_decanter = feed.F_vol*0.00028/v_settling # m2
         D['Diameter'] = D_decanter = (A_decanter/pi)**(1/2) # m
         D['Length'] = L_decanter = 2.2*D_decanter # m
         D['Volume'] = V_decanter = (pi*D_decanter*L_decanter)/(2*self.V_wf)
 
+#!!! TODO: Add cooling utility
 
 # class AcidulationReactor(Reactor):
 #     _N_ins = 2
@@ -1818,13 +1830,18 @@ class Crystallization(Reactor):
                 ])
     TAL_to_SA_rxn = dehydration_rxns[0]
     
+    def __init__(self, ID='', ins=None, outs=(), tau=1., T=293.15, reagent_fraction=1.):
+        Reactor.__init__(self, ID, ins, outs, tau=tau)
+        self.reagent_fraction = reagent_fraction
+    
+
     def _run(self):
-        feed, reagent, recycle = self.ins
-        effluent, KCl = self.outs
+        feed, reagent, recycle_reagent, recycle_feed = ins = self.ins
+        effluent, KCl = outs = self.outs
         
-        reagent.imol['HCl'] = feed.imol['KSA'] - recycle.imol['HCl']
+        reagent.imol['HCl'] = max(0, sum([i.imol['KSA'] for i in ins]) - sum([i.imol['HCl'] for i in ins]))
         # effluent = feed.copy()
-        effluent.mix_from([feed, reagent, recycle])
+        effluent.mix_from([feed, reagent, recycle_reagent, recycle_feed])
         
         # effluent.T = feed.T
         # effluent.P = feed.P
@@ -1837,6 +1854,7 @@ class Crystallization(Reactor):
         
         # effluent.imol['H2O'] = effluent.imol['H2O']
         
+        effluent.imol['HCl'] = 0.
         effluent.imol['KCl'] = 0
         # effluent.imol['H2O'] = 0
         
