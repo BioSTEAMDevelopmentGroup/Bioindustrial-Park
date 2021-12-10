@@ -71,12 +71,7 @@ def create_feedstock_handling_system(ins, outs):
 
 @SystemFactory(
     ID='juicing_sys',
-    ins=[create_feedstock_handling_system.ins[0],
-         dict(ID='enzyme',
-              Cellulose=100,
-              Water=900,
-              units='kg/hr',
-              price=0.5),],
+    ins=[create_feedstock_handling_system.ins[0]],
     outs=[dict(ID='untreated_juice'),
           dict(ID='bagasse')]
 )
@@ -84,26 +79,16 @@ def create_juicing_system_without_treatment(ins, outs, pellet_bagasse=None):
     if pellet_bagasse is None: pellet_bagasse = True
     
     ### Streams ###
-    sugarcane, enzyme = ins
+    sugarcane, = ins
     untreated_juice, bagasse = outs
     
     imbibition_water = bst.Stream('imbibition_water',
                                   Water=87023.35, units='kg/hr',
                                   T = 350.15)
     
-    # Hydrolyze starch
-    T201 = units.EnzymeTreatment('T201', (sugarcane, enzyme), T=323.15)  # T=50
-    
-    @T201.add_specification(run=True)
-    def update_enzyme_and_imbibition_water():
-        sugarcane = T201.ins[0]
-        F_mass = sugarcane.F_mass
-        enzyme.imass['Cellulose', 'Water'] = 0.003 * F_mass * np.array([0.1, 0.9])
-        imbibition_water.imass['Water'] = 1.47 * (F_mass - sugarcane.imass['Water', 'Cellulose', 'Hemicellulose', 'Lignin'].sum())
-    
     # Finely crush lipid cane
     U201 = units.CrushingMill('U201',
-                              ins=(T201-0, ''),
+                              ins=(sugarcane, ''),
                               split=dict(Ash=0.92,
                                          Cellulose=0.92,
                                          Glucose=0.04,
@@ -112,6 +97,11 @@ def create_juicing_system_without_treatment(ins, outs, pellet_bagasse=None):
                                          Sucrose=0.04,
                                          Solids=1),
                               moisture_content=0.5)
+    
+    @U201.add_specification(run=True)
+    def update_imbibition_water():
+        imbibition_water.imass['Water'] = 0.245 * U201.ins[0].F_mass
+    
     U202 = units.ConveyingBelt('U202', U201-0, [''] if pellet_bagasse else [bagasse])
     
     if pellet_bagasse:
@@ -159,7 +149,7 @@ def create_juicing_system_without_treatment(ins, outs, pellet_bagasse=None):
 def create_juicing_system_up_to_clarification(ins, outs, pellet_bagasse=None):
     
     ### Streams ###
-    sugarcane, enzyme, H3PO4, lime, polymer = ins
+    sugarcane, H3PO4, lime, polymer = ins
     clarified_juice, bagasse = outs
     
     rvf_wash_water = bst.Stream('rvf_wash_water',
@@ -167,12 +157,12 @@ def create_juicing_system_up_to_clarification(ins, outs, pellet_bagasse=None):
                                 T=363.15)  # to C202
     
     juicing_sys_without_treatment = create_juicing_system_without_treatment(
-        ins=(sugarcane, enzyme),
+        ins=(sugarcane,),
         outs=('', bagasse),
         mockup=True,
         pellet_bagasse=pellet_bagasse,
     )
-    T201 = f.unit.T201
+    U201 = f.unit.U201
     
     # Heat up before adding acid
     H201 = units.HXutility('H201', juicing_sys_without_treatment-0, T=343.15)
@@ -228,14 +218,12 @@ def create_juicing_system_up_to_clarification(ins, outs, pellet_bagasse=None):
     ### Process specifications ###
     
     # Specifications dependent on lipid cane flow rate
-    @T201.add_specification(run=True)
+    @U201.add_specification(run=True)
     def correct_flows():
-        F_mass = T201.ins[0].F_mass
-        # correct enzyme, lime, phosphoric acid, and imbibition water
-        enzyme.F_mass *= F_mass / 333334.2
+        F_mass = U201.ins[0].F_mass
+        # correct lime, phosphoric acid, and imbibition water
         lime.imass['CaO', 'Water'] = 0.001 * F_mass * np.array([0.046, 0.954])
         H3PO4.imass['H3PO4', 'Water'] = 0.00025 * F_mass
-        T201._run()
     
     # Specifications within a system
     def correct_wash_water():
@@ -669,7 +657,7 @@ def create_sugarcane_to_ethanol_system(ins, outs,
     s = f.stream
     u = f.unit
     
-    sugarcane, enzyme, H3PO4, lime, polymer, denaturant = ins
+    sugarcane, H3PO4, lime, polymer, denaturant = ins
     ethanol, vinasse, wastewater, emissions, ash_disposal = outs
     
     feedstock_handling_sys = create_feedstock_handling_system(
@@ -680,7 +668,7 @@ def create_sugarcane_to_ethanol_system(ins, outs,
     )
     juicing_sys = create_juicing_system_with_fiber_screener(
         area=200 if use_area_convention else None,
-        ins=[feedstock_handling_sys-0, enzyme, H3PO4, lime, polymer],
+        ins=[feedstock_handling_sys-0, H3PO4, lime, polymer],
         pellet_bagasse=pellet_bagasse,
         mockup=True
     )

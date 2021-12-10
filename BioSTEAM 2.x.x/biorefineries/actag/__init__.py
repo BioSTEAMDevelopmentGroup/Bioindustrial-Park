@@ -34,13 +34,24 @@ baseline = {
         'Productivity': 0.033}
 }
 target = {
-    1: {'Yield': 80.,
-        'Titer': 75.,
+    1: {'Yield': 85.,
+        'Titer': 90.,
         'Selectivity': 75.,
         'Productivity': 1.0},
-    2: {'Yield': 80.,
-        'Titer': 75.,
+    2: {'Yield': 85.,
+        'Titer': 90.,
         'Selectivity': 75.,
+        'Productivity': 1.0},
+}
+
+best = {
+    1: {'Yield': 90.,
+        'Titer': 100.,
+        'Selectivity': 100.,
+        'Productivity': 1.0},
+    2: {'Yield': 90.,
+        'Titer': 100.,
+        'Selectivity': 100.,
         'Productivity': 1.0},
 }
 
@@ -67,7 +78,7 @@ def load_process_settings():
     bst.PowerUtility.price = 0.065
     HeatUtility = bst.HeatUtility
     steam_utility = HeatUtility.get_agent('low_pressure_steam')
-    steam_utility.heat_transfer_efficiency = 0.9
+    steam_utility.heat_transfer_efficiency = 1.0
     steam_utility.regeneration_price = 0.30626
     steam_utility.T = 529.2
     steam_utility.P = 44e5
@@ -85,7 +96,7 @@ def load_cellulosic_chemicals():
     _cellulosic_chemicals_loaded = True
 
 def load(configuration, simulate=None, cache={}):
-    global tea, sys, sys_no_dry_fractionation, fermentation, model, set_selectivity
+    global tea, sys, sys_no_dry_fractionation, model, set_selectivity
     configuration = int(configuration)
     key = (configuration, simulate)
     dct = globals()
@@ -129,9 +140,11 @@ def load(configuration, simulate=None, cache={}):
     tea = create_tea(sys)
     tea_no_dry_fractionation = create_tea(sys_no_dry_fractionation)
     tea.operating_hours = tea_no_dry_fractionation.operating_hours = operating_hours
+    tea.income_tax = 0.21
+    tea_no_dry_fractionation.income_tax = 0.21
     load_process_settings()
-    fermentation = u.R301
-    fermentation.product_yield = 0.06
+    dct['fermentation'] = fermentation = u.R301
+    fermentation.product_yield = 0.34
     fermentation.selectivity = 0.5
     ## Model
     model = bst.Model(sys, exception_hook='raise', retry_evaluation=False)
@@ -180,16 +193,21 @@ def load(configuration, simulate=None, cache={}):
         dct = baseline[configuration]
     elif simulate == 'target':
         dct = target[configuration]
+    elif simulate == 'best':
+        dct = best[configuration]
     elif simulate is None:
         return
     else:
         raise ValueError(f"simulate must be 'target' or 'baseline'; not {simulate}")
     
-    fermentation.selectivity = dct['Selectivity'] / 100.
+    fermentation.selectivity = selectivity = dct['Selectivity'] / 100.
     fermentation.productivity = dct['Productivity']
     fermentation.titer = dct['Titer']
     fermentation.product_yield = dct['Yield'] / 100.
-    sys.simulate()
+    if selectivity == 1.:
+        sys_no_dry_fractionation.simulate()
+    else:
+        sys.simulate()
     
 def evaluate_across_yield_titer_selectivity_and_productivity(product_yield, titer, selectivity, productivities, configuration):
     load(configuration)
@@ -202,10 +220,10 @@ def evaluate_across_yield_titer_selectivity_and_productivity(product_yield, tite
     fermentation.selectivity = selectivity / 100.
     try:
         if selectivity == 100.:
-            sys_no_dry_fractionation.empty_recycles()
+            # sys_no_dry_fractionation.empty_recycles()
             sys_no_dry_fractionation.simulate()
         else:
-            sys.empty_recycles()
+            # sys.empty_recycles()
             sys.simulate()
     except RuntimeError as e:
         if str(e) == 'infeasible to evaporate any more water':
@@ -216,8 +234,9 @@ def evaluate_across_yield_titer_selectivity_and_productivity(product_yield, tite
             raise e
         
     for i in range(P):
+        fermentation.productivity = productivities[i]
         fermentation.tau = titer / productivities[i]
-        fermentation._summary()
+        fermentation._reevaluate()
         for j in range(M):
             data[i, j] = metrics[j]()
     return data
@@ -251,6 +270,27 @@ def fermentation_data(configuration, load):
     np.save(file, data)
     return X, Y, z, w, data
 
+def save_contour_plot_data(configuration):
+    X, Y, selectivities, productivities, data = fermentation_data(configuration, load)
+    yields = np.linspace(30, 90, 20)
+    titers = np.linspace(5, 100, 20)
+    MPSP_data = data[:, :, :, :, 0]
+    folder = os.path.dirname(__file__)
+    if configuration == 1:
+        configuration_name = 'sugarcane'
+    elif configuration == 2:
+        configuration_name = 'switchgrass'
+    for i, selectivity in enumerate(selectivities):
+        for j, productivity in enumerate(productivities):
+            file = f'{configuration_name}_biorefinery_selectivity_{selectivity}_productivity_{productivity}.xlsx'
+            file = os.path.join(folder, file)
+            pd.DataFrame(
+                data=MPSP_data[:, :, i, j],
+                index=pd.MultiIndex.from_tuples([(i,) for i in yields], names=['Yield [% theoretical]']),
+                columns=pd.MultiIndex.from_tuples([(i,) for i in titers], names=['Titer [g / L]']),
+            ).to_excel(file, startrow=1)
+    
+
 def save_tables():
     import biorefineries.actag as actag
     import biorefineries.cornstover as cs
@@ -272,13 +312,46 @@ def save_tables():
     file = os.path.join(folder, file)
     writer = pd.ExcelWriter(file)
     bst.report.voc_table(
-        [sys1_baseline, sys1_target, sys2_baseline, sys2_target], 
+        [sys1_baseline, sys2_baseline, sys1_target, sys2_target], 
         ['TAG', 'acTAG'],
-        ['Baseline conventional', 'Target conventional',
-         'Baseline cellulosic', 'Target cellulosic']).to_excel(writer, 'VOC')
+        ['Baseline conventional', 'Baseline cellulosic', 
+         'Target conventional', 'Target cellulosic']).to_excel(writer, 'VOC')
     cs.capex_table(
-        [tea1_baseline, tea1_target, tea2_baseline, tea2_target], 
-        ['Baseline conventional', 'Target conventional',
-         'Baseline cellulosic', 'Target cellulosic']).to_excel(writer, 'CAPEX')
+        [tea1_baseline, tea2_baseline, tea1_target, tea2_target], 
+        ['Baseline conventional', 'Baseline cellulosic', 
+         'Target conventional', 'Target cellulosic']).to_excel(writer, 'CAPEX')
+    cs.foc_table(
+        [tea1_baseline, tea2_baseline, tea1_target, tea2_target], 
+        ['Baseline conventional', 'Baseline cellulosic', 
+         'Target conventional', 'Target cellulosic']).to_excel(writer, 'FOC')
     writer.save()
+    
+def save_plots(load=True, single_bar=False):
+    import matplotlib.pyplot as plt
+    if single_bar:
+        set_plot_style()
+        plot_yield_titer_selectivity_productivity_contours([1, 2], load=load)
+        folder = os.path.dirname(__file__)
+        file = 'contour_plots.svg'
+        file = os.path.join(folder, file)
+        plt.savefig(file, transparent=True)
+    else:
+        set_plot_style(half=True)
+        folder = os.path.dirname(__file__)
+        fig0, axes0 = plot_yield_titer_selectivity_productivity_contours(1, load=load)
+        plt.subplots_adjust(left=0.17, right=0.86)
+        # plt.tight_layout()
+        # fig0.set_constrained_layout_pads(hspace=0.02, wspace=0.02)
+        file = 'contour_plots_left.svg'
+        file = os.path.join(folder, file)
+        plt.savefig(file, transparent=True)
+        fig1, axes1 = plot_yield_titer_selectivity_productivity_contours(2, load=load)
+        plt.subplots_adjust(left=0.17, right=0.86)
+        # plt.tight_layout()
+        # fig1.set_constrained_layout_pads(hspace=0.02, wspace=0.02)
+        file = 'contour_plots_right.svg'
+        file = os.path.join(folder, file)
+        plt.show()
+        plt.savefig(file, transparent=True)
+        
     

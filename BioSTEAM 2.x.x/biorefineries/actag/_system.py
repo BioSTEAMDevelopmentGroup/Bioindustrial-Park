@@ -232,7 +232,8 @@ def create_cellulosic_acTAG_system(ins, outs):
     oil_separation_sys = create_post_fermentation_oil_separation_system(
         'oil_separation_sys', cellulosic_beer,
         mockup=True, area=400,
-        target_oil_content=60,
+        target_oil_content=110,
+        pop_last_evaporator=False,
     )
     oil, cellmass, wastewater, condensate = oil_separation_sys.outs
     oil_wash_sys = create_lipid_wash_system(
@@ -377,7 +378,8 @@ def create_conventional_acTAG_system(ins, outs):
     oil_separation_sys = create_post_fermentation_oil_separation_system(
         'oil_separation_sys', TX-0,
         mockup=True, area=400,
-        target_oil_content=60,
+        target_oil_content=110,
+        pop_last_evaporator=False,
     )
     oil, cellmass, wastewater, condensate = oil_separation_sys.outs
     oil_wash_sys = create_lipid_wash_system(

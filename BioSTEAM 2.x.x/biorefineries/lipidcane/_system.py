@@ -57,7 +57,7 @@ __all__ = (
           dict(ID='spent_oil_wash_water')]
 )
 def create_juicing_and_lipid_extraction_system(ins, outs, pellet_bagasse=None):
-    lipidcane, enzyme, H3PO4, lime, polymer = ins
+    lipidcane, H3PO4, lime, polymer = ins
     screened_juice, lipid, bagasse, fiber_fines, spent_oil_wash_water = outs
     
     oil_wash_water = bst.Stream('oil_wash_water',
@@ -66,7 +66,7 @@ def create_juicing_and_lipid_extraction_system(ins, outs, pellet_bagasse=None):
                                 T=358.15)  # to T207
     juicing_sys = create_juicing_system_up_to_clarification(
         pellet_bagasse=pellet_bagasse,
-        ins=[lipidcane, enzyme, H3PO4, lime, polymer], 
+        ins=[lipidcane, H3PO4, lime, polymer], 
         outs=['', bagasse],
         mockup=True,
     )
@@ -159,7 +159,7 @@ def create_lipid_wash_system(ins, outs):
           dict(ID='fiber_fines')]
 )
 def create_juicing_system(ins, outs, pellet_bagasse=None):
-    lipidcane, enzyme, H3PO4, lime, polymer = ins
+    lipidcane, H3PO4, lime, polymer = ins
     screened_juice, bagasse, fiber_fines = outs
     
     oil_wash_water = bst.Stream('oil_wash_water',
@@ -168,7 +168,7 @@ def create_juicing_system(ins, outs, pellet_bagasse=None):
                                 T=358.15)  # to T207
     juicing_sys = create_juicing_system_with_fiber_screener(
         pellet_bagasse=pellet_bagasse,
-        ins=[lipidcane, enzyme, H3PO4, lime, polymer], 
+        ins=[lipidcane, H3PO4, lime, polymer], 
         outs=[screened_juice, bagasse, fiber_fines],
         mockup=True,
     )
@@ -571,7 +571,7 @@ def create_transesterification_and_biodiesel_separation_system(ins, outs):
 )
 def create_lipidcane_to_biodiesel_and_conventional_ethanol_system(ins, outs):
     
-    lipidcane, enzyme, H3PO4, lime, polymer, denaturant = ins
+    lipidcane, H3PO4, lime, polymer, denaturant = ins
     ethanol, biodiesel, crude_glycerol, wastewater, emissions, ash_disposal = outs
     
     feedstock_handling_sys = create_feedstock_handling_system(
@@ -579,10 +579,27 @@ def create_lipidcane_to_biodiesel_and_conventional_ethanol_system(ins, outs):
         mockup=True,
     )
     
+    enzyme = bst.Stream(
+        ID='enzyme',
+        Cellulose=100,
+        Water=900,
+        units='kg/hr',
+        price=0.5
+    )
+    
+    # Hydrolyze lipid bodies
+    T201 = units.EnzymeTreatment('T201', (feedstock_handling_sys-0, enzyme), T=323.15)  # T=50
+    
+    @T201.add_specification(run=True)
+    def update_enzyme():
+        sugarcane = T201.ins[0]
+        F_mass = sugarcane.F_mass
+        enzyme.imass['Cellulose', 'Water'] = 0.003 * F_mass * np.array([0.1, 0.9])
+    
     ### Oil and juice separation ###
     
     juicing_and_lipid_extraction_sys = create_juicing_and_lipid_extraction_system(
-        ins=[feedstock_handling_sys-0, enzyme, H3PO4, lime, polymer],
+        ins=[T201-0, H3PO4, lime, polymer],
         mockup=True,
     )
     

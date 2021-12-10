@@ -23,7 +23,6 @@ from biosteam.plots import (
 )
 from math import floor, ceil
 from biosteam import plots
-from biosteam.utils import CABBI_colors
 from thermosteam.units_of_measure import format_units
 from biosteam.plots.utils import style_axis, style_plot_limits, fill_plot, set_axes_labels
 from biosteam import Metric
@@ -35,18 +34,22 @@ __all__ = ('plot_yield_titer_selectivity_productivity_contours',
            'plot_purity_across_selectivity',
            'plot_metrics_across_titer',
            'plot_tea_across_titer',
-           'plot_MPSP_across_titer_and_yield')
+           'plot_MPSP_across_titer_and_yield',
+           'set_plot_style')
 
-baselinecolor = (*colors.red.RGBn, 1)
+scatter_color = (*colors.purple.tint(15).RGBn, 1)
 shadecolor = (*colors.neutral.RGBn, 0.20)
 linecolor = (*colors.neutral_shade.RGBn, 0.85)
 markercolor = (*colors.orange_tint.RGBn, 1)
 edgecolor = (*colors.CABBI_black.RGBn, 1)
     
-CABBI_colors = (colors.CABBI_yellow.tint(75).RGBn, 
+CABBI_colors = (colors.CABBI_yellow.tint(70).RGBn, 
                 colors.CABBI_yellow.RGBn,
+                (colors.CABBI_green.RGBn + colors.CABBI_yellow.RGBn) * 0.5,
                 colors.CABBI_green.RGBn,
-                colors.CABBI_teal_green.shade(60).RGBn,
+                (colors.CABBI_green.RGBn + colors.CABBI_teal_green.shade(50).RGBn) * 0.5,
+                colors.CABBI_teal_green.shade(50).RGBn,
+                colors.CABBI_teal_green.shade(70).RGBn,
                 colors.CABBI_teal_green.shade(90).RGBn)
 
 CABBI_colors_x = (colors.CABBI_blue_light.tint(90).RGBn,
@@ -63,67 +66,111 @@ diverging_colormaps = [
 
 colormaps = [
     LinearSegmentedColormap.from_list('CABBI', CABBI_colors, 25),
-    LinearSegmentedColormap.from_list('CABBI', CABBI_colors_x, 25),
+    # LinearSegmentedColormap.from_list('CABBI', CABBI_colors_x, 25),
     plt.cm.get_cmap('inferno_r'),
     plt.cm.get_cmap('copper_r'),
     plt.cm.get_cmap('bone_r'),
 ] * 2
 
+market_price_colors = [
+    colors.CABBI_blue.shade(30).RGBn,
+    colors.red.shade(30).RGBn,
+]
+
 ### Defaults
-rho = 0.900 # kg / L
-f = 1 / rho * 907.1847 # L / ton
-lubricating_oil_market_price = (0.92 * f, 1.35 * f) # USD / L to USD / ton
+liter_per_gal = 4.54609
+rho = 0.900 * liter_per_gal # Diesel 4; kg / gal
+kg_per_ton = 907.1847 
+invrho = 1 / rho * kg_per_ton # gal / ton
+fuel_oil_no4_market_price = (0.657 * invrho, 1.017 * invrho) # USD / gal to USD / ton
+emulsifier_food_additive_market_price = (1.8 * kg_per_ton, 2.5 * kg_per_ton)
+
+def set_plot_style(half=False):
+    import matplotlib
+    font = {'size'   : 8}
+    matplotlib.rc('font', **font)
+    params = matplotlib.rcParams
+    params['font.sans-serif'] = "Arial"
+    params['font.family'] = "sans-serif"
+    point_per_mm = 72. / 25.4
+    params['axes.linewidth'] = 0.5 * point_per_mm
+    params['lines.linewidth'] = params['xtick.major.width'] = params['ytick.major.width'] = 0.25 * point_per_mm
+    width = 168 / 25.4
+    aspect_ratio = 0.65
+    if half: 
+        width *= 0.55
+        aspect_ratio = 0.65 / 0.55
+    else:
+        aspect_ratio = 0.65
+    params['figure.figsize'] = np.array([width, width * aspect_ratio]) * 0.98
+    
 
 def plot_yield_titer_selectivity_productivity_contours(
-        configuration=1, load=True, price_ranges=[lubricating_oil_market_price],
+        configurations=(1,), load=True, 
+        price_ranges=[fuel_oil_no4_market_price, 
+                      emulsifier_food_additive_market_price],
         metric_index=0,
     ):
-    baseline = actag.baseline[configuration]
-    target = actag.target[configuration]
-    baseline = [[baseline['Yield']], [baseline['Titer']]]
-    target  = [[target['Yield']], [target['Titer']]]
-    
-    # Generate contour data
-    X, Y, z, w, data = actag.fermentation_data(configuration, load)
-    
+    try:
+        N_configurations = len(configurations)
+    except:
+        configurations = [configurations]
+        N_configurations = 1
+    if N_configurations > 1:
+        # Generate contour data
+        X, Y, z, w, data_0 = actag.fermentation_data(1, load)
+        *_, data_1 = actag.fermentation_data(2, load)
+        data = np.concatenate([data_0, data_1], axis=-2)
+        forced_size = None
+    elif N_configurations == 1:
+        X, Y, z, w, data = actag.fermentation_data(configurations[0], load)
+        forced_size = 0.55
+    else:
+        raise ValueError("length of configurations must be at least 1")
     data = data[:, :, :, :, metric_index]
     
     # Plot contours
     xlabel = "Yield\n[% theoretical]" 
-    ylabel = f"Titer\n[{format_units('g/L')}]"
+    ylabel = "Titer\n[g / L]"
     xticks = [30, 45, 60, 75, 90]
     yticks = [5, 25, 50, 75, 100]
+    fillcolor = None
     if metric_index == 0:
         metric_bar = MetricBar(
-            'MSP', format_units('$/ton'), 
+            'MSP', '$ / ton', 
             colormaps[metric_index],
-            tickmarks(data, 5, 5), 15
+            tickmarks(data, 5, 5, ub_max=17000), 75,
+            forced_size=forced_size,
         )
+        fillcolor = CABBI_colors[-1]
     elif metric_index == 1:
         metric_bar = MetricBar(
             'TCI', format_units('10^6*$'), 
             colormaps[metric_index], 
-            tickmarks(data, 5, 5), 15
+            tickmarks(data, 5, 5), 75,
+            forced_size=forced_size,
         )
     elif metric_index == 2:
         metric_bar = MetricBar(
             'Heating', format_units('GJ/hr'), 
             colormaps[metric_index], 
-            tickmarks(data, 5, 5), 15
+            tickmarks(data, 5, 5), 75,
+            forced_size=forced_size,
         )
     elif metric_index == 3:
         metric_bar = MetricBar(
             'Cooling', format_units('GJ/hr'), 
             colormaps[metric_index], 
-            tickmarks(data, 5, 5), 15
+            tickmarks(data, 5, 5), 75,
+            forced_size=forced_size,
         )
     X = X[:, :, 0]
     Y = Y[:, :, 0]
     fig, axes, CSs, CB = plot_contour_single_metric(
         X, Y, data, xlabel, ylabel, xticks, yticks, metric_bar, 
-        fillblack=False, styleaxiskw=dict(xtick0=False), label=False,
+        fillcolor=fillcolor, styleaxiskw=dict(xtick0=False), label=False,
     )
-    
+    # fig.set_size_inches([168 / 25.4, 168 / 25.4])
     *_, nrows, ncols = data.shape
     # colors = [linecolor]
     # hatches = ['//', r'\\']
@@ -141,17 +188,25 @@ def plot_yield_titer_selectivity_productivity_contours(
                     # # Doing this also colors in the box around each level
                     # # We can remove the colored line around the levels by setting the linewidth to 0
                     # for collection in csf.collections: collection.set_linewidth(0.)
-                    cs = plt.contour(X, Y, metric_data, zorder=1e6, linestyles='dashed', linewidths=1.,
-                                     levels=price_range, colors=[linecolor])
+                    cs = plt.contour(X, Y, metric_data, zorder=1e6, linestyles='dashed', 
+                                     levels=price_range, colors=[market_price_colors[i]])
                     # clabels = ax.clabel(cs, levels=cs.levels, inline=True, fmt=metric_bar.fmt,
                     #                     fontsize=12, colors=['k'], zorder=1e16)
                     # for i in clabels: i.set_rotation(0)
-    plt.sca(axes[0, 0])
-    plt.scatter(*baseline, color=baselinecolor, marker='o', s=75, edgecolor='black', zorder=1e6)
-    plt.sca(axes[1, 1])
-    plt.scatter(*target, color=baselinecolor, marker='*', s=125, edgecolor='black', zorder=1e6)
+    
+    for i in range(N_configurations):
+        c = configurations[i]
+        baseline = actag.baseline[c]
+        target = actag.target[c]
+        baseline = [[baseline['Yield']], [baseline['Titer']]]
+        target  = [[target['Yield']], [target['Titer']]]
+        col = i * 2
+        plt.sca(axes[0, col])
+        plt.scatter(*baseline, color=scatter_color, marker='o', s=75, edgecolor='black', zorder=1e6)
+        plt.sca(axes[1, 1 + col])
+        plt.scatter(*target, color=scatter_color, marker='*', s=125, edgecolor='black', zorder=1e6)
     plt.show()
-    # breakpoint()
+    return fig, axes
 
 def plot_purity_across_selectivity(configuration=1):
     actag.load(configuration)

@@ -21,15 +21,17 @@ All units are explicitly defined here for transparency and easy reference
 
 import numpy as np
 import thermosteam as tmo
-from math import exp
+from math import exp, pi, log
 from flexsolve import aitken_secant
-from biosteam import Unit
+from biosteam import Unit, BatchCrystallizer
 from biosteam.units import Flash, HXutility, Mixer, MixTank, Pump, \
     SolidsSeparator, StorageTank, LiquidsSplitSettler
 from biosteam.units.decorators import cost
+from biosteam.units.design_tools import CEPCI_by_year as CEPCI
 from thermosteam import Stream, MultiStream
 from biorefineries.TAL.process_settings import price
-from biorefineries.TAL.utils import CEPCI, baseline_feedflow, compute_extra_chemical, adjust_recycle
+# from biorefineries.TAL.utils import CEPCI, baseline_feedflow, compute_extra_chemical, adjust_recycle
+from biorefineries.TAL.utils import baseline_feedflow, compute_extra_chemical, adjust_recycle
 
 _kg_per_ton = 907.18474
 _Gcal_2_kJ = 4.184 * 1e6 # (also MMkcal/hr)
@@ -706,6 +708,54 @@ class SeedHoldTank(Unit): pass
 # Separation
 # =============================================================================
 
+
+class SorbicAcidCrystallizer(BatchCrystallizer):
+    
+    def __init__(self, ID='', ins=None, outs=(), thermo=None, *, 
+                 T=250., crystal_SA_purity=0.98, melt_water_purity=0.90,
+                 order=None):
+        BatchCrystallizer.__init__(self, ID, ins, outs, thermo,
+                                       tau=5, V=1e6, T=T)
+        self.melt_AcTAG_purity = melt_AcTAG_purity
+        self.crystal_TAG_purity = crystal_TAG_purity
+
+    @property
+    def Hnet(self):
+        feed = self.ins[0]
+        effluent = self.outs[0]
+        if 's' in feed.phases:
+            H_in = - sum([i.Hfus * j for i,j in zip(self.chemicals, feed['s'].mol) if i.Hfus])
+        else:
+            H_in = 0.
+        solids = effluent['s']
+        H_out = - sum([i.Hfus * j for i,j in zip(self.chemicals, solids.mol) if i.Hfus])
+        return H_out - H_in
+        
+    def _run(self):
+        outlet = self.outs[0]
+        outlet.phases = ('s', 'l')
+        crystal_TAG_purity = self.crystal_TAG_purity
+        melt_AcTAG_purity = self.melt_AcTAG_purity
+        feed = self.ins[0]
+        TAG, AcTAG = feed.imass['TAG', 'AcTAG'].value
+        total = TAG + AcTAG
+        minimum_melt_purity = AcTAG / total
+        minimum_crystal_purity = TAG / total
+        outlet.empty()
+        if crystal_TAG_purity < minimum_crystal_purity:
+            outlet.imol['s'] = feed.mol
+        elif melt_AcTAG_purity < minimum_melt_purity:
+            outlet.imol['l'] = feed.mol
+        else: # Lever rule
+            crystal_AcTAG_purity = (1. - crystal_TAG_purity)
+            melt_fraction = (minimum_melt_purity - crystal_AcTAG_purity) / (melt_AcTAG_purity - crystal_AcTAG_purity)
+            melt = melt_fraction * total
+            AcTAG_melt = melt * melt_AcTAG_purity
+            TAG_melt = melt - AcTAG
+            outlet.imass['l', ('AcTAG', 'TAG')] = [AcTAG_melt, TAG_melt]
+            outlet.imol['s'] = feed.mol - outlet.imol['l']
+        outlet.T = self.T
+        
 # Filter to separate fermentation broth into products liquid and solid
 @cost(basis='Solids flow rate', ID='Feed tank', units='kg/hr',
       cost=174800, S=31815, CE=CEPCI[2010], n=0.7, BM=2.0)
@@ -882,6 +932,86 @@ class Reactor(Unit, PressureVessel, isabstract=True):
             return self.BM_horizontal 
         else:
             raise RuntimeError("invalid vessel type")
+
+#TODO:
+# 1. Find a source for recovery - the only thing I found for this is in Woods 2007 section 5.3.1 "allow both phases to have > 20% of the diameter and no less than 0.2 m to ensure that the exit phases do not become cross-contaminated"
+# 2. Do we need a backup reactor? - need to discuss
+# 3. Need electricity? - I think so but I don't know how to account for this? Let's discuss.
+# 4. Look into n - mothi's thesis uses n=1, I canot find where I had previously found a value of 0.84
+# 5. Look into BM (bare module factor) - Sieder et al 2016 Table 16.11 use 4.16 for  a vertical pressure vessel
+# I also had in my notes to check the decanter usable % and I believe that is 90% but it already accounted for in the height sizing of adding an additional 10% to the height.
+@cost(basis='Flow rate', ID='Decanter', units='m3/s',
+      cost=190000, S=0.0012, CE=CEPCI[2008], n=1, BM=2.3)
+class Decantation(Unit):
+    '''
+    A decanter to separate the sorbic acid crystal from the broth.
+
+    Using Stokes’ Law to calculate settling velocity and the desired volumetric flow rate
+    of the solution into the decanter.
+
+    Parameters
+    ----------
+    recovery : float
+        Recovery of the crystal.
+    V_wf : float
+        Working fraction of the decanter.
+
+    References
+    ----------
+    1. Towler, G., & Sinnott, R. K. (2008). Chemical engineering design: principles, practice and economics of plant and process design.
+    2. Peters, M. S., Timmerhaus, K. D., West, R. E., Timmerhaus, K., & West, R. (2003). Plant design and economics for chemical engineers (Vol. 4).
+    3. Density: https://pubchem.ncbi.nlm.nih.gov/compound/Sorbic-acid#section=Solubility
+    4. Seider, W. D., Lewin, D. R., Seader, J. D., Widagdo, S., Gani, R., Ming Ng, K. (2017) Product and Process Design Principles: Synthesis, Analysis, and Evaluation (4th Edition) Wiley.
+    5. M. Viswanathan. (2019) Process generalizations and rules of thumb for scaling up biobased processes.
+    6. Woods, D. R. (2007) Rules of Thumb in Engineering Practice, Wiley.
+    '''
+
+    _N_ins = 1
+    _N_outs = 2
+
+    _units={
+        'Settling velocity': 'm/s',
+        'Area': 'm2',
+        'Diameter': 'm',
+        'Length': 'm',
+        'Volume': 'm3',
+        }
+
+    def __init__(self, ID='', ins=None, outs=(), forced_recovery=None, V_wf=0.9, T=293.15):
+        Unit.__init__(self, ID, ins, outs)
+        self.forced_recovery = forced_recovery
+        self.V_wf = V_wf
+        self.T = T
+        
+    def get_SA_solubility(self, T): # mol SA/ (mol SA + mol water)
+        return exp(-157.137 + 3505.81/T + 24.1015*log(T)) # Modified Apelblat Equation
+    
+    def _run(self):
+        feed = self.ins[0]
+        dil_SA, crystal = self.outs
+        dil_SA.copy_like(feed)
+        if self.forced_recovery:
+            crystal.imass['SorbicAcid'] = feed.imass['SorbicAcid']*self.forced_recovery
+            dil_SA.imass['SorbicAcid'] -= crystal.imass['SorbicAcid']
+        else:
+            sol_SA = self.get_SA_solubility(self.T)
+            still_dissolved_SA = sol_SA * feed.imol['Water'] / (1-sol_SA)
+            dil_SA.imass['SorbicAcid'] = still_dissolved_SA
+            crystal.imass['SorbicAcid'] = feed.imass['SorbicAcid'] - dil_SA.imass['SorbicAcid']
+        
+
+
+    def _design(self):
+        feed = self.ins[0]
+        D = self.design_results
+        D['Flow rate'] = feed.F_vol/3600.
+        D['Settling velocity'] = v_settling = 0.00015*9.81*(1204-1000)/(18*0.001) # m/s
+        D['Area'] = A_decanter = feed.F_vol*0.00028/v_settling # m2
+        D['Diameter'] = D_decanter = (A_decanter/pi)**(1/2) # m
+        D['Length'] = L_decanter = 2.2*D_decanter # m
+        D['Volume'] = V_decanter = (pi*D_decanter*L_decanter)/(2*self.V_wf)
+
+#!!! TODO: Add cooling utility
 
 # class AcidulationReactor(Reactor):
 #     _N_ins = 2
@@ -1293,17 +1423,16 @@ class AnaerobicDigestion(Unit):
         wastewater = self.ins[0]	
         biogas, treated_water, sludge = self.outs	
         T = self.T	
-
         sludge.copy_flow(wastewater)	
         self.digestion_rxns(sludge.mol)	
         self.multi_stream.copy_flow(sludge)	
-        self.multi_stream.vle(P=101325, T=T)	
+        self.multi_stream.vle(P=101325, H=self.multi_stream.H)
         biogas.mol = self.multi_stream.imol['g']	
         biogas.phase = 'g'	
         liquid_mol = self.multi_stream.imol['l']	
         treated_water.mol = liquid_mol * self.split	
         sludge.mol = liquid_mol - treated_water.mol	
-        biogas.receive_vent(treated_water, accumulate=True)	
+        biogas.receive_vent(treated_water)	
         biogas.T = treated_water.T = sludge.T = T
         
     def _design(self):
@@ -1691,7 +1820,7 @@ class HydrolysisReactor(Reactor):
             self.mcat_frac * self.ins[0].imass['SA'] * price['Amberlyst15']
             
 
-class Crystallization_Decantation(Reactor):
+class Crystallization(Reactor):
     N_ins = 3
     _N_outs = 2
     _F_BM_default = {**Reactor._F_BM_default}
@@ -1701,13 +1830,18 @@ class Crystallization_Decantation(Reactor):
                 ])
     TAL_to_SA_rxn = dehydration_rxns[0]
     
+    def __init__(self, ID='', ins=None, outs=(), tau=1., T=293.15, reagent_fraction=1.):
+        Reactor.__init__(self, ID, ins, outs, tau=tau)
+        self.reagent_fraction = reagent_fraction
+    
+
     def _run(self):
-        feed, reagent, recycle = self.ins
-        effluent, KCl = self.outs
+        feed, reagent, recycle_reagent, recycle_feed = ins = self.ins
+        effluent, KCl = outs = self.outs
         
-        reagent.imol['HCl'] = feed.imol['KSA'] - recycle.imol['HCl']
+        reagent.imol['HCl'] = max(0, sum([i.imol['KSA'] for i in ins]) - sum([i.imol['HCl'] for i in ins]))
         # effluent = feed.copy()
-        effluent.mix_from([feed, reagent, recycle])
+        effluent.mix_from([feed, reagent, recycle_reagent, recycle_feed])
         
         # effluent.T = feed.T
         # effluent.P = feed.P
@@ -1720,6 +1854,7 @@ class Crystallization_Decantation(Reactor):
         
         # effluent.imol['H2O'] = effluent.imol['H2O']
         
+        effluent.imol['HCl'] = 0.
         effluent.imol['KCl'] = 0
         # effluent.imol['H2O'] = 0
         

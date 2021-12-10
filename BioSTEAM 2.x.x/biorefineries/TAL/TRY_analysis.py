@@ -292,7 +292,7 @@ TAL_metrics = [get_SA_MPSP, get_TAL_sugars_conc, get_TAL_inhibitors_conc]
 # TAL_metrics = [get_TAL_MPSP, get_GWP, get_FEC]
 
 # %% Generate 3-specification meshgrid and set specification loading functions
-steps = 5
+steps = 25
 
 # Yield, titer, productivity (rate)
 spec_1 = np.linspace(0.15, 0.95, steps) # yield
@@ -687,8 +687,8 @@ def plot(data, titers, yields, productivities,
     
     return plot_contour_2d(titers, yields, productivities, data, 
                                 xlabel, ylabel, xticks, yticks, metric_bars, 
-                                Z_value_format=lambda Z: f"{Z:.1f} [{spec_3_units}]",
-                                fillblack=False)
+                                Z_value_format=lambda Z: f"{Z:.1f} [{spec_3_units}]",)
+                                # fillblack=False)
 
 
 

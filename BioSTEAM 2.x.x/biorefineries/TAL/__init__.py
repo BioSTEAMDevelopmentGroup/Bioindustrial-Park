@@ -18,8 +18,3 @@ All units are explicitly defined here for transparency and easy reference
 
 
 __all__ = []
-
-from lazypkg import LazyPkg
-LazyPkg(__name__, [#'system_wo_HXN',
-                   'chemicals_data', 'facilities', 'process_settings', 'system', 
-                   'tea', 'units'])
