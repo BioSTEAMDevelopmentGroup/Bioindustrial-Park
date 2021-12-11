@@ -549,14 +549,14 @@ class CoFermentation(Unit):
         self.cofermentation_rxns = ParallelRxn([
         #      Reaction definition            Reactant    Conversion
         Rxn('Glucose -> 1.42856 TAL',        'Glucose',   .25), 
-        Rxn('Glucose -> VitaminA',               'Glucose',   0.1), # retinol
-        Rxn('Glucose -> VitaminD2',               'Glucose',   0.1), # ergosterol
-        Rxn('Glucose -> 6 FermMicrobe',       'Glucose',   0.1),
+        Rxn('Glucose -> VitaminA',               'Glucose',   0.005), # retinol
+        Rxn('Glucose -> VitaminD2',               'Glucose',   0.005), # ergosterol
+        Rxn('Glucose -> 6 FermMicrobe',       'Glucose',   0.05),
         
         Rxn('Xylose -> 1.42856 TAL',       'Xylose',    0.25),
-        Rxn('Xylose -> VitaminA',       'Xylose',    0.1),
-        Rxn('Xylose -> VitaminD2',       'Xylose',    0.1),
-        Rxn('Xylose -> 5 FermMicrobe',        'Xylose',    0.1),
+        Rxn('Xylose -> VitaminA',       'Xylose',    0.005),
+        Rxn('Xylose -> VitaminD2',       'Xylose',    0.005),
+        Rxn('Xylose -> 5 FermMicrobe',        'Xylose',    0.05),
         ])
         
         # self.cofermentation_rxns = ParallelRxn([
@@ -990,6 +990,7 @@ class Decantation(Unit):
         feed = self.ins[0]
         dil_SA, crystal = self.outs
         dil_SA.copy_like(feed)
+        dil_SA.T = crystal.T = self.T
         if self.forced_recovery:
             crystal.imass['SorbicAcid'] = feed.imass['SorbicAcid']*self.forced_recovery
             dil_SA.imass['SorbicAcid'] -= crystal.imass['SorbicAcid']
@@ -999,7 +1000,6 @@ class Decantation(Unit):
             dil_SA.imass['SorbicAcid'] = still_dissolved_SA
             crystal.imass['SorbicAcid'] = feed.imass['SorbicAcid'] - dil_SA.imass['SorbicAcid']
         
-
 
     def _design(self):
         feed = self.ins[0]
