@@ -76,7 +76,7 @@ def create_feedstock_handling_system(ins, outs):
           dict(ID='bagasse')]
 )
 def create_juicing_system_without_treatment(ins, outs, pellet_bagasse=None):
-    if pellet_bagasse is None: pellet_bagasse = True
+    if pellet_bagasse is None: pellet_bagasse = False
     
     ### Streams ###
     sugarcane, = ins
