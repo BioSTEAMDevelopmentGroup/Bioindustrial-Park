@@ -1733,7 +1733,7 @@ class HydrogenationReactor(Reactor):
     mcat_frac = 0.00001 # fraction of catalyst by weight in relation to the reactant (TAL)
     dehydration_rxns = ParallelRxn([
             #   Reaction definition                                       Reactant   Conversion
-            Rxn('TAL + H2-> HMTHP',         'TAL',   0.98)
+            Rxn('TAL + H2-> HMTHP',         'TAL',   0.964*0.99) # conversion from Chia et al. 2012
                 ])
     TAL_to_SA_rxn = dehydration_rxns[0]
     
@@ -1766,7 +1766,7 @@ class DehydrationRingOpeningReactor(Reactor):
     mcat_frac = 0.01 # fraction of catalyst by weight in relation to the reactant (TAL)
     dehydration_rxns = ParallelRxn([
             #   Reaction definition                                       Reactant   Conversion
-            Rxn('HMTHP -> SA',         'HMTHP',   0.90)
+            Rxn('HMTHP -> SA',         'HMTHP',   0.667) # conversion from Chia et al. 2012
                 ])
     TAL_to_SA_rxn = dehydration_rxns[0]
     
