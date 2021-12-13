@@ -52,18 +52,7 @@ tmo.settings.set_thermo(ozo_chemicals)
  
 
 
-Ozonolysis_parallel_rxn = tmo.ParallelReaction([
-      #Assumption, every conversion is 0.947 and overall conversion is (0.947^3)
-tmo.Reaction('Oleic_acid + H2O2 -> Epoxy_stearic_acid+ Water ', 'Oleic_acid',
-             X= 0.947),
-tmo.Reaction('Epoxy_stearic_acid + H2O2 -> Nonanal + Oxononanoic_acid + H2O', 'Epoxy_stearic_acid',
-             X = 0.947),
-tmo.Reaction('Nonanal + Oxononanoic_acid + 2H2O2 -> Azelaic_acid + Nonanoic_acid+ 2H2O', 'Nonanal',
-             X = 0.947)])
-#Ozonolysis_parallel_rxn.correct_atomic_balance(['Oleic_acid','H2O2','9_10_epoxy_stearic_acid','H2O','Nonanal','9_Oxononanoic_acid','Nonaoic_acid','Azelaic_acid'])
-Ozonolysis_parallel_rxn.show()
-Ozonolysis_series_rxn = tmo.SeriesReaction(Ozonolysis_parallel_rxn)
-Ozonolysis_series_rxn.show()
+
 
 #%% Stream Data and Mass balance
 mixed_feed_stream = tmo.Stream('mixed_feed_stream')
@@ -81,41 +70,38 @@ outs = [Stream('reactor_out')]
 #Check if you need diol data
 
 #%% Units
-U1 = Unit(ID='Reactor', ins=mixed_feed_stream, outs=outs)
-U1.show(data=False) 
-U1.diagram()
 
- _N_ins = 3
- _N_outs = 6
- _ins_size_is_fixed = False
- _outs_size_is_fixed = False
+import biosteam as bst
 
-    _units = {**PressureVessel._units,
-              'Residence time': 'hr',
-              'Total volume': 'm3',
-              'Reactor volume': 'm3'}
-
-    # For a single reactor, based on diameter and length from PressureVessel._bounds,
-    # converted from ft3 to m3
-    _Vmax = pi/4*(20**2)*40/35.3147
-
+class OzonolysisReactor(bst.BatchBioreactor):
+    _N_ins = 1
+    _N_outs = 1
+    
     def __init__(self, ID='', ins=None, outs=(), *,
                  P=101325, tau=0.5, V_wf=0.8,
-                 length_to_diameter=2, mixing_intensity=None, kW_per_m3=0.0985,
-                 wall_thickness_factor=1,
+                 length_to_diameter=2, kW_per_m3=0.0985,
                  vessel_material='Stainless steel 316',
                  vessel_type='Vertical'):
-
         Unit.__init__(self, ID, ins, outs)
         self.P = P
         self.tau = tau
         self.V_wf = V_wf
         self.length_to_diameter = length_to_diameter
-        self.mixing_intensity = mixing_intensity
         self.kW_per_m3 = kW_per_m3
-        self.wall_thickness_factor = wall_thickness_factor
         self.vessel_material = vessel_material
         self.vessel_type = vessel_type
+        
+    def _setup(self):
+        self.reactions = Ozonolysis_parallel_rxn = tmo.SeriesReaction([
+             #Assumption, every conversion is 0.947 and overall conversion is (0.947^3)
+            tmo.Rxn('Oleic_acid + H2O2 -> Epoxy_stearic_acid+ Water ', 'Oleic_acid', X= 0.947),
+            tmo.Rxn('Epoxy_stearic_acid + H2O2 -> Nonanal + Oxononanoic_acid + H2O', 'Epoxy_stearic_acid', X = 0.947),
+            tmo.Rxn('Nonanal + Oxononanoic_acid + 2H2O2 -> Azelaic_acid + Nonanoic_acid+ 2H2O', 'Nonanal', X = 0.947)]
+        )
+        #Ozonolysis_parallel_rxn.correct_atomic_balance(['Oleic_acid','H2O2','9_10_epoxy_stearic_acid','H2O','Nonanal','9_Oxononanoic_acid','Nonaoic_acid','Azelaic_acid'])
+    
+    def _run(self):
+        
 
 
 class Reactor(Unit):
