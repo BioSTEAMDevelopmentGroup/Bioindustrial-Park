@@ -60,11 +60,11 @@ mixed_feed_stream.imol['Oleic_acid']=0.86
 mixed_feed_stream.imol['H2O2']=6.85
 mixed_feed_stream.imol['H2O']=27.1
 print(mixed_feed_stream.F_mass)
-Ozonolysis_series_rxn(mixed_feed_stream)
-print(mixed_feed_stream.F_mass)
-mixed_feed_stream.show(N=100)
+# Ozonolysis_series_rxn(mixed_feed_stream)
+# print(mixed_feed_stream.F_mass)
+# mixed_feed_stream.show(N=100)
 
-outs = [Stream('reactor_out')]
+# outs = [Stream('reactor_out')]
 #!!!TODO
 #Change conversion values
 #Check if you need diol data
@@ -76,20 +76,19 @@ import biosteam as bst
 class OzonolysisReactor(bst.BatchBioreactor):
     _N_ins = 1
     _N_outs = 1
+    @property
+    def effluent(self):
+        return self.outs[0]
+
     
-    def __init__(self, ID='', ins=None, outs=(), *,
-                 P=101325, tau=0.5, V_wf=0.8,
-                 length_to_diameter=2, kW_per_m3=0.0985,
-                 vessel_material='Stainless steel 316',
-                 vessel_type='Vertical'):
-        Unit.__init__(self, ID, ins, outs)
-        self.P = P
-        self.tau = tau
-        self.V_wf = V_wf
-        self.length_to_diameter = length_to_diameter
-        self.kW_per_m3 = kW_per_m3
-        self.vessel_material = vessel_material
-        self.vessel_type = vessel_type
+    def __init__(self, ID='', ins=None, outs=(), thermo=None,
+                 tau=17, N=None, V=None, T=373.15, P=101325,
+                 Nmin=2, Nmax=36):
+        bst.BatchBioreactor.__init__(self, ID, ins, outs, thermo,
+                                   tau = tau , N = N, V = V, T = T, 
+                                   P =P ,Nmin =Nmin, Nmax = Nmax)
+    
+        
         
     def _setup(self):
         self.reactions = Ozonolysis_parallel_rxn = tmo.SeriesReaction([
@@ -101,32 +100,22 @@ class OzonolysisReactor(bst.BatchBioreactor):
         #Ozonolysis_parallel_rxn.correct_atomic_balance(['Oleic_acid','H2O2','9_10_epoxy_stearic_acid','H2O','Nonanal','9_Oxononanoic_acid','Nonaoic_acid','Azelaic_acid'])
     
     def _run(self):
+        feed = self.ins[0]
+        effluent = self.outs[0]
+        effluent.copy_like(feed)
+        self.reactions(effluent)
+        effluent.T = self.T
+        effluent.P = self.P
         
+reactor = OzonolysisReactor(ID ='',ins = mixed_feed_stream)
+reactor.simulate()
+print(reactor.results())
+reactor.show()
+
+ 
+     
 
 
-class Reactor(Unit):
-	
-	def __init__(self, ID='', ins=None, outs=(), *,
-                 P=101325, T, tau = 17, V_wf=0.8,
-                 length_to_diameter=2, mixing_intensity=None, kW_per_m3=0.0985,
-                 wall_thickness_factor=1,
-                 vessel_material='Stainless steel 316',
-                 vessel_type='Vertical'):
-        
-    	Unit.__init__(self, ID, ins, outs)
 
-    	self.reactions = tmo.SeriesReaction(
-            Ozonolysis_parallel_rxn
-    	)
-        self.P = P
-        self.tau = tau	
-        self.V_wf = V_wf
-        self.length_to_diameter = length_to_diameter
-        self.mixing_intensity = mixing_intensity
-        self.KW_per_m3 = KW_per_m3
-        self.wall_thickness_factor = wall_thickness_factor 
-        self.vessel_material = vessel_material
-        self.vessel_type = vessel_type
-    
 
 
