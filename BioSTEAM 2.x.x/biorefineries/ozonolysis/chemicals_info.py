@@ -59,7 +59,6 @@ mixed_feed_stream = tmo.Stream('mixed_feed_stream')
 mixed_feed_stream.imol['Oleic_acid']=0.86
 mixed_feed_stream.imol['H2O2']=6.85
 mixed_feed_stream.imol['H2O']=27.1
-print(mixed_feed_stream.F_mass)
 # Ozonolysis_series_rxn(mixed_feed_stream)
 # print(mixed_feed_stream.F_mass)
 # mixed_feed_stream.show(N=100)
@@ -107,7 +106,10 @@ class OzonolysisReactor(bst.BatchBioreactor):
         effluent.T = self.T
         effluent.P = self.P
         
-reactor = OzonolysisReactor(ID ='',ins = mixed_feed_stream)
+reactor = OzonolysisReactor(
+    ins = mixed_feed_stream, 
+    V=3785, # in m3 (equivalent to 1 MMGal)
+)
 reactor.simulate()
 print(reactor.results())
 reactor.show()
