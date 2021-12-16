@@ -163,7 +163,7 @@ def enable_derivative(enable=True):
     global _derivative_disabled
     _derivative_disabled = not enable
     
-_derivative_disabled = True
+_derivative_disabled = False
 
 def load(name, cache={}, reduce_chemicals=True, 
          enhanced_cellulosic_performance=False,
