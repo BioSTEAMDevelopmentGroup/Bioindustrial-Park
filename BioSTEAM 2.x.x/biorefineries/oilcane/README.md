@@ -96,49 +96,83 @@ outs...
 
 ```
 
-To retrieve economic and environmental results are different scenarios, you can 
+To retrieve economic and environmental results at different scenarios, you can 
 use the Model object:
 
 ```python
 >>> import biorefineries.oilcane as oc
 >>> oc.load('O2') # Load cellulosic oilcane system
->>> oc.model.metrics_at_baseline() # All metrics at the baseline scenario
-Biorefinery              MFPP [USD/ton]                                        19.8
-                         Feedstock consumption [ton/yr]                    1.72e+06
-                         Biodiesel production [Gal/ton]                        6.56
-                         Ethanol production [Gal/ton]                          25.7
-                         Electricity production [kWhr/ton]                        0
-                         Natural gas consumption [cf/ton]                       624
-                         TCI [10^6*USD]                                         437
-                         Heat exchanger network error [%]                 -2.17e-09
-Economic allocation      GWP [kg*CO2*eq / USD]                                 1.11
-                         Ethanol GWP [kg*CO2*eq / gal]                          2.1
-                         Biodiesel GWP [kg*CO2*eq / gal]                       4.07
-                         Crude glycerol GWP [kg*CO2*eq / kg]                  0.177
-                         Electricity GWP [kg*CO2*eq / MWhr]                       0
-Displacement allocation  Ethanol GWP [kg*CO2*eq / gal]                        0.154
-Energy allocation        Biofuel GWP [kg*CO2*eq / GGE]                         3.32
-                         Ethanol GWP [kg*CO2*eq / gal]                         2.22
-                         Biodiesel GWP [kg*CO2*eq / gal]                       3.48
-                         Crude-glycerol GWP [kg*CO2*eq / kg]                  0.352
-Biorefinery              MFPP derivative [USD/ton]                             1.22
-                         Biodiesel production derivative [Gal/ton]            0.656
-                         Ethanol production derivative [Gal/ton]             -0.743
-                         Electricity production derivative [kWhr/ton]      5.94e-14
-                         Natural gas consumption derivative [cf/ton]          -43.1
-                         TCI derivative [10^6*USD]                           -0.186
-Economic allocation      GWP derivative [kg*CO2*eq / USD]                   -0.0463
-Ethanol                  Ethanol GWP derivative [kg*CO2*eq / gal]           -0.0879
-Biodiesel                Biodiesel GWP derivative [kg*CO2*eq / gal]           -0.17
-Crude glycerol           Crude glycerol GWP derivative [kg*CO2*eq / kg]    -0.00741
-Electricity              Electricity GWP derivative [kg*CO2*eq / MWhr]            0
+>>> parameters = oc.model.get_baseline_sample() # All parameters at the baseline scenario
+>>> parameters
+biorefinery                        Oil retention [%]                                70
+                                   Bagasse oil extraction efficiency [%]            70
+                                   Capacity [ton/hr]                               367
+Stream-ethanol                     Price [USD/gal]                                 1.9
+Stream-biodiesel                   Price [USD/gal]                                3.67
+Stream-natural gas                 Price [USD/cf]                                 4.73
+biorefinery                        Electricity price [USD/kWhr]                 0.0641
+                                   Operating days [day/yr]                         200
+                                   IRR [%]                                          10
+Stream-crude glycerol              Price [USD/kg]                                 0.16
+Stream-pure glycerine              Price [USD/kg]                                 0.65
+Saccharification                   Reaction time [hr]                               72
+cellulase                          Price [USD/kg]                                0.212
+                                   Cellulase loading [wt. % cellulose]            0.02
+Pretreatment reactor system        Base cost [million USD]                    1.97e+07
+Pretreatment and saccharification  Cane glucose yield [%]                           91
+                                   Sorghum glucose yield [%]                        79
+                                   Cane xylose yield [%]                          97.5
+                                   Sorghum xylose yield [%]                         86
+Cofermenation                      Glucose to ethanol yield [%]                     90
+                                   Xylose to ethanol yield [%]                      42
+Cofermentation                     Titer [g/L]                                    68.5
+                                   Productivity [g/L]                            0.951
+oilcane                            Cane PL content [% oil]                          10
+oilsorghum                         Sorghum PL content [% oil]                       10
+oilcane                            Cane FFA content [% oil]                         10
+oilsorghum                         Sorghum FFA content [% oil]                      10
+oilcane                            Cane oil content [dry wt. %]                      5
+oilsorghum                         Relative sorghum oil content [dry wt. %]       -1.5
+biorefinery                        TAG to FFA conversion [% oil]                    23
+Stream-oilcane                     GWP [kg*CO2-eq/kg]                           0.0352
+Stream-methanol                    GWP [kg*CO2-eq/kg]                             0.45
+Stream-pure glycerine              GWP [kg*CO2-eq/kg]                             1.67
+Stream-cellulase                   GWP [kg*CO2-eq/kg]                            0.161
+Stream-natural gas                 GWP [kg*CO2-eq/kg]                             0.33
 dtype: float64
 
->>> parameters = oc.model.parameters_at_baseline() # All parameter values at the baseline scenario
->>> parameters
-
->>> parameters['oilcane', 'Cane oil content [%]'] = 10
->>> model(parameters) # Reevaluate at new oil content
+>>> parameters['oilcane', 'Cane oil content [dry wt. %]'] = 10 # Change oil content
+>>> oc.model(parameters) # Evaluate at new oil content
+Biorefinery              MFPP [USD/ton]                                        13.5
+                         Feedstock consumption [ton/yr]                    1.76e+06
+                         Biodiesel production [Gal/ton]                        5.83
+                         Ethanol production [Gal/ton]                          23.9
+                         Electricity production [kWhr/ton]                 8.91e-14
+                         Natural gas consumption [cf/ton]                       604
+                         TCI [10^6*USD]                                         473
+                         Heat exchanger network error [%]                  -9.6e-10
+Economic allocation      GWP [kg*CO2*eq / USD]                                 1.22
+                         Ethanol GWP [kg*CO2*eq / gal]                         2.31
+                         Biodiesel GWP [kg*CO2*eq / gal]                       4.47
+                         Crude glycerol GWP [kg*CO2*eq / kg]                  0.195
+                         Electricity GWP [kg*CO2*eq / MWhr]                       0
+Displacement allocation  Ethanol GWP [kg*CO2*eq / gal]                        0.552
+Energy allocation        Biofuel GWP [kg*CO2*eq / GGE]                         3.65
+                         Ethanol GWP [kg*CO2*eq / gal]                         2.43
+                         Biodiesel GWP [kg*CO2*eq / gal]                       3.82
+                         Crude-glycerol GWP [kg*CO2*eq / kg]                  0.386
+Biorefinery              MFPP derivative [USD/ton]                             1.22
+                         Biodiesel production derivative [Gal/ton]            0.583
+                         Ethanol production derivative [Gal/ton]             -0.752
+                         Electricity production derivative [kWhr/ton]     -8.91e-14
+                         Natural gas consumption derivative [cf/ton]           -103
+                         TCI derivative [10^6*USD]                            -3.59
+Economic allocation      GWP derivative [kg*CO2*eq / USD]                    -0.101
+Ethanol                  Ethanol GWP derivative [kg*CO2*eq / gal]            -0.192
+Biodiesel                Biodiesel GWP derivative [kg*CO2*eq / gal]          -0.371
+Crude glycerol           Crude glycerol GWP derivative [kg*CO2*eq / kg]     -0.0162
+Electricity              Electricity GWP derivative [kg*CO2*eq / MWhr]            0
+dtype: float64
 
 ```
 
