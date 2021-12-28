@@ -102,17 +102,15 @@ class InternalCirculationRx(bst.MixTank):
     References
     ----------
     .. [1] Kontos, G. A. Advanced Anaerobic Treatment for Energy Recovery and
-    Improved Process Economics in the Management of Biorefinery Wastewaters,
-    University of Illinois at Urbana-Champaign, Champaign, IL, 2021.
-
+        Improved Process Economics in the Management of Biorefinery Wastewaters,
+        University of Illinois at Urbana-Champaign, Champaign, IL, 2021.
     .. [2] Irizar et al., Model-Based Design of a Software Sensor for Real-Time
-    Diagnosis of the Stability Conditions in High-Rate Anaerobic Reactors –
-    Full-Scale Application to Internal Circulation Technology.
-    Water Research 2018, 143, 479–491.
-    `<https://doi.org/10.1016/j.watres.2018.06.055>`_.
-
+        Diagnosis of the Stability Conditions in High-Rate Anaerobic Reactors –
+        Full-Scale Application to Internal Circulation Technology.
+        Water Research 2018, 143, 479–491.
+        `<https://doi.org/10.1016/j.watres.2018.06.055>`_.
     .. [3] Tchobanoglous et al., Wastewater Engineering: Treatment and Resource Recovery,
-    5th ed.; McGraw-Hill Education: New York, 2013.
+        5th ed.; McGraw-Hill Education: New York, 2013.
     '''
     _N_ins = 1
     _N_outs = 3 # biogas, effluent, waste sludge

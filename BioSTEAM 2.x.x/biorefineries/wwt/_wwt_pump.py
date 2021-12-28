@@ -36,6 +36,7 @@ class WWTpump(bst.Unit):
     pump_type : str
         The type of the pump that determines the design algorithms to use.
         The following combination is valid:
+
             - "permeate_cross-flow"
             - "retentate_CSTR"
             - "retentate_AF"
@@ -44,19 +45,20 @@ class WWTpump(bst.Unit):
             - "lift"
             - "sludge"
             - "chemical"
+
     Q_mgd : float
         Volumetric flow rate in million gallon per day, [mgd].
         Will use total volumetric flow through the unit if not provided.
-    add_inputs : dct
-        Additional inputs that will be passed to the corresponding design alogrithm.
-        Check the document for the design alogrithm for the specific input requirements.
+    add_inputs : dict
+        Additional inputs that will be passed to the corresponding design algorithm.
+        Check the document for the design algorithm for the specific input requirements.
 
     References
     ----------
     .. [1] Shoener et al., Design of Anaerobic Membrane Bioreactors for the
-    Valorization of Dilute Organic Carbon Waste Streams.
-    Energy Environ. Sci. 2016, 9 (3), 1102–1112.
-    https://doi.org/10.1039/C5EE03715H.
+        Valorization of Dilute Organic Carbon Waste Streams.
+        Energy Environ. Sci. 2016, 9 (3), 1102–1112.
+        https://doi.org/10.1039/C5EE03715H.
     '''
     _N_ins = 1
     _N_outs = 1
@@ -164,8 +166,8 @@ class WWTpump(bst.Unit):
         '''
         Design pump for the permeate stream of cross-flow membrane configuration.
 
-        Parameters defined through the `add_inputs` argument upon initiation of
-        this unit (Q_mgd listed separatedly) will be used if not provided
+        Parameters defined through the `add_inputs` argument upon initialization of
+        this unit (Q_mgd listed separately) will be used if not provided
         when calling this function.
 
         Parameters
@@ -212,8 +214,8 @@ class WWTpump(bst.Unit):
         '''
         Design pump for the retent stream of CSTR reactors.
 
-        Parameters defined through the `add_inputs` argument upon initiation of
-        this unit (Q_mgd listed separatedly) will be used if not provided
+        Parameters defined through the `add_inputs` argument upon initialization of
+        this unit (Q_mgd listed separately) will be used if not provided
         when calling this function.
 
         Parameters
@@ -242,8 +244,8 @@ class WWTpump(bst.Unit):
         '''
         Design pump for the retentate stream of AF reactors.
 
-        Parameters defined through the `add_inputs` argument upon initiation of
-        this unit (Q_mgd listed separatedly) will be used if not provided
+        Parameters defined through the `add_inputs` argument upon initialization of
+        this unit (Q_mgd listed separately) will be used if not provided
         when calling this function.
 
         Parameters
@@ -276,8 +278,8 @@ class WWTpump(bst.Unit):
         '''
         Design pump for the recirculation stream of CSTR reactors.
 
-        Parameters defined through the `add_inputs` argument upon initiation of
-        this unit (Q_mgd listed separatedly) will be used if not provided
+        Parameters defined through the `add_inputs` argument upon initialization of
+        this unit (Q_mgd listed separately) will be used if not provided
         when calling this function.
 
         Parameters
@@ -307,8 +309,8 @@ class WWTpump(bst.Unit):
         '''
         Design pump for the recirculation stream of AF reactors.
 
-        Parameters defined through the `add_inputs` argument upon initiation of
-        this unit (Q_mgd listed separatedly) will be used if not provided
+        Parameters defined through the `add_inputs` argument upon initialization of
+        this unit (Q_mgd listed separately) will be used if not provided
         when calling this function.
 
         Parameters
@@ -344,8 +346,8 @@ class WWTpump(bst.Unit):
         '''
         Design pump for the filter tank to lift streams.
 
-        Parameters defined through the `add_inputs` argument upon initiation of
-        this unit (Q_mgd listed separatedly) will be used if not provided
+        Parameters defined through the `add_inputs` argument upon initialization of
+        this unit (Q_mgd listed separately) will be used if not provided
         when calling this function.
 
         Parameters
@@ -403,8 +405,8 @@ class WWTpump(bst.Unit):
         storage containers are included, and are assumed to be cubic in shape
         and made of HDPE.
 
-        Parameters defined through the `add_inputs` argument upon initiation of
-        this unit (Q_mgd listed separatedly) will be used if not provided
+        Parameters defined through the `add_inputs` argument upon initialization of
+        this unit (Q_mgd listed separately) will be used if not provided
         when calling this function.
 
         Parameters

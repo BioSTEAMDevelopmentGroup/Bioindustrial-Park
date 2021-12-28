@@ -18,7 +18,7 @@ __all__ = ('SludgeHandling', 'BeltThickener', 'SludgeCentrifuge')
 
 class SludgeHandling(bst.Unit):
     '''
-    A generic class for handling of wastewater treatmnet sludge.
+    A generic class for handling of wastewater treatment sludge.
 
     The 0th outs is the water-rich supernatant (effluent) and
     the 1st outs is the solid-rich sludge.
@@ -36,15 +36,15 @@ class SludgeHandling(bst.Unit):
     solubles : tuple
         IDs of the soluble chemicals.
         Note that all chemicals that are not included in this tuple and not
-        locked as gas phase (i.e., `chemical.locked_state!='g'`) will be
+        locked as gas phase (i.e., `chemical.locked_state` != "g") will be
         treated as solids in simulation.
 
     References
     ----------
     .. [1] Shoener et al., Design of Anaerobic Membrane Bioreactors for the
-    Valorization of Dilute Organic Carbon Waste Streams.
-    Energy Environ. Sci. 2016, 9 (3), 1102–1112.
-    https://doi.org/10.1039/C5EE03715H.
+        Valorization of Dilute Organic Carbon Waste Streams.
+        Energy Environ. Sci. 2016, 9 (3), 1102–1112.
+        https://doi.org/10.1039/C5EE03715H.
     '''
 
     _graphics = bst.Splitter._graphics
@@ -110,7 +110,7 @@ class BeltThickener(SludgeHandling):
         - Capacity: 80-100 m3/h.
         - Influent solids concentration: 0.2-1%.
         - Sludge cake moisture content: 90-96%.
-        - Motor power: 3 (driving motor) and 1.1 agitator motor.
+        - Motor power: 3 (driving motor) and 1.1 (agitator motor) kW.
         - Belt width: 2.5 m.
         - Weight: 2350 kg.
         - Quote price: $3680 ea for three or more sets.

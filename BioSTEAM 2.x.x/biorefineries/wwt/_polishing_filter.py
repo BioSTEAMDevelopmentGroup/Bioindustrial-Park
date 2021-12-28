@@ -88,15 +88,14 @@ class PolishingFilter(bst.Unit):
     References
     ----------
     .. [1] Shoener et al., Design of Anaerobic Membrane Bioreactors for the
-    Valorization of Dilute Organic Carbon Waste Streams.
-    Energy Environ. Sci. 2016, 9 (3), 1102–1112.
-    https://doi.org/10.1039/C5EE03715H.
-
+        Valorization of Dilute Organic Carbon Waste Streams.
+        Energy Environ. Sci. 2016, 9 (3), 1102–1112.
+        https://doi.org/10.1039/C5EE03715H.
     .. [2] Humbird et al., Process Design and Economics for Biochemical Conversion of
-    Lignocellulosic Biomass to Ethanol: Dilute-Acid Pretreatment and Enzymatic
-    Hydrolysis of Corn Stover; Technical Report NREL/TP-5100-47764;
-    National Renewable Energy Lab (NREL), 2011.
-    https://www.nrel.gov/docs/fy11osti/47764.pdf
+        Lignocellulosic Biomass to Ethanol: Dilute-Acid Pretreatment and Enzymatic
+        Hydrolysis of Corn Stover; Technical Report NREL/TP-5100-47764;
+        National Renewable Energy Lab (NREL), 2011.
+        https://www.nrel.gov/docs/fy11osti/47764.pdf
     '''
     _N_ins = 3 # influent, recycle, air (optional)
     _N_outs = 4 # biogas (optional), effluent, waste sludge, air (optional)

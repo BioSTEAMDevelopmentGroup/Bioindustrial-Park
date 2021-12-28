@@ -107,7 +107,7 @@ class AnMBR(bst.Unit):
         (generated through the digestion reaction) recovery.
     biodegradability : float or dict
         Biodegradability of chemicals,
-        when shown as a float, all biodegradable chemicals are assumped to have
+        when shown as a float, all biodegradable chemicals are assume to have
         the same degradability.
     Y : float
         Biomass yield, [kg biomass/kg consumed COD].
@@ -130,15 +130,14 @@ class AnMBR(bst.Unit):
     References
     ----------
     .. [1] Shoener et al., Design of Anaerobic Membrane Bioreactors for the
-    Valorization of Dilute Organic Carbon Waste Streams.
-    Energy Environ. Sci. 2016, 9 (3), 1102–1112.
-    https://doi.org/10.1039/C5EE03715H.
-
+        Valorization of Dilute Organic Carbon Waste Streams.
+        Energy Environ. Sci. 2016, 9 (3), 1102–1112.
+        https://doi.org/10.1039/C5EE03715H.
     .. [2] Humbird et al., Process Design and Economics for Biochemical Conversion of
-    Lignocellulosic Biomass to Ethanol: Dilute-Acid Pretreatment and Enzymatic
-    Hydrolysis of Corn Stover; Technical Report NREL/TP-5100-47764;
-    National Renewable Energy Lab (NREL), 2011.
-    https://www.nrel.gov/docs/fy11osti/47764.pdf
+        Lignocellulosic Biomass to Ethanol: Dilute-Acid Pretreatment and Enzymatic
+        Hydrolysis of Corn Stover; Technical Report NREL/TP-5100-47764;
+        National Renewable Energy Lab (NREL), 2011.
+        https://www.nrel.gov/docs/fy11osti/47764.pdf
     '''
     _N_ins = 6 # influent, recycle (optional), naocl, citric acid, bisulfite, air (optional)
     _N_outs = 4 # biogas, effluent, waste sludge, air (optional)
@@ -252,7 +251,7 @@ class AnMBR(bst.Unit):
 
         if reactor_type == 'CSTR':
             if self.include_aerobic_filter:
-                raise DesignError('Aerobic filteration cannot be used in CSTR.')
+                raise DesignError('Aerobic filtration cannot be used in CSTR.')
 
         if m_config == 'submerged':
             if not m_type in ('hollow fiber', 'flat sheet'):
@@ -702,7 +701,7 @@ class AnMBR(bst.Unit):
             self.F_BM, self._default_equipment_lifetime
 
         ### Capital ###
-        # Concrete and excavaction
+        # Concrete and excavation
         VEX, VWC, VSC = \
             D['Excavation [ft3]'], D['Wall concrete [ft3]'], D['Slab concrete [ft3]']
         # 27 is to convert the VEX from ft3 to yard3
@@ -737,7 +736,7 @@ class AnMBR(bst.Unit):
         C['Pump excavation'] = VEX/27*0.3 if self.include_excavation_cost else 0.
 
         F_BM['Pumps'] = F_BM['Pump building'] = F_BM['Pump excavation'] = \
-            1.18 * (1+0.007) # 0.007 is for  miscellaneous costs
+            1.18 * (1+0.007/100) # 0.007 is for  miscellaneous costs
         lifetime['Pumps'] = 15
 
         # Blower and air pipe
@@ -747,7 +746,7 @@ class AnMBR(bst.Unit):
         F_BM['Blower building'] = 1.11
         lifetime['Blowers'] = 15
 
-        # Degassing membrame
+        # Degassing membrane
         C['Degassing membrane'] = 10000 * D['Degassing membrane']
 
         # Set bare module factor to 1 if not otherwise provided
@@ -823,7 +822,7 @@ class AnMBR(bst.Unit):
 
         # Blower building
         area = 128 * (TCFM**0.256) # building area, [ft2]
-        building = area * 90 # 90 is the unit price, [$/ft]
+        building = area * 90 # 90 is the unit price, [USD/ft2]
 
         return air_pipes, blowers, building
 
@@ -1294,7 +1293,7 @@ class AnMBR(bst.Unit):
     def biodegradability(self):
         '''
         [float of dict] Biodegradability of chemicals,
-        when shown as a float, all biodegradable chemicals are assumped to have
+        when shown as a float, all biodegradable chemicals are assumed to have
         the same degradability.
         '''
         return self._biodegradability
