@@ -27,7 +27,7 @@ All units are explicitly defined here for transparency and easy reference
 from biosteam import HeatUtility, Facility
 from biosteam.units.decorators import cost
 from thermosteam import Stream
-from biorefineries.TAL.utils import CEPCI
+from biosteam.units.design_tools import CEPCI_by_year as CEPCI
 # from thermosteam.reaction import Reaction as Rxn
 # from thermosteam.reaction import ParallelReaction as ParallelRxn
 

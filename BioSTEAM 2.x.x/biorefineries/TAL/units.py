@@ -21,15 +21,17 @@ All units are explicitly defined here for transparency and easy reference
 
 import numpy as np
 import thermosteam as tmo
-from math import exp
+from math import exp, pi, log
 from flexsolve import aitken_secant
 from biosteam import Unit, BatchCrystallizer
 from biosteam.units import Flash, HXutility, Mixer, MixTank, Pump, \
     SolidsSeparator, StorageTank, LiquidsSplitSettler
 from biosteam.units.decorators import cost
+from biosteam.units.design_tools import CEPCI_by_year as CEPCI
 from thermosteam import Stream, MultiStream
 from biorefineries.TAL.process_settings import price
-from biorefineries.TAL.utils import CEPCI, baseline_feedflow, compute_extra_chemical, adjust_recycle
+# from biorefineries.TAL.utils import CEPCI, baseline_feedflow, compute_extra_chemical, adjust_recycle
+from biorefineries.TAL.utils import baseline_feedflow, compute_extra_chemical, adjust_recycle
 
 _kg_per_ton = 907.18474
 _Gcal_2_kJ = 4.184 * 1e6 # (also MMkcal/hr)
@@ -547,14 +549,14 @@ class CoFermentation(Unit):
         self.cofermentation_rxns = ParallelRxn([
         #      Reaction definition            Reactant    Conversion
         Rxn('Glucose -> 1.42856 TAL',        'Glucose',   .25), 
-        Rxn('Glucose -> VitaminA',               'Glucose',   0.1), # retinol
-        Rxn('Glucose -> VitaminD2',               'Glucose',   0.1), # ergosterol
-        Rxn('Glucose -> 6 FermMicrobe',       'Glucose',   0.1),
+        Rxn('Glucose -> VitaminA',               'Glucose',   0.005), # retinol
+        Rxn('Glucose -> VitaminD2',               'Glucose',   0.005), # ergosterol
+        Rxn('Glucose -> 6 FermMicrobe',       'Glucose',   0.05),
         
         Rxn('Xylose -> 1.42856 TAL',       'Xylose',    0.25),
-        Rxn('Xylose -> VitaminA',       'Xylose',    0.1),
-        Rxn('Xylose -> VitaminD2',       'Xylose',    0.1),
-        Rxn('Xylose -> 5 FermMicrobe',        'Xylose',    0.1),
+        Rxn('Xylose -> VitaminA',       'Xylose',    0.005),
+        Rxn('Xylose -> VitaminD2',       'Xylose',    0.005),
+        Rxn('Xylose -> 5 FermMicrobe',        'Xylose',    0.05),
         ])
         
         # self.cofermentation_rxns = ParallelRxn([
@@ -930,6 +932,86 @@ class Reactor(Unit, PressureVessel, isabstract=True):
             return self.BM_horizontal 
         else:
             raise RuntimeError("invalid vessel type")
+
+#TODO:
+# 1. Find a source for recovery - the only thing I found for this is in Woods 2007 section 5.3.1 "allow both phases to have > 20% of the diameter and no less than 0.2 m to ensure that the exit phases do not become cross-contaminated"
+# 2. Do we need a backup reactor? - need to discuss
+# 3. Need electricity? - I think so but I don't know how to account for this? Let's discuss.
+# 4. Look into n - mothi's thesis uses n=1, I canot find where I had previously found a value of 0.84
+# 5. Look into BM (bare module factor) - Sieder et al 2016 Table 16.11 use 4.16 for  a vertical pressure vessel
+# I also had in my notes to check the decanter usable % and I believe that is 90% but it already accounted for in the height sizing of adding an additional 10% to the height.
+@cost(basis='Flow rate', ID='Decanter', units='m3/s',
+      cost=190000, S=0.0012, CE=CEPCI[2008], n=1, BM=2.3)
+class Decantation(Unit):
+    '''
+    A decanter to separate the sorbic acid crystal from the broth.
+
+    Using Stokes’ Law to calculate settling velocity and the desired volumetric flow rate
+    of the solution into the decanter.
+
+    Parameters
+    ----------
+    recovery : float
+        Recovery of the crystal.
+    V_wf : float
+        Working fraction of the decanter.
+
+    References
+    ----------
+    1. Towler, G., & Sinnott, R. K. (2008). Chemical engineering design: principles, practice and economics of plant and process design.
+    2. Peters, M. S., Timmerhaus, K. D., West, R. E., Timmerhaus, K., & West, R. (2003). Plant design and economics for chemical engineers (Vol. 4).
+    3. Density: https://pubchem.ncbi.nlm.nih.gov/compound/Sorbic-acid#section=Solubility
+    4. Seider, W. D., Lewin, D. R., Seader, J. D., Widagdo, S., Gani, R., Ming Ng, K. (2017) Product and Process Design Principles: Synthesis, Analysis, and Evaluation (4th Edition) Wiley.
+    5. M. Viswanathan. (2019) Process generalizations and rules of thumb for scaling up biobased processes.
+    6. Woods, D. R. (2007) Rules of Thumb in Engineering Practice, Wiley.
+    '''
+
+    _N_ins = 1
+    _N_outs = 2
+
+    _units={
+        'Settling velocity': 'm/s',
+        'Area': 'm2',
+        'Diameter': 'm',
+        'Length': 'm',
+        'Volume': 'm3',
+        }
+
+    def __init__(self, ID='', ins=None, outs=(), forced_recovery=None, T=293.15):
+        Unit.__init__(self, ID, ins, outs)
+        self.forced_recovery = forced_recovery
+        self.T = T
+        
+    def get_SA_solubility(self, T): # mol SA/ (mol SA + mol water)
+        return exp(-157.137 + 3505.81/T + 24.1015*log(T)) # Modified Apelblat Equation
+    
+    def _run(self):
+        feed = self.ins[0]
+        dil_SA, crystal = self.outs
+        dil_SA.copy_like(feed)
+        dil_SA.T = crystal.T = self.T
+        if self.forced_recovery:
+            crystal.imass['SorbicAcid'] = feed.imass['SorbicAcid']*self.forced_recovery
+            dil_SA.imass['SorbicAcid'] -= crystal.imass['SorbicAcid']
+        else:
+            sol_SA = self.get_SA_solubility(self.T)
+            still_dissolved_SA = sol_SA * feed.imol['Water'] / (1-sol_SA)
+            dil_SA.imass['SorbicAcid'] = still_dissolved_SA
+            crystal.imass['SorbicAcid'] = feed.imass['SorbicAcid'] - dil_SA.imass['SorbicAcid']
+        
+
+    def _design(self):
+        feed = self.ins[0]
+        D = self.design_results
+        D['Flow rate'] = feed.F_vol/3600. # m3/s
+        D['Settling velocity'] = v_settling = \
+            (0.00015**2)*9.81*(1204-998.19)/(18*0.001) # m/s
+        D['Area'] = A_decanter = feed.F_vol*0.00028/v_settling # m2
+        D['Diameter'] = D_decanter = (A_decanter/pi)**(1/2) # m
+        D['Length'] = L_decanter = 2.2*D_decanter # m
+        D['Volume'] = (pi*D_decanter*L_decanter)/2 # multiply by 2.2 and then divided by 2 makes a 10% extra headspace
+
+#!!! TODO: Add cooling utility
 
 # class AcidulationReactor(Reactor):
 #     _N_ins = 2
@@ -1651,7 +1733,7 @@ class HydrogenationReactor(Reactor):
     mcat_frac = 0.00001 # fraction of catalyst by weight in relation to the reactant (TAL)
     dehydration_rxns = ParallelRxn([
             #   Reaction definition                                       Reactant   Conversion
-            Rxn('TAL + H2-> HMTHP',         'TAL',   0.98)
+            Rxn('TAL + H2-> HMTHP',         'TAL',   0.964*0.99) # conversion from Chia et al. 2012
                 ])
     TAL_to_SA_rxn = dehydration_rxns[0]
     
@@ -1684,7 +1766,7 @@ class DehydrationRingOpeningReactor(Reactor):
     mcat_frac = 0.01 # fraction of catalyst by weight in relation to the reactant (TAL)
     dehydration_rxns = ParallelRxn([
             #   Reaction definition                                       Reactant   Conversion
-            Rxn('HMTHP -> SA',         'HMTHP',   0.90)
+            Rxn('HMTHP -> SA',         'HMTHP',   0.667) # conversion from Chia et al. 2012
                 ])
     TAL_to_SA_rxn = dehydration_rxns[0]
     
@@ -1738,7 +1820,7 @@ class HydrolysisReactor(Reactor):
             self.mcat_frac * self.ins[0].imass['SA'] * price['Amberlyst15']
             
 
-class Crystallization_Decantation(Reactor):
+class Crystallization(Reactor):
     N_ins = 3
     _N_outs = 2
     _F_BM_default = {**Reactor._F_BM_default}
@@ -1748,13 +1830,18 @@ class Crystallization_Decantation(Reactor):
                 ])
     TAL_to_SA_rxn = dehydration_rxns[0]
     
+    def __init__(self, ID='', ins=None, outs=(), tau=1., T=293.15, reagent_fraction=1.):
+        Reactor.__init__(self, ID, ins, outs, tau=tau)
+        self.reagent_fraction = reagent_fraction
+    
+
     def _run(self):
-        feed, reagent, recycle = self.ins
-        effluent, KCl = self.outs
+        feed, reagent, recycle_reagent, recycle_feed = ins = self.ins
+        effluent, KCl = outs = self.outs
         
-        reagent.imol['HCl'] = feed.imol['KSA'] - recycle.imol['HCl']
+        reagent.imol['HCl'] = max(0, sum([i.imol['KSA'] for i in ins]) - sum([i.imol['HCl'] for i in ins]))
         # effluent = feed.copy()
-        effluent.mix_from([feed, reagent, recycle])
+        effluent.mix_from([feed, reagent, recycle_reagent, recycle_feed])
         
         # effluent.T = feed.T
         # effluent.P = feed.P
@@ -1767,6 +1854,7 @@ class Crystallization_Decantation(Reactor):
         
         # effluent.imol['H2O'] = effluent.imol['H2O']
         
+        effluent.imol['HCl'] = 0.
         effluent.imol['KCl'] = 0
         # effluent.imol['H2O'] = 0
         

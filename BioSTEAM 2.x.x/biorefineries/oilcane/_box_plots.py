@@ -15,14 +15,25 @@ import matplotlib.patches as mpatches
 from warnings import warn
 import numpy as np
 import pandas as pd
+from matplotlib.lines import Line2D
+from matplotlib.gridspec import GridSpec
 from . import _variable_mockups as variables
 from ._variable_mockups import (
     tea_monte_carlo_metric_mockups,
     tea_monte_carlo_derivative_metric_mockups,
     lca_monte_carlo_metric_mockups, 
     lca_monte_carlo_derivative_metric_mockups,
-    MFPP, ethanol_production, biodiesel_production,
-    GWP_economic
+    MFPP, TCI, electricity_production, natural_gas_consumption,
+    ethanol_production, biodiesel_production,
+    GWP_ethanol, GWP_biodiesel, GWP_electricity,
+    GWP_ethanol_allocation, GWP_biodiesel_allocation,
+    GWP_economic, MFPP_derivative, 
+    TCI_derivative, 
+    ethanol_production_derivative,
+    biodiesel_production_derivative,
+    electricity_production_derivative,
+    natural_gas_consumption_derivative,
+    GWP_ethanol_derivative,
 )
 from ._load_data import (
     images_folder,
@@ -32,22 +43,30 @@ from ._load_data import (
 import os
 from._parse_configuration import format_name
 from math import log10, floor
+from collections import Iterable
 
 __all__ = (
     'plot_all',
-    'plot_breakdown_main_manuscript',
     'plot_montecarlo_main_manuscript',
-    'plot_montecarlo_derivative_main_manuscript',
-    'plot_montecarlo_SI',
-    'plot_spearman_tea_main_manuscript',
-    'plot_spearman_lca_main_manuscript',
+    'plot_breakdowns',
+    'plot_montecarlo_feedstock_comparison',
+    'plot_montecarlo_configuration_comparison',
+    'plot_montecarlo_agile_comparison',
+    'plot_montecarlo_derivative',
+    'plot_montecarlo_absolute',
+    'plot_spearman_tea',
+    'plot_spearman_lca',
     'plot_monte_carlo_across_coordinate',
     'monte_carlo_box_plot',
-    'monte_carlo_results',
     'plot_monte_carlo',
     'plot_spearman',
     'plot_configuration_breakdown',
     'plot_TCI_areas_across_oil_content',
+    'plot_heatmap_comparison',
+    'monte_carlo_results',
+    'montecarlo_results_feedstock_comparison',
+    'montecarlo_results_configuration_comparison',
+    'montecarlo_results_agile_comparison',
 )
 
 area_colors = {
@@ -91,39 +110,232 @@ area_hatches = {
 for i in area_colors: area_colors[i] = area_colors[i].tint(20)
 palette = Palette(**area_colors)
 letter_color = colors.neutral.shade(25).RGBn
+GWP_units_gal = '$\\mathrm{kg} \\cdot \\mathrm{CO}_{2}\\mathrm{eq} \\cdot \\mathrm{gal}^{-1}$'
+CABBI_colors.orange_hatch = CABBI_colors.orange.copy(hatch='////')
 
-# %% Publication
+def roundsigfigs(x, nsigfigs=2):
+    if isinstance(x, Iterable):
+        n = nsigfigs - int(floor(log10(abs(x[1])))) - 1 if abs(x[1]) > 1e-12 else 0.
+        try:
+            value = np.round(x, n)
+        except:
+            return np.array(x, dtype=int)
+        if (np.array(value, int) == value).all():
+            return np.array(value, int)
+        else:
+            return value
+    else:
+        n = nsigfigs - int(floor(log10(abs(x)))) - 1 if abs(x) > 1e-12 else 0.
+        try:
+            value = round(x, n)
+        except:
+            return int(x)
+        if int(value) == value:
+            return int(value)
+        else:
+            return value
+    
+ethanol_over_biodiesel = bst.MockVariable('Ethanol over biodiesel', 'gal/ton', 'Biorefinery')
+GWP_ethanol_displacement = variables.GWP_ethanol_displacement
+production = [ethanol_production, biodiesel_production]
+
+mc_metric_settings = {
+    'MFPP': (MFPP, f"MFPP\n[{format_units('USD/ton')}]", None),
+    'TCI': (TCI, f"TCI\n[{format_units('10^6*USD')}]", None),
+    'production': (production, f"Production\n[{format_units('gal/ton')}]", None),
+    'electricity_production': (electricity_production, f"Elec. prod.\n[{format_units('kWhr/ton')}]", None),
+    'natural_gas_consumption': (natural_gas_consumption, f"NG cons.\n[{format_units('cf/ton')}]", None),
+    'GWP_ethanol_displacement': (GWP_ethanol_displacement, "GWP$_{\\mathrm{displacement}}$" f"\n[{GWP_units_gal}]", None),
+    'GWP_economic': ([GWP_ethanol, GWP_biodiesel], "GWP$_{\\mathrm{economic}}$" f"\n[{GWP_units_gal}]", None),
+    'GWP_energy': ([GWP_ethanol_allocation, GWP_biodiesel_allocation], "GWP$_{\\mathrm{energy}}$" f"\n[{GWP_units_gal}]", None),
+}
+
+mc_comparison_settings = {
+    'MFPP': (MFPP, f"MFPP\n[{format_units('USD/ton')}]", None),
+    'TCI': (TCI, f"TCI\n[{format_units('10^6*USD')}]", None),
+    'production': (production, f"Production\n[{format_units('gal/ton')}]", None),
+    'electricity_production': (electricity_production, f"Elec. prod.\n[{format_units('kWhr/ton')}]", None),
+    'natural_gas_consumption': (natural_gas_consumption, f"NG cons.\n[{format_units('cf/ton')}]", None),
+    'GWP_ethanol_displacement': (GWP_ethanol_displacement, "GWP$_{\\mathrm{displacement}}$" f"\n[{GWP_units_gal}]", None),
+    'GWP_economic': (GWP_ethanol, "GWP$_{\\mathrm{economic}}$" f"\n[{GWP_units_gal}]", None),
+    'GWP_energy': (GWP_ethanol_allocation, "GWP$_{\\mathrm{energy}}$" f"\n[{GWP_units_gal}]", None),
+    'GWP_property_allocation': ([GWP_ethanol, GWP_ethanol_allocation] , f"GWP\n[{GWP_units_gal}]", None),
+}
+
+mc_derivative_metric_settings = {
+    'MFPP': (MFPP_derivative, r"$\Delta$" + format_units(r"MFPP/OC").replace('cdot', r'cdot \Delta') + f"\n[{format_units('USD/ton')}]", None),
+    'TCI': (TCI_derivative,  r"$\Delta$" + format_units(r"TCI/OC").replace('cdot', r'cdot \Delta') + f"\n[{format_units('10^6*USD')}]", None),
+    'production': ([ethanol_production_derivative, biodiesel_production_derivative], r"$\Delta$" + format_units(r"Prod./OC").replace('cdot', r'cdot \Delta') + f"\n[{format_units('gal/ton')}]", None),
+    'electricity_production': (electricity_production_derivative, r"$\Delta$" + format_units(r"EP/OC").replace('cdot', r'cdot \Delta') + f"\n[{format_units('kWhr/ton')}]", None),
+    'natural_gas_consumption': (natural_gas_consumption_derivative, r"$\Delta$" + format_units(r"NGC/OC").replace('cdot', r'cdot \Delta') + f"\n[{format_units('cf/ton')}]", None),
+    'GWP_economic': (GWP_ethanol_derivative, r"$\Delta$" + r"GWP $\cdot \Delta \mathrm{OC}^{-1}$" f"\n[{GWP_units_gal.replace('kg','g')}]", 1000),
+}
+
+
+# %% Plots for publication
 
 def plot_all():
     plot_montecarlo_main_manuscript()
-    plot_montecarlo_derivative_main_manuscript()
-    plot_montecarlo_SI()
-    plot_spearman_tea_main_manuscript()
-    plot_spearman_lca_main_manuscript()
-    plot_breakdown_main_manuscript()
-    
+    plot_montecarlo_absolute()
+    plot_spearman_tea()
+    plot_spearman_lca()
+    plot_breakdowns()
+
 def plot_montecarlo_main_manuscript():
     set_font(size=8)
-    set_figure_size(aspect_ratio=0.8)
-    fig, axes = plot_monte_carlo(derivative=False, absolute=False, comparison=True,
-                     tickmarks=None, agile=True)
-    for ax, letter in zip(axes, 'ABCDEFGH'):
-        plt.sca(ax)
-        ylb, yub = plt.ylim()
-        plt.text(4.7, ylb + (yub - ylb) * 0.90, letter, color=letter_color,
-                 horizontalalignment='center',verticalalignment='center',
-                 fontsize=12, fontweight='bold')
-    plt.subplots_adjust(right=0.95, wspace=0.45, top=0.98, bottom=0.05)
+    set_figure_size(aspect_ratio=0.85)
+    fig = plt.figure()
+    everything = GridSpec(4, 3, fig, hspace=1.5, wspace=0.7,
+                          top=0.90, bottom=0.05,
+                          left=0.11, right=0.97)
+    
+    def spec2axes(spec, x, y, hspace=0, wspace=0.7, **kwargs):
+        subspec = spec.subgridspec(x, y, hspace=hspace, wspace=wspace, **kwargs)
+        return np.array([[fig.add_subplot(subspec[i, j]) for j in range(y)] for i in range(x)], object)
+    
+    gs_feedstock_comparison = everything[:2, :]
+    gs_configuration_comparison = everything[2:, :2]
+    gs_agile_comparison = everything[2:, 2]
+    axes_feedstock_comparison = spec2axes(gs_feedstock_comparison, 2, 3)
+    axes_configuration_comparison = spec2axes(gs_configuration_comparison, 2, 2)
+    axes_agile_comparison = spec2axes(gs_agile_comparison, 2, 1)
+    plot_montecarlo_feedstock_comparison(axes_feedstock_comparison, letters='ABCDEFG')
+    plot_montecarlo_configuration_comparison(axes_configuration_comparison, letters='ABCDEFG')
+    plot_montecarlo_agile_comparison(axes_agile_comparison, letters='ABCDEFG')
+    
+    def add_title(gs, title):
+        ax =  fig.add_subplot(gs)
+        ax._frameon = False
+        ax.xaxis.set_visible(False)
+        ax.yaxis.set_visible(False)
+        ax.set_title(
+            title, color=letter_color,
+            horizontalalignment='center',verticalalignment='center',
+            fontsize=12, fontweight='bold', y=1.1
+        )
+    add_title(gs_feedstock_comparison, '(I) Impact of opting to process oilcane over sugarcane')
+    add_title(gs_configuration_comparison, '(II) Impact of cellulosic ethanol integration')
+    add_title(gs_agile_comparison, '(III) Impact of\noilsorghum\nintegration')
+    plt.show()
     file = os.path.join(images_folder, 'montecarlo_main_manuscript.svg')
     plt.savefig(file, transparent=True)
+
+def plot_montecarlo_feedstock_comparison(axes_box=None, letters=None):
+    if axes_box is None:
+        set_font(size=8)
+        set_figure_size(aspect_ratio=0.75)
+    fig, axes = plot_monte_carlo(
+        derivative=False, absolute=False, comparison=True,
+        tickmarks=None, agile=False, ncols=3, axes_box=axes_box,
+        labels=[
+            'Conventional',
+            'Cellulosic',
+            # 'Conventional',
+            # 'Cellulosic',
+        ],
+        comparison_names=['O1 - S1', 'O2 - S2'],
+        metrics = ['MFPP', 'TCI', 'production', 'GWP_property_allocation', 
+                   'natural_gas_consumption', 'electricity_production'],
+        color_wheel = CABBI_colors.wheel([
+            'blue_light', 'green_dirty', 'orange', 'green', 
+            'orange', 'orange_hatch', 'grey', 'brown',
+        ])
+    )
+    for ax, letter in zip(axes, 'ABCDEFGH' if letters is None else letters):
+        plt.sca(ax)
+        ylb, yub = plt.ylim()
+        plt.text(1.65, ylb + (yub - ylb) * 0.90, letter, color=letter_color,
+                 horizontalalignment='center',verticalalignment='center',
+                 fontsize=12, fontweight='bold')
+        if axes_box is None and letter in 'DH':
+            x = 0.5
+            plt.text(x, ylb - (yub - ylb) * 0.3, 
+                     'Impact of processing\noilcane over sugarcane', 
+                     horizontalalignment='center',verticalalignment='center',
+                     fontsize=8)
+    if axes_box is None:
+        plt.subplots_adjust(right=0.96, left=0.105, wspace=0.38, top=0.98, bottom=0.12)
+        file = os.path.join(images_folder, 'montecarlo_feedstock_comparison.svg')
+        plt.savefig(file, transparent=True)
     
-def plot_montecarlo_derivative_main_manuscript():
+def plot_montecarlo_configuration_comparison(axes_box=None, letters=None):
+    if axes_box is None:
+        set_font(size=8)
+        set_figure_size(aspect_ratio=0.75)
+    fig, axes = plot_monte_carlo(
+        derivative=False, absolute=False, comparison=True,
+        tickmarks=None, agile=False, ncols=2, axes_box=axes_box,
+        labels=[
+            'Oilcane',
+            # 'Sugarcane',
+        ],
+        comparison_names=[
+            'O2 - O1', 
+            # 'S2 - S1'
+        ],
+        metrics=['MFPP', 'TCI', 'production', 'GWP_property_allocation'],
+        color_wheel = CABBI_colors.wheel([
+            'blue_light', 'green_dirty', 'orange', 'green', 
+            'orange', 'orange_hatch', 
+        ])
+    )
+    for ax, letter in zip(axes, 'ABCDEF' if letters is None else letters):
+        plt.sca(ax)
+        ylb, yub = plt.ylim()
+        plt.text(0.58, ylb + (yub - ylb) * 0.90, letter, color=letter_color,
+                 horizontalalignment='center',verticalalignment='center',
+                 fontsize=12, fontweight='bold')
+        if axes_box is None and letter in 'CF':
+            x = 0.5
+            plt.text(x, ylb - (yub - ylb) * 0.21, 
+                     'Impact of integrating\ncellulosic ethanol production', 
+                     horizontalalignment='center',verticalalignment='center',
+                     fontsize=8)
+    if axes_box is None:
+        plt.subplots_adjust(right=0.96, left=0.105, wspace=0.38, top=0.98, bottom=0.12)
+        file = os.path.join(images_folder, 'montecarlo_configuration_comparison.svg')
+        plt.savefig(file, transparent=True)
+    
+def plot_montecarlo_agile_comparison(axes_box=None, letters=None):
+    if axes_box is None:
+        set_font(size=8)
+        set_figure_size(width=3.3071, aspect_ratio=1.0)
+    fig, axes = plot_monte_carlo(
+        derivative=False, absolute=False, comparison=True,
+        tickmarks=None, agile_only=True, ncols=1,
+        labels=[
+            'Conventional',
+            'Cellulosic'
+        ],
+        metrics=['MFPP', 'TCI'],
+        axes_box=axes_box,
+    )
+    for ax, letter in zip(axes, 'AB'  if letters is None else letters):
+        plt.sca(ax)
+        ylb, yub = plt.ylim()
+        plt.text(1.65, ylb + (yub - ylb) * 0.90, letter, color=letter_color,
+                 horizontalalignment='center',verticalalignment='center',
+                 fontsize=12, fontweight='bold')
+        if axes_box is None and letter == 'B':
+            plt.text(0.5, ylb - (yub - ylb) * 0.25, 
+                      'Impact of integrating oilsorghum\nat an agile oilcane biorefinery', 
+                      horizontalalignment='center',verticalalignment='center',
+                      fontsize=8)
+    if axes_box is None:
+        plt.subplots_adjust(right=0.9, left=0.2, wspace=0.5, top=0.98, bottom=0.15)
+        file = os.path.join(images_folder, 'montecarlo_agile_comparison.svg')
+        plt.savefig(file, transparent=True)
+    
+def plot_montecarlo_derivative():
     set_font(size=8)
-    set_figure_size(width=3.3071, aspect_ratio=1.85)
+    set_figure_size(
+        aspect_ratio=0.5,
+        # width=3.3071, aspect_ratio=1.85
+    )
     fig, axes = plot_monte_carlo(
         derivative=True, absolute=True, 
         comparison=False, agile=False,
-        split=False,
+        ncols=3,
         # tickmarks=np.array([
         #     [-3, -2, -1, 0, 1, 2, 3, 4, 5],
         #     [-9, -6, -3,  0, 3, 6, 9, 12, 15],
@@ -132,28 +344,41 @@ def plot_montecarlo_derivative_main_manuscript():
         #     [-400, -300, -200, -100, 0, 100, 200, 300, 400],
         #     [-300, -225, -150, -75, 0, 75, 150, 225, 300]
         # ], dtype=object),
-        labels=['Conventional', 'Cellulosic']
+        labels=['Conventional', 'Cellulosic'],
+        color_wheel = CABBI_colors.wheel([
+            'blue_light', 'green_dirty', 'orange', 'green', 'grey', 'brown',
+            'orange', 
+        ])
     )
     for ax, letter in zip(axes, 'ABCDEFGH'):
         plt.sca(ax)
         ylb, yub = plt.ylim()
-        plt.text(1.6, ylb + (yub - ylb) * 0.90, letter, color=letter_color,
+        plt.text(1.65, ylb + (yub - ylb) * 0.90, letter, color=letter_color,
                  horizontalalignment='center',verticalalignment='center',
                  fontsize=12, fontweight='bold')
-    plt.subplots_adjust(left=0.25, right=0.9, wspace=0.4, top=0.98, bottom=0.05)
-    file = os.path.join(images_folder, 'montecarlo_derivative_main_manuscript.svg')
+    plt.subplots_adjust(
+        hspace=0, wspace=0.7,
+        top=0.95, bottom=0.1,
+        left=0.12, right=0.96
+    )
+    file = os.path.join(images_folder, 'montecarlo_derivative.svg')
     plt.savefig(file, transparent=True)
 
-def plot_montecarlo_SI():
+def plot_montecarlo_absolute():
     set_font(size=8)
-    set_figure_size(aspect_ratio=1)
+    set_figure_size(aspect_ratio=1.05)
     fig, axes = plot_monte_carlo(
-        absolute=True, comparison=False, split=True,
-        expand=0.1, allocated=True,
-        # labels=['Sugarcane\nconventional', 'Oilcane\nconventional',
-        #         'Sugarcane\ncellulosic', 'Oilcane\ncellulosic',
-        #         'Sugarcane\nconventional\nagile', 'Oilcane\nconventional\nagile',
-        #         'Sugarcane\ncellulosic\nagile', 'Oilcane\ncellulosic\nagile'],
+        absolute=True, comparison=False, ncols=2,
+        expand=0.1, 
+        labels=['Sugarcane\nConventional', 'Oilcane\nConventional',
+                'Sugarcane\nCellulosic', 'Oilcane\nCellulosic',
+                'Sugarcane/Sorghum\nConventional', 'Oilcane/Oilsorghum\nConventional',
+                'Sugarcane\Sorghum\nCellulosic', 'Oilcane/Oilsorghum\nCellulosic'],
+        xrot=90,
+        color_wheel = CABBI_colors.wheel([
+            'blue_light', 'green_dirty', 'orange', 'green', 'grey', 'brown',
+            'orange', 'orange', 'green', 'orange', 'green',
+        ])
     )
     for ax, letter in zip(axes, 'ABCDEFGHIJ'):
         plt.sca(ax)
@@ -161,11 +386,11 @@ def plot_montecarlo_SI():
         plt.text(7.8, ylb + (yub - ylb) * 0.92, letter, color=letter_color,
                  horizontalalignment='center',verticalalignment='center',
                  fontsize=12, fontweight='bold')
-    plt.subplots_adjust(left=0.12, right=0.95, wspace=0.40, top=0.98, bottom=0.04)
-    file = os.path.join(images_folder, 'montecarlo_SI.svg')
+    plt.subplots_adjust(left=0.12, right=0.95, wspace=0.40, top=0.98, bottom=0.2)
+    file = os.path.join(images_folder, 'montecarlo_absolute.svg')
     plt.savefig(file, transparent=True)
     
-def plot_spearman_tea_main_manuscript():
+def plot_spearman_tea():
     set_font(size=8)
     set_figure_size(aspect_ratio=0.80)
     plot_spearman(
@@ -181,10 +406,10 @@ def plot_spearman_tea_main_manuscript():
         kind='TEA',
     )
     plt.subplots_adjust(left=0.45, right=0.975, top=0.98, bottom=0.08)
-    file = os.path.join(images_folder, 'spearman_tea_main_manuscript.svg')
+    file = os.path.join(images_folder, 'spearman_tea.svg')
     plt.savefig(file, transparent=True)
 
-def plot_spearman_lca_main_manuscript():
+def plot_spearman_lca():
     set_font(size=8)
     set_figure_size(aspect_ratio=0.65)
     plot_spearman(
@@ -200,10 +425,10 @@ def plot_spearman_lca_main_manuscript():
         kind='LCA',
     )
     plt.subplots_adjust(left=0.45, right=0.975, top=0.98, bottom=0.10)
-    file = os.path.join(images_folder, 'spearman_lca_main_manuscript.svg')
+    file = os.path.join(images_folder, 'spearman_lca.svg')
     plt.savefig(file, transparent=True)
 
-def plot_breakdown_main_manuscript():
+def plot_breakdowns():
     set_font(size=8)
     set_figure_size(aspect_ratio=0.68)
     fig, axes = plt.subplots(nrows=1, ncols=2)
@@ -223,10 +448,129 @@ def plot_breakdown_main_manuscript():
                   horizontalalignment='center',verticalalignment='center',
                   fontsize=12, fontweight='bold')
     
-    file = os.path.join(images_folder, 'breakdown_main_manuscript.svg')
+    file = os.path.join(images_folder, 'breakdowns.svg')
     plt.savefig(file, transparent=True)
 
+# %% Monte carlo values for manuscript
+
+def montecarlo_results_feedstock_comparison():
+    return montecarlo_results_short(
+        metrics = [
+            MFPP, TCI, ethanol_production, biodiesel_production, 
+            electricity_production, natural_gas_consumption, GWP_ethanol_displacement, 
+            GWP_ethanol, GWP_ethanol_allocation, GWP_ethanol, GWP_ethanol_allocation
+        ],
+        names = [
+            'O1 - S1',
+            'O2 - S2',
+        ],
+    )
+    
+def montecarlo_results_configuration_comparison():
+    return montecarlo_results_short(
+        metrics = [
+            MFPP, TCI, ethanol_production, biodiesel_production, 
+            electricity_production, natural_gas_consumption, GWP_ethanol_displacement, 
+            GWP_ethanol, GWP_ethanol_allocation, GWP_ethanol, GWP_ethanol_allocation
+        ],
+        names = [
+            'O2 - O1',
+        ],
+    )['O2 - O1']
+
+def montecarlo_results_agile_comparison():
+    return montecarlo_results_short(
+        metrics = [
+            MFPP, TCI, ethanol_production, biodiesel_production, 
+            electricity_production, natural_gas_consumption, GWP_ethanol_displacement, 
+            GWP_ethanol, GWP_ethanol_allocation, GWP_ethanol, GWP_ethanol_allocation
+        ],
+        names = [
+            'O1* - O1',
+            'O2* - O2',
+        ],
+    )
+
+def montecarlo_results_short(names, metrics):
+    results = {}
+    for name in names:
+        df = get_monte_carlo(name)
+        results[name] = dct = {}
+        for metric in metrics:
+            index = metric.index
+            data = df[index].values
+            q05, q50, q95 = roundsigfigs(np.percentile(data, [5, 50, 95], axis=0), 3)
+            key = get_monte_carlo_key(index, dct, False)
+            dct[key] = f"{q50} [{q05}, {q95}]"
+    return results
+
 # %% General
+
+def get_fraction_in_same_direction(data, direction):
+    return (direction * data >= 0.).sum(axis=0) / data.size
+
+def get_median(data):
+    return roundsigfigs(np.percentile(data, 50, axis=0))
+
+def plot_heatmap_comparison(comparison_names=None, xlabels=None):
+    if comparison_names is None: comparison_names = oc.comparison_names
+    columns = comparison_names
+    if xlabels is None: xlabels = [format_name(i).replace(' ', '') for i in comparison_names]
+    def get_data(metric, name):
+        df = get_monte_carlo(name, metric)
+        values = df.values
+        return values
+    
+    GWP_economic, GWP_ethanol, GWP_biodiesel, GWP_electricity, GWP_crude_glycerol, = lca_monte_carlo_metric_mockups
+    MFPP, TCI, ethanol_production, biodiesel_production, electricity_production, natural_gas_consumption = tea_monte_carlo_metric_mockups
+    GWP_ethanol_displacement = variables.GWP_ethanol_displacement
+    GWP_ethanol_allocation = variables.GWP_ethanol_allocation
+    rows = [
+        MFPP, 
+        TCI, 
+        ethanol_production, 
+        biodiesel_production,
+        electricity_production,
+        natural_gas_consumption,
+        GWP_ethanol_displacement,
+        GWP_ethanol_allocation,
+        GWP_ethanol, # economic
+    ]
+    ylabels = [
+        f"MFPP\n[{format_units('USD/ton')}]",
+        f"TCI\n[{format_units('10^6*USD')}]",
+        f"Ethanol production\n[{format_units('gal/ton')}]",
+        f"Biodiesel production\n[{format_units('gal/ton')}]",
+        f"Elec. prod.\n[{format_units('kWhr/ton')}]",
+        f"NG cons.\n[{format_units('cf/ton')}]",
+        "GWP$_{\\mathrm{displacement}}$" f"\n[{GWP_units_gal}]",
+        "GWP$_{\\mathrm{energy}}$" f"\n[{GWP_units_gal}]",
+        "GWP$_{\\mathrm{economic}}$" f"\n[{GWP_units_gal}]",
+    ]
+    N_rows = len(rows)
+    N_cols = len(comparison_names)
+    data = np.zeros([N_rows, N_cols], dtype=object)
+    data[:] = [[get_data(i, j) for j in columns] for i in rows]
+    medians = np.zeros_like(data, dtype=float)
+    fractions = medians.copy()
+    for i in range(N_rows):
+        for j in range(N_cols):
+            medians[i, j] = x = get_median(data[i, j])
+            fractions[i, j] = get_fraction_in_same_direction(data[i, j], 1 if x > 0 else -1)
+            
+    fig, ax = plt.subplots()
+    mbar = bst.plots.MetricBar(
+        'Fraction in the same direction [%]', ticks=[-100, -75, -50, -25, 0, 25, 50, 75, 100],
+        cmap=plt.cm.get_cmap('RdYlGn')
+    )
+    im, cbar = bst.plots.plot_heatmap(
+        100 * fractions, vmin=0, vmax=100, ax=ax, cell_labels=medians,
+        metric_bar=mbar, xlabels=xlabels, ylabels=ylabels,
+    )
+    cbar.ax.set_ylabel(mbar.title, rotation=-90, va="bottom")
+    plt.sca(ax)
+    ax.spines[:].set_visible(False)
+    plt.grid(True, 'major', 'both', lw=1, color='w', ls='-')
 
 def plot_monte_carlo_across_coordinate(coordinate, data, color_wheel):
     if isinstance(data, list):
@@ -239,22 +583,33 @@ def plot_monte_carlo_across_coordinate(coordinate, data, color_wheel):
             dark_color=color.shade(50).RGBn,
         )
 
-def monte_carlo_box_plot(data, positions, light_color, dark_color, width=None):
+def monte_carlo_box_plot(data, positions, light_color, dark_color, width=None, 
+                         hatch=None, **kwargs):
     if width is None: width = 0.8
-    return plt.boxplot(x=data, positions=positions, patch_artist=True,
-                     widths=width, whis=[5, 95],
-                     boxprops={'facecolor':light_color,
-                               'edgecolor':dark_color},
-                     medianprops={'color':dark_color,
-                                  'linewidth':1.5},
-                     flierprops = {'marker':'D',
-                                   'markerfacecolor': light_color,
-                                   'markeredgecolor': dark_color,
-                                   'markersize':3})
+    bp = plt.boxplot(
+        x=data, positions=positions, patch_artist=True,
+        widths=width, whis=[5, 95],
+        boxprops={'facecolor':light_color,
+                  'edgecolor':dark_color},
+        medianprops={'color':dark_color,
+                     'linewidth':1.5},
+        flierprops = {'marker':'D',
+                      'markerfacecolor': light_color,
+                      'markeredgecolor': dark_color,
+                      'markersize':3},
+        **kwargs
+    )
+    if hatch:
+        for box in bp['boxes']:
+            box.set(hatch = hatch)
+
+def get_monte_carlo_key(index, dct, with_units=False):
+    key = index[1] if with_units else index[1].split(' [')[0]
+    if key in dct: key = f'{key}, {index[0]}'
+    return key
 
 def monte_carlo_results(with_units=False):
-    results = {}
-    ethanol_over_biodiesel = bst.MockVariable('Ethanol over biodiesel', 'Gal/ton', 'Biorefinery')
+    results = {}    
     for name in oc.configuration_names + oc.comparison_names + oc.other_comparison_names:
         try: 
             df = get_monte_carlo(name)
@@ -264,7 +619,7 @@ def monte_carlo_results(with_units=False):
         results[name] = dct = {}
         if name in ('O1', 'O2'):
             index = ethanol_over_biodiesel.index
-            key = index[1] if with_units else index[1].split(' [')[0]
+            key = get_monte_carlo_key(index, dct, with_units)
             data = df[ethanol_production.index].values / df[biodiesel_production.index].values
             q05, q25, q50, q75, q95 = np.percentile(data, [5,25,50,75,95], axis=0)
             dct[key] = {
@@ -278,12 +633,11 @@ def monte_carlo_results(with_units=False):
             }
         for metric in (*tea_monte_carlo_metric_mockups, *tea_monte_carlo_derivative_metric_mockups,
                        *lca_monte_carlo_metric_mockups, *lca_monte_carlo_derivative_metric_mockups,
-                       variables.GWP_ethanol_displacement):
+                       variables.GWP_ethanol_displacement, variables.GWP_ethanol_allocation):
             index = metric.index
             data = df[index].values
             q05, q25, q50, q75, q95 = np.percentile(data, [5,25,50,75,95], axis=0)
-            key = index[1] if with_units else index[1].split(' [')[0]
-            if key in dct: key = f'{key}, {index[0]}'
+            key = get_monte_carlo_key(index, dct, with_units)
             dct[key] = {
                 'mean': np.mean(data),
                 'std': np.std(data),
@@ -318,90 +672,36 @@ def monte_carlo_results(with_units=False):
 
 def plot_monte_carlo(derivative=False, absolute=True, comparison=True,
                      configuration_names=None, comparison_names=None,
-                     labels=None, tickmarks=None, agile=True, split=True,
-                     allocated=False, expand=None, step_min=None):
-    if configuration_names is None: configuration_names = oc.configuration_names
-    if comparison_names is None: comparison_names = oc.comparison_names
-    factors = []
+                     metrics=None, labels=None, tickmarks=None, agile=True, 
+                     ncols=1, expand=None, step_min=None,
+                     agile_only=False, xrot=None,
+                     color_wheel=None, axes_box=None):
     if derivative:
-        configuration_names = ['O1', 'O2']
-        comparison_names = ['O2 - O1']
-        GWP_economic, *GWP_main_products, GWP_electricity, GWP_crude_glycerol, = lca_monte_carlo_derivative_metric_mockups
-        MFPP, TCI, *production, electricity_production, natural_gas_consumption = tea_monte_carlo_derivative_metric_mockups
-        rows = [
-            MFPP, 
-            TCI, 
-            production,
-            electricity_production,
-            natural_gas_consumption,
-            GWP_economic,
-        ]
-        GWP_units_economic = '$\\mathrm{g} \\cdot \\mathrm{CO}_{2}\\mathrm{eq} \\cdot \\mathrm{USD}^{-1}$'
-        factors = [(-1, 1000)] # For changing units of measure; not currently in use
+        default_configuration_names = ['O1', 'O2']
+        default_comparison_names = ['O2 - O1']
+        metric_info = mc_derivative_metric_settings
+        default_metrics = list(metric_info)
     else:
-        GWP_economic, *GWP_main_products, GWP_electricity, GWP_crude_glycerol, = lca_monte_carlo_metric_mockups
-        MFPP, TCI, *production, electricity_production, natural_gas_consumption = tea_monte_carlo_metric_mockups
-        GWP_ethanol_displacement = variables.GWP_ethanol_displacement
-        GWP_biofuel_allocation = variables.GWP_biofuel_allocation
-        rows = [
-            MFPP, 
-            TCI, 
-            production,
-            electricity_production,
-            natural_gas_consumption,
-            GWP_ethanol_displacement,
-            GWP_biofuel_allocation,
-            GWP_economic,
-        ]
-        GWP_units_gal = '$\\mathrm{kg} \\cdot \\mathrm{CO}_{2}\\mathrm{eq} \\cdot \\mathrm{gal}^{-1}$'
-        GWP_units_economic = '$\\mathrm{kg} \\cdot \\mathrm{CO}_{2}\\mathrm{eq} \\cdot \\mathrm{USD}^{-1}$'
-        GWP_units_energy = GWP_units_economic.replace('USD', 'GGE')
-        ylabels = [
-            f"MFPP\n[{format_units('USD/ton')}]",
-            f"TCI\n[{format_units('10^6*USD')}]",
-            f"Production\n[{format_units('Gal/ton')}]",
-            f"Elec. prod.\n[{format_units('kWhr/ton')}]",
-            f"NG cons.\n[{format_units('cf/ton')}]",
-            "GWP$_{\\mathrm{displacement}}$" f"\n[{GWP_units_gal}]",
-            "GWP$_{\\mathrm{economic}}$" f"\n[{GWP_units_economic}]",
-            "GWP$_\\mathrm{{energy}}$" f"\n[{GWP_units_energy}]",
-        ]
-        if allocated:
-            GWP_economic = [variables.GWP_ethanol, variables.GWP_biodiesel]
-            GWP_energy = [variables.GWP_ethanol_allocation, variables.GWP_biodiesel_allocation]
-            rows.append(GWP_economic)
-            rows.append(GWP_energy)
-            ylabels.append("Allocated GWP$_{\\mathrm{economic}}$" f"\n[{GWP_units_gal}]")
-            ylabels.append("Allocated GWP$_\\mathrm{{energy}}$" f"\n[{GWP_units_gal}]")
-    if derivative:
-        ylabels = [
-            r"$\Delta$" + format_units(r"MFPP/OC").replace('cdot', r'cdot \Delta') + f"\n[{format_units('USD/ton')}]",
-            r"$\Delta$" + format_units(r"TCI/OC").replace('cdot', r'cdot \Delta') + f"\n[{format_units('10^6*USD')}]",
-            r"$\Delta$" + format_units(r"Prod./OC").replace('cdot', r'cdot \Delta') + f"\n[{format_units('Gal/ton')}]",
-            r"$\Delta$" + format_units(r"EP/OC").replace('cdot', r'cdot \Delta') + f"\n[{format_units('kWhr/ton')}]",
-            r"$\Delta$" + format_units(r"NGC/OC").replace('cdot', r'cdot \Delta') + f"\n[{format_units('cf/ton')}]",
-            r"$\Delta$" + r"GWP$_{\mathrm{econ.}} \cdot \Delta \mathrm{OC}^{-1}$" f"\n[{GWP_units_economic}]",
-        ]
-    elif comparison and not absolute:
-        ylabels = [r"$\Delta$" + i for i in ylabels]
-    color_wheel = CABBI_colors.wheel(['blue_light', 'green_dirty', 'orange', 'green',
-                                      'teal', 'brown', 'orange', 'grey', 'green_soft',
-                                      'orange', 'green', 'orange', 'green'])
-    
-    N_rows = len(rows)
-    if split:
-        ncols = 2
-        nrows = int(round(N_rows / 2))
-    else:
-        ncols = 1
-        nrows = N_rows
-    fig, axes_box = plt.subplots(ncols=ncols, nrows=nrows)
-    plt.subplots_adjust(wspace=0.45)
-    axes = axes_box.transpose()
-    axes = axes.flatten()
-    
+        default_configuration_names = oc.configuration_names
+        default_comparison_names = oc.comparison_names
+        if comparison:
+            metric_info = mc_comparison_settings
+        else:
+            metric_info = mc_metric_settings
+        if agile_only:
+            default_configuration_names = [i for i in default_configuration_names if '*' in i]
+            default_comparison_names = [i for i in default_comparison_names if '*' in i]
+            default_metrics = ['MFPP', 'TCI', 'production']
+        else:
+            default_metrics = list(metric_info)
+    if configuration_names is None: configuration_names = default_configuration_names
+    if comparison_names is None: comparison_names = default_comparison_names
+    if metrics is None: metrics = default_metrics
     combined = absolute and comparison
-    if not agile:
+    if agile_only:
+        configuration_names = [i for i in configuration_names if '*' in i]
+        comparison_names = [i for i in comparison_names if '*' in i]
+    elif not agile:
         configuration_names = [i for i in configuration_names if '*' not in i]
         comparison_names = [i for i in comparison_names if '*' not in i]
     if combined:
@@ -412,15 +712,25 @@ def plot_monte_carlo(derivative=False, absolute=True, comparison=True,
         columns = configurations = comparison_names
     else:
         columns = configurations = []
+    rows, ylabels, factors = zip(*[metric_info[i] for i in metrics])
+    factors = [(i, j) for i, j in enumerate(factors) if j is not None]
+    if comparison and not absolute: ylabels = [r"$\Delta$" + i for i in ylabels]
+    if color_wheel is None: color_wheel = CABBI_colors.wheel()
+    N_rows = len(rows)
+    nrows = int(round(N_rows / ncols))
+    if axes_box is None:
+        fig, axes_box = plt.subplots(ncols=ncols, nrows=nrows)
+        plt.subplots_adjust(wspace=0.45)
+    else:
+        fig = None
+    axes = axes_box.transpose()
+    axes = axes.flatten()
     N_cols = len(columns)    
     xtext = labels or [format_name(i).replace(' ', '') for i in configurations]
     N_marks = len(xtext)
     xticks = tuple(range(N_marks))
     
     def get_data(metric, name):
-        if metric is GWP_main_products and name in ('O1 - S1', 'O2 - S2'):
-            metric = GWP_main_products[0] # GWP ethanol
-            return get_data(metric, name)
         try:
             df = get_monte_carlo(name, metric)
         except:
@@ -438,10 +748,11 @@ def plot_monte_carlo(derivative=False, absolute=True, comparison=True,
             for i in range(N):
                 color = color_wheel.next()
                 boxplot = monte_carlo_box_plot(
-                    data=arr[:, i], positions=[position + (i-1/N)*width], 
+                    data=arr[:, i], positions=[position + (i-(N-1)/2)*width], 
                     light_color=color.RGBn, 
                     dark_color=color.shade(60).RGBn,
                     width=boxwidth,
+                    hatch=getattr(color, 'hatch', None),
                 )
                 plots.append(boxplot)
             return plots
@@ -457,21 +768,12 @@ def plot_monte_carlo(derivative=False, absolute=True, comparison=True,
     data = np.zeros([N_rows, N_cols], dtype=object)
     data[:] = [[get_data(i, j) for j in columns] for i in rows]
     for i, j in factors: data[i, :] *= j
-    def round2sigfigs(x):
-        try:
-            value = round(x, 1-int(floor(log10(abs(x)))))
-        except:
-            return int(x)
-        if int(value) == value:
-            return int(value)
-        else:
-            return value
         
     if tickmarks is None: 
         tickmarks = [
             bst.plots.rounded_tickmarks_from_data(
                 i, step_min=step_min, N_ticks=8, lb_max=0, center=0,
-                f=round2sigfigs, expand=expand,
+                f=roundsigfigs, expand=expand,
             ) 
             for i in data
         ]
@@ -511,25 +813,14 @@ def plot_monte_carlo(derivative=False, absolute=True, comparison=True,
             xticklabels= xticklabels, 
             ytick0=False,
             ytickf=False,
+            offset_xticks=True,
+            xrot=xrot,
         )
+    if fig is None:
+        fig = plt.gcf()
+    else:
+        plt.subplots_adjust(hspace=0)
     fig.align_ylabels(axes)
-    plt.subplots_adjust(hspace=0)
-    plt.sca(axes[1])
-    # legend = plt.legend(
-    #     handles=[
-    #         mpatches.Patch(facecolor=color_wheel[0].RGBn, 
-    #                        edgecolor=CABBI_colors.black.RGBn,
-    #                        label='Oilcane only'),
-    #         mpatches.Patch(facecolor=color_wheel[1].RGBn, 
-    #                        edgecolor=CABBI_colors.black.RGBn,
-    #                        label='Oilcane & oilsorghum'),
-    #     ], 
-    #     bbox_to_anchor=(0, 1, 1, 0), 
-    #     loc="lower right", 
-    #     # mode="expand", 
-    #     # ncol=2
-    # )
-    # legend.get_frame().set_linewidth(0.0)
     return fig, axes
 
 def plot_spearman(configurations, top=None, labels=None, metric=None, cutoff=None,

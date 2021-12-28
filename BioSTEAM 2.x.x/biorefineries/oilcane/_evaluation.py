@@ -33,6 +33,15 @@ __all__ = (
     'run_all',
 )
 
+def no_derivative(f):
+    def f_derivative_disabled(*args, **kwargs):
+        oc.disable_derivative()
+        try:
+            return f(*args, **kwargs)
+        finally:
+            oc.enable_derivative()
+    return f
+
 def evaluate_configurations_across_extraction_efficiency_and_oil_content(
         efficiency, oil_content, oil_retention, agile, configurations,
     ):
@@ -58,12 +67,13 @@ def evaluate_configurations_across_extraction_efficiency_and_oil_content(
     return data
 
 N_metrics = len(all_metric_mockups)
-evaluate_configurations_across_extraction_efficiency_and_oil_content = np.vectorize(
-    evaluate_configurations_across_extraction_efficiency_and_oil_content, 
-    excluded=['oil_retention', 'agile', 'configurations'],
-    signature=f'(),(),(),(a),(c)->(a,c,{N_metrics})'
+evaluate_configurations_across_extraction_efficiency_and_oil_content = no_derivative(
+    np.vectorize(
+        evaluate_configurations_across_extraction_efficiency_and_oil_content, 
+        excluded=['oil_retention', 'agile', 'configurations'],
+        signature=f'(),(),(),(a),(c)->(a,c,{N_metrics})'
+    )
 )
-
 def evaluate_configurations_across_sorghum_and_cane_oil_content(
         sorghum_oil_content, cane_oil_content, configurations, relative,
     ):
@@ -81,10 +91,12 @@ def evaluate_configurations_across_sorghum_and_cane_oil_content(
         data[ic, :] = [j() for j in oc.model.metrics]
     return data
 
-evaluate_configurations_across_sorghum_and_cane_oil_content = np.vectorize(
-    evaluate_configurations_across_sorghum_and_cane_oil_content, 
-    excluded=['configurations', 'relative'],
-    signature=f'(),(),(c),()->(c,{N_metrics})'
+evaluate_configurations_across_sorghum_and_cane_oil_content = no_derivative(
+    np.vectorize(
+        evaluate_configurations_across_sorghum_and_cane_oil_content, 
+        excluded=['configurations', 'relative'],
+        signature=f'(),(),(c),()->(c,{N_metrics})'
+    )
 )              
 
 def evaluate_MFPP_uncertainty_across_ethanol_and_biodiesel_prices(name, ethanol_price, biodiesel_price):
@@ -113,7 +125,7 @@ def evaluate_MFPP_benefit_uncertainty_across_ethanol_and_biodiesel_prices(name, 
     MFPP_baseline = evaluate_MFPP_uncertainty_across_ethanol_and_biodiesel_prices(baseline, ethanol_price, biodiesel_price)
     MFPP = evaluate_MFPP_uncertainty_across_ethanol_and_biodiesel_prices(name, ethanol_price, biodiesel_price)
     return MFPP - MFPP_baseline
-
+@no_derivative
 def evaluate_MFPP_across_ethanol_and_biodiesel_prices(ethanol_price, biodiesel_price, configuration=None):
     if configuration is not None: oc.load(configuration)
     feedstock_flow = oc.flows['feedstock']()
@@ -143,56 +155,52 @@ def run_uncertainty_and_sensitivity(name, N, rule='L',
                                     sample_cache={},
                                     autosave=True,
                                     autoload=True):
-    oc.enable_derivative()
-    try:
-        np.random.seed(1)
-        from warnings import filterwarnings
-        filterwarnings('ignore', category=bst.utils.DesignWarning)
-        oc.load(name)
-        key = (N, rule)
-        if key in sample_cache:
-            samples = sample_cache[key]
+    np.random.seed(1)
+    from warnings import filterwarnings
+    filterwarnings('ignore', category=bst.utils.DesignWarning)
+    oc.load(name)
+    key = (N, rule)
+    if key in sample_cache:
+        samples = sample_cache[key]
+    else:
+        sample_cache[key] = samples = oc.model.sample(N, rule)
+    oc.model.load_samples(samples)
+    file = monte_carlo_file(name, across_oil_content)
+    if across_oil_content:
+        if parse(name).number < 0:
+            oc.model.evaluate(notify=int(N/10))
+            oc.model.evaluate_across_coordinate(
+                name='Oil content',
+                f_coordinate=lambda x: None,
+                coordinate=oc.oil_content,
+                notify=int(N/10), 
+                notify_coordinate=True,
+                xlfile=file,
+                re_evaluate=False,
+            )
         else:
-            sample_cache[key] = samples = oc.model.sample(N, rule)
-        oc.model.load_samples(samples)
-        file = monte_carlo_file(name, across_oil_content)
-        if across_oil_content:
-            if parse(name).number < 0:
-                oc.model.evaluate(notify=int(N/10))
-                oc.model.evaluate_across_coordinate(
-                    name='Oil content',
-                    f_coordinate=lambda x: None,
-                    coordinate=oc.oil_content,
-                    notify=int(N/10), 
-                    notify_coordinate=True,
-                    xlfile=file,
-                    re_evaluate=False,
-                )
-            else:
-                def f(x):
-                    oc.oil_extraction_specification.locked_oil_content = False
-                    oc.oil_extraction_specification.load_oil_content(x)
-                    oc.oil_extraction_specification.locked_oil_content = True
-                oc.model.evaluate_across_coordinate(
-                    name='Oil content',
-                    f_coordinate=f,
-                    coordinate=oc.oil_content,
-                    notify=int(N/10), 
-                    notify_coordinate=True,
-                    xlfile=file,
-                )
-        else:
-            N = min(int(N/10), 50)
-            oc.model.evaluate(notify=N,
-                           autosave=N if autosave else N,
-                           autoload=autoload,
-                           file=autoload_file_name(name))
-            oc.model.table.to_excel(file)
-            rho, p = oc.model.spearman_r()
-            file = spearman_file(name)
-            rho.to_excel(file)
-    finally:
-        oc.disable_derivative()
+            def f(x):
+                oc.oil_extraction_specification.locked_oil_content = False
+                oc.oil_extraction_specification.load_oil_content(x)
+                oc.oil_extraction_specification.locked_oil_content = True
+            oc.model.evaluate_across_coordinate(
+                name='Oil content',
+                f_coordinate=f,
+                coordinate=oc.oil_content,
+                notify=int(N/10), 
+                notify_coordinate=True,
+                xlfile=file,
+            )
+    else:
+        N = min(int(N/10), 50)
+        oc.model.evaluate(notify=N,
+                       autosave=N if autosave else N,
+                       autoload=autoload,
+                       file=autoload_file_name(name))
+        oc.model.table.to_excel(file)
+        rho, p = oc.model.spearman_r()
+        file = spearman_file(name)
+        rho.to_excel(file)
 
 run = run_uncertainty_and_sensitivity
     

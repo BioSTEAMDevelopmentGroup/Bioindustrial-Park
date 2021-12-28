@@ -9,7 +9,8 @@ from ._variable_mockups import (
     tea_monte_carlo_derivative_metric_mockups,
     lca_monte_carlo_metric_mockups, 
     lca_monte_carlo_derivative_metric_mockups,
-    GWP_ethanol_displacement
+    GWP_ethanol_displacement,
+    GWP_ethanol_allocation,
 )
 from ._parse_configuration import parse, Configuration, ConfigurationComparison
 import os
@@ -93,6 +94,7 @@ def get_monte_carlo(name, variables=None, cache={}):
                 *lca_monte_carlo_metric_mockups, 
                 *lca_monte_carlo_derivative_metric_mockups,
                 GWP_ethanol_displacement,
+                GWP_ethanol_allocation,
             )
         if isinstance(variables, bst.Variable):
             index = variables.index
