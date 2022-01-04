@@ -14,12 +14,16 @@ mixed_feed_stream.imol['Oleic_acid']=0.86
 mixed_feed_stream.imol['H2O2']=6.85
 mixed_feed_stream.imol['H2O']=27.1
 
+#TODO.XXX CHECK IF BELOW IS RIGHT
+mixed_feed_stream.price = 0.15 # USD/kg
+
 #%% Units
 
 reactor = units.OzonolysisReactor(
     ins = mixed_feed_stream, 
     V=3785, # in m3 (equivalent to 1 MMGal)
 )
+
 reactor.simulate()
 print(reactor.results())
 reactor.show()
