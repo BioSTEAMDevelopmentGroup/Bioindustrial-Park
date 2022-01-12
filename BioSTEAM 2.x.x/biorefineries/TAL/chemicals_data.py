@@ -147,12 +147,6 @@ CalciumSuccinate = chemical_database('CalciumSuccinate', phase='l')
 AceticAcid = chemical_database('AceticAcid')
 Glucose = chemical_database('Glucose', phase = 'l')
 
-# TAL = chemical_database('Triacetic acid lactone')
-
-# SA = chemical_database('Sorbic acid')
-# KSA = chemical_database('Potassium sorbate')
-# BSA = chemical_database('Butyl sorbate')
-
 IBA = chemical_database('Isobutyraldehyde')
 DPHP = chemical_database('DipotassiumHydrogenPhosphate',
                          search_ID='Dipotassium hydrogen phosphate',
@@ -229,37 +223,39 @@ HMF = chemical_database('HMF', Hf=-99677*_cal2joule, Tb=291.5+273.15, Hfus=19800
 HMF.copy_models_from(Furfural, ['V', 'Hvap', 'Psat', 'mu', 'kappa'])
 HMF.Dortmund.update(chems.Furfural.Dortmund)
 
-# TAL = chemical_copied('Triacetic acid lactone', HMF)
-# SA = chemical_copied('Sorbic acid', HMF)
-# KSA = chemical_copied('Potassium sorbate', HMF)
-# BSA = chemical_copied('Butyl sorbate', HMF)
+KSA = Potassiumsorbate = chemical_database(ID='PotassiumSorbate',
+                                           search_ID='Potassium sorbate',
+                                           phase='l')
 
 TAL = Triaceticacidlactone = chemical_database(ID='TAL',
                                                search_ID='Triacetic acid lactone')
 TAL.copy_models_from(Furfural, ['Psat', 'Hvap', 'V']) # doesn't matter, since we never boil TAL in significant amounts
-# SA = Sorbicacid =  chemical_database('Sorbic acid')
-# KSA = Potassiumsorbate = chemical_database('Potassium sorbate')
-# BSA = Butylsorbate = chemical_database('Butyl sorbate')
-SA = Sorbicacid =  chemical_database(ID='SorbicAcid', search_ID='Sorbic acid')
-KSA = Potassiumsorbate = chemical_database(ID='PotassiumSorbate',
-                                           search_ID='Potassium sorbate',
-                                           phase='l')
+
+# TAL.Hfus = Furfural.Hfus/2.18
+TAL.Hfus = 30883.66976 # Dannenfelser-Yalkowsky method
+TAL.Tm = KSA.Tm = 185. + 273.15 # CAS SciFinder 675-10-5
+TAL.Tb = KSA.Tb =  239.1 + 273.15# (predicted) CAS SciFinder 675-10-5
+
+# TAL.Cn.l.add_method(tmo.Chemical('Succinic acid').Cn.l)
+
 BSA = Butylsorbate = chemical_database(ID='ButylSorbate',
                                        search_ID='Butyl sorbate',
                                        phase='l')
 
-HMTHP = chemical_copied('HMTHP', TAL)
+SA = Sorbicacid =  chemical_database(ID='SorbicAcid', search_ID='Sorbic acid')
 
-TAL.Hfus = Furfural.Hfus/2.18 # !!! matters for solubility; update 
-TAL.Tm = KSA.Tm = 185 + 273.15
-TAL.Tb = KSA.Tb =  239.1 + 273.15
-
+# HMTHP = chemical_copied('HMTHP', TAL)
+HMTHP = chemical_database(ID='HMTHP', search_ID='674-26-0')
+HMTHP.Tm = 273.15 + (27.+28.)/2. # CAS SciFinder 674-26-0
+HMTHP.Tb = 273.15 + (148.+151.)/2. # CAS SciFinder 674-26-0
+HMTHP.Hfus = TAL.Hfus
 # https://pubchem.ncbi.nlm.nih.gov/compound/Sorbic-acid#section=Stability-Shelf-Life
 SA.Tb = 228 + 273.15
 
 BSA.Tm = 130 + 273.15
 BSA.Tb = 226.5 + 273.15
 
+PD = Pentanedione = chemical_database(ID='PD', search_ID='2,4-pentanedione')
 VitaminA = chemical_database('VitaminA')
 VitaminD2 = chemical_database('VitaminD2')
 # Hfus from NIST, condensed phase, accessed 04/07/2020
@@ -377,7 +373,7 @@ chemical_groups = dict(
                               'BoilerChems', 'Na2SO4', 'AmmoniumHydroxide'),
     Furfurals = ('Furfural', 'HMF'),
     #!!! I suspect you want to add some chemicals here
-    OtherOrganics = ('Denaturant', 'Xylitol'),
+    OtherOrganics = ('Denaturant', 'Xylitol', 'PD'),
     COSOxNOxH2S = ('NitricOxide', 'NO2', 'SO2', 'CarbonMonoxide', 'H2S'),
     Proteins = ('Protein', 'Enzyme', 'DenaturedEnzyme'),
     CellMass = ('WWTsludge', 'FermMicrobe'),
