@@ -47,6 +47,7 @@ biorefineries/cornstover/_tea.py
 biorefineries/cornstover/model.py
 biorefineries/cornstover/specifications.py
 biorefineries/cornstover/units.py
+biorefineries/cornstover/webapp_model.py
 biorefineries/fattyalcohols/README.rst
 biorefineries/fattyalcohols/__init__.py
 biorefineries/fattyalcohols/_chemicals.py

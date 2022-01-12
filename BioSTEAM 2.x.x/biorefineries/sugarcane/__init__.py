@@ -31,7 +31,7 @@ from ._tea import *
 _system_loaded = False
 _chemicals_loaded = False
 
-def load(pellet_bagasse=False):
+def load(pellet_bagasse=None):
     if not _chemicals_loaded: _load_chemicals()
     try: 
         _load_system(pellet_bagasse)
@@ -70,9 +70,11 @@ if PY37:
             _load_chemicals()
             if name == 'chemicals': return chemicals
         if not _system_loaded: 
-            _load_system()
-            dct = globals()
-            dct.update(flowsheet.to_dict())
+            try:
+                _load_system()
+            finally:
+                dct = globals()
+                dct.update(flowsheet.to_dict())
             if name in dct: return dct[name]
         raise AttributeError(f"module '{__name__}' has no attribute '{name}'")
 else: 

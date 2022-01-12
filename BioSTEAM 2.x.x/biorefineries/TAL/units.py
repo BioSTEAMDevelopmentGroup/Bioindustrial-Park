@@ -977,10 +977,9 @@ class Decantation(Unit):
         'Volume': 'm3',
         }
 
-    def __init__(self, ID='', ins=None, outs=(), forced_recovery=None, V_wf=0.9, T=293.15):
+    def __init__(self, ID='', ins=None, outs=(), forced_recovery=None, T=293.15):
         Unit.__init__(self, ID, ins, outs)
         self.forced_recovery = forced_recovery
-        self.V_wf = V_wf
         self.T = T
         
     def get_SA_solubility(self, T): # mol SA/ (mol SA + mol water)
@@ -1004,12 +1003,13 @@ class Decantation(Unit):
     def _design(self):
         feed = self.ins[0]
         D = self.design_results
-        D['Flow rate'] = feed.F_vol/3600.
-        D['Settling velocity'] = v_settling = 0.00015*9.81*(1204-1000)/(18*0.001) # m/s
+        D['Flow rate'] = feed.F_vol/3600. # m3/s
+        D['Settling velocity'] = v_settling = \
+            (0.00015**2)*9.81*(1204-998.19)/(18*0.001) # m/s
         D['Area'] = A_decanter = feed.F_vol*0.00028/v_settling # m2
         D['Diameter'] = D_decanter = (A_decanter/pi)**(1/2) # m
         D['Length'] = L_decanter = 2.2*D_decanter # m
-        D['Volume'] = V_decanter = (pi*D_decanter*L_decanter)/(2*self.V_wf)
+        D['Volume'] = (pi*D_decanter*L_decanter)/2 # multiply by 2.2 and then divided by 2 makes a 10% extra headspace
 
 #!!! TODO: Add cooling utility
 

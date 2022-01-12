@@ -163,7 +163,7 @@ def enable_derivative(enable=True):
     global _derivative_disabled
     _derivative_disabled = not enable
     
-_derivative_disabled = True
+_derivative_disabled = False
 
 def load(name, cache={}, reduce_chemicals=True, 
          enhanced_cellulosic_performance=False,
@@ -456,12 +456,14 @@ def load(name, cache={}, reduce_chemicals=True,
     def default(baseline, *args, **kwargs):
         lb = 0.75*baseline
         ub = 1.25*baseline
-        return parameter(*args, distribution=shape.Uniform(lb, ub), bounds=(lb, ub), **kwargs)
+        return parameter(*args, distribution=shape.Uniform(lb, ub), bounds=(lb, ub),
+                         baseline=baseline, **kwargs)
     
     def default_gwp(baseline, *args, **kwargs):
         lb = 0.90*baseline
         ub = 1.10*baseline
-        return parameter(*args, distribution=shape.Uniform(lb, ub), bounds=(lb, ub), **kwargs)
+        return parameter(*args, distribution=shape.Uniform(lb, ub), bounds=(lb, ub), 
+                         baseline=baseline, **kwargs)
     
     def triangular(lb, mid, ub, *args, **kwargs):
         return parameter(*args, distribution=shape.Triangle(lb, mid, ub), bounds=(lb, ub), **kwargs)
@@ -484,35 +486,38 @@ def load(name, cache={}, reduce_chemicals=True,
         oil_extraction_specification.load_efficiency(bagasse_oil_extraction_efficiency / 100.)
 
     capacity = feedstock.F_mass / kg_per_ton
-    @uniform(0.75 * capacity, 1.25 * capacity, units='ton/hr', kind='coupled')
+    @default(capacity, units='ton/hr', kind='coupled')
     def set_plant_capacity(capacity):
         feedstock.F_mass = F_mass = kg_per_ton * capacity
         if agile: oilsorghum.F_mass = F_mass
 
     # USDA ERS historical price data
-    @parameter(distribution=ethanol_price_distribution, element=s.ethanol, units='USD/gal')
+    @parameter(distribution=ethanol_price_distribution, element=s.ethanol, 
+               baseline=1.90, units='USD/gal')
     def set_ethanol_price(price): # Triangular distribution fitted over the past 10 years Sep 2009 to Nov 2020
         s.ethanol.price = price / 2.98668849
         
     # USDA ERS historical price data
     @parameter(distribution=biodiesel_minus_ethanol_price_distribution, element=s.biodiesel, units='USD/gal',
-               hook=lambda x: s.ethanol.price * 2.98668849 + x)
+               baseline=2.47, hook=lambda x: s.ethanol.price * 2.98668849 + x)
     def set_biodiesel_price(price): # Triangular distribution fitted over the past 10 years Sep 2009 to March 2021
         s.biodiesel.price = price / 3.3111
 
     # https://www.eia.gov/energyexplained/natural-gas/prices.php
-    @parameter(distribution=natural_gas_price_distribution, element=s.natural_gas, units='USD/cf')
+    @parameter(distribution=natural_gas_price_distribution, element=s.natural_gas, units='USD/cf',
+               baseline=4.73)
     def set_natural_gas_price(price): # Triangular distribution fitted over the past 10 years Sep 2009 to March 2021
         BT.natural_gas_price = 51.92624700383502 * price / 1000. 
 
     # https://www.eia.gov/outlooks/aeo/pdf/00%20AEO2021%20Chart%20Library.pdf
     # Data from historical prices, 2010-2020
-    @triangular(0.0583, 0.065, 0.069, units='USD/kWhr')
+    @triangular(0.0583, 0.065, 0.069, units='USD/kWhr',
+                baseline=0.0637)
     def set_electricity_price(electricity_price): 
         bst.PowerUtility.price = electricity_price
         
     # From Huang's 2016 paper
-    @uniform(6 * 30, 7 * 30, units='day/yr')
+    @uniform(6 * 30, 7 * 30, units='day/yr', baseline=200)
     def set_operating_days(operating_days):
         if agile:
             cane_mode.operating_hours = operating_days * 24
@@ -520,7 +525,7 @@ def load(name, cache={}, reduce_chemicals=True,
             tea.operating_days = operating_days
     
     # 10% is suggested for waste reducing, but 15% is suggested for investment
-    @uniform(10., 15., units='%')
+    @uniform(10., 15., units='%', baseline=10)
     def set_IRR(IRR):
         tea.IRR = IRR / 100.
     
@@ -528,9 +533,7 @@ def load(name, cache={}, reduce_chemicals=True,
     def set_crude_glycerol_price(price):
         crude_glycerol.price = price
 
-    pure_glycerine_base_price = 0.65
-    @uniform(0.75 * pure_glycerine_base_price, 1.25 * pure_glycerine_base_price,
-             units='USD/kg', element=pure_glycerine)
+    @default(0.65, units='USD/kg', element=pure_glycerine)
     def set_pure_glycerol_price(price):
         pure_glycerine.price = price
     
@@ -538,46 +541,48 @@ def load(name, cache={}, reduce_chemicals=True,
     def set_saccharification_reaction_time(reaction_time):
         if abs(number) == 2: saccharification.tau = reaction_time
     
-    cellulase_base_cost = 0.212
-    @uniform(0.75 * cellulase_base_cost, 1.25 * cellulase_base_cost, units='USD/kg', element='cellulase')
+    @default(0.212, units='USD/kg', element='cellulase')
     def set_cellulase_price(price):
         if abs(number) == 2: s.cellulase.price = price
     
-    cellulase_loading = 0.02
-    @uniform(0.75 * cellulase_loading, 1.25 * cellulase_loading, units='wt. % cellulose', element='cellulase')
+    @default(0.02, units='wt. % cellulose', element='cellulase')
     def set_cellulase_loading(cellulase_loading):
         if abs(number) == 2: u.M302.cellulase_loading = cellulase_loading
     
-    PRS_base_cost = PRS_cost_item.cost
-    @uniform(0.75 * PRS_base_cost, 1.25 * PRS_base_cost, units='million USD', element='Pretreatment reactor system')
+    @default(PRS_cost_item.cost, units='million USD', element='Pretreatment reactor system')
     def set_reactor_base_cost(base_cost):
         PRS_cost_item.cost = base_cost
     
-    @uniform(85, 97.5, units='%', element='Pretreatment and saccharification')
+    @uniform(85, 97.5, units='%', element='Pretreatment and saccharification',
+             baseline=85)
     def set_cane_glucose_yield(cane_glucose_yield):
         if agile:
             cane_mode.glucose_yield = cane_glucose_yield
         elif abs(number) == 2:
             set_glucose_yield(cane_glucose_yield)
     
-    @uniform(79, 97.5, units='%', element='Pretreatment and saccharification')
+    @uniform(79, 97.5, units='%', element='Pretreatment and saccharification',
+             baseline=79)
     def set_sorghum_glucose_yield(sorghum_glucose_yield):
         if not agile: return
         sorghum_mode.glucose_yield = sorghum_glucose_yield
         
-    @uniform(65, 97.5, units='%', element='Pretreatment and saccharification')
+    @uniform(65, 97.5, units='%', element='Pretreatment and saccharification',
+             baseline=65)
     def set_cane_xylose_yield(cane_xylose_yield):
         if agile:
             cane_mode.xylose_yield = cane_xylose_yield
         elif abs(number) == 2:
             set_xylose_yield(cane_xylose_yield)
     
-    @uniform(86, 97.5, units='%', element='Pretreatment and saccharification')
+    @uniform(86, 97.5, units='%', element='Pretreatment and saccharification',
+             baseline=86)
     def set_sorghum_xylose_yield(sorghum_xylose_yield):
         if not agile: return
         sorghum_mode.xylose_yield = sorghum_xylose_yield
     
-    @uniform(90, 95, units='%', element='Cofermenation')
+    @uniform(90, 95, units='%', element='Cofermenation',
+             baseline=90)
     def set_glucose_to_ethanol_yield(glucose_to_ethanol_yield):
         if abs(number) == 2:
             glucose_to_ethanol_yield *= 0.01
@@ -594,7 +599,8 @@ def load(name, cache={}, reduce_chemicals=True,
             fermentor.cofermentation.X[0] = X3
             fermentor.cofermentation.X[2] = X3 * 0.0526 # 95% towards ethanol, the other 5% goes towards cell mass
     
-    @uniform(50, 95, units='%', element='Cofermenation')
+    @uniform(50, 95, units='%', element='Cofermenation',
+             baseline=50)
     def set_xylose_to_ethanol_yield(xylose_to_ethanol_yield):
         if abs(number) == 2:
             # fermentor.cofermentation[6].X = 0.004 # Baseline
@@ -611,11 +617,13 @@ def load(name, cache={}, reduce_chemicals=True,
             fermentor.cofermentation.X[1] = X3
             fermentor.cofermentation.X[3] = X3 * 0.0526 # 95% towards ethanol, the other 5% goes towards cell mass
 
-    @uniform(68.5, 137, units='g/L', element='Cofermentation')
+    @uniform(68.5, 137, units='g/L', element='Cofermentation',
+             baseline=68.5)
     def set_cofermentation_titer(titer):
         if abs(number) == 2: fermentor.titer = titer
 
-    @uniform(0.951, 1.902, units='g/L', element='Cofermentation')
+    @uniform(0.951, 1.902, units='g/L', element='Cofermentation',
+             baseline=0.951)
     def set_cofermentation_productivity(productivity):
         if abs(number) == 2: fermentor.productivity = productivity
 
@@ -644,7 +652,8 @@ def load(name, cache={}, reduce_chemicals=True,
         else:
             oil_extraction_specification.load_oil_content(cane_oil_content / 100.)
 
-    @uniform(-3., 0., element='oilsorghum', units='dry wt. %', kind='coupled')
+    @uniform(-3., 0., element='oilsorghum', units='dry wt. %', kind='coupled',
+             baseline=0.)
     def set_relative_sorghum_oil_content(relative_sorghum_oil_content):
         if agile:
             sorghum_mode.oil_content = cane_mode.oil_content + relative_sorghum_oil_content / 100.
@@ -955,39 +964,43 @@ def load(name, cache={}, reduce_chemicals=True,
     
     
     # Single point evaluation for detailed design results
+    def set_baseline(p, x):
+        p.setter(x)
+        p.baseline = x
+    
     if abs(number) == 2:
         if enhanced_cellulosic_performance:
-            set_sorghum_glucose_yield.setter(97.5)
-            set_sorghum_xylose_yield.setter(97.5)
-            set_cane_glucose_yield.setter(97.5)
-            set_cane_xylose_yield.setter(97.5)
-            set_glucose_to_ethanol_yield.setter(95)
-            set_xylose_to_ethanol_yield.setter(95)
-            set_cofermentation_titer.setter(120.)
-            set_cofermentation_productivity.setter(2.0)
+            set_baseline(set_sorghum_glucose_yield, 97.5)
+            set_baseline(set_sorghum_xylose_yield, 97.5)
+            set_baseline(set_cane_glucose_yield, 97.5)
+            set_baseline(set_cane_xylose_yield, 97.5)
+            set_baseline(set_glucose_to_ethanol_yield, 95)
+            set_baseline(set_xylose_to_ethanol_yield, 95)
+            set_baseline(set_cofermentation_titer, 120.)
+            set_baseline(set_cofermentation_productivity, 2.0)
         else:
-            set_sorghum_glucose_yield.setter(79)
-            set_sorghum_xylose_yield.setter(86)
-            set_cane_glucose_yield.setter(91.0)
-            set_cane_xylose_yield.setter(97.5)
-            set_glucose_to_ethanol_yield.setter(90)
-            set_xylose_to_ethanol_yield.setter(42)
+            set_baseline(set_sorghum_glucose_yield, 79)
+            set_baseline(set_sorghum_xylose_yield, 86)
+            set_baseline(set_cane_glucose_yield, 91.0)
+            set_baseline(set_cane_xylose_yield, 97.5)
+            set_baseline(set_glucose_to_ethanol_yield, 90)
+            set_baseline(set_xylose_to_ethanol_yield, 42)
     if number == 1 and enhanced_biodiesel_production:
-        oil_extraction_specification.load_oil_content(0.15)
-        set_bagasse_oil_extraction_efficiency.setter(oil_extraction_efficiency_hook(20))
-        oil_extraction_specification.load_oil_retention(0.40)
+        set_baseline(set_cane_oil_content, 15)
+        set_baseline(set_bagasse_oil_extraction_efficiency, oil_extraction_efficiency_hook(20))
+        set_baseline(set_bagasse_oil_retention, 40)
     else:
-        oil_extraction_specification.load_oil_content(0.05)
-        set_bagasse_oil_extraction_efficiency.setter(oil_extraction_efficiency_hook(0.))
-        oil_extraction_specification.load_oil_retention(0.70)
-    set_ethanol_price.setter(mean_ethanol_price) 
-    set_crude_glycerol_price.setter(mean_glycerol_price)
-    set_biodiesel_price.setter(mean_biodiesel_price)
-    set_natural_gas_price.setter(mean_natural_gas_price)
-    set_electricity_price.setter(mean_electricity_price)
+        set_baseline(set_cane_oil_content, 5)
+        set_baseline(set_bagasse_oil_extraction_efficiency, oil_extraction_efficiency_hook(0.))
+        set_baseline(set_bagasse_oil_retention, 70)
+    set_baseline(set_ethanol_price, mean_ethanol_price) 
+    set_baseline(set_crude_glycerol_price, mean_glycerol_price)
+    set_baseline(set_biodiesel_price, mean_biodiesel_price)
+    set_baseline(set_natural_gas_price, mean_natural_gas_price)
+    set_baseline(set_electricity_price, mean_electricity_price)
     if number > 0:
-        set_cane_PL_content.setter(10)
-        set_cane_FFA_content.setter(10)
+        set_baseline(set_cane_PL_content, 10)
+        set_baseline(set_cane_FFA_content, 10)
     # set_fermentation_solids_loading(20) # Same as Humbird
     # set_feedstock_oil_content(10) # Consistent with SI of Huang's 2016 paper
     # set_ethanol_price(2.356) # Consistent with Huang's 2016 paper
