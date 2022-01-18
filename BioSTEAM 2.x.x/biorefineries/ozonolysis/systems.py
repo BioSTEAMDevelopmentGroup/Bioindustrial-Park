@@ -9,15 +9,13 @@ from biorefineries.ozonolysis.chemicals_info import ozo_chemicals
 import biosteam as bst
 
 bst.settings.set_thermo(ozo_chemicals)
+
 mixed_feed_stream = bst.Stream('mixed_feed_stream')
 mixed_feed_stream.imol['Oleic_acid']=0.86
 mixed_feed_stream.imol['H2O2']=6.85
 mixed_feed_stream.imol['H2O']=27.1
 
-#TODO.XXX CHECK IF BELOW IS RIGHT
-mixed_feed_stream.price = 0.15 # USD/kg
-
-#%% Units
+#%% Units 
 
 reactor = units.OzonolysisReactor(
     ins = mixed_feed_stream, 
@@ -27,6 +25,22 @@ reactor = units.OzonolysisReactor(
 reactor.simulate()
 print(reactor.results())
 reactor.show()
+
+distillation1 = units.D1(
+                 "D1",
+                 ins = reactor.effluent,
+                   )
+ 
+distillation1.simulate()
+print(distillation1.results())        
+distillation1.show()
+
+
+# =============================================================================
+# separator = units.Separator(
+#     ins = reactor.effluent,
+#     )
+# =============================================================================
 
 
 ozonolysis_sys = bst.main_flowsheet.create_system('ozonolysis_sys')
