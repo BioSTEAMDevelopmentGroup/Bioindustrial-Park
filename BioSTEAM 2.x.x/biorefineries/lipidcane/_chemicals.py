@@ -54,6 +54,7 @@ def create_acyl_olein(N_acyl):
     chemical.V.add_model(fn.rho_to_V(rho=900, MW=chemical.MW))
     chemical.Cn.add_model(model.Cp(298.15) * chemical.MW)
     chemical.copy_models_from(model, ['mu', 'sigma', 'kappa'])
+    if ID == 'MonoOlein': chemical.mu.add_model(lambda T: 0.0001)
     return chemical
 
 def create_chemicals():
@@ -95,10 +96,10 @@ def create_chemicals():
         tmo.Chemical('Phosphatidylinositol', formula='C47H83O13P',
                      search_db=False, CAS='383907-36-6', default=True,
                      Hf=-1.779e6, # Assume same as TAG on a weight basis
-                     synonyms={'PL', 'PolarLipid'}, phase='l'),
+                     aliases={'PL', 'PolarLipid'}, phase='l'),
         # tmo.Chemical('BetaSitosterol', search_ID='83-46-5',
         #               phase='l', Hf=-1000. * (533.79 + 93.90),
-        #               synonyms=['Sterol']),
+        #               aliases=['Sterol']),
         create_acyl_olein(0),
         create_acyl_olein(1),
         create_acyl_olein(2),
