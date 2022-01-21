@@ -62,8 +62,6 @@ def create_chemicals():
     (Water, Ethanol, Glucose, Sucrose, H3PO4, P4O10, CO2, Octane, O2, N2, CH4, 
      Ash, Cellulose, Hemicellulose, Flocculant, Lignin, Solids, DryYeast, CaO) = sc.chemicals
     
-    
-    
     ### Define common chemicals ###
     Biodiesel = tmo.Chemical('Biodiesel',
                              search_ID='Methyl oleate')
