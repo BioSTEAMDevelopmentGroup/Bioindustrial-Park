@@ -9,8 +9,9 @@ import biosteam as bst
 from biorefineries.ozonolysis.systems import reactor, ozonolysis_sys,separator
 model = bst.Model(ozonolysis_sys)
 
-@model.metric(name = 'theoritical_minimum_sellling_price')
+@model.metric(name = 'Theoritical_minimum_sellling_price')
 def theoritical_min_SP():
+    #cost is a property decorator of a stream object = self.price(depends on parameters)*F_mass
     
     revenue = sum([i.cost for i in separator.outs])
     
@@ -25,33 +26,33 @@ def set_conversion(X):
     # reactor is the object, reactant conversion is not defined
     
 #Nonanal    
-@model.parameter(name='Oleic Acid',
+@model.parameter(name='Oleic Acid product price ($USD/Kg)',
                  distribution=shape.Uniform(6, 8))
 def set_product_price(X):
     separator.outs[0].price = X
     
-@model.parameter(name='Nonanal',
+@model.parameter(name='Nonanalproduct price ($USD/Kg)',
                  distribution=shape.Uniform(20, 50))
 def set_product_price(X):
     separator.outs[1].price = X
 
-@model.parameter(name='Nonanoic Acid',
+@model.parameter(name='Nonanoic Acid product price ($USD/Kg)',
                  distribution=shape.Uniform(1, 10))
 def set_product_price(X):
     separator.outs[2].price = X
     
-@model.parameter(name='Azelaic Acid',
+@model.parameter(name='Azelaic Acid product price ($USD/Kg)',
                  distribution=shape.Uniform(20, 28))
 def set_product_price(X):
     separator.outs[3].price = X
     
-@model.parameter(name='Oxo_nonanoic_acid',
+@model.parameter(name='Oxo_nonanoic_acid product price ($USD/Kg)',
                  distribution=shape.Uniform(1, 30))
 #Oxo_nonanoic is $290 for 50 mg,
 def set_product_price(X):
     separator.outs[4].price = X  
 
-@model.parameter(name='oxiraneoctanoic_acid,_3-octyl-',
+@model.parameter(name='Epoxy_stearic_acid product price ($USD/Kg)',
                  distribution=shape.Uniform(6, 8))
 def set_product_price(X):
     separator.outs[5].price = X
@@ -69,7 +70,8 @@ print(model.table)
 
 
 df_rho, df_p = model.spearman_r()
-df_rho['Biorefinery', 'theoritical_minimum_sellling_price']
-bst.plots.plot_spearman_1d(df_rho['Biorefinery', 'theoritical_minimum_sellling_price'],
+bst.plots.plot_spearman_1d(df_rho['Biorefinery', 'Theoritical_minimum_sellling_price'],
                            index=[i.describe() for i in model.parameters],
-                           name='IMFP')
+                           name='Theoritical_minimum_sellling_price')
+# 
+# =============================================================================
