@@ -79,74 +79,77 @@ class OzonolysisReactor(bst.BatchBioreactor):
         effluent.T = self.T
         effluent.P = self.P
         
-class D1(bst.BinaryDistillation):
-    
-    _N_ins = 1
-    _N_outs = 2   
-   
-    def __init__(self, ID='', ins=None, outs=(), thermo=None,
-                P= 3333.05921,   
-                T= 503.15, LHK = ('Nonanoic_acid','Azelaic_acid'),
-                k=2,
-                Rmin=0.3,
-                Lr=None,
-                Hr=None,
-                y_top = 0.8,
-                x_bot= 0.2,                 
-                product_specification_format='Composition',
-                vessel_material='Carbon steel',
-                tray_material='Carbon steel',
-                tray_type='Sieve',
-                tray_spacing=450,
-                stage_efficiency=None,
-                velocity_fraction=0.8,
-                foaming_factor=1.0,
-                open_tray_area_fraction=0.1,
-                downcomer_area_fraction=None,
-                is_divided=False,
-                vacuum_system_preference='Liquid-ring pump',
-                condenser_thermo=None,
-                boiler_thermo=None,
-                partial_condenser=True,
-                
-                ):
-        
-          self.P = P
-          self.T = T
-          self.product_specification_format = product_specification_format
-          self.y_top = y_top
-          self.x_bot = x_bot  
-                    
-          bst.BinaryDistillation.__init__(self, ID, ins, outs, thermo,
-                P=P, LHK=LHK, k=k,
-                Rmin=0.3,
-                Lr=Lr,
-                Hr=Hr,
-                y_top= y_top,
-                x_bot=x_bot, 
-                product_specification_format=None,
-                vessel_material='Carbon steel',
-                tray_material='Carbon steel',
-                tray_type='Sieve',
-                tray_spacing=450,
-                stage_efficiency=None,
-                velocity_fraction=0.8,
-                foaming_factor=1.0,
-                open_tray_area_fraction=0.1,
-                downcomer_area_fraction=None,
-                is_divided=False,
-                vacuum_system_preference='Liquid-ring pump',
-                condenser_thermo=None,
-                boiler_thermo=None,
-                partial_condenser=True,
-        )
-                 
-    def _run(self):
-        feed = self.ins[0]
-        products = self.outs[0]
-        products.copy_like(feed)
-        products.T = self.T
-        products.P = self.P
+# =============================================================================
+# class D1(bst.BinaryDistillation):
+#     
+#     _N_ins = 1
+#     _N_outs = 2   
+#    
+#     def __init__(self, ID='', ins=None, outs=(), thermo=None,
+#                 P= 3333.05921,   
+#                 T= 503.15, LHK = ('Nonanoic_acid','Azelaic_acid'),
+#                 k=2,
+#                 Rmin=0.3,
+#                 Lr=None,
+#                 Hr=None,
+#                 y_top = 0.8,
+#                 x_bot= 0.2,                 
+#                 product_specification_format='Composition',
+#                 vessel_material='Carbon steel',
+#                 tray_material='Carbon steel',
+#                 tray_type='Sieve',
+#                 tray_spacing=450,
+#                 stage_efficiency=None,
+#                 velocity_fraction=0.8,
+#                 foaming_factor=1.0,
+#                 open_tray_area_fraction=0.1,
+#                 downcomer_area_fraction=None,
+#                 is_divided=False,
+#                 vacuum_system_preference='Liquid-ring pump',
+#                 condenser_thermo=None,
+#                 boiler_thermo=None,
+#                 partial_condenser=True,
+#                 
+#                 ):
+#         
+#           self.P = P
+#           self.T = T
+#           self.product_specification_format = product_specification_format
+#           self.y_top = y_top
+#           self.x_bot = x_bot  
+#                     
+#           bst.BinaryDistillation.__init__(self, ID, ins, outs, thermo,
+#                 P=P, LHK=LHK, k=k,
+#                 Rmin=0.3,
+#                 Lr=Lr,
+#                 Hr=Hr,
+#                 y_top= y_top,
+#                 x_bot=x_bot, 
+#                 product_specification_format=None,
+#                 vessel_material='Carbon steel',
+#                 tray_material='Carbon steel',
+#                 tray_type='Sieve',
+#                 tray_spacing=450,
+#                 stage_efficiency=None,
+#                 velocity_fraction=0.8,
+#                 foaming_factor=1.0,
+#                 open_tray_area_fraction=0.1,
+#                 downcomer_area_fraction=None,
+#                 is_divided=False,
+#                 vacuum_system_preference='Liquid-ring pump',
+#                 condenser_thermo=None,
+#                 boiler_thermo=None,
+#                 partial_condenser=True,
+#         )
+#                  
+#     def _run(self):
+#         feed = self.ins[0]
+#         products = self.outs[0]
+#         products.copy_like(feed)
+#         products.T = self.T
+#         products.P = self.P
+# =============================================================================
+
 # =============================================================================
 # class Separator(bst.Unit):
 #     #Why does this not have an _init_?
@@ -157,10 +160,12 @@ class D1(bst.BinaryDistillation):
 #         feed = self.ins[0]
 #         IDs = ['Oleic_acid','Nonanal','Nonanoic_acid','Azelaic_acid', 
 #                   'Oxononanoic_acid', 'oxiraneoctanoic_acid,_3-octyl-']
+#         outs = self.outs[0]
 #         
 #         for stream, ID in zip(self.outs,IDs):
 #             stream.imol[ID] = feed.imol[ID]
 # =============================================================================
+
             
 
                    
