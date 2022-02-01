@@ -150,21 +150,20 @@ class OzonolysisReactor(bst.BatchBioreactor):
 #         products.P = self.P
 # =============================================================================
 
-# =============================================================================
-# class Separator(bst.Unit):
-#     #Why does this not have an _init_?
-#     
-#     _N_outs = 6
-#         
-#     def _run(self):
-#         feed = self.ins[0]
-#         IDs = ['Oleic_acid','Nonanal','Nonanoic_acid','Azelaic_acid', 
-#                   'Oxononanoic_acid', 'oxiraneoctanoic_acid,_3-octyl-']
-#         outs = self.outs[0]
-#         
-#         for stream, ID in zip(self.outs,IDs):
-#             stream.imol[ID] = feed.imol[ID]
-# =============================================================================
+class Separator(bst.Unit):
+    #Why does this not have an _init_?
+    
+    _N_outs = 6
+        
+    def _run(self):
+        feed = self.ins[0]
+        IDs = ['Oleic_acid','Nonanal','Nonanoic_acid','Azelaic_acid', 
+                  'Oxononanoic_acid', 'oxiraneoctanoic_acid,_3-octyl-','Water']
+        outs = self.outs[0]
+        
+        for stream, ID in zip(self.outs,IDs):
+            stream.imol[ID] = feed.imol[ID]
+
 
             
 
