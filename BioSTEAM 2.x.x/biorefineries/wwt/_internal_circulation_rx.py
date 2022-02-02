@@ -69,7 +69,7 @@ class InternalCirculationRx(bst.MixTank):
         Overall organic loading rate, [kg COD/m3/hr].
     biodegradability : float or dict
         Biodegradability of chemicals,
-        when shown as a float, all biodegradable chemicals are assumped to have
+        when shown as a float, all biodegradable chemicals are assumed to have
         the same degradability.
     Y : float
         Biomass yield, [kg biomass/kg consumed COD].
@@ -148,7 +148,7 @@ class InternalCirculationRx(bst.MixTank):
         self.kW_per_m3 = kW_per_m3
         self.T = T
 
-        # Initiate the attributes
+        # Initialize the attributes
         self.heat_exchanger = hx = bst.HXutility(None, None, None, T=T)
         self.heat_utilities = hx.heat_utilities
         self._refresh_rxns()
@@ -196,7 +196,7 @@ class InternalCirculationRx(bst.MixTank):
         biogas, eff, waste  = self.outs
         degassing = self._degassing
 
-        # Initiate the streams
+        # Initialize the streams
         biogas.phase = 'g'
         biogas.empty()
 
@@ -364,7 +364,7 @@ class InternalCirculationRx(bst.MixTank):
     def biodegradability(self):
         '''
         [float of dict] Biodegradability of chemicals,
-        when shown as a float, all biodegradable chemicals are assumped to have
+        when shown as a float, all biodegradable chemicals are assumed to have
         the same degradability.
         '''
         return self._biodegradability
@@ -552,7 +552,7 @@ class InternalCirculationRx(bst.MixTank):
     @property
     def decay_rxn(self):
         '''
-        [:class:`tmo.Reaction`] Biomass endogeneous decay.
+        [:class:`tmo.Reaction`] Biomass endogenous decay.
 
         .. note::
             Conversion is adjusted in the _run function.

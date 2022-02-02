@@ -486,7 +486,7 @@ class AnMBR(bst.Unit):
             if i is None:
                 continue
             ldpe += i.design_results['Packing LDPE [m3]']
-            hdpe += i.design_results['Packing LDPE [m3]']
+            hdpe += i.design_results['Packing HDPE [m3]']
 
         # Optional addition of GAC
         D['GAC [kg]'] = self._design_GAC()

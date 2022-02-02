@@ -92,6 +92,7 @@ class SludgeHandling(bst.Unit):
 
     def _cost(self):
         pumps = (self.effluent_pump, self.sludge_pump)
+        self.power_utility.rate = 0.
         for i in range(2):
             pumps[i].ins[0] = self.outs[i].copy() # use `.proxy()` will interfere `_run`
             pumps[i].simulate()
