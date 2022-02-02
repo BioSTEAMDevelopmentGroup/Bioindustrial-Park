@@ -1740,10 +1740,11 @@ class HydrogenationReactor(Reactor):
     def _run(self):
         feed, recycle, reagent = self.ins
         effluent = self.outs[0]
-        reagent.imol['H2'] = feed.imol['TAL'] + recycle.imol['TAL']
-        
+        reagent.imol['H2'] = (feed.imol['TAL'] + recycle.imol['TAL'])*self.dehydration_rxns[0].X
+        reagent.phase = 'g'
         # effluent = feed.copy()
         effluent.mix_from([feed, recycle, reagent])
+        effluent.phase = 'l'
         # effluent.T = feed.T
         # effluent.P = feed.P
         
