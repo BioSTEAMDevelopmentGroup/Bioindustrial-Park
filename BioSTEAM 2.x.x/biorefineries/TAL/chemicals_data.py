@@ -249,6 +249,10 @@ HMTHP = chemical_database(ID='HMTHP', search_ID='674-26-0')
 HMTHP.Tm = 273.15 + (27.+28.)/2. # CAS SciFinder 674-26-0
 HMTHP.Tb = 273.15 + (148.+151.)/2. # CAS SciFinder 674-26-0
 HMTHP.Hfus = TAL.Hfus
+
+HMTHP_missing_properties = HMTHP.get_missing_properties()
+TAL_missing_properties = TAL.get_missing_properties()
+HMTHP.copy_models_from(TAL, [i for i in HMTHP_missing_properties if not i in TAL_missing_properties])
 # https://pubchem.ncbi.nlm.nih.gov/compound/Sorbic-acid#section=Stability-Shelf-Life
 SA.Tb = 228 + 273.15
 
@@ -421,10 +425,13 @@ combustibles.extend(['WWTsludge','NH3', 'NitricOxide', 'CarbonMonoxide', 'H2S', 
 #!!! Sarang please review and update this, I'm not sure what chemicals are used
 # in the biorefinery, getting rid of unused chemicals (i.e., exclude them from chems)
 # should help reduce simulation time
-phase_change_chemicals = ['Methanol', 'Ethanol', 'H2O', 'EthylAcetate', 'Denaturant',
-                          'AceticAcid', 'MethylAcetate', 'MethylLactate',
-                          'EthylLactate', 'Furfural', 'EthylSuccinate',
-                          'SuccinicAcid', 'LacticAcid', 'HMF']
+phase_change_chemicals = ['H2O', 'Denaturant',
+                          'AceticAcid', 'Ethanol',
+                          'Furfural',
+                          'SuccinicAcid', 'HMF',
+                           'PD', 'Hexanol',
+                           # 'HMTHP',
+                          ]
 
 for chem in chems:
     if chem.ID in phase_change_chemicals: pass
