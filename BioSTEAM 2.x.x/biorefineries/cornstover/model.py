@@ -43,9 +43,9 @@ cornstover_sys.simulate()
 param = cornstover_model.parameter
 
 # Add saccharification as a parameter
-saccharification_reaction = R301.saccharification[2]
+saccharification_reaction = R303.saccharification[2]
 X = tools.bounded_triang(saccharification_reaction.X, addition=0.04)
-@param(element=R301, kind='coupled', distribution=X, baseline=saccharification_reaction.X)
+@param(element=R303, kind='coupled', distribution=X, baseline=saccharification_reaction.X)
 def set_saccharification_conversion(saccharification_conversion):
     saccharification_reaction.X = saccharification_conversion
 
