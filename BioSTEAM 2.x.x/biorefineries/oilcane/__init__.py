@@ -485,10 +485,23 @@ def load(name, cache={}, reduce_chemicals=True,
     def set_bagasse_oil_extraction_efficiency(bagasse_oil_extraction_efficiency):
         oil_extraction_specification.load_efficiency(bagasse_oil_extraction_efficiency / 100.)
 
+    # From Huang's 2016 paper
+    @uniform(5 * 30, 7 * 30, units='day/yr', baseline=200)
+    def set_cane_operating_days(cane_operating_days):
+        if agile:
+            cane_mode.operating_hours = cane_operating_days * 24
+        else:
+            tea.operating_days = cane_operating_days
+
+    # From Ed Cahoon and Huang 2017
+    @uniform(30, 60, units='day/yr', baseline=45)
+    def set_sorghum_operating_days(sorghum_operating_days):
+        if agile: sorghum_mode.operating_hours = sorghum_operating_days * 24
+
     capacity = feedstock.F_mass / kg_per_ton
-    @default(capacity, units='ton/hr', kind='coupled')
-    def set_plant_capacity(capacity):
-        feedstock.F_mass = F_mass = kg_per_ton * capacity
+    @default(capacity, units='ton/yr', kind='coupled')
+    def set_annual_crushing_capacity(capacity):
+        feedstock.F_mass = F_mass = kg_per_ton * capacity / tea.operating_hours
         if agile: oilsorghum.F_mass = F_mass
 
     # USDA ERS historical price data
@@ -515,14 +528,6 @@ def load(name, cache={}, reduce_chemicals=True,
                 baseline=0.0637)
     def set_electricity_price(electricity_price): 
         bst.PowerUtility.price = electricity_price
-        
-    # From Huang's 2016 paper
-    @uniform(6 * 30, 7 * 30, units='day/yr', baseline=200)
-    def set_operating_days(operating_days):
-        if agile:
-            cane_mode.operating_hours = operating_days * 24
-        else:
-            tea.operating_days = operating_days
     
     # 10% is suggested for waste reducing, but 15% is suggested for investment
     @uniform(10., 15., units='%', baseline=10)
