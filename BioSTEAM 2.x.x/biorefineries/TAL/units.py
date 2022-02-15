@@ -1731,16 +1731,16 @@ class HydrogenationReactor(Reactor):
     _F_BM_default = {**Reactor._F_BM_default,
             'AuPd catalyst': 1}
     mcat_frac = 0.00001 # fraction of catalyst by weight in relation to the reactant (TAL)
-    dehydration_rxns = ParallelRxn([
+    hydrogenation_rxns = ParallelRxn([
             #   Reaction definition                                       Reactant   Conversion
             Rxn('TAL + H2-> HMTHP',         'TAL',   0.964*0.99) # conversion from Chia et al. 2012
                 ])
-    TAL_to_SA_rxn = dehydration_rxns[0]
+    TAL_to_SA_rxn = hydrogenation_rxns[0]
     
     def _run(self):
         feed, recycle, reagent = self.ins
         effluent = self.outs[0]
-        reagent.imol['H2'] = (feed.imol['TAL'] + recycle.imol['TAL'])*self.dehydration_rxns[0].X
+        reagent.imol['H2'] = (feed.imol['TAL'] + recycle.imol['TAL'])*self.hydrogenation_rxns[0].X
         reagent.phase = 'g'
         # effluent = feed.copy()
         effluent.mix_from([feed, recycle, reagent])
@@ -1748,7 +1748,7 @@ class HydrogenationReactor(Reactor):
         # effluent.T = feed.T
         # effluent.P = feed.P
         
-        self.dehydration_rxns(effluent.mol)
+        self.hydrogenation_rxns(effluent.mol)
         
     def _cost(self):
         super()._cost()
@@ -1797,23 +1797,23 @@ class HydrolysisReactor(Reactor):
     _F_BM_default = {**Reactor._F_BM_default,
             'Amberlyst15 catalyst': 1}
     mcat_frac = 0.01 # fraction of catalyst by weight in relation to the reactant (TAL)
-    dehydration_rxns = ParallelRxn([
+    hydrolysis_rxns = ParallelRxn([
             #   Reaction definition                                       Reactant   Conversion
             Rxn('SA + KOH -> KSA + H2O',         'SA',   1.) # not mentioned in Viswanathan et al. 2020
                 ])
-    TAL_to_SA_rxn = dehydration_rxns[0]
+    TAL_to_SA_rxn = hydrolysis_rxns[0]
     
     def _run(self):
         feed, recycle, reagent = self.ins
         effluent = self.outs[0]
-        reagent.imol['KOH'] = feed.imol['SA'] + recycle.imol['SA'] - recycle.imol['KOH']
+        reagent.imol['KOH'] = max(0, feed.imol['SA'] + recycle.imol['SA'] - recycle.imol['KOH'])
         
         # effluent = feed.copy()
         effluent.mix_from([feed, recycle, reagent])
         # effluent.T = feed.T
         # effluent.P = feed.P
         
-        self.dehydration_rxns(effluent.mol)
+        self.hydrolysis_rxns(effluent.mol)
         
     def _cost(self):
         super()._cost()

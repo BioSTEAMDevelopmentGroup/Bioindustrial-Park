@@ -195,7 +195,8 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
         # print(yield_)
         reactor = self.reactor
         self.spec_1 = reactor.glucose_to_TAL_rxn.X = yield_
-        reactor.xylose_to_TAL_rxn.X = self.xylose_utilization_fraction * yield_
+        # reactor.xylose_to_TAL_rxn.X = self.xylose_utilization_fraction * yield_
+        reactor.xylose_to_TAL_rxn.X = yield_
         
         if (reactor.glucose_to_TAL_rxn.X + reactor.glucose_to_VitaminA_rxn.X \
             + reactor.glucose_to_VitaminD2_rxn.X+ reactor.glucose_to_microbe_rxn.X) > 0.999:

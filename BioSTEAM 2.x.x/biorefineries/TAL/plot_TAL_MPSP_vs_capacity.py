@@ -5,7 +5,7 @@ Created on Sun Jan 30 15:44:35 2022
 @author: saran
 """
 
-from biorefineries.TAL.system_TAL import *
+from biorefineries.TAL.system_TAL_glucose import *
 from matplotlib import pyplot as plt
 from pandas import DataFrame
 
