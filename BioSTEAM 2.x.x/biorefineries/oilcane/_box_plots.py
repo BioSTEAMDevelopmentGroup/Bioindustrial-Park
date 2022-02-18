@@ -48,6 +48,10 @@ from collections import Iterable
 __all__ = (
     'plot_all',
     'plot_montecarlo_main_manuscript',
+    'plot_montecarlo_feedstock_comparison_single_column_short',
+    'plot_montecarlo_feedstock_comparison_single_column',
+    'plot_montecarlo_configuration_comparison_single_column',
+    'plot_montecarlo_agile_comparison_single_column',
     'plot_breakdowns',
     'plot_montecarlo_feedstock_comparison',
     'plot_montecarlo_configuration_comparison',
@@ -220,6 +224,122 @@ def plot_montecarlo_main_manuscript():
     file = os.path.join(images_folder, 'montecarlo_main_manuscript.svg')
     plt.savefig(file, transparent=True)
 
+def plot_montecarlo_feedstock_comparison_single_column(letters=None):
+    set_font(size=8)
+    set_figure_size(width='half', aspect_ratio=2.25)
+    fig, axes = plot_monte_carlo(
+        derivative=False, absolute=False, comparison=True,
+        tickmarks=None, agile=False, ncols=1, 
+        labels=[
+            'Conventional',
+            'Cellulosic',
+            # 'Conventional',
+            # 'Cellulosic',
+        ],
+        comparison_names=['O1 - S1', 'O2 - S2'],
+        metrics = ['MFPP', 'TCI', 'production', 'GWP_property_allocation', 
+                   'natural_gas_consumption', 'electricity_production'],
+        color_wheel = CABBI_colors.wheel([
+            'blue_light', 'green_dirty', 'orange', 'green', 
+            'orange', 'orange_hatch', 'grey', 'brown',
+        ])
+    )
+    for ax, letter in zip(axes, 'ABCDEFGH' if letters is None else letters):
+        plt.sca(ax)
+        ylb, yub = plt.ylim()
+        plt.text(1.65, ylb + (yub - ylb) * 0.90, letter, color=letter_color,
+                 horizontalalignment='center',verticalalignment='center',
+                 fontsize=12, fontweight='bold')
+    plt.subplots_adjust(right=0.90, left=0.255, wspace=0.38, top=0.98, bottom=0.05)
+    file = os.path.join(images_folder, 'montecarlo_feedstock_comparison.svg')
+    plt.savefig(file, transparent=True)
+
+def plot_montecarlo_feedstock_comparison_single_column_short(letters=None):
+    set_font(size=8)
+    set_figure_size(width='half', aspect_ratio=1.6)
+    fig, axes = plot_monte_carlo(
+        derivative=False, absolute=False, comparison=True,
+        tickmarks=None, agile=False, ncols=1, 
+        labels=[
+            'Conventional',
+            'Cellulosic',
+            # 'Conventional',
+            # 'Cellulosic',
+        ],
+        comparison_names=['O1 - S1', 'O2 - S2'],
+        metrics = ['MFPP', 'TCI', 'production', 'GWP_property_allocation'],
+        color_wheel = CABBI_colors.wheel([
+            'blue_light', 'green_dirty', 'orange', 'green', 
+            'orange', 'orange_hatch', 'grey', 'brown',
+        ])
+    )
+    for ax, letter in zip(axes, 'ABCDEFGH' if letters is None else letters):
+        plt.sca(ax)
+        ylb, yub = plt.ylim()
+        plt.text(1.65, ylb + (yub - ylb) * 0.90, letter, color=letter_color,
+                 horizontalalignment='center',verticalalignment='center',
+                 fontsize=12, fontweight='bold')
+    plt.subplots_adjust(right=0.90, left=0.225, wspace=0.38, top=0.98, bottom=0.05)
+    file = os.path.join(images_folder, 'montecarlo_feedstock_comparison.svg')
+    plt.savefig(file, transparent=True)
+
+
+def plot_montecarlo_configuration_comparison_single_column(letters=None):
+    set_font(size=8)
+    set_figure_size(width='half', aspect_ratio=2.25)
+    fig, axes = plot_monte_carlo(
+        derivative=False, absolute=False, comparison=True,
+        tickmarks=None, agile=False, ncols=1,
+        labels=[
+            'Oilcane',
+            'Sugarcane',
+        ],
+        comparison_names=[
+            'O2 - O1', 
+            'S2 - S1'
+        ],
+        metrics=['MFPP', 'TCI', 'production', 'GWP_property_allocation',
+                 'natural_gas_consumption', 'electricity_production'],
+        color_wheel = CABBI_colors.wheel([
+            'blue_light', 'green_dirty', 'orange', 'green', 
+            'orange', 'orange_hatch', 'grey', 'brown',
+        ])
+    )
+    for ax, letter in zip(axes, 'ABCDEFGH' if letters is None else letters):
+        plt.sca(ax)
+        ylb, yub = plt.ylim()
+        plt.text(1.65, ylb + (yub - ylb) * 0.90, letter, color=letter_color,
+                 horizontalalignment='center',verticalalignment='center',
+                 fontsize=12, fontweight='bold')
+        # plt.text(0.58, ylb + (yub - ylb) * 0.90, letter, color=letter_color,
+        #          horizontalalignment='center',verticalalignment='center',
+        #          fontsize=12, fontweight='bold')
+    plt.subplots_adjust(right=0.90, left=0.255, wspace=0.38, top=0.98, bottom=0.05)
+    file = os.path.join(images_folder, 'montecarlo_configuration_comparison.svg')
+    plt.savefig(file, transparent=True)
+
+def plot_montecarlo_agile_comparison_single_column(letters=None):
+    set_font(size=8)
+    set_figure_size(width='half', aspect_ratio=1.0)
+    fig, axes = plot_monte_carlo(
+        derivative=False, absolute=False, comparison=True,
+        tickmarks=None, agile_only=True, ncols=1,
+        labels=[
+            'Conventional',
+            'Cellulosic'
+        ],
+        metrics=['MFPP', 'TCI'],
+    )
+    for ax, letter in zip(axes, 'AB'  if letters is None else letters):
+        plt.sca(ax)
+        ylb, yub = plt.ylim()
+        plt.text(1.65, ylb + (yub - ylb) * 0.90, letter, color=letter_color,
+                 horizontalalignment='center',verticalalignment='center',
+                 fontsize=12, fontweight='bold')
+    plt.subplots_adjust(right=0.9, left=0.2, wspace=0.5, top=0.98, bottom=0.05)
+    file = os.path.join(images_folder, 'montecarlo_agile_comparison.svg')
+    plt.savefig(file, transparent=True)
+
 def plot_montecarlo_feedstock_comparison(axes_box=None, letters=None):
     if axes_box is None:
         set_font(size=8)
@@ -247,12 +367,12 @@ def plot_montecarlo_feedstock_comparison(axes_box=None, letters=None):
         plt.text(1.65, ylb + (yub - ylb) * 0.90, letter, color=letter_color,
                  horizontalalignment='center',verticalalignment='center',
                  fontsize=12, fontweight='bold')
-        if axes_box is None and letter in 'DH':
-            x = 0.5
-            plt.text(x, ylb - (yub - ylb) * 0.3, 
-                     'Impact of processing\noilcane over sugarcane', 
-                     horizontalalignment='center',verticalalignment='center',
-                     fontsize=8)
+        # if axes_box is None and letter in 'DH':
+        #     x = 0.5
+        #     plt.text(x, ylb - (yub - ylb) * 0.3, 
+        #              'Impact of processing\noilcane over sugarcane', 
+        #              horizontalalignment='center',verticalalignment='center',
+        #              fontsize=8)
     if axes_box is None:
         plt.subplots_adjust(right=0.96, left=0.105, wspace=0.38, top=0.98, bottom=0.12)
         file = os.path.join(images_folder, 'montecarlo_feedstock_comparison.svg')

@@ -4,7 +4,10 @@ Created on Tue Dec  7 06:20:39 2021
 
 @author: yrc2
 """
+import biosteam as bst
 from biorefineries import oilcane as oc
+
+bst.Metric.caching = False
 oc.load('O1')
 model = oc.model
 names = (
