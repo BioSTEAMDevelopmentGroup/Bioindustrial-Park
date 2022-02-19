@@ -132,7 +132,10 @@ def get_TAL_solublity_in_solvent_very_rough(T, solvent_ID='Hexanol', units='g/L'
         return temp_stream_2.imass['TAL']/temp_stream_2.F_vol
     elif units=='mol/mol':
         return K_TAL_in_extract*mol_TAL/(mol_TAL+mol_solvent) # 
-    
+
+def get_TAL_solubility_in_hexanol():
+    return 2.*0.0222/(2.*0.0222+0.951) # mol/mol; 2 * Marco's initial experimental solubility of 2.8 wt% at 21 C
+
 # %% 
 @SystemFactory(ID = 'TAL_sys')
 def create_TAL_sys(ins, outs):
@@ -143,10 +146,15 @@ def create_TAL_sys(ins, outs):
     # Feedstock
     # =============================================================================
     
-    feedstock = Stream('feedstock',
-                        baseline_feedflow.copy(),
-                        units='kg/hr',
-                        price=price['Feedstock'])
+    # feedstock = Stream('feedstock',
+    #                     baseline_feedflow.copy(),
+    #                     units='kg/hr',
+    #                     price=price['Feedstock'])
+    
+    feedstock = Stream('feedstock')
+    feedstock.imass['Glucose'] = 29000.
+    feedstock.imass['H2O'] = 500.
+    feedstock.price = price['Glucose']*feedstock.imass['Glucose']/feedstock.F_mass
     
     U101 = units.FeedstockPreprocessing('U101', ins=feedstock)
     
@@ -156,108 +164,6 @@ def create_TAL_sys(ins, outs):
     
     
 
-    # =============================================================================
-    # Pretreatment streams
-    # =============================================================================
-    
-    # For pretreatment, 93% purity
-    sulfuric_acid_T201 = Stream('sulfuric_acid_T201', units='kg/hr')
-    # To be mixed with sulfuric acid, flow updated in SulfuricAcidMixer
-    water_M201 = Stream('water_M201', T=300, units='kg/hr')
-        
-    # To be used for feedstock conditioning
-    water_M202 = Stream('water_M202', T=300, units='kg/hr')
-    
-    # To be added to the feedstock/sulfuric acid mixture, flow updated by the SteamMixer
-    water_M203 = Stream('water_M203', phase='l', T=300, P=13.*101325, units='kg/hr')
-    
-    # For neutralization of pretreatment hydrolysate
-    ammonia_M205 = Stream('ammonia_M205', phase='l', units='kg/hr')
-    # To be used for ammonia addition, flow updated by AmmoniaMixer
-    water_M205 = Stream('water_M205', units='kg/hr')
-    
-    
-    # =============================================================================
-    # Pretreatment units
-    # =============================================================================
-    H_M201 = bst.units.HXutility('H_M201', ins=water_M201,
-                                     outs='steam_M201',
-                                     T=99.+273.15, rigorous=True)
-    
-    H_M201.heat_utilities[0].heat_transfer_efficiency = 1.
-    def H_M201_specification():
-        T201._run()
-        acid_imass = T201.outs[0].imass['SulfuricAcid']
-        H_M201.ins[0].imass['Water'] = acid_imass / 0.05
-        # H_M201.ins[0].imass['H2SO4'] = H_M201.ins[0].imass['Water']/1000.
-        H_M201._run()
-    H_M201.specification = H_M201_specification
-    # H_M201._cost = lambda: None
-    # H_M201._design = lambda: None
-    # H_M201.heat_utilities[0].heat_exchanger = None
-    H_M202 = bst.units.HXutility('H_M202', ins=water_M202,
-                                     outs='hot_water_M202',
-                                     T=99.+273.15, rigorous=True)
-    H_M202.heat_utilities[0].heat_transfer_efficiency = 1.
-    def H_M202_specification():
-        U101._run()
-        H_M201.run()
-        M201._run()
-        feedstock, acid = U101.outs[0], M201.outs[0]
-        recycled_water = H201.outs[0]
-        mixture_F_mass = feedstock.F_mass + acid.F_mass
-        mixture_imass_water = feedstock.imass['Water'] + acid.imass['Water'] + \
-            recycled_water.imass['Water']
-        total_mass = (mixture_F_mass - mixture_imass_water)/M202.solid_loading
-        H_M202.ins[0].imass['Water'] = max(0, total_mass - mixture_F_mass)
-        # H_M202.ins[0].imass['H2SO4'] = H_M202.ins[0].imass['Water']/1000.
-        H_M202._run()
-    H_M202.specification = H_M202_specification
-    
-    
-    # Prepare sulfuric acid
-    get_feedstock_dry_mass = lambda: feedstock.F_mass - feedstock.imass['H2O']
-    T201 = units.SulfuricAcidAdditionTank('T201', ins=sulfuric_acid_T201,
-                                          feedstock_dry_mass=get_feedstock_dry_mass())
-    
-    M201 = units.SulfuricAcidMixer('M201', ins=(T201-0, H_M201-0))
-        
-    # Mix sulfuric acid and feedstock, adjust water loading for pretreatment
-    M202 = units.PretreatmentMixer('M202', ins=(U101-0, M201-0, H_M202-0, ''))
-    
-    # Mix feedstock/sulfuric acid mixture and steam
-    # M203 = units.SteamMixer('M203', ins=(M202-0, water_M203), P=5.5*101325)
-    M203 = bst.units.SteamMixer('M203', ins=(M202-0, '', water_M203), P=5.5*101325)
-    M203.heat_utilities[0].heat_transfer_efficiency = 1.
-    R201 = units.PretreatmentReactorSystem('R201', ins=M203-0, outs=('R201_g', 'R201_l'))
-    
-    # Pump bottom of the pretreatment products to the oligomer conversion tank
-    T202 = units.BlowdownTank('T202', ins=R201-1)
-    T203 = units.OligomerConversionTank('T203', ins=T202-0)
-    F201 = units.PretreatmentFlash('F201', ins=T203-0,
-                                   outs=('F201_waste_vapor', 'F201_to_fermentation'),
-                                   P=101325, Q=0)
-    
-    M204 = bst.units.Mixer('M204', ins=(R201-0, F201-0))
-    @M204.add_specification(run=True)
-    def valve():
-        M204.ins[0].P = 101325
-    H201 = bst.units.HXutility('H201', ins=M204-0,
-                               outs='condensed_pretreatment_waste_vapor',
-                               V=0, rigorous=True)
-    
-    # Neutralize pretreatment hydrolysate
-    M205 = units.AmmoniaMixer('M205', ins=(ammonia_M205, water_M205))
-    def update_ammonia_and_mix():
-        hydrolysate = F201.outs[1]
-        # Load 10% extra
-        ammonia_M205.imol['NH4OH'] = (2*hydrolysate.imol['H2SO4']) * 1.1
-        M205._run()
-    M205.specification = update_ammonia_and_mix
-    
-    T204 = units.AmmoniaAdditionTank('T204', ins=(F201-1, M205-0))
-    P201 = units.HydrolysatePump('P201', ins=T204-0)
-    
     
     # %% 
     
@@ -284,7 +190,7 @@ def create_TAL_sys(ins, outs):
     # =============================================================================
     
     # Cool hydrolysate down to fermentation temperature at 50°C
-    H301 = bst.units.HXutility('H301', ins=P201-0, T=50+273.15)
+    H301 = bst.units.HXutility('H301', ins=U101-0, T=50+273.15)
     
     # Mix enzyme with the cooled pretreatment hydrolysate
     M301 = units.EnzymeHydrolysateMixer('M301', ins=(H301-0, enzyme, enzyme_water))
@@ -536,7 +442,7 @@ def create_TAL_sys(ins, outs):
     S402.specification = S402_TAL_split_spec
     
     H403 = bst.HXutility('H403', ins=S402-0, outs=('heated_TAL'), T=273.15+40.)
-
+    
     F401 = bst.Flash('F401', ins=H403-0, outs = ('volatiles', 'pure_TAL_product'), V = 0.99, P=101325.)
     
     def F401_spec():
@@ -547,6 +453,7 @@ def create_TAL_sys(ins, outs):
          'HMF',]) / F401_ins_0.F_mol
         F401._run()
     F401.specification = F401_spec
+    
     
     # %% 
     
@@ -568,8 +475,11 @@ def create_TAL_sys(ins, outs):
     # =============================================================================
     
     # Mix waste liquids for treatment
-    M501 = bst.units.Mixer('M501', ins=(F301-1, S402-1,))
-                                        # r_S402_s-1, r_S403_s-1, r_S404_s-1,)
+    M501 = bst.units.Mixer('M501', ins=(F301-1, S402-1,
+                                        F401-0,
+                                        # r_S402_s-1, r_S403_s-1, r_S404_s-1,
+                                        # X401-1, S408-0,
+                                        ))
     
     # This represents the total cost of wastewater treatment system
     WWT_cost = units.WastewaterSystemCost('WWT_cost', ins=M501-0)
@@ -631,7 +541,9 @@ def create_TAL_sys(ins, outs):
     S504.line = 'Reverse osmosis'
     
     # Mix solid wastes to boiler turbogenerator
-    M505 = bst.units.Mixer('M505', ins=(S503-1, S301-0, S401-0), 
+    M505 = bst.units.Mixer('M505', ins=(S503-1, S301-0, S401-0, 
+                                        # F401-0, D401-0,
+                                        ), 
                             outs='wastes_to_boiler_turbogenerator')
     
     
@@ -710,9 +622,9 @@ def create_TAL_sys(ins, outs):
     # Facilities units
     # =============================================================================
     
-    T601 = units.SulfuricAcidStorageTank('T601', ins=sulfuric_acid_fresh,
-                                         outs=sulfuric_acid_T201)
-    T601.line = 'Sulfuric acid storage tank'
+    # T601 = units.SulfuricAcidStorageTank('T601', ins=sulfuric_acid_fresh,
+    #                                      outs=sulfuric_acid_T201)
+    # T601.line = 'Sulfuric acid storage tank'
     # S601 = bst.units.ReversedSplitter('S601', ins=T601-0, 
     #                                   outs=(pretreatment_sulfuric_acid, 
     #                                         ''))
@@ -721,8 +633,8 @@ def create_TAL_sys(ins, outs):
     # T608-0-3-R401
     # T608.line = 'Tricalcium diphosphate storage tank'
     #
-    T602 = units.AmmoniaStorageTank('T602', ins=ammonia_fresh, outs=ammonia_M205)
-    T602.line = 'Ammonia storage tank'
+    # T602 = units.AmmoniaStorageTank('T602', ins=ammonia_fresh, outs=ammonia_M205)
+    # T602.line = 'Ammonia storage tank'
     
     T603 = units.CSLstorageTank('T603', ins=CSL_fresh, outs=CSL)
     T603.line = 'CSL storage tank'
@@ -854,8 +766,7 @@ def create_TAL_sys(ins, outs):
     
     # All water used in the system, here only consider water usage,
     # if heating needed, then heeating duty required is considered in BT
-    process_water_streams = (water_M201, water_M202, water_M203, water_M205, 
-                             enzyme_water,
+    process_water_streams = (enzyme_water,
                              aerobic_caustic, 
                              CIP.ins[-1], BT.ins[-1], CT.ins[-1])
     
@@ -934,7 +845,8 @@ TAL_tea = TALTEA(system=TAL_sys, IRR=0.10, duration=(2016, 2046),
         # cost of all wastewater treatment units are included in WWT_cost,
         # BT is not included in this TEA
         OSBL_units=(u.U101, u.WWT_cost,
-                    u.T601, u.T602, u.T603, 
+                    # u.T601, u.T602, 
+                    u.T603, 
                     # u.T606, u.T606_P,
                     u.CWP, u.CT, u.PWC, u.CIP, u.ADP, u.FWT, u.BT),
         warehouse=0.04, site_development=0.09, additional_piping=0.045,
@@ -1119,7 +1031,7 @@ TAL_sub_sys = {
 #     'conversion_sys': (H301, M301, M302, R301, R302, T301),
     # 'separation_sys': (S401, M401, M401_P,
     #                     S402, 
-    #                     # F401, F401_H, F401_P,
+    #                     # F401, F401_H, X401,
     #                     D401, D401_H, D401_P, S403,
     #                     M402_P, S403,
     #                     D403, D403_H, D403_P,
