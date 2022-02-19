@@ -27,7 +27,7 @@ from biosteam import MockVariable
     MockVariable('Bagasse oil extraction efficiency', '%', 'biorefinery'),
     MockVariable('Cane operating days', 'day/yr', 'biorefinery'),
     MockVariable('Sorghum operating days', 'day/yr', 'biorefinery'),
-    MockVariable('Capacity', 'ton/yr', 'biorefinery'),
+    MockVariable('Annual crushing capacity', 'ton/yr', 'biorefinery'),
     MockVariable('Price', 'USD/gal', 'Stream-ethanol'),
     MockVariable('Price', 'USD/gal', 'Stream-biodiesel'),
     MockVariable('Price', 'USD/cf', 'Stream-natural gas'),

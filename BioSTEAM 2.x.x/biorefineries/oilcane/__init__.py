@@ -16,7 +16,7 @@ from . import (
     _oil_extraction_specification,
     _distributions,
     _evaluation,
-    _box_plots,
+    _uncertainty_plots,
     _contour_plots,
     _lca_characterization_factors,
     _load_data,
@@ -31,7 +31,7 @@ from ._tea import *
 from ._oil_extraction_specification import *
 from ._distributions import *
 from ._evaluation import *
-from ._box_plots import *
+from ._uncertainty_plots import *
 from ._contour_plots import *
 from ._lca_characterization_factors import *
 from ._load_data import *
@@ -47,7 +47,7 @@ __all__ = (
     *_oil_extraction_specification.__all__,
     *_distributions.__all__,
     *_evaluation.__all__,
-    *_box_plots.__all__,
+    *_uncertainty_plots.__all__,
     *_contour_plots.__all__,
     *_lca_characterization_factors.__all__,
     *_load_data.__all__,
@@ -498,9 +498,9 @@ def load(name, cache={}, reduce_chemicals=True,
     def set_sorghum_operating_days(sorghum_operating_days):
         if agile: sorghum_mode.operating_hours = sorghum_operating_days * 24
 
-    capacity = feedstock.F_mass / kg_per_ton
+    capacity = tea.operating_hours * feedstock.F_mass / kg_per_ton
     @default(capacity, units='ton/yr', kind='coupled')
-    def set_annual_crushing_capacity(capacity):
+    def set_annual_crushing_capacity(annual_crushing_capacity):
         feedstock.F_mass = F_mass = kg_per_ton * capacity / tea.operating_hours
         if agile: oilsorghum.F_mass = F_mass
 
@@ -1013,6 +1013,9 @@ def load(name, cache={}, reduce_chemicals=True,
     # set_natural_gas_price(4.198) # Consistent with Humbird's 2012 paper
     # set_electricity_price(0.0572) # Consistent with Humbird's 2012 paper
     # set_operating_days(200) # Consistent with Huang's 2016 paper
+    
+    for i in sys.units:
+        if isinstance(i, bst.MultiEffectEvaporator): i.flash = False
     
     for i in model._parameters:
         dct[i.setter.__name__] = i

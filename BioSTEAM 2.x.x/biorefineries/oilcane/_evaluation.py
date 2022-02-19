@@ -194,7 +194,7 @@ def run_uncertainty_and_sensitivity(name, N, rule='L',
     else:
         N = min(int(N/10), 50)
         oc.model.evaluate(notify=N,
-                       autosave=N if autosave else N,
+                       autosave=N if autosave else False,
                        autoload=autoload,
                        file=autoload_file_name(name))
         oc.model.table.to_excel(file)

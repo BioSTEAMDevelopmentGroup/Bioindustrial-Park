@@ -36,7 +36,7 @@ __all__ = (
     'plot_benefit_ethanol_and_biodiesel_price_contours_manuscript',
     'plot_extraction_efficiency_and_oil_content_contours',
     'plot_relative_sorghum_oil_content_and_cane_oil_content_contours',
-    'plot_ethanol_and_biodiesel_price_contours'
+    'plot_ethanol_and_biodiesel_price_contours',
 )
 
 filterwarnings('ignore', category=bst.utils.DesignWarning)
@@ -174,7 +174,7 @@ def plot_benefit_ethanol_and_biodiesel_price_contours_manuscript():
     file = os.path.join(images_folder, 'benefit_ethanol_and_biodiesel_price_contours.svg')
     plt.savefig(file, transparent=True)
 
-# %%
+# %% General    
 
 def plot_ethanol_and_biodiesel_price_contours(N=30, benefit=False, cache={}, 
                                               enhanced_cellulosic_performance=False,
