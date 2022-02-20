@@ -267,8 +267,43 @@ def load(name, cache={}, reduce_chemicals=True,
             operating_hours=operating_hours,
         )
         rename_storage_units(1100)
+    elif number == 3:
+        isplit_efficiency_is_reversed = False
+        oilcane_sys = create_oilcane_to_crude_oil_and_ethanol_1g(
+            operating_hours=operating_hours,
+        )
+        area_names = [
+            'Feedstock handling', 
+            'Juicing', 
+            'EtOH prod.', 
+            'Oil ext.', 
+            'CH&P',
+            'Utilities',
+            'HXN',
+            'Storage',
+        ]
+        rename_storage_units(800)
+    elif number == 4:
+        isplit_efficiency_is_reversed = True
+        area_names = [
+            'Feedstock handling', 
+            'Juicing', 
+            'Pretreatment',
+            'EtOH prod.',
+            'Wastewater treatment',
+            'Oil ext.',
+            'CH&P', 
+            'Utilities',
+            'HXN',
+            'Storage',
+        ]
+        oilcane_sys = create_oilcane_to_crude_oil_and_ethanol_combined_1_and_2g_post_fermentation_oil_separation(
+            operating_hours=operating_hours,
+        )
+        rename_storage_units(1000)
     else:
         raise NotImplementedError(number)
+    
     oilcane_sys.set_tolerance(rmol=1e-5, mol=1e-3, subsystems=True)
     dct.update(flowsheet.to_dict())
     
@@ -306,7 +341,7 @@ def load(name, cache={}, reduce_chemicals=True,
     unit_groups[-1].metrics[-1].getter = lambda: 0.    
     
     
-    if abs(number) == 2:
+    if abs(number) in (2, 4):
         prs, = flowsheet(cs.units.PretreatmentReactorSystem)
         saccharification, = flowsheet(cs.units.Saccharification)
         seed_train, = flowsheet(cs.units.SeedTrain)
@@ -325,7 +360,7 @@ def load(name, cache={}, reduce_chemicals=True,
         prs.reactions.X[10] = 0.0 # baseline
             
     def set_glucose_yield(glucose_yield):
-        if abs(number) == 2:
+        if abs(number) in (2, 4):
             glucose_yield *= 0.01
             X1 = prs.reactions.X[0]
             X1_side = prs.reactions.X[1:3].sum()
@@ -335,7 +370,7 @@ def load(name, cache={}, reduce_chemicals=True,
             if X_excess > 0: breakpoint()
             
     def set_xylose_yield(xylose_yield):
-        if abs(number) == 2:
+        if abs(number) in (2, 4):
             xylose_yield *= 0.01
             X1_side = prs.reactions.X[9:11].sum()
             prs.reactions.X[8] = X1 = xylose_yield
@@ -397,6 +432,9 @@ def load(name, cache={}, reduce_chemicals=True,
         isplit_b = None
         oil_extraction_specification = MockExtractionSpecification()
     else:
+        if number > 2:
+            dct['biodiesel'] = bst.Stream('biodiesel')
+        
         for i in oilcane_sys.cost_units:
             if getattr(i, 'tag', None) == 'oil extraction efficiency':
                 isplit_a = i.isplit
@@ -414,11 +452,11 @@ def load(name, cache={}, reduce_chemicals=True,
     ## LCA
     
     # Set non-negligible characterization factors
-    if abs(number) != 2:
+    if abs(number) not in (2, 4):
         for i in ('FGD_lime', 'cellulase', 'DAP', 'CSL', 'caustic'): MockStream(i)
-    if number < 0:
+    if number < 0 or number > 2:
         for i in ('catalyst', 'methanol', 'HCl', 'NaOH', 'crude_glycerol', 'pure_glycerine'): MockStream(i)
-    if abs(number) != 1:
+    if abs(number) not in (1, 3):
         MockStream('dryer_natural_gas')
         
     set_GWPCF(feedstock, 'sugarcane')
@@ -441,7 +479,7 @@ def load(name, cache={}, reduce_chemicals=True,
     set_GWPCF(s.biodiesel, 'biodiesel displacement')
     bst.PowerUtility.set_CF(GWP, GWP_characterization_factors['Electricity'])
     dct['natural_gas_streams'] = natural_gas_streams = [s.natural_gas]
-    if abs(number) == 1: natural_gas_streams.append(s.dryer_natural_gas)
+    if abs(number) in (1, 3): natural_gas_streams.append(s.dryer_natural_gas)
     for stream in natural_gas_streams:
         set_GWPCF(stream, 'CH4')
     
@@ -475,9 +513,9 @@ def load(name, cache={}, reduce_chemicals=True,
     def oil_extraction_efficiency_hook(x):
         if number < 0:
             return x
-        elif number == 1:
+        elif number in (1, 3):
             return 50.0 + x
-        elif number == 2:
+        elif number in (2, 4):
             return 70.0 + x
     
     @uniform(0., 20, units='%', kind='coupled', 
@@ -544,15 +582,15 @@ def load(name, cache={}, reduce_chemicals=True,
     
     @default(72, units='hr', element='Saccharification')
     def set_saccharification_reaction_time(reaction_time):
-        if abs(number) == 2: saccharification.tau = reaction_time
+        if abs(number) in (2, 4): saccharification.tau = reaction_time
     
     @default(0.212, units='USD/kg', element='cellulase')
     def set_cellulase_price(price):
-        if abs(number) == 2: s.cellulase.price = price
+        if abs(number) in (2, 4): s.cellulase.price = price
     
     @default(0.02, units='wt. % cellulose', element='cellulase')
     def set_cellulase_loading(cellulase_loading):
-        if abs(number) == 2: u.M302.cellulase_loading = cellulase_loading
+        if abs(number) in (2, 4): u.M302.cellulase_loading = cellulase_loading
     
     @default(PRS_cost_item.cost, units='million USD', element='Pretreatment reactor system')
     def set_reactor_base_cost(base_cost):
@@ -563,7 +601,7 @@ def load(name, cache={}, reduce_chemicals=True,
     def set_cane_glucose_yield(cane_glucose_yield):
         if agile:
             cane_mode.glucose_yield = cane_glucose_yield
-        elif abs(number) == 2:
+        elif abs(number) in (2, 4):
             set_glucose_yield(cane_glucose_yield)
     
     @uniform(79, 97.5, units='%', element='Pretreatment and saccharification',
@@ -577,7 +615,7 @@ def load(name, cache={}, reduce_chemicals=True,
     def set_cane_xylose_yield(cane_xylose_yield):
         if agile:
             cane_mode.xylose_yield = cane_xylose_yield
-        elif abs(number) == 2:
+        elif abs(number) in (2, 4):
             set_xylose_yield(cane_xylose_yield)
     
     @uniform(86, 97.5, units='%', element='Pretreatment and saccharification',
@@ -589,7 +627,7 @@ def load(name, cache={}, reduce_chemicals=True,
     @uniform(90, 95, units='%', element='Cofermenation',
              baseline=90)
     def set_glucose_to_ethanol_yield(glucose_to_ethanol_yield):
-        if abs(number) == 2:
+        if abs(number) in (2, 4):
             glucose_to_ethanol_yield *= 0.01
             # fermentor.cofermentation[2].X = 0.004 # Baseline
             # fermentor.cofermentation[3].X = 0.006 # Baseline
@@ -607,7 +645,7 @@ def load(name, cache={}, reduce_chemicals=True,
     @uniform(50, 95, units='%', element='Cofermenation',
              baseline=50)
     def set_xylose_to_ethanol_yield(xylose_to_ethanol_yield):
-        if abs(number) == 2:
+        if abs(number) in (2, 4):
             # fermentor.cofermentation[6].X = 0.004 # Baseline
             # fermentor.cofermentation[7].X = 0.046 # Baseline
             # fermentor.cofermentation[8].X = 0.009 # Baseline
@@ -625,12 +663,12 @@ def load(name, cache={}, reduce_chemicals=True,
     @uniform(68.5, 137, units='g/L', element='Cofermentation',
              baseline=68.5)
     def set_cofermentation_titer(titer):
-        if abs(number) == 2: fermentor.titer = titer
+        if abs(number) in (2, 4): fermentor.titer = titer
 
     @uniform(0.951, 1.902, units='g/L', element='Cofermentation',
              baseline=0.951)
     def set_cofermentation_productivity(productivity):
-        if abs(number) == 2: fermentor.productivity = productivity
+        if abs(number) in (2, 4): fermentor.productivity = productivity
 
     @default(10, element='oilcane', units='% oil', kind='coupled')
     def set_cane_PL_content(cane_PL_content):
@@ -665,9 +703,9 @@ def load(name, cache={}, reduce_chemicals=True,
 
     @default(23, units='% oil', kind='coupled', name='TAG to FFA conversion')
     def set_TAG_to_FFA_conversion(TAG_to_FFA_conversion):
-        if number == 1:
+        if number in (1, 3):
             u.R301.oil_reaction.X[0] = TAG_to_FFA_conversion / 100.
-        elif number == 2:
+        elif number in (2, 4):
             u.R401.oil_reaction.X[0] = TAG_to_FFA_conversion / 100.
     
     @default_gwp(feedstock.characterization_factors[GWP], name='GWP', 
@@ -829,7 +867,7 @@ def load(name, cache={}, reduce_chemicals=True,
     
     @metric(name='Electricity GWP', element='Economic allocation', units='kg*CO2*eq / MWhr')
     def GWP_electricity(): # Cradle to gate
-        if abs(number) == 1:
+        if abs(number) in (1, 3):
             return GWP_economic.get() * mean_electricity_price * 1000.
         else:
             return 0.
@@ -954,7 +992,7 @@ def load(name, cache={}, reduce_chemicals=True,
     
     @metric(name='Electricity GWP derivative', element='Electricity', units='kg*CO2*eq / MWhr')
     def GWP_electricity_derivative(): # Cradle to gate
-        if abs(number) == 1:
+        if abs(number) in (1, 3):
             return GWP_economic_derivative.get() * mean_electricity_price * 1000.
         else:
             return 0.
@@ -973,7 +1011,7 @@ def load(name, cache={}, reduce_chemicals=True,
         p.setter(x)
         p.baseline = x
     
-    if abs(number) == 2:
+    if abs(number) in (2, 4):
         if enhanced_cellulosic_performance:
             set_baseline(set_sorghum_glucose_yield, 97.5)
             set_baseline(set_sorghum_xylose_yield, 97.5)
@@ -990,7 +1028,7 @@ def load(name, cache={}, reduce_chemicals=True,
             set_baseline(set_cane_xylose_yield, 97.5)
             set_baseline(set_glucose_to_ethanol_yield, 90)
             set_baseline(set_xylose_to_ethanol_yield, 42)
-    if number == 1 and enhanced_biodiesel_production:
+    if number in (1, 3) and enhanced_biodiesel_production:
         set_baseline(set_cane_oil_content, 15)
         set_baseline(set_bagasse_oil_extraction_efficiency, oil_extraction_efficiency_hook(20))
         set_baseline(set_bagasse_oil_retention, 40)

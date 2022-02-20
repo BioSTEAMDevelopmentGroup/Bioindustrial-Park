@@ -63,7 +63,8 @@ __all__ = (
     'plot_configuration_breakdown',
     'plot_TCI_areas_across_oil_content',
     'plot_heatmap_comparison',
-    'plot_agile_comparison_kde',
+    'plot_configuration_comparison_kde_diff',
+    'plot_configuration_comparison_kde',
     'monte_carlo_results',
     'montecarlo_results_feedstock_comparison',
     'montecarlo_results_configuration_comparison',
@@ -601,7 +602,7 @@ def plot_heatmap_comparison(comparison_names=None, xlabels=None):
 
 # %% KDE
 
-def plot_agile_comparison_kde():
+def plot_configuration_comparison_kde_diff():
     metrics = [MFPP, TCI, GWP_ethanol, biodiesel_production]
     df_conventional = oc.get_monte_carlo('O1 - S1', metrics)
     df_cellulosic = oc.get_monte_carlo('O2 - S2', metrics)
@@ -623,6 +624,30 @@ def plot_agile_comparison_kde():
         [-2, -1.5, -1, -0.5, 0, 0.5,  1.0],
     ]
     bst.plots.plot_kde_2d(ys=ys, xs=xs, xticks=xticks, yticks=yticks)
+
+def plot_configuration_comparison_kde():
+    metrics = [MFPP, TCI, GWP_ethanol, biodiesel_production]
+    df_conventional_oc = oc.get_monte_carlo('O1', metrics)
+    df_cellulosic_oc = oc.get_monte_carlo('O2', metrics)
+    df_conventional_sc = oc.get_monte_carlo('S1', metrics)
+    df_cellulosic_sc = oc.get_monte_carlo('S2', metrics)
+    MFPPi = MFPP.index
+    TCIi = TCI.index
+    ys = np.zeros([1, 2], dtype=object)
+    xs = np.zeros([1, 2], dtype=object)
+    
+    ys[0, 0] = (df_conventional_oc[MFPPi], df_cellulosic_oc[MFPPi])
+    ys[0, 1] = (df_conventional_sc[MFPPi], df_cellulosic_sc[MFPPi])
+    xs[0, 0] = (df_conventional_oc[TCIi], df_cellulosic_oc[TCIi])
+    xs[0, 1] = (df_conventional_sc[TCIi], df_cellulosic_sc[TCIi])
+    
+    yticks = [[-30, -15, 0, 15, 30, 45, 60, 75]]
+    xticks = 2*[[200, 300, 400, 500, 600]]
+    bst.plots.plot_kde_2d(
+        ys=ys, xs=xs, xticks=xticks, yticks=yticks,
+        xbox_kwargs=[dict(position=1), dict(position=1)],
+        ybox_kwargs=[dict(position=0), dict(position=0)],
+    )
 
 #%%  General Monte Carlo box plots
 
