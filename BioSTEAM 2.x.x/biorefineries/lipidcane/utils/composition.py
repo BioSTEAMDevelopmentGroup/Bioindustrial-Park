@@ -40,9 +40,9 @@ def set_lipid_fraction(lipid_fraction, stream=None,
     fiber.imol[fiber_IDs] = stream.imol[fiber_IDs]
     
     # Mass property arrays
-    carbs_mass = stream.imass[carbs_IDs].value
-    fiber_mass = stream.imass[fiber_IDs].value
-    lipid_mass = lipid.imass[lipid_IDs].value
+    carbs_mass = stream.imass[carbs_IDs]
+    fiber_mass = stream.imass[fiber_IDs]
+    lipid_mass = lipid.imass[lipid_IDs]
     
     
     # Net weight
