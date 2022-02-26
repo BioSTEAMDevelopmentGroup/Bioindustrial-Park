@@ -99,7 +99,6 @@ biorefineries/oilcane/README.md
 biorefineries/oilcane/S1_breakdown.xlsx
 biorefineries/oilcane/__init__.py
 biorefineries/oilcane/_across_time_plots.py
-biorefineries/oilcane/_box_plots.py
 biorefineries/oilcane/_chemicals.py
 biorefineries/oilcane/_contour_plots.py
 biorefineries/oilcane/_delete_later.py
@@ -113,6 +112,7 @@ biorefineries/oilcane/_process_settings.py
 biorefineries/oilcane/_system.py
 biorefineries/oilcane/_tables.py
 biorefineries/oilcane/_tea.py
+biorefineries/oilcane/_uncertainty_plots.py
 biorefineries/oilcane/_variable_mockups.py
 biorefineries/oilcane/distributions.xlsx
 biorefineries/oilcane/lca_benchmarks.py
