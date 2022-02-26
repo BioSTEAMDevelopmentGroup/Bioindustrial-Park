@@ -753,7 +753,7 @@ def create_TAL_sys(ins, outs):
         ref_unit = S403
         reqd_solvent_frac = 1.
         M404.reqd_solvent_mass = reqd_solvent_mass = reqd_solvent_frac * ref_unit.outs[1].F_mass
-        mixer.ins[0].imass[solvent] = reqd_solvent_mass - mixer.ins[1].imass[solvent]
+        mixer.ins[0].imass[solvent] = max(0., reqd_solvent_mass - mixer.ins[1].imass[solvent])
         mixer._run()
     M404.specification = adjust_M404_solvent
     
@@ -781,80 +781,21 @@ def create_TAL_sys(ins, outs):
     )
     S405.isplit['PolarComponents'] = 0.1
     
-    R401 = units.HydrogenationReactor('R401', ins = (S405-0, '', Hydrogen), outs = 'HMTHP',
-                                      vessel_material='Stainless steel 316',)
+    H401 = bst.units.HXutility('H401', ins=S405-0, T=273.15+5.)
     
+    S406 = bst.units.FakeSplitter('S406', ins=H401-0)
     
-    R402 = units.DehydrationRingOpeningReactor('R402', ins = (R401-0, ''), outs = 'SA',
-                                               vessel_material='Stainless steel 316',
-                                               tau = 12)
-    
-    R403 = units.HydrolysisReactor('R403', ins = (R402-0, '', KOH), outs = 'KSA',
-                                               vessel_material='Stainless steel 316')
-    
-    splits_S406 = np.zeros(len(TAL_chemicals))
-    
-    splits_S406[TAL_chemicals.index('KSA')] = 0.98
-    splits_S406[TAL_chemicals.index('Water')] = 0.2
-    
-    S406 = bst.units.SolidsCentrifuge('S406', ins=R403-0, outs=('K_sorbate', ''),
-                                # moisture_content=0.50,
-                                split=splits_S406,
-                                solids = ['KSA'])
-    # !!! splits for moisture content (negligible in feed), hexanol content 
     def S406_spec():
-        try:
-            S406._run()
-        except:
-            moisture_content = S406.moisture_content
-            # S406.ins[0].imol['Water'] = 0.
-            S406.moisture_content/= 5.
-            S406._run()
-            S406.moisture_content = moisture_content
+        S406.outs[0].imol['TAL'] = S406.ins[0].imol['TAL']
+        S406.outs[1].copy_like(S406.ins[0])
+        S406.outs[1].imol['TAL'] = 0.
     
     S406.specification = S406_spec
     
-    M406 = bst.units.Mixer('M406', ins=(S406-1, r_S404_s-0), outs='mixed_recovered_hexanol')
-    
-    S406_splitter = bst.units.FakeSplitter('S406_splitter', ins=M406-0, outs=('to_solid_fraction_extraction',
-                                                                          'to_liquid_fraction_extraction'), 
-                                       )
+    S407 = bst.units.Splitter('S407', ins=S406-1, split=0.99)
     
     
-    S406_splitter-0-1-M404_s
-    S406_splitter-1-1-M404
-    
-    def S406_splitter_specification():
-        M404.run()
-        M404_s.run()
-        S406_splitter_ins_0 = S406_splitter.ins[0]
-        # recycled_hexanol_massfrac = S406_splitter_ins_0.imass['Hexanol']/S406_splitter_ins_0.F_mass
-        hexanol_req_ratio = M404_s.reqd_solvent_mass / (M404_s.reqd_solvent_mass + M404.reqd_solvent_mass)
-        S406_splitter.outs[0].mol[:] = hexanol_req_ratio*S406_splitter_ins_0.mol[:]
-        S406_splitter.outs[1].mol[:] = S406_splitter_ins_0.mol[:] - S406_splitter.outs[0].mol[:]
-        M404.run()
-        M404_s.run()
-        
-    S406_splitter.specification = S406_splitter_specification
-    
-    
-    S407 = units.Crystallization('S407', ins = (S406-0, HCl, '', ''), outs = ('wet_SorbicAcid_crystals', 'KCl'))
-    
-    def S407_spec():
-        S407._run()
-        S408.run()
-    S407.specification = S407_spec
-    
-    R404 = units.HClKOHRecovery('R404', ins = (S407-1, 'water'),
-                                outs = ('HCl_recycle', 'KOH_recycle'))
-    
-    
-    R404-0-2-S407
-    R404-1-1-R403
-    
-    S408 = units.Decantation('S408', ins=S407-0,
-                             outs=('dissolved_SorbicAcid_to_evaporative_crystallization', 'SorbicAcid_crystals'),
-                             forced_recovery=None,)
+    S407-0-1-M404
     # S408-0-3-S407
     
     # S408 = bst.units.Flash('S408', ins = S407-0, outs = ('water', 'SorbicAcid_crystals'),
@@ -902,7 +843,9 @@ def create_TAL_sys(ins, outs):
     
     # Mix waste liquids for treatment
     M501 = bst.units.Mixer('M501', ins=(F301-1, r_S402-1, r_S403-1, S404-0,
-                                        r_S402_s-1, r_S403_s-1, r_S404_s-1))
+                                        r_S402_s-1, r_S403_s-1, r_S404_s-1,
+                                        S407-1
+                                        ))
     
     # This represents the total cost of wastewater treatment system
     WWT_cost = units.WastewaterSystemCost('WWT_cost', ins=M501-0)
@@ -1063,9 +1006,9 @@ def create_TAL_sys(ins, outs):
     # DPHP storage
     #!!! Yalin suggests to use BioSTEAM's storage tank, and maybe we don't need the ConveryingBelt
     # (Yalin removed that from lactic acid biorefinery)
-    T604 = units.DPHPStorageTank('T604', ins=hexanol_fresh)
-    T604.line = 'Hexanol storage tank'
-    T604_P = bst.units.ConveyingBelt('T604_P', ins=T604-0, outs = Hexanol)
+    T604 = units.DPHPStorageTank('T604', ins=hexanol_fresh, outs=Hexanol)
+    # T604.line = 'Hexanol storage tank'
+    # T604_P = bst.units.ConveyingBelt('T604_P', ins=T604-0, outs = Hexanol)
     
     # 7-day storage time, similar to ethanol's in Humbird et al.
     T605 = units.DPHPStorageTank('T605', ins=heptane_fresh)
@@ -1110,7 +1053,7 @@ def create_TAL_sys(ins, outs):
     # T605_P-0-2-M401
     
     # 7-day storage time, similar to ethanol's in Humbird et al.
-    T620 = units.TALStorageTank('T620', ins=S408-1, tau=7*24, V_wf=0.9,
+    T620 = units.TALStorageTank('T620', ins=S406-0, tau=7*24, V_wf=0.9,
                                           vessel_type='Floating roof',
                                           vessel_material='Stainless steel')
     
@@ -1310,7 +1253,7 @@ def get_SA_MPSP():
         TAL_sys.simulate()
     for i in range(3):
         SA.price = TAL_tea.solve_price(SA)
-    return SA.price
+    return SA.price*SA.F_mass/SA.imass['TAL']
 
 def get_titer():
     return R302.outs[0].imass['TAL']/R302.outs[0].F_vol

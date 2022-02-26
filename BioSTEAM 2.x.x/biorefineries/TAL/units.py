@@ -1720,8 +1720,8 @@ class Adsorption(PressureVessel):
         Analysis, and Evaluation (pp. 470, 481). New York: Wiley.
         
     '''
-    _N_in = 1
-    _N_out = 1
+    _N_ins = 2
+    _N_outs = 3
     
     #!!! Should choose silica gel
     # 574, 613
@@ -1741,18 +1741,20 @@ class Adsorption(PressureVessel):
                  wall_thickness_factor=1,
                  vessel_material='Stainless steel 316',
                  vessel_type='Vertical'):
-
+        self.ins = ins
+        self.outs = outs
         self.adsorbent = adsorbent
 
         self.tau = tau
         self.P = P
         self.V_wf = V_wf
         self.length_to_diameter = length_to_diameter
+        self.F_M = {}
         self.vessel_material = vessel_material
         self.vessel_type = vessel_type
-
     
     def _cost(self):
+        super()._cost()
         Cost = self.purchase_costs
         Design = self.design_results()
         

@@ -2,13 +2,14 @@
 """
 Created on Sun Jan 30 15:44:35 2022
 
-@author: saran
+@author: sarangbhagwat
 """
 
-from biorefineries.TAL.system_TAL_glucose import *
+from biorefineries.TAL.system_split_TAL_glucose import *
 from matplotlib import pyplot as plt
 from pandas import DataFrame
-
+from warnings import filterwarnings
+filterwarnings('ignore')
 
 def get_MPSP_for_feedstock_flow(flow_rate):
     feedstock.F_mass = flow_rate
@@ -16,7 +17,7 @@ def get_MPSP_for_feedstock_flow(flow_rate):
         return get_SA_MPSP(), get_feedstock_dry_mass(), SA.F_mass, R302.ins[1].imass['Glucose', 'Xylose'].sum()
     except:
         print('Error at feedstock flow rate of %s kg/h; returning 0.'%str(flow_rate))
-        return 0., 0., 0.
+        return 0., 0., 0., 0.
     
 def get_feedstock_dry_mass():
     return feedstock.F_mass - feedstock.imass['Water']
@@ -34,7 +35,7 @@ metrics_data_dict = {'TAL MPSP': [i[0] for i in metrics_data],
 
 metrics_data_df = DataFrame(metrics_data_dict, feedstock_flow_rates*24./1000.)
 
-metrics_data_df.to_excel('TAL_MPSP_vs_capacity.xlsx')
+metrics_data_df.to_excel('system_split_TAL_MPSP_vs_capacity.xlsx')
 #%% Plot MPSP vs Feedstock dry mass
 x = 'Feedstock dry mass'
 y = 'TAL MPSP'
