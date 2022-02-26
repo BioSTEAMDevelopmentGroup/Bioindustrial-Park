@@ -38,6 +38,10 @@ _Gcal_2_kJ = 4.184 * 1e6 # (also MMkcal/hr)
 Rxn = tmo.reaction.Reaction
 ParallelRxn = tmo.reaction.ParallelReaction
 
+compute_TAL_titer = lambda effluent: effluent.imass['TAL'] / effluent.F_vol
+
+compute_TAL_mass = lambda effluent: effluent.imass['TAL']
+
 
 # %% 
 
@@ -621,12 +625,15 @@ class CoFermentation(Unit):
         effluent.imol['CO2'] = 0
         effluent.imass['CSL'] = 0
         
+        self.effluent_titer = compute_TAL_titer(effluent)
+        
     def _design(self):
         Design = self.design_results
         total_mass_flow = sum([instream.F_mass for instream in self.ins])
         Design['Fermenter size'] = self.outs[0].F_mass * self.tau_cofermentation
         Design['Recirculation flow rate'] = total_mass_flow
         
+    
         
 # Seed train, 5 stages, 2 trains
 @cost(basis='Seed fermenter size', ID='Stage #1 fermenters', units='kg',
@@ -662,30 +669,72 @@ class SeedTrain(Unit):
         self.T = T
         self.ferm_ratio = ferm_ratio
 
-        # FermMicrobe reaction from Table 14 on Page 31 of Humbird et al.
         self.cofermentation_rxns = ParallelRxn([
         #      Reaction definition            Reactant    Conversion
-        Rxn('Glucose -> 1.42856 TAL',        'Glucose',   .5*ferm_ratio), 
-        Rxn('Glucose -> VitaminA',               'Glucose',   0.1*ferm_ratio), # retinol
-        Rxn('Glucose -> VitaminD2',               'Glucose',   0.1*ferm_ratio), # ergosterol
-        Rxn('Glucose -> 6 FermMicrobe',       'Glucose',   0.1*ferm_ratio),
+        Rxn('Glucose -> 1.42856 TAL',        'Glucose',   .25), 
+        Rxn('Glucose -> VitaminA',               'Glucose',   0.005), # retinol
+        Rxn('Glucose -> VitaminD2',               'Glucose',   0.005), # ergosterol
+        Rxn('Glucose -> 6 FermMicrobe',       'Glucose',   0.05),
         
-        Rxn('Xylose -> 1.42856 TAL',       'Xylose',    0.5*ferm_ratio),
-        Rxn('Xylose -> VitaminA',       'Xylose',    0.1*ferm_ratio),
-        Rxn('Xylose -> VitaminD2',       'Xylose',    0.1*ferm_ratio),
-        Rxn('Xylose -> 5 FermMicrobe',        'Xylose',    0.1*ferm_ratio),
+        Rxn('Xylose -> 1.42856 TAL',       'Xylose',    0.25),
+        Rxn('Xylose -> VitaminA',       'Xylose',    0.005),
+        Rxn('Xylose -> VitaminD2',       'Xylose',    0.005),
+        Rxn('Xylose -> 5 FermMicrobe',        'Xylose',    0.05),
         ])
-
+        self.cofermentation_rxns.X *= ferm_ratio
+        
+        # self.cofermentation_rxns = ParallelRxn([
+        # #      Reaction definition            Reactant    Conversion
+        # Rxn('Glucose -> TAL',        'Glucose',   .99), 
+        # Rxn('Glucose -> VitaminA',               'Glucose',   0.001), # retinol
+        # Rxn('Glucose -> VitaminD2',               'Glucose',   0.001), # ergosterol
+        # Rxn('Glucose -> 6 FermMicrobe',       'Glucose',   0.00025),
+        
+        # Rxn('Xylose -> TAL',       'Xylose',    0.99*0.8),
+        # Rxn('Xylose -> VitaminA',       'Xylose',    0.001*0.8),
+        # Rxn('Xylose -> VitaminD2',       'Xylose',    0.001*0.8),
+        # Rxn('Xylose -> 5 FermMicrobe',        'Xylose',    0.00025*0.8),
+        # ])
+        
+        self.CO2_generation_rxns = ParallelRxn([
+            Rxn('Glucose -> 6CO2 + 6H2O', 'Glucose', 1.),
+            Rxn('Xylose -> 5CO2 + 5H2O', 'Xylose', 1.)])
+        
+        self.glucose_to_TAL_rxn = self.cofermentation_rxns[0]
+        self.xylose_to_TAL_rxn = self.cofermentation_rxns[4]
+        
+        self.glucose_to_VitaminA_rxn = self.cofermentation_rxns[1]
+        self.xylose_to_VitaminA_rxn = self.cofermentation_rxns[5]
+        
+        self.glucose_to_VitaminD2_rxn = self.cofermentation_rxns[2]
+        self.xylose_to_VitaminD2_rxn = self.cofermentation_rxns[6]
+        
+        self.glucose_to_microbe_rxn = self.cofermentation_rxns[3]
+        self.xylose_to_microbe_rxn = self.cofermentation_rxns[7]
+        
+        self.glucose_to_CO2_rxn = self.CO2_generation_rxns[0]
+        self.xylose_to_CO2_rxn = self.CO2_generation_rxns[1]
+        
     def _run(self):
         feed = self.ins[0]
-        effluent = self.outs[0]
+        effluent, CO2 = self.outs
         effluent.copy_like(feed)
-
+        CO2.phase = 'g'
+        
+        if 'Sucrose' in effluent.available_chemicals:
+            self.sucrose_hydrolysis_rxn.force_reaction(effluent)
+            if effluent.imol['Water'] < 0.: effluent.imol['Water'] = 0.
+        
         self.cofermentation_rxns(effluent.mol)
+        self.CO2_generation_rxns(effluent.mol)
+        
         # Assume all CSL is used up
         effluent.imass['CSL'] = 0 
         
-        effluent.T = self.T
+        effluent.T = CO2.T = self.T
+        CO2.imass['CO2'] = effluent.imass['CO2']
+        effluent.imass['CO2'] = 0
+
 
     def _design(self):
         Design = self.design_results
