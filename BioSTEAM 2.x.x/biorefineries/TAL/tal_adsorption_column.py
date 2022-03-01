@@ -5,7 +5,20 @@ Created on Mon Feb 28 11:34:18 2022
 @author: yrc2
 """
 import biosteam as bst
-    
+from scipy.interpolate import interp2d
+
+# Based on experimental data from Singh group
+ts = [0.166666667,	0.5,	1,	2]
+Ts = [303.15, 323.15]
+recoveries = [[0.791785714,	0.947,	0.960821429,	0.975035714],
+[0.92402381,	0.956595238,	0.96297619,	0.9785]]
+capacities = [[0.0739,	0.088386667,	0.089676667,	0.091003333],
+[0.086242222,	0.089282222,	0.089877778,	0.091326667]]
+
+# Interpolate
+rec_interp = interp2d(ts, Ts, recoveries)
+cap_interp = interp2d(ts, Ts, capacities)
+
 if __name__ == '__main__':
     TAL = bst.Chemical('TAL', search_ID='Triacetic acid lactone')
     Furfural = bst.Chemical('Furfural')
@@ -33,7 +46,17 @@ if __name__ == '__main__':
         split=dict(TAL=1-0.98, Water=1),
         K = 0.125,
     )
-
+    
+    def AC1_spec(): # update recovery and capacity based on user-input adsorption time and temperature
+        T = AC1.ins[0].T    
+        t = AC1.cycle_time # this needs to be exclusively time for adsorption
+        # recovery = rec_interp(t, T)
+        capacity = cap_interp(t, T)
+        # AC1.recovery = recovery
+        AC1.adsorbent_capacity = capacity
+        
+    AC1.specification = AC1_spec
+    
     AC1.simulate()
     print(AC1.adsorbent)
     AC1.show()
