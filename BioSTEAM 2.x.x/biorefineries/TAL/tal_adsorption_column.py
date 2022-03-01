@@ -48,9 +48,13 @@ if __name__ == '__main__':
     )
     
     def AC1_spec(): # update recovery and capacity based on user-input adsorption time and temperature
-        rec_interp 
-        cap_interp
-        pass
+        T = AC1.ins[0].T    
+        t = AC1.cycle_time # this needs to be exclusively time for adsorption
+        # recovery = rec_interp(t, T)
+        capacity = cap_interp(t, T)
+        # AC1.recovery = recovery
+        AC1.adsorbent_capacity = capacity
+        
     AC1.specification = AC1_spec
     
     AC1.simulate()
