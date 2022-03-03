@@ -74,6 +74,10 @@ def format_name(name):
 
 def format_configuration(configuration):
     number, agile = configuration
+    if number == -4:
+        name = 'S4'
+    elif number == -3:
+        name = 'S3'
     if number == -2:
         name = 'S2'
     elif number == -1:
@@ -84,6 +88,10 @@ def format_configuration(configuration):
         name = 'O1'
     elif number == 2:
         name = 'O2'
+    elif number == 3:
+        name = 'O3'
+    elif number == 4:
+        name = 'O4'
     else:
         raise ValueError(f'invalid configuration {configuration}')
     name = r'$\mathtt{' + name + '}$'

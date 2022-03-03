@@ -38,4 +38,5 @@ price = {'Lipid cane': 0.03455, # 70% m.c
          'Biodiesel': 1.38, # assuming density = 870 kg/m3
          'Ethanol': 0.789,
          'Waste': -0.33,
-         'Gasoline': 0.756} # 2 USD/gal
+         'Gasoline': 0.756,
+         'Crude oil': 0.6173} # 28 cts / lb (vegetable)

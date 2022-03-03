@@ -979,7 +979,7 @@ def get_SA_MPSP():
         TAL_sys.simulate()
     for i in range(3):
         SA.price = TAL_tea.solve_price(SA)
-    return SA.price
+    return SA.price*SA.F_mass/SA.imass['TAL']
 
 def get_titer():
     return R302.outs[0].imass['TAL']/R302.outs[0].F_vol

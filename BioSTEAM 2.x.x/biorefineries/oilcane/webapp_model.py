@@ -4,7 +4,10 @@ Created on Tue Dec  7 06:20:39 2021
 
 @author: yrc2
 """
+import biosteam as bst
 from biorefineries import oilcane as oc
+
+bst.Metric.caching = False
 oc.load('O1')
 model = oc.model
 names = (
@@ -73,14 +76,14 @@ names = (
     (3, None),
     (4, None),
     (5, None),
-    (8, 'Ethanol GWP, economic allocation'),
-    (9, 'Biodiesel GWP, economic allocation'),
-    (10, 'Crude glycerol GWP, economic allocation'),
-    (11, 'Electricity GWP, economic allocation'),
-    (12, 'Ethanol GWP, displacement allocation'),
-    (14, 'Ethanol GWP, energy allocation'),
-    (15, 'Biodiesel GWP, energy allocation'),
-    (16, 'Crude glycerol GWP, energy allocation'),
+    (9, 'Ethanol GWP, economic allocation'),
+    (10, 'Biodiesel GWP, economic allocation'),
+    (11, 'Crude glycerol GWP, economic allocation'),
+    (12, 'Electricity GWP, economic allocation'),
+    (13, 'Ethanol GWP, displacement allocation'),
+    (15, 'Ethanol GWP, energy allocation'),
+    (16, 'Biodiesel GWP, energy allocation'),
+    (17, 'Crude glycerol GWP, energy allocation'),
 )
 
 def rename(metric, name):
