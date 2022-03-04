@@ -192,11 +192,17 @@ def run_uncertainty_and_sensitivity(name, N, rule='L',
                 xlfile=file,
             )
     else:
-        N = min(int(N/10), 50)
-        oc.model.evaluate(notify=N,
-                       autosave=N if autosave else False,
-                       autoload=autoload,
-                       file=autoload_file_name(name))
+        N = min(int(N/10), 20)
+        for i in range(5):
+            try:
+                oc.model.evaluate(notify=N,
+                               autosave=N if autosave else False,
+                               autoload=autoload,
+                               file=autoload_file_name(name))
+            except:
+                pass
+            else:
+                break
         oc.model.table.to_excel(file)
         rho, p = oc.model.spearman_r()
         file = spearman_file(name)

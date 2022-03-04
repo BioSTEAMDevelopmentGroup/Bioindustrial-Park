@@ -671,13 +671,22 @@ def plot_configuration_comparison_kde():
         bottom_right='Conventional wins',
     )
 
+def plot_configuration_comparison_kde():
+    plot_kde(
+        'O3 - O1',
+        yticks=[-30, -20, -10, 0, 10],
+        xticks=[-0.8, -.4, 0, 0.4, 0.8, 1.2, 1.6],
+        top_left='Crude oil wins',
+        bottom_right='Biodiesel wins',
+    )
+
 def plot_agile_comparison_kde():
     plot_kde(
         'O1* - O1',
         metrics=[TCI, MFPP],
         yticks=[-60, -30, 0, 30, 60],
         xticks=[-150, -100, -50, 0, 50, 100, 150],
-        top_left='Agile sorghum/cane wins',
+        top_left='Sorghum\nintegration\nwins',
         bottom_right='Cane-only wins',
         ybox_kwargs=dict(light=CABBI_colors.green_dirty.RGBn, 
                          dark=CABBI_colors.green_dirty.shade(60).RGBn),
