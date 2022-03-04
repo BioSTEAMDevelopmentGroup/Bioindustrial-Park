@@ -989,8 +989,11 @@ class Reactor(Unit, PressureVessel, isabstract=True):
 # 4. Look into n - mothi's thesis uses n=1, I canot find where I had previously found a value of 0.84
 # 5. Look into BM (bare module factor) - Sieder et al 2016 Table 16.11 use 4.16 for  a vertical pressure vessel
 # I also had in my notes to check the decanter usable % and I believe that is 90% but it already accounted for in the height sizing of adding an additional 10% to the height.
-@cost(basis='Flow rate', ID='Decanter', units='m3/s',
-      cost=190000, S=0.0012, CE=CEPCI[2008], n=1, BM=2.3)
+
+# @cost(basis='Flow rate', ID='Decanter', units='m3/s',
+#        cost=190000, S=0.0012, CE=CEPCI[2008], n=1, BM=2.3)
+@cost(basis='Flow rate', ID='Decanter', units='kg/hr',
+      cost=588000, S=145930, CE=CEPCI[2013], n=0.5, BM=2)
 class Decantation(Unit):
     '''
     A decanter to separate the sorbic acid crystal from the broth.
@@ -1052,7 +1055,8 @@ class Decantation(Unit):
     def _design(self):
         feed = self.ins[0]
         D = self.design_results
-        D['Flow rate'] = feed.F_vol/3600. # m3/s
+        D['Flow rate'] = self.F_mass_in
+        # D['Flow rate'] = feed.F_vol/3600. # m3/s
         D['Settling velocity'] = v_settling = \
             (0.00015**2)*9.81*(1204-998.19)/(18*0.001) # m/s
         D['Area'] = A_decanter = feed.F_vol*0.00028/v_settling # m2
