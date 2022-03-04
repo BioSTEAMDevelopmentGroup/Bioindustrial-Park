@@ -115,7 +115,7 @@ kg_per_ton = 907.18474
 
 
 configuration_names = (
-    'S1', 'O1', 'S2', 'O2', 'S1*', 'O1*', 'S2*', 'O2*',
+    'S1', 'O1', 'S2', 'O2', 'S1*', 'O1*', 'S2*', 'O2*', 'O3',
 )
 comparison_names = (
     # 'I - ∅', 
@@ -523,8 +523,8 @@ def load(name, cache={}, reduce_chemicals=True,
     def set_bagasse_oil_extraction_efficiency(bagasse_oil_extraction_efficiency):
         oil_extraction_specification.load_efficiency(bagasse_oil_extraction_efficiency / 100.)
 
-    # From Huang's 2016 paper
-    @uniform(5 * 30, 7 * 30, units='day/yr', baseline=200)
+    # Baseline from Huang's 2016 paper, but distribution more in line with Florida sugarcane harvesting (3-5 months)
+    @uniform(4 * 30, 6 * 30, units='day/yr', baseline=200)
     def set_cane_operating_days(cane_operating_days):
         if agile:
             cane_mode.operating_hours = cane_operating_days * 24
@@ -1004,7 +1004,6 @@ def load(name, cache={}, reduce_chemicals=True,
     #         - electricity() * 3600 / 131760
     #         - natural_gas_flow() / 126.67)
     #     return GGE / 1e6
-    
     
     # Single point evaluation for detailed design results
     def set_baseline(p, x):

@@ -63,7 +63,8 @@ __all__ = (
     'plot_configuration_breakdown',
     'plot_TCI_areas_across_oil_content',
     'plot_heatmap_comparison',
-    'plot_feedstock_comparison_kde',
+    'plot_feedstock_conventional_comparison_kde',
+    'plot_feedstock_cellulosic_comparison_kde',
     'plot_configuration_comparison_kde',
     'plot_open_comparison_kde',
     'monte_carlo_results',
@@ -604,62 +605,41 @@ def plot_heatmap_comparison(comparison_names=None, xlabels=None):
 
 # %% KDE
 
-def plot_feedstock_comparison_kde():
-    metrics = [MFPP, TCI, GWP_ethanol, biodiesel_production]
-    df_conventional = oc.get_monte_carlo('O1 - S1', metrics)
-    df_cellulosic = oc.get_monte_carlo('O2 - S2', metrics)
-    MFPPi = MFPP.index
-    TCIi = TCI.index
-    GWPi = GWP_ethanol.index
-    bdpi = biodiesel_production.index
-    ys = np.array([[df_conventional[MFPPi], df_cellulosic[MFPPi]],
-                   [df_cellulosic[bdpi], df_conventional[bdpi]]])
-    xs = np.array([[df_conventional[TCIi], df_cellulosic[GWPi]],
-                   [df_cellulosic[TCIi], df_conventional[GWPi]]])
-    yticks = [
-        [-10, 0, 10, 20, 30, 40, 50],
-        [0, 2, 4, 6, 8, 10, 12],
-    ]
-    
-    xticks = [
-        [-25, 0, 25, 50, 75, 100, 125],
-        [-2, -1.5, -1, -0.5, 0, 0.5,  1.0],
-    ]
-    bst.plots.plot_kde_2d(ys=ys, xs=xs, xticks=xticks, yticks=yticks)
+def plot_kde(name, metrics=(GWP_ethanol, MFPP), xticks=None, yticks=None):
+    df = oc.get_monte_carlo(name, metrics)
+    Xi, Yi = [i.index for i in metrics]
+    ax = bst.plots.plot_kde(y=df[Yi], x=df[Xi], xticks=xticks, yticks=yticks)
+    plt.sca(ax)
+    bst.plots.plot_quadrants()
+
+def plot_feedstock_conventional_comparison_kde():
+    plot_kde(
+        'O1 - S1',
+        yticks=[-20, -10, 0, 10, 20, 30, 40, 50],
+        xticks=[-0.45, -0.30, -0.15, 0, 0.15, 0.30],
+    )
+
+def plot_feedstock_cellulosic_comparison_kde():
+    plot_kde(
+        'O2 - S1',
+        yticks=[-60, -40, -20, 0, 20, 40, 65, 80],
+        xticks=[-5, -4, -3, -2, -1, 0, 1],
+    )
 
 def plot_configuration_comparison_kde():
-    metrics = [MFPP, GWP_ethanol]
-    df_oc = oc.get_monte_carlo('O2 - O1', metrics)
-    MFPPi = MFPP.index
-    GWPi = GWP_ethanol.index
-    ys = np.array([[df_oc[MFPPi]]])
-    xs = np.array([[df_oc[GWPi]]])
-    xticks = None
-    yticks = 2* [
-        [-70, -35, 0, 35, 70],
-    ]
-    
-    xticks = [
-        [-1, -.5, 0, 0.5, 1, 1.5, 2],
-    ]
-    bst.plots.plot_kde_2d(ys=ys, xs=xs, xticks=xticks, yticks=yticks)
+    plot_kde(
+        'O2 - O1',
+        yticks=[-70, -35, 0, 35, 70],
+        xticks=[-1, -.5, 0, 0.5, 1, 1.5, 2],
+    )
 
 def plot_agile_comparison_kde():
-    metrics = [MFPP, TCI]
-    df_oc = oc.get_monte_carlo('O1* - O1', metrics)
-    MFPPi = MFPP.index
-    TCIi = TCI.index
-    ys = np.array([[df_oc[MFPPi]]])
-    xs = np.array([[df_oc[TCIi]]])
-    xticks = None
-    yticks = 2* [
-        [-70, -35, 0, 35, 70],
-    ]
-    
-    xticks = [
-        [-100, -50, 0, 50, 100],
-    ]
-    bst.plots.plot_kde_2d(ys=ys, xs=xs, xticks=xticks, yticks=yticks)
+    plot_kde(
+        'O1* - O1',
+        metrics=[TCI, MFPP],
+        yticks=[-60, -30, 0, 30, 60],
+        xticks=[-150, -100, -50, 0, 50, 100, 150],
+    )
 
 def plot_open_comparison_kde(overlap=False):
     metrics = [MFPP, TCI, GWP_ethanol, biodiesel_production]
