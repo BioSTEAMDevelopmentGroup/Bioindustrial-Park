@@ -535,12 +535,10 @@ def load(name, cache={}, reduce_chemicals=True,
     @uniform(30, 60, units='day/yr', baseline=45)
     def set_sorghum_operating_days(sorghum_operating_days):
         if agile: sorghum_mode.operating_hours = sorghum_operating_days * 24
-
-    capacity = tea.operating_hours * feedstock.F_mass / kg_per_ton
-    @default(capacity, units='ton/yr', kind='coupled')
+    
+    @default(1761600, units='ton/yr', kind='coupled')
     def set_annual_crushing_capacity(annual_crushing_capacity):
-        feedstock.F_mass = F_mass = kg_per_ton * capacity / tea.operating_hours
-        if agile: oilsorghum.F_mass = F_mass
+        feedstock.F_mass = kg_per_ton * annual_crushing_capacity / tea.operating_hours
 
     # USDA ERS historical price data
     @parameter(distribution=ethanol_price_distribution, element=s.ethanol, 

@@ -661,7 +661,7 @@ def plot_kde(name, metrics=(GWP_ethanol, MFPP), xticks=None, yticks=None,
 
 def plot_kde_2d(name, metrics=(GWP_ethanol, MFPP), xticks=None, yticks=None,
                 top_left='', top_right='Tradeoff', bottom_left='Tradeoff',
-                bottom_right=''):
+                bottom_right='', ybox_kwargs=None):
     set_font(size=8)
     set_figure_size(aspect_ratio=0.65)
     if isinstance(name, str): name = (name,)
@@ -673,7 +673,7 @@ def plot_kde_2d(name, metrics=(GWP_ethanol, MFPP), xticks=None, yticks=None,
         xticks=xticks, yticks=yticks,
         xticklabels=[True, True], yticklabels=[True, True],
         xbox_kwargs=2*[dict(light=CABBI_colors.orange.RGBn, dark=CABBI_colors.orange.shade(60).RGBn)],
-        ybox_kwargs=[dict(light=CABBI_colors.blue.RGBn, dark=CABBI_colors.blue.shade(60).RGBn)],
+        ybox_kwargs=[ybox_kwargs or dict(light=CABBI_colors.blue.RGBn, dark=CABBI_colors.blue.shade(60).RGBn)],
     )
     M, N = axes.shape
     for i in range(M):
@@ -711,9 +711,9 @@ def plot_kde_2d(name, metrics=(GWP_ethanol, MFPP), xticks=None, yticks=None,
                      fontsize=10, fontweight='bold', zorder=10)
                 bottom_right = None
     plt.subplots_adjust(
-        hspace=0.05, wspace=0.05,
+        hspace=0, wspace=0,
         top=0.98, bottom=0.15,
-        left=0.15, right=0.98,
+        left=0.1, right=0.98,
     )
 
 def plot_feedstock_conventional_comparison_kde():
@@ -749,38 +749,42 @@ def plot_feedstock_comparison_kde():
     )
     plt.subplots_adjust(
         wspace=0,
+        
     )
     file = os.path.join(images_folder, 'feedstock_comparison_kde.svg')
     plt.savefig(file, transparent=True)
 
 def plot_configuration_comparison_kde():
     plot_kde(
-        'O2 - O1',
-        yticks=[-70, -35, 0, 35, 70],
-        xticks=[-1, -.5, 0, 0.5, 1, 1.5, 2],
-        top_left='Cellulosic wins',
-        bottom_right='Conventional wins',
+        'O1 - O2',
+        yticks=[-20, 0, 20, 40, 60],
+        xticks=[-8, -6, -4, -2, 0, 2, 4],
+        top_left='Conventional wins',
+        bottom_right='Cellulosic\nwins',
     )
     file = os.path.join(images_folder, 'configuration_comparison_kde.svg')
     plt.savefig(file, transparent=True)
     
 def plot_crude_configuration_comparison_kde():
-    plot_kde(
-        'O3 - O1',
-        yticks=[-30, -20, -10, 0, 10],
-        xticks=[-1, -.5, 0, 0.5, 1, 1.5, 2],
-        top_left='Crude oil\nwins',
-        bottom_right='Biodiesel wins',
+    plot_kde_2d(
+        ('O1 - O3', 'O2 - O4'),
+        yticks=[[-10, 0, 10, 20, 30, 40]],
+        xticks=[
+            [-2, -1.5, -1, -.5, 0],
+            [-3, -2.5, -2, -1.5, -1, -.5, 0]
+        ],
+        top_left='Biodiesel production wins',
+        bottom_right='Crude oil production wins',
     )
     file = os.path.join(images_folder, 'crude_configuration_comparison_kde.svg')
     plt.savefig(file, transparent=True)
 
 def plot_agile_comparison_kde():
-    plot_kde(
+    plot_kde_2d(
         ('O1* - O1', 'O2* - O2'),
         metrics=[TCI, MFPP],
-        yticks=[[-60, -30, 0, 30, 60]],
-        xticks=[[-150, -100, -50, 0, 50, 100, 150], [-150, -100, -50, 0, 50, 100, 150]],
+        yticks=[[0, 5, 10, 15, 20]],
+        xticks=2*[[-50, -25, 0, 25, 50, 75]],
         top_left='Sorghum\nintegration\nwins',
         bottom_right='Cane-only wins',
         ybox_kwargs=dict(light=CABBI_colors.green_dirty.RGBn, 
