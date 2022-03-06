@@ -34,6 +34,7 @@ _Gcal_2_kJ = 4.184 * 1e6 # (also MMkcal/hr)
 Rxn = tmo.reaction.Reaction
 ParallelRxn = tmo.reaction.ParallelReaction
 
+# !!! Add unit classes as needed in specific subsections
 
 # %% 
 

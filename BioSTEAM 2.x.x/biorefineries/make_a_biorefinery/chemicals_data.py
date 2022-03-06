@@ -62,6 +62,7 @@ _cal2joule = 4.184
 # =============================================================================
 # Create chemical objects available in database
 # =============================================================================
+# !!! Add chemical objects as needed in specific subsections
 
 H2O = chemical_database('H2O')
 

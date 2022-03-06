@@ -23,6 +23,7 @@ _chemical_2011to2016 = 102.5 / 91.7
 _chemical_2020to2016 = 102.5 / 113.8 # average of Jan and Feb
 
 #%% Prices in $/kg ($ of the year of your TEA)
+# !!! Add price variables as needed
 
 # From USD/dry-ton to USD/kg in 2016$, 20% moisture content
 # changed from Humbird et al., 2011 to Davis et al., 2018
@@ -107,6 +108,8 @@ lactic_acid_price = 2.
 
 # All in 2016$/kg
 price = {
+         # !!! Add price items to this dictionary that have your new price variables as values
+         
          'Corn stover': cornstover_price,
          'Ethanol': ethanol_price,
          'Succinic acid': succinic_acid_price,

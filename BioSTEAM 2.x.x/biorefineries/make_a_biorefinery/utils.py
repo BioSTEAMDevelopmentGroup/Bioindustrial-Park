@@ -147,18 +147,17 @@ def get_feedstock_flow(dry_composition, moisture_content, dry_flow):
     feedstock_flow = wet_flow * (dry_array*(1-moisture_content)+moisture_array)
     return feedstock_flow
 
+# !!! This is the dry composition of corn stover; update to the composition you need
 dry_composition = dict(
     Glucan=0.3505, Xylan=0.1953, Lignin=0.1576, Ash=0.0493, Acetate=0.0181,
     Protein=0.0310, Arabinan=0.0238, Galactan=0.0143, Mannan=0.0060, 
     Sucrose=0.0077, Extract=0.1465, SuccinicAcid=0)
 
-moisture_content = 0.2
+moisture_content = 0.2 #!!! This is the moisture content of preprocessed corn stover; update to the moisture content you need
 dry_feedstock_flow = 2205. * _kg_per_ton / 24. # !!! Changing this will alter the total flow without altering the composition
-# dry_feedstock_flow = 1188.9732935254162 * _kg_per_ton / 24     
-# dry_feedstock_flow = 500 * _kg_per_ton / 24     
+ 
 baseline_feedflow = get_feedstock_flow(dry_composition, moisture_content, 
                                        dry_feedstock_flow)
-
 
 # %% 
 
