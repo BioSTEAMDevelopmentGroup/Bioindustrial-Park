@@ -353,28 +353,35 @@ def create_TAL_sys(ins, outs):
                                     ['Xylan', 'Glucan', 'Lignin', 'FermMicrobe',\
                                       'Ash', 'Arabinan', 'Galactan', 'Mannan'])
     
+    H401 = bst.units.HXutility('H401', ins=S401-1, outs = ('broth_to_adsorbent',), T=30. + 273.15)
+    
     AC1 = bst.AdsorptionColumnTSA(
         'AC1', 
         # ins=[bst.Stream('feed', TAL=0.014, Water=1, units='kg/hr', T=30 + 273.15), 'ethanol'], 
-        ins = [S401-1, 'ethanol'],
+        ins=[H401-0, 'ethanol', 'hot_air'],
+        outs=['broth_post_adsorption', 'TAL_laden_ethanol', 'ethanol_laden_air'],
         mean_velocity=7.2, # m / hr; typical velocities are 4 to 14.4 m /hr for liquids; Adsorption basics Alan Gabelman (2017) Adsorption basics Part 1. AICHE
-        regeneration_velocity=14.4, 
+        regeneration_velocity=14.4*3.1746, 
         cycle_time=2, # 1-2 hours required for thermal-swing-adsorption (TSA) for silica gels (add 1 hr for conservativeness); Seader, J. D., Separation Process Principles: Chemical and Biochemical Operations,” 3rd ed., Wiley, Hoboken, NJ (2011).
         rho_adsorbent=480, # (in kg/m3) Common for silica gels https://www.daisogelusa.com/technical-notes/approximate-packing-density-for-daisogel-bulk-silica-gel/
         adsorbent_capacity=0.091327, # Conservative heuristic from Seider et. al. (2017) Product and Process Design Principles. Wiley
-        T_regeneration=30 + 273.15, # For silica gels; Seader, J. D., Separation Process Principles: Chemical and Biochemical Operations,” 3rd ed., Wiley, Hoboken, NJ (2011).
+        T_regeneration=30. + 273.15, # For silica gels; Seader, J. D., Separation Process Principles: Chemical and Biochemical Operations,” 3rd ed., Wiley, Hoboken, NJ (2011).
+        drying_time = 10./60., # h
+        air_velocity = 1332., # m/h
+        # T_air = 100. + 273.15, #K
         vessel_material='Stainless steel 316',
         vessel_type='Vertical',
-        regeneration_fluid=dict(phase='l', Ethanol=1, units='kg/hr'),
+        regeneration_fluid=dict(phase='l', Ethanol=1., units='kg/hr'),
         adsorbate_ID='TAL',  
-        split=dict(TAL=1-0.98, Water=1),
+        split=dict(TAL=1-0.99, Water=1, VitaminA=1., VitaminD2=1., FermMicrobe=1.),
         length_plus = 0.,
         K = 0.078, # 0.125,
     )
+    
     @AC1.add_specification
     def AC1_spec(): # update recovery and capacity based on user-input adsorption time and temperature
         T = AC1.ins[0].T    
-        t = AC1.cycle_time # this needs to be exclusively time for adsorption
+        t = AC1.cycle_time # this needs to exclude hot air time
         # recovery = rec_interp(t, T)
         capacity = cap_interp(t, T)
         # AC1.recovery = recovery
