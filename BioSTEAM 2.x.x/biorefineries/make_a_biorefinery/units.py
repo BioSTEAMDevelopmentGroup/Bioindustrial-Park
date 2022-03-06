@@ -108,7 +108,7 @@ class FakeCoFermentation(Unit):
     _N_outs = 2
     
     fake_cofermentation_rxns = ParallelRxn([
-        Rxn('Glucose -> SuccinicAcid', 'Glucose', 0.5),
+        Rxn('Glucose -> SuccinicAcid', 'Glucose', 0.5), # reaction, reactant, conversion (%)
         Rxn('Xylose -> SuccinicAcid', 'Xylose', 0.5),
         
         Rxn('Glucose -> LacticAcid', 'Glucose', 0.1),
@@ -130,10 +130,12 @@ class FakeCoFermentation(Unit):
         saccharified_slurry, = self.ins
         fermentation_broth, vented_gases = self.outs
         
+        #perform reactions
         fermentation_broth.copy_like(saccharified_slurry)
         self.fake_cofermentation_rxns(fermentation_broth)
         self.fake_CO2_generation_rxns(fermentation_broth)
         
+        # split phases
         CO2_vented = fermentation_broth.imol['CO2']
         vented_gases.imol['CO2'] = CO2_vented
         vented_gases.phase = 'g'
