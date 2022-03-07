@@ -98,11 +98,11 @@ def _add_letter_labels(axes, xpos, ypos, colors):
                      horizontalalignment='center',verticalalignment='center',
                      fontsize=12, fontweight='bold', zorder=1e17)
 
-def plot_extraction_efficiency_and_oil_content_contours_manuscript():
+def plot_extraction_efficiency_and_oil_content_contours_manuscript(load=True):
     set_font(size=8)
     set_figure_size()
     fig, axes = plot_extraction_efficiency_and_oil_content_contours(
-        load=True,
+        load=load,
     )
     colors = np.zeros([2, 2], object)
     colors[:] = [[dark_letter_color, dark_letter_color],
@@ -112,11 +112,11 @@ def plot_extraction_efficiency_and_oil_content_contours_manuscript():
     file = os.path.join(images_folder, 'extraction_efficiency_and_oil_content_contours.svg')
     plt.savefig(file, transparent=True)
 
-def plot_relative_sorghum_oil_content_and_cane_oil_content_contours_manuscript():
+def plot_relative_sorghum_oil_content_and_cane_oil_content_contours_manuscript(load=True):
     set_font(size=8)
     set_figure_size()
     fig, axes = plot_relative_sorghum_oil_content_and_cane_oil_content_contours(
-        load=True,
+        load=load,
     )
     colors = np.zeros([2, 2], object)
     colors[:] = [[light_letter_color, light_letter_color],
@@ -304,7 +304,7 @@ def plot_relative_sorghum_oil_content_and_cane_oil_content_contours(
         raise ValueError('configuration index must be either 0 or 1')
     metric_bars = [
         MetricBar(MFPP.name, format_units(MFPP.units), colormaps[0], tickmarks(data[:, :, 0], 5, 5), 15, 1),
-        MetricBar(TCI.name, format_units(TCI.units), colormaps[1], tickmarks(data[:, :, 1], 5, 5), 29),
+        MetricBar(TCI.name, format_units(TCI.units), colormaps[1], tickmarks(data[:, :, 1], 5, 5), 30),
     ]
     fig, axes, CSs, CB = plot_contour_2d(
         100.*X, 100.*Y, Z, data, xlabel, ylabel, xticks, yticks, metric_bars, 
@@ -316,8 +316,8 @@ def plot_extraction_efficiency_and_oil_content_contours(
         load=False, metric_index=0, N_decimals=0,
     ):
     # Generate contour data
-    x = np.linspace(0.4, 1., 8)
-    y = np.linspace(0.05, 0.15, 8)
+    x = np.linspace(0.4, 1., 20)
+    y = np.linspace(0.05, 0.15, 20)
     X, Y = np.meshgrid(x, y)
     metric = bst.metric
     folder = os.path.dirname(__file__)

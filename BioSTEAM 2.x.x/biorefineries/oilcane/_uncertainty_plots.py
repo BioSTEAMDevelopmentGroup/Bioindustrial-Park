@@ -63,13 +63,16 @@ __all__ = (
     'plot_configuration_breakdown',
     'plot_TCI_areas_across_oil_content',
     'plot_heatmap_comparison',
-    'plot_feedstock_comparison_kde',
+    'plot_feedstock_conventional_comparison_kde',
+    'plot_feedstock_cellulosic_comparison_kde',
     'plot_configuration_comparison_kde',
     'plot_open_comparison_kde',
     'monte_carlo_results',
     'montecarlo_results_feedstock_comparison',
     'montecarlo_results_configuration_comparison',
     'montecarlo_results_agile_comparison',
+    'plot_feedstock_comparison_kde',
+    'plot_crude_configuration_comparison_kde',
     'plot_agile_comparison_kde',
 )
 
@@ -141,7 +144,7 @@ def roundsigfigs(x, nsigfigs=2):
     
 ethanol_over_biodiesel = bst.MockVariable('Ethanol over biodiesel', 'gal/ton', 'Biorefinery')
 GWP_ethanol_displacement = variables.GWP_ethanol_displacement
-production = [ethanol_production, biodiesel_production]
+production = (ethanol_production, biodiesel_production)
 
 mc_metric_settings = {
     'MFPP': (MFPP, f"MFPP\n[{format_units('USD/ton')}]", None),
@@ -150,32 +153,34 @@ mc_metric_settings = {
     'electricity_production': (electricity_production, f"Elec. prod.\n[{format_units('kWhr/ton')}]", None),
     'natural_gas_consumption': (natural_gas_consumption, f"NG cons.\n[{format_units('cf/ton')}]", None),
     'GWP_ethanol_displacement': (GWP_ethanol_displacement, "GWP$_{\\mathrm{displacement}}$" f"\n[{GWP_units_gal}]", None),
-    'GWP_economic': ([GWP_ethanol, GWP_biodiesel], "GWP$_{\\mathrm{economic}}$" f"\n[{GWP_units_gal}]", None),
-    'GWP_energy': ([GWP_ethanol_allocation, GWP_biodiesel_allocation], "GWP$_{\\mathrm{energy}}$" f"\n[{GWP_units_gal}]", None),
+    'GWP_economic': ((GWP_ethanol, GWP_biodiesel), "GWP$_{\\mathrm{economic}}$" f"\n[{GWP_units_gal}]", None),
+    'GWP_energy': ((GWP_ethanol_allocation, GWP_biodiesel_allocation), "GWP$_{\\mathrm{energy}}$" f"\n[{GWP_units_gal}]", None),
 }
 
 mc_comparison_settings = {
-    'MFPP': (MFPP, f"MFPP\n[{format_units('USD/ton')}]", None),
-    'TCI': (TCI, f"TCI\n[{format_units('10^6*USD')}]", None),
-    'production': (production, f"Production\n[{format_units('gal/ton')}]", None),
-    'electricity_production': (electricity_production, f"Elec. prod.\n[{format_units('kWhr/ton')}]", None),
-    'natural_gas_consumption': (natural_gas_consumption, f"NG cons.\n[{format_units('cf/ton')}]", None),
-    'GWP_ethanol_displacement': (GWP_ethanol_displacement, "GWP$_{\\mathrm{displacement}}$" f"\n[{GWP_units_gal}]", None),
-    'GWP_economic': (GWP_ethanol, "GWP$_{\\mathrm{economic}}$" f"\n[{GWP_units_gal}]", None),
-    'GWP_energy': (GWP_ethanol_allocation, "GWP$_{\\mathrm{energy}}$" f"\n[{GWP_units_gal}]", None),
-    'GWP_property_allocation': ([GWP_ethanol, GWP_ethanol_allocation] , f"GWP\n[{GWP_units_gal}]", None),
+    'MFPP': (MFPP, r"$\Delta$" + f"MFPP\n[{format_units('USD/ton')}]", None),
+    'TCI': (TCI, r"$\Delta$" + f"TCI\n[{format_units('10^6*USD')}]", None),
+    'production': (production, r"$\Delta$" + f"Production\n[{format_units('gal/ton')}]", None),
+    'electricity_production': (electricity_production, r"$\Delta$" + f"Elec. prod.\n[{format_units('kWhr/ton')}]", None),
+    'natural_gas_consumption': (natural_gas_consumption, r"$\Delta$" + f"NG cons.\n[{format_units('cf/ton')}]", None),
+    'GWP_ethanol_displacement': (GWP_ethanol_displacement, r"$\Delta$" + "GWP$_{\\mathrm{displacement}}$" f"\n[{GWP_units_gal}]", None),
+    'GWP_economic': (GWP_ethanol, r"$\Delta$" + "GWP$_{\\mathrm{economic}}$" f"\n[{GWP_units_gal}]", None),
+    'GWP_energy': (GWP_ethanol_allocation, r"$\Delta$" + "GWP$_{\\mathrm{energy}}$" f"\n[{GWP_units_gal}]", None),
+    'GWP_property_allocation': ((GWP_ethanol, GWP_ethanol_allocation), r"$\Delta$" + f"GWP\n[{GWP_units_gal}]", None),
 }
 
 mc_derivative_metric_settings = {
     'MFPP': (MFPP_derivative, r"$\Delta$" + format_units(r"MFPP/OC").replace('cdot', r'cdot \Delta') + f"\n[{format_units('USD/ton')}]", None),
     'TCI': (TCI_derivative,  r"$\Delta$" + format_units(r"TCI/OC").replace('cdot', r'cdot \Delta') + f"\n[{format_units('10^6*USD')}]", None),
-    'production': ([ethanol_production_derivative, biodiesel_production_derivative], r"$\Delta$" + format_units(r"Prod./OC").replace('cdot', r'cdot \Delta') + f"\n[{format_units('gal/ton')}]", None),
+    'production': ((ethanol_production_derivative, biodiesel_production_derivative), r"$\Delta$" + format_units(r"Prod./OC").replace('cdot', r'cdot \Delta') + f"\n[{format_units('gal/ton')}]", None),
     'electricity_production': (electricity_production_derivative, r"$\Delta$" + format_units(r"EP/OC").replace('cdot', r'cdot \Delta') + f"\n[{format_units('kWhr/ton')}]", None),
     'natural_gas_consumption': (natural_gas_consumption_derivative, r"$\Delta$" + format_units(r"NGC/OC").replace('cdot', r'cdot \Delta') + f"\n[{format_units('cf/ton')}]", None),
     'GWP_economic': (GWP_ethanol_derivative, r"$\Delta$" + r"GWP $\cdot \Delta \mathrm{OC}^{-1}$" f"\n[{GWP_units_gal.replace('kg','g')}]", 1000),
 }
 
-
+for dct in (mc_metric_settings, mc_comparison_settings, mc_derivative_metric_settings):
+    for i, j in dct.copy().items(): dct[j[0]] = j
+    
 # %% Plots for publication
 
 def plot_all():
@@ -604,62 +609,189 @@ def plot_heatmap_comparison(comparison_names=None, xlabels=None):
 
 # %% KDE
 
+
+def plot_kde(name, metrics=(GWP_ethanol, MFPP), xticks=None, yticks=None,
+             xbox_kwargs=None, ybox_kwargs=None, top_left='',
+             top_right='Tradeoff', bottom_left='Tradeoff',
+             bottom_right=''):
+    set_font(size=8)
+    set_figure_size(width='half', aspect_ratio=0.80)
+    Xi, Yi = [i.index for i in metrics]
+    df = oc.get_monte_carlo(name, metrics)
+    # print(df[Xi].min(), df[Xi].max())
+    # print(df[Yi].min(), df[Yi].max())
+    ax = bst.plots.plot_kde(
+        y=df[Yi], x=df[Xi], xticks=xticks, yticks=yticks,
+        xticklabels=True, yticklabels=True,
+        xbox_kwargs=xbox_kwargs or dict(light=CABBI_colors.orange.RGBn, dark=CABBI_colors.orange.shade(60).RGBn),
+        ybox_kwargs=ybox_kwargs or dict(light=CABBI_colors.blue.RGBn, dark=CABBI_colors.blue.shade(60).RGBn),
+    )
+    plt.sca(ax)
+    sX, sY = [mc_comparison_settings[i] for i in metrics]
+    _, xlabel, _ = sX
+    _, ylabel, _ = sY
+    plt.xlabel(xlabel.replace('\n', ' '))
+    plt.ylabel(ylabel.replace('\n', ' '))
+    bst.plots.plot_quadrants()
+    xlb, xub = plt.xlim()
+    ylb, yub = plt.ylim()
+    xpos = lambda x: xlb + (xub - xlb) * x
+    ypos = lambda y: ylb + (yub - ylb) * y
+    if yub > 0. and xlb < 0.:
+        plt.text(xpos(0.02), ypos(0.94), top_left, color=CABBI_colors.teal.shade(50).RGBn,
+                 horizontalalignment='left', verticalalignment='top',
+                 fontsize=10, fontweight='bold', zorder=10)
+    if ylb < 0. and xlb < 0.:
+        plt.text(xpos(0.02), ypos(0.02), bottom_left, color=CABBI_colors.grey.shade(75).RGBn,
+                 horizontalalignment='left', verticalalignment='bottom',
+                 fontsize=10, fontweight='bold', zorder=10)
+    if yub > 0. and xub > 0.:
+        plt.text(xpos(0.98), ypos(0.94), top_right, color=CABBI_colors.grey.shade(75).RGBn,
+                 horizontalalignment='right', verticalalignment='top',
+                 fontsize=10, fontweight='bold', zorder=10)
+    if ylb < 0. and xub > 0.:
+        plt.text(xpos(0.98), ypos(0.02), bottom_right, color=colors.red.shade(50).RGBn,
+                 horizontalalignment='right', verticalalignment='bottom',
+                 fontsize=10, fontweight='bold', zorder=10)
+    plt.subplots_adjust(
+        hspace=0.05, wspace=0.05,
+        top=0.98, bottom=0.15,
+        left=0.15, right=0.98,
+    )
+
+def plot_kde_2d(name, metrics=(GWP_ethanol, MFPP), xticks=None, yticks=None,
+                top_left='', top_right='Tradeoff', bottom_left='Tradeoff',
+                bottom_right='', ybox_kwargs=None):
+    set_font(size=8)
+    set_figure_size(aspect_ratio=0.65)
+    if isinstance(name, str): name = (name,)
+    Xi, Yi = [i.index for i in metrics]
+    dfs = [oc.get_monte_carlo(i, metrics) for i in name]
+    axes = bst.plots.plot_kde_2d(
+        ys=np.array([[df[Yi] for df in dfs]]),
+        xs=np.array([[df[Xi] for df in dfs]]), 
+        xticks=xticks, yticks=yticks,
+        xticklabels=[True, True], yticklabels=[True, True],
+        xbox_kwargs=2*[dict(light=CABBI_colors.orange.RGBn, dark=CABBI_colors.orange.shade(60).RGBn)],
+        ybox_kwargs=[ybox_kwargs or dict(light=CABBI_colors.blue.RGBn, dark=CABBI_colors.blue.shade(60).RGBn)],
+    )
+    M, N = axes.shape
+    for i in range(M):
+        for j in range(N):
+            ax = axes[i, j]
+            plt.sca(ax)
+            sX, sY = [mc_comparison_settings[i] for i in metrics]
+            _, xlabel, _ = sX
+            _, ylabel, _ = sY
+            if i == M - 1: plt.xlabel(xlabel.replace('\n', ' '))
+            if j == 0: plt.ylabel(ylabel.replace('\n', ' '))
+            bst.plots.plot_quadrants()
+            xlb, xub = plt.xlim()
+            ylb, yub = plt.ylim()
+            xpos = lambda x: xlb + (xub - xlb) * x
+            ypos = lambda y: ylb + (yub - ylb) * y
+            if yub > 0. and xlb < 0. and top_left:
+                plt.text(xpos(0.02), ypos(0.94), top_left, color=CABBI_colors.teal.shade(50).RGBn,
+                         horizontalalignment='left', verticalalignment='top',
+                         fontsize=10, fontweight='bold', zorder=10)
+                top_left = None
+            if ylb < 0. and xlb < 0. and bottom_left:
+                plt.text(xpos(0.02), ypos(0.02), bottom_left, color=CABBI_colors.grey.shade(75).RGBn,
+                         horizontalalignment='left', verticalalignment='bottom',
+                         fontsize=10, fontweight='bold', zorder=10)
+                bottom_left = None
+            if yub > 0. and xub > 0. and top_right:
+                plt.text(xpos(0.98), ypos(0.94), top_right, color=CABBI_colors.grey.shade(75).RGBn,
+                     horizontalalignment='right', verticalalignment='top',
+                     fontsize=10, fontweight='bold', zorder=10)
+                top_right = None
+            if ylb < 0. and xub > 0. and bottom_right:
+                plt.text(xpos(0.98), ypos(0.02), bottom_right, color=colors.red.shade(50).RGBn,
+                     horizontalalignment='right', verticalalignment='bottom',
+                     fontsize=10, fontweight='bold', zorder=10)
+                bottom_right = None
+    plt.subplots_adjust(
+        hspace=0, wspace=0,
+        top=0.98, bottom=0.15,
+        left=0.1, right=0.98,
+    )
+
+def plot_feedstock_conventional_comparison_kde():
+    plot_kde(
+        'O1 - S1',
+        yticks=[-20, -10, 0, 10, 20, 30, 40],
+        xticks=[-0.40, -0.3, -0.20, -0.10, 0, 0.10, 0.20],
+        top_left='Oilcane wins',
+        bottom_right='Sugarcane\nwins',
+    )
+    file = os.path.join(images_folder, 'feedstock_conventional_comparison_kde.svg')
+    plt.savefig(file, transparent=True)
+
+def plot_feedstock_cellulosic_comparison_kde():
+    plot_kde(
+        'O2 - S2',
+        yticks=[-40, -20, 0, 20, 40, 60, 80],
+        xticks=[-5, -4, -3, -2, -1, 0],
+        top_left='Oilcane wins',
+        bottom_right='Sugarcane wins',
+    )
+    file = os.path.join(images_folder, 'feedstock_cellulosic_comparison_kde.svg')
+    plt.savefig(file, transparent=True)
+
 def plot_feedstock_comparison_kde():
-    metrics = [MFPP, TCI, GWP_ethanol, biodiesel_production]
-    df_conventional = oc.get_monte_carlo('O1 - S1', metrics)
-    df_cellulosic = oc.get_monte_carlo('O2 - S2', metrics)
-    MFPPi = MFPP.index
-    TCIi = TCI.index
-    GWPi = GWP_ethanol.index
-    bdpi = biodiesel_production.index
-    ys = np.array([[df_conventional[MFPPi], df_cellulosic[MFPPi]],
-                   [df_cellulosic[bdpi], df_conventional[bdpi]]])
-    xs = np.array([[df_conventional[TCIi], df_cellulosic[GWPi]],
-                   [df_cellulosic[TCIi], df_conventional[GWPi]]])
-    yticks = [
-        [-10, 0, 10, 20, 30, 40, 50],
-        [0, 2, 4, 6, 8, 10, 12],
-    ]
-    
-    xticks = [
-        [-25, 0, 25, 50, 75, 100, 125],
-        [-2, -1.5, -1, -0.5, 0, 0.5,  1.0],
-    ]
-    bst.plots.plot_kde_2d(ys=ys, xs=xs, xticks=xticks, yticks=yticks)
+    plot_kde_2d(
+        ('O1 - S1', 'O2 - S2'),
+        yticks=[[-30, -15, 0, 15, 30, 45]],
+        xticks=[[-0.40, -0.3, -0.20, -0.10, 0, 0.10, 0.20],
+                [-4.5, -3, -1.5, 0., 1.5, 3, 4.5, 6]],
+        top_left='Oilcane wins',
+        bottom_right='Sugarcane\nwins',
+    )
+    plt.subplots_adjust(
+        wspace=0,
+        
+    )
+    file = os.path.join(images_folder, 'feedstock_comparison_kde.svg')
+    plt.savefig(file, transparent=True)
 
 def plot_configuration_comparison_kde():
-    metrics = [MFPP, GWP_ethanol]
-    df_oc = oc.get_monte_carlo('O2 - O1', metrics)
-    MFPPi = MFPP.index
-    GWPi = GWP_ethanol.index
-    ys = np.array([[df_oc[MFPPi]]])
-    xs = np.array([[df_oc[GWPi]]])
-    xticks = None
-    yticks = 2* [
-        [-70, -35, 0, 35, 70],
-    ]
+    plot_kde(
+        'O1 - O2',
+        yticks=[-20, 0, 20, 40, 60],
+        xticks=[-8, -6, -4, -2, 0, 2, 4],
+        top_left='Conventional wins',
+        bottom_right='Cellulosic\nwins',
+    )
+    file = os.path.join(images_folder, 'configuration_comparison_kde.svg')
+    plt.savefig(file, transparent=True)
     
-    xticks = [
-        [-1, -.5, 0, 0.5, 1, 1.5, 2],
-    ]
-    bst.plots.plot_kde_2d(ys=ys, xs=xs, xticks=xticks, yticks=yticks)
+def plot_crude_configuration_comparison_kde():
+    plot_kde_2d(
+        ('O1 - O3', 'O2 - O4'),
+        yticks=[[-10, 0, 10, 20, 30, 40]],
+        xticks=[
+            [-2, -1.5, -1, -.5, 0],
+            [-3, -2.5, -2, -1.5, -1, -.5, 0]
+        ],
+        top_left='Biodiesel production wins',
+        bottom_right='Crude oil production wins',
+    )
+    file = os.path.join(images_folder, 'crude_configuration_comparison_kde.svg')
+    plt.savefig(file, transparent=True)
 
 def plot_agile_comparison_kde():
-    metrics = [MFPP, TCI]
-    df_oc = oc.get_monte_carlo('O1* - O1', metrics)
-    MFPPi = MFPP.index
-    TCIi = TCI.index
-    ys = np.array([[df_oc[MFPPi]]])
-    xs = np.array([[df_oc[TCIi]]])
-    xticks = None
-    yticks = 2* [
-        [-70, -35, 0, 35, 70],
-    ]
-    
-    xticks = [
-        [-100, -50, 0, 50, 100],
-    ]
-    bst.plots.plot_kde_2d(ys=ys, xs=xs, xticks=xticks, yticks=yticks)
+    plot_kde_2d(
+        ('O1* - O1', 'O2* - O2'),
+        metrics=[TCI, MFPP],
+        yticks=[[0, 5, 10, 15, 20]],
+        xticks=2*[[-50, -25, 0, 25, 50, 75]],
+        top_left='Sorghum\nintegration\nwins',
+        bottom_right='Cane-only wins',
+        ybox_kwargs=dict(light=CABBI_colors.green_dirty.RGBn, 
+                         dark=CABBI_colors.green_dirty.shade(60).RGBn),
+    )
+    file = os.path.join(images_folder, 'agile_conventional_comparison_kde.svg')
+    plt.savefig(file, transparent=True)
 
 def plot_open_comparison_kde(overlap=False):
     metrics = [MFPP, TCI, GWP_ethanol, biodiesel_production]
@@ -839,7 +971,6 @@ def plot_monte_carlo(derivative=False, absolute=True, comparison=True,
         columns = configurations = []
     rows, ylabels, factors = zip(*[metric_info[i] for i in metrics])
     factors = [(i, j) for i, j in enumerate(factors) if j is not None]
-    if comparison and not absolute: ylabels = [r"$\Delta$" + i for i in ylabels]
     if color_wheel is None: color_wheel = CABBI_colors.wheel()
     N_rows = len(rows)
     nrows = int(round(N_rows / ncols))

@@ -86,6 +86,7 @@ def create_post_fermentation_oil_separation_system(ins, outs, wastewater_concent
     )
     Ev607.target_oil_content = target_oil_content # kg / kg
     Ev607.pop_last_evaporator = pop_last_evaporator
+    Ev607.remove_evaporators = False
     P_original = tuple(Ev607.P)
     @Ev607.add_specification(run=False)
     def adjust_evaporation():
@@ -104,10 +105,10 @@ def create_post_fermentation_oil_separation_system(ins, outs, wastewater_concent
         y0 = x_oil(x0)
         EvX.P = P_original
         EvX._reload_components = True
-        if y0 < 0.:
+        if y0 <= 0.:
             EvX.V = x0
             return
-        else:
+        elif EvX.remove_evaporators:
             pop_last_evaporator = EvX.pop_last_evaporator
             if pop_last_evaporator:
                 EvX.P = list(P_original)
@@ -125,6 +126,11 @@ def create_post_fermentation_oil_separation_system(ins, outs, wastewater_concent
                     break    
             y1 = x_oil(x1)
             EvX.V = flx.IQ_interpolation(x_oil, x0, x1, y0, y1, x=V_last, ytol=1e-5, xtol=1e-6)
+        elif x_oil(1e-6) < 0.:
+            EvX.V = 1e-6
+        else:
+            y1 = x_oil(x1)
+            EvX.V = flx.IQ_interpolation(x_oil, 1e-6, x1, y0, y1, x=V_last, ytol=1e-5, xtol=1e-6)
         
     P607 = bst.Pump('P607', Ev607-0, P=101325.)
     C603_2 = bst.LiquidsSplitCentrifuge('C603_2', P607-0, (oil, ''), 
@@ -939,6 +945,7 @@ def create_sugarcane_to_ethanol_combined_1_and_2g(ins, outs):
     
     cofermentation.titer = 68.5
     cofermentation.productivity = 0.95
+    EvX.pop_last_evaporator = False
     @EvX.add_specification(run=True)
     def evaporation():
         evaporator_to_seedtrain = EvX.path_until(seedtrain)
@@ -952,6 +959,7 @@ def create_sugarcane_to_ethanol_combined_1_and_2g(ins, outs):
         beer = cofermentation.outs[1]
         target_titer = cofermentation.titer
         MX.ins[1].imass['Water'] = 0.
+        pop_last_evaporator = EvX.pop_last_evaporator
         def f(V):
             EvX.V = V
             EvX._run()
@@ -967,11 +975,14 @@ def create_sugarcane_to_ethanol_combined_1_and_2g(ins, outs):
             MX.ins[1].imass['Water'] = max(required_water, 0)
         else:
             P_original = P = tuple(EvX.P)
-            EvX.P = list(P)
+            EvX.P = deque(P)
             EvX._load_components()
             for i in range(EvX._N_evap-1):
                 if f(1e-6) < 0.:
-                    EvX.P.pop()
+                    if pop_last_evaporator:
+                        EvX.P.pop()
+                    else:
+                        EvX.P.popleft()
                     EvX._reload_components = True
                 else:
                     break  

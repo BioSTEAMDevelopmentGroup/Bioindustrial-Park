@@ -68,6 +68,21 @@ from biorefineries.TAL.chemicals_data import TAL_chemicals, chemical_groups, \
 from biorefineries.cornstover import CellulosicEthanolTEA as TALTEA
 from biosteam import SystemFactory
 from warnings import filterwarnings
+
+from scipy.interpolate import interp2d
+
+# Based on experimental data from Singh group
+ts = [0.166666667,	0.5,	1,	2]
+Ts = [303.15, 323.15]
+recoveries = [[0.791785714,	0.947,	0.960821429,	0.975035714],
+[0.92402381,	0.956595238,	0.96297619,	0.9785]]
+capacities = [[0.0739,	0.088386667,	0.089676667,	0.091003333],
+[0.086242222,	0.089282222,	0.089877778,	0.091326667]]
+
+# Interpolate
+rec_interp = interp2d(ts, Ts, recoveries)
+cap_interp = interp2d(ts, Ts, capacities)
+
 filterwarnings('ignore')
 
 Rxn = tmo.reaction.Reaction
@@ -338,32 +353,42 @@ def create_TAL_sys(ins, outs):
                                     ['Xylan', 'Glucan', 'Lignin', 'FermMicrobe',\
                                       'Ash', 'Arabinan', 'Galactan', 'Mannan'])
     
-   
-    bst.Unit._ins_size_is_fixed = bst.Unit._outs_size_is_fixed = False
-    A401 = bst.Unit('A401', ins=(S401-1, 'ethanol_for_desorption', 'hot_air_for_regen'), 
-                            outs=('retentate', 'adsorbate', 'purge'),
-                            # adsorbent='Activated carbon',
-                            # tau=1.,
-                            )
-    A401._N_ins = 3
-    A401._N_outs = 3
+    H401 = bst.units.HXutility('H401', ins=S401-1, outs = ('broth_to_adsorbent',), T=30. + 273.15)
     
-    A401.adsorption_recovery = 0.975
-    A401.regeneration_purge_loss = 0.01
-    A401.desorption_recovery = 0.72
-    A401.ethanol_evaporative_loss = 0.02
+    AC1 = bst.AdsorptionColumnTSA(
+        'AC1', 
+        # ins=[bst.Stream('feed', TAL=0.014, Water=1, units='kg/hr', T=30 + 273.15), 'ethanol'], 
+        ins=[H401-0, 'ethanol', 'hot_air'],
+        outs=['broth_post_adsorption', 'TAL_laden_ethanol', 'ethanol_laden_air'],
+        mean_velocity=7.2, # m / hr; typical velocities are 4 to 14.4 m /hr for liquids; Adsorption basics Alan Gabelman (2017) Adsorption basics Part 1. AICHE
+        regeneration_velocity=14.4*3.1746, 
+        cycle_time=2, # 1-2 hours required for thermal-swing-adsorption (TSA) for silica gels (add 1 hr for conservativeness); Seader, J. D., Separation Process Principles: Chemical and Biochemical Operations,” 3rd ed., Wiley, Hoboken, NJ (2011).
+        rho_adsorbent=480, # (in kg/m3) Common for silica gels https://www.daisogelusa.com/technical-notes/approximate-packing-density-for-daisogel-bulk-silica-gel/
+        adsorbent_capacity=0.091327, # Conservative heuristic from Seider et. al. (2017) Product and Process Design Principles. Wiley
+        T_regeneration=30. + 273.15, # For silica gels; Seader, J. D., Separation Process Principles: Chemical and Biochemical Operations,” 3rd ed., Wiley, Hoboken, NJ (2011).
+        drying_time = 10./60., # h
+        air_velocity = 1332., # m/h
+        # T_air = 100. + 273.15, #K
+        vessel_material='Stainless steel 316',
+        vessel_type='Vertical',
+        regeneration_fluid=dict(phase='l', Ethanol=1., units='kg/hr'),
+        adsorbate_ID='TAL',  
+        split=dict(TAL=1-0.99, Water=1, VitaminA=1., VitaminD2=1., FermMicrobe=1.),
+        length_plus = 0.,
+        K = 0.078, # 0.125,
+    )
     
-    def A401_spec():
-        # A401._run()
-        TAL_mol = A401.ins[0].imol['TAL']
-        # TAL_wt = A401.ins[0].imass['TAL']
-        A401.outs[0].imol['TAL'] = TAL_mol \
-            * A401.adsorption_recovery * (1. - A401.regeneration_purge_loss) * A401.desorption_recovery
-        A401.outs[1].copy_like(A401.ins[0])
-        A401.outs[1].imol['TAL'] = TAL_mol - A401.outs[0].imol['TAL']
-        A401.ins[1].ivol['Ethanol'] = A401.outs[0].imass['TAL']/157.425
-    A401.specification = A401_spec
-    
+    @AC1.add_specification
+    def AC1_spec(): # update recovery and capacity based on user-input adsorption time and temperature
+        T = AC1.ins[0].T    
+        t = AC1.cycle_time # this needs to exclude hot air time
+        # recovery = rec_interp(t, T)
+        capacity = cap_interp(t, T)
+        # AC1.recovery = recovery
+        AC1.adsorbent_capacity = capacity[0]
+        AC1._run()
+        AC1.outs[1].phase = 'l'
+        
     # %% 
     
     # =============================================================================
@@ -384,7 +409,8 @@ def create_TAL_sys(ins, outs):
     # =============================================================================
     
     # Mix waste liquids for treatment
-    M501 = bst.units.Mixer('M501', ins=(F301-1, 
+    M501 = bst.units.Mixer('M501', ins=(F301-1,
+                                        AC1-0,
                                         # S402-1,
                                         # F401-0,
                                         # r_S402_s-1, r_S403_s-1, r_S404_s-1,
@@ -600,7 +626,7 @@ def create_TAL_sys(ins, outs):
     # T605_P-0-2-M401
     
     # 7-day storage time, similar to ethanol's in Humbird et al.
-    T620 = units.TALStorageTank('T620', ins=A401.outs[0], tau=7*24, V_wf=0.9,
+    T620 = units.TALStorageTank('T620', ins=AC1.outs[1], tau=7*24, V_wf=0.9,
                                           vessel_type='Floating roof',
                                           vessel_material='Stainless steel')
     
