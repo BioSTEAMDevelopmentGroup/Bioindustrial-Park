@@ -5,17 +5,17 @@
 # Bioindustrial-Park: BioSTEAM's Premier Biorefinery Models and Results
 # Copyright (C) 2020-2021, Yalin Li <yalinli2@illinois.edu>,
 # Sarang Bhagwat <sarangb2@illinois.edu>, and Yoel Cortes-Pena (this biorefinery)
-# 
-# This module is under the UIUC open-source license. See 
+#
+# This module is under the UIUC open-source license. See
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
 # for license details.
 
 '''
 References
 ----------
-[1] Davis et al., Process Design and Economics for the Conversion of Lignocellulosic 
-    Biomass to Hydrocarbon Fuels and Coproducts: 2018 Biochemical Design Case Update; 
-    NREL/TP-5100-71949; National Renewable Energy Lab (NREL), 2018. 
+[1] Davis et al., Process Design and Economics for the Conversion of Lignocellulosic
+    Biomass to Hydrocarbon Fuels and Coproducts: 2018 Biochemical Design Case Update;
+    NREL/TP-5100-71949; National Renewable Energy Lab (NREL), 2018.
     https://doi.org/10.2172/1483234
 [2] Aden et al., Process Design Report for Stover Feedstock: Lignocellulosic
     Biomass to Ethanol Process Design and Economics Utilizing Co-Current Dilute
@@ -27,7 +27,7 @@ References
     (accessed Aug 25, 2020).
 [4] Roni et al., Herbaceous Feedstock 2018 State of Technology Report;
     INL/EXT-18-51654-Rev000; Idaho National Lab. (INL), 2020.
-    https://doi.org/10.2172/1615147. 
+    https://doi.org/10.2172/1615147.
 [5] ecoinvent 3.6 https://www.ecoinvent.org/home.html (accessed Aug 26, 2020).
 
 '''
@@ -92,19 +92,19 @@ _GDP_2007to2016 = 1.160
 # https://doi.org/10.1021/acssuschemeng.9b06551.
 _feedstock_factor = _kg_per_ton / 0.8
 feedstock_price = 71.3 / _feedstock_factor
-		
+
 # Baseline from ref [1], lower and upper bounds (96% and 110% of baseline)
 # calculated using the index of sulfuric acid from U.S. Bureau of Labor Statistics
 # (Producer Price Index by Commodity for Chemicals and Allied Products)
 # https://fred.stlouisfed.org/series/WPU0613020T1 (accessed Jul 31, 2020).
 sulfuric_acid_price = 0.0430 * _lb_per_kg
 
-# 2.2 is the average whole-sale ethanol price between 2010-2019 in 2016 $/gal 	
-# based on Annual Energy Outlook (AEO) from Energy Information Adiministration (EIA)	
-# (https://www.eia.gov/outlooks/aeo/), which is $0.732/gal and similar to the 	
+# 2.2 is the average whole-sale ethanol price between 2010-2019 in 2016 $/gal
+# based on Annual Energy Outlook (AEO) from Energy Information Adiministration (EIA)
+# (https://www.eia.gov/outlooks/aeo/), which is $0.732/gal and similar to the
 # 2.2/(2988/1e3) = $0.736/gal based on a density of 2988 g/gal from H2 Tools
 # Lower and upper bounds are $1.37/gal and $2.79/gal, or $0.460/kg and $0.978/kg
-_ethanol_V = chems.Ethanol.V('l', 298.15, 101325) # molar volume in m3/mol	
+_ethanol_V = chems.Ethanol.V('l', 298.15, 101325) # molar volume in m3/mol
 _ethanol_MW = chems.Ethanol.MW
 _ethanol_kg_2_gal = _liter_per_gallon/_ethanol_V*_ethanol_MW/1e6
 ethanol_price = 2.2 / _ethanol_kg_2_gal
@@ -112,10 +112,10 @@ ethanol_price = 2.2 / _ethanol_kg_2_gal
 # Cost is negative because it's a product stream
 ash_disposal_price = -1.41e6 / (4279*7880)
 
-# Assums no cost/credit for baseline, the same as ash disposal for the lower bound,	
-# for the upper bound (i.e., positive selling price indicating profit), use 	
-# USGS 2015-2019 average  free on bard price in $/metric tonne for crude gypsum. 
-# National Minerals Information Center. Mineral Commodity Summaries 2020; 
+# Assums no cost/credit for baseline, the same as ash disposal for the lower bound,
+# for the upper bound (i.e., positive selling price indicating profit), use
+# USGS 2015-2019 average  free on bard price in $/metric tonne for crude gypsum.
+# National Minerals Information Center. Mineral Commodity Summaries 2020;
 # U.S. Geological Survey, 2020.
 # Assuming all prices were in their nominal year (e.g., 2015 price in 2015$)
 # and adjusted to 2016$
@@ -129,36 +129,36 @@ ash_disposal_price = -1.41e6 / (4279*7880)
 # ref [2]: $0.0094/lb in 2000$ = 0.0094*1.114/0.802*2.20462 = $0.0288/kg in 2016$
 gypsum_price = 0
 
-# Baseline from ref [1], lower bound is 2015-2019 average of 	
-# hydrate lime in $/ton at plant from Mineral Commodity Summaries 2020.	
-# 2015: 146.40 * (1.114/1.100) / 907.18474 = 0.163	
-# 2016: 145.50 / 907.18474 = 0.160	
-# 2017: 147.10 * (1.114/1.134) / 907.18474 = 0.159	
-# 2018: 151.50 * (1.114/1.157) / 907.18474 = 0.161	
-# 2019: 151.00 * (1.114/1.185) / 907.18474 = 0.156	
-# (0.163+0.160+0.159+0.161+0.156) / 5 = 0.160	
+# Baseline from ref [1], lower bound is 2015-2019 average of
+# hydrate lime in $/ton at plant from Mineral Commodity Summaries 2020.
+# 2015: 146.40 * (1.114/1.100) / 907.18474 = 0.163
+# 2016: 145.50 / 907.18474 = 0.160
+# 2017: 147.10 * (1.114/1.134) / 907.18474 = 0.159
+# 2018: 151.50 * (1.114/1.157) / 907.18474 = 0.161
+# 2019: 151.00 * (1.114/1.185) / 907.18474 = 0.156
+# (0.163+0.160+0.159+0.161+0.156) / 5 = 0.160
 # Upper bound is +10% from baseline = 0.1189 * _lb_per_kg * 1.1 = 0.288
 lime_price = 0.1189 * _lb_per_kg
 
 baghouse_bag_price = 466183/5/(24*365*0.96) * _GDP_2007to2016
 
 # 4.70 is the average natural gas price in 2016$/Mcf based on AEO from EIA,
-# which is $0.231/kg at 273.15 K or $0.253/kg at 298.15 K using BioSTEAM,   
+# which is $0.231/kg at 273.15 K or $0.253/kg at 298.15 K using BioSTEAM,
 # similar to the 4.7/1000/22*1000 = $0.214/kg at 273.15 K using 22 g/ft3 from H2 Tools
-# Using the same conversion, lower and upper bounds (min/max of 2010-2019) should be 
+# Using the same conversion, lower and upper bounds (min/max of 2010-2019) should be
 # $3.68/Mcf and $5.65/Mcf, or $0.198/kg and $0.304/kg
 _CH4_V = chems.CH4.V(298.15, 101325) # molar volume in m3/mol
 _CH4_MW = chems.CH4.MW
 natural_gas_price = 4.70/1e3*_ft3_per_m3*_CH4_V * (1e3/_CH4_MW)
 
-# https://www.rightpricechemicals.com/buy-amberlyst-15-ion-exchange-resin.html	
+# https://www.rightpricechemicals.com/buy-amberlyst-15-ion-exchange-resin.html
 # USD 383.13 for 2.5kg (largest available size order), accessed 06/11/2020
 amberlyst_15_price = 153.252 * _chemical_2020to2016
 
 # All in 2016$/kg
-price = {'Feedstock': feedstock_price, 	
+price = {'Feedstock': feedstock_price,
          'H2SO4': 0.0430 * _lb_per_kg,
-         # 0.1900 is for NH3	
+         # 0.1900 is for NH3
          'NH4OH': 0.1900 * _lb_per_kg * chems.NH3.MW/chems.NH4OH.MW,
          'CSL': 0.0339 * _lb_per_kg,
          'Enzyme': 6.16,
@@ -166,14 +166,14 @@ price = {'Feedstock': feedstock_price,
          'Amberlyst15': amberlyst_15_price,
          'NaOH': 0.2384 * _lb_per_kg,
          'WWT polymer': 2.6282 * _lb_per_kg,
-         'Boiler chems': 2.9772 * _lb_per_kg,	
-         'Cooling tower chems': 1.7842 * _lb_per_kg,	
-         'Makeup water': 0.0002 * _lb_per_kg,	
-         # Cost of ash is negative because it's a product stream	
-         'Ash disposal': ash_disposal_price,	
+         'Boiler chems': 2.9772 * _lb_per_kg,
+         'Cooling tower chems': 1.7842 * _lb_per_kg,
+         'Makeup water': 0.0002 * _lb_per_kg,
+         # Cost of ash is negative because it's a product stream
+         'Ash disposal': ash_disposal_price,
          'Gypsum': gypsum_price,
-         'Ethanol': ethanol_price,	
-         'Baghouse bag': baghouse_bag_price,	
+         'Ethanol': ethanol_price,
+         'Baghouse bag': baghouse_bag_price,
          'Natural gas': natural_gas_price}
 
 # $/kWh, from EIA AEO, 2010-2019 average (0.067-0.074 range)
@@ -183,7 +183,7 @@ bst.PowerUtility.price = 0.070
 # %%
 
 # =============================================================================
-# Characterization factors (CFs) for life cycle analysis (LCA), all from ref [3] 
+# Characterization factors (CFs) for life cycle analysis (LCA), all from ref [3]
 # if not noted, note that it is unclear if in-plant receiving and preprocessing
 # (~50% of the total impact per ref [4]) of feedstock is included in ref [3]
 # =============================================================================
@@ -252,13 +252,3 @@ FEC_CFs['Lactic acid_fossil'] = 91.265
 
 CFs['FEC_CFs'] = FEC_CFs
 CFs['FEC_CF_stream'] = FEC_CF_stream
-
-
-
-
-
-
-
-
-
-
