@@ -116,8 +116,10 @@ class CWP(Facility):
         total_chilled_water = self.total_chilled_water = \
             - hu_chilled.flow * self.chemicals.H2O.MW
         self.ins[0].imass['H2O'] = self.outs[0].imass['H2O'] = total_chilled_water
-        self.ins[0].T = hu_chilled.agent.T_limit
-        self.outs[0].T = hu_chilled.agent.T
+        
+        if hu_chilled.agent:
+            self.ins[0].T = hu_chilled.agent.T_limit
+            self.outs[0].T = hu_chilled.agent.T
 
         self.design_results['Duty'] = hu_chilled.duty
 
