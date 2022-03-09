@@ -15,7 +15,7 @@ from lignocellulosic biomass. Part of the script is adopted from [2]_.
 Getting Started
 ---------------
 Two configurations are now included in this biorefinery, one with simultaneous
-saccahrification and co-fermentation (SSCF), one with separate hydrolysis and
+saccharification and co-fermentation (SSCF), one with separate hydrolysis and
 co-fermentation (SHF). You can choose which system to load.
 
 .. code-block:: python
@@ -32,7 +32,7 @@ co-fermentation (SHF). You can choose which system to load.
     FEC is 58.32 MJ/kg lactic acid
     ------------------------------------------
     >>> la.chems.show()
-    >>> # All chemicals used in the bioreinfery
+    >>> # All chemicals used in the biorefinery
     CompiledChemicals([H2O, O2, N2, CH4, CO, CO2, NH3, NO, NO2, H2S, SO2, H2SO4, HNO3, NaOH, NH4OH, CalciumDihydroxide, AmmoniumSulfate, NaNO3, Na2SO4, CaSO4, Ethanol, AceticAcid, Glucose, GlucoseOligomer, Extractives, Xylose, XyloseOligomer, Sucrose, Cellobiose, Mannose, MannoseOligomer, Galactose, GalactoseOligomer, Arabinose, ArabinoseOligomer, SolubleLignin, Protein, Enzyme, FermMicrobe, WWTsludge, Furfural, HMF, Xylitol, LacticAcid, SuccinicAcid, EthylAcetate, EthylLactate, EthylSuccinate, Acetate, AmmoniumAcetate, CalciumLactate, CalciumAcetate, CalciumSuccinate, Glucan, Mannan, Galactan, Xylan, Arabinan, Lignin, P4O10, Ash, Tar, CSL, BoilerChems, Polymer, BaghouseBag, CoolingTowerChems])
     >>> # To load the alternative configuration, you can just use the load_system function
     >>> la.load_system('SHF')
@@ -70,7 +70,7 @@ Naming conventions:
 
     U = Other units
 
-    PS = Process specificiation, not physical units, but for adjusting streams
+    PS = Process specification, not physical units, but for adjusting streams
 
 Processes:
     100: Preprocessing
