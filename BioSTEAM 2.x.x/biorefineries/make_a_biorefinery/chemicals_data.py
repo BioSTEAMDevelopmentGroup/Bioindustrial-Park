@@ -62,6 +62,7 @@ _cal2joule = 4.184
 # =============================================================================
 # Create chemical objects available in database
 # =============================================================================
+# !!! Add chemical objects as needed in specific subsections
 
 H2O = chemical_database('H2O')
 
@@ -311,7 +312,7 @@ solubles = tuple(soluble_organics) + chemical_groups['InorganicSolubleSolids'] +
 insoluble_groups = ('OtherInsolubleSolids', 'OtherStructuralCarbohydrates')
 insolubles = sum([chemical_groups[i] for i in insoluble_groups], ('WWTsludge',))
 
-# This group is needed in the system.py module
+# This group is no longer needed in the system.py module
 combustibles = soluble_organics + list(chemical_groups['OtherStructuralCarbohydrates'])
 # combustibles.remove('CalciumLactate')
 # combustibles.remove('CalciumAcetate')
