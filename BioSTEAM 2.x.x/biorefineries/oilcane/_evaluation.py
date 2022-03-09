@@ -6,6 +6,7 @@ Created on Fri Nov  5 00:04:53 2021
 """
 import numpy as np
 import biosteam as bst
+from warnings import warn
 from biorefineries import oilcane as oc
 from ._variable_mockups import (
     all_metric_mockups
@@ -158,7 +159,7 @@ def run_uncertainty_and_sensitivity(name, N, rule='L',
     np.random.seed(1)
     from warnings import filterwarnings
     filterwarnings('ignore', category=bst.utils.DesignWarning)
-    oc.load(name)
+    oc.load(name, cache=None)
     key = (N, rule)
     if key in sample_cache:
         samples = sample_cache[key]
@@ -193,10 +194,25 @@ def run_uncertainty_and_sensitivity(name, N, rule='L',
             )
     else:
         N = min(int(N/10), 20)
-        oc.model.evaluate(notify=N,
-                       autosave=N if autosave else False,
-                       autoload=autoload,
-                       file=autoload_file_name(name))
+        autosave = N if autosave else False
+        autoload_file = autoload_file_name(name)
+        success = False
+        for i in range(3):
+            try:
+                oc.model.evaluate(
+                    notify=N,
+                    autosave=autosave,
+                    autoload=autoload,
+                    file=autoload_file
+                )
+            except Exception as e:
+                raise e from None
+                warn('failed evaluation; restarting without cache')
+            else:
+                success = True
+                break
+        if not success:
+            raise RuntimeError('evaluation failed')
         oc.model.table.to_excel(file)
         rho, p = oc.model.spearman_r()
         file = spearman_file(name)
