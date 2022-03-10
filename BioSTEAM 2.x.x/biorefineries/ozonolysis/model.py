@@ -21,7 +21,7 @@ def theoritical_min_SP():
 @model.parameter(name='Oleic acid conversion',
                  distribution=shape.Uniform(0.8, 1))
 def set_conversion(X):
-    reactor.reactant_conversion = X
+    reactor.Oleic_acid_conversion = X
     
     # reactor is the object, reactant conversion is not defined
     
@@ -60,7 +60,7 @@ def set_product_price(X):
     
 import numpy as np
 np.random.seed(1234) # For consistent results
-N_samples = 50
+N_samples = 10
 rule = 'L' # For Latin-Hypercube sampling
 samples = model.sample(N_samples, rule)
 model.load_samples(samples)

@@ -32,7 +32,7 @@ if __name__ == '__main__':
              
     AC1 = bst.AdsorptionColumnTSA(
         'AC1', 
-        ins=[bst.Stream('feed', TAL=0.014, Water=1, units='kg/hr', T=30 + 273.15), 'ethanol', 'dry_air'], 
+        ins=[bst.Stream('feed', TAL=0.014, Water=1, units='kg/hr', total_flow=1000, T=30 + 273.15), 'ethanol', 'dry_air'], 
         mean_velocity=7.2, # m / hr; typical velocities are 4 to 14.4 m /hr for liquids; Adsorption basics Alan Gabelman (2017) Adsorption basics Part 1. AICHE
         regeneration_velocity=14.4, 
         cycle_time=2, # 1-2 hours required for thermal-swing-adsorption (TSA) for silica gels (add 1 hr for conservativeness); Seader, J. D., Separation Process Principles: Chemical and Biochemical Operations,” 3rd ed., Wiley, Hoboken, NJ (2011).

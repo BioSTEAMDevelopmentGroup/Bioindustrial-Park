@@ -115,7 +115,7 @@ kg_per_ton = 907.18474
 
 
 configuration_names = (
-    'S1', 'O1', 'S2', 'O2', 'S1*', 'O1*', 'S2*', 'O2*', 'O3',
+    'S1', 'O1', 'S2', 'O2', 'S1*', 'O1*', 'S2*', 'O2*', 'O3', 'O4',
 )
 comparison_names = (
     # 'I - ∅', 
@@ -171,7 +171,7 @@ def load(name, cache={}, reduce_chemicals=True,
     dct = globals()
     number, agile = dct['configuration'] = configuration = parse(name)
     key = (number, agile, enhanced_cellulosic_performance)
-    if key in cache:
+    if cache is not None and key in cache:
         dct.update(cache[key])
         return
     global oilcane_sys, sys, tea, specs, flowsheet, _system_loaded
@@ -1056,9 +1056,12 @@ def load(name, cache={}, reduce_chemicals=True,
         dct[i.setter.__name__] = i
     for i in model._metrics:
         dct[i.getter.__name__] = i
-    cache[key] = dct.copy()
+    if cache is not None: cache[key] = dct.copy()
     
     ## Simulation
+    HXN.force_ideal_thermo = True
+    HXN.cache_network = True
+    HXN.avoid_recycle = True
     try: 
         sys.simulate()
     except Exception as e:
@@ -1066,8 +1069,6 @@ def load(name, cache={}, reduce_chemicals=True,
     if reduce_chemicals:
         oilcane_sys.reduce_chemicals()
     oilcane_sys._load_stream_links()
-    HXN.force_ideal_thermo = True
-    HXN.cache_network = True
     HXN.simulate()
 
 # DO NOT DELETE: For removing ylabel and yticklabels and combine plots

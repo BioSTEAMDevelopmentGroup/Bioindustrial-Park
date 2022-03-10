@@ -83,6 +83,7 @@ def create_post_fermentation_oil_separation_system(ins, outs, wastewater_concent
         ins=P606-0,
         P=(101325, 69682, 47057, 30953),
         V=0.90, V_definition='First-effect',
+        thermo=oil.thermo.ideal(),
     )
     Ev607.target_oil_content = target_oil_content # kg / kg
     Ev607.pop_last_evaporator = pop_last_evaporator
@@ -489,6 +490,7 @@ def create_oilcane_to_crude_oil_and_ethanol_combined_1_and_2g_post_fermentation_
     EvX = bst.MultiEffectEvaporator(400, ins=MX-0,
                                     P=(101325, 69682, 47057, 30953, 19781),
                                     V_definition='First-effect',
+                                    thermo=hydrolysate.thermo.ideal(),
                                     V=0.05) # fraction evaporated
     PX = bst.Pump(400, ins=EvX-0, P=101325.)
     MX = bst.Mixer(400, [PX-0, 'dilution_water'])
@@ -702,6 +704,7 @@ def create_oilcane_to_biodiesel_and_ethanol_combined_1_and_2g_post_fermentation_
     EvX = bst.MultiEffectEvaporator(400, ins=MX-0,
                                     P=(101325, 69682, 47057, 30953, 19781),
                                     V_definition='First-effect',
+                                    thermo=hydrolysate.thermo.ideal(),
                                     V=0.05) # fraction evaporated
     PX = bst.Pump(400, ins=EvX-0, P=101325.)
     MX = bst.Mixer(400, [PX-0, 'dilution_water'])
@@ -929,6 +932,7 @@ def create_sugarcane_to_ethanol_combined_1_and_2g(ins, outs):
     EvX = bst.MultiEffectEvaporator(400, ins=MX-0,
                                     P=(101325, 69682, 47057, 30953, 19781),
                                     V_definition='First-effect',
+                                    thermo=screened_juice.thermo.ideal(),
                                     V=0.05) # fraction evaporated
     PX = bst.Pump(400, ins=EvX-0, P=101325.)
     HX = bst.HXutility(400, PX-0, T=305.15)
