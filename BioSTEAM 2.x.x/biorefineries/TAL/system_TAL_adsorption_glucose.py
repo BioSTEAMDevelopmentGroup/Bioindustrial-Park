@@ -325,7 +325,7 @@ def create_TAL_sys(ins, outs):
     def M401_spec():
         makeup_ethanol, recycled_ethanol = M401.ins
         AC1.run()
-        AC2.run()
+        # AC2.run()
         M401._run()
         makeup_ethanol.imol['Ethanol'] = max(0., M401.outs[0].imol['Ethanol'] - recycled_ethanol.imol['Ethanol'])
         # S402.run()
@@ -337,7 +337,7 @@ def create_TAL_sys(ins, outs):
         # ins=[bst.Stream('feed', TAL=0.014, Water=1, units='kg/hr', T=30 + 273.15), 'ethanol'], 
         ins=[H401-0, S402-0, 'hot_air'],
         outs=['broth_post_adsorption', 'TAL_laden_ethanol', 'ethanol_laden_air'],
-        mean_velocity=7.2, # m / hr; typical velocities are 4 to 14.4 m /hr for liquids; Adsorption basics Alan Gabelman (2017) Adsorption basics Part 1. AICHE
+        mean_velocity=5, # m / hr; typical velocities are 4 to 14.4 m /hr for liquids; Adsorption basics Alan Gabelman (2017) Adsorption basics Part 1. AICHE
         regeneration_velocity=14.4, 
         cycle_time=2, # 1-2 hours required for thermal-swing-adsorption (TSA) for silica gels (add 1 hr for conservativeness); Seader, J. D., Separation Process Principles: Chemical and Biochemical Operations,” 3rd ed., Wiley, Hoboken, NJ (2011).
         rho_adsorbent=480, # (in kg/m3) Common for silica gels https://www.daisogelusa.com/technical-notes/approximate-packing-density-for-daisogel-bulk-silica-gel/
@@ -350,7 +350,7 @@ def create_TAL_sys(ins, outs):
         vessel_type='Vertical',
         regeneration_fluid=dict(phase='l', Ethanol=1., units='kg/hr'),
         adsorbate_ID='TAL',  
-        split=dict(TAL=1-0.99, Water=1, VitaminA=1., VitaminD2=1., FermMicrobe=1.),
+        split=dict(TAL=0, Water=1, VitaminA=1., VitaminD2=1., FermMicrobe=1.),
         length_plus = 0.,
         K = 0.078, # 0.125,
     )
@@ -371,44 +371,44 @@ def create_TAL_sys(ins, outs):
         # TAL_laden_ethanol.imol['Ethanol'] -= retained_ethanol_mol
         # M401.run()
     
-    AC2 = bst.AdsorptionColumnTSA(
-        'AC2', 
-        # ins=[bst.Stream('feed', TAL=0.014, Water=1, units='kg/hr', T=30 + 273.15), 'ethanol'], 
-        ins=[AC1-0, S401-0, 'hot_air'],
-        outs=['broth_post_adsorption', 'TAL_laden_ethanol', 'ethanol_laden_air'],
-        mean_velocity=7.2, # m / hr; typical velocities are 4 to 14.4 m /hr for liquids; Adsorption basics Alan Gabelman (2017) Adsorption basics Part 1. AICHE
-        regeneration_velocity=14.4, 
-        cycle_time=2, # 1-2 hours required for thermal-swing-adsorption (TSA) for silica gels (add 1 hr for conservativeness); Seader, J. D., Separation Process Principles: Chemical and Biochemical Operations,” 3rd ed., Wiley, Hoboken, NJ (2011).
-        rho_adsorbent=480, # (in kg/m3) Common for silica gels https://www.daisogelusa.com/technical-notes/approximate-packing-density-for-daisogel-bulk-silica-gel/
-        adsorbent_capacity=0.091327, # Conservative heuristic from Seider et. al. (2017) Product and Process Design Principles. Wiley
-        T_regeneration=30. + 273.15, # For silica gels; Seader, J. D., Separation Process Principles: Chemical and Biochemical Operations,” 3rd ed., Wiley, Hoboken, NJ (2011).
-        drying_time = 10./60., # h
-        air_velocity = 1332., # m/h
-        # T_air = 100. + 273.15, #K
-        vessel_material='Stainless steel 316',
-        vessel_type='Vertical',
-        regeneration_fluid=dict(phase='l', Ethanol=1., units='kg/hr'),
-        adsorbate_ID='TAL',  
-        split=dict(TAL=1-0.99, Water=1, VitaminA=1., VitaminD2=1., FermMicrobe=1.),
-        length_plus = 0.,
-        K = 0.078, # 0.125,
-    )
+    # AC2 = bst.AdsorptionColumnTSA(
+    #     'AC2', 
+    #     # ins=[bst.Stream('feed', TAL=0.014, Water=1, units='kg/hr', T=30 + 273.15), 'ethanol'], 
+    #     ins=[AC1-0, S401-0, 'hot_air'],
+    #     outs=['broth_post_adsorption', 'TAL_laden_ethanol', 'ethanol_laden_air'],
+    #     mean_velocity=7.2, # m / hr; typical velocities are 4 to 14.4 m /hr for liquids; Adsorption basics Alan Gabelman (2017) Adsorption basics Part 1. AICHE
+    #     regeneration_velocity=14.4, 
+    #     cycle_time=2, # 1-2 hours required for thermal-swing-adsorption (TSA) for silica gels (add 1 hr for conservativeness); Seader, J. D., Separation Process Principles: Chemical and Biochemical Operations,” 3rd ed., Wiley, Hoboken, NJ (2011).
+    #     rho_adsorbent=480, # (in kg/m3) Common for silica gels https://www.daisogelusa.com/technical-notes/approximate-packing-density-for-daisogel-bulk-silica-gel/
+    #     adsorbent_capacity=0.091327, # Conservative heuristic from Seider et. al. (2017) Product and Process Design Principles. Wiley
+    #     T_regeneration=30. + 273.15, # For silica gels; Seader, J. D., Separation Process Principles: Chemical and Biochemical Operations,” 3rd ed., Wiley, Hoboken, NJ (2011).
+    #     drying_time = 10./60., # h
+    #     air_velocity = 1332., # m/h
+    #     # T_air = 100. + 273.15, #K
+    #     vessel_material='Stainless steel 316',
+    #     vessel_type='Vertical',
+    #     regeneration_fluid=dict(phase='l', Ethanol=1., units='kg/hr'),
+    #     adsorbate_ID='TAL',  
+    #     split=dict(TAL=1-0.99, Water=1, VitaminA=1., VitaminD2=1., FermMicrobe=1.),
+    #     length_plus = 0.,
+    #     K = 0.078, # 0.125,
+    # )
     
-    @AC2.add_specification
-    def AC2_spec(): # update recovery and capacity based on user-input adsorption time and temperature
-        T = AC2.ins[0].T    
-        t = AC2.cycle_time # this needs to exclude hot air time
-        # recovery = rec_interp(t, T)
-        capacity = cap_interp(t, T)
-        # AC2.recovery = recovery
-        AC2.adsorbent_capacity = capacity[0]
-        AC2._run()
-        # TAL_laden_ethanol = AC2.outs[1]
-        # TAL_laden_ethanol.phase = 'l'
-        # ethanol_laden_air = AC2.outs[2]
-        # ethanol_laden_air.imol['Ethanol'] = retained_ethanol_mol = AC2.ins[1].imol['Ethanol'] / AC2.N_washes # worst case; assume entire void volume of columns is still filled with ethanol
-        # TAL_laden_ethanol.imol['Ethanol'] -= retained_ethanol_mol
-        # M401.run()
+    # @AC2.add_specification
+    # def AC2_spec(): # update recovery and capacity based on user-input adsorption time and temperature
+    #     T = AC2.ins[0].T    
+    #     t = AC2.cycle_time # this needs to exclude hot air time
+    #     # recovery = rec_interp(t, T)
+    #     capacity = cap_interp(t, T)
+    #     # AC2.recovery = recovery
+    #     AC2.adsorbent_capacity = capacity[0]
+    #     AC2._run()
+    #     # TAL_laden_ethanol = AC2.outs[1]
+    #     # TAL_laden_ethanol.phase = 'l'
+    #     # ethanol_laden_air = AC2.outs[2]
+    #     # ethanol_laden_air.imol['Ethanol'] = retained_ethanol_mol = AC2.ins[1].imol['Ethanol'] / AC2.N_washes # worst case; assume entire void volume of columns is still filled with ethanol
+    #     # TAL_laden_ethanol.imol['Ethanol'] -= retained_ethanol_mol
+    #     # M401.run()
         
     # F401 = bst.units.MultiEffectEvaporator('F401', ins=AC1-1, outs=('F401_b', 'F401_t'),
     #                                         P = (101325, 73581, 50892, 32777, 20000), V = 0.7)
@@ -425,8 +425,8 @@ def create_TAL_sys(ins, outs):
 
     # F401.specification = BoundedNumericalSpecification(F401_obj_fn, 1e-4, 1.-1e-4)
     
-    M403 = bst.Mixer('M403', ins=(AC1-1, AC2-1))
-    F402 = bst.units.Flash('F402', ins=M403-0, outs=('F402_b', 'F402_t'), P=101325.,
+    # M403 = bst.Mixer('M403', ins=(AC1-1, AC2-1))
+    F402 = bst.units.Flash('F402', ins=AC1-1, outs=('F402_b', 'F402_t'), P=101325.,
                             V=0.5) # !!! TODO: replace with dryer
     def F402_spec():
             F402_b = F402.outs[1]
@@ -438,8 +438,8 @@ def create_TAL_sys(ins, outs):
             F402_ins_0.imol['TAL'] = TAL_mol
             F402_b.imol['TAL'] = TAL_mol        
     F402.specification = F402_spec
-    M404 = bst.Mixer('M402', ins=(AC1-2, AC2-2))
-    H402 = bst.units.HXutility('H402', ins=M404-0, outs=('cooled_ethanol_laden_air'), 
+    # M404 = bst.Mixer('M402', ins=(AC1-2, AC2-2))
+    H402 = bst.units.HXutility('H402', ins=AC1-2, outs=('cooled_ethanol_laden_air'), 
                                T=2.+273.15, rigorous=True)
     
     S403 = bst.units.FakeSplitter('S403', ins=H402-0, outs=('cool_air', 'ethanol_recovered_from_air'))
@@ -474,7 +474,7 @@ def create_TAL_sys(ins, outs):
     
     # Mix waste liquids for treatment
     M501 = bst.units.Mixer('M501', ins=(
-                                        AC2-0,
+                                        AC1-0,
                                         # S402-1,
                                         # F401-0,
                                         # r_S402_s-1, r_S403_s-1, r_S404_s-1,
