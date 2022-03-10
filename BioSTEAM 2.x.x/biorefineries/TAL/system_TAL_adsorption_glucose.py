@@ -338,7 +338,7 @@ def create_TAL_sys(ins, outs):
         ins=[H401-0, S402-0, 'hot_air'],
         outs=['broth_post_adsorption', 'TAL_laden_ethanol', 'ethanol_laden_air'],
         mean_velocity=7.2, # m / hr; typical velocities are 4 to 14.4 m /hr for liquids; Adsorption basics Alan Gabelman (2017) Adsorption basics Part 1. AICHE
-        regeneration_velocity=11.555, # max 14.4
+        regeneration_velocity=4.838, # max 14.4
         cycle_time=2, # 1-2 hours required for thermal-swing-adsorption (TSA) for silica gels (add 1 hr for conservativeness); Seader, J. D., Separation Process Principles: Chemical and Biochemical Operations,” 3rd ed., Wiley, Hoboken, NJ (2011).
         rho_adsorbent=480, # (in kg/m3) Common for silica gels https://www.daisogelusa.com/technical-notes/approximate-packing-density-for-daisogel-bulk-silica-gel/
         adsorbent_capacity=0.091327, # Conservative heuristic from Seider et. al. (2017) Product and Process Design Principles. Wiley
@@ -377,7 +377,7 @@ def create_TAL_sys(ins, outs):
         ins=[AC1-0, S401-0, 'hot_air'],
         outs=['broth_post_adsorption', 'TAL_laden_ethanol', 'ethanol_laden_air'],
         mean_velocity=7.2, # m / hr; typical velocities are 4 to 14.4 m /hr for liquids; Adsorption basics Alan Gabelman (2017) Adsorption basics Part 1. AICHE
-        regeneration_velocity=11.555, # max 14.4
+        regeneration_velocity=4.838, # max 14.4
         cycle_time=2, # 1-2 hours required for thermal-swing-adsorption (TSA) for silica gels (add 1 hr for conservativeness); Seader, J. D., Separation Process Principles: Chemical and Biochemical Operations,” 3rd ed., Wiley, Hoboken, NJ (2011).
         rho_adsorbent=480, # (in kg/m3) Common for silica gels https://www.daisogelusa.com/technical-notes/approximate-packing-density-for-daisogel-bulk-silica-gel/
         adsorbent_capacity=0.091327, # Conservative heuristic from Seider et. al. (2017) Product and Process Design Principles. Wiley
