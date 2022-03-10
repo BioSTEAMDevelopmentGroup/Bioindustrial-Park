@@ -289,27 +289,27 @@ def create_TAL_sys(ins, outs):
     # =============================================================================
     
     
-    # Fake unit to enable solid-liquid equilibrium for fermentation broth
-    U401 = bst.Unit('U401', ins=R302-0, outs=('fermentation_broth_first_sle'))
+    # # Fake unit to enable solid-liquid equilibrium for fermentation broth
+    # U401 = bst.Unit('U401', ins=R302-0, outs=('fermentation_broth_first_sle'))
     
-    def U401_spec():
-        U401_ins_0 = U401.ins[0]
-        tot_TAL = U401_ins_0.imol['TAL']
-        U401_outs_0 = U401.outs[0]
-        U401_outs_0.copy_like(U401_ins_0)
-        mol_TAL_dissolved = get_mol_TAL_dissolved(U401_outs_0.T, U401_outs_0.imol['Water'])
-        U401_outs_0.sle('TAL', U401_outs_0.T) #!!! TODO: use computationally cheaper way of changing from Stream to MultiStream
-        U401_outs_0.imol['l', 'TAL'] = min(mol_TAL_dissolved, tot_TAL)
-        U401_outs_0.imol['s', 'TAL'] = tot_TAL - min(mol_TAL_dissolved, tot_TAL)
+    # def U401_spec():
+    #     U401_ins_0 = U401.ins[0]
+    #     tot_TAL = U401_ins_0.imol['TAL']
+    #     U401_outs_0 = U401.outs[0]
+    #     U401_outs_0.copy_like(U401_ins_0)
+    #     mol_TAL_dissolved = get_mol_TAL_dissolved(U401_outs_0.T, U401_outs_0.imol['Water'])
+    #     U401_outs_0.sle('TAL', U401_outs_0.T) #!!! TODO: use computationally cheaper way of changing from Stream to MultiStream
+    #     U401_outs_0.imol['l', 'TAL'] = min(mol_TAL_dissolved, tot_TAL)
+    #     U401_outs_0.imol['s', 'TAL'] = tot_TAL - min(mol_TAL_dissolved, tot_TAL)
         
-    U401.specification = U401_spec
+    # U401.specification = U401_spec
     
 
     # # Remove solids from fermentation broth, modified from the pressure filter in Humbird et al.
     S401_index = [splits_df.index[0]] + splits_df.index[2:].to_list()
     S401_cell_mass_split = [splits_df['stream_571'][0]] + splits_df['stream_571'][2:].to_list()
     S401_filtrate_split = [splits_df['stream_535'][0]] + splits_df['stream_535'][2:].to_list()
-    S401 = bst.units.SolidsCentrifuge('S401', ins=U401-0, outs=('S401_solid_fraction', 'S401_liquid_fraction'),
+    S401 = bst.units.SolidsCentrifuge('S401', ins=R302-0, outs=('S401_solid_fraction', 'S401_liquid_fraction'),
                                 # moisture_content=0.50,
                                 split=find_split(S401_index,
                                                   S401_cell_mass_split,
@@ -318,7 +318,7 @@ def create_TAL_sys(ins, outs):
                                     ['Xylan', 'Glucan', 'Lignin', 'FermMicrobe',\
                                       'Ash', 'Arabinan', 'Galactan', 'Mannan'])
     
-    H401 = bst.units.HXutility('H401', ins=S401-1, outs = ('broth_to_adsorbent',), T=30. + 273.15)
+    H401 = bst.units.HXutility('H401', ins=S401-1, outs = ('broth_to_adsorbtion',), T=30. + 273.15)
     
     M401 = bst.Mixer('M401', ins=(Ethanol_desorption, ''), outs=('mixed_ethanol_for_desorption'))
     S402 = bst.FakeSplitter('S402', ins=M401-0, outs=('ethanol_to_AC1', 'ethanol_to_AC2'))
@@ -327,7 +327,9 @@ def create_TAL_sys(ins, outs):
         AC1.run()
         # AC2.run()
         M401._run()
-        makeup_ethanol.imol['Ethanol'] = max(0., M401.outs[0].imol['Ethanol'] - recycled_ethanol.imol['Ethanol'])
+        M401_outs_0 = M401.outs[0]
+        M401_outs_0.imol['Ethanol'] = S402.outs[0].imol['Ethanol'] + S402.outs[1].imol['Ethanol']
+        makeup_ethanol.imol['Ethanol'] = max(0., M401_outs_0.imol['Ethanol'] - recycled_ethanol.imol['Ethanol'])
         # S402.run()
         # M401._run()
     M401.specification = M401_spec
@@ -337,10 +339,18 @@ def create_TAL_sys(ins, outs):
         # ins=[bst.Stream('feed', TAL=0.014, Water=1, units='kg/hr', T=30 + 273.15), 'ethanol'], 
         ins=[H401-0, S402-0, 'hot_air'],
         outs=['broth_post_adsorption', 'TAL_laden_ethanol', 'ethanol_laden_air'],
-        mean_velocity=5, # m / hr; typical velocities are 4 to 14.4 m /hr for liquids; Adsorption basics Alan Gabelman (2017) Adsorption basics Part 1. AICHE
-        regeneration_velocity=14.4, 
-        cycle_time=2, # 1-2 hours required for thermal-swing-adsorption (TSA) for silica gels (add 1 hr for conservativeness); Seader, J. D., Separation Process Principles: Chemical and Biochemical Operations,” 3rd ed., Wiley, Hoboken, NJ (2011).
-        rho_adsorbent=480, # (in kg/m3) Common for silica gels https://www.daisogelusa.com/technical-notes/approximate-packing-density-for-daisogel-bulk-silica-gel/
+        mean_velocity=7.2, # m / hr; typical velocities are 4 to 14.4 m /hr for liquids; Adsorption basics Alan Gabelman (2017) Adsorption basics Part 1. AICHE
+        
+        # TODO: Why is this value so low, shouldn't it be as high as possible?
+        regeneration_velocity=4.838, # max 14.4
+        
+        cycle_time=2., # 1-2 hours required for thermal-swing-adsorption (TSA) for silica gels (add 1 hr for conservativeness); Seader, J. D., Separation Process Principles: Chemical and Biochemical Operations,” 3rd ed., Wiley, Hoboken, NJ (2011).
+        
+        # TODO: This is density of activated carbon packing, including voids.
+        # So rho_adsorbent = (1 - epsilon) * rho where epsilon is the void fraction
+        # and rho is the density of activated carbon with no voids.
+        rho_adsorbent=2050., # (in kg/m3) 
+        
         adsorbent_capacity=0.091327, # Conservative heuristic from Seider et. al. (2017) Product and Process Design Principles. Wiley
         T_regeneration=30. + 273.15, # For silica gels; Seader, J. D., Separation Process Principles: Chemical and Biochemical Operations,” 3rd ed., Wiley, Hoboken, NJ (2011).
         drying_time = 10./60., # h
@@ -374,12 +384,12 @@ def create_TAL_sys(ins, outs):
     # AC2 = bst.AdsorptionColumnTSA(
     #     'AC2', 
     #     # ins=[bst.Stream('feed', TAL=0.014, Water=1, units='kg/hr', T=30 + 273.15), 'ethanol'], 
-    #     ins=[AC1-0, S401-0, 'hot_air'],
+    #     ins=[AC1-0, S402-1, 'hot_air'],
     #     outs=['broth_post_adsorption', 'TAL_laden_ethanol', 'ethanol_laden_air'],
     #     mean_velocity=7.2, # m / hr; typical velocities are 4 to 14.4 m /hr for liquids; Adsorption basics Alan Gabelman (2017) Adsorption basics Part 1. AICHE
-    #     regeneration_velocity=14.4, 
-    #     cycle_time=2, # 1-2 hours required for thermal-swing-adsorption (TSA) for silica gels (add 1 hr for conservativeness); Seader, J. D., Separation Process Principles: Chemical and Biochemical Operations,” 3rd ed., Wiley, Hoboken, NJ (2011).
-    #     rho_adsorbent=480, # (in kg/m3) Common for silica gels https://www.daisogelusa.com/technical-notes/approximate-packing-density-for-daisogel-bulk-silica-gel/
+    #     regeneration_velocity=4.838, # max 14.4
+    #     cycle_time=2., # 1-2 hours required for thermal-swing-adsorption (TSA) for silica gels (add 1 hr for conservativeness); Seader, J. D., Separation Process Principles: Chemical and Biochemical Operations,” 3rd ed., Wiley, Hoboken, NJ (2011).
+    #     rho_adsorbent=480., # (in kg/m3) Common for silica gels https://www.daisogelusa.com/technical-notes/approximate-packing-density-for-daisogel-bulk-silica-gel/
     #     adsorbent_capacity=0.091327, # Conservative heuristic from Seider et. al. (2017) Product and Process Design Principles. Wiley
     #     T_regeneration=30. + 273.15, # For silica gels; Seader, J. D., Separation Process Principles: Chemical and Biochemical Operations,” 3rd ed., Wiley, Hoboken, NJ (2011).
     #     drying_time = 10./60., # h
@@ -438,6 +448,7 @@ def create_TAL_sys(ins, outs):
             F402_ins_0.imol['TAL'] = TAL_mol
             F402_b.imol['TAL'] = TAL_mol        
     F402.specification = F402_spec
+    
     # M404 = bst.Mixer('M402', ins=(AC1-2, AC2-2))
     H402 = bst.units.HXutility('H402', ins=AC1-2, outs=('cooled_ethanol_laden_air'), 
                                T=2.+273.15, rigorous=True)
@@ -448,8 +459,8 @@ def create_TAL_sys(ins, outs):
         S403.outs[0].mol[:] = S403_ins_0['g'].mol[:]
         S403.outs[1].mol[:] = S403_ins_0['l'].mol[:]
     S403.specification = S403_spec
-    
-    M402 = bst.Mixer('M402', ins=(F402-0, S402-1), outs=('recycled_ethanol',))
+    # S403-0-2-M404
+    M402 = bst.Mixer('M402', ins=(F402-0, S403-1), outs=('recycled_ethanol',))
     M402-0-1-M401
     
     
@@ -935,7 +946,7 @@ spec = ProcessSpecification(
     substrates=('Xylose', 'Glucose'),
     products=('TAL',),
     spec_1=0.203,
-    spec_2=35.9,
+    spec_2=15.,
     spec_3=0.21,
     xylose_utilization_fraction = 0.80,
     feedstock = feedstock,
@@ -969,7 +980,7 @@ def M304_titer_obj_fn(water_to_sugar_mol_ratio):
 
 def load_titer_with_glucose(titer_to_load):
     u.R302.titer_to_load = titer_to_load
-    flx.IQ_interpolation(M304_titer_obj_fn, 1e-3, 250.)
+    flx.IQ_interpolation(M304_titer_obj_fn, 1e-3, 2000.)
     
 spec.load_spec_2 = load_titer_with_glucose
 
@@ -1060,7 +1071,7 @@ def simulate_and_print():
 # simulate_and_print()
 # TAL_sys.simulate()
 get_SA_MPSP()
-spec.load_specifications(0.203, 35.9, 0.21)
+spec.load_specifications(0.203, 15., 0.21)
 simulate_and_print()
 
 # %% 
