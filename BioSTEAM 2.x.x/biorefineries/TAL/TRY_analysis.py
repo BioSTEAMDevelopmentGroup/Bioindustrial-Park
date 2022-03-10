@@ -292,11 +292,11 @@ TAL_metrics = [get_SA_MPSP, get_TAL_sugars_conc, get_TAL_inhibitors_conc]
 # TAL_metrics = [get_TAL_MPSP, get_GWP, get_FEC]
 
 # %% Generate 3-specification meshgrid and set specification loading functions
-steps = 5
+steps = 20
 
 # Yield, titer, productivity (rate)
 spec_1 = np.linspace(0.2, 0.9, steps) # yield
-spec_2 = np.linspace(25., 100., steps) # titer
+spec_2 = np.linspace(5., 25., steps) # titer
 # spec_1 = np.linspace(0.2, 0.99, steps) # yield
 # spec_2 = np.linspace(45, 225, steps) # titer
 spec_3 = np.array([0.21,]) # productivity
@@ -308,7 +308,7 @@ ylabel = 'Titer [$\mathrm{g} \cdot \mathrm{L}^{-1}$]'
 # xticks = [0.33, 0.66, 0.99]
 xticks = [0.0, 0.2, 0.4, 0.6, 0.8, 1.0]
 # yticks = [75, 150, 225]
-yticks = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100]
+yticks = [10, 20, 30]
 # xticks = [0.2, 0.6, 0.99]
 # yticks = [45, 135, 225]
 spec_3_units = "$\mathrm{g} \cdot \mathrm{L}^{-1} \cdot \mathrm{hr}^{-1}$"
