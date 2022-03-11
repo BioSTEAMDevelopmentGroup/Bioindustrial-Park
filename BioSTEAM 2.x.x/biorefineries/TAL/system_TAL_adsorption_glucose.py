@@ -341,8 +341,7 @@ def create_TAL_sys(ins, outs):
         outs=['broth_post_adsorption', 'TAL_laden_ethanol', 'ethanol_laden_air'],
         mean_velocity=7.2, # m / hr; typical velocities are 4 to 14.4 m /hr for liquids; Adsorption basics Alan Gabelman (2017) Adsorption basics Part 1. AICHE
         
-        # TODO: Why is this value so low, shouldn't it be as high as possible?
-        regeneration_velocity=7.2, # max 14.4
+        regeneration_velocity=14.4, # max 14.4
         
         cycle_time=2., # 1-2 hours required for thermal-swing-adsorption (TSA) for silica gels (add 1 hr for conservativeness); Seader, J. D., Separation Process Principles: Chemical and Biochemical Operations,” 3rd ed., Wiley, Hoboken, NJ (2011).
         
@@ -351,7 +350,7 @@ def create_TAL_sys(ins, outs):
         # and rho is the density of activated carbon with no voids.
         rho_adsorbent=2050., # (in kg/m3) 
         
-        adsorbent_capacity=0.091327, # Conservative heuristic from Seider et. al. (2017) Product and Process Design Principles. Wiley
+        adsorbent_capacity=0.091327, # Default value (updated in unit specification); conservative heuristic from Seider et. al. (2017) Product and Process Design Principles. Wiley
         T_regeneration=30. + 273.15, # For silica gels; Seader, J. D., Separation Process Principles: Chemical and Biochemical Operations,” 3rd ed., Wiley, Hoboken, NJ (2011).
         drying_time = 10./60., # h
         air_velocity = 1332., # m/h
@@ -375,11 +374,7 @@ def create_TAL_sys(ins, outs):
         # AC1.recovery = recovery
         AC1.adsorbent_capacity = capacity[0]
         AC1._run()
-        # TAL_laden_ethanol = AC1.outs[1]
-        # TAL_laden_ethanol.phase = 'l'
-        # ethanol_laden_air = AC1.outs[2]
-        # ethanol_laden_air.imol['Ethanol'] = retained_ethanol_mol = AC1.ins[1].imol['Ethanol'] / AC1.N_washes # worst case; assume entire void volume of columns is still filled with ethanol
-        # TAL_laden_ethanol.imol['Ethanol'] -= retained_ethanol_mol
+
         # M401.run()
     
     # AC2 = bst.AdsorptionColumnTSA(
@@ -421,23 +416,24 @@ def create_TAL_sys(ins, outs):
     #     # TAL_laden_ethanol.imol['Ethanol'] -= retained_ethanol_mol
     #     # M401.run()
         
-    # F401 = bst.units.MultiEffectEvaporator('F401', ins=AC1-1, outs=('F401_b', 'F401_t'),
-    #                                         P = (101325, 73581, 50892, 32777, 20000), V = 0.7)
-    # def F401_obj_fn(V):
-    #     F401_b = F401.outs[0]
-    #     F401_ins_0 = F401.ins[0]
-    #     TAL_mass = F401_ins_0.imass['TAL']
-    #     F401_ins_0.imass['TAL'] = 0.
-    #     F401.V = V
-    #     F401._run()
-    #     F401_ins_0.imass['TAL']  =TAL_mass
-    #     F401_b.imass['TAL'] = TAL_mass
-    #     return get_TAL_solubility_in_ethanol_ww() - F401_b.imass['TAL']/F401_b.F_mass
+    F401 = bst.units.MultiEffectEvaporator('F401', ins=AC1-1, outs=('F401_b', 'F401_t'),
+                                            P = (101325, 73581, 50892, 32777, 20000), V = 0.7)
+    F401.TAL_solubility_in_ethanol_ww = get_TAL_solubility_in_ethanol_ww()
+    def F401_obj_fn(V):
+        F401_b = F401.outs[0]
+        F401_ins_0 = F401.ins[0]
+        TAL_mass = F401_ins_0.imass['TAL']
+        F401_ins_0.imass['TAL'] = 0.
+        F401.V = V
+        F401._run()
+        F401_ins_0.imass['TAL']  =TAL_mass
+        F401_b.imass['TAL'] = TAL_mass
+        return F401.TAL_solubility_in_ethanol_ww - F401_b.imass['TAL']/F401_b.F_mass
 
-    # F401.specification = BoundedNumericalSpecification(F401_obj_fn, 1e-4, 1.-1e-4)
+    F401.specification = BoundedNumericalSpecification(F401_obj_fn, 1e-4, 1.-1e-4)
     
     # M403 = bst.Mixer('M403', ins=(AC1-1, AC2-1))
-    F402 = bst.units.Flash('F402', ins=AC1-1, outs=('F402_b', 'F402_t'), P=101325.,
+    F402 = bst.units.Flash('F402', ins=F401-0, outs=('F402_b', 'F402_t'), P=101325.,
                             V=0.5) # !!! TODO: replace with dryer
     def F402_spec():
             F402_b = F402.outs[1]
