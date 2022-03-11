@@ -342,7 +342,7 @@ def create_TAL_sys(ins, outs):
         mean_velocity=7.2, # m / hr; typical velocities are 4 to 14.4 m /hr for liquids; Adsorption basics Alan Gabelman (2017) Adsorption basics Part 1. AICHE
         
         # TODO: Why is this value so low, shouldn't it be as high as possible?
-        regeneration_velocity=4.838, # max 14.4
+        regeneration_velocity=7.2, # max 14.4
         
         cycle_time=2., # 1-2 hours required for thermal-swing-adsorption (TSA) for silica gels (add 1 hr for conservativeness); Seader, J. D., Separation Process Principles: Chemical and Biochemical Operations,” 3rd ed., Wiley, Hoboken, NJ (2011).
         
@@ -362,6 +362,7 @@ def create_TAL_sys(ins, outs):
         adsorbate_ID='TAL',  
         split=dict(TAL=0, Water=1, VitaminA=1., VitaminD2=1., FermMicrobe=1.),
         length_plus = 0.,
+        target_recovery=0.99,
         K = 0.078, # 0.125,
     )
     

@@ -184,7 +184,7 @@ for dct in (mc_metric_settings, mc_comparison_settings, mc_derivative_metric_set
 # %% Plots for publication
 
 def plot_all():
-    plot_montecarlo_main_manuscript()
+    # plot_montecarlo_main_manuscript()
     plot_montecarlo_absolute()
     plot_spearman_tea()
     plot_spearman_lca()
@@ -226,8 +226,9 @@ def plot_montecarlo_main_manuscript():
     add_title(gs_configuration_comparison, '(II) Impact of cellulosic ethanol integration')
     add_title(gs_agile_comparison, '(III) Impact of\noilsorghum\nintegration')
     plt.show()
-    file = os.path.join(images_folder, 'montecarlo_main_manuscript.png')
-    plt.savefig(file, transparent=True)
+    for i in ('svg', 'png'):
+        file = os.path.join(images_folder, f'montecarlo_main_manuscript.{i}')
+        plt.savefig(file, transparent=True)
 
 def plot_montecarlo_feedstock_comparison(axes_box=None, letters=None, 
                                          single_column=True):
@@ -277,8 +278,9 @@ def plot_montecarlo_feedstock_comparison(axes_box=None, letters=None,
         #              fontsize=8)
     if axes_box is None:
         plt.subplots_adjust(right=0.96, left=left, wspace=0.38, top=0.98, bottom=bottom)
-        file = os.path.join(images_folder, 'montecarlo_feedstock_comparison.png')
-        plt.savefig(file, transparent=True)
+        for i in ('svg', 'png'):
+            file = os.path.join(images_folder, f'montecarlo_feedstock_comparison.{i}')
+            plt.savefig(file, transparent=True)
 
     
 def plot_montecarlo_configuration_comparison(axes_box=None, letters=None,
@@ -328,8 +330,9 @@ def plot_montecarlo_configuration_comparison(axes_box=None, letters=None,
                  fontsize=12, fontweight='bold')
     if axes_box is None:
         plt.subplots_adjust(right=0.96, left=left, wspace=0.38, top=0.98, bottom=bottom)
-        file = os.path.join(images_folder, 'montecarlo_configuration_comparison.png')
-        plt.savefig(file, transparent=True)
+        for i in ('svg', 'png'):
+            file = os.path.join(images_folder, f'montecarlo_configuration_comparison.{i}')
+            plt.savefig(file, transparent=True)
     
 def plot_montecarlo_agile_comparison(axes_box=None, letters=None):
     if axes_box is None:
@@ -358,8 +361,9 @@ def plot_montecarlo_agile_comparison(axes_box=None, letters=None):
                       fontsize=8)
     if axes_box is None:
         plt.subplots_adjust(right=0.9, left=0.2, wspace=0.5, top=0.98, bottom=0.15)
-        file = os.path.join(images_folder, 'montecarlo_agile_comparison.png')
-        plt.savefig(file, transparent=True)
+        for i in ('svg', 'png'):
+            file = os.path.join(images_folder, f'montecarlo_agile_comparison.{i}')
+            plt.savefig(file, transparent=True)
     
 def plot_montecarlo_derivative():
     set_font(size=8)
@@ -396,8 +400,9 @@ def plot_montecarlo_derivative():
         top=0.95, bottom=0.1,
         left=0.12, right=0.96
     )
-    file = os.path.join(images_folder, 'montecarlo_derivative.png')
-    plt.savefig(file, transparent=True)
+    for i in ('svg', 'png'):
+        file = os.path.join(images_folder, f'montecarlo_derivative.{i}')
+        plt.savefig(file, transparent=True)
 
 def plot_montecarlo_absolute():
     set_font(size=8)
@@ -422,8 +427,9 @@ def plot_montecarlo_absolute():
                  horizontalalignment='center',verticalalignment='center',
                  fontsize=12, fontweight='bold')
     plt.subplots_adjust(left=0.12, right=0.95, wspace=0.40, top=0.98, bottom=0.2)
-    file = os.path.join(images_folder, 'montecarlo_absolute.png')
-    plt.savefig(file, transparent=True)
+    for i in ('svg', 'png'):
+        file = os.path.join(images_folder, f'montecarlo_absolute.{i}')
+        plt.savefig(file, transparent=True)
     
 def plot_spearman_tea():
     set_font(size=8)
@@ -437,12 +443,13 @@ def plot_spearman_tea():
             'Conventional', 'Agile-Conventional',
             'Cellulosic', 'Agile-Cellulosic',
         ],
-        cutoff=0.03,
+        cutoff=0.025,
         kind='TEA',
     )
     plt.subplots_adjust(left=0.45, right=0.975, top=0.98, bottom=0.08)
-    file = os.path.join(images_folder, 'spearman_tea.png')
-    plt.savefig(file, transparent=True)
+    for i in ('svg', 'png'):
+        file = os.path.join(images_folder, f'spearman_tea.{i}')
+        plt.savefig(file, transparent=True)
 
 def plot_spearman_lca():
     set_font(size=8)
@@ -460,8 +467,9 @@ def plot_spearman_lca():
         kind='LCA',
     )
     plt.subplots_adjust(left=0.45, right=0.975, top=0.98, bottom=0.10)
-    file = os.path.join(images_folder, 'spearman_lca.png')
-    plt.savefig(file, transparent=True)
+    for i in ('svg', 'png'):
+        file = os.path.join(images_folder, f'spearman_lca.{i}')
+        plt.savefig(file, transparent=True)
 
 def plot_breakdowns():
     set_font(size=8)
@@ -482,9 +490,9 @@ def plot_breakdowns():
         plt.text((xlb + xub) * 0.5, ylb + (yub - ylb) * 1.2, letter, color=letter_color,
                   horizontalalignment='center',verticalalignment='center',
                   fontsize=12, fontweight='bold')
-    
-    file = os.path.join(images_folder, 'breakdowns.png')
-    plt.savefig(file, transparent=True)
+    for i in ('svg', 'png'):
+        file = os.path.join(images_folder, f'breakdowns.{i}')
+        plt.savefig(file, transparent=True)
 
 # %% Monte carlo values for manuscript
 
@@ -998,7 +1006,7 @@ def plot_monte_carlo(derivative=False, absolute=True, comparison=True,
         metric_info = mc_derivative_metric_settings
         default_metrics = list(metric_info)
     else:
-        default_configuration_names = oc.configuration_names
+        default_configuration_names = oc.configuration_names[:-2]
         default_comparison_names = oc.comparison_names
         if comparison:
             metric_info = mc_comparison_settings
@@ -1010,7 +1018,7 @@ def plot_monte_carlo(derivative=False, absolute=True, comparison=True,
             default_metrics = ['MFPP', 'TCI', 'production']
         else:
             default_metrics = list(metric_info)
-    if configuration_names is None: configuration_names = default_configuration_names
+    if configuration_names is None: configuration_names = default_configuration_names[:-2]
     if comparison_names is None: comparison_names = default_comparison_names
     if metrics is None: metrics = default_metrics
     combined = absolute and comparison
@@ -1162,7 +1170,7 @@ def plot_spearman(configurations, top=None, labels=None, metric=None, cutoff=Non
     ng_price = format_units('USD/cf')
     electricity_price = format_units('USD/kWhr')
     operating_days = format_units('day/yr')
-    capacity = format_units('ton/hr')
+    capacity = format_units('dry-MMton/yr')
     titer = format_units('g/L')
     productivity = format_units('g/L/hr')
     material_GWP = '$\\mathrm{kg} \\cdot \\mathrm{CO}_{2}\\mathrm{eq} \\cdot \\mathrm{kg}^{-1}$'
@@ -1170,12 +1178,13 @@ def plot_spearman(configurations, top=None, labels=None, metric=None, cutoff=Non
     index, ignored_list = zip(*[
          ('Bagasse oil retention [40 $-$ 70 %]', ['S2', 'S1', 'S2*', 'S1*']),
          ('Oil extraction efficiency [baseline + 0 $-$ 20 %]', ['S2', 'S1', 'S2*', 'S1*']),
-        (f'Plant capacity [330 $-$ 404 {capacity}]', []),
+        (f'Cane operating days [120 $-$ 180 {operating_days}]', []),
+        (f'Sorghum operating days [20 $-$ 60 {operating_days}]', ['S2', 'S1', 'O1', 'O2']),
+        (f'Crushing capacity [1.32 $-$ 2.20 {capacity}]', []),
         (f'Ethanol price [1.02, 1.80, 2.87 {stream_price}]', []),
         (f'Relative biodiesel price [0.31, 2.98, 4.11 {stream_price}]', []),
         (f'Natural gas price [3.71, 4.73, 6.18 {ng_price}]', ['S1', 'O1', 'S1*', 'O1*']),
         (f'Electricity price [0.0583, 0.065, 0.069 {electricity_price}]', ['S2', 'O2', 'S2*', 'O2*']),
-        (f'Operating days [180 $-$ 210 {operating_days}]', []),
          ('IRR [10 $-$ 15 %]', []),
         (f'Crude glycerol price [91 $-$ 200 {USD_ton}]', ['S2', 'S1', 'S2*', 'S1*']),
         (f'Pure glycerol price [501 $-$ 678 {USD_ton}]', ['S2', 'S1', 'S2*', 'S1*']),
