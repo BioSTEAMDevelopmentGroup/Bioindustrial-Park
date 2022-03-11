@@ -230,7 +230,7 @@ def create_canvas_sys(ins, outs):
     # Mix waste liquids for treatment
     M501 = bst.units.Mixer('M501', 
                            # ins=(S401-4)) # !!! here, add all wastewater streams (waste streams that are mostly mostly liquid-phase)
-                           ins=(''))
+                           ins=(S401-4))
     # This represents the total cost of wastewater treatment system
     WWT_cost = units.WastewaterSystemCost('WWT_cost', ins=M501-0)
     
@@ -298,7 +298,7 @@ def create_canvas_sys(ins, outs):
     # Mention results with and without S401-0 in manuscript
     M505 = bst.units.Mixer('M505', 
                            # ins=(S401-3), # !!! here, add all solid waste streams
-                           ins=(''),
+                           ins=(S401-3),
                             outs='wastes_to_boiler_turbogenerator')
     
     
@@ -435,9 +435,9 @@ def create_canvas_sys(ins, outs):
     process_groups.append(HXN_group)
     
     
-    AWM = AutoWasteManagement('AWM', wastewater_mixer=M501, boiler_solids_mixer=M505,
-                              to_wastewater_mixer_ID_key='to_WWT',
-                              to_boiler_solids_mixer_ID_key='to_boiler')
+    # AWM = AutoWasteManagement('AWM', wastewater_mixer=M501, boiler_solids_mixer=M505,
+    #                           to_wastewater_mixer_ID_key='to_WWT',
+    #                           to_boiler_solids_mixer_ID_key='to_boiler')
     
     BT_group = UnitGroup('BT_group',
                                    units=(BT,))

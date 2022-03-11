@@ -12,10 +12,10 @@ import numpy as np
 #%%
 def fun(v, t):
     AC1.mean_velocity=v
-    AC2.mean_velocity=v
+    # AC2.mean_velocity=v
     
     AC1.cycle_time = t
-    AC2.cycle_time = t
+    # AC2.cycle_time = t
     return get_SA_MPSP()
 
 mean_vels = np.linspace(1., 20., 20)

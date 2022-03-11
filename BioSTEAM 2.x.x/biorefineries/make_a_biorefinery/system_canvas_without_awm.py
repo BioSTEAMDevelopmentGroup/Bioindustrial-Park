@@ -275,7 +275,7 @@ def create_canvas_sys(ins, outs):
     M504 = bst.units.Mixer('M504', ins=(R501-2, S502-1))
     
     # Sludge centrifuge to separate water (centrate) from sludge
-    S503 = bst.units.Splitter('S503', ins=M504-0, outs=(1-M503, 'sludge'),
+    S503 = bst.units.Splitter('S503', ins=M504-0, outs=(1-M503, 'sludge_to_boiler'),
                               split=find_split(splits_df.index,
                                                splits_df['stream_616'],
                                                splits_df['stream_623'],
@@ -294,7 +294,8 @@ def create_canvas_sys(ins, outs):
     # Mix solid wastes to boiler turbogeneration
     
     # Mention results with and without S401-0 in manuscript
-    M505 = bst.units.Mixer('M505', ins=(S503-1,
+    M505 = bst.units.Mixer('M505', ins=(
+                                        # S503-1,
                                         S401-3,
                                         ), # !!! here, add all solid waste streams
                             outs='wastes_to_boiler_turbogenerator')
