@@ -416,7 +416,7 @@ def create_TAL_sys(ins, outs):
     #     # TAL_laden_ethanol.imol['Ethanol'] -= retained_ethanol_mol
     #     # M401.run()
         
-    F401 = bst.units.MultiEffectEvaporator('F401', ins=AC1-1, outs=('F401_b', 'F401_t'),
+    F401 = bst.units.MultiEffectEvaporator('F401', ins=AC1-1, outs=('F401_b', 'F401_t'), chemical='Ethanol',
                                             P = (101325, 73581, 50892, 32777, 20000), V = 0.7)
     F401.TAL_solubility_in_ethanol_ww = get_TAL_solubility_in_ethanol_ww()
     def F401_obj_fn(V):
@@ -457,7 +457,7 @@ def create_TAL_sys(ins, outs):
         S403.outs[1].mol[:] = S403_ins_0['l'].mol[:]
     S403.specification = S403_spec
     # S403-0-2-M404
-    M402 = bst.Mixer('M402', ins=(F402-0, S403-1), outs=('recycled_ethanol',))
+    M402 = bst.Mixer('M402', ins=(F401-1, F402-0, S403-1), outs=('recycled_ethanol',))
     M402-0-1-M401
     
     
