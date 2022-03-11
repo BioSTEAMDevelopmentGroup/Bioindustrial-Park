@@ -67,8 +67,10 @@ diverging_colormaps = [
 ]
 
 colormaps = [
-    LinearSegmentedColormap.from_list('CABBI', CABBI_colors, 25),
-    LinearSegmentedColormap.from_list('CABBI', CABBI_colors_x, 25),
+    plt.cm.get_cmap('viridis'),
+    plt.cm.get_cmap('copper_r'),
+    # LinearSegmentedColormap.from_list('CABBI', CABBI_colors, 25),
+    # LinearSegmentedColormap.from_list('CABBI', CABBI_colors_x, 25),
     plt.cm.get_cmap('inferno_r'),
     plt.cm.get_cmap('copper_r'),
     plt.cm.get_cmap('bone_r'),
@@ -120,7 +122,7 @@ def plot_relative_sorghum_oil_content_and_cane_oil_content_contours_manuscript(l
     )
     colors = np.zeros([2, 2], object)
     colors[:] = [[light_letter_color, light_letter_color],
-                 [dark_letter_color, light_letter_color]]
+                 [light_letter_color, light_letter_color]]
     _add_letter_labels(axes, 0.82, 0.70, colors)
     plt.subplots_adjust(right=0.92, wspace=0.1, top=0.9, bottom=0.12)
     file = os.path.join(images_folder, 'relative_sorghum_oil_content_and_cane_oil_content_contours.svg')
@@ -303,8 +305,10 @@ def plot_relative_sorghum_oil_content_and_cane_oil_content_contours(
     else:
         raise ValueError('configuration index must be either 0 or 1')
     metric_bars = [
-        MetricBar(MFPP.name, format_units(MFPP.units), colormaps[0], tickmarks(data[:, :, 0], 5, 5), 15, 1),
-        MetricBar(TCI.name, format_units(TCI.units), colormaps[1], tickmarks(data[:, :, 1], 5, 5), 30),
+        [MetricBar(MFPP.name, format_units(MFPP.units), colormaps[0], tickmarks(data[:, :, 0, 0], 5, 1, expand=0, p=1), 10, 1),
+         MetricBar(MFPP.name, format_units(MFPP.units), colormaps[0], tickmarks(data[:, :, 0, 1], 5, 1, expand=0, p=1), 10, 1)],
+        [MetricBar(TCI.name, format_units(TCI.units), colormaps[1], tickmarks(data[:, :, 1, 0], 5, 5, expand=0, p=5), 10, 1),
+         MetricBar(TCI.name, format_units(TCI.units), colormaps[1], tickmarks(data[:, :, 1, 1], 5, 5, expand=0, p=5), 10, 1)],
     ]
     fig, axes, CSs, CB = plot_contour_2d(
         100.*X, 100.*Y, Z, data, xlabel, ylabel, xticks, yticks, metric_bars, 
@@ -343,15 +347,16 @@ def plot_extraction_efficiency_and_oil_content_contours(
     yticks = [5, 7.5, 10, 12.5, 15]
     metric = oc.all_metric_mockups[metric_index]
     units = metric.units if metric.units == '%' else format_units(metric.units)
-    metric_bar = MetricBar(
-        metric.name, units, colormaps[metric_index], 
-        tickmarks(data, 5, 5), 18, N_decimals=N_decimals,
-        forced_size=0.3
-    )
-    fig, axes, CSs, CB = plot_contour_single_metric(
-        100.*X, 100.*Y, data, xlabel, ylabels, xticks, yticks, metric_bar, 
+    mb = lambda i, j: MetricBar(metric.name, units, colormaps[metric_index], tickmarks(data[:, :, i, j], 5, 1, expand=0, p=1), 10, N_decimals=N_decimals)
+    
+    metric_bars = [
+        [mb(0, 0), mb(0, 1)],
+        [mb(1, 0), mb(1, 1)],
+    ]
+    
+    fig, axes, CSs, CB = plot_contour_2d(
+        100.*X, 100.*Y, ['CONVENTIONAL', 'CELLULOSIC'], data, xlabel, ylabels, xticks, yticks, metric_bars, 
         fillcolor=None, styleaxiskw=dict(xtick0=False), label=True,
-        titles=['CONVENTIONAL', 'CELLULOSIC'],
     )
     M = len(configurations)
     N = len(agile)
