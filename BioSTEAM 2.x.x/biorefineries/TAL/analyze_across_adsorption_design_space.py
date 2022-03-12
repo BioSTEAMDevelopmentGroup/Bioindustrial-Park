@@ -34,7 +34,8 @@ plt.contourf(regen_vels, cycle_times, MPSPs_ads_ds)
 
 #%% Across titer without adsorption design optimization
 def MPSP_at_titer(t):
-    spec.load_specifications(spec_1=spec.spec_1, spec_2=t, spec_3=spec.spec_3)    
+    spec.load_specifications(spec_1=spec.spec_1, spec_2=t, spec_3=spec.spec_3)
+    AC1.regeneration_velocity = 3. + (17./25.)*t
     return get_SA_MPSP()
 
 titers = np.linspace(2., 25., 10)

@@ -383,7 +383,8 @@ data_1 = TAL_data = spec.evaluate_across_specs(
 
 
 dateTimeObj = datetime.now()
-file_to_save = 'TAL_TRY_%s.%s.%s-%s.%s'%(dateTimeObj.year, dateTimeObj.month, dateTimeObj.day, dateTimeObj.hour, dateTimeObj.minute)
+minute = '0' + str(dateTimeObj.minute) if len(str(dateTimeObj.minute))==1 else str(dateTimeObj.minute)
+file_to_save = 'TAL_TRY_%s.%s.%s-%s.%s'%(dateTimeObj.year, dateTimeObj.month, dateTimeObj.day, dateTimeObj.hour, minute)
 np.save(file_to_save, data_1)
 
 pd.DataFrame(data_1[:, :, 0, :][:,:,0]).to_csv('MPSP-'+file_to_save+'.csv')

@@ -368,7 +368,6 @@ def create_TAL_sys(ins, outs):
     @AC1.add_specification
     def AC1_spec(): # update recovery and capacity based on user-input adsorption time and temperature
         
-        #!!! When these 2 lines are commented in, the simulation takes absurdly long
         # AC1.cycle_time = 4.
         # AC1.regeneration_velocity = 3. + (17./25.)*R302.effluent_titer
         
@@ -946,7 +945,7 @@ def M304_titer_obj_fn(water_to_sugar_mol_ratio):
 def load_titer_with_glucose(titer_to_load):
     u.R302.titer_to_load = titer_to_load
     flx.IQ_interpolation(M304_titer_obj_fn, 1e-3, 2000.)
-    
+    u.AC1.regeneration_velocity = 3. + (17./25.)*titer_to_load
 spec.load_spec_2 = load_titer_with_glucose
 
 # path = (F301, R302)
