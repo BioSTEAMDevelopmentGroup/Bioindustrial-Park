@@ -1,9 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# BioSTEAM: The Biorefinery Simulation and Techno-Economic Analysis Modules
-# Copyright (C) 2020-2021, Yoel Cortes-Pena <yoelcortes@gmail.com>
 # Bioindustrial-Park: BioSTEAM's Premier Biorefinery Models and Results
-# Copyright (C) 2021, Yalin Li <yalinli2@illinois.edu>
+# Copyright (C) 2021-, Yalin Li <zoe.yalin.li@gmail.com>
 #
 # This module is under the UIUC open-source license. See
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
@@ -29,26 +27,10 @@ import math
 import biosteam as bst
 # from collections.abc import Iterable
 from biosteam.exceptions import DesignError
-
-# from biorefineries.wwt import (
-#     default_insolubles,
-#     InternalCirculationRx,
-#     WWTpump,
-#     PolishingFilter,
-#     new_price
-#     )
-# from biorefineries.utils import (
-#     auom,
-#     compute_stream_COD,
-#     format_str,
-#     get_BD_dct,
-#     get_split_dct,
-#     )
-from _chemicals import default_insolubles
-from _internal_circulation_rx import InternalCirculationRx
-from _wwt_pump import WWTpump
-from utils import (
-    auom,
+from ._chemicals import default_insolubles
+from ._internal_circulation_rx import InternalCirculationRx
+from ._wwt_pump import WWTpump
+from .utils import (
     compute_stream_COD,
     format_str,
     get_BD_dct,
@@ -58,14 +40,13 @@ from utils import (
 
 __all__ = ('AnMBR',)
 
-_ft_to_m = auom('ft').conversion_factor('m')
-_ft2_to_m2 = auom('ft2').conversion_factor('m2')
-_ft3_to_m3 = auom('ft3').conversion_factor('m3')
-_ft3_to_gal = auom('ft3').conversion_factor('gallon')
-_m3_to_gal = auom('m3').conversion_factor('gal')
+_ft_to_m = 0.3048 # auom('ft').conversion_factor('m')
+_ft2_to_m2 = 0.09290 # auom('ft2').conversion_factor('m2')
+_ft3_to_m3 = 0.02832 # auom('ft3').conversion_factor('m3')
+_ft3_to_gal = 7.4805 # auom('ft3').conversion_factor('gallon')
+_m3_to_gal = 264.1721 # auom('m3').conversion_factor('gal')
 _cmh_to_mgd = _m3_to_gal * 24 / 1e6 # cubic meter per hour to million gallon per day
-_lb_to_kg = auom('lb').conversion_factor('kg')
-
+_lb_to_kg = 0.4536 # auom('lb').conversion_factor('kg')
 
 
 # %%

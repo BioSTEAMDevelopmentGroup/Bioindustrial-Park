@@ -1,9 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# BioSTEAM: The Biorefinery Simulation and Techno-Economic Analysis Modules
-# Copyright (C) 2020-2021, Yoel Cortes-Pena <yoelcortes@gmail.com>
 # Bioindustrial-Park: BioSTEAM's Premier Biorefinery Models and Results
-# Copyright (C) 2021, Yalin Li <yalinli2@illinois.edu>
+# Copyright (C) 2021-, Yalin Li <zoe.yalin.li@gmail.com>
 #
 # This module is under the UIUC open-source license. See
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
@@ -12,8 +10,8 @@
 
 import os, pandas as pd
 from qsdsan.utils import time_printer, copy_samples
-from __init__ import results_path
-from models import model_cs, model_cs_wwt
+from . import results_path
+from .models import model_cs, model_cs_wwt
 
 N = 1000
 

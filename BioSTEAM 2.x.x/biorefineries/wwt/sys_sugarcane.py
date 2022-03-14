@@ -1,9 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# BioSTEAM: The Biorefinery Simulation and Techno-Economic Analysis Modules
-# Copyright (C) 2020-2021, Yoel Cortes-Pena <yoelcortes@gmail.com>
 # Bioindustrial-Park: BioSTEAM's Premier Biorefinery Models and Results
-# Copyright (C) 2021, Yalin Li <yalinli2@illinois.edu>
+# Copyright (C) 2021-, Yalin Li <zoe.yalin.li@gmail.com>
 #
 # Part of this module is based on the sugarcane biorefinery:
 # https://github.com/BioSTEAMDevelopmentGroup/Bioindustrial-Park/tree/master/BioSTEAM%202.x.x/biorefineries/sugarcane
@@ -14,7 +12,7 @@
 
 
 import biosteam  as bst
-from biosteam import main_flowsheet as F
+from biosteam import main_flowsheet
 
 # from biorefineries.wwt import (
 #     sc
@@ -26,7 +24,7 @@ from biosteam import main_flowsheet as F
 from __init__ import sc
 from _chemicals import create_sc_chemicals
 from _settings import new_price, load_sc_settings
-from _wwt_sys import create_wastewater_treatment_system
+from _wwt_sys import create_wastewater_system
 from utils import print_MESP
 
 
@@ -50,8 +48,8 @@ bst.settings.set_thermo(chems)
 
 )
 def create_sc_system(ins, outs, **wwt_kwargs):
-    s = F.stream
-    u = F.unit
+    s = main_flowsheet.stream
+    u = main_flowsheet.unit
 
     sugarcane, enzyme, H3PO4, lime, polymer, denaturant = ins
     ethanol, emissions, ash_disposal = outs
@@ -79,7 +77,7 @@ def create_sc_system(ins, outs, **wwt_kwargs):
     )
 
     ### Wastewater treatment ###
-    create_wastewater_treatment_system(
+    create_wastewater_system(
         ins=[ethanol_production_sys-1, M305-0],
         outs=['biogas', 'sludge_S603', 'recycled_water', 'brine'],
         mockup=True,
@@ -129,13 +127,15 @@ def create_sc_system(ins, outs, **wwt_kwargs):
 # =============================================================================
 
 flowsheet = bst.Flowsheet('wwt_sugarcane')
-F.set_flowsheet(flowsheet)
-sugarcane_sys = create_sc_system(skip_R601=True, skip_R602=True)
-u = F.unit
+main_flowsheet.set_flowsheet(flowsheet)
+sugarcane_sys = create_sc_system(skip_IC=True, skip_AnMBR=True)
+u = main_flowsheet.unit
+s = main_flowsheet.stream
 
 sugarcane_sys.simulate()
 sugarcane_tea = sc.create_tea(sugarcane_sys)
-ethanol = F.stream.ethanol
+
+ethanol = s.ethanol
 
 # Compare MESP
 original_IRR = 0.1267
@@ -163,7 +163,7 @@ MESP_new = print_MESP(ethanol, sugarcane_tea, 'new sc sys')
 # Sum up results
 # =============================================================================
 
-wwt_units = [i for i in u if i.ID[1:3]=='60']
+wwt_units = main_flowsheet.wastewater_treatment_system.units
 new_capexes = {i.ID: i.installed_cost/1e6 for i in wwt_units}
 new_capex = sum(i for i in new_capexes.values())
 
@@ -174,7 +174,7 @@ new_power_ratio = new_power_wwt / new_power_tot
 
 new_power_net = sum(i.power_utility.rate for i in sugarcane_sys.units)/1e3
 
-s = F.stream
+
 # Hf in kJ/hr
 net_e = s.ethanol.Hf/3600/1e3 + u.BT.power_utility.rate/1e3
 net_e_ratio = net_e/(s.sugarcane.Hf/3600/1e3)

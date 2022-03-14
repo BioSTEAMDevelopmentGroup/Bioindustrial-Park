@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# BioSTEAM: The Biorefinery Simulation and Techno-Economic Analysis Modules
-# Copyright (C) 2020-2021, Yoel Cortes-Pena <yoelcortes@gmail.com>
 # Bioindustrial-Park: BioSTEAM's Premier Biorefinery Models and Results
-# Copyright (C) 2020-2021, Yalin Li <yalinli2@illinois.edu>,
-# Sarang Bhagwat <sarangb2@illinois.edu>, and Yoel Cortes-Pena (this biorefinery)
+# Copyright (C) 2020-, Yalin Li <zoe.yalin.li@gmail.com>,
+#                      Sarang Bhagwat <sarangb2@illinois.edu>,
+#                      Yoel Cortes-Pena <yoelcortes@gmail.com>
 #
 # This module is under the UIUC open-source license. See
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
@@ -22,7 +21,7 @@ import biosteam as bst
 from biosteam.evaluation import Model, Metric
 from chaospy import distributions as shape
 from ._settings import CFs
-from ._utils import set_yield, _feedstock_factor
+from .utils import set_yield, _feedstock_factor
 from .systems import simulate_and_print, \
     SSCF_flowsheet, SSCF_groups, SSCF_teas, SSCF_funcs, \
     SHF_flowsheet, SHF_groups, SHF_teas, SHF_funcs

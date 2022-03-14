@@ -1,9 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# BioSTEAM: The Biorefinery Simulation and Techno-Economic Analysis Modules
-# Copyright (C) 2020-2021, Yoel Cortes-Pena <yoelcortes@gmail.com>
 # Bioindustrial-Park: BioSTEAM's Premier Biorefinery Models and Results
-# Copyright (C) 2021, Yalin Li <yalinli2@illinois.edu>
+# Copyright (C) 2021-, Yalin Li <zoe.yalin.li@gmail.com>
 #
 # Part of this module is based on the cornstover biorefinery:
 # https://github.com/BioSTEAMDevelopmentGroup/Bioindustrial-Park/tree/master/BioSTEAM%202.x.x/biorefineries/cornstover
@@ -14,22 +12,14 @@
 
 
 import biosteam as bst
-from biosteam import main_flowsheet as F
-
-# from biorefineries.wwt import (
-#     sc, cs,
-#     create_cs_chemicals,
-#     cs_price, load_cs_settings,
-#     create_wastewater_treatment_system,
-#     get_cs_GWP,
-#     )
-# from biorefineries.utils import get_MESP, get_digestable_chemicals
-from __init__ import sc, cs, ethanol_density_kggal
-from _chemicals import create_cs_chemicals
-from _settings import cs_price, load_cs_settings
-from _wwt_sys import create_wastewater_treatment_system
-from _lca import get_cs_GWP
-from utils import print_MESP, get_digestable_chemicals
+from biosteam import main_flowsheet
+from biorefineries.wwt import (
+    ethanol_density_kggal, print_MESP,
+    sc, cs, create_cs_chemicals, get_digestable_chemicals,
+    cs_price, load_cs_settings,
+    create_wastewater_treatment_system,
+    get_cs_GWP,
+    )
 
 
 # %%
@@ -54,7 +44,7 @@ def create_cs_system(ins, outs, include_blowdown_recycle=True,
                      default_BD=True, wwt_kwargs={}):
     feedstock, denaturant = ins
     ethanol, = outs
-    f = bst.main_flowsheet
+    f = main_flowsheet
     s = f.stream
     u = f.unit
     U101 = cs.FeedStockHandling('U101', feedstock)
@@ -97,21 +87,20 @@ def create_cs_system(ins, outs, include_blowdown_recycle=True,
                                 P=3.9*101325,
                                 units='kg/hr')
     S401 = bst.PressureFilter('S401', (stillage, recycled_water))
-    if include_blowdown_recycle:
-        blowdown_to_wastewater = bst.Stream('blowdown_to_wastewater')
-    else:
-        blowdown_to_wastewater = None
+
+    blowdown_to_wastewater = \
+        bst.Stream('blowdown_to_wastewater') if include_blowdown_recycle else None
 
     if default_BD:
-        skip_R603 = wwt_kwargs.get('skip_R603')
-        wwt_kwargs['skip_R603'] = True if skip_R603 is None else skip_R603
+        skip_AF = wwt_kwargs.get('skip_AF')
+        wwt_kwargs['skip_AF'] = True if skip_AF is None else skip_AF
 
     create_wastewater_treatment_system(
         ins=[S401-1, pretreatment_sys-1, blowdown_to_wastewater],
-        outs=['biogas', 'sludge_S603', 'recycled_water', 'brine'],
+        outs=['biogas', 'sludge', 'recycled_water', 'brine'],
         mockup=True,
-        R601_kwargs={'method': 'lumped'},
-        R602_kwargs={'HRT': 35},
+        IC_kwargs={'method': 'lumped'},
+        AnMBR_kwargs={'HRT': 35},
         **wwt_kwargs,
     )
 
@@ -149,17 +138,17 @@ def create_cs_system(ins, outs, include_blowdown_recycle=True,
 # =============================================================================
 
 flowsheet = bst.Flowsheet('cs_wwt')
-F.set_flowsheet(flowsheet)
+main_flowsheet.set_flowsheet(flowsheet)
 sys_wwt = create_cs_system(include_blowdown_recycle=True, default_BD=False)
 
-u = F.unit
-wwt_units = [i for i in u if i.ID[1:3]=='60']
+u = main_flowsheet.unit
+wwt_units = main_flowsheet.wastewater_treatment_system.units
 OSBL_units = (*wwt_units, u.CWP, u.CT, u.PWC, u.ADP,
               u.T701, u.T702, u.P701, u.P702, u.M701, u.FT,
               u.CSL_storage, u.DAP_storage, u.BT)
 tea_wwt = cs.create_tea(sys_wwt, OSBL_units)
 
-s = F.stream
+s = main_flowsheet.stream
 ethanol = s.ethanol
 
 # Get the ratio of ethanol-to-dry-cornstover

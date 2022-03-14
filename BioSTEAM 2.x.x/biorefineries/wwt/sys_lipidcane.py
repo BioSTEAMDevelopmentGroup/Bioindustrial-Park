@@ -1,9 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# BioSTEAM: The Biorefinery Simulation and Techno-Economic Analysis Modules
-# Copyright (C) 2020-2021, Yoel Cortes-Pena <yoelcortes@gmail.com>
 # Bioindustrial-Park: BioSTEAM's Premier Biorefinery Models and Results
-# Copyright (C) 2021, Yalin Li <yalinli2@illinois.edu>
+# Copyright (C) 2021-, Yalin Li <zoe.yalin.li@gmail.com>
 #
 # Part of this module is based on the lipidcane biorefinery:
 # https://github.com/BioSTEAMDevelopmentGroup/Bioindustrial-Park/tree/master/BioSTEAM%202.x.x/biorefineries/lipidcane
@@ -13,7 +11,7 @@
 # for license details.
 
 import biosteam  as bst
-from biosteam import main_flowsheet as F
+from biosteam import main_flowsheet
 from biorefineries import (
     lipidcane as lc,
     sugarcane as sc
@@ -29,7 +27,7 @@ from biorefineries import (
 from __init__ import sc, lc
 from _chemicals import create_lc_chemicals
 from _settings import lc_price, new_price, load_lc_settings
-from _wwt_sys import create_wastewater_treatment_system
+from _wwt_sys import create_wastewater_system
 from utils import print_MESP
 
 
@@ -54,8 +52,8 @@ bst.settings.set_thermo(chems)
           dict(ID='ash_disposal')]
 )
 def create_lc_system(ins, outs, **wwt_kwargs):
-    s = F.stream
-    u = F.unit
+    s = main_flowsheet.stream
+    u = main_flowsheet.unit
 
     lipidcane, enzyme, H3PO4, lime, polymer, denaturant = ins
     ethanol, biodiesel, crude_glycerol, emissions, ash_disposal = outs
@@ -96,7 +94,7 @@ def create_lc_system(ins, outs, **wwt_kwargs):
         outs='wastewater',
     )
 
-    create_wastewater_treatment_system(
+    create_wastewater_system(
         ins=[ethanol_production_sys-1, M305-0],
         outs=['biogas', 'sludge_S603', 'recycled_water', 'brine'],
         mockup=True,
@@ -151,13 +149,14 @@ def create_lc_system(ins, outs, **wwt_kwargs):
 # =============================================================================
 
 flowsheet = bst.Flowsheet('wwt_lipidcane')
-F.set_flowsheet(flowsheet)
-lipidcane_sys = create_lc_system(skip_R601=True, skip_R602=True)
-u = F.unit
+main_flowsheet.set_flowsheet(flowsheet)
+lipidcane_sys = create_lc_system(skip_IC=True, skip_AnMBR=True)
+u = main_flowsheet.unit
+s = main_flowsheet.stream
 
 lipidcane_sys.simulate()
 lipidcane_tea = lc.create_tea(lipidcane_sys)
-ethanol = F.stream.ethanol
+ethanol = s.ethanol
 
 # Compare MESP
 original_IRR = 0.2108
@@ -186,7 +185,7 @@ MESP_new = print_MESP(ethanol, lipidcane_tea, 'new lc sys')
 # Sum up results
 # =============================================================================
 
-wwt_units = [i for i in u if i.ID[1:3]=='60']
+wwt_units = main_flowsheet.wastewater_treatment_system.units
 new_capexes = {i.ID: i.installed_cost/1e6 for i in wwt_units}
 new_capex = sum(i for i in new_capexes.values())
 
@@ -197,7 +196,6 @@ new_power_ratio = new_power_wwt / new_power_tot
 
 new_power_net = sum(i.power_utility.rate for i in lipidcane_sys.units)/1e3
 
-s = F.stream
 # Hf in kJ/hr
 net_e = (s.biodiesel.Hf+s.ethanol.Hf)/3600/1e3 + u.BT.power_utility.rate/1e3
 net_e_ratio = net_e/(s.lipidcane.Hf/3600/1e3)

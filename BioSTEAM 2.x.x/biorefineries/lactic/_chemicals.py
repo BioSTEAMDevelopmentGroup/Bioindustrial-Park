@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# BioSTEAM: The Biorefinery Simulation and Techno-Economic Analysis Modules
-# Copyright (C) 2020-2021, Yoel Cortes-Pena <yoelcortes@gmail.com>
 # Bioindustrial-Park: BioSTEAM's Premier Biorefinery Models and Results
-# Copyright (C) 2020-2021, Yalin Li <yalinli2@illinois.edu>,
-# Sarang Bhagwat <sarangb2@illinois.edu>, and Yoel Cortes-Pena (this biorefinery)
+# Copyright (C) 2020-, Yalin Li <zoe.yalin.li@gmail.com>,
+#                      Sarang Bhagwat <sarangb2@illinois.edu>,
+#                      Yoel Cortes-Pena <yoelcortes@gmail.com>
 #
 # This module is under the UIUC open-source license. See
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
@@ -306,7 +305,7 @@ chemical_groups = dict(
     Proteins = ('Protein', 'Enzyme'),
     CellMass = ('WWTsludge', 'FermMicrobe'),
     # Theoretically P4O10 should be soluble, but it's the product of the
-    # auto-populated combusion reactions so should in solid phase, however no
+    # auto-populated combustion reactions so should in solid phase, however no
     # P4O10 will be generated in the system as no P-containing chemicals
     # are included in "combustibles"
     OtherInsolubleSolids = ('Tar', 'Ash', 'CalciumDihydroxide', 'CaSO4', 'P4O10',
@@ -315,7 +314,7 @@ chemical_groups = dict(
                                     'Galactan'),
     SeparatelyListedOrganics = ('Ethanol', 'Glucose', 'Xylose', 'AceticAcid',
                                 'Lignin', 'Acetate'),
-    SpearatedlyListedOthers = ('H2O', 'NH3', 'H2SO4', 'CO2', 'CH4', 'O2', 'N2')
+    SpearatedlyListedOthers = ('H2O', 'NH3', 'H2SO4', 'CO2', 'CH4', 'O2', 'N2'),
     )
 
 # all_chemicals = []
@@ -349,7 +348,7 @@ COD_chemicals = (*soluble_organics, *chemical_groups['OtherStructuralCarbohydrat
 
 combustibles = (*COD_chemicals, 'NH3', 'NH4OH', 'NO', 'CO', 'H2S', 'CH4')
 
-# Chemicals that will be modeled in Distallation/Flash units,
+# Chemicals that will be modeled in Distillation/Flash units,
 # list is in ascending order of Tb
 # Xylitol is not included due to high Tm and Tb thus will stay in liquid phase
 vle_chemicals = ['Ethanol', 'H2O', 'EthylAcetate', 'AceticAcid', 'EthylLactate',
@@ -368,7 +367,7 @@ for chemical in (CSL, Protein, Enzyme, WWTsludge, FermMicrobe):
     chemical.Cn.add_model(1.25*chemical.MW)
 
 # Set chemical molar volume following assumptions in lipidcane biorefinery,
-# assume densities for solulables and insolubles to be 1e5 and 1540 kg/m3, respectively
+# assume densities for solubles and insolubles to be 1e5 and 1540 kg/m3, respectively
 for chemical in chems:
     if chemical.ID in vle_chemicals or chemical.locked_state=='g':
         continue

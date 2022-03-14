@@ -1,16 +1,14 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# BioSTEAM: The Biorefinery Simulation and Techno-Economic Analysis Modules
-# Copyright (C) 2020-2021, Yoel Cortes-Pena <yoelcortes@gmail.com>
 # Bioindustrial-Park: BioSTEAM's Premier Biorefinery Models and Results
-# Copyright (C) 2021, Yalin Li <yalinli2@illinois.edu>
+# Copyright (C) 2021-, Yalin Li <zoe.yalin.li@gmail.com>
 #
 # This module is under the UIUC open-source license. See
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
 # for license details.
 
 '''
-Unit construction and functions for creating wastewwater treatment system.
+Unit construction and functions for creating wastewater treatment system.
 
 References
 ----------
@@ -38,34 +36,24 @@ TODO:
 import thermosteam as tmo
 import biosteam as bst
 from biosteam.units.decorators import cost
+from ._chemicals import default_insolubles
+from ._internal_circulation_rx import InternalCirculationRx
+from ._polishing_filter import PolishingFilter
+from ._membrane_bioreactor import AnMBR
+from ._sludge_handling import BeltThickener, SludgeCentrifuge
+from . import new_price
 
-# from biorefineries.wwt import (
-#     default_insolubles, get_insoluble_IDs, get_soluble_IDs,
-#     InternalCirculationRx,
-#     PolishingFilter,
-#     AnMBR,
-#     BeltThickener,
-#     )
-# from biorefineries.wwt.utils import auom, compute_stream_COD
-from _chemicals import default_insolubles#, get_insoluble_IDs, get_soluble_IDs
-from utils import auom#, compute_stream_COD
-from _internal_circulation_rx import InternalCirculationRx
-from _polishing_filter import PolishingFilter
-from _membrane_bioreactor import AnMBR
-from _sludge_handling import BeltThickener, SludgeCentrifuge
-from _settings import new_price
-
-_mgd_to_cmh = auom('gallon').conversion_factor('m3')*1e6/24
-_gpm_to_cmh = auom('gallon').conversion_factor('m3')*60
-_Gcal_to_kJ = auom('kcal').conversion_factor('kJ')*1e6 # (also MMkcal/hr)
-_kW_to_kJhr = auom('kW').conversion_factor('kJ/hr')
+_mgd_to_cmh = 157.7255 # auom('gallon').conversion_factor('m3')*1e6/24
+_gpm_to_cmh = 0.2271 # auom('gallon').conversion_factor('m3')*60
+_Gcal_to_kJ = 4184000 # auom('kcal').conversion_factor('kJ')*1e6 # (also MMkcal/hr)
+_kW_to_kJhr = 3600 # auom('kW').conversion_factor('kJ/hr')
 
 Rxn = tmo.reaction.Reaction
 ParallelRxn = tmo.reaction.ParallelReaction
 CEPCI = bst.units.design_tools.CEPCI_by_year
 Unit = bst.Unit
 
-__all__ = ('create_wastewater_treatment_system',)
+__all__ = ('create_wastewater_system',)
 
 
 # %%
@@ -73,7 +61,7 @@ __all__ = ('create_wastewater_treatment_system',)
 # =============================================================================
 # Other units
 # =============================================================================
-# # The scaling basis of BeltThickener and Centrifugure changed significantly
+# # The scaling basis of BeltThickener and Centrifuge changed significantly
 # # from previous report to this current one (ref [2])
 # @cost(basis='COD flow', ID='Thickeners', units='kg-O2/hr',
 #       kW=107.3808, cost=750000, S=5600, CE=CEPCI[2012], n=0.6, BM=1.6)
@@ -195,39 +183,42 @@ class Skipped(Unit):
 # =============================================================================
 # System function
 # =============================================================================
-def create_wastewater_treatment_units(ins, outs,
-                                      skip_R601=False, R601_kwargs={},
-                                      skip_R602=False, R602_kwargs={},
-                                      skip_R603=False, R603_kwargs={}):
+def create_wastewater_units(ins, outs, process_ID='6', flowsheet=None,
+                            skip_IC=False, IC_kwargs={},
+                            skip_AnMBR=False, AnMBR_kwargs={},
+                            skip_AF=False, AF_kwargs={}):
+    if flowsheet:
+        bst.main_flowsheet.set_flowsheet(flowsheet)
     wwt_streams = ins
-    biogas, sludge_S603, recycled_water, brine = outs
+    biogas, sludge, recycled_water, brine = outs
 
     ######################## Units ########################
     # Mix waste liquids for treatment
-    M601 = bst.units.Mixer('M601', ins=wwt_streams)
+    X = process_ID
+    MX01 = bst.units.Mixer(f'M{X}01', ins=wwt_streams)
 
-    R601_outs = ('biogas_R601', 'IC_eff', 'IC_sludge')
-    if skip_R601:
-        R601 = Skipped('R601', ins=M601-0, outs=R601_outs)
+    RX01_outs = (f'biogas_R{X}01', 'IC_eff', 'IC_sludge')
+    if skip_IC:
+        RX01 = Skipped(f'R{X}01', ins=MX01-0, outs=RX01_outs)
     else:
-        R601 = InternalCirculationRx('R601', ins=M601-0, outs=R601_outs,
-                                     T=35+273.15, **R601_kwargs)
+        RX01 = InternalCirculationRx(f'R{X}01', ins=MX01-0, outs=RX01_outs,
+                                     T=35+273.15, **IC_kwargs)
 
-    R602_outs = ('biogas_R602', 'permeate_R602', 'sludge_R602', 'vent_R602')
-    if skip_R602:
-        R602 = Skipped('R602', ins=R601-1, outs=R602_outs)
+    RX02_outs = (f'biogas_R{X}02', f'permeate_R{X}02', f'sludge_R{X}02', f'vent_R{X}02')
+    if skip_AnMBR:
+        RX02 = Skipped(f'R{X}02', ins=RX01-1, outs=RX02_outs)
     else:
         # Just setting the prices, flows will be updated upon simulation
-        naocl_R602 = tmo.Stream('naocl_R602', NaOCl=0.125, Water=1-0.125, units='kg/hr')
-        naocl_R602.price = (naocl_R602.F_mass/naocl_R602.F_vol/1000)*new_price['NaOCl'] # $/L to $/kg
-        citric_R602 = tmo.Stream('citric_R602', CitricAcid=1, units='kg/hr')
-        citric_R602.price = (citric_R602.F_mass/citric_R602.F_vol/1000)*new_price['CitricAcid'] # $/L to $/kg      
-        bisulfite_R602 = tmo.Stream('bisulfite_R602', Bisulfite=0.38, Water=1-0.38, units='kg/hr')
-        bisulfite_R602.price = (bisulfite_R602.F_mass/bisulfite_R602.F_vol/1000)*new_price['Bisulfite'] # $/L to $/kg           
-        
-        R602 = AnMBR('R602', ins=(R601-1, '', naocl_R602, citric_R602,
-                                  bisulfite_R602, 'air_R602'),
-                     outs=R602_outs,
+        naocl_RX02 = tmo.Stream(f'naocl_R{X}02', NaOCl=0.125, Water=1-0.125, units='kg/hr')
+        naocl_RX02.price = (naocl_RX02.F_mass/naocl_RX02.F_vol/1000)*new_price['NaOCl'] # $/L to $/kg
+        citric_RX02 = tmo.Stream(f'citric_R{X}02', CitricAcid=1, units='kg/hr')
+        citric_RX02.price = (citric_RX02.F_mass/citric_RX02.F_vol/1000)*new_price['CitricAcid'] # $/L to $/kg
+        bisulfite_RX02 = tmo.Stream(f'bisulfite_R{X}02', Bisulfite=0.38, Water=1-0.38, units='kg/hr')
+        bisulfite_RX02.price = (bisulfite_RX02.F_mass/bisulfite_RX02.F_vol/1000)*new_price['Bisulfite'] # $/L to $/kg
+
+        RX02 = AnMBR(f'R{X}02', ins=(RX01-1, '', naocl_RX02, citric_RX02,
+                                     bisulfite_RX02, f'air_R{X}02'),
+                     outs=RX02_outs,
                      reactor_type='CSTR',
                      membrane_configuration='cross-flow',
                      membrane_type='multi-tube',
@@ -238,61 +229,62 @@ def create_wastewater_treatment_units(ins, outs,
                      T=None, # heat loss will be adjusted later
                      # Below include in the TEA
                      include_pump_building_cost=False,
-                     include_excavation_cost=False, **R602_kwargs)
+                     include_excavation_cost=False, **AnMBR_kwargs)
 
-    R603_outs = ('biogas_R603', 'treated_R603', 'sludge_R603', 'vent_R603')
-    if skip_R603:
-        R603 = Skipped('R603', ins=(R602-1, ''), outs=R603_outs)
+    RX03_outs = (f'biogas_R{X}03', f'treated_R{X}03', f'sludge_R{X}03', f'vent_R{X}03')
+    if skip_AF:
+        RX03 = Skipped(f'R{X}03', ins=(RX02-1, ''), outs=RX03_outs)
     else:
-        R603 = PolishingFilter('R603', ins=(R602-1, '', 'air_R603'), outs=R603_outs,
+        RX03 = PolishingFilter(f'R{X}03', ins=(RX02-1, '', f'air_R{X}03'), outs=RX03_outs,
                               filter_type='aerobic',
                               include_degassing_membrane=False,
                               T=None, # heat loss will be adjusted later
                               # Below include in the TEA
                               include_pump_building_cost=False,
-                              include_excavation_cost=False)
+                              include_excavation_cost=False,
+                              **AF_kwargs)
     # # This isn't working, think of a better way to deal with it
-    # _R603_cost = R603._cost
+    # _RX03_cost = RX03._cost
     # def adjust_heat_loss():
-    #     _R603_cost()
-    #     loss_kW = R602._heat_loss + R603._heat_loss
-    #     # Assume the heat loss in R602/R603 can be compensated by heat exchange
-    #     # with R601 with an 80% heat transfer efficiency
-    #     R601.heat_utilities[0].duty += loss_kW * _kW_to_kJhr / 0.8
-    #     R602.power_utility.rate -= R602._heat_loss
-    #     R603.power_utility.rate -= R603._heat_loss
-    # R603._cost = adjust_heat_loss
+    #     _RX03_cost()
+    #     loss_kW = RX02._heat_loss + RX03._heat_loss
+    #     # Assume the heat loss in RX02/RX03 can be compensated by heat exchange
+    #     # with RX01 with an 80% heat transfer efficiency
+    #     RX01.heat_utilities[0].duty += loss_kW * _kW_to_kJhr / 0.8
+    #     RX02.power_utility.rate -= RX02._heat_loss
+    #     RX03.power_utility.rate -= RX03._heat_loss
+    # RX03._cost = adjust_heat_loss
 
 
-    bst.units.Mixer('M602', ins=(R601-0, R602-0, R603-0), outs=biogas)
+    bst.units.Mixer(f'M{X}02', ins=(RX01-0, RX02-0, RX03-0), outs=biogas)
 
     # Recycled the majority of sludge (96%) to the aerobic filter,
     # 96% from the membrane bioreactor in ref [2]
-    S601 = bst.units.Splitter('S601', ins=R603-2, outs=('recycled_S601', 'wasted_S601'),
+    SX01 = bst.units.Splitter(f'S{X}01', ins=RX03-2, outs=(f'recycled_S{X}01', f'wasted_S{X}01'),
                               split=0.96)
 
-    solubles = [i.ID for i in S601.chemicals if not i.ID in default_insolubles]
-    S602 = BeltThickener('S602', ins=(R601-2, R602-2, S601-1),
-                         outs=('eff_S602', 'sludge_S602'),
+    solubles = [i.ID for i in SX01.chemicals if not i.ID in default_insolubles]
+    SX02 = BeltThickener(f'S{X}02', ins=(RX01-2, RX02-2, SX01-1),
+                         outs=(f'eff_S{X}02', f'sludge_S{X}02'),
                          sludge_moisture=0.96, solubles=solubles)
 
-    S603 = SludgeCentrifuge('S603', ins=S602-1,
-                            outs=('centrate_S603', sludge_S603),
+    SX03 = SludgeCentrifuge(f'S{X}03', ins=SX02-1,
+                            outs=(f'centrate_S{X}03', sludge),
                             sludge_moisture=0.8, solubles=solubles,
                             centrifuge_type='reciprocating_pusher')
 
     # Mix recycles to aerobic digestion
-    bst.units.Mixer('M603', ins=(S601-0, S602-0, S603-0), outs=1-R603)
+    bst.units.Mixer(f'M{X}03', ins=(SX01-0, SX02-0, SX03-0), outs=1-RX03)
 
     # Reverse osmosis to treat aerobically polished water
-    ReverseOsmosis('S604', ins=R603-1, outs=(recycled_water, brine))
+    ReverseOsmosis(f'S{X}04', ins=RX03-1, outs=(recycled_water, brine))
 
 
-create_wastewater_treatment_system = bst.SystemFactory(
-    f=create_wastewater_treatment_units,
-    ID='wastewater_treatment_sys',
+create_wastewater_system = bst.SystemFactory(
+    f=create_wastewater_units,
+    ID='wastewater_sys',
     outs=[dict(ID='biogas'),
-          dict(ID='sludge_S603'),
+          dict(ID='sludge'),
           dict(ID='recycled_water'),
           dict(ID='brine')],
     fixed_ins_size=False,

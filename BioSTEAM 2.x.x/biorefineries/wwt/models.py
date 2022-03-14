@@ -1,9 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# BioSTEAM: The Biorefinery Simulation and Techno-Economic Analysis Modules
-# Copyright (C) 2020-2021, Yoel Cortes-Pena <yoelcortes@gmail.com>
 # Bioindustrial-Park: BioSTEAM's Premier Biorefinery Models and Results
-# Copyright (C) 2021, Yalin Li <yalinli2@illinois.edu>
+# Copyright (C) 2021-, Yalin Li <zoe.yalin.li@gmail.com>
 #
 # This module is under the UIUC open-source license. See
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
@@ -22,11 +20,9 @@ TODO:
 import thermosteam as tmo
 from biosteam import Model, Metric
 from chaospy import distributions as shape
-
-# from . import cs, cornstover as cs_wwt, ethanol_density_kggal
-import cornstover as cs_wwt
-from __init__ import cs, ethanol_density_kggal
-
+from biorefineries.wwt import (
+    cs, cornstover as cs_wwt, ethanol_density_kggal
+    )
 
 
 # %%

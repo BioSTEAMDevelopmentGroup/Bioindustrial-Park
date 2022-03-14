@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# BioSTEAM: The Biorefinery Simulation and Techno-Economic Analysis Modules
-# Copyright (C) 2020-2021, Yoel Cortes-Pena <yoelcortes@gmail.com>
 # Bioindustrial-Park: BioSTEAM's Premier Biorefinery Models and Results
-# Copyright (C) 2020-2021, Yalin Li <yalinli2@illinois.edu>,
-# Sarang Bhagwat <sarangb2@illinois.edu>, and Yoel Cortes-Pena (this biorefinery)
+# Copyright (C) 2020-, Yalin Li <zoe.yalin.li@gmail.com>,
+#                      Sarang Bhagwat <sarangb2@illinois.edu>,
+#                      Yoel Cortes-Pena <yoelcortes@gmail.com>
 #
 # This module is under the UIUC open-source license. See
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
@@ -42,7 +41,7 @@ References
 import biosteam as bst
 import thermosteam as tmo
 from ._chemicals import chems
-from ._utils import auom
+from .utils import auom
 
 __all__ = ('price', 'CFs')
 
@@ -100,7 +99,7 @@ feedstock_price = 71.3 / _feedstock_factor
 sulfuric_acid_price = 0.0430 * _lb_per_kg
 
 # 2.2 is the average whole-sale ethanol price between 2010-2019 in 2016 $/gal
-# based on Annual Energy Outlook (AEO) from Energy Information Adiministration (EIA)
+# based on Annual Energy Outlook (AEO) from Energy Information Administration (EIA)
 # (https://www.eia.gov/outlooks/aeo/), which is $0.732/gal and similar to the
 # 2.2/(2988/1e3) = $0.736/gal based on a density of 2988 g/gal from H2 Tools
 # Lower and upper bounds are $1.37/gal and $2.79/gal, or $0.460/kg and $0.978/kg

@@ -1,31 +1,19 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# BioSTEAM: The Biorefinery Simulation and Techno-Economic Analysis Modules
-# Copyright (C) 2020-2021, Yoel Cortes-Pena <yoelcortes@gmail.com>
 # Bioindustrial-Park: BioSTEAM's Premier Biorefinery Models and Results
-# Copyright (C) 2021, Yalin Li <yalinli2@illinois.edu>
+# Copyright (C) 2021-, Yalin Li <zoe.yalin.li@gmail.com>
 #
 # This module is under the UIUC open-source license. See
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
 # for license details.
 
-import math
 import biosteam as bst
-import thermosteam as tmo
+from math import pi, ceil
 from warnings import warn
-# from biorefineries.wwt import InternalCirculationRx, WWTpump
-# from biorefineries.wwt.utils import (
-#     default_insolubles,
-#     auom,
-#     compute_stream_COD,
-#     get_digestion_rxns,
-#     get_split_dct
-#     )
-from _chemicals import default_insolubles
-from _internal_circulation_rx import InternalCirculationRx
-from _wwt_pump import WWTpump
-from utils import (
-    auom,
+from ._chemicals import default_insolubles
+from ._internal_circulation_rx import InternalCirculationRx
+from ._wwt_pump import WWTpump
+from .utils import (
     compute_stream_COD,
     get_digestion_rxns,
     get_split_dct,
@@ -34,17 +22,16 @@ from utils import (
 
 __all__ = ('PolishingFilter',)
 
-_ft_to_m = auom('ft').conversion_factor('m')
-_ft2_to_m2 = auom('ft2').conversion_factor('m2')
-_ft3_to_m3 = auom('ft3').conversion_factor('m3')
-_ft3_to_gal = auom('ft3').conversion_factor('gallon')
-_m3_to_gal = auom('m3').conversion_factor('gal')
+_ft_to_m = 0.3047 # auom('ft').conversion_factor('m')
+_ft2_to_m2 = 0.09290 # auom('ft2').conversion_factor('m2')
+_ft3_to_m3 = 0.02832 # auom('ft3').conversion_factor('m3')
+_ft3_to_gal = 7.4805 # auom('ft3').conversion_factor('gallon')
+_m3_to_gal = 264.1721 # auom('m3').conversion_factor('gallon')
 _cmh_to_mgd = _m3_to_gal * 24 / 1e6 # cubic meter per hour to million gallon per day
-_lb_to_kg = auom('lb').conversion_factor('kg')
+_lb_to_kg = 0.4536 # auom('lb').conversion_factor('kg')
 
-
-_d_to_A = lambda d: math.pi/4*(d**2)
-_A_to_d = lambda A: ((4*A)/math.pi)**0.5
+_d_to_A = lambda d: pi/4*(d**2)
+_A_to_d = lambda A: ((4*A)/pi)**0.5
 
 
 # %%
@@ -306,7 +293,7 @@ class PolishingFilter(bst.Unit):
 
         # Volume of wall/slab concrete, [ft3]
         # 8/12 is wall thickness, 3 is freeboard
-        VWC = self.t_wall * math.pi * d_ft * (D_ft+3)
+        VWC = self.t_wall * pi * d_ft * (D_ft+3)
         VWC *= N
 
         # 1 is slab thickness
@@ -356,7 +343,7 @@ class PolishingFilter(bst.Unit):
     #     ### Concrete material ###
     #     # External wall concrete, [ft3]
     #     # 6/12 is wall thickness and 3 is freeboard
-    #     VWC_AF = N_AF * 6/12 * math.pi * d_AF * (D_AF+3)
+    #     VWC_AF = N_AF * 6/12 * pi * d_AF * (D_AF+3)
     #     VWC_AF *= N_AF
     #     # Floor slab concrete, [ft3]
     #     # 8/12 is slab thickness
@@ -370,7 +357,7 @@ class PolishingFilter(bst.Unit):
     #     PBL, PBW, PBD = 50, 30, 10 # pump building length, width, depth, [ft]
     #     Area_B_P = (PBL+2*CA) * (PBW+2*CA) # bottom area of frustum, [ft2]
     #     Area_T_P = (PBL+2*CA+PBW*SL) * (PBW+2*CA+PBD*SL) # top area of frustum, [ft2]
-    #     VEX_PB = 0.5 * (Area_B_P+Area_T_P) * PBD # total volume of excavaion, [ft3]
+    #     VEX_PB = 0.5 * (Area_B_P+Area_T_P) * PBD # total volume of excavation, [ft3]
 
     #     return N_AF, d_AF, D_AF, V_m_AF, VWC_AF, VWC_AF, VEX_PB
 
@@ -379,7 +366,7 @@ class PolishingFilter(bst.Unit):
             self.F_BM, self._default_equipment_lifetime
 
         ### Capital ###
-        # Concrete and excavaction
+        # Concrete and excavation
         VEX, VWC, VSC = \
             D['Excavation [ft3]'], D['Wall concrete [ft3]'], D['Slab concrete [ft3]']
         # 27 is to convert the VEX from ft3 to yard3
@@ -419,7 +406,7 @@ class PolishingFilter(bst.Unit):
             loss = 0.
         else:
             N_filter, d, D = self.N_filter, self.d, self.D
-            A_W = math.pi * d * D
+            A_W = pi * d * D
             A_F = _d_to_A(d)
             A_W *= N_filter * _ft2_to_m2
             A_F *= N_filter * _ft2_to_m2
@@ -547,7 +534,7 @@ class PolishingFilter(bst.Unit):
             if self.filter_type=='aerobic':
                 warn('No degassing membrane needed for when `filter_type` is "aerobic".')
                 return 0
-            return math.ceil(self.Q_cmd/24/30) # assume each can hand 30 m3/d of influent
+            return ceil(self.Q_cmd/24/30) # assume each can hand 30 m3/d of influent
         return 0
 
     @property

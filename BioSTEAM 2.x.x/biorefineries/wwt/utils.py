@@ -1,15 +1,11 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# BioSTEAM: The Biorefinery Simulation and Techno-Economic Analysis Modules
-# Copyright (C) 2020-2021, Yoel Cortes-Pena <yoelcortes@gmail.com>
 # Bioindustrial-Park: BioSTEAM's Premier Biorefinery Models and Results
-# Copyright (C) 2021, Yalin Li <yalinli2@illinois.edu>
+# Copyright (C) 2021-, Yalin Li <zoe.yalin.li@gmail.com>
 #
 # This module is under the UIUC open-source license. See
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
 # for license details.
-
-'''Util functions for digestion reactions.'''
 
 import numpy as np
 from chemicals.elements import molecular_weight
@@ -17,16 +13,163 @@ from thermosteam.reaction import (
     Reaction as Rxn,
     ParallelReaction as PRxn
     )
-from _chemicals import default_insolubles
+from biosteam.utils import (
+    ExponentialFunctor,
+    remove_undefined_chemicals,
+    default_chemical_dict
+    )
+from biosteam.units.design_tools.tank_design import (
+    mix_tank_purchase_cost_algorithms,
+    TankPurchaseCostAlgorithm
+    )
+from ._chemicals import default_insolubles
 
 __all__ = (
+    # Construction
+    'IC_purchase_cost_algorithms', 'select_pipe', 'cost_pump',
+    # Digestion
     'get_BD_dct',
     'get_digestable_chemicals',
     'compute_stream_COD',
     'get_CN_ratio',
     'get_digestion_rxns',
+    # Miscellaneous
+    'format_str',
+    'remove_undefined_chemicals',
+    'get_split_dct',
+    'kph_to_tpd',
     )
 
+
+# %%
+
+# =============================================================================
+# Construction
+# =============================================================================
+
+##### Internal Circulation Reactor #####
+IC_purchase_cost_algorithms = mix_tank_purchase_cost_algorithms.copy()
+conventional = IC_purchase_cost_algorithms['Conventional']
+#!!! Need to check if the cost correlation still holds for the ranges beyond
+ic = TankPurchaseCostAlgorithm(
+    ExponentialFunctor(A=conventional.f_Cp.A,
+                       n=conventional.f_Cp.n),
+    V_min=np.pi/4*1.5**2*16, # 1.5 and 16 are the lower bounds of the width and height ranges in ref [1]
+    V_max=np.pi/4*12**2*25, # 12 and 25 are the lower bounds of the width and height ranges in ref [1]
+    V_units='m^3',
+    CE=conventional.CE,
+    material='Stainless steel')
+
+IC_purchase_cost_algorithms['IC'] = ic
+
+##### Pipe Selection #####
+# Based on ANSI (American National Standards Institute) pipe chart
+# the original code has a bug (no data for 22) and has been fixed here
+boundaries = np.concatenate([
+    np.arange(1/8, 0.5, 1/8),
+    np.arange(0.5, 1.5, 1/4),
+    np.arange(1.5, 5,   0.5),
+    np.arange(5,   12,  1),
+    np.arange(12,  36,  2),
+    np.arange(36,  54,  6)
+    ])
+
+size = boundaries.shape[0]
+
+pipe_dct = {
+    1/8 : (0.405,  0.049), # OD (outer diameter), t (wall thickness)
+    1/4 : (0.540,  0.065),
+    3/8 : (0.675,  0.065),
+    1/2 : (0.840,  0.083),
+    3/4 : (1.050,  0.083),
+    1   : (1.315,  0.109),
+    1.25: (1.660,  0.109),
+    1.5 : (1.900,  0.109),
+    2   : (2.375,  0.109),
+    2.5 : (2.875,  0.120),
+    3   : (3.500,  0.120),
+    3.5 : (4.000,  0.120),
+    4   : (4.500,  0.120),
+    4.5 : (5.000,  0.120),
+    5   : (5.563,  0.134),
+    6   : (6.625,  0.134),
+    7   : (7.625,  0.134),
+    8   : (8.625,  0.148),
+    9   : (9.625,  0.148),
+    10  : (10.750, 0.165),
+    11  : (11.750, 0.165),
+    12  : (12.750, 0.180),
+    14  : (14.000, 0.188),
+    16  : (16.000, 0.199),
+    18  : (18.000, 0.188),
+    20  : (20.000, 0.218),
+    22  : (22.000, 0.250),
+    24  : (24.000, 0.250),
+    26  : (26.000, 0.250),
+    28  : (28.000, 0.250),
+    30  : (30.000, 0.312),
+    32  : (32.000, 0.312),
+    34  : (34.000, 0.312),
+    36  : (36.000, 0.312),
+    42  : (42.000, 0.312),
+    48  : (48.000, 0.312)
+    }
+
+
+def select_pipe(Q, v):
+    '''Select pipe based on Q (flow in ft3/s) and velocity (ft/s)'''
+    A = Q / v # cross-section area
+    d = (4*A/np.pi) ** 0.5 # minimum inner diameter, [ft]
+    d *= 12 # minimum inner diameter, [in]
+    d_index = np.searchsorted(boundaries, d, side='left') # a[i-1] < v <= a[i]
+    d_index = d_index-1 if d_index==size else d_index # if beyond the largest size
+    OD, t = pipe_dct[boundaries[d_index]]
+    ID = OD - 2*t # inner diameter, [in]
+    return OD, t, ID
+
+
+##### Pumping #####
+def cost_pump(unit):
+    '''
+    Calculate the cost of the pump and pump building for a unit
+    based on its `Q_mgd` (hydraulic flow in million gallons per day),
+    `recir_ratio` (recirculation ratio) attributes.
+    '''
+
+    Q_mgd, recir_ratio = unit.Q_mgd, unit.recir_ratio
+
+    # Installed pump cost, this is a fitted curve
+    pumps = 2.065e5 + 7.721*1e4*Q_mgd
+
+    # Design capacity of intermediate pumps, gpm,
+    # 2 is the excess capacity factor to handle peak flows
+    GPMI = 2 * Q_mgd * 1e6 / 24 / 60
+
+    # Design capacity of recirculation pumps, gpm
+    GPMR = recir_ratio * Q_mgd * 1e6 / 24 / 60
+
+    building = 0.
+    for GPM in (GPMI, GPMR):
+        if GPM == 0:
+            N = 0
+        else:
+            N = 1 # number of buildings
+            GPMi = GPM
+            while GPMi > 80000:
+                N += 1
+                GPMi = GPM / N
+
+        PBA = N * (0.0284*GPM+640) # pump building area, [ft]
+        building += 90 * PBA
+
+    return pumps, building
+
+
+# %%
+
+# =============================================================================
+# Digestion
+# =============================================================================
 
 def get_CHONSP(chemical):
     organic = True
@@ -161,7 +304,6 @@ def get_CN_ratio(stream):
              for i in stream.chemicals if i.formula])
     N = sum([(i.atoms.get('N') or 0.)*14*stream.imol[i.ID]
              for i in stream.chemicals if i.formula])
-
     return C/N if N !=0 else 'NA'
 
 
@@ -208,3 +350,71 @@ def get_digestion_rxns(stream, BD, X_biogas, X_growth, biomass_ID):
         return PRxn(biogas_rxns+growth_rxns)
 
     return []
+
+
+# %%
+
+# =============================================================================
+# Miscellaneous
+# =============================================================================
+
+def format_str(string):
+    string = string.replace(' ', '_')
+    string = string.replace('-', '_')
+    return string
+
+
+def get_split_dct(chemicals, **split):
+    # Copied from the cornstover biorefinery,
+    # which is based on the 2011 NREL report (Humbird et al.),
+    # assume no insolubles go to permeate
+    insolubles_dct = dict.fromkeys(default_insolubles, 0.)
+    split_dct = dict(
+        Water=0.1454,
+        Glycerol=0.125,
+        LacticAcid=0.145,
+        SuccinicAcid=0.125,
+        HNO3=0.1454,
+        Denaturant=0.125,
+        DAP=0.1454,
+        AmmoniumAcetate=0.145,
+        AmmoniumSulfate=0.1454,
+        H2SO4=0.1454,
+        NaNO3=0.1454,
+        Oil=0.125,
+        N2=0.1351,
+        NH3=0.1579,
+        O2=0.15,
+        CO2=0.1364,
+        Xylose=0.25,
+        Sucrose=0.125,
+        Mannose=0.125,
+        Galactose=0.125,
+        Arabinose=0.125,
+        Extract=0.145,
+        NaOH=0.1454,
+        SolubleLignin=0.145,
+        GlucoseOligomer=0.1429,
+        GalactoseOligomer=0.1429,
+        MannoseOligomer=0.1429,
+        XyloseOligomer=0.1429,
+        ArabinoseOligomer=0.1429,
+        Xylitol=0.125,
+        Cellobiose=0.125,
+        Cellulase=0.145
+        )
+    split_dct.update(insolubles_dct)
+    default_chemical_dict(split_dct, chemicals, 0.15, 0.125, 0) # 'g', 'l', 's'
+
+    if split is not None:
+        split_dct.update(split)
+
+    remove_undefined_chemicals(split_dct, chemicals)
+
+    return split_dct
+
+
+def kph_to_tpd(stream):
+    dry_mass = stream.F_mass - stream.imass['Water']
+    factor = 0.026455471462185312 # auom('kg').conversion_factor('ton')/auom('hr').conversion_factor('day')
+    return dry_mass*factor

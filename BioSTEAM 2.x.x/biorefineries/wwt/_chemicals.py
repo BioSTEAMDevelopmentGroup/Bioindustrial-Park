@@ -1,9 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# BioSTEAM: The Biorefinery Simulation and Techno-Economic Analysis Modules
-# Copyright (C) 2020-2021, Yoel Cortes-Pena <yoelcortes@gmail.com>
 # Bioindustrial-Park: BioSTEAM's Premier Biorefinery Models and Results
-# Copyright (C) 2021, Yalin Li <yalinli2@illinois.edu>
+# Copyright (C) 2021-, Yalin Li <zoe.yalin.li@gmail.com>
 #
 # This module is under the UIUC open-source license. See
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
@@ -18,8 +16,8 @@ https://github.com/BioSTEAMDevelopmentGroup/Bioindustrial-Park/blob/master/BioST
 '''
 
 import thermosteam as tmo
-# from . import sc_chems, lc_chems, cs_chems
-from __init__ import sc_chems, lc_chems, cs_chems
+from biorefineries import lactic as la
+from . import sc_chems, lc_chems, cs_chems, la_chems
 
 __all__ = (
     'default_insolubles',
@@ -28,15 +26,18 @@ __all__ = (
     'create_cs_chemicals',
     'create_sc_chemicals',
     'create_lc_chemicals',
+    'create_la_chemicals',
     )
 
 default_insolubles = (
+    # Sugarcane biorefinery
+    'Yeast', 'CaO', 'Solids', 'Flocculant',
     # Cornstover biorefinery
     'Lime', 'CaSO4', 'Ash', 'P4O10',
     'Tar', 'Lignin', 'Cellulose', 'Hemicellulose',
     'Protein', 'Enzyme', 'DenaturedEnzyme', 'Z_mobilis', 'T_reesei', 'WWTsludge',
-    # Sugarcane biorefinery
-    'Yeast', 'CaO', 'Solids', 'Flocculant'
+    # Lactic acid biorefinery
+    *la._chemicals.insolubles,
     )
 
 def get_insoluble_IDs(chemicals, insolubles):
@@ -97,6 +98,7 @@ def add_wwt_chemicals(chemicals):
     return chems
 
 
+# Add synonyms
 synonym_dct = {
     'Water': 'H2O',
     'Denaturant': 'Octane',
@@ -121,14 +123,36 @@ def set_synonym_grp(chemicals):
     return chemicals
 
 
-# For the cornstover biorefinery
+# Sugarcane
+def create_sc_chemicals():
+    '''
+    Create compiled chemicals for the sugarcane biorefinery with the new
+    wastewater treatment process.
+    '''
+    new_chems = add_wwt_chemicals(sc_chems)
+    new_chems.compile()
+    new_chems = set_synonym_grp(new_chems)
+    return new_chems
+
+
+# Lipidcane
+def create_lc_chemicals():
+    '''
+    Create compiled chemicals for the lipidcane biorefinery with the new
+    wastewater treatment process.
+    '''
+    new_chems = add_wwt_chemicals(lc_chems)
+    new_chems.compile()
+    new_chems = set_synonym_grp(new_chems)
+    return new_chems
+
+
+# Cornstover
 def create_cs_chemicals():
     '''
     Create compiled chemicals for the cornstover biorefinery with the new
     wastewater treatment process.
     '''
-    # from biorefineries.cornstover import chemicals as cs_chems
-
     if cs_chems.CSL.formula is None:
         # CSL stream is modeled as 50% water, 25% protein, and 25% lactic acid,
         # its formula was obtained using the following codes
@@ -145,27 +169,13 @@ def create_cs_chemicals():
     return new_chems
 
 
-# For the sugarcane biorefinery
-def create_sc_chemicals():
+# Lactic acid
+def create_la_chemicals():
     '''
-    Create compiled chemicals for the sugarcane biorefinery with the new
+    Create compiled chemicals for the lactic acid biorefinery with the new
     wastewater treatment process.
     '''
-    # from biorefineries.sugarcane import chemicals as sc_chems
-    new_chems = add_wwt_chemicals(sc_chems)
-    new_chems.compile()
-    new_chems = set_synonym_grp(new_chems)
-    return new_chems
-
-
-# For the lipidcane biorefinery
-def create_lc_chemicals():
-    '''
-    Create compiled chemicals for the lipidcane biorefinery with the new
-    wastewater treatment process.
-    '''
-    # from biorefineries.lipidcane import chemicals as lc_chems
-    new_chems = add_wwt_chemicals(lc_chems)
+    new_chems = add_wwt_chemicals(la_chems)
     new_chems.compile()
     new_chems = set_synonym_grp(new_chems)
     return new_chems

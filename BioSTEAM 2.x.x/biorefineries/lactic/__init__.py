@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# BioSTEAM: The Biorefinery Simulation and Techno-Economic Analysis Modules
-# Copyright (C) 2020-2021, Yoel Cortes-Pena <yoelcortes@gmail.com>
 # Bioindustrial-Park: BioSTEAM's Premier Biorefinery Models and Results
-# Copyright (C) 2020-2021, Yalin Li <yalinli2@illinois.edu>,
-# Sarang Bhagwat <sarangb2@illinois.edu>, and Yoel Cortes-Pena (this biorefinery)
+# Copyright (C) 2020-, Yalin Li <zoe.yalin.li@gmail.com>,
+#                      Sarang Bhagwat <sarangb2@illinois.edu>,
+#                      Yoel Cortes-Pena <yoelcortes@gmail.com>
 #
 # This module is under the UIUC open-source license. See
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
@@ -13,12 +12,10 @@
 
 # %%
 
-import biosteam as bst
-bst.speed_up()
-
+from biosteam import main_flowsheet
 from . import (
     _chemicals,
-    _utils,
+    utils,
     _settings,
     _units,
     _facilities,
@@ -28,7 +25,7 @@ from . import (
     )
 
 from ._chemicals import chems
-from ._utils import auom, CEPCI
+from .utils import auom, CEPCI
 from ._settings import price, CFs
 from ._processes import update_settings
 from .systems import *
@@ -48,7 +45,7 @@ def load_system(kind='SSCF'):
     funcs = getattr(systems, f'{kind}_funcs')
 
     update_settings(chems)
-    bst.main_flowsheet.set_flowsheet(flowsheet)
+    main_flowsheet.set_flowsheet(flowsheet)
 
     lactic_sys = flowsheet.system.lactic_sys
     lactic_tea = teas['lactic_tea']

@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# BioSTEAM: The Biorefinery Simulation and Techno-Economic Analysis Modules
-# Copyright (C) 2020-2021, Yoel Cortes-Pena <yoelcortes@gmail.com>
 # Bioindustrial-Park: BioSTEAM's Premier Biorefinery Models and Results
-# Copyright (C) 2020-2021, Yalin Li <yalinli2@illinois.edu>,
-# Sarang Bhagwat <sarangb2@illinois.edu>, and Yoel Cortes-Pena (this biorefinery)
+# Copyright (C) 2020-, Yalin Li <zoe.yalin.li@gmail.com>,
+#                      Sarang Bhagwat <sarangb2@illinois.edu>,
+#                      Yoel Cortes-Pena <yoelcortes@gmail.com>
 #
 # This module is under the UIUC open-source license. See
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
@@ -44,7 +43,7 @@ Naming conventions:
     S = Splitter (including solid/liquid separator)
     T = Tank or bin for storage
     U = Other units
-    PS = Process specificiation, not physical units, but for adjusting streams
+    PS = Process specifications, not physical units, but for adjusting streams
 
 Processes:
     100: Preprocessing
@@ -71,7 +70,7 @@ from . import (
     )
 
 from ._settings import price, CFs
-from ._utils import baseline_feedflow, _kg_per_ton, set_yield, \
+from .utils import get_baseline_feedflow, _kg_per_ton, set_yield, \
     cell_mass_split, gypsum_split, AD_split, MB_split
 from ._chemicals import chems, sugars, soluble_organics, \
     solubles, insolubles, COD_chemicals, combustibles
@@ -115,11 +114,11 @@ def update_settings(chems, CE=541.7):
 
 # %%
 
-def create_preprocessing_process(flowsheet):
+def create_preprocessing_process(flowsheet, chemicals):
     bst.main_flowsheet.set_flowsheet(flowsheet)
 
     ######################## Streams ########################
-    feedstock = Stream('feedstock', baseline_feedflow.copy(),
+    feedstock = Stream('feedstock', get_baseline_feedflow(chemicals),
                         units='kg/hr', price=price['Feedstock'])
 
     ######################## Units ########################
@@ -741,7 +740,7 @@ def create_wastewater_process(flowsheet, groups, get_flow_tpd, wwt_streams,
                                     outs=('membrane_treated_water', 'membrane_sludge'),
                                     split=MB_split, COD_chemicals=COD_chemicals)
 
-    # Recycled sludge stream of memberane bioreactor, the majority of it (96%)
+    # Recycled sludge stream of membrane bioreactor, the majority of it (96%)
     # goes to aerobic digestion
     S502 = bst.units.Splitter('S502', ins=S501-1, outs=('to_aerobic_digestion', ''),
                               split=0.96)

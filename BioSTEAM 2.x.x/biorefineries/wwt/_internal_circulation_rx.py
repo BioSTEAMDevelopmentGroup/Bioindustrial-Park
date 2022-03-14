@@ -1,9 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# BioSTEAM: The Biorefinery Simulation and Techno-Economic Analysis Modules
-# Copyright (C) 2020-2021, Yoel Cortes-Pena <yoelcortes@gmail.com>
 # Bioindustrial-Park: BioSTEAM's Premier Biorefinery Models and Results
-# Copyright (C) 2021, Yalin Li <yalinli2@illinois.edu>
+# Copyright (C) 2021-, Yalin Li <zoe.yalin.li@gmail.com>
 #
 # This module is under the UIUC open-source license. See
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
@@ -23,14 +21,7 @@ import sympy as sp
 import biosteam as bst
 import thermosteam as tmo
 from biosteam.exceptions import DesignError
-
-# from biorefineries.wwt.utils import (
-#     get_BD_dct,
-#     compute_stream_COD,
-#     get_digestion_rxns,
-#     IC_purchase_cost_algorithms
-#     )
-from utils import (
+from .utils import (
     get_BD_dct,
     compute_stream_COD,
     get_digestion_rxns,
@@ -456,7 +447,7 @@ class InternalCirculationRx(bst.MixTank):
     @property
     def Fxb(self):
         '''
-        [float] Biomass transfer ratio from the bottom reacor to the top reactor,
+        [float] Biomass transfer ratio from the bottom reactor to the top reactor,
         should be within [0, 1] (ideal to no retention),
         only relevant when the "separate" method is used.
         '''
@@ -471,7 +462,7 @@ class InternalCirculationRx(bst.MixTank):
     @property
     def Fxt(self):
         '''
-        [float] Biomass transfer ratio from the top reacor to the effluent,
+        [float] Biomass transfer ratio from the top reactor to the effluent,
         should be within [0, 1] (ideal to no retention),
         only relevant when the "separate" method is used.
         '''

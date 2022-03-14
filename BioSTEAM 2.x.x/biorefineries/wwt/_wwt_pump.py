@@ -1,9 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# BioSTEAM: The Biorefinery Simulation and Techno-Economic Analysis Modules
-# Copyright (C) 2020-2021, Yoel Cortes-Pena <yoelcortes@gmail.com>
 # Bioindustrial-Park: BioSTEAM's Premier Biorefinery Models and Results
-# Copyright (C) 2021, Yalin Li <yalinli2@illinois.edu>
+# Copyright (C) 2021-, Yalin Li <zoe.yalin.li@gmail.com>
 #
 # This module is under the UIUC open-source license. See
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
@@ -15,17 +13,18 @@ from biosteam.units.design_tools.mechanical import (
     brake_efficiency as brake_eff,
     motor_efficiency as motor_eff
     )
-
-# from biorefineries.wwt.utils import auom, select_pipe, format_str
-from utils import auom, select_pipe, format_str
+from .utils import select_pipe, format_str
 
 __all__ = ('WWTpump',)
 
-_hp_to_kW = auom('hp').conversion_factor('kW')
-_lb_to_kg = auom('lb').conversion_factor('kg')
-_ft_to_m = auom('ft').conversion_factor('m')
-_ft3_to_gal = auom('ft3').conversion_factor('gallon')
-_m3_to_gal = auom('m3').conversion_factor('gallon')
+_hp_to_kW = 0.7457 # auom('hp').conversion_factor('kW')
+_lb_to_kg = 0.4536 # auom('lb').conversion_factor('kg')
+_ft_to_m = 0.3048 # auom('ft').conversion_factor('m')
+_ft3_to_gal = 7.4805 # auom('ft3').conversion_factor('gallon')
+_m3_to_gal = 264.1721 # auom('m3').conversion_factor('gallon')
+
+
+# %%
 
 class WWTpump(bst.Unit):
     '''
@@ -212,7 +211,7 @@ class WWTpump(bst.Unit):
 
     def design_retentate_CSTR(self, Q_mgd=None, cas_per_tank=None):
         '''
-        Design pump for the retent stream of CSTR reactors.
+        Design pump for the retentate stream of CSTR reactors.
 
         Parameters defined through the `add_inputs` argument upon initialization of
         this unit (Q_mgd listed separately) will be used if not provided

@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# BioSTEAM: The Biorefinery Simulation and Techno-Economic Analysis Modules
-# Copyright (C) 2020-2021, Yoel Cortes-Pena <yoelcortes@gmail.com>
 # Bioindustrial-Park: BioSTEAM's Premier Biorefinery Models and Results
-# Copyright (C) 2020-2021, Yalin Li <yalinli2@illinois.edu>,
-# Sarang Bhagwat <sarangb2@illinois.edu>, and Yoel Cortes-Pena (this biorefinery)
+# Copyright (C) 2020-, Yalin Li <zoe.yalin.li@gmail.com>,
+#                      Sarang Bhagwat <sarangb2@illinois.edu>,
+#                      Yoel Cortes-Pena <yoelcortes@gmail.com>
 #
 # This module is under the UIUC open-source license. See
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
@@ -45,12 +44,11 @@ from biosteam import Stream, Unit
 from biosteam.exceptions import DesignError
 from biosteam.units import Flash, HXutility, Mixer, MixTank, Pump, \
     SolidsSeparator, StorageTank
-from biosteam.units.design_tools import PressureVessel
-from biosteam.units.design_tools import pressure_vessel_material_factors as factors
+from biosteam.units.design_tools import PressureVessel, pressure_vessel_material_factors as factors
 from biosteam.units.decorators import cost
 from ._settings import price, auom
-from ._chemicals import sugars, COD_chemicals, solubles, insolubles
-from ._utils import CEPCI, baseline_feedflow, compute_lactic_titer, \
+from ._chemicals import chems, sugars, COD_chemicals, solubles, insolubles
+from .utils import CEPCI, get_baseline_feedflow, compute_lactic_titer, \
     compute_extra_chemical, adjust_recycle, compute_COD
 
 _MGD_2_m3hr = auom('gallon').conversion_factor('m3')*1e6/24
@@ -72,7 +70,7 @@ ParallelRxn = tmo.reaction.ParallelReaction
 class FeedstockPreprocessing(Unit):
     _N_outs = 2
     # 2205 U.S. ton/day (2000 metric tonne/day) as in ref [1]
-    _baseline_flow_rate = baseline_feedflow.sum()
+    _baseline_flow_rate = get_baseline_feedflow(chems).sum()
     _cached_flow_rate = 2205
 
     def __init__(self, ID='', ins=None, outs=(), diversion_to_CHP=0):
@@ -541,6 +539,7 @@ class Saccharification(Unit):
         Design = self.design_results
         Design['Saccharification tank size'] = self.F_mass_in * self.tau_saccharification
         Design['Slurry flow rate'] = self.F_mass_in
+
 
 class Reactor(Unit, PressureVessel, isabstract=True):
     '''
@@ -1096,7 +1095,7 @@ class AcidulationReactor(Reactor):
     _N_ins = 2
     _N_outs = 1
 
-    acidulation_rxns = ParallelRxn([
+    _acidulation_rxns = ParallelRxn([
         #   Reaction definition                                           Reactant        Conversion
         Rxn('CalciumLactate + H2SO4 -> 2 LacticAcid + CaSO4',         'CalciumLactate',       1),
         Rxn('CalciumAcetate + H2SO4 -> 2 AceticAcid + CaSO4',         'CalciumAcetate',       1),
@@ -1140,6 +1139,19 @@ class AcidulationReactor(Reactor):
             self.baseline_purchase_costs.clear()
         else: super()._cost()
 
+    @property
+    def acidulation_rxns(self):
+        rxns = self._acidulation_rxns
+        if rxns.chemicals is not self.chemicals:
+            # Reset chemicals, if needed, this is because `acidulation_rxns` was set
+            # prior to __init__
+            rxns.reset_chemicals(self.chemicals)
+        return rxns
+    @acidulation_rxns.setter
+    def acidulation_rxns(self, i):
+        self._acidulation_rxns = i
+
+
 # Filter to separate gypsum from the acidified fermentation broth
 @cost(basis='Feed flow rate', ID='Hydrocyclone & rotary drum filter', units='kg/hr',
       # Size based on stream 239 in ref [3]
@@ -1173,6 +1185,7 @@ class GypsumFilter(SolidsSeparator):
         if self.bypass:
             self.baseline_purchase_costs.clear()
         else: self._decorated_cost()
+
 
 class Esterification(Reactor):
     """
@@ -1424,7 +1437,7 @@ class HydrolysisReactor(Reactor):
     _N_outs = 2
     water2esters = 12
 
-    hydrolysis_rxns = ParallelRxn([
+    _hydrolysis_rxns = ParallelRxn([
             #   Reaction definition                                       Reactant   Conversion
             Rxn('EthylLactate + H2O -> LacticAcid + Ethanol',         'EthylLactate',   0.8),
             Rxn('EthylAcetate + H2O -> AceticAcid + Ethanol',         'EthylAcetate',   0.8),
@@ -1469,6 +1482,18 @@ class HydrolysisReactor(Reactor):
         rxns(effluent.mol)
         self.outs[0].copy_like(effluent)
         self.outs[1].copy_like(wastewater)
+
+    @property
+    def hydrolysis_rxns(self):
+        rxns = self._hydrolysis_rxns
+        if rxns.chemicals is not self.chemicals:
+            # Reset chemicals, if needed, this is because `hydrolysis_rxns` was set
+            # prior to __init__
+            rxns.reset_chemicals(self.chemicals)
+        return rxns
+    @hydrolysis_rxns.setter
+    def hydrolysis_rxns(self, i):
+        self._hydrolysis_rxns = i
 
 
 # %%

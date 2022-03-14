@@ -1,9 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# BioSTEAM: The Biorefinery Simulation and Techno-Economic Analysis Modules
-# Copyright (C) 2020-2021, Yoel Cortes-Pena <yoelcortes@gmail.com>
 # Bioindustrial-Park: BioSTEAM's Premier Biorefinery Models and Results
-# Copyright (C) 2021, Yalin Li <yalinli2@illinois.edu>
+# Copyright (C) 2021-, Yalin Li <zoe.yalin.li@gmail.com>
 #
 # This module is under the UIUC open-source license. See
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
@@ -60,6 +58,7 @@ class SludgeHandling(bst.Unit):
         self.solubles = tuple(solubles)
         self.solids = tuple(i.ID for i in self.chemicals
                             if (i.ID not in solubles) and (i.locked_state!='g'))
+        self._mixed = bst.Stream(f'{self.ID}_mixed')
         self.effluent_pump = bst.Pump(f'{self.ID}_eff')
         self.sludge_pump = bst.Pump(f'{self.ID}_sludge')
 
@@ -76,10 +75,9 @@ class SludgeHandling(bst.Unit):
         eff, sludge = self.outs
         solubles, solids = self.solubles, self.solids
 
-        mixed = bst.Stream()
+        mixed = self._mixed
         mixed.mix_from(self.ins)
         eff.T = sludge.T = mixed.T
-        self._mixed = mixed.copy()
 
         sludge.copy_flow(mixed, solids, remove=True) # all solids go to sludge
         eff.copy_flow(mixed, solubles)

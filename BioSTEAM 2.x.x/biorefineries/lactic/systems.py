@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# BioSTEAM: The Biorefinery Simulation and Techno-Economic Analysis Modules
-# Copyright (C) 2020-2021, Yoel Cortes-Pena <yoelcortes@gmail.com>
 # Bioindustrial-Park: BioSTEAM's Premier Biorefinery Models and Results
-# Copyright (C) 2020-2021, Yalin Li <yalinli2@illinois.edu>,
-# Sarang Bhagwat <sarangb2@illinois.edu>, and Yoel Cortes-Pena (this biorefinery)
+# Copyright (C) 2020-, Yalin Li <zoe.yalin.li@gmail.com>,
+#                      Sarang Bhagwat <sarangb2@illinois.edu>,
+#                      Yoel Cortes-Pena <yoelcortes@gmail.com>
 #
 # This module is under the UIUC open-source license. See
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
@@ -13,7 +12,7 @@
 
 # %%
 
-import biosteam as bst
+from biosteam import Flowsheet, main_flowsheet
 from ._chemicals import chems
 from ._processes import (
     update_settings,
@@ -27,7 +26,6 @@ from ._processes import (
     create_lactic_sys
     )
 
-bst.speed_up()
 update_settings(chems)
 
 __all__ = (
@@ -42,12 +40,12 @@ __all__ = (
 # %%
 
 def create_SSCF_sys():
-    flowsheet = bst.Flowsheet('SSCF')
+    flowsheet = Flowsheet('SSCF')
     s = flowsheet.stream
     u = flowsheet.unit
 
     flowsheet, groups, get_feedstock_dry_mass, get_flow_tpd = \
-        create_preprocessing_process(flowsheet)
+        create_preprocessing_process(flowsheet, chems)
 
     flowsheet, groups = \
         create_pretreatment_process(flowsheet, groups, u.U101-0, get_feedstock_dry_mass)
@@ -82,12 +80,12 @@ def create_SSCF_sys():
     return flowsheet, groups, teas, funcs
 
 def create_SHF_sys():
-    flowsheet = bst.Flowsheet('SHF')
+    flowsheet = Flowsheet('SHF')
     s = flowsheet.stream
     u = flowsheet.unit
 
     flowsheet, groups, get_feedstock_dry_mass, get_flow_tpd = \
-        create_preprocessing_process(flowsheet)
+        create_preprocessing_process(flowsheet, chems)
 
     flowsheet, groups = \
         create_pretreatment_process(flowsheet, groups, u.U101-0, get_feedstock_dry_mass)
@@ -141,7 +139,7 @@ def simulate_and_print(system='SSCF'):
         funcs = SHF_funcs
     else:
         raise ValueError(f'system can only be "SSCF" or "SHF", not {system}.')
-    bst.main_flowsheet.set_flowsheet(flowsheet)
+    main_flowsheet.set_flowsheet(flowsheet)
 
     print('\n---------- Simulation Results ----------')
     print(f'MPSP is ${funcs["simulate_get_MPSP"]():.3f}/kg')
@@ -157,7 +155,7 @@ def simulate_fermentation_improvement(kind='SSCF'):
         flowsheet = SHF_flowsheet
     else:
         raise ValueError(f'kind can only be "SSCF" or "SHF", not {kind}.')
-    bst.main_flowsheet.set_flowsheet(flowsheet)
+    main_flowsheet.set_flowsheet(flowsheet)
     u = flowsheet.unit
     flowsheet.system.lactic_sys.simulate()
 
@@ -176,7 +174,7 @@ def simulate_separation_improvement(kind='SSCF'):
         flowsheet = SHF_flowsheet
     else:
         raise ValueError(f'kind can only be "SSCF" or "SHF", not {kind}.')
-    bst.main_flowsheet.set_flowsheet(flowsheet)
+    main_flowsheet.set_flowsheet(flowsheet)
     u = SHF_flowsheet.unit
     flowsheet.system.lactic_sys.simulate()
 
@@ -193,7 +191,7 @@ def simulate_operating_improvement(kind='SSCF'):
         funcs = SHF_funcs
     else:
         raise ValueError(f'kind can only be "SSCF" or "SHF", not {kind}.')
-    bst.main_flowsheet.set_flowsheet(flowsheet)
+    main_flowsheet.set_flowsheet(flowsheet)
     s = flowsheet.stream
     u = flowsheet.unit
     flowsheet.system.lactic_sys.simulate()
