@@ -19,7 +19,7 @@ def create_new_chemical(ID, phase = 's', **constants):
 ozo_chemicals = tmo.Chemicals(
     ['Water','Hydrogen_peroxide','Oleic_acid',
      'Nonanal','Nonanoic_acid','Azelaic_acid',
-     'oxiraneoctanoic_acid,_3-octyl-'])
+     'oxiraneoctanoic_acid,_3-octyl-','Hexane','Ethyl_acetate'])
 
 #Solid Catalyst not available in the database
 #TODO.xxx Add ref for the below
@@ -46,12 +46,9 @@ ozo_chemicals.compile()
 ozo_chemicals.set_synonym('oxiraneoctanoic_acid,_3-octyl-' ,'Epoxy_stearic_acid') 
 ozo_chemicals.show()
 
-# =============================================================================
-#Tried below alternatives for Oxononanoic acid
-#Recognised CAS but does not have Tb, P or Hf
-#Methyl_oxo_nonanoate = Chemical('1931-63-1')
-#Methyl_oxo_nonanoate.show()
-# =============================================================================
+for i in ozo_chemicals:
+    if not i.locked_state: i.V.g.method_P = 'IDEAL'
+
 
 
 

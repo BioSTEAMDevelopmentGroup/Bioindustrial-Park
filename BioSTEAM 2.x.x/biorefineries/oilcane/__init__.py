@@ -115,7 +115,7 @@ kg_per_ton = 907.18474
 
 
 configuration_names = (
-    'S1', 'O1', 'S2', 'O2', 'S1*', 'O1*', 'S2*', 'O2*', 'O3',
+    'S1', 'O1', 'S2', 'O2', 'S1*', 'O1*', 'S2*', 'O2*', 'O3', 'O4',
 )
 comparison_names = (
     # 'I - ∅', 
@@ -171,7 +171,7 @@ def load(name, cache={}, reduce_chemicals=True,
     dct = globals()
     number, agile = dct['configuration'] = configuration = parse(name)
     key = (number, agile, enhanced_cellulosic_performance)
-    if key in cache:
+    if cache is not None and key in cache:
         dct.update(cache[key])
         return
     global oilcane_sys, sys, tea, specs, flowsheet, _system_loaded
@@ -187,7 +187,7 @@ def load(name, cache={}, reduce_chemicals=True,
     load_process_settings()
     s = flowsheet.stream
     u = flowsheet.unit
-    operating_hours = 24 * 200
+    operating_hours = 24 * 180
     
     ## System
     
@@ -401,7 +401,7 @@ def load(name, cache={}, reduce_chemicals=True,
         sys.operation_parameter(set_xylose_yield)
         
         dct['cane_mode'] = cane_mode = sys.operation_mode(oilcane_sys,
-            operating_hours=200*24, oil_content=0.05, feedstock=feedstock.copy(),
+            operating_hours=180*24, oil_content=0.05, feedstock=feedstock.copy(),
             z_mass_carbs_baseline=0.1491, glucose_yield=85, xylose_yield=65, 
             FFA_content=0.10, PL_content=0.10
         )
@@ -524,7 +524,7 @@ def load(name, cache={}, reduce_chemicals=True,
         oil_extraction_specification.load_efficiency(bagasse_oil_extraction_efficiency / 100.)
 
     # Baseline from Huang's 2016 paper, but distribution more in line with Florida sugarcane harvesting (3-5 months)
-    @uniform(4 * 30, 6 * 30, units='day/yr', baseline=200)
+    @uniform(4 * 30, 6 * 30, units='day/yr', baseline=180)
     def set_cane_operating_days(cane_operating_days):
         if agile:
             cane_mode.operating_hours = cane_operating_days * 24
@@ -1056,9 +1056,12 @@ def load(name, cache={}, reduce_chemicals=True,
         dct[i.setter.__name__] = i
     for i in model._metrics:
         dct[i.getter.__name__] = i
-    cache[key] = dct.copy()
+    if cache is not None: cache[key] = dct.copy()
     
     ## Simulation
+    HXN.force_ideal_thermo = True
+    HXN.cache_network = True
+    HXN.avoid_recycle = True
     try: 
         sys.simulate()
     except Exception as e:
@@ -1066,8 +1069,6 @@ def load(name, cache={}, reduce_chemicals=True,
     if reduce_chemicals:
         oilcane_sys.reduce_chemicals()
     oilcane_sys._load_stream_links()
-    HXN.force_ideal_thermo = True
-    HXN.cache_network = True
     HXN.simulate()
 
 # DO NOT DELETE: For removing ylabel and yticklabels and combine plots

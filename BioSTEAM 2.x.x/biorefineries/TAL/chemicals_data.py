@@ -168,7 +168,7 @@ XyloseOligomer = chemical_defined('XyloseOligomer', phase='l', formula='C5H8O4',
 XyloseOligomer.copy_models_from(Xylose, ['Hvap', 'Psat', 'Cn', 'mu'])
 
 Sucrose = chemical_database('Sucrose', phase='l')
-Sucrose.Cn.move_up_model_priority('Dadgostar and Shaw (2011)', 0)
+Sucrose.Cn.move_up_model_priority('DADGOSTAR_SHAW', 0)
 Cellobiose = chemical_database('Cellobiose', phase='l', Hf=-480900*_cal2joule)
 
 Mannose = chemical_database('Mannose', phase='l', Hf=Glucose.Hf)
