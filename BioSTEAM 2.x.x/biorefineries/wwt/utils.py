@@ -287,7 +287,7 @@ def get_BMP_stoichiometry(chemical):
         'CH4': 0.5*nC+0.125*nH-0.25*nO-0.375*nN-0.25*nS,
         'CO2': 0.5*nC-0.125*nH+0.25*nO+0.375*nN+0.25*nS,
         'NH3': nN,
-        'H2S': nS
+        'H2S': nS,
         }
 
     return dct
@@ -372,9 +372,9 @@ def get_digestion_rxns(stream, BD, X_biogas, X_growth, biomass_ID):
         iX_biogas = X * X_biogas # the amount of chemical used for biogas production
         iX_growth = X * X_growth # the amount of chemical used for cell growth
 
-        if iX_biogas:
+        if iX_biogas: # do not check atomic balance as P will not be accounted for
             biogas_rxn = Rxn(reaction=biogas_stoyk, reactant=i.ID, X=iX_biogas,
-                             check_atomic_balance=True)
+                             check_atomic_balance=False)
             biogas_rxns.append(biogas_rxn)
 
         if iX_growth:

@@ -13,25 +13,28 @@
 import biosteam as bst
 from biorefineries import corn as cn
 from biorefineries.corn import create_chemicals, create_system, create_tea
-from biorefineries.wwt import compute_stream_COD
-from biorefineries.wwt import add_wwt_chemicals, create_wastewater_system, CHP as CHPunit, new_price
+from biorefineries.wwt import (
+    compute_stream_COD,
+    add_wwt_chemicals, create_wastewater_system, CHP as CHPunit,
+    new_price,
+    )
 
 
 # %%
 
 cn.load()
+# Fix the processing water streams
 PWC = cn.T608
 PWC.process_water_streams = (cn.recycled_process_water, cn.scrubber_water)
-cn_u = cn.flowsheet.unit
 ww = bst.Stream('ww')
-WWmixer = bst.Mixer('WWmixer', ins=(cn_u.MH103.outs[1], cn_u.MX5.outs[0]), outs=ww)
+WWmixer = bst.Mixer('WWmixer', ins=(cn.MH103.outs[1], cn.MX5.outs[0]), outs=ww)
 cn_sys = bst.System('cn_sys', path=(cn.corn_sys, WWmixer))
 cn_tea = create_tea(cn_sys)
 cn_sys.simulate()
 cn_tea.IRR = cn_tea.solve_IRR()
 print(f'\nOriginal IRR: {cn_tea.IRR:.2%}\n')
 
-def simulate_at_ww_price(price=new_price['Wastewater']):
+def IRR_at_ww_price(price=new_price['Wastewater']):
     ww.price = price
     IRR = cn_tea.IRR = cn_tea.solve_IRR()
     print(f'\nIRR: {IRR:.2%}\n')
@@ -54,12 +57,9 @@ bst.main_flowsheet.set_flowsheet(new_f)
 new_chems = add_wwt_chemicals(create_chemicals())
 new_chems.compile()
 bst.settings.set_thermo(new_chems)
-new_sys_cn = create_system('new_sys_cn', chemicals=new_chems, flowsheet=new_f)
+new_sys_cn = create_system('new_sys_cn', flowsheet=new_f)
 
-ww_streams = (
-    new_u.MH103.outs[1],
-    new_u.MX5.outs[0],
-    )
+ww_streams = (new_u.MH103.outs[1], new_u.MX5.outs[0],)
 # new_sys_wwt = create_wastewater_system('new_sys_wwt', ins=ww_streams, process_ID='7')
 new_sys_wwt = create_wastewater_system('new_sys_wwt', ins=ww_streams, process_ID='7',
                                        skip_AeF=True)

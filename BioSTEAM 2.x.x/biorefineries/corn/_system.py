@@ -26,10 +26,10 @@ SACCHARIFICATION_SULFURIC_ACID_LOADING = 0.001 # g Enzyme / g dry Corn
 SACCHARIFICATION_GLUCO_AMYLASE_LOADING = 0.002 # g H2SO4 / g dry Corn
 SCRUBBER_WASH_WATER_OVER_VENT = 1.21 # g Water / g Vent
 
-def create_system(ID='corn_sys', chemicals=None, flowsheet=None):
+def create_system(ID='corn_sys', flowsheet=None):
     ### Streams ###
     
-    chemicals = chemicals or bst.settings.get_chemicals()
+    chemicals = bst.settings.get_chemicals()
     
     z_mass_corn = chemicals.kwarray(
         dict(Starch=0.612,

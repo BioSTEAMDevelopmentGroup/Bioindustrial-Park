@@ -16,7 +16,7 @@ from . import (
     _oil_extraction_specification,
     _distributions,
     _evaluation,
-    _uncertainty_plots,
+#    _uncertainty_plots,
     _contour_plots,
     _lca_characterization_factors,
     _load_data,
@@ -31,7 +31,7 @@ from ._tea import *
 from ._oil_extraction_specification import *
 from ._distributions import *
 from ._evaluation import *
-from ._uncertainty_plots import *
+# from ._uncertainty_plots import *
 from ._contour_plots import *
 from ._lca_characterization_factors import *
 from ._load_data import *
@@ -47,7 +47,7 @@ __all__ = (
     *_oil_extraction_specification.__all__,
     *_distributions.__all__,
     *_evaluation.__all__,
-    *_uncertainty_plots.__all__,
+#    *_uncertainty_plots.__all__,
     *_contour_plots.__all__,
     *_lca_characterization_factors.__all__,
     *_load_data.__all__,

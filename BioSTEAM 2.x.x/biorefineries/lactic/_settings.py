@@ -111,7 +111,7 @@ ethanol_price = 2.2 / _ethanol_kg_2_gal
 # Cost is negative because it's a product stream
 ash_disposal_price = -1.41e6 / (4279*7880)
 
-# Assums no cost/credit for baseline, the same as ash disposal for the lower bound,
+# Assume no cost/credit for baseline, the same as ash disposal for the lower bound,
 # for the upper bound (i.e., positive selling price indicating profit), use
 # USGS 2015-2019 average  free on bard price in $/metric tonne for crude gypsum.
 # National Minerals Information Center. Mineral Commodity Summaries 2020;
