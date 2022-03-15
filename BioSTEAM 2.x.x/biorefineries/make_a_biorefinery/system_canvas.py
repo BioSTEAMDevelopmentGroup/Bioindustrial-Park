@@ -49,6 +49,7 @@ from biorefineries.make_a_biorefinery.utils import find_split, splits_df, baseli
 from biorefineries.make_a_biorefinery.chemicals_data import chems, chemical_groups, \
                                 soluble_organics, combustibles
 from biorefineries.make_a_biorefinery.tea import TemplateTEA
+from biorefineries.make_a_biorefinery.auto_waste_management import AutoWasteManagement
 
 Rxn = tmo.reaction.Reaction
 ParallelRxn = tmo.reaction.ParallelReaction
@@ -227,8 +228,9 @@ def create_canvas_sys(ins, outs):
     # =============================================================================
     
     # Mix waste liquids for treatment
-    M501 = bst.units.Mixer('M501', ins=(S401-4)) # !!! here, add all wastewater streams (waste streams that are mostly mostly liquid-phase)
-    
+    M501 = bst.units.Mixer('M501', 
+                           # ins=(S401-4)) # !!! here, add all wastewater streams (waste streams that are mostly mostly liquid-phase)
+                           ins=(S401-4))
     # This represents the total cost of wastewater treatment system
     WWT_cost = units.WastewaterSystemCost('WWT_cost', ins=M501-0)
     
@@ -266,7 +268,7 @@ def create_canvas_sys(ins, outs):
     # Recycled sludge stream of memberane bioreactor, the majority of it (96%)
     # goes to aerobic digestion and the rest to sludge holding tank then to BT
     S502 = bst.units.Splitter('S502', ins=S501-1, outs=('to_aerobic_digestion', 
-                                                        'to_boiler_turbogenerator'),
+                                                        'to_sludge_holding_tank'),
                               split=0.96)
     
     M503 = bst.units.Mixer('M503', ins=(S502-0, 'centrate'), outs=1-M502)
@@ -275,7 +277,7 @@ def create_canvas_sys(ins, outs):
     M504 = bst.units.Mixer('M504', ins=(R501-2, S502-1))
     
     # Sludge centrifuge to separate water (centrate) from sludge
-    S503 = bst.units.Splitter('S503', ins=M504-0, outs=(1-M503, 'sludge'),
+    S503 = bst.units.Splitter('S503', ins=M504-0, outs=(1-M503, 'sludge_to_boiler'),
                               split=find_split(splits_df.index,
                                                splits_df['stream_616'],
                                                splits_df['stream_623'],
@@ -294,7 +296,9 @@ def create_canvas_sys(ins, outs):
     # Mix solid wastes to boiler turbogeneration
     
     # Mention results with and without S401-0 in manuscript
-    M505 = bst.units.Mixer('M505', ins=(S401-3), # !!! here, add all solid waste streams
+    M505 = bst.units.Mixer('M505', 
+                           # ins=(S401-3), # !!! here, add all solid waste streams
+                           ins=(S401-3),
                             outs='wastes_to_boiler_turbogenerator')
     
     
@@ -432,8 +436,8 @@ def create_canvas_sys(ins, outs):
     
     
     # AWM = AutoWasteManagement('AWM', wastewater_mixer=M501, boiler_solids_mixer=M505,
-    #                           to_wastewater_mixer_ID_key=liquid_waste_stream_ID_key,
-    #                           to_boiler_solids_mixer_ID_key=solid_waste_stream_ID_key)
+    #                           to_wastewater_mixer_ID_key='to_WWT',
+    #                           to_boiler_solids_mixer_ID_key='to_boiler')
     
     BT_group = UnitGroup('BT_group',
                                    units=(BT,))

@@ -20,9 +20,9 @@ from matplotlib.ticker import AutoMinorLocator as AML
 
 # from TAL.system_solubility_exploit import TAL_sys, TAL_tea, R302, spec
 # from TAL.system_solubility_exploit import MEK as product
-from TAL.system_solubility_exploit import TAL_sys, TAL_tea, R302, spec
+from TAL.system_TAL_adsorption_glucose import TAL_sys, TAL_tea, R302, spec
 # get_GWP, get_non_bio_GWP, get_FEC, get_SPED
-from TAL.system_solubility_exploit import SA as product
+from TAL.system_TAL_adsorption_glucose import SA as product
 
 from matplotlib import pyplot as plt
 from  matplotlib.colors import LinearSegmentedColormap
@@ -292,23 +292,23 @@ TAL_metrics = [get_SA_MPSP, get_TAL_sugars_conc, get_TAL_inhibitors_conc]
 # TAL_metrics = [get_TAL_MPSP, get_GWP, get_FEC]
 
 # %% Generate 3-specification meshgrid and set specification loading functions
-steps = 10
+steps = 20
 
 # Yield, titer, productivity (rate)
 spec_1 = np.linspace(0.2, 0.9, steps) # yield
-spec_2 = np.linspace(25., 100., steps) # titer
+spec_2 = np.linspace(5., 25., steps) # titer
 # spec_1 = np.linspace(0.2, 0.99, steps) # yield
 # spec_2 = np.linspace(45, 225, steps) # titer
 spec_3 = np.array([0.21,]) # productivity
 spec.load_spec_1 = spec.load_yield
-spec.load_spec_2 = spec.load_titer
+# spec.load_spec_2 = spec.load_titer
 spec.load_spec_3 = spec.load_productivity
 xlabel = "Yield"
 ylabel = 'Titer [$\mathrm{g} \cdot \mathrm{L}^{-1}$]'
 # xticks = [0.33, 0.66, 0.99]
 xticks = [0.0, 0.2, 0.4, 0.6, 0.8, 1.0]
 # yticks = [75, 150, 225]
-yticks = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100]
+yticks = [10, 20, 30]
 # xticks = [0.2, 0.6, 0.99]
 # yticks = [45, 135, 225]
 spec_3_units = "$\mathrm{g} \cdot \mathrm{L}^{-1} \cdot \mathrm{hr}^{-1}$"
@@ -383,8 +383,14 @@ data_1 = TAL_data = spec.evaluate_across_specs(
 
 
 dateTimeObj = datetime.now()
-file_to_save = 'TAL_TRY_%s.%s.%s-%s.%s'%(dateTimeObj.year, dateTimeObj.month, dateTimeObj.day, dateTimeObj.hour, dateTimeObj.minute)
+minute = '0' + str(dateTimeObj.minute) if len(str(dateTimeObj.minute))==1 else str(dateTimeObj.minute)
+file_to_save = 'TAL_TRY_%s.%s.%s-%s.%s'%(dateTimeObj.year, dateTimeObj.month, dateTimeObj.day, dateTimeObj.hour, minute)
 np.save(file_to_save, data_1)
+
+pd.DataFrame(data_1[:, :, 0, :][:,:,0]).to_csv('MPSP-'+file_to_save+'.csv')
+pd.DataFrame(data_1[:, :, 1, :][:,:,0]).to_csv('GWP-'+file_to_save+'.csv')
+pd.DataFrame(data_1[:, :, 2, :][:,:,0]).to_csv('FEC-'+file_to_save+'.csv')
+
 
 # %% Load previously saved data
 file_to_load = file_to_save
