@@ -12,23 +12,13 @@
 
 import biosteam  as bst
 from biosteam import main_flowsheet
-from biorefineries import (
-    lipidcane as lc,
-    sugarcane as sc
+from biorefineries import lipidcane as lc
+from biorefineries.sugarcane import create_sucrose_to_ethanol_system
+from biorefineries.lipidcane import create_chemicals, load_process_settings, price
+from biorefineries.wwt import (
+    add_wwt_chemicals, create_wastewater_system,
+    print_MESP, new_price,
     )
-
-# from biorefineries.wwt import (
-#     sc, cs,
-#     create_lc_chemicals,
-#     lc_price, new_price, load_cs_settings,
-#     create_wastewater_treatment_system
-#     )
-# from biorefineries.utils import get_MESP
-from __init__ import sc, lc
-from _chemicals import create_lc_chemicals
-from _settings import lc_price, new_price, load_lc_settings
-from _wwt_sys import create_wastewater_system
-from utils import print_MESP
 
 
 # %%
@@ -37,17 +27,17 @@ from utils import print_MESP
 # Function to make the system
 # =============================================================================
 
-load_lc_settings()
-chems = create_lc_chemicals()
-bst.settings.set_thermo(chems)
+new_lc_chems = add_wwt_chemicals(create_chemicals())
+bst.settings.set_thermo(new_lc_chems)
+load_process_settings()
 
 @bst.SystemFactory(
     ID='lipidcane_sys',
     ins=[*lc.create_juicing_and_lipid_extraction_system.ins,
-         sc.create_sucrose_to_ethanol_system.ins[1]],
-    outs=[dict(ID='ethanol', price=lc_price['Ethanol']),
-          dict(ID='biodiesel', price=lc_price['Biodiesel']),
-          dict(ID='crude_glycerol', price=lc_price['Crude glycerol']),
+         create_sucrose_to_ethanol_system.ins[1]],
+    outs=[dict(ID='ethanol', price=price['Ethanol']),
+          dict(ID='biodiesel', price=price['Biodiesel']),
+          dict(ID='crude_glycerol', price=price['Crude glycerol']),
           dict(ID='emissions'),
           dict(ID='ash_disposal')]
 )
@@ -70,7 +60,7 @@ def create_lc_system(ins, outs, **wwt_kwargs):
     )
 
     ### Ethanol section ###
-    ethanol_production_sys = sc.create_sucrose_to_ethanol_system(
+    ethanol_production_sys = create_sucrose_to_ethanol_system(
         ins=[juicing_and_lipid_extraction_sys-0, denaturant],
         outs=[ethanol, 'vinasse'],
         mockup=True,
@@ -169,7 +159,7 @@ MESP_old = print_MESP(lc.ethanol, lc.lipidcane_tea, 'old lc sys w ww cost')
 MESP_new = print_MESP(ethanol, lipidcane_tea, 'new lc sys')
 
 lipidcane_tea.IRR = lc.lipidcane_tea.IRR = 0.1
-ethanol.price = lc.ethanol.price = lc_price['Ethanol']
+ethanol.price = lc.ethanol.price = price['Ethanol']
 assert(lipidcane_tea.IRR==lc.lipidcane_tea.IRR)
 print(f'\n\nIRR = {lipidcane_tea.IRR:.0%}')
 lc.wastewater.price = 0.

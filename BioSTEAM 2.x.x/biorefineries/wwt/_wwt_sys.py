@@ -42,6 +42,7 @@ from ._polishing_filter import PolishingFilter
 from ._membrane_bioreactor import AnMBR
 from ._sludge_handling import BeltThickener, SludgeCentrifuge
 from . import new_price
+from .utils import get_combustion_energy
 
 _mgd_to_cmh = 157.7255 # auom('gallon').conversion_factor('m3')*1e6/24
 _gpm_to_cmh = 0.2271 # auom('gallon').conversion_factor('m3')*60
@@ -53,7 +54,7 @@ ParallelRxn = tmo.reaction.ParallelReaction
 CEPCI = bst.units.design_tools.CEPCI_by_year
 Unit = bst.Unit
 
-__all__ = ('create_wastewater_system',)
+__all__ = ('create_wastewater_system', 'CHP',)
 
 
 # %%
@@ -61,8 +62,10 @@ __all__ = ('create_wastewater_system',)
 # =============================================================================
 # Other units
 # =============================================================================
+
 # # The scaling basis of BeltThickener and Centrifuge changed significantly
-# # from previous report to this current one (ref [2])
+# # from previous report to this current one (ref [2]),
+# # therefore using alternative designs
 # @cost(basis='COD flow', ID='Thickeners', units='kg-O2/hr',
 #       kW=107.3808, cost=750000, S=5600, CE=CEPCI[2012], n=0.6, BM=1.6)
 # class BeltThickener(Unit):
@@ -166,17 +169,56 @@ class Skipped(Unit):
     _ins_size_is_fixed = False
     _outs_size_is_fixed = False
 
-
     def __init__(self, ID='', ins=None, outs=(), thermo=None,
-                 main_in=0, main_out=1):
+                 main_in=0, main_out=1): # outs[0] is the gas phase
         Unit.__init__(self, ID, ins, outs, thermo)
         self.main_in = main_in
         self.main_out = main_out
 
-
     def _run(self):
         self.outs[self.main_out].copy_like(self.ins[self.main_in])
 
+
+class CHP(Unit):
+    '''
+    Used to estimate the cost of producing electricity.
+    
+    Parameters
+    ----------
+    eff : float
+        Combined efficiency for combustion and power generation.
+    unit_CAPEX : float
+        Capital cost of the CHP per kW of power generated, $/kW.
+    
+    References
+    ----------
+    [1] Shoener et al., Design of Anaerobic Membrane Bioreactors for the
+    Valorization of Dilute Organic Carbon Waste Streams.
+    Energy Environ. Sci. 2016, 9 (3), 1102–1112.
+    https://doi.org/10.1039/C5EE03715H.
+    '''
+    _ins_size_is_fixed = False
+    _F_BM_default = {'CHP': 1.}
+    
+    def __init__(self, ID='', ins=None, outs=(), thermo=None,
+                 eff=0.3375, # average of 40.5%, 27%, 36%, and 31.5% for the four types in ref [1]
+                 unit_CAPEX=1225): 
+        Unit.__init__(self, ID, ins, outs, thermo)
+        self.eff = eff
+        self.unit_CAPEX = unit_CAPEX
+        self._mixed = tmo.Stream(f'{self.ID}_mixed')
+        
+    def _run(self):
+        mixed = self._mixed
+        mixed.mix_from(self.ins)
+        H_net = get_combustion_energy(mixed, 1)
+        self.H_for_power = H_net * self.eff
+    
+    def _design(self):
+        kW = self.H_for_power / 3600 # kJ/hr to kW
+        self.baseline_purchase_costs['CHP'] = kW*self.unit_CAPEX
+        self.power_utility(-kW)
+    
 
 # %%
 
@@ -186,7 +228,7 @@ class Skipped(Unit):
 def create_wastewater_units(ins, outs, process_ID='6', flowsheet=None,
                             skip_IC=False, IC_kwargs={},
                             skip_AnMBR=False, AnMBR_kwargs={},
-                            skip_AF=False, AF_kwargs={}):
+                            skip_AeF=False, AF_kwargs={}):
     if flowsheet:
         bst.main_flowsheet.set_flowsheet(flowsheet)
     wwt_streams = ins
@@ -232,7 +274,7 @@ def create_wastewater_units(ins, outs, process_ID='6', flowsheet=None,
                      include_excavation_cost=False, **AnMBR_kwargs)
 
     RX03_outs = (f'biogas_R{X}03', f'treated_R{X}03', f'sludge_R{X}03', f'vent_R{X}03')
-    if skip_AF:
+    if skip_AeF:
         RX03 = Skipped(f'R{X}03', ins=(RX02-1, ''), outs=RX03_outs)
     else:
         RX03 = PolishingFilter(f'R{X}03', ins=(RX02-1, '', f'air_R{X}03'), outs=RX03_outs,

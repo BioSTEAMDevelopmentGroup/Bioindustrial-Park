@@ -7,39 +7,8 @@
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
 # for license details.
 
+
 # %%
-
-# =============================================================================
-# Biorefineries
-# =============================================================================
-
-# Sugarcane
-from biorefineries import sugarcane as sc # module
-from biorefineries.sugarcane import chemicals as sc_chems # chemicals
-from biorefineries.sugarcane._process_settings import \
-    load_process_settings as load_sc_settings # settings
-
-# Lipidcane
-from biorefineries import lipidcane as lc
-from biorefineries.lipidcane import chemicals as lc_chems
-from biorefineries.lipidcane._process_settings import (
-    price as lc_price,
-    load_process_settings as load_lc_settings
-    )
-
-# Corn stover
-from biorefineries import cornstover as cs
-from biorefineries.cornstover import chemicals as cs_chems
-from biorefineries.cornstover._process_settings import (
-    price as cs_price,
-    load_process_settings as load_cs_settings,
-    )
-
-# Lactic acid
-from biorefineries import lactic as la
-from biorefineries.lactic import chems as la_chems, update_settings as load_la_settings
-from biorefineries.lactic._settings import price as la_price
-
 
 # =============================================================================
 # Initializing here to avoid circular importing
@@ -77,16 +46,17 @@ _GDP_2007to2016 = 1.160
 #     process vs. without/with the original process, this will not affect the
 #     conclusions.
 
+#!!! Want to adjust to $2016
 new_price = { # $/kg unless otherwise noted
     'Wastewater': -0.03, # ref [1], negative value for cost from product,
     'NaOCl': 0.14, # $/L
     'CitricAcid': 0.22, # $/L
     'Bisulfite': 0.08, # $/L
-    'Caustics': cs.caustic.price,
+    'Caustics': 0.2627, # la._settings.price['NaOH]/2 as the caustic is 50% NaOH/water
     'Polymer': 2.6282 / _lb_per_kg / _GDP_2007to2016, # ref [2]
     }
 
-ethanol_density_kggal = cs.ethanol_density_kggal
+ethanol_density_kggal = 2.9867 # cs.ethanol_density_kggal
 import biosteam as bst
 def print_MESP(ethanol, tea, tea_name=''):
     bst.settings.set_thermo(ethanol.chemicals)
@@ -137,18 +107,8 @@ from ._lca import *
 
 
 __all__ = (
-    # Biorefineries
-    'sc', 'lc', 'cs', 'la',
-    'sc_chems', 'lc_chems', 'cs_chems', 'la_chems',
-    'cs_price', 'lc_price', 'la_price',
-    'load_sc_settings',
-    'load_lc_settings',
-    'load_cs_settings',
-    'load_la_settings',
-    'new_price',
     # Unit conversion
-    'auom',
-    'ethanol_density_kggal',
+    'auom', 'ethanol_density_kggal', 'new_price',
     # Path
     'wwt_path', 'results_path',
     *_chemicals.__all__,

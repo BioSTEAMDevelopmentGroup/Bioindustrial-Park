@@ -13,19 +13,12 @@
 
 import biosteam  as bst
 from biosteam import main_flowsheet
-
-# from biorefineries.wwt import (
-#     sc
-#     create_sc_chemicals,
-#     new_price, load_cs_settings,
-#     create_wastewater_treatment_system
-#     )
-# from biorefineries.utils import get_MESP
-from __init__ import sc
-from _chemicals import create_sc_chemicals
-from _settings import new_price, load_sc_settings
-from _wwt_sys import create_wastewater_system
-from utils import print_MESP
+from biorefineries import sugarcane as sc
+from biorefineries.sugarcane import create_chemicals, load_process_settings
+from biorefineries.wwt import (
+    add_wwt_chemicals, create_wastewater_system,
+    new_price, print_MESP,
+    )
 
 
 # %%
@@ -34,9 +27,11 @@ from utils import print_MESP
 # Function to make the system
 # =============================================================================
 
-load_sc_settings()
-chems = create_sc_chemicals()
-bst.settings.set_thermo(chems)
+#!!! REDO THIS BASED ON THE OILCANE BIOREFINERY
+
+new_sc_chems = add_wwt_chemicals(create_chemicals())
+bst.settings.set_thermo(new_sc_chems)
+load_process_settings()
 
 @bst.SystemFactory(
     ID='sugarcane_sys',

@@ -12,6 +12,7 @@
 
 from biosteam import Stream, Flowsheet, main_flowsheet
 from biosteam.process_tools import UnitGroup
+from biorefineries.lactic import chems as la_chems, update_settings as load_process_settings
 from biorefineries.lactic._processes import (
     create_preprocessing_process,
     create_pretreatment_process,
@@ -20,29 +21,25 @@ from biorefineries.lactic._processes import (
     create_facilities,
     create_lactic_sys,
     )
+from biorefineries.lactic._settings import price
 from biorefineries.lactic.utils import cell_mass_split, gypsum_split
 from biorefineries.wwt import (
+    add_wwt_chemicals, create_wastewater_system,
     default_insolubles, get_insoluble_IDs,
-    la_chems, create_la_chemicals, load_la_settings,
-    create_wastewater_system,
     )
 
 
 # %%
 
-# =============================================================================
-# Function to make the system
-# =============================================================================
-
-chems = create_la_chemicals()
-load_la_settings(chems)
+new_la_chems = add_wwt_chemicals(la_chems)
+load_process_settings(new_la_chems)
 # `load_la_settings` would set thermo
 # bst.settings.set_thermo(chems)
 
 # Add WWT chemicals to the existing splits array,
 # splits of chemicals that do now exist in the original chemicals obj
 # will be copied from the splits of the corresponding group
-def create_new_splits(original_splits, original_chems=la_chems, new_chems=chems):
+def create_new_splits(original_splits, original_chems=la_chems, new_chems=new_la_chems):
     new_splits = new_chems.zeros()
     new_splits[new_chems.indices(original_chems.IDs)] = original_splits
     new_splits[new_chems.indices(('Bisulfite', 'CitricAcid', 'HCl', 'NaOCl'))] = \
@@ -51,7 +48,7 @@ def create_new_splits(original_splits, original_chems=la_chems, new_chems=chems)
 
 wwt_cell_mass_split = create_new_splits(cell_mass_split)
 wwt_gypsum_split = create_new_splits(gypsum_split)
-insolubles = get_insoluble_IDs(chems, default_insolubles)
+insolubles = get_insoluble_IDs(new_la_chems, default_insolubles)
 
 
 # Modify for the lactic acid system
@@ -71,14 +68,13 @@ def create_wastewater_process(flowsheet, groups, WWT_streams, wwt_kwargs):
     return flowsheet, groups
 
 
-
 def create_la_system(flowsheet, include_blowdown_recycle=True,
                      default_BD=True, wwt_kwargs={}):
     s = flowsheet.stream
     u = flowsheet.unit
 
     flowsheet, groups, get_feedstock_dry_mass, get_flow_tpd = \
-        create_preprocessing_process(flowsheet, chems)
+        create_preprocessing_process(flowsheet, new_la_chems)
 
     flowsheet, groups = \
         create_pretreatment_process(flowsheet, groups, u.U101-0, get_feedstock_dry_mass)
@@ -108,7 +104,6 @@ def create_la_system(flowsheet, include_blowdown_recycle=True,
     # Empty stream so that errors won't be raised when creating facilities
     Stream('ammonia_R502')
 
-
     CHP_wastes = (u.U101-1, u.S401-0, u.S503-1)
     CHP_biogas = u.M502-0
     CHP_side_streams = (s.water_M201, s.water_M202, s.steam_M203)
@@ -128,6 +123,9 @@ def create_la_system(flowsheet, include_blowdown_recycle=True,
     flowsheet, teas, funcs = create_lactic_sys(flowsheet, groups, get_flow_tpd)
 
     return flowsheet, groups, teas, funcs
+
+
+# %%
 
 la_flowsheet = Flowsheet('la_wwt')
 main_flowsheet.set_flowsheet(la_flowsheet)

@@ -13,11 +13,13 @@
 
 import biosteam as bst
 from biosteam import main_flowsheet
+from biorefineries import cornstover as cs
+from biorefineries.sugarcane import create_ethanol_purification_system
+from biorefineries.cornstover import create_chemicals, load_process_settings, price
 from biorefineries.wwt import (
+    add_wwt_chemicals, create_wastewater_system,
     ethanol_density_kggal, print_MESP,
-    sc, cs, create_cs_chemicals, get_digestable_chemicals,
-    cs_price, load_cs_settings,
-    create_wastewater_treatment_system,
+    get_digestable_chemicals,
     get_cs_GWP,
     )
 
@@ -28,17 +30,26 @@ from biorefineries.wwt import (
 # Function to make the system
 # =============================================================================
 
-load_cs_settings()
-chems = create_cs_chemicals()
-bst.settings.set_thermo(chems)
+new_cs_chems = add_wwt_chemicals(create_chemicals())
+if new_cs_chems.CSL.formula is None:
+    # CSL stream is modeled as 50% water, 25% protein, and 25% lactic acid,
+    # its formula was obtained using the following codes
+    # get_atom = lambda chemical, element: chemical.atoms.get(element) or 0.
+    # CSL_atoms = {}
+    # for i in ('C', 'H', 'O', 'N', 'S'):
+    #     CSL_atoms[i] = 0.5*get_atom(new_cs_chems.Water, i)+\
+    #         0.25*get_atom(new_cs_chems.Protein, i)+0.25*get_atom(new_cs_chems.LacticAcid, i)
+    new_cs_chems.CSL.formula = 'CH2.8925O1.3275N0.0725S0.00175'
+bst.settings.set_thermo(new_cs_chems)
+load_process_settings()
 
 @bst.SystemFactory(
     ID='cornstover_sys',
     ins=[*cs.create_dilute_acid_pretreatment_system.ins,
           dict(ID='denaturant',
                Octane=1,
-               price=cs_price['Denaturant'])],
-    outs=[dict(ID='ethanol', price=cs_price['Ethanol'])],
+               price=price['Denaturant'])],
+    outs=[dict(ID='ethanol', price=price['Ethanol'])],
 )
 def create_cs_system(ins, outs, include_blowdown_recycle=True,
                      default_BD=True, wwt_kwargs={}):
@@ -60,7 +71,7 @@ def create_cs_system(ins, outs, include_blowdown_recycle=True,
         mockup=True,
     )
 
-    ethanol_purification_sys = sc.create_ethanol_purification_system(
+    ethanol_purification_sys = create_ethanol_purification_system(
         ins=[fermentation_sys-1, denaturant],
         outs=[ethanol],
         IDs={'Beer pump': 'P401',
@@ -95,7 +106,7 @@ def create_cs_system(ins, outs, include_blowdown_recycle=True,
         skip_AF = wwt_kwargs.get('skip_AF')
         wwt_kwargs['skip_AF'] = True if skip_AF is None else skip_AF
 
-    create_wastewater_treatment_system(
+    create_wastewater_system(
         ins=[S401-1, pretreatment_sys-1, blowdown_to_wastewater],
         outs=['biogas', 'sludge', 'recycled_water', 'brine'],
         mockup=True,
@@ -110,7 +121,7 @@ def create_cs_system(ins, outs, include_blowdown_recycle=True,
     # This might be due to the different CH4/CO2 ratios in the biogas production reaction,
     # Humbird assumed 51%:49% (1.04) CH4:CO2 on a molar basis, here is about 1
     if default_BD:
-        BD_dct = {k.ID: 1. for k in get_digestable_chemicals(chems)}
+        BD_dct = {k.ID: 1. for k in get_digestable_chemicals(new_cs_chems)}
         u.R601.biodegradability = BD_dct
         u.R601._refresh_rxns(X_biogas=0.86, X_growth=0.05)
 

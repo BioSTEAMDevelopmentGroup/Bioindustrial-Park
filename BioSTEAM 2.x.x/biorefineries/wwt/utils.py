@@ -9,6 +9,7 @@
 
 import numpy as np
 from chemicals.elements import molecular_weight
+import thermosteam as tmo
 from thermosteam.reaction import (
     Reaction as Rxn,
     ParallelReaction as PRxn
@@ -22,9 +23,12 @@ from biosteam.units.design_tools.tank_design import (
     mix_tank_purchase_cost_algorithms,
     TankPurchaseCostAlgorithm
     )
+from biorefineries.cornstover import create_chemicals
 from ._chemicals import default_insolubles
 
 __all__ = (
+    # Combustion
+    'get_combustion_energy',
     # Construction
     'IC_purchase_cost_algorithms', 'select_pipe', 'cost_pump',
     # Digestion
@@ -39,6 +43,43 @@ __all__ = (
     'get_split_dct',
     'kph_to_tpd',
     )
+
+
+# %%
+
+# =============================================================================
+# Combustion
+# =============================================================================
+
+cs_chems = create_chemicals()
+def get_combustion_energy(stream, combustion_eff=0.8):
+    '''
+    Estimate the amount of energy generated from combustion of incoming streams.
+    '''
+    chems = stream.chemicals
+    to_add = []
+    combustion_chemicals = ('O2', 'H2O', 'CO2', 'N2', 'P4O10', 'SO2', 'Ash')
+    for ID in combustion_chemicals:
+        if not hasattr(chems, ID):
+            to_add.append(ID)
+    if to_add:
+        for ID in to_add:
+            to_add.append(getattr(cs_chems, to_add.pop(ID)))
+        new_chems = tmo.Chemicals(to_add)
+        new_chems.compile()
+        tmo.settings.set_thermo(new_chems)
+        new_stream = tmo.Stream()
+        new_stream.imass[chems.IDs] = stream.imass[chems.IDs]
+    else:
+        new_chems = chems
+        new_stream = stream
+    rxns = new_stream.chemicals.get_combustion_reactions()
+    reacted = new_stream.copy()
+    rxns.force_reaction(reacted.mol)
+    reacted.imol['O2'] = 0
+    H_net = new_stream.H + new_stream.HHV - reacted.H
+    tmo.settings.set_thermo(chems)
+    return H_net
 
 
 # %%

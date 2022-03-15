@@ -11,32 +11,28 @@
 '''
 Set properties of the chemicals used in the biorefineries.
 
-Chemical data from the lactic acid biorefinery:
+Part of the chemical data is from the lactic acid biorefinery:
 https://github.com/BioSTEAMDevelopmentGroup/Bioindustrial-Park/blob/master/BioSTEAM%202.x.x/biorefineries/lactic/_chemicals.py
 '''
 
 import thermosteam as tmo
 from biorefineries import lactic as la
-from . import sc_chems, lc_chems, cs_chems, la_chems
 
 __all__ = (
-    'default_insolubles',
-    'get_insoluble_IDs',
-    'get_soluble_IDs',
-    'create_cs_chemicals',
-    'create_sc_chemicals',
-    'create_lc_chemicals',
-    'create_la_chemicals',
+    'default_insolubles', 'get_insoluble_IDs', 'get_soluble_IDs',
+    'add_wwt_chemicals',
     )
 
 default_insolubles = (
-    # Sugarcane biorefinery
+    # Sugarcane
     'Yeast', 'CaO', 'Solids', 'Flocculant',
-    # Cornstover biorefinery
+    # Corn
+    'Fiber', 'InsolubleProtein',
+    # Cornstover
     'Lime', 'CaSO4', 'Ash', 'P4O10',
     'Tar', 'Lignin', 'Cellulose', 'Hemicellulose',
     'Protein', 'Enzyme', 'DenaturedEnzyme', 'Z_mobilis', 'T_reesei', 'WWTsludge',
-    # Lactic acid biorefinery
+    # Lactic acid
     *la._chemicals.insolubles,
     )
 
@@ -47,6 +43,32 @@ def get_insoluble_IDs(chemicals, insolubles):
 
 def get_soluble_IDs(chemicals, insolubles):
     return tuple(i.ID for i in chemicals if not i.ID in insolubles)
+
+
+# Add synonyms
+synonym_dct = {
+    'Water': 'H2O',
+    'Denaturant': 'Octane',
+    'CO2': 'CarbonDioxide',
+    'NH3': 'Ammonia',
+    'H2SO4': 'SulfuricAcid',
+    'AmmoniumSulfate': '(NH4)2SO4',
+    'Lime': 'Ca(OH)2',
+    'Yeast': 'DryYeast',
+    'OleicAcid': 'FFA',
+    'MonoOlein': 'MAG',
+    'DiOlein': 'DAG',
+    'TriOlein': 'TAG',
+    }
+UndefinedChemical = tmo.exceptions.UndefinedChemical
+def set_synonym_grp(chemicals):
+    for i in chemicals:
+        if i.ID in synonym_dct.keys():
+            chemicals.set_synonym(i.ID, synonym_dct[i.ID])
+            if i.ID == 'TriOlein': # some biorefineries have 'Triolein; but not the individual chemicals
+                try: chemicals.define_group('Lipid', ('PL', 'FFA', 'MAG', 'DAG', 'TAG'))
+                except UndefinedChemical: pass
+    return chemicals
 
 
 _cal2joule = 4.184 # auom('cal').conversion_factor('J')
@@ -92,90 +114,8 @@ def add_wwt_chemicals(chemicals):
     chemical_defined('Polymer', phase='s', MW=1, Hf=0, HHV=0, LHV=0)
     chems.Polymer.Cn.add_model(evaluate=0, name='Constant')
 
-    for i in chems:
-        i.default()
+    for i in chems: i.default()
+    chems.compile()
+    chems = set_synonym_grp(chems)
 
     return chems
-
-
-# Add synonyms
-synonym_dct = {
-    'Water': 'H2O',
-    'Denaturant': 'Octane',
-    'CO2': 'CarbonDioxide',
-    'NH3': 'Ammonia',
-    'H2SO4': 'SulfuricAcid',
-    'AmmoniumSulfate': '(NH4)2SO4',
-    'Lime': 'Ca(OH)2',
-    'Yeast': 'DryYeast',
-    'OleicAcid': 'FFA',
-    'MonoOlein': 'MAG',
-    'DiOlein': 'DAG',
-    'TriOlein': 'TAG',
-    }
-def set_synonym_grp(chemicals):
-    for i in chemicals:
-        if i.ID in synonym_dct.keys():
-            chemicals.set_synonym(i.ID, synonym_dct[i.ID])
-            if i.ID == 'TriOlein':
-                chemicals.define_group('Lipid', ('PL', 'FFA', 'MAG', 'DAG', 'TAG'))
-
-    return chemicals
-
-
-# Sugarcane
-def create_sc_chemicals():
-    '''
-    Create compiled chemicals for the sugarcane biorefinery with the new
-    wastewater treatment process.
-    '''
-    new_chems = add_wwt_chemicals(sc_chems)
-    new_chems.compile()
-    new_chems = set_synonym_grp(new_chems)
-    return new_chems
-
-
-# Lipidcane
-def create_lc_chemicals():
-    '''
-    Create compiled chemicals for the lipidcane biorefinery with the new
-    wastewater treatment process.
-    '''
-    new_chems = add_wwt_chemicals(lc_chems)
-    new_chems.compile()
-    new_chems = set_synonym_grp(new_chems)
-    return new_chems
-
-
-# Cornstover
-def create_cs_chemicals():
-    '''
-    Create compiled chemicals for the cornstover biorefinery with the new
-    wastewater treatment process.
-    '''
-    if cs_chems.CSL.formula is None:
-        # CSL stream is modeled as 50% water, 25% protein, and 25% lactic acid,
-        # its formula was obtained using the following codes
-        # get_atom = lambda chemical, element: chemical.atoms.get(element) or 0.
-        # CSL_atoms = {}
-        # for i in ('C', 'H', 'O', 'N', 'S'):
-        #     CSL_atoms[i] = 0.5*get_atom(chems.Water, i)+\
-        #         0.25*get_atom(chems.Protein, i)+0.25*get_atom(chems.LacticAcid, i)
-        cs_chems.CSL.formula = 'CH2.8925O1.3275N0.0725S0.00175'
-
-    new_chems = add_wwt_chemicals(cs_chems)
-    new_chems.compile()
-    new_chems = set_synonym_grp(new_chems)
-    return new_chems
-
-
-# Lactic acid
-def create_la_chemicals():
-    '''
-    Create compiled chemicals for the lactic acid biorefinery with the new
-    wastewater treatment process.
-    '''
-    new_chems = add_wwt_chemicals(la_chems)
-    new_chems.compile()
-    new_chems = set_synonym_grp(new_chems)
-    return new_chems
