@@ -178,8 +178,8 @@ mc_derivative_metric_settings = {
     'GWP_economic': (GWP_ethanol_derivative, r"$\Delta$" + r"GWP $\cdot \Delta \mathrm{OC}^{-1}$" f"\n[{GWP_units_gal.replace('kg','g')}]", 1000),
 }
 
-for dct in (mc_metric_settings, mc_comparison_settings, mc_derivative_metric_settings):
-    for i, j in dct.copy().items(): dct[j[0]] = j
+# for dct in (mc_metric_settings, mc_comparison_settings, mc_derivative_metric_settings):
+#     for i, j in dct.copy().items(): dct[j[0]] = j
     
 # %% Plots for publication
 
@@ -934,7 +934,7 @@ def get_monte_carlo_key(index, dct, with_units=False):
 
 def monte_carlo_results(with_units=False):
     results = {}    
-    for name in oc.configuration_names + oc.comparison_names + oc.other_comparison_names:
+    for name in oc.configuration_names + oc.comparison_names + oc.other_comparison_names + ('O3', 'O4', 'O1 - O3', 'O2 - O4'):
         try: 
             df = get_monte_carlo(name)
         except:
@@ -1018,7 +1018,7 @@ def plot_monte_carlo(derivative=False, absolute=True, comparison=True,
             default_metrics = ['MFPP', 'TCI', 'production']
         else:
             default_metrics = list(metric_info)
-    if configuration_names is None: configuration_names = default_configuration_names[:-2]
+    if configuration_names is None: configuration_names = default_configuration_names
     if comparison_names is None: comparison_names = default_comparison_names
     if metrics is None: metrics = default_metrics
     combined = absolute and comparison
@@ -1040,9 +1040,8 @@ def plot_monte_carlo(derivative=False, absolute=True, comparison=True,
     factors = [(i, j) for i, j in enumerate(factors) if j is not None]
     if color_wheel is None: color_wheel = CABBI_colors.wheel()
     N_rows = len(rows)
-    nrows = int(round(N_rows / ncols))
     if axes_box is None:
-        fig, axes_box = plt.subplots(ncols=ncols, nrows=nrows)
+        fig, axes_box = plt.subplots(ncols=ncols, nrows=int(round(N_rows / ncols)))
         plt.subplots_adjust(wspace=0.45)
     else:
         fig = None
@@ -1179,7 +1178,7 @@ def plot_spearman(configurations, top=None, labels=None, metric=None, cutoff=Non
          ('Bagasse oil retention [40 $-$ 70 %]', ['S2', 'S1', 'S2*', 'S1*']),
          ('Oil extraction efficiency [baseline + 0 $-$ 20 %]', ['S2', 'S1', 'S2*', 'S1*']),
         (f'Cane operating days [120 $-$ 180 {operating_days}]', []),
-        (f'Sorghum operating days [20 $-$ 60 {operating_days}]', ['S2', 'S1', 'O1', 'O2']),
+        (f'Sorghum operating days [30 $-$ 60 {operating_days}]', ['S2', 'S1', 'O1', 'O2']),
         (f'Crushing capacity [1.32 $-$ 2.20 {capacity}]', []),
         (f'Ethanol price [1.02, 1.80, 2.87 {stream_price}]', []),
         (f'Relative biodiesel price [0.31, 2.98, 4.11 {stream_price}]', []),

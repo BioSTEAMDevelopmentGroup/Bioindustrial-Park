@@ -39,4 +39,4 @@ price = {'Lipid cane': 0.03455, # 70% m.c
          'Ethanol': 0.789,
          'Waste': -0.33,
          'Gasoline': 0.756,
-         'Crude oil': 0.6173} # 28 cts / lb (vegetable)
+         'Crude oil': 0.661} # 30 cts / lb (vegetable); 5yr average https://www.ams.usda.gov/mnreports/lswagenergy.pdf
