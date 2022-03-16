@@ -170,8 +170,8 @@ def tickmarks_from_data(data, accuracy=50, N_points=5):
     return tickmarks(dmin, dmax, accuracy, N_points)
 
 def tickmarks(dmin, dmax, accuracy=50, N_points=5):
-    dmin = floor(dmin/50) * 50
-    dmax = ceil(dmax/50) * 50
+    dmin = floor(dmin/accuracy) * accuracy
+    dmax = ceil(dmax/accuracy) * accuracy
     step = (dmax - dmin) / (N_points - 1)
     return [dmin + step * i for i in range(N_points)]
 
@@ -207,8 +207,10 @@ lab_spec_3 = 1
 SA_price_range = [6500, 7500]
 # temporary price range from https://www.alibaba.com/product-detail/hot-sale-C4H8O-butanon-mek_62345760689.html?spm=a2700.7724857.normalList.26.1d194486SbCyfR
 
-
-get_SA_MPSP = lambda: TAL_tea.solve_price(product) * 907.185 # To USD / ton
+product_chemical_ID = 'TAL'
+get_SA_MPSP = lambda: TAL_tea.solve_price(product) * 907.185 / get_product_purity() # USD / ton
+get_product_purity = lambda: product.imass[product_chemical_ID]/product.F_mass
+# get_SA_MPSP = lambda: TAL_tea.solve_price(product) / get_product_purity() # USD / kg
 get_TAL_VOC = lambda: TAL_tea.VOC / 1e6 # million USD / yr
 get_TAL_FCI = lambda: TAL_tea.FCI / 1e6 # million USD
 
@@ -292,11 +294,11 @@ TAL_metrics = [get_SA_MPSP, get_TAL_sugars_conc, get_TAL_inhibitors_conc]
 # TAL_metrics = [get_TAL_MPSP, get_GWP, get_FEC]
 
 # %% Generate 3-specification meshgrid and set specification loading functions
-steps = 20
+steps = 50
 
 # Yield, titer, productivity (rate)
-spec_1 = np.linspace(0.2, 0.9, steps) # yield
-spec_2 = np.linspace(5., 25., steps) # titer
+spec_1 = np.linspace(0.1, 0.9, steps) # yield
+spec_2 = np.linspace(1., 30., steps) # titer
 # spec_1 = np.linspace(0.2, 0.99, steps) # yield
 # spec_2 = np.linspace(45, 225, steps) # titer
 spec_3 = np.array([0.21,]) # productivity
@@ -306,9 +308,9 @@ spec.load_spec_3 = spec.load_productivity
 xlabel = "Yield"
 ylabel = 'Titer [$\mathrm{g} \cdot \mathrm{L}^{-1}$]'
 # xticks = [0.33, 0.66, 0.99]
-xticks = [0.0, 0.2, 0.4, 0.6, 0.8, 1.0]
+xticks = [0.1, 0.3, 0.5, 0.7, 0.9]
 # yticks = [75, 150, 225]
-yticks = [10, 20, 30]
+yticks = [0, 5, 10, 15, 20, 25, 30]
 # xticks = [0.2, 0.6, 0.99]
 # yticks = [45, 135, 225]
 spec_3_units = "$\mathrm{g} \cdot \mathrm{L}^{-1} \cdot \mathrm{hr}^{-1}$"
@@ -682,11 +684,11 @@ def plot(data, titers, yields, productivities,
     metric_bars = (MetricBar('MPSP\n', MPSP_units, CABBI_green_colormap(),
                              Metric_1_tickmarks,
                              1 + int((max(Metric_1_tickmarks) - min(Metric_1_tickmarks))/250)),
-                   MetricBar('Total sugars\n', VOC_units,
+                   MetricBar(' \n', ' ',
                             CABBI_blue_colormap(), # plt.cm.get_cmap('magma_r'),
                              Metric_2_tickmarks, 
                              1 + int((max(Metric_2_tickmarks) - min(Metric_2_tickmarks))/6.25)),
-                   MetricBar('Total inhibitors\n', FCI_units,
+                   MetricBar(' \n', ' ',
                              plt.cm.get_cmap('bone_r'), # plt.cm.get_cmap('bone_r'),
                              Metric_3_tickmarks,
                              1 + int((max(Metric_3_tickmarks) - min(Metric_3_tickmarks))/62.5)))
@@ -842,198 +844,3 @@ plt.show()
 # fig_to_save = file_to_save + '.png'
 
 # plt.savefig(fig_to_save, format = 'png', dpi=500)
-
-
-# %% Functions to get relative impact data faster from generated MPSP data
-spec_1_r = np.round(spec_1, 4)
-spec_2_r = np.round(spec_2, 4)
-
-
-# def get_metric_for_XY_coordinates(X,Y, spec_1, spec_2, tmetric, Z_coord=0):
-#     metric = tmetric[:,:,Z_coord]
-#     x = list(spec_1[0]).index(X)
-#     y = list(spec_2[:,0]).index(Y)
-#     return metric[y][x]
-
-
-def rel_impact_fn_fast(x, y, step_size1, step_size2, metric, Z_coord = 0):
-    lower_bound = 1/10
-    upper_bound = 10
-    middle = 1
-    rel_impact_titer_yield = None
-    max_x = len(Xs) - 1
-    max_y = len(Ys) - 1
-    next_x= x + step_size1
-    next_y = y + step_size2
-    d_MPSP_d_yield, d_MPSP_d_titer = None, None
-    if metric[y][x][Z_coord] == np.nan:
-        rel_impact_titer_yield = np.nan
-    elif next_x > max_x  and not next_y > max_y:
-        # if step_size1 == 1 or step_size2 == 1:
-        rel_impact_titer_yield = upper_bound
-        # else:
-        #     return rel_impact_fn_fast(x, y, step_size1 - 1, step_size2 -1, metric)
-    elif next_y > max_y and not next_x > max_x:
-        # if step_size1 == 1 or step_size2 == 1:
-        rel_impact_titer_yield = lower_bound
-        # else:
-        #     return rel_impact_fn_fast(x, y, step_size1 - 1, step_size2 -1, metric)
-        
-    elif next_x > max_x  and next_y > max_y:
-        rel_impact_titer_yield = middle
-    else:
-        curr_MPSP = metric[y][x][Z_coord]        
-        d_MPSP_d_yield = (metric[y][next_x][Z_coord] - curr_MPSP)/step_size1
-        d_MPSP_d_titer = (metric[next_y][x][Z_coord] - curr_MPSP)/step_size2
-        rel_impact_titer_yield = d_MPSP_d_titer/d_MPSP_d_yield
-    if rel_impact_titer_yield < 0:
-    #     if step_size1 == 1 or step_size2 == 1:
-    #         relative_impact_titer_yield = np.nan
-    #     else:
-        return rel_impact_fn_fast(x, y, step_size1+1, step_size2+1, metric)
-    # print(x, y, next_x, next_y,'\n', d_MPSP_d_yield, d_MPSP_d_titer, rel_impact_titer_yield)
-    # return 1 + log(rel_impact_yield_titer, 10)
-    return rel_impact_titer_yield
-
-Xs = spec_1_r[0]
-Ys = spec_2_r[:,0]
-
-
-def get_all_rel_imp_fast(Xs=Xs, Ys=Ys, metric=d1_Metric1, step_size1 = 3, step_size2 = 3):
-    all_rel_imp = np.nan * np.ones((len(Ys), len(Xs)))
-    for x in range(len(Xs)):
-        for y in range(len(Ys)):
-            next_x, next_y = x + step_size1, y + step_size2
-            all_rel_imp[y][x] = rel_impact_fn_fast(x, y, step_size1, step_size2, metric)
-    return all_rel_imp
-
-def get_biorefinery_steepness(rel_impact_data, steps = steps,
-                              slope_invs_to_check = (1.5, 1.2), abs_tol = 0.05):
-    # points = {}
-    # for ri in RIs_to_check:
-    #     points[ri] = []
-    #     for i in range(int(len(rel_impact_data)/6), int(len(rel_impact_data))):
-    #         for j in range(int(len(rel_impact_data[i])/6), len(rel_impact_data[i])):
-    #             if (not points[ri]) or (points[ri][0][0] - i >2 and len(points[ri])==1):
-    #                 if abs(rel_impact_data[i][j] - 1/ri) < abs_tol:
-    #                     points[ri].append((i,j))
-    # print(points)
-    # b_list = []
-    # for ri, points in points.items():
-    #     x1, y1, x2, y2 =\
-    #         points[0][0], points [0][1], points[1][0], points[1][1]
-    #     m = (y2-y1)/(x2-x1)
-    #     b =  flx.IQ_interpolation(lambda b: ri - m**(1+b), -2, 0, ytol=1e-2, maxiter=100)
-    #     b_list.append[b]
-    
-    points = {}
-    xs = [int(round(steps/4.,0)), int(round(steps/2.,0))]
-    for slope_inv in slope_invs_to_check:
-        ys = [int(round((1/slope_inv)*x,0)) for x in xs]
-        points[slope_inv] = (xs, ys)
-    print(points)
-    b_list = []
-    for slope_inv, points in points.items():
-        x1, y1, x2, y2 =\
-            points[0][0], points [1][0], points[0][1], points[1][1]
-        m = 1./slope_inv
-        act_ri1 = rel_impact_data[x1][y1]
-        act_ri2 = rel_impact_data[x2][y2]
-        
-        b =  flx.IQ_interpolation(lambda b: 1./act_ri1 + 1./act_ri2 - 2*m**(1+b), -2, 0,
-                                  ytol=1e-2, maxiter=100)
-        b_list.append(b)
-       
-    return sum([b for b in b_list])/len(b_list), b_list
- 
-# %% Get rel_imp_data
-rel_imp_data = get_all_rel_imp_fast()
-# rel_imp_data = np.where(arr1==1e-4, 1/10, arr1)
-# rel_imp_data = np.where(arr1==1e4, 10, arr1)
-
-# %% Relative impact plot
-fig, ax = plt.subplots(1, 2)
-Z_label=None,
-Z_value_format=lambda Z: str(Z),
-metric_bar = metric_bars[2]
-
-X, Y, Z = spec_1, spec_2, rel_imp_data
-levels3 = list(np.linspace(1/10, 1-(1-1/10)/19, 19)) + [1.] + list(np.linspace(1+ (10-1)/19, 10, 19))
-plt.sca(ax[0])
-
-
-style_plot_limits(xticks, yticks)
-pcm = plt.contourf(X, Y, Z, levels=levels3,
-                   norm=mcolors.DivergingNorm(vmin=1/10., vcenter=1., vmax=10),
-                   cmap = metric_bar.cmap)
-style_plot_limits(xticks, yticks)
-# fig.colorbar(pcm, ax=ax[0], extend='max')
-set_axes_labels(np.array([ax]), xlabel, ylabel)
-
-contourlevels = [1., 2,3,4,5,6]
-rel_imp_lines = plt.contour(X, Y, Z, zorder=1e6, linestyles='dashed', linewidths=1., levels=contourlevels, colors=[linecolor_dark])
-plt.clabel(rel_imp_lines, levels=contourlevels, inline_spacing = 0.03, \
-                fmt=lambda x: format(x,'.1f'), inline=True, fontsize=8)
-
-Yss_direct = []
-ms = np.array(contourlevels)
-ms = 1/ms
-
-# biorefinery_steepness = -0.54
-
-
- 
-biorefinery_steepness, b_list = get_biorefinery_steepness(rel_imp_data)
-# biorefinery_steepness = -0.48
-# biorefinery_steepness = -0.545
-# biorefinery_steepness = -0.62 # how steeped towards yield rather than titer (-2 to 0)
-from math import e
-for m in ms:
-    # Yss_direct.append((m*(2.75**(1-m))* (yticks[-1]/xticks[-1]) *np.array(X[0])))
-    # Yss_direct.append((m*(1+1.03*log(1/m)))* (yticks[-1]/xticks[-1]) *np.array(X[0]))
-    # Yss_direct.append((m*(0.00005**((m-1)/10))* (yticks[-1]/xticks[-1]) *np.array(X[0])))
-    fm = (1*m)**(biorefinery_steepness)
-    Yss_direct.append((m * fm) * (yticks[-1]/xticks[-1]) * np.array(X[0]))
-Yss_direct = np.array(Yss_direct)
-for i in range(len(Yss_direct)):
-    ax[0].plot(X[0][0:-1:8], Yss_direct[i][0:-1:8], 'g-')
-# for i in range(len(Yss_direct)):
-#     ax[0].plot(X[0][0:-1:8], Yss_direct[i][0:-1:8], 'r-')
-ax[0].set_facecolor('black')
-plt.sca(ax[1])
-plt.axis('off')
-ticks = [0., 0.1, 0.3, 0.6, 0.8, 1., 3., 6., 8., 10.]
-cb = fig.colorbar(mappable = pcm, ax=ax[1], shrink=0.6, extend = 'both', ticks = ticks)
-plt.subplots_adjust(hspace=0.1, wspace=0.1)
-ax[1].set_title(metric_bar.title)
-plt.show()
-# fig, axes = plot(data_2, titers_2, yields_2, productivities_2, Metric_1_tickmarks, Metric_2_tickmarks, Metric_3_tickmarks)
-# percent_yields_2 = 100 * yields_2
-# for i, ax_col in enumerate(axes[:, :3].transpose()):
-#     MSP = data_2[:, :, 0, i]
-#     for ax in ax_col:
-#         plt.sca(ax)
-#         CS = plt.contourf(titers_2, percent_yields_2, MSP, zorder=1e6,
-#                           levels=SA_price_range, colors=[marketrange_shadecolor])
-#         plt.contour(CS,zorder=1e6, linestyles='dashed', linewidths=1.,
-#                     levels=SA_price_range, colors=[linecolor_dark])
-
-# axes_target_spec_3 = axes[:, 1]
-# for i, ax in enumerate(axes_target_spec_3):
-#     plt.sca(ax)
-#     # plt.clabel(CS, fmt=lambda x: format(x,'.0f'), inline=1, fontsize=12)
-#     plot_scatter_points([target_spec_2], [target_spec_1], marker='p', s=125, color=markercolor,
-#                         edgecolor=edgecolor)
-
-# axes_target_spec_3 = axes[:, 1]
-# for ax in axes_target_spec_3:
-#     plt.sca(ax)
-#     plot_scatter_points([target_spec_2], [target_spec_1], marker='h', s=125, color=markercolor,
-#                         edgecolor=edgecolor)
-    
-
-
-# plt.show()
-
-
-

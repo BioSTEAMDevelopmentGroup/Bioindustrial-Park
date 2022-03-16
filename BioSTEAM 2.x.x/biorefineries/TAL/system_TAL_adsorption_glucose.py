@@ -243,7 +243,7 @@ def create_TAL_sys(ins, outs):
     R302.specification = include_seed_CSL_in_cofermentation
     
     # ferm_ratio is the ratio of conversion relative to the fermenter
-    R303 = units.SeedTrain('R303', ins=S302-0, outs=('seed', 'CO2_seedtrain'), ferm_ratio=0.9)
+    R303 = units.SeedTrain('R303', ins=S302-0, outs=('seed', 'CO2_seedtrain'), ferm_ratio=0.95)
     
     T301 = units.SeedHoldTank('T301', ins=R303-0, outs=1-R302)
     
@@ -321,10 +321,10 @@ def create_TAL_sys(ins, outs):
     H401 = bst.units.HXutility('H401', ins=S401-1, outs = ('broth_to_adsorbtion',), T=30. + 273.15)
     
     M401 = bst.Mixer('M401', ins=(Ethanol_desorption, ''), outs=('mixed_ethanol_for_desorption'))
-    S402 = bst.FakeSplitter('S402', ins=M401-0, outs=('ethanol_to_AC1', 'ethanol_to_AC2'))
+    S402 = bst.FakeSplitter('S402', ins=M401-0, outs=('ethanol_to_AC401', 'ethanol_to_AC2'))
     def M401_spec():
         makeup_ethanol, recycled_ethanol = M401.ins
-        AC1.run()
+        AC401.run()
         # AC2.run()
         M401._run()
         M401_outs_0 = M401.outs[0]
@@ -334,23 +334,24 @@ def create_TAL_sys(ins, outs):
         # M401._run()
     M401.specification = M401_spec
     
-    AC1 = bst.AdsorptionColumnTSA(
-        'AC1', 
+    AC401 = bst.AdsorptionColumnTSA(
+        'AC401', 
         # ins=[bst.Stream('feed', TAL=0.014, Water=1, units='kg/hr', T=30 + 273.15), 'ethanol'], 
         ins=[H401-0, S402-0, 'hot_air'],
         outs=['broth_post_adsorption', 'TAL_laden_ethanol', 'ethanol_laden_air'],
         mean_velocity=7.2, # m / hr; typical velocities are 4 to 14.4 m /hr for liquids; Adsorption basics Alan Gabelman (2017) Adsorption basics Part 1. AICHE
         
-        regeneration_velocity=14.4, # updated in specification based on titer
+        regeneration_velocity=14.4, # default value (updated in unit specification based on titer)
         
-        cycle_time=4., # 1-2 hours required for thermal-swing-adsorption (TSA) for silica gels (add 1 hr for conservativeness); Seader, J. D., Separation Process Principles: Chemical and Biochemical Operations,” 3rd ed., Wiley, Hoboken, NJ (2011).
+        cycle_time=2., # 1-2 hours required for thermal-swing-adsorption (TSA) for silica gels (add 1 hr for conservativeness); Seader, J. D., Separation Process Principles: Chemical and Biochemical Operations,” 3rd ed., Wiley, Hoboken, NJ (2011).
+        # this is changed to 4 hours after the first simulation
         
         # TODO: This is density of activated carbon packing, including voids.
         # So rho_adsorbent = (1 - epsilon) * rho where epsilon is the void fraction
         # and rho is the density of activated carbon with no voids.
         rho_adsorbent=2050., # (in kg/m3) 
-        
-        adsorbent_capacity=0.091327, # Default value (updated in unit specification); conservative heuristic from Seider et. al. (2017) Product and Process Design Principles. Wiley
+        void_fraction = 0.35, # Only matters when K given; 0.30 - 0.35 for activated carbon
+        adsorbent_capacity=0.091327, # default value for unsaturated capacity (updated in unit specification); conservative heuristic from Seider et. al. (2017) Product and Process Design Principles. Wiley
         T_regeneration=30. + 273.15, # For silica gels; Seader, J. D., Separation Process Principles: Chemical and Biochemical Operations,” 3rd ed., Wiley, Hoboken, NJ (2011).
         drying_time = 10./60., # h
         air_velocity = 1332., # m/h
@@ -362,28 +363,29 @@ def create_TAL_sys(ins, outs):
         split=dict(TAL=0, Water=1, VitaminA=1., VitaminD2=1., FermMicrobe=1.),
         length_plus = 0.,
         target_recovery=0.99,
+        wet_retention=1., # conservatively assume one full wash's worth of ethanol is retained in the column before dry air is passed through it
         K = 0.078, # 0.125 # constant desorption partition coefficient; calculated for 1 wash from experimental data for 3 washes pooled together
     )
     
-    @AC1.add_specification
-    def AC1_spec(): # update recovery and capacity based on user-input adsorption time and temperature
+    @AC401.add_specification
+    def AC401_spec(): # update recovery and capacity based on user-input adsorption time and temperature
         
-        # AC1.cycle_time = 4.
-        # AC1.regeneration_velocity = 3. + (17./25.)*R302.effluent_titer
+        # AC401.cycle_time = 4.
+        # AC401.regeneration_velocity = 3. + (17./25.)*R302.effluent_titer
         
-        T = AC1.ins[0].T    
-        t = AC1.cycle_time # this needs to exclude hot air time
+        T = AC401.ins[0].T    
+        t = AC401.cycle_time # this needs to exclude hot air time
         capacity = cap_interp(t, T)
-        AC1.adsorbent_capacity = capacity[0]
+        AC401.adsorbent_capacity = capacity[0]
         
         
-        AC1._run()
+        AC401._run()
 
         # M401.run()
     
 
         
-    F401 = bst.units.MultiEffectEvaporator('F401', ins=AC1-1, outs=('F401_b', 'F401_t'), chemical='Ethanol',
+    F401 = bst.units.MultiEffectEvaporator('F401', ins=AC401-1, outs=('F401_b', 'F401_t'), chemical='Ethanol',
                                             P = (101325, 73581, 50892, 32777, 20000), V = 0.7)
     F401.TAL_solubility_in_ethanol_ww = get_TAL_solubility_in_ethanol_ww()
     def F401_obj_fn(V):
@@ -399,9 +401,10 @@ def create_TAL_sys(ins, outs):
 
     F401.specification = BoundedNumericalSpecification(F401_obj_fn, 1e-4, 1.-1e-4)
     
-    # M403 = bst.Mixer('M403', ins=(AC1-1, AC2-1))
-    F402 = bst.units.Flash('F402', ins=F401-0, outs=('F402_b', 'F402_t'), P=101325.,
+    # M403 = bst.Mixer('M403', ins=(AC401-1, AC2-1))
+    F402 = bst.units.Flash('F402', ins=F401-0, outs=('F402_t', 'F402_b'), P=101325.,
                             V=0.5) # !!! TODO: replace with dryer
+    
     def F402_spec():
             F402_b = F402.outs[1]
             F402_ins_0 = F402.ins[0]
@@ -413,8 +416,12 @@ def create_TAL_sys(ins, outs):
             F402_b.imol['TAL'] = TAL_mol        
     F402.specification = F402_spec
     
-    # M404 = bst.Mixer('M402', ins=(AC1-2, AC2-2))
-    H402 = bst.units.HXutility('H402', ins=AC1-2, outs=('cooled_ethanol_laden_air'), 
+    H403 = bst.units.HXutility('H403', ins=F402-1, outs=('cooled_TAL'), 
+                               T=30.+273.15, rigorous=True)
+    
+    
+    # M404 = bst.Mixer('M402', ins=(AC401-2, AC2-2))
+    H402 = bst.units.HXutility('H402', ins=AC401-2, outs=('cooled_ethanol_laden_air'), 
                                T=2.+273.15, rigorous=True)
     
     S403 = bst.units.FakeSplitter('S403', ins=H402-0, outs=('cool_air', 'ethanol_recovered_from_air'))
@@ -449,7 +456,7 @@ def create_TAL_sys(ins, outs):
     
     # Mix waste liquids for treatment
     M501 = bst.units.Mixer('M501', ins=(
-                                        AC1-0,
+                                        AC401-0,
                                         # S402-1,
                                         # F401-0,
                                         # r_S402_s-1, r_S403_s-1, r_S404_s-1,
@@ -457,7 +464,7 @@ def create_TAL_sys(ins, outs):
                                         ))
     
     # This represents the total cost of wastewater treatment system
-    WWT_cost = units.WastewaterSystemCost('WWT_cost', ins=M501-0)
+    WWT_cost = units.WastewaterSystemCost('WWTcost501', ins=M501-0)
     
     R501 = units.AnaerobicDigestion('R501', ins=WWT_cost-0,
                                     outs=('biogas', 'anaerobic_treated_water', 
@@ -621,43 +628,7 @@ def create_TAL_sys(ins, outs):
     T604.line = 'Ethanol storage tank'
     T604_P = units.TALPump('T604_P', ins=T604-0, outs = Ethanol_desorption)
     # T604_P = bst.units.ConveyingBelt('T604_P', ins=T604-0, outs = Hexanol)
-    
-    # # 7-day storage time, similar to ethanol's in Humbird et al.
-    # T605 = units.DPHPStorageTank('T605', ins=heptane_fresh)
-    # T605.line = 'Heptane storage tank'
-    # T605_P = units.TALPump('T605_P', ins=T605-0, outs = Heptane)
-    
-    # T606 = units.DPHPStorageTank('T606', ins=toluene_fresh)
-    # T606.line = 'Toluene storage tank'
-    # T606_P = units.TALPump('T606_P', ins=T606-0, outs = Toluene)
-    
-    
-    T607 = units.DPHPStorageTank('T607', ins=hydrogen_fresh, outs = Hydrogen)
-    T607.line = 'Hydrogen storage tank'
-    
-    T608 = units.DPHPStorageTank('T608', ins=HCl_fresh, outs = HCl,
-                                 vessel_material = 'Stainless steel')
-    T608.line = 'HCl storage tank'
-    
-    T609 = units.DPHPStorageTank('T609', ins=KOH_fresh, outs = KOH,
-                                 vessel_material = 'Stainless steel')
-    T609.line = 'KOH storage tank'
-    
-    
-    # T604_s = units.DPHPStorageTank('T604_s', ins=hexanol_fresh_s)
-    # T604_s.line = 'Hexanol storage tank s'
-    # T604_s_P = units.TALPump('T604_s_P', ins=T604_s-0, outs = Hexanol_s)
-    
-    # 7-day storage time, similar to ethanol's in Humbird et al.
-    T605_s = units.DPHPStorageTank('T605_s', ins=heptane_fresh_s)
-    T605_s.line = 'Heptane storage tank s'
-    T605_s_P = units.TALPump('T605_s_P', ins=T605_s-0, outs = Heptane_s)
-    
-    T606_s = units.DPHPStorageTank('T606_s', ins=toluene_fresh_s)
-    T606_s.line = 'Toluene storage tank s'
-    T606_s_P = units.TALPump('T606_s_P', ins=T606_s-0, outs = Toluene_s)
-    
-    
+
     # T607_P = units.TALPump('T607_P', ins=T607-0, outs = Hydrogen)
     
     # Connections to ATPE Mixer
@@ -665,7 +636,7 @@ def create_TAL_sys(ins, outs):
     # T605_P-0-2-M401
     
     # 7-day storage time, similar to ethanol's in Humbird et al.
-    T620 = units.TALStorageTank('T620', ins=F402-1, tau=7*24, V_wf=0.9,
+    T620 = units.TALStorageTank('T620', ins=H403-0, tau=7*24, V_wf=0.9,
                                           vessel_type='Floating roof',
                                           vessel_material='Stainless steel')
     
@@ -698,15 +669,15 @@ def create_TAL_sys(ins, outs):
     # T608_P = units.TALPump('T608_P', ins=T608-0, outs=IBA)
     
     
-    CIP = facilities.CIP('CIP', ins=CIP_chems_in, outs='CIP_chems_out')
-    ADP = facilities.ADP('ADP', ins=plant_air_in, outs='plant_air_out',
+    CIP = facilities.CIP('CIP901', ins=CIP_chems_in, outs='CIP_chems_out')
+    ADP = facilities.ADP('ADP902', ins=plant_air_in, outs='plant_air_out',
                          ratio=get_flow_tpd()/2205)
     
     
-    FWT = units.FireWaterTank('FWT', ins=fire_water_in, outs='fire_water_out')
+    FWT = units.FireWaterTank('FWT903', ins=fire_water_in, outs='fire_water_out')
     
     #!!! M304_H uses chilled water, thus requiring CWP
-    CWP = facilities.CWP('CWP', ins='return_chilled_water',
+    CWP = facilities.CWP('CWP802', ins='return_chilled_water',
                          outs='process_chilled_water')
     
     # M505-0 is the liquid/solid mixture, R501-0 is the biogas, blowdown is discharged
@@ -719,7 +690,7 @@ def create_TAL_sys(ins, outs):
     #                                 side_streams_to_heat=(water_M201, water_M202, steam_M203),
     #                                 outs=('gas_emission', ash, 'boiler_blowdown_water'))
     
-    BT = bst.facilities.BoilerTurbogenerator('BT',
+    BT = bst.facilities.BoilerTurbogenerator('BT701',
                                                       ins=(M505-0,
                                                           R501-0, 
                                                           'boiler_makeup_water',
@@ -735,7 +706,7 @@ def create_TAL_sys(ins, outs):
     #                                    turbogenerator_efficiency=0.85)
     
     # Blowdown is discharged
-    CT = facilities.CT('CT', ins=('return_cooling_water', cooling_tower_chems,
+    CT = facilities.CT('CT801', ins=('return_cooling_water', cooling_tower_chems,
                                   'CT_makeup_water'),
                        outs=('process_cooling_water', 'cooling_tower_blowdown'))
     
@@ -745,13 +716,13 @@ def create_TAL_sys(ins, outs):
                              aerobic_caustic, 
                              CIP.ins[-1], BT.ins[-1], CT.ins[-1])
     
-    PWC = facilities.PWC('PWC', ins=(system_makeup_water, S504-0),
+    PWC = facilities.PWC('PWC904', ins=(system_makeup_water, S504-0),
                          process_water_streams=process_water_streams,
                          recycled_blowdown_streams=None,
                          outs=('process_water', 'discharged_water'))
     
     # Heat exchange network
-    HXN = bst.facilities.HeatExchangerNetwork('HXN',
+    HXN = bst.facilities.HeatExchangerNetwork('HXN1001',
                                                ignored=[H401, H402])
 
     # HXN = HX_Network('HXN')
@@ -819,17 +790,17 @@ TAL_tea = TALTEA(system=TAL_sys, IRR=0.10, duration=(2016, 2046),
         # biosteam Splitters and Mixers have no cost, 
         # cost of all wastewater treatment units are included in WWT_cost,
         # BT is not included in this TEA
-        OSBL_units=(u.U101, u.WWT_cost,
+        OSBL_units=(u.U101, u.WWTcost501,
                     # u.T601, u.T602, 
-                    u.T603, 
+                    u.T603, u.T604, u.T620,
                     # u.T606, u.T606_P,
-                    u.CWP, u.CT, u.PWC, u.CIP, u.ADP, u.FWT, u.BT),
+                    u.CWP802, u.CT801, u.PWC904, u.CIP901, u.ADP902, u.FWT903, u.BT701),
         warehouse=0.04, site_development=0.09, additional_piping=0.045,
         proratable_costs=0.10, field_expenses=0.10, construction=0.20,
         contingency=0.10, other_indirect_costs=0.10, 
         labor_cost=3212962*get_flow_tpd()/2205,
         labor_burden=0.90, property_insurance=0.007, maintenance=0.03,
-        steam_power_depreciation='MACRS20', boiler_turbogenerator=u.BT)
+        steam_power_depreciation='MACRS20', boiler_turbogenerator=u.BT701)
 
 TAL_no_BT_tea = TAL_tea
 
@@ -847,6 +818,50 @@ TAL_no_BT_tea = TAL_tea
 # Changed to MACRS 20 to be consistent with Humbird
 # BT_tea.depreciation = 'MACRS20'
 # BT_tea.OSBL_units = (BT,)
+
+#%% Define unit groups
+
+area_names = [
+    'feedstock',
+    # 'pretreatment',
+    'conversion',
+    'separation',
+    'wastewater',
+    'storage',
+    'co-heat and power',
+    'cooling tower and chilled water package',
+    'other facilities',
+    'heat exchanger network',
+]
+# u.CWP901.ID = 'CWP802' 
+for ui in u:
+    if type(ui) == bst.ChilledWaterPackage:
+        ui.ID = 'CWP802' # group with CT for system cooling demand
+        break
+unit_groups = bst.UnitGroup.group_by_area(TAL_sys.units)
+for i, j in zip(unit_groups, area_names): i.name = j
+for i in unit_groups: i.autofill_metrics(shorthand=True, 
+                                         electricity_production=True, 
+                                         material_cost=True)
+for i in unit_groups:
+    if i.name == 'storage' or i.name=='other facilities' or i.name == 'cooling tower and chilled water package':
+        i.metrics[-1].getter = lambda: 0. # Material cost
+    if i.name == 'cooling tower and chilled water package':
+        i.metrics[1].getter = lambda: 0. # Cooling duty
+HXN = None
+for HXN_group in unit_groups:
+    if HXN_group.name == 'heat exchanger network':
+        HXN_group.filter_savings = False
+        HXN = HXN_group.units[0]
+        assert isinstance(HXN, bst.HeatExchangerNetwork)
+
+unit_groups_dict = {}
+for i in unit_groups:
+    unit_groups_dict[i.name] = i
+# HXN.force_ideal_thermo = True
+CT = u.CT801
+BT = u.BT701
+CWP = u.CWP802
 
 
 # %% 
@@ -916,11 +931,16 @@ spec = ProcessSpecification(
     feedstock = feedstock,
     dehydration_reactor = None,
     byproduct_streams = [],
-    HXN = u.HXN,
+    HXN = u.HXN1001,
     maximum_inhibitor_concentration = 1.,
     # pre_conversion_units = process_groups_dict['feedstock_group'].units + process_groups_dict['pretreatment_group'].units + [u.H301], # if the line below does not work (depends on BioSTEAM version)
     pre_conversion_units = TAL_sys.split(u.M304.ins[0])[0],
-    baseline_titer = 35.9,
+    
+    # set baseline fermentation performance here
+    baseline_yield = 0.19,
+    baseline_titer = 15.,
+    baseline_productivity = 0.19,
+    
     feedstock_mass = feedstock.F_mass,
     pretreatment_reactor = None)
 
@@ -944,8 +964,8 @@ def M304_titer_obj_fn(water_to_sugar_mol_ratio):
 
 def load_titer_with_glucose(titer_to_load):
     u.R302.titer_to_load = titer_to_load
-    flx.IQ_interpolation(M304_titer_obj_fn, 1e-3, 2000.)
-    u.AC1.regeneration_velocity = 3. + (17./25.)*titer_to_load
+    flx.IQ_interpolation(M304_titer_obj_fn, 1e-3, 8000.)
+    u.AC401.regeneration_velocity = 3. + (17./25.)*titer_to_load
 spec.load_spec_2 = load_titer_with_glucose
 
 # path = (F301, R302)
@@ -972,55 +992,6 @@ spec.load_spec_2 = load_titer_with_glucose
 # plt.plot(titers, MPSPs)
 # plt.show()   
 
-# %%
-
-# =============================================================================
-# Life cycle analysis (LCA), waste disposal emission not included
-# =============================================================================
-
-# 100-year global warming potential (GWP) from material flows
-LCA_streams = TEA_feeds.copy()
-LCA_stream = Stream('LCA_stream', units='kg/hr')
-    
-def get_material_GWP():
-    LCA_stream.mass = sum(i.mass for i in LCA_streams)
-    chemical_GWP = LCA_stream.mass*CFs['GWP_CF_stream'].mass
-    # feedstock_GWP = feedstock.F_mass*CFs['GWP_CFs']['Corn stover']
-    return chemical_GWP.sum()/SA.F_mass
-
-# GWP from combustion of non-biogenic carbons
-get_non_bio_GWP = lambda: (natural_gas.get_atomic_flow('C'))* TAL_chemicals.CO2.MW / SA.F_mass
-                            # +ethanol_fresh.get_atomic_flow('C')) \
-    
-
-# GWP from electricity
-get_electricity_use = lambda: sum(i.power_utility.rate for i in TAL_sys.units)
-get_electricity_GWP = lambda: get_electricity_use()*CFs['GWP_CFs']['Electricity'] \
-    / SA.F_mass
-
-# CO2 fixed in lactic acid product
-get_fixed_GWP = lambda: \
-    SA.get_atomic_flow('C')*TAL_chemicals.CO2.MW/SA.F_mass
-
-# carbon_content_of_feedstock = 0
-get_GWP = lambda: get_material_GWP()+get_non_bio_GWP()+get_electricity_GWP() 
-
-# Fossil energy consumption (FEC) from materials
-def get_material_FEC():
-    LCA_stream.mass = sum(i.mass for i in LCA_streams)
-    chemical_FEC = LCA_stream.mass*CFs['FEC_CF_stream'].mass
-    # feedstock_FEC = feedstock.F_mass*CFs['FEC_CFs']['Corn stover']
-    return chemical_FEC.sum()/SA.F_mass
-
-# FEC from electricity
-get_electricity_FEC = lambda: \
-    get_electricity_use()*CFs['FEC_CFs']['Electricity']/SA.F_mass
-
-# Total FEC
-get_FEC = lambda: get_material_FEC()+get_electricity_FEC()
-
-# get_SPED = lambda: BT.system_heating_demand*0.001/SA.F_mass
-SA_LHV = 31.45 # MJ/kg SA
 
 # %% Full analysis
 def simulate_and_print():
@@ -1035,7 +1006,8 @@ def simulate_and_print():
 # simulate_and_print()
 # TAL_sys.simulate()
 get_SA_MPSP()
-spec.load_specifications(0.203, 15., 0.21)
+# u.AC401.cycle_time = 4.
+spec.load_specifications(spec.baseline_yield, spec.baseline_titer, spec.baseline_productivity)
 simulate_and_print()
 
 # %% 
@@ -1084,3 +1056,30 @@ TAL_sub_sys = {
 # for unit in TAL_sys.units:
 #     if not unit in sum(TAL_sub_sys.values(), ()):
 #         print(f'{unit.ID} not in TAL_sub_sys')
+
+#%% TEA breakdown
+
+def TEA_breakdown(print_output=False):
+    metric_breakdowns = {i.name: {} for i in unit_groups[0].metrics}
+    for ug in unit_groups:
+        for metric in ug.metrics:
+            # storage_metric_val = None
+            if not ug.name=='storage':
+                if ug.name=='other facilities':
+                    metric_breakdowns[metric.name]['storage and ' + ug.name] = metric() + unit_groups_dict['storage'].metrics[ug.metrics.index(metric)]()
+                else:
+                    metric_breakdowns[metric.name][ug.name] = metric()
+            
+            # else:
+            #     storage_metric_val = metric()
+                
+    # print and return metric_breakdowns
+    if print_output:
+        for i in unit_groups[0].metrics:
+            print(f"\n\n----- {i.name} ({i.units}) -----")
+            metric_breakdowns_i = metric_breakdowns[i.name]
+            for j in metric_breakdowns_i.keys():
+                print(f"{j}: {format(metric_breakdowns_i[j], '.3f')}")
+    return metric_breakdowns
+
+TEA_breakdown()
