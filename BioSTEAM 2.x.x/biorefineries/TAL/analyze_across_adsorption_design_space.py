@@ -37,13 +37,13 @@ column.cycle_time = cycle_times[opt_indices[1][0]]
 print(min_MPSP, get_SA_MPSP())
 #%% Plot MPSP
 fig1, ax2 = plt.subplots(constrained_layout=True)
-CS = ax2.contourf(regen_vels, cycle_times, MPSPs_ads_ds)
+CS = ax2.contourf(cycle_times, regen_vels, MPSPs_ads_ds)
 
 CS2 = ax2.contour(CS, levels=CS.levels[::2], colors='black', origin='lower')
 
 # ax2.set_title('Nonsense (3 masked regions)')
-ax2.set_xlabel('Regeneration solvent velocity [m/s]')
-ax2.set_ylabel('Cycle time [h]')
+ax2.set_ylabel('Regeneration solvent velocity [m/s]')
+ax2.set_xlabel('Cycle time [h]')
 
 # Make a colorbar for the ContourSet returned by the contourf call.
 cbar = fig1.colorbar(CS)
@@ -52,13 +52,13 @@ cbar.ax.set_ylabel('MPSP [$/kg]')
 cbar.add_lines(CS2)
 #%% Plot column cost
 fig1, ax2 = plt.subplots(constrained_layout=True)
-CS = ax2.contourf(regen_vels, cycle_times, column_costs_ads_r_t)
+CS = ax2.contourf(cycle_times, regen_vels, column_costs_ads_r_t)
 
 CS2 = ax2.contour(CS, levels=CS.levels[::2], colors='black', origin='lower')
 
 # ax2.set_title('Nonsense (3 masked regions)')
-ax2.set_xlabel('Regeneration solvent velocity [m/s]')
-ax2.set_ylabel('Cycle time [h]')
+ax2.set_ylabel('Regeneration solvent velocity [m/s]')
+ax2.set_xlabel('Cycle time [h]')
 
 # Make a colorbar for the ContourSet returned by the contourf call.
 cbar = fig1.colorbar(CS)
@@ -129,7 +129,7 @@ plt.plot(titers, MPSPs_titer)
 #%%
 AC401.target_recovery=None
 mean_velocities = np.linspace(4., 15., 10)
-cycle_times = np.linspace(0.1, 2, 10)
+cycle_times = np.linspace(2/6, 2, 10)
 MPSPs = []
 column_costs = []
 for m in mean_velocities:
@@ -145,13 +145,13 @@ for m in mean_velocities:
 # plt.contourf(mean_velocities, cycle_times, MPSPs)
 
 fig1, ax2 = plt.subplots(constrained_layout=True)
-CS = ax2.contourf(mean_velocities, cycle_times, column_costs)
+CS = ax2.contourf(cycle_times, mean_velocities, column_costs)
 
 CS2 = ax2.contour(CS, levels=CS.levels[::2], colors='black', origin='lower')
 
 # ax2.set_title('Nonsense (3 masked regions)')
-ax2.set_xlabel('Mean feed velocity [m/s]')
-ax2.set_ylabel('Cycle time [h]')
+ax2.set_ylabel('Mean feed velocity [m/s]')
+ax2.set_xlabel('Cycle time [h]')
 
 # Make a colorbar for the ContourSet returned by the contourf call.
 cbar = fig1.colorbar(CS)
@@ -163,13 +163,13 @@ cbar.add_lines(CS2)
 # plt.contourf(mean_velocities, cycle_times, MPSPs)
 
 fig1, ax2 = plt.subplots(constrained_layout=True)
-CS = ax2.contourf(mean_velocities, cycle_times, MPSPs)
+CS = ax2.contourf(cycle_times, mean_velocities, MPSPs)
 
 CS2 = ax2.contour(CS, levels=CS.levels[::2], colors='black', origin='lower')
 
 # ax2.set_title('Nonsense (3 masked regions)')
-ax2.set_xlabel('Mean feed velocity [m/s]')
-ax2.set_ylabel('Cycle time [h]')
+ax2.set_ylabel('Mean feed velocity [m/s]')
+ax2.set_xlabel('Cycle time [h]')
 
 # Make a colorbar for the ContourSet returned by the contourf call.
 cbar = fig1.colorbar(CS)

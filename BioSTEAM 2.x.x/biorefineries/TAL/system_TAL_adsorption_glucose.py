@@ -343,7 +343,7 @@ def create_TAL_sys(ins, outs):
         
         regeneration_velocity=14.4, # default value (updated in unit specification based on titer)
         
-        cycle_time=2., # 1-2 hours required for thermal-swing-adsorption (TSA) for silica gels (add 1 hr for conservativeness); Seader, J. D., Separation Process Principles: Chemical and Biochemical Operations,” 3rd ed., Wiley, Hoboken, NJ (2011).
+        cycle_time=4., # 1-2 hours required for thermal-swing-adsorption (TSA) for silica gels (add 1 hr for conservativeness); Seader, J. D., Separation Process Principles: Chemical and Biochemical Operations,” 3rd ed., Wiley, Hoboken, NJ (2011).
         # this is changed to 4 hours after the first simulation
         
         # TODO: This is density of activated carbon packing, including voids.
@@ -387,6 +387,7 @@ def create_TAL_sys(ins, outs):
         
     F401 = bst.units.MultiEffectEvaporator('F401', ins=AC401-1, outs=('F401_b', 'F401_t'), chemical='Ethanol',
                                             P = (101325, 73581, 50892, 32777, 20000), V = 0.7)
+    # F401.flash=False
     F401.TAL_solubility_in_ethanol_ww = get_TAL_solubility_in_ethanol_ww()
     def F401_obj_fn(V):
         F401_b = F401.outs[0]
