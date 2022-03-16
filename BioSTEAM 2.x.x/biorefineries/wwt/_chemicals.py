@@ -15,7 +15,7 @@ Part of the chemical data is from the lactic acid biorefinery:
 https://github.com/BioSTEAMDevelopmentGroup/Bioindustrial-Park/blob/master/BioSTEAM%202.x.x/biorefineries/lactic/_chemicals.py
 '''
 
-import thermosteam as tmo
+from thermosteam import Chemical, settings
 from biorefineries import lactic as la
 
 __all__ = (
@@ -23,6 +23,7 @@ __all__ = (
     'add_wwt_chemicals',
     )
 
+#!!! Need to update this with corn, oilcane biorefineries
 default_insolubles = (
     # Sugarcane
     'Yeast', 'CaO', 'Solids', 'Flocculant',
@@ -34,6 +35,8 @@ default_insolubles = (
     'Protein', 'Enzyme', 'DenaturedEnzyme', 'Z_mobilis', 'T_reesei', 'WWTsludge',
     # Lactic acid
     *la._chemicals.insolubles,
+    # Oilcane
+    'Biomass', 'Cellmass',
     )
 
 def get_insoluble_IDs(chemicals, insolubles):
@@ -45,77 +48,52 @@ def get_soluble_IDs(chemicals, insolubles):
     return tuple(i.ID for i in chemicals if not i.ID in insolubles)
 
 
-# Add synonyms
-synonym_dct = {
-    'Water': 'H2O',
-    'Denaturant': 'Octane',
-    'CO2': 'CarbonDioxide',
-    'NH3': 'Ammonia',
-    'H2SO4': 'SulfuricAcid',
-    'AmmoniumSulfate': '(NH4)2SO4',
-    'Lime': 'Ca(OH)2',
-    'Yeast': 'DryYeast',
-    'OleicAcid': 'FFA',
-    'MonoOlein': 'MAG',
-    'DiOlein': 'DAG',
-    'TriOlein': 'TAG',
-    }
-UndefinedChemical = tmo.exceptions.UndefinedChemical
-def set_synonym_grp(chemicals):
-    for i in chemicals:
-        if i.ID in synonym_dct.keys():
-            chemicals.set_synonym(i.ID, synonym_dct[i.ID])
-            if i.ID == 'TriOlein': # some biorefineries have 'Triolein; but not the individual chemicals
-                try: chemicals.define_group('Lipid', ('PL', 'FFA', 'MAG', 'DAG', 'TAG'))
-                except UndefinedChemical: pass
-    return chemicals
-
-
 _cal2joule = 4.184 # auom('cal').conversion_factor('J')
 
-def add_wwt_chemicals(chemicals):
+def add_wwt_chemicals(chemicals, set_thermo=True):
     chems = chemicals.copy()
     exist_IDs = [i.ID for i in chems]
 
-    def chemical_database(ID, phase=None, **data):
+    def add_chemical(ID, **data):
         if not ID in exist_IDs:
-            chemical = tmo.Chemical(ID, **data)
-            if phase:
-                chemical.at_state(phase)
-                # chemical.phase_ref = phase # causes trouble for HCl
+            chemical = Chemical(ID, **data)
             chems.append(chemical)
-            return chemical
 
-    def chemical_defined(ID, **data):
-        if not ID in exist_IDs:
-            chemical = tmo.Chemical.blank(ID, **data)
-            chems.append(chemical)
-            return chemical
-
-    chemical_database('NH3', phase='g', Hf=-10963*_cal2joule)
-    chemical_database('H2S', phase='g', Hf=-4927*_cal2joule)
-    chemical_database('SO2', phase='g')
-    chemical_database('NH4OH', search_ID='AmmoniumHydroxide', phase='l', Hf=-336719)
-    chemical_database('H2SO4', phase='l')
-    chemical_database('HCl', phase='l')
-    chemical_database('HNO3', phase='l', Hf=-41406*_cal2joule)
-    chemical_database('NaOH', phase='l')
-    chemical_database('NaNO3', phase='l', Hf=-118756*_cal2joule)
-    chemical_database('Na2SO4', phase='l', Hf=-1356380)
-    chemical_database('CaSO4', phase='s', Hf=-342531*_cal2joule)
-    chemical_database('NaOCl', phase='l', Hf=-347.1e3) # https://en.wikipedia.org/wiki/Sodium_hypochlorite
-    chemical_database('CitricAcid', phase='l', Hf=-347.1e3)
-    chemical_database('Bisulfite', phase='l')
+    add_chemical('NH3', phase='g', Hf=-10963*_cal2joule),
+    add_chemical('H2S', phase='g', Hf=-4927*_cal2joule),
+    add_chemical('SO2', phase='g'),
+    add_chemical('NH4OH', search_ID='AmmoniumHydroxide', phase='l', Hf=-336719),
+    add_chemical('H2SO4', phase='l'),
+    add_chemical('HCl', phase='l'),
+    add_chemical('HNO3', phase='l', Hf=-41406*_cal2joule),
+    add_chemical('NaOH', phase='l'),
+    add_chemical('NaNO3', phase='l', Hf=-118756*_cal2joule),
+    add_chemical('Na2SO4', phase='l', Hf=-1356380),
+    add_chemical('CaSO4', phase='s', Hf=-342531*_cal2joule),
+    add_chemical('NaOCl', phase='l', Hf=-347*1e3), # https://en.wikipedia.org/wiki/Sodium_hypochlorite
+    add_chemical('CitricAcid', phase='l', Hf=-1543.8*1e3), # https://en.wikipedia.org/wiki/Citric_acid
+    add_chemical('Bisulfite', phase='l'),
+    add_chemical('WWTsludge', search_db=False, phase='s',
+                formula='CH1.64O0.39N0.23S0.0035', Hf=-23200.01*_cal2joule),
+    add_chemical('Polymer', search_db=False, phase='s', MW=1, Hf=0, HHV=0, LHV=0),
 
     chems.CaSO4.Cn.move_up_model_priority('LASTOVKA_S', 0)
-
-    chemical_defined('WWTsludge', phase='s',
-                     formula='CH1.64O0.39N0.23S0.0035', Hf=-23200.01*_cal2joule)
-    chemical_defined('Polymer', phase='s', MW=1, Hf=0, HHV=0, LHV=0)
     chems.Polymer.Cn.add_model(evaluate=0, name='Constant')
 
     for i in chems: i.default()
     chems.compile()
-    chems = set_synonym_grp(chems)
 
+    # Add aliases and groups
+    get = getattr
+    for chem in chemicals:
+        aliases = chem.aliases
+        chem_ID = chem.ID
+        for alias in aliases:
+            chems.set_alias(chem_ID, alias)
+        get(chems, chem.ID).aliases = chem.aliases
+    for grp in chemicals._group_mol_compositions.keys():
+        group_IDs = [chem.ID for chem in get(chemicals, grp)]
+        chems.define_group(grp, group_IDs)
+
+    if set_thermo: settings.set_thermo(chems)
     return chems

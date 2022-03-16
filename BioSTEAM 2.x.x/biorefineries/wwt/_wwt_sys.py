@@ -41,8 +41,7 @@ from ._internal_circulation_rx import InternalCirculationRx
 from ._polishing_filter import PolishingFilter
 from ._membrane_bioreactor import AnMBR
 from ._sludge_handling import BeltThickener, SludgeCentrifuge
-from . import new_price
-from .utils import get_combustion_energy
+from .utils import get_combustion_energy, new_price
 
 _mgd_to_cmh = 157.7255 # auom('gallon').conversion_factor('m3')*1e6/24
 _gpm_to_cmh = 0.2271 # auom('gallon').conversion_factor('m3')*60
@@ -182,14 +181,14 @@ class Skipped(Unit):
 class CHP(Unit):
     '''
     Used to estimate the cost of producing electricity.
-    
+
     Parameters
     ----------
     eff : float
         Combined efficiency for combustion and power generation.
     unit_CAPEX : float
         Capital cost of the CHP per kW of power generated, $/kW.
-    
+
     References
     ----------
     [1] Shoener et al., Design of Anaerobic Membrane Bioreactors for the
@@ -199,26 +198,26 @@ class CHP(Unit):
     '''
     _ins_size_is_fixed = False
     _F_BM_default = {'CHP': 1.}
-    
+
     def __init__(self, ID='', ins=None, outs=(), thermo=None,
                  eff=0.3375, # average of 40.5%, 27%, 36%, and 31.5% for the four types in ref [1]
-                 unit_CAPEX=1225): 
+                 unit_CAPEX=1225):
         Unit.__init__(self, ID, ins, outs, thermo)
         self.eff = eff
         self.unit_CAPEX = unit_CAPEX
         self._mixed = tmo.Stream(f'{self.ID}_mixed')
-        
+
     def _run(self):
         mixed = self._mixed
         mixed.mix_from(self.ins)
         H_net = get_combustion_energy(mixed, 1)
         self.H_for_power = H_net * self.eff
-    
+
     def _design(self):
         kW = self.H_for_power / 3600 # kJ/hr to kW
         self.baseline_purchase_costs['CHP'] = kW*self.unit_CAPEX
         self.power_utility(-kW)
-    
+
 
 # %%
 
@@ -236,7 +235,7 @@ def create_wastewater_units(ins, outs, process_ID='6', flowsheet=None,
 
     ######################## Units ########################
     # Mix waste liquids for treatment
-    X = process_ID
+    X = str(process_ID)
     MX01 = bst.units.Mixer(f'M{X}01', ins=wwt_streams)
 
     RX01_outs = (f'biogas_R{X}01', 'IC_eff', 'IC_sludge')

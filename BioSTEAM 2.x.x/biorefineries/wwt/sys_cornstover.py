@@ -27,7 +27,13 @@ from biorefineries.wwt import (
 # %%
 
 # =============================================================================
-# Function to make the system
+# Existing system
+# =============================================================================
+
+# %%
+
+# =============================================================================
+# With new wastewater treatment process
 # =============================================================================
 
 new_cs_chems = add_wwt_chemicals(create_chemicals())
@@ -40,7 +46,6 @@ if new_cs_chems.CSL.formula is None:
     #     CSL_atoms[i] = 0.5*get_atom(new_cs_chems.Water, i)+\
     #         0.25*get_atom(new_cs_chems.Protein, i)+0.25*get_atom(new_cs_chems.LacticAcid, i)
     new_cs_chems.CSL.formula = 'CH2.8925O1.3275N0.0725S0.00175'
-bst.settings.set_thermo(new_cs_chems)
 load_process_settings()
 
 @bst.SystemFactory(

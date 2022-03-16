@@ -10,7 +10,7 @@
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
 # for license details.
 
-from biosteam import Stream, Flowsheet, main_flowsheet
+import biosteam as bst
 from biosteam.process_tools import UnitGroup
 from biorefineries.lactic import chems as la_chems, update_settings as load_process_settings
 from biorefineries.lactic._processes import (
@@ -31,12 +31,25 @@ from biorefineries.wwt import (
 
 # %%
 
-# =============================================================================
-# Existing system
-# =============================================================================
+la_f = bst.Flowsheet('la')
+la_u = la_f.unit
+la_s = la_f.stream
+bst.main_flowsheet.set()
+
+
+
+
+
+
+
+
+
+# %%
 
 new_la_chems = add_wwt_chemicals(la_chems)
 load_process_settings(new_la_chems)
+# `load_la_settings` would set thermo
+# bst.settings.set_thermo(chems)
 
 # Add WWT chemicals to the existing splits array,
 # splits of chemicals that do now exist in the original chemicals obj
@@ -128,10 +141,6 @@ def create_la_system(flowsheet, include_blowdown_recycle=True,
 
 
 # %%
-
-# =============================================================================
-# With new wastewater treatment process
-# =============================================================================
 
 la_flowsheet = Flowsheet('la_wwt')
 main_flowsheet.set_flowsheet(la_flowsheet)

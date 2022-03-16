@@ -10,21 +10,22 @@
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
 # for license details.
 
+
 import biosteam as bst
 from biorefineries.oilcane import (
     create_chemicals,
-    create_sugarcane_to_ethanol_combined_1_and_2g as create_system,
+    create_oilcane_to_biodiesel_and_ethanol_combined_1_and_2g_post_fermentation_oil_separation as create_system,
     create_tea,
     load_process_settings,
     )
 from biorefineries.wwt import (
-    rename_storage_units,
-    add_wwt_chemicals, create_wastewater_system,
-    get_COD_breakdown,
-    )
+	rename_storage_units,
+	add_wwt_chemicals, create_wastewater_system,
+	get_COD_breakdown,
+	)
 
 operating_hours = 24 * 180
-storage_ID = 900
+storage_ID = 1100
 WWT_ID = 5
 
 
@@ -34,21 +35,21 @@ WWT_ID = 5
 # Existing system
 # =============================================================================
 
-sc_f = bst.Flowsheet('sc')
-sc_u = sc_f.unit
-sc_s = sc_f.stream
-bst.main_flowsheet.set_flowsheet(sc_f)
-sc_chems = add_wwt_chemicals(create_chemicals())
+oc_f = bst.Flowsheet('oc')
+oc_u = oc_f.unit
+oc_s = oc_f.stream
+bst.main_flowsheet.set_flowsheet(oc_f)
+oc_chems = add_wwt_chemicals(create_chemicals())
 load_process_settings()
 
-sc_sys = create_system('sc_sys', operating_hours=operating_hours)
-rename_storage_units(sc_sys, storage_ID)
-sc_sys.simulate()
+oc_sys = create_system('oc_sys', operating_hours=operating_hours)
+rename_storage_units(oc_sys, storage_ID)
+oc_sys.simulate()
 
-sc_tea = create_tea(sc_sys)
-sc_tea.operating_hours = operating_hours
-sc_tea.IRR = sc_tea.solve_IRR()
-print(f'\nOriginal IRR: {sc_tea.IRR:.2%}\n')
+oc_tea = create_tea(oc_sys)
+oc_tea.operating_hours = operating_hours
+oc_tea.IRR = oc_tea.solve_IRR()
+print(f'\nOriginal IRR: {oc_tea.IRR:.2%}\n')
 
 
 # %%
@@ -57,7 +58,7 @@ print(f'\nOriginal IRR: {sc_tea.IRR:.2%}\n')
 # With new wastewater treatment process
 # =============================================================================
 
-new_f = bst.Flowsheet('new_sc')
+new_f = bst.Flowsheet('new_oc')
 new_u = new_f.unit
 new_s = new_f.stream
 bst.main_flowsheet.set_flowsheet(new_f)
@@ -71,10 +72,20 @@ units_to_discard = [u for u in new_u if u.ID[1]=='5']
 streams_to_discard = [s for s in sum([u.outs for u in units_to_discard], [])]
 systems_to_discard = [sys for sys in new_f.system
                       if (new_u.R502 in sys.units and sys.ID!='new_sys_temp')]
+
+ww_streams = [s for s in new_u.M501.ins] # the original mixer for WWT
+# ww_streams = [
+#     new_s.wastewater,
+#     new_s.fiber_fines,
+#     new_s.pretreatment_wastewater,
+#     new_s.evaporator_condensate, # unlike the 1G oilcane, its COD is >3 g/L, thus included here
+#     new_u.P802.outs[0],
+#     new_u.T205.outs[0],
+#     ]
+
 for i in units_to_discard+streams_to_discard+systems_to_discard:
     new_f.discard(i)
 
-ww_streams = [new_u.C401.outs[1], new_s.fiber_fines, new_s.pretreatment_wastewater]
 new_sys_wwt = create_wastewater_system('new_sys_wwt', ins=ww_streams, process_ID=WWT_ID)
 new_u.M701.ins[0] = new_s.sludge
 new_u.BT701.ins[1] = new_s.biogas
@@ -92,5 +103,5 @@ new_tea.operating_hours = operating_hours
 new_tea.IRR = new_tea.solve_IRR()
 print(f'\nNew IRR: {new_tea.IRR:.2%}\n')
 
-# ~123 mg/L COD, mostly (~100/>80%) due to soluble lignin and arabinose
+# ~184 mg/L COD, mostly (~150/>80%) due to soluble lignin and arabinose
 get_COD_breakdown(getattr(new_u, f'S{WWT_ID}04').ins[0])

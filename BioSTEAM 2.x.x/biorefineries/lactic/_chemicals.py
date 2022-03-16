@@ -31,6 +31,7 @@ References
 # =============================================================================
 
 import thermosteam as tmo
+_cal2joule = 4.184 # auom('cal').conversion_factor('J')
 
 __all__ = ('chems', 'chemical_groups', 'sugars', 'soluble_organics', 'solubles',
            'insolubles', 'COD_chemicals', 'combustibles', 'get_chemical_properties')
@@ -61,8 +62,7 @@ def creating_funcs(chems):
 
 chemical_database, chemical_copied, chemical_defined = creating_funcs(chems)
 
-auom = tmo.units_of_measure.AbsoluteUnitsOfMeasure
-_cal2joule = auom('cal').conversion_factor('J')
+
 
 
 # %%

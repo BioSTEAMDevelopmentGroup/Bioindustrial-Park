@@ -7,9 +7,9 @@
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
 # for license details.
 
-import numpy as np
+import numpy as np, pandas as pd
 from chemicals.elements import molecular_weight
-import thermosteam as tmo
+import thermosteam as tmo, biosteam as bst
 from thermosteam.reaction import (
     Reaction as Rxn,
     ParallelReaction as PRxn
@@ -34,14 +34,16 @@ __all__ = (
     # Digestion
     'get_BD_dct',
     'get_digestable_chemicals',
-    'compute_stream_COD',
+    'compute_stream_COD', 'get_COD_breakdown',
     'get_CN_ratio',
     'get_digestion_rxns',
     # Miscellaneous
     'format_str',
-    'remove_undefined_chemicals',
-    'get_split_dct',
+    'remove_undefined_chemicals', 'get_split_dct',
     'kph_to_tpd',
+    'rename_storage_units',
+    # Price
+    'new_price', 'IRR_at_ww_price', 'ww_price_at_IRR', 'print_MESP',
     )
 
 
@@ -340,6 +342,38 @@ def compute_stream_COD(stream):
     return COD
 
 
+def get_COD_breakdown(stream):
+    '''
+    Print the estimated breakdown of COD resulting from each chemical
+    by creating a new mock stream with the same water flowrate as
+    the original stream, then copying the flowrate of each chemical
+    at a time and calculate the COD.
+    '''
+    chems = stream.chemicals
+    COD = compute_stream_COD(stream)
+    print(f'\nTotal COD of {stream.ID}: {round(COD*1000, 2)} mg/L:')
+    foo = tmo.Stream()
+    foo.imass['Water'] = stream.imass['Water']
+    COD_dct = {}
+    for chem in chems:
+        if chem is chems.Water: continue
+        chem_ID = chem.ID
+        foo.copy_flow(stream, (chem_ID,))
+        chem_COD = compute_stream_COD(foo)
+        if chem_COD == 0: continue
+        COD_dct[chem_ID] = chem_COD
+        foo.imass[chem_ID] = 0
+    df = pd.DataFrame({
+        'ID': COD_dct.keys(),
+        'COD [mg/L]': COD_dct.values(),
+        })
+    df['ratio'] = df.iloc[:,1]/COD
+    df.iloc[:,1] *= 1000
+    df = df.sort_values(by='ratio', ascending=False)
+    print(df)
+    return df
+
+
 def get_CN_ratio(stream):
     C = sum([(i.atoms.get('C') or 0.)*12*stream.imol[i.ID]
              for i in stream.chemicals if i.formula])
@@ -459,3 +493,81 @@ def kph_to_tpd(stream):
     dry_mass = stream.F_mass - stream.imass['Water']
     factor = 0.026455471462185312 # auom('kg').conversion_factor('ton')/auom('hr').conversion_factor('day')
     return dry_mass*factor
+
+def rename_storage_units(sys, storage):
+        bst.rename_units([i for i in sys.units if bst.is_storage_unit(i)], storage)
+
+
+# %%
+
+# =============================================================================
+# Price
+# =============================================================================
+
+_lb_per_kg = 0.4536 # auom('lb').conversion_factor('kg')
+_GDP_2007to2016 = 1.160
+
+# Harmonized prices
+# References
+# ----------
+# [1] Hossain et al. Techno-Economic Evaluation of Heat Integrated
+# Second Generation Bioethanol and Furfural Coproduction.
+# Biochemical Engineering Journal 2019, 144, 89–103.
+# https://doi.org/10.1016/j.bej.2019.01.017.
+
+# [2] Davis et al., Process Design and Economics for the Conversion of Lignocellulosic
+# Biomass to Hydrocarbon Fuels and Coproducts: 2018 Biochemical Design Case Update;
+# NREL/TP-5100-71949; National Renewable Energy Lab (NREL), 2018.
+# https://doi.org/10.2172/1483234.
+
+# [3] Shoener et al., Design of Anaerobic Membrane Bioreactors for the
+# Valorization of Dilute Organic Carbon Waste Streams.
+# Energy Environ. Sci. 2016, 9 (3), 1102–1112.
+# https://doi.org/10.1039/C5EE03715H.
+
+# .. note::
+#
+#     The cornstover biorefinery uses 2011 USD whereas sugarcane and lipidcane
+#     biorefineries use 2013 USD, thus ideally prices in the the `new_price` dct
+#     should be adjusted accordingly. However, since the calculated MESPs are only
+#     used for comparison between biorefineries with the new wastewater treatment
+#     process vs. without/with the original process, this will not affect the
+#     conclusions.
+
+#!!! Want to adjust to $2016
+new_price = { # $/kg unless otherwise noted
+    'Wastewater': -0.03, # ref [1], negative value for cost from product,
+    'NaOCl': 0.14, # $/L
+    'CitricAcid': 0.22, # $/L
+    'Bisulfite': 0.08, # $/L
+    'Caustics': 0.2627, # la._settings.price['NaOH]/2 as the caustic is 50% NaOH/water
+    'Polymer': 2.6282 / _lb_per_kg / _GDP_2007to2016, # ref [2]
+    }
+
+
+def IRR_at_ww_price(ww_stream, tea, ww_price=new_price['Wastewater']):
+    ww_stream.price = ww_price
+    IRR = tea.IRR = tea.solve_IRR()
+    print(f'\nIRR: {IRR:.2%}\n')
+    # Reset after analysis
+    ww_stream.price = 0
+    tea.IRR = tea.solve_IRR()
+    return IRR
+
+def ww_price_at_IRR(ww_stream, tea, IRR):
+    tea.IRR = IRR
+    ww_price = ww_stream.price = tea.solve_price(ww_stream)
+    print(f'\nWW price: {ww_price:.5f}\n')
+    ww_stream.price = 0 # reset after analysis
+    return ww_price
+
+
+ethanol_density_kggal = 2.9867 # cs.ethanol_density_kggal
+def print_MESP(ethanol, tea, tea_name=''):
+    bst.settings.set_thermo(ethanol.chemicals)
+    tea.system.simulate()
+    ethanol.price = tea.solve_price(ethanol)
+    ethanol_price_gal = ethanol.price * ethanol_density_kggal
+    pre_tea = ' of ' if tea_name else ''
+    print(f'MESP{pre_tea}{tea_name} is ${ethanol_price_gal:.2f}/gal.')
+    return ethanol_price_gal

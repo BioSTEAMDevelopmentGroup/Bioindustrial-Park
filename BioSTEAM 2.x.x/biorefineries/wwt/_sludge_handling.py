@@ -10,6 +10,7 @@
 import math
 import flexsolve as flx
 import biosteam as bst
+from warnings import warn
 
 __all__ = ('SludgeHandling', 'BeltThickener', 'SludgeCentrifuge')
 
@@ -45,6 +46,7 @@ class SludgeHandling(bst.Unit):
         https://doi.org/10.1039/C5EE03715H.
     '''
 
+    SKIPPED = False
     _graphics = bst.Splitter._graphics
     _ins_size_is_fixed = False
     _N_outs = 2
@@ -79,22 +81,44 @@ class SludgeHandling(bst.Unit):
         mixed.mix_from(self.ins)
         eff.T = sludge.T = mixed.T
 
+        if mixed.F_mass == 0:
+            eff.empty()
+            sludge.empty()
+            self.SKIPPED = True
+            return
+
+        mc = mixed.imass['Water']/mixed.F_mass
+        target_mc = self.sludge_moisture
+        if mc < target_mc:
+            if self.SKIPPED == False:
+                warn(f'The moisture of influent ({mc:.2%}) is smaller than the desired {target_mc:%}, '
+                     'simulation skipped.')
+                self.SKIPPED = True
+            sludge.copy_like(mixed)
+            eff.empty()
+            return
+
         sludge.copy_flow(mixed, solids, remove=True) # all solids go to sludge
         eff.copy_flow(mixed, solubles)
 
         flx.IQ_interpolation(
                 f=self._mc_at_split, x0=1e-3, x1=1.-1e-3,
-                args=(solubles, mixed, eff, sludge, self.sludge_moisture),
+                args=(solubles, mixed, eff, sludge, target_mc),
                 checkbounds=False)
+        self.SKIPPED = False
 
 
     def _cost(self):
-        pumps = (self.effluent_pump, self.sludge_pump)
-        self.power_utility.rate = 0.
-        for i in range(2):
-            pumps[i].ins[0] = self.outs[i].copy() # use `.proxy()` will interfere `_run`
-            pumps[i].simulate()
-            self.power_utility.rate += pumps[i].power_utility.rate
+        if self.SKIPPED == False:
+            pumps = (self.effluent_pump, self.sludge_pump)
+            self.power_utility.rate = 0.
+            for i in range(2):
+                pumps[i].ins[0] = self.outs[i].copy() # use `.proxy()` will interfere `_run`
+                pumps[i].simulate()
+                self.power_utility.rate += pumps[i].power_utility.rate
+        else:
+            self.baseline_purchase_costs.clear()
+            self.power_utility.rate = 0
 
 
 class BeltThickener(SludgeHandling):
@@ -106,6 +130,7 @@ class BeltThickener(SludgeHandling):
     the 1st outs is the solid-rich sludge.
 
     Key parameters include:
+
         - Capacity: 80-100 m3/h.
         - Influent solids concentration: 0.2-1%.
         - Sludge cake moisture content: 90-96%.
