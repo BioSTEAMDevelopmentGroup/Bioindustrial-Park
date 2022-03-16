@@ -546,19 +546,21 @@ new_price = { # $/kg unless otherwise noted
 
 
 def IRR_at_ww_price(ww_stream, tea, ww_price=new_price['Wastewater']):
+    current_price = ww_stream.price
     ww_stream.price = ww_price
-    IRR = tea.IRR = tea.solve_IRR()
+    IRR = tea.solve_IRR()
     print(f'\nIRR: {IRR:.2%}\n')
     # Reset after analysis
-    ww_stream.price = 0
+    ww_stream.price = current_price
     tea.IRR = tea.solve_IRR()
     return IRR
 
 def ww_price_at_IRR(ww_stream, tea, IRR):
+    current_IRR = tea.IRR
     tea.IRR = IRR
-    ww_price = ww_stream.price = tea.solve_price(ww_stream)
+    for i in range(3): ww_price = tea.solve_price(ww_stream)
     print(f'\nWW price: {ww_price:.5f}\n')
-    ww_stream.price = 0 # reset after analysis
+    tea.IRR = current_IRR # reset after analysis
     return ww_price
 
 

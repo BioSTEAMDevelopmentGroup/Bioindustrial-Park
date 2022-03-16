@@ -12,7 +12,7 @@
 
 import biosteam as bst
 from biorefineries.oilcane import (
-    create_chemicals, 
+    create_chemicals,
     create_sugarcane_to_ethanol_system as create_system,
     create_tea,
     load_process_settings,
@@ -25,7 +25,7 @@ from biorefineries.wwt import (
 
 operating_hours = 24 * 180 # 90% uptime for 200 days?
 storage_ID = 700
-WWT_ID = 8
+WWT_ID = '8'
 
 
 # %%
@@ -33,8 +33,8 @@ WWT_ID = 8
 # =============================================================================
 # Existing system
 # =============================================================================
-        
-sc_f = bst.Flowsheet('sc')
+
+sc_f = bst.Flowsheet('sc1g')
 sc_u = sc_f.unit
 sc_s = sc_f.stream
 bst.main_flowsheet.set_flowsheet(sc_f)
@@ -62,15 +62,15 @@ sc_tea = create_tea(sc_sys)
 sc_tea.operating_hours = operating_hours
 sc_tea.IRR = sc_tea.solve_IRR()
 print(f'\nOriginal IRR: {sc_tea.IRR:.2%}\n')
-    
-    
+
+
 # %%
 
 # =============================================================================
 # With new wastewater treatment process
 # =============================================================================
 
-new_f = bst.Flowsheet('new_sc')
+new_f = bst.Flowsheet('new_sc1g')
 new_u = new_f.unit
 new_s = new_f.stream
 bst.main_flowsheet.set_flowsheet(new_f)

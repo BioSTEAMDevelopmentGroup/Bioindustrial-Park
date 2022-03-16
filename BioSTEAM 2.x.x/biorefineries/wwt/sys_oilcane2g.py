@@ -26,7 +26,7 @@ from biorefineries.wwt import (
 
 operating_hours = 24 * 180
 storage_ID = 1100
-WWT_ID = 5
+WWT_ID = '5'
 
 
 # %%
@@ -35,7 +35,7 @@ WWT_ID = 5
 # Existing system
 # =============================================================================
 
-oc_f = bst.Flowsheet('oc')
+oc_f = bst.Flowsheet('oc2g')
 oc_u = oc_f.unit
 oc_s = oc_f.stream
 bst.main_flowsheet.set_flowsheet(oc_f)
@@ -58,7 +58,7 @@ print(f'\nOriginal IRR: {oc_tea.IRR:.2%}\n')
 # With new wastewater treatment process
 # =============================================================================
 
-new_f = bst.Flowsheet('new_oc')
+new_f = bst.Flowsheet('new_oc2g')
 new_u = new_f.unit
 new_s = new_f.stream
 bst.main_flowsheet.set_flowsheet(new_f)
@@ -68,12 +68,11 @@ new_sys_temp = create_system('new_sys_temp', operating_hours=operating_hours)
 rename_storage_units(new_sys_temp, storage_ID)
 
 # Replace the conventional wastewater treatment process with new ones
-units_to_discard = [u for u in new_u if u.ID[1]=='5']
+units_to_discard = [u for u in new_u if (u.ID[1]==WWT_ID or u.ID=='WWTC')]
 streams_to_discard = [s for s in sum([u.outs for u in units_to_discard], [])]
 systems_to_discard = [sys for sys in new_f.system
-                      if (new_u.R502 in sys.units and sys.ID!='new_sys_temp')]
-
-ww_streams = [s for s in new_u.M501.ins] # the original mixer for WWT
+                      if (getattr(new_u, f'R{WWT_ID}02') in sys.units and sys.ID!=new_sys_temp.ID)]
+ww_streams = [s for s in getattr(new_u, f'M{WWT_ID}01').ins] # the original mixer for WWT
 # ww_streams = [
 #     new_s.wastewater,
 #     new_s.fiber_fines,

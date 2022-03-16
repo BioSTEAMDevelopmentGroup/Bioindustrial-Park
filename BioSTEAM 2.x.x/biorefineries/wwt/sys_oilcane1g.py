@@ -26,7 +26,7 @@ from biorefineries.wwt import (
 
 operating_hours = 24 * 180
 storage_ID = 1000
-WWT_ID = 11
+WWT_ID = '11'
 
 
 # %%
@@ -35,7 +35,7 @@ WWT_ID = 11
 # Existing system
 # =============================================================================
 
-oc_f = bst.Flowsheet('oc')
+oc_f = bst.Flowsheet('oc1g')
 oc_u = oc_f.unit
 oc_s = oc_f.stream
 bst.main_flowsheet.set_flowsheet(oc_f)
@@ -68,7 +68,7 @@ print(f'\nOriginal IRR: {oc_tea.IRR:.2%}\n')
 # With new wastewater treatment process
 # =============================================================================
 
-new_f = bst.Flowsheet('new_oc')
+new_f = bst.Flowsheet('new_oc1g')
 new_u = new_f.unit
 new_s = new_f.stream
 bst.main_flowsheet.set_flowsheet(new_f)
