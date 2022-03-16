@@ -343,7 +343,7 @@ def create_TAL_sys(ins, outs):
         
         regeneration_velocity=14.4, # default value (updated in unit specification based on titer)
         
-        cycle_time=4., # 1-2 hours required for thermal-swing-adsorption (TSA) for silica gels (add 1 hr for conservativeness); Seader, J. D., Separation Process Principles: Chemical and Biochemical Operations,” 3rd ed., Wiley, Hoboken, NJ (2011).
+        cycle_time=2., # 1-2 hours required for thermal-swing-adsorption (TSA) for silica gels (add 1 hr for conservativeness); Seader, J. D., Separation Process Principles: Chemical and Biochemical Operations,” 3rd ed., Wiley, Hoboken, NJ (2011).
         # this is changed to 4 hours after the first simulation
         
         # TODO: This is density of activated carbon packing, including voids.
