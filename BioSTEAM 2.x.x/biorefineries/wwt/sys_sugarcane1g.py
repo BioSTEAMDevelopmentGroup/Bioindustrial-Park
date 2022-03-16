@@ -27,7 +27,7 @@ from biorefineries.wwt import \
 # Function to make the system
 # =============================================================================
 
-operating_hours = 24 * 180
+operating_hours = 24 * 180 # 90% uptime for 200 days?
 def rename_storage_units(sys, storage):
         bst.rename_units([i for i in sys.units if bst.is_storage_unit(i)], storage)
         
@@ -55,8 +55,10 @@ ww = bst.Stream('ww')
 WWmixer = bst.Mixer('WWmixer', ins=(sc_s.vinasse, sc_s.fiber_fines), outs=ww)
 
 sc_sys = bst.System('sc_sys', path=(sc_sys_sc, SolidsMixer, WWmixer))
-sc_tea = create_tea(sc_sys)
 sc_sys.simulate()
+
+sc_tea = create_tea(sc_sys)
+sc_tea.operating_hours = operating_hours
 sc_tea.IRR = sc_tea.solve_IRR()
 print(f'\nOriginal IRR: {sc_tea.IRR:.2%}\n')
 
@@ -102,9 +104,10 @@ SolidsMixer.outs[0] = new_u.BT401.ins[0]
 new_u.BT401.ins[1] = new_s.biogas
 
 new_sys = bst.System('new_sys', path=(new_sys_sc, new_sys_wwt, SolidsMixer,))
-new_tea = create_tea(new_sys)
-
 new_sys.simulate()
+
+new_tea = create_tea(new_sys)
+new_tea.operating_hours = operating_hours
 new_tea.IRR = new_tea.solve_IRR()
 print(f'\nNew IRR: {new_tea.IRR:.2%}\n')
 

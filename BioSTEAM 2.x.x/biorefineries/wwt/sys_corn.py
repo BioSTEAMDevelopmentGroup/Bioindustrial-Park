@@ -29,8 +29,9 @@ PWC.process_water_streams = (cn.recycled_process_water, cn.scrubber_water)
 ww = bst.Stream('ww')
 WWmixer = bst.Mixer('WWmixer', ins=(cn.MH103.outs[1], cn.MX5.outs[0]), outs=ww)
 cn_sys = bst.System('cn_sys', path=(cn.corn_sys, WWmixer))
-cn_tea = create_tea(cn_sys)
 cn_sys.simulate()
+
+cn_tea = create_tea(cn_sys)
 cn_tea.IRR = cn_tea.solve_IRR()
 print(f'\nOriginal IRR: {cn_tea.IRR:.2%}\n')
 
@@ -66,9 +67,9 @@ new_sys_wwt = create_wastewater_system('new_sys_wwt', ins=ww_streams, process_ID
 CHP = CHPunit('CHP', ins=(new_s.biogas, new_s.sludge))
 
 new_sys = bst.System('new_sys', path=(new_sys_cn, new_sys_wwt, CHP))
-new_tea = create_tea(new_sys)
-
 new_sys.simulate()
+
+new_tea = create_tea(new_sys)
 new_tea.IRR = new_tea.solve_IRR()
 print(f'\nNew IRR: {new_tea.IRR:.2%}\n')
 

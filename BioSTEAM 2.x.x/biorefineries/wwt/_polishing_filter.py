@@ -10,6 +10,7 @@
 import biosteam as bst
 from math import pi, ceil
 from warnings import warn
+from thermosteam.reaction import ParallelReaction as PRxn
 from ._chemicals import default_insolubles
 from ._internal_circulation_rx import InternalCirculationRx
 from ._wwt_pump import WWTpump
@@ -43,6 +44,10 @@ class PolishingFilter(bst.Unit):
 
     Parameters
     ----------
+    ins : Inlets(obj)
+        Influent, recycle, air (optional & when aerobic).
+    outs : Outlets(obj)
+        Biogas (when anaerobic), effluent, waste sludge, air (optional & when aerobic).
     filter_type : str
         Can either be "anaerobic" or "aerobic".
     OLR : float
@@ -132,10 +137,20 @@ class PolishingFilter(bst.Unit):
         X_decomp = X_decomp if X_decomp else self.X_decomp
         X_growth = X_growth if X_growth else self.X_growth
 
-        self._decomp_rxns = get_digestion_rxns(self.ins[0], 1.,
-                                               X_decomp, 0., 'WWTsludge')
-        self._growth_rxns = get_digestion_rxns(self.ins[0], 1.,
-                                               0., X_growth, 'WWTsludge')
+        self._growth_rxns = growth_rxns = \
+            get_digestion_rxns(self.ins[0], 1., 0., X_growth, 'WWTsludge')
+        if self.filter_type == 'anaerobic':
+            self._decomp_rxns = get_digestion_rxns(self.ins[0], 1.,
+                                                   X_decomp, 0., 'WWTsludge')
+        else: # aerobic
+            decomp_rxns = []
+            get = getattr
+            chems = self.chemicals
+            for chem_ID in growth_rxns.reactants:
+                decomp_rxns.append(get(chems, chem_ID).get_combustion_reaction())
+            self._decomp_rxns = PRxn(decomp_rxns)
+            self._decomp_rxns.X *= X_decomp
+
         self._i_rm = self._decomp_rxns.X + self._growth_rxns.X
 
 

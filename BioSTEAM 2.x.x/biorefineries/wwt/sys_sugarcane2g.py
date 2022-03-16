@@ -11,15 +11,14 @@
 # for license details.
 
 import biosteam as bst
-from biorefineries.sugarcane import (
+from biorefineries.oilcane import (
     create_chemicals, 
-    create_sugarcane_to_ethanol_system as create_system,
+    create_sugarcane_to_ethanol_combined_1_and_2g as create_system,
     create_tea,
     load_process_settings,
     )
-from biorefineries.oilcane import load_process_settings
 from biorefineries.wwt import \
-    compute_stream_COD, add_wwt_chemicals, create_wastewater_system, new_price
+    compute_stream_COD, add_wwt_chemicals, create_wastewater_system
 
 
 # %%
@@ -41,38 +40,14 @@ sc_chems.compile()
 bst.settings.set_thermo(sc_chems)
 load_process_settings()
 
-sc_sys_sc = create_system(
-    'sc_sys_sc', operating_hours=operating_hours,
-    use_area_convention=True,
-    pellet_bagasse=True,
-    )
-rename_storage_units(sc_sys_sc, 700)
-
-solids = bst.Stream('solids')
-SolidsMixer = bst.Mixer('SolidsMixer', ins=(sc_s.bagasse, sc_s.filter_cake), outs=solids)
-SolidsMixer.outs[0] = sc_u.BT401.ins[0]
-
-ww = bst.Stream('ww')
-WWmixer = bst.Mixer('WWmixer', ins=(sc_s.vinasse, sc_s.fiber_fines), outs=ww)
-
-sc_sys = bst.System('sc_sys', path=(sc_sys_sc, SolidsMixer, WWmixer))
-sc_tea = create_tea(sc_sys)
+sc_sys = create_system('sc_sys', operating_hours=operating_hours)
+rename_storage_units(sc_sys, 900)
 sc_sys.simulate()
+
+sc_tea = create_tea(sc_sys)
+sc_tea.operating_hours = operating_hours
 sc_tea.IRR = sc_tea.solve_IRR()
 print(f'\nOriginal IRR: {sc_tea.IRR:.2%}\n')
-
-def IRR_at_ww_price(price=new_price['Wastewater']):
-    ww.price = price
-    IRR = sc_tea.IRR = sc_tea.solve_IRR()
-    print(f'\nIRR: {IRR:.2%}\n')
-    ww.price = 0
-    sc_tea.IRR = sc_tea.solve_IRR()
-
-def solve_ww_price():
-    sc_tea.IRR = new_tea.IRR = new_tea.solve_IRR()
-    ww_price = ww.price = sc_tea.solve_price(ww)
-    print(f'\nWW price: {ww_price:.5f}\n')
-    ww.price = 0
     
     
 # %%
@@ -85,29 +60,38 @@ new_chems = add_wwt_chemicals(create_chemicals())
 new_chems.compile()
 bst.settings.set_thermo(new_chems)
 
-new_sys_sc = create_system(
-    'new_sys_sc', operating_hours=operating_hours,
-    use_area_convention=True,
-    pellet_bagasse=True,
-    )
-rename_storage_units(new_sys_sc, 700)
+new_sys_temp = create_system('new_sys_temp', operating_hours=operating_hours)
+rename_storage_units(new_sys_temp, 900)
 
-ww_streams = (new_s.vinasse, new_s.fiber_fines,)
-# new_sys_wwt = create_wastewater_system('new_sys_wwt', ins=ww_streams, process_ID='8')
-new_sys_wwt = create_wastewater_system('new_sys_wwt', ins=ww_streams, process_ID='8',
-                                        skip_AeF=True)
+# Units in the conventional wastewater treatment process
+units_to_discard = [u for u in new_u if u.ID[1]=='5']
+streams_to_discard = [s for s in sum([u.outs for u in units_to_discard], [])]
+systems_to_discard = [sys for sys in new_f.system 
+                      if (new_u.R502 in sys.units and sys.ID!='new_sys_temp')]
+for i in units_to_discard+streams_to_discard+systems_to_discard:
+    new_f.discard(i)
 
-solids = bst.Stream('solids')
-SolidsMixer = bst.Mixer('SolidsMixer', ins=(new_s.bagasse, new_s.filter_cake, new_s.sludge), outs=solids)
-SolidsMixer.outs[0] = new_u.BT401.ins[0]
-new_u.BT401.ins[1] = new_s.biogas
+ww_streams = [new_u.C401.outs[1], new_s.fiber_fines, new_s.pretreatment_wastewater]
+new_sys_wwt = create_wastewater_system('new_sys_wwt', ins=ww_streams, process_ID='5')
+# new_sys_wwt = create_wastewater_system('new_sys_wwt', ins=ww_streams, process_ID='5',
+#                                         skip_AeF=True)
+new_u.M501
+new_u.M701.ins[0] = new_s.sludge
+new_u.BT701.ins[1] = new_s.biogas
 
-new_sys = bst.System('new_sys', path=(new_sys_sc, new_sys_wwt, SolidsMixer,))
-new_tea = create_tea(new_sys)
+for units in units_to_discard:
+    new_sys_temp.units.remove(units)
+for sys in systems_to_discard:
+    new_sys_temp.subsystems.remove(sys)
 
+new_sys = bst.System.from_units('new_sys', units=new_u)
+# new_sys = bst.System('new_sys', path=(*new_sys_temp.units, new_sys_wwt,))
 new_sys.simulate()
+
+new_tea = create_tea(new_sys)
+new_tea.operating_hours = operating_hours
 new_tea.IRR = new_tea.solve_IRR()
 print(f'\nNew IRR: {new_tea.IRR:.2%}\n')
 
-COD = compute_stream_COD(new_u.S804.ins[0])
+COD = compute_stream_COD(new_u.S504.ins[0])
 print(f'\nNew COD: {round(COD*1000, 2)} mg/L\n')

@@ -61,6 +61,10 @@ class AnMBR(bst.Unit):
 
     Parameters
     ----------
+    ins : Inlets(obj)
+        Influent, recycle (optional), naocl, citric acid, bisulfite, air (optional).
+    outs : Outlets(obj)
+        Biogas, effluent, waste sludge, air (optional).
     reactor_type : str
         Can either be "CSTR" for continuous stirred tank reactor
         or "AF" for anaerobic filter.
