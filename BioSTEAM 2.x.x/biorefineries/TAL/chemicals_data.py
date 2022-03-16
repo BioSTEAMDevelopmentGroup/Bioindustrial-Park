@@ -129,16 +129,16 @@ AmmoniumAcetate = chemical_database('AmmoniumAcetate', phase='l',
 # Lactic Acid by the Fermentation of Whey: a Design and Cost Study. 
 # Commonwealth Scientific and Industrial Research Organization, Australia, 
 # which was also cited by other studies, but the origianl source cannot be found online
-CalciumLactate = chemical_database('CalciumLactate', phase='l',
-                                   Hf=-1686.1e3)
-# Hf from Lange's Handbook of Chemistry, 15th edn., Table 6.3, PDF page 631
-CalciumAcetate = chemical_database('CalciumAcetate', phase='l', Hf=-1514.73e3)
+# CalciumLactate = chemical_database('CalciumLactate', phase='l',
+#                                    Hf=-1686.1e3)
+# # Hf from Lange's Handbook of Chemistry, 15th edn., Table 6.3, PDF page 631
+# CalciumAcetate = chemical_database('CalciumAcetate', phase='l', Hf=-1514.73e3)
 
-# Solubility of CalciumSuccinate is 3.2 g/L in water as Ca2+ based on 
-# Burgess and Drasdo, Polyhedron 1993, 12 (24), 2905–2911, which is 12.5 g/L as CaSA
-# Baseline CalciumSuccinate is ~14 g/L in fermentation broth, thus assumes all 
-# CalciumSuccinate in liquid phase
-CalciumSuccinate = chemical_database('CalciumSuccinate', phase='l')
+# # Solubility of CalciumSuccinate is 3.2 g/L in water as Ca2+ based on 
+# # Burgess and Drasdo, Polyhedron 1993, 12 (24), 2905–2911, which is 12.5 g/L as CaSA
+# # Baseline CalciumSuccinate is ~14 g/L in fermentation broth, thus assumes all 
+# # CalciumSuccinate in liquid phase
+# CalciumSuccinate = chemical_database('CalciumSuccinate', phase='l')
 
 # =============================================================================
 # Soluble organics
@@ -147,10 +147,10 @@ CalciumSuccinate = chemical_database('CalciumSuccinate', phase='l')
 AceticAcid = chemical_database('AceticAcid')
 Glucose = chemical_database('Glucose', phase = 'l')
 
-IBA = chemical_database('Isobutyraldehyde')
-DPHP = chemical_database('DipotassiumHydrogenPhosphate',
-                         search_ID='Dipotassium hydrogen phosphate',
-                         phase = 'l')
+# IBA = chemical_database('Isobutyraldehyde')
+# DPHP = chemical_database('DipotassiumHydrogenPhosphate',
+#                          search_ID='Dipotassium hydrogen phosphate',
+#                          phase = 'l')
 # DPHP = chemical_database('Dipotassium hydrogen phosphate', phase = 'l')
 
 # This one is more consistent with others
@@ -201,16 +201,16 @@ WWTsludge = chemical_defined('WWTsludge', phase='s',
 Furfural = chemical_database('Furfural')
 
 
-Acetoin = chemical_database(ID='Acetoin',
-                            search_ID='3-Hydroxybutanone',
-                            phase = None, Hvap = 44.56*1000) # , V = 89.5e-6
-Acetoin.copy_models_from(Furfural, ['Psat', 'Cn', 'mu', 'kappa', 'V'])
-Acetoin.Tb = 145.4 + 273.15
+# Acetoin = chemical_database(ID='Acetoin',
+#                             search_ID='3-Hydroxybutanone',
+#                             phase = None, Hvap = 44.56*1000) # , V = 89.5e-6
+# Acetoin.copy_models_from(Furfural, ['Psat', 'Cn', 'mu', 'kappa', 'V'])
+# Acetoin.Tb = 145.4 + 273.15
 
 
 Hexanol = chemical_database('Hexanol')
-Heptane = chemical_database('Heptane')
-Toluene = chemical_database('Toluene')
+# Heptane = chemical_database('Heptane')
+# Toluene = chemical_database('Toluene')
 # Tb from chemspider(chemenu database)
 # http://www.chemspider.com/Chemical-Structure.207215.html, accessed 04/07/2020
 # https://www.chemenu.com/products/CM196167, accessed 04/07/2020
@@ -266,22 +266,6 @@ VitaminD2 = chemical_database('VitaminD2')
 # https://webbook.nist.gov/cgi/cbook.cgi?ID=C87990&Mask=4
 Xylitol = chemical_database('Xylitol', phase='l', Hf=-243145*_cal2joule, Hfus=-1118.6e3)
 
-# Hfus from NIST, accessed 04/07/2020
-# https://webbook.nist.gov/cgi/cbook.cgi?ID=C50215&Mask=4
-# LacticAcid = chemical_database('LacticAcid', Hfus=11.34e3)
-LacticAcid = chemical_database('LacticAcid')
-LacticAcid.Hfus = 11.34e3
-
-SuccinicAcid = chemical_database('SuccinicAcid', phase_ref='s')
-
-EthylAcetate = chemical_database('EthylAcetate')
-# Hf from DIPPR value in Table 3 of Vatani et al., Int J Mol Sci 2007, 8 (5), 407–432
-EthylLactate = chemical_database('EthylLactate', Hf=-695.08e3)
-
-EthylSuccinate = chemical_database('EthylSuccinate')
-# Cannot find data on Hf of CalciumSuccinate, estimate here assuming
-# Hrxn for Ca(OH)2 and SA and Ca(OH)2 and LA are the same 
-CalciumSuccinate.Hf = CalciumLactate.Hf + (SuccinicAcid.Hf-2*LacticAcid.Hf)
 
 
 # =============================================================================
@@ -322,7 +306,7 @@ Tar = chemical_copied('Tar', Xylose, phase_ref='s')
 # CSL is modeled as 50% water, 25% protein, and 25% lactic acid in Humbird et al.,
 # did not model separately as only one price is given
 CSL = chemical_defined('CSL', phase='l', formula='CH2.8925O1.3275N0.0725S0.00175', 
-                      Hf=Protein.Hf/4+H2O.Hf/2+LacticAcid.Hf/4)
+                      Hf=Protein.Hf/4+H2O.Hf/2+(-682502.448)/4)
 
 # Boiler chemicals includes amine, ammonia, and phosphate,
 # did not model separately as composition unavailable and only one price is given
@@ -344,7 +328,6 @@ CoolingTowerChems = chemical_copied('CoolingTowerChems', BaghouseBag)
 DAP = chemical_database('DAP', search_ID='DiammoniumPhosphate',
                              phase='l', Hf= -283996*_cal2joule)
 Methanol = chemical_database('Methanol')
-MethylAcetate = chemical_database('MethylAcetate')
 Denaturant = chemical_database('Denaturant', search_ID='n-Heptane')
 DenaturedEnzyme = chemical_copied('DenaturedEnzyme', Enzyme)
 
@@ -428,8 +411,10 @@ combustibles.extend(['WWTsludge','NH3', 'NitricOxide', 'CarbonMonoxide', 'H2S', 
 phase_change_chemicals = ['H2O', 'Denaturant',
                           'AceticAcid', 'Ethanol',
                           'Furfural',
-                          'SuccinicAcid', 'HMF',
-                           'PD', 'Hexanol',
+                          # 'SuccinicAcid', 
+                          'HMF',
+                           'PD', 
+                            'Hexanol',
                            # 'HMTHP',
                           ]
 
@@ -506,7 +491,7 @@ chems.set_synonym('PotassiumSorbate', 'KSA')
 chems.set_synonym('PotassiumSorbate', 'Potassiumsorbate')
 chems.set_synonym('ButylSorbate', 'BSA')
 chems.set_synonym('ButylSorbate', 'Butylsorbate')
-chems.set_synonym('DipotassiumHydrogenPhosphate', 'DPHP')
+# chems.set_synonym('DipotassiumHydrogenPhosphate', 'DPHP')
 chems.set_synonym('H2O', 'Water')
 chems.set_synonym('H2SO4', 'SulfuricAcid')
 chems.set_synonym('NH3', 'Ammonia')
@@ -519,7 +504,7 @@ chems.set_synonym('NitricOxide', 'NO')
 chems.set_synonym('P4O10', 'PhosphorusPentoxide')
 chems.set_synonym('Na2SO4', 'SodiumSulfate')
 chems.set_synonym('AmmoniumHydroxide', 'NH4OH')
-chems.set_synonym('Isobutyraldehyde', 'IBA')
+# chems.set_synonym('Isobutyraldehyde', 'IBA')
 
 
 chems.define_group(
