@@ -387,17 +387,12 @@ def create_TAL_sys(ins, outs):
         
     F401 = bst.units.MultiEffectEvaporator('F401', ins=AC401-1, outs=('F401_b', 'F401_t'), chemical='Ethanol',
                                             P = (101325, 73581, 50892, 32777, 20000), V = 0.7)
-    # F401.flash=False
+    F401.flash = False
     F401.TAL_solubility_in_ethanol_ww = get_TAL_solubility_in_ethanol_ww()
     def F401_obj_fn(V):
         F401_b = F401.outs[0]
-        F401_ins_0 = F401.ins[0]
-        TAL_mass = F401_ins_0.imass['TAL']
-        F401_ins_0.imass['TAL'] = 0.
         F401.V = V
         F401._run()
-        F401_ins_0.imass['TAL']  =TAL_mass
-        F401_b.imass['TAL'] = TAL_mass
         return F401.TAL_solubility_in_ethanol_ww - F401_b.imass['TAL']/F401_b.F_mass
 
     F401.specification = BoundedNumericalSpecification(F401_obj_fn, 1e-4, 1.-1e-4)
