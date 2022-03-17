@@ -26,7 +26,7 @@ co-fermentation (SHF). You can choose which system to load.
     >>> la.load(kind='SSCF', print_results=True) # `kind` can be "SSCF" or "SHF"
 
     ---------- Simulation Results ----------
-    MPSP is $1.424/kg
+    MPSP is $1.414/kg
     GWP is 4.567 kg CO2-eq/kg lactic acid
     FEC is 58.67 MJ/kg lactic acid
     ------------------------------------------
@@ -37,7 +37,7 @@ co-fermentation (SHF). You can choose which system to load.
     >>> la.load('SHF')
 
     ---------- Simulation Results ----------
-    MPSP is $1.464/kg
+    MPSP is $1.454/kg
     GWP is 4.489 kg CO2-eq/kg lactic acid
     FEC is 57.52 MJ/kg lactic acid
     ------------------------------------------

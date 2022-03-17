@@ -62,6 +62,7 @@ new_u = new_f.unit
 new_s = new_f.stream
 bst.main_flowsheet.set_flowsheet(new_f)
 new_chems = add_wwt_chemicals(create_chemicals())
+load_process_settings()
 
 new_sys_temp = create_system('new_sys_temp', operating_hours=operating_hours)
 rename_storage_units(new_sys_temp, storage_ID)
@@ -69,6 +70,7 @@ rename_storage_units(new_sys_temp, storage_ID)
 # Replace the conventional wastewater treatment process with new ones
 units_to_discard = [u for u in new_u if (u.ID[1]==WWT_ID or u.ID=='WWTC')]
 streams_to_discard = [s for s in sum([u.outs for u in units_to_discard], [])]
+streams_to_discard += [s for s in sum([u.ins for u in units_to_discard], []) if s.source is None]
 systems_to_discard = [sys for sys in new_f.system
                       if (getattr(new_u, f'R{WWT_ID}02') in sys.units and sys.ID!=new_sys_temp.ID)]
 ww_streams = [s for s in getattr(new_u, f'M{WWT_ID}01').ins] # the original mixer for WWT
@@ -99,6 +101,7 @@ new_sys.simulate()
 new_tea = create_tea(new_sys)
 new_tea.operating_hours = operating_hours
 new_tea.IRR = new_tea.solve_IRR()
+
 
 if __name__ == '__main__':
     print('\n\n2G oilcane biorefinery:')

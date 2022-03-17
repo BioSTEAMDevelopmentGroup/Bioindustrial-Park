@@ -57,20 +57,21 @@ new_u = new_f.unit
 new_s = new_f.stream
 bst.main_flowsheet.set_flowsheet(new_f)
 new_chems = add_wwt_chemicals(create_chemicals())
+load_process_settings()
 
 new_sys_temp = create_system('new_sys_temp', include_blowdown_recycle=True)
 
 # Replace the conventional wastewater treatment process with new ones
 units_to_discard = [u for u in new_u if (u.ID[1]==WWT_ID or u.ID=='WWTC')]
 streams_to_discard = [s for s in sum([u.outs for u in units_to_discard], [])]
+streams_to_discard += [s for s in sum([u.ins for u in units_to_discard], []) if s.source is None]
 systems_to_discard = [sys for sys in new_f.system
                       if (get(new_u, f'R{WWT_ID}02') in sys.units and sys.ID!=new_sys_temp.ID)]
 ww_streams = [s for s in get(new_u, f'M{WWT_ID}01').ins] # the original mixer for WWT
 # ww_streams = [new_u.S401.outs[1], new_s.pretreatment_wastewater, new_s.blowdown_to_wastewater]
 
 for i in units_to_discard+streams_to_discard+systems_to_discard:
-    try: new_f.discard(i)
-    except: breakpoint()
+    new_f.discard(i)
 
 new_sys_wwt = create_wastewater_system('new_sys_wwt', ins=ww_streams, process_ID=WWT_ID)
 new_u.M501.ins[0] = new_s.sludge
@@ -88,6 +89,7 @@ OSBL_IDs.remove('WWTC')
 OSBL_IDs.extend([u.ID for u in new_sys_wwt.units])
 new_tea = create_tea(new_sys, OSBL_units=[get(new_u, ID) for ID in OSBL_IDs])
 new_tea.IRR = new_tea.solve_IRR()
+
 
 if __name__ == '__main__':
     print('\n\ncornstover biorefinery:')

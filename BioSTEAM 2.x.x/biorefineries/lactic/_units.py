@@ -70,12 +70,11 @@ ParallelRxn = tmo.reaction.ParallelReaction
 class FeedstockPreprocessing(Unit):
     _N_outs = 2
     # 2205 U.S. ton/day (2000 metric tonne/day) as in ref [1]
-    chemicals = tmo.settings.get_chemicals()
-    _baseline_flow_rate = get_baseline_feedflow(chemicals).sum()
     _cached_flow_rate = 2205
 
-    def __init__(self, ID='', ins=None, outs=(), diversion_to_CHP=0):
-        Unit.__init__(self, ID, ins, outs)
+    def __init__(self, ID='', ins=None, outs=(), thermo=None, diversion_to_CHP=0):
+        Unit.__init__(self, ID, ins, outs, thermo)
+        self._baseline_flow_rate = get_baseline_feedflow(self.chemicals).sum()
         self.diversion_to_CHP = diversion_to_CHP
 
     def _run(self):
@@ -1103,7 +1102,9 @@ class AcidulationReactor(Reactor):
     _N_ins = 2
     _N_outs = 1
 
-    _acidulation_rxns = ParallelRxn([
+    def _setup(self):
+        super()._setup()
+        self.acidulation_rxns = ParallelRxn([
         #   Reaction definition                                           Reactant        Conversion
         Rxn('CalciumLactate + H2SO4 -> 2 LacticAcid + CaSO4',         'CalciumLactate',       1),
         Rxn('CalciumAcetate + H2SO4 -> 2 AceticAcid + CaSO4',         'CalciumAcetate',       1),
@@ -1146,18 +1147,6 @@ class AcidulationReactor(Reactor):
         if self.bypass:
             self.baseline_purchase_costs.clear()
         else: super()._cost()
-
-    @property
-    def acidulation_rxns(self):
-        rxns = self._acidulation_rxns
-        if rxns.chemicals is not self.chemicals:
-            # Reset chemicals, if needed, this is because `acidulation_rxns` was set
-            # prior to __init__
-            rxns.reset_chemicals(self.chemicals)
-        return rxns
-    @acidulation_rxns.setter
-    def acidulation_rxns(self, i):
-        self._acidulation_rxns = i
 
 
 # Filter to separate gypsum from the acidified fermentation broth
@@ -1450,12 +1439,15 @@ class HydrolysisReactor(Reactor):
     _N_outs = 2
     water2esters = 12
 
-    _hydrolysis_rxns = ParallelRxn([
-            #   Reaction definition                                       Reactant   Conversion
-            Rxn('EthylLactate + H2O -> LacticAcid + Ethanol',         'EthylLactate',   0.8),
-            Rxn('EthylAcetate + H2O -> AceticAcid + Ethanol',         'EthylAcetate',   0.8),
-            Rxn('EthylSuccinate + 2 H2O -> SuccinicAcid + 2 Ethanol', 'EthylSuccinate', 0.8),
-                ])
+    def _setup(self):
+        super()._setup()
+        self.hydrolysis_rxns = ParallelRxn([
+                #   Reaction definition                                       Reactant   Conversion
+                Rxn('EthylLactate + H2O -> LacticAcid + Ethanol',         'EthylLactate',   0.8),
+                Rxn('EthylAcetate + H2O -> AceticAcid + Ethanol',         'EthylAcetate',   0.8),
+                Rxn('EthylSuccinate + 2 H2O -> SuccinicAcid + 2 Ethanol', 'EthylSuccinate', 0.8),
+                    ])
+
 
     def _run(self):
         # On weight basis, recycle2 is near 10% EtLA so will always be recycled,
@@ -1495,18 +1487,6 @@ class HydrolysisReactor(Reactor):
         rxns(effluent.mol)
         self.outs[0].copy_like(effluent)
         self.outs[1].copy_like(wastewater)
-
-    @property
-    def hydrolysis_rxns(self):
-        rxns = self._hydrolysis_rxns
-        if rxns.chemicals is not self.chemicals:
-            # Reset chemicals, if needed, this is because `hydrolysis_rxns` was set
-            # prior to __init__
-            rxns.reset_chemicals(self.chemicals)
-        return rxns
-    @hydrolysis_rxns.setter
-    def hydrolysis_rxns(self, i):
-        self._hydrolysis_rxns = i
 
 
 # %%

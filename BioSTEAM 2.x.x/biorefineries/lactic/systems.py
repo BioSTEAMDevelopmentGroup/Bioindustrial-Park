@@ -21,6 +21,7 @@ from . import (
     create_separation_process,
     create_wastewater_process,
     create_facilities,
+    get_splits,
     )
 
 __all__ = ('create_system',)
@@ -28,17 +29,30 @@ __all__ = ('create_system',)
 
 # %%
 
-def create_system(kind='SSCF', if_HXN=True, if_BDM=False,
-                  flowsheet=None, return_groups=False):
+def create_system(ID='lactic_sys', kind='SSCF', if_HXN=True, if_BDM=False,
+                  flowsheet=None, return_groups=False,
+                  cell_mass_split=None, gypsum_split=None,
+                  AD_split=None, MB_split=None):
     kind = kind.upper()
     flowsheet = flowsheet or bst.main_flowsheet
     s = flowsheet.stream
     u = flowsheet.unit
 
+    # Default splits
+    _cell_mass_split, _gypsum_split, _AD_split, _MB_split = get_splits()
+    cell_mass_split = cell_mass_split if cell_mass_split is not None else _cell_mass_split
+    gypsum_split = gypsum_split if gypsum_split is not None else _gypsum_split
+    AD_split = AD_split if AD_split is not None else _AD_split
+    MB_split = MB_split if MB_split is not None else _MB_split
+
     create_preprocessing_process(flowsheet=flowsheet)
     create_pretreatment_process(feed=u.U101-0, flowsheet=flowsheet)
-    create_conversion_process(kind=kind, feed=u.P201-0, flowsheet=flowsheet)
-    create_separation_process(feed=u.PS301-0, kind=kind, flowsheet=flowsheet)
+    create_conversion_process(kind=kind, feed=u.P201-0, flowsheet=flowsheet,
+                              cell_mass_split=cell_mass_split)
+    create_separation_process(feed=u.PS301-0, kind=kind,
+                              flowsheet=flowsheet,
+                              cell_mass_split=cell_mass_split,
+                              gypsum_split=gypsum_split)
 
     if kind == 'SSCF':
         # The last one is reserved for blowdown
@@ -49,7 +63,8 @@ def create_system(kind='SSCF', if_HXN=True, if_BDM=False,
         CHP_wastes = (u.U101-1, u.S301-0, u.S401-0,)
     else: raise ValueError(f'kind can only be "SSCF" or "SHF", not {kind}.')
 
-    create_wastewater_process(ww_streams=ww_streams, flowsheet=flowsheet)
+    create_wastewater_process(ww_streams=ww_streams, flowsheet=flowsheet,
+                              AD_split=AD_split, MB_split=MB_split)
     CHP_wastes = (*CHP_wastes, u.S504-1)
 
     process_water_streams = {
@@ -68,7 +83,7 @@ def create_system(kind='SSCF', if_HXN=True, if_BDM=False,
     if if_BDM: facilities = (*facilities, u.BDM)
 
     sys = flowsheet.system
-    lactic_sys = bst.System('lactic_sys',
+    lactic_sys = bst.System(ID,
                             path=(u.U101, sys.pretreatment_sys, sys.conversion_sys,
                                   sys.separation_sys, sys.wastewater_sys,
                                   u.T601, u.T601_P, u.T602_S, u.T602,
@@ -77,7 +92,6 @@ def create_system(kind='SSCF', if_HXN=True, if_BDM=False,
                             facilities=facilities,
                             facility_recycle=u.BDM-0 if hasattr(u, 'BDM') else None
                             )
-    bst.System('CHP_sys', path=(u.CHP,))
 
     if not return_groups: return lactic_sys
 

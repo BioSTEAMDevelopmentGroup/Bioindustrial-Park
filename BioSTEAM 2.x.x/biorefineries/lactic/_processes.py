@@ -64,7 +64,6 @@ from biosteam import Stream, System
 
 from . import (
     price, get_baseline_feedflow, set_yield,
-    cell_mass_split, gypsum_split, AD_split, MB_split,
     _units as units,
     _facilities as facilities,
     )
@@ -101,6 +100,10 @@ def create_preprocessing_process(flowsheet=None):
     U101 = units.FeedstockPreprocessing('U101', ins=feedstock,
                                         outs=('processed', 'diverted_to_CHP'),
                                         diversion_to_CHP=0)
+    # try: U101 = units.FeedstockPreprocessing('U101', ins=feedstock,
+    #                                     outs=('processed', 'diverted_to_CHP'),
+    #                                     diversion_to_CHP=0)
+    # except: breakpoint()
 
     ######################## System ########################
     System('preprocessing_sys', path=(U101,))
@@ -194,7 +197,7 @@ def create_conversion_process(kind='SSCF', **kwargs):
     else: raise ValueError(f'kind can only be "SSCF" or "SHF", not {kind}.')
 
 
-def create_SSCF_conversion_process(feed, flowsheet=None):
+def create_SSCF_conversion_process(feed, flowsheet=None, **extras): # extras is to avoid errors
     flowsheet = flowsheet or bst.main_flowsheet
 
     ######################## Streams ########################
@@ -263,7 +266,7 @@ def create_SSCF_conversion_process(feed, flowsheet=None):
     System('conversion_sys', path=(M301, H301, seed_recycle, PS301))
 
 
-def create_SHF_conversion_process(feed, cell_mass_split=cell_mass_split,
+def create_SHF_conversion_process(feed, cell_mass_split,
                                   sugars=None, flowsheet=None):
     flowsheet = flowsheet or bst.main_flowsheet
 
@@ -436,10 +439,8 @@ def create_SHF_conversion_process(feed, cell_mass_split=cell_mass_split,
 # Separation
 # =============================================================================
 
-def create_separation_process(feed, insolubles=None,
-                              cell_mass_split=cell_mass_split,
-                              gypsum_split=gypsum_split,
-                              kind='SSCF', flowsheet=None):
+def create_separation_process(feed, cell_mass_split, gypsum_split,
+                              insolubles=None, kind='SSCF', flowsheet=None):
     flowsheet = flowsheet or bst.main_flowsheet
     chemicals = bst.settings.get_chemicals()
     insolubles = insolubles or tuple(i.ID for i in chemicals.insolubles)
@@ -645,7 +646,7 @@ def create_separation_process(feed, insolubles=None,
 # Wastewater
 # =============================================================================
 
-def create_wastewater_process(ww_streams, AD_split=AD_split, MB_split=MB_split,
+def create_wastewater_process(ww_streams, AD_split, MB_split,
                               COD_chemicals=None, soluble_organics=None,
                               solubles=None, insolubles=None,
                               need_ammonia=False, bypass_R501=False,

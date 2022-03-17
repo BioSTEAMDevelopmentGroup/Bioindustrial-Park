@@ -184,7 +184,8 @@ price = {
     'Ethanol': ethanol_price,
     'Baghouse bag': baghouse_bag_price,
     'Natural gas': natural_gas_price,
-    'Power': 0.070 # $/kWh, from EIA AEO, 2010-2019 average (0.067-0.074 range)
+    'Power': 0.070, # $/kWh, from EIA AEO, 2010-2019 average (0.067-0.074 range)
+    'Lactic acid': 1.9, # the average of $1.7-2.1/kg
     }
 price['Electricity'] = price['Power']
 

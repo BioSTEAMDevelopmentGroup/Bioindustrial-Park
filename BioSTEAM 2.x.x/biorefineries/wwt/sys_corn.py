@@ -58,6 +58,7 @@ new_u = new_f.unit
 new_s = new_f.stream
 bst.main_flowsheet.set_flowsheet(new_f)
 new_chems = add_wwt_chemicals(create_chemicals())
+load_process_settings()
 new_sys_temp = create_system('new_sys_temp', flowsheet=new_f)
 
 ww_streams = [new_u.MH103.outs[1], new_u.MX5.outs[0],]

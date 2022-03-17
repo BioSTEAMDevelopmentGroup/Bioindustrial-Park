@@ -74,8 +74,7 @@ new_u = new_f.unit
 new_s = new_f.stream
 bst.main_flowsheet.set_flowsheet(new_f)
 new_chems = add_wwt_chemicals(create_chemicals())
-new_chems.compile()
-bst.settings.set_thermo(new_chems)
+load_process_settings()
 
 new_sys_temp = create_system(
     'new_sys_temp', operating_hours=operating_hours,
@@ -100,6 +99,7 @@ new_sys.simulate()
 new_tea = create_tea(new_sys)
 new_tea.operating_hours = operating_hours
 new_tea.IRR = new_tea.solve_IRR()
+
 
 if __name__ == '__main__':
     print('\n\n1G sugarcane biorefinery:')

@@ -22,24 +22,15 @@ class LacticTEA(CellulosicEthanolTEA):
     _TCI_ratio_cached = 1
 
 
-def create_tea(lactic_sys=None, OSBL_units=None, flowsheet=None, return_all=False):
+def create_tea(lactic_sys=None, OSBL_units=None, flowsheet=None):
     flowsheet = flowsheet or bst.main_flowsheet
     sys = flowsheet.system
     u = flowsheet.unit
     s = flowsheet.stream
     lactic_sys = lactic_sys or sys.lactic_sys
-    CHP_sys = sys.CHP_sys
-    if lactic_sys is not flowsheet.system.lactic_sys:
+    if lactic_sys is not getattr(flowsheet.system, lactic_sys.ID):
         raise RuntimeError(f'The provided system "{lactic_sys.ID}" and '
                            f'flowsheet "{flowsheet.ID}" do not match.')
-
-    TEA_feeds = set([i for i in lactic_sys.feeds if i.price]+ \
-        [i for i in CHP_sys.feeds if i.price])
-    teas = {'TEA_feeds': TEA_feeds}
-
-    TEA_products = set([i for i in lactic_sys.products if i.price]+ \
-        [i for i in CHP_sys.products if i.price]+[s.lactic_acid, s.gypsum])
-    teas['TEA_products'] = TEA_products
 
     if not OSBL_units:
         ISBL_units = set((*sys.pretreatment_sys.units, *sys.conversion_sys.units,
@@ -71,7 +62,4 @@ def create_tea(lactic_sys=None, OSBL_units=None, flowsheet=None, return_all=Fals
             steam_power_depreciation='MACRS20',
             boiler_turbogenerator=u.CHP,
             )
-    teas['lactic_tea'] = lactic_tea
-
-    if not return_all: return lactic_tea
-    return teas
+    return lactic_tea

@@ -19,8 +19,7 @@ __all__ = (
     'get_feedstock_flow', 'dry_composition', 'feedstock_factor', 'get_baseline_feedflow',
     'compute_lactic_titer', 'set_yield',
     'compute_extra_chemical', 'adjust_recycle', 'compute_COD',
-    'find_split', 'splits_df',
-    'cell_mass_split', 'gypsum_split', 'AD_split', 'MB_split',
+    'find_split', 'get_splits',
     )
 
 
@@ -154,12 +153,12 @@ def compute_COD(IDs, stream):
 # specified in splits
 # =============================================================================
 
-def find_split(IDs, flow0, flow1, chemical_groups):
+def find_split(IDs, flow0, flow1, chemical_groups, chemicals=None):
     # Add 1e-6 to avoid flow0 and flow1 both being 0
     flow0 = np.asarray(flow0) + 1e-6
     flow1 = np.asarray(flow1) + 1e-6
     splits = flow0/(flow0 + flow1)
-    chemicals = tmo.settings.get_chemicals()
+    chemicals = chemicals or tmo.settings.get_chemicals()
     array = np.zeros(chemicals.size)
     for ID, split in zip(IDs, splits):
         if ID in chemical_groups:
@@ -169,6 +168,7 @@ def find_split(IDs, flow0, flow1, chemical_groups):
     # WWTsludge is removed from the cell mass group
     array[chemicals.index('WWTsludge')] = array[chemicals.index('FermMicrobe')]
     return array
+
 
 IDs = (
    'Ethanol', 'H2O', 'Glucose', 'Xylose', 'OtherSugars',
@@ -239,27 +239,40 @@ streams['stream_625'] = (1, 2241169, 2, 3, 7,
 splits_df = pd.DataFrame.from_dict(streams)
 splits_df.index = IDs
 
-# 1 is water, changed by moisture content rather than using data from ref [1]
-cell_mass_index = [splits_df.index[0]] + splits_df.index[2:].to_list()
-cell_mass_solid = [splits_df['stream_571'][0]] + splits_df['stream_571'][2:].to_list()
-cell_mass_filtrate = [splits_df['stream_535'][0]] + splits_df['stream_535'][2:].to_list()
-cell_mass_split = find_split(cell_mass_index, cell_mass_solid, cell_mass_filtrate,
-                             chemical_groups)
+def get_splits(chemicals=None):
+    chemicals = chemicals or tmo.settings.get_chemicals()
 
-# Moisture content (20%) and gypsum removal (99.5%) on Page 24 of ref [3]
-gypsum_index = cell_mass_index + ['Gypsum']
-gypsum_solid = cell_mass_solid + [0.995]
-gypsum_filtrate = cell_mass_filtrate + [0.005]
-gypsum_split = find_split(gypsum_index, gypsum_solid, gypsum_filtrate, chemical_groups)
+    # 1 is water, changed by moisture content rather than using data from ref [1]
+    cell_mass_index = [splits_df.index[0]] + splits_df.index[2:].to_list()
+    cell_mass_solid = [splits_df['stream_571'][0]] + splits_df['stream_571'][2:].to_list()
+    cell_mass_filtrate = [splits_df['stream_535'][0]] + splits_df['stream_535'][2:].to_list()
+    cell_mass_split = find_split(cell_mass_index,
+                                 cell_mass_solid,
+                                 cell_mass_filtrate,
+                                 chemical_groups,
+                                 chemicals=chemicals)
 
-# Anaerobic digestion
-AD_split = find_split(splits_df.index,
-                      splits_df['stream_611'],
-                      splits_df['stream_612'],
-                      chemical_groups)
+    # Moisture content (20%) and gypsum removal (99.5%) on Page 24 of ref [3]
+    gypsum_index = cell_mass_index + ['Gypsum']
+    gypsum_solid = cell_mass_solid + [0.995]
+    gypsum_filtrate = cell_mass_filtrate + [0.005]
+    gypsum_split = find_split(gypsum_index,
+                              gypsum_solid,
+                              gypsum_filtrate,
+                              chemical_groups,
+                              chemicals=chemicals)
 
-# Membrane bioreactor
-MB_split = find_split(splits_df.index,
-                      splits_df['stream_624'],
-                      splits_df['stream_625'],
-                      chemical_groups)
+    # Anaerobic digestion
+    AD_split = find_split(splits_df.index,
+                          splits_df['stream_611'],
+                          splits_df['stream_612'],
+                          chemical_groups,
+                          chemicals=chemicals)
+
+    # Membrane bioreactor
+    MB_split = find_split(splits_df.index,
+                          splits_df['stream_624'],
+                          splits_df['stream_625'],
+                          chemical_groups,
+                          chemicals=chemicals)
+    return cell_mass_split, gypsum_split, AD_split, MB_split

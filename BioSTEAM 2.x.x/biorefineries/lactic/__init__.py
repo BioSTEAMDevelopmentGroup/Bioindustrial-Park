@@ -35,8 +35,6 @@ CEPCI = bst.design_tools.CEPCI_by_year
 # %%
 
 from ._chemicals import *
-global chemicals
-chemicals = create_chemicals()
 from .utils import *
 from ._process_settings import *
 from ._processes import *
@@ -56,9 +54,11 @@ from . import (
     models,
     )
 
-
+_chemicals_loaded = False
 _system_loaded = False
+
 def load(kind='SSCF', print_results=True):
+    if not _chemicals_loaded: _load_chemicals()
     kind = kind.upper()
     if not kind in ('SSCF', 'SHF'):
         raise ValueError(f'kind can only be "SSCF" or "SHF", not "{kind}".')
@@ -67,19 +67,25 @@ def load(kind='SSCF', print_results=True):
     dct.update(flowsheet.to_dict())
     if print_results: simulate_and_print(flowsheet=flowsheet)
 
+def _load_chemicals():
+    global chemicals, _chemicals_loaded
+    chemicals = create_chemicals()
+    _chemicals_loaded = True
+
 def _load_system(kind='SSCF'):
-    global flowsheet, groups, teas, funcs, lactic_sys, lactic_tea, \
+    global flowsheet, groups, funcs, lactic_sys, lactic_tea, \
         simulate_and_print, simulate_fermentation_improvement, \
         simulate_separation_improvement, simulate_operating_improvement
     bst.main_flowsheet.clear()
     flowsheet = bst.Flowsheet('lactic')
     bst.main_flowsheet.set_flowsheet(flowsheet)
+    bst.settings.set_thermo(chemicals)
     load_process_settings()
-    lactic_sys = create_system(kind, return_groups=True, flowsheet=flowsheet)
-    teas = create_tea(return_all=True, flowsheet=flowsheet)
-    lactic_tea = teas['lactic_tea']
-    funcs = create_funcs(teas=teas, flowsheet=flowsheet)
-    return
+    lactic_sys = create_system(kind=kind, return_groups=True, flowsheet=flowsheet)
+    lactic_tea = create_tea(flowsheet=flowsheet)
+    funcs = create_funcs(lactic_tea=lactic_tea, flowsheet=flowsheet)
+    _system_loaded = True
+
 
 # %%
 
@@ -88,8 +94,8 @@ def _load_system(kind='SSCF'):
 # decision variables
 # =============================================================================
 
-def simulate_and_print(funcs=None, flowsheet=None):
-    funcs = funcs or create_funcs(flowsheet=flowsheet)
+def simulate_and_print(funcs=None, lactic_tea=None, flowsheet=None):
+    funcs = funcs or create_funcs(lactic_tea=lactic_tea, flowsheet=flowsheet)
     MPSP = funcs['simulate_get_MPSP']()
     GWP = funcs['get_GWP']()
     FEC = funcs['get_FEC']()
@@ -99,9 +105,9 @@ def simulate_and_print(funcs=None, flowsheet=None):
     print(f'FEC is {FEC:.2f} MJ/kg lactic acid')
     print('------------------------------------------\n')
 
-def simulate_fermentation_improvement(funcs=None, flowsheet=None):
+def simulate_fermentation_improvement(funcs=None, lactic_tea=None, flowsheet=None):
     flowsheet = flowsheet or bst.main_flowsheet
-    funcs = funcs or create_funcs(flowsheet=flowsheet)
+    funcs = funcs or create_funcs(lactic_tea=lactic_tea, flowsheet=flowsheet)
     u = flowsheet.unit
     flowsheet.system.lactic_sys.simulate()
     R301_X = u.R301.cofermentation_rxns.X
@@ -112,18 +118,18 @@ def simulate_fermentation_improvement(funcs=None, flowsheet=None):
     R302_X[1] = R302_X[4] = 0
     simulate_and_print(flowsheet)
 
-def simulate_separation_improvement(funcs=None, flowsheet=None):
+def simulate_separation_improvement(funcs=None, lactic_tea=None, flowsheet=None):
     flowsheet = flowsheet or bst.main_flowsheet
-    funcs = funcs or create_funcs(flowsheet=flowsheet)
+    funcs = funcs or create_funcs(lactic_tea=lactic_tea, flowsheet=flowsheet)
     u = flowsheet.unit
     flowsheet.system.lactic_sys.simulate()
     u.R402.X_factor = 0.9/u.R402.esterification_rxns.X[0]
     u.R403.hydrolysis_rxns.X[:] = 0.9
     simulate_and_print(flowsheet)
 
-def simulate_operating_improvement(funcs=None, flowsheet=None):
+def simulate_operating_improvement(funcs=None, lactic_tea=None, flowsheet=None):
     flowsheet = flowsheet or bst.main_flowsheet
-    funcs = funcs or create_funcs(flowsheet=flowsheet)
+    funcs = funcs or create_funcs(lactic_tea=lactic_tea, flowsheet=flowsheet)
     s = flowsheet.stream
     u = flowsheet.unit
     flowsheet.system.lactic_sys.simulate()
@@ -140,26 +146,23 @@ def simulate_operating_improvement(funcs=None, flowsheet=None):
     print('------------------------------------------\n')
 
 
-def create_funcs(teas=None, flowsheet=None):
+def create_funcs(lactic_tea=None, flowsheet=None):
     flowsheet = flowsheet or bst.main_flowsheet
-    teas = teas or create_tea(flowsheet=flowsheet, return_all=True)
-    s = flowsheet.stream
     lactic_sys = flowsheet.system.lactic_sys
-    lactic_tea = teas['lactic_tea']
+    lactic_tea = lactic_tea or create_tea(flowsheet=flowsheet)
+    s = flowsheet.stream
 
     # Simulate system and get results
     def simulate_get_MPSP():
-        s.lactic_acid.price = 0
         lactic_sys.simulate()
-        for i in range(3):
-            MPSP = s.lactic_acid.price = lactic_tea.solve_price(s.lactic_acid)
-        return MPSP
+        return lactic_tea.solve_price(s.lactic_acid)
+
     funcs = {'simulate_get_MPSP': simulate_get_MPSP}
 
     ######################## LCA ########################
     CFs = get_CFs(flowsheet=flowsheet)
     # 100-year global warming potential (GWP) from material flows
-    LCA_streams = teas['TEA_feeds'].copy()
+    LCA_streams = set([i for i in lactic_sys.feeds if i.price])
     LCA_stream = s.search('LCA_stream') or bst.Stream('LCA_stream', units='kg/hr')
 
     def get_material_GWP():
@@ -212,22 +215,38 @@ def create_funcs(teas=None, flowsheet=None):
 # %%
 
 from .. import PY37
+# if PY37:
+#     def __getattr__(name):
+#         if name == 'chemicals': return chemicals
+#         if not _system_loaded:
+#             _load_system()
+#             dct = globals()
+#             dct.update(flowsheet.to_dict())
+#             if name in dct: return dct[name]
+#         raise AttributeError(f"module '{__name__}' has no attribute '{name}'")
+# else:
+#     load()
+# del PY37
+
 if PY37:
     def __getattr__(name):
-        if name == 'chemicals': return chemicals
+        if not _chemicals_loaded:
+            _load_chemicals()
+            if name == 'chemicals': return chemicals
         if not _system_loaded:
-            _load_system()
-            dct = globals()
-            dct.update(flowsheet.to_dict())
+            try:
+                _load_system()
+            finally:
+                dct = globals()
+                dct.update(flowsheet.to_dict())
             if name in dct: return dct[name]
         raise AttributeError(f"module '{__name__}' has no attribute '{name}'")
 else:
     load()
-del PY37
 
 __all__ = (
     'auom', 'CEPCI',
-    'flowsheet', 'groups', 'teas', 'funcs', 'lactic_sys', 'lactic_tea',
+    'flowsheet', 'groups', 'funcs', 'lactic_sys', 'lactic_tea',
     'simulate_and_print', 'simulate_separation_improvement',
     'simulate_separation_improvement', 'simulate_operating_improvement',
     *_chemicals.__all__,
