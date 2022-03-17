@@ -10,37 +10,18 @@
 # for license details.
 
 
-# %% Setup
-
-import numpy as np
-import pandas as pd
-import thermosteam as tmo, biosteam as bst
-from ._chemicals import chems, chemical_groups
-
-__all__ = ('auom', 'CEPCI', 'get_feedstock_flow', 'dry_composition',
-           'get_baseline_feedflow', 'compute_lactic_titer', 'set_yield',
-           'compute_COD', 'find_split', 'splits_df')
-
-auom = tmo.units_of_measure.AbsoluteUnitsOfMeasure
-
-
 # %%
 
-# Using BioSTEAM's default values
-# (about the same as the previous dict, only as integers)
-CEPCI = bst.design_tools.CEPCI_by_year
-# # Legact Chemical Engineering Plant Cost Index from Chemical Engineering Magazine
-# # (https://www.chemengonline.com/the-magazine/)
-# CEPCI = {1997: 386.5,
-#          1998: 389.5,
-#          2007: 525.4,
-#          2009: 521.9,
-#          2010: 550.8,
-#          2011: 585.7,
-#          2012: 584.6,
-#          2013: 567.3,
-#          2014: 576.1,
-#          2016: 541.7}
+import numpy as np, pandas as pd, thermosteam as tmo
+from . import chemical_groups
+
+__all__ = (
+    'get_feedstock_flow', 'dry_composition', 'feedstock_factor', 'get_baseline_feedflow',
+    'compute_lactic_titer', 'set_yield',
+    'compute_extra_chemical', 'adjust_recycle', 'compute_COD',
+    'find_split', 'splits_df',
+    'cell_mass_split', 'gypsum_split', 'AD_split', 'MB_split',
+    )
 
 
 # %%
@@ -62,8 +43,8 @@ dry_composition = dict(
     Protein=0.0310, Arabinan=0.0238, Galactan=0.0143, Mannan=0.0060,
     Sucrose=0.0077, Extractives=0.1465, SuccinicAcid=0)
 
-_kg_per_ton = auom('ton').conversion_factor('kg')
-_feedstock_factor = _kg_per_ton / 0.8
+_kg_per_ton = 907.1847 # auom('ton').conversion_factor('kg')
+feedstock_factor = _kg_per_ton / 0.8
 
 moisture_content = 0.2
 dry_feedstock_flow = 2205 * _kg_per_ton / 24
@@ -79,8 +60,8 @@ get_baseline_feedflow = lambda chemicals: get_feedstock_flow(
 # =============================================================================
 
 def compute_lactic_titer(stream, V=None):
-    lactic_mass = 2*stream.imol['CalciumLactate']*chems.LacticAcid.MW \
-        + stream.imass['LacticAcid']
+    # 90.07794 is chems.LacticAcid.MW
+    lactic_mass = 2*stream.imol['CalciumLactate']*90.07794 + stream.imass['LacticAcid']
     if V:
         vol = V
     else: vol = stream.F_vol
@@ -152,6 +133,8 @@ def compute_COD(IDs, stream):
         raise TypeError(f'{IDs.__class__} is not iterable.')
     if isinstance(IDs, str):
         IDs = (IDs,)
+    elif not isinstance(IDs[0], str):
+        IDs = [i.ID for i in IDs]
     for i in IDs:
         if i not in stream.chemicals.IDs: continue
         chemical = getattr(stream.chemicals, i)
@@ -176,8 +159,7 @@ def find_split(IDs, flow0, flow1, chemical_groups):
     flow0 = np.asarray(flow0) + 1e-6
     flow1 = np.asarray(flow1) + 1e-6
     splits = flow0/(flow0 + flow1)
-    thermo = tmo.settings.get_thermo()
-    chemicals = thermo.chemicals
+    chemicals = tmo.settings.get_chemicals()
     array = np.zeros(chemicals.size)
     for ID, split in zip(IDs, splits):
         if ID in chemical_groups:
@@ -188,12 +170,14 @@ def find_split(IDs, flow0, flow1, chemical_groups):
     array[chemicals.index('WWTsludge')] = array[chemicals.index('FermMicrobe')]
     return array
 
-IDs = ('Ethanol', 'H2O', 'Glucose', 'Xylose', 'OtherSugars',
-    'SugarOligomers', 'OrganicSolubleSolids', 'InorganicSolubleSolids', 'Ammonia', 'AceticAcid',
-    'SulfuricAcid', 'Furfurals', 'OtherOrganics', 'CO2', 'CH4',
-    'O2', 'N2', 'COSOxNOxH2S', 'Glucan', 'Xylan',
-    'OtherStructuralCarbohydrates', 'Acetate', 'Lignin', 'Protein', 'CellMass',
-    'OtherInsolubleSolids')
+IDs = (
+   'Ethanol', 'H2O', 'Glucose', 'Xylose', 'OtherSugars',
+   'SugarOligomers', 'OrganicSolubleSolids', 'InorganicSolubleSolids', 'Ammonia', 'AceticAcid',
+   'SulfuricAcid', 'Furfurals', 'OtherOrganics', 'CO2', 'CH4',
+   'O2', 'N2', 'COSOxNOxH2S', 'Glucan', 'Xylan',
+   'OtherStructuralCarbohydrates', 'Acetate', 'Lignin', 'Protein', 'CellMass',
+   'OtherInsolubleSolids'
+   )
 
 streams = {}
 

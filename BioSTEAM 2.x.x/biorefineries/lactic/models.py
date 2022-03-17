@@ -16,15 +16,10 @@
 # Setup
 # =============================================================================
 
-import numpy as np
-import biosteam as bst
+import numpy as np, biosteam as bst
 from biosteam.evaluation import Model, Metric
 from chaospy import distributions as shape
-from ._settings import CFs
-from .utils import set_yield, _feedstock_factor
-from .systems import simulate_and_print, \
-    SSCF_flowsheet, SSCF_groups, SSCF_teas, SSCF_funcs, \
-    SHF_flowsheet, SHF_groups, SHF_teas, SHF_funcs
+from . import get_CFs, create_system, simulate_and_print, set_yield, feedstock_factor
 
 __all__ = ('create_model',)
 
@@ -36,19 +31,8 @@ __all__ = ('create_model',)
 # =============================================================================
 
 def create_model(kind='SSCF'):
-    if 'SSCF' in str(kind).upper():
-        flowsheet = SSCF_flowsheet
-        groups = SSCF_groups
-        teas = SSCF_teas
-        funcs = SSCF_funcs
-    elif 'SHF' in str(kind).upper():
-        flowsheet = SHF_flowsheet
-        groups = SHF_groups
-        teas = SHF_teas
-        funcs = SHF_funcs
-    else:
-        raise ValueError(f'kind can only be "SSCF" or "SHF", not {kind}.')
-
+    flowsheet, groups, teas, funcs = create_system(kind, return_all=True)
+    CFs = get_CFs()
     bst.main_flowsheet.set_flowsheet(flowsheet)
     s = flowsheet.stream
     u = flowsheet.unit
@@ -407,7 +391,7 @@ def create_model(kind='SSCF'):
     @param(name='Feedstock unit price', element='TEA', kind='isolated', units='$/dry-ton',
            baseline=71.3, distribution=D)
     def set_feedstock_price(price):
-        feedstock.price = price / _feedstock_factor
+        feedstock.price = price / feedstock_factor
 
     sulfuric_acid = s.sulfuric_acid
     D = shape.Triangle(0.0910, 0.0948, 0.1046)

@@ -13,9 +13,8 @@
 # %%
 
 from biosteam import Flowsheet, main_flowsheet
-from ._chemicals import chems
-from ._processes import (
-    update_settings,
+from . import (
+    chemicals,
     create_preprocessing_process,
     create_pretreatment_process,
     create_SSCF_conversion_process,
@@ -26,12 +25,8 @@ from ._processes import (
     create_lactic_sys
     )
 
-update_settings(chems)
-
 __all__ = (
-    'create_SSCF_sys', 'create_SHF_sys',
-    'SSCF_flowsheet', 'SSCF_groups', 'SSCF_teas', 'SSCF_funcs',
-    'SHF_flowsheet', 'SHF_groups', 'SHF_teas', 'SHF_funcs',
+    'create_system',
     'simulate_and_print', 'simulate_separation_improvement',
     'simulate_separation_improvement', 'simulate_operating_improvement'
     )
@@ -39,7 +34,20 @@ __all__ = (
 
 # %%
 
-def create_SSCF_sys():
+def create_system(kind='SSCF', return_all=False):
+    if 'SSCF' in str(kind).upper():
+        flowsheet, groups, teas, funcs = create_SSCF_sys(chemicals)
+    elif 'SHF' in str(kind).upper():
+        flowsheet, groups, teas, funcs = create_SHF_sys(chemicals)
+    else:
+        raise ValueError(f'kind can only be "SSCF" or "SHF", not {kind}.')
+    if return_all:
+        return flowsheet, groups, teas, funcs
+    else:
+        return flowsheet.system.lactic_sys
+
+
+def create_SSCF_sys(chems):
     flowsheet = Flowsheet('SSCF')
     s = flowsheet.stream
     u = flowsheet.unit
@@ -79,7 +87,7 @@ def create_SSCF_sys():
 
     return flowsheet, groups, teas, funcs
 
-def create_SHF_sys():
+def create_SHF_sys(chems):
     flowsheet = Flowsheet('SHF')
     s = flowsheet.stream
     u = flowsheet.unit
@@ -119,8 +127,6 @@ def create_SHF_sys():
 
     return flowsheet, groups, teas, funcs
 
-SSCF_flowsheet, SSCF_groups, SSCF_teas, SSCF_funcs = create_SSCF_sys()
-SHF_flowsheet, SHF_groups, SHF_teas, SHF_funcs  = create_SHF_sys()
 
 
 # %%
@@ -130,72 +136,39 @@ SHF_flowsheet, SHF_groups, SHF_teas, SHF_funcs  = create_SHF_sys()
 # decision variables
 # =============================================================================
 
-def simulate_and_print(system='SSCF'):
-    if 'SSCF' in str(system).upper():
-        flowsheet = SSCF_flowsheet
-        funcs = SSCF_funcs
-    elif 'SHF' in str(system).upper():
-        flowsheet = SHF_flowsheet
-        funcs = SHF_funcs
-    else:
-        raise ValueError(f'system can only be "SSCF" or "SHF", not {system}.')
-    main_flowsheet.set_flowsheet(flowsheet)
-
+def simulate_and_print(flowsheet=None):
+    flowsheet = flowsheet or main_flowsheet
     print('\n---------- Simulation Results ----------')
     print(f'MPSP is ${funcs["simulate_get_MPSP"]():.3f}/kg')
     print(f'GWP is {funcs["get_GWP"]():.3f} kg CO2-eq/kg lactic acid')
     print(f'FEC is {funcs["get_FEC"]():.2f} MJ/kg lactic acid')
     print('------------------------------------------\n')
 
-
-def simulate_fermentation_improvement(kind='SSCF'):
-    if 'SSCF' in str(kind).upper():
-        flowsheet = SSCF_flowsheet
-    elif 'SHF' in str(kind).upper():
-        flowsheet = SHF_flowsheet
-    else:
-        raise ValueError(f'kind can only be "SSCF" or "SHF", not {kind}.')
-    main_flowsheet.set_flowsheet(flowsheet)
+def simulate_fermentation_improvement(flowsheet=None):
+    flowsheet = flowsheet or main_flowsheet
     u = flowsheet.unit
     flowsheet.system.lactic_sys.simulate()
-
     R301_X = u.R301.cofermentation_rxns.X
     R302_X = u.R302.cofermentation_rxns.X
     u.R301.target_yield = 0.95
     R301_X[0] = R301_X[3] = 0.95
     R301_X[1] = R301_X[4] = 0
     R302_X[1] = R302_X[4] = 0
-    simulate_and_print(kind)
+    simulate_and_print(flowsheet)
 
-def simulate_separation_improvement(kind='SSCF'):
-    if 'SSCF' in str(kind).upper():
-        flowsheet = SSCF_flowsheet
-    elif 'SHF' in str(kind).upper():
-        flowsheet = SHF_flowsheet
-    else:
-        raise ValueError(f'kind can only be "SSCF" or "SHF", not {kind}.')
-    main_flowsheet.set_flowsheet(flowsheet)
-    u = SHF_flowsheet.unit
+def simulate_separation_improvement(flowsheet=None):
+    flowsheet = flowsheet or main_flowsheet
+    u = flowsheet.unit
     flowsheet.system.lactic_sys.simulate()
-
     u.R402.X_factor = 0.9/u.R402.esterification_rxns.X[0]
     u.R403.hydrolysis_rxns.X[:] = 0.9
-    simulate_and_print(kind)
+    simulate_and_print(flowsheet)
 
-def simulate_operating_improvement(kind='SSCF'):
-    if 'SSCF' in str(kind).upper():
-        flowsheet = SSCF_flowsheet
-        funcs = SSCF_funcs
-    elif 'SHF' in str(kind).upper():
-        flowsheet = SHF_flowsheet
-        funcs = SHF_funcs
-    else:
-        raise ValueError(f'kind can only be "SSCF" or "SHF", not {kind}.')
-    main_flowsheet.set_flowsheet(flowsheet)
+def simulate_operating_improvement(flowsheet=None):
+    flowsheet = flowsheet or main_flowsheet
     s = flowsheet.stream
     u = flowsheet.unit
     flowsheet.system.lactic_sys.simulate()
-
     u.U101.diversion_to_CHP = 0.25
     print('\n---------- Simulation Results ----------')
     print(f'MPSP is ${funcs["simulate_get_MPSP"]():.3f}/kg')
@@ -204,3 +177,7 @@ def simulate_operating_improvement(kind='SSCF'):
     print(f'GWP is {funcs["get_GWP"]():.3f} kg CO2-eq/kg lactic acid')
     print(f'FEC is {funcs["get_FEC"]():.2f} MJ/kg lactic acid')
     print('------------------------------------------\n')
+
+
+if __name__ == '__main__':
+    flowsheet, groups, teas, funcs = create_system('SSCF')

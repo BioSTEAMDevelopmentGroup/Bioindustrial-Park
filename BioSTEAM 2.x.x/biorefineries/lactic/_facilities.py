@@ -30,9 +30,8 @@ References
 from biosteam import HeatUtility, Facility
 from biosteam.units.decorators import cost
 from thermosteam import Stream
-from thermosteam.reaction import Reaction as Rxn
-from thermosteam.reaction import ParallelReaction as ParallelRxn
-from .utils import CEPCI
+from thermosteam.reaction import Reaction as Rxn, ParallelReaction as ParallelRxn
+from . import CEPCI
 
 __all__ = ('ADP', 'CIP', 'CT', 'PWC', 'CHP')
 
@@ -254,8 +253,8 @@ class CHP(Facility):
         Fraction of heat transfered to steam.
     TG_eff : float
         Fraction of steam heat converted to electricity.
-    combustibles : tuple
-        IDs of combustible chemicals.
+    combustibles : tuple(str or obj)
+        Combustible chemicals or their IDs.
     side_streams_to_heat : tuple
         Process streams that need to be heat up.
 
@@ -287,7 +286,8 @@ class CHP(Facility):
         Facility.__init__(self, ID, ins, outs)
         self.B_eff = B_eff
         self.TG_eff = TG_eff
-        self.combustibles = combustibles
+        self.combustibles = combustibles if isinstance(combustibles[0], str) else [i.ID for i in combustibles]
+        self._combustible_feeds = Stream(f'{self.ID}_combustible_feeds')
         self.side_streams_to_heat = side_streams_to_heat
         self.side_streams_lps = None
 
@@ -312,7 +312,7 @@ class CHP(Facility):
 
         # Use combustion reactions to create outs
         combustion_rxns = self.chemicals.get_combustion_reactions()
-        combustible_feeds = Stream(None)
+        combustible_feeds = self._combustible_feeds
         emission.mol = feed_solids.mol + feed_gases.mol
         combustible_feeds.copy_flow(emission, tuple(self.combustibles), remove=True)
         combustion_rxns.force_reaction(combustible_feeds.mol)

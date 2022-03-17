@@ -62,23 +62,17 @@ import biosteam as bst
 from flexsolve import aitken_secant, IQ_interpolation
 from biosteam import Stream, System
 from biosteam.process_tools import UnitGroup
-from biorefineries import BST222
 
 from . import (
+    price, get_CFs,
+    get_baseline_feedflow, set_yield,
+    cell_mass_split, gypsum_split, AD_split, MB_split,
     _units as units,
-    _facilities as facilities
+    _facilities as facilities,
+    LacticTEA,
     )
 
-from ._settings import price, CFs
-from .utils import get_baseline_feedflow, _kg_per_ton, set_yield, \
-    cell_mass_split, gypsum_split, AD_split, MB_split
-from ._chemicals import chems, sugars, soluble_organics, \
-    solubles, insolubles, COD_chemicals, combustibles
-from ._tea import LacticTEA
-
-
 __all__ = (
-    'update_settings',
     'create_preprocessing_process',
     'create_pretreatment_process',
     'create_SSCF_conversion_process',
@@ -88,28 +82,6 @@ __all__ = (
     'create_facilities',
     'create_lactic_sys'
     )
-
-
-# %%
-
-# =============================================================================
-# Biorefinery settings
-# =============================================================================
-
-def update_settings(chems, CE=541.7):
-    bst.settings.set_thermo(chems)
-    bst.CE = CE # year 2016
-
-    # These settings are sufficient to get baseline lactic acid price within $0.002/kg
-    # of the final stabilized results
-    if BST222:
-        System.default_converge_method = 'fixed-point' # aitken isn't stable
-        System.default_maxiter = 1500
-        System.default_molar_tolerance = 0.02
-    else:
-        System.maxiter = 1500
-        System.converge_method = 'fixed-point'
-        System.molar_tolerance = 0.02
 
 
 # %%
@@ -130,9 +102,9 @@ def create_preprocessing_process(flowsheet, chemicals):
     get_feedstock_dry_mass = lambda: \
         (feedstock.F_mass-feedstock.imass['H2O'])*(1-U101.diversion_to_CHP)
 
-    # Feedstock flow rate in dry U.S. ton per day
+    # Feedstock flow rate in dry U.S. ton per day, 907.1847 is auom('ton').conversion_factor('kg')
     get_flow_tpd = lambda: \
-        (feedstock.F_mass-feedstock.imass['H2O'])*24/_kg_per_ton*(1-U101.diversion_to_CHP)
+        (feedstock.F_mass-feedstock.imass['H2O'])*24/907.1847*(1-U101.diversion_to_CHP)
 
     preprocessing_sys = System('preprocessing_sys',
                                path=(U101,))
@@ -302,8 +274,10 @@ def create_SSCF_conversion_process(flowsheet, groups, feed):
 
 
 def create_SHF_conversion_process(flowsheet, groups, feed,
-                                  cell_mass_split=cell_mass_split):
+                                  cell_mass_split=cell_mass_split,
+                                  sugars=None):
     bst.main_flowsheet.set_flowsheet(flowsheet)
+    sugars = sugars or 'sugars'
 
     ######################## Streams ########################
     # flow updated in EnzymeHydrolysateMixer
@@ -402,7 +376,6 @@ def create_SHF_conversion_process(flowsheet, groups, feed,
         seed_recycle._run()
         return R301.effluent_titer-R301.target_titer
 
-    #!!! Find a paper on the maximum MEE sugar conc.
     # Adjust V of the multi-effect evaporator to the maximum possible sugar concentration
     def get_max_V(V):
         E301.V = V
@@ -432,9 +405,9 @@ def create_SHF_conversion_process(flowsheet, groups, feed,
 
     def adjust_ferm_loop():
         water_R301.empty()
-        #!!! This can be upadted using newer biosteam
+        #!!! This can be updated using newer biosteam
         # S302.split = 1
-        S302._isplit = S302.thermo.chemicals.isplit(1-1e-6)
+        S302.split = S302.thermo.chemicals.isplit(1-1e-6)
         E301.V = 0
         set_yield(R301.target_yield, R301, R302)
         ferm_loop._run()
@@ -483,7 +456,7 @@ def create_SHF_conversion_process(flowsheet, groups, feed,
 # Separation
 # =============================================================================
 
-def create_separation_process(flowsheet, groups, feed, insolubles=insolubles,
+def create_separation_process(flowsheet, groups, feed, insolubles='insolubles',
                               cell_mass_split=cell_mass_split,
                               gypsum_split=gypsum_split, kind='SSCF'):
     bst.main_flowsheet.set_flowsheet(flowsheet)
@@ -507,7 +480,7 @@ def create_separation_process(flowsheet, groups, feed, insolubles=insolubles,
         S401 = bst.units.SolidsCentrifuge('S401', ins=feed,
                                           outs=('S401_cell_mass', ''),
                                           split=cell_mass_split,
-                                          solids=insolubles)
+                                          solids='insolubles')
     # Ca(LA)2 + H2SO4 --> CaSO4 + 2 LA
     R401 = units.AcidulationReactor('R401', ins=(S401-1, sulfuric_acid_R401),
                                     P=101325, tau=1, V_wf=0.8, length_to_diameter=2,
@@ -563,12 +536,14 @@ def create_separation_process(flowsheet, groups, feed, insolubles=insolubles,
     # R402.ins[2] is lactic acid recycled from D403,
     # R402.ins[3] is supplementary ethanol,
     # R402.ins[4] is ethanol recycled from D404
-    R402 = units.Esterification('R402', ins=(D401_P-0, '', 'D403_l_recycled',
-                                             ethanol_R402, ''),
+    R402 = units.Esterification('R402',
+                                ins=(D401_P-0, '', 'D403_l_recycled',
+                                     ethanol_R402, ''),
                                 V_wf=0.8, length_to_diameter=2,
                                 kW_per_m3=1.97, wall_thickness_factor=1,
                                 vessel_material='Stainless steel 316',
-                                vessel_type='Vertical')
+                                vessel_type='Vertical',
+                                catalyst_price=price['Amberlyst15'])
     # Increase pressure as the solution can be very thick for some designs
     R402_P = bst.units.Pump('R402_P', ins=R402-0, dP_design=5*101325)
 
@@ -694,11 +669,14 @@ def create_separation_process(flowsheet, groups, feed, insolubles=insolubles,
 
 def create_wastewater_process(flowsheet, groups, get_flow_tpd, wwt_streams,
                               AD_split=AD_split, MB_split=MB_split,
-                              COD_chemicals=COD_chemicals,
-                              soluble_organics=soluble_organics,
-                              solubles=solubles, insolubles=insolubles,
+                              COD_chemicals=None, soluble_organics=None,
+                              solubles=None, insolubles=None,
                               need_ammonia=False, bypass_R501=False):
     bst.main_flowsheet.set_flowsheet(flowsheet)
+    chemicals = bst.settings.get_chemicals()
+    COD_chemicals = COD_chemicals or chemicals.cod
+    soluble_organics = soluble_organics or chemicals.soluble_organics
+
 
     ######################## Streams ########################
     ammonia_R502 = Stream('ammonia_R502', units='kg/hr')
@@ -787,9 +765,12 @@ def create_wastewater_process(flowsheet, groups, get_flow_tpd, wwt_streams,
 def create_facilities(flowsheet, groups, get_flow_tpd,
                       CHP_wastes, CHP_biogas='', CHP_side_streams=(),
                       process_water_streams={}, recycled_water='',
-                      combustibles=combustibles,
+                      combustibles=None,
                       if_HXN=True, if_BDM=False):
     bst.main_flowsheet.set_flowsheet(flowsheet)
+    chemicals = bst.settings.get_chemicals()
+    combustibles = combustibles or chemicals.combustibles
+
     s = flowsheet.stream
     u = flowsheet.unit
 
@@ -935,6 +916,7 @@ def create_lactic_sys(flowsheet, groups, get_flow_tpd):
     s = flowsheet.stream
     u = flowsheet.unit
     sys = flowsheet.system
+    CFs = get_CFs()
 
     ################## Overall System ##################
     facilities = (u.CHP, u.CT, u.PWC, u.ADP, u.CIP)
@@ -1012,7 +994,7 @@ def create_lactic_sys(flowsheet, groups, get_flow_tpd):
 
     # GWP from onsite emission (e.g., combustion) of non-biogenic carbons
     get_onsite_GWP = lambda: (s.natural_gas.get_atomic_flow('C')+s.ethanol.get_atomic_flow('C')) \
-        * chems.CO2.MW / s.lactic_acid.F_mass
+        * 44.0095 / s.lactic_acid.F_mass # 44.0095 is chems.CO2.MW
     funcs['get_onsite_GWP'] = get_onsite_GWP
 
     # GWP from electricity
@@ -1024,7 +1006,7 @@ def create_lactic_sys(flowsheet, groups, get_flow_tpd):
 
     # CO2 fixed in lactic acid product
     get_fixed_GWP = lambda: \
-        s.lactic_acid.get_atomic_flow('C')*chems.CO2.MW/s.lactic_acid.F_mass
+        s.lactic_acid.get_atomic_flow('C')*44.0095/s.lactic_acid.F_mass
     funcs['get_fixed_GWP'] = get_fixed_GWP
 
     get_GWP = lambda: get_material_GWP()+get_onsite_GWP()+get_electricity_GWP()

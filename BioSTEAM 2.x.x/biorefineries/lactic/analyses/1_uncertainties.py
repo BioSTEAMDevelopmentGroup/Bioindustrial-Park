@@ -102,7 +102,7 @@ def evaluate_uncertainties(kind='SSCF', seed=None, N_simulation=1000,
     spearman_results = model.spearman_r(spearman_parameters, spearman_metrics)[0]
     spearman_results.columns = pd.Index([i.name_with_units for i in spearman_metrics])
 
-    # Calculate the cumulative probabilitie of each parameter
+    # Calculate the cumulative probabilities of each parameter
     probabilities = {}
     for i in range(index_parameters):
         p = parameters[i]

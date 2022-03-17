@@ -39,35 +39,45 @@ References
 # =============================================================================
 
 import biosteam as bst
-import thermosteam as tmo
-from ._chemicals import chems
-from .utils import auom
+from biorefineries import BST222
 
-__all__ = ('price', 'CFs')
+__all__ = ('price', 'get_CFs', 'load_process_settings')
 
 
 # %%
 
-# =============================================================================
-# Energy balances
-# =============================================================================
+def load_process_settings(CE=541.7): # year 2016
+    bst.CE = CE
 
-_lps = bst.HeatUtility.get_heating_agent('low_pressure_steam')
-_mps = bst.HeatUtility.get_heating_agent('medium_pressure_steam')
-_hps = bst.HeatUtility.get_heating_agent('high_pressure_steam')
-_mps.T = 233 + 273.15
-_hps.T = 266 + 273.15
+    # These settings are sufficient to get baseline lactic acid price within $0.002/kg
+    # of the final stabilized results
+    if BST222:
+        bst.System.default_converge_method = 'fixed-point' # aitken isn't stable
+        bst.System.default_maxiter = 1500
+        bst.System.default_molar_tolerance = 0.02
+    else:
+        bst.System.maxiter = 1500
+        bst.System.converge_method = 'fixed-point'
+        bst.System.molar_tolerance = 0.02
 
-_cooling = bst.HeatUtility.get_cooling_agent('cooling_water')
-_cooling.regeneration_price = 0
-_cooling.T = 28 + 273.15
-_cooling.T_limit = _cooling.T + 9
+    lps = bst.HeatUtility.get_heating_agent('low_pressure_steam')
+    mps = bst.HeatUtility.get_heating_agent('medium_pressure_steam')
+    hps = bst.HeatUtility.get_heating_agent('high_pressure_steam')
+    mps.T = 233 + 273.15
+    hps.T = 266 + 273.15
 
-# Side steam in CHP not a heat utility, thus will cause problem in TEA utility
-# cost calculation if price not set to 0 here, costs for regeneration of heating
-# and cooling utilities will be considered as CAPEX and OPEX of CHP and CT, respectively
-for i in (_lps, _mps, _hps, _cooling):
-    i.heat_transfer_price = i.regeneration_price = 0
+    cooling = bst.HeatUtility.get_cooling_agent('cooling_water')
+    cooling.regeneration_price = 0
+    cooling.T = 28 + 273.15
+    cooling.T_limit = cooling.T + 9
+
+    # Side steam in CHP not a heat utility, thus will cause problem in TEA utility
+    # cost calculation if price not set to 0 here, costs for regeneration of heating
+    # and cooling utilities will be considered as CAPEX and OPEX of CHP and CT, respectively
+    for i in (lps, mps, hps, cooling):
+        i.heat_transfer_price = i.regeneration_price = 0
+
+    bst.PowerUtility.price = price['Power']
 
 
 # %%
@@ -77,11 +87,10 @@ for i in (_lps, _mps, _hps, _cooling):
 # and from ref [1] if not noted
 # =============================================================================
 
-bst.CE = 541.7 # year 2016
-_kg_per_ton = auom('ton').conversion_factor('kg')
-_lb_per_kg = auom('kg').conversion_factor('lb')
-_liter_per_gallon = auom('gal').conversion_factor('L')
-_ft3_per_m3 = auom('m3').conversion_factor('ft3')
+_kg_per_ton = 907.1847 # auom('ton').conversion_factor('kg')
+_lb_per_kg = 2.2046 # auom('kg').conversion_factor('lb')
+_liter_per_gallon = 3.7854 # auom('gal').conversion_factor('L')
+_ft3_per_m3 = 35.3147 # auom('m3').conversion_factor('ft3')
 _chemical_2020to2016 = 102.5 / 113.8 # average of Jan and Feb
 _GDP_2007to2016 = 1.160
 
@@ -103,8 +112,8 @@ sulfuric_acid_price = 0.0430 * _lb_per_kg
 # (https://www.eia.gov/outlooks/aeo/), which is $0.732/gal and similar to the
 # 2.2/(2988/1e3) = $0.736/gal based on a density of 2988 g/gal from H2 Tools
 # Lower and upper bounds are $1.37/gal and $2.79/gal, or $0.460/kg and $0.978/kg
-_ethanol_V = chems.Ethanol.V('l', 298.15, 101325) # molar volume in m3/mol
-_ethanol_MW = chems.Ethanol.MW
+_ethanol_V = 5.8617e-5 # chemicals.Ethanol.V('l', 298.15, 101325), molar volume in m3/mol
+_ethanol_MW = 46.06844 # chemicals.Ethanol.MW
 _ethanol_kg_2_gal = _liter_per_gallon/_ethanol_V*_ethanol_MW/1e6
 ethanol_price = 2.2 / _ethanol_kg_2_gal
 
@@ -146,8 +155,8 @@ baghouse_bag_price = 466183/5/(24*365*0.96) * _GDP_2007to2016
 # similar to the 4.7/1000/22*1000 = $0.214/kg at 273.15 K using 22 g/ft3 from H2 Tools
 # Using the same conversion, lower and upper bounds (min/max of 2010-2019) should be
 # $3.68/Mcf and $5.65/Mcf, or $0.198/kg and $0.304/kg
-_CH4_V = chems.CH4.V(298.15, 101325) # molar volume in m3/mol
-_CH4_MW = chems.CH4.MW
+_CH4_V = 0.02442 # chemicals.CH4.V(298.15, 101325), molar volume in m3/mol
+_CH4_MW = 16.04246 # chemicals.CH4.MW
 natural_gas_price = 4.70/1e3*_ft3_per_m3*_CH4_V * (1e3/_CH4_MW)
 
 # https://www.rightpricechemicals.com/buy-amberlyst-15-ion-exchange-resin.html
@@ -155,28 +164,29 @@ natural_gas_price = 4.70/1e3*_ft3_per_m3*_CH4_V * (1e3/_CH4_MW)
 amberlyst_15_price = 153.252 * _chemical_2020to2016
 
 # All in 2016$/kg
-price = {'Feedstock': feedstock_price,
-         'H2SO4': 0.0430 * _lb_per_kg,
-         # 0.1900 is for NH3
-         'NH4OH': 0.1900 * _lb_per_kg * chems.NH3.MW/chems.NH4OH.MW,
-         'CSL': 0.0339 * _lb_per_kg,
-         'Enzyme': 6.16,
-         'Lime': lime_price,
-         'Amberlyst15': amberlyst_15_price,
-         'NaOH': 0.2384 * _lb_per_kg,
-         'WWT polymer': 2.6282 * _lb_per_kg,
-         'Boiler chems': 2.9772 * _lb_per_kg,
-         'Cooling tower chems': 1.7842 * _lb_per_kg,
-         'Makeup water': 0.0002 * _lb_per_kg,
-         # Cost of ash is negative because it's a product stream
-         'Ash disposal': ash_disposal_price,
-         'Gypsum': gypsum_price,
-         'Ethanol': ethanol_price,
-         'Baghouse bag': baghouse_bag_price,
-         'Natural gas': natural_gas_price}
-
-# $/kWh, from EIA AEO, 2010-2019 average (0.067-0.074 range)
-bst.PowerUtility.price = 0.070
+price = {
+    'Feedstock': feedstock_price,
+    'H2SO4': 0.0430 * _lb_per_kg,
+    # 0.1900 is for NH3
+    'NH4OH': 0.1900 * _lb_per_kg * 0.4860, # chemicals.NH3.MW/chemicals.NH4OH.MW,
+    'CSL': 0.0339 * _lb_per_kg,
+    'Enzyme': 6.16,
+    'Lime': lime_price,
+    'Amberlyst15': amberlyst_15_price,
+    'NaOH': 0.2384 * _lb_per_kg,
+    'WWT polymer': 2.6282 * _lb_per_kg,
+    'Boiler chems': 2.9772 * _lb_per_kg,
+    'Cooling tower chems': 1.7842 * _lb_per_kg,
+    'Makeup water': 0.0002 * _lb_per_kg,
+    # Cost of ash is negative because it's a product stream
+    'Ash disposal': ash_disposal_price,
+    'Gypsum': gypsum_price,
+    'Ethanol': ethanol_price,
+    'Baghouse bag': baghouse_bag_price,
+    'Natural gas': natural_gas_price,
+    'Power': 0.070 # $/kWh, from EIA AEO, 2010-2019 average (0.067-0.074 range)
+    }
+price['Electricity'] = price['Power']
 
 
 # %%
@@ -187,67 +197,67 @@ bst.PowerUtility.price = 0.070
 # (~50% of the total impact per ref [4]) of feedstock is included in ref [3]
 # =============================================================================
 
-CFs = {}
+def get_CFs(chemicals=None):
+    chemicals = chemicals or bst.settings.get_chemicals()
+    CFs = {}
 
-# =============================================================================
-# 100-year global warming potential (GWP) in kg CO2-eq/kg
-# =============================================================================
-GWP_CFs = {
-    'NH4OH': 2.64 * chems.NH3.MW/chems.NH4OH.MW,
-    'CSL': 1.55,
-    'CH4': 0.40, # NA NG from shale and conventional recovery
-    'Enzyme': 2.24,
-    'Lime': 1.29 * 56.0774/74.093, # CaO to Ca(OH)2
-    'NaOH': 2.11,
-    'H2SO4': 44.47/1e3,
-    'Ethanol': 1.44
-    }
+    ##### 100-year global warming potential (GWP) in kg CO2-eq/kg #####
+    GWP_CFs = {
+        'NH4OH': 2.64 * 0.4860, # chemicals.NH3.MW/chemicals.NH4OH.MW,
+        'CSL': 1.55,
+        'CH4': 0.40, # NA NG from shale and conventional recovery
+        'Enzyme': 2.24,
+        'Lime': 1.29 * 56.0774/74.093, # CaO to Ca(OH)2
+        'NaOH': 2.11,
+        'H2SO4': 44.47/1e3,
+        'Ethanol': 1.44
+        }
 
-GWP_CF_array = chems.kwarray(GWP_CFs)
-# In kg CO2-eq/kg of material
-GWP_CF_stream = tmo.Stream('GWP_CF_stream', GWP_CF_array, units='kg/hr')
+    GWP_CF_array = chemicals.kwarray(GWP_CFs)
+    # In kg CO2-eq/kg of material
+    GWP_CF_stream = bst.Stream('GWP_CF_stream', GWP_CF_array, units='kg/hr')
 
-GWP_CFs['CaCO3'] = 10.30/1e3
-GWP_CFs['Gypsum'] = -4.20/1e3
-# In kg CO2-eq/kWh
-GWP_CFs['Electricity'] = 0.48
-# Lactic acid from corn stover
-GWP_CFs['Lactic acid_GREET'] = 1.80
-# From ref [5], lactic acid production, RoW, TRACI global warming,
-# substitution, consequential, long-term
-GWP_CFs['Lactic acid_fossil'] = 5.2796
+    GWP_CFs['CaCO3'] = 10.30/1e3
+    GWP_CFs['Gypsum'] = -4.20/1e3
+    # In kg CO2-eq/kWh
+    GWP_CFs['Electricity'] = 0.48
+    # Lactic acid from corn stover
+    GWP_CFs['Lactic acid_GREET'] = 1.80
+    # From ref [5], lactic acid production, RoW, TRACI global warming,
+    # substitution, consequential, long-term
+    GWP_CFs['Lactic acid_fossil'] = 5.2796
 
-CFs['GWP_CFs'] = GWP_CFs
-CFs['GWP_CF_stream'] = GWP_CF_stream
+    CFs['GWP_CFs'] = GWP_CFs
+    CFs['GWP_CF_stream'] = GWP_CF_stream
 
-# =============================================================================
-# Fossil energy consumption (FEC), in MJ/kg of material
-# =============================================================================
 
-FEC_CFs = {
-    'NH4OH': 42 * chems.NH3.MW/chems.NH4OH.MW,
-    'CSL': 12,
-    'CH4': 50, # NA NG from shale and conventional recovery
-    'Enzyme': 26,
-    'Lime': 4.896 * 56.0774/74.093, # CaO to Ca(OH)2
-    'NaOH': 29,
-    'H2SO4': 568.98/1e3,
-    'Ethanol': 16
-    }
+    ##### Fossil energy consumption (FEC), in MJ/kg of material #####
+    FEC_CFs = {
+        'NH4OH': 42 * 0.4860, # chemicals.NH3.MW/chemicals.NH4OH.MW,
+        'CSL': 12,
+        'CH4': 50, # NA NG from shale and conventional recovery
+        'Enzyme': 26,
+        'Lime': 4.896 * 56.0774/74.093, # CaO to Ca(OH)2
+        'NaOH': 29,
+        'H2SO4': 568.98/1e3,
+        'Ethanol': 16
+        }
 
-FEC_CF_array = chems.kwarray(FEC_CFs)
-# In MJ/kg of material
-FEC_CF_stream = tmo.Stream('FEC_CF_stream', FEC_CF_array, units='kg/hr')
+    FEC_CF_array = chemicals.kwarray(FEC_CFs)
+    # In MJ/kg of material
+    FEC_CF_stream = bst.Stream('FEC_CF_stream', FEC_CF_array, units='kg/hr')
 
-FEC_CFs['CaCO3'] = 133.19/1e3
-FEC_CFs['Gypsum'] = -44.19/1e3
-# In MJ/kWh
-FEC_CFs['Electricity'] = 5.926
-# From corn stover
-FEC_CFs['Lactic acid'] = 29
-# From ref [5], lactic acid production, RoW, cumulative energy demand, fossil,
-# substitution, consequential, long-term
-FEC_CFs['Lactic acid_fossil'] = 91.265
+    FEC_CFs['CaCO3'] = 133.19/1e3
+    FEC_CFs['Gypsum'] = -44.19/1e3
+    # In MJ/kWh
+    FEC_CFs['Electricity'] = 5.926
+    # From corn stover
+    FEC_CFs['Lactic acid'] = 29
+    # From ref [5], lactic acid production, RoW, cumulative energy demand, fossil,
+    # substitution, consequential, long-term
+    FEC_CFs['Lactic acid_fossil'] = 91.265
 
-CFs['FEC_CFs'] = FEC_CFs
-CFs['FEC_CF_stream'] = FEC_CF_stream
+    CFs['FEC_CFs'] = FEC_CFs
+    CFs['FEC_CF_stream'] = FEC_CF_stream
+
+    return CFs

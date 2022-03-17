@@ -27,7 +27,7 @@ from biorefineries.lactic.utils import _feedstock_factor
 # %%
 
 # =============================================================================
-# Model to evalute system across feedstock carbohydate content at different
+# Model to evaluate system across feedstock carbohydrate content at different
 # feedstock price metrics
 # =============================================================================
 
