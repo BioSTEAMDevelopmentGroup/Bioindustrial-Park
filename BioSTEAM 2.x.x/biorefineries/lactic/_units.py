@@ -773,9 +773,11 @@ class CoFermentation(Reactor):
         self.feed_freq = feed_freq
         self.allow_dilution = allow_dilution
         self.allow_concentration = allow_concentration
-        self.sugars = sugars or 'sugars'
+        self.sugars = sugars or tuple(i.ID for i in self.chemicals.sugars)
         self._mixed_feed = Stream(f'{self.ID}_mixed_feed')
         self._tot_feed = Stream(f'{self.ID}_tot_feed')
+        self._mixture = Stream(f'{self.ID}_mixture')
+        self._single_rx_effluent = Stream(f'{self.ID}_single_rx_effluent')
         self.heat_exchanger = HXutility(None, None, None, T=T)
 
         # FermMicrobe reaction from ref [1]
@@ -873,9 +875,9 @@ class CoFermentation(Reactor):
         mode = self.mode
         Design = self.design_results
         Design.clear()
-        _mixture = self._mixture = Stream()
+        _mixture = self._mixture
         _mixture.mix_from((*self.ins[0:3], *self.ins[4:]))
-        duty = Design['Duty'] = self.mixed_feed.H - _mixture.H
+        duty = Design['Duty'] = self._mixed_feed.H - _mixture.H
 
         if mode == 'batch':
             tau_tot = self.tau_batch_turnaround + self.tau_cofermentation
@@ -910,7 +912,8 @@ class CoFermentation(Reactor):
             Reactor._cost(self)
 
             N_working = Design['Number of reactors'] - 1 # subtract the one back-up
-            single_rx_effluent = self._mixture.copy()
+            single_rx_effluent = self._single_rx_effluent
+            single_rx_effluent.copy_like(self._mixture)
             single_rx_effluent.mol[:] /= N_working
             hx.simulate_as_auxiliary_exchanger(duty=Design['Duty']/N_working,
                                                stream=single_rx_effluent)
@@ -1527,7 +1530,7 @@ class AnaerobicDigestion(Unit):
         self.reactants = reactants if isinstance(reactants[0], str) else [i.ID for i in reactants]
         self.COD_chemicals = COD_chemicals
         self.split = split
-        self._multi_stream = tmo.MultiStream(None)
+        self._multi_stream = tmo.MultiStream()
         self.T = T
         self.heat_exchanger = hx = HXutility(None, None, None, T=T)
         self.heat_utilities = hx.heat_utilities
@@ -1718,8 +1721,8 @@ class BeltThickener(Unit):
     def __init__(self, ID='', ins=None, outs=(),
                  solubles=None, insolubles=None, *, COD_chemicals):
         Unit.__init__(self, ID, ins, outs)
-        self.solubles = solubles or 'solubles'
-        self.insolubles = insolubles or 'insolubles'
+        self.solubles = solubles or tuple(i.ID for i in self.chemicals.solubles)
+        self.insolubles = insolubles or tuple(i.ID for i in self.chemicals.insolubles)
         self.COD_chemicals = COD_chemicals
 
     def _run(self):
@@ -1766,11 +1769,11 @@ class SludgeCentrifuge(Unit):
         # Centrifuge captures 95% of the solids at 20% solids
         solids.imass[insolubles] = 0.95 * influent.imass[insolubles]
         solids.imass['Water'] = 0.8/0.2 * (influent.imass[insolubles].sum())
-        if solids.imass['Water'] < influent.imass['Water']:
+        if solids.imass['Water'] < influent.imass['Water']: # have enough water
+            # Assume solubles have the same split as water
             ratio = solids.imass['Water'] / influent.imass['Water']
             solids.imass[solubles] = ratio * influent.imass[solubles]
             solids.T = influent.T
-
             centrate.mol = influent.mol - solids.mol
             centrate.T = influent.T
         else:

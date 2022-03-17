@@ -19,7 +19,7 @@
 import numpy as np, biosteam as bst
 from biosteam.evaluation import Model, Metric
 from chaospy import distributions as shape
-from . import get_CFs, create_system, simulate_and_print, set_yield, feedstock_factor
+from . import get_CFs, create_system, set_yield, feedstock_factor
 
 __all__ = ('create_model',)
 
@@ -38,7 +38,6 @@ def create_model(kind='SSCF'):
     u = flowsheet.unit
     sys = flowsheet.system
 
-    simulate_and_print(kind)
     # =============================================================================
     # Overall biorefinery metrics
     # =============================================================================

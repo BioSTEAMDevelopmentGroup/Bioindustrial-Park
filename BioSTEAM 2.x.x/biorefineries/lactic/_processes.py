@@ -405,9 +405,7 @@ def create_SHF_conversion_process(flowsheet, groups, feed,
 
     def adjust_ferm_loop():
         water_R301.empty()
-        #!!! This can be updated using newer biosteam
-        # S302.split = 1
-        S302.split = S302.thermo.chemicals.isplit(1-1e-6)
+        S302.split = 1
         E301.V = 0
         set_yield(R301.target_yield, R301, R302)
         ferm_loop._run()
@@ -460,6 +458,8 @@ def create_separation_process(flowsheet, groups, feed, insolubles='insolubles',
                               cell_mass_split=cell_mass_split,
                               gypsum_split=gypsum_split, kind='SSCF'):
     bst.main_flowsheet.set_flowsheet(flowsheet)
+    chemicals = bst.settings.get_chemicals()
+    insolubles = tuple(i.ID for i in chemicals.insolubles)
 
     ######################## Streams ########################
     # flow updated in AcidulationReactor
@@ -480,7 +480,7 @@ def create_separation_process(flowsheet, groups, feed, insolubles='insolubles',
         S401 = bst.units.SolidsCentrifuge('S401', ins=feed,
                                           outs=('S401_cell_mass', ''),
                                           split=cell_mass_split,
-                                          solids='insolubles')
+                                          solids=insolubles)
     # Ca(LA)2 + H2SO4 --> CaSO4 + 2 LA
     R401 = units.AcidulationReactor('R401', ins=(S401-1, sulfuric_acid_R401),
                                     P=101325, tau=1, V_wf=0.8, length_to_diameter=2,

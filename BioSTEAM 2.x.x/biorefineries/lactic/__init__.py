@@ -58,20 +58,77 @@ from . import (
 
 
 _system_loaded = False
-def load(kind='SSCF'):
+def load(kind='SSCF', print_results=True):
     _load_system(kind)
     dct = globals()
     dct.update(flowsheet.to_dict())
+    if print_results: simulate_and_print()
 
 def _load_system(kind='SSCF'):
     if not kind in ('SSCF', 'SHF'):
         raise ValueError(f'kind can only be "SSCF" or "SHF", not "{kind}".')
-    global flowsheet, groups, teas, funcs, lactic_sys, lactic_tea
-    load_process_settings(chemicals)
+    global flowsheet, groups, teas, funcs, lactic_sys, lactic_tea, \
+        simulate_and_print, simulate_fermentation_improvement, \
+        simulate_separation_improvement, simulate_operating_improvement
+    load_process_settings()
     flowsheet, groups, teas, funcs = create_system(kind, return_all=True)
     lactic_sys = flowsheet.system.lactic_sys
     lactic_tea = teas['lactic_tea']
     return
+
+# %%
+
+# =============================================================================
+# Useful functions for summarizing results and considering alternative process
+# decision variables
+# =============================================================================
+
+def simulate_and_print(flowsheet=None):
+    MPSP = funcs['simulate_get_MPSP']()
+    GWP = funcs['get_GWP']()
+    FEC = funcs['get_FEC']()
+    print('\n---------- Simulation Results ----------')
+    print(f'MPSP is ${MPSP:.3f}/kg')
+    print(f'GWP is {GWP:.3f} kg CO2-eq/kg lactic acid')
+    print(f'FEC is {FEC:.2f} MJ/kg lactic acid')
+    print('------------------------------------------\n')
+
+def simulate_fermentation_improvement(flowsheet=None):
+    u = flowsheet.unit
+    flowsheet.system.lactic_sys.simulate()
+    R301_X = u.R301.cofermentation_rxns.X
+    R302_X = u.R302.cofermentation_rxns.X
+    u.R301.target_yield = 0.95
+    R301_X[0] = R301_X[3] = 0.95
+    R301_X[1] = R301_X[4] = 0
+    R302_X[1] = R302_X[4] = 0
+    simulate_and_print(flowsheet)
+
+def simulate_separation_improvement(flowsheet=None):
+    u = flowsheet.unit
+    flowsheet.system.lactic_sys.simulate()
+    u.R402.X_factor = 0.9/u.R402.esterification_rxns.X[0]
+    u.R403.hydrolysis_rxns.X[:] = 0.9
+    simulate_and_print(flowsheet)
+
+def simulate_operating_improvement(flowsheet=None):
+    s = flowsheet.stream
+    u = flowsheet.unit
+    flowsheet.system.lactic_sys.simulate()
+    u.U101.diversion_to_CHP = 0.25
+    MPSP = funcs['simulate_get_MPSP']()
+    print('\n---------- Simulation Results ----------')
+    print(f'MPSP is ${MPSP:.3f}/kg')
+    s.LCA_stream.imass['CH4'] *= 0.75
+    s.natural_gas.imass['CH4'] *= 0.75
+    GWP = funcs['get_GWP']()
+    FEC = funcs['get_FEC']()
+    print(f'GWP is {GWP:.3f} kg CO2-eq/kg lactic acid')
+    print(f'FEC is {FEC:.2f} MJ/kg lactic acid')
+    print('------------------------------------------\n')
+
+
+# %%
 
 from .. import PY37
 if PY37:
@@ -89,8 +146,9 @@ del PY37
 
 __all__ = (
     'auom', 'CEPCI',
-    'flowsheet', 'groups', 'teas', 'funcs',
-    'lactic_sys', 'lactic_tea',
+    'flowsheet', 'groups', 'teas', 'funcs', 'lactic_sys', 'lactic_tea',
+    'simulate_and_print', 'simulate_separation_improvement',
+    'simulate_separation_improvement', 'simulate_operating_improvement',
     *_chemicals.__all__,
     *_process_settings.__all__,
     *systems.__all__,

@@ -12,7 +12,7 @@
 
 # %%
 
-from biosteam import Flowsheet, main_flowsheet
+from biosteam import Flowsheet#, main_flowsheet
 from . import (
     chemicals,
     create_preprocessing_process,
@@ -25,11 +25,7 @@ from . import (
     create_lactic_sys
     )
 
-__all__ = (
-    'create_system',
-    'simulate_and_print', 'simulate_separation_improvement',
-    'simulate_separation_improvement', 'simulate_operating_improvement'
-    )
+__all__ = ('create_system',)
 
 
 # %%
@@ -126,57 +122,6 @@ def create_SHF_sys(chems):
     flowsheet, teas, funcs = create_lactic_sys(flowsheet, groups, get_flow_tpd)
 
     return flowsheet, groups, teas, funcs
-
-
-
-# %%
-
-# =============================================================================
-# Useful functions for summarizing results and considering alternative process
-# decision variables
-# =============================================================================
-
-def simulate_and_print(flowsheet=None):
-    flowsheet = flowsheet or main_flowsheet
-    print('\n---------- Simulation Results ----------')
-    print(f'MPSP is ${funcs["simulate_get_MPSP"]():.3f}/kg')
-    print(f'GWP is {funcs["get_GWP"]():.3f} kg CO2-eq/kg lactic acid')
-    print(f'FEC is {funcs["get_FEC"]():.2f} MJ/kg lactic acid')
-    print('------------------------------------------\n')
-
-def simulate_fermentation_improvement(flowsheet=None):
-    flowsheet = flowsheet or main_flowsheet
-    u = flowsheet.unit
-    flowsheet.system.lactic_sys.simulate()
-    R301_X = u.R301.cofermentation_rxns.X
-    R302_X = u.R302.cofermentation_rxns.X
-    u.R301.target_yield = 0.95
-    R301_X[0] = R301_X[3] = 0.95
-    R301_X[1] = R301_X[4] = 0
-    R302_X[1] = R302_X[4] = 0
-    simulate_and_print(flowsheet)
-
-def simulate_separation_improvement(flowsheet=None):
-    flowsheet = flowsheet or main_flowsheet
-    u = flowsheet.unit
-    flowsheet.system.lactic_sys.simulate()
-    u.R402.X_factor = 0.9/u.R402.esterification_rxns.X[0]
-    u.R403.hydrolysis_rxns.X[:] = 0.9
-    simulate_and_print(flowsheet)
-
-def simulate_operating_improvement(flowsheet=None):
-    flowsheet = flowsheet or main_flowsheet
-    s = flowsheet.stream
-    u = flowsheet.unit
-    flowsheet.system.lactic_sys.simulate()
-    u.U101.diversion_to_CHP = 0.25
-    print('\n---------- Simulation Results ----------')
-    print(f'MPSP is ${funcs["simulate_get_MPSP"]():.3f}/kg')
-    s.LCA_stream.imass['CH4'] *= 0.75
-    s.natural_gas.imass['CH4'] *= 0.75
-    print(f'GWP is {funcs["get_GWP"]():.3f} kg CO2-eq/kg lactic acid')
-    print(f'FEC is {funcs["get_FEC"]():.2f} MJ/kg lactic acid')
-    print('------------------------------------------\n')
 
 
 if __name__ == '__main__':
