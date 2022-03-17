@@ -26,7 +26,7 @@ price = {'Ethanol': ethanol_cost/ethanol_density_kggal,
          'DAP': 895.32 * factor,
          'Sorbitol': 1021.93 * factor,
          'Glucose': 526.52 * factor,
-         'Caustic': 135.65 * factor,
+         'Caustic': 135.65 * factor * 0.5, # see here: https://github.com/BioSTEAMDevelopmentGroup/Bioindustrial-Park/issues/31
          'Boiler chems': 4532.17 * factor,
          'FGD lime': 180.87 * factor,
          'Cooling tower chems': 2716.1 * factor,
