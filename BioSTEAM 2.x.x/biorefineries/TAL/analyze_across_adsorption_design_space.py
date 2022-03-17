@@ -129,7 +129,7 @@ plt.plot(titers, MPSPs_titer)
 #%%
 AC401.target_recovery=None
 mean_velocities = np.linspace(4., 15., 10)
-cycle_times = np.linspace(2/6, 2, 10)
+cycle_times = np.linspace(0.5, 4., 10)
 MPSPs = []
 column_costs = []
 for m in mean_velocities:
