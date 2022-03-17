@@ -11,22 +11,25 @@
 # for license details.
 
 import biosteam as bst
-from biosteam.process_tools import UnitGroup
-from biorefineries.lactic import chems as la_chems, update_settings as load_process_settings
-from biorefineries.lactic._processes import (
-    create_preprocessing_process,
-    create_pretreatment_process,
-    create_SSCF_conversion_process,
-    create_separation_process,
-    create_facilities,
-    create_lactic_sys,
+from biorefineries.lactic import (
+    create_chemicals,
     )
-from biorefineries.lactic._settings import price
-from biorefineries.lactic.utils import cell_mass_split, gypsum_split
-from biorefineries.wwt import (
-    add_wwt_chemicals, create_wastewater_system,
-    default_insolubles, get_insoluble_IDs,
-    )
+# from biosteam.process_tools import UnitGroup
+# from biorefineries.lactic import chems as la_chems, update_settings as load_process_settings
+# from biorefineries.lactic._processes import (
+#     create_preprocessing_process,
+#     create_pretreatment_process,
+#     create_SSCF_conversion_process,
+#     create_separation_process,
+#     create_facilities,
+#     create_lactic_sys,
+#     )
+# from biorefineries.lactic._settings import price
+# from biorefineries.lactic.utils import cell_mass_split, gypsum_split
+# from biorefineries.wwt import (
+#     add_wwt_chemicals, create_wastewater_system,
+#     default_insolubles, get_insoluble_IDs,
+#     )
 
 
 # %%

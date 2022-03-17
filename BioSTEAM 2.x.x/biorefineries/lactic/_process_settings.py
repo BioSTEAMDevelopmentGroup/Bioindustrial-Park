@@ -197,8 +197,9 @@ price['Electricity'] = price['Power']
 # (~50% of the total impact per ref [4]) of feedstock is included in ref [3]
 # =============================================================================
 
-def get_CFs(chemicals=None):
-    chemicals = chemicals or bst.settings.get_chemicals()
+def get_CFs(flowsheet=None):
+    flowsheet = flowsheet or bst.main_flowsheet
+    chemicals = bst.settings.get_chemicals()
     CFs = {}
 
     ##### 100-year global warming potential (GWP) in kg CO2-eq/kg #####
@@ -215,7 +216,8 @@ def get_CFs(chemicals=None):
 
     GWP_CF_array = chemicals.kwarray(GWP_CFs)
     # In kg CO2-eq/kg of material
-    GWP_CF_stream = bst.Stream('GWP_CF_stream', GWP_CF_array, units='kg/hr')
+    GWP_CF_stream = flowsheet.stream.search('GWP_CF_stream') or \
+        bst.Stream('GWP_CF_stream', GWP_CF_array, units='kg/hr')
 
     GWP_CFs['CaCO3'] = 10.30/1e3
     GWP_CFs['Gypsum'] = -4.20/1e3
@@ -245,7 +247,8 @@ def get_CFs(chemicals=None):
 
     FEC_CF_array = chemicals.kwarray(FEC_CFs)
     # In MJ/kg of material
-    FEC_CF_stream = bst.Stream('FEC_CF_stream', FEC_CF_array, units='kg/hr')
+    FEC_CF_stream = flowsheet.stream.search('FEC_CF_stream') or \
+        bst.Stream('FEC_CF_stream', FEC_CF_array, units='kg/hr')
 
     FEC_CFs['CaCO3'] = 133.19/1e3
     FEC_CFs['Gypsum'] = -44.19/1e3

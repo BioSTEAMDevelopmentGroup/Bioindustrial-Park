@@ -23,7 +23,7 @@ co-fermentation (SHF). You can choose which system to load.
     >>> # Loading the biorefinery is easy and you can have a quick glance of the results
     >>> # Note that the first simulation will take a longer time
     >>> from biorefineries import lactic as la
-    >>> la.load(kind='SSCF', print_results=True) # can be "SSCF" or "SHF"
+    >>> la.load(kind='SSCF', print_results=True) # `kind` can be "SSCF" or "SHF"
 
     ---------- Simulation Results ----------
     MPSP is $1.424/kg

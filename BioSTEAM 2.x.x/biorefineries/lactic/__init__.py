@@ -39,8 +39,8 @@ global chemicals
 chemicals = create_chemicals()
 from .utils import *
 from ._process_settings import *
-from ._tea import *
 from ._processes import *
+from ._tea import *
 from .systems import *
 from .models import *
 
@@ -50,8 +50,8 @@ from . import (
     _process_settings,
     _units,
     _facilities,
-    _tea,
     _processes,
+    _tea,
     systems,
     models,
     )
@@ -59,21 +59,26 @@ from . import (
 
 _system_loaded = False
 def load(kind='SSCF', print_results=True):
+    kind = kind.upper()
+    if not kind in ('SSCF', 'SHF'):
+        raise ValueError(f'kind can only be "SSCF" or "SHF", not "{kind}".')
     _load_system(kind)
     dct = globals()
     dct.update(flowsheet.to_dict())
-    if print_results: simulate_and_print()
+    if print_results: simulate_and_print(flowsheet=flowsheet)
 
 def _load_system(kind='SSCF'):
-    if not kind in ('SSCF', 'SHF'):
-        raise ValueError(f'kind can only be "SSCF" or "SHF", not "{kind}".')
     global flowsheet, groups, teas, funcs, lactic_sys, lactic_tea, \
         simulate_and_print, simulate_fermentation_improvement, \
         simulate_separation_improvement, simulate_operating_improvement
+    bst.main_flowsheet.clear()
+    flowsheet = bst.Flowsheet('lactic')
+    bst.main_flowsheet.set_flowsheet(flowsheet)
     load_process_settings()
-    flowsheet, groups, teas, funcs = create_system(kind, return_all=True)
-    lactic_sys = flowsheet.system.lactic_sys
+    lactic_sys = create_system(kind, return_groups=True, flowsheet=flowsheet)
+    teas = create_tea(return_all=True, flowsheet=flowsheet)
     lactic_tea = teas['lactic_tea']
+    funcs = create_funcs(teas=teas, flowsheet=flowsheet)
     return
 
 # %%
@@ -83,7 +88,8 @@ def _load_system(kind='SSCF'):
 # decision variables
 # =============================================================================
 
-def simulate_and_print(flowsheet=None):
+def simulate_and_print(funcs=None, flowsheet=None):
+    funcs = funcs or create_funcs(flowsheet=flowsheet)
     MPSP = funcs['simulate_get_MPSP']()
     GWP = funcs['get_GWP']()
     FEC = funcs['get_FEC']()
@@ -93,7 +99,9 @@ def simulate_and_print(flowsheet=None):
     print(f'FEC is {FEC:.2f} MJ/kg lactic acid')
     print('------------------------------------------\n')
 
-def simulate_fermentation_improvement(flowsheet=None):
+def simulate_fermentation_improvement(funcs=None, flowsheet=None):
+    flowsheet = flowsheet or bst.main_flowsheet
+    funcs = funcs or create_funcs(flowsheet=flowsheet)
     u = flowsheet.unit
     flowsheet.system.lactic_sys.simulate()
     R301_X = u.R301.cofermentation_rxns.X
@@ -104,14 +112,18 @@ def simulate_fermentation_improvement(flowsheet=None):
     R302_X[1] = R302_X[4] = 0
     simulate_and_print(flowsheet)
 
-def simulate_separation_improvement(flowsheet=None):
+def simulate_separation_improvement(funcs=None, flowsheet=None):
+    flowsheet = flowsheet or bst.main_flowsheet
+    funcs = funcs or create_funcs(flowsheet=flowsheet)
     u = flowsheet.unit
     flowsheet.system.lactic_sys.simulate()
     u.R402.X_factor = 0.9/u.R402.esterification_rxns.X[0]
     u.R403.hydrolysis_rxns.X[:] = 0.9
     simulate_and_print(flowsheet)
 
-def simulate_operating_improvement(flowsheet=None):
+def simulate_operating_improvement(funcs=None, flowsheet=None):
+    flowsheet = flowsheet or bst.main_flowsheet
+    funcs = funcs or create_funcs(flowsheet=flowsheet)
     s = flowsheet.stream
     u = flowsheet.unit
     flowsheet.system.lactic_sys.simulate()
@@ -126,6 +138,75 @@ def simulate_operating_improvement(flowsheet=None):
     print(f'GWP is {GWP:.3f} kg CO2-eq/kg lactic acid')
     print(f'FEC is {FEC:.2f} MJ/kg lactic acid')
     print('------------------------------------------\n')
+
+
+def create_funcs(teas=None, flowsheet=None):
+    flowsheet = flowsheet or bst.main_flowsheet
+    teas = teas or create_tea(flowsheet=flowsheet, return_all=True)
+    s = flowsheet.stream
+    lactic_sys = flowsheet.system.lactic_sys
+    lactic_tea = teas['lactic_tea']
+
+    # Simulate system and get results
+    def simulate_get_MPSP():
+        s.lactic_acid.price = 0
+        lactic_sys.simulate()
+        for i in range(3):
+            MPSP = s.lactic_acid.price = lactic_tea.solve_price(s.lactic_acid)
+        return MPSP
+    funcs = {'simulate_get_MPSP': simulate_get_MPSP}
+
+    ######################## LCA ########################
+    CFs = get_CFs(flowsheet=flowsheet)
+    # 100-year global warming potential (GWP) from material flows
+    LCA_streams = teas['TEA_feeds'].copy()
+    LCA_stream = s.search('LCA_stream') or bst.Stream('LCA_stream', units='kg/hr')
+
+    def get_material_GWP():
+        LCA_stream.mass = sum(i.mass for i in LCA_streams)
+        chemical_GWP = LCA_stream.mass*CFs['GWP_CF_stream'].mass
+        # feedstock_GWP = s.feedstock.F_mass*CFs['GWP_CFs']['Corn stover']
+        return chemical_GWP.sum()/s.lactic_acid.F_mass
+    funcs['get_material_GWP'] = get_material_GWP
+
+    # GWP from onsite emission (e.g., combustion) of non-biogenic carbons
+    get_onsite_GWP = lambda: (s.natural_gas.get_atomic_flow('C')+s.ethanol.get_atomic_flow('C')) \
+        * 44.0095 / s.lactic_acid.F_mass # 44.0095 is chems.CO2.MW
+    funcs['get_onsite_GWP'] = get_onsite_GWP
+
+    # GWP from electricity
+    get_electricity_use = lambda: sum(i.power_utility.rate for i in lactic_sys.units)
+    funcs['get_electricity_use'] = get_electricity_use
+    get_electricity_GWP = lambda: get_electricity_use()*CFs['GWP_CFs']['Electricity'] \
+        / s.lactic_acid.F_mass
+    funcs['get_electricity_GWP'] = get_electricity_GWP
+
+    # CO2 fixed in lactic acid product
+    get_fixed_GWP = lambda: \
+        s.lactic_acid.get_atomic_flow('C')*44.0095/s.lactic_acid.F_mass
+    funcs['get_fixed_GWP'] = get_fixed_GWP
+
+    get_GWP = lambda: get_material_GWP()+get_onsite_GWP()+get_electricity_GWP()
+    funcs['get_GWP'] = get_GWP
+
+    # Fossil energy consumption (FEC) from materials
+    def get_material_FEC():
+        LCA_stream.mass = sum(i.mass for i in LCA_streams)
+        chemical_FEC = LCA_stream.mass*CFs['FEC_CF_stream'].mass
+        # feedstock_FEC = feedstock.F_mass*CFs['FEC_CFs']['Corn stover']
+        return chemical_FEC.sum()/s.lactic_acid.F_mass
+    funcs['get_material_FEC'] = get_material_FEC
+
+    # FEC from electricity
+    get_electricity_FEC = lambda: \
+        get_electricity_use()*CFs['FEC_CFs']['Electricity']/s.lactic_acid.F_mass
+    funcs['get_electricity_FEC'] = get_electricity_FEC
+
+    # Total FEC
+    get_FEC = lambda: get_material_FEC()+get_electricity_FEC()
+    funcs['get_FEC'] = get_FEC
+
+    return funcs
 
 
 # %%
@@ -151,6 +232,7 @@ __all__ = (
     'simulate_separation_improvement', 'simulate_operating_improvement',
     *_chemicals.__all__,
     *_process_settings.__all__,
+    *_tea.__all__,
     *systems.__all__,
     *models.__all__,
     )
