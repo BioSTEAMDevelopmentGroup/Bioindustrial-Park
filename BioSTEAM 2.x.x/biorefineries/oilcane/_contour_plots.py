@@ -134,7 +134,7 @@ def plot_ethanol_and_biodiesel_price_contours_manuscript():
     set_font(size=8)
     set_figure_size(aspect_ratio=0.7)
     fig, axes = plot_ethanol_and_biodiesel_price_contours(
-        titles=['CONVENTIONAL', 'CELLULOSIC'],
+        titles=['Conventional', 'Cellulosic'],
     )
     colors = np.zeros([3, 2], object)
     colors[:] = [[letter_color, letter_color],
@@ -151,7 +151,7 @@ def plot_enhanced_ethanol_and_biodiesel_price_contours_manuscript():
     set_figure_size(aspect_ratio=0.7)
     fig, axes = plot_ethanol_and_biodiesel_price_contours(
         enhanced_cellulosic_performance=True,
-        titles=['CONVENTIONAL', 'CELLULOSIC'],
+        titles=['Conventional', 'Cellulosic'],
     )
     colors = np.zeros([3, 2], object)
     colors[:] = [[letter_color, letter_color],
@@ -168,7 +168,7 @@ def plot_benefit_ethanol_and_biodiesel_price_contours_manuscript():
     set_figure_size(aspect_ratio=0.7)
     fig, axes = plot_ethanol_and_biodiesel_price_contours(
         benefit=True,
-        titles=['CONVENTIONAL', 'CELLULOSIC'],
+        titles=['Conventional', 'Cellulosic'],
         dist=True,
     )
     colors = np.zeros([3, 2], object)
@@ -185,7 +185,7 @@ def plot_benefit_ethanol_and_biodiesel_price_contours_manuscript():
 
 def plot_ethanol_and_biodiesel_price_contours(N=30, benefit=False, cache={}, 
                                               enhanced_cellulosic_performance=False,
-                                              titles=None, load=True, save=True,
+                                              titles=None, load=False, save=True,
                                               dist=False):
     ethanol_price = np.linspace(1., 3., N)
     biodiesel_price = np.linspace(2, 6, N)
@@ -205,23 +205,22 @@ def plot_ethanol_and_biodiesel_price_contours(N=30, benefit=False, cache={},
         try: Z = np.load(file)
         except: load = True
         else: load = False
-    if load:
-        if (N, benefit, enhanced_cellulosic_performance) in cache:
-            Z = cache[N, benefit, enhanced_cellulosic_performance]
-        else:
-            Z = np.zeros([N, N, N_rows, N_cols])
-            for i in range(N_rows):
-                for j in range(N_cols):
-                    oc.load(configuration[j], enhanced_cellulosic_performance=enhanced_cellulosic_performance)
-                    oc.set_cane_oil_content(oil_content[i])
-                    oc.set_relative_sorghum_oil_content(0)
-                    oc.sys.simulate()
-                    if benefit:
-                        Z[:, :, i, j] = oc.evaluate_MFPP_benefit_across_ethanol_and_biodiesel_prices(X, Y)
-                    else:
-                        Z[:, :, i, j] = oc.evaluate_MFPP_across_ethanol_and_biodiesel_prices(X, Y)
-        if save:
-            np.save(file, Z)
+    if load and (N, benefit, enhanced_cellulosic_performance) in cache:
+        Z = cache[N, benefit, enhanced_cellulosic_performance]
+    else:
+        Z = np.zeros([N, N, N_rows, N_cols])
+        for i in range(N_rows):
+            for j in range(N_cols):
+                oc.load(configuration[j], enhanced_cellulosic_performance=enhanced_cellulosic_performance)
+                oc.set_cane_oil_content(oil_content[i])
+                oc.set_relative_sorghum_oil_content(0)
+                oc.sys.simulate()
+                if benefit:
+                    Z[:, :, i, j] = oc.evaluate_MFPP_benefit_across_ethanol_and_biodiesel_prices(X, Y)
+                else:
+                    Z[:, :, i, j] = oc.evaluate_MFPP_across_ethanol_and_biodiesel_prices(X, Y)
+    if save:
+        np.save(file, Z)
     xlabel = f"Ethanol price\n[{format_units('$/gal')}]"
     ylabels = [f"Biodiesel price\n[{format_units('$/gal')}]"] * 4
     xticks = [1., 1.5, 2.0, 2.5, 3.0]

@@ -2,7 +2,6 @@
 # -*- coding: utf-8 -*-
 """
 Created on Thu Dec 21 11:05:24 2017
-
 @author: Yoel
 """
 import numpy as np
@@ -723,5 +722,3 @@ def create_sugarcane_to_ethanol_system(ins, outs,
     #         ins=[vinasse],
     #         mockup=True,
     #     )
-        
-        
