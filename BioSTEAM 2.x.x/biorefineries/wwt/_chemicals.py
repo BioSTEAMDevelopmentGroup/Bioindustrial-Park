@@ -16,28 +16,29 @@ https://github.com/BioSTEAMDevelopmentGroup/Bioindustrial-Park/blob/master/BioST
 '''
 
 from thermosteam import Chemical, settings
-from biorefineries import lactic as la
 
 __all__ = (
     'default_insolubles', 'get_insoluble_IDs', 'get_soluble_IDs',
     'add_wwt_chemicals',
     )
 
-#!!! Need to update this with corn, oilcane biorefineries
-default_insolubles = (
+
+default_insolubles = {
     # Sugarcane
-    'Yeast', 'CaO', 'Solids', 'Flocculant',
+    'CaO', 'Flocculant', 'Solids', 'Yeast',
     # Corn
     'Fiber', 'InsolubleProtein',
     # Cornstover
-    'Lime', 'CaSO4', 'Ash', 'P4O10',
-    'Tar', 'Lignin', 'Cellulose', 'Hemicellulose',
-    'Protein', 'Enzyme', 'DenaturedEnzyme', 'Z_mobilis', 'T_reesei', 'WWTsludge',
+    'Ash', 'CaSO4', 'Cellulose', 'DenaturedEnzyme', 'Enzyme', 'Hemicellulose',
+    'Lignin', 'Lime', 'P4O10', 'Protein', 'Tar', 'T_reesei', 'WWTsludge', 'Z_mobilis',
     # Lactic acid
-    *la._chemicals.insolubles,
+     'Arabinan', 'Acetate', 'BaghouseBag', 'CalciumDihydroxide', 'CoolingTowerChems',
+     'FermMicrobe', 'Galactan', 'Glucan','Mannan', 'Polymer', 'Xylan',
     # Oilcane
-    'Biomass', 'Cellmass',
-    )
+    'Biomass', 'Cellmass', 'DryYeast',
+    # Others
+    'CellMass',
+    }
 
 def get_insoluble_IDs(chemicals, insolubles):
     chem_IDs = set([i.ID for i in chemicals])

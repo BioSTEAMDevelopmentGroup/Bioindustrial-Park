@@ -25,17 +25,11 @@ https://doi.org/10.1039/C5EE03715H.
 
 import math
 import biosteam as bst
-# from collections.abc import Iterable
 from biosteam.exceptions import DesignError
-from ._chemicals import default_insolubles
-from ._internal_circulation_rx import InternalCirculationRx
-from ._wwt_pump import WWTpump
-from .utils import (
-    compute_stream_COD,
-    format_str,
-    get_BD_dct,
-    get_split_dct,
-    cost_pump,
+from . import (
+    default_insolubles,
+    InternalCirculationRx, WWTpump,
+    compute_stream_COD, format_str, get_BD_dct, get_split_dct, cost_pump,
     )
 
 __all__ = ('AnMBR',)

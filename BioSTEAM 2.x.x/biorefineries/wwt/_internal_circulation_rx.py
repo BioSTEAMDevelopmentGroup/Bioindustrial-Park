@@ -21,7 +21,7 @@ import sympy as sp
 import biosteam as bst
 import thermosteam as tmo
 from biosteam.exceptions import DesignError
-from .utils import (
+from . import (
     get_BD_dct,
     compute_stream_COD,
     get_digestion_rxns,

@@ -44,7 +44,6 @@ cs_sys.simulate()
 
 cs_tea = create_tea(cs_sys, OSBL_units=[get(cs_u, ID) for ID in OSBL_IDs])
 cs_tea.IRR = cs_tea.solve_IRR()
-print(f'\nOriginal IRR: {cs_tea.IRR:.2%}\n')
 
 
 # %%
@@ -89,7 +88,10 @@ OSBL_IDs.remove('WWTC')
 OSBL_IDs.extend([u.ID for u in new_sys_wwt.units])
 new_tea = create_tea(new_sys, OSBL_units=[get(new_u, ID) for ID in OSBL_IDs])
 new_tea.IRR = new_tea.solve_IRR()
-print(f'\nNew IRR: {new_tea.IRR:.2%}\n')
 
-# ~235 mg/L COD, mostly (~200/>85%) due to soluble lignin, arabinose, and extract
-get_COD_breakdown(getattr(new_u, f'S{WWT_ID}04').ins[0])
+if __name__ == '__main__':
+    print('\n\ncornstover biorefinery:')
+    print(f'Original IRR: {cs_tea.IRR:.2%}')
+    print(f'New IRR: {new_tea.IRR:.2%}')
+    # ~235 mg/L COD, mostly (~200/>85%) due to soluble lignin, arabinose, and extract
+    get_COD_breakdown(getattr(new_u, f'S{WWT_ID}04').ins[0])

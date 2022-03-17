@@ -45,7 +45,6 @@ cn_sys.simulate()
 
 cn_tea = create_tea(cn_sys)
 cn_tea.IRR = cn_tea.solve_IRR()
-print(f'\nOriginal IRR: {cn_tea.IRR:.2%}\n')
 
 
 # %%
@@ -73,8 +72,11 @@ new_sys.simulate()
 
 new_tea = create_tea(new_sys)
 new_tea.IRR = new_tea.solve_IRR()
-print(f'\nNew IRR: {new_tea.IRR:.2%}\n')
 
-get_COD_breakdown(getattr(new_u, f'S{WWT_ID}04').ins[0])
-IRR_at_ww_price(ww, cn_tea, -0.003) # the default -0.03 will lead to negative IRR
-ww_price_at_IRR(ww, cn_tea, new_tea.IRR)
+if __name__ == '__main__':
+    print('\n\ncorn biorefinery:')
+    print(f'Original IRR: {cn_tea.IRR:.2%}')
+    print(f'New IRR: {new_tea.IRR:.2%}')
+    get_COD_breakdown(getattr(new_u, f'S{WWT_ID}04').ins[0])
+    IRR_at_ww_price(ww, cn_tea, -0.003) # the default -0.03 will lead to negative IRR
+    ww_price_at_IRR(ww, cn_tea, new_tea.IRR)

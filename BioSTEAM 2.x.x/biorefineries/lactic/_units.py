@@ -1524,7 +1524,7 @@ class AnaerobicDigestion(Unit):
     def __init__(self, ID='', ins=None, outs=(), *, reactants, COD_chemicals,
                  split=(), T=35+273.15):
         Unit.__init__(self, ID, ins, outs)
-        self.reactants = reactants
+        self.reactants = reactants if isinstance(reactants[0], str) else [i.ID for i in reactants]
         self.COD_chemicals = COD_chemicals
         self.split = split
         self._multi_stream = tmo.MultiStream(None)
@@ -1542,7 +1542,6 @@ class AnaerobicDigestion(Unit):
         f_sludge = 0.05 * 1/0.91/chems.WWTsludge.MW
 
         def anaerobic_rxn(reactant):
-            reactant = str(reactant) # in the case that reactant is the actual chemical
             MW = getattr(chems, reactant).MW
             return Rxn(f'{1/MW}{reactant} -> {f_CH4}CH4 + {f_CO2}CO2 + {f_sludge}WWTsludge',
                        reactant, 0.91)
@@ -1608,7 +1607,8 @@ class AerobicDigestion(Unit):
     def __init__(self, ID='', ins=None, outs=(), *, reactants, COD_chemicals,
                  caustic_mass=0, need_ammonia=False):
         Unit.__init__(self, ID, ins, outs)
-        self.reactants = reactants
+        # In the case that the actual chemicals are provided
+        self.reactants = reactants if isinstance(reactants[0], str) else [i.ID for i in reactants]
         self.COD_chemicals = COD_chemicals
         self.caustic_mass = caustic_mass
         self.need_ammonia = need_ammonia
@@ -1625,7 +1625,7 @@ class AerobicDigestion(Unit):
         combustion_rxns = chems.get_combustion_reactions()
         self.digestion_rxns = ParallelRxn([i*0.74 + 0.22*growth(i.reactant)
                                            for i in combustion_rxns
-                                           if (i.reactant in reactants)])
+                                           if (i.reactant in self.reactants)])
         self.digestion_rxns.X[:] = 0.96
 
         #                                 Reaction definition       Reactant Conversion

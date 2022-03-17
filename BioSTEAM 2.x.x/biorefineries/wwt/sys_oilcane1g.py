@@ -59,7 +59,6 @@ oc_sys.simulate()
 oc_tea = create_tea(oc_sys)
 oc_tea.operating_hours = operating_hours
 oc_tea.IRR = oc_tea.solve_IRR()
-print(f'\nOriginal IRR: {oc_tea.IRR:.2%}\n')
 
 
 # %%
@@ -93,8 +92,11 @@ new_sys.simulate()
 new_tea = create_tea(new_sys)
 new_tea.operating_hours = operating_hours
 new_tea.IRR = new_tea.solve_IRR()
-print(f'\nNew IRR: {new_tea.IRR:.2%}\n')
 
-get_COD_breakdown(getattr(new_u, f'S{WWT_ID}04').ins[0])
-IRR_at_ww_price(ww, oc_tea)
-ww_price_at_IRR(ww, oc_tea, new_tea.IRR)
+if __name__ == '__main__':
+    print('\n\n1G oilcane biorefinery:')
+    print(f'Original IRR: {oc_tea.IRR:.2%}')
+    print(f'New IRR: {new_tea.IRR:.2%}')
+    get_COD_breakdown(getattr(new_u, f'S{WWT_ID}04').ins[0])
+    IRR_at_ww_price(ww, oc_tea)
+    ww_price_at_IRR(ww, oc_tea, new_tea.IRR)

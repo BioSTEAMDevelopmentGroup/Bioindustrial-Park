@@ -7,13 +7,13 @@
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
 # for license details.
 
-import math
-import flexsolve as flx
-import biosteam as bst
+import math, flexsolve as flx, biosteam as bst
 from warnings import warn
 
 __all__ = ('SludgeHandling', 'BeltThickener', 'SludgeCentrifuge')
 
+
+# %%
 
 class SludgeHandling(bst.Unit):
     '''

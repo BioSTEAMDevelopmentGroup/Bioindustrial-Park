@@ -48,7 +48,6 @@ sc_sys.simulate()
 sc_tea = create_tea(sc_sys)
 sc_tea.operating_hours = operating_hours
 sc_tea.IRR = sc_tea.solve_IRR()
-print(f'\nOriginal IRR: {sc_tea.IRR:.2%}\n')
 
 
 # %%
@@ -92,7 +91,10 @@ new_sys.simulate()
 new_tea = create_tea(new_sys)
 new_tea.operating_hours = operating_hours
 new_tea.IRR = new_tea.solve_IRR()
-print(f'\nNew IRR: {new_tea.IRR:.2%}\n')
 
-# ~123 mg/L COD, mostly (~100/>80%) due to soluble lignin and arabinose
-get_COD_breakdown(getattr(new_u, f'S{WWT_ID}04').ins[0])
+if __name__ == '__main__':
+    print('\n\n2G sugarcane biorefinery:')
+    print(f'Original IRR: {sc_tea.IRR:.2%}')
+    print(f'New IRR: {new_tea.IRR:.2%}')
+    # ~123 mg/L COD, mostly (~100/>80%) due to soluble lignin and arabinose
+    get_COD_breakdown(getattr(new_u, f'S{WWT_ID}04').ins[0])

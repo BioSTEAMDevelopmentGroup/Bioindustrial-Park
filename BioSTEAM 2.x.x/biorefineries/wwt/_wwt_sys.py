@@ -33,15 +33,13 @@ TODO:
 
 # %%
 
-import thermosteam as tmo
-import biosteam as bst
+import thermosteam as tmo, biosteam as bst
 from biosteam.units.decorators import cost
-from ._chemicals import default_insolubles
-from ._internal_circulation_rx import InternalCirculationRx
-from ._polishing_filter import PolishingFilter
-from ._membrane_bioreactor import AnMBR
-from ._sludge_handling import BeltThickener, SludgeCentrifuge
-from .utils import get_combustion_energy, new_price
+from . import (
+    default_insolubles,
+    InternalCirculationRx, AnMBR, PolishingFilter, BeltThickener, SludgeCentrifuge,
+    get_combustion_energy, new_price,
+    )
 
 _mgd_to_cmh = 157.7255 # auom('gallon').conversion_factor('m3')*1e6/24
 _gpm_to_cmh = 0.2271 # auom('gallon').conversion_factor('m3')*60

@@ -11,14 +11,10 @@ import biosteam as bst
 from math import pi, ceil
 from warnings import warn
 from thermosteam.reaction import ParallelReaction as PRxn
-from ._chemicals import default_insolubles
-from ._internal_circulation_rx import InternalCirculationRx
-from ._wwt_pump import WWTpump
-from .utils import (
-    compute_stream_COD,
-    get_digestion_rxns,
-    get_split_dct,
-    cost_pump,
+from . import (
+    default_insolubles,
+    InternalCirculationRx, WWTpump,
+    compute_stream_COD, get_digestion_rxns, get_split_dct, cost_pump,
     )
 
 __all__ = ('PolishingFilter',)

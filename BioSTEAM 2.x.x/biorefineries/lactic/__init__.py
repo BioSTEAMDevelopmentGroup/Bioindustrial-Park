@@ -67,7 +67,7 @@ def _load_system(kind='SSCF'):
     if not kind in ('SSCF', 'SHF'):
         raise ValueError(f'kind can only be "SSCF" or "SHF", not "{kind}".')
     global flowsheet, groups, teas, funcs, lactic_sys, lactic_tea
-    load_process_settings(chems)
+    load_process_settings(chemicals)
     flowsheet, groups, teas, funcs = create_system(kind, return_all=True)
     lactic_sys = flowsheet.system.lactic_sys
     lactic_tea = teas['lactic_tea']

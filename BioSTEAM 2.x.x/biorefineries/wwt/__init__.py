@@ -24,7 +24,16 @@ wwt_path = os.path.dirname(__file__)
 results_path = os.path.join(wwt_path, 'results')
 del os
 
-# Importing order matters
+from ._chemicals import *
+from .utils import *
+from ._internal_circulation_rx import *
+from ._wwt_pump import *
+from ._polishing_filter import *
+from ._membrane_bioreactor import *
+from ._sludge_handling import *
+from ._wwt_sys import *
+from ._lca import *
+
 from . import (
     _chemicals,
     utils,
@@ -36,17 +45,6 @@ from . import (
     _wwt_sys,
     _lca,
     )
-
-# These orders don't matter
-from .utils import *
-from ._chemicals import *
-from ._internal_circulation_rx import *
-from ._wwt_pump import *
-from ._polishing_filter import *
-from ._membrane_bioreactor import *
-from ._sludge_handling import *
-from ._wwt_sys import *
-from ._lca import *
 
 
 __all__ = (

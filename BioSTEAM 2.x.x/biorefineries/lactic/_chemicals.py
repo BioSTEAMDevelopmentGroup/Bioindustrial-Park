@@ -133,12 +133,6 @@ def create_chemicals(set_thermo=True):
     Glucose = add_chemical('Glucose')
     # This one is more consistent with others
     Glucose.Cn.l.move_up_model_priority('DADGOSTAR_SHAW', 0)
-
-    # #!!! Probably don't need this?
-    # try: Glucose.Cn.l.move_up_model_priority('DADGOSTAR_SHAW', 0)
-    # except: Glucose.Cn.move_up_model_priority('DADGOSTAR_SHAW', 0)
-
-
     GlucoseOligomer = add_chemical('GlucoseOligomer', search_db=False, phase='l',
                                    formula='C6H10O5', Hf=-233200*_cal2joule)
     GlucoseOligomer.copy_models_from(Glucose, ['Hvap', 'Psat', 'Cn', 'mu', 'kappa'])

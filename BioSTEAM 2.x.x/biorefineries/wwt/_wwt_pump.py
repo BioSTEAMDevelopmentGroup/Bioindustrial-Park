@@ -13,7 +13,7 @@ from biosteam.units.design_tools.mechanical import (
     brake_efficiency as brake_eff,
     motor_efficiency as motor_eff
     )
-from .utils import select_pipe, format_str
+from . import select_pipe, format_str
 
 __all__ = ('WWTpump',)
 
