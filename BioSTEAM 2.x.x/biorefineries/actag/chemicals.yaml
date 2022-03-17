@@ -165,6 +165,16 @@ Chemicals:
     rho: 1540
     Hf: -2012085.6
     default: True
+  Xylobiose:
+   search_db: False 
+   formula: C10H18O9
+   Tb: 1068.88
+   Tm: 632.07
+   Tc: 1330.57 
+   Pc: 4762809.70
+   Vc: 0.0006295
+   Hf: -1572730.
+   Hfus: 53426.
   # Inhibitors
   Furfural:
     search_ID: 98-01-1
