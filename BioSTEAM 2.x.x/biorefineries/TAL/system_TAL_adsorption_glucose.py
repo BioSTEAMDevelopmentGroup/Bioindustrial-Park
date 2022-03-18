@@ -175,6 +175,7 @@ def create_TAL_sys(ins, outs):
     feedstock.imass['H2O'] = 500.
     feedstock.price = price['Glucose']*feedstock.imass['Glucose']/feedstock.F_mass
     
+    feedstock.F_mass = 25802.9 # at the baseline, the amount of TAL produced would exactly satisfy the US demand for sorbic acid with a hypothetical 100% TAL->sorbic acid conversion.
     U101 = units.FeedstockPreprocessing('U101', ins=feedstock)
     
     # Handling costs/utilities included in feedstock cost thus not considered here
@@ -324,8 +325,7 @@ def create_TAL_sys(ins, outs):
     S402 = bst.FakeSplitter('S402', ins=M401-0, outs=('ethanol_to_AC401', 'ethanol_to_AC2'))
     def M401_spec():
         makeup_ethanol, recycled_ethanol = M401.ins
-        AC401.run()
-        # AC2.run()
+        # AC401.run()
         M401._run()
         M401_outs_0 = M401.outs[0]
         M401_outs_0.imol['Ethanol'] = S402.outs[0].imol['Ethanol'] + S402.outs[1].imol['Ethanol']
@@ -344,15 +344,14 @@ def create_TAL_sys(ins, outs):
         regeneration_velocity=14.4, # default value (updated in unit specification based on titer)
         
         cycle_time=2., # 1-2 hours required for thermal-swing-adsorption (TSA) for silica gels (add 1 hr for conservativeness); Seader, J. D., Separation Process Principles: Chemical and Biochemical Operations,” 3rd ed., Wiley, Hoboken, NJ (2011).
-        # this is changed to 4 hours after the first simulation
         
-        # TODO: This is density of activated carbon packing, including voids.
+        # This is density of activated carbon packing, including voids.
         # So rho_adsorbent = (1 - epsilon) * rho where epsilon is the void fraction
         # and rho is the density of activated carbon with no voids.
         rho_adsorbent=2050., # (in kg/m3) 
         void_fraction = 0.35, # Only matters when K given; 0.30 - 0.35 for activated carbon
-        adsorbent_capacity=0.091327, # default value for unsaturated capacity (updated in unit specification); conservative heuristic from Seider et. al. (2017) Product and Process Design Principles. Wiley
-        T_regeneration=30. + 273.15, # For silica gels; Seader, J. D., Separation Process Principles: Chemical and Biochemical Operations,” 3rd ed., Wiley, Hoboken, NJ (2011).
+        adsorbent_capacity=0.091, # default value for unsaturated capacity (updated in unit specification); conservative heuristic from Seider et. al. (2017) Product and Process Design Principles. Wiley
+        T_regeneration=30. + 273.15, 
         drying_time = 10./60., # h
         air_velocity = 1332., # m/h
         # T_air = 100. + 273.15, #K
@@ -364,24 +363,22 @@ def create_TAL_sys(ins, outs):
         length_plus = 0.,
         target_recovery=0.99,
         wet_retention=1., # conservatively assume one full wash's worth of ethanol is retained in the column before dry air is passed through it
-        K = 0.078, # 0.125 # constant desorption partition coefficient; calculated for 1 wash from experimental data for 3 washes pooled together
+        K = 0.078, # back-calculated for 1 wash from experimental measurements for 3 washes pooled together; 0.125 for 3-wash # constant desorption partition coefficient; calculated for 1 wash from experimental data for 3 washes pooled together
     )
+    
+    AC401.adsorbent_cost['Activated carbon'] = price['Activated carbon'] # 41. $/ft^3
     
     @AC401.add_specification
     def AC401_spec(): # update recovery and capacity based on user-input adsorption time and temperature
-        
-        # AC401.cycle_time = 4.
-        # AC401.regeneration_velocity = 3. + (17./25.)*R302.effluent_titer
         
         T = AC401.ins[0].T    
         t = AC401.cycle_time # this needs to exclude hot air time
         capacity = cap_interp(t, T)
         AC401.adsorbent_capacity = capacity[0]
         
-        
         AC401._run()
 
-        # M401.run()
+        M401.run()
     
 
         
@@ -699,7 +696,8 @@ def create_TAL_sys(ins, outs):
                                                           'lime',
                                                           'boilerchems'), 
                                                       outs=('gas_emission', 'boiler_blowdown_water', ash,),
-                                                      turbogenerator_efficiency=0.85)
+                                                      turbogenerator_efficiency=0.85,
+                                                      natural_gas_price=price['Natural gas'])
     
     # BT = bst.BDunits.BoilerTurbogenerator('BT',
     #                                    ins=(M505-0, R501-0, 'boiler_makeup_water', 'natural_gas', FGD_lime, boiler_chems),
@@ -870,12 +868,6 @@ CWP = u.CWP802
 # Simulate system and get results
 # =============================================================================
 
-# def get_TAL_MPSP():
-#     TAL_sys.simulate()
-    
-#     for i in range(3):
-#         TAL.price = TAL_tea.solve_price(TAL, TAL_no_BT_tea)
-#     return TAL.price
 
 def get_SA_MPSP():
     for i in range(3):
@@ -883,37 +875,6 @@ def get_SA_MPSP():
     for i in range(3):
         SA.price = TAL_tea.solve_price(SA)
     return SA.price*SA.F_mass/SA.imass['TAL']
-
-def get_titer():
-    return R302.outs[0].imass['TAL']/R302.outs[0].F_vol
-
-def set_titer(titer):
-    M304.water_multiplier *= get_titer()/titer
-    get_SA_MPSP()
-    return get_titer()
-
-# get_SA_MPSP()
-
-# R301 = F('R301') # Fermentor
-# yearly_production = 125000 # ton/yr
-
-
-# spec = ProcessSpecification(
-#     evaporator = None,
-#     mixer = M304,
-#     reactor=R302,
-#     reaction_name='fermentation_reaction',
-#     substrates=('Xylose', 'Glucose'),
-#     products=('TAL',),
-#     spec_1=0.203,
-#     spec_2=35.9,
-#     spec_3=0.21,
-#     path = (M304_H, S302),
-#     xylose_utilization_fraction = 0.80,
-#     feedstock = feedstock,
-#     dehydration_reactor = None,
-#     byproduct_streams = None,
-#     evaporator_pump = None)
 
 spec = ProcessSpecification(
     evaporator = None,
@@ -964,6 +925,7 @@ def M304_titer_obj_fn(water_to_sugar_mol_ratio):
     return R302.effluent_titer - R302.titer_to_load
 
 def load_titer_with_glucose(titer_to_load):
+    spec.spec_2 = titer_to_load
     u.R302.titer_to_load = titer_to_load
     flx.IQ_interpolation(M304_titer_obj_fn, 1e-3, 8000.)
     u.AC401.regeneration_velocity = 3. + (17./25.)*titer_to_load

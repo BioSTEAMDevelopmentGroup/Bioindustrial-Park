@@ -37,9 +37,9 @@ import numpy as np
 import pandas as pd
 # import biosteam as bst
 from biosteam.utils import TicToc
-from biorefineries.TAL.system_TAL_adsorption_glucose import (
-    spec, TAL_sys,
-)
+# from biorefineries.TAL.system_TAL_adsorption_glucose import (
+#     spec, TAL_sys,
+# )
 from biorefineries.TAL.analyses import models
 from datetime import datetime
 import os
@@ -48,19 +48,21 @@ import os
 percentiles = [0, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 1]
 
 
+model = models.TAL_model
+system = TAL_sys = models.TAL_sys
+spec = models.spec
+
+
+print('\n\n')
+
 # %%
 
 # =============================================================================
 # Evaluate and organize results for Monte Carlo analysis
 # =============================================================================
-# spec.load_specifications(spec_1=0.49, spec_2=54.8, spec_3=0.76)
 # Initiate a timer
 timer = TicToc('timer')
 timer.tic()
-
-# model = models.model_full
-model = models.TAL_model
-# R301.set_titer_limit = True
 
 # Set seed to make sure each time the same set of random numbers will be used
 np.random.seed(3221) # 3221
@@ -74,7 +76,7 @@ model.load_samples(samples)
 # Bugfix barrage
 ###############################
 
-system = TAL_sys
+
 baseline_spec = {'spec_1': spec.baseline_yield,
                  'spec_2': spec.baseline_titer,
                  'spec_3': spec.baseline_productivity,}
@@ -126,11 +128,15 @@ fermenter_index = full_path.index(spec.titer_inhibitor_specification.reactor)
 pre_fermenter_units_path = full_path[0:fermenter_index]
 
 def model_specification():
-    # TODO: bugfix barrage was removed for speed up, no failed evaluations found for now
+    # !!!: bugfix barrage was removed for speed up, no failed evaluations found for now
     # try:
     for i in pre_fermenter_units_path: i._run()
     spec.load_specifications(spec_1=spec.spec_1, spec_2=spec.spec_2, spec_3=spec.spec_3)
-    model._system.simulate()   
+    model._system.simulate()
+    
+    # print(spec.spec_1, spec.spec_2, spec.spec_3)
+    # print(spec.reactor.effluent_titer)
+    
     # except Exception as e:
     #     str_e = str(e).lower()
     #     print('Error in model spec: %s'%str_e)
@@ -155,7 +161,8 @@ model.table.to_excel('all_results.xlsx')
 # Baseline results
 baseline_end = model.metrics_at_baseline()
 dateTimeObj = datetime.now()
-file_to_save = 'TAL_%s.%s.%s-%s.%s'%(dateTimeObj.year, dateTimeObj.month, dateTimeObj.day, dateTimeObj.hour, dateTimeObj.minute)\
+minute = '0' + str(dateTimeObj.minute) if len(str(dateTimeObj.minute))==1 else str(dateTimeObj.minute)
+file_to_save = 'TAL_%s.%s.%s-%s.%s'%(dateTimeObj.year, dateTimeObj.month, dateTimeObj.day, dateTimeObj.hour, minute)\
     + '_' + str(N_simulation) + 'sims'
 
 baseline = baseline.append(baseline_end, ignore_index=True)
