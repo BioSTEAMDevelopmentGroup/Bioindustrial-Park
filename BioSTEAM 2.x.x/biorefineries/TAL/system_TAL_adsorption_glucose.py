@@ -360,7 +360,7 @@ def create_TAL_sys(ins, outs):
         regeneration_fluid=dict(phase='l', Ethanol=1., units='kg/hr'),
         adsorbate_ID='TAL',  
         split=dict(TAL=0, Water=1, VitaminA=1., VitaminD2=1., FermMicrobe=1.),
-        length_plus = 0.,
+        length_plus = 1.219,
         target_recovery=0.99,
         wet_retention=1., # conservatively assume one full wash's worth of ethanol is retained in the column before dry air is passed through it
         K = 0.078, # back-calculated for 1 wash from experimental measurements for 3 washes pooled together; 0.125 for 3-wash # constant desorption partition coefficient; calculated for 1 wash from experimental data for 3 washes pooled together
