@@ -298,7 +298,7 @@ steps = 50
 
 # Yield, titer, productivity (rate)
 spec_1 = np.linspace(0.1, 0.9, steps) # yield
-spec_2 = np.linspace(1., 30., steps) # titer
+spec_2 = np.linspace(3., 30., steps) # titer
 # spec_1 = np.linspace(0.2, 0.99, steps) # yield
 # spec_2 = np.linspace(45, 225, steps) # titer
 spec_3 = np.array([0.21,]) # productivity

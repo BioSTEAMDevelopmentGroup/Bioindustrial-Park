@@ -360,7 +360,7 @@ def create_TAL_sys(ins, outs):
         regeneration_fluid=dict(phase='l', Ethanol=1., units='kg/hr'),
         adsorbate_ID='TAL',  
         split=dict(TAL=0, Water=1, VitaminA=1., VitaminD2=1., FermMicrobe=1.),
-        length_plus = 1.219,
+        length_plus = 1.219, # 4 ft based on [REF] #!!! TODO: add ref
         target_recovery=0.99,
         wet_retention=1., # conservatively assume one full wash's worth of ethanol is retained in the column before dry air is passed through it
         K = 0.078, # back-calculated for 1 wash from experimental measurements for 3 washes pooled together; 0.125 for 3-wash # constant desorption partition coefficient; calculated for 1 wash from experimental data for 3 washes pooled together
@@ -371,10 +371,10 @@ def create_TAL_sys(ins, outs):
     @AC401.add_specification
     def AC401_spec(): # update recovery and capacity based on user-input adsorption time and temperature
         
-        T = AC401.ins[0].T    
-        t = AC401.cycle_time # this needs to exclude hot air time
-        capacity = cap_interp(t, T)
-        AC401.adsorbent_capacity = capacity[0]
+        # T = AC401.ins[0].T    
+        # t = AC401.cycle_time
+        # capacity = cap_interp(t, T)
+        # AC401.adsorbent_capacity = capacity[0]
         
         AC401._run()
 
@@ -724,7 +724,10 @@ def create_TAL_sys(ins, outs):
     
     # Heat exchange network
     HXN = bst.facilities.HeatExchangerNetwork('HXN1001',
-                                               ignored=[H401, H402])
+                                               ignored=[H401, H402],
+                                               # cache_network=True,
+                                               # force_ideal_thermo=True,
+                                               )
 
     # HXN = HX_Network('HXN')
 
