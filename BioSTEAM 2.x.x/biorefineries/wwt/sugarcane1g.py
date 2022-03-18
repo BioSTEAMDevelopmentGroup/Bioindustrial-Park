@@ -10,101 +10,65 @@
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
 # for license details.
 
-import biosteam as bst
-from biorefineries.oilcane import (
-    create_chemicals,
-    create_sugarcane_to_ethanol_system as create_system,
-    create_tea,
-    load_process_settings,
-    )
-from biorefineries.wwt import (
-    rename_storage_units,
-    add_wwt_chemicals, create_wastewater_process,
-    get_COD_breakdown, IRR_at_ww_price, ww_price_at_IRR,
-    )
-
-operating_hours = 24 * 180 # 90% uptime for 200 days?
-storage_ID = 700
-WWT_ID = '8'
+info = {
+    'abbr': 'sc1g',
+    'WWT_ID': '8',
+    'is2G': False,
+    'add_CHP': False,
+    'ww_price': None,
+    }
 
 
 # %%
 
 # =============================================================================
-# Existing system
+# Systems
 # =============================================================================
 
-sc_f = bst.Flowsheet('sc1g')
-sc_u = sc_f.unit
-sc_s = sc_f.stream
-bst.main_flowsheet.set_flowsheet(sc_f)
-sc_chems = add_wwt_chemicals(create_chemicals())
-load_process_settings()
+def create_sc1g_comparison_systems():
+    from biorefineries.wwt import create_comparison_systems
+    from biorefineries.oilcane import (
+        create_chemicals,
+        create_sugarcane_to_ethanol_system as create_system,
+        create_tea,
+        load_process_settings,
+        )
+    functions = (create_chemicals, create_system, create_tea, load_process_settings,)
+    sys_dct = {
+        'create_system': {'operating_hours': 24*200, 'use_area_convention': True, 'pellet_bagasse': True},
+        'rename_storage_to': 700,
+        'create_wastewater_process': {'skip_AeF': True},
+        # `vinasse`, `fiber_fines`,
+        # not using `wastewater` as it contains `evaporator_condensate` (all water)
+        'ww_streams': (('H302', 1), ('U211', 0)),
+        'solids_streams': (('U207', 0), ('U210', 0)), # `bagasse`, `filter_cake`
+        'BT': 'BT401',
+        'new_wwt_connections': {'solids': ('BT401', 0), 'biogas': ('BT401', 1)},
+        }
+    exist_sys, new_sys = create_comparison_systems(info, functions, sys_dct)
+    return exist_sys, new_sys
 
-sc_sys_temp = create_system(
-    'sc_sys_temp', operating_hours=operating_hours,
-    use_area_convention=True,
-    pellet_bagasse=True,
-    )
-rename_storage_units(sc_sys_temp, storage_ID)
 
-ww = bst.Stream('ww')
-WWmixer = bst.Mixer('WWmixer', ins=(sc_s.vinasse, sc_s.fiber_fines), outs=ww)
-
-solids = bst.Stream('solids')
-SolidsMixer = bst.Mixer('SolidsMixer', ins=(sc_s.bagasse, sc_s.filter_cake), outs=solids)
-SolidsMixer.outs[0] = sc_u.BT401.ins[0]
-
-sc_sys = bst.System('sc_sys', path=(sc_sys_temp, SolidsMixer, WWmixer))
-sc_sys.simulate()
-
-sc_tea = create_tea(sc_sys)
-sc_tea.operating_hours = operating_hours
-sc_tea.IRR = sc_tea.solve_IRR()
+def simulate_sc1g_systems():
+    from biorefineries.wwt import simulate_systems
+    exist_sys, new_sys = create_sc1g_comparison_systems()
+    simulate_systems(exist_sys, new_sys, info)
+    return exist_sys, new_sys
 
 
 # %%
 
 # =============================================================================
-# With new wastewater treatment process
+# Models
 # =============================================================================
 
-new_f = bst.Flowsheet('new_sc1g')
-new_u = new_f.unit
-new_s = new_f.stream
-bst.main_flowsheet.set_flowsheet(new_f)
-new_chems = add_wwt_chemicals(create_chemicals())
-load_process_settings()
 
-new_sys_temp = create_system(
-    'new_sys_temp', operating_hours=operating_hours,
-    use_area_convention=True,
-    pellet_bagasse=True,
-    )
-rename_storage_units(new_sys_temp, storage_ID)
+# %%
 
-ww_streams = (new_s.vinasse, new_s.fiber_fines,)
-# new_sys_wwt = create_wastewater_system('new_sys_wwt', ins=ww_streams, process_ID=WWT_ID)
-new_sys_wwt = create_wastewater_process('new_sys_wwt', ins=ww_streams, process_ID=WWT_ID,
-                                         skip_AeF=True)
-
-solids = bst.Stream('solids')
-SolidsMixer = bst.Mixer('SolidsMixer', ins=(new_s.bagasse, new_s.filter_cake, new_s.sludge), outs=solids)
-SolidsMixer.outs[0] = new_u.BT401.ins[0]
-new_u.BT401.ins[1] = new_s.biogas
-
-new_sys = bst.System('new_sys', path=(new_sys_temp, new_sys_wwt, SolidsMixer,))
-new_sys.simulate()
-
-new_tea = create_tea(new_sys)
-new_tea.operating_hours = operating_hours
-new_tea.IRR = new_tea.solve_IRR()
-
+# =============================================================================
+# Run
+# =============================================================================
 
 if __name__ == '__main__':
-    print('\n\n1G sugarcane biorefinery:')
-    print(f'Original IRR: {sc_tea.IRR:.2%}')
-    print(f'New IRR: {new_tea.IRR:.2%}')
-    get_COD_breakdown(getattr(new_u, f'S{WWT_ID}04').ins[0])
-    IRR_at_ww_price(ww, sc_tea)
-    ww_price_at_IRR(ww, sc_tea, new_tea.IRR)
+    exist_sys, new_sys = simulate_sc1g_systems()
+    # exist_model, new_model = create_sc1g_comparison_models()

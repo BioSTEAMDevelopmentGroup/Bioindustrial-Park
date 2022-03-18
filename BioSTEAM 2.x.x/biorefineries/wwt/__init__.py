@@ -26,7 +26,8 @@ from ._membrane_bioreactor import *
 from ._sludge_handling import *
 from ._wwt_process import *
 from ._lca import * #!!! needs updating, maybe don't need it
-from ._models import *
+from ._system import *
+from ._model import *
 
 from . import (
     _chemicals,
@@ -38,7 +39,8 @@ from . import (
     _sludge_handling,
     _wwt_process,
     _lca,
-    _models,
+    _system,
+    _model,
     )
 
 
@@ -53,5 +55,6 @@ __all__ = (
     *_sludge_handling.__all__,
     *_wwt_process.__all__,
     *_lca.__all__,
-    *_models.__all__,
+    *_system.__all__,
+    *_model.__all__,
     )

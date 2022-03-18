@@ -197,13 +197,13 @@ class CHP(Unit):
         Unit.__init__(self, ID, ins, outs, thermo)
         self.eff = eff
         self.unit_CAPEX = unit_CAPEX
-        self._mixed = tmo.Stream(f'{self.ID}_mixed')
 
     def _run(self):
-        mixed = self._mixed
+        mixed, = self.outs
         mixed.mix_from(self.ins)
         H_net = get_combustion_energy(mixed, 1)
         self.H_for_power = H_net * self.eff
+
 
     def _design(self):
         kW = self.H_for_power / 3600 # kJ/hr to kW
