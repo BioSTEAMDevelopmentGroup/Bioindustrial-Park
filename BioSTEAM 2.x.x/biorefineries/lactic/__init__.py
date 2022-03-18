@@ -73,15 +73,15 @@ def _load_chemicals():
     _chemicals_loaded = True
 
 def _load_system(kind='SSCF'):
-    global flowsheet, groups, funcs, lactic_sys, lactic_tea, \
-        simulate_and_print, simulate_fermentation_improvement, \
-        simulate_separation_improvement, simulate_operating_improvement
+    global flowsheet, funcs, lactic_sys, lactic_tea
     bst.main_flowsheet.clear()
     flowsheet = bst.Flowsheet('lactic')
     bst.main_flowsheet.set_flowsheet(flowsheet)
     bst.settings.set_thermo(chemicals)
     load_process_settings()
-    lactic_sys = create_system(kind=kind, return_groups=True, flowsheet=flowsheet)
+    lactic_sys, groups = create_system(kind=kind, return_groups=True, flowsheet=flowsheet)
+    global Area100, Area200, Area300, Area400, Area500, Area600
+    Area100, Area200, Area300, Area400, Area500, HXN, CHP, CT, Area600 = groups
     lactic_tea = create_tea(flowsheet=flowsheet)
     funcs = create_funcs(lactic_tea=lactic_tea, flowsheet=flowsheet)
     _system_loaded = True
@@ -94,6 +94,7 @@ def _load_system(kind='SSCF'):
 # decision variables
 # =============================================================================
 
+global simulate_and_print
 def simulate_and_print(funcs=None, lactic_tea=None, flowsheet=None):
     funcs = funcs or create_funcs(lactic_tea=lactic_tea, flowsheet=flowsheet)
     MPSP = funcs['simulate_get_MPSP']()
@@ -105,6 +106,8 @@ def simulate_and_print(funcs=None, lactic_tea=None, flowsheet=None):
     print(f'FEC is {FEC:.2f} MJ/kg lactic acid')
     print('------------------------------------------\n')
 
+
+global simulate_fermentation_improvement
 def simulate_fermentation_improvement(funcs=None, lactic_tea=None, flowsheet=None):
     flowsheet = flowsheet or bst.main_flowsheet
     funcs = funcs or create_funcs(lactic_tea=lactic_tea, flowsheet=flowsheet)
@@ -118,6 +121,8 @@ def simulate_fermentation_improvement(funcs=None, lactic_tea=None, flowsheet=Non
     R302_X[1] = R302_X[4] = 0
     simulate_and_print(flowsheet)
 
+
+global simulate_separation_improvement
 def simulate_separation_improvement(funcs=None, lactic_tea=None, flowsheet=None):
     flowsheet = flowsheet or bst.main_flowsheet
     funcs = funcs or create_funcs(lactic_tea=lactic_tea, flowsheet=flowsheet)
@@ -127,6 +132,8 @@ def simulate_separation_improvement(funcs=None, lactic_tea=None, flowsheet=None)
     u.R403.hydrolysis_rxns.X[:] = 0.9
     simulate_and_print(flowsheet)
 
+
+global simulate_operating_improvement
 def simulate_operating_improvement(funcs=None, lactic_tea=None, flowsheet=None):
     flowsheet = flowsheet or bst.main_flowsheet
     funcs = funcs or create_funcs(lactic_tea=lactic_tea, flowsheet=flowsheet)
@@ -247,6 +254,7 @@ else:
 __all__ = (
     'auom', 'CEPCI',
     'flowsheet', 'groups', 'funcs', 'lactic_sys', 'lactic_tea',
+    'Area100', 'Area200', 'Area300', 'Area400', 'Area500', 'Area600',
     'simulate_and_print', 'simulate_separation_improvement',
     'simulate_separation_improvement', 'simulate_operating_improvement',
     *_chemicals.__all__,

@@ -24,12 +24,6 @@ NREL/TP-5100-71949; National Renewable Energy Lab (NREL), 2018.
 https://doi.org/10.2172/1483234
 '''
 
-'''
-TODO:
-    - Think of ways to handle the no-power usage thing for the cornstover biorefinery
-'''
-
-
 
 # %%
 
@@ -51,7 +45,7 @@ ParallelRxn = tmo.reaction.ParallelReaction
 CEPCI = bst.units.design_tools.CEPCI_by_year
 Unit = bst.Unit
 
-__all__ = ('create_wastewater_system', 'CHP',)
+__all__ = ('create_wastewater_process', 'CHP',)
 
 
 # %%
@@ -222,7 +216,16 @@ class CHP(Unit):
 # =============================================================================
 # System function
 # =============================================================================
-def create_wastewater_units(ins, outs, process_ID='6', flowsheet=None,
+
+@bst.SystemFactory(
+    ID='wastewater_sys',
+    outs=[dict(ID='biogas'),
+          dict(ID='sludge'),
+          dict(ID='recycled_water'),
+          dict(ID='brine')],
+    fixed_ins_size=False,
+)
+def create_wastewater_process(ins, outs, process_ID='6', flowsheet=None,
                             skip_IC=False, IC_kwargs={},
                             skip_AnMBR=False, AnMBR_kwargs={},
                             skip_AeF=False, AF_kwargs={}):
@@ -317,14 +320,3 @@ def create_wastewater_units(ins, outs, process_ID='6', flowsheet=None,
 
     # Reverse osmosis to treat aerobically polished water
     ReverseOsmosis(f'S{X}04', ins=RX03-1, outs=(recycled_water, brine))
-
-
-create_wastewater_system = bst.SystemFactory(
-    f=create_wastewater_units,
-    ID='wastewater_sys',
-    outs=[dict(ID='biogas'),
-          dict(ID='sludge'),
-          dict(ID='recycled_water'),
-          dict(ID='brine')],
-    fixed_ins_size=False,
-)

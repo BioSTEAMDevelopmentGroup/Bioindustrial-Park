@@ -20,7 +20,7 @@ from biorefineries.oilcane import (
     )
 from biorefineries.wwt import (
 	rename_storage_units,
-	add_wwt_chemicals, create_wastewater_system,
+	add_wwt_chemicals, create_wastewater_process,
 	get_COD_breakdown, IRR_at_ww_price, ww_price_at_IRR,
 	)
 
@@ -79,8 +79,8 @@ rename_storage_units(new_sys_temp, storage_ID)
 
 ww_streams = [oc_s.vinasse, oc_s.wastewater, oc_s.fiber_fines]
 # new_sys_wwt = create_wastewater_system('new_sys_wwt', ins=ww_streams, process_ID=WWT_ID)
-new_sys_wwt = create_wastewater_system('new_sys_wwt', ins=ww_streams, process_ID=WWT_ID,
-                                        skip_AeF=True)
+new_sys_wwt = create_wastewater_process('new_sys_wwt', ins=ww_streams, process_ID=WWT_ID,
+                                         skip_AeF=True)
 
 solids = bst.Stream('solids')
 SolidsMixer = bst.Mixer('SolidsMixer', ins=(new_u.M701.outs[0], new_s.filter_cake, new_s.sludge), outs=solids)

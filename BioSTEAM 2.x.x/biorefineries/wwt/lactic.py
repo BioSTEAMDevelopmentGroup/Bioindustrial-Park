@@ -19,7 +19,7 @@ from biorefineries.lactic import (
     get_splits,
     )
 from biorefineries.wwt import \
-    add_wwt_chemicals, create_wastewater_system, get_COD_breakdown
+    add_wwt_chemicals, create_wastewater_process, get_COD_breakdown
 
 get = getattr
 WWT_ID = '5'
@@ -98,7 +98,7 @@ ww_streams = [
 for i in units_to_discard+streams_to_discard+systems_to_discard:
     new_f.discard(i)
 
-new_sys_wwt = create_wastewater_system('new_sys_wwt', ins=ww_streams, process_ID=WWT_ID)
+new_sys_wwt = create_wastewater_process('new_sys_wwt', ins=ww_streams, process_ID=WWT_ID)
 new_u.M601.ins[0] = new_s.sludge
 new_u.CHP.ins[1] = new_s.biogas
 

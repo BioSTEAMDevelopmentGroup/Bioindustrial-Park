@@ -7,22 +7,6 @@
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
 # for license details.
 
-
-'''
-TODO:
-    - Add algorithms for other configurations
-    (AF, submerged, sparging, GAC, flat sheet, hollow fiber)
-    - Maybe add AeMBR as well (make an MBR superclass)
-        - AeMBR can use higher flux and allows for lower transmembrane pressure
-
-References
-----------
-[1] Shoener et al., Design of Anaerobic Membrane Bioreactors for the
-Valorization of Dilute Organic Carbon Waste Streams.
-Energy Environ. Sci. 2016, 9 (3), 1102–1112.
-https://doi.org/10.1039/C5EE03715H.
-'''
-
 import math
 import biosteam as bst
 from biosteam.exceptions import DesignError
@@ -79,7 +63,7 @@ class AnMBR(bst.Unit):
         Whether to include an aerobic filtration process in this AnMBR,
         can only be True in "AF" (not "CSTR") reactor.
     add_GAC : bool
-        If to add granual activated carbon to enhance biomass retention,
+        If to add granular activated carbon to enhance biomass retention,
         can only be True for the "submerged" configuration.
     include_degassing_membrane : bool
         If to include a degassing membrane to enhance methane
@@ -122,6 +106,29 @@ class AnMBR(bst.Unit):
     _N_outs = 4 # biogas, effluent, waste sludge, air (optional)
 
     # Equipment-related parameters
+    F_BM_pumps = 1.18 * (1+0.007/100) # 0.007 is for  miscellaneous costs
+    _F_BM_default = {
+        'Membrane': 1 + 0.15, # assume 15% for replacement labor
+        'Pumps': F_BM_pumps,
+        'Pump building': F_BM_pumps,
+        'Pump excavation': F_BM_pumps,
+        'Blowers': 2 * 1.11,
+        'Blower building': 1.11,
+        # Set bare module factor to 1 if not otherwise provided
+        'Reactor excavation': 1,
+        'Wall concrete': 1,
+        'Slab concrete': 1,
+        'GAC': 1,
+        'Air pipes': 1,
+        'Degassing membrane': 1,
+        }
+
+    _default_equipment_lifetime = {
+        'Membrane': 10,
+        'Pumps': 15,
+        'Blowers': 15,
+        }
+
     _N_train_min = 2
     _cas_per_tank_spare = 2
 
@@ -559,8 +566,7 @@ class AnMBR(bst.Unit):
 
     # Called by _design
     def _design_AF(self):
-        '''NOT READY YET.'''
-        # Use FilterTank
+        raise RuntimeError('Design not implemented.')
 
 
     # Called by _design_CSTR/_design_AF
@@ -585,23 +591,19 @@ class AnMBR(bst.Unit):
 
     # Called by _design
     def _design_GAC(self):
-        '''NOT READY YET.'''
-        if not self.add_GAC:
-            return 0
-
-        M_GAC = 1
-        return M_GAC
+        if not self.add_GAC: return 0
+        raise RuntimeError('Design not implemented.')
 
 
     ### Step B functions ###
     # Called by _design
     def _design_hollow_fiber(self):
-        '''NOT READY YET.'''
+        raise RuntimeError('Design not implemented.')
 
 
     # Called by _design
     def _design_flat_sheet(self):
-        '''NOT READY YET.'''
+        raise RuntimeError('Design not implemented.')
 
 
     # Called by _design
@@ -676,8 +678,7 @@ class AnMBR(bst.Unit):
     # _cost
     # =========================================================================
     def _cost(self):
-        D, C, F_BM, lifetime = self.design_results, self.baseline_purchase_costs, \
-            self.F_BM, self._default_equipment_lifetime
+        D, C = self.design_results, self.baseline_purchase_costs
 
         ### Capital ###
         # Concrete and excavation
@@ -690,8 +691,6 @@ class AnMBR(bst.Unit):
 
         # Membrane
         C['Membrane'] = self.membrane_unit_cost * D['Membrane [m3]'] / _ft2_to_m2
-        F_BM['Membrane'] = 1 + 0.15 # assume 15% for replacement labor
-        lifetime['Membrane'] = 10
 
         # GAC
         # $13.78/kg
@@ -708,29 +707,17 @@ class AnMBR(bst.Unit):
         # Pump
         # Note that maintenance and operating costs are included as a lumped
         # number in the biorefinery thus not included here
-        # TODO: considering adding the O&M and letting user choose if to include
         pumps, building = cost_pump(self)
         C['Pumps'] = pumps
         C['Pump building'] = building if self.include_pump_building_cost else 0.
         C['Pump excavation'] = VEX/27*0.3 if self.include_excavation_cost else 0.
 
-        F_BM['Pumps'] = F_BM['Pump building'] = F_BM['Pump excavation'] = \
-            1.18 * (1+0.007/100) # 0.007 is for  miscellaneous costs
-        lifetime['Pumps'] = 15
-
         # Blower and air pipe
         TCFM, CFMB = D['Total air flow [CFM]'], D['Blower capacity [CFM]']
         C['Air pipes'], C['Blowers'], C['Blower building'] = self._cost_blower(TCFM, CFMB)
-        F_BM['Blowers'] = 2 * 1.11
-        F_BM['Blower building'] = 1.11
-        lifetime['Blowers'] = 15
 
         # Degassing membrane
         C['Degassing membrane'] = 10000 * D['Degassing membrane']
-
-        # Set bare module factor to 1 if not otherwise provided
-        for k in C.keys():
-            F_BM[k] = 1 if not F_BM.get(k) else F_BM.get(k)
 
         ### Heat and power ###
         # Heat loss, assume air is 17°C, ground is 10°C
@@ -768,7 +755,7 @@ class AnMBR(bst.Unit):
             pumping += p.power_utility.rate
 
         # Gas
-        sparging = 0. #!!! output from submerge design
+        sparging = 0. # submerge design not implemented
         degassing = 3 * self.N_degasser # assume each uses 3 kW
 
         self.power_utility.rate = sparging + degassing + pumping + loss
@@ -966,7 +953,6 @@ class AnMBR(bst.Unit):
     @property
     def L_membrane_tank(self):
         '''[float] Length of the membrane tank, [ft].'''
-        #!!! Maybe should set this to 0 for cross-flow?
         return math.ceil((self.cas_per_tank+self.cas_per_tank_spare)*3.4)
 
     @property

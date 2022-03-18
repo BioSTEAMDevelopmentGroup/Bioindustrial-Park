@@ -393,7 +393,6 @@ class PolishingFilter(bst.Unit):
         # Pump
         # Note that maintenance and operating costs are included as a lumped
         # number in the biorefinery thus not included here
-        # TODO: considering adding the O&M and letting user choose if to include
         pumps, building = cost_pump(self)
         C['Pumps'] = pumps
         C['Pump building'] = building if self.include_pump_building_cost else 0.

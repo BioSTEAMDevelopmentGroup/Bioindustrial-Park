@@ -13,7 +13,7 @@
 import biosteam as bst
 from biorefineries.corn import create_chemicals, create_system, create_tea, load_process_settings
 from biorefineries.wwt import (
-    add_wwt_chemicals, create_wastewater_system, CHP as CHPunit,
+    add_wwt_chemicals, create_wastewater_process, CHP as CHPunit,
     get_COD_breakdown, IRR_at_ww_price, ww_price_at_IRR,
     )
 
@@ -41,10 +41,7 @@ cn_u.T608.process_water_streams = (cn_s.recycled_process_water, cn_s.scrubber_wa
 ww = bst.Stream('ww')
 WWmixer = bst.Mixer('WWmixer', ins=(cn_u.MH103.outs[1], cn_u.MX5.outs[0]), outs=ww)
 cn_sys = bst.System('cn_sys', path=(cn_sys_temp, WWmixer))
-cn_sys.simulate()
-
 cn_tea = create_tea(cn_sys)
-cn_tea.IRR = cn_tea.solve_IRR()
 
 
 # %%
@@ -63,18 +60,20 @@ new_sys_temp = create_system('new_sys_temp', flowsheet=new_f)
 
 ww_streams = [new_u.MH103.outs[1], new_u.MX5.outs[0],]
 # new_sys_wwt = create_wastewater_system('new_sys_wwt', ins=ww_streams, process_ID=WWT_ID)
-new_sys_wwt = create_wastewater_system('new_sys_wwt', ins=ww_streams, process_ID=WWT_ID,
-                                       skip_AeF=True)
+new_sys_wwt = create_wastewater_process('new_sys_wwt', ins=ww_streams, process_ID=WWT_ID,
+                                        skip_AeF=True)
 new_u.T608.process_water_streams = (new_s.recycled_process_water, new_s.scrubber_water, new_s.recycled_water)
 CHP = CHPunit('CHP', ins=(new_s.biogas, new_s.sludge))
 
 new_sys = bst.System('new_sys', path=(new_sys_temp, new_sys_wwt, CHP))
-new_sys.simulate()
-
 new_tea = create_tea(new_sys)
-new_tea.IRR = new_tea.solve_IRR()
+
 
 if __name__ == '__main__':
+    cn_sys.simulate()
+    cn_tea.IRR = cn_tea.solve_IRR()
+    new_sys.simulate()
+    new_tea.IRR = new_tea.solve_IRR()
     print('\n\ncorn biorefinery:')
     print(f'Original IRR: {cn_tea.IRR:.2%}')
     print(f'New IRR: {new_tea.IRR:.2%}')
