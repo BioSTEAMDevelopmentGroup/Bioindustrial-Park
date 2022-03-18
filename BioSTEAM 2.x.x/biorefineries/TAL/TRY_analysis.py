@@ -389,9 +389,9 @@ minute = '0' + str(dateTimeObj.minute) if len(str(dateTimeObj.minute))==1 else s
 file_to_save = 'TAL_TRY_%s.%s.%s-%s.%s'%(dateTimeObj.year, dateTimeObj.month, dateTimeObj.day, dateTimeObj.hour, minute)
 np.save(file_to_save, data_1)
 
-pd.DataFrame(data_1[:, :, 0, :][:,:,0]).to_csv('MPSP-'+file_to_save+'.csv')
-pd.DataFrame(data_1[:, :, 1, :][:,:,0]).to_csv('GWP-'+file_to_save+'.csv')
-pd.DataFrame(data_1[:, :, 2, :][:,:,0]).to_csv('FEC-'+file_to_save+'.csv')
+pd.DataFrame(data_1[:, :, 0, :][:,:,0]/907.185).to_csv('MPSP-'+file_to_save+'.csv')
+# pd.DataFrame(data_1[:, :, 1, :][:,:,0]).to_csv('GWP-'+file_to_save+'.csv')
+# pd.DataFrame(data_1[:, :, 2, :][:,:,0]).to_csv('FEC-'+file_to_save+'.csv')
 
 
 # %% Load previously saved data

@@ -29,7 +29,7 @@ from chaospy import distributions as shape
 # from biosteam import main_flowsheet as find
 from biosteam.evaluation import Model, Metric
 # from biosteam.evaluation.evaluation_tools import Setter
-from TAL.system_TAL_adsorption_glucose import TAL_sys, TAL_tea, u, s, unit_groups, spec
+from TAL.system_TAL_adsorption_glucose import TAL_sys, TAL_tea, u, s, unit_groups, spec, price
 
 # get_annual_factor = lambda: TAL_tea._annual_factor
 
@@ -64,6 +64,7 @@ R302 = u.R302
 R303 = u.R303
 
 AC401 = u.AC401
+
 F401 = u.F401
 F402 = u.F402
 H403 = u.H403
@@ -200,34 +201,44 @@ def set_plant_uptime(uptime):
 
 # Only include materials that account for >5% of total annual material cost,
 # enzyme not included as it's cost is more affected by the loading (considered later)
-D = shape.Triangle(0.8*0.2573, 0.2573, 1.2*0.2573)
-@param(name='Feedstock unit price', element='TEA', kind='isolated', units='$/dry-ton',
-       baseline=0.2573, distribution=D)
-def set_feedstock_price(price):
-    feedstock.price = price / _feedstock_factor
+D = shape.Triangle(0.8*price['Glucose'], price['Glucose'], 1.2*price['Glucose'])
+@param(name='Feedstock unit price', element='TEA', kind='isolated', units='$/dry-kg',
+       baseline=price['Glucose'], distribution=D)
+def set_feedstock_price(f_price):
+    feedstock.price = f_price / _feedstock_factor
 
 
-# #!!! TODO: update
-# D = shape.Triangle(0.198, 0.253, 0.304)
-# @param(name='Natural gas unit price', element='TEA', kind='isolated', units='$/kg',
-#        baseline=0.253, distribution=D)
-# def set_natural_gas_price(price):
-#     natural_gas.price = price
+D = shape.Triangle(0.198, 0.2527, 0.304)
+@param(name='Natural gas unit price', element='TEA', kind='isolated', units='$/kg',
+        baseline=0.2527, distribution=D)
+def set_natural_gas_price(gas_price):
+    BT.natural_gas_price = gas_price
 
 
 D = shape.Triangle(0.067, 0.070, 0.074)
 @param(name='Electricity unit price', element='TEA', kind='isolated', units='$/kWh',
        baseline=0.070, distribution=D)
-def set_electricity_price(price):
-    bst.PowerUtility.price = price
+def set_electricity_price(e_price):
+    bst.PowerUtility.price = e_price
 
 
-D = shape.Triangle(0.8*41, 41, 1.2*41)
-@param(name='Activated carbon adsorbent price', element='TEA', kind='isolated', units='$/ft^3',
+D = shape.Triangle(0.8*price['Activated carbon'], price['Activated carbon'], 1.2*price['Activated carbon'])
+@param(name='Activated carbon unit price', element='TEA', kind='isolated', units='$/ft^3',
        baseline=41, distribution=D)
-def set_adsorbent_price(price):
-    AC401.adsorbent_cost['Activated carbon'] = price
+def set_adsorbent_price(ac_price):
+    AC401.adsorbent_cost['Activated carbon'] = ac_price
 
+# 2.2 is the average whole-sale ethanol price between 2010-2019 in 2016 $/gal
+# based on Annual Energy Outlook (AEO) from Energy Information Adiministration (EIA)
+# (https://www.eia.gov/outlooks/aeo/), which is $0.7328/gal and similar to the
+# 2.2/(2988/1e3) = $0.736/gal based on a density of 2988 g/gal from H2 Tools
+# Lower and upper bounds are $1.37/gal and $2.79/gal, or $0.460/kg and $0.978/kg
+D = shape.Triangle(0.460, 0.7328, 0.978)
+@param(name='Ethanol unit price', element='TEA', kind='isolated', units='$/kg',
+       baseline=0.7328, distribution=D)
+def set_ethanol_price(etoh_price):
+    ethanol_fresh.price = etoh_price
+    
 #%% ######################## Conversion parameters ########################
 
 # Fermentation
@@ -245,32 +256,35 @@ D = shape.Triangle(0.9, 0.95, 1-1e-6)
 def set_ferm_ratio(ratio):
     R303.ferm_ratio = ratio
 
+### Fermentation
+
 D = shape.Triangle(baseline_yield*0.8, baseline_yield, baseline_yield*1.2)
 @param(name='TAL yield', element=R302, kind='coupled', units='g/g',
        baseline=baseline_yield, distribution=D)
 def set_TAL_yield(TAL_yield):
     # spec.load_specifications(TAL_yield,
-    #                          spec.spec_2,
-    #                          spec.spec_3)
+    #                           spec.spec_2,
+    #                           spec.spec_3)
     spec.spec_1 = TAL_yield
 
 D = shape.Triangle(baseline_titer*0.8, baseline_titer, baseline_titer*1.2)
 @param(name='TAL titer', element=R302, kind='coupled', units='g/L',
        baseline=baseline_titer, distribution=D)
 def set_TAL_titer(TAL_titer):
-    # spec.load_specifications(TAL_yield,
-    #                          spec.spec_2,
-    #                          spec.spec_3)
+    # spec.load_specifications(spec.spec_1,
+    #                           TAL_titer,
+    #                           spec.spec_3)
     spec.spec_2 = TAL_titer
     
 D = shape.Triangle(baseline_productivity*0.8, baseline_productivity, baseline_productivity*1.2)
-@param(name='Productivity', element=R302, kind='coupled', units='g/L/hr',
+@param(name='TAL productivity', element=R302, kind='coupled', units='g/L/hr',
        baseline=baseline_productivity, distribution=D)
-def set_TAL_productivity(productivity):
-    # spec.load_specifications(TAL_yield,
-    #                          spec.spec_2,
-    #                          spec.spec_3)
-    spec.spec_3 = productivity
+def set_TAL_productivity(TAL_prod):
+    # spec.load_specifications(spec.spec_1,
+    #                           spec.spec_2,
+    #                           TAL_prod)
+    spec.spec_3 = TAL_prod
+###
 
 D = shape.Triangle(0.8*0.005, 0.005, 1.2*0.005)
 @param(name='VitaminA yield', element=R302, kind='coupled', units='g/g',
@@ -293,12 +307,6 @@ def set_microbe_yield(yield_):
     R302.glucose_to_microbe_rxn.X = yield_
     R303.glucose_to_microbe_rxn.X = R303.ferm_ratio*yield_
    
-    
-# D = shape.Triangle(0.05, 0.07, 0.1)
-# @param(name='Inoculum ratio', element=R301, kind='coupled', units='%',
-#        baseline=0.07, distribution=D)
-# def set_inoculum_ratio(ratio):
-#     R301.inoculum_ratio = ratio
 
 #%%
 ######################## Separation parameters ########################
@@ -333,10 +341,10 @@ D = baseline_uniform(0.8, 0.1)
 @param(name='boiler efficiency', element=BT, kind='coupled', units='%',
        baseline=0.8, distribution=D)
 def set_boiler_efficiency(efficiency):
-    BT.B_eff = efficiency
+    BT.boiler_efficiency = efficiency
 
 D = shape.Triangle(0.8*7*24, 7*24, 1.2*7*24)
-@param(name='Product TAL storage time', element=BT, kind='coupled', units='%',
+@param(name='Product TAL storage time', element=BT, kind='coupled', units='h',
        baseline=7*24, distribution=D)
 def set_product_storage_time(storage_time):
     T620.tau = storage_time
