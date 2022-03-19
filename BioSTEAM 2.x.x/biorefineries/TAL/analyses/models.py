@@ -311,9 +311,9 @@ def set_microbe_yield(yield_):
 #%%
 ######################## Separation parameters ########################
 
-D = shape.Triangle(0.0739, 0.091, 0.091326667)
+D = shape.Triangle(0.0739, 0.0910, 0.2474)
 @param(name='Adsorbent unsaturated capacity', element=AC401, kind='coupled', units='g/g',
-       baseline=0.091, distribution=D)
+       baseline=0.0910, distribution=D)
 def set_adsorbent_cap(cap):
     AC401.adsorbent_capacity = cap
 
