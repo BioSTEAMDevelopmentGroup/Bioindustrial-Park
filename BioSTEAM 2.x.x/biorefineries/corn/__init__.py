@@ -7,7 +7,6 @@
 # for license details.
 """
 """
-from .. import PY37
 from . import (utils,
                units,
                _process_settings,
@@ -65,18 +64,15 @@ def _load_system():
     all_areas = bst.process_tools.UnitGroup('All Areas', corn_sys.units)
     _system_loaded = True
 
-if PY37:    
-    def __getattr__(name):
-        if not _chemicals_loaded:
-            _load_chemicals()
-            if name == 'chemicals': return chemicals
-        if not _system_loaded: 
-            try:
-                _load_system()
-            finally:
-                dct = globals()
-                dct.update(flowsheet.to_dict())
-            if name in dct: return dct[name]
-        raise AttributeError(f"module '{__name__}' has no attribute '{name}'")
-else:
-    load()
+def __getattr__(name):
+    if not _chemicals_loaded:
+        _load_chemicals()
+        if name == 'chemicals': return chemicals
+    if not _system_loaded: 
+        try:
+            _load_system()
+        finally:
+            dct = globals()
+            dct.update(flowsheet.to_dict())
+        if name in dct: return dct[name]
+    raise AttributeError(f"module '{__name__}' has no attribute '{name}'")

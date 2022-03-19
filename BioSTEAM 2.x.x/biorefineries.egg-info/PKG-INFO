@@ -1,6 +1,6 @@
 Metadata-Version: 2.1
 Name: biorefineries
-Version: 2.23.13
+Version: 2.23.14
 Summary: Biorefinery models in BioSTEAM
 Home-page: https://github.com/BioSTEAMDevelopmentGroup/Bioindustrial-Park/tree/master/biorefineries/BioSTEAM 2.x.x/biorefineries
 Author: Yoel Cortes-Pena
@@ -19,7 +19,7 @@ Classifier: Programming Language :: Python :: 3.7
 Classifier: Topic :: Scientific/Engineering
 Classifier: Topic :: Scientific/Engineering :: Chemistry
 Classifier: Topic :: Scientific/Engineering :: Mathematics
-Requires-Python: >=3.6
+Requires-Python: >=3.8
 License-File: LICENSE.txt
 
 =============================================
