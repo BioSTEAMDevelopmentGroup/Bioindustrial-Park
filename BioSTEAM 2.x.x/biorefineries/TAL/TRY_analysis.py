@@ -398,6 +398,7 @@ pd.DataFrame(data_1[:, :, 0, :][:,:,0]/907.185).to_csv('MPSP-'+file_to_save+'.cs
 file_to_load = file_to_save
 # file_to_load = 'C:/Users/saran/Documents/Academia/Spring 2020/BioSTEAM/Bioindustrial-Park/BioSTEAM 2.x.x/biorefineries/TAL/TAL_TRY_2020.9.22-16.44'
 data_1 = np.load(file_to_load+'.npy')
+# data_1 = np.load('TAL_TRY_2022.3.18-22.15.npy')
 data_1_copy = copy.deepcopy(data_1)
 
 data_2 = data_1

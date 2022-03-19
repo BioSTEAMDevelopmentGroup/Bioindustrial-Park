@@ -339,9 +339,9 @@ def create_TAL_sys(ins, outs):
         # ins=[bst.Stream('feed', TAL=0.014, Water=1, units='kg/hr', T=30 + 273.15), 'ethanol'], 
         ins=[H401-0, S402-0, 'hot_air'],
         outs=['broth_post_adsorption', 'TAL_laden_ethanol', 'ethanol_laden_air'],
-        mean_velocity=7.2, # m / hr; typical velocities are 4 to 14.4 m /hr for liquids; Adsorption basics Alan Gabelman (2017) Adsorption basics Part 1. AICHE
+        mean_velocity=7.2, # m/h; typical velocities are 4 to 14.4 m/h for liquids; Adsorption basics Alan Gabelman (2017) Adsorption basics Part 1. AICHE
         
-        regeneration_velocity=14.4, # default value (updated in unit specification based on titer)
+        regeneration_velocity=14.4, # m/h; default value (updated in unit specification based on titer)
         
         cycle_time=2., # 1-2 hours required for thermal-swing-adsorption (TSA) for silica gels (add 1 hr for conservativeness); Seader, J. D., Separation Process Principles: Chemical and Biochemical Operations,” 3rd ed., Wiley, Hoboken, NJ (2011).
         
@@ -360,7 +360,7 @@ def create_TAL_sys(ins, outs):
         regeneration_fluid=dict(phase='l', Ethanol=1., units='kg/hr'),
         adsorbate_ID='TAL',  
         split=dict(TAL=0, Water=1, VitaminA=1., VitaminD2=1., FermMicrobe=1.),
-        length_plus = 1.219, # 4 ft based on [REF] #!!! TODO: add ref
+        length_plus = 1.219, # m; 4 ft based on recommendation by Seader et al. (Separation Process Principles)
         target_recovery=0.99,
         wet_retention=1., # conservatively assume one full wash's worth of ethanol is retained in the column before dry air is passed through it
         K = 0.078, # back-calculated for 1 wash from experimental measurements for 3 washes pooled together; 0.125 for 3-wash # constant desorption partition coefficient; calculated for 1 wash from experimental data for 3 washes pooled together
@@ -933,7 +933,8 @@ def load_titer_with_glucose(titer_to_load):
     spec.spec_2 = titer_to_load
     u.R302.titer_to_load = titer_to_load
     flx.IQ_interpolation(M304_titer_obj_fn, 1e-3, 8000.)
-    u.AC401.regeneration_velocity = 3. + (17./25.)*titer_to_load
+    u.AC401.regeneration_velocity = min(14.4, 6.64 + ((14.4-6.64)/(20.05-3.))*(titer_to_load-3.)) # heuristic to obtain regeneration velocity at which MPSP is minimum fitted to results from simulations at target_recovery=0.99 
+    
 spec.load_spec_2 = load_titer_with_glucose
 
 # path = (F301, R302)
