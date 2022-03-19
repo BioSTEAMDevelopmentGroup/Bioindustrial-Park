@@ -71,12 +71,12 @@ cbar.add_lines(CS2)
 #%%
 AC401.regeneration_velocity = 14.4
 AC401.target_recovery=None
-mean_velocities = np.linspace(4., 15., 10)
+superficial_velocities = np.linspace(4., 15., 10)
 cycle_times = np.linspace(0.5, 4., 10)
 MPSPs = []
 column_costs = []
-for m in mean_velocities:
-    AC401.mean_velocity = m
+for m in superficial_velocities:
+    AC401.superficial_velocity = m
     MPSPs.append([])
     column_costs.append([])
     for t in cycle_times:
@@ -85,15 +85,15 @@ for m in mean_velocities:
         column_costs[-1].append(AC401.installed_cost/1e6)
 
 #%% Plot column cost
-# plt.contourf(mean_velocities, cycle_times, MPSPs)
+# plt.contourf(superficial_velocities, cycle_times, MPSPs)
 
 fig1, ax2 = plt.subplots(constrained_layout=True)
-CS = ax2.contourf(cycle_times, mean_velocities, column_costs)
+CS = ax2.contourf(cycle_times, superficial_velocities, column_costs)
 
 CS2 = ax2.contour(CS, levels=CS.levels[::2], colors='black', origin='lower')
 
 # ax2.set_title('Nonsense (3 masked regions)')
-ax2.set_ylabel('Mean feed velocity [m/s]')
+ax2.set_ylabel('Superficial feed velocity [m/s]')
 ax2.set_xlabel('Cycle time [h]')
 
 # Make a colorbar for the ContourSet returned by the contourf call.
@@ -103,15 +103,15 @@ cbar.ax.set_ylabel('Column installed cost [10^6 USD]')
 cbar.add_lines(CS2)
 
 #%% Plot MPSP
-# plt.contourf(mean_velocities, cycle_times, MPSPs)
+# plt.contourf(superficial_velocities, cycle_times, MPSPs)
 
 fig1, ax2 = plt.subplots(constrained_layout=True)
-CS = ax2.contourf(cycle_times, mean_velocities, MPSPs)
+CS = ax2.contourf(cycle_times, superficial_velocities, MPSPs)
 
 CS2 = ax2.contour(CS, levels=CS.levels[::2], colors='black', origin='lower')
 
 # ax2.set_title('Nonsense (3 masked regions)')
-ax2.set_ylabel('Mean feed velocity [m/s]')
+ax2.set_ylabel('Superficial feed velocity [m/s]')
 ax2.set_xlabel('Cycle time [h]')
 
 # Make a colorbar for the ContourSet returned by the contourf call.
