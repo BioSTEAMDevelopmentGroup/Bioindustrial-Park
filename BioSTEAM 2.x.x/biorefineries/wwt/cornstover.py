@@ -26,28 +26,39 @@ info = {
 # =============================================================================
 
 def create_cs_comparison_systems():
+    # # Create from scratch, IRR doesn't match as closely as the method below
+    # from biorefineries.wwt import create_comparison_systems
+    # from biorefineries import cornstover as cs
+    # from biorefineries.cornstover import (
+    #     create_chemicals,
+    #     create_system,
+    #     create_tea,
+    #     load_process_settings,
+    #     )
+    # OSBL_IDs = [u.ID for u in cs.cornstover_tea.OSBL_units]
+    # functions = (create_chemicals, create_system, create_tea, load_process_settings,)
+    # sys_dct = {
+    #     'create_system': {'include_blowdown_recycle': True},
+    #     'BT': 'BT',
+    #     'new_wwt_connections': {'sludge': ('M501', 0), 'biogas': ('BT', 1)},
+    #     }
+    # exist_sys, new_sys = create_comparison_systems(info, functions, sys_dct)
+
+    # exist_f, new_f = exist_sys.flowsheet, new_sys.flowsheet
+    # exist_sys.TEA.OSBL_units = [getattr(exist_f.unit, ID) for ID in OSBL_IDs]
+    # OSBL_IDs.remove('WWTC')
+    # OSBL_IDs.extend([u.ID for u in new_f.system.new_sys_wwt.units])
+    # new_sys.TEA.OSBL_units = [getattr(new_f.unit, ID) for ID in OSBL_IDs]
+
     from biorefineries.wwt import create_comparison_systems
     from biorefineries import cornstover as cs
-    from biorefineries.cornstover import (
-        create_chemicals,
-        create_system,
-        create_tea,
-        load_process_settings,
-        )
-    OSBL_IDs = [u.ID for u in cs.cornstover_tea.OSBL_units]
-    functions = (create_chemicals, create_system, create_tea, load_process_settings,)
     sys_dct = {
-        'create_system': {'include_blowdown_recycle': True},
+        'system_name': 'cornstover_sys',
         'BT': 'BT',
         'new_wwt_connections': {'sludge': ('M501', 0), 'biogas': ('BT', 1)},
         }
-    exist_sys, new_sys = create_comparison_systems(info, functions, sys_dct)
+    exist_sys, new_sys = create_comparison_systems(info, cs, sys_dct, from_load=True)
 
-    exist_f, new_f = exist_sys.flowsheet, new_sys.flowsheet
-    exist_sys.TEA.OSBL_units = [getattr(exist_f.unit, ID) for ID in OSBL_IDs]
-    OSBL_IDs.remove('WWTC')
-    OSBL_IDs.extend([u.ID for u in new_f.system.new_sys_wwt.units])
-    new_sys.TEA.OSBL_units = [getattr(new_f.unit, ID) for ID in OSBL_IDs]
     return exist_sys, new_sys
 
 

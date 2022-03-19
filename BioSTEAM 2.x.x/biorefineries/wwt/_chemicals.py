@@ -15,6 +15,7 @@ Part of the chemical data is from the lactic acid biorefinery:
 https://github.com/BioSTEAMDevelopmentGroup/Bioindustrial-Park/blob/master/BioSTEAM%202.x.x/biorefineries/lactic/_chemicals.py
 '''
 
+from warnings import warn
 from thermosteam import Chemical, settings
 
 __all__ = (
@@ -90,7 +91,10 @@ def add_wwt_chemicals(chemicals, set_thermo=True):
         aliases = chem.aliases
         chem_ID = chem.ID
         for alias in aliases:
-            chems.set_alias(chem_ID, alias)
+            try: chems.set_alias(chem_ID, alias)
+            except:
+                warn(f'Cannot set alias "{alias}" for chemical {chem_ID}, '
+                     'this alias might already be in use.')
         get(chems, chem.ID).aliases = chem.aliases
     for grp in chemicals._group_mol_compositions.keys():
         group_IDs = [chem.ID for chem in get(chemicals, grp)]

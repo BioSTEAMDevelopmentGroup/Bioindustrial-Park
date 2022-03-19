@@ -10,26 +10,33 @@
 import biosteam as bst
 from . import (
     add_wwt_chemicals, create_wastewater_process, CHP as CHPunit,
-    rename_storage_units, get_COD_breakdown, IRR_at_ww_price, ww_price_at_IRR,
+    rename_storage_units, get_COD_breakdown,
+    update_product_prices, IRR_at_ww_price, ww_price_at_IRR,
     )
 
-__all__ = ('create_comparison_systems', 'simulate_systems',)
+__all__ = (
+    'create_comparison_systems',
+    'simulate_systems',
+    )
 
 
 kwdct = {
-    'create_system': dict(),
+    'load': {},
+    'system_name': '',
+    'create_system': {},
     'rename_storage_to': None,
-    'create_tea': dict(),
-    'create_wastewater_process': dict(),
+    'create_tea': {},
+    'create_wastewater_process': {},
     'ww_streams': (),
     'BT': '',
     'solids_streams': (),
-    'new_wwt_connections': dict(),
+    'new_wwt_connections': {},
+    'update_product_price': False,
 }
 
-def create_comparison_systems(info, functions, sys_dct):
+
+def create_comparison_systems(info, functions, sys_dct={}, from_load=False):
     abbr, WWT_ID, is2G, add_CHP, ww_price = info.values()
-    create_chemicals, create_system, create_tea, load_process_settings = functions
     kwdct.update(sys_dct)
 
     if kwdct['new_wwt_connections']:
@@ -39,21 +46,33 @@ def create_comparison_systems(info, functions, sys_dct):
         sludge_ID = biogas_ID = ''
 
     ##### Existing system #####
-    exist_f = bst.Flowsheet(abbr)
+    if from_load:
+        module = functions
+        create_chemicals = module.create_chemicals
+        chemicals = add_wwt_chemicals(create_chemicals())
+        dct = module.__dict__
+        dct['_chemicals_loaded'] = True
+        dct['chemicals'] = chemicals
+        dct['_system_loaded'] = False
+        module.load(**kwdct['load'])
+        exist_f = bst.main_flowsheet
+        exist_sys_temp = dct[kwdct['system_name']]
+    else:
+        create_chemicals, create_system, create_tea, load_process_settings = functions
+        exist_f = bst.Flowsheet(abbr)
+        bst.main_flowsheet.set_flowsheet(exist_f)
+        chemicals = add_wwt_chemicals(create_chemicals())
+        load_process_settings()
+        exist_sys_temp = create_system('exist_sys_temp', **kwdct['create_system'])
+        if kwdct['rename_storage_to']:
+            rename_storage_units(exist_sys_temp, kwdct['rename_storage_to'])
+
     exist_u = exist_f.unit
     exist_s = exist_f.stream
-    bst.main_flowsheet.set_flowsheet(exist_f)
-    add_wwt_chemicals(create_chemicals())
-    load_process_settings()
-
-    exist_sys_temp = create_system('exist_sys_temp', **kwdct['create_system'])
-    if kwdct['rename_storage_to']:
-        rename_storage_units(exist_sys_temp, kwdct['rename_storage_to'])
 
     if not is2G:
         ww = bst.Stream('ww')
-        try: ww_streams = [getattr(exist_u, i[0]).outs[i[1]] for i in kwdct['ww_streams']]
-        except: breakpoint()
+        ww_streams = [getattr(exist_u, i[0]).outs[i[1]] for i in kwdct['ww_streams']]
         WWmixer = bst.Mixer('WWmixer', ins=ww_streams, outs=ww)
 
         solids = bst.Stream('solids')
@@ -64,22 +83,30 @@ def create_comparison_systems(info, functions, sys_dct):
         exist_wwt_units = [WWmixer, SolidsMixer]
     else:
         exist_wwt_units = [u for u in exist_u if (u.ID[1]==WWT_ID or u.ID=='WWTC')]
-    bst.System('exist_sys_wwt', path=exist_wwt_units,
-               operating_hours=exist_sys_temp.operating_hours)
+    exist_sys_wwt = bst.System('exist_sys_wwt', path=exist_wwt_units)
     exist_sys = bst.System.from_units('exist_sys', units=exist_u)
-    exist_tea = create_tea(exist_sys)
-    exist_tea.operating_hours = exist_sys.operating_hours
+    exist_sys_wwt.operating_hours = exist_sys.operating_hours = exist_sys_temp.operating_hours
+
+    if from_load:
+        exist_tea = exist_sys_temp.TEA.copy(exist_sys)
+    else:
+        exist_tea = create_tea(exist_sys)
+        exist_tea.operating_hours = exist_sys.operating_hours
 
     ##### With the new wastewater treatment process #####
-    new_f = bst.Flowsheet(f'new_{abbr}')
+    if from_load:
+        dct['_system_loaded'] = False
+        module.load(**kwdct['load'])
+        new_f = bst.main_flowsheet
+        new_sys_temp = dct[kwdct['system_name']]
+    else:
+        new_f = bst.Flowsheet(f'new_{abbr}')
+        bst.main_flowsheet.set_flowsheet(new_f)
+        new_sys_temp = create_system('new_sys_temp', **kwdct['create_system'])
+
     new_u = new_f.unit
     new_s = new_f.stream
-    bst.main_flowsheet.set_flowsheet(new_f)
 
-    new_sys_temp = create_system('new_sys_temp', **kwdct['create_system'])
-    if kwdct['rename_storage_to']:
-        rename_storage_units(new_sys_temp, kwdct['rename_storage_to'])
-        
     if is2G: # replace the conventional wastewater treatment process with new ones
         units_to_discard = [u for u in new_u if (u.ID[1]==WWT_ID or u.ID=='WWTC')]
 
@@ -96,7 +123,9 @@ def create_comparison_systems(info, functions, sys_dct):
 
         ww_streams = [s for s in getattr(new_u, f'M{WWT_ID}01').ins] # the original mixer for WWT
         for i in units_to_discard+streams_to_discard+systems_to_discard: new_f.discard(i)
-        for units in units_to_discard: new_sys_temp.units.remove(units)
+        for unit in units_to_discard:
+            if unit.__class__.__name__ == 'Junction': continue
+            new_sys_temp.units.remove(unit)
         for sys in systems_to_discard:
             try: new_sys_temp.subsystems.remove(sys)
             except: pass # some outdated systems are the subsystem of another system
@@ -119,10 +148,18 @@ def create_comparison_systems(info, functions, sys_dct):
     if add_CHP: CHPunit('CHP', ins=(new_s.biogas, new_s.sludge))
 
     new_sys = bst.System.from_units('new_sys', units=new_u)
-    new_sys_wwt.operating_hours = new_sys.operating_hours
+    new_sys_wwt.operating_hours = new_sys.operating_hours = new_sys_temp.operating_hours
 
-    new_tea = create_tea(new_sys)
-    new_tea.operating_hours = new_sys.operating_hours
+    ##### TEA #####
+    if from_load:
+        new_tea = new_sys_temp.TEA.copy(new_sys)
+    else:
+        new_tea = create_tea(new_sys)
+        new_tea.operating_hours = new_sys.operating_hours
+
+    if kwdct['update_product_price']:
+        update_product_prices(exist_s)
+        update_product_prices(new_s)
 
     return exist_sys, new_sys
 

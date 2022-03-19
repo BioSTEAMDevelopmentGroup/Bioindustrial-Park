@@ -32,7 +32,7 @@ from biosteam.units.decorators import cost
 from . import (
     default_insolubles,
     InternalCirculationRx, AnMBR, PolishingFilter, BeltThickener, SludgeCentrifuge,
-    get_combustion_energy, new_price,
+    get_combustion_energy, price,
     )
 
 _mgd_to_cmh = 157.7255 # auom('gallon').conversion_factor('m3')*1e6/24
@@ -252,11 +252,11 @@ def create_wastewater_process(ins, outs, process_ID='6', flowsheet=None,
     else:
         # Just setting the prices, flows will be updated upon simulation
         naocl_RX02 = tmo.Stream(f'naocl_R{X}02', NaOCl=0.125, Water=1-0.125, units='kg/hr')
-        naocl_RX02.price = (naocl_RX02.F_mass/naocl_RX02.F_vol/1000)*new_price['NaOCl'] # $/L to $/kg
+        naocl_RX02.price = (naocl_RX02.F_mass/naocl_RX02.F_vol/1000)*price['naocl'] # $/L to $/kg
         citric_RX02 = tmo.Stream(f'citric_R{X}02', CitricAcid=1, units='kg/hr')
-        citric_RX02.price = (citric_RX02.F_mass/citric_RX02.F_vol/1000)*new_price['CitricAcid'] # $/L to $/kg
+        citric_RX02.price = (citric_RX02.F_mass/citric_RX02.F_vol/1000)*price['citric_acid'] # $/L to $/kg
         bisulfite_RX02 = tmo.Stream(f'bisulfite_R{X}02', Bisulfite=0.38, Water=1-0.38, units='kg/hr')
-        bisulfite_RX02.price = (bisulfite_RX02.F_mass/bisulfite_RX02.F_vol/1000)*new_price['Bisulfite'] # $/L to $/kg
+        bisulfite_RX02.price = (bisulfite_RX02.F_mass/bisulfite_RX02.F_vol/1000)*price['bisulfite'] # $/L to $/kg
 
         RX02 = AnMBR(f'R{X}02', ins=(RX01-1, '', naocl_RX02, citric_RX02,
                                      bisulfite_RX02, f'air_R{X}02'),

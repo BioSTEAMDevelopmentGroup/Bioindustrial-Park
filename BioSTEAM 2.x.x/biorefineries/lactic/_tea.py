@@ -30,7 +30,7 @@ def create_tea(lactic_sys=None, OSBL_units=None, flowsheet=None):
     lactic_sys = lactic_sys or sys.lactic_sys
     if lactic_sys is not getattr(flowsheet.system, lactic_sys.ID):
         raise RuntimeError(f'The provided system "{lactic_sys.ID}" and '
-                           f'flowsheet "{flowsheet.ID}" do not match.')
+                            f'flowsheet "{flowsheet.ID}" do not match.')
 
     if not OSBL_units:
         ISBL_units = set((*sys.pretreatment_sys.units, *sys.conversion_sys.units,

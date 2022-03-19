@@ -39,7 +39,6 @@ References
 # =============================================================================
 
 import biosteam as bst
-from biorefineries import BST222
 
 __all__ = ('price', 'get_CFs', 'load_process_settings')
 
@@ -51,14 +50,9 @@ def load_process_settings(CE=541.7): # year 2016
 
     # These settings are sufficient to get baseline lactic acid price within $0.002/kg
     # of the final stabilized results
-    if BST222:
-        bst.System.default_converge_method = 'fixed-point' # aitken isn't stable
-        bst.System.default_maxiter = 1500
-        bst.System.default_molar_tolerance = 0.02
-    else:
-        bst.System.maxiter = 1500
-        bst.System.converge_method = 'fixed-point'
-        bst.System.molar_tolerance = 0.02
+    bst.System.default_converge_method = 'fixed-point' # aitken isn't stable
+    bst.System.default_maxiter = 1500
+    bst.System.default_molar_tolerance = 0.02
 
     lps = bst.HeatUtility.get_heating_agent('low_pressure_steam')
     mps = bst.HeatUtility.get_heating_agent('medium_pressure_steam')

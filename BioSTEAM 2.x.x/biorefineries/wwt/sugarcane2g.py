@@ -26,21 +26,34 @@ info = {
 # =============================================================================
 
 def create_sc2g_comparison_systems():
+    # # Does not work for oilcane biorefineries due to the many settings
+    # # not included in the system creation function
+    # from biorefineries.wwt import create_comparison_systems
+    # from biorefineries.oilcane import (
+    #     create_chemicals,
+    #     create_sugarcane_to_ethanol_combined_1_and_2g as create_system,
+    #     create_tea,
+    #     load_process_settings,
+    #     )
+    # functions = (create_chemicals, create_system, create_tea, load_process_settings,)
+    # sys_dct = {
+    #     'create_system': {'operating_hours': 24*200},
+    #     'rename_storage_to': 900,
+    #     'BT': 'BT701',
+    #     'new_wwt_connections': {'sludge': ('M701', 0), 'biogas': ('BT701', 1)},
+    #     }
+    # exist_sys, new_sys = create_comparison_systems(info, functions, sys_dct)
+
     from biorefineries.wwt import create_comparison_systems
-    from biorefineries.oilcane import (
-        create_chemicals,
-        create_sugarcane_to_ethanol_combined_1_and_2g as create_system,
-        create_tea,
-        load_process_settings,
-        )
-    functions = (create_chemicals, create_system, create_tea, load_process_settings,)
+    from biorefineries import oilcane as oc
     sys_dct = {
-        'create_system': {'operating_hours': 24*200},
-        'rename_storage_to': 900,
+        'load': {'name': 'S2', 'cache': None, 'reduce_chemicals': False},
+        'system_name': 'oilcane_sys',
         'BT': 'BT701',
         'new_wwt_connections': {'sludge': ('M701', 0), 'biogas': ('BT701', 1)},
         }
-    exist_sys, new_sys = create_comparison_systems(info, functions, sys_dct)
+    exist_sys, new_sys = create_comparison_systems(info, oc, sys_dct, from_load=True)
+
     return exist_sys, new_sys
 
 

@@ -26,6 +26,7 @@ info = {
 # =============================================================================
 
 def create_la_comparison_systems():
+    # Create from scratch
     from biorefineries.wwt import create_comparison_systems, add_wwt_chemicals
     from biorefineries.lactic import (
         create_chemicals,
@@ -34,7 +35,6 @@ def create_la_comparison_systems():
         load_process_settings,
         get_splits,
         )
-
     # Add WWT chemicals to the existing splits array,
     # splits of chemicals that do now exist in the original chemicals obj
     # will be copied from the splits of the corresponding group
@@ -51,10 +51,22 @@ def create_la_comparison_systems():
     functions = (create_chemicals, create_system, create_tea, load_process_settings,)
     sys_dct = {
         'create_system': {'cell_mass_split': new_cell_mass_split, 'gypsum_split': new_gypsum_split},
-        'BT': 'CHP'
+        'BT': 'CHP',
         'new_wwt_connections': {'sludge': ('M601', 0), 'biogas': ('CHP', 1)},
         }
     exist_sys, new_sys = create_comparison_systems(info, functions, sys_dct)
+
+    # # IRR doesn't match with direct loading as closely as creating from scratch
+    # from biorefineries.wwt import create_comparison_systems
+    # from biorefineries import lactic as la
+    # sys_dct = {
+    #     'load': {'print_results': False},
+    #     'system_name': 'lactic_sys',
+    #     'BT': 'CHP',
+    #     'new_wwt_connections': {'sludge': ('M601', 0), 'biogas': ('CHP', 1)},
+    #     }
+    # exist_sys, new_sys = create_comparison_systems(info, la, sys_dct, from_load=True)
+
     return exist_sys, new_sys
 
 

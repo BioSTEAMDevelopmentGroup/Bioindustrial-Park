@@ -23,7 +23,7 @@ from biosteam.units.design_tools.tank_design import (
     mix_tank_purchase_cost_algorithms,
     TankPurchaseCostAlgorithm
     )
-from biorefineries.cornstover import create_chemicals
+from biorefineries.cornstover import create_chemicals as create_cs_chemicals
 from ._chemicals import default_insolubles
 
 __all__ = (
@@ -42,8 +42,8 @@ __all__ = (
     'remove_undefined_chemicals', 'get_split_dct',
     'kph_to_tpd',
     'rename_storage_units',
-    # Price
-    'new_price', 'IRR_at_ww_price', 'ww_price_at_IRR', 'print_MESP',
+    # Prices
+    'price', 'update_product_prices', 'IRR_at_ww_price', 'ww_price_at_IRR',
     )
 
 
@@ -53,7 +53,7 @@ __all__ = (
 # Combustion
 # =============================================================================
 
-cs_chems = create_chemicals()
+cs_chems = create_cs_chemicals()
 def get_combustion_energy(stream, combustion_eff=0.8):
     '''
     Estimate the amount of energy generated from combustion of incoming streams.
@@ -93,7 +93,7 @@ def get_combustion_energy(stream, combustion_eff=0.8):
 ##### Internal Circulation Reactor #####
 IC_purchase_cost_algorithms = mix_tank_purchase_cost_algorithms.copy()
 conventional = IC_purchase_cost_algorithms['Conventional']
-#!!! Need to check if the cost correlation still holds for the ranges beyond
+# The cost correlation might not hold for the ranges beyond
 ic = TankPurchaseCostAlgorithm(
     ExponentialFunctor(A=conventional.f_Cp.A,
                        n=conventional.f_Cp.n),
@@ -413,7 +413,6 @@ def get_digestion_rxns(stream, BD, X_biogas, X_growth, biomass_ID):
 
         if iX_growth:
         # Cannot check atom balance since the substrate may not have the atom
-        #!!! Maybe balance this with CSL, DAP, and some other chemicals
             growth_rxn = Rxn(f'{i.ID} -> {i.MW/biomass_MW}{biomass_ID}',
                              reactant=i.ID, X=iX_growth,
                              check_atomic_balance=False)
@@ -528,26 +527,33 @@ _GDP_2007to2016 = 1.160
 # .. note::
 #
 #     The cornstover biorefinery uses 2011 USD whereas sugarcane and lipidcane
-#     biorefineries use 2013 USD, thus ideally prices in the the `new_price` dct
+#     biorefineries use 2013 USD, thus ideally prices in the the `price` dct
 #     should be adjusted accordingly. However, since the calculated MESPs are only
 #     used for comparison between biorefineries with the new wastewater treatment
 #     process vs. without/with the original process, this will not affect the
 #     conclusions.
 
-#!!! Want to adjust to $2016
-new_price = { # $/kg unless otherwise noted
-    'Wastewater': -0.03, # ref [1], negative value for cost from product,
-    'NaOCl': 0.14, # $/L
-    'CitricAcid': 0.22, # $/L
-    'Bisulfite': 0.08, # $/L
-    'Caustics': 0.2627, # la._settings.price['NaOH]/2 as the caustic is 50% NaOH/water
-    'Polymer': 2.6282 / _lb_per_kg / _GDP_2007to2016, # ref [2]
+price = { # $/kg unless otherwise noted
+    'wastewater': -0.03, # ref [1], negative value for cost from product,
+    'naocl': 0.14, # $/L
+    'citric_acid': 0.22, # $/L
+    'bisulfite': 0.08, # $/L
+    'ethanol': 0.789, # $/kg, lipidcane biorefinery
+    'biodiesel': 1.38, # $/kg, lipidcane biorefinery
+    'lactic_acid': 1.9, # $/kg, lactic acid biorefinery
+#    'caustics': 0.2627, # lactic acid biorefinery, price['NaOH]/2 as the caustic is 50% NaOH/water
+#    'polymer': 2.6282 / _lb_per_kg / _GDP_2007to2016, # ref [2]
     }
+
+def update_product_prices(stream_registry):
+    for p in 'ethanol', 'biodiesel', 'lactic_acid':
+        if stream_registry.search(p):
+            stream_registry.search(p).price = price[p]
 
 
 def IRR_at_ww_price(ww_stream, tea, ww_price=None):
     current_price = ww_stream.price
-    ww_stream.price = ww_price or new_price['Wastewater']
+    ww_stream.price = ww_price or price['wastewater']
     IRR = tea.solve_IRR()
     print(f'\nIRR: {IRR:.2%}\n')
     # Reset after analysis

@@ -27,6 +27,7 @@ info = {
 # =============================================================================
 
 def create_cn_comparison_systems():
+    # Create from scratch
     import biosteam as bst
     from biorefineries.wwt import create_comparison_systems
     from biorefineries.corn import (
@@ -42,6 +43,17 @@ def create_cn_comparison_systems():
         'ww_streams': (('MH103', 1), ('MX5', 0)),
         }
     exist_sys, new_sys = create_comparison_systems(info, functions, sys_dct)
+
+    # #!!! Why IRR doesn't match with direct loading?
+    # from biorefineries.wwt import create_comparison_systems
+    # from biorefineries import corn as cn
+    # sys_dct = {
+    #     'system_name': 'corn_sys',
+    #     'create_wastewater_process': {'skip_AeF': True},
+    #     'ww_streams': (('MH103', 1), ('MX5', 0)),
+    #     }
+    # exist_sys, new_sys = create_comparison_systems(info, cn, sys_dct, from_load=True)
+
     return exist_sys, new_sys
 
 
