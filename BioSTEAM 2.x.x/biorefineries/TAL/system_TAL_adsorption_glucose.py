@@ -352,9 +352,9 @@ def create_TAL_sys(ins, outs):
         void_fraction = 0.5, # v/v # Seader et al. Table 15.2
         adsorbent_capacity=0.091, # default value for unsaturated capacity (updated in unit specification); conservative heuristic from Seider et. al. (2017) Product and Process Design Principles. Wiley
         T_regeneration=30. + 273.15, 
-        drying_time = 10./60., # h
-        air_velocity = 1332., # m/h
-        # T_air = 100. + 273.15, #K
+        drying_time = 60./60., # h
+        T_air=TAL_chemicals.Ethanol.Tb + 10, # K
+        air_velocity = 2160, # m/h
         vessel_material='Stainless steel 316',
         vessel_type='Vertical',
         regeneration_fluid=dict(phase='l', Ethanol=1., units='kg/hr'),
@@ -421,8 +421,11 @@ def create_TAL_sys(ins, outs):
     
     
     # M404 = bst.Mixer('M402', ins=(AC401-2, AC2-2))
-    H402 = bst.units.HXutility('H402', ins=AC401-2, outs=('cooled_ethanol_laden_air'), 
-                               T=2.+273.15, rigorous=True)
+    H402 = bst.units.HXutility(
+        'H402', ins=AC401-2, outs=('cooled_ethanol_laden_air'), 
+        T=265,
+        rigorous=True
+    )
     
     S403 = bst.units.FakeSplitter('S403', ins=H402-0, outs=('cool_air', 'ethanol_recovered_from_air'))
     def S403_spec():
@@ -724,7 +727,9 @@ def create_TAL_sys(ins, outs):
     
     # Heat exchange network
     HXN = bst.facilities.HeatExchangerNetwork('HXN1001',
-                                               ignored=[H401, H402],
+                                               ignored=[H401, H402, 
+                                                        AC401.heat_exchanger_drying,
+                                                        AC401.heat_exchanger_regeneration],
                                                 # cache_network=True,
                                                 # force_ideal_thermo=True,
                                                )
