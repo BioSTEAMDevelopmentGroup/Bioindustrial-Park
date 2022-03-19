@@ -348,8 +348,8 @@ def create_TAL_sys(ins, outs):
         # This is density of activated carbon packing, including voids.
         # So rho_adsorbent = (1 - epsilon) * rho where epsilon is the void fraction
         # and rho is the density of activated carbon with no voids.
-        rho_adsorbent=350, # (in kg/m3) 
-        void_fraction = 0.35, # Only matters when K given; 0.30 - 0.35 for activated carbon
+        rho_adsorbent=350, # (in kg/m3)  # Seader et al. Table 15.2
+        void_fraction = 0.5, # v/v # Seader et al. Table 15.2
         adsorbent_capacity=0.091, # default value for unsaturated capacity (updated in unit specification); conservative heuristic from Seider et. al. (2017) Product and Process Design Principles. Wiley
         T_regeneration=30. + 273.15, 
         drying_time = 10./60., # h
@@ -363,9 +363,9 @@ def create_TAL_sys(ins, outs):
         length_unused = 1.219, # m; 4 ft based on recommendation by Seader et al. (Separation Process Principles)
         target_recovery=0.99,
         wet_retention=1., # conservatively assume one full wash's worth of ethanol is retained in the column before dry air is passed through it
-        K = 0.078, # back-calculated for 1 wash from experimental measurements for 3 washes pooled together; 0.125 for 3-wash # constant desorption partition coefficient; calculated for 1 wash from experimental data for 3 washes pooled together
+        K = 0.07795, # back-calculated for 1 wash from experimental measurements for 3 washes pooled together; 0.125 for 3-wash # constant desorption partition coefficient; calculated for 1 wash from experimental data for 3 washes pooled together
     )
-    
+    AC401._default_equipment_lifetime['Activated carbon'] = 1.
     AC401.adsorbent_cost['Activated carbon'] = price['Activated carbon'] # 41. $/ft^3
     
     @AC401.add_specification
@@ -725,8 +725,8 @@ def create_TAL_sys(ins, outs):
     # Heat exchange network
     HXN = bst.facilities.HeatExchangerNetwork('HXN1001',
                                                ignored=[H401, H402],
-                                               # cache_network=True,
-                                               # force_ideal_thermo=True,
+                                                # cache_network=True,
+                                                # force_ideal_thermo=True,
                                                )
 
     # HXN = HX_Network('HXN')
@@ -933,7 +933,7 @@ def load_titer_with_glucose(titer_to_load):
     spec.spec_2 = titer_to_load
     u.R302.titer_to_load = titer_to_load
     flx.IQ_interpolation(M304_titer_obj_fn, 1e-3, 8000.)
-    u.AC401.regeneration_velocity = min(14.4, 6.64 + ((14.4-6.64)/(20.05-3.))*(titer_to_load-3.)) # heuristic to obtain regeneration velocity at which MPSP is minimum fitted to results from simulations at target_recovery=0.99 
+    u.AC401.regeneration_velocity = min(14.4, 2.410 + ((10.168-2.410)/(30.-3.))*(titer_to_load-3.)) # heuristic to obtain regeneration velocity at which MPSP is minimum fitted to results from simulations at target_recovery=0.99 
     
 spec.load_spec_2 = load_titer_with_glucose
 
