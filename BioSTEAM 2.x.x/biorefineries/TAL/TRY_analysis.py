@@ -298,7 +298,7 @@ steps = 50
 
 # Yield, titer, productivity (rate)
 spec_1 = np.linspace(0.1, 0.9, steps) # yield
-spec_2 = np.linspace(1., 30., steps) # titer
+spec_2 = np.linspace(3., 30., steps) # titer
 # spec_1 = np.linspace(0.2, 0.99, steps) # yield
 # spec_2 = np.linspace(45, 225, steps) # titer
 spec_3 = np.array([0.21,]) # productivity
@@ -398,6 +398,7 @@ pd.DataFrame(data_1[:, :, 0, :][:,:,0]/907.185).to_csv('MPSP-'+file_to_save+'.cs
 file_to_load = file_to_save
 # file_to_load = 'C:/Users/saran/Documents/Academia/Spring 2020/BioSTEAM/Bioindustrial-Park/BioSTEAM 2.x.x/biorefineries/TAL/TAL_TRY_2020.9.22-16.44'
 data_1 = np.load(file_to_load+'.npy')
+# data_1 = np.load('TAL_TRY_2022.3.18-22.15.npy')
 data_1_copy = copy.deepcopy(data_1)
 
 data_2 = data_1
