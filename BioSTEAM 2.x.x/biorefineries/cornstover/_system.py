@@ -9,7 +9,6 @@ from biosteam import System
 import biosteam as bst
 import thermosteam as tmo
 from thermosteam import Stream
-from biorefineries import BST222
 from biorefineries.sugarcane import create_ethanol_purification_system
 from biorefineries.cornstover._process_settings import price
 from biorefineries.cornstover._chemicals import chemical_groups
