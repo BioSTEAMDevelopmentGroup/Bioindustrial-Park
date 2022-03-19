@@ -339,7 +339,7 @@ def create_TAL_sys(ins, outs):
         # ins=[bst.Stream('feed', TAL=0.014, Water=1, units='kg/hr', T=30 + 273.15), 'ethanol'], 
         ins=[H401-0, S402-0, 'hot_air'],
         outs=['broth_post_adsorption', 'TAL_laden_ethanol', 'ethanol_laden_air'],
-        mean_velocity=7.2, # m/h; typical velocities are 4 to 14.4 m/h for liquids; Adsorption basics Alan Gabelman (2017) Adsorption basics Part 1. AICHE
+        superficial_velocity=7.2, # m/h; typical velocities are 4 to 14.4 m/h for liquids; Adsorption basics Alan Gabelman (2017) Adsorption basics Part 1. AICHE
         
         regeneration_velocity=14.4, # m/h; default value (updated in unit specification based on titer)
         
@@ -348,7 +348,7 @@ def create_TAL_sys(ins, outs):
         # This is density of activated carbon packing, including voids.
         # So rho_adsorbent = (1 - epsilon) * rho where epsilon is the void fraction
         # and rho is the density of activated carbon with no voids.
-        rho_adsorbent=2050., # (in kg/m3) 
+        rho_adsorbent=350, # (in kg/m3) 
         void_fraction = 0.35, # Only matters when K given; 0.30 - 0.35 for activated carbon
         adsorbent_capacity=0.091, # default value for unsaturated capacity (updated in unit specification); conservative heuristic from Seider et. al. (2017) Product and Process Design Principles. Wiley
         T_regeneration=30. + 273.15, 
@@ -360,7 +360,7 @@ def create_TAL_sys(ins, outs):
         regeneration_fluid=dict(phase='l', Ethanol=1., units='kg/hr'),
         adsorbate_ID='TAL',  
         split=dict(TAL=0, Water=1, VitaminA=1., VitaminD2=1., FermMicrobe=1.),
-        length_plus = 1.219, # m; 4 ft based on recommendation by Seader et al. (Separation Process Principles)
+        length_unused = 1.219, # m; 4 ft based on recommendation by Seader et al. (Separation Process Principles)
         target_recovery=0.99,
         wet_retention=1., # conservatively assume one full wash's worth of ethanol is retained in the column before dry air is passed through it
         K = 0.078, # back-calculated for 1 wash from experimental measurements for 3 washes pooled together; 0.125 for 3-wash # constant desorption partition coefficient; calculated for 1 wash from experimental data for 3 washes pooled together
