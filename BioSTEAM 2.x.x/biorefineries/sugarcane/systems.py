@@ -21,6 +21,8 @@ __all__ = (
     'create_ethanol_purification_system',
     'create_sugarcane_to_ethanol_system',
     'create_bagasse_pelleting_system',
+    'create_sugar_crystallization_system',
+    'create_sugarcane_to_sugar_and_molasses_system',
 )
 
 
@@ -95,6 +97,8 @@ vinasse = skw('vinasse')
 wastewater = skw('wastewater')
 emissions = skw('emissions')
 ash_disposal = skw('ash_disposal')
+molasses = skw('molasses')
+sugar = skw('sugar')
       
 # %% Juicing and evaporation
 
@@ -481,6 +485,154 @@ def create_ethanol_purification_system(ins, outs,
 
 # %% Ethanol production section (fermentation and separations)
 
+
+@SystemFactory(
+    ID='sugar_crystallization_sys',
+    ins=[screened_juice, lime, H3PO4, polymer],
+    outs=[sugar, molasses]
+)
+
+def create_sugar_crystallization_system(ins, outs):
+    # https://www.researchgate.net/profile/Maciej-Starzak/publication/311206128_Mass_and_Energy_Balance_Modelling_of_a_Sugar_Mill_A_comparison_of_MATLABR_and_SUGARS_simulations/links/583f240308ae2d217557dcd8/Mass-and-Energy-Balance-Modelling-of-a-Sugar-Mill-A-comparison-of-MATLABR-and-SUGARS-simulations.pdf?origin=publication_detail
+    # https://www3.epa.gov/ttn/chief/ap42/ch09/final/c9s10-1a.pdf
+    screened_juice, lime, H3PO4, polymer = ins
+    sugar, molasses, = outs
+    
+    # Concentrate sugars
+    P1 = units.Pump('P1', ins=screened_juice, P=101325)
+    
+    MEE = units.MultiEffectEvaporator('MEE', P1-0,
+        P=(101325, 69682, 47057, 30953, 19781),
+        V_definition='First-effect',
+        V=0.3
+    ) # fraction evaporated
+    MEE.brix = 95
+    
+    def get_brix():
+        effluent = MEE.outs[0]
+        return 100 * effluent.imass['Sugar'] / effluent.imass['Water']
+    
+    def brix_objective(V):
+        MEE.V = V
+        MEE._run()
+        return MEE.brix - get_brix()
+    
+    @MEE.add_specification(run=False)
+    def adjust_glucose_concentration():
+        V_guess = MEE.V
+        MEE.V = flx.IQ_interpolation(
+            brix_objective, 0., 1., x=V_guess, ytol=1e-5
+        )
+    
+    # Mix in flocculant
+    T1 = units.MixTank('T1', (MEE-0, lime, H3PO4, polymer))
+    T1.tau = 0.10
+    
+    @T1.add_specification(run=True)
+    def correct_flows():
+        F_mass = T1.ins[0].F_mass
+        # correct lime, phosphoric acid, and imbibition water
+        lime.imass['CaO', 'Water'] = 0.1 * F_mass * np.array([0.046, 0.954])
+        H3PO4.imass['H3PO4', 'Water'] = 0.025 * F_mass
+    
+    # Separate residual solids
+    C1 = units.Clarifier('C1', T1-0, 
+                           split=dict(Ash=0,
+                                      Cellulose=0,
+                                      Flocculant=1,
+                                      Glucose=1,
+                                      Hemicellulose=0,
+                                      Lignin=0,
+                                      CaO=1,
+                                      H3PO4=1,
+                                      Sucrose=1,
+                                      Water=0.99))
+    P2 = units.Pump('P2', C1-0, P=101325)
+    M1 = units.Mixer('M1', (P2-0, '', ''))
+    E1 = units.Flash('E1', M1-0, V=0.5, P=5000)
+    
+    def get_purity(flash):
+        effluent = flash.outs[1]
+        return effluent.imass['Sugar'] / effluent.F_mass
+    
+    def purity_objective(V, flash):
+        flash.V = V
+        flash._run()
+        return flash.purity - get_purity(flash)
+    
+    def adjust_purity(flash):
+        V_guess = flash.V
+        y0 = purity_objective(0., flash)
+        if y0 < 0.: return
+        y1 = purity_objective(1., flash)
+        if y1 > 0.: return
+        try:
+            flash.V = flx.IQ_interpolation(
+                purity_objective, 0., 1., y0, y1, x=V_guess, ytol=1e-5,
+                args=(flash,),
+            )
+        except:
+            flash.show('cwt100')
+            print(purity_objective(0, flash))
+            print(purity_objective(1, flash))
+            breakpoint()
+    
+    E1.add_specification(adjust_purity, run=False, args=(E1,))
+    E1.purity = 0.8623
+    BC1 = units.BatchCrystallizer('BC1', E1-1, tau=48, V=3785)
+    
+    def get_split(molasses_flow, molasses_purity, crystal_flow, crystal_purity):
+        s_crystal = crystal_flow * crystal_purity
+        s_molasses = molasses_flow * molasses_purity
+        s_split = s_crystal / (s_crystal + s_molasses)
+        o_crystal = crystal_flow * (100 - crystal_purity)
+        o_molasses = molasses_flow * (100 - molasses_purity)
+        o_split = o_crystal / (o_crystal + o_molasses)
+        return dict(
+            Water=o_split,
+            H3PO4=o_split,
+            CaO=o_split,
+            Sugar=s_split,
+        )
+    
+    C2 = units.SolidsCentrifuge('C2', 
+        BC1-0, 
+        split=get_split(19.53, 62.91, 29.68, 98.61),
+        outs=[sugar, ''],
+        moisture_content=None,
+    )
+    
+    def correct_wash_water(mixer):
+        mixer.ins[1].imass['Water'] = mixer.ins[0].imass['Sugar']
+    
+    M2 = units.Mixer('M2', (C2-1, ''))
+    M2.add_specification(correct_wash_water, run=True, args=(M2,))
+    P3 = units.Pump('P3', M2-0, P=101325)
+    E2 = units.Flash('E2', P3-0, V=0.5, P=5000)
+    E2.add_specification(adjust_purity, run=False, args=(E2,))
+    E2.purity = 0.6291
+    BC2 = units.BatchCrystallizer('BC2', E2-1, tau=48, V=3785)
+    C3 = units.SolidsCentrifuge('C3', 
+        BC2-0, (2-M1, ''),
+        split=get_split(4.34, 33.88, 3.15, 96.49),
+        moisture_content=None,
+    )
+    M3 = units.Mixer('M3', (C3-1, ''))
+    M3.add_specification(correct_wash_water, run=True, args=(M3,))
+    P4 = units.Pump('P4', M3-0, P=101325)
+    E3 = units.Flash('E3', P4-0, V=0.5, P=5000)
+    E3.add_specification(adjust_purity, run=False, args=(E3,))
+    E3.purity = 0.5450
+    BC3 = units.BatchCrystallizer('BC3', E3-1, tau=48, V=3785)
+    C4 = units.SolidsCentrifuge('C4', 
+        BC3-0, (1-M1, molasses),
+        split=get_split(9.04, 32.88, 4.48, 93.84),
+        moisture_content=None,
+    )
+    
+    
+
+
 @SystemFactory(
     ID='sucrose_fermentation_sys',
     ins=[screened_juice],
@@ -712,6 +864,80 @@ def create_sugarcane_to_ethanol_system(ins, outs,
     D303 = edct['D303']
     HXN = bst.HeatExchangerNetwork(600 if use_area_convention else 'HXN',
                                    units=[F301, D303.condenser])
+    
+    # if vinasse_to_wastewater:
+    #     plant_air = bst.Stream('plant_air', N2=83333, units='kg/hr')
+    #     ADP = bst.facilities.AirDistributionPackage('ADP', plant_air)
+    #     @ADP.add_specification(run=True)
+    #     def adjust_plant_air():
+    #         plant_air.imass['N2'] = 0.8 * feedstock_handling_sys.ins[0].F_mass
+            
+    #     wastewater_treatment_sys = bst.create_wastewater_treatment_system(
+    #         ins=[vinasse],
+    #         mockup=True,
+    #     )
+    
+@SystemFactory(
+    ID='sugarcane_sys', 
+    ins=[sugarcane, H3PO4, lime, polymer], 
+    outs=[sugar, molasses, wastewater, emissions, ash_disposal]
+)
+def create_sugarcane_to_sugar_and_molasses_system(ins, outs, 
+                                       use_area_convention=False,
+                                       pellet_bagasse=None):
+    s = f.stream
+    u = f.unit
+    
+    sugarcane, H3PO4, lime, polymer, denaturant = ins
+    sugar, molasses, wastewater, emissions, ash_disposal = outs
+    
+    feedstock_handling_sys = create_feedstock_handling_system(
+        area=100 if use_area_convention else None,
+        ins=[sugarcane],
+        outs=[''],
+        mockup=True,
+    )
+    juicing_sys = create_juicing_system_with_fiber_screener(
+        area=200 if use_area_convention else None,
+        ins=[feedstock_handling_sys-0, H3PO4, lime, polymer],
+        pellet_bagasse=pellet_bagasse,
+        mockup=True
+    )
+    
+    sugar_crystallization_sys, edct = create_sugar_crystallization_system(
+        area=300 if use_area_convention else None,
+        udct=True,
+        ins=juicing_sys-0, outs=(sugar, molasses),
+        mockup=True
+    )
+    M305 = units.Mixer(400 if use_area_convention else 'M305', 
+        ins=(juicing_sys-2,),
+        outs=wastewater
+    )
+    
+    ### Facilities ###    
+    
+    BT = units.BoilerTurbogenerator(400 if use_area_convention else 'BT',
+        (juicing_sys-1, '', 'boiler_makeup_water', 'natural_gas', '', ''),
+        outs=(emissions, 'rejected_water_and_blowdown', ash_disposal),
+        boiler_efficiency=0.80,
+        turbogenerator_efficiency=0.85
+    )
+    CT = units.CoolingTower(500 if use_area_convention else 'CT')
+    makeup_water_streams = (s.cooling_tower_makeup_water,
+                            s.boiler_makeup_water)
+    process_water_streams = (s.imbibition_water,
+                             s.rvf_wash_water,
+                             *makeup_water_streams)
+    makeup_water = bst.Stream('makeup_water', price=0.000254)
+    CWP = units.ChilledWaterPackage(500 if use_area_convention else 'CWP')
+    PWC = units.ProcessWaterCenter(500 if use_area_convention else 'PWC',
+                                   (bst.Stream(), makeup_water),
+                                   (),
+                                   None,
+                                   makeup_water_streams,
+                                   process_water_streams)
+    HXN = bst.HeatExchangerNetwork(600 if use_area_convention else 'HXN')
     
     # if vinasse_to_wastewater:
     #     plant_air = bst.Stream('plant_air', N2=83333, units='kg/hr')
