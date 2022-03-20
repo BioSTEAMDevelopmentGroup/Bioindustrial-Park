@@ -7,7 +7,7 @@ Created on Thu Dec 21 11:05:24 2017
 import numpy as np
 import biosteam as bst
 import flexsolve as flx
-from biosteam import units, SystemFactory
+from biosteam import units, SystemFactory, stream_kwargs as skw
 from biosteam import main_flowsheet as f
 
 __all__ = (
@@ -24,12 +24,84 @@ __all__ = (
 )
 
 
+bagasse = skw('bagasse')
+bagasse_pellets = skw('bagasse_pellets')
+sugarcane = skw('sugarcane',
+    Water=0.7,
+    Glucose=0.01208,
+    Sucrose=0.1369,
+    Ash=0.006,
+    Cellulose=0.06115,
+    Hemicellulose=0.03608,
+    Lignin=0.03276,
+    Solids=0.015,
+    total_flow=333334.2,
+    units='kg/hr',
+    price=0.03455
+)
+shredded_cane = skw('shredded_cane')
+untreated_juice = skw('untreated_juice')
+H3PO4 = skw('H3PO4',
+    H3PO4=74.23,
+    Water=13.1,
+    units='kg/hr',
+    price=0
+)
+lime = skw('lime',
+    CaO=333.0,
+    Water=2200.0,
+    units='kg/hr',
+    price=0.077
+)
+polymer = skw('polymer',
+    Flocculant=0.83,
+    units='kg/hr',
+    price=0
+)
+clarified_juice = skw('clarified_juice')
+screened_juice = skw('screened_juice', 
+    Glucose=3802,
+    Sucrose=4.309e+04,
+    Water=2.59e+05,
+    H3PO4=83.33,
+    units='kg/hr',
+    T=372
+)
+fiber_fines = skw('fiber_fines')
+beer = skw('beer',
+    T=348.34,
+    P=101325,
+    Water=96500.0,
+    Ethanol=22550.0,
+    Glucose=4916,
+    H3PO4=83.33,
+    Yeast=103,
+    units='kg/hr'
+)
+distilled_beer = skw('distilled_beer')
+stillage = skw('stillage')
+denaturant = skw('denaturant',
+    Octane=230.69,
+    units='kg/hr',
+    price=0.756
+)
+ethanol = skw('ethanol',
+    price=0.789
+)
+stripper_bottoms_product = skw('stripper_bottoms_product')
+evaporator_condensate = skw('evaporator_condensate')
+vent = skw('vent')
+vinasse = skw('vinasse')
+wastewater = skw('wastewater')
+emissions = skw('emissions')
+ash_disposal = skw('ash_disposal')
+      
 # %% Juicing and evaporation
 
 @SystemFactory(
     ID='bagasse_pelleting_sys',
-    ins=[dict(ID='bagasse')],
-    outs=[dict(ID='bagasse_pellets')]
+    ins=[bagasse],
+    outs=[bagasse_pellets]
 )
 def create_bagasse_pelleting_system(ins, outs):
     bagasse, = ins
@@ -47,19 +119,8 @@ def create_bagasse_pelleting_system(ins, outs):
 
 @SystemFactory(
     ID='feedstock_handling_sys',
-    ins=[dict(ID='sugarcane',
-              Water=0.7,
-              Glucose=0.01208,
-              Sucrose=0.1369,
-              Ash=0.006,
-              Cellulose=0.06115,
-              Hemicellulose=0.03608,
-              Lignin=0.03276,
-              Solids=0.015,
-              total_flow=333334.2,
-              units='kg/hr',
-              price=0.03455)],
-    outs=[dict(ID='shredded_cane')]
+    ins=[sugarcane],
+    outs=[shredded_cane]
 )
 def create_feedstock_handling_system(ins, outs):
     sugarcane, = ins
@@ -70,9 +131,8 @@ def create_feedstock_handling_system(ins, outs):
 
 @SystemFactory(
     ID='juicing_sys',
-    ins=[create_feedstock_handling_system.ins[0]],
-    outs=[dict(ID='untreated_juice'),
-          dict(ID='bagasse')]
+    ins=[sugarcane],
+    outs=[untreated_juice, bagasse]
 )
 def create_juicing_system_without_treatment(ins, outs, pellet_bagasse=None):
     if pellet_bagasse is None: pellet_bagasse = False
@@ -127,23 +187,8 @@ def create_juicing_system_without_treatment(ins, outs, pellet_bagasse=None):
 
 @SystemFactory(
     ID='juicing_sys',
-    ins=[*create_juicing_system_without_treatment.ins,
-         dict(ID='H3PO4',
-              H3PO4=74.23,
-              Water=13.1,
-              units='kg/hr',
-              price=0),
-         dict(ID='lime',
-              CaO=333.0,
-              Water=2200.0,
-              units='kg/hr',
-              price=0.077),
-         dict(ID='polymer',
-              Flocculant=0.83,
-              units='kg/hr',
-              price=0)],
-    outs=[dict(ID='clarified_juice'),
-          dict(ID='bagasse')]
+    ins=[sugarcane, H3PO4, lime, polymer],
+    outs=[clarified_juice, bagasse]
 )
 def create_juicing_system_up_to_clarification(ins, outs, pellet_bagasse=None):
     
@@ -235,10 +280,8 @@ def create_juicing_system_up_to_clarification(ins, outs, pellet_bagasse=None):
 
 @SystemFactory(
     ID='juicing_sys',
-    ins=create_juicing_system_up_to_clarification.ins,
-    outs=[dict(ID='screened_juice'),
-          dict(ID='bagasse'),
-          dict(ID='fiber_fines')]
+    ins=[sugarcane, H3PO4, lime, polymer],
+    outs=[screened_juice, bagasse, fiber_fines]
 )          
 def create_juicing_system_with_fiber_screener(ins, outs, pellet_bagasse=None):
     screened_juice, bagasse, fiber_fines = outs
@@ -266,17 +309,8 @@ def create_juicing_system_with_fiber_screener(ins, outs, pellet_bagasse=None):
 
 @SystemFactory(
     ID='beer_distillation_sys',
-    ins=[dict(ID='beer',
-              T=348.34,
-              P=101325,
-              Water=96500.0,
-              Ethanol=22550.0,
-              Glucose=4916,
-              H3PO4=83.33,
-              Yeast=103,
-              units='kg/hr')],
-    outs=[dict(ID='distilled_beer'),
-          dict(ID='stillage')] # TODO: Find good selling price for stillage/vinasse and possibly yeast
+    ins=[beer],
+    outs=[distilled_beer, stillage] # TODO: Find good selling price for stillage/vinasse and possibly yeast
 )
 def create_beer_distillation_system(ins, outs,
                                     beer_column_heat_integration=True,
@@ -312,14 +346,8 @@ def create_beer_distillation_system(ins, outs,
 
 @SystemFactory(
     ID='ethanol_purification_from_distilled_beer_sys',
-    ins=[dict(ID='distilled_beer'),
-         dict(ID='denaturant',
-              Octane=230.69,
-              units='kg/hr',
-              price=0.756)],
-    outs=[dict(ID='ethanol',
-               price=0.789),
-          dict(ID='stripper_bottoms_product')]
+    ins=[distilled_beer, denaturant],
+    outs=[ethanol, stripper_bottoms_product]
 )
 def create_ethanol_purification_system_after_beer_column(ins, outs, IDs={}):
     distilled_beer, denaturant = ins
@@ -384,10 +412,10 @@ def create_ethanol_purification_system_after_beer_column(ins, outs, IDs={}):
 
 # @SystemFactory(
 #     ID='ethanol_purification_from_distilled_beer_sys',
-#     ins=[dict(ID='distilled_beer'),
-#           dict(ID='denaturant', Octane=230.69, units='kg/hr', price=0.756)],
-#     outs=[dict(ID='ethanol', price=0.789),
-#           dict(ID='stripper_bottoms_product')]
+#     ins=[skw('distilled_beer'),
+#           skw('denaturant', Octane=230.69, units='kg/hr', price=0.756)],
+#     outs=[skw('ethanol', price=0.789),
+#           skw('stripper_bottoms_product')]
 # )
 # def create_ethanol_purification_system_after_beer_column(ins, outs):
 #     distilled_beer, denaturant = ins
@@ -427,19 +455,8 @@ def create_ethanol_purification_system_after_beer_column(ins, outs, IDs={}):
 
 @SystemFactory(
     ID='ethanol_purification_sys',
-    ins=[dict(ID='beer',
-              T=348.34,
-              P=101325,
-              Water=96500.0,
-              Ethanol=22550.0,
-              Glucose=4916,
-              H3PO4=83.33,
-              Yeast=103,
-              units='kg/hr'),
-         create_ethanol_purification_system_after_beer_column.ins[1]],
-    outs=[create_ethanol_purification_system_after_beer_column.outs[0],
-          dict(ID='stillage'),
-          create_ethanol_purification_system_after_beer_column.outs[1]]
+    ins=[beer, denaturant],
+    outs=[ethanol, stillage, stripper_bottoms_product]
 )
 def create_ethanol_purification_system(ins, outs,
                                        beer_column_heat_integration=True,
@@ -466,16 +483,8 @@ def create_ethanol_purification_system(ins, outs,
 
 @SystemFactory(
     ID='sucrose_fermentation_sys',
-    ins=[dict(ID='screened_juice', 
-              Glucose=3802,
-              Sucrose=4.309e+04,
-              Water=2.59e+05,
-              H3PO4=83.33,
-              units='kg/hr',
-              T=372)],
-    outs=[dict(ID='beer'),
-          dict(ID='evaporator_condensate'),
-          dict(ID='vent')],
+    ins=[screened_juice],
+    outs=[beer, evaporator_condensate, vent],
 )
 def create_sucrose_fermentation_system(ins, outs, scrubber=True):
     screened_juice, = ins
@@ -614,10 +623,8 @@ def create_sucrose_fermentation_system(ins, outs, scrubber=True):
 
 @SystemFactory(
     ID='sucrose_to_ethanol_sys',
-    ins=[create_sucrose_fermentation_system.ins[0],
-         create_ethanol_purification_system.ins[1]], # denaturant
-    outs=[*create_ethanol_purification_system.outs,
-          create_sucrose_fermentation_system.outs[1]]
+    ins=[screened_juice, denaturant],
+    outs=[ethanol, stillage, stripper_bottoms_product, evaporator_condensate]
 )
 def create_sucrose_to_ethanol_system(ins, outs):
     screened_juice, denaturant = ins
@@ -642,13 +649,8 @@ def create_sucrose_to_ethanol_system(ins, outs):
 
 @SystemFactory(
     ID='sugarcane_sys', 
-    ins=[*create_juicing_system_with_fiber_screener.ins,
-         create_ethanol_purification_system.ins[1]], # denaturant
-    outs=[create_ethanol_purification_system.outs[0], # ethanol
-          dict(ID='vinasse'),
-          dict(ID='wastewater'),
-          dict(ID='emissions'),
-          dict(ID='ash_disposal')]
+    ins=[sugarcane, H3PO4, lime, polymer, denaturant], 
+    outs=[ethanol, vinasse, wastewater, emissions, ash_disposal]
 )
 def create_sugarcane_to_ethanol_system(ins, outs, 
                                        use_area_convention=False,
