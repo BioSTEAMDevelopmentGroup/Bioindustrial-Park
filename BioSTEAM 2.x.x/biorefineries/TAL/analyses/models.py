@@ -326,8 +326,8 @@ def set_adsorbent_vvf(frac):
 D = shape.Uniform(500, 900) # Seader et al., Table 15.2
 @param(name='Adsorbent solid particle density', element=AC401, kind='coupled', units='kg/m^3',
        baseline=700, distribution=D)
-def set_adsorbent_bulk_rho(rho):
-    AC401.rho_adsorbent = rho * AC401.void_fraction
+def set_adsorbent_solid_rho(rho):
+    AC401.rho_adsorbent_solid = rho
 
 D = shape.Triangle(0.8*0.07795, 0.07795, 1.2*0.07795)
 @param(name='Desorption single-wash partition coefficient', element=AC401, kind='coupled', units='(g/L)/(g/L)',

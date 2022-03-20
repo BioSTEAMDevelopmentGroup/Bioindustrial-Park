@@ -349,7 +349,9 @@ def create_TAL_sys(ins, outs):
         # So rho_adsorbent = (1 - epsilon) * rho where epsilon is the void fraction
         # and rho is the density of activated carbon with no voids.
         adsorbent='Activated carbon',
-        rho_adsorbent=350, # (in kg/m3)  # Seader et al. Table 15.2
+        rho_adsorbent=None, # Bulk density including void fraction; calculated based on void fraction and solid density
+        rho_adsorbent_solid=700, # Solid density excluding void fraction (in kg/m3)  # Seader et al. Table 15.2
+        
         void_fraction = 0.5, # v/v # Seader et al. Table 15.2
         adsorbent_capacity=0.091, # default value for unsaturated capacity (updated in unit specification); conservative heuristic from Seider et. al. (2017) Product and Process Design Principles. Wiley
         T_regeneration=30. + 273.15, 
