@@ -315,7 +315,8 @@ def create_TAL_sys(ins, outs):
                                 split=find_split(S401_index,
                                                   S401_cell_mass_split,
                                                   S401_filtrate_split,
-                                                  chemical_groups), solids =\
+                                                  chemical_groups), 
+                                solids =\
                                     ['Xylan', 'Glucan', 'Lignin', 'FermMicrobe',\
                                       'Ash', 'Arabinan', 'Galactan', 'Mannan'])
     
@@ -941,12 +942,12 @@ spec.load_spec_3 = spec.load_productivity
 def M304_titer_obj_fn(water_to_sugar_mol_ratio):
     M304, R302 = u.M304, u.R302
     M304.water_to_sugar_mol_ratio = water_to_sugar_mol_ratio
-    M304.specification[0]()
+    M304.specification[0][0]()
     u.M304_H._run()
     u.S302._run()
     u.R303._run()
     u.T301._run()
-    R302.specification[0]()
+    R302.specification[0][0]()
     # broth = R302.outs[0]
     # return broth.imass['TAL']/broth.F_vol - R302.titer_to_load
     return R302.effluent_titer - R302.titer_to_load
