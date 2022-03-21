@@ -8,7 +8,8 @@ from thermosteam import functional as fn
 from biorefineries.lipidcane._chemicals import create_acyl_olein
 
 __all__ = ('create_cellulosic_chemicals',
-           'create_conventional_chemicals')
+           'create_conventional_chemicals',
+           'chemical_data')
 
 chemical_data_path = os.path.join(os.path.dirname(__file__), 'chemicals.yaml')
 chemical_data = tmo.ThermoData.from_yaml(chemical_data_path)

@@ -11,7 +11,7 @@ from . import (
     units,
     _process_settings,
     _chemicals,
-    _system,
+    systems,
     _tea,
     _oil_extraction_specification,
     _distributions,
@@ -26,7 +26,7 @@ from .units import *
 from ._process_settings import *
 from ._chemicals import *
 from ._contour_plots import *
-from ._system import *
+from .systems import *
 from ._tea import *
 from ._oil_extraction_specification import *
 from ._distributions import *
@@ -42,7 +42,7 @@ __all__ = (
     units.__all__,
     *_process_settings.__all__,
     *_chemicals.__all__,
-    *_system.__all__,
+    *systems.__all__,
     *_tea.__all__,
     *_oil_extraction_specification.__all__,
     *_distributions.__all__,
@@ -69,7 +69,7 @@ from chaospy import distributions as shape
 import numpy as np
 from ._process_settings import load_process_settings
 from ._chemicals import create_chemicals
-from ._system import (
+from .systems import (
     create_oilcane_to_biodiesel_and_ethanol_1g,
     create_oilcane_to_biodiesel_and_ethanol_combined_1_and_2g_post_fermentation_oil_separation,
     create_sugarcane_to_ethanol_combined_1_and_2g,    

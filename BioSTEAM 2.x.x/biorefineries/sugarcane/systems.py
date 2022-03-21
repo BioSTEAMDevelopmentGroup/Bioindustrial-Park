@@ -9,6 +9,7 @@ import biosteam as bst
 import flexsolve as flx
 from biosteam import units, SystemFactory, stream_kwargs as skw
 from biosteam import main_flowsheet as f
+import thermosteam as tmo
 
 __all__ = (
     'create_feedstock_handling_system',
@@ -23,6 +24,7 @@ __all__ = (
     'create_bagasse_pelleting_system',
     'create_sugar_crystallization_system',
     'create_sugarcane_to_sugar_and_molasses_system',
+    'convert_fiber_to_lignocelluosic_components',
 )
 
 
@@ -98,8 +100,36 @@ wastewater = skw('wastewater')
 emissions = skw('emissions')
 ash_disposal = skw('ash_disposal')
 molasses = skw('molasses')
-sugar = skw('sugar')
+sugar = skw('sugar', price=0.419) # https://markets.businessinsider.com/commodities/sugar-price?op=1 (3/18/2022)
       
+def convert_fiber_to_lignocelluosic_components(stream):
+    chemicals = stream.chemicals
+    if chemicals is convert_fiber_to_lignocelluosic_components.last_chemicals:
+        prxn = convert_fiber_to_lignocelluosic_components.last_reaction
+    else:
+        cellulose_rxn = tmo.Reaction('Cellulose -> Glucan', 'Cellulose', 1.0,
+                                     basis='wt', chemicals=chemicals)
+        cellulose_rxn.basis = 'mol'
+        # Bagasse composition https://www.sciencedirect.com/science/article/pii/S0144861710005072
+        # South american; by HPLC
+        # Glucan: 41.3%
+        # Xylan: 24.9%
+        # Galactan: 0.6%
+        # Arabinan: 1.7%
+        # Lignin: 23.2%
+        # Acetyl: 3.0%
+        hemicellulose_rxn = tmo.Reaction(
+            '30.2 Hemicellulose -> 24.9 Xylan + 1.7 Arabinan + 0.6 Galactan + 3 Acetate', 'Hemicellulose', 
+            1.0, basis='wt', chemicals=chemicals)
+        hemicellulose_rxn.basis = 'mol'
+        convert_fiber_to_lignocelluosic_components.last_chemicals = chemicals
+        convert_fiber_to_lignocelluosic_components.last_reaction = prxn = tmo.ParallelReaction(
+            [cellulose_rxn, hemicellulose_rxn]
+        )
+    prxn(stream)
+
+convert_fiber_to_lignocelluosic_components.last_chemicals = None
+
 # %% Juicing and evaporation
 
 @SystemFactory(
@@ -493,10 +523,15 @@ def create_ethanol_purification_system(ins, outs,
 )
 
 def create_sugar_crystallization_system(ins, outs):
+    # TODO: Add conveyors, storage tanks, packing, sugar remelter
     # https://www.researchgate.net/profile/Maciej-Starzak/publication/311206128_Mass_and_Energy_Balance_Modelling_of_a_Sugar_Mill_A_comparison_of_MATLABR_and_SUGARS_simulations/links/583f240308ae2d217557dcd8/Mass-and-Energy-Balance-Modelling-of-a-Sugar-Mill-A-comparison-of-MATLABR-and-SUGARS-simulations.pdf?origin=publication_detail
     # https://www3.epa.gov/ttn/chief/ap42/ch09/final/c9s10-1a.pdf
+    # http://sugartech.co.za/verticalcrystalliser/index.php
     screened_juice, lime, H3PO4, polymer = ins
     sugar, molasses, = outs
+    
+    if 'Sugar' not in sugar.chemicals:
+        sugar.chemicals.define_group('Sugar', ('Glucose', 'Sucrose'))
     
     # Concentrate sugars
     P1 = units.Pump('P1', ins=screened_juice, P=101325)
@@ -510,7 +545,9 @@ def create_sugar_crystallization_system(ins, outs):
     
     def get_brix():
         effluent = MEE.outs[0]
-        return 100 * effluent.imass['Sugar'] / effluent.imass['Water']
+        water = effluent.imass['Water']
+        if water < 0.0001: water = 0.0001
+        return 100 * effluent.imass['Sugar'] / water
     
     def brix_objective(V):
         MEE.V = V
@@ -549,7 +586,7 @@ def create_sugar_crystallization_system(ins, outs):
                                       Water=0.99))
     P2 = units.Pump('P2', C1-0, P=101325)
     M1 = units.Mixer('M1', (P2-0, '', ''))
-    E1 = units.Flash('E1', M1-0, V=0.5, P=5000)
+    E1 = units.Flash('E1', M1-0, V=0.5, P=15000)
     
     def get_purity(flash):
         effluent = flash.outs[1]
@@ -579,7 +616,7 @@ def create_sugar_crystallization_system(ins, outs):
     
     E1.add_specification(adjust_purity, run=False, args=(E1,))
     E1.purity = 0.8623
-    BC1 = units.BatchCrystallizer('BC1', E1-1, tau=48, V=3785)
+    BC1 = units.BatchCrystallizer('BC1', E1-1, tau=8, V=3785, T=55 + 273.15)
     
     def get_split(molasses_flow, molasses_purity, crystal_flow, crystal_purity):
         s_crystal = crystal_flow * crystal_purity
@@ -598,9 +635,10 @@ def create_sugar_crystallization_system(ins, outs):
     C2 = units.SolidsCentrifuge('C2', 
         BC1-0, 
         split=get_split(19.53, 62.91, 29.68, 98.61),
-        outs=[sugar, ''],
         moisture_content=None,
     )
+    
+    S1 = units.StorageTank('S1', C2-0, sugar, tau=27 * 7)
     
     def correct_wash_water(mixer):
         mixer.ins[1].imass['Water'] = mixer.ins[0].imass['Sugar']
@@ -608,10 +646,10 @@ def create_sugar_crystallization_system(ins, outs):
     M2 = units.Mixer('M2', (C2-1, ''))
     M2.add_specification(correct_wash_water, run=True, args=(M2,))
     P3 = units.Pump('P3', M2-0, P=101325)
-    E2 = units.Flash('E2', P3-0, V=0.5, P=5000)
+    E2 = units.Flash('E2', P3-0, V=0.5, P=15000)
     E2.add_specification(adjust_purity, run=False, args=(E2,))
     E2.purity = 0.6291
-    BC2 = units.BatchCrystallizer('BC2', E2-1, tau=48, V=3785)
+    BC2 = units.BatchCrystallizer('BC2', E2-1, tau=24, V=3785, T=50 + 273.15)
     C3 = units.SolidsCentrifuge('C3', 
         BC2-0, (2-M1, ''),
         split=get_split(4.34, 33.88, 3.15, 96.49),
@@ -620,19 +658,18 @@ def create_sugar_crystallization_system(ins, outs):
     M3 = units.Mixer('M3', (C3-1, ''))
     M3.add_specification(correct_wash_water, run=True, args=(M3,))
     P4 = units.Pump('P4', M3-0, P=101325)
-    E3 = units.Flash('E3', P4-0, V=0.5, P=5000)
+    E3 = units.Flash('E3', P4-0, V=0.5, P=15000)
     E3.add_specification(adjust_purity, run=False, args=(E3,))
     E3.purity = 0.5450
-    BC3 = units.BatchCrystallizer('BC3', E3-1, tau=48, V=3785)
+    BC3 = units.BatchCrystallizer('BC3', E3-1, tau=40, V=3785, T=45 + 273.15)
     C4 = units.SolidsCentrifuge('C4', 
-        BC3-0, (1-M1, molasses),
+        BC3-0, (1-M1, ''),
         split=get_split(9.04, 32.88, 4.48, 93.84),
         moisture_content=None,
     )
+    S2 = units.StorageTank('S2', C4-1, molasses, tau=24 * 7)
     
     
-
-
 @SystemFactory(
     ID='sucrose_fermentation_sys',
     ins=[screened_juice],
