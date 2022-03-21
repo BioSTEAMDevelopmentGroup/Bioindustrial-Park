@@ -317,23 +317,35 @@ D = shape.Triangle(0.0739, 0.0910, 0.2474)
 def set_adsorbent_cap(cap):
     AC401.adsorbent_capacity = cap
 
-D = shape.Triangle(0.8*0.35, 0.35, 1.2*0.35)
+D = shape.Uniform(0.4, 0.6) # Seader et al., Table 15.2
 @param(name='Adsorbent void volume fraction', element=AC401, kind='coupled', units='L/L',
-       baseline=0.35, distribution=D)
+       baseline=0.5, distribution=D)
 def set_adsorbent_vvf(frac):
     AC401.void_fraction = frac
 
-D = shape.Triangle(0.8*2050, 2050, 1.2*2050)
-@param(name='Adsorbent bulk density', element=AC401, kind='coupled', units='kg/m^3',
-       baseline=2050, distribution=D)
-def set_adsorbent_bulk_rho(rho):
-    AC401.rho_adsorbent = rho
+D = shape.Uniform(500, 900) # Seader et al., Table 15.2
+@param(name='Adsorbent solid particle density', element=AC401, kind='coupled', units='kg/m^3',
+       baseline=700, distribution=D)
+def set_adsorbent_solid_rho(rho):
+    AC401.rho_adsorbent_solid = rho
 
-D = shape.Triangle(0.8*0.078, 0.078, 1.2*0.078)
+D = shape.Triangle(0.8*0.07795, 0.07795, 1.2*0.07795)
 @param(name='Desorption single-wash partition coefficient', element=AC401, kind='coupled', units='(g/L)/(g/L)',
-       baseline=0.078, distribution=D)
+       baseline=0.07795, distribution=D)
 def set_desorption_K(K):
     AC401.K = K
+    
+D = shape.Uniform(0.1, 1.9) # assumed
+@param(name='Adsorbent replacement period', element=AC401, kind='coupled', units='y',
+       baseline=1., distribution=D)
+def set_adsorbent_lifetime(lt):
+    AC401._default_equipment_lifetime['Activated carbon'] = lt
+
+D = shape.Uniform(0.05, 0.95) # assumed
+@param(name='Regeneration fluid wet retention', element=AC401, kind='coupled', units='L-ethanol/L-void',
+       baseline=0.5, distribution=D)
+def set_wet_retention(wr):
+    AC401.wet_retention = wr
     
 #%%
 ######################## Facility parameters ########################

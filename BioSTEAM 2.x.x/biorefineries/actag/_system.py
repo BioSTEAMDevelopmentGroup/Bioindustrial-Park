@@ -17,10 +17,10 @@ from ..lipidcane import (
     create_lipid_pretreatment_system as create_oil_pretreatment_system,
     create_transesterification_and_biodiesel_separation_system,
 )
-from ..oilcane._system import (
+from ..oilcane.systems import (
     create_post_fermentation_oil_separation_system
 )
-from ..sugarcane._system import (
+from ..sugarcane.systems import (
     create_juicing_system_with_fiber_screener,
 )
 from biorefineries.cornstover import price

@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 import os
 from biorefineries.cornstover import create_tea
-from ._chemicals import create_conventional_chemicals, create_cellulosic_chemicals
+from ._chemicals import *
 from ._system import (
     create_cellulosic_acTAG_system,
     create_conventional_acTAG_system,

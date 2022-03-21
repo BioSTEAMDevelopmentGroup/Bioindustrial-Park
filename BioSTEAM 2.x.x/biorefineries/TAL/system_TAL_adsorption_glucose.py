@@ -348,13 +348,16 @@ def create_TAL_sys(ins, outs):
         # This is density of activated carbon packing, including voids.
         # So rho_adsorbent = (1 - epsilon) * rho where epsilon is the void fraction
         # and rho is the density of activated carbon with no voids.
-        rho_adsorbent=350, # (in kg/m3) 
-        void_fraction = 0.35, # Only matters when K given; 0.30 - 0.35 for activated carbon
+        adsorbent='Activated carbon',
+        rho_adsorbent=None, # Bulk density including void fraction; calculated based on void fraction and solid density
+        rho_adsorbent_solid=700, # Solid density excluding void fraction (in kg/m3)  # Seader et al. Table 15.2
+        
+        void_fraction = 0.5, # v/v # Seader et al. Table 15.2
         adsorbent_capacity=0.091, # default value for unsaturated capacity (updated in unit specification); conservative heuristic from Seider et. al. (2017) Product and Process Design Principles. Wiley
         T_regeneration=30. + 273.15, 
-        drying_time = 10./60., # h
-        air_velocity = 1332., # m/h
-        # T_air = 100. + 273.15, #K
+        drying_time = 0.55, # h #!!! This is updated to 0.5 h after the first run
+        T_air=TAL_chemicals.Ethanol.Tb + 10, # K
+        air_velocity = 2160, # m/h
         vessel_material='Stainless steel 316',
         vessel_type='Vertical',
         regeneration_fluid=dict(phase='l', Ethanol=1., units='kg/hr'),
@@ -362,10 +365,10 @@ def create_TAL_sys(ins, outs):
         split=dict(TAL=0, Water=1, VitaminA=1., VitaminD2=1., FermMicrobe=1.),
         length_unused = 1.219, # m; 4 ft based on recommendation by Seader et al. (Separation Process Principles)
         target_recovery=0.99,
-        wet_retention=1., # conservatively assume one full wash's worth of ethanol is retained in the column before dry air is passed through it
-        K = 0.078, # back-calculated for 1 wash from experimental measurements for 3 washes pooled together; 0.125 for 3-wash # constant desorption partition coefficient; calculated for 1 wash from experimental data for 3 washes pooled together
+        wet_retention=0.5, # conservatively assume half a wash's worth of ethanol is retained in the column before dry air is passed through it
+        K = 0.07795, # back-calculated for 1 wash from experimental measurements for 3 washes pooled together; 0.125 for 3-wash # constant desorption partition coefficient; calculated for 1 wash from experimental data for 3 washes pooled together
     )
-    
+    AC401._default_equipment_lifetime['Activated carbon'] = 1.
     AC401.adsorbent_cost['Activated carbon'] = price['Activated carbon'] # 41. $/ft^3
     
     @AC401.add_specification
@@ -377,8 +380,10 @@ def create_TAL_sys(ins, outs):
         # AC401.adsorbent_capacity = capacity[0]
         
         AC401._run()
-
+        
         M401.run()
+        
+        AC401.ins[1].T = M401.outs[0].T
     
 
         
@@ -401,6 +406,10 @@ def create_TAL_sys(ins, outs):
 
     F401.specification = BoundedNumericalSpecification(F401_obj_fn, 1e-4, 1.-1e-4)
     
+    P401 = bst.Pump('P401', ins=F401-1, P=101325.)
+    # H404 = bst.units.HXutility('H404', ins=P401-0, outs=('cooled_ethanol'), 
+    #                            T=30.+273.15, rigorous=True)
+    
     # M403 = bst.Mixer('M403', ins=(AC401-1, AC2-1))
     F402 = bst.units.Flash('F402', ins=F401-0, outs=('F402_t', 'F402_b'), P=101325.,
                             V=0.5) # !!! TODO: replace with dryer
@@ -416,13 +425,19 @@ def create_TAL_sys(ins, outs):
             F402_b.imol['TAL'] = TAL_mol        
     F402.specification = F402_spec
     
+    H404 = bst.units.HXutility('H404', ins=F402-0, outs=('cooled_ethanol_F402'), 
+                               T=30.+273.15, rigorous=True)
+    
     H403 = bst.units.HXutility('H403', ins=F402-1, outs=('cooled_TAL'), 
                                T=30.+273.15, rigorous=True)
     
     
     # M404 = bst.Mixer('M402', ins=(AC401-2, AC2-2))
-    H402 = bst.units.HXutility('H402', ins=AC401-2, outs=('cooled_ethanol_laden_air'), 
-                               T=2.+273.15, rigorous=True)
+    H402 = bst.units.HXutility(
+        'H402', ins=AC401-2, outs=('cooled_ethanol_laden_air'), 
+        T=265.,
+        rigorous=True
+    )
     
     S403 = bst.units.FakeSplitter('S403', ins=H402-0, outs=('cool_air', 'ethanol_recovered_from_air'))
     def S403_spec():
@@ -431,7 +446,7 @@ def create_TAL_sys(ins, outs):
         S403.outs[1].mol[:] = S403_ins_0['l'].mol[:]
     S403.specification = S403_spec
     # S403-0-2-M404
-    M402 = bst.Mixer('M402', ins=(F401-1, F402-0, S403-1), outs=('recycled_ethanol',))
+    M402 = bst.Mixer('M402', ins=(P401-0, H404-0, S403-1), outs=('recycled_ethanol',))
     M402-0-1-M401
     
     
@@ -676,7 +691,6 @@ def create_TAL_sys(ins, outs):
     
     FWT = units.FireWaterTank('FWT903', ins=fire_water_in, outs='fire_water_out')
     
-    #!!! M304_H uses chilled water, thus requiring CWP
     CWP = facilities.CWP('CWP802', ins='return_chilled_water',
                          outs='process_chilled_water')
     
@@ -724,9 +738,14 @@ def create_TAL_sys(ins, outs):
     
     # Heat exchange network
     HXN = bst.facilities.HeatExchangerNetwork('HXN1001',
-                                               ignored=[H401, H402],
-                                               # cache_network=True,
-                                               # force_ideal_thermo=True,
+                                               ignored=lambda:[
+                                                        H401, H402, H403, H404,
+                                                        AC401.heat_exchanger_drying,
+                                                        AC401.heat_exchanger_regeneration,
+                                                        F401.components['condenser'],
+                                                        ],
+                                                cache_network=True,
+                                                force_ideal_thermo=True,
                                                )
 
     # HXN = HX_Network('HXN')
@@ -891,9 +910,9 @@ spec = ProcessSpecification(
     reaction_name='fermentation_reaction',
     substrates=('Xylose', 'Glucose'),
     products=('TAL',),
-    spec_1=0.203,
+    spec_1=0.19,
     spec_2=15.,
-    spec_3=0.21,
+    spec_3=0.19,
     xylose_utilization_fraction = 0.80,
     feedstock = feedstock,
     dehydration_reactor = None,
@@ -933,7 +952,7 @@ def load_titer_with_glucose(titer_to_load):
     spec.spec_2 = titer_to_load
     u.R302.titer_to_load = titer_to_load
     flx.IQ_interpolation(M304_titer_obj_fn, 1e-3, 8000.)
-    u.AC401.regeneration_velocity = min(14.4, 6.64 + ((14.4-6.64)/(20.05-3.))*(titer_to_load-3.)) # heuristic to obtain regeneration velocity at which MPSP is minimum fitted to results from simulations at target_recovery=0.99 
+    u.AC401.regeneration_velocity = min(14.4, 3.1158 + ((10.168-3.1158)/(30.-3.))*(titer_to_load-3.)) # heuristic to obtain regeneration velocity at which MPSP is minimum fitted to results from simulations at target_recovery=0.99 
     
 spec.load_spec_2 = load_titer_with_glucose
 
@@ -976,6 +995,7 @@ def simulate_and_print():
 # TAL_sys.simulate()
 get_SA_MPSP()
 # u.AC401.cycle_time = 4.
+u.AC401.drying_time = 0.5 #!!! Drying time is updated to this value (overwritten the value passed during initialization)
 spec.load_specifications(spec.baseline_yield, spec.baseline_titer, spec.baseline_productivity)
 simulate_and_print()
 
