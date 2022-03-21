@@ -272,3 +272,35 @@ def get_sugar_conc(stream, sugars=()):
         fermentable_sugar += stream.imass[sugar]
     fermentable_sugar_conc = fermentable_sugar/stream.F_vol    
     return fermentable_sugar_conc
+
+
+#%% Estimate MPSP at a given IRR from results for IRR at a set product selling price (assuming uniform cash flows across all years)
+
+def get_MPSP_from_IRR(new_IRR, old_IRR, old_selling_price, yearly_sales_mass_of_main_product, t, initial_investment):
+    assert type(t) is int
+    yearly_cash_flow_without_product_sale = \
+        + yearly_sales_mass_of_main_product * old_selling_price \
+        - initial_investment / (t*sum([1/((1+old_IRR)**(i+1)) for i in range(t)]))
+    print(yearly_cash_flow_without_product_sale)
+    print(sum([1/((1+new_IRR)**i) for i in range(t)]))
+    MPSP_new = \
+        (yearly_cash_flow_without_product_sale \
+        +  initial_investment / (t*sum([1/((1+new_IRR)**i) for i in range(t)]))) \
+        * (1/yearly_sales_mass_of_main_product)
+    return MPSP_new
+
+#%% Estimate MPSP at a given IRR from results for NPV at a set product selling price (assuming uniform cash flows across all years)
+
+def get_MPSP_from_NPV(new_IRR, old_NPV, old_selling_price, yearly_sales_mass_of_main_product, t, initial_investment):
+    assert type(t) is int
+    old_IRR = 0.
+    yearly_cash_flow_without_product_sale = \
+        + yearly_sales_mass_of_main_product * old_selling_price \
+        - (initial_investment + old_NPV) / (t*sum([1/((1+old_IRR)**(i+1)) for i in range(t)]))
+    print(yearly_cash_flow_without_product_sale)
+    print(sum([1/((1+new_IRR)**i) for i in range(t)]))
+    MPSP_new = \
+        (yearly_cash_flow_without_product_sale \
+        +  initial_investment / (t*sum([1/((1+new_IRR)**i) for i in range(t)]))) \
+        * (1/yearly_sales_mass_of_main_product)
+    return MPSP_new
