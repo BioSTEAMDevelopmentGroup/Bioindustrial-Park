@@ -165,7 +165,7 @@ LiquefactionTank = tank_factory('LiquefactionTank',
 
 class Liquefaction(LiquefactionTank):
     """
-    Create a Liquefaction unit operation that models the converion
+    Create a Liquefaction unit operation that models the conversion
     for Starch to Glucose oligomers.
     
     Parameters
@@ -218,7 +218,7 @@ class SimultaneousSaccharificationFermentation(bst.BatchBioreactor):
     """
     Create a SimultaneousSaccharificationFermentation unit operation that 
     models the simultaneous saccharification and fermentation in the conventional
-    dry-grind enthanol process.
+    dry-grind ethanol process.
     
     Parameters
     ----------

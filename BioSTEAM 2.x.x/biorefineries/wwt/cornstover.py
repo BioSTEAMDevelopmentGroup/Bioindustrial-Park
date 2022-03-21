@@ -64,6 +64,7 @@ def create_cs_comparison_systems():
 
 def simulate_cs_systems():
     from biorefineries.wwt import simulate_systems
+    global exist_sys, new_sys
     exist_sys, new_sys = create_cs_comparison_systems()
     # ~235 mg/L COD, mostly (~200/>85%) due to soluble lignin, arabinose, and extract
     simulate_systems(exist_sys, new_sys, info)
@@ -77,12 +78,10 @@ def simulate_cs_systems():
 # =============================================================================
 
 def create_cs_comparison_models():
-    from biosteam import Model
-    from biorefineries.wwt import add_2G_parameters, add_new_wwt_parameters, add_metrics
+    from biorefineries.wwt import create_comparison_models
     exist_sys, new_sys = create_cs_comparison_systems()
 
     ##### Existing system #####
-    exist_model = Model(exist_sys)
     exist_model_dct = {
         'feedstock': 'cornstover',
         'sulfuric_acid': 'sulfuric_acid',
@@ -94,24 +93,33 @@ def create_cs_comparison_models():
         'PT_rx': 'R201',
         'EH_mixer': 'M301',
         'fermentor': 'R303',
+        'reactions': {
+            'PT glucan-to-glucose': ('reactions', 0),
+            'PT xylan-to-xylose': ('reactions', 8),
+            'EH glucan-to-glucose': ('saccharification', 2),
+            'FERM glucan-to-product': ('cofermentation', 0),
+            'FERM xylan-to-product': ('cofermentation', 4),
+            },
         'BT': 'BT',
         'wwt_system': 'exist_sys_wwt',
+        'is2G': info['is2G'],
         }
-
-    exist_model = add_2G_parameters(exist_model, exist_model_dct)
-    BT = exist_sys.flowsheet.unit.BT
-    eff = BT.boiler_efficiency * BT.turbogenerator_efficiency
-    exist_model = add_metrics(exist_model, exist_model_dct, eff=eff)
+    exist_model = create_comparison_models(exist_sys, exist_model_dct)
 
     ##### With the new wastewater treatment process #####
-    new_model = Model(new_sys)
     new_model_dct = exist_model_dct.copy()
     new_model_dct['biogas'] = 'biogas'
     new_model_dct['wwt_system'] = 'new_sys_wwt'
-    new_model = add_2G_parameters(new_model, new_model_dct)
-    new_model = add_new_wwt_parameters(new_model, process_ID=info['WWT_ID'])
-    new_model = add_metrics(new_model, new_model_dct, eff=eff)
+    new_model_dct['WWT_ID'] = info['WWT_ID']
+    new_model = create_comparison_models(new_sys, new_model_dct)
     return exist_model, new_model
+
+
+def evaluate_cs_models(**kwargs):
+    from biorefineries.wwt import evaluate_models
+    global exist_model, new_model
+    exist_model, new_model = create_cs_comparison_models()
+    return evaluate_models(exist_model, new_model, abbr=info['abbr'], **kwargs)
 
 
 # %%
@@ -121,5 +129,6 @@ def create_cs_comparison_models():
 # =============================================================================
 
 if __name__ == '__main__':
-    exist_sys, new_sys = simulate_cs_systems()
+    # exist_sys, new_sys = simulate_cs_systems()
     # exist_model, new_model = create_cs_comparison_models()
+    exist_model, new_model = evaluate_cs_models(N=10, notify=100)

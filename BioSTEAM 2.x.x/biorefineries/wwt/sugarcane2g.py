@@ -59,6 +59,7 @@ def create_sc2g_comparison_systems():
 
 def simulate_sc2g_systems():
     from biorefineries.wwt import simulate_systems
+    global exist_sys, new_sys
     exist_sys, new_sys = create_sc2g_comparison_systems()
     simulate_systems(exist_sys, new_sys, info)
     return exist_sys, new_sys

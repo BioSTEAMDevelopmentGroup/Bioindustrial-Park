@@ -85,7 +85,6 @@ def create_comparison_systems(info, functions, sys_dct={}, from_load=False):
         exist_wwt_units = [u for u in exist_u if (u.ID[1]==WWT_ID or u.ID=='WWTC')]
     exist_sys_wwt = bst.System('exist_sys_wwt', path=exist_wwt_units)
     exist_sys = bst.System.from_units('exist_sys', units=exist_u)
-    exist_sys_wwt.operating_hours = exist_sys.operating_hours = exist_sys_temp.operating_hours
 
     if from_load:
         exist_tea = exist_sys_temp.TEA.copy(exist_sys)
@@ -148,7 +147,11 @@ def create_comparison_systems(info, functions, sys_dct={}, from_load=False):
     if add_CHP: CHPunit('CHP', ins=(new_s.biogas, new_s.sludge))
 
     new_sys = bst.System.from_units('new_sys', units=new_u)
-    new_sys_wwt.operating_hours = new_sys.operating_hours = new_sys_temp.operating_hours
+
+    for attr in ('operating_hours', 'lang_factor'):
+        val = getattr(exist_sys_temp, attr)
+        for sys in (exist_sys_wwt, exist_sys, new_sys_wwt, new_sys):
+            setattr(sys, attr, val)
 
     ##### TEA #####
     if from_load:
@@ -176,6 +179,5 @@ def simulate_systems(exist_sys, new_sys, info):
 
     if not is2G:
         exist_ww = exist_sys.flowsheet.stream.ww
-        # The default price ($-0.03/kg) will lead to negative IRR
         IRR_at_ww_price(exist_ww, exist_tea, ww_price)
         ww_price_at_IRR(exist_ww, exist_tea, new_tea.solve_IRR())

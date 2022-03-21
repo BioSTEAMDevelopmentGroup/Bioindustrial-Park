@@ -506,7 +506,7 @@ def rename_storage_units(sys, storage):
 _lb_per_kg = 0.4536 # auom('lb').conversion_factor('kg')
 _GDP_2007to2016 = 1.160
 
-# Harmonized prices
+# Harmonized prices, note that the cost year is different among biorefineries
 # References
 # ----------
 # [1] Hossain et al. Techno-Economic Evaluation of Heat Integrated
@@ -524,17 +524,8 @@ _GDP_2007to2016 = 1.160
 # Energy Environ. Sci. 2016, 9 (3), 1102–1112.
 # https://doi.org/10.1039/C5EE03715H.
 
-# .. note::
-#
-#     The cornstover biorefinery uses 2011 USD whereas sugarcane and lipidcane
-#     biorefineries use 2013 USD, thus ideally prices in the the `price` dct
-#     should be adjusted accordingly. However, since the calculated MESPs are only
-#     used for comparison between biorefineries with the new wastewater treatment
-#     process vs. without/with the original process, this will not affect the
-#     conclusions.
-
 price = { # $/kg unless otherwise noted
-    'wastewater': -0.03, # ref [1], negative value for cost from product,
+    'wastewater': -0.03, # ref [1], negative value for cost of product
     'naocl': 0.14, # $/L
     'citric_acid': 0.22, # $/L
     'bisulfite': 0.08, # $/L
@@ -551,31 +542,18 @@ def update_product_prices(stream_registry):
             stream_registry.search(p).price = price[p]
 
 
-def IRR_at_ww_price(ww_stream, tea, ww_price=None):
-    current_price = ww_stream.price
+def IRR_at_ww_price(ww_stream, tea, ww_price=None, print_msg=True):
     ww_stream.price = ww_price or price['wastewater']
-    IRR = tea.solve_IRR()
-    print(f'\nIRR: {IRR:.2%}\n')
-    # Reset after analysis
-    ww_stream.price = current_price
-    tea.IRR = tea.solve_IRR()
+    IRRs = [] # two IRR solutions for some biorefineries, choosing the smaller one
+    for i in range(3):
+        IRRs.append(tea.solve_IRR())
+    if IRRs[-2]*IRRs[-1] < 0: IRR = min(IRRs[-2], IRRs[-1])
+    else: IRR = IRRs[-1]
+    if print_msg: print(f'\nIRR: {IRR:.2%}\n')
     return IRR
 
-def ww_price_at_IRR(ww_stream, tea, IRR):
-    current_IRR = tea.IRR
+def ww_price_at_IRR(ww_stream, tea, IRR, print_msg=True):
     tea.IRR = IRR
     ww_price = tea.solve_price(ww_stream)
-    print(f'\nWW price: {ww_price:.5f}\n')
-    tea.IRR = current_IRR # reset after analysis
+    if print_msg: print(f'\nWW price: {ww_price:.5f}\n')
     return ww_price
-
-
-ethanol_density_kggal = 2.9867 # cs.ethanol_density_kggal
-def print_MESP(ethanol, tea, tea_name=''):
-    bst.settings.set_thermo(ethanol.chemicals)
-    tea.system.simulate()
-    ethanol.price = tea.solve_price(ethanol)
-    ethanol_price_gal = ethanol.price * ethanol_density_kggal
-    pre_tea = ' of ' if tea_name else ''
-    print(f'MESP{pre_tea}{tea_name} is ${ethanol_price_gal:.2f}/gal.')
-    return ethanol_price_gal

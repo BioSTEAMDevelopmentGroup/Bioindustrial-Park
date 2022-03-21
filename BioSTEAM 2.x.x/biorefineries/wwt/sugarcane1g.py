@@ -57,7 +57,7 @@ def create_sc1g_comparison_systems():
         'create_wastewater_process': {'skip_AeF': True},
         # `vinasse`, `fiber_fines`,
         # not using `wastewater` as it contains `evaporator_condensate` (all water)
-        'ww_streams': (('H302', 1), ('U211', 0)),
+        'ww_streams': (('H302', 1), ('U211', 1)),
         'solids_streams': (('U207', 0), ('U210', 0)), # `bagasse`, `filter_cake`
         'BT': 'BT401',
         'new_wwt_connections': {'solids': ('BT401', 0), 'biogas': ('BT401', 1)},
@@ -69,6 +69,7 @@ def create_sc1g_comparison_systems():
 
 def simulate_sc1g_systems():
     from biorefineries.wwt import simulate_systems
+    global exist_sys, new_sys
     exist_sys, new_sys = create_sc1g_comparison_systems()
     simulate_systems(exist_sys, new_sys, info)
     return exist_sys, new_sys
@@ -79,6 +80,16 @@ def simulate_sc1g_systems():
 # =============================================================================
 # Models
 # =============================================================================
+
+# def create_sc1g_comparison_models():
+#     from biosteam import Model
+#     from biorefineries.wwt import get_default_distribution, add_new_wwt_parameters, add_metrics
+#     exist_sys, new_sys = create_cs_comparison_systems()
+#     exist_model = Model(exist_sys)
+
+#     def add_corn_parameters(model, model_dct):
+#         b =
+
 
 
 # %%

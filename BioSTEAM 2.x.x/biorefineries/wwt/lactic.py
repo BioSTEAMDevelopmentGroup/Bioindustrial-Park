@@ -72,6 +72,7 @@ def create_la_comparison_systems():
 
 def simulate_la_systems():
     from biorefineries.wwt import simulate_systems
+    global exist_sys, new_sys
     exist_sys, new_sys = create_la_comparison_systems()
     # ~504 mg/L COD, soluble lignin, arabinose, and galactose all >10%,
     # lactic acid, extract, xylose, and mannose ~5-10%
