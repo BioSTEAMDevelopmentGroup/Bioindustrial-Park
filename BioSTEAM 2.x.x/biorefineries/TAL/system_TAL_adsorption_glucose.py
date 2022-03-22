@@ -315,7 +315,8 @@ def create_TAL_sys(ins, outs):
                                 split=find_split(S401_index,
                                                   S401_cell_mass_split,
                                                   S401_filtrate_split,
-                                                  chemical_groups), solids =\
+                                                  chemical_groups), 
+                                solids =\
                                     ['Xylan', 'Glucan', 'Lignin', 'FermMicrobe',\
                                       'Ash', 'Arabinan', 'Galactan', 'Mannan'])
     
@@ -739,7 +740,10 @@ def create_TAL_sys(ins, outs):
     # Heat exchange network
     HXN = bst.facilities.HeatExchangerNetwork('HXN1001',
                                                ignored=lambda:[
-                                                        H401, H402, H403, H404,
+                                                        H401, 
+                                                        H402, 
+                                                        H403, 
+                                                        H404,
                                                         AC401.heat_exchanger_drying,
                                                         AC401.heat_exchanger_regeneration,
                                                         F401.components['condenser'],
@@ -938,12 +942,12 @@ spec.load_spec_3 = spec.load_productivity
 def M304_titer_obj_fn(water_to_sugar_mol_ratio):
     M304, R302 = u.M304, u.R302
     M304.water_to_sugar_mol_ratio = water_to_sugar_mol_ratio
-    M304.specification[0]()
+    M304.specification[0][0]()
     u.M304_H._run()
     u.S302._run()
     u.R303._run()
     u.T301._run()
-    R302.specification[0]()
+    R302.specification[0][0]()
     # broth = R302.outs[0]
     # return broth.imass['TAL']/broth.F_vol - R302.titer_to_load
     return R302.effluent_titer - R302.titer_to_load
@@ -951,7 +955,7 @@ def M304_titer_obj_fn(water_to_sugar_mol_ratio):
 def load_titer_with_glucose(titer_to_load):
     spec.spec_2 = titer_to_load
     u.R302.titer_to_load = titer_to_load
-    flx.IQ_interpolation(M304_titer_obj_fn, 1e-3, 8000.)
+    flx.IQ_interpolation(M304_titer_obj_fn, 1e-3, 20000.)
     u.AC401.regeneration_velocity = min(14.4, 3.1158 + ((10.168-3.1158)/(30.-3.))*(titer_to_load-3.)) # heuristic to obtain regeneration velocity at which MPSP is minimum fitted to results from simulations at target_recovery=0.99 
     
 spec.load_spec_2 = load_titer_with_glucose

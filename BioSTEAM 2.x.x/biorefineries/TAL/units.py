@@ -663,8 +663,8 @@ class SeedTrain(Unit):
     tau_batch = 36
     
     # ferm_ratio is the ratio of conversion relative to the fermenter
-    #!!! Should this T be changed to 30°C?
-    def __init__(self, ID='', ins=None, outs=(), T=50+273.15, ferm_ratio=0.95):
+    
+    def __init__(self, ID='', ins=None, outs=(), T=30+273.15, ferm_ratio=0.95):
         Unit.__init__(self, ID, ins, outs)
         self.T = T
         self.ferm_ratio = ferm_ratio
