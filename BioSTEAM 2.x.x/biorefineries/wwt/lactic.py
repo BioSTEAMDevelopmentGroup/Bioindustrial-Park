@@ -26,7 +26,7 @@ info = {
 # =============================================================================
 
 def create_la_comparison_systems():
-    # Create from scratch
+    # Create from scratch, IRR for existing system is 24.38% (24.39% if do direct loading)
     from biorefineries.wwt import create_comparison_systems, add_wwt_chemicals
     from biorefineries.lactic import (
         create_chemicals,
@@ -56,7 +56,8 @@ def create_la_comparison_systems():
         }
     exist_sys, new_sys = create_comparison_systems(info, functions, sys_dct)
 
-    # # IRR doesn't match with direct loading as closely as creating from scratch
+    # #!!! COD from above is ~504, but here 416, need to figure out why
+    # # IRR for existing system is 24.63% (24.39% if do direct loading)
     # from biorefineries.wwt import create_comparison_systems
     # from biorefineries import lactic as la
     # sys_dct = {
@@ -86,6 +87,50 @@ def simulate_la_systems():
 # Models
 # =============================================================================
 
+def create_la_comparison_models():
+    from biorefineries.wwt import create_comparison_models
+    exist_sys, new_sys = create_la_comparison_systems()
+
+    ##### Existing system #####
+    exist_model_dct = {
+        'abbr': info['abbr'],
+        'feedstock': 'feedstock',
+        'primary_product': 'lactic_acid',
+        'sludge': 'wastes_to_CHP',
+        'biogas': 'biogas',
+        'PT_acid_mixer': 'T201',
+        'adjust_acid_with_acid_loading': True,
+        'PT_solids_mixer': 'M202',
+        'PT_rx': 'R201',
+        'EH_mixer': 'M301',
+        'fermentor': 'R301',
+        'reactions': {
+            'PT glucan-to-glucose': ('pretreatment_rxns', 0),
+            'PT xylan-to-xylose': ('pretreatment_rxns', 4),
+            'EH glucan-to-glucose': ('saccharification_rxns', 2),
+            'FERM glucan-to-product': ('cofermentation_rxns', 0),
+            'FERM xylan-to-product': ('cofermentation_rxns', 3),
+            },
+        'BT': 'CHP',
+        'BT_eff': ('B_eff', 'TG_eff'),
+        'wwt_system': 'exist_sys_wwt',
+        'is2G': info['is2G'],
+        }
+    exist_model = create_comparison_models(exist_sys, exist_model_dct)
+
+    ##### With the new wastewater treatment process #####
+    new_model_dct = exist_model_dct.copy()
+    new_model_dct['wwt_system'] = 'new_sys_wwt'
+    new_model_dct['new_wwt_ID'] = info['WWT_ID']
+    new_model = create_comparison_models(new_sys, new_model_dct)
+    return exist_model, new_model
+
+
+def evaluate_la_models(**kwargs):
+    from biorefineries.wwt import evaluate_models
+    global exist_model, new_model
+    exist_model, new_model = create_la_comparison_models()
+    return evaluate_models(exist_model, new_model, abbr=info['abbr'], **kwargs)
 
 
 # %%
@@ -94,6 +139,9 @@ def simulate_la_systems():
 # Run
 # =============================================================================
 
+#!!! The lactic acid module is REALLY slow... would want to profile and find out why
+#!!! There are problems with the metrics
 if __name__ == '__main__':
-    exist_sys, new_sys = simulate_la_systems()
-    # exist_model, new_model = create_la_comparison_models()
+    # exist_sys, new_sys = simulate_la_systems()
+    exist_model, new_model = create_la_comparison_models()
+    # exist_model, new_model = evaluate_la_models(N=10, notify=1)

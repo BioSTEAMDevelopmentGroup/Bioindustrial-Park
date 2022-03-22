@@ -76,7 +76,9 @@ def create_cn_comparison_models():
 
     ##### Existing system #####
     exist_model_dct = {
+        'abbr': info['abbr'],
         'feedstock': 'corn',
+        'primary_product': 'ethanol',
         'PT_rx': 'V310',
         'fermentor': 'V405',
         'reactions': {
@@ -92,10 +94,11 @@ def create_cn_comparison_models():
     ##### With the new wastewater treatment process #####
     new_model_dct = exist_model_dct.copy()
     new_model_dct['BT'] = 'CHP'
+    new_model_dct['BT_eff'] = ('eff',) # need to be an Iterable
     new_model_dct['sludge'] = 'sludge'
     new_model_dct['biogas'] = 'biogas'
     new_model_dct['wwt_system'] = 'new_sys_wwt'
-    new_model_dct['WWT_ID'] = info['WWT_ID']
+    new_model_dct['new_wwt_ID'] = info['WWT_ID']
     new_model = create_comparison_models(new_sys, new_model_dct)
 
     return exist_model, new_model
@@ -117,4 +120,4 @@ def evaluate_cn_models(**kwargs):
 if __name__ == '__main__':
     # exist_sys, new_sys = simulate_cn_systems()
     # exist_model, new_model = create_cn_comparison_models()
-    exist_model, new_model = evaluate_cn_models(N=10, notify=100)
+    exist_model, new_model = evaluate_cn_models(N=10)

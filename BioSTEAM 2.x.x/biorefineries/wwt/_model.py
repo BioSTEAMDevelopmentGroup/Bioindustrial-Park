@@ -85,32 +85,73 @@ def add_biorefinery_parameters(model, model_dct, f, u, s, get_obj, get_rxn, para
     return model
 
 
+def add_biodiesel_parameters(model, model_dct, f, u, s, get_obj, get_rxn, param):
+    from biorefineries.oilcane import OilExtractionSpecification
+    sys = model.system
+    isplit_a = get_obj(u, 'bagasse_oil_extraction').isplit
+    isplit_b = get_obj(u, 'bagasse_oil_retention').isplit
+
+    # Oil extraction
+    feedstock = get_obj(s, 'feedstock')
+    oil_extraction_specification = OilExtractionSpecification(
+            sys, [feedstock], isplit_a, isplit_b, model_dct['isplit_efficiency_is_reversed']
+        )
+    b = oil_extraction_specification.efficiency
+    D = shape.Uniform(0.4, 0.7)
+    @param(name='Oil extraction efficiency', element=oil_extraction_specification,
+           units='', kind='coupled', baseline=b, distribution=D)
+    def set_bagasse_oil_extraction_efficiency(bagasse_oil_extraction_efficiency):
+        oil_extraction_specification.load_efficiency(bagasse_oil_extraction_efficiency)
+
+    b = oil_extraction_specification.oil_retention
+    D = shape.Uniform(0.5, 0.7)
+    @param(name='Bagasse oil retention', element=oil_extraction_specification,
+           units='', kind='coupled', baseline=b, distribution=D)
+    def set_bagasse_oil_retention(oil_retention):
+        oil_extraction_specification.load_oil_retention(oil_retention)
+
+    # Transesterification
+    TE_rx = get_obj(u, 'TE_rx')
+    rxns, idices = get_rxn(TE_rx, 'TE oil-to-product')
+    if rxns is not None:
+        b = rxns[idices[0]].X
+        D = get_default_distribution('uniform', baseline=b, lb=0, ub=1)
+        @param(name='TE oil-to-product', element=TE_rx, kind='coupled', units='-',
+               baseline=b, distribution=D)
+        def set_TE_oil_to_product(X):
+            for idx in idices:
+                rxns[idx].X = X
+
+    return model
+
+
+
 def add_combustion_parameters(model, model_dct, f, u, s, get_obj, get_rxn, param):
     try: BT = get_obj(u, 'BT')
     except: return model # 1G biorefinery without BT/CHP
 
-    if 'CHP' not in BT.ID:
-        b = BT.boiler_efficiency
+    BT_eff = model_dct['BT_eff']
+    if len(BT_eff) == 2:
+        b = getattr(BT, BT_eff[0])
         D = shape.Triangle(b*0.9, b, b*1.1)
         @param(name='Boiler efficiency', element=BT, kind='coupled', units='-',
                baseline=b, distribution=D)
-        def set_boiler_efficiency(X):
-            BT.boiler_efficiency = X
+        def set_boiler_efficiency(eff):
+            setattr(BT, BT_eff[0], eff)
 
-        b = BT.turbogenerator_efficiency
+        b = getattr(BT, BT_eff[1])
         D = shape.Triangle(b*0.9, b, b*1.1)
         @param(name='Turbogenerator efficiency', element=BT, kind='coupled', units='-',
                baseline=b, distribution=D)
-        def set_turbogenerator_efficiency(X):
-            BT.turbogenerator_efficiency = X
+        def set_turbogenerator_efficiency(eff):
+            setattr(BT, BT_eff[1], eff)
     else: # CHP
-        CHP = BT
-        b = CHP.eff
+        b = getattr(BT, BT_eff[0])
         D = shape.Uniform(0.27, 0.405)
-        @param(name='CHP combined efficiency', element=CHP, kind='coupled', units='-',
+        @param(name='CHP combined efficiency', element=BT, kind='coupled', units='-',
                baseline=b, distribution=D)
-        def set_CHP_efficiency(X):
-            CHP.eff = X
+        def set_CHP_efficiency(eff):
+            setattr(BT, BT_eff[0], eff)
     return model
 
 
@@ -138,7 +179,7 @@ def add_1G_parameters(model, model_dct, f, u, s, get_obj, get_rxn, param):
             rxn.X = X
 
     # Wastewater treatment price
-    if not model_dct.get('WWT_ID'):
+    if not model_dct.get('new_wwt_ID'):
         ww = s.ww
         b = -0.03
         D = get_default_distribution('uniform', baseline=b)
@@ -154,19 +195,25 @@ def add_1G_parameters(model, model_dct, f, u, s, get_obj, get_rxn, param):
 # based on in Humbird et al.
 def add_2G_parameters(model, model_dct, f, u, s, get_obj, get_rxn, param):
     # Pretreatment
-    feedstock = get_obj(s, 'feedstock')
-    sulfuric_acid = get_obj(s, 'sulfuric_acid')
-    acid_dilution_water = get_obj(s, 'acid_dilution_water')
     PT_acid_mixer = get_obj(u, 'PT_acid_mixer')
     D = shape.Triangle(10, 22.1, 35)
-    @param(name='PT H2SO4 loading', element=PT_acid_mixer, kind='coupled', units='mg/g',
-           baseline=22.1, distribution=D)
-    def set_PT_H2SO4_loading(loading):
-        def update_sulfuric_acid_loading():
-            F_mass_dry_feedstock = feedstock.F_mass - feedstock.imass['water']
-            sulfuric_acid.F_mass = 0.02316/22.1*loading * F_mass_dry_feedstock
-            acid_dilution_water.F_mass = 0.282/22.1*loading * F_mass_dry_feedstock
-        PT_acid_mixer.specification[0] = update_sulfuric_acid_loading
+    if not model_dct.get('adjust_acid_with_acid_loading'):
+        feedstock = get_obj(s, 'feedstock')
+        sulfuric_acid = get_obj(s, 'sulfuric_acid')
+        acid_dilution_water = get_obj(s, 'acid_dilution_water')
+        def set_PT_H2SO4_loading(loading):
+            def update_sulfuric_acid_loading():
+                F_mass_dry_feedstock = feedstock.F_mass - feedstock.imass['water']
+                sulfuric_acid.F_mass = 0.02316/22.1*loading * F_mass_dry_feedstock
+                acid_dilution_water.F_mass = 0.282/22.1*loading * F_mass_dry_feedstock
+            PT_acid_mixer.specification[0] = update_sulfuric_acid_loading
+    else:
+        def set_PT_H2SO4_loading(loading):
+            PT_acid_mixer.acid_loading = loading
+    param(set_PT_H2SO4_loading,
+          name='PT H2SO4 loading', element=PT_acid_mixer, kind='coupled', units='mg/g',
+          baseline=22.1, distribution=D)
+
 
     PT_solids_mixer = get_obj(u, 'PT_solids_mixer')
     b = PT_solids_mixer.solids_loading
@@ -204,12 +251,18 @@ def add_2G_parameters(model, model_dct, f, u, s, get_obj, get_rxn, param):
 
     # Saccharification (enzymatic hydrolysis) and cofermentation
     EH_mixer = get_obj(u, 'EH_mixer')
-    b = EH_mixer.enzyme_loading*1e3
+    if 10 < EH_mixer.enzyme_loading < 30:
+        b = EH_mixer.enzyme_loading
+        def set_EH_enzyme_loading(loading):
+            EH_mixer.enzyme_loading = loading
+    else:
+        b = EH_mixer.enzyme_loading*1e3
+        def set_EH_enzyme_loading(loading):
+            EH_mixer.enzyme_loading = loading/1e3
     D = shape.Triangle(10, b, 30)
-    @param(name='EH enzyme loading', element=EH_mixer, kind='coupled', units='-',
-           baseline=b, distribution=D)
-    def set_EH_enzyme_loading(loading):
-        EH_mixer.enzyme_loading = loading/1e3
+    param(set_EH_enzyme_loading,
+          name='EH enzyme loading', element=EH_mixer, kind='coupled', units='-',
+          baseline=b, distribution=D)
 
     b = EH_mixer.solids_loading
     D = shape.Triangle(0.175, b, 0.25)
@@ -228,37 +281,27 @@ def add_2G_parameters(model, model_dct, f, u, s, get_obj, get_rxn, param):
         def set_EH_glucan_to_glucose(X):
             rxn.X = X
 
-    rxn = get_rxn(fermentor, 'FERM glucan-to-product')
-    if rxn is not None:
-        b = rxn.X
-        D = shape.Triangle(0.9, b, 0.97)
+    rxn_g = get_rxn(fermentor, 'FERM glucan-to-product')
+    rxn_x = get_rxn(fermentor, 'FERM xylan-to-product')
+    b_g = rxn_g.X
+    b_x = rxn_x.X
+    if model_dct['primary_product']=='ethanol':
+        D_g = shape.Triangle(0.9, b_g, 0.97)
+        D_x = shape.Triangle(0.75, b_x, 0.9)
+    elif model_dct['primary_product']=='lactic_acid':
+        D_g = shape.Triangle(0.55, b_g, 0.93)
+        D_x = shape.Triangle(0.55, b_x, 0.93)
+    #!!! Want to add 3HP here as well
+    if rxn_g is not None:
         @param(name='FERM glucose yield', element=fermentor, kind='coupled', units='-',
-               baseline=b, distribution=D)
+               baseline=b, distribution=D_g)
         def set_FERM_glucose_yield(X):
-            rxn.X = X
-
-        rxn = get_rxn(fermentor, 'FERM xylan-to-product')
-        b = rxn.X
-        D = shape.Triangle(0.75, b, 0.9)
+            rxn_g.X = X
+    if rxn_g is not None:
         @param(name='FERM xylose yield', element=fermentor, kind='coupled', units='-',
-               baseline=b, distribution=D)
+               baseline=b, distribution=D_x)
         def set_FERM_xylose_yield(X):
-            rxn.X = X
-
-        # b = 0
-        # D = shape.Triangle(0, b, 0.85)
-        # if 'Arabinose' not in fermentor.cofermentation.reactants:
-        #     rxns = PRxn([
-        #         *fermentor.cofermentation,
-        #         Rxn('3 Arabinose -> 5 Ethanol + 5 CO2', 'Arabinose', b, fermentor.chemicals)
-        #         ])
-        #     fermentor.cofermentation = rxns
-        # @param(name='FERM arabinose-to-product', element=fermentor, kind='coupled', units='-',
-        #        baseline=b, distribution=D)
-        # def set_FERM_arabinose_to_ethanol(X):
-        #     fermentor.cofermentation[-1].X = X
-
-    #!!! Need to add some basic transesterification parameters
+            rxn_x.X = X
 
     return model
 
@@ -267,7 +310,7 @@ def add_2G_parameters(model, model_dct, f, u, s, get_obj, get_rxn, param):
 #!!! Want to add parameters related to the biodegradability
 # Or not since can't really do this to the existing WWT process?
 def add_new_wwt_parameters(model, model_dct, f, u, s, get_obj, get_rxn, param):
-    X = model_dct['WWT_ID']
+    X = model_dct['new_wwt_ID']
 
     # IC
     IC = getattr(u, f'R{X}01')
@@ -384,15 +427,18 @@ def add_parameters(model, model_dct, f, u, s, get_obj):
         if not val: return None
         elif len(val) == 1: return getattr(unit, val[0]) # only one reaction
         rxn, idx = val
-        return getattr(unit, rxn)[idx] # parallel reactions
+        if isinstance(idx, int): return getattr(unit, rxn)[idx] # parallel reactions, only adjust one
+        return getattr(unit, rxn), idx # parallel reactions, need to adjust multiple
 
     model = add_biorefinery_parameters(model, model_dct, f, u, s, get_obj, get_rxn, param)
+    if 'oc' in model_dct['abbr']:
+        model = add_biodiesel_parameters(model, model_dct, f, u, s, get_obj, get_rxn, param)
     model = add_combustion_parameters(model, model_dct, f, u, s, get_obj, get_rxn, param)
     if not model_dct['is2G']:
         model = add_1G_parameters(model, model_dct, f, u, s, get_obj, get_rxn, param)
     else:
         model = add_2G_parameters(model, model_dct, f, u, s, get_obj, get_rxn, param)
-    if model_dct.get('WWT_ID'):
+    if model_dct.get('new_wwt_ID'):
         model = add_new_wwt_parameters(model, model_dct, f, u, s, get_obj, get_rxn, param)
     return model
 
@@ -421,14 +467,14 @@ def add_metrics(model, model_dct, f, u, s, get_obj):
     wwt_system = get_obj(f.system, 'wwt_system')
 
     tea = sys.TEA
+    product = get_obj(s, 'primary_product')
     def get_IRR(): # sometimes IRR has two solutions
         IRRs = []
         for i in range(3):
             IRRs.append(tea.solve_IRR())
-        if IRRs[-2]*IRRs[-1] < 0: IRR = min(IRRs[-2], IRRs[-1])
-        else: IRR = IRRs[-1]
-        return IRR
-    model.metric(get_IRR, name='IRR at wastewater price', units='-')
+        if tea.solve_price(product) < product.price: return min(IRRs)
+        return max(IRRs)
+    model.metric(get_IRR, name='IRR modified', units='-')
 
     metrics = [
         *model.metrics,
@@ -450,20 +496,23 @@ def add_metrics(model, model_dct, f, u, s, get_obj):
             ])
     model.metrics = metrics
 
-    if model_dct['BT']: # used to convert energy in sludge/biogas into electricity
-        BT = get_obj(u, 'BT')
-        wwt_energy_streams = (get_obj(s, 'sludge'), get_obj(s, 'biogas'))
-        if not 'CHP' in BT.ID:
-            def get_wwt_produced_energy():
-                eff = BT.boiler_efficiency * BT.turbogenerator_efficiency
-                energy = sum(get_combustion_energy(i) for i in wwt_energy_streams)
-                return energy*eff/3600/1e3
-        else: # CHP
-            def get_wwt_produced_energy():
-                eff = BT.eff
-                energy = sum(get_combustion_energy(i) for i in wwt_energy_streams)
-                return energy*eff/3600/1e3
-        model.metric(get_wwt_produced_energy, name='WWT produced energy', units='MW')
+    BT_eff = model_dct.get('BT_eff') or ()
+    if len(BT_eff) == 0: return model
+
+    BT = get_obj(u, 'BT')
+    try: wwt_energy_streams = (get_obj(s, 'sludge'), get_obj(s, 'biogas'))
+    except: return model
+    if len(BT_eff) == 2:
+        def get_wwt_produced_energy():
+            eff = getattr(BT, BT_eff[0]) * getattr(BT, BT_eff[1])
+            energy = sum(get_combustion_energy(i) for i in wwt_energy_streams)
+            return energy*eff/3600/1e3
+    else: # CHP
+        def get_wwt_produced_energy():
+            eff = BT.eff
+            energy = sum(get_combustion_energy(i) for i in wwt_energy_streams)
+            return energy*eff/3600/1e3
+    model.metric(get_wwt_produced_energy, name='WWT produced energy', units='MW')
 
     return model
 
@@ -522,12 +571,13 @@ def save_model_results(model, path, percentiles):
 
 def evaluate_models(exist_model, new_model, abbr,
                     percentiles=(0, 0.05, 0.25, 0.5, 0.75, 0.95, 1),
-                    N=1000, notify=100, seed=3221, rule='L'):
+                    N=1000, seed=3221, rule='L'):
     import os
     exist_samples = exist_model.sample(N=N, seed=seed, rule=rule)
     exist_model.load_samples(exist_samples)
     exist_path = os.path.join(results_path, f'{abbr}_exist_uncertainties.xlsx')
 
+    notify = round(N/10, 0)
     exist_model.evaluate(notify=notify)
     save_model_results(exist_model, exist_path, percentiles)
 

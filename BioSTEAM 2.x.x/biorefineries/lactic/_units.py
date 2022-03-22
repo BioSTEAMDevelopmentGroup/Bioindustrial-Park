@@ -133,7 +133,7 @@ class PretreatmentMixer(Mixer):
     _N_ins = 3
     _N_outs = 1
 
-    solid_loading = 0.3
+    solids_loading = 0.3
 
     def _run(self):
         feedstock, acid, water = self.ins
@@ -142,7 +142,7 @@ class PretreatmentMixer(Mixer):
         mixture = feedstock.copy()
         mixture.mix_from([feedstock, acid])
 
-        total_mass = (mixture.F_mass-mixture.imass['Water'])/self.solid_loading
+        total_mass = (mixture.F_mass-mixture.imass['Water'])/self.solids_loading
         water.imass['Water'] = total_mass - mixture.F_mass
 
         mixture_out.mix_from([mixture, water])
@@ -312,10 +312,10 @@ class EnzymeHydrolysateMixer(Mixer):
     auxiliary_unit_names = ('heat_exchanger',)
 
     def __init__(self, ID='', ins=None, outs=(),
-                 enzyme_loading=20, solid_loading=0.2, T=None):
+                 enzyme_loading=20, solids_loading=0.2, T=None):
         Unit.__init__(self, ID, ins, outs)
         self.enzyme_loading = enzyme_loading
-        self.solid_loading = solid_loading
+        self.solids_loading = solids_loading
         self.T = T
         self.heat_exchanger = HXutility(None, None, None, T=T)
 
@@ -328,7 +328,7 @@ class EnzymeHydrolysateMixer(Mixer):
         mixture = hydrolysate.copy()
         mixture.mix_from([hydrolysate, enzyme])
 
-        total_mass = (mixture.F_mass-mixture.imass['Water'])/self.solid_loading
+        total_mass = (mixture.F_mass-mixture.imass['Water'])/self.solids_loading
         water.imass['Water'] = max(0, total_mass-mixture.F_mass)
 
         effluent.mix_from([hydrolysate, enzyme, water])

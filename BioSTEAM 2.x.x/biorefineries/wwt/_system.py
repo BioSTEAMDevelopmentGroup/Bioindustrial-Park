@@ -71,10 +71,11 @@ def create_comparison_systems(info, functions, sys_dct={}, from_load=False):
     exist_s = exist_f.stream
 
     if not is2G:
+        # Mixed wastewater
         ww = bst.Stream('ww')
         ww_streams = [getattr(exist_u, i[0]).outs[i[1]] for i in kwdct['ww_streams']]
         WWmixer = bst.Mixer('WWmixer', ins=ww_streams, outs=ww)
-
+        # Mixed soilids
         solids = bst.Stream('solids')
         solids_streams = [getattr(exist_u, i[0]).outs[i[1]] for i in kwdct['solids_streams']]
         SolidsMixer = bst.Mixer('SolidsMixer', ins=solids_streams, outs=solids)
@@ -90,7 +91,8 @@ def create_comparison_systems(info, functions, sys_dct={}, from_load=False):
         exist_tea = exist_sys_temp.TEA.copy(exist_sys)
     else:
         exist_tea = create_tea(exist_sys)
-        exist_tea.operating_hours = exist_sys.operating_hours
+        exist_sys_temp.operating_hours = exist_sys_temp.operating_hours or \
+            exist_sys.operating_hours or exist_tea.operating_hours
 
     ##### With the new wastewater treatment process #####
     if from_load:
@@ -150,6 +152,7 @@ def create_comparison_systems(info, functions, sys_dct={}, from_load=False):
 
     for attr in ('operating_hours', 'lang_factor'):
         val = getattr(exist_sys_temp, attr)
+        if val is None: continue
         for sys in (exist_sys_wwt, exist_sys, new_sys_wwt, new_sys):
             setattr(sys, attr, val)
 
@@ -158,7 +161,7 @@ def create_comparison_systems(info, functions, sys_dct={}, from_load=False):
         new_tea = new_sys_temp.TEA.copy(new_sys)
     else:
         new_tea = create_tea(new_sys)
-        new_tea.operating_hours = new_sys.operating_hours
+        new_tea.operating_hours = new_sys.operating_hours or new_tea.operating_hours
 
     if kwdct['update_product_price']:
         update_product_prices(exist_s)

@@ -100,10 +100,6 @@ def create_preprocessing_process(flowsheet=None):
     U101 = units.FeedstockPreprocessing('U101', ins=feedstock,
                                         outs=('processed', 'diverted_to_CHP'),
                                         diversion_to_CHP=0)
-    # try: U101 = units.FeedstockPreprocessing('U101', ins=feedstock,
-    #                                     outs=('processed', 'diverted_to_CHP'),
-    #                                     diversion_to_CHP=0)
-    # except: breakpoint()
 
     ######################## System ########################
     System('preprocessing_sys', path=(U101,))

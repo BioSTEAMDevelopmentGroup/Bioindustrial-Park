@@ -81,14 +81,7 @@ def simulate_sc1g_systems():
 # Models
 # =============================================================================
 
-# def create_sc1g_comparison_models():
-#     from biosteam import Model
-#     from biorefineries.wwt import get_default_distribution, add_new_wwt_parameters, add_metrics
-#     exist_sys, new_sys = create_cs_comparison_systems()
-#     exist_model = Model(exist_sys)
 
-#     def add_corn_parameters(model, model_dct):
-#         b =
 
 
 

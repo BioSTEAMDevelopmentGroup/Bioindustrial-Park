@@ -427,10 +427,10 @@ def create_model(kind='SSCF'):
     ######################## Pretreatment parameters ########################
     M202 = u.M202
     D = shape.Triangle(0.25, 0.3, 0.4)
-    @param(name='Pretreatment solid loading', element=M202, kind='coupled', units='%',
+    @param(name='Pretreatment solids loading', element=M202, kind='coupled', units='%',
            baseline=0.3, distribution=D)
-    def set_pretreatment_solid_loading(loading):
-        M202.solid_loading = loading
+    def set_pretreatment_solids_loading(loading):
+        M202.solids_loading = loading
 
     T201 = u.T201
     D = shape.Triangle(10, 22.1, 35)
@@ -456,10 +456,10 @@ def create_model(kind='SSCF'):
     ######################## Conversion parameters ########################
     M301 = u.M301
     D = shape.Triangle(0.175, 0.2, 0.25)
-    @param(name='Enzymatic hydrolysis solid loading', element=M301, kind='coupled', units='%',
+    @param(name='Enzymatic hydrolysis solids loading', element=M301, kind='coupled', units='%',
            baseline=0.2, distribution=D)
-    def set_R301_solid_loading(loading):
-        M301.solid_loading = loading
+    def set_R301_solids_loading(loading):
+        M301.solids_loading = loading
 
     D = shape.Triangle(10, 20, 30)
     @param(name='Enzyme loading', element=M301, kind='coupled', units='mg/g',

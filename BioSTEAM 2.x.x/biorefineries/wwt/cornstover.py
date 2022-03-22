@@ -83,7 +83,9 @@ def create_cs_comparison_models():
 
     ##### Existing system #####
     exist_model_dct = {
+        'abbr': info['abbr'],
         'feedstock': 'cornstover',
+        'primary_product': 'ethanol',
         'sulfuric_acid': 'sulfuric_acid',
         'acid_dilution_water': 'warm_process_water_1',
         'sludge': 'sludge',
@@ -101,6 +103,7 @@ def create_cs_comparison_models():
             'FERM xylan-to-product': ('cofermentation', 4),
             },
         'BT': 'BT',
+        'BT_eff': ('boiler_efficiency', 'turbogenerator_efficiency'),
         'wwt_system': 'exist_sys_wwt',
         'is2G': info['is2G'],
         }
@@ -110,7 +113,7 @@ def create_cs_comparison_models():
     new_model_dct = exist_model_dct.copy()
     new_model_dct['biogas'] = 'biogas'
     new_model_dct['wwt_system'] = 'new_sys_wwt'
-    new_model_dct['WWT_ID'] = info['WWT_ID']
+    new_model_dct['new_wwt_ID'] = info['WWT_ID']
     new_model = create_comparison_models(new_sys, new_model_dct)
     return exist_model, new_model
 
@@ -131,4 +134,4 @@ def evaluate_cs_models(**kwargs):
 if __name__ == '__main__':
     # exist_sys, new_sys = simulate_cs_systems()
     # exist_model, new_model = create_cs_comparison_models()
-    exist_model, new_model = evaluate_cs_models(N=10, notify=100)
+    exist_model, new_model = evaluate_cs_models(N=10)
