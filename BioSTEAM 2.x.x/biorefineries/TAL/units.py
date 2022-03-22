@@ -557,7 +557,7 @@ class CoFermentation(Unit):
         Rxn('Glucose -> 0.3 VitaminD2',               'Glucose',   0.005), # ergosterol
         Rxn('Glucose -> 6 FermMicrobe',       'Glucose',   0.05),
         
-        Rxn('Xylose -> 0.6667 TAL + 1.3334 CO2',       'Xylose',    0.25),
+        Rxn('Xylose -> 0.555583 TAL + 1.3334 CO2',       'Xylose',    0.25),
         Rxn('Xylose -> 0.17856 VitaminA',       'Xylose',    0.005),
         Rxn('Xylose -> 0.25 VitaminD2',       'Xylose',    0.005),
         Rxn('Xylose -> 5 FermMicrobe',        'Xylose',    0.05),
@@ -671,12 +671,12 @@ class SeedTrain(Unit):
 
         self.cofermentation_rxns = ParallelRxn([
         #      Reaction definition            Reactant    Conversion
-        Rxn('Glucose -> 0.64 TAL + 2.16 CO2',        'Glucose',   .25), 
+        Rxn('Glucose -> 0.6667 TAL + 2 CO2',        'Glucose',   .25), 
         Rxn('Glucose -> 0.2143 VitaminA',               'Glucose',   0.005), # retinol
         Rxn('Glucose -> 0.3 VitaminD2',               'Glucose',   0.005), # ergosterol
         Rxn('Glucose -> 6 FermMicrobe',       'Glucose',   0.05),
         
-        Rxn('Xylose -> 0.533312 TAL + 1.799928 CO2',       'Xylose',    0.25),
+        Rxn('Xylose -> 0.555583 TAL + 1.3334 CO2',       'Xylose',    0.25),
         Rxn('Xylose -> 0.17856 VitaminA',       'Xylose',    0.005),
         Rxn('Xylose -> 0.25 VitaminD2',       'Xylose',    0.005),
         Rxn('Xylose -> 5 FermMicrobe',        'Xylose',    0.05),
