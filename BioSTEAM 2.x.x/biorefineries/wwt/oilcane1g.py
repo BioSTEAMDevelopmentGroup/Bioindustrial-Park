@@ -91,7 +91,7 @@ def create_oc1g_comparison_models():
     exist_model_dct = {
         'abbr': info['abbr'],
         'feedstock': 'oilcane',
-        'primary_product': 'ethanol',
+        'FERM_product': 'ethanol',
         'PT_rx': 'R301',
         'fermentor': 'R301',
         'TE_rx': 'U601',
@@ -101,6 +101,7 @@ def create_oc1g_comparison_models():
         'reactions': {
             'PT glucan-to-glucose': ('hydrolysis_reaction', ),
             'FERM glucan-to-product': ('fermentation_reaction', ),
+            'FERM oil-to-FFA': ('oil_reaction', 0), # not fermentation, but happens in the fermentor
             'TE oil-to-product': ('transesterification', (0, 1, 2)),
             },
         'BT': 'BT701',

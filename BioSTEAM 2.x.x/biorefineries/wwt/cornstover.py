@@ -85,7 +85,7 @@ def create_cs_comparison_models():
     exist_model_dct = {
         'abbr': info['abbr'],
         'feedstock': 'cornstover',
-        'primary_product': 'ethanol',
+        'FERM_product': 'ethanol',
         'sulfuric_acid': 'sulfuric_acid',
         'acid_dilution_water': 'warm_process_water_1',
         'sludge': 'sludge',

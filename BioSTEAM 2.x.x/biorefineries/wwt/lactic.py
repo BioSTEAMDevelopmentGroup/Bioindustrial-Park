@@ -95,7 +95,7 @@ def create_la_comparison_models():
     exist_model_dct = {
         'abbr': info['abbr'],
         'feedstock': 'feedstock',
-        'primary_product': 'lactic_acid',
+        'FERM_product': 'lactic_acid',
         'sludge': 'wastes_to_CHP',
         'biogas': 'biogas',
         'PT_acid_mixer': 'T201',

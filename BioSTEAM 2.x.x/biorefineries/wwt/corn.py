@@ -78,7 +78,7 @@ def create_cn_comparison_models():
     exist_model_dct = {
         'abbr': info['abbr'],
         'feedstock': 'corn',
-        'primary_product': 'ethanol',
+        'FERM_product': 'ethanol',
         'PT_rx': 'V310',
         'fermentor': 'V405',
         'reactions': {
