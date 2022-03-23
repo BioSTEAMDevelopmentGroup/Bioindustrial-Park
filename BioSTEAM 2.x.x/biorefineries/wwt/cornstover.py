@@ -14,6 +14,7 @@ info = {
     'abbr': 'cs',
     'WWT_ID': '6',
     'is2G': True,
+    'FERM_product': 'ethanol',
     'add_CHP': False,
     'ww_price': None,
     }
@@ -25,7 +26,9 @@ info = {
 # Systems
 # =============================================================================
 
-def create_cs_comparison_systems():
+def create_cs_comparison_systems(default_BD=True):
+    BD = {} if not default_BD else 1.
+    wwt_kwdct = dict.fromkeys(('IC_kwargs', 'AnMBR_kwargs',), {'biodegradability': BD,})
     # # Create from scratch, IRR doesn't match as closely as the method below
     # from biorefineries.wwt import create_comparison_systems
     # from biorefineries import cornstover as cs
@@ -39,6 +42,7 @@ def create_cs_comparison_systems():
     # functions = (create_chemicals, create_system, create_tea, load_process_settings,)
     # sys_dct = {
     #     'create_system': {'include_blowdown_recycle': True},
+    #     'create_wastewater_process': wwt_kwdct,
     #     'BT': 'BT',
     #     'new_wwt_connections': {'sludge': ('M501', 0), 'biogas': ('BT', 1)},
     #     }
@@ -54,6 +58,7 @@ def create_cs_comparison_systems():
     from biorefineries import cornstover as cs
     sys_dct = {
         'system_name': 'cornstover_sys',
+        'create_wastewater_process': wwt_kwdct,
         'BT': 'BT',
         'new_wwt_connections': {'sludge': ('M501', 0), 'biogas': ('BT', 1)},
         }
@@ -62,10 +67,10 @@ def create_cs_comparison_systems():
     return exist_sys, new_sys
 
 
-def simulate_cs_systems():
+def simulate_cs_systems(**sys_kwdct):
     from biorefineries.wwt import simulate_systems
     global exist_sys, new_sys
-    exist_sys, new_sys = create_cs_comparison_systems()
+    exist_sys, new_sys = create_cs_comparison_systems(**sys_kwdct)
     # ~235 mg/L COD, mostly (~200/>85%) due to soluble lignin, arabinose, and extract
     simulate_systems(exist_sys, new_sys, info)
     return exist_sys, new_sys
@@ -85,12 +90,9 @@ def create_cs_comparison_models():
     exist_model_dct = {
         'abbr': info['abbr'],
         'feedstock': 'cornstover',
-        'FERM_product': 'ethanol',
-        'sulfuric_acid': 'sulfuric_acid',
-        'acid_dilution_water': 'warm_process_water_1',
+        'FERM_product': info['FERM_product'],
         'sludge': 'sludge',
         'biogas': 'methane',
-        'PT_acid_mixer': 'M201',
         'PT_solids_mixer': 'M203',
         'PT_rx': 'R201',
         'EH_mixer': 'M301',
@@ -118,11 +120,11 @@ def create_cs_comparison_models():
     return exist_model, new_model
 
 
-def evaluate_cs_models(**kwargs):
+def evaluate_cs_models(**eval_kwdct):
     from biorefineries.wwt import evaluate_models
     global exist_model, new_model
     exist_model, new_model = create_cs_comparison_models()
-    return evaluate_models(exist_model, new_model, abbr=info['abbr'], **kwargs)
+    return evaluate_models(exist_model, new_model, abbr=info['abbr'], **eval_kwdct)
 
 
 # %%
@@ -132,6 +134,6 @@ def evaluate_cs_models(**kwargs):
 # =============================================================================
 
 if __name__ == '__main__':
-    # exist_sys, new_sys = simulate_cs_systems()
+    # exist_sys, new_sys = simulate_cs_systems(default_BD=True)
     # exist_model, new_model = create_cs_comparison_models()
-    exist_model, new_model = evaluate_cs_models(N=10)
+    exist_model, new_model = evaluate_cs_models(N=1000)

@@ -14,6 +14,7 @@ info = {
     'abbr': 'oc1g',
     'WWT_ID': '11',
     'is2G': False,
+    'FERM_product': 'ethanol',
     'add_CHP': False,
     'ww_price': None,
     }
@@ -25,7 +26,10 @@ info = {
 # Systems
 # =============================================================================
 
-def create_oc1g_comparison_systems():
+def create_oc1g_comparison_systems(default_BD=True):
+    BD = {} if not default_BD else 1.
+    wwt_kwdct = dict.fromkeys(('IC_kwargs', 'AnMBR_kwargs',), {'biodegradability': BD,})
+    wwt_kwdct['skip_AeF'] = True
     # # Does not work for oilcane biorefineries due to the many settings
     # # not included in the system creation function
     # from biorefineries.wwt import create_comparison_systems
@@ -39,7 +43,7 @@ def create_oc1g_comparison_systems():
     # sys_dct = {
     #     'create_system': {'operating_hours': 24*200},
     #     'rename_storage_to': 1000,
-    #     'create_wastewater_process': {'skip_AeF': True},
+    #     'create_wastewater_process': wwt_kwdct,
     #     # `vinasse`, `wastewater`, `fiber_fines`,
     #     # COD of `evaporator_condensate` is only ~20 mg/L
     #     'ww_streams': (('M403', 0), ('M603', 0), ('U206', 1)),
@@ -55,7 +59,7 @@ def create_oc1g_comparison_systems():
         'load': {'name': 'O1', 'cache': None, 'reduce_chemicals': False},
         'system_name': 'oilcane_sys',
         'BT': 'BT701',
-        'create_wastewater_process': {'skip_AeF': True},
+        'create_wastewater_process': wwt_kwdct,
         # `vinasse`, `wastewater`, `fiber_fines`,
         # COD of `evaporator_condensate` is only ~20 mg/L
         'ww_streams': (('M403', 0), ('M603', 0), ('U206', 1)),
@@ -68,10 +72,10 @@ def create_oc1g_comparison_systems():
     return exist_sys, new_sys
 
 
-def simulate_oc1g_systems():
+def simulate_oc1g_systems(**sys_kwdct):
     from biorefineries.wwt import simulate_systems
     global exist_sys, new_sys
-    exist_sys, new_sys = create_oc1g_comparison_systems()
+    exist_sys, new_sys = create_oc1g_comparison_systems(**sys_kwdct)
     simulate_systems(exist_sys, new_sys, info)
     return exist_sys, new_sys
 
@@ -91,7 +95,7 @@ def create_oc1g_comparison_models():
     exist_model_dct = {
         'abbr': info['abbr'],
         'feedstock': 'oilcane',
-        'FERM_product': 'ethanol',
+        'FERM_product': info['FERM_product'],
         'PT_rx': 'R301',
         'fermentor': 'R301',
         'TE_rx': 'U601',
@@ -121,11 +125,11 @@ def create_oc1g_comparison_models():
     return exist_model, new_model
 
 
-def evaluate_oc1g_models(**kwargs):
+def evaluate_oc1g_models(**eval_kwdct):
     from biorefineries.wwt import evaluate_models
     global exist_model, new_model
     exist_model, new_model = create_oc1g_comparison_models()
-    return evaluate_models(exist_model, new_model, abbr=info['abbr'], **kwargs)
+    return evaluate_models(exist_model, new_model, abbr=info['abbr'], **eval_kwdct)
 
 
 # %%
@@ -135,6 +139,6 @@ def evaluate_oc1g_models(**kwargs):
 # =============================================================================
 
 if __name__ == '__main__':
-    # exist_sys, new_sys = simulate_oc1g_systems()
+    # exist_sys, new_sys = simulate_oc1g_systems(default_BD=True)
     # exist_model, new_model = create_oc1g_comparison_models()
-    exist_model, new_model = evaluate_oc1g_models(N=10)
+    exist_model, new_model = evaluate_oc1g_models(N=1000)

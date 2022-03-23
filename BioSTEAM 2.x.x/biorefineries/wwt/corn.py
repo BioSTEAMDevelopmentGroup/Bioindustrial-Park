@@ -15,6 +15,7 @@ info = {
     'abbr': 'cn',
     'WWT_ID': '7',
     'is2G': False,
+    'FERM_product': 'ethanol',
     'add_CHP': True,
     'ww_price': -0.003, # the default -0.03 leads to two solutions
     }
@@ -26,7 +27,9 @@ info = {
 # Systems
 # =============================================================================
 
-def create_cn_comparison_systems():
+def create_cn_comparison_systems(default_BD=True):
+    BD = {} if not default_BD else 1.
+    wwt_kwdct = dict.fromkeys(('IC_kwargs', 'AnMBR_kwargs',), {'biodegradability': BD,})
     # # Create from scratch
     # import biosteam as bst
     # from biorefineries.wwt import create_comparison_systems
@@ -39,7 +42,7 @@ def create_cn_comparison_systems():
     # functions = (create_chemicals, create_system, create_tea, load_process_settings,)
     # sys_dct = {
     #     'create_system': {'flowsheet': bst.main_flowsheet},
-    #     'create_wastewater_process': {'skip_AeF': True},
+    #     'create_wastewater_process': wwt_kwdct,
     #     'ww_streams': (('MH103', 1), ('MX5', 0)),
     #     }
     # exist_sys, new_sys = create_comparison_systems(info, functions, sys_dct)
@@ -48,7 +51,7 @@ def create_cn_comparison_systems():
     from biorefineries import corn as cn
     sys_dct = {
         'system_name': 'corn_sys',
-        'create_wastewater_process': {'skip_AeF': True},
+        'create_wastewater_process': wwt_kwdct,
         'ww_streams': (('MH103', 1), ('MX5', 0)),
         }
     exist_sys, new_sys = create_comparison_systems(info, cn, sys_dct, from_load=True)
@@ -56,10 +59,10 @@ def create_cn_comparison_systems():
     return exist_sys, new_sys
 
 
-def simulate_cn_systems():
+def simulate_cn_systems(**sys_kwdct):
     from biorefineries.wwt import simulate_systems
     global exist_sys, new_sys
-    exist_sys, new_sys = create_cn_comparison_systems()
+    exist_sys, new_sys = create_cn_comparison_systems(**sys_kwdct)
     simulate_systems(exist_sys, new_sys, info)
     return exist_sys, new_sys
 
@@ -78,14 +81,13 @@ def create_cn_comparison_models():
     exist_model_dct = {
         'abbr': info['abbr'],
         'feedstock': 'corn',
-        'FERM_product': 'ethanol',
+        'FERM_product': info['FERM_product'],
         'PT_rx': 'V310',
         'fermentor': 'V405',
         'reactions': {
             'PT glucan-to-glucose': ('reaction',),
             'FERM glucan-to-product': ('reaction',),
             },
-        'BT': None,
         'wwt_system': 'exist_sys_wwt',
         'is2G': info['is2G'],
         }
@@ -104,11 +106,11 @@ def create_cn_comparison_models():
     return exist_model, new_model
 
 
-def evaluate_cn_models(**kwargs):
+def evaluate_cn_models(**eval_kwdct):
     from biorefineries.wwt import evaluate_models
     global exist_model, new_model
     exist_model, new_model = create_cn_comparison_models()
-    return evaluate_models(exist_model, new_model, abbr=info['abbr'], **kwargs)
+    return evaluate_models(exist_model, new_model, abbr=info['abbr'], **eval_kwdct)
 
 
 # %%
@@ -118,6 +120,6 @@ def evaluate_cn_models(**kwargs):
 # =============================================================================
 
 if __name__ == '__main__':
-    # exist_sys, new_sys = simulate_cn_systems()
+    # exist_sys, new_sys = simulate_cn_systems(default_BD=True)
     # exist_model, new_model = create_cn_comparison_models()
-    exist_model, new_model = evaluate_cn_models(N=10)
+    exist_model, new_model = evaluate_cn_models(N=1000)

@@ -9,9 +9,9 @@
 
 import pandas as pd
 # from thermosteam.reaction import Reaction as Rxn, ParallelReaction as PRxn
-from biosteam import Metric, PowerUtility
+from biosteam import Metric, PowerUtility, WastewaterSystemCost, ReverseOsmosis
 from chaospy import distributions as shape
-from . import get_combustion_energy, results_path
+from . import results_path, get_combustion_energy, compute_stream_COD as get_COD
 
 __all__ = (
     'create_comparison_models', 'evaluate_models',
@@ -115,7 +115,7 @@ def add_biodiesel_parameters(model, model_dct, f, u, s, get_obj, get_rxn, param)
     rxn = get_rxn(fermentor, 'FERM oil-to-FFA')
     b = rxn.X
     D = get_default_distribution('uniform', b)
-    @param(name='FERM glucose-to-product', element=fermentor, kind='coupled', units='-',
+    @param(name='FERM oil-to-FFA', element=fermentor, kind='coupled', units='-',
            baseline=b, distribution=D)
     def set_FERM_oil_to_FFA(X):
         rxn.X = X
@@ -136,8 +136,8 @@ def add_biodiesel_parameters(model, model_dct, f, u, s, get_obj, get_rxn, param)
 
 
 def add_combustion_parameters(model, model_dct, f, u, s, get_obj, get_rxn, param):
-    try: BT = get_obj(u, 'BT')
-    except: return model # 1G biorefinery without BT/CHP
+    BT = get_obj(u, 'BT')
+    if not BT: return model # 1G biorefinery without BT/CHP
 
     BT_eff = model_dct['BT_eff']
     if len(BT_eff) == 2:
@@ -202,26 +202,6 @@ def add_1G_parameters(model, model_dct, f, u, s, get_obj, get_rxn, param):
 # based on in Humbird et al. if not otherwise noted
 def add_2G_parameters(model, model_dct, f, u, s, get_obj, get_rxn, param):
     # Pretreatment
-    if model_dct.get('PT_acid_mixer'): 
-        PT_acid_mixer = get_obj(u, 'PT_acid_mixer')
-        D = shape.Triangle(10, 22.1, 35)
-        if not model_dct.get('adjust_acid_with_acid_loading'):
-            feedstock = get_obj(s, 'feedstock')
-            sulfuric_acid = get_obj(s, 'sulfuric_acid')
-            acid_dilution_water = get_obj(s, 'acid_dilution_water')
-            def set_PT_H2SO4_loading(loading):
-                def update_sulfuric_acid_loading():
-                    F_mass_dry_feedstock = feedstock.F_mass - feedstock.imass['water']
-                    sulfuric_acid.F_mass = 0.02316/22.1*loading * F_mass_dry_feedstock
-                    acid_dilution_water.F_mass = 0.282/22.1*loading * F_mass_dry_feedstock
-                PT_acid_mixer.specification[0] = update_sulfuric_acid_loading
-        else:
-            def set_PT_H2SO4_loading(loading):
-                PT_acid_mixer.acid_loading = loading
-        param(set_PT_H2SO4_loading,
-              name='PT H2SO4 loading', element=PT_acid_mixer, kind='coupled', units='mg/g',
-              baseline=22.1, distribution=D)
-
     PT_solids_mixer = get_obj(u, 'PT_solids_mixer')
     b = PT_solids_mixer.solids_loading
     try: D = shape.Triangle(0.25, b, 0.4)
@@ -265,7 +245,7 @@ def add_2G_parameters(model, model_dct, f, u, s, get_obj, get_rxn, param):
            baseline=b, distribution=D)
     def set_EH_solid_loading(loading):
         EH_mixer.solid_loading = loading
-    
+
     EH_rx = get_obj(u, 'EH_rx') or get_obj(u, 'fermentor')
     rxn = get_rxn(EH_rx, 'EH glucan-to-glucose')
     b = rxn.X
@@ -294,7 +274,7 @@ def add_2G_parameters(model, model_dct, f, u, s, get_obj, get_rxn, param):
         D_g = get_default_distribution('triangle', b_g, ratio=0.2)
         D_x = get_default_distribution('triangle', b_x, ratio=0.2)
     else: raise ValueError(f"Fermentation product {model_dct['FERM_product']} not recognized.")
-    
+
     @param(name='FERM glucose yield', element=fermentor, kind='coupled', units='-',
            baseline=b, distribution=D_g)
     def set_FERM_glucose_yield(X):
@@ -464,29 +444,67 @@ class AttrGetter:
         return self.hook(getattr(self.obj, self.attr))
 
 
+# IRR weird when going into negative,
+# solving for fermentation product price instead
 def add_metrics(model, model_dct, f, u, s, get_obj):
     sys = model.system
     wwt_system = get_obj(f.system, 'wwt_system')
 
     tea = sys.TEA
     product = get_obj(s, 'FERM_product')
-    def get_IRR(): # sometimes IRR has two solutions
-        IRRs = []
-        for i in range(3):
-            IRRs.append(tea.solve_IRR())
-        print(IRRs)
-        if tea.solve_price(product) < product.price: return min(IRRs)
-        return max(IRRs)
-    model.metric(get_IRR, name='IRR modified', units='-')
+    gal_or_kg = 'gal' if product.ID=='ethanol' else 'kg'
+    factor = 2.9867 if product.ID=='ethanol' else 1. # factor is cs.ethanol_density_kggal
 
-    metrics = [
-        *model.metrics,
-        Metric('IRR', lambda: sys.TEA.solve_IRR(), ''),
+    metrics = []
+    ww = s.search('ww')
+    if ww: # solve product price without wastewater
+        def product_price_wo_ww():
+            ww_price = ww.price
+            ww.price = 0
+            price = tea.solve_price(product)
+            ww.price = ww_price
+            return price*factor
+        metric0 = [
+            Metric('FERM product price no WW', product_price_wo_ww, f'$/{gal_or_kg}'),
+            ]
+    else: # get COD-related data
+        metric0 = []
+        isa = isinstance
+        if wwt_system.ID == 'exist_sys_wwt':
+            for unit in wwt_system.units:
+                if isa(unit, WastewaterSystemCost): break
+            ww_in = unit.outs[0]
+            for unit in wwt_system.units:
+                if isa(unit, ReverseOsmosis): break
+            ww_out = unit.ins[0]
+        else:
+            X = model_dct['new_wwt_ID']
+            ww_in = u.search(f'M{X}01').outs[0] # WWT mixer
+            ww_out = u.search(f'S{X}04').ins[0] # RO
+        metrics.extend([
+            Metric('COD in', lambda: get_COD(ww_in)*1e3, 'mg/L'),
+            Metric('COD out', lambda: get_COD(ww_out)*1e3, 'mg/L'),
+            Metric('COD removal', lambda: 1-get_COD(ww_out)/get_COD(ww_in), ''),
+            ])
+
+    # def get_IRR(): # sometimes IRR has two solutions
+    #     IRRs = []
+    #     for i in range(3):
+    #         IRRs.append(tea.solve_IRR())
+    #     if tea.solve_price(product) < product.price: return min(IRRs)
+    #     return max(IRRs)
+    # model.metric(get_IRR, name='IRR modified', units='-')
+
+    metrics = ([
+        *metric0,
+        Metric('FERM product price', lambda: tea.solve_price(product)*factor, f'$/{gal_or_kg}'),
+        # Metric('IRR', lambda: tea.solve_IRR(), ''),
         #!!! Need to add GWP
         # Metric('GWP', lambda: cs_wwt.get_GWP(sys), 'kg-CO2eq/gal'),
+        *metrics,
         Metric('WWT CAPEX', lambda: wwt_system.installed_equipment_cost/1e6, 'MM$'),
         Metric('WWT electricity usage', lambda: wwt_system.get_electricity_consumption()/1e3, 'MW')
-        ]
+        ])
 
     # Cost and electricity usage breakdown
     for i in wwt_system.units:
@@ -503,8 +521,9 @@ def add_metrics(model, model_dct, f, u, s, get_obj):
     if len(BT_eff) == 0: return model
 
     BT = get_obj(u, 'BT')
-    try: wwt_energy_streams = (get_obj(s, 'sludge'), get_obj(s, 'biogas'))
-    except: return model
+    wwt_energy_streams = (get_obj(s, 'sludge'), get_obj(s, 'biogas'))
+    if None in wwt_energy_streams: return model
+
     if len(BT_eff) == 2:
         def get_wwt_produced_energy():
             eff = getattr(BT, BT_eff[0]) * getattr(BT, BT_eff[1])
@@ -529,6 +548,7 @@ def add_metrics(model, model_dct, f, u, s, get_obj):
 def create_comparison_models(system, model_dct):
     from biosteam import Model
     model = Model(system)
+    # model = Model(system, exception_hook='raise') # if want to raise the error
     f = model.system.flowsheet
     u = f.unit
     s = f.stream
@@ -578,7 +598,7 @@ def evaluate_models(exist_model, new_model, abbr,
     import os
     exist_samples = exist_model.sample(N=N, seed=seed, rule=rule)
     exist_model.load_samples(exist_samples)
-    exist_path = os.path.join(results_path, f'{abbr}_exist_uncertainties.xlsx')
+    exist_path = os.path.join(results_path, f'{abbr}_exist_uncertainties_{N}.xlsx')
 
     notify = round(N/10, 0)
     exist_model.evaluate(notify=notify)
@@ -587,7 +607,7 @@ def evaluate_models(exist_model, new_model, abbr,
     new_samples = new_model.sample(N=N, seed=seed, rule=rule)
     new_model.load_samples(new_samples)
     copy_samples(exist_model, new_model)
-    new_path = os.path.join(results_path, f'{abbr}_new_uncertainties.xlsx')
+    new_path = os.path.join(results_path, f'{abbr}_new_uncertainties_{N}.xlsx')
 
     new_model.evaluate(notify=notify)
     save_model_results(new_model, new_path, percentiles)

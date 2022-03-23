@@ -91,7 +91,7 @@ class SludgeHandling(bst.Unit):
         target_mc = self.sludge_moisture
         if mc < target_mc:
             if self.SKIPPED == False:
-                warn(f'The moisture of influent ({mc:.2%}) is smaller than the desired {target_mc:%}, '
+                warn(f'The moisture of influent ({mc:.2%}) is smaller than the desired {target_mc:.0%}, '
                      'simulation skipped.')
                 self.SKIPPED = True
             sludge.copy_like(mixed)

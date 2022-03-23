@@ -43,7 +43,7 @@ __all__ = (
     'kph_to_tpd',
     'rename_storage_units',
     # Prices
-    'price', 'update_product_prices', 'IRR_at_ww_price', 'ww_price_at_IRR',
+    'price', 'update_product_prices', 'IRR_at_ww_price', 'ww_price_at_IRR', 'get_MPSP',
     )
 
 
@@ -552,8 +552,24 @@ def IRR_at_ww_price(ww_stream, tea, ww_price=None, print_msg=True):
     if print_msg: print(f'\nIRR: {IRR:.2%}\n')
     return IRR
 
+
 def ww_price_at_IRR(ww_stream, tea, IRR, print_msg=True):
     tea.IRR = IRR
     ww_price = tea.solve_price(ww_stream)
     if print_msg: print(f'\nWW price: {ww_price:.5f}\n')
     return ww_price
+
+
+ethanol_density_kggal = 2.9867 # cs.ethanol_density_kggal
+def get_MPSP(system, product='ethanol', print_msg=True):
+    tea = system.TEA
+    product = system.flowsheet.stream.search(product)
+    if product.ID=='ethanol':
+        txt = ('MESP', 'gal')
+        factor = ethanol_density_kggal
+    else:
+        txt = ('MPSP', 'kg')
+        factor = 1.
+    price = tea.solve_price(product) * factor
+    if print_msg: print(f'\n{txt[0]} of {product.ID} for {system.ID}: ${price:.2f}/{txt[1]}.')
+    return price

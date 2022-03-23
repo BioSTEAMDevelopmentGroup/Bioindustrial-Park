@@ -11,7 +11,7 @@ import biosteam as bst
 from . import (
     add_wwt_chemicals, create_wastewater_process, CHP as CHPunit,
     rename_storage_units, get_COD_breakdown,
-    update_product_prices, IRR_at_ww_price, ww_price_at_IRR,
+    update_product_prices, IRR_at_ww_price, ww_price_at_IRR, get_MPSP,
     )
 
 __all__ = (
@@ -36,7 +36,7 @@ kwdct = {
 
 
 def create_comparison_systems(info, functions, sys_dct={}, from_load=False):
-    abbr, WWT_ID, is2G, add_CHP, ww_price = info.values()
+    abbr, WWT_ID, is2G, FERM_product, add_CHP, ww_price = info.values()
     kwdct.update(sys_dct)
 
     if kwdct['new_wwt_connections']:
@@ -171,16 +171,17 @@ def create_comparison_systems(info, functions, sys_dct={}, from_load=False):
 
 
 def simulate_systems(exist_sys, new_sys, info):
-    abbr, WWT_ID, is2G, add_CHP, ww_price = info.values()
     exist_tea, new_tea = exist_sys.TEA, new_sys.TEA
     exist_sys.simulate()
     new_sys.simulate()
-    print(f'\n\n{abbr} module:')
+    print(f'\n\n{info["abbr"]} module:')
     print(f'Existing system IRR: {exist_tea.solve_IRR():.2%}')
     print(f'New system IRR: {new_tea.solve_IRR():.2%}')
-    get_COD_breakdown(getattr(new_sys.flowsheet.unit, f'S{WWT_ID}04').ins[0])
+    get_MPSP(exist_sys, info['FERM_product'])
+    get_MPSP(new_sys, info['FERM_product'])
+    get_COD_breakdown(getattr(new_sys.flowsheet.unit, f'S{info["WWT_ID"]}04').ins[0])
 
-    if not is2G:
+    if not info['is2G']:
         exist_ww = exist_sys.flowsheet.stream.ww
-        IRR_at_ww_price(exist_ww, exist_tea, ww_price)
+        IRR_at_ww_price(exist_ww, exist_tea, info['ww_price'])
         ww_price_at_IRR(exist_ww, exist_tea, new_tea.solve_IRR())

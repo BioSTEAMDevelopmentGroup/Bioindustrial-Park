@@ -14,6 +14,7 @@ info = {
     'abbr': 'la',
     'WWT_ID': '5',
     'is2G': True,
+    'FERM_product': 'lactic_acid',
     'add_CHP': False,
     'ww_price': None,
     }
@@ -25,7 +26,9 @@ info = {
 # Systems
 # =============================================================================
 
-def create_la_comparison_systems():
+def create_la_comparison_systems(default_BD=True):
+    BD = {} if not default_BD else 1.
+    wwt_kwdct = dict.fromkeys(('IC_kwargs', 'AnMBR_kwargs',), {'biodegradability': BD,})
     # Create from scratch, IRR for existing system is 24.38% (24.39% if do direct loading)
     from biorefineries.wwt import create_comparison_systems, add_wwt_chemicals
     from biorefineries.lactic import (
@@ -51,6 +54,7 @@ def create_la_comparison_systems():
     functions = (create_chemicals, create_system, create_tea, load_process_settings,)
     sys_dct = {
         'create_system': {'cell_mass_split': new_cell_mass_split, 'gypsum_split': new_gypsum_split},
+        'create_wastewater_process': wwt_kwdct,
         'BT': 'CHP',
         'new_wwt_connections': {'sludge': ('M601', 0), 'biogas': ('CHP', 1)},
         }
@@ -63,6 +67,7 @@ def create_la_comparison_systems():
     # sys_dct = {
     #     'load': {'print_results': False},
     #     'system_name': 'lactic_sys',
+    #     'create_wastewater_process': wwt_kwdct,
     #     'BT': 'CHP',
     #     'new_wwt_connections': {'sludge': ('M601', 0), 'biogas': ('CHP', 1)},
     #     }
@@ -71,10 +76,10 @@ def create_la_comparison_systems():
     return exist_sys, new_sys
 
 
-def simulate_la_systems():
+def simulate_la_systems(**sys_kwdct):
     from biorefineries.wwt import simulate_systems
     global exist_sys, new_sys
-    exist_sys, new_sys = create_la_comparison_systems()
+    exist_sys, new_sys = create_la_comparison_systems(**sys_kwdct)
     # ~504 mg/L COD, soluble lignin, arabinose, and galactose all >10%,
     # lactic acid, extract, xylose, and mannose ~5-10%
     simulate_systems(exist_sys, new_sys, info)
@@ -95,11 +100,9 @@ def create_la_comparison_models():
     exist_model_dct = {
         'abbr': info['abbr'],
         'feedstock': 'feedstock',
-        'FERM_product': 'lactic_acid',
+        'FERM_product': info['FERM_product'],
         'sludge': 'wastes_to_CHP',
         'biogas': 'biogas',
-        'PT_acid_mixer': 'T201',
-        'adjust_acid_with_acid_loading': True,
         'PT_solids_mixer': 'M202',
         'PT_rx': 'R201',
         'EH_mixer': 'M301',
@@ -126,11 +129,11 @@ def create_la_comparison_models():
     return exist_model, new_model
 
 
-def evaluate_la_models(**kwargs):
+def evaluate_la_models(**eval_kwdct):
     from biorefineries.wwt import evaluate_models
     global exist_model, new_model
     exist_model, new_model = create_la_comparison_models()
-    return evaluate_models(exist_model, new_model, abbr=info['abbr'], **kwargs)
+    return evaluate_models(exist_model, new_model, abbr=info['abbr'], **eval_kwdct)
 
 
 # %%
@@ -142,6 +145,6 @@ def evaluate_la_models(**kwargs):
 #!!! The lactic acid module is REALLY slow... would want to profile and find out why
 #!!! There are problems with the metrics
 if __name__ == '__main__':
-    # exist_sys, new_sys = simulate_la_systems()
+    # exist_sys, new_sys = simulate_la_systems(default_BD=True)
     exist_model, new_model = create_la_comparison_models()
     # exist_model, new_model = evaluate_la_models(N=10, notify=1)

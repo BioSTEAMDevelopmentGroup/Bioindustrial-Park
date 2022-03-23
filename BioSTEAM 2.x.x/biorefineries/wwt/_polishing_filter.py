@@ -193,7 +193,6 @@ class PolishingFilter(bst.Unit):
             waste.ivol['Water'] = m_insolubles/sludge_conc
             eff.ivol['Water'] += diff
 
-
         biogas.phase = air_in.phase = air_out.phase = 'g'
 
         if inf.imol['O2'] < 0:
@@ -213,6 +212,7 @@ class PolishingFilter(bst.Unit):
             degassing(air_out, eff)
             degassing(air_out, waste)
             air_out.imol['N2'] += air_in.imol['N2']
+            air_out.imol['O2'] += air_in.imol['O2']
             self._recir_ratio = None
 
         if self.T is not None:
