@@ -471,12 +471,16 @@ def add_metrics(model, model_dct, f, u, s, get_obj):
         metric0 = []
         isa = isinstance
         if wwt_system.ID == 'exist_sys_wwt':
-            for unit in wwt_system.units:
-                if isa(unit, WastewaterSystemCost): break
-            ww_in = unit.outs[0]
-            for unit in wwt_system.units:
-                if isa(unit, ReverseOsmosis): break
-            ww_out = unit.ins[0]
+            if not model_dct['FERM_product'] == 'lactic_acid':
+                for unit in wwt_system.units:
+                    if isa(unit, WastewaterSystemCost): break
+                ww_in = unit.outs[0]
+                for unit in wwt_system.units:
+                    if isa(unit, ReverseOsmosis): break
+                ww_out = unit.ins[0]
+            else:
+                ww_in = u.search('M501').outs[0]
+                ww_out = u.search('S505').ins[0]
         else:
             X = model_dct['new_wwt_ID']
             ww_in = u.search(f'M{X}01').outs[0] # WWT mixer
@@ -502,8 +506,14 @@ def add_metrics(model, model_dct, f, u, s, get_obj):
         #!!! Need to add GWP
         # Metric('GWP', lambda: cs_wwt.get_GWP(sys), 'kg-CO2eq/gal'),
         *metrics,
-        Metric('WWT CAPEX', lambda: wwt_system.installed_equipment_cost/1e6, 'MM$'),
-        Metric('WWT electricity usage', lambda: wwt_system.get_electricity_consumption()/1e3, 'MW')
+        Metric('WWT CAPEX',
+               lambda: wwt_system.installed_equipment_cost/1e6, 'MM$'),
+        Metric('WWT CAPEX %',
+               lambda: wwt_system.installed_equipment_cost/sys.installed_equipment_cost, ''),
+        Metric('WWT electricity usage',
+               lambda: wwt_system.get_electricity_consumption()/1e3, 'MW'),
+        Metric('WWT electricity usage %',
+               lambda: wwt_system.get_electricity_consumption()/sys.get_electricity_consumption(), ''),
         ])
 
     # Cost and electricity usage breakdown
@@ -596,11 +606,12 @@ def evaluate_models(exist_model, new_model, abbr,
                     percentiles=(0, 0.05, 0.25, 0.5, 0.75, 0.95, 1),
                     N=1000, seed=3221, rule='L'):
     import os
+    from math import ceil
     exist_samples = exist_model.sample(N=N, seed=seed, rule=rule)
     exist_model.load_samples(exist_samples)
     exist_path = os.path.join(results_path, f'{abbr}_exist_uncertainties_{N}.xlsx')
 
-    notify = round(N/10, 0)
+    notify = ceil(N/10)
     exist_model.evaluate(notify=notify)
     save_model_results(exist_model, exist_path, percentiles)
 

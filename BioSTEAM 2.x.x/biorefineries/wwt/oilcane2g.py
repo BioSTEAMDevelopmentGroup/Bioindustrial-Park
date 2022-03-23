@@ -44,7 +44,7 @@ def create_oc2g_comparison_systems(default_BD=True):
     #     'create_wastewater_process': wwt_kwdct,
     #     'rename_storage_to': 1100,
     #     'BT': 'BT701',
-    #     'new_wwt_connections': {'sludge': ('BT701', 0), 'biogas': ('BT701', 1)},
+    #     'new_wwt_connections': {'sludge': ('M701', 0), 'biogas': ('BT701', 1)},
     #     }
     # exist_sys, new_sys = create_comparison_systems(info, functions, sys_dct)
 
@@ -55,7 +55,7 @@ def create_oc2g_comparison_systems(default_BD=True):
         'system_name': 'oilcane_sys',
         'create_wastewater_process': wwt_kwdct,
         'BT': 'BT701',
-        'new_wwt_connections': {'sludge': ('BT701', 0), 'biogas': ('BT701', 1)},
+        'new_wwt_connections': {'sludge': ('M701', 0), 'biogas': ('BT701', 1)},
         }
     exist_sys, new_sys = create_comparison_systems(info, oc, sys_dct, from_load=True)
 
@@ -136,6 +136,6 @@ def evaluate_oc2g_models(**eval_kwdct):
 # =============================================================================
 
 if __name__ == '__main__':
-    exist_sys, new_sys = simulate_oc2g_systems(default_BD=True)
+    # exist_sys, new_sys = simulate_oc2g_systems(default_BD=True)
     # exist_model, new_model = create_oc2g_comparison_models()
-    # exist_model, new_model = evaluate_oc2g_models(N=1000)
+    exist_model, new_model = evaluate_oc2g_models(N=1000)

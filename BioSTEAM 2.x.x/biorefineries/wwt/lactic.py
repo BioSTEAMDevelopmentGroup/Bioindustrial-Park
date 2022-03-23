@@ -146,5 +146,5 @@ def evaluate_la_models(**eval_kwdct):
 #!!! There are problems with the metrics
 if __name__ == '__main__':
     # exist_sys, new_sys = simulate_la_systems(default_BD=True)
-    exist_model, new_model = create_la_comparison_models()
-    # exist_model, new_model = evaluate_la_models(N=10, notify=1)
+    # exist_model, new_model = create_la_comparison_models()
+    exist_model, new_model = evaluate_la_models(N=100)
