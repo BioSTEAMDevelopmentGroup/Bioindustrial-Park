@@ -57,12 +57,12 @@ from . import (
 _chemicals_loaded = False
 _system_loaded = False
 
-def load(kind='SSCF', print_results=True):
+def load(kind='SSCF', print_results=True, **sys_kwdct):
     if not _chemicals_loaded: _load_chemicals()
     kind = kind.upper()
     if not kind in ('SSCF', 'SHF'):
         raise ValueError(f'kind can only be "SSCF" or "SHF", not "{kind}".')
-    _load_system(kind)
+    _load_system(kind, **sys_kwdct)
     dct = globals()
     dct.update(flowsheet.to_dict())
     if print_results: simulate_and_print(flowsheet=flowsheet)
@@ -72,13 +72,13 @@ def _load_chemicals():
     chemicals = create_chemicals()
     _chemicals_loaded = True
 
-def _load_system(kind='SSCF'):
+def _load_system(kind='SSCF', **sys_kwdct):
     global flowsheet, funcs, lactic_sys, lactic_tea
     flowsheet = bst.Flowsheet('lactic')
     bst.main_flowsheet.set_flowsheet(flowsheet)
     bst.settings.set_thermo(chemicals)
     load_process_settings()
-    lactic_sys, groups = create_system(kind=kind, return_groups=True, flowsheet=flowsheet)
+    lactic_sys, groups = create_system(kind=kind, return_groups=True, flowsheet=flowsheet, **sys_kwdct)
     global Area100, Area200, Area300, Area400, Area500, Area600
     Area100, Area200, Area300, Area400, Area500, HXN, CHP, CT, Area600 = groups
     lactic_tea = create_tea(flowsheet=flowsheet)
@@ -169,7 +169,7 @@ def create_funcs(lactic_tea=None, flowsheet=None):
     ######################## LCA ########################
     CFs = get_CFs(flowsheet=flowsheet)
     # 100-year global warming potential (GWP) from material flows
-    LCA_streams = set([i for i in lactic_sys.feeds if i.price])
+    LCA_streams = set([i for i in lactic_sys.feeds if getattr(i, 'price', None)])
     LCA_stream = s.search('LCA_stream') or bst.Stream('LCA_stream', units='kg/hr')
 
     def get_material_GWP():

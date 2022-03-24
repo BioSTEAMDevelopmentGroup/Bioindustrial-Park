@@ -92,6 +92,7 @@ def create_system(ID='lactic_sys', kind='SSCF', if_HXN=True, if_BDM=False,
                             facilities=facilities,
                             facility_recycle=u.BDM-0 if hasattr(u, 'BDM') else None
                             )
+    # lactic_sys.set_tolerance(mol=1e-3, rmol=1e-3, subsystems=True)
 
     if not return_groups: return lactic_sys
 

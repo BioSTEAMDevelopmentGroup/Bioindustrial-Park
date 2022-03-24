@@ -80,14 +80,6 @@ __all__ = (
 
 # %%
 
-# Feedstock flow rate in dry U.S. ton per day, 907.1847 is auom('ton').conversion_factor('kg')
-def get_flow_tpd(flowsheet=None):
-    flowsheet = flowsheet or bst.main_flowsheet
-    feedstock = flowsheet.stream.feedstock
-    U101 = flowsheet.unit.U101
-    return (feedstock.F_mass-feedstock.imass['H2O'])*24/907.1847*(1-U101.diversion_to_CHP)
-
-
 def create_preprocessing_process(flowsheet=None):
     flowsheet = flowsheet or bst.main_flowsheet
     chemicals = bst.settings.get_chemicals()
@@ -541,9 +533,10 @@ def create_separation_process(feed, cell_mass_split, gypsum_split,
     D402_H = bst.units.HXutility('D402_H', ins=D402-0, outs=1-R402, V=0, rigorous=True)
     D402_P = bst.units.Pump('D402_P', ins=D402-1)
 
-    ethanol_recycle = System('ethanol_recycle',
-                             path=(R402, R402_P, D402, D402_H, D402_P),
-                             recycle=D402_H-0)
+    # ethanol_recycle = System('ethanol_recycle',
+    #                          path=(R402, R402_P, D402, D402_H, D402_P),
+    #                          recycle=D402_H-0)
+    separation_sys_units = [R402, R402_P, D402, D402_H, D402_P]
 
     # Principal recovery step; EtLA separated from less volatile impurities
     D403 = bst.units.BinaryDistillation('D403', ins=D402_P-0,
@@ -563,12 +556,12 @@ def create_separation_process(feed, cell_mass_split, gypsum_split,
     # S403.outs[1] is discarded to prevent accumulation
     # It might have been a better idea to mix this with R301-0,
     # but currently not possible to simulate this recycle stream
-    S403 = bst.units.Splitter('S403',ins=D403_P-0, outs=(2-R402, 'D403_l_to_waste'),
-                              split=0.97)
+    S403 = bst.units.Splitter('S403',ins=D403_P-0, outs=(2-R402, 'D403_l_to_waste'), split=0.97)
 
-    acid_ester_recycle = System('acid_ester_recycle',
-                                path=(ethanol_recycle, D403, D403_H, D403_P, S403),
-                                recycle=S403-0)
+    # acid_ester_recycle = System('acid_ester_recycle',
+    #                             path=(ethanol_recycle, D403, D403_H, D403_P, S403),
+    #                             recycle=S403-0)
+    separation_sys_units.extend([D403, D403_H, D403_P, S403])
 
     # EtLA + H2O --> LA + EtOH
     # R403.ins[0] is the main EtLA feed,
@@ -616,13 +609,16 @@ def create_separation_process(feed, cell_mass_split, gypsum_split,
 
     F402_H1 = bst.units.HXutility('F402_H1', ins=F402-0, outs=3-R403, V=0, rigorous=True)
 
-    hydrolysis_recycle = System('hydrolysis_recycle',
-                                path=(R403, R403_P, D404, D404_H, D404_P,
-                                      F402, F402_H1),
-                                recycle=F402_H1-0)
-    esterification_recycle = System('esterification_recycle',
-                                    path=(acid_ester_recycle, hydrolysis_recycle),
-                                    recycle=D404_H-0)
+    # hydrolysis_recycle = System('hydrolysis_recycle',
+    #                             path=(R403, R403_P, D404, D404_H, D404_P,
+    #                                   F402, F402_H1),
+    #                             recycle=F402_H1-0)
+    # esterification_recycle = System('esterification_recycle',
+    #                                 path=(acid_ester_recycle, hydrolysis_recycle),
+    #                                 recycle=D404_H-0)
+    separation_sys_units.extend([
+        R403, R403_P, D404, D404_H, D404_P, F402, F402_H1
+        ])
 
     F402_H2 = bst.units.HXutility('F402_H2', ins=F402-1, T=345)
     F402_P = bst.units.Pump('F402_P', ins=F402_H2-0)
@@ -631,9 +627,15 @@ def create_separation_process(feed, cell_mass_split, gypsum_split,
     M401_P = bst.units.Pump('M401_P', ins=M401-0, outs='condensed_separation_waste_vapor')
 
     ######################## System ########################
-    System('separation_sys',
-            path=(S401, R401, R401_P, S402, F401, F401_H, F401_P, D401, D401_H, D401_P,
-                  esterification_recycle, F402_H2, F402_P, M401, M401_P,))
+    # System('separation_sys',
+    #         path=(S401, R401, R401_P, S402, F401, F401_H, F401_P, D401, D401_H, D401_P,
+    #               esterification_recycle, F402_H2, F402_P, M401, M401_P,))
+    separation_sys_units = ([
+        S401, R401, R401_P, S402, F401, F401_H, F401_P, D401, D401_H, D401_P,
+        *separation_sys_units,
+        F402_H2, F402_P, M401, M401_P,
+        ])
+    System.from_units('separation_sys', separation_sys_units)
 
 
 # %%
@@ -679,13 +681,12 @@ def create_wastewater_process(ww_streams, AD_split, MB_split,
         S503_ins0 = ''
         pre_aerobic = (M501,)
 
-    caustic_mass = get_flow_tpd(flowsheet=flowsheet)/2205 * 2252
     R502 = units.AerobicDigestion('R502',
                                   ins=(R502_ins0, '', caustic_R502,
                                        ammonia_R502, polymer_R502, air_R502),
                                   outs=(vent_R502, 'aerobic_treated_water'),
                                   reactants=soluble_organics,
-                                  caustic_mass=caustic_mass,
+                                  caustic_mass=None,
                                   need_ammonia=need_ammonia, COD_chemicals=COD_chemicals)
 
     # Membrane bioreactor to split treated wastewater from R502
@@ -754,9 +755,7 @@ def create_facilities(CHP_wastes, CHP_biogas='', CHP_side_streams=(),
 
     # Chemicals used/generated in CHP
     lime_CHP = Stream('lime_CHP', units='kg/hr', price=price['Lime'])
-    flowrate_ratio = get_flow_tpd(flowsheet=flowsheet) / 2205
-    NH4OH = flowrate_ratio * 1054 * 35.046/17.031 # convert from NH3 to NH4OH
-    ammonia_CHP = Stream('ammonia_CHP', units='kg/hr', NH4OH=NH4OH)
+    ammonia_CHP = Stream('ammonia_CHP', units='kg/hr')
     boiler_chems = Stream('boiler_chems', units='kg/hr', price=price['Boiler chems'])
     baghouse_bag = Stream('baghouse_bag', units='kg/hr', price=price['Baghouse bag'])
     # Supplementary natural gas for CHP if produced steam not enough for regenerating
@@ -770,18 +769,27 @@ def create_facilities(CHP_wastes, CHP_biogas='', CHP_side_streams=(),
 
     system_makeup_water = Stream('system_makeup_water', price=price['Makeup water'])
 
-    firewater_in = Stream('firewater_in', Water=flowrate_ratio*8021, units='kg/hr')
+    firewater_in = Stream('firewater_in', units='kg/hr')
 
     # Clean-in-place
-    CIP_chems_in = Stream('CIP_chems_in', Water=flowrate_ratio*145, units='kg/hr')
+    CIP_chems_in = Stream('CIP_chems_in', units='kg/hr')
 
     # Air needed for multiple processes (including enzyme production that was not included here),
     # not rigorously modeled, only scaled based on plant size
-    tot_air = flowrate_ratio * 1372608
-    plant_air_in = Stream('plant_air_in', phase='g', units='kg/hr',
-                          N2=0.79*tot_air, O2=0.21*tot_air)
+    plant_air_in =  Stream('plant_air_in', phase='g', N2=0.79, O2=0.21, units='kg/hr')
 
     ######################## Units ########################
+    # Update ratios associated with the feedstock flowrate
+    def update_facility_streams():
+        flowrate_ratio = units.get_flow_tpd(flowsheet=flowsheet) / 2205
+        ammonia_CHP.imass['NH4OH'] = flowrate_ratio * 1054 * 35.046/17.031 # NH3 to NH4OH
+        firewater_in.imass['H2O'] = flowrate_ratio * 8021
+        CIP_chems_in.imass['H2O'] = flowrate_ratio * 145
+        plant_air_in.F_mass = flowrate_ratio * 1372608
+
+    PS601 = bst.ProcessSpecification('PS601', ins=ammonia_CHP,
+                                     specification=update_facility_streams)
+
     # 7-day storage time similar to ethanol's in ref [1]
     T601 = bst.units.StorageTank('T601', ins=u.F402_P-0, tau=7*24, V_wf=0.9,
                                   vessel_type='Floating roof',
@@ -817,7 +825,7 @@ def create_facilities(CHP_wastes, CHP_biogas='', CHP_side_streams=(),
     M601 = bst.units.Mixer('M601', ins=CHP_wastes, outs='wastes_to_CHP')
 
     # Blowdown is discharged
-    CHP = facilities.CHP('CHP', ins=(M601-0, CHP_biogas, lime_CHP, ammonia_CHP,
+    CHP = facilities.CHP('CHP', ins=(M601-0, CHP_biogas, lime_CHP, PS601-0,
                                      boiler_chems, baghouse_bag, natural_gas,
                                      'boiler_makeup_water'),
                          B_eff=0.8, TG_eff=0.85, combustibles=combustibles,
@@ -837,7 +845,8 @@ def create_facilities(CHP_wastes, CHP_biogas='', CHP_side_streams=(),
                          recycled_blowdown_streams=(),
                          outs=('process_water', 'discharged_water'))
 
-    facilities.ADP('ADP', ins=plant_air_in, outs='plant_air_out', ratio=flowrate_ratio)
+    facilities.ADP('ADP', ins=plant_air_in, outs='plant_air_out',
+                   ratio=units.get_flow_tpd(flowsheet=flowsheet)/2205)
     facilities.CIP('CIP', ins=CIP_chems_in, outs='CIP_chems_out')
 
     # Optional facilities
