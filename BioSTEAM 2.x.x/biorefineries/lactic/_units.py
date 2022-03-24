@@ -1090,7 +1090,7 @@ class CellMassFilter(SolidsSeparator):
 
     def _design(self):
         Design = self.design_results
-        # 809 is the scailng basis of equipment M-505,
+        # 809 is the scaling basis of equipment M-505,
         # 391501 from stream 508 in ref [1]
         Design['Pressing air flow rate'] = 809/391501 * self.ins[0].F_mass
         # 12105 and 391501 from streams 559 and 508 in ref [1]

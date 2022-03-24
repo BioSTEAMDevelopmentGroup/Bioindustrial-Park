@@ -43,7 +43,7 @@ __all__ = (
     'kph_to_tpd',
     'rename_storage_units',
     # Prices
-    'price', 'update_product_prices', 'IRR_at_ww_price', 'ww_price_at_IRR', 'get_MPSP',
+    'prices', 'update_product_prices', 'IRR_at_ww_price', 'ww_price_at_IRR', 'get_MPSP',
     )
 
 
@@ -524,8 +524,8 @@ _GDP_2007to2016 = 1.160
 # Energy Environ. Sci. 2016, 9 (3), 1102–1112.
 # https://doi.org/10.1039/C5EE03715H.
 
-price = { # $/kg unless otherwise noted
-    'wastewater': -0.03, # ref [1], negative value for cost of product
+prices = { # $/kg unless otherwise noted
+    'wastewater': -0.02, # average of the -0.03 from ref [1] and -0.01 estimated based on brewery data, negative value for cost of product
     'naocl': 0.14, # $/L
     'citric_acid': 0.22, # $/L
     'bisulfite': 0.08, # $/L
@@ -539,11 +539,11 @@ price = { # $/kg unless otherwise noted
 def update_product_prices(stream_registry):
     for p in 'ethanol', 'biodiesel', 'lactic_acid':
         if stream_registry.search(p):
-            stream_registry.search(p).price = price[p]
+            stream_registry.search(p).price = prices[p]
 
 
 def IRR_at_ww_price(ww_stream, tea, ww_price=None, print_msg=True):
-    ww_stream.price = ww_price or price['wastewater']
+    ww_stream.price = ww_price or prices['wastewater']
     IRRs = [] # two IRR solutions for some biorefineries, choosing the smaller one
     for i in range(3):
         IRRs.append(tea.solve_IRR())

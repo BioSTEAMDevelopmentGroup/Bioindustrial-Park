@@ -29,6 +29,7 @@ info = {
 def create_oc2g_comparison_systems(default_BD=True):
     BD = {} if not default_BD else 1.
     wwt_kwdct = dict.fromkeys(('IC_kwargs', 'AnMBR_kwargs',), {'biodegradability': BD,})
+    
     # # Does not work for oilcane biorefineries due to the many settings
     # # not included in the system creation function
     # from biorefineries.wwt import create_comparison_systems

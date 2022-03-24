@@ -74,7 +74,6 @@ def _load_chemicals():
 
 def _load_system(kind='SSCF'):
     global flowsheet, funcs, lactic_sys, lactic_tea
-    bst.main_flowsheet.clear()
     flowsheet = bst.Flowsheet('lactic')
     bst.main_flowsheet.set_flowsheet(flowsheet)
     bst.settings.set_thermo(chemicals)
@@ -84,6 +83,7 @@ def _load_system(kind='SSCF'):
     Area100, Area200, Area300, Area400, Area500, HXN, CHP, CT, Area600 = groups
     lactic_tea = create_tea(flowsheet=flowsheet)
     funcs = create_funcs(lactic_tea=lactic_tea, flowsheet=flowsheet)
+    global _system_loaded
     _system_loaded = True
 
 
@@ -221,17 +221,16 @@ def create_funcs(lactic_tea=None, flowsheet=None):
 
 # %%
 
-def __getattr__(name):
-    if not _chemicals_loaded:
-        _load_chemicals()
-        if name == 'chemicals': return chemicals
-    if not _system_loaded: _load_system()
-    dct = globals()
-    dct.update(flowsheet.to_dict())
-    if name in dct:
-        return dct[name]
-    else:
-        raise AttributeError(f"module '{__name__}' has no attribute '{name}'")
+# def __getattr__(name):
+#     if not _chemicals_loaded:
+#         _load_chemicals()
+#         if name == 'chemicals': return chemicals
+#     if not _system_loaded:
+#         _load_system()
+#         dct = globals()
+#         dct.update(flowsheet.to_dict())
+#         if name in dct: return dct[name]
+#     raise AttributeError(f'module "{__name__}" has no attribute "{name}."')
 
 
 __all__ = (

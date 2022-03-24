@@ -26,52 +26,54 @@ info = {
 # Systems
 # =============================================================================
 
+#!!! The results are off, some accumulation in repetitive simulation
+#!!! The lactic acid module is REALLY slow... would want to profile and find out why
 def create_la_comparison_systems(default_BD=True):
     BD = {} if not default_BD else 1.
     wwt_kwdct = dict.fromkeys(('IC_kwargs', 'AnMBR_kwargs',), {'biodegradability': BD,})
-    # Create from scratch, IRR for existing system is 24.38% (24.39% if do direct loading)
-    from biorefineries.wwt import create_comparison_systems, add_wwt_chemicals
-    from biorefineries.lactic import (
-        create_chemicals,
-        create_system,
-        create_tea,
-        load_process_settings,
-        get_splits,
-        )
-    # Add WWT chemicals to the existing splits array,
-    # splits of chemicals that do now exist in the original chemicals obj
-    # will be copied from the splits of the corresponding group
-    la_chems = add_wwt_chemicals(create_chemicals())
-    def create_new_splits(original_splits):
-        new_splits = la_chems.zeros()
-        new_splits[la_chems.indices(('Bisulfite', 'CitricAcid', 'HCl', 'NaOCl'))] = \
-            original_splits[la_chems.index('NaOH')]
-        return new_splits
-    cell_mass_split, gypsum_split, AD_split, MB_split = get_splits(la_chems)
-    new_cell_mass_split = create_new_splits(cell_mass_split)
-    new_gypsum_split = create_new_splits(gypsum_split)
 
-    functions = (create_chemicals, create_system, create_tea, load_process_settings,)
-    sys_dct = {
-        'create_system': {'cell_mass_split': new_cell_mass_split, 'gypsum_split': new_gypsum_split},
-        'create_wastewater_process': wwt_kwdct,
-        'BT': 'CHP',
-        'new_wwt_connections': {'sludge': ('M601', 0), 'biogas': ('CHP', 1)},
-        }
-    exist_sys, new_sys = create_comparison_systems(info, functions, sys_dct)
+    # # Create from scratch, IRR for existing system is 24.38% (24.39% if do direct loading)
+    # from biorefineries.wwt import create_comparison_systems, add_wwt_chemicals
+    # from biorefineries.lactic import (
+    #     create_chemicals,
+    #     create_system,
+    #     create_tea,
+    #     load_process_settings,
+    #     get_splits,
+    #     )
+    # # Add WWT chemicals to the existing splits array,
+    # # splits of chemicals that do now exist in the original chemicals obj
+    # # will be copied from the splits of the corresponding group
+    # la_chems = add_wwt_chemicals(create_chemicals())
+    # def create_new_splits(original_splits):
+    #     new_splits = original_splits.copy()
+    #     new_splits[la_chems.indices(('Bisulfite', 'CitricAcid', 'HCl', 'NaOCl'))] = \
+    #         original_splits[la_chems.index('NaOH')]
+    #     return new_splits
+    # cell_mass_split, gypsum_split, AD_split, MB_split = get_splits(la_chems)
+    # new_cell_mass_split = create_new_splits(cell_mass_split)
+    # new_gypsum_split = create_new_splits(gypsum_split)
 
-    # #!!! COD from above is ~504, but here 416, need to figure out why
-    # # IRR for existing system is 24.63% (24.39% if do direct loading)
-    # from biorefineries.wwt import create_comparison_systems
-    # from biorefineries import lactic as la
+    # functions = (create_chemicals, create_system, create_tea, load_process_settings,)
     # sys_dct = {
-    #     'load': {'print_results': False},
-    #     'system_name': 'lactic_sys',
+    #     'create_system': {'cell_mass_split': new_cell_mass_split, 'gypsum_split': new_gypsum_split},
     #     'create_wastewater_process': wwt_kwdct,
     #     'BT': 'CHP',
     #     'new_wwt_connections': {'sludge': ('M601', 0), 'biogas': ('CHP', 1)},
     #     }
-    # exist_sys, new_sys = create_comparison_systems(info, la, sys_dct, from_load=True)
+    # exist_sys, new_sys = create_comparison_systems(info, functions, sys_dct)
+
+    # IRR for existing system is 24.63% (24.39% if do direct loading)
+    from biorefineries.wwt import create_comparison_systems
+    from biorefineries import lactic as la
+    sys_dct = {
+        'load': {'print_results': False},
+        'system_name': 'lactic_sys',
+        'create_wastewater_process': wwt_kwdct,
+        'BT': 'CHP',
+        'new_wwt_connections': {'sludge': ('M601', 0), 'biogas': ('CHP', 1)},
+        }
+    exist_sys, new_sys = create_comparison_systems(info, la, sys_dct, from_load=True)
 
     return exist_sys, new_sys
 
@@ -142,9 +144,7 @@ def evaluate_la_models(**eval_kwdct):
 # Run
 # =============================================================================
 
-#!!! The lactic acid module is REALLY slow... would want to profile and find out why
-#!!! There are problems with the metrics
 if __name__ == '__main__':
     # exist_sys, new_sys = simulate_la_systems(default_BD=True)
     # exist_model, new_model = create_la_comparison_models()
-    exist_model, new_model = evaluate_la_models(N=100)
+    exist_model, new_model = evaluate_la_models(N=5)

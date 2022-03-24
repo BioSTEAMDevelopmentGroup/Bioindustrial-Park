@@ -17,7 +17,7 @@ info = {
     'is2G': False,
     'FERM_product': 'ethanol',
     'add_CHP': True,
-    'ww_price': -0.003, # the default -0.03 leads to two solutions
+    'ww_price': None,
     }
 
 
@@ -30,6 +30,8 @@ info = {
 def create_cn_comparison_systems(default_BD=True):
     BD = {} if not default_BD else 1.
     wwt_kwdct = dict.fromkeys(('IC_kwargs', 'AnMBR_kwargs',), {'biodegradability': BD,})
+    wwt_kwdct['skip_AeF'] = True
+
     # # Create from scratch
     # import biosteam as bst
     # from biorefineries.wwt import create_comparison_systems

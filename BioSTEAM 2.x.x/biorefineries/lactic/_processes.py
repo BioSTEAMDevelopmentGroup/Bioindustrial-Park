@@ -743,7 +743,7 @@ def create_facilities(CHP_wastes, CHP_biogas='', CHP_side_streams=(),
 
     ######################## Streams ########################
     # Final product
-    lactic_acid = Stream('lactic_acid', units='kg/hr')
+    lactic_acid = Stream('lactic_acid', units='kg/hr', price=price['Lactic acid'])
 
     # Process chemicals
     sulfuric_acid = Stream('sulfuric_acid', units='kg/hr', price=price['H2SO4'])

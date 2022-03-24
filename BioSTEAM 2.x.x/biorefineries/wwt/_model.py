@@ -97,14 +97,17 @@ def add_biodiesel_parameters(model, model_dct, f, u, s, get_obj, get_rxn, param)
             sys, [feedstock], isplit_a, isplit_b, model_dct['isplit_efficiency_is_reversed']
         )
     b = oil_extraction_specification.efficiency
-    D = shape.Uniform(0.5, 0.7) if not model_dct['is2G'] else shape.Uniform(0.7, 0.9)
+    D = get_default_distribution('uniform', b)
+    # not using the range in the biorefinery as the baseline is 0.5/0.7
+    # D = shape.Uniform(0.5, 0.7) if not model_dct['is2G'] else shape.Uniform(0.7, 0.9)
     @param(name='Oil extraction efficiency', element=oil_extraction_specification,
            units='', kind='coupled', baseline=b, distribution=D)
     def set_bagasse_oil_extraction_efficiency(bagasse_oil_extraction_efficiency):
         oil_extraction_specification.load_efficiency(bagasse_oil_extraction_efficiency)
 
     b = oil_extraction_specification.oil_retention
-    D = shape.Uniform(0.4, 0.7)
+    D = get_default_distribution('uniform', b)
+    # D = shape.Uniform(0.4, 0.7) # not using the range in the biorefinery as the baseline is 0.7
     @param(name='Bagasse oil retention', element=oil_extraction_specification,
            units='', kind='coupled', baseline=b, distribution=D)
     def set_bagasse_oil_retention(oil_retention):
@@ -114,7 +117,7 @@ def add_biodiesel_parameters(model, model_dct, f, u, s, get_obj, get_rxn, param)
     fermentor = get_obj(u, 'fermentor')
     rxn = get_rxn(fermentor, 'FERM oil-to-FFA')
     b = rxn.X
-    D = get_default_distribution('uniform', b)
+    D = get_default_distribution('triangle', b)
     @param(name='FERM oil-to-FFA', element=fermentor, kind='coupled', units='-',
            baseline=b, distribution=D)
     def set_FERM_oil_to_FFA(X):
@@ -124,7 +127,7 @@ def add_biodiesel_parameters(model, model_dct, f, u, s, get_obj, get_rxn, param)
     TE_rx = get_obj(u, 'TE_rx')
     rxns, idices = get_rxn(TE_rx, 'TE oil-to-product')
     b = rxns[idices[0]].X
-    D = get_default_distribution('uniform', b, lb=0, ub=1)
+    D = get_default_distribution('uniform', b, lb=0, ub=1) # lipidcane biorefinery
     @param(name='TE oil-to-product', element=TE_rx, kind='coupled', units='-',
            baseline=b, distribution=D)
     def set_TE_oil_to_product(X):
@@ -132,7 +135,6 @@ def add_biodiesel_parameters(model, model_dct, f, u, s, get_obj, get_rxn, param)
             rxns[idx].X = X
 
     return model
-
 
 
 def add_combustion_parameters(model, model_dct, f, u, s, get_obj, get_rxn, param):
@@ -169,7 +171,7 @@ def add_1G_parameters(model, model_dct, f, u, s, get_obj, get_rxn, param):
     PT_rx = get_obj(u, 'PT_rx')
     rxn = get_rxn(PT_rx, 'PT glucan-to-glucose')
     b = rxn.X
-    D = get_default_distribution('uniform', b, lb=0, ub=1)
+    D = get_default_distribution('triangle', b, ratio=0.1, lb=0, ub=1) # sugarcane biorefinery
     @param(name='PT glucan-to-glucose', element=PT_rx, kind='coupled', units='-',
            baseline=b, distribution=D)
     def set_PT_glucan_to_glucose(X):
@@ -179,7 +181,7 @@ def add_1G_parameters(model, model_dct, f, u, s, get_obj, get_rxn, param):
     fermentor = get_obj(u, 'fermentor')
     rxn = get_rxn(fermentor, 'FERM glucan-to-product')
     b = rxn.X
-    D = get_default_distribution('uniform', b, lb=0, ub=1)
+    D = get_default_distribution('triangle', b, ratio=0.1, lb=0, ub=1) # sugarcane biorefinery
     @param(name='FERM glucose-to-product', element=fermentor, kind='coupled', units='-',
            baseline=b, distribution=D)
     def set_FERM_glucose_to_product(X):
@@ -188,8 +190,8 @@ def add_1G_parameters(model, model_dct, f, u, s, get_obj, get_rxn, param):
     # Wastewater treatment price
     if not model_dct.get('new_wwt_ID'):
         ww = s.ww
-        b = -0.03
-        D = get_default_distribution('uniform', b)
+        b = -0.02
+        D = shape.Uniform(-0.03, -0.01)
         @param(name='Wastewater price', element=ww, kind='cost', units='-',
                baseline=b, distribution=D)
         def set_wastewater_price(price):
@@ -465,19 +467,19 @@ def add_metrics(model, model_dct, f, u, s, get_obj):
             ww.price = ww_price
             return price*factor
         metric0 = [
-            Metric('FERM product price no WW', product_price_wo_ww, f'$/{gal_or_kg}'),
+            Metric('MPSP no WW', product_price_wo_ww, f'$/{gal_or_kg}'),
             ]
     else: # get COD-related data
         metric0 = []
         isa = isinstance
         if wwt_system.ID == 'exist_sys_wwt':
             if not model_dct['FERM_product'] == 'lactic_acid':
-                for unit in wwt_system.units:
-                    if isa(unit, WastewaterSystemCost): break
-                ww_in = unit.outs[0]
-                for unit in wwt_system.units:
-                    if isa(unit, ReverseOsmosis): break
-                ww_out = unit.ins[0]
+                for wwtc in wwt_system.units:
+                    if isa(wwtc, WastewaterSystemCost): break
+                ww_in = wwtc.outs[0]
+                for ro in wwt_system.units:
+                    if isa(ro, ReverseOsmosis): break
+                ww_out = ro.ins[0]
             else:
                 ww_in = u.search('M501').outs[0]
                 ww_out = u.search('S505').ins[0]
@@ -501,18 +503,18 @@ def add_metrics(model, model_dct, f, u, s, get_obj):
 
     metrics = ([
         *metric0,
-        Metric('FERM product price', lambda: tea.solve_price(product)*factor, f'$/{gal_or_kg}'),
+        Metric('MPSP', lambda: tea.solve_price(product)*factor, f'$/{gal_or_kg}'),
         # Metric('IRR', lambda: tea.solve_IRR(), ''),
         #!!! Need to add GWP
         # Metric('GWP', lambda: cs_wwt.get_GWP(sys), 'kg-CO2eq/gal'),
         *metrics,
         Metric('WWT CAPEX',
                lambda: wwt_system.installed_equipment_cost/1e6, 'MM$'),
-        Metric('WWT CAPEX %',
+        Metric('WWT CAPEX frac',
                lambda: wwt_system.installed_equipment_cost/sys.installed_equipment_cost, ''),
-        Metric('WWT electricity usage',
-               lambda: wwt_system.get_electricity_consumption()/1e3, 'MW'),
-        Metric('WWT electricity usage %',
+        Metric('WWT annual electricity',
+               lambda: wwt_system.get_electricity_consumption()/1e3, 'MWh/yr'),
+        Metric('WWT annual electricity frac',
                lambda: wwt_system.get_electricity_consumption()/sys.get_electricity_consumption(), ''),
         ])
 
@@ -522,8 +524,9 @@ def add_metrics(model, model_dct, f, u, s, get_obj):
         metrics.extend([
             Metric(f'{name} installed cost',
                    AttrGetter(i, 'installed_cost', lambda cost: cost/1e6), 'MM$'),
-            Metric(f'{name} electricity usage',
-                   AttrGetter(i.power_utility, 'rate', hook=lambda rate: rate/1e3), 'MW')
+            Metric(f'{name} annual electricity',
+                   AttrGetter(i.power_utility, 'rate',
+                              hook=lambda rate: rate/1e3*wwt_system.operating_hours), 'MWh/yr')
             ])
     model.metrics = metrics
 
@@ -538,13 +541,15 @@ def add_metrics(model, model_dct, f, u, s, get_obj):
         def get_wwt_produced_energy():
             eff = getattr(BT, BT_eff[0]) * getattr(BT, BT_eff[1])
             energy = sum(get_combustion_energy(i) for i in wwt_energy_streams)
-            return energy*eff/3600/1e3
+            return energy*eff/3600/1e3*wwt_system.operating_hours
     else: # CHP
         def get_wwt_produced_energy():
             eff = BT.eff
             energy = sum(get_combustion_energy(i) for i in wwt_energy_streams)
-            return energy*eff/3600/1e3
-    model.metric(get_wwt_produced_energy, name='WWT produced energy', units='MW')
+            return energy*eff/3600/1e3*wwt_system.operating_hours
+    model.metric(get_wwt_produced_energy, name='WWT produced energy', units='MWh/yr')
+    model.metric(lambda: (wwt_system.get_electricity_consumption()/1e3)/get_wwt_produced_energy(),
+                 name='WWT ECR', units='')
 
     return model
 
