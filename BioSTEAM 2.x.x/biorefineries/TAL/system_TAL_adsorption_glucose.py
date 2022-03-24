@@ -411,30 +411,47 @@ def create_TAL_sys(ins, outs):
     #                            T=30.+273.15, rigorous=True)
     
     # M403 = bst.Mixer('M403', ins=(AC401-1, AC2-1))
-    F402 = bst.units.Flash('F402', ins=F401-0, outs=('F402_t', 'F402_b'), P=101325.,
-                            V=0.5) # !!! TODO: replace with dryer
     
-    def F402_spec():
-            F402_b = F402.outs[1]
-            F402_ins_0 = F402.ins[0]
-            TAL_mol = F402_ins_0.imol['TAL']
-            F402_ins_0.imol['TAL'] = 0.
-            F402.V=0.99999
-            F402._run()
-            F402_ins_0.imol['TAL'] = TAL_mol
-            F402_b.imol['TAL'] = TAL_mol        
-    F402.specification = F402_spec
-    
-    H404 = bst.units.HXutility('H404', ins=F402-0, outs=('cooled_ethanol_F402'), 
-                               T=30.+273.15, rigorous=True)
-    
-    H403 = bst.units.HXutility('H403', ins=F402-1, outs=('cooled_TAL'), 
-                               T=30.+273.15, rigorous=True)
+    BC401 = bst.BatchCrystallizer('BC401', F401-0, tau=1, V=3785, T=-30 + 273.15)
+    S404 = bst.SolidsCentrifuge('S404', 
+        BC401-0, ('', ''),
+        split=dict(TAL=0.99),
+        moisture_content=0.05,
+        moisture_ID='Ethanol', 
+    )
+    U401 = bst.DrumDryer('U401', 
+        (S404-0, 'dryer_air', 'dryer_natural_gas'), 
+        ('', 'dryer_outlet_air', 'dryer_emissions'),
+        moisture_content=0.01, split=0., moisture_ID='Ethanol',
+        P=101325*10,
+    )
     
     
-    # M404 = bst.Mixer('M402', ins=(AC401-2, AC2-2))
+    
+    # F402 = bst.units.Flash('F402', ins=F401-0, outs=('F402_t', 'F402_b'), P=101325.,
+    #                         V=0.5) # !!! TODO: replace with dryer
+    
+    # def F402_spec():
+    #         F402_b = F402.outs[1]
+    #         F402_ins_0 = F402.ins[0]
+    #         TAL_mol = F402_ins_0.imol['TAL']
+    #         F402_ins_0.imol['TAL'] = 0.
+    #         F402.V=0.99999
+    #         F402._run()
+    #         F402_ins_0.imol['TAL'] = TAL_mol
+    #         F402_b.imol['TAL'] = TAL_mol        
+    # F402.specification = F402_spec
+    
+    # H404 = bst.units.HXutility('H404', ins=F402-0, outs=('cooled_ethanol_F402'), 
+    #                            T=30.+273.15, rigorous=True)
+    
+    # H403 = bst.units.HXutility('H403', ins=F402-1, outs=('cooled_TAL'), 
+    #                            T=30.+273.15, rigorous=True)
+    
+    
+    M406 = bst.Mixer('M406', ins=(AC401-2, U401-1))
     H402 = bst.units.HXutility(
-        'H402', ins=AC401-2, outs=('cooled_ethanol_laden_air'), 
+        'H402', ins=M406-0, outs=('cooled_ethanol_laden_air'), 
         T=265.,
         rigorous=True
     )
@@ -446,7 +463,7 @@ def create_TAL_sys(ins, outs):
         S403.outs[1].mol[:] = S403_ins_0['l'].mol[:]
     S403.specification = S403_spec
     # S403-0-2-M404
-    M402 = bst.Mixer('M402', ins=(P401-0, H404-0, S403-1), outs=('recycled_ethanol',))
+    M402 = bst.Mixer('M402', ins=(P401-0, S404-1, S403-1), outs=('recycled_ethanol',))
     M402-0-1-M401
     
     
@@ -651,7 +668,7 @@ def create_TAL_sys(ins, outs):
     # T605_P-0-2-M401
     
     # 7-day storage time, similar to ethanol's in Humbird et al.
-    T620 = units.TALStorageTank('T620', ins=H403-0, tau=7*24, V_wf=0.9,
+    T620 = units.TALStorageTank('T620', ins=U401-0, tau=7*24, V_wf=0.9,
                                           vessel_type='Floating roof',
                                           vessel_material='Stainless steel')
     
@@ -741,8 +758,8 @@ def create_TAL_sys(ins, outs):
                                                ignored=lambda:[
                                                         H401, 
                                                         H402, 
-                                                        H403, 
-                                                        H404,
+                                                        # H403, 
+                                                        # H404,
                                                         AC401.heat_exchanger_drying,
                                                         AC401.heat_exchanger_regeneration,
                                                         F401.components['condenser'],
