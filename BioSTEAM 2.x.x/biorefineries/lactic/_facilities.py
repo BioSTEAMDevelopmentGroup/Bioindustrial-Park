@@ -304,6 +304,8 @@ class CHP(Facility):
         feed_solids, feed_gases, lime, ammonia, boiler_chems, bag, natural_gas, \
             makeup_water = self.ins
         emission, ash, blowdown_water = self.outs
+        for i in self.ins[2:]: i.empty()
+        for i in self.outs: i.empty()
         side_streams_to_heat = self.side_streams_to_heat
         side_streams_lps = self.side_streams_lps
         system_heating_utilities = self.system_heating_utilities = {}
@@ -313,6 +315,7 @@ class CHP(Facility):
         # Use combustion reactions to create outs
         combustion_rxns = self.chemicals.get_combustion_reactions()
         combustible_feeds = self._combustible_feeds
+        combustible_feeds.empty() # Need to empty because after reactions takes place, there is CO2 and Water that doesn't get replaced with copy flow.
         emission.mol = feed_solids.mol + feed_gases.mol
         combustible_feeds.copy_flow(emission, tuple(self.combustibles), remove=True)
         combustion_rxns.force_reaction(combustible_feeds.mol)
@@ -388,7 +391,6 @@ class CHP(Facility):
             # this is to condense the unused steam
             cooling_need = self.cooling_need = -(CHP_heat_surplus-electricity_generated*3600)
             hu_cooling(unit_duty=cooling_need, T_in=lps.T)
-            natural_gas.empty()
         # CHP cannot meet system heating/steam demand, supplement with natural gas
         else:
             CH4_LHV = natural_gas.chemicals.CH4.LHV # J/mol
