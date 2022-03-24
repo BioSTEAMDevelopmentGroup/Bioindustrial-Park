@@ -1,17 +1,16 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# BioSTEAM: The Biorefinery Simulation and Techno-Economic Analysis Modules
-# Copyright (C) 2020-2021, Yoel Cortes-Pena <yoelcortes@gmail.com>
 # Bioindustrial-Park: BioSTEAM's Premier Biorefinery Models and Results
-# Copyright (C) 2020-2021, Yalin Li <yalinli2@illinois.edu>,
-# Sarang Bhagwat <sarangb2@illinois.edu>, and Yoel Cortes-Pena (this biorefinery)
-# 
-# This module is under the UIUC open-source license. See 
+# Copyright (C) 2020-, Yalin Li <zoe.yalin.li@gmail.com>,
+#                      Sarang Bhagwat <sarangb2@illinois.edu>,
+#                      Yoel Cortes-Pena <yoelcortes@gmail.com>
+#
+# This module is under the UIUC open-source license. See
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
 # for license details.
 
 
-# %% 
+# %%
 
 # =============================================================================
 # Setup
@@ -19,19 +18,16 @@
 
 import numpy as np
 import pandas as pd
-import biosteam as bst
 from biosteam.utils import TicToc
 from biorefineries.lactic import load_system, \
     SSCF_flowsheet, SSCF_funcs, SHF_flowsheet, SHF_funcs
-from biorefineries.lactic._utils import _feedstock_factor
-
-bst.speed_up()
+from biorefineries.lactic.utils import _feedstock_factor
 
 
 # %%
 
 # =============================================================================
-# Model to evalute system across feedstock carbohydate content at different
+# Model to evaluate system across feedstock carbohydrate content at different
 # feedstock price metrics
 # =============================================================================
 
@@ -96,7 +92,7 @@ lactic_tea = lactic_sys.TEA
 # Using two loops are not optimal, can potentially use Model and Metric to speed up
 for i in carb_contents1:
     set_carbs(i, feedstock)
-    LCA_actual_carbs.append(get_feedstock_carbs())    
+    LCA_actual_carbs.append(get_feedstock_carbs())
     lactic_sys.simulate()
     LCA_titers.append(R301.effluent_titer)
     LCA_yields.append(R301.lactic_yield)
@@ -143,7 +139,7 @@ for i in carb_contents2:
         TEA_actual_carbs.append(get_feedstock_carbs())
         TEA_prices.append(j)
         TEA_titers.append(R301.effluent_titer)
-        TEA_yields.append(R301.lactic_yield)        
+        TEA_yields.append(R301.lactic_yield)
         feedstock.price = j / _feedstock_factor
         lactic_acid.price = 0
         for m in range(3):
@@ -176,15 +172,3 @@ with pd.ExcelWriter('3_feedstock_carb-price.xlsx') as writer:
     LCA_data.to_excel(writer, sheet_name='LCA')
 
 print(f'\nSimulation time is {timer.elapsed_time/60:.1f} min')
-
-
-
-
-
-
-
-
-
-
-
-

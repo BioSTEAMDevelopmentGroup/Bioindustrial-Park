@@ -87,7 +87,7 @@ def create_chemicals():
         V = fn.rho_to_V(rho=1e5, MW=chemical.MW)
         chemical.V.add_model(V, top_priority=True)
     
-    # Assume sodium methoxide has some of the same properities as methanol
+    # Assume sodium methoxide has some of the same properties as methanol
     LiquidMethanol = Methanol.at_state(phase='l', copy=True)
     NaOCH3.copy_models_from(LiquidMethanol, ['V', 'sigma', 'kappa', 'Cn'])
     lipidcane_chemicals.extend([
