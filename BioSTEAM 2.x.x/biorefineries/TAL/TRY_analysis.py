@@ -20,9 +20,9 @@ from matplotlib.ticker import AutoMinorLocator as AML
 
 # from TAL.system_solubility_exploit import TAL_sys, TAL_tea, R302, spec
 # from TAL.system_solubility_exploit import MEK as product
-from TAL.system_TAL_adsorption_glucose import TAL_sys, TAL_tea, R302, spec
+from biorefineries.TAL.system_TAL_adsorption_glucose import TAL_sys, TAL_tea, R302, spec, SA
 # get_GWP, get_non_bio_GWP, get_FEC, get_SPED
-from TAL.system_TAL_adsorption_glucose import SA as product
+# from TAL.system_glucose_to_TAL_adsorb_evap_dry import SA as product
 
 from matplotlib import pyplot as plt
 from  matplotlib.colors import LinearSegmentedColormap
@@ -37,6 +37,9 @@ from biosteam.utils import style_axis, style_plot_limits, fill_plot, set_axes_la
 import matplotlib.colors as mcolors
 ig = np.seterr(invalid='ignore')
 bst.speed_up()
+
+product = SA
+
 # %%Colors
 marketrange_shadecolor = (*colors.neutral.shade(50).RGBn, 0.3)
 
@@ -301,7 +304,7 @@ spec_1 = np.linspace(0.1, 0.9, steps) # yield
 spec_2 = np.linspace(0.5, 30., steps) # titer
 # spec_1 = np.linspace(0.2, 0.99, steps) # yield
 # spec_2 = np.linspace(45, 225, steps) # titer
-spec_3 = np.array([0.21,]) # productivity
+spec_3 = np.array([spec.baseline_productivity,]) # productivity
 spec.load_spec_1 = spec.load_yield
 # spec.load_spec_2 = spec.load_titer
 spec.load_spec_3 = spec.load_productivity

@@ -65,11 +65,14 @@ R303 = u.R303
 
 AC401 = u.AC401
 
-F401 = u.F401
-F402 = u.F402
-H403 = u.H403
+# U401 = u.U401
 
-H402 = u.H402
+F401 = u.F401
+
+F402 = u.F402
+# H403 = u.H403
+
+# H402 = u.H402
 
 T620 = u.T620
 
@@ -311,7 +314,7 @@ def set_microbe_yield(yield_):
 #%%
 ######################## Separation parameters ########################
 
-D = shape.Triangle(0.0739, 0.0910, 0.2474)
+D = shape.Triangle(0.0739, 0.0910, 0.2474) # experimental data from Singh group
 @param(name='Adsorbent unsaturated capacity', element=AC401, kind='coupled', units='g/g',
        baseline=0.0910, distribution=D)
 def set_adsorbent_cap(cap):
@@ -329,7 +332,7 @@ D = shape.Uniform(500, 900) # Seader et al., Table 15.2
 def set_adsorbent_solid_rho(rho):
     AC401.rho_adsorbent_solid = rho
 
-D = shape.Triangle(0.8*0.07795, 0.07795, 1.2*0.07795)
+D = shape.Triangle(0.8*0.07795, 0.07795, 1.2*0.07795) # experimental data from Singh group
 @param(name='Desorption single-wash partition coefficient', element=AC401, kind='coupled', units='(g/L)/(g/L)',
        baseline=0.07795, distribution=D)
 def set_desorption_K(K):
@@ -342,11 +345,45 @@ def set_adsorbent_lifetime(lt):
     AC401._default_equipment_lifetime['Activated carbon'] = lt
 
 D = shape.Uniform(0.05, 0.95) # assumed
-@param(name='Regeneration fluid wet retention', element=AC401, kind='coupled', units='L-ethanol/L-void',
+@param(name='Regeneration fluid retention in column', element=AC401, kind='coupled', units='L-ethanol/L-void',
        baseline=0.5, distribution=D)
-def set_wet_retention(wr):
+def set_adsorption_ethanol_retention(wr):
     AC401.wet_retention = wr
+
+D = shape.Uniform(0.01, 0.09) # assumed
+@param(name='Ethanol retention in product after drying', element=F402, kind='coupled', units='g-ethanol/g-TAL',
+        baseline=0.05, distribution=D)
+def set_drying_ethanol_retention_in_product_stream(ethanol_retention_drying):
+    F402.product_ethanol_content = ethanol_retention_drying
     
+D = shape.Triangle(0.144945, 0.166880, 0.187718) # experimental data from Singh group
+@param(name='TAL solubility in ethanol', element=F401, kind='coupled', units='g-TAL/g-solution',
+       baseline=0.166880, distribution=D)
+def set_TAL_solubility_ethanol(solubility):
+    F401.TAL_solubility_in_ethanol_ww = solubility
+    
+    
+
+# D = shape.Uniform(0.01, 0.09) # assumed
+# @param(name='Ethanol retention in product after drying', element=U401, kind='coupled', units='g-ethanol/g-product',
+#        baseline=0.05, distribution=D)
+# def set_drying_ethanol_retention_in_product_stream(ethanol_retention_drying):
+#     U401.moisture_content = ethanol_retention_drying
+    
+  
+    
+# D = shape.Uniform(0.991, 0.999) # assumed
+# @param(name='Crystallization and centrifugation recovery', element=S404, kind='coupled', units='g-recovered/g-influent',
+#        baseline=0.995, distribution=D)
+# def set_crystallization_and_centrifugation_combined_recovery(TAL_recovery):
+#     S404.split = np.array([0.  , 0.  , 0.  , 0.  , 0.  , 0.  , 0.  , 0.  , 0.  , 0.  , 0.  ,
+#            0.  , 0.  , 0.  , 0.  , 0.  , 0.  , 0.  , 0.  , 0.  , 0.  , 0.  ,
+#            0.  , 0.  , 0.  , 0.  , 0.  , 0.  , 0.  , 0.  , 0.  , 0.  , 0.  ,
+#            0.  , 0.  , 0.  , 0.  , 0.  , 0.  , 0.  , 0.  , 0.  , 0.  , 0.  ,
+#            0.  , 0.  , 0.  , 0.  , 0.  , TAL_recovery, 0.  , 0.  , 0.  , 0.  , 0.  ,
+#            0.  , 0.  , 0.  , 0.  , 0.  , 0.  , 0.  , 0.  , 0.  , 0.  , 0.  ,
+#            0.  , 0.  , 0.  , 0.  , 0.  , 0.  , 0.  , 0.  , 0.  , 0.  , 0.  ])
+
 #%%
 ######################## Facility parameters ########################
 D = baseline_uniform(0.8, 0.1)
@@ -361,7 +398,7 @@ D = shape.Triangle(0.8*7*24, 7*24, 1.2*7*24)
 def set_product_storage_time(storage_time):
     T620.tau = storage_time
     
-    
+
 parameters = model.get_parameters()
 
 

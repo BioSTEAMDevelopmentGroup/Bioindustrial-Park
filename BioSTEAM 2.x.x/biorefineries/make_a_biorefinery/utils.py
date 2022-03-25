@@ -276,31 +276,42 @@ def get_sugar_conc(stream, sugars=()):
 
 #%% Estimate MPSP at a given IRR from results for IRR at a set product selling price (assuming uniform cash flows across all years)
 
-def get_MPSP_from_IRR(new_IRR, old_IRR, old_selling_price, yearly_sales_mass_of_main_product, t, initial_investment):
-    assert type(t) is int
+def get_MPSP_at_IRR(new_IRR, # fraction; e.g., 10% is 0.10
+                      old_IRR, # fraction; e.g., 10% is 0.10
+                      old_selling_price, # USD/kg
+                      yearly_sales_mass_of_main_product, #kg/y
+                      t, # y
+                      initial_investment, # USD
+                      old_NPV=0., # USD
+                      ):
+    
+    t = int(round(t))
+    
     yearly_cash_flow_without_product_sale = \
         + yearly_sales_mass_of_main_product * old_selling_price \
-        - initial_investment / (t*sum([1/((1+old_IRR)**(i+1)) for i in range(t)]))
-    print(yearly_cash_flow_without_product_sale)
-    print(sum([1/((1+new_IRR)**i) for i in range(t)]))
+        - ((old_NPV + initial_investment) / (sum([1/((1+old_IRR)**(i+1)) for i in range(t)])))
+        
     MPSP_new = \
+        (1/yearly_sales_mass_of_main_product) *\
         (yearly_cash_flow_without_product_sale \
-        +  initial_investment / (t*sum([1/((1+new_IRR)**i) for i in range(t)]))) \
-        * (1/yearly_sales_mass_of_main_product)
-    return MPSP_new
+        +  (initial_investment / (sum([1/((1+new_IRR)**(i+1)) for i in range(t)])))) \
+        
+    return round(MPSP_new, 3) # USD/kg
 
-#%% Estimate MPSP at a given IRR from results for NPV at a set product selling price (assuming uniform cash flows across all years)
 
-def get_MPSP_from_NPV(new_IRR, old_NPV, old_selling_price, yearly_sales_mass_of_main_product, t, initial_investment):
-    assert type(t) is int
-    old_IRR = 0.
-    yearly_cash_flow_without_product_sale = \
-        + yearly_sales_mass_of_main_product * old_selling_price \
-        - (initial_investment + old_NPV) / (t*sum([1/((1+old_IRR)**(i+1)) for i in range(t)]))
-    print(yearly_cash_flow_without_product_sale)
-    print(sum([1/((1+new_IRR)**i) for i in range(t)]))
-    MPSP_new = \
-        (yearly_cash_flow_without_product_sale \
-        +  initial_investment / (t*sum([1/((1+new_IRR)**i) for i in range(t)]))) \
-        * (1/yearly_sales_mass_of_main_product)
-    return MPSP_new
+#%% Estimate MPSP assuming all installed costs are 0
+
+def get_MPSP_without_capital_cost(product_stream, TEA, flowsheet, sys, product_chem_ID=None, N_sims=1, N_tea_solves=20):
+    for i in range(N_sims):
+        sys.simulate()
+    for u in flowsheet.unit:
+        for k in u.installed_costs.keys():
+            u.installed_costs[k] = 0.
+    MPSP = None
+    for i in range(N_tea_solves):
+        product_stream.price = TEA.solve_price(product_stream)
+        if product_chem_ID:
+            MPSP = product_stream.price*product_stream.F_mass/product_stream.imass[product_chem_ID]
+        else:
+            MPSP = product_stream.price
+    return MPSP
