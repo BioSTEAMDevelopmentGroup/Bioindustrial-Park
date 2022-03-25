@@ -28,6 +28,7 @@ https://doi.org/10.2172/1483234
 # %%
 
 import thermosteam as tmo, biosteam as bst
+from biosteam import Unit
 from biosteam.units.decorators import cost
 from . import (
     default_insolubles,
@@ -43,7 +44,6 @@ _kW_to_kJhr = 3600 # auom('kW').conversion_factor('kJ/hr')
 Rxn = tmo.reaction.Reaction
 ParallelRxn = tmo.reaction.ParallelReaction
 CEPCI = bst.units.design_tools.CEPCI_by_year
-Unit = bst.Unit
 
 __all__ = ('create_wastewater_process', 'CHP',)
 
@@ -157,17 +157,36 @@ class ReverseOsmosis(Unit):
 
 
 class Skipped(Unit):
+    '''
+    Copy ins[`main_in`] as ins[`main_out`].
+    Can be also used to calculate the cost of wastewater treatment
+    by clearing all WWT-related units and streams.
+    '''
     _ins_size_is_fixed = False
     _outs_size_is_fixed = False
+    cache_dct = {} # to save some computation effort
 
     def __init__(self, ID='', ins=None, outs=(), thermo=None,
-                 main_in=0, main_out=1): # outs[0] is the gas phase
+                 main_in=0, main_out=1, # outs[0] is the gas phase
+                 wwt_units=[], clear_cost=False):
         Unit.__init__(self, ID, ins, outs, thermo)
         self.main_in = main_in
         self.main_out = main_out
+        self.wwt_units = wwt_units
+        self.clear_cost = clear_cost
 
     def _run(self):
         self.outs[self.main_out].copy_like(self.ins[self.main_in])
+
+    def _cost(self):
+        if not self.clear_cost: return
+        for u in self.wwt_units:
+            u.baseline_purchase_costs.clear()
+            u.installed_costs.clear()
+            for hu in u.heat_utilities: hu.empty()
+            u.power_utility(0)
+            for s in u.ins+u.outs:
+                if s.price: s.empty()
 
 
 class CHP(Unit):
@@ -319,4 +338,8 @@ def create_wastewater_process(ins, outs, process_ID='6', flowsheet=None,
     bst.units.Mixer(f'M{X}03', ins=(SX01-0, SX02-0, SX03-0), outs=1-RX03)
 
     # Reverse osmosis to treat aerobically polished water
-    ReverseOsmosis(f'S{X}04', ins=RX03-1, outs=(recycled_water, brine))
+    SX04 = ReverseOsmosis(f'S{X}04', ins=RX03-1, outs=(recycled_water, ''))
+
+    # A process specification for wastewater treatment cost calculation
+    Skipped(f'U{X}01', ins=SX04-1, outs=brine, main_in=0, main_out=0,
+            wwt_units=[u for u in bst.main_flowsheet.unit if (u.ID[1:1+len(X)]==X)])

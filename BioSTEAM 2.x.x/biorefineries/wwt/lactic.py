@@ -26,13 +26,12 @@ info = {
 # Systems
 # =============================================================================
 
-#!!! The results are off, some accumulation in repetitive simulation
-#!!! The lactic acid module is REALLY slow... would want to profile and find out why
+#
 def create_la_comparison_systems(default_BD=True):
     BD = {} if not default_BD else 1.
     wwt_kwdct = dict.fromkeys(('IC_kwargs', 'AnMBR_kwargs',), {'biodegradability': BD,})
 
-    # # Create from scratch, IRR for existing system is 24.38% (24.39% if do direct loading)
+    # # Create from scratch, not as accurate as direct load ($1.31/kg vs. $1.42/kg)
     # from biorefineries.wwt import create_comparison_systems, add_wwt_chemicals
     # from biorefineries.lactic import (
     #     create_chemicals,
@@ -63,11 +62,10 @@ def create_la_comparison_systems(default_BD=True):
     #     }
     # exist_sys, new_sys = create_comparison_systems(info, functions, sys_dct)
 
-    # IRR for existing system is 24.63% (24.39% if do direct loading)
     from biorefineries.wwt import create_comparison_systems
     from biorefineries import lactic as la
     sys_dct = {
-        'load': {'print_results': False},
+        # 'load': {'print_results': False}, # need to run `simulate_and_print`
         'system_name': 'lactic_sys',
         'create_wastewater_process': wwt_kwdct,
         'BT': 'CHP',
@@ -82,6 +80,7 @@ def simulate_la_systems(**sys_kwdct):
     from biorefineries.wwt import simulate_systems
     global exist_sys, new_sys
     exist_sys, new_sys = create_la_comparison_systems(**sys_kwdct)
+    # If using conservative biodegradability,
     # ~504 mg/L COD, soluble lignin, arabinose, and galactose all >10%,
     # lactic acid, extract, xylose, and mannose ~5-10%
     simulate_systems(exist_sys, new_sys, info)
@@ -147,4 +146,4 @@ def evaluate_la_models(**eval_kwdct):
 if __name__ == '__main__':
     # exist_sys, new_sys = simulate_la_systems(default_BD=True)
     # exist_model, new_model = create_la_comparison_models()
-    exist_model, new_model = evaluate_la_models(N=5)
+    exist_model, new_model = evaluate_la_models(N=1000)

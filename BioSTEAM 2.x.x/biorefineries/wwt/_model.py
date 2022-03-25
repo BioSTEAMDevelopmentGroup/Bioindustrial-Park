@@ -8,8 +8,8 @@
 # for license details.
 
 import pandas as pd
-# from thermosteam.reaction import Reaction as Rxn, ParallelReaction as PRxn
-from biosteam import Metric, PowerUtility, WastewaterSystemCost, ReverseOsmosis
+from biosteam import Stream, Metric, PowerUtility, WastewaterSystemCost, ReverseOsmosis
+from biosteam.utils import ignore_docking_warnings
 from chaospy import distributions as shape
 from . import results_path, get_combustion_energy, compute_stream_COD as get_COD
 
@@ -64,7 +64,7 @@ def add_biorefinery_parameters(model, model_dct, f, u, s, get_obj, get_rxn, para
 
     # Stream prices
     sys = model.system
-    for stream in sys.feeds+sys.products:
+    for stream in sys.feeds:
         ID = stream.ID
         if ID == 'ww': continue # wastewater disposal price will be set separately
         b = stream.price
@@ -291,8 +291,7 @@ def add_2G_parameters(model, model_dct, f, u, s, get_obj, get_rxn, param):
 
 
 # Related to the new wastewater treatment process
-#!!! Want to add parameters related to the biodegradability
-# Or not since can't really do this to the existing WWT process?
+#!!! Want to evaluate the new WWT process across different biodegradability and COD content
 def add_new_wwt_parameters(model, model_dct, f, u, s, get_obj, get_rxn, param):
     X = model_dct['new_wwt_ID']
 
@@ -457,54 +456,119 @@ def add_metrics(model, model_dct, f, u, s, get_obj):
     gal_or_kg = 'gal' if product.ID=='ethanol' else 'kg'
     factor = 2.9867 if product.ID=='ethanol' else 1. # factor is cs.ethanol_density_kggal
 
-    metrics = []
+    metrics0, metrics1, metrics = [], [], []
     ww = s.search('ww')
-    if ww: # solve product price without wastewater
-        def product_price_wo_ww():
+    if ww: # product price without wastewater treatment, IRR sometimes has two solutions so use price
+        def get_product_price_no_ww():
             ww_price = ww.price
             ww.price = 0
             price = tea.solve_price(product)
             ww.price = ww_price
             return price*factor
-        metric0 = [
-            Metric('MPSP no WW', product_price_wo_ww, f'$/{gal_or_kg}'),
+        metrics1 = [
+            Metric('MPSP no WW', get_product_price_no_ww, f'$/{gal_or_kg}'),
             ]
-    else: # get COD-related data
-        metric0 = []
+    else:
         isa = isinstance
         if wwt_system.ID == 'exist_sys_wwt':
+            metrics1 = []
             if not model_dct['FERM_product'] == 'lactic_acid':
-                for wwtc in wwt_system.units:
-                    if isa(wwtc, WastewaterSystemCost): break
-                ww_in = wwtc.outs[0]
-                for ro in wwt_system.units:
-                    if isa(ro, ReverseOsmosis): break
-                ww_out = ro.ins[0]
+                for WWTC in wwt_system.units:
+                    if isa(WWTC, WastewaterSystemCost): break
+                ww_in = WWTC.outs[0]
+                for RO in wwt_system.units:
+                    if isa(RO, ReverseOsmosis): break
+                ww_out = RO.ins[0]
             else:
                 ww_in = u.search('M501').outs[0]
                 ww_out = u.search('S505').ins[0]
         else:
             X = model_dct['new_wwt_ID']
-            ww_in = u.search(f'M{X}01').outs[0] # WWT mixer
-            ww_out = u.search(f'S{X}04').ins[0] # RO
+            UX01 = u.search(f'U{X}01')
+            brine = UX01.outs[0]
+            MX01 = u.search(f'M{X}01') # WWT mixer
+            wwt_downstream_units = MX01.get_downstream_units()
+            ww_in = MX01.outs[0]
+            ww_in_unit = ww_in.sink
+            ww_in_idx = ww_in.get_connection().sink_index
+            SX04 = u.search(f'S{X}04') # RO
+            ww_out = SX04.ins[0]
+            sludge = get_obj(s, 'sludge')
+            solids_mixer = sludge.sink
+            biogas = get_obj(s, 'biogas')
+            biogas_idx = biogas.get_connection().sink_index
+            BT = get_obj(u, 'BT')
+            sludge_dummy = Stream('sludge_dummy')
+            solids_mixer = sludge.sink
+            solids_idx = sludge.get_connection().sink_index
+            biogas_dummy = Stream('biogas_dummy')
+
+            # Product price without wastewater treatment
+            @ignore_docking_warnings
+            def get_product_price_no_ww():
+                cache_dct = UX01.cache_dct
+                product_default_price = product.price
+                product.price = tea.solve_price(product) # MPSP with WWT system
+
+                # Disconnect WWT system
+                solids_mixer.ins[solids_idx] = sludge_dummy
+                UX01.ins[0] = ww_in
+                BT.ins[biogas_idx] = biogas_dummy
+                UX01.clear_cost = True
+                for u in wwt_downstream_units:
+                    if not u in UX01.wwt_units: u.simulate()
+
+                MPSP_no_ww = cache_dct['MPSP no ww'] = tea.solve_price(product) * factor
+
+                ww_price = - tea.solve_price(brine)
+                cache_dct['WW price'] = ww_price * 100
+
+                cod_per_kg = ww_price*brine.F_mass / (get_COD(brine)*brine.F_vol)
+                cache_dct['COD price per kg'] = cod_per_kg * 100
+
+                # 907.1847 is auom('ton').conversion_factor('kg')
+                cache_dct['COD price per ton'] = cod_per_kg * 907.1847
+
+                # Reconnect WWT system
+                ww_in_unit.ins[ww_in_idx] = ww_in
+                solids_mixer.ins[solids_idx] = sludge
+                BT.ins[1] = biogas
+                UX01.ins[0] = SX04.outs[1]
+                UX01.clear_cost = False
+                for u in wwt_downstream_units: u.simulate()
+                product.price = product_default_price
+
+                return MPSP_no_ww
+
+            def get_ww_price():
+                return UX01.cache_dct['WW price']
+
+            def get_cod_price_per_kg():
+                return UX01.cache_dct['COD price per kg']
+
+            def get_cod_price_per_ton():
+                cod_price = UX01.cache_dct['COD price per ton']
+                UX01.cache_dct.clear() # make sure the data won't be carried into the next sample
+                return cod_price
+
+            metrics0 = [Metric('MPSP no WW', get_product_price_no_ww, f'$/{gal_or_kg}'),]
+            metrics1 = [
+                Metric('WW price', get_ww_price, '¢/kg'),
+                Metric('COD price per kg', get_cod_price_per_kg, '¢/kg'),
+                Metric('COD price per ton', get_cod_price_per_ton, '$/ton'),
+                ]
+
+        # COD-related data
         metrics.extend([
             Metric('COD in', lambda: get_COD(ww_in)*1e3, 'mg/L'),
             Metric('COD out', lambda: get_COD(ww_out)*1e3, 'mg/L'),
             Metric('COD removal', lambda: 1-get_COD(ww_out)/get_COD(ww_in), ''),
             ])
 
-    # def get_IRR(): # sometimes IRR has two solutions
-    #     IRRs = []
-    #     for i in range(3):
-    #         IRRs.append(tea.solve_IRR())
-    #     if tea.solve_price(product) < product.price: return min(IRRs)
-    #     return max(IRRs)
-    # model.metric(get_IRR, name='IRR modified', units='-')
-
     metrics = ([
-        *metric0,
         Metric('MPSP', lambda: tea.solve_price(product)*factor, f'$/{gal_or_kg}'),
-        # Metric('IRR', lambda: tea.solve_IRR(), ''),
+        *metrics0,
+        *metrics1,
         #!!! Need to add GWP
         # Metric('GWP', lambda: cs_wwt.get_GWP(sys), 'kg-CO2eq/gal'),
         *metrics,
@@ -610,8 +674,9 @@ def save_model_results(model, path, percentiles):
 def evaluate_models(exist_model, new_model, abbr,
                     percentiles=(0, 0.05, 0.25, 0.5, 0.75, 0.95, 1),
                     N=1000, seed=3221, rule='L'):
-    import os
+    import os, numpy as np
     from math import ceil
+    np.random.seed(seed)
     exist_samples = exist_model.sample(N=N, seed=seed, rule=rule)
     exist_model.load_samples(exist_samples)
     exist_path = os.path.join(results_path, f'{abbr}_exist_uncertainties_{N}.xlsx')

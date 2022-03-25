@@ -29,7 +29,7 @@ info = {
 def create_oc2g_comparison_systems(default_BD=True):
     BD = {} if not default_BD else 1.
     wwt_kwdct = dict.fromkeys(('IC_kwargs', 'AnMBR_kwargs',), {'biodegradability': BD,})
-    
+
     # # Does not work for oilcane biorefineries due to the many settings
     # # not included in the system creation function
     # from biorefineries.wwt import create_comparison_systems
@@ -67,6 +67,8 @@ def simulate_oc2g_systems(**sys_kwdct):
     from biorefineries.wwt import simulate_systems
     global exist_sys, new_sys
     exist_sys, new_sys = create_oc2g_comparison_systems(**sys_kwdct)
+    # If using conservative biodegradability,
+    # ~184 mg/L COD, mostly (~150/>80%) due to soluble lignin and arabinose
     simulate_systems(exist_sys, new_sys, info)
     return exist_sys, new_sys
 
