@@ -66,7 +66,7 @@ timer.tic()
 
 # Set seed to make sure each time the same set of random numbers will be used
 np.random.seed(3221) # 3221
-N_simulation = 50 # 5000
+N_simulation = 5000 # 5000
 
 samples = model.sample(N=N_simulation, rule='L')
 model.load_samples(samples)

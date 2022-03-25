@@ -916,9 +916,15 @@ spec = ProcessSpecification(
     reaction_name='fermentation_reaction',
     substrates=('Xylose', 'Glucose'),
     products=('TAL',),
-    spec_1=0.19,
-    spec_2=15.,
+    
+    # spec_1=0.19,
+    # spec_2=15.,
+    # spec_3=0.19,
+    
+    spec_1=0.3,
+    spec_2=25.,
     spec_3=0.19,
+    
     xylose_utilization_fraction = 0.80,
     feedstock = feedstock,
     dehydration_reactor = None,
