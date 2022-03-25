@@ -917,13 +917,10 @@ spec = ProcessSpecification(
     substrates=('Xylose', 'Glucose'),
     products=('TAL',),
     
-    # spec_1=0.19,
-    # spec_2=15.,
-    # spec_3=0.19,
-    
-    spec_1=0.3,
-    spec_2=25.,
+    spec_1=0.19,
+    spec_2=15.,
     spec_3=0.19,
+
     
     xylose_utilization_fraction = 0.80,
     feedstock = feedstock,
@@ -938,6 +935,10 @@ spec = ProcessSpecification(
     baseline_yield = 0.19,
     baseline_titer = 15.,
     baseline_productivity = 0.19,
+    
+    # baseline_yield = 0.30,
+    # baseline_titer = 25.,
+    # baseline_productivity = 0.19,
     
     feedstock_mass = feedstock.F_mass,
     pretreatment_reactor = None)
