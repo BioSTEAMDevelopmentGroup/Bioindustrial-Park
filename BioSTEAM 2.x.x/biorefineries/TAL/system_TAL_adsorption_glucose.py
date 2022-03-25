@@ -1,30 +1,27 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+# Bioindustrial-Park: BioSTEAM's Premier Biorefinery Models and Results
+# Copyright (C) 2022-2023, Sarang Bhagwat <sarangb2@illinois.edu> (this biorefinery)
+# 
+# This module is under the UIUC open-source license. See 
+# github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
+# for license details.
 """
 
 @author: sarangbhagwat
 
 Created on Sun Aug 23 12:11:15 2020
 
-Modified from the cornstover biorefinery constructed in Cortes-Peña et al., 2020,
-with modification of fermentation system for 2,3-Butanediol instead of the original ethanol
+This module is a modified implementation of modules from the following:
+[1]	Bhagwat et al., Sustainable Production of Acrylic Acid via 3-Hydroxypropionic Acid from Lignocellulosic Biomass. ACS Sustainable Chem. Eng. 2021, 9 (49), 16659–16669. https://doi.org/10.1021/acssuschemeng.1c05441
+[2]	Li et al., Sustainable Lactic Acid Production from Lignocellulosic Biomass. ACS Sustainable Chem. Eng. 2021, 9 (3), 1341–1351. https://doi.org/10.1021/acssuschemeng.0c08055
+[3]	Cortes-Peña et al., BioSTEAM: A Fast and Flexible Platform for the Design, Simulation, and Techno-Economic Analysis of Biorefineries under Uncertainty. ACS Sustainable Chem. Eng. 2020, 8 (8), 3302–3310. https://doi.org/10.1021/acssuschemeng.9b07040
 
-[1] Cortes-Peña et al., BioSTEAM: A Fast and Flexible Platform for the Design, 
-    Simulation, and Techno-Economic Analysis of Biorefineries under Uncertainty. 
-    ACS Sustainable Chem. Eng. 2020, 8 (8), 3302–3310. 
-    https://doi.org/10.1021/acssuschemeng.9b07040.
-
-All units are explicitly defined here for transparency and easy reference
-
-[1] Cortes-Peña et al., BioSTEAM: A Fast and Flexible Platform for the Design, 
-    Simulation, and Techno-Economic Analysis of Biorefineries under Uncertainty. 
-    ACS Sustainable Chem. Eng. 2020, 8 (8), 3302–3310. 
-    https://doi.org/10.1021/acssuschemeng.9b07040.
-
+All units are explicitly defined here for transparency and easy reference.
 Naming conventions:
-    A = Adsorption column
     D = Distillation column
-    F = Flash tank
+    AC = Adsorption column
+    F = Flash tank or multiple-effect evaporator
     H = Heat exchange
     M = Mixer
     P = Pump (including conveying belt)
@@ -32,15 +29,17 @@ Naming conventions:
     S = Splitter (including solid/liquid separator)
     T = Tank or bin for storage
     U = Other units
-    PS = Process specificiation, not physical units, but for adjusting streams
-
 Processes:
     100: Feedstock preprocessing
     200: Pretreatment
     300: Conversion
     400: Separation
     500: Wastewater treatment
-    600: Facilities
+    600: Storage
+    700: Co-heat and power
+    800: Cooling utility generation
+    900: Miscellaneous facilities
+    1000: Heat exchanger network
 
 """
 
@@ -415,12 +414,15 @@ def create_TAL_sys(ins, outs):
     F402 = bst.units.Flash('F402', ins=F401-0, outs=('F402_t', 'F402_b'), P=101325.,
                             V=0.5) # !!! TODO: replace with dryer
     
+    F402.product_ethanol_content = 0.05 # g-ethanol per g-TAL, not per g-product
     def F402_spec():
             F402_b = F402.outs[1]
             F402_ins_0 = F402.ins[0]
+            TAL_mass = F402_ins_0.imass['TAL']
             TAL_mol = F402_ins_0.imol['TAL']
             F402_ins_0.imol['TAL'] = 0.
-            F402.V=0.99999
+            F402.V = 1. - (F402.product_ethanol_content*TAL_mass)/(46.06844*F402_ins_0.imol['Ethanol'])
+            
             F402._run()
             F402_ins_0.imol['TAL'] = TAL_mol
             F402_b.imol['TAL'] = TAL_mol        
@@ -914,9 +916,12 @@ spec = ProcessSpecification(
     reaction_name='fermentation_reaction',
     substrates=('Xylose', 'Glucose'),
     products=('TAL',),
+    
     spec_1=0.19,
     spec_2=15.,
     spec_3=0.19,
+
+    
     xylose_utilization_fraction = 0.80,
     feedstock = feedstock,
     dehydration_reactor = None,
@@ -930,6 +935,10 @@ spec = ProcessSpecification(
     baseline_yield = 0.19,
     baseline_titer = 15.,
     baseline_productivity = 0.19,
+    
+    # baseline_yield = 0.30,
+    # baseline_titer = 25.,
+    # baseline_productivity = 0.19,
     
     feedstock_mass = feedstock.F_mass,
     pretreatment_reactor = None)

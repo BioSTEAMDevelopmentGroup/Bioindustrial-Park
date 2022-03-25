@@ -9,7 +9,7 @@ import flexsolve as flx
 import numpy as np
 from biosteam.exceptions import InfeasibleRegion
 from biorefineries.TAL.units import compute_TAL_titer, compute_TAL_mass
-# from winsound import Beep
+from winsound import Beep
 
 _red_highlight_white_text = '\033[1;47;41m'
 _yellow_text = '\033[1;33m'
@@ -44,7 +44,7 @@ def evaluate_across_specs(spec, system,
             # spec.load_yield(0.49)
             # spec.load_titer(54.8)
             
-            spec.load_specifications(spec_1=0.2, spec_2=15., spec_3=0.21)
+            spec.load_specifications(spec_1=spec.baseline_yield, spec_2=spec.baseline_titer, spec_3=spec.baseline_productivity)
             
             system.simulate()
             print('Loading and simulating with required specifications ...')
@@ -128,7 +128,8 @@ def evaluate_across_specs(spec, system,
                 # Beep(320, 250)
             except Exception as e2:
                 print(str(e2))
-                # Beep(640, 500)
+                try: Beep(640, 500)
+                except: pass
                 spec.count_exceptions += 1
                 print(_red_highlight_white_text+f"Point failed; returning metric values as np.nan."+_reset_text)
                 spec.exceptions_dict[spec.count] = (e1, e2)

@@ -3,17 +3,17 @@
 """
 Created on Sun Aug 23 12:11:15 2020
 
-Modified from the cornstover biorefinery constructed in Cortes-Peña et al., 2020,
-with modification of fermentation system for 2,3-Butanediol instead of the original ethanol
-
-[1] Cortes-Peña et al., BioSTEAM: A Fast and Flexible Platform for the Design, 
-    Simulation, and Techno-Economic Analysis of Biorefineries under Uncertainty. 
-    ACS Sustainable Chem. Eng. 2020, 8 (8), 3302–3310. 
-    https://doi.org/10.1021/acssuschemeng.9b07040.
-
 All units are explicitly defined here for transparency and easy reference
 
 @author: sarangbhagwat
+
+This module is a modified implementation of modules from the following:
+[1]	Bhagwat et al., Sustainable Production of Acrylic Acid via 3-Hydroxypropionic Acid from Lignocellulosic Biomass. ACS Sustainable Chem. Eng. 2021, 9 (49), 16659–16669. https://doi.org/10.1021/acssuschemeng.1c05441
+[2]	Li et al., Sustainable Lactic Acid Production from Lignocellulosic Biomass. ACS Sustainable Chem. Eng. 2021, 9 (3), 1341–1351. https://doi.org/10.1021/acssuschemeng.0c08055
+[3]	Cortes-Peña et al., BioSTEAM: A Fast and Flexible Platform for the Design, Simulation, and Techno-Economic Analysis of Biorefineries under Uncertainty. ACS Sustainable Chem. Eng. 2020, 8 (8), 3302–3310. https://doi.org/10.1021/acssuschemeng.9b07040
+
+All units are explicitly defined here for transparency and easy reference
+
 """
 
 
@@ -552,12 +552,12 @@ class CoFermentation(Unit):
 
         self.cofermentation_rxns = ParallelRxn([
         #      Reaction definition            Reactant    Conversion
-        Rxn('Glucose -> TAL + 3H2O',        'Glucose',   .25), 
+        Rxn('Glucose -> 0.6667 TAL + 2 CO2',        'Glucose',   .25), 
         Rxn('Glucose -> 0.2143 VitaminA',               'Glucose',   0.005), # retinol
         Rxn('Glucose -> 0.3 VitaminD2',               'Glucose',   0.005), # ergosterol
         Rxn('Glucose -> 6 FermMicrobe',       'Glucose',   0.05),
         
-        Rxn('Xylose -> 0.8333 TAL + 2.5 H2O',       'Xylose',    0.25),
+        Rxn('Xylose -> 0.555583 TAL + 1.3334 CO2',       'Xylose',    0.25),
         Rxn('Xylose -> 0.17856 VitaminA',       'Xylose',    0.005),
         Rxn('Xylose -> 0.25 VitaminD2',       'Xylose',    0.005),
         Rxn('Xylose -> 5 FermMicrobe',        'Xylose',    0.05),
@@ -671,12 +671,12 @@ class SeedTrain(Unit):
 
         self.cofermentation_rxns = ParallelRxn([
         #      Reaction definition            Reactant    Conversion
-        Rxn('Glucose -> TAL + 3H2O',        'Glucose',   .25), 
+        Rxn('Glucose -> 0.6667 TAL + 2 CO2',        'Glucose',   .25), 
         Rxn('Glucose -> 0.2143 VitaminA',               'Glucose',   0.005), # retinol
         Rxn('Glucose -> 0.3 VitaminD2',               'Glucose',   0.005), # ergosterol
         Rxn('Glucose -> 6 FermMicrobe',       'Glucose',   0.05),
         
-        Rxn('Xylose -> 0.8333 TAL + 2.5 H2O',       'Xylose',    0.25),
+        Rxn('Xylose -> 0.555583 TAL + 1.3334 CO2',       'Xylose',    0.25),
         Rxn('Xylose -> 0.17856 VitaminA',       'Xylose',    0.005),
         Rxn('Xylose -> 0.25 VitaminD2',       'Xylose',    0.005),
         Rxn('Xylose -> 5 FermMicrobe',        'Xylose',    0.05),

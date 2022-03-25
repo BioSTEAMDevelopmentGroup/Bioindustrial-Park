@@ -1,0 +1,11 @@
+# IPython==7.22.0 # uncomment this only if results are vastly different from those in the README
+graphviz==0.8.3
+chaospy==4.3.3
+chemicals==1.0.19
+free_properties==0.3.4
+flexsolve==0.5.3
+
+# In your command prompt, simply navigate to the folder 
+# that this file (requirements.txt) is in, 
+# and run the following command:
+# pip install -r requirements.txt
