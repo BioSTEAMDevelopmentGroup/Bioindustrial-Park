@@ -28,51 +28,18 @@ info = {
 
 #
 def create_la_comparison_systems(default_BD=True):
-    BD = {} if not default_BD else 1.
-    wwt_kwdct = dict.fromkeys(('IC_kwargs', 'AnMBR_kwargs',), {'biodegradability': BD,})
-
-    # # Create from scratch, not as accurate as direct load ($1.31/kg vs. $1.42/kg)
-    # from biorefineries.wwt import create_comparison_systems, add_wwt_chemicals
-    # from biorefineries.lactic import (
-    #     create_chemicals,
-    #     create_system,
-    #     create_tea,
-    #     load_process_settings,
-    #     get_splits,
-    #     )
-    # # Add WWT chemicals to the existing splits array,
-    # # splits of chemicals that do now exist in the original chemicals obj
-    # # will be copied from the splits of the corresponding group
-    # la_chems = add_wwt_chemicals(create_chemicals())
-    # def create_new_splits(original_splits):
-    #     new_splits = original_splits.copy()
-    #     new_splits[la_chems.indices(('Bisulfite', 'CitricAcid', 'HCl', 'NaOCl'))] = \
-    #         original_splits[la_chems.index('NaOH')]
-    #     return new_splits
-    # cell_mass_split, gypsum_split, AD_split, MB_split = get_splits(la_chems)
-    # new_cell_mass_split = create_new_splits(cell_mass_split)
-    # new_gypsum_split = create_new_splits(gypsum_split)
-
-    # functions = (create_chemicals, create_system, create_tea, load_process_settings,)
-    # sys_dct = {
-    #     'create_system': {'cell_mass_split': new_cell_mass_split, 'gypsum_split': new_gypsum_split},
-    #     'create_wastewater_process': wwt_kwdct,
-    #     'BT': 'CHP',
-    #     'new_wwt_connections': {'sludge': ('M601', 0), 'biogas': ('CHP', 1)},
-    #     }
-    # exist_sys, new_sys = create_comparison_systems(info, functions, sys_dct)
-
     from biorefineries.wwt import create_comparison_systems
     from biorefineries import lactic as la
+    BD = {} if not default_BD else 1.
+    wwt_kwdct = dict.fromkeys(('IC_kwargs', 'AnMBR_kwargs',), {'biodegradability': BD,})
     sys_dct = {
-        # 'load': {'print_results': False}, # need to run `simulate_and_print`
+        # 'load': {'print_results': False}, # need to run `simulate_and_print` for results to match
         'system_name': 'lactic_sys',
         'create_wastewater_process': wwt_kwdct,
         'BT': 'CHP',
         'new_wwt_connections': {'sludge': ('M601', 0), 'biogas': ('CHP', 1)},
         }
     exist_sys, new_sys = create_comparison_systems(info, la, sys_dct, from_load=True)
-
     return exist_sys, new_sys
 
 

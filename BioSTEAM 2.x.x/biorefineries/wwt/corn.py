@@ -28,36 +28,17 @@ info = {
 # =============================================================================
 
 def create_cn_comparison_systems(default_BD=True):
+    from biorefineries.wwt import create_comparison_systems
+    from biorefineries import corn as cn
     BD = {} if not default_BD else 1.
     wwt_kwdct = dict.fromkeys(('IC_kwargs', 'AnMBR_kwargs',), {'biodegradability': BD,})
     wwt_kwdct['skip_AeF'] = True
-
-    # # Create from scratch
-    # import biosteam as bst
-    # from biorefineries.wwt import create_comparison_systems
-    # from biorefineries.corn import (
-    #     create_chemicals,
-    #     create_system,
-    #     create_tea,
-    #     load_process_settings
-    #     )
-    # functions = (create_chemicals, create_system, create_tea, load_process_settings,)
-    # sys_dct = {
-    #     'create_system': {'flowsheet': bst.main_flowsheet},
-    #     'create_wastewater_process': wwt_kwdct,
-    #     'ww_streams': (('MH103', 1), ('MX5', 0)),
-    #     }
-    # exist_sys, new_sys = create_comparison_systems(info, functions, sys_dct)
-
-    from biorefineries.wwt import create_comparison_systems
-    from biorefineries import corn as cn
     sys_dct = {
         'system_name': 'corn_sys',
         'create_wastewater_process': wwt_kwdct,
         'ww_streams': (('MH103', 1), ('MX5', 0)),
         }
     exist_sys, new_sys = create_comparison_systems(info, cn, sys_dct, from_load=True)
-
     return exist_sys, new_sys
 
 

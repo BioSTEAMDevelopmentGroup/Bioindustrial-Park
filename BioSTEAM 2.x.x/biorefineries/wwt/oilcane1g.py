@@ -27,35 +27,11 @@ info = {
 # =============================================================================
 
 def create_oc1g_comparison_systems(default_BD=True):
+    from biorefineries.wwt import create_comparison_systems
+    from biorefineries import oilcane as oc
     BD = {} if not default_BD else 1.
     wwt_kwdct = dict.fromkeys(('IC_kwargs', 'AnMBR_kwargs',), {'biodegradability': BD,})
     wwt_kwdct['skip_AeF'] = True
-
-    # # Does not work for oilcane biorefineries due to the many settings
-    # # not included in the system creation function
-    # from biorefineries.wwt import create_comparison_systems
-    # from biorefineries.oilcane import (
-    #     create_chemicals,
-    #     create_oilcane_to_biodiesel_and_ethanol_1g as create_system,
-    #     create_tea,
-    #     load_process_settings,
-    #     )
-    # functions = (create_chemicals, create_system, create_tea, load_process_settings,)
-    # sys_dct = {
-    #     'create_system': {'operating_hours': 24*200},
-    #     'rename_storage_to': 1000,
-    #     'create_wastewater_process': wwt_kwdct,
-    #     # `vinasse`, `wastewater`, `fiber_fines`,
-    #     # COD of `evaporator_condensate` is only ~20 mg/L
-    #     'ww_streams': (('M403', 0), ('M603', 0), ('U206', 1)),
-    #     'solids_streams': (('M701', 0), ('U205', 0)), # the second one is `filter_cake`
-    #     'BT': 'BT701',
-    #     'new_wwt_connections': {'solids': ('BT701', 0), 'biogas': ('BT701', 1)},
-    #     }
-    # exist_sys, new_sys = create_comparison_systems(info, functions, sys_dct)
-
-    from biorefineries.wwt import create_comparison_systems
-    from biorefineries import oilcane as oc
     sys_dct = {
         'load': {'name': 'O1', 'cache': None, 'reduce_chemicals': False},
         'system_name': 'oilcane_sys',
@@ -69,7 +45,6 @@ def create_oc1g_comparison_systems(default_BD=True):
         'new_wwt_connections': {'solids': ('BT701', 0), 'biogas': ('BT701', 1)},
         }
     exist_sys, new_sys = create_comparison_systems(info, oc, sys_dct, from_load=True)
-
     return exist_sys, new_sys
 
 
