@@ -16,7 +16,7 @@ import thermosteam as tmo
 import biosteam as bst
 import copy 
 from matplotlib import pyplot as plt
-from biorefineries.TAL.chemicals_data import TAL_chemicals as borrowed_chemicals
+from biorefineries.TAL.chemicals_data import TAL_chemicals as borrowed_chemicals #!!!
 # from biorefineries.HP.system_light_lle_vacuum_distillation import S404
 
 #%% Initialize chemicals
