@@ -16,13 +16,45 @@ import thermosteam as tmo
 import biosteam as bst
 import copy 
 from matplotlib import pyplot as plt
-    
+
+#%% Default solvent IDs list
+solvent_IDs = [
+                # 'AceticAcid',
+                'Pentadecanol',
+                'Tridecanol',
+                'Ethanol',
+                'Methanol',
+                'Propyl acetate',
+                'Butyl acetate',
+                'Hexanol',
+                'Cyclohexanol',
+                'Cyclohexanone',
+                'Heptanol',
+                'Octanol',
+                '1,8-Octanediol',
+                '2-Ethyl hexanol',
+                'Nonanol',
+                'Decanol',
+                'Dodecanol',
+                '117-81-7', # CAS number for Dioctyl (Diethylhexyl) phthalate
+                'Diethyl sebacate', # No Psat, Hvap
+                # 'Glycerol',
+                'Toluene',
+                'Trioctylamine',
+                'Isoamyl alcohol',
+                '5137-55-3', # CAS number for Aliquat 336
+                # 'Water',
+                'Benzene',
+                '143-28-2', # CAS number for Oleyl alcohol
+                'Tetrahydrofuran'
+                ]
     #%% Initialize chemicals
     
 def run_solvents_barrage(stream, # Stream from which you wish to extract the solute
                          solute_ID, # solute chemical ID
                          impurity_IDs, # List of IDs of impurities in "stream" that you want get partitioning results for, other than water; note that all chemicals in the stream will affect LLE interaction effects, regardless of which chemicals are present in impurity_IDs
                          T=None, # Temperature (K) at which you wish to run solvents barrage; temperature (K) of "stream" by default
+                         solvent_IDs=solvent_IDs, # List of solvents to run the barrage for; defaults to a list of 25 common organic solvents
                          stream_modifiers='baseline_stream', # 'baseline_stream' to analyze the "stream" passed in arguments; 'impurity_free_stream' to remove the impurities listed in impurity_IDs before performing analyses; 'solute_in_pure_water' to analyze simply for the solute in pure water
                          show_all_mixer_settlers=False,
                          plot_Ks=True,
@@ -54,40 +86,11 @@ def run_solvents_barrage(stream, # Stream from which you wish to extract the sol
     
     
     #%% Select solute, impurities, and solvents
-    solute = borrowed_chemicals[solute_ID] # !!!
+    solute = borrowed_chemicals[solute_ID]
     # solute_ID = 'TAL'
     # solute_ID = solute.ID
     # impurity_IDs = ['VitaminA', 'VitaminD2']
-    solvent_IDs = [ #!!!
-                    # 'AceticAcid',
-                    'Pentadecanol',
-                    'Tridecanol',
-                    'Ethanol',
-                    'Methanol',
-                    'Propyl acetate',
-                    'Butyl acetate',
-                    'Hexanol',
-                    'Cyclohexanol',
-                    'Cyclohexanone',
-                    'Heptanol',
-                    'Octanol',
-                    '1,8-Octanediol',
-                    '2-Ethyl hexanol',
-                    'Nonanol',
-                    'Decanol',
-                    'Dodecanol',
-                    '117-81-7', # CAS number for Dioctyl (Diethylhexyl) phthalate
-                    'Diethyl sebacate', # No Psat, Hvap
-                    # 'Glycerol',
-                    'Toluene',
-                    'Trioctylamine',
-                    'Isoamyl alcohol',
-                    '5137-55-3', # CAS number for Aliquat 336
-                    # 'Water',
-                    'Benzene',
-                    '143-28-2', # CAS number for Oleyl alcohol
-                    'Tetrahydrofuran'
-                    ]
+    
     
     #%% Load solvents
     def load_solvents_and_get_dict(solvent_IDs):
@@ -153,14 +156,10 @@ def run_solvents_barrage(stream, # Stream from which you wish to extract the sol
     
     
     # %% Streams initialization
-    
-    from biorefineries.TAL.system_TAL_adsorption_glucose import u #!!!
-    
-    # T = 273.15 + 30 #!!!
-    
+  
     stream_modifiers = 'baseline_stream'
     process_stream_orig = tmo.Stream('process_stream_orig')
-    process_stream_orig.copy_like(u.R302.outs[0]) #!!!
+    process_stream_orig.copy_like(stream)
     
     # process_stream_orig.mix_from([u.S402.ins[0], u.S402.ins[1]])
     
@@ -173,8 +172,8 @@ def run_solvents_barrage(stream, # Stream from which you wish to extract the sol
     
     elif stream_modifiers == 'solute_in_pure_water':
         process_stream_orig.empty()
-        process_stream_orig.imol[solute_ID] = u.R302.outs[0].imol[solute_ID]
-        process_stream_orig.imol['Water'] = u.R302.outs[0].imol['Water']
+        process_stream_orig.imol[solute_ID] = stream.imol[solute_ID]
+        process_stream_orig.imol['Water'] = stream.outs[0].imol['Water']
     
     tmo.settings.set_thermo(test_env_chems)
     
@@ -249,7 +248,8 @@ def run_solvents_barrage(stream, # Stream from which you wish to extract the sol
             K_impurity_2_in_solvent = get_K(impurity_IDs[1], mixed_stream, extract_phase, raffinate_phase)
         except:
             pass
-        return (mixed_stream.copy(), K_solute_in_solvent, K_Water_in_solvent, K_solvent_in_Water, T_diff, K_impurity_1_in_solvent, K_impurity_2_in_solvent)
+        return (mixed_stream.copy(), K_solute_in_solvent, K_Water_in_solvent, K_solvent_in_Water, T_diff, K_impurity_1_in_solvent, K_impurity_2_in_solvent,
+                solvent_chemical.Tb-solute.Tb)
     
     def get_results_meeting_constraints(results_list, constraints):
         filtered_results = []
@@ -417,8 +417,9 @@ def run_solvents_barrage(stream, # Stream from which you wish to extract the sol
         rn[f'K_{impurity_IDs[0]}_in_extract'] = result[1][5]
         rn[f'K_{impurity_IDs[1]}_in_extract'] = result[1][6]
         rn['Tb_solvent - Tb_water'] = result[1][4]
+        rn['Tb_solvent - Tb_solute'] = result[1][7]
         rn['Forms azeotrope with water'] = forms_azeotrope_with_water(result[0])
-    
+        
     results_df = pd.DataFrame(compiled_results_dict)
     
     dateTimeObj = datetime.now()
@@ -485,6 +486,6 @@ def run_solvents_barrage(stream, # Stream from which you wish to extract the sol
     plt.xlabel('Partition coefficients at ' + str(T-273.15) + ' deg Celsius [(mol/mol)/(mol/mol)]', fontsize=52)
     plt.legend(loc='lower right', prop={'size': 52})
     fig2 = ax2.get_figure()
-    fig2.savefig(file_to_save+'___'+ 'Ks-nonpolar_lle_impurities-solvent'+'.png', bbox_inches='tight')
+    fig2.savefig(file_to_save+'___'+ 'Ks-impurities-solvent'+'.png', bbox_inches='tight')
     
     # %% Get rough solubility in organic solvent vs T
