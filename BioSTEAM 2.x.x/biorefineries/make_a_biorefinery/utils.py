@@ -290,7 +290,8 @@ def get_MPSP_at_IRR(new_IRR, # fraction; e.g., 10% is 0.10
     yearly_cash_flow_without_product_sale = \
         + yearly_sales_mass_of_main_product * old_selling_price \
         - ((old_NPV + initial_investment) / (sum([1/((1+old_IRR)**(i+1)) for i in range(t)])))
-        
+    
+    print(yearly_cash_flow_without_product_sale)
     MPSP_new = \
         (1/yearly_sales_mass_of_main_product) *\
         (yearly_cash_flow_without_product_sale \
