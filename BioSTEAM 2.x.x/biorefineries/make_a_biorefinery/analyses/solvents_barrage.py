@@ -23,13 +23,13 @@ def run_solvents_barrage(stream, # Stream from which you wish to extract the sol
                          solute_ID, # solute chemical ID
                          impurity_IDs, # List of IDs of impurities in "stream" that you want get partitioning results for, other than water; note that all chemicals in the stream will affect LLE interaction effects, regardless of which chemicals are present in impurity_IDs
                          T=None, # Temperature (K) at which you wish to run solvents barrage; temperature (K) of "stream" by default
-                         stream_modifiers='baseline_stream',
+                         stream_modifiers='baseline_stream', # 'baseline_stream' to analyze the "stream" passed in arguments; 'impurity_free_stream' to remove the impurities listed in impurity_IDs before performing analyses; 'solute_in_pure_water' to analyze simply for the solute in pure water
                          show_all_mixer_settlers=False,
                          plot_Ks=True,
                          save_excel=True,
                          save_K_plots=True,
                          criterion = 'Partition of solute into extract',
-                         print_result_with_optimal_criterion=False): # 'baseline_stream' to analyze the "stream" passed in arguments; 'impurity_free_stream' to remove the impurities listed in impurity_IDs before performing analyses; 'solute_in_pure_water' to analyze simply for the solute in pure water
+                         print_result_with_optimal_criterion=False): 
     test_env_chems = tmo.Chemicals([])
     borrowed_chemicals = stream.chemicals
     if not T:
