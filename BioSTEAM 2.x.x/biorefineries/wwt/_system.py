@@ -146,17 +146,26 @@ def create_comparison_systems(info, functions, sys_dct={}, from_load=False):
         getattr(new_u, sludge_u).ins[sludge_idx] = getattr(new_s, sludge_ID)
         getattr(new_u, biogas_u).ins[biogas_idx] = getattr(new_s, biogas_ID)
 
-    if add_CHP: CHPunit('CHP', ins=(new_s.biogas, new_s.sludge))
+    if add_CHP:
+        CHP = CHPunit('CHP', ins=(new_s.biogas, new_s.sludge))
+        getattr(new_u, f'U{WWT_ID}01').wwt_units.append(CHP)
 
     new_sys = bst.System.from_units('new_sys', units=new_u)
 
-    for attr in ('operating_hours', 'lang_factor'):
-        val = getattr(exist_sys_temp, attr)
-        if val is None: continue
-        for sys in (exist_sys_wwt, exist_sys, new_sys_wwt, new_sys):
-            setattr(sys, attr, val)
+    # # `lang_factor` is set for the corn biorefinery,
+    # # which makes its results deviate from the trend with others,
+    # # so do not estimate cost this way
+    # for attr in ('operating_hours', 'lang_factor'):
+    #     val = getattr(exist_sys_temp, attr)
+    #     if val is None: continue
+    #     for sys in (exist_sys_wwt, exist_sys, new_sys_wwt, new_sys):
+    #         setattr(sys, attr, val)
+    hours = exist_sys_temp.operating_hours
+    for sys in (exist_sys_wwt, exist_sys, new_sys_wwt, new_sys):
+        sys.operating_hours = hours
+        sys.lang_factor = None
 
-    ##### TEA #####
+
     if from_load:
         new_tea = new_sys_temp.TEA.copy(new_sys)
     else:
@@ -166,6 +175,8 @@ def create_comparison_systems(info, functions, sys_dct={}, from_load=False):
     if kwdct['update_product_price']:
         update_product_prices(exist_s)
         update_product_prices(new_s)
+
+    exist_tea.IRR = new_tea.IRR = 0.1
 
     return exist_sys, new_sys
 

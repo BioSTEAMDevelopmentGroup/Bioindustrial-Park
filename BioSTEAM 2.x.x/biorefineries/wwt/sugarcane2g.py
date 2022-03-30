@@ -29,7 +29,7 @@ info = {
 def create_sc2g_comparison_systems(default_BD=True):
     BD = {} if not default_BD else 1.
     wwt_kwdct = dict.fromkeys(('IC_kwargs', 'AnMBR_kwargs',), {'biodegradability': BD,})
-    
+
     # # Does not work for oilcane biorefineries due to the many settings
     # # not included in the system creation function
     # from biorefineries.wwt import create_comparison_systems
@@ -67,6 +67,8 @@ def simulate_sc2g_systems(**sys_kwdct):
     from biorefineries.wwt import simulate_systems
     global exist_sys, new_sys
     exist_sys, new_sys = create_sc2g_comparison_systems(**sys_kwdct)
+    # If using conservative biodegradability,
+    # ~123 mg/L COD, mostly (~100/>80%) due to soluble lignin and arabinose
     simulate_systems(exist_sys, new_sys, info)
     return exist_sys, new_sys
 
@@ -133,4 +135,4 @@ def evaluate_sc2g_models(**eval_kwdct):
 if __name__ == '__main__':
     # exist_sys, new_sys = simulate_sc2g_systems(default_BD=True)
     # exist_model, new_model = create_sc2g_comparison_models()
-    exist_model, new_model = evaluate_sc2g_models(N=100)
+    exist_model, new_model = evaluate_sc2g_models(N=1000)

@@ -40,7 +40,7 @@ References
 import numpy as np
 import thermosteam as tmo
 from math import exp, pi, ceil
-from biosteam import Stream, Unit
+from biosteam import Stream, Unit, main_flowsheet
 from biosteam.exceptions import DesignError
 from biosteam.units import Flash, HXutility, Mixer, MixTank, Pump, \
     SolidsSeparator, StorageTank
@@ -57,6 +57,13 @@ _Gcal_2_kJ = 4184000 # auom('kcal').conversion_factor('kJ')*1e6 , also MMkcal/hr
 _316_over_304 = factors['Stainless steel 316'] / factors['Stainless steel 304']
 Rxn = tmo.reaction.Reaction
 ParallelRxn = tmo.reaction.ParallelReaction
+
+# Feedstock flow rate in dry U.S. ton per day, 907.1847 is auom('ton').conversion_factor('kg')
+def get_flow_tpd(flowsheet=None):
+    flowsheet = flowsheet or main_flowsheet
+    feedstock = flowsheet.stream.feedstock
+    U101 = flowsheet.unit.U101
+    return (feedstock.F_mass-feedstock.imass['H2O'])*24/907.1847*(1-U101.diversion_to_CHP)
 
 
 # %%
@@ -1588,12 +1595,12 @@ class AerobicDigestion(Unit):
     evaporation = 4350 / 356069
 
     def __init__(self, ID='', ins=None, outs=(), *, reactants, COD_chemicals,
-                 caustic_mass=0, need_ammonia=False):
+                 caustic_mass=None, need_ammonia=False):
         Unit.__init__(self, ID, ins, outs)
         # In the case that the actual chemicals are provided
         self.reactants = reactants if isinstance(reactants[0], str) else [i.ID for i in reactants]
         self.COD_chemicals = COD_chemicals
-        self.caustic_mass = caustic_mass
+        self.caustic_mass = caustic_mass or get_flow_tpd()/2205 * 2252
         self.need_ammonia = need_ammonia
 
         chems = self.chemicals
