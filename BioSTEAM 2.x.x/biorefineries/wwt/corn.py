@@ -33,12 +33,30 @@ def create_cn_comparison_systems(default_BD=True):
     BD = {} if not default_BD else 1.
     wwt_kwdct = dict.fromkeys(('IC_kwargs', 'AnMBR_kwargs',), {'biodegradability': BD,})
     wwt_kwdct['skip_AeF'] = True
+    CF_dct = {
+        ##### Feeds #####
+        'alpha_amylase': ('AlphaAmylase',),
+        'ammonia': ('NH3',),
+        'corn': ('Corn', (1-0.15)), # adjust for the moisture content
+        'denaturant': ('Denaturant'),
+        'gluco_amylase': 'GlucoAmylase',
+        'lime': ('CaO',),
+        'natural_gas': ('CH4',),
+        'sulfuric_acid': ('H2SO4',),
+        ('X611', 2): ('CH4',),
+        'yeast': ('Yeast', 0.04587), # yeast and water #!!! revisit
+        ##### Co-products #####
+        'crude_oil': ('CornOil',), # triolein
+        'DDGS': ('DDGS',), #!!! this is a mixture
+         # `s4` (from MH103) taken care of by WWT
+    }
     sys_dct = {
         'system_name': 'corn_sys',
         'create_wastewater_process': wwt_kwdct,
         'ww_streams': (('MH103', 1), ('MX5', 0)),
+        'CF_dct': CF_dct,
         }
-    exist_sys, new_sys = create_comparison_systems(info, cn, sys_dct, from_load=True)
+    exist_sys, new_sys = create_comparison_systems(info, cn, sys_dct)
     return exist_sys, new_sys
 
 

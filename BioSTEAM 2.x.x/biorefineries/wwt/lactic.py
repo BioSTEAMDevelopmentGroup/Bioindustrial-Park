@@ -32,14 +32,31 @@ def create_la_comparison_systems(default_BD=True):
     from biorefineries import lactic as la
     BD = {} if not default_BD else 1.
     wwt_kwdct = dict.fromkeys(('IC_kwargs', 'AnMBR_kwargs',), {'biodegradability': BD,})
+    CF_dct = {
+        ##### Feeds #####
+        'ammonia': ('NH4OH',), # NH4OH
+        'caustic_R502': ('NaOH',),
+        'CSL': ('CSL',),
+        'enzyme_M301': ('Enzyme',),
+        'ethanol': ('Ethanol',),
+        'feedstock': ('CornStover', (1-0.2)), # adjust for the moisture content
+        'lime': ('Lime',),
+        'lime_CHP': ('Lime',),
+        'natural_gas': ('CH4',),
+        # 'polymer_R502': ('Polymer',), #!!! maybe add as Flocculant?
+        'sulfuric_acid': ('H2SO4', 0.93), # H2SO4 and water
+        ##### Co-products #####
+        # following the lactic paper baseline, gypsum not included
+        }
     sys_dct = {
         # 'load': {'print_results': False}, # need to run `simulate_and_print` for results to match
         'system_name': 'lactic_sys',
         'create_wastewater_process': wwt_kwdct,
         'BT': 'CHP',
         'new_wwt_connections': {'sludge': ('M601', 0), 'biogas': ('CHP', 1)},
+        'CF_dct': CF_dct,
         }
-    exist_sys, new_sys = create_comparison_systems(info, la, sys_dct, from_load=True)
+    exist_sys, new_sys = create_comparison_systems(info, la, sys_dct)
     return exist_sys, new_sys
 
 

@@ -32,18 +32,34 @@ def create_sc1g_comparison_systems(default_BD=True):
     BD = {} if not default_BD else 1.
     wwt_kwdct = dict.fromkeys(('IC_kwargs', 'AnMBR_kwargs',), {'biodegradability': BD,})
     wwt_kwdct['skip_AeF'] = True
+    CF_dct = {
+        ##### Feeds #####
+        'denaturant': ('Denaturant'),
+        'dryer_natural_gas': ('CH4',),
+        'H3PO4': ('H3PO4', 0.5), # H3PO4 and water
+        'lime': ('CaO', 0.046), # CaO and water
+        'polymer': ('Flocculant'),
+        'sugarcane': ('Sugarcane', (1-0.7)), # adjust for the moisture content
+        'Yeast': ('Yeast',), #!!! not pure yeast, need to consider
+        ##### Co-products #####
+        # `fiber_fines`, `wastewater`, `vinasse` taken care of by WWT
+        # `filter_cake` taken care of by BT
+        # `s41` (from `T302`) is empty
+        }
     sys_dct = {
         'load': {'name': 'S1', 'cache': None, 'reduce_chemicals': False},
         'system_name': 'oilcane_sys',
         'create_wastewater_process': wwt_kwdct,
-        # `vinasse`, `fiber_fines`,
-        # not using `wastewater` as it contains `evaporator_condensate` (all water)
-        'ww_streams': (('H302', 1), ('U211', 1)),
+        # `fiber_fines`, `vinasse`
+        # `wastewater` is mixed from `fiber_fines` (taken care of),
+        # `stripper_bottoms_product` (~20 mg/L COD), and `evaporator_condensate` (only water)
+        'ww_streams': (('U211', 1), ('H302', 1)),
         'solids_streams': (('U207', 0), ('U210', 0)), # `bagasse`, `filter_cake`
         'BT': 'BT401',
         'new_wwt_connections': {'solids': ('BT401', 0), 'biogas': ('BT401', 1)},
+        'CF_dct': CF_dct,
         }
-    exist_sys, new_sys = create_comparison_systems(info, oc, sys_dct, from_load=True)
+    exist_sys, new_sys = create_comparison_systems(info, oc, sys_dct)
     return exist_sys, new_sys
 
 

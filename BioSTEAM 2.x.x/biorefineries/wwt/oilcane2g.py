@@ -29,14 +29,37 @@ info = {
 def create_oc2g_comparison_systems(default_BD=True):
     from biorefineries.wwt import create_comparison_systems
     from biorefineries import oilcane as oc
-    BD = {} if not default_BD else 1.
+    BD = {} if not  default_BD else 1.
     wwt_kwdct = dict.fromkeys(('IC_kwargs', 'AnMBR_kwargs',), {'biodegradability': BD,})
+    CF_dct = {
+        ##### Feeds #####
+        'catalyst': ('TEcatalyst',), # methanol and NaOCH3
+        'caustic': ('caustic', 0.5), # NaOH and water
+        'cellulase': ('cellulase', 0.05), # cellulase and water
+        'CSL': ('CSL',),
+        'DAP': ('DAP',),
+        'denaturant': ('Denaturant'),
+        'FGD_lime': ('Lime', 0.4513), # lime and water
+        'H3PO4': ('H3PO4', 0.5), # H3PO4 and water
+        'HCl': ('HCl', 0.3498), # HCl and water
+        'lime': ('CaO', 0.046), # CaO and water
+        'methanol': ('Methanol', 1), # CaO and water
+        'NaOH': ('NaOH',),
+        'natural_gas': ('CH4',),
+        'oilcane': ('Oilcane', (1-0.7)), # adjust for the moisture content
+        'polymer': ('Flocculant',),
+        'pure_glycerine': ('Glycerol',),
+        ##### Co-products #####
+        'biodiesel': ('Biodiesel',), # has <0.01 wt% impurities
+        'crude_glycerol': ('Glycerol', 0.8), # glycerol and water #!!! need to see if there's a CF for crude glycerol
+        }
     sys_dct = {
         'load': {'name': 'O2', 'cache': None, 'reduce_chemicals': False},
         'system_name': 'oilcane_sys',
         'create_wastewater_process': wwt_kwdct,
         'BT': 'BT701',
         'new_wwt_connections': {'sludge': ('M701', 0), 'biogas': ('BT701', 1)},
+        'CF_dct': CF_dct,
         }
     exist_sys, new_sys = create_comparison_systems(info, oc, sys_dct, from_load=True)
     return exist_sys, new_sys

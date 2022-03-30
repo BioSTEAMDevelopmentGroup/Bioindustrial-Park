@@ -149,7 +149,8 @@ def create_comparison_systems(info, functions, sys_dct={}):
         update_product_prices(exist_s)
         update_product_prices(new_s)
 
-    for reg in (exist_s, new_s): add_CFs(reg, kwdct['stream_CF_dct'])
+    for (s_reg, u_reg) in zip((exist_s, new_s), (exist_u, new_u)):
+        add_CFs(s_reg, u_reg, kwdct['stream_CF_dct'])
 
     return exist_sys, new_sys
 

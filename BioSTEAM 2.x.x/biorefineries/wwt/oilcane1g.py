@@ -32,19 +32,41 @@ def create_oc1g_comparison_systems(default_BD=True):
     BD = {} if not default_BD else 1.
     wwt_kwdct = dict.fromkeys(('IC_kwargs', 'AnMBR_kwargs',), {'biodegradability': BD,})
     wwt_kwdct['skip_AeF'] = True
+    CF_dct = {
+        ##### Feeds #####
+        'catalyst': ('TEcatalyst',), # methanol and NaOCH3
+        'denaturant': ('Denaturant'),
+        'dryer_natural_gas': ('CH4',),
+        'H3PO4': ('H3PO4', 0.5), # H3PO4 and water
+        'HCl': ('HCl', 0.3498), # HCl and water
+        'lime': ('CaO', 0.046), # CaO and water
+        'methanol': ('Methanol',),
+        'NaOH': ('NaOH',),
+        'natural_gas': ('CH4',), # probably not needed
+        'oilcane': ('Oilcane', (1-0.7)), # adjust for the moisture content
+        'polymer': ('Flocculant'),
+        'pure_glycerine': ('Glycerol',),
+        ##### Co-products #####
+        'biodiesel': ('Biodiesel',), # has <0.01 wt% impurities
+        'crude_glycerol': ('Glycerol', 0.8), # glycerol and water #!!! need to see if there's a CF for crude glycerol
+        'Yeast': ('Yeast',), #!!! not pure yeast, need to consider
+        # `fiber_fines`, `wastewater`, `vinasse` taken care of by WWT
+        # `filter_cake` taken care of by BT
+        # `s46` (from `T302`) is empty
+        }
     sys_dct = {
         'load': {'name': 'O1', 'cache': None, 'reduce_chemicals': False},
         'system_name': 'oilcane_sys',
         'BT': 'BT701',
         'create_wastewater_process': wwt_kwdct,
-        # `vinasse`, `wastewater`, `fiber_fines`,
-        # COD of `evaporator_condensate` is only ~20 mg/L
-        'ww_streams': (('M403', 0), ('M603', 0), ('U206', 1)),
-        'solids_streams': (('M701', 0), ('U205', 0)), # the second one is `filter_cake`
+        # `fiber_fines`, `wastewater`, `vinasse`
+        'ww_streams': (('U206', 1), ('M603', 0), ('M403', 0),),
+        'solids_streams': (('U205', 0), ('M701', 0),), # the first one is `filter_cake`
         'BT': 'BT701',
         'new_wwt_connections': {'solids': ('BT701', 0), 'biogas': ('BT701', 1)},
+        'CF_dct': CF_dct,
         }
-    exist_sys, new_sys = create_comparison_systems(info, oc, sys_dct, from_load=True)
+    exist_sys, new_sys = create_comparison_systems(info, oc, sys_dct)
     return exist_sys, new_sys
 
 

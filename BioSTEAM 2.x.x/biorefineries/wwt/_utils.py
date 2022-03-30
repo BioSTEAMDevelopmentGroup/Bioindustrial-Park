@@ -42,8 +42,9 @@ __all__ = (
     'remove_undefined_chemicals', 'get_split_dct',
     'kph_to_tpd',
     'rename_storage_units',
-    # Prices
+    # TEA/LCA
     'prices', 'update_product_prices', 'IRR_at_ww_price', 'ww_price_at_IRR', 'get_MPSP',
+    'add_CFs',
     )
 
 
@@ -500,7 +501,7 @@ def rename_storage_units(sys, storage):
 # %%
 
 # =============================================================================
-# Price
+# Related to techno-economic analysis (TEA)
 # =============================================================================
 
 _lb_per_kg = 0.4536 # auom('lb').conversion_factor('kg')
@@ -573,3 +574,91 @@ def get_MPSP(system, product='ethanol', print_msg=True):
     price = tea.solve_price(product) * factor
     if print_msg: print(f'\n{txt[0]} of {product.ID} for {system.ID}: ${price:.2f}/{txt[1]}.')
     return price
+
+
+# %%
+
+# =============================================================================
+# Related to life cycle assessment (LCA)
+# =============================================================================
+
+# 100-year global warming potential (GWP) in kg CO2-eq/kg dry material,
+# all data from GREET 2020 unless otherwise noted
+# Direct emissions from fossil-derived materials (e.g., CO2 from CH4) included
+
+# North America, from shale and conventional recovery
+ng_CF = 0.33 + 1/16.04246*44.0095
+
+# Gasoline blendstock from crude oil for use in US refineries, modeled as octane
+denaturant_CF = 0.84 + 1/114.22852*44.0095*8
+
+##### Chemicals used in the new WWT process #####
+# CFs for NaOCl, citric acid, and bisulfite from ecoinvent 3.7.1,
+# allocation at the point of substitution
+
+# Market for sodium hypochlorite, without water, in 15% solution state, RoW,
+# converted to 12.5 wt% solution (15 vol%)
+naocl_CF = 2.5165 * 0.125
+
+# Market for citric acid, GLO
+citric_acid_CF = 5.9272
+
+# Sodium hydrogen sulfite production, RoW,
+# converted to 38% solution
+bisulfite_CF = 1.3065 * 0.38
+
+#!!! Need to add ones for the other biorefineries,
+#!!! want to do an update with consistent data source
+XXX = 0
+GWP_CFs = {
+    ##### Feeds #####
+    'AlphaAmylase': XXX,
+    'Bisulfite': bisulfite_CF,
+    'CaO': 1.29,
+    'Cellulase': 2.24,
+    'CH4': ng_CF,
+    'CitricAcid': citric_acid_CF,
+    'Corn': XXX,
+    'CornStover': 0.10945,
+    'CSL': 1.55,
+    'DAP': XXX,
+    'Denaturant': denaturant_CF,
+    'Electricity': 0.48, #!!! feeds and products
+    'Ethanol': 1.44 + 1/46.06844*44.0095*2, # CO2 emission included
+    'Flocculant': XXX,
+    'GlucoAmylase': XXX,
+    'Glycerol': XXX, #!!! feeds and products
+    'H2SO4': 0.04344,
+    'H3PO4': XXX,
+    'HCl': XXX,
+    'Methanol': XXX + 1/32.04186*44.0095,
+    'NaOCH3': XXX + 1/54.02369*44.0095,
+    'NaOCl': naocl_CF,
+    'NaOH': 2.11,
+    'NH3': 2.64,
+    'Sugarcane': XXX,
+    'Yeast': XXX, #!!! feeds and products #!!! need to see if they are pure
+    ##### Products #####
+    'Biodiesel': XXX,
+    'CornOil': XXX,
+    'DDGS': XXX, #!!! this is a mixture
+    }
+# All feeds
+GWP_CFs['Lime'] = GWP_CFs['CaO'] * 56.0774/74.093 # CaO to Ca(OH)2
+GWP_CFs['NH4OH'] = GWP_CFs['NH3'] * 0.4860 # NH3 to NHOH
+GWP_CFs['Oilcane'] = GWP_CFs['Sugarcane'] # oilcane assumed to be the same as sugarcane
+# Transesterification catalyst, mixture of methanol and NaOCH3
+GWP_CFs['TEcatalyst'] = GWP_CFs['Methanol']*0.75 + GWP_CFs['NaOCH3']*0.25
+
+def add_CFs(stream_registry, unit_registry, stream_CF_dct):
+    for ID, key_factor in stream_CF_dct.items():
+        stream = stream_registry.search(ID) if isinstance(ID, str) \
+            else unit_registry.search(ID[0]).outs[ID[1]]
+        try:
+            iter(key_factor)
+            if isinstance(key_factor, str): key_factor = (key_factor,)
+        except:
+            key_factor = (key_factor,)
+        key, factor = (key_factor, 1.) if len(key_factor) == 1 else key_factor
+        stream.characterization_factors['GWP'] = GWP_CFs[key]*factor
+    bst.PowerUtility.characterization_factors['GWP'] = GWP_CFs['Electricity']

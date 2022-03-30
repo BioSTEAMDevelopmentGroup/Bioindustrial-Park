@@ -426,7 +426,6 @@ def add_parameters(model, model_dct, f, u, s, get_obj):
     return model
 
 
-
 # %%
 
 # =============================================================================
@@ -456,7 +455,7 @@ def add_metrics(model, model_dct, f, u, s, get_obj):
     gal_or_kg = 'gal' if product.ID=='ethanol' else 'kg'
     factor = 2.9867 if product.ID=='ethanol' else 1. # factor is cs.ethanol_density_kggal
 
-    metrics0, metrics1, metrics = [], [], []
+    metrics = []
     ww = s.search('ww')
     if ww: # product price without wastewater treatment, IRR sometimes has two solutions so use price
         def get_product_price_no_ww():
@@ -464,14 +463,13 @@ def add_metrics(model, model_dct, f, u, s, get_obj):
             ww.price = 0
             price = tea.solve_price(product)
             ww.price = ww_price
-            return price*factor
-        metrics1 = [
+            return price * factor
+        metrics0 = [ # this should be the same as the "MPSP no WW" calculated from the new system
             Metric('MPSP no WW', get_product_price_no_ww, f'$/{gal_or_kg}'),
             ]
     else:
         isa = isinstance
         if wwt_system.ID == 'exist_sys_wwt':
-            metrics1 = []
             if not model_dct['FERM_product'] == 'lactic_acid':
                 for WWTC in wwt_system.units:
                     if isa(WWTC, WastewaterSystemCost): break
@@ -480,8 +478,9 @@ def add_metrics(model, model_dct, f, u, s, get_obj):
                     if isa(RO, ReverseOsmosis): break
                 ww_out = RO.ins[0]
             else:
-                ww_in = u.search('M501').outs[0]
-                ww_out = u.search('S505').ins[0]
+                ww_in = u.M501.outs[0]
+                ww_out = u.S505.ins[0]
+            metrics0 = []
         else:
             X = model_dct['new_wwt_ID']
             UX01 = u.search(f'U{X}01')
@@ -495,12 +494,11 @@ def add_metrics(model, model_dct, f, u, s, get_obj):
             ww_out = SX04.ins[0]
             sludge = get_obj(s, 'sludge')
             solids_mixer = sludge.sink
+            solids_idx = sludge.get_connection().sink_index
             biogas = get_obj(s, 'biogas')
             biogas_idx = biogas.get_connection().sink_index
             BT = get_obj(u, 'BT')
             sludge_dummy = Stream('sludge_dummy')
-            solids_mixer = sludge.sink
-            solids_idx = sludge.get_connection().sink_index
             biogas_dummy = Stream('biogas_dummy')
 
             # Product price without wastewater treatment
@@ -543,6 +541,8 @@ def add_metrics(model, model_dct, f, u, s, get_obj):
             def get_ww_price():
                 return UX01.cache_dct['WW price']
 
+            #!!! These aren't accurate (OK for almost 100% COD removal with 100% biodegradability)
+            # need to add COD loading in/out as kg/hr and calculate COD removal accordingly
             def get_cod_price_per_kg():
                 return UX01.cache_dct['COD price per kg']
 
@@ -551,8 +551,8 @@ def add_metrics(model, model_dct, f, u, s, get_obj):
                 UX01.cache_dct.clear() # make sure the data won't be carried into the next sample
                 return cod_price
 
-            metrics0 = [Metric('MPSP no WW', get_product_price_no_ww, f'$/{gal_or_kg}'),]
-            metrics1 = [
+            metrics0 = [
+                Metric('MPSP no WW', get_product_price_no_ww, f'$/{gal_or_kg}'),
                 Metric('WW price', get_ww_price, '¢/kg'),
                 Metric('COD price per kg', get_cod_price_per_kg, '¢/kg'),
                 Metric('COD price per ton', get_cod_price_per_ton, '$/ton'),
@@ -562,13 +562,18 @@ def add_metrics(model, model_dct, f, u, s, get_obj):
         metrics.extend([
             Metric('COD in', lambda: get_COD(ww_in)*1e3, 'mg/L'),
             Metric('COD out', lambda: get_COD(ww_out)*1e3, 'mg/L'),
+
+            #TODO: add COD loading
+            Metric('COD loading in', lambda: get_COD(ww_out)*1e3, 'mg/L'),
+            Metric('COD loading out', lambda: get_COD(ww_out)*1e3, 'mg/L'),
+
+            #!!! This isn't accurate, need to calculate based on loading
             Metric('COD removal', lambda: 1-get_COD(ww_out)/get_COD(ww_in), ''),
             ])
 
     metrics = ([
         Metric('MPSP', lambda: tea.solve_price(product)*factor, f'$/{gal_or_kg}'),
         *metrics0,
-        *metrics1,
         #!!! Need to add GWP
         # Metric('GWP', lambda: cs_wwt.get_GWP(sys), 'kg-CO2eq/gal'),
         *metrics,
