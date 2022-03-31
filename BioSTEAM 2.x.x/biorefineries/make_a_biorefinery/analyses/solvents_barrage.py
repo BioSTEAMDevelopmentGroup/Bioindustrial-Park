@@ -9,13 +9,15 @@ Created on Sat Jan 16 19:09:17 2021
 
 @author: sarangbhagwat
 """
-# %% Imports and chemicals initialization
+# %% Imports and setup
 
 import numpy as np
 import thermosteam as tmo
 import biosteam as bst
-import copy 
+# import copy 
 from matplotlib import pyplot as plt
+
+azeotrope_infeasible_recovery_identifier = 'cannot meet'
 
 #%% Default solvent IDs list
 solvent_IDs = [
@@ -56,7 +58,7 @@ def run_solvents_barrage(stream, # Stream from which you wish to extract the sol
                          T=None, # Temperature (K) at which you wish to run solvents barrage; temperature (K) of "stream" by default
                          solvent_IDs=solvent_IDs, # List of solvents to run the barrage for; defaults to a list of 25 common organic solvents
                          stream_modifiers='baseline_stream', # 'baseline_stream' to analyze the "stream" passed in arguments; 'impurity_free_stream' to remove the impurities listed in impurity_IDs before performing analyses; 'solute_in_pure_water' to analyze simply for the solute in pure water
-                         show_all_mixer_settlers=False,
+                         # show_all_mixer_settlers=False,
                          plot_Ks=True,
                          save_excel=True,
                          save_K_plots=True,
@@ -298,8 +300,27 @@ def run_solvents_barrage(stream, # Stream from which you wish to extract the sol
         try:
             d_az.simulate()
             return False
-        except:
-            return True
+        except RuntimeError as e:
+            if azeotrope_infeasible_recovery_identifier in str(e):
+                return True
+            else:
+                return 'Error: ' + str(e)
+        
+    def forms_azeotrope_with_solute(chem_ID):
+        d_az_in = tmo.Stream('d_az_in')
+        d_az_in.imol[solute_ID] = 100
+        d_az_in.imol[chem_ID] = 100
+        LHK = (chem_ID, solute_ID) if test_env_chems[chem_ID].Tb<test_env_chems[solute_ID].Tb else (solute_ID, chem_ID)
+        d_az = bst.BinaryDistillation('d_az', ins=d_az_in, LHK=LHK, k=1.2, Lr=0.99, Hr=0.99)
+        try:
+            d_az.simulate()
+            return False
+        except RuntimeError as e:
+            if azeotrope_infeasible_recovery_identifier in str(e):
+                return True
+            else:
+                return 'Error: ' + str(e)
+        
     # %% Run test barrage
     results_dict = {}
     solvent_mol = process_stream.ivol['Water']
@@ -381,7 +402,7 @@ def run_solvents_barrage(stream, # Stream from which you wish to extract the sol
     solvent_to_run = results_list[0][0]
     set_solvent(solvent_to_run)
     partition_data = dict(IDs=(solute_ID, 'Water', solvent_to_run,
-                                'GlucoseOligomer', 'SolubleLignin',), 
+                                impurity_IDs[0], impurity_IDs[1],), 
                 K=np.array([1./results_dict[solvent_to_run][1],
                             1/results_dict[solvent_to_run][2],
                             results_dict[solvent_to_run][3],
@@ -398,7 +419,7 @@ def run_solvents_barrage(stream, # Stream from which you wish to extract the sol
     #                                          outs = ('raffinate', 'extract'),
     #                                          N_stages = 15, partition_data = Kds,) 
     
-    if show_all_mixer_settlers:
+    if print_result_with_optimal_criterion:
         MS.simulate()
         MS.show(N=100, composition=True, flow='kg/hr')
     
@@ -419,6 +440,7 @@ def run_solvents_barrage(stream, # Stream from which you wish to extract the sol
         rn['Tb_solvent - Tb_water'] = result[1][4]
         rn['Tb_solvent - Tb_solute'] = result[1][7]
         rn['Forms azeotrope with water'] = forms_azeotrope_with_water(result[0])
+        rn['Forms azeotrope with solute'] = forms_azeotrope_with_solute(result[0])
         
     results_df = pd.DataFrame(compiled_results_dict)
     
@@ -488,4 +510,4 @@ def run_solvents_barrage(stream, # Stream from which you wish to extract the sol
     fig2 = ax2.get_figure()
     fig2.savefig(file_to_save+'___'+ 'Ks-impurities-solvent'+'.png', bbox_inches='tight')
     
-    # %% Get rough solubility in organic solvent vs T
+    return final_results_df
