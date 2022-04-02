@@ -158,7 +158,7 @@ class OilExtractionSpecification:
             self.isplit_efficiency['Oil'] = efficiency
     
     def load_oil_retention(self, oil_retention):
-        if self.isplit_efficiency is None: return
+        if self.isplit_oil_retention is None: return
         self.oil_retention = oil_retention
         self.isplit_oil_retention['Oil'] = oil_retention    
     
