@@ -10,8 +10,10 @@ from biosteam import Unit, Stream, settings, main_flowsheet
 
 #For unavailable chemicals
 def create_new_chemical(ID, phase = 's', **constants):
-       na_chemical = tmo.Chemical(ID, search_db=False,
-                                  phase=phase, **constants)
+       na_chemical = tmo.Chemical(ID,
+                                  search_db=False,
+                                  phase=phase,
+                                  **constants)
        ozo_chemicals.append(na_chemical)
        return na_chemical
 
