@@ -29,6 +29,7 @@ solvent_IDs = [
                 'Propyl acetate',
                 'Butyl acetate',
                 'Hexanol',
+                'Hexane',
                 'Cyclohexanol',
                 'Cyclohexanone',
                 'Heptanol',
@@ -296,7 +297,7 @@ def run_solvents_barrage(stream, # Stream from which you wish to extract the sol
         d_az_in.imol['Water'] = 100
         d_az_in.imol[chem_ID] = 100
         LHK = (chem_ID, 'Water') if test_env_chems[chem_ID].Tb<test_env_chems['Water'].Tb else ('Water', chem_ID)
-        d_az = bst.BinaryDistillation('d_az', ins=d_az_in, LHK=LHK, k=1.2, Lr=0.99, Hr=0.99)
+        d_az = bst.BinaryDistillation('d_az', ins=d_az_in, LHK=LHK, k=1.2, Lr=0.99, Hr=0.99, P=101325./10.)
         try:
             d_az.simulate()
             return False
@@ -311,7 +312,7 @@ def run_solvents_barrage(stream, # Stream from which you wish to extract the sol
         d_az_in.imol[solute_ID] = 100
         d_az_in.imol[chem_ID] = 100
         LHK = (chem_ID, solute_ID) if test_env_chems[chem_ID].Tb<test_env_chems[solute_ID].Tb else (solute_ID, chem_ID)
-        d_az = bst.BinaryDistillation('d_az', ins=d_az_in, LHK=LHK, k=1.2, Lr=0.99, Hr=0.99)
+        d_az = bst.BinaryDistillation('d_az', ins=d_az_in, LHK=LHK, k=1.2, Lr=0.99, Hr=0.99, P=101325./10.)
         try:
             d_az.simulate()
             return False

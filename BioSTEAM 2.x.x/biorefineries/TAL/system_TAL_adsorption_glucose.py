@@ -868,6 +868,8 @@ for ui in u:
         ui.ID = 'CWP802' # group with CT for system cooling demand
         break
 unit_groups = bst.UnitGroup.group_by_area(TAL_sys.units)
+unit_groups.append(bst.UnitGroup('natural gas'))
+
 for i, j in zip(unit_groups, area_names): i.name = j
 for i in unit_groups: i.autofill_metrics(shorthand=True, 
                                          electricity_production=True, 
@@ -1071,7 +1073,9 @@ def TEA_breakdown(print_output=False):
                     metric_breakdowns[metric.name]['storage and ' + ug.name] = metric() + unit_groups_dict['storage'].metrics[ug.metrics.index(metric)]()
                 else:
                     metric_breakdowns[metric.name][ug.name] = metric()
-            
+            if ug.name=='natural gas':
+                if metric.name=='Mat. cost':
+                    metric_breakdowns[metric.name][ug.name] = BT.natural_gas.F_mass*BT.natural_gas_price
             # else:
             #     storage_metric_val = metric()
                 
