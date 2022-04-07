@@ -178,18 +178,20 @@ Chemicals:
   Xylobiose:
    search_db: False 
    formula: C10H18O9
-   Tb: 1068.88
-   Tm: 632.07
-   Tc: 1330.57 
-   Pc: 4762809.70
-   Vc: 0.0006295
+   phase: liquid
+   # Tb: 1068.88
+   # Tm: 632.07
+   # Tc: 1330.57 
+   # Pc: 4762809.70
+   # Vc: 0.0006295
    Hf: -1572730.
    Hfus: 53426.
+   default: True
   # Inhibitors
   Furfural:
     search_ID: 98-01-1
   HMF:
-    phase_ref: 'liquid'
+    phase_ref: liquid
     search_ID: 67-47-0 # Missing data, must be altered in code later
   # Other
   Ash:
