@@ -363,5 +363,3 @@ class FireWaterTank(Unit): pass
 
 class SugarsMixer(Mixer):
     _N_ins = 3
-
-

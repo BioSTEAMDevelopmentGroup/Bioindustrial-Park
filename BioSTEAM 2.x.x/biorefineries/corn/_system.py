@@ -26,7 +26,7 @@ SACCHARIFICATION_SULFURIC_ACID_LOADING = 0.001 # g Enzyme / g dry Corn
 SACCHARIFICATION_GLUCO_AMYLASE_LOADING = 0.002 # g H2SO4 / g dry Corn
 SCRUBBER_WASH_WATER_OVER_VENT = 1.21 # g Water / g Vent
 
-def create_system(ID='corn_sys'):
+def create_system(ID='corn_sys', flowsheet=None):
     ### Streams ###
     
     chemicals = bst.settings.get_chemicals()
@@ -179,7 +179,7 @@ def create_system(ID='corn_sys'):
             'Distillation bottoms product pump': 'P508',
         }
     )
-    f = cn.flowsheet
+    f = flowsheet or cn.flowsheet
     fu = f.unit
     fu.X504.approx_duty = False
     fu.T501.Rmin = 0.0001

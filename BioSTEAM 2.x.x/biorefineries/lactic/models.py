@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# BioSTEAM: The Biorefinery Simulation and Techno-Economic Analysis Modules
-# Copyright (C) 2020-2021, Yoel Cortes-Pena <yoelcortes@gmail.com>
 # Bioindustrial-Park: BioSTEAM's Premier Biorefinery Models and Results
-# Copyright (C) 2020-2021, Yalin Li <yalinli2@illinois.edu>,
-# Sarang Bhagwat <sarangb2@illinois.edu>, and Yoel Cortes-Pena (this biorefinery)
+# Copyright (C) 2020-, Yalin Li <zoe.yalin.li@gmail.com>,
+#                      Sarang Bhagwat <sarangb2@illinois.edu>,
+#                      Yoel Cortes-Pena <yoelcortes@gmail.com>
 #
 # This module is under the UIUC open-source license. See
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
@@ -17,15 +16,10 @@
 # Setup
 # =============================================================================
 
-import numpy as np
-import biosteam as bst
+import numpy as np, biosteam as bst
 from biosteam.evaluation import Model, Metric
 from chaospy import distributions as shape
-from ._settings import CFs
-from ._utils import set_yield, _feedstock_factor
-from .systems import simulate_and_print, \
-    SSCF_flowsheet, SSCF_groups, SSCF_teas, SSCF_funcs, \
-    SHF_flowsheet, SHF_groups, SHF_teas, SHF_funcs
+from . import get_CFs, create_system, set_yield, feedstock_factor
 
 __all__ = ('create_model',)
 
@@ -37,25 +31,13 @@ __all__ = ('create_model',)
 # =============================================================================
 
 def create_model(kind='SSCF'):
-    if 'SSCF' in str(kind).upper():
-        flowsheet = SSCF_flowsheet
-        groups = SSCF_groups
-        teas = SSCF_teas
-        funcs = SSCF_funcs
-    elif 'SHF' in str(kind).upper():
-        flowsheet = SHF_flowsheet
-        groups = SHF_groups
-        teas = SHF_teas
-        funcs = SHF_funcs
-    else:
-        raise ValueError(f'kind can only be "SSCF" or "SHF", not {kind}.')
-
+    flowsheet, groups, teas, funcs = create_system(kind, return_all=True)
+    CFs = get_CFs()
     bst.main_flowsheet.set_flowsheet(flowsheet)
     s = flowsheet.stream
     u = flowsheet.unit
     sys = flowsheet.system
 
-    simulate_and_print(kind)
     # =============================================================================
     # Overall biorefinery metrics
     # =============================================================================
@@ -408,7 +390,7 @@ def create_model(kind='SSCF'):
     @param(name='Feedstock unit price', element='TEA', kind='isolated', units='$/dry-ton',
            baseline=71.3, distribution=D)
     def set_feedstock_price(price):
-        feedstock.price = price / _feedstock_factor
+        feedstock.price = price / feedstock_factor
 
     sulfuric_acid = s.sulfuric_acid
     D = shape.Triangle(0.0910, 0.0948, 0.1046)
@@ -445,10 +427,10 @@ def create_model(kind='SSCF'):
     ######################## Pretreatment parameters ########################
     M202 = u.M202
     D = shape.Triangle(0.25, 0.3, 0.4)
-    @param(name='Pretreatment solid loading', element=M202, kind='coupled', units='%',
+    @param(name='Pretreatment solids loading', element=M202, kind='coupled', units='%',
            baseline=0.3, distribution=D)
-    def set_pretreatment_solid_loading(loading):
-        M202.solid_loading = loading
+    def set_pretreatment_solids_loading(loading):
+        M202.solids_loading = loading
 
     T201 = u.T201
     D = shape.Triangle(10, 22.1, 35)
@@ -474,10 +456,10 @@ def create_model(kind='SSCF'):
     ######################## Conversion parameters ########################
     M301 = u.M301
     D = shape.Triangle(0.175, 0.2, 0.25)
-    @param(name='Enzymatic hydrolysis solid loading', element=M301, kind='coupled', units='%',
+    @param(name='Enzymatic hydrolysis solids loading', element=M301, kind='coupled', units='%',
            baseline=0.2, distribution=D)
-    def set_R301_solid_loading(loading):
-        M301.solid_loading = loading
+    def set_R301_solids_loading(loading):
+        M301.solids_loading = loading
 
     D = shape.Triangle(10, 20, 30)
     @param(name='Enzyme loading', element=M301, kind='coupled', units='mg/g',

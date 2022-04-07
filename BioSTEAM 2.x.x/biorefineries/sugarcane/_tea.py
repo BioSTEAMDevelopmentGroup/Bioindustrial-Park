@@ -65,7 +65,7 @@ class ConventionalEthanolTEA(bst.TEA):
     """
     __slots__ = ('labor_cost', 'fringe_benefits', 'maintenance',
                  'property_tax', 'property_insurance', '_FCI_cached',
-                 'supplies', 'maintanance', 'administration')
+                 'supplies', 'maintenance', 'administration')
     
     def __init__(self, system, IRR, duration, depreciation, income_tax,
                  operating_days, lang_factor, construction_schedule, WC_over_FCI,

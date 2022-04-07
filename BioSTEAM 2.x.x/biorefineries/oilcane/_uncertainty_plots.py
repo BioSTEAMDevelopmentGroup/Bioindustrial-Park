@@ -178,13 +178,13 @@ mc_derivative_metric_settings = {
     'GWP_economic': (GWP_ethanol_derivative, r"$\Delta$" + r"GWP $\cdot \Delta \mathrm{OC}^{-1}$" f"\n[{GWP_units_gal.replace('kg','g')}]", 1000),
 }
 
-for dct in (mc_metric_settings, mc_comparison_settings, mc_derivative_metric_settings):
-    for i, j in dct.copy().items(): dct[j[0]] = j
+# for dct in (mc_metric_settings, mc_comparison_settings, mc_derivative_metric_settings):
+#     for i, j in dct.copy().items(): dct[j[0]] = j
     
 # %% Plots for publication
 
 def plot_all():
-    plot_montecarlo_main_manuscript()
+    # plot_montecarlo_main_manuscript()
     plot_montecarlo_absolute()
     plot_spearman_tea()
     plot_spearman_lca()
@@ -226,8 +226,9 @@ def plot_montecarlo_main_manuscript():
     add_title(gs_configuration_comparison, '(II) Impact of cellulosic ethanol integration')
     add_title(gs_agile_comparison, '(III) Impact of\noilsorghum\nintegration')
     plt.show()
-    file = os.path.join(images_folder, 'montecarlo_main_manuscript.svg')
-    plt.savefig(file, transparent=True)
+    for i in ('svg', 'png'):
+        file = os.path.join(images_folder, f'montecarlo_main_manuscript.{i}')
+        plt.savefig(file, transparent=True)
 
 def plot_montecarlo_feedstock_comparison(axes_box=None, letters=None, 
                                          single_column=True):
@@ -277,8 +278,9 @@ def plot_montecarlo_feedstock_comparison(axes_box=None, letters=None,
         #              fontsize=8)
     if axes_box is None:
         plt.subplots_adjust(right=0.96, left=left, wspace=0.38, top=0.98, bottom=bottom)
-        file = os.path.join(images_folder, 'montecarlo_feedstock_comparison.svg')
-        plt.savefig(file, transparent=True)
+        for i in ('svg', 'png'):
+            file = os.path.join(images_folder, f'montecarlo_feedstock_comparison.{i}')
+            plt.savefig(file, transparent=True)
 
     
 def plot_montecarlo_configuration_comparison(axes_box=None, letters=None,
@@ -328,8 +330,9 @@ def plot_montecarlo_configuration_comparison(axes_box=None, letters=None,
                  fontsize=12, fontweight='bold')
     if axes_box is None:
         plt.subplots_adjust(right=0.96, left=left, wspace=0.38, top=0.98, bottom=bottom)
-        file = os.path.join(images_folder, 'montecarlo_configuration_comparison.svg')
-        plt.savefig(file, transparent=True)
+        for i in ('svg', 'png'):
+            file = os.path.join(images_folder, f'montecarlo_configuration_comparison.{i}')
+            plt.savefig(file, transparent=True)
     
 def plot_montecarlo_agile_comparison(axes_box=None, letters=None):
     if axes_box is None:
@@ -358,8 +361,9 @@ def plot_montecarlo_agile_comparison(axes_box=None, letters=None):
                       fontsize=8)
     if axes_box is None:
         plt.subplots_adjust(right=0.9, left=0.2, wspace=0.5, top=0.98, bottom=0.15)
-        file = os.path.join(images_folder, 'montecarlo_agile_comparison.svg')
-        plt.savefig(file, transparent=True)
+        for i in ('svg', 'png'):
+            file = os.path.join(images_folder, f'montecarlo_agile_comparison.{i}')
+            plt.savefig(file, transparent=True)
     
 def plot_montecarlo_derivative():
     set_font(size=8)
@@ -396,8 +400,9 @@ def plot_montecarlo_derivative():
         top=0.95, bottom=0.1,
         left=0.12, right=0.96
     )
-    file = os.path.join(images_folder, 'montecarlo_derivative.svg')
-    plt.savefig(file, transparent=True)
+    for i in ('svg', 'png'):
+        file = os.path.join(images_folder, f'montecarlo_derivative.{i}')
+        plt.savefig(file, transparent=True)
 
 def plot_montecarlo_absolute():
     set_font(size=8)
@@ -422,8 +427,9 @@ def plot_montecarlo_absolute():
                  horizontalalignment='center',verticalalignment='center',
                  fontsize=12, fontweight='bold')
     plt.subplots_adjust(left=0.12, right=0.95, wspace=0.40, top=0.98, bottom=0.2)
-    file = os.path.join(images_folder, 'montecarlo_absolute.svg')
-    plt.savefig(file, transparent=True)
+    for i in ('svg', 'png'):
+        file = os.path.join(images_folder, f'montecarlo_absolute.{i}')
+        plt.savefig(file, transparent=True)
     
 def plot_spearman_tea():
     set_font(size=8)
@@ -437,12 +443,13 @@ def plot_spearman_tea():
             'Conventional', 'Agile-Conventional',
             'Cellulosic', 'Agile-Cellulosic',
         ],
-        cutoff=0.03,
+        cutoff=0.025,
         kind='TEA',
     )
     plt.subplots_adjust(left=0.45, right=0.975, top=0.98, bottom=0.08)
-    file = os.path.join(images_folder, 'spearman_tea.svg')
-    plt.savefig(file, transparent=True)
+    for i in ('svg', 'png'):
+        file = os.path.join(images_folder, f'spearman_tea.{i}')
+        plt.savefig(file, transparent=True)
 
 def plot_spearman_lca():
     set_font(size=8)
@@ -460,8 +467,9 @@ def plot_spearman_lca():
         kind='LCA',
     )
     plt.subplots_adjust(left=0.45, right=0.975, top=0.98, bottom=0.10)
-    file = os.path.join(images_folder, 'spearman_lca.svg')
-    plt.savefig(file, transparent=True)
+    for i in ('svg', 'png'):
+        file = os.path.join(images_folder, f'spearman_lca.{i}')
+        plt.savefig(file, transparent=True)
 
 def plot_breakdowns():
     set_font(size=8)
@@ -482,9 +490,9 @@ def plot_breakdowns():
         plt.text((xlb + xub) * 0.5, ylb + (yub - ylb) * 1.2, letter, color=letter_color,
                   horizontalalignment='center',verticalalignment='center',
                   fontsize=12, fontweight='bold')
-    
-    file = os.path.join(images_folder, 'breakdowns.svg')
-    plt.savefig(file, transparent=True)
+    for i in ('svg', 'png'):
+        file = os.path.join(images_folder, f'breakdowns.{i}')
+        plt.savefig(file, transparent=True)
 
 # %% Monte carlo values for manuscript
 
@@ -615,13 +623,15 @@ def plot_kde(name, metrics=(GWP_ethanol, MFPP), xticks=None, yticks=None,
              top_right='Tradeoff', bottom_left='Tradeoff',
              bottom_right=''):
     set_font(size=8)
-    set_figure_size(width='half', aspect_ratio=0.80)
+    set_figure_size(width='half', aspect_ratio=1.20)
     Xi, Yi = [i.index for i in metrics]
     df = oc.get_monte_carlo(name, metrics)
+    y = df[Yi].values
+    x = df[Xi].values
     # print(df[Xi].min(), df[Xi].max())
     # print(df[Yi].min(), df[Yi].max())
     ax = bst.plots.plot_kde(
-        y=df[Yi], x=df[Xi], xticks=xticks, yticks=yticks,
+        y=y, x=x, xticks=xticks, yticks=yticks,
         xticklabels=True, yticklabels=True,
         xbox_kwargs=xbox_kwargs or dict(light=CABBI_colors.orange.RGBn, dark=CABBI_colors.orange.shade(60).RGBn),
         ybox_kwargs=ybox_kwargs or dict(light=CABBI_colors.blue.RGBn, dark=CABBI_colors.blue.shade(60).RGBn),
@@ -636,21 +646,42 @@ def plot_kde(name, metrics=(GWP_ethanol, MFPP), xticks=None, yticks=None,
     xlb, xub = plt.xlim()
     ylb, yub = plt.ylim()
     xpos = lambda x: xlb + (xub - xlb) * x
+    # xlpos = lambda x: xlb * (1 - x)
     ypos = lambda y: ylb + (yub - ylb) * y
+    y_mt_0 = y > 0
+    y_lt_0 = y < 0
+    x_mt_0 = x > 0
+    x_lt_0 = x < 0
+    xleft = 0.02
+    xright = 0.98
+    ytop = 0.94
+    ybottom = 0.02
     if yub > 0. and xlb < 0.:
-        plt.text(xpos(0.02), ypos(0.94), top_left, color=CABBI_colors.teal.shade(50).RGBn,
+        if top_left.endswith('()'):
+            p = (y_mt_0 & x_lt_0).sum() / y.size
+            top_left = f"{p:.0%} {top_left.strip('()')}"
+        plt.text(xpos(xleft), ypos(ytop), top_left, color=CABBI_colors.teal.shade(50).RGBn,
                  horizontalalignment='left', verticalalignment='top',
                  fontsize=10, fontweight='bold', zorder=10)
     if ylb < 0. and xlb < 0.:
-        plt.text(xpos(0.02), ypos(0.02), bottom_left, color=CABBI_colors.grey.shade(75).RGBn,
+        if bottom_left.endswith('()'):
+            p = (y_lt_0 & x_lt_0).sum() / y.size
+            bottom_left = f"{p:.0%} {bottom_left.strip('()')}"
+        plt.text(xpos(xleft), ypos(ybottom), bottom_left, color=CABBI_colors.grey.shade(75).RGBn,
                  horizontalalignment='left', verticalalignment='bottom',
                  fontsize=10, fontweight='bold', zorder=10)
     if yub > 0. and xub > 0.:
-        plt.text(xpos(0.98), ypos(0.94), top_right, color=CABBI_colors.grey.shade(75).RGBn,
+        if top_right.endswith('()'):
+            p = (y_mt_0 & x_mt_0).sum() / y.size
+            top_right = f"{p:.0%} {top_right.strip('()')}"
+        plt.text(xpos(xright), ypos(ytop), top_right, color=CABBI_colors.grey.shade(75).RGBn,
                  horizontalalignment='right', verticalalignment='top',
                  fontsize=10, fontweight='bold', zorder=10)
     if ylb < 0. and xub > 0.:
-        plt.text(xpos(0.98), ypos(0.02), bottom_right, color=colors.red.shade(50).RGBn,
+        if bottom_right.endswith('()'):
+            p = (y_lt_0 & x_mt_0).sum() / y.size
+            bottom_right = f"{p:.0%} {bottom_right.strip('()')}"
+        plt.text(xpos(xright), ypos(ybottom), bottom_right, color=colors.red.shade(50).RGBn,
                  horizontalalignment='right', verticalalignment='bottom',
                  fontsize=10, fontweight='bold', zorder=10)
     plt.subplots_adjust(
@@ -661,7 +692,7 @@ def plot_kde(name, metrics=(GWP_ethanol, MFPP), xticks=None, yticks=None,
 
 def plot_kde_2d(name, metrics=(GWP_ethanol, MFPP), xticks=None, yticks=None,
                 top_left='', top_right='Tradeoff', bottom_left='Tradeoff',
-                bottom_right='', ybox_kwargs=None):
+                bottom_right='', ybox_kwargs=None, titles=None):
     set_font(size=8)
     set_figure_size(aspect_ratio=0.65)
     if isinstance(name, str): name = (name,)
@@ -676,6 +707,10 @@ def plot_kde_2d(name, metrics=(GWP_ethanol, MFPP), xticks=None, yticks=None,
         ybox_kwargs=[ybox_kwargs or dict(light=CABBI_colors.blue.RGBn, dark=CABBI_colors.blue.shade(60).RGBn)],
     )
     M, N = axes.shape
+    xleft = 0.02
+    xright = 0.98
+    ytop = 0.94
+    ybottom = 0.02
     for i in range(M):
         for j in range(N):
             ax = axes[i, j]
@@ -689,42 +724,87 @@ def plot_kde_2d(name, metrics=(GWP_ethanol, MFPP), xticks=None, yticks=None,
             xlb, xub = plt.xlim()
             ylb, yub = plt.ylim()
             xpos = lambda x: xlb + (xub - xlb) * x
+            # xlpos = lambda x: xlb * (1 - x)
             ypos = lambda y: ylb + (yub - ylb) * y
+            df = dfs[j]
+            x = df[Xi]
+            y = df[Yi]
+            y_mt_0 = y > 0
+            y_lt_0 = y < 0
+            x_mt_0 = x > 0
+            x_lt_0 = x < 0
             if yub > 0. and xlb < 0. and top_left:
-                plt.text(xpos(0.02), ypos(0.94), top_left, color=CABBI_colors.teal.shade(50).RGBn,
+                if top_left.endswith('()'):
+                    p = (y_mt_0 & x_lt_0).sum() / y.size
+                    top_left = f"{p:.0%} {top_left.strip('()')}"
+                    replacement = '()'
+                else:
+                    replacement = None
+                plt.text(xpos(xleft), ypos(ytop), top_left, color=CABBI_colors.teal.shade(50).RGBn,
                          horizontalalignment='left', verticalalignment='top',
                          fontsize=10, fontweight='bold', zorder=10)
-                top_left = None
+                top_left = replacement
             if ylb < 0. and xlb < 0. and bottom_left:
-                plt.text(xpos(0.02), ypos(0.02), bottom_left, color=CABBI_colors.grey.shade(75).RGBn,
+                if bottom_left.endswith('()'):
+                    p = (y_lt_0 & x_lt_0).sum() / y.size
+                    bottom_left = f"{p:.0%} {bottom_left.strip('()')}"
+                    replacement = '()'
+                else:
+                    replacement = None
+                plt.text(xpos(xleft), ypos(ybottom), bottom_left, color=CABBI_colors.grey.shade(75).RGBn,
                          horizontalalignment='left', verticalalignment='bottom',
                          fontsize=10, fontweight='bold', zorder=10)
-                bottom_left = None
+                bottom_left = replacement
             if yub > 0. and xub > 0. and top_right:
-                plt.text(xpos(0.98), ypos(0.94), top_right, color=CABBI_colors.grey.shade(75).RGBn,
+                if top_right.endswith('()'):
+                    p = (y_mt_0 & x_mt_0).sum() / y.size
+                    top_right = f"{p:.0%} {top_right.strip('()')}"
+                    replacement = '()'
+                else:
+                    replacement = None
+                plt.text(xpos(xright), ypos(ytop), top_right, color=CABBI_colors.grey.shade(75).RGBn,
                      horizontalalignment='right', verticalalignment='top',
                      fontsize=10, fontweight='bold', zorder=10)
-                top_right = None
+                top_right = replacement
             if ylb < 0. and xub > 0. and bottom_right:
-                plt.text(xpos(0.98), ypos(0.02), bottom_right, color=colors.red.shade(50).RGBn,
+                if bottom_right.endswith('()'):
+                    p = (y_lt_0 & x_mt_0).sum() / y.size
+                    bottom_right = f"{p:.0%} {bottom_right.strip('()')}"
+                    replacement = '()'
+                else:
+                    replacement = None
+                plt.text(xpos(xright), ypos(ybottom), bottom_right, color=colors.red.shade(50).RGBn,
                      horizontalalignment='right', verticalalignment='bottom',
                      fontsize=10, fontweight='bold', zorder=10)
-                bottom_right = None
+                bottom_right = replacement
     plt.subplots_adjust(
         hspace=0, wspace=0,
         top=0.98, bottom=0.15,
         left=0.1, right=0.98,
     )
+    if titles:
+        plt.subplots_adjust(
+            top=0.90,
+        )
+        for ax, letter in zip(axes[0, :], titles):
+            plt.sca(ax)
+            ylb, yub = plt.ylim()
+            xlb, xub = plt.xlim()
+            plt.text((xlb + xub) * 0.5, ylb + (yub - ylb) * 1.17, letter, color=letter_color,
+                      horizontalalignment='center', verticalalignment='center',
+                      fontsize=12, fontweight='bold')
 
 def plot_feedstock_conventional_comparison_kde():
     plot_kde(
         'O1 - S1',
         yticks=[-20, -10, 0, 10, 20, 30, 40],
         xticks=[-0.40, -0.3, -0.20, -0.10, 0, 0.10, 0.20],
-        top_left='Oilcane wins',
-        bottom_right='Sugarcane\nwins',
+        top_left='Oilcane Favored',
+        bottom_right='Sugarcane\nFavored',
+        top_right='GWP\nTradeoff()',
+        bottom_left='MFPP\nTradeoff()',
     )
-    file = os.path.join(images_folder, 'feedstock_conventional_comparison_kde.svg')
+    file = os.path.join(images_folder, 'feedstock_conventional_comparison_kde.png')
     plt.savefig(file, transparent=True)
 
 def plot_feedstock_cellulosic_comparison_kde():
@@ -732,37 +812,44 @@ def plot_feedstock_cellulosic_comparison_kde():
         'O2 - S2',
         yticks=[-40, -20, 0, 20, 40, 60, 80],
         xticks=[-5, -4, -3, -2, -1, 0],
-        top_left='Oilcane wins',
-        bottom_right='Sugarcane wins',
+        top_left='Oilcane Favored',
+        bottom_right='Sugarcane Favored',
+        top_right='GWP\nTradeoff()',
+        bottom_left='MFPP\nTradeoff()',
     )
-    file = os.path.join(images_folder, 'feedstock_cellulosic_comparison_kde.svg')
+    file = os.path.join(images_folder, 'feedstock_cellulosic_comparison_kde.png')
     plt.savefig(file, transparent=True)
 
 def plot_feedstock_comparison_kde():
     plot_kde_2d(
         ('O1 - S1', 'O2 - S2'),
-        yticks=[[-30, -15, 0, 15, 30, 45]],
+        yticks=[[-20, -10, 0, 10, 20, 30, 40, 50]],
         xticks=[[-0.40, -0.3, -0.20, -0.10, 0, 0.10, 0.20],
-                [-4.5, -3, -1.5, 0., 1.5, 3, 4.5, 6]],
-        top_left='Oilcane wins',
-        bottom_right='Sugarcane\nwins',
+                [-7.5, -6, -4.5, -3, -1.5, 0., 1.5, 3]],
+        top_right='GWP\nTradeoff()',
+        bottom_left='MFPP\nTradeoff()',
+        top_left='Oilcane\nFavored()',
+        bottom_right='\nSugarcane\nFavored()',
+        titles=['(A) Conventional', '(B) Cellulosic'],
     )
     plt.subplots_adjust(
         wspace=0,
         
     )
-    file = os.path.join(images_folder, 'feedstock_comparison_kde.svg')
+    file = os.path.join(images_folder, 'feedstock_comparison_kde.png')
     plt.savefig(file, transparent=True)
 
 def plot_configuration_comparison_kde():
     plot_kde(
         'O1 - O2',
         yticks=[-20, 0, 20, 40, 60],
-        xticks=[-8, -6, -4, -2, 0, 2, 4],
-        top_left='Conventional wins',
-        bottom_right='Cellulosic\nwins',
+        xticks=[-7, -6, -5, -4, -3, -2, -1, 0, 1, 2, 3],
+        top_right='GWP\nTradeoff()',
+        bottom_left='MFPP\nTradeoff()',
+        top_left='Conventional\nFavored()',
+        bottom_right='\nCellulosic\nFavored()',
     )
-    file = os.path.join(images_folder, 'configuration_comparison_kde.svg')
+    file = os.path.join(images_folder, 'configuration_comparison_kde.png')
     plt.savefig(file, transparent=True)
     
 def plot_crude_configuration_comparison_kde():
@@ -773,24 +860,30 @@ def plot_crude_configuration_comparison_kde():
             [-2, -1.5, -1, -.5, 0],
             [-3, -2.5, -2, -1.5, -1, -.5, 0]
         ],
-        top_left='Biodiesel production wins',
-        bottom_right='Crude oil production wins',
+        top_right='GWP\nTradeoff()',
+        bottom_left='MFPP\nTradeoff()',
+        top_left='Biodiesel\nProduction Favored()',
+        bottom_right='Crude Oil\nProduction Favored()',
+        titles=['(A) Conventional', '(B) Cellulosic'],
     )
-    file = os.path.join(images_folder, 'crude_configuration_comparison_kde.svg')
+    file = os.path.join(images_folder, 'crude_configuration_comparison_kde.png')
     plt.savefig(file, transparent=True)
 
 def plot_agile_comparison_kde():
     plot_kde_2d(
         ('O1* - O1', 'O2* - O2'),
         metrics=[TCI, MFPP],
-        yticks=[[0, 5, 10, 15, 20]],
-        xticks=2*[[-50, -25, 0, 25, 50, 75]],
-        top_left='Sorghum\nintegration\nwins',
-        bottom_right='Cane-only wins',
+        yticks=[[0, 3, 6, 9, 12, 15]],
+        xticks=2*[[-150, -125, -100, -75, -50, -25, 0]],
+        top_right='TCI-Tradeoff()',
+        bottom_left='MFPP\nTradeoff()',
+        top_left='Sorghum\nIntegration Favored()',
+        bottom_right='Cane-only\nFavored()',
         ybox_kwargs=dict(light=CABBI_colors.green_dirty.RGBn, 
                          dark=CABBI_colors.green_dirty.shade(60).RGBn),
+        titles=['(A) Conventional', '(B) Cellulosic'],
     )
-    file = os.path.join(images_folder, 'agile_conventional_comparison_kde.svg')
+    file = os.path.join(images_folder, 'agile_conventional_comparison_kde.png')
     plt.savefig(file, transparent=True)
 
 def plot_open_comparison_kde(overlap=False):
@@ -841,8 +934,15 @@ def plot_monte_carlo_across_coordinate(coordinate, data, color_wheel):
         )
 
 def monte_carlo_box_plot(data, positions, light_color, dark_color, width=None, 
-                         hatch=None, **kwargs):
+                         hatch=None, outliers=False, **kwargs):
     if width is None: width = 0.8
+    if outliers:
+        flierprops = {'marker':'D',
+                  'markerfacecolor': light_color,
+                  'markeredgecolor': dark_color,
+                  'markersize':3}
+    else:
+        flierprops = {'marker':''}
     bp = plt.boxplot(
         x=data, positions=positions, patch_artist=True,
         widths=width, whis=[5, 95],
@@ -850,10 +950,7 @@ def monte_carlo_box_plot(data, positions, light_color, dark_color, width=None,
                   'edgecolor':dark_color},
         medianprops={'color':dark_color,
                      'linewidth':1.5},
-        flierprops = {'marker':'D',
-                      'markerfacecolor': light_color,
-                      'markeredgecolor': dark_color,
-                      'markersize':3},
+        flierprops=flierprops,
         **kwargs
     )
     if hatch:
@@ -867,7 +964,7 @@ def get_monte_carlo_key(index, dct, with_units=False):
 
 def monte_carlo_results(with_units=False):
     results = {}    
-    for name in oc.configuration_names + oc.comparison_names + oc.other_comparison_names:
+    for name in oc.configuration_names + oc.comparison_names + oc.other_comparison_names + ('O3', 'O4', 'O1 - O3', 'O2 - O4'):
         try: 
             df = get_monte_carlo(name)
         except:
@@ -939,7 +1036,7 @@ def plot_monte_carlo(derivative=False, absolute=True, comparison=True,
         metric_info = mc_derivative_metric_settings
         default_metrics = list(metric_info)
     else:
-        default_configuration_names = oc.configuration_names
+        default_configuration_names = oc.configuration_names[:-2]
         default_comparison_names = oc.comparison_names
         if comparison:
             metric_info = mc_comparison_settings
@@ -973,9 +1070,8 @@ def plot_monte_carlo(derivative=False, absolute=True, comparison=True,
     factors = [(i, j) for i, j in enumerate(factors) if j is not None]
     if color_wheel is None: color_wheel = CABBI_colors.wheel()
     N_rows = len(rows)
-    nrows = int(round(N_rows / ncols))
     if axes_box is None:
-        fig, axes_box = plt.subplots(ncols=ncols, nrows=nrows)
+        fig, axes_box = plt.subplots(ncols=ncols, nrows=int(round(N_rows / ncols)))
         plt.subplots_adjust(wspace=0.45)
     else:
         fig = None
@@ -1030,6 +1126,8 @@ def plot_monte_carlo(derivative=False, absolute=True, comparison=True,
             bst.plots.rounded_tickmarks_from_data(
                 i, step_min=step_min, N_ticks=8, lb_max=0, center=0,
                 f=roundsigfigs, expand=expand,
+                f_min=lambda x: np.percentile(x, 5),
+                f_max=lambda x: np.percentile(x, 95),
             ) 
             for i in data
         ]
@@ -1103,7 +1201,7 @@ def plot_spearman(configurations, top=None, labels=None, metric=None, cutoff=Non
     ng_price = format_units('USD/cf')
     electricity_price = format_units('USD/kWhr')
     operating_days = format_units('day/yr')
-    capacity = format_units('ton/hr')
+    capacity = format_units('dry-MMton/yr')
     titer = format_units('g/L')
     productivity = format_units('g/L/hr')
     material_GWP = '$\\mathrm{kg} \\cdot \\mathrm{CO}_{2}\\mathrm{eq} \\cdot \\mathrm{kg}^{-1}$'
@@ -1111,12 +1209,13 @@ def plot_spearman(configurations, top=None, labels=None, metric=None, cutoff=Non
     index, ignored_list = zip(*[
          ('Bagasse oil retention [40 $-$ 70 %]', ['S2', 'S1', 'S2*', 'S1*']),
          ('Oil extraction efficiency [baseline + 0 $-$ 20 %]', ['S2', 'S1', 'S2*', 'S1*']),
-        (f'Plant capacity [330 $-$ 404 {capacity}]', []),
+        (f'Cane operating days [120 $-$ 180 {operating_days}]', []),
+        (f'Sorghum operating days [30 $-$ 60 {operating_days}]', ['S2', 'S1', 'O1', 'O2']),
+        (f'Crushing capacity [1.32 $-$ 2.20 {capacity}]', []),
         (f'Ethanol price [1.02, 1.80, 2.87 {stream_price}]', []),
         (f'Relative biodiesel price [0.31, 2.98, 4.11 {stream_price}]', []),
         (f'Natural gas price [3.71, 4.73, 6.18 {ng_price}]', ['S1', 'O1', 'S1*', 'O1*']),
         (f'Electricity price [0.0583, 0.065, 0.069 {electricity_price}]', ['S2', 'O2', 'S2*', 'O2*']),
-        (f'Operating days [180 $-$ 210 {operating_days}]', []),
          ('IRR [10 $-$ 15 %]', []),
         (f'Crude glycerol price [91 $-$ 200 {USD_ton}]', ['S2', 'S1', 'S2*', 'S1*']),
         (f'Pure glycerol price [501 $-$ 678 {USD_ton}]', ['S2', 'S1', 'S2*', 'S1*']),

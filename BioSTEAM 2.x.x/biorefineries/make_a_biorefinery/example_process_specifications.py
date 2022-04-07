@@ -162,7 +162,7 @@ recycled_hexanol-1-M402
 # Facilities streams and units
 hexanol_fresh = Stream('hexanol_fresh', price=5.)
 T601 = bst.units.StorageTank('T601', ins=hexanol_fresh)
-T601_P = bst.units.ConveyingBelt('T601_P', ins=T601-0, outs = hexanol)
+T601_P = bst.units.Pump('T601_P', ins=T601-0, outs = hexanol)
 
 # Simulate and print
 M402.simulate()

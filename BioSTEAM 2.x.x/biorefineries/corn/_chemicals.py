@@ -19,10 +19,10 @@ def create_chemicals():
                              'Yeast', 'CaO', 'TAG', 'Cellulose']
     chemicals += cs.chemicals['H2SO4', 'N2', 'SO2']
     chemicals = tmo.Chemicals([*chemicals, 'NH3'])
-    Starch = chemicals.Cellulose.copy('Starch')
-    Fiber = chemicals.Cellulose.copy('Fiber')
-    SolubleProtein = chemicals.Cellulose.copy('SolubleProtein')
-    InsolubleProtein = chemicals.Cellulose.copy('InsolubleProtein')
+    Starch = chemicals.Cellulose.copy('Starch', aliases=())
+    Fiber = chemicals.Cellulose.copy('Fiber', aliases=())
+    SolubleProtein = chemicals.Cellulose.copy('SolubleProtein', aliases=())
+    InsolubleProtein = chemicals.Cellulose.copy('InsolubleProtein', aliases=())
     chemicals.extend([Starch, Fiber, SolubleProtein, InsolubleProtein])
     chemicals.NH3.at_state('l')
     chemicals.compile()

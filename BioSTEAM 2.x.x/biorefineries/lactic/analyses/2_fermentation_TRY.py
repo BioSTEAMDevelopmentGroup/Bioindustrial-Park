@@ -1,17 +1,16 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# BioSTEAM: The Biorefinery Simulation and Techno-Economic Analysis Modules
-# Copyright (C) 2020-2021, Yoel Cortes-Pena <yoelcortes@gmail.com>
 # Bioindustrial-Park: BioSTEAM's Premier Biorefinery Models and Results
-# Copyright (C) 2020-2021, Yalin Li <yalinli2@illinois.edu>,
-# Sarang Bhagwat <sarangb2@illinois.edu>, and Yoel Cortes-Pena (this biorefinery)
-# 
-# This module is under the UIUC open-source license. See 
+# Copyright (C) 2020-, Yalin Li <zoe.yalin.li@gmail.com>,
+#                      Sarang Bhagwat <sarangb2@illinois.edu>,
+#                      Yoel Cortes-Pena <yoelcortes@gmail.com>
+#
+# This module is under the UIUC open-source license. See
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
 # for license details.
 
 
-# %% 
+# %%
 
 # =============================================================================
 # Setup
@@ -25,13 +24,13 @@ from biosteam.utils import TicToc
 from biorefineries.lactic import load_system, \
     SSCF_flowsheet, SSCF_funcs, SHF_flowsheet, SHF_funcs
 from biorefineries.lactic._chemicals import sugars
-from biorefineries.lactic._utils import set_yield
+from biorefineries.lactic.utils import set_yield
 
 load_system('SSCF')
 load_system('SHF')
 
 
-# %% 
+# %%
 
 # =============================================================================
 # Evaluate system at different lactic acid titer and yield (conversion),
@@ -87,13 +86,13 @@ def simulate_log_results(kind):
         funcs = SHF_funcs
     bst.main_flowsheet.set_flowsheet(flowsheet)
     load_system(kind)
-    
+
     R301 = flowsheet.unit.R301
     R302 = flowsheet.unit.R302
     lactic_acid = flowsheet.stream.lactic_acid
     lactic_sys = flowsheet.system.lactic_sys
     lactic_tea = lactic_sys.TEA
-    
+
     try:
         lactic_sys.simulate()
         for productivity in (0.89, 0.18, 1.92):
@@ -186,7 +185,7 @@ def run_TRY(yield_range, kind, mode, feed_freq, if_resistant, titer_range):
                     for m in (MPSPs, NPVs,GWPs, FECs):
                         m[p].extend(['']*n_remained)
                 break
-    
+
     print(f'\nSimulation time is {timer.elapsed_time/60:.1f} min for {run_number} runs.')
 
 
@@ -254,5 +253,3 @@ run_TRY(yield_range=yield_range, kind='SHF', mode='continuous', feed_freq=1,
         if_resistant=True, titer_range=titer_range)
 SHF_reg_c = save_data_clear()
 SHF_reg_c.to_excel('SHF_reg_continuous.xlsx')
-
-

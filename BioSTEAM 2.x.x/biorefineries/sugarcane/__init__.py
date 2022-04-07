@@ -7,16 +7,15 @@
 # for license details.
 """
 """
-from .. import PY37
 from . import (_process_settings,
                _chemicals,
-               _system,
+               systems,
                _tea,
 )
 
 __all__ = [*_process_settings.__all__,
            *_chemicals.__all__,
-           *_system.__all__,
+           *systems.__all__,
            *_tea.__all__,
            'sugarcane_sys',
            'sugarcane_tea', 
@@ -25,7 +24,7 @@ __all__ = [*_process_settings.__all__,
 
 from ._process_settings import *
 from ._chemicals import *
-from ._system import *
+from .systems import *
 from ._tea import *
 
 _system_loaded = False
@@ -64,18 +63,15 @@ def _load_system(pellet_bagasse=None):
     sugarcane_tea.IRR = sugarcane_tea.solve_IRR()
     _system_loaded = True
   
-if PY37:
-    def __getattr__(name):
-        if not _chemicals_loaded:
-            _load_chemicals()
-            if name == 'chemicals': return chemicals
-        if not _system_loaded: 
-            try:
-                _load_system()
-            finally:
-                dct = globals()
-                dct.update(flowsheet.to_dict())
-            if name in dct: return dct[name]
-        raise AttributeError(f"module '{__name__}' has no attribute '{name}'")
-else: 
-    load()
+def __getattr__(name):
+    if not _chemicals_loaded:
+        _load_chemicals()
+        if name == 'chemicals': return chemicals
+    if not _system_loaded: 
+        try:
+            _load_system()
+        finally:
+            dct = globals()
+            dct.update(flowsheet.to_dict())
+        if name in dct: return dct[name]
+    raise AttributeError(f"module '{__name__}' has no attribute '{name}'")

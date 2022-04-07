@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# BioSTEAM: The Biorefinery Simulation and Techno-Economic Analysis Modules
-# Copyright (C) 2020-2021, Yoel Cortes-Pena <yoelcortes@gmail.com>
 # Bioindustrial-Park: BioSTEAM's Premier Biorefinery Models and Results
-# Copyright (C) 2020-2021, Yalin Li <yalinli2@illinois.edu>,
-# Sarang Bhagwat <sarangb2@illinois.edu>, and Yoel Cortes-Pena (this biorefinery)
+# Copyright (C) 2020-, Yalin Li <zoe.yalin.li@gmail.com>,
+#                      Sarang Bhagwat <sarangb2@illinois.edu>,
+#                      Yoel Cortes-Pena <yoelcortes@gmail.com>
 #
 # This module is under the UIUC open-source license. See
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
@@ -14,195 +13,109 @@
 # %%
 
 import biosteam as bst
-from ._chemicals import chems
-from ._processes import (
-    update_settings,
+from biosteam.process_tools import UnitGroup
+from . import (
     create_preprocessing_process,
     create_pretreatment_process,
-    create_SSCF_conversion_process,
-    create_SHF_conversion_process,
+    create_conversion_process,
     create_separation_process,
     create_wastewater_process,
     create_facilities,
-    create_lactic_sys
+    get_splits,
     )
 
-bst.speed_up()
-update_settings(chems)
-
-__all__ = (
-    'create_SSCF_sys', 'create_SHF_sys',
-    'SSCF_flowsheet', 'SSCF_groups', 'SSCF_teas', 'SSCF_funcs',
-    'SHF_flowsheet', 'SHF_groups', 'SHF_teas', 'SHF_funcs',
-    'simulate_and_print', 'simulate_separation_improvement',
-    'simulate_separation_improvement', 'simulate_operating_improvement'
-    )
+__all__ = ('create_system',)
 
 
 # %%
 
-def create_SSCF_sys():
-    flowsheet = bst.Flowsheet('SSCF')
+def create_system(ID='lactic_sys', kind='SSCF', if_HXN=True, if_BDM=False,
+                  flowsheet=None, return_groups=False,
+                  cell_mass_split=None, gypsum_split=None,
+                  AD_split=None, MB_split=None):
+    kind = kind.upper()
+    flowsheet = flowsheet or bst.main_flowsheet
     s = flowsheet.stream
     u = flowsheet.unit
 
-    flowsheet, groups, get_feedstock_dry_mass, get_flow_tpd = \
-        create_preprocessing_process(flowsheet)
+    # Default splits
+    _cell_mass_split, _gypsum_split, _AD_split, _MB_split = get_splits()
+    cell_mass_split = cell_mass_split if cell_mass_split is not None else _cell_mass_split
+    gypsum_split = gypsum_split if gypsum_split is not None else _gypsum_split
+    AD_split = AD_split if AD_split is not None else _AD_split
+    MB_split = MB_split if MB_split is not None else _MB_split
 
-    flowsheet, groups = \
-        create_pretreatment_process(flowsheet, groups, u.U101-0, get_feedstock_dry_mass)
+    create_preprocessing_process(flowsheet=flowsheet)
+    create_pretreatment_process(feed=u.U101-0, flowsheet=flowsheet)
+    create_conversion_process(kind=kind, feed=u.P201-0, flowsheet=flowsheet,
+                              cell_mass_split=cell_mass_split)
+    create_separation_process(feed=u.PS301-0, kind=kind,
+                              flowsheet=flowsheet,
+                              cell_mass_split=cell_mass_split,
+                              gypsum_split=gypsum_split)
 
-    flowsheet, groups = \
-        create_SSCF_conversion_process(flowsheet, groups, u.P201-0)
+    if kind == 'SSCF':
+        # The last one is reserved for blowdown
+        ww_streams = (u.H201-0, u.M401_P-0, u.R402-1, u.R403-1, '')
+        CHP_wastes = (u.U101-1, u.S401-0,)
+    elif kind == 'SHF':
+        ww_streams = (u.H201-0, u.E301-1, u.M401_P-0, u.R402-1, u.R403-1, '')
+        CHP_wastes = (u.U101-1, u.S301-0, u.S401-0,)
+    else: raise ValueError(f'kind can only be "SSCF" or "SHF", not {kind}.')
 
-    flowsheet, groups = \
-        create_separation_process(flowsheet, groups, u.PS301-0, kind='SSCF')
+    create_wastewater_process(ww_streams=ww_streams, flowsheet=flowsheet,
+                              AD_split=AD_split, MB_split=MB_split)
+    CHP_wastes = (*CHP_wastes, u.S504-1)
 
-    # The last one is reserved for blowdown
-    WWT_streams = (u.H201-0, u.M401_P-0, u.R402-1, u.R403-1, '')
-    flowsheet, groups = \
-        create_wastewater_process(flowsheet, groups, get_flow_tpd, WWT_streams)
-
-    CHP_wastes = (u.U101-1, u.S401-0, u.S504-1)
-    CHP_biogas = u.R501-0
-    CHP_side_streams = (s.water_M201, s.water_M202, s.steam_M203)
     process_water_streams = {
         'pretreatment': (s.water_M201, s.water_M202, s.steam_M203, s.water_M205),
         'conversion': (s.water_M301, s.water_R301),
         'separation': (s.water_R403,)
         }
-    recycled_water = u.S505-0
-    flowsheet, groups = \
-        create_facilities(flowsheet, groups, get_flow_tpd,
-                          CHP_wastes, CHP_biogas, CHP_side_streams,
-                          process_water_streams, recycled_water)
+    create_facilities(CHP_wastes=CHP_wastes, CHP_biogas=u.R501-0,
+                      CHP_side_streams=(s.water_M201, s.water_M202, s.steam_M203),
+                      process_water_streams=process_water_streams,
+                      recycled_water=u.S505-0,
+                      if_HXN=if_HXN, if_BDM=if_BDM, flowsheet=flowsheet)
 
-    flowsheet, teas, funcs = create_lactic_sys(flowsheet, groups, get_flow_tpd)
+    no_hu_facilities = (u.PWC, u.ADP, u.CIP)
+    if if_HXN: facilities = (u.HXN, u.CHP, u.CT, *no_hu_facilities)
+    if if_BDM: facilities = (*facilities, u.BDM)
 
-    return flowsheet, groups, teas, funcs
+    sys = flowsheet.system
+    lactic_sys = bst.System(ID,
+                            path=(u.U101, sys.pretreatment_sys, sys.conversion_sys,
+                                  sys.separation_sys, sys.wastewater_sys,
+                                  u.T601, u.T601_P, u.T602_S, u.T602,
+                                  u.T603_S, u.T603, u.T604, u.T605,
+                                  u.T606, u.T606_P, u.T607, u.M601),
+                            facilities=facilities,
+                            facility_recycle=u.BDM-0 if hasattr(u, 'BDM') else None
+                            )
+    # lactic_sys.set_tolerance(mol=1e-3, rmol=1e-3, subsystems=True)
 
-def create_SHF_sys():
-    flowsheet = bst.Flowsheet('SHF')
-    s = flowsheet.stream
-    u = flowsheet.unit
+    if not return_groups: return lactic_sys
 
-    flowsheet, groups, get_feedstock_dry_mass, get_flow_tpd = \
-        create_preprocessing_process(flowsheet)
+    groups = [
+        UnitGroup('preprocessing_group', units=sys.preprocessing_sys.units),
+        UnitGroup('pretreatment_group', units=sys.pretreatment_sys.units),
+        UnitGroup('conversion_group', units=sys.conversion_sys.units),
+        UnitGroup('separation_group', units=sys.separation_sys.units),
+        UnitGroup('wastewater_group', units=sys.wastewater_sys.units),
+        ]
 
-    flowsheet, groups = \
-        create_pretreatment_process(flowsheet, groups, u.U101-0, get_feedstock_dry_mass)
+    if if_HXN: groups.append(UnitGroup('HXN_group', units=(u.HXN,)))
+    facility_units = [u.T601, u.T601_P, u.T602, u.T602_S, u.T603, u.T603_S,
+                    u.T604, u.T605, u.T606, u.T606_P, u.T607, u.M601,
+                    *no_hu_facilities]
+    groups.extend([
+        UnitGroup('CHP_group', units=(u.CHP,)),
+        UnitGroup('CT_group', units=(u.CT,)),
+        UnitGroup('facilities_no_hu_group', units=facility_units)
+        ])
 
-    flowsheet, groups = \
-        create_SHF_conversion_process(flowsheet, groups, u.P201-0)
-
-    flowsheet, groups = \
-        create_separation_process(flowsheet, groups, u.PS301-0, kind='SHF')
-
-    # The last one is reserved for blowdown
-    WWT_streams = (u.H201-0, u.E301-1, u.M401_P-0, u.R402-1, u.R403-1, '')
-    flowsheet, groups = \
-        create_wastewater_process(flowsheet, groups, get_flow_tpd, WWT_streams)
-
-    CHP_wastes = (u.U101-1, u.S301-0, u.S401-0, u.S504-1)
-    CHP_biogas = u.R501-0
-    CHP_side_streams = (s.water_M201, s.water_M202, s.steam_M203)
-    process_water_streams = {
-        'pretreatment': (s.water_M201, s.water_M202, s.steam_M203, s.water_M205),
-        'conversion': (s.water_M301, s.water_R301),
-        'separation': (s.water_R403,)
-        }
-    recycled_water = u.S505-0
-    flowsheet, groups = \
-        create_facilities(flowsheet, groups, get_flow_tpd,
-                          CHP_wastes, CHP_biogas, CHP_side_streams,
-                          process_water_streams, recycled_water)
-
-    flowsheet, teas, funcs = create_lactic_sys(flowsheet, groups, get_flow_tpd)
-
-    return flowsheet, groups, teas, funcs
-
-SSCF_flowsheet, SSCF_groups, SSCF_teas, SSCF_funcs = create_SSCF_sys()
-SHF_flowsheet, SHF_groups, SHF_teas, SHF_funcs  = create_SHF_sys()
+    return lactic_sys, groups
 
 
-# %%
-
-# =============================================================================
-# Useful functions for summarizing results and considering alternative process
-# decision variables
-# =============================================================================
-
-def simulate_and_print(system='SSCF'):
-    if 'SSCF' in str(system).upper():
-        flowsheet = SSCF_flowsheet
-        funcs = SSCF_funcs
-    elif 'SHF' in str(system).upper():
-        flowsheet = SHF_flowsheet
-        funcs = SHF_funcs
-    else:
-        raise ValueError(f'system can only be "SSCF" or "SHF", not {system}.')
-    bst.main_flowsheet.set_flowsheet(flowsheet)
-
-    print('\n---------- Simulation Results ----------')
-    print(f'MPSP is ${funcs["simulate_get_MPSP"]():.3f}/kg')
-    print(f'GWP is {funcs["get_GWP"]():.3f} kg CO2-eq/kg lactic acid')
-    print(f'FEC is {funcs["get_FEC"]():.2f} MJ/kg lactic acid')
-    print('------------------------------------------\n')
-
-
-def simulate_fermentation_improvement(kind='SSCF'):
-    if 'SSCF' in str(kind).upper():
-        flowsheet = SSCF_flowsheet
-    elif 'SHF' in str(kind).upper():
-        flowsheet = SHF_flowsheet
-    else:
-        raise ValueError(f'kind can only be "SSCF" or "SHF", not {kind}.')
-    bst.main_flowsheet.set_flowsheet(flowsheet)
-    u = flowsheet.unit
-    flowsheet.system.lactic_sys.simulate()
-
-    R301_X = u.R301.cofermentation_rxns.X
-    R302_X = u.R302.cofermentation_rxns.X
-    u.R301.target_yield = 0.95
-    R301_X[0] = R301_X[3] = 0.95
-    R301_X[1] = R301_X[4] = 0
-    R302_X[1] = R302_X[4] = 0
-    simulate_and_print(kind)
-
-def simulate_separation_improvement(kind='SSCF'):
-    if 'SSCF' in str(kind).upper():
-        flowsheet = SSCF_flowsheet
-    elif 'SHF' in str(kind).upper():
-        flowsheet = SHF_flowsheet
-    else:
-        raise ValueError(f'kind can only be "SSCF" or "SHF", not {kind}.')
-    bst.main_flowsheet.set_flowsheet(flowsheet)
-    u = SHF_flowsheet.unit
-    flowsheet.system.lactic_sys.simulate()
-
-    u.R402.X_factor = 0.9/u.R402.esterification_rxns.X[0]
-    u.R403.hydrolysis_rxns.X[:] = 0.9
-    simulate_and_print(kind)
-
-def simulate_operating_improvement(kind='SSCF'):
-    if 'SSCF' in str(kind).upper():
-        flowsheet = SSCF_flowsheet
-        funcs = SSCF_funcs
-    elif 'SHF' in str(kind).upper():
-        flowsheet = SHF_flowsheet
-        funcs = SHF_funcs
-    else:
-        raise ValueError(f'kind can only be "SSCF" or "SHF", not {kind}.')
-    bst.main_flowsheet.set_flowsheet(flowsheet)
-    s = flowsheet.stream
-    u = flowsheet.unit
-    flowsheet.system.lactic_sys.simulate()
-
-    u.U101.diversion_to_CHP = 0.25
-    print('\n---------- Simulation Results ----------')
-    print(f'MPSP is ${funcs["simulate_get_MPSP"]():.3f}/kg')
-    s.LCA_stream.imass['CH4'] *= 0.75
-    s.natural_gas.imass['CH4'] *= 0.75
-    print(f'GWP is {funcs["get_GWP"]():.3f} kg CO2-eq/kg lactic acid')
-    print(f'FEC is {funcs["get_FEC"]():.2f} MJ/kg lactic acid')
-    print('------------------------------------------\n')
+if __name__ == '__main__':
+    lactic_sys = create_system('SSCF')

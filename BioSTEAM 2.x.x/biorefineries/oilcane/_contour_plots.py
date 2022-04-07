@@ -44,7 +44,7 @@ filterwarnings('ignore', category=bst.utils.DesignWarning)
 shadecolor = (*colors.neutral.RGBn, 0.20)
 linecolor = (*colors.neutral_shade.RGBn, 0.85)
 targetcolor = (*colors.red_tint.RGBn, 1)
-startcolor = (*colors.purple.tint(10).RGBn, 1)
+startcolor = (*colors.red_tint.RGBn, 1)
 edgecolor = (*colors.CABBI_black.RGBn, 1)
     
 CABBI_colors = (colors.CABBI_yellow.tint(75).RGBn, 
@@ -67,8 +67,10 @@ diverging_colormaps = [
 ]
 
 colormaps = [
-    LinearSegmentedColormap.from_list('CABBI', CABBI_colors, 25),
-    LinearSegmentedColormap.from_list('CABBI', CABBI_colors_x, 25),
+    plt.cm.get_cmap('viridis'),
+    plt.cm.get_cmap('copper_r'),
+    # LinearSegmentedColormap.from_list('CABBI', CABBI_colors, 25),
+    # LinearSegmentedColormap.from_list('CABBI', CABBI_colors_x, 25),
     plt.cm.get_cmap('inferno_r'),
     plt.cm.get_cmap('copper_r'),
     plt.cm.get_cmap('bone_r'),
@@ -105,12 +107,13 @@ def plot_extraction_efficiency_and_oil_content_contours_manuscript(load=True):
         load=load,
     )
     colors = np.zeros([2, 2], object)
-    colors[:] = [[dark_letter_color, dark_letter_color],
-                 [dark_letter_color, dark_letter_color]]
-    _add_letter_labels(axes, 0.68, 0.70, colors)
+    colors[:] = [[light_letter_color, light_letter_color],
+                 [light_letter_color, light_letter_color]]
+    _add_letter_labels(axes, 1 - 0.68, 0.70, colors)
     plt.subplots_adjust(right=0.92, wspace=0.1, top=0.9, bottom=0.10)
-    file = os.path.join(images_folder, 'extraction_efficiency_and_oil_content_contours.svg')
-    plt.savefig(file, transparent=True)
+    for i in ('svg', 'png'):
+        file = os.path.join(images_folder, f'extraction_efficiency_and_oil_content_contours.{i}')
+        plt.savefig(file, transparent=True)
 
 def plot_relative_sorghum_oil_content_and_cane_oil_content_contours_manuscript(load=True):
     set_font(size=8)
@@ -120,17 +123,18 @@ def plot_relative_sorghum_oil_content_and_cane_oil_content_contours_manuscript(l
     )
     colors = np.zeros([2, 2], object)
     colors[:] = [[light_letter_color, light_letter_color],
-                 [dark_letter_color, light_letter_color]]
-    _add_letter_labels(axes, 0.82, 0.70, colors)
+                 [light_letter_color, light_letter_color]]
+    _add_letter_labels(axes, 1 - 0.82, 0.70, colors)
     plt.subplots_adjust(right=0.92, wspace=0.1, top=0.9, bottom=0.12)
-    file = os.path.join(images_folder, 'relative_sorghum_oil_content_and_cane_oil_content_contours.svg')
-    plt.savefig(file, transparent=True)
+    for i in ('svg', 'png'):
+        file = os.path.join(images_folder, f'relative_sorghum_oil_content_and_cane_oil_content_contours.{i}')
+        plt.savefig(file, transparent=True)
 
 def plot_ethanol_and_biodiesel_price_contours_manuscript():
     set_font(size=8)
     set_figure_size(aspect_ratio=0.7)
     fig, axes = plot_ethanol_and_biodiesel_price_contours(
-        titles=['CONVENTIONAL', 'CELLULOSIC'],
+        titles=['Conventional', 'Cellulosic'],
     )
     colors = np.zeros([3, 2], object)
     colors[:] = [[letter_color, letter_color],
@@ -138,15 +142,16 @@ def plot_ethanol_and_biodiesel_price_contours_manuscript():
                  [letter_color, letter_color]]
     _add_letter_labels(axes, 0.7, 0.65, colors)
     plt.subplots_adjust(left=0.2, right=0.92, wspace=0.1, top=0.94, bottom=0.12)
-    file = os.path.join(images_folder, 'ethanol_and_biodiesel_price_contours.svg')
-    plt.savefig(file, transparent=True)
+    for i in ('svg', 'png'):
+        file = os.path.join(images_folder, f'ethanol_and_biodiesel_price_contours.{i}')
+        plt.savefig(file, transparent=True)
 
 def plot_enhanced_ethanol_and_biodiesel_price_contours_manuscript():
     set_font(size=8)
     set_figure_size(aspect_ratio=0.7)
     fig, axes = plot_ethanol_and_biodiesel_price_contours(
         enhanced_cellulosic_performance=True,
-        titles=['CONVENTIONAL', 'CELLULOSIC'],
+        titles=['Conventional', 'Cellulosic'],
     )
     colors = np.zeros([3, 2], object)
     colors[:] = [[letter_color, letter_color],
@@ -154,15 +159,16 @@ def plot_enhanced_ethanol_and_biodiesel_price_contours_manuscript():
                  [letter_color, letter_color]]
     _add_letter_labels(axes, 0.7, 0.65, colors)
     plt.subplots_adjust(left=0.2, right=0.92, wspace=0.1, top=0.94, bottom=0.12)
-    file = os.path.join(images_folder, 'enhanced_ethanol_and_biodiesel_price_contours.svg')
-    plt.savefig(file, transparent=True)
+    for i in ('svg', 'png'):
+        file = os.path.join(images_folder, f'enhanced_ethanol_and_biodiesel_price_contours.{i}')
+        plt.savefig(file, transparent=True)
     
 def plot_benefit_ethanol_and_biodiesel_price_contours_manuscript():
     set_font(size=8)
     set_figure_size(aspect_ratio=0.7)
     fig, axes = plot_ethanol_and_biodiesel_price_contours(
         benefit=True,
-        titles=['CONVENTIONAL', 'CELLULOSIC'],
+        titles=['Conventional', 'Cellulosic'],
         dist=True,
     )
     colors = np.zeros([3, 2], object)
@@ -171,14 +177,15 @@ def plot_benefit_ethanol_and_biodiesel_price_contours_manuscript():
                  [dark_letter_color, dark_letter_color]]
     _add_letter_labels(axes, 0.7, 0.65, colors)
     plt.subplots_adjust(left=0.2, right=0.92, wspace=0.1, top=0.94, bottom=0.12)
-    file = os.path.join(images_folder, 'benefit_ethanol_and_biodiesel_price_contours.svg')
-    plt.savefig(file, transparent=True)
+    for i in ('svg', 'png'):
+        file = os.path.join(images_folder, f'benefit_ethanol_and_biodiesel_price_contours.{i}')
+        plt.savefig(file, transparent=True)
 
 # %% General    
 
 def plot_ethanol_and_biodiesel_price_contours(N=30, benefit=False, cache={}, 
                                               enhanced_cellulosic_performance=False,
-                                              titles=None, load=True, save=True,
+                                              titles=None, load=False, save=True,
                                               dist=False):
     ethanol_price = np.linspace(1., 3., N)
     biodiesel_price = np.linspace(2, 6, N)
@@ -198,23 +205,22 @@ def plot_ethanol_and_biodiesel_price_contours(N=30, benefit=False, cache={},
         try: Z = np.load(file)
         except: load = True
         else: load = False
-    if load:
-        if (N, benefit, enhanced_cellulosic_performance) in cache:
-            Z = cache[N, benefit, enhanced_cellulosic_performance]
-        else:
-            Z = np.zeros([N, N, N_rows, N_cols])
-            for i in range(N_rows):
-                for j in range(N_cols):
-                    oc.load(configuration[j], enhanced_cellulosic_performance=enhanced_cellulosic_performance)
-                    oc.set_cane_oil_content(oil_content[i])
-                    oc.set_relative_sorghum_oil_content(0)
-                    oc.sys.simulate()
-                    if benefit:
-                        Z[:, :, i, j] = oc.evaluate_MFPP_benefit_across_ethanol_and_biodiesel_prices(X, Y)
-                    else:
-                        Z[:, :, i, j] = oc.evaluate_MFPP_across_ethanol_and_biodiesel_prices(X, Y)
-        if save:
-            np.save(file, Z)
+    if load and (N, benefit, enhanced_cellulosic_performance) in cache:
+        Z = cache[N, benefit, enhanced_cellulosic_performance]
+    else:
+        Z = np.zeros([N, N, N_rows, N_cols])
+        for i in range(N_rows):
+            for j in range(N_cols):
+                oc.load(configuration[j], enhanced_cellulosic_performance=enhanced_cellulosic_performance)
+                oc.set_cane_oil_content(oil_content[i])
+                oc.set_relative_sorghum_oil_content(0)
+                oc.sys.simulate()
+                if benefit:
+                    Z[:, :, i, j] = oc.evaluate_MFPP_benefit_across_ethanol_and_biodiesel_prices(X, Y)
+                else:
+                    Z[:, :, i, j] = oc.evaluate_MFPP_across_ethanol_and_biodiesel_prices(X, Y)
+    if save:
+        np.save(file, Z)
     xlabel = f"Ethanol price\n[{format_units('$/gal')}]"
     ylabels = [f"Biodiesel price\n[{format_units('$/gal')}]"] * 4
     xticks = [1., 1.5, 2.0, 2.5, 3.0]
@@ -292,19 +298,21 @@ def plot_relative_sorghum_oil_content_and_cane_oil_content_contours(
     MFPP = oc.all_metric_mockups[0]
     TCI = oc.all_metric_mockups[6]
     if configuration_index == 0:
-        Z = np.array(["AGILE-CONVENTIONAL"])
+        Z = np.array(["Agile-Conventional"])
         data = data[:, :, :, np.newaxis]
     elif configuration_index == 1:
-        Z = np.array(["AGILE-CELLULOSIC"])
+        Z = np.array(["Agile-Cellulosic"])
         data = data[:, :, :, np.newaxis]
     elif configuration_index == ...:
-        Z = np.array(["AGILE-CONVENTIONAL", "AGILE-CELLULOSIC"])
+        Z = np.array(["Agile-Conventional", "Agile-Cellulosic"])
         data = np.swapaxes(data, 2, 3)
     else:
         raise ValueError('configuration index must be either 0 or 1')
     metric_bars = [
-        MetricBar(MFPP.name, format_units(MFPP.units), colormaps[0], tickmarks(data[:, :, 0], 5, 5), 15, 1),
-        MetricBar(TCI.name, format_units(TCI.units), colormaps[1], tickmarks(data[:, :, 1], 5, 5), 30),
+        [MetricBar(MFPP.name, format_units(MFPP.units), colormaps[0], tickmarks(data[:, :, 0, 0], 5, 1, expand=0, p=0.5), 10, 1),
+         MetricBar(MFPP.name, format_units(MFPP.units), colormaps[0], tickmarks(data[:, :, 0, 1], 5, 1, expand=0, p=0.5), 10, 1)],
+        [MetricBar(TCI.name, format_units(TCI.units), colormaps[1], tickmarks(data[:, :, 1, 0], 5, 5, expand=0, p=5), 10, 1),
+         MetricBar(TCI.name, format_units(TCI.units), colormaps[1], tickmarks(data[:, :, 1, 1], 5, 5, expand=0, p=5), 10, 1)],
     ]
     fig, axes, CSs, CB = plot_contour_2d(
         100.*X, 100.*Y, Z, data, xlabel, ylabel, xticks, yticks, metric_bars, 
@@ -313,7 +321,7 @@ def plot_relative_sorghum_oil_content_and_cane_oil_content_contours(
     return fig, axes
     
 def plot_extraction_efficiency_and_oil_content_contours(
-        load=False, metric_index=0, N_decimals=0,
+        load=False, metric_index=0, N_decimals=1,
     ):
     # Generate contour data
     x = np.linspace(0.4, 1., 20)
@@ -333,25 +341,24 @@ def plot_extraction_efficiency_and_oil_content_contours(
         )
     np.save(file, data)
     data = data[:, :, :, :, metric_index]
+    data = np.swapaxes(data, 2, 3)
     
     # Plot contours
     xlabel = 'Oil extraction [%]'
     ylabel = "Oil content [dry wt. %]"
-    ylabels = [f'Oilcane only\n{ylabel}',
-               f'Oilcane & oilsorghum\n{ylabel}']
+    ylabels = [f'Conventional Configuration\n{ylabel}',
+               f'Cellulosic Configuration\n{ylabel}']
     xticks = [40, 60, 80, 100]
     yticks = [5, 7.5, 10, 12.5, 15]
     metric = oc.all_metric_mockups[metric_index]
     units = metric.units if metric.units == '%' else format_units(metric.units)
-    metric_bar = MetricBar(
-        metric.name, units, colormaps[metric_index], 
-        tickmarks(data, 5, 5), 18, N_decimals=N_decimals,
-        forced_size=0.3
-    )
-    fig, axes, CSs, CB = plot_contour_single_metric(
-        100.*X, 100.*Y, data, xlabel, ylabels, xticks, yticks, metric_bar, 
+    mb = lambda x: MetricBar(metric.name, units, colormaps[metric_index], tickmarks(data[:, :, x, :], 5, 0.1, expand=0, p=0.1), 10, N_decimals=N_decimals)
+    
+    metric_bars = [mb(0), mb(1)]
+    
+    fig, axes, CSs, CB = plot_contour_2d(
+        100.*X, 100.*Y, ['Oilcane Only', 'Oilcane & Oilsorghum'], data, xlabel, ylabels, xticks, yticks, metric_bars, 
         fillcolor=None, styleaxiskw=dict(xtick0=False), label=True,
-        titles=['CONVENTIONAL', 'CELLULOSIC'],
     )
     M = len(configurations)
     N = len(agile)

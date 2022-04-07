@@ -8,7 +8,11 @@ from thermosteam import functional as fn
 from biorefineries.lipidcane._chemicals import create_acyl_olein
 
 __all__ = ('create_cellulosic_chemicals',
-           'create_conventional_chemicals')
+           'create_conventional_chemicals',
+           'chemical_data')
+
+chemical_data_path = os.path.join(os.path.dirname(__file__), 'chemicals.yaml')
+chemical_data = tmo.ThermoData.from_yaml(chemical_data_path)
 
 def create_acetyl_diolein():
     # Assume properties are similar between oleic and palmitic chains
@@ -34,8 +38,6 @@ def create_acetyl_diolein():
     return chemical
 
 def create_cellulosic_chemicals():
-    chemical_data_path = os.path.join(os.path.dirname(__file__), 'chemicals.yaml')
-    chemical_data = tmo.ThermoData.from_yaml(chemical_data_path)
     chemicals = chemical_data.create_chemicals(
         ['Water', 'AceticAcid', 'Furfural', 'NH3', 'LacticAcid', 
          'Methane', 'SulfuricAcid', 'N2', 'O2', 'H2S', 'SO2', 'CO2', 
@@ -67,8 +69,6 @@ def create_cellulosic_chemicals():
     return chemicals
     
 def create_conventional_chemicals():
-    chemical_data_path = os.path.join(os.path.dirname(__file__), 'chemicals.yaml')
-    chemical_data = tmo.ThermoData.from_yaml(chemical_data_path)
     chemicals = chemical_data.create_chemicals(
         ['Water', 'Glucose', 'Sucrose', 'PhosphoricAcid', 'P4O10', 'CO2', 'O2', 
          'N2', 'Methane', 'Ash', 'Cellulose', 'Hemicellulose', 'Flocculant', 

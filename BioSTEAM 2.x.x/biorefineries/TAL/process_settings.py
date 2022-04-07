@@ -32,14 +32,15 @@ _chemical_2020to2016 = 102.5 / 113.8 # average of Jan and Feb
 # changed from Humbird et al., 2011 to Davis et al., 2018
 feedstock_price = 71.26 / _kg_per_ton * 0.8 
 
-# 2.18 is the average whole-sale ethanol price between 2010-2019 in 2016 $/gal 	
-# based on Annual Energy Outlook (AEO) from Energy Information Adiministration (EIA)	
-# (https://www.eia.gov/outlooks/aeo/), which is $0.732/gal and similar to the 	
-# 2.18/(2988/1e3) = $0.730/gal based on a density of 2988 g/gal from H2 Tools	
-# Lower and upper bounds are $1.37/gal and $2.79/gal, or $0.460/kg and $0.978/kg	
-ethanol_V = chems.Ethanol.V('l', 298.15, 101325) # molar volume in m3/mol	
-ethanol_MW = chems.Ethanol.MW	
-ethanol_price = 2.18 / (_liter_per_gallon/chems.Ethanol.V('l', 298.15, 101325)*ethanol_MW/1e6)
+# 2.2 is the average whole-sale ethanol price between 2010-2019 in 2016 $/gal
+# based on Annual Energy Outlook (AEO) from Energy Information Adiministration (EIA)
+# (https://www.eia.gov/outlooks/aeo/), which is $0.7328/gal and similar to the
+# 2.2/(2988/1e3) = $0.736/gal based on a density of 2988 g/gal from H2 Tools
+# Lower and upper bounds are $1.37/gal and $2.79/gal, or $0.460/kg and $0.978/kg
+_ethanol_V = chems.Ethanol.V('l', 298.15, 101325) # molar volume in m3/mol
+_ethanol_MW = chems.Ethanol.MW
+_ethanol_kg_2_gal = _liter_per_gallon/_ethanol_V*_ethanol_MW/1e6
+ethanol_price = 2.2 / _ethanol_kg_2_gal
 	
 
 # Dipotassium hydrogen phosphate (DPHP)
@@ -129,7 +130,7 @@ acetoin_price = 3. # assumed
 # IBA_price = 1.2
 IBA_price = 0. # assumed
 
-TAL_price = 1.88 # assumed
+TAL_price = 4. # assumed; when solving for MPSP, this is merely the initial value and has no effect on results
 
 glucose_price = 236. /_kg_per_ton # refer to email: "sugar price from maravelias group"
 
@@ -157,6 +158,7 @@ KOH_price = 1.6
 # https://www.alibaba.com/product-detail/Hydrochloric-acid-HCl-7647-01-0_60439085052.html?spm=a2700.galleryofferlist.0.0.4fa42c515nP2GH
 HCl_price = 0.3
 
+activated_carbon_price = 41. # $/ft^3 # Seader et al.
 # All in 2016$/kg
 price = {'SA': SA_price,
          'TCP': TCP_price,
@@ -196,9 +198,12 @@ price = {'SA': SA_price,
          'Gypsum': gypsum_price,
          'Denaturant': denaturant_price,
          'Amberlyst15': amberlyst_15_price,
-         'DAP': 0.1645 * _lb_per_kg}
+         'DAP': 0.1645 * _lb_per_kg,
+         'Activated carbon': activated_carbon_price}
     
-
+#!!! Round all prices to 4 *decimal places*
+for k in price.keys():
+    price[k] = round(price[k], 4)
 
 bst.PowerUtility.price = price['Electricity']
 

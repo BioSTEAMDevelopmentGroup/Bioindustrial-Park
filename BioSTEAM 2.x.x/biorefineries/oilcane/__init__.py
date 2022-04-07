@@ -11,7 +11,7 @@ from . import (
     units,
     _process_settings,
     _chemicals,
-    _system,
+    systems,
     _tea,
     _oil_extraction_specification,
     _distributions,
@@ -26,7 +26,7 @@ from .units import *
 from ._process_settings import *
 from ._chemicals import *
 from ._contour_plots import *
-from ._system import *
+from .systems import *
 from ._tea import *
 from ._oil_extraction_specification import *
 from ._distributions import *
@@ -42,7 +42,7 @@ __all__ = (
     units.__all__,
     *_process_settings.__all__,
     *_chemicals.__all__,
-    *_system.__all__,
+    *systems.__all__,
     *_tea.__all__,
     *_oil_extraction_specification.__all__,
     *_distributions.__all__,
@@ -69,7 +69,7 @@ from chaospy import distributions as shape
 import numpy as np
 from ._process_settings import load_process_settings
 from ._chemicals import create_chemicals
-from ._system import (
+from .systems import (
     create_oilcane_to_biodiesel_and_ethanol_1g,
     create_oilcane_to_biodiesel_and_ethanol_combined_1_and_2g_post_fermentation_oil_separation,
     create_sugarcane_to_ethanol_combined_1_and_2g,    
@@ -115,7 +115,7 @@ kg_per_ton = 907.18474
 
 
 configuration_names = (
-    'S1', 'O1', 'S2', 'O2', 'S1*', 'O1*', 'S2*', 'O2*', 'O3',
+    'S1', 'O1', 'S2', 'O2', 'S1*', 'O1*', 'S2*', 'O2*', 'O3', 'O4',
 )
 comparison_names = (
     # 'I - ∅', 
@@ -171,7 +171,7 @@ def load(name, cache={}, reduce_chemicals=True,
     dct = globals()
     number, agile = dct['configuration'] = configuration = parse(name)
     key = (number, agile, enhanced_cellulosic_performance)
-    if key in cache:
+    if cache is not None and key in cache:
         dct.update(cache[key])
         return
     global oilcane_sys, sys, tea, specs, flowsheet, _system_loaded
@@ -187,7 +187,7 @@ def load(name, cache={}, reduce_chemicals=True,
     load_process_settings()
     s = flowsheet.stream
     u = flowsheet.unit
-    operating_hours = 24 * 200
+    operating_hours = 24 * 180
     
     ## System
     
@@ -401,7 +401,7 @@ def load(name, cache={}, reduce_chemicals=True,
         sys.operation_parameter(set_xylose_yield)
         
         dct['cane_mode'] = cane_mode = sys.operation_mode(oilcane_sys,
-            operating_hours=200*24, oil_content=0.05, feedstock=feedstock.copy(),
+            operating_hours=180*24, oil_content=0.05, feedstock=feedstock.copy(),
             z_mass_carbs_baseline=0.1491, glucose_yield=85, xylose_yield=65, 
             FFA_content=0.10, PL_content=0.10
         )
@@ -434,7 +434,7 @@ def load(name, cache={}, reduce_chemicals=True,
     else:
         if number > 2:
             dct['biodiesel'] = bst.Stream('biodiesel')
-        
+        isplit_b = isplit_a = None
         for i in oilcane_sys.cost_units:
             if getattr(i, 'tag', None) == 'oil extraction efficiency':
                 isplit_a = i.isplit
@@ -506,25 +506,16 @@ def load(name, cache={}, reduce_chemicals=True,
     def triangular(lb, mid, ub, *args, **kwargs):
         return parameter(*args, distribution=shape.Triangle(lb, mid, ub), bounds=(lb, ub), **kwargs)
     
-    @uniform(40, 70, units='%', kind='coupled')
+    @uniform(40, 5, units='%', kind='coupled')
     def set_bagasse_oil_retention(oil_retention):
         oil_extraction_specification.load_oil_retention(oil_retention / 100.)
     
-    def oil_extraction_efficiency_hook(x):
-        if number < 0:
-            return x
-        elif number in (1, 3):
-            return 50.0 + x
-        elif number in (2, 4):
-            return 70.0 + x
-    
-    @uniform(0., 20, units='%', kind='coupled', 
-             hook=oil_extraction_efficiency_hook)
+    @uniform(70.0, 95, units='%', kind='coupled')
     def set_bagasse_oil_extraction_efficiency(bagasse_oil_extraction_efficiency):
         oil_extraction_specification.load_efficiency(bagasse_oil_extraction_efficiency / 100.)
 
     # Baseline from Huang's 2016 paper, but distribution more in line with Florida sugarcane harvesting (3-5 months)
-    @uniform(4 * 30, 6 * 30, units='day/yr', baseline=200)
+    @uniform(4 * 30, 6 * 30, units='day/yr', baseline=180)
     def set_cane_operating_days(cane_operating_days):
         if agile:
             cane_mode.operating_hours = cane_operating_days * 24
@@ -1027,12 +1018,11 @@ def load(name, cache={}, reduce_chemicals=True,
             set_baseline(set_xylose_to_ethanol_yield, 42)
     if number in (1, 3) and enhanced_biodiesel_production:
         set_baseline(set_cane_oil_content, 15)
-        set_baseline(set_bagasse_oil_extraction_efficiency, oil_extraction_efficiency_hook(20))
-        set_baseline(set_bagasse_oil_retention, 40)
+        set_baseline(set_bagasse_oil_extraction_efficiency, 95)
     else:
         set_baseline(set_cane_oil_content, 5)
-        set_baseline(set_bagasse_oil_extraction_efficiency, oil_extraction_efficiency_hook(0.))
-        set_baseline(set_bagasse_oil_retention, 70)
+        set_baseline(set_bagasse_oil_extraction_efficiency, 70)
+    set_baseline(set_bagasse_oil_retention, 40)
     set_baseline(set_ethanol_price, mean_ethanol_price) 
     set_baseline(set_crude_glycerol_price, mean_glycerol_price)
     set_baseline(set_biodiesel_price, mean_biodiesel_price)
@@ -1056,9 +1046,12 @@ def load(name, cache={}, reduce_chemicals=True,
         dct[i.setter.__name__] = i
     for i in model._metrics:
         dct[i.getter.__name__] = i
-    cache[key] = dct.copy()
+    if cache is not None: cache[key] = dct.copy()
     
     ## Simulation
+    HXN.force_ideal_thermo = True
+    HXN.cache_network = True
+    HXN.avoid_recycle = True
     try: 
         sys.simulate()
     except Exception as e:
@@ -1066,8 +1059,6 @@ def load(name, cache={}, reduce_chemicals=True,
     if reduce_chemicals:
         oilcane_sys.reduce_chemicals()
     oilcane_sys._load_stream_links()
-    HXN.force_ideal_thermo = True
-    HXN.cache_network = True
     HXN.simulate()
 
 # DO NOT DELETE: For removing ylabel and yticklabels and combine plots

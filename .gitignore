@@ -1,6 +1,32 @@
 build
 dist
-biorefineries.egg-info
+BioSTEAM 2.x.x/biorefineries.egg-info
+**/__pycache__
+*.pyc
+*.pyo
+.gitignore
+.pypirc
+dist
+MANIFEST
+.coverage
+.coveralls.yml
+htmlcov
+_build
+.cache
+__pycache__
+prof
+*Pyreverse*
+monkeytype.sqlite3
+*.spyproject*
+
+# Docs #
+########
+# No need to save these files
+docs/tutorial/.ipynb_checkpoints
+docs/.ipynb_checkpoints
+docs/_build/*
+docs/_static/*
+docs/_templates/*
 
 # Compiled source #
 ###################
@@ -10,28 +36,28 @@ biorefineries.egg-info
 *.exe
 *.o
 *.so
-
-# Packages #
+*.idea
+ # Packages #
 ############
 # it's better to unpack these files and commit the raw source
 # git has its own built in compression methods
 *.7z
 *.dmg
-*.gz
+#*.gz
 *.iso
 *.jar
 *.rar
-*.tar
-*.zip
-
+#*.tar
+#*.zip
+ 
 # Logs and databases #
 ######################
 *.log
 *.sql
-*.sqlite 
-
-# macOS generated files #
-#########################
+*.sqlite
+ 
+# mac OS generated files #
+######################
 .DS_Store
 .DS_Store?
 ._*
@@ -39,7 +65,4 @@ biorefineries.egg-info
 .Trashes
 ehthumbs.db
 Thumbs.db
-
-# Python caches #
-#################
-**/__pycache__
+surfaces

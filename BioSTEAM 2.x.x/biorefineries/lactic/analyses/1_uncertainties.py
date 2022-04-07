@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# BioSTEAM: The Biorefinery Simulation and Techno-Economic Analysis Modules
-# Copyright (C) 2020-2021, Yoel Cortes-Pena <yoelcortes@gmail.com>
 # Bioindustrial-Park: BioSTEAM's Premier Biorefinery Models and Results
-# Copyright (C) 2020-2021, Yalin Li <yalinli2@illinois.edu>,
-# Sarang Bhagwat <sarangb2@illinois.edu>, and Yoel Cortes-Pena (this biorefinery)
+# Copyright (C) 2020-, Yalin Li <yalinli2@illinois.edu>,
+#                      Sarang Bhagwat <sarangb2@illinois.edu>,
+#                      Yoel Cortes-Pena <yoelcortes@gmail.com>
 #
 # This module is under the UIUC open-source license. See
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
@@ -103,7 +102,7 @@ def evaluate_uncertainties(kind='SSCF', seed=None, N_simulation=1000,
     spearman_results = model.spearman_r(spearman_parameters, spearman_metrics)[0]
     spearman_results.columns = pd.Index([i.name_with_units for i in spearman_metrics])
 
-    # Calculate the cumulative probabilitie of each parameter
+    # Calculate the cumulative probabilities of each parameter
     probabilities = {}
     for i in range(index_parameters):
         p = parameters[i]

@@ -5,13 +5,12 @@ Created on Wed Aug 11 19:01:59 2021
 @author: sarangbhagwat
 """
 
-import biosteam as bst
-import thermosteam as tmo
+from biosteam import Facility
+
 # from . import Facility
 
 __all__ = ('AutoWasteManagement')
 
-Facility = bst.Facility
 
 class AutoWasteManagement(Facility):
     """
@@ -23,62 +22,55 @@ class AutoWasteManagement(Facility):
     
     Parameters
     ----------
-    ins : None
-        
-    outs : None
-    
     wastewater_mixer: Unit
         Used by the biorefinery to mix wastes to be sent to wastewater treatment and/or disposal.
     
     boiler_solids_mixer: Unit
         Used by the biorefinery to mix wastes to be sent to the boiler for combustion.
     
-    to_wastewater_mixer_ID_key: str
+    to_wastewater_mixer_ID_key: str, optional
         Used to identify streams in the flowsheet to be sent to the wastewater_mixer unit.
         Defaults to '_to_WWT'.
         
-    to_boiler_solids_mixer_ID_key: str
+    to_boiler_solids_mixer_ID_key: str, optional
         Used to identify streams in the flowsheet to be sent to the boilder_solids_mixer unit.
         Defaults to '_to_boiler'
         
-    Example
-    ----------
-    import thermosteam as tmo
-    import biosteam as bst
-    from biosteam import SystemFactory
-    flowsheet = bst.Flowsheet('AWM_test')
-    bst.main_flowsheet.set_flowsheet(flowsheet)
+    Examples
+    -------
+    >>>import thermosteam as tmo
+    >>>import biosteam as bst
+    >>>from biosteam import SystemFactory
+    >>>flowsheet = bst.Flowsheet('AWM_test')
+    >>>bst.main_flowsheet.set_flowsheet(flowsheet)
     
-    Lignin=tmo.Chemical('Lignin')
-    Lignin.Psat.add = 0.
-    Lignin.Tb = 600
-    Lignin.Hvap = 1e5
-    tmo.settings.set_thermo([Lignin, 'Water', 'AceticAcid'])
+    >>>Lignin=tmo.Chemical('Lignin')
+    >>>Lignin.Psat.add = 0.
+    >>>Lignin.Tb = 600
+    >>>Lignin.Hvap = 1e5
+    >>>tmo.settings.set_thermo([Lignin, 'Water', 'AceticAcid'])
     
-    @SystemFactory(ID = 'AWM_test_sys')
-    def create_AWM_test_sys(ins, outs):
-        S101_feed=tmo.Stream('S101_feed', Lignin=10, Water=30, AceticAcid=10)
-        M101_feed=tmo.Stream('M101_feed', Lignin=5)
-        S101 = bst.units.FakeSplitter('S101', ins=S101_feed, outs=('S101_to_WWT', 'S101_to_boiler'))
-        @S101.add_specification()
-        def S101_spec():
-            S101.outs[1].imol['Lignin'] = S101.ins[0].imol['Lignin']
-            S101.outs[0].copy_like(S101.ins[0])
-            S101.outs[0].imol['Lignin'] -= S101.ins[0].imol['Lignin']
-        M101 = bst.units.Mixer('M101', ins=M101_feed, outs=('M101_to_boiler'))
-        M501 = bst.units.Mixer('M501', ins=('mixed_wastewater_to_M501'), outs=())
-        M505 = bst.units.Mixer('M505', ins=(M101-0,'mixed_solids_to_M505'), outs=())
-        AWM = bst.facilities.AutoWasteManagement('AWM', wastewater_mixer=M501, boiler_solids_mixer=M505,
-                                  to_wastewater_mixer_ID_key='to_WWT',
-                                  to_boiler_solids_mixer_ID_key='to_boiler')
-    AWM_test_sys = create_AWM_test_sys()
-    AWM_test_sys.simulate()
-    u = flowsheet.unit
-    u.M501.show()
-    u.M505.show()
-    
-    Output
-    ----------
+    >>>@SystemFactory(ID = 'AWM_test_sys')
+    >>>def create_AWM_test_sys(ins, outs):
+    >>>    S101_feed=tmo.Stream('S101_feed', Lignin=10, Water=30, AceticAcid=10)
+    >>>    M101_feed=tmo.Stream('M101_feed', Lignin=5)
+    >>>    S101 = bst.units.FakeSplitter('S101', ins=S101_feed, outs=('S101_to_WWT', 'S101_to_boiler'))
+    >>>    @S101.add_specification()
+    >>>    def S101_spec():
+    >>>        S101.outs[1].imol['Lignin'] = S101.ins[0].imol['Lignin']
+    >>>        S101.outs[0].copy_like(S101.ins[0])
+    >>>        S101.outs[0].imol['Lignin'] -= S101.ins[0].imol['Lignin']
+    >>>    M101 = bst.units.Mixer('M101', ins=M101_feed, outs=('M101_to_boiler'))
+    >>>    M501 = bst.units.Mixer('M501', ins=('mixed_wastewater_to_M501'), outs=())
+    >>>    M505 = bst.units.Mixer('M505', ins=(M101-0,'mixed_solids_to_M505'), outs=())
+    >>>    AWM = bst.facilities.AutoWasteManagement('AWM', wastewater_mixer=M501, boiler_solids_mixer=M505,
+    >>>                              to_wastewater_mixer_ID_key='to_WWT',
+    >>>                              to_boiler_solids_mixer_ID_key='to_boiler')
+    >>>AWM_test_sys = create_AWM_test_sys()
+    >>>AWM_test_sys.simulate()
+    >>>u = flowsheet.unit
+    >>>u.M501.show()
+    >>>u.M505.show()
     
 
     The AutoWasteManagement facility is being used. Note that
@@ -118,11 +110,11 @@ class AutoWasteManagement(Facility):
     _N_heat_utilities = 0
     _N_power_utilities = 0
     
-    def __init__(self, ID='', ins=None, outs=None, thermo=None, 
+    def __init__(self, ID='',
                  wastewater_mixer=None, boiler_solids_mixer=None,
                  to_wastewater_mixer_ID_key='_to_WWT',
                  to_boiler_solids_mixer_ID_key='_to_boiler'):
-        Facility.__init__(self, ID, ins, outs, thermo)
+        Facility.__init__(self, ID, ins=None, outs=None, thermo=None)
         self.wastewater_mixer = wastewater_mixer
         self.boiler_solids_mixer = boiler_solids_mixer
         self.to_wastewater_mixer_ID_key = to_wastewater_mixer_ID_key
@@ -132,7 +124,7 @@ class AutoWasteManagement(Facility):
         print(f"all streams labeled '{to_wastewater_mixer_ID_key}' are mixed as the final inlet of {wastewater_mixer.ID}, and")
         print(f"all streams labeled '{to_boiler_solids_mixer_ID_key}' are mixed as the final inlet of {boiler_solids_mixer.ID}.")
         print("If any streams with those labels were manually set as an inlet for either mixer, those")
-        print("streams will be excluded from the mixed final inlet of that mixer.\n\n")
+        print("streams will be excluded from the mixed final inlet of that mixer (i.e., the manual connection will be retained.\n\n")
         
         @wastewater_mixer.add_specification(run=True)
         def wastewater_mixer_spec():
@@ -158,10 +150,12 @@ class AutoWasteManagement(Facility):
         
         for si in s:
             if to_wastewater_mixer_ID_key in si.ID and \
-                not (si in wastewater_mixer.ins or si in wastewater_mixer.outs):
+                not (si in wastewater_mixer.ins or si in wastewater_mixer.outs) and \
+                not si.source in wastewater_mixer.get_downstream_units():
                 individual_streams_to_WWT.append(si)
             elif to_boiler_solids_mixer_ID_key in si.ID and \
-                not (si in boiler_solids_mixer.ins or si in boiler_solids_mixer.outs):
+                not (si in boiler_solids_mixer.ins or si in boiler_solids_mixer.outs) and \
+                not si.source in boiler_solids_mixer.get_downstream_units():
                 individual_solids_to_boiler.append(si)
         
         mixed_streams_to_WWT.empty()
