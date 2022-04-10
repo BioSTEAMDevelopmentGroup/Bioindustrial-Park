@@ -434,7 +434,7 @@ def load(name, cache={}, reduce_chemicals=True,
     else:
         if number > 2:
             dct['biodiesel'] = bst.Stream('biodiesel')
-        
+        isplit_b = isplit_a = None
         for i in oilcane_sys.cost_units:
             if getattr(i, 'tag', None) == 'oil extraction efficiency':
                 isplit_a = i.isplit
@@ -506,20 +506,11 @@ def load(name, cache={}, reduce_chemicals=True,
     def triangular(lb, mid, ub, *args, **kwargs):
         return parameter(*args, distribution=shape.Triangle(lb, mid, ub), bounds=(lb, ub), **kwargs)
     
-    @uniform(40, 70, units='%', kind='coupled')
+    @uniform(40, 5, units='%', kind='coupled')
     def set_bagasse_oil_retention(oil_retention):
         oil_extraction_specification.load_oil_retention(oil_retention / 100.)
     
-    def oil_extraction_efficiency_hook(x):
-        if number < 0:
-            return x
-        elif number in (1, 3):
-            return 50.0 + x
-        elif number in (2, 4):
-            return 70.0 + x
-    
-    @uniform(0., 20, units='%', kind='coupled', 
-             hook=oil_extraction_efficiency_hook)
+    @uniform(70.0, 95, units='%', kind='coupled')
     def set_bagasse_oil_extraction_efficiency(bagasse_oil_extraction_efficiency):
         oil_extraction_specification.load_efficiency(bagasse_oil_extraction_efficiency / 100.)
 
@@ -1027,12 +1018,11 @@ def load(name, cache={}, reduce_chemicals=True,
             set_baseline(set_xylose_to_ethanol_yield, 42)
     if number in (1, 3) and enhanced_biodiesel_production:
         set_baseline(set_cane_oil_content, 15)
-        set_baseline(set_bagasse_oil_extraction_efficiency, oil_extraction_efficiency_hook(20))
-        set_baseline(set_bagasse_oil_retention, 40)
+        set_baseline(set_bagasse_oil_extraction_efficiency, 95)
     else:
         set_baseline(set_cane_oil_content, 5)
-        set_baseline(set_bagasse_oil_extraction_efficiency, oil_extraction_efficiency_hook(0.))
-        set_baseline(set_bagasse_oil_retention, 70)
+        set_baseline(set_bagasse_oil_extraction_efficiency, 70)
+    set_baseline(set_bagasse_oil_retention, 40)
     set_baseline(set_ethanol_price, mean_ethanol_price) 
     set_baseline(set_crude_glycerol_price, mean_glycerol_price)
     set_baseline(set_biodiesel_price, mean_biodiesel_price)

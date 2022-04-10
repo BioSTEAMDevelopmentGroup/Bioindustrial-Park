@@ -191,16 +191,7 @@ def create_oilcane_to_biodiesel_and_ethanol_1g(
     screened_juice, bagasse, fiber_fines = juicing_sys.outs
     bagasse_pelleting_sys = create_bagasse_pelleting_system(None, bagasse, area=400, mockup=True)
     pelleted_bagasse, = bagasse_pelleting_sys.outs
-    
-    oil_expression_sys = create_oil_expression_system(
-        ins=pelleted_bagasse,
-        mockup=True,
-        area=400
-    )
-    bagasse_oil, pressed_bagasse = oil_expression_sys.outs
-    bagasse_oil.ID = ''
-    PX = bst.Pump(400, bagasse_oil)
-    vibrating_screen = jdct['S201'].isplit['Lipid'] = 1.
+    jdct['S201'].isplit['Lipid'] = 1.
     crushing_mill = jdct['U201']
     crushing_mill.tag = "bagasse oil retention"
     crushing_mill.isplit['Lipid'] = 0.90
@@ -222,9 +213,8 @@ def create_oilcane_to_biodiesel_and_ethanol_1g(
         area=400,
     )
     oil, cellmass, thick_vinasse, evaporator_condensate_b = post_fermentation_oil_separation_sys.outs
-    MX = bst.Mixer(400, [PX-0, oil])
     oil_pretreatment_sys, oil_pretreatment_dct = create_oil_pretreatment_system(
-        ins=MX-0,
+        ins=oil,
         mockup=True,
         outs=['', 'polar_lipids', ''],
         area=600,
@@ -253,7 +243,7 @@ def create_oilcane_to_biodiesel_and_ethanol_1g(
     u = f.unit
     
     MX2 = bst.Mixer(700,
-        [polar_lipids, pressed_bagasse, cellmass]
+        [polar_lipids, pelleted_bagasse, cellmass]
     )
     
     # Burn bagasse from conveyor belt

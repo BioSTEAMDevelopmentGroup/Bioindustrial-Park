@@ -289,22 +289,22 @@ def set_TAL_productivity(TAL_prod):
     spec.spec_3 = TAL_prod
 ###
 
-D = shape.Triangle(0.8*0.005, 0.005, 1.2*0.005)
-@param(name='VitaminA yield', element=R302, kind='coupled', units='g/g',
-       baseline=0.005, distribution=D)
-def set_vitaminA_yield(yield_):
-    R302.glucose_to_VitaminA_rxn.X = yield_
-    R303.glucose_to_VitaminA_rxn.X = R303.ferm_ratio*yield_
+# D = shape.Uniform(0.8*0.005, 0.005, 1.2*0.005)
+# @param(name='VitaminA yield', element=R302, kind='coupled', units='% theoretical',
+#        baseline=0.005, distribution=D)
+# def set_vitaminA_yield(yield_):
+#     R302.glucose_to_VitaminA_rxn.X = yield_
+#     R303.glucose_to_VitaminA_rxn.X = R303.ferm_ratio*yield_
 
-D = shape.Triangle(0.8*0.005, 0.005, 1.2*0.005)
-@param(name='VitaminD2 yield', element=R302, kind='coupled', units='g/g',
-       baseline=0.005, distribution=D)
-def set_vitaminD2_yield(yield_):
-    R302.glucose_to_VitaminD2_rxn.X = yield_
-    R303.glucose_to_VitaminD2_rxn.X = R303.ferm_ratio*yield_
+# D = shape.Uniform(0.8*0.005, 0.005, 1.2*0.005)
+# @param(name='VitaminD2 yield', element=R302, kind='coupled', units='% theoretical',
+#        baseline=0.005, distribution=D)
+# def set_vitaminD2_yield(yield_):
+#     R302.glucose_to_VitaminD2_rxn.X = yield_
+#     R303.glucose_to_VitaminD2_rxn.X = R303.ferm_ratio*yield_
 
 D = shape.Triangle(0.8*0.05, 0.05, 1.2*0.05)
-@param(name='Microbe yield', element=R302, kind='coupled', units='g/g',
+@param(name='Microbe yield', element=R302, kind='coupled', units='% theoretical',
        baseline=0.05, distribution=D)
 def set_microbe_yield(yield_):
     R302.glucose_to_microbe_rxn.X = yield_
