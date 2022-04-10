@@ -34,24 +34,24 @@ def create_oc2g_comparison_systems(default_BD=True):
     CF_dct = {
         ##### Feeds #####
         'catalyst': ('TEcatalyst',), # methanol and NaOCH3
-        'caustic': ('caustic', 0.5), # NaOH and water
-        'cellulase': ('cellulase', 0.05), # cellulase and water
+        'caustic': ('NaOH', 0.5), # NaOH and water
+        'cellulase': ('Cellulase', 0.05), # cellulase and water
         'CSL': ('CSL',),
         'DAP': ('DAP',),
         'denaturant': ('Denaturant'),
         'FGD_lime': ('Lime', 0.4513), # lime and water
-        'H3PO4': ('H3PO4', 0.5), # H3PO4 and water
-        'HCl': ('HCl', 0.3498), # HCl and water
+        'H3PO4': ('H3PO4',),
+        'HCl': ('HCl',),
         'lime': ('CaO', 0.046), # CaO and water
-        'methanol': ('Methanol', 1), # CaO and water
+        'methanol': ('Methanol',),
         'NaOH': ('NaOH',),
         'natural_gas': ('CH4',),
-        'oilcane': ('Oilcane', (1-0.7)), # adjust for the moisture content
-        'polymer': ('Flocculant',),
-        'pure_glycerine': ('Glycerol',),
+        'oilcane': ('Oilcane',), # moisture content already adjusted
+        'polymer': ('Polymer',),
+        'pure_glycerine': ('GlycerinPure',),
         ##### Co-products #####
         'biodiesel': ('Biodiesel',), # has <0.01 wt% impurities
-        'crude_glycerol': ('Glycerol', 0.8), # glycerol and water #!!! need to see if there's a CF for crude glycerol
+        'crude_glycerol': ('GlycerolCrude',),
         }
     sys_dct = {
         'load': {'name': 'O2', 'cache': None, 'reduce_chemicals': False},

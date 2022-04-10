@@ -37,14 +37,14 @@ def create_la_comparison_systems(default_BD=True):
         'ammonia': ('NH4OH',), # NH4OH
         'caustic_R502': ('NaOH',),
         'CSL': ('CSL',),
-        'enzyme_M301': ('Enzyme',),
+        'enzyme_M301': ('Cellulase',), # this is pure enzyme
         'ethanol': ('Ethanol',),
-        'feedstock': ('CornStover', (1-0.2)), # adjust for the moisture content
+        'feedstock': ('CornStover',),
         'lime': ('Lime',),
         'lime_CHP': ('Lime',),
         'natural_gas': ('CH4',),
-        # 'polymer_R502': ('Polymer',), #!!! maybe add as Flocculant?
-        'sulfuric_acid': ('H2SO4', 0.93), # H2SO4 and water
+        'polymer_R502': ('Polymer',),
+        'sulfuric_acid': ('H2SO4',),
         ##### Co-products #####
         # following the lactic paper baseline, gypsum not included
         }

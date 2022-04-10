@@ -32,17 +32,17 @@ def create_sc2g_comparison_systems(default_BD=True):
     BD = {} if not default_BD else 1.
     wwt_kwdct = dict.fromkeys(('IC_kwargs', 'AnMBR_kwargs',), {'biodegradability': BD,})
     CF_dct = { # all feeds
-        'caustic': ('caustic', 0.5), # NaOH and water
-        'cellulase': ('cellulase', 0.05), # cellulase and water
+        'caustic': ('NaOH', 0.5), # NaOH and water
+        'cellulase': ('Cellulase', 0.05), # cellulase and water
         'denaturant': ('Denaturant'),
         'CSL': ('CSL',),
         'DAP': ('DAP',),
         'FGD_lime': ('Lime', 0.4513), # lime and water
-        'H3PO4': ('H3PO4', 0.5), # H3PO4 and water
+        'H3PO4': ('H3PO4',),
         'lime': ('CaO', 0.046), # CaO and water
         'natural_gas': ('CH4',),
-        'polymer': ('Flocculant'),
-        'sugarcane': ('Sugarcane', (1-0.7)), # adjust for the moisture content
+        'polymer': ('Polymer'),
+        'sugarcane': ('Sugarcane',), # moisture content already adjusted
         }
     sys_dct = {
         'load': {'name': 'S2', 'cache': None, 'reduce_chemicals': False},

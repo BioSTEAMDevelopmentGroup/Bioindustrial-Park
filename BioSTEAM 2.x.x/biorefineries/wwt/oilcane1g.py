@@ -37,19 +37,19 @@ def create_oc1g_comparison_systems(default_BD=True):
         'catalyst': ('TEcatalyst',), # methanol and NaOCH3
         'denaturant': ('Denaturant'),
         'dryer_natural_gas': ('CH4',),
-        'H3PO4': ('H3PO4', 0.5), # H3PO4 and water
-        'HCl': ('HCl', 0.3498), # HCl and water
+        'H3PO4': ('H3PO4',),
+        'HCl': ('HCl',),
         'lime': ('CaO', 0.046), # CaO and water
         'methanol': ('Methanol',),
         'NaOH': ('NaOH',),
         'natural_gas': ('CH4',), # probably not needed
-        'oilcane': ('Oilcane', (1-0.7)), # adjust for the moisture content
-        'polymer': ('Flocculant'),
-        'pure_glycerine': ('Glycerol',),
+        'oilcane': ('Oilcane',), # moisture content already adjusted
+        'polymer': ('Polymer'),
+        'pure_glycerine': ('PureGlycerin',),
         ##### Co-products #####
         'biodiesel': ('Biodiesel',), # has <0.01 wt% impurities
-        'crude_glycerol': ('Glycerol', 0.8), # glycerol and water #!!! need to see if there's a CF for crude glycerol
-        'Yeast': ('Yeast',), #!!! not pure yeast, need to consider
+        'crude_glycerol': ('GlycerolCrude',),
+        # 'Yeast': ('Yeast',), # no price considered, no GWP considered (probably used in fermentation)
         # `fiber_fines`, `wastewater`, `vinasse` taken care of by WWT
         # `filter_cake` taken care of by BT
         # `s46` (from `T302`) is empty

@@ -526,13 +526,13 @@ _GDP_2007to2016 = 1.160
 # https://doi.org/10.1039/C5EE03715H.
 
 prices = { # $/kg unless otherwise noted
-    'wastewater': -0.02, # average of the -0.03 from ref [1] and -0.01 estimated based on brewery data, negative value for cost of product
-    'naocl': 0.14, # $/L
-    'citric_acid': 0.22, # $/L
-    'bisulfite': 0.08, # $/L
-    'ethanol': 0.789, # $/kg, lipidcane biorefinery
     'biodiesel': 1.38, # $/kg, lipidcane biorefinery
+    'bisulfite': 0.08, # $/L
+    'citric_acid': 0.22, # $/L
+    'ethanol': 0.789, # $/kg, lipidcane biorefinery
     'lactic_acid': 1.9, # $/kg, lactic acid biorefinery
+    'naocl': 0.14, # $/L
+    'wastewater': -0.02, # average of the -0.03 from ref [1] and -0.01 estimated based on brewery data, negative value for cost of product
 #    'caustics': 0.2627, # lactic acid biorefinery, price['NaOH]/2 as the caustic is 50% NaOH/water
 #    'polymer': 2.6282 / _lb_per_kg / _GDP_2007to2016, # ref [2]
     }
@@ -582,66 +582,82 @@ def get_MPSP(system, product='ethanol', print_msg=True):
 # Related to life cycle assessment (LCA)
 # =============================================================================
 
-# 100-year global warming potential (GWP) in kg CO2-eq/kg dry material,
-# all data from GREET 2020 unless otherwise noted
+# 100-year global warming potential (GWP) in kg CO2-eq/kg dry material unless otherwise noted
+# All data from GREET 2021 unless otherwise noted
+# All ecoinvent entries are from v3.8, allocation at the point of substitution
 # Direct emissions from fossil-derived materials (e.g., CO2 from CH4) included
 
-# North America, from shale and conventional recovery
-ng_CF = 0.33 + 1/16.04246*44.0095
+# GREET, from soybean, ILUC included, transportation and storage excluded
+# Ecoinvent is 1.0156 for US, esterification of soybean oil
+biodiesel_CF = 0.9650
 
-# Gasoline blendstock from crude oil for use in US refineries, modeled as octane
-denaturant_CF = 0.84 + 1/114.22852*44.0095*8
+# Ecoinvent, market for sodium hydrogen sulfite, GLO,
+# converted to 38% solution
+bisulfite_CF = 1.2871 * 0.38
 
-##### Chemicals used in the new WWT process #####
-# CFs for NaOCl, citric acid, and bisulfite from ecoinvent 3.7.1,
-# allocation at the point of substitution
+# Ecoinvent, market for citric acid, GLO
+citric_acid_CF = 5.9048
+
+# GREET for biofuel refinery, moisture included
+# Ecoinvent sweet corn production, GLO is 0.26218
+corn_CF = 0.2719
+
+# GREET, gasoline blendstock from crude oil for use in US refineries, modeled as octane
+denaturant_CF = 0.8499 + 1/114.22852*44.0095*8
+
+# GREET, co-product from soybean biodiesel, transportation excluded
+glycerin_crude_CF = 0.2806
+# Ecoinvent, market for glycerine, RoW
+glycerin_pure_CF = 1.4831
+
+# Ecoinvent, market for sodium hypochlorite, without water, in 15% solution state, RoW,
+# converted to 12.5 wt% solution (15 vol%)
+naocl_CF = 2.4871 * 0.125
 
 # Market for sodium hypochlorite, without water, in 15% solution state, RoW,
 # converted to 12.5 wt% solution (15 vol%)
-naocl_CF = 2.5165 * 0.125
+naocl_CF = 2.4871 * 0.125
 
-# Market for citric acid, GLO
-citric_acid_CF = 5.9272
+# GREET, North America, from shale and conventional recovery, average US
+ng_CF = 0.3899 + 1/16.04246*44.0095
 
-# Sodium hydrogen sulfite production, RoW,
-# converted to 38% solution
-bisulfite_CF = 1.3065 * 0.38
+# GREET 70% water wet mass, ecoinvent market for sugarcane, RoW, is 0.047651 (71.4% water)
+sugarcane_CF = 28.1052/1e3/(1-0.75)*(1-0.7)
 
-#!!! Need to add ones for the other biorefineries,
-#!!! want to do an update with consistent data source
-XXX = 0
+#!!! Need to double-check enzyme-related GWPs: AlphaAmylase, Cellulase, GlucoAmylase, Yeast
 GWP_CFs = {
     ##### Feeds #####
-    'AlphaAmylase': XXX,
+    'AlphaAmylase': 1.2043, # assumed to be for the solution
     'Bisulfite': bisulfite_CF,
-    'CaO': 1.29,
-    'Cellulase': 2.24,
+    'CaO': 1.2833,
+    'Cellulase': 2.2199, # assumed to be for the solution; ecoinvent, market for enzymes, GLO, 10.452
     'CH4': ng_CF,
     'CitricAcid': citric_acid_CF,
-    'Corn': XXX,
-    'CornStover': 0.10945,
-    'CSL': 1.55,
-    'DAP': XXX,
+    'Corn': corn_CF,
+    'CornStover': 43.1442/1e3, # for ethanol plant, moisture included
+    'CSL': 1.6721,
+    'DAP': 1.6712,
     'Denaturant': denaturant_CF,
-    'Electricity': (0.48, 0.48), # consumption, production #!!! needs updating
-    'Ethanol': 1.44 + 1/46.06844*44.0095*2, # CO2 emission included
-    'Flocculant': XXX,
-    'GlucoAmylase': XXX,
-    'Glycerol': XXX, #!!! feeds and products
-    'H2SO4': 0.04344,
-    'H3PO4': XXX,
-    'HCl': XXX,
-    'Methanol': XXX + 1/32.04186*44.0095,
-    'NaOCH3': XXX + 1/54.02369*44.0095,
+    'Electricity': (0.4398, 0.4184), # consumption, production (US mix, distributed/non-distributed)
+    'Ethanol': 1.4610 + 1/46.06844*44.0095*2, # not the denatured one, CO2 emission included
+    'GlucoAmylase': 5.5135, # assumed to be for the solution
+    'GlycerinPure': glycerin_pure_CF,
+    'H2SO4': 43.3831/1e3, # assumed to be concentrated solution
+    'H3PO4': 1.0619, # assumed to be concentrated solution
+    'HCl': 1.9683, # in the US, assumed to be concentrated solution
+    'Methanol': 0.4866 + 1/32.04186*44.0095, # combined upstream, CO2 emission included
+    'NaOCH3': 1.5732 + 1/54.02369*44.0095, # ecoinvent, market for sodium methoxide
     'NaOCl': naocl_CF,
-    'NaOH': 2.11,
-    'NH3': 2.64,
-    'Sugarcane': XXX,
-    'Yeast': XXX, #!!! feeds and products #!!! need to see if they are pure
+    'NaOH': 2.0092,
+    'NH3': 2.6355,
+    'Polymer': 0, # for existing wastewater treatment, small quantity, ignored
+    'Sugarcane': sugarcane_CF,
+    'Yeast': 2.5554, # assumed to be for the solution
     ##### Products, no needs to make product CFs negative #####
-    'Biodiesel': XXX,
-    'CornOil': XXX,
-    'DDGS': XXX, #!!! this is a mixture
+    'Biodiesel': biodiesel_CF,
+    'CornOil': 75.5919/1e3, # from corn, transportation excluded
+    'DDGS': 0.8607, # from corn
+    'GlycerinCrude': glycerin_crude_CF,
     }
 # All feeds
 GWP_CFs['Lime'] = GWP_CFs['CaO'] * 56.0774/74.093 # CaO to Ca(OH)2

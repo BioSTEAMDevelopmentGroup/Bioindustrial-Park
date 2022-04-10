@@ -35,19 +35,19 @@ def create_cn_comparison_systems(default_BD=True):
     wwt_kwdct['skip_AeF'] = True
     CF_dct = {
         ##### Feeds #####
-        'alpha_amylase': ('AlphaAmylase',),
+        'alpha_amylase': ('AlphaAmylase',), # 0.00082 soluble protein and water #!!! check concentration
         'ammonia': ('NH3',),
-        'corn': ('Corn', (1-0.15)), # adjust for the moisture content
-        'denaturant': ('Denaturant'),
-        'gluco_amylase': 'GlucoAmylase',
+        'corn': ('Corn',), # adjust for the moisture content
+        'denaturant': ('Denaturant',),
+        'gluco_amylase': ('GlucoAmylase',), # 0.0011 soluble protein and water #!!! check concentration
         'lime': ('CaO',),
         'natural_gas': ('CH4',),
         'sulfuric_acid': ('H2SO4',),
         ('X611', 2): ('CH4',),
-        'yeast': ('Yeast', 0.04587), # yeast and water #!!! revisit
+        'yeast': ('Yeast',),
         ##### Co-products #####
         'crude_oil': ('CornOil',), # triolein
-        'DDGS': ('DDGS',), #!!! this is a mixture
+        'DDGS': ('DDGS',),
          # `s4` (from MH103) taken care of by WWT
     }
     sys_dct = {

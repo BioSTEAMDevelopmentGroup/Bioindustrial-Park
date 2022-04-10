@@ -35,13 +35,13 @@ def create_cs_comparison_systems(default_BD=True):
         'ammonia': ('NH4OH',), # NH4OH
         'caustic': ('NaOH', 0.5), # NaOH and water
         'cellulase': ('Cellulase', 0.05), # cellulase and water
-        'cornstover': ('CornStover', (1-0.2022)), # adjust for the moisture content
+        'cornstover': ('CornStover',), # adjust for the moisture content
         'CSL': ('CSL',),
         'DAP': ('DAP',),
         'denaturant': ('Denaturant'),
         'FGD_lime': ('Lime', 0.4513), # lime and water
         'natural_gas': ('CH4',), # CH4 actually not used due to heat surplus
-        'sulfuric_acid': ('H2SO4', 0.9326), # H2SO4 and water
+        'sulfuric_acid': ('H2SO4',),
         }
     sys_dct = {
         'system_name': 'cornstover_sys',

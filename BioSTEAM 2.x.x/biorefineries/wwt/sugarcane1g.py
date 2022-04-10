@@ -36,12 +36,12 @@ def create_sc1g_comparison_systems(default_BD=True):
         ##### Feeds #####
         'denaturant': ('Denaturant'),
         'dryer_natural_gas': ('CH4',),
-        'H3PO4': ('H3PO4', 0.5), # H3PO4 and water
+        'H3PO4': ('H3PO4',),
         'lime': ('CaO', 0.046), # CaO and water
-        'polymer': ('Flocculant'),
-        'sugarcane': ('Sugarcane', (1-0.7)), # adjust for the moisture content
-        'Yeast': ('Yeast',), #!!! not pure yeast, need to consider
+        'polymer': ('Polymer'),
+        'sugarcane': ('Sugarcane',), # moisture content already adjusted
         ##### Co-products #####
+        # 'Yeast': ('Yeast',), # no price considered, no GWP considered (probably used in fermentation)
         # `fiber_fines`, `wastewater`, `vinasse` taken care of by WWT
         # `filter_cake` taken care of by BT
         # `s41` (from `T302`) is empty
