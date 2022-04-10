@@ -44,7 +44,7 @@ __all__ = (
     'rename_storage_units',
     # TEA/LCA
     'prices', 'update_product_prices', 'IRR_at_ww_price', 'ww_price_at_IRR', 'get_MPSP',
-    'add_CFs',
+    'add_CFs', 'get_GWP',
     )
 
 
@@ -623,7 +623,7 @@ GWP_CFs = {
     'CSL': 1.55,
     'DAP': XXX,
     'Denaturant': denaturant_CF,
-    'Electricity': 0.48, #!!! feeds and products
+    'Electricity': (0.48, 0.48), # consumption, production #!!! needs updating
     'Ethanol': 1.44 + 1/46.06844*44.0095*2, # CO2 emission included
     'Flocculant': XXX,
     'GlucoAmylase': XXX,
@@ -638,7 +638,7 @@ GWP_CFs = {
     'NH3': 2.64,
     'Sugarcane': XXX,
     'Yeast': XXX, #!!! feeds and products #!!! need to see if they are pure
-    ##### Products #####
+    ##### Products, no needs to make product CFs negative #####
     'Biodiesel': XXX,
     'CornOil': XXX,
     'DDGS': XXX, #!!! this is a mixture
@@ -661,4 +661,17 @@ def add_CFs(stream_registry, unit_registry, stream_CF_dct):
             key_factor = (key_factor,)
         key, factor = (key_factor, 1.) if len(key_factor) == 1 else key_factor
         stream.characterization_factors['GWP'] = GWP_CFs[key]*factor
-    bst.PowerUtility.characterization_factors['GWP'] = GWP_CFs['Electricity']
+    bst.PowerUtility.set_CF('GWP', *GWP_CFs['Electricity'])
+
+
+def get_GWP(system, product='ethanol', print_msg=True):
+    product = system.flowsheet.stream.search(product)
+    if product.ID=='ethanol':
+        txt = ('GWP', 'gal')
+        factor = ethanol_density_kggal
+    else:
+        txt = ('GWP', 'kg')
+        factor = 1.
+    GWP = system.get_net_impact('GWP') * factor / product.F_mass
+    if print_msg: print(f'\n{txt[0]} of {product.ID} for {system.ID}: ${GWP:.2f}/{txt[1]}.')
+    return GWP

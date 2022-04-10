@@ -11,7 +11,7 @@ import biosteam as bst
 from . import (
     add_wwt_chemicals, create_wastewater_process, CHP as CHPunit,
     get_COD_breakdown, update_product_prices,
-    IRR_at_ww_price, ww_price_at_IRR, get_MPSP, add_CFs,
+    IRR_at_ww_price, ww_price_at_IRR, get_MPSP, add_CFs, get_GWP,
     )
 
 __all__ = (
@@ -162,8 +162,10 @@ def simulate_systems(exist_sys, new_sys, info):
     print(f'\n\n{info["abbr"]} module:')
     print(f'Existing system IRR: {exist_tea.solve_IRR():.2%}')
     print(f'New system IRR: {new_tea.solve_IRR():.2%}')
-    get_MPSP(exist_sys, info['FERM_product'])
-    get_MPSP(new_sys, info['FERM_product'])
+    FERM_product = info['FERM_product']
+    for sys in (exist_sys, new_sys):
+        for fn in (get_MPSP, get_GWP):
+            fn(sys, FERM_product)
     get_COD_breakdown(getattr(new_sys.flowsheet.unit, f'S{info["WWT_ID"]}04').ins[0])
 
     if not info['is2G']:
