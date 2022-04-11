@@ -43,7 +43,7 @@ def create_cn_comparison_systems(default_BD=True):
         'lime': ('CaO',),
         'natural_gas': ('CH4',),
         'sulfuric_acid': ('H2SO4',),
-        ('X611', 2): ('CH4',),
+        ('X611', 'ins', 2): ('CH4',),
         'yeast': ('Yeast',),
         ##### Co-products #####
         'crude_oil': ('CornOil',), # triolein
@@ -121,6 +121,6 @@ def evaluate_cn_models(**eval_kwdct):
 # =============================================================================
 
 if __name__ == '__main__':
-    # exist_sys, new_sys = simulate_cn_systems(default_BD=True)
+    exist_sys, new_sys = simulate_cn_systems(default_BD=True)
     # exist_model, new_model = create_cn_comparison_models()
-    exist_model, new_model = evaluate_cn_models(N=1000)
+    # exist_model, new_model = evaluate_cn_models(N=1000)

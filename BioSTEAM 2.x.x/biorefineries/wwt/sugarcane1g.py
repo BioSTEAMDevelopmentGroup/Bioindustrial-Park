@@ -124,6 +124,6 @@ def evaluate_sc1g_models(**eval_kwdct):
 # =============================================================================
 
 if __name__ == '__main__':
-    # exist_sys, new_sys = simulate_sc1g_systems(default_BD=True)
+    exist_sys, new_sys = simulate_sc1g_systems(default_BD=True)
     # exist_model, new_model = create_sc1g_comparison_models()
-    exist_model, new_model = evaluate_sc1g_models(N=10)
+    # exist_model, new_model = evaluate_sc1g_models(N=10)

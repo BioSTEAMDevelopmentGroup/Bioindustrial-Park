@@ -31,7 +31,7 @@ def create_sc2g_comparison_systems(default_BD=True):
     from biorefineries import oilcane as oc
     BD = {} if not default_BD else 1.
     wwt_kwdct = dict.fromkeys(('IC_kwargs', 'AnMBR_kwargs',), {'biodegradability': BD,})
-    CF_dct = { # all feeds
+    CF_dct = { # all streams are feeds
         'caustic': ('NaOH', 0.5), # NaOH and water
         'cellulase': ('Cellulase', 0.05), # cellulase and water
         'denaturant': ('Denaturant'),
@@ -126,6 +126,6 @@ def evaluate_sc2g_models(**eval_kwdct):
 # =============================================================================
 
 if __name__ == '__main__':
-    # exist_sys, new_sys = simulate_sc2g_systems(default_BD=True)
+    exist_sys, new_sys = simulate_sc2g_systems(default_BD=True)
     # exist_model, new_model = create_sc2g_comparison_models()
-    exist_model, new_model = evaluate_sc2g_models(N=1000)
+    # exist_model, new_model = evaluate_sc2g_models(N=1000)

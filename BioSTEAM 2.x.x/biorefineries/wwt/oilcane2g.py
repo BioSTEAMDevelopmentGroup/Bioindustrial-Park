@@ -51,7 +51,7 @@ def create_oc2g_comparison_systems(default_BD=True):
         'pure_glycerine': ('GlycerinPure',),
         ##### Co-products #####
         'biodiesel': ('Biodiesel',), # has <0.01 wt% impurities
-        'crude_glycerol': ('GlycerolCrude',),
+        'crude_glycerol': ('GlycerinCrude',),
         }
     sys_dct = {
         'load': {'name': 'O2', 'cache': None, 'reduce_chemicals': False},
@@ -61,7 +61,7 @@ def create_oc2g_comparison_systems(default_BD=True):
         'new_wwt_connections': {'sludge': ('M701', 0), 'biogas': ('BT701', 1)},
         'CF_dct': CF_dct,
         }
-    exist_sys, new_sys = create_comparison_systems(info, oc, sys_dct, from_load=True)
+    exist_sys, new_sys = create_comparison_systems(info, oc, sys_dct)
     return exist_sys, new_sys
 
 
@@ -141,6 +141,6 @@ def evaluate_oc2g_models(**eval_kwdct):
 # =============================================================================
 
 if __name__ == '__main__':
-    # exist_sys, new_sys = simulate_oc2g_systems(default_BD=True)
+    exist_sys, new_sys = simulate_oc2g_systems(default_BD=True)
     # exist_model, new_model = create_oc2g_comparison_models()
-    exist_model, new_model = evaluate_oc2g_models(N=1000)
+    # exist_model, new_model = evaluate_oc2g_models(N=1000)

@@ -11,7 +11,7 @@ import biosteam as bst
 from . import (
     add_wwt_chemicals, create_wastewater_process, CHP as CHPunit,
     get_COD_breakdown, update_product_prices,
-    IRR_at_ww_price, ww_price_at_IRR, get_MPSP, add_CFs, get_GWP,
+    IRR_at_ww_price, ww_price_at_IRR, get_MPSP, GWP_CFs, add_CFs, get_GWP,
     )
 
 __all__ = (
@@ -33,7 +33,7 @@ kwdct = {
     'new_wwt_connections': {},
     'update_product_price': False,
     'IRR': 0.1,
-    'stream_CF_dct': {},
+    'CF_dct': {},
 }
 
 def create_comparison_systems(info, functions, sys_dct={}):
@@ -150,7 +150,11 @@ def create_comparison_systems(info, functions, sys_dct={}):
         update_product_prices(new_s)
 
     for (s_reg, u_reg) in zip((exist_s, new_s), (exist_u, new_u)):
-        add_CFs(s_reg, u_reg, kwdct['stream_CF_dct'])
+        add_CFs(s_reg, u_reg, kwdct['CF_dct'])
+    RX02 = getattr(new_u, f'R{WWT_ID}02')
+    RX02.ins[2].characterization_factors['GWP'] = GWP_CFs['NaOCl']
+    RX02.ins[3].characterization_factors['GWP'] = GWP_CFs['CitricAcid']
+    RX02.ins[4].characterization_factors['GWP'] = GWP_CFs['Bisulfite']
 
     return exist_sys, new_sys
 
@@ -160,8 +164,8 @@ def simulate_systems(exist_sys, new_sys, info):
     exist_sys.simulate()
     new_sys.simulate()
     print(f'\n\n{info["abbr"]} module:')
-    print(f'Existing system IRR: {exist_tea.solve_IRR():.2%}')
-    print(f'New system IRR: {new_tea.solve_IRR():.2%}')
+    print(f'\nExisting system IRR: {exist_tea.solve_IRR():.2%}')
+    print(f'\nNew system IRR: {new_tea.solve_IRR():.2%}')
     FERM_product = info['FERM_product']
     for sys in (exist_sys, new_sys):
         for fn in (get_MPSP, get_GWP):

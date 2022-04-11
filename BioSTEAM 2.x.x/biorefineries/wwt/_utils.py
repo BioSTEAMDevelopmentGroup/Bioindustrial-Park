@@ -44,7 +44,7 @@ __all__ = (
     'rename_storage_units',
     # TEA/LCA
     'prices', 'update_product_prices', 'IRR_at_ww_price', 'ww_price_at_IRR', 'get_MPSP',
-    'add_CFs', 'get_GWP',
+    'GWP_CFs', 'add_CFs', 'get_GWP',
     )
 
 
@@ -614,10 +614,6 @@ glycerin_pure_CF = 1.4831
 # converted to 12.5 wt% solution (15 vol%)
 naocl_CF = 2.4871 * 0.125
 
-# Market for sodium hypochlorite, without water, in 15% solution state, RoW,
-# converted to 12.5 wt% solution (15 vol%)
-naocl_CF = 2.4871 * 0.125
-
 # GREET, North America, from shale and conventional recovery, average US
 ng_CF = 0.3899 + 1/16.04246*44.0095
 
@@ -669,14 +665,16 @@ GWP_CFs['TEcatalyst'] = GWP_CFs['Methanol']*0.75 + GWP_CFs['NaOCH3']*0.25
 def add_CFs(stream_registry, unit_registry, stream_CF_dct):
     for ID, key_factor in stream_CF_dct.items():
         stream = stream_registry.search(ID) if isinstance(ID, str) \
-            else unit_registry.search(ID[0]).outs[ID[1]]
-        try:
-            iter(key_factor)
-            if isinstance(key_factor, str): key_factor = (key_factor,)
-        except:
-            key_factor = (key_factor,)
-        key, factor = (key_factor, 1.) if len(key_factor) == 1 else key_factor
-        stream.characterization_factors['GWP'] = GWP_CFs[key]*factor
+            else getattr(unit_registry.search(ID[0]), ID[1])[ID[2]]
+        if stream: # some streams might only exist in exist/new systems
+            try:
+                iter(key_factor)
+                if isinstance(key_factor, str): key_factor = (key_factor,)
+            except:
+                key_factor = (key_factor,)
+            key, factor = (key_factor[0], 1.) if len(key_factor) == 1 else key_factor
+            
+            stream.characterization_factors['GWP'] = GWP_CFs[key]*factor
     bst.PowerUtility.set_CF('GWP', *GWP_CFs['Electricity'])
 
 
@@ -688,6 +686,6 @@ def get_GWP(system, product='ethanol', print_msg=True):
     else:
         txt = ('GWP', 'kg')
         factor = 1.
-    GWP = system.get_net_impact('GWP') * factor / product.F_mass
-    if print_msg: print(f'\n{txt[0]} of {product.ID} for {system.ID}: ${GWP:.2f}/{txt[1]}.')
+    GWP = system.get_net_impact('GWP') * factor / (system.operating_hours*product.F_mass)
+    if print_msg: print(f'\n{txt[0]} of {product.ID} for {system.ID}: {GWP:.2f} kg CO2/{txt[1]}.')
     return GWP

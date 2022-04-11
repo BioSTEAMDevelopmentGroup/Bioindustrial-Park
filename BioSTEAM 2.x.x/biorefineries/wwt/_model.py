@@ -93,7 +93,6 @@ def add_biorefinery_parameters(model, model_dct, f, u, s, get_obj, get_rxn, para
                   kind='cost', element=stream, units='kg CO2/kg',
                   baseline=b, distribution=D)
 
-
     # Electricity price and CF
     b = PowerUtility.price
     D = get_default_distribution('triangle', b)
@@ -119,8 +118,16 @@ def add_biorefinery_parameters(model, model_dct, f, u, s, get_obj, get_rxn, para
 def add_biodiesel_parameters(model, model_dct, f, u, s, get_obj, get_rxn, param):
     from biorefineries.oilcane import OilExtractionSpecification
     sys = model.system
-    isplit_a = get_obj(u, 'bagasse_oil_extraction').isplit
-    isplit_b = get_obj(u, 'bagasse_oil_retention').isplit
+    
+    isplit_a = isplit_b = None
+    for i in sys.cost_units:
+        if getattr(i, 'tag', None) == 'oil extraction efficiency':
+            isplit_a = i.isplit
+            break
+    for i in sys.cost_units:
+        if getattr(i, 'tag', None) == 'bagasse oil retention':
+            isplit_b = i.isplit
+            break
 
     # Extraction
     feedstock = get_obj(s, 'feedstock')
@@ -612,7 +619,7 @@ def add_metrics(model, model_dct, f, u, s, get_obj):
 
     # Summary metrics
     product_mass = product.F_mass
-    GWP_factor = factor/product_mass
+    GWP_factor = factor/product_mass/sys.operating_hours
     metrics = ([
         Metric('MPSP', lambda: tea.solve_price(product)*factor, f'$/{gal_or_kg}'),
         Metric('GWP', lambda: sys.get_net_impact('GWP')*GWP_factor, f'$/{gal_or_kg}'),
@@ -664,11 +671,11 @@ def add_metrics(model, model_dct, f, u, s, get_obj):
                    'MWh/yr'),
             ])
     for stream in sys.feeds+sys.products:
-        if not s.characterization_factors: continue
+        if not stream.characterization_factors: continue
         ID = stream.ID
-        metrics.append([
+        metrics.append(
             Metric(f'{ID} impact', lambda: stream.get_impact('GWP')/product_mass, 'kg CO2/kg'),
-            ])
+            )
     model.metrics = metrics
 
     BT_eff = model_dct.get('BT_eff') or ()

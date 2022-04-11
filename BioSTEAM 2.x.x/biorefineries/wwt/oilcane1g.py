@@ -45,10 +45,10 @@ def create_oc1g_comparison_systems(default_BD=True):
         'natural_gas': ('CH4',), # probably not needed
         'oilcane': ('Oilcane',), # moisture content already adjusted
         'polymer': ('Polymer'),
-        'pure_glycerine': ('PureGlycerin',),
+        'pure_glycerine': ('GlycerinPure',),
         ##### Co-products #####
         'biodiesel': ('Biodiesel',), # has <0.01 wt% impurities
-        'crude_glycerol': ('GlycerolCrude',),
+        'crude_glycerol': ('GlycerinCrude',),
         # 'Yeast': ('Yeast',), # no price considered, no GWP considered (probably used in fermentation)
         # `fiber_fines`, `wastewater`, `vinasse` taken care of by WWT
         # `filter_cake` taken care of by BT
@@ -60,7 +60,7 @@ def create_oc1g_comparison_systems(default_BD=True):
         'BT': 'BT701',
         'create_wastewater_process': wwt_kwdct,
         # `fiber_fines`, `wastewater`, `vinasse`
-        'ww_streams': (('U206', 1), ('M603', 0), ('M403', 0),),
+        'ww_streams': (('U206', 1), ('M603', 0), ('M402', 0),),
         'solids_streams': (('U205', 0), ('M701', 0),), # the first one is `filter_cake`
         'BT': 'BT701',
         'new_wwt_connections': {'solids': ('BT701', 0), 'biogas': ('BT701', 1)},
@@ -137,6 +137,6 @@ def evaluate_oc1g_models(**eval_kwdct):
 # =============================================================================
 
 if __name__ == '__main__':
-    # exist_sys, new_sys = simulate_oc1g_systems(default_BD=True)
+    exist_sys, new_sys = simulate_oc1g_systems(default_BD=True)
     # exist_model, new_model = create_oc1g_comparison_models()
-    exist_model, new_model = evaluate_oc1g_models(N=1000)
+    # exist_model, new_model = evaluate_oc1g_models(N=1000)

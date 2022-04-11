@@ -31,7 +31,7 @@ def create_cs_comparison_systems(default_BD=True):
     from biorefineries import cornstover as cs
     BD = {} if not default_BD else 1.
     wwt_kwdct = dict.fromkeys(('IC_kwargs', 'AnMBR_kwargs',), {'biodegradability': BD,})
-    CF_dct = { # all feeds
+    CF_dct = { # all streams are feeds
         'ammonia': ('NH4OH',), # NH4OH
         'caustic': ('NaOH', 0.5), # NaOH and water
         'cellulase': ('Cellulase', 0.05), # cellulase and water
@@ -122,6 +122,6 @@ def evaluate_cs_models(**eval_kwdct):
 # =============================================================================
 
 if __name__ == '__main__':
-    # exist_sys, new_sys = simulate_cs_systems(default_BD=True)
+    exist_sys, new_sys = simulate_cs_systems(default_BD=True)
     # exist_model, new_model = create_cs_comparison_models()
-    exist_model, new_model = evaluate_cs_models(N=1000)
+    # exist_model, new_model = evaluate_cs_models(N=1000)
