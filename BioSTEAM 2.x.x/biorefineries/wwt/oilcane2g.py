@@ -99,8 +99,8 @@ def create_oc2g_comparison_models():
         'fermentor': 'R401',
         'TE_rx': 'U802',
         'isplit_efficiency_is_reversed': True,
-        'bagasse_oil_extraction': 'U402',
-        'bagasse_oil_retention': 'U201',
+        # 'bagasse_oil_extraction': 'U402',
+        # 'bagasse_oil_retention': 'U201',
         'reactions': {
             'PT glucan-to-glucose': ('reactions', 0),
             'PT xylan-to-xylose': ('reactions', 8),
@@ -113,6 +113,7 @@ def create_oc2g_comparison_models():
         'BT': 'BT701',
         'BT_eff': ('boiler_efficiency', 'turbogenerator_efficiency'),
         'wwt_system': 'exist_sys_wwt',
+        'wwt_ID': info['WWT_ID'],
         'is2G': info['is2G'],
         }
     exist_model = create_comparison_models(exist_sys, exist_model_dct)
@@ -122,16 +123,17 @@ def create_oc2g_comparison_models():
     new_model_dct['biogas'] = 'biogas'
     new_model_dct['sludge'] = 'sludge'
     new_model_dct['wwt_system'] = 'new_sys_wwt'
-    new_model_dct['new_wwt_ID'] = info['WWT_ID']
     new_model = create_comparison_models(new_sys, new_model_dct)
     return exist_model, new_model
 
 
 def evaluate_oc2g_models(**eval_kwdct):
-    from biorefineries.wwt import evaluate_models
+    from biorefineries.wwt import evaluate_models, get_baseline_summary
     global exist_model, new_model
     exist_model, new_model = create_oc2g_comparison_models()
-    return evaluate_models(exist_model, new_model, abbr=info['abbr'], **eval_kwdct)
+    abbr = info['abbr']
+    get_baseline_summary(exist_model, new_model, abbr)
+    return evaluate_models(exist_model, new_model, abbr=abbr, **eval_kwdct)
 
 
 # %%
@@ -141,6 +143,6 @@ def evaluate_oc2g_models(**eval_kwdct):
 # =============================================================================
 
 if __name__ == '__main__':
-    exist_sys, new_sys = simulate_oc2g_systems(default_BD=True)
+    # exist_sys, new_sys = simulate_oc2g_systems(default_BD=True)
     # exist_model, new_model = create_oc2g_comparison_models()
-    # exist_model, new_model = evaluate_oc2g_models(N=1000)
+    exist_model, new_model = evaluate_oc2g_models(N=1000)

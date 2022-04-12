@@ -572,6 +572,22 @@ def get_MPSP(system, product='ethanol', print_msg=True):
         txt = ('MPSP', 'kg')
         factor = 1.
     price = tea.solve_price(product) * factor
+
+    for unit in system.units:
+        if hasattr(unit, 'cache_dct'):
+            cache_dct = unit.cache_dct
+            break
+    
+    sale_dct = {}
+    for stream in system.products:
+        if stream.price:
+            cache_dct[f'{stream.ID} price'] = stream.price
+            sale_dct[f'{stream.ID} ratio'] = stream.cost
+    cache_dct[f'{product} price'] = price / factor
+    cache_dct['MPSP'] = price
+    sales = sum(v for v in sale_dct.values())
+    cache_dct.update({k:v/sales for k, v in sale_dct.items()})
+    
     if print_msg: print(f'\n{txt[0]} of {product.ID} for {system.ID}: ${price:.2f}/{txt[1]}.')
     return price
 
@@ -650,10 +666,15 @@ GWP_CFs = {
     'Sugarcane': sugarcane_CF,
     'Yeast': 2.5554, # assumed to be for the solution
     ##### Products, no needs to make product CFs negative #####
-    'Biodiesel': biodiesel_CF,
-    'CornOil': 75.5919/1e3, # from corn, transportation excluded
-    'DDGS': 0.8607, # from corn
-    'GlycerinCrude': glycerin_crude_CF,
+    'Biodiesel': 0,
+    'CornOil': 0,
+    'DDGS': 0,
+    'GlycerinCrude': 0,
+    # # Allocate based on the value
+    # 'Biodiesel': biodiesel_CF,
+    # 'CornOil': 75.5919/1e3, # from corn, transportation excluded
+    # 'DDGS': 0.8607, # from corn
+    # 'GlycerinCrude': glycerin_crude_CF,
     }
 # All feeds
 GWP_CFs['Lime'] = GWP_CFs['CaO'] * 56.0774/74.093 # CaO to Ca(OH)2
@@ -678,14 +699,22 @@ def add_CFs(stream_registry, unit_registry, stream_CF_dct):
     bst.PowerUtility.set_CF('GWP', *GWP_CFs['Electricity'])
 
 
+# Allocation based on the value
 def get_GWP(system, product='ethanol', print_msg=True):
-    product = system.flowsheet.stream.search(product)
+    s_reg = system.flowsheet.stream
+    product = s_reg.search(product)
     if product.ID=='ethanol':
         txt = ('GWP', 'gal')
         factor = ethanol_density_kggal
     else:
         txt = ('GWP', 'kg')
         factor = 1.
-    GWP = system.get_net_impact('GWP') * factor / (system.operating_hours*product.F_mass)
+
+    for unit in system.units:
+        if hasattr(unit, 'cache_dct'):
+            cache_dct = unit.cache_dct
+            break
+    
+    GWP = system.get_net_impact('GWP')/system.operating_hours * factor * cache_dct[f'{product.ID} ratio']/product.F_mass
     if print_msg: print(f'\n{txt[0]} of {product.ID} for {system.ID}: {GWP:.2f} kg CO2/{txt[1]}.')
     return GWP

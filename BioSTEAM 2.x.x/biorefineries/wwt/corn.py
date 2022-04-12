@@ -90,6 +90,7 @@ def create_cn_comparison_models():
             'FERM glucan-to-product': ('reaction',),
             },
         'wwt_system': 'exist_sys_wwt',
+        'wwt_ID': info['WWT_ID'],
         'is2G': info['is2G'],
         }
     exist_model = create_comparison_models(exist_sys, exist_model_dct)
@@ -101,17 +102,18 @@ def create_cn_comparison_models():
     new_model_dct['sludge'] = 'sludge'
     new_model_dct['biogas'] = 'biogas'
     new_model_dct['wwt_system'] = 'new_sys_wwt'
-    new_model_dct['new_wwt_ID'] = info['WWT_ID']
     new_model = create_comparison_models(new_sys, new_model_dct)
 
     return exist_model, new_model
 
 
 def evaluate_cn_models(**eval_kwdct):
-    from biorefineries.wwt import evaluate_models
+    from biorefineries.wwt import evaluate_models, get_baseline_summary
     global exist_model, new_model
     exist_model, new_model = create_cn_comparison_models()
-    return evaluate_models(exist_model, new_model, abbr=info['abbr'], **eval_kwdct)
+    abbr = info['abbr']
+    get_baseline_summary(exist_model, new_model, abbr)
+    return evaluate_models(exist_model, new_model, abbr=abbr, **eval_kwdct)
 
 
 # %%
@@ -121,6 +123,6 @@ def evaluate_cn_models(**eval_kwdct):
 # =============================================================================
 
 if __name__ == '__main__':
-    exist_sys, new_sys = simulate_cn_systems(default_BD=True)
+    # exist_sys, new_sys = simulate_cn_systems(default_BD=True)
     # exist_model, new_model = create_cn_comparison_models()
-    # exist_model, new_model = evaluate_cn_models(N=1000)
+    exist_model, new_model = evaluate_cn_models(N=10)

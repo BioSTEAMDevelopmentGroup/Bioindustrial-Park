@@ -9,7 +9,7 @@
 
 import biosteam as bst
 from . import (
-    add_wwt_chemicals, create_wastewater_process, CHP as CHPunit,
+    add_wwt_chemicals, create_wastewater_process, CHP as CHPunit, Skipped,
     get_COD_breakdown, update_product_prices,
     IRR_at_ww_price, ww_price_at_IRR, get_MPSP, GWP_CFs, add_CFs, get_GWP,
     )
@@ -64,16 +64,20 @@ def create_comparison_systems(info, functions, sys_dct={}):
         # Mixed wastewater
         ww = bst.Stream('ww')
         ww_streams = [getattr(exist_u, i[0]).outs[i[1]] for i in kwdct['ww_streams']]
-        WWmixer = bst.Mixer('WWmixer', ins=ww_streams, outs=ww)
+        WWmixer = bst.Mixer('WWmixer', ins=ww_streams)
         # Mixed solids
         solids = bst.Stream('solids')
         solids_streams = [getattr(exist_u, i[0]).outs[i[1]] for i in kwdct['solids_streams']]
         SolidsMixer = bst.Mixer('SolidsMixer', ins=solids_streams, outs=solids)
         if kwdct['BT'] and sludge_ID:
             getattr(exist_u, sludge_u).ins[sludge_idx] = getattr(exist_s, sludge_ID)
-        exist_wwt_units = [WWmixer, SolidsMixer]
+        Caching = Skipped('Caching', ins=WWmixer-0, outs=ww) # for result caching
+        Caching.wwt_units = [WWmixer, SolidsMixer]
     else:
-        exist_wwt_units = [u for u in exist_u if (u.ID[1]==WWT_ID or u.ID=='WWTC')]
+        Caching = Skipped('Caching', # for result caching
+                          ins=exist_s.search('waste_brine') or exist_s.search('brine'))
+        Caching.wwt_units = [u for u in exist_u if (u.ID[1]==WWT_ID or u.ID=='WWTC')]
+    exist_wwt_units = Caching.wwt_units + [Caching]
     exist_sys_wwt = bst.System('exist_sys_wwt', path=exist_wwt_units)
     exist_sys = bst.System.from_units('exist_sys', units=exist_u)
     exist_tea = exist_sys_temp.TEA.copy(exist_sys)
@@ -124,7 +128,7 @@ def create_comparison_systems(info, functions, sys_dct={}):
 
     if add_CHP:
         CHP = CHPunit('CHP', ins=(new_s.biogas, new_s.sludge))
-        getattr(new_u, f'U{WWT_ID}01').wwt_units.append(CHP)
+        getattr(new_u, 'Skipped').wwt_units.append(CHP)
 
     new_sys = bst.System.from_units('new_sys', units=new_u)
 
