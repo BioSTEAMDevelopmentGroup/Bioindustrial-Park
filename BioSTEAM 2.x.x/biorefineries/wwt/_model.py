@@ -7,16 +7,17 @@
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
 # for license details.
 
-import pandas as pd
+import os, numpy as np, pandas as pd
+from math import ceil
 from biosteam import Stream, Metric, PowerUtility, WastewaterSystemCost, ReverseOsmosis
 from biosteam.utils import ignore_docking_warnings
 from chaospy import distributions as shape
 from . import results_path, get_combustion_energy, compute_stream_COD as get_COD
 
 __all__ = (
-    'create_comparison_models', 'evaluate_models',
-    'get_default_distribution', 'Setter', 'AttrGetter',
-    'copy_samples', 'save_model_results',
+    'get_default_distribution', 'Setter', 'AttrGetter', 'copy_samples', 
+    'create_comparison_models', 'save_model_results',  'evaluate_models',
+    'get_baseline_summary', 'summarize_baselines',
     )
 
 
@@ -51,10 +52,21 @@ class Setter:
         setattr(self.obj, self.attr, value)
 
 
-#!!! Need to add GWP
+class DictSetter:
+    '''For batch-adding parameters.'''
+    __slots__ = ('obj', 'dict_attr', 'key')
+    def __init__(self, obj, dict_attr, key):
+        self.dict_attr = getattr(obj, dict_attr)
+        self.key = key
+
+    def __call__(self, value):
+        self.dict_attr[self.key] = value
+
+
 def add_biorefinery_parameters(model, model_dct, f, u, s, get_obj, get_rxn, param):
     # Flowrate
     feedstock = get_obj(s, 'feedstock')
+    product = get_obj(s, 'FERM_product')
     b = feedstock.F_mass
     D = get_default_distribution('triangle', b)
     @param(name='Feedstock flowrate', element=feedstock, kind='coupled', units='kg/hr',
@@ -62,25 +74,44 @@ def add_biorefinery_parameters(model, model_dct, f, u, s, get_obj, get_rxn, para
     def set_feedstock_flowrate(flowrate):
         feedstock.F_mass = flowrate
 
-    # Stream prices
+    # Stream price and CF
     sys = model.system
-    for stream in sys.feeds:
+    for stream in sys.feeds+sys.products:
         ID = stream.ID
         if ID == 'ww': continue # wastewater disposal price will be set separately
+        # Not changing the default price for the main product
         b = stream.price
-        if b:
+        if b and stream is not product:
             D = get_default_distribution('triangle', b)
             param(Setter(stream, 'price'), name=f'{stream.ID} price',
                   kind='cost', element=stream, units='USD/kg',
                   baseline=b, distribution=D)
+        b = stream.get_CF('GWP')
+        if b:
+            D = get_default_distribution('triangle', b)
+            param(DictSetter(stream, 'characterization_factors', 'GWP'),
+                  name=f'{stream.ID} CF',
+                  kind='cost', element=stream, units='kg CO2/kg',
+                  baseline=b, distribution=D)
 
-    # Electricity prices
+    # Electricity price and CF
     b = PowerUtility.price
     D = get_default_distribution('triangle', b)
-    @param(name='Electricity price', element=feedstock, kind='cost', units='$/kWh',
+    @param(name='Electricity price', element='biorefinery', kind='cost', units='$/kWh',
            baseline=b, distribution=D)
     def set_electricity_price(price):
         PowerUtility.price = price
+    bc, bp = PowerUtility.get_CF('GWP') # consumption, production
+    Dc = get_default_distribution('triangle', bc)
+    @param(name='Electricity consumption CF', element='biorefinery', kind='cost', units='kg CO2/kWh',
+           baseline=b, distribution=Dc)
+    def set_electricity_consumption_CF(CF):
+        PowerUtility.set_CF('GWP', consumption=CF)
+    Dp = get_default_distribution('triangle', bp)
+    @param(name='Electricity production CF', element='biorefinery', kind='cost', units='kg CO2/kWh',
+           baseline=b, distribution=Dp)
+    def set_electricity_production_CF(CF):
+        PowerUtility.set_CF('GWP', production=CF)
 
     return model
 
@@ -88,8 +119,16 @@ def add_biorefinery_parameters(model, model_dct, f, u, s, get_obj, get_rxn, para
 def add_biodiesel_parameters(model, model_dct, f, u, s, get_obj, get_rxn, param):
     from biorefineries.oilcane import OilExtractionSpecification
     sys = model.system
-    isplit_a = get_obj(u, 'bagasse_oil_extraction').isplit
-    isplit_b = get_obj(u, 'bagasse_oil_retention').isplit
+
+    isplit_a = isplit_b = None
+    for i in sys.cost_units:
+        if getattr(i, 'tag', None) == 'oil extraction efficiency':
+            isplit_a = i.isplit
+            break
+    for i in sys.cost_units:
+        if getattr(i, 'tag', None) == 'bagasse oil retention':
+            isplit_b = i.isplit
+            break
 
     # Extraction
     feedstock = get_obj(s, 'feedstock')
@@ -188,8 +227,8 @@ def add_1G_parameters(model, model_dct, f, u, s, get_obj, get_rxn, param):
         rxn.X = X
 
     # Wastewater treatment price
-    if not model_dct.get('new_wwt_ID'):
-        ww = s.ww
+    ww = s.search('ww')
+    if ww:
         b = -0.02
         D = shape.Uniform(-0.03, -0.01)
         @param(name='Wastewater price', element=ww, kind='cost', units='-',
@@ -293,7 +332,7 @@ def add_2G_parameters(model, model_dct, f, u, s, get_obj, get_rxn, param):
 # Related to the new wastewater treatment process
 #!!! Want to evaluate the new WWT process across different biodegradability and COD content
 def add_new_wwt_parameters(model, model_dct, f, u, s, get_obj, get_rxn, param):
-    X = model_dct['new_wwt_ID']
+    X = model_dct['wwt_ID']
 
     # IC
     IC = getattr(u, f'R{X}01')
@@ -386,7 +425,7 @@ def add_new_wwt_parameters(model, model_dct, f, u, s, get_obj, get_rxn, param):
     # AeF, some systems do not need it thus using a dummy unit
     AeF = getattr(u, f'R{X}03')
     if not type(AeF).__name__ == 'Skipped':
-        b = AeF.OLR
+        b = AeF.OLR * 24
         D = shape.Uniform(0.5, 4)
         @param(name='AeF organic loading rate', element=AeF, kind='coupled', units='kg COD/m3/hr',
                baseline=b, distribution=D)
@@ -421,10 +460,9 @@ def add_parameters(model, model_dct, f, u, s, get_obj):
         model = add_1G_parameters(model, model_dct, f, u, s, get_obj, get_rxn, param)
     else:
         model = add_2G_parameters(model, model_dct, f, u, s, get_obj, get_rxn, param)
-    if model_dct.get('new_wwt_ID'):
+    if 'new' in model.system.ID:
         model = add_new_wwt_parameters(model, model_dct, f, u, s, get_obj, get_rxn, param)
     return model
-
 
 
 # %%
@@ -456,74 +494,123 @@ def add_metrics(model, model_dct, f, u, s, get_obj):
     gal_or_kg = 'gal' if product.ID=='ethanol' else 'kg'
     factor = 2.9867 if product.ID=='ethanol' else 1. # factor is cs.ethanol_density_kggal
 
-    metrics0, metrics1, metrics = [], [], []
     ww = s.search('ww')
+    X = model_dct['wwt_ID']
+    Caching = u.search('Caching')
+
+    def get_MPSP():
+        cache_dct = Caching.cache_dct
+        cache_dct['MPSP'] = price = tea.solve_price(product)*factor
+        # for stream in sys.products:
+        #     if stream.price:
+        #         cache_dct[f'{stream.ID} price'] = stream.price
+        # cache_dct[f'{product} price'] = price / factor
+
+        sale_dct = {}
+        for stream in sys.products:
+            if stream.price:
+                cache_dct[f'{stream.ID} price'] = stream.price
+                sale_dct[f'{stream.ID} ratio'] = stream.cost
+        cache_dct[f'{product} price'] = price / factor
+        cache_dct['MPSP'] = price
+        sales = sum(v for v in sale_dct.values())
+        cache_dct.update({k:v/sales for k, v in sale_dct.items()})
+
+        return price
+
+    def get_GWP(product_ratio=None):
+        cache_dct = Caching.cache_dct
+        product_ratio = product_ratio or cache_dct[f'{product.ID} ratio']
+        GWP = sys.get_net_impact('GWP')/sys.operating_hours * factor * product_ratio/product.F_mass
+        return GWP
+
     if ww: # product price without wastewater treatment, IRR sometimes has two solutions so use price
         def get_product_price_no_ww():
             ww_price = ww.price
             ww.price = 0
             price = tea.solve_price(product)
             ww.price = ww_price
-            return price*factor
-        metrics1 = [
-            Metric('MPSP no WW', get_product_price_no_ww, f'$/{gal_or_kg}'),
+            return price * factor
+        metrics0 = [ # this should be the same as the "MPSP no WWT" calculated from the new system
+            Metric('MPSP no WWT', get_product_price_no_ww, f'$/{gal_or_kg}'),
             ]
     else:
         isa = isinstance
         if wwt_system.ID == 'exist_sys_wwt':
-            metrics1 = []
             if not model_dct['FERM_product'] == 'lactic_acid':
                 for WWTC in wwt_system.units:
-                    if isa(WWTC, WastewaterSystemCost): break
-                ww_in = WWTC.outs[0]
+                    if isa(WWTC, WastewaterSystemCost):
+                        ww_in = WWTC.outs[0]
+                        break
                 for RO in wwt_system.units:
-                    if isa(RO, ReverseOsmosis): break
-                ww_out = RO.ins[0]
+                    if isa(RO, ReverseOsmosis):
+                        ww_out = RO.ins[0]
+                        break
             else:
-                ww_in = u.search('M501').outs[0]
-                ww_out = u.search('S505').ins[0]
+                ww_in = u.M501.outs[0]
+                ww_out = u.S505.ins[0] # also RO, but not the default RO
+
+            def get_cod_removal():
+                cod_in = get_COD(ww_in)
+                cod_out = get_COD(ww_out)
+                return (cod_in-cod_out)/cod_in
+            metrics0 = [
+                Metric('COD in', lambda: get_COD(ww_in)*1e3, 'mg/L'),
+                Metric('COD out', lambda: get_COD(ww_out)*1e3, 'mg/L'),
+                Metric('COD load',
+                       lambda: (get_COD(ww_in)*ww_in.F_vol-get_COD(ww_out)*ww_out.F_vol),
+                       'kg/hr'),
+                Metric('COD removal', get_cod_removal, ''),
+            ]
         else:
-            X = model_dct['new_wwt_ID']
-            UX01 = u.search(f'U{X}01')
-            brine = UX01.outs[0]
+            brine = Caching.outs[0]
             MX01 = u.search(f'M{X}01') # WWT mixer
             wwt_downstream_units = MX01.get_downstream_units()
             ww_in = MX01.outs[0]
             ww_in_unit = ww_in.sink
             ww_in_idx = ww_in.get_connection().sink_index
             SX04 = u.search(f'S{X}04') # RO
-            ww_out = SX04.ins[0]
+            ww_out = SX04.ins[0] # SX04.outs[0] is Caching.ins[0]
             sludge = get_obj(s, 'sludge')
             solids_mixer = sludge.sink
+            solids_idx = sludge.get_connection().sink_index
             biogas = get_obj(s, 'biogas')
             biogas_idx = biogas.get_connection().sink_index
             BT = get_obj(u, 'BT')
             sludge_dummy = Stream('sludge_dummy')
-            solids_mixer = sludge.sink
-            solids_idx = sludge.get_connection().sink_index
             biogas_dummy = Stream('biogas_dummy')
 
-            # Product price without wastewater treatment
+            # Product metrics without wastewater treatment
             @ignore_docking_warnings
             def get_product_price_no_ww():
-                cache_dct = UX01.cache_dct
+                cache_dct = Caching.cache_dct
                 product_default_price = product.price
                 product.price = tea.solve_price(product) # MPSP with WWT system
 
-                # Disconnect WWT system
+                # Disconnect WWT system and clear cost
                 solids_mixer.ins[solids_idx] = sludge_dummy
-                UX01.ins[0] = ww_in
+                Caching.ins[0] = ww_in
                 BT.ins[biogas_idx] = biogas_dummy
-                UX01.clear_cost = True
+                Caching.clear_cost = True
                 for u in wwt_downstream_units:
-                    if not u in UX01.wwt_units: u.simulate()
+                    if not u in Caching.wwt_units: u.simulate()
 
-                MPSP_no_ww = cache_dct['MPSP no ww'] = tea.solve_price(product) * factor
+                product_price = tea.solve_price(product)
+                MPSP_no_ww = cache_dct['MPSP no WWT'] = product_price * factor
+                sales = sum(stream.cost for stream in sys.products if stream.price and stream is not product)
+                product_cost = product_price * product.F_mass
+                ratio = product_cost/(sales+product_cost)
+                cache_dct['GWP no WWT'] = get_GWP(ratio)
 
                 ww_price = - tea.solve_price(brine)
                 cache_dct['WW price'] = ww_price * 100
 
-                cod_per_kg = ww_price*brine.F_mass / (get_COD(brine)*brine.F_vol)
+                cod_in = cache_dct['COD in'] = get_COD(ww_in) * 1e3
+                cod_out = cache_dct['COD out'] = get_COD(ww_out) * 1e3
+                cod_load = cache_dct['COD load'] = (cod_in*ww_in.F_vol-cod_out*ww_out.F_vol) / 1e3
+                cache_dct['COD removal'] = (cod_in-cod_out) / cod_in
+
+                cod_per_kg = ww_price*brine.F_mass / cod_load
                 cache_dct['COD price per kg'] = cod_per_kg * 100
 
                 # 907.1847 is auom('ton').conversion_factor('kg')
@@ -533,65 +620,92 @@ def add_metrics(model, model_dct, f, u, s, get_obj):
                 ww_in_unit.ins[ww_in_idx] = ww_in
                 solids_mixer.ins[solids_idx] = sludge
                 BT.ins[1] = biogas
-                UX01.ins[0] = SX04.outs[1]
-                UX01.clear_cost = False
+                Caching.ins[0] = SX04.outs[1]
+                Caching.clear_cost = False
                 for u in wwt_downstream_units: u.simulate()
                 product.price = product_default_price
 
                 return MPSP_no_ww
 
-            def get_ww_price():
-                return UX01.cache_dct['WW price']
-
-            def get_cod_price_per_kg():
-                return UX01.cache_dct['COD price per kg']
-
-            def get_cod_price_per_ton():
-                cod_price = UX01.cache_dct['COD price per ton']
-                UX01.cache_dct.clear() # make sure the data won't be carried into the next sample
-                return cod_price
-
-            metrics0 = [Metric('MPSP no WW', get_product_price_no_ww, f'$/{gal_or_kg}'),]
-            metrics1 = [
-                Metric('WW price', get_ww_price, '¢/kg'),
-                Metric('COD price per kg', get_cod_price_per_kg, '¢/kg'),
-                Metric('COD price per ton', get_cod_price_per_ton, '$/ton'),
+            metrics0 = [
+                Metric('MPSP no WWT', get_product_price_no_ww, f'$/{gal_or_kg}'),
+                Metric('GWP no WWT', lambda: Caching.cache_dct['GWP no WWT'], f'kg CO2/{gal_or_kg}'),
+                Metric('WW price', lambda: Caching.cache_dct['WW price'], '¢/kg'),
+                Metric('COD price per kg', lambda: Caching.cache_dct['COD price per kg'], '¢/kg'),
+                Metric('COD price per ton', lambda: Caching.cache_dct['COD price per ton'], '$/ton'),
+                Metric('COD in', lambda: Caching.cache_dct['COD in'], 'mg/L'),
+                Metric('COD out', lambda: Caching.cache_dct['COD out'], 'mg/L'),
+                Metric('COD removal', lambda: Caching.cache_dct['COD removal'], ''),
+                Metric('COD load', lambda: Caching.cache_dct['COD load'], 'kg/hr'),
                 ]
 
-        # COD-related data
-        metrics.extend([
-            Metric('COD in', lambda: get_COD(ww_in)*1e3, 'mg/L'),
-            Metric('COD out', lambda: get_COD(ww_out)*1e3, 'mg/L'),
-            Metric('COD removal', lambda: 1-get_COD(ww_out)/get_COD(ww_in), ''),
-            ])
-
+    # Summary metrics
+    product_mass = product.F_mass
+    ratio_key = f'{product.ID} ratio'
+    GWP_factor = factor/sys.operating_hours / product_mass
     metrics = ([
-        Metric('MPSP', lambda: tea.solve_price(product)*factor, f'$/{gal_or_kg}'),
+        Metric('MPSP', get_MPSP, f'$/{gal_or_kg}'),
+        Metric('GWP', get_GWP, f'kg CO2/{gal_or_kg}'),
         *metrics0,
-        *metrics1,
-        #!!! Need to add GWP
-        # Metric('GWP', lambda: cs_wwt.get_GWP(sys), 'kg-CO2eq/gal'),
-        *metrics,
+        Metric('Total CAPEX',
+               lambda: sys.installed_equipment_cost/1e6, 'MM$'),
+
+        # Metric('WWT CAPEX',
+        #         get_WWT_CAPEX, 'MM$'),
+
         Metric('WWT CAPEX',
-               lambda: wwt_system.installed_equipment_cost/1e6, 'MM$'),
+                lambda: wwt_system.installed_equipment_cost/1e6, 'MM$'),
         Metric('WWT CAPEX frac',
-               lambda: wwt_system.installed_equipment_cost/sys.installed_equipment_cost, ''),
-        Metric('WWT annual electricity',
+                lambda: wwt_system.installed_equipment_cost/sys.installed_equipment_cost,
+                ''),
+        Metric('Total input GWP', # material and onsite emission
+               lambda: sys.get_total_input_impact('GWP')*GWP_factor*Caching.cache_dct[ratio_key],
+               f'kg CO2/{gal_or_kg}'),
+        Metric('WWT input GWP',
+               lambda: wwt_system.get_total_input_impact('GWP')*GWP_factor*Caching.cache_dct[ratio_key],
+               f'kg CO2/{gal_or_kg}'),
+        Metric('WWT input GWP frac',
+               lambda: wwt_system.get_total_input_impact('GWP') \
+                   / sys.get_total_input_impact('GWP'), ''),
+        Metric('Annual net electricity', # negative means generating more than used
+               lambda: (sys.get_electricity_consumption()-
+                        sys.get_electricity_production())/1e3, 'MWh/yr'),
+        Metric('Annual electricity consumption',
+               lambda: sys.get_electricity_consumption()/1e3, 'MWh/yr'),
+        Metric('WWT annual electricity consumption',
                lambda: wwt_system.get_electricity_consumption()/1e3, 'MWh/yr'),
-        Metric('WWT annual electricity frac',
-               lambda: wwt_system.get_electricity_consumption()/sys.get_electricity_consumption(), ''),
+        Metric('WWT annual electricity consumption frac',
+               lambda: wwt_system.get_electricity_consumption() \
+                   /sys.get_electricity_consumption(), ''),
+        Metric('Total electricity GWP',
+               lambda: sys.get_net_electricity_impact('GWP')*GWP_factor*Caching.cache_dct[ratio_key],
+               f'kg CO2/{gal_or_kg}'),
+        Metric('WWT electricity GWP',
+               lambda: wwt_system.get_net_electricity_impact('GWP')*GWP_factor*Caching.cache_dct[ratio_key],
+               f'kg CO2/{gal_or_kg}'),
         ])
 
-    # Cost and electricity usage breakdown
+    # Breakdowns
     for i in wwt_system.units:
         name = f'{type(i).__name__}-{i.ID}'
         metrics.extend([
             Metric(f'{name} installed cost',
                    AttrGetter(i, 'installed_cost', lambda cost: cost/1e6), 'MM$'),
-            Metric(f'{name} annual electricity',
-                   AttrGetter(i.power_utility, 'rate',
-                              hook=lambda rate: rate/1e3*wwt_system.operating_hours), 'MWh/yr')
+            Metric(f'{name} annual electricity consumption',
+                   AttrGetter(
+                       i.power_utility, 'consumption',
+                       hook=lambda consumption: consumption/1e3*wwt_system.operating_hours),
+                   'MWh/yr'),
             ])
+    for stream in sys.feeds:
+        if not stream.characterization_factors: continue
+        ID = stream.ID
+        metrics.append(
+            Metric(
+                f'{ID} impact',
+                lambda: stream.get_impact('GWP')*Caching.cache_dct[ratio_key]/product_mass*factor,
+                f'kg CO2/{gal_or_kg}')
+            )
     model.metrics = metrics
 
     BT_eff = model_dct.get('BT_eff') or ()
@@ -614,7 +728,12 @@ def add_metrics(model, model_dct, f, u, s, get_obj):
     model.metric(get_wwt_produced_energy, name='WWT produced energy', units='MWh/yr')
     model.metric(lambda: (wwt_system.get_electricity_consumption()/1e3)/get_wwt_produced_energy(),
                  name='WWT ECR', units='')
-
+    # Make sure the data won't be carried into the next sample
+    metrics = model.metrics
+    def clear_cache():
+        Caching.cache_dct.clear()
+        return 0.
+    model.metric(clear_cache, name='Clear cache', units='')
     return model
 
 
@@ -674,8 +793,6 @@ def save_model_results(model, path, percentiles):
 def evaluate_models(exist_model, new_model, abbr,
                     percentiles=(0, 0.05, 0.25, 0.5, 0.75, 0.95, 1),
                     N=1000, seed=3221, rule='L'):
-    import os, numpy as np
-    from math import ceil
     np.random.seed(seed)
     exist_samples = exist_model.sample(N=N, seed=seed, rule=rule)
     exist_model.load_samples(exist_samples)
@@ -694,3 +811,72 @@ def evaluate_models(exist_model, new_model, abbr,
     save_model_results(new_model, new_path, percentiles)
 
     return exist_model, new_model
+
+
+def get_baseline_summary(exist_model, new_model, abbr, file_path=None):
+    path = file_path or os.path.join(results_path, f'baseline_summary_{abbr}.csv')
+    exist_df = exist_model.metrics_at_baseline()
+    exist_df.rename({'Biorefinery': 'exist'}, inplace=True)
+    new_df = new_model.metrics_at_baseline()
+    new_df.rename({'Biorefinery': 'new'}, inplace=True)
+    df = pd.concat((exist_df, new_df))
+    df.to_csv(path)
+
+
+def summarize_baselines(names=None, file_path=None):
+    path = file_path or os.path.join(results_path, 'baseline_summary_all.xlsx')
+    
+    MPSP_exist, MPSP_new, MPSP_no_WWT = [], [], []
+    GWP_exist, GWP_new, GWP_no_WWT = [], [], []
+    CAPEX_WWT_exist, CAPEX_WWT_new = [], []
+    electricity_WWT_exist, electricity_WWT_new = [], []
+
+    get_val = lambda key1, key2: df[(df.type==key1) & (df.metric==key2)].value.item()
+    names = names or ('cn', 'sc1g', 'oc1g', 'cs', 'sc2g', 'oc2g', 'la')
+    for name in names:
+        df_path = os.path.join(results_path, f'baseline_summary_{name}.csv')
+        df = pd.read_csv(df_path, names=('type', 'metric', 'value'), skiprows=(0,))
+        per = 'gal'
+        try:
+            MPSP_exist.append(get_val('exist', f'MPSP [$/{per}]'))
+        except:
+            per = 'kg'
+            MPSP_exist.append(get_val('exist', f'MPSP [$/{per}]'))
+        MPSP_no_WWT.append(get_val('new', f'MPSP no WWT [$/{per}]'))
+        MPSP_new.append(get_val('new', f'MPSP [$/{per}]'))
+
+        GWP_exist.append(get_val('exist', f'GWP [kg CO2/{per}]'))
+        GWP_no_WWT.append(get_val('new', f'GWP no WWT [kg CO2/{per}]'))
+        GWP_new.append(get_val('new', f'GWP [kg CO2/{per}]'))
+
+        CAPEX_WWT_exist.append(get_val('exist', 'WWT CAPEX [MM$]'))
+        CAPEX_WWT_new.append(get_val('new', 'WWT CAPEX [MM$]'))
+
+        electricity_WWT_exist.append(get_val('exist', 'WWT annual electricity consumption [MWh/yr]'))
+        electricity_WWT_new.append(get_val('new', 'WWT annual electricity consumption [MWh/yr]'))
+        
+    df_all = pd.DataFrame({
+        'MPSP_exist': MPSP_exist,
+        'MPSP_no_WWT': MPSP_no_WWT,
+        'MPSP_new': MPSP_new,
+        })
+    df_all['MPSP_reduction'] = (df_all.MPSP_exist-df_all.MPSP_new)/df_all.MPSP_exist
+    
+    df_all['GWP_exist'] = GWP_exist
+    df_all['GWP_no_WWT'] = GWP_no_WWT
+    df_all['GWP_new'] = GWP_new
+    df_all['GWP_reduction'] = (df_all.GWP_exist-df_all.GWP_new)/df_all.GWP_exist
+    
+    df_all['CAPEX_WWT_exist'] = CAPEX_WWT_exist
+    df_all['CAPEX_WWT_new'] = CAPEX_WWT_new
+    df_all['CAPEX_reduction'] = (df_all.CAPEX_WWT_exist-df_all.CAPEX_WWT_new)/df_all.CAPEX_WWT_exist
+    
+    df_all['electricity_WWT_exist'] = electricity_WWT_exist
+    df_all['electricity_WWT_new'] = electricity_WWT_new
+    df_all['electricity_WWT_reduction'] = \
+        (df_all.electricity_WWT_exist-df_all.electricity_WWT_new)/df_all.electricity_WWT_exist
+    
+    df_all['biorefinery'] = names
+    df_all.set_index('biorefinery', inplace=True)
+    df_all.to_excel(path)
+    

@@ -42,8 +42,9 @@ __all__ = (
     'remove_undefined_chemicals', 'get_split_dct',
     'kph_to_tpd',
     'rename_storage_units',
-    # Prices
+    # TEA/LCA
     'prices', 'update_product_prices', 'IRR_at_ww_price', 'ww_price_at_IRR', 'get_MPSP',
+    'GWP_CFs', 'add_CFs', 'get_GWP',
     )
 
 
@@ -500,7 +501,7 @@ def rename_storage_units(sys, storage):
 # %%
 
 # =============================================================================
-# Price
+# Related to techno-economic analysis (TEA)
 # =============================================================================
 
 _lb_per_kg = 0.4536 # auom('lb').conversion_factor('kg')
@@ -525,13 +526,13 @@ _GDP_2007to2016 = 1.160
 # https://doi.org/10.1039/C5EE03715H.
 
 prices = { # $/kg unless otherwise noted
-    'wastewater': -0.02, # average of the -0.03 from ref [1] and -0.01 estimated based on brewery data, negative value for cost of product
-    'naocl': 0.14, # $/L
-    'citric_acid': 0.22, # $/L
-    'bisulfite': 0.08, # $/L
-    'ethanol': 0.789, # $/kg, lipidcane biorefinery
     'biodiesel': 1.38, # $/kg, lipidcane biorefinery
+    'bisulfite': 0.08, # $/L
+    'citric_acid': 0.22, # $/L
+    'ethanol': 0.789, # $/kg, lipidcane biorefinery
     'lactic_acid': 1.9, # $/kg, lactic acid biorefinery
+    'naocl': 0.14, # $/L
+    'wastewater': -0.02, # average of the -0.03 from ref [1] and -0.01 estimated based on brewery data, negative value for cost of product
 #    'caustics': 0.2627, # lactic acid biorefinery, price['NaOH]/2 as the caustic is 50% NaOH/water
 #    'polymer': 2.6282 / _lb_per_kg / _GDP_2007to2016, # ref [2]
     }
@@ -571,5 +572,149 @@ def get_MPSP(system, product='ethanol', print_msg=True):
         txt = ('MPSP', 'kg')
         factor = 1.
     price = tea.solve_price(product) * factor
+
+    for unit in system.units:
+        if hasattr(unit, 'cache_dct'):
+            cache_dct = unit.cache_dct
+            break
+    
+    sale_dct = {}
+    for stream in system.products:
+        if stream.price:
+            cache_dct[f'{stream.ID} price'] = stream.price
+            sale_dct[f'{stream.ID} ratio'] = stream.cost
+    cache_dct[f'{product} price'] = price / factor
+    cache_dct['MPSP'] = price
+    sales = sum(v for v in sale_dct.values())
+    cache_dct.update({k:v/sales for k, v in sale_dct.items()})
+    
     if print_msg: print(f'\n{txt[0]} of {product.ID} for {system.ID}: ${price:.2f}/{txt[1]}.')
     return price
+
+
+# %%
+
+# =============================================================================
+# Related to life cycle assessment (LCA)
+# =============================================================================
+
+# 100-year global warming potential (GWP) in kg CO2-eq/kg dry material unless otherwise noted
+# All data from GREET 2021 unless otherwise noted
+# All ecoinvent entries are from v3.8, allocation at the point of substitution
+# Direct emissions from fossil-derived materials (e.g., CO2 from CH4) included
+
+# GREET, from soybean, ILUC included, transportation and storage excluded
+# Ecoinvent is 1.0156 for US, esterification of soybean oil
+biodiesel_CF = 0.9650
+
+# Ecoinvent, market for sodium hydrogen sulfite, GLO,
+# converted to 38% solution
+bisulfite_CF = 1.2871 * 0.38
+
+# Ecoinvent, market for citric acid, GLO
+citric_acid_CF = 5.9048
+
+# GREET for biofuel refinery, moisture included
+# Ecoinvent sweet corn production, GLO is 0.26218
+corn_CF = 0.2719
+
+# GREET, gasoline blendstock from crude oil for use in US refineries, modeled as octane
+denaturant_CF = 0.8499 + 1/114.22852*44.0095*8
+
+# GREET, co-product from soybean biodiesel, transportation excluded
+glycerin_crude_CF = 0.2806
+# Ecoinvent, market for glycerine, RoW
+glycerin_pure_CF = 1.4831
+
+# Ecoinvent, market for sodium hypochlorite, without water, in 15% solution state, RoW,
+# converted to 12.5 wt% solution (15 vol%)
+naocl_CF = 2.4871 * 0.125
+
+# GREET, North America, from shale and conventional recovery, average US
+ng_CF = 0.3899 + 1/16.04246*44.0095
+
+# GREET 70% water wet mass, ecoinvent market for sugarcane, RoW, is 0.047651 (71.4% water)
+sugarcane_CF = 28.1052/1e3/(1-0.75)*(1-0.7)
+
+#!!! Need to double-check enzyme-related GWPs: AlphaAmylase, Cellulase, GlucoAmylase, Yeast
+GWP_CFs = {
+    ##### Feeds #####
+    'AlphaAmylase': 1.2043, # assumed to be for the solution
+    'Bisulfite': bisulfite_CF,
+    'CaO': 1.2833,
+    'Cellulase': 2.2199, # assumed to be for the solution; ecoinvent, market for enzymes, GLO, 10.452
+    'CH4': ng_CF,
+    'CitricAcid': citric_acid_CF,
+    'Corn': corn_CF,
+    'CornStover': 43.1442/1e3, # for ethanol plant, moisture included
+    'CSL': 1.6721,
+    'DAP': 1.6712,
+    'Denaturant': denaturant_CF,
+    'Electricity': (0.4398, 0.4184), # consumption, production (US mix, distributed/non-distributed)
+    'Ethanol': 1.4610 + 1/46.06844*44.0095*2, # not the denatured one, CO2 emission included
+    'GlucoAmylase': 5.5135, # assumed to be for the solution
+    'GlycerinPure': glycerin_pure_CF,
+    'H2SO4': 43.3831/1e3, # assumed to be concentrated solution
+    'H3PO4': 1.0619, # assumed to be concentrated solution
+    'HCl': 1.9683, # in the US, assumed to be concentrated solution
+    'Methanol': 0.4866 + 1/32.04186*44.0095, # combined upstream, CO2 emission included
+    'NaOCH3': 1.5732 + 1/54.02369*44.0095, # ecoinvent, market for sodium methoxide
+    'NaOCl': naocl_CF,
+    'NaOH': 2.0092,
+    'NH3': 2.6355,
+    'Polymer': 0, # for existing wastewater treatment, small quantity, ignored
+    'Sugarcane': sugarcane_CF,
+    'Yeast': 2.5554, # assumed to be for the solution
+    ##### Products, no needs to make product CFs negative #####
+    'Biodiesel': 0,
+    'CornOil': 0,
+    'DDGS': 0,
+    'GlycerinCrude': 0,
+    # # Allocate based on the value
+    # 'Biodiesel': biodiesel_CF,
+    # 'CornOil': 75.5919/1e3, # from corn, transportation excluded
+    # 'DDGS': 0.8607, # from corn
+    # 'GlycerinCrude': glycerin_crude_CF,
+    }
+# All feeds
+GWP_CFs['Lime'] = GWP_CFs['CaO'] * 56.0774/74.093 # CaO to Ca(OH)2
+GWP_CFs['NH4OH'] = GWP_CFs['NH3'] * 0.4860 # NH3 to NHOH
+GWP_CFs['Oilcane'] = GWP_CFs['Sugarcane'] # oilcane assumed to be the same as sugarcane
+# Transesterification catalyst, mixture of methanol and NaOCH3
+GWP_CFs['TEcatalyst'] = GWP_CFs['Methanol']*0.75 + GWP_CFs['NaOCH3']*0.25
+
+def add_CFs(stream_registry, unit_registry, stream_CF_dct):
+    for ID, key_factor in stream_CF_dct.items():
+        stream = stream_registry.search(ID) if isinstance(ID, str) \
+            else getattr(unit_registry.search(ID[0]), ID[1])[ID[2]]
+        if stream: # some streams might only exist in exist/new systems
+            try:
+                iter(key_factor)
+                if isinstance(key_factor, str): key_factor = (key_factor,)
+            except:
+                key_factor = (key_factor,)
+            key, factor = (key_factor[0], 1.) if len(key_factor) == 1 else key_factor
+            
+            stream.characterization_factors['GWP'] = GWP_CFs[key]*factor
+    bst.PowerUtility.set_CF('GWP', *GWP_CFs['Electricity'])
+
+
+# Allocation based on the value
+def get_GWP(system, product='ethanol', print_msg=True):
+    s_reg = system.flowsheet.stream
+    product = s_reg.search(product)
+    if product.ID=='ethanol':
+        txt = ('GWP', 'gal')
+        factor = ethanol_density_kggal
+    else:
+        txt = ('GWP', 'kg')
+        factor = 1.
+
+    for unit in system.units:
+        if hasattr(unit, 'cache_dct'):
+            cache_dct = unit.cache_dct
+            break
+    
+    GWP = system.get_net_impact('GWP')/system.operating_hours * factor * cache_dct[f'{product.ID} ratio']/product.F_mass
+    if print_msg: print(f'\n{txt[0]} of {product.ID} for {system.ID}: {GWP:.2f} kg CO2/{txt[1]}.')
+    return GWP

@@ -27,44 +27,30 @@ info = {
 # =============================================================================
 
 def create_cs_comparison_systems(default_BD=True):
-    BD = {} if not default_BD else 1.
-    wwt_kwdct = dict.fromkeys(('IC_kwargs', 'AnMBR_kwargs',), {'biodegradability': BD,})
-
-    # # Create from scratch, IRR doesn't match as closely as the method below
-    # from biorefineries.wwt import create_comparison_systems
-    # from biorefineries import cornstover as cs
-    # from biorefineries.cornstover import (
-    #     create_chemicals,
-    #     create_system,
-    #     create_tea,
-    #     load_process_settings,
-    #     )
-    # OSBL_IDs = [u.ID for u in cs.cornstover_tea.OSBL_units]
-    # functions = (create_chemicals, create_system, create_tea, load_process_settings,)
-    # sys_dct = {
-    #     'create_system': {'include_blowdown_recycle': True},
-    #     'create_wastewater_process': wwt_kwdct,
-    #     'BT': 'BT',
-    #     'new_wwt_connections': {'sludge': ('M501', 0), 'biogas': ('BT', 1)},
-    #     }
-    # exist_sys, new_sys = create_comparison_systems(info, functions, sys_dct)
-
-    # exist_f, new_f = exist_sys.flowsheet, new_sys.flowsheet
-    # exist_sys.TEA.OSBL_units = [getattr(exist_f.unit, ID) for ID in OSBL_IDs]
-    # OSBL_IDs.remove('WWTC')
-    # OSBL_IDs.extend([u.ID for u in new_f.system.new_sys_wwt.units])
-    # new_sys.TEA.OSBL_units = [getattr(new_f.unit, ID) for ID in OSBL_IDs]
-
     from biorefineries.wwt import create_comparison_systems
     from biorefineries import cornstover as cs
+    BD = {} if not default_BD else 1.
+    wwt_kwdct = dict.fromkeys(('IC_kwargs', 'AnMBR_kwargs',), {'biodegradability': BD,})
+    CF_dct = { # all streams are feeds
+        'ammonia': ('NH4OH',), # NH4OH
+        'caustic': ('NaOH', 0.5), # NaOH and water
+        'cellulase': ('Cellulase', 0.05), # cellulase and water
+        'cornstover': ('CornStover',), # adjust for the moisture content
+        'CSL': ('CSL',),
+        'DAP': ('DAP',),
+        'denaturant': ('Denaturant'),
+        'FGD_lime': ('Lime', 0.4513), # lime and water
+        'natural_gas': ('CH4',), # CH4 actually not used due to heat surplus
+        'sulfuric_acid': ('H2SO4',),
+        }
     sys_dct = {
         'system_name': 'cornstover_sys',
         'create_wastewater_process': wwt_kwdct,
         'BT': 'BT',
         'new_wwt_connections': {'sludge': ('M501', 0), 'biogas': ('BT', 1)},
+        'CF_dct': CF_dct,
         }
-    exist_sys, new_sys = create_comparison_systems(info, cs, sys_dct, from_load=True)
-
+    exist_sys, new_sys = create_comparison_systems(info, cs, sys_dct)
     return exist_sys, new_sys
 
 
@@ -109,6 +95,7 @@ def create_cs_comparison_models():
         'BT': 'BT',
         'BT_eff': ('boiler_efficiency', 'turbogenerator_efficiency'),
         'wwt_system': 'exist_sys_wwt',
+        'wwt_ID': info['WWT_ID'],
         'is2G': info['is2G'],
         }
     exist_model = create_comparison_models(exist_sys, exist_model_dct)
@@ -117,16 +104,17 @@ def create_cs_comparison_models():
     new_model_dct = exist_model_dct.copy()
     new_model_dct['biogas'] = 'biogas'
     new_model_dct['wwt_system'] = 'new_sys_wwt'
-    new_model_dct['new_wwt_ID'] = info['WWT_ID']
     new_model = create_comparison_models(new_sys, new_model_dct)
     return exist_model, new_model
 
 
 def evaluate_cs_models(**eval_kwdct):
-    from biorefineries.wwt import evaluate_models
+    from biorefineries.wwt import evaluate_models, get_baseline_summary
     global exist_model, new_model
     exist_model, new_model = create_cs_comparison_models()
-    return evaluate_models(exist_model, new_model, abbr=info['abbr'], **eval_kwdct)
+    abbr = info['abbr']
+    get_baseline_summary(exist_model, new_model, abbr)
+    return evaluate_models(exist_model, new_model, abbr=abbr, **eval_kwdct)
 
 
 # %%
