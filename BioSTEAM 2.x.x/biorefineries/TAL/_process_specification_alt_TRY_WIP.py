@@ -128,7 +128,14 @@ def evaluate_across_specs(spec, system,
                 # Beep(320, 250)
             except Exception as e2:
                 print(str(e2))
-                try: Beep(640, 500)
+                try: 
+                    try:
+                        system.simulate()
+                        return get_metrics()
+                    except:
+                        Beep(640, 500)
+                        import pdb
+                        pdb.set_trace()
                 except: pass
                 spec.count_exceptions += 1
                 print(_red_highlight_white_text+f"Point failed; returning metric values as np.nan."+_reset_text)
