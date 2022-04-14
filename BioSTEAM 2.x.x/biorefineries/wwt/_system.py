@@ -128,7 +128,7 @@ def create_comparison_systems(info, functions, sys_dct={}):
 
     if add_CHP:
         CHP = CHPunit('CHP', ins=(new_s.biogas, new_s.sludge))
-        getattr(new_u, 'Skipped').wwt_units.append(CHP)
+        getattr(new_u, 'Caching').wwt_units.append(CHP)
 
     new_sys = bst.System.from_units('new_sys', units=new_u)
 

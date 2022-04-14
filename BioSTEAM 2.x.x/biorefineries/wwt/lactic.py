@@ -10,6 +10,12 @@
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
 # for license details.
 
+from biorefineries import lactic as la
+from biorefineries.wwt import (
+    create_comparison_systems, simulate_systems,
+    create_comparison_models,evaluate_models,
+    )
+
 info = {
     'abbr': 'la',
     'WWT_ID': '5',
@@ -27,11 +33,8 @@ info = {
 # =============================================================================
 
 #
-def create_la_comparison_systems(default_BD=True):
-    from biorefineries.wwt import create_comparison_systems
-    from biorefineries import lactic as la
-    BD = {} if not default_BD else 1.
-    wwt_kwdct = dict.fromkeys(('IC_kwargs', 'AnMBR_kwargs',), {'biodegradability': BD,})
+def create_la_comparison_systems(biodegradability=0.91):
+    wwt_kwdct = dict.fromkeys(('IC_kwargs', 'AnMBR_kwargs',), {'biodegradability': biodegradability,})
     CF_dct = {
         ##### Feeds #####
         'ammonia': ('NH4OH',), # NH4OH
@@ -61,7 +64,6 @@ def create_la_comparison_systems(default_BD=True):
 
 
 def simulate_la_systems(**sys_kwdct):
-    from biorefineries.wwt import simulate_systems
     global exist_sys, new_sys
     exist_sys, new_sys = create_la_comparison_systems(**sys_kwdct)
     # If using conservative biodegradability,
@@ -78,7 +80,6 @@ def simulate_la_systems(**sys_kwdct):
 # =============================================================================
 
 def create_la_comparison_models():
-    from biorefineries.wwt import create_comparison_models
     exist_sys, new_sys = create_la_comparison_systems()
 
     ##### Existing system #####
@@ -115,12 +116,10 @@ def create_la_comparison_models():
 
 
 def evaluate_la_models(**eval_kwdct):
-    from biorefineries.wwt import evaluate_models, get_baseline_summary
     global exist_model, new_model
     exist_model, new_model = create_la_comparison_models()
-    abbr = info['abbr']
-    get_baseline_summary(exist_model, new_model, abbr)
-    return evaluate_models(exist_model, new_model, abbr=abbr, **eval_kwdct)
+    evaluate_models(exist_model, new_model, info['abbr'], **eval_kwdct)
+    return exist_model, new_model
 
 
 # %%
@@ -130,6 +129,13 @@ def evaluate_la_models(**eval_kwdct):
 # =============================================================================
 
 if __name__ == '__main__':
-    # exist_sys, new_sys = simulate_la_systems(default_BD=True)
+    # exist_sys, new_sys = simulate_la_systems(biodegradability=0.91)
     # exist_model, new_model = create_la_comparison_models()
-    exist_model, new_model = evaluate_la_models(N=1000)
+    exist_model, new_model = evaluate_la_models(
+        # include_baseline=False,
+        # include_uncertainty=False,
+        # include_biodegradability=False,
+        N_uncertainty=100,
+        N_biodegradability=10,
+        # biodegradability=(0.5, 1,),
+        )

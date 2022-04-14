@@ -1,0 +1,129 @@
+,,0
+exist,MPSP [$/gal],2.2175418366761126
+exist,GWP [kg CO2/gal],2.220680833790259
+exist,COD in [mg/L],54757.47438029875
+exist,COD out [mg/L],32.053465389230055
+exist,COD load [kg/hr],27282.711546147348
+exist,COD removal,0.9994146284913249
+exist,Total CAPEX [MM$],217.48809469511838
+exist,WWT CAPEX [MM$],55.5537333981063
+exist,WWT CAPEX frac,0.25543344556851844
+exist,Total input GWP [kg CO2/gal],2.38688998919711
+exist,WWT input GWP [kg CO2/gal],0.8170869014820914
+exist,WWT input GWP frac,0.3423228155382808
+exist,Annual net electricity [MWh/yr],-211866.2682188308
+exist,Annual electricity consumption [MWh/yr],206911.39575492154
+exist,WWT annual electricity consumption [MWh/yr],73089.46617412315
+exist,WWT annual electricity consumption frac,0.35324040953594826
+exist,Total electricity GWP [kg CO2/gal],-0.19595225903622215
+exist,WWT electricity GWP [kg CO2/gal],0.06759946323205225
+exist,Mixer-M601 installed cost [MM$],0.0
+exist,Mixer-M601 annual electricity consumption [MWh/yr],0.0
+exist,WastewaterSystemCost-WWTC installed cost [MM$],55.5537333981063
+exist,WastewaterSystemCost-WWTC annual electricity consumption [MWh/yr],73089.46617412315
+exist,AnaerobicDigestion-R601 installed cost [MM$],0.0
+exist,AnaerobicDigestion-R601 annual electricity consumption [MWh/yr],0.0
+exist,Mixer-M602 installed cost [MM$],0.0
+exist,Mixer-M602 annual electricity consumption [MWh/yr],0.0
+exist,AerobicDigestion-R602 installed cost [MM$],0.0
+exist,AerobicDigestion-R602 annual electricity consumption [MWh/yr],0.0
+exist,MembraneBioreactor-S601 installed cost [MM$],0.0
+exist,MembraneBioreactor-S601 annual electricity consumption [MWh/yr],0.0
+exist,Splitter-S602 installed cost [MM$],0.0
+exist,Splitter-S602 annual electricity consumption [MWh/yr],0.0
+exist,Mixer-M603 installed cost [MM$],0.0
+exist,Mixer-M603 annual electricity consumption [MWh/yr],0.0
+exist,SludgeCentrifuge-S603 installed cost [MM$],0.0
+exist,SludgeCentrifuge-S603 annual electricity consumption [MWh/yr],0.0
+exist,ReverseOsmosis-S604 installed cost [MM$],0.0
+exist,ReverseOsmosis-S604 annual electricity consumption [MWh/yr],0.0
+exist,Skipped-Caching installed cost [MM$],0.0
+exist,Skipped-Caching annual electricity consumption [MWh/yr],0.0
+exist,natural_gas impact [kg CO2/gal],0.0
+exist,denaturant impact [kg CO2/gal],0.0
+exist,FGD_lime impact [kg CO2/gal],0.0
+exist,cellulase impact [kg CO2/gal],0.0
+exist,DAP impact [kg CO2/gal],0.0
+exist,CSL impact [kg CO2/gal],0.0
+exist,sulfuric_acid impact [kg CO2/gal],0.0
+exist,ammonia impact [kg CO2/gal],0.0
+exist,caustic impact [kg CO2/gal],0.0
+exist,cornstover impact [kg CO2/gal],0.0
+exist,WWT produced energy [MWh/yr],507894.16886991035
+exist,WWT ECR,0.14390688189382214
+exist,Clear cache,0.0
+new,MPSP [$/gal],2.0248511633870763
+new,GWP [kg CO2/gal],1.4138800017416067
+new,MPSP no WWT [$/gal],2.0706300248492857
+new,GWP no WWT [kg CO2/gal],3.000322475097083
+new,WW price [¢/kg],-0.06609365106783593
+new,COD price per kg [¢/kg],-1.2184721107880911
+new,COD price per ton [$/ton],-11.053792562836612
+new,WW GWP [g CO2-e/kg],-22.904408699571523
+new,COD GWP per kg [g CO2-e/kg],-42.22551298592351
+new,COD GWP per ton [kg CO2-e/ton],-383.0633933048112
+new,COD in [mg/L],54751.4852107248
+new,COD out [mg/L],79.00655683616395
+new,COD removal,0.9985569970105453
+new,COD load [kg/hr],27259.978963906135
+new,Total CAPEX [MM$],200.75448489870817
+new,WWT CAPEX [MM$],38.710415449306225
+new,WWT CAPEX frac,0.19282466077327134
+new,Total input GWP [kg CO2/gal],1.6480273800296663
+new,WWT input GWP [kg CO2/gal],0.013281832588133034
+new,WWT input GWP frac,0.008059230537719553
+new,Annual net electricity [MWh/yr],-273637.73480405024
+new,Annual electricity consumption [MWh/yr],146990.10013575054
+new,WWT annual electricity consumption [MWh/yr],13148.498836518529
+new,WWT annual electricity consumption frac,0.0894515945249063
+new,Total electricity GWP [kg CO2/gal],-0.25308385682720275
+new,WWT electricity GWP [kg CO2/gal],0.012160869550455155
+new,Mixer-M601 installed cost [MM$],0.0
+new,Mixer-M601 annual electricity consumption [MWh/yr],0.0
+new,InternalCirculationRx-R601 installed cost [MM$],13.019626781571606
+new,InternalCirculationRx-R601 annual electricity consumption [MWh/yr],623.991442435154
+new,AnMBR-R602 installed cost [MM$],1.6364242551671646
+new,AnMBR-R602 annual electricity consumption [MWh/yr],508.66673432713503
+new,PolishingFilter-R603 installed cost [MM$],11.605470221641006
+new,PolishingFilter-R603 annual electricity consumption [MWh/yr],134.62674761571978
+new,Splitter-S601 installed cost [MM$],0.0
+new,Splitter-S601 annual electricity consumption [MWh/yr],0.0
+new,Mixer-M603 installed cost [MM$],0.0
+new,Mixer-M603 annual electricity consumption [MWh/yr],0.0
+new,BeltThickener-S602 installed cost [MM$],0.07065835658045191
+new,BeltThickener-S602 annual electricity consumption [MWh/yr],355.91036926399806
+new,SludgeCentrifuge-S603 installed cost [MM$],0.24642121158425337
+new,SludgeCentrifuge-S603 annual electricity consumption [MWh/yr],165.64048122836206
+new,ReverseOsmosis-S604 installed cost [MM$],11.968846221186672
+new,ReverseOsmosis-S604 annual electricity consumption [MWh/yr],10214.120768720648
+new,Skipped-Caching installed cost [MM$],0.0
+new,Skipped-Caching annual electricity consumption [MWh/yr],0.0
+new,Mixer-M602 installed cost [MM$],0.0
+new,Mixer-M602 annual electricity consumption [MWh/yr],0.0
+new,Pump-R601_eff installed cost [MM$],0.06147160797850088
+new,Pump-R601_eff annual electricity consumption [MWh/yr],611.1917554641105
+new,Pump-R601_sludge installed cost [MM$],0.014515317829225377
+new,Pump-R601_sludge annual electricity consumption [MWh/yr],12.799686971043487
+new,Pump-S602_eff installed cost [MM$],0.027421007629290946
+new,Pump-S602_eff annual electricity consumption [MWh/yr],205.05245136036166
+new,Pump-S602_sludge installed cost [MM$],0.022837348951160966
+new,Pump-S602_sludge annual electricity consumption [MWh/yr],150.85791790363635
+new,Pump-S603_eff installed cost [MM$],0.021969611905008492
+new,Pump-S603_eff annual electricity consumption [MWh/yr],134.021714714374
+new,Pump-S603_sludge installed cost [MM$],0.014753507281885838
+new,Pump-S603_sludge annual electricity consumption [MWh/yr],31.61876651398804
+new,DAP impact [kg CO2/gal],0.0
+new,CSL impact [kg CO2/gal],0.0
+new,naocl_R602 impact [kg CO2/gal],0.0
+new,citric_R602 impact [kg CO2/gal],0.0
+new,bisulfite_R602 impact [kg CO2/gal],0.0
+new,natural_gas impact [kg CO2/gal],0.0
+new,FGD_lime impact [kg CO2/gal],0.0
+new,cornstover impact [kg CO2/gal],0.0
+new,denaturant impact [kg CO2/gal],0.0
+new,sulfuric_acid impact [kg CO2/gal],0.0
+new,ammonia impact [kg CO2/gal],0.0
+new,cellulase impact [kg CO2/gal],0.0
+new,WWT produced energy [MWh/yr],567412.3945872635
+new,WWT ECR,0.0231727381388677
+new,Clear cache,0.0

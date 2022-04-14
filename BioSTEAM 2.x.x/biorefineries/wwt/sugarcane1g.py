@@ -10,6 +10,12 @@
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
 # for license details.
 
+from biorefineries import oilcane as oc
+from biorefineries.wwt import (
+    create_comparison_systems, simulate_systems,
+    create_comparison_models,evaluate_models,
+    )
+
 info = {
     'abbr': 'sc1g',
     'WWT_ID': '8',
@@ -26,11 +32,8 @@ info = {
 # Systems
 # =============================================================================
 
-def create_sc1g_comparison_systems(default_BD=True):
-    from biorefineries.wwt import create_comparison_systems
-    from biorefineries import oilcane as oc
-    BD = {} if not default_BD else 1.
-    wwt_kwdct = dict.fromkeys(('IC_kwargs', 'AnMBR_kwargs',), {'biodegradability': BD,})
+def create_sc1g_comparison_systems(biodegradability=0.91):
+    wwt_kwdct = dict.fromkeys(('IC_kwargs', 'AnMBR_kwargs',), {'biodegradability': biodegradability,})
     wwt_kwdct['skip_AeF'] = True
     CF_dct = {
         ##### Feeds #####
@@ -64,7 +67,6 @@ def create_sc1g_comparison_systems(default_BD=True):
 
 
 def simulate_sc1g_systems(**sys_kwdct):
-    from biorefineries.wwt import simulate_systems
     global exist_sys, new_sys
     exist_sys, new_sys = create_sc1g_comparison_systems(**sys_kwdct)
     simulate_systems(exist_sys, new_sys, info)
@@ -78,7 +80,6 @@ def simulate_sc1g_systems(**sys_kwdct):
 # =============================================================================
 
 def create_sc1g_comparison_models():
-    from biorefineries.wwt import create_comparison_models
     exist_sys, new_sys = create_sc1g_comparison_systems()
 
     ##### Existing system #####
@@ -110,13 +111,10 @@ def create_sc1g_comparison_models():
 
 
 def evaluate_sc1g_models(**eval_kwdct):
-    from biorefineries.wwt import evaluate_models, get_baseline_summary
     global exist_model, new_model
     exist_model, new_model = create_sc1g_comparison_models()
-    abbr = info['abbr']
-    get_baseline_summary(exist_model, new_model, abbr)
-    return evaluate_models(exist_model, new_model, abbr=abbr, **eval_kwdct)
-
+    evaluate_models(exist_model, new_model, info['abbr'], **eval_kwdct)
+    return exist_model, new_model
 
 
 # %%
@@ -126,6 +124,11 @@ def evaluate_sc1g_models(**eval_kwdct):
 # =============================================================================
 
 if __name__ == '__main__':
-    # exist_sys, new_sys = simulate_sc1g_systems(default_BD=True)
+    # exist_sys, new_sys = simulate_sc1g_systems(biodegradability=0.91)
     # exist_model, new_model = create_sc1g_comparison_models()
-    exist_model, new_model = evaluate_sc1g_models(N=10)
+    exist_model, new_model = evaluate_sc1g_models(
+        # include_baseline=False,
+        # include_uncertainty=False,
+        include_biodegradability=False, # biodegradability for 1G should be high
+        N_uncertainty=100,
+        )
