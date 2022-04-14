@@ -17,8 +17,8 @@ def MPSP_at_adsorption_design(v, t):
     column.cycle_time = t
     return get_SA_MPSP(), AC401.installed_cost/1e6
 
-regen_vels = np.linspace(1., 20., 10)
-cycle_times = np.linspace(0.5, 4., 10)
+regen_vels = np.linspace(3., 20., 40)
+cycle_times = np.linspace(1., 4., 40)
 MPSPs_ads_ds = []
 column_costs_ads_r_t = []
 #%%
@@ -26,7 +26,12 @@ for i in regen_vels:
     MPSPs_ads_ds.append([])
     column_costs_ads_r_t.append([])
     for j in cycle_times:
-        MPSP, cost = MPSP_at_adsorption_design(i, j)
+        MPSP, cost = None, None
+        try:
+            MPSP, cost = MPSP_at_adsorption_design(i, j)
+        except:
+            print(i, j)
+            MPSP, cost = np.nan, np.nan
         MPSPs_ads_ds[-1].append(MPSP)
         column_costs_ads_r_t[-1].append(cost)
 #%% Set parameters to optimal
@@ -37,7 +42,7 @@ column.cycle_time = cycle_times[opt_indices[1][0]]
 print(min_MPSP, get_SA_MPSP())
 #%% Plot MPSP
 fig1, ax2 = plt.subplots(constrained_layout=True)
-CS = ax2.contourf(cycle_times, regen_vels, MPSPs_ads_ds, levels=[0., 2.5, 5., 7.5, 10, 12.5, 15, 17.5, 20])
+CS = ax2.contourf(cycle_times, regen_vels, MPSPs_ads_ds, levels=[4., 4.5, 5, 5.5,  6., 6.5, 7.])
 
 CS2 = ax2.contour(CS, levels=CS.levels[::2], colors='black', origin='lower')
 
@@ -53,7 +58,7 @@ cbar.add_lines(CS2)
 #%% Plot column cost
 fig1, ax2 = plt.subplots(constrained_layout=True)
 CS = ax2.contourf(cycle_times, regen_vels, column_costs_ads_r_t, 
-                  # levels=[0, 2, 4, 6, 8, 10, 12, 14, 16, 18 ,20],
+                   levels=[0, 0.25, 0.5, 0.75, 1., 1.25, 1.5, 1.75, 2., 2.25, 2.5],
                   )
 
 CS2 = ax2.contour(CS, levels=CS.levels[::2], colors='black', origin='lower')
@@ -71,8 +76,8 @@ cbar.add_lines(CS2)
 #%%
 AC401.regeneration_velocity = 14.4
 AC401.target_recovery=None
-superficial_velocities = np.linspace(4., 15., 10)
-cycle_times = np.linspace(0.5, 4., 10)
+superficial_velocities = np.linspace(4., 15., 9)
+cycle_times = np.linspace(1., 4., 10)
 MPSPs = []
 column_costs = []
 for m in superficial_velocities:
@@ -249,9 +254,9 @@ def MPSP_at_titer(t):
 
 titers = np.linspace(3., 30, 20)
 
-MPSPs_titer = []
 
 #%%
+MPSPs_titer = []
 for i in titers:
     MPSPs_titer.append(MPSP_at_titer(i))
     

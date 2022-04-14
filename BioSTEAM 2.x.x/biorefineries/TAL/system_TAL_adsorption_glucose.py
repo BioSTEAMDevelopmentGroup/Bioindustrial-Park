@@ -58,7 +58,7 @@ from math import exp as math_exp
 from thermosteam import Stream
 # from biorefineries.cornstover import CellulosicEthanolTEA
 from biorefineries.TAL import units, facilities
-from biorefineries.TAL._process_specification_alt_TRY_WIP import ProcessSpecification
+from biorefineries.TAL._process_specification import ProcessSpecification
 from biorefineries.TAL.process_settings import price, CFs
 from biorefineries.TAL.utils import find_split, splits_df, baseline_feedflow
 from biorefineries.TAL.chemicals_data import TAL_chemicals, chemical_groups, \
@@ -868,6 +868,9 @@ for ui in u:
         ui.ID = 'CWP802' # group with CT for system cooling demand
         break
 unit_groups = bst.UnitGroup.group_by_area(TAL_sys.units)
+unit_groups.append(bst.UnitGroup('natural gas'))
+
+
 for i, j in zip(unit_groups, area_names): i.name = j
 for i in unit_groups: i.autofill_metrics(shorthand=True, 
                                          electricity_production=True, 
@@ -883,6 +886,11 @@ for HXN_group in unit_groups:
         HXN_group.filter_savings = False
         HXN = HXN_group.units[0]
         assert isinstance(HXN, bst.HeatExchangerNetwork)
+        
+unit_groups[-1].metrics[-1] = bst.evaluation.Metric('Mat. cost', 
+                                                    getter=lambda: BT.natural_gas_price * BT.natural_gas.F_mass, 
+                                                    units='USD/hr',
+                                                    element=None)
 
 unit_groups_dict = {}
 for i in unit_groups:
@@ -965,8 +973,8 @@ def load_titer_with_glucose(titer_to_load):
     spec.spec_2 = titer_to_load
     u.R302.titer_to_load = titer_to_load
     flx.IQ_interpolation(M304_titer_obj_fn, 1e-3, 20000.)
-    u.AC401.regeneration_velocity = min(14.4, 3.1158 + ((10.168-3.1158)/(30.-3.))*(titer_to_load-3.)) # heuristic to obtain regeneration velocity at which MPSP is minimum fitted to results from simulations at target_recovery=0.99 
-    
+    u.AC401.regeneration_velocity = min(14.4, 3.1158 + ((14.4-3.1158)/(30.-3.))*(titer_to_load-3.)) # heuristic to obtain regeneration velocity at which MPSP is minimum fitted to results from simulations at target_recovery=0.99 
+    # u.AC401.regeneration_velocity = 14.4
 spec.load_spec_2 = load_titer_with_glucose
 
 # path = (F301, R302)
@@ -1071,6 +1079,12 @@ def TEA_breakdown(print_output=False):
                     metric_breakdowns[metric.name]['storage and ' + ug.name] = metric() + unit_groups_dict['storage'].metrics[ug.metrics.index(metric)]()
                 else:
                     metric_breakdowns[metric.name][ug.name] = metric()
+                    
+                    
+            # if ug.name=='natural gas':
+            #     if metric.name=='Mat. cost':
+            #         metric_breakdowns[metric.name][ug.name] = BT.natural_gas.F_mass*BT.natural_gas_price
+            
             
             # else:
             #     storage_metric_val = metric()

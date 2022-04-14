@@ -27,49 +27,39 @@ info = {
 # =============================================================================
 
 def create_sc1g_comparison_systems(default_BD=True):
+    from biorefineries.wwt import create_comparison_systems
+    from biorefineries import oilcane as oc
     BD = {} if not default_BD else 1.
     wwt_kwdct = dict.fromkeys(('IC_kwargs', 'AnMBR_kwargs',), {'biodegradability': BD,})
     wwt_kwdct['skip_AeF'] = True
-
-    # # Does not work for oilcane biorefineries due to the many settings
-    # # not included in the system creation function
-    # from biorefineries.wwt import create_comparison_systems
-    # from biorefineries.oilcane import (
-    #     create_chemicals,
-    #     create_sugarcane_to_ethanol_system as create_system,
-    #     create_tea,
-    #     load_process_settings,
-    #     )
-    # functions = (create_chemicals, create_system, create_tea, load_process_settings,)
-    # sys_dct = {
-    #     'create_system': {'operating_hours': 24*200, 'use_area_convention': True, 'pellet_bagasse': True},
-    #     'create_wastewater_process': wwt_kwdct,
-    #     'rename_storage_to': 700,
-    #     'create_wastewater_process': {'skip_AeF': True},
-    #     # `vinasse`, `fiber_fines`,
-    #     # not using `wastewater` as it contains `evaporator_condensate` (all water)
-    #     'ww_streams': (('H302', 1), ('U211', 0)),
-    #     'solids_streams': (('U207', 0), ('U210', 0)), # `bagasse`, `filter_cake`
-    #     'BT': 'BT401',
-    #     'new_wwt_connections': {'solids': ('BT401', 0), 'biogas': ('BT401', 1)},
-    #     }
-    # exist_sys, new_sys = create_comparison_systems(info, functions, sys_dct)
-
-    from biorefineries.wwt import create_comparison_systems
-    from biorefineries import oilcane as oc
+    CF_dct = {
+        ##### Feeds #####
+        'denaturant': ('Denaturant'),
+        'dryer_natural_gas': ('CH4',),
+        'H3PO4': ('H3PO4',),
+        'lime': ('CaO', 0.046), # CaO and water
+        'polymer': ('Polymer'),
+        'sugarcane': ('Sugarcane',), # moisture content already adjusted
+        ##### Co-products #####
+        # 'Yeast': ('Yeast',), # no price considered, no GWP considered (probably used in fermentation)
+        # `fiber_fines`, `wastewater`, `vinasse` taken care of by WWT
+        # `filter_cake` taken care of by BT
+        # `s41` (from `T302`) is empty
+        }
     sys_dct = {
         'load': {'name': 'S1', 'cache': None, 'reduce_chemicals': False},
         'system_name': 'oilcane_sys',
         'create_wastewater_process': wwt_kwdct,
-        # `vinasse`, `fiber_fines`,
-        # not using `wastewater` as it contains `evaporator_condensate` (all water)
-        'ww_streams': (('H302', 1), ('U211', 1)),
+        # `fiber_fines`, `vinasse`
+        # `wastewater` is mixed from `fiber_fines` (taken care of),
+        # `stripper_bottoms_product` (~20 mg/L COD), and `evaporator_condensate` (only water)
+        'ww_streams': (('U211', 1), ('H302', 1)),
         'solids_streams': (('U207', 0), ('U210', 0)), # `bagasse`, `filter_cake`
         'BT': 'BT401',
         'new_wwt_connections': {'solids': ('BT401', 0), 'biogas': ('BT401', 1)},
+        'CF_dct': CF_dct,
         }
-    exist_sys, new_sys = create_comparison_systems(info, oc, sys_dct, from_load=True)
-
+    exist_sys, new_sys = create_comparison_systems(info, oc, sys_dct)
     return exist_sys, new_sys
 
 
@@ -105,6 +95,7 @@ def create_sc1g_comparison_models():
         'BT': 'BT401',
         'BT_eff': ('boiler_efficiency', 'turbogenerator_efficiency'),
         'wwt_system': 'exist_sys_wwt',
+        'wwt_ID': info['WWT_ID'],
         'is2G': info['is2G'],
         }
     exist_model = create_comparison_models(exist_sys, exist_model_dct)
@@ -114,16 +105,17 @@ def create_sc1g_comparison_models():
     new_model_dct['biogas'] = 'biogas'
     new_model_dct['sludge'] = 'sludge'
     new_model_dct['wwt_system'] = 'new_sys_wwt'
-    new_model_dct['new_wwt_ID'] = info['WWT_ID']
     new_model = create_comparison_models(new_sys, new_model_dct)
     return exist_model, new_model
 
 
 def evaluate_sc1g_models(**eval_kwdct):
-    from biorefineries.wwt import evaluate_models
+    from biorefineries.wwt import evaluate_models, get_baseline_summary
     global exist_model, new_model
     exist_model, new_model = create_sc1g_comparison_models()
-    return evaluate_models(exist_model, new_model, abbr=info['abbr'], **eval_kwdct)
+    abbr = info['abbr']
+    get_baseline_summary(exist_model, new_model, abbr)
+    return evaluate_models(exist_model, new_model, abbr=abbr, **eval_kwdct)
 
 
 
@@ -136,4 +128,4 @@ def evaluate_sc1g_models(**eval_kwdct):
 if __name__ == '__main__':
     # exist_sys, new_sys = simulate_sc1g_systems(default_BD=True)
     # exist_model, new_model = create_sc1g_comparison_models()
-    exist_model, new_model = evaluate_sc1g_models(N=1000)
+    exist_model, new_model = evaluate_sc1g_models(N=10)

@@ -21,7 +21,6 @@ azeotrope_infeasible_recovery_identifier = 'cannot meet'
 
 #%% Default solvent IDs list
 solvent_IDs = [
-                # 'AceticAcid',
                 'Pentadecanol',
                 'Tridecanol',
                 'Ethanol',
@@ -29,6 +28,7 @@ solvent_IDs = [
                 'Propyl acetate',
                 'Butyl acetate',
                 'Hexanol',
+                'Hexane',
                 'Cyclohexanol',
                 'Cyclohexanone',
                 'Heptanol',
@@ -296,7 +296,7 @@ def run_solvents_barrage(stream, # Stream from which you wish to extract the sol
         d_az_in.imol['Water'] = 100
         d_az_in.imol[chem_ID] = 100
         LHK = (chem_ID, 'Water') if test_env_chems[chem_ID].Tb<test_env_chems['Water'].Tb else ('Water', chem_ID)
-        d_az = bst.BinaryDistillation('d_az', ins=d_az_in, LHK=LHK, k=1.2, Lr=0.99, Hr=0.99)
+        d_az = bst.BinaryDistillation('d_az', ins=d_az_in, LHK=LHK, k=1.2, Lr=0.99, Hr=0.99, P=101325./10.)
         try:
             d_az.simulate()
             return False
@@ -311,7 +311,7 @@ def run_solvents_barrage(stream, # Stream from which you wish to extract the sol
         d_az_in.imol[solute_ID] = 100
         d_az_in.imol[chem_ID] = 100
         LHK = (chem_ID, solute_ID) if test_env_chems[chem_ID].Tb<test_env_chems[solute_ID].Tb else (solute_ID, chem_ID)
-        d_az = bst.BinaryDistillation('d_az', ins=d_az_in, LHK=LHK, k=1.2, Lr=0.99, Hr=0.99)
+        d_az = bst.BinaryDistillation('d_az', ins=d_az_in, LHK=LHK, k=1.2, Lr=0.99, Hr=0.99, P=101325./10.)
         try:
             d_az.simulate()
             return False
@@ -432,13 +432,13 @@ def run_solvents_barrage(stream, # Stream from which you wish to extract the sol
     compiled_results_dict = {}
     for result in results_list:
         compiled_results_dict[result[0]] = rn = {}
-        rn['K_solute_in_extract'] = result[1][1]
-        rn['K_water_in_extract'] = result[1][2]
-        rn['K_solvent_in_raffinate'] = result[1][3]
-        rn[f'K_{impurity_IDs[0]}_in_extract'] = result[1][5]
-        rn[f'K_{impurity_IDs[1]}_in_extract'] = result[1][6]
-        rn['Tb_solvent - Tb_water'] = result[1][4]
-        rn['Tb_solvent - Tb_solute'] = result[1][7]
+        rn['K_solute, extract:raffinate [(mol/mol)/(mol/mol)]'] = result[1][1]
+        rn['K_water, extract:raffinate [(mol/mol)/(mol/mol)]'] = result[1][2]
+        rn['K_solvent, raffinate:extract [(mol/mol)/(mol/mol)]'] = result[1][3]
+        rn[f'K_{impurity_IDs[0]}, extract:raffinate [(mol/mol)/(mol/mol)]'] = result[1][5]
+        rn[f'K_{impurity_IDs[1]}, extract:raffinate [(mol/mol)/(mol/mol)]'] = result[1][6]
+        rn['Tb_solvent - Tb_water [K]'] = result[1][4]
+        rn['Tb_solvent - Tb_solute [K]'] = result[1][7]
         rn['Forms azeotrope with water'] = forms_azeotrope_with_water(result[0])
         rn['Forms azeotrope with solute'] = forms_azeotrope_with_solute(result[0])
         

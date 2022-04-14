@@ -158,7 +158,7 @@ KOH_price = 1.6
 # https://www.alibaba.com/product-detail/Hydrochloric-acid-HCl-7647-01-0_60439085052.html?spm=a2700.galleryofferlist.0.0.4fa42c515nP2GH
 HCl_price = 0.3
 
-activated_carbon_price = 41. # $/ft^3
+activated_carbon_price = 41. # $/ft^3 # Seader et al.
 # All in 2016$/kg
 price = {'SA': SA_price,
          'TCP': TCP_price,
