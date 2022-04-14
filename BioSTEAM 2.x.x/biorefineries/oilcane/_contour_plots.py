@@ -324,7 +324,7 @@ def plot_extraction_efficiency_and_oil_content_contours(
         load=False, metric_index=0, N_decimals=1,
     ):
     # Generate contour data
-    x = np.linspace(0.4, 1., 20)
+    x = np.linspace(0.6, 1., 20)
     y = np.linspace(0.05, 0.15, 20)
     X, Y = np.meshgrid(x, y)
     metric = bst.metric
@@ -337,7 +337,7 @@ def plot_extraction_efficiency_and_oil_content_contours(
         data = np.load(file)
     else:
         data = oc.evaluate_configurations_across_extraction_efficiency_and_oil_content(
-            X, Y, 0.70, agile, configurations, 
+            X, Y, agile, configurations, 
         )
     np.save(file, data)
     data = data[:, :, :, :, metric_index]

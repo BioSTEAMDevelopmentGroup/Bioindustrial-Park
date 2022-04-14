@@ -6,7 +6,7 @@ Created on Thu Nov  4 14:44:17 2021
 """
 from biosteam import MockVariable
 
-(set_cane_oil_content, set_relative_sorghum_oil_content, set_bagasse_oil_retention, 
+(set_cane_oil_content, set_relative_sorghum_oil_content, set_oil_extraction_efficiency, 
  set_bagasse_oil_extraction_efficiency, 
  set_cane_operating_days, set_sorghum_operating_days, 
  set_plant_capacity, set_ethanol_price,
@@ -23,7 +23,7 @@ from biosteam import MockVariable
  set_sorghum_FFA_content, set_TAG_to_FFA_conversion, set_oilcane_GWP,
  set_methanol_GWP, set_pure_glycerine_GWP, set_cellulase_GWP, set_natural_gas_GWP
  ) = all_parameter_mockups = (
-    MockVariable('Oil retention', '%', 'biorefinery'),
+    MockVariable('Oil extraction efficiency', '%', 'biorefinery'),
     MockVariable('Bagasse oil extraction efficiency', '%', 'biorefinery'),
     MockVariable('Cane operating days', 'day/yr', 'biorefinery'),
     MockVariable('Sorghum operating days', 'day/yr', 'biorefinery'),

@@ -44,24 +44,22 @@ def no_derivative(f):
     return f
 
 def evaluate_configurations_across_extraction_efficiency_and_oil_content(
-        efficiency, oil_content, oil_retention, agile, configurations,
+        efficiency, oil_content, agile, configurations,
     ):
     A = len(agile)
     C = len(configurations)
     M = len(all_metric_mockups)
     data = np.zeros([A, C, M])
     for ia in range(A):
-        for ic in range(C):    
+        for ic in range(C):
             oc.load([int(configurations[ic]), agile[ia]])
             if agile[ia]:
                 oc.cane_mode.oil_content = oc.sorghum_mode.oil_content = oil_content
                 oc.oil_extraction_specification.load_efficiency(efficiency)
-                oc.oil_extraction_specification.load_oil_retention(oil_retention)
             else:
                 oc.oil_extraction_specification.load_specifications(
                     efficiency=efficiency, 
                     oil_content=oil_content, 
-                    oil_retention=oil_retention
                 )
             oc.sys.simulate()
             data[ia, ic, :] = [j() for j in oc.model.metrics]
@@ -71,8 +69,8 @@ N_metrics = len(all_metric_mockups)
 evaluate_configurations_across_extraction_efficiency_and_oil_content = no_derivative(
     np.vectorize(
         evaluate_configurations_across_extraction_efficiency_and_oil_content, 
-        excluded=['oil_retention', 'agile', 'configurations'],
-        signature=f'(),(),(),(a),(c)->(a,c,{N_metrics})'
+        excluded=['agile', 'configurations'],
+        signature=f'(),(),(a),(c)->(a,c,{N_metrics})'
     )
 )
 def evaluate_configurations_across_sorghum_and_cane_oil_content(
@@ -220,9 +218,11 @@ def run_uncertainty_and_sensitivity(name, N, rule='L',
 
 run = run_uncertainty_and_sensitivity
     
-def run_all(N, across_oil_content=False, rule='L', configurations=None, **kwargs):
+def run_all(N, across_oil_content=False, rule='L', configurations=None,
+            filter=None,**kwargs):
     if configurations is None: configurations = oc.configuration_names
     for name in configurations:
+        if filter and not filter(name): continue
         print(f"Running {name}:")
         run_uncertainty_and_sensitivity(
             name, N, rule, across_oil_content, **kwargs

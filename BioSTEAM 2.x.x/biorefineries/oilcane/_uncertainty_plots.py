@@ -74,6 +74,8 @@ __all__ = (
     'plot_feedstock_comparison_kde',
     'plot_crude_configuration_comparison_kde',
     'plot_agile_comparison_kde',
+    'area_colors',
+    'area_hatches',
 )
 
 area_colors = {

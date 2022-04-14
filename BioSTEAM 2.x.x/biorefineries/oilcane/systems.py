@@ -64,19 +64,22 @@ def create_oil_expression_system(ins, outs):
     U801.cost_items = U801.cost_items.copy() 
     U801.cost_items['Screw press'] = cost_item = U801.cost_items['Screw press'].copy()
     cost_item.ub = 24000
-    U801.tag = "oil extraction efficiency"
+    U801.tag = "bagasse oil extraction"
 
 @SystemFactory(
     ID='post_fermentation_oil_separation_sys',
     ins=[dict(ID='solids_free_stillage')],
     outs=[dict(ID='oil'),
-          dict(ID='cellmass'),
           dict(ID='wastewater'),
           dict(ID='evaporator_condensate')], 
 )
 def create_post_fermentation_oil_separation_system(ins, outs, wastewater_concentration=None,
-                                                   target_oil_content=60, pop_last_evaporator=True):
-    oil, cellmass, wastewater, evaporator_condensate = outs
+                                                   target_oil_content=60, pop_last_evaporator=True,
+                                                   separate_cellmass=False):
+    oil, wastewater, evaporator_condensate = outs
+    if separate_cellmass:     
+        cellmass = bst.Stream('cellmass')
+        outs.insert(1, cellmass)
     V605 = bst.MixTank('V605', ins)
     P606 = bst.Pump('P606', V605-0)
     Ev607 = bst.MultiEffectEvaporator('Ev607',
@@ -137,10 +140,14 @@ def create_post_fermentation_oil_separation_system(ins, outs, wastewater_concent
     C603_2 = bst.LiquidsSplitCentrifuge('C603_2', P607-0, (oil, ''), 
                                         split={'Oil': 0.99,
                                                'Water': 0.0001})
+    if separate_cellmass:        
+        C603_3 = bst.SolidsCentrifuge('C603_3', C603_2-1, (cellmass, ''), 
+                                      split={'Cellmass': 0.99}, solids=('Cellmass',))
+        stream = C603_3-1
+    else:
+        stream = C603_2-1
     S601 = bst.Splitter('S601', ins=Ev607-1, outs=['', evaporator_condensate], split=0.5)
-    C603_3 = bst.SolidsCentrifuge('C603_3', C603_2-1, (cellmass, ''), 
-                                  split={'Cellmass': 0.99}, solids=('Cellmass',))
-    M601 = bst.Mixer('M601', [S601-0, C603_3-1], wastewater)
+    M601 = bst.Mixer('M601', [S601-0, stream], wastewater)
     M601.target_wastewater_concentration = 60. # kg / m3
     @M601.add_specification(run=True)
     def adjust_wastewater_concentration():
@@ -193,7 +200,7 @@ def create_oilcane_to_biodiesel_and_ethanol_1g(
     pelleted_bagasse, = bagasse_pelleting_sys.outs
     jdct['S201'].isplit['Lipid'] = 1.
     crushing_mill = jdct['U201']
-    crushing_mill.tag = "bagasse oil retention"
+    crushing_mill.tag = "oil extraction"
     crushing_mill.isplit['Lipid'] = 0.90
     
     ### Ethanol section ###
@@ -212,7 +219,7 @@ def create_oilcane_to_biodiesel_and_ethanol_1g(
         mockup=True,
         area=400,
     )
-    oil, cellmass, thick_vinasse, evaporator_condensate_b = post_fermentation_oil_separation_sys.outs
+    oil, thick_vinasse, evaporator_condensate_b = post_fermentation_oil_separation_sys.outs
     oil_pretreatment_sys, oil_pretreatment_dct = create_oil_pretreatment_system(
         ins=oil,
         mockup=True,
@@ -243,7 +250,7 @@ def create_oilcane_to_biodiesel_and_ethanol_1g(
     u = f.unit
     
     MX2 = bst.Mixer(700,
-        [polar_lipids, pelleted_bagasse, cellmass]
+        [polar_lipids, pelleted_bagasse]
     )
     
     # Burn bagasse from conveyor belt
@@ -328,7 +335,7 @@ def create_oilcane_to_crude_oil_and_ethanol_1g(
     PX = bst.Pump(400, bagasse_oil)
     vibrating_screen = jdct['S201'].isplit['Lipid'] = 1.
     crushing_mill = jdct['U201']
-    crushing_mill.tag = "bagasse oil retention"
+    crushing_mill.tag = "oil extraction"
     crushing_mill.isplit['Lipid'] = 0.90
     
     ### Ethanol section ###
@@ -347,7 +354,7 @@ def create_oilcane_to_crude_oil_and_ethanol_1g(
         mockup=True,
         area=400,
     )
-    oil, cellmass, thick_vinasse, evaporator_condensate_b = post_fermentation_oil_separation_sys.outs
+    oil, thick_vinasse, evaporator_condensate_b = post_fermentation_oil_separation_sys.outs
     MX = bst.Mixer(400, [thick_vinasse, evaporator_condensate_a], vinasse)
     MX = bst.Mixer(400, [PX-0, oil], crude_oil)
     
@@ -357,7 +364,7 @@ def create_oilcane_to_crude_oil_and_ethanol_1g(
     u = f.unit
     
     MX2 = bst.Mixer(700,
-        [pressed_bagasse, cellmass]
+        [pressed_bagasse]
     )
     
     # Burn bagasse from conveyor belt
@@ -423,7 +430,7 @@ def create_oilcane_to_crude_oil_and_ethanol_combined_1_and_2g_post_fermentation_
     
     vibrating_screen = udct['S201'].isplit['Lipid'] = 1.
     crushing_mill = udct['U201']
-    crushing_mill.tag = "bagasse oil retention"
+    crushing_mill.tag = "oil extraction"
     crushing_mill.isplit['Lipid'] = 0.90
     conveying_belt = bagasse.source
     conveying_belt.cellulose_rxn = tmo.Reaction('Cellulose -> Glucan', 'Cellulose', 1.0, basis='wt')
@@ -464,14 +471,15 @@ def create_oilcane_to_crude_oil_and_ethanol_combined_1_and_2g_post_fermentation_
         insoluble_solids_loading=0.23,
         SeedTrain=units.SeedTrain,
         CoFermentation=units.CoFermentation,
+        add_CSL=False,
         solids_loading=0.23, # 30 wt/vol % solids content in saccharification
     )
-    DAP_storage = cf_dct['DAP_storage']
-    CSL_storage = cf_dct['CSL_storage']
+    # DAP_storage = cf_dct['DAP_storage']
+    # CSL_storage = cf_dct['CSL_storage']
     seedtrain = cf_dct['R302'] # Seed train
     cofermentation = cf_dct['R303'] # Cofermentation
     pressurefilter = cf_dct['S303'] # Pressure filter
-    pressurefilter.tag = "oil extraction efficiency"
+    pressurefilter.tag = "bagasse oil extraction"
     pressurefilter.isplit['Lipid'] = 1. - 0.7
     hydrolysate = pressurefilter.outs[1]
     sink = hydrolysate.sink
@@ -502,12 +510,12 @@ def create_oilcane_to_crude_oil_and_ethanol_combined_1_and_2g_post_fermentation_
     @EvX.add_specification(run=True)
     def evaporation():
         evaporator_to_seedtrain = EvX.path_until(seedtrain)
-        DAP_to_seedtrain = DAP_storage.path_until(seedtrain)
-        CSL_to_seedtrain = CSL_storage.path_until(seedtrain)
+        # DAP_to_seedtrain = DAP_storage.path_until(seedtrain)
+        # CSL_to_seedtrain = CSL_storage.path_until(seedtrain)
         seedtrain_to_cofermentation = seedtrain.path_until(cofermentation)
         path = (*evaporator_to_seedtrain[1:],
-                *DAP_to_seedtrain,
-                *CSL_to_seedtrain,
+                # *DAP_to_seedtrain,
+                # *CSL_to_seedtrain,
                 *seedtrain_to_cofermentation)
         beer = cofermentation.outs[1]
         target_titer = cofermentation.titer
@@ -573,6 +581,7 @@ def create_oilcane_to_crude_oil_and_ethanol_combined_1_and_2g_post_fermentation_
         mockup=True,
         area=600,
         udct=True,
+        separate_cellmass=True,
     )
     backend_oil, cellmass, wastewater, evaporator_condensate = post_fermentation_oil_separation_sys.outs
     MX_process_water = bst.Mixer(800, (EvX.outs[1], evaporator_condensate, stripper_process_water),
@@ -637,7 +646,7 @@ def create_oilcane_to_biodiesel_and_ethanol_combined_1_and_2g_post_fermentation_
     
     vibrating_screen = udct['S201'].isplit['Lipid'] = 1.
     crushing_mill = udct['U201']
-    crushing_mill.tag = "bagasse oil retention"
+    crushing_mill.tag = "oil extraction"
     crushing_mill.isplit['Lipid'] = 0.90
     conveying_belt = bagasse.source
     conveying_belt.cellulose_rxn = tmo.Reaction('Cellulose -> Glucan', 'Cellulose', 1.0, basis='wt')
@@ -678,14 +687,15 @@ def create_oilcane_to_biodiesel_and_ethanol_combined_1_and_2g_post_fermentation_
         insoluble_solids_loading=0.23,
         SeedTrain=units.SeedTrain,
         CoFermentation=units.CoFermentation,
+        add_nutrients=False,
         solids_loading=0.23, # 30 wt/vol % solids content in saccharification
     )
-    DAP_storage = cf_dct['DAP_storage']
-    CSL_storage = cf_dct['CSL_storage']
+    # DAP_storage = cf_dct['DAP_storage']
+    # CSL_storage = cf_dct['CSL_storage']
     seedtrain = cf_dct['R302'] # Seed train
     cofermentation = cf_dct['R303'] # Cofermentation
     pressurefilter = cf_dct['S303'] # Pressure filter
-    pressurefilter.tag = "oil extraction efficiency"
+    pressurefilter.tag = "bagasse oil extraction"
     pressurefilter.isplit['Lipid'] = 1. - 0.7
     hydrolysate = pressurefilter.outs[1]
     sink = hydrolysate.sink
@@ -716,12 +726,12 @@ def create_oilcane_to_biodiesel_and_ethanol_combined_1_and_2g_post_fermentation_
     @EvX.add_specification(run=True)
     def evaporation():
         evaporator_to_seedtrain = EvX.path_until(seedtrain)
-        DAP_to_seedtrain = DAP_storage.path_until(seedtrain)
-        CSL_to_seedtrain = CSL_storage.path_until(seedtrain)
+        # DAP_to_seedtrain = DAP_storage.path_until(seedtrain)
+        # CSL_to_seedtrain = CSL_storage.path_until(seedtrain)
         seedtrain_to_cofermentation = seedtrain.path_until(cofermentation)
         path = (*evaporator_to_seedtrain[1:],
-                *DAP_to_seedtrain,
-                *CSL_to_seedtrain,
+                # *DAP_to_seedtrain,
+                # *CSL_to_seedtrain,
                 *seedtrain_to_cofermentation)
         beer = cofermentation.outs[1]
         target_titer = cofermentation.titer
@@ -787,6 +797,7 @@ def create_oilcane_to_biodiesel_and_ethanol_combined_1_and_2g_post_fermentation_
         mockup=True,
         area=600,
         udct=True,
+        separate_cellmass=True,
     )
     backend_oil, cellmass, wastewater, evaporator_condensate = post_fermentation_oil_separation_sys.outs
     backend_oil.ID = 'backend_oil'
@@ -910,10 +921,11 @@ def create_sugarcane_to_ethanol_combined_1_and_2g(ins, outs):
         insoluble_solids_loading=0.15,
         solids_loading=0.23,
         SeedTrain=units.SeedTrain,
+        add_nutrients=False,
         CoFermentation=units.CoFermentation,
     )
-    DAP_storage = cf_dct['DAP_storage']
-    CSL_storage = cf_dct['CSL_storage']
+    # DAP_storage = cf_dct['DAP_storage']
+    # CSL_storage = cf_dct['CSL_storage']
     seedtrain = cf_dct['R302'] # Seed train
     cofermentation = cf_dct['R303'] # Cofermentation
     pressurefilter = cf_dct['S303'] # Pressure filter
@@ -943,12 +955,12 @@ def create_sugarcane_to_ethanol_combined_1_and_2g(ins, outs):
     @EvX.add_specification(run=True)
     def evaporation():
         evaporator_to_seedtrain = EvX.path_until(seedtrain)
-        DAP_to_seedtrain = DAP_storage.path_until(seedtrain)
-        CSL_to_seedtrain = CSL_storage.path_until(seedtrain)
+        # DAP_to_seedtrain = DAP_storage.path_until(seedtrain)
+        # CSL_to_seedtrain = CSL_storage.path_until(seedtrain)
         seedtrain_to_cofermentation = seedtrain.path_until(cofermentation)
         path = (*evaporator_to_seedtrain[1:],
-                *DAP_to_seedtrain,
-                *CSL_to_seedtrain,
+                # *DAP_to_seedtrain,
+                # *CSL_to_seedtrain,
                 *seedtrain_to_cofermentation)
         beer = cofermentation.outs[1]
         target_titer = cofermentation.titer

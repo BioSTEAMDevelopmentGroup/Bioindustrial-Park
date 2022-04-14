@@ -303,7 +303,11 @@ def load(name, cache={}, reduce_chemicals=True,
         rename_storage_units(1000)
     else:
         raise NotImplementedError(number)
-    
+    if not number % 2:
+        for sys in oilcane_sys.subsystems:
+            for unit in sys.path:
+                if isinstance(unit, bst.AnaerobicDigestion):
+                    sys.converge_method = 'fixed-point'
     oilcane_sys.set_tolerance(rmol=1e-5, mol=1e-3, subsystems=True)
     dct.update(flowsheet.to_dict())
     
@@ -342,10 +346,10 @@ def load(name, cache={}, reduce_chemicals=True,
     
     
     if abs(number) in (2, 4):
-        prs, = flowsheet(cs.units.PretreatmentReactorSystem)
-        saccharification, = flowsheet(cs.units.Saccharification)
-        seed_train, = flowsheet(cs.units.SeedTrain)
-        fermentor, = flowsheet(cs.units.CoFermentation)
+        prs = flowsheet(cs.units.PretreatmentReactorSystem)
+        saccharification = flowsheet(cs.units.Saccharification)
+        seed_train = flowsheet(cs.units.SeedTrain)
+        fermentor = flowsheet(cs.units.CoFermentation)
         dct['pretreatment_rxnsys'] = tmo.ReactionSystem(
             prs.reactions, saccharification.saccharification
         )
@@ -436,12 +440,12 @@ def load(name, cache={}, reduce_chemicals=True,
             dct['biodiesel'] = bst.Stream('biodiesel')
         isplit_b = isplit_a = None
         for i in oilcane_sys.cost_units:
-            if getattr(i, 'tag', None) == 'oil extraction efficiency':
+            if getattr(i, 'tag', None) == 'oil extraction':
                 isplit_a = i.isplit
                 break
         
         for i in oilcane_sys.cost_units:
-            if getattr(i, 'tag', None) == 'bagasse oil retention':
+            if getattr(i, 'tag', None) == 'bagasse bagasse_efficiency=None,':
                 isplit_b = i.isplit
                 break
         
@@ -506,13 +510,13 @@ def load(name, cache={}, reduce_chemicals=True,
     def triangular(lb, mid, ub, *args, **kwargs):
         return parameter(*args, distribution=shape.Triangle(lb, mid, ub), bounds=(lb, ub), **kwargs)
     
-    @uniform(40, 5, units='%', kind='coupled')
-    def set_bagasse_oil_retention(oil_retention):
-        oil_extraction_specification.load_oil_retention(oil_retention / 100.)
+    @uniform(30, 90, units='%', kind='coupled')
+    def set_oil_extraction_efficiency(oil_extraction_efficiency):
+        oil_extraction_specification.load_efficiency(oil_extraction_efficiency / 100.)
     
     @uniform(70.0, 95, units='%', kind='coupled')
     def set_bagasse_oil_extraction_efficiency(bagasse_oil_extraction_efficiency):
-        oil_extraction_specification.load_efficiency(bagasse_oil_extraction_efficiency / 100.)
+        oil_extraction_specification.load_bagasse_efficiency(bagasse_oil_extraction_efficiency / 100.)
 
     # Baseline from Huang's 2016 paper, but distribution more in line with Florida sugarcane harvesting (3-5 months)
     @uniform(4 * 30, 6 * 30, units='day/yr', baseline=180)
@@ -621,11 +625,11 @@ def load(name, cache={}, reduce_chemicals=True,
             # fermentor.cofermentation[2].X = 0.004 # Baseline
             # fermentor.cofermentation[3].X = 0.006 # Baseline
             # fermentor.loss[0].X = 0.03 # Baseline
-            split = np.mean(u.S403.split)
+            split = np.mean(u.S401.split)
             X1 = split * seed_train.reactions.X[0]
             X2 = split * seed_train.reactions.X[2]
             X3 = (glucose_to_ethanol_yield - X1) / (1 - X1 - X2)
-            split = np.mean(u.S403.split)
+            split = np.mean(u.S401.split)
             X_excess = X3 * 1.0526 - 1
             if X_excess > 0.: breakpoint()
             fermentor.cofermentation.X[0] = X3
@@ -640,7 +644,7 @@ def load(name, cache={}, reduce_chemicals=True,
             # fermentor.cofermentation[8].X = 0.009 # Baseline
             # fermentor.loss[1].X = 0.03 # Baseline
             xylose_to_ethanol_yield *= 0.01
-            split = np.mean(u.S403.split)
+            split = np.mean(u.S401.split)
             X1 = split * seed_train.reactions.X[1]
             X2 = split * seed_train.reactions.X[3]
             X3 = (xylose_to_ethanol_yield - X1) / (1 - X1 - X2)
@@ -1022,7 +1026,7 @@ def load(name, cache={}, reduce_chemicals=True,
     else:
         set_baseline(set_cane_oil_content, 5)
         set_baseline(set_bagasse_oil_extraction_efficiency, 70)
-    set_baseline(set_bagasse_oil_retention, 40)
+    set_baseline(set_oil_extraction_efficiency, 60)
     set_baseline(set_ethanol_price, mean_ethanol_price) 
     set_baseline(set_crude_glycerol_price, mean_glycerol_price)
     set_baseline(set_biodiesel_price, mean_biodiesel_price)
