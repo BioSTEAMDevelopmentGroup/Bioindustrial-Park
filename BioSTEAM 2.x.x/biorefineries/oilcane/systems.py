@@ -189,15 +189,15 @@ def create_oilcane_to_biodiesel_and_ethanol_1g(
     
     juicing_sys, jdct = create_juicing_system(
         ins=feedstock_handling_sys-0,
-        outs=['', '', 'fiber_fines'],
+        outs=['', 'bagasse', 'fiber_fines'],
         pellet_bagasse=False,
         mockup=True,
         udct=True,
         area=200,
     )
     screened_juice, bagasse, fiber_fines = juicing_sys.outs
-    bagasse_pelleting_sys = create_bagasse_pelleting_system(None, bagasse, area=400, mockup=True)
-    pelleted_bagasse, = bagasse_pelleting_sys.outs
+    # bagasse_pelleting_sys = create_bagasse_pelleting_system(None, bagasse, area=200, mockup=True)
+    # pelleted_bagasse, = bagasse_pelleting_sys.outs
     jdct['S201'].isplit['Lipid'] = 1.
     crushing_mill = jdct['U201']
     crushing_mill.tag = "oil extraction"
@@ -250,7 +250,7 @@ def create_oilcane_to_biodiesel_and_ethanol_1g(
     u = f.unit
     
     MX2 = bst.Mixer(700,
-        [polar_lipids, pelleted_bagasse]
+        [polar_lipids, bagasse]
     )
     
     # Burn bagasse from conveyor belt
@@ -322,17 +322,8 @@ def create_oilcane_to_crude_oil_and_ethanol_1g(
         area=200,
     )
     screened_juice, bagasse, fiber_fines = juicing_sys.outs
-    bagasse_pelleting_sys = create_bagasse_pelleting_system(None, bagasse, area=400, mockup=True)
-    pelleted_bagasse, = bagasse_pelleting_sys.outs
-    
-    oil_expression_sys = create_oil_expression_system(
-        ins=pelleted_bagasse,
-        mockup=True,
-        area=400
-    )
-    bagasse_oil, pressed_bagasse = oil_expression_sys.outs
-    bagasse_oil.ID = ''
-    PX = bst.Pump(400, bagasse_oil)
+    # bagasse_pelleting_sys = create_bagasse_pelleting_system(None, bagasse, area=200, mockup=True)
+    # pelleted_bagasse, = bagasse_pelleting_sys.outs
     vibrating_screen = jdct['S201'].isplit['Lipid'] = 1.
     crushing_mill = jdct['U201']
     crushing_mill.tag = "oil extraction"
@@ -350,26 +341,21 @@ def create_oilcane_to_crude_oil_and_ethanol_1g(
     ethanol, stillage, stripper_bottoms_product, evaporator_condensate_a = ethanol_production_sys.outs
     post_fermentation_oil_separation_sys = create_post_fermentation_oil_separation_system(
         ins=stillage,
-        outs=['', '', ''],
+        outs=[crude_oil, '', ''],
         mockup=True,
         area=400,
     )
-    oil, thick_vinasse, evaporator_condensate_b = post_fermentation_oil_separation_sys.outs
+    crude_oil, thick_vinasse, evaporator_condensate_b = post_fermentation_oil_separation_sys.outs
     MX = bst.Mixer(400, [thick_vinasse, evaporator_condensate_a], vinasse)
-    MX = bst.Mixer(400, [PX-0, oil], crude_oil)
     
     ### Facilities ###
     
     s = f.stream
     u = f.unit
     
-    MX2 = bst.Mixer(700,
-        [pressed_bagasse]
-    )
-    
     # Burn bagasse from conveyor belt
     BT = bst.BoilerTurbogenerator(700,
-                                   (MX2-0, '', 
+                                   (bagasse, '', 
                                     'boiler_makeup_water', 'natural_gas', '', ''),
                                    ('emissions', 'rejected_water_and_blowdown', 'ash_disposal'),
                                    boiler_efficiency=0.80,

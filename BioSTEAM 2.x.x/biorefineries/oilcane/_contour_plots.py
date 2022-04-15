@@ -30,11 +30,11 @@ from ._distributions import (
 
 __all__ = (
     'plot_relative_sorghum_oil_content_and_cane_oil_content_contours_manuscript',
-    'plot_extraction_efficiency_and_oil_content_contours_manuscript',
+    'plot_recovery_and_oil_content_contours_manuscript',
     'plot_ethanol_and_biodiesel_price_contours_manuscript',
     'plot_enhanced_ethanol_and_biodiesel_price_contours_manuscript',
     'plot_benefit_ethanol_and_biodiesel_price_contours_manuscript',
-    'plot_extraction_efficiency_and_oil_content_contours',
+    'plot_recovery_and_oil_content_contours',
     'plot_relative_sorghum_oil_content_and_cane_oil_content_contours',
     'plot_ethanol_and_biodiesel_price_contours',
 )
@@ -100,19 +100,19 @@ def _add_letter_labels(axes, xpos, ypos, colors):
                      horizontalalignment='center',verticalalignment='center',
                      fontsize=12, fontweight='bold', zorder=1e17)
 
-def plot_extraction_efficiency_and_oil_content_contours_manuscript(load=True):
+def plot_recovery_and_oil_content_contours_manuscript(load=True):
     set_font(size=8)
     set_figure_size()
-    fig, axes = plot_extraction_efficiency_and_oil_content_contours(
+    fig, axes = plot_recovery_and_oil_content_contours(
         load=load,
     )
     colors = np.zeros([2, 2], object)
     colors[:] = [[light_letter_color, light_letter_color],
                  [light_letter_color, light_letter_color]]
-    _add_letter_labels(axes, 1 - 0.68, 0.70, colors)
+    _add_letter_labels(axes, 1 - 0.6, 0.7, colors)
     plt.subplots_adjust(right=0.92, wspace=0.1, top=0.9, bottom=0.10)
     for i in ('svg', 'png'):
-        file = os.path.join(images_folder, f'extraction_efficiency_and_oil_content_contours.{i}')
+        file = os.path.join(images_folder, f'recovery_and_oil_content_contours.{i}')
         plt.savefig(file, transparent=True)
 
 def plot_relative_sorghum_oil_content_and_cane_oil_content_contours_manuscript(load=True):
@@ -264,8 +264,8 @@ def plot_ethanol_and_biodiesel_price_contours(N=30, benefit=False, cache={},
     
 def relative_sorghum_oil_content_and_cane_oil_content_data(load, relative):
     # Generate contour data
-    y = np.linspace(0.05, 0.15, 20)
-    x = np.linspace(-0.03, 0., 20) if relative else np.linspace(0.02, 0.15, 20)
+    y = np.linspace(0.05, 0.15, 15)
+    x = np.linspace(-0.03, 0., 15) if relative else np.linspace(0.02, 0.15, 15)
     X, Y = np.meshgrid(x, y)
     folder = os.path.dirname(__file__)
     file = 'oil_content_analysis.npy'
@@ -298,13 +298,13 @@ def plot_relative_sorghum_oil_content_and_cane_oil_content_contours(
     MFPP = oc.all_metric_mockups[0]
     TCI = oc.all_metric_mockups[6]
     if configuration_index == 0:
-        Z = np.array(["Agile-Conventional"])
+        Z = np.array(["Juice Fermentation"])
         data = data[:, :, :, np.newaxis]
     elif configuration_index == 1:
-        Z = np.array(["Agile-Cellulosic"])
+        Z = np.array(["Integrated Co-Fermentation"])
         data = data[:, :, :, np.newaxis]
     elif configuration_index == ...:
-        Z = np.array(["Agile-Conventional", "Agile-Cellulosic"])
+        Z = np.array(["Juice Fermentation", "Integrated Co-Fermentation"])
         data = np.swapaxes(data, 2, 3)
     else:
         raise ValueError('configuration index must be either 0 or 1')
@@ -320,12 +320,12 @@ def plot_relative_sorghum_oil_content_and_cane_oil_content_contours(
     )
     return fig, axes
     
-def plot_extraction_efficiency_and_oil_content_contours(
+def plot_recovery_and_oil_content_contours(
         load=False, metric_index=0, N_decimals=1,
     ):
     # Generate contour data
-    x = np.linspace(0.6, 1., 20)
-    y = np.linspace(0.05, 0.15, 20)
+    x = np.linspace(0.6, 1., 15)
+    y = np.linspace(0.05, 0.15, 15)
     X, Y = np.meshgrid(x, y)
     metric = bst.metric
     folder = os.path.dirname(__file__)
@@ -336,7 +336,7 @@ def plot_extraction_efficiency_and_oil_content_contours(
     if load:
         data = np.load(file)
     else:
-        data = oc.evaluate_configurations_across_extraction_efficiency_and_oil_content(
+        data = oc.evaluate_configurations_across_recovery_and_oil_content(
             X, Y, agile, configurations, 
         )
     np.save(file, data)
@@ -344,11 +344,11 @@ def plot_extraction_efficiency_and_oil_content_contours(
     data = np.swapaxes(data, 2, 3)
     
     # Plot contours
-    xlabel = 'Oil extraction [%]'
+    xlabel = 'Crushing mill oil recovery [%]'
     ylabel = "Oil content [dry wt. %]"
-    ylabels = [f'Conventional Configuration\n{ylabel}',
-               f'Cellulosic Configuration\n{ylabel}']
-    xticks = [40, 60, 80, 100]
+    ylabels = [f'Juice Fermentation\n{ylabel}',
+               f'Integrated Co-Fermentation\n{ylabel}']
+    xticks = [60, 70, 80, 90, 100]
     yticks = [5, 7.5, 10, 12.5, 15]
     metric = oc.all_metric_mockups[metric_index]
     units = metric.units if metric.units == '%' else format_units(metric.units)
@@ -375,25 +375,19 @@ def plot_extraction_efficiency_and_oil_content_contours(
                              levels=levels, colors=[linecolor])
             # ax.clabel(CS, levels=CS.levels, inline=True, fmt=lambda x: f'{round(x):,}',
             #           colors=[linecolor], zorder=1e16)
-            if j == 0:
-                lb = 50.0
-                ub = 70.0
-            else:
-                lb = 70.0
-                ub = 90.0
-            plt.fill_between([lb, ub], [2], [20], 
-                             color=shadecolor,
-                             linewidth=1)
-            plot_vertical_line(lb, ls='-.',
-                               color=linecolor,
-                               linewidth=1.0)
-            plot_vertical_line(ub, ls='-.',
-                               color=linecolor,
-                               linewidth=1.0)
+            # plt.fill_between([lb, ub], [5], [20], 
+            #                  color=shadecolor,
+            #                  linewidth=1)
+            # plot_vertical_line(lb, ls='-.',
+            #                    color=linecolor,
+            #                    linewidth=1.0)
+            # plot_vertical_line(ub, ls='-.',
+            #                    color=linecolor,
+            #                    linewidth=1.0)
             if hasattr(ax, '_cached_ytwin'):                
                 plt.sca(ax._cached_ytwin)
-            plot_scatter_points([lb], [5], marker='o', s=50, color=startcolor,
+            plot_scatter_points([0.6], [5], marker='o', s=50, color=startcolor,
                                 edgecolor=edgecolor, clip_on=False, zorder=3)
-            plot_scatter_points([ub], [15], marker='*', s=100, color=targetcolor,
-                                edgecolor=edgecolor, clip_on=False, zorder=3)
+            # plot_scatter_points([ub], [15], marker='*', s=100, color=targetcolor,
+            #                     edgecolor=edgecolor, clip_on=False, zorder=3)
     return fig, axes

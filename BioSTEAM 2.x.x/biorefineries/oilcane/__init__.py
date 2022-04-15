@@ -196,7 +196,7 @@ def load(name, cache={}, reduce_chemicals=True,
         bst.rename_units([i for i in oilcane_sys.units if bst.is_storage_unit(i)], storage)
     
     if number == -1:
-        isplit_efficiency_is_reversed = None
+        isplit_recovery_is_reversed = None
         # starting_chemicals = create_starting_chemicals()
         # bst.settings.set_thermo(starting_chemicals)
         oilcane_sys = create_sugarcane_to_ethanol_system(
@@ -215,7 +215,7 @@ def load(name, cache={}, reduce_chemicals=True,
         ]
         rename_storage_units(700)
     elif number == -2:
-        isplit_efficiency_is_reversed = None
+        isplit_recovery_is_reversed = None
         oilcane_sys = create_sugarcane_to_ethanol_combined_1_and_2g(
             operating_hours=operating_hours,
         )
@@ -232,7 +232,7 @@ def load(name, cache={}, reduce_chemicals=True,
         ]
         rename_storage_units(900)
     elif number == 1:
-        isplit_efficiency_is_reversed = False
+        isplit_recovery_is_reversed = False
         oilcane_sys = create_oilcane_to_biodiesel_and_ethanol_1g(
             operating_hours=operating_hours,
         )
@@ -249,7 +249,7 @@ def load(name, cache={}, reduce_chemicals=True,
         ]
         rename_storage_units(1000)
     elif number == 2:
-        isplit_efficiency_is_reversed = True
+        isplit_recovery_is_reversed = True
         area_names = [
             'Feedstock handling', 
             'Juicing', 
@@ -268,7 +268,7 @@ def load(name, cache={}, reduce_chemicals=True,
         )
         rename_storage_units(1100)
     elif number == 3:
-        isplit_efficiency_is_reversed = False
+        isplit_recovery_is_reversed = False
         oilcane_sys = create_oilcane_to_crude_oil_and_ethanol_1g(
             operating_hours=operating_hours,
         )
@@ -284,7 +284,7 @@ def load(name, cache={}, reduce_chemicals=True,
         ]
         rename_storage_units(800)
     elif number == 4:
-        isplit_efficiency_is_reversed = True
+        isplit_recovery_is_reversed = True
         area_names = [
             'Feedstock handling', 
             'Juicing', 
@@ -445,12 +445,12 @@ def load(name, cache={}, reduce_chemicals=True,
                 break
         
         for i in oilcane_sys.cost_units:
-            if getattr(i, 'tag', None) == 'bagasse bagasse_efficiency=None,':
+            if getattr(i, 'tag', None) == 'bagasse oil extraction':
                 isplit_b = i.isplit
                 break
         
         oil_extraction_specification = OilExtractionSpecification(
-            sys, [feedstock], isplit_a, isplit_b, isplit_efficiency_is_reversed
+            sys, [feedstock], isplit_a, isplit_b, isplit_recovery_is_reversed
         )
     
     ## LCA
@@ -460,8 +460,8 @@ def load(name, cache={}, reduce_chemicals=True,
         for i in ('FGD_lime', 'cellulase', 'DAP', 'CSL', 'caustic'): MockStream(i)
     if number < 0 or number > 2:
         for i in ('catalyst', 'methanol', 'HCl', 'NaOH', 'crude_glycerol', 'pure_glycerine'): MockStream(i)
-    if abs(number) not in (1, 3):
-        MockStream('dryer_natural_gas')
+    # if abs(number) not in (1, 3):
+    #     MockStream('dryer_natural_gas')
         
     set_GWPCF(feedstock, 'sugarcane')
     set_GWPCF(s.H3PO4, 'H3PO4')
@@ -478,12 +478,12 @@ def load(name, cache={}, reduce_chemicals=True,
     set_GWPCF(s.HCl, 'HCl')
     set_GWPCF(s.NaOH, 'NaOH')
     set_GWPCF(s.pure_glycerine, 'pure-glycerol')
-    set_GWPCF(s.dryer_natural_gas, 'CH4')
+    # set_GWPCF(s.dryer_natural_gas, 'CH4')
     set_GWPCF(s.crude_glycerol, 'crude-glycerol', dilution=0.80)
     set_GWPCF(s.biodiesel, 'biodiesel displacement')
     bst.PowerUtility.set_CF(GWP, GWP_characterization_factors['Electricity'])
     dct['natural_gas_streams'] = natural_gas_streams = [s.natural_gas]
-    if abs(number) in (1, 3): natural_gas_streams.append(s.dryer_natural_gas)
+    # if abs(number) in (1, 3): natural_gas_streams.append(s.dryer_natural_gas)
     for stream in natural_gas_streams:
         set_GWPCF(stream, 'CH4')
     
@@ -510,13 +510,13 @@ def load(name, cache={}, reduce_chemicals=True,
     def triangular(lb, mid, ub, *args, **kwargs):
         return parameter(*args, distribution=shape.Triangle(lb, mid, ub), bounds=(lb, ub), **kwargs)
     
-    @uniform(30, 90, units='%', kind='coupled')
-    def set_oil_extraction_efficiency(oil_extraction_efficiency):
-        oil_extraction_specification.load_efficiency(oil_extraction_efficiency / 100.)
+    @uniform(60, 95, units='%', kind='coupled')
+    def set_crushing_mill_oil_recovery(oil_recovery):
+        oil_extraction_specification.load_crushing_mill_oil_recovery(oil_recovery / 100.)
     
     @uniform(70.0, 95, units='%', kind='coupled')
-    def set_bagasse_oil_extraction_efficiency(bagasse_oil_extraction_efficiency):
-        oil_extraction_specification.load_bagasse_efficiency(bagasse_oil_extraction_efficiency / 100.)
+    def set_saccharification_oil_recovery(saccharification_oil_recovery):
+        oil_extraction_specification.load_saccharification_oil_recovery(saccharification_oil_recovery / 100.)
 
     # Baseline from Huang's 2016 paper, but distribution more in line with Florida sugarcane harvesting (3-5 months)
     @uniform(4 * 30, 6 * 30, units='day/yr', baseline=180)
@@ -1022,11 +1022,11 @@ def load(name, cache={}, reduce_chemicals=True,
             set_baseline(set_xylose_to_ethanol_yield, 42)
     if number in (1, 3) and enhanced_biodiesel_production:
         set_baseline(set_cane_oil_content, 15)
-        set_baseline(set_bagasse_oil_extraction_efficiency, 95)
+        set_baseline(set_saccharification_oil_recovery, 95)
     else:
         set_baseline(set_cane_oil_content, 5)
-        set_baseline(set_bagasse_oil_extraction_efficiency, 70)
-    set_baseline(set_oil_extraction_efficiency, 60)
+        set_baseline(set_saccharification_oil_recovery, 70)
+    set_baseline(set_crushing_mill_oil_recovery, 60)
     set_baseline(set_ethanol_price, mean_ethanol_price) 
     set_baseline(set_crude_glycerol_price, mean_glycerol_price)
     set_baseline(set_biodiesel_price, mean_biodiesel_price)

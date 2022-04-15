@@ -23,7 +23,7 @@ from ._load_data import (
 )
 
 __all__ = (
-    'evaluate_configurations_across_extraction_efficiency_and_oil_content',
+    'evaluate_configurations_across_recovery_and_oil_content',
     'evaluate_configurations_across_sorghum_and_cane_oil_content',
     'evaluate_MFPP_uncertainty_across_ethanol_and_biodiesel_prices',
     'evaluate_MFPP_benefit_uncertainty_across_ethanol_and_biodiesel_prices',
@@ -43,8 +43,8 @@ def no_derivative(f):
             oc.enable_derivative()
     return f
 
-def evaluate_configurations_across_extraction_efficiency_and_oil_content(
-        efficiency, oil_content, agile, configurations,
+def evaluate_configurations_across_recovery_and_oil_content(
+        recovery, oil_content, agile, configurations,
     ):
     A = len(agile)
     C = len(configurations)
@@ -55,10 +55,10 @@ def evaluate_configurations_across_extraction_efficiency_and_oil_content(
             oc.load([int(configurations[ic]), agile[ia]])
             if agile[ia]:
                 oc.cane_mode.oil_content = oc.sorghum_mode.oil_content = oil_content
-                oc.oil_extraction_specification.load_efficiency(efficiency)
+                oc.oil_extraction_specification.load_crushing_mill_oil_recovery(recovery)
             else:
                 oc.oil_extraction_specification.load_specifications(
-                    efficiency=efficiency, 
+                    crushing_mill_oil_recovery=recovery, 
                     oil_content=oil_content, 
                 )
             oc.sys.simulate()
@@ -66,9 +66,9 @@ def evaluate_configurations_across_extraction_efficiency_and_oil_content(
     return data
 
 N_metrics = len(all_metric_mockups)
-evaluate_configurations_across_extraction_efficiency_and_oil_content = no_derivative(
+evaluate_configurations_across_recovery_and_oil_content = no_derivative(
     np.vectorize(
-        evaluate_configurations_across_extraction_efficiency_and_oil_content, 
+        evaluate_configurations_across_recovery_and_oil_content, 
         excluded=['agile', 'configurations'],
         signature=f'(),(),(a),(c)->(a,c,{N_metrics})'
     )

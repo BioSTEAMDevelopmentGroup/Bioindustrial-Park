@@ -6,12 +6,10 @@ Created on Thu Nov  4 14:44:17 2021
 """
 from biosteam import MockVariable
 
-(set_cane_oil_content, set_relative_sorghum_oil_content, set_oil_extraction_efficiency, 
- set_bagasse_oil_extraction_efficiency, 
+(set_crushing_mill_oil_recovery, set_saccharification_oil_recovery, 
  set_cane_operating_days, set_sorghum_operating_days, 
- set_plant_capacity, set_ethanol_price,
- set_biodiesel_price, set_natural_gas_price, 
- set_electricity_price, 
+ set_plant_capacity, 
+ set_ethanol_price, set_biodiesel_price, set_natural_gas_price, set_electricity_price, 
  set_IRR, set_crude_glycerol_price, set_pure_glycerol_price,
  set_saccharification_reaction_time, set_cellulase_price, 
  set_cellulase_loading, set_reactor_base_cost,
@@ -20,11 +18,12 @@ from biosteam import MockVariable
  set_glucose_to_ethanol_yield, set_xylose_to_ethanol_yield,
  set_cofermentation_titer, set_cofermentation_productivity,
  set_cane_PL_content, set_sorghum_PL_content, set_cane_FFA_content,
- set_sorghum_FFA_content, set_TAG_to_FFA_conversion, set_oilcane_GWP,
- set_methanol_GWP, set_pure_glycerine_GWP, set_cellulase_GWP, set_natural_gas_GWP
+ set_sorghum_FFA_content,  set_cane_oil_content, set_relative_sorghum_oil_content,
+ set_TAG_to_FFA_conversion, set_oilcane_GWP, set_methanol_GWP, 
+ set_pure_glycerine_GWP, set_cellulase_GWP, set_natural_gas_GWP
  ) = all_parameter_mockups = (
-    MockVariable('Oil extraction efficiency', '%', 'biorefinery'),
-    MockVariable('Bagasse oil extraction efficiency', '%', 'biorefinery'),
+    MockVariable('Crushing mill oil recovery', '%', 'biorefinery'),
+    MockVariable('Saccharification oil recovery', '%', 'biorefinery'),
     MockVariable('Cane operating days', 'day/yr', 'biorefinery'),
     MockVariable('Sorghum operating days', 'day/yr', 'biorefinery'),
     MockVariable('Annual crushing capacity', 'ton/yr', 'biorefinery'),

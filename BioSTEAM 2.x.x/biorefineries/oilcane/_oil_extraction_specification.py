@@ -19,18 +19,18 @@ __all__ = ('OilExtractionSpecification', 'MockExtractionSpecification')
 
 class MockExtractionSpecification:
     
-    def load_bagasse_efficiency(self, bagasse_efficiency):
+    def load_saccharification_oil_recovery(self, bagasse_recovery):
         pass
       
-    def load_efficiency(self, efficiency):
+    def load_crushing_mill_oil_recovery(self, recovery):
         pass
     
     def load_oil_content(self, oil_content):
         pass
     
     def load_specifications(self, 
-            efficiency=None,
-            bagasse_efficiency=None,
+            recovery=None,
+            bagasse_recovery=None,
             oil_content=None,
         ):
         pass
@@ -46,8 +46,8 @@ class OilExtractionSpecification:
         System associated to feedstocks.
     feedstocks : Stream
         Oilcane feedstocks.
-    isplit_efficiency : ChemicalIndexer
-        Defines extraction efficiency as a material split.
+    isplit_crushing_mill : ChemicalIndexer
+        Defines extraction recovery as a material split.
     oil_content : float 
         Oil content of feedstocks [dry wt. %].
         
@@ -60,28 +60,36 @@ class OilExtractionSpecification:
     __slots__ = (
         'system',
         'feedstocks',
-        'isplit_efficiency',
-        'isplit_bagasse_efficiency',
-        'efficiency',
-        'bagasse_efficiency',
+        'isplit_crushing_mill',
+        'isplit_saccharification',
+        'crushing_mill_oil_recovery',
+        'saccharification_oil_recovery',
         'oil_content',
         'locked_oil_content',
-        'isplit_efficiency_is_reversed',
+        'isplit_recovery_is_reversed',
         'FFA_content',
         'PL_content',
     )
     
-    def __init__(self, system, feedstocks, isplit_efficiency, isplit_bagasse_efficiency=None, 
+    def __init__(self, system, feedstocks, isplit_crushing_mill, isplit_saccharification=None, 
                  oil_content=0.1, FFA_content=0.1, PL_content=0.1):
         self.system = system #: [System] System associated to feedstocks
         self.feedstocks = feedstocks #: Stream Oil feedstocks
-        self.isplit_efficiency = isplit_efficiency #: [SplitIndexer] Defines extraction efficiency as a material split.
-        self.isplit_bagasse_efficiency = isplit_bagasse_efficiency #: [SplitIndexer] Defines extraction efficiency from bagasse as a material split.
+        self.isplit_crushing_mill = isplit_crushing_mill #: [SplitIndexer] Defines extraction recovery as a material split.
+        self.isplit_saccharification = isplit_saccharification #: [SplitIndexer] Defines extraction recovery from bagasse as a material split.
         self.oil_content = oil_content #: [float] Oil content of feedstocks [dry wt. %].
         self.locked_oil_content = False
         self.FFA_content = FFA_content
         self.PL_content = PL_content
-        
+        if isplit_crushing_mill is not None: 
+            self.crushing_mill_oil_recovery = isplit_crushing_mill['Oil'].mean()
+        else:
+            self.crushing_mill_oil_recovery = None
+        if isplit_saccharification is not None: 
+            self.saccharification_oil_recovery = isplit_saccharification['Oil'].mean()
+        else:
+            self.saccharification_oil_recovery = None
+            
     def MFPP(self):
         return self.system.TEA.solve_price(self.feedstocks)
     
@@ -94,18 +102,18 @@ class OilExtractionSpecification:
             )
         self.oil_content = oil_content
       
-    def load_efficiency(self, efficiency):
-        if self.isplit_efficiency is None: return
-        self.efficiency = efficiency
-        self.isplit_efficiency['Oil'] = 1. - efficiency
+    def load_crushing_mill_oil_recovery(self, recovery):
+        if self.isplit_crushing_mill is None: return
+        self.crushing_mill_oil_recovery = recovery
+        self.isplit_crushing_mill['Oil'] = 1. - recovery
     
-    def load_bagasse_efficiency(self, bagasse_efficiency):
-        if self.isplit_bagasse_efficiency is None: return
-        self.bagasse_efficiency = self.isplit_bagasse_efficiency['Oil'] = bagasse_efficiency
+    def load_saccharification_oil_recovery(self, recovery):
+        if self.isplit_saccharification is None: return
+        self.saccharification_oil_recovery = self.isplit_saccharification['Oil'] = recovery
     
     def load_specifications(self, 
-            efficiency=None,
-            bagasse_efficiency=None,
+            crushing_mill_oil_recovery=None,
+            saccharification_oil_recovery=None,
             oil_content=None,
         ):
         """
@@ -113,17 +121,21 @@ class OilExtractionSpecification:
 
         Parameters
         ----------
-        efficiency : float, optional
-            Oil extraction efficiency.
-        bagasse_efficiency : float, optional
-            Oil extraction efficiency from bagasse.
+        recovery : float, optional
+            Oil extraction recovery.
+        bagasse_recovery : float, optional
+            Oil extraction recovery from bagasse.
         oil_content : float, optional
             Oil content of feedstocks [dry wt. %].
 
         """
-        if efficiency is None: efficiency = self.efficiency
-        if oil_content is None: oil_content = self.oil_content
-        self.load_efficiency(efficiency)
+        if crushing_mill_oil_recovery is None: 
+            crushing_mill_oil_recovery = self.crushing_mill_oil_recovery
+        if saccharification_oil_recovery is None:
+            saccharification_oil_recovery = self.saccharification_oil_recovery
+        if oil_content is None: 
+            oil_content = self.oil_content
+        self.load_crushing_mill_oil_recovery(crushing_mill_oil_recovery)
         self.load_oil_content(oil_content)
-        self.load_bagasse_efficiency(bagasse_efficiency)
+        self.load_saccharification_oil_recovery(saccharification_oil_recovery)
     

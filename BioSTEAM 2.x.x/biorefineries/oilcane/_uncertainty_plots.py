@@ -1209,8 +1209,8 @@ def plot_spearman(configurations, top=None, labels=None, metric=None, cutoff=Non
     material_GWP = '$\\mathrm{kg} \\cdot \\mathrm{CO}_{2}\\mathrm{eq} \\cdot \\mathrm{kg}^{-1}$'
     feedstock_GWP = '$\\mathrm{g} \\cdot \\mathrm{CO}_{2}\\mathrm{eq} \\cdot \\mathrm{kg}^{-1}$'
     index, ignored_list = zip(*[
-         ('Bagasse oil retention [40 $-$ 70 %]', ['S2', 'S1', 'S2*', 'S1*']),
-         ('Oil extraction efficiency [baseline + 0 $-$ 20 %]', ['S2', 'S1', 'S2*', 'S1*']),
+         ('Crushing mill oil recovery [60 $-$ 95 %]', ['S2', 'S1', 'S2*', 'S1*']),
+         ('Saccharification oil recovery [70 $-$ 95 %]', ['S2', 'S1', 'S2*', 'S1*', 'O1', 'O1*']),
         (f'Cane operating days [120 $-$ 180 {operating_days}]', []),
         (f'Sorghum operating days [30 $-$ 60 {operating_days}]', ['S2', 'S1', 'O1', 'O2']),
         (f'Crushing capacity [1.32 $-$ 2.20 {capacity}]', []),
