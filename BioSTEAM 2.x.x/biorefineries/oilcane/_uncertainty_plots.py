@@ -180,9 +180,10 @@ mc_derivative_metric_settings = {
     'GWP_economic': (GWP_ethanol_derivative, r"$\Delta$" + r"GWP $\cdot \Delta \mathrm{OC}^{-1}$" f"\n[{GWP_units_gal.replace('kg','g')}]", 1000),
 }
 
-# for dct in (mc_metric_settings, mc_comparison_settings, mc_derivative_metric_settings):
-#     for i, j in dct.copy().items(): dct[j[0]] = j
-    
+kde_metric_settings = {j[0]: j for j in mc_metric_settings.values()}
+kde_comparison_settings = {j[0]: j for j in mc_comparison_settings.values()}
+kde_derivative_settings = {j[0]: j for j in mc_derivative_metric_settings.values()}
+
 # %% Plots for publication
 
 def plot_all():
@@ -253,10 +254,10 @@ def plot_montecarlo_feedstock_comparison(axes_box=None, letters=None,
         derivative=False, absolute=False, comparison=True,
         tickmarks=None, agile=False, ncols=ncols, axes_box=axes_box,
         labels=[
-            'Conventional',
-            'Cellulosic',
-            # 'Conventional',
-            # 'Cellulosic',
+            'Juice Fermentation',
+            'Integrated Co-Fermentation',
+            # 'Juice Fermentation',
+            # 'Integrated Co-Fermentation',
         ],
         comparison_names=['O1 - S1', 'O2 - S2'],
         metrics = ['MFPP', 'TCI', 'production', 'GWP_property_allocation', 
@@ -344,8 +345,8 @@ def plot_montecarlo_agile_comparison(axes_box=None, letters=None):
         derivative=False, absolute=False, comparison=True,
         tickmarks=None, agile_only=True, ncols=1,
         labels=[
-            'Conventional',
-            'Cellulosic'
+            'Juice Fermentation',
+            'Integrated Co-Fermentation'
         ],
         metrics=['MFPP', 'TCI'],
         axes_box=axes_box,
@@ -385,7 +386,7 @@ def plot_montecarlo_derivative():
         #     [-400, -300, -200, -100, 0, 100, 200, 300, 400],
         #     [-300, -225, -150, -75, 0, 75, 150, 225, 300]
         # ], dtype=object),
-        labels=['Conventional', 'Cellulosic'],
+        labels=['Juice Fermentation', 'Integrated Co-Fermentation'],
         color_wheel = CABBI_colors.wheel([
             'blue_light', 'green_dirty', 'orange', 'green', 'grey', 'brown',
             'orange', 
@@ -442,8 +443,8 @@ def plot_spearman_tea():
             'O2', 'O2*',
         ],
         labels=[
-            'Conventional', 'Agile-Conventional',
-            'Cellulosic', 'Agile-Cellulosic',
+            'Juice Fermentation', 'Agile, Juice Fermentation',
+            'Integrated Co-Fermentation', 'Agile, Integrated Co-Fermentation',
         ],
         cutoff=0.025,
         kind='TEA',
@@ -462,8 +463,8 @@ def plot_spearman_lca():
             'O2', 'O2*',
         ],
         labels=[
-            'Conventional', 'Agile-Conventional',
-            'Cellulosic', 'Agile-Cellulosic',
+            'Juice Fermentation', 'Agile, Juice Fermentation',
+            'Integrated Co-Fermentation', 'Agile, Integrated Co-Fermentation',
         ],
         cutoff=0.03,
         kind='LCA',
@@ -485,7 +486,7 @@ def plot_breakdowns():
     plt.yticks(yticks, ['']*len(yticks))
     plt.ylabel('')
     plt.subplots_adjust(left=0.09, right=0.96, wspace=0., top=0.84, bottom=0.31)
-    for ax, letter in zip(axes, ['(A) Conventional', '(B) Cellulosic']):
+    for ax, letter in zip(axes, ['(A) Juice Fermentation', '(B) Integrated Co-Fermentation']):
         plt.sca(ax)
         ylb, yub = plt.ylim()
         xlb, xub = plt.xlim()
@@ -639,7 +640,7 @@ def plot_kde(name, metrics=(GWP_ethanol, MFPP), xticks=None, yticks=None,
         ybox_kwargs=ybox_kwargs or dict(light=CABBI_colors.blue.RGBn, dark=CABBI_colors.blue.shade(60).RGBn),
     )
     plt.sca(ax)
-    sX, sY = [mc_comparison_settings[i] for i in metrics]
+    sX, sY = [kde_comparison_settings[i] for i in metrics]
     _, xlabel, _ = sX
     _, ylabel, _ = sY
     plt.xlabel(xlabel.replace('\n', ' '))
@@ -717,7 +718,7 @@ def plot_kde_2d(name, metrics=(GWP_ethanol, MFPP), xticks=None, yticks=None,
         for j in range(N):
             ax = axes[i, j]
             plt.sca(ax)
-            sX, sY = [mc_comparison_settings[i] for i in metrics]
+            sX, sY = [kde_comparison_settings[i] for i in metrics]
             _, xlabel, _ = sX
             _, ylabel, _ = sY
             if i == M - 1: plt.xlabel(xlabel.replace('\n', ' '))
@@ -832,7 +833,7 @@ def plot_feedstock_comparison_kde():
         bottom_left='MFPP\nTradeoff()',
         top_left='Oilcane\nFavored()',
         bottom_right='\nSugarcane\nFavored()',
-        titles=['(A) Conventional', '(B) Cellulosic'],
+        titles=['(A) Juice Fermentation', '(B) Integrated Co-Fermentation'],
     )
     plt.subplots_adjust(
         wspace=0,
@@ -848,8 +849,8 @@ def plot_configuration_comparison_kde():
         xticks=[-7, -6, -5, -4, -3, -2, -1, 0, 1, 2, 3],
         top_right='GWP\nTradeoff()',
         bottom_left='MFPP\nTradeoff()',
-        top_left='Conventional\nFavored()',
-        bottom_right='\nCellulosic\nFavored()',
+        top_left='JF Favored()',
+        bottom_right='ICF\nFavored()',
     )
     file = os.path.join(images_folder, 'configuration_comparison_kde.png')
     plt.savefig(file, transparent=True)
@@ -866,7 +867,7 @@ def plot_crude_configuration_comparison_kde():
         bottom_left='MFPP\nTradeoff()',
         top_left='Biodiesel\nProduction Favored()',
         bottom_right='Crude Oil\nProduction Favored()',
-        titles=['(A) Conventional', '(B) Cellulosic'],
+        titles=['(A) Juice Fermentation', '(B) Integrated Co-Fermentation'],
     )
     file = os.path.join(images_folder, 'crude_configuration_comparison_kde.png')
     plt.savefig(file, transparent=True)
@@ -883,7 +884,7 @@ def plot_agile_comparison_kde():
         bottom_right='Cane-only\nFavored()',
         ybox_kwargs=dict(light=CABBI_colors.green_dirty.RGBn, 
                          dark=CABBI_colors.green_dirty.shade(60).RGBn),
-        titles=['(A) Conventional', '(B) Cellulosic'],
+        titles=['(A) Juice Fermentation', '(B) Integrated Co-Fermentation'],
     )
     file = os.path.join(images_folder, 'agile_conventional_comparison_kde.png')
     plt.savefig(file, transparent=True)
