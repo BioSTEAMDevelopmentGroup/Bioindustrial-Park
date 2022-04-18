@@ -298,13 +298,13 @@ def plot_relative_sorghum_oil_content_and_cane_oil_content_contours(
     MFPP = oc.all_metric_mockups[0]
     TCI = oc.all_metric_mockups[6]
     if configuration_index == 0:
-        Z = np.array(["Juice Fermentation"])
+        Z = np.array(["Direct Cogeneration"])
         data = data[:, :, :, np.newaxis]
     elif configuration_index == 1:
         Z = np.array(["Integrated Co-Fermentation"])
         data = data[:, :, :, np.newaxis]
     elif configuration_index == ...:
-        Z = np.array(["Juice Fermentation", "Integrated Co-Fermentation"])
+        Z = np.array(["Direct Cogeneration", "Integrated Co-Fermentation"])
         data = np.swapaxes(data, 2, 3)
     else:
         raise ValueError('configuration index must be either 0 or 1')
@@ -346,7 +346,7 @@ def plot_recovery_and_oil_content_contours(
     # Plot contours
     xlabel = 'Crushing mill oil recovery [%]'
     ylabel = "Oil content [dry wt. %]"
-    ylabels = [f'Juice Fermentation\n{ylabel}',
+    ylabels = [f'Direct Cogeneration\n{ylabel}',
                f'Integrated Co-Fermentation\n{ylabel}']
     xticks = [60, 70, 80, 90, 100]
     yticks = [5, 7.5, 10, 12.5, 15]

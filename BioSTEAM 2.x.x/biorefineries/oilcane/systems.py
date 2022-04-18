@@ -457,7 +457,7 @@ def create_oilcane_to_crude_oil_and_ethanol_combined_1_and_2g_post_fermentation_
         insoluble_solids_loading=0.23,
         SeedTrain=units.SeedTrain,
         CoFermentation=units.CoFermentation,
-        add_CSL=False,
+        add_nutrients=False,
         solids_loading=0.23, # 30 wt/vol % solids content in saccharification
     )
     # DAP_storage = cf_dct['DAP_storage']

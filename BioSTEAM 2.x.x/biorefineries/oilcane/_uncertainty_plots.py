@@ -254,9 +254,9 @@ def plot_montecarlo_feedstock_comparison(axes_box=None, letters=None,
         derivative=False, absolute=False, comparison=True,
         tickmarks=None, agile=False, ncols=ncols, axes_box=axes_box,
         labels=[
-            'Juice Fermentation',
+            'Direct Cogeneration',
             'Integrated Co-Fermentation',
-            # 'Juice Fermentation',
+            # 'Direct Cogeneration',
             # 'Integrated Co-Fermentation',
         ],
         comparison_names=['O1 - S1', 'O2 - S2'],
@@ -345,7 +345,7 @@ def plot_montecarlo_agile_comparison(axes_box=None, letters=None):
         derivative=False, absolute=False, comparison=True,
         tickmarks=None, agile_only=True, ncols=1,
         labels=[
-            'Juice Fermentation',
+            'Direct Cogeneration',
             'Integrated Co-Fermentation'
         ],
         metrics=['MFPP', 'TCI'],
@@ -386,7 +386,7 @@ def plot_montecarlo_derivative():
         #     [-400, -300, -200, -100, 0, 100, 200, 300, 400],
         #     [-300, -225, -150, -75, 0, 75, 150, 225, 300]
         # ], dtype=object),
-        labels=['Juice Fermentation', 'Integrated Co-Fermentation'],
+        labels=['Direct Cogeneration', 'Integrated Co-Fermentation'],
         color_wheel = CABBI_colors.wheel([
             'blue_light', 'green_dirty', 'orange', 'green', 'grey', 'brown',
             'orange', 
@@ -443,7 +443,7 @@ def plot_spearman_tea():
             'O2', 'O2*',
         ],
         labels=[
-            'Juice Fermentation', 'Agile, Juice Fermentation',
+            'Direct Cogeneration', 'Agile, Direct Cogeneration',
             'Integrated Co-Fermentation', 'Agile, Integrated Co-Fermentation',
         ],
         cutoff=0.025,
@@ -463,7 +463,7 @@ def plot_spearman_lca():
             'O2', 'O2*',
         ],
         labels=[
-            'Juice Fermentation', 'Agile, Juice Fermentation',
+            'Direct Cogeneration', 'Agile, Direct Cogeneration',
             'Integrated Co-Fermentation', 'Agile, Integrated Co-Fermentation',
         ],
         cutoff=0.03,
@@ -486,7 +486,7 @@ def plot_breakdowns():
     plt.yticks(yticks, ['']*len(yticks))
     plt.ylabel('')
     plt.subplots_adjust(left=0.09, right=0.96, wspace=0., top=0.84, bottom=0.31)
-    for ax, letter in zip(axes, ['(A) Juice Fermentation', '(B) Integrated Co-Fermentation']):
+    for ax, letter in zip(axes, ['(A) Direct Cogeneration', '(B) Integrated Co-Fermentation']):
         plt.sca(ax)
         ylb, yub = plt.ylim()
         xlb, xub = plt.xlim()
@@ -695,7 +695,7 @@ def plot_kde(name, metrics=(GWP_ethanol, MFPP), xticks=None, yticks=None,
 
 def plot_kde_2d(name, metrics=(GWP_ethanol, MFPP), xticks=None, yticks=None,
                 top_left='', top_right='Tradeoff', bottom_left='Tradeoff',
-                bottom_right='', ybox_kwargs=None, titles=None):
+                bottom_right='', xbox_kwargs=None, ybox_kwargs=None, titles=None):
     set_font(size=8)
     set_figure_size(aspect_ratio=0.65)
     if isinstance(name, str): name = (name,)
@@ -706,7 +706,7 @@ def plot_kde_2d(name, metrics=(GWP_ethanol, MFPP), xticks=None, yticks=None,
         xs=np.array([[df[Xi] for df in dfs]]), 
         xticks=xticks, yticks=yticks,
         xticklabels=[True, True], yticklabels=[True, True],
-        xbox_kwargs=2*[dict(light=CABBI_colors.orange.RGBn, dark=CABBI_colors.orange.shade(60).RGBn)],
+        xbox_kwargs=2*[xbox_kwargs or dict(light=CABBI_colors.orange.RGBn, dark=CABBI_colors.orange.shade(60).RGBn)],
         ybox_kwargs=[ybox_kwargs or dict(light=CABBI_colors.blue.RGBn, dark=CABBI_colors.blue.shade(60).RGBn)],
     )
     M, N = axes.shape
@@ -807,8 +807,9 @@ def plot_feedstock_conventional_comparison_kde():
         top_right='GWP\nTradeoff()',
         bottom_left='MFPP\nTradeoff()',
     )
-    file = os.path.join(images_folder, 'feedstock_conventional_comparison_kde.png')
-    plt.savefig(file, transparent=True)
+    for i in ('svg', 'png'):
+        file = os.path.join(images_folder, f'feedstock_conventional_comparison_kde.{i}')
+        plt.savefig(file, transparent=True)
 
 def plot_feedstock_cellulosic_comparison_kde():
     plot_kde(
@@ -820,8 +821,9 @@ def plot_feedstock_cellulosic_comparison_kde():
         top_right='GWP\nTradeoff()',
         bottom_left='MFPP\nTradeoff()',
     )
-    file = os.path.join(images_folder, 'feedstock_cellulosic_comparison_kde.png')
-    plt.savefig(file, transparent=True)
+    for i in ('svg', 'png'):
+        file = os.path.join(images_folder, f'feedstock_cellulosic_comparison_kde.{i}')
+        plt.savefig(file, transparent=True)
 
 def plot_feedstock_comparison_kde():
     plot_kde_2d(
@@ -833,14 +835,15 @@ def plot_feedstock_comparison_kde():
         bottom_left='MFPP\nTradeoff()',
         top_left='Oilcane\nFavored()',
         bottom_right='\nSugarcane\nFavored()',
-        titles=['(A) Juice Fermentation', '(B) Integrated Co-Fermentation'],
+        titles=['(A) Direct Cogeneration', '(B) Integrated Co-Fermentation'],
     )
     plt.subplots_adjust(
         wspace=0,
         
     )
-    file = os.path.join(images_folder, 'feedstock_comparison_kde.png')
-    plt.savefig(file, transparent=True)
+    for i in ('svg', 'png'):
+        file = os.path.join(images_folder, f'feedstock_comparison_kde.{i}')
+        plt.savefig(file, transparent=True)
 
 def plot_configuration_comparison_kde():
     plot_kde(
@@ -849,11 +852,12 @@ def plot_configuration_comparison_kde():
         xticks=[-7, -6, -5, -4, -3, -2, -1, 0, 1, 2, 3],
         top_right='GWP\nTradeoff()',
         bottom_left='MFPP\nTradeoff()',
-        top_left='JF Favored()',
+        top_left='DC Favored()',
         bottom_right='ICF\nFavored()',
     )
-    file = os.path.join(images_folder, 'configuration_comparison_kde.png')
-    plt.savefig(file, transparent=True)
+    for i in ('svg', 'png'):
+        file = os.path.join(images_folder, f'configuration_comparison_kde.{i}')
+        plt.savefig(file, transparent=True)
     
 def plot_crude_configuration_comparison_kde():
     plot_kde_2d(
@@ -867,27 +871,29 @@ def plot_crude_configuration_comparison_kde():
         bottom_left='MFPP\nTradeoff()',
         top_left='Biodiesel\nProduction Favored()',
         bottom_right='Crude Oil\nProduction Favored()',
-        titles=['(A) Juice Fermentation', '(B) Integrated Co-Fermentation'],
+        titles=['(A) Direct Cogeneration', '(B) Integrated Co-Fermentation'],
     )
-    file = os.path.join(images_folder, 'crude_configuration_comparison_kde.png')
-    plt.savefig(file, transparent=True)
+    for i in ('svg', 'png'):
+        file = os.path.join(images_folder, f'crude_configuration_comparison_kde.{i}')
+        plt.savefig(file, transparent=True)
 
 def plot_agile_comparison_kde():
     plot_kde_2d(
         ('O1* - O1', 'O2* - O2'),
         metrics=[TCI, MFPP],
-        yticks=[[0, 3, 6, 9, 12, 15]],
+        yticks=[[0, 2.5, 5, 7.5, 10, 12.5]], 
         xticks=2*[[-150, -125, -100, -75, -50, -25, 0]],
         top_right='TCI-Tradeoff()',
         bottom_left='MFPP\nTradeoff()',
         top_left='Sorghum\nIntegration Favored()',
         bottom_right='Cane-only\nFavored()',
-        ybox_kwargs=dict(light=CABBI_colors.green_dirty.RGBn, 
+        xbox_kwargs=dict(light=CABBI_colors.green_dirty.RGBn, 
                          dark=CABBI_colors.green_dirty.shade(60).RGBn),
-        titles=['(A) Juice Fermentation', '(B) Integrated Co-Fermentation'],
+        titles=['(A) Direct Cogeneration', '(B) Integrated Co-Fermentation'],
     )
-    file = os.path.join(images_folder, 'agile_conventional_comparison_kde.png')
-    plt.savefig(file, transparent=True)
+    for i in ('svg', 'png'):
+        file = os.path.join(images_folder, f'agile_conventional_comparison_kde.{i}')
+        plt.savefig(file, transparent=True)
 
 def plot_open_comparison_kde(overlap=False):
     metrics = [MFPP, TCI, GWP_ethanol, biodiesel_production]
