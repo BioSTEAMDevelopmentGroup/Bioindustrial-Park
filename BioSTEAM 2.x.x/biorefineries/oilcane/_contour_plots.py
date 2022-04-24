@@ -264,8 +264,8 @@ def plot_ethanol_and_biodiesel_price_contours(N=30, benefit=False, cache={},
     
 def relative_sorghum_oil_content_and_cane_oil_content_data(load, relative):
     # Generate contour data
-    y = np.linspace(0.05, 0.15, 15)
-    x = np.linspace(-0.03, 0., 15) if relative else np.linspace(0.02, 0.15, 15)
+    y = np.linspace(0.05, 0.15, 20)
+    x = np.linspace(-0.03, 0., 20) if relative else np.linspace(0.02, 0.15, 20)
     X, Y = np.meshgrid(x, y)
     folder = os.path.dirname(__file__)
     file = 'oil_content_analysis.npy'
@@ -328,8 +328,8 @@ def plot_recovery_and_oil_content_contours(
         load=False, metric_index=0, N_decimals=1,
     ):
     # Generate contour data
-    x = np.linspace(0.6, 1., 15)
-    y = np.linspace(0.05, 0.15, 15)
+    x = np.linspace(0.6, 0.95, 20)
+    y = np.linspace(0.05, 0.15, 20)
     X, Y = np.meshgrid(x, y)
     metric = bst.metric
     folder = os.path.dirname(__file__)

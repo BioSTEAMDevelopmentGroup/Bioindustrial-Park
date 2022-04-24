@@ -116,8 +116,8 @@ kg_per_MT = 1000
 liter_per_gal = 3.7854
 biodiesel_kg_per_gal = 3.3111
 biodiesel_gal_per_kg = 1. / biodiesel_kg_per_gal
-ethanol_gal_per_kg = 2.98668849
-ethanol_kg_per_gal = 1. / ethanol_gal_per_kg
+ethanol_kg_per_gal = 2.98668849
+ethanol_gal_per_kg = 1. / ethanol_kg_per_gal
 biodiesel_liter_per_kg = biodiesel_gal_per_kg * liter_per_gal
 biodiesel_kg_per_liter = 1. / biodiesel_liter_per_kg
 ethanol_liter_per_kg = ethanol_gal_per_kg * liter_per_gal
@@ -554,15 +554,15 @@ def load(name, cache={}, reduce_chemicals=True,
 
     # USDA ERS historical price data
     @parameter(distribution=ethanol_price_distribution, element=s.ethanol, 
-               baseline=1.90 / liter_per_gal, units='USD/L')
+               baseline=1.90 * liter_per_gal, units='USD/L')
     def set_ethanol_price(price): # Triangular distribution fitted over the past 10 years Sep 2009 to Nov 2020
-        s.ethanol.price = price * ethanol_kg_per_liter
+        s.ethanol.price = price * ethanol_liter_per_kg
         
     # USDA ERS historical price data
     @parameter(distribution=biodiesel_minus_ethanol_price_distribution, element=s.biodiesel, units='USD/L',
-               baseline=2.47 / liter_per_gal, hook=lambda x: s.ethanol.price + x)
+               baseline=2.47 * liter_per_gal, hook=lambda x: s.ethanol.price + x)
     def set_biodiesel_price(price): # Triangular distribution fitted over the past 10 years Sep 2009 to March 2021
-        s.biodiesel.price = price * biodiesel_kg_per_liter 
+        s.biodiesel.price = price * biodiesel_liter_per_kg
 
     # https://www.eia.gov/energyexplained/natural-gas/prices.php
     @parameter(distribution=natural_gas_price_distribution, element=s.natural_gas, units='USD/m3',
