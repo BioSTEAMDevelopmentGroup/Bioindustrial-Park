@@ -132,7 +132,7 @@ def evaluate_MFPP_across_ethanol_and_biodiesel_prices(ethanol_price, biodiesel_p
     ethanol_flow = oc.flows['ethanol']()
     baseline_price = (
         oc.tea.solve_price(oc.oilcane) * oc.kg_per_ton
-        - (oc.ethanol.price * ethanol_flow  * 2.98668849 + oc.biodiesel.price * 3.3111 * biodiesel_flow) / feedstock_flow
+        - (oc.ethanol.price * ethanol_flow  * oc.ethanol_kg_per_L + oc.biodiesel.price * oc.biodiesel_kg_per_L * biodiesel_flow) / feedstock_flow
     )
     return (
         baseline_price 

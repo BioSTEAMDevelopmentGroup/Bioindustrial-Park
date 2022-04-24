@@ -113,15 +113,15 @@ PRS = cs.PretreatmentReactorSystem
 PRS_cost_item = PRS.cost_items['Pretreatment reactor system']
 kg_per_ton = 907.18474
 kg_per_MT = 1000
-liter_per_gal = 3.7854
+L_per_gal = 3.7854
 biodiesel_kg_per_gal = 3.3111
 biodiesel_gal_per_kg = 1. / biodiesel_kg_per_gal
 ethanol_kg_per_gal = 2.98668849
 ethanol_gal_per_kg = 1. / ethanol_kg_per_gal
-biodiesel_liter_per_kg = biodiesel_gal_per_kg * liter_per_gal
-biodiesel_kg_per_liter = 1. / biodiesel_liter_per_kg
-ethanol_liter_per_kg = ethanol_gal_per_kg * liter_per_gal
-ethanol_kg_per_liter = 1. / ethanol_liter_per_kg
+biodiesel_L_per_kg = biodiesel_gal_per_kg * L_per_gal
+biodiesel_kg_per_L = 1. / biodiesel_L_per_kg
+ethanol_L_per_kg = ethanol_gal_per_kg * L_per_gal
+ethanol_kg_per_L = 1. / ethanol_L_per_kg
 
 configuration_names = (
     'S1', 'O1', 'S2', 'O2', 'S1*', 'O1*', 'S2*', 'O2*', 'O3', 'O4',
@@ -554,15 +554,15 @@ def load(name, cache={}, reduce_chemicals=True,
 
     # USDA ERS historical price data
     @parameter(distribution=ethanol_price_distribution, element=s.ethanol, 
-               baseline=1.90 * liter_per_gal, units='USD/L')
+               baseline=1.90 / L_per_gal, units='USD/L')
     def set_ethanol_price(price): # Triangular distribution fitted over the past 10 years Sep 2009 to Nov 2020
-        s.ethanol.price = price * ethanol_liter_per_kg
+        s.ethanol.price = price * ethanol_L_per_kg
         
     # USDA ERS historical price data
     @parameter(distribution=biodiesel_minus_ethanol_price_distribution, element=s.biodiesel, units='USD/L',
-               baseline=2.47 * liter_per_gal, hook=lambda x: s.ethanol.price + x)
+               baseline=2.47 / L_per_gal, hook=lambda x: s.ethanol.price + x)
     def set_biodiesel_price(price): # Triangular distribution fitted over the past 10 years Sep 2009 to March 2021
-        s.biodiesel.price = price * biodiesel_liter_per_kg
+        s.biodiesel.price = price * biodiesel_L_per_kg
 
     # https://www.eia.gov/energyexplained/natural-gas/prices.php
     @parameter(distribution=natural_gas_price_distribution, element=s.natural_gas, units='USD/m3',
@@ -752,8 +752,8 @@ def load(name, cache={}, reduce_chemicals=True,
     
     if agile:
         feedstock_flow = lambda: sys.flow_rates[feedstock] / kg_per_MT # MT / yr
-        biodiesel_flow = lambda: sys.flow_rates.get(s.biodiesel, 0.) * biodiesel_liter_per_kg # L / yr
-        ethanol_flow = lambda: sys.flow_rates[s.ethanol] * ethanol_liter_per_kg # L / yr
+        biodiesel_flow = lambda: sys.flow_rates.get(s.biodiesel, 0.) * biodiesel_L_per_kg # L / yr
+        ethanol_flow = lambda: sys.flow_rates[s.ethanol] * ethanol_L_per_kg # L / yr
         natural_gas_flow = lambda: sum([sys.flow_rates[i] for i in natural_gas_streams]) * V_ng # m3 / yr
         crude_glycerol_flow = lambda: sys.flow_rates.get(s.crude_glycerol, 0.) # kg / yr
         
@@ -763,8 +763,8 @@ def load(name, cache={}, reduce_chemicals=True,
         
     else:
         feedstock_flow = lambda: sys.operating_hours * feedstock.F_mass / kg_per_MT # MT / yr
-        biodiesel_flow = lambda: sys.operating_hours * s.biodiesel.F_mass * biodiesel_liter_per_kg # L / yr
-        ethanol_flow = lambda: sys.operating_hours * s.ethanol.F_mass * ethanol_liter_per_kg # L / yr
+        biodiesel_flow = lambda: sys.operating_hours * s.biodiesel.F_mass * biodiesel_L_per_kg # L / yr
+        ethanol_flow = lambda: sys.operating_hours * s.ethanol.F_mass * ethanol_L_per_kg # L / yr
         crude_glycerol_flow = lambda: sys.operating_hours * s.crude_glycerol.F_mass # kg / yr
         natural_gas_flow = lambda: sum([i.F_mass for i in natural_gas_streams]) * sys.operating_hours * V_ng # m3 / yr
         direct_nonbiogenic_emissions = lambda: sum([i.F_mol for i in natural_gas_streams]) * chemicals.CO2.MW * sys.operating_hours
@@ -893,8 +893,8 @@ def load(name, cache={}, reduce_chemicals=True,
         GWP_material = sys.get_total_feeds_impact(GWP)
         GWP_emissions = sys.get_process_impact(GWP) # kg CO2 eq. / yr
         GWP_total = GWP_material + GWP_emissions # kg CO2 eq. / yr
-        GGE_biodiesel_annual = (biodiesel_production.get() * feedstock_consumption.get()) / 0.9536 / liter_per_gal
-        GGE_ethanol_annual = (ethanol_production.get() * feedstock_consumption.get()) / 1.5 / liter_per_gal
+        GGE_biodiesel_annual = (biodiesel_production.get() * feedstock_consumption.get()) / 0.9536 / L_per_gal
+        GGE_ethanol_annual = (ethanol_production.get() * feedstock_consumption.get()) / 1.5 / L_per_gal
         GEE_electricity_production = max(-electricity() * 3600 / 114000, 0.) 
         GEE_crude_glycerol = crude_glycerol_flow() * 0.1059
         return GWP_total / (GGE_biodiesel_annual + GGE_ethanol_annual + GEE_electricity_production + GEE_crude_glycerol)

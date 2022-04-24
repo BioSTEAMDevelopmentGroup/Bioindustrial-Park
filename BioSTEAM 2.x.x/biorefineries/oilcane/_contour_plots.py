@@ -134,13 +134,13 @@ def plot_ethanol_and_biodiesel_price_contours_manuscript():
     set_font(size=8)
     set_figure_size(aspect_ratio=0.7)
     fig, axes = plot_ethanol_and_biodiesel_price_contours(
-        titles=['Conventional', 'Cellulosic'],
+        titles=['Direct cogeneration', 'Integrated Co-Fermentation'],
     )
     colors = np.zeros([3, 2], object)
     colors[:] = [[letter_color, letter_color],
                  [letter_color, letter_color],
                  [letter_color, letter_color]]
-    _add_letter_labels(axes, 0.7, 0.65, colors)
+    _add_letter_labels(axes, 0.7, 0.75, colors)
     plt.subplots_adjust(left=0.2, right=0.92, wspace=0.1, top=0.94, bottom=0.12)
     for i in ('svg', 'png'):
         file = os.path.join(images_folder, f'ethanol_and_biodiesel_price_contours.{i}')
@@ -151,13 +151,13 @@ def plot_enhanced_ethanol_and_biodiesel_price_contours_manuscript():
     set_figure_size(aspect_ratio=0.7)
     fig, axes = plot_ethanol_and_biodiesel_price_contours(
         enhanced_cellulosic_performance=True,
-        titles=['Conventional', 'Cellulosic'],
+        titles=['Direct cogeneration', 'Integrated Co-Fermentation'],
     )
     colors = np.zeros([3, 2], object)
     colors[:] = [[letter_color, letter_color],
                  [letter_color, letter_color],
                  [letter_color, letter_color]]
-    _add_letter_labels(axes, 0.7, 0.65, colors)
+    _add_letter_labels(axes, 0.7, 0.75, colors)
     plt.subplots_adjust(left=0.2, right=0.92, wspace=0.1, top=0.94, bottom=0.12)
     for i in ('svg', 'png'):
         file = os.path.join(images_folder, f'enhanced_ethanol_and_biodiesel_price_contours.{i}')
@@ -168,14 +168,14 @@ def plot_benefit_ethanol_and_biodiesel_price_contours_manuscript():
     set_figure_size(aspect_ratio=0.7)
     fig, axes = plot_ethanol_and_biodiesel_price_contours(
         benefit=True,
-        titles=['Conventional', 'Cellulosic'],
+        titles=['Direct Cogeneration', 'Integrated Co-Fermentation'],
         dist=True,
     )
     colors = np.zeros([3, 2], object)
     colors[:] = [[dark_letter_color, dark_letter_color],
                  [dark_letter_color, dark_letter_color],
                  [dark_letter_color, dark_letter_color]]
-    _add_letter_labels(axes, 0.7, 0.65, colors)
+    _add_letter_labels(axes, 0.7, 0.75, colors)
     plt.subplots_adjust(left=0.2, right=0.92, wspace=0.1, top=0.94, bottom=0.12)
     for i in ('svg', 'png'):
         file = os.path.join(images_folder, f'benefit_ethanol_and_biodiesel_price_contours.{i}')
@@ -187,8 +187,8 @@ def plot_ethanol_and_biodiesel_price_contours(N=30, benefit=False, cache={},
                                               enhanced_cellulosic_performance=False,
                                               titles=None, load=False, save=True,
                                               dist=False):
-    ethanol_price = np.linspace(1., 3., N)
-    biodiesel_price = np.linspace(2, 6, N)
+    ethanol_price = np.linspace(0.25, 0.8, N)
+    biodiesel_price = np.linspace(0.30, 1.9, N)
     oil_content = [5, 10, 15]
     N_rows = len(oil_content)
     configuration = ['O1', 'O2']
@@ -223,8 +223,8 @@ def plot_ethanol_and_biodiesel_price_contours(N=30, benefit=False, cache={},
         np.save(file, Z)
     xlabel = f"Ethanol price\n[{format_units('$/L')}]"
     ylabels = [f"Biodiesel price\n[{format_units('$/L')}]"] * 4
-    xticks = [1., 1.5, 2.0, 2.5, 3.0]
-    yticks = [2, 3, 4, 5, 6]
+    xticks = [0.25, 0.4, 0.55, 0.8]
+    yticks = [0.3, 0.7, 1.1, 1.5, 1.9]
     marks = tickmarks(Z, 5, 5, center=0.) if benefit else tickmarks(Z, 5, 5)
     colormap = (diverging_colormaps if benefit else colormaps)[0]
     metric_bar = MetricBar('MFPP', format_units('$/MT'), colormap, marks, 15,
