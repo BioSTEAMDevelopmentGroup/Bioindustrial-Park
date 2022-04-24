@@ -112,7 +112,16 @@ _chemicals_loaded = False
 PRS = cs.PretreatmentReactorSystem
 PRS_cost_item = PRS.cost_items['Pretreatment reactor system']
 kg_per_ton = 907.18474
-
+kg_per_MT = 1000
+liter_per_gal = 3.7854
+biodiesel_kg_per_gal = 3.3111
+biodiesel_gal_per_kg = 1. / biodiesel_kg_per_gal
+ethanol_gal_per_kg = 2.98668849
+ethanol_kg_per_gal = 1. / ethanol_gal_per_kg
+biodiesel_liter_per_kg = biodiesel_gal_per_kg * liter_per_gal
+biodiesel_kg_per_liter = 1. / biodiesel_liter_per_kg
+ethanol_liter_per_kg = ethanol_gal_per_kg * liter_per_gal
+ethanol_kg_per_liter = 1. / ethanol_liter_per_kg
 
 configuration_names = (
     'S1', 'O1', 'S2', 'O2', 'S1*', 'O1*', 'S2*', 'O2*', 'O3', 'O4',
@@ -492,6 +501,14 @@ def load(name, cache={}, reduce_chemicals=True,
     parameter = model.parameter
     metric = model.metric
     
+    s.natural_gas.phase = 'g'
+    s.natural_gas.set_property('T', 60, 'degF')
+    s.natural_gas.set_property('P', 14.73, 'psi')
+    original_value = s.natural_gas.imol['CH4']
+    s.natural_gas.imass['CH4'] = 1 
+    V_ng = s.natural_gas.get_total_flow('m3/hr')
+    s.natural_gas.imol['CH4'] = original_value
+    
     def uniform(lb, ub, *args, **kwargs):
         return parameter(*args, distribution=shape.Uniform(lb, ub), bounds=(lb, ub), **kwargs)
     
@@ -531,27 +548,27 @@ def load(name, cache={}, reduce_chemicals=True,
     def set_sorghum_operating_days(sorghum_operating_days):
         if agile: sorghum_mode.operating_hours = sorghum_operating_days * 24
     
-    @default(1761600, units='ton/yr', kind='coupled')
+    @default(1600000, units='MT/yr', kind='coupled')
     def set_annual_crushing_capacity(annual_crushing_capacity):
-        feedstock.F_mass = kg_per_ton * annual_crushing_capacity / tea.operating_hours
+        feedstock.F_mass = kg_per_MT * annual_crushing_capacity / tea.operating_hours
 
     # USDA ERS historical price data
     @parameter(distribution=ethanol_price_distribution, element=s.ethanol, 
-               baseline=1.90, units='USD/gal')
+               baseline=1.90 / liter_per_gal, units='USD/L')
     def set_ethanol_price(price): # Triangular distribution fitted over the past 10 years Sep 2009 to Nov 2020
-        s.ethanol.price = price / 2.98668849
+        s.ethanol.price = price * ethanol_kg_per_liter
         
     # USDA ERS historical price data
-    @parameter(distribution=biodiesel_minus_ethanol_price_distribution, element=s.biodiesel, units='USD/gal',
-               baseline=2.47, hook=lambda x: s.ethanol.price * 2.98668849 + x)
+    @parameter(distribution=biodiesel_minus_ethanol_price_distribution, element=s.biodiesel, units='USD/L',
+               baseline=2.47 / liter_per_gal, hook=lambda x: s.ethanol.price + x)
     def set_biodiesel_price(price): # Triangular distribution fitted over the past 10 years Sep 2009 to March 2021
-        s.biodiesel.price = price / 3.3111
+        s.biodiesel.price = price * biodiesel_kg_per_liter 
 
     # https://www.eia.gov/energyexplained/natural-gas/prices.php
-    @parameter(distribution=natural_gas_price_distribution, element=s.natural_gas, units='USD/cf',
-               baseline=4.73)
+    @parameter(distribution=natural_gas_price_distribution, element=s.natural_gas, units='USD/m3',
+               baseline=4.73 / 35.3146667)
     def set_natural_gas_price(price): # Triangular distribution fitted over the past 10 years Sep 2009 to March 2021
-        BT.natural_gas_price = 51.92624700383502 * price / 1000. 
+        BT.natural_gas_price = price / V_ng
 
     # https://www.eia.gov/outlooks/aeo/pdf/00%20AEO2021%20Chart%20Library.pdf
     # Data from historical prices, 2010-2020
@@ -733,31 +750,23 @@ def load(name, cache={}, reduce_chemicals=True,
         for ng in natural_gas_streams:
             ng.characterization_factors[GWP] = value
     
-    s.natural_gas.phase = 'g'
-    s.natural_gas.set_property('T', 60, 'degF')
-    s.natural_gas.set_property('P', 14.73, 'psi')
-    original_value = s.natural_gas.imol['CH4']
-    s.natural_gas.imass['CH4'] = 1 
-    V_ng = s.natural_gas.get_total_flow('ft3/hr')
-    s.natural_gas.imol['CH4'] = original_value
-    
     if agile:
-        feedstock_flow = lambda: sys.flow_rates[feedstock] / kg_per_ton # ton/yr
-        biodiesel_flow = lambda: sys.flow_rates.get(s.biodiesel, 0.) / 3.3111 # gal/yr
-        ethanol_flow = lambda: sys.flow_rates[s.ethanol] / 2.98668849 # gal/yr
-        natural_gas_flow = lambda: sum([sys.flow_rates[i] for i in natural_gas_streams]) * V_ng # cf/yr
-        crude_glycerol_flow = lambda: sys.flow_rates.get(s.crude_glycerol, 0.) # kg/yr
+        feedstock_flow = lambda: sys.flow_rates[feedstock] / kg_per_MT # MT / yr
+        biodiesel_flow = lambda: sys.flow_rates.get(s.biodiesel, 0.) * biodiesel_liter_per_kg # L / yr
+        ethanol_flow = lambda: sys.flow_rates[s.ethanol] * ethanol_liter_per_kg # L / yr
+        natural_gas_flow = lambda: sum([sys.flow_rates[i] for i in natural_gas_streams]) * V_ng # m3 / yr
+        crude_glycerol_flow = lambda: sys.flow_rates.get(s.crude_glycerol, 0.) # kg / yr
         
         @sys.operation_metric(annualize=True)
         def direct_nonbiogenic_emissions(mode):
             return sum([i.F_mol for i in natural_gas_streams]) * chemicals.CO2.MW
         
     else:
-        feedstock_flow = lambda: sys.operating_hours * feedstock.F_mass / kg_per_ton # ton/yr
-        biodiesel_flow = lambda: sys.operating_hours * s.biodiesel.F_mass / 3.3111 # gal/yr
-        ethanol_flow = lambda: sys.operating_hours * s.ethanol.F_mass / 2.98668849 # gal/yr
-        crude_glycerol_flow = lambda: sys.operating_hours * s.crude_glycerol.F_mass # kg/yr
-        natural_gas_flow = lambda: sum([i.F_mass for i in natural_gas_streams]) * sys.operating_hours * V_ng # cf/yr
+        feedstock_flow = lambda: sys.operating_hours * feedstock.F_mass / kg_per_MT # MT / yr
+        biodiesel_flow = lambda: sys.operating_hours * s.biodiesel.F_mass * biodiesel_liter_per_kg # L / yr
+        ethanol_flow = lambda: sys.operating_hours * s.ethanol.F_mass * ethanol_liter_per_kg # L / yr
+        crude_glycerol_flow = lambda: sys.operating_hours * s.crude_glycerol.F_mass # kg / yr
+        natural_gas_flow = lambda: sum([i.F_mass for i in natural_gas_streams]) * sys.operating_hours * V_ng # m3 / yr
         direct_nonbiogenic_emissions = lambda: sum([i.F_mol for i in natural_gas_streams]) * chemicals.CO2.MW * sys.operating_hours
     electricity = lambda: sys.operating_hours * sys.power_utility.rate
     
@@ -777,30 +786,30 @@ def load(name, cache={}, reduce_chemicals=True,
         'crude_glycerol': crude_glycerol_flow,
         'electricity': electricity
     }
-    @metric(units='USD/ton')
+    @metric(units='USD/MT')
     def MFPP():
         price = tea.solve_price(feedstock)
-        return kg_per_ton * price
+        return kg_per_MT * price
     
-    @metric(units='ton/yr')
+    @metric(units='MT/yr')
     def feedstock_consumption():
         return feedstock_flow()
     
-    @metric(units='Gal/ton')
+    @metric(units='L/MT')
     def biodiesel_production():
         return biodiesel_flow() / feedstock_consumption.get()
     
-    @metric(units='Gal/ton')
+    @metric(units='L/MT')
     def ethanol_production():
         return ethanol_flow() / feedstock_consumption.get()
     
-    @metric(units='kWhr/ton')
+    @metric(units='kWhr/MT')
     def electricity_production():
         value = - electricity() / feedstock_consumption.get()
         if value < 0.: value = 0.
         return value
     
-    @metric(units='cf/ton')
+    @metric(units='m3/MT')
     def natural_gas_consumption():
         value = natural_gas_flow() / feedstock_consumption.get()
         return value
@@ -840,11 +849,11 @@ def load(name, cache={}, reduce_chemicals=True,
         )
         return (GWP_material + GWP_emissions) / sales
 
-    @metric(name='Ethanol GWP', element='Economic allocation', units='kg*CO2*eq / gal')
+    @metric(name='Ethanol GWP', element='Economic allocation', units='kg*CO2*eq / L')
     def GWP_ethanol(): # Cradle to gate
         return GWP_economic.get() * mean_ethanol_price
     
-    @metric(name='Biodiesel GWP', element='Economic allocation', units='kg*CO2*eq / gal')
+    @metric(name='Biodiesel GWP', element='Economic allocation', units='kg*CO2*eq / L')
     def GWP_biodiesel(): # Cradle to gate
         if number > 0:
             return GWP_economic.get() * mean_biodiesel_price
@@ -865,7 +874,7 @@ def load(name, cache={}, reduce_chemicals=True,
         else:
             return 0.
 
-    @metric(name='Ethanol GWP', element='Displacement allocation', units='kg*CO2*eq / gal')
+    @metric(name='Ethanol GWP', element='Displacement allocation', units='kg*CO2*eq / L')
     def GWP_ethanol_displacement(): # Cradle to gate
         GWP_material = sys.get_total_feeds_impact(GWP)
         GWP_electricity_production = GWP_characterization_factors['Electricity'] * electricity_production.get() * feedstock_consumption.get()
@@ -884,17 +893,17 @@ def load(name, cache={}, reduce_chemicals=True,
         GWP_material = sys.get_total_feeds_impact(GWP)
         GWP_emissions = sys.get_process_impact(GWP) # kg CO2 eq. / yr
         GWP_total = GWP_material + GWP_emissions # kg CO2 eq. / yr
-        GGE_biodiesel_annual = (biodiesel_production.get() * feedstock_consumption.get()) / 0.9536
-        GGE_ethanol_annual = (ethanol_production.get() * feedstock_consumption.get()) / 1.5
+        GGE_biodiesel_annual = (biodiesel_production.get() * feedstock_consumption.get()) / 0.9536 / liter_per_gal
+        GGE_ethanol_annual = (ethanol_production.get() * feedstock_consumption.get()) / 1.5 / liter_per_gal
         GEE_electricity_production = max(-electricity() * 3600 / 114000, 0.) 
         GEE_crude_glycerol = crude_glycerol_flow() * 0.1059
         return GWP_total / (GGE_biodiesel_annual + GGE_ethanol_annual + GEE_electricity_production + GEE_crude_glycerol)
     
-    @metric(name='Ethanol GWP', element='Energy allocation', units='kg*CO2*eq / gal')
+    @metric(name='Ethanol GWP', element='Energy allocation', units='kg*CO2*eq / L')
     def GWP_ethanol_allocation(): # Cradle to gate
         return GWP_biofuel_allocation.get() / 1.5
     
-    @metric(name='Biodiesel GWP', element='Energy allocation', units='kg*CO2*eq / gal')
+    @metric(name='Biodiesel GWP', element='Energy allocation', units='kg*CO2*eq / L')
     def GWP_biodiesel_allocation(): # Cradle to gate
         if number > 0:
             return GWP_biofuel_allocation.get() / 0.9536
@@ -908,7 +917,7 @@ def load(name, cache={}, reduce_chemicals=True,
         else:
             return 0.
 
-    @metric(units='USD/ton')
+    @metric(units='USD/MT')
     def MFPP_derivative():
         if number < 0: return 0.
         if _derivative_disabled: return np.nan
@@ -918,35 +927,35 @@ def load(name, cache={}, reduce_chemicals=True,
         else:
             oil_extraction_specification.load_oil_content(oil_extraction_specification.oil_content + 0.01)
         sys.simulate()  
-        # value = (kg_per_ton * tea.solve_price(feedstock) - MFPP.cache)
+        # value = (kg_per_MT * tea.solve_price(feedstock) - MFPP.cache)
         # feedstock.price = tea.solve_price(feedstock)
         # print('AFTER')
-        # print('MFPP', kg_per_ton * tea.solve_price(feedstock))
+        # print('MFPP', kg_per_MT * tea.solve_price(feedstock))
         # print('VOC', tea.VOC / 1e3)
         # print('TCI', tea.TCI / 1e6)
         # print('sales', tea.sales / 1e3)
         # print('NPV', tea.NPV)
         return MFPP.difference()
     
-    @metric(units='Gal/ton')
+    @metric(units='L/MT')
     def biodiesel_production_derivative():
         if number < 0: return 0.
         if _derivative_disabled: return np.nan
         return biodiesel_production.difference()
     
-    @metric(units='Gal/ton')
+    @metric(units='L/MT')
     def ethanol_production_derivative():
         if number < 0: return 0.
         if _derivative_disabled: return np.nan
         return ethanol_production.difference()
     
-    @metric(units='kWhr/ton')
+    @metric(units='kWhr/MT')
     def electricity_production_derivative():
         if number < 0: return 0.
         if _derivative_disabled: return np.nan
         return electricity_production.difference()
     
-    @metric(units='cf/ton')
+    @metric(units='cf/MT')
     def natural_gas_consumption_derivative():
         if number < 0: return 0.
         if _derivative_disabled: return np.nan
@@ -965,11 +974,11 @@ def load(name, cache={}, reduce_chemicals=True,
         if _derivative_disabled: return np.nan
         return GWP_economic.difference()
 
-    @metric(name='Ethanol GWP derivative', element='Ethanol', units='kg*CO2*eq / gal')
+    @metric(name='Ethanol GWP derivative', element='Ethanol', units='kg*CO2*eq / L')
     def GWP_ethanol_derivative(): # Cradle to gate
         return GWP_economic_derivative.get() * mean_ethanol_price
     
-    @metric(name='Biodiesel GWP derivative', element='Biodiesel', units='kg*CO2*eq / gal')
+    @metric(name='Biodiesel GWP derivative', element='Biodiesel', units='kg*CO2*eq / L')
     def GWP_biodiesel_derivative(): # Cradle to gate
         if number > 0:
             return GWP_economic_derivative.get() * mean_biodiesel_price

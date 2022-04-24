@@ -221,13 +221,13 @@ def plot_ethanol_and_biodiesel_price_contours(N=30, benefit=False, cache={},
                     Z[:, :, i, j] = oc.evaluate_MFPP_across_ethanol_and_biodiesel_prices(X, Y)
     if save:
         np.save(file, Z)
-    xlabel = f"Ethanol price\n[{format_units('$/gal')}]"
-    ylabels = [f"Biodiesel price\n[{format_units('$/gal')}]"] * 4
+    xlabel = f"Ethanol price\n[{format_units('$/L')}]"
+    ylabels = [f"Biodiesel price\n[{format_units('$/L')}]"] * 4
     xticks = [1., 1.5, 2.0, 2.5, 3.0]
     yticks = [2, 3, 4, 5, 6]
     marks = tickmarks(Z, 5, 5, center=0.) if benefit else tickmarks(Z, 5, 5)
     colormap = (diverging_colormaps if benefit else colormaps)[0]
-    metric_bar = MetricBar('MFPP', format_units('$/ton'), colormap, marks, 15,
+    metric_bar = MetricBar('MFPP', format_units('$/MT'), colormap, marks, 15,
                            forced_size=0.3)
     if benefit:
         baseline = ['S1', 'S2']
@@ -318,6 +318,10 @@ def plot_relative_sorghum_oil_content_and_cane_oil_content_contours(
         100.*X, 100.*Y, Z, data, xlabel, ylabel, xticks, yticks, metric_bars, 
         styleaxiskw=dict(xtick0=True), label=True,
     )
+    for i in axes.flatten():
+        plt.sca(i)
+        plot_scatter_points([7], [10], marker='*', s=100, color=startcolor,
+                            edgecolor=edgecolor, clip_on=False, zorder=3)
     return fig, axes
     
 def plot_recovery_and_oil_content_contours(
@@ -348,7 +352,7 @@ def plot_recovery_and_oil_content_contours(
     ylabel = "Oil content [dry wt. %]"
     ylabels = [f'Direct Cogeneration\n{ylabel}',
                f'Integrated Co-Fermentation\n{ylabel}']
-    xticks = [60, 70, 80, 90, 100]
+    xticks = [60, 65, 70, 75, 80, 85, 90, 95]
     yticks = [5, 7.5, 10, 12.5, 15]
     metric = oc.all_metric_mockups[metric_index]
     units = metric.units if metric.units == '%' else format_units(metric.units)
@@ -386,7 +390,7 @@ def plot_recovery_and_oil_content_contours(
             #                    linewidth=1.0)
             if hasattr(ax, '_cached_ytwin'):                
                 plt.sca(ax._cached_ytwin)
-            plot_scatter_points([0.6], [5], marker='o', s=50, color=startcolor,
+            plot_scatter_points([60], [10], marker='*', s=100, color=startcolor,
                                 edgecolor=edgecolor, clip_on=False, zorder=3)
             # plot_scatter_points([ub], [15], marker='*', s=100, color=targetcolor,
             #                     edgecolor=edgecolor, clip_on=False, zorder=3)

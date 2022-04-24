@@ -74,6 +74,7 @@ __all__ = (
     'plot_feedstock_comparison_kde',
     'plot_crude_configuration_comparison_kde',
     'plot_agile_comparison_kde',
+    'plot_separated_configuration_comparison_kde',
     'area_colors',
     'area_hatches',
 )
@@ -119,7 +120,7 @@ area_hatches = {
 for i in area_colors: area_colors[i] = area_colors[i].tint(20)
 palette = Palette(**area_colors)
 letter_color = colors.neutral.shade(25).RGBn
-GWP_units_gal = '$\\mathrm{kg} \\cdot \\mathrm{CO}_{2}\\mathrm{eq} \\cdot \\mathrm{gal}^{-1}$'
+GWP_units_L = '$\\mathrm{kg} \\cdot \\mathrm{CO}_{2}\\mathrm{eq} \\cdot \\mathrm{L}^{-1}$'
 CABBI_colors.orange_hatch = CABBI_colors.orange.copy(hatch='////')
 
 def roundsigfigs(x, nsigfigs=2):
@@ -144,40 +145,40 @@ def roundsigfigs(x, nsigfigs=2):
         else:
             return value
     
-ethanol_over_biodiesel = bst.MockVariable('Ethanol over biodiesel', 'gal/ton', 'Biorefinery')
+ethanol_over_biodiesel = bst.MockVariable('Ethanol over biodiesel', 'L/MT', 'Biorefinery')
 GWP_ethanol_displacement = variables.GWP_ethanol_displacement
 production = (ethanol_production, biodiesel_production)
 
 mc_metric_settings = {
-    'MFPP': (MFPP, f"MFPP\n[{format_units('USD/ton')}]", None),
+    'MFPP': (MFPP, f"MFPP\n[{format_units('USD/MT')}]", None),
     'TCI': (TCI, f"TCI\n[{format_units('10^6*USD')}]", None),
-    'production': (production, f"Production\n[{format_units('gal/ton')}]", None),
-    'electricity_production': (electricity_production, f"Elec. prod.\n[{format_units('kWhr/ton')}]", None),
-    'natural_gas_consumption': (natural_gas_consumption, f"NG cons.\n[{format_units('cf/ton')}]", None),
-    'GWP_ethanol_displacement': (GWP_ethanol_displacement, "GWP$_{\\mathrm{displacement}}$" f"\n[{GWP_units_gal}]", None),
-    'GWP_economic': ((GWP_ethanol, GWP_biodiesel), "GWP$_{\\mathrm{economic}}$" f"\n[{GWP_units_gal}]", None),
-    'GWP_energy': ((GWP_ethanol_allocation, GWP_biodiesel_allocation), "GWP$_{\\mathrm{energy}}$" f"\n[{GWP_units_gal}]", None),
+    'production': (production, f"Production\n[{format_units('L/MT')}]", None),
+    'electricity_production': (electricity_production, f"Elec. prod.\n[{format_units('kWhr/MT')}]", None),
+    'natural_gas_consumption': (natural_gas_consumption, f"NG cons.\n[{format_units('m3/MT')}]", None),
+    'GWP_ethanol_displacement': (GWP_ethanol_displacement, "GWP$_{\\mathrm{displacement}}$" f"\n[{GWP_units_L}]", None),
+    'GWP_economic': ((GWP_ethanol, GWP_biodiesel), "GWP$_{\\mathrm{economic}}$" f"\n[{GWP_units_L}]", None),
+    'GWP_energy': ((GWP_ethanol_allocation, GWP_biodiesel_allocation), "GWP$_{\\mathrm{energy}}$" f"\n[{GWP_units_L}]", None),
 }
 
 mc_comparison_settings = {
-    'MFPP': (MFPP, r"$\Delta$" + f"MFPP\n[{format_units('USD/ton')}]", None),
+    'MFPP': (MFPP, r"$\Delta$" + f"MFPP\n[{format_units('USD/MT')}]", None),
     'TCI': (TCI, r"$\Delta$" + f"TCI\n[{format_units('10^6*USD')}]", None),
-    'production': (production, r"$\Delta$" + f"Production\n[{format_units('gal/ton')}]", None),
-    'electricity_production': (electricity_production, r"$\Delta$" + f"Elec. prod.\n[{format_units('kWhr/ton')}]", None),
-    'natural_gas_consumption': (natural_gas_consumption, r"$\Delta$" + f"NG cons.\n[{format_units('cf/ton')}]", None),
-    'GWP_ethanol_displacement': (GWP_ethanol_displacement, r"$\Delta$" + "GWP$_{\\mathrm{displacement}}$" f"\n[{GWP_units_gal}]", None),
-    'GWP_economic': (GWP_ethanol, r"$\Delta$" + "GWP$_{\\mathrm{economic}}$" f"\n[{GWP_units_gal}]", None),
-    'GWP_energy': (GWP_ethanol_allocation, r"$\Delta$" + "GWP$_{\\mathrm{energy}}$" f"\n[{GWP_units_gal}]", None),
-    'GWP_property_allocation': ((GWP_ethanol, GWP_ethanol_allocation), r"$\Delta$" + f"GWP\n[{GWP_units_gal}]", None),
+    'production': (production, r"$\Delta$" + f"Production\n[{format_units('L/MT')}]", None),
+    'electricity_production': (electricity_production, r"$\Delta$" + f"Elec. prod.\n[{format_units('kWhr/MT')}]", None),
+    'natural_gas_consumption': (natural_gas_consumption, r"$\Delta$" + f"NG cons.\n[{format_units('m3/MT')}]", None),
+    'GWP_ethanol_displacement': (GWP_ethanol_displacement, r"$\Delta$" + "GWP$_{\\mathrm{displacement}}$" f"\n[{GWP_units_L}]", None),
+    'GWP_economic': (GWP_ethanol, r"$\Delta$" + "GWP$_{\\mathrm{economic}}$" f"\n[{GWP_units_L}]", None),
+    'GWP_energy': (GWP_ethanol_allocation, r"$\Delta$" + "GWP$_{\\mathrm{energy}}$" f"\n[{GWP_units_L}]", None),
+    'GWP_property_allocation': ((GWP_ethanol, GWP_ethanol_allocation), r"$\Delta$" + f"GWP\n[{GWP_units_L}]", None),
 }
 
 mc_derivative_metric_settings = {
-    'MFPP': (MFPP_derivative, r"$\Delta$" + format_units(r"MFPP/OC").replace('cdot', r'cdot \Delta') + f"\n[{format_units('USD/ton')}]", None),
+    'MFPP': (MFPP_derivative, r"$\Delta$" + format_units(r"MFPP/OC").replace('cdot', r'cdot \Delta') + f"\n[{format_units('USD/MT')}]", None),
     'TCI': (TCI_derivative,  r"$\Delta$" + format_units(r"TCI/OC").replace('cdot', r'cdot \Delta') + f"\n[{format_units('10^6*USD')}]", None),
-    'production': ((ethanol_production_derivative, biodiesel_production_derivative), r"$\Delta$" + format_units(r"Prod./OC").replace('cdot', r'cdot \Delta') + f"\n[{format_units('gal/ton')}]", None),
-    'electricity_production': (electricity_production_derivative, r"$\Delta$" + format_units(r"EP/OC").replace('cdot', r'cdot \Delta') + f"\n[{format_units('kWhr/ton')}]", None),
-    'natural_gas_consumption': (natural_gas_consumption_derivative, r"$\Delta$" + format_units(r"NGC/OC").replace('cdot', r'cdot \Delta') + f"\n[{format_units('cf/ton')}]", None),
-    'GWP_economic': (GWP_ethanol_derivative, r"$\Delta$" + r"GWP $\cdot \Delta \mathrm{OC}^{-1}$" f"\n[{GWP_units_gal.replace('kg','g')}]", 1000),
+    'production': ((ethanol_production_derivative, biodiesel_production_derivative), r"$\Delta$" + format_units(r"Prod./OC").replace('cdot', r'cdot \Delta') + f"\n[{format_units('L/MT')}]", None),
+    'electricity_production': (electricity_production_derivative, r"$\Delta$" + format_units(r"EP/OC").replace('cdot', r'cdot \Delta') + f"\n[{format_units('kWhr/MT')}]", None),
+    'natural_gas_consumption': (natural_gas_consumption_derivative, r"$\Delta$" + format_units(r"NGC/OC").replace('cdot', r'cdot \Delta') + f"\n[{format_units('m3/MT')}]", None),
+    'GWP_economic': (GWP_ethanol_derivative, r"$\Delta$" + r"GWP $\cdot \Delta \mathrm{OC}^{-1}$" f"\n[{GWP_units_L.replace('kg','g')}]", 1000),
 }
 
 kde_metric_settings = {j[0]: j for j in mc_metric_settings.values()}
@@ -413,10 +414,10 @@ def plot_montecarlo_absolute():
     fig, axes = plot_monte_carlo(
         absolute=True, comparison=False, ncols=2,
         expand=0.1, 
-        labels=['Sugarcane\nConventional', 'Oilcane\nConventional',
-                'Sugarcane\nCellulosic', 'Oilcane\nCellulosic',
-                'Sugarcane/Sorghum\nConventional', 'Oilcane/Oilsorghum\nConventional',
-                'Sugarcane\Sorghum\nCellulosic', 'Oilcane/Oilsorghum\nCellulosic'],
+        labels=['Sugarcane\nDC', 'Oilcane\nDC',
+                'Sugarcane\nICF', 'Oilcane\nICF',
+                'Sugarcane &\nSorghum DC', 'Oilcane &\nOil-sorghum DC',
+                'Sugarcane &\nSorghum ICF', 'Oilcane &\nOil-sorghum ICF'],
         xrot=90,
         color_wheel = CABBI_colors.wheel([
             'blue_light', 'green_dirty', 'orange', 'green', 'grey', 'brown',
@@ -443,8 +444,8 @@ def plot_spearman_tea():
             'O2', 'O2*',
         ],
         labels=[
-            'Direct Cogeneration', 'Agile, Direct Cogeneration',
-            'Integrated Co-Fermentation', 'Agile, Integrated Co-Fermentation',
+            'DC', 'Oil-sorghum int., DC',
+            'ICF', 'Oil-sorghum int., ICF',
         ],
         cutoff=0.025,
         kind='TEA',
@@ -463,8 +464,8 @@ def plot_spearman_lca():
             'O2', 'O2*',
         ],
         labels=[
-            'Direct Cogeneration', 'Agile, Direct Cogeneration',
-            'Integrated Co-Fermentation', 'Agile, Integrated Co-Fermentation',
+            'DC', 'Oil-sorghum int., DC',
+            'ICF', 'Oil-sorghum int., ICF',
         ],
         cutoff=0.03,
         kind='LCA',
@@ -583,15 +584,15 @@ def plot_heatmap_comparison(comparison_names=None, xlabels=None):
         GWP_ethanol, # economic
     ]
     ylabels = [
-        f"MFPP\n[{format_units('USD/ton')}]",
+        f"MFPP\n[{format_units('USD/MT')}]",
         f"TCI\n[{format_units('10^6*USD')}]",
-        f"Ethanol production\n[{format_units('gal/ton')}]",
-        f"Biodiesel production\n[{format_units('gal/ton')}]",
-        f"Elec. prod.\n[{format_units('kWhr/ton')}]",
-        f"NG cons.\n[{format_units('cf/ton')}]",
-        "GWP$_{\\mathrm{displacement}}$" f"\n[{GWP_units_gal}]",
-        "GWP$_{\\mathrm{energy}}$" f"\n[{GWP_units_gal}]",
-        "GWP$_{\\mathrm{economic}}$" f"\n[{GWP_units_gal}]",
+        f"Ethanol production\n[{format_units('L/MT')}]",
+        f"Biodiesel production\n[{format_units('L/MT')}]",
+        f"Elec. prod.\n[{format_units('kWhr/MT')}]",
+        f"NG cons.\n[{format_units('m3/MT')}]",
+        "GWP$_{\\mathrm{displacement}}$" f"\n[{GWP_units_L}]",
+        "GWP$_{\\mathrm{energy}}$" f"\n[{GWP_units_L}]",
+        "GWP$_{\\mathrm{economic}}$" f"\n[{GWP_units_L}]",
     ]
     N_rows = len(rows)
     N_cols = len(comparison_names)
@@ -858,7 +859,24 @@ def plot_configuration_comparison_kde():
     for i in ('svg', 'png'):
         file = os.path.join(images_folder, f'configuration_comparison_kde.{i}')
         plt.savefig(file, transparent=True)
-    
+
+def plot_separated_configuration_comparison_kde():
+    plot_kde_2d(
+        ('O1', 'O2'),
+        yticks=[[-20, 0, 20, 40, 60]],
+        xticks=[
+            [0, 0.5, 1, 1.5],
+            [0, 2, 4, 6, 8, 10]
+        ],
+        top_right='GWP\nTradeoff()',
+        bottom_left='MFPP\nTradeoff()',
+        top_left='DC Favored()',
+        bottom_right='ICF\nFavored()',
+    )
+    for i in ('svg', 'png'):
+        file = os.path.join(images_folder, f'separated_configuration_comparison_kde.{i}')
+        plt.savefig(file, transparent=True)
+
 def plot_crude_configuration_comparison_kde():
     plot_kde_2d(
         ('O1 - O3', 'O2 - O4'),
@@ -1205,12 +1223,12 @@ def plot_spearman(configurations, top=None, labels=None, metric=None, cutoff=Non
         elif metric == 'GWP':
             metric = GWP_economic
         metric_name = metric.name
-    stream_price = format_units('USD/gal')
-    USD_ton = format_units('USD/ton')
-    ng_price = format_units('USD/cf')
+    stream_price = format_units('USD/L')
+    USD_MT = format_units('USD/MT')
+    ng_price = format_units('USD/m3')
     electricity_price = format_units('USD/kWhr')
     operating_days = format_units('day/yr')
-    capacity = format_units('dry-MMton/yr')
+    capacity = format_units('10^6 MT/yr')
     titer = format_units('g/L')
     productivity = format_units('g/L/hr')
     material_GWP = '$\\mathrm{kg} \\cdot \\mathrm{CO}_{2}\\mathrm{eq} \\cdot \\mathrm{kg}^{-1}$'
@@ -1220,16 +1238,16 @@ def plot_spearman(configurations, top=None, labels=None, metric=None, cutoff=Non
          ('Saccharification oil recovery [70 $-$ 95 %]', ['S2', 'S1', 'S2*', 'S1*', 'O1', 'O1*']),
         (f'Cane operating days [120 $-$ 180 {operating_days}]', []),
         (f'Sorghum operating days [30 $-$ 60 {operating_days}]', ['S2', 'S1', 'O1', 'O2']),
-        (f'Crushing capacity [1.32 $-$ 2.20 {capacity}]', []),
-        (f'Ethanol price [1.02, 1.80, 2.87 {stream_price}]', []),
-        (f'Relative biodiesel price [0.31, 2.98, 4.11 {stream_price}]', []),
-        (f'Natural gas price [3.71, 4.73, 6.18 {ng_price}]', ['S1', 'O1', 'S1*', 'O1*']),
+        (f'Crushing capacity [1.2 $-$ 2.0 {capacity}]', []),
+        (f'Ethanol price [0.269, 0.476, 0.758 {stream_price}]', []),
+        (f'Relative biodiesel price [0.0819, 0.786, 1.09 {stream_price}]', []),
+        (f'Natural gas price [0.105, 0.122, 1.09 {ng_price}]', ['S1', 'O1', 'S1*', 'O1*']),
         (f'Electricity price [0.0583, 0.065, 0.069 {electricity_price}]', ['S2', 'O2', 'S2*', 'O2*']),
          ('IRR [10 $-$ 15 %]', []),
-        (f'Crude glycerol price [91 $-$ 200 {USD_ton}]', ['S2', 'S1', 'S2*', 'S1*']),
-        (f'Pure glycerol price [501 $-$ 678 {USD_ton}]', ['S2', 'S1', 'S2*', 'S1*']),
+        (f'Crude glycerol price [100 $-$ 220 {USD_MT}]', ['S2', 'S1', 'S2*', 'S1*']),
+        (f'Pure glycerol price [488 $-$ 812 {USD_MT}]', ['S2', 'S1', 'S2*', 'S1*']),
          ('Saccharification reaction time [54 $-$ 90 hr]', ['S1', 'O1', 'S1*', 'O1*']),
-        (f'Cellulase price [144 $-$ 240 {USD_ton}]', ['S1', 'O1', 'S1*', 'O1*']),
+        (f'Cellulase price [144 $-$ 240 {USD_MT}]', ['S1', 'O1', 'S1*', 'O1*']),
          ('Cellulase loading [1.5 $-$ 2.5 wt. % cellulose]', ['S1', 'O1', 'S1*', 'O1*']),
          ('PTRS base cost [14.9 $-$ 24.7 MMUSD]', ['S1', 'O1', 'S1*', 'O1*']),
          # ('Pretreatment reactor system base cost [14.9 $-$ 24.7 MMUSD]', ['S1', 'O1', 'S1*', 'O1*']),
@@ -1398,16 +1416,16 @@ def plot_TCI_areas_across_oil_content(configuration='O2'):
 #     if derivative:
 #         x = 100 * (oil_content[:-1] + np.diff(oil_content) / 2.)
 #         ylabels = [
-#             f"MFPP der. [{format_units('USD/ton')}]",
+#             f"MFPP der. [{format_units('USD/MT')}]",
 #             f"TCI der. [{format_units('10^6*USD')}]",
-#             f"Production der. [{format_units('gal/ton')}]"
+#             f"Production der. [{format_units('L/MT')}]"
 #         ]
 #     else:
 #         x = 100 * oil_content
 #         ylabels = [
-#             f"MFPP$\backprime$ [{format_units('USD/ton')}]",
+#             f"MFPP$\backprime$ [{format_units('USD/MT')}]",
 #             f"TCI [{format_units('10^6*USD')}]",
-#             f"Production [{format_units('gal/ton')}]"
+#             f"Production [{format_units('L/MT')}]"
 #         ]
 #     N_cols = len(columns)
 #     N_rows = len(rows)
