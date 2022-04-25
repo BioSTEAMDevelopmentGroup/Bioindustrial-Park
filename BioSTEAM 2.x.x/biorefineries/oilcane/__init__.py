@@ -527,11 +527,11 @@ def load(name, cache={}, reduce_chemicals=True,
     def triangular(lb, mid, ub, *args, **kwargs):
         return parameter(*args, distribution=shape.Triangle(lb, mid, ub), bounds=(lb, ub), **kwargs)
     
-    @uniform(60, 95, units='%', kind='coupled')
+    @uniform(60, 90, units='%', kind='coupled')
     def set_crushing_mill_oil_recovery(oil_recovery):
         oil_extraction_specification.load_crushing_mill_oil_recovery(oil_recovery / 100.)
     
-    @uniform(70.0, 95, units='%', kind='coupled')
+    @uniform(70.0, 90, units='%', kind='coupled')
     def set_saccharification_oil_recovery(saccharification_oil_recovery):
         oil_extraction_specification.load_saccharification_oil_recovery(saccharification_oil_recovery / 100.)
 

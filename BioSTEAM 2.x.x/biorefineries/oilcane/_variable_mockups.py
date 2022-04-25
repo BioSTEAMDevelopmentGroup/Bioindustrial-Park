@@ -95,7 +95,7 @@ from biosteam import MockVariable
     MockVariable('Biodiesel production derivative', 'L/MT', 'Biorefinery'),
     MockVariable('Ethanol production derivative', 'L/MT', 'Biorefinery'),
     MockVariable('Electricity production derivative', 'kWhr/MT', 'Biorefinery'),
-    MockVariable('Natural gas consumption derivative', 'm3/MT', 'Biorefinery'),
+    MockVariable('Natural gas consumption derivative', 'cf/MT', 'Biorefinery'),
     MockVariable('TCI derivative', '10^6*USD', 'Biorefinery'),
     MockVariable('GWP derivative', 'kg*CO2*eq / USD', 'Economic allocation'),
     MockVariable('Ethanol GWP derivative', 'kg*CO2*eq / L', 'Ethanol'),

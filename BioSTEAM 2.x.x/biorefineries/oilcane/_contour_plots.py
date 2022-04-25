@@ -109,7 +109,7 @@ def plot_recovery_and_oil_content_contours_manuscript(load=True):
     colors = np.zeros([2, 2], object)
     colors[:] = [[light_letter_color, light_letter_color],
                  [light_letter_color, light_letter_color]]
-    _add_letter_labels(axes, 1 - 0.6, 0.7, colors)
+    _add_letter_labels(axes, 1 - 0.68, 0.7, colors)
     plt.subplots_adjust(right=0.92, wspace=0.1, top=0.9, bottom=0.10)
     for i in ('svg', 'png'):
         file = os.path.join(images_folder, f'recovery_and_oil_content_contours.{i}')
@@ -328,7 +328,7 @@ def plot_recovery_and_oil_content_contours(
         load=False, metric_index=0, N_decimals=1,
     ):
     # Generate contour data
-    x = np.linspace(0.6, 0.95, 20)
+    x = np.linspace(0.40, 1.0, 20)
     y = np.linspace(0.05, 0.15, 20)
     X, Y = np.meshgrid(x, y)
     metric = bst.metric
@@ -352,7 +352,7 @@ def plot_recovery_and_oil_content_contours(
     ylabel = "Oil content [dry wt. %]"
     ylabels = [f'Direct Cogeneration\n{ylabel}',
                f'Integrated Co-Fermentation\n{ylabel}']
-    xticks = [60, 65, 70, 75, 80, 85, 90, 95]
+    xticks = [40, 50, 60, 70, 80, 90, 100]
     yticks = [5, 7.5, 10, 12.5, 15]
     metric = oc.all_metric_mockups[metric_index]
     units = metric.units if metric.units == '%' else format_units(metric.units)
@@ -379,15 +379,15 @@ def plot_recovery_and_oil_content_contours(
                              levels=levels, colors=[linecolor])
             # ax.clabel(CS, levels=CS.levels, inline=True, fmt=lambda x: f'{round(x):,}',
             #           colors=[linecolor], zorder=1e16)
-            # plt.fill_between([lb, ub], [5], [20], 
-            #                  color=shadecolor,
-            #                  linewidth=1)
-            # plot_vertical_line(lb, ls='-.',
-            #                    color=linecolor,
-            #                    linewidth=1.0)
-            # plot_vertical_line(ub, ls='-.',
-            #                    color=linecolor,
-            #                    linewidth=1.0)
+            plt.fill_between([60, 90], [5], [15], 
+                              color=shadecolor,
+                              linewidth=1)
+            plot_vertical_line(60, ls='-.',
+                                color=linecolor,
+                                linewidth=1.0)
+            plot_vertical_line(90, ls='-.',
+                                color=linecolor,
+                                linewidth=1.0)
             if hasattr(ax, '_cached_ytwin'):                
                 plt.sca(ax._cached_ytwin)
             plot_scatter_points([60], [10], marker='*', s=100, color=startcolor,
