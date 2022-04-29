@@ -15,7 +15,6 @@ import matplotlib.patches as mpatches
 from warnings import warn
 import numpy as np
 import pandas as pd
-from matplotlib.lines import Line2D
 from matplotlib.gridspec import GridSpec
 from . import _variable_mockups as variables
 from ._variable_mockups import (
@@ -36,14 +35,13 @@ from ._variable_mockups import (
     GWP_ethanol_derivative,
 )
 from ._load_data import (
+    roundsigfigs,
     images_folder,
     get_monte_carlo,
     spearman_file,
 )
 import os
 from._parse_configuration import format_name
-from math import log10, floor
-from collections import Iterable
 
 __all__ = (
     'plot_all',
@@ -67,10 +65,6 @@ __all__ = (
     'plot_feedstock_cellulosic_comparison_kde',
     'plot_configuration_comparison_kde',
     'plot_open_comparison_kde',
-    'monte_carlo_results',
-    'montecarlo_results_feedstock_comparison',
-    'montecarlo_results_configuration_comparison',
-    'montecarlo_results_agile_comparison',
     'plot_feedstock_comparison_kde',
     'plot_crude_configuration_comparison_kde',
     'plot_agile_comparison_kde',
@@ -123,28 +117,6 @@ letter_color = colors.neutral.shade(25).RGBn
 GWP_units_L = '$\\mathrm{kg} \\cdot \\mathrm{CO}_{2}\\mathrm{eq} \\cdot \\mathrm{L}^{-1}$'
 GWP_units_L_small = GWP_units_L.replace('kg', 'g')
 CABBI_colors.orange_hatch = CABBI_colors.orange.copy(hatch='////')
-
-def roundsigfigs(x, nsigfigs=2):
-    if isinstance(x, Iterable):
-        n = nsigfigs - int(floor(log10(abs(x[1])))) - 1 if abs(x[1]) > 1e-12 else 0.
-        try:
-            value = np.round(x, n)
-        except:
-            return np.array(x, dtype=int)
-        if (np.array(value, int) == value).all():
-            return np.array(value, int)
-        else:
-            return value
-    else:
-        n = nsigfigs - int(floor(log10(abs(x)))) - 1 if abs(x) > 1e-12 else 0.
-        try:
-            value = round(x, n)
-        except:
-            return int(x)
-        if int(value) == value:
-            return int(value)
-        else:
-            return value
     
 ethanol_over_biodiesel = bst.MockVariable('Ethanol over biodiesel', 'L/MT', 'Biorefinery')
 GWP_ethanol_displacement = variables.GWP_ethanol_displacement
@@ -388,7 +360,7 @@ def plot_montecarlo_derivative():
         #     [-400, -300, -200, -100, 0, 100, 200, 300, 400],
         #     [-300, -225, -150, -75, 0, 75, 150, 225, 300]
         # ], dtype=object),
-        labels=['Direct Cogeneration', 'Integrated Co-Fermentation'],
+        labels=['DC', 'ICF'],
         color_wheel = CABBI_colors.wheel([
             'blue_light', 'green_dirty', 'orange', 'green', 'grey', 'brown',
             'orange', 
@@ -498,59 +470,6 @@ def plot_breakdowns():
     for i in ('svg', 'png'):
         file = os.path.join(images_folder, f'breakdowns.{i}')
         plt.savefig(file, transparent=True)
-
-# %% Monte carlo values for manuscript
-
-def montecarlo_results_feedstock_comparison():
-    return montecarlo_results_short(
-        metrics = [
-            MFPP, TCI, ethanol_production, biodiesel_production, 
-            electricity_production, natural_gas_consumption, GWP_ethanol_displacement, 
-            GWP_ethanol, GWP_ethanol_allocation, GWP_ethanol, GWP_ethanol_allocation
-        ],
-        names = [
-            'O1 - S1',
-            'O2 - S2',
-        ],
-    )
-    
-def montecarlo_results_configuration_comparison():
-    return montecarlo_results_short(
-        metrics = [
-            MFPP, TCI, ethanol_production, biodiesel_production, 
-            electricity_production, natural_gas_consumption, GWP_ethanol_displacement, 
-            GWP_ethanol, GWP_ethanol_allocation, GWP_ethanol, GWP_ethanol_allocation
-        ],
-        names = [
-            'O2 - O1',
-        ],
-    )['O2 - O1']
-
-def montecarlo_results_agile_comparison():
-    return montecarlo_results_short(
-        metrics = [
-            MFPP, TCI, ethanol_production, biodiesel_production, 
-            electricity_production, natural_gas_consumption, GWP_ethanol_displacement, 
-            GWP_ethanol, GWP_ethanol_allocation, GWP_ethanol, GWP_ethanol_allocation
-        ],
-        names = [
-            'O1* - O1',
-            'O2* - O2',
-        ],
-    )
-
-def montecarlo_results_short(names, metrics):
-    results = {}
-    for name in names:
-        df = get_monte_carlo(name)
-        results[name] = dct = {}
-        for metric in metrics:
-            index = metric.index
-            data = df[index].values
-            q05, q50, q95 = roundsigfigs(np.percentile(data, [5, 50, 95], axis=0), 3)
-            key = get_monte_carlo_key(index, dct, False)
-            dct[key] = f"{q50} [{q05}, {q95}]"
-    return results
 
 # %% Heatmap
 
@@ -885,10 +804,10 @@ def plot_separated_configuration_comparison_kde():
 def plot_crude_configuration_comparison_kde():
     plot_kde_2d(
         ('O1 - O3', 'O2 - O4'),
-        yticks=[[-10, 0, 10, 20, 30, 40]],
+        yticks=[[-12, 0, 12, 24, 36, 48]],
         xticks=[
-            [-2, -1.5, -1, -.5, 0],
-            [-3, -2.5, -2, -1.5, -1, -.5, 0]
+            [-0.5, -0.4, -0.3, -0.2, -0.1, 0],
+            [-1, -0.8, -0.6, -0.4, -0.2, 0]
         ],
         top_right='GWP\nTradeoff()',
         bottom_left='MFPP\nTradeoff()',
@@ -988,73 +907,6 @@ def monte_carlo_box_plot(data, positions, light_color, dark_color, width=None,
     if hatch:
         for box in bp['boxes']:
             box.set(hatch = hatch)
-
-def get_monte_carlo_key(index, dct, with_units=False):
-    key = index[1] if with_units else index[1].split(' [')[0]
-    if key in dct: key = f'{key}, {index[0]}'
-    return key
-
-def monte_carlo_results(with_units=False):
-    results = {}    
-    for name in oc.configuration_names + oc.comparison_names + oc.other_comparison_names + ('O3', 'O4', 'O1 - O3', 'O2 - O4'):
-        try: 
-            df = get_monte_carlo(name)
-        except:
-            warn(f'could not load {name}', RuntimeWarning)
-            continue
-        results[name] = dct = {}
-        if name in ('O1', 'O2'):
-            index = ethanol_over_biodiesel.index
-            key = get_monte_carlo_key(index, dct, with_units)
-            data = df[ethanol_production.index].values / df[biodiesel_production.index].values
-            q05, q25, q50, q75, q95 = np.percentile(data, [5,25,50,75,95], axis=0)
-            dct[key] = {
-                'mean': np.mean(data),
-                'std': np.std(data),
-                'q05': q05,
-                'q25': q25,
-                'q50': q50,
-                'q75': q75,
-                'q95': q95,
-            }
-        for metric in (*tea_monte_carlo_metric_mockups, *tea_monte_carlo_derivative_metric_mockups,
-                       *lca_monte_carlo_metric_mockups, *lca_monte_carlo_derivative_metric_mockups,
-                       variables.GWP_ethanol_displacement, variables.GWP_ethanol_allocation):
-            index = metric.index
-            data = df[index].values
-            q05, q25, q50, q75, q95 = np.percentile(data, [5,25,50,75,95], axis=0)
-            key = get_monte_carlo_key(index, dct, with_units)
-            dct[key] = {
-                'mean': np.mean(data),
-                'std': np.std(data),
-                'q05': q05,
-                'q25': q25,
-                'q50': q50,
-                'q75': q75,
-                'q95': q95,
-            }
-    try:
-        df_O2O1 = get_monte_carlo('O2 - O1')
-        df_O1 = get_monte_carlo('O1')
-    except:
-        warn('could not load O2 - O1', RuntimeWarning)
-    else:
-        results['(O2 - O1) / O1'] = relative_results = {}
-        for metric in (biodiesel_production, ethanol_production):
-            index = metric.index
-            key = index[1] if with_units else index[1].split(' [')[0]
-            data = (df_O2O1[index].values / df_O1[index].values)
-            q05, q25, q50, q75, q95 = np.percentile(data, [5,25,50,75,95], axis=0)
-            relative_results[key] = {
-                'mean': np.mean(data),
-                'std': np.std(data),
-                'q05': q05,
-                'q25': q25,
-                'q50': q50,
-                'q75': q75,
-                'q95': q95,
-            }
-    return results
 
 def plot_monte_carlo(derivative=False, absolute=True, comparison=True,
                      configuration_names=None, comparison_names=None,
