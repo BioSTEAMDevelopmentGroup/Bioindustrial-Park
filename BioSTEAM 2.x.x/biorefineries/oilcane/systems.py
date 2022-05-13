@@ -256,7 +256,10 @@ def create_oilcane_to_biodiesel_and_ethanol_1g(
     # Burn bagasse from conveyor belt
     BT = bst.BoilerTurbogenerator(700,
                                    (MX2-0, '', 
-                                    'boiler_makeup_water', 'natural_gas', '', ''),
+                                    'boiler_makeup_water',
+                                    'natural_gas',
+                                    'FGD_lime',
+                                    'boilerchems'),
                                    ('emissions', 'rejected_water_and_blowdown', 'ash_disposal'),
                                    boiler_efficiency=0.80,
                                    turbogenerator_efficiency=0.85)
@@ -356,7 +359,10 @@ def create_oilcane_to_crude_oil_and_ethanol_1g(
     # Burn bagasse from conveyor belt
     BT = bst.BoilerTurbogenerator(700,
                                    (bagasse, '', 
-                                    'boiler_makeup_water', 'natural_gas', '', ''),
+                                    'boiler_makeup_water',
+                                    'natural_gas',
+                                    'FGD_lime',
+                                    'boilerchems'),
                                    ('emissions', 'rejected_water_and_blowdown', 'ash_disposal'),
                                    boiler_efficiency=0.80,
                                    turbogenerator_efficiency=0.85)

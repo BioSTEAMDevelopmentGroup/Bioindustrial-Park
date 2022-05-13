@@ -7,8 +7,6 @@ Created on Thu Nov  4 14:39:10 2021
 from . import _variable_mockups as v
 from ._parse_configuration import parse, Configuration, ConfigurationComparison
 from warnings import warn
-from math import log10, floor
-from collections import Iterable
 import biorefineries.oilcane as oc
 import os
 import pandas as pd
@@ -234,25 +232,3 @@ def montecarlo_results_agile_comparison():
             'O2* - O2',
         ],
     )
-
-def roundsigfigs(x, nsigfigs=2):
-    if isinstance(x, Iterable):
-        n = nsigfigs - int(floor(log10(abs(x[1])))) - 1 if abs(x[1]) > 1e-12 else 0.
-        try:
-            value = np.round(x, n)
-        except:
-            return np.array(x, dtype=int)
-        if (np.array(value, int) == value).all():
-            return np.array(value, int)
-        else:
-            return value
-    else:
-        n = nsigfigs - int(floor(log10(abs(x)))) - 1 if abs(x) > 1e-12 else 0.
-        try:
-            value = round(x, n)
-        except:
-            return int(x)
-        if int(value) == value:
-            return int(value)
-        else:
-            return value

@@ -7,7 +7,7 @@ Created on Fri Nov  5 01:34:00 2021
 import biosteam as bst
 import biorefineries.oilcane as oc
 from biosteam.utils import CABBI_colors, colors
-from thermosteam.utils import set_figure_size, set_font
+from thermosteam.utils import set_figure_size, set_font, roundsigfigs
 from thermosteam.units_of_measure import format_units
 from colorpalette import Palette
 import matplotlib.pyplot as plt
@@ -35,7 +35,6 @@ from ._variable_mockups import (
     GWP_ethanol_derivative,
 )
 from ._load_data import (
-    roundsigfigs,
     images_folder,
     get_monte_carlo,
     spearman_file,
@@ -54,6 +53,8 @@ __all__ = (
     'plot_montecarlo_absolute',
     'plot_spearman_tea',
     'plot_spearman_lca',
+    'plot_spearman_tea_short',
+    'plot_spearman_lca_short',
     'plot_monte_carlo_across_coordinate',
     'monte_carlo_box_plot',
     'plot_monte_carlo',
@@ -127,7 +128,7 @@ mc_metric_settings = {
     'TCI': (TCI, f"TCI\n[{format_units('10^6*USD')}]", None),
     'production': (production, f"Production\n[{format_units('L/MT')}]", None),
     'electricity_production': (electricity_production, f"Elec. prod.\n[{format_units('kWhr/MT')}]", None),
-    'natural_gas_consumption': (natural_gas_consumption, f"NG cons.\n[{format_units('m3/MT')}]", None),
+    'natural_gas_consumption': (natural_gas_consumption, f"NG cons.\n[{format_units('m^3/MT')}]", None),
     'GWP_ethanol_displacement': (GWP_ethanol_displacement, "GWP$_{\\mathrm{displacement}}$" f"\n[{GWP_units_L}]", None),
     'GWP_economic': ((GWP_ethanol, GWP_biodiesel), "GWP$_{\\mathrm{economic}}$" f"\n[{GWP_units_L}]", None),
     'GWP_energy': ((GWP_ethanol_allocation, GWP_biodiesel_allocation), "GWP$_{\\mathrm{energy}}$" f"\n[{GWP_units_L}]", None),
@@ -138,7 +139,7 @@ mc_comparison_settings = {
     'TCI': (TCI, r"$\Delta$" + f"TCI\n[{format_units('10^6*USD')}]", None),
     'production': (production, r"$\Delta$" + f"Production\n[{format_units('L/MT')}]", None),
     'electricity_production': (electricity_production, r"$\Delta$" + f"Elec. prod.\n[{format_units('kWhr/MT')}]", None),
-    'natural_gas_consumption': (natural_gas_consumption, r"$\Delta$" + f"NG cons.\n[{format_units('m3/MT')}]", None),
+    'natural_gas_consumption': (natural_gas_consumption, r"$\Delta$" + f"NG cons.\n[{format_units('m^3/MT')}]", None),
     'GWP_ethanol_displacement': (GWP_ethanol_displacement, r"$\Delta$" + "GWP$_{\\mathrm{displacement}}$" f"\n[{GWP_units_L}]", None),
     'GWP_economic': (GWP_ethanol, r"$\Delta$" + "GWP$_{\\mathrm{economic}}$" f"\n[{GWP_units_L}]", None),
     'GWP_energy': (GWP_ethanol_allocation, r"$\Delta$" + "GWP$_{\\mathrm{energy}}$" f"\n[{GWP_units_L}]", None),
@@ -150,7 +151,7 @@ mc_derivative_metric_settings = {
     'TCI': (TCI_derivative,  r"$\Delta$" + format_units(r"TCI/OC").replace('cdot', r'cdot \Delta') + f"\n[{format_units('10^6*USD')}]", None),
     'production': ((ethanol_production_derivative, biodiesel_production_derivative), r"$\Delta$" + format_units(r"Prod./OC").replace('cdot', r'cdot \Delta') + f"\n[{format_units('L/MT')}]", None),
     'electricity_production': (electricity_production_derivative, r"$\Delta$" + format_units(r"EP/OC").replace('cdot', r'cdot \Delta') + f"\n[{format_units('kWhr/MT')}]", None),
-    'natural_gas_consumption': (natural_gas_consumption_derivative, r"$\Delta$" + format_units(r"NGC/OC").replace('cdot', r'cdot \Delta') + f"\n[{format_units('m3/MT')}]", None),
+    'natural_gas_consumption': (natural_gas_consumption_derivative, r"$\Delta$" + format_units(r"NGC/OC").replace('cdot', r'cdot \Delta') + f"\n[{format_units('m^3/MT')}]", None),
     'GWP_economic': (GWP_ethanol_derivative, r"$\Delta$" + r"GWP $\cdot \Delta \mathrm{OC}^{-1}$" f"\n[{GWP_units_L_small}]", 1000),
 }
 
@@ -408,9 +409,9 @@ def plot_montecarlo_absolute():
         file = os.path.join(images_folder, f'montecarlo_absolute.{i}')
         plt.savefig(file, transparent=True)
     
-def plot_spearman_tea():
+def plot_spearman_tea(with_units=None, aspect_ratio=0.8, **kwargs):
     set_font(size=8)
-    set_figure_size(aspect_ratio=0.80)
+    set_figure_size(aspect_ratio=aspect_ratio)
     plot_spearman(
         configurations=[
             'O1', 'O1*',
@@ -420,17 +421,68 @@ def plot_spearman_tea():
             'DC', 'Oil-sorghum int., DC',
             'ICF', 'Oil-sorghum int., ICF',
         ],
-        cutoff=0.025,
         kind='TEA',
+        with_units=with_units,
+        cutoff=0.03,
+        **kwargs
     )
     plt.subplots_adjust(left=0.45, right=0.975, top=0.98, bottom=0.08)
     for i in ('svg', 'png'):
         file = os.path.join(images_folder, f'spearman_tea.{i}')
         plt.savefig(file, transparent=True)
 
-def plot_spearman_lca():
+def plot_spearman_tea_short(**kwargs):
     set_font(size=8)
-    set_figure_size(aspect_ratio=0.65)
+    set_figure_size(aspect_ratio=0.65, width=6.6142 * 2/3)
+    plot_spearman(
+        configurations=[
+            'O1', 
+            'O2', 
+        ],
+        labels=[
+            'DC', 
+            'ICF',
+        ],
+        kind='TEA',
+        with_units=False,
+        cutoff=0.03,
+        top=5,
+        legend=True,
+        legend_kwargs={'loc': 'upper left'},
+        **kwargs
+    )
+    plt.subplots_adjust(left=0.35, right=0.975, top=0.98, bottom=0.15)
+    for i in ('svg', 'png'):
+        file = os.path.join(images_folder, f'spearman_tea.{i}')
+        plt.savefig(file, transparent=True)
+
+def plot_spearman_lca_short(with_units=False, aspect_ratio=0.65, **kwargs):
+    set_font(size=8)
+    set_figure_size(aspect_ratio=aspect_ratio, width=6.6142 * 2/3)
+    plot_spearman(
+        configurations=[
+            'O1', 
+            'O2', 
+        ],
+        labels=[
+            'DC', 
+            'ICF',
+        ],
+        kind='LCA',
+        with_units=with_units,
+        cutoff=0.03,
+        top=5,
+        legend=False,
+        **kwargs
+    )
+    plt.subplots_adjust(left=0.35, right=0.975, top=0.98, bottom=0.15)
+    for i in ('svg', 'png'):
+        file = os.path.join(images_folder, f'spearman_lca.{i}')
+        plt.savefig(file, transparent=True)
+
+def plot_spearman_lca(with_units=None, aspect_ratio=0.65, **kwargs):
+    set_font(size=8)
+    set_figure_size(aspect_ratio=aspect_ratio)
     plot_spearman(
         configurations=[
             'O1', 'O1*',
@@ -440,8 +492,10 @@ def plot_spearman_lca():
             'DC', 'Oil-sorghum int., DC',
             'ICF', 'Oil-sorghum int., ICF',
         ],
-        cutoff=0.03,
         kind='LCA',
+        with_units=with_units,
+        cutoff=0.03,
+        **kwargs
     )
     plt.subplots_adjust(left=0.45, right=0.975, top=0.98, bottom=0.10)
     for i in ('svg', 'png'):
@@ -509,7 +563,7 @@ def plot_heatmap_comparison(comparison_names=None, xlabels=None):
         f"Ethanol production\n[{format_units('L/MT')}]",
         f"Biodiesel production\n[{format_units('L/MT')}]",
         f"Elec. prod.\n[{format_units('kWhr/MT')}]",
-        f"NG cons.\n[{format_units('m3/MT')}]",
+        f"NG cons.\n[{format_units('m^3/MT')}]",
         "GWP$_{\\mathrm{displacement}}$" f"\n[{GWP_units_L}]",
         "GWP$_{\\mathrm{energy}}$" f"\n[{GWP_units_L}]",
         "GWP$_{\\mathrm{economic}}$" f"\n[{GWP_units_L}]",
@@ -1063,8 +1117,11 @@ def plot_monte_carlo(derivative=False, absolute=True, comparison=True,
 
 #%% Spearman
 
-def plot_spearman(configurations, top=None, labels=None, metric=None, cutoff=None,
-                  kind='TEA'):
+def plot_spearman(configurations, labels=None, metric=None, 
+                  kind=None, with_units=None, legend=None, legend_kwargs=None, **kwargs):
+    if kind is None: kind = 'TEA'
+    if with_units is None: with_units = True
+    if legend is None: legend = True
     if metric is None:
         if kind == 'TEA':
             metric = MFPP
@@ -1082,7 +1139,7 @@ def plot_spearman(configurations, top=None, labels=None, metric=None, cutoff=Non
         metric_name = metric.name
     stream_price = format_units('USD/L')
     USD_MT = format_units('USD/MT')
-    ng_price = format_units('USD/m3')
+    ng_price = format_units('USD/m^3')
     electricity_price = format_units('USD/kWhr')
     operating_days = format_units('day/yr')
     capacity = format_units('10^6 MT/yr')
@@ -1130,6 +1187,7 @@ def plot_spearman(configurations, top=None, labels=None, metric=None, cutoff=Non
         (f'Cellulase GWPCF [6.05 $-$ 10.1 {material_GWP}]', ['S1', 'O1', 'S1*', 'O1*']),
         (f'Natural gas GWPCF [0.297 $-$ 0.363 {material_GWP}]', ['S1', 'O1', 'S1*', 'O1*']),
     ])
+    if not with_units: index = [i.split(' [')[0] for i in index]
     ignored_dct = {
         'S1': [],
         'O1': [],
@@ -1167,19 +1225,23 @@ def plot_spearman(configurations, top=None, labels=None, metric=None, cutoff=Non
         s.iloc[ignored_dct[name]] = 0.
         rhos.append(s)
     color_wheel = [CABBI_colors.orange, CABBI_colors.green_soft, CABBI_colors.blue, CABBI_colors.brown]
-    fig, ax = bst.plots.plot_spearman_2d(rhos, top=top, index=index, cutoff=cutoff, 
+    fig, ax = bst.plots.plot_spearman_2d(rhos, index=index,
                                          color_wheel=color_wheel,
-                                         name=metric_name)
-    plt.legend(
-        handles=[
-            mpatches.Patch(
-                color=color_wheel[i].RGBn, 
-                label=labels[i] if labels else format_name(configurations[i])
-            )
-            for i in range(len(configurations))
-        ], 
-        loc='lower left'
-    )
+                                         name=metric_name,
+                                         **kwargs)
+    if legend:
+        if legend_kwargs is None:
+            legend_kwargs = {'loc': 'lower left'}
+        plt.legend(
+            handles=[
+                mpatches.Patch(
+                    color=color_wheel[i].RGBn, 
+                    label=labels[i] if labels else format_name(configurations[i])
+                )
+                for i in range(len(configurations))
+            ], 
+            **legend_kwargs,
+        )
     return fig, ax
 
 # %% Other
