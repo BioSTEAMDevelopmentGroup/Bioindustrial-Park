@@ -13,6 +13,7 @@ from biorefineries.sugarcane import create_ethanol_purification_system
 from biorefineries.cornstover._process_settings import price
 from biorefineries.cornstover._chemicals import chemical_groups
 from biorefineries.cornstover import units
+from biosteam import stream_kwargs as skw
 import thermosteam.reaction as rxn
 import numpy as np
 
@@ -38,8 +39,8 @@ default_insoluble_solids = ['Glucan', 'Mannan', 'Xylan',
 
 default_ignored = ['TAG', 'DAG', 'MAG', 'FFA', 'PL']
 
-cornstover_dct = dict(
-    ID='cornstover', # Cornstover composition by default
+cornstover = skw(
+    'cornstover',
     Glucan=0.28,
     Xylan=0.1562,
     Galactan=0.001144,
@@ -57,16 +58,31 @@ cornstover_dct = dict(
     price=price['Feedstock']
 )
 
+switchgrass = skw(
+    'switchgrass',
+    Arabinan=0.02789023841655421,
+    Galactan=0.010436347278452543,
+    Glucan=0.2717049032838507,
+    Xylan=0.21214574898785432,
+    Mannan=0.005937921727395412,
+    Lignin=0.17112010796221322,
+    Ash=0.016194331983805668,
+    Extractives=0.08457040035987407,
+    Water=0.2,
+    total_flow=104229.16,
+    units='kg/hr',
+    price=0.08, # Price of switchgrass, table 4, Madhu Khanna et al. (Costs of producing miscanthus and switchgrass for bioenergy in Illinois);  https://www.sciencedirect.com/science/article/pii/S096195340700205X?casa_token=KfYfzJtDwv0AAAAA:OqeJmpofk1kIgFk2DcUvXNG35qYwlWvPKZ7ENI3R6RUKeoahiTDpOhhd_mpLtRthTGuXJKDzMOc
+)
+
 @bst.SystemFactory(
     ID='hot_water_pretreatment_sys',
-    ins=[cornstover_dct],
+    ins=[cornstover],
     outs=[dict(ID='hydrolyzate'),
           dict(ID='pretreatment_wastewater')],
 )
 def create_hot_water_pretreatment_system(
         ins, outs,
         pretreatment_area=200,
-        include_feedstock_handling=True,
         solids_loading=0.305,
         nonsolids=['Water'],
         milling=False,
@@ -106,42 +122,23 @@ def create_hot_water_pretreatment_system(
 
 @bst.SystemFactory(
     ID='AFEX_pretreatment_sys',
-    ins=[dict(ID='switchgrass', # Switchgrass composition by default
-              Arabinan=0.02789023841655421,
-              Galactan=0.010436347278452543,
-              Glucan=0.2717049032838507,
-              Xylan=0.21214574898785432,
-              Mannan=0.005937921727395412,
-              Lignin=0.17112010796221322,
-              Ash=0.016194331983805668,
-              Extractives=0.08457040035987407,
-              Water=0.2,
-              total_flow=104229.16,
-              units='kg/hr',
-              price=0.08)], # Price of switchgrass, table 4, Madhu Khanna et al. (Costs of producing miscanthus and switchgrass for bioenergy in Illinois);  https://www.sciencedirect.com/science/article/pii/S096195340700205X?casa_token=KfYfzJtDwv0AAAAA:OqeJmpofk1kIgFk2DcUvXNG35qYwlWvPKZ7ENI3R6RUKeoahiTDpOhhd_mpLtRthTGuXJKDzMOc
+    ins=[switchgrass], # Price of switchgrass, table 4, Madhu Khanna et al. (Costs of producing miscanthus and switchgrass for bioenergy in Illinois);  https://www.sciencedirect.com/science/article/pii/S096195340700205X?casa_token=KfYfzJtDwv0AAAAA:OqeJmpofk1kIgFk2DcUvXNG35qYwlWvPKZ7ENI3R6RUKeoahiTDpOhhd_mpLtRthTGuXJKDzMOc
     outs=[dict(ID='pretreated_biomass'),],
 )
 def create_ammonia_fiber_expansion_pretreatment_system(
         ins, outs,
-        include_feedstock_handling=True,
         solids_loading=0.20,
         ammonia_loading=2, # g ammonia / g dry feedstock
         T_pretreatment_reactor=273.15 + 100.,
         residence_time=0.5,
         pretreatment_reactions=None,
+        neutralize=True,
     ):
     
     feedstock, = ins
     hydrolyzate, = outs
     
     ammonia = Stream('ammonia', NH3=1, P=12 * 101325, price=price['Ammonia'])
-    sulfuric_acid = Stream('sulfuric_acid',
-                            P=5.4*101325,
-                            T=294.15,
-                            Water=130,
-                            H2SO4=1800,
-                            units='kg/hr',
-                            price=price['Sulfuric acid'])
     warm_process_water = Stream('warm_process_water',
                               T=368.15,
                               P=4.7*101325,
@@ -201,32 +198,129 @@ def create_ammonia_fiber_expansion_pretreatment_system(
         recycle.imass['NH3'] = required_ammonia - NH3_loss
         for i in T201.path_until(M206): i.run()
     
-    P202 = units.HydrolyzatePump('P202', F201-1, thermo=ideal)
-    H2SO4_storage = units.SulfuricAcidStorageTank('H2SO4_storage', sulfuric_acid)
-    T202 = units.SulfuricAcidTank('T202', H2SO4_storage-0)
-    M207 = bst.Mixer('M207', (T202-0, P202-0), hydrolyzate)
+    if neutralize:
+        sulfuric_acid = Stream('sulfuric_acid',
+                                P=5.4*101325,
+                                T=294.15,
+                                Water=130,
+                                H2SO4=1800,
+                                units='kg/hr',
+                                price=price['Sulfuric acid'])
+        P202 = units.HydrolyzatePump('P202', F201-1, thermo=ideal)
+        H2SO4_storage = units.SulfuricAcidStorageTank('H2SO4_storage', sulfuric_acid)
+        T202 = units.SulfuricAcidTank('T202', H2SO4_storage-0)
+        M207 = bst.Mixer('M207', (T202-0, P202-0), hydrolyzate)
+        M207.neutralization_rxn = tmo.Reaction('2 NH3 + H2SO4 -> (NH4)2SO4', 'H2SO4', 1)
+        @M207.add_specification
+        def update_sulfuric_acid_loading():
+            _, feed = M207.ins
+            fresh_sulfuric_acid = H2SO4_storage.ins[0]
+            fresh_sulfuric_acid.imol['H2SO4'] = feed.imol['NH3'] / 2
+            for i in H2SO4_storage.path_until(M207): i.run()
+            M207._run()
+            M207.neutralization_rxn(M207.outs[0])
+    else:
+        P202 = units.HydrolyzatePump('P202', F201-1, hydrolyzate, thermo=ideal)
+        
+@bst.SystemFactory(
+    ID='Alkaline_pretreatment_sys',
+    ins=[switchgrass], 
+    outs=[skw('pretreated_biomass'), skw('filtrate')],
+) # DOI: 10.1002/bbb.2054; Biofuels, Bioprod. Bioref. (2019)
+def create_alkaline_pretreatment_system(
+        ins, outs,
+        solids_loading=0.091, # Liquid solids ratio of 10
+        caustic_loading=1, # g NaOH / g dry feedstock
+        T_pretreatment_reactor=273.15 + 121.,
+        residence_time=1,
+        pretreatment_reactions=None,
+    ):
     
-    M207.neutralization_rxn = tmo.Reaction('2 NH3 + H2SO4 -> (NH4)2SO4', 'H2SO4', 1)
-    @M207.add_specification
-    def update_sulfuric_acid_loading():
-        _, feed = M207.ins
-        fresh_sulfuric_acid = H2SO4_storage.ins[0]
-        fresh_sulfuric_acid.imol['H2SO4'] = feed.imol['NH3'] / 2
-        for i in H2SO4_storage.path_until(M207): i.run()
-        M207._run()
-        M207.neutralization_rxn(M207.outs[0])
+    feedstock, = ins
+    pretreated_biomass, filtrate = outs
+    NaOH = Stream('NaOH', NaOH=1, price=2 * price['Caustic'])
+    sulfuric_acid = Stream('sulfuric_acid',
+                            P=5.4*101325,
+                            T=294.15,
+                            Water=130,
+                            H2SO4=1800,
+                            units='kg/hr',
+                            price=price['Sulfuric acid'])
+    warm_process_water = Stream('warm_process_water',
+                              T=368.15,
+                              P=4.7*101325,
+                              Water=1)
+    pretreatment_steam = Stream('pretreatment_steam',
+                    phase='g',
+                    T=268+273.15,
+                    P=13*101325,
+                    Water=24534+3490,
+                    units='kg/hr')
+    
+    ### Pretreatment system
+    ideal = NaOH.thermo.ideal()
+    T201 = bst.StorageTank('T201', NaOH, tau=7, thermo=ideal)
+    P = pretreatment_steam.chemicals['H2O'].Psat(T_pretreatment_reactor + 25)
+    M202 = bst.SteamMixer('M202', (feedstock, pretreatment_steam, warm_process_water), 
+                          P=P, liquid_IDs=['H2O', 'NaOH'], solids_loading=solids_loading, thermo=ideal)
+    R201 = units.PretreatmentReactorSystem('R201', M202-0, tau=residence_time,
+                                           T=T_pretreatment_reactor, thermo=ideal,
+                                           reactions=pretreatment_reactions,
+                                           run_vle=False)
+    P201 = units.BlowdownDischargePump('P201', R201-1, thermo=ideal)
+    
+    PF1 = bst.PressureFilter(300, P201-0)
+    solids, liquid = PF1.outs
+    M1 = bst.Mixer(300, (solids, 'wash_water'))
+    
+    @M1.add_specification(run=True)
+    def adjust_wash_water():
+        solids, wash_water = M1.ins
+        wash_water.imass['Water'] = solids.F_mass
+        
+    C1 = bst.SolidsCentrifuge(
+        300, M1-0, moisture_content=0.5,
+        split=dict(
+            Glucan=0.99,
+            Xylan=0.99,
+            Arabinan=0.99,
+            Mannan=0.99,
+            Lignin=0.99
+        )
+    )
+    P202 = units.HydrolyzatePump('P202', C1-0, pretreated_biomass, thermo=ideal)
+    M2 = bst.Mixer(300, [C1-1, PF1-1])
+    NF = units.ReverseOsmosis(300,
+        ins=M2-0, outs=[filtrate, ''],
+        moisture_content=0.9,
+        split=0.95,
+    )
+    NF.line = 'Nanofilter'
+    NF.isplit['NaOH'] = 0.10
+    NF.isplit['SolubleLignin'] = 0.60
+
+    M202.ins.extend([NF-1, T201-0])
+    M202.caustic_loading = caustic_loading
+    @M202.add_specification(run=True)
+    def adjust_NaOH():
+        *_, NaOH_recycle, NaOH = M202.ins
+        biomass = M202.ins[0]
+        NaOH_requried = M202.caustic_loading * (biomass.F_mass - biomass.imass['Water', 'Sucrose', 'Glucose'].sum())
+        NaOH_recycled = NaOH_recycle.imass['NaOH']
+        NaOH.imass['NaOH'] = max(
+            NaOH_requried - NaOH_recycled, 0
+        )
     
 
 @bst.SystemFactory(
     ID='dilute_acid_pretreatment_sys',
-    ins=[cornstover_dct],
+    ins=[cornstover],
     outs=[dict(ID='hydrolyzate'),
           dict(ID='pretreatment_wastewater')],
 )
 def create_dilute_acid_pretreatment_system(
         ins, outs,
         pretreatment_area=200,
-        include_feedstock_handling=True,
         solids_loading=0.3,
         nonsolids=default_nonsolids,
     ):

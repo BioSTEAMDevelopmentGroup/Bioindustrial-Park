@@ -19,6 +19,7 @@ from biosteam.units.design_tools import size_batch
 from math import ceil
 import thermosteam as tmo
 import biosteam as bst
+from math import exp, log as ln
 
 Rxn = tmo.reaction.Reaction
 ParallelRxn = tmo.reaction.ParallelReaction
@@ -652,14 +653,21 @@ class SimultaneousSaccharificationAndCoFermentation(Unit):
         Design['Reactor duty'] = reactor_duty = self.Hnet
         hu_fermentation(reactor_duty, effluent.T)
 
-# %% Lignin separation
+# %% Pretreatment separations 
 
-@cost('Flow rate', units='kg/hr',
-      S=63, cost=421e3, CE=522, BM=1.8, n=0.6)
-class CIPpackage(bst.Facility):
-    line = 'CIP Package'
-    network_priority = 0
-    _N_ins = 1
-    _N_outs = 1
-    
-        
+# Membrane separation processes. Perry's Chemical Engineer's Handbook 7th Edition. 
+@cost('Flow rate', 'Nanofiltration', kW=18000, S=0.25, units='m3/s',
+      cost=17300, n=0.6, BM=1., CE=bst.units.design_tools.CEPCI_by_year[1996])
+@cost('Annual flow rate', 'Membranes and maintenance', S=1., units='m3/yr',
+      cost=0.13, n=1., BM=1., CE=bst.units.design_tools.CEPCI_by_year[1996],
+      annual=True)
+class ReverseOsmosis(bst.SolidsSeparator):
+    pass
+   
+
+Nanofiltration = ReverseOsmosis
+    # def _cost(self):
+    #     Q = self.ins[0].get_total_flow('gal/day')
+    #     lnQ = ln(Q)
+    #     self.baseline_purchase_costs['Nanofilter'] = exp(0.1258 + 1.802 * lnQ + 0.01775 * lnQ * lnQ)
+
