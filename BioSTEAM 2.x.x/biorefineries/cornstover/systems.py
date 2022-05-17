@@ -225,7 +225,7 @@ def create_ammonia_fiber_expansion_pretreatment_system(
 @bst.SystemFactory(
     ID='Alkaline_pretreatment_sys',
     ins=[switchgrass], 
-    outs=[skw('pretreated_biomass'), skw('filtrate')],
+    outs=[skw('pretreated_biomass'), skw('nanofilter_retentate')],
 ) # DOI: 10.1002/bbb.2054; Biofuels, Bioprod. Bioref. (2019)
 def create_alkaline_pretreatment_system(
         ins, outs,
@@ -237,7 +237,7 @@ def create_alkaline_pretreatment_system(
     ):
     
     feedstock, = ins
-    pretreated_biomass, filtrate = outs
+    pretreated_biomass, nanofilter_retentate = outs
     NaOH = Stream('NaOH', NaOH=1, price=2 * price['Caustic'])
     sulfuric_acid = Stream('sulfuric_acid',
                             P=5.4*101325,
@@ -262,11 +262,13 @@ def create_alkaline_pretreatment_system(
     T201 = bst.StorageTank('T201', NaOH, tau=7, thermo=ideal)
     P = pretreatment_steam.chemicals['H2O'].Psat(T_pretreatment_reactor + 25)
     M202 = bst.SteamMixer('M202', (feedstock, pretreatment_steam, warm_process_water), 
-                          P=P, liquid_IDs=['H2O', 'NaOH'], solids_loading=solids_loading, thermo=ideal)
+                          P=P, T=T_pretreatment_reactor, liquid_IDs=['H2O', 'NaOH'], solids_loading=solids_loading, 
+                          thermo=ideal, solid_IDs=('Glucan', 'Xylan', 'Arabinan', 'Mannan', 'Lignin'))
     R201 = units.PretreatmentReactorSystem('R201', M202-0, tau=residence_time,
-                                           T=T_pretreatment_reactor, thermo=ideal,
+                                           T=None, thermo=ideal,
                                            reactions=pretreatment_reactions,
-                                           run_vle=False)
+                                           run_vle=True)
+    
     P201 = units.BlowdownDischargePump('P201', R201-1, thermo=ideal)
     
     PF1 = bst.PressureFilter(300, P201-0)
@@ -280,26 +282,16 @@ def create_alkaline_pretreatment_system(
         
     C1 = bst.SolidsCentrifuge(
         300, M1-0, moisture_content=0.5,
-        split=dict(
-            Glucan=0.99,
-            Xylan=0.99,
-            Arabinan=0.99,
-            Mannan=0.99,
-            Lignin=0.99
-        )
+        split=PF1.split,
     )
+    C1.isplit['Glucan', 'Xylan', 'Arabinan', 'Mannan', 'Lignin'] = 0.99
     P202 = units.HydrolyzatePump('P202', C1-0, pretreated_biomass, thermo=ideal)
     M2 = bst.Mixer(300, [C1-1, PF1-1])
-    NF = units.ReverseOsmosis(300,
-        ins=M2-0, outs=[filtrate, ''],
-        moisture_content=0.9,
-        split=0.95,
+    NF = units.Nanofilter(300,
+        ins=M2-0, outs=['', nanofilter_retentate],
     )
-    NF.line = 'Nanofilter'
-    NF.isplit['NaOH'] = 0.10
-    NF.isplit['SolubleLignin'] = 0.60
-
-    M202.ins.extend([NF-1, T201-0])
+    
+    M202.ins.extend([NF-0, T201-0])
     M202.caustic_loading = caustic_loading
     @M202.add_specification(run=True)
     def adjust_NaOH():
@@ -361,7 +353,7 @@ def create_dilute_acid_pretreatment_system(
     T201 = units.SulfuricAcidTank(f'T{n+1}', H2SO4_storage-0)
     M201 = units.SulfuricAcidMixer(f'M{n+1}', (warm_process_water_1, T201-0))
     M203 = bst.SteamMixer(f'M{n+3}', (feedstock, pretreatment_steam, warm_process_water_2, M201-0),
-                          P=5.5*101325, solids_loading=solids_loading)
+                          P=5.5*101325, T=158 + 273.15, solids_loading=solids_loading)
     R201 = units.PretreatmentReactorSystem(f'R{n+1}', M203-0)
     P201 = units.BlowdownDischargePump(f'P{n+1}', R201-1)
     T202 = units.OligomerConversionTank(f'T{n+2}', P201-0)
