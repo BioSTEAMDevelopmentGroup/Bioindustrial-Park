@@ -267,9 +267,9 @@ def create_alkaline_pretreatment_system(
     R201 = units.PretreatmentReactorSystem('R201', M202-0, tau=residence_time,
                                            T=None, thermo=ideal,
                                            reactions=pretreatment_reactions,
-                                           run_vle=True)
-    
-    P201 = units.BlowdownDischargePump('P201', R201-1, thermo=ideal)
+                                           run_vle=False)
+    H1 = bst.HXutility(200, ins=R201-1, T=368, V=0)
+    P201 = units.BlowdownDischargePump('P201', H1-0, thermo=ideal)
     
     PF1 = bst.PressureFilter(300, P201-0)
     solids, liquid = PF1.outs
