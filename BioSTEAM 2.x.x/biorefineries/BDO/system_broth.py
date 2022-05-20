@@ -90,7 +90,9 @@ get_flow_tpd = lambda: (feedstock.F_mass-feedstock.imass['H2O'])*24/907.185
 u = F.unit
 s = F.stream
 # globals().update(F.to_dict())
+
 exclude_product_storage_costs = True
+
 if exclude_product_storage_costs:
     u.T601._cost = lambda: None
     
@@ -193,7 +195,7 @@ def get_conc_aqueous_broth_MPSP():
     
     for i in range(3):
         conc_aqueous_broth.price = BDO_tea.solve_price(conc_aqueous_broth)
-    return conc_aqueous_broth.price
+    return conc_aqueous_broth.price*conc_aqueous_broth.F_mass/conc_aqueous_broth.imass['BDO']
 
 M401, F401 = flowsheet('M401'), flowsheet('F401')
 def set_target_BDO_x(target_BDO_x):
@@ -317,7 +319,8 @@ get_electricity_GWP = lambda: get_electricity_use()*CFs['GWP_CFs']['Electricity'
 get_fixed_GWP = lambda: \
     conc_aqueous_broth.get_atomic_flow('C')*BDO_chemicals.CO2.MW/conc_aqueous_broth.F_mass
 
-get_GWP = lambda: get_material_GWP()+get_non_bio_GWP()+get_electricity_GWP() - get_Isobutanol_GWP()
+get_GWP = lambda: (conc_aqueous_broth.F_mass/conc_aqueous_broth.imass['BDO'])*\
+    (get_material_GWP()+get_non_bio_GWP()+get_electricity_GWP() - get_Isobutanol_GWP())
 
 # Fossil energy consumption (FEC) from materials
 def get_material_FEC():
@@ -331,7 +334,8 @@ get_electricity_FEC = lambda: \
     get_electricity_use()*CFs['FEC_CFs']['Electricity']/conc_aqueous_broth.F_mass
 
 # Total FEC
-get_FEC = lambda: get_material_FEC() + get_electricity_FEC() - get_Isobutanol_FEC()
+get_FEC = lambda: (conc_aqueous_broth.F_mass/conc_aqueous_broth.imass['BDO'])*\
+    (get_material_FEC() + get_electricity_FEC() - get_Isobutanol_FEC())
 
 get_SPED = lambda: u.BT.system_heating_demand*0.001/conc_aqueous_broth.F_mass
 conc_aqueous_broth_LHV = 31.45 # MJ/kg conc_aqueous_broth
@@ -415,9 +419,9 @@ def simulate_and_print():
     # print_specs()
     # print_capital_cost()
     print(f'MPSP is ${get_conc_aqueous_broth_MPSP():.3f}/kg')
-    print(f'GWP is {BDO_lca.GWP:.3f} kg CO2-eq/kg conc_aqueous_broth')
+    print(f"GWP is {(conc_aqueous_broth.F_mass/conc_aqueous_broth.imass['BDO'])*BDO_lca.GWP:.3f} kg CO2-eq/kg conc_aqueous_broth")
     # print(f'Non-bio GWP is {():.3f} kg CO2-eq/kg conc_aqueous_broth')
-    print(f'FEC is {BDO_lca.FEC:.2f} MJ/kg conc_aqueous_broth or {get_FEC()/conc_aqueous_broth_LHV:.2f} MJ/MJ conc_aqueous_broth')
+    print(f"FEC is {(conc_aqueous_broth.F_mass/conc_aqueous_broth.imass['BDO'])*BDO_lca.FEC:.2f} MJ/kg conc_aqueous_broth or {get_FEC()/conc_aqueous_broth_LHV:.2f} MJ/MJ conc_aqueous_broth")
     # print(f'SPED is {get_SPED():.2f} MJ/kg conc_aqueous_broth or {get_SPED()/conc_aqueous_broth_LHV:.2f} MJ/MJ conc_aqueous_broth')
     print('--------------------\n')
 
