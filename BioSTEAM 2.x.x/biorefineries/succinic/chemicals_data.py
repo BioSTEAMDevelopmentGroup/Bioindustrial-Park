@@ -269,6 +269,7 @@ for i in DHL.get_missing_properties():
 
 # TAL.Cn.l.add_method(tmo.Chemical('Succinic acid').Cn.l)
 
+SuccinicAcid = chemical_database(ID='SuccinicAcid', search_ID='Succinic acid')
 
 SA = Sorbicacid =  chemical_database(ID='SorbicAcid', search_ID='Sorbic acid')
 
@@ -531,7 +532,7 @@ combustibles.extend(['WWTsludge','NH3', 'NitricOxide', 'CarbonMonoxide', 'H2S', 
 phase_change_chemicals = ['H2O', 'Denaturant',
                           'AceticAcid', 'Ethanol',
                           'Furfural',
-                          # 'SuccinicAcid', 
+                           'SuccinicAcid', 
                           'HMF',
                            'PD', 
                             'Hexanol',
