@@ -469,8 +469,6 @@ def load(name, cache={}, reduce_chemicals=True,
         for i in ('FGD_lime', 'cellulase', 'DAP', 'CSL', 'caustic'): MockStream(i)
     if number < 0 or number > 2:
         for i in ('catalyst', 'methanol', 'HCl', 'NaOH', 'crude_glycerol', 'pure_glycerine'): MockStream(i)
-    # if abs(number) not in (1, 3):
-    #     MockStream('dryer_natural_gas')
         
     set_GWPCF(feedstock, 'sugarcane')
     set_GWPCF(s.H3PO4, 'H3PO4')
@@ -598,9 +596,11 @@ def load(name, cache={}, reduce_chemicals=True,
     def set_cellulase_price(price):
         if abs(number) in (2, 4): s.cellulase.price = price
     
+    cellulase_mixer, = [i for i in flowsheet.unit if hasattr(i, 'enzyme_loading')]
+    
     @default(0.02, units='wt. % cellulose', element='cellulase')
     def set_cellulase_loading(cellulase_loading):
-        if abs(number) in (2, 4): u.M302.cellulase_loading = cellulase_loading
+        if abs(number) in (2, 4): cellulase_mixer.enzyme_loading = cellulase_loading
     
     @default(PRS_cost_item.cost, units='million USD', element='Pretreatment reactor system')
     def set_reactor_base_cost(base_cost):
