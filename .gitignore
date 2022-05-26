@@ -31,11 +31,11 @@ docs/_templates/*
 
 # Data #
 ########
-**.xlsx
-**.png
-**.jpeg
-**.svg
-**.npy
+*.xlsx
+*.png
+*.jpeg
+*.svg
+*.npy
 
 # Compiled source #
 ###################
