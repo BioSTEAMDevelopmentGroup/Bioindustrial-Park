@@ -28,6 +28,14 @@ docs/_build/*
 docs/_static/*
 docs/_templates/*
 
+# Data #
+########
+*.xlsx
+*.png
+*.jpeg
+*.svg
+*.npy
+
 # Compiled source #
 ###################
 *.com
