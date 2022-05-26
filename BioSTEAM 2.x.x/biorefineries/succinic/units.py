@@ -3,17 +3,12 @@
 """
 Created on Sun Aug 23 12:11:15 2020
 
-All units are explicitly defined here for transparency and easy reference
-
-@author: sarangbhagwat
-
 This module is a modified implementation of modules from the following:
 [1]	Bhagwat et al., Sustainable Production of Acrylic Acid via 3-Hydroxypropionic Acid from Lignocellulosic Biomass. ACS Sustainable Chem. Eng. 2021, 9 (49), 16659–16669. https://doi.org/10.1021/acssuschemeng.1c05441
 [2]	Li et al., Sustainable Lactic Acid Production from Lignocellulosic Biomass. ACS Sustainable Chem. Eng. 2021, 9 (3), 1341–1351. https://doi.org/10.1021/acssuschemeng.0c08055
 [3]	Cortes-Peña et al., BioSTEAM: A Fast and Flexible Platform for the Design, Simulation, and Techno-Economic Analysis of Biorefineries under Uncertainty. ACS Sustainable Chem. Eng. 2020, 8 (8), 3302–3310. https://doi.org/10.1021/acssuschemeng.9b07040
 
-All units are explicitly defined here for transparency and easy reference
-
+@author: sarangbhagwat
 """
 
 
@@ -21,26 +16,29 @@ All units are explicitly defined here for transparency and easy reference
 
 import numpy as np
 import thermosteam as tmo
-from math import exp, pi, log
+from math import exp
+from warnings import warn
 from flexsolve import aitken_secant
-from biosteam import Unit, BatchCrystallizer
+from biosteam import Unit
 from biosteam.units import Flash, HXutility, Mixer, MixTank, Pump, \
     SolidsSeparator, StorageTank, LiquidsSplitSettler
 from biosteam.units.decorators import cost
-from biosteam.units.design_tools import CEPCI_by_year as CEPCI
 from thermosteam import Stream, MultiStream
-from biorefineries.TAL.process_settings import price
-# from biorefineries.TAL.utils import CEPCI, baseline_feedflow, compute_extra_chemical, adjust_recycle
-from biorefineries.TAL.utils import baseline_feedflow, compute_extra_chemical, adjust_recycle
+from biorefineries.succinic.process_settings import price
+from biorefineries.succinic.utils import CEPCI, baseline_feedflow, compute_extra_chemical, adjust_recycle
+from biorefineries.succinic.chemicals_data import chems
+from biosteam import BatchCrystallizer
+
+tmo.settings.set_thermo(chems)
 
 _kg_per_ton = 907.18474
 _Gcal_2_kJ = 4.184 * 1e6 # (also MMkcal/hr)
 Rxn = tmo.reaction.Reaction
 ParallelRxn = tmo.reaction.ParallelReaction
 
-compute_TAL_titer = lambda effluent: effluent.imass['TAL'] / effluent.F_vol
+compute_succinic_acid_titer = lambda effluent: effluent.imass['SuccinicAcid'] / effluent.F_vol
 
-compute_TAL_mass = lambda effluent: effluent.imass['TAL']
+compute_succinic_acid_mass = lambda effluent: effluent.imass['SuccinicAcid']
 
 
 # %% 
@@ -337,126 +335,6 @@ class EnzymeHydrolysateMixer(Mixer):
 
 # # Saccharification and co-fermentation (both Glucose & Xylose are used in fermentation)
 # # Not including heat exchanger as saccharificatoin and co-fermentation 
-# # are at the same temperature now
-# # !!! But inlet is not at T=50+273.15; how is it brought to this temperature?
-
-# @cost(basis='Saccharification tank size', ID='Saccharification tanks', units='kg',
-#       cost=3840000, S=421776*24, CE=CEPCI[2009], n=0.7, BM=2)
-# @cost(basis='Slurry flow rate', ID='Saccharification transfer pumps', units='kg/hr',
-#       kW=74.57, cost=47200, S=421776*24, CE=CEPCI[2009], n=0.8, BM=2.3)
-# @cost(basis='Fermenter size', ID='Fermentors', units='kg',
-#       cost=10128000, S=(42607+443391+948+116)*(60+36), CE=CEPCI[2009], n=1, BM=1.5)
-# @cost(basis='Fermenter size', ID='Agitators', units='kg',
-#       # Scaling basis based on sum of all streams into fermenter
-#       # (304, 306, 311, and 312 in Humbird et al.)
-#       # and total residence time (batch hydrolysis and fermentation)
-#       kW=22.371, cost=52500, S=(42607+443391+948+116)*(60+36), CE=CEPCI[2009], n=1, BM=1.5)
-# @cost(basis='Recirculation flow rate', ID='Recirculation pumps', units='kg/hr',
-#       # Scaling basis based on sum of all streams into fermenter
-#       # (304, 306, 311, and 312 in Humbird et al.)
-#       kW=74.57, cost=47200, S=(42607+443391+948+116), CE=CEPCI[2009], n=0.8, BM=2.3)
-
-# class SaccharificationAndCoFermentation(Unit):    
-#     _N_ins = 2
-#     _N_outs = 2
-#     _units= {'Saccharification tank size': 'kg',
-#              'Slurry flow rate': 'kg/hr',
-#              'Fermenter size': 'kg',
-#              'Recirculation flow rate': 'kg/hr'}             
-    
-#     # Residence time of countinuous saccharification tanks (hr)
-#     tau_saccharification = 24
-    
-#     # Co-Fermentation time (hr)
-#     tau_cofermentation = 120
-    
-#     # Equals the split of saccharified slurry to seed train
-#     inoculum_ratio = 0.07
-    
-#     CSL_loading = 10 # kg/m3
-    
-#     def __init__(self, ID='', ins=None, outs=(), T=50+273.15):
-#         Unit.__init__(self, ID, ins, outs)
-#         # Same T for saccharificatoin and co-fermentation
-#         self.T = T
-        
-#         # Based on Table 9 on Page 28 of Humbird et al.
-#         self.saccharification_rxns = ParallelRxn([
-#             #   Reaction definition                   Reactant        Conversion
-#             Rxn('Glucan -> GlucoseOligomer',          'Glucan',         0.04),
-#             Rxn('Glucan + 0.5 H2O -> 0.5 Cellobiose', 'Glucan',         0.012),
-#             Rxn('Glucan + H2O -> Glucose',            'Glucan',         0.85),
-#             Rxn('Cellobiose + H2O -> 2 Glucose',      'Cellobiose',     1)
-#             ])
-        
-#         self.saccharified_stream = Stream(None)
-        
-#         # FermMicrobe reaction from Table 14 on Page 31 of Humbird et al.
-#         self.cofermentation_rxns = ParallelRxn([
-#         #      Reaction definition            Reactant    Conversion
-#         Rxn('Glucose -> TAL',        'Glucose',   .9099),
-#         # Rxn('Glucose -> 2,3-Butanediol',        'Glucose',   0.666),
-#         Rxn('Glucose -> AceticAcid',               'Glucose',   0.07),
-#         Rxn('Glucose -> 6 FermMicrobe',       'Glucose',   0.02),
-#         Rxn('Xylose -> TAL',       'Xylose',    0.9099),
-#         Rxn('Xylose -> AceticAcid',       'Xylose',    0.07),
-#         Rxn('Xylose -> 5 FermMicrobe',        'Xylose',    0.02),
-#         ])
-        
-#         self.glucose_to_TAL_rxn = self.cofermentation_rxns[0]
-#         self.xylose_to_TAL_rxn = self.cofermentation_rxns[3]
-        
-#         # Neutralization of lactic acid and acetic acid by lime (Ca(OH)2)
-#         # self.neutralization_rxns = ParallelRxn([
-#         # #   Reaction definition                                               Reactant  Conversion
-#         # Rxn('2 LacticAcid + CalciumDihydroxide -> CalciumLactate + 2 H2O',  'LacticAcid',   1),
-#         # Rxn('2 AceticAcid + CalciumDihydroxide -> CalciumAcetate + 2 H2O',  'AceticAcid',   1),
-#         # Rxn('SuccinicAcid + CalciumDihydroxide -> CalciumSuccinate + 2H2O', 'SuccinicAcid', 1)
-#         #     ])
-
-#     def _run(self):
-#         feed, CSL = self.ins
-#         effluent, sidedraw = self.outs
-#         ss = self.saccharified_stream
-#         ss.T = sidedraw.T = effluent.T = self.T
-        
-#         ss.copy_like(feed)
-#         CSL.imass['CSL'] = feed.F_vol * self.CSL_loading 
-#         ss.mol += CSL.mol
-#         self.saccharification_rxns(ss.mol)
-#         # Sidedraw to SeedTrain
-#         sidedraw.mol = ss.mol * self.inoculum_ratio
-#         effluent.mol = ss.mol - sidedraw.mol
-        
-#         self.cofermentation_rxns(effluent.mol)
-#         effluent.imass['CSL'] = 0
-        
-#         # Set feed lime mol to match rate of acids production, add 5% extra
-#         # lime.imol['Lime'] = (effluent.imol['LacticAcid']/2/self.neutralization_rxns.X[0] \
-#         #                     +effluent.imol['AceticAcid']/2/self.neutralization_rxns.X[1] \
-#         #                     +effluent.imol['SuccinicAcid']/self.neutralization_rxns.X[2]) \
-#         #                     * 1.05
-#         # effluent.mol += lime.mol
-#         # self.neutralization_rxns(effluent.mol)
-        
-#         # !!! Temporary alteration for 2,3-TAL production
-#         # Rxns. can't parse chemical strings with ",", "-"
-#         # effluent.imol['2,3-Butanediol'] = effluent.imol['LacticAcid']
-#         # effluent.imol['LacticAcid'] = 0
-        
-#         # effluent.imass['LacticAcid'] = 0
-#         # effluent.imass['AceticAcid'] = (8/1000) * effluent.imass['H2O']
-#         # effluent.imass['2,3-Butanediol'] = (109.9/1000) * effluent.imass['H2O']
-#         # effluent.imass['Glucose'] = 1.5 * effluent.F_vol
-#         # effluent.imass['Xylose'] = 1.5 * effluent.F_vol
-        
-#     def _design(self):
-#         Design = self.design_results
-#         total_mass_flow = self.ins[0].F_mass + self.ins[1].F_mass
-#         Design['Saccharification tank size'] = total_mass_flow * self.tau_saccharification
-#         Design['Slurry flow rate'] = total_mass_flow
-#         Design['Fermenter size'] = self.outs[0].F_mass * self.tau_cofermentation
-#         Design['Recirculation flow rate'] = total_mass_flow
 
 
 
@@ -532,7 +410,7 @@ class Saccharification(Unit):
       kW=74.57, cost=47200, S=(42607+443391+948+116), CE=CEPCI[2009], n=0.8, BM=2.3)
 
 class CoFermentation(Unit):    
-    _N_ins = 3
+    _N_ins = 4
     _N_outs = 2
     _units= {'Fermenter size': 'kg',
              'Recirculation flow rate': 'kg/hr'}             
@@ -552,42 +430,29 @@ class CoFermentation(Unit):
 
         self.cofermentation_rxns = ParallelRxn([
         #      Reaction definition            Reactant    Conversion
-        Rxn('Glucose -> 0.6667 TAL + 2 CO2',        'Glucose',   0.19), 
-        Rxn('Glucose -> 0.2143 VitaminA',               'Glucose',   1e-8), # retinol
-        Rxn('Glucose -> 0.3 VitaminD2',               'Glucose',   1e-8), # ergosterol
+        Rxn('Glucose + 2 CO2 -> 2 SuccinicAcid + 2 O2',        'Glucose',   0.8), 
+        Rxn('Glucose -> 3 AceticAcid',               'Glucose',   1e-8),
+        Rxn('Glucose -> 2 Ethanol + 2 CO2',               'Glucose',   1e-8),
         Rxn('Glucose -> 6 FermMicrobe',       'Glucose',   0.05),
         
-        Rxn('Xylose -> 0.555583 TAL + 1.3334 CO2',       'Xylose',    0.19),
-        Rxn('Xylose -> 0.17856 VitaminA',       'Xylose',    1e-8),
-        Rxn('Xylose -> 0.25 VitaminD2',       'Xylose',    1e-8),
+        Rxn('Xylose + 1.667 CO2 -> 1.667 SuccinicAcid + 0.833 O2',       'Xylose',    0.8),
+        Rxn('Xylose -> 2.5 AceticAcid',       'Xylose',    1e-8),
+        Rxn('Xylose -> 1.667 Ethanol + 1.667 CO2',       'Xylose',    1e-8),
         Rxn('Xylose -> 5 FermMicrobe',        'Xylose',    0.05),
         ])
-        
-        # self.cofermentation_rxns = ParallelRxn([
-        # #      Reaction definition            Reactant    Conversion
-        # Rxn('Glucose -> TAL',        'Glucose',   .99), 
-        # Rxn('Glucose -> VitaminA',               'Glucose',   0.001), # retinol
-        # Rxn('Glucose -> VitaminD2',               'Glucose',   0.001), # ergosterol
-        # Rxn('Glucose -> 6 FermMicrobe',       'Glucose',   0.00025),
-        
-        # Rxn('Xylose -> TAL',       'Xylose',    0.99*0.8),
-        # Rxn('Xylose -> VitaminA',       'Xylose',    0.001*0.8),
-        # Rxn('Xylose -> VitaminD2',       'Xylose',    0.001*0.8),
-        # Rxn('Xylose -> 5 FermMicrobe',        'Xylose',    0.00025*0.8),
-        # ])
-        
+
         self.CO2_generation_rxns = ParallelRxn([
             Rxn('Glucose -> 6CO2 + 6H2O', 'Glucose', 1.),
             Rxn('Xylose -> 5CO2 + 5H2O', 'Xylose', 1.)])
         
-        self.glucose_to_TAL_rxn = self.cofermentation_rxns[0]
-        self.xylose_to_TAL_rxn = self.cofermentation_rxns[4]
+        self.glucose_to_succinic_acid_rxn = self.cofermentation_rxns[0]
+        self.xylose_to_succinic_acid_rxn = self.cofermentation_rxns[4]
         
-        self.glucose_to_VitaminA_rxn = self.cofermentation_rxns[1]
-        self.xylose_to_VitaminA_rxn = self.cofermentation_rxns[5]
+        self.glucose_to_acetic_acid_rxn = self.cofermentation_rxns[1]
+        self.xylose_to_acetic_acid_rxn = self.cofermentation_rxns[5]
         
-        self.glucose_to_VitaminD2_rxn = self.cofermentation_rxns[2]
-        self.xylose_to_VitaminD2_rxn = self.cofermentation_rxns[6]
+        self.glucose_to_ethanol_rxn = self.cofermentation_rxns[2]
+        self.xylose_to_ethanol_rxn = self.cofermentation_rxns[6]
         
         self.glucose_to_microbe_rxn = self.cofermentation_rxns[3]
         self.xylose_to_microbe_rxn = self.cofermentation_rxns[7]
@@ -606,26 +471,31 @@ class CoFermentation(Unit):
         #     ])
 
     def _run(self):
-        feed, sugars, CSL = self.ins
+        feed, sugars, CSL, CO2 = self.ins
         
         effluent, vapor = self.outs
         effluent.mix_from([feed, sugars])
+        
+        CO2.imol['CO2'] = 2 * self.glucose_to_succinic_acid_rxn.X * effluent.imol['Glucose']\
+            + 1.667 * self.xylose_to_succinic_acid_rxn.X * effluent.imol['Xylose']
+        
+        effluent.mix_from([effluent, CO2])
         # ss = Stream(None)
         # effluent.copy_like(feed)
         effluent.T = vapor.T = self.T
         CSL.imass['CSL'] = (sugars.F_vol+feed.F_vol) * self.CSL_loading 
         
         self.cofermentation_rxns(effluent.mol)
-        vapor.imol['CO2'] = effluent.imol['CO2']
+        vapor.imol['CO2', 'O2'] = effluent.imol['CO2', 'O2']
         vapor.phase = 'g'
         
         self.CO2_generation_rxns(effluent.mol)
         
-        vapor = effluent.imol['CO2']
         effluent.imol['CO2'] = 0
+        effluent.imol['O2'] = 0
         effluent.imass['CSL'] = 0
         
-        self.effluent_titer = compute_TAL_titer(effluent)
+        self.effluent_titer = compute_succinic_acid_titer(effluent)
         
     def _design(self):
         Design = self.design_results
@@ -654,7 +524,7 @@ class CoFermentation(Unit):
 @cost(basis='Flow rate', ID='Pumps', units='kg/hr',
       kW=59.656, cost=24300, S=43149, CE=CEPCI[2009], n=0.8, BM=2.3)
 class SeedTrain(Unit):
-    _N_ins = 1
+    _N_ins = 2
     _N_outs = 2
     _units= {'Seed fermenter size': 'kg',
              'Flow rate': 'kg/hr'}
@@ -671,44 +541,29 @@ class SeedTrain(Unit):
 
         self.cofermentation_rxns = ParallelRxn([
         #      Reaction definition            Reactant    Conversion
-        Rxn('Glucose -> 0.6667 TAL + 2 CO2',        'Glucose',   .19), 
-        Rxn('Glucose -> 0.2143 VitaminA',               'Glucose',   1e-8), # retinol
-        Rxn('Glucose -> 0.3 VitaminD2',               'Glucose',   1e-8), # ergosterol
+        Rxn('Glucose + 2 CO2 -> 2 SuccinicAcid + 2 O2',        'Glucose',   0.8), 
+        Rxn('Glucose -> 3 AceticAcid',               'Glucose',   1e-8),
+        Rxn('Glucose -> 2 Ethanol + 2 CO2',               'Glucose',   1e-8),
         Rxn('Glucose -> 6 FermMicrobe',       'Glucose',   0.05),
         
-        Rxn('Xylose -> 0.555583 TAL + 1.3334 CO2',       'Xylose',    0.19),
-        Rxn('Xylose -> 0.17856 VitaminA',       'Xylose',    1e-8),
-        Rxn('Xylose -> 0.25 VitaminD2',       'Xylose',    1e-8),
+        Rxn('Xylose + 1.667 CO2 -> 1.667 SuccinicAcid + 0.833 O2',       'Xylose',    0.8),
+        Rxn('Xylose -> 2.5 AceticAcid',       'Xylose',    1e-8),
+        Rxn('Xylose -> 1.667 Ethanol + 1.667 CO2',       'Xylose',    1e-8),
         Rxn('Xylose -> 5 FermMicrobe',        'Xylose',    0.05),
         ])
-        
-        self.cofermentation_rxns.X *= ferm_ratio
-        
-        # self.cofermentation_rxns = ParallelRxn([
-        # #      Reaction definition            Reactant    Conversion
-        # Rxn('Glucose -> TAL',        'Glucose',   .99), 
-        # Rxn('Glucose -> VitaminA',               'Glucose',   0.001), # retinol
-        # Rxn('Glucose -> VitaminD2',               'Glucose',   0.001), # ergosterol
-        # Rxn('Glucose -> 6 FermMicrobe',       'Glucose',   0.00025),
-        
-        # Rxn('Xylose -> TAL',       'Xylose',    0.99*0.8),
-        # Rxn('Xylose -> VitaminA',       'Xylose',    0.001*0.8),
-        # Rxn('Xylose -> VitaminD2',       'Xylose',    0.001*0.8),
-        # Rxn('Xylose -> 5 FermMicrobe',        'Xylose',    0.00025*0.8),
-        # ])
-        
+
         self.CO2_generation_rxns = ParallelRxn([
             Rxn('Glucose -> 6CO2 + 6H2O', 'Glucose', 1.),
             Rxn('Xylose -> 5CO2 + 5H2O', 'Xylose', 1.)])
         
-        self.glucose_to_TAL_rxn = self.cofermentation_rxns[0]
-        self.xylose_to_TAL_rxn = self.cofermentation_rxns[4]
+        self.glucose_to_succinic_acid_rxn = self.cofermentation_rxns[0]
+        self.xylose_to_succinic_acid_rxn = self.cofermentation_rxns[4]
         
-        self.glucose_to_VitaminA_rxn = self.cofermentation_rxns[1]
-        self.xylose_to_VitaminA_rxn = self.cofermentation_rxns[5]
+        self.glucose_to_acetic_acid_rxn = self.cofermentation_rxns[1]
+        self.xylose_to_acetic_acid_rxn = self.cofermentation_rxns[5]
         
-        self.glucose_to_VitaminD2_rxn = self.cofermentation_rxns[2]
-        self.xylose_to_VitaminD2_rxn = self.cofermentation_rxns[6]
+        self.glucose_to_ethanol_rxn = self.cofermentation_rxns[2]
+        self.xylose_to_ethanol_rxn = self.cofermentation_rxns[6]
         
         self.glucose_to_microbe_rxn = self.cofermentation_rxns[3]
         self.xylose_to_microbe_rxn = self.cofermentation_rxns[7]
@@ -717,24 +572,29 @@ class SeedTrain(Unit):
         self.xylose_to_CO2_rxn = self.CO2_generation_rxns[1]
         
     def _run(self):
-        feed = self.ins[0]
-        effluent, CO2 = self.outs
-        effluent.copy_like(feed)
-        CO2.phase = 'g'
+        feed, CO2 = self.ins
         
-        if 'Sucrose' in effluent.available_chemicals:
-            self.sucrose_hydrolysis_rxn.force_reaction(effluent)
-            if effluent.imol['Water'] < 0.: effluent.imol['Water'] = 0.
+        effluent, vapor = self.outs
+        # effluent.mix_from([feed, CO2])
+        
+        CO2.imol['CO2'] = 2 * self.glucose_to_succinic_acid_rxn.X * feed.imol['Glucose']\
+            + 1.667 * self.xylose_to_succinic_acid_rxn.X * feed.imol['Xylose']
+        
+        effluent.mix_from([feed, CO2])
+        # ss = Stream(None)
+        # effluent.copy_like(feed)
+        effluent.T = vapor.T = self.T
+        # CSL.imass['CSL'] = (sugars.F_vol+feed.F_vol) * self.CSL_loading 
         
         self.cofermentation_rxns(effluent.mol)
+        vapor.imol['CO2', 'O2'] = effluent.imol['CO2', 'O2']
+        vapor.phase = 'g'
+        
         self.CO2_generation_rxns(effluent.mol)
         
-        # Assume all CSL is used up
-        effluent.imass['CSL'] = 0 
-        
-        effluent.T = CO2.T = self.T
-        CO2.imass['CO2'] = effluent.imass['CO2']
-        effluent.imass['CO2'] = 0
+        effluent.imol['CO2'] = 0
+        effluent.imol['O2'] = 0
+        effluent.imass['CSL'] = 0
 
 
     def _design(self):
@@ -1498,7 +1358,7 @@ class AnaerobicDigestion(Unit):
         duty = -(wastewater.H - H_at_35C)
         self.heat_exchanger.simulate_as_auxiliary_exchanger(duty, wastewater)
         
-# class TALLiquidsSplitSettler():
+# class SuccinicAcidLiquidsSplitSettler():
 #     def __init__(self, ID='', ins=None, outs=(), *, part_coeffs = [], solvents = (), split = []):
 #         self.part_coeffs = part_coeffs
         
@@ -1655,7 +1515,7 @@ class SugarsMixer(Mixer):
     _N_ins = 3
     
 # Modified from bst.units.StorageTank, which won't simulate for 0 flow 	
-class TALStorageTank(StorageTank):
+class SuccinicAcidStorageTank(StorageTank):
     def _cost(self):
         if self.ins[0].F_mol == 0:
             self.design_results['Number of tanks'] = 0
@@ -1663,7 +1523,7 @@ class TALStorageTank(StorageTank):
         else: StorageTank._cost(self)
 
 # Modified from bst.units.Pump, which won't simulate for 0 flow 
-class TALPump(Pump):
+class SuccinicAcidPump(Pump):
     def _design(self):
         if self.ins[0].F_mol == 0:
             Design = self.design_results
@@ -1685,7 +1545,7 @@ class TALPump(Pump):
         else: Pump._cost(self)
         
 
-class TAL_Separation(Unit):
+class SuccinicAcid_Separation(Unit):
     _N_outs = 2
     def _run(self): pass
     def _cost(self): pass
@@ -1694,8 +1554,8 @@ class TAL_Separation(Unit):
 class Adsorption(PressureVessel):
     '''
     Removal of polar compounds (e.g., amino acids, ions) from the stream. The unit
-    is modeled based on description in [1]_. Freundlich isotherm is assumed for TAL
-    based on the constants of catechol [2]_, whose structure is similar to TAL.
+    is modeled based on description in [1]_. Freundlich isotherm is assumed for SuccinicAcid
+    based on the constants of catechol [2]_, whose structure is similar to SuccinicAcid.
     
     .. math:: q_e = K_F * C_e^(1/n)
     
@@ -1786,19 +1646,19 @@ class HydrogenationReactor(Reactor):
     _N_outs = 1
     _F_BM_default = {**Reactor._F_BM_default,
             'AuPd catalyst': 1}
-    mcat_frac = 0.00001 # fraction of catalyst by weight in relation to the reactant (TAL)
+    mcat_frac = 0.00001 # fraction of catalyst by weight in relation to the reactant (SuccinicAcid)
     hydrogenation_rxns = ParallelRxn([
             #   Reaction definition   Reactant   Conversion
-            Rxn('TAL + 2H2 -> HMTHP',         'TAL',   0.7324), # conversion from Huber group experimental data
+            Rxn('SuccinicAcid + 2H2 -> HMTHP',         'SuccinicAcid',   0.7324), # conversion from Huber group experimental data
             Rxn('HMDHP + H2 -> HMTHP',         'HMDHP',   1.-1e-5)
             ])
     byproduct_formation_rxns  = ParallelRxn([
             #   Reaction definition   Reactant   Conversion
-            Rxn('TAL + 3H2 -> DHL + H2O',         'TAL',   0.2125), # conversion from Huber group experimental data
-            Rxn('TAL + H2 -> HMDHP',         'TAL',   1-0.2125),  # conversion from Huber group experimental data
+            Rxn('SuccinicAcid + 3H2 -> DHL + H2O',         'SuccinicAcid',   0.2125), # conversion from Huber group experimental data
+            Rxn('SuccinicAcid + H2 -> HMDHP',         'SuccinicAcid',   1-0.2125),  # conversion from Huber group experimental data
             ])
     
-    TAL_to_SA_rxn = hydrogenation_rxns[0]
+    SuccinicAcid_to_SA_rxn = hydrogenation_rxns[0]
     
     def _run(self):
         feed, recycle, reagent = self.ins
@@ -1806,7 +1666,7 @@ class HydrogenationReactor(Reactor):
         
         # effluent.imol['HMDHP'] += 1e-10
         
-        H2_mol_needed_for_HMTHP_formation = (sum(feed.imol['TAL', 'HMDHP']) + sum(recycle.imol['TAL', 'HMDHP']))*2*self.hydrogenation_rxns[0].X
+        H2_mol_needed_for_HMTHP_formation = (sum(feed.imol['SuccinicAcid', 'HMDHP']) + sum(recycle.imol['SuccinicAcid', 'HMDHP']))*2*self.hydrogenation_rxns[0].X
         reagent.imol['H2'] = 5*H2_mol_needed_for_HMTHP_formation
         reagent.phase = 'g'
         # effluent = feed.copy()
@@ -1828,7 +1688,7 @@ class HydrogenationReactor(Reactor):
     def _cost(self):
         super()._cost()
         self.purchase_costs['AuPd catalyst'] =\
-            self.mcat_frac * self.ins[0].imass['TAL'] * price['AuPd']
+            self.mcat_frac * self.ins[0].imass['SuccinicAcid'] * price['AuPd']
             
 
 class DehydrationReactor(Reactor):
@@ -1839,12 +1699,12 @@ class DehydrationReactor(Reactor):
     _N_outs = 1
     _F_BM_default = {**Reactor._F_BM_default,
             'RaneyNi catalyst': 1}
-    mcat_frac = 0.01 # fraction of catalyst by weight in relation to the reactant (TAL)
+    mcat_frac = 0.01 # fraction of catalyst by weight in relation to the reactant (SuccinicAcid)
     dehydration_rxns = ParallelRxn([
             #   Reaction definition                                       Reactant   Conversion
             Rxn('HMTHP -> PSA',         'HMTHP',   1.-1e-5) # conversion from Chia et al. 2012
                 ])
-    TAL_to_SA_rxn = dehydration_rxns[0]
+    SuccinicAcid_to_SA_rxn = dehydration_rxns[0]
     
     def _run(self):
         feed, recycle = self.ins
@@ -1870,7 +1730,7 @@ class RingOpeningReactor(Reactor):
     _N_outs = 1
     _F_BM_default = {**Reactor._F_BM_default,
             'RaneyNi catalyst': 1}
-    mcat_frac = 0.01 # fraction of catalyst by weight in relation to the reactant (TAL)
+    mcat_frac = 0.01 # fraction of catalyst by weight in relation to the reactant (SuccinicAcid)
     ring_opening_rxns = ParallelRxn([
             #   Reaction definition                                       Reactant   Conversion
             Rxn('PSA -> SA',         'PSA',   0.667) # conversion from Chia et al. 2012
@@ -1905,12 +1765,12 @@ class DehydrationRingOpeningReactor(Reactor):
     _N_outs = 1
     _F_BM_default = {**Reactor._F_BM_default,
             'RaneyNi catalyst': 1}
-    mcat_frac = 0.01 # fraction of catalyst by weight in relation to the reactant (TAL)
+    mcat_frac = 0.01 # fraction of catalyst by weight in relation to the reactant (SuccinicAcid)
     dehydration_rxns = ParallelRxn([
             #   Reaction definition                                       Reactant   Conversion
             Rxn('HMTHP -> SA',         'HMTHP',   0.667) # conversion from Chia et al. 2012
                 ])
-    TAL_to_SA_rxn = dehydration_rxns[0]
+    SuccinicAcid_to_SA_rxn = dehydration_rxns[0]
     
     def _run(self):
         feed, recycle = self.ins
@@ -1937,12 +1797,12 @@ class HydrolysisReactor(Reactor):
     _N_outs = 1
     _F_BM_default = {**Reactor._F_BM_default,
             'Amberlyst15 catalyst': 1}
-    mcat_frac = 0.01 # fraction of catalyst by weight in relation to the reactant (TAL)
+    mcat_frac = 0.01 # fraction of catalyst by weight in relation to the reactant (SuccinicAcid)
     hydrolysis_rxns = ParallelRxn([
             #   Reaction definition                                       Reactant   Conversion
             Rxn('SA + KOH -> KSA + H2O',         'SA',   1.) # not mentioned in Viswanathan et al. 2020
                 ])
-    TAL_to_SA_rxn = hydrolysis_rxns[0]
+    SuccinicAcid_to_SA_rxn = hydrolysis_rxns[0]
     
     def _run(self):
         feed, recycle, reagent = self.ins
@@ -1970,7 +1830,7 @@ class Crystallization(Reactor):
             #   Reaction definition                                       Reactant   Conversion
             Rxn('KSA + HCl -> SA + KCl',         'KSA',   0.98)
                 ])
-    TAL_to_SA_rxn = dehydration_rxns[0]
+    SuccinicAcid_to_SA_rxn = dehydration_rxns[0]
     
     def __init__(self, ID='', ins=None, outs=(), tau=1., T=293.15, reagent_fraction=1.):
         Reactor.__init__(self, ID, ins, outs, tau=tau)
@@ -2012,7 +1872,7 @@ class HClKOHRecovery(Reactor):
             #   Reaction definition                                       Reactant   Conversion
             Rxn('KCl + H2O -> HCl + KOH',         'KCl',   1.)
                 ])
-    TAL_to_SA_rxn = dehydration_rxns[0]
+    SuccinicAcid_to_SA_rxn = dehydration_rxns[0]
     
     def _run(self):
         feed, reagent = self.ins
