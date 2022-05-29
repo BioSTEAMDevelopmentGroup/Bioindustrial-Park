@@ -1,11 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# BioSTEAM: The Biorefinery Simulation and Techno-Economic Analysis Modules
-# Copyright (C) 2020-2021, Yoel Cortes-Pena <yoelcortes@gmail.com>
 # Bioindustrial-Park: BioSTEAM's Premier Biorefinery Models and Results
-# Copyright (C) 2020-2021, Yalin Li <mailto.yalin.li@gmail.com> (this biorefinery)
-# 
-# This module is under the UIUC open-source license. See 
+# Copyright (C) 2020-, Yalin Li <mailto.yalin.li@gmail.com>
+#
+# This module is under the UIUC open-source license. See
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
 # for license details.
 
@@ -13,14 +11,14 @@
 '''
 References
 ----------
-[1] Humbird et al., Process Design and Economics for Biochemical Conversion of 
-    Lignocellulosic Biomass to Ethanol: Dilute-Acid Pretreatment and Enzymatic 
-    Hydrolysis of Corn Stover; Technical Report NREL/TP-5100-47764; 
+[1] Humbird et al., Process Design and Economics for Biochemical Conversion of
+    Lignocellulosic Biomass to Ethanol: Dilute-Acid Pretreatment and Enzymatic
+    Hydrolysis of Corn Stover; Technical Report NREL/TP-5100-47764;
     National Renewable Energy Lab (NREL), 2011.
     https://www.nrel.gov/docs/fy11osti/47764.pdf
-[2] Davis et al., Process Design and Economics for the Conversion of Lignocellulosic 
-    Biomass to Hydrocarbon Fuels and Coproducts: 2018 Biochemical Design Case Update; 
-    NREL/TP-5100-71949; National Renewable Energy Lab (NREL), 2018. 
+[2] Davis et al., Process Design and Economics for the Conversion of Lignocellulosic
+    Biomass to Hydrocarbon Fuels and Coproducts: 2018 Biochemical Design Case Update;
+    NREL/TP-5100-71949; National Renewable Energy Lab (NREL), 2018.
     https://doi.org/10.2172/1483234
 [3] Roni et al., Herbaceous Feedstock 2018 State of Technology Report;
     INL/EXT-18-51654-Rev000; Idaho National Lab. (INL), 2020.
@@ -129,21 +127,21 @@ def create_acid_biorefinery(preprocessed):
     bst.main_flowsheet.set_flowsheet(flowsheet)
     s = flowsheet.stream
     u = flowsheet.unit
-    
+
     feedstock = preprocessed.copy('feedstock')
     feedstock.price = preprocessed.price
     get_feedstock_dry_mass = \
         lambda: feedstock.F_mass - feedstock.imass['H2O']
     get_flow_tpd = \
         lambda: (feedstock.F_mass-feedstock.imass['H2O'])*24/_kg_per_ton
-    
+
     groups = []
     flowsheet, groups = create_acid_pretreatment_process(
         flowsheet, groups, feedstock, get_feedstock_dry_mass)
 
     flowsheet, groups = \
         create_ethanol_process(flowsheet, groups, u.P201-0)
-    
+
     # The last one is reserved for blowdown
     wwt_streams = (u.H201-0, u.D402_P-0, u.S401-1, '')
     flowsheet, groups = \
@@ -164,7 +162,7 @@ def create_acid_biorefinery(preprocessed):
                           CHP_wastes, CHP_biogas, CHP_side_streams,
                           process_water_streams, recycled_water,
                           if_HXN=False, if_BDM=True)
-    
+
     u.T603.outs[0] = s.sulfuric_acid_T201
     u.T604_S.outs[0] = s.ammonia_M205
 
@@ -185,21 +183,21 @@ def create_AFEX_biorefinery(preprocessed, include_adipic_process=False,
     bst.main_flowsheet.set_flowsheet(flowsheet)
     s = flowsheet.stream
     u = flowsheet.unit
-    
+
     feedstock = preprocessed.copy('feedstock')
     feedstock.price = preprocessed.price
     get_flow_tpd = \
         lambda: (feedstock.F_mass-feedstock.imass['H2O'])*24/_kg_per_ton
-    
+
     groups = []
     flowsheet, groups = \
         create_ethanol_process(flowsheet, groups, feedstock)
     u.M301.T = u.R301.T_saccharification
     u.R301.C5_saccharification = True
-    
+
     # An empty filler stream
     black_liquor = bst.Stream('black_liquor')
-    
+
     if include_adipic_process:
         flowsheet, groups = \
             create_adipic_process(flowsheet, groups, black_liquor, u.S401-0)
@@ -220,7 +218,7 @@ def create_AFEX_biorefinery(preprocessed, include_adipic_process=False,
         CHP_wastes1 = (u.S401-0, u.S504-1)
         CHP_biogas = u.R501-0
         process_water_streams = {}
-        
+
     CHP_wastes2 = (u.S506-1, ) if recover_sodium_sulfate else ()
     CHP_wastes = (*CHP_wastes1, *CHP_wastes2)
     CHP_side_streams = ()
@@ -231,7 +229,7 @@ def create_AFEX_biorefinery(preprocessed, include_adipic_process=False,
                           CHP_wastes, CHP_biogas, CHP_side_streams,
                           process_water_streams, recycled_water,
                           if_HXN=False, if_BDM=True)
-    
+
     flowsheet, teas, funcs = create_biorefinery(flowsheet, groups, get_flow_tpd)
 
     return flowsheet, groups, teas, funcs
@@ -254,17 +252,17 @@ def create_base_biorefinery(preprocessed, include_adipic_process=True,
     feedstock.price = preprocessed.price
     get_flow_tpd = \
         lambda: (feedstock.F_mass-feedstock.imass['H2O'])*24/_kg_per_ton
-    
+
     groups = []
     flowsheet, groups = create_base_pretreatment_process(
         flowsheet, groups, feedstock)
-    
+
     flowsheet, groups = \
         create_ethanol_process(flowsheet, groups, u.P202-0)
     u.M301.enzyme_load = 10
     u.M301.solid_loading = 0.25
     u.R301.C5_saccharification = True
-    
+
     if include_adipic_process:
         flowsheet, groups = \
             create_adipic_process(flowsheet, groups, u.P201-0, u.S401-0)
@@ -285,9 +283,9 @@ def create_base_biorefinery(preprocessed, include_adipic_process=True,
         CHP_wastes1 = (u.S401-0, u.S504-1)
         CHP_biogas = u.R501-0
         process_water_streams = {}
-        
+
     CHP_wastes2 = (u.S506-1, ) if recover_sodium_sulfate else ()
-    CHP_wastes = (*CHP_wastes1, *CHP_wastes2)    
+    CHP_wastes = (*CHP_wastes1, *CHP_wastes2)
     CHP_side_streams = ()
     process_water_streams['pretreatment'] = (s.water_R201,)
     process_water_streams['ethanol'] = (s.water_M301, s.water_U401,)
@@ -301,18 +299,3 @@ def create_base_biorefinery(preprocessed, include_adipic_process=True,
     flowsheet, teas, funcs = create_biorefinery(flowsheet, groups, get_flow_tpd)
 
     return flowsheet, groups, teas, funcs
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

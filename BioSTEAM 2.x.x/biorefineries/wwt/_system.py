@@ -60,14 +60,23 @@ def create_comparison_systems(info, functions, sys_dct={}):
     exist_u = exist_f.unit
     exist_s = exist_f.stream
 
+    def get_streams(u_reg, s_reg, infos):
+        streams = []
+        for info in infos:
+            if isinstance(info, str): # stream info given as stream ID
+                streams.append(getattr(s_reg, info))
+            else: # stream info given as source unit ID, # in outs
+                streams.append(getattr(u_reg, info[0]).outs[info[1]])
+        return streams
+
     if not is2G:
         # Mixed wastewater
         ww = bst.Stream('ww')
-        ww_streams = [getattr(exist_u, i[0]).outs[i[1]] for i in kwdct['ww_streams']]
+        ww_streams = get_streams(exist_u, exist_s, kwdct['ww_streams'])
         WWmixer = bst.Mixer('WWmixer', ins=ww_streams)
         # Mixed solids
         solids = bst.Stream('solids')
-        solids_streams = [getattr(exist_u, i[0]).outs[i[1]] for i in kwdct['solids_streams']]
+        solids_streams = get_streams(exist_u, exist_s, kwdct['solids_streams'])
         SolidsMixer = bst.Mixer('SolidsMixer', ins=solids_streams, outs=solids)
         if kwdct['BT'] and sludge_ID:
             getattr(exist_u, sludge_u).ins[sludge_idx] = getattr(exist_s, sludge_ID)
@@ -111,14 +120,14 @@ def create_comparison_systems(info, functions, sys_dct={}):
             try: new_sys_temp.subsystems.remove(sys)
             except: pass # some outdated systems are the subsystem of another system
     else:
-        ww_streams = [getattr(new_u, i[0]).outs[i[1]] for i in kwdct['ww_streams']]
+        ww_streams = get_streams(new_u, new_s, kwdct['ww_streams'])
 
     new_sys_wwt = create_wastewater_process(
         'new_sys_wwt', ins=ww_streams, process_ID=WWT_ID, **kwdct['create_wastewater_process'])
 
     if kwdct['solids_streams']:
         solids = bst.Stream('solids')
-        solids_streams = [getattr(exist_u, i[0]).outs[i[1]] for i in kwdct['solids_streams']]
+        solids_streams = get_streams(new_u, new_s, kwdct['solids_streams'])
         solids_streams += [new_s.sludge]
         SolidsMixer = bst.Mixer('SolidsMixer', ins=solids_streams, outs=solids)
 

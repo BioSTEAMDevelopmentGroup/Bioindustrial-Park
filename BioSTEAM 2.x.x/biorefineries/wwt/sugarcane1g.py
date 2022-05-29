@@ -53,11 +53,10 @@ def create_sc1g_comparison_systems(biodegradability=1): # will be multiplied by 
         'load': {'name': 'S1', 'cache': None, 'reduce_chemicals': False},
         'system_name': 'oilcane_sys',
         'create_wastewater_process': wwt_kwdct,
-        # `fiber_fines`, `vinasse`
         # `wastewater` is mixed from `fiber_fines` (taken care of),
         # `stripper_bottoms_product` (~20 mg/L COD), and `evaporator_condensate` (only water)
-        'ww_streams': (('U211', 1), ('H302', 1)),
-        'solids_streams': (('U207', 0), ('U210', 0)), # `bagasse`, `filter_cake`
+        'ww_streams': ('fiber_fines', 'vinasse'),
+        'solids_streams': ('bagasse', 'filter_cake'), # `bagasse`, `filter_cake`
         'BT': 'BT401',
         'new_wwt_connections': {'solids': ('BT401', 0), 'biogas': ('BT401', 1)},
         'CF_dct': CF_dct,

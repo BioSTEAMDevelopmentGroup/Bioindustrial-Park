@@ -118,44 +118,71 @@ def add_biorefinery_parameters(model, model_dct, f, u, s, get_obj, get_rxn, para
 
 
 def add_biodiesel_parameters(model, model_dct, f, u, s, get_obj, get_rxn, param):
+    # Some of the distributions differ from those in the reference
+    # as the reference uses more optimistic values
     from biorefineries.oilcane import OilExtractionSpecification
     sys = model.system
 
     isplit_a = isplit_b = None
     for i in sys.cost_units:
-        if getattr(i, 'tag', None) == 'oil extraction efficiency':
+        if getattr(i, 'tag', None) == 'oil extraction':
             isplit_a = i.isplit
             break
     for i in sys.cost_units:
-        if getattr(i, 'tag', None) == 'bagasse oil retention':
+        if getattr(i, 'tag', None) == 'bagasse oil extraction':
             isplit_b = i.isplit
             break
 
-    #!!! Add oilcane oil content
-
-    #!!! NEEDS UPDATING WITH NEWER BIOSTEAM/OILCANE
-    # Extraction
+    # Feedstock dry mass oil content,
+    # not using the range in the biorefinery as the baseline is 0.05 and
+    # the distribution is uniform, 0.05-0.15
     feedstock = get_obj(s, 'feedstock')
     oil_extraction_specification = OilExtractionSpecification(
             sys, [feedstock], isplit_a, isplit_b, model_dct['isplit_efficiency_is_reversed']
         )
-    b = oil_extraction_specification.efficiency
+    b = oil_extraction_specification.oil_content or 0.05
     D = get_default_distribution('uniform', b, lb=0, ub=1)
-    # not using the range in the biorefinery as the baseline is 0.5/0.7
-    # D = shape.Uniform(0.5, 0.7) if not model_dct['is2G'] else shape.Uniform(0.7, 0.9)
-    @param(name='Oil extraction efficiency', element=oil_extraction_specification,
-           units='', kind='coupled', baseline=b, distribution=D)
-    def set_bagasse_oil_extraction_efficiency(bagasse_oil_extraction_efficiency):
-        oil_extraction_specification.load_efficiency(bagasse_oil_extraction_efficiency)
-
-    # Oil retained in the bagasse after crushing
-    b = oil_extraction_specification.oil_retention
+    @param(name='Feedstock oil content', element=oil_extraction_specification,
+           units='dry mass', kind='coupled', baseline=b, distribution=D)
+    def set_feedstock_oil_content(i):
+        oil_extraction_specification.load_oil_content(i)
+        
+    # Free fatty acid content as a fraction of the feedstock oil content
+    b = oil_extraction_specification.FFA_content
     D = get_default_distribution('uniform', b, lb=0, ub=1)
-    # D = shape.Uniform(0.4, 0.7) # not using the range in the biorefinery as the baseline is 0.4
-    @param(name='Bagasse oil retention', element=oil_extraction_specification,
+    @param(name='Feedstock free fatty acid content', element=oil_extraction_specification,
+           units='frac of oil', kind='coupled', baseline=b, distribution=D)
+    def set_free_fatty_acid_content(i):
+        oil_extraction_specification.FFA_content = i
+        
+    # Polar lipid content as a fraction of the feedstock oil content
+    b = oil_extraction_specification.PL_content
+    D = get_default_distribution('uniform', b, lb=0, ub=1)
+    @param(name='Feedstock polar lipid content', element=oil_extraction_specification,
+           units='frac of oil', kind='coupled', baseline=b, distribution=D)
+    def set_polar_lipid_content(i):
+        oil_extraction_specification.PL_content = i
+        
+    
+    # Oil retained in the bagasse after crushing,
+    # not using the range in the biorefinery as the baseline is 0.6 and
+    # the distribution is uniform, 0.6-0.9
+    b = oil_extraction_specification.crushing_mill_oil_recovery or 0.6
+    D = get_default_distribution('uniform', b, lb=0, ub=1)
+    @param(name='Crushing mill oil recovery', element=oil_extraction_specification,
            units='', kind='coupled', baseline=b, distribution=D)
-    def set_bagasse_oil_retention(oil_retention):
-        oil_extraction_specification.load_oil_retention(oil_retention)
+    def set_crushing_mill_oil_recovery(i):
+        oil_extraction_specification.load_crushing_mill_oil_recovery(i)
+    
+    # Oil recovery after enzymatic hydrolysis (i.e., saccharification),
+    # not using the range in the biorefinery as the baseline is 0.7 and
+    # the distribution is uniform, 0.7-0.9
+    b = oil_extraction_specification.saccharification_oil_recovery or 0.7
+    D = get_default_distribution('uniform', b, lb=0, ub=1)
+    @param(name='EH oil recovery', element=oil_extraction_specification,
+           units='', kind='coupled', baseline=b, distribution=D)
+    def set_EH_oil_recovery(i):
+        oil_extraction_specification.load_saccharification_oil_recovery(i)
 
     # Hydrolysis
     fermentor = get_obj(u, 'fermentor')
@@ -244,38 +271,9 @@ def add_1G_parameters(model, model_dct, f, u, s, get_obj, get_rxn, param):
     return model
 
 
-# All chemical loading and conversions parameters related to 2G biorefineries
-# based on in Humbird et al. if not otherwise noted
 def add_2G_parameters(model, model_dct, f, u, s, get_obj, get_rxn, param):
-    # Pretreatment
-    PT_solids_mixer = get_obj(u, 'PT_solids_mixer')
-    b = PT_solids_mixer.solids_loading
-    try: D = shape.Triangle(0.25, b, 0.4)
-    except: D = get_default_distribution('uniform', b) # hydrothermal pretreatment
-    @param(name='PT solids loading', element=PT_solids_mixer, kind='coupled', units='-',
-           baseline=b, distribution=D)
-    def set_PT_solids_loading(loading):
-        PT_solids_mixer.solids_loading = loading
-
-    PT_rx = get_obj(u, 'PT_rx')
-    rxn = get_rxn(PT_rx, 'PT glucan-to-glucose')
-    b = rxn.X
-    D = shape.Triangle(0.06, b, 0.12)
-    @param(name='PT glucan-to-glucose', element=PT_rx, kind='coupled', units='-',
-           baseline=b, distribution=D)
-    def set_PT_glucan_to_glucose(X):
-        rxn.X = X
-
-    rxn = get_rxn(PT_rx, 'PT xylan-to-xylose')
-    b = rxn.X
-    try: D = shape.Triangle(0.8, b, 0.92)
-    except: D = get_default_distribution('uniform', b, ub=1) # hydrothermal pretreatment
-    @param(name='PT xylan-to-xylose', element=PT_rx, kind='coupled', units='-',
-           baseline=b, distribution=D)
-    def set_PT_xylan_to_xylose(X):
-        rxn.X = X
-
-    # Saccharification (enzymatic hydrolysis) and cofermentation
+    ##### Common parameters #####
+    # Enzymatic hydrolysis (i.e., saccharification) and cofermentation
     EH_mixer = get_obj(u, 'EH_mixer')
     b = EH_mixer.enzyme_loading
     try: D = shape.Triangle(10, b, 30)
@@ -284,43 +282,115 @@ def add_2G_parameters(model, model_dct, f, u, s, get_obj, get_rxn, param):
            baseline=b, distribution=D)
     def set_EH_enzyme_loading(loading):
         EH_mixer.enzyme_loading = loading
-
-    b = EH_mixer.solids_loading
-    D = shape.Triangle(0.175, b, 0.25)
-    @param(name='EH solids loading', element=EH_mixer, kind='coupled', units='-',
-           baseline=b, distribution=D)
-    def set_EH_solid_loading(loading):
-        EH_mixer.solid_loading = loading
-
-    #!!! Here differentiate the two pretreatment methods
-    EH_rx = get_obj(u, 'EH_rx') or get_obj(u, 'fermentor')
-    rxn = get_rxn(EH_rx, 'EH glucan-to-glucose')
-    b = rxn.X
-    D = shape.Triangle(0.75, b, 0.95)
-    @param(name='EH glucan-to-glucose', element=EH_rx, kind='coupled', units='-',
-           baseline=b, distribution=D)
-    def set_EH_glucan_to_glucose(X):
-        rxn.X = X
-
+        
     fermentor = get_obj(u, 'fermentor')
     rxn_g = get_rxn(fermentor, 'FERM glucan-to-product')
     rxn_x = get_rxn(fermentor, 'FERM xylan-to-product')
     b_g = rxn_g.X
     b_x = rxn_x.X
-    if model_dct['FERM_product']=='ethanol':
-        try:
+
+    ##### Specific settings #####
+    if model_dct['feedstock'] in ('sugarcane', 'oilcane'): # hydrothermal pretreatment (SC/OC-2G)
+        # Pretreatment
+        PT_solids_mixer = get_obj(u, 'PT_solids_mixer')
+        b = PT_solids_mixer.solids_loading
+        D = get_default_distribution('uniform', b)
+        @param(name='PT solids loading', element=PT_solids_mixer, kind='coupled', units='-',
+               baseline=b, distribution=D)
+        def set_PT_solids_loading(loading):
+            PT_solids_mixer.solids_loading = loading
+    
+        PT_rx = get_obj(u, 'PT_rx')
+        rxn = get_rxn(PT_rx, 'PT glucan-to-glucose')
+        b = rxn.X
+        D = get_default_distribution('uniform', b, lb=0, ub=1)
+        @param(name='PT glucan-to-glucose', element=PT_rx, kind='coupled', units='-',
+               baseline=b, distribution=D)
+        def set_PT_glucan_to_glucose(X):
+            rxn.X = X
+            
+        rxn = get_rxn(PT_rx, 'PT xylan-to-xylose')
+        b = rxn.X
+        D = get_default_distribution('uniform', b, lb=0, ub=1)
+        @param(name='PT xylan-to-xylose', element=PT_rx, kind='coupled', units='-',
+               baseline=b, distribution=D)
+        def set_PT_xylan_to_xylose(X):
+            rxn.X = X
+    
+        b = EH_mixer.solids_loading
+        D = get_default_distribution('uniform', b)
+        @param(name='EH solids loading', element=EH_mixer, kind='coupled', units='-',
+               baseline=b, distribution=D)
+        def set_EH_solid_loading(loading):
+            EH_mixer.solid_loading = loading
+    
+        EH_rx = get_obj(u, 'EH_rx') or get_obj(u, 'fermentor')
+        rxn = get_rxn(EH_rx, 'EH glucan-to-glucose')
+        b = rxn.X
+        D = get_default_distribution('uniform', b, lb=0, ub=1)
+        @param(name='EH glucan-to-glucose', element=EH_rx, kind='coupled', units='-',
+               baseline=b, distribution=D)
+        def set_EH_glucan_to_glucose(X):
+            rxn.X = X
+            
+        # Fermentation
+        D_g = get_default_distribution('uniform', b_g, ub=1)
+        D_x = get_default_distribution('uniform', b_x, ub=1)
+        
+    else: # dilute acid pretreatment (CS/LA)
+        # Pretreatment
+        PT_solids_mixer = get_obj(u, 'PT_solids_mixer')
+        b = PT_solids_mixer.solids_loading
+        D = shape.Triangle(0.25, b, 0.4)
+        @param(name='PT solids loading', element=PT_solids_mixer, kind='coupled', units='-',
+               baseline=b, distribution=D)
+        def set_PT_solids_loading(loading):
+            PT_solids_mixer.solids_loading = loading
+    
+        PT_rx = get_obj(u, 'PT_rx')
+        rxn = get_rxn(PT_rx, 'PT glucan-to-glucose')
+        b = rxn.X
+        D = shape.Triangle(0.06, b, 0.12)
+        @param(name='PT glucan-to-glucose', element=PT_rx, kind='coupled', units='-',
+               baseline=b, distribution=D)
+        def set_PT_glucan_to_glucose(X):
+            rxn.X = X
+    
+        rxn = get_rxn(PT_rx, 'PT xylan-to-xylose')
+        b = rxn.X
+        D = shape.Triangle(0.8, b, 0.92)
+        @param(name='PT xylan-to-xylose', element=PT_rx, kind='coupled', units='-',
+               baseline=b, distribution=D)
+        def set_PT_xylan_to_xylose(X):
+            rxn.X = X
+    
+        b = EH_mixer.solids_loading
+        D = shape.Triangle(0.175, b, 0.25)
+        @param(name='EH solids loading', element=EH_mixer, kind='coupled', units='-',
+               baseline=b, distribution=D)
+        def set_EH_solid_loading(loading):
+            EH_mixer.solid_loading = loading
+    
+        EH_rx = get_obj(u, 'EH_rx') or get_obj(u, 'fermentor')
+        rxn = get_rxn(EH_rx, 'EH glucan-to-glucose')
+        b = rxn.X
+        D = shape.Triangle(0.75, b, 0.95)
+        @param(name='EH glucan-to-glucose', element=EH_rx, kind='coupled', units='-',
+               baseline=b, distribution=D)
+        def set_EH_glucan_to_glucose(X):
+            rxn.X = X
+            
+        # Fermentation
+        if model_dct['FERM_product']=='ethanol':
             D_g = shape.Triangle(0.9, b_g, 0.97)
             D_x = shape.Triangle(0.75, b_x, 0.9)
-        except: # hydrothermal pretreatment
-            D_g = get_default_distribution('uniform', b_g, ub=1)
-            D_x = get_default_distribution('uniform', b_x, ub=1)
-    elif model_dct['FERM_product']=='lactic_acid':
-        D_g = shape.Triangle(0.55, b_g, 0.93)
-        D_x = shape.Triangle(0.55, b_x, 0.93)
-    elif model_dct['FERM_product']=='acrylic_acid':
-        D_g = get_default_distribution('triangle', b_g, ratio=0.2)
-        D_x = get_default_distribution('triangle', b_x, ratio=0.2)
-    else: raise ValueError(f"Fermentation product {model_dct['FERM_product']} not recognized.")
+        elif model_dct['FERM_product']=='lactic_acid':
+            D_g = shape.Triangle(0.55, b_g, 0.93)
+            D_x = shape.Triangle(0.55, b_x, 0.93)
+        elif model_dct['FERM_product']=='acrylic_acid':
+            D_g = get_default_distribution('triangle', b_g, ratio=0.2)
+            D_x = get_default_distribution('triangle', b_x, ratio=0.2)
+        else: raise ValueError(f"Fermentation product {model_dct['FERM_product']} not recognized.")
 
     @param(name='FERM glucose yield', element=fermentor, kind='coupled', units='-',
            baseline=b_g, distribution=D_g)
@@ -331,7 +401,7 @@ def add_2G_parameters(model, model_dct, f, u, s, get_obj, get_rxn, param):
            baseline=b_x, distribution=D_x)
     def set_FERM_xylose_yield(X):
         rxn_x.X = X
-
+        
     return model
 
 

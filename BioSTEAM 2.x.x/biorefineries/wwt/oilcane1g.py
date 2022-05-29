@@ -62,9 +62,8 @@ def create_oc1g_comparison_systems(biodegradability=1): # will be multiplied by 
         'system_name': 'oilcane_sys',
         'BT': 'BT701',
         'create_wastewater_process': wwt_kwdct,
-        # `fiber_fines`, `wastewater`, `vinasse`
-        'ww_streams': (('U206', 1), ('M603', 0), ('M402', 0),),
-        'solids_streams': (('U205', 0), ('M701', 0),), # the first one is `filter_cake`
+        'ww_streams': ('fiber_fines', 'wastewater', 'vinasse',),
+        'solids_streams': ('filter_cake', ('M701', 0),),
         'BT': 'BT701',
         'new_wwt_connections': {'solids': ('BT701', 0), 'biogas': ('BT701', 1)},
         'CF_dct': CF_dct,
@@ -98,8 +97,6 @@ def create_oc1g_comparison_models():
         'fermentor': 'R301',
         'TE_rx': 'U601',
         'isplit_efficiency_is_reversed': False,
-        'bagasse_oil_extraction': 'U406',
-        'bagasse_oil_retention': 'U201',
         'reactions': {
             'PT glucan-to-glucose': ('hydrolysis_reaction', ),
             'FERM glucan-to-product': ('fermentation_reaction', ),

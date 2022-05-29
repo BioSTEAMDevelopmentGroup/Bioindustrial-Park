@@ -595,12 +595,13 @@ def load(name, cache={}, reduce_chemicals=True,
     @default(0.212, units='USD/kg', element='cellulase')
     def set_cellulase_price(price):
         if abs(number) in (2, 4): s.cellulase.price = price
-    
-    cellulase_mixer, = [i for i in flowsheet.unit if hasattr(i, 'enzyme_loading')]
-    
-    @default(0.02, units='wt. % cellulose', element='cellulase')
-    def set_cellulase_loading(cellulase_loading):
-        if abs(number) in (2, 4): cellulase_mixer.enzyme_loading = cellulase_loading
+
+    if abs(number) in (2, 4):
+        cellulase_mixer, = [i for i in flowsheet.unit if hasattr(i, 'enzyme_loading')]
+   
+        @default(0.02, units='wt. % cellulose', element='cellulase')
+        def set_cellulase_loading(cellulase_loading):
+            if abs(number) in (2, 4): cellulase_mixer.enzyme_loading = cellulase_loading
     
     @default(PRS_cost_item.cost, units='million USD', element='Pretreatment reactor system')
     def set_reactor_base_cost(base_cost):

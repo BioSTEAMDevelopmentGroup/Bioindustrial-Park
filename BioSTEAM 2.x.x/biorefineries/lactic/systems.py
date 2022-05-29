@@ -115,7 +115,3 @@ def create_system(ID='lactic_sys', kind='SSCF', if_HXN=True, if_BDM=False,
         ])
 
     return lactic_sys, groups
-
-
-if __name__ == '__main__':
-    lactic_sys = create_system('SSCF')
