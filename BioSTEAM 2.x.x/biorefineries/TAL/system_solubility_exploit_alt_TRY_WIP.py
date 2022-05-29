@@ -58,7 +58,7 @@ from math import exp as math_exp
 from thermosteam import Stream
 # from biorefineries.cornstover import CellulosicEthanolTEA
 from biorefineries.TAL import units, facilities
-from biorefineries.TAL._process_specification_alt_TRY_WIP import ProcessSpecification
+from biorefineries.TAL._process_specification import ProcessSpecification
 from biorefineries.TAL.process_settings import price, CFs
 from biorefineries.TAL.utils import find_split, splits_df, baseline_feedflow
 from biorefineries.TAL.chemicals_data import TAL_chemicals, chemical_groups, \

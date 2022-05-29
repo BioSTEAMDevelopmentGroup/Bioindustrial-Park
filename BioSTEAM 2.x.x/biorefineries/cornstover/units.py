@@ -19,6 +19,8 @@ from biosteam.units.design_tools import size_batch
 from math import ceil
 import thermosteam as tmo
 import biosteam as bst
+from math import exp, log as ln
+import numpy as np
 
 Rxn = tmo.reaction.Reaction
 ParallelRxn = tmo.reaction.ParallelReaction
@@ -108,16 +110,17 @@ class PretreatmentReactorSystem(Unit, bst.units.design_tools.PressureVessel):
         vapor, liquid = self.outs
         liquid.copy_like(feed)
         self.reactions.adiabatic_reaction(liquid) 
-        if self.run_vle:
-            ms = self._multistream
-            ms.copy_like(liquid)
-            ms.vle(T=self.T, H=ms.H)
-            vapor.mol[:] = ms.imol['g']
-            liquid.mol[:] = ms.imol['l']
-            vapor.T = liquid.T = ms.T
-            vapor.P = liquid.P = ms.P
-        else:
-            liquid.T = self.T
+        if self.T:
+            if self.run_vle:
+                ms = self._multistream
+                ms.copy_like(liquid)
+                ms.vle(T=self.T, H=ms.H)
+                vapor.mol[:] = ms.imol['g']
+                liquid.mol[:] = ms.imol['l']
+                vapor.T = liquid.T = ms.T
+                vapor.P = liquid.P = ms.P
+            else:
+                liquid.T = self.T
 
     def _design(self):
         Design = self.design_results
@@ -409,11 +412,14 @@ class CoFermentation(bst.BatchBioreactor):
             self.xylose_to_byproducts = self.cofermentation[5:]
         else:
             self.cofermentation = cofermentation
-            
-        self.CSL_to_constituents = Rxn(
-            'CSL -> 0.5 H2O + 0.25 LacticAcid + 0.25 Protein', 'CSL', 1.0000, chemicals, basis='wt',
-        )
-        self.CSL_to_constituents.basis = 'mol'
+        
+        if 'CSL' in self.chemicals:
+            self.CSL_to_constituents = Rxn(
+                'CSL -> 0.5 H2O + 0.25 LacticAcid + 0.25 Protein', 'CSL', 1.0000, chemicals, basis='wt',
+            )
+            self.CSL_to_constituents.basis = 'mol'
+        else:
+            self.CSL_to_constituents = None
         
         if all([i in self.chemicals for i in ('FFA', 'DAG', 'TAG', 'Glycerol')]):
             self.oil_reaction = self.lipid_reaction = ParallelRxn([
@@ -432,7 +438,7 @@ class CoFermentation(bst.BatchBioreactor):
         effluent.mix_from(feeds, energy_balance=False)
         if self.loss: self.loss(effluent)
         self.cofermentation(effluent)
-        self.CSL_to_constituents(effluent)
+        if self.CSL_to_constituents: self.CSL_to_constituents(effluent)
         if self.lipid_reaction: 
             self.lipid_reaction.force_reaction(effluent)
             effluent.empty_negative_flows()
@@ -652,14 +658,96 @@ class SimultaneousSaccharificationAndCoFermentation(Unit):
         Design['Reactor duty'] = reactor_duty = self.Hnet
         hu_fermentation(reactor_duty, effluent.T)
 
-# %% Lignin separation
+# %% Pretreatment separations 
 
-@cost('Flow rate', units='kg/hr',
-      S=63, cost=421e3, CE=522, BM=1.8, n=0.6)
-class CIPpackage(bst.Facility):
-    line = 'CIP Package'
-    network_priority = 0
+# Membrane separation processes. Perry's Chemical Engineer's Handbook 7th Edition. 
+@cost('Flow rate', 'Nanofiltration', kW=18000, S=0.25, units='m3/s',
+      cost=17300, n=0.6, BM=1., CE=bst.units.design_tools.CEPCI_by_year[1996])
+@cost('Annual flow rate', 'Membranes and maintenance', S=1., units='m3/yr',
+      cost=0.13, n=1., BM=1., CE=bst.units.design_tools.CEPCI_by_year[1996],
+      annual=True)
+class ReverseOsmosis(bst.SolidsSeparator):
+    pass
+
+Europe_investment_site_factor = 1.2
+euro_to_dollar = 1.04
+installation_cost = 115000 # euro
+volume_treated = 10 * 24 * 30 * 18 # m3
+membrane_area = 27.5 # m2
+membrane_cost = 95 # euro / m2
+cleaning_cost = 50 # euro / m2
+maintenance_cost = installation_cost * 0.02
+yearly_operating_hours = 8000
+operating_cost = membrane_area * (membrane_cost + cleaning_cost) + maintenance_cost * yearly_operating_hours / (18 * 30 * 24)
+operating_cost_per_volume_treated = operating_cost / volume_treated
+US_operating_cost = euro_to_dollar * operating_cost_per_volume_treated / Europe_investment_site_factor
+US_installation_cost = euro_to_dollar * installation_cost / Europe_investment_site_factor
+CEPCI2013 = bst.units.design_tools.CEPCI_by_year[2013]
+electricity_cost = 2e3 # euro / yr
+electricity_price = 0.04 # euro / kWh
+electricity_demand = electricity_cost / yearly_operating_hours / electricity_price
+
+@cost('Flow rate', 'Nanofiltration', kW=electricity_demand, S=10, units='m3/hr',
+      cost=US_installation_cost, n=0.6, BM=1., CE=CEPCI2013)
+@cost('Annual flow rate', 'Membranes and maintenance', S=1., units='m3/yr',
+      cost=US_operating_cost, n=1., BM=1., CE=CEPCI2013,
+      annual=True)
+class Nanofilter(bst.Unit):
     _N_ins = 1
-    _N_outs = 1
+    _N_outs = 2
+    volume_reduction = 0.80
+    lignin_retention = 0.60
+    NaOH_retention = 0.10
+    sugar_retention = 0.95
+    sugars_IDs = ('Glucose', 'Xylose', 'Arabinose', 'Galactose', 'Mannose',
+              'GlucoseOligomer', 'GalactoseOligomer', 'MannoseOligomer',
+              'XyloseOligomer', 'ArabinoseOligomer', 'HMF', 'Furfural', 'Xylobiose')
+    lignin_IDs = ('SolubleLignin',)
+    retentate_only_IDs = ('Lignin', 'Glucan', 'Xylan', 'Arabinan', 'Galactan',
+                          'Mannan', 'Solids', 'Ash')
     
+    def _run(self):
+        feed, = self.ins
+        permeate, retentate = self.outs
+        permeate.empty()
+        retentate.empty()
+        lignin_retention = self.lignin_retention
+        sugar_retention = self.sugar_retention
+        NaOH_retention = self.NaOH_retention
+        volume_reduction = self.volume_reduction
+        water = feed.imass['Water']
+        permeate.imass['Water'] = volume_reduction * water
+        retentate.imass['Water'] = feed.imass['Water'] - permeate.imass['Water']
+        retentate.copy_flow(feed, self.retentate_only_IDs)
+        not_permeate_unique = (*self.retentate_only_IDs, *self.lignin_IDs, *self.sugars_IDs, 'NaOH', 'Water')
+        not_permeate_unique = set([self.chemicals[i].ID for i in not_permeate_unique])
+        permeate_unique = tuple([i.ID for i in self.chemicals if i.ID not in not_permeate_unique])
+        permeate.copy_flow(feed, permeate_unique)
+        F_mass = feed.F_mass
+        lignin_comps = feed.imass[self.lignin_IDs]
+        sugar_comps = feed.imass[self.sugars_IDs]
+        NaOH = feed.imass['NaOH']
+        lignin = lignin_comps.sum()
+        sugar = sugar_comps.sum()
+        lignin_def = lignin_comps / lignin
+        sugar_def = sugar_comps / sugar
+        NaOH = feed.imass['NaOH']
+        feed_mass = np.array([lignin, sugar, NaOH])
+        z_mass = feed_mass / F_mass
+        K = np.array([lignin_retention, sugar_retention, NaOH_retention])
+        phi_guess = 0.5
+        Fa = permeate.F_mass
+        Fb = retentate.F_mass
+        assert abs((Fa + Fb + lignin + sugar + NaOH) - F_mass) < 1e-6
+        permeate_mass = feed_mass / water * (1 - K) * permeate.imass['Water']
         
+        # phi = tmo.separations.compute_phase_fraction(z_mass, K, phi_guess, Fa/F_mass, Fb/F_mass)
+        # x_retentate = z_mass / (phi * K + (1. - phi))
+        # retentate_mass = x_retentate * (1. - phi) * F_mass
+        
+        permeate.imass[self.lignin_IDs] = permeate_mass[0] * lignin_def
+        permeate.imass[self.sugars_IDs] = permeate_mass[1] * sugar_def
+        permeate.imass['NaOH'] = permeate_mass[2]
+        retentate.mol = feed.mol - permeate.mol
+        assert (permeate.mol >= 0.).all()
+        retentate.T = permeate.T = feed.T

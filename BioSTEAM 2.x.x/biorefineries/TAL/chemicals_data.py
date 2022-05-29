@@ -228,36 +228,156 @@ KSA = Potassiumsorbate = chemical_database(ID='PotassiumSorbate',
                                            phase='l')
 
 TAL = Triaceticacidlactone = chemical_database(ID='TAL',
-                                               search_ID='Triacetic acid lactone')
-TAL.copy_models_from(Furfural, ['Psat', 'Hvap', 'V']) # doesn't matter, since we never boil TAL in significant amounts
+                                               search_ID='Triacetic acid lactone',
+                                               phase='s')
+Pyrone = chemical_database(ID='Pyrone',
+                           search_ID='2-pyrone',
+                           phase='s')
 
-# TAL.Hfus = Furfural.Hfus/2.18
 TAL.Hfus = 30883.66976 # Dannenfelser-Yalkowsky method
 TAL.Tm = KSA.Tm = 185. + 273.15 # CAS SciFinder 675-10-5
 TAL.Tb = KSA.Tb =  239.1 + 273.15# (predicted) CAS SciFinder 675-10-5
+TAL.Hf = Pyrone.Hf
+TAL.LHV = Pyrone.LHV
+TAL.HHV = Pyrone.HHV
+
+for i in TAL.get_missing_properties():
+    if not i in Pyrone.get_missing_properties():
+        try:
+            TAL.copy_models_from(Pyrone, [i])
+        except:
+            pass
+
+
+DHL = chemical_database(ID='DHL', search_ID='delta-hexalactone', phase='s')
+
+DHL.Hf = Pyrone.Hf
+DHL.LHV = Pyrone.LHV
+DHL.HHV = Pyrone.HHV
+
+for i in DHL.get_missing_properties():
+    if not i in Pyrone.get_missing_properties():
+        try:
+            DHL.copy_models_from(Pyrone, [i])
+        except:
+            pass
+
+# TAL.copy_models_from(tmo.Chemical('2-pyrone'), 
+#                      [i for i in TAL.get_missing_properties() if not i in tmo.Chemical('2-pyrone').get_missing_properties() and not (i=='Hf' or i=='LHV' or i=='HHV' or i=='combustion')]) # doesn't matter, since we never boil TAL in significant amounts
+
+# TAL.Hfus = Furfural.Hfus/2.18
 
 # TAL.Cn.l.add_method(tmo.Chemical('Succinic acid').Cn.l)
+
+
+SA = Sorbicacid =  chemical_database(ID='SorbicAcid', search_ID='Sorbic acid')
+
+HEA = tmo.Chemical('2-hexenoic acid')
+
+SA.Hfus = HEA.Hfus
+
+SA.Hf = 0.
+# SA.LHV = HEA.LHV
+# SA.HHV = HEA.HHV
+
+# https://pubchem.ncbi.nlm.nih.gov/compound/Sorbic-acid#section=Stability-Shelf-Life
+SA.Tb = 228. + 273.15
+
+for i in SA.get_missing_properties():
+    if not i in HEA.get_missing_properties():
+        try:
+            SA.copy_models_from(HEA, [i])
+        except:
+            pass
+
+PSA = chemical_database(ID='PSA', search_ID='parasorbic acid')
+
+PSA.Tb = SA.Tb
+PSA.Tm = SA.Tm
+
+PSA.Hfus = SA.Hfus
+PSA.Hf = SA.Hf
+PSA.LHV = SA.LHV
+PSA.HHV = SA.HHV
+
+for i in PSA.get_missing_properties():
+    if not i in SA.get_missing_properties():
+        try:
+            PSA.copy_models_from(SA, [i])
+        except:
+            pass
+PSA.copy_models_from(H2O, ['V'])
+        
+PolyPSA = chemical_defined(ID='PolyPSA', phase='s', 
+                             formula='C30H40O10', 
+                             Hf=0.)
+
+PolyPSA.Tb = PSA.Tb
+PolyPSA.Tm = PSA.Tm
+
+PolyPSA.Hfus = PSA.Hfus
+PolyPSA.Hf = PSA.Hf
+PolyPSA.LHV = PSA.LHV
+PolyPSA.HHV = PSA.HHV
+
+for i in PolyPSA.get_missing_properties():
+    if not i in PSA.get_missing_properties():
+        try:
+            PolyPSA.copy_models_from(PSA, [i])
+        except:
+            pass
+
 
 BSA = Butylsorbate = chemical_database(ID='ButylSorbate',
                                        search_ID='Butyl sorbate',
                                        phase='l')
-
-SA = Sorbicacid =  chemical_database(ID='SorbicAcid', search_ID='Sorbic acid')
+# https://pubchem.ncbi.nlm.nih.gov/compound/Sorbic-acid#section=Stability-Shelf-Life
+BSA.Tb = 226.5 + 273.15
+BSA.Tm = 130. + 273.15
 
 # HMTHP = chemical_copied('HMTHP', TAL)
-HMTHP = chemical_database(ID='HMTHP', search_ID='674-26-0')
+HMTHP = chemical_database(ID='HMTHP', search_ID='674-26-0',)
 HMTHP.Tm = 273.15 + (27.+28.)/2. # CAS SciFinder 674-26-0
 HMTHP.Tb = 273.15 + (148.+151.)/2. # CAS SciFinder 674-26-0
+
+HB = tmo.Chemical('2-hydroxybenzaldehyde')
 HMTHP.Hfus = TAL.Hfus
 
-HMTHP_missing_properties = HMTHP.get_missing_properties()
-TAL_missing_properties = TAL.get_missing_properties()
-HMTHP.copy_models_from(TAL, [i for i in HMTHP_missing_properties if not i in TAL_missing_properties])
-# https://pubchem.ncbi.nlm.nih.gov/compound/Sorbic-acid#section=Stability-Shelf-Life
-SA.Tb = 228 + 273.15
+HMTHP.Hf = HB.Hf
+HMTHP.LHV = HB.LHV
+HMTHP.HHV = HB.HHV
 
-BSA.Tm = 130 + 273.15
-BSA.Tb = 226.5 + 273.15
+for i in HMTHP.get_missing_properties():
+    if not i in HB.get_missing_properties():
+        try:
+            HMTHP.copy_models_from(HB, [i])
+        except:
+            pass
+HMTHP.copy_models_from(H2O, ['V'])
+
+HMDHP = chemical_defined(ID='HMDHP', 
+                         phase='l', 
+                         formula='C6H8O3', 
+                         Hf=Pyrone.Hf)
+
+# HMDHP.smiles = 
+# HMDHP.Dortmund = 
+
+HMDHP.Tm = 273.15 + (127.+128.)/2. # CAS SciFinder 33177-29-6
+HMDHP.Tb = TAL.Tb
+HMDHP.Hfus = TAL.Hfus
+
+HMDHP.Hf = Pyrone.Hf
+HMDHP.LHV = Pyrone.LHV
+HMDHP.HHV = Pyrone.HHV
+
+for i in HMDHP.get_missing_properties():
+    if not i in Pyrone.get_missing_properties():
+        try:
+            HMDHP.copy_models_from(Pyrone, [i])
+        except:
+            pass
+        
 
 PD = Pentanedione = chemical_database(ID='PD', search_ID='2,4-pentanedione')
 VitaminA = chemical_database('VitaminA')
@@ -415,7 +535,7 @@ phase_change_chemicals = ['H2O', 'Denaturant',
                           'HMF',
                            'PD', 
                             'Hexanol',
-                           # 'HMTHP',
+                            'HMTHP',
                           ]
 
 for chem in chems:
@@ -462,10 +582,11 @@ for chemical in chems:
     if chemical.locked_state:
         try: chemical.kappa.move_up_model_priority('Lakshmi Prasad', -1)
         except: pass
-        
+ 
 # Default missing properties of chemicals to those of water,
 for chemical in chems: chemical.default()
 
+# set_rho(HMTHP, 1e5)
 
 # %%
 

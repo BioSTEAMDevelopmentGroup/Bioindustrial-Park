@@ -13,6 +13,7 @@ from biorefineries.sugarcane import create_ethanol_purification_system
 from biorefineries.cornstover._process_settings import price
 from biorefineries.cornstover._chemicals import chemical_groups
 from biorefineries.cornstover import units
+from biosteam import stream_kwargs as skw
 import thermosteam.reaction as rxn
 import numpy as np
 
@@ -38,8 +39,8 @@ default_insoluble_solids = ['Glucan', 'Mannan', 'Xylan',
 
 default_ignored = ['TAG', 'DAG', 'MAG', 'FFA', 'PL']
 
-cornstover_dct = dict(
-    ID='cornstover', # Cornstover composition by default
+cornstover = skw(
+    'cornstover',
     Glucan=0.28,
     Xylan=0.1562,
     Galactan=0.001144,
@@ -57,16 +58,31 @@ cornstover_dct = dict(
     price=price['Feedstock']
 )
 
+switchgrass = skw(
+    'switchgrass',
+    Arabinan=0.02789023841655421,
+    Galactan=0.010436347278452543,
+    Glucan=0.2717049032838507,
+    Xylan=0.21214574898785432,
+    Mannan=0.005937921727395412,
+    Lignin=0.17112010796221322,
+    Ash=0.016194331983805668,
+    Extractives=0.08457040035987407,
+    Water=0.2,
+    total_flow=104229.16,
+    units='kg/hr',
+    price=0.08, # Price of switchgrass, table 4, Madhu Khanna et al. (Costs of producing miscanthus and switchgrass for bioenergy in Illinois);  https://www.sciencedirect.com/science/article/pii/S096195340700205X?casa_token=KfYfzJtDwv0AAAAA:OqeJmpofk1kIgFk2DcUvXNG35qYwlWvPKZ7ENI3R6RUKeoahiTDpOhhd_mpLtRthTGuXJKDzMOc
+)
+
 @bst.SystemFactory(
     ID='hot_water_pretreatment_sys',
-    ins=[cornstover_dct],
+    ins=[cornstover],
     outs=[dict(ID='hydrolyzate'),
           dict(ID='pretreatment_wastewater')],
 )
 def create_hot_water_pretreatment_system(
         ins, outs,
         pretreatment_area=200,
-        include_feedstock_handling=True,
         solids_loading=0.305,
         nonsolids=['Water'],
         milling=False,
@@ -106,42 +122,23 @@ def create_hot_water_pretreatment_system(
 
 @bst.SystemFactory(
     ID='AFEX_pretreatment_sys',
-    ins=[dict(ID='switchgrass', # Switchgrass composition by default
-              Arabinan=0.02789023841655421,
-              Galactan=0.010436347278452543,
-              Glucan=0.2717049032838507,
-              Xylan=0.21214574898785432,
-              Mannan=0.005937921727395412,
-              Lignin=0.17112010796221322,
-              Ash=0.016194331983805668,
-              Extractives=0.08457040035987407,
-              Water=0.2,
-              total_flow=104229.16,
-              units='kg/hr',
-              price=0.08)], # Price of switchgrass, table 4, Madhu Khanna et al. (Costs of producing miscanthus and switchgrass for bioenergy in Illinois);  https://www.sciencedirect.com/science/article/pii/S096195340700205X?casa_token=KfYfzJtDwv0AAAAA:OqeJmpofk1kIgFk2DcUvXNG35qYwlWvPKZ7ENI3R6RUKeoahiTDpOhhd_mpLtRthTGuXJKDzMOc
+    ins=[switchgrass], # Price of switchgrass, table 4, Madhu Khanna et al. (Costs of producing miscanthus and switchgrass for bioenergy in Illinois);  https://www.sciencedirect.com/science/article/pii/S096195340700205X?casa_token=KfYfzJtDwv0AAAAA:OqeJmpofk1kIgFk2DcUvXNG35qYwlWvPKZ7ENI3R6RUKeoahiTDpOhhd_mpLtRthTGuXJKDzMOc
     outs=[dict(ID='pretreated_biomass'),],
 )
 def create_ammonia_fiber_expansion_pretreatment_system(
         ins, outs,
-        include_feedstock_handling=True,
         solids_loading=0.20,
         ammonia_loading=2, # g ammonia / g dry feedstock
         T_pretreatment_reactor=273.15 + 100.,
         residence_time=0.5,
         pretreatment_reactions=None,
+        neutralize=True,
     ):
     
     feedstock, = ins
     hydrolyzate, = outs
     
     ammonia = Stream('ammonia', NH3=1, P=12 * 101325, price=price['Ammonia'])
-    sulfuric_acid = Stream('sulfuric_acid',
-                            P=5.4*101325,
-                            T=294.15,
-                            Water=130,
-                            H2SO4=1800,
-                            units='kg/hr',
-                            price=price['Sulfuric acid'])
     warm_process_water = Stream('warm_process_water',
                               T=368.15,
                               P=4.7*101325,
@@ -176,7 +173,19 @@ def create_ammonia_fiber_expansion_pretreatment_system(
         air.imol['O2', 'N2'] = [flow * 0.23, flow * 0.77] # Assume equal volumes is enough
     
     M204 = bst.Mixer('M204', (R201-0, F201-0), thermo=ideal)
-    F202 = bst.Flash('F202', M204-0, V=0, P=101325, thermo=ideal)
+    F202 = bst.Flash('F202', M204-0, T=278., P=101325, thermo=ideal)
+    @F202.add_specification
+    def complete_recovery():
+        feed = F202.ins[0]
+        vap, liq = F202.outs
+        ms = F202._multi_stream
+        liq.mol = feed.mol
+        ms.T = vap.T = liq.T = F202.T
+        ms.P = vap.P = liq.P = F202.P
+        vap.imol['N2', 'O2'], liq.imol['N2', 'O2'] = liq.imol['N2', 'O2'], 0.
+        ms['g'].copy_flow(vap)
+        ms['l'].copy_flow(liq)
+        
     P203 = bst.Pump('P203', F202-1, P=10*101325)
     M206 = bst.Mixer('M206', (P203-0, T201-0), recycle)
     
@@ -189,32 +198,121 @@ def create_ammonia_fiber_expansion_pretreatment_system(
         recycle.imass['NH3'] = required_ammonia - NH3_loss
         for i in T201.path_until(M206): i.run()
     
-    P202 = units.HydrolyzatePump('P202', F201-1, thermo=ideal)
-    H2SO4_storage = units.SulfuricAcidStorageTank('H2SO4_storage', sulfuric_acid)
-    T202 = units.SulfuricAcidTank('T202', H2SO4_storage-0)
-    M207 = bst.Mixer('M207', (T202-0, P202-0), hydrolyzate)
+    if neutralize:
+        sulfuric_acid = Stream('sulfuric_acid',
+                                P=5.4*101325,
+                                T=294.15,
+                                Water=130,
+                                H2SO4=1800,
+                                units='kg/hr',
+                                price=price['Sulfuric acid'])
+        P202 = units.HydrolyzatePump('P202', F201-1, thermo=ideal)
+        H2SO4_storage = units.SulfuricAcidStorageTank('H2SO4_storage', sulfuric_acid)
+        T202 = units.SulfuricAcidTank('T202', H2SO4_storage-0)
+        M207 = bst.Mixer('M207', (T202-0, P202-0), hydrolyzate)
+        M207.neutralization_rxn = tmo.Reaction('2 NH3 + H2SO4 -> (NH4)2SO4', 'H2SO4', 1)
+        @M207.add_specification
+        def update_sulfuric_acid_loading():
+            _, feed = M207.ins
+            fresh_sulfuric_acid = H2SO4_storage.ins[0]
+            fresh_sulfuric_acid.imol['H2SO4'] = feed.imol['NH3'] / 2
+            for i in H2SO4_storage.path_until(M207): i.run()
+            M207._run()
+            M207.neutralization_rxn(M207.outs[0])
+    else:
+        P202 = units.HydrolyzatePump('P202', F201-1, hydrolyzate, thermo=ideal)
+        
+@bst.SystemFactory(
+    ID='Alkaline_pretreatment_sys',
+    ins=[switchgrass], 
+    outs=[skw('pretreated_biomass'), skw('nanofilter_retentate')],
+) # DOI: 10.1002/bbb.2054; Biofuels, Bioprod. Bioref. (2019)
+def create_alkaline_pretreatment_system(
+        ins, outs,
+        solids_loading=0.091, # Liquid solids ratio of 10
+        caustic_loading=1, # g NaOH / g dry feedstock
+        T_pretreatment_reactor=273.15 + 121.,
+        residence_time=1,
+        pretreatment_reactions=None,
+    ):
     
-    M207.neutralization_rxn = tmo.Reaction('2 NH3 + H2SO4 -> (NH4)2SO4', 'H2SO4', 1)
-    @M207.add_specification
-    def update_sulfuric_acid_loading():
-        _, feed = M207.ins
-        fresh_sulfuric_acid = H2SO4_storage.ins[0]
-        fresh_sulfuric_acid.imol['H2SO4'] = feed.imol['NH3'] / 2
-        for i in H2SO4_storage.path_until(M207): i.run()
-        M207._run()
-        M207.neutralization_rxn(M207.outs[0])
+    feedstock, = ins
+    pretreated_biomass, nanofilter_retentate = outs
+    NaOH = Stream('NaOH', NaOH=1, price=2 * price['Caustic'])
+    sulfuric_acid = Stream('sulfuric_acid',
+                            P=5.4*101325,
+                            T=294.15,
+                            Water=130,
+                            H2SO4=1800,
+                            units='kg/hr',
+                            price=price['Sulfuric acid'])
+    warm_process_water = Stream('warm_process_water',
+                              T=368.15,
+                              P=4.7*101325,
+                              Water=1)
+    pretreatment_steam = Stream('pretreatment_steam',
+                    phase='g',
+                    T=268+273.15,
+                    P=13*101325,
+                    Water=24534+3490,
+                    units='kg/hr')
+    
+    ### Pretreatment system
+    ideal = NaOH.thermo.ideal()
+    T201 = bst.StorageTank('T201', NaOH, tau=7, thermo=ideal)
+    P = pretreatment_steam.chemicals['H2O'].Psat(T_pretreatment_reactor + 25)
+    M202 = bst.SteamMixer('M202', (feedstock, pretreatment_steam, warm_process_water), 
+                          P=P, T=T_pretreatment_reactor, liquid_IDs=['H2O', 'NaOH'], solids_loading=solids_loading, 
+                          thermo=ideal, solid_IDs=('Glucan', 'Xylan', 'Arabinan', 'Mannan', 'Lignin'))
+    R201 = units.PretreatmentReactorSystem('R201', M202-0, tau=residence_time,
+                                           T=None, thermo=ideal,
+                                           reactions=pretreatment_reactions,
+                                           run_vle=False)
+    H1 = bst.HXutility(200, ins=R201-1, T=368, V=0)
+    P201 = units.BlowdownDischargePump('P201', H1-0, thermo=ideal)
+    
+    PF1 = bst.PressureFilter(300, P201-0)
+    solids, liquid = PF1.outs
+    M1 = bst.Mixer(300, (solids, 'wash_water'))
+    
+    @M1.add_specification(run=True)
+    def adjust_wash_water():
+        solids, wash_water = M1.ins
+        wash_water.imass['Water'] = solids.F_mass
+        
+    C1 = bst.SolidsCentrifuge(
+        300, M1-0, moisture_content=0.5,
+        split=PF1.split,
+    )
+    C1.isplit['Glucan', 'Xylan', 'Arabinan', 'Mannan', 'Lignin'] = 0.99
+    P202 = units.HydrolyzatePump('P202', C1-0, pretreated_biomass, thermo=ideal)
+    M2 = bst.Mixer(300, [C1-1, PF1-1])
+    NF = units.Nanofilter(300,
+        ins=M2-0, outs=['', nanofilter_retentate],
+    )
+    
+    M202.ins.extend([NF-0, T201-0])
+    M202.caustic_loading = caustic_loading
+    @M202.add_specification(run=True)
+    def adjust_NaOH():
+        *_, NaOH_recycle, NaOH = M202.ins
+        biomass = M202.ins[0]
+        NaOH_requried = M202.caustic_loading * (biomass.F_mass - biomass.imass['Water', 'Sucrose', 'Glucose'].sum())
+        NaOH_recycled = NaOH_recycle.imass['NaOH']
+        NaOH.imass['NaOH'] = max(
+            NaOH_requried - NaOH_recycled, 0
+        )
     
 
 @bst.SystemFactory(
     ID='dilute_acid_pretreatment_sys',
-    ins=[cornstover_dct],
+    ins=[cornstover],
     outs=[dict(ID='hydrolyzate'),
           dict(ID='pretreatment_wastewater')],
 )
 def create_dilute_acid_pretreatment_system(
         ins, outs,
         pretreatment_area=200,
-        include_feedstock_handling=True,
         solids_loading=0.3,
         nonsolids=default_nonsolids,
     ):
@@ -255,7 +353,7 @@ def create_dilute_acid_pretreatment_system(
     T201 = units.SulfuricAcidTank(f'T{n+1}', H2SO4_storage-0)
     M201 = units.SulfuricAcidMixer(f'M{n+1}', (warm_process_water_1, T201-0))
     M203 = bst.SteamMixer(f'M{n+3}', (feedstock, pretreatment_steam, warm_process_water_2, M201-0),
-                          P=5.5*101325, solids_loading=solids_loading)
+                          P=5.5*101325, T=158 + 273.15, solids_loading=solids_loading)
     R201 = units.PretreatmentReactorSystem(f'R{n+1}', M203-0)
     P201 = units.BlowdownDischargePump(f'P{n+1}', R201-1)
     T202 = units.OligomerConversionTank(f'T{n+2}', P201-0)
@@ -379,65 +477,74 @@ def create_simultaneous_saccharification_and_cofermentation_system(
         saccharification_reactions=None,
         seed_train_reactions=None,
         cofermentaion_reactions=None,
-        include_scrubber=True
+        include_scrubber=True,
+        add_nutrients=True,
     ):
     slurry, DAP, CSL = ins
     vent, beer = outs
-    
-    DAP1 = Stream('DAP1',
-                    DAP=26,
-                    units='kg/hr',
-                    price=price['DAP'])
-    DAP2 = Stream('DAP2',
-                    DAP=116,
-                    units='kg/hr',
-                    price=price['DAP'])
-    CSL1 = Stream('CSL1',
-                    CSL=211,
-                    units='kg/hr',
-                    price=price['CSL'])
-    CSL2 = Stream('CSL2',
-                    CSL=948,
-                    units='kg/hr',
-                    price=price['CSL'])
-    
-    DAP_storage = units.DAPStorageTank('DAP_storage', DAP)
-    S301 = bst.FakeSplitter('S301', DAP_storage-0, outs=(DAP1, DAP2))
-    CSL_storage = units.CSLStorageTank('CSL_storage', CSL)
-    S302 = bst.FakeSplitter('S302', CSL_storage-0, outs=(CSL1, CSL2))
+    if add_nutrients:
+        DAP1 = Stream('DAP1',
+                        DAP=26,
+                        units='kg/hr',
+                        price=price['DAP'])
+        DAP2 = Stream('DAP2',
+                        DAP=116,
+                        units='kg/hr',
+                        price=price['DAP'])
+        CSL1 = Stream('CSL1',
+                        CSL=211,
+                        units='kg/hr',
+                        price=price['CSL'])
+        CSL2 = Stream('CSL2',
+                        CSL=948,
+                        units='kg/hr',
+                        price=price['CSL'])
+        
+        DAP_storage = units.DAPStorageTank('DAP_storage', DAP)
+        S301 = bst.FakeSplitter('S301', DAP_storage-0, outs=(DAP1, DAP2))
+        CSL_storage = units.CSLStorageTank('CSL_storage', CSL)
+        S302 = bst.FakeSplitter('S302', CSL_storage-0, outs=(CSL1, CSL2))
+        nutrients_1 = (CSL1, DAP1)
+        nutrients_2 = (CSL2, DAP2)
+    else:
+        ins.remove(DAP)
+        ins.remove(CSL)
+        nutrients_1 = nutrients_2 = ()
+        
     S303 = bst.Splitter('S303', slurry, split=0.1)
     if not SimultaneousSaccharificationAndCoFermentation:
         SimultaneousSaccharificationAndCoFermentation = units.SimultaneousSaccharificationAndCoFermentation
     if not SeedTrain: SeedTrain = units.SeedTrain
-    R302 = SeedTrain('R302', (S303-0, CSL1, DAP1), 
+    R302 = SeedTrain('R302', (S303-0, *nutrients_1), 
                      reactions=seed_train_reactions,
                      saccharification=saccharification_reactions or True)
-    
-    def adjust_CSL_and_DAP_feed_to_seed_train():
-        feed, CSL1, DAP1 = R302.ins
-        CSL1.imass['CSL'] = 0.0050 * feed.F_mass
-        DAP1.imass['DAP'] = 0.33 * feed.F_vol
-        R302._run()
+    if add_nutrients:
+        @R302.add_specification(run=True)
+        def adjust_CSL_and_DAP_feed_to_seed_train():
+            feed, CSL1, DAP1 = R302.ins
+            CSL1.imass['CSL'] = 0.0050 * feed.F_mass
+            DAP1.imass['DAP'] = 0.33 * feed.F_vol
+            R302._run()
     
     R302.specification = adjust_CSL_and_DAP_feed_to_seed_train
     T301 = units.SeedHoldTank('T301', R302-1)
     R303 = SimultaneousSaccharificationAndCoFermentation(
-        'R303', (S303-1, T301-0, CSL2, DAP2), 
+        'R303', (S303-1, T301-0, *nutrients_2), 
         saccharification=saccharification_reactions,
         cofermentaion=cofermentaion_reactions,
     )
+    if add_nutrients:
+        @R303.add_specification(run=True)
+        def adjust_CSL_and_DAP_feed_to_fermentation():
+            feed, seed, CSL2, DAP2 = R303.ins
+            CSL2.imass['CSL'] = 0.0025 * feed.F_mass
+            DAP2.imass['DAP'] = 0.33 * feed.F_vol
+            S301.ins[0].mix_from(S301.outs)
+            S302.ins[0].mix_from(S302.outs)
+            DAP_storage.ins[0].copy_like(DAP_storage.outs[0])
+            CSL_storage.ins[0].copy_like(CSL_storage.outs[0])
+            R303._run()
     
-    def adjust_CSL_and_DAP_feed_to_fermentation():
-        feed, seed, CSL2, DAP2 = R303.ins
-        CSL2.imass['CSL'] = 0.0025 * feed.F_mass
-        DAP2.imass['DAP'] = 0.33 * feed.F_vol
-        S301.ins[0].mix_from(S301.outs)
-        S302.ins[0].mix_from(S302.outs)
-        DAP_storage.ins[0].copy_like(DAP_storage.outs[0])
-        CSL_storage.ins[0].copy_like(CSL_storage.outs[0])
-        R303._run()
-    
-    R303.specification = adjust_CSL_and_DAP_feed_to_fermentation
     M304 = bst.Mixer('M304', (R302-0, R303-0))
     T302 = units.BeerTank('T302', outs=beer)
     
@@ -475,64 +582,71 @@ def create_integrated_bioprocess_saccharification_and_cofermentation_system(
         saccharification_reactions=None,
         seed_train_reactions=None,
         cofermentation_reactions=None,
-        include_scrubber=True
+        include_scrubber=True,
+        add_nutrients=True,
     ):
     slurry, DAP, CSL = ins
     vent, beer = outs
+    if add_nutrients:
+        DAP1 = Stream('DAP1',
+                        DAP=26,
+                        units='kg/hr',
+                        price=price['DAP'])
+        DAP2 = Stream('DAP2',
+                        DAP=116,
+                        units='kg/hr',
+                        price=price['DAP'])
+        CSL1 = Stream('CSL1',
+                        CSL=211,
+                        units='kg/hr',
+                        price=price['CSL'])
+        CSL2 = Stream('CSL2',
+                        CSL=948,
+                        units='kg/hr',
+                        price=price['CSL'])
+        
+        DAP_storage = units.DAPStorageTank('DAP_storage', DAP)
+        S301 = bst.FakeSplitter('S301', DAP_storage-0, outs=(DAP1, DAP2))
+        CSL_storage = units.CSLStorageTank('CSL_storage', CSL)
+        S302 = bst.FakeSplitter('S302', CSL_storage-0, outs=(CSL1, CSL2))
+        nutrients_1 = (CSL1, DAP1)
+        nutrients_2 = (CSL2, DAP2)
+    else:
+        ins.remove(DAP)
+        ins.remove(CSL)
+        nutrients_1 = nutrients_2 = ()
     
-    DAP1 = Stream('DAP1',
-                    DAP=26,
-                    units='kg/hr',
-                    price=price['DAP'])
-    DAP2 = Stream('DAP2',
-                    DAP=116,
-                    units='kg/hr',
-                    price=price['DAP'])
-    CSL1 = Stream('CSL1',
-                    CSL=211,
-                    units='kg/hr',
-                    price=price['CSL'])
-    CSL2 = Stream('CSL2',
-                    CSL=948,
-                    units='kg/hr',
-                    price=price['CSL'])
-    
-    DAP_storage = units.DAPStorageTank('DAP_storage', DAP)
-    S301 = bst.FakeSplitter('S301', DAP_storage-0, outs=(DAP1, DAP2))
-    CSL_storage = units.CSLStorageTank('CSL_storage', CSL)
-    S302 = bst.FakeSplitter('S302', CSL_storage-0, outs=(CSL1, CSL2))
     if not SaccharificationAndCoFermentation:
         SaccharificationAndCoFermentation = units.SaccharificationAndCoFermentation
     if not SeedTrain: SeedTrain = units.SeedTrain
     recycle = bst.Stream()
-    R302 = SeedTrain('R302', (recycle, CSL1, DAP1), 
+    R302 = SeedTrain('R302', (recycle, *nutrients_1), 
                      reactions=seed_train_reactions)
-    
-    def adjust_CSL_and_DAP_feed_to_seed_train():
-        feed, CSL1, DAP1 = R302.ins
-        CSL1.imass['CSL'] = 0.0050 * feed.F_mass
-        DAP1.imass['DAP'] = 0.33 * feed.F_vol
-        R302._run()
-    
-    R302.specification = adjust_CSL_and_DAP_feed_to_seed_train
+    if add_nutrients:
+        @R302.add_specification(run=True)
+        def adjust_CSL_and_DAP_feed_to_seed_train():
+            feed, CSL1, DAP1 = R302.ins
+            CSL1.imass['CSL'] = 0.0050 * feed.F_mass
+            DAP1.imass['DAP'] = 0.33 * feed.F_vol
+        
     T301 = units.SeedHoldTank('T301', R302-1)
     R303 = SaccharificationAndCoFermentation(
-        'R303', (slurry, T301-0, CSL2, DAP2), outs=('', '', recycle), 
+        'R303', (slurry, T301-0, *nutrients_2), outs=('', '', recycle), 
         cofermentation=cofermentation_reactions,
         saccharification=saccharification_reactions,
     )
+    if add_nutrients:
+        @R303.add_specification(run=True)
+        def adjust_CSL_and_DAP_feed_to_fermentation():
+            feed, seed, CSL2, DAP2 = R303.ins
+            CSL2.imass['CSL'] = 0.0025 * feed.F_mass
+            DAP2.imass['DAP'] = 0.33 * feed.F_vol
+            S301.ins[0].mix_from(S301.outs)
+            S302.ins[0].mix_from(S302.outs)
+            DAP_storage.ins[0].copy_like(DAP_storage.outs[0])
+            CSL_storage.ins[0].copy_like(CSL_storage.outs[0])
+            R303._run()
     
-    def adjust_CSL_and_DAP_feed_to_fermentation():
-        feed, seed, CSL2, DAP2 = R303.ins
-        CSL2.imass['CSL'] = 0.0025 * feed.F_mass
-        DAP2.imass['DAP'] = 0.33 * feed.F_vol
-        S301.ins[0].mix_from(S301.outs)
-        S302.ins[0].mix_from(S302.outs)
-        DAP_storage.ins[0].copy_like(DAP_storage.outs[0])
-        CSL_storage.ins[0].copy_like(CSL_storage.outs[0])
-        R303._run()
-    
-    R303.specification = adjust_CSL_and_DAP_feed_to_fermentation
     M304 = bst.Mixer('M304', (R302-0, R303-0))
     T302 = units.BeerTank('T302', outs=beer)
     
@@ -571,57 +685,66 @@ def create_cofermentation_system(
         include_scrubber=True,
         seed_train_reactions=None,
         cofermentation_reactions=None,
+        add_nutrients=True,
     ):
     slurry, DAP, CSL = ins
     vent, beer, lignin = outs
+    if add_nutrients:
+        DAP1 = Stream('DAP1',
+                        DAP=26,
+                        units='kg/hr',
+                        price=price['DAP'])
+        DAP2 = Stream('DAP2',
+                        DAP=116,
+                        units='kg/hr',
+                        price=price['DAP'])
+        CSL1 = Stream('CSL1',
+                        CSL=211,
+                        units='kg/hr',
+                        price=price['CSL'])
+        CSL2 = Stream('CSL2',
+                        CSL=948,
+                        units='kg/hr',
+                        price=price['CSL'])
+        DAP_storage = units.DAPStorageTank('DAP_storage', DAP)
+        S301 = bst.FakeSplitter('S301', DAP_storage-0, outs=(DAP1, DAP2))
+        CSL_storage = units.CSLStorageTank('CSL_storage', CSL)
+        S302 = bst.FakeSplitter('S302', CSL_storage-0, outs=(CSL1, CSL2))
+        nutrients_1 = (CSL1, DAP1)
+        nutrients_2 = (CSL2, DAP2)
+    else:
+        ins.remove(DAP)
+        ins.remove(CSL)
+        nutrients_1 = nutrients_2 = ()
     
-    DAP1 = Stream('DAP1',
-                    DAP=26,
-                    units='kg/hr',
-                    price=price['DAP'])
-    DAP2 = Stream('DAP2',
-                    DAP=116,
-                    units='kg/hr',
-                    price=price['DAP'])
-    CSL1 = Stream('CSL1',
-                    CSL=211,
-                    units='kg/hr',
-                    price=price['CSL'])
-    CSL2 = Stream('CSL2',
-                    CSL=948,
-                    units='kg/hr',
-                    price=price['CSL'])
-    
-    DAP_storage = units.DAPStorageTank('DAP_storage', DAP)
-    S301 = bst.FakeSplitter('S301', DAP_storage-0, outs=(DAP1, DAP2))
-    CSL_storage = units.CSLStorageTank('CSL_storage', CSL)
-    S302 = bst.FakeSplitter('S302', CSL_storage-0, outs=(CSL1, CSL2))
     S303 = bst.PressureFilter('S303', slurry, (lignin, ''))
     S304 = bst.Splitter('S304', S303-1, split=0.1)
     if not SeedTrain: SeedTrain = units.SeedTrain
-    R302 = SeedTrain('R302', (S304-0, CSL1, DAP1), reactions=seed_train_reactions)
+    R302 = SeedTrain('R302', (S304-0, *nutrients_1), reactions=seed_train_reactions)
     
-    @R302.add_specification(run=True)
-    def adjust_CSL_and_DAP_feed_to_seed_train():
-        feed, CSL1, DAP1 = R302.ins
-        CSL1.imass['CSL'] = 0.0050 * feed.F_mass
-        DAP1.imass['DAP'] = 0.33 * feed.F_vol
+    if add_nutrients:
+        @R302.add_specification(run=True)
+        def adjust_CSL_and_DAP_feed_to_seed_train():
+            feed, CSL1, DAP1 = R302.ins
+            CSL1.imass['CSL'] = 0.0050 * feed.F_mass
+            DAP1.imass['DAP'] = 0.33 * feed.F_vol
     
     T301 = units.SeedHoldTank('T301', R302-1)
     if not CoFermentation: CoFermentation = units.CoFermentation
-    R303 = CoFermentation('R303', (S304-1, T301-0, CSL2, DAP2),
+    R303 = CoFermentation('R303', (S304-1, T301-0, *nutrients_2),
                           outs=('', ''), cofermentation=cofermentation_reactions)
     
-    @R303.add_specification(run=True)
-    def adjust_CSL_and_DAP_feed_to_fermentation():
-        feed, seed, CSL2, DAP2, *other = R303.ins
-        CSL2.imass['CSL'] = 0.0025 * feed.F_mass
-        DAP2.imass['DAP'] = 0.33 * feed.F_vol
-        S301.ins[0].mix_from(S301.outs)
-        S302.ins[0].mix_from(S302.outs)
-        DAP_storage.ins[0].copy_like(DAP_storage.outs[0])
-        CSL_storage.ins[0].copy_like(CSL_storage.outs[0])
-    
+    if add_nutrients:
+        @R303.add_specification(run=True)
+        def adjust_CSL_and_DAP_feed_to_fermentation():
+            feed, seed, CSL2, DAP2, *other = R303.ins
+            CSL2.imass['CSL'] = 0.0025 * feed.F_mass
+            DAP2.imass['DAP'] = 0.33 * feed.F_vol
+            S301.ins[0].mix_from(S301.outs)
+            S302.ins[0].mix_from(S302.outs)
+            DAP_storage.ins[0].copy_like(DAP_storage.outs[0])
+            CSL_storage.ins[0].copy_like(CSL_storage.outs[0])
+        
     M304 = bst.Mixer('M304', (R302-0, R303-0))
     T302 = units.BeerTank('T302', outs=beer)
     
@@ -679,10 +802,13 @@ def create_cellulosic_fermentation_system(
         saccharification_reactions=None,
         seed_train_reactions=None,
         cofermentation_reactions=None,
+        add_nutrients=True,
     ):
     vent, beer, lignin = outs
     hydrolyzate, cellulase, saccharification_water, DAP, CSL = ins
-    
+    if not add_nutrients:
+        ins.remove(CSL)
+        ins.remove(DAP)
     saccharification_sys = create_saccharification_system(
         ins=[hydrolyzate, cellulase, saccharification_water],
         mockup=True,
@@ -703,6 +829,7 @@ def create_cellulosic_fermentation_system(
             include_scrubber=include_scrubber,
             seed_train_reactions=seed_train_reactions,
             cofermentation_reactions=cofermentation_reactions,
+            add_nutrients=add_nutrients,
         )
     elif kind == 1:
         cofermentation_sys = create_simultaneous_saccharification_and_cofermentation_system(
@@ -712,6 +839,7 @@ def create_cellulosic_fermentation_system(
             include_scrubber=include_scrubber,
             seed_train_reactions=seed_train_reactions,
             cofermentation_reactions=cofermentation_reactions,
+            add_nutrients=add_nutrients,
         )
     elif kind == 2:
         T303 = bst.StorageTank('T303', saccharification_sys-0, tau=4)
@@ -724,6 +852,7 @@ def create_cellulosic_fermentation_system(
             include_scrubber=include_scrubber,
             seed_train_reactions=seed_train_reactions,
             cofermentation_reactions=cofermentation_reactions,
+            add_nutrients=add_nutrients,
         )
     else:
         raise ValueError("invalid 'kind'")
