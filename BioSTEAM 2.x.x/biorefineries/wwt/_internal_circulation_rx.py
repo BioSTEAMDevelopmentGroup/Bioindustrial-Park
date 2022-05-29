@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 # Bioindustrial-Park: BioSTEAM's Premier Biorefinery Models and Results
-# Copyright (C) 2021-, Yalin Li <zoe.yalin.li@gmail.com>
+# Copyright (C) 2021-, Yalin Li <mailto.yalin.li@gmail.com>
 #
 # This module is under the UIUC open-source license. See
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
@@ -119,7 +119,7 @@ class InternalCirculationRx(bst.MixTank):
     _b = 0.00083
     _Fxb = 0.0032
     _Fxt = 0.0281
-    _Y = 0.07
+    _Y = 0.05
 
     # Related to cost algorithm
     _default_vessel_type = 'IC'
@@ -131,7 +131,7 @@ class InternalCirculationRx(bst.MixTank):
 
 
     def __init__(self, ID='', ins=None, outs=(), thermo=None, *,
-                 method='lumped', OLRall=1.25, Y_biogas=0.86, Y_biomass=0.07, biodegradability={},
+                 method='lumped', OLRall=1.25, Y_biogas=0.86, Y_biomass=0.05, biodegradability={},
                  vessel_type='IC', vessel_material='Stainless steel',
                  V_wf=0.8, kW_per_m3=0., T=35+273.15, **kwargs):
         bst.Unit.__init__(self, ID, ins, outs, thermo)

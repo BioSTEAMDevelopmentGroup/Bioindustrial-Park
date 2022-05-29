@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 # Bioindustrial-Park: BioSTEAM's Premier Biorefinery Models and Results
-# Copyright (C) 2022-, Yalin Li <zoe.yalin.li@gmail.com>
+# Copyright (C) 2022-, Yalin Li <mailto.yalin.li@gmail.com>
 #
 # This module is under the UIUC open-source license. See
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
@@ -131,13 +131,16 @@ def add_biodiesel_parameters(model, model_dct, f, u, s, get_obj, get_rxn, param)
             isplit_b = i.isplit
             break
 
+    #!!! Add oilcane oil content
+
+    #!!! NEEDS UPDATING WITH NEWER BIOSTEAM/OILCANE
     # Extraction
     feedstock = get_obj(s, 'feedstock')
     oil_extraction_specification = OilExtractionSpecification(
             sys, [feedstock], isplit_a, isplit_b, model_dct['isplit_efficiency_is_reversed']
         )
     b = oil_extraction_specification.efficiency
-    D = get_default_distribution('uniform', b)
+    D = get_default_distribution('uniform', b, lb=0, ub=1)
     # not using the range in the biorefinery as the baseline is 0.5/0.7
     # D = shape.Uniform(0.5, 0.7) if not model_dct['is2G'] else shape.Uniform(0.7, 0.9)
     @param(name='Oil extraction efficiency', element=oil_extraction_specification,
@@ -145,9 +148,10 @@ def add_biodiesel_parameters(model, model_dct, f, u, s, get_obj, get_rxn, param)
     def set_bagasse_oil_extraction_efficiency(bagasse_oil_extraction_efficiency):
         oil_extraction_specification.load_efficiency(bagasse_oil_extraction_efficiency)
 
+    # Oil retained in the bagasse after crushing
     b = oil_extraction_specification.oil_retention
-    D = get_default_distribution('uniform', b)
-    # D = shape.Uniform(0.4, 0.7) # not using the range in the biorefinery as the baseline is 0.7
+    D = get_default_distribution('uniform', b, lb=0, ub=1)
+    # D = shape.Uniform(0.4, 0.7) # not using the range in the biorefinery as the baseline is 0.4
     @param(name='Bagasse oil retention', element=oil_extraction_specification,
            units='', kind='coupled', baseline=b, distribution=D)
     def set_bagasse_oil_retention(oil_retention):
@@ -288,6 +292,7 @@ def add_2G_parameters(model, model_dct, f, u, s, get_obj, get_rxn, param):
     def set_EH_solid_loading(loading):
         EH_mixer.solid_loading = loading
 
+    #!!! Here differentiate the two pretreatment methods
     EH_rx = get_obj(u, 'EH_rx') or get_obj(u, 'fermentor')
     rxn = get_rxn(EH_rx, 'EH glucan-to-glucose')
     b = rxn.X
@@ -318,12 +323,12 @@ def add_2G_parameters(model, model_dct, f, u, s, get_obj, get_rxn, param):
     else: raise ValueError(f"Fermentation product {model_dct['FERM_product']} not recognized.")
 
     @param(name='FERM glucose yield', element=fermentor, kind='coupled', units='-',
-           baseline=b, distribution=D_g)
+           baseline=b_g, distribution=D_g)
     def set_FERM_glucose_yield(X):
         rxn_g.X = X
 
     @param(name='FERM xylose yield', element=fermentor, kind='coupled', units='-',
-           baseline=b, distribution=D_x)
+           baseline=b_x, distribution=D_x)
     def set_FERM_xylose_yield(X):
         rxn_x.X = X
 
@@ -375,7 +380,7 @@ def add_new_wwt_parameters(model, model_dct, f, u, s, get_obj, get_rxn, param):
 
     b = AnMBR.membrane_unit_cost
     D = shape.Uniform(6, 10)
-    @param(name='AnMBR membrane unit cost', element=AnMBR, kind='cost', units='$/ft2',
+    @param(name='AnMBR membrane unit price', element=AnMBR, kind='cost', units='$/ft2',
            baseline=b, distribution=D)
     def set_AnMBR_membrane_cost(cost):
         AnMBR.membrane_unit_cost = cost
@@ -415,22 +420,23 @@ def add_new_wwt_parameters(model, model_dct, f, u, s, get_obj, get_rxn, param):
     def set_AnMBR_Y_biomass(Y):
         AnMBR.Y_biomass = Y
 
-    b = AnMBR.v_GAC
-    D = shape.Uniform(6, 10)
-    @param(name='AnMBR upflow velocity for GAC', element=AnMBR, kind='coupled', units='m/hr',
-           baseline=b, distribution=D)
-    def set_AnMBR_v_GAC(v):
-        AnMBR.v_GAC = v
+    # # Not used for the cross-flow configuration
+    # b = AnMBR.v_GAC
+    # D = shape.Uniform(6, 10)
+    # @param(name='AnMBR upflow velocity for GAC', element=AnMBR, kind='coupled', units='m/hr',
+    #        baseline=b, distribution=D)
+    # def set_AnMBR_v_GAC(v):
+    #     AnMBR.v_GAC = v
 
     # AeF, some systems do not need it thus using a dummy unit
     AeF = getattr(u, f'R{X}03')
     if not type(AeF).__name__ == 'Skipped':
-        b = AeF.OLR * 24
-        D = shape.Uniform(0.5, 4)
+        b = AeF.OLR
+        D = shape.Uniform(0.5/24, 4/24) # kg COD/m3/d to kg COD/m3/hr
         @param(name='AeF organic loading rate', element=AeF, kind='coupled', units='kg COD/m3/hr',
                baseline=b, distribution=D)
         def set_AeF_OLR(OLR):
-            AeF.OLR = OLR/24 # kg COD/m3/d to kg COD/m3/hr
+            AeF.OLR = OLR
 
         b = AeF.OLR
         D = shape.Uniform(0.11, 0.44)

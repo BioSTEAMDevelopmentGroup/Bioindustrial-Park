@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 # Bioindustrial-Park: BioSTEAM's Premier Biorefinery Models and Results
-# Copyright (C) 2021-, Yalin Li <zoe.yalin.li@gmail.com>
+# Copyright (C) 2021-, Yalin Li <mailto.yalin.li@gmail.com>
 #
 # This module is under the UIUC open-source license. See
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
@@ -296,22 +296,23 @@ def get_BMP_stoichiometry(chemical):
     return dct
 
 
-# Biodegradability, 0.87 from glucose (treated as the maximum value)
-def get_BD_dct(chemicals, default_BD=0.87, **kwargs):
+# Note that these biodegradabilities will then be multiplied by the yield
+# of biogas/cell mass (0.86 is the default)
+def get_BD_dct(chemicals, default_BD=1, **kwargs):
     BD_dct = dict.fromkeys([i.ID for i in get_digestable_chemicals(chemicals)],
                            default_BD)
 
     # Based on Kontos thesis
-    BD_dct['AceticAcid'] = 0.87
-    BD_dct['Arabinose'] = 0.2
-    BD_dct['Glucose'] = 0.87
-    BD_dct['GlucoseOligomer'] = BD_dct['Glucan'] = 0.81
-    BD_dct['HMF'] = 0.85
-    BD_dct['LacticAcid'] = 0.85
-    BD_dct['Lignin'] = BD_dct['SolubleLignin'] = 0.001
+    BD_dct['AceticAcid'] = 1 # 0.87/0.86>1
+    BD_dct['Arabinose'] = 0.2/0.86
+    BD_dct['Glucose'] = 1 # 0.87/0.86>1
+    BD_dct['GlucoseOligomer'] = BD_dct['Glucan'] = 0.81/0.86
+    BD_dct['HMF'] = 0.85/0.86
+    BD_dct['LacticAcid'] = 0.85/0.86
+    BD_dct['Lignin'] = BD_dct['SolubleLignin'] = 0.001/0.86
     BD_dct['Tar'] = 0.
-    BD_dct['Xylose'] = 0.8
-    BD_dct['XyloseOligomer'] = BD_dct['Xylan'] = 0.75
+    BD_dct['Xylose'] = 0.8/0.86
+    BD_dct['XyloseOligomer'] = BD_dct['Xylan'] = 0.75/0.86
 
     # Assume biodegradabilities based on glucose and xylose
     BD_dct['Galactose'] = BD_dct['Mannose'] = \

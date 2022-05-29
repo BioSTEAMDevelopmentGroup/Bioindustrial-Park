@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 # Bioindustrial-Park: BioSTEAM's Premier Biorefinery Models and Results
-# Copyright (C) 2021-, Yalin Li <zoe.yalin.li@gmail.com>
+# Copyright (C) 2021-, Yalin Li <mailto.yalin.li@gmail.com>
 #
 # Part of this module is based on the cornstover biorefinery:
 # https://github.com/BioSTEAMDevelopmentGroup/Bioindustrial-Park/tree/master/BioSTEAM%202.x.x/biorefineries/cornstover
@@ -32,7 +32,7 @@ info = {
 # Systems
 # =============================================================================
 
-def create_cs_comparison_systems(biodegradability=0.91):
+def create_cs_comparison_systems(biodegradability=1): # will be multiplied by 0.86/0.05 for biogas/cell mass
     wwt_kwdct = dict.fromkeys(('IC_kwargs', 'AnMBR_kwargs',), {'biodegradability': biodegradability,})
     CF_dct = { # all streams are feeds
         'ammonia': ('NH4OH',), # NH4OH
@@ -123,7 +123,7 @@ def evaluate_cs_models(**eval_kwdct):
 # =============================================================================
 
 if __name__ == '__main__':
-    # exist_sys, new_sys = simulate_cs_systems(biodegradability=0.91)
+    # exist_sys, new_sys = simulate_cs_systems(biodegradability=1)
     # exist_model, new_model = create_cs_comparison_models()
     exist_model, new_model = evaluate_cs_models(
         # include_baseline=False,

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 # Bioindustrial-Park: BioSTEAM's Premier Biorefinery Models and Results
-# Copyright (C) 2022-, Yalin Li <zoe.yalin.li@gmail.com>
+# Copyright (C) 2022-, Yalin Li <mailto.yalin.li@gmail.com>
 #
 # Part of this module is based on the oilcane biorefinery:
 # https://github.com/BioSTEAMDevelopmentGroup/Bioindustrial-Park/tree/master/BioSTEAM%202.x.x/biorefineries/oilcane
@@ -32,7 +32,7 @@ info = {
 # Systems
 # =============================================================================
 
-def create_sc2g_comparison_systems(biodegradability=0.91):
+def create_sc2g_comparison_systems(biodegradability=1): # will be multiplied by 0.86/0.05 for biogas/cell mass
     wwt_kwdct = dict.fromkeys(('IC_kwargs', 'AnMBR_kwargs',), {'biodegradability': biodegradability,})
     CF_dct = { # all streams are feeds
         'caustic': ('NaOH', 0.5), # NaOH and water
@@ -127,7 +127,7 @@ def evaluate_sc2g_models(**eval_kwdct):
 # =============================================================================
 
 if __name__ == '__main__':
-    # exist_sys, new_sys = simulate_sc2g_systems(biodegradability=0.91)
+    # exist_sys, new_sys = simulate_sc2g_systems(biodegradability=1)
     # exist_model, new_model = create_sc2g_comparison_models()
     exist_model, new_model = evaluate_sc2g_models(
         # include_baseline=False,
