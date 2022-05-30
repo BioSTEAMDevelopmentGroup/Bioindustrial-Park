@@ -221,6 +221,7 @@ def run_solvents_barrage(stream, # Stream from which you wish to extract the sol
         mixed_stream.mix_from([process_stream, solvent_stream])
         # print(mixed_stream.lle_chemicals)
         mixed_stream.lle(T=T, top_chemical = solvent_chemical.ID)
+        mixed_stream.show()
         # mixed_stream.lle(T=T)
         # mixed_stream.show(N=100, composition=True)
         K_solute_in_solvent = get_K(solute.ID, mixed_stream, extract_phase, raffinate_phase)
