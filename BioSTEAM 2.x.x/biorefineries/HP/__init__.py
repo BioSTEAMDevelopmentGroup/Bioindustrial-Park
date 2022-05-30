@@ -6,7 +6,7 @@
 # Copyright (C) 2020-2021, Yoel Cortes-Pena <yoelcortes@gmail.com>
 # Bioindustrial-Park: BioSTEAM's Premier Biorefinery Models and Results
 # Copyright (C) 2020-2021, Sarang Bhagwat <sarangb2@illinois.edu>,
-# Yalin Li <yalinli2@illinois.edu>, and Yoel Cortes-Pena (yoelcortes@gmail.com)
+# Yalin Li <mailto.yalin.li@gmail.com>, and Yoel Cortes-Pena (yoelcortes@gmail.com)
 # 
 # This module is under the UIUC open-source license. See 
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt

@@ -1,6 +1,7 @@
 build
 dist
 BioSTEAM 2.x.x/biorefineries.egg-info
+**/.ipynb_checkpoints
 **/__pycache__
 *.pyc
 *.pyo
@@ -28,6 +29,14 @@ docs/_build/*
 docs/_static/*
 docs/_templates/*
 
+# Data #
+########
+*.xlsx
+*.png
+*.jpeg
+*.svg
+*.npy
+
 # Compiled source #
 ###################
 *.com
@@ -37,7 +46,8 @@ docs/_templates/*
 *.o
 *.so
 *.idea
- # Packages #
+
+# Packages #
 ############
 # it's better to unpack these files and commit the raw source
 # git has its own built in compression methods

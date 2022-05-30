@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 # Bioindustrial-Park: BioSTEAM's Premier Biorefinery Models and Results
-# Copyright (C) 2022-, Yalin Li <zoe.yalin.li@gmail.com>
+# Copyright (C) 2022-, Yalin Li <mailto.yalin.li@gmail.com>
 #
 # This module is under the UIUC open-source license. See
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
 # for license details.
 
 import os, numpy as np, pandas as pd
+from copy import deepcopy
 from math import ceil
 from biosteam import Stream, Metric, PowerUtility, WastewaterSystemCost, ReverseOsmosis
 from biosteam.utils import ignore_docking_warnings
@@ -15,9 +16,9 @@ from chaospy import distributions as shape
 from . import results_path, get_combustion_energy, compute_stream_COD as get_COD
 
 __all__ = (
-    'get_default_distribution', 'Setter', 'AttrGetter', 'copy_samples', 
-    'create_comparison_models', 'save_model_results',  'evaluate_models',
-    'get_baseline_summary', 'summarize_baselines',
+    'get_default_distribution', 'Setter', 'AttrGetter', 'copy_samples',
+    'create_comparison_models', 'save_model_results',
+    'evaluate_models', 'summarize_baselines', 'summarize_biodegradabilities',
     )
 
 
@@ -117,40 +118,71 @@ def add_biorefinery_parameters(model, model_dct, f, u, s, get_obj, get_rxn, para
 
 
 def add_biodiesel_parameters(model, model_dct, f, u, s, get_obj, get_rxn, param):
+    # Some of the distributions differ from those in the reference
+    # as the reference uses more optimistic values
     from biorefineries.oilcane import OilExtractionSpecification
     sys = model.system
 
     isplit_a = isplit_b = None
     for i in sys.cost_units:
-        if getattr(i, 'tag', None) == 'oil extraction efficiency':
+        if getattr(i, 'tag', None) == 'oil extraction':
             isplit_a = i.isplit
             break
     for i in sys.cost_units:
-        if getattr(i, 'tag', None) == 'bagasse oil retention':
+        if getattr(i, 'tag', None) == 'bagasse oil extraction':
             isplit_b = i.isplit
             break
 
-    # Extraction
+    # Feedstock dry mass oil content,
+    # not using the range in the biorefinery as the baseline is 0.05 and
+    # the distribution is uniform, 0.05-0.15
     feedstock = get_obj(s, 'feedstock')
     oil_extraction_specification = OilExtractionSpecification(
             sys, [feedstock], isplit_a, isplit_b, model_dct['isplit_efficiency_is_reversed']
         )
-    b = oil_extraction_specification.efficiency
-    D = get_default_distribution('uniform', b)
-    # not using the range in the biorefinery as the baseline is 0.5/0.7
-    # D = shape.Uniform(0.5, 0.7) if not model_dct['is2G'] else shape.Uniform(0.7, 0.9)
-    @param(name='Oil extraction efficiency', element=oil_extraction_specification,
+    b = oil_extraction_specification.oil_content or 0.05
+    D = get_default_distribution('uniform', b, lb=0, ub=1)
+    @param(name='Feedstock oil content', element=oil_extraction_specification,
+           units='dry mass', kind='coupled', baseline=b, distribution=D)
+    def set_feedstock_oil_content(i):
+        oil_extraction_specification.load_oil_content(i)
+        
+    # Free fatty acid content as a fraction of the feedstock oil content
+    b = oil_extraction_specification.FFA_content
+    D = get_default_distribution('uniform', b, lb=0, ub=1)
+    @param(name='Feedstock free fatty acid content', element=oil_extraction_specification,
+           units='frac of oil', kind='coupled', baseline=b, distribution=D)
+    def set_free_fatty_acid_content(i):
+        oil_extraction_specification.FFA_content = i
+        
+    # Polar lipid content as a fraction of the feedstock oil content
+    b = oil_extraction_specification.PL_content
+    D = get_default_distribution('uniform', b, lb=0, ub=1)
+    @param(name='Feedstock polar lipid content', element=oil_extraction_specification,
+           units='frac of oil', kind='coupled', baseline=b, distribution=D)
+    def set_polar_lipid_content(i):
+        oil_extraction_specification.PL_content = i
+        
+    
+    # Oil retained in the bagasse after crushing,
+    # not using the range in the biorefinery as the baseline is 0.6 and
+    # the distribution is uniform, 0.6-0.9
+    b = oil_extraction_specification.crushing_mill_oil_recovery or 0.6
+    D = get_default_distribution('uniform', b, lb=0, ub=1)
+    @param(name='Crushing mill oil recovery', element=oil_extraction_specification,
            units='', kind='coupled', baseline=b, distribution=D)
-    def set_bagasse_oil_extraction_efficiency(bagasse_oil_extraction_efficiency):
-        oil_extraction_specification.load_efficiency(bagasse_oil_extraction_efficiency)
-
-    b = oil_extraction_specification.oil_retention
-    D = get_default_distribution('uniform', b)
-    # D = shape.Uniform(0.4, 0.7) # not using the range in the biorefinery as the baseline is 0.7
-    @param(name='Bagasse oil retention', element=oil_extraction_specification,
+    def set_crushing_mill_oil_recovery(i):
+        oil_extraction_specification.load_crushing_mill_oil_recovery(i)
+    
+    # Oil recovery after enzymatic hydrolysis (i.e., saccharification),
+    # not using the range in the biorefinery as the baseline is 0.7 and
+    # the distribution is uniform, 0.7-0.9
+    b = oil_extraction_specification.saccharification_oil_recovery or 0.7
+    D = get_default_distribution('uniform', b, lb=0, ub=1)
+    @param(name='EH oil recovery', element=oil_extraction_specification,
            units='', kind='coupled', baseline=b, distribution=D)
-    def set_bagasse_oil_retention(oil_retention):
-        oil_extraction_specification.load_oil_retention(oil_retention)
+    def set_EH_oil_recovery(i):
+        oil_extraction_specification.load_saccharification_oil_recovery(i)
 
     # Hydrolysis
     fermentor = get_obj(u, 'fermentor')
@@ -239,38 +271,9 @@ def add_1G_parameters(model, model_dct, f, u, s, get_obj, get_rxn, param):
     return model
 
 
-# All chemical loading and conversions parameters related to 2G biorefineries
-# based on in Humbird et al. if not otherwise noted
 def add_2G_parameters(model, model_dct, f, u, s, get_obj, get_rxn, param):
-    # Pretreatment
-    PT_solids_mixer = get_obj(u, 'PT_solids_mixer')
-    b = PT_solids_mixer.solids_loading
-    try: D = shape.Triangle(0.25, b, 0.4)
-    except: D = get_default_distribution('uniform', b) # hydrothermal pretreatment
-    @param(name='PT solids loading', element=PT_solids_mixer, kind='coupled', units='-',
-           baseline=b, distribution=D)
-    def set_PT_solids_loading(loading):
-        PT_solids_mixer.solids_loading = loading
-
-    PT_rx = get_obj(u, 'PT_rx')
-    rxn = get_rxn(PT_rx, 'PT glucan-to-glucose')
-    b = rxn.X
-    D = shape.Triangle(0.06, b, 0.12)
-    @param(name='PT glucan-to-glucose', element=PT_rx, kind='coupled', units='-',
-           baseline=b, distribution=D)
-    def set_PT_glucan_to_glucose(X):
-        rxn.X = X
-
-    rxn = get_rxn(PT_rx, 'PT xylan-to-xylose')
-    b = rxn.X
-    try: D = shape.Triangle(0.8, b, 0.92)
-    except: D = get_default_distribution('uniform', b, ub=1) # hydrothermal pretreatment
-    @param(name='PT xylan-to-xylose', element=PT_rx, kind='coupled', units='-',
-           baseline=b, distribution=D)
-    def set_PT_xylan_to_xylose(X):
-        rxn.X = X
-
-    # Saccharification (enzymatic hydrolysis) and cofermentation
+    ##### Common parameters #####
+    # Enzymatic hydrolysis (i.e., saccharification) and cofermentation
     EH_mixer = get_obj(u, 'EH_mixer')
     b = EH_mixer.enzyme_loading
     try: D = shape.Triangle(10, b, 30)
@@ -279,58 +282,130 @@ def add_2G_parameters(model, model_dct, f, u, s, get_obj, get_rxn, param):
            baseline=b, distribution=D)
     def set_EH_enzyme_loading(loading):
         EH_mixer.enzyme_loading = loading
-
-    b = EH_mixer.solids_loading
-    D = shape.Triangle(0.175, b, 0.25)
-    @param(name='EH solids loading', element=EH_mixer, kind='coupled', units='-',
-           baseline=b, distribution=D)
-    def set_EH_solid_loading(loading):
-        EH_mixer.solid_loading = loading
-
-    EH_rx = get_obj(u, 'EH_rx') or get_obj(u, 'fermentor')
-    rxn = get_rxn(EH_rx, 'EH glucan-to-glucose')
-    b = rxn.X
-    D = shape.Triangle(0.75, b, 0.95)
-    @param(name='EH glucan-to-glucose', element=EH_rx, kind='coupled', units='-',
-           baseline=b, distribution=D)
-    def set_EH_glucan_to_glucose(X):
-        rxn.X = X
-
+        
     fermentor = get_obj(u, 'fermentor')
     rxn_g = get_rxn(fermentor, 'FERM glucan-to-product')
     rxn_x = get_rxn(fermentor, 'FERM xylan-to-product')
     b_g = rxn_g.X
     b_x = rxn_x.X
-    if model_dct['FERM_product']=='ethanol':
-        try:
+
+    ##### Specific settings #####
+    if model_dct['feedstock'] in ('sugarcane', 'oilcane'): # hydrothermal pretreatment (SC/OC-2G)
+        # Pretreatment
+        PT_solids_mixer = get_obj(u, 'PT_solids_mixer')
+        b = PT_solids_mixer.solids_loading
+        D = get_default_distribution('uniform', b)
+        @param(name='PT solids loading', element=PT_solids_mixer, kind='coupled', units='-',
+               baseline=b, distribution=D)
+        def set_PT_solids_loading(loading):
+            PT_solids_mixer.solids_loading = loading
+    
+        PT_rx = get_obj(u, 'PT_rx')
+        rxn = get_rxn(PT_rx, 'PT glucan-to-glucose')
+        b = rxn.X
+        D = get_default_distribution('uniform', b, lb=0, ub=1)
+        @param(name='PT glucan-to-glucose', element=PT_rx, kind='coupled', units='-',
+               baseline=b, distribution=D)
+        def set_PT_glucan_to_glucose(X):
+            rxn.X = X
+            
+        rxn = get_rxn(PT_rx, 'PT xylan-to-xylose')
+        b = rxn.X
+        D = get_default_distribution('uniform', b, lb=0, ub=1)
+        @param(name='PT xylan-to-xylose', element=PT_rx, kind='coupled', units='-',
+               baseline=b, distribution=D)
+        def set_PT_xylan_to_xylose(X):
+            rxn.X = X
+    
+        b = EH_mixer.solids_loading
+        D = get_default_distribution('uniform', b)
+        @param(name='EH solids loading', element=EH_mixer, kind='coupled', units='-',
+               baseline=b, distribution=D)
+        def set_EH_solid_loading(loading):
+            EH_mixer.solid_loading = loading
+    
+        EH_rx = get_obj(u, 'EH_rx') or get_obj(u, 'fermentor')
+        rxn = get_rxn(EH_rx, 'EH glucan-to-glucose')
+        b = rxn.X
+        D = get_default_distribution('uniform', b, lb=0, ub=1)
+        @param(name='EH glucan-to-glucose', element=EH_rx, kind='coupled', units='-',
+               baseline=b, distribution=D)
+        def set_EH_glucan_to_glucose(X):
+            rxn.X = X
+            
+        # Fermentation
+        D_g = get_default_distribution('uniform', b_g, ub=1)
+        D_x = get_default_distribution('uniform', b_x, ub=1)
+        
+    else: # dilute acid pretreatment (CS/LA)
+        # Pretreatment
+        PT_solids_mixer = get_obj(u, 'PT_solids_mixer')
+        b = PT_solids_mixer.solids_loading
+        D = shape.Triangle(0.25, b, 0.4)
+        @param(name='PT solids loading', element=PT_solids_mixer, kind='coupled', units='-',
+               baseline=b, distribution=D)
+        def set_PT_solids_loading(loading):
+            PT_solids_mixer.solids_loading = loading
+    
+        PT_rx = get_obj(u, 'PT_rx')
+        rxn = get_rxn(PT_rx, 'PT glucan-to-glucose')
+        b = rxn.X
+        D = shape.Triangle(0.06, b, 0.12)
+        @param(name='PT glucan-to-glucose', element=PT_rx, kind='coupled', units='-',
+               baseline=b, distribution=D)
+        def set_PT_glucan_to_glucose(X):
+            rxn.X = X
+    
+        rxn = get_rxn(PT_rx, 'PT xylan-to-xylose')
+        b = rxn.X
+        D = shape.Triangle(0.8, b, 0.92)
+        @param(name='PT xylan-to-xylose', element=PT_rx, kind='coupled', units='-',
+               baseline=b, distribution=D)
+        def set_PT_xylan_to_xylose(X):
+            rxn.X = X
+    
+        b = EH_mixer.solids_loading
+        D = shape.Triangle(0.175, b, 0.25)
+        @param(name='EH solids loading', element=EH_mixer, kind='coupled', units='-',
+               baseline=b, distribution=D)
+        def set_EH_solid_loading(loading):
+            EH_mixer.solid_loading = loading
+    
+        EH_rx = get_obj(u, 'EH_rx') or get_obj(u, 'fermentor')
+        rxn = get_rxn(EH_rx, 'EH glucan-to-glucose')
+        b = rxn.X
+        D = shape.Triangle(0.75, b, 0.95)
+        @param(name='EH glucan-to-glucose', element=EH_rx, kind='coupled', units='-',
+               baseline=b, distribution=D)
+        def set_EH_glucan_to_glucose(X):
+            rxn.X = X
+            
+        # Fermentation
+        if model_dct['FERM_product']=='ethanol':
             D_g = shape.Triangle(0.9, b_g, 0.97)
             D_x = shape.Triangle(0.75, b_x, 0.9)
-        except: # hydrothermal pretreatment
-            D_g = get_default_distribution('uniform', b_g, ub=1)
-            D_x = get_default_distribution('uniform', b_x, ub=1)
-    elif model_dct['FERM_product']=='lactic_acid':
-        D_g = shape.Triangle(0.55, b_g, 0.93)
-        D_x = shape.Triangle(0.55, b_x, 0.93)
-    elif model_dct['FERM_product']=='acrylic_acid':
-        D_g = get_default_distribution('triangle', b_g, ratio=0.2)
-        D_x = get_default_distribution('triangle', b_x, ratio=0.2)
-    else: raise ValueError(f"Fermentation product {model_dct['FERM_product']} not recognized.")
+        elif model_dct['FERM_product']=='lactic_acid':
+            D_g = shape.Triangle(0.55, b_g, 0.93)
+            D_x = shape.Triangle(0.55, b_x, 0.93)
+        elif model_dct['FERM_product']=='acrylic_acid':
+            D_g = get_default_distribution('triangle', b_g, ratio=0.2)
+            D_x = get_default_distribution('triangle', b_x, ratio=0.2)
+        else: raise ValueError(f"Fermentation product {model_dct['FERM_product']} not recognized.")
 
     @param(name='FERM glucose yield', element=fermentor, kind='coupled', units='-',
-           baseline=b, distribution=D_g)
+           baseline=b_g, distribution=D_g)
     def set_FERM_glucose_yield(X):
         rxn_g.X = X
 
     @param(name='FERM xylose yield', element=fermentor, kind='coupled', units='-',
-           baseline=b, distribution=D_x)
+           baseline=b_x, distribution=D_x)
     def set_FERM_xylose_yield(X):
         rxn_x.X = X
-
+        
     return model
 
 
 # Related to the new wastewater treatment process
-#!!! Want to evaluate the new WWT process across different biodegradability and COD content
 def add_new_wwt_parameters(model, model_dct, f, u, s, get_obj, get_rxn, param):
     X = model_dct['wwt_ID']
 
@@ -375,7 +450,7 @@ def add_new_wwt_parameters(model, model_dct, f, u, s, get_obj, get_rxn, param):
 
     b = AnMBR.membrane_unit_cost
     D = shape.Uniform(6, 10)
-    @param(name='AnMBR membrane unit cost', element=AnMBR, kind='cost', units='$/ft2',
+    @param(name='AnMBR membrane unit price', element=AnMBR, kind='cost', units='$/ft2',
            baseline=b, distribution=D)
     def set_AnMBR_membrane_cost(cost):
         AnMBR.membrane_unit_cost = cost
@@ -408,29 +483,30 @@ def add_new_wwt_parameters(model, model_dct, f, u, s, get_obj, get_rxn, param):
     def set_AnMBR_SGD(SGD):
         AnMBR.SGD = SGD
 
-    b = AnMBR.Y
+    b = AnMBR.Y_biomass
     D = shape.Uniform(0.02, 0.08)
     @param(name='AnMBR biomass yield', element=AnMBR, kind='coupled', units='-',
            baseline=b, distribution=D)
-    def set_AnMBR_Y(Y):
-        AnMBR.Y = Y
+    def set_AnMBR_Y_biomass(Y):
+        AnMBR.Y_biomass = Y
 
-    b = AnMBR.v_GAC
-    D = shape.Uniform(6, 10)
-    @param(name='AnMBR upflow velocity for GAC', element=AnMBR, kind='coupled', units='m/hr',
-           baseline=b, distribution=D)
-    def set_AnMBR_v_GAC(v):
-        AnMBR.v_GAC = v
+    # # Not used for the cross-flow configuration
+    # b = AnMBR.v_GAC
+    # D = shape.Uniform(6, 10)
+    # @param(name='AnMBR upflow velocity for GAC', element=AnMBR, kind='coupled', units='m/hr',
+    #        baseline=b, distribution=D)
+    # def set_AnMBR_v_GAC(v):
+    #     AnMBR.v_GAC = v
 
     # AeF, some systems do not need it thus using a dummy unit
     AeF = getattr(u, f'R{X}03')
     if not type(AeF).__name__ == 'Skipped':
-        b = AeF.OLR * 24
-        D = shape.Uniform(0.5, 4)
+        b = AeF.OLR
+        D = shape.Uniform(0.5/24, 4/24) # kg COD/m3/d to kg COD/m3/hr
         @param(name='AeF organic loading rate', element=AeF, kind='coupled', units='kg COD/m3/hr',
                baseline=b, distribution=D)
         def set_AeF_OLR(OLR):
-            AeF.OLR = OLR/24 # kg COD/m3/d to kg COD/m3/hr
+            AeF.OLR = OLR
 
         b = AeF.OLR
         D = shape.Uniform(0.11, 0.44)
@@ -521,7 +597,8 @@ def add_metrics(model, model_dct, f, u, s, get_obj):
     def get_GWP(product_ratio=None):
         cache_dct = Caching.cache_dct
         product_ratio = product_ratio or cache_dct[f'{product.ID} ratio']
-        GWP = sys.get_net_impact('GWP')/sys.operating_hours * factor * product_ratio/product.F_mass
+        GWP = cache_dct['GWP'] = \
+            sys.get_net_impact('GWP')/sys.operating_hours * factor * product_ratio/product.F_mass
         return GWP
 
     if ww: # product price without wastewater treatment, IRR sometimes has two solutions so use price
@@ -585,6 +662,7 @@ def add_metrics(model, model_dct, f, u, s, get_obj):
             def get_product_price_no_ww():
                 cache_dct = Caching.cache_dct
                 product_default_price = product.price
+                gwp = cache_dct['GWP']
                 product.price = tea.solve_price(product) # MPSP with WWT system
 
                 # Disconnect WWT system and clear cost
@@ -596,14 +674,16 @@ def add_metrics(model, model_dct, f, u, s, get_obj):
                     if not u in Caching.wwt_units: u.simulate()
 
                 product_price = tea.solve_price(product)
-                MPSP_no_ww = cache_dct['MPSP no WWT'] = product_price * factor
+                MPSP_no_wwt = cache_dct['MPSP no WWT'] = product_price * factor
                 sales = sum(stream.cost for stream in sys.products if stream.price and stream is not product)
                 product_cost = product_price * product.F_mass
                 ratio = product_cost/(sales+product_cost)
-                cache_dct['GWP no WWT'] = get_GWP(ratio)
+                gwp_no_wwt = cache_dct['GWP no WWT'] = get_GWP(ratio)
 
                 ww_price = - tea.solve_price(brine)
                 cache_dct['WW price'] = ww_price * 100
+                ww_gwp = (gwp-gwp_no_wwt)/factor*product.F_mass/brine.F_mass
+                cache_dct['WW GWP'] = ww_gwp * 1e3
 
                 cod_in = cache_dct['COD in'] = get_COD(ww_in) * 1e3
                 cod_out = cache_dct['COD out'] = get_COD(ww_out) * 1e3
@@ -612,9 +692,12 @@ def add_metrics(model, model_dct, f, u, s, get_obj):
 
                 cod_per_kg = ww_price*brine.F_mass / cod_load
                 cache_dct['COD price per kg'] = cod_per_kg * 100
+                gwp_per_kg = ww_gwp*brine.F_mass / cod_load
+                cache_dct['COD GWP per kg'] = gwp_per_kg * 100
 
                 # 907.1847 is auom('ton').conversion_factor('kg')
                 cache_dct['COD price per ton'] = cod_per_kg * 907.1847
+                cache_dct['COD GWP per ton'] = gwp_per_kg * 907.1847
 
                 # Reconnect WWT system
                 ww_in_unit.ins[ww_in_idx] = ww_in
@@ -624,8 +707,9 @@ def add_metrics(model, model_dct, f, u, s, get_obj):
                 Caching.clear_cost = False
                 for u in wwt_downstream_units: u.simulate()
                 product.price = product_default_price
+                cache_dct['GWP'] = gwp
 
-                return MPSP_no_ww
+                return MPSP_no_wwt
 
             metrics0 = [
                 Metric('MPSP no WWT', get_product_price_no_ww, f'$/{gal_or_kg}'),
@@ -633,6 +717,9 @@ def add_metrics(model, model_dct, f, u, s, get_obj):
                 Metric('WW price', lambda: Caching.cache_dct['WW price'], '¢/kg'),
                 Metric('COD price per kg', lambda: Caching.cache_dct['COD price per kg'], '¢/kg'),
                 Metric('COD price per ton', lambda: Caching.cache_dct['COD price per ton'], '$/ton'),
+                Metric('WW GWP', lambda: Caching.cache_dct['WW GWP'], 'g CO2/kg'),
+                Metric('COD GWP per kg', lambda: Caching.cache_dct['COD GWP per kg'], 'g CO2/kg'),
+                Metric('COD GWP per ton', lambda: Caching.cache_dct['COD GWP per ton'], 'kg CO2/ton'),
                 Metric('COD in', lambda: Caching.cache_dct['COD in'], 'mg/L'),
                 Metric('COD out', lambda: Caching.cache_dct['COD out'], 'mg/L'),
                 Metric('COD removal', lambda: Caching.cache_dct['COD removal'], ''),
@@ -649,10 +736,6 @@ def add_metrics(model, model_dct, f, u, s, get_obj):
         *metrics0,
         Metric('Total CAPEX',
                lambda: sys.installed_equipment_cost/1e6, 'MM$'),
-
-        # Metric('WWT CAPEX',
-        #         get_WWT_CAPEX, 'MM$'),
-
         Metric('WWT CAPEX',
                 lambda: wwt_system.installed_equipment_cost/1e6, 'MM$'),
         Metric('WWT CAPEX frac',
@@ -740,7 +823,7 @@ def add_metrics(model, model_dct, f, u, s, get_obj):
 # %%
 
 # =============================================================================
-# Overall wrapper function
+# Summarizing functions
 # =============================================================================
 
 def create_comparison_models(system, model_dct):
@@ -790,42 +873,88 @@ def save_model_results(model, path, percentiles):
         model.table.to_excel(writer, sheet_name='Raw data')
 
 
-def evaluate_models(exist_model, new_model, abbr,
-                    percentiles=(0, 0.05, 0.25, 0.5, 0.75, 0.95, 1),
-                    N=1000, seed=3221, rule='L'):
-    np.random.seed(seed)
-    exist_samples = exist_model.sample(N=N, seed=seed, rule=rule)
-    exist_model.load_samples(exist_samples)
-    exist_path = os.path.join(results_path, f'{abbr}_exist_uncertainties_{N}.xlsx')
-
-    notify = ceil(N/10)
-    exist_model.evaluate(notify=notify)
-    save_model_results(exist_model, exist_path, percentiles)
-
-    new_samples = new_model.sample(N=N, seed=seed, rule=rule)
-    new_model.load_samples(new_samples)
-    copy_samples(exist_model, new_model)
-    new_path = os.path.join(results_path, f'{abbr}_new_uncertainties_{N}.xlsx')
-
-    new_model.evaluate(notify=notify)
-    save_model_results(new_model, new_path, percentiles)
-
-    return exist_model, new_model
-
-
-def get_baseline_summary(exist_model, new_model, abbr, file_path=None):
-    path = file_path or os.path.join(results_path, f'baseline_summary_{abbr}.csv')
+def run_baseline(exist_model, new_model, abbr):
     exist_df = exist_model.metrics_at_baseline()
     exist_df.rename({'Biorefinery': 'exist'}, inplace=True)
     new_df = new_model.metrics_at_baseline()
     new_df.rename({'Biorefinery': 'new'}, inplace=True)
     df = pd.concat((exist_df, new_df))
+    dir_path = os.path.join(results_path, 'baselines')
+    if not os.path.isdir(dir_path): os.mkdir(dir_path)
+    path = os.path.join(dir_path, f'{abbr}.csv')
     df.to_csv(path)
+    return df
 
 
-def summarize_baselines(names=None, file_path=None):
-    path = file_path or os.path.join(results_path, 'baseline_summary_all.xlsx')
-    
+def run_uncertainty(exist_model, new_model, abbr, percentiles, seed, N,
+                    skip_exist=False, dir_path=None):
+    np.random.seed(seed)
+    exist_samples = exist_model.sample(N=N, seed=seed, rule='L')
+    exist_model.load_samples(exist_samples)
+    dir_path = dir_path or os.path.join(results_path, 'uncertainties')
+    if not os.path.isdir(dir_path): os.mkdir(dir_path)
+
+    notify = ceil(N/10)
+    if not skip_exist:
+        print(f'\n\n Exist model for {abbr}: N = {N}')
+        exist_model.evaluate(notify=notify)
+        exist_path = os.path.join(dir_path, f'{abbr}_exist_{N}.xlsx')
+        save_model_results(exist_model, exist_path, percentiles)
+
+    new_samples = new_model.sample(N=N, seed=seed, rule='L')
+    new_model.load_samples(new_samples)
+    copy_samples(exist_model, new_model)
+
+    print(f'\n\n New model for {abbr}: N = {N}')
+    new_model.evaluate(notify=notify)
+    new_path = os.path.join(dir_path, f'{abbr}_new_{N}.xlsx')
+    save_model_results(new_model, new_path, percentiles)
+
+    return exist_model, new_model
+
+
+def run_biodegradability(exist_model, new_model, abbr,
+                         percentiles, seed, N, biodegradability):
+    dir_path = os.path.join(results_path, 'biodegradabilities')
+    if not os.path.isdir(dir_path): os.mkdir(dir_path)
+    for bd in biodegradability:
+        print(f'\n\n Biodegradability = {bd}')
+        for unit in new_model.system.flowsheet.system.new_sys_wwt.units:
+            if hasattr(unit, 'biodegradability'):
+                unit.biodegradability = bd
+        bd_path = os.path.join(dir_path, str(int(100*bd)))
+        run_uncertainty(
+            exist_model, new_model, abbr, percentiles, seed, N,
+            skip_exist=True, dir_path=bd_path) # no need to run the exist systems
+
+
+# %%
+
+# =============================================================================
+# Analyze function
+# =============================================================================
+
+def evaluate_models(
+        exist_model, new_model, abbr,
+        include_baseline=True,
+        include_uncertainty=True,
+        include_biodegradability=True,
+        percentiles=(0, 0.05, 0.25, 0.5, 0.75, 0.95, 1), N_uncertainty=1000, seed=3221,
+        biodegradability=(0.5, 0.6, 0.7, 0.8, 0.9, 1), N_biodegradability=100,
+        ):
+    args = [exist_model, new_model, abbr]
+    if include_baseline: run_baseline(*args)
+
+    args.extend([percentiles, seed, N_uncertainty])
+    if include_uncertainty: run_uncertainty(*args)
+
+    args.pop(-1)
+    args.extend([N_biodegradability, biodegradability])
+    if include_biodegradability: run_biodegradability(*args)
+
+
+def summarize_baselines(names=None, dir_path=None):
+    dir_path = dir_path or os.path.join(results_path, 'baselines')
     MPSP_exist, MPSP_new, MPSP_no_WWT = [], [], []
     GWP_exist, GWP_new, GWP_no_WWT = [], [], []
     CAPEX_WWT_exist, CAPEX_WWT_new = [], []
@@ -834,7 +963,7 @@ def summarize_baselines(names=None, file_path=None):
     get_val = lambda key1, key2: df[(df.type==key1) & (df.metric==key2)].value.item()
     names = names or ('cn', 'sc1g', 'oc1g', 'cs', 'sc2g', 'oc2g', 'la')
     for name in names:
-        df_path = os.path.join(results_path, f'baseline_summary_{name}.csv')
+        df_path = os.path.join(dir_path, f'{name}.csv')
         df = pd.read_csv(df_path, names=('type', 'metric', 'value'), skiprows=(0,))
         per = 'gal'
         try:
@@ -854,29 +983,89 @@ def summarize_baselines(names=None, file_path=None):
 
         electricity_WWT_exist.append(get_val('exist', 'WWT annual electricity consumption [MWh/yr]'))
         electricity_WWT_new.append(get_val('new', 'WWT annual electricity consumption [MWh/yr]'))
-        
+
     df_all = pd.DataFrame({
         'MPSP_exist': MPSP_exist,
         'MPSP_no_WWT': MPSP_no_WWT,
         'MPSP_new': MPSP_new,
         })
     df_all['MPSP_reduction'] = (df_all.MPSP_exist-df_all.MPSP_new)/df_all.MPSP_exist
-    
+
     df_all['GWP_exist'] = GWP_exist
     df_all['GWP_no_WWT'] = GWP_no_WWT
     df_all['GWP_new'] = GWP_new
     df_all['GWP_reduction'] = (df_all.GWP_exist-df_all.GWP_new)/df_all.GWP_exist
-    
+
     df_all['CAPEX_WWT_exist'] = CAPEX_WWT_exist
     df_all['CAPEX_WWT_new'] = CAPEX_WWT_new
     df_all['CAPEX_reduction'] = (df_all.CAPEX_WWT_exist-df_all.CAPEX_WWT_new)/df_all.CAPEX_WWT_exist
-    
+
     df_all['electricity_WWT_exist'] = electricity_WWT_exist
     df_all['electricity_WWT_new'] = electricity_WWT_new
     df_all['electricity_WWT_reduction'] = \
         (df_all.electricity_WWT_exist-df_all.electricity_WWT_new)/df_all.electricity_WWT_exist
-    
+
     df_all['biorefinery'] = names
     df_all.set_index('biorefinery', inplace=True)
-    df_all.to_excel(path)
-    
+    summary_path = os.path.join(dir_path, 'summary.xlsx')
+    df_all.to_excel(summary_path)
+
+
+def summarize_biodegradabilities(lower=0.05, mid=0.5, upper=0.95,
+                                 dir_path=None, names=None):
+    dir_path = dir_path or os.path.join(results_path, 'biodegradabilities')
+    names = names or ('cs', 'sc2g', 'oc2g', 'la')
+    bds = [int(i) for i in os.listdir(dir_path) if i.isnumeric()]
+    bds.sort()
+    MPSPs = {}
+    for name in names: MPSPs[name] = []
+    GWPs = deepcopy(MPSPs)
+    COD_prices = deepcopy(MPSPs)
+    COD_GWPs = deepcopy(MPSPs)
+
+    def get_vals(df, key, indices):
+        vals = df[key].to_list()
+        vals = [vals[i] for i in indices]
+        return vals
+
+    for bd in bds:
+        bd_path = os.path.join(dir_path, str(bd))
+        files = list(os.walk(bd_path))[0][-1]
+        for i in files:
+            abbr = i.split('_')[0]
+            MPSP, GWP, COD_price, COD_GWP = MPSPs[abbr], GWPs[abbr], COD_prices[abbr], COD_GWPs[abbr]
+            df = pd.read_excel(os.path.join(bd_path, i), sheet_name='Percentiles',
+                               index_col=(0), header=(0, 1))
+            df = df.droplevel(level=0, axis=1)
+            percentiles = df.index.to_list()
+            indices = [percentiles.index(i) for i in (lower, mid, upper)]
+            per = 'gal'
+            try:
+                MPSP.extend(get_vals(df, f'MPSP [$/{per}]', indices))
+            except:
+                per = 'kg'
+                MPSP.extend(get_vals(df, f'MPSP [$/{per}]', indices))
+
+            GWP.extend(get_vals(df, f'GWP [kg CO2/{per}]', indices))
+            COD_price.extend(get_vals(df, 'COD price per ton [$/ton]', indices))
+            COD_GWP.extend(get_vals(df, 'COD GWP per ton [kg CO2/ton]', indices))
+
+    MPSP_df = pd.DataFrame.from_dict(MPSPs)
+    MPSP_df.index = pd.MultiIndex.from_product(
+        (bds, (lower, mid, upper)), names=('Biodegradability', 'Percentile'))
+    GWP_df = pd.DataFrame.from_dict(GWPs)
+    COD_price_df = pd.DataFrame.from_dict(COD_prices)
+    COD_GWP_df = pd.DataFrame.from_dict(COD_GWPs)
+    new_index = pd.MultiIndex.from_product(
+        ((lower, mid, upper), bds), names=('Percentile', 'Biodegradability'))
+    for df in (GWP_df, COD_price_df, COD_GWP_df, MPSP_df): # MPSP_df last for index
+        if df is not MPSP_df: df.index = MPSP_df.index
+        df.sort_index(level=1, inplace=True)
+        df.index = new_index
+
+    path = os.path.join(dir_path, 'summary.xlsx')
+    with pd.ExcelWriter(path) as writer:
+        MPSP_df.to_excel(writer, sheet_name='MPSP')
+        GWP_df.to_excel(writer, sheet_name='GWP')
+        COD_price_df.to_excel(writer, sheet_name='COD Cost')
+        COD_GWP_df.to_excel(writer, sheet_name='COD GWP')

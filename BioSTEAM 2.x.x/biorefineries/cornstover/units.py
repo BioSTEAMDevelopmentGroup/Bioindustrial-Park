@@ -412,11 +412,14 @@ class CoFermentation(bst.BatchBioreactor):
             self.xylose_to_byproducts = self.cofermentation[5:]
         else:
             self.cofermentation = cofermentation
-            
-        self.CSL_to_constituents = Rxn(
-            'CSL -> 0.5 H2O + 0.25 LacticAcid + 0.25 Protein', 'CSL', 1.0000, chemicals, basis='wt',
-        )
-        self.CSL_to_constituents.basis = 'mol'
+        
+        if 'CSL' in self.chemicals:
+            self.CSL_to_constituents = Rxn(
+                'CSL -> 0.5 H2O + 0.25 LacticAcid + 0.25 Protein', 'CSL', 1.0000, chemicals, basis='wt',
+            )
+            self.CSL_to_constituents.basis = 'mol'
+        else:
+            self.CSL_to_constituents = None
         
         if all([i in self.chemicals for i in ('FFA', 'DAG', 'TAG', 'Glycerol')]):
             self.oil_reaction = self.lipid_reaction = ParallelRxn([
@@ -435,7 +438,7 @@ class CoFermentation(bst.BatchBioreactor):
         effluent.mix_from(feeds, energy_balance=False)
         if self.loss: self.loss(effluent)
         self.cofermentation(effluent)
-        self.CSL_to_constituents(effluent)
+        if self.CSL_to_constituents: self.CSL_to_constituents(effluent)
         if self.lipid_reaction: 
             self.lipid_reaction.force_reaction(effluent)
             effluent.empty_negative_flows()

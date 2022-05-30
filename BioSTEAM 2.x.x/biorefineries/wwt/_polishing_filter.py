@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 # Bioindustrial-Park: BioSTEAM's Premier Biorefinery Models and Results
-# Copyright (C) 2021-, Yalin Li <zoe.yalin.li@gmail.com>
+# Copyright (C) 2021-, Yalin Li <mailto.yalin.li@gmail.com>
 #
 # This module is under the UIUC open-source license. See
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
@@ -104,7 +104,7 @@ class PolishingFilter(bst.Unit):
 
     def __init__(self, ID='', ins=None, outs=(), thermo=None, *,
                  filter_type='aerobic',
-                 OLR=(0.5+4)/24, # from the 0.5-4 kg/m3/d uniform range in ref [1]
+                 OLR=(0.5+4)/2/24, # from the 0.5-4 kg/m3/d uniform range in ref [1]
                  HLR=(0.11+0.44)/2, # from the 0.11-0.44  uniform range in ref [1]
                  X_decomp=0.74, X_growth=0.22, # X_decomp & X_growth from ref[2]
                  split={}, T=30+273.15,

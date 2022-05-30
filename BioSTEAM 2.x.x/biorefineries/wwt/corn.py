@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 # Bioindustrial-Park: BioSTEAM's Premier Biorefinery Models and Results
-# Copyright (C) 2022-, Yalin Li <zoe.yalin.li@gmail.com>
+# Copyright (C) 2022-, Yalin Li <mailto.yalin.li@gmail.com>
 #
 # Part of this module is based on the corn biorefinery:
 # https://github.com/BioSTEAMDevelopmentGroup/Bioindustrial-Park/tree/master/BioSTEAM%202.x.x/biorefineries/corn
@@ -10,6 +10,11 @@
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
 # for license details.
 
+from biorefineries import corn as cn
+from biorefineries.wwt import (
+    create_comparison_systems, simulate_systems,
+    create_comparison_models,evaluate_models,
+    )
 
 info = {
     'abbr': 'cn',
@@ -27,11 +32,8 @@ info = {
 # Systems
 # =============================================================================
 
-def create_cn_comparison_systems(default_BD=True):
-    from biorefineries.wwt import create_comparison_systems
-    from biorefineries import corn as cn
-    BD = {} if not default_BD else 1.
-    wwt_kwdct = dict.fromkeys(('IC_kwargs', 'AnMBR_kwargs',), {'biodegradability': BD,})
+def create_cn_comparison_systems(biodegradability=1): # will be multiplied by 0.86/0.05 for biogas/cell mass
+    wwt_kwdct = dict.fromkeys(('IC_kwargs', 'AnMBR_kwargs',), {'biodegradability': biodegradability,})
     wwt_kwdct['skip_AeF'] = True
     CF_dct = {
         ##### Feeds #####
@@ -61,7 +63,6 @@ def create_cn_comparison_systems(default_BD=True):
 
 
 def simulate_cn_systems(**sys_kwdct):
-    from biorefineries.wwt import simulate_systems
     global exist_sys, new_sys
     exist_sys, new_sys = create_cn_comparison_systems(**sys_kwdct)
     simulate_systems(exist_sys, new_sys, info)
@@ -75,7 +76,6 @@ def simulate_cn_systems(**sys_kwdct):
 # =============================================================================
 
 def create_cn_comparison_models():
-    from biorefineries.wwt import create_comparison_models
     exist_sys, new_sys = create_cn_comparison_systems()
 
     ##### Existing system #####
@@ -108,12 +108,10 @@ def create_cn_comparison_models():
 
 
 def evaluate_cn_models(**eval_kwdct):
-    from biorefineries.wwt import evaluate_models, get_baseline_summary
     global exist_model, new_model
     exist_model, new_model = create_cn_comparison_models()
-    abbr = info['abbr']
-    get_baseline_summary(exist_model, new_model, abbr)
-    return evaluate_models(exist_model, new_model, abbr=abbr, **eval_kwdct)
+    evaluate_models(exist_model, new_model, info['abbr'], **eval_kwdct)
+    return exist_model, new_model
 
 
 # %%
@@ -123,6 +121,11 @@ def evaluate_cn_models(**eval_kwdct):
 # =============================================================================
 
 if __name__ == '__main__':
-    # exist_sys, new_sys = simulate_cn_systems(default_BD=True)
+    # exist_sys, new_sys = simulate_cn_systems(biodegradability=1)
     # exist_model, new_model = create_cn_comparison_models()
-    exist_model, new_model = evaluate_cn_models(N=10)
+    exist_model, new_model = evaluate_cn_models(
+        # include_baseline=False,
+        # include_uncertainty=False,
+        include_biodegradability=False, # biodegradability for 1G should be high
+        N_uncertainty=100,
+        )

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 # Bioindustrial-Park: BioSTEAM's Premier Biorefinery Models and Results
-# Copyright (C) 2020-, Yalin Li <zoe.yalin.li@gmail.com>,
+# Copyright (C) 2020-, Yalin Li <mailto.yalin.li@gmail.com>,
 #                      Sarang Bhagwat <sarangb2@illinois.edu>,
 #                      Yoel Cortes-Pena <yoelcortes@gmail.com>
 #
@@ -115,7 +115,3 @@ def create_system(ID='lactic_sys', kind='SSCF', if_HXN=True, if_BDM=False,
         ])
 
     return lactic_sys, groups
-
-
-if __name__ == '__main__':
-    lactic_sys = create_system('SSCF')

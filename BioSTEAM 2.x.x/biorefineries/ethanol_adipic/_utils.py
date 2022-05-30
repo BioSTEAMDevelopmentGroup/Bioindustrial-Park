@@ -1,34 +1,30 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# BioSTEAM: The Biorefinery Simulation and Techno-Economic Analysis Modules
-# Copyright (C) 2020-2021, Yoel Cortes-Pena <yoelcortes@gmail.com>
 # Bioindustrial-Park: BioSTEAM's Premier Biorefinery Models and Results
-# Copyright (C) 2020-2021, Yalin Li <yalinli2@illinois.edu> (this biorefinery)
-# 
-# This module is under the UIUC open-source license. See 
+# Copyright (C) 2020-, Yalin Li <mailto.yalin.li@gmail.com>
+#
+# This module is under the UIUC open-source license. See
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
 # for license details.
 
 '''
 References
 ----------
-[1] Humbird et al., Process Design and Economics for Biochemical Conversion of 
-    Lignocellulosic Biomass to Ethanol: Dilute-Acid Pretreatment and Enzymatic 
-    Hydrolysis of Corn Stover; Technical Report NREL/TP-5100-47764; 
+[1] Humbird et al., Process Design and Economics for Biochemical Conversion of
+    Lignocellulosic Biomass to Ethanol: Dilute-Acid Pretreatment and Enzymatic
+    Hydrolysis of Corn Stover; Technical Report NREL/TP-5100-47764;
     National Renewable Energy Lab (NREL), 2011.
     https://www.nrel.gov/docs/fy11osti/47764.pdf
 
-[2] Davis et al., Process Design and Economics for the Conversion of Lignocellulosic 
-    Biomass to Hydrocarbon Fuels and Coproducts: 2018 Biochemical Design Case Update; 
-    NREL/TP-5100-71949; National Renewable Energy Lab (NREL), 2018. 
+[2] Davis et al., Process Design and Economics for the Conversion of Lignocellulosic
+    Biomass to Hydrocarbon Fuels and Coproducts: 2018 Biochemical Design Case Update;
+    NREL/TP-5100-71949; National Renewable Energy Lab (NREL), 2018.
     https://doi.org/10.2172/1483234
 
-[3] Cortes-Peña et al., BioSTEAM: A Fast and Flexible Platform for the Design, 
-    Simulation, and Techno-Economic Analysis of Biorefineries under Uncertainty. 
-    ACS Sustainable Chem. Eng. 2020, 8 (8), 3302–3310. 
+[3] Cortes-Peña et al., BioSTEAM: A Fast and Flexible Platform for the Design,
+    Simulation, and Techno-Economic Analysis of Biorefineries under Uncertainty.
+    ACS Sustainable Chem. Eng. 2020, 8 (8), 3302–3310.
     https://doi.org/10.1021/acssuschemeng.9b07040
-
-@author: yalinli_cabbi
 '''
 
 
@@ -42,13 +38,13 @@ from biorefineries.lactic._utils import (
     compute_COD, splits_df
     )
 
-__all__ = ('auom', 'CEPCI', 'get_feedstock_flow', 'dry_composition', 
+__all__ = ('auom', 'CEPCI', 'get_feedstock_flow', 'dry_composition',
            'baseline_feedflow', 'compute_muconic_titer',
            #'set_yield',
            'compute_COD')
 
 _kg_per_ton = auom('ton').conversion_factor('kg')
-ethanol_V = chems.Ethanol.V('l', 298.15, 101325) # molar volume in m3/mol	
+ethanol_V = chems.Ethanol.V('l', 298.15, 101325) # molar volume in m3/mol
 ethanol_MW = chems.Ethanol.MW
 _ethanol_kg_2_gal = auom('gal').conversion_factor('liter')/ethanol_V*ethanol_MW/1e6
 
@@ -85,7 +81,7 @@ def compute_muconic_titer(stream, V=None):
 #!!! Maybe need a function to set yield for muconic acid?
 
 
-# %% 
+# %%
 
 # =============================================================================
 # Function to find the split ratios for Splitters, assume 0 for chemicals not specified in splits,
@@ -95,17 +91,17 @@ def compute_muconic_titer(stream, V=None):
 def find_split(IDs, flow0, flow1, chemical_groups):
     # Add 1e-6 to avoid flow0 and flow1 both being 0
     flow0 = np.asarray(flow0) + 1e-6
-    flow1 = np.asarray(flow1) + 1e-6    
+    flow1 = np.asarray(flow1) + 1e-6
     splits = flow0/(flow0 + flow1)
     thermo = tmo.settings.get_thermo()
     chemicals = thermo.chemicals
-    array = np.zeros(chemicals.size)  
+    array = np.zeros(chemicals.size)
     for ID, split in zip(IDs, splits):
         if ID in chemical_groups:
             array[chemicals.get_index(chemical_groups[ID])] = split
         else:
             array[chemicals.index(ID)] = split
-    # WWTsludge is removed from the cell mass group 
+    # WWTsludge is removed from the cell mass group
     array[chemicals.index('WWTsludge')] = array[chemicals.index('Z_mobilis')]
     return array
 
@@ -127,6 +123,3 @@ MB_split = find_split(splits_df.index,
                       splits_df['stream_624'],
                       splits_df['stream_625'],
                       chemical_groups)
-
-
-

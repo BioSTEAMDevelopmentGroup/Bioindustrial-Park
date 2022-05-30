@@ -1,25 +1,23 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# BioSTEAM: The Biorefinery Simulation and Techno-Economic Analysis Modules
-# Copyright (C) 2020-2021, Yoel Cortes-Pena <yoelcortes@gmail.com>
 # Bioindustrial-Park: BioSTEAM's Premier Biorefinery Models and Results
-# Copyright (C) 2020-2021, Yalin Li <yalinli2@illinois.edu> (this biorefinery)
-# 
-# This module is under the UIUC open-source license. See 
+# Copyright (C) 2020-, Yalin Li <mailto.yalin.li@gmail.com>
+#
+# This module is under the UIUC open-source license. See
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
 # for license details.
 
 '''
 References
 ----------
-[1] Humbird et al., Process Design and Economics for Biochemical Conversion of 
-    Lignocellulosic Biomass to Ethanol: Dilute-Acid Pretreatment and Enzymatic 
-    Hydrolysis of Corn Stover; Technical Report NREL/TP-5100-47764; 
+[1] Humbird et al., Process Design and Economics for Biochemical Conversion of
+    Lignocellulosic Biomass to Ethanol: Dilute-Acid Pretreatment and Enzymatic
+    Hydrolysis of Corn Stover; Technical Report NREL/TP-5100-47764;
     National Renewable Energy Lab (NREL), 2011.
     https://www.nrel.gov/docs/fy11osti/47764.pdf
-[2] Davis et al., Process Design and Economics for the Conversion of Lignocellulosic 
-    Biomass to Hydrocarbon Fuels and Coproducts: 2018 Biochemical Design Case Update; 
-    NREL/TP-5100-71949; National Renewable Energy Lab (NREL), 2018. 
+[2] Davis et al., Process Design and Economics for the Conversion of Lignocellulosic
+    Biomass to Hydrocarbon Fuels and Coproducts: 2018 Biochemical Design Case Update;
+    NREL/TP-5100-71949; National Renewable Energy Lab (NREL), 2018.
     https://doi.org/10.2172/1483234
 [3] Davis et al., Process Design and Economics for the Conversion of Lignocellulosic
     Biomass to Hydrocarbons: Dilute-Acid and Enzymatic Deconstruction of Biomass
@@ -74,7 +72,7 @@ Rxn = tmo.reaction.Reaction
 ParallelRxn = tmo.reaction.ParallelReaction
 
 
-# %% 
+# %%
 
 # =============================================================================
 # Pretreatment (base-specific ones)
@@ -97,18 +95,18 @@ class DeacetylationReactor(Unit):
     _units= {'Duty': 'kJ/hr',
              'Flow rate': 'kg/hr',
              'Dry flow': 'kg/hr'}
-    
+
     solublization_dict = {'Sucrose': 0.5,
                           'Ash': 0.66,
                           'Lignin': 0.47,
                           'Glucan': 0.02,
                           'Xylan': 0.1,
                           'Arabinan': 0.3}
-    
+
     def __init__(self, ID='', ins=None, outs=(), T=92+273.15):
         Unit.__init__(self, ID, ins, outs)
         self.T = T
-    
+
     def _run(self):
         feedstock, caustic, water = self.ins
         liquor, solids = self.outs
@@ -126,22 +124,22 @@ class DeacetylationReactor(Unit):
         for i, j in self.solublization_dict.items():
             liquor.imass[i] = solids.imass[i] * j
             solids.imass[i] -= liquor.imass[i]
-        
+
         # 66% water content
-        liquor.imass['Water'] = 0        
+        liquor.imass['Water'] = 0
         liquor.imass['Water'] = 0.66/(1-0.66) * liquor.F_mass
-        
+
         # 30% total solids content stated in text, but 25% according to stream 301
         # in ref [2], used 25%
         solids.imass['Water'] = 0
         total_solids_mass = solids.imass[total_solids].sum()
         solids.imass['Water'] = total_solids_mass/0.25 - solids.F_mass
         water.imass['Water'] = (liquor.imass['Water']+solids.imass['Water']) \
-            - feedstock.imass['Water']        
+            - feedstock.imass['Water']
         mixture = feedstock.copy()
         mixture.mix_from(self.ins)
         self.design_results['Flow rate'] = mixture.F_mass
-        
+
     def _design(self):
         # Use Hnet (as opposed to H_out-H_in when there are reactions/change of materials)
         duty = self.Hnet
@@ -149,7 +147,7 @@ class DeacetylationReactor(Unit):
         self.design_results['Duty'] = duty
         self.design_results['Dry flow'] = \
             self.ins[0].imass[insolubles].sum()
-        
+
 
 # Mill solids to for increased accessible to solids
 @cost(basis='Dry flow', ID='Primary disc refiner', units='kg/hr',
@@ -158,7 +156,7 @@ class DeacetylationReactor(Unit):
       cost=578000*11, S=62942, CE=CEPCI[2013],  n=0.6, BM=1.4)
 class DiscMill(Unit):
     _units= {'Dry flow': 'kg/hr'}
-    
+
     def _design(self):
         dry_flow_rate = self.outs[0].imass[insolubles].sum()
         self.design_results['Dry flow'] = dry_flow_rate
@@ -170,7 +168,7 @@ class DiscMill(Unit):
       kW=55.9275, cost=22500, S=204390, CE=CEPCI[2009], n=0.8, BM=2.3)
 class BlackLiquorPump(Unit):
     _graphics = Pump._graphics
-    
+
     def _design(self):
         self.design_results['Flow rate'] = self.outs[0].F_mass
 
@@ -199,37 +197,37 @@ class SaccharificationAndCoFermentation(Unit):
     _N_ins = 4
     _N_outs = 3
     _N_heat_utilities = 2
-    
+
     #: Saccharification temperature (K)
     T_saccharification = 48+273.15
-    
+
     #: Fermentation temperature (K)
     T_fermentation = 32+273.15
-    
+
     _units = {'Flow rate': 'kg/hr',
               'Duty': 'kJ/hr'}
-    
+
     # Split to outs[2]
     inoculum_ratio = 0.1
-    
+
     def __init__(self, ID='', ins=None, outs=(), P=101325, C5_saccharification=False):
         Unit.__init__(self, ID, ins, outs)
         self.P = P
         self.C5_saccharification = C5_saccharification
         self.saccharified_stream = tmo.Stream(None)
- 
+
         self.saccharification_rxns_C6 = ParallelRxn([
     #   Reaction definition                   Reactant     Conversion
     Rxn('Glucan -> GlucoseOligomer',          'Glucan',      0.04),
     Rxn('Glucan + 0.5 H2O -> 0.5 Cellobiose', 'Glucan',      0.012),
     Rxn('Glucan + H2O -> Glucose',            'Glucan',      0.9),
     Rxn('Cellobiose + H2O -> Glucose',        'Cellobiose',  1)])
-    
+
         self.saccharification_rxns_C5 = ParallelRxn([
     #   Reaction definition                   Reactant     Conversion
     Rxn('Xylan + H2O -> Xylose',              'Xylan',       0.9),
     Rxn('Arabinan + H2O -> Arabinose',        'Arabinan',    0.85)])
-    
+
         self.loss_rxns = ParallelRxn([
     #   Reaction definition               Reactant    Conversion
     Rxn('Glucose -> 2 LacticAcid',       'Glucose',   0.03),
@@ -237,7 +235,7 @@ class SaccharificationAndCoFermentation(Unit):
     Rxn('3 Arabinose -> 5 LacticAcid',   'Arabinose', 0.03),
     Rxn('Galactose -> 2 LacticAcid',     'Galactose', 0.03),
     Rxn('Mannose -> 2 LacticAcid',       'Mannose',   0.03),])
-    
+
         self.fermentation_rxns = ParallelRxn([
     #   Reaction definition                                          Reactant    Conversion
     Rxn('Glucose -> 2 Ethanol + 2 CO2',                             'Glucose',   0.95),
@@ -251,14 +249,14 @@ class SaccharificationAndCoFermentation(Unit):
     Rxn('Xylose + H2O -> Xylitol + 0.5 O2',                         'Xylose',    0.046),
     Rxn('3 Xylose + 5 CO2 -> 5 SuccinicAcid + 2.5 O2',              'Xylose',    0.009),
     ])
-    
+
     def _run(self):
         feed, inoculum, CSL, DAP = self.ins
         vent, effluent, sidedraw = self.outs
         vent.P = effluent.P = sidedraw.P = self.P
         ss = self.saccharified_stream
         vent.phase = 'g'
-        
+
         # 0.25 wt% and 0.33 g/L (kg/m3) based on ref [1]
         CSL.imass['CSL'] = feed.imass['CSL'] = 0.0025 * feed.F_mass
         DAP.imass['DAP'] = feed.imass['DAP'] = 0.33 * feed.F_vol
@@ -271,10 +269,10 @@ class SaccharificationAndCoFermentation(Unit):
         self.loss_rxns(effluent.mol)
         self.fermentation_rxns(effluent.mol)
         vent.receive_vent(effluent)
-        
+
         ss.T = sidedraw.T = self.T_saccharification
         vent.T = effluent.T = self.T_fermentation
-    
+
     def _design(self):
         self.design_results['Flow rate'] = self.ins[0].F_mass
         hu_hydrolysate, hu_saccharification = self.heat_utilities
@@ -285,7 +283,7 @@ class SaccharificationAndCoFermentation(Unit):
         ss_in.mix_from(self.ins)
         # To cool or heat hydrolysate to the fermentation temperature
         hu_hydrolysate(unit_duty=ss.H-ss_in.H, T_in=ss_in.T)
-        
+
         mol = ss.mol
         duty = (mixture.H('l', mol, self.T_fermentation, 101325.)
                 - mixture.H('l', mol, self.T_saccharification, 101325.))
@@ -314,12 +312,12 @@ class SeedTrain(Unit):
     _N_ins = 3
     _N_outs = 2
     _N_heat_utilities = 1
-    
+
     _units= {'Flow rate': 'kg/hr'}
 
     #: Operating temperature (K)
     T = 32+273.15
-    
+
     def __init__(self, ID='', ins=None, outs=()):
         Unit.__init__(self, ID, ins, outs)
         self.fermentation_rxns = ParallelRxn([
@@ -335,11 +333,11 @@ class SeedTrain(Unit):
     Rxn('3 Xylose + 5 H2O -> 5 Glycerol + 2.5 O2',      'Xylose',    0.003),
     Rxn('Xylose + H2O -> Xylitol + 0.5 O2',             'Xylose',    0.046),
     Rxn('3 Xylose + 5 CO2 -> 5 SuccinicAcid + 2.5 O2',  'Xylose',    0.009)])
-    
+
     def _run(self):
         feed, CSL, DAP = self.ins
         vent, effluent = self.outs
-        
+
         # 0.50 wt% and 0.66 g/L (kg/m3) based on ref [1]
         CSL.imass['CSL'] = 0.005 * feed.F_mass
         feed.imass['CSL'] += CSL.imass['CSL']
@@ -352,7 +350,7 @@ class SeedTrain(Unit):
         vent.phase = 'g'
         vent.copy_flow(effluent, ('CO2', 'NH3', 'O2'), remove=True)
 
-    def _design(self): 
+    def _design(self):
         self.design_results['Flow rate'] = self.ins[0].F_mass
         self.heat_utilities[0](self.Hnet, self.T)
 
@@ -381,7 +379,7 @@ class SeedHoldTank(Unit): pass
 class BeerTank(Unit): pass
 
 
-# %% 
+# %%
 
 # =============================================================================
 # Lignin utilization
@@ -397,17 +395,17 @@ class BlackLiquorStorage(Unit): pass
 @cost(basis='Flow rate', ID='Flash/drain tank', units='kg/hr',
       cost=262000, S=323295, CE=CEPCI[2013], n=0.7, BM=2)
 class PulpingReactor(Unit):
-    _N_ins = 3	
+    _N_ins = 3
     _N_outs = 2
     _N_heat_utilities = 1
     _units= {'Duty': 'kJ/hr',
              'Flow rate': 'kg/hr'}
-    
-    def __init__(self, ID='', ins=None, outs=(), T=120+273.15, P=6.32*101325):	
+
+    def __init__(self, ID='', ins=None, outs=(), T=120+273.15, P=6.32*101325):
         Unit.__init__(self, ID, ins, outs)
         self.T = T
         self.P = P
-        
+
         self.deconstruction_rxns = ParallelRxn([
             #         Reaction definition        Reactant   Conversion
             Rxn('Glucan + H2O -> Glucose',       'Glucan',      0.48),
@@ -415,11 +413,11 @@ class PulpingReactor(Unit):
             Rxn('Arabinan + H2O -> Arabinose',   'Arabinan',    0.48),
             Rxn('Lignin -> SolubleLignin',       'Lignin',      0.53)
             ])
-        
+
     def _run(self):
         liquor, residuals, caustic = self.ins
         pulp, solids = self.outs
-        
+
         # Minimum of 2 wt%
         caustic_demand = 0.02 * self.F_mass_in
         caustic_supplied = sum(i.imass['NaOH'] for i in self.ins)
@@ -428,23 +426,23 @@ class PulpingReactor(Unit):
             caustic.imass['NaOH'] = caustic_needed
         else:
             caustic.empty()
-        
+
         mixture = liquor.copy()
         mixture.mix_from(self.ins)
         self.T_in = mixture.T
         self.deconstruction_rxns(mixture)
-        
+
         # removed
         solids.copy_flow(mixture, insolubles, remove=True)
         # Based on stream 713 in ref [2]
         solids.imass['Water'] = 0
         solids.imass['Water'] = solids.F_mass
         mixture.imass['Water'] -= solids.imass['Water']
-        
+
         pulp.copy_flow(mixture)
         pulp.T = solids.T = self.T
         pulp.P = self.P
-        
+
     def _design(self):
         duty = self.Hnet
         self.heat_utilities[0](unit_duty=duty, T_in=self.T_in)
@@ -456,25 +454,25 @@ class PulpingReactor(Unit):
 class NeutralizationTank(Unit):
     _N_ins = 2
     _N_outs = 1
-   
-    def __init__(self, ID='', ins=None, outs=(), T=32+273.15):	
+
+    def __init__(self, ID='', ins=None, outs=(), T=32+273.15):
         Unit.__init__(self, ID, ins, outs)
         self.T = T
-        self.neutralization_rxn = Rxn('2 NaOH + H2SO4 -> Na2SO4 + 2 H2O', 
+        self.neutralization_rxn = Rxn('2 NaOH + H2SO4 -> Na2SO4 + 2 H2O',
                                       reactant='NaOH', X=1)
-    
+
     def _run(self):
         pulp, acid = self.ins
         mixture = self.outs[0]
-        
+
         acid.imol['H2SO4'] = 0.5*pulp.imol['NaOH'] / self.neutralization_rxn.X
         acid.imass['Water'] = acid.imass['H2SO4'] / 0.93 * 0.07 # 93% purity
-        
+
         mixture.mix_from(self.ins)
         self.neutralization_rxn(mixture)
         self.design_results['Flow rate'] = self.outs[0].F_mass
-        
-        
+
+
 # Including seed fermenter, main fermenter, and surge tank
 @cost(basis='Flow rate', ID='First seed fermenter', units='kg/hr',
       cost=138000, S=162593, CE=CEPCI[2009], n=1, BM=1.8)
@@ -506,27 +504,27 @@ class MuconicFermentation(Unit):
     _N_heat_utilities = 1
     _units= {'Duty': 'kJ/hr',
              'Flow rate': 'kg/hr'}
-    
+
     # Assumes 10% inoculum based on the size of the largest seed fermenter (100 m3)
-    # and the main fermenter (1000 m3), also consistent with NREL's assumption for 
+    # and the main fermenter (1000 m3), also consistent with NREL's assumption for
     # 2,3-BDO fermentation and past assumption on ethanol fermentation
     inoculum_ratio = 0.1
-    
+
     target_titer = 100
     # target_titer = (34.5+68.5) / 2 # in g/L (kg/m3)
-    
+
     effluent_titer = 0
 
-    def __init__(self, ID='', ins=None, outs=(), T=32+273.15, P=1.34*101325):	
+    def __init__(self, ID='', ins=None, outs=(), T=32+273.15, P=1.34*101325):
         Unit.__init__(self, ID, ins, outs)
         self.T = T
-        self.P = P        
+        self.P = P
         self.seed_fermentation_rxns = ParallelRxn([
     #                           Reaction definition                       Reactant    Conversion
     Rxn('Glucose + 0.047 CSL + 0.018 DAP -> 6 P_putidaGrow + 2.4 H2O',    'Glucose',    0.46),
     Rxn('Glucose + 1.94 O2 -> 0.74 MuconicAcid + 1.57 CO2 + 3.78 H2O',    'Glucose',    0.54),
     Rxn('Xylose + 0.039 CSL + 0.015 DAP -> 5 P_putidaGrow + 2H2O',        'Xylose',     0.46),
-    Rxn('Xylose + 1.57 O2 -> 0.62 MuconicAcid + 1.26 CO2 + 3.13 H2O',     'Xylose',     0.54),    
+    Rxn('Xylose + 1.57 O2 -> 0.62 MuconicAcid + 1.26 CO2 + 3.13 H2O',     'Xylose',     0.54),
     Rxn('Arabinose + 0.039 CSL + 0.015 DAP -> 5 P_putidaGrow + 2H2O',     'Arabinose',  0.46),
     Rxn('Arabinose + 1.57 O2 -> 0.62 MuconicAcid + 1.26 CO2 + 3.13 H2O',  'Arabinose',  0.54)
             ])
@@ -541,7 +539,7 @@ class MuconicFermentation(Unit):
     Rxn('Glucose + 1.18 O2 + 0.28 NH4OH -> 4.8 P_putida + 1.2 CO2 + 2.26 H2O',      'Glucose',        0.46),
     Rxn('Glucose + 1.94 O2 -> 0.74 MuconicAcid + 1.57 CO2 + 3.78 H2O',              'Glucose',        0.54),
     Rxn('Xylose + 0.98 O2 + 0.23 NH4OH -> 4 P_putida + CO2 + 1.87 H2O',             'Xylose',         0.46),
-    Rxn('Xylose + 1.57 O2 -> 0.62 MuconicAcid + 1.26 CO2 + 3.13 H2O',               'Xylose',         0.54),    
+    Rxn('Xylose + 1.57 O2 -> 0.62 MuconicAcid + 1.26 CO2 + 3.13 H2O',               'Xylose',         0.54),
     Rxn('Arabinose + 0.98 O2 + 0.23 NH4OH -> 4 P_putida + CO2 + 1.87 H2O',          'Arabinose',      0.46),
     Rxn('Arabinose + 1.57 O2 -> 0.62 MuconicAcid + 1.26 CO2 + 3.13 H2O',            'Arabinose',      0.54),
     Rxn('Sucrose + 2.35 O2 + 0.56 NH4OH -> 9.6 P_putida + 2.4 CO2 + 3.52 H2O',      'Sucrose',        0.46),
@@ -553,7 +551,7 @@ class MuconicFermentation(Unit):
             ])
         self._main_X = self.main_fermentation_rxns.X.copy()
 
-        # Based on chemical usage in ref [2], only need to neutralized to the mono salt        
+        # Based on chemical usage in ref [2], only need to neutralized to the mono salt
         self.neutralization_rxn = \
             Rxn('MuconicAcid + NaOH -> MonoSodiumMuconate + 2 H2O',
                 reactant='MuconicAcid', X=1)
@@ -562,12 +560,12 @@ class MuconicFermentation(Unit):
     def _run(self):
         substrate, water, ammonia, caustic, CSL, DAP, air = self.ins
         vent, broth = self.outs
-        
+
         substrate_seed = substrate.copy()
         substrate_seed.mol = substrate.mol * self.inoculum_ratio
         substrate_main = substrate.copy()
         substrate_main.mol = substrate.mol - substrate_seed.mol
-        
+
         # Assume the same CSL and DAP loading as R301 and R302
         substrate_seed.imass['CSL'] = 0.005 * substrate_seed.F_mass
         substrate_main.imass['CSL'] = 0.0025 * substrate_main.F_mass
@@ -577,39 +575,39 @@ class MuconicFermentation(Unit):
         substrate_main.imass['DAP'] = 0.33 * substrate_main.F_vol
         DAP.imass['DAP'] = substrate_seed.imass['DAP']+substrate_main.imass['DAP']
 
-        # Based on stream 708 in ref [2], however in the text it is stated that 
+        # Based on stream 708 in ref [2], however in the text it is stated that
         # the seed is diluted twofolds
         water.imass['Water'] = substrate_seed.F_mass
         water.imass['Water'] = max(80000, substrate_seed.F_mass)
-        
+
         substrate_seed.mix_from([water, substrate_seed])
         self.seed_fermentation_rxns.force_reaction(substrate_seed)
 
         substrate_main.imass['P_putida'] = substrate_seed.imass['P_putidaGrow']
         substrate_seed.imass['P_putidaGrow'] = 0
-                
-        substrate_main.mix_from([substrate_seed, substrate_main])        
+
+        substrate_main.mix_from([substrate_seed, substrate_main])
         self.main_fermentation_rxns.force_reaction(substrate_main)
         self.neutralization_rxn.force_reaction(substrate_main)
-        
+
         ammonia.imass['NH4OH'] = max(0, -substrate_main.imass['NH4OH'])
         air.imass['O2'] = max(0, -substrate_main.imass['O2'])
         # Air mass ratio based on stream 703 in ref [2]
         air.imass['N2'] = air.imass['O2'] / 0.21 * 0.79
         caustic.imass['NaOH'] = max(0, -substrate_main.imass['NaOH'])
         for i in ('NH4OH', 'O2', 'NaOH'):
-            substrate_main.imass[i] = 0        
-        
+            substrate_main.imass[i] = 0
+
         vent.copy_flow(substrate_main, 'CO2', remove=True)
         vent.imol['N2'] = air.imol['N2']
         broth.copy_flow(substrate_main)
         vent.T = broth.T = self.T
-        
+
         # Avoid getting tiny negatives
         for i in broth.mol.nonzero()[0]:
             if broth.mol[i] < 0:
                 broth.mol[i] = min(0, broth.mol[i]+1e-6)
-                
+
         self.effluent_titer = compute_muconic_titer(broth)
 
     def _design(self):
@@ -630,23 +628,23 @@ class MuconicMembrane(Unit):
     _N_ins = 1
     _N_outs = 2
     _units= {'Volumetric flow': 'm3/hr'}
-    
+
     def _run(self):
         broth = self.ins[0]
         liquid, solids = self.outs
-        
+
         solids.imass[insolubles] = broth.imass[insolubles]
         # 4.3% loss based on Appendic C in ref [2]
         solids.imass['MonoSodiumMuconate'] = 0.043 * broth.imass['MonoSodiumMuconate']
         # Based on stream 713 in ref [2]
         solids.imass['Water'] = min(broth.imass['Water'], solids.F_mass)
         liquid.mol = broth.mol - solids.mol
-        
+
         # Avoid getting tiny negatives
         for i in liquid.mol.nonzero()[0]:
             if liquid.mol[i] < 0:
                 liquid.mol[i] = min(0, liquid.mol[i]+1e-6)
-    
+
     def _design(self):
         self.design_results['Volumetric flow'] = self.F_vol_in
 
@@ -672,10 +670,10 @@ class MuconicCrystallizer(Unit):
              'Dried crystal flow': 'kg/hr',
              'Duty': 'kJ/hr'}
 
-    def __init__(self, ID='', ins=None, outs=(), T=15+273.15):	
+    def __init__(self, ID='', ins=None, outs=(), T=15+273.15):
         Unit.__init__(self, ID, ins, outs)
         self.T = T
-        
+
         self.reacidification_rxn = \
             Rxn('MonoSodiumMuconate + 0.5 H2SO4 -> MuconicAcid + 0.5 Na2SO4',
                 reactant='MonoSodiumMuconate', X=1)
@@ -683,27 +681,27 @@ class MuconicCrystallizer(Unit):
     def _run(self):
         liquid, acid = self.ins
         water, crystal = self.outs
-        
+
         acid.imol['H2SO4'] = 0.5 * liquid.imol['MonoSodiumMuconate']
         acid.imass['Water'] = acid.imass['H2SO4'] / 0.93 * 0.07 # 93% purity
         mixture = liquid.copy()
         mixture.mix_from(self.ins)
         self.T_in = mixture.T
         self.reacidification_rxn(mixture)
-        
+
         # No information on salts and water carried to crystals, assumed none
         wet_crystal = crystal.copy()
         wet_crystal.imass['MuconicAcid'] = 0.988 * mixture.imass['MuconicAcid']
         # Based on equipment sizing in ref [2]
         wet_crystal.imass['Water'] = wet_crystal.imass['MuconicAcid']/10930*(11498-11930)
         self.design_results['Crystal flow'] = wet_crystal.F_mass
-        
+
         crystal.imass['MuconicAcid'] = wet_crystal.imass['MuconicAcid']
         water.mol = mixture.mol - crystal.mol
 
         crystal.T = water.T = self.T
         crystal.phase = 's'
-        
+
     def _design(self):
         duty = self.H_out - self.H_in
         self.heat_utilities[0](unit_duty=duty, T_in=self.T_in)
@@ -725,11 +723,11 @@ class MuconicDissolution(Unit):
     _N_outs = 1
     _units= {'Flow rate': 'kg/hr',
              'Salt flow': 'kg/hr'}
-    
+
     def _run(self):
         crystal, recycled_ethanol, fresh_ethanol = self.ins
         solution = self.outs[0]
-        
+
         fresh_ethanol.imass['Ethanol'] = 4*crystal.F_mass - recycled_ethanol.imass['Ethanol']
         solution.mix_from(self.ins)
         solution.phase = 'l'
@@ -738,7 +736,7 @@ class MuconicDissolution(Unit):
         self.design_results['Flow rate'] = self.F_mass_in
         # Based on equipment sizing in ref [2]
         self.design_results['Salt flow'] = 149/54079 * self.F_mass_in
-        
+
 
 @cost(basis='Muconic flow', ID='Feed tank', units='kg/hr',
       cost=16721, S=53930, CE=CEPCI[2011], n=0.6, BM=2.5)
@@ -772,11 +770,11 @@ class MuconicHydrogenation(Unit):
              'H2 flow': 'kg/hr',
              'Flow rate': 'kg/hr'}
 
-    def __init__(self, ID='', ins=None, outs=(), T=78+273.15, P=40*101325):	
+    def __init__(self, ID='', ins=None, outs=(), T=78+273.15, P=40*101325):
         Unit.__init__(self, ID, ins, outs)
         self.T = T
         self.P = P
-        self.hydrogenation_rxn = Rxn('MuconicAcid + H2 -> AdipicAcid', 
+        self.hydrogenation_rxn = Rxn('MuconicAcid + H2 -> AdipicAcid',
                                       reactant='MuconicAcid', X=1)
 
     def _run(self):
@@ -785,7 +783,7 @@ class MuconicHydrogenation(Unit):
 
         # Though H2:muconic == 2.6 on a molar basis, the extra H2 is recycled
         hydrogen.imol['H2'] = muconic.imol['MuconicAcid']
-        
+
         adipic.mix_from(self.ins)
         adipic_cold = adipic.copy()
         adipic.T = self.T
@@ -793,14 +791,14 @@ class MuconicHydrogenation(Unit):
         duty = adipic.H - adipic_cold.H
         self.heat_utilities[0](unit_duty=duty, T_in=adipic.T)
         self.hydrogenation_rxn(adipic)
-        
+
     def _design(self):
         Design = self.design_results
         Design['Muconic flow'] = self.ins[0].F_mass
         Design['Liquid volumetric flow'] = self.F_vol_out
         Design['H2 flow'] = self.ins[1].F_mass
         Design['Flow rate'] = self.F_mass_out
-    
+
     # Ru/C catalyst cost not included in capital/variable operating cost in ref [2],
     # but was stated in text/table
     def _cost(self):
@@ -824,7 +822,7 @@ class AdipicEvaporator(Unit):
     _N_heat_utilities = 1
     _units= {'Duty': 'kJ/hr',
              'Flow rate': 'kg/hr'}
-    
+
     def _run(self):
         adipic_dilute, adipic_recycled = self.ins
         ethanol, adipic_concentrated = self.outs
@@ -835,14 +833,14 @@ class AdipicEvaporator(Unit):
         ethanol.imass['Ethanol'] = adipic_total.imass['Ethanol'] \
             - adipic_concentrated.imass['Ethanol']
         adipic_concentrated.mol = adipic_total.mol - ethanol.mol
-            
+
         ethanol.phase = 'g'
         ethanol.T = adipic_concentrated.T = adipic_total.T
 
         duty = self.design_results['Duty'] = self.H_out - self.H_in
         self.heat_utilities[0](unit_duty=duty, T_in=adipic_total.T)
         self.design_results['Flow rate'] = self.F_mass_in
-        
+
 
 @cost(basis='Volumetric flow', ID='Crystallizer', units='m3/hr',
       # 190 in gallon per minute (GPM)
@@ -857,30 +855,30 @@ class AdipicCrystallizer(Unit):
     _units= {'Volumetric flow': 'm3/hr',
              'Crystal flow': 'kg/hr'}
 
-    def __init__(self, ID='', ins=None, outs=(), T=15+273.15, P=101325):	
+    def __init__(self, ID='', ins=None, outs=(), T=15+273.15, P=101325):
         Unit.__init__(self, ID, ins, outs)
         self.T = T
         self.P = P
-        
+
     def _run(self):
         influent = self.ins[0]
         uncrystallized, crystal = self.outs
-        
+
         crystal.imass['AdipicAcid'] = 0.734 * influent.imass['AdipicAcid']
         # Based on stream 710 in ref [2]
         crystal.imass['Ethanol'] = 29/11092 * crystal.imass['AdipicAcid']
         uncrystallized.mol = influent.mol - crystal.mol
-        
+
         crystal.T = uncrystallized.T = self.T
         crystal.phase = 's'
-        
+
     def _design(self):
         Design = self.design_results
         Design['Volumetric flow'] = self.outs[1].F_vol
         Design['Crystal flow'] = self.outs[1].F_mass
         duty = self.H_out - self.H_in
         self.heat_utilities[0](unit_duty=duty, T_in=self.ins[0].T)
-        
+
 @cost(basis='Duty', ID='Condenser', units='kJ/hr',
       # -23 is the duty in MMkca/hr
       cost=487000, S=-23*_Gcal_2_kJ, CE=CEPCI[2010], n=0.6, BM=2.8)
@@ -891,7 +889,7 @@ class AdipicCondenser(HXutility):
         self.design_results['Duty'] = self.Q
 
 
-# %% 
+# %%
 
 # =============================================================================
 # Wastewater treatment
@@ -924,7 +922,7 @@ class SodiumSulfateRecovery(Unit):
     def _run(self):
         brine = self.ins[0]
         vent, residuals, Na2SO4 = self.outs
-        
+
         influent = brine.copy()
         Na2SO4.copy_flow(influent, 'Na2SO4')
         residuals.copy_flow(influent, solubles+insolubles)
@@ -934,7 +932,7 @@ class SodiumSulfateRecovery(Unit):
         vent.phase = 'g'
         Na2SO4.phase = 's'
         self.design_results['Duty'] = self.H_out - self.H_in
-    
+
     def _design(self):
         Design = self.design_results
         self.heat_utilities[0](unit_duty=self.design_results['Duty'], T_in=self.ins[0].T)
@@ -946,7 +944,7 @@ class SodiumSulfateRecovery(Unit):
 
 
 
-# %% 
+# %%
 
 # =============================================================================
 # Storage
@@ -969,7 +967,7 @@ class DenaturantStorage(Unit): pass
 class DenaturantMixer(Unit):
     _N_ins = 2
     _N_outs = 1
-    
+
     def _run(self):
         # Based on streams 701 and 515 in ref [1]
         self.ins[1].imass['Denaturant'] = 465/21673 * self.ins[0].imass['Ethanol']
@@ -989,5 +987,3 @@ class CoproductStorage(Unit): pass
 @cost(basis='Flow rate', ID='Pump', units='kg/hr',
       kW=0.37285, cost=3000, S=163, CE=CEPCI[2009], n=0.8, BM=3.1)
 class DAPstorage(Unit): pass
-
-

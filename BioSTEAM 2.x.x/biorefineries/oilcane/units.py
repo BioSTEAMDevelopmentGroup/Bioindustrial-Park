@@ -55,12 +55,14 @@ class CoFermentation(CoFermentation):
     Rxn('Glucose -> Cellmass',                'Glucose',  0.05, chemicals),
     Rxn('Xylose -> Cellmass',                 'Xylose',  0.05, chemicals),
         ])
-    
-        self.CSL_to_constituents = Rxn(
-            'CSL -> 0.5 H2O + 0.25 LacticAcid + 0.25 Protein', 'CSL', 1.0000, chemicals, basis='wt',
-        )
-        self.CSL_to_constituents.basis = 'mol'
         
+        if 'CSL' in chemicals:
+            self.CSL_to_constituents = Rxn(
+                'CSL -> 0.5 H2O + 0.25 LacticAcid + 0.25 Protein', 'CSL', 1.0000, chemicals, basis='wt',
+            )
+            self.CSL_to_constituents.basis = 'mol'
+        else:
+            self.CSL_to_constituents = None
         if all([i in self.chemicals for i in ('FFA', 'DAG', 'TAG', 'Glycerol')]):
             self.lipid_reaction = self.oil_reaction = PRxn([
                 Rxn('TAG + 3Water -> 3FFA + Glycerol', 'TAG', 0.23, chemicals),

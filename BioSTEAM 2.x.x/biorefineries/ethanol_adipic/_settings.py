@@ -1,30 +1,28 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# BioSTEAM: The Biorefinery Simulation and Techno-Economic Analysis Modules
-# Copyright (C) 2020-2021, Yoel Cortes-Pena <yoelcortes@gmail.com>
 # Bioindustrial-Park: BioSTEAM's Premier Biorefinery Models and Results
-# Copyright (C) 2020-2021, Yalin Li <yalinli2@illinois.edu> (this biorefinery)
-# 
-# This module is under the UIUC open-source license. See 
+# Copyright (C) 2020-, Yalin Li <mailto.yalin.li@gmail.com>
+#
+# This module is under the UIUC open-source license. See
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
 # for license details.
 
 '''
 References
 ----------
-[1] Humbird et al., Process Design and Economics for Biochemical Conversion of 
-    Lignocellulosic Biomass to Ethanol: Dilute-Acid Pretreatment and Enzymatic 
-    Hydrolysis of Corn Stover; Technical Report NREL/TP-5100-47764; 
+[1] Humbird et al., Process Design and Economics for Biochemical Conversion of
+    Lignocellulosic Biomass to Ethanol: Dilute-Acid Pretreatment and Enzymatic
+    Hydrolysis of Corn Stover; Technical Report NREL/TP-5100-47764;
     National Renewable Energy Lab (NREL), 2011.
     https://www.nrel.gov/docs/fy11osti/47764.pdf
-[2] Davis et al., Process Design and Economics for the Conversion of Lignocellulosic 
-    Biomass to Hydrocarbon Fuels and Coproducts: 2018 Biochemical Design Case Update; 
-    NREL/TP-5100-71949; National Renewable Energy Lab (NREL), 2018. 
-    https://doi.org/10.2172/1483234    
+[2] Davis et al., Process Design and Economics for the Conversion of Lignocellulosic
+    Biomass to Hydrocarbon Fuels and Coproducts: 2018 Biochemical Design Case Update;
+    NREL/TP-5100-71949; National Renewable Energy Lab (NREL), 2018.
+    https://doi.org/10.2172/1483234
 [3] Argonne National Laboratory. The Greenhouse gases, Regulated Emissions,
     and Energy use in Transportation (GREET) Model https://greet.es.anl.gov/
     (accessed Aug 25, 2020).
-    
+
 '''
 
 __all__ = (
@@ -102,11 +100,11 @@ def set_feedstock_price(feedstock, preprocessing=None):
     feedstock.price = price/1e3/(1-feedstock.imass['Water']/feedstock.F_mass)
     return feedstock.price
 
-# 2.86 is the average motor gasoline price between 2010-2019 in 2016 $/gal	
-# based on AEO from EIA, density of gasoline is 2.819 kg/gal	
-# based on Lower and Higher Heating Values of Hydrogen and Other Fuels	
-# from H2 Tools maintained by Pacific Northwest National Laboratory	
-# (https://h2tools.org/hyarc/calculator-tools/lower-and-higher-heating-values-fuels)	
+# 2.86 is the average motor gasoline price between 2010-2019 in 2016 $/gal
+# based on AEO from EIA, density of gasoline is 2.819 kg/gal
+# based on Lower and Higher Heating Values of Hydrogen and Other Fuels
+# from H2 Tools maintained by Pacific Northwest National Laboratory
+# (https://h2tools.org/hyarc/calculator-tools/lower-and-higher-heating-values-fuels)
 denaturant_price = 2.86 / 2.819
 
 # 1.41e6 is $/yr and 4279 in kg/hr from Table 33 of ref [2] (BDO scenario)
@@ -114,14 +112,14 @@ denaturant_price = 2.86 / 2.819
 # cost is negative because it's a product stream
 ash_disposal_price = -1.41e6 / (4279*7880)
 
-# Baseline from ref [2], lower bound is 2015-2019 average of 	
-# hydrate lime in $/ton at plant from Mineral Commodity Summaries 2020.	
-# 2015: 146.40 * (1.114/1.100) / 907.18474 = 0.163	
-# 2016: 145.50 / 907.18474 = 0.160	
-# 2017: 147.10 * (1.114/1.134) / 907.18474 = 0.159	
-# 2018: 151.50 * (1.114/1.157) / 907.18474 = 0.161	
-# 2019: 151.00 * (1.114/1.185) / 907.18474 = 0.156	
-# (0.163+0.160+0.159+0.161+0.156) / 5 = 0.160	
+# Baseline from ref [2], lower bound is 2015-2019 average of
+# hydrate lime in $/ton at plant from Mineral Commodity Summaries 2020.
+# 2015: 146.40 * (1.114/1.100) / 907.18474 = 0.163
+# 2016: 145.50 / 907.18474 = 0.160
+# 2017: 147.10 * (1.114/1.134) / 907.18474 = 0.159
+# 2018: 151.50 * (1.114/1.157) / 907.18474 = 0.161
+# 2019: 151.00 * (1.114/1.185) / 907.18474 = 0.156
+# (0.163+0.160+0.159+0.161+0.156) / 5 = 0.160
 # Upper bound is +10% from baseline = 0.1189 * _lb_per_kg * 1.1 = 0.288
 lime_price = 0.1189 * _lb_per_kg
 
@@ -138,13 +136,13 @@ natural_gas_price = CH4_cost_per_mol * (1000/CH4_MW)
 
 
 # All in 2016$/kg
-price = {'Feedstock': feedstock_price, 	
-         'H2SO4': 0.0430 * _lb_per_kg,	
-         # 0.1900 is for NH3	
+price = {'Feedstock': feedstock_price,
+         'H2SO4': 0.0430 * _lb_per_kg,
+         # 0.1900 is for NH3
          'NH3': 0.1900 * _lb_per_kg,
          'NH4OH': 0.1900 * _lb_per_kg * 17.031/35.046,
          'NaOH': 0.2384 * _lb_per_kg,
-         'CSL': 0.0339 * _lb_per_kg,	
+         'CSL': 0.0339 * _lb_per_kg,
          'DAP': 0.1645 * _lb_per_kg,
          # $6.16/kg protein in 2016$, P25 of ref [2]
          'Enzyme': 6.16,
@@ -152,12 +150,12 @@ price = {'Feedstock': feedstock_price,
          'Hydrogenation catalyst': 528 * _lb_per_kg,
          'WWT polymer': 2.6282 * _lb_per_kg,
          'Natural gas': natural_gas_price,
-         'Lime': lime_price,         
-         'Boiler chems': 2.9772 * _lb_per_kg,	
+         'Lime': lime_price,
+         'Boiler chems': 2.9772 * _lb_per_kg,
          'Baghouse bag': baghouse_bag_price,
-         'Cooling tower chems': 1.7842 * _lb_per_kg,	
+         'Cooling tower chems': 1.7842 * _lb_per_kg,
          'Makeup water': 0.0002 * _lb_per_kg,
-         # Cost of ash is negative because it's a product stream	
+         # Cost of ash is negative because it's a product stream
          'Ash disposal': ash_disposal_price,
          'Electricity': 0.068,
          'Denaturant': denaturant_price, # n-Heptane
@@ -165,18 +163,18 @@ price = {'Feedstock': feedstock_price,
          'Adipic acid': 0.8554 * _lb_per_kg,
          'Sodium sulfate': 0.0706 * _lb_per_kg
          }
-    
+
 bst.PowerUtility.price = price['Electricity']
 
 # =============================================================================
 # Characterization factors (CFs) for life cycle analysis (LCA), 100-year global
-# warming potential (GWP) in kg CO2-eq/kg, from ref [3] if not 
+# warming potential (GWP) in kg CO2-eq/kg, from ref [3] if not
 # =============================================================================
 
 GWP_CFs = {
     'H2SO4': 44.47/1e3,
     'NH3': 2.64,
-    'NH4OH': 2.64 * chems.NH3.MW/chems.NH4OH.MW,    
+    'NH4OH': 2.64 * chems.NH3.MW/chems.NH4OH.MW,
     'NaOH': 2.11,
     'CSL': 1.55,
     'DAP': 1.20,
@@ -207,11 +205,3 @@ GWP_CFs['Electricity'] = 0.48
 # GWP_CFs['SodiumSulfate_ecoinvent'] = 0.10829
 
 CFs = {'GWP_CFs': GWP_CFs, 'GWP_CF_stream': GWP_CF_stream}
-
-
-
-
-
-
-    
-    
