@@ -1,11 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# BioSTEAM: The Biorefinery Simulation and Techno-Economic Analysis Modules
-# Copyright (C) 2020-2021, Yoel Cortes-Pena <yoelcortes@gmail.com>
 # Bioindustrial-Park: BioSTEAM's Premier Biorefinery Models and Results
-# Copyright (C) 2020-2021, Yalin Li <yalinli2@illinois.edu> (this biorefinery)
-# 
-# This module is under the UIUC open-source license. See 
+# Copyright (C) 2020-, Yalin Li <mailto.yalin.li@gmail.com>
+#
+# This module is under the UIUC open-source license. See
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
 # for license details.
 
@@ -29,14 +27,14 @@ __all__ = ('prep_cost', 'Preprocessing', 'OptionPrep',
 def prep_cost(basis, ID=None, *, CE, cost, n,
               lifetime, salvage, maintenance, labor,
               S=1, lb=None, ub=None, kW=0, BM=1, units=None, f=None, N=None):
-    
+
     def add_param(cls):
         add_cost(cls, ID, basis, units, S, lb, ub, CE, cost, n, kW, BM, N, lifetime, f)
         cls.salvage[ID] = salvage
         cls.maintenance[ID] = maintenance
         cls.labor[ID] = labor
         return cls
-    
+
     return add_param
 
 
@@ -45,7 +43,7 @@ class Preprocessing(Unit):
     For preprocessing units at biomass depots based on description in Lamers et al., [1]_
     capacity of the plant is set at 9.07 metric tonne (MT, or Mg) per hour
     (equivalent to 10 U.S. ton per hr).
-    
+
     Parameters
     ----------
     ins : biosteam.Stream
@@ -70,29 +68,29 @@ class Preprocessing(Unit):
         https://doi.org/10.1016/j.biortech.2015.07.009.
 
     '''
-    
+
     salvage = {}
     maintenance = {}
     labor = {}
-    
+
     _units= {'Dry flow': 'kg/hr'}
-    
+
     def __init__(self, ID='', ins=None, outs=(), **kwargs):
         Unit.__init__(self, ID, ins, outs)
         for attr, val in kwargs.items():
             setattr(self, attr, val)
-            
+
     def _run(self):
         self.outs[0].copy_like(self.ins[0])
-    
+
     def _design(self):
         self.design_results['Dry flow'] = self.ins[0].F_mass - self.ins[0].imass['Water']
-        
+
     @property
     def moisture_in(self):
         '''[float] Moisture content of feedstock prior to this unit'''
         return self.ins[0].imass['Water']/self.ins[0].F_mass
-    
+
     @property
     def moisture_out(self):
         '''[float] Moisture content of feedstock after this unit'''
@@ -100,12 +98,12 @@ class Preprocessing(Unit):
 
 
 class OptionPrep(Preprocessing):
-    
+
     def __init__(self, ID='', ins=None, outs=(), kind='CPP', **kwargs):
         Unit.__init__(self, ID, ins, outs)
         self.kind = kind
         for attr, val in kwargs.items():
-            setattr(self, attr, val) 
+            setattr(self, attr, val)
 
     def _cost(self):
         name = format_title(type(self).__name__)
@@ -113,11 +111,11 @@ class OptionPrep(Preprocessing):
         self.cost_items = {ID: self.cost_items[ID]}
         self.purchase_costs.clear()
         self._decorated_cost()
-        
+
     @property
     def kind(self):
         '''
-        [str] Type of the equipment, can be either CPP or HMPP (conventional or 
+        [str] Type of the equipment, can be either CPP or HMPP (conventional or
         high-moisture pelleting process).
         '''
         return self._kind
@@ -126,7 +124,7 @@ class OptionPrep(Preprocessing):
         if i not in ('CPP', 'HMPP'):
             raise ValueError(f'kind can only be CPP or HMPP, not {i}.')
         self._kind = i
-    
+
 
 
 # %%
@@ -152,19 +150,19 @@ class Auxiliary(Preprocessing):
     '''
     Auxiliary units including conveyor system, dust collection system, surge bin,
     and other miscellaneous equipment.
-    
+
     Note
     ----
     [1] For conveyor, dust collection, surge bin, and miscellaneous equipment,
         lifetime, salvage, and electricity usage was not explicitly provided in
         Lamers et al., [1]_ thus was back calculated based on the provided information.
-        
+
     References
     ----------
     .. [1] Lamers et al., Techno-Economic Analysis of Decentralized Biomass
         Processing Depots. Bioresource Technology 2015, 194, 205–213.
         https://doi.org/10.1016/j.biortech.2015.07.009.
-        
+
     '''
 
 @prep_cost(basis='Dry flow', ID='Grinder', units='kg/hr',
@@ -183,7 +181,7 @@ class Grinder(Preprocessing): pass
            lifetime=40000/(365*24), salvage=0.3, maintenance=0.1,
            labor=0.5*19.88)
 class HammerMill(OptionPrep):
-    
+
     _cost = OptionPrep._cost
 
 
@@ -198,7 +196,7 @@ class HammerMill(OptionPrep):
 class Dryer(OptionPrep):
 
     _target_moisture = 0.2
-    
+
     def _run(self):
         mc_out = self.target_moisture
         dried = self.outs[0]
@@ -216,7 +214,7 @@ class Dryer(OptionPrep):
             self.power_utility.rate *= mc_diff/(0.3-0.09)
         else:
             self.power_utility.rate *= mc_diff/(0.3-0.19)
-        
+
     @property
     def target_moisture(self):
         '''[float] Target moisture content after drying.'''
@@ -235,7 +233,7 @@ class Dryer(OptionPrep):
            lifetime=100000/(365*24), salvage=0.3, maintenance=0.1,
            labor=0.5*15.51)
 class PelletMill(OptionPrep):
-    
+
     def _run(self):
         if self.kind == 'CPP':
             OptionPrep._run(self)
@@ -245,7 +243,7 @@ class PelletMill(OptionPrep):
             dried.copy_like(self.ins[0])
             dry_mass = dried.F_mass - dried.imass['Water']
             dried.imass['Water'] = mc_out/(1-mc_out) * dry_mass
-    
+
     _cost = OptionPrep._cost
 
 
@@ -260,7 +258,7 @@ class DepotAFEX(Preprocessing):
     Ammonia fiber expansion (AFEX) pretreatment at a biorefinery depot,
     equipment information based on description in Lamers et al., [1]_
     makeup water and ammonia (makeup and fugative) based on Kim and Dale. [2]_
-    
+
     Parameters
     ----------
     ins : Stream sequence
@@ -281,7 +279,7 @@ class DepotAFEX(Preprocessing):
         Fugative ammonia as kg ammonia/kg dry feedstock.
     CH4_loading : float
         Natural gas consumption as kg CH4/kg dry feedstock.
-        
+
     References
     ----------
     .. [1] Lamers et al., Techno-Economic Analysis of Decentralized Biomass
@@ -291,12 +289,12 @@ class DepotAFEX(Preprocessing):
         Systems: Centralized versus Distributed Processing Systems.
         Biomass and Bioenergy 2015, 74, 135–147.
         https://doi.org/10.1016/j.biombioe.2015.01.018.
-    
+
     '''
-    
+
     _N_ins = 4
     _N_outs = 2
-    
+
     loss = 0
     water_makeup = 2.1/3.6
     ammonia_makeup = 31.3/1e3/3.6
@@ -304,23 +302,23 @@ class DepotAFEX(Preprocessing):
     # 325 kWh/Mg as in ref [1], did not use value in ref [2] as ref [2] also has
     # steam consumption
     CH4_loading = (325*3600/-CH4_HHV)/1e3
-    
+
     def _run(self):
         feed, makeup_H2O, makeup_NH3, CH4  = self.ins
         processed, fugative_NH3 = self.outs
-        
+
         dry_mass = feed.F_mass - feed.imass['Water']
         makeup_H2O.imass['Water'] = self.water_makeup * dry_mass
         makeup_NH3.imass['NH3'] = self.ammonia_makeup * dry_mass
         CH4.imass['CH4'] = self.CH4_loading * dry_mass
         fugative_NH3.imass['NH3'] = self.ammonia_fugative * dry_mass
         fugative_NH3.phase = 'g'
-        
+
         processed.copy_like(feed)
         processed.imol['NH4OH'] = makeup_NH3.imol['NH3'] - fugative_NH3.imol['NH3']
         processed.imol['H2O'] -= processed.imol['NH4OH']
         processed.F_mass *= 1 - self.loss
-    
+
 
 # %%
 
@@ -358,19 +356,19 @@ def create_default_depot(raw_feedstock='raw_feedstock', kind='CPP',
     flowsheet : biosteam.Flowsheet
         Flowsheet containing the depot system, the preprocessed feedstock can
         be retrieved as flowsheet.stream.preprocessed.
-        
+
     References
     ----------
     .. [1] Lamers et al., Techno-Economic Analysis of Decentralized Biomass
         Processing Depots. Bioresource Technology 2015, 194, 205–213.
         https://doi.org/10.1016/j.biortech.2015.07.009.
-    .. [2] Davis et al., Process Design and Economics for the Conversion of Lignocellulosic 
-        Biomass to Hydrocarbon Fuels and Coproducts: 2018 Biochemical Design Case Update; 
-        NREL/TP-5100-71949; National Renewable Energy Lab (NREL), 2018. 
+    .. [2] Davis et al., Process Design and Economics for the Conversion of Lignocellulosic
+        Biomass to Hydrocarbon Fuels and Coproducts: 2018 Biochemical Design Case Update;
+        NREL/TP-5100-71949; National Renewable Energy Lab (NREL), 2018.
         https://doi.org/10.2172/1483234
 
     '''
-    
+
     flowsheet = bst.Flowsheet(f'{kind}_depot')
     bst.main_flowsheet.set_flowsheet(flowsheet)
     feed_ID = 'raw_feedstock'
@@ -405,16 +403,16 @@ def create_default_depot(raw_feedstock='raw_feedstock', kind='CPP',
         U103 = HammerMill(f'U{n+3}', kind='CPP', ins=U102-0)
         U104 = PelletMill(f'U{n+4}', kind='CPP', ins=U103-0)
         U105 = Auxiliary(f'U{n+5}', ins=U104-0, outs='preprocessed')
-        
+
     elif kind == 'HMPP':
         U102 = HammerMill(f'U{n+2}', kind='HMPP')
         U103 = PelletMill(f'U{n+3}', kind='HMPP', ins=U102-0)
         U104 = Dryer(f'U{n+4}', kind='HMPP', target_moisture=0.2, ins=U103-0)
         U105 = Auxiliary(f'U{n+5}', ins=U104-0, outs='preprocessed')
-        
+
     else:
         raise ValueError(f'kind can only be CPP or HMPP, not {kind}.')
-    
+
     if with_AFEX:
         AFEX-0-U102
         prep_sys = bst.System('prep_sys',
@@ -432,7 +430,7 @@ class PreprocessingCost:
     '''
     To calculate the cost of feedstock preprocessing for a biorefinery depot
     ststen based on description in Lamers et al. [1]_
-    
+
     Parameters
     ----------
     depot_sys : biosteam.System
@@ -460,20 +458,20 @@ class PreprocessingCost:
         https://doi.org/10.1016/j.biortech.2015.07.009.
 
     '''
-    
+
     __slots__ = ('ID', '_depot_sys', '_feedstock', '_units', '_throughput', '_feeds',
                  'operating_hours', 'interest', 'insurance',
-                 'housing', 'tax', 'labor_adjustment')    
-    
+                 'housing', 'tax', 'labor_adjustment')
+
     def __repr__(self):
         return f'<{type(self).__name__}: {self.depot_sys.ID}>'
-    
-    
+
+
     def __init__(self, depot_sys=None, feedstock=None,
                  operating_hours=365*24, interest=0.06,
                  insurance=0.0025, housing=0.0075, tax=0.01,
                  labor_adjustment=1):
-        
+
         self.depot_sys = depot_sys
         if not feedstock:
             feedstock, = (i for i in depot_sys.products if i.phase != 'g')
@@ -488,18 +486,18 @@ class PreprocessingCost:
     def get_depreciation_cost(self):
         r'''
         Calculate the depreciation cost per metric tonne (MT) of dry feedstock.
-        
+
         .. math:: cost[\frac{$}{yr}] = (P-S) * \frac{i*(1+i)^n}{(1+i)^n-1} + S*i
         .. math:: cost[\frac{$}{MT}] = \frac{cost[\frac{$}{yr}]}{MT \ feedstock \ per \ yr}
 
-        
+
         where:
             P: purchase cost
-            
+
             S: salvage value = salvage fraction * purchase cost
-            
+
             i: interest rate
-            
+
             n: equipment lifetime in year
 
         Returns
@@ -507,7 +505,7 @@ class PreprocessingCost:
         A dict of depreciation cost.
 
         '''
-        
+
         i = self.interest
         operating_hours = self.operating_hours
         dry_mass = self._throughput
@@ -521,21 +519,21 @@ class PreprocessingCost:
                 depreciation_cost[unit_eqpt] = \
                     (cost*(1-sal)*frac+cost*sal*i)/(operating_hours*dry_mass/1e3)
         return depreciation_cost
-    
+
     def get_IHT_cost(self):
         r'''
         Calculate insurance, housing, and tax costs per metric tonne (MT) of dry feedstock.
-        
+
         .. math:: cost[\frac{$}{yr}] = IHT_{frac} * \frac{P+S}{2}
         .. math:: cost[\frac{$}{MT}] = \frac{cost[\frac{$}{yr}]}{MT \ feedstock \ per \ yr}
-        
+
         where:
             P: purchase cost
-            
+
             S: salvage value = salvage fraction * purchase cost
-            
+
             :math:`IHT_{frac}`: insurance, housing, and tax costs as a fraction of purchase cost
-            
+
                 :math:`IHT_{frac} = I_{frac} + H_{frac} + T_{frac}`
 
         Returns
@@ -543,7 +541,7 @@ class PreprocessingCost:
         A dict of IHT cost.
 
         '''
-        
+
         frac = self.insurance + self.housing + self.tax
         operating_hours = self.operating_hours
         dry_mass = self._throughput
@@ -554,20 +552,20 @@ class PreprocessingCost:
                 IHT_cost[unit_eqpt] = \
                     cost*(1+unit.salvage[eqpt])/2*frac/(operating_hours*dry_mass/1e3)
         return IHT_cost
-    
+
     def get_maintenance_cost(self):
         r'''
         Calculate maintenance cost per metric tonne (MT) of dry feedstock.
-        
+
         .. math:: cost[\frac{$}{hr}] = \frac{P*maintenance_{frac}}{lifetime}
         .. math:: cost[\frac{$}{MT}] = \frac{cost[\frac{$}{hr}]}{dry \ feedstock \ per \ hour}
 
-        
+
         where:
             P: purchase cost
-            
+
             :math:`maintenance_{frac}`: maintenance cost as a fraction of purchase cost
-            
+
             lifetime: equipment lifetime in hours
 
         Returns
@@ -575,7 +573,7 @@ class PreprocessingCost:
         A dict of maintenance cost.
 
         '''
-        
+
         dry_mass = self._throughput
         maintenance_cost = {}
         hr = self.operating_hours
@@ -586,20 +584,20 @@ class PreprocessingCost:
                 maintenance_cost[unit_eqpt] = \
                     unit.maintenance[eqpt]*cost/lifetime/(dry_mass/1e3)
         return maintenance_cost
-    
+
     def get_labor_cost(self):
         r'''
         Calculate labor cost per metric tonne (MT) of dry feedstock.
 
         .. math:: cost[\frac{$}{MT}] = \frac{cost[\frac{$}{hr}]}{dry \ feedstock \ per \ hour} * labor_adjustment
-        
-        
+
+
         Returns
         -------
         A dict of labor cost.
 
         '''
-        
+
         adj = self.labor_adjustment
         labor_cost = {}
         for unit in self._units:
@@ -611,17 +609,17 @@ class PreprocessingCost:
                     labor_cost[unit_eqpt] = \
                         unit.labor[eqpt]/(unit.cost_items[eqpt].S/1e3)*adj
         return labor_cost
-    
+
     def get_electricity_cost(self):
         '''
         Calculate electricity cost per metric tonne (MT) of dry feedstock.
- 
+
         Returns
         -------
         A dict of electricity cost.
 
         '''
-        
+
         e_dct = {}
         e_price = bst.PowerUtility.price
         for unit in self._units:
@@ -633,17 +631,17 @@ class PreprocessingCost:
                 else:
                     e_dct[unit_eqpt] = e_price * cost_item.kW/(cost_item.S/1e3)
         return e_dct
-        
-    
+
+
     def get_equipment_cost(self):
         '''
         Get a result table for equipment costs, all in $ per metric
         tonne ([$/MT]), equivalent to [$/Mg].
-        
+
         Returns
         -------
         A pandas.DataFrame table.
-        
+
         '''
         cost_dct = {
             'Depreciation': self.get_depreciation_cost(),
@@ -658,16 +656,16 @@ class PreprocessingCost:
         all_series.name = 'All'
         df = df.append(all_series)
         return df
-    
+
     def get_chemical_cost(self):
         '''
         Get a result table for chemical costs, all in $ per metric
         tonne ([$/MT]), equivalent to [$/Mg].
-        
+
         Returns
         -------
         A pandas.DataFrame table.
-        
+
         '''
         IDs = tuple(i.ID for i in self._feeds)
         mass_dct = dict.fromkeys(IDs)
@@ -689,12 +687,12 @@ class PreprocessingCost:
         all_series['Cost [$/MT]'] = df.sum(axis='index')['Cost [$/MT]']
         df = df.append(all_series)
         return df
-    
+
     @property
     def depot_sys(self):
         '''
         [biosteam.System] Depot system.
-        
+
         Note
         ----
         Changing the depot system will not automatically update feedstock.'''
@@ -704,7 +702,7 @@ class PreprocessingCost:
         self._depot_sys = sys
         self._units = sorted(sys.units, key=lambda u: u.ID)
         self._feeds = sorted((i for i in sys.feeds if i.price), key=lambda f: f.ID)
-        
+
     @property
     def feedstock(self):
         '''[biosteam.Stream] Preporcessed feedstock stream from the depot system.'''
@@ -713,7 +711,7 @@ class PreprocessingCost:
     def feedstock(self, feed):
         self._feedstock = feed
         self._throughput = feed.F_mass - feed.imass['Water']
-        
+
     @property
     def feedstock_unit_price(self):
         '''Feedstock price in $/metric tonne (MT), equivalent to 1 Mg.'''
@@ -756,8 +754,3 @@ cost3 = PreprocessingCost(depot_sys=flowsheet3.system.prep_sys,
                           labor_adjustment=_labor_2011to2016)
 cost4 = PreprocessingCost(depot_sys=flowsheet4.system.prep_sys,
                           labor_adjustment=_labor_2011to2016)
-
-
-
-
-

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 # Bioindustrial-Park: BioSTEAM's Premier Biorefinery Models and Results
-# Copyright (C) 2022-, Yalin Li <zoe.yalin.li@gmail.com>
+# Copyright (C) 2022-, Yalin Li <mailto.yalin.li@gmail.com>
 #
 # Part of this module is based on the oilcane biorefinery:
 # https://github.com/BioSTEAMDevelopmentGroup/Bioindustrial-Park/tree/master/BioSTEAM%202.x.x/biorefineries/oilcane
@@ -9,6 +9,12 @@
 # This module is under the UIUC open-source license. See
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
 # for license details.
+
+from biorefineries import oilcane as oc
+from biorefineries.wwt import (
+    create_comparison_systems, simulate_systems,
+    create_comparison_models,evaluate_models,
+    )
 
 info = {
     'abbr': 'sc2g',
@@ -26,45 +32,34 @@ info = {
 # Systems
 # =============================================================================
 
-def create_sc2g_comparison_systems(default_BD=True):
-    BD = {} if not default_BD else 1.
-    wwt_kwdct = dict.fromkeys(('IC_kwargs', 'AnMBR_kwargs',), {'biodegradability': BD,})
-
-    # # Does not work for oilcane biorefineries due to the many settings
-    # # not included in the system creation function
-    # from biorefineries.wwt import create_comparison_systems
-    # from biorefineries.oilcane import (
-    #     create_chemicals,
-    #     create_sugarcane_to_ethanol_combined_1_and_2g as create_system,
-    #     create_tea,
-    #     load_process_settings,
-    #     )
-    # functions = (create_chemicals, create_system, create_tea, load_process_settings,)
-    # sys_dct = {
-    #     'create_system': {'operating_hours': 24*200},
-    #     'rename_storage_to': 900,
-    #     'create_wastewater_process': wwt_kwdct,
-    #     'BT': 'BT701',
-    #     'new_wwt_connections': {'sludge': ('M701', 0), 'biogas': ('BT701', 1)},
-    #     }
-    # exist_sys, new_sys = create_comparison_systems(info, functions, sys_dct)
-
-    from biorefineries.wwt import create_comparison_systems
-    from biorefineries import oilcane as oc
+def create_sc2g_comparison_systems(biodegradability=1): # will be multiplied by 0.86/0.05 for biogas/cell mass
+    wwt_kwdct = dict.fromkeys(('IC_kwargs', 'AnMBR_kwargs',), {'biodegradability': biodegradability,})
+    CF_dct = { # all streams are feeds
+        'caustic': ('NaOH', 0.5), # NaOH and water
+        'cellulase': ('Cellulase', 0.05), # cellulase and water
+        'denaturant': ('Denaturant'),
+        'CSL': ('CSL',),
+        'DAP': ('DAP',),
+        'FGD_lime': ('Lime', 0.4513), # lime and water
+        'H3PO4': ('H3PO4',),
+        'lime': ('CaO', 0.046), # CaO and water
+        'natural_gas': ('CH4',),
+        'polymer': ('Polymer'),
+        'sugarcane': ('Sugarcane',), # moisture content already adjusted
+        }
     sys_dct = {
         'load': {'name': 'S2', 'cache': None, 'reduce_chemicals': False},
         'system_name': 'oilcane_sys',
         'create_wastewater_process': wwt_kwdct,
         'BT': 'BT701',
         'new_wwt_connections': {'sludge': ('M701', 0), 'biogas': ('BT701', 1)},
+        'CF_dct': CF_dct,
         }
-    exist_sys, new_sys = create_comparison_systems(info, oc, sys_dct, from_load=True)
-
+    exist_sys, new_sys = create_comparison_systems(info, oc, sys_dct)
     return exist_sys, new_sys
 
 
 def simulate_sc2g_systems(**sys_kwdct):
-    from biorefineries.wwt import simulate_systems
     global exist_sys, new_sys
     exist_sys, new_sys = create_sc2g_comparison_systems(**sys_kwdct)
     # If using conservative biodegradability,
@@ -80,7 +75,6 @@ def simulate_sc2g_systems(**sys_kwdct):
 # =============================================================================
 
 def create_sc2g_comparison_models():
-    from biorefineries.wwt import create_comparison_models
     exist_sys, new_sys = create_sc2g_comparison_systems()
 
     ##### Existing system #####
@@ -105,6 +99,7 @@ def create_sc2g_comparison_models():
         'BT': 'BT701',
         'BT_eff': ('boiler_efficiency', 'turbogenerator_efficiency'),
         'wwt_system': 'exist_sys_wwt',
+        'wwt_ID': info['WWT_ID'],
         'is2G': info['is2G'],
         }
     exist_model = create_comparison_models(exist_sys, exist_model_dct)
@@ -114,16 +109,15 @@ def create_sc2g_comparison_models():
     new_model_dct['biogas'] = 'biogas'
     new_model_dct['sludge'] = 'sludge'
     new_model_dct['wwt_system'] = 'new_sys_wwt'
-    new_model_dct['new_wwt_ID'] = info['WWT_ID']
     new_model = create_comparison_models(new_sys, new_model_dct)
     return exist_model, new_model
 
 
 def evaluate_sc2g_models(**eval_kwdct):
-    from biorefineries.wwt import evaluate_models
     global exist_model, new_model
     exist_model, new_model = create_sc2g_comparison_models()
-    return evaluate_models(exist_model, new_model, abbr=info['abbr'], **eval_kwdct)
+    evaluate_models(exist_model, new_model, info['abbr'], **eval_kwdct)
+    return exist_model, new_model
 
 
 # %%
@@ -133,6 +127,13 @@ def evaluate_sc2g_models(**eval_kwdct):
 # =============================================================================
 
 if __name__ == '__main__':
-    # exist_sys, new_sys = simulate_sc2g_systems(default_BD=True)
+    # exist_sys, new_sys = simulate_sc2g_systems(biodegradability=1)
     # exist_model, new_model = create_sc2g_comparison_models()
-    exist_model, new_model = evaluate_sc2g_models(N=1000)
+    exist_model, new_model = evaluate_sc2g_models(
+        # include_baseline=False,
+        # include_uncertainty=False,
+        # include_biodegradability=False,
+        N_uncertainty=100,
+        N_biodegradability=10,
+        # biodegradability=(0.5, 1,),
+        )

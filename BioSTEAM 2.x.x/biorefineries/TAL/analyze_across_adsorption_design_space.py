@@ -17,8 +17,8 @@ def MPSP_at_adsorption_design(v, t):
     column.cycle_time = t
     return get_SA_MPSP(), AC401.installed_cost/1e6
 
-regen_vels = np.linspace(3., 20., 10)
-cycle_times = np.linspace(1., 4., 10)
+regen_vels = np.linspace(3., 20., 40)
+cycle_times = np.linspace(1., 4., 40)
 MPSPs_ads_ds = []
 column_costs_ads_r_t = []
 #%%
@@ -58,7 +58,7 @@ cbar.add_lines(CS2)
 #%% Plot column cost
 fig1, ax2 = plt.subplots(constrained_layout=True)
 CS = ax2.contourf(cycle_times, regen_vels, column_costs_ads_r_t, 
-                   levels=[0, 0.25, 0.5, 0.75, 1., 1.25, 1.5, 1.75, 2., 2.25],
+                   levels=[0, 0.25, 0.5, 0.75, 1., 1.25, 1.5, 1.75, 2., 2.25, 2.5],
                   )
 
 CS2 = ax2.contour(CS, levels=CS.levels[::2], colors='black', origin='lower')
@@ -254,9 +254,9 @@ def MPSP_at_titer(t):
 
 titers = np.linspace(3., 30, 20)
 
-MPSPs_titer = []
 
 #%%
+MPSPs_titer = []
 for i in titers:
     MPSPs_titer.append(MPSP_at_titer(i))
     

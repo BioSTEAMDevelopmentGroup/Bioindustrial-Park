@@ -5,17 +5,19 @@ Created on Fri Nov  5 01:57:46 2021
 @author: yrc2
 """
 import os
+import numpy as np
 import pandas as pd
 import biosteam as bst
 import biorefineries.cornstover as cs
 import biorefineries.oilcane as oc
+from thermosteam.utils import array_roundsigfigs
 
 __all__ = (
     'save_detailed_expenditure_tables',
     'save_detailed_life_cycle_tables',   
 )
 
-def save_detailed_expenditure_tables():
+def save_detailed_expenditure_tables(sigfigs=3):
     folder = os.path.dirname(__file__)
     folder = os.path.join(folder, 'results')
     filename = 'expenditures.xlsx'
@@ -29,20 +31,42 @@ def save_detailed_expenditure_tables():
     def get_tea(name):
         oc.load(name)
         return oc.tea
-    IDs = ('S1', 'S2', 'O1', 'O2')
-    names = ['Conventional Sugarcane Biorefinery',
-             'Cellulosic Sugarcane Biorefinery',
-             'Conventional Oilcane Biorefinery',
-             'Cellulosic Oilcane Biorefinery',]
+    IDs = (
+        # 'S1',
+        # 'S2', 
+        'O1', 
+        'O2'
+    )
+    names = [
+        # 'Conventional Sugarcane Biorefinery',
+        # 'Cellulosic Sugarcane Biorefinery',
+        'Conventional Oilcane Biorefinery',
+        'Cellulosic Oilcane Biorefinery',
+    ]
     syss = [get_sys(i) for i in IDs]
     teas = [get_tea(i) for i in IDs]
     product_IDs = [oc.ethanol.ID, oc.biodiesel.ID]
-    bst.report.voc_table(syss, product_IDs, names).to_excel(writer, 'VOC')
-    cs.foc_table(teas, names).to_excel(writer, 'FOC')
-    cs.capex_table(teas, names).to_excel(writer, 'CAPEX')
+    tables = {
+        'VOC': bst.report.voc_table(syss, product_IDs, names),
+        'FOC': cs.foc_table(teas, names),
+        'CAPEX': cs.capex_table(teas, names),
+    }
+    for key, table in tables.items(): 
+        values = array_roundsigfigs(table.values, sigfigs=3, inplace=True)
+        if key == 'CAPEX': # Bug in pandas
+            for i, col in enumerate(table):
+                table[col] = values[:, i]
+        # if key == 'VOC':
+        #     new_index = sorted(
+        #         table.index, 
+        #         key=lambda x: -abs(table.loc[x][1:].sum()) if x[0] == 'Raw materials' else 0,
+        #     )
+        #     tables[key] = table.reindex(new_index)
+        table.to_excel(writer, key)
     writer.save()
+    return tables
     
-def save_detailed_life_cycle_tables():
+def save_detailed_life_cycle_tables(sigfigs=3):
     try:
         # Energy allocation by gasoline gallon equivalent (GGE)
         bst.PowerUtility.define_property(
@@ -83,19 +107,42 @@ def save_detailed_life_cycle_tables():
              'Cellulosic Oilcane Biorefinery',]
     syss = [get(i, 'sys') for i in IDs]
     ethanol_streams = [get(i, 'ethanol') for i in IDs]
-    bst.report.lca_inventory_table(
-        syss, oc.GWP, ethanol_streams, names
-    ).to_excel(writer, 'Inventory')
-    bst.report.lca_displacement_allocation_table(
-        syss, oc.GWP, ethanol_streams, 'ethanol', names
-    ).to_excel(writer, 'Displacement allocation')
-    bst.report.lca_property_allocation_factor_table(
-        syss, property='energy', units='GGE/hr', system_names=names,
-    ).to_excel(writer, 'Energy allocation factors')
-    bst.report.lca_property_allocation_factor_table(
-        syss, property='revenue', units='USD/hr', system_names=names,
-    ).to_excel(writer, 'Economic allocation factors')
-    bst.report.lca_displacement_allocation_factor_table(
-        syss, ethanol_streams, oc.GWP, names
-    ).to_excel(writer, 'Displacement allocation factors')
+    index = ['Energy allocation',
+             'Economic allocation',
+             'Displacement allocation']
+    columns = [
+        'Sugarcane DC [kg∙CO2e∙kg-1]',
+        'Sugarcane ICF [kg∙CO2e∙kg-1]',
+        'Oilcane DC [kg∙CO2e∙kg-1]',
+        'Oilcane ICF [kg∙CO2e∙kg-1]',
+    ]
+    methods = ('GWP_ethanol_allocation', 'GWP_ethanol', 'GWP_ethanol_displacement')
+    values = np.zeros([len(methods), len(IDs)])
+    for i, method in enumerate(methods):
+        for j, name in enumerate(IDs):
+            oc.load(name)
+            values[i, j] = getattr(oc, method)() 
+    df_gwp = pd.DataFrame(values, index=index, columns=columns)
+    tables = {
+        'Inventory': bst.report.lca_inventory_table(
+            syss, oc.GWP, ethanol_streams, names
+        ),
+        'Displacement allocation': bst.report.lca_displacement_allocation_table(
+            syss, oc.GWP, ethanol_streams, 'ethanol', names
+        ),
+        'Energy allocation factors': bst.report.lca_property_allocation_factor_table(
+            syss, property='energy', units='GGE/hr', system_names=names,
+        ),
+        'Economic allocation factors': bst.report.lca_property_allocation_factor_table(
+            syss, property='revenue', units='USD/hr', system_names=names,
+        ),
+        'Displacement allocation factors': bst.report.lca_displacement_allocation_factor_table(
+            syss, ethanol_streams, oc.GWP, names
+        ),
+        'GWP ethanol': df_gwp,
+    }
+    for key, table in tables.items(): 
+        array_roundsigfigs(table.values, sigfigs=3, inplace=True)
+        table.to_excel(writer, key) 
     writer.save()
+    return tables

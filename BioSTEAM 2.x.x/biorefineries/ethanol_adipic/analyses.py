@@ -1,33 +1,31 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# BioSTEAM: The Biorefinery Simulation and Techno-Economic Analysis Modules
-# Copyright (C) 2020, Yoel Cortes-Pena <yoelcortes@gmail.com>
 # Bioindustrial-Park: BioSTEAM's Premier Biorefinery Models and Results
-# Copyright (C) 2020, Yalin Li <yalinli2@illinois.edu> (this biorefinery)
-# 
-# This module is under the UIUC open-source license. See 
+# Copyright (C) 2020-, Yalin Li <mailto.yalin.li@gmail.com>
+#
+# This module is under the UIUC open-source license. See
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
 # for license details.
 
 '''
 References
 ----------
-[1] Humbird et al., Process Design and Economics for Biochemical Conversion of 
-    Lignocellulosic Biomass to Ethanol: Dilute-Acid Pretreatment and Enzymatic 
-    Hydrolysis of Corn Stover; Technical Report NREL/TP-5100-47764; 
+[1] Humbird et al., Process Design and Economics for Biochemical Conversion of
+    Lignocellulosic Biomass to Ethanol: Dilute-Acid Pretreatment and Enzymatic
+    Hydrolysis of Corn Stover; Technical Report NREL/TP-5100-47764;
     National Renewable Energy Lab (NREL), 2011.
     https://www.nrel.gov/docs/fy11osti/47764.pdf
 
-[2] Davis et al., Process Design and Economics for the Conversion of Lignocellulosic 
-    Biomass to Hydrocarbon Fuels and Coproducts: 2018 Biochemical Design Case Update; 
-    NREL/TP-5100-71949; National Renewable Energy Lab (NREL), 2018. 
+[2] Davis et al., Process Design and Economics for the Conversion of Lignocellulosic
+    Biomass to Hydrocarbon Fuels and Coproducts: 2018 Biochemical Design Case Update;
+    NREL/TP-5100-71949; National Renewable Energy Lab (NREL), 2018.
     https://doi.org/10.2172/1483234
 
-[3] Cortes-Peña et al., BioSTEAM: A Fast and Flexible Platform for the Design, 
-    Simulation, and Techno-Economic Analysis of Biorefineries under Uncertainty. 
-    ACS Sustainable Chem. Eng. 2020, 8 (8), 3302–3310. 
+[3] Cortes-Peña et al., BioSTEAM: A Fast and Flexible Platform for the Design,
+    Simulation, and Techno-Economic Analysis of Biorefineries under Uncertainty.
+    ACS Sustainable Chem. Eng. 2020, 8 (8), 3302–3310.
     https://doi.org/10.1021/acssuschemeng.9b07040
-    
+
 '''
 
 
@@ -43,7 +41,7 @@ from biosteam.utils import TicToc
 
 timer_efficacy = TicToc('timer_efficacy')
 timer_efficacy.tic()
- 
+
 lignin = np.arange(0, 0.41, 0.01)
 conversion_max = np.ones(1000)
 conversion_min = np.zeros(1000)
@@ -92,27 +90,27 @@ for i in range(1, 42):
     IL_individual = intercept_IL + lignin[i-1]*slope_IL
     ORG_individual = intercept_ORG
     OXD_individual = intercept_OXD
-    
+
     # Constrict conversion to [0, 100%]
-    df_LHW[round(lignin[i-1],2)] = np.minimum(conversion_max, 
-                                              np.maximum(conversion_min, 
+    df_LHW[round(lignin[i-1],2)] = np.minimum(conversion_max,
+                                              np.maximum(conversion_min,
                                                           LHW_individual))
-    df_acid[round(lignin[i-1],2)] = np.minimum(conversion_max, 
-                                                np.maximum(conversion_min, 
+    df_acid[round(lignin[i-1],2)] = np.minimum(conversion_max,
+                                                np.maximum(conversion_min,
                                                           acid_individual))
-    df_EXP[round(lignin[i-1],2)] = np.minimum(conversion_max, 
-                                              np.maximum(conversion_min, 
+    df_EXP[round(lignin[i-1],2)] = np.minimum(conversion_max,
+                                              np.maximum(conversion_min,
                                                           EXP_individual))
     df_base[round(lignin[i-1],2)] = np.minimum(conversion_max,
                                                 np.maximum(conversion_min,
                                                           base_individual))
-    df_IL[round(lignin[i-1],2)] = np.minimum(conversion_max, 
+    df_IL[round(lignin[i-1],2)] = np.minimum(conversion_max,
                                               np.maximum(conversion_min,
                                                         IL_individual))
-    df_ORG[round(lignin[i-1],2)] = np.minimum(conversion_max, 
+    df_ORG[round(lignin[i-1],2)] = np.minimum(conversion_max,
                                               np.maximum(conversion_min,
                                                           ORG_individual))
-    df_OXD[round(lignin[i-1],2)] = np.minimum(conversion_max, 
+    df_OXD[round(lignin[i-1],2)] = np.minimum(conversion_max,
                                               np.maximum(conversion_min,
                                                           OXD_individual))
 
@@ -121,8 +119,8 @@ dfs =(df_LHW, df_acid, df_EXP, df_base, df_IL, df_ORG, df_OXD)
 indices = ['LHW', 'Acid', 'EXP', 'Base', 'IL', 'ORG', 'OXD']
 quantiles = [[df.quantile(q=i) for i in (0.05, 0.5, 0.95)] for df in dfs]
 
-df_stats = pd.concat([pd.concat(quantiles[indices.index(index)], axis=1) 
-                      for index in indices], 
+df_stats = pd.concat([pd.concat(quantiles[indices.index(index)], axis=1)
+                      for index in indices],
                       axis=1, keys=indices)
 df_stats.rename_axis('Lignin content')
 
@@ -175,7 +173,7 @@ _feedstock_factor = acid._feedstock_factor
 path = os.path.join(os.path.abspath(os.path.dirname(sys.argv[0])), '_Feedstock compositions.xlsx')
 simulated_composition = pd.read_excel(path, sheet_name='Compositions')
 # simulated_composition = simulated_composition[0:5] # for debugging
-    
+
 market_ethanol_price = 2.2 / _ethanol_kg_2_gal
 # From 80% moisture $/kg to $/dry-U.S. ton to $/kg with 20% moiture
 default_feedstock_price = 71.3 / _feedstock_factor
@@ -206,7 +204,7 @@ def compute_electricity(group, annual_factor):
     power_production = group.get_electricity_production()
     net_electricity = (power_production-power_consumption)*annual_factor / 1e3
     return net_electricity
-        
+
 # Function to compute ethanol yield in gal/dry-ton feedstock
 feedstock_dry_ton = baseline_feedflow.sum() / _feedstock_factor
 def compute_ethanol_yield(ethanol, feedstock):
@@ -231,7 +229,7 @@ def compute_MFPP(feedstock, tea):
 timer_acid = TicToc('timer_acid')
 timer_acid.tic()
 
-# This is for double-checking, simulated total flow rates should be the same 
+# This is for double-checking, simulated total flow rates should be the same
 # as the default value (default_total_flow, 104180 kg/hr)
 acid_total_flow = []
 
@@ -252,8 +250,8 @@ acid_factor = acid.ethanol_tea.operating_days * 24
 for i in range(0, simulated_composition.shape[0]):
     # Update feedstock flow
     update_feedstock_flows(acid.feedstock, simulated_composition.iloc[i])
-    
-    # Adjust cellulose conversion 
+
+    # Adjust cellulose conversion
     lignin_percent = acid.feedstock.imass['Lignin'] / feedstock_dry_mass
     # 0.04 and 0.012 are cellulose (glucan) conversion to other products,
     # subtract 1e-6 to avoid getting tiny negatives,
@@ -269,19 +267,19 @@ for i in range(0, simulated_composition.shape[0]):
     acid.R201.pretreatment_rxns[9].X = C5_conversion # mannan
     acid.R201.pretreatment_rxns[12].X = C5_conversion # galactan
     acid.R201.pretreatment_rxns[15].X = C5_conversion # arabinanan
-    
+
     # Simulate system and log results
     acid.ethanol_sys.simulate()
     acid_total_flow.append(acid.feedstock.F_mass)
-    acid_conversions_C6.append(C6_conversion)    
+    acid_conversions_C6.append(C6_conversion)
     acid_conversions_C5.append(C5_conversion)
     acid_produced_electricity.append(compute_electricity(acid_group, acid_factor))
     acid_ethanol_yields.append(compute_ethanol_yield(acid.ethanol, acid.feedstock))
     acid_GWPs.append(acid.get_GWP())
-    
+
     acid.feedstock.price = default_feedstock_price
     acid_MESPs.append(compute_MESP(acid.ethanol, acid.ethanol_tea))
-   
+
     acid.ethanol.price = market_ethanol_price
     acid_MFPPs.append(compute_MFPP(acid.feedstock, acid.ethanol_tea))
 
@@ -300,7 +298,7 @@ timer_base.tic()
 
 base.R502.set_titer_limit = False
 
-# This is for double-checking, simulated total flow rates should be the same 
+# This is for double-checking, simulated total flow rates should be the same
 # as the default value (104180 kg/hr)
 base_total_flow = []
 
@@ -323,7 +321,7 @@ base_group = UnitGroup('Base pretreatment', base.ethanol_adipic_sys.units)
 base_factor = base.ethanol_adipic_tea.operating_days * 24
 for i in range(0, simulated_composition.shape[0]):
     update_feedstock_flows(base.feedstock, simulated_composition.iloc[i])
-    
+
     # Adjust cellulose and hemicellulose conversions, 0.82 based on developed correlation
     conversion = 0.82
     # Cellulose
@@ -331,7 +329,7 @@ for i in range(0, simulated_composition.shape[0]):
     # Xylan and arabinan, no mention of other carbohydrates conversion in the
     # baseline based on ref [2]
     base.R301.saccharification_rxns_C5.X[:] = conversion
-    
+
     # Simulate system and log results
     base.ethanol_adipic_sys.simulate()
     base_total_flow.append(base.feedstock.F_mass)
@@ -345,10 +343,10 @@ for i in range(0, simulated_composition.shape[0]):
 
     base.feedstock.price = default_feedstock_price
     base_MESPs.append(compute_MESP(base.ethanol, base.ethanol_adipic_tea))
-    
+
     base.ethanol.price = market_ethanol_price
     base_MFPPs.append(compute_MFPP(base.feedstock, base.ethanol_adipic_tea))
-    
+
 print(f'\nSimulation time: {timer_base.elapsed_time/60:.1f} min')
 print('\n-------- Base Biorefinery Simulation Completed --------\n\n')
 
@@ -387,9 +385,7 @@ df_varied_composition_results = pd.DataFrame({
     ('MFPP [$/dry-ton]', 'Acid-Base'): np.asarray(acid_MFPPs)-np.asarray(base_MFPPs),
     ('GWP [kg CO2-eq./gal]', 'Acid'): acid_GWPs,
     ('GWP [kg CO2-eq./gal]', 'Base'): base_GWPs,
-    ('GWP [kg CO2-eq./gal]', 'Acid-Base'): np.asarray(acid_GWPs)-np.asarray(base_GWPs),    
+    ('GWP [kg CO2-eq./gal]', 'Acid-Base'): np.asarray(acid_GWPs)-np.asarray(base_GWPs),
     })
 
 df_varied_composition_results.to_excel('Biorefinery results.xlsx')
-
-

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 # Bioindustrial-Park: BioSTEAM's Premier Biorefinery Models and Results
-# Copyright (C) 2022-, Yalin Li <zoe.yalin.li@gmail.com>
+# Copyright (C) 2022-, Yalin Li <mailto.yalin.li@gmail.com>
 #
 # This module is under the UIUC open-source license. See
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
@@ -9,9 +9,9 @@
 
 import biosteam as bst
 from . import (
-    add_wwt_chemicals, create_wastewater_process, CHP as CHPunit,
-    rename_storage_units, get_COD_breakdown,
-    update_product_prices, IRR_at_ww_price, ww_price_at_IRR, get_MPSP,
+    add_wwt_chemicals, create_wastewater_process, CHP as CHPunit, Skipped,
+    get_COD_breakdown, update_product_prices,
+    IRR_at_ww_price, ww_price_at_IRR, get_MPSP, GWP_CFs, add_CFs, get_GWP,
     )
 
 __all__ = (
@@ -32,10 +32,11 @@ kwdct = {
     'solids_streams': (),
     'new_wwt_connections': {},
     'update_product_price': False,
+    'IRR': 0.1,
+    'CF_dct': {},
 }
 
-
-def create_comparison_systems(info, functions, sys_dct={}, from_load=False):
+def create_comparison_systems(info, functions, sys_dct={}):
     abbr, WWT_ID, is2G, FERM_product, add_CHP, ww_price = info.values()
     kwdct.update(sys_dct)
 
@@ -46,71 +47,60 @@ def create_comparison_systems(info, functions, sys_dct={}, from_load=False):
         sludge_ID = biogas_ID = ''
 
     ##### Existing system #####
-    if from_load:
-        module = functions
-        create_chemicals = module.create_chemicals
-        chemicals = add_wwt_chemicals(create_chemicals())
-        dct = module.__dict__
-        dct['_chemicals_loaded'] = True
-        dct['chemicals'] = chemicals
-        dct['_system_loaded'] = False
-        module.load(**kwdct['load'])
-        exist_f = bst.main_flowsheet
-        exist_sys_temp = dct[kwdct['system_name']]
-    else:
-        create_chemicals, create_system, create_tea, load_process_settings = functions
-        exist_f = bst.Flowsheet(abbr)
-        bst.main_flowsheet.set_flowsheet(exist_f)
-        chemicals = add_wwt_chemicals(create_chemicals())
-        load_process_settings()
-        exist_sys_temp = create_system('exist_sys_temp', **kwdct['create_system'])
-        if kwdct['rename_storage_to']:
-            rename_storage_units(exist_sys_temp, kwdct['rename_storage_to'])
-
+    module = functions
+    create_chemicals = module.create_chemicals
+    chemicals = add_wwt_chemicals(create_chemicals())
+    dct = module.__dict__
+    dct['_chemicals_loaded'] = True
+    dct['chemicals'] = chemicals
+    dct['_system_loaded'] = False
+    module.load(**kwdct['load'])
+    exist_f = bst.main_flowsheet
+    exist_sys_temp = dct[kwdct['system_name']]
     exist_u = exist_f.unit
     exist_s = exist_f.stream
+
+    def get_streams(u_reg, s_reg, infos):
+        streams = []
+        for info in infos:
+            if isinstance(info, str): # stream info given as stream ID
+                streams.append(getattr(s_reg, info))
+            else: # stream info given as source unit ID, # in outs
+                streams.append(getattr(u_reg, info[0]).outs[info[1]])
+        return streams
 
     if not is2G:
         # Mixed wastewater
         ww = bst.Stream('ww')
-        ww_streams = [getattr(exist_u, i[0]).outs[i[1]] for i in kwdct['ww_streams']]
-        WWmixer = bst.Mixer('WWmixer', ins=ww_streams, outs=ww)
-        # Mixed soilids
+        ww_streams = get_streams(exist_u, exist_s, kwdct['ww_streams'])
+        WWmixer = bst.Mixer('WWmixer', ins=ww_streams)
+        # Mixed solids
         solids = bst.Stream('solids')
-        solids_streams = [getattr(exist_u, i[0]).outs[i[1]] for i in kwdct['solids_streams']]
+        solids_streams = get_streams(exist_u, exist_s, kwdct['solids_streams'])
         SolidsMixer = bst.Mixer('SolidsMixer', ins=solids_streams, outs=solids)
         if kwdct['BT'] and sludge_ID:
             getattr(exist_u, sludge_u).ins[sludge_idx] = getattr(exist_s, sludge_ID)
-        exist_wwt_units = [WWmixer, SolidsMixer]
+        Caching = Skipped('Caching', ins=WWmixer-0, outs=ww) # for result caching
+        Caching.wwt_units = [WWmixer, SolidsMixer]
     else:
-        exist_wwt_units = [u for u in exist_u if (u.ID[1]==WWT_ID or u.ID=='WWTC')]
+        Caching = Skipped('Caching', # for result caching
+                          ins=exist_s.search('waste_brine') or exist_s.search('brine'))
+        Caching.wwt_units = [u for u in exist_u if (u.ID[1]==WWT_ID or u.ID=='WWTC')]
+    exist_wwt_units = Caching.wwt_units + [Caching]
     exist_sys_wwt = bst.System('exist_sys_wwt', path=exist_wwt_units)
     exist_sys = bst.System.from_units('exist_sys', units=exist_u)
-
-    if from_load:
-        exist_tea = exist_sys_temp.TEA.copy(exist_sys)
-    else:
-        exist_tea = create_tea(exist_sys)
-        exist_sys_temp.operating_hours = exist_sys_temp.operating_hours or \
-            exist_sys.operating_hours or exist_tea.operating_hours
+    exist_tea = exist_sys_temp.TEA.copy(exist_sys)
 
     ##### With the new wastewater treatment process #####
-    if from_load:
-        dct['_system_loaded'] = False
-        module.load(**kwdct['load'])
-        new_f = bst.main_flowsheet
-        new_sys_temp = dct[kwdct['system_name']]
-    else:
-        new_f = bst.Flowsheet(f'new_{abbr}')
-        bst.main_flowsheet.set_flowsheet(new_f)
-        new_sys_temp = create_system('new_sys_temp', **kwdct['create_system'])
-
+    dct['_system_loaded'] = False
+    module.load(**kwdct['load'])
+    new_f = bst.main_flowsheet
+    new_sys_temp = dct[kwdct['system_name']]
     new_u = new_f.unit
     new_s = new_f.stream
 
     if is2G: # replace the conventional wastewater treatment process with new ones
         units_to_discard = [u for u in new_u if (u.ID[1]==WWT_ID or u.ID=='WWTC')]
-
         streams_to_discard = [s for s in sum([u.outs for u in units_to_discard], [])]
         streams_to_discard += [s for s in sum([u.ins for u in units_to_discard], []) if s.source is None]
         # # Slower than above
@@ -118,7 +108,6 @@ def create_comparison_systems(info, functions, sys_dct={}, from_load=False):
         #     s.source in units_to_discard or
         #     (s.source is None and s.sink in units_to_discard)
         #     )]
-
         systems_to_discard = [sys for sys in new_f.system
                               if (getattr(new_u, f'R{WWT_ID}02') in sys.units and sys.ID!=new_sys_temp.ID)]
 
@@ -131,14 +120,14 @@ def create_comparison_systems(info, functions, sys_dct={}, from_load=False):
             try: new_sys_temp.subsystems.remove(sys)
             except: pass # some outdated systems are the subsystem of another system
     else:
-        ww_streams = [getattr(new_u, i[0]).outs[i[1]] for i in kwdct['ww_streams']]
+        ww_streams = get_streams(new_u, new_s, kwdct['ww_streams'])
 
     new_sys_wwt = create_wastewater_process(
         'new_sys_wwt', ins=ww_streams, process_ID=WWT_ID, **kwdct['create_wastewater_process'])
 
     if kwdct['solids_streams']:
         solids = bst.Stream('solids')
-        solids_streams = [getattr(exist_u, i[0]).outs[i[1]] for i in kwdct['solids_streams']]
+        solids_streams = get_streams(new_u, new_s, kwdct['solids_streams'])
         solids_streams += [new_s.sludge]
         SolidsMixer = bst.Mixer('SolidsMixer', ins=solids_streams, outs=solids)
 
@@ -148,7 +137,7 @@ def create_comparison_systems(info, functions, sys_dct={}, from_load=False):
 
     if add_CHP:
         CHP = CHPunit('CHP', ins=(new_s.biogas, new_s.sludge))
-        getattr(new_u, f'U{WWT_ID}01').wwt_units.append(CHP)
+        getattr(new_u, 'Caching').wwt_units.append(CHP)
 
     new_sys = bst.System.from_units('new_sys', units=new_u)
 
@@ -160,23 +149,25 @@ def create_comparison_systems(info, functions, sys_dct={}, from_load=False):
     #     if val is None: continue
     #     for sys in (exist_sys_wwt, exist_sys, new_sys_wwt, new_sys):
     #         setattr(sys, attr, val)
+
     hours = exist_sys_temp.operating_hours
     for sys in (exist_sys_wwt, exist_sys, new_sys_wwt, new_sys):
         sys.operating_hours = hours
         sys.lang_factor = None
 
-
-    if from_load:
-        new_tea = new_sys_temp.TEA.copy(new_sys)
-    else:
-        new_tea = create_tea(new_sys)
-        new_tea.operating_hours = new_sys.operating_hours or new_tea.operating_hours
+    new_tea = new_sys_temp.TEA.copy(new_sys)
+    exist_tea.IRR = new_tea.IRR = kwdct.get('IRR')
 
     if kwdct['update_product_price']:
         update_product_prices(exist_s)
         update_product_prices(new_s)
 
-    exist_tea.IRR = new_tea.IRR = 0.1
+    for (s_reg, u_reg) in zip((exist_s, new_s), (exist_u, new_u)):
+        add_CFs(s_reg, u_reg, kwdct['CF_dct'])
+    RX02 = getattr(new_u, f'R{WWT_ID}02')
+    RX02.ins[2].characterization_factors['GWP'] = GWP_CFs['NaOCl']
+    RX02.ins[3].characterization_factors['GWP'] = GWP_CFs['CitricAcid']
+    RX02.ins[4].characterization_factors['GWP'] = GWP_CFs['Bisulfite']
 
     return exist_sys, new_sys
 
@@ -186,10 +177,12 @@ def simulate_systems(exist_sys, new_sys, info):
     exist_sys.simulate()
     new_sys.simulate()
     print(f'\n\n{info["abbr"]} module:')
-    print(f'Existing system IRR: {exist_tea.solve_IRR():.2%}')
-    print(f'New system IRR: {new_tea.solve_IRR():.2%}')
-    get_MPSP(exist_sys, info['FERM_product'])
-    get_MPSP(new_sys, info['FERM_product'])
+    print(f'\nExisting system IRR: {exist_tea.solve_IRR():.2%}')
+    print(f'\nNew system IRR: {new_tea.solve_IRR():.2%}')
+    FERM_product = info['FERM_product']
+    for sys in (exist_sys, new_sys):
+        for fn in (get_MPSP, get_GWP):
+            fn(sys, FERM_product)
     get_COD_breakdown(getattr(new_sys.flowsheet.unit, f'S{info["WWT_ID"]}04').ins[0])
 
     if not info['is2G']:

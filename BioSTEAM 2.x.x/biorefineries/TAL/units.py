@@ -1778,6 +1778,70 @@ class Adsorption_and_Centrifugation(Unit):
     def _cost(self): pass
 
 
+class HydrogenationEstersReactor(Reactor):
+    """
+    A hydrogenation reactor to produce esters from TAL.
+    """
+    _N_ins = 3
+    _N_outs = 1
+    _F_BM_default = {**Reactor._F_BM_default,
+            'AuPd catalyst': 1}
+    mcat_frac = 0.00001 # fraction of catalyst by weight in relation to the reactant (TAL)
+    TAL_to_esters_conversion = 0.80
+    mono_di_hydroxy_esters_conversion_ratio = 0.5
+    
+    hydrogenation_rxns = ParallelRxn([
+            #   Reaction definition   Reactant   Conversion
+            Rxn('TAL + 2H2 + Octanol -> Octyl_5_hydroxyhexanoate',         'TAL',   TAL_to_esters_conversion*mono_di_hydroxy_esters_conversion_ratio),
+            Rxn('TAL + 2H2 + Octanol -> Octyl_3_5_dihydroxyhexanoate',         'TAL',   TAL_to_esters_conversion*(1.-mono_di_hydroxy_esters_conversion_ratio)),
+            Rxn('TAL + 2H2 -> HMTHP',         'TAL',   0.05), # conversion from Huber group experimental data
+            # Rxn('HMDHP + H2 -> HMTHP',         'HMDHP',   1.-1e-5),
+            # ])
+    # byproduct_formation_rxns  = ParallelRxn([
+            #   Reaction definition   Reactant   Conversion
+            Rxn('TAL + 3H2 -> DHL + H2O',         'TAL',   0.05), # conversion from Huber group experimental data
+            Rxn('TAL + H2 -> HMDHP',         'TAL',   0.05),  # conversion from Huber group experimental data
+            ])
+    
+    TAL_to_esters_rxns = hydrogenation_rxns[:2]
+    byproduct_formation_rxns  = ParallelRxn([
+            #   Reaction definition   Reactant   Conversion
+            Rxn('TAL + H2 -> TALHydrogenationDegradationProducts',         'TAL',   1-1e-5), # conversion from Huber group experimental data
+           ])
+    
+    def _run(self):
+        feed, recycle, reagent = self.ins
+        effluent = self.outs[0]
+        
+        # effluent.imol['HMDHP'] += 1e-10
+        
+        H2_mol_needed_for_HMTHP_formation = (sum(feed.imol['TAL', 'HMDHP']) + sum(recycle.imol['TAL', 'HMDHP']))*2*self.hydrogenation_rxns[0].X
+        reagent.imol['H2'] = 5*H2_mol_needed_for_HMTHP_formation
+        reagent.phase = 'g'
+        # effluent = feed.copy()
+        effluent.mix_from([feed, recycle, reagent])
+        
+        # effluent.imol['HMTHP'] -= 1e-10
+        
+        effluent.phase = 'l'
+        # effluent.T = feed.T
+        # effluent.P = feed.P
+        
+        self.hydrogenation_rxns(effluent.mol)
+        self.byproduct_formation_rxns(effluent.mol)
+        
+        extra_H2_mol_to_exclude = effluent.imol['H2']
+        reagent.imol['H2'] -= extra_H2_mol_to_exclude
+        effluent.imol['H2'] = 0.
+        
+    def _cost(self):
+        super()._cost()
+        self.purchase_costs['AuPd catalyst'] =\
+            self.mcat_frac * self.ins[0].imass['TAL'] * price['AuPd']
+            
+
+
+
 class HydrogenationReactor(Reactor):
     """
     A hydrogenation reactor.
@@ -1788,23 +1852,42 @@ class HydrogenationReactor(Reactor):
             'AuPd catalyst': 1}
     mcat_frac = 0.00001 # fraction of catalyst by weight in relation to the reactant (TAL)
     hydrogenation_rxns = ParallelRxn([
-            #   Reaction definition                                       Reactant   Conversion
-            Rxn('TAL + H2-> HMTHP',         'TAL',   0.964*0.99) # conversion from Chia et al. 2012
-                ])
+            #   Reaction definition   Reactant   Conversion
+            Rxn('TAL + 2H2 -> HMTHP',         'TAL',   0.7324), # conversion from Huber group experimental data
+            Rxn('HMDHP + H2 -> HMTHP',         'HMDHP',   1.-1e-5)
+            ])
+    byproduct_formation_rxns  = ParallelRxn([
+            #   Reaction definition   Reactant   Conversion
+            Rxn('TAL + 3H2 -> DHL + H2O',         'TAL',   0.2125), # conversion from Huber group experimental data
+            Rxn('TAL + H2 -> HMDHP',         'TAL',   1-0.2125),  # conversion from Huber group experimental data
+            ])
+    
     TAL_to_SA_rxn = hydrogenation_rxns[0]
     
     def _run(self):
         feed, recycle, reagent = self.ins
         effluent = self.outs[0]
-        reagent.imol['H2'] = (feed.imol['TAL'] + recycle.imol['TAL'])*self.hydrogenation_rxns[0].X
+        
+        # effluent.imol['HMDHP'] += 1e-10
+        
+        H2_mol_needed_for_HMTHP_formation = (sum(feed.imol['TAL', 'HMDHP']) + sum(recycle.imol['TAL', 'HMDHP']))*2*self.hydrogenation_rxns[0].X
+        reagent.imol['H2'] = 5*H2_mol_needed_for_HMTHP_formation
         reagent.phase = 'g'
         # effluent = feed.copy()
         effluent.mix_from([feed, recycle, reagent])
+        
+        # effluent.imol['HMTHP'] -= 1e-10
+        
         effluent.phase = 'l'
         # effluent.T = feed.T
         # effluent.P = feed.P
         
         self.hydrogenation_rxns(effluent.mol)
+        self.byproduct_formation_rxns(effluent.mol)
+        
+        extra_H2_mol_to_exclude = effluent.imol['H2']
+        reagent.imol['H2'] -= extra_H2_mol_to_exclude
+        effluent.imol['H2'] = 0.
         
     def _cost(self):
         super()._cost()
@@ -1812,6 +1895,73 @@ class HydrogenationReactor(Reactor):
             self.mcat_frac * self.ins[0].imass['TAL'] * price['AuPd']
             
 
+
+class DehydrationReactor(Reactor):
+    """
+    A dehydration reactor.
+    """
+    _N_ins = 2
+    _N_outs = 1
+    _F_BM_default = {**Reactor._F_BM_default,
+            'RaneyNi catalyst': 1}
+    mcat_frac = 0.01 # fraction of catalyst by weight in relation to the reactant (TAL)
+    dehydration_rxns = ParallelRxn([
+            #   Reaction definition                                       Reactant   Conversion
+            Rxn('HMTHP -> PSA',         'HMTHP',   1.-1e-5) # conversion from Chia et al. 2012
+                ])
+    TAL_to_SA_rxn = dehydration_rxns[0]
+    
+    def _run(self):
+        feed, recycle = self.ins
+        effluent = self.outs[0]
+        
+        # effluent = feed.copy()
+        effluent.mix_from([feed, recycle])
+        # effluent.T = feed.T
+        # effluent.P = feed.P
+        
+        self.dehydration_rxns(effluent.mol)
+        
+    def _cost(self):
+        super()._cost()
+        self.purchase_costs['RaneyNi catalyst'] =\
+            self.mcat_frac * self.ins[0].imass['HMTHP'] * price['RaneyNi']
+            
+class RingOpeningReactor(Reactor):
+    """
+    A ring-opening reactor.
+    """
+    _N_ins = 2
+    _N_outs = 1
+    _F_BM_default = {**Reactor._F_BM_default,
+            'RaneyNi catalyst': 1}
+    mcat_frac = 0.01 # fraction of catalyst by weight in relation to the reactant (TAL)
+    ring_opening_rxns = ParallelRxn([
+            #   Reaction definition                                       Reactant   Conversion
+            Rxn('PSA -> SA',         'PSA',   0.667) # conversion from Chia et al. 2012
+                ])
+    byproduct_formation_rxns = ParallelRxn([
+            #   Reaction definition                                       Reactant   Conversion
+            Rxn('PSA -> 0.2PolyPSA',         'PSA',   1.-0.089) # conversion from Chia et al. 2012
+                ])
+    PSA_to_SA_rxn = ring_opening_rxns[0]
+    
+    def _run(self):
+        feed, recycle = self.ins
+        effluent = self.outs[0]
+        
+        # effluent = feed.copy()
+        effluent.mix_from([feed, recycle])
+        # effluent.T = feed.T
+        # effluent.P = feed.P
+        
+        self.ring_opening_rxns(effluent.mol)
+        self.byproduct_formation_rxns(effluent.mol)
+    def _cost(self):
+        super()._cost()
+        self.purchase_costs['RaneyNi catalyst'] =\
+            self.mcat_frac * self.ins[0].imass['HMTHP'] * price['RaneyNi']
+            
 class DehydrationRingOpeningReactor(Reactor):
     """
     A dehydration reactor.

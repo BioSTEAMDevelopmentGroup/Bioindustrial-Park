@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 # Bioindustrial-Park: BioSTEAM's Premier Biorefinery Models and Results
-# Copyright (C) 2021-, Yalin Li <zoe.yalin.li@gmail.com>
+# Copyright (C) 2021-, Yalin Li <mailto.yalin.li@gmail.com>
 #
 # This module is under the UIUC open-source license. See
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
@@ -68,12 +68,14 @@ class AnMBR(bst.Unit):
     include_degassing_membrane : bool
         If to include a degassing membrane to enhance methane
         (generated through the digestion reaction) recovery.
+    Y_biogas : float
+        Biogas yield, [kg biogas/kg consumed COD].
+    Y_biomass : float
+        Biomass yield, [kg biomass/kg consumed COD].
     biodegradability : float or dict
         Biodegradability of chemicals,
         when shown as a float, all biodegradable chemicals are assume to have
         the same degradability.
-    Y : float
-        Biomass yield, [kg biomass/kg consumed COD].
     split : dict
         Component-wise split to the treated water.
         E.g., {'Water':1, 'WWTsludge':0} indicates all of the water goes to
@@ -195,7 +197,9 @@ class AnMBR(bst.Unit):
                  include_aerobic_filter=False,
                  add_GAC=False,
                  include_degassing_membrane=True,
-                 biodegradability={}, Y=0.05, # from the 0.02-0.08 uniform range in ref [1]
+                 Y_biogas=0.86,
+                 Y_biomass=0.05, # from the 0.02-0.08 uniform range in ref [1]
+                 biodegradability={},
                  split={},
                  T=35+273.15,
                  include_pump_building_cost=False,
@@ -210,9 +214,10 @@ class AnMBR(bst.Unit):
         self.membrane_unit_cost = membrane_unit_cost
         self.add_GAC = add_GAC
         self.include_degassing_membrane = include_degassing_membrane
+        self.Y_biogas = Y_biogas
+        self.Y_biomass = Y_biomass
         self.biodegradability = \
             biodegradability if biodegradability else get_BD_dct(self.chemicals)
-        self.Y = Y
         self.split = split if split else get_split_dct(self.chemicals)
         self.T = T
         self.include_pump_building_cost = include_pump_building_cost
@@ -1264,19 +1269,19 @@ class AnMBR(bst.Unit):
         return self._biodegradability
     @biodegradability.setter
     def biodegradability(self, i):
-        if isinstance(i, float):
+        if not isinstance(i, dict):
             if not 0<=i<=1:
                 raise ValueError('`biodegradability` should be within [0, 1], '
                                  f'the input value {i} is outside the range.')
-            self._biodegradability = i
-            return
-
-        for k, v in i.items():
-            if not 0<=v<=1:
-                raise ValueError('`biodegradability` should be within [0, 1], '
-                                 f'the input value for chemical "{k}" is '
-                                 'outside the range.')
-        self._biodegradability = i
+            self._biodegradability = dict.fromkeys(self.chemicals.IDs, i)
+        else:
+            for k, v in i.items():
+                if not 0<=v<=1:
+                    raise ValueError('`biodegradability` should be within [0, 1], '
+                                     f'the input value for chemical "{k}" is '
+                                     'outside the range.')
+            self._biodegradability = dict.fromkeys(self.chemicals.IDs, i).update(i)
+        self._refresh_rxns()
 
     @property
     def sludge_conc(self):
@@ -1285,17 +1290,6 @@ class AnMBR(bst.Unit):
     @sludge_conc.setter
     def sludge_conc(self, i):
         self._sludge_conc = i
-
-    @property
-    def Y(self):
-        '''[float] Biomass yield, [kg biomass/kg consumed COD].'''
-        return self._Y
-    @Y.setter
-    def Y(self, i):
-        if not 0 <= i <= 1:
-            raise ValueError('`Y` should be within [0, 1], '
-                             f'the input value {i} is outside the range.')
-        self._Y = i
 
     @property
     def i_rm(self):

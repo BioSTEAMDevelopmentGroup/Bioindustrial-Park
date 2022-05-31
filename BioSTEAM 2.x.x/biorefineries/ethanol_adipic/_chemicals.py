@@ -1,16 +1,14 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# BioSTEAM: The Biorefinery Simulation and Techno-Economic Analysis Modules
-# Copyright (C) 2020-2021, Yoel Cortes-Pena <yoelcortes@gmail.com>
 # Bioindustrial-Park: BioSTEAM's Premier Biorefinery Models and Results
-# Copyright (C) 2020-2021, Yalin Li <yalinli2@illinois.edu> (this biorefinery)
-# 
-# This module is under the UIUC open-source license. See 
+# Copyright (C) 2020-, Yalin Li <mailto.yalin.li@gmail.com>
+#
+# This module is under the UIUC open-source license. See
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
 # for license details.
 
 
-# %%  
+# %%
 
 # =============================================================================
 # Setup
@@ -45,7 +43,7 @@ def set_V_from_rho(chemical, rho, phase):
         chemical.V.s.add_model(V)
 
 
-# %% 
+# %%
 
 # =============================================================================
 # Gases
@@ -193,7 +191,7 @@ BaghouseBag = chemical_la('BaghouseBag')
 CoolingTowerChems = chemical_la('CoolingTowerChems')
 
 
-# %% 
+# %%
 
 # =============================================================================
 # Group chemicals
@@ -219,7 +217,7 @@ chemical_groups['SpearatedlyListedOthers'] = \
 # for i in chems:
 #     if i.ID not in all_chemicals:
 #         print(i.ID)
-        
+
 # for i in all_chemicals:
 #     if i not in chems.IDs:
 #         print(i)
@@ -250,7 +248,7 @@ vle_chemicals = ['Ethanol', 'H2O', 'Denaturant', 'AceticAcid',
 crystalization_chemicals = ['Na2SO4', 'MuconicAcid', 'AdipicAcid']
 
 
-# %% 
+# %%
 
 # =============================================================================
 # Set assumptions/estimations for missing properties
@@ -267,7 +265,7 @@ for chemical in chems:
     if chemical.ID in vle_chemicals or chemical.locked_state=='g':
         continue
     V_l = tmo.functional.rho_to_V(1e5, chemical.MW)
-    V_s = tmo.functional.rho_to_V(1540, chemical.MW)    
+    V_s = tmo.functional.rho_to_V(1540, chemical.MW)
     if chemical.locked_state == 'l':
         chemical.V.add_model(V_l, top_priority=True)
     elif chemical.locked_state == 's':
@@ -280,7 +278,7 @@ for chemical in chems:
     if chemical.locked_state:
         try: chemical.kappa.move_up_model_priority('Lakshmi Prasad', -1)
         except: pass
-        
+
 # Default missing properties of chemicals to those of water,
 for chemical in chems: chemical.default()
 

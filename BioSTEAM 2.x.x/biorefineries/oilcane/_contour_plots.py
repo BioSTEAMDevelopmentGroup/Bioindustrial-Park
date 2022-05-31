@@ -30,11 +30,11 @@ from ._distributions import (
 
 __all__ = (
     'plot_relative_sorghum_oil_content_and_cane_oil_content_contours_manuscript',
-    'plot_extraction_efficiency_and_oil_content_contours_manuscript',
+    'plot_recovery_and_oil_content_contours_manuscript',
     'plot_ethanol_and_biodiesel_price_contours_manuscript',
     'plot_enhanced_ethanol_and_biodiesel_price_contours_manuscript',
     'plot_benefit_ethanol_and_biodiesel_price_contours_manuscript',
-    'plot_extraction_efficiency_and_oil_content_contours',
+    'plot_recovery_and_oil_content_contours',
     'plot_relative_sorghum_oil_content_and_cane_oil_content_contours',
     'plot_ethanol_and_biodiesel_price_contours',
 )
@@ -100,19 +100,19 @@ def _add_letter_labels(axes, xpos, ypos, colors):
                      horizontalalignment='center',verticalalignment='center',
                      fontsize=12, fontweight='bold', zorder=1e17)
 
-def plot_extraction_efficiency_and_oil_content_contours_manuscript(load=True):
+def plot_recovery_and_oil_content_contours_manuscript(load=True):
     set_font(size=8)
     set_figure_size()
-    fig, axes = plot_extraction_efficiency_and_oil_content_contours(
+    fig, axes = plot_recovery_and_oil_content_contours(
         load=load,
     )
     colors = np.zeros([2, 2], object)
     colors[:] = [[light_letter_color, light_letter_color],
                  [light_letter_color, light_letter_color]]
-    _add_letter_labels(axes, 1 - 0.68, 0.70, colors)
+    _add_letter_labels(axes, 1 - 0.68, 0.7, colors)
     plt.subplots_adjust(right=0.92, wspace=0.1, top=0.9, bottom=0.10)
     for i in ('svg', 'png'):
-        file = os.path.join(images_folder, f'extraction_efficiency_and_oil_content_contours.{i}')
+        file = os.path.join(images_folder, f'recovery_and_oil_content_contours.{i}')
         plt.savefig(file, transparent=True)
 
 def plot_relative_sorghum_oil_content_and_cane_oil_content_contours_manuscript(load=True):
@@ -134,13 +134,13 @@ def plot_ethanol_and_biodiesel_price_contours_manuscript():
     set_font(size=8)
     set_figure_size(aspect_ratio=0.7)
     fig, axes = plot_ethanol_and_biodiesel_price_contours(
-        titles=['Conventional', 'Cellulosic'],
+        titles=['Direct cogeneration', 'Integrated Co-Fermentation'],
     )
     colors = np.zeros([3, 2], object)
     colors[:] = [[letter_color, letter_color],
                  [letter_color, letter_color],
                  [letter_color, letter_color]]
-    _add_letter_labels(axes, 0.7, 0.65, colors)
+    _add_letter_labels(axes, 0.7, 0.75, colors)
     plt.subplots_adjust(left=0.2, right=0.92, wspace=0.1, top=0.94, bottom=0.12)
     for i in ('svg', 'png'):
         file = os.path.join(images_folder, f'ethanol_and_biodiesel_price_contours.{i}')
@@ -151,13 +151,13 @@ def plot_enhanced_ethanol_and_biodiesel_price_contours_manuscript():
     set_figure_size(aspect_ratio=0.7)
     fig, axes = plot_ethanol_and_biodiesel_price_contours(
         enhanced_cellulosic_performance=True,
-        titles=['Conventional', 'Cellulosic'],
+        titles=['Direct cogeneration', 'Integrated Co-Fermentation'],
     )
     colors = np.zeros([3, 2], object)
     colors[:] = [[letter_color, letter_color],
                  [letter_color, letter_color],
                  [letter_color, letter_color]]
-    _add_letter_labels(axes, 0.7, 0.65, colors)
+    _add_letter_labels(axes, 0.7, 0.75, colors)
     plt.subplots_adjust(left=0.2, right=0.92, wspace=0.1, top=0.94, bottom=0.12)
     for i in ('svg', 'png'):
         file = os.path.join(images_folder, f'enhanced_ethanol_and_biodiesel_price_contours.{i}')
@@ -168,14 +168,14 @@ def plot_benefit_ethanol_and_biodiesel_price_contours_manuscript():
     set_figure_size(aspect_ratio=0.7)
     fig, axes = plot_ethanol_and_biodiesel_price_contours(
         benefit=True,
-        titles=['Conventional', 'Cellulosic'],
+        titles=['Direct Cogeneration', 'Integrated Co-Fermentation'],
         dist=True,
     )
     colors = np.zeros([3, 2], object)
     colors[:] = [[dark_letter_color, dark_letter_color],
                  [dark_letter_color, dark_letter_color],
                  [dark_letter_color, dark_letter_color]]
-    _add_letter_labels(axes, 0.7, 0.65, colors)
+    _add_letter_labels(axes, 0.7, 0.75, colors)
     plt.subplots_adjust(left=0.2, right=0.92, wspace=0.1, top=0.94, bottom=0.12)
     for i in ('svg', 'png'):
         file = os.path.join(images_folder, f'benefit_ethanol_and_biodiesel_price_contours.{i}')
@@ -187,8 +187,8 @@ def plot_ethanol_and_biodiesel_price_contours(N=30, benefit=False, cache={},
                                               enhanced_cellulosic_performance=False,
                                               titles=None, load=False, save=True,
                                               dist=False):
-    ethanol_price = np.linspace(1., 3., N)
-    biodiesel_price = np.linspace(2, 6, N)
+    ethanol_price = np.linspace(0.25, 0.8, N)
+    biodiesel_price = np.linspace(0.30, 1.9, N)
     oil_content = [5, 10, 15]
     N_rows = len(oil_content)
     configuration = ['O1', 'O2']
@@ -221,13 +221,13 @@ def plot_ethanol_and_biodiesel_price_contours(N=30, benefit=False, cache={},
                     Z[:, :, i, j] = oc.evaluate_MFPP_across_ethanol_and_biodiesel_prices(X, Y)
     if save:
         np.save(file, Z)
-    xlabel = f"Ethanol price\n[{format_units('$/gal')}]"
-    ylabels = [f"Biodiesel price\n[{format_units('$/gal')}]"] * 4
-    xticks = [1., 1.5, 2.0, 2.5, 3.0]
-    yticks = [2, 3, 4, 5, 6]
+    xlabel = f"Ethanol price\n[{format_units('$/L')}]"
+    ylabels = [f"Biodiesel price\n[{format_units('$/L')}]"] * 4
+    xticks = [0.25, 0.4, 0.55, 0.8]
+    yticks = [0.3, 0.7, 1.1, 1.5, 1.9]
     marks = tickmarks(Z, 5, 5, center=0.) if benefit else tickmarks(Z, 5, 5)
     colormap = (diverging_colormaps if benefit else colormaps)[0]
-    metric_bar = MetricBar('MFPP', format_units('$/ton'), colormap, marks, 15,
+    metric_bar = MetricBar('MFPP', format_units('$/MT'), colormap, marks, 15,
                            forced_size=0.3)
     if benefit:
         baseline = ['S1', 'S2']
@@ -298,13 +298,13 @@ def plot_relative_sorghum_oil_content_and_cane_oil_content_contours(
     MFPP = oc.all_metric_mockups[0]
     TCI = oc.all_metric_mockups[6]
     if configuration_index == 0:
-        Z = np.array(["Agile-Conventional"])
+        Z = np.array(["Direct Cogeneration"])
         data = data[:, :, :, np.newaxis]
     elif configuration_index == 1:
-        Z = np.array(["Agile-Cellulosic"])
+        Z = np.array(["Integrated Co-Fermentation"])
         data = data[:, :, :, np.newaxis]
     elif configuration_index == ...:
-        Z = np.array(["Agile-Conventional", "Agile-Cellulosic"])
+        Z = np.array(["Direct Cogeneration", "Integrated Co-Fermentation"])
         data = np.swapaxes(data, 2, 3)
     else:
         raise ValueError('configuration index must be either 0 or 1')
@@ -318,13 +318,17 @@ def plot_relative_sorghum_oil_content_and_cane_oil_content_contours(
         100.*X, 100.*Y, Z, data, xlabel, ylabel, xticks, yticks, metric_bars, 
         styleaxiskw=dict(xtick0=True), label=True,
     )
+    for i in axes.flatten():
+        plt.sca(i)
+        plot_scatter_points([7], [10], marker='*', s=100, color=startcolor,
+                            edgecolor=edgecolor, clip_on=False, zorder=3)
     return fig, axes
     
-def plot_extraction_efficiency_and_oil_content_contours(
+def plot_recovery_and_oil_content_contours(
         load=False, metric_index=0, N_decimals=1,
     ):
     # Generate contour data
-    x = np.linspace(0.4, 1., 20)
+    x = np.linspace(0.40, 1.0, 20)
     y = np.linspace(0.05, 0.15, 20)
     X, Y = np.meshgrid(x, y)
     metric = bst.metric
@@ -336,19 +340,19 @@ def plot_extraction_efficiency_and_oil_content_contours(
     if load:
         data = np.load(file)
     else:
-        data = oc.evaluate_configurations_across_extraction_efficiency_and_oil_content(
-            X, Y, 0.70, agile, configurations, 
+        data = oc.evaluate_configurations_across_recovery_and_oil_content(
+            X, Y, agile, configurations, 
         )
     np.save(file, data)
     data = data[:, :, :, :, metric_index]
     data = np.swapaxes(data, 2, 3)
     
     # Plot contours
-    xlabel = 'Oil extraction [%]'
+    xlabel = 'Crushing mill oil recovery [%]'
     ylabel = "Oil content [dry wt. %]"
-    ylabels = [f'Conventional Configuration\n{ylabel}',
-               f'Cellulosic Configuration\n{ylabel}']
-    xticks = [40, 60, 80, 100]
+    ylabels = [f'Direct Cogeneration\n{ylabel}',
+               f'Integrated Co-Fermentation\n{ylabel}']
+    xticks = [40, 50, 60, 70, 80, 90, 100]
     yticks = [5, 7.5, 10, 12.5, 15]
     metric = oc.all_metric_mockups[metric_index]
     units = metric.units if metric.units == '%' else format_units(metric.units)
@@ -375,25 +379,19 @@ def plot_extraction_efficiency_and_oil_content_contours(
                              levels=levels, colors=[linecolor])
             # ax.clabel(CS, levels=CS.levels, inline=True, fmt=lambda x: f'{round(x):,}',
             #           colors=[linecolor], zorder=1e16)
-            if j == 0:
-                lb = 50.0
-                ub = 70.0
-            else:
-                lb = 70.0
-                ub = 90.0
-            plt.fill_between([lb, ub], [2], [20], 
-                             color=shadecolor,
-                             linewidth=1)
-            plot_vertical_line(lb, ls='-.',
-                               color=linecolor,
-                               linewidth=1.0)
-            plot_vertical_line(ub, ls='-.',
-                               color=linecolor,
-                               linewidth=1.0)
+            plt.fill_between([60, 90], [5], [15], 
+                              color=shadecolor,
+                              linewidth=1)
+            plot_vertical_line(60, ls='-.',
+                                color=linecolor,
+                                linewidth=1.0)
+            plot_vertical_line(90, ls='-.',
+                                color=linecolor,
+                                linewidth=1.0)
             if hasattr(ax, '_cached_ytwin'):                
                 plt.sca(ax._cached_ytwin)
-            plot_scatter_points([lb], [5], marker='o', s=50, color=startcolor,
+            plot_scatter_points([60], [10], marker='*', s=100, color=startcolor,
                                 edgecolor=edgecolor, clip_on=False, zorder=3)
-            plot_scatter_points([ub], [15], marker='*', s=100, color=targetcolor,
-                                edgecolor=edgecolor, clip_on=False, zorder=3)
+            # plot_scatter_points([ub], [15], marker='*', s=100, color=targetcolor,
+            #                     edgecolor=edgecolor, clip_on=False, zorder=3)
     return fig, axes

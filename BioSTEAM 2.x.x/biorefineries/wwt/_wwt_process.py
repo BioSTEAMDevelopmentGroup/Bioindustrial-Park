@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 # Bioindustrial-Park: BioSTEAM's Premier Biorefinery Models and Results
-# Copyright (C) 2021-, Yalin Li <zoe.yalin.li@gmail.com>
+# Copyright (C) 2021-, Yalin Li <mailto.yalin.li@gmail.com>
 #
 # This module is under the UIUC open-source license. See
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
@@ -45,7 +45,7 @@ Rxn = tmo.reaction.Reaction
 ParallelRxn = tmo.reaction.ParallelReaction
 CEPCI = bst.units.design_tools.CEPCI_by_year
 
-__all__ = ('create_wastewater_process', 'CHP',)
+__all__ = ('create_wastewater_process', 'CHP', 'Skipped',)
 
 
 # %%
@@ -167,8 +167,7 @@ class Skipped(Unit):
     cache_dct = {} # to save some computation effort
 
     def __init__(self, ID='', ins=None, outs=(), thermo=None,
-                 main_in=0, main_out=1, # outs[0] is the gas phase
-                 wwt_units=[], clear_cost=False):
+                 main_in=0, main_out=0, wwt_units=[], clear_cost=False):
         Unit.__init__(self, ID, ins, outs, thermo)
         self.main_in = main_in
         self.main_out = main_out
@@ -260,14 +259,14 @@ def create_wastewater_process(ins, outs, process_ID='6', flowsheet=None,
 
     RX01_outs = (f'biogas_R{X}01', 'IC_eff', 'IC_sludge')
     if skip_IC:
-        RX01 = Skipped(f'R{X}01', ins=MX01-0, outs=RX01_outs)
+        RX01 = Skipped(f'R{X}01', ins=MX01-0, outs=RX01_outs, main_in=0, main_out=1) # outs[0] is the gas phase 
     else:
         RX01 = InternalCirculationRx(f'R{X}01', ins=MX01-0, outs=RX01_outs,
                                      T=35+273.15, **IC_kwargs)
 
     RX02_outs = (f'biogas_R{X}02', f'permeate_R{X}02', f'sludge_R{X}02', f'vent_R{X}02')
     if skip_AnMBR:
-        RX02 = Skipped(f'R{X}02', ins=RX01-1, outs=RX02_outs)
+        RX02 = Skipped(f'R{X}02', ins=RX01-1, outs=RX02_outs, main_in=0, main_out=1)
     else:
         # Just setting the prices, flows will be updated upon simulation
         naocl_RX02 = tmo.Stream(f'naocl_R{X}02', NaOCl=0.125, Water=1-0.125, units='kg/hr')
@@ -294,7 +293,7 @@ def create_wastewater_process(ins, outs, process_ID='6', flowsheet=None,
 
     RX03_outs = (f'biogas_R{X}03', f'treated_R{X}03', f'sludge_R{X}03', f'vent_R{X}03')
     if skip_AeF:
-        RX03 = Skipped(f'R{X}03', ins=(RX02-1, ''), outs=RX03_outs)
+        RX03 = Skipped(f'R{X}03', ins=(RX02-1, ''), outs=RX03_outs, main_in=0, main_out=1)
     else:
         RX03 = PolishingFilter(f'R{X}03', ins=(RX02-1, '', f'air_R{X}03'), outs=RX03_outs,
                               filter_type='aerobic',
@@ -304,6 +303,7 @@ def create_wastewater_process(ins, outs, process_ID='6', flowsheet=None,
                               include_pump_building_cost=False,
                               include_excavation_cost=False,
                               **AF_kwargs)
+   
     # # This isn't working, think of a better way to deal with it
     # _RX03_cost = RX03._cost
     # def adjust_heat_loss():
@@ -315,7 +315,6 @@ def create_wastewater_process(ins, outs, process_ID='6', flowsheet=None,
     #     RX02.power_utility.rate -= RX02._heat_loss
     #     RX03.power_utility.rate -= RX03._heat_loss
     # RX03._cost = adjust_heat_loss
-
 
     bst.units.Mixer(f'M{X}02', ins=(RX01-0, RX02-0, RX03-0), outs=biogas)
 
@@ -341,5 +340,5 @@ def create_wastewater_process(ins, outs, process_ID='6', flowsheet=None,
     SX04 = ReverseOsmosis(f'S{X}04', ins=RX03-1, outs=(recycled_water, ''))
 
     # A process specification for wastewater treatment cost calculation
-    Skipped(f'U{X}01', ins=SX04-1, outs=brine, main_in=0, main_out=0,
+    Skipped('Caching', ins=SX04-1, outs=brine, main_in=0, main_out=0,
             wwt_units=[u for u in bst.main_flowsheet.unit if (u.ID[1:1+len(X)]==X)])

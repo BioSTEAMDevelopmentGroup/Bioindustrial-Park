@@ -1,11 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# BioSTEAM: The Biorefinery Simulation and Techno-Economic Analysis Modules
-# Copyright (C) 2020-2021, Yoel Cortes-Pena <yoelcortes@gmail.com>
 # Bioindustrial-Park: BioSTEAM's Premier Biorefinery Models and Results
-# Copyright (C) 2020-2021, Yalin Li <yalinli2@illinois.edu> (this biorefinery)
-# 
-# This module is under the UIUC open-source license. See 
+# Copyright (C) 2020-, Yalin Li <mailto.yalin.li@gmail.com>
+#
+# This module is under the UIUC open-source license. See
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
 # for license details.
 
@@ -43,14 +41,14 @@ def load_system(system_kind='acid', depot_kind='HMPP'):
                          f'or "HMPP_AFEX", not {depot_kind}.')
 
     global flowsheet, groups, teas, funcs, biorefinery, tea
-    
+
     depot_dct = systems.depot_dct[depot_kind]
     create_sys = getattr(systems, f'create_{system_kind}_biorefinery')
-    
+
     flowsheet, groups, teas, funcs = create_sys(depot_dct['preprocessed'])
     biorefinery = flowsheet.system.biorefinery
     tea = teas['tea']
-    
+
     bst.settings.set_thermo(chems)
     bst.main_flowsheet.set_flowsheet(flowsheet)
 
@@ -80,18 +78,3 @@ def simulate_and_print(depot_for_GWP=None):
             / (s.ethanol.F_mass/systems._ethanol_kg_2_gal)
         print(f'GWP: {GWP:.3f} kg CO2-eq/gal ethanol with feedstock')
     print('--------------------------------------')
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

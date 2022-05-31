@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 # Bioindustrial-Park: BioSTEAM's Premier Biorefinery Models and Results
-# Copyright (C) 2021-, Yalin Li <zoe.yalin.li@gmail.com>
+# Copyright (C) 2021-, Yalin Li <mailto.yalin.li@gmail.com>
 #
 # This module is under the UIUC open-source license. See
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
@@ -15,6 +15,10 @@ from thermosteam.units_of_measure import AbsoluteUnitsOfMeasure as auom
 import os
 wwt_path = os.path.dirname(__file__)
 results_path = os.path.join(wwt_path, 'results')
+figures_path = os.path.join(wwt_path, 'figures')
+# To save simulation results and generated figures
+if not os.path.isdir(results_path): os.mkdir(results_path)
+if not os.path.isdir(figures_path): os.mkdir(figures_path)
 del os
 
 from ._chemicals import *
@@ -25,7 +29,6 @@ from ._polishing_filter import *
 from ._membrane_bioreactor import *
 from ._sludge_handling import *
 from ._wwt_process import *
-from ._lca import * #!!! needs updating, maybe don't need it
 from ._system import *
 from ._model import *
 
@@ -38,7 +41,6 @@ from . import (
     _membrane_bioreactor,
     _sludge_handling,
     _wwt_process,
-    _lca,
     _system,
     _model,
     )
@@ -54,7 +56,6 @@ __all__ = (
     *_membrane_bioreactor.__all__,
     *_sludge_handling.__all__,
     *_wwt_process.__all__,
-    *_lca.__all__,
     *_system.__all__,
     *_model.__all__,
     )

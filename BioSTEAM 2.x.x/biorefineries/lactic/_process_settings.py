@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 # Bioindustrial-Park: BioSTEAM's Premier Biorefinery Models and Results
-# Copyright (C) 2020-, Yalin Li <zoe.yalin.li@gmail.com>,
+# Copyright (C) 2020-, Yalin Li <mailto.yalin.li@gmail.com>,
 #                      Sarang Bhagwat <sarangb2@illinois.edu>,
 #                      Yoel Cortes-Pena <yoelcortes@gmail.com>
 #
@@ -202,7 +202,7 @@ def get_CFs(flowsheet=None):
         'NH4OH': 2.64 * 0.4860, # chemicals.NH3.MW/chemicals.NH4OH.MW,
         'CSL': 1.55,
         'CH4': 0.40, # NA NG from shale and conventional recovery
-        'Enzyme': 2.24,
+        'Enzyme': 2.24, # won't make a big diff (<4%) if it's 12.24 (~ ecoinvent value)
         'Lime': 1.29 * 56.0774/74.093, # CaO to Ca(OH)2
         'NaOH': 2.11,
         'H2SO4': 44.47/1e3,

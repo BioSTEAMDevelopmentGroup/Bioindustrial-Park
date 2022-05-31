@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 # Bioindustrial-Park: BioSTEAM's Premier Biorefinery Models and Results
-# Copyright (C) 2020-, Yalin Li <zoe.yalin.li@gmail.com>,
+# Copyright (C) 2020-, Yalin Li <mailto.yalin.li@gmail.com>,
 #                      Sarang Bhagwat <sarangb2@illinois.edu>,
 #                      Yoel Cortes-Pena <yoelcortes@gmail.com>
 #
@@ -346,7 +346,7 @@ class EnzymeHydrolysateMixer(Mixer):
 
 
 # Saccharification and co-fermentation (both glucose & xylose are used in fermentation)
-# Not including heat exchanger as saccharificatoin and co-fermentation
+# Not including heat exchanger as saccharification and co-fermentation
 # are at the same temperature now
 @cost(basis='Saccharification tank size', ID='Saccharification tank', units='kg',
       cost=3840000, S=421776*24, CE=CEPCI[2009], n=0.7, BM=2)
@@ -406,7 +406,7 @@ class SaccharificationAndCoFermentation(Unit):
     def __init__(self, ID='', ins=None, outs=(), T=50+273.15,
                  neutralization=True, allow_dilution=False):
         Unit.__init__(self, ID, ins, outs)
-        # Same T for saccharificatoin and co-fermentation
+        # Same T for saccharification and co-fermentation
         self.T = T
         self.neutralization = neutralization
         self.allow_dilution = allow_dilution
