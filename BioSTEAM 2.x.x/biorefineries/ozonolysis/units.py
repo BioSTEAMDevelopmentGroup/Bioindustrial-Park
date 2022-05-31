@@ -5,21 +5,6 @@ Created on Fri Oct 29 08:17:38 2021
 import biosteam as bst
 import thermosteam as tmo
 
-class Adjustingfeed(bst.Unit):
-    _N_ins = 1
-    _N_outs = 1 
-
-    def __init__(self, ID='', ins=None, outs=(), *, OA_moles):
-        Unit.__init__(self, ID, ins, outs)
-        self.OA_moles = OA_moles
-
-    def _run(self):
-        self.ins[0].imol['Oleic_acid'] = self.OA_moles
-        self.ins[0].imol['H2O2'] = self.ins[0].imol['Oleic_acid'] * 6.85/0.86
-        self.ins[0].imol['H2O'] = self.ins[0].imol['H2O'] * 27.1/0.86
-        self.outs[0].copy_like(self.ins[0])
-
-
 class OzonolysisReactor(bst.BatchBioreactor):
     _N_ins = 1
     _N_outs = 1
@@ -72,11 +57,12 @@ class OzonolysisReactor(bst.BatchBioreactor):
         X1 = 1 - (self.selectivity_oxiraneoctanoic_acid)
         X2 = self.selectivity_Azelaic_acid / X1
         
+        # reaction_name = 'Ozonolysis_reaction'
         self.reactions = tmo.SeriesReaction([
-            tmo.Rxn('Oleic_acid + H2O2 -> Epoxy_stearic_acid + Water ', 'Oleic_acid', X=self.Oleic_acid_conversion),
+            tmo.Rxn('Oleic_acid + H2O2   -> Epoxy_stearic_acid + Water ', 'Oleic_acid', X=self.Oleic_acid_conversion),
             tmo.Rxn('Epoxy_stearic_acid + H2O2 -> Nonanal + Oxononanoic_acid + H2O', 'oxiraneoctanoic_acid,_3-octyl-', X = X1),
-            tmo.Rxn('Nonanal + Oxononanoic_acid + 2H2O2 -> Azelaic_acid + Nonanoic_acid+ 2H2O', 'Nonanal', X = X2)
-            ])
+            tmo.Rxn('Nonanal + Oxononanoic_acid + 2H2O2 -> Azelaic_acid + Nonanoic_acid+ 2H2O', 'Nonanal', X = X2),
+                   ])
         
     def _run(self):
         feed = self.ins[0]
@@ -106,7 +92,7 @@ class Separator(bst.Unit):
            
             
 class AACrystalliser(bst.units.BatchCrystallizer):
-    
+  
     def __init__(self, ID='', ins=None, outs=(), thermo=None, *,  
                  T = None
                   ):
@@ -125,46 +111,58 @@ class AACrystalliser(bst.units.BatchCrystallizer):
         solids = effluent['s']
         H_out = - sum([i.Hfus * j for i,j in zip(self.chemicals, solids.mol) if i.Hfus])
         return H_out 
-        # solids = effluent['s']
-        # c = solids.chemicals
-        # H_tot = - (c.Azelaic_acid.Hfus * AA_solid + c.Nonanoic_acid.Hfus * NA)              
-         
-        # return H_tot
-    
-#Interpolating using the solubility data that we have
-#Calculating S = mT + c
-        
+
     def solubility(self, T):
-        m = self.AA_molefraction_330_15K - self.AA_molefraction_280_15K / 330.15 - 280.15
-        c = self.AA_molefraction_330_15K - m * 330.15
+        delta_T = 330.15 - 280.15
+        delta_S = self.AA_molefraction_330_15K - self.AA_molefraction_280_15K
+        m = delta_S/delta_T
+        b = m*330.15
+        c = self.AA_molefraction_330_15K - b
         S = m*T + c
         return S
     
 #Assuming inlet at saturation. Therefore adding the feed at saturation of 330.15
     def _run(self):
-        outlet = self.outs[0]
-        outlet.phases = ('s', 'l')
         feed = self.ins[0]    
+        outlet = self.outs[0]
         outlet.copy_like(feed)
-        outlet.T = self.T
+        outlet.phases = ('s', 'l')
         x = self.solubility(self.T)
-        outlet.sle('Azelaic_acid', solubility=x, T = self.T)
-        outlet.imass['l', 'Nonanoic_acid'] = 0.
-        outlet.imass['s', 'Nonanoic_acid'] = feed.imass['Nonanoic_acid']
-        AA_solid = outlet.imass['s','Azelaic_acid']
-        NA = outlet.imass['s','Nonanoic_acid']
-        
-#####################################StorageTanks#########################################
-# class OAFeedtank(Unit): pass
-# class WaterFeedtank(Unit): pass
-# class HPFeedtank(Unit): pass 
-# class HexaneFeedtank(Unit): pass
-# class EAFeedtank(Unit): pass       
-             
-        
+        outlet.sle('Azelaic_acid',
+                    solubility=x,
+                    T = self.T)
+        outlet.imass['s','Nonanoic_acid'] = feed.imass['Nonanoic_acid']
+
+        # self.outs[0].copy_like(feed)
+        # self.outs[0].phases = ('s', 'l')
+        # self.outs[0].sle('Azelaic_acid', solubility=x, T = self.T)
+    
+        # outlet['s'] = outlet['s']
+        #+ feed.imass['l', 'Nonanoic_acid']
+
         
         
+
         
+
+# C301.outs[0].sle('Azelaic_acid', solubility= 0.0000594 , T = 280)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
         
         
         
