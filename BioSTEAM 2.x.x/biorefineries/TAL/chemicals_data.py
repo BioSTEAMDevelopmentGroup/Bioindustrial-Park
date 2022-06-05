@@ -434,17 +434,20 @@ for i in OctylDihydroxyHexanoate.get_missing_properties():
         except:
             pass
 
-TALHydrogenationDegradationProducts = chemical_defined('TALHydrogenationDegradationProducts', 
-                                                       phase='s', 
-                                                       formula='C6H6O3',
-                                                       
+Acetylacetone = chemical_database(ID='Acetylacetone', 
+                                                       # phase='s', 
+                                                       # formula='C6H6O3',
+                                                       # search_ID='Acetylacetone',
                                                        )
-for i in TALHydrogenationDegradationProducts.get_missing_properties():
-    if not i in TAL.get_missing_properties():
-        try:
-            TALHydrogenationDegradationProducts.copy_models_from(TAL, [i])
-        except:
-            pass
+# for i in TALHydrogenationDegradationProducts.get_missing_properties():
+#     if not i in TAL.get_missing_properties():
+#         try:
+#             TALHydrogenationDegradationProducts.copy_models_from(TAL, [i])
+#         except:
+#             pass
+
+Hexane = chemical_defined('Hexane', phase='l')
+
 # =============================================================================
 # Insoluble organics
 # =============================================================================
