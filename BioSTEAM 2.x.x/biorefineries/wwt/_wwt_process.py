@@ -33,7 +33,7 @@ from biosteam.units.decorators import cost
 from . import (
     default_insolubles,
     InternalCirculationRx, AnMBR, PolishingFilter, BeltThickener, SludgeCentrifuge,
-    get_combustion_energy, prices,
+    get_combustion_energy, prices, GWP_CFs,
     )
 
 _mgd_to_cmh = 157.7255 # auom('gallon').conversion_factor('m3')*1e6/24
@@ -229,6 +229,87 @@ class CHP(Unit):
         self.power_utility(-kW)
 
 
+class BiogasUpgrading(Unit):
+    '''
+    Upgrade the biogas to renewable natural gas (RNG).
+    Note that the second influent is a dummy stream to calculate the upgrading cost.
+
+    Parameters
+    ----------
+    ratio : float
+        How much of the incoming biogas will be upgraded to RNG.
+    loss : float
+        CH4 loss during upgrading.
+    unit_upgrading_cost : float
+        Unit cost for upgrading, in $/MMBtu.
+    unit_upgrading_GWP : float
+        Unit 100-yr global warming potential (GWP) for biogas upgrading, in kg CO2/MMBtu.
+
+    References
+    ----------
+    [1] Yang et al., Cost and Life-Cycle Greenhouse Gas Implications of 
+    Integrating Biogas Upgrading and Carbon Capture Technologies in Cellulosic Biorefineries.
+    Environ. Sci. Technol. 2020.
+    https://doi.org/10.1021/acs.est.0c02816.
+    [2] IEA. Outlook for Biogas and Biomethane: Prospects for Organic Growth; IEA: Paris, 2020.
+    https://www.iea.org/reports/outlook-for-biogas-and-biomethane-prospects-for-organic-growth
+    [3] Rai et al., Comparative Life Cycle Evaluation of the Global Warming Potential (GWP)
+    Impacts of Renewable Natural Gas Production Pathways. Environ. Sci. Technol. 2022.
+    https://doi.org/10.1021/acs.est.2c00093.
+
+    '''
+    
+    # Default upgrading cost is calculated by
+    # 0.18*0.914/35.3147*1055.056
+    # where $0.18/NM is from ref 1,
+    # 0.914 ft3/MJ is from U.S. EIA https://www.eia.gov/energyexplained/units-and-calculators/energy-conversion-calculators.php#natgascalc
+    # 35.3147 ft3/m3 is auom('m3').conversion_factor('ft3')
+    # 1055.056 MJ/MMBtu is auom('MMBtu').conversion_factor('MJ')
+    # This cost is close to the general range of $2-4 for a
+    # 3.5 million m3/yr biogas plant in ref 2.
+    
+    # Default upgrading GWP is from calculated by
+    # 8.67/1e3*1055.056
+    # where 8.67 g CO2/MJ is the average of upgrading GWP (5, 8, 13)
+    # from Section S5 of ref 3
+
+    _N_ins = 2
+    _N_outs = 2
+    
+    RIN_incentive = prices['RIN']
+    # Credits from the displaced fossil natural gas
+    FNG_price = bst.stream_utility_prices['Natural gas'] # $/kg
+    FNG_CF = GWP_CFs['CH4']
+    # FNG_CF = GWP_CFs['CH4'] - 1/16.04246*44.0095 # do not subtract the direct emission
+
+    def __init__(self, ID='', ins=None, outs=(), thermo=None,
+                 ratio=0, loss=0.05, 
+                 unit_upgrading_cost=4.92,
+                 unit_upgrading_GWP=9.15):
+        Unit.__init__(self, ID, ins, outs, thermo)
+        self.ratio = ratio
+        self.loss = loss
+        self.unit_upgrading_cost = unit_upgrading_cost
+        self.unit_upgrading_GWP = unit_upgrading_GWP
+
+
+    def _run(self):
+        biogas, foo = self.ins
+        rng, remained = self.outs
+        rng.empty()
+        rng.imass['CH4'] = biogas.imass['CH4'] * self.ratio
+        remained.mass = biogas.mass - rng.mass # assume impurities left in the unused biogas
+        rng.mass *= (1 - self.loss) # lost methane not included in the unused biogas
+        rng.price = self.FNG_price + self.RIN_incentive
+        rng.characterization_factors['GWP'] = self.FNG_CF
+        
+        # Upgrading cost/GWP
+        foo.copy_like(rng)
+        if foo.F_mass == 0: foo.imass['CH4'] = 1
+        foo.price = self.unit_upgrading_cost/1055.056*(foo.HHV/1e3)/foo.F_mass # HHV in kJ/hr
+        foo.characterization_factors['GWP'] = self.unit_upgrading_GWP/1055.056*(foo.HHV/1e3)/foo.F_mass
+
+
 # %%
 
 # =============================================================================
@@ -237,7 +318,8 @@ class CHP(Unit):
 
 @bst.SystemFactory(
     ID='wastewater_sys',
-    outs=[dict(ID='biogas'),
+    outs=[dict(ID='rng'), # renewable natural gas
+          dict(ID='biogas'),
           dict(ID='sludge'),
           dict(ID='recycled_water'),
           dict(ID='brine')],
@@ -250,7 +332,7 @@ def create_wastewater_process(ins, outs, process_ID='6', flowsheet=None,
     if flowsheet:
         bst.main_flowsheet.set_flowsheet(flowsheet)
     wwt_streams = ins
-    biogas, sludge, recycled_water, brine = outs
+    rng, biogas, sludge, recycled_water, brine = outs
 
     ######################## Units ########################
     # Mix waste liquids for treatment
@@ -316,7 +398,8 @@ def create_wastewater_process(ins, outs, process_ID='6', flowsheet=None,
     #     RX03.power_utility.rate -= RX03._heat_loss
     # RX03._cost = adjust_heat_loss
 
-    bst.units.Mixer(f'M{X}02', ins=(RX01-0, RX02-0, RX03-0), outs=biogas)
+    MX02 = bst.units.Mixer(f'M{X}02', ins=(RX01-0, RX02-0, RX03-0))
+    BiogasUpgrading('Upgrading', ins=(MX02-0, 'foo'), outs=(rng, biogas))
 
     # Recycled the majority of sludge (96%) to the aerobic filter,
     # 96% from the membrane bioreactor in ref [2]

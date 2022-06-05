@@ -39,13 +39,13 @@ def create_oc1g_comparison_systems(biodegradability=1): # will be multiplied by 
         ##### Feeds #####
         'catalyst': ('TEcatalyst',), # methanol and NaOCH3
         'denaturant': ('Denaturant'),
-        'dryer_natural_gas': ('CH4',),
+        # 'dryer_natural_gas': ('CH4',), # used to be in the registry, but not any more
         'H3PO4': ('H3PO4',),
         'HCl': ('HCl',),
         'lime': ('CaO', 0.046), # CaO and water
         'methanol': ('Methanol',),
         'NaOH': ('NaOH',),
-        'natural_gas': ('CH4',), # probably not needed
+        'natural_gas': ('CH4',), # usually not needed
         'oilcane': ('Oilcane',), # moisture content already adjusted
         'polymer': ('Polymer'),
         'pure_glycerine': ('GlycerinPure',),
@@ -140,5 +140,5 @@ if __name__ == '__main__':
         # include_baseline=False,
         # include_uncertainty=False,
         include_biodegradability=False, # biodegradability for 1G should be high
-        N_uncertainty=100,
+        N_uncertainty=1000,
         )

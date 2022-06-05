@@ -92,7 +92,6 @@ class WWTpump(bst.Unit):
 
 
     def _design(self):
-
         pump_type = format_str(self.pump_type)
         design_func = getattr(self, f'design_{pump_type}')
 
@@ -113,8 +112,9 @@ class WWTpump(bst.Unit):
     def _batch_adding_pump(obj, IDs, ins_dct, type_dct, inputs_dct):
         for i in IDs:
             if not hasattr(obj, f'{i}_pump'):
-                # if i == None:
-                #     continue
+                if getattr(obj, 'system', None):                    
+                    if not bst.main_flowsheet is obj.system.flowsheet:
+                        bst.main_flowsheet.set_flowsheet(obj.system.flowsheet)
                 pump = WWTpump(
                     ID=f'{obj.ID}_{i}',
                     ins=ins_dct[i],

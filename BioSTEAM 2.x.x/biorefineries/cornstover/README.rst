@@ -38,68 +38,92 @@ are lazy loaded by the module:
     >>> cs.load()
     >>> cs.chemicals # All chemicals used by the biorefinery.
     CompiledChemicals([Water, Ethanol, AceticAcid, Furfural, Glycerol, H2SO4, LacticAcid, SuccinicAcid, P4O10, HNO3, Denaturant, DAP, AmmoniumAcetate, AmmoniumSulfate, NaNO3, Oil, HMF, N2, NH3, O2, CH4, H2S, SO2, CO2, NO2, NO, CO, Glucose, Xylose, Sucrose, CaSO4, Mannose, Galactose, Arabinose, CellulaseNutrients, Extract, Acetate, Tar, CaO, Ash, NaOH, Lignin, SolubleLignin, GlucoseOligomer, GalactoseOligomer, MannoseOligomer, XyloseOligomer, ArabinoseOligomer, Z_mobilis, T_reesei, Biomass, Cellulose, Protein, Enzyme, Glucan, Xylan, Xylitol, Cellobiose, CSL, DenaturedEnzyme, Arabinan, Mannan, Galactan, WWTsludge, Cellulase])
-    >>> cs.cornstover_sys.show() # The complete biorefinery system
+    >>> cs.cornstover_sys.show() # The main biorefinery system
     System: cornstover_sys
-     path: (pretreatment_sys, fermentation_sys,
-            purification, S401, M601, WWTC,
-            R601, aerobic_digestion_sys, S604)
-     facilities: (M501, CWP, BT, CT, PWC, ADP, CIP_package,
-                  S301, S302, DAP_storage, CSL_storage,
-                  FT, blowdown_mixer)
+    ins...
+    [0] cornstover
+        phase: 'l', T: 298.15 K, P: 101325 Pa
+        flow (kmol/hr): Water     1.17e+03
+                        Sucrose   1.9
+                        Extract   68.5
+                        Acetate   25.4
+                        Ash       4.16e+03
+                        Lignin    87.3
+                        Protein   114
+                        ...
+    [1] denaturant
+        phase: 'l', T: 298.15 K, P: 101325 Pa
+        flow (kmol/hr): Denaturant  4.14
+    outs...
+    [0] ethanol
+        phase: 'l', T: 339.28 K, P: 101325 Pa
+        flow (kmol/hr): Water       9.84
+                        Ethanol     463
+                        Denaturant  4.14
     >>> cs.cornstover_tea.show() # The TEA object
-    CombinedTEA: cornstover_sys, Area700
-     NPV: -193,156 USD at 10.0% IRR
+    ellulosicEthanolTEA: cornstover_sys
+     NPV: -190,889 USD at 10.0% IRR
     >>> cs.flowsheet # The complete flowsheet
     <Flowsheet: cornstover>
-    >>> cs.R301.show() # Any unit operations and streams can be accessed through the module
-    SaccharificationAndCoFermentation: R301
+    >>> cs.R303.show() # Any unit operations and streams can be accessed through the module
+    SaccharificationAndCoFermentation: R303
     ins...
-    [0] d329  from  Mixer-M302
-        phase: 'l', T: 319.61 K, P: 101325 Pa
-        flow (kmol/hr): Water              1.92e+04
-                        Ethanol            49.9
-                        AceticAcid         21.5
-                        Furfural           0.327
-                        Glycerol           0.21
-                        H2SO4              20.9
-                        SuccinicAcid       0.409
-                        ...
-    [1] CSL2  from  ReversedSplitter-S302
-        phase: 'l', T: 298.15 K, P: 101325 Pa
-        flow (kmol/hr): CSL  22.6
-    [2] DAP2  from  ReversedSplitter-S301
-        phase: 'l', T: 298.15 K, P: 101325 Pa
-        flow (kmol/hr): DAP  0.779
-    outs...
-    [0] d330  to  Mixer-M304
-        phase: 'g', T: 305.15 K, P: 101325 Pa
-        flow (kmol/hr): Water         17.5
-                        Ethanol       4.53
-                        AceticAcid    0.0394
-                        Furfural      0.00191
-                        Glycerol      1.34e-07
-                        LacticAcid    1.14e-05
-                        SuccinicAcid  0.000737
-                        ...
-    [1] d331  to  Mixer-M401
-        phase: 'l', T: 305.15 K, P: 101325 Pa
-        flow (kmol/hr): Water              1.72e+04
-                        Ethanol            460
-                        AceticAcid         19.3
-                        Furfural           0.294
-                        Glycerol           1.84
-                        H2SO4              18.8
-                        LacticAcid         17.5
-                        ...
-    [2] d332  to  Mixer-M303
+    [0] slurry  from  ContinuousPresaccharification-R301
         phase: 'l', T: 321.15 K, P: 101325 Pa
-        flow (kmol/hr): Water              1.91e+03
-                        Ethanol            4.99
-                        AceticAcid         2.15
-                        Furfural           0.0327
-                        Glycerol           0.021
-                        H2SO4              2.09
-                        SuccinicAcid       0.0409
+        flow (kmol/hr): Water              1.9e+04
+                        AceticAcid         19.5
+                        Furfural           2.67
+                        AmmoniumSulfate    18.3
+                        HMF                2.45
+                        Glucose            19.9
+                        Xylose             112
+                        ...
+    [1] s23  from  SeedHoldTank-T301
+        phase: 'l', T: 305.15 K, P: 101325 Pa
+        flow (kmol/hr): Water              1.89e+03
+                        Ethanol            44.9
+                        AceticAcid         1.95
+                        Furfural           0.267
+                        Glycerol           0.189
+                        SuccinicAcid       0.368
+                        DAP                0.0825
+                        ...
+    [2] CSL2  from  MockSplitter-S302
+        phase: 'l', T: 298.15 K, P: 101325 Pa
+        flow (kmol/hr): CSL  28.9
+    [3] DAP2  from  MockSplitter-S301
+        phase: 'l', T: 298.15 K, P: 101325 Pa
+        flow (kmol/hr): DAP  1.04
+    outs...
+    [0] s24  to  Mixer-M304
+        phase: 'g', T: 305.15 K, P: 101325 Pa
+        flow (kmol/hr): Water         15.3
+                        Ethanol       3.95
+                        AceticAcid    0.0306
+                        Furfural      0.0134
+                        Glycerol      1.52e-07
+                        LacticAcid    9.36e-06
+                        SuccinicAcid  2.47e-08
+                        ...
+    [1] s25  to  Mixer-M401
+        phase: 'l', T: 305.15 K, P: 101325 Pa
+        flow (kmol/hr): Water              1.89e+04
+                        Ethanol            459
+                        AceticAcid         19.5
+                        Furfural           2.66
+                        Glycerol           1.85
+                        LacticAcid         18.4
+                        SuccinicAcid       3.61
+                        ...
+    [2] s20  to  SeedTrain-R302
+        phase: 'l', T: 321.15 K, P: 101325 Pa
+        flow (kmol/hr): Water              1.89e+03
+                        AceticAcid         1.95
+                        Furfural           0.267
+                        AmmoniumSulfate    1.83
+                        HMF                0.245
+                        Glucose            16.6
+                        Xylose             11.2
                         ...
 
 

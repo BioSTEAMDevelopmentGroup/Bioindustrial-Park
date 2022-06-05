@@ -8,6 +8,7 @@
 # for license details.
 
 import biosteam as bst
+from biosteam import main_flowsheet as main_f
 from . import (
     add_wwt_chemicals, create_wastewater_process, CHP as CHPunit, Skipped,
     get_COD_breakdown, update_product_prices,
@@ -55,8 +56,9 @@ def create_comparison_systems(info, functions, sys_dct={}):
     dct['chemicals'] = chemicals
     dct['_system_loaded'] = False
     module.load(**kwdct['load'])
-    exist_f = bst.main_flowsheet
     exist_sys_temp = dct[kwdct['system_name']]
+    exist_f = bst.Flowsheet.from_flowsheets('exist', (main_f,))
+    main_f.set_flowsheet(exist_f)
     exist_u = exist_f.unit
     exist_s = exist_f.stream
 
@@ -94,8 +96,10 @@ def create_comparison_systems(info, functions, sys_dct={}):
     ##### With the new wastewater treatment process #####
     dct['_system_loaded'] = False
     module.load(**kwdct['load'])
-    new_f = bst.main_flowsheet
     new_sys_temp = dct[kwdct['system_name']]
+
+    new_f = bst.Flowsheet.from_flowsheets('new', (main_f,))
+    main_f.set_flowsheet(new_f)
     new_u = new_f.unit
     new_s = new_f.stream
 
@@ -121,9 +125,10 @@ def create_comparison_systems(info, functions, sys_dct={}):
             except: pass # some outdated systems are the subsystem of another system
     else:
         ww_streams = get_streams(new_u, new_s, kwdct['ww_streams'])
-
+        
     new_sys_wwt = create_wastewater_process(
-        'new_sys_wwt', ins=ww_streams, process_ID=WWT_ID, **kwdct['create_wastewater_process'])
+        'new_sys_wwt', ins=ww_streams, process_ID=WWT_ID, flowsheet=new_f,
+        **kwdct['create_wastewater_process'])
 
     if kwdct['solids_streams']:
         solids = bst.Stream('solids')

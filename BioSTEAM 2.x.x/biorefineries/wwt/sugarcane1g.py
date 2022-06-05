@@ -38,10 +38,10 @@ def create_sc1g_comparison_systems(biodegradability=1): # will be multiplied by 
     CF_dct = {
         ##### Feeds #####
         'denaturant': ('Denaturant'),
-        'dryer_natural_gas': ('CH4',),
+        # 'dryer_natural_gas': ('CH4',), # used to be in the registry, but not any more
         'H3PO4': ('H3PO4',),
         'lime': ('CaO', 0.046), # CaO and water
-        'polymer': ('Polymer'),
+        'polymer': ('Polymer',),
         'sugarcane': ('Sugarcane',), # moisture content already adjusted
         ##### Co-products #####
         # 'Yeast': ('Yeast',), # no price considered, no GWP considered (probably used in fermentation)
@@ -129,5 +129,5 @@ if __name__ == '__main__':
         # include_baseline=False,
         # include_uncertainty=False,
         include_biodegradability=False, # biodegradability for 1G should be high
-        N_uncertainty=100,
+        N_uncertainty=1000,
         )

@@ -501,9 +501,9 @@ def create_simultaneous_saccharification_and_cofermentation_system(
                         price=price['CSL'])
         
         DAP_storage = units.DAPStorageTank('DAP_storage', DAP)
-        S301 = bst.FakeSplitter('S301', DAP_storage-0, outs=(DAP1, DAP2))
+        S301 = bst.MockSplitter('S301', DAP_storage-0, outs=(DAP1, DAP2))
         CSL_storage = units.CSLStorageTank('CSL_storage', CSL)
-        S302 = bst.FakeSplitter('S302', CSL_storage-0, outs=(CSL1, CSL2))
+        S302 = bst.MockSplitter('S302', CSL_storage-0, outs=(CSL1, CSL2))
         nutrients_1 = (CSL1, DAP1)
         nutrients_2 = (CSL2, DAP2)
     else:
@@ -606,9 +606,9 @@ def create_integrated_bioprocess_saccharification_and_cofermentation_system(
                         price=price['CSL'])
         
         DAP_storage = units.DAPStorageTank('DAP_storage', DAP)
-        S301 = bst.FakeSplitter('S301', DAP_storage-0, outs=(DAP1, DAP2))
+        S301 = bst.MockSplitter('S301', DAP_storage-0, outs=(DAP1, DAP2))
         CSL_storage = units.CSLStorageTank('CSL_storage', CSL)
-        S302 = bst.FakeSplitter('S302', CSL_storage-0, outs=(CSL1, CSL2))
+        S302 = bst.MockSplitter('S302', CSL_storage-0, outs=(CSL1, CSL2))
         nutrients_1 = (CSL1, DAP1)
         nutrients_2 = (CSL2, DAP2)
     else:
@@ -707,9 +707,9 @@ def create_cofermentation_system(
                         units='kg/hr',
                         price=price['CSL'])
         DAP_storage = units.DAPStorageTank('DAP_storage', DAP)
-        S301 = bst.FakeSplitter('S301', DAP_storage-0, outs=(DAP1, DAP2))
+        S301 = bst.MockSplitter('S301', DAP_storage-0, outs=(DAP1, DAP2))
         CSL_storage = units.CSLStorageTank('CSL_storage', CSL)
-        S302 = bst.FakeSplitter('S302', CSL_storage-0, outs=(CSL1, CSL2))
+        S302 = bst.MockSplitter('S302', CSL_storage-0, outs=(CSL1, CSL2))
         nutrients_1 = (CSL1, DAP1)
         nutrients_2 = (CSL2, DAP2)
     else:
