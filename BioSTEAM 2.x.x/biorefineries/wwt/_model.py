@@ -13,7 +13,7 @@ from math import ceil
 from biosteam import Stream, Metric, PowerUtility, WastewaterSystemCost, ReverseOsmosis
 from biosteam.utils import ignore_docking_warnings
 from chaospy import distributions as shape
-from . import results_path, get_combustion_energy, compute_stream_COD as get_COD
+from . import results_path, get_combustion_energy, compute_stream_COD as get_COD, prices
 
 __all__ = (
     'get_default_distribution', 'Setter', 'AttrGetter', 'copy_samples',
@@ -140,7 +140,8 @@ def add_biodiesel_parameters(model, model_dct, f, u, s, get_obj, get_rxn, param)
     oil_extraction_specification = OilExtractionSpecification(
             sys, [feedstock], isplit_a, isplit_b, model_dct['isplit_efficiency_is_reversed']
         )
-    b = oil_extraction_specification.oil_content or 0.05
+    b = oil_extraction_specification.oil_content
+    b = 0.05 if isinstance(b, bool) else b
     D = get_default_distribution('uniform', b, lb=0, ub=1)
     @param(name='Feedstock oil content', element=oil_extraction_specification,
            units='dry mass', kind='coupled', baseline=b, distribution=D)
@@ -167,28 +168,30 @@ def add_biodiesel_parameters(model, model_dct, f, u, s, get_obj, get_rxn, param)
     # Oil retained in the bagasse after crushing,
     # not using the range in the biorefinery as the baseline is 0.6 and
     # the distribution is uniform, 0.6-0.9
-    b = oil_extraction_specification.crushing_mill_oil_recovery or 0.6
+    b = 0.6 # oil_extraction_specification.crushing_mill_oil_recovery default is somehow 0.4
     D = get_default_distribution('uniform', b, lb=0, ub=1)
     @param(name='Crushing mill oil recovery', element=oil_extraction_specification,
            units='', kind='coupled', baseline=b, distribution=D)
     def set_crushing_mill_oil_recovery(i):
         oil_extraction_specification.load_crushing_mill_oil_recovery(i)
     
-    # Oil recovery after enzymatic hydrolysis (i.e., saccharification),
-    # not using the range in the biorefinery as the baseline is 0.7 and
-    # the distribution is uniform, 0.7-0.9
-    b = oil_extraction_specification.saccharification_oil_recovery or 0.7
-    D = get_default_distribution('uniform', b, lb=0, ub=1)
-    @param(name='EH oil recovery', element=oil_extraction_specification,
-           units='', kind='coupled', baseline=b, distribution=D)
-    def set_EH_oil_recovery(i):
-        oil_extraction_specification.load_saccharification_oil_recovery(i)
+    if model_dct['is2G']:
+        # Oil recovery after enzymatic hydrolysis (i.e., saccharification),
+        # not using the range in the biorefinery as the baseline is 0.7 and
+        # the distribution is uniform, 0.7-0.9
+        b = oil_extraction_specification.saccharification_oil_recovery
+        if b != 0.7: raise RuntimeError()
+        D = get_default_distribution('uniform', b, lb=0, ub=1)
+        @param(name='EH oil recovery', element=oil_extraction_specification,
+               units='', kind='coupled', baseline=b, distribution=D)
+        def set_EH_oil_recovery(i):
+            oil_extraction_specification.load_saccharification_oil_recovery(i)
 
     # Hydrolysis
     fermentor = get_obj(u, 'fermentor')
     rxn = get_rxn(fermentor, 'FERM oil-to-FFA')
     b = rxn.X
-    D = get_default_distribution('triangle', b)
+    D = get_default_distribution('uniform', b)
     @param(name='FERM oil-to-FFA', element=fermentor, kind='coupled', units='-',
            baseline=b, distribution=D)
     def set_FERM_oil_to_FFA(X):
@@ -515,6 +518,36 @@ def add_new_wwt_parameters(model, model_dct, f, u, s, get_obj, get_rxn, param):
         def set_AeF_HLR(HLR):
             AeF.HLR = HLR
 
+    # Biogas upgrading parameters
+    Upgrading = getattr(u, 'Upgrading')
+    b = Upgrading.loss
+    D = get_default_distribution('uniform', b, lb=0)
+    @param(name='Biogas upgrading loss', element=Upgrading, kind='coupled', units='',
+           baseline=b, distribution=D)
+    def set_upgrading_loss(loss):
+        Upgrading.loss = loss
+        
+    b = Upgrading.unit_upgrading_cost
+    D = get_default_distribution('uniform', b)
+    @param(name='Unit upgrading cost', element=Upgrading, kind='cost', units='',
+           baseline=b, distribution=D)
+    def set_upgrading_cost(cost):
+        Upgrading.unit_upgrading_cost = cost
+
+    b = prices['RIN']
+    D = get_default_distribution('uniform', b)
+    @param(name='RIN credit', element=Upgrading, kind='cost', units='',
+           baseline=b, distribution=D)
+    def set_RIN_price(price):
+        Upgrading.RIN_incentive = price
+        
+    b = Upgrading.unit_upgrading_GWP
+    D = get_default_distribution('uniform', b)
+    @param(name='Unit upgrading GWP', element=Upgrading, kind='cost', units='',
+           baseline=b, distribution=D)
+    def set_upgrading_GWP(GWP):
+        Upgrading.unit_upgrading_GWP = GWP
+
     return model
 
 
@@ -574,9 +607,10 @@ def add_metrics(model, model_dct, f, u, s, get_obj):
     X = model_dct['wwt_ID']
     Caching = u.search('Caching')
 
-    def get_MPSP():
+    def get_MPSP(with_RIN=False):
+        RIN_suffix = '' if not with_RIN else '_RIN'
         cache_dct = Caching.cache_dct
-        cache_dct['MPSP'] = price = tea.solve_price(product)*factor
+        cache_dct[f'MPSP{RIN_suffix}'] = price = tea.solve_price(product)*factor
         # for stream in sys.products:
         #     if stream.price:
         #         cache_dct[f'{stream.ID} price'] = stream.price
@@ -585,21 +619,34 @@ def add_metrics(model, model_dct, f, u, s, get_obj):
         sale_dct = {}
         for stream in sys.products:
             if stream.price:
-                cache_dct[f'{stream.ID} price'] = stream.price
-                sale_dct[f'{stream.ID} ratio'] = stream.cost
-        cache_dct[f'{product} price'] = price / factor
-        cache_dct['MPSP'] = price
+                cache_dct[f'{stream.ID} price{RIN_suffix}'] = stream.price
+                sale_dct[f'{stream.ID} ratio{RIN_suffix}'] = stream.cost
+        cache_dct[f'{product} price{RIN_suffix}'] = price / factor
+        cache_dct[f'MPSP{RIN_suffix}'] = price
         sales = sum(v for v in sale_dct.values())
         cache_dct.update({k:v/sales for k, v in sale_dct.items()})
 
         return price
 
-    def get_GWP(product_ratio=None):
-        cache_dct = Caching.cache_dct
-        product_ratio = product_ratio or cache_dct[f'{product.ID} ratio']
-        GWP = cache_dct['GWP'] = \
+    def get_GWP(product_ratio=None, with_RIN=False):
+        RIN_suffix = '' if not with_RIN else '_RIN'
+        cache_dct = Caching.cache_dct      
+        product_ratio = product_ratio or cache_dct[f'{product.ID} ratio{RIN_suffix}']
+        GWP = cache_dct[f'GWP{RIN_suffix}'] = \
             sys.get_net_impact('GWP')/sys.operating_hours * factor * product_ratio/product.F_mass
         return GWP
+
+    Upgrading = u.search('Upgrading') # biogas upgrading unit, new WWT only
+    if Upgrading:
+        resimulate_units = [Upgrading, *Upgrading.get_downstream_units()]
+        def get_MPSP_w_RIN():
+            Upgrading.ratio = 1
+            for u in resimulate_units: u.simulate()
+            MPSP = get_MPSP(with_RIN=True)
+            get_GWP(with_RIN=True)
+            Upgrading.ratio = 0
+            for u in resimulate_units: u.simulate()
+            return MPSP
 
     if ww: # product price without wastewater treatment, IRR sometimes has two solutions so use price
         def get_product_price_no_ww():
@@ -725,6 +772,13 @@ def add_metrics(model, model_dct, f, u, s, get_obj):
                 Metric('COD removal', lambda: Caching.cache_dct['COD removal'], ''),
                 Metric('COD load', lambda: Caching.cache_dct['COD load'], 'kg/hr'),
                 ]
+            
+            if Upgrading:
+                metrics0 = [
+                *metrics0,
+                Metric('MPSP w RIN', get_MPSP_w_RIN, f'$/{gal_or_kg}'),
+                Metric('GWP w RIN', lambda: Caching.cache_dct['GWP_RIN'], f'kg CO2/{gal_or_kg}'),
+                    ]
 
     # Summary metrics
     product_mass = product.F_mass

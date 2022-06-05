@@ -508,6 +508,16 @@ def rename_storage_units(sys, storage):
 _lb_per_kg = 0.4536 # auom('lb').conversion_factor('kg')
 _GDP_2007to2016 = 1.160
 
+# Renewable natural gas, RIN D3, average of 2015 (first year with year-round data)-2021
+# https://www.epa.gov/fuels-registration-reporting-and-compliance-help/rin-trades-and-price-information
+# D3 designation based on entry Q of the approved pathways
+# https://www.epa.gov/renewable-fuel-standard-program/approved-pathways-renewable-fuel
+RIN_per_gal = 1.843 # $/liquid gal
+LNG_gal_to_Btu = 84820 # HHV, https://h2tools.org/hyarc/calculator-tools/lower-and-higher-heating-values-fuels
+RIN_per_Btu = RIN_per_gal / LNG_gal_to_Btu # $/Btu
+RIN_g_per_Btu = 0.0191 # HHV, https://h2tools.org/hyarc/calculator-tools/lower-and-higher-heating-values-fuels
+RIN_price = RIN_per_Btu / RIN_g_per_Btu * 1e3 # $/kg
+
 # Harmonized prices, note that the cost year is different among biorefineries
 # References
 # ----------
@@ -533,6 +543,7 @@ prices = { # $/kg unless otherwise noted
     'ethanol': 0.789, # $/kg, lipidcane biorefinery
     'lactic_acid': 1.9, # $/kg, lactic acid biorefinery
     'naocl': 0.14, # $/L
+    'RIN': RIN_price, # in addition to the natural gas price
     'wastewater': -0.02, # average of the -0.03 from ref [1] and -0.01 estimated based on brewery data, negative value for cost of product
 #    'caustics': 0.2627, # lactic acid biorefinery, price['NaOH]/2 as the caustic is 50% NaOH/water
 #    'polymer': 2.6282 / _lb_per_kg / _GDP_2007to2016, # ref [2]

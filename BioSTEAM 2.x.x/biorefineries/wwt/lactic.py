@@ -134,8 +134,8 @@ if __name__ == '__main__':
     exist_model, new_model = evaluate_la_models(
         # include_baseline=False,
         # include_uncertainty=False,
-        # include_biodegradability=False,
+        include_biodegradability=False,
         N_uncertainty=100,
-        N_biodegradability=10,
+        # N_biodegradability=10,
         # biodegradability=(0.5, 1,),
         )
