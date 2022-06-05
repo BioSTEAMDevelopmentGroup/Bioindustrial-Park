@@ -388,6 +388,63 @@ Xylitol = chemical_database('Xylitol', phase='l', Hf=-243145*_cal2joule, Hfus=-1
 
 
 
+# Esters - Ethyl
+
+EHH = chemical_database(ID='Ethyl 6-hydroxyhexanoate', search_ID='ethyl 6-hydroxyhexanoate')
+EHH.Tb = 213.4 + 273.15
+EHH.Hvap.add_method(lambda: 52.31e3)
+EHH.V.l.add_model(lambda: 161.9e-6)
+EHH.Psat.add_method(lambda: 4.85293421)
+
+EDHH = chemical_copied('Ethyl 3,5-dihydroxyhexanoate', EHH)
+
+Octanol = chemical_database('Octanol')
+# Esters - Octyl
+OctylyHexanoate = chemical_database(ID='Octyl hexanoate', search_ID='4887-30-3') # used for missing properties
+
+OctylHydroxyHexanoate = chemical_defined('Octyl_5_hydroxyhexanoate', phase='l', formula='C14H28O3', 
+                       # Hf=-233200*_cal2joule,
+                       )
+OctylHydroxyHexanoate.Dortmund.update({1:2, 2:10, 22:1, 14:1})
+OctylHydroxyHexanoate.UNIFAC.update({1:2, 2:10, 22:1, 14:1})
+
+OctylHydroxyHexanoate.Tb = 400. + 273.15 # assumed
+OctylHydroxyHexanoate.Tm = 50. + 273.15 # assumed
+
+for i in OctylHydroxyHexanoate.get_missing_properties():
+    if not i in OctylyHexanoate.get_missing_properties():
+        try:
+            OctylHydroxyHexanoate.copy_models_from(OctylyHexanoate, [i])
+        except:
+            pass
+
+
+OctylDihydroxyHexanoate = chemical_defined('Octyl_3_5_dihydroxyhexanoate', phase='l', formula='C14H28O4', 
+                       # Hf=0,
+                       )
+OctylDihydroxyHexanoate.Dortmund.update({1:2, 2:10, 22:1, 14:2})
+OctylDihydroxyHexanoate.UNIFAC.update({1:2, 2:10, 22:1, 14:2})
+OctylDihydroxyHexanoate.Tb = 400. + 273.15 # assumed
+OctylDihydroxyHexanoate.Tm = 50. + 273.15 # assumed
+
+for i in OctylDihydroxyHexanoate.get_missing_properties():
+    if not i in OctylyHexanoate.get_missing_properties():
+        try:
+            OctylDihydroxyHexanoate.copy_models_from(OctylyHexanoate, [i])
+        except:
+            pass
+
+TALHydrogenationDegradationProducts = chemical_defined('TALHydrogenationDegradationProducts', 
+                                                       phase='s', 
+                                                       formula='C6H6O3',
+                                                       
+                                                       )
+for i in TALHydrogenationDegradationProducts.get_missing_properties():
+    if not i in TAL.get_missing_properties():
+        try:
+            TALHydrogenationDegradationProducts.copy_models_from(TAL, [i])
+        except:
+            pass
 # =============================================================================
 # Insoluble organics
 # =============================================================================
