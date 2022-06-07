@@ -133,7 +133,7 @@ if __name__ == '__main__':
         include_baseline=False,
         include_uncertainty=False,
         # include_biodegradability=False,
-        # N_uncertainty=1000,
-        N_biodegradability=100,
+        # N_uncertainty=100,
+        # N_biodegradability=10,
         # biodegradability=(0.5, 1,),
         )

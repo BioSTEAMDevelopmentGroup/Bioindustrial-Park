@@ -85,7 +85,7 @@ def simulate_oc2g_systems(**sys_kwdct):
 
 def create_oc2g_comparison_models():
     exist_sys, new_sys = create_oc2g_comparison_systems()
-    
+
     ##### Existing system #####
     exist_model_dct = {
         'abbr': info['abbr'],
@@ -144,9 +144,9 @@ if __name__ == '__main__':
     # exist_model, new_model = create_oc2g_comparison_models()
     exist_model, new_model = evaluate_oc2g_models(
         # include_baseline=False,
-        include_uncertainty=False,
+        # include_uncertainty=False,
         include_biodegradability=False,
-        # N_uncertainty=1000,
-        N_biodegradability=100,
+        N_uncertainty=100,
+        # N_biodegradability=10,
         # biodegradability=(0.5, 1,),
         )

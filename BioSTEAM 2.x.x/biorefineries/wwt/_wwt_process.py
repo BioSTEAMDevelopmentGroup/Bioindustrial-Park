@@ -161,24 +161,42 @@ class Skipped(Unit):
     Copy ins[`main_in`] as ins[`main_out`].
     Can be also used to calculate the cost of wastewater treatment
     by clearing all WWT-related units and streams.
+
+    Parameters
+    ----------
+    main_in : int
+        Which influent will be copied to `main_out`.
+    main_out : int
+        Which effluent will be copied from `main_in`.
+    wwt_units : Iterable
+        Collection of units whose costs will be cleared when `clear_wwt` is True.
+        ins and outs of the units will be emptied if its price isn't 0.
+    wwt_streams : Iterable
+        Collection of streams which will be emptied when `clear_wwt` is True.
+        Usually should at least includes the biogas and sludge stream.
+    clear_wwt : bool
+        Whether to clear the costs of and select streams associated with
+        `wwt_units`.
     '''
     _ins_size_is_fixed = False
     _outs_size_is_fixed = False
     cache_dct = {} # to save some computation effort
 
     def __init__(self, ID='', ins=None, outs=(), thermo=None,
-                 main_in=0, main_out=0, wwt_units=[], clear_cost=False):
+                 main_in=0, main_out=0, wwt_units=[], wwt_streams=[],
+                 clear_wwt=False):
         Unit.__init__(self, ID, ins, outs, thermo)
         self.main_in = main_in
         self.main_out = main_out
         self.wwt_units = wwt_units
-        self.clear_cost = clear_cost
+        self.wwt_streams = wwt_streams
+        self.clear_wwt = clear_wwt
 
     def _run(self):
         self.outs[self.main_out].copy_like(self.ins[self.main_in])
 
     def _cost(self):
-        if not self.clear_cost: return
+        if not self.clear_wwt: return
         for u in self.wwt_units:
             u.baseline_purchase_costs.clear()
             u.installed_costs.clear()
@@ -186,6 +204,8 @@ class Skipped(Unit):
             u.power_utility(0)
             for s in u.ins+u.outs:
                 if s.price: s.empty()
+            u._utility_cost = 0.
+        for s in self.wwt_streams: s.empty()
 
 
 class CHP(Unit):
@@ -247,7 +267,7 @@ class BiogasUpgrading(Unit):
 
     References
     ----------
-    [1] Yang et al., Cost and Life-Cycle Greenhouse Gas Implications of 
+    [1] Yang et al., Cost and Life-Cycle Greenhouse Gas Implications of
     Integrating Biogas Upgrading and Carbon Capture Technologies in Cellulosic Biorefineries.
     Environ. Sci. Technol. 2020.
     https://doi.org/10.1021/acs.est.0c02816.
@@ -258,7 +278,7 @@ class BiogasUpgrading(Unit):
     https://doi.org/10.1021/acs.est.2c00093.
 
     '''
-    
+
     # Default upgrading cost is calculated by
     # 0.18*0.914/35.3147*1055.056
     # where $0.18/NM is from ref 1,
@@ -267,7 +287,7 @@ class BiogasUpgrading(Unit):
     # 1055.056 MJ/MMBtu is auom('MMBtu').conversion_factor('MJ')
     # This cost is close to the general range of $2-4 for a
     # 3.5 million m3/yr biogas plant in ref 2.
-    
+
     # Default upgrading GWP is from calculated by
     # 8.67/1e3*1055.056
     # where 8.67 g CO2/MJ is the average of upgrading GWP (5, 8, 13)
@@ -275,7 +295,7 @@ class BiogasUpgrading(Unit):
 
     _N_ins = 2
     _N_outs = 2
-    
+
     RIN_incentive = prices['RIN']
     # Credits from the displaced fossil natural gas
     FNG_price = bst.stream_utility_prices['Natural gas'] # $/kg
@@ -283,7 +303,7 @@ class BiogasUpgrading(Unit):
     # FNG_CF = GWP_CFs['CH4'] - 1/16.04246*44.0095 # do not subtract the direct emission
 
     def __init__(self, ID='', ins=None, outs=(), thermo=None,
-                 ratio=0, loss=0.05, 
+                 ratio=0, loss=0.05,
                  unit_upgrading_cost=4.92,
                  unit_upgrading_GWP=9.15):
         Unit.__init__(self, ID, ins, outs, thermo)
@@ -295,16 +315,16 @@ class BiogasUpgrading(Unit):
 
     def _run(self):
         biogas, foo = self.ins
-        rng, remained = self.outs
-        rng.empty()
-        rng.imass['CH4'] = biogas.imass['CH4'] * self.ratio
-        remained.mass = biogas.mass - rng.mass # assume impurities left in the unused biogas
-        rng.mass *= (1 - self.loss) # lost methane not included in the unused biogas
-        rng.price = self.FNG_price + self.RIN_incentive
-        rng.characterization_factors['GWP'] = self.FNG_CF
-        
+        RNG, remained = self.outs
+        RNG.empty()
+        RNG.imass['CH4'] = biogas.imass['CH4'] * self.ratio
+        remained.mass = biogas.mass - RNG.mass # assume impurities left in the unused biogas
+        RNG.mass *= (1 - self.loss) # lost methane not included in the unused biogas
+        RNG.price = self.FNG_price + self.RIN_incentive
+        RNG.characterization_factors['GWP'] = self.FNG_CF
+
         # Upgrading cost/GWP
-        foo.copy_like(rng)
+        foo.copy_like(RNG)
         if foo.F_mass == 0: foo.imass['CH4'] = 1
         foo.price = self.unit_upgrading_cost/1055.056*(foo.HHV/1e3)/foo.F_mass # HHV in kJ/hr
         foo.characterization_factors['GWP'] = self.unit_upgrading_GWP/1055.056*(foo.HHV/1e3)/foo.F_mass
@@ -318,7 +338,7 @@ class BiogasUpgrading(Unit):
 
 @bst.SystemFactory(
     ID='wastewater_sys',
-    outs=[dict(ID='rng'), # renewable natural gas
+    outs=[dict(ID='RNG'), # renewable natural gas
           dict(ID='biogas'),
           dict(ID='sludge'),
           dict(ID='recycled_water'),
@@ -332,7 +352,7 @@ def create_wastewater_process(ins, outs, process_ID='6', flowsheet=None,
     if flowsheet:
         bst.main_flowsheet.set_flowsheet(flowsheet)
     wwt_streams = ins
-    rng, biogas, sludge, recycled_water, brine = outs
+    RNG, biogas, sludge, recycled_water, brine = outs
 
     ######################## Units ########################
     # Mix waste liquids for treatment
@@ -341,7 +361,7 @@ def create_wastewater_process(ins, outs, process_ID='6', flowsheet=None,
 
     RX01_outs = (f'biogas_R{X}01', 'IC_eff', 'IC_sludge')
     if skip_IC:
-        RX01 = Skipped(f'R{X}01', ins=MX01-0, outs=RX01_outs, main_in=0, main_out=1) # outs[0] is the gas phase 
+        RX01 = Skipped(f'R{X}01', ins=MX01-0, outs=RX01_outs, main_in=0, main_out=1) # outs[0] is the gas phase
     else:
         RX01 = InternalCirculationRx(f'R{X}01', ins=MX01-0, outs=RX01_outs,
                                      T=35+273.15, **IC_kwargs)
@@ -385,7 +405,7 @@ def create_wastewater_process(ins, outs, process_ID='6', flowsheet=None,
                               include_pump_building_cost=False,
                               include_excavation_cost=False,
                               **AF_kwargs)
-   
+
     # # This isn't working, think of a better way to deal with it
     # _RX03_cost = RX03._cost
     # def adjust_heat_loss():
@@ -399,7 +419,7 @@ def create_wastewater_process(ins, outs, process_ID='6', flowsheet=None,
     # RX03._cost = adjust_heat_loss
 
     MX02 = bst.units.Mixer(f'M{X}02', ins=(RX01-0, RX02-0, RX03-0))
-    BiogasUpgrading('Upgrading', ins=(MX02-0, 'foo'), outs=(rng, biogas))
+    BiogasUpgrading('Upgrading', ins=(MX02-0, 'foo'), outs=(RNG, biogas))
 
     # Recycled the majority of sludge (96%) to the aerobic filter,
     # 96% from the membrane bioreactor in ref [2]
@@ -424,4 +444,5 @@ def create_wastewater_process(ins, outs, process_ID='6', flowsheet=None,
 
     # A process specification for wastewater treatment cost calculation
     Skipped('Caching', ins=SX04-1, outs=brine, main_in=0, main_out=0,
-            wwt_units=[u for u in bst.main_flowsheet.unit if (u.ID[1:1+len(X)]==X)])
+            wwt_units=[u for u in bst.main_flowsheet.unit if (u.ID[1:1+len(X)]==X)],
+            wwt_streams=[RNG, biogas, sludge])

@@ -129,5 +129,5 @@ if __name__ == '__main__':
         # include_baseline=False,
         # include_uncertainty=False,
         include_biodegradability=False, # biodegradability for 1G should be high
-        N_uncertainty=1000,
+        N_uncertainty=100,
         )
