@@ -534,19 +534,19 @@ def add_new_wwt_parameters(model, model_dct, f, u, s, get_obj, get_rxn, param):
     def set_upgrading_cost(cost):
         Upgrading.unit_upgrading_cost = cost
 
-    b = prices['RIN']
-    D = get_default_distribution('uniform', b)
-    @param(name='RIN credit', element=Upgrading, kind='cost', units='',
-           baseline=b, distribution=D)
-    def set_RIN_price(price):
-        Upgrading.RIN_incentive = price
-        
     b = Upgrading.unit_upgrading_GWP
     D = get_default_distribution('uniform', b)
     @param(name='Unit upgrading GWP', element=Upgrading, kind='cost', units='',
            baseline=b, distribution=D)
     def set_upgrading_GWP(GWP):
         Upgrading.unit_upgrading_GWP = GWP
+
+    b = prices['RIN']
+    D = get_default_distribution('uniform', b)
+    @param(name='RIN credit', element=Upgrading, kind='cost', units='$/gal',
+           baseline=b, distribution=D)
+    def set_RIN_price(price):
+        Upgrading.RIN_incentive = price
 
     return model
 
@@ -611,10 +611,6 @@ def add_metrics(model, model_dct, f, u, s, get_obj):
         RIN_suffix = '' if not with_RIN else '_RIN'
         cache_dct = Caching.cache_dct
         cache_dct[f'MPSP{RIN_suffix}'] = price = tea.solve_price(product)*factor
-        # for stream in sys.products:
-        #     if stream.price:
-        #         cache_dct[f'{stream.ID} price'] = stream.price
-        # cache_dct[f'{product} price'] = price / factor
 
         sale_dct = {}
         for stream in sys.products:
@@ -758,7 +754,14 @@ def add_metrics(model, model_dct, f, u, s, get_obj):
 
                 return MPSP_no_wwt
 
-            metrics0 = [
+            if Upgrading:
+                metrics0 = [
+                Metric('MPSP w RIN', get_MPSP_w_RIN, f'$/{gal_or_kg}'),
+                Metric('GWP w RIN', lambda: Caching.cache_dct['GWP_RIN'], f'kg CO2/{gal_or_kg}'),
+                ]
+            else: metrics0 = []
+
+            metrics0.extend([
                 Metric('MPSP no WWT', get_product_price_no_ww, f'$/{gal_or_kg}'),
                 Metric('GWP no WWT', lambda: Caching.cache_dct['GWP no WWT'], f'kg CO2/{gal_or_kg}'),
                 Metric('WW price', lambda: Caching.cache_dct['WW price'], '¢/kg'),
@@ -771,14 +774,7 @@ def add_metrics(model, model_dct, f, u, s, get_obj):
                 Metric('COD out', lambda: Caching.cache_dct['COD out'], 'mg/L'),
                 Metric('COD removal', lambda: Caching.cache_dct['COD removal'], ''),
                 Metric('COD load', lambda: Caching.cache_dct['COD load'], 'kg/hr'),
-                ]
-            
-            if Upgrading:
-                metrics0 = [
-                *metrics0,
-                Metric('MPSP w RIN', get_MPSP_w_RIN, f'$/{gal_or_kg}'),
-                Metric('GWP w RIN', lambda: Caching.cache_dct['GWP_RIN'], f'kg CO2/{gal_or_kg}'),
-                    ]
+                ])
 
     # Summary metrics
     product_mass = product.F_mass
@@ -1009,8 +1005,8 @@ def evaluate_models(
 
 def summarize_baselines(names=None, dir_path=None):
     dir_path = dir_path or os.path.join(results_path, 'baselines')
-    MPSP_exist, MPSP_new, MPSP_no_WWT = [], [], []
-    GWP_exist, GWP_new, GWP_no_WWT = [], [], []
+    MPSP_exist, MPSP_new, MPSP_RIN, MPSP_no_WWT = [], [], [], []
+    GWP_exist, GWP_new, GWP_RIN, GWP_no_WWT = [], [], [], []
     CAPEX_WWT_exist, CAPEX_WWT_new = [], []
     electricity_WWT_exist, electricity_WWT_new = [], []
 
@@ -1025,12 +1021,14 @@ def summarize_baselines(names=None, dir_path=None):
         except:
             per = 'kg'
             MPSP_exist.append(get_val('exist', f'MPSP [$/{per}]'))
-        MPSP_no_WWT.append(get_val('new', f'MPSP no WWT [$/{per}]'))
         MPSP_new.append(get_val('new', f'MPSP [$/{per}]'))
+        MPSP_RIN.append(get_val('new', f'MPSP w RIN [$/{per}]'))
+        MPSP_no_WWT.append(get_val('new', f'MPSP no WWT [$/{per}]'))
 
         GWP_exist.append(get_val('exist', f'GWP [kg CO2/{per}]'))
-        GWP_no_WWT.append(get_val('new', f'GWP no WWT [kg CO2/{per}]'))
         GWP_new.append(get_val('new', f'GWP [kg CO2/{per}]'))
+        GWP_RIN.append(get_val('new', f'GWP w RIN [kg CO2/{per}]'))
+        GWP_no_WWT.append(get_val('new', f'GWP no WWT [kg CO2/{per}]'))
 
         CAPEX_WWT_exist.append(get_val('exist', 'WWT CAPEX [MM$]'))
         CAPEX_WWT_new.append(get_val('new', 'WWT CAPEX [MM$]'))
@@ -1040,28 +1038,32 @@ def summarize_baselines(names=None, dir_path=None):
 
     df_all = pd.DataFrame({
         'MPSP_exist': MPSP_exist,
-        'MPSP_no_WWT': MPSP_no_WWT,
         'MPSP_new': MPSP_new,
+        'MPSP_RIN': MPSP_RIN,
+        'MPSP_no_WWT': MPSP_no_WWT,
         })
-    df_all['MPSP_reduction'] = (df_all.MPSP_exist-df_all.MPSP_new)/df_all.MPSP_exist
+    df_all['MPSP_new_frac_reduction'] = (df_all.MPSP_exist-df_all.MPSP_new)/df_all.MPSP_exist
+    df_all['MPSP_RIN_frac_reduction'] = (df_all.MPSP_exist-df_all.MPSP_RIN)/df_all.MPSP_exist
 
     df_all['GWP_exist'] = GWP_exist
-    df_all['GWP_no_WWT'] = GWP_no_WWT
     df_all['GWP_new'] = GWP_new
-    df_all['GWP_reduction'] = (df_all.GWP_exist-df_all.GWP_new)/df_all.GWP_exist
+    df_all['GWP_RIN'] = GWP_RIN
+    df_all['GWP_no_WWT'] = GWP_no_WWT
+    df_all['GWP_new_frac_reduction'] = (df_all.GWP_exist-df_all.GWP_new)/df_all.GWP_exist
+    df_all['GWP_RIN_frac_reduction'] = (df_all.GWP_exist-df_all.GWP_RIN)/df_all.GWP_exist
 
     df_all['CAPEX_WWT_exist'] = CAPEX_WWT_exist
     df_all['CAPEX_WWT_new'] = CAPEX_WWT_new
-    df_all['CAPEX_reduction'] = (df_all.CAPEX_WWT_exist-df_all.CAPEX_WWT_new)/df_all.CAPEX_WWT_exist
+    df_all['CAPEX_frac_reduction'] = (df_all.CAPEX_WWT_exist-df_all.CAPEX_WWT_new)/df_all.CAPEX_WWT_exist
 
     df_all['electricity_WWT_exist'] = electricity_WWT_exist
     df_all['electricity_WWT_new'] = electricity_WWT_new
-    df_all['electricity_WWT_reduction'] = \
+    df_all['electricity_WWT_frac_reduction'] = \
         (df_all.electricity_WWT_exist-df_all.electricity_WWT_new)/df_all.electricity_WWT_exist
 
     df_all['biorefinery'] = names
     df_all.set_index('biorefinery', inplace=True)
-    summary_path = os.path.join(dir_path, 'summary.xlsx')
+    summary_path = os.path.join(dir_path, 'summary_baseline.xlsx')
     df_all.to_excel(summary_path)
 
 
@@ -1117,7 +1119,7 @@ def summarize_biodegradabilities(lower=0.05, mid=0.5, upper=0.95,
         df.sort_index(level=1, inplace=True)
         df.index = new_index
 
-    path = os.path.join(dir_path, 'summary.xlsx')
+    path = os.path.join(dir_path, 'summary_biodegradabilities.xlsx')
     with pd.ExcelWriter(path) as writer:
         MPSP_df.to_excel(writer, sheet_name='MPSP')
         GWP_df.to_excel(writer, sheet_name='GWP')

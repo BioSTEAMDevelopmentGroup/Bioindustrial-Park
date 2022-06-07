@@ -7,8 +7,9 @@
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
 # for license details.
 
-from biorefineries.wwt import summarize_baselines
+from biorefineries.wwt import summarize_baselines, summarize_biodegradabilities
 
 
 if __name__ == '__main__':
     summarize_baselines()
+    summarize_biodegradabilities()
