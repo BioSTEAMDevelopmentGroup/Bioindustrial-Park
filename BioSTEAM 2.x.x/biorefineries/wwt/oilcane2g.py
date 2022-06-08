@@ -143,10 +143,10 @@ if __name__ == '__main__':
     # exist_sys, new_sys = simulate_oc2g_systems(biodegradability=1)
     # exist_model, new_model = create_oc2g_comparison_models()
     exist_model, new_model = evaluate_oc2g_models(
-        include_baseline=False,
-        include_uncertainty=False,
-        # include_biodegradability=False,
-        # N_uncertainty=1000,
-        N_biodegradability=100,
-        # biodegradability=(0.5, 1,),
+        include_baseline=True,
+        include_uncertainty=True,
+        include_BMP=True,
+        N_uncertainty=100,
+        # N_BMP=10,
+        # BMPs=(0.5, 0.9499,), # allow for minor error
         )

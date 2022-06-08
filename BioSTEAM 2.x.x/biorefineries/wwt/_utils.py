@@ -7,6 +7,31 @@
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
 # for license details.
 
+# References
+# ----------
+# [1] Kontos, G. A. Advanced Anaerobic Treatment for Energy Recovery and Improved Process Economics
+# in the Management of Biorefinery Wastewaters.
+# M.S. Thesis, University of Illinois Urbana-Champaign, Urbana, IL, 2021.
+
+# [2] Schueller, D. MUNICIPAL RESIDENTIAL WASTEWATER RATES.
+# Metropolitan Council Environmental Services, 2020.
+
+# [3] Humbird et al., Process Design and Economics for Biochemical Conversion of Lignocellulosic
+# Biomass to Ethanol: Dilute-Acid Pretreatment and Enzymatic Hydrolysis of Corn Stover;
+# Technical Report NREL/TP-5100-47764; DOE: NREL, 2011.
+# http://www.nrel.gov/docs/fy11osti/47764.pdf
+
+# [4] Davis et al., Process Design and Economics for the Conversion of Lignocellulosic
+# Biomass to Hydrocarbon Fuels and Coproducts: 2018 Biochemical Design Case Update;
+# NREL/TP-5100-71949; National Renewable Energy Lab (NREL), 2018.
+# https://doi.org/10.2172/1483234.
+
+# [5] Shoener et al., Design of Anaerobic Membrane Bioreactors for the
+# Valorization of Dilute Organic Carbon Waste Streams.
+# Energy Environ. Sci. 2016, 9 (3), 1102–1112.
+# https://doi.org/10.1039/C5EE03715H.
+
+
 import numpy as np, pandas as pd
 from chemicals.elements import molecular_weight
 import thermosteam as tmo, biosteam as bst
@@ -98,8 +123,8 @@ conventional = IC_purchase_cost_algorithms['Conventional']
 ic = TankPurchaseCostAlgorithm(
     ExponentialFunctor(A=conventional.f_Cp.A,
                        n=conventional.f_Cp.n),
-    V_min=np.pi/4*1.5**2*16, # 1.5 and 16 are the lower bounds of the width and height ranges in ref [1]
-    V_max=np.pi/4*12**2*25, # 12 and 25 are the lower bounds of the width and height ranges in ref [1]
+    V_min=np.pi/4*1.5**2*16, # 1.5 and 16 are the lower bounds of the width and height ranges in Kontos
+    V_max=np.pi/4*12**2*25, # 12 and 25 are the lower bounds of the width and height ranges in Kontos
     V_units='m^3',
     CE=conventional.CE,
     material='Stainless steel')
@@ -302,7 +327,7 @@ def get_BD_dct(chemicals, default_BD=1, **kwargs):
     BD_dct = dict.fromkeys([i.ID for i in get_digestable_chemicals(chemicals)],
                            default_BD)
 
-    # Based on Kontos thesis
+    # Based on Kontos
     BD_dct['AceticAcid'] = 1 # 0.87/0.86>1
     BD_dct['Arabinose'] = 0.2/0.86
     BD_dct['Glucose'] = 1 # 0.87/0.86>1
@@ -339,6 +364,7 @@ def compute_stream_COD(stream):
     '''
     chems = stream.chemicals
     mol = stream.mol
+    if stream.F_vol == 0: return 0
     iCOD = np.array([-get_COD_stoichiometry(i)['O2'] for i in chems])
     COD = (mol*iCOD).sum()*molecular_weight({'O': 2}) / stream.F_vol
     return COD
@@ -518,23 +544,9 @@ RIN_per_Btu = RIN_per_gal / LNG_gal_to_Btu # $/Btu
 RIN_g_per_Btu = 0.0191 # HHV, https://h2tools.org/hyarc/calculator-tools/lower-and-higher-heating-values-fuels
 RIN_price = RIN_per_Btu / RIN_g_per_Btu * 1e3 # $/kg
 
-# Harmonized prices, note that the cost year is different among biorefineries
-# References
-# ----------
-# [1] Hossain et al. Techno-Economic Evaluation of Heat Integrated
-# Second Generation Bioethanol and Furfural Coproduction.
-# Biochemical Engineering Journal 2019, 144, 89–103.
-# https://doi.org/10.1016/j.bej.2019.01.017.
-
-# [2] Davis et al., Process Design and Economics for the Conversion of Lignocellulosic
-# Biomass to Hydrocarbon Fuels and Coproducts: 2018 Biochemical Design Case Update;
-# NREL/TP-5100-71949; National Renewable Energy Lab (NREL), 2018.
-# https://doi.org/10.2172/1483234.
-
-# [3] Shoener et al., Design of Anaerobic Membrane Bioreactors for the
-# Valorization of Dilute Organic Carbon Waste Streams.
-# Energy Environ. Sci. 2016, 9 (3), 1102–1112.
-# https://doi.org/10.1039/C5EE03715H.
+# Wastewater disposal (page 9 of Schueller)
+# COD excess cost is $0.127/0.2065 per lb ($280/455 per tonne), average to $0.16675/lb, or 0.3676/kg
+ww_price = 0.3676
 
 prices = { # $/kg unless otherwise noted
     'biodiesel': 1.38, # $/kg, lipidcane biorefinery
@@ -544,9 +556,9 @@ prices = { # $/kg unless otherwise noted
     'lactic_acid': 1.9, # $/kg, lactic acid biorefinery
     'naocl': 0.14, # $/L
     'RIN': RIN_price, # in addition to the natural gas price
-    'wastewater': -0.02, # average of the -0.03 from ref [1] and -0.01 estimated based on brewery data, negative value for cost of product
+    'wastewater': -ww_price, # negative value for cost of product
 #    'caustics': 0.2627, # lactic acid biorefinery, price['NaOH]/2 as the caustic is 50% NaOH/water
-#    'polymer': 2.6282 / _lb_per_kg / _GDP_2007to2016, # ref [2]
+#    'polymer': 2.6282 / _lb_per_kg / _GDP_2007to2016, # Davis et al.
     }
 
 def update_product_prices(stream_registry):
@@ -556,7 +568,10 @@ def update_product_prices(stream_registry):
 
 
 def IRR_at_ww_price(ww_stream, tea, ww_price=None, print_msg=True):
-    ww_stream.price = ww_price or prices['wastewater']
+    ww_price = ww_price or prices['wastewater'] # $/kg COD
+    ww_cod = compute_stream_COD(ww_stream) * ww_stream.F_vol # kg COD/hr
+    if ww_cod == 0: ww_stream.price = 0
+    else: ww_stream.price = ww_price * ww_cod / ww_stream.F_mass
     IRRs = [] # two IRR solutions for some biorefineries, choosing the smaller one
     for i in range(3):
         IRRs.append(tea.solve_IRR())
@@ -589,7 +604,7 @@ def get_MPSP(system, product='ethanol', print_msg=True):
         if hasattr(unit, 'cache_dct'):
             cache_dct = unit.cache_dct
             break
-    
+
     sale_dct = {}
     for stream in system.products:
         if stream.price:
@@ -599,7 +614,7 @@ def get_MPSP(system, product='ethanol', print_msg=True):
     cache_dct['MPSP'] = price
     sales = sum(v for v in sale_dct.values())
     cache_dct.update({k:v/sales for k, v in sale_dct.items()})
-    
+
     if print_msg: print(f'\n{txt[0]} of {product.ID} for {system.ID}: ${price:.2f}/{txt[1]}.')
     return price
 
@@ -706,7 +721,7 @@ def add_CFs(stream_registry, unit_registry, stream_CF_dct):
             except:
                 key_factor = (key_factor,)
             key, factor = (key_factor[0], 1.) if len(key_factor) == 1 else key_factor
-            
+
             stream.characterization_factors['GWP'] = GWP_CFs[key]*factor
     bst.PowerUtility.set_CF('GWP', *GWP_CFs['Electricity'])
 
@@ -726,7 +741,7 @@ def get_GWP(system, product='ethanol', print_msg=True):
         if hasattr(unit, 'cache_dct'):
             cache_dct = unit.cache_dct
             break
-    
+
     GWP = system.get_net_impact('GWP')/system.operating_hours * factor * cache_dct[f'{product.ID} ratio']/product.F_mass
     if print_msg: print(f'\n{txt[0]} of {product.ID} for {system.ID}: {GWP:.2f} kg CO2/{txt[1]}.')
     return GWP

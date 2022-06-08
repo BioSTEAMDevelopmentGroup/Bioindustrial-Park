@@ -508,7 +508,7 @@ class SaccharificationAndCoFermentation(Unit):
 
 
 # Saccharification and co-fermentation (both glucose & xylose are used in fermentation)
-# Not including heat exchanger as saccharificatoin and co-fermentation
+# Not including heat exchanger as saccharification and co-fermentation
 # are at the same temperature now
 @cost(basis='Saccharification tank size', ID='Saccharification tank', units='kg',
       cost=3840000, S=421776*24, CE=CEPCI[2009], n=0.7, BM=2)
@@ -1195,7 +1195,7 @@ class Esterification(Reactor):
     """
     Create an esterification reactor that converts organic acids and ethanol
     to corresponding ethyl esters and water. Finds the amount of catalyst
-    'Amberlyst-15' required as well as the loss occured by physicochemical attrition.
+    'Amberlyst-15' required as well as the loss occurred by physicochemical attrition.
 
     Parameters
     ----------
@@ -1342,7 +1342,7 @@ class Esterification(Reactor):
         effluent, wastewater = self.outs
 
         acids = ('LacticAcid', 'AceticAcid', 'SuccinicAcid')
-        # Succnic acid is a dicarboxylic acid, needs twice as much ethanol
+        # Succinic acid is a dicarboxylic acid, needs twice as much ethanol
         ratios = self.ethanol2acids * np.array([1, 1, 2])
 
         feeds = feed.copy()

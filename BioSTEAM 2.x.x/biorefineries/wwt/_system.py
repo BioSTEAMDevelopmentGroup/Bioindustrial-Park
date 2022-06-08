@@ -125,7 +125,7 @@ def create_comparison_systems(info, functions, sys_dct={}):
             except: pass # some outdated systems are the subsystem of another system
     else:
         ww_streams = get_streams(new_u, new_s, kwdct['ww_streams'])
-        
+
     new_sys_wwt = create_wastewater_process(
         'new_sys_wwt', ins=ww_streams, process_ID=WWT_ID, flowsheet=new_f,
         **kwdct['create_wastewater_process'])
