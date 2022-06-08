@@ -10,8 +10,10 @@ from biosteam import Unit, Stream, settings, main_flowsheet
 
 #For unavailable chemicals
 def create_new_chemical(ID, phase = 's', **constants):
-       na_chemical = tmo.Chemical(ID, search_db=False,
-                                  phase=phase, **constants)
+       na_chemical = tmo.Chemical(ID,
+                                  search_db=False,
+                                  phase=phase,
+                                  **constants)
        ozo_chemicals.append(na_chemical)
        return na_chemical
 
@@ -19,7 +21,14 @@ def create_new_chemical(ID, phase = 's', **constants):
 ozo_chemicals = tmo.Chemicals(
     ['Water','Hydrogen_peroxide','Oleic_acid',
      'Nonanal','Nonanoic_acid','Azelaic_acid',
-     'oxiraneoctanoic_acid,_3-octyl-','Hexane','Ethyl_acetate'])
+     'oxiraneoctanoic_acid,_3-octyl-','Hexane',
+     'Ethyl_acetate','Octane',
+     'pentene',
+     'Methylcyclohexane',
+     'Cyclopentane',
+     '540-84-1',
+     'heptane',
+     'pentane'])
 
 #Solid Catalyst not available in the database
 #TODO.xxx Add ref for the below
@@ -27,8 +36,13 @@ Catalyst = create_new_chemical(
     'Phosphotungstic_acid',
     formula="H3PW12O40",
     MW=2880.2,
-    CAS='1343-93-7'
+    CAS='1343-93-7',
+    phase = 'l',
+    rho = 2850 
     )
+#https://www.fishersci.com/shop/products/phosphotungstic-acid-hydrate-thermo-scientific/AA4011614
+#rho = 2.852g/cm3
+#conversion = 
 
 #Liquid chemical not available in the database
 #TODO.xxx Add ref for the below
