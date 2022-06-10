@@ -14,24 +14,26 @@ def create_new_chemical(ID, phase = 's', **constants):
                                   search_db=False,
                                   phase=phase,
                                   **constants)
-       ozo_chemicals.append(na_chemical)
+       chemicals.append(na_chemical)
        return na_chemical
 
-#Chemicals that are available in the database
-ozo_chemicals = tmo.Chemicals(
+chemicals = tmo.Chemicals(
     ['Water','Hydrogen_peroxide','Oleic_acid',
      'Nonanal','Nonanoic_acid','Azelaic_acid',
-     'oxiraneoctanoic_acid,_3-octyl-','Hexane',
-     'Ethyl_acetate','Octane',
-     'pentene',
-     'Methylcyclohexane',
-     'Cyclopentane',
-     '540-84-1',
-     'heptane',
-     'pentane'])
+     tmo.Chemical('Epoxy_stearic_acid', search_ID='oxiraneoctanoic_acid,_3-octyl-'),
+     Chemical('Naphtol', search_ID='90-15-3'),
+     'Ethyl_acetate', 
+     # 'Octane',
+     # 'pentene',
+     # 'Methylcyclohexane',
+     # 'Cyclopentane',
+     # tmo.Chemical('Trimethylpentene', search_ID='540-84-1'),
+     # 'heptane',
+     # 'pentane'
+])
 
-#Solid Catalyst not available in the database
-#TODO.xxx Add ref for the below
+# Solid Catalyst not available in the database
+# TODO.xxx Add ref for the below
 Catalyst = create_new_chemical(
     'Phosphotungstic_acid',
     formula="H3PW12O40",
@@ -55,12 +57,12 @@ Oxononanoic_acid = create_new_chemical(
     CAS = '2553-17-5'
 )
 
-for chemical in ozo_chemicals: chemical.default()
-ozo_chemicals.compile()
-ozo_chemicals.set_synonym('oxiraneoctanoic_acid,_3-octyl-' ,'Epoxy_stearic_acid') 
-ozo_chemicals.show()
+for chemical in chemicals: chemical.default()
+chemicals.compile()
+chemicals.set_synonym('Epoxy_stearic_acid', 'oxiraneoctanoic_acid,_3-octyl-') 
+chemicals.show()
 
-for i in ozo_chemicals:
+for i in chemicals:
     if not i.locked_state: i.V.g.method_P = 'IDEAL'
 
 
