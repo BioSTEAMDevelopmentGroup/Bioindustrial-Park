@@ -123,9 +123,8 @@ def evaluate_cn_models(**eval_kwdct):
 if __name__ == '__main__':
     # exist_sys, new_sys = simulate_cn_systems(biodegradability=1)
     # exist_model, new_model = create_cn_comparison_models()
-    exist_model, new_model = evaluate_cn_models(
-        # include_baseline=False,
-        # include_uncertainty=False,
-        include_biodegradability=False, # biodegradability for 1G should be high
-        N_uncertainty=1000,
+    exist_model, new_model = evaluate_cn_models( # 1G BMP should be high
+        include_baseline=True,
+        include_uncertainty=True,
+        N_uncertainty=100,
         )

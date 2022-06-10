@@ -3,7 +3,7 @@
 # Bioindustrial-Park: BioSTEAM's Premier Biorefinery Models and Results
 # Copyright (C) 2022-, Yalin Li <mailto.yalin.li@gmail.com>
 #
-# Part of this module is based on the oilcane biorefinery:
+# Part of this module is based on the oilcane biorefinery (configuration O1/1):
 # https://github.com/BioSTEAMDevelopmentGroup/Bioindustrial-Park/tree/master/BioSTEAM%202.x.x/biorefineries/oilcane
 #
 # This module is under the UIUC open-source license. See
@@ -136,9 +136,8 @@ def evaluate_oc1g_models(**eval_kwdct):
 if __name__ == '__main__':
     # exist_sys, new_sys = simulate_oc1g_systems(biodegradability=1)
     # exist_model, new_model = create_oc1g_comparison_models()
-    exist_model, new_model = evaluate_oc1g_models(
-        # include_baseline=False,
-        # include_uncertainty=False,
-        include_biodegradability=False, # biodegradability for 1G should be high
-        N_uncertainty=1000,
+    exist_model, new_model = evaluate_oc1g_models( # 1G BMP should be high
+        include_baseline=True,
+        include_uncertainty=True,
+        N_uncertainty=100,
         )
