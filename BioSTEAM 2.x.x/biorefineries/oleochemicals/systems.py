@@ -3,13 +3,12 @@ Created on Fri Oct 29 08:18:19 2021
 @author: yrc2
 """
 
-from biorefineries.ozonolysis import units
-from biorefineries.ozonolysis.chemicals_info import chemicals
+from biorefineries.oleochemicals import units
+from biorefineries.oleochemicals.chemicals_info import chemicals
 import biosteam as bst
 import thermosteam as tmo
 import flexsolve as flx
 import numpy as np
-from biorefineries.make_a_biorefinery.analyses.solvents_barrage import run_solvents_barrage
 """
 All units are explicitly defined here for transparency and easy reference
 Naming conventions:
@@ -56,8 +55,6 @@ def adjust_water_for_extraction():
     
 def adjust_reactor_feed_flow():
       fresh_OA.F_mass = total_feed        
-    
-s = bst.Stream(Azelaic_acid=22, Water=1000 - 22, units='kg/hr')
 
 def cache_Ks(ms, raffinate_chemicals=()):
     feed, solvent = ms.ins
@@ -67,6 +64,9 @@ def cache_Ks(ms, raffinate_chemicals=()):
         s_mix.lle(T=s_mix.T)
         IDs = tuple([i.ID for i in s_mix.lle_chemicals if i.ID not in raffinate_chemicals])
         Ks = tmo.separations.partition_coefficients(IDs, s_mix['L'], s_mix['l'])
+        if hasattr(ms, 'K_fudge_factor'):
+            index = IDs.index('Azelaic_acid')
+            Ks[index] *= ms.K_fudge_factor 
         ms.partition_data = {
             'IDs': IDs,
             'K': Ks,
@@ -214,14 +214,14 @@ def adjust_HP_feed_flow():
     for i in path_HP + path_water: i.run()
 
              
-#Batch Ozonolysis process
+#Batch oleochemicals process
 R101_H = bst.HXutility('R101_H',
                              ins = M102-0,
-                             outs = 'feed_to_ozonolysis_reactor',
+                             outs = 'feed_to_reactor',
                              T = 70 + 273.15
                              )
 
-R101 = units.OzonolysisReactor('R101',
+R101 = units.CatalyticReactor('R101',
                                 ins = R101_H-0, 
                                 outs ='mixed_oxidation_products',
                                 V=3785 + 1.213553930851268e-06
@@ -345,8 +345,8 @@ L202 = bst.MultiStageMixerSettlers('L202',
                                     N_stages=5,
                                     )
 L202.add_specification(cache_Ks, args=(L202, ('Epoxy_stearic_acid',)), run=True) 
-L202.solvent_ratio = 0.10
-
+L202.solvent_ratio = 2.
+L202.K_fudge_factor = 1e3
 # # Secondary separation (300 series)   
 # #Hexane extraction
 # L301 = bst.MultiStageMixerSettlers('L301',
@@ -471,9 +471,9 @@ L202.solvent_ratio = 0.10
 # # # # Tank for storing extract from hexane extraction
 # # # # Tank for storing distillate from last distillation
 
-ozonolysis_sys = bst.main_flowsheet.create_system('ozonolysis_sys')
-ozonolysis_sys.diagram(number=True)
-ozonolysis_sys.simulate()
+azelaic_acid_sys = bst.main_flowsheet.create_system('azelaic_acid_sys')
+azelaic_acid_sys.diagram(number=True)
+azelaic_acid_sys.simulate()
 
 # #Solubility data
 # #Pelargonic acid is insoluble in water

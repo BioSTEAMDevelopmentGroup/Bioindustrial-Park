@@ -5,7 +5,7 @@ Created on Fri Oct 29 08:17:38 2021
 import biosteam as bst
 import thermosteam as tmo
 
-class OzonolysisReactor(bst.BatchBioreactor):
+class CatalyticReactor(bst.BatchBioreactor):
     _N_ins = 1
     _N_outs = 1
     
