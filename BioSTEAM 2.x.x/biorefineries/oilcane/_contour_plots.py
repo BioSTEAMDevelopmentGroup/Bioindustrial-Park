@@ -100,8 +100,8 @@ def _add_letter_labels(axes, xpos, ypos, colors):
                      horizontalalignment='center',verticalalignment='center',
                      fontsize=12, fontweight='bold', zorder=1e17)
 
-def plot_recovery_and_oil_content_contours_manuscript(load=True):
-    set_font(size=8)
+def plot_recovery_and_oil_content_contours_manuscript(load=True, fs=8):
+    set_font(size=fs)
     set_figure_size()
     fig, axes = plot_recovery_and_oil_content_contours(
         load=load,
@@ -110,13 +110,13 @@ def plot_recovery_and_oil_content_contours_manuscript(load=True):
     colors[:] = [[light_letter_color, light_letter_color],
                  [light_letter_color, light_letter_color]]
     _add_letter_labels(axes, 1 - 0.68, 0.7, colors)
-    plt.subplots_adjust(right=0.92, wspace=0.1, top=0.9, bottom=0.10)
+    plt.subplots_adjust(right=0.92, wspace=0.1 * (fs/8) ** 2, top=0.9, bottom=0.10)
     for i in ('svg', 'png'):
         file = os.path.join(images_folder, f'recovery_and_oil_content_contours.{i}')
         plt.savefig(file, transparent=True)
 
-def plot_relative_sorghum_oil_content_and_cane_oil_content_contours_manuscript(load=True):
-    set_font(size=8)
+def plot_relative_sorghum_oil_content_and_cane_oil_content_contours_manuscript(load=True, fs=8):
+    set_font(size=fs)
     set_figure_size()
     fig, axes = plot_relative_sorghum_oil_content_and_cane_oil_content_contours(
         load=load,
@@ -134,7 +134,7 @@ def plot_ethanol_and_biodiesel_price_contours_manuscript():
     set_font(size=8)
     set_figure_size(aspect_ratio=0.7)
     fig, axes = plot_ethanol_and_biodiesel_price_contours(
-        titles=['Direct cogeneration', 'Integrated Co-Fermentation'],
+        titles=['Direct Cogeneration', 'Integrated Co-Fermentation'],
     )
     colors = np.zeros([3, 2], object)
     colors[:] = [[letter_color, letter_color],
@@ -151,7 +151,7 @@ def plot_enhanced_ethanol_and_biodiesel_price_contours_manuscript():
     set_figure_size(aspect_ratio=0.7)
     fig, axes = plot_ethanol_and_biodiesel_price_contours(
         enhanced_cellulosic_performance=True,
-        titles=['Direct cogeneration', 'Integrated Co-Fermentation'],
+        titles=['Direct Cogeneration', 'Integrated Co-Fermentation'],
     )
     colors = np.zeros([3, 2], object)
     colors[:] = [[letter_color, letter_color],
@@ -227,7 +227,9 @@ def plot_ethanol_and_biodiesel_price_contours(N=30, benefit=False, cache={},
     yticks = [0.3, 0.7, 1.1, 1.5, 1.9]
     marks = tickmarks(Z, 5, 5, center=0.) if benefit else tickmarks(Z, 5, 5)
     colormap = (diverging_colormaps if benefit else colormaps)[0]
-    metric_bar = MetricBar('MFPP', format_units('$/MT'), colormap, marks, 15,
+    name = 'MFPP'
+    if benefit: name = r'$\Delta$MFPP'
+    metric_bar = MetricBar(name, format_units('$/MT'), colormap, marks, 15,
                            forced_size=0.3)
     if benefit:
         baseline = ['S1', 'S2']
@@ -356,10 +358,9 @@ def plot_recovery_and_oil_content_contours(
     yticks = [5, 7.5, 10, 12.5, 15]
     metric = oc.all_metric_mockups[metric_index]
     units = metric.units if metric.units == '%' else format_units(metric.units)
-    mb = lambda x: MetricBar(metric.name, units, colormaps[metric_index], tickmarks(data[:, :, x, :], 5, 0.1, expand=0, p=0.1), 10, N_decimals=N_decimals)
+    mb = lambda x, name=None: MetricBar(metric.name if name is None else name, units if name is None else "", colormaps[metric_index], tickmarks(data[:, :, x, :], 5, 0.1, expand=0, p=0.1), 10, N_decimals=N_decimals)
     
-    metric_bars = [mb(0), mb(1)]
-    
+    metric_bars = [mb(0), mb(1, "")]
     fig, axes, CSs, CB = plot_contour_2d(
         100.*X, 100.*Y, ['Oilcane Only', 'Oilcane & Oilsorghum'], data, xlabel, ylabels, xticks, yticks, metric_bars, 
         fillcolor=None, styleaxiskw=dict(xtick0=False), label=True,

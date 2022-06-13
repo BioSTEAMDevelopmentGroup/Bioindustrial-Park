@@ -86,7 +86,7 @@ class OilExtractionSpecification:
         else:
             self.crushing_mill_oil_recovery = None
         if isplit_saccharification is not None: 
-            self.saccharification_oil_recovery = isplit_saccharification['Oil'].mean()
+            self.saccharification_oil_recovery = 1 - isplit_saccharification['Oil'].mean()
         else:
             self.saccharification_oil_recovery = None
             
@@ -109,7 +109,7 @@ class OilExtractionSpecification:
     
     def load_saccharification_oil_recovery(self, recovery):
         if self.isplit_saccharification is None: return
-        self.saccharification_oil_recovery = self.isplit_saccharification['Oil'] = recovery
+        self.saccharification_oil_recovery = self.isplit_saccharification['Oil'] = 1. - recovery
     
     def load_specifications(self, 
             crushing_mill_oil_recovery=None,

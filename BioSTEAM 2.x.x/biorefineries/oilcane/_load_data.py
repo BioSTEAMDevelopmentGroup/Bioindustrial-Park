@@ -7,6 +7,7 @@ Created on Thu Nov  4 14:39:10 2021
 from . import _variable_mockups as v
 from ._parse_configuration import parse, Configuration, ConfigurationComparison
 from warnings import warn
+from thermosteam.utils import roundsigfigs
 import biorefineries.oilcane as oc
 import os
 import pandas as pd
@@ -26,6 +27,7 @@ __all__ = (
     'montecarlo_results_feedstock_comparison',
     'montecarlo_results_configuration_comparison',
     'montecarlo_results_agile_comparison',
+    'montecarlo_results_crude_comparison',
 )
 
 results_folder = os.path.join(os.path.dirname(__file__), 'results')
@@ -230,5 +232,13 @@ def montecarlo_results_agile_comparison():
         names = [
             'O1* - O1',
             'O2* - O2',
+        ],
+    )
+
+def montecarlo_results_crude_comparison():
+    return montecarlo_results_short(
+        names = [
+            'O1 - O3',
+            'O2 - O4',
         ],
     )

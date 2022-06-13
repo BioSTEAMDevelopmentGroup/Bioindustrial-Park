@@ -620,7 +620,6 @@ def create_oilcane_to_crude_oil_and_ethanol_combined_1_and_2g_post_fermentation_
 def create_oilcane_to_biodiesel_and_ethanol_combined_1_and_2g_post_fermentation_oil_separation(ins, outs, front_end_oil_separation=False):
     oilcane, = ins
     ethanol, biodiesel, crude_glycerol = outs
-    
     feedstock_handling_sys = create_feedstock_handling_system(
         ins=oilcane,
         outs='',
