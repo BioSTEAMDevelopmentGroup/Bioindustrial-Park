@@ -204,7 +204,8 @@ def run_solvents_barrage(stream, # Stream from which you wish to extract the sol
     
     def get_K(chem_ID, stream, phase_1, phase_2):
         # try:
-        return (stream[phase_1].imol[chem_ID]/stream[phase_1].F_mol)/max(1e-6, (stream[phase_2].imol[chem_ID]/stream[phase_2].F_mol))
+        #L edit e^-19  
+        return (stream[phase_1].imol[chem_ID]/stream[phase_1].F_mol)/max(1e-40, (stream[phase_2].imol[chem_ID]/stream[phase_2].F_mol))
         # except:
         #     import pdb
         #     pdb.set_trace()

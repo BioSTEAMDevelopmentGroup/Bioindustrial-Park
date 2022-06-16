@@ -39,7 +39,7 @@ from ._parse_configuration import *
 from ._variable_mockups import *
 
 __all__ = (
-    units.__all__,
+    *units.__all__,
     *_process_settings.__all__,
     *_chemicals.__all__,
     *systems.__all__,
@@ -173,8 +173,9 @@ def enable_derivative(enable=True):
     _derivative_disabled = not enable
     
 _derivative_disabled = False
+cache = {}
 
-def load(name, cache={}, reduce_chemicals=True, 
+def load(name, cache=cache, reduce_chemicals=True, 
          enhanced_cellulosic_performance=False,
          enhanced_biodiesel_production=False):
     dct = globals()
@@ -317,7 +318,7 @@ def load(name, cache={}, reduce_chemicals=True,
             for unit in sys.path:
                 if isinstance(unit, bst.AnaerobicDigestion):
                     sys.converge_method = 'fixed-point'
-    oilcane_sys.set_tolerance(rmol=1e-5, mol=1e-3, subsystems=True)
+    oilcane_sys.set_tolerance(rmol=1e-4, mol=1e-2, subsystems=True)
     dct.update(flowsheet.to_dict())
     
     def get_stream(ID):
@@ -459,7 +460,7 @@ def load(name, cache={}, reduce_chemicals=True,
                 break
         
         oil_extraction_specification = OilExtractionSpecification(
-            sys, [feedstock], isplit_a, isplit_b, isplit_recovery_is_reversed
+            sys, [feedstock], isplit_a, isplit_b, 
         )
     
     ## LCA
@@ -599,9 +600,9 @@ def load(name, cache={}, reduce_chemicals=True,
     if abs(number) in (2, 4):
         cellulase_mixer, = [i for i in flowsheet.unit if hasattr(i, 'enzyme_loading')]
    
-        @default(0.02, units='wt. % cellulose', element='cellulase')
-        def set_cellulase_loading(cellulase_loading):
-            if abs(number) in (2, 4): cellulase_mixer.enzyme_loading = cellulase_loading
+    @default(0.02, units='wt. % cellulose', element='cellulase')
+    def set_cellulase_loading(cellulase_loading):
+        if abs(number) in (2, 4): cellulase_mixer.enzyme_loading = cellulase_loading
     
     @default(PRS_cost_item.cost, units='million USD', element='Pretreatment reactor system')
     def set_reactor_base_cost(base_cost):
@@ -1034,7 +1035,7 @@ def load(name, cache={}, reduce_chemicals=True,
         set_baseline(set_cane_oil_content, 15)
         set_baseline(set_saccharification_oil_recovery, 95)
     else:
-        set_baseline(set_cane_oil_content, 5)
+        set_baseline(set_cane_oil_content, 10)
         set_baseline(set_saccharification_oil_recovery, 70)
     set_baseline(set_crushing_mill_oil_recovery, 60)
     set_baseline(set_ethanol_price, mean_ethanol_price) 
