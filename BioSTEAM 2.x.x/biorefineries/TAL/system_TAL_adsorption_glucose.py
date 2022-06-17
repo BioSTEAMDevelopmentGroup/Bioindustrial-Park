@@ -404,7 +404,7 @@ def create_TAL_sys(ins, outs):
 
         return F401.TAL_solubility_in_ethanol_ww - F401_b.imass['TAL']/F401_b.F_mass
 
-    F401.specification = BoundedNumericalSpecification(F401_obj_fn, 1e-4, 1.-1e-4)
+    F401.specification = BoundedNumericalSpecification(F401_obj_fn, 1e-4, 1.-1e-4, ytol=1e-4)
     
     P401 = bst.Pump('P401', ins=F401-1, P=101325.)
     # H404 = bst.units.HXutility('H404', ins=P401-0, outs=('cooled_ethanol'), 

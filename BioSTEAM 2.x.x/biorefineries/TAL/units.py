@@ -1783,40 +1783,45 @@ class HydrogenationEstersReactor(Reactor):
     A hydrogenation reactor to produce esters from TAL.
     """
     _N_ins = 3
-    _N_outs = 1
+    _N_outs = 2
     _F_BM_default = {**Reactor._F_BM_default,
-            'AuPd catalyst': 1}
-    mcat_frac = 0.00001 # fraction of catalyst by weight in relation to the reactant (TAL)
-    TAL_to_esters_conversion = 0.80
+            'PdC catalyst': 1}
+    mcat_frac = 0.5 # fraction of catalyst by weight in relation to the reactant (TAL)
+    TAL_to_esters_conversion = 0.5-1e-3
     mono_di_hydroxy_esters_conversion_ratio = 0.5
+    catalyst_deactivation_k = 2e-3
     
     hydrogenation_rxns = ParallelRxn([
             #   Reaction definition   Reactant   Conversion
-            Rxn('TAL + 2H2 + Octanol -> Octyl_5_hydroxyhexanoate',         'TAL',   TAL_to_esters_conversion*mono_di_hydroxy_esters_conversion_ratio),
-            Rxn('TAL + 2H2 + Octanol -> Octyl_3_5_dihydroxyhexanoate',         'TAL',   TAL_to_esters_conversion*(1.-mono_di_hydroxy_esters_conversion_ratio)),
-            Rxn('TAL + 2H2 -> HMTHP',         'TAL',   0.05), # conversion from Huber group experimental data
+            Rxn('TAL + 2H2 + Ethanol -> Ethyl_5_hydroxyhexanoate',         'TAL',   TAL_to_esters_conversion*mono_di_hydroxy_esters_conversion_ratio),
+            Rxn('TAL + 2H2 + Ethanol -> Ethyl_3_5_dihydroxyhexanoate',         'TAL',   TAL_to_esters_conversion*(1.-mono_di_hydroxy_esters_conversion_ratio)),
+            Rxn('TAL + 2H2 -> HMTHP',         'TAL',   1e-6), # conversion from Huber group experimental data
             # Rxn('HMDHP + H2 -> HMTHP',         'HMDHP',   1.-1e-5),
             # ])
     # byproduct_formation_rxns  = ParallelRxn([
             #   Reaction definition   Reactant   Conversion
-            Rxn('TAL + 3H2 -> DHL + H2O',         'TAL',   0.05), # conversion from Huber group experimental data
-            Rxn('TAL + H2 -> HMDHP',         'TAL',   0.05),  # conversion from Huber group experimental data
+            Rxn('TAL + 3H2 -> DHL + H2O',         'TAL',   0.5-1e-3), # conversion from Huber group experimental data
+            Rxn('TAL + H2 -> HMDHP',         'TAL',   1e-3),  # conversion from Huber group experimental data
+            Rxn('HMDHP + H2 -> HMTHP',         'HMDHP',   1.),  # conversion from Huber group experimental data
+            Rxn('HMTHP + Ethanol -> Ethyl_5_hydroxyhexanoate',         'HMTHP',   TAL_to_esters_conversion*mono_di_hydroxy_esters_conversion_ratio),  # conversion from Huber group experimental data
+            Rxn('DHL + Ethanol -> Ethyl_3_5_dihydroxyhexanoate',         'DHL',   TAL_to_esters_conversion*mono_di_hydroxy_esters_conversion_ratio),  # conversion from Huber group experimental data
             ])
     
     TAL_to_esters_rxns = hydrogenation_rxns[:2]
+    TAL_to_DHL_rxn = hydrogenation_rxns[3]
     byproduct_formation_rxns  = ParallelRxn([
             #   Reaction definition   Reactant   Conversion
-            Rxn('TAL + H2 -> TALHydrogenationDegradationProducts',         'TAL',   1-1e-5), # conversion from Huber group experimental data
+            Rxn('TAL + H2O -> Acetylacetone + CO2',         'TAL',   1.-1e-5),
            ])
     
     def _run(self):
-        feed, recycle, reagent = self.ins
-        effluent = self.outs[0]
+        feed, recycle, reagent, fresh_catalyst = self.ins
+        effluent, vented_gas, spent_catalyst = self.outs
         
         # effluent.imol['HMDHP'] += 1e-10
         
         H2_mol_needed_for_HMTHP_formation = (sum(feed.imol['TAL', 'HMDHP']) + sum(recycle.imol['TAL', 'HMDHP']))*2*self.hydrogenation_rxns[0].X
-        reagent.imol['H2'] = 5*H2_mol_needed_for_HMTHP_formation
+        reagent.imol['H2'] = 20*H2_mol_needed_for_HMTHP_formation
         reagent.phase = 'g'
         # effluent = feed.copy()
         effluent.mix_from([feed, recycle, reagent])
@@ -1824,6 +1829,8 @@ class HydrogenationEstersReactor(Reactor):
         # effluent.imol['HMTHP'] -= 1e-10
         
         effluent.phase = 'l'
+        
+        
         # effluent.T = feed.T
         # effluent.P = feed.P
         
@@ -1831,13 +1838,34 @@ class HydrogenationEstersReactor(Reactor):
         self.byproduct_formation_rxns(effluent.mol)
         
         extra_H2_mol_to_exclude = effluent.imol['H2']
+        
+        vented_gas.phase = 'g'
+        vented_gas.imol['CO2'] = effluent.imol['CO2']
+        # vented_gas.imol['H2'] = effluent.imol['H2']
+        
+        effluent.imol['CO2'] = 0.
+        # effluent.imol['H2'] = 0.
+        
         reagent.imol['H2'] -= extra_H2_mol_to_exclude
         effluent.imol['H2'] = 0.
         
+        spent_catalyst.imol['Pd'] = fresh_catalyst.imol['Pd'] =\
+            self.catalyst_deactivation_k * (feed.imol['TAL'] - effluent.imol['TAL'])
+            
+            # self.catalyst_deactivation_k * reagent.imol['H2']
+            
+            # effluent.imol['Ethyl_5_hydroxyhexanoate'])
+            # effluent.imol['Ethyl_3_5_dihydroxyhexanoate'])
+            # effluent.imol['DHL'])
+            
+            
+            # Alternative 
+            # reagent.imol['H2']
+            
     def _cost(self):
         super()._cost()
-        self.purchase_costs['AuPd catalyst'] =\
-            self.mcat_frac * self.ins[0].imass['TAL'] * price['AuPd']
+        self.purchase_costs['PdC catalyst'] =\
+            self.mcat_frac * self.ins[0].imass['TAL'] * self.tau * price['PdC']
             
 
 

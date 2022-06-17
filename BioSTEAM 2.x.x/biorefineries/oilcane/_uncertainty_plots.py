@@ -44,7 +44,7 @@ from._parse_configuration import format_name
 
 __all__ = (
     'plot_all',
-    'plot_montecarlo_main_manuscript',
+    # 'plot_montecarlo_main_manuscript',
     'plot_breakdowns',
     'plot_montecarlo_feedstock_comparison',
     'plot_montecarlo_configuration_comparison',
@@ -168,45 +168,45 @@ def plot_all():
     plot_spearman_lca()
     plot_breakdowns()
 
-def plot_montecarlo_main_manuscript():
-    set_font(size=8)
-    set_figure_size(aspect_ratio=0.85)
-    fig = plt.figure()
-    everything = GridSpec(4, 3, fig, hspace=1.5, wspace=0.7,
-                          top=0.90, bottom=0.05,
-                          left=0.11, right=0.97)
+# def plot_montecarlo_main_manuscript():
+#     set_font(size=8)
+#     set_figure_size(aspect_ratio=0.85)
+#     fig = plt.figure()
+#     everything = GridSpec(4, 3, fig, hspace=1.5, wspace=0.7,
+#                           top=0.90, bottom=0.05,
+#                           left=0.11, right=0.97)
     
-    def spec2axes(spec, x, y, hspace=0, wspace=0.7, **kwargs):
-        subspec = spec.subgridspec(x, y, hspace=hspace, wspace=wspace, **kwargs)
-        return np.array([[fig.add_subplot(subspec[i, j]) for j in range(y)] for i in range(x)], object)
+#     def spec2axes(spec, x, y, hspace=0, wspace=0.7, **kwargs):
+#         subspec = spec.subgridspec(x, y, hspace=hspace, wspace=wspace, **kwargs)
+#         return np.array([[fig.add_subplot(subspec[i, j]) for j in range(y)] for i in range(x)], object)
     
-    gs_feedstock_comparison = everything[:2, :]
-    gs_configuration_comparison = everything[2:, :2]
-    gs_agile_comparison = everything[2:, 2]
-    axes_feedstock_comparison = spec2axes(gs_feedstock_comparison, 2, 3)
-    axes_configuration_comparison = spec2axes(gs_configuration_comparison, 2, 2)
-    axes_agile_comparison = spec2axes(gs_agile_comparison, 2, 1)
-    plot_montecarlo_feedstock_comparison(axes_feedstock_comparison, letters='ABCDEFG')
-    plot_montecarlo_configuration_comparison(axes_configuration_comparison, letters='ABCDEFG')
-    plot_montecarlo_agile_comparison(axes_agile_comparison, letters='ABCDEFG')
+#     gs_feedstock_comparison = everything[:2, :]
+#     gs_configuration_comparison = everything[2:, :2]
+#     gs_agile_comparison = everything[2:, 2]
+#     axes_feedstock_comparison = spec2axes(gs_feedstock_comparison, 2, 3)
+#     axes_configuration_comparison = spec2axes(gs_configuration_comparison, 2, 2)
+#     axes_agile_comparison = spec2axes(gs_agile_comparison, 2, 1)
+#     plot_montecarlo_feedstock_comparison(axes_feedstock_comparison, letters='ABCDEFG')
+#     plot_montecarlo_configuration_comparison(axes_configuration_comparison, letters='ABCDEFG')
+#     plot_montecarlo_agile_comparison(axes_agile_comparison, letters='ABCDEFG')
     
-    def add_title(gs, title):
-        ax =  fig.add_subplot(gs)
-        ax._frameon = False
-        ax.xaxis.set_visible(False)
-        ax.yaxis.set_visible(False)
-        ax.set_title(
-            title, color=letter_color,
-            horizontalalignment='center',verticalalignment='center',
-            fontsize=12, fontweight='bold', y=1.1
-        )
-    add_title(gs_feedstock_comparison, '(I) Impact of opting to process oilcane over sugarcane')
-    add_title(gs_configuration_comparison, '(II) Impact of cellulosic ethanol integration')
-    add_title(gs_agile_comparison, '(III) Impact of\noilsorghum\nintegration')
-    plt.show()
-    for i in ('svg', 'png'):
-        file = os.path.join(images_folder, f'montecarlo_main_manuscript.{i}')
-        plt.savefig(file, transparent=True)
+#     def add_title(gs, title):
+#         ax =  fig.add_subplot(gs)
+#         ax._frameon = False
+#         ax.xaxis.set_visible(False)
+#         ax.yaxis.set_visible(False)
+#         ax.set_title(
+#             title, color=letter_color,
+#             horizontalalignment='center',verticalalignment='center',
+#             fontsize=12, fontweight='bold', y=1.1
+#         )
+#     add_title(gs_feedstock_comparison, '(I) Impact of opting to process oilcane over sugarcane')
+#     add_title(gs_configuration_comparison, '(II) Impact of cellulosic ethanol integration')
+#     add_title(gs_agile_comparison, '(III) Impact of\noilsorghum\nintegration')
+#     plt.show()
+#     for i in ('svg', 'png'):
+#         file = os.path.join(images_folder, f'montecarlo_main_manuscript.{i}')
+#         plt.savefig(file, transparent=True)
 
 def plot_montecarlo_feedstock_comparison(axes_box=None, letters=None, 
                                          single_column=True):
@@ -423,7 +423,7 @@ def plot_spearman_tea(with_units=None, aspect_ratio=0.8, **kwargs):
         ],
         kind='TEA',
         with_units=with_units,
-        cutoff=0.03,
+        cutoff=0.05,
         **kwargs
     )
     plt.subplots_adjust(left=0.45, right=0.975, top=0.98, bottom=0.08)
@@ -445,7 +445,7 @@ def plot_spearman_tea_short(**kwargs):
         ],
         kind='TEA',
         with_units=False,
-        cutoff=0.03,
+        cutoff=0.05,
         top=5,
         legend=True,
         legend_kwargs={'loc': 'upper left'},
@@ -470,7 +470,7 @@ def plot_spearman_lca_short(with_units=False, aspect_ratio=0.65, **kwargs):
         ],
         kind='LCA',
         with_units=with_units,
-        cutoff=0.03,
+        cutoff=0.05,
         top=5,
         legend=False,
         **kwargs
@@ -494,7 +494,7 @@ def plot_spearman_lca(with_units=None, aspect_ratio=0.65, **kwargs):
         ],
         kind='LCA',
         with_units=with_units,
-        cutoff=0.03,
+        cutoff=0.05,
         **kwargs
     )
     plt.subplots_adjust(left=0.45, right=0.975, top=0.98, bottom=0.10)
@@ -601,7 +601,7 @@ def plot_kde(name, metrics=(GWP_ethanol, MFPP), xticks=None, yticks=None,
              top_right='Tradeoff', bottom_left='Tradeoff',
              bottom_right=''):
     set_font(size=8)
-    set_figure_size(width='half', aspect_ratio=1.20)
+    set_figure_size(width='half', aspect_ratio=1.1)
     Xi, Yi = [i.index for i in metrics]
     df = oc.get_monte_carlo(name, metrics)
     y = df[Yi].values
@@ -616,6 +616,7 @@ def plot_kde(name, metrics=(GWP_ethanol, MFPP), xticks=None, yticks=None,
         xticklabels=True, yticklabels=True,
         xbox_kwargs=xbox_kwargs or dict(light=CABBI_colors.orange.RGBn, dark=CABBI_colors.orange.shade(60).RGBn),
         ybox_kwargs=ybox_kwargs or dict(light=CABBI_colors.blue.RGBn, dark=CABBI_colors.blue.shade(60).RGBn),
+        aspect_ratio=1.2,
     )
     plt.sca(ax)
     plt.xlabel(xlabel.replace('\n', ' '))
@@ -670,9 +671,10 @@ def plot_kde(name, metrics=(GWP_ethanol, MFPP), xticks=None, yticks=None,
 
 def plot_kde_2d(name, metrics=(GWP_ethanol, MFPP), xticks=None, yticks=None,
                 top_left='', top_right='Tradeoff', bottom_left='Tradeoff',
-                bottom_right='', xbox_kwargs=None, ybox_kwargs=None, titles=None):
-    set_font(size=8)
-    set_figure_size(aspect_ratio=0.65)
+                bottom_right='', xbox_kwargs=None, ybox_kwargs=None, titles=None,
+                fs=None):
+    set_font(size=fs or 8)
+    set_figure_size(aspect_ratio=0.6)
     if isinstance(name, str): name = (name,)
     Xi, Yi = [i.index for i in metrics]
     dfs = [oc.get_monte_carlo(i, metrics) for i in name]
@@ -689,6 +691,7 @@ def plot_kde_2d(name, metrics=(GWP_ethanol, MFPP), xticks=None, yticks=None,
         xticklabels=[True, True], yticklabels=[True, True],
         xbox_kwargs=2*[xbox_kwargs or dict(light=CABBI_colors.orange.RGBn, dark=CABBI_colors.orange.shade(60).RGBn)],
         ybox_kwargs=[ybox_kwargs or dict(light=CABBI_colors.blue.RGBn, dark=CABBI_colors.blue.shade(60).RGBn)],
+        aspect_ratio=1.,
     )
     M, N = axes.shape
     xleft = 0.02
@@ -798,23 +801,24 @@ def plot_feedstock_cellulosic_comparison_kde():
         bottom_right='Sugarcane Favored',
         top_right='GWP\nTradeoff()',
         bottom_left='MFPP\nTradeoff()',
-        fx=1000.,
+        # fx=1000.,
     )
     for i in ('svg', 'png'):
         file = os.path.join(images_folder, f'feedstock_cellulosic_comparison_kde.{i}')
         plt.savefig(file, transparent=True)
 
-def plot_feedstock_comparison_kde():
+def plot_feedstock_comparison_kde(fs=None):
     plot_kde_2d(
         ('O1 - S1', 'O2 - S2'),
-        yticks=[[-10, 0, 10, 20, 30, 40, 50, 60]],
+        yticks=[[-15, 0, 15, 30, 45, 60]],
         xticks=[[-0.12, -0.09, -0.06, -0.03, 0, 0.03, 0.06],
-                [-2.0, -1.5, -1, -0.5, 0., 0.5, 1.0]],
+                [-0.75, -0.5, -0.25, 0., 0.25, 0.5]],
         top_right='GWP\nTradeoff()',
         bottom_left='MFPP\nTradeoff()',
         top_left='Oilcane\nFavored()',
         bottom_right='\nSugarcane\nFavored()',
         titles=['(A) Direct Cogeneration', '(B) Integrated Co-Fermentation'],
+        fs=fs,
     )
     plt.subplots_adjust(
         wspace=0,
@@ -827,8 +831,8 @@ def plot_feedstock_comparison_kde():
 def plot_configuration_comparison_kde():
     plot_kde(
         'O1 - O2',
-        yticks=[-20, 0, 20, 40, 60],
-        xticks=[-2, -1.5, -1, -0.5, 0, 0.5, 1],
+        yticks=[-10, 0, 10, 20, 30, 40, 50],
+        xticks=[-0.75, -0.6, -0.45, -0.3, -0.15, 0, 0.15, 0.3],
         top_right='GWP\nTradeoff()',
         bottom_left='MFPP\nTradeoff()',
         top_left='DC Favored()',
@@ -860,8 +864,8 @@ def plot_crude_configuration_comparison_kde():
         ('O1 - O3', 'O2 - O4'),
         yticks=[[-12, 0, 12, 24, 36, 48]],
         xticks=[
-            [-0.5, -0.4, -0.3, -0.2, -0.1, 0],
-            [-1, -0.8, -0.6, -0.4, -0.2, 0]
+            [-0.3, -0.24, -0.18, -0.12, -0.06, 0],
+            [-0.5, -0.4, -0.3, -0.2, -0.1, 0]
         ],
         top_right='GWP\nTradeoff()',
         bottom_left='MFPP\nTradeoff()',
@@ -878,7 +882,10 @@ def plot_agile_comparison_kde():
         ('O1* - O1', 'O2* - O2'),
         metrics=[TCI, MFPP],
         yticks=[[0, 3, 6, 9, 12, 15]], 
-        xticks=2*[[-150, -125, -100, -75, -50, -25, 0]],
+        xticks=[
+            [-100, -80, -60, -40, -20, 0],
+            [-150, -125, -100, -75, -50, -25, 0],
+        ],
         top_right='TCI-Tradeoff()',
         bottom_left='MFPP\nTradeoff()',
         top_left='Sorghum\nIntegration Favored()',

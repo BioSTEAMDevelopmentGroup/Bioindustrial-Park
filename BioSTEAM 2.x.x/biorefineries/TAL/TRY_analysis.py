@@ -20,7 +20,8 @@ from matplotlib.ticker import AutoMinorLocator as AML
 
 # from TAL.system_solubility_exploit import TAL_sys, TAL_tea, R302, spec
 # from TAL.system_solubility_exploit import MEK as product
-from biorefineries.TAL.system_TAL_adsorption_glucose import TAL_sys, TAL_tea, R302, spec, SA
+# from biorefineries.TAL.system_TAL_adsorption_glucose import TAL_sys, TAL_tea, R302, spec, SA
+from biorefineries.TAL.system_ethyl_esters import TAL_sys, TAL_tea, R302, spec, Mixed_esters
 # get_GWP, get_non_bio_GWP, get_FEC, get_SPED
 # from TAL.system_glucose_to_TAL_adsorb_evap_dry import SA as product
 
@@ -38,7 +39,7 @@ import matplotlib.colors as mcolors
 ig = np.seterr(invalid='ignore')
 bst.speed_up()
 
-product = SA
+product = Mixed_esters
 
 # %%Colors
 marketrange_shadecolor = (*colors.neutral.shade(50).RGBn, 0.3)
@@ -210,10 +211,10 @@ lab_spec_3 = 1
 SA_price_range = [6500, 7500]
 # temporary price range from https://www.alibaba.com/product-detail/hot-sale-C4H8O-butanon-mek_62345760689.html?spm=a2700.7724857.normalList.26.1d194486SbCyfR
 
-product_chemical_ID = 'TAL'
-get_SA_MPSP = lambda: TAL_tea.solve_price(product) * 907.185 / get_product_purity() # USD / ton
-get_product_purity = lambda: product.imass[product_chemical_ID]/product.F_mass
-# get_SA_MPSP = lambda: TAL_tea.solve_price(product) / get_product_purity() # USD / kg
+product_chemical_IDs = ['Octyl_5_hydroxyhexanoate', 'Octyl_3_5_dihydroxyhexanoate', 'DHL']
+get_product_MPSP = lambda: TAL_tea.solve_price(product) * 907.185 / get_product_purity() # USD / ton
+get_product_purity = lambda: sum([product.imass[i] for i in product_chemical_IDs])/product.F_mass
+# get_product_MPSP = lambda: TAL_tea.solve_price(product) / get_product_purity() # USD / kg
 get_TAL_VOC = lambda: TAL_tea.VOC / 1e6 # million USD / yr
 get_TAL_FCI = lambda: TAL_tea.FCI / 1e6 # million USD
 
@@ -293,11 +294,11 @@ get_TAL_inhibitors_conc = lambda: 1000*sum(R302.outs[0].imass['AceticAcid', 'Fur
 
 # get_rel_impact_t_y = lambda: rel_impact_fn(steps)
 
-TAL_metrics = [get_SA_MPSP, get_TAL_sugars_conc, get_TAL_inhibitors_conc]
+TAL_metrics = [get_product_MPSP, get_TAL_sugars_conc, get_TAL_inhibitors_conc]
 # TAL_metrics = [get_TAL_MPSP, get_GWP, get_FEC]
 
 # %% Generate 3-specification meshgrid and set specification loading functions
-steps = 50
+steps = 20
 
 # Yield, titer, productivity (rate)
 spec_1 = np.linspace(0.1, 0.9, steps) # yield

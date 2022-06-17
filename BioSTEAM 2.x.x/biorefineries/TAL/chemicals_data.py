@@ -249,11 +249,21 @@ for i in TAL.get_missing_properties():
             pass
 
 
-DHL = chemical_database(ID='DHL', search_ID='delta-hexalactone', phase='s')
+DHL = chemical_database(ID='DHL', search_ID='delta-hexalactone', 
+                        # phase='s',
+                        )
 
 DHL.Hf = Pyrone.Hf
 DHL.LHV = Pyrone.LHV
 DHL.HHV = Pyrone.HHV
+
+
+DHL.Hvap.add_method(lambda T: 45.21e3) # CAS Scifinder 823-22-3
+DHL.V.l.add_model(lambda T: 113.9e-6) # CAS Scifinder 823-22-3
+DHL.Psat.add_method(lambda T: 4.85293421) # assumed to be same as Ethyl_5_HydroxyHexanoate
+# DHL.copy_models_from(EH, ['Psat',])
+DHL.Tb = 215.7 + 273.15 # CAS Scifinder 823-22-3
+DHL.Tm = 17. + 273.15 # CAS Scifinder 823-22-3
 
 for i in DHL.get_missing_properties():
     if not i in Pyrone.get_missing_properties():
@@ -390,14 +400,58 @@ Xylitol = chemical_database('Xylitol', phase='l', Hf=-243145*_cal2joule, Hfus=-1
 
 # Esters - Ethyl
 
-EHH = chemical_database(ID='Ethyl 6-hydroxyhexanoate', search_ID='ethyl 6-hydroxyhexanoate')
-EHH.Tb = 213.4 + 273.15
-EHH.Hvap.add_method(lambda: 52.31e3)
-EHH.V.l.add_model(lambda: 161.9e-6)
-EHH.Psat.add_method(lambda: 4.85293421)
+# EHH = chemical_database(ID='Ethyl 6-hydroxyhexanoate', search_ID='ethyl 6-hydroxyhexanoate')
+# EHH.Tb = 213.4 + 273.15
+# EHH.Hvap.add_method(lambda: 52.31e3)
+# EHH.V.l.add_model(lambda: 161.9e-6)
+# EHH.Psat.add_method(lambda: 4.85293421)
 
-EDHH = chemical_copied('Ethyl 3,5-dihydroxyhexanoate', EHH)
+# EDHH = chemical_copied('Ethyl 3,5-dihydroxyhexanoate', EHH)
+EH = tmo.Chemical('Ethyl hexanoate')
 
+Ethyl_5_HydroxyHexanoate = chemical_defined('Ethyl_5_hydroxyhexanoate',
+                                            # phase='l', 
+                                            formula='C14H28O3', 
+                       # Hf=-233200*_cal2joule,
+                       )
+Ethyl_5_HydroxyHexanoate.Dortmund.update({1:2, 2:3, 3:1, 14:1, 22:1})
+Ethyl_5_HydroxyHexanoate.UNIFAC.update({1:2, 2:3, 3:1, 14:1, 22:1})
+Ethyl_5_HydroxyHexanoate.Hvap.add_method(lambda T: 52.31e3) # SciFinder CAS 20266-62-0
+Ethyl_5_HydroxyHexanoate.V.l.add_model(lambda T: 161.9e-6) # SciFinder CAS 20266-62-0 
+Ethyl_5_HydroxyHexanoate.Psat.add_method(lambda T: 4.85293421) # SciFinder CAS 20266-62-0
+# Ethyl_5_HydroxyHexanoate.copy_models_from(EH, ['Psat',])
+Ethyl_5_HydroxyHexanoate.Tb = 213.4 + 273.15 # SciFinder CAS 20266-62-0
+Ethyl_5_HydroxyHexanoate.Tm = 0. + 273.15 # assumed
+
+Ethyl_3_5_dihydroxyhexanoate = chemical_defined('Ethyl_3_5_dihydroxyhexanoate',
+                                            # phase='l', 
+                                            formula='C14H28O4', 
+                       # Hf=-233200*_cal2joule,
+                       )
+
+for i in Ethyl_5_HydroxyHexanoate.get_missing_properties():
+    if not i in EH.get_missing_properties():
+        try:
+            Ethyl_5_HydroxyHexanoate.copy_models_from(EH, [i])
+        except:
+            pass
+        
+Ethyl_3_5_dihydroxyhexanoate.Dortmund.update({1:2, 2:2, 3:2, 14:2, 22:1})
+Ethyl_3_5_dihydroxyhexanoate.UNIFAC.update({1:2, 2:2, 3:2, 14:2, 22:1})
+Ethyl_3_5_dihydroxyhexanoate.Hvap.add_method(lambda T: 52.31e3) # assumed to be same as Ethyl_5_HydroxyHexanoate
+Ethyl_3_5_dihydroxyhexanoate.V.l.add_model(lambda T: 161.9e-6) # assumed to be same as Ethyl_5_HydroxyHexanoate
+Ethyl_3_5_dihydroxyhexanoate.Psat.add_method(lambda T: 4.85293421) # assumed to be same as Ethyl_5_HydroxyHexanoate
+# Ethyl_3_5_dihydroxyhexanoate.copy_models_from(EH, ['Psat',])
+Ethyl_3_5_dihydroxyhexanoate.Tb = 213.4 + 273.15 # assumed to be same as Ethyl_5_HydroxyHexanoate
+Ethyl_3_5_dihydroxyhexanoate.Tm = 0. + 273.15 # assumed
+
+        
+for i in Ethyl_3_5_dihydroxyhexanoate.get_missing_properties():
+    if not i in EH.get_missing_properties():
+        try:
+            Ethyl_3_5_dihydroxyhexanoate.copy_models_from(EH, [i])
+        except:
+            pass
 Octanol = chemical_database('Octanol')
 # Esters - Octyl
 OctylyHexanoate = chemical_database(ID='Octyl hexanoate', search_ID='4887-30-3') # used for missing properties
@@ -434,17 +488,20 @@ for i in OctylDihydroxyHexanoate.get_missing_properties():
         except:
             pass
 
-TALHydrogenationDegradationProducts = chemical_defined('TALHydrogenationDegradationProducts', 
-                                                       phase='s', 
-                                                       formula='C6H6O3',
-                                                       
+Acetylacetone = chemical_database(ID='Acetylacetone', 
+                                                       # phase='s', 
+                                                       # formula='C6H6O3',
+                                                       # search_ID='Acetylacetone',
                                                        )
-for i in TALHydrogenationDegradationProducts.get_missing_properties():
-    if not i in TAL.get_missing_properties():
-        try:
-            TALHydrogenationDegradationProducts.copy_models_from(TAL, [i])
-        except:
-            pass
+# for i in TALHydrogenationDegradationProducts.get_missing_properties():
+#     if not i in TAL.get_missing_properties():
+#         try:
+#             TALHydrogenationDegradationProducts.copy_models_from(TAL, [i])
+#         except:
+#             pass
+
+Hexane = chemical_defined('Hexane', phase='l')
+
 # =============================================================================
 # Insoluble organics
 # =============================================================================
@@ -475,6 +532,8 @@ CaSO4 = chemical_database('CaSO4')
 # This is to copy the solid state of Xylose,
 # cannot directly use Xylose as Xylose is locked at liquid state now
 Tar = chemical_copied('Tar', Xylose, phase_ref='s')
+
+PdC = chemical_database('Pd', phase='s')
 
 # =============================================================================
 # Mixtures

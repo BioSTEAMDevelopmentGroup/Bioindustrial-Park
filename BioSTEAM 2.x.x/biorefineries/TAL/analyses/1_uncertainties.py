@@ -40,7 +40,7 @@ from biosteam.utils import TicToc
 # from biorefineries.TAL.system_TAL_adsorption_glucose import (
 #     spec, TAL_sys,
 # )
-from biorefineries.TAL.analyses import models
+from biorefineries.TAL.analyses import models_ethyl_esters as models
 from datetime import datetime
 import os
 
@@ -66,7 +66,7 @@ timer.tic()
 
 # Set seed to make sure each time the same set of random numbers will be used
 np.random.seed(3221) # 3221
-N_simulation = 5000 # 5000
+N_simulation = 2000 # 5000
 
 samples = model.sample(N=N_simulation, rule='L')
 model.load_samples(samples)
@@ -129,23 +129,23 @@ pre_fermenter_units_path = full_path[0:fermenter_index]
 
 def model_specification():
     # !!!: bugfix barrage was removed for speed up, no failed evaluations found for now
-    # try:
-    for i in pre_fermenter_units_path: i._run()
-    spec.load_specifications(spec_1=spec.spec_1, spec_2=spec.spec_2, spec_3=spec.spec_3)
-    model._system.simulate()
+    try:
+        for i in pre_fermenter_units_path: i._run()
+        spec.load_specifications(spec_1=spec.spec_1, spec_2=spec.spec_2, spec_3=spec.spec_3)
+        model._system.simulate()
     
     # print(spec.spec_1, spec.spec_2, spec.spec_3)
     # print(spec.reactor.effluent_titer)
     
-    # except Exception as e:
-    #     str_e = str(e).lower()
-    #     print('Error in model spec: %s'%str_e)
-    #     # raise e
-    #     if 'sugar concentration' in str_e:
-    #         # flowsheet('AcrylicAcid').F_mass /= 1000.
-    #         raise e
-    #     else:
-    #         run_bugfix_barrage()
+    except Exception as e:
+        str_e = str(e).lower()
+        print('Error in model spec: %s'%str_e)
+        # raise e
+        if 'sugar concentration' in str_e:
+            # flowsheet('AcrylicAcid').F_mass /= 1000.
+            raise e
+        else:
+            run_bugfix_barrage()
             
 model.specification = model_specification
 
@@ -167,7 +167,7 @@ file_to_save = 'TAL_%s.%s.%s-%s.%s'%(dateTimeObj.year, dateTimeObj.month, dateTi
 
 baseline = baseline.append(baseline_end, ignore_index=True)
 baseline.index = ('initial', 'end')
-baseline.to_excel(file_to_save+'_0_baseline.xlsx')
+baseline.to_excel(file_to_save+'_0_baseline_esters.xlsx')
 
 # Parameters
 parameters = model.get_parameters()
@@ -214,7 +214,7 @@ run_number = samples.shape[0]
 
 #%%
 '''Output to Excel'''
-with pd.ExcelWriter(file_to_save+'_1_full_evaluation.xlsx') as writer:
+with pd.ExcelWriter(file_to_save+'_1_full_evaluation_esters.xlsx') as writer:
     parameter_values.to_excel(writer, sheet_name='Parameters')
     TEA_results.to_excel(writer, sheet_name='TEA results')
     TEA_percentiles.to_excel(writer, sheet_name='TEA percentiles')

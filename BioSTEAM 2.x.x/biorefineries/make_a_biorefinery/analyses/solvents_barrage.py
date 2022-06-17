@@ -57,6 +57,7 @@ def run_solvents_barrage(stream, # Stream from which you wish to extract the sol
                          impurity_IDs, # List of IDs of impurities in "stream" that you want get partitioning results for, other than water; note that all chemicals in the stream will affect LLE interaction effects, regardless of which chemicals are present in impurity_IDs
                          T=None, # Temperature (K) at which you wish to run solvents barrage; temperature (K) of "stream" by default
                          solvent_IDs=solvent_IDs, # List of solvents to run the barrage for; defaults to a list of 25 common organic solvents
+                         solvent_mol=1000.,
                          stream_modifiers='baseline_stream', # 'baseline_stream' to analyze the "stream" passed in arguments; 'impurity_free_stream' to remove the impurities listed in impurity_IDs before performing analyses; 'solute_in_pure_water' to analyze simply for the solute in pure water
                          # show_all_mixer_settlers=False,
                          plot_Ks=True,
@@ -203,7 +204,8 @@ def run_solvents_barrage(stream, # Stream from which you wish to extract the sol
     
     def get_K(chem_ID, stream, phase_1, phase_2):
         # try:
-        return (stream[phase_1].imol[chem_ID]/stream[phase_1].F_mol)/max(1e-6, (stream[phase_2].imol[chem_ID]/stream[phase_2].F_mol))
+        #L edit e^-19  
+        return (stream[phase_1].imol[chem_ID]/stream[phase_1].F_mol)/max(1e-40, (stream[phase_2].imol[chem_ID]/stream[phase_2].F_mol))
         # except:
         #     import pdb
         #     pdb.set_trace()
@@ -221,7 +223,7 @@ def run_solvents_barrage(stream, # Stream from which you wish to extract the sol
         mixed_stream.mix_from([process_stream, solvent_stream])
         # print(mixed_stream.lle_chemicals)
         mixed_stream.lle(T=T, top_chemical = solvent_chemical.ID)
-        mixed_stream.show()
+        # mixed_stream.show()
         # mixed_stream.lle(T=T)
         # mixed_stream.show(N=100, composition=True)
         K_solute_in_solvent = get_K(solute.ID, mixed_stream, extract_phase, raffinate_phase)
@@ -306,6 +308,8 @@ def run_solvents_barrage(stream, # Stream from which you wish to extract the sol
                 return True
             else:
                 return 'Error: ' + str(e)
+        except FloatingPointError as e:
+            return 'Error: ' + str(e)
         
     def forms_azeotrope_with_solute(chem_ID):
         d_az_in = tmo.Stream('d_az_in')
@@ -321,10 +325,12 @@ def run_solvents_barrage(stream, # Stream from which you wish to extract the sol
                 return True
             else:
                 return 'Error: ' + str(e)
+        except FloatingPointError as e:
+            return 'Error: ' + str(e)
         
     # %% Run test barrage
     results_dict = {}
-    solvent_mol = process_stream.ivol['Water']
+    solvent_mol = solvent_mol
     for solvent in solvents:
         results_dict[formatted_name(solvent.common_name)] = run_single_test(solvent_chemical=solvent, solvent_mol=solvent_mol)
     
