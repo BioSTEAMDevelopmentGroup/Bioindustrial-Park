@@ -25,6 +25,19 @@ info = {
     'ww_price': None,
     }
 
+CF_dct = { # all streams are feeds
+    'ammonia': ('NH4OH',), # NH4OH
+    'caustic': ('NaOH', 0.5), # NaOH and water
+    'cellulase': ('Cellulase', 0.05), # cellulase and water
+    'cornstover': ('CornStover',), # adjust for the moisture content
+    'CSL': ('CSL',),
+    'DAP': ('DAP',),
+    'denaturant': ('Denaturant'),
+    'FGD_lime': ('Lime', 0.4513), # lime and water
+    'natural_gas': ('CH4',), # CH4 actually not used due to heat surplus
+    'sulfuric_acid': ('H2SO4',),
+    }
+
 
 # %%
 
@@ -34,18 +47,6 @@ info = {
 
 def create_cs_comparison_systems(biodegradability=1): # will be multiplied by 0.86/0.05 for biogas/cell mass
     wwt_kwdct = dict.fromkeys(('IC_kwargs', 'AnMBR_kwargs',), {'biodegradability': biodegradability,})
-    CF_dct = { # all streams are feeds
-        'ammonia': ('NH4OH',), # NH4OH
-        'caustic': ('NaOH', 0.5), # NaOH and water
-        'cellulase': ('Cellulase', 0.05), # cellulase and water
-        'cornstover': ('CornStover',), # adjust for the moisture content
-        'CSL': ('CSL',),
-        'DAP': ('DAP',),
-        'denaturant': ('Denaturant'),
-        'FGD_lime': ('Lime', 0.4513), # lime and water
-        'natural_gas': ('CH4',), # CH4 actually not used due to heat surplus
-        'sulfuric_acid': ('H2SO4',),
-        }
     sys_dct = {
         'system_name': 'cornstover_sys',
         'create_wastewater_process': wwt_kwdct,
@@ -78,6 +79,7 @@ def create_cs_comparison_models():
     ##### Existing system #####
     exist_model_dct = {
         'abbr': info['abbr'],
+        'CF_dct': CF_dct,
         'feedstock': 'cornstover',
         'FERM_product': info['FERM_product'],
         'sludge': 'sludge',
@@ -128,8 +130,9 @@ if __name__ == '__main__':
     exist_model, new_model = evaluate_cs_models(
         include_baseline=True,
         include_uncertainty=True,
-        include_BMP=True,
+        # include_BMP=True,
         N_uncertainty=100,
+        uncertainty_skip_exist=True,
         # N_BMP=10,
         # BMPs=(0.5, 0.9499,), # allow for minor error
         )

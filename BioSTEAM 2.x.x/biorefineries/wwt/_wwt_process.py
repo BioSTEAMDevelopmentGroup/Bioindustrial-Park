@@ -354,7 +354,7 @@ def create_wastewater_process(ins, outs, process_ID='6', flowsheet=None,
     wwt_streams = ins
     RNG, biogas, sludge, recycled_water, brine = outs
 
-    ######################## Units ########################
+    ##### Units #####
     # Mix waste liquids for treatment
     X = str(process_ID)
     MX01 = bst.units.Mixer(f'M{X}01', ins=wwt_streams)
@@ -405,18 +405,6 @@ def create_wastewater_process(ins, outs, process_ID='6', flowsheet=None,
                               include_pump_building_cost=False,
                               include_excavation_cost=False,
                               **AF_kwargs)
-
-    # # This isn't working, think of a better way to deal with it
-    # _RX03_cost = RX03._cost
-    # def adjust_heat_loss():
-    #     _RX03_cost()
-    #     loss_kW = RX02._heat_loss + RX03._heat_loss
-    #     # Assume the heat loss in RX02/RX03 can be compensated by heat exchange
-    #     # with RX01 with an 80% heat transfer efficiency
-    #     RX01.heat_utilities[0].duty += loss_kW * _kW_to_kJhr / 0.8
-    #     RX02.power_utility.rate -= RX02._heat_loss
-    #     RX03.power_utility.rate -= RX03._heat_loss
-    # RX03._cost = adjust_heat_loss
 
     MX02 = bst.units.Mixer(f'M{X}02', ins=(RX01-0, RX02-0, RX03-0))
     BiogasUpgrading('Upgrading', ins=(MX02-0, 'foo'), outs=(RNG, biogas))

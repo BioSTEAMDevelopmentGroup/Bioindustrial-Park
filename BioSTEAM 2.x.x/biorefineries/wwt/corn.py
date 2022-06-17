@@ -25,6 +25,24 @@ info = {
     'ww_price': None,
     }
 
+CF_dct = {
+    ##### Feeds #####
+    'alpha_amylase': ('AlphaAmylase',), # 0.00082 soluble protein and water #!!! check concentration
+    'ammonia': ('NH3',),
+    'corn': ('Corn',), # adjust for the moisture content
+    'denaturant': ('Denaturant',),
+    'gluco_amylase': ('GlucoAmylase',), # 0.0011 soluble protein and water #!!! check concentration
+    'lime': ('CaO',),
+    'natural_gas': ('CH4',),
+    'sulfuric_acid': ('H2SO4',),
+    ('X611', 'ins', 2): ('CH4',),
+    'yeast': ('Yeast',),
+    ##### Co-products #####
+    'crude_oil': ('CornOil',), # triolein
+    'DDGS': ('DDGS',),
+     # `s4` (from MH103) taken care of by WWT
+}
+
 
 # %%
 
@@ -35,23 +53,6 @@ info = {
 def create_cn_comparison_systems(biodegradability=1): # will be multiplied by 0.86/0.05 for biogas/cell mass
     wwt_kwdct = dict.fromkeys(('IC_kwargs', 'AnMBR_kwargs',), {'biodegradability': biodegradability,})
     wwt_kwdct['skip_AeF'] = True
-    CF_dct = {
-        ##### Feeds #####
-        'alpha_amylase': ('AlphaAmylase',), # 0.00082 soluble protein and water #!!! check concentration
-        'ammonia': ('NH3',),
-        'corn': ('Corn',), # adjust for the moisture content
-        'denaturant': ('Denaturant',),
-        'gluco_amylase': ('GlucoAmylase',), # 0.0011 soluble protein and water #!!! check concentration
-        'lime': ('CaO',),
-        'natural_gas': ('CH4',),
-        'sulfuric_acid': ('H2SO4',),
-        ('X611', 'ins', 2): ('CH4',),
-        'yeast': ('Yeast',),
-        ##### Co-products #####
-        'crude_oil': ('CornOil',), # triolein
-        'DDGS': ('DDGS',),
-         # `s4` (from MH103) taken care of by WWT
-    }
     sys_dct = {
         'system_name': 'corn_sys',
         'create_wastewater_process': wwt_kwdct,
@@ -81,6 +82,7 @@ def create_cn_comparison_models():
     ##### Existing system #####
     exist_model_dct = {
         'abbr': info['abbr'],
+        'CF_dct': CF_dct,
         'feedstock': 'corn',
         'FERM_product': info['FERM_product'],
         'PT_rx': 'V310',
@@ -127,4 +129,5 @@ if __name__ == '__main__':
         include_baseline=True,
         include_uncertainty=True,
         N_uncertainty=100,
+        # uncertainty_skip_exist=True,
         )

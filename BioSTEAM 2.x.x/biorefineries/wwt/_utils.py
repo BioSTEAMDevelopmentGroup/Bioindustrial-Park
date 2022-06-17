@@ -606,14 +606,15 @@ def get_MPSP(system, product='ethanol', print_msg=True):
             break
 
     sale_dct = {}
-    for stream in system.products:
+    for stream in sys.products:
+        if stream is product: continue
         if stream.price:
-            cache_dct[f'{stream.ID} price'] = stream.price
-            sale_dct[f'{stream.ID} ratio'] = stream.cost
-    cache_dct[f'{product} price'] = price / factor
-    cache_dct['MPSP'] = price
-    sales = sum(v for v in sale_dct.values())
-    cache_dct.update({k:v/sales for k, v in sale_dct.items()})
+            if stream.price < 0: continue # a waste stream, not a product
+            sale_dct[f'{stream.ID} ratio{suffix}'] = stream.cost
+    sale_dct[f'Electricity ratio{suffix}'] = max(0, -sys.power_utility.cost)
+    sale_dct[f'Product ratio{suffix}'] = product.F_mass*price/factor
+    hourly_sales = sum(v for v in sale_dct.values())
+    cache_dct.update({k:v/hourly_sales for k, v in sale_dct.items()})
 
     if print_msg: print(f'\n{txt[0]} of {product.ID} for {system.ID}: ${price:.2f}/{txt[1]}.')
     return price
@@ -678,6 +679,7 @@ GWP_CFs = {
     'DAP': 1.6712,
     'Denaturant': denaturant_CF,
     'Electricity': (0.4398, 0.4184), # consumption, production (US mix, distributed/non-distributed)
+    # 'Electricity': (0.4398, 0.), # consumption, production (if want to allocate based on the value)
     'Ethanol': 1.4610 + 1/46.06844*44.0095*2, # not the denatured one, CO2 emission included
     'GlucoAmylase': 5.5135, # assumed to be for the solution
     'GlycerinPure': glycerin_pure_CF,
@@ -693,15 +695,15 @@ GWP_CFs = {
     'Sugarcane': sugarcane_CF,
     'Yeast': 2.5554, # assumed to be for the solution
     ##### Products, no needs to make product CFs negative #####
-    'Biodiesel': 0,
-    'CornOil': 0,
-    'DDGS': 0,
-    'GlycerinCrude': 0,
-    # # Allocate based on the value
-    # 'Biodiesel': biodiesel_CF,
-    # 'CornOil': 75.5919/1e3, # from corn, transportation excluded
-    # 'DDGS': 0.8607, # from corn
-    # 'GlycerinCrude': glycerin_crude_CF,
+    # # If want to allocate based on the value
+    # 'Biodiesel': 0,
+    # 'CornOil': 0,
+    # 'DDGS': 0,
+    # 'GlycerinCrude': 0,
+    'Biodiesel': biodiesel_CF,
+    'CornOil': 75.5919/1e3, # from corn, transportation excluded
+    'DDGS': 0.8607, # from corn
+    'GlycerinCrude': glycerin_crude_CF,
     }
 # All feeds
 GWP_CFs['Lime'] = GWP_CFs['CaO'] * 56.0774/74.093 # CaO to Ca(OH)2
@@ -742,6 +744,11 @@ def get_GWP(system, product='ethanol', print_msg=True):
             cache_dct = unit.cache_dct
             break
 
-    GWP = system.get_net_impact('GWP')/system.operating_hours * factor * cache_dct[f'{product.ID} ratio']/product.F_mass
+    total_GWP =  (
+            system.get_net_impact('GWP') +
+            min(system.get_total_products_impact('GWP'), 0) - # positive if having product credit
+            min(system.get_net_electricity_impact('GWP'), 0) # negative if producing electricity
+            )
+    GWP = total_GWP/system.operating_hours * factor * cache_dct[f'{product.ID} ratio']/product.F_mass
     if print_msg: print(f'\n{txt[0]} of {product.ID} for {system.ID}: {GWP:.2f} kg CO2/{txt[1]}.')
     return GWP

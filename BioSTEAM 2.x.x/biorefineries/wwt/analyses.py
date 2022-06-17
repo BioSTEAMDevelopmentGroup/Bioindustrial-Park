@@ -11,6 +11,7 @@ import os, pandas as pd
 from copy import deepcopy
 from biorefineries.wwt import results_path
 
+#!!! Need to decide whether to use the displacement or allocation approach for LCA
 def summarize_baselines(names=None, dir_path=None):
     dir_path = dir_path or os.path.join(results_path, 'baselines')
     MPSP_exist, MPSP_new, MPSP_RIN, MPSP_no_WWT = [], [], [], []
@@ -30,13 +31,13 @@ def summarize_baselines(names=None, dir_path=None):
             per = 'kg'
             MPSP_exist.append(get_val('exist', f'MPSP [$/{per}]'))
         MPSP_new.append(get_val('new', f'MPSP [$/{per}]'))
-        MPSP_RIN.append(get_val('new', f'MPSP w RIN [$/{per}]'))
-        MPSP_no_WWT.append(get_val('new', f'MPSP no WWT [$/{per}]'))
+        MPSP_RIN.append(get_val('new', f'MPSP_RIN [$/{per}]'))
+        MPSP_no_WWT.append(get_val('new', f'MPSP_no WWT [$/{per}]'))
 
-        GWP_exist.append(get_val('exist', f'GWP [kg CO2/{per}]'))
-        GWP_new.append(get_val('new', f'GWP [kg CO2/{per}]'))
-        GWP_RIN.append(get_val('new', f'GWP w RIN [kg CO2/{per}]'))
-        GWP_no_WWT.append(get_val('new', f'GWP no WWT [kg CO2/{per}]'))
+        GWP_exist.append(get_val('exist', f'Product GWP disp [kg CO2/{per}]'))
+        GWP_new.append(get_val('new', f'Product GWP disp [kg CO2/{per}]'))
+        GWP_RIN.append(get_val('new', f'Product GWP disp_RIN [kg CO2/{per}]'))
+        GWP_no_WWT.append(get_val('new', f'Product GWP disp_no WWT [kg CO2/{per}]'))
 
         CAPEX_WWT_exist.append(get_val('exist', 'WWT CAPEX [MM$]'))
         CAPEX_WWT_new.append(get_val('new', 'WWT CAPEX [MM$]'))

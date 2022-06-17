@@ -25,6 +25,23 @@ info = {
     'ww_price': None,
     }
 
+CF_dct = {
+    ##### Feeds #####
+    'ammonia': ('NH4OH',), # NH4OH
+    'caustic_R502': ('NaOH',),
+    'CSL': ('CSL',),
+    'enzyme_M301': ('Cellulase',), # this is pure enzyme
+    'ethanol': ('Ethanol',),
+    'feedstock': ('CornStover',),
+    'lime': ('Lime',),
+    'lime_CHP': ('Lime',),
+    'natural_gas': ('CH4',),
+    'polymer_R502': ('Polymer',),
+    'sulfuric_acid': ('H2SO4',),
+    ##### Co-products #####
+    # following the lactic paper baseline, gypsum not included
+    }
+
 
 # %%
 
@@ -35,22 +52,6 @@ info = {
 #
 def create_la_comparison_systems(biodegradability=1): # will be multiplied by 0.86/0.05 for biogas/cell mass
     wwt_kwdct = dict.fromkeys(('IC_kwargs', 'AnMBR_kwargs',), {'biodegradability': biodegradability,})
-    CF_dct = {
-        ##### Feeds #####
-        'ammonia': ('NH4OH',), # NH4OH
-        'caustic_R502': ('NaOH',),
-        'CSL': ('CSL',),
-        'enzyme_M301': ('Cellulase',), # this is pure enzyme
-        'ethanol': ('Ethanol',),
-        'feedstock': ('CornStover',),
-        'lime': ('Lime',),
-        'lime_CHP': ('Lime',),
-        'natural_gas': ('CH4',),
-        'polymer_R502': ('Polymer',),
-        'sulfuric_acid': ('H2SO4',),
-        ##### Co-products #####
-        # following the lactic paper baseline, gypsum not included
-        }
     sys_dct = {
         # 'load': {'print_results': False}, # need to run `simulate_and_print` for results to match
         'system_name': 'lactic_sys',
@@ -85,6 +86,7 @@ def create_la_comparison_models():
     ##### Existing system #####
     exist_model_dct = {
         'abbr': info['abbr'],
+        'CF_dct': CF_dct,
         'feedstock': 'feedstock',
         'FERM_product': info['FERM_product'],
         'sludge': 'wastes_to_CHP',
@@ -134,8 +136,9 @@ if __name__ == '__main__':
     exist_model, new_model = evaluate_la_models(
         include_baseline=True,
         include_uncertainty=True,
-        include_BMP=True,
+        # include_BMP=True,
         N_uncertainty=100,
+        # uncertainty_skip_exist=True,
         # N_BMP=10,
         # BMPs=(0.5, 0.9499,), # allow for minor error
         )

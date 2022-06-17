@@ -25,6 +25,29 @@ info = {
     'ww_price': None,
     }
 
+CF_dct = {
+    ##### Feeds #####
+    'catalyst': ('TEcatalyst',), # methanol and NaOCH3
+    'denaturant': ('Denaturant'),
+    # 'dryer_natural_gas': ('CH4',), # used to be in the registry, but not any more
+    'H3PO4': ('H3PO4',),
+    'HCl': ('HCl',),
+    'lime': ('CaO', 0.046), # CaO and water
+    'methanol': ('Methanol',),
+    'NaOH': ('NaOH',),
+    'natural_gas': ('CH4',), # usually not needed
+    'oilcane': ('Oilcane',), # moisture content already adjusted
+    'polymer': ('Polymer'),
+    'pure_glycerine': ('GlycerinPure',),
+    ##### Co-products #####
+    'biodiesel': ('Biodiesel',), # has <0.01 wt% impurities
+    'crude_glycerol': ('GlycerinCrude',),
+    # 'Yeast': ('Yeast',), # no price considered, no GWP considered (probably used in fermentation)
+    # `fiber_fines`, `wastewater`, `vinasse` taken care of by WWT
+    # `filter_cake` taken care of by BT
+    # `s46` (from `T302`) is empty
+    }
+
 
 # %%
 
@@ -35,28 +58,6 @@ info = {
 def create_oc1g_comparison_systems(biodegradability=1): # will be multiplied by 0.86/0.05 for biogas/cell mass
     wwt_kwdct = dict.fromkeys(('IC_kwargs', 'AnMBR_kwargs',), {'biodegradability': biodegradability,})
     wwt_kwdct['skip_AeF'] = True
-    CF_dct = {
-        ##### Feeds #####
-        'catalyst': ('TEcatalyst',), # methanol and NaOCH3
-        'denaturant': ('Denaturant'),
-        # 'dryer_natural_gas': ('CH4',), # used to be in the registry, but not any more
-        'H3PO4': ('H3PO4',),
-        'HCl': ('HCl',),
-        'lime': ('CaO', 0.046), # CaO and water
-        'methanol': ('Methanol',),
-        'NaOH': ('NaOH',),
-        'natural_gas': ('CH4',), # usually not needed
-        'oilcane': ('Oilcane',), # moisture content already adjusted
-        'polymer': ('Polymer'),
-        'pure_glycerine': ('GlycerinPure',),
-        ##### Co-products #####
-        'biodiesel': ('Biodiesel',), # has <0.01 wt% impurities
-        'crude_glycerol': ('GlycerinCrude',),
-        # 'Yeast': ('Yeast',), # no price considered, no GWP considered (probably used in fermentation)
-        # `fiber_fines`, `wastewater`, `vinasse` taken care of by WWT
-        # `filter_cake` taken care of by BT
-        # `s46` (from `T302`) is empty
-        }
     sys_dct = {
         'load': {'name': 'O1', 'cache': None, 'reduce_chemicals': False},
         'system_name': 'oilcane_sys',
@@ -91,6 +92,7 @@ def create_oc1g_comparison_models():
     ##### Existing system #####
     exist_model_dct = {
         'abbr': info['abbr'],
+        'CF_dct': CF_dct,
         'feedstock': 'oilcane',
         'FERM_product': info['FERM_product'],
         'PT_rx': 'R301',
@@ -140,4 +142,5 @@ if __name__ == '__main__':
         include_baseline=True,
         include_uncertainty=True,
         N_uncertainty=100,
+        # uncertainty_skip_exist=True,
         )
