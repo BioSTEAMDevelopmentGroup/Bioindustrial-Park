@@ -21,7 +21,7 @@ info = {
     'WWT_ID': '7',
     'is2G': False,
     'FERM_product': 'ethanol',
-    'add_CHP': True,
+    'add_BT': True,
     'ww_price': None,
     }
 
@@ -34,6 +34,7 @@ CF_dct = {
     'gluco_amylase': ('GlucoAmylase',), # 0.0011 soluble protein and water #!!! check concentration
     'lime': ('CaO',),
     'natural_gas': ('CH4',),
+    'steam':('Steam',),
     'sulfuric_acid': ('H2SO4',),
     ('X611', 'ins', 2): ('CH4',),
     'yeast': ('Yeast',),
@@ -55,6 +56,8 @@ def create_cn_comparison_systems(biodegradability=1): # will be multiplied by 0.
     wwt_kwdct['skip_AeF'] = True
     sys_dct = {
         'system_name': 'corn_sys',
+        'BT': 'CHP',
+        # 'BT': 'BT',
         'create_wastewater_process': wwt_kwdct,
         'ww_streams': (('MH103', 1), ('MX5', 0)),
         'CF_dct': CF_dct,
@@ -100,7 +103,9 @@ def create_cn_comparison_models():
     ##### With the new wastewater treatment process #####
     new_model_dct = exist_model_dct.copy()
     new_model_dct['BT'] = 'CHP'
+    # new_model_dct['BT'] = 'BT'
     new_model_dct['BT_eff'] = ('eff',) # need to be an Iterable
+    # new_model_dct['BT_eff'] = ('boiler_efficiency', 'turbogenerator_efficiency')
     new_model_dct['sludge'] = 'sludge'
     new_model_dct['biogas'] = 'biogas'
     new_model_dct['wwt_system'] = 'new_sys_wwt'

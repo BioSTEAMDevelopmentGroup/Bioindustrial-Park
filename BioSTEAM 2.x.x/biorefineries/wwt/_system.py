@@ -38,7 +38,7 @@ kwdct = {
 }
 
 def create_comparison_systems(info, functions, sys_dct={}):
-    abbr, WWT_ID, is2G, FERM_product, add_CHP, ww_price = info.values()
+    abbr, WWT_ID, is2G, FERM_product, add_BT, ww_price = info.values()
     kwdct.update(sys_dct)
 
     if kwdct['new_wwt_connections']:
@@ -140,9 +140,19 @@ def create_comparison_systems(info, functions, sys_dct={}):
         getattr(new_u, sludge_u).ins[sludge_idx] = getattr(new_s, sludge_ID)
         getattr(new_u, biogas_u).ins[biogas_idx] = getattr(new_s, biogas_ID)
 
-    if add_CHP:
+    if add_BT:
         CHP = CHPunit('CHP', ins=(new_s.biogas, new_s.sludge))
         getattr(new_u, 'Caching').wwt_units.append(CHP)
+        # BT = bst.BoilerTurbogenerator('BT',
+        #                                (new_s.sludge, new_s.biogas, 
+        #                                 'boiler_makeup_water',
+        #                                 'natural_gas',
+        #                                 'FGD_lime',
+        #                                 'boilerchems'),
+        #                                ('emissions', 'rejected_water_and_blowdown', 'ash_disposal'),
+        #                                boiler_efficiency=0.80,
+        #                                turbogenerator_efficiency=0.85)
+        # getattr(new_u, 'Caching').wwt_units.append(BT)
 
     new_sys = bst.System.from_units('new_sys', units=new_u)
 

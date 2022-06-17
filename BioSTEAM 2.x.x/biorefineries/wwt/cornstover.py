@@ -21,7 +21,7 @@ info = {
     'WWT_ID': '6',
     'is2G': True,
     'FERM_product': 'ethanol',
-    'add_CHP': False,
+    'add_BT': False,
     'ww_price': None,
     }
 
@@ -132,7 +132,7 @@ if __name__ == '__main__':
         include_uncertainty=True,
         # include_BMP=True,
         N_uncertainty=100,
-        uncertainty_skip_exist=True,
+        # uncertainty_skip_exist=True,
         # N_BMP=10,
         # BMPs=(0.5, 0.9499,), # allow for minor error
         )

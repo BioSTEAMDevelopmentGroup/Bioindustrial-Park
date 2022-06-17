@@ -21,7 +21,7 @@ info = {
     'WWT_ID': '5',
     'is2G': True,
     'FERM_product': 'lactic_acid',
-    'add_CHP': False,
+    'add_BT': False,
     'ww_price': None,
     }
 

@@ -606,13 +606,13 @@ def get_MPSP(system, product='ethanol', print_msg=True):
             break
 
     sale_dct = {}
-    for stream in sys.products:
+    for stream in system.products:
         if stream is product: continue
         if stream.price:
             if stream.price < 0: continue # a waste stream, not a product
-            sale_dct[f'{stream.ID} ratio{suffix}'] = stream.cost
-    sale_dct[f'Electricity ratio{suffix}'] = max(0, -sys.power_utility.cost)
-    sale_dct[f'Product ratio{suffix}'] = product.F_mass*price/factor
+            sale_dct[f'{stream.ID} ratio'] = stream.cost
+    sale_dct['Electricity ratio'] = max(0, -system.power_utility.cost)
+    sale_dct['Product ratio'] = product.F_mass*price/factor
     hourly_sales = sum(v for v in sale_dct.values())
     cache_dct.update({k:v/hourly_sales for k, v in sale_dct.items()})
 
@@ -692,6 +692,7 @@ GWP_CFs = {
     'NaOH': 2.0092,
     'NH3': 2.6355,
     'Polymer': 0, # for existing wastewater treatment, small quantity, ignored
+    'Steam': 0.0860362, # per MJ, GREET 2021, mix natural gas and still gas
     'Sugarcane': sugarcane_CF,
     'Yeast': 2.5554, # assumed to be for the solution
     ##### Products, no needs to make product CFs negative #####
@@ -713,7 +714,11 @@ GWP_CFs['Oilcane'] = GWP_CFs['Sugarcane'] # oilcane assumed to be the same as su
 GWP_CFs['TEcatalyst'] = GWP_CFs['Methanol']*0.75 + GWP_CFs['NaOCH3']*0.25
 
 def add_CFs(stream_registry, unit_registry, stream_CF_dct):
+    has_steam = False
     for ID, key_factor in stream_CF_dct.items():
+        if ID == 'steam':
+            has_steam = True
+            continue
         stream = stream_registry.search(ID) if isinstance(ID, str) \
             else getattr(unit_registry.search(ID[0]), ID[1])[ID[2]]
         if stream: # some streams might only exist in exist/new systems
@@ -726,6 +731,10 @@ def add_CFs(stream_registry, unit_registry, stream_CF_dct):
 
             stream.characterization_factors['GWP'] = GWP_CFs[key]*factor
     bst.PowerUtility.set_CF('GWP', *GWP_CFs['Electricity'])
+    if has_steam:
+        steam = stream_registry.search('steam')
+        MJ = steam.H / 1e3 # enthalpy in kJ/hr
+        steam.characterization_factors['GWP'] = MJ/steam.F_mass * GWP_CFs['Steam'] 
 
 
 # Allocation based on the value
@@ -749,6 +758,6 @@ def get_GWP(system, product='ethanol', print_msg=True):
             min(system.get_total_products_impact('GWP'), 0) - # positive if having product credit
             min(system.get_net_electricity_impact('GWP'), 0) # negative if producing electricity
             )
-    GWP = total_GWP/system.operating_hours * factor * cache_dct[f'{product.ID} ratio']/product.F_mass
+    GWP = total_GWP/system.operating_hours * factor * cache_dct['Product ratio']/product.F_mass
     if print_msg: print(f'\n{txt[0]} of {product.ID} for {system.ID}: {GWP:.2f} kg CO2/{txt[1]}.')
     return GWP

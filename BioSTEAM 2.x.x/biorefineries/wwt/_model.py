@@ -89,15 +89,16 @@ def add_biorefinery_parameters(model, model_dct, f, u, s, get_obj, get_rxn, para
             param(Setter(stream, 'price'), name=f'{stream.ID} price',
                   kind='cost', element=stream, units='USD/kg',
                   baseline=b, distribution=D)
-        b = stream.get_CF('GWP')
-        if b:
-            D = get_default_distribution('triangle', b)
-            param(DictSetter(stream, 'characterization_factors', 'GWP'),
-                  name=f'{stream.ID} CF',
-                  kind='cost', element=stream, units='kg CO2/kg',
-                  baseline=b, distribution=D)
+            b = stream.get_CF('GWP')
+            if b:
+                D = get_default_distribution('triangle', b)
+                param(DictSetter(stream, 'characterization_factors', 'GWP'),
+                      name=f'{stream.ID} CF',
+                      kind='cost', element=stream, units='kg CO2/kg',
+                      baseline=b, distribution=D)
 
     # Natural gas is a utility stream in some biorefineries, need to be added separately
+    Upgrading = u.search('Upgrading')
     b = bst.stream_utility_prices['Natural gas']
     D = get_default_distribution('triangle', b)
     @param(name='Natural gas price', element='biorefinery', kind='cost', units='$/kg',
@@ -106,6 +107,18 @@ def add_biorefinery_parameters(model, model_dct, f, u, s, get_obj, get_rxn, para
         for ng in ng_streams: 
             if ng: ng.price = price 
         bst.stream_utility_prices['Natural gas'] = price
+        if Upgrading: Upgrading.FNG_price = price
+        
+    ng = ng_streams[0] if ng_streams else None
+    if ng:
+        b = ng.characterization_factors['GWP']
+        D = get_default_distribution('triangle', b)
+        @param(name='Natural gas CF', element='biorefinery', kind='cost', units='kg CO2/kg',
+               baseline=b, distribution=D)
+        def set_natural_gas_CF(CF):
+            for ng in ng_streams: 
+                if ng: ng.characterization_factors['GWP'] = CF
+            if Upgrading: Upgrading.FNG_CF = CF
 
     # Electricity price and CF
     b = bst.PowerUtility.price
@@ -228,7 +241,7 @@ def add_biodiesel_parameters(model, model_dct, f, u, s, get_obj, get_rxn, param)
 
 def add_combustion_parameters(model, model_dct, f, u, s, get_obj, get_rxn, param):
     BT = get_obj(u, 'BT')
-    if not BT: return model # 1G biorefinery without BT/CHP
+    if not BT: return model # 1G biorefinery without BT/CHP (cn_exist)
 
     BT_eff = model_dct['BT_eff']
     if len(BT_eff) == 2:
@@ -695,12 +708,12 @@ def add_metrics(model, model_dct, f, u, s, get_obj):
 
             # Calculate the CO2 cost to compare the RIN tradeoff
             cache_dct = Caching.cache_dct
-            GWP_disp_diff = (cache_dct['Net GWP_RIN']-cache_dct['Net GWP']) / 1e3 # tonne CO2/yr
-            GWP_econ_diff = (cache_dct['Total GWP_RIN']-cache_dct['Total GWP']) / 1e3 # tonne CO2/yr
+            GWP_net_diff = (cache_dct['Net GWP_RIN']-cache_dct['Net GWP']) / 1e3 # tonne CO2/yr            
+            GWP_tot_diff = (cache_dct['Total GWP_RIN']-cache_dct['Total GWP']) / 1e3 # tonne CO2/yr
             cost_diff = cache_dct['MPSP'] - cache_dct['MPSP_RIN'] # $/unit product
             cost_diff *= product.F_mass/factor*sys.operating_hours # $/yr
-            cache_dct['CO2 cost disp'] = cost_diff / GWP_disp_diff
-            cache_dct['CO2 cost econ'] = cost_diff / GWP_econ_diff
+            cache_dct['CO2 cost net'] = cost_diff / GWP_net_diff
+            cache_dct['CO2 cost total'] = cost_diff / GWP_tot_diff
             Upgrading.ratio = 0
             for u in resimulate_units: u.simulate()
             return MPSP
@@ -823,8 +836,8 @@ def add_metrics(model, model_dct, f, u, s, get_obj):
                 Metric('MPSP_no WWT', get_MPSP_no_WWT, f'$/{gal_or_kg}'),
                 Metric('Product GWP disp_no WWT', lambda: Caching.cache_dct['Product GWP disp_no WWT'], f'kg CO2/{gal_or_kg}'),
                 Metric('Product GWP econ_no WWT', lambda: Caching.cache_dct['Product GWP econ_no WWT'], f'kg CO2/{gal_or_kg}'),
-                Metric('CO2 cost disp', lambda: Caching.cache_dct['CO2 cost disp'], '$/tonne CO2'),
-                Metric('CO2 cost econ', lambda: Caching.cache_dct['CO2 cost econ'], '$/tonne CO2'),
+                Metric('CO2 cost net', lambda: Caching.cache_dct['CO2 cost net'], '$/tonne CO2'),
+                Metric('CO2 cost total', lambda: Caching.cache_dct['CO2 cost total'], '$/tonne CO2'),
                 Metric('Product yield', lambda: product.F_mass/factor*sys.operating_hours, f'{gal_or_kg}/yr'),
                 # GWP breakdowns
                 Metric('Net GWP', lambda: Caching.cache_dct['Net GWP'], 'kg CO2/yr'), # displacement
@@ -896,7 +909,7 @@ def add_metrics(model, model_dct, f, u, s, get_obj):
             eff = BT.eff
             energy = sum(get_combustion_energy(i) for i in wwt_energy_streams if i is not None)
             return energy*eff/3600/1e3*wwt_system.operating_hours
-    else: get_wwt_produced_energy = lambda: 0 # no BT/CHP
+    else: get_wwt_produced_energy = lambda: 0 # no BT/CHP (cn_exist)
 
     def get_ECR():
         wwt_energy = get_wwt_produced_energy()
@@ -1029,7 +1042,7 @@ def evaluate_models(
         include_uncertainty=False,
         include_BMP=False,      
         percentiles=(0, 0.05, 0.25, 0.5, 0.75, 0.95, 1),
-        seed=3221, N_uncertainty=1000, uncertainty_skip_exist=True,
+        seed=3221, N_uncertainty=1000, uncertainty_skip_exist=False,
         BMPs=(0.5, 0.6, 0.7, 0.8, 0.9, 0.9499), N_BMP=100, # 0.9499 is for minor error
         ):
     args = [exist_model, new_model, abbr]

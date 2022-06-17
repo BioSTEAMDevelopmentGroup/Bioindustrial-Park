@@ -21,7 +21,7 @@ info = {
     'WWT_ID': '8',
     'is2G': False,
     'FERM_product': 'ethanol',
-    'add_CHP': False,
+    'add_BT': False,
     'ww_price': None,
     }
 
