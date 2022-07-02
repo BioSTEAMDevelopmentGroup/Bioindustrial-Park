@@ -45,15 +45,15 @@ def _load_chemicals():
 def _load_system(dct):
     import biosteam as bst
     from biosteam import main_flowsheet as F, UnitGroup
-    global lipidcane_sys, lipidcane_tea, specs, flowsheet, _system_loaded
+    global lipidcane_sys, lipidcane_tea, sys, tea, specs, flowsheet, _system_loaded
     global biodiesel_production_units, ethanol_production_units
     flowsheet = bst.Flowsheet('lipidcane')
     F.set_flowsheet(flowsheet)
     bst.settings.set_thermo(chemicals)
     load_process_settings()
-    lipidcane_sys = create_lipidcane_to_biodiesel_and_conventional_ethanol_system()
+    sys = lipidcane_sys = create_lipidcane_to_biodiesel_and_conventional_ethanol_system()
     lipidcane_sys.simulate()
-    lipidcane_tea = create_tea(lipidcane_sys)
+    tea = lipidcane_tea = create_tea(lipidcane_sys)
     lipidcane_tea.IRR = lipidcane_tea.solve_IRR()
     dct.update(flowsheet.to_dict())
     biodiesel_production_units = UnitGroup('Biodisel production units', 

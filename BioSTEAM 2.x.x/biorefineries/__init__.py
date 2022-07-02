@@ -7,7 +7,7 @@
 # for license details.
 """
 """
-__version__ = '2.23.16'
+__version__ = '2.23.17'
 
 import sys, biosteam
 version_components = sys.version.split('.')

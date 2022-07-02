@@ -423,7 +423,7 @@ def plot_spearman_tea(with_units=None, aspect_ratio=0.8, **kwargs):
         ],
         kind='TEA',
         with_units=with_units,
-        cutoff=0.05,
+        cutoff=0.025,
         **kwargs
     )
     plt.subplots_adjust(left=0.45, right=0.975, top=0.98, bottom=0.08)
@@ -445,7 +445,7 @@ def plot_spearman_tea_short(**kwargs):
         ],
         kind='TEA',
         with_units=False,
-        cutoff=0.05,
+        cutoff=0.025,
         top=5,
         legend=True,
         legend_kwargs={'loc': 'upper left'},
@@ -470,7 +470,7 @@ def plot_spearman_lca_short(with_units=False, aspect_ratio=0.65, **kwargs):
         ],
         kind='LCA',
         with_units=with_units,
-        cutoff=0.05,
+        cutoff=0.025,
         top=5,
         legend=False,
         **kwargs
@@ -494,7 +494,7 @@ def plot_spearman_lca(with_units=None, aspect_ratio=0.65, **kwargs):
         ],
         kind='LCA',
         with_units=with_units,
-        cutoff=0.05,
+        cutoff=0.025,
         **kwargs
     )
     plt.subplots_adjust(left=0.45, right=0.975, top=0.98, bottom=0.10)
@@ -599,8 +599,8 @@ def plot_heatmap_comparison(comparison_names=None, xlabels=None):
 def plot_kde(name, metrics=(GWP_ethanol, MFPP), xticks=None, yticks=None,
              xbox_kwargs=None, ybox_kwargs=None, top_left='',
              top_right='Tradeoff', bottom_left='Tradeoff',
-             bottom_right=''):
-    set_font(size=8)
+             bottom_right='', fs=None):
+    set_font(size=fs or 8)
     set_figure_size(width='half', aspect_ratio=1.1)
     Xi, Yi = [i.index for i in metrics]
     df = oc.get_monte_carlo(name, metrics)
@@ -828,7 +828,7 @@ def plot_feedstock_comparison_kde(fs=None):
         file = os.path.join(images_folder, f'feedstock_comparison_kde.{i}')
         plt.savefig(file, transparent=True)
 
-def plot_configuration_comparison_kde():
+def plot_configuration_comparison_kde(fs=None):
     plot_kde(
         'O1 - O2',
         yticks=[-10, 0, 10, 20, 30, 40, 50],
@@ -837,6 +837,7 @@ def plot_configuration_comparison_kde():
         bottom_left='MFPP\nTradeoff()',
         top_left='DC Favored()',
         bottom_right='ICF\nFavored()',
+        fs=fs,
     )
     for i in ('svg', 'png'):
         file = os.path.join(images_folder, f'configuration_comparison_kde.{i}')
@@ -877,7 +878,7 @@ def plot_crude_configuration_comparison_kde():
         file = os.path.join(images_folder, f'crude_configuration_comparison_kde.{i}')
         plt.savefig(file, transparent=True)
 
-def plot_agile_comparison_kde():
+def plot_agile_comparison_kde(fs=None):
     plot_kde_2d(
         ('O1* - O1', 'O2* - O2'),
         metrics=[TCI, MFPP],
@@ -893,6 +894,7 @@ def plot_agile_comparison_kde():
         xbox_kwargs=dict(light=CABBI_colors.green_dirty.RGBn, 
                          dark=CABBI_colors.green_dirty.shade(60).RGBn),
         titles=['(A) Direct Cogeneration', '(B) Integrated Co-Fermentation'],
+        fs=fs,
     )
     for i in ('svg', 'png'):
         file = os.path.join(images_folder, f'agile_conventional_comparison_kde.{i}')
@@ -1155,8 +1157,8 @@ def plot_spearman(configurations, labels=None, metric=None,
     material_GWP = '$\\mathrm{kg} \\cdot \\mathrm{CO}_{2}\\mathrm{eq} \\cdot \\mathrm{kg}^{-1}$'
     feedstock_GWP = '$\\mathrm{g} \\cdot \\mathrm{CO}_{2}\\mathrm{eq} \\cdot \\mathrm{kg}^{-1}$'
     index, ignored_list = zip(*[
-         ('Crushing mill oil recovery [60 $-$ 95 %]', ['S2', 'S1', 'S2*', 'S1*']),
-         ('Saccharification oil recovery [70 $-$ 95 %]', ['S2', 'S1', 'S2*', 'S1*', 'O1', 'O1*']),
+         ('Crushing mill oil recovery [60 $-$ 90 %]', ['S2', 'S1', 'S2*', 'S1*']),
+         ('Saccharification oil recovery [70 $-$ 90 %]', ['S2', 'S1', 'S2*', 'S1*', 'O1', 'O1*']),
         (f'Cane operating days [120 $-$ 180 {operating_days}]', []),
         (f'Sorghum operating days [30 $-$ 60 {operating_days}]', ['S2', 'S1', 'O1', 'O2']),
         (f'Crushing capacity [1.2 $-$ 2.0 {capacity}]', []),

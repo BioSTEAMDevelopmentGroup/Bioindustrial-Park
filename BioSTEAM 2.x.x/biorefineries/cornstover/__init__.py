@@ -58,20 +58,20 @@ def _load_chemicals():
 def _load_system():
     import biosteam as bst
     from biosteam import main_flowsheet as F
-    global cornstover_sys, cornstover_tea, specs, flowsheet, _system_loaded
+    global cornstover_sys, cornstover_tea, sys, tea, specs, flowsheet, _system_loaded
     global Area100, Area200, Area300, Area400, Area500, Area600, Area700, Area800
     global AllAreas, areas, ethanol_price_gal
     flowsheet = bst.Flowsheet('cornstover')
     F.set_flowsheet(flowsheet)
     bst.settings.set_thermo(chemicals)
     load_process_settings()
-    cornstover_sys = create_system(include_blowdown_recycle=_include_blowdown_recycle)
+    sys = cornstover_sys = create_system(include_blowdown_recycle=_include_blowdown_recycle)
     cornstover_sys.simulate()
     u = F.unit
     OSBL_units = (u.WWTC, u.CWP, u.CT, u.PWC, u.ADP,
                   u.T701, u.T702, u.P701, u.P702, u.M701, u.FT,
                   u.CSL_storage, u.DAP_storage, u.BT)
-    cornstover_tea = create_tea(cornstover_sys, OSBL_units=OSBL_units)
+    tea = cornstover_tea = create_tea(cornstover_sys, OSBL_units=OSBL_units)
     ethanol = F.stream.ethanol
     ethanol.price = cornstover_tea.solve_price(ethanol)
     ethanol_price_gal = ethanol.price * ethanol_density_kggal

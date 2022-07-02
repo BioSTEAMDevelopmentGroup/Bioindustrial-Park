@@ -16,12 +16,12 @@ ugroup = UnitGroup('Biorefinery', tea.units)
 ethanol = sc.ethanol
 products = (ethanol,)
 
-get_prodcost = lambda: float(tea.production_cost(products))
+get_prodcost = lambda: float(tea.total_production_cost(products, with_annual_depreciation=False))
 get_FCI = lambda: tea._FCI_cached
-get_prod = lambda: ethanol.F_mass * tea._operating_hours
-get_steam = lambda: sum([i.flow for i in sc.BT.steam_utilities])*18.01528*tea._operating_hours/1000
-get_electricity_consumption = lambda: tea._operating_hours * ugroup.get_electricity_consumption()
-get_electricity_production = lambda: tea._operating_hours * ugroup.get_electricity_production()
+get_prod = lambda: ethanol.F_mass * tea.operating_hours
+get_steam = lambda: sum([i.flow for i in sc.BT.steam_utilities])*18.01528*tea.operating_hours/1000
+get_electricity_consumption = lambda: tea.operating_hours * ugroup.get_electricity_consumption()
+get_electricity_production = lambda: tea.operating_hours * ugroup.get_electricity_production()
 get_excess_electricity = lambda: get_electricity_production() - get_electricity_consumption()
 
 metrics = (Metric('Internal rate of return', sc.sugarcane_tea.solve_IRR, '%'),
@@ -32,7 +32,7 @@ metrics = (Metric('Internal rate of return', sc.sugarcane_tea.solve_IRR, '%'),
            Metric('Consumed electricity', get_electricity_consumption, 'MWhr/yr'),
            Metric('Excess electricity', get_excess_electricity, 'MWhr/yr'))
 
-sugarcane_model = Model(sc.sugarcane_sys, metrics, skip=False)
+sugarcane_model = Model(sc.sugarcane_sys, metrics)
 sugarcane_model.load_default_parameters(sc.sugarcane)
 param = sugarcane_model.parameter
 
@@ -67,8 +67,11 @@ def set_rvf_solids_retention(solids_retention):
 
 
 
-
-
+def test(N=1000, optimize=True):
+    from warnings import filterwarnings
+    filterwarnings('ignore')
+    sugarcane_model.load_samples(sugarcane_model.sample(N, 'L'), optimize=optimize)
+    sugarcane_model.evaluate(notify=50)
 
 
 

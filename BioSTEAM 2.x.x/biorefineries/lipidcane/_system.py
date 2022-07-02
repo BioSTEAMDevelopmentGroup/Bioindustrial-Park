@@ -72,8 +72,8 @@ def create_juicing_and_lipid_extraction_system(ins, outs, pellet_bagasse=None):
     )
     clarified_juice, bagasse = juicing_sys.outs
     u = f.unit
-    u.U201.isplit['Lipid'] = 0.01 # Crushing mill
-    u.S201.isplit['Lipid'] = 0.88 # Fiber screener 
+    u.U201.isplit['Lipid'] = 0.10 # Crushing mill
+    u.S201.isplit['Lipid'] = 1.00 # Fiber screener 
     u.C201.isplit['Lipid'] = 0.98 # Clarifier
     
     # Separate oil and sugar

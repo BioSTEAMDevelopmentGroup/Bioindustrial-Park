@@ -365,12 +365,14 @@ def create_dilute_acid_pretreatment_system(
     T203 = units.AmmoniaAdditionTank(f'T{n+3}', (F201-1, M205-0))
     P202 = units.HydrolyzatePump(f'P{n+2}', T203-0, hydrolyzate)
     
+    T201.sulfuric_acid_loading_per_dry_mass = 0.02316
+    
     @T201.add_specification(run=True)
     def update_sulfuric_acid_loading():
         F_mass_dry_feedstock = feedstock.F_mass - feedstock.imass['water']
         sulfuric_acid, = H2SO4_storage.ins
         warm_water, _ = M201.ins
-        sulfuric_acid.F_mass = 0.02316 * F_mass_dry_feedstock
+        sulfuric_acid.F_mass = T201.sulfuric_acid_loading_per_dry_mass * F_mass_dry_feedstock
         warm_water.F_mass = 0.282 * F_mass_dry_feedstock
     
     neutralization_rxn = tmo.Reaction('2 NH4OH + H2SO4 -> (NH4)2SO4 + 2 H2O', 'H2SO4', 1)

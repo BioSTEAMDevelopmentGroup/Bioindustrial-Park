@@ -600,7 +600,7 @@ def load(name, cache=cache, reduce_chemicals=True,
     if abs(number) in (2, 4):
         cellulase_mixer, = [i for i in flowsheet.unit if hasattr(i, 'enzyme_loading')]
    
-    @default(0.02, units='wt. % cellulose', element='cellulase')
+    @default(0.02, units='wt. % cellulose', element='cellulase', kind='coupled')
     def set_cellulase_loading(cellulase_loading):
         if abs(number) in (2, 4): cellulase_mixer.enzyme_loading = cellulase_loading
     
@@ -609,7 +609,7 @@ def load(name, cache=cache, reduce_chemicals=True,
         PRS_cost_item.cost = base_cost
     
     @uniform(85, 97.5, units='%', element='Pretreatment and saccharification',
-             baseline=85)
+             baseline=85, kind='coupled')
     def set_cane_glucose_yield(cane_glucose_yield):
         if agile:
             cane_mode.glucose_yield = cane_glucose_yield
@@ -617,13 +617,13 @@ def load(name, cache=cache, reduce_chemicals=True,
             set_glucose_yield(cane_glucose_yield)
     
     @uniform(79, 97.5, units='%', element='Pretreatment and saccharification',
-             baseline=79)
+             baseline=79, kind='coupled')
     def set_sorghum_glucose_yield(sorghum_glucose_yield):
         if not agile: return
         sorghum_mode.glucose_yield = sorghum_glucose_yield
         
     @uniform(65, 97.5, units='%', element='Pretreatment and saccharification',
-             baseline=65)
+             baseline=65, kind='coupled')
     def set_cane_xylose_yield(cane_xylose_yield):
         if agile:
             cane_mode.xylose_yield = cane_xylose_yield
@@ -631,13 +631,13 @@ def load(name, cache=cache, reduce_chemicals=True,
             set_xylose_yield(cane_xylose_yield)
     
     @uniform(86, 97.5, units='%', element='Pretreatment and saccharification',
-             baseline=86)
+             baseline=86, kind='coupled')
     def set_sorghum_xylose_yield(sorghum_xylose_yield):
         if not agile: return
         sorghum_mode.xylose_yield = sorghum_xylose_yield
     
     @uniform(90, 95, units='%', element='Cofermenation',
-             baseline=90)
+             baseline=90, kind='coupled')
     def set_glucose_to_ethanol_yield(glucose_to_ethanol_yield):
         if abs(number) in (2, 4):
             glucose_to_ethanol_yield *= 0.01
@@ -655,7 +655,7 @@ def load(name, cache=cache, reduce_chemicals=True,
             fermentor.cofermentation.X[2] = X3 * 0.0526 # 95% towards ethanol, the other 5% goes towards cell mass
     
     @uniform(50, 95, units='%', element='Cofermenation',
-             baseline=50)
+             baseline=50, kind='coupled')
     def set_xylose_to_ethanol_yield(xylose_to_ethanol_yield):
         if abs(number) in (2, 4):
             # fermentor.cofermentation[6].X = 0.004 # Baseline
@@ -673,7 +673,7 @@ def load(name, cache=cache, reduce_chemicals=True,
             fermentor.cofermentation.X[3] = X3 * 0.0526 # 95% towards ethanol, the other 5% goes towards cell mass
 
     @uniform(68.5, 137, units='g/L', element='Cofermentation',
-             baseline=68.5)
+             baseline=68.5, kind='coupled')
     def set_cofermentation_titer(titer):
         if abs(number) in (2, 4): fermentor.titer = titer
 

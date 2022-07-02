@@ -209,3 +209,10 @@ Chemicals:
     default: True
     search_db: False
     phase: solids
+  Urea:
+    default: True
+    phase: solid
+  MgSO4:
+    default: True
+    phase: solid
+      

@@ -25,6 +25,7 @@ __all__ = (
     'create_sugar_crystallization_system',
     'create_sugarcane_to_sugar_and_molasses_system',
     'convert_fiber_to_lignocelluosic_components',
+    'set_sugarcane_composition',
 )
 
 
@@ -102,7 +103,23 @@ ash_disposal = skw('ash_disposal')
 molasses = skw('molasses')
 sugar = skw('sugar', price=0.419) # https://markets.businessinsider.com/commodities/sugar-price?op=1 (3/18/2022)
       
-def convert_fiber_to_lignocelluosic_components(stream):
+def set_sugarcane_composition(stream, water, fiber, sugar):
+    chemicals = stream.chemicals
+    if 'Sugar' not in chemicals:
+        IDs = ('Sucrose', 'Glucose')
+        chemicals.define_group('Sugar', IDs, composition=stream.imass[IDs], wt=True)
+    if 'Fiber' not in chemicals:
+        IDs = ('Cellulose', 'Hemicellulose', 'Lignin')
+        chemicals.define_group('Fiber', IDs, composition=stream.imass[IDs], wt=True)
+    if 'Other' not in chemicals:
+        IDs = ('Ash', 'Solids')
+        chemicals.define_group('Other', IDs, composition=stream.imass[IDs], wt=True)
+    F_mass = stream.F_mass
+    other = 1 - water - fiber - sugar
+    assert other > 0, (water, fiber, sugar, other)
+    stream.imass['Water', 'Fiber', 'Sugar', 'Other'] = F_mass * np.array([water, fiber, sugar, other])
+
+def convert_fiber_to_lignocelluosic_components(stream, ignore_acetate=False):
     chemicals = stream.chemicals
     if chemicals is convert_fiber_to_lignocelluosic_components.last_chemicals:
         prxn = convert_fiber_to_lignocelluosic_components.last_reaction
@@ -118,9 +135,16 @@ def convert_fiber_to_lignocelluosic_components(stream):
         # Arabinan: 1.7%
         # Lignin: 23.2%
         # Acetyl: 3.0%
-        hemicellulose_rxn = tmo.Reaction(
-            '30.2 Hemicellulose -> 24.9 Xylan + 1.7 Arabinan + 0.6 Galactan + 3 Acetate', 'Hemicellulose', 
-            1.0, basis='wt', chemicals=chemicals)
+        if ignore_acetate:
+            hemicellulose_rxn = tmo.Reaction(
+                '27.2 Hemicellulose -> 24.9 Xylan + 1.7 Arabinan + 0.6 Galactan', 'Hemicellulose', 
+                1.0, basis='wt', chemicals=chemicals
+            )
+        else:
+            hemicellulose_rxn = tmo.Reaction(
+                '30.2 Hemicellulose -> 24.9 Xylan + 1.7 Arabinan + 0.6 Galactan + 3 Acetate', 'Hemicellulose', 
+                1.0, basis='wt', chemicals=chemicals
+            )
         hemicellulose_rxn.basis = 'mol'
         convert_fiber_to_lignocelluosic_components.last_chemicals = chemicals
         convert_fiber_to_lignocelluosic_components.last_reaction = prxn = tmo.ParallelReaction(
@@ -193,7 +217,8 @@ def create_juicing_system_without_treatment(ins, outs, pellet_bagasse=None):
     
     @U201.add_specification(run=True)
     def update_imbibition_water():
-        imbibition_water.imass['Water'] = 0.245 * U201.ins[0].F_mass
+        feed = U201.ins[0]
+        imbibition_water.imass['Water'] = 0.245 * (feed.F_mass - feed.imass['Water']) / 0.7
     
     U202 = units.ConveyingBelt('U202', U201-0, [''] if pellet_bagasse else [bagasse])
     
@@ -298,7 +323,8 @@ def create_juicing_system_up_to_clarification(ins, outs, pellet_bagasse=None):
     # Specifications dependent on lipid cane flow rate
     @U201.add_specification(run=True)
     def correct_flows():
-        F_mass = U201.ins[0].F_mass
+        feed = U201.ins[0]
+        F_mass = (feed.F_mass - feed.imass['Water']) / 0.7
         # correct lime, phosphoric acid, and imbibition water
         lime.imass['CaO', 'Water'] = 0.001 * F_mass * np.array([0.046, 0.954])
         H3PO4.imass['H3PO4', 'Water'] = 0.00025 * F_mass
@@ -568,7 +594,7 @@ def create_sugar_crystallization_system(ins, outs):
     @T1.add_specification(run=True)
     def correct_flows():
         F_mass = T1.ins[0].F_mass
-        # correct lime, phosphoric acid, and imbibition water
+        # correct lime and phosphoric acid
         lime.imass['CaO', 'Water'] = 0.1 * F_mass * np.array([0.046, 0.954])
         H3PO4.imass['H3PO4', 'Water'] = 0.025 * F_mass
     

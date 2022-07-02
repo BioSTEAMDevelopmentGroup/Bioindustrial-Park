@@ -207,7 +207,10 @@ def montecarlo_results_short(names, metrics=None, derivative=None):
             data = df[index].values
             q05, q50, q95 = roundsigfigs(np.percentile(data, [5, 50, 95], axis=0), 3)
             key = get_monte_carlo_key(index, dct, False)
-            dct[key] = f"{q50} [{q05}, {q95}]"
+            if q50 < 0:
+                dct[key] = f"{-q50} [{-q95}, {-q05}] -negative-"
+            else:
+                dct[key] = f"{q50} [{q05}, {q95}]"
     return results
 
 def montecarlo_results_feedstock_comparison():
