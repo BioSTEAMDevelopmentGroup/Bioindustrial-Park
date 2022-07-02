@@ -21,9 +21,28 @@ info = {
     'WWT_ID': '7',
     'is2G': False,
     'FERM_product': 'ethanol',
-    'add_CHP': True,
+    'add_BT': True,
     'ww_price': None,
     }
+
+CF_dct = {
+    ##### Feeds #####
+    'alpha_amylase': ('AlphaAmylase',), # 0.00082 soluble protein and water #!!! check concentration
+    'ammonia': ('NH3',),
+    'corn': ('Corn',), # adjust for the moisture content
+    'denaturant': ('Denaturant',),
+    'gluco_amylase': ('GlucoAmylase',), # 0.0011 soluble protein and water #!!! check concentration
+    'lime': ('CaO',),
+    'natural_gas': ('CH4',),
+    'steam':('Steam',),
+    'sulfuric_acid': ('H2SO4',),
+    ('X611', 'ins', 2): ('CH4',),
+    'yeast': ('Yeast',),
+    ##### Co-products #####
+    'crude_oil': ('CornOil',), # triolein
+    'DDGS': ('DDGS',),
+     # `s4` (from MH103) taken care of by WWT
+}
 
 
 # %%
@@ -35,25 +54,10 @@ info = {
 def create_cn_comparison_systems(biodegradability=1): # will be multiplied by 0.86/0.05 for biogas/cell mass
     wwt_kwdct = dict.fromkeys(('IC_kwargs', 'AnMBR_kwargs',), {'biodegradability': biodegradability,})
     wwt_kwdct['skip_AeF'] = True
-    CF_dct = {
-        ##### Feeds #####
-        'alpha_amylase': ('AlphaAmylase',), # 0.00082 soluble protein and water #!!! check concentration
-        'ammonia': ('NH3',),
-        'corn': ('Corn',), # adjust for the moisture content
-        'denaturant': ('Denaturant',),
-        'gluco_amylase': ('GlucoAmylase',), # 0.0011 soluble protein and water #!!! check concentration
-        'lime': ('CaO',),
-        'natural_gas': ('CH4',),
-        'sulfuric_acid': ('H2SO4',),
-        ('X611', 'ins', 2): ('CH4',),
-        'yeast': ('Yeast',),
-        ##### Co-products #####
-        'crude_oil': ('CornOil',), # triolein
-        'DDGS': ('DDGS',),
-         # `s4` (from MH103) taken care of by WWT
-    }
     sys_dct = {
         'system_name': 'corn_sys',
+        'BT': 'CHP',
+        # 'BT': 'BT',
         'create_wastewater_process': wwt_kwdct,
         'ww_streams': (('MH103', 1), ('MX5', 0)),
         'CF_dct': CF_dct,
@@ -81,6 +85,7 @@ def create_cn_comparison_models():
     ##### Existing system #####
     exist_model_dct = {
         'abbr': info['abbr'],
+        'CF_dct': CF_dct,
         'feedstock': 'corn',
         'FERM_product': info['FERM_product'],
         'PT_rx': 'V310',
@@ -98,7 +103,9 @@ def create_cn_comparison_models():
     ##### With the new wastewater treatment process #####
     new_model_dct = exist_model_dct.copy()
     new_model_dct['BT'] = 'CHP'
+    # new_model_dct['BT'] = 'BT'
     new_model_dct['BT_eff'] = ('eff',) # need to be an Iterable
+    # new_model_dct['BT_eff'] = ('boiler_efficiency', 'turbogenerator_efficiency')
     new_model_dct['sludge'] = 'sludge'
     new_model_dct['biogas'] = 'biogas'
     new_model_dct['wwt_system'] = 'new_sys_wwt'
@@ -123,9 +130,9 @@ def evaluate_cn_models(**eval_kwdct):
 if __name__ == '__main__':
     # exist_sys, new_sys = simulate_cn_systems(biodegradability=1)
     # exist_model, new_model = create_cn_comparison_models()
-    exist_model, new_model = evaluate_cn_models(
-        # include_baseline=False,
-        # include_uncertainty=False,
-        include_biodegradability=False, # biodegradability for 1G should be high
-        N_uncertainty=1000,
+    exist_model, new_model = evaluate_cn_models( # 1G BMP should be high
+        include_baseline=True,
+        include_uncertainty=True,
+        N_uncertainty=100,
+        # uncertainty_skip_exist=True,
         )

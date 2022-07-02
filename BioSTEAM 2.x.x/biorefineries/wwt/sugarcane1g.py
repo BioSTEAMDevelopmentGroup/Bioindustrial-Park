@@ -3,7 +3,7 @@
 # Bioindustrial-Park: BioSTEAM's Premier Biorefinery Models and Results
 # Copyright (C) 2022-, Yalin Li <mailto.yalin.li@gmail.com>
 #
-# Part of this module is based on the oilcane biorefinery:
+# Part of this module is based on the oilcane biorefinery (configuration S1/-1):
 # https://github.com/BioSTEAMDevelopmentGroup/Bioindustrial-Park/tree/master/BioSTEAM%202.x.x/biorefineries/oilcane
 #
 # This module is under the UIUC open-source license. See
@@ -21,8 +21,23 @@ info = {
     'WWT_ID': '8',
     'is2G': False,
     'FERM_product': 'ethanol',
-    'add_CHP': False,
+    'add_BT': False,
     'ww_price': None,
+    }
+
+CF_dct = {
+    ##### Feeds #####
+    'denaturant': ('Denaturant'),
+    # 'dryer_natural_gas': ('CH4',), # used to be in the registry, but not any more
+    'H3PO4': ('H3PO4',),
+    'lime': ('CaO', 0.046), # CaO and water
+    'polymer': ('Polymer',),
+    'sugarcane': ('Sugarcane',), # moisture content already adjusted
+    ##### Co-products #####
+    # 'Yeast': ('Yeast',), # no price considered, no GWP considered (probably used in fermentation)
+    # `fiber_fines`, `wastewater`, `vinasse` taken care of by WWT
+    # `filter_cake` taken care of by BT
+    # `s41` (from `T302`) is empty
     }
 
 
@@ -35,20 +50,6 @@ info = {
 def create_sc1g_comparison_systems(biodegradability=1): # will be multiplied by 0.86/0.05 for biogas/cell mass
     wwt_kwdct = dict.fromkeys(('IC_kwargs', 'AnMBR_kwargs',), {'biodegradability': biodegradability,})
     wwt_kwdct['skip_AeF'] = True
-    CF_dct = {
-        ##### Feeds #####
-        'denaturant': ('Denaturant'),
-        # 'dryer_natural_gas': ('CH4',), # used to be in the registry, but not any more
-        'H3PO4': ('H3PO4',),
-        'lime': ('CaO', 0.046), # CaO and water
-        'polymer': ('Polymer',),
-        'sugarcane': ('Sugarcane',), # moisture content already adjusted
-        ##### Co-products #####
-        # 'Yeast': ('Yeast',), # no price considered, no GWP considered (probably used in fermentation)
-        # `fiber_fines`, `wastewater`, `vinasse` taken care of by WWT
-        # `filter_cake` taken care of by BT
-        # `s41` (from `T302`) is empty
-        }
     sys_dct = {
         'load': {'name': 'S1', 'cache': None, 'reduce_chemicals': False},
         'system_name': 'oilcane_sys',
@@ -84,6 +85,7 @@ def create_sc1g_comparison_models():
     ##### Existing system #####
     exist_model_dct = {
         'abbr': info['abbr'],
+        'CF_dct': CF_dct,
         'feedstock': 'sugarcane',
         'FERM_product': info['FERM_product'],
         'PT_rx': 'R301',
@@ -125,9 +127,9 @@ def evaluate_sc1g_models(**eval_kwdct):
 if __name__ == '__main__':
     # exist_sys, new_sys = simulate_sc1g_systems(biodegradability=1)
     # exist_model, new_model = create_sc1g_comparison_models()
-    exist_model, new_model = evaluate_sc1g_models(
-        # include_baseline=False,
-        # include_uncertainty=False,
-        include_biodegradability=False, # biodegradability for 1G should be high
-        N_uncertainty=1000,
+    exist_model, new_model = evaluate_sc1g_models( # 1G BMP should be high
+        include_baseline=True,
+        include_uncertainty=True,
+        N_uncertainty=100,
+        # uncertainty_skip_exist=True,
         )

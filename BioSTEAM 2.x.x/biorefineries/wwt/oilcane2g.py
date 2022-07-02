@@ -3,7 +3,7 @@
 # Bioindustrial-Park: BioSTEAM's Premier Biorefinery Models and Results
 # Copyright (C) 2022-, Yalin Li <mailto.yalin.li@gmail.com>
 #
-# Part of this module is based on the oilcane biorefinery:
+# Part of this module is based on the oilcane biorefinery (configuration O2/2):
 # https://github.com/BioSTEAMDevelopmentGroup/Bioindustrial-Park/tree/master/BioSTEAM%202.x.x/biorefineries/oilcane
 #
 # This module is under the UIUC open-source license. See
@@ -21,8 +21,31 @@ info = {
     'WWT_ID': '5',
     'is2G': True,
     'FERM_product': 'ethanol',
-    'add_CHP': False,
+    'add_BT': False,
     'ww_price': None,
+    }
+
+CF_dct = {
+    ##### Feeds #####
+    'catalyst': ('TEcatalyst',), # methanol and NaOCH3
+    'caustic': ('NaOH', 0.5), # NaOH and water
+    'cellulase': ('Cellulase', 0.05), # cellulase and water
+    'CSL': ('CSL',),
+    'DAP': ('DAP',),
+    'denaturant': ('Denaturant'),
+    'FGD_lime': ('Lime', 0.4513), # lime and water
+    'H3PO4': ('H3PO4',),
+    'HCl': ('HCl',),
+    'lime': ('CaO', 0.046), # CaO and water
+    'methanol': ('Methanol',),
+    'NaOH': ('NaOH',),
+    'natural_gas': ('CH4',),
+    'oilcane': ('Oilcane',), # moisture content already adjusted
+    'polymer': ('Polymer',),
+    'pure_glycerine': ('GlycerinPure',),
+    ##### Co-products #####
+    'biodiesel': ('Biodiesel',), # has <0.01 wt% impurities
+    'crude_glycerol': ('GlycerinCrude',),
     }
 
 
@@ -34,28 +57,6 @@ info = {
 
 def create_oc2g_comparison_systems(biodegradability=1): # will be multiplied by 0.86/0.05 for biogas/cell mass
     wwt_kwdct = dict.fromkeys(('IC_kwargs', 'AnMBR_kwargs',), {'biodegradability': biodegradability,})
-    CF_dct = {
-        ##### Feeds #####
-        'catalyst': ('TEcatalyst',), # methanol and NaOCH3
-        'caustic': ('NaOH', 0.5), # NaOH and water
-        'cellulase': ('Cellulase', 0.05), # cellulase and water
-        'CSL': ('CSL',),
-        'DAP': ('DAP',),
-        'denaturant': ('Denaturant'),
-        'FGD_lime': ('Lime', 0.4513), # lime and water
-        'H3PO4': ('H3PO4',),
-        'HCl': ('HCl',),
-        'lime': ('CaO', 0.046), # CaO and water
-        'methanol': ('Methanol',),
-        'NaOH': ('NaOH',),
-        'natural_gas': ('CH4',),
-        'oilcane': ('Oilcane',), # moisture content already adjusted
-        'polymer': ('Polymer',),
-        'pure_glycerine': ('GlycerinPure',),
-        ##### Co-products #####
-        'biodiesel': ('Biodiesel',), # has <0.01 wt% impurities
-        'crude_glycerol': ('GlycerinCrude',),
-        }
     sys_dct = {
         'load': {'name': 'O2', 'cache': None, 'reduce_chemicals': False},
         'system_name': 'oilcane_sys',
@@ -89,6 +90,7 @@ def create_oc2g_comparison_models():
     ##### Existing system #####
     exist_model_dct = {
         'abbr': info['abbr'],
+        'CF_dct': CF_dct,
         'feedstock': 'oilcane',
         'FERM_product': info['FERM_product'],
         'sludge': 'sludge',
@@ -143,10 +145,11 @@ if __name__ == '__main__':
     # exist_sys, new_sys = simulate_oc2g_systems(biodegradability=1)
     # exist_model, new_model = create_oc2g_comparison_models()
     exist_model, new_model = evaluate_oc2g_models(
-        # include_baseline=False,
-        # include_uncertainty=False,
-        include_biodegradability=False,
-        N_uncertainty=1000,
-        # N_biodegradability=10,
-        # biodegradability=(0.5, 1,),
+        include_baseline=True,
+        include_uncertainty=True,
+        # include_BMP=True,
+        N_uncertainty=100,
+        # uncertainty_skip_exist=True,
+        # N_BMP=10,
+        # BMPs=(0.5, 0.9499,), # allow for minor error
         )

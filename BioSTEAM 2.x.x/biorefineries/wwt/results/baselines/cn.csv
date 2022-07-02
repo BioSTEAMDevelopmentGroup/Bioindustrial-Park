@@ -1,112 +1,61 @@
 ,,0
-exist,MPSP [$/gal],1.7118653724445145
-exist,GWP [kg CO2/gal],3.7186726969788086
-exist,MPSP no WWT [$/gal],1.3801050943053694
-exist,Total CAPEX [MM$],29.317664852934943
+exist,MPSP [$/gal],1.474423008518943
+exist,Product GWP disp [kg CO2/gal],2.9421917565003537
+exist,Product GWP econ [kg CO2/gal],3.7768777133114257
+exist,MPSP_no WWT [$/gal],1.4252195620711543
+exist,Total CAPEX [MM$],29.39168117750951
 exist,WWT CAPEX [MM$],0.0
 exist,WWT CAPEX frac,0.0
-exist,Total input GWP [kg CO2/gal],3.7186726350351185
-exist,WWT input GWP [kg CO2/gal],0.0
-exist,WWT input GWP frac,0.0
-exist,Annual net electricity [MWh/yr],16408.39616942974
-exist,Annual electricity consumption [MWh/yr],16408.39616942974
+exist,Annual net electricity [MWh/yr],16427.324710233544
+exist,Annual electricity consumption [MWh/yr],16427.324710233544
 exist,WWT annual electricity consumption [MWh/yr],0.0
 exist,WWT annual electricity consumption frac,0.0
-exist,Total electricity GWP [kg CO2/gal],0.027349877440143264
-exist,WWT electricity GWP [kg CO2/gal],0.0
-exist,Mixer-WWmixer installed cost [MM$],0.0
-exist,Mixer-WWmixer annual electricity consumption [MWh/yr],0.0
-exist,Mixer-SolidsMixer installed cost [MM$],0.0
-exist,Mixer-SolidsMixer annual electricity consumption [MWh/yr],0.0
-exist,Skipped-Caching installed cost [MM$],0.0
-exist,Skipped-Caching annual electricity consumption [MWh/yr],0.0
-exist,corn impact [kg CO2/gal],0.0
-exist,ammonia impact [kg CO2/gal],0.0
-exist,natural_gas impact [kg CO2/gal],0.0
-exist,lime impact [kg CO2/gal],0.0
-exist,alpha_amylase impact [kg CO2/gal],0.0
-exist,gluco_amylase impact [kg CO2/gal],0.0
-exist,sulfuric_acid impact [kg CO2/gal],0.0
-exist,yeast impact [kg CO2/gal],0.0
-exist,denaturant impact [kg CO2/gal],0.0
-exist,s84 impact [kg CO2/gal],0.0
-new,MPSP [$/gal],1.4020543388666316
-new,GWP [kg CO2/gal],3.0238273632260886
-new,MPSP no WWT [$/gal],1.3740307417256088
-new,GWP no WWT [kg CO2/gal],2.998834593522529
-new,WW price [¢/kg],0.1689394893967943
-new,COD price per kg [¢/kg],20.975493291577127
-new,COD price per ton [$/ton],190.28646589071408
-new,WW GWP [g CO2/kg],1.5066822903153274
-new,COD GWP per kg [g CO2/kg],18.706937250662072
-new,COD GWP per ton [kg CO2/ton],169.70647257660698
+exist,WWT produced energy [MWh/yr],0.0
+exist,WWT ECR,0.0
+exist,Clear cache,
+new,MPSP [$/gal],1.4471740568156752
+new,Product GWP disp [kg CO2/gal],2.6613034908077973
+new,Product GWP econ [kg CO2/gal],3.7203849224425816
+new,MPSP_RIN [$/gal],1.4220902972090588
+new,Product GWP disp_RIN [kg CO2/gal],2.6547491739875504
+new,Product GWP econ_RIN [kg CO2/gal],3.6933809967844446
+new,MPSP_no WWT [$/gal],1.4252742664658857
+new,Product GWP disp_no WWT [kg CO2/gal],2.7147373638957806
+new,Product GWP econ_no WWT [kg CO2/gal],3.7525539575721503
+new,CO2 cost net [$/tonne CO2],-3827.0593708759643
+new,CO2 cost total [$/tonne CO2],292.4054421695642
+new,Product yield [gal/yr],41684811.40656485
+new,Net GWP [kg CO2/yr],110935934.10995571
+new,Total GWP [kg CO2/yr],191796133.9771594
+new,Product ratio,0.8085853485989187
+new,Electricity ratio,0.0
+new,Net GWP_RIN [kg CO2/yr],110662718.64940484
+new,Total GWP_RIN [kg CO2/yr],195372031.13150537
+new,Product ratio_RIN,0.7880242090533452
+new,Electricity ratio_RIN,0.0
+new,RNG yield_RIN [kg/yr],1228487.108251563
+new,RNG ratio_RIN,0.022138090754253506
+new,RNG CF econ_RIN [kg CO2/kg],3.5207237641979576
+new,Total GWP_no WWT [kg CO2/yr],194023514.8995543
+new,Product ratio_no WWT,0.8062141544819159
+new,Electricity ratio_no WWT,0.0
+new,WW price [¢/kg],0.13202228753761835
+new,WW GWP disp [g CO2/kg],-3.2212464340498697
+new,WW GWP econ [g CO2/kg],-1.9393014900365169
+new,COD price [$/tonne],163.9186087558122
+new,COD GWP disp [kg CO2/tonne],-399.94931445088116
+new,COD GWP econ [kg CO2/tonne],-240.78328601470466
 new,COD in [mg/L],7777.007541917569
 new,COD out [mg/L],15.759521411608413
 new,COD removal,0.9979735751409954
-new,COD load [kg/hr],703.176514591553
-new,MPSP w RIN [$/gal],1.3771008671050409
-new,GWP w RIN [kg CO2/gal],2.905621540343024
-new,Total CAPEX [MM$],35.78637875374156
+new,COD annual load [tonne/yr],5569.1579955651
+new,Total CAPEX [MM$],35.861698509612175
 new,WWT CAPEX [MM$],5.427749132854864
-new,WWT CAPEX frac,0.1516708122440966
-new,Total input GWP [kg CO2/gal],3.0245255056914986
-new,WWT input GWP [kg CO2/gal],0.003227312010774698
-new,WWT input GWP frac,0.0010670473780768585
-new,Annual net electricity [MWh/yr],11831.024098091133
-new,Annual electricity consumption [MWh/yr],18561.17998558332
+new,WWT CAPEX frac,0.15135226044578007
+new,Annual net electricity [MWh/yr],11849.952648535183
+new,Annual electricity consumption [MWh/yr],18580.108536024673
 new,WWT annual electricity consumption [MWh/yr],2152.7838161535783
-new,WWT annual electricity consumption frac,0.11598313349828353
-new,Total electricity GWP [kg CO2/gal],0.016070497901823553
-new,WWT electricity GWP [kg CO2/gal],0.0029242022933718558
-new,Mixer-M701 installed cost [MM$],0.0
-new,Mixer-M701 annual electricity consumption [MWh/yr],0.0
-new,InternalCirculationRx-R701 installed cost [MM$],0.8521261288347917
-new,InternalCirculationRx-R701 annual electricity consumption [MWh/yr],130.24423073906237
-new,AnMBR-R702 installed cost [MM$],0.6360492750591187
-new,AnMBR-R702 annual electricity consumption [MWh/yr],158.8269101134259
-new,Skipped-R703 installed cost [MM$],0.0
-new,Skipped-R703 annual electricity consumption [MWh/yr],0.0
-new,Splitter-S701 installed cost [MM$],0.0
-new,Splitter-S701 annual electricity consumption [MWh/yr],0.0
-new,Mixer-M703 installed cost [MM$],0.0
-new,Mixer-M703 annual electricity consumption [MWh/yr],0.0
-new,BeltThickener-S702 installed cost [MM$],0.037622268197199375
-new,BeltThickener-S702 annual electricity consumption [MWh/yr],11.209808950153887
-new,SludgeCentrifuge-S703 installed cost [MM$],0.058242943198428605
-new,SludgeCentrifuge-S703 annual electricity consumption [MWh/yr],2.461529212784044
-new,Mixer-M702 installed cost [MM$],0.0
-new,Mixer-M702 annual electricity consumption [MWh/yr],0.0
-new,BiogasUpgrading-Upgrading installed cost [MM$],0.0
-new,BiogasUpgrading-Upgrading annual electricity consumption [MWh/yr],0.0
-new,ReverseOsmosis-S704 installed cost [MM$],3.7436381145639417
-new,ReverseOsmosis-S704 annual electricity consumption [MWh/yr],1706.125768236152
-new,Skipped-Caching installed cost [MM$],0.0
-new,Skipped-Caching annual electricity consumption [MWh/yr],0.0
-new,Pump-R701_eff installed cost [MM$],0.023837170808718052
-new,Pump-R701_eff annual electricity consumption [MWh/yr],128.0242913067588
-new,Pump-R701_sludge installed cost [MM$],0.01526826406916533
-new,Pump-R701_sludge annual electricity consumption [MWh/yr],2.219939432303524
-new,Pump-S702_eff installed cost [MM$],0.01555663454424085
-new,Pump-S702_eff annual electricity consumption [MWh/yr],8.748279737369844
-new,Pump-S702_sludge installed cost [MM$],0.015265633652958523
-new,Pump-S702_sludge annual electricity consumption [MWh/yr],2.4615292127840434
-new,Pump-S703_eff installed cost [MM$],0.015268318278761933
-new,Pump-S703_eff annual electricity consumption [MWh/yr],2.0012190314093683
-new,Pump-S703_sludge installed cost [MM$],0.014874381647540572
-new,Pump-S703_sludge annual electricity consumption [MWh/yr],0.4603101813746757
-new,gluco_amylase impact [kg CO2/gal],0.0
-new,sulfuric_acid impact [kg CO2/gal],0.0
-new,yeast impact [kg CO2/gal],0.0
-new,s172 impact [kg CO2/gal],0.0
-new,denaturant impact [kg CO2/gal],0.0
-new,corn impact [kg CO2/gal],0.0
-new,natural_gas impact [kg CO2/gal],0.0
-new,ammonia impact [kg CO2/gal],0.0
-new,naocl_R702 impact [kg CO2/gal],0.0
-new,lime impact [kg CO2/gal],0.0
-new,citric_R702 impact [kg CO2/gal],0.0
-new,bisulfite_R702 impact [kg CO2/gal],0.0
-new,alpha_amylase impact [kg CO2/gal],0.0
+new,WWT annual electricity consumption frac,0.1158649752760906
 new,WWT produced energy [MWh/yr],7250.43703249537
 new,WWT ECR,0.2969178004725956
-new,Clear cache,0.0
+new,Clear cache,

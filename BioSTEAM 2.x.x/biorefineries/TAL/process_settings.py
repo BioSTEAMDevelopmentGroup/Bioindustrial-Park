@@ -164,7 +164,8 @@ activated_carbon_price = 41. # $/ft^3 # Seader et al.
 PdC_price = 0.075*(2045./0.0311035) \
       + (1-0.075)*0.20 # Pd : 2045 EIB (USD/troy-ounce) per https://apps.catalysts.basf.com/apps/eibprices/mp/ (accessed 6/3/2022)
                        #!!! activated carbon: $0.20/kg
-                       
+spent_PdC_price = 1. # assumed
+
 price = {'SA': SA_price,
          'TCP': TCP_price,
          'AuPd': AuPd_price,
@@ -176,6 +177,7 @@ price = {'SA': SA_price,
          'Acetoin': acetoin_price,
          'RaneyNi': RaneyNi_price,
          'PdC': PdC_price,
+         'Spent PdC': spent_PdC_price,
          'Feedstock': feedstock_price,
          'Glucose': glucose_price,
          'Hexanol': hexanol_price,
