@@ -318,7 +318,7 @@ def load(name, cache=cache, reduce_chemicals=True,
             for unit in sys.path:
                 if isinstance(unit, bst.AnaerobicDigestion):
                     sys.converge_method = 'fixed-point'
-    oilcane_sys.set_tolerance(rmol=1e-4, mol=1e-2, subsystems=True)
+    oilcane_sys.set_tolerance(rmol=1e-4, mol=1e-2, subsystems=True, subfactor=1.5)
     dct.update(flowsheet.to_dict())
     
     def get_stream(ID):
@@ -549,7 +549,7 @@ def load(name, cache=cache, reduce_chemicals=True,
     
     @default(1600000, units='MT/yr', kind='coupled')
     def set_annual_crushing_capacity(annual_crushing_capacity):
-        feedstock.F_mass = kg_per_MT * annual_crushing_capacity / tea.operating_hours
+        sys.rescale(feedstock, kg_per_MT * annual_crushing_capacity / tea.operating_hours / feedstock.F_mass)
 
     # USDA ERS historical price data
     @parameter(distribution=ethanol_price_distribution, element=s.ethanol, 

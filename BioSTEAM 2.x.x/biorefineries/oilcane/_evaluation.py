@@ -153,7 +153,8 @@ def run_uncertainty_and_sensitivity(name, N, rule='L',
                                     across_oil_content=False, 
                                     sample_cache={},
                                     autosave=True,
-                                    autoload=True):
+                                    autoload=True,
+                                    optimize=True):
     np.random.seed(1)
     from warnings import filterwarnings
     filterwarnings('ignore', category=bst.utils.DesignWarning)
@@ -163,7 +164,7 @@ def run_uncertainty_and_sensitivity(name, N, rule='L',
         samples = sample_cache[key]
     else:
         sample_cache[key] = samples = oc.model.sample(N, rule)
-    oc.model.load_samples(samples)
+    oc.model.load_samples(samples, optimize=optimize)
     file = monte_carlo_file(name, across_oil_content)
     if across_oil_content:
         if parse(name).number < 0:
@@ -211,10 +212,10 @@ def run_uncertainty_and_sensitivity(name, N, rule='L',
                 break
         if not success:
             raise RuntimeError('evaluation failed')
-        oc.model.table.to_excel(file)
+        # oc.model.table.to_excel(file)
         rho, p = oc.model.spearman_r()
         file = spearman_file(name)
-        rho.to_excel(file)
+        # rho.to_excel(file)
 
 run = run_uncertainty_and_sensitivity
     

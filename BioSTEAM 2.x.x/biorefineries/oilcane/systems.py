@@ -501,14 +501,7 @@ def create_oilcane_to_crude_oil_and_ethanol_combined_1_and_2g_post_fermentation_
     P_original = tuple(EvX.P)
     @EvX.add_specification(run=True)
     def evaporation():
-        evaporator_to_seedtrain = EvX.path_until(seedtrain)
-        # DAP_to_seedtrain = DAP_storage.path_until(seedtrain)
-        # CSL_to_seedtrain = CSL_storage.path_until(seedtrain)
-        seedtrain_to_cofermentation = seedtrain.path_until(cofermentation)
-        path = (*evaporator_to_seedtrain[1:],
-                # *DAP_to_seedtrain,
-                # *CSL_to_seedtrain,
-                *seedtrain_to_cofermentation)
+        path = EvX.path_until(cofermentation, inclusive=True)
         beer = cofermentation.outs[1]
         target_titer = cofermentation.titer
         V_last = EvX.V
@@ -516,9 +509,7 @@ def create_oilcane_to_crude_oil_and_ethanol_combined_1_and_2g_post_fermentation_
         EvX._reload_components = True
         def f(V):
             EvX.V = V
-            EvX._run()
             for unit in path: unit.run()
-            cofermentation.run()
             return target_titer - beer.imass['Ethanol'] / beer.F_vol
         MX.ins[1].imass['Water'] = 0.
         y0 = f(0)
@@ -716,14 +707,7 @@ def create_oilcane_to_biodiesel_and_ethanol_combined_1_and_2g_post_fermentation_
     P_original = tuple(EvX.P)
     @EvX.add_specification(run=True)
     def evaporation():
-        evaporator_to_seedtrain = EvX.path_until(seedtrain)
-        # DAP_to_seedtrain = DAP_storage.path_until(seedtrain)
-        # CSL_to_seedtrain = CSL_storage.path_until(seedtrain)
-        seedtrain_to_cofermentation = seedtrain.path_until(cofermentation)
-        path = (*evaporator_to_seedtrain[1:],
-                # *DAP_to_seedtrain,
-                # *CSL_to_seedtrain,
-                *seedtrain_to_cofermentation)
+        path = EvX.path_until(cofermentation, inclusive=True)
         beer = cofermentation.outs[1]
         target_titer = cofermentation.titer
         V_last = EvX.V
@@ -731,9 +715,7 @@ def create_oilcane_to_biodiesel_and_ethanol_combined_1_and_2g_post_fermentation_
         EvX._reload_components = True
         def f(V):
             EvX.V = V
-            EvX._run()
             for unit in path: unit.run()
-            cofermentation.run()
             return target_titer - beer.imass['Ethanol'] / beer.F_vol
         MX.ins[1].imass['Water'] = 0.
         y0 = f(0)
@@ -945,23 +927,14 @@ def create_sugarcane_to_ethanol_combined_1_and_2g(ins, outs):
     EvX.pop_last_evaporator = False
     @EvX.add_specification(run=True)
     def evaporation():
-        evaporator_to_seedtrain = EvX.path_until(seedtrain)
-        # DAP_to_seedtrain = DAP_storage.path_until(seedtrain)
-        # CSL_to_seedtrain = CSL_storage.path_until(seedtrain)
-        seedtrain_to_cofermentation = seedtrain.path_until(cofermentation)
-        path = (*evaporator_to_seedtrain[1:],
-                # *DAP_to_seedtrain,
-                # *CSL_to_seedtrain,
-                *seedtrain_to_cofermentation)
+        path = EvX.path_until(cofermentation, inclusive=True)
         beer = cofermentation.outs[1]
         target_titer = cofermentation.titer
         MX.ins[1].imass['Water'] = 0.
         pop_last_evaporator = EvX.pop_last_evaporator
         def f(V):
             EvX.V = V
-            EvX._run()
             for unit in path: unit.run()
-            cofermentation.run()
             return target_titer - beer.imass['Ethanol'] / beer.F_vol
         
         y0 = f(0)

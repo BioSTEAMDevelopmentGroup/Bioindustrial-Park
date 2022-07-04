@@ -37,8 +37,9 @@ biorefineries/cornstover/_chemicals.py
 biorefineries/cornstover/_humbird2011.xlsx
 biorefineries/cornstover/_legacy_code.py
 biorefineries/cornstover/_plot_bars.py
+biorefineries/cornstover/_plot_single_point.py
 biorefineries/cornstover/_plot_spearman.py
-biorefineries/cornstover/_plot_uncertainty_top.py
+biorefineries/cornstover/_plot_uncertainty.py
 biorefineries/cornstover/_process_settings.py
 biorefineries/cornstover/_sankey.py
 biorefineries/cornstover/_switchgrass.py
@@ -102,7 +103,6 @@ biorefineries/oilcane/__init__.py
 biorefineries/oilcane/_across_time_plots.py
 biorefineries/oilcane/_chemicals.py
 biorefineries/oilcane/_contour_plots.py
-biorefineries/oilcane/_delete_later.py
 biorefineries/oilcane/_distributions.py
 biorefineries/oilcane/_evaluation.py
 biorefineries/oilcane/_lca_characterization_factors.py
