@@ -20,142 +20,6 @@ import numpy as np
 Rxn = tmo.reaction.Reaction
 ParallelRxn = tmo.reaction.ParallelReaction
 
-
-# %% Add excel unit operations
-
-# DO NOT DELETE:
-# from biosteam.units.factories import xl2txt
-# print(xl2txt('_humbird2011.xlsx'))
-
-@cost('Tank', 'Flow rate', S=1171, units='kg/hr',
-      CE=522, cost=196000, n=0.7, BM=2)
-class AmmoniaStorageTank(Unit): pass
-
-@cost('Agitator', 'Flow rate', S=410846, units='kg/hr',
-      CE=522, cost=None, n=0.5, BM=1.5, kW=14.914)
-@cost('Tank', 'Flow rate', S=410369, units='kg/hr',
-      CE=522, cost=None, n=0.7, BM=2)
-class AmmoniaReacidificationTank(Unit): pass
-
-@cost('Tank', 'Flow rate', S=425878, units='kg/hr',
-      CE=522, cost=636000, n=0.7, BM=1.8)
-@cost('Pump', 'Flow rate', S=425878, units='kg/hr',
-      CE=522, cost=26800, n=0.8, BM=2.3, kW=93.2125)
-@cost('Agitator', 'Flow rate', S=425878, units='kg/hr',
-      CE=522, cost=68300, n=0.5, BM=1.5, kW=14.914)
-class BeerTank(Unit): pass
-
-@cost('Pump', 'Flow rate', S=292407, units='kg/hr',
-      CE=551, cost=25365, n=0.8, BM=2.3, kW=93.2125)
-class BlowdownDischargePump(Unit): pass
-
-@cost('Tank', 'Flow rate', S=1393, units='kg/hr',
-      CE=522, cost=70000, n=0.7, BM=2.6)
-@cost('Pump', 'Flow rate', S=1393, units='kg/hr',
-      CE=522, cost=3000, n=0.8, BM=3.1, kW=0.37285)
-@cost('Agitator', 'Flow rate', S=1393, units='kg/hr',
-      CE=522, cost=21200, n=0.5, BM=1.5, kW=7.457)
-class CSLStorageTank(Unit): pass
-
-@cost('Tank', 'Flow rate', S=163, units='kg/hr',
-      CE=522, cost=102000, n=0.7, BM=1.8)
-@cost('Pump', 'Flow rate', S=163, units='kg/hr',
-      CE=522, cost=3000, n=0.8, BM=3.1, kW=0.37735)
-@cost('Agitator', 'Flow rate', S=163, units='kg/hr',
-      CE=522, cost=9800, n=0.5, BM=1.5, kW=4.10135)
-@cost('Bag unloader', 'Flow rate', S=163, units='kg/hr',
-      CE=522, cost=30000, n=0.6, BM=1.7)
-class DAPStorageTank(Unit): pass
-
-@cost('System', 'Flow rate', S=94697, units='kg/hr',
-      CE=522, cost=13329690, n=0.6, BM=1.7, kW=783)
-class FeedStockHandling(Unit): pass
-
-@cost('Tank', 'Flow rate', S=8343, units='kg/hr',
-      CE=522, cost=803000, n=0.7, BM=1.8)
-@cost('Pump', 'Flow rate', S=8343, units='kg/hr',
-      CE=522, cost=15000, n=0.8, BM=1.7, kW=94.3375)
-class FireWaterStorageTank(Unit): pass
-
-@cost('Tank', 'Flow rate', S=252891, units='kg/hr',
-      CE=522, cost=511000, n=0.7, BM=2)
-@cost('Pump', 'Flow rate', S=252891, units='kg/hr',
-      CE=522, cost=30000, n=0.8, BM=1.7, kW=55.9)
-@cost('Agitator', 'Flow rate', S=252891, units='kg/hr',
-      CE=522, cost=90000, n=0.5, BM=1.5, kW=170)
-class PretreatmentFlash(bst.Flash): pass
-
-@cost('Heat exchanger', 'Duty', S=8, units='Gcal/hr',
-      CE=522, cost=85000, n=0.7, BM=2.2)
-class HydrolysateHeatExchanger(bst.HXutility): pass
-
-@cost('Heat Exchanger', 'Duty', S=8, units='Gcal/hr',
-      CE=551, cost=92000, n=0.7, BM=2.2)
-class PretreatmentWasteHeater(bst.HXutility): pass
-
-@cost('Heat Exchanger', 'Duty', S=2, units='Gcal/hr',
-      CE=522, cost=34000, n=0.7, BM=2.2)
-class WasteVaporCondenser(bst.HXutility): pass
-
-@cost('Pump', 'Flow rate', S=402194, units='kg/hr',
-      CE=522, cost=22500, n=0.8, BM=2.3, kW=74.57)
-class HydrolyzatePump(Unit): pass
-
-@cost('Separator', 'Flow rate', S=39000, units='kg/hr',
-      CE=522, cost=35000000, n=0.7, BM=1.7)
-class HydrolyzateSolidLiquidSeparator(Unit): pass
-
-@cost('Tank', 'Flow rate', S=410369, units='kg/hr',
-      CE=522, cost=236000, n=0.7, BM=2)
-@cost('Agitator', 'Flow rate', S=410369, units='kg/hr',
-      CE=522, cost=21900, n=0.5, BM=1.5, kW=7.457)
-class AmmoniaAdditionTank(bst.MixTank): pass
-
-@cost('Mixer', 'Flow rate', S=157478, units='kg/hr',
-      CE=522, cost=5000, n=0.5, BM=1)
-class AmmoniaMixer(bst.Mixer): pass
-
-@cost('Mixer', 'Flow rate', S=380000, units='kg/hr',
-      CE=522, cost=109000, n=0.5, BM=1.7, kW=74.57)
-class EnzymeHydrolysateMixer(bst.Mixer): pass
-
-@cost('Mixer', 'Flow rate', S=136260, units='kg/hr',
-      CE=522, cost=6000, n=0.5, BM=1)
-class SulfuricAcidMixer(bst.Mixer): pass
-
-@cost('Tank', 'Flow rate', S=264116, units='kg/hr',
-      CE=522, cost=203000, n=0.7, BM=2)
-@cost('Pump', 'Flow rate', S=264116, units='kg/hr',
-      CE=551, cost=17480, n=0.8, BM=1.7, kW=55.9)
-@cost('Agitator', 'Flow rate', S=264116, units='kg/hr',
-      CE=522, cost=90000, n=0.5, BM=1.5, kW=170)
-class OligomerConversionTank(Unit): pass
-
-@cost('Pump', 'Flow rate', S=402195, units='kg/hr',
-      CE=522, cost=None, n=0.8, BM=2.3, kW=44.742)
-class ReacidifiedHydrolyzatePump(Unit): pass
-
-@cost('Pump', 'Flow rate', S=43149, units='kg/hr',
-      CE=522, cost=8200, n=0.8, BM=2.3, kW=7.457)
-@cost('Tank', 'Flow rate', S=40414, units='kg/hr',
-      CE=522, cost=439000, n=0.7, BM=1.8)
-@cost('Agitator', 'Flow rate', S=40414, units='kg/hr',
-      CE=522, cost=31800, n=0.5, BM=1.5, kW=11.3205)
-class SeedHoldTank(Unit): pass
-
-@cost('Tank', 'Flow rate', S=1981, units='kg/hr',
-      CE=522, cost=96000, n=0.7, BM=1.5)
-@cost('Pump', 'Flow rate', S=1981, units='kg/hr',
-      CE=522, cost=7493, n=0.8, BM=2.3, kW=0.5)
-class SulfuricAcidStorageTank(Unit): pass
-
-@cost('Tank', 'Flow rate', S=1981, units='kg/hr',
-      CE=551, cost=6210, n=0.7, BM=2)
-@cost('Pump', 'Flow rate', S=3720, units='kg/hr',
-      CE=522, cost=8000, n=0.8, BM=2.3, kW=1)
-class SulfuricAcidTank(Unit): pass
-
-
 # %% Constants
 
 _gal2m3 = 0.003785
@@ -874,3 +738,134 @@ class Nanofilter(bst.Unit):
         retentate.mol = feed.mol - permeate.mol
         assert (permeate.mol >= 0.).all()
         retentate.T = permeate.T = feed.T
+
+
+# %% Simple unit operations
+
+@cost('Flow rate', 'Tank', S=1171, units='kg/hr',
+      CE=522, cost=196000, n=0.7, BM=2)
+class AmmoniaStorageTank(Unit): pass
+
+@cost('Flow rate', 'Agitator', S=410846, units='kg/hr',
+      CE=522, cost=None, n=0.5, BM=1.5, kW=14.914)
+@cost('Flow rate', 'Tank', S=410369, units='kg/hr',
+      CE=522, cost=None, n=0.7, BM=2)
+class AmmoniaReacidificationTank(Unit): pass
+
+@cost('Flow rate', 'Tank', S=425878, units='kg/hr',
+      CE=522, cost=636000, n=0.7, BM=1.8)
+@cost('Flow rate', 'Pump', S=425878, units='kg/hr',
+      CE=522, cost=26800, n=0.8, BM=2.3, kW=93.2125)
+@cost('Flow rate', 'Agitator', S=425878, units='kg/hr',
+      CE=522, cost=68300, n=0.5, BM=1.5, kW=14.914)
+class BeerTank(Unit): pass
+
+@cost('Flow rate', 'Pump', S=292407, units='kg/hr',
+      CE=551, cost=25365, n=0.8, BM=2.3, kW=93.2125)
+class BlowdownDischargePump(Unit): pass
+
+@cost('Flow rate', 'Tank', S=1393, units='kg/hr',
+      CE=522, cost=70000, n=0.7, BM=2.6)
+@cost('Flow rate', 'Pump', S=1393, units='kg/hr',
+      CE=522, cost=3000, n=0.8, BM=3.1, kW=0.37285)
+@cost('Flow rate', 'Agitator', S=1393, units='kg/hr',
+      CE=522, cost=21200, n=0.5, BM=1.5, kW=7.457)
+class CSLStorageTank(Unit): pass
+
+@cost('Flow rate', 'Tank', S=163, units='kg/hr',
+      CE=522, cost=102000, n=0.7, BM=1.8)
+@cost('Flow rate', 'Pump', S=163, units='kg/hr',
+      CE=522, cost=3000, n=0.8, BM=3.1, kW=0.37735)
+@cost('Flow rate', 'Agitator', S=163, units='kg/hr',
+      CE=522, cost=9800, n=0.5, BM=1.5, kW=4.10135)
+@cost('Flow rate', 'Bag unloader', S=163, units='kg/hr',
+      CE=522, cost=30000, n=0.6, BM=1.7)
+class DAPStorageTank(Unit): pass
+
+@cost('Flow rate', 'System', S=94697, units='kg/hr',
+      CE=522, cost=13329690, n=0.6, BM=1.7, kW=783)
+class FeedStockHandling(Unit): pass
+
+@cost('Flow rate', 'Tank', S=8343, units='kg/hr',
+      CE=522, cost=803000, n=0.7, BM=1.8)
+@cost('Flow rate', 'Pump', S=8343, units='kg/hr',
+      CE=522, cost=15000, n=0.8, BM=1.7, kW=94.3375)
+class FireWaterStorageTank(Unit): pass
+
+@cost('Flow rate', 'Tank', S=252891, units='kg/hr',
+      CE=522, cost=511000, n=0.7, BM=2)
+@cost('Flow rate', 'Pump', S=252891, units='kg/hr',
+      CE=522, cost=30000, n=0.8, BM=1.7, kW=55.9)
+@cost('Flow rate', 'Agitator', S=252891, units='kg/hr',
+      CE=522, cost=90000, n=0.5, BM=1.5, kW=170)
+class PretreatmentFlash(bst.Flash): pass
+
+@cost('Duty', 'Heat exchanger', S=8, units='Gcal/hr',
+      CE=522, cost=85000, n=0.7, BM=2.2)
+class HydrolysateHeatExchanger(bst.HXutility): pass
+
+@cost('Duty', 'Heat Exchanger', S=8, units='Gcal/hr',
+      CE=551, cost=92000, n=0.7, BM=2.2)
+class PretreatmentWasteHeater(bst.HXutility): pass
+
+@cost('Duty', 'Heat Exchanger', S=2, units='Gcal/hr',
+      CE=522, cost=34000, n=0.7, BM=2.2)
+class WasteVaporCondenser(bst.HXutility): pass
+
+@cost('Flow rate', 'Pump', S=402194, units='kg/hr',
+      CE=522, cost=22500, n=0.8, BM=2.3, kW=74.57)
+class HydrolyzatePump(Unit): pass
+
+@cost('Flow rate', 'Separator', S=39000, units='kg/hr',
+      CE=522, cost=35000000, n=0.7, BM=1.7)
+class HydrolyzateSolidLiquidSeparator(Unit): pass
+
+@cost('Flow rate', 'Tank', S=410369, units='kg/hr',
+      CE=522, cost=236000, n=0.7, BM=2)
+@cost('Flow rate', 'Agitator', S=410369, units='kg/hr',
+      CE=522, cost=21900, n=0.5, BM=1.5, kW=7.457)
+class AmmoniaAdditionTank(bst.MixTank): pass
+
+@cost('Flow rate', 'Mixer', S=157478, units='kg/hr',
+      CE=522, cost=5000, n=0.5, BM=1)
+class AmmoniaMixer(bst.Mixer): pass
+
+@cost('Flow rate', 'Mixer', S=380000, units='kg/hr',
+      CE=522, cost=109000, n=0.5, BM=1.7, kW=74.57)
+class EnzymeHydrolysateMixer(bst.Mixer): pass
+
+@cost('Flow rate', 'Mixer', S=136260, units='kg/hr',
+      CE=522, cost=6000, n=0.5, BM=1)
+class SulfuricAcidMixer(bst.Mixer): pass
+
+@cost('Flow rate', 'Tank', S=264116, units='kg/hr',
+      CE=522, cost=203000, n=0.7, BM=2)
+@cost('Flow rate', 'Pump', S=264116, units='kg/hr',
+      CE=551, cost=17480, n=0.8, BM=1.7, kW=55.9)
+@cost('Flow rate', 'Agitator', S=264116, units='kg/hr',
+      CE=522, cost=90000, n=0.5, BM=1.5, kW=170)
+class OligomerConversionTank(Unit): pass
+
+@cost('Flow rate', 'Pump', S=402195, units='kg/hr',
+      CE=522, cost=None, n=0.8, BM=2.3, kW=44.742)
+class ReacidifiedHydrolyzatePump(Unit): pass
+
+@cost('Flow rate', 'Pump', S=43149, units='kg/hr',
+      CE=522, cost=8200, n=0.8, BM=2.3, kW=7.457)
+@cost('Flow rate', 'Tank', S=40414, units='kg/hr',
+      CE=522, cost=439000, n=0.7, BM=1.8)
+@cost('Flow rate', 'Agitator', S=40414, units='kg/hr',
+      CE=522, cost=31800, n=0.5, BM=1.5, kW=11.3205)
+class SeedHoldTank(Unit): pass
+
+@cost('Flow rate', 'Tank', S=1981, units='kg/hr',
+      CE=522, cost=96000, n=0.7, BM=1.5)
+@cost('Flow rate', 'Pump', S=1981, units='kg/hr',
+      CE=522, cost=7493, n=0.8, BM=2.3, kW=0.5)
+class SulfuricAcidStorageTank(Unit): pass
+
+@cost('Flow rate', 'Tank', S=1981, units='kg/hr',
+      CE=551, cost=6210, n=0.7, BM=2)
+@cost('Flow rate', 'Pump', S=3720, units='kg/hr',
+      CE=522, cost=8000, n=0.8, BM=2.3, kW=1)
+class SulfuricAcidTank(Unit): pass
