@@ -14,8 +14,7 @@ from . import (units,
                _tea,
 )
 
-__all__ = [*units.__all__,
-           *_process_settings.__all__,
+__all__ = [*_process_settings.__all__,
            *_chemicals.__all__,
            *systems.__all__,
            *_tea.__all__,
