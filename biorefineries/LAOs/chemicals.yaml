@@ -1,0 +1,95 @@
+Chemicals:
+  HCl: 
+  Methane:
+  Water:
+  Acetone:
+  LacticAcid:
+  PhosphoricAcid:
+    synonyms: H3PO4
+    phase: liquid
+    default: True
+  Tridecane:
+  Ethanol:
+  Butanol:
+  Hexanol:
+  Octanol:
+  Decanol:
+  Dodecanol:
+  Tetradecanol:
+  Hexadecanol:
+  Hexene:
+    search_ID: 1-Hexene
+  Octene:
+    search_ID: 1-Octene
+  Decene:
+    search_ID: 1-Decene
+  Dodecene:
+    search_ID: 1-Dodecene
+  Tetradecene:
+    search_ID: 1-Tetradecene
+  Hexadecene:
+    search_ID: 1-Hexadecene
+  P4O10:
+    phase: solid
+    default: True
+  Ca(OH)2:
+    phase: solid
+    default: True
+  CaSO4:
+    phase: solid
+    default: True
+  SO2:
+    phase: gas
+  N2:
+    synonyms: Nitrogen
+    phase: gas
+  O2:
+    synonyms: Oxygen
+    phase: gas
+  CO2:
+    phase: gas
+  Glucose:
+    phase: solid
+    default: True
+    rho: 1.0e+6
+  NaCl:
+    phase: solid
+    default: True
+    rho: 1.0e+6
+  DiammoniumPhosphate:
+    synonyms: DAP
+    phase: solid
+    rho: 1.0e+6
+    default: True 
+  CornSteepLiquor:
+    synonyms: CSL
+    search_db: False
+    phase: liquid
+    MW: 37.24
+    Hf: -334649
+    default: True
+  Ash:
+    search_db: False
+    phase: solid
+    default: True
+  Cells:
+    formula: CH1.61O0.56N0.16 # Yeast
+    synonyms: Yeast
+    search_db: False
+    phase_ref: solid
+    phase: solid
+    rho: 1540
+    default: True
+    Hf: -130412.73
+  Gliadin:
+    formula: CH1.57O0.31N0.29S0.007
+    search_db: False
+    Hf: -73714
+    rho: 1.0e+6
+    phase: solid
+    default: True
+  CellExtract:
+    synonyms: YeastExtract
+    Copy of: Cells
+  Tryptone:
+    Copy of: Cells    

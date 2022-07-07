@@ -1,0 +1,38 @@
+Streams:
+  CSL:
+    CSL: 1
+    price: 0.0568
+    units: kg/hr
+  DAP:
+    DiammoniumPhosphate: 1
+    units: kg/hr
+    price: 0.987
+  nitrogen:
+    Nitrogen: 1
+    phase: g
+  glucose:
+    Glucose: 1
+    price: 0.265 # 240 USD / ton DOI average across dilute acid cornstover: 10.1002/bbb.1976
+  process_water:
+    Water: 1
+    price: 0.000353
+  tridecane:
+    Tridecane: 1
+    price: 0.968 # Same as diesel (2.76 USD / gal) average between Jan 2015 to Aug 2020 https://www.eia.gov/petroleum/gasdiesel/
+  tryptone:
+    Tryptone: 1
+    price: 10.
+  salt:
+    NaCl: 1
+    price: 0.15 # https://www.economist.com/finance-and-economics/2010/01/14/salt-sellers
+  cell_recycle:
+    Cells: 1
+  mixed_bioreactor_feed:
+    Glucose: 1.0
+    Water: 100.0
+    Tridecane: 20.0
+    NaCl: 1.0
+    CSL: 0.3075
+    DAP: 0.400
+    Cells: 0.5
+    units: kg/hr

@@ -1,0 +1,61 @@
+,,0
+exist,MPSP [$/gal],2.2679557878494876
+exist,Product GWP disp [kg CO2/gal],-2.4119048399811445
+exist,Product GWP econ [kg CO2/gal],1.4904697082784126
+exist,MPSP_no WWT [$/gal],2.1813738782027525
+exist,Total CAPEX [MM$],133.5867688885202
+exist,WWT CAPEX [MM$],0.0
+exist,WWT CAPEX frac,0.0
+exist,Annual net electricity [MWh/yr],-313252.6518979496
+exist,Annual electricity consumption [MWh/yr],42229.62535993712
+exist,WWT annual electricity consumption [MWh/yr],0.0
+exist,WWT annual electricity consumption frac,0.0
+exist,WWT produced energy [MWh/yr],0.0
+exist,WWT ECR,0.0
+exist,Clear cache,
+new,MPSP [$/gal],2.2604585974130647
+new,Product GWP disp [kg CO2/gal],-2.9731597521244577
+new,Product GWP econ [kg CO2/gal],1.4788420278722214
+new,MPSP_RIN [$/gal],2.231076425231903
+new,Product GWP disp_RIN [kg CO2/gal],-2.909877363367226
+new,Product GWP econ_RIN [kg CO2/gal],1.47463397897134
+new,MPSP_no WWT [$/gal],2.1858788627597376
+new,Product GWP disp_no WWT [kg CO2/gal],-2.8137999759241787
+new,Product GWP econ_no WWT [kg CO2/gal],1.471109385986346
+new,CO2 cost net [$/tonne CO2],464.3025138301856
+new,CO2 cost total [$/tonne CO2],1113.507844342937
+new,Product yield [gal/yr],28221240.853678774
+new,Net GWP [kg CO2/yr],-83906257.4611682
+new,Total GWP [kg CO2/yr],65033684.52834909
+new,Product ratio,0.6417406203539328
+new,Electricity ratio,0.20889041757430107
+new,Net GWP_RIN [kg CO2/yr],-82120349.92625423
+new,Total GWP_RIN [kg CO2/yr],65778359.44208364
+new,Product ratio_RIN,0.6326700915703258
+new,Electricity ratio_RIN,0.19993782943491506
+new,RNG yield_RIN [kg/yr],1473952.7658338558
+new,RNG ratio_RIN,0.018195025092810596
+new,RNG CF econ_RIN [kg CO2/kg],0.8119927099126151
+new,Total GWP_no WWT [kg CO2/yr],65019214.81594122
+new,Product ratio_no WWT,0.6385271249668992
+new,Electricity ratio_no WWT,0.2077810913470731
+new,WW price [¢/kg],0.24748816653013955
+new,WW GWP disp [g CO2/kg],-5.288254110019308
+new,WW GWP econ [g CO2/kg],0.2566028655995095
+new,COD price [$/tonne],314.4757908670797
+new,COD GWP disp [kg CO2/tonne],-671.9625899171548
+new,COD GWP econ [kg CO2/tonne],32.60575656183444
+new,COD in [mg/L],7707.764745633773
+new,COD out [mg/L],2.8617389813534633
+new,COD removal,0.9996287199887652
+new,COD annual load [tonne/yr],6692.828877707148
+new,Total CAPEX [MM$],144.01370275321713
+new,WWT CAPEX [MM$],8.940747437727614
+new,WWT CAPEX frac,0.0620826162149899
+new,Annual net electricity [MWh/yr],-323560.414494156
+new,Annual electricity consumption [MWh/yr],45395.28367990968
+new,WWT annual electricity consumption [MWh/yr],2538.5401124584187
+new,WWT annual electricity consumption frac,0.055920789709303774
+new,WWT produced energy [MWh/yr],18261.805668343786
+new,WWT ECR,0.13900816592626933
+new,Clear cache,

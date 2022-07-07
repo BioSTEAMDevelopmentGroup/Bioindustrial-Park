@@ -1,0 +1,218 @@
+Chemicals:
+  # Common gases and liquids
+  Water:
+  AceticAcid:
+    synonyms: Acetate
+  Furfural:
+  NH3:
+  LacticAcid:
+  # Gas only
+  Methane:
+    synonyms: CH4
+    phase: gas
+  N2:
+    phase: gas
+  O2:
+    phase: gas
+  H2S:
+    phase: gas
+  SO2:
+    phase: gas
+  CO2:
+    phase: gas
+  # Liquid only
+  CornSteepLiquor:
+    formula: H2.8925O1.3275C1N0.0725S0.00175
+    synonyms: CSL
+    search_db: False
+    phase: liquid
+    Hf: -334649
+    default: True
+  PhosphoricAcid:
+    synonyms: H3PO4
+    phase: liquid
+    default: True
+  SulfuricAcid:
+    synonyms: H2SO4
+    phase: liquid
+    default: True
+  # Salts
+  AmmoniumAcetate:
+    phase: solid
+    default: True
+  AmmoniumSulfate:
+    synonyms: (NH4)2SO4
+    phase: solid
+    default: True
+  NaOH:
+    phase: solid
+    default: True
+  NaNO3:
+    search_ID: SodiumNitrate
+    phase: solid
+    default: True
+  P4O10:
+    phase: solid
+    default: True
+  Lime:
+    search_ID: Ca(OH)2
+    synonyms: Ca(OH)2
+    phase: solid
+    default: True
+  CaSO4:
+    phase: solid
+    default: True
+  DiammoniumPhosphate:
+    synonyms: DAP
+    phase: solid
+    default: True   
+  # Sugars
+  Glucose:
+    Cp: 1.364
+    phase: solid
+    default: True
+  Xylose:
+    Cp: 1.364
+    phase: solid
+    default: True
+  Sucrose:
+    Cp: 1.364
+    phase: solid
+    default: True
+  Mannose:
+    Copy of: Glucose
+  Galactose:
+    Copy of: Glucose
+  Arabinose:
+    Copy of: Xylose
+  Extract:
+    synonyms: Extractives
+    Copy of: Glucose
+  # Biological
+  Cells:
+    synonyms: YarrowiaLipolytica
+    formula: CH1.61O0.56N0.16 # Yeast
+    search_db: False
+    phase_ref: solid
+    phase: solid
+    rho: 1540
+    default: True
+    Hf: -130412.73
+  WWTsludge: 
+    search_db: False
+    phase: solid
+    formula: CH1.64O0.39N0.23S0.0035
+    Hf: -97068.84184
+    default: True
+  Protein:
+    search_db: False
+    phase: solid
+    formula: CH1.57O0.31N0.29S0.007
+    Hf: -73713.712
+    default: True
+  Enzyme:
+    Copy of: Protein
+  Cellulase:
+    Copy of: Protein
+  # Cellulosic
+  Lignin:
+    search_db: False
+    formula: C8H8O3
+    Hf: -452909.632
+    phase: solid
+    rho: 1540
+    Cp: 1.364
+    default: True
+  Glucan:
+    search_db: False
+    formula: C6H10O5
+    phase: solid
+    rho: 1540
+    Cp: 1.364
+    Hf: -975708.8
+    default: True
+  Xylan:
+    search_db: False
+    formula: C5H8O4
+    phase: solid
+    rho: 1540
+    Cp: 1.364
+    Hf: -761906.4
+    default: True
+  Xylitol: 
+    search_db: False
+    formula: C5H12O5
+    phase: solid
+    rho: 1540
+    Hf: -1017318.68
+    default: True
+  SolubleLignin:
+    Copy of: Lignin
+  Arabinan:
+    Copy of: Xylan
+  Mannan:
+    Copy of: Glucan
+  Galactan: 
+    Copy of: Glucan
+  Cellulose:
+    Copy of: Glucan
+  GlucoseOligomer:
+    Copy of: Glucan
+  XyloseOligomer:
+    Copy of: Xylan
+  MannoseOligomer:
+    Copy of: Mannan
+  ArabinoseOligomer:
+    Copy of: Arabinan
+  GalactoseOligomer:
+    Copy of: Galactan
+  Hemicellulose:
+    Copy of: Xylan
+  Cellobiose:
+    search_db: False
+    formula: C12H22O11
+    phase: solid
+    rho: 1540
+    Hf: -2012085.6
+    default: True
+  Xylobiose:
+   search_db: False 
+   formula: C10H18O9
+   phase: liquid
+   # Tb: 1068.88
+   # Tm: 632.07
+   # Tc: 1330.57 
+   # Pc: 4762809.70
+   # Vc: 0.0006295
+   Hf: -1572730.
+   Hfus: 53426.
+   default: True
+  # Inhibitors
+  Furfural:
+    search_ID: 98-01-1
+  HMF:
+    phase_ref: liquid
+    search_ID: 67-47-0 # Missing data, must be altered in code later
+  # Other
+  Ash:
+    search_db: False
+    phase: solid
+    default: True
+  Flocculant:
+    rho: 1540
+    default: True
+    search_db: False
+    phase: solid
+  Solids:
+    Cp: 1.100
+    rho: 1540
+    default: True
+    search_db: False
+    phase: solids
+  Urea:
+    default: True
+    phase: solid
+  MgSO4:
+    default: True
+    phase: solid
+      
