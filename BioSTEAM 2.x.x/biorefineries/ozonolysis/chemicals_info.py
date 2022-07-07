@@ -18,6 +18,7 @@ def create_new_chemical(ID, phase = 's', **constants):
        return na_chemical
 
 #Chemicals that are available in the database
+DHSA = tmo.Chemical('DHSA', search_ID = '120-87-6')
 ozo_chemicals = tmo.Chemicals(
     ['Water','Hydrogen_peroxide','Oleic_acid',
      'Nonanal','Nonanoic_acid','Azelaic_acid',
@@ -28,21 +29,28 @@ ozo_chemicals = tmo.Chemicals(
      'Cyclopentane',
      '540-84-1',
      'heptane',
-     'pentane'])
+     'pentane',
+     'Sulphuric_acid',
+      DHSA])
 
 #Solid Catalyst not available in the database
 #TODO.xxx Add ref for the below
 Catalyst = create_new_chemical(
-    'Phosphotungstic_acid',
-    formula="H3PW12O40",
-    MW=2880.2,
-    CAS='1343-93-7',
-    phase = 'l',
-    rho = 2850 
+        'Phosphotungstic_acid',
+        # formula="H3PW12O40",
+        # MW=2880.2,
+        #CAS = '7783-03-1',
+        CAS='1343-93-7',
+       phase = 'l',
+       # rho = 2850 
     )
+
 #https://www.fishersci.com/shop/products/phosphotungstic-acid-hydrate-thermo-scientific/AA4011614
 #rho = 2.852g/cm3
 #conversion = 
+
+#####I think the chemmical is actually this###
+# https://www.sigmaaldrich.com/US/en/product/aldrich/455970
 
 #Liquid chemical not available in the database
 #TODO.xxx Add ref for the below
