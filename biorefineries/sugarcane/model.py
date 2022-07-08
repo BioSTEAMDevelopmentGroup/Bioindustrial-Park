@@ -66,11 +66,10 @@ def set_rvf_solids_retention(solids_retention):
     rvf.isplit['Lignin', 'CaO', 'Ash', 'Cellulose', 'Hemicellulose'] = solids_retention
 
 
-
-def test(N=1000, optimize=True):
+def test(N=1000, optimize=True, ss=False):
     from warnings import filterwarnings
     filterwarnings('ignore')
-    sugarcane_model.load_samples(sugarcane_model.sample(N, 'L'), optimize=optimize)
+    sugarcane_model.load_samples(sugarcane_model.sample(N, 'L'), optimize=optimize, ss=ss)
     sugarcane_model.evaluate(notify=50)
 
 

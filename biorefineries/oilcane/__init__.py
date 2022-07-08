@@ -36,7 +36,7 @@ from ._contour_plots import *
 from ._lca_characterization_factors import *
 from ._load_data import *
 from ._parse_configuration import *
-from ._variable_mockups import *
+from ._feature_mockups import *
 
 __all__ = (
     *units.__all__,

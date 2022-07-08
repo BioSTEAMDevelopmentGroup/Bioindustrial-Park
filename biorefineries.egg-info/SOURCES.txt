@@ -34,7 +34,6 @@ biorefineries/cornstover/README.rst
 biorefineries/cornstover/__init__.py
 biorefineries/cornstover/_analysis.py
 biorefineries/cornstover/_chemicals.py
-biorefineries/cornstover/_humbird2011.xlsx
 biorefineries/cornstover/_legacy_code.py
 biorefineries/cornstover/_plot_bars.py
 biorefineries/cornstover/_plot_single_point.py

@@ -39,11 +39,6 @@ def name_to_configuration(name):
     return Configuration((-1 if name.startswith('S') else 1) * int(name[1]), '*' in name)
 
 def parse(x):
-    try:
-        return asconfiguration(x)
-        return ascomparison(x)
-    except:
-        pass
     if isinstance(x, int):
         return Configuration(x)
     elif isinstance(x, str):
@@ -61,7 +56,10 @@ def parse(x):
         else:
             factor = -1 if x.startswith('S') else 1
             return Configuration(factor * int(x[1]), '*' in x)
-    raise ValueError(f'could not parse {x}')
+    elif isinstance(x, (Configuration, ConfigurationComparison)):
+        return x
+    else:
+        raise ValueError(f'could not parse {x}')
     
 def format_name(name):
     key = parse(name)

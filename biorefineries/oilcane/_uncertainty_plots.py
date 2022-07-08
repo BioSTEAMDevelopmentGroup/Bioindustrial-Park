@@ -16,8 +16,8 @@ from warnings import warn
 import numpy as np
 import pandas as pd
 from matplotlib.gridspec import GridSpec
-from . import _variable_mockups as variables
-from ._variable_mockups import (
+from . import _feature_mockups as features
+from ._feature_mockups import (
     tea_monte_carlo_metric_mockups,
     tea_monte_carlo_derivative_metric_mockups,
     lca_monte_carlo_metric_mockups, 
@@ -120,7 +120,7 @@ GWP_units_L_small = GWP_units_L.replace('kg', 'g')
 CABBI_colors.orange_hatch = CABBI_colors.orange.copy(hatch='////')
     
 ethanol_over_biodiesel = bst.MockVariable('Ethanol over biodiesel', 'L/MT', 'Biorefinery')
-GWP_ethanol_displacement = variables.GWP_ethanol_displacement
+GWP_ethanol_displacement = features.GWP_ethanol_displacement
 production = (ethanol_production, biodiesel_production)
 
 mc_metric_settings = {
@@ -544,8 +544,8 @@ def plot_heatmap_comparison(comparison_names=None, xlabels=None):
     
     GWP_economic, GWP_ethanol, GWP_biodiesel, GWP_electricity, GWP_crude_glycerol, = lca_monte_carlo_metric_mockups
     MFPP, TCI, ethanol_production, biodiesel_production, electricity_production, natural_gas_consumption = tea_monte_carlo_metric_mockups
-    GWP_ethanol_displacement = variables.GWP_ethanol_displacement
-    GWP_ethanol_allocation = variables.GWP_ethanol_allocation
+    GWP_ethanol_displacement = features.GWP_ethanol_displacement
+    GWP_ethanol_allocation = features.GWP_ethanol_allocation
     rows = [
         MFPP, 
         TCI, 
@@ -621,48 +621,7 @@ def plot_kde(name, metrics=(GWP_ethanol, MFPP), xticks=None, yticks=None,
     plt.sca(ax)
     plt.xlabel(xlabel.replace('\n', ' '))
     plt.ylabel(ylabel.replace('\n', ' '))
-    bst.plots.plot_quadrants()
-    xlb, xub = plt.xlim()
-    ylb, yub = plt.ylim()
-    xpos = lambda x: xlb + (xub - xlb) * x
-    # xlpos = lambda x: xlb * (1 - x)
-    ypos = lambda y: ylb + (yub - ylb) * y
-    y_mt_0 = y > 0
-    y_lt_0 = y < 0
-    x_mt_0 = x > 0
-    x_lt_0 = x < 0
-    xleft = 0.02
-    xright = 0.98
-    ytop = 0.94
-    ybottom = 0.02
-    if yub > 0. and xlb < 0.:
-        if top_left.endswith('()'):
-            p = (y_mt_0 & x_lt_0).sum() / y.size
-            top_left = f"{p:.0%} {top_left.strip('()')}"
-        plt.text(xpos(xleft), ypos(ytop), top_left, color=CABBI_colors.teal.shade(50).RGBn,
-                 horizontalalignment='left', verticalalignment='top',
-                 fontsize=10, fontweight='bold', zorder=10)
-    if ylb < 0. and xlb < 0.:
-        if bottom_left.endswith('()'):
-            p = (y_lt_0 & x_lt_0).sum() / y.size
-            bottom_left = f"{p:.0%} {bottom_left.strip('()')}"
-        plt.text(xpos(xleft), ypos(ybottom), bottom_left, color=CABBI_colors.grey.shade(75).RGBn,
-                 horizontalalignment='left', verticalalignment='bottom',
-                 fontsize=10, fontweight='bold', zorder=10)
-    if yub > 0. and xub > 0.:
-        if top_right.endswith('()'):
-            p = (y_mt_0 & x_mt_0).sum() / y.size
-            top_right = f"{p:.0%} {top_right.strip('()')}"
-        plt.text(xpos(xright), ypos(ytop), top_right, color=CABBI_colors.grey.shade(75).RGBn,
-                 horizontalalignment='right', verticalalignment='top',
-                 fontsize=10, fontweight='bold', zorder=10)
-    if ylb < 0. and xub > 0.:
-        if bottom_right.endswith('()'):
-            p = (y_lt_0 & x_mt_0).sum() / y.size
-            bottom_right = f"{p:.0%} {bottom_right.strip('()')}"
-        plt.text(xpos(xright), ypos(ybottom), bottom_right, color=colors.red.shade(50).RGBn,
-                 horizontalalignment='right', verticalalignment='bottom',
-                 fontsize=10, fontweight='bold', zorder=10)
+    bst.plots.plot_quadrants(data=[x, y], text=[top_left, top_right, bottom_left, bottom_right])
     plt.subplots_adjust(
         hspace=0.05, wspace=0.05,
         top=0.98, bottom=0.15,
@@ -694,73 +653,16 @@ def plot_kde_2d(name, metrics=(GWP_ethanol, MFPP), xticks=None, yticks=None,
         aspect_ratio=1.,
     )
     M, N = axes.shape
-    xleft = 0.02
-    xright = 0.98
-    ytop = 0.94
-    ybottom = 0.02
     for i in range(M):
         for j in range(N):
             ax = axes[i, j]
             plt.sca(ax)
             if i == M - 1: plt.xlabel(xlabel.replace('\n', ' '))
             if j == 0: plt.ylabel(ylabel.replace('\n', ' '))
-            bst.plots.plot_quadrants()
-            xlb, xub = plt.xlim()
-            ylb, yub = plt.ylim()
-            xpos = lambda x: xlb + (xub - xlb) * x
-            # xlpos = lambda x: xlb * (1 - x)
-            ypos = lambda y: ylb + (yub - ylb) * y
             df = dfs[j]
             x = df[Xi]
             y = df[Yi]
-            y_mt_0 = y > 0
-            y_lt_0 = y < 0
-            x_mt_0 = x > 0
-            x_lt_0 = x < 0
-            if yub > 0. and xlb < 0. and top_left:
-                if top_left.endswith('()'):
-                    p = (y_mt_0 & x_lt_0).sum() / y.size
-                    top_left = f"{p:.0%} {top_left.strip('()')}"
-                    replacement = '()'
-                else:
-                    replacement = None
-                plt.text(xpos(xleft), ypos(ytop), top_left, color=CABBI_colors.teal.shade(50).RGBn,
-                         horizontalalignment='left', verticalalignment='top',
-                         fontsize=10, fontweight='bold', zorder=10)
-                top_left = replacement
-            if ylb < 0. and xlb < 0. and bottom_left:
-                if bottom_left.endswith('()'):
-                    p = (y_lt_0 & x_lt_0).sum() / y.size
-                    bottom_left = f"{p:.0%} {bottom_left.strip('()')}"
-                    replacement = '()'
-                else:
-                    replacement = None
-                plt.text(xpos(xleft), ypos(ybottom), bottom_left, color=CABBI_colors.grey.shade(75).RGBn,
-                         horizontalalignment='left', verticalalignment='bottom',
-                         fontsize=10, fontweight='bold', zorder=10)
-                bottom_left = replacement
-            if yub > 0. and xub > 0. and top_right:
-                if top_right.endswith('()'):
-                    p = (y_mt_0 & x_mt_0).sum() / y.size
-                    top_right = f"{p:.0%} {top_right.strip('()')}"
-                    replacement = '()'
-                else:
-                    replacement = None
-                plt.text(xpos(xright), ypos(ytop), top_right, color=CABBI_colors.grey.shade(75).RGBn,
-                     horizontalalignment='right', verticalalignment='top',
-                     fontsize=10, fontweight='bold', zorder=10)
-                top_right = replacement
-            if ylb < 0. and xub > 0. and bottom_right:
-                if bottom_right.endswith('()'):
-                    p = (y_lt_0 & x_mt_0).sum() / y.size
-                    bottom_right = f"{p:.0%} {bottom_right.strip('()')}"
-                    replacement = '()'
-                else:
-                    replacement = None
-                plt.text(xpos(xright), ypos(ybottom), bottom_right, color=colors.red.shade(50).RGBn,
-                     horizontalalignment='right', verticalalignment='bottom',
-                     fontsize=10, fontweight='bold', zorder=10)
-                bottom_right = replacement
+            bst.plots.plot_quadrants(data=[x, y], text=[top_left, top_right, bottom_left, bottom_right], axes=axes)
     plt.subplots_adjust(
         hspace=0, wspace=0,
         top=0.98, bottom=0.15,

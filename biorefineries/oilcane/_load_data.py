@@ -4,7 +4,7 @@ Created on Thu Nov  4 14:39:10 2021
 
 @author: yrc2
 """
-from . import _variable_mockups as v
+from . import _feature_mockups as f
 from ._parse_configuration import parse, Configuration, ConfigurationComparison
 from warnings import warn
 from thermosteam.utils import roundsigfigs
@@ -78,7 +78,7 @@ def get_monte_carlo_key(index, dct, with_units=False):
     if key in dct: key = f'{key}, {index[0]}'
     return key
 
-def get_monte_carlo(name, variables=None, cache={}):
+def get_monte_carlo(name, features=None, cache={}):
     key = parse(name)
     if isinstance(key, Configuration):
         if key in cache:
@@ -86,26 +86,26 @@ def get_monte_carlo(name, variables=None, cache={}):
         else:
             file = monte_carlo_file(key)
             cache[key] = df = pd.read_excel(file, header=[0, 1], index_col=[0])
-        if variables is None:
+        if features is None:
             mc = df
-        elif isinstance(variables, bst.Variable):
-            mc = df[variables.index]
+        elif isinstance(features, bst.Feature):
+            mc = df[features.index]
         else:
-            mc = df[[i.index for i in variables]]
+            mc = df[[i.index for i in features]]
     elif isinstance(key, ConfigurationComparison):
-        if variables is None:
-            variables = (
-                *v.tea_monte_carlo_metric_mockups, 
-                *v.tea_monte_carlo_derivative_metric_mockups,
-                *v.lca_monte_carlo_metric_mockups, 
-                *v.lca_monte_carlo_derivative_metric_mockups,
-                v.GWP_ethanol_displacement,
-                v.GWP_ethanol_allocation,
+        if features is None:
+            features = (
+                *f.tea_monte_carlo_metric_mockups, 
+                *f.tea_monte_carlo_derivative_metric_mockups,
+                *f.lca_monte_carlo_metric_mockups, 
+                *f.lca_monte_carlo_derivative_metric_mockups,
+                f.GWP_ethanol_displacement,
+                f.GWP_ethanol_allocation,
             )
-        if isinstance(variables, bst.Variable):
-            index = variables.index
+        if isinstance(features, bst.Feature):
+            index = features.index
         else:
-            index = [i.index for i in variables]
+            index = [i.index for i in features]
         df_a = get_monte_carlo(key.a)[index]
         df_b = get_monte_carlo(key.b)[index]
         row_a = df_a.shape[0]
@@ -130,9 +130,9 @@ def montecarlo_results(with_units=False):
             continue
         results[name] = dct = {}
         if name in ('O1', 'O2'):
-            index = v.ethanol_over_biodiesel.index
+            index = f.ethanol_over_biodiesel.index
             key = get_monte_carlo_key(index, dct, with_units)
-            data = df[v.ethanol_production.index].values / df[v.biodiesel_production.index].values
+            data = df[f.ethanol_production.index].values / df[f.biodiesel_production.index].values
             q05, q25, q50, q75, q95 = np.percentile(data, [5,25,50,75,95], axis=0)
             dct[key] = {
                 'mean': np.mean(data),
@@ -143,9 +143,9 @@ def montecarlo_results(with_units=False):
                 'q75': q75,
                 'q95': q95,
             }
-        for metric in (*v.tea_monte_carlo_metric_mockups, *v.tea_monte_carlo_derivative_metric_mockups,
-                       *v.lca_monte_carlo_metric_mockups, *v.lca_monte_carlo_derivative_metric_mockups,
-                       v.GWP_ethanol_displacement, v.GWP_ethanol_allocation):
+        for metric in (*f.tea_monte_carlo_metric_mockups, *f.tea_monte_carlo_derivative_metric_mockups,
+                       *f.lca_monte_carlo_metric_mockups, *f.lca_monte_carlo_derivative_metric_mockups,
+                       f.GWP_ethanol_displacement, f.GWP_ethanol_allocation):
             index = metric.index
             data = df[index].values
             q05, q25, q50, q75, q95 = np.percentile(data, [5,25,50,75,95], axis=0)
@@ -166,7 +166,7 @@ def montecarlo_results(with_units=False):
         warn('could not load O2 - O1', RuntimeWarning)
     else:
         results['(O2 - O1) / O1'] = relative_results = {}
-        for metric in (v.biodiesel_production, v.ethanol_production):
+        for metric in (f.biodiesel_production, f.ethanol_production):
             index = metric.index
             key = index[1] if with_units else index[1].split(' [')[0]
             data = (df_O2O1[index].values / df_O1[index].values)
@@ -188,15 +188,15 @@ def montecarlo_results_short(names, metrics=None, derivative=None):
     if metrics is None:
         if derivative:
             metrics = [
-                v.MFPP_derivative, v.TCI_derivative, v.ethanol_production_derivative, v.biodiesel_production_derivative, 
-                v.electricity_production_derivative, v.natural_gas_consumption_derivative, 
-                v.GWP_ethanol_derivative, 
+                f.MFPP_derivative, f.TCI_derivative, f.ethanol_production_derivative, f.biodiesel_production_derivative, 
+                f.electricity_production_derivative, f.natural_gas_consumption_derivative, 
+                f.GWP_ethanol_derivative, 
             ]
         else:
             metrics = [
-                v.MFPP, v.TCI, v.ethanol_production, v.biodiesel_production, 
-                v.electricity_production, v.natural_gas_consumption, v.GWP_ethanol_displacement, 
-                v.GWP_ethanol, v.GWP_ethanol_allocation, 
+                f.MFPP, f.TCI, f.ethanol_production, f.biodiesel_production, 
+                f.electricity_production, f.natural_gas_consumption, f.GWP_ethanol_displacement, 
+                f.GWP_ethanol, f.GWP_ethanol_allocation, 
             ]
     results = {}
     for name in names:

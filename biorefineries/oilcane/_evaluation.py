@@ -8,7 +8,7 @@ import numpy as np
 import biosteam as bst
 from warnings import warn
 from biorefineries import oilcane as oc
-from ._variable_mockups import (
+from ._feature_mockups import (
     all_metric_mockups
 )
 from ._parse_configuration import (

@@ -1,6 +1,6 @@
 Metadata-Version: 2.1
 Name: biorefineries
-Version: 2.23.17
+Version: 2.23.18
 Summary: Biorefinery models in BioSTEAM
 Home-page: https://github.com/BioSTEAMDevelopmentGroup/Bioindustrial-Park/tree/master/biorefineries/BioSTEAM 2.x.x/biorefineries
 Author: Yoel Cortes-Pena
@@ -22,24 +22,27 @@ Classifier: Topic :: Scientific/Engineering :: Mathematics
 Requires-Python: >=3.8
 License-File: LICENSE.txt
 
-=============================================
-Biorefineries: Biorefinery Models in BioSTEAM
-=============================================
+=====================================================================
+Bioindustrial-Park: BioSTEAM's Premier Biorefinery Models and Results
+=====================================================================
 
 .. image:: http://img.shields.io/pypi/v/biorefineries.svg?style=flat
    :target: https://pypi.python.org/pypi/biorefineries
    :alt: Version_status
 .. image:: http://img.shields.io/badge/license-MIT-blue.svg?style=flat
-   :target: https://github.com/yoelcortes/Bioindustrial-Park/biorefineries/blob/master/LICENSE.txt
+   :target: https://github.com/yoelcortes/Bioindustrial-Park/blob/master/LICENSE.txt
    :alt: license
-
 
 .. contents::
 
-What is Biorefineries?
-----------------------
+What is the Bioindustrial-Park?
+-------------------------------
 
-Biorefineries serves as a standard package for complete biorefinery models in BioSTEAM.
+The Bioindustrial-Park is the premier repository for complete biorefinery
+models and results generated with BioSTEAM. The repository is meant to 
+foster accessibility and deeper communication within the BioSTEAM biorefinery 
+simulation community. All biorefinery models are in the "biorefineries" 
+package, as an installable package for complete biorefinery models in BioSTEAM.
 
 Installation
 ------------
