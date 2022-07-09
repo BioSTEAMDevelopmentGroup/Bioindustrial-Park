@@ -653,6 +653,7 @@ def plot_kde_2d(name, metrics=(GWP_ethanol, MFPP), xticks=None, yticks=None,
         aspect_ratio=1.,
     )
     M, N = axes.shape
+    text = [top_left, top_right, bottom_left, bottom_right]
     for i in range(M):
         for j in range(N):
             ax = axes[i, j]
@@ -662,7 +663,7 @@ def plot_kde_2d(name, metrics=(GWP_ethanol, MFPP), xticks=None, yticks=None,
             df = dfs[j]
             x = df[Xi]
             y = df[Yi]
-            bst.plots.plot_quadrants(data=[x, y], text=[top_left, top_right, bottom_left, bottom_right], axes=axes)
+            bst.plots.plot_quadrants(data=[x, y], text=text)
     plt.subplots_adjust(
         hspace=0, wspace=0,
         top=0.98, bottom=0.15,
