@@ -70,6 +70,7 @@ __all__ = (
     'plot_crude_configuration_comparison_kde',
     'plot_agile_comparison_kde',
     'plot_separated_configuration_comparison_kde',
+    'plot_unlabeled_feedstock_conventional_comparison_kde',
     'area_colors',
     'area_hatches',
 )
@@ -599,9 +600,9 @@ def plot_heatmap_comparison(comparison_names=None, xlabels=None):
 def plot_kde(name, metrics=(GWP_ethanol, MFPP), xticks=None, yticks=None,
              xbox_kwargs=None, ybox_kwargs=None, top_left='',
              top_right='Tradeoff', bottom_left='Tradeoff',
-             bottom_right='', fs=None):
+             bottom_right='', fs=None, ticklabels=True, aspect_ratio=1.1):
     set_font(size=fs or 8)
-    set_figure_size(width='half', aspect_ratio=1.1)
+    set_figure_size(width='half', aspect_ratio=aspect_ratio)
     Xi, Yi = [i.index for i in metrics]
     df = oc.get_monte_carlo(name, metrics)
     y = df[Yi].values
@@ -613,7 +614,7 @@ def plot_kde(name, metrics=(GWP_ethanol, MFPP), xticks=None, yticks=None,
     if fy: y *= fy
     ax = bst.plots.plot_kde(
         y=y, x=x, xticks=xticks, yticks=yticks,
-        xticklabels=True, yticklabels=True,
+        xticklabels=ticklabels, yticklabels=ticklabels,
         xbox_kwargs=xbox_kwargs or dict(light=CABBI_colors.orange.RGBn, dark=CABBI_colors.orange.shade(60).RGBn),
         ybox_kwargs=ybox_kwargs or dict(light=CABBI_colors.blue.RGBn, dark=CABBI_colors.blue.shade(60).RGBn),
         aspect_ratio=1.2,
@@ -628,10 +629,63 @@ def plot_kde(name, metrics=(GWP_ethanol, MFPP), xticks=None, yticks=None,
         left=0.15, right=0.98,
     )
 
+def plot_kde_fake_scenarios_ethanol_price(name, xticks=None, yticks=None,
+             xbox_kwargs=None, ybox_kwargs=None, top_left='',
+             top_right='Tradeoff', bottom_left='Tradeoff',
+             bottom_right='', fs=None, ticklabels=True, aspect_ratio=1.1):
+    set_font(size=fs or 8)
+    set_figure_size(width='half', aspect_ratio=aspect_ratio)
+    ethanol_price = features.set_ethanol_price
+    relative_biodiesel_price = features.set_biodiesel_price
+    metrics = (GWP_ethanol, MFPP)
+    all_features = (*metrics, ethanol_price, relative_biodiesel_price, 
+                    ethanol_production, biodiesel_production)
+    Xi, Yi = [i.index for i in metrics]
+    df = oc.get_monte_carlo(name, all_features)
+    x = df[Xi].values
+    y = df[Yi].values
+    ethanol_price_range = [0.269, 0.758 * 2]
+    biodiesel_price_range = [0.0819, 1.09 * 2]
+    settings = kde_metric_settings if '-' in name else  kde_comparison_settings
+    sX, sY = [settings[i] for i in metrics]
+    _, xlabel, fx = sX
+    _, ylabel, fy = sY
+    if fx: x *= fx
+    if fy: y *= fy
+    xs = (x, x)
+    ys = tuple([y + (i - df[ethanol_price.index]) * df[ethanol_production.index]
+                  + (i + j - df[ethanol_price.index] + df[relative_biodiesel_price.index]) * df[biodiesel_production.index]
+                for (i, j) in zip(ethanol_price_range, biodiesel_price_range)])
+    
+    print(x.min(), x.max())
+    print(min(ys[0].min(), ys[1].min()), max(ys[0].max(), ys[1].max()))
+    ax = bst.plots.plot_kde(
+        y=ys, x=xs, xticks=xticks, yticks=yticks,
+        xticklabels=ticklabels, yticklabels=ticklabels,
+        xbox_kwargs=xbox_kwargs or dict(light=CABBI_colors.orange.RGBn, dark=CABBI_colors.orange.shade(60).RGBn),
+        ybox_kwargs=ybox_kwargs or dict(light=CABBI_colors.blue.RGBn, dark=CABBI_colors.blue.shade(60).RGBn),
+        cmaps=['inferno', 'viridis'],
+        aspect_ratio=1.2,
+    )
+    plt.sca(ax)
+    plt.xlabel(xlabel.replace('\n', ' '))
+    plt.ylabel(ylabel.replace('\n', ' '))
+    bst.plots.plot_quadrants(
+        data=None, 
+        text=['Market\nCompetitive', 'Market\nCompetitive',
+              'Financial\nRisk', 'Financial\nRisk'],
+        y=50,
+    )
+    plt.subplots_adjust(
+        hspace=0.05, wspace=0.05,
+        top=0.98, bottom=0.15,
+        left=0.15, right=0.98,
+    )
+
 def plot_kde_2d(name, metrics=(GWP_ethanol, MFPP), xticks=None, yticks=None,
                 top_left='', top_right='Tradeoff', bottom_left='Tradeoff',
                 bottom_right='', xbox_kwargs=None, ybox_kwargs=None, titles=None,
-                fs=None):
+                fs=None, ticklabels=True):
     set_font(size=fs or 8)
     set_figure_size(aspect_ratio=0.6)
     if isinstance(name, str): name = (name,)
@@ -644,10 +698,11 @@ def plot_kde_2d(name, metrics=(GWP_ethanol, MFPP), xticks=None, yticks=None,
     ys = np.array([[df[Yi] for df in dfs]])
     if fx: xs *= fx
     if fy: ys *= fy
+    ticklabels = [True, True] if ticklabels else [False, False]
     axes = bst.plots.plot_kde_2d(
         xs=xs, ys=ys,
         xticks=xticks, yticks=yticks,
-        xticklabels=[True, True], yticklabels=[True, True],
+        xticklabels=ticklabels, yticklabels=ticklabels,
         xbox_kwargs=2*[xbox_kwargs or dict(light=CABBI_colors.orange.RGBn, dark=CABBI_colors.orange.shade(60).RGBn)],
         ybox_kwargs=[ybox_kwargs or dict(light=CABBI_colors.blue.RGBn, dark=CABBI_colors.blue.shade(60).RGBn)],
         aspect_ratio=1.,
@@ -681,10 +736,46 @@ def plot_kde_2d(name, metrics=(GWP_ethanol, MFPP), xticks=None, yticks=None,
                       horizontalalignment='center', verticalalignment='center',
                       fontsize=12, fontweight='bold')
 
+def plot_unlabeled_feedstock_conventional_comparison_kde(fake_scenarios=True):
+    mfpp = kde_comparison_settings[MFPP]
+    gwp = kde_comparison_settings[GWP_ethanol]
+    gwp_dummy = gwp[1].replace('$_{\\mathrm{economic}}$', '')
+    if fake_scenarios: 
+        gwp_dummy = gwp_dummy.replace(r"$\Delta$", '')
+    kde_comparison_settings[GWP_ethanol] = [
+        gwp[0], 
+        gwp_dummy, 
+        gwp[2]
+    ]
+    kde_comparison_settings[MFPP] = [
+        mfpp[0], 
+        'IRR [%]', 
+        mfpp[2]
+    ]
+    (plot_kde_fake_scenarios_ethanol_price if fake_scenarios else plot_kde)(
+        'O1' if fake_scenarios else 'O1 - S1',
+        yticks=[-75, 0, 75, 150, 225, 300] if fake_scenarios else [-15, 0, 15, 30, 45, 60],
+        xticks=[0.25, 0.3, 0.35, 0.4] if fake_scenarios else [-0.12, -0.09, -0.06, -0.03, 0, 0.03, 0.06],
+        top_left='Conf. A\nFavored()',
+        bottom_right='Conf. B\nFavored()',
+        top_right='GWP\nTradeoff()',
+        bottom_left='MFPP\nTradeoff()',
+        ticklabels=False,
+        aspect_ratio=0.8,
+    )
+    kde_comparison_settings[GWP_ethanol] = gwp
+    kde_comparison_settings[MFPP] = mfpp
+    for i in ('svg', 'png'):
+        file = os.path.join(
+            images_folder, 
+            f'prelim_scenario_comparison_kde.{i}' if fake_scenarios else f'prelim_comparison_kde.{i}'
+        )
+        plt.savefig(file, transparent=True)
+
 def plot_feedstock_conventional_comparison_kde():
     plot_kde(
         'O1 - S1',
-        yticks=[-20, -10, 0, 10, 20, 30, 40],
+        yticks=[-15, 0, 15, 30, 45, 60],
         xticks=[-0.12, -0.09, -0.06, -0.03, 0, 0.03, 0.06],
         top_left='Oilcane Favored',
         bottom_right='Sugarcane\nFavored',

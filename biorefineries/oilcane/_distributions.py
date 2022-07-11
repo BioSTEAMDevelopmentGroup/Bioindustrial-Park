@@ -47,7 +47,7 @@ biodiesel_prices = np.array([ # USD / gal Dec 2009 - Nov 2020, by month
 
 
 N_quarters = int(len(biodiesel_prices)/3)
-biodiesel_prices_quarter = [ # By quarter
+biodiesel_prices = [ # By quarter
     np.mean(biodiesel_prices[3*i: 3*i+3]) for i in range(N_quarters)
 ]
 

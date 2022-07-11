@@ -24,7 +24,7 @@ from biorefineries.oilcane._load_data import images_folder
 from warnings import filterwarnings
 import os
 from ._distributions import (
-    biodiesel_prices_quarter,
+    biodiesel_prices,
     ethanol_prices,
 )
 
@@ -259,7 +259,7 @@ def plot_ethanol_and_biodiesel_price_contours(N=30, benefit=False, cache={},
     for ax in axes.flatten():
         try: fig.sca(ax)
         except: continue
-        plot_scatter_points(ethanol_prices, biodiesel_prices_quarter, 
+        plot_scatter_points(ethanol_prices, biodiesel_prices, 
                             marker='o', s=2, color=dark_letter_color,
                             edgecolor=edgecolor, clip_on=False, zorder=3)
     return fig, axes
