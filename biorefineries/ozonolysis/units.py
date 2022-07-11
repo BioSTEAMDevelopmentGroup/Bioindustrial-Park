@@ -4,8 +4,9 @@ Created on Fri Oct 29 08:17:38 2021
 """
 import biosteam as bst
 import thermosteam as tmo
+from thermosteam import Rxn, RxnSys, PRxn, SRxn, settings, Chemical, Stream
 
-class CatalyticReactor(bst.BatchBioreactor):
+class OzonolysisReactor(bst.BatchBioreactor):
     _N_ins = 1
     _N_outs = 1
     
@@ -56,13 +57,26 @@ class CatalyticReactor(bst.BatchBioreactor):
         X=self.Oleic_acid_conversion
         X1 = 1 - (self.selectivity_oxiraneoctanoic_acid)
         X2 = self.selectivity_Azelaic_acid / X1
-        
-        # reaction_name = 'Ozonolysis_reaction'
+                
         self.reactions = tmo.SeriesReaction([
             tmo.Rxn('Oleic_acid + H2O2   -> Epoxy_stearic_acid + Water ', 'Oleic_acid', X=self.Oleic_acid_conversion),
             tmo.Rxn('Epoxy_stearic_acid + H2O2 -> Nonanal + Oxononanoic_acid + H2O', 'oxiraneoctanoic_acid,_3-octyl-', X = X1),
             tmo.Rxn('Nonanal + Oxononanoic_acid + 2H2O2 -> Azelaic_acid + Nonanoic_acid+ 2H2O', 'Nonanal', X = X2),
-                   ])
+                    ])
+
+        
+        #NEEDS TO BE CONFIRMED WITH DANIM
+        
+        # Epoxide_formation = SRxn([Rxn('Oleic_acid + H2O2   -> Epoxy_stearic_acid ', 'Oleic_acid', X=self.Oleic_acid_conversion),
+        #                           Rxn('Epoxy_stearic_acid + H2O -> DHSA', 'Epoxy_stearic_acid', X = 1),
+        #                           Rxn('DHSA -> Nonanal + Oxononanoic_acid', 'DHSA', X = X1)])
+        
+        # Product_formation = PRxn([ Rxn('Nonanal + H2O2 ->  Nonanoic_acid', 'Nonanal', X = X2),
+        #                            Rxn('Oxononanoic_acid + H2O2 -> Azelaic_acid', 'Oxononanoic_acid', X = X2),
+        #                         ])
+
+        # oxidative_cleavage_rxnsys = RxnSys(Epoxide_formation,Product_formation)
+        # self.reactions = oxidative_cleavage_rxnsys
         
     def _run(self):
         feed = self.ins[0]
@@ -73,12 +87,12 @@ class CatalyticReactor(bst.BatchBioreactor):
               
         self.reactions(effluent) 
         
+        
         effluent.T = self.T
         effluent.P = self.P
         
 class Separator(bst.Unit):
-    #Why does this not have an _init_?
-    
+  
     _N_outs = 6
         
     def _run(self):
@@ -133,22 +147,12 @@ class AACrystalliser(bst.units.BatchCrystallizer):
                     T = self.T)
         outlet.imass['s','Nonanoic_acid'] = feed.imass['Nonanoic_acid']
 
-        # self.outs[0].copy_like(feed)
-        # self.outs[0].phases = ('s', 'l')
-        # self.outs[0].sle('Azelaic_acid', solubility=x, T = self.T)
-    
-        # outlet['s'] = outlet['s']
-        #+ feed.imass['l', 'Nonanoic_acid']
-
         
-        
-
-        
-
-# C301.outs[0].sle('Azelaic_acid', solubility= 0.0000594 , T = 280)
-
-
-
+        # self.reactions = tmo.SeriesReaction([
+        #     tmo.Rxn('Oleic_acid + H2O2   -> Epoxy_stearic_acid + Water ', 'Oleic_acid', X=self.Oleic_acid_conversion),
+        #     tmo.Rxn('Epoxy_stearic_acid + H2O2 -> Nonanal + Oxononanoic_acid + H2O', 'oxiraneoctanoic_acid,_3-octyl-', X = X1),
+        #     tmo.Rxn('Nonanal + Oxononanoic_acid + 2H2O2 -> Azelaic_acid + Nonanoic_acid+ 2H2O', 'Nonanal', X = X2),
+        #            ])
 
 
 
@@ -170,29 +174,3 @@ class AACrystalliser(bst.units.BatchCrystallizer):
         
         
         
-        # AA_solid = outlet.imol['s',('Azelaic_acid')]
-        # NA = feed.imol ['Nonanoic_acid']
-
-#         feed = self.ins[0]
-#         AA, NA, Hexane, Water = feed.imass['Azelaic_acid',
-#                                            'Nonanoic_acid',
-#                                            'Hexane',
-#                                            'Water'].value
-#         total = AA + NA  
-#         outlet.empty()
-#         AA_solid_molefrac = 1 - self.AA_molefraction_280K         
-#         AA_in_liquid = (self.AA_molefraction_280K *feed.imass['Water'].value * 188.8)/( AA_solid_molefrac * 18)
-# # NA_in_liquid = self.NA_solubility*feed.imass['Water'] if only cooling till 20 deg cel
-# # Assumption is that all the NA crystallises at 280K
-#         AA_solid = AA - AA_in_liquid
-#         outlet.imass['s',('Azelaic_acid','Nonanoic_acid')] =  [AA_solid, NA] 
-#         outlet.imass['l',('Azelaic_acid','Hexane','Water')] = [AA_in_liquid,Hexane,Water]
-#         outlet.T = self.T
-
-
-        
-        
-        
-        
-        
-
