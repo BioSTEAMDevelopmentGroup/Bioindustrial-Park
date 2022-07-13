@@ -547,7 +547,7 @@ def load(name, cache=cache, reduce_chemicals=True,
     def set_sorghum_operating_days(sorghum_operating_days):
         if agile: sorghum_mode.operating_hours = sorghum_operating_days * 24
     
-    @default(1600000, units='MT/yr', kind='coupled')
+    @default(1600000, units='MT/yr', kind='isolated')
     def set_annual_crushing_capacity(annual_crushing_capacity):
         sys.rescale(feedstock, kg_per_MT * annual_crushing_capacity / tea.operating_hours / feedstock.F_mass)
 
