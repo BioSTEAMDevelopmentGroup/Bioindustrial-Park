@@ -81,7 +81,7 @@ def Organic_phase_separation(ins,outs,T_in):
                                    # 'phi': 0.590}
                                     )
     
-s    def cache_Ks(ms):
+    def cache_Ks(ms):
         feed, solvent = ms.ins
         if not ms.partition_data:
             s_mix = bst.Stream.sum(ms.ins)

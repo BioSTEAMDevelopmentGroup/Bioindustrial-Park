@@ -15,32 +15,31 @@ from biorefineries.ozonolysis.streams_storage_specs import *
 #from biorefineries.ozonolysis.Batch_conversion import *
 from biosteam import SystemFactory
 from biorefineries.ozonolysis.organic_separation import ob2
-#PARTITION COEFFICIENTS FOR HOT WATER EXTRACTION NEED TO BE ADJUSTED
-#THEY WERE SET BASED ON PREVIOUS PARTITION COEFFICIENTS
-#NEEDS UPDATING
+#This section now does not have a water extraction column
+#A mixture of AA crude and Water will be added in the Secondary separation
 
 @SystemFactory(
     ID = 'Primary_separation',
     ins = [dict(ID='organic_phase_for_separation'),
-           dict(ID = 'Water_for_AA_extraction',
-                Water = 1000,
-                T = 95 + 273.15,
-                units = 'kg/hr',
-                price = 1)],
+           #dict(ID = 'Water_for_AA_extraction',
+           #     Water = 1000,
+            #    T = 95 + 273.15,
+             #   units = 'kg/hr',
+              #  price = 1)
+           ],
     
     outs = [dict(ID = 'Nonanoic_acid_crude_product'),
-            dict(ID = 'Epoxy_stearic_acid_bottoms'),
-            dict(ID = 'Wastewater_aqueous_stream'),
-            dict(ID = 'AA_crude_product'),            
-           
+            dict(ID = 'AA_crude_product'),
+            dict(ID = 'Epoxy_stearic_acid_bottoms'),            
            ],
     fixed_ins_size = True,
     fixed_outs_size = True,     
               )
 
 def Primary_separation(ins,outs,Tin):
-    organic_phase_for_separation,Water_for_AA_extraction, = ins
-    Nonanoic_acid_crude_product,Epoxy_stearic_acid_bottoms,Wastewater_aqueous_stream,AA_crude_product, = outs
+    organic_phase_for_separation, = ins
+    #Water_for_AA_extraction,
+    Nonanoic_acid_crude_product,AA_crude_product,Epoxy_stearic_acid_bottoms = outs
 #
 # MCA removal, should be around 40% acc to literature
     Water = tmo.Chemical('Water')    
@@ -74,7 +73,7 @@ def Primary_separation(ins,outs,Tin):
                         T = 600)
     D203 = bst.units.BinaryDistillation("D203",
                                     ins = D203_H-0, 
-                                    outs=('AA_rich_stream',
+                                    outs=(AA_crude_product,
                                           Epoxy_stearic_acid_bottoms),
                                     LHK = ('Azelaic_acid',
                                            'Epoxy_stearic_acid'),
@@ -85,16 +84,21 @@ def Primary_separation(ins,outs,Tin):
                                     partial_condenser=False,
                                     )
 #[2.04  0.856 0.005 0.005 0.018]
+
  
-#Hot water extraction
-    L202_cooling_water = bst.HeatUtility.get_cooling_agent('chilled_brine')
-    L202_cooling_water.T = -10 + 273.15                      
-    L202 = bst.MultiStageMixerSettlers('L202',
-                                    ins= (D203-0,
-                                          Water_for_AA_extraction), 
-                                    outs=(Wastewater_aqueous_stream, 
-                                          AA_crude_product),                                     
-                                    N_stages=5,)
+ob3 = Primary_separation(ins= ob2.outs[2],Tin = 230+273.15)
+ob3.simulate()
+ob3.show()
+
+# #Hot water extraction
+#     L202_cooling_water = bst.HeatUtility.get_cooling_agent('chilled_brine')
+#     L202_cooling_water.T = -10 + 273.15                      
+#     L202 = bst.MultiStageMixerSettlers('L202',
+#                                     ins= (D203-0,
+#                                           Water_for_AA_extraction), 
+#                                     outs=(Wastewater_aqueous_stream, 
+#                                           AA_crude_product),                                     
+#                                     N_stages=5,)
                                     # partition_data={
                                     #     'K': np.array([2.04,
                                     #                    0.856,
@@ -122,9 +126,6 @@ def Primary_separation(ins,outs,Tin):
     #             }
     #         ms._setup() 
     
-ob3 = Primary_separation(ins= ob2.outs[2],Tin = 230+273.15)
-ob3.simulate()
-ob3.show()
 
 #     def cache_Ks(ms):
 #         feed, solvent = ms.ins

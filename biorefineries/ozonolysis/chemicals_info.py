@@ -31,6 +31,12 @@ ozo_chemicals = tmo.Chemicals(
      'heptane',
      'pentane',
      'Sulphuric_acid',
+     'Nonane',
+     'Decane',
+     'Undecane',
+     'Cyclohexane',
+     'Cycloheptane',
+     'Benzene',
       DHSA])
 
 #Solid Catalyst not available in the database
