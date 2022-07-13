@@ -164,7 +164,7 @@ def run_uncertainty_and_sensitivity(name, N, rule='L',
         samples = sample_cache[key]
     else:
         sample_cache[key] = samples = oc.model.sample(N, rule)
-    oc.model.load_samples(samples, optimize=optimize)
+    oc.model.load_samples(samples, optimize=optimize, ss=False)
     file = monte_carlo_file(name, across_oil_content)
     if across_oil_content:
         if parse(name).number < 0:
