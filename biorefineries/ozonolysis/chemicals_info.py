@@ -64,6 +64,9 @@ Oxononanoic_acid = create_new_chemical(
 )
 
 for chemical in ozo_chemicals: chemical.default()
+
+Dortmund = ozo_chemicals.Oxononanoic_acid.Dortmund
+Dortmund.set_group_counts_by_name(dict(COOH=1, CH2=7, CHO=1))
 ozo_chemicals.compile()
 ozo_chemicals.set_synonym('oxiraneoctanoic_acid,_3-octyl-' ,'Epoxy_stearic_acid') 
 ozo_chemicals.show()

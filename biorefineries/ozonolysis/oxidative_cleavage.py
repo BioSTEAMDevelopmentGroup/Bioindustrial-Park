@@ -27,7 +27,7 @@ from biosteam import SystemFactory
                 price = 0.68
                 ),
           dict(ID='fresh_Water_1',
-                Water = 10,
+                Water = 1000,
                 units = 'kg/hr',
                 price = 1
               ),
@@ -86,8 +86,18 @@ def conversion_oxidative_cleavage(ins,outs,T_in):
                         ins = (P102-0,                               
                                T103_1-0),
                         outs = 'feed_to_reactor_mixer')
+    
+
+    def adjust_HP_feed_flow():   
+        # path_HP = fresh_HP.sink.path_until(M102)
+        # path_water = fresh_Water_1.sink.path_until(M102)
+        fresh_HP.F_mass = fresh_OA.F_mass * 0.958 #- MS201.outs[0].imass['Hydrogen_peroxide']
+        fresh_Water_1.F_mass = fresh_OA.F_mass * 2.008
+        # for i in path_HP + path_water: i.run()
    
-             
+    M101.add_specification(adjust_HP_feed_flow, run=True)   
+
+      
 #Mixer for reactor feed, adds the h2O2 sol and oleic acid
 #Need to add catalyst to it as a separate stream
     M102 = bst.units.Mixer('M102',
@@ -96,17 +106,14 @@ def conversion_oxidative_cleavage(ins,outs,T_in):
                                P104-0),
                         outs = 'feed_to_heat_exchanger')
     
-    M102.add_specification(adjust_reactor_feed_flow, run=True)
+        
+    # def adjust_reactor_feed_flow():
+    #     fresh_OA.F_mass = Total_feed  
+  
+    # M102.add_specification(adjust_reactor_feed_flow, run=True)
+    
 
-    # @M102.add_specification(run=True)
-    # def adjust_HP_feed_flow():   
-    #     path_HP = fresh_HP.sink.path_until(M102)
-    #     path_water = fresh_Water_1.sink.path_until(M102)
-    #     fresh_HP.F_mass = Total_feed * 0.958 - MS201.outs[0].imass['Hydrogen_peroxide']
-    #     fresh_Water_1.F_mass = Total_feed * 2.008
-    #     for i in path_HP + path_water: i.run()
-
-             
+                
 #Batch Ozonolysis process
     R101_H = bst.units.HXutility('R101_H',
                              ins = M102-0,

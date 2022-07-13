@@ -13,7 +13,7 @@ from biorefineries.make_a_biorefinery.analyses.solvents_barrage import run_solve
 from biorefineries.ozonolysis.streams_storage_specs import * 
 #from biorefineries.ozonolysis.Batch_conversion import *
 from biosteam import SystemFactory
-from biorefineries.ozonolysis.Primary_separation import ob3
+from biorefineries.ozonolysis.primary_separation import ob3
 #PARTITION COEFF FOR SOLVENT EXTRACTION NOT IN YET
 #ASSUSSIMG THE SOLVENT HAS PROPERTIES OF OCTANE
 #NEEDS TO BE ADJUSTED ACCORDING TO THE NAPHTHOL MINERAL SPIRITS PATENT 
