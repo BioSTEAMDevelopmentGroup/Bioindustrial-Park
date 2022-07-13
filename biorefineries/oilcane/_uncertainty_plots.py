@@ -804,7 +804,7 @@ def plot_feedstock_cellulosic_comparison_kde():
 def plot_feedstock_comparison_kde(fs=None):
     plot_kde_2d(
         ('O1 - S1', 'O2 - S2'),
-        yticks=[[-15, 0, 15, 30, 45, 60]],
+        yticks=[[-15, 0, 15, 30, 45]],
         xticks=[[-0.12, -0.09, -0.06, -0.03, 0, 0.03, 0.06],
                 [-0.75, -0.5, -0.25, 0., 0.25, 0.5]],
         top_right='GWP\nTradeoff()',
@@ -825,7 +825,7 @@ def plot_feedstock_comparison_kde(fs=None):
 def plot_configuration_comparison_kde(fs=None):
     plot_kde(
         'O1 - O2',
-        yticks=[-10, 0, 10, 20, 30, 40, 50],
+        yticks=[-20, 0, 20, 40, 60],
         xticks=[-0.75, -0.6, -0.45, -0.3, -0.15, 0, 0.15, 0.3],
         top_right='GWP\nTradeoff()',
         bottom_left='MFPP\nTradeoff()',

@@ -292,9 +292,9 @@ def plot_relative_sorghum_oil_content_and_cane_oil_content_contours(
     data = data[:, :, configuration_index, [0, 6]]
     
     # Plot contours
-    xlabel = "Sorghum oil content\n[dry wt. %]" 
+    xlabel = "Oil-sorghum oil content\n[dry wt. %]" 
     if relative: xlabel = ('relative ' + xlabel).capitalize()
-    ylabel = 'Cane oil content\n[dry wt. %]'
+    ylabel = 'Oilcane oil content\n[dry wt. %]'
     yticks = [5, 7.5, 10, 12.5, 15]
     xticks = [-3, -2, -1, 0] if relative else [2, 5, 7.5, 10, 12.5, 15]
     MFPP = oc.all_metric_mockups[0]
@@ -362,7 +362,7 @@ def plot_recovery_and_oil_content_contours(
     
     metric_bars = [mb(0), mb(1, "")]
     fig, axes, CSs, CB = plot_contour_2d(
-        100.*X, 100.*Y, ['Oilcane Only', 'Oilcane & Oilsorghum'], data, xlabel, ylabels, xticks, yticks, metric_bars, 
+        100.*X, 100.*Y, ['Oilcane Only', 'Oilcane & Oil-sorghum'], data, xlabel, ylabels, xticks, yticks, metric_bars, 
         fillcolor=None, styleaxiskw=dict(xtick0=False), label=True,
     )
     M = len(configurations)
