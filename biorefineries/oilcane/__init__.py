@@ -553,13 +553,13 @@ def load(name, cache=cache, reduce_chemicals=True,
 
     # USDA ERS historical price data
     @parameter(distribution=ethanol_price_distribution, element=s.ethanol, 
-               baseline=1.90 / L_per_gal, units='USD/L')
+               baseline=mean_ethanol_price, units='USD/L')
     def set_ethanol_price(price): # Triangular distribution fitted over the past 10 years Sep 2009 to Nov 2020
         s.ethanol.price = price * ethanol_L_per_kg
         
     # USDA ERS historical price data
     @parameter(distribution=biodiesel_minus_ethanol_price_distribution, element=s.biodiesel, units='USD/L',
-               baseline=2.47 / L_per_gal, hook=lambda x: s.ethanol.price + x)
+               baseline=mean_biodiesel_price, hook=lambda x: s.ethanol.price + x)
     def set_biodiesel_price(price): # Triangular distribution fitted over the past 10 years Sep 2009 to March 2021
         s.biodiesel.price = price * biodiesel_L_per_kg
 

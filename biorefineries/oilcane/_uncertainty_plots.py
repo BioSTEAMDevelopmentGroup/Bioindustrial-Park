@@ -857,7 +857,7 @@ def plot_separated_configuration_comparison_kde():
 def plot_crude_configuration_comparison_kde():
     plot_kde_2d(
         ('O1 - O3', 'O2 - O4'),
-        yticks=[[-12, 0, 12, 24, 36, 48]],
+        yticks=[[-10, 0, 10, 20, 30]],
         xticks=[
             [-0.3, -0.24, -0.18, -0.12, -0.06, 0],
             [-0.5, -0.4, -0.3, -0.2, -0.1, 0]
@@ -883,7 +883,7 @@ def plot_agile_comparison_kde(fs=None):
         ],
         top_right='TCI-Tradeoff()',
         bottom_left='MFPP\nTradeoff()',
-        top_left='Sorghum\nIntegration Favored()',
+        top_left='Oil-sorghum\nIntegration Favored()',
         bottom_right='Cane-only\nFavored()',
         xbox_kwargs=dict(light=CABBI_colors.green_dirty.RGBn, 
                          dark=CABBI_colors.green_dirty.shade(60).RGBn),
@@ -1205,7 +1205,7 @@ def plot_spearman(configurations, labels=None, metric=None,
         for name in ignored: ignored_dct[name].append(i)
         index_name = index[i]
         if kind == 'LCA':
-            for term in ('cost', 'price', 'IRR', 'time', 'capacity'):
+            for term in ('cost', 'price', 'IRR', 'time', 'capacity', 'operating'):
                 if term in index_name:
                     for name in ignored_dct: ignored_dct[name].append(i)
                     break
