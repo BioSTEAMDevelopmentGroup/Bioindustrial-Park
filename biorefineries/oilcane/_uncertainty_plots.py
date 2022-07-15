@@ -804,7 +804,7 @@ def plot_feedstock_cellulosic_comparison_kde():
 def plot_feedstock_comparison_kde(fs=None):
     plot_kde_2d(
         ('O1 - S1', 'O2 - S2'),
-        yticks=[[-15, 0, 15, 30, 45, 60]],
+        yticks=[[-15, 0, 15, 30, 45]],
         xticks=[[-0.12, -0.09, -0.06, -0.03, 0, 0.03, 0.06],
                 [-0.75, -0.5, -0.25, 0., 0.25, 0.5]],
         top_right='GWP\nTradeoff()',
@@ -825,7 +825,7 @@ def plot_feedstock_comparison_kde(fs=None):
 def plot_configuration_comparison_kde(fs=None):
     plot_kde(
         'O1 - O2',
-        yticks=[-10, 0, 10, 20, 30, 40, 50],
+        yticks=[-20, 0, 20, 40, 60],
         xticks=[-0.75, -0.6, -0.45, -0.3, -0.15, 0, 0.15, 0.3],
         top_right='GWP\nTradeoff()',
         bottom_left='MFPP\nTradeoff()',
@@ -857,7 +857,7 @@ def plot_separated_configuration_comparison_kde():
 def plot_crude_configuration_comparison_kde():
     plot_kde_2d(
         ('O1 - O3', 'O2 - O4'),
-        yticks=[[-12, 0, 12, 24, 36, 48]],
+        yticks=[[-10, 0, 10, 20, 30]],
         xticks=[
             [-0.3, -0.24, -0.18, -0.12, -0.06, 0],
             [-0.5, -0.4, -0.3, -0.2, -0.1, 0]
@@ -883,7 +883,7 @@ def plot_agile_comparison_kde(fs=None):
         ],
         top_right='TCI-Tradeoff()',
         bottom_left='MFPP\nTradeoff()',
-        top_left='Sorghum\nIntegration Favored()',
+        top_left='Oil-sorghum\nIntegration Favored()',
         bottom_right='Cane-only\nFavored()',
         xbox_kwargs=dict(light=CABBI_colors.green_dirty.RGBn, 
                          dark=CABBI_colors.green_dirty.shade(60).RGBn),
@@ -1157,7 +1157,7 @@ def plot_spearman(configurations, labels=None, metric=None,
         (f'Sorghum operating days [30 $-$ 60 {operating_days}]', ['S2', 'S1', 'O1', 'O2']),
         (f'Crushing capacity [1.2 $-$ 2.0 {capacity}]', []),
         (f'Ethanol price [0.269, 0.476, 0.758 {stream_price}]', []),
-        (f'Relative biodiesel price [0.0819, 0.786, 1.09 {stream_price}]', []),
+        (f'Relative biodiesel price [0.255, 0.430, 0.719 {stream_price}]', []),
         (f'Natural gas price [0.105, 0.122, 0.175 {ng_price}]', ['S1', 'O1', 'S1*', 'O1*']),
         (f'Electricity price [0.0583, 0.065, 0.069 {electricity_price}]', ['S2', 'O2', 'S2*', 'O2*']),
          ('IRR [10 $-$ 15 %]', []),
@@ -1205,7 +1205,7 @@ def plot_spearman(configurations, labels=None, metric=None,
         for name in ignored: ignored_dct[name].append(i)
         index_name = index[i]
         if kind == 'LCA':
-            for term in ('cost', 'price', 'IRR', 'time', 'capacity'):
+            for term in ('cost', 'price', 'IRR', 'time', 'capacity', 'operating'):
                 if term in index_name:
                     for name in ignored_dct: ignored_dct[name].append(i)
                     break

@@ -59,7 +59,13 @@ def parse(x):
     elif isinstance(x, (Configuration, ConfigurationComparison)):
         return x
     else:
-        raise ValueError(f'could not parse {x}')
+        try:
+            try:
+                return asconfiguration(x)
+            except:
+                return ascomparison(x)
+        except:
+            raise ValueError(f'could not parse {x}')
     
 def format_name(name):
     key = parse(name)

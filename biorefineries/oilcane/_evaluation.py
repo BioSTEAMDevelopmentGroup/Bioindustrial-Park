@@ -164,7 +164,7 @@ def run_uncertainty_and_sensitivity(name, N, rule='L',
         samples = sample_cache[key]
     else:
         sample_cache[key] = samples = oc.model.sample(N, rule)
-    oc.model.load_samples(samples, optimize=optimize)
+    oc.model.load_samples(samples, optimize=optimize, ss=False)
     file = monte_carlo_file(name, across_oil_content)
     if across_oil_content:
         if parse(name).number < 0:
@@ -198,6 +198,7 @@ def run_uncertainty_and_sensitivity(name, N, rule='L',
         success = False
         for i in range(3):
             try:
+                if name not in ('O1', 'O2'): oc.disable_derivative()
                 oc.model.evaluate(
                     notify=N,
                     autosave=autosave,
@@ -209,13 +210,14 @@ def run_uncertainty_and_sensitivity(name, N, rule='L',
                 warn('failed evaluation; restarting without cache')
             else:
                 success = True
+                oc.enable_derivative()
                 break
         if not success:
             raise RuntimeError('evaluation failed')
-        # oc.model.table.to_excel(file)
+        oc.model.table.to_excel(file)
         rho, p = oc.model.spearman_r()
         file = spearman_file(name)
-        # rho.to_excel(file)
+        rho.to_excel(file)
 
 run = run_uncertainty_and_sensitivity
     
