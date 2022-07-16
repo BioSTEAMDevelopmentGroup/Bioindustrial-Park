@@ -361,10 +361,6 @@ class CoFermentation(bst.BatchBioreactor):
     #: Unload and clean up time (hr)
     tau_0 = 4
     
-    _units = {'Flow rate': 'm3/hr',
-              'Reactor volume': 'm3',
-              'Reactor duty': 'kJ/hr'}
-    
     def __init__(self, ID='', ins=None, outs=(), thermo=None,
                  tau=36, N=None, V=3785.4118, T=305.15, P=101325,
                  Nmin=2, Nmax=36, cofermentation=None, loss=None):

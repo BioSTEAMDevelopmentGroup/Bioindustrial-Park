@@ -96,6 +96,10 @@ def format_configuration(configuration, latex=True):
         name = 'O3'
     elif number == 4:
         name = 'O4'
+    elif number == 5:
+        name = 'O5'
+    elif number == 6:
+        name = 'O6'
     else:
         raise ValueError(f'invalid configuration {configuration}')
     if latex:

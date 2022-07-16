@@ -12,7 +12,7 @@ from biorefineries.cornstover.units import (
 )
 
 __all__ = ('SeedTrain', 'CoFermentation')
-
+    
 class SeedTrain(SeedTrain):
     
     def __init__(self, ID='', ins=None, outs=(), thermo=None, reactions=None, saccharification=False):
@@ -70,4 +70,3 @@ class CoFermentation(CoFermentation):
             ])
         else:
             self.lipid_reaction = self.oil_reaction = None
-            

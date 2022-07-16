@@ -694,163 +694,119 @@ def create_sugar_crystallization_system(ins, outs):
         moisture_content=None,
     )
     units.StorageTank('S2', C4-1, molasses, tau=24 * 7)
-    
-# @SystemFactory(
-#       ID='fermentation_sys',
-#       ins=[screened_juice],
-#       outs=[beer, evaporator_condensate, vent],
-#   )   
-# def create_juice_to_fermentation_system(ins, outs, include_scrubber=None):
-#     screened_juice, = ins
-#     beer, evaporator_condensate, vent, = outs
-#     EvX = bst.MultiEffectEvaporator(400, ins=screened_juice, outs=('', evaporator_condensate),
-#                                     P=(101325, 69682, 47057, 30953, 19781),
-#                                     V_definition='First-effect',
-#                                     thermo=screened_juice.thermo.ideal(),
-#                                     V=0.05) # fraction evaporated
-#     PX = bst.Pump(400, ins=EvX-0, P=101325.)
-#     MX = bst.Mixer(400, [PX-0, 'dilution_water'])
-#     HX = bst.HXutility(400, MX-0, T=305.15)
-#     PX.sucrose_hydrolysis_reaction = tmo.Reaction(
-#         'Sucrose + Water -> 2Glucose', 'Sucrose', 1.00
-#     )
-
-#     @PX.add_specification(run=True)
-#     def hydrolysis():
-#         feed = PX.ins[0]
-#         PX.sucrose_hydrolysis_reaction.force_reaction(feed)
-#         if feed.imol['Water'] < 0: feed.imol['Water'] = 0.
-    
-#     fermentation = None
-#     fermentation.titer = titer
-#     fermentation.productivity = productivity
-#     P_original = tuple(EvX.P)
-#     @EvX.add_specification(run=True)
-#     def evaporation():
-#         path = EvX.path_until(fermentation, inclusive=True)
-#         beer = fermentation.outs[1]
-#         target_titer = fermentation.titer
-#         V_last = EvX.V
-#         EvX.P = P_original
-#         EvX._reload_components = True
-#         def f(V):
-#             EvX.V = V
-#             for unit in path: unit.run()
-#             return target_titer - beer.imass[product_group] / beer.F_vol
-#         MX.ins[1].imass['Water'] = 0.
-#         y0 = f(0)
-#         if y0 < 0.:
-#             ethanol = float(beer.imass[product_group])
-#             current_titer = ethanol / beer.F_vol
-#             required_water = (1./target_titer - 1./current_titer) * ethanol * 1000.
-#             MX.ins[1].imass['Water'] = max(required_water, 0)
-#         else:
-#             EvX.P = list(P_original)
-#             EvX._load_components()
-#             for i in range(EvX._N_evap-1):
-#                 if f(1e-6) < 0.:
-#                     EvX.P.pop()
-#                     EvX._reload_components = True
-#                 else:
-#                     break  
-#             x0 = 0.
-#             x1 = 0.1
-#             y1 = f(x1)
-#             while y1 > 0:
-#                 if x1 > 0.9: raise RuntimeError('infeasible to evaporate any more water')
-#                 x0 = x1            
-#                 x1 += 0.1
-#                 y1 = f(x1)
-#             EvX.V = flx.IQ_interpolation(f, x0, x1, y0, y1, x=V_last, ytol=1e-5, xtol=1e-6)
-#         fermentation.tau = target_titer / fermentation.productivity 
 
 @SystemFactory(
     ID='sucrose_fermentation_sys',
     ins=[screened_juice],
     outs=[beer, evaporator_condensate, vent],
 )
-def create_sucrose_fermentation_system(ins, outs, scrubber=True):
+def create_sucrose_fermentation_system(ins, outs,
+        scrubber=None, product_group=None, Fermentor=None, titer=None,
+        productivity=None, ignored_volume=None,
+    ):
     screened_juice, = ins
     beer, evaporator_condensate, vent = outs
-    
+    if ignored_volume is None: ignored_volume = 'Lipid'
+    if titer is None: titer = 117.0056 # g / L
+    if productivity is None: productivity = 13
+    if product_group is None: product_group = 'Ethanol'
+    if Fermentor is None: Fermentor = units.Fermentation
+    if Fermentor._N_outs == 2:
+        if scrubber is None: scrubber = True
+        fermentor_outs = [('CO2' if scrubber else vent), '']
+    else:
+        scrubber = False
+        fermentor_outs = ['']
     dilution_water = bst.Stream('dilution_water')
     
-    ### Units ###
-    
-    # Split sugar solution
-    S301 = units.Splitter('S301',
-                          split=0.10)
-    
-    # Concentrate sugars
     F301 = units.MultiEffectEvaporator('F301',
+                                       screened_juice,
                                        P=(101325, 69682, 47057, 30953, 19781),
                                        outs=('', evaporator_condensate),
                                        V_definition='First-effect',
+                                       thermo=dilution_water.thermo.ideal(),
                                        V=0.3) # fraction evaporated
-    F301.specification = lambda: None
+    P306 = units.Pump('P306', F301-0)
     # Note: value of steam ~ 6.86 for the following 
     # (101325, 73580.467, 50891.17, 32777.406, 19999.925, 11331.5),
     
     # Mix sugar solutions
-    M301 = units.Mixer('M301')
+    M301 = units.Mixer('M301', ins=(P306-0, dilution_water))
     
-    def get_sugar_concentration():
-        s = M301.outs[0]
-        if 'Lipid' in s.chemicals:
-            ignored = float(s.imass['Lipid'])
-        else:
-            ignored = 0.
-        return s.imass['Glucose', 'Sucrose'].sum() / (s.F_mass - ignored)
+    # Cool for fermentation
+    H301 = units.HXutility('H301', M301-0, T=295.15)
     
-    def sugar_concentration_at_fraction_evaporated(V):
+    # Ethanol Production
+    R301 = Fermentor('R301', 
+        ins=[H301-0, ''],
+        outs=fermentor_outs, 
+        tau=9, efficiency=0.90, N=4
+    ) 
+    T301 = units.StorageTank('T301', R301-1, tau=4, vessel_material='Carbon steel')
+    T301.line = 'Beer tank'
+    
+    # Separate 99% of yeast
+    C301 = units.SolidsCentrifuge('C301', 
+                                  ins=T301-0,
+                                  outs=('', '' if scrubber else beer),
+                                  split=(1-1e-6, 0.99, 1, 0.01),
+                                  order=('Ethanol', 'Glucose', 'H3PO4', 'DryYeast'),
+                                  solids=('DryYeast',))
+    C301.split[:] = 1. - C301.split
+    if 'Lipid' in C301.chemicals: C301.isplit['Lipid'] = 0.
+    
+    S302 = units.FakeSplitter('S302', C301-0, (1-R301, 'Yeast'))
+    R301.titer = titer # g / L
+    R301.productivity = productivity # g / L-h
+    def adjust_yeast_recycle():
+        recycle, beer = S302.outs
+        feed, = S302.ins
+        yeast = 0.1 * feed.F_mass
+        m = C301.moisture_content
+        recycle.imass['Yeast', 'Water'] = [yeast, yeast * m / (1 - m)]
+        beer.copy_like(feed)
+        beer.separate_out(recycle, energy_balance=False)
+        beer.mol[beer.mol < 0.] = 0.
+        beer.T = recycle.T = feed.T
+    S302.specification = adjust_yeast_recycle
+    
+    def get_titer():
+        s = R301.outs[1]
+        ignored = s.ivol[ignored_volume] if ignored_volume in s.chemicals else 0.
+        ignored_product = sum([i.imass[product_group] for i in R301.ins])
+        return (s.imass[product_group] - ignored_product) / (s.F_vol - ignored)
+    
+    def titer_at_fraction_evaporated_objective(V, path):
         F301.V = V
-        for i in F301.path_until(M301): i._run()
-        M301._run()
-        return F301.sugar_concentration - get_sugar_concentration()
+        for i in path: i._run()
+        return R301.titer - get_titer()
     
-    def get_dilution_water():
+    def get_dilution_water(path):
         F301.V = 0
-        for i in F301.path_until(M301): i._run()
-        M301._run()
-        target = F301.sugar_concentration
-        current = get_sugar_concentration()
-        return (1./target - 1./current) * sum([i.imass['Glucose', 'Sucrose'].sum() for i in M301.ins])
+        for i in path: i._run()
+        target = R301.titer
+        current = get_titer()
+        return (1./target - 1./current) * R301.outs[0].imass[product_group] * 1000.
     
-    @M301.add_specification(run=False)
-    def adjust_glucose_concentration():
+    @F301.add_specification(run=False)
+    def evaporation():
         V_guess = F301.V
-        s_dilution_water = M301.ins[2]
+        s_dilution_water = M301.ins[-1]
         s_dilution_water.empty()
-        dilution_water = get_dilution_water()
+        path = F301.path_until(R301, inclusive=True)
+        dilution_water = get_dilution_water(path)
         if dilution_water < 0.:
-            y1 = sugar_concentration_at_fraction_evaporated(1.)
-            if y1 > 0.: 
-                S301.split = 0.05
-                S301._run()
-                y1 = sugar_concentration_at_fraction_evaporated(1.)
-                if y1 > 0.: 
-                    S301.split = 0.
-                    S301._run()
-                    y1 = sugar_concentration_at_fraction_evaporated(1.)
-                    if y1 > 0.:
-                        raise RuntimeError('cannot evaporate to target sugar concentration')
+            x1 = 0.95
+            y1 = titer_at_fraction_evaporated_objective(x1, path)
+            if y1 > 0.: raise RuntimeError('cannot evaporate to target sugar concentration')
             F301.V = flx.IQ_interpolation(
-                sugar_concentration_at_fraction_evaporated,
-                0., 1., x=V_guess, ytol=1e-5
+                titer_at_fraction_evaporated_objective,
+                0., x1, None, y1, x=V_guess, ytol=1e-5,
+                args=(path,),
             )
         else:
             s_dilution_water.imass['Water'] = dilution_water
-        S301.split = 0.10
-            
-    F301.sugar_concentration = 0.23 # wt. % sugar
-    
-    # Cool for fermentation
-    H301 = units.HXutility('H301', T=295.15)
-    
-    # Ethanol Production
-    R301 = units.Fermentation('R301', outs=(('CO2' if scrubber else vent), ''), tau=9, efficiency=0.90, N=4) 
-    T301 = units.StorageTank('T301', tau=4, vessel_material='Carbon steel')
-    T301.line = 'Beer tank'
+        R301.tau = R301.titer / R301.productivity
     
     if scrubber:
         stripping_water = bst.Stream('stripping_water',
@@ -864,44 +820,7 @@ def create_sucrose_fermentation_system(ins, outs, scrubber=True):
         D301 = units.VentScrubber('D301', ins=(stripping_water, R301-0), 
                                   outs=(vent, ''),
                                   gas=('CO2', 'O2'))
-        M302 = units.Mixer('M302', outs=beer)
-    
-    # Separate 99% of yeast
-    C301 = units.SolidsCentrifuge('C301', 
-                                  outs=('', '' if scrubber else beer),
-                                  split=(1-1e-6, 0.99, 1, 0.01),
-                                  order=('Ethanol', 'Glucose', 'H3PO4', 'DryYeast'),
-                                  solids=('DryYeast',))
-    C301.split[:] = 1. - C301.split
-    if 'Lipid' in C301.chemicals: C301.isplit['Lipid'] = 0.
-    
-    S302 = units.FakeSplitter('S302', None, ('', 'Yeast'))
-    
-    # Yeast mixing
-    T305 = units.MixTank('T305')
-    T305.tau = 0.1
-    
-    # Multi-effect evaporator pumps
-    P306 = units.Pump('P306')
-    
-    def adjust_yeast_recycle():
-        recycle, beer = S302.outs
-        feed, = S302.ins
-        yeast = 0.1 * feed.F_mass
-        m = C301.moisture_content
-        recycle.imass['Yeast', 'Water'] = [yeast, yeast * m / (1 - m)]
-        beer.copy_like(feed)
-        beer.separate_out(recycle, energy_balance=False)
-        beer.mol[beer.mol < 0.] = 0.
-        beer.T = recycle.T = feed.T
-    S302.specification = adjust_yeast_recycle
-    
-    ### Ethanol system set-up ###
-    
-    screened_juice-S301-1-F301-0-P306
-    (S301-0, P306-0, dilution_water)-M301-H301
-    (H301-0, C301-0-S302-0)-R301-1-T301-0-C301-0-S302
-    if scrubber: (C301-1, D301-1)-M302
+        units.Mixer('M302', ins=(C301-1, D301-1), outs=beer)
     
 
 @SystemFactory(

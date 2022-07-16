@@ -395,7 +395,9 @@ def create_oilcane_to_crude_oil_and_ethanol_1g(
 )
 def create_cane_to_combined_1_and_2g_fermentation(
         ins, outs, titer=None, productivity=None, product_group=None,
-        SeedTrain=None, CoFermentation=None,
+        SeedTrain=None, CoFermentation=None, ignored_volume=None,
+        cofermentation_reactions=None,
+        seed_train_reactions=None,
     ):
     """
     Create a system that produces crude oil and a fermentation-derived product 
@@ -467,6 +469,8 @@ def create_cane_to_combined_1_and_2g_fermentation(
         area=400,
         udct=True,
         kind='Saccharification and Co-Fermentation',
+        cofermentation_reactions=cofermentation_reactions,
+        seed_train_reactions=seed_train_reactions,
         insoluble_solids_loading=0.23,
         SeedTrain=SeedTrain,
         CoFermentation=CoFermentation,
@@ -516,7 +520,9 @@ def create_cane_to_combined_1_and_2g_fermentation(
         def f(V):
             EvX.V = V
             for unit in path: unit.run()
-            return target_titer - beer.imass[product_group] / beer.F_vol
+            ignored = beer.ivol[ignored_volume] if ignored_volume in cofermentation.chemicals else 0.
+            ignored_product = sum([i.imass[product_group] for i in cofermentation.ins])
+            return target_titer - (beer.imass[product_group] - ignored_product) / (beer.F_vol - ignored)
         MX.ins[1].imass['Water'] = 0.
         y0 = f(0)
         if y0 < 0.:
@@ -765,5 +771,88 @@ def create_sugarcane_to_ethanol_combined_1_and_2g(ins, outs):
 def create_oilcane_to_biodiesel_1g():
     raise NotImplementedError()
 
-def create_oilcane_to_biodiesel_combined_1_and_2g_post_fermentation_oil_separation():
-    raise NotImplementedError()
+@SystemFactory(
+    ID='oilcane_sys',
+    ins=[oilcane_dct],
+    outs=[dict(ID='biodiesel', price=price['Biodiesel']),
+          dict(ID='crude_glycerol', price=price['Crude glycerol'])],
+)
+def create_oilcane_to_biodiesel_combined_1_and_2g_post_fermentation_oil_separation(ins, outs):
+    oilcane, = ins
+    biodiesel, crude_glycerol = outs
+    cofermentation = tmo.Rxn(
+        'CO2 + Glucose -> H2O + TAG', 'Glucose', 0.9500,
+        correct_atomic_balance=True
+    )
+    oilcane_to_fermentation_sys = create_cane_to_combined_1_and_2g_fermentation('oilcane_to_fermentation_sys',
+        ins=oilcane, 
+        product_group='Lipid',
+        titer=89.4,
+        productivity=0.61,
+        cofermentation_reactions=cofermentation,
+        seed_train_reactions=cofermentation,
+        CoFermentation=units.CoFermentation,
+        SeedTrain=units.SeedTrain,
+    )
+    beer, lignin, condensate, pretreatment_wastewater, fiber_fines = oilcane_to_fermentation_sys.outs
+    post_fermentation_oil_separation_sys, pfls_dct = create_post_fermentation_oil_separation_system(
+        ins=beer,
+        mockup=True,
+        area=600,
+        udct=True,
+        separate_cellmass=True,
+    )
+    backend_oil, cellmass, wastewater, evaporator_condensate = post_fermentation_oil_separation_sys.outs
+    backend_oil.ID = 'backend_oil'
+    MX_process_water = bst.Mixer(900, (condensate, evaporator_condensate),
+                                 'recycle_process_water')
+    oil_pretreatment_sys, oil_pretreatment_dct = create_oil_pretreatment_system(
+        ins=backend_oil,
+        outs=['', 'polar_lipids', ''],
+        mockup=True,
+        area=800,
+        udct=True
+    )
+    oil, polar_lipids, wastewater_small = oil_pretreatment_sys.outs
+    
+    transesterification_and_biodiesel_separation_sys = create_transesterification_and_biodiesel_separation_system(
+        ins=oil, 
+        outs=[biodiesel, crude_glycerol, ''],
+        mockup=True,
+        area=800,
+    )
+    wastewater_treatment_sys = bst.create_wastewater_treatment_system(
+        ins=[wastewater,
+             fiber_fines,
+             pretreatment_wastewater,
+             wastewater_small,
+             transesterification_and_biodiesel_separation_sys-2,
+             evaporator_condensate],
+        mockup=True,
+        area=500,
+    )
+    s = f.stream
+    u = f.unit
+    M501 = bst.Mixer(700, (wastewater_treatment_sys-1, lignin, polar_lipids, cellmass, f.stream.filter_cake))
+    brf.cornstover.create_facilities(
+        solids_to_boiler=M501-0,
+        gas_to_boiler=wastewater_treatment_sys-0,
+        process_water_streams=(s.imbibition_water,
+                               s.biodiesel_wash_water,
+                               s.oil_wash_water,
+                               s.rvf_wash_water,
+                               s.caustic, 
+                               s.warm_process_water,
+                               s.pretreatment_steam,
+                               s.saccharification_water),
+        feedstock=s.bagasse,
+        RO_water=wastewater_treatment_sys-2,
+        recycle_process_water=MX_process_water-0,
+        BT_area=700,
+        area=900,
+    )
+    HXN = bst.HeatExchangerNetwork(1000,
+        ignored=lambda: [u.D801.boiler, u.D802.boiler, u.H803, u.H802, u.H801, u.H804, u.H806, u.H809, oil_pretreatment_dct['F3']],
+        Qmin=1e3,
+    )
+    HXN.acceptable_energy_balance_error = 0.01

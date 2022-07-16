@@ -451,7 +451,7 @@ def load(name, cache=cache, reduce_chemicals=True,
         isplit_b = None
         oil_extraction_specification = MockExtractionSpecification()
     else:
-        if number > 2:
+        if 2 < number < 5:
             dct['biodiesel'] = bst.Stream('biodiesel')
         isplit_b = isplit_a = None
         for i in oilcane_sys.cost_units:
@@ -473,9 +473,12 @@ def load(name, cache=cache, reduce_chemicals=True,
     # Set non-negligible characterization factors
     if abs(number) not in (2, 4):
         for i in ('FGD_lime', 'cellulase', 'DAP', 'CSL', 'caustic'): MockStream(i)
-    if number < 0 or number > 2:
+    if number < 0 or 2 < number < 5: 
         for i in ('catalyst', 'methanol', 'HCl', 'NaOH', 'crude_glycerol', 'pure_glycerine'): MockStream(i)
-        
+    if number < 0 or 2 < number < 5:
+        for i in ('catalyst', 'methanol', 'HCl', 'NaOH', 'crude_glycerol', 'pure_glycerine'): MockStream(i)
+    if number > 4:
+        for i in ('denaturant', 'ethanol'): MockStream(i)
     set_GWPCF(feedstock, 'sugarcane')
     set_GWPCF(s.H3PO4, 'H3PO4')
     set_GWPCF(s.lime, 'lime', dilution=0.046) # Diluted with water
@@ -564,9 +567,9 @@ def load(name, cache=cache, reduce_chemicals=True,
         
     # USDA ERS historical price data
     @parameter(distribution=biodiesel_minus_ethanol_price_distribution, element=s.biodiesel, units='USD/L',
-               baseline=mean_biodiesel_price, hook=lambda x: s.ethanol.price + x)
+               baseline=mean_biodiesel_price - mean_ethanol_price)
     def set_biodiesel_price(price): # Triangular distribution fitted over the past 10 years Sep 2009 to March 2021
-        s.biodiesel.price = price * biodiesel_L_per_kg
+        s.biodiesel.price = (s.ethanol.price + price) * biodiesel_L_per_kg
 
     # https://www.eia.gov/energyexplained/natural-gas/prices.php
     @parameter(distribution=natural_gas_price_distribution, element=s.natural_gas, units='USD/m3',
@@ -1045,7 +1048,7 @@ def load(name, cache=cache, reduce_chemicals=True,
     set_baseline(set_crushing_mill_oil_recovery, 60)
     set_baseline(set_ethanol_price, mean_ethanol_price) 
     set_baseline(set_crude_glycerol_price, mean_glycerol_price)
-    set_baseline(set_biodiesel_price, mean_biodiesel_price)
+    set_baseline(set_biodiesel_price, mean_biodiesel_price - mean_ethanol_price)
     set_baseline(set_natural_gas_price, mean_natural_gas_price)
     set_baseline(set_electricity_price, mean_electricity_price)
     if number > 0:
