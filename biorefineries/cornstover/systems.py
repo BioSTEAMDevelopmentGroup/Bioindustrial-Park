@@ -482,6 +482,11 @@ def create_simultaneous_saccharification_and_cofermentation_system(
         include_scrubber=True,
         add_nutrients=True,
     ):
+    """
+    Create an integrated system that performs saccharification and co-fermentation 
+    at the same time.
+    
+    """
     slurry, DAP, CSL = ins
     vent, beer = outs
     if add_nutrients:
@@ -587,6 +592,11 @@ def create_integrated_bioprocess_saccharification_and_cofermentation_system(
         include_scrubber=True,
         add_nutrients=True,
     ):
+    """
+    Create an integrated system that performs saccharification and co-fermentation 
+    in the same tanks.
+    
+    """
     slurry, DAP, CSL = ins
     vent, beer = outs
     if add_nutrients:
@@ -689,6 +699,11 @@ def create_cofermentation_system(
         cofermentation_reactions=None,
         add_nutrients=True,
     ):
+    """
+    Create co-fermentation system that includes a pressure filter to separate
+    lignin before fermentation.
+    
+    """
     slurry, DAP, CSL = ins
     vent, beer, lignin = outs
     if add_nutrients:

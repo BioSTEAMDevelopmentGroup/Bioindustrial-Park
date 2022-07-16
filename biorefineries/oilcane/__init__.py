@@ -72,7 +72,11 @@ from ._chemicals import create_chemicals
 from .systems import (
     create_oilcane_to_biodiesel_and_ethanol_1g,
     create_oilcane_to_biodiesel_and_ethanol_combined_1_and_2g_post_fermentation_oil_separation,
-    create_sugarcane_to_ethanol_combined_1_and_2g,    
+    create_sugarcane_to_ethanol_combined_1_and_2g,  
+    create_oilcane_to_crude_oil_and_ethanol_1g,
+    create_oilcane_to_crude_oil_and_ethanol_combined_1_and_2g_post_fermentation_oil_separation,
+    create_oilcane_to_biodiesel_1g,
+    create_oilcane_to_biodiesel_combined_1_and_2g_post_fermentation_oil_separation
 )
 from ._parse_configuration import (
     parse,
@@ -135,29 +139,6 @@ comparison_names = (
     'O2* - O2',  
 )
 
-other_comparison_names = (
-    'O1* - S1*', 'O2* - S2*', 
-)
-
-across_oil_content_names = (
-    'O1', 'O2', 
-)
-
-across_oil_content_agile_names = (
-    'O1*', 'O2*', 
-)
-
-across_oil_content_comparison_names = (
-    'O1 - S1', 'O2 - S2', 'O2 - O1', 
-)
-
-across_oil_content_agile_direct_comparison_names = (
-    'O1* - O1', 'O2* - O2', 
-)
-
-across_oil_content_agile_comparison_names = (
-    'O1* - S1*', 'O2* - S2*', 'O2* - O1*', 
-)
 
 def load_chemicals():
     global chemicals, _chemicals_loaded
@@ -206,7 +187,6 @@ def load(name, cache=cache, reduce_chemicals=True,
         bst.rename_units([i for i in oilcane_sys.units if bst.is_storage_unit(i)], storage)
     
     if number == -1:
-        isplit_recovery_is_reversed = None
         # starting_chemicals = create_starting_chemicals()
         # bst.settings.set_thermo(starting_chemicals)
         oilcane_sys = create_sugarcane_to_ethanol_system(
@@ -225,7 +205,6 @@ def load(name, cache=cache, reduce_chemicals=True,
         ]
         rename_storage_units(700)
     elif number == -2:
-        isplit_recovery_is_reversed = None
         oilcane_sys = create_sugarcane_to_ethanol_combined_1_and_2g(
             operating_hours=operating_hours,
         )
@@ -242,7 +221,6 @@ def load(name, cache=cache, reduce_chemicals=True,
         ]
         rename_storage_units(900)
     elif number == 1:
-        isplit_recovery_is_reversed = False
         oilcane_sys = create_oilcane_to_biodiesel_and_ethanol_1g(
             operating_hours=operating_hours,
         )
@@ -259,7 +237,6 @@ def load(name, cache=cache, reduce_chemicals=True,
         ]
         rename_storage_units(1000)
     elif number == 2:
-        isplit_recovery_is_reversed = True
         area_names = [
             'Feedstock handling', 
             'Juicing', 
@@ -278,7 +255,6 @@ def load(name, cache=cache, reduce_chemicals=True,
         )
         rename_storage_units(1100)
     elif number == 3:
-        isplit_recovery_is_reversed = False
         oilcane_sys = create_oilcane_to_crude_oil_and_ethanol_1g(
             operating_hours=operating_hours,
         )
@@ -294,7 +270,6 @@ def load(name, cache=cache, reduce_chemicals=True,
         ]
         rename_storage_units(800)
     elif number == 4:
-        isplit_recovery_is_reversed = True
         area_names = [
             'Feedstock handling', 
             'Juicing', 
@@ -311,6 +286,40 @@ def load(name, cache=cache, reduce_chemicals=True,
             operating_hours=operating_hours,
         )
         rename_storage_units(1000)
+    elif number == 5:
+        oilcane_sys = create_oilcane_to_biodiesel_1g(
+            operating_hours=operating_hours,
+        )
+        area_names = [
+            'Feedstock handling', 
+            'Juicing', 
+            'EtOH prod.', 
+            'Oil ext.',
+            'Biod. prod.', 
+            'CH&P',
+            'Utilities',
+            'HXN',
+            'Storage',
+        ]
+        rename_storage_units(1000)
+    elif number == 6:
+        area_names = [
+            'Feedstock handling', 
+            'Juicing', 
+            'Pretreatment',
+            'EtOH prod.',
+            'Wastewater treatment',
+            'Oil ext.',
+            'CH&P', 
+            'Biod. prod.',
+            'Utilities',
+            'HXN',
+            'Storage',
+        ]
+        oilcane_sys = create_oilcane_to_biodiesel_combined_1_and_2g_post_fermentation_oil_separation(
+            operating_hours=operating_hours,
+        )
+        rename_storage_units(1100)
     else:
         raise NotImplementedError(number)
     if not number % 2:
@@ -432,10 +441,6 @@ def load(name, cache=cache, reduce_chemicals=True,
         tea = create_tea(sys)
         tea.operating_days = 200
         tea.IRR = 0.10
-        
-        # def electricity_GWP():
-        #     power_utility = bst.PowerUtility.sum([i.power_utility for i in sys.cost_units])
-        #     return power_utility.get_impact(production_key=GWP) * sys.operating_hours
         
     tea.income_tax = 0.21 # Davis et al. 2018; https://www.nrel.gov/docs/fy19osti/71949.pdf
     
