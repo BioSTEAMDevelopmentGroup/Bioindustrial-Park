@@ -30,7 +30,7 @@ Here are a few examples:
 
 ```python
 >>> import biorefineries.oilcane as oc
->>> oc.load('S1') # Load conventional sugarcane system
+>>> oc.load('S1') # Load conventional sugarcane biorefinery
 >>> oc.sys.show(data=False) # Full system
 System: sugarcane_sys
 ins...
@@ -46,7 +46,7 @@ outs...
 [3] emissions
 [4] ash_disposal
 
->>> oc.load('O1') # Load conventional oilcane system
+>>> oc.load('O1') # Load direct cogeneration oilcane configuration
 >>> oc.sys.show(data=False)
 System: oilcane_sys
 ins...
@@ -64,7 +64,7 @@ use the Model object:
 
 ```python
 >>> import biorefineries.oilcane as oc
->>> oc.load('O2') # Load cellulosic oilcane system
+>>> oc.load('O2') # Load integrated co-fermentation oilcane configuration
 >>> parameters = oc.model.get_baseline_sample() # All parameters at the baseline scenario
 >>> parameters
 biorefinery                        Oil recovery [%]                                 60
