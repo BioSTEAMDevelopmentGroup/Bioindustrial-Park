@@ -20,9 +20,9 @@ Four biorefineries can be loaded using the names detailed in the following table
 | Feedstocks                | Products            | Direct cogeneration | Integrated Co-fermentation|
 | ------------------------- | ------------------  | ------------------- | ------------------------- |
 | Oilcane                   | Ethanol & biodiesel | O1                  | O2                        |
-|                           | Ethanol & crude oil | O3                  | O4                        |
+| Oilcane                   | Ethanol & crude oil | O3                  | O4                        |
 | Oilcane & oil-sorghum     | Ethanol & biodiesel | O1\*                | O2\*                      |
-|                           | Ethanol & crude oil | O3\*                | O4\*                      |
+| Oilcane & oil-sorghum     | Ethanol & crude oil | O3\*                | O4\*                      |
 | Sugarcane                 | Ethanol & biodiesel | S1                  | S2                        |
 | Sugarcane & sweet sorghum | Ethanol             | S1\*                | S2\*                      |
 
