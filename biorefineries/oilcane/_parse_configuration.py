@@ -76,7 +76,7 @@ def format_name(name):
     else:
         raise Exception('unknown error')
 
-def format_configuration(configuration):
+def format_configuration(configuration, latex=True):
     number, agile = configuration
     if number == -4:
         name = 'S4'
@@ -98,7 +98,8 @@ def format_configuration(configuration):
         name = 'O4'
     else:
         raise ValueError(f'invalid configuration {configuration}')
-    name = r'$\mathtt{' + name + '}$'
+    if latex:
+        name = r'$\mathtt{' + name + '}$'
     if agile: name += '*'
     return name
 

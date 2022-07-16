@@ -188,7 +188,7 @@ def load(name, cache=cache, reduce_chemicals=True,
     global oil_extraction_specification, model, unit_groups
     global HXN, BT
     if not _chemicals_loaded: load_chemicals()
-    flowsheet_name = format_configuration(configuration)
+    flowsheet_name = format_configuration(configuration, latex=False)
     if enhanced_cellulosic_performance:
         flowsheet_name += '_enhanced_fermentation'
     flowsheet = bst.Flowsheet(flowsheet_name)
