@@ -12,45 +12,6 @@ is accounted for. Note that the name "oilcane" is prefered
 over lipid-cane, as it resonates better with a non-scientific audience and is more
 consistent with how we talk about vegetable oils.
 
-![Oilcane Biorefinery Areas](./images/oilcane_areas.png)
-
-All configurations share the same feedstock handling, juicing, and biodiesel 
-production systems. In the juicing system, the oilcane is crushed, the juice 
-is treated and filtered to remove impurities, and the bagasse is conveyed out 
-at a moisture content of 50%. The bagasse is assumed to retain 40-70% of the 
-total oil present in oilcane. In the biodiesel production area, the oil is first
-pretreated to remove polar lipids and convert any free fatty acids (FFAs) to 
-acyl glycerides via glycerolysis.15–17 Once pretreated, the oil is trans-esterified 
-with excess methanol and sodium methoxide catalyst to produce biodiesel and glycerol.
-The biodiesel is centrifuged out, washed, and vacuum dried. The glycerol is distilled 
-to 80 wt % and sold as crude glycerol. 
-
-The conventional configuration can be divided into nine areas: feedstock handling,
-juicing, ethanol production, oil extraction, biodiesel production, combined 
-heat and power, utilities, heat exchanger network (HXN), and storage (Figure 1). 
-The oil-rich bagasse is pelleted to reduce the moisture content and volume to 
-extract 50 to 70% of the oil by screw pressing (Area 400). Then, the bagasse is
-burned to produce steam and electricity for the plant (Area 600), with excess
-electricity sold to the grid. The juice is fermented and distilled (Area 300).
-The vinasse is also sent to the oil extraction area (Area 400), where it is 
-concentrated by evaporation then centrifuged to extract the oil. The utility 
-area includes on-site recirculation of cooling water and chilled water (Area 700).
-
-Two sugarcane biorefinery configurations were also modeled to compare the economic 
-benefit of processing oil-producing feedstocks. The conventional and cellulosic
-ethanol sugarcane biorefineries are non-oil processing counterparts to the 
-conventional and cellulosic configurations of the oilcane biorefineries, 
-respectively, and follow the same assumptions and overall configurations with 
-the exception of no oil extraction or biodiesel production areas (Figure S1). 
-
-![Sugarcane Biorefinery Areas](./images/sugarcane_areas.png)
-
-Integrated oilsorghum processing is also implemented in this module using
-BioSTEAM's agile system simulation features. Because oilsorghum can be 
-harvested for 2 months when oilcane is not in season, an idle oilcane 
-biorefinery could potentially increase biofuel production by processing 
-oilsorghum.
-
 Getting Started
 ---------------
 
