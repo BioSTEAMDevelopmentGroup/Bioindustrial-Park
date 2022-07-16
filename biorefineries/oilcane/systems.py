@@ -780,9 +780,9 @@ def create_oilcane_to_biodiesel_1g():
 def create_oilcane_to_biodiesel_combined_1_and_2g_post_fermentation_oil_separation(ins, outs):
     oilcane, = ins
     biodiesel, crude_glycerol = outs
-    cofermentation = tmo.Rxn(
-        'CO2 + Glucose -> H2O + TAG', 'Glucose', 0.9500,
-        correct_atomic_balance=True
+    cofermentation = tmo.PRxn(
+        [tmo.Rxn('CO2 + Xylose -> H2O + TAG', 'Xylose', 0.9500, correct_atomic_balance=True),
+         tmo.Rxn('CO2 + Glucose -> H2O + TAG', 'Glucose', 0.9500, correct_atomic_balance=True)],
     )
     oilcane_to_fermentation_sys = create_cane_to_combined_1_and_2g_fermentation('oilcane_to_fermentation_sys',
         ins=oilcane, 
