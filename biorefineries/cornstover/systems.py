@@ -5,13 +5,11 @@ Created on Thu Jun 27 23:12:28 2019
 @author: yoelr
 """
 
-from biosteam import System
 import biosteam as bst
 import thermosteam as tmo
 from thermosteam import Stream
 from biorefineries.sugarcane import create_ethanol_purification_system
 from biorefineries.cornstover._process_settings import price
-from biorefineries.cornstover._chemicals import chemical_groups
 from biorefineries.cornstover import units
 from biosteam import stream_kwargs as skw
 import thermosteam.reaction as rxn
@@ -112,11 +110,10 @@ def create_hot_water_pretreatment_system(
     P201 = units.BlowdownDischargePump(f'P{n+1}', R201-1)
     F201 = units.PretreatmentFlash(f'F{n+1}', P201-0, P=101325, Q=0)
     M204 = bst.Mixer(f'M{n+3}', (R201-0, F201-0))
-    H201 = units.WasteVaporCondenser(f'H{n+1}', M204-0, pretreatment_wastewater, V=0)
+    units.WasteVaporCondenser(f'H{n+1}', M204-0, pretreatment_wastewater, V=0)
     P202 = units.HydrolyzatePump(f'P{n+2}', F201-1, None)
     if milling:
-        U201 = bst.HammerMill(f'U{n+1}', P202-0, hydrolyzate)
-        P202.outs[0].materialize_connection
+        bst.HammerMill(f'U{n+1}', P202-0, hydrolyzate)
     else:
         P202.outs[0] = hydrolyzate
 
@@ -210,7 +207,7 @@ def create_ammonia_fiber_expansion_pretreatment_system(
         H2SO4_storage = units.SulfuricAcidStorageTank('H2SO4_storage', sulfuric_acid)
         T202 = units.SulfuricAcidTank('T202', H2SO4_storage-0)
         M207 = bst.Mixer('M207', (T202-0, P202-0), hydrolyzate)
-        M207.neutralization_rxn = tmo.Reaction('2 NH3 + H2SO4 -> (NH4)2SO4', 'H2SO4', 1)
+        M207.neutralization_rxn = rxn.Rxn('2 NH3 + H2SO4 -> (NH4)2SO4', 'H2SO4', 1)
         @M207.add_specification
         def update_sulfuric_acid_loading():
             _, feed = M207.ins
@@ -239,13 +236,6 @@ def create_alkaline_pretreatment_system(
     feedstock, = ins
     pretreated_biomass, nanofilter_retentate = outs
     NaOH = Stream('NaOH', NaOH=1, price=2 * price['Caustic'])
-    sulfuric_acid = Stream('sulfuric_acid',
-                            P=5.4*101325,
-                            T=294.15,
-                            Water=130,
-                            H2SO4=1800,
-                            units='kg/hr',
-                            price=price['Sulfuric acid'])
     warm_process_water = Stream('warm_process_water',
                               T=368.15,
                               P=4.7*101325,
@@ -285,7 +275,7 @@ def create_alkaline_pretreatment_system(
         split=PF1.split,
     )
     C1.isplit['Glucan', 'Xylan', 'Arabinan', 'Mannan', 'Lignin'] = 0.99
-    P202 = units.HydrolyzatePump('P202', C1-0, pretreated_biomass, thermo=ideal)
+    units.HydrolyzatePump('P202', C1-0, pretreated_biomass, thermo=ideal)
     M2 = bst.Mixer(300, [C1-1, PF1-1])
     NF = units.Nanofilter(300,
         ins=M2-0, outs=['', nanofilter_retentate],
@@ -359,11 +349,11 @@ def create_dilute_acid_pretreatment_system(
     T202 = units.OligomerConversionTank(f'T{n+2}', P201-0)
     F201 = units.PretreatmentFlash(f'F{n+1}', T202-0, P=101325, Q=0)
     M204 = bst.Mixer(f'M{n+4}', (R201-0, F201-0))
-    H201 = units.WasteVaporCondenser(f'H{n+1}', M204-0, pretreatment_wastewater, T=373.15, V=0)
+    units.WasteVaporCondenser(f'H{n+1}', M204-0, pretreatment_wastewater, T=373.15, V=0)
     Ammonia_storage = units.AmmoniaStorageTank('Ammonia_storage', ammonia)
     M205 = units.AmmoniaMixer(f'M{n+5}', (Ammonia_storage-0, ammonia_process_water))
     T203 = units.AmmoniaAdditionTank(f'T{n+3}', (F201-1, M205-0))
-    P202 = units.HydrolyzatePump(f'P{n+2}', T203-0, hydrolyzate)
+    units.HydrolyzatePump(f'P{n+2}', T203-0, hydrolyzate)
     
     T201.sulfuric_acid_loading_per_dry_mass = 0.02316
     
@@ -375,7 +365,7 @@ def create_dilute_acid_pretreatment_system(
         sulfuric_acid.F_mass = T201.sulfuric_acid_loading_per_dry_mass * F_mass_dry_feedstock
         warm_water.F_mass = 0.282 * F_mass_dry_feedstock
     
-    neutralization_rxn = tmo.Reaction('2 NH4OH + H2SO4 -> (NH4)2SO4 + 2 H2O', 'H2SO4', 1)
+    neutralization_rxn = rxn.Rxn('2 NH4OH + H2SO4 -> (NH4)2SO4 + 2 H2O', 'H2SO4', 1)
     @M205.add_specification(run=True)
     def update_ammonia_loading():
         ammonia, ammonia_process_water = M205.ins
@@ -462,7 +452,7 @@ def create_saccharification_system(
     
     if Saccharification is None:
         Saccharification = units.ContinuousPresaccharification
-    R301 = Saccharification('R301', H301-0, slurry, reactions=saccharification_reactions)
+    Saccharification('R301', H301-0, slurry, reactions=saccharification_reactions)
 
 @bst.SystemFactory(
     ID='cofermentation_sys',
@@ -479,7 +469,7 @@ def create_simultaneous_saccharification_and_cofermentation_system(
         saccharification_reactions=None,
         seed_train_reactions=None,
         cofermentaion_reactions=None,
-        include_scrubber=True,
+        include_scrubber=None,
         add_nutrients=True,
     ):
     """
@@ -489,6 +479,16 @@ def create_simultaneous_saccharification_and_cofermentation_system(
     """
     slurry, DAP, CSL = ins
     vent, beer = outs
+    if not SeedTrain: SeedTrain = units.SeedTrain
+    if not SimultaneousSaccharificationAndCoFermentation:
+        SimultaneousSaccharificationAndCoFermentation = units.SimultaneousSaccharificationAndCoFermentation
+    has_vent = SimultaneousSaccharificationAndCoFermentation._N_outs == 2
+    if has_vent:
+        if include_scrubber is None: include_scrubber = True
+    else:
+        include_scrubber = False
+        outs.remove(vent)
+        
     if add_nutrients:
         DAP1 = Stream('DAP1',
                         DAP=26,
@@ -519,9 +519,6 @@ def create_simultaneous_saccharification_and_cofermentation_system(
         nutrients_1 = nutrients_2 = ()
         
     S303 = bst.Splitter('S303', slurry, split=0.1)
-    if not SimultaneousSaccharificationAndCoFermentation:
-        SimultaneousSaccharificationAndCoFermentation = units.SimultaneousSaccharificationAndCoFermentation
-    if not SeedTrain: SeedTrain = units.SeedTrain
     R302 = SeedTrain('R302', (S303-0, *nutrients_1), 
                      reactions=seed_train_reactions,
                      saccharification=saccharification_reactions or True)
@@ -552,7 +549,6 @@ def create_simultaneous_saccharification_and_cofermentation_system(
             CSL_storage.ins[0].copy_like(CSL_storage.outs[0])
             R303._run()
     
-    M304 = bst.Mixer('M304', (R302-0, R303-0))
     T302 = units.BeerTank('T302', outs=beer)
     
     if include_scrubber:
@@ -560,6 +556,7 @@ def create_simultaneous_saccharification_and_cofermentation_system(
                                  Water=26836,
                                  units='kg/hr')
         M401 = bst.Mixer('M401', (R303-1, None))
+        M304 = bst.Mixer('M304', (R302-0, R303-0))
         D401 = bst.VentScrubber('D401', (stripping_water, M304-0), (vent, ''),
                                 gas=('CO2', 'NH3', 'O2'))
         D401-1-1-M401-0-T302
@@ -570,9 +567,11 @@ def create_simultaneous_saccharification_and_cofermentation_system(
             stripping_water.mol[:] = stripping_water_over_vent * vent.F_mass
             D401._run()
         D401.specification = update_stripping_water
-    else:
-        M304.outs[0] = vent
+    elif has_vent:
+        M304 = bst.Mixer('M304', (R302-0, R303-0), vent)
         R303-1-T302
+    else:
+        R303-0-T302
 
 @bst.SystemFactory(
     ID='cofermentation_sys',
@@ -589,7 +588,7 @@ def create_integrated_bioprocess_saccharification_and_cofermentation_system(
         saccharification_reactions=None,
         seed_train_reactions=None,
         cofermentation_reactions=None,
-        include_scrubber=True,
+        include_scrubber=None,
         add_nutrients=True,
     ):
     """
@@ -599,6 +598,15 @@ def create_integrated_bioprocess_saccharification_and_cofermentation_system(
     """
     slurry, DAP, CSL = ins
     vent, beer = outs
+    if not SaccharificationAndCoFermentation: SaccharificationAndCoFermentation = units.SaccharificationAndCoFermentation
+    if not SeedTrain: SeedTrain = units.SeedTrain
+    has_vent = SaccharificationAndCoFermentation._N_outs == 3
+    if has_vent:
+        if include_scrubber is None: include_scrubber = True
+    else:
+        include_scrubber = False
+        outs.remove(vent)
+    
     if add_nutrients:
         DAP1 = Stream('DAP1',
                         DAP=26,
@@ -628,9 +636,6 @@ def create_integrated_bioprocess_saccharification_and_cofermentation_system(
         ins.remove(CSL)
         nutrients_1 = nutrients_2 = ()
     
-    if not SaccharificationAndCoFermentation:
-        SaccharificationAndCoFermentation = units.SaccharificationAndCoFermentation
-    if not SeedTrain: SeedTrain = units.SeedTrain
     recycle = bst.Stream()
     R302 = SeedTrain('R302', (recycle, *nutrients_1), 
                      reactions=seed_train_reactions)
@@ -659,7 +664,6 @@ def create_integrated_bioprocess_saccharification_and_cofermentation_system(
             CSL_storage.ins[0].copy_like(CSL_storage.outs[0])
             R303._run()
     
-    M304 = bst.Mixer('M304', (R302-0, R303-0))
     T302 = units.BeerTank('T302', outs=beer)
     
     if include_scrubber:
@@ -667,6 +671,7 @@ def create_integrated_bioprocess_saccharification_and_cofermentation_system(
                                  Water=26836,
                                  units='kg/hr')
         M401 = bst.Mixer('M401', (R303-1, None))
+        M304 = bst.Mixer('M304', (R302-0, R303-0))
         D401 = bst.VentScrubber('D401', (stripping_water, M304-0), (vent, ''),
                                 gas=('CO2', 'NH3', 'O2'))
         D401-1-1-M401-0-T302
@@ -677,9 +682,11 @@ def create_integrated_bioprocess_saccharification_and_cofermentation_system(
             stripping_water.mol[:] = stripping_water_over_vent * vent.F_mass
             D401._run()
         D401.specification = update_stripping_water
-    else:
-        M304.outs[0] = vent
+    elif has_vent:
+        M304 = bst.Mixer('M304', (R302-0, R303-0), vent)
         R303-1-T302
+    else:
+        R303-0-T302
  
 @bst.SystemFactory(
     ID='cofermentation_sys',
@@ -694,7 +701,7 @@ def create_integrated_bioprocess_saccharification_and_cofermentation_system(
 )
 def create_cofermentation_system(
         ins, outs, CoFermentation=None, SeedTrain=None,
-        include_scrubber=True,
+        include_scrubber=None,
         seed_train_reactions=None,
         cofermentation_reactions=None,
         add_nutrients=True,
@@ -706,6 +713,15 @@ def create_cofermentation_system(
     """
     slurry, DAP, CSL = ins
     vent, beer, lignin = outs
+    if not SeedTrain: SeedTrain = units.SeedTrain
+    if not CoFermentation: CoFermentation = units.CoFermentation
+    has_vent = CoFermentation._N_outs == 2
+    if has_vent:
+        if include_scrubber is None: include_scrubber = True
+    else:
+        include_scrubber = False
+        outs.remove(vent)
+        
     if add_nutrients:
         DAP1 = Stream('DAP1',
                         DAP=26,
@@ -736,7 +752,6 @@ def create_cofermentation_system(
     
     S303 = bst.PressureFilter('S303', slurry, (lignin, ''))
     S304 = bst.Splitter('S304', S303-1, split=0.1)
-    if not SeedTrain: SeedTrain = units.SeedTrain
     R302 = SeedTrain('R302', (S304-0, *nutrients_1), reactions=seed_train_reactions)
     
     if add_nutrients:
@@ -747,7 +762,6 @@ def create_cofermentation_system(
             DAP1.imass['DAP'] = 0.33 * feed.F_vol
     
     T301 = units.SeedHoldTank('T301', R302-1)
-    if not CoFermentation: CoFermentation = units.CoFermentation
     R303 = CoFermentation('R303', (S304-1, T301-0, *nutrients_2),
                           outs=('', ''), cofermentation=cofermentation_reactions)
     
@@ -762,7 +776,6 @@ def create_cofermentation_system(
             DAP_storage.ins[0].copy_like(DAP_storage.outs[0])
             CSL_storage.ins[0].copy_like(CSL_storage.outs[0])
         
-    M304 = bst.Mixer('M304', (R302-0, R303-0))
     T302 = units.BeerTank('T302', outs=beer)
     
     if include_scrubber:
@@ -770,6 +783,7 @@ def create_cofermentation_system(
                                  Water=26836,
                                  units='kg/hr')
         M401 = bst.Mixer('M401', (R303-1, None))
+        M304 = bst.Mixer('M304', (R302-0, R303-0))
         D401 = bst.VentScrubber('D401', (stripping_water, M304-0), (vent, ''),
                                 gas=('CO2', 'NH3', 'O2'))
         D401-1-1-M401-0-T302
@@ -780,9 +794,11 @@ def create_cofermentation_system(
             stripping_water.imol['Water'] = stripping_water_over_vent * vent.F_mass
             D401._run()
         D401.specification = update_stripping_water
+    elif has_vent:
+        M304 = bst.Mixer('M304', (R302-0, R303-0), vent)
+        R303-1-T302
     else:
-        M304.outs[0] = vent
-        R303-1-T302   
+        R303-0-T302
  
 @bst.SystemFactory(
     ID='cellulosic_fermentation_sys',
@@ -798,19 +814,19 @@ def create_cofermentation_system(
     outs=[dict(ID='vent'),
           dict(ID='beer'),
           dict(ID='lignin')],
-    optional_outs_index=[2],
 )
 def create_cellulosic_fermentation_system(
         ins, outs,
-        include_scrubber=True,
+        include_scrubber=None,
         solids_loading=None,
         insoluble_solids_loading=None,
         nonsolids=None,
         insoluble_solids=None,
-        kind=0, 
-        # 0 for Integrated Bioprocess(IB)
-        # 1 for Simultaneous Saccharification and Co-fermentation (SSCF) 
-        # 2 for Saccharification and Co-fermentation (SCF)
+        kind=None, 
+        # Valid arguments include:
+        # Integrated Bioprocess (IB), 
+        # Simultaneous Saccharification and Co-Fermentation (SSCF),
+        # Saccharification and Co-Fermentation (SCF),
         Saccharification=None,
         ContinuousPresaccharification=None,
         SeedTrain=None,
@@ -826,6 +842,8 @@ def create_cellulosic_fermentation_system(
     if not add_nutrients:
         ins.remove(CSL)
         ins.remove(DAP)
+    if kind is None: kind = 'IB'
+    SCF_keys = ('SCF', 'Saccharification and Co-Fermentation')
     saccharification_sys = create_saccharification_system(
         ins=[hydrolyzate, cellulase, saccharification_water],
         mockup=True,
@@ -833,11 +851,12 @@ def create_cellulosic_fermentation_system(
         insoluble_solids_loading=insoluble_solids_loading,
         nonsolids=nonsolids,
         insoluble_solids=insoluble_solids,
-        Saccharification=(Saccharification or units.Saccharification if kind == 2 else ContinuousPresaccharification or units.ContinuousPresaccharification),
+        Saccharification=(Saccharification or units.Saccharification if kind in SCF_keys else ContinuousPresaccharification or units.ContinuousPresaccharification),
         saccharification_reactions=saccharification_reactions,
     )
-    if kind == 0:
-        cofermentation_sys = create_integrated_bioprocess_saccharification_and_cofermentation_system(
+    if kind in ('IB', 'Integrated Bioprocess'):
+        outs.remove(lignin)
+        create_integrated_bioprocess_saccharification_and_cofermentation_system(
             ins=[saccharification_sys-0, DAP, CSL],
             outs=[vent, beer],
             mockup=True,
@@ -848,8 +867,9 @@ def create_cellulosic_fermentation_system(
             cofermentation_reactions=cofermentation_reactions,
             add_nutrients=add_nutrients,
         )
-    elif kind == 1:
-        cofermentation_sys = create_simultaneous_saccharification_and_cofermentation_system(
+    elif kind in ('SSCF', 'Simultaneous Saccharification and Co-Fermentation'):
+        outs.remove(lignin)
+        create_simultaneous_saccharification_and_cofermentation_system(
             ins=[saccharification_sys-0, DAP, CSL],
             outs=[vent, beer],
             mockup=True,
@@ -858,9 +878,9 @@ def create_cellulosic_fermentation_system(
             cofermentation_reactions=cofermentation_reactions,
             add_nutrients=add_nutrients,
         )
-    elif kind == 2:
+    elif kind in SCF_keys:
         T303 = bst.StorageTank('T303', saccharification_sys-0, tau=4)
-        cofermentation_sys = create_cofermentation_system(
+        create_cofermentation_system(
             ins=[T303-0, DAP, CSL],
             outs=[vent, beer, lignin],
             mockup=True,
@@ -894,7 +914,7 @@ def create_facilities(
                                                   'FGD_lime',
                                                   'boilerchems'))
     
-    CWP = bst.facilities.ChilledWaterPackage(area or 'CWP')
+    bst.facilities.ChilledWaterPackage(area or 'CWP')
     CT = bst.facilities.CoolingTower(area or 'CT')
     
     process_water_streams = (*process_water_streams,
@@ -902,15 +922,15 @@ def create_facilities(
             
     makeup_water = Stream('makeup_water', price=price['Makeup water'])
     
-    PWC = bst.facilities.ProcessWaterCenter(area or 'PWC',
-                                            (RO_water, makeup_water, recycle_process_water),
-                                            (),
-                                            None,
-                                            (BT-1, CT-1),
-                                            process_water_streams)
-    
+    bst.facilities.ProcessWaterCenter(area or 'PWC',
+        (RO_water, makeup_water, recycle_process_water),
+        (),
+        None,
+        (BT-1, CT-1),
+        process_water_streams
+    )
     CIP = Stream('CIP', Water=126, units='kg/hr')
-    CIP_package = bst.facilities.CIPpackage(area or 'CIP_package', CIP)
+    bst.facilities.CIPpackage(area or 'CIP_package', CIP)
     plant_air = Stream('plant_air', N2=83333, units='kg/hr')
     def adjust_plant_air():
         plant_air.imass['N2'] = 0.8 * feedstock.F_mass
@@ -919,11 +939,11 @@ def create_facilities(
     ADP = bst.facilities.AirDistributionPackage(area or 'ADP', plant_air)
     ADP.specification = adjust_plant_air
     fire_water = Stream('fire_water', Water=8343, units='kg/hr')
-    FT = units.FireWaterStorageTank(area or 'FT', fire_water)
+    units.FireWaterStorageTank(area or 'FT', fire_water)
     
     ### Complete system
     if blowdown_to_wastewater:
-        blowdown_mixer = bst.BlowdownMixer(area or 'blowdown_mixer', (BT-1, CT-1), blowdown_to_wastewater)
+        bst.BlowdownMixer(area or 'blowdown_mixer', (BT-1, CT-1), blowdown_to_wastewater)
 
 @bst.SystemFactory(
     ID='cornstover_sys',
@@ -981,7 +1001,7 @@ def create_system(ins, outs, include_blowdown_recycle=False):
         blowdown_to_wastewater = Stream('blowdown_to_wastewater')
     else:
         blowdown_to_wastewater = None
-    wastewater_treatment_sys = bst.create_wastewater_treatment_system(
+    bst.create_wastewater_treatment_system(
         ins=[S401-1, pretreatment_sys-1, blowdown_to_wastewater],
         mockup=True,
     )

@@ -693,9 +693,77 @@ def create_sugar_crystallization_system(ins, outs):
         split=get_split(9.04, 32.88, 4.48, 93.84),
         moisture_content=None,
     )
-    S2 = units.StorageTank('S2', C4-1, molasses, tau=24 * 7)
+    units.StorageTank('S2', C4-1, molasses, tau=24 * 7)
     
+# @SystemFactory(
+#       ID='fermentation_sys',
+#       ins=[screened_juice],
+#       outs=[beer, evaporator_condensate, vent],
+#   )   
+# def create_juice_to_fermentation_system(ins, outs, include_scrubber=None):
+#     screened_juice, = ins
+#     beer, evaporator_condensate, vent, = outs
+#     EvX = bst.MultiEffectEvaporator(400, ins=screened_juice, outs=('', evaporator_condensate),
+#                                     P=(101325, 69682, 47057, 30953, 19781),
+#                                     V_definition='First-effect',
+#                                     thermo=screened_juice.thermo.ideal(),
+#                                     V=0.05) # fraction evaporated
+#     PX = bst.Pump(400, ins=EvX-0, P=101325.)
+#     MX = bst.Mixer(400, [PX-0, 'dilution_water'])
+#     HX = bst.HXutility(400, MX-0, T=305.15)
+#     PX.sucrose_hydrolysis_reaction = tmo.Reaction(
+#         'Sucrose + Water -> 2Glucose', 'Sucrose', 1.00
+#     )
+
+#     @PX.add_specification(run=True)
+#     def hydrolysis():
+#         feed = PX.ins[0]
+#         PX.sucrose_hydrolysis_reaction.force_reaction(feed)
+#         if feed.imol['Water'] < 0: feed.imol['Water'] = 0.
     
+#     fermentation = None
+#     fermentation.titer = titer
+#     fermentation.productivity = productivity
+#     P_original = tuple(EvX.P)
+#     @EvX.add_specification(run=True)
+#     def evaporation():
+#         path = EvX.path_until(fermentation, inclusive=True)
+#         beer = fermentation.outs[1]
+#         target_titer = fermentation.titer
+#         V_last = EvX.V
+#         EvX.P = P_original
+#         EvX._reload_components = True
+#         def f(V):
+#             EvX.V = V
+#             for unit in path: unit.run()
+#             return target_titer - beer.imass[product_group] / beer.F_vol
+#         MX.ins[1].imass['Water'] = 0.
+#         y0 = f(0)
+#         if y0 < 0.:
+#             ethanol = float(beer.imass[product_group])
+#             current_titer = ethanol / beer.F_vol
+#             required_water = (1./target_titer - 1./current_titer) * ethanol * 1000.
+#             MX.ins[1].imass['Water'] = max(required_water, 0)
+#         else:
+#             EvX.P = list(P_original)
+#             EvX._load_components()
+#             for i in range(EvX._N_evap-1):
+#                 if f(1e-6) < 0.:
+#                     EvX.P.pop()
+#                     EvX._reload_components = True
+#                 else:
+#                     break  
+#             x0 = 0.
+#             x1 = 0.1
+#             y1 = f(x1)
+#             while y1 > 0:
+#                 if x1 > 0.9: raise RuntimeError('infeasible to evaporate any more water')
+#                 x0 = x1            
+#                 x1 += 0.1
+#                 y1 = f(x1)
+#             EvX.V = flx.IQ_interpolation(f, x0, x1, y0, y1, x=V_last, ytol=1e-5, xtol=1e-6)
+#         fermentation.tau = target_titer / fermentation.productivity 
+
 @SystemFactory(
     ID='sucrose_fermentation_sys',
     ins=[screened_juice],

@@ -385,15 +385,15 @@ def create_oilcane_to_crude_oil_and_ethanol_1g(
     HXN.acceptable_energy_balance_error = 0.01
 
 @SystemFactory(
-    ID='oilcane_to_fermentation_sys',
-    ins=create_oilcane_to_biodiesel_and_ethanol_1g.ins,
+    ID='cane_to_fermentation_sys',
+    ins=[dict(ID='cane')],
     outs=[dict(ID='beer'),
           dict(ID='lignin'),
           dict(ID='condensate'),
           dict(ID='pretreatment_wastewater'),
           dict(ID='fiber_fines')],
 )
-def create_oilcane_to_combined_1_and_2g_fermentation(
+def create_cane_to_combined_1_and_2g_fermentation(
         ins, outs, titer=None, productivity=None, product_group=None,
         SeedTrain=None, CoFermentation=None,
     ):
@@ -466,7 +466,7 @@ def create_oilcane_to_combined_1_and_2g_fermentation(
         mockup=True,
         area=400,
         udct=True,
-        kind=2,
+        kind='Saccharification and Co-Fermentation',
         insoluble_solids_loading=0.23,
         SeedTrain=SeedTrain,
         CoFermentation=CoFermentation,
@@ -544,7 +544,6 @@ def create_oilcane_to_combined_1_and_2g_fermentation(
             EvX.V = flx.IQ_interpolation(f, x0, x1, y0, y1, x=V_last, ytol=1e-5, xtol=1e-6)
         cofermentation.tau = target_titer / cofermentation.productivity 
 
-
 @SystemFactory(
     ID='oilcane_sys',
     ins=create_oilcane_to_biodiesel_and_ethanol_1g.ins,
@@ -555,12 +554,10 @@ def create_oilcane_to_crude_oil_and_ethanol_combined_1_and_2g_post_fermentation_
     oilcane, = ins
     ethanol, crude_oil = outs
     
-    oilcane_to_fermentation_sys = create_oilcane_to_combined_1_and_2g_fermentation('oilcane_to_fermentation_sys', ins=oilcane)
-    beer, lignin, condensate, pretreatment_wastewater, fiber_fines = oilcane_to_fermentation_sys.outs
-    
-    vent, cellulosic_beer, lignin = oilcane_to_fermentation_sys.outs
+    cane_to_fermentation_sys = create_cane_to_combined_1_and_2g_fermentation('cane_to_fermentation_sys', ins=oilcane)
+    beer, lignin, condensate, pretreatment_wastewater, fiber_fines = cane_to_fermentation_sys.outs
     cellulosic_beer_distillation_sys = create_beer_distillation_system(
-        ins=cellulosic_beer,
+        ins=beer,
         outs=[''],
         mockup=True,
         area=400,
@@ -625,7 +622,7 @@ def create_oilcane_to_crude_oil_and_ethanol_combined_1_and_2g_post_fermentation_
 def create_oilcane_to_biodiesel_and_ethanol_combined_1_and_2g_post_fermentation_oil_separation(ins, outs):
     oilcane, = ins
     ethanol, biodiesel, crude_glycerol = outs
-    oilcane_to_fermentation_sys = create_oilcane_to_combined_1_and_2g_fermentation('oilcane_to_fermentation_sys', ins=oilcane)
+    oilcane_to_fermentation_sys = create_cane_to_combined_1_and_2g_fermentation('oilcane_to_fermentation_sys', ins=oilcane)
     beer, lignin, condensate, pretreatment_wastewater, fiber_fines = oilcane_to_fermentation_sys.outs
     cellulosic_beer_distillation_sys = create_beer_distillation_system(
         ins=beer,
@@ -714,139 +711,10 @@ def create_oilcane_to_biodiesel_and_ethanol_combined_1_and_2g_post_fermentation_
 def create_sugarcane_to_ethanol_combined_1_and_2g(ins, outs):
     sugarcane, = ins
     ethanol, = outs
-    
-    feedstock_handling_sys = create_feedstock_handling_system(
-        ins=sugarcane,
-        outs='',
-        mockup=True,
-        area=100
-    )
-    
-    juicing_sys, udct = create_juicing_system(
-        ins=feedstock_handling_sys-0,
-        mockup=True,
-        udct=True,
-        area=200,
-        pellet_bagasse=False,
-    )
-    screened_juice, bagasse, fiber_fines = juicing_sys.outs
-    conveying_belt = bagasse.source
-    conveying_belt.cellulose_rxn = tmo.Reaction('Cellulose -> Glucan', 'Cellulose', 1.0, basis='wt')
-    conveying_belt.cellulose_rxn.basis = 'mol'
-    # Bagasse composition https://www.sciencedirect.com/science/article/pii/S0144861710005072
-    # South american; by HPLC
-    # Glucan: 41.3%
-    # Xylan: 24.9%
-    # Galactan: 0.6%
-    # Arabinan: 1.7%
-    # Lignin: 23.2%
-    # Acetyl: 3.0%
-    conveying_belt.hemicellulose_rxn = tmo.Reaction('30.2 Hemicellulose -> 24.9 Xylan + 1.7 Arabinan + 0.6 Galactan + 3 Acetate', 'Hemicellulose', 1.0, basis='wt')
-    conveying_belt.hemicellulose_rxn.basis = 'mol'
-    @conveying_belt.add_specification
-    def convert_hemicellulose():
-        conveying_belt._run()
-        bagasse = conveying_belt.outs[0]
-        conveying_belt.cellulose_rxn(bagasse)
-        conveying_belt.hemicellulose_rxn(bagasse)
-    hot_water_pretreatment_sys, hw_dct = brf.cornstover.create_hot_water_pretreatment_system(
-        ins=bagasse,
-        mockup=True,
-        area=300,
-        udct=True,
-        solids_loading=0.3333,
-        T_pretreatment_reactor=273.15 + 180,
-        milling=True
-    )
-    hydrolyzate, pretreatment_wastewater = hot_water_pretreatment_sys.outs
-    
-    cellulosic_fermentation_sys, cf_dct = brf.cornstover.create_cellulosic_fermentation_system(
-        ins=(hydrolyzate,),
-        outs=['vent', 'cellulosic_beer', 'lignin'],
-        mockup=True,
-        area=400,
-        udct=True,
-        kind=2,
-        insoluble_solids_loading=0.15,
-        solids_loading=0.23,
-        SeedTrain=units.SeedTrain,
-        add_nutrients=False,
-        CoFermentation=units.CoFermentation,
-    )
-    # DAP_storage = cf_dct['DAP_storage']
-    # CSL_storage = cf_dct['CSL_storage']
-    cofermentation = cf_dct['R303'] # Cofermentation
-    pressurefilter = cf_dct['S303'] # Pressure filter
-    sink = pressurefilter.outs[1].sink
-    MX = bst.Mixer(400, [pressurefilter-1, screened_juice])
-    EvX = bst.MultiEffectEvaporator(400, ins=MX-0,
-                                    P=(101325, 69682, 47057, 30953, 19781),
-                                    V_definition='First-effect',
-                                    thermo=screened_juice.thermo.ideal(),
-                                    V=0.05) # fraction evaporated
-    PX = bst.Pump(400, ins=EvX-0, P=101325.)
-    HX = bst.HXutility(400, PX-0, T=305.15)
-    HX-0-sink
-    PX.sucrose_hydrolysis_reaction = tmo.Reaction(
-        'Sucrose + Water -> 2Glucose', 'Sucrose', 1.00
-    )
-
-    @PX.add_specification(run=True)
-    def hydrolysis():
-        feed = PX.ins[0]
-        PX.sucrose_hydrolysis_reaction.force_reaction(feed)
-        if feed.imol['Water'] < 0: feed.imol['Water'] = 0.
-    
-    cofermentation.titer = 68.5
-    cofermentation.productivity = 0.95
-    EvX.pop_last_evaporator = False
-    @EvX.add_specification(run=True)
-    def evaporation():
-        path = EvX.path_until(cofermentation, inclusive=True)
-        beer = cofermentation.outs[1]
-        target_titer = cofermentation.titer
-        MX.ins[1].imass['Water'] = 0.
-        pop_last_evaporator = EvX.pop_last_evaporator
-        def f(V):
-            EvX.V = V
-            for unit in path: unit.run()
-            return target_titer - beer.imass['Ethanol'] / beer.F_vol
-        
-        y0 = f(0)
-        if y0 < 0.:
-            ethanol = float(beer.imass['Ethanol'])
-            current_titer = ethanol / beer.F_vol
-            required_water = (1./target_titer - 1./current_titer) * ethanol * 1000.
-            MX.ins[1].imass['Water'] = max(required_water, 0)
-        else:
-            P_original = P = tuple(EvX.P)
-            EvX.P = deque(P)
-            EvX._load_components()
-            for i in range(EvX._N_evap-1):
-                if f(1e-6) < 0.:
-                    if pop_last_evaporator:
-                        EvX.P.pop()
-                    else:
-                        EvX.P.popleft()
-                    EvX._reload_components = True
-                else:
-                    break  
-            x0 = 0.
-            x1 = 0.1
-            y1 = f(x1)
-            while y1 > 0:
-                if x1 > 0.9: raise RuntimeError('infeasible to evaporate any more water')
-                x0 = x1            
-                x1 += 0.1
-                y1 = f(x1)
-            EvX.V = flx.IQ_interpolation(f, x0, x1, y0, y1, ytol=1e-5, xtol=1e-6)
-            EvX.P = P_original
-            EvX._reload_components = True
-        cofermentation.tau = target_titer / cofermentation.productivity 
-    
-    vent, cellulosic_beer, lignin = cellulosic_fermentation_sys.outs
+    cane_to_fermentation_sys = create_cane_to_combined_1_and_2g_fermentation('cane_to_fermentation_sys', ins=sugarcane)
+    beer, lignin, condensate, pretreatment_wastewater, fiber_fines = cane_to_fermentation_sys.outs
     cellulosic_beer_distillation_sys = create_beer_distillation_system(
-        ins=cellulosic_beer,
+        ins=beer,
         outs=[''],
         mockup=True,
         area=400,
@@ -871,7 +739,7 @@ def create_sugarcane_to_ethanol_combined_1_and_2g(ins, outs):
     )
     s = f.stream
     M501 = bst.Mixer(700, (wastewater_treatment_sys-1, lignin, C603_3-0, s.filter_cake))
-    MX = bst.Mixer(400, [EvX.outs[1], stripper_process_water])
+    MX = bst.Mixer(400, [condensate, stripper_process_water])
     brf.cornstover.create_facilities(
         solids_to_boiler=M501-0,
         gas_to_boiler=wastewater_treatment_sys-0,
@@ -882,7 +750,7 @@ def create_sugarcane_to_ethanol_combined_1_and_2g(ins, outs):
                                s.warm_process_water,
                                s.pretreatment_steam,
                                s.saccharification_water),
-        feedstock=bagasse,
+        feedstock=s.bagasse,
         RO_water=wastewater_treatment_sys-2,
         recycle_process_water=MX-0,
         BT_area=700,
