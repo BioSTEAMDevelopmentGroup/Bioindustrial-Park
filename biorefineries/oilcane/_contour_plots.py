@@ -120,7 +120,7 @@ def plot_recovery_and_oil_content_contours_biodiesel_only(load=True, fs=8):
     set_font(size=fs)
     set_figure_size()
     fig, axes = plot_recovery_and_oil_content_contours(
-        load=load, configurations=[5, 6], N_points=5,
+        load=load, configurations=[5, 6], N_points=8, 
     )
     colors = np.zeros([2, 2], object)
     colors[:] = [[light_letter_color, light_letter_color],
@@ -344,7 +344,7 @@ def plot_relative_sorghum_oil_content_and_cane_oil_content_contours(
     
 def plot_recovery_and_oil_content_contours(
         load=False, metric_index=0, N_decimals=1, configurations=None,
-        N_points=20,
+        N_points=20, agile=None,
     ):
     # Generate contour data
     x = np.linspace(0.40, 1.0, N_points)
@@ -355,7 +355,9 @@ def plot_recovery_and_oil_content_contours(
     file = 'oil_extraction_analysis.npy'
     file = os.path.join(folder, file)
     if configurations is None: configurations = [1, 2]
-    agile = [False, True]
+    if agile is None: agile = [False, True]
+    titles = ['Oilcane Only', 'Oilcane & Oil-sorghum']
+    titles = [titles[i] for i in agile]
     if load:
         data = np.load(file)
     else:
@@ -379,7 +381,7 @@ def plot_recovery_and_oil_content_contours(
     
     metric_bars = [mb(0), mb(1, "")]
     fig, axes, CSs, CB = plot_contour_2d(
-        100.*X, 100.*Y, ['Oilcane Only', 'Oilcane & Oil-sorghum'], data, xlabel, ylabels, xticks, yticks, metric_bars, 
+        100.*X, 100.*Y, titles, data, xlabel, ylabels, xticks, yticks, metric_bars, 
         fillcolor=None, styleaxiskw=dict(xtick0=False), label=True,
     )
     M = len(configurations)
