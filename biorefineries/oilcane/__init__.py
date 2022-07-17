@@ -364,7 +364,7 @@ def load(name, cache=cache, reduce_chemicals=True,
     unit_groups[-1].metrics[-1].getter = lambda: 0.    
     
     
-    if abs(number) in (2, 4):
+    if abs(number) in (2, 4, 6):
         prs = flowsheet(cs.units.PretreatmentReactorSystem)
         saccharification = flowsheet(cs.units.Saccharification)
         seed_train = flowsheet(cs.units.SeedTrain)
@@ -635,7 +635,7 @@ def load(name, cache=cache, reduce_chemicals=True,
     def set_cane_xylose_yield(cane_xylose_yield):
         if agile:
             cane_mode.xylose_yield = cane_xylose_yield
-        elif abs(number) in (2, 4):
+        elif abs(number) in (2, 4, 6):
             set_xylose_yield(cane_xylose_yield)
     
     @uniform(86, 97.5, units='%', element='Pretreatment and saccharification',
@@ -763,7 +763,7 @@ def load(name, cache=cache, reduce_chemicals=True,
     if agile:
         feedstock_flow = lambda: sys.flow_rates[feedstock] / kg_per_MT # MT / yr
         biodiesel_flow = lambda: sys.flow_rates.get(s.biodiesel, 0.) * biodiesel_L_per_kg # L / yr
-        ethanol_flow = lambda: sys.flow_rates[s.ethanol] * ethanol_L_per_kg # L / yr
+        ethanol_flow = lambda: sys.flow_rates.get(s.ethanol, 0.) * ethanol_L_per_kg # L / yr
         natural_gas_flow = lambda: sum([sys.flow_rates[i] for i in natural_gas_streams]) * V_ng # m3 / yr
         crude_glycerol_flow = lambda: sys.flow_rates.get(s.crude_glycerol, 0.) # kg / yr
         
@@ -886,12 +886,15 @@ def load(name, cache=cache, reduce_chemicals=True,
 
     @metric(name='Ethanol GWP', element='Displacement allocation', units='kg*CO2*eq / L')
     def GWP_ethanol_displacement(): # Cradle to gate
-        GWP_material = sys.get_total_feeds_impact(GWP)
-        GWP_electricity_production = GWP_characterization_factors['Electricity'] * electricity_production.get() * feedstock_consumption.get()
-        GWP_coproducts = sys.get_total_products_impact(GWP)
-        GWP_emissions = sys.get_process_impact(GWP) # kg CO2 eq. / yr
-        GWP_total = GWP_material + GWP_emissions - GWP_electricity_production - GWP_coproducts # kg CO2 eq. / yr
-        return GWP_total / (ethanol_production.get() * feedstock_consumption.get())
+        if number not in (5, 6):
+            GWP_material = sys.get_total_feeds_impact(GWP)
+            GWP_electricity_production = GWP_characterization_factors['Electricity'] * electricity_production.get() * feedstock_consumption.get()
+            GWP_coproducts = sys.get_total_products_impact(GWP)
+            GWP_emissions = sys.get_process_impact(GWP) # kg CO2 eq. / yr
+            GWP_total = GWP_material + GWP_emissions - GWP_electricity_production - GWP_coproducts # kg CO2 eq. / yr
+            return GWP_total / (ethanol_production.get() * feedstock_consumption.get())
+        else:
+            return None
     
     # import thermosteam as tmo
     # glycerol = tmo.Chemical('Glycerol')
