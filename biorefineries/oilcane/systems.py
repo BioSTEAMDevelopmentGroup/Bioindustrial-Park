@@ -768,8 +768,128 @@ def create_sugarcane_to_ethanol_combined_1_and_2g(ins, outs):
     HXN.acceptable_energy_balance_error = 0.01
     # HXN.raise_energy_balance_error = True
 
-def create_oilcane_to_biodiesel_1g():
-    raise NotImplementedError()
+@SystemFactory(
+    ID='oilcane_sys',
+    ins=[oilcane_dct],
+    outs=[dict(ID='biodiesel', price=price['Biodiesel']),
+          dict(ID='crude_glycerol', price=price['Crude glycerol']),
+          'vinasse'],
+)
+def create_oilcane_to_biodiesel_1g(
+            ins, outs,
+        ):
+    oilcane, = ins
+    biodiesel, crude_glycerol, vinasse = outs
+    
+    feedstock_handling_sys = create_feedstock_handling_system(
+        ins=oilcane,
+        outs='',
+        mockup=True,
+        area=100
+    )
+    
+    ### Oil and juice separation ###
+    
+    juicing_sys, jdct = create_juicing_system(
+        ins=feedstock_handling_sys-0,
+        outs=['', '', 'fiber_fines'],
+        pellet_bagasse=False,
+        mockup=True,
+        udct=True,
+        area=200,
+    )
+    screened_juice, bagasse, fiber_fines = juicing_sys.outs
+    # bagasse_pelleting_sys = create_bagasse_pelleting_system(None, bagasse, area=200, mockup=True)
+    # pelleted_bagasse, = bagasse_pelleting_sys.outs
+    jdct['S201'].isplit['Lipid'] = 1. # Vibrating screen
+    crushing_mill = jdct['U201']
+    crushing_mill.tag = "oil extraction"
+    crushing_mill.isplit['Lipid'] = 0.90
+    
+    ### Ethanol section ###
+    fermrxn = tmo.Rxn('CO2 + Glucose -> H2O + TAG', 'Glucose', 0.9500, correct_atomic_balance=True)
+    fermentation_sys, epdct = create_sucrose_fermentation_system(
+        ins=[screened_juice],
+        fermentation_reaction=fermrxn,
+        titer=89.4,
+        productivity=0.61,
+        product_group='Lipid',
+        mockup=True,
+        area=300,
+        udct=True,
+    )
+    fermentor = epdct['R301']
+    fermentor.N = None
+    fermentor.V = 3785.4118
+    fermentor.Nmin = 2
+    fermentor.Nmax = 36 
+    product, condensate, vent = fermentation_sys.outs
+    post_fermentation_oil_separation_sys = create_post_fermentation_oil_separation_system(
+        ins=product,
+        mockup=True,
+        area=400,
+    )
+    oil, thick_vinasse, evaporator_condensate_b = post_fermentation_oil_separation_sys.outs
+    oil_pretreatment_sys, oil_pretreatment_dct = create_oil_pretreatment_system(
+        ins=oil,
+        mockup=True,
+        outs=['', 'polar_lipids', ''],
+        area=600,
+        udct=True,
+    )
+    MX = bst.Mixer(400, [thick_vinasse, condensate], vinasse)
+    oil, polar_lipids, wastewater = oil_pretreatment_sys.outs
+    
+    # Fresh degummed oil
+    transesterification_and_biodiesel_separation_sys, tbdct = create_transesterification_and_biodiesel_separation_system(
+        ins=oil, 
+        outs=[biodiesel, crude_glycerol, ''],
+        mockup=True,
+        area=600,
+        udct=True,
+    )
+    MX = bst.Mixer(600, [transesterification_and_biodiesel_separation_sys-2, wastewater], 'wastewater')
+
+    ### Facilities ###
+    s = f.stream
+    u = f.unit
+    MX2 = bst.Mixer(700,
+        [polar_lipids, bagasse]
+    )
+    # Burn bagasse from conveyor belt
+    bst.BoilerTurbogenerator(700,
+        (MX2-0, '', 
+         'boiler_makeup_water',
+         'natural_gas',
+         'FGD_lime',
+         'boilerchems'),
+        ('emissions', 'rejected_water_and_blowdown', 'ash_disposal'),
+        boiler_efficiency=0.80,
+        turbogenerator_efficiency=0.85
+    )
+    bst.CoolingTower(800)
+    makeup_water_streams = (s.cooling_tower_makeup_water,
+                            s.boiler_makeup_water)
+    process_water_streams = (s.imbibition_water,
+                             s.biodiesel_wash_water,
+                             s.oil_wash_water,
+                             s.rvf_wash_water,
+                             *makeup_water_streams)
+    makeup_water = bst.Stream('makeup_water', price=0.000254)
+    MX = bst.Mixer(800, [evaporator_condensate_b], 'recycle_process_water')
+    bst.ChilledWaterPackage(800)
+    bst.ProcessWaterCenter(800,
+        (MX-0, makeup_water),
+        (),
+        None,
+        makeup_water_streams,
+        process_water_streams
+    )
+    HXN = bst.HeatExchangerNetwork(900, 
+        ignored=lambda: [u.E301, u.D601.boiler, u.D602.boiler, u.H601, u.H602, u.H603, u.H604, oil_pretreatment_dct['F3']],
+        Qmin=1e5,
+    )
+    HXN.acceptable_energy_balance_error = 0.01
 
 @SystemFactory(
     ID='oilcane_sys',

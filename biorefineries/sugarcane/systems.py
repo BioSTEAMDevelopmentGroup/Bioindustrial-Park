@@ -702,7 +702,7 @@ def create_sugar_crystallization_system(ins, outs):
 )
 def create_sucrose_fermentation_system(ins, outs,
         scrubber=None, product_group=None, Fermentor=None, titer=None,
-        productivity=None, ignored_volume=None,
+        productivity=None, ignored_volume=None, fermentation_reaction=None,
     ):
     screened_juice, = ins
     beer, evaporator_condensate, vent = outs
@@ -740,7 +740,8 @@ def create_sucrose_fermentation_system(ins, outs,
     R301 = Fermentor('R301', 
         ins=[H301-0, ''],
         outs=fermentor_outs, 
-        tau=9, efficiency=0.90, N=4
+        tau=9, efficiency=0.90, N=4,
+        fermentation_reaction=fermentation_reaction,
     ) 
     T301 = units.StorageTank('T301', R301-1, tau=4, vessel_material='Carbon steel')
     T301.line = 'Beer tank'
