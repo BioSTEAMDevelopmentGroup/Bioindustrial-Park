@@ -718,7 +718,7 @@ def create_sucrose_fermentation_system(ins, outs,
         if 'Sugar' not in dilution_water.chemicals:
             dilution_water.chemicals.define_group('Sugar', ('Glucose', 'Sucrose', 'Xylose'))
         
-        SX0 = bst.Splitter(300, screened_juice, split=0.1)
+        SX0 = bst.Splitter(300, screened_juice, split=0.2)
         F301 = units.MultiEffectEvaporator('F301',
                                            SX0-1,
                                            P=(101325, 69682, 47057, 30953, 19781),
@@ -765,14 +765,22 @@ def create_sucrose_fermentation_system(ins, outs,
             y0 = f(x0)
             if y0 < 0.:
                 product = float(beer.imass[product_group])
-                current_titer = product / beer.F_vol
+                current_titer = get_titer()
                 ignored_product = P306.outs[0].imass[product_group]
                 required_water = (1./target_titer - 1./current_titer) * (product - ignored_product) * 1000.
                 dilution_water.imass['Water'] = max(required_water, 0)
             else:
                 y1 = f(x1)
+                if y1 > 0.:
+                    long_path = [SX0, F301, *sugar_path]
+                    for split in (0.20, 0.15, 0.10, 0.5, 0.):
+                        SX0.split[:] = split
+                        for i in long_path: i.run()
+                        y1 = f(x1)
+                        if y1 < 0.: break
                 SX1.split[:] = flx.IQ_interpolation(f, x0, x1, y0, y1, x=SX1.split[0], ytol=1e-5, xtol=1e-6)
             R301.tau = target_titer / R301.productivity 
+            SX0.split[:] = 0.2 # Restart
     else:
         F301 = units.MultiEffectEvaporator('F301',
                                            screened_juice,

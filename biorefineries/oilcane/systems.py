@@ -515,7 +515,7 @@ def create_cane_to_combined_1_and_2g_fermentation(
     if fed_batch:
         if 'Sugar' not in MX.chemicals:
             MX.chemicals.define_group('Sugar', ('Glucose', 'Sucrose', 'Xylose'))
-        SX0 = bst.Splitter(400, MX-0, split=0.1)
+        SX0 = bst.Splitter(400, MX-0, split=0.2)
         EvX = bst.MultiEffectEvaporator(400, ins=SX0-1, 
                                         P=(101325, 69682, 47057, 30953, 19781),
                                         V_definition='First-effect',
@@ -565,14 +565,22 @@ def create_cane_to_combined_1_and_2g_fermentation(
             y0 = f(x0)
             if y0 < 0.:
                 product = float(beer.imass[product_group])
-                current_titer = product / beer.F_vol
+                current_titer = get_titer()
                 ignored_product = PX.outs[0].imass[product_group]
                 required_water = (1./target_titer - 1./current_titer) * (product - ignored_product) * 1000.
                 dilution_water.imass['Water'] = max(required_water, 0)
             else:
                 y1 = f(x1)
+                if y1 > 0.:
+                    long_path = [SX0, EvX, *sugar_path]
+                    for split in (0.20, 0.15, 0.10, 0.5, 0.):
+                        SX0.split[:] = split
+                        for i in long_path: i.run()
+                        y1 = f(x1)
+                        if y1 < 0.: break
                 SX1.split[:] = flx.IQ_interpolation(f, x0, x1, y0, y1, x=SX1.split[0], ytol=1e-5, xtol=1e-6)
             cofermentation.tau = target_titer / cofermentation.productivity 
+            SX0.split[:] = 0.2 # Restart
     else:
         EvX = bst.MultiEffectEvaporator(400, ins=MX-0, outs=('', condensate),
                                         P=(101325, 69682, 47057, 30953, 19781),

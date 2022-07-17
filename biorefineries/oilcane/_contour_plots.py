@@ -120,7 +120,7 @@ def plot_recovery_and_oil_content_contours_biodiesel_only(load=True, fs=8):
     set_font(size=fs)
     set_figure_size()
     fig, axes = plot_recovery_and_oil_content_contours(
-        load=load, configurations=[5, 6], N_points=10,
+        load=load, configurations=[5, 6], N_points=5,
     )
     colors = np.zeros([2, 2], object)
     colors[:] = [[light_letter_color, light_letter_color],
