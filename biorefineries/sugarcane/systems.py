@@ -629,16 +629,10 @@ def create_sugar_crystallization_system(ins, outs):
         if y0 < 0.: return
         y1 = purity_objective(1., flash)
         if y1 > 0.: return
-        try:
-            flash.V = flx.IQ_interpolation(
-                purity_objective, 0., 1., y0, y1, x=V_guess, ytol=1e-5,
-                args=(flash,),
-            )
-        except:
-            flash.show('cwt100')
-            print(purity_objective(0, flash))
-            print(purity_objective(1, flash))
-            breakpoint()
+        flash.V = flx.IQ_interpolation(
+            purity_objective, 0., 1., y0, y1, x=V_guess, ytol=1e-5,
+            args=(flash,),
+        )
     
     E1.add_specification(adjust_purity, run=False, args=(E1,))
     E1.purity = 0.8623
@@ -664,7 +658,7 @@ def create_sugar_crystallization_system(ins, outs):
         moisture_content=None,
     )
     
-    S1 = units.StorageTank('S1', C2-0, sugar, tau=27 * 7)
+    units.StorageTank('S1', C2-0, sugar, tau=27 * 7)
     
     def correct_wash_water(mixer):
         mixer.ins[1].imass['Water'] = mixer.ins[0].imass['Sugar']
@@ -776,6 +770,7 @@ def create_sucrose_fermentation_system(ins, outs,
         ignored = s.ivol[ignored_volume] if ignored_volume in s.chemicals else 0.
         ignored_product = sum([i.imass[product_group] for i in R301.ins])
         return (s.imass[product_group] - ignored_product) / (s.F_vol - ignored)
+    R301.get_titer = get_titer
     
     def titer_at_fraction_evaporated_objective(V, path):
         F301.V = V
@@ -787,8 +782,10 @@ def create_sucrose_fermentation_system(ins, outs,
         for i in path: i._run()
         target = R301.titer
         current = get_titer()
-        return (1./target - 1./current) * R301.outs[0].imass[product_group] * 1000.
+        ignored_product = sum([i.imass[product_group] for i in R301.ins])
+        return (1./target - 1./current) * (R301.outs[1].imass[product_group] - ignored_product) * 1000.
     
+    F301.P_original = tuple(F301.P)
     @F301.add_specification(run=False)
     def evaporation():
         V_guess = F301.V
@@ -796,17 +793,32 @@ def create_sucrose_fermentation_system(ins, outs,
         s_dilution_water.empty()
         path = F301.path_until(R301, inclusive=True)
         dilution_water = get_dilution_water(path)
+        F301.P = F301.P_original
+        F301._reload_components = True
         if dilution_water < 0.:
+            x0 = 0.
+            y0 = titer_at_fraction_evaporated_objective(x0, path)
             x1 = 0.95
             y1 = titer_at_fraction_evaporated_objective(x1, path)
             if y1 > 0.: raise RuntimeError('cannot evaporate to target sugar concentration')
+            if y0 < 0.:
+                x0 = 0.
+                x1 = 0.1
+                F301.P = list(F301.P_original)
+                for i in range(F301._N_evap-1):
+                    if f(1e-6) < 0.:
+                        F301.P.pop()
+                        F301._reload_components = True
+                    else:
+                        break  
             F301.V = flx.IQ_interpolation(
                 titer_at_fraction_evaporated_objective,
-                0., x1, None, y1, x=V_guess, ytol=1e-5,
+                x0, x1, y0, y1, x=V_guess, ytol=1e-5,
                 args=(path,),
             )
         else:
             s_dilution_water.imass['Water'] = dilution_water
+            for i in path: i._run()
         R301.tau = R301.titer / R301.productivity
     
     if scrubber:

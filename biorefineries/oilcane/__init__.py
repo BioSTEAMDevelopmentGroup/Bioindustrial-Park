@@ -383,7 +383,7 @@ def load(name, cache=cache, reduce_chemicals=True,
         prs.reactions.X[10] = 0.0 # baseline
             
     def set_glucose_yield(glucose_yield):
-        if abs(number) in (2, 4):
+        if abs(number) in (2, 4, 6):
             glucose_yield *= 0.01
             X1 = prs.reactions.X[0]
             X1_side = prs.reactions.X[1:3].sum()
@@ -393,7 +393,7 @@ def load(name, cache=cache, reduce_chemicals=True,
             if X_excess > 0: breakpoint()
             
     def set_xylose_yield(xylose_yield):
-        if abs(number) in (2, 4):
+        if abs(number) in (2, 4, 6):
             xylose_yield *= 0.01
             X1_side = prs.reactions.X[9:11].sum()
             prs.reactions.X[8] = X1 = xylose_yield
@@ -599,18 +599,18 @@ def load(name, cache=cache, reduce_chemicals=True,
     
     @default(72, units='hr', element='Saccharification')
     def set_saccharification_reaction_time(reaction_time):
-        if abs(number) in (2, 4): saccharification.tau = reaction_time
+        if abs(number) in (2, 4, 6): saccharification.tau = reaction_time
     
     @default(0.212, units='USD/kg', element='cellulase')
     def set_cellulase_price(price):
-        if abs(number) in (2, 4): s.cellulase.price = price
+        if abs(number) in (2, 4, 6): s.cellulase.price = price
 
-    if abs(number) in (2, 4):
+    if abs(number) in (2, 4, 6):
         cellulase_mixer, = [i for i in flowsheet.unit if hasattr(i, 'enzyme_loading')]
    
     @default(0.02, units='wt. % cellulose', element='cellulase', kind='coupled')
     def set_cellulase_loading(cellulase_loading):
-        if abs(number) in (2, 4): cellulase_mixer.enzyme_loading = cellulase_loading
+        if abs(number) in (2, 4, 6): cellulase_mixer.enzyme_loading = cellulase_loading
     
     @default(PRS_cost_item.cost, units='million USD', element='Pretreatment reactor system')
     def set_reactor_base_cost(base_cost):
@@ -621,7 +621,7 @@ def load(name, cache=cache, reduce_chemicals=True,
     def set_cane_glucose_yield(cane_glucose_yield):
         if agile:
             cane_mode.glucose_yield = cane_glucose_yield
-        elif abs(number) in (2, 4):
+        elif abs(number) in (2, 4, 6):
             set_glucose_yield(cane_glucose_yield)
     
     @uniform(79, 97.5, units='%', element='Pretreatment and saccharification',
@@ -1083,78 +1083,3 @@ def load(name, cache=cache, reduce_chemicals=True,
         oilcane_sys.reduce_chemicals()
     oilcane_sys._load_stream_links()
     HXN.simulate()
-
-# DO NOT DELETE: For removing ylabel and yticklabels and combine plots
-# import biorefineries.oilcane as oc
-# import matplotlib.pyplot as plt
-# oc.plot_configuration_breakdown('O2')
-# ax, *_ = plt.gcf().get_axes()
-# yticks = ax.get_yticks()
-# plt.yticks(yticks, ['']*len(yticks))
-# plt.ylabel('')
-# plt.show()
-
-# DO NOT DELETE: For better TEA tickmarks
-# import biorefineries.oilcane as oc
-# import numpy as np
-# oc.plot_monte_carlo(derivative=True, comparison=False,
-#     tickmarks=np.array([
-#         [-3.0, -1.5, 0, 1.5, 3.0, 4.5],
-#         [-6, -3, 0, 3, 6, 9],
-#         [-2.25, -1.5, -0.75, 0, 0.75, 1.5],
-#         [-10, 0, 10, 20, 30, 40],
-#         [-300, -225, -150, -75, 0, 75]
-#     ]),
-#     labels=['Conventional', 'Cellulosic']
-# )
-
-# DO NOT DELETE: For better LCA tickmarks
-# import biorefineries.oilcane as oc
-# import numpy as np
-# oc.plot_monte_carlo(kind='LCA', comparison=True, agile=False,
-#     tickmarks=np.array([
-#         [-2, -1, 0, 1, 2, 3, 4, 5],
-#         [-2, 0, 2, 4, 6, 8, 10],
-#         [-1, 0, 1, 2, 3, 4, 5],
-#         [-150, -75, -50, -25, 0., 75, 150, 225, 300],
-#     ]),
-# )
-
-# DO NOT DELETE: For SI Monte Carlo
-# import biorefineries.oilcane as oc
-# import numpy as np
-# oc.plot_monte_carlo(
-#     absolute=True, comparison=False,
-#     labels=['Sugarcane\nconventional', 'Oilcane\nconventional',
-#             'Sugarcane\ncellulosic', 'Oilcane\ncellulosic',
-#             'Sugarcane\nconventional\nagile', 'Oilcane\nconventional\nagile',
-#             'Sugarcane\ncellulosic\nagile', 'Oilcane\ncellulosic\nagile'],
-# )
-
-# # DO NOT DELETE: For GWP tables
-# from biorefineries import oilcane as oc
-# import biosteam as bst
-# def get_sys(ID):
-#     oc.load(ID)
-#     return oc.sys
-# def get_ethanol(ID):
-#     oc.load(ID)
-#     return oc.ethanol
-# IDs = ('S1', 'S2', 'O1', 'O2')
-# systems = [get_sys(i) for i in IDs]
-# items = [get_ethanol(i) for i in IDs]
-# bst.settings.define_impact_indicator('GWP', 'kg*CO2e')
-# bst.report.lca_table_displacement_allocation(systems, 'GWP', items, 'ethanol', system_names=IDs)
-
-# # Calculate xylose conversion based on net conversion of sugars
-# import biosteam as bst
-# import biorefineries.oilcane as oc
-# oc.load('L2')
-# feed = bst.Stream.sum(oc.R401.ins)
-# total_glucose, total_xylose = feed.imass['Glucose', 'Xylose'] + feed.imass['Glucan', 'Xylan'] * 1.11
-# total_sugars = total_glucose + total_xylose
-# glucose = 0.91 * total_glucose
-# xylose = total_xylose
-# sugar_conversion = 0.83 * 0.95 
-# xylose_conversion = (sugar_conversion * total_sugars - 0.95 * glucose) / xylose
-# print(xylose_conversion)
