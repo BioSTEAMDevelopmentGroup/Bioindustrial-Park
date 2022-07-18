@@ -934,6 +934,30 @@ def create_oilcane_to_biodiesel_1g(
     fermentor.Nmin = 2
     fermentor.Nmax = 36
     product, condensate, vent = fermentation_sys.outs
+    
+    urea = bst.Stream(
+        'urea',
+        Urea=26,
+        units='kg/hr'
+    )
+    MgSO4 = bst.Stream(
+        'MgSO4',
+         MgSO4=211,
+         units='kg/hr',
+    )
+    Urea_storage = bst.StorageTank('Urea_storage', urea)
+    MgSO4_storage = bst.StorageTank('MgSO4_storage', MgSO4)
+    fermentor.ins.append(Urea_storage-0)
+    fermentor.ins.append(MgSO4_storage-0)
+    @fermentor.add_specification(run=True)
+    def adjust_nutrients_feed_to_fermentation():
+        feed, *others, urea, MgSO4, = fermentor.ins
+        F_vol = sum([i.F_vol - i.ivol['Lipid'] for i in others], feed.F_vol - feed.ivol['Lipid'])
+        urea.imass['Urea'] = 0.5 * F_vol
+        MgSO4.imass['MgSO4'] = 1 * F_vol
+        for i in Urea_storage.path_until(fermentor): i.run()
+        for i in MgSO4_storage.path_until(fermentor): i.run()
+    
     post_fermentation_oil_separation_sys = create_post_fermentation_oil_separation_system(
         ins=product,
         mockup=True,
@@ -1067,20 +1091,20 @@ def create_oilcane_to_biodiesel_combined_1_and_2g_post_fermentation_oil_separati
     @seedtrain.add_specification(run=True)
     def adjust_nutrients_to_seed_train():
         *feeds, urea, MgSO4 = seedtrain.ins
-        F_mass = sum([i.F_mass - i.imass['Lipid'] for i in feeds])
-        urea.imass['Urea'] = 0.0050 * F_mass
-        MgSO4.imass['MgSO4'] = 0.0004 * F_mass
+        F_vol = sum([i.F_vol - i.ivol['Lipid'] for i in feeds])
+        urea.imass['Urea'] = 0.5 * F_vol
+        MgSO4.imass['MgSO4'] = 1 * F_vol
         
     @cofermentation.add_specification(run=True)
     def adjust_CSL_and_DAP_feed_to_fermentation():
-        feed, seed, *others, CSL2, DAP2, = cofermentation.ins
-        F_mass = sum([i.F_mass - i.imass['Lipid'] for i in others], feed.F_mass - feed.imass['Lipid'])
-        urea.imass['Urea'] = 0.0050 * F_mass
-        MgSO4.imass['MgSO4'] = 0.0004 * F_mass
+        feed, seed, *others, urea, MgSO4, = cofermentation.ins
+        F_vol = sum([i.F_vol - i.ivol['Lipid'] for i in others], feed.F_vol - feed.ivol['Lipid'])
+        urea.imass['Urea'] = 0.5 * F_vol
+        MgSO4.imass['MgSO4'] = 1 * F_vol
         S301.ins[0].mix_from(S301.outs)
         S302.ins[0].mix_from(S302.outs)
-        Urea_storage.ins[0].copy_like(Urea_storage.outs[0])
-        MgSO4_storage.ins[0].copy_like(MgSO4_storage.outs[0])  
+        for i in Urea_storage.path_until(cofermentation): i.run()
+        for i in MgSO4_storage.path_until(cofermentation): i.run()
     
     beer, lignin, condensate, pretreatment_wastewater, fiber_fines = oilcane_to_fermentation_sys.outs
     post_fermentation_oil_separation_sys, pfls_dct = create_post_fermentation_oil_separation_system(
