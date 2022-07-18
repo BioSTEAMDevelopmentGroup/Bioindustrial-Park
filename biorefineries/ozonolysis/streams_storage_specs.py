@@ -191,13 +191,13 @@ P103_2 = bst.units.Pump('P103_2',
 
 P103_1.add_specification(adjust_water_for_extraction, run=True)
 
-# Catalyst_feed_tank
-T104 = bst.units.StorageTank('T104',
-                             ins = fresh_Catalyst,
-                             outs = 'fresh_catalyst_to_pump')
-P104 = bst.units.Pump('P104',
-                      ins = T104-0,
-                      outs ='to_reactor_mixer') 
+# # Catalyst_feed_tank
+# T104 = bst.units.StorageTank('T104',
+#                              ins = fresh_Catalyst,
+#                              outs = 'fresh_catalyst_to_pump')
+# P104 = bst.units.Pump('P104',
+#                       ins = T104-0,
+#                       outs ='to_reactor_mixer') 
 
 # Fresh_ethyl_acetate_feedtank
 # T105 = bst.units.StorageTank ('T105', 

@@ -19,6 +19,12 @@ def create_new_chemical(ID, phase = 's', **constants):
 
 #Chemicals that are available in the database
 DHSA = tmo.Chemical('DHSA', search_ID = '120-87-6')
+Methyl_oct_3 = tmo.Chemical('Methyl_oct_3', search_ID ='3-Methyloctane')
+Methyl_oct_4 = tmo.Chemical('Methyl_oct_4', search_ID = '4-Methyloctane')
+Dimethyl_heptane_3_3 = tmo.Chemical('Dimethyl_heptane_3_3', search_ID ='3,3-Dimethylheptane')
+Ethylheptane_3 = tmo.Chemical('Ethylheptane_3',search_ID ='3-Ethylheptane')
+Ethylheptane_4 = tmo.Chemical('Ethylheptane_4', search_ID ='4-Ethylheptane') 
+
 ozo_chemicals = tmo.Chemicals(
     ['Water','Hydrogen_peroxide','Oleic_acid',
      'Nonanal','Nonanoic_acid','Azelaic_acid',
@@ -37,7 +43,13 @@ ozo_chemicals = tmo.Chemicals(
      'Cyclohexane',
      'Cycloheptane',
      'Benzene',
-      DHSA])
+      Methyl_oct_3,
+      Methyl_oct_4,
+      Dimethyl_heptane_3_3,
+      Ethylheptane_3,
+      Ethylheptane_4
+      ])      
+
 
 #Solid Catalyst not available in the database
 #TODO.xxx Add ref for the below

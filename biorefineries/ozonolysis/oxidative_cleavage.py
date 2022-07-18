@@ -1,3 +1,4 @@
+
 """
 Created on Fri Oct 29 08:18:19 2021
 @author: yrc2
@@ -10,9 +11,17 @@ import thermosteam as tmo
 import flexsolve as flx
 import numpy as np
 from biorefineries.make_a_biorefinery.analyses.solvents_barrage import run_solvents_barrage
-from biorefineries.ozonolysis.streams_storage_specs import * 
+# from biorefineries.ozonolysis.streams_storage_specs import * 
 #from biorefineries.ozonolysis.Batch_conversion import *
 from biosteam import SystemFactory
+
+#############################################################
+bst.settings.set_thermo(ozo_chemicals)
+bst.Stream.display_units.flow = 'kg/hr'
+bst.Stream.display_units.composition = True
+bst.Stream.display_units.N = 100
+Total_feed = 1000
+
 
 ######################## Units ########################
 @SystemFactory(
@@ -51,15 +60,17 @@ def conversion_oxidative_cleavage(ins,outs,T_in):
                               outs ='fresh_OA_to_pump' )
     P101 = bst.units.Pump('P101',
                       ins = T101-0,
-                      outs = 'to_reactor_mixer')
+                      outs = 'OA_to_reactor_mixer')
 
 # Fresh_Hydrogen_peroxide_feedtank
-    T102 =  bst.units.MixTank('T102',
-                               ins = (fresh_HP, recycle_HP),
+##TODO.xxs add recycle if that works out
+
+    T102 =  bst.units.StorageTank('T102',
+                               ins = fresh_HP,
                                outs = 'fresh_HP_to_pump')
     P102 = bst.units.Pump('P102',
                       ins = T102-0,
-                      outs = 'to_reactor_mixer')
+                      outs = 'HP_to_conc_mixer')
 # Fresh_water_feedtank
 #TODO.xxx add correct price for water
     T103_1  = bst.units.StorageTank('T103_1',
@@ -67,7 +78,7 @@ def conversion_oxidative_cleavage(ins,outs,T_in):
                               outs = 'fresh_water_to_pump')
     P103_1 = bst.units.Pump('P103_1',
                       ins = T103_1-0,
-                      outs ='to_reactor_mixer')
+                      outs ='water_to_conc_mixer')
 
 # Catalyst_feed_tank
     T104 = bst.units.StorageTank('T104',
@@ -75,7 +86,7 @@ def conversion_oxidative_cleavage(ins,outs,T_in):
                               outs = 'fresh_catalyst_to_pump')
     P104 = bst.units.Pump('P104',
                       ins = T104-0,
-                      outs ='to_reactor_mixer') 
+                      outs ='cat_to_reactor_mixer') 
     def adjust_catalyst_flow():
        fresh_Catalyst = fresh_OA.F_mass/103861.94035901062 
       
@@ -84,7 +95,7 @@ def conversion_oxidative_cleavage(ins,outs,T_in):
 #Mixer for hydrogen_peroxide solution
     M101 = bst.units.Mixer('M101',
                         ins = (P102-0,                               
-                               T103_1-0),
+                               P103_1-0),
                         outs = 'feed_to_reactor_mixer')
     
 
@@ -131,6 +142,7 @@ def conversion_oxidative_cleavage(ins,outs,T_in):
 ob1 = conversion_oxidative_cleavage(T_in = 70 + 273.15)
 ob1.simulate()
 ob1.show()
+ob1.diagram()
 
 # ozonolysis_sys = bst.main_flowsheet.create_system('ozonolysis_sys')
 # ozonolysis_sys.diagram(number=True)
