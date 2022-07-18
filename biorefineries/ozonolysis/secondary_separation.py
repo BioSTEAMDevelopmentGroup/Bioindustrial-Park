@@ -4,7 +4,7 @@ Created on Thu Jun 23 15:58:17 2022
 @author: LavanyaKudli"""
 
 from biorefineries.ozonolysis import units
-from biorefineries.ozonolysis.chemicals_info import ozo_chemicals
+from biorefineries.ozonolysis.chemicals_info import *
 import biosteam as bst
 import thermosteam as tmo
 import flexsolve as flx
@@ -17,28 +17,39 @@ from biorefineries.ozonolysis.primary_separation import ob3
 #PARTITION COEFF FOR SOLVENT EXTRACTION NOT IN YET
 #ASSUSSIMG THE SOLVENT HAS PROPERTIES OF OCTANE
 #NEEDS TO BE ADJUSTED ACCORDING TO THE NAPHTHOL MINERAL SPIRITS PATENT 
-#
 
+Methyl_oct_3,
+Methyl_oct_4,
+Dimethyl_heptane_3_3,
+Ethylheptane_3,
+Ethylheptane_4
+      
 @SystemFactory(
     ID = 'Secondary_separation',
     ins = [dict(ID = 'AA_to_be_recovered'),
            dict(ID = 'Water_for_extraction',
-                Water = 400,
+                Water = 300,
                 T = 90+273.15,
                 units = 'kg/hr',
                 price = 1),           
            dict(ID = 'Solvent_for_extraction',
-                Octane = 10,
-                Hexane = 10,
-                Nonane = 10,
-                Undecane = 10,
-                Cycloheptane = 10,
-                cycloheptane = 10,
-                Benzene = 5,
+                Methyl_oct_3 = 10,
+                Methyl_oct_4 = 10,
+                Octane = 70,
+                # Hexane = 10,
+                # # Nonane = 5,
+                # # Undecane = 5,
+                # cyclohexane = 5,
+                # # Dimethyl_heptane_3_3 = 5,
+                # # Ethylheptane_3 = 5,
+                # # Ethylheptane_4  = 5,    
+                # cycloheptane = 1,
+                # # Benzene = 5,
                 T = 100 + 273.15,
                 units = 'kg/hr',
                 price = 1)],   
-    outs = [dict(ID = 'Recovered_solvent'), 
+    outs = [dict(ID = 'solvent_Nacid_mix'),
+            dict(ID = 'Recovered_solvent'), 
             dict(ID = 'AA_high_purity_product'),
            ],
     fixed_ins_size = True,
@@ -46,19 +57,19 @@ from biorefineries.ozonolysis.primary_separation import ob3
               )
 def Secondary_separation(ins,outs,Tin):
     AA_to_be_recovered,Water_for_extraction,Solvent_for_extraction, = ins
-    Recovered_solvent,AA_high_purity_product, = outs
+    solvent_Nacid_mix,Recovered_solvent,AA_high_purity_product, = outs
    
-   #Hot_water_mixture
+   #Hot_water_and_crude_azelaic_mixture
     M301 = bst.units.Mixer('M301',
                            ins = (AA_to_be_recovered,Water_for_extraction ),
                            outs = ('Hot_water_mixture'))
        
    #Solvent_extraction
-    Solvent_for_extraction.F_mass = 200
-    L301 = bst.units.MultiStageMixerSettlers('L301',
+    Solvent_for_extraction.F_mass = 400
+    L301 = bst.units.MultiStageMixettlers('L301',
                                           ins= (M301-0,
                                                 Solvent_for_extraction), 
-                                          outs=('extract_for_solvent_recovery',
+                                          outs=(solvent_Nacid_mix,
                                                 'raffinate_for_AA_recovery'), 
                                           N_stages = 5,
                                           # add partition coefficients!
@@ -66,11 +77,13 @@ def Secondary_separation(ins,outs,Tin):
     # L301.add_specification(cache_Ks, args=(L301,), run=True)
     # L301.solvent_ratio = 0.05
     # L301.K_fudge_factor = 1 / L202.K_fudge_factor
-    def cache_Ks(ms):
+    def some_Ks(ms):
         feed, solvent = ms.ins
         if not ms.partition_data:
             s_mix = bst.Stream.sum(ms.ins)
-            s_mix.lle(T=s_mix.T)
+            s_mix.lle(T=s_mix.T, 
+                      top_chemical = ('Nonanoic_acid')),
+                      #bottom_chemical = ('Azelaic_acid'))
             IDs = tuple([i.ID for i in s_mix.lle_chemicals])
             Ks = tmo.separations.partition_coefficients(IDs, s_mix['L'], s_mix['l'])
             ms.partition_data = {
@@ -79,7 +92,7 @@ def Secondary_separation(ins,outs,Tin):
                 'phi': 0.5,
                 }
             ms._setup() 
-    L301.add_specification(cache_Ks, args=[L301], run=True)
+    L301.add_specification(some_Ks, args=[L301], run=True)
     
 # Azelaic acid and hexane separation  
     D301_H = bst.HXutility('D301_H',
