@@ -92,6 +92,7 @@ area_colors = {
     'Storage': CABBI_colors.grey,
     'HXN': colors.orange,
     'Heat exchanger network': colors.orange,
+    'TAG prod.': CABBI_colors.blue,
 }
 
 area_hatches = {
@@ -111,6 +112,7 @@ area_hatches = {
     'Storage': '',
     'HXN': '+',
     'Heat exchanger network': '+',
+    'TAG prod.': '/',
 }
 
 for i in area_colors: area_colors[i] = area_colors[i].tint(20)
@@ -503,14 +505,15 @@ def plot_spearman_lca(with_units=None, aspect_ratio=0.65, **kwargs):
         file = os.path.join(images_folder, f'spearman_lca.{i}')
         plt.savefig(file, transparent=True)
 
-def plot_breakdowns():
+def plot_breakdowns(biodiesel_only=True):
     set_font(size=8)
     set_figure_size(aspect_ratio=0.68)
     fig, axes = plt.subplots(nrows=1, ncols=2)
     plt.sca(axes[0])
-    plot_configuration_breakdown('O1', ax=axes[0], legend=False)
+    c1, c2 = ('O5', 'O6') if biodiesel_only else ('O1', 'O2')
+    plot_configuration_breakdown(c1, ax=axes[0], legend=False)
     plt.sca(axes[1])
-    plot_configuration_breakdown('O2', ax=axes[1], legend=True)
+    plot_configuration_breakdown(c2, ax=axes[1], legend=True)
     yticks = axes[1].get_yticks()
     plt.yticks(yticks, ['']*len(yticks))
     plt.ylabel('')
@@ -523,7 +526,8 @@ def plot_breakdowns():
                   horizontalalignment='center',verticalalignment='center',
                   fontsize=12, fontweight='bold')
     for i in ('svg', 'png'):
-        file = os.path.join(images_folder, f'breakdowns.{i}')
+        name = f'breakdowns_biodiesel_only.{i}' if biodiesel_only else f'breakdowns.{i}'
+        file = os.path.join(images_folder, name)
         plt.savefig(file, transparent=True)
 
 # %% Heatmap

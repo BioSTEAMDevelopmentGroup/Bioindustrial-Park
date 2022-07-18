@@ -218,7 +218,8 @@ def create_juicing_system_without_treatment(ins, outs, pellet_bagasse=None):
     @U201.add_specification(run=True)
     def update_imbibition_water():
         feed = U201.ins[0]
-        imbibition_water.imass['Water'] = 0.245 * (feed.F_mass - feed.imass['Water']) / 0.7
+        other_liquids = feed.imass['Lipid'] if 'Lipid' in feed.chemicals else 0.
+        imbibition_water.imass['Water'] = 0.245 * (feed.F_mass - feed.imass['Water'] - other_liquids) / 0.7
     
     U202 = units.ConveyingBelt('U202', U201-0, [''] if pellet_bagasse else [bagasse])
     
@@ -324,7 +325,8 @@ def create_juicing_system_up_to_clarification(ins, outs, pellet_bagasse=None):
     @U201.add_specification(run=True)
     def correct_flows():
         feed = U201.ins[0]
-        F_mass = (feed.F_mass - feed.imass['Water']) / 0.7
+        other_liquids = feed.imass['Lipid'] if 'Lipid' in feed.chemicals else 0.
+        F_mass = (feed.F_mass - feed.imass['Water'] - other_liquids) / 0.7
         # correct lime, phosphoric acid, and imbibition water
         lime.imass['CaO', 'Water'] = 0.001 * F_mass * np.array([0.046, 0.954])
         H3PO4.imass['H3PO4', 'Water'] = 0.00025 * F_mass
@@ -761,7 +763,7 @@ def create_sucrose_fermentation_system(ins, outs,
                 return target_titer - get_titer()
             dilution_water.imass['Water'] = 0.
             x0 = 0
-            x1 = 0.99
+            x1 = 0.999
             y0 = f(x0)
             if y0 < 0.:
                 product = float(beer.imass[product_group])
@@ -773,7 +775,7 @@ def create_sucrose_fermentation_system(ins, outs,
                 y1 = f(x1)
                 if y1 > 0.:
                     long_path = [SX0, F301, *sugar_path]
-                    for split in (0.20, 0.15, 0.10, 0.5, 0.):
+                    for split in (0.15, 0.10, 0.5, 0.):
                         SX0.split[:] = split
                         for i in long_path: i.run()
                         y1 = f(x1)

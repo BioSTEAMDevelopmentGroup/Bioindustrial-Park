@@ -573,7 +573,7 @@ def create_cane_to_combined_1_and_2g_fermentation(
                 y1 = f(x1)
                 if y1 > 0.:
                     long_path = [SX0, EvX, *sugar_path]
-                    for split in (0.20, 0.15, 0.10, 0.5, 0.):
+                    for split in (0.15, 0.10, 0.5, 0.):
                         SX0.split[:] = split
                         for i in long_path: i.run()
                         y1 = f(x1)
