@@ -537,7 +537,7 @@ def create_cane_to_combined_1_and_2g_fermentation(
         def adjust_glucose_concentration():
             V_guess = EvX.V
             EvX.V = flx.IQ_interpolation(
-                brix_objective, 0., 0.2, x=V_guess, ytol=1e-3, maxiter=500
+                brix_objective, 0., 0.2, x=V_guess, ytol=0.1, maxiter=1000,
             )
         
         MT1 = bst.MixTank(400, EvX-0)

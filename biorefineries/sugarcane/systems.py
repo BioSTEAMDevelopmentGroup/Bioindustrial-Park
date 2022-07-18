@@ -743,7 +743,7 @@ def create_sucrose_fermentation_system(ins, outs,
         def adjust_glucose_concentration():
             V_guess = F301.V
             F301.V = flx.IQ_interpolation(
-                brix_objective, 0., 0.2, x=V_guess, ytol=1e-3, maxiter=500,
+                brix_objective, 0., 0.2, x=V_guess, ytol=0.1, maxiter=1000,
             )
         MT1 = bst.MixTank(300, F301-0)
         SX1 = bst.Splitter(300, ins=F301-1, outs=[evaporator_condensate, ''], split=0.9)

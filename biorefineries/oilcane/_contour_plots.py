@@ -120,7 +120,7 @@ def plot_recovery_and_oil_content_contours_biodiesel_only(load=True, fs=8):
     set_font(size=fs)
     set_figure_size()
     fig, axes = plot_recovery_and_oil_content_contours(
-        load=load, configurations=[5, 6], N_points=8, yticks=[0, 2.5, 5, 7.5, 10, 12.5, 15, 17.5, 20],
+        load=load, configurations=[5, 6], N_points=8, yticks=[0, 2.5, 5, 7.5, 10, 12.5, 15],
     )
     colors = np.zeros([2, 2], object)
     colors[:] = [[light_letter_color, light_letter_color],
@@ -353,7 +353,7 @@ def plot_recovery_and_oil_content_contours(
     X, Y = np.meshgrid(x, y)
     metric = bst.metric
     folder = os.path.dirname(__file__)
-    file = 'oil_extraction_analysis.npy'
+    file = f"oil_extraction_analysis_{''.join([str(i) for i in configurations])}.npy"
     file = os.path.join(folder, file)
     if configurations is None: configurations = [1, 2]
     if agile is None: agile = [False, True]
@@ -400,7 +400,7 @@ def plot_recovery_and_oil_content_contours(
                              levels=levels, colors=[linecolor])
             # ax.clabel(CS, levels=CS.levels, inline=True, fmt=lambda x: f'{round(x):,}',
             #           colors=[linecolor], zorder=1e16)
-            plt.fill_between([60, 90], [5], [15], 
+            plt.fill_between([60, 90], [yticks[0]], [yticks[-1]], 
                               color=shadecolor,
                               linewidth=1)
             plot_vertical_line(60, ls='-.',
