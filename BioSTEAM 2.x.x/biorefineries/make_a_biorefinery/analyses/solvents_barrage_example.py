@@ -11,14 +11,21 @@ import thermosteam as tmo
 
 #%% Initialize chemicals (no need to initialize solvent chemicals) and feed streams. 
 #   This can be done in an external module (e.g., your biorefinery) and you can simply import your feed stream.
-from biorefineries.TAL.chemicals_data import TAL_chemicals as chemicals
-tmo.settings.set_thermo(chemicals)
+
+
+# from biorefineries.TAL.chemicals_data import TAL_chemicals as chemicals
+# tmo.settings.set_thermo(chemicals)
+# stream = tmo.Stream('stream')
+# stream.imol['Water'] = 100.
+# stream.imol['Octyl_3_5_dihydroxyhexanoate'] = 50.
+# stream.imass['Octyl_5_hydroxyhexanoate'] = 50.
+# stream.imass['HMTHP'] = 20.
+
 stream = tmo.Stream('stream')
 stream.imol['Water'] = 100.
 stream.imol['Octyl_3_5_dihydroxyhexanoate'] = 50.
 stream.imass['Octyl_5_hydroxyhexanoate'] = 50.
 stream.imass['HMTHP'] = 20.
-
 #%% Run
 
 run_solvents_barrage(stream=stream, # Stream from which you wish to extract the solute

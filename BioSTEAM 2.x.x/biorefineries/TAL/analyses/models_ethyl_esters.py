@@ -368,7 +368,7 @@ baseline_mono_di_hydroxy_esters_conversion_ratio = R401.mono_di_hydroxy_esters_c
 D = shape.Triangle(0.8*baseline_mono_di_hydroxy_esters_conversion_ratio, 
                    baseline_mono_di_hydroxy_esters_conversion_ratio, 
                    1.2*baseline_mono_di_hydroxy_esters_conversion_ratio) # experimental data from Huber group
-@param(name='mono_di_hydroxy_esters_conversion_ratio', element=F401, kind='coupled', units='%',
+@param(name='mono_di_hydroxy_esters_conversion_ratio', element=R401, kind='coupled', units='%',
        baseline=baseline_mono_di_hydroxy_esters_conversion_ratio, distribution=D)
 def set_TAL_solubility_ethanol(mono_di_hydroxy_esters_conversion_ratio):
     R401.mono_di_hydroxy_esters_conversion_ratio = mono_di_hydroxy_esters_conversion_ratio
@@ -380,13 +380,24 @@ baseline_TAL_to_esters_conversion = R401.TAL_to_esters_conversion
 D = shape.Triangle(0.8*baseline_TAL_to_esters_conversion, 
                    baseline_TAL_to_esters_conversion, 
                    1.2*baseline_TAL_to_esters_conversion) # experimental data from Huber group
-@param(name='TAL_to_esters_conversion', element=F401, kind='coupled', units='%',
+@param(name='TAL_to_esters_conversion', element=R401, kind='coupled', units='%',
        baseline=baseline_TAL_to_esters_conversion, distribution=D)
 def set_TAL_solubility_ethanol(TAL_to_esters_conversion):
     R401.TAL_to_esters_conversion = TAL_to_esters_conversion
     R401.hydrogenation_rxns[0].X = TAL_to_esters_conversion * R401.mono_di_hydroxy_esters_conversion_ratio
     R401.hydrogenation_rxns[1].X = TAL_to_esters_conversion * (1.-R401.mono_di_hydroxy_esters_conversion_ratio)
     R401.TAL_to_DHL_rxn.X = 1. - sum([i.X for i in list(R401.hydrogenation_rxns[:5]) if not i==R401.TAL_to_DHL_rxn and i.reactant=='TAL'])
+  
+baseline_catalyst_deactivation_k = R401.catalyst_deactivation_k
+D = shape.Triangle(0.8*baseline_catalyst_deactivation_k, 
+                   baseline_catalyst_deactivation_k, 
+                   1.2*baseline_catalyst_deactivation_k) # experimental data from Huber group
+@param(name='Pd|C catalyst deactivation k', element=R401, kind='coupled', units='s^-1',
+       baseline=baseline_TAL_to_esters_conversion, distribution=D)
+def set_TAL_solubility_ethanol(catalyst_deactivation_k):
+    R401.catalyst_deactivation_k = catalyst_deactivation_k
+    
+
 # D = shape.Uniform(0.01, 0.09) # assumed
 # @param(name='Ethanol retention in product after drying', element=U401, kind='coupled', units='g-ethanol/g-product',
 #        baseline=0.05, distribution=D)

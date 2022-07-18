@@ -493,6 +493,10 @@ Acetylacetone = chemical_database(ID='Acetylacetone',
                                                        # formula='C6H6O3',
                                                        # search_ID='Acetylacetone',
                                                        )
+
+Pentenone = chemical_database(ID='Pentenone', search_ID='3-penten-2-one')
+
+
 # for i in TALHydrogenationDegradationProducts.get_missing_properties():
 #     if not i in TAL.get_missing_properties():
 #         try:
