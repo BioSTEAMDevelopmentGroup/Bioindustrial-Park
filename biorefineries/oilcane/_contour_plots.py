@@ -116,19 +116,20 @@ def plot_recovery_and_oil_content_contours_manuscript(load=True, fs=8):
         file = os.path.join(images_folder, f'recovery_and_oil_content_contours.{i}')
         plt.savefig(file, transparent=True)
         
-def plot_recovery_and_oil_content_contours_biodiesel_only(load=True, fs=8):
+def plot_recovery_and_oil_content_contours_biodiesel_only(load=True, fs=8, metric_index=2):
     set_font(size=fs)
     set_figure_size()
     fig, axes = plot_recovery_and_oil_content_contours(
         load=load, configurations=[5, 6], N_points=20, yticks=[0, 2.5, 5, 7.5, 10, 12.5, 15],
+        metric_index=metric_index,
     )
     colors = np.zeros([2, 2], object)
     colors[:] = [[light_letter_color, light_letter_color],
                  [light_letter_color, light_letter_color]]
-    _add_letter_labels(axes, 1 - 0.68, 0.7, colors)
+    _add_letter_labels(axes, 1 - 0.68, 0.85, colors)
     plt.subplots_adjust(right=0.92, wspace=0.1 * (fs/8) ** 2, top=0.9, bottom=0.10)
     for i in ('svg', 'png'):
-        file = os.path.join(images_folder, f'recovery_and_oil_content_contours_biodiesel_only.{i}')
+        file = os.path.join(images_folder, f'recovery_and_oil_content_contours_biodiesel_only_{metric_index}.{i}')
         plt.savefig(file, transparent=True)
 
 def plot_relative_sorghum_oil_content_and_cane_oil_content_contours_manuscript(load=True, fs=8):
