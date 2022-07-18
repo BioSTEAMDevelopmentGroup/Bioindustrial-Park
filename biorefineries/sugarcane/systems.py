@@ -731,7 +731,7 @@ def create_sucrose_fermentation_system(ins, outs,
         def get_brix():
             effluent = F301.outs[0]
             water = effluent.imass['Water']
-            if water < 0.0001: water = 0.0001
+            if water < 1: water = 1
             return 100 * effluent.imass['Sugar'] / water
         
         def brix_objective(V):
@@ -743,7 +743,7 @@ def create_sucrose_fermentation_system(ins, outs,
         def adjust_glucose_concentration():
             V_guess = F301.V
             F301.V = flx.IQ_interpolation(
-                brix_objective, 0., 1., x=V_guess, ytol=1e-5
+                brix_objective, 0., 0.2, x=V_guess, ytol=1e-3, maxiter=500,
             )
         MT1 = bst.MixTank(300, F301-0)
         SX1 = bst.Splitter(300, ins=F301-1, outs=[evaporator_condensate, ''], split=0.9)
@@ -884,7 +884,7 @@ def create_sucrose_fermentation_system(ins, outs,
         s = R301.outs[1]
         ignored = s.ivol[ignored_volume] if ignored_volume in s.chemicals else 0.
         ignored_product = sum([i.imass[product_group] for i in R301.ins])
-        return (s.imass[product_group] - ignored_product) / (s.F_vol - ignored)
+        return (s.imass[product_group] - ignored_product) / (s.ivol['Water', product_group].sum() - ignored)
     R301.get_titer = get_titer
     
     def get_dilution_water():

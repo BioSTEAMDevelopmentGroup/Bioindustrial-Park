@@ -15,6 +15,7 @@ def create_chemicals():
     chemicals = tmo.Chemicals([
         i for i in (lc.chemicals.tuple + cs.chemicals.tuple) if i.ID not in removed
     ])
+    chemicals.extend([tmo.Chemical('Urea', phase='l', default=True), tmo.Chemical('MgSO4', phase='l', default=True)])
     chemicals.compile()
     chemicals.define_group('Lipid', ['PL', 'FFA', 'MAG', 'DAG', 'TAG'])
     chemicals.define_group('Oil', ['PL', 'FFA', 'MAG', 'DAG', 'TAG'])

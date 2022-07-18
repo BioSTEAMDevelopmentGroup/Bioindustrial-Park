@@ -100,7 +100,7 @@ def create_post_fermentation_oil_separation_system(ins, outs, wastewater_concent
         V_last = EvX.V
         def x_oil(V):
             EvX.V = V
-            EvX._run()
+            EvX.run()
             effluent = EvX.outs[0]
             oil = effluent.imass['Oil']
             total = effluent.imass['Oil', 'Water'].sum()
@@ -165,7 +165,7 @@ def create_post_fermentation_oil_separation_system(ins, outs, wastewater_concent
             elif split > 1.:
                 split = 1.
             S601.split[:] = split
-            for i in S601.path_until(M601): i._run()
+            for i in S601.path_until(M601): i.run()
 
 @SystemFactory(
     ID='oilcane_sys',
@@ -435,7 +435,7 @@ def create_cane_combined_1_and_2g_pretreatment(ins, outs):
     conveying_belt.hemicellulose_rxn = tmo.Reaction('30.2 Hemicellulose -> 24.9 Xylan + 1.7 Arabinan + 0.6 Galactan + 3 Acetate', 'Hemicellulose', 1.0, basis='wt')
     conveying_belt.hemicellulose_rxn.basis = 'mol'
     def convert_hemicellulose():
-        conveying_belt._run()
+        conveying_belt.run()
         bagasse = conveying_belt.outs[0]
         conveying_belt.cellulose_rxn(bagasse)
         conveying_belt.hemicellulose_rxn(bagasse)
@@ -509,8 +509,8 @@ def create_cane_to_combined_1_and_2g_fermentation(
     pressurefilter.tag = "bagasse oil extraction"
     pressurefilter.isplit['Lipid'] = 1. - 0.7
     hydrolysate = pressurefilter.outs[1]
-    sink = hydrolysate.sink
-    sink.ins[0] = None
+    hydrolysate_sink = hydrolysate.sink
+    hydrolysate_sink.ins[0] = None
     MX = bst.Mixer(400, [hydrolysate, juice])
     if fed_batch:
         if 'Sugar' not in MX.chemicals:
@@ -525,19 +525,19 @@ def create_cane_to_combined_1_and_2g_fermentation(
         def get_brix():
             effluent = EvX.outs[0]
             water = effluent.imass['Water']
-            if water < 0.0001: water = 0.0001
+            if water < 1: water = 1
             return 100 * effluent.imass['Sugar'] / water
         
         def brix_objective(V):
             EvX.V = V
-            EvX._run()
+            EvX.run()
             return EvX.brix - get_brix()
         
         @EvX.add_specification(run=False)
         def adjust_glucose_concentration():
             V_guess = EvX.V
             EvX.V = flx.IQ_interpolation(
-                brix_objective, 0., 1., x=V_guess, ytol=1e-5
+                brix_objective, 0., 0.2, x=V_guess, ytol=1e-3, maxiter=500
             )
         
         MT1 = bst.MixTank(400, EvX-0)
@@ -578,7 +578,10 @@ def create_cane_to_combined_1_and_2g_fermentation(
                         for i in long_path: i.run()
                         y1 = f(x1)
                         if y1 < 0.: break
-                SX1.split[:] = flx.IQ_interpolation(f, x0, x1, y0, y1, x=SX1.split[0], ytol=1e-5, xtol=1e-6)
+                try:
+                    SX1.split[:] = flx.IQ_interpolation(f, x0, x1, y0, y1, x=SX1.split[0], ytol=1e-5, xtol=1e-6)
+                except:
+                    breakpoint()
             cofermentation.tau = target_titer / cofermentation.productivity 
             SX0.split[:] = 0.2 # Restart
     else:
@@ -605,7 +608,7 @@ def create_cane_to_combined_1_and_2g_fermentation(
             y0 = f(0)
             if y0 < 0.:
                 product = float(beer.imass[product_group])
-                current_titer = product / beer.F_vol
+                current_titer = get_titer()
                 ignored_product = PX.outs[0].imass[product_group]
                 required_water = (1./target_titer - 1./current_titer) * (product - ignored_product) * 1000.
                 MX.ins[1].imass['Water'] = max(required_water, 0)
@@ -627,26 +630,28 @@ def create_cane_to_combined_1_and_2g_fermentation(
                     y1 = f(x1)
                 EvX.V = flx.IQ_interpolation(f, x0, x1, y0, y1, x=V_last, ytol=1e-5, xtol=1e-6)
             cofermentation.tau = target_titer / cofermentation.productivity 
-        
+    
+    syrup_sink = EvX.outs[0].sink
+    syrup_sink.sucrose_hydrolysis_reaction = tmo.Reaction(
+        'Sucrose + Water -> 2Glucose', 'Sucrose', 1.00
+    )
+    
+    @syrup_sink.add_specification(run=True)
+    def hydrolysis():
+        syrup, = syrup_sink.ins
+        syrup_sink.sucrose_hydrolysis_reaction.force_reaction(syrup)
+        if syrup.imol['Water'] < 0: syrup.imol['Water'] = 0.
+    
     MX = bst.Mixer(400, [PX-0, 'dilution_water'])
     if fed_batch: MX.ins.append(SX0-0)
     HX = bst.HXutility(400, MX-0, T=305.15)
-    HX-0-sink
-    PX.sucrose_hydrolysis_reaction = tmo.Reaction(
-        'Sucrose + Water -> 2Glucose', 'Sucrose', 1.00
-    )
-
-    @PX.add_specification(run=True)
-    def hydrolysis():
-        feed = PX.ins[0]
-        PX.sucrose_hydrolysis_reaction.force_reaction(feed)
-        if feed.imol['Water'] < 0: feed.imol['Water'] = 0.
+    HX-0-hydrolysate_sink
     
     def get_titer():
         beer = cofermentation.outs[1]
         ignored = beer.ivol[ignored_volume] if ignored_volume in cofermentation.chemicals else 0.
         ignored_product = PX.outs[0].imass[product_group]
-        return (beer.imass[product_group] - ignored_product) / (beer.F_vol - ignored)
+        return (beer.imass[product_group] - ignored_product) / (beer.ivol['Water', product_group].sum() - ignored)
     cofermentation.get_titer = get_titer
     cofermentation.titer = titer
     cofermentation.productivity = productivity
@@ -1024,7 +1029,59 @@ def create_oilcane_to_biodiesel_combined_1_and_2g_post_fermentation_oil_separati
         SeedTrain=units.SeedTrain,
         include_scrubber=False,
         fed_batch=fed_batch,
+        mockup=True
     )
+    cofermentation = f(units.CoFermentation)
+    seedtrain = f(units.SeedTrain)
+    
+    urea = bst.Stream('urea', price=90/907.185) # https://www.alibaba.com/product-detail/High-Quality-UREA-Fertilizer-Factory-price_1600464698965.html?spm=a2700.galleryofferlist.topad_classic.d_title.a69046eeVn83ML
+    MgSO4 = bst.Stream('MgSO4', price=110/907.185) # https://www.alibaba.com/product-detail/Magnesium-Sulfate-Sulphate-Sulphate-Magnesium-Sulfate_1600305131579.html?spm=a2700.galleryofferlist.topad_creative.d_image.ad602e15oP8kqh
+    urea_1 = bst.Stream(
+        'urea_1',
+        Urea=26,
+        units='kg/hr'
+    )
+    urea_2 = bst.Stream(
+        'urea_2',
+        Urea=116,
+        units='kg/hr',
+    )
+    MgSO4_1 = bst.Stream(
+        'MgSO4_1',
+         MgSO4=211,
+         units='kg/hr',
+    )
+    MgSO4_2 = bst.Stream(
+        'MgSO4_2',
+        MgSO4=948,
+        units='kg/hr',
+    )
+    Urea_storage = bst.StorageTank('Urea_storage', urea)
+    S301 = bst.MockSplitter('S301', Urea_storage-0, outs=(urea_1, urea_2))
+    MgSO4_storage = bst.StorageTank('MgSO4_storage', MgSO4)
+    S302 = bst.MockSplitter('S302', MgSO4_storage-0, outs=(MgSO4_1, MgSO4_2))
+    nutrients_1 = (urea_1, MgSO4_1)
+    nutrients_2 = (urea_2, MgSO4_2)
+    seedtrain.ins.extend(nutrients_1)
+    cofermentation.ins.extend(nutrients_2)
+    @seedtrain.add_specification(run=True)
+    def adjust_nutrients_to_seed_train():
+        *feeds, urea, MgSO4 = seedtrain.ins
+        F_mass = sum([i.F_mass - i.imass['Lipid'] for i in feeds])
+        urea.imass['Urea'] = 0.0050 * F_mass
+        MgSO4.imass['MgSO4'] = 0.0004 * F_mass
+        
+    @cofermentation.add_specification(run=True)
+    def adjust_CSL_and_DAP_feed_to_fermentation():
+        feed, seed, *others, CSL2, DAP2, = cofermentation.ins
+        F_mass = sum([i.F_mass - i.imass['Lipid'] for i in others], feed.F_mass - feed.imass['Lipid'])
+        urea.imass['Urea'] = 0.0050 * F_mass
+        MgSO4.imass['MgSO4'] = 0.0004 * F_mass
+        S301.ins[0].mix_from(S301.outs)
+        S302.ins[0].mix_from(S302.outs)
+        Urea_storage.ins[0].copy_like(Urea_storage.outs[0])
+        MgSO4_storage.ins[0].copy_like(MgSO4_storage.outs[0])  
+    
     beer, lignin, condensate, pretreatment_wastewater, fiber_fines = oilcane_to_fermentation_sys.outs
     post_fermentation_oil_separation_sys, pfls_dct = create_post_fermentation_oil_separation_system(
         ins=beer,
