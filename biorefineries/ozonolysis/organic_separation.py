@@ -134,10 +134,7 @@ def Organic_phase_separation(ins,outs,T_in):
                                   P=10132.5,
                                   partial_condenser=False                                  
                                   )
-#Connect the distillate with solvent stream and recycle stream
-    recycle_loop_sys = f.create_system('recycle_loop_sys')
-    recycle_loop_sys.print()
-    recycle_loop_sys.prioritize_unit(D201)
+    
    
 ob2 = Organic_phase_separation(ins = ob1.outs[0],
                                T_in = 273.15 + 70)
