@@ -24,6 +24,7 @@ Methyl_oct_4 = tmo.Chemical('Methyl_oct_4', search_ID = '4-Methyloctane')
 Dimethyl_heptane_3_3 = tmo.Chemical('Dimethyl_heptane_3_3', search_ID ='3,3-Dimethylheptane')
 Ethylheptane_3 = tmo.Chemical('Ethylheptane_3',search_ID ='3-Ethylheptane')
 Ethylheptane_4 = tmo.Chemical('Ethylheptane_4', search_ID ='4-Ethylheptane') 
+bicyclo_octane = tmo.Chemical('bicyclo_octane',search_ID = '6221-55-2')
 
 ozo_chemicals = tmo.Chemicals(
     ['Water','Hydrogen_peroxide','Oleic_acid',
@@ -43,6 +44,8 @@ ozo_chemicals = tmo.Chemicals(
      'Cyclohexane',
      'Cycloheptane',
      'Benzene',
+     'toluene',
+      bicyclo_octane,
       Methyl_oct_3,
       Methyl_oct_4,
       Dimethyl_heptane_3_3,
@@ -75,11 +78,13 @@ Catalyst = create_new_chemical(
 Oxononanoic_acid = create_new_chemical(
    'Oxononanoic_acid',
     phase='l',
+    Tb = 304.8 + 25.0 + 273.15,
     Hf=-579480,
     formula = 'C9H16O3',
     MW = 172.22,
     CAS = '2553-17-5'
 )
+
 
 for chemical in ozo_chemicals: chemical.default()
 

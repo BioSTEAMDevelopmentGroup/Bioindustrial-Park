@@ -4,6 +4,8 @@ Created on Thu Jun 23 15:56:37 2022
 
 @author: LavanyaKudli
 """
+import os
+os.environ["NUMBA_DISABLE_JIT"] = "1"
 from biorefineries.ozonolysis import units
 from biorefineries.ozonolysis.chemicals_info import ozo_chemicals
 import biosteam as bst
@@ -57,8 +59,8 @@ def Primary_separation(ins,outs,Tin):
                                         LHK = ('Nonanoic_acid',
                                                'Azelaic_acid'),
                                         k=2,
-                                        Lr=0.9,
-                                        Hr=0.9,
+                                        Lr=0.995,
+                                        Hr=0.995,
                                         P = 3333
                                         )
 
@@ -80,13 +82,13 @@ def Primary_separation(ins,outs,Tin):
                                     k=2,
                                     Lr=0.999, 
                                     Hr=0.999,
-                                    P = 466.6,
+                                    P = 800,
                                     partial_condenser=False,
                                     )
 #[2.04  0.856 0.005 0.005 0.018]
 
  
-ob3 = Primary_separation(ins= ob2.outs[2],Tin = 230+273.15)
+ob3 = Primary_separation(ins= ob2.outs[2],Tin = 240+273.15)
 ob3.simulate()
 ob3.show()
 

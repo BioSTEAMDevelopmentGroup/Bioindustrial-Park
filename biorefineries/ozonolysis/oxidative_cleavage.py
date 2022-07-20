@@ -3,7 +3,8 @@
 Created on Fri Oct 29 08:18:19 2021
 @author: yrc2
 """
-
+import os
+os.environ["NUMBA_DISABLE_JIT"] = "1"
 from biorefineries.ozonolysis import units
 from biorefineries.ozonolysis.chemicals_info import ozo_chemicals
 import biosteam as bst
@@ -27,7 +28,7 @@ Total_feed = 1000
 @SystemFactory(
     ID = 'conversion_oxidative_clevage',
     ins = [dict(ID='fresh_OA',
-                Oleic_acid = 1000,
+                Oleic_acid = 10000,
                 units = 'kg/hr',
                 price = 7),
           dict(ID='fresh_HP',
@@ -141,8 +142,8 @@ def conversion_oxidative_cleavage(ins,outs,T_in):
 
 ob1 = conversion_oxidative_cleavage(T_in = 70 + 273.15)
 ob1.simulate()
-ob1.show()
-ob1.diagram()
+# ob1.show()
+# ob1.diagram()
 
 # ozonolysis_sys = bst.main_flowsheet.create_system('ozonolysis_sys')
 # ozonolysis_sys.diagram(number=True)
