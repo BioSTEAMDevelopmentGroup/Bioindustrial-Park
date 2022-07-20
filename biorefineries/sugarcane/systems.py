@@ -726,6 +726,7 @@ def create_sucrose_fermentation_system(ins, outs,
                                            P=(101325, 69682, 47057, 30953, 19781),
                                            V_definition='First-effect',
                                            thermo=dilution_water.thermo.ideal(),
+                                           flash=False,
                                            V=0.3) # fraction evaporated
         F301.brix = 95
         def get_brix():
@@ -790,6 +791,7 @@ def create_sucrose_fermentation_system(ins, outs,
                                            outs=('', evaporator_condensate),
                                            V_definition='First-effect',
                                            thermo=dilution_water.thermo.ideal(),
+                                           flash=False,
                                            V=0.3) # fraction evaporated
         P306 = units.Pump('P306', F301-0)
         # Note: value of steam ~ 6.86 for the following 
@@ -812,25 +814,28 @@ def create_sucrose_fermentation_system(ins, outs,
             dilution_water = get_dilution_water()
             F301.P = F301.P_original
             F301._reload_components = True
+            f = titer_at_fraction_evaporated_objective
             if dilution_water < 0.:
                 x0 = 0.
-                y0 = titer_at_fraction_evaporated_objective(x0, path)
-                x1 = 0.95
-                y1 = titer_at_fraction_evaporated_objective(x1, path)
+                y0 = f(x0, path)
+                x1 = 0.5
+                y1 = f(x1, path)
                 if y1 > 0.: raise RuntimeError('cannot evaporate to target sugar concentration')
                 if y0 < 0.:
-                    x0 = 0.
-                    x1 = 0.1
                     F301.P = list(F301.P_original)
                     for i in range(F301._N_evap-1):
                         if f(1e-6) < 0.:
                             F301.P.pop()
                             F301._reload_components = True
                         else:
-                            break  
+                            break
+                x1 = 0.05
+                y1 = f(x1, path)
+                while y1 > 0:
+                    x1 += 0.05
+                    y1 = f(x1, path)
                 F301.V = flx.IQ_interpolation(
-                    titer_at_fraction_evaporated_objective,
-                    x0, x1, y0, y1, x=V_guess, ytol=1e-5,
+                    f, x0, x1, y0, y1, x=V_guess, ytol=1e-2, xtol=1e-6, maxiter=500,
                     args=(path,),
                 )
             else:

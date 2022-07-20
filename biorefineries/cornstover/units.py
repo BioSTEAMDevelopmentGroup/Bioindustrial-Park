@@ -29,10 +29,6 @@ _hp2kW = 0.7457
 _Gcal2kJ = 4184e3
 
 # %% Pretreatment
-        
-@cost('Flow rate', 'Pump', units='kg/hr',
-      S=402194, CE=522, cost=22500, n=0.8, kW=74.57, BM=2.3)
-class HydrolysatePump(Unit): pass
 
 @cost('Dry flow rate', 'Pretreatment reactor system', units='kg/hr',
       S=83333, CE=522, cost=19812400 * 0.993, n=0.6, kW=4578, BM=1.5)
@@ -641,6 +637,7 @@ class SimultaneousSaccharificationAndCoFermentation(Unit):
         Design['Reactor duty'] = reactor_duty = self.Hnet
         hu_fermentation(reactor_duty, effluent.T)
 
+
 # %% Pretreatment separations 
 
 # Membrane separation processes. Perry's Chemical Engineer's Handbook 7th Edition. 
@@ -737,6 +734,10 @@ class Nanofilter(bst.Unit):
 
 
 # %% Simple unit operations
+
+@cost('Flow rate', 'Pump', units='kg/hr',
+      S=402194, CE=522, cost=22500, n=0.8, kW=74.57, BM=2.3)
+class HydrolysatePump(Unit): pass
 
 @cost('Flow rate', 'Tank', S=1171, units='kg/hr',
       CE=522, cost=196000, n=0.7, BM=2)

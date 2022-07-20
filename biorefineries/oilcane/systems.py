@@ -89,6 +89,7 @@ def create_post_fermentation_oil_separation_system(ins, outs, wastewater_concent
         P=(101325, 69682, 47057, 30953),
         V=0.90, V_definition='First-effect',
         thermo=oil.thermo.ideal(),
+        flash=False,
     )
     Ev607.target_oil_content = target_oil_content # kg / kg
     Ev607.pop_last_evaporator = pop_last_evaporator
@@ -520,6 +521,7 @@ def create_cane_to_combined_1_and_2g_fermentation(
                                         P=(101325, 69682, 47057, 30953, 19781),
                                         V_definition='First-effect',
                                         thermo=hydrolysate.thermo.ideal(),
+                                        flash=False,
                                         V=0.05)
         EvX.brix = 95
         def get_brix():
@@ -578,10 +580,7 @@ def create_cane_to_combined_1_and_2g_fermentation(
                         for i in long_path: i.run()
                         y1 = f(x1)
                         if y1 < 0.: break
-                try:
-                    SX1.split[:] = flx.IQ_interpolation(f, x0, x1, y0, y1, x=SX1.split[0], ytol=1e-5, xtol=1e-6)
-                except:
-                    breakpoint()
+                SX1.split[:] = flx.IQ_interpolation(f, x0, x1, y0, y1, x=SX1.split[0], ytol=1e-5, xtol=1e-6)
             cofermentation.tau = target_titer / cofermentation.productivity 
             SX0.split[:] = 0.2 # Restart
     else:
@@ -589,6 +588,7 @@ def create_cane_to_combined_1_and_2g_fermentation(
                                         P=(101325, 69682, 47057, 30953, 19781),
                                         V_definition='First-effect',
                                         thermo=hydrolysate.thermo.ideal(),
+                                        flash=False,
                                         V=0.05) # fraction evaporated
         PX = bst.Pump(400, ins=EvX-0, P=101325.)
         P_original = tuple(EvX.P)
@@ -1096,7 +1096,7 @@ def create_oilcane_to_biodiesel_combined_1_and_2g_post_fermentation_oil_separati
         MgSO4.imass['MgSO4'] = 1 * F_vol
         
     @cofermentation.add_specification(run=True)
-    def adjust_CSL_and_DAP_feed_to_fermentation():
+    def adjust_urea_and_MgSO4_feed_to_fermentation():
         feed, seed, *others, urea, MgSO4, = cofermentation.ins
         F_vol = sum([i.F_vol - i.ivol['Lipid'] for i in others], feed.F_vol - feed.ivol['Lipid'])
         urea.imass['Urea'] = 0.5 * F_vol
