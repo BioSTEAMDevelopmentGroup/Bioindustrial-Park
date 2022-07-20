@@ -27,7 +27,7 @@ from biosteam import SystemFactory
 
 def nonanoic_acid_production_system(ins,outs):
     nonanoic_acid_crude_stream, = ins
-    azelaic_acid_for_recycle,crude_nonanal,nonanoic_acid_product, = outs
+    azelaic_acid_for_recycle, crude_nonanal, nonanoic_acid_product, = outs
 
     
     Heating_crude_stream = bst.HXutility(ins = nonanoic_acid_crude_stream,

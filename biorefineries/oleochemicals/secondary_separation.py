@@ -54,15 +54,23 @@ from biosteam import SystemFactory
               )
 def secondary_separation_system(ins,outs,Tin):
     AA_to_be_recovered,Water_for_extraction,Solvent_for_extraction, = ins
-    extract,Recovered_solvent,AA_high_purity_product, = outs
+    extract,Recovered_solvent, AA_high_purity_product, = outs
     # Recovered_solvent,
     # 
    
    #Hot_water_and_crude_azelaic_mixture
     M301 = bst.units.Mixer('M301',
-                           ins = (AA_to_be_recovered,Water_for_extraction ),
+                           ins = (AA_to_be_recovered, Water_for_extraction ),
                            outs = ('Hot_water_mixture'))
-       
+     
+    M301.target_concentation = 0.18
+    @M301.add_specification(run=True)
+    def AA_composition():
+        feed, water = M301.ins
+        feed_AA = feed.imass['Azelaic_acid']
+        current_concentation = feed_AA / feed.F_mass
+        water.imass['Water'] = (1 / M301.target_concentation - 1 / current_concentation) * feed_AA
+    
    #Solvent_extraction
     Solvent_for_extraction.F_mass = 4 * Water_for_extraction.F_mass
     L301 = bst.units.MultiStageMixerSettlers('L301',

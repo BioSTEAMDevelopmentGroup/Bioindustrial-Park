@@ -27,14 +27,17 @@ def azelaic_acid_system(ins, outs):
     primary_separation_sys = primary_separation_system(
         ins=organic_phase_sys-1, Tin = 240+273.15
     )
+    Nonanoic_acid_crude_product, AA_crude_product, Epoxy_stearic_acid_bottoms = primary_separation_sys.outs
     secondary_separation_sys = secondary_separation_system(
-        ins=primary_separation_sys-1,Tin = 273.15 + 200
+        ins=AA_crude_product, Tin = 273.15 + 200
     )
+    extract, Recovered_solvent, AA_high_purity_product, = secondary_separation_sys.outs
     nonanoic_acid_production_sys = nonanoic_acid_production_system(
-        ins = secondary_separation_sys-0
+        ins = Nonanoic_acid_crude_product,
     )
+    azelaic_acid_for_recycle, crude_nonanal, nonanoic_acid_product, = nonanoic_acid_production_system.outs
     solvent_recovery_sys = solvent_recovery_system(
-        ins=nonanoic_acid_production_sys-0, T_out = 150 + 273.15,
+        ins=extract, T_out = 150 + 273.15,
     )
     
     

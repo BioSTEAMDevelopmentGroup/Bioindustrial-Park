@@ -36,7 +36,7 @@ from biosteam import SystemFactory
 def primary_separation_system(ins,outs,Tin):
     organic_phase_for_separation, = ins
     #Water_for_AA_extraction,
-    Nonanoic_acid_crude_product,AA_crude_product,Epoxy_stearic_acid_bottoms = outs
+    Nonanoic_acid_crude_product, AA_crude_product, Epoxy_stearic_acid_bottoms = outs
 #
 # MCA removal, should be around 40% acc to literature
     Water = tmo.Chemical('Water')    
