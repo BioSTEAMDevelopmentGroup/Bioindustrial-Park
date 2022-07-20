@@ -4,8 +4,6 @@ Created on Wed Jul 20 13:01:51 2022
 
 @author: yrc2
 """
-import os
-os.environ["NUMBA_DISABLE_JIT"] = "1"
 import biosteam as bst
 from .chemicals_info import create_chemicals
 from .systems import (

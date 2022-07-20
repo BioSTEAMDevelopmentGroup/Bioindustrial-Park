@@ -34,7 +34,7 @@ def azelaic_acid_system(ins, outs):
         ins = secondary_separation_sys-0
     )
     solvent_recovery_sys = solvent_recovery_system(
-        ins=secondary_separation_sys-0, T_out = 150 + 273.15,
+        ins=nonanoic_acid_production_sys-0, T_out = 150 + 273.15,
     )
     
     
