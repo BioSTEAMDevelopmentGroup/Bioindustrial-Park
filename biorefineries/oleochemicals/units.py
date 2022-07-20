@@ -6,7 +6,7 @@ import biosteam as bst
 import thermosteam as tmo
 from thermosteam import Rxn, RxnSys, PRxn, SRxn, settings, Chemical, Stream
 
-class OzonolysisReactor(bst.BatchBioreactor):
+class OxidativeCleavageReactor(bst.BatchBioreactor):
     _N_ins = 1
     _N_outs = 1
     

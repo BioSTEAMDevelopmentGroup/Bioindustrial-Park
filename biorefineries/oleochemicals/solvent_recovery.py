@@ -4,20 +4,13 @@ Created on Tue Jul 19 18:52:22 2022
 
 @author: LENOVO
 """
-import os
-os.environ["NUMBA_DISABLE_JIT"] = "1"
-
-from biorefineries.ozonolysis import units
-from biorefineries.ozonolysis.chemicals_info import *
+from biorefineries.oleochemicals import units
 import biosteam as bst
 import thermosteam as tmo
 import flexsolve as flx
 import numpy as np
-from biorefineries.make_a_biorefinery.analyses.solvents_barrage import run_solvents_barrage
-from biorefineries.ozonolysis.streams_storage_specs import * 
-#from biorefineries.ozonolysis.Batch_conversion import *
+#from biorefineries.oleochemicals.Batch_conversion import *
 from biosteam import SystemFactory
-from biorefineries.ozonolysis.secondary_separation import ob4
 
 @SystemFactory(
     ID = 'solvent_recovery',
@@ -31,7 +24,7 @@ from biorefineries.ozonolysis.secondary_separation import ob4
     fixed_outs_size = False,     
               )
 
-def solvent_recovery(ins,outs,T_out):
+def solvent_recovery_system(ins,outs,T_out):
     solvent_extract_mixture, = ins
     solvent_for_recycle,add_recycle_back,crude_nonoanoic_acid, = outs
     
@@ -60,7 +53,3 @@ def solvent_recovery(ins,outs,T_out):
                                 Lr = 0.999,
                                 Hr = 0.999
                               )
-                                
-ob6 = solvent_recovery(ins = ob4.outs[0],T_out = 150 + 273.15)
-ob6.simulate()
-ob6.show()

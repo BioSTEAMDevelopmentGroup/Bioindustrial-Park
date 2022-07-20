@@ -4,20 +4,14 @@ Created on Mon Jul 18 12:41:04 2022
 
 @author: LENOVO
 """
-
-import os
-os.environ["NUMBA_DISABLE_JIT"] = "1"
-from biorefineries.ozonolysis import units
-from biorefineries.ozonolysis.chemicals_info import ozo_chemicals
+from biorefineries.oleochemicals import units
 import biosteam as bst
 import thermosteam as tmo
 import flexsolve as flx
 import numpy as np
-from biorefineries.make_a_biorefinery.analyses.solvents_barrage import run_solvents_barrage
-# from biorefineries.ozonolysis.streams_storage_specs import * 
-#from biorefineries.ozonolysis.Batch_conversion import *
+# from biorefineries.oleochemicals.streams_storage_specs import * 
+#from biorefineries.oleochemicals.Batch_conversion import *
 from biosteam import SystemFactory
-from primary_separation import ob3
 
 @SystemFactory(
     ID = 'nonanoic_acid_production',
@@ -31,7 +25,7 @@ from primary_separation import ob3
     fixed_outs_size = False,     
               )
 
-def nonanoic_acid_production(ins,outs):
+def nonanoic_acid_production_system(ins,outs):
     nonanoic_acid_crude_stream, = ins
     azelaic_acid_for_recycle,crude_nonanal,nonanoic_acid_product, = outs
 
@@ -60,7 +54,3 @@ def nonanoic_acid_production(ins,outs):
                                                        Hr = 0.999,
                                                        k = 2
                                                        )
-
-ob5 = nonanoic_acid_production(ins = ob3.outs[0])
-ob5.simulate()
-ob5.show()

@@ -6,18 +6,11 @@ Created on Fri May 27 11:02:07 2022
 """
 import biosteam as bst
 import thermosteam as tmo
-from biorefineries.ozonolysis import units
-from biorefineries.ozonolysis.chemicals_info import ozo_chemicals
+from biorefineries.oleochemicals import units
 import biosteam as bst
 import thermosteam as tmo
 import flexsolve as flx
 import numpy as np
-
-bst.settings.set_thermo(ozo_chemicals)
-bst.Stream.display_units.flow = 'kg/hr'
-bst.Stream.display_units.composition = True
-bst.Stream.display_units.N = 100
-Total_feed = 1000
 
 ###################################SPECS FUNCS##################################################3
 
@@ -38,8 +31,8 @@ def adjust_octane_for_extraction():
 def adjust_reactor_feed_flow():
       fresh_OA.F_mass = Total_feed        
     
-s = bst.Stream(Azelaic_acid=22, Water=1000 - 22, units='kg/hr')
 def solve_K_correction_factor():
+    s = bst.Stream(Azelaic_acid=22, Water=1000 - 22, units='kg/hr')
     s.lle(T=273.15 + 65)
     IDs = ('Azelaic_acid', 'Water')
     Ks = tmo.separations.partition_coefficients(IDs, s['L'], s['l'])

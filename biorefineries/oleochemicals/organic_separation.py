@@ -4,20 +4,15 @@ Created on Thu Jun 23 15:24:11 2022
 
 @author: LavanyaKudli
 """
-import os
-os.environ["NUMBA_DISABLE_JIT"] = "1"
-from biorefineries.ozonolysis.chemicals_info import ozo_chemicals
 from biosteam import main_flowsheet as f
 import biosteam as bst
 import thermosteam as tmo
-from biorefineries.ozonolysis import units
+from biorefineries.oleochemicals import units
 import flexsolve as flx
 import numpy as np
-from biorefineries.make_a_biorefinery.analyses.solvents_barrage import run_solvents_barrage
-# from biorefineries.ozonolysis.streams_storage_specs import * 
-#from biorefineries.ozonolysis.Batch_conversion import *
+# from biorefineries.oleochemicals.streams_storage_specs import * 
+#from biorefineries.oleochemicals.Batch_conversion import *
 from biosteam import SystemFactory
-from biorefineries.ozonolysis.oxidative_cleavage import ob1
 
 #TWO ISSUES IN THIS: TEMPERATURE OF THE SOLVENT ETHYL ACETATE COMING OUT FROM DISTILLATION COLUMN
 #SHOULD BE AROUND BOILING POIINT OF ETHYL ACETATE
@@ -43,7 +38,7 @@ from biorefineries.ozonolysis.oxidative_cleavage import ob1
     fixed_outs_size = False,     
               )
 
-def Organic_phase_separation(ins,outs,T_in):
+def organic_separation_system(ins,outs,T_in):
     mixed_products_for_separation,fresh_EA, = ins
     # EA_recycle,
     aqueous_raffinate_with_catalyst, organic_phase_for_PS, = outs
@@ -135,11 +130,7 @@ def Organic_phase_separation(ins,outs,T_in):
                                   partial_condenser=False                                  
                                   )
     
-   
-ob2 = Organic_phase_separation(ins = ob1.outs[0],
-                               T_in = 273.15 + 70)
-ob2.simulate()
-ob2.show()          
+      
                
 
  

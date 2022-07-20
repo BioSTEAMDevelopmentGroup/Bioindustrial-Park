@@ -6,8 +6,8 @@ Created on Mon Dec 20 09:02:42 2021
 """
 from chaospy import distributions as shape
 import biosteam as bst
-from biorefineries.ozonolysis.copy_of_code_that_runs import ozonolysis_sys,S301,R101
-model = bst.Model(ozonolysis_sys)
+from biorefineries.oleochemicals.copy_of_code_that_runs import oleochemicals_sys,S301,R101
+model = bst.Model(oleochemicals_sys)
 import matplotlib.pyplot as plt
 
 @model.metric(name = 'Preliminary maximum feedstock price [$.Kg-1]')

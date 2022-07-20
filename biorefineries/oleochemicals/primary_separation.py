@@ -4,19 +4,14 @@ Created on Thu Jun 23 15:56:37 2022
 
 @author: LavanyaKudli
 """
-import os
-os.environ["NUMBA_DISABLE_JIT"] = "1"
-from biorefineries.ozonolysis import units
-from biorefineries.ozonolysis.chemicals_info import ozo_chemicals
+from biorefineries.oleochemicals import units
 import biosteam as bst
 import thermosteam as tmo
 import flexsolve as flx
 import numpy as np
-from biorefineries.make_a_biorefinery.analyses.solvents_barrage import run_solvents_barrage
-# from biorefineries.ozonolysis.streams_storage_specs import * 
-#from biorefineries.ozonolysis.Batch_conversion import *
+# from biorefineries.oleochemicals.streams_storage_specs import * 
+#from biorefineries.oleochemicals.Batch_conversion import *
 from biosteam import SystemFactory
-from biorefineries.ozonolysis.organic_separation import ob2
 #This section now does not have a water extraction column
 #A mixture of AA crude and Water will be added in the Secondary separation
 
@@ -38,7 +33,7 @@ from biorefineries.ozonolysis.organic_separation import ob2
     fixed_outs_size = True,     
               )
 
-def Primary_separation(ins,outs,Tin):
+def primary_separation_system(ins,outs,Tin):
     organic_phase_for_separation, = ins
     #Water_for_AA_extraction,
     Nonanoic_acid_crude_product,AA_crude_product,Epoxy_stearic_acid_bottoms = outs
@@ -87,10 +82,6 @@ def Primary_separation(ins,outs,Tin):
                                     )
 #[2.04  0.856 0.005 0.005 0.018]
 
- 
-ob3 = Primary_separation(ins= ob2.outs[2],Tin = 240+273.15)
-ob3.simulate()
-ob3.show()
 
 # #Hot water extraction
 #     L202_cooling_water = bst.HeatUtility.get_cooling_agent('chilled_brine')

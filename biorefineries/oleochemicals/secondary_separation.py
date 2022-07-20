@@ -1,21 +1,16 @@
  # -*- coding: utf-8 -*-
 """
 Created on Thu Jun 23 15:58:17 2022
-@author: LavanyaKudli"""
+@author: LavanyaKudli
+"""
 
-import os
-os.environ["NUMBA_DISABLE_JIT"] = "1"
-from biorefineries.ozonolysis import units
-from biorefineries.ozonolysis.chemicals_info import *
+from biorefineries.oleochemicals import units
 import biosteam as bst
 import thermosteam as tmo
 import flexsolve as flx
 import numpy as np
-from biorefineries.make_a_biorefinery.analyses.solvents_barrage import run_solvents_barrage
-from biorefineries.ozonolysis.streams_storage_specs import * 
-#from biorefineries.ozonolysis.Batch_conversion import *
+#from biorefineries.oleochemicals.Batch_conversion import *
 from biosteam import SystemFactory
-from biorefineries.ozonolysis.primary_separation import ob3
 #PARTITION COEFF FOR SOLVENT EXTRACTION NOT IN YET
 #ASSUSSIMG THE SOLVENT HAS PROPERTIES OF OCTANE
 #NEEDS TO BE ADJUSTED ACCORDING TO THE NAPHTHOL MINERAL SPIRITS PATENT 
@@ -57,7 +52,7 @@ from biorefineries.ozonolysis.primary_separation import ob3
     fixed_ins_size = True,
     fixed_outs_size = True,     
               )
-def Secondary_separation(ins,outs,Tin):
+def secondary_separation_system(ins,outs,Tin):
     AA_to_be_recovered,Water_for_extraction,Solvent_for_extraction, = ins
     extract,Recovered_solvent,AA_high_purity_product, = outs
     # Recovered_solvent,
@@ -192,10 +187,6 @@ def Secondary_separation(ins,outs,Tin):
 #                                     P =  3333
 #                                     )   
 # #we effectively go from 474 to 423
-ob4 = Secondary_separation(ins= ob3.outs[1],Tin = 273.15 + 200)
-ob4.simulate()
-
-ob4.show()
 
 # #Final drying to obtain crystals                            
                                  

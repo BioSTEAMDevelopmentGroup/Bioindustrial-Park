@@ -3,30 +3,18 @@
 Created on Fri Oct 29 08:18:19 2021
 @author: yrc2
 """
-import os
-os.environ["NUMBA_DISABLE_JIT"] = "1"
-from biorefineries.ozonolysis import units
-from biorefineries.ozonolysis.chemicals_info import ozo_chemicals
+from biorefineries.oleochemicals import units
 import biosteam as bst
 import thermosteam as tmo
 import flexsolve as flx
 import numpy as np
-from biorefineries.make_a_biorefinery.analyses.solvents_barrage import run_solvents_barrage
-# from biorefineries.ozonolysis.streams_storage_specs import * 
-#from biorefineries.ozonolysis.Batch_conversion import *
+# from biorefineries.oleochemicals.streams_storage_specs import * 
+#from biorefineries.oleochemicals.Batch_conversion import *
 from biosteam import SystemFactory
-
-#############################################################
-bst.settings.set_thermo(ozo_chemicals)
-bst.Stream.display_units.flow = 'kg/hr'
-bst.Stream.display_units.composition = True
-bst.Stream.display_units.N = 100
-Total_feed = 1000
-
 
 ######################## Units ########################
 @SystemFactory(
-    ID = 'conversion_oxidative_clevage',
+    ID = 'oxidative_clevage',
     ins = [dict(ID='fresh_OA',
                 Oleic_acid = 10000,
                 units = 'kg/hr',
@@ -48,10 +36,8 @@ Total_feed = 1000
       outs = [dict(ID = 'mixed_oxidation_products')],
       fixed_outs_size = False,     
               )
-
-      
-def conversion_oxidative_cleavage(ins,outs,T_in):
-    fresh_OA,fresh_HP,fresh_Water_1,fresh_Cat = ins
+def oxidative_cleavage_system(ins,outs,T_in):
+    fresh_OA, fresh_HP, fresh_Water_1, fresh_Cat = ins
     mixed_oxidation_products, = outs
     
 #Feedtanks and pumps
@@ -126,28 +112,25 @@ def conversion_oxidative_cleavage(ins,outs,T_in):
     
 
                 
-#Batch Ozonolysis process
+#Batch oleochemicals process
     R101_H = bst.units.HXutility('R101_H',
                              ins = M102-0,
-                             outs = 'feed_to_ozonolysis_reactor',
+                             outs = 'feed_to_oleochemicals_reactor',
                              T = T_in
                              )
 
-    R101 = units.OzonolysisReactor('R101',
+    R101 = units.OxidativeCleavageReactor('R101',
                                 ins = R101_H-0, 
                                 outs = mixed_oxidation_products,
                                 V=3785 + 1.213553930851268e-06
                                 # in m3 (equivalent to 1 MMGal), this is including catalyst volume
                                                               )
-
-ob1 = conversion_oxidative_cleavage(T_in = 70 + 273.15)
-ob1.simulate()
 # ob1.show()
 # ob1.diagram()
 
-# ozonolysis_sys = bst.main_flowsheet.create_system('ozonolysis_sys')
-# ozonolysis_sys.diagram(number=True)
-# ozonolysis_sys.simulate()  
+# oleochemicals_sys = bst.main_flowsheet.create_system('oleochemicals_sys')
+# oleochemicals_sys.diagram(number=True)
+# oleochemicals_sys.simulate()  
 
 # # TODO.xxx add ethyl acetate recycle
 # # using D204.outs[0] as one stream and D201.outs[0] as another
