@@ -199,7 +199,7 @@ def create_lipid_pretreatment_system(ins, outs):
     # Vacume out water
     F3 = units.SplitFlash('F3', T=357.15, P=10000.,
                           ins=crude_vegetable_oil,
-                          split=dict(Lipid=0.0001,
+                          split=dict(Lipid=0.00001,
                                      Water=1.0),)
     P10 = units.Pump('P10', F3-1, P=101325)
     H5 = units.HXutility('H5', ins=F3-0, T=320, V=0)

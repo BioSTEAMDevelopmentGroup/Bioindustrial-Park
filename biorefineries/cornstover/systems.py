@@ -930,16 +930,22 @@ def create_facilities(
         process_water_streams
     )
     CIP = Stream('CIP', Water=126, units='kg/hr')
-    bst.facilities.CIPpackage(area or 'CIP_package', CIP)
+    CIP_package = bst.facilities.CIPpackage(area or 'CIP_package', CIP)
+    CIP_package.CIP_over_feedstock = 0.00121
+    @CIP_package.add_specification(run=True)
+    def adjust_CIP(): CIP.imass['Water'] = feedstock.F_mass * CIP_package.CIP_over_feedstock
+    
     plant_air = Stream('plant_air', N2=83333, units='kg/hr')
-    def adjust_plant_air():
-        plant_air.imass['N2'] = 0.8 * feedstock.F_mass
-        ADP._run()
-        
     ADP = bst.facilities.AirDistributionPackage(area or 'ADP', plant_air)
-    ADP.specification = adjust_plant_air
+    ADP.plant_air_over_feedstock = 0.8
+    @ADP.add_specification(run=True)
+    def adjust_plant_air(): plant_air.imass['N2'] = feedstock.F_mass * ADP.plant_air_over_feedstock
+        
     fire_water = Stream('fire_water', Water=8343, units='kg/hr')
-    units.FireWaterStorageTank(area or 'FT', fire_water)
+    FT = bst.FireWaterTank(area or 'FT', fire_water)
+    FT.fire_water_over_feedstock = 0.08
+    @FT.add_specification(run=True)
+    def adjust_fire_water(): fire_water.imass['Water'] = feedstock.F_mass * FT.fire_water_over_feedstock
     
     ### Complete system
     if blowdown_to_wastewater:

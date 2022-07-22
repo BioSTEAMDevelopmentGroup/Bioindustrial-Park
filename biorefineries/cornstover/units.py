@@ -783,12 +783,6 @@ class DAPStorageTank(Unit): pass
       CE=522, cost=13329690, n=0.6, BM=1.7, kW=783)
 class FeedStockHandling(Unit): pass
 
-@cost('Flow rate', 'Tank', S=8343, units='kg/hr',
-      CE=522, cost=803000, n=0.7, BM=1.8)
-@cost('Flow rate', 'Pump', S=8343, units='kg/hr',
-      CE=522, cost=15000, n=0.8, BM=1.7, kW=94.3375)
-class FireWaterStorageTank(Unit): pass
-
 @cost('Flow rate', 'Tank', S=252891, units='kg/hr',
       CE=522, cost=511000, n=0.7, BM=2)
 @cost('Flow rate', 'Pump', S=252891, units='kg/hr',

@@ -987,43 +987,18 @@ def create_oilcane_to_biodiesel_1g(
     ### Facilities ###
     s = f.stream
     u = f.unit
-    MX2 = bst.Mixer(700,
-        [polar_lipids, bagasse]
+    bst.create_facilities(
+        recycle_process_water_streams=(evaporator_condensate_b,),
+        HXN_kwargs=dict(
+            ID=900,
+            ignored=lambda: [u.E301, u.D601.boiler, u.D602.boiler, u.H601, u.H602, u.H603, u.H604, oil_pretreatment_dct['F3']],
+            Qmin=1e5,
+            acceptable_energy_balance_error=0.01,
+        ),
+        CHP_kwargs=dict(area=700),
+        WWT=False,
+        area=800,
     )
-    # Burn bagasse from conveyor belt
-    bst.BoilerTurbogenerator(700,
-        (MX2-0, '', 
-         'boiler_makeup_water',
-         'natural_gas',
-         'FGD_lime',
-         'boilerchems'),
-        ('emissions', 'rejected_water_and_blowdown', 'ash_disposal'),
-        boiler_efficiency=0.80,
-        turbogenerator_efficiency=0.85
-    )
-    bst.CoolingTower(800)
-    makeup_water_streams = (s.cooling_tower_makeup_water,
-                            s.boiler_makeup_water)
-    process_water_streams = (s.imbibition_water,
-                             s.biodiesel_wash_water,
-                             s.oil_wash_water,
-                             s.rvf_wash_water,
-                             *makeup_water_streams)
-    makeup_water = bst.Stream('makeup_water', price=0.000254)
-    MX = bst.Mixer(800, [evaporator_condensate_b], 'recycle_process_water')
-    bst.ChilledWaterPackage(800)
-    bst.ProcessWaterCenter(800,
-        (MX-0, makeup_water),
-        (),
-        None,
-        makeup_water_streams,
-        process_water_streams
-    )
-    HXN = bst.HeatExchangerNetwork(900, 
-        ignored=lambda: [u.E301, u.D601.boiler, u.D602.boiler, u.H601, u.H602, u.H603, u.H604, oil_pretreatment_dct['F3']],
-        Qmin=1e5,
-    )
-    HXN.acceptable_energy_balance_error = 0.01
 
 @SystemFactory(
     ID='oilcane_sys',
@@ -1116,8 +1091,6 @@ def create_oilcane_to_biodiesel_combined_1_and_2g_post_fermentation_oil_separati
     )
     backend_oil, cellmass, wastewater, evaporator_condensate = post_fermentation_oil_separation_sys.outs
     backend_oil.ID = 'backend_oil'
-    MX_process_water = bst.Mixer(900, (condensate, evaporator_condensate),
-                                 'recycle_process_water')
     oil_pretreatment_sys, oil_pretreatment_dct = create_oil_pretreatment_system(
         ins=backend_oil,
         outs=['', 'polar_lipids', ''],
@@ -1133,38 +1106,21 @@ def create_oilcane_to_biodiesel_combined_1_and_2g_post_fermentation_oil_separati
         mockup=True,
         area=800,
     )
-    wastewater_treatment_sys = bst.create_wastewater_treatment_system(
-        ins=[wastewater,
-             fiber_fines,
-             pretreatment_wastewater,
-             wastewater_small,
-             transesterification_and_biodiesel_separation_sys-2,
-             evaporator_condensate],
-        mockup=True,
-        area=500,
-    )
+    
     s = f.stream
     u = f.unit
-    M501 = bst.Mixer(700, (wastewater_treatment_sys-1, lignin, polar_lipids, cellmass, f.stream.filter_cake))
-    brf.cornstover.create_facilities(
-        solids_to_boiler=M501-0,
-        gas_to_boiler=wastewater_treatment_sys-0,
-        process_water_streams=(s.imbibition_water,
-                               s.biodiesel_wash_water,
-                               s.oil_wash_water,
-                               s.rvf_wash_water,
-                               s.caustic, 
-                               s.warm_process_water,
-                               s.pretreatment_steam,
-                               s.saccharification_water),
+    bst.create_facilities(
         feedstock=s.bagasse,
-        RO_water=wastewater_treatment_sys-2,
-        recycle_process_water=MX_process_water-0,
-        BT_area=700,
+        recycle_process_water_streams=(condensate, evaporator_condensate),
+        HXN_kwargs=dict(
+            ID=1000,
+            ignored=lambda: [u.D801.boiler, u.D802.boiler, u.H803, u.H802, u.H801, u.H804, u.H806, u.H809, oil_pretreatment_dct['F3']],
+            Qmin=1e3,
+            acceptable_energy_balance_error=0.01,
+        ),
+        CHP_kwargs=dict(area=700),
+        WWT_kwargs=dict(area=500),
         area=900,
     )
-    HXN = bst.HeatExchangerNetwork(1000,
-        ignored=lambda: [u.D801.boiler, u.D802.boiler, u.H803, u.H802, u.H801, u.H804, u.H806, u.H809, oil_pretreatment_dct['F3']],
-        Qmin=1e3,
-    )
-    HXN.acceptable_energy_balance_error = 0.01
+    
+    
