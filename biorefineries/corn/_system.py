@@ -230,7 +230,7 @@ def create_system(ID='corn_sys', flowsheet=None):
         units=lambda: [fu.Ev607.components['evaporators'][0], fu.T503_T507.condenser]
     )
     globals().update(f.unit.data)
-    return f.create_system('corn_sys', feeds=[i for i in f.stream if i.isfeed()])
+    return f.create_system('corn_sys')
     
     # System = bst.System
     
