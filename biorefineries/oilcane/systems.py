@@ -15,8 +15,6 @@ import biosteam as bst
 from biosteam import main_flowsheet as f
 from biosteam import SystemFactory
 from ..sugarcane import (
-    systems as scsys,
-    create_bagasse_pelleting_system,
     create_sucrose_fermentation_system,
     create_sucrose_to_ethanol_system,
     create_beer_distillation_system,
@@ -934,30 +932,7 @@ def create_oilcane_to_biodiesel_1g(
     fermentor.Nmin = 2
     fermentor.Nmax = 36
     product, condensate, vent = fermentation_sys.outs
-    
-    urea = bst.Stream(
-        'urea',
-        Urea=26,
-        units='kg/hr'
-    )
-    MgSO4 = bst.Stream(
-        'MgSO4',
-         MgSO4=211,
-         units='kg/hr',
-    )
-    Urea_storage = bst.StorageTank('Urea_storage', urea)
-    MgSO4_storage = bst.StorageTank('MgSO4_storage', MgSO4)
-    fermentor.ins.append(Urea_storage-0)
-    fermentor.ins.append(MgSO4_storage-0)
-    @fermentor.add_specification(run=True)
-    def adjust_nutrients_feed_to_fermentation():
-        feed, *others, urea, MgSO4, = fermentor.ins
-        F_vol = sum([i.F_vol - i.ivol['Lipid'] for i in others], feed.F_vol - feed.ivol['Lipid'])
-        urea.imass['Urea'] = 0.5 * F_vol
-        MgSO4.imass['MgSO4'] = 1 * F_vol
-        for i in Urea_storage.path_until(fermentor): i.run()
-        for i in MgSO4_storage.path_until(fermentor): i.run()
-    
+    add_urea_MgSO4_nutrients(fermentor)
     post_fermentation_oil_separation_sys = create_post_fermentation_oil_separation_system(
         ins=product,
         mockup=True,
@@ -971,7 +946,7 @@ def create_oilcane_to_biodiesel_1g(
         area=600,
         udct=True,
     )
-    MX = bst.Mixer(400, [thick_vinasse, condensate], vinasse)
+    bst.Mixer(400, [thick_vinasse, condensate], vinasse)
     oil, polar_lipids, wastewater = oil_pretreatment_sys.outs
     
     # Fresh degummed oil
@@ -982,10 +957,9 @@ def create_oilcane_to_biodiesel_1g(
         area=600,
         udct=True,
     )
-    MX = bst.Mixer(600, [transesterification_and_biodiesel_separation_sys-2, wastewater], 'wastewater')
+    bst.Mixer(600, [transesterification_and_biodiesel_separation_sys-2, wastewater], 'wastewater')
 
     ### Facilities ###
-    s = f.stream
     u = f.unit
     bst.create_facilities(
         recycle_process_water_streams=(evaporator_condensate_b,),
@@ -1040,55 +1014,7 @@ def create_oilcane_to_biodiesel_combined_1_and_2g_post_fermentation_oil_separati
     )
     cofermentation = f(units.CoFermentation)
     seedtrain = f(units.SeedTrain)
-    
-    urea = bst.Stream('urea', price=90/907.185) # https://www.alibaba.com/product-detail/High-Quality-UREA-Fertilizer-Factory-price_1600464698965.html?spm=a2700.galleryofferlist.topad_classic.d_title.a69046eeVn83ML
-    MgSO4 = bst.Stream('MgSO4', price=110/907.185) # https://www.alibaba.com/product-detail/Magnesium-Sulfate-Sulphate-Sulphate-Magnesium-Sulfate_1600305131579.html?spm=a2700.galleryofferlist.topad_creative.d_image.ad602e15oP8kqh
-    urea_1 = bst.Stream(
-        'urea_1',
-        Urea=26,
-        units='kg/hr'
-    )
-    urea_2 = bst.Stream(
-        'urea_2',
-        Urea=116,
-        units='kg/hr',
-    )
-    MgSO4_1 = bst.Stream(
-        'MgSO4_1',
-         MgSO4=211,
-         units='kg/hr',
-    )
-    MgSO4_2 = bst.Stream(
-        'MgSO4_2',
-        MgSO4=948,
-        units='kg/hr',
-    )
-    Urea_storage = bst.StorageTank('Urea_storage', urea)
-    S301 = bst.MockSplitter('S301', Urea_storage-0, outs=(urea_1, urea_2))
-    MgSO4_storage = bst.StorageTank('MgSO4_storage', MgSO4)
-    S302 = bst.MockSplitter('S302', MgSO4_storage-0, outs=(MgSO4_1, MgSO4_2))
-    nutrients_1 = (urea_1, MgSO4_1)
-    nutrients_2 = (urea_2, MgSO4_2)
-    seedtrain.ins.extend(nutrients_1)
-    cofermentation.ins.extend(nutrients_2)
-    @seedtrain.add_specification(run=True)
-    def adjust_nutrients_to_seed_train():
-        *feeds, urea, MgSO4 = seedtrain.ins
-        F_vol = sum([i.F_vol - i.ivol['Lipid'] for i in feeds])
-        urea.imass['Urea'] = 0.5 * F_vol
-        MgSO4.imass['MgSO4'] = 1 * F_vol
-        
-    @cofermentation.add_specification(run=True)
-    def adjust_urea_and_MgSO4_feed_to_fermentation():
-        feed, seed, *others, urea, MgSO4, = cofermentation.ins
-        F_vol = sum([i.F_vol - i.ivol['Lipid'] for i in others], feed.F_vol - feed.ivol['Lipid'])
-        urea.imass['Urea'] = 0.5 * F_vol
-        MgSO4.imass['MgSO4'] = 1 * F_vol
-        S301.ins[0].mix_from(S301.outs)
-        S302.ins[0].mix_from(S302.outs)
-        for i in Urea_storage.path_until(cofermentation): i.run()
-        for i in MgSO4_storage.path_until(cofermentation): i.run()
-    
+    add_urea_MgSO4_nutrients(cofermentation, seedtrain)
     beer, lignin, condensate, pretreatment_wastewater, fiber_fines = oilcane_to_fermentation_sys.outs
     post_fermentation_oil_separation_sys, pfls_dct = create_post_fermentation_oil_separation_system(
         ins=beer,
@@ -1108,7 +1034,7 @@ def create_oilcane_to_biodiesel_combined_1_and_2g_post_fermentation_oil_separati
     )
     oil, polar_lipids, wastewater_small = oil_pretreatment_sys.outs
     
-    transesterification_and_biodiesel_separation_sys = create_transesterification_and_biodiesel_separation_system(
+    create_transesterification_and_biodiesel_separation_system(
         ins=oil, 
         outs=[biodiesel, crude_glycerol, ''],
         mockup=True,
@@ -1140,4 +1066,65 @@ def create_oilcane_to_biodiesel_combined_1_and_2g_post_fermentation_oil_separati
         area=900,
     )
     
+    
+def add_urea_MgSO4_nutrients(fermentor, seedtrain=None):
+    urea = bst.Stream('urea', price=90/907.185) # https://www.alibaba.com/product-detail/High-Quality-UREA-Fertilizer-Factory-price_1600464698965.html?spm=a2700.galleryofferlist.topad_classic.d_title.a69046eeVn83ML
+    MgSO4 = bst.Stream('MgSO4', price=110/907.185) # https://www.alibaba.com/product-detail/Magnesium-Sulfate-Sulphate-Sulphate-Magnesium-Sulfate_1600305131579.html?spm=a2700.galleryofferlist.topad_creative.d_image.ad602e15oP8kqh
+    Urea_storage = bst.StorageTank('Urea_storage', urea)
+    MgSO4_storage = bst.StorageTank('MgSO4_storage', MgSO4)
+    if seedtrain:
+        urea_1 = bst.Stream(
+            'urea_1',
+            Urea=26,
+            units='kg/hr'
+        )
+        urea_2 = bst.Stream(
+            'urea_2',
+            Urea=116,
+            units='kg/hr',
+        )
+        MgSO4_1 = bst.Stream(
+            'MgSO4_1',
+             MgSO4=211,
+             units='kg/hr',
+        )
+        MgSO4_2 = bst.Stream(
+            'MgSO4_2',
+            MgSO4=948,
+            units='kg/hr',
+        )
+        S301 = bst.MockSplitter('S301', Urea_storage-0, outs=(urea_1, urea_2))
+        S302 = bst.MockSplitter('S302', MgSO4_storage-0, outs=(MgSO4_1, MgSO4_2))
+        nutrients_1 = (urea_1, MgSO4_1)
+        nutrients_2 = (urea_2, MgSO4_2)
+        seedtrain.ins.extend(nutrients_1)
+        fermentor.ins.extend(nutrients_2)
+        @seedtrain.add_specification(run=True)
+        def adjust_nutrients_to_seed_train():
+            *feeds, urea, MgSO4 = seedtrain.ins
+            F_vol = sum([i.F_vol - i.ivol['Lipid'] for i in feeds])
+            urea.imass['Urea'] = 0.5 * F_vol
+            MgSO4.imass['MgSO4'] = 1 * F_vol
+            
+        @fermentor.add_specification(run=True)
+        def adjust_urea_and_MgSO4_feed_to_fermentor():
+            feed, seed, *others, urea, MgSO4, = fermentor.ins
+            F_vol = sum([i.F_vol - i.ivol['Lipid'] for i in others], feed.F_vol - feed.ivol['Lipid'])
+            urea.imass['Urea'] = 0.5 * F_vol
+            MgSO4.imass['MgSO4'] = 1 * F_vol
+            S301.ins[0].mix_from(S301.outs)
+            S302.ins[0].mix_from(S302.outs)
+            for i in Urea_storage.path_until(fermentor): i.run()
+            for i in MgSO4_storage.path_until(fermentor): i.run()
+    else:
+        fermentor.ins.append(Urea_storage-0)
+        fermentor.ins.append(MgSO4_storage-0)
+        @fermentor.add_specification(run=True)
+        def adjust_nutrients_feed_to_fermentor():
+            feed, *others, urea, MgSO4, = fermentor.ins
+            F_vol = sum([i.F_vol - i.ivol['Lipid'] for i in others], feed.F_vol - feed.ivol['Lipid'])
+            urea.imass['Urea'] = 0.5 * F_vol
+            MgSO4.imass['MgSO4'] = 1 * F_vol
+            for i in Urea_storage.path_until(fermentor): i.run()
+            for i in MgSO4_storage.path_until(fermentor): i.run()
     
