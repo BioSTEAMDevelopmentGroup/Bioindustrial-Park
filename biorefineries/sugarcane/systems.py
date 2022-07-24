@@ -870,7 +870,7 @@ def create_sucrose_fermentation_system(ins, outs,
     C301.split[:] = 1. - C301.split
     if 'Lipid' in C301.chemicals: C301.isplit['Lipid'] = 0.
     
-    S302 = units.FakeSplitter('S302', C301-0, (1-R301, 'Yeast'))
+    S302 = units.MockSplitter('S302', C301-0, (1-R301, 'Yeast'))
     R301.titer = titer # g / L
     R301.productivity = productivity # g / L-h
     def adjust_yeast_recycle():

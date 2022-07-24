@@ -34,3 +34,9 @@ acetate = 0.008966261808367074
 switchgrass_composition_dct['Extractives'] -= acetate
 switchgrass_composition_dct['Acetate'] = acetate
 switchgrass_composition_dct['Water'] = 0.2
+switchgrass = {
+    'ID': 'switchgrass',
+    'total_flow': 104229.16,
+    'units': 'kg/hr',
+}
+switchgrass.update(switchgrass_composition_dct)

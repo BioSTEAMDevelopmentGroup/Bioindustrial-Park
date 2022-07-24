@@ -27,6 +27,7 @@ __all__ = (
     'create_integrated_bioprocess_saccharification_and_cofermentation_system',
     'create_cellulosic_fermentation_system',
     'create_ammonia_fiber_expansion_pretreatment_system',
+    'create_ethanol_purification_system',
 )
 
 default_nonsolids = ['Water', 'Ethanol', 'AceticAcid', 
@@ -1003,25 +1004,30 @@ def create_system(ins, outs, include_blowdown_recycle=False):
                                 P=3.9*101325,
                                 units='kg/hr')
     S401 = bst.PressureFilter('S401', (stillage, recycled_water))
-    if include_blowdown_recycle:
-        blowdown_to_wastewater = Stream('blowdown_to_wastewater')
-    else:
-        blowdown_to_wastewater = None
-    bst.create_wastewater_treatment_system(
-        ins=[S401-1, pretreatment_sys-1, blowdown_to_wastewater],
-        mockup=True,
+    bst.create_all_facilities(
+        feedstock, blowdown_recycle=include_blowdown_recycle, HXN=False,
+        recycle_process_water_streams=[stripper_bottoms_product],
     )
-    M501 = bst.Mixer('M501', (u.S603-1, S401-0))
-    create_facilities(
-        solids_to_boiler=M501-0,
-        gas_to_boiler=u.R601-0,
-        process_water_streams=(s.caustic, s.stripping_water, 
-                                s.warm_process_water_1, 
-                                s.warm_process_water_2,
-                                s.pretreatment_steam,
-                                s.saccharification_water),
-        feedstock=feedstock,
-        RO_water=u.S604-0,
-        recycle_process_water=stripper_bottoms_product,
-        blowdown_to_wastewater=blowdown_to_wastewater,
-    )
+    
+    # if include_blowdown_recycle:
+    #     blowdown_to_wastewater = Stream('blowdown_to_wastewater')
+    # else:
+    #     blowdown_to_wastewater = None
+    # bst.create_wastewater_treatment_system(
+    #     ins=[S401-1, pretreatment_sys-1, blowdown_to_wastewater],
+    #     mockup=True,
+    # )
+    # M501 = bst.Mixer('M501', (u.S603-1, S401-0))
+    # create_facilities(
+    #     solids_to_boiler=M501-0,
+    #     gas_to_boiler=u.R601-0,
+    #     process_water_streams=(s.caustic, s.stripping_water, 
+    #                             s.warm_process_water_1, 
+    #                             s.warm_process_water_2,
+    #                             s.pretreatment_steam,
+    #                             s.saccharification_water),
+    #     feedstock=feedstock,
+    #     RO_water=u.S604-0,
+    #     recycle_process_water=stripper_bottoms_product,
+    #     blowdown_to_wastewater=blowdown_to_wastewater,
+    # )
