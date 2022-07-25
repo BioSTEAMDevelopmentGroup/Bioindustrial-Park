@@ -66,8 +66,8 @@ def _load_system(dct):
                                             H403, P411, H404, P412, T408,
                                             T409])
     ethanol_production_units = UnitGroup('Ethanol production units',
-                                         [S301, F301, P306, M301, H301,
-                                          T305, R301, T301, C301, D301,
+                                         [F301, P306, M301, H301,
+                                          R301, T301, C301, D301,
                                           M302, P301, H302, D302, P302,
                                           M303, D303, H303, U301, H304,
                                           T302, P304, T303, P305, M304,

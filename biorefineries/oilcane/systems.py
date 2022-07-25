@@ -607,7 +607,8 @@ def create_cane_to_combined_1_and_2g_fermentation(
             if y0 < 0.:
                 product = float(beer.imass[product_group])
                 current_titer = get_titer()
-                ignored_product = PX.outs[0].imass[product_group]
+                feed = PX.outs[0]
+                ignored_product = feed.imass[product_group] if product_group in feed.chemicals else 0.
                 required_water = (1./target_titer - 1./current_titer) * (product - ignored_product) * 1000.
                 MX.ins[1].imass['Water'] = max(required_water, 0)
             else:
@@ -647,8 +648,9 @@ def create_cane_to_combined_1_and_2g_fermentation(
     
     def get_titer():
         beer = cofermentation.outs[1]
+        feed = PX.outs[0]
         ignored = beer.ivol[ignored_volume] if ignored_volume in cofermentation.chemicals else 0.
-        ignored_product = PX.outs[0].imass[product_group]
+        ignored_product = feed.imass[product_group] if product_group in feed.chemicals else 0.
         return (beer.imass[product_group] - ignored_product) / (beer.ivol['Water', product_group].sum() - ignored)
     cofermentation.get_titer = get_titer
     cofermentation.titer = titer

@@ -1086,3 +1086,13 @@ def load(name, cache=cache, reduce_chemicals=True,
         oilcane_sys.reduce_chemicals()
     oilcane_sys._load_stream_links()
     HXN.simulate()
+
+def test_model_convergence_speed(configuration, N, **kwargs):
+    load(configuration)
+    model.metrics = []
+    @model.metric
+    def N_iter(): return sum([i._iter for i in model.system.subsystems])
+    samples = model.sample(N, 'L')
+    model.load_samples(samples, **kwargs)
+    model.evaluate()
+    return model.table

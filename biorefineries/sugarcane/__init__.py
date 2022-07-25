@@ -31,8 +31,8 @@ _system_loaded = False
 _chemicals_loaded = False
 
 def load(pellet_bagasse=None):
-    if not _chemicals_loaded: _load_chemicals()
     try: 
+        _load_chemicals()
         _load_system(pellet_bagasse)
     finally: 
         dct = globals()
