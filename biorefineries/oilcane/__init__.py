@@ -286,9 +286,9 @@ def load(name, cache=cache, reduce_chemicals=True,
             operating_hours=operating_hours,
         )
         rename_storage_units(1000)
-    elif number == 5:
+    elif number in (5, 7):
         oilcane_sys = create_oilcane_to_biodiesel_1g(
-            operating_hours=operating_hours,
+            operating_hours=operating_hours, fed_batch=number==5,
         )
         area_names = [
             'Feedstock handling', 
@@ -302,7 +302,7 @@ def load(name, cache=cache, reduce_chemicals=True,
             'Storage',
         ]
         rename_storage_units(1000)
-    elif number == 6:
+    elif number in (6, 8):
         area_names = [
             'Feedstock handling', 
             'Juicing', 
@@ -317,7 +317,7 @@ def load(name, cache=cache, reduce_chemicals=True,
             'Storage',
         ]
         oilcane_sys = create_oilcane_to_biodiesel_combined_1_and_2g_post_fermentation_oil_separation(
-            operating_hours=operating_hours,
+            operating_hours=operating_hours, fed_batch=number==6,
         )
         rename_storage_units(1100)
     else:
@@ -886,7 +886,7 @@ def load(name, cache=cache, reduce_chemicals=True,
 
     @metric(name='Ethanol GWP', element='Displacement allocation', units='kg*CO2*eq / L')
     def GWP_ethanol_displacement(): # Cradle to gate
-        if number not in (5, 6):
+        if number < 5:
             GWP_material = sys.get_total_feeds_impact(GWP)
             GWP_electricity_production = GWP_characterization_factors['Electricity'] * electricity_production.get() * feedstock_consumption.get()
             GWP_coproducts = sys.get_total_products_impact(GWP)

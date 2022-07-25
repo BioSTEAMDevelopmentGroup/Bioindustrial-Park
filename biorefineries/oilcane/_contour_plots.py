@@ -105,7 +105,7 @@ def plot_recovery_and_oil_content_contours_manuscript(load=True, fs=8):
     set_font(size=fs)
     set_figure_size()
     fig, axes = plot_recovery_and_oil_content_contours(
-        load=load, configurations=[1, 2]
+        load=load, 
     )
     colors = np.zeros([2, 2], object)
     colors[:] = [[light_letter_color, light_letter_color],
@@ -116,21 +116,26 @@ def plot_recovery_and_oil_content_contours_manuscript(load=True, fs=8):
         file = os.path.join(images_folder, f'recovery_and_oil_content_contours.{i}')
         plt.savefig(file, transparent=True)
         
-def plot_recovery_and_oil_content_contours_biodiesel_only(load=True, fs=8, metric_index=2):
+def plot_recovery_and_oil_content_contours_biodiesel_only(load=True, fs=8, metric_indices=None):
     set_font(size=fs)
     set_figure_size()
-    fig, axes = plot_recovery_and_oil_content_contours(
-        load=load, configurations=[5, 6], N_points=20, yticks=[0, 2.5, 5, 7.5, 10, 12.5, 15],
-        metric_index=metric_index,
-    )
-    colors = np.zeros([2, 2], object)
-    colors[:] = [[light_letter_color, light_letter_color],
-                 [light_letter_color, light_letter_color]]
-    _add_letter_labels(axes, 1 - 0.68, 0.85, colors)
-    plt.subplots_adjust(right=0.92, wspace=0.1 * (fs/8) ** 2, top=0.9, bottom=0.10)
-    for i in ('svg', 'png'):
-        file = os.path.join(images_folder, f'recovery_and_oil_content_contours_biodiesel_only_{metric_index}.{i}')
-        plt.savefig(file, transparent=True)
+    if metric_indices is None: metric_indices = (0, 2, 6, 10)
+    for cmap, i in zip(colormaps, metric_indices):
+        fig, axes = plot_recovery_and_oil_content_contours(
+            load=load, configurations=np.array([[7, 8], [5, 6]]),
+            N_points=20, yticks=[0, 2.5, 5, 7.5, 10, 12.5, 15],
+            titles=['Batch', 'Fed-Batch'],
+            metric_index=i, cmap=cmap,
+        )
+        load = True
+        colors = np.zeros([2, 2], object)
+        colors[:] = [[light_letter_color, light_letter_color],
+                     [light_letter_color, light_letter_color]]
+        _add_letter_labels(axes, 1 - 0.68, 0.85, colors)
+        plt.subplots_adjust(right=0.92, wspace=0.1 * (fs/8) ** 2, top=0.9, bottom=0.10)
+        for j in ('svg', 'png'):
+            file = os.path.join(images_folder, f'recovery_and_oil_content_contours_biodiesel_only_{i}.{j}')
+            plt.savefig(file, transparent=True)
 
 def plot_relative_sorghum_oil_content_and_cane_oil_content_contours_manuscript(load=True, fs=8):
     set_font(size=fs)
@@ -345,9 +350,13 @@ def plot_relative_sorghum_oil_content_and_cane_oil_content_contours(
     
 def plot_recovery_and_oil_content_contours(
         load=False, metric_index=0, N_decimals=1, configurations=None,
-        N_points=20, agile=None, yticks=None,
+        N_points=20, yticks=None, titles=None, cmap=None,
     ):
     if yticks is None: yticks = [5, 7.5, 10, 12.5, 15]
+    if configurations is None:
+        configurations = np.array([['O1', 'O1*'], ['O2', 'O2*']])
+        if titles is None: titles = ['Oilcane Only', 'Oilcane & Oil-sorghum']
+        
     # Generate contour data
     x = np.linspace(0.40, 1.0, N_points)
     y = np.linspace(yticks[0] / 100, yticks[-1] / 100, N_points)
@@ -356,15 +365,12 @@ def plot_recovery_and_oil_content_contours(
     folder = os.path.dirname(__file__)
     file = f"oil_extraction_analysis_{''.join([str(i) for i in configurations])}.npy"
     file = os.path.join(folder, file)
-    if configurations is None: configurations = [1, 2]
-    if agile is None: agile = [False, True]
-    titles = ['Oilcane Only', 'Oilcane & Oil-sorghum']
-    titles = [titles[i] for i in agile]
+    
     if load:
         data = np.load(file)
     else:
         data = oc.evaluate_configurations_across_recovery_and_oil_content(
-            X, Y, agile, configurations,
+            X, Y, configurations,
         )
     np.save(file, data)
     data = data[:, :, :, :, metric_index]
@@ -379,15 +385,21 @@ def plot_recovery_and_oil_content_contours(
     
     metric = oc.all_metric_mockups[metric_index]
     units = metric.units if metric.units == '%' else format_units(metric.units)
-    mb = lambda x, name=None: MetricBar(metric.name if name is None else name, units if name is None else "", colormaps[metric_index], tickmarks(data[:, :, x, :], 5, 0.1, expand=0, p=0.1), 10, N_decimals=N_decimals)
+    if cmap is None: cmap = colormaps[metric_index]
+    # if metric_index == 10:
+    #     breakpoint()
+    mb = lambda x, name=None: MetricBar(
+        metric.name if name is None else name, units if name is None else "", cmap, 
+        tickmarks(data[:, :, x, :], 5, 0.1, expand=0, p=0.1, f=lambda x: round(x, N_decimals)),
+        10, N_decimals=N_decimals
+    )
     
     metric_bars = [mb(0), mb(1, "")]
     fig, axes, CSs, CB = plot_contour_2d(
         100.*X, 100.*Y, titles, data, xlabel, ylabels, xticks, yticks, metric_bars, 
         fillcolor=None, styleaxiskw=dict(xtick0=False), label=True,
     )
-    M = len(configurations)
-    N = len(agile)
+    M, N = configurations.shape
     for i in range(N):
         for j in range(M):
             ax = axes[i, j]

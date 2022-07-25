@@ -19,8 +19,11 @@ __all__ = (
 )
 
 def asconfiguration(x):
-    number, agile = x
-    return Configuration(int(number), bool(agile))
+    try:
+        number, agile = x
+        return Configuration(int(number), bool(agile))
+    except:
+        return Configuration(int(x), False)
 
 def ascomparison(x):
     a, b = x
@@ -78,29 +81,11 @@ def format_name(name):
 
 def format_configuration(configuration, latex=True):
     number, agile = configuration
-    if number == -4:
-        name = 'S4'
-    elif number == -3:
-        name = 'S3'
-    if number == -2:
-        name = 'S2'
-    elif number == -1:
-        name = 'S1'
-    elif number == 0:
-        name = '∅'
-    elif number == 1:
-        name = 'O1'
-    elif number == 2:
-        name = 'O2'
-    elif number == 3:
-        name = 'O3'
-    elif number == 4:
-        name = 'O4'
-    elif number == 5:
-        name = 'O5'
-    elif number == 6:
-        name = 'O6'
+    if number < 0:
+        name = f"S{number}"
     else:
+        name = f"O{number}"
+    if number == 0 or number > 8 or number < -2: 
         raise ValueError(f'invalid configuration {configuration}')
     if latex:
         name = r'$\mathtt{' + name + '}$'

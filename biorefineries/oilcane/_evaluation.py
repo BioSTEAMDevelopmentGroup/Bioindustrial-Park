@@ -44,33 +44,29 @@ def no_derivative(f):
     return f
 
 def evaluate_configurations_across_recovery_and_oil_content(
-        recovery, oil_content, agile, configurations,
+        recovery, oil_content, configurations, 
     ):
-    A = len(agile)
-    C = len(configurations)
-    M = len(all_metric_mockups)
-    data = np.zeros([A, C, M])
-    for ia in range(A):
-        for ic in range(C):
-            oc.load([int(configurations[ic]), agile[ia]])
-            if agile[ia]:
-                oc.cane_mode.oil_content = oc.sorghum_mode.oil_content = oil_content
-                oc.oil_extraction_specification.load_crushing_mill_oil_recovery(recovery)
-            else:
-                oc.oil_extraction_specification.load_specifications(
-                    crushing_mill_oil_recovery=recovery, 
-                    oil_content=oil_content, 
-                )
-            oc.sys.simulate()
-            data[ia, ic, :] = [j() for j in oc.model.metrics]
+    A, B = configurations.shape
+    data = np.zeros([A, B, N_metrics])
+    for index, configuration in np.ndenumerate(configurations):
+        oc.load(configuration)
+        if oc.configuration.agile:
+            oc.cane_mode.oil_content = oc.sorghum_mode.oil_content = oil_content
+            oc.oil_extraction_specification.load_crushing_mill_oil_recovery(recovery)
+        else:
+            oc.oil_extraction_specification.load_specifications(
+                crushing_mill_oil_recovery=recovery, 
+                oil_content=oil_content, 
+            )
+        oc.sys.simulate()
+        data[index] = [j() for j in oc.model.metrics]
     return data
 
 N_metrics = len(all_metric_mockups)
 evaluate_configurations_across_recovery_and_oil_content = no_derivative(
     np.vectorize(
-        evaluate_configurations_across_recovery_and_oil_content, 
-        excluded=['agile', 'configurations'],
-        signature=f'(),(),(a),(c)->(a,c,{N_metrics})'
+        evaluate_configurations_across_recovery_and_oil_content,
+        signature=f'(),(),(a, b)->(a, b, {N_metrics})'
     )
 )
 def evaluate_configurations_across_sorghum_and_cane_oil_content(

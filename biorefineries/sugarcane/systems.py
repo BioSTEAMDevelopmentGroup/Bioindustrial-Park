@@ -853,8 +853,7 @@ def create_sucrose_fermentation_system(ins, outs,
     R301 = Fermentor('R301', 
         ins=[H301-0, ''],
         outs=fermentor_outs, 
-        tau=9, efficiency=0.90, N=4,
-        fermentation_reaction=fermentation_reaction,
+        tau=9, N=4, fermentation_reaction=fermentation_reaction,
     ) 
     if fed_batch: R301.ins.append(MT1.outs[0])
     T301 = units.StorageTank('T301', R301-1, tau=4, vessel_material='Carbon steel')
