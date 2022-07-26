@@ -8,36 +8,21 @@ import biosteam as bst
 import thermosteam as tmo
 import flexsolve as flx
 import numpy as np
-# from biorefineries.oleochemicals.streams_storage_specs import * 
-#from biorefineries.oleochemicals.Batch_conversion import *
+
 from biosteam import SystemFactory
 
 ######################## Units ########################
 @SystemFactory(
     ID = 'oxidative_clevage',
-    ins = [dict(ID='fresh_OA',
-                Oleic_acid = 10000,
-                units = 'kg/hr',
-                price = 7),
-          dict(ID='fresh_HP',
-                Hydrogen_peroxide = 1000,
-                units = 'kg/hr',
-                price = 0.68
-                ),
-          dict(ID='fresh_Water_1',
-                Water = 1000,
-                units = 'kg/hr',
-                price = 1
-              ),
-          dict(ID = 'fresh_Cat',
-                units = 'kg/hr',
-                Phosphotungstic_acid = 10,
-                price = 7.7)],
-      outs = [dict(ID = 'mixed_oxidation_products')],
-      fixed_outs_size = False,     
+    ins = [dict(ID='fresh_OA'),
+           dict(ID='fresh_HP'),
+           dict(ID='water_for_oxidative_cleavage'),
+           dict(ID = 'fresh_Cat')],           
+    outs = [dict(ID = 'mixed_oxidation_products')],
+    fixed_outs_size = True,     
               )
 def oxidative_cleavage_system(ins,outs,T_in):
-    fresh_OA, fresh_HP, fresh_Water_1, fresh_Cat = ins
+    fresh_OA, fresh_HP, water_for_oxidative_cleavage, fresh_Cat = ins
     mixed_oxidation_products, = outs
     
 #Feedtanks and pumps
@@ -61,7 +46,7 @@ def oxidative_cleavage_system(ins,outs,T_in):
 # Fresh_water_feedtank
 #TODO.xxx add correct price for water
     T103_1  = bst.units.StorageTank('T103_1',
-                              ins = fresh_Water_1,
+                              ins = water_for_oxidative_cleavage,
                               outs = 'fresh_water_to_pump')
     P103_1 = bst.units.Pump('P103_1',
                       ins = T103_1-0,
@@ -75,7 +60,7 @@ def oxidative_cleavage_system(ins,outs,T_in):
                       ins = T104-0,
                       outs ='cat_to_reactor_mixer') 
     def adjust_catalyst_flow():
-       fresh_Catalyst = fresh_OA.F_mass/103861.94035901062 
+       fresh_Cat.F_mass = fresh_OA.F_mass/103861.94035901062 
       
     T104.add_specification(adjust_catalyst_flow, run=True)
     
@@ -87,11 +72,8 @@ def oxidative_cleavage_system(ins,outs,T_in):
     
 
     def adjust_HP_feed_flow():   
-        # path_HP = fresh_HP.sink.path_until(M102)
-        # path_water = fresh_Water_1.sink.path_until(M102)
-        fresh_HP.F_mass = fresh_OA.F_mass * 0.958 #- MS201.outs[0].imass['Hydrogen_peroxide']
-        fresh_Water_1.F_mass = fresh_OA.F_mass * 2.008
-        # for i in path_HP + path_water: i.run()
+      fresh_HP.F_mass = fresh_OA.F_mass * 0.958 
+      water_for_oxidative_cleavage.F_mass = fresh_OA.F_mass * 2.008
    
     M101.add_specification(adjust_HP_feed_flow, run=True)   
 

@@ -32,6 +32,8 @@ def nonanoic_acid_production_system(ins,outs):
     
     Heating_crude_stream = bst.HXutility(ins = nonanoic_acid_crude_stream,
                                          T = 240 + 273)
+
+# TODO.xxx check if these can be done using high P and temperatures
     
     Distillation_of_crude_mix = bst.BinaryDistillation('Distillation_of_crude_mix',
                                                        ins = Heating_crude_stream - 0,

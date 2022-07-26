@@ -11,58 +11,41 @@ import flexsolve as flx
 import numpy as np
 #from biorefineries.oleochemicals.Batch_conversion import *
 from biosteam import SystemFactory
-#PARTITION COEFF FOR SOLVENT EXTRACTION NOT IN YET
-#ASSUSSIMG THE SOLVENT HAS PROPERTIES OF OCTANE
-#NEEDS TO BE ADJUSTED ACCORDING TO THE NAPHTHOL MINERAL SPIRITS PATENT 
 
-# Methyl_oct_3,
-# Methyl_oct_4,
-# Dimethyl_heptane_3_3,
-# Ethylheptane_3,
-# Ethylheptane_4
+#Partition coefficients of only the DCA's available
+#Partition coefficients of MCA not estimatable
       
 #Azelaic acid in the aq phase should be less than 10% by weight of AA
 # here, about 80% of the bottoms of distillation is AA
-# 
+
 #NMS solvent properties
 #https://www.cdc.gov/niosh/npg/npgd0664.html#:~:text=Class%20IB%20Flammable%20Liquid%3A%20Fl.P.%20below%2073%C2%B0F%20and,paraffins%2C%2030%25%20monocycloparaffins%2C%202%25%20dicycloparaffins%20%26%2012%25%20alklybenzenes.%5D
 
 @SystemFactory(
     ID = 'Secondary_separation',
     ins = [dict(ID = 'AA_to_be_recovered'),
-           dict(ID = 'Water_for_extraction',
-                Water = 4700,
-                T = 90+273.15,
-                units = 'kg/hr',
-                price = 1),           
-           dict(ID = 'Solvent_for_extraction',
-                Octane = 55,
-                cycloheptane = 30,
-                bicyclo_octane = 2,
-                toluene = 12,
-                T = 100 + 273.15,
-                units = 'kg/hr',
-                price = 1)],   
+           dict(ID = 'water_for_extraction'),
+           dict(ID = 'solvent_for_extraction')
+           ],
     outs = [
-            dict(ID = 'extract'),
-            dict(ID = 'Recovered_solvent'), 
-            # dict(ID = 'raffinate'),
+            dict(ID = 'NMS_solvent_MCA_extract'),
+            dict(ID = 'recovered_solvent'), 
             dict(ID = 'AA_high_purity_product'),
            ],
     fixed_ins_size = True,
     fixed_outs_size = True,     
               )
 def secondary_separation_system(ins,outs,Tin):
-    AA_to_be_recovered,Water_for_extraction,Solvent_for_extraction, = ins
-    extract,Recovered_solvent, AA_high_purity_product, = outs
-    # Recovered_solvent,
-    # 
-   
+    AA_to_be_recovered,water_for_extraction,solvent_for_extraction, = ins
+    NMS_solvent_MCA_extract,recovered_solvent,AA_high_purity_product, = outs
+ 
    #Hot_water_and_crude_azelaic_mixture
     M301 = bst.units.Mixer('M301',
-                           ins = (AA_to_be_recovered, Water_for_extraction ),
-                           outs = ('Hot_water_mixture'))
-     
+                           ins = (AA_to_be_recovered, 
+                                  water_for_extraction),
+                           outs = ('Hot_water_AA_mixture'))
+#TODO.xxx check the 0.18 target concentration
+   
     M301.target_concentation = 0.18
     @M301.add_specification(run=True)
     def AA_composition():
@@ -72,19 +55,19 @@ def secondary_separation_system(ins,outs,Tin):
         water.imass['Water'] = (1 / M301.target_concentation - 1 / current_concentation) * feed_AA
     
    #Solvent_extraction
-    Solvent_for_extraction.F_mass = 4 * Water_for_extraction.F_mass
+    solvent_for_extraction.F_mass = 4 * water_for_extraction.F_mass
     L301 = bst.units.MultiStageMixerSettlers('L301',
                                           ins= (M301-0,
-                                                Solvent_for_extraction), 
+                                                solvent_for_extraction), 
                                           outs=('raffinate',
-                                                extract,
+                                                NMS_solvent_MCA_extract,
                                                 ), 
                                           N_stages = 5,
                                           partition_data = {
-                                              'K': np.array([4.402e-02, 
-                                                             1.928e-04,
-                                                             2.784e-01,
-                                                             4.041e-03,
+                                              'K': np.array([0, 
+                                                             1,
+                                                             1,
+                                                             0.064657614,
                                                              1.152e+18,
                                                              1.493e+04,
                                                              # 4.199e+06,
@@ -129,15 +112,17 @@ def secondary_separation_system(ins,outs,Tin):
     #         ms._setup() 
     # L301.add_specification(some_Ks, args=[L301], run=True)
  
+# TODO.xxx check if flash can be used here instead
 
 # Azelaic acid and solvent separation  
     D301_H = bst.HXutility('D301_H',
                         ins = L301-0,
                         T = Tin)  
     
+# TODO.xxx check if this below distillation column can be run without low pressures
     D301 = bst.units.ShortcutColumn("D301",
                                     ins = D301_H-0, 
-                                    outs=(Recovered_solvent,
+                                    outs=(recovered_solvent,
                                           AA_high_purity_product),
                                     LHK = ('toluene',
                                            'Nonanoic_acid'),
