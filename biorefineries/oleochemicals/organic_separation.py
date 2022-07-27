@@ -14,34 +14,34 @@ import numpy as np
 #from biorefineries.oleochemicals.Batch_conversion import *
 from biosteam import SystemFactory
 
-#TODO.xxx check if the top chemical thing in the SLLE is right
+
 @SystemFactory(
     ID = 'organic_phase_separation',
     ins = [dict(ID = 'mixed_products_for_separation'),
            dict(ID = 'fresh_EA'),
           ],
-    outs = [dict(ID = 'organic_phase_for_PS'),
+    outs = [dict(ID = 'solid_catalyst'),
             dict(ID = 'aqueous_raffinate'),
-            dict(ID = 'solid_catalyst'),],
+            dict(ID = 'organic_phase_for_PS'),
+            
+            ],
     fixed_ins_size = False,
     fixed_outs_size = False,     
               )
 
 def organic_separation_system(ins,outs,T_in):
     mixed_products_for_separation,fresh_EA, = ins
-    organic_phase_for_PS,aqueous_raffinate,solid_catalyst,  = outs
+    solid_catalyst,aqueous_raffinate,organic_phase_for_PS,  = outs
     
-#The mixed oxidation products that come in have the catalyst in them, 
-#this catalyst needs to be separated out
-    
-  
-    S105 = bst.units.SLLECentrifuge(ins = mixed_products_for_separation,
-                    outs = ('organic_phase_for_PS',
-                            'aqueous_raffinate',
-                              solid_catalyst),
-                    moisture_content = 0.2,
-                    solids_split={'bea_zeolite':1.0})
  
+    S105 = bst.units.SolidsCentrifuge(ins = mixed_products_for_separation,
+                    outs = (solid_catalyst,
+                        'mixture_for_PS',
+                             ),
+                    moisture_content = 0.2,
+                    split={'bea_zeolite':1.0})
+    
+     
     recycle = bst.Stream('recycle',
                           Ethyl_acetate = 10,
                           units = 'kg/hr')
@@ -69,15 +69,8 @@ def organic_separation_system(ins,outs,T_in):
                               outs = 'feed_to_ethyl_extraction',
                               T = T_in,
                               )
-    M201 = bst.Mixer('M201',
-                      ins = (S105-0,
-                             S105-1,
-                             L201_H-0),
-                      outs = ('mixed_oxidation_products_ea_mixture')         
-                      )
-               
     L201 = bst.units.MultiStageMixerSettlers('L201', 
-                                    ins= ( M201-0,L201_H-0), 
+                                    ins= ( S105-1,L201_H-0), 
                                     outs=( aqueous_raffinate,
                                             'organic_phase_extract_with_EA',
                                           ), 
