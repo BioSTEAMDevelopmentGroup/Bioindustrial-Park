@@ -963,7 +963,7 @@ def create_oilcane_to_biodiesel_1g(
 
     ### Facilities ###
     u = f.unit
-    bst.create_facilities(
+    bst.create_all_facilities(
         recycle_process_water_streams=(evaporator_condensate_b,),
         HXN_kwargs=dict(
             ID=900,
@@ -972,15 +972,7 @@ def create_oilcane_to_biodiesel_1g(
             acceptable_energy_balance_error=0.01,
         ),
         CHP_kwargs=dict(area=700),
-        CT=True,
-        CWP=True,
-        CIP=True,
-        FWT=True,
-        ADP=True,
         WWT=False,
-        CHP=True,
-        HXN=True,
-        PWC=True,
         area=800,
     )
 
@@ -1045,7 +1037,7 @@ def create_oilcane_to_biodiesel_combined_1_and_2g_post_fermentation_oil_separati
     
     s = f.stream
     u = f.unit
-    bst.create_facilities(
+    bst.create_all_facilities(
         feedstock=s.bagasse,
         recycle_process_water_streams=(condensate, evaporator_condensate),
         HXN_kwargs=dict(
@@ -1054,15 +1046,6 @@ def create_oilcane_to_biodiesel_combined_1_and_2g_post_fermentation_oil_separati
             Qmin=1e3,
             acceptable_energy_balance_error=0.01,
         ),
-        CT=True,
-        CWP=True,
-        CIP=True,
-        FWT=True,
-        ADP=True,
-        WWT=True,
-        CHP=True,
-        HXN=True,
-        PWC=True,
         CHP_kwargs=dict(area=700),
         WWT_kwargs=dict(area=500),
         area=900,

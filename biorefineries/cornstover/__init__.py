@@ -92,6 +92,8 @@ def _load_system():
     Area800 = UnitGroup('Area 800', (u.CWP, u.CT, u.PWC, u.ADP, u.CIP))
     areas = (Area100, Area200, Area300, Area400,
              Area500, Area600, Area700, Area800)
+    WWTsys = sys.find_system(u.R602)
+    WWTsys.set_tolerance(method='fixed-point', maxiter=1000, mol=10)
     AllAreas = UnitGroup('All Areas', cornstover_sys.units)
     _system_loaded = True
     

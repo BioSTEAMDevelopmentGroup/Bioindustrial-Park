@@ -322,11 +322,6 @@ def load(name, cache=cache, reduce_chemicals=True,
         rename_storage_units(1100)
     else:
         raise NotImplementedError(number)
-    if not number % 2:
-        for sys in oilcane_sys.subsystems:
-            for unit in sys.path:
-                if isinstance(unit, bst.AnaerobicDigestion):
-                    sys.converge_method = 'fixed-point'
     oilcane_sys.set_tolerance(rmol=1e-4, mol=1e-2, subsystems=True, subfactor=1.5)
     dct.update(flowsheet.to_dict())
     
@@ -1078,10 +1073,13 @@ def load(name, cache=cache, reduce_chemicals=True,
     HXN.force_ideal_thermo = True
     HXN.cache_network = True
     HXN.avoid_recycle = True
-    try: 
-        sys.simulate()
-    except Exception as e:
-        raise e
+    try: AD = flowsheet(bst.AerobicDigestion)
+    except: pass
+    else:
+        WWTsys = sys.find_system(AD)
+        WWTsys.set_tolerance(mol=10, method='wegstein')
+        # sys.track_recycle(WWTsys.recycle)
+    sys.simulate()
     if reduce_chemicals:
         oilcane_sys.reduce_chemicals()
     oilcane_sys._load_stream_links()
