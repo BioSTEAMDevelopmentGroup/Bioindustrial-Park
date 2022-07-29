@@ -14,38 +14,37 @@ import numpy as np
 #from biorefineries.oleochemicals.Batch_conversion import *
 from biosteam import SystemFactory
 
-#TWO ISSUES IN THIS: TEMPERATURE OF THE SOLVENT ETHYL ACETATE COMING OUT FROM DISTILLATION COLUMN
-#SHOULD BE AROUND BOILING POIINT OF ETHYL ACETATE
-#SOLVENT EXTRACTION IS NOT WORKING, PARITION COEFFICENTS NEED TO BE ADJUSTED
-#SOLVENT SHOULD EXTRACT THE ORGANIC PHASE
-#CATALYST SEPARATION NEEDS TO BE LOOKED INTO
-
 
 @SystemFactory(
     ID = 'organic_phase_separation',
-    ins = [  dict(ID = 'mixed_products_for_separation'),
-            dict(ID = 'fresh_EA',
-                  Ethyl_acetate = 1000,
-                  T = 273.15,
-                  units = 'kg/hr',
-                  price = 1.625),
-            # dict(ID = 'EA_recycle'),
+    ins = [dict(ID = 'mixed_products_for_separation'),
+           dict(ID = 'fresh_EA'),
           ],
-    outs = [dict(ID = 'aqueous_raffinate_with_catalyst'),
-            # dict(ID = 'distillate_with_solvent'),
-            dict(ID = 'organic_phase_for_PS')],
+    outs = [dict(ID = 'solid_catalyst'),
+            dict(ID = 'aqueous_raffinate'),
+            dict(ID = 'organic_phase_for_PS'),
+            
+            ],
     fixed_ins_size = False,
     fixed_outs_size = False,     
               )
 
 def organic_separation_system(ins,outs,T_in):
     mixed_products_for_separation,fresh_EA, = ins
-    # EA_recycle,
-    aqueous_raffinate_with_catalyst, organic_phase_for_PS, = outs
+    solid_catalyst,aqueous_raffinate,organic_phase_for_PS,  = outs
     
+ 
+    S105 = bst.units.SolidsCentrifuge(ins = mixed_products_for_separation,
+                    outs = (solid_catalyst,
+                        'mixture_for_PS',
+                             ),
+                    moisture_content = 0.2,
+                    split={'bea_zeolite':1.0})
+    
+     
     recycle = bst.Stream('recycle',
-                         Ethyl_acetate = 10,
-                         units = 'kg/hr')
+                          Ethyl_acetate = 10,
+                          units = 'kg/hr')
   
     T105 = bst.units.StorageTank ('T105', 
                               ins = fresh_EA,
@@ -54,40 +53,28 @@ def organic_separation_system(ins,outs,T_in):
     P105 = bst.units.Pump('P105',
                       ins = T105-0,
                       outs ='to_mixer')
+    
     M105 = bst.units.Mixer('M105',
                             ins = (P105-0,recycle),
                             outs = ('EA_for_extraction'))   
 
     def adjust_EA_recycle():
         fresh_EA.F_mass = mixed_products_for_separation.F_mass - recycle.F_mass 
-        fresh_EA.sink.run_until(M105)
-        
+        fresh_EA.sink.run_until(M105)        
     M105.add_specification(adjust_EA_recycle, run=True)  
     
-#Hot ethyl acetate extraction
+    #Hot ethyl acetate extraction
     L201_H = bst.units.HXutility('L201_H',
                               ins = M105-0,
                               outs = 'feed_to_ethyl_extraction',
                               T = T_in,
                               )
-
     L201 = bst.units.MultiStageMixerSettlers('L201', 
-                                    ins= ( mixed_products_for_separation,L201_H-0), 
-                                    outs=( aqueous_raffinate_with_catalyst,
-                                           'organic_phase_extract_with_EA',
+                                    ins= ( S105-1,L201_H-0), 
+                                    outs=( aqueous_raffinate,
+                                            'organic_phase_extract_with_EA',
                                           ), 
                                     N_stages= 5,       
-                                   #  partition_data={
-                                   # 'K': np.array([2.120e+01, 1.006e+00,
-                                   #                3.197e-06, 2.481e-03,
-                                   #                2.862e-03, 4.001e-02,
-                                   #                1.201e-06, 5.367e-03]),
-                                   # 'IDs': ( 'Water','Hydrogen_peroxide',
-                                   #         'Oleic_acid','Nonanal',
-                                   #         'Nonanoic_acid','Azelaic_acid',
-                                   #         'oxiraneoctanoic_acid,_3-octyl-'
-                                   #         ,'Ethyl_acetate'),
-                                   # 'phi': 0.590}
                                     )
     
     def cache_Ks(ms):
@@ -105,17 +92,10 @@ def organic_separation_system(ins,outs,T_in):
             ms._setup() 
     
     L201.add_specification(cache_Ks, args=[L201], run=True)
-    
 
-# Separation of Ethyl actetate and organic mixture
-#No heating required as the temperature high enough to yield separation
-
-    # D201_H = bst.HXutility('D201_H',
-    #                     ins = L201-1,
-    #                     T = 90 + 273.15)
-    # D201_P = bst.Pump('D201_P',
-    #               ins = D201_H-0,
-    #               P = 4000)
+#Separation of Ethyl actetate and organic mixture
+# No heating required as the temperature high enough to yield separation
+# TODO.XXX FIGURE OUT IF VACCUUM DISTILLATION IS NEEDED
     
     D201 = bst.units.ShortcutColumn("D201",
                                   ins = L201-1, 
@@ -128,8 +108,3 @@ def organic_separation_system(ins,outs,T_in):
                                   P=10132.5,
                                   partial_condenser=False                                  
                                   )
-    
-      
-               
-
- 

@@ -32,6 +32,8 @@ def load(name=None, cache=cache):
         dct['azelaic_acid_sys'] = dct['sys'] = azelaic_acid_sys = azelaic_acid_system()
         EA_recycle_mixer = flowsheet.unit.M105
         azelaic_acid_sys.prioritize_unit(EA_recycle_mixer)
+        NMS_recycle_mixer = flowsheet.unit.M304
+        azelaic_acid_sys.prioritize_unit(NMS_recycle_mixer)
         dct.update(flowsheet.to_dict())
     else:
         raise ValueError(f"configuration '{name}' is not implemented yet")

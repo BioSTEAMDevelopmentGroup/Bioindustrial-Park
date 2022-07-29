@@ -153,6 +153,17 @@ class AACrystalliser(bst.units.BatchCrystallizer):
         #     tmo.Rxn('Epoxy_stearic_acid + H2O2 -> Nonanal + Oxononanoic_acid + H2O', 'oxiraneoctanoic_acid,_3-octyl-', X = X1),
         #     tmo.Rxn('Nonanal + Oxononanoic_acid + 2H2O2 -> Azelaic_acid + Nonanoic_acid+ 2H2O', 'Nonanal', X = X2),
         #            ])
+  
+    
+# #Solubility data
+# #Pelargonic acid is insoluble in water
+# #Interpolation for Azelaic acid in water
+# # m = 22-2/50-20 = 1.96
+# # S = mT + C
+# # S = 1.96T - 76.0
+# #Therefore, we assume azelaic acid solubility at 95 deg cel is 110g/l
+
+
 
 
 
