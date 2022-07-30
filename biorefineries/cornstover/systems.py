@@ -171,11 +171,13 @@ def create_ammonia_fiber_expansion_pretreatment_system(
         air.imol['O2', 'N2'] = [flow * 0.23, flow * 0.77] # Assume equal volumes is enough
     
     M204 = bst.Mixer('M204', (R201-0, F201-0), thermo=ideal)
-    F202 = bst.Flash('F202', M204-0, T=278., P=101325, thermo=ideal)
+    F202 = bst.Flash('F202', M204-0, T=260., P=101325, thermo=ideal)
+    F202.HXN_ignore = True
     @F202.add_specification
     def complete_recovery():
         feed = F202.ins[0]
         vap, liq = F202.outs
+        vap.phase = 'g'
         ms = F202._multi_stream
         liq.mol = feed.mol
         ms.T = vap.T = liq.T = F202.T

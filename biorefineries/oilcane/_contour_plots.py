@@ -420,8 +420,8 @@ def plot_recovery_and_oil_content_contours(
                                 color=linecolor,
                                 linewidth=1.0)
             plot_vertical_line(90, ls='-.',
-                                color=linecolor,
-                                linewidth=1.0)
+                               color=linecolor,
+                               linewidth=1.0)
             if hasattr(ax, '_cached_ytwin'):                
                 plt.sca(ax._cached_ytwin)
             plot_scatter_points([60], [10], marker='*', s=100, color=startcolor,
