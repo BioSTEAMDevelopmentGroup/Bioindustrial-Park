@@ -964,6 +964,7 @@ def create_oilcane_to_biodiesel_1g(
     ### Facilities ###
     u = f.unit
     bst.create_all_facilities(
+        feedstock=bagasse,
         recycle_process_water_streams=(evaporator_condensate_b,),
         HXN_kwargs=dict(
             ID=900,

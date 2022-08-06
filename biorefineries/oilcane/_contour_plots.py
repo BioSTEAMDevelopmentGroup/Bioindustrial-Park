@@ -40,7 +40,7 @@ __all__ = (
     'plot_recovery_and_oil_content_contours_biodiesel_only',
 )
 
-filterwarnings('ignore', category=bst.utils.DesignWarning)
+filterwarnings('ignore', category=bst.exceptions.DesignWarning)
     
 shadecolor = (*colors.neutral.RGBn, 0.20)
 linecolor = (*colors.neutral_shade.RGBn, 0.85)
