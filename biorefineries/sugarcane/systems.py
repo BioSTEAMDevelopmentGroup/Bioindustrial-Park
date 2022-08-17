@@ -93,7 +93,7 @@ denaturant = skw('denaturant',
 ethanol = skw('ethanol',
     price=0.789
 )
-stripper_bottoms_product = skw('stripper_bottoms_product')
+recycle_process_water = skw('recycle_process_water')
 evaporator_condensate = skw('evaporator_condensate')
 vent = skw('vent')
 vinasse = skw('vinasse')
@@ -409,11 +409,11 @@ def create_beer_distillation_system(ins, outs,
 @SystemFactory(
     ID='ethanol_purification_from_distilled_beer_sys',
     ins=[distilled_beer, denaturant],
-    outs=[ethanol, stripper_bottoms_product]
+    outs=[ethanol, recycle_process_water]
 )
 def create_ethanol_purification_system_after_beer_column(ins, outs, IDs={}):
     distilled_beer, denaturant = ins
-    ethanol, stripper_bottoms_product = outs
+    ethanol, recycle_process_water = outs
   
     
     # Mix ethanol Recycle (Set-up)
@@ -428,7 +428,7 @@ def create_ethanol_purification_system_after_beer_column(ins, outs, IDs={}):
                                 is_divided=True)
     D303.boiler.U = 1.85
     P303 = units.Pump(IDs.get('Distillation bottoms product pump', 'P303'), 
-                      outs=stripper_bottoms_product)
+                      outs=recycle_process_water)
     
     # Superheat vapor for mol sieve
     H303 = units.HXutility(IDs.get('Heat exchanger to superheat vapor to molecular sieves', 'H303'),
@@ -477,11 +477,11 @@ def create_ethanol_purification_system_after_beer_column(ins, outs, IDs={}):
 #     ins=[skw('distilled_beer'),
 #           skw('denaturant', Octane=230.69, units='kg/hr', price=0.756)],
 #     outs=[skw('ethanol', price=0.789),
-#           skw('stripper_bottoms_product')]
+#           skw('recycle_process_water')]
 # )
 # def create_ethanol_purification_system_after_beer_column(ins, outs):
 #     distilled_beer, denaturant = ins
-#     ethanol, stripper_bottoms_product = outs
+#     ethanol, recycle_process_water = outs
 #     M303 = units.Mixer('M303')
 #     D303 = units.BinaryDistillation('D303',
 #         P=101325, x_bot=3.9106e-06, y_top=0.80805, k=1.25, Rmin=0.01,
@@ -489,7 +489,7 @@ def create_ethanol_purification_system_after_beer_column(ins, outs, IDs={}):
 #         vessel_material='Stainless steel 304', is_divided=True
 #     )
 #     D303.boiler.U = 1.85
-#     P303 = units.Pump('P303', outs=stripper_bottoms_product)
+#     P303 = units.Pump('P303', outs=recycle_process_water)
 #     H303 = units.HXutility('H303', T=115+273.15, V=1)
 #     U301 = units.MolecularSieve('U301', split=dict(Ethanol=0.162, Water=0.925))
 #     H304 = units.HXutility('H304', V=0, T=340.)
@@ -518,13 +518,13 @@ def create_ethanol_purification_system_after_beer_column(ins, outs, IDs={}):
 @SystemFactory(
     ID='ethanol_purification_sys',
     ins=[beer, denaturant],
-    outs=[ethanol, stillage, stripper_bottoms_product]
+    outs=[ethanol, stillage, recycle_process_water]
 )
 def create_ethanol_purification_system(ins, outs,
                                        beer_column_heat_integration=True,
                                        IDs={}):
     beer, denaturant = ins
-    ethanol, stillage, stripper_bottoms_product = outs
+    ethanol, stillage, recycle_process_water = outs
     distilled_beer = bst.Stream('')
     create_beer_distillation_system(
         ins=beer,
@@ -535,7 +535,7 @@ def create_ethanol_purification_system(ins, outs,
     )
     create_ethanol_purification_system_after_beer_column(
         ins=[distilled_beer, denaturant],
-        outs=[ethanol, stripper_bottoms_product],
+        outs=[ethanol, recycle_process_water],
         IDs=IDs,
         mockup=True,
     )
@@ -915,11 +915,11 @@ def create_sucrose_fermentation_system(ins, outs,
 @SystemFactory(
     ID='sucrose_to_ethanol_sys',
     ins=[screened_juice, denaturant],
-    outs=[ethanol, stillage, stripper_bottoms_product, evaporator_condensate]
+    outs=[ethanol, stillage, recycle_process_water, evaporator_condensate]
 )
 def create_sucrose_to_ethanol_system(ins, outs):
     screened_juice, denaturant = ins
-    ethanol, stillage, stripper_bottoms_product, evaporator_condensate = outs
+    ethanol, stillage, recycle_process_water, evaporator_condensate = outs
     
     beer = bst.Stream()
     
@@ -930,7 +930,7 @@ def create_sucrose_to_ethanol_system(ins, outs):
     )
     create_ethanol_purification_system(
         ins=[beer, denaturant], 
-        outs=[ethanol, stillage, stripper_bottoms_product],
+        outs=[ethanol, stillage, recycle_process_water],
         mockup=True
     )
     

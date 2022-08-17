@@ -51,14 +51,15 @@ def create_acTAG_separation_system(ins, outs):
         melt_AcTAG_purity=0.90,
     )
     PF1 = bst.PressureFilter('PF1', C1-0, split=0.5, moisture_content=0.)
-    S1 = bst.StorageTank('S1', PF1-0, TAG, tau=24*7)
+    bst.StorageTank('S1', PF1-0, TAG, tau=24*7)
     
-    @PF1.add_specification
-    def split_phases():
-        feed = PF1.ins[0]
+    def split_phases(unit):
+        feed = unit.ins[0]
         solid, liquid = PF1.outs
         solid.copy_like(feed['s'])
         liquid.copy_like(feed['l'])
+    
+    PF1.add_specification(args=[PF1])
     
     C2 = OleinCrystallizer(
         'C2', PF1-1, T=273.15 - 35,
@@ -66,15 +67,8 @@ def create_acTAG_separation_system(ins, outs):
         melt_AcTAG_purity=0.95,
     )
     PF2 = bst.PressureFilter('PF2', C2-0, split=0.5, moisture_content=0.)
-    S2 = bst.StorageTank('S2', PF2-1, acTAG, tau=24*7)
-    
-    @PF2.add_specification
-    def split_phases():
-        feed = PF2.ins[0]
-        solid, liquid = PF2.outs
-        solid.copy_like(feed['s'])
-        liquid.copy_like(feed['l'])
-    
+    PF2.add_specification(args=[PF2])
+    bst.StorageTank('S2', PF2-1, acTAG, tau=24*7)
     M1.ins[1] = PF2.outs[0]
     
 

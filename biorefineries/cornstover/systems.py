@@ -76,7 +76,7 @@ switchgrass = skw(
 @bst.SystemFactory(
     ID='hot_water_pretreatment_sys',
     ins=[cornstover],
-    outs=[dict(ID='hydrolyzate'),
+    outs=[dict(ID='pretreated_biomass'),
           dict(ID='pretreatment_wastewater')],
 )
 def create_hot_water_pretreatment_system(
@@ -89,7 +89,7 @@ def create_hot_water_pretreatment_system(
     ):
     
     feedstock, = ins
-    hydrolyzate, pretreatment_wastewater = outs
+    pretreated_biomass, pretreatment_wastewater = outs
     
     warm_process_water = Stream('warm_process_water',
                               T=368.15,
@@ -114,9 +114,9 @@ def create_hot_water_pretreatment_system(
     units.WasteVaporCondenser(f'H{n+1}', M204-0, pretreatment_wastewater, V=0)
     P202 = units.HydrolyzatePump(f'P{n+2}', F201-1, None)
     if milling:
-        bst.HammerMill(f'U{n+1}', P202-0, hydrolyzate)
+        bst.HammerMill(f'U{n+1}', P202-0, pretreated_biomass)
     else:
-        P202.outs[0] = hydrolyzate
+        P202.outs[0] = pretreated_biomass
 
 @bst.SystemFactory(
     ID='AFEX_pretreatment_sys',
@@ -134,7 +134,7 @@ def create_ammonia_fiber_expansion_pretreatment_system(
     ):
     
     feedstock, = ins
-    hydrolyzate, = outs
+    pretreated_biomass, = outs
     
     ammonia = Stream('ammonia', NH3=1, P=12 * 101325, price=price['Ammonia'])
     warm_process_water = Stream('warm_process_water',
@@ -209,7 +209,7 @@ def create_ammonia_fiber_expansion_pretreatment_system(
         P202 = units.HydrolyzatePump('P202', F201-1, thermo=ideal)
         H2SO4_storage = units.SulfuricAcidStorageTank('H2SO4_storage', sulfuric_acid)
         T202 = units.SulfuricAcidTank('T202', H2SO4_storage-0)
-        M207 = bst.Mixer('M207', (T202-0, P202-0), hydrolyzate)
+        M207 = bst.Mixer('M207', (T202-0, P202-0), pretreated_biomass)
         M207.neutralization_rxn = rxn.Rxn('2 NH3 + H2SO4 -> (NH4)2SO4', 'H2SO4', 1)
         @M207.add_specification
         def update_sulfuric_acid_loading():
@@ -220,7 +220,7 @@ def create_ammonia_fiber_expansion_pretreatment_system(
             M207._run()
             M207.neutralization_rxn(M207.outs[0])
     else:
-        P202 = units.HydrolyzatePump('P202', F201-1, hydrolyzate, thermo=ideal)
+        P202 = units.HydrolyzatePump('P202', F201-1, pretreated_biomass, thermo=ideal)
         
 @bst.SystemFactory(
     ID='Alkaline_pretreatment_sys',
@@ -300,7 +300,7 @@ def create_alkaline_pretreatment_system(
 @bst.SystemFactory(
     ID='dilute_acid_pretreatment_sys',
     ins=[cornstover],
-    outs=[dict(ID='hydrolyzate'),
+    outs=[dict(ID='pretreated_biomass'),
           dict(ID='pretreatment_wastewater')],
 )
 def create_dilute_acid_pretreatment_system(
@@ -311,7 +311,7 @@ def create_dilute_acid_pretreatment_system(
     ):
     
     feedstock, = ins
-    hydrolyzate, pretreatment_wastewater = outs
+    pretreated_biomass, pretreatment_wastewater = outs
     
     warm_process_water_1 = Stream('warm_process_water_1',
                               T=368.15,
@@ -356,7 +356,7 @@ def create_dilute_acid_pretreatment_system(
     Ammonia_storage = units.AmmoniaStorageTank('Ammonia_storage', ammonia)
     M205 = units.AmmoniaMixer(f'M{n+5}', (Ammonia_storage-0, ammonia_process_water))
     T203 = units.AmmoniaAdditionTank(f'T{n+3}', (F201-1, M205-0))
-    units.HydrolyzatePump(f'P{n+2}', T203-0, hydrolyzate)
+    units.HydrolyzatePump(f'P{n+2}', T203-0, pretreated_biomass)
     
     T201.sulfuric_acid_loading_per_dry_mass = 0.02316
     
@@ -372,8 +372,8 @@ def create_dilute_acid_pretreatment_system(
     @M205.add_specification(run=True)
     def update_ammonia_loading():
         ammonia, ammonia_process_water = M205.ins
-        hydrolyzate = F201.outs[1]
-        ammonia.imol['NH4OH'] = 2. * hydrolyzate.imol['H2SO4']
+        pretreated_biomass = F201.outs[1]
+        ammonia.imol['NH4OH'] = 2. * pretreated_biomass.imol['H2SO4']
         ammonia_process_water.imass['Water'] = 2435.6 * ammonia.imol['NH4OH']
     
     def neutralization():
@@ -382,7 +382,7 @@ def create_dilute_acid_pretreatment_system(
 
 @bst.SystemFactory(
     ID='saccharification_sys',
-    ins=[dict(ID='hydrolyzate'),
+    ins=[dict(ID='pretreated_biomass'),
          dict(ID='cellulase',
               units='kg/hr',
               price=price['Enzyme']),
@@ -398,14 +398,14 @@ def create_saccharification_system(
         Saccharification=None,
         saccharification_reactions=None,
     ):
-    hydrolyzate, cellulase, saccharification_water = ins
+    pretreated_biomass, cellulase, saccharification_water = ins
     slurry, = outs
     if nonsolids is None: nonsolids = default_nonsolids
     if insoluble_solids is None: insoluble_solids = default_insoluble_solids
     if insoluble_solids_loading is None: insoluble_solids_loading = 10.3
     if solids_loading is None: solids_loading = 0.2
     if ignored is None: ignored = default_ignored
-    M301 = units.EnzymeHydrolysateMixer('M301', (hydrolyzate, cellulase, saccharification_water))
+    M301 = units.EnzymeHydrolysateMixer('M301', (pretreated_biomass, cellulase, saccharification_water))
     H301 = units.HydrolysateHeatExchanger('H301', M301-0, T=48+273.15)
     M301.solids_loading = solids_loading
     M301.insoluble_solids_loading = insoluble_solids_loading
@@ -414,7 +414,7 @@ def create_saccharification_system(
     
     @M301.add_specification
     def update_cellulase_loading():
-        hydrolyzate, cellulase, water = M301.ins
+        pretreated_biomass, cellulase, water = M301.ins
         # Note: An additional 10% is produced to produce sophorose
         # Humbird (2011) pg. 37 
         enzyme_concentration = M301.enzyme_concentration
@@ -423,15 +423,15 @@ def create_saccharification_system(
         cellulase.imass['Water', 'Cellulase'] = (
             enzyme_over_cellulose
             * z_mass_cellulase_mixture
-            * 1.2 * (hydrolyzate.imass['Glucan'])
+            * 1.2 * (pretreated_biomass.imass['Glucan'])
         )
     
     
     @M301.add_specification(run=True)
     def update_moisture_content():
-        hydrolyzate, cellulase, saccharification_water, *other = M301.ins
+        pretreated_biomass, cellulase, saccharification_water, *other = M301.ins
         chemicals = M301.chemicals
-        s_mix = Stream.sum([hydrolyzate, cellulase], None, M301.outs[0].thermo, energy_balance=False)
+        s_mix = Stream.sum([pretreated_biomass, cellulase], None, M301.outs[0].thermo, energy_balance=False)
         mass = s_mix.mol * chemicals.MW
         solids_loading = M301.solids_loading
         insoluble_solids_loading = M301.insoluble_solids_loading
@@ -805,7 +805,7 @@ def create_cofermentation_system(
  
 @bst.SystemFactory(
     ID='cellulosic_fermentation_sys',
-    ins=[dict(ID='hydrolyzate'),
+    ins=[dict(ID='pretreated_biomass'),
          dict(ID='cellulase',
               units='kg/hr',
               price=price['Enzyme']),
@@ -841,14 +841,14 @@ def create_cellulosic_fermentation_system(
         add_nutrients=True,
     ):
     vent, beer, lignin = outs
-    hydrolyzate, cellulase, saccharification_water, DAP, CSL = ins
+    pretreated_biomass, cellulase, saccharification_water, DAP, CSL = ins
     if not add_nutrients:
         ins.remove(CSL)
         ins.remove(DAP)
     if kind is None: kind = 'IB'
     SCF_keys = ('SCF', 'Saccharification and Co-Fermentation')
     saccharification_sys = create_saccharification_system(
-        ins=[hydrolyzate, cellulase, saccharification_water],
+        ins=[pretreated_biomass, cellulase, saccharification_water],
         mockup=True,
         solids_loading=solids_loading,
         insoluble_solids_loading=insoluble_solids_loading,
@@ -1000,7 +1000,7 @@ def create_system(ins, outs, include_blowdown_recycle=False):
              'Product tank': 'T703'},
         mockup=True,
     )
-    ethanol, stillage, stripper_bottoms_product = ethanol_purification_sys.outs
+    ethanol, stillage, recycle_process_water = ethanol_purification_sys.outs
     recycled_water = tmo.Stream(Water=1,
                                 T=47+273.15,
                                 P=3.9*101325,
@@ -1008,7 +1008,7 @@ def create_system(ins, outs, include_blowdown_recycle=False):
     S401 = bst.PressureFilter('S401', (stillage, recycled_water))
     bst.create_all_facilities(
         feedstock, blowdown_recycle=include_blowdown_recycle, HXN=False,
-        recycle_process_water_streams=[stripper_bottoms_product],
+        recycle_process_water_streams=[recycle_process_water],
     )
     
     # if include_blowdown_recycle:
@@ -1030,6 +1030,6 @@ def create_system(ins, outs, include_blowdown_recycle=False):
     #                             s.saccharification_water),
     #     feedstock=feedstock,
     #     RO_water=u.S604-0,
-    #     recycle_process_water=stripper_bottoms_product,
+    #     recycle_process_water=recycle_process_water,
     #     blowdown_to_wastewater=blowdown_to_wastewater,
     # )
