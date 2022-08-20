@@ -21,6 +21,7 @@ from ..sugarcane import (
     create_ethanol_purification_system_after_beer_column,
 )
 from ..lipidcane import (
+    create_lipid_wash_system,
     create_feedstock_handling_system,
     create_juicing_system,
     create_lipid_pretreatment_system as create_oil_pretreatment_system,
@@ -74,8 +75,8 @@ def create_oil_expression_system(ins, outs):
 )
 def create_lipid_exctraction_system(ins, outs):
     fermentation_effluent, = ins
-    lipid, cellmass, wastewater, = outs
-    U401 = bst.SolidsCentrifuge('U401', fermentation_effluent, ['', wastewater],
+    lipids, cellmass, wastewater, = outs
+    U401 = bst.SolidsCentrifuge('U401', fermentation_effluent, ['', ''],
         split=dict(cellmass=0.98, lipid=0.98),
         moisture_content=0.5,
         solids=['cellmass'],
@@ -87,10 +88,13 @@ def create_lipid_exctraction_system(ins, outs):
     )
     # X401 = bst.ThermalOxidizer('X401', (U403-1, 'oxidizer_air'), 'oxidizer_emissions')
     U403 = bst.ScrewFeeder('U403', U402-0)
-    U404 = bst.Splitter('U404', U403-0, [lipid, ''],
+    U404 = bst.Splitter('U404', U403-0, 
         split=dict(cellmass=1, lipid=0.3, Water=0.8),
     )
     bst.ConveyingBelt('U405', U404-0, cellmass)
+    lipid_wash_sys = create_lipid_wash_system(ins=U404-1, outs=lipids, mockup=True)
+    washed_lipid, spent_wash_water = lipid_wash_sys.outs
+    bst.Mixer(ins=[spent_wash_water, U401-1], outs=wastewater)
 
 @bst.SystemFactory(
     ID='acTAG_separation_sys',
@@ -107,8 +111,7 @@ def create_acTAG_separation_system(ins, outs):
         solid_purity=0.95, 
         melt_purity=0.90,
     )
-    PF1 = bst.PressureFilter('PF1', C1-0, split=0.5, moisture_content=0.)
-    bst.StorageTank('S1', PF1-0, TAG, tau=24*7)
+    PF1 = bst.PressureFilter('PF1', C1-0, [TAG, ''], split=0.5, moisture_content=0.)
     
     def split_phases(unit):
         feed = unit.ins[0]
@@ -1181,13 +1184,14 @@ def add_urea_MgSO4_nutrients(fermentor, seedtrain=None):
     ins=[oilcane_dct],
     outs=[dict(ID='biodiesel', price=price['Biodiesel']),
           dict(ID='crude_glycerol', price=price['Crude glycerol']),
-          'vinasse'],
+          'vinasse',
+          dict(ID='acTAG', price=1.633)],
 )
 def create_oilcane_to_biodiesel_and_acTAG_1g(
             ins, outs,
         ):
     oilcane, = ins
-    biodiesel, crude_glycerol, vinasse = outs
+    biodiesel, crude_glycerol, vinasse, acTAG = outs
     
     feedstock_handling_sys = create_feedstock_handling_system(
         ins=oilcane,
@@ -1246,12 +1250,13 @@ def create_oilcane_to_biodiesel_and_acTAG_1g(
     )
     oil, cellmass, wastewater = post_fermentation_oil_separation_sys.outs
     
-    actag.create_acTAG_separation_system(
-        'acTAG_separation_sys', washed_lipid, [acTAG, TAG], mockup=True, area=400,
+    acTAG_separation_sys = create_acTAG_separation_system(
+        'acTAG_separation_sys', oil, [acTAG, ''], mockup=True, area=400,
     )
+    acTAG, TAG = acTAG_separation_sys.outs
     
     oil_pretreatment_sys, oil_pretreatment_dct = create_oil_pretreatment_system(
-        ins=oil,
+        ins=TAG,
         mockup=True,
         outs=['', 'polar_lipids', ''],
         area=600,
@@ -1289,48 +1294,46 @@ def create_oilcane_to_biodiesel_and_acTAG_1g(
     ID='oilcane_sys',
     ins=[oilcane_dct],
     outs=[dict(ID='biodiesel', price=price['Biodiesel']),
-          dict(ID='crude_glycerol', price=price['Crude glycerol'])],
+          dict(ID='crude_glycerol', price=price['Crude glycerol']),
+          dict(ID='acTAG', price=1.633)],
 )
-def create_oilcane_to_biodiesel_and_acTAG_combined_1_and_2g_post_fermentation_oil_separation(ins, outs, fed_batch=True):
+def create_oilcane_to_biodiesel_and_acTAG_combined_1_and_2g_post_fermentation_oil_separation(ins, outs):
     oilcane, = ins
-    biodiesel, crude_glycerol = outs
-    X = 0.60 if fed_batch else 0.495
-    cofermentation = tmo.PRxn(
-        [tmo.Rxn('CO2 + Xylose -> H2O + TAG', 'Xylose', X, correct_atomic_balance=True),
-         tmo.Rxn('CO2 + Glucose -> H2O + TAG', 'Glucose', X, correct_atomic_balance=True),
-         tmo.Rxn('Xylose -> Cellmass', 'Xylose', 0.99 - X, correct_mass_balance=True),
-         tmo.Rxn('Glucose -> Cellmass', 'Glucose', 0.99 - X, correct_mass_balance=True)],
-    )
+    biodiesel, crude_glycerol, acTAG = outs
+    cofermentation = tmo.PRxn([
+        tmo.Rxn('Glucose -> 2.04 Water + 1.67 CO2 + 0.106 AcetylDiOlein', 'Glucose', 0.156),
+        tmo.Rxn('Glucose -> 2.1 Water + 1.72 CO2 + 0.075 TriOlein', 'Glucose', 0.165),
+        tmo.Rxn('Glucose -> Cells', 'Glucose', 0.10, basis='wt').copy(basis='mol'),
+    ])
     oilcane_to_fermentation_sys = create_cane_to_combined_1_and_2g_fermentation('oilcane_to_fermentation_sys',
         ins=oilcane, 
         product_group='Lipid',
-        titer=89.4 if fed_batch else 27.4,
-        productivity=0.61 if fed_batch else 0.31,
+        titer=2.5,
+        productivity=0.33,
         ignored_volume='Lipid',
         cofermentation_reactions=cofermentation,
         seed_train_reactions=cofermentation,
         CoFermentation=units.CoFermentation,
         SeedTrain=units.SeedTrain,
         include_scrubber=False,
-        fed_batch=fed_batch,
+        fed_batch=False,
         mockup=True
     )
     cofermentation = f(units.CoFermentation)
     seedtrain = f(units.SeedTrain)
     add_urea_MgSO4_nutrients(cofermentation, seedtrain)
     beer, lignin, condensate, pretreatment_wastewater, fiber_fines = oilcane_to_fermentation_sys.outs
-    post_fermentation_oil_separation_sys = create_lipid_exctraction_system(
+    lipid_exctraction_sys = create_lipid_exctraction_system(
         ins=beer,
         mockup=True,
         area=400,
     )
-    oil, cellmass, wastewater = post_fermentation_oil_separation_sys.outs
+    oil, cellmass, wastewater = lipid_exctraction_sys.outs
     
     acTAG_separation_sys = create_acTAG_separation_system(
-        'acTAG_separation_sys', oil, mockup=True, area=400,
+        'acTAG_separation_sys', oil, [acTAG, ''], mockup=True, area=400,
     )
     acTAG, TAG = acTAG_separation_sys.outs
-    
     
     oil_pretreatment_sys, oil_pretreatment_dct = create_oil_pretreatment_system(
         ins=TAG,
