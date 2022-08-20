@@ -41,6 +41,7 @@ __all__ = (
     'create_sugarcane_to_ethanol_combined_1_and_2g',
     'create_oilcane_to_biodiesel_1g',
     'create_oilcane_to_biodiesel_combined_1_and_2g_post_fermentation_oil_separation',
+    'create_lipid_exctraction_system',
 )
 
 oilcane_dct = create_juicing_and_oil_extraction_system.ins[0].copy()
@@ -65,6 +66,67 @@ def create_oil_expression_system(ins, outs):
     U801.cost_items['Screw press'] = cost_item = U801.cost_items['Screw press'].copy()
     cost_item.ub = 24000
     U801.tag = "bagasse oil extraction"
+
+@SystemFactory(
+    ID='lipid_exctraction_sys',
+    ins=['fermentation_effluent'],
+    outs=['lipids', 'cellmass', 'wastewater'],
+)
+def create_lipid_exctraction_system(ins, outs):
+    fermentation_effluent, = ins
+    lipid, cellmass, wastewater, = outs
+    U401 = bst.SolidsCentrifuge('U401', fermentation_effluent, ['', wastewater],
+        split=dict(cellmass=0.98, lipid=0.98),
+        moisture_content=0.5,
+        solids=['cellmass'],
+    )
+    U402 = bst.DrumDryer('U402', 
+        (U401-0, 'dryer_air', 'dryer_natural_gas'), 
+        ('', 'dryer_outlet_air', 'dryer_emissions'),
+        moisture_content=0.18, split=0.,
+    )
+    # X401 = bst.ThermalOxidizer('X401', (U403-1, 'oxidizer_air'), 'oxidizer_emissions')
+    U403 = bst.ScrewFeeder('U403', U402-0)
+    U404 = bst.Splitter('U404', U403-0, [lipid, ''],
+        split=dict(cellmass=1, lipid=0.3, Water=0.8),
+    )
+    bst.ConveyingBelt('U405', U404-0, cellmass)
+
+@bst.SystemFactory(
+    ID='acTAG_separation_sys',
+    ins=[dict(ID='lipid')],
+    outs=[dict(ID='acTAG'),
+          dict(ID='TAG')],
+)
+def create_acTAG_separation_system(ins, outs):
+    lipid, = ins
+    acTAG, TAG = outs
+    M1 = bst.Mixer('M1', (lipid, None))
+    C1 = units.OleinCrystallizer(
+        'C1', M1-0, T=273.15 - 20,
+        solid_purity=0.95, 
+        melt_purity=0.90,
+    )
+    PF1 = bst.PressureFilter('PF1', C1-0, split=0.5, moisture_content=0.)
+    bst.StorageTank('S1', PF1-0, TAG, tau=24*7)
+    
+    def split_phases(unit):
+        feed = unit.ins[0]
+        solid, liquid = PF1.outs
+        solid.copy_like(feed['s'])
+        liquid.copy_like(feed['l'])
+    
+    PF1.add_specification(args=[PF1])
+    
+    C2 = units.OleinCrystallizer(
+        'C2', PF1-1, T=273.15 - 35,
+        solid_purity=0.90, 
+        melt_purity=0.95,
+    )
+    PF2 = bst.PressureFilter('PF2', C2-0, split=0.5, moisture_content=0.)
+    PF2.add_specification(args=[PF2])
+    bst.StorageTank('S2', PF2-1, acTAG, tau=24*7)
+    M1.ins[1] = PF2.outs[0]
 
 @SystemFactory(
     ID='post_fermentation_oil_separation_sys',
@@ -1114,3 +1176,190 @@ def add_urea_MgSO4_nutrients(fermentor, seedtrain=None):
             for i in Urea_storage.path_until(fermentor): i.run()
             for i in MgSO4_storage.path_until(fermentor): i.run()
     
+@SystemFactory(
+    ID='oilcane_sys',
+    ins=[oilcane_dct],
+    outs=[dict(ID='biodiesel', price=price['Biodiesel']),
+          dict(ID='crude_glycerol', price=price['Crude glycerol']),
+          'vinasse'],
+)
+def create_oilcane_to_biodiesel_and_acTAG_1g(
+            ins, outs,
+        ):
+    oilcane, = ins
+    biodiesel, crude_glycerol, vinasse = outs
+    
+    feedstock_handling_sys = create_feedstock_handling_system(
+        ins=oilcane,
+        outs='',
+        mockup=True,
+        area=100
+    )
+    
+    ### Oil and juice separation ###
+    
+    juicing_sys, jdct = create_juicing_system(
+        ins=feedstock_handling_sys-0,
+        outs=['', '', 'fiber_fines'],
+        pellet_bagasse=False,
+        mockup=True,
+        udct=True,
+        area=200,
+    )
+    screened_juice, bagasse, fiber_fines = juicing_sys.outs
+    # bagasse_pelleting_sys = create_bagasse_pelleting_system(None, bagasse, area=200, mockup=True)
+    # pelleted_bagasse, = bagasse_pelleting_sys.outs
+    jdct['S201'].isplit['Lipid'] = 1. # Vibrating screen
+    crushing_mill = jdct['U201']
+    crushing_mill.tag = "oil extraction"
+    crushing_mill.isplit['Lipid'] = 0.90
+    fermrxn = tmo.PRxn([
+        tmo.Rxn('Glucose -> 2.04 Water + 1.67 CO2 + 0.106 AcetylDiOlein', 'Glucose', 0.156),
+        tmo.Rxn('Glucose -> 2.1 Water + 1.72 CO2 + 0.075 TriOlein', 'Glucose', 0.165),
+        tmo.Rxn('Glucose -> Cells', 'Glucose', 0.10, basis='wt').copy(basis='mol'),
+    ])
+    fermentation_sys, epdct = create_sucrose_fermentation_system(
+        ins=[screened_juice],
+        scrubber=False,
+        fermentation_reaction=fermrxn,
+        fed_batch=False,
+        titer=5.5,
+        productivity=0.033,
+        product_group='Lipid',
+        mockup=True,
+        area=300,
+        udct=True,
+    )
+    fermentor = epdct['R301']
+    fermentor.N = None
+    fermentor.V = 3785.4118
+    fermentor.Nmin = 2
+    fermentor.Nmax = 36
+    product, condensate, vent = fermentation_sys.outs
+    add_urea_MgSO4_nutrients(fermentor)
+    
+    post_fermentation_oil_separation_sys = create_lipid_exctraction_system(
+        ins=product,
+        outs=[None, None, vinasse],
+        mockup=True,
+        area=400,
+    )
+    oil, cellmass, wastewater = post_fermentation_oil_separation_sys.outs
+    
+    actag.create_acTAG_separation_system(
+        'acTAG_separation_sys', washed_lipid, [acTAG, TAG], mockup=True, area=400,
+    )
+    
+    oil_pretreatment_sys, oil_pretreatment_dct = create_oil_pretreatment_system(
+        ins=oil,
+        mockup=True,
+        outs=['', 'polar_lipids', ''],
+        area=600,
+        udct=True,
+    )
+    oil, polar_lipids, wastewater = oil_pretreatment_sys.outs
+    
+    # Fresh degummed oil
+    transesterification_and_biodiesel_separation_sys, tbdct = create_transesterification_and_biodiesel_separation_system(
+        ins=oil, 
+        outs=[biodiesel, crude_glycerol, ''],
+        mockup=True,
+        area=600,
+        udct=True,
+    )
+    bst.Mixer(600, [transesterification_and_biodiesel_separation_sys-2, wastewater], 'wastewater')
+
+    ### Facilities ###
+    u = f.unit
+    bst.create_all_facilities(
+        feedstock=bagasse,
+        recycle_process_water_streams=(condensate,),
+        HXN_kwargs=dict(
+            ID=900,
+            ignored=lambda: [u.E301, u.D601.boiler, u.D602.boiler, u.H601, u.H602, u.H603, u.H604, oil_pretreatment_dct['F3']],
+            Qmin=1e5,
+            acceptable_energy_balance_error=0.01,
+        ),
+        CHP_kwargs=dict(area=700),
+        WWT=False,
+        area=800,
+    )
+
+@SystemFactory(
+    ID='oilcane_sys',
+    ins=[oilcane_dct],
+    outs=[dict(ID='biodiesel', price=price['Biodiesel']),
+          dict(ID='crude_glycerol', price=price['Crude glycerol'])],
+)
+def create_oilcane_to_biodiesel_and_acTAG_combined_1_and_2g_post_fermentation_oil_separation(ins, outs, fed_batch=True):
+    oilcane, = ins
+    biodiesel, crude_glycerol = outs
+    X = 0.60 if fed_batch else 0.495
+    cofermentation = tmo.PRxn(
+        [tmo.Rxn('CO2 + Xylose -> H2O + TAG', 'Xylose', X, correct_atomic_balance=True),
+         tmo.Rxn('CO2 + Glucose -> H2O + TAG', 'Glucose', X, correct_atomic_balance=True),
+         tmo.Rxn('Xylose -> Cellmass', 'Xylose', 0.99 - X, correct_mass_balance=True),
+         tmo.Rxn('Glucose -> Cellmass', 'Glucose', 0.99 - X, correct_mass_balance=True)],
+    )
+    oilcane_to_fermentation_sys = create_cane_to_combined_1_and_2g_fermentation('oilcane_to_fermentation_sys',
+        ins=oilcane, 
+        product_group='Lipid',
+        titer=89.4 if fed_batch else 27.4,
+        productivity=0.61 if fed_batch else 0.31,
+        ignored_volume='Lipid',
+        cofermentation_reactions=cofermentation,
+        seed_train_reactions=cofermentation,
+        CoFermentation=units.CoFermentation,
+        SeedTrain=units.SeedTrain,
+        include_scrubber=False,
+        fed_batch=fed_batch,
+        mockup=True
+    )
+    cofermentation = f(units.CoFermentation)
+    seedtrain = f(units.SeedTrain)
+    add_urea_MgSO4_nutrients(cofermentation, seedtrain)
+    beer, lignin, condensate, pretreatment_wastewater, fiber_fines = oilcane_to_fermentation_sys.outs
+    post_fermentation_oil_separation_sys = create_lipid_exctraction_system(
+        ins=beer,
+        mockup=True,
+        area=400,
+    )
+    oil, cellmass, wastewater = post_fermentation_oil_separation_sys.outs
+    
+    acTAG_separation_sys = create_acTAG_separation_system(
+        'acTAG_separation_sys', oil, mockup=True, area=400,
+    )
+    acTAG, TAG = acTAG_separation_sys.outs
+    
+    
+    oil_pretreatment_sys, oil_pretreatment_dct = create_oil_pretreatment_system(
+        ins=TAG,
+        outs=['', 'polar_lipids', ''],
+        mockup=True,
+        area=800,
+        udct=True
+    )
+    oil, polar_lipids, wastewater_small = oil_pretreatment_sys.outs
+    
+    create_transesterification_and_biodiesel_separation_system(
+        ins=oil, 
+        outs=[biodiesel, crude_glycerol, ''],
+        mockup=True,
+        area=800,
+    )
+    
+    s = f.stream
+    u = f.unit
+    bst.create_all_facilities(
+        feedstock=s.bagasse,
+        recycle_process_water_streams=(condensate,),
+        HXN_kwargs=dict(
+            ID=1000,
+            ignored=lambda: [u.D801.boiler, u.D802.boiler, u.H803, u.H802, u.H801, u.H804, u.H806, u.H809, oil_pretreatment_dct['F3']],
+            Qmin=1e3,
+            acceptable_energy_balance_error=0.01,
+        ),
+        CHP_kwargs=dict(area=700),
+        WWT_kwargs=dict(area=500),
+        area=900,
+    )
