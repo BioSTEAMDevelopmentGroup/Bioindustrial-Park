@@ -15,6 +15,7 @@ import biosteam as bst
 from biosteam import main_flowsheet as f
 from biosteam import SystemFactory
 from ..sugarcane import (
+    add_urea_MgSO4_nutrients,
     create_sucrose_fermentation_system,
     create_sucrose_to_ethanol_system,
     create_beer_distillation_system,
@@ -43,6 +44,8 @@ __all__ = (
     'create_oilcane_to_biodiesel_1g',
     'create_oilcane_to_biodiesel_combined_1_and_2g_post_fermentation_oil_separation',
     'create_lipid_exctraction_system',
+    'create_oilcane_to_biodiesel_and_actag_1g',
+    'create_oilcane_to_biodiesel_and_actag_combined_1_and_2g_post_fermentation_oil_separation',
 )
 
 oilcane_dct = create_juicing_and_oil_extraction_system.ins[0].copy()
@@ -565,10 +568,9 @@ def create_cane_to_combined_1_and_2g_fermentation(
         solids_loading=0.23, # 30 wt/vol % solids content in saccharification
         include_scrubber=include_scrubber,
     )
-    # DAP_storage = cfdct['DAP_storage']
-    # CSL_storage = cfdct['CSL_storage']
-    seed_train = cfdct['R302']
+    seedtrain = cfdct['R302']
     cofermentation = cfdct['R303'] # Cofermentation
+    add_urea_MgSO4_nutrients(cofermentation, seedtrain)
     pressurefilter = cfdct['S303'] # Pressure filter
     pressurefilter.tag = "bagasse oil extraction"
     pressurefilter.isplit['Lipid'] = 1. - 0.7
@@ -609,7 +611,7 @@ def create_cane_to_combined_1_and_2g_fermentation(
         SX1 = bst.Splitter(400, ins=EvX-1, outs=[condensate, ''], split=0.9)
         SX2 = bst.Splitter(400, ins=MT1-0, split=0.07)
         to_seed_train, to_cofermentation = SX2.outs
-        seed_train.ins.append(to_seed_train)
+        seedtrain.ins.append(to_seed_train)
         cofermentation.ins.append(to_cofermentation)
         PX = bst.Pump(400, ins=SX1-1, P=101325.)
         @SX1.add_specification(run=False)
@@ -999,7 +1001,6 @@ def create_oilcane_to_biodiesel_1g(
     fermentor.Nmin = 2
     fermentor.Nmax = 36
     product, condensate, vent = fermentation_sys.outs
-    add_urea_MgSO4_nutrients(fermentor)
     post_fermentation_oil_separation_sys = create_post_fermentation_oil_separation_system(
         ins=product,
         mockup=True,
@@ -1072,9 +1073,6 @@ def create_oilcane_to_biodiesel_combined_1_and_2g_post_fermentation_oil_separati
         fed_batch=fed_batch,
         mockup=True
     )
-    cofermentation = f(units.CoFermentation)
-    seedtrain = f(units.SeedTrain)
-    add_urea_MgSO4_nutrients(cofermentation, seedtrain)
     beer, lignin, condensate, pretreatment_wastewater, fiber_fines = oilcane_to_fermentation_sys.outs
     post_fermentation_oil_separation_sys, pfls_dct = create_post_fermentation_oil_separation_system(
         ins=beer,
@@ -1117,68 +1115,6 @@ def create_oilcane_to_biodiesel_combined_1_and_2g_post_fermentation_oil_separati
         area=900,
     )
     
-    
-def add_urea_MgSO4_nutrients(fermentor, seedtrain=None):
-    urea = bst.Stream('urea', price=90/907.185) # https://www.alibaba.com/product-detail/High-Quality-UREA-Fertilizer-Factory-price_1600464698965.html?spm=a2700.galleryofferlist.topad_classic.d_title.a69046eeVn83ML
-    MgSO4 = bst.Stream('MgSO4', price=110/907.185) # https://www.alibaba.com/product-detail/Magnesium-Sulfate-Sulphate-Sulphate-Magnesium-Sulfate_1600305131579.html?spm=a2700.galleryofferlist.topad_creative.d_image.ad602e15oP8kqh
-    Urea_storage = bst.StorageTank('Urea_storage', urea)
-    MgSO4_storage = bst.StorageTank('MgSO4_storage', MgSO4)
-    if seedtrain:
-        urea_1 = bst.Stream(
-            'urea_1',
-            Urea=26,
-            units='kg/hr'
-        )
-        urea_2 = bst.Stream(
-            'urea_2',
-            Urea=116,
-            units='kg/hr',
-        )
-        MgSO4_1 = bst.Stream(
-            'MgSO4_1',
-             MgSO4=211,
-             units='kg/hr',
-        )
-        MgSO4_2 = bst.Stream(
-            'MgSO4_2',
-            MgSO4=948,
-            units='kg/hr',
-        )
-        S301 = bst.MockSplitter('S301', Urea_storage-0, outs=(urea_1, urea_2))
-        S302 = bst.MockSplitter('S302', MgSO4_storage-0, outs=(MgSO4_1, MgSO4_2))
-        nutrients_1 = (urea_1, MgSO4_1)
-        nutrients_2 = (urea_2, MgSO4_2)
-        seedtrain.ins.extend(nutrients_1)
-        fermentor.ins.extend(nutrients_2)
-        @seedtrain.add_specification(run=True)
-        def adjust_nutrients_to_seed_train():
-            *feeds, urea, MgSO4 = seedtrain.ins
-            F_vol = sum([i.F_vol - i.ivol['Lipid'] for i in feeds])
-            urea.imass['Urea'] = 0.5 * F_vol
-            MgSO4.imass['MgSO4'] = 1 * F_vol
-            
-        @fermentor.add_specification(run=True)
-        def adjust_urea_and_MgSO4_feed_to_fermentor():
-            feed, seed, *others, urea, MgSO4, = fermentor.ins
-            F_vol = sum([i.F_vol - i.ivol['Lipid'] for i in others], feed.F_vol - feed.ivol['Lipid'])
-            urea.imass['Urea'] = 0.5 * F_vol
-            MgSO4.imass['MgSO4'] = 1 * F_vol
-            S301.ins[0].mix_from(S301.outs)
-            S302.ins[0].mix_from(S302.outs)
-            for i in Urea_storage.path_until(fermentor): i.run()
-            for i in MgSO4_storage.path_until(fermentor): i.run()
-    else:
-        fermentor.ins.append(Urea_storage-0)
-        fermentor.ins.append(MgSO4_storage-0)
-        @fermentor.add_specification(run=True)
-        def adjust_nutrients_feed_to_fermentor():
-            feed, *others, urea, MgSO4, = fermentor.ins
-            F_vol = sum([i.F_vol - i.ivol['Lipid'] for i in others], feed.F_vol - feed.ivol['Lipid'])
-            urea.imass['Urea'] = 0.5 * F_vol
-            MgSO4.imass['MgSO4'] = 1 * F_vol
-            for i in Urea_storage.path_until(fermentor): i.run()
-            for i in MgSO4_storage.path_until(fermentor): i.run()
-    
 @SystemFactory(
     ID='oilcane_sys',
     ins=[oilcane_dct],
@@ -1187,7 +1123,7 @@ def add_urea_MgSO4_nutrients(fermentor, seedtrain=None):
           'vinasse',
           dict(ID='acTAG', price=1.633)],
 )
-def create_oilcane_to_biodiesel_and_acTAG_1g(
+def create_oilcane_to_biodiesel_and_actag_1g(
             ins, outs,
         ):
     oilcane, = ins
@@ -1240,7 +1176,6 @@ def create_oilcane_to_biodiesel_and_acTAG_1g(
     fermentor.Nmin = 2
     fermentor.Nmax = 36
     product, condensate, vent = fermentation_sys.outs
-    add_urea_MgSO4_nutrients(fermentor)
     
     post_fermentation_oil_separation_sys = create_lipid_exctraction_system(
         ins=product,
@@ -1251,7 +1186,7 @@ def create_oilcane_to_biodiesel_and_acTAG_1g(
     oil, cellmass, wastewater = post_fermentation_oil_separation_sys.outs
     
     acTAG_separation_sys = create_acTAG_separation_system(
-        'acTAG_separation_sys', oil, [acTAG, ''], mockup=True, area=400,
+        'acTAG_separation_sys', oil, [acTAG, ''], mockup=True, area=500,
     )
     acTAG, TAG = acTAG_separation_sys.outs
     
@@ -1297,7 +1232,7 @@ def create_oilcane_to_biodiesel_and_acTAG_1g(
           dict(ID='crude_glycerol', price=price['Crude glycerol']),
           dict(ID='acTAG', price=1.633)],
 )
-def create_oilcane_to_biodiesel_and_acTAG_combined_1_and_2g_post_fermentation_oil_separation(ins, outs):
+def create_oilcane_to_biodiesel_and_actag_combined_1_and_2g_post_fermentation_oil_separation(ins, outs):
     oilcane, = ins
     biodiesel, crude_glycerol, acTAG = outs
     cofermentation = tmo.PRxn([
@@ -1319,9 +1254,6 @@ def create_oilcane_to_biodiesel_and_acTAG_combined_1_and_2g_post_fermentation_oi
         fed_batch=False,
         mockup=True
     )
-    cofermentation = f(units.CoFermentation)
-    seedtrain = f(units.SeedTrain)
-    add_urea_MgSO4_nutrients(cofermentation, seedtrain)
     beer, lignin, condensate, pretreatment_wastewater, fiber_fines = oilcane_to_fermentation_sys.outs
     lipid_exctraction_sys = create_lipid_exctraction_system(
         ins=beer,
@@ -1331,7 +1263,7 @@ def create_oilcane_to_biodiesel_and_acTAG_combined_1_and_2g_post_fermentation_oi
     oil, cellmass, wastewater = lipid_exctraction_sys.outs
     
     acTAG_separation_sys = create_acTAG_separation_system(
-        'acTAG_separation_sys', oil, [acTAG, ''], mockup=True, area=400,
+        'acTAG_separation_sys', oil, [acTAG, ''], mockup=True, area=500,
     )
     acTAG, TAG = acTAG_separation_sys.outs
     
@@ -1363,6 +1295,6 @@ def create_oilcane_to_biodiesel_and_acTAG_combined_1_and_2g_post_fermentation_oi
             acceptable_energy_balance_error=0.01,
         ),
         CHP_kwargs=dict(area=700),
-        WWT_kwargs=dict(area=500),
+        WWT_kwargs=dict(area=600),
         area=900,
     )

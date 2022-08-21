@@ -12,6 +12,7 @@ from biosteam import main_flowsheet as f
 import thermosteam as tmo
 
 __all__ = (
+    'add_urea_MgSO4_nutrients',
     'create_feedstock_handling_system',
     'create_juicing_system_up_to_clarification',
     'create_juicing_system_with_fiber_screener',
@@ -153,6 +154,70 @@ def convert_fiber_to_lignocelluosic_components(stream, ignore_acetate=False):
     prxn(stream)
 
 convert_fiber_to_lignocelluosic_components.last_chemicals = None
+
+# %% Fermentation extensions
+
+def add_urea_MgSO4_nutrients(fermentor, seedtrain=None):
+    urea = bst.Stream('urea', price=90/907.185) # https://www.alibaba.com/product-detail/High-Quality-UREA-Fertilizer-Factory-price_1600464698965.html?spm=a2700.galleryofferlist.topad_classic.d_title.a69046eeVn83ML
+    MgSO4 = bst.Stream('MgSO4', price=110/907.185) # https://www.alibaba.com/product-detail/Magnesium-Sulfate-Sulphate-Sulphate-Magnesium-Sulfate_1600305131579.html?spm=a2700.galleryofferlist.topad_creative.d_image.ad602e15oP8kqh
+    Urea_storage = bst.StorageTank('Urea_storage', urea)
+    MgSO4_storage = bst.StorageTank('MgSO4_storage', MgSO4)
+    if seedtrain:
+        urea_1 = bst.Stream(
+            'urea_1',
+            Urea=26,
+            units='kg/hr'
+        )
+        urea_2 = bst.Stream(
+            'urea_2',
+            Urea=116,
+            units='kg/hr',
+        )
+        MgSO4_1 = bst.Stream(
+            'MgSO4_1',
+             MgSO4=211,
+             units='kg/hr',
+        )
+        MgSO4_2 = bst.Stream(
+            'MgSO4_2',
+            MgSO4=948,
+            units='kg/hr',
+        )
+        S301 = bst.MockSplitter('S301', Urea_storage-0, outs=(urea_1, urea_2))
+        S302 = bst.MockSplitter('S302', MgSO4_storage-0, outs=(MgSO4_1, MgSO4_2))
+        nutrients_1 = (urea_1, MgSO4_1)
+        nutrients_2 = (urea_2, MgSO4_2)
+        seedtrain.ins.extend(nutrients_1)
+        fermentor.ins.extend(nutrients_2)
+        @seedtrain.add_specification(run=True)
+        def adjust_nutrients_to_seed_train():
+            *feeds, urea, MgSO4 = seedtrain.ins
+            F_vol = sum([i.F_vol - i.ivol['Lipid'] for i in feeds])
+            urea.imass['Urea'] = 0.5 * F_vol
+            MgSO4.imass['MgSO4'] = 1 * F_vol
+            
+        @fermentor.add_specification(run=True)
+        def adjust_urea_and_MgSO4_feed_to_fermentor():
+            feed, seed, *others, urea, MgSO4, = fermentor.ins
+            F_vol = sum([i.F_vol - i.ivol['Lipid'] for i in others], feed.F_vol - feed.ivol['Lipid'])
+            urea.imass['Urea'] = 0.5 * F_vol
+            MgSO4.imass['MgSO4'] = 1 * F_vol
+            S301.ins[0].mix_from(S301.outs)
+            S302.ins[0].mix_from(S302.outs)
+            for i in Urea_storage.path_until(fermentor): i.run()
+            for i in MgSO4_storage.path_until(fermentor): i.run()
+    else:
+        fermentor.ins.append(Urea_storage-0)
+        fermentor.ins.append(MgSO4_storage-0)
+        @fermentor.add_specification(run=True)
+        def adjust_nutrients_feed_to_fermentor():
+            feed, *others, urea, MgSO4, = fermentor.ins
+            F_vol = sum([i.F_vol - i.ivol['Lipid'] for i in others], feed.F_vol - feed.ivol['Lipid'])
+            urea.imass['Urea'] = 0.5 * F_vol
+            MgSO4.imass['MgSO4'] = 1 * F_vol
+            for i in Urea_storage.path_until(fermentor): i.run()
+            for i in MgSO4_storage.path_until(fermentor): i.run()
+
 
 # %% Juicing and evaporation
 
@@ -698,7 +763,7 @@ def create_sugar_crystallization_system(ins, outs):
 def create_sucrose_fermentation_system(ins, outs,
         scrubber=None, product_group=None, Fermentor=None, titer=None,
         productivity=None, ignored_volume=None, fermentation_reaction=None,
-        fed_batch=None,
+        fed_batch=None, add_nutrients=True,
     ):
     screened_juice, = ins
     beer, evaporator_condensate, vent = outs
@@ -910,6 +975,9 @@ def create_sucrose_fermentation_system(ins, outs,
                                   outs=(vent, ''),
                                   gas=('CO2', 'O2'))
         units.Mixer('M302', ins=(C301-1, D301-1), outs=beer)
+    
+    if add_nutrients:
+        add_urea_MgSO4_nutrients(R301)
     
 
 @SystemFactory(

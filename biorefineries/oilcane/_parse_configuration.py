@@ -85,7 +85,7 @@ def format_configuration(configuration, latex=True):
         name = f"S{number}"
     else:
         name = f"O{number}"
-    if number == 0 or number > 8 or number < -2: 
+    if number == 0 or number > 10 or number < -2: 
         raise ValueError(f'invalid configuration {configuration}')
     if latex:
         name = r'$\mathtt{' + name + '}$'
