@@ -58,7 +58,7 @@ def parse(x):
                 raise RuntimeError('cannot parse multiple subtractions')
         else:
             factor = -1 if x.startswith('S') else 1
-            return Configuration(factor * int(x[1]), '*' in x)
+            return Configuration(factor * int(x[1:]), '*' in x)
     elif isinstance(x, (Configuration, ConfigurationComparison)):
         return x
     else:

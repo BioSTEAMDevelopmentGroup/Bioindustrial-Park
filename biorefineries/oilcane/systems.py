@@ -111,18 +111,18 @@ def create_acTAG_separation_system(ins, outs):
     M1 = bst.Mixer('M1', (lipid, None))
     C1 = units.OleinCrystallizer(
         'C1', M1-0, T=273.15 - 20,
-        solid_purity=0.95, 
-        melt_purity=0.90,
+        solid_purity=0.99, 
+        melt_purity=0.50,
     )
     PF1 = bst.PressureFilter('PF1', C1-0, [TAG, ''], split=0.5, moisture_content=0.)
     
     def split_phases(unit):
         feed = unit.ins[0]
-        solid, liquid = PF1.outs
+        solid, liquid = unit.outs
         solid.copy_like(feed['s'])
         liquid.copy_like(feed['l'])
     
-    PF1.add_specification(args=[PF1])
+    PF1.add_specification(split_phases, args=[PF1])
     
     C2 = units.OleinCrystallizer(
         'C2', PF1-1, T=273.15 - 35,
@@ -130,7 +130,7 @@ def create_acTAG_separation_system(ins, outs):
         melt_purity=0.95,
     )
     PF2 = bst.PressureFilter('PF2', C2-0, split=0.5, moisture_content=0.)
-    PF2.add_specification(args=[PF2])
+    PF2.add_specification(split_phases, args=[PF2])
     bst.StorageTank('S2', PF2-1, acTAG, tau=24*7)
     M1.ins[1] = PF2.outs[0]
 
@@ -1177,16 +1177,17 @@ def create_oilcane_to_biodiesel_and_actag_1g(
     fermentor.Nmax = 36
     product, condensate, vent = fermentation_sys.outs
     
-    post_fermentation_oil_separation_sys = create_lipid_exctraction_system(
+    post_fermentation_oil_separation_sys, ledct = create_lipid_exctraction_system(
         ins=product,
         outs=[None, None, vinasse],
         mockup=True,
         area=400,
+        udct=True
     )
     oil, cellmass, wastewater = post_fermentation_oil_separation_sys.outs
     
-    acTAG_separation_sys = create_acTAG_separation_system(
-        'acTAG_separation_sys', oil, [acTAG, ''], mockup=True, area=500,
+    acTAG_separation_sys, acdct = create_acTAG_separation_system(
+        'acTAG_separation_sys', oil, [acTAG, ''], mockup=True, area=500, udct=True
     )
     acTAG, TAG = acTAG_separation_sys.outs
     
@@ -1216,7 +1217,9 @@ def create_oilcane_to_biodiesel_and_actag_1g(
         recycle_process_water_streams=(condensate,),
         HXN_kwargs=dict(
             ID=900,
-            ignored=lambda: [u.E301, u.D601.boiler, u.D602.boiler, u.H601, u.H602, u.H603, u.H604, oil_pretreatment_dct['F3']],
+            ignored=lambda: [u.E301, u.D601.boiler, u.D602.boiler, u.H601, 
+                             u.H602, u.H603, u.H604, oil_pretreatment_dct['F3'],
+                             acdct['C1'], acdct['C2'], ledct['F201']],
             Qmin=1e5,
             acceptable_energy_balance_error=0.01,
         ),
@@ -1255,15 +1258,16 @@ def create_oilcane_to_biodiesel_and_actag_combined_1_and_2g_post_fermentation_oi
         mockup=True
     )
     beer, lignin, condensate, pretreatment_wastewater, fiber_fines = oilcane_to_fermentation_sys.outs
-    lipid_exctraction_sys = create_lipid_exctraction_system(
+    lipid_exctraction_sys, ledct = create_lipid_exctraction_system(
         ins=beer,
         mockup=True,
         area=400,
+        udct=True,
     )
     oil, cellmass, wastewater = lipid_exctraction_sys.outs
     
-    acTAG_separation_sys = create_acTAG_separation_system(
-        'acTAG_separation_sys', oil, [acTAG, ''], mockup=True, area=500,
+    acTAG_separation_sys, acdct = create_acTAG_separation_system(
+        'acTAG_separation_sys', oil, [acTAG, ''], mockup=True, area=500, udct=True
     )
     acTAG, TAG = acTAG_separation_sys.outs
     
@@ -1275,6 +1279,10 @@ def create_oilcane_to_biodiesel_and_actag_combined_1_and_2g_post_fermentation_oi
         udct=True
     )
     oil, polar_lipids, wastewater_small = oil_pretreatment_sys.outs
+    # flash = oil_pretreatment_dct['F3']
+    # @flash.add_specification
+    # def remelt():
+    #     flash.outs[1].phase
     
     create_transesterification_and_biodiesel_separation_system(
         ins=oil, 
@@ -1290,7 +1298,9 @@ def create_oilcane_to_biodiesel_and_actag_combined_1_and_2g_post_fermentation_oi
         recycle_process_water_streams=(condensate,),
         HXN_kwargs=dict(
             ID=1000,
-            ignored=lambda: [u.D801.boiler, u.D802.boiler, u.H803, u.H802, u.H801, u.H804, u.H806, u.H809, oil_pretreatment_dct['F3']],
+            ignored=lambda: [u.D801.boiler, u.D802.boiler, u.H803, u.H802, 
+                             u.H801, u.H804, u.H806, u.H809, oil_pretreatment_dct['F3'],
+                             acdct['C1'], acdct['C2'], ledct['F201']],
             Qmin=1e3,
             acceptable_energy_balance_error=0.01,
         ),

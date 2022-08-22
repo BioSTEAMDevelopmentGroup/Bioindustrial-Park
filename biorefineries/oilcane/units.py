@@ -75,8 +75,8 @@ class CoFermentation(CoFermentation):
 class OleinCrystallizer(bst.BatchCrystallizer):
     
     def __init__(self, ID='', ins=None, outs=(), thermo=None, *, 
-                 T, solid_purity=0.95, melt_purity=0.90,
-                 solid_IDs=('TAG', 'FFA', 'PL'), melt_IDs=('acTAG',),
+                 T, solid_purity=0.98, melt_purity=0.90,
+                 solid_IDs=('TAG', 'FFA', 'PL'), melt_IDs=('AcTAG',),
                  order=None):
         bst.BatchCrystallizer.__init__(self, ID, ins, outs, thermo,
                                        tau=5, V=1e6, T=T)
@@ -90,7 +90,8 @@ class OleinCrystallizer(bst.BatchCrystallizer):
         feed = self.ins[0]
         effluent = self.outs[0]
         if 's' in feed.phases:
-            H_in = - sum([i.Hfus * j for i,j in zip(self.chemicals, feed['s'].mol) if i.Hfus])
+            solid = feed if feed.phase == 's' else feed['s']
+            H_in = - sum([i.Hfus * j for i,j in zip(self.chemicals, solid.mol) if i.Hfus])
         else:
             H_in = 0.
         solids = effluent['s']
@@ -107,9 +108,11 @@ class OleinCrystallizer(bst.BatchCrystallizer):
         melt_IDs = self.melt_IDs
         solid_flows = feed.imass[solid_IDs]
         melt_flows = feed.imass[melt_IDs]
-        total = solid_flows + melt_flows
-        minimum_melt_purity = melt_flows.sum() / total
-        minimum_solid_purity = solid_flows.sum() / total
+        net_solid_flow = solid_flows.sum()
+        net_melt_flow = melt_flows.sum()
+        total = net_solid_flow + net_melt_flow
+        minimum_melt_purity = net_melt_flow / total
+        minimum_solid_purity = net_solid_flow / total
         outlet.empty()
         if solid_purity < minimum_solid_purity:
             outlet.imol['s'] = feed.mol

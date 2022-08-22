@@ -363,9 +363,6 @@ def load(name, cache=cache, reduce_chemicals=True,
             'HXN',
             'Storage',
         ]
-        oilcane_sys = create_oilcane_to_biodiesel_combined_1_and_2g_post_fermentation_oil_separation(
-            operating_hours=operating_hours, fed_batch=number==6,
-        )
         rename_storage_units(1100)
     else:
         raise NotImplementedError(number)
@@ -1053,8 +1050,8 @@ def load(name, cache=cache, reduce_chemicals=True,
             return 0.
     
     @metric
-    def acTAG():
-        return tea.solve_price(s.actag) if number in actag_configurations else 0.
+    def MASP():
+        return tea.solve_price(s.acTAG) if number in actag_configurations else 0.
     
     # @metric(units='MMGGE/yr')
     # def productivity():

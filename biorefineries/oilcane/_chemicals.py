@@ -46,14 +46,14 @@ def create_chemicals():
         create_acetyl_diolein(),
     ])
     chemicals.compile()
-    chemicals.define_group('Lipid', ['PL', 'FFA', 'MAG', 'DAG', 'TAG'])
-    chemicals.define_group('lipid', ['PL', 'FFA', 'MAG', 'DAG', 'TAG'])
+    chemicals.set_synonym('AcetylDiOlein', 'AcTAG')
+    chemicals.define_group('Lipid', ['PL', 'FFA', 'MAG', 'DAG', 'TAG', 'AcTAG'])
+    chemicals.define_group('lipid', ['PL', 'FFA', 'MAG', 'DAG', 'TAG', 'AcTAG'])
     chemicals.define_group('Oil', ['PL', 'FFA', 'MAG', 'DAG', 'TAG'])
     chemicals.set_synonym('DryYeast', 'Cellmass')
     chemicals.AcetylDiOlein.V.method_P = chemicals.TriOlein.V.method_P = None
     chemicals.set_synonym('Cellmass', 'Cells')
     chemicals.set_synonym('Cellmass', 'cellmass')
-    chemicals.set_synonym('AcetylDiOlein', 'AcTAG')
     chemicals.set_synonym('TriOlein', 'TAG')
     return chemicals
     

@@ -199,7 +199,10 @@ def add_urea_MgSO4_nutrients(fermentor, seedtrain=None):
         @fermentor.add_specification(run=True)
         def adjust_urea_and_MgSO4_feed_to_fermentor():
             feed, seed, *others, urea, MgSO4, = fermentor.ins
-            F_vol = sum([i.F_vol - i.ivol['Lipid'] for i in others], feed.F_vol - feed.ivol['Lipid'])
+            if 'Lipid' in feed.chemicals:
+                F_vol = sum([i.F_vol - i.ivol['Lipid'] for i in others], feed.F_vol - feed.ivol['Lipid'])
+            else:
+                F_vol = sum([i.F_vol for i in others], feed.F_vol)
             urea.imass['Urea'] = 0.5 * F_vol
             MgSO4.imass['MgSO4'] = 1 * F_vol
             S301.ins[0].mix_from(S301.outs)
@@ -212,7 +215,10 @@ def add_urea_MgSO4_nutrients(fermentor, seedtrain=None):
         @fermentor.add_specification(run=True)
         def adjust_nutrients_feed_to_fermentor():
             feed, *others, urea, MgSO4, = fermentor.ins
-            F_vol = sum([i.F_vol - i.ivol['Lipid'] for i in others], feed.F_vol - feed.ivol['Lipid'])
+            if 'Lipid' in feed.chemicals:
+                F_vol = sum([i.F_vol - i.ivol['Lipid'] for i in others], feed.F_vol - feed.ivol['Lipid'])
+            else:
+                F_vol = sum([i.F_vol for i in others], feed.F_vol)
             urea.imass['Urea'] = 0.5 * F_vol
             MgSO4.imass['MgSO4'] = 1 * F_vol
             for i in Urea_storage.path_until(fermentor): i.run()
