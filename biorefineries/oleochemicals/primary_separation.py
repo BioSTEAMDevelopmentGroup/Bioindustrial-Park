@@ -15,7 +15,7 @@ from biosteam import SystemFactory
 
 
 @SystemFactory(
-    ID = 'Primary_separation',
+    ID = 'primary_separation',
     ins = [dict(ID='organic_phase_for_separation')
           ],    
     outs = [dict(ID = 'nonanoic_acid_crude_product'),

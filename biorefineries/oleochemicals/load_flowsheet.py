@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Created on Tue Jul 26 15:32:26 2022
 
@@ -9,5 +8,5 @@ from biorefineries import oleochemicals as oc
 from importlib import reload
 reload(oc)
 oc.load('azelaic_acid')
-oc.sys.diagram()
+oc.sys.diagram(number = True)
 oc.sys.simulate()
