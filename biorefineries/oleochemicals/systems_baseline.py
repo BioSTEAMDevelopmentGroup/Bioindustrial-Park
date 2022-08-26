@@ -105,7 +105,7 @@ def dihydroxylation_system(ins,outs):
     R101 = units_baseline.DihydroxylationReactor('R101',
                                 ins = R101_H-0, 
                                 outs = diol_product,
-                                P = 20000,
+                                P = 101325,
                                 V=3785, 
                                 # in m3 (equivalent to 1 MMGal), 
                                 # this is including catalyst volume
@@ -159,7 +159,7 @@ def oxidative_cleavage_system(ins,outs):
                                 ins = R201_H-0, 
                                 outs = (vented_gas,
                                         mixed_oxidation_products),
-                                P = 20*10e5,
+                                P = 5*10e5,
                                 V=3785, 
                                 # in m3 (equivalent to 1 MMGal), 
                                 # this is including catalyst volume
@@ -182,7 +182,7 @@ def organic_phase_separation(ins,outs):
     mixed_oxidation_products, = ins
     organic_phase,aqueous_phase, = outs
 ### TODO.xxx add the costs acc to disc separators
-# how to depressurise
+### TODO.xxx figure out how to depressurise
     L301 = bst.units.LiquidsSplitCentrifuge('L301',
                                             ins= mixed_oxidation_products,
                                             outs=(organic_phase,
@@ -224,7 +224,7 @@ def nonanoic_acid_fraction_separation(ins,outs):
     D501_steam.T = 620
     D501_steam.P = Water.Psat(620)
     H501 = bst.HXutility(ins = crude_fatty_acids,
-                          T = 200 + 273)
+                          T = 260 + 273)
 
 # TODO.xxx check if these can be done using high P and temperatures
     
@@ -232,11 +232,13 @@ def nonanoic_acid_fraction_separation(ins,outs):
                                    ins = H501 - 0,
                                    outs = ('crude_nonanal',
                                             heavy_fatty_acids),
-                                   LHK = ('Pelargonic_acid',
-                                          'Azelaic_acid'),
-                                   Lr = 0.9,
-                                   Hr = 0.9,
-                                   k = 2
+                                   LHK = ('Methyl_azelate',
+                                          'Pelargonic_acid'),
+                                   Lr=0.8,
+                                   Hr=0.8,
+                                   P = 5000,
+                                   k = 2,
+                                   partial_condenser=False
                                   )
     
     D502 = bst.BinaryDistillation('D502',
@@ -244,11 +246,13 @@ def nonanoic_acid_fraction_separation(ins,outs):
                                   outs = (Caprylic_acid,
                                           Pelargonic_acid),
                                   LHK = ('Caprylic_acid',
-                                  'Pelargonic_acid'),
-                                  Lr = 0.9,
-                                  Hr = 0.9,
-                                  k = 2
+                                         'Pelargonic_acid'),
+                                  Lr = 0.8,
+                                  Hr = 0.8,
+                                  k = 2,
+                                  partial_condenser=False
                                  )
+
 ob5 = nonanoic_acid_fraction_separation(ins = ob3.outs[0]) 
 ob5.simulate()
 ob5.show()

@@ -89,13 +89,13 @@ class OxidativeCleavageReactor(bst.BatchBioreactor):
         # decarboxylations conversion
         X2 = 0.2
         # X3 = 0.2
-        Product_formation = PRxn([Rxn('MDHSA + 1.5 Oxygen  -> Pelargonic_acid + Methyl_azelate','MDHSA', X = X1),
-                                  Rxn('MDHSA  ->  Caprylic_acid + Methyl_azelate','MDHSA', X = X2)])                        
+        Product_formation = PRxn([Rxn('MDHSA + 1.5 Oxygen  -> Pelargonic_acid + Monomethyl_azelate','MDHSA', X = X1),
+                                  Rxn('MDHSA  ->  Caprylic_acid + Monomethyl_azelate','MDHSA', X = X2)])                        
         #TODO.xxx check again possible decarboxylation https://doi.org/10.1016/j.renene.2018.01.107
         #TODO.xxx check again Organic Reactions in Strong Alkalis. Part V.l Alkali Fusion of Epoxides and Ethers 
 
         # Side_reaction = SRxn([Rxn('Pelargonic_acid   -> Caprylic_acid + carbon_dioxide ', 'Pelargonic_acid', X= X2),
-                               # Rxn('Methyl_azelate -> suberic_acid + carbon_dioxide', 'Methyl_azelate', X = X3),
+                               # Rxn('Monomethyl_azelate -> suberic_acid + carbon_dioxide', 'Monomethyl_azelate', X = X3),
                              # ])
         oxidative_cleavage_rxnsys = RxnSys(Product_formation)
         self.reactions = oxidative_cleavage_rxnsys
