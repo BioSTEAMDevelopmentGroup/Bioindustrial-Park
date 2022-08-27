@@ -55,18 +55,20 @@ def chemical_defined(ID, **kwargs):
 
 ##Chemicals that are already in the data base
 
-Hydrogen_peroxide = chemical_database('Hydrogen_peroxide')
+Hydrogen_peroxide = chemical_database('Hydrogen_peroxide',phase = 'l')
+
 Biodiesel = chemical_database('Methyl_oleate')
 Water =  chemical_database('Water')
 #look into phase of the below
 MDHSA = chemical_database('MDHSA',search_ID = '1115-01-1')
 Pelargonic_acid = chemical_database('Pelargonic_acid')
 Azelaic_acid = chemical_database('Azelaic_acid')
-Monomethyl_azelate = chemical_database('Methyl_azelate')
+Monomethyl_azelate = chemical_database('Monomethyl_azelate')
 Suberic_acid = chemical_database('Suberic_acid')
 Caprylic_acid = chemical_database('Caprylic_acid')
 Nitrogen = chemical_database('Nitrogen')
 Oxygen = chemical_database('Oxygen')
+Methanol = chemical_database('Methanol')
 ### Chemicals that were missing some properties
 ### TODO.xxx check if this is a good assumption with Yoel
 Tungsten = chemical_database('tungsten')
@@ -76,13 +78,34 @@ Tungsten_catalyst.copy_models_from(Tungsten,['Hvap','Psat'])
 
 ###Using cobalt chloride instead of acetate as allowed by the patent
 ###cobalt acetate has a few missing properties, further GWP data not available
-Cobalt_chloride = chemical_database('Cobalt_chloride',search_ID = '7646-79-9')
+Cobalt_chloride = chemical_database('Cobalt_chloride',search_ID = '7646-79-9',
+                                    phase = 's')
 # cobalt_acetate_Tb: https://www.chemsrc.com/en/cas/71-48-7_34110.html
-Cobalt_catalyst = chemical_database('Cobalt_acetate',Tb = 117.1+273.15, phase = 's')
+Cobalt_catalyst = chemical_database('Cobalt_acetate',Tb = 117.1+273.15, 
+                                    phase = 's')
 Cobalt_catalyst.copy_models_from(Cobalt_chloride,['Hvap','Psat'])
 #defaulting the rest of the properties to that of water
 Cobalt_catalyst.default()
 
+###Modelling amberlyte catalyst like a solid catalyst
+##Using sunfonated_polystyrene boiling point
+##https://www.chemsrc.com/en/cas/39389-20-3_843683.html#:~:text=amberlyst%28r%29%2015%20CAS%20Number%3A%2039389-20-3%3A%20Molecular%20Weight%3A%20314.39900%3A,Point%3A%20266.3%C2%BAC%3A%20Symbol%3A%20GHS07%3A%20Signal%20Word%3A%20Warning%20%C3%97
+
+##Chemicals not in the database
+Amberlyst_catalyst = chemical_defined('polystyrene_based_catalyst',
+                                       Tb = 516.7+273.15,
+                                       phase = 's')
+##Below lacks Hvap etc models
+# Sulfonated_polystyrene = chemical_database('Sulfonated_polystyrene',
+#                                            search_ID = '98-70-4',
+#                                            )
+##Hence using polystyrene
+Polystyrene = chemical_database('Polystyrene')
+##Hence using polystyrene
+Amberlyst_catalyst.copy_models_from(Polystyrene,
+                                    ['Hvap','Psat','sigma', 
+                                     'epsilon', 'kappa', 'V',
+                                     'Cn', 'mu'])
 chems.compile()
 tmo.settings.set_thermo(chems)
 chems.show()

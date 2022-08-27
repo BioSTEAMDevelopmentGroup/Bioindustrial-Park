@@ -20,6 +20,15 @@ from biosteam import Unit
 class DihydroxylationReactor(bst.BatchBioreactor):
     _N_ins = 1
     _N_outs = 1
+ #: [bool] If True, number of reactors (N) is chosen as to minimize installation cost in every simulation. Otherwise, N remains constant.
+    autoselect_N = False    
+    #: [float] Cleaning and unloading time (hr).
+    tau_0 = 3    
+    #: [float] Fraction of filled tank to total tank volume.
+    V_wf = 0.9    
+    def _get_design_info(self):
+        return (('Cleaning and unloading time', self.tau_0, 'hr'),
+                ('Working volume fraction', self.V_wf, '')) 
     
     @property
     def effluent(self):
@@ -39,8 +48,8 @@ class DihydroxylationReactor(bst.BatchBioreactor):
                                    P = P ,Nmin = Nmin , Nmax = Nmax)
     def _setup(self):  
                          
-            self.reactions = tmo.SeriesReaction([
-                tmo.Rxn('Methyl_oleate + H2O2   -> MDHSA ', 'Methyl_oleate', X = 0.9)])
+        self.reactions = tmo.SeriesReaction([
+                tmo.Rxn('Methyl_oleate + Hydrogen_peroxide   -> MDHSA ', 'Methyl_oleate', X = 0.9)])
             
     def _run(self):
         feed = self.ins[0]
@@ -113,4 +122,50 @@ class OxidativeCleavageReactor(bst.BatchBioreactor):
         vent.T = effluent.T = self.T
         vent.P = effluent.P = self.P
 
+class Ion_exchange_reactor(bst.units.ContinuousReactor):
+#resin and the emulsified mixture    
+    _N_ins = 2
+#methanol vapour along with water and the fatty
+    _N_outs = 2
+    
+    @property
+    def effluent(self):
+        return self.outs[0]
+    
+    @effluent.setter
+    def effluent(self,effluent):
+        self.outs[0]=effluent
+        
+## pressure according to what was suggested by the patent
+    
+    def __init__(self, ID='', ins=None, outs=(), thermo=None,
+                  tau=3.5, N=None, V=None, T= 100+273.15, P=1000000,
+                  Nmin=2, Nmax=36):
+        
+        bst.ContinuousReactor.__init__(self, ID='', ins=None, outs=(), thermo=None,
+                                        P=101325, tau=0.5, V_wf=0.8, V_max=355,
+                                        length_to_diameter=2, kW_per_m3=0.985,
+                                        vessel_material='Stainless steel 316',
+                                        vessel_type='Vertical')
+    def _setup(self):           
+        #oxidative_cleavage_conversion
+        X1 = 0.9
+## TODO.xxx make the reaction system name more descriptive
+        Product_formation = PRxn([Rxn('Methyl_azelate,l + Water,g  -> Methanol,g + Azelaic_acid,l','Methyl_azelate', X = X1),
+                                  ])                        
+        oxidative_cleavage_rxnsys = RxnSys(Product_formation)
+        self.reactions = oxidative_cleavage_rxnsys
+            
+    def _run(self):
+        feed = self.ins[0]
+        vent, effluent = self.outs    
+        #https://thermosteam.readthedocs.io/en/latest/_modules/thermosteam/_stream.html#Stream.copy_like
+        effluent.copy_like(feed)              
+        self.reactions(effluent)
+        effluent.T = self.T
+        effluent.P = self.P
+        vent.phase = 'g'
+        vent.copy_flow(effluent, ('Methanol', 'Water'), remove=True)
+        vent.T = effluent.T = self.T
+        vent.P = effluent.P = self.P
               
