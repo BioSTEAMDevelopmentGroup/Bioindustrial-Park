@@ -41,9 +41,8 @@ def create_chemicals():
         i for i in (lc.chemicals.tuple + cs.chemicals.tuple) if i.ID not in removed
     ])
     chemicals.extend([
-        tmo.Chemical('Urea', phase='l', default=True),
-        tmo.Chemical('MgSO4', phase='l', default=True),
         create_acetyl_diolein(),
+        tmo.Chemical('Urea', default=True, phase='l'),
     ])
     chemicals.compile()
     chemicals.set_synonym('AcetylDiOlein', 'AcTAG')

@@ -117,9 +117,10 @@ def plot_yield_titer_selectivity_productivity_contours(
         configurations = [configurations]
         N_configurations = 1
     if N_configurations > 1:
+        conf0, conf1= configurations
         # Generate contour data
-        X, Y, z, w, data_0 = actag.fermentation_data(1, load)
-        *_, data_1 = actag.fermentation_data(2, load)
+        X, Y, z, w, data_0 = actag.fermentation_data(conf0, load)
+        *_, data_1 = actag.fermentation_data(conf1, load)
         data = np.concatenate([data_0, data_1], axis=-2)
         forced_size = None
     elif N_configurations == 1:
@@ -133,11 +134,11 @@ def plot_yield_titer_selectivity_productivity_contours(
     xlabel = "Yield\n[% theoretical]" 
     ylabel = "Titer\n[g / L]"
     xticks = [30, 45, 60, 75, 90]
-    yticks = [5, 25, 50, 75, 100]
+    yticks = [5, 20, 35, 50]
     fillcolor = None
     if metric_index == 0:
         metric_bar = MetricBar(
-            'MSP', '$ / ton', 
+            'MSP', '$ / MT', 
             colormaps[metric_index],
             tickmarks(data, 5, 5, ub_max=17000), 75,
             forced_size=forced_size,
@@ -150,23 +151,9 @@ def plot_yield_titer_selectivity_productivity_contours(
             tickmarks(data, 5, 5), 75,
             forced_size=forced_size,
         )
-    elif metric_index == 2:
-        metric_bar = MetricBar(
-            'Heating', format_units('GJ/hr'), 
-            colormaps[metric_index], 
-            tickmarks(data, 5, 5), 75,
-            forced_size=forced_size,
-        )
-    elif metric_index == 3:
-        metric_bar = MetricBar(
-            'Cooling', format_units('GJ/hr'), 
-            colormaps[metric_index], 
-            tickmarks(data, 5, 5), 75,
-            forced_size=forced_size,
-        )
     X = X[:, :, 0]
     Y = Y[:, :, 0]
-    fig, axes, CSs, CB = plot_contour_single_metric(
+    fig, axes, cps, cb, other_axes = plot_contour_single_metric(
         X, Y, data, xlabel, ylabel, xticks, yticks, metric_bar, 
         fillcolor=fillcolor, styleaxiskw=dict(xtick0=False), label=False,
     )
@@ -189,7 +176,7 @@ def plot_yield_titer_selectivity_productivity_contours(
                     # # We can remove the colored line around the levels by setting the linewidth to 0
                     # for collection in csf.collections: collection.set_linewidth(0.)
                     cs = plt.contour(X, Y, metric_data, zorder=1e6, linestyles='dashed', 
-                                     levels=price_range, colors=[market_price_colors[i]])
+                                     levels=price_range, colors=market_price_colors)
                     # clabels = ax.clabel(cs, levels=cs.levels, inline=True, fmt=metric_bar.fmt,
                     #                     fontsize=12, colors=['k'], zorder=1e16)
                     # for i in clabels: i.set_rotation(0)

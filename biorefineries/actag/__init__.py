@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 """
+from biorefineries import oilcane as oc
 import biosteam as bst
 import numpy as np
 import pandas as pd
@@ -22,6 +23,18 @@ from biosteam.plots import (
 )
 
 # %% Baseline and targets
+# L_per_gal = 3.7854
+# biodiesel_L_per_kg = 1.143245447132373
+# mean_biodiesel_price_5yr = np.mean([3.13, 3.23, 3.31, 3.33, 3.3, 3.34, 
+#                                     3.23, 3.45, 3.16, 3.04, 3.02, 3.13, 
+#                                     3.11, 3.02, 3.01, 3.04, 3.09, 3.09,
+#                                     3.06, 3.12, 3.24, 3.08, 2.98, 2.86, 
+#                                     2.87, 2.91, 2.99, 3.06, 3.13, 3.21, 
+#                                     3.26, 3.35, 3.11, 2.97, 2.77, 2.74, 
+#                                     2.87, 2.92, 3.12, 3.3, 2.88, 3.51,
+#                                     3.61, 4.08, 4.91, 5, 5.99, 5.91, 5.71,
+#                                     5.49, 4.88, 4.83, 6.03, 6.5, 6.99, 7.53, 
+#                                     7.35]) /  L_per_gal * biodiesel_L_per_kg
 
 baseline = {
     1: {'Yield': 34.,
@@ -35,25 +48,17 @@ baseline = {
 }
 target = {
     1: {'Yield': 85.,
-        'Titer': 90.,
+        'Titer': 30.,
         'Selectivity': 75.,
         'Productivity': 1.0},
     2: {'Yield': 85.,
-        'Titer': 90.,
+        'Titer': 30.,
         'Selectivity': 75.,
         'Productivity': 1.0},
 }
-
-best = {
-    1: {'Yield': 90.,
-        'Titer': 100.,
-        'Selectivity': 100.,
-        'Productivity': 1.0},
-    2: {'Yield': 90.,
-        'Titer': 100.,
-        'Selectivity': 100.,
-        'Productivity': 1.0},
-}
+for i in baseline, target:
+    i[3] = i[1]
+    i[4] = i[2]
 
 # %% Mock variables and settings
 
@@ -122,28 +127,46 @@ def load(configuration, simulate=None, cache={}):
         bst.settings.set_thermo(chemicals)
         sys = create_cellulosic_acTAG_system(f'actag_sys_{configuration}')
         operating_hours = 330 * 24
+    elif configuration == 3:
+        oc.load('O9')
+        sys = oc.sys
+        sys.N_runs = 2
+        flowsheet = oc.flowsheet
+        fermentation = flowsheet('Fermentation')
+        # oc.biodiesel.price = mean_biodiesel_price_5yr
+    elif configuration == 4:
+        oc.load('O10')
+        sys = oc.sys
+        sys.N_runs = 2
+        flowsheet = oc.flowsheet
+        fermentation = flowsheet('CoFermentation')
+        # oc.biodiesel.price = mean_biodiesel_price_5yr
     else:
         raise ValueError(f"invalid configuration '{configuration}'; only 1 and 2 are valid")
     u = flowsheet.unit
     s = flowsheet.stream
     dct.update(flowsheet.to_dict())
-    lipid = u.F401.outs[1]
-    downstream_units = lipid.sink.get_downstream_units()
-    downstream_units.add(lipid.sink)
-    u.F401.outs[1] = s.acTAG
-    sys_no_dry_fractionation = bst.System.from_units(
-        f'actag_sys_{configuration}_no_dry_fractionation', 
-        [i for i in sys.units if i not in downstream_units], 
-    )
-    sys.set_tolerance(rmol=1e-5, mol=1e-3, subsystems=True)
-    sys_no_dry_fractionation.set_tolerance(rmol=1e-5, mol=1e-3, subsystems=True)
-    tea = create_tea(sys)
-    tea_no_dry_fractionation = create_tea(sys_no_dry_fractionation)
-    tea.operating_hours = tea_no_dry_fractionation.operating_hours = operating_hours
-    tea.income_tax = 0.21
-    tea_no_dry_fractionation.income_tax = 0.21
-    load_process_settings()
-    dct['fermentation'] = fermentation = u.R301
+    if configuration in (1, 2):
+        lipid = u.F401.outs[1]
+        downstream_units = lipid.sink.get_downstream_units()
+        downstream_units.add(lipid.sink)
+        u.F401.outs[1] = s.acTAG
+        sys_no_dry_fractionation = bst.System.from_units(
+            f'actag_sys_{configuration}_no_dry_fractionation', 
+            [i for i in sys.units if i not in downstream_units], 
+        )
+        sys_no_dry_fractionation.set_tolerance(rmol=1e-5, mol=1e-3, subsystems=True)
+        tea = create_tea(sys)
+        tea_no_dry_fractionation = create_tea(sys_no_dry_fractionation)
+        tea.operating_hours = tea_no_dry_fractionation.operating_hours = operating_hours
+        tea.income_tax = 0.21
+        tea_no_dry_fractionation.income_tax = 0.21
+        load_process_settings()
+        fermentation = u.R301
+    else:
+        tea = oc.tea
+    sys.set_tolerance(rmol=1e-6, mol=1e-3, subsystems=True)
+    dct['fermentation'] = fermentation 
     fermentation.product_yield = 0.34
     fermentation.selectivity = 0.5
     ## Model
@@ -155,33 +178,19 @@ def load(configuration, simulate=None, cache={}):
     def set_selectivity(selectivity):
         fermentation.selectivity = selectivity / 100.
     
-    @metric(units='USD/ton')
+    @metric(units='USD/MT')
     def MPSP(): 
-        if fermentation.selectivity == 1.:
-            return tea_no_dry_fractionation.solve_price(s.acTAG) * kg_per_ton
+        if fermentation.selectivity == 1. and configuration in (1, 2):
+            return tea_no_dry_fractionation.solve_price(s.acTAG) * 1000
         else:
-            return tea.solve_price(s.acTAG) * kg_per_ton
+            return tea.solve_price(s.acTAG) * 1000
     
     @metric(units='10^6*USD')
     def TCI(): 
-        if fermentation.selectivity == 1.:
+        if fermentation.selectivity == 1. and configuration in (1, 2):
             return tea_no_dry_fractionation.TCI / 1e6 # 10^6*$
         else:
             return tea.TCI / 1e6 # 10^6*$
-    
-    @metric(units='GJ/yr')
-    def heating_duty(): 
-        if fermentation.selectivity == 1.:
-            return sys_no_dry_fractionation.get_heating_duty() / 1e6
-        else:
-            return sys.get_heating_duty() / 1e6
-    
-    @metric(units='GJ/yr')
-    def cooling_duty(): 
-        if fermentation.selectivity == 1.:
-            return sys_no_dry_fractionation.get_cooling_duty() / 1e6
-        else:
-            return sys.get_cooling_duty() / 1e6
     
     for i in model._parameters:
         dct[i.setter.__name__] = i
@@ -193,8 +202,6 @@ def load(configuration, simulate=None, cache={}):
         dct = baseline[configuration]
     elif simulate == 'target':
         dct = target[configuration]
-    elif simulate == 'best':
-        dct = best[configuration]
     elif simulate is None:
         return
     else:
@@ -219,7 +226,7 @@ def evaluate_across_yield_titer_selectivity_and_productivity(product_yield, tite
     fermentation.product_yield = product_yield / 100.
     fermentation.selectivity = selectivity / 100.
     try:
-        if selectivity == 100.:
+        if selectivity == 100. and configuration in (1, 2):
             # sys_no_dry_fractionation.empty_recycles()
             sys_no_dry_fractionation.simulate()
         else:
@@ -246,13 +253,13 @@ evaluate_across_yield_titer_selectivity_and_productivity = np.vectorize(
     excluded=['productivities', 'configuration'],
     signature=f'(),(),(),(p),()->(p,{N_metrics})'
 )
-
+N = 10
 def fermentation_data(configuration, load):
     # Generate contour data
-    x = np.linspace(30, 90, 20)
-    y = np.linspace(5, 100, 20)
+    x = np.linspace(30, 90, N)
+    y = np.linspace(5, 60, N)
     z = np.array([50, 75, 100])
-    w = np.array([0.033, 1.00])
+    w = np.array([0.033, 0.6])
     X, Y, Z = np.meshgrid(x, y, z)
     folder = os.path.dirname(__file__)
     file = f'fermentation_data_{configuration}.npy'
@@ -272,8 +279,8 @@ def fermentation_data(configuration, load):
 
 def save_contour_plot_data(configuration):
     X, Y, selectivities, productivities, data = fermentation_data(configuration, load)
-    yields = np.linspace(30, 90, 20)
-    titers = np.linspace(5, 100, 20)
+    yields = np.linspace(30, 90, N)
+    titers = np.linspace(5, 60, N)
     MPSP_data = data[:, :, :, :, 0]
     folder = os.path.dirname(__file__)
     if configuration == 1:
@@ -330,7 +337,7 @@ def save_plots(load=True, single_bar=False):
     import matplotlib.pyplot as plt
     if single_bar:
         set_plot_style()
-        plot_yield_titer_selectivity_productivity_contours([1, 2], load=load)
+        plot_yield_titer_selectivity_productivity_contours([3, 4], load=load)
         folder = os.path.dirname(__file__)
         file = 'contour_plots.svg'
         file = os.path.join(folder, file)
@@ -338,14 +345,14 @@ def save_plots(load=True, single_bar=False):
     else:
         set_plot_style(half=True)
         folder = os.path.dirname(__file__)
-        fig0, axes0 = plot_yield_titer_selectivity_productivity_contours(1, load=load)
+        fig0, axes0 = plot_yield_titer_selectivity_productivity_contours(3, load=load)
         plt.subplots_adjust(left=0.17, right=0.86)
         # plt.tight_layout()
         # fig0.set_constrained_layout_pads(hspace=0.02, wspace=0.02)
         file = 'contour_plots_left.svg'
         file = os.path.join(folder, file)
         plt.savefig(file, transparent=True)
-        fig1, axes1 = plot_yield_titer_selectivity_productivity_contours(2, load=load)
+        fig1, axes1 = plot_yield_titer_selectivity_productivity_contours(4, load=load)
         plt.subplots_adjust(left=0.17, right=0.86)
         # plt.tight_layout()
         # fig1.set_constrained_layout_pads(hspace=0.02, wspace=0.02)
@@ -353,5 +360,3 @@ def save_plots(load=True, single_bar=False):
         file = os.path.join(folder, file)
         plt.show()
         plt.savefig(file, transparent=True)
-        
-    

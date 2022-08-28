@@ -1049,9 +1049,9 @@ def load(name, cache=cache, reduce_chemicals=True,
         else:
             return 0.
     
-    @metric
-    def MASP():
-        return tea.solve_price(s.acTAG) if number in actag_configurations else 0.
+    # @metric
+    # def MASP():
+    #     return tea.solve_price(s.acTAG) if number in actag_configurations else 0.
     
     # @metric(units='MMGGE/yr')
     # def productivity():

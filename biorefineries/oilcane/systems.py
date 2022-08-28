@@ -15,7 +15,7 @@ import biosteam as bst
 from biosteam import main_flowsheet as f
 from biosteam import SystemFactory
 from ..sugarcane import (
-    add_urea_MgSO4_nutrients,
+    add_urea_nutrient,
     create_sucrose_fermentation_system,
     create_sucrose_to_ethanol_system,
     create_beer_distillation_system,
@@ -34,6 +34,7 @@ from ..lipidcane import (
 import biorefineries as brf
 from biorefineries.oilcane import units
 from collections import deque
+import numpy as np
 
 __all__ = (
     'create_oilcane_to_biodiesel_and_ethanol_1g',
@@ -111,8 +112,8 @@ def create_acTAG_separation_system(ins, outs):
     M1 = bst.Mixer('M1', (lipid, None))
     C1 = units.OleinCrystallizer(
         'C1', M1-0, T=273.15 - 20,
-        solid_purity=0.99, 
-        melt_purity=0.50,
+        solid_purity=0.95, 
+        melt_purity=0.60,
     )
     PF1 = bst.PressureFilter('PF1', C1-0, [TAG, ''], split=0.5, moisture_content=0.)
     
@@ -126,7 +127,7 @@ def create_acTAG_separation_system(ins, outs):
     
     C2 = units.OleinCrystallizer(
         'C2', PF1-1, T=273.15 - 35,
-        solid_purity=0.90, 
+        solid_purity=0.85, 
         melt_purity=0.95,
     )
     PF2 = bst.PressureFilter('PF2', C2-0, split=0.5, moisture_content=0.)
@@ -142,7 +143,7 @@ def create_acTAG_separation_system(ins, outs):
           dict(ID='evaporator_condensate')], 
 )
 def create_post_fermentation_oil_separation_system(ins, outs, wastewater_concentration=None,
-                                                   target_oil_content=60, pop_last_evaporator=True,
+                                                   target_oil_content=60, 
                                                    separate_cellmass=False):
     oil, wastewater, evaporator_condensate = outs
     if separate_cellmass:     
@@ -158,9 +159,11 @@ def create_post_fermentation_oil_separation_system(ins, outs, wastewater_concent
         flash=False,
     )
     Ev607.target_oil_content = target_oil_content # kg / kg
-    Ev607.pop_last_evaporator = pop_last_evaporator
     Ev607.remove_evaporators = False
     P_original = tuple(Ev607.P)
+    Pstart = P_original[0]
+    Plast = P_original[-1]
+    N = len(P_original)
     @Ev607.add_specification(run=False)
     def adjust_evaporation():
         EvX = Ev607
@@ -175,25 +178,17 @@ def create_post_fermentation_oil_separation_system(ins, outs, wastewater_concent
         
         x0 = 0.
         x1 = 0.5
-        y0 = x_oil(x0)
         EvX.P = P_original
         EvX._reload_components = True
+        y0 = x_oil(x0)
         if y0 <= 0.:
             EvX.V = x0
             return
         elif EvX.remove_evaporators:
-            pop_last_evaporator = EvX.pop_last_evaporator
-            if pop_last_evaporator:
-                EvX.P = list(P_original)
-            else:
-                EvX.P = deque(P_original)
             EvX._load_components()
-            for i in range(EvX._N_evap-1):
+            for i in range(1, N):
                 if x_oil(1e-6) < 0.:
-                    if pop_last_evaporator:
-                        EvX.P.pop()
-                    else:
-                        EvX.P.popleft()
+                    EvX.P = np.linspace(Pstart, Plast, N - 1)
                     EvX._reload_components = True
                 else:
                     break    
@@ -279,6 +274,7 @@ def create_oilcane_to_biodiesel_and_ethanol_1g(
         outs=[ethanol, '', '', ''],
         mockup=True,
         area=300,
+        add_urea=True,
         udct=True,
     )
     ethanol, stillage, stripper_bottoms_product, evaporator_condensate_a = ethanol_production_sys.outs
@@ -400,6 +396,7 @@ def create_oilcane_to_crude_oil_and_ethanol_1g(
         outs=[ethanol, '', '', ''],
         mockup=True,
         area=300,
+        add_urea=True,
         udct=True,
     )
     ethanol, stillage, stripper_bottoms_product, evaporator_condensate_a = ethanol_production_sys.outs
@@ -570,7 +567,7 @@ def create_cane_to_combined_1_and_2g_fermentation(
     )
     seedtrain = cfdct['R302']
     cofermentation = cfdct['R303'] # Cofermentation
-    add_urea_MgSO4_nutrients(cofermentation, seedtrain)
+    add_urea_nutrient(cofermentation, seedtrain)
     pressurefilter = cfdct['S303'] # Pressure filter
     pressurefilter.tag = "bagasse oil extraction"
     pressurefilter.isplit['Lipid'] = 1. - 0.7
@@ -657,6 +654,9 @@ def create_cane_to_combined_1_and_2g_fermentation(
                                         V=0.05) # fraction evaporated
         PX = bst.Pump(400, ins=EvX-0, P=101325.)
         P_original = tuple(EvX.P)
+        Pstart = P_original[0]
+        Plast = P_original[-1]
+        N = len(P_original)
         @EvX.add_specification(run=True)
         def evaporation():
             path = EvX.path_until(cofermentation, inclusive=True)
@@ -676,21 +676,34 @@ def create_cane_to_combined_1_and_2g_fermentation(
                 current_titer = get_titer()
                 feed = PX.outs[0]
                 ignored_product = feed.imass[product_group] if product_group in feed.chemicals else 0.
-                required_water = (1./target_titer - 1./current_titer) * (product - ignored_product) * 1000.
-                MX.ins[1].imass['Water'] = max(required_water, 0)
+                T, P = beer.thermal_condition
+                rho = beer.chemicals.Water.rho('l', T, P)
+                dilution_water = (1./target_titer - 1./current_titer) * (product - ignored_product) * rho
+                mx_path = MX.path_until(cofermentation, inclusive=True)
+                def f(dilution_water):
+                    MX.ins[1].imass['Water'] = max(dilution_water, 0)
+                    for unit in mx_path: unit.run()
+                    return target_titer - get_titer()
+                try:
+                    MX.ins[1].imass['Water'] = flx.IQ_interpolation(
+                        f, 0, dilution_water * 5, x=dilution_water, ytol=1e-3, xtol=1e-3, maxiter=1000,
+                    )
+                except:
+                    breakpoint()
             else:
-                EvX.P = list(P_original)
-                for i in range(len(P_original)-1):
+                for i in range(1, N):
                     if f(1e-6) < 0.:
-                        EvX.P.pop()
+                        EvX.P = np.linspace(Pstart, Plast, N - i)
                         EvX._reload_components = True
                     else:
-                        break  
+                        break
                 x0 = 0.
                 x1 = 0.1
                 y1 = f(x1)
                 while y1 > 0:
-                    if x1 > 0.9: raise RuntimeError('infeasible to evaporate any more water')
+                    if x1 > 0.9: 
+                        breakpoint()
+                        raise RuntimeError('infeasible to evaporate any more water')
                     x0 = x1            
                     x1 += 0.1
                     y1 = f(x1)
@@ -715,10 +728,11 @@ def create_cane_to_combined_1_and_2g_fermentation(
     
     def get_titer():
         beer = cofermentation.outs[1]
-        feed = PX.outs[0]
+        feed = EvX.outs[0]
         ignored = beer.ivol[ignored_volume] if ignored_volume in cofermentation.chemicals else 0.
-        ignored_product = feed.imass[product_group] if product_group in feed.chemicals else 0.
-        return (beer.imass[product_group] - ignored_product) / (beer.ivol['Water', product_group].sum() - ignored)
+        ignored_product = feed.imass[product_group]
+        ignored_product_vol = feed.ivol[product_group]
+        return (beer.imass[product_group] - ignored_product) / (beer.ivol['Water', product_group].sum() - ignored_product_vol - ignored)
     cofermentation.get_titer = get_titer
     cofermentation.titer = titer
     cofermentation.productivity = productivity
@@ -993,6 +1007,7 @@ def create_oilcane_to_biodiesel_1g(
         product_group='Lipid',
         mockup=True,
         area=300,
+        add_urea=True,
         udct=True,
     )
     fermentor = epdct['R301']
@@ -1064,7 +1079,6 @@ def create_oilcane_to_biodiesel_combined_1_and_2g_post_fermentation_oil_separati
         product_group='Lipid',
         titer=89.4 if fed_batch else 27.4,
         productivity=0.61 if fed_batch else 0.31,
-        ignored_volume='Lipid',
         cofermentation_reactions=cofermentation,
         seed_train_reactions=cofermentation,
         CoFermentation=units.CoFermentation,
@@ -1167,6 +1181,7 @@ def create_oilcane_to_biodiesel_and_actag_1g(
         productivity=0.033,
         product_group='Lipid',
         mockup=True,
+        add_urea=True,
         area=300,
         udct=True,
     )
@@ -1177,6 +1192,16 @@ def create_oilcane_to_biodiesel_and_actag_1g(
     fermentor.Nmax = 36
     product, condensate, vent = fermentation_sys.outs
     
+    fermentor.selectivity = 0.75
+    fermentor.product_yield = 0.321
+    
+    @fermentor.add_specification(run=True)
+    def update_selectivity_and_product_yield():
+        selectivity = fermentor.selectivity
+        product_yield = fermentor.product_yield
+        fermrxn.X[0] = product_yield * selectivity
+        fermrxn.X[1] = product_yield * (1. - selectivity)
+    
     post_fermentation_oil_separation_sys, ledct = create_lipid_exctraction_system(
         ins=product,
         outs=[None, None, vinasse],
@@ -1185,6 +1210,17 @@ def create_oilcane_to_biodiesel_and_actag_1g(
         udct=True
     )
     oil, cellmass, wastewater = post_fermentation_oil_separation_sys.outs
+    
+    splitter = ledct['U404']
+    splitter.lipid_recovery = 0.7
+    @splitter.add_specification(run=True)
+    def adjust_lipid_recovery():
+        total_lipid = fermentor.outs[1].imass['Lipid']
+        free_lipid = fermentor.ins[0].imass['Lipid']
+        x_free = free_lipid / total_lipid
+        splitter.isplit['Lipid'] = 1. - (
+            splitter.lipid_recovery * (1 - x_free) + x_free
+        )
     
     acTAG_separation_sys, acdct = create_acTAG_separation_system(
         'acTAG_separation_sys', oil, [acTAG, ''], mockup=True, area=500, udct=True
@@ -1242,13 +1278,15 @@ def create_oilcane_to_biodiesel_and_actag_combined_1_and_2g_post_fermentation_oi
         tmo.Rxn('Glucose -> 2.04 Water + 1.67 CO2 + 0.106 AcetylDiOlein', 'Glucose', 0.156),
         tmo.Rxn('Glucose -> 2.1 Water + 1.72 CO2 + 0.075 TriOlein', 'Glucose', 0.165),
         tmo.Rxn('Glucose -> Cells', 'Glucose', 0.10, basis='wt').copy(basis='mol'),
+        tmo.Rxn('Xylose -> 2.04 Water + 1.67 CO2 + 0.106 AcetylDiOlein', 'Xylose', 0.156),
+        tmo.Rxn('Xylose -> 2.1 Water + 1.72 CO2 + 0.075 TriOlein', 'Xylose', 0.165),
+        tmo.Rxn('Xylose -> Cells', 'Xylose', 0.10, basis='wt').copy(basis='mol'),
     ])
     oilcane_to_fermentation_sys = create_cane_to_combined_1_and_2g_fermentation('oilcane_to_fermentation_sys',
         ins=oilcane, 
         product_group='Lipid',
         titer=2.5,
         productivity=0.33,
-        ignored_volume='Lipid',
         cofermentation_reactions=cofermentation,
         seed_train_reactions=cofermentation,
         CoFermentation=units.CoFermentation,
@@ -1258,6 +1296,19 @@ def create_oilcane_to_biodiesel_and_actag_combined_1_and_2g_post_fermentation_oi
         mockup=True
     )
     beer, lignin, condensate, pretreatment_wastewater, fiber_fines = oilcane_to_fermentation_sys.outs
+    
+    fermentor = f(units.CoFermentation)
+    fermentor.selectivity = 0.75
+    fermentor.product_yield = 0.321
+    
+    @fermentor.add_specification(run=True)
+    def update_selectivity_and_product_yield():
+        selectivity = fermentor.selectivity
+        product_yield = fermentor.product_yield
+        X = cofermentation.X
+        X[0] = X[3] = product_yield * selectivity
+        X[1] = X[4] = product_yield * (1. - selectivity)
+    
     lipid_exctraction_sys, ledct = create_lipid_exctraction_system(
         ins=beer,
         mockup=True,
@@ -1265,6 +1316,17 @@ def create_oilcane_to_biodiesel_and_actag_combined_1_and_2g_post_fermentation_oi
         udct=True,
     )
     oil, cellmass, wastewater = lipid_exctraction_sys.outs
+    
+    splitter = ledct['U404']
+    splitter.lipid_recovery = 0.7
+    @splitter.add_specification(run=True)
+    def adjust_lipid_recovery():
+        total_lipid = fermentor.outs[1].imass['Lipid']
+        free_lipid = fermentor.ins[0].imass['Lipid']
+        x_free = free_lipid / total_lipid
+        splitter.isplit['Lipid'] = 1. - (
+            splitter.lipid_recovery * (1 - x_free) + x_free
+        )
     
     acTAG_separation_sys, acdct = create_acTAG_separation_system(
         'acTAG_separation_sys', oil, [acTAG, ''], mockup=True, area=500, udct=True
