@@ -16,22 +16,23 @@ from biosteam import SystemFactory
 #https://www.cdc.gov/niosh/npg/npgd0664.html#:~:text=Class%20IB%20Flammable%20Liquid%3A%20Fl.P.%20below%2073%C2%B0F%20and,paraffins%2C%2030%25%20monocycloparaffins%2C%202%25%20dicycloparaffins%20%26%2012%25%20alklybenzenes.%5D
 
 @SystemFactory(
-    ID = 'Secondary_separation',
+    ID = 'secondary_separation',
     ins = [dict(ID = 'AA_to_be_recovered'),
            dict(ID = 'water_for_extraction'),
-           dict(ID = 'solvent_for_extraction'),
-           dict(ID = 'recovered_NMS_solvent_stream')
+           dict(ID = 'solvent_for_extraction')
+           # dict(ID = 'recovered_NMS_solvent_stream')
            ],
     outs = [
             dict(ID = 'NMS_solvent_MCA_extract'),
             dict(ID = 'recovered_raffinate_solvent'), 
-            dict(ID = 'AA_high_purity_product'),
+            dict(ID = 'AA_high_purity_product')
            ],
     fixed_ins_size = True,
     fixed_outs_size = True,     
               )
 def secondary_separation_system(ins,outs,Tin):
-    AA_to_be_recovered,water_for_extraction,solvent_for_extraction,recovered_NMS_solvent_stream, = ins
+    AA_to_be_recovered,water_for_extraction,solvent_for_extraction, = ins
+    #recovered_NMS_solvent_stream, = ins
     NMS_solvent_MCA_extract,recovered_raffinate_solvent,AA_high_purity_product, = outs
  
    #Hot_water_and_crude_azelaic_mixture
@@ -40,34 +41,32 @@ def secondary_separation_system(ins,outs,Tin):
                                   water_for_extraction),
                            outs = ('Hot_water_AA_mixture'))
 #TODO.xxx check the 0.18 target concentration
-   
-    M301.target_concentation = 0.18
+    M301.target_concentation = 0.18   
     @M301.add_specification(run=True)
     def AA_composition():
          feed, water = M301.ins
          feed_AA = feed.imass['Azelaic_acid']
          current_concentation = feed_AA / feed.F_mass
          water.imass['Water'] = (1 / M301.target_concentation - 1 / current_concentation) * feed_AA
+         
     
-   #Solvent_extraction
-    M304 = bst.units.Mixer('M304',
-                          ins = (solvent_for_extraction,
-                                 recovered_NMS_solvent_stream),
-                          outs = ('NMS_solvent_combined')
-                          )
+### TODO.xxx add the solvent recycle stream and check solvent amount 
+   # #Solvent_extraction
+   #  M304 = bst.units.Mixer('M304',
+   #                        ins = (solvent_for_extraction,
+   #                               recovered_NMS_solvent_stream),
+   #                        outs = ('NMS_solvent_combined')
+   #                        )
    
-    @M304.add_specification(run=True)
-    def adjust_NMS_recycle():
-         solvent_for_extraction.F_mass = 4*[water_for_extraction.F_mass] - recovered_NMS_solvent_stream.F_mass 
-         solvent_for_extraction.sink.run_until(M304)        
-
-    
-##TODO.xxx adjust the water and solvent according to the patent solvent and water ratio
-    
+   #  def adjust_NMS_recycle():
+   #       solvent_for_extraction.sink.run_until(M304) 
+   #       solvent_for_extraction.F_mass = water_for_extraction.F_mass*4 - recovered_NMS_solvent_stream.F_mass 
+   #  M304.add_specification(run=True)
+   
     L301 = bst.units.MultiStageMixerSettlers(
         'L301',
-        ins= (M301-0,
-              solvent_for_extraction), 
+        ins= (M301-0,solvent_for_extraction),
+              #M304-0), 
         outs=('raffinate',
               NMS_solvent_MCA_extract,
               ), 
@@ -86,6 +85,9 @@ def secondary_separation_system(ins,outs,Tin):
             'phi' : 0.595
             }
         )
+    @L301.add_specification(run = True)
+    def adjust_solvent_flow():
+        solvent_for_extraction.F_mass = M301.outs[0].imass['water']/4
 # TODO.xxx check if flash can be used here instead
 # Azelaic acid and solvent separation  
     D301_H = bst.HXutility('D301_H',

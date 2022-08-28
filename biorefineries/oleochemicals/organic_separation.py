@@ -59,8 +59,8 @@ def organic_separation_system(ins,outs,T_in):
                             outs = ('EA_for_extraction'))   
 
     def adjust_EA_recycle():
+        fresh_EA.sink.run_until(M105)   
         fresh_EA.F_mass = mixed_products_for_separation.F_mass - recycle.F_mass 
-        fresh_EA.sink.run_until(M105)        
     M105.add_specification(adjust_EA_recycle, run=True)  
     
     #Hot ethyl acetate extraction

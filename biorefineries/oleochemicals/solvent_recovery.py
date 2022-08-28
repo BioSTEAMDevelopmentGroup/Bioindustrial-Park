@@ -11,6 +11,8 @@ import flexsolve as flx
 import numpy as np
 from biosteam import SystemFactory
 
+##Right now we might not need solvent recovery, considering the impurities are low
+
 @SystemFactory(
     ID = 'solvent_recovery',
     ins = [ dict(ID = 'solvent_extract_mixture'),
@@ -24,36 +26,38 @@ from biosteam import SystemFactory
 
 def solvent_recovery_system(ins,outs,T_out):
     solvent_extract_mixture, = ins
-    crude_nonoanoic_acid,recovered_NMS_solvent_stream, = outs
+    recovered_NMS_solvent_stream,crude_nonoanoic_acid, = outs
     
     D601_H = bst.HXutility('D601_H',
                            ins = solvent_extract_mixture,
                            T = T_out
                           )
 #This is being run at atm pressure and at about 135deg acc to the patent     
-    D601_1 = bst.BinaryDistillation('D601_1',
+    D601_1 = bst.ShortcutColumn('D601_1',
                               ins = solvent_extract_mixture,
-                              outs =('solvent_for_recycle',
-                                     'crude_nonoanoic_acid'),
-                              LHK = ('cycloheptane',
-                                     'Nonanoic_acid'),
+                              outs =(recovered_NMS_solvent_stream,
+                                     crude_nonoanoic_acid),
+                              LHK = ('toluene',
+                                     'Azelaic_acid'),
                               k = 2,
-                              x_bot = 0.99,
-                              y_top = 0.99
+                              x_bot = 0.7,
+                              y_top = 0.7
                               )
-#THis below column acts as a stripper
-    D601_2 = bst.BinaryDistillation('D601_2',
-                                ins = D601_1-1,
-                                outs = ('add_recycle_back',
-                                        crude_nonoanoic_acid),
-                                LHK = ('cycloheptane',
-                                       'Nonanoic_acid'),
-                                k = 2,
-                                x_bot = 0.99,
-                                y_top = 0.99
-                              )
+    
+### TODO.xxx add the below if only extra flashing is required
+# #THis below column acts as a stripper
+#     D601_2 = bst.ShortcutColumn('D601_2',
+#                                       ins = D601_1.outs[1],
+#                                       outs = ('add_recycle_back',
+#                                          crude_nonoanoic_acid),
+#                                 LHK = ('toluene',
+#                                        'Nonanoic_acid'),
+#                                 k = 2,
+#                                 x_bot = 0.99,
+#                                 y_top = 0.99
+#                               )
   
-    M601 = bst.units.Mixer('M601',
-                          ins = (D601_1.outs[0],D601_2.outs[0]),
-                          outs = recovered_NMS_solvent_stream
-                          )
+#     M601 = bst.units.Mixer('M601',
+#                           ins = (D601_1.outs[0],D601_2.outs[0]),
+#                           outs = recovered_NMS_solvent_stream
+#                           )
