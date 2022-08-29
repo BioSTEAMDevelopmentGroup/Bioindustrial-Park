@@ -55,9 +55,11 @@ def chemical_defined(ID, **kwargs):
 
 ##Chemicals that are already in the data base
 
-Hydrogen_peroxide = chemical_database('Hydrogen_peroxide',phase = 'l')
 
-Biodiesel = chemical_database('Methyl_oleate')
+Biodiesel = chemical_database('Methyl_oleate', phase = 'l')
+# available methods are {'ROWLINSON_POLING', 'DADGOSTAR_SHAW', 'ROWLINSON_BONDI'}
+Biodiesel.Cn.method = 'ROWLINSON_BONDI'
+Hydrogen_peroxide = chemical_database('Hydrogen_peroxide',phase = 'l')
 Water =  chemical_database('Water')
 #look into phase of the below
 MDHSA = chemical_database('MDHSA',search_ID = '1115-01-1')
