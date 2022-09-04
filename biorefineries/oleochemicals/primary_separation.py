@@ -15,7 +15,7 @@ from biosteam import SystemFactory
 
 
 @SystemFactory(
-    ID = 'Primary_separation',
+    ID = 'primary_separation',
     ins = [dict(ID='organic_phase_for_separation')
           ],    
     outs = [dict(ID = 'nonanoic_acid_crude_product'),
@@ -48,7 +48,8 @@ def primary_separation_system(ins,outs,Tin):
                                         k=2,
                                         Lr=0.995,
                                         Hr=0.995,
-                                        P = 3333
+                                        P = 3333,
+                                        partial_condenser=False
                                         )
 
 
@@ -61,14 +62,13 @@ def primary_separation_system(ins,outs,Tin):
                         ins = D202-1,
                         T = 600)
     D203 = bst.units.BinaryDistillation("D203",
-                                    ins = D203_H-0, 
-                                    outs=(AA_crude_product,
-                                          Epoxy_stearic_acid_bottoms),
-                                    LHK = ('Azelaic_acid',
-                                           'Epoxy_stearic_acid'),
-                                    k=2,
-                                    Lr=0.999, 
-                                    Hr=0.999,
-                                    P = 800,
-                                    partial_condenser=False,
+                                       ins = D203_H-0, 
+                                       outs=(AA_crude_product,
+                                             Epoxy_stearic_acid_bottoms),
+                                       LHK = ('Azelaic_acid',
+                                              'Epoxy_stearic_acid'),
+                                       k=2,
+                                       Lr=0.999, 
+                                       Hr=0.999,
+                                       partial_condenser=False,
                                     )

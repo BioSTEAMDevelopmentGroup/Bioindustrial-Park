@@ -85,55 +85,22 @@ def oxidative_cleavage_system(ins,outs,T_in):
                                M101-0,
                                P104-0),
                         outs = 'feed_to_heat_exchanger')
-    
-        
-    # def adjust_reactor_feed_flow():
-    #     fresh_OA.F_mass = Total_feed  
-  
-    # M102.add_specification(adjust_reactor_feed_flow, run=True)
-    
 
-                
+               
 #Batch oleochemicals process
     R101_H = bst.units.HXutility('R101_H',
                              ins = M102-0,
                              outs = 'feed_to_oleochemicals_reactor',
                              T = T_in
                              )
+    
+### TODO.xxx check if catalyst volume is still required
 
     R101 = units.OxidativeCleavageReactor('R101',
                                 ins = R101_H-0, 
                                 outs = mixed_oxidation_products,
                                 V=3785 + 1.213553930851268e-06
-                                # in m3 (equivalent to 1 MMGal), this is including catalyst volume
+                                # in m3 (equivalent to 1 MMGal), 
+                                # this is including catalyst volume
                                                               )
-# ob1.show()
-# ob1.diagram()
-
-# oleochemicals_sys = bst.main_flowsheet.create_system('oleochemicals_sys')
-# oleochemicals_sys.diagram(number=True)
-# oleochemicals_sys.simulate()  
-
-# # TODO.xxx add ethyl acetate recycle
-# # using D204.outs[0] as one stream and D201.outs[0] as another
-
- 
-
-# #To separate catalyst and H2O2
-#     MS201 = bst.MolecularSieve('MS201',
-#                             ins= D204-1,
-#                             outs=(recycle_HP, 
-#                                   'rest_of_the_mixture'),
-#                             split=dict(Water = 0,
-#                                   Hydrogen_peroxide = 1,
-#                                   Oleic_acid = 0,
-#                                   Nonanal = 0,
-#                                   Nonanoic_acid = 0,
-#                                   Azelaic_acid = 0,
-#                                   Epoxy_stearic_acid = 0,
-#                                   Ethyl_acetate = 0,
-#                                   Oxononanoic_acid = 0))
-
-# ob2 = primary_separation(T_inn = 230 + 273.15)
-# ob2.simulate()
-# ob2.show() 
+    
