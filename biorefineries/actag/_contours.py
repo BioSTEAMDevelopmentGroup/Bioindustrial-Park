@@ -175,11 +175,13 @@ def plot_yield_titer_selectivity_productivity_contours(
                     # # Doing this also colors in the box around each level
                     # # We can remove the colored line around the levels by setting the linewidth to 0
                     # for collection in csf.collections: collection.set_linewidth(0.)
-                    cs = plt.contour(X, Y, metric_data, zorder=1e6, linestyles='dashed', 
+                    cs = plt.contour(X, Y, metric_data, zorder=1e6, linestyles='solid', 
                                      levels=price_range, colors=market_price_colors)
                     # clabels = ax.clabel(cs, levels=cs.levels, inline=True, fmt=metric_bar.fmt,
                     #                     fontsize=12, colors=['k'], zorder=1e16)
                     # for i in clabels: i.set_rotation(0)
+                    cs = plt.contour(X, Y, metric_data, zorder=1e6, linestyles='solid', 
+                                     levels=[1262], colors=['grey'])
     
     for i in range(N_configurations):
         c = configurations[i]

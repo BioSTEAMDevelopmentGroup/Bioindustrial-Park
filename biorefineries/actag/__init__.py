@@ -39,22 +39,22 @@ from biosteam.plots import (
 baseline = {
     1: {'Yield': 34.,
         'Titer': 12.,
-        'Selectivity': 50.,
-        'Productivity': 0.033},
+        'Selectivity': 50,
+        'Productivity': 0.0625},
     2: {'Yield': 34., # TODO: Update with actual experimental values
         'Titer': 12.,
         'Selectivity': 50.,
-        'Productivity': 0.033}
+        'Productivity': 0.0625}
 }
 target = {
-    1: {'Yield': 85.,
+    1: {'Yield': 55.,
         'Titer': 30.,
         'Selectivity': 75.,
-        'Productivity': 1.0},
-    2: {'Yield': 85.,
+        'Productivity': 0.7},
+    2: {'Yield': 55.,
         'Titer': 30.,
         'Selectivity': 75.,
-        'Productivity': 1.0},
+        'Productivity': 0.7},
 }
 for i in baseline, target:
     i[3] = i[1]
@@ -107,97 +107,100 @@ def load(configuration, simulate=None, cache={}):
     dct = globals()
     if key in cache:
         dct.update(cache[key])
-        return
-    if configuration == 1:
-        if not _conventional_chemicals_loaded: 
-            load_conventional_chemicals()
-            chemicals = conventional_chemicals
-        flowsheet = bst.Flowsheet('conventional_acTAG')
-        bst.main_flowsheet.set_flowsheet(flowsheet)
-        bst.settings.set_thermo(chemicals)
-        sys = create_conventional_acTAG_system(f'actag_sys_{configuration}')
-        tea = create_tea(sys)
-        operating_hours = 200 * 24
-    elif configuration == 2:
-        if not _cellulosic_chemicals_loaded: 
-            load_cellulosic_chemicals()
-            chemicals = cellulosic_chemicals
-        flowsheet = bst.Flowsheet('cellulosic_acTAG')
-        bst.main_flowsheet.set_flowsheet(flowsheet)
-        bst.settings.set_thermo(chemicals)
-        sys = create_cellulosic_acTAG_system(f'actag_sys_{configuration}')
-        operating_hours = 330 * 24
-    elif configuration == 3:
-        oc.load('O9')
-        sys = oc.sys
-        sys.N_runs = 2
-        flowsheet = oc.flowsheet
-        fermentation = flowsheet('Fermentation')
-        # oc.biodiesel.price = mean_biodiesel_price_5yr
-    elif configuration == 4:
-        oc.load('O10')
-        sys = oc.sys
-        sys.N_runs = 2
-        flowsheet = oc.flowsheet
-        fermentation = flowsheet('CoFermentation')
-        # oc.biodiesel.price = mean_biodiesel_price_5yr
+        if configuration in (3, 4):
+            flowsheet = oc.flowsheet
+            fermentation = flowsheet('Fermentation')
     else:
-        raise ValueError(f"invalid configuration '{configuration}'; only 1 and 2 are valid")
-    u = flowsheet.unit
-    s = flowsheet.stream
-    dct.update(flowsheet.to_dict())
-    if configuration in (1, 2):
-        lipid = u.F401.outs[1]
-        downstream_units = lipid.sink.get_downstream_units()
-        downstream_units.add(lipid.sink)
-        u.F401.outs[1] = s.acTAG
-        sys_no_dry_fractionation = bst.System.from_units(
-            f'actag_sys_{configuration}_no_dry_fractionation', 
-            [i for i in sys.units if i not in downstream_units], 
-        )
-        sys_no_dry_fractionation.set_tolerance(rmol=1e-5, mol=1e-3, subsystems=True)
-        tea = create_tea(sys)
-        tea_no_dry_fractionation = create_tea(sys_no_dry_fractionation)
-        tea.operating_hours = tea_no_dry_fractionation.operating_hours = operating_hours
-        tea.income_tax = 0.21
-        tea_no_dry_fractionation.income_tax = 0.21
-        load_process_settings()
-        fermentation = u.R301
-    else:
-        tea = oc.tea
-    sys.set_tolerance(rmol=1e-6, mol=1e-3, subsystems=True)
-    dct['fermentation'] = fermentation 
-    fermentation.product_yield = 0.34
-    fermentation.selectivity = 0.5
-    ## Model
-    model = bst.Model(sys, exception_hook='raise', retry_evaluation=False)
-    parameter = model.parameter
-    metric = model.metric
-    
-    @parameter
-    def set_selectivity(selectivity):
-        fermentation.selectivity = selectivity / 100.
-    
-    @metric(units='USD/MT')
-    def MPSP(): 
-        if fermentation.selectivity == 1. and configuration in (1, 2):
-            return tea_no_dry_fractionation.solve_price(s.acTAG) * 1000
+        if configuration == 1:
+            if not _conventional_chemicals_loaded: 
+                load_conventional_chemicals()
+                chemicals = conventional_chemicals
+            flowsheet = bst.Flowsheet('conventional_acTAG')
+            bst.main_flowsheet.set_flowsheet(flowsheet)
+            bst.settings.set_thermo(chemicals)
+            sys = create_conventional_acTAG_system(f'actag_sys_{configuration}')
+            tea = create_tea(sys)
+            operating_hours = 200 * 24
+        elif configuration == 2:
+            if not _cellulosic_chemicals_loaded: 
+                load_cellulosic_chemicals()
+                chemicals = cellulosic_chemicals
+            flowsheet = bst.Flowsheet('cellulosic_acTAG')
+            bst.main_flowsheet.set_flowsheet(flowsheet)
+            bst.settings.set_thermo(chemicals)
+            sys = create_cellulosic_acTAG_system(f'actag_sys_{configuration}')
+            operating_hours = 330 * 24
+        elif configuration == 3:
+            oc.load('O9', cache={})
+            sys = oc.sys
+            sys.N_runs = 2
+            flowsheet = oc.flowsheet
+            fermentation = flowsheet('Fermentation')
+            # oc.biodiesel.price = mean_biodiesel_price_5yr
+        elif configuration == 4:
+            oc.load('O10', cache={})
+            sys = oc.sys
+            sys.N_runs = 2
+            flowsheet = oc.flowsheet
+            fermentation = flowsheet('CoFermentation')
+            # oc.biodiesel.price = mean_biodiesel_price_5yr
         else:
-            return tea.solve_price(s.acTAG) * 1000
-    
-    @metric(units='10^6*USD')
-    def TCI(): 
-        if fermentation.selectivity == 1. and configuration in (1, 2):
-            return tea_no_dry_fractionation.TCI / 1e6 # 10^6*$
+            raise ValueError(f"invalid configuration '{configuration}'; only 1 and 2 are valid")
+        u = flowsheet.unit
+        s = flowsheet.stream
+        dct.update(flowsheet.to_dict())
+        if configuration in (1, 2):
+            lipid = u.F401.outs[1]
+            downstream_units = lipid.sink.get_downstream_units()
+            downstream_units.add(lipid.sink)
+            u.F401.outs[1] = s.acTAG
+            sys_no_dry_fractionation = bst.System.from_units(
+                f'actag_sys_{configuration}_no_dry_fractionation', 
+                [i for i in sys.units if i not in downstream_units], 
+            )
+            sys_no_dry_fractionation.set_tolerance(rmol=1e-5, mol=1e-3, subsystems=True)
+            tea = create_tea(sys)
+            tea_no_dry_fractionation = create_tea(sys_no_dry_fractionation)
+            tea.operating_hours = tea_no_dry_fractionation.operating_hours = operating_hours
+            tea.income_tax = 0.21
+            tea_no_dry_fractionation.income_tax = 0.21
+            load_process_settings()
+            fermentation = u.R301
         else:
-            return tea.TCI / 1e6 # 10^6*$
-    
-    for i in model._parameters:
-        dct[i.setter.__name__] = i
-    for i in model._metrics:
-        dct[i.getter.__name__] = i
-    cache[key] = dct.copy()
-    
+            tea = oc.tea
+        sys.set_tolerance(rmol=1e-6, mol=1e-3, subsystems=True)
+        dct['fermentation'] = fermentation 
+        fermentation.product_yield = 0.34
+        fermentation.selectivity = 0.5
+        ## Model
+        model = bst.Model(sys, exception_hook='raise', retry_evaluation=False)
+        parameter = model.parameter
+        metric = model.metric
+        
+        @parameter
+        def set_selectivity(selectivity):
+            fermentation.selectivity = selectivity / 100.
+        
+        @metric(units='USD/MT')
+        def MPSP(): 
+            if fermentation.selectivity == 1. and configuration in (1, 2):
+                return tea_no_dry_fractionation.solve_price(s.acTAG) * 1000
+            else:
+                return tea.solve_price(s.acTAG) * 1000
+        
+        @metric(units='10^6*USD')
+        def TCI(): 
+            if fermentation.selectivity == 1. and configuration in (1, 2):
+                return tea_no_dry_fractionation.TCI / 1e6 # 10^6*$
+            else:
+                return tea.TCI / 1e6 # 10^6*$
+        
+        for i in model._parameters:
+            dct[i.setter.__name__] = i
+        for i in model._metrics:
+            dct[i.getter.__name__] = i
+        cache[key] = dct.copy()
+        
     if simulate == 'baseline':
         dct = baseline[configuration]
     elif simulate == 'target':
@@ -211,7 +214,7 @@ def load(configuration, simulate=None, cache={}):
     fermentation.productivity = dct['Productivity']
     fermentation.titer = dct['Titer']
     fermentation.product_yield = dct['Yield'] / 100.
-    if selectivity == 1.:
+    if selectivity == 1. and configuration in (1, 2):
         sys_no_dry_fractionation.simulate()
     else:
         sys.simulate()
@@ -253,13 +256,13 @@ evaluate_across_yield_titer_selectivity_and_productivity = np.vectorize(
     excluded=['productivities', 'configuration'],
     signature=f'(),(),(),(p),()->(p,{N_metrics})'
 )
-N = 10
+N = 15
 def fermentation_data(configuration, load):
     # Generate contour data
     x = np.linspace(30, 90, N)
     y = np.linspace(5, 60, N)
     z = np.array([50, 75, 100])
-    w = np.array([0.033, 0.6])
+    w = np.array([0.0625, 0.7])
     X, Y, Z = np.meshgrid(x, y, z)
     folder = os.path.dirname(__file__)
     file = f'fermentation_data_{configuration}.npy'
@@ -302,20 +305,20 @@ def save_tables():
     import biorefineries.actag as actag
     import biorefineries.cornstover as cs
     import biosteam as bst
-    actag.load(1, 'baseline')
+    actag.load(3, 'baseline')
     tea1_baseline = actag.tea
     sys1_baseline = actag.sys
-    actag.load(1, 'target')
+    actag.load(3, 'target')
     tea1_target = actag.tea
     sys1_target = actag.sys
-    actag.load(2, 'baseline')
+    actag.load(4, 'baseline')
     tea2_baseline = actag.tea
     sys2_baseline = actag.sys
-    actag.load(2, 'target')
+    actag.load(4, 'target')
     tea2_target = actag.tea
     sys2_target = actag.sys
     folder = os.path.dirname(__file__)
-    file = f'tables.xlsx'
+    file = 'tables.xlsx'
     file = os.path.join(folder, file)
     writer = pd.ExcelWriter(file)
     bst.report.voc_table(

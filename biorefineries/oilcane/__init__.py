@@ -60,7 +60,7 @@ __all__ = (
 import biosteam as bst
 from biosteam.utils import MockStream
 import thermosteam as tmo
-from biorefineries.sugarcane import create_sugarcane_to_ethanol_system
+from biorefineries.sugarcane import create_sugarcane_to_ethanol_system, create_sugarcane_to_sugar_and_ethanol_system
 from biorefineries.lipidcane import (
     set_lipid_fraction as set_oil_fraction, 
 )
@@ -94,7 +94,10 @@ from ._distributions import (
     biodiesel_minus_ethanol_price_distribution,
     natural_gas_price_distribution,
     mean_biodiesel_price,
-    mean_ethanol_price,
+    cellulosic_ethanol_price_distribution,
+    advanced_ethanol_price_distribution,
+    mean_advanced_ethanol_price,
+    mean_cellulosic_ethanol_price,
     mean_glycerol_price,
     mean_natural_gas_price,
     mean_electricity_price,
@@ -187,9 +190,10 @@ def load(name, cache=cache, reduce_chemicals=True,
     
     
     cellulosic_configurations = frozenset([-2, 2, 4, 6, 8])
-    biodiesel_configurations = frozenset([1, 2, 3, 4, 5, 6, 7, 8])
+    biodiesel_configurations = frozenset([1, 2, 5, 6, 7, 8])
     ethanol_configurations = frozenset([-2, -1, 1, 2, 3, 4])
     actag_configurations = frozenset([9, 10])
+    conventional_ethanol_configurations = ethanol_configurations.difference(cellulosic_configurations)
     cellulosic_ethanol_configurations = cellulosic_configurations.intersection(ethanol_configurations)
     ethanol_biodiesel_configurations = ethanol_configurations.intersection(biodiesel_configurations)
     cellulosic_ethanol_biodiesel_configurations = ethanol_biodiesel_configurations.intersection(cellulosic_ethanol_configurations)
@@ -223,6 +227,20 @@ def load(name, cache=cache, reduce_chemicals=True,
             'EtOH prod.',
             'Wastewater treatment',
             'CH&P', 
+            'Utilities',
+            'HXN',
+            'Storage',
+        ]
+        rename_storage_units(900)
+    elif number == -3:
+        oilcane_sys = create_sugarcane_to_sugar_and_ethanol_system(
+            operating_hours=operating_hours,
+        )
+        area_names = [
+            'Feedstock handling', 
+            'Juicing', 
+            'EtOH prod.', 
+            'CH&P',
             'Utilities',
             'HXN',
             'Storage',
@@ -366,8 +384,7 @@ def load(name, cache=cache, reduce_chemicals=True,
         rename_storage_units(1100)
     else:
         raise NotImplementedError(number)
-    oilcane_sys.set_tolerance(rmol=1e-4, mol=1e-2, subsystems=True, subfactor=1.5)
-    dct.update(flowsheet.to_dict())
+    oilcane_sys.set_tolerance(rmol=1e-5, mol=1e-2, subsystems=True, subfactor=1.5)
     
     def get_stream(ID):
         if ID in flowsheet.stream:
@@ -395,13 +412,18 @@ def load(name, cache=cache, reduce_chemicals=True,
         if isinstance(BT, bst.BoilerTurbogenerator): break
 
     HXN = None
-    for HXN_group in unit_groups:
-        if HXN_group.name == 'HXN':
-            HXN_group.filter_savings = False
-            HXN = HXN_group.units[0]
-            assert isinstance(HXN, bst.HeatExchangerNetwork)
-    unit_groups[-1].metrics[-1].getter = lambda: 0.    
+    if number == -3:
+        HXN = flowsheet(bst.HeatExchangerNetwork)
+    else:
+        for HXN_group in unit_groups:
+            if HXN_group.name == 'HXN':
+                HXN_group.filter_savings = False
+                HXN = HXN_group.units[0]
+                assert isinstance(HXN, bst.HeatExchangerNetwork)
+        unit_groups[-1].metrics[-1].getter = lambda: 0.    
     
+    BT = flowsheet(bst.BoilerTurbogenerator)
+    BT.boiler_efficiency = 0.89
     
     if abs(number) in cellulosic_configurations:
         prs = flowsheet(cs.units.PretreatmentReactorSystem)
@@ -511,13 +533,39 @@ def load(name, cache=cache, reduce_chemicals=True,
     
     # Set non-negligible characterization factors
     if number not in cellulosic_configurations:
-        for i in ('FGD_lime', 'cellulase', 'MgSO4', 'urea', 'caustic'): MockStream(i)
+        for i in ('FGD_lime', 'cellulase', 'urea', 'caustic', 'cellulosic_ethanol'): MockStream(i)
+    if number not in cellulosic_ethanol_configurations:
+        for i in ('cellulosic_ethanol',): MockStream(i)
     if number not in biodiesel_configurations: 
         for i in ('catalyst', 'methanol', 'HCl', 'NaOH', 'crude_glycerol', 'pure_glycerine'): MockStream(i)
     if number not in ethanol_configurations:
         for i in ('denaturant', 'ethanol'): MockStream(i)
+    if number not in conventional_ethanol_configurations:
+        for i in ('advanced_ethanol',): MockStream(i)
     if number not in actag_configurations:
         MockStream('acTAG')
+        
+    if number in cellulosic_ethanol_configurations:
+        RIN_splitter = bst.Splitter('RIN_splitter',
+            ins=s.ethanol,
+            outs=['cellulosic_ethanol', 'advanced_ethanol'],
+            split=0.5
+        )
+        @RIN_splitter.add_specification(run=True)
+        def adjust_ethanol_split():
+            # outs: stream sequence
+            # [0] Advanced biofuel ethanol
+            # [1] Cellulosic biofuel ethanol
+            RIN_splitter.split[:] = (
+                (juice_sugar := s.juice.imass['Glucose', 'Sucrose'].sum()) 
+                / (juice_sugar + s.slurry.imass['Glucose', 'Xylose', 'Arabinose'].sum())
+            )
+        
+        sys.update_configuration([*sys.units, RIN_splitter])
+        assert RIN_splitter in sys.units
+    elif number in conventional_ethanol_configurations:
+        s.ethanol.ID = 'advanced_ethanol'
+        
     set_GWPCF(feedstock, 'sugarcane')
     set_GWPCF(s.H3PO4, 'H3PO4')
     set_GWPCF(s.lime, 'lime', dilution=0.046) # Diluted with water
@@ -525,7 +573,6 @@ def load(name, cache=cache, reduce_chemicals=True,
     set_GWPCF(s.FGD_lime, 'lime', dilution=0.451)
     set_GWPCF(s.cellulase, 'cellulase', dilution=0.02) 
     set_GWPCF(s.urea, 'urea')
-    set_GWPCF(s.MgSO4, 'MgSO4')
     set_GWPCF(s.caustic, 'NaOH', 0.5)
     set_GWPCF(s.catalyst, 'NaOH', 0.5)
     set_GWPCF(s.catalyst, 'methanol catalyst mixture')
@@ -541,6 +588,9 @@ def load(name, cache=cache, reduce_chemicals=True,
     try: natural_gas_streams.append(s.dryer_natural_gas)
     except: pass
     for stream in natural_gas_streams: set_GWPCF(stream, 'CH4')
+    
+    ## Add BioSTEAM objects to module for easy access
+    dct.update(flowsheet.to_dict())
     
     ## Model
     model = bst.Model(sys, exception_hook='raise', retry_evaluation=False)
@@ -598,17 +648,22 @@ def load(name, cache=cache, reduce_chemicals=True,
     def set_annual_crushing_capacity(annual_crushing_capacity):
         sys.rescale(feedstock, kg_per_MT * annual_crushing_capacity / tea.operating_hours / feedstock.F_mass)
 
-    # USDA ERS historical price data
-    @parameter(distribution=ethanol_price_distribution, element=s.ethanol, 
-               baseline=mean_ethanol_price, units='USD/L')
-    def set_ethanol_price(price): # Triangular distribution fitted over the past 10 years Sep 2009 to Nov 2020
-        s.ethanol.price = price * ethanol_L_per_kg
+    # USDA ERS historical price data with EPA RIN prices
+    @parameter(distribution=cellulosic_ethanol_price_distribution, element=s.cellulosic_ethanol, 
+               baseline=mean_cellulosic_ethanol_price, units='USD/L')
+    def set_cellulosic_ethanol_price(price): # Triangular distribution fitted over the past 10 years Sep 2009 to Nov 2020
+        s.cellulosic_ethanol.price = price * ethanol_L_per_kg
+        
+    @parameter(distribution=advanced_ethanol_price_distribution, element=s.advanced_ethanol, 
+               baseline=mean_advanced_ethanol_price, units='USD/L')
+    def set_advanced_ethanol_price(price): # Triangular distribution fitted over the past 10 years Sep 2009 to Nov 2020
+        s.advanced_ethanol.price = price * ethanol_L_per_kg
         
     # USDA ERS historical price data
     @parameter(distribution=biodiesel_minus_ethanol_price_distribution, element=s.biodiesel, units='USD/L',
-               baseline=mean_biodiesel_price - mean_ethanol_price)
+               baseline=mean_biodiesel_price - mean_advanced_ethanol_price)
     def set_biodiesel_price(price): # Triangular distribution fitted over the past 10 years Sep 2009 to March 2021
-        s.biodiesel.price = (s.ethanol.price + price) * biodiesel_L_per_kg
+        s.biodiesel.price = (s.advanced_ethanol.price + price) * biodiesel_L_per_kg
 
     # https://www.eia.gov/energyexplained/natural-gas/prices.php
     @parameter(distribution=natural_gas_price_distribution, element=s.natural_gas, units='USD/m3',
@@ -1086,7 +1141,8 @@ def load(name, cache=cache, reduce_chemicals=True,
     set_baseline(set_cane_oil_content, 10)
     set_baseline(set_saccharification_oil_recovery, 70)
     set_baseline(set_crushing_mill_oil_recovery, 60)
-    set_baseline(set_ethanol_price, mean_ethanol_price) 
+    set_baseline(set_advanced_ethanol_price, mean_advanced_ethanol_price) 
+    set_baseline(set_cellulosic_ethanol_price, mean_cellulosic_ethanol_price) 
     set_baseline(set_crude_glycerol_price, mean_glycerol_price)
     set_baseline(set_biodiesel_price, mean_biodiesel_price - mean_ethanol_price)
     set_baseline(set_natural_gas_price, mean_natural_gas_price)
@@ -1122,8 +1178,7 @@ def load(name, cache=cache, reduce_chemicals=True,
         WWTsys.set_tolerance(mol=10, method='wegstein')
         # sys.track_recycle(WWTsys.recycle)
     sys.simulate()
-    if reduce_chemicals:
-        oilcane_sys.reduce_chemicals()
+    if reduce_chemicals: oilcane_sys.reduce_chemicals()
     oilcane_sys._load_stream_links()
     HXN.simulate()
 

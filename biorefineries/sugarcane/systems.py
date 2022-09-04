@@ -15,6 +15,7 @@ __all__ = (
     'add_urea_MgSO4_nutrients',
     'add_urea_nutrient',
     'create_feedstock_handling_system',
+    'create_bagasse_drying_system',
     'create_juicing_system_up_to_clarification',
     'create_juicing_system_with_fiber_screener',
     'create_sucrose_fermentation_system',
@@ -26,6 +27,7 @@ __all__ = (
     'create_bagasse_pelleting_system',
     'create_sugar_crystallization_system',
     'create_sugarcane_to_sugar_and_molasses_system',
+    'create_sugarcane_to_sugar_and_ethanol_system',
     'convert_fiber_to_lignocelluosic_components',
     'set_sugarcane_composition',
 )
@@ -292,6 +294,20 @@ def create_bagasse_pelleting_system(ins, outs):
     U405 = units.ConveyingBelt('U405', U404-0, bagasse_pellets)
 
 @SystemFactory(
+    ID='bagasse_drying_sys',
+    ins=[bagasse],
+    outs=['dried_bagasse']
+)
+def create_bagasse_drying_system(ins, outs, utility_agent='Steam'):
+    U402 = units.DrumDryer('U402', 
+        (ins[0], 'dryer_air', 'dryer_natural_gas'), 
+        ('', 'dryer_outlet_air', 'dryer_emissions'),
+        moisture_content=0.40, split=0.,
+        utility_agent=utility_agent,
+    )
+    units.ConveyingBelt('U403', U402-0, outs)
+
+@SystemFactory(
     ID='feedstock_handling_sys',
     ins=[sugarcane],
     outs=[shredded_cane]
@@ -308,8 +324,10 @@ def create_feedstock_handling_system(ins, outs):
     ins=[sugarcane],
     outs=[untreated_juice, bagasse]
 )
-def create_juicing_system_without_treatment(ins, outs, pellet_bagasse=None):
+def create_juicing_system_without_treatment(ins, outs, pellet_bagasse=None,
+                                            dry_bagasse=None):
     if pellet_bagasse is None: pellet_bagasse = False
+    if dry_bagasse is None: dry_bagasse = False
     
     ### Streams ###
     sugarcane, = ins
@@ -337,10 +355,12 @@ def create_juicing_system_without_treatment(ins, outs, pellet_bagasse=None):
         other_liquids = feed.imass['Lipid'] if 'Lipid' in feed.chemicals else 0.
         imbibition_water.imass['Water'] = 0.245 * (feed.F_mass - feed.imass['Water'] - other_liquids) / 0.7
     
-    U202 = units.ConveyingBelt('U202', U201-0, [''] if pellet_bagasse else [bagasse])
+    U202 = units.ConveyingBelt('U202', U201-0, [''] if (pellet_bagasse or dry_bagasse) else [bagasse])
     
     if pellet_bagasse:
-        bagasse_pelleting_sys = create_bagasse_pelleting_system(None, ins=U202-0, outs=bagasse, mockup=True)
+        create_bagasse_pelleting_system(None, ins=U202-0, outs=bagasse, mockup=True)
+    elif dry_bagasse:
+        create_bagasse_drying_system(None, ins=U202-0, outs=bagasse, mockup=True)
     
     # Mix in water
     M201 = units.Mixer('M201', ('', imbibition_water), 1-U201)
@@ -366,7 +386,8 @@ def create_juicing_system_without_treatment(ins, outs, pellet_bagasse=None):
     ins=[sugarcane, H3PO4, lime, polymer],
     outs=[clarified_juice, bagasse]
 )
-def create_juicing_system_up_to_clarification(ins, outs, pellet_bagasse=None):
+def create_juicing_system_up_to_clarification(ins, outs, pellet_bagasse=None,
+                                              dry_bagasse=None):
     
     ### Streams ###
     sugarcane, H3PO4, lime, polymer = ins
@@ -381,6 +402,7 @@ def create_juicing_system_up_to_clarification(ins, outs, pellet_bagasse=None):
         outs=('', bagasse),
         mockup=True,
         pellet_bagasse=pellet_bagasse,
+        dry_bagasse=dry_bagasse,
     )
     U201 = f.unit.U201
     
@@ -461,12 +483,14 @@ def create_juicing_system_up_to_clarification(ins, outs, pellet_bagasse=None):
     ins=[sugarcane, H3PO4, lime, polymer],
     outs=[screened_juice, bagasse, fiber_fines]
 )          
-def create_juicing_system_with_fiber_screener(ins, outs, pellet_bagasse=None):
+def create_juicing_system_with_fiber_screener(ins, outs, pellet_bagasse=None,
+                                              dry_bagasse=None):
     screened_juice, bagasse, fiber_fines = outs
     sys = create_juicing_system_up_to_clarification(
         None, ins, ['', bagasse],
         mockup=True,
-        pellet_bagasse=pellet_bagasse
+        pellet_bagasse=pellet_bagasse,
+        dry_bagasse=dry_bagasse,
     )
     # Screen out small fibers from sugar stream
     S202 = units.VibratingScreen('S202', sys-0, (screened_juice, fiber_fines),
@@ -1160,9 +1184,8 @@ def create_sugarcane_to_sugar_and_molasses_system(ins, outs,
                                        use_area_convention=False,
                                        pellet_bagasse=None):
     s = f.stream
-    u = f.unit
     
-    sugarcane, H3PO4, lime, polymer, denaturant = ins
+    sugarcane, H3PO4, lime, polymer, = ins
     sugar, molasses, wastewater, emissions, ash_disposal = outs
     
     feedstock_handling_sys = create_feedstock_handling_system(
@@ -1224,3 +1247,52 @@ def create_sugarcane_to_sugar_and_molasses_system(ins, outs,
     #         ins=[vinasse],
     #         mockup=True,
     #     )
+
+@SystemFactory(
+    ID='molasses_fermentation_sys',
+    ins=[molasses],
+    outs=[beer],
+)
+def create_molasses_fermentation_system(ins, outs):
+    molasses, = ins
+    beer, = outs
+    MY = bst.Mixer(500, [molasses, 'dilution_water'])
+    HX = bst.HXutility(500, ins=MY-0, T=305.15)
+    
+    # Ethanol Production
+    RX = bst.Fermentation(500, HX-0, outs=['', beer], tau=9, efficiency=0.90, N=4)
+    RX.titer = 96
+    RX.productivity = 96 / 24
+    RX.fermentation_reaction.X = 0.9337
+        
+    @MY.add_specification
+    def adjust_titer():
+        beer = RX.outs[1]
+        target_titer = RX.titer
+        path = MY.path_until(RX)
+        for unit in path: unit.run()
+        RX.run()
+        ethanol = float(beer.imass['Ethanol'])
+        current_titer = ethanol / beer.F_vol
+        required_water = (1./target_titer - 1./current_titer) * ethanol * 1000.
+        MY.ins[1].imass['Water'] = max(required_water, 0)
+        for unit in path: unit.run()
+        RX.tau = target_titer / RX.productivity 
+
+       
+
+@SystemFactory(
+    ID='sugarcane_sys', 
+    ins=[sugarcane, H3PO4, lime, polymer], 
+    outs=[sugar, ethanol]
+)
+def create_sugarcane_to_sugar_and_ethanol_system(ins, outs):
+    sugar, ethanol = outs
+    sugar_and_molasses_sys = create_sugarcane_to_sugar_and_molasses_system(ins=ins, outs=[sugar], mockup=True)
+    sugar, molasses, wastewater, emissions, ash_disposal = sugar_and_molasses_sys.outs
+    molasses_fermentation_sys = create_molasses_fermentation_system(ins=molasses, mockup=True)
+    beer, = molasses_fermentation_sys.outs
+    beer_distillation_sys = create_beer_distillation_system(ins=beer, mockup=True)
+    distilled_beer, stillage = beer_distillation_sys.outs
+    create_ethanol_purification_system_after_beer_column(ins=distilled_beer, outs=ethanol, mockup=True)
+    

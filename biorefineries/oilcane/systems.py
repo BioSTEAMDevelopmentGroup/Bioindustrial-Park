@@ -16,6 +16,7 @@ from biosteam import main_flowsheet as f
 from biosteam import SystemFactory
 from ..sugarcane import (
     add_urea_nutrient,
+    create_bagasse_drying_system,
     create_sucrose_fermentation_system,
     create_sucrose_to_ethanol_system,
     create_beer_distillation_system,
@@ -255,6 +256,7 @@ def create_oilcane_to_biodiesel_and_ethanol_1g(
         ins=feedstock_handling_sys-0,
         outs=['', 'bagasse', 'fiber_fines'],
         pellet_bagasse=False,
+        dry_bagasse=True,
         mockup=True,
         udct=True,
         area=200,
@@ -322,7 +324,6 @@ def create_oilcane_to_biodiesel_and_ethanol_1g(
          'FGD_lime',
          'boilerchems'),
         ('emissions', 'rejected_water_and_blowdown', 'ash_disposal'),
-        boiler_efficiency=0.80,
         turbogenerator_efficiency=0.85
     )
     bst.CoolingTower(800)
@@ -377,6 +378,7 @@ def create_oilcane_to_crude_oil_and_ethanol_1g(
         ins=feedstock_handling_sys-0,
         outs=['', '', 'fiber_fines'],
         pellet_bagasse=False,
+        dry_bagasse=True,
         mockup=True,
         udct=True,
         area=200,
@@ -422,7 +424,6 @@ def create_oilcane_to_crude_oil_and_ethanol_1g(
          'FGD_lime',
          'boilerchems'),
         ('emissions', 'rejected_water_and_blowdown', 'ash_disposal'),
-        boiler_efficiency=0.80,
         turbogenerator_efficiency=0.85
     )
     bst.CoolingTower(800)
@@ -451,11 +452,12 @@ def create_oilcane_to_crude_oil_and_ethanol_1g(
 
 @SystemFactory(
     ID='cane_pretreatment_sys',
-    ins=[dict(ID='cane')],
-    outs=[dict(ID='juice'),
-          dict(ID='hydrolysate'),
-          dict(ID='pretreatment_wastewater'),
-          dict(ID='fiber_fines')],
+    ins=['cane'],
+    outs=['juice',
+          'hydrolysate',
+          'pretreatment_wastewater',
+          'fiber_fines',
+          'bagasse_to_boiler'],
 )
 def create_cane_combined_1_and_2g_pretreatment(ins, outs):
     """
@@ -463,7 +465,7 @@ def create_cane_combined_1_and_2g_pretreatment(ins, outs):
     
     """
     oilcane, = ins
-    juice, hydrolysate, pretreatment_wastewater, fiber_fines = outs
+    juice, hydrolysate, pretreatment_wastewater, fiber_fines, bagasse_to_boiler = outs
     
     feedstock_handling_sys = create_feedstock_handling_system(
         ins=oilcane,
@@ -477,15 +479,20 @@ def create_cane_combined_1_and_2g_pretreatment(ins, outs):
         mockup=True,
         udct=True,
         area=200,
+        dry_bagasse=False,
         pellet_bagasse=False,
     )
     screened_juice, bagasse, fiber_fines = juicing_sys.outs
+    
+    S1 = bst.Splitter(200, bagasse, split=0.85)
+    
+    create_bagasse_drying_system(ins=S1-1, outs=bagasse_to_boiler, area=200)
     
     udct['S201'].isplit['Lipid'] = 1. # Vibrating screen
     crushing_mill = udct['U201']
     crushing_mill.tag = "oil extraction"
     crushing_mill.isplit['Lipid'] = 0.90
-    conveying_belt = bagasse.source
+    conveying_belt = S1.outs[0].source
     conveying_belt.cellulose_rxn = tmo.Reaction('Cellulose -> Glucan', 'Cellulose', 1.0, basis='wt')
     conveying_belt.cellulose_rxn.basis = 'mol'
     # Bagasse composition https://www.sciencedirect.com/science/article/pii/S0144861710005072
@@ -507,7 +514,7 @@ def create_cane_combined_1_and_2g_pretreatment(ins, outs):
     conveying_belt.specification = convert_hemicellulose
     hot_water_pretreatment_sys, hw_dct = brf.cornstover.create_hot_water_pretreatment_system(
         outs=(hydrolysate, pretreatment_wastewater),
-        ins=bagasse,
+        ins=S1-0,
         mockup=True,
         area=300,
         udct=True,
@@ -516,12 +523,13 @@ def create_cane_combined_1_and_2g_pretreatment(ins, outs):
 
 @SystemFactory(
     ID='cane_to_fermentation_sys',
-    ins=[dict(ID='cane')],
-    outs=[dict(ID='beer'),
-          dict(ID='lignin'),
-          dict(ID='condensate'),
-          dict(ID='pretreatment_wastewater'),
-          dict(ID='fiber_fines')],
+    ins=['cane'],
+    outs=['beer',
+          'lignin',
+          'condensate',
+          'pretreatment_wastewater',
+          'fiber_fines',
+          'bagasse_to_boiler'],
 )
 def create_cane_to_combined_1_and_2g_fermentation(
         ins, outs, titer=None, productivity=None, product_group=None,
@@ -537,7 +545,7 @@ def create_cane_to_combined_1_and_2g_fermentation(
     
     """
     oilcane, = ins
-    beer, lignin, condensate, pretreatment_wastewater, fiber_fines = outs
+    beer, lignin, condensate, pretreatment_wastewater, fiber_fines, bagasse_to_boiler = outs
     if fed_batch is None: fed_batch = False
     if SeedTrain is None: SeedTrain = units.SeedTrain
     if CoFermentation is None: CoFermentation = units.CoFermentation
@@ -546,11 +554,11 @@ def create_cane_to_combined_1_and_2g_fermentation(
     if titer is None: titer = 68.5
     pretreatment_sys = create_cane_combined_1_and_2g_pretreatment(
         ins=oilcane, 
-        outs=['juice', 'hydrolysate', pretreatment_wastewater, fiber_fines]
+        outs=['juice', 'pretreated_biomass', pretreatment_wastewater, fiber_fines, bagasse_to_boiler]
     )
-    juice, hydrolysate, pretreatment_wastewater, fiber_fines = pretreatment_sys.outs
+    juice, pretreated_biomass, pretreatment_wastewater, fiber_fines, bagasse_to_boiler = pretreatment_sys.outs
     cellulosic_fermentation_sys, cfdct = brf.cornstover.create_cellulosic_fermentation_system(
-        ins=(hydrolysate,),
+        ins=(pretreated_biomass,),
         outs=['vent', beer, lignin],
         mockup=True,
         area=400,
@@ -684,12 +692,17 @@ def create_cane_to_combined_1_and_2g_fermentation(
                     MX.ins[1].imass['Water'] = max(dilution_water, 0)
                     for unit in mx_path: unit.run()
                     return target_titer - get_titer()
-                try:
-                    MX.ins[1].imass['Water'] = flx.IQ_interpolation(
-                        f, 0, dilution_water * 5, x=dilution_water, ytol=1e-3, xtol=1e-3, maxiter=1000,
-                    )
-                except:
-                    breakpoint()
+                x0 = 0
+                x1 = dilution_water * 5
+                y0 = f(0)
+                if y0 < 0: 
+                    y1 = f(x1)
+                    try:
+                        MX.ins[1].imass['Water'] = flx.IQ_interpolation(
+                            f, x0, x1, y0, y1, x=dilution_water, ytol=1e-3, xtol=1e-3, maxiter=1000,
+                        )
+                    except:
+                        breakpoint()
             else:
                 for i in range(1, N):
                     if f(1e-6) < 0.:
@@ -749,7 +762,7 @@ def create_oilcane_to_crude_oil_and_ethanol_combined_1_and_2g_post_fermentation_
     ethanol, crude_oil = outs
     
     cane_to_fermentation_sys = create_cane_to_combined_1_and_2g_fermentation('cane_to_fermentation_sys', ins=oilcane)
-    beer, lignin, condensate, pretreatment_wastewater, fiber_fines = cane_to_fermentation_sys.outs
+    beer, lignin, condensate, pretreatment_wastewater, fiber_fines, bagasse_to_boiler = cane_to_fermentation_sys.outs
     cellulosic_beer_distillation_sys = create_beer_distillation_system(
         ins=beer,
         outs=[''],
@@ -785,7 +798,7 @@ def create_oilcane_to_crude_oil_and_ethanol_combined_1_and_2g_post_fermentation_
         area=500,
     )
     s = f.stream
-    M501 = bst.Mixer(700, (wastewater_treatment_sys-1, lignin, cellmass, f.stream.filter_cake))
+    M501 = bst.Mixer(700, (wastewater_treatment_sys-1, lignin, cellmass, f.stream.filter_cake, bagasse_to_boiler))
     brf.cornstover.create_facilities(
         solids_to_boiler=M501-0,
         gas_to_boiler=wastewater_treatment_sys-0,
@@ -817,7 +830,7 @@ def create_oilcane_to_biodiesel_and_ethanol_combined_1_and_2g_post_fermentation_
     oilcane, = ins
     ethanol, biodiesel, crude_glycerol = outs
     oilcane_to_fermentation_sys = create_cane_to_combined_1_and_2g_fermentation('oilcane_to_fermentation_sys', ins=oilcane)
-    beer, lignin, condensate, pretreatment_wastewater, fiber_fines = oilcane_to_fermentation_sys.outs
+    beer, lignin, condensate, pretreatment_wastewater, fiber_fines, bagasse_to_boiler = oilcane_to_fermentation_sys.outs
     cellulosic_beer_distillation_sys = create_beer_distillation_system(
         ins=beer,
         outs=[''],
@@ -872,7 +885,7 @@ def create_oilcane_to_biodiesel_and_ethanol_combined_1_and_2g_post_fermentation_
     )
     s = f.stream
     u = f.unit
-    M501 = bst.Mixer(700, (wastewater_treatment_sys-1, lignin, polar_lipids, cellmass, f.stream.filter_cake))
+    M501 = bst.Mixer(700, (wastewater_treatment_sys-1, lignin, polar_lipids, cellmass, f.stream.filter_cake, bagasse_to_boiler))
     brf.cornstover.create_facilities(
         solids_to_boiler=M501-0,
         gas_to_boiler=wastewater_treatment_sys-0,
@@ -906,7 +919,7 @@ def create_sugarcane_to_ethanol_combined_1_and_2g(ins, outs):
     sugarcane, = ins
     ethanol, = outs
     cane_to_fermentation_sys = create_cane_to_combined_1_and_2g_fermentation('cane_to_fermentation_sys', ins=sugarcane)
-    beer, lignin, condensate, pretreatment_wastewater, fiber_fines = cane_to_fermentation_sys.outs
+    beer, lignin, condensate, pretreatment_wastewater, fiber_fines, bagasse_to_boiler = cane_to_fermentation_sys.outs
     cellulosic_beer_distillation_sys = create_beer_distillation_system(
         ins=beer,
         outs=[''],
@@ -932,7 +945,7 @@ def create_sugarcane_to_ethanol_combined_1_and_2g(ins, outs):
         area=500,
     )
     s = f.stream
-    M501 = bst.Mixer(700, (wastewater_treatment_sys-1, lignin, C603_3-0, s.filter_cake))
+    M501 = bst.Mixer(700, (wastewater_treatment_sys-1, lignin, C603_3-0, s.filter_cake, bagasse_to_boiler))
     MX = bst.Mixer(400, [condensate, stripper_process_water])
     brf.cornstover.create_facilities(
         solids_to_boiler=M501-0,
@@ -982,6 +995,7 @@ def create_oilcane_to_biodiesel_1g(
         ins=feedstock_handling_sys-0,
         outs=['', '', 'fiber_fines'],
         pellet_bagasse=False,
+        dry_bagasse=True,
         mockup=True,
         udct=True,
         area=200,
@@ -1087,7 +1101,7 @@ def create_oilcane_to_biodiesel_combined_1_and_2g_post_fermentation_oil_separati
         fed_batch=fed_batch,
         mockup=True
     )
-    beer, lignin, condensate, pretreatment_wastewater, fiber_fines = oilcane_to_fermentation_sys.outs
+    beer, lignin, condensate, pretreatment_wastewater, fiber_fines, bagasse_to_boiler = oilcane_to_fermentation_sys.outs
     post_fermentation_oil_separation_sys, pfls_dct = create_post_fermentation_oil_separation_system(
         ins=beer,
         mockup=True,
@@ -1156,6 +1170,7 @@ def create_oilcane_to_biodiesel_and_actag_1g(
         ins=feedstock_handling_sys-0,
         outs=['', '', 'fiber_fines'],
         pellet_bagasse=False,
+        dry_bagasse=True,
         mockup=True,
         udct=True,
         area=200,
@@ -1295,7 +1310,7 @@ def create_oilcane_to_biodiesel_and_actag_combined_1_and_2g_post_fermentation_oi
         fed_batch=False,
         mockup=True
     )
-    beer, lignin, condensate, pretreatment_wastewater, fiber_fines = oilcane_to_fermentation_sys.outs
+    beer, lignin, condensate, pretreatment_wastewater, fiber_fines, bagasse_to_boiler = oilcane_to_fermentation_sys.outs
     
     fermentor = f(units.CoFermentation)
     fermentor.selectivity = 0.75
