@@ -380,7 +380,7 @@ def create_conventional_acTAG_system(ins, outs):
         'oil_wash_sys', oil, mockup=True, area=400
     )
     washed_lipid, spent_wash_water = oil_wash_sys.outs
-    acTAG_separation_sys = create_acTAG_separation_system(
+    create_acTAG_separation_system(
         'acTAG_separation_sys', washed_lipid, [acTAG, TAG], mockup=True, area=400,
     )
     # wastewater_treatment_sys = bst.create_wastewater_treatment_system(

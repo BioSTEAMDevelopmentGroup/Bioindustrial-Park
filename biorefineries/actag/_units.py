@@ -34,7 +34,7 @@ class OleinCrystallizer(bst.BatchCrystallizer):
         crystal_TAG_purity = self.crystal_TAG_purity
         melt_AcTAG_purity = self.melt_AcTAG_purity
         feed = self.ins[0]
-        TAG, AcTAG = feed.imass['TAG', 'AcTAG'].value
+        TAG, AcTAG = feed.imass['TAG', 'AcTAG']
         total = TAG + AcTAG
         minimum_melt_purity = AcTAG / total
         minimum_crystal_purity = TAG / total

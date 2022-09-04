@@ -158,7 +158,7 @@ def create_lipid_wash_system(ins, outs):
           dict(ID='bagasse'),
           dict(ID='fiber_fines')]
 )
-def create_juicing_system(ins, outs, pellet_bagasse=None):
+def create_juicing_system(ins, outs, pellet_bagasse=None, dry_bagasse=None):
     lipidcane, H3PO4, lime, polymer = ins
     screened_juice, bagasse, fiber_fines = outs
     
@@ -170,6 +170,7 @@ def create_juicing_system(ins, outs, pellet_bagasse=None):
         pellet_bagasse=pellet_bagasse,
         ins=[lipidcane, H3PO4, lime, polymer], 
         outs=[screened_juice, bagasse, fiber_fines],
+        dry_bagasse=dry_bagasse,
         mockup=True,
     )
     u = f.unit

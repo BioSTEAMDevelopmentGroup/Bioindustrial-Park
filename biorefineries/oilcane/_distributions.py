@@ -6,6 +6,8 @@ Created on Fri May 14 22:48:34 2021
 """
 from matplotlib import pyplot as plt
 import numpy as np
+import pandas as pd
+import os
 from chaospy import distributions as shape
 from math import sqrt
 
@@ -21,6 +23,11 @@ __all__ = (
     'mean_electricity_price',
     'mean_soymeal_price',
 )
+
+__file__
+
+RINfile = os.path.join(os.path.dirname(__file__), 'RIN_prices.csv')
+df_RIN = pd.read_csv(RINfile)
 
 liter_per_gal = 3.7854
 
