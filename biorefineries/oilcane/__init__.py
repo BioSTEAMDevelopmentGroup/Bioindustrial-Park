@@ -90,9 +90,8 @@ from ._oil_extraction_specification import (
     MockExtractionSpecification,
 )
 from ._distributions import (
-    ethanol_price_distribution,
-    biodiesel_minus_ethanol_price_distribution,
     natural_gas_price_distribution,
+    biodiesel_price_distribution,
     mean_biodiesel_price,
     cellulosic_ethanol_price_distribution,
     advanced_ethanol_price_distribution,
@@ -548,7 +547,7 @@ def load(name, cache=cache, reduce_chemicals=True,
     if number in cellulosic_ethanol_configurations:
         RIN_splitter = bst.Splitter('RIN_splitter',
             ins=s.ethanol,
-            outs=['cellulosic_ethanol', 'advanced_ethanol'],
+            outs=['advanced_ethanol', 'cellulosic_ethanol'],
             split=0.5
         )
         @RIN_splitter.add_specification(run=True)
@@ -660,10 +659,10 @@ def load(name, cache=cache, reduce_chemicals=True,
         s.advanced_ethanol.price = price * ethanol_L_per_kg
         
     # USDA ERS historical price data
-    @parameter(distribution=biodiesel_minus_ethanol_price_distribution, element=s.biodiesel, units='USD/L',
-               baseline=mean_biodiesel_price - mean_advanced_ethanol_price)
+    @parameter(distribution=biodiesel_price_distribution, element=s.biodiesel, units='USD/L',
+               baseline=mean_biodiesel_price)
     def set_biodiesel_price(price): # Triangular distribution fitted over the past 10 years Sep 2009 to March 2021
-        s.biodiesel.price = (s.advanced_ethanol.price + price) * biodiesel_L_per_kg
+        s.biodiesel.price = price * biodiesel_L_per_kg
 
     # https://www.eia.gov/energyexplained/natural-gas/prices.php
     @parameter(distribution=natural_gas_price_distribution, element=s.natural_gas, units='USD/m3',
@@ -874,6 +873,13 @@ def load(name, cache=cache, reduce_chemicals=True,
         direct_nonbiogenic_emissions = lambda: sum([i.F_mol for i in natural_gas_streams]) * chemicals.CO2.MW * sys.operating_hours
     electricity = lambda: sys.operating_hours * sys.power_utility.rate
     
+    def get_GWP_mean_ethanol_price():
+        if number in cellulosic_ethanol_configurations:
+            f = float(RIN_splitter.split.mean())
+            return f * mean_advanced_ethanol_price + (1 - f) * mean_cellulosic_ethanol_price
+        else:
+            return mean_advanced_ethanol_price
+    
     sys.define_process_impact(
         key=GWP,
         name='Direct non-biogenic emissions',
@@ -930,12 +936,12 @@ def load(name, cache=cache, reduce_chemicals=True,
         GWP_total = sys.get_total_feeds_impact(GWP) + min(electricity(), 0) * GWP_characterization_factors['Electricity'] # kg CO2 eq. / yr
         sales = (
             biodiesel_flow() * mean_biodiesel_price
-            + ethanol_flow() * mean_ethanol_price
+            + ethanol_flow() * get_GWP_mean_ethanol_price()
             + crude_glycerol_flow() * mean_glycerol_price
         )
         GWP_per_USD = GWP_total / sales
         return {
-            'Ethanol': GWP_per_USD * mean_ethanol_price,
+            'Ethanol': GWP_per_USD * get_GWP_mean_ethanol_price(),
             'Biodiesel': GWP_per_USD * mean_biodiesel_price,
             'Crude glycerol': GWP_per_USD * mean_glycerol_price,
         }
@@ -947,7 +953,7 @@ def load(name, cache=cache, reduce_chemicals=True,
         GWP_emissions = sys.get_process_impact(GWP) # kg CO2 eq. / yr
         sales = (
             biodiesel_flow() * mean_biodiesel_price
-            + ethanol_flow() * mean_ethanol_price
+            + ethanol_flow() * get_GWP_mean_ethanol_price()
             + crude_glycerol_flow() * mean_glycerol_price
             + max(-electricity(), 0) * mean_electricity_price
         )
@@ -955,7 +961,7 @@ def load(name, cache=cache, reduce_chemicals=True,
 
     @metric(name='Ethanol GWP', element='Economic allocation', units='kg*CO2*eq / L')
     def GWP_ethanol(): # Cradle to gate
-        return GWP_economic.get() * mean_ethanol_price
+        return GWP_economic.get() * get_GWP_mean_ethanol_price()
     
     @metric(name='Biodiesel GWP', element='Economic allocation', units='kg*CO2*eq / L')
     def GWP_biodiesel(): # Cradle to gate
@@ -1081,7 +1087,7 @@ def load(name, cache=cache, reduce_chemicals=True,
 
     @metric(name='Ethanol GWP derivative', element='Ethanol', units='kg*CO2*eq / L')
     def GWP_ethanol_derivative(): # Cradle to gate
-        return GWP_economic_derivative.get() * mean_ethanol_price
+        return GWP_economic_derivative.get() * get_GWP_mean_ethanol_price()
     
     @metric(name='Biodiesel GWP derivative', element='Biodiesel', units='kg*CO2*eq / L')
     def GWP_biodiesel_derivative(): # Cradle to gate
@@ -1144,7 +1150,7 @@ def load(name, cache=cache, reduce_chemicals=True,
     set_baseline(set_advanced_ethanol_price, mean_advanced_ethanol_price) 
     set_baseline(set_cellulosic_ethanol_price, mean_cellulosic_ethanol_price) 
     set_baseline(set_crude_glycerol_price, mean_glycerol_price)
-    set_baseline(set_biodiesel_price, mean_biodiesel_price - mean_ethanol_price)
+    set_baseline(set_biodiesel_price, mean_biodiesel_price)
     set_baseline(set_natural_gas_price, mean_natural_gas_price)
     set_baseline(set_electricity_price, mean_electricity_price)
     if number > 0:
