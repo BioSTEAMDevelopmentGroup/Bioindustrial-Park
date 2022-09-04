@@ -259,6 +259,7 @@ def add_urea_nutrient(fermentor, seedtrain=None):
                 F_vol = sum([i.F_vol for i in others], feed.F_vol)
             urea.imass['Urea'] = 0.5 * F_vol
             S301.ins[0].mix_from(S301.outs)
+            Urea_storage.ins[0].imol['Urea'] = S301.ins[0].imol['Urea']
             for i in Urea_storage.path_until(fermentor): i.run()
     else:
         fermentor.ins.append(Urea_storage-0)
@@ -269,7 +270,7 @@ def add_urea_nutrient(fermentor, seedtrain=None):
                 F_vol = sum([i.F_vol - i.ivol['Lipid'] for i in others], feed.F_vol - feed.ivol['Lipid'])
             else:
                 F_vol = sum([i.F_vol for i in others], feed.F_vol)
-            urea.imass['Urea'] = 0.5 * F_vol
+            Urea_storage.ins[0].imass['Urea'] = 0.5 * F_vol
             for i in Urea_storage.path_until(fermentor): i.run()
             
 # %% Juicing and evaporation

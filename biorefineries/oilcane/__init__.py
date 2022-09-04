@@ -560,10 +560,10 @@ def load(name, cache=cache, reduce_chemicals=True,
                 / (juice_sugar + s.slurry.imass['Glucose', 'Xylose', 'Arabinose'].sum())
             )
         
-        sys.update_configuration([*sys.units, RIN_splitter])
-        assert RIN_splitter in sys.units
+        oilcane_sys.update_configuration([*sys.units, RIN_splitter])
+        assert RIN_splitter in oilcane_sys.units
     elif number in conventional_ethanol_configurations:
-        s.ethanol.ID = 'advanced_ethanol'
+        s.ethanol.register_alias('advanced_ethanol')
         
     set_GWPCF(feedstock, 'sugarcane')
     set_GWPCF(s.H3PO4, 'H3PO4')
@@ -856,7 +856,7 @@ def load(name, cache=cache, reduce_chemicals=True,
     if agile:
         feedstock_flow = lambda: sys.flow_rates[feedstock] / kg_per_MT # MT / yr
         biodiesel_flow = lambda: sys.flow_rates.get(s.biodiesel, 0.) * biodiesel_L_per_kg # L / yr
-        ethanol_flow = lambda: sys.flow_rates.get(s.ethanol, 0.) * ethanol_L_per_kg # L / yr
+        ethanol_flow = lambda: (sys.flow_rates.get(s.cellulosic_ethanol, 0.) + sys.flow_rates.get(s.advanced_ethanol, 0.))* ethanol_L_per_kg # L / yr
         natural_gas_flow = lambda: sum([sys.flow_rates[i] for i in natural_gas_streams]) * V_ng # m3 / yr
         crude_glycerol_flow = lambda: sys.flow_rates.get(s.crude_glycerol, 0.) # kg / yr
         
@@ -1180,7 +1180,7 @@ def load(name, cache=cache, reduce_chemicals=True,
     try: AD = flowsheet(bst.AerobicDigestion)
     except: pass
     else:
-        WWTsys = sys.find_system(AD)
+        WWTsys = oilcane_sys.find_system(AD)
         WWTsys.set_tolerance(mol=10, method='wegstein')
         # sys.track_recycle(WWTsys.recycle)
     sys.simulate()

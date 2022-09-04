@@ -736,15 +736,15 @@ def create_cane_to_combined_1_and_2g_fermentation(
     
     MX = bst.Mixer(400, [PX-0, 'dilution_water'])
     if fed_batch: MX.ins.append(SX0-0)
-    HX = bst.HXutility(400, MX-0, T=305.15)
+    HX = bst.HXutility(400, MX-0, T=305.15) 
     HX-0-hydrolysate_sink
     
     def get_titer():
         beer = cofermentation.outs[1]
         feed = EvX.outs[0]
         ignored = beer.ivol[ignored_volume] if ignored_volume in cofermentation.chemicals else 0.
-        ignored_product = feed.imass[product_group]
-        ignored_product_vol = feed.ivol[product_group]
+        ignored_product = feed.imass[product_group] if product_group in feed.chemicals else 0.
+        ignored_product_vol = feed.ivol[product_group] if product_group in feed.chemicals else 0.
         return (beer.imass[product_group] - ignored_product) / (beer.ivol['Water', product_group].sum() - ignored_product_vol - ignored)
     cofermentation.get_titer = get_titer
     cofermentation.titer = titer
