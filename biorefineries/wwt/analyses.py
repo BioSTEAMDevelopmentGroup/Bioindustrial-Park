@@ -11,18 +11,24 @@ import os, pandas as pd
 from copy import deepcopy
 from biorefineries.wwt import results_path
 
-#!!! Need to decide whether to use the displacement or allocation approach for LCA
-def summarize_baselines(names=None, dir_path=None):
-    dir_path = dir_path or os.path.join(results_path, 'baselines')
+modules_all = ('cn', 'sc1g', 'oc1g', 'cs', 'sc2g', 'oc2g', 'la')
+modules_2G = ('cs', 'sc2g', 'oc2g', 'la')
+
+
+# %%
+
+def summarize_baselines(
+        dir_path=os.path.join(results_path, 'baselines'),
+        modules=modules_all,
+        ):
     MPSP_exist, MPSP_new, MPSP_RIN, MPSP_no_WWT = [], [], [], []
     GWP_exist, GWP_new, GWP_RIN, GWP_no_WWT = [], [], [], []
     CAPEX_WWT_exist, CAPEX_WWT_new = [], []
     electricity_WWT_exist, electricity_WWT_new = [], []
-
     get_val = lambda key1, key2: df[(df.type==key1) & (df.metric==key2)].value.item()
-    names = names or ('cn', 'sc1g', 'oc1g', 'cs', 'sc2g', 'oc2g', 'la')
-    for name in names:
-        df_path = os.path.join(dir_path, f'{name}.csv')
+
+    for module in modules:
+        df_path = os.path.join(dir_path, f'{module}.csv')
         df = pd.read_csv(df_path, names=('type', 'metric', 'value'), skiprows=(0,))
         per = 'gal'
         try:
@@ -34,6 +40,7 @@ def summarize_baselines(names=None, dir_path=None):
         MPSP_RIN.append(get_val('new', f'MPSP_RIN [$/{per}]'))
         MPSP_no_WWT.append(get_val('new', f'MPSP_no WWT [$/{per}]'))
 
+        # Use the displacement or allocation approach for LCA
         GWP_exist.append(get_val('exist', f'Product GWP disp [kg CO2/{per}]'))
         GWP_new.append(get_val('new', f'Product GWP disp [kg CO2/{per}]'))
         GWP_RIN.append(get_val('new', f'Product GWP disp_RIN [kg CO2/{per}]'))
@@ -70,19 +77,23 @@ def summarize_baselines(names=None, dir_path=None):
     df_all['electricity_WWT_frac_reduction'] = \
         (df_all.electricity_WWT_exist-df_all.electricity_WWT_new)/df_all.electricity_WWT_exist
 
-    df_all['biorefinery'] = names
+    df_all['biorefinery'] = modules
     df_all.set_index('biorefinery', inplace=True)
     summary_path = os.path.join(dir_path, 'summary_baseline.xlsx')
     df_all.to_excel(summary_path)
 
 
-def summarize_BMPs(lower=0.05, mid=0.5, upper=0.95, dir_path=None, names=None):
-    dir_path = dir_path or os.path.join(results_path, 'BMPs')
-    names = names or ('cs', 'sc2g', 'oc2g', 'la')
+# %%
+
+def summarize_BMPs(
+        lower=0.05, mid=0.5, upper=0.95,
+        dir_path=os.path.join(results_path, 'BMPs'),
+        modules=modules_2G,
+        ):
     BMPs = [int(i) for i in os.listdir(dir_path) if i.isnumeric()]
     BMPs.sort()
     MPSPs = {}
-    for name in names: MPSPs[name] = []
+    for module in modules: MPSPs[module] = []
     GWPs = deepcopy(MPSPs)
     COD_prices = deepcopy(MPSPs)
     COD_GWPs = deepcopy(MPSPs)
@@ -135,6 +146,34 @@ def summarize_BMPs(lower=0.05, mid=0.5, upper=0.95, dir_path=None, names=None):
         COD_GWP_df.to_excel(writer, sheet_name='COD GWP')
 
 
+# %%
+
+def summarize_spearman(
+        cutoff=0.2,
+        N=1000,
+        modules=modules_all,
+        dir_path=os.path.join(results_path, 'uncertainties'),
+        ):
+    get_path = lambda module, kind, N: os.path.join(dir_path, f'{module}_{kind}_{N}.xlsx')
+    read_df = lambda path: pd.read_excel(pd.ExcelFile(path), 'Spearman', index_col=[0, 1])
+    kinds = ('exist', 'new')
+    with pd.ExcelWriter(os.path.join(dir_path, f'summary_uncertainties_{N}.xlsx')) as writer:
+        for module in modules:
+            dfs = [read_df(get_path(module, kind, N)).iloc[:, :2] for kind in kinds]
+            unit = 'gal' if module!='la' else 'kg'
+            dfs = [df[
+                (df[f'MPSP [$/{unit}]']<=-cutoff)|
+                (df[f'MPSP [$/{unit}]']>=cutoff)|
+                (df[f'Product GWP disp [kg CO2/{unit}]']<=-cutoff)|
+                (df[f'Product GWP disp [kg CO2/{unit}]']>=cutoff)
+                ] for df in dfs]
+            compiled = pd.concat(dfs, axis=1, keys=kinds)
+            compiled.to_excel(writer, sheet_name=module)
+
+
+# %%
+
 if __name__ == '__main__':
     summarize_baselines()
     summarize_BMPs()
+    summarize_spearman()
