@@ -153,7 +153,8 @@ def run_uncertainty_and_sensitivity(name, N, rule='L',
                                     optimize=True):
     np.random.seed(1)
     from warnings import filterwarnings
-    filterwarnings('ignore', category=bst.utils.DesignWarning)
+    filterwarnings('ignore', category=bst.exceptions.DesignWarning)
+    filterwarnings('ignore', category=bst.exceptions.CostWarning)
     oc.load(name, cache=None)
     key = (N, rule)
     if key in sample_cache:

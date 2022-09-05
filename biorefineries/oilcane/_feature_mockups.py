@@ -20,7 +20,8 @@ from biosteam import MockFeature
  set_cane_PL_content, set_sorghum_PL_content, set_cane_FFA_content,
  set_sorghum_FFA_content,  set_cane_oil_content, set_relative_sorghum_oil_content,
  set_TAG_to_FFA_conversion, set_oilcane_GWP, set_methanol_GWP, 
- set_pure_glycerine_GWP, set_cellulase_GWP, set_natural_gas_GWP
+ set_pure_glycerine_GWP, set_cellulase_GWP, set_natural_gas_GWP,
+ set_income_tax,
  ) = all_parameter_mockups = (
     MockFeature('Crushing mill oil recovery', '%', 'biorefinery'),
     MockFeature('Saccharification oil recovery', '%', 'biorefinery'),
@@ -58,6 +59,7 @@ from biosteam import MockFeature
     MockFeature('GWP', 'kg*CO2-eq/kg', 'Stream-pure glycerine'),
     MockFeature('GWP', 'kg*CO2-eq/kg', 'Stream-cellulase'),
     MockFeature('GWP', 'kg*CO2-eq/kg', 'Stream-natural gas'),
+    MockFeature('Income tax', '%', 'Biorefinery'),
 )
      
 (MFPP, feedstock_consumption, biodiesel_production, ethanol_production, 

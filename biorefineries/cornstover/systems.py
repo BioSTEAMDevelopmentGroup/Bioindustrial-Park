@@ -907,9 +907,11 @@ def create_facilities(
         blowdown_to_wastewater=None,
         BT_area=None,
         area=None,
+        BTkw=None
     ):
     
     BT = bst.facilities.BoilerTurbogenerator(BT_area or area or 'BT',
+                                             **(BTkw or {}),
                                              ins=(solids_to_boiler,
                                                   gas_to_boiler, 
                                                   'boiler_makeup_water',

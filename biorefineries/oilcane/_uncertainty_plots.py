@@ -1193,6 +1193,7 @@ def plot_spearman(configurations, labels=None, metric=None,
         (f'Pure glycerine GWPCF [1.25 $-$ 2.08 {material_GWP}]', ['S1', 'S2', 'S1*', 'S2*']),
         (f'Cellulase GWPCF [6.05 $-$ 10.1 {material_GWP}]', ['S1', 'O1', 'S1*', 'O1*']),
         (f'Natural gas GWPCF [0.297 $-$ 0.363 {material_GWP}]', ['S1', 'O1', 'S1*', 'O1*']),
+         ('Corporate income tax [21 $-$ 28 %]', []),
     ])
     if not with_units: index = [i.split(' [')[0] for i in index]
     ignored_dct = {

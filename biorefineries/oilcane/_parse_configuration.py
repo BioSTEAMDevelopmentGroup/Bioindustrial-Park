@@ -58,7 +58,7 @@ def parse(x):
                 raise RuntimeError('cannot parse multiple subtractions')
         else:
             factor = -1 if x.startswith('S') else 1
-            return Configuration(factor * int(x[1]), '*' in x)
+            return Configuration(factor * int(x[1:].strip('*')), '*' in x)
     elif isinstance(x, (Configuration, ConfigurationComparison)):
         return x
     else:
@@ -85,7 +85,7 @@ def format_configuration(configuration, latex=True):
         name = f"S{number}"
     else:
         name = f"O{number}"
-    if number == 0 or number > 8 or number < -2: 
+    if number == 0 or number > 10 or number < -3: 
         raise ValueError(f'invalid configuration {configuration}')
     if latex:
         name = r'$\mathtt{' + name + '}$'

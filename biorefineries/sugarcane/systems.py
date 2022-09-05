@@ -12,7 +12,10 @@ from biosteam import main_flowsheet as f
 import thermosteam as tmo
 
 __all__ = (
+    'add_urea_MgSO4_nutrients',
+    'add_urea_nutrient',
     'create_feedstock_handling_system',
+    'create_bagasse_drying_system',
     'create_juicing_system_up_to_clarification',
     'create_juicing_system_with_fiber_screener',
     'create_sucrose_fermentation_system',
@@ -24,6 +27,7 @@ __all__ = (
     'create_bagasse_pelleting_system',
     'create_sugar_crystallization_system',
     'create_sugarcane_to_sugar_and_molasses_system',
+    'create_sugarcane_to_sugar_and_ethanol_system',
     'convert_fiber_to_lignocelluosic_components',
     'set_sugarcane_composition',
 )
@@ -154,6 +158,121 @@ def convert_fiber_to_lignocelluosic_components(stream, ignore_acetate=False):
 
 convert_fiber_to_lignocelluosic_components.last_chemicals = None
 
+# %% Fermentation extensions
+
+def add_urea_MgSO4_nutrients(fermentor, seedtrain=None):
+    urea = bst.Stream('urea', price=90/907.185) # https://www.alibaba.com/product-detail/High-Quality-UREA-Fertilizer-Factory-price_1600464698965.html?spm=a2700.galleryofferlist.topad_classic.d_title.a69046eeVn83ML
+    MgSO4 = bst.Stream('MgSO4', price=110/907.185) # https://www.alibaba.com/product-detail/Magnesium-Sulfate-Sulphate-Sulphate-Magnesium-Sulfate_1600305131579.html?spm=a2700.galleryofferlist.topad_creative.d_image.ad602e15oP8kqh
+    Urea_storage = bst.StorageTank('Urea_storage', urea)
+    MgSO4_storage = bst.StorageTank('MgSO4_storage', MgSO4)
+    if seedtrain:
+        urea_1 = bst.Stream(
+            'urea_1',
+            Urea=26,
+            units='kg/hr'
+        )
+        urea_2 = bst.Stream(
+            'urea_2',
+            Urea=116,
+            units='kg/hr',
+        )
+        MgSO4_1 = bst.Stream(
+            'MgSO4_1',
+             MgSO4=211,
+             units='kg/hr',
+        )
+        MgSO4_2 = bst.Stream(
+            'MgSO4_2',
+            MgSO4=948,
+            units='kg/hr',
+        )
+        S301 = bst.MockSplitter('S301', Urea_storage-0, outs=(urea_1, urea_2))
+        S302 = bst.MockSplitter('S302', MgSO4_storage-0, outs=(MgSO4_1, MgSO4_2))
+        nutrients_1 = (urea_1, MgSO4_1)
+        nutrients_2 = (urea_2, MgSO4_2)
+        seedtrain.ins.extend(nutrients_1)
+        fermentor.ins.extend(nutrients_2)
+        @seedtrain.add_specification(run=True)
+        def adjust_nutrients_to_seed_train():
+            *feeds, urea, MgSO4 = seedtrain.ins
+            F_vol = sum([i.F_vol - i.ivol['Lipid'] for i in feeds])
+            urea.imass['Urea'] = 0.5 * F_vol
+            MgSO4.imass['MgSO4'] = 0.04 * F_vol
+            
+        @fermentor.add_specification(run=True)
+        def adjust_urea_and_MgSO4_feed_to_fermentor():
+            feed, seed, *others, urea, MgSO4, = fermentor.ins
+            if 'Lipid' in feed.chemicals:
+                F_vol = sum([i.F_vol - i.ivol['Lipid'] for i in others], feed.F_vol - feed.ivol['Lipid'])
+            else:
+                F_vol = sum([i.F_vol for i in others], feed.F_vol)
+            urea.imass['Urea'] = 0.5 * F_vol
+            MgSO4.imass['MgSO4'] = 0.04 * F_vol
+            S301.ins[0].mix_from(S301.outs)
+            S302.ins[0].mix_from(S302.outs)
+            for i in Urea_storage.path_until(fermentor): i.run()
+            for i in MgSO4_storage.path_until(fermentor): i.run()
+    else:
+        fermentor.ins.append(Urea_storage-0)
+        fermentor.ins.append(MgSO4_storage-0)
+        @fermentor.add_specification(run=True)
+        def adjust_nutrients_feed_to_fermentor():
+            feed, *others, urea, MgSO4, = fermentor.ins
+            if 'Lipid' in feed.chemicals:
+                F_vol = sum([i.F_vol - i.ivol['Lipid'] for i in others], feed.F_vol - feed.ivol['Lipid'])
+            else:
+                F_vol = sum([i.F_vol for i in others], feed.F_vol)
+            urea.imass['Urea'] = 0.5 * F_vol
+            MgSO4.imass['MgSO4'] = 0.04 * F_vol
+            for i in Urea_storage.path_until(fermentor): i.run()
+            for i in MgSO4_storage.path_until(fermentor): i.run()
+
+def add_urea_nutrient(fermentor, seedtrain=None):
+    urea = bst.Stream('urea', price=90/907.185) # https://www.alibaba.com/product-detail/High-Quality-UREA-Fertilizer-Factory-price_1600464698965.html?spm=a2700.galleryofferlist.topad_classic.d_title.a69046eeVn83ML
+    Urea_storage = bst.StorageTank('Urea_storage', urea)
+    if seedtrain:
+        urea_1 = bst.Stream(
+            'urea_1',
+            Urea=26,
+            units='kg/hr'
+        )
+        urea_2 = bst.Stream(
+            'urea_2',
+            Urea=116,
+            units='kg/hr',
+        )
+        S301 = bst.MockSplitter('S301', Urea_storage-0, outs=(urea_1, urea_2))
+        seedtrain.ins.append(urea_1)
+        fermentor.ins.append(urea_2)
+        @seedtrain.add_specification(run=True)
+        def adjust_nutrients_to_seed_train():
+            *feeds, urea, = seedtrain.ins
+            F_vol = sum([i.F_vol - i.ivol['Lipid'] for i in feeds])
+            urea.imass['Urea'] = 0.5 * F_vol
+            
+        @fermentor.add_specification(run=True)
+        def adjust_urea_and_MgSO4_feed_to_fermentor():
+            feed, seed, *others, urea, = fermentor.ins
+            if 'Lipid' in feed.chemicals:
+                F_vol = sum([i.F_vol - i.ivol['Lipid'] for i in others], feed.F_vol - feed.ivol['Lipid'])
+            else:
+                F_vol = sum([i.F_vol for i in others], feed.F_vol)
+            urea.imass['Urea'] = 0.5 * F_vol
+            S301.ins[0].mix_from(S301.outs)
+            Urea_storage.ins[0].imol['Urea'] = S301.ins[0].imol['Urea']
+            for i in Urea_storage.path_until(fermentor): i.run()
+    else:
+        fermentor.ins.append(Urea_storage-0)
+        @fermentor.add_specification(run=True)
+        def adjust_nutrients_feed_to_fermentor():
+            feed, *others, urea, = fermentor.ins
+            if 'Lipid' in feed.chemicals:
+                F_vol = sum([i.F_vol - i.ivol['Lipid'] for i in others], feed.F_vol - feed.ivol['Lipid'])
+            else:
+                F_vol = sum([i.F_vol for i in others], feed.F_vol)
+            Urea_storage.ins[0].imass['Urea'] = 0.5 * F_vol
+            for i in Urea_storage.path_until(fermentor): i.run()
+            
 # %% Juicing and evaporation
 
 @SystemFactory(
@@ -176,6 +295,20 @@ def create_bagasse_pelleting_system(ins, outs):
     U405 = units.ConveyingBelt('U405', U404-0, bagasse_pellets)
 
 @SystemFactory(
+    ID='bagasse_drying_sys',
+    ins=[bagasse],
+    outs=['dried_bagasse']
+)
+def create_bagasse_drying_system(ins, outs, utility_agent='Steam'):
+    U402 = units.DrumDryer('U402', 
+        (ins[0], 'dryer_air', 'dryer_natural_gas'), 
+        ('', 'dryer_outlet_air', 'dryer_emissions'),
+        moisture_content=0.40, split=0.,
+        utility_agent=utility_agent,
+    )
+    units.ConveyingBelt('U403', U402-0, outs)
+
+@SystemFactory(
     ID='feedstock_handling_sys',
     ins=[sugarcane],
     outs=[shredded_cane]
@@ -192,8 +325,10 @@ def create_feedstock_handling_system(ins, outs):
     ins=[sugarcane],
     outs=[untreated_juice, bagasse]
 )
-def create_juicing_system_without_treatment(ins, outs, pellet_bagasse=None):
+def create_juicing_system_without_treatment(ins, outs, pellet_bagasse=None,
+                                            dry_bagasse=None):
     if pellet_bagasse is None: pellet_bagasse = False
+    if dry_bagasse is None: dry_bagasse = False
     
     ### Streams ###
     sugarcane, = ins
@@ -221,10 +356,12 @@ def create_juicing_system_without_treatment(ins, outs, pellet_bagasse=None):
         other_liquids = feed.imass['Lipid'] if 'Lipid' in feed.chemicals else 0.
         imbibition_water.imass['Water'] = 0.245 * (feed.F_mass - feed.imass['Water'] - other_liquids) / 0.7
     
-    U202 = units.ConveyingBelt('U202', U201-0, [''] if pellet_bagasse else [bagasse])
+    U202 = units.ConveyingBelt('U202', U201-0, [''] if (pellet_bagasse or dry_bagasse) else [bagasse])
     
     if pellet_bagasse:
-        bagasse_pelleting_sys = create_bagasse_pelleting_system(None, ins=U202-0, outs=bagasse, mockup=True)
+        create_bagasse_pelleting_system(None, ins=U202-0, outs=bagasse, mockup=True)
+    elif dry_bagasse:
+        create_bagasse_drying_system(None, ins=U202-0, outs=bagasse, mockup=True)
     
     # Mix in water
     M201 = units.Mixer('M201', ('', imbibition_water), 1-U201)
@@ -250,7 +387,8 @@ def create_juicing_system_without_treatment(ins, outs, pellet_bagasse=None):
     ins=[sugarcane, H3PO4, lime, polymer],
     outs=[clarified_juice, bagasse]
 )
-def create_juicing_system_up_to_clarification(ins, outs, pellet_bagasse=None):
+def create_juicing_system_up_to_clarification(ins, outs, pellet_bagasse=None,
+                                              dry_bagasse=None):
     
     ### Streams ###
     sugarcane, H3PO4, lime, polymer = ins
@@ -265,6 +403,7 @@ def create_juicing_system_up_to_clarification(ins, outs, pellet_bagasse=None):
         outs=('', bagasse),
         mockup=True,
         pellet_bagasse=pellet_bagasse,
+        dry_bagasse=dry_bagasse,
     )
     U201 = f.unit.U201
     
@@ -345,12 +484,14 @@ def create_juicing_system_up_to_clarification(ins, outs, pellet_bagasse=None):
     ins=[sugarcane, H3PO4, lime, polymer],
     outs=[screened_juice, bagasse, fiber_fines]
 )          
-def create_juicing_system_with_fiber_screener(ins, outs, pellet_bagasse=None):
+def create_juicing_system_with_fiber_screener(ins, outs, pellet_bagasse=None,
+                                              dry_bagasse=None):
     screened_juice, bagasse, fiber_fines = outs
     sys = create_juicing_system_up_to_clarification(
         None, ins, ['', bagasse],
         mockup=True,
-        pellet_bagasse=pellet_bagasse
+        pellet_bagasse=pellet_bagasse,
+        dry_bagasse=dry_bagasse,
     )
     # Screen out small fibers from sugar stream
     S202 = units.VibratingScreen('S202', sys-0, (screened_juice, fiber_fines),
@@ -698,11 +839,10 @@ def create_sugar_crystallization_system(ins, outs):
 def create_sucrose_fermentation_system(ins, outs,
         scrubber=None, product_group=None, Fermentor=None, titer=None,
         productivity=None, ignored_volume=None, fermentation_reaction=None,
-        fed_batch=None,
+        fed_batch=None, add_urea=False,
     ):
     screened_juice, = ins
     beer, evaporator_condensate, vent = outs
-    if ignored_volume is None: ignored_volume = 'Lipid'
     if titer is None: titer = 117.0056 # g / L
     if productivity is None: productivity = 13
     if product_group is None: product_group = 'Ethanol'
@@ -799,21 +939,24 @@ def create_sucrose_fermentation_system(ins, outs,
         
         def titer_at_fraction_evaporated_objective(V, path):
             F301.V = V
-            for i in path: i._run()
+            for i in path: i.run()
             return R301.titer - get_titer()
     
-        F301.P_original = tuple(F301.P)
+        F301.P_original = P_original = tuple(F301.P)
+        N_evaps = len(P_original)
+        Pstart = P_original[0]
+        Plast = P_original[-1]
         @F301.add_specification(run=False)
         def evaporation():
             V_guess = F301.V
             s_dilution_water = M301.ins[-1]
             s_dilution_water.empty()
             path = F301.path_until(R301, inclusive=True)
-            F301.V = 0
-            for i in path: i._run()
-            dilution_water = get_dilution_water()
             F301.P = F301.P_original
             F301._reload_components = True
+            F301.V = 0
+            for i in path: i.run()
+            dilution_water = get_dilution_water()
             f = titer_at_fraction_evaporated_objective
             if dilution_water < 0.:
                 x0 = 0.
@@ -821,25 +964,35 @@ def create_sucrose_fermentation_system(ins, outs,
                 x1 = 0.5
                 y1 = f(x1, path)
                 if y1 > 0.: raise RuntimeError('cannot evaporate to target sugar concentration')
-                if y0 < 0.:
-                    F301.P = list(F301.P_original)
-                    for i in range(F301._N_evap-1):
-                        if f(1e-6) < 0.:
-                            F301.P.pop()
-                            F301._reload_components = True
-                        else:
-                            break
+                for i in range(1, N_evaps):
+                    if f(1e-6, path) < 0.:
+                        F301.P = np.linspace(Pstart, Plast, N_evaps - i)
+                        F301._reload_components = True
+                    else:
+                        break
                 x1 = 0.05
                 y1 = f(x1, path)
                 while y1 > 0:
                     x1 += 0.05
                     y1 = f(x1, path)
                 F301.V = flx.IQ_interpolation(
-                    f, x0, x1, y0, y1, x=V_guess, ytol=1e-2, xtol=1e-6, maxiter=500,
+                    f, x0, x1, y0, y1, x=V_guess, ytol=1e-3, xtol=1e-9, maxiter=1000,
                     args=(path,),
                 )
             else:
-                s_dilution_water.imass['Water'] = dilution_water
+                mx_path = M301.path_until(R301, inclusive=True)
+                def f(required_water):
+                    M301.ins[-1].imass['Water'] = max(required_water, 0)
+                    for unit in mx_path: unit.run()
+                    return R301.titer - get_titer()
+                try:
+                    s_dilution_water.imass['Water'] = flx.IQ_interpolation(
+                        f, 0 , dilution_water * 5, x=dilution_water, ytol=1e-3, xtol=1e-9, maxiter=1000,
+                    )
+                except:
+                    breakpoint()
+            if abs(R301.titer - get_titer()) > 1:
+                breakpoint()
             R301.tau = R301.titer / R301.productivity
     
     # Mix sugar solutions
@@ -847,7 +1000,7 @@ def create_sucrose_fermentation_system(ins, outs,
     if fed_batch: M301.ins.append(SX0-0)
     
     # Cool for fermentation
-    H301 = units.HXutility('H301', M301-0, T=295.15)
+    H301 = units.HXutility('H301', M301-0, T=273.15 + 30)
     
     # Ethanol Production
     R301 = Fermentor('R301', 
@@ -888,14 +1041,17 @@ def create_sucrose_fermentation_system(ins, outs,
         s = R301.outs[1]
         ignored = s.ivol[ignored_volume] if ignored_volume in s.chemicals else 0.
         ignored_product = sum([i.imass[product_group] for i in R301.ins])
-        return (s.imass[product_group] - ignored_product) / (s.ivol['Water', product_group].sum() - ignored)
+        ignored_product_vol = sum([i.ivol[product_group] for i in R301.ins])
+        return (s.imass[product_group] - ignored_product) / (s.F_vol - ignored_product_vol - ignored)
     R301.get_titer = get_titer
     
     def get_dilution_water():
         target = R301.titer
         current = get_titer()
         ignored_product = sum([i.imass[product_group] for i in R301.ins])
-        return (1./target - 1./current) * (R301.outs[1].imass[product_group] - ignored_product) * 1000.
+        T, P = R301.outs[1].thermal_condition
+        rho = R301.chemicals.Water.rho('l', T, P)
+        return (1./target - 1./current) * (R301.outs[1].imass[product_group] - ignored_product) * rho
     
     if scrubber:
         stripping_water = bst.Stream('stripping_water',
@@ -911,13 +1067,16 @@ def create_sucrose_fermentation_system(ins, outs,
                                   gas=('CO2', 'O2'))
         units.Mixer('M302', ins=(C301-1, D301-1), outs=beer)
     
+    if add_urea:
+        add_urea_nutrient(R301)
+    
 
 @SystemFactory(
     ID='sucrose_to_ethanol_sys',
     ins=[screened_juice, denaturant],
     outs=[ethanol, stillage, recycle_process_water, evaporator_condensate]
 )
-def create_sucrose_to_ethanol_system(ins, outs):
+def create_sucrose_to_ethanol_system(ins, outs, add_urea=False):
     screened_juice, denaturant = ins
     ethanol, stillage, recycle_process_water, evaporator_condensate = outs
     
@@ -926,7 +1085,8 @@ def create_sucrose_to_ethanol_system(ins, outs):
     create_sucrose_fermentation_system(
         ins=screened_juice,
         outs=[beer, evaporator_condensate],
-        mockup=True
+        mockup=True,
+        add_urea=add_urea,
     )
     create_ethanol_purification_system(
         ins=[beer, denaturant], 
@@ -1025,9 +1185,8 @@ def create_sugarcane_to_sugar_and_molasses_system(ins, outs,
                                        use_area_convention=False,
                                        pellet_bagasse=None):
     s = f.stream
-    u = f.unit
     
-    sugarcane, H3PO4, lime, polymer, denaturant = ins
+    sugarcane, H3PO4, lime, polymer, = ins
     sugar, molasses, wastewater, emissions, ash_disposal = outs
     
     feedstock_handling_sys = create_feedstock_handling_system(
@@ -1089,3 +1248,52 @@ def create_sugarcane_to_sugar_and_molasses_system(ins, outs,
     #         ins=[vinasse],
     #         mockup=True,
     #     )
+
+@SystemFactory(
+    ID='molasses_fermentation_sys',
+    ins=[molasses],
+    outs=[beer],
+)
+def create_molasses_fermentation_system(ins, outs):
+    molasses, = ins
+    beer, = outs
+    MY = bst.Mixer(500, [molasses, 'dilution_water'])
+    HX = bst.HXutility(500, ins=MY-0, T=305.15)
+    
+    # Ethanol Production
+    RX = bst.Fermentation(500, HX-0, outs=['', beer], tau=9, efficiency=0.90, N=4)
+    RX.titer = 96
+    RX.productivity = 96 / 24
+    RX.fermentation_reaction.X = 0.9337
+        
+    @MY.add_specification
+    def adjust_titer():
+        beer = RX.outs[1]
+        target_titer = RX.titer
+        path = MY.path_until(RX)
+        for unit in path: unit.run()
+        RX.run()
+        ethanol = float(beer.imass['Ethanol'])
+        current_titer = ethanol / beer.F_vol
+        required_water = (1./target_titer - 1./current_titer) * ethanol * 1000.
+        MY.ins[1].imass['Water'] = max(required_water, 0)
+        for unit in path: unit.run()
+        RX.tau = target_titer / RX.productivity 
+
+       
+
+@SystemFactory(
+    ID='sugarcane_sys', 
+    ins=[sugarcane, H3PO4, lime, polymer], 
+    outs=[sugar, ethanol]
+)
+def create_sugarcane_to_sugar_and_ethanol_system(ins, outs):
+    sugar, ethanol = outs
+    sugar_and_molasses_sys = create_sugarcane_to_sugar_and_molasses_system(ins=ins, outs=[sugar], mockup=True)
+    sugar, molasses, wastewater, emissions, ash_disposal = sugar_and_molasses_sys.outs
+    molasses_fermentation_sys = create_molasses_fermentation_system(ins=molasses, mockup=True)
+    beer, = molasses_fermentation_sys.outs
+    beer_distillation_sys = create_beer_distillation_system(ins=beer, mockup=True)
+    distilled_beer, stillage = beer_distillation_sys.outs
+    create_ethanol_purification_system_after_beer_column(ins=distilled_beer, outs=ethanol, mockup=True)
+    
