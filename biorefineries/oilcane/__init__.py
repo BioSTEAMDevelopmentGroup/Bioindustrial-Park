@@ -182,11 +182,9 @@ def load(name, cache=cache, reduce_chemicals=True,
     operating_hours = 24 * 180
     
     ## System
-    
     area_names = None
     def rename_storage_units(storage):
         bst.rename_units([i for i in oilcane_sys.units if bst.is_storage_unit(i)], storage)
-    
     
     cellulosic_configurations = frozenset([-2, 2, 4, 6, 8])
     biodiesel_configurations = frozenset([1, 2, 5, 6, 7, 8])
@@ -420,7 +418,7 @@ def load(name, cache=cache, reduce_chemicals=True,
                 HXN = HXN_group.units[0]
                 assert isinstance(HXN, bst.HeatExchangerNetwork)
         unit_groups[-1].metrics[-1].getter = lambda: 0.    
-    
+    HXN.raise_energy_balance_error = True
     BT = flowsheet(bst.BoilerTurbogenerator)
     BT.boiler_efficiency = 0.89
     
@@ -852,6 +850,10 @@ def load(name, cache=cache, reduce_chemicals=True,
     def set_natural_gas_GWP(value):
         for ng in natural_gas_streams:
             ng.characterization_factors[GWP] = value
+    
+    @uniform(21., 28., baseline=21., name='Income tax', units='%')
+    def set_income_tax(income_tax):
+        tea.income_tax = income_tax * 0.01
     
     if agile:
         feedstock_flow = lambda: sys.flow_rates[feedstock] / kg_per_MT # MT / yr

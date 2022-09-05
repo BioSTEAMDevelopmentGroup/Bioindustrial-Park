@@ -798,6 +798,7 @@ def create_oilcane_to_crude_oil_and_ethanol_combined_1_and_2g_post_fermentation_
         area=500,
     )
     s = f.stream
+    u = f.unit
     M501 = bst.Mixer(700, (wastewater_treatment_sys-1, lignin, cellmass, f.stream.filter_cake, bagasse_to_boiler))
     brf.cornstover.create_facilities(
         solids_to_boiler=M501-0,
@@ -817,6 +818,7 @@ def create_oilcane_to_crude_oil_and_ethanol_combined_1_and_2g_post_fermentation_
         area=800,
     )
     HXN = bst.HeatExchangerNetwork(900,
+        ignored=[u.H401, u.H402],
         Qmin=1e3,
     )
     HXN.acceptable_energy_balance_error = 0.01

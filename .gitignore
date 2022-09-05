@@ -1,6 +1,7 @@
 build
 dist
 BioSTEAM 2.x.x/biorefineries.egg-info
+**/results/*
 **/.ipynb_checkpoints
 **/__pycache__
 *.pyc
