@@ -345,8 +345,13 @@ def create_oilcane_to_biodiesel_and_ethanol_1g(
         makeup_water_streams,
         process_water_streams
     )
+    def get_hx_issues():
+        hxs = [u.E301, u.D601.boiler, u.D602.boiler, u.H601, u.H602, u.H603, u.H604, oil_pretreatment_dct['F3'], u.H606]
+        if 'condenser' in u.E401.components: hxs.append(u.E401.components['condenser'])
+        return hxs
+    
     HXN = bst.HeatExchangerNetwork(900, 
-        ignored=lambda: [u.E301, u.D601.boiler, u.D602.boiler, u.H601, u.H602, u.H603, u.H604, oil_pretreatment_dct['F3']],
+        ignored=get_hx_issues,
         Qmin=1e5,
     )
     HXN.acceptable_energy_balance_error = 0.01
