@@ -92,7 +92,7 @@ def create_cn_comparison_models():
         'fermentor': 'V405',
         'reactions': {
             'PT glucan-to-glucose': ('reaction',),
-            'FERM glucan-to-product': ('reaction',),
+            'FERM glucose-to-product': ('reaction',),
             },
         'wwt_system': 'exist_sys_wwt',
         'wwt_ID': info['WWT_ID'],

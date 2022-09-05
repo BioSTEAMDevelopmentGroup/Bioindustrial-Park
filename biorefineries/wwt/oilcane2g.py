@@ -106,8 +106,8 @@ def create_oc2g_comparison_models():
             'PT glucan-to-glucose': ('reactions', 0),
             'PT xylan-to-xylose': ('reactions', 8),
             'EH glucan-to-glucose': ('saccharification', 2),
-            'FERM glucan-to-product': ('cofermentation', 0),
-            'FERM xylan-to-product': ('cofermentation', 1),
+            'FERM glucose-to-product': ('cofermentation', 0),
+            'FERM xylose-to-product': ('cofermentation', 1),
             'FERM oil-to-FFA': ('oil_reaction', 0), # not fermentation, but happens in the fermentor
             'TE oil-to-product': ('transesterification', (0, 1, 2)),
             },

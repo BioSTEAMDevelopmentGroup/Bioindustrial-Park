@@ -149,7 +149,8 @@ def summarize_BMPs(
 # %%
 
 def summarize_spearman(
-        cutoff=0.2,
+        cutoff_val=0.2, # absolute value > this cutoff
+        cutoff_rank=10, # select the top X
         N=1000,
         modules=modules_all,
         dir_path=os.path.join(results_path, 'uncertainties'),
@@ -161,19 +162,31 @@ def summarize_spearman(
         for module in modules:
             dfs = [read_df(get_path(module, kind, N)).iloc[:, :2] for kind in kinds]
             unit = 'gal' if module!='la' else 'kg'
-            dfs = [df[
-                (df[f'MPSP [$/{unit}]']<=-cutoff)|
-                (df[f'MPSP [$/{unit}]']>=cutoff)|
-                (df[f'Product GWP disp [kg CO2/{unit}]']<=-cutoff)|
-                (df[f'Product GWP disp [kg CO2/{unit}]']>=cutoff)
-                ] for df in dfs]
-            compiled = pd.concat(dfs, axis=1, keys=kinds)
+            key_MPSP = f'MPSP [$/{unit}]'
+            key_GWP = f'Product GWP disp [kg CO2/{unit}]'
+            tops = []
+            for df in dfs:
+                df['abs_MPSP'] = df[key_MPSP].abs()
+                df['abs_GWP'] = df[key_GWP].abs()
+                select = [df.sort_values(by=[key], ascending=False)[:cutoff_rank]
+                        for key in ('abs_MPSP', 'abs_GWP')]
+                top = pd.concat(select).drop_duplicates()
+                top = top.iloc[:, :2]
+                tops.append(top)
+
+            module_dfs = [df[
+                (df[key_MPSP]<=-cutoff_val)|
+                (df[key_MPSP]>=cutoff_val)|
+                (df[key_GWP]<=-cutoff_val)|
+                (df[key_GWP]>=cutoff_val)
+                ] for df in tops]
+            compiled = pd.concat(module_dfs, axis=1, keys=kinds)
             compiled.to_excel(writer, sheet_name=module)
 
 
 # %%
 
 if __name__ == '__main__':
-    summarize_baselines()
-    summarize_BMPs()
+    # summarize_baselines()
+    # summarize_BMPs()
     summarize_spearman()

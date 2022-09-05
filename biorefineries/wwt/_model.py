@@ -104,11 +104,11 @@ def add_biorefinery_parameters(model, model_dct, f, u, s, get_obj, get_rxn, para
     @param(name='Natural gas price', element='biorefinery', kind='cost', units='$/kg',
            baseline=b, distribution=D)
     def set_natural_gas_price(price):
-        for ng in ng_streams: 
-            if ng: ng.price = price 
+        for ng in ng_streams:
+            if ng: ng.price = price
         bst.stream_utility_prices['Natural gas'] = price
         if Upgrading: Upgrading.FNG_price = price
-        
+
     ng = ng_streams[0] if ng_streams else None
     if ng:
         b = ng.characterization_factors['GWP']
@@ -116,7 +116,7 @@ def add_biorefinery_parameters(model, model_dct, f, u, s, get_obj, get_rxn, para
         @param(name='Natural gas CF', element='biorefinery', kind='cost', units='kg CO2/kg',
                baseline=b, distribution=D)
         def set_natural_gas_CF(CF):
-            for ng in ng_streams: 
+            for ng in ng_streams:
                 if ng: ng.characterization_factors['GWP'] = CF
             if Upgrading: Upgrading.FNG_CF = CF
 
@@ -324,14 +324,14 @@ def add_2G_parameters(model, model_dct, f, u, s, get_obj, get_rxn, param):
     b = EH_mixer.enzyme_loading
     try: D = shape.Triangle(10, b, 30)
     except: D = shape.Triangle(10/1e3, b, 30/1e3)
-    @param(name='EH enzyme loading', element=EH_mixer, kind='coupled', units='-',
+    @param(name='EH enzyme loading', element=EH_mixer, kind='coupled', units='mg protein/glucan',
            baseline=b, distribution=D)
     def set_EH_enzyme_loading(loading):
         EH_mixer.enzyme_loading = loading
 
     fermentor = get_obj(u, 'fermentor')
-    rxn_g = get_rxn(fermentor, 'FERM glucan-to-product')
-    rxn_x = get_rxn(fermentor, 'FERM xylan-to-product')
+    rxn_g = get_rxn(fermentor, 'FERM glucose-to-product')
+    rxn_x = get_rxn(fermentor, 'FERM xylose-to-product')
     b_g = rxn_g.X
     b_x = rxn_x.X
 
@@ -341,7 +341,7 @@ def add_2G_parameters(model, model_dct, f, u, s, get_obj, get_rxn, param):
         PT_solids_mixer = get_obj(u, 'PT_solids_mixer')
         b = PT_solids_mixer.solids_loading
         D = get_default_distribution('uniform', b)
-        @param(name='PT solids loading', element=PT_solids_mixer, kind='coupled', units='-',
+        @param(name='PT solids loading', element=PT_solids_mixer, kind='coupled', units='%',
                baseline=b, distribution=D)
         def set_PT_solids_loading(loading):
             PT_solids_mixer.solids_loading = loading
@@ -438,12 +438,12 @@ def add_2G_parameters(model, model_dct, f, u, s, get_obj, get_rxn, param):
             D_x = get_default_distribution('triangle', b_x, ratio=0.2)
         else: raise ValueError(f"Fermentation product {model_dct['FERM_product']} not recognized.")
 
-    @param(name='FERM glucose yield', element=fermentor, kind='coupled', units='-',
+    @param(name='FERM glucose-to-product', element=fermentor, kind='coupled', units='-',
            baseline=b_g, distribution=D_g)
     def set_FERM_glucose_yield(X):
         rxn_g.X = X
 
-    @param(name='FERM xylose yield', element=fermentor, kind='coupled', units='-',
+    @param(name='FERM xylose-to-product', element=fermentor, kind='coupled', units='-',
            baseline=b_x, distribution=D_x)
     def set_FERM_xylose_yield(X):
         rxn_x.X = X
@@ -708,7 +708,7 @@ def add_metrics(model, model_dct, f, u, s, get_obj):
 
             # Calculate the CO2 cost to compare the RIN tradeoff
             cache_dct = Caching.cache_dct
-            GWP_net_diff = (cache_dct['Net GWP_RIN']-cache_dct['Net GWP']) / 1e3 # tonne CO2/yr            
+            GWP_net_diff = (cache_dct['Net GWP_RIN']-cache_dct['Net GWP']) / 1e3 # tonne CO2/yr
             GWP_tot_diff = (cache_dct['Total GWP_RIN']-cache_dct['Total GWP']) / 1e3 # tonne CO2/yr
             cost_diff = cache_dct['MPSP'] - cache_dct['MPSP_RIN'] # $/unit product
             cost_diff *= product.F_mass/factor*sys.operating_hours # $/yr
@@ -792,7 +792,7 @@ def add_metrics(model, model_dct, f, u, s, get_obj):
                 MPSP_no_wwt = get_MPSP(no_WWT=True)
                 ww_price = - tea.solve_price(brine)
                 cache_dct['WW price'] = ww_price * 100 # ¢/kg
-                
+
                 GWP_disp = cache_dct['Product GWP disp']
                 GWP_econ = cache_dct['Product GWP econ']
                 GWP_no_wwt_disp = get_GWP(no_WWT=True)
@@ -1040,7 +1040,7 @@ def evaluate_models(
         exist_model, new_model, abbr,
         include_baseline=False,
         include_uncertainty=False,
-        include_BMP=False,      
+        include_BMP=False,
         percentiles=(0, 0.05, 0.25, 0.5, 0.75, 0.95, 1),
         seed=3221, N_uncertainty=1000, uncertainty_skip_exist=False,
         BMPs=(0.5, 0.6, 0.7, 0.8, 0.9, 0.9499), N_BMP=100, # 0.9499 is for minor error
