@@ -91,7 +91,7 @@ def save_detailed_life_cycle_tables(sigfigs=3):
         )
     except:
         pass
-    def get(configuration, name):
+    def get(configuration, name, RIN=False):
         oc.load(configuration)
         return getattr(oc, name)
     bst.settings.define_impact_indicator(oc.GWP, 'kg*CO2e')

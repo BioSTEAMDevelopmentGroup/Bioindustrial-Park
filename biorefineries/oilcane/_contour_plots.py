@@ -25,7 +25,10 @@ from warnings import filterwarnings
 import os
 from ._distributions import (
     biodiesel_prices,
-    ethanol_prices,
+    biodiesel_no_RIN_prices,
+    ethanol_no_RIN_prices,
+    advanced_ethanol_prices,
+    cellulosic_ethanol_prices,
 )
 
 __all__ = (
@@ -209,8 +212,8 @@ def plot_ethanol_and_biodiesel_price_contours(N=30, benefit=False, cache={},
                                               enhanced_cellulosic_performance=False,
                                               titles=None, load=False, save=True,
                                               dist=False):
-    ethanol_price = np.linspace(0.25, 0.8, N)
-    biodiesel_price = np.linspace(0.30, 1.9, N)
+    ethanol_price = np.linspace(0.25, 0.5, N)
+    biodiesel_price = np.linspace(0.65, 0.95, N)
     oil_content = [5, 10, 15]
     N_rows = len(oil_content)
     configuration = ['O1', 'O2']
@@ -233,7 +236,9 @@ def plot_ethanol_and_biodiesel_price_contours(N=30, benefit=False, cache={},
         Z = np.zeros([N, N, N_rows, N_cols])
         for i in range(N_rows):
             for j in range(N_cols):
-                oc.load(configuration[j], enhanced_cellulosic_performance=enhanced_cellulosic_performance)
+                oc.load(configuration[j],
+                        reduce_chemicals=False,
+                        enhanced_cellulosic_performance=enhanced_cellulosic_performance)
                 oc.set_cane_oil_content(oil_content[i])
                 oc.set_relative_sorghum_oil_content(0)
                 oc.sys.simulate()
@@ -245,8 +250,8 @@ def plot_ethanol_and_biodiesel_price_contours(N=30, benefit=False, cache={},
         np.save(file, Z)
     xlabel = f"Ethanol price\n[{format_units('$/L')}]"
     ylabels = [f"Biodiesel price\n[{format_units('$/L')}]"] * 4
-    xticks = [0.25, 0.4, 0.55, 0.8]
-    yticks = [0.3, 0.7, 1.1, 1.5, 1.9]
+    xticks = [0.25, 0.3, 0.35, 0.4, 0.45, 0.5]
+    yticks = [0.7, 0.75, 0.8, 0.85, 0.9, 0.95]
     marks = tickmarks(Z, 5, 5, center=0.) if benefit else tickmarks(Z, 5, 5)
     colormap = (diverging_colormaps if benefit else colormaps)[0]
     name = 'MFPP'
@@ -260,9 +265,9 @@ def plot_ethanol_and_biodiesel_price_contours(N=30, benefit=False, cache={},
                       for i, j in  zip(configuration, baseline)]
     elif titles is None:
         titles = [oc.format_name(i) for i in configuration]
-    fig, axes, CSs, CB = plot_contour_single_metric(
+    fig, axes, cps, cb, other_axes = plot_contour_single_metric(
         X, Y, Z, xlabel, ylabels, xticks, yticks, metric_bar, 
-        styleaxiskw=dict(xtick0=False), label=True,
+        styleaxiskw=dict(xtickf=False, ytickf=False), label=True,
         titles=titles,
     )
     # for i in range(N_rows):
@@ -281,9 +286,9 @@ def plot_ethanol_and_biodiesel_price_contours(N=30, benefit=False, cache={},
     for ax in axes.flatten():
         try: fig.sca(ax)
         except: continue
-        plot_scatter_points(ethanol_prices, biodiesel_prices, 
-                            marker='o', s=2, color=dark_letter_color,
-                            edgecolor=edgecolor, clip_on=False, zorder=3)
+        plot_scatter_points(ethanol_no_RIN_prices, biodiesel_no_RIN_prices, 
+                            marker='o', s=2, color=(*colors.brown.RGBn, 1),
+                            edgecolor=(*colors.brown.RGBn, 1), clip_on=True, zorder=3)
     return fig, axes
     
 def relative_sorghum_oil_content_and_cane_oil_content_data(load, relative):
@@ -363,7 +368,7 @@ def plot_recovery_and_oil_content_contours(
     X, Y = np.meshgrid(x, y)
     metric = bst.metric
     folder = os.path.dirname(__file__)
-    file = f"oil_extraction_analysis_{''.join([str(i) for i in configurations])}.npy"
+    file = "oil_extraction_analysis.npy"
     file = os.path.join(folder, file)
     
     if load:
