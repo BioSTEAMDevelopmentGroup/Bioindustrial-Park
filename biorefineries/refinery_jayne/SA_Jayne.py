@@ -18,9 +18,6 @@ settings.set_thermo(['Glucose','Quicklime','Water','H2SO4'])
 pure_glucose = bst.Stream(Glucose=1000.)
 pure_glucose.show()
 
-# NADH = bst.Stream(NADH=100)    ### how to account for NADH?
-# NADH.show()
-
 quicklime = bst.Stream(Quicklime=10000.,Water=100.)
 quicklime.show()
 
