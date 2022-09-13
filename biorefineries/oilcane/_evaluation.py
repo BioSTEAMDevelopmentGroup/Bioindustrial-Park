@@ -10,7 +10,6 @@ from warnings import warn
 from biorefineries import oilcane as oc
 from ._distributions import (
     mean_RIN_D3_price,
-    mean_RIN_D4_price,
     mean_RIN_D5_price,
 )
 from ._feature_mockups import (
@@ -143,7 +142,6 @@ def evaluate_MFPP_across_ethanol_and_biodiesel_prices(ethanol_price, biodiesel_p
     )
     ethanol_RIN_price = split * mean_RIN_D5_price + (1 - split) * mean_RIN_D3_price
     ethanol_price = ethanol_price + ethanol_RIN_price
-    biodiesel_price = biodiesel_price + mean_RIN_D4_price
     return (
         baseline_price 
         + (ethanol_price * ethanol_flow + biodiesel_price * biodiesel_flow) / feedstock_flow

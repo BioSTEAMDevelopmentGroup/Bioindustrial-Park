@@ -25,7 +25,6 @@ from warnings import filterwarnings
 import os
 from ._distributions import (
     biodiesel_prices,
-    biodiesel_no_RIN_prices,
     ethanol_no_RIN_prices,
     advanced_ethanol_prices,
     cellulosic_ethanol_prices,
@@ -286,7 +285,7 @@ def plot_ethanol_and_biodiesel_price_contours(N=30, benefit=False, cache={},
     for ax in axes.flatten():
         try: fig.sca(ax)
         except: continue
-        plot_scatter_points(ethanol_no_RIN_prices, biodiesel_no_RIN_prices, 
+        plot_scatter_points(ethanol_no_RIN_prices, biodiesel_prices, 
                             marker='o', s=2, color=(*colors.brown.RGBn, 1),
                             edgecolor=(*colors.brown.RGBn, 1), clip_on=True, zorder=3)
     return fig, axes
