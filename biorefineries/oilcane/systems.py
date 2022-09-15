@@ -953,6 +953,7 @@ def create_sugarcane_to_ethanol_combined_1_and_2g(ins, outs):
         area=500,
     )
     s = f.stream
+    u = f.unit
     M501 = bst.Mixer(700, (wastewater_treatment_sys-1, lignin, C603_3-0, s.filter_cake, bagasse_to_boiler))
     MX = bst.Mixer(400, [condensate, stripper_process_water])
     brf.cornstover.create_facilities(
@@ -972,6 +973,7 @@ def create_sugarcane_to_ethanol_combined_1_and_2g(ins, outs):
         area=900,
     )
     HXN = bst.HeatExchangerNetwork(1000,
+        ignored=lambda: [u.H402],
         Qmin=1e3,
     )
     HXN.acceptable_energy_balance_error = 0.01
