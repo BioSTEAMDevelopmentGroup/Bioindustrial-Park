@@ -429,16 +429,16 @@ def load(name, cache=cache, reduce_chemicals=True,
     for splitter in flowsheet.unit:
         if getattr(splitter, 'isbagasse_splitter', False):
             @oilcane_sys.add_bounded_numerical_specification(
-                x0=0.2, x1=0.999, xtol=5e-4, ytol=1, args=(splitter,)
+                x0=0.2, x1=0.999, xtol=5e-4, ytol=100, args=(splitter,)
             )
             def adjust_bagasse_to_boiler(split, splitter):
                 # Returns energy consumption at given fraction processed (not sent to boiler).
                 splitter.split[:] = split
                 oilcane_sys.simulate()
-                consumption = oilcane_sys.power_utility.rate + (BT.boiler_efficiency * BT.turbogenerator_efficiency) * sum([i.LHV * 0.000278 for i in natural_gas_streams])
-                if split == 0.999 and consumption < 0: return 0 # No need to burn bagasse
-                if split == 0.2 and consumption > 0: 0 # Cannot satisfy energy demand even at 80% sent to boiler
-                return consumption
+                excess = BT._excess_electricity_without_natural_gas
+                if split == 0.999 and excess > 0: return 0 # No need to burn bagasse
+                if split == 0.2 and excess < 0: return 0 # Cannot satisfy energy demand even at 80% sent to boiler
+                return excess
     
     if abs(number) in cellulosic_configurations:
         prs = flowsheet(cs.units.PretreatmentReactorSystem)
