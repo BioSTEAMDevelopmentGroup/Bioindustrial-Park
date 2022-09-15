@@ -489,7 +489,8 @@ def create_cane_combined_1_and_2g_pretreatment(ins, outs):
     )
     screened_juice, bagasse, fiber_fines = juicing_sys.outs
     
-    S1 = bst.Splitter(200, bagasse, split=0.85)
+    S1 = bst.Splitter(200, bagasse, split=0.85) # 15% is sent to cogeneration
+    S1.isbagasse_splitter = True
     
     create_bagasse_drying_system(ins=S1-1, outs=bagasse_to_boiler, area=200)
     
@@ -510,13 +511,13 @@ def create_cane_combined_1_and_2g_pretreatment(ins, outs):
     # Acetyl: 3.0%
     conveying_belt.hemicellulose_rxn = tmo.Reaction('30.2 Hemicellulose -> 24.9 Xylan + 1.7 Arabinan + 0.6 Galactan + 3 Acetate', 'Hemicellulose', 1.0, basis='wt')
     conveying_belt.hemicellulose_rxn.basis = 'mol'
+    @conveying_belt.add_specification
     def convert_hemicellulose():
         conveying_belt.run()
         bagasse = conveying_belt.outs[0]
         conveying_belt.cellulose_rxn(bagasse)
         conveying_belt.hemicellulose_rxn(bagasse)
         
-    conveying_belt.specification = convert_hemicellulose
     hot_water_pretreatment_sys, hw_dct = brf.cornstover.create_hot_water_pretreatment_system(
         outs=(hydrolysate, pretreatment_wastewater),
         ins=S1-0,

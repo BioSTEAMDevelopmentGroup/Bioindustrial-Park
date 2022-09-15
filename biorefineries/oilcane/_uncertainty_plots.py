@@ -829,7 +829,7 @@ def plot_feedstock_comparison_kde(fs=None):
 def plot_configuration_comparison_kde(fs=None):
     plot_kde(
         'O1 - O2',
-        yticks=[-20, 0, 20, 40, 60],
+        yticks=[-30, -20, -10, 0, 10, 20],
         xticks=[-0.75, -0.6, -0.45, -0.3, -0.15, 0, 0.15, 0.3],
         top_right='GWP\nTradeoff()',
         bottom_left='MFPP\nTradeoff()',

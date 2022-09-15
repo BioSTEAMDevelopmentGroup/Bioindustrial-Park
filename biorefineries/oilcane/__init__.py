@@ -143,7 +143,6 @@ comparison_names = (
     'O2* - O2',  
 )
 
-
 def load_chemicals():
     global chemicals, _chemicals_loaded
     chemicals = create_chemicals()
@@ -426,6 +425,20 @@ def load(name, cache=cache, reduce_chemicals=True,
     HXN.vle_quenched_streams = False
     BT = flowsheet(bst.BoilerTurbogenerator)
     BT.boiler_efficiency = 0.89
+    
+    for splitter in flowsheet.unit:
+        if getattr(splitter, 'isbagasse_splitter', False):
+            # HXN.cache_network = True
+            @oilcane_sys.add_bounded_numerical_specification(
+                x=0.6, x0=0.4, x1=0.999, xtol=5e-4, ytol=1, args=(splitter,)
+            )
+            def adjust_bagasse_to_boiler(split, splitter):
+                # Returns energy consumption at given fraction sent to boiler.
+                splitter.split[:] = split
+                oilcane_sys.simulate()
+                consumption = oilcane_sys.power_utility.rate + sum([i.LHV * 0.000278 for i in natural_gas_streams])
+                if split >= 0.998 and consumption < 0: return 0
+                return consumption
     
     if abs(number) in cellulosic_configurations:
         prs = flowsheet(cs.units.PretreatmentReactorSystem)

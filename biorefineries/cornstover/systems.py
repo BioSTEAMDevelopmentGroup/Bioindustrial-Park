@@ -792,11 +792,11 @@ def create_cofermentation_system(
         D401-1-1-M401-0-T302
     
         stripping_water_over_vent = stripping_water.imol['Water'] / 21202.490455845436
+        @D401.add_specification(run=True)
         def update_stripping_water():
             stripping_water, vent = D401.ins
             stripping_water.imol['Water'] = stripping_water_over_vent * vent.F_mass
-            D401._run()
-        D401.specification = update_stripping_water
+
     elif has_vent:
         M304 = bst.Mixer('M304', (R302-0, R303-0), vent)
         R303-1-T302
