@@ -426,27 +426,29 @@ def load(name, cache=cache, reduce_chemicals=True,
     HXN.vle_quenched_streams = False
     BT = flowsheet(bst.BoilerTurbogenerator)
     BT.boiler_efficiency = 0.89
-    
+    dct['active_derivative'] = False
     for splitter in flowsheet.unit:
         if getattr(splitter, 'isbagasse_splitter', False):
             # n = [0]
             minimum_fraction_processed = 0.2
+            maximum_fraction_processed = 1.
             recycle_data = {}
             @oilcane_sys.add_bounded_numerical_specification(
-                x0=minimum_fraction_processed, x1=1., xtol=1e-3, ytol=1000, args=(splitter,)
+                x0=minimum_fraction_processed, x1=maximum_fraction_processed, 
+                xtol=1e-3, ytol=1000, args=(splitter,)
             )
             def adjust_bagasse_to_boiler(split, splitter):
                 # n[0] += 1
                 # Returns energy consumption at given fraction processed (not sent to boiler).
                 splitter.split[:] = split
-                round_split = int(round(splitter.split[0], 5) * 1e5)
-                key = (round_split, getattr(sys, 'active_operation_mode', None))
+                operation_mode = getattr(sys, 'active_operation_mode', None)
+                if split in (minimum_fraction_processed, maximum_fraction_processed):
+                    key = (operation_mode, minimum_fraction_processed, dct['active_derivative'])
+                else:
+                    key = (operation_mode, 'last', dct['active_derivative'])
                 if key in recycle_data: 
                     material_data = recycle_data[key]
-                elif split == 1 or split == minimum_fraction_processed:
-                    recycle_data[key] = material_data = oilcane_sys.get_material_data()
                 else:
-                    key = (*key, 'last')
                     recycle_data[key] = material_data = oilcane_sys.get_material_data()
                 oilcane_sys.simulate(material_data=material_data, update_material_data=True)
                 excess = BT._excess_electricity_without_natural_gas
@@ -1098,14 +1100,18 @@ def load(name, cache=cache, reduce_chemicals=True,
 
     @metric(units='USD/MT')
     def MFPP_derivative():
-        if number < 0: return 0.
-        if _derivative_disabled: return np.nan
+        if number < 0:
+            return 0.
+        if _derivative_disabled:
+            return np.nan
+        dct['active_derivative'] = True
         if agile:
             cane_mode.oil_content += 0.01
             sorghum_mode.oil_content += 0.01
         else:
             oil_extraction_specification.load_oil_content(oil_extraction_specification.oil_content + 0.01)
         sys.simulate()  
+        dct['active_derivative'] = False
         # value = (kg_per_MT * tea.solve_price(feedstock) - MFPP.cache)
         # feedstock.price = tea.solve_price(feedstock)
         # print('AFTER')
