@@ -162,7 +162,8 @@ _derivative_disabled = False
 cache = {}
 
 def load(name, cache=cache, reduce_chemicals=True, 
-         enhanced_cellulosic_performance=False, RIN=True):
+         enhanced_cellulosic_performance=False, RIN=True,
+         avoid_natural_gas=True):
     dct = globals()
     number, agile = dct['configuration'] = configuration = parse(name)
     key = (number, agile, enhanced_cellulosic_performance, RIN)
@@ -428,17 +429,42 @@ def load(name, cache=cache, reduce_chemicals=True,
     
     for splitter in flowsheet.unit:
         if getattr(splitter, 'isbagasse_splitter', False):
+            # n = [0]
+            minimum_fraction_processed = 0.2
+            recycle_data = {}
             @oilcane_sys.add_bounded_numerical_specification(
-                x0=0.2, x1=0.999, xtol=5e-4, ytol=100, args=(splitter,)
+                x0=minimum_fraction_processed, x1=1., xtol=1e-3, ytol=1000, args=(splitter,)
             )
             def adjust_bagasse_to_boiler(split, splitter):
+                # n[0] += 1
                 # Returns energy consumption at given fraction processed (not sent to boiler).
                 splitter.split[:] = split
-                oilcane_sys.simulate()
+                round_split = int(round(splitter.split[0], 5) * 1e5)
+                key = (round_split, getattr(sys, 'active_operation_mode', None))
+                if key in recycle_data: 
+                    material_data = recycle_data[key]
+                elif split == 1 or split == minimum_fraction_processed:
+                    recycle_data[key] = material_data = oilcane_sys.get_material_data()
+                else:
+                    key = (*key, 'last')
+                    recycle_data[key] = material_data = oilcane_sys.get_material_data()
+                oilcane_sys.simulate(material_data=material_data, update_material_data=True)
                 excess = BT._excess_electricity_without_natural_gas
-                if split == 0.999 and excess > 0: return 0 # No need to burn bagasse
-                if split == 0.2 and excess < 0: return 0 # Cannot satisfy energy demand even at 80% sent to boiler
-                return excess
+                if split == 1. and excess > 0:
+                    splitter.neglect_natural_gas_streams = False
+                    return 0 # No need to burn bagasse
+                elif split == minimum_fraction_processed and excess < 0: 
+                    splitter.neglect_natural_gas_streams = False
+                    return 0 # Cannot satisfy energy demand even at 80% sent to boiler
+                else:
+                    splitter.neglect_natural_gas_streams = True
+                    return excess
+            @oilcane_sys.add_specification(args=(splitter,))
+            def assume_negligible_natural_gas_streams(splitter):
+                if splitter.neglect_natural_gas_streams:
+                    for i in natural_gas_streams: i.empty()
+                # print(n)
+                # n[0] = 0
     
     if abs(number) in cellulosic_configurations:
         prs = flowsheet(cs.units.PretreatmentReactorSystem)
