@@ -913,7 +913,7 @@ def create_oilcane_to_biodiesel_and_ethanol_combined_1_and_2g_post_fermentation_
         area=900,
     )
     HXN = bst.HeatExchangerNetwork(1000,
-        ignored=lambda: [u.D801.boiler, u.D802.boiler, u.H803, u.H802, u.H801, u.H804, u.H806, u.H809, oil_pretreatment_dct['F3']],
+        ignored=lambda: [u.H402, u.D801.boiler, u.D802.boiler, u.H803, u.H802, u.H801, u.H804, u.H806, u.H809, oil_pretreatment_dct['F3']],
         Qmin=1e3,
     )
     HXN.acceptable_energy_balance_error = 0.01
@@ -973,7 +973,7 @@ def create_sugarcane_to_ethanol_combined_1_and_2g(ins, outs):
         area=900,
     )
     HXN = bst.HeatExchangerNetwork(1000,
-        ignored=lambda: [u.H402],
+        ignored=lambda: [u.H401, u.H402],
         Qmin=1e3,
     )
     HXN.acceptable_energy_balance_error = 0.01
@@ -1144,7 +1144,7 @@ def create_oilcane_to_biodiesel_combined_1_and_2g_post_fermentation_oil_separati
         recycle_process_water_streams=(condensate, evaporator_condensate),
         HXN_kwargs=dict(
             ID=1000,
-            ignored=lambda: [u.D801.boiler, u.D802.boiler, u.H803, u.H802, u.H801, u.H804, u.H806, u.H809, oil_pretreatment_dct['F3']],
+            ignored=lambda: [u.H401, u.D801.boiler, u.D802.boiler, u.H803, u.H802, u.H801, u.H804, u.H806, u.H809, oil_pretreatment_dct['F3']],
             Qmin=1e3,
             acceptable_energy_balance_error=0.01,
         ),

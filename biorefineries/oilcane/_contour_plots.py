@@ -22,6 +22,7 @@ from thermosteam.units_of_measure import format_units
 from thermosteam.utils import set_figure_size, set_font
 from biorefineries.oilcane._load_data import images_folder
 from warnings import filterwarnings
+from scipy.ndimage.filters import gaussian_filter
 import os
 from ._distributions import (
     biodiesel_prices,
@@ -103,11 +104,12 @@ def _add_letter_labels(axes, xpos, ypos, colors):
                      horizontalalignment='center',verticalalignment='center',
                      fontsize=12, fontweight='bold', zorder=1e17)
 
-def plot_recovery_and_oil_content_contours_manuscript(load=True, fs=8):
+def plot_recovery_and_oil_content_contours_manuscript(load=True, fs=8, smooth=1):
     set_font(size=fs)
     set_figure_size()
     fig, axes = plot_recovery_and_oil_content_contours(
         load=load, 
+        smooth=smooth,
     )
     colors = np.zeros([2, 2], object)
     colors[:] = [[light_letter_color, light_letter_color],
@@ -139,11 +141,11 @@ def plot_recovery_and_oil_content_contours_biodiesel_only(load=True, fs=8, metri
             file = os.path.join(images_folder, f'recovery_and_oil_content_contours_biodiesel_only_{i}.{j}')
             plt.savefig(file, transparent=True)
 
-def plot_relative_sorghum_oil_content_and_cane_oil_content_contours_manuscript(load=True, fs=8):
+def plot_relative_sorghum_oil_content_and_cane_oil_content_contours_manuscript(load=True, fs=8, smooth=0.9):
     set_font(size=fs)
     set_figure_size()
     fig, axes = plot_relative_sorghum_oil_content_and_cane_oil_content_contours(
-        load=load,
+        load=load, smooth=smooth,
     )
     colors = np.zeros([2, 2], object)
     colors[:] = [[light_letter_color, light_letter_color],
@@ -310,7 +312,7 @@ def relative_sorghum_oil_content_and_cane_oil_content_data(load, relative):
     return X, Y, data
     
 def plot_relative_sorghum_oil_content_and_cane_oil_content_contours(
-        load=False, configuration_index=..., relative=False
+        load=False, configuration_index=..., relative=False, smooth=None,
     ):
     # Generate contour data
     X, Y, data = relative_sorghum_oil_content_and_cane_oil_content_data(load, relative)
@@ -342,6 +344,26 @@ def plot_relative_sorghum_oil_content_and_cane_oil_content_contours(
         [MetricBar(TCI.name, format_units(TCI.units), colormaps[1], tickmarks(data[:, :, 1, 0], 5, 5, expand=0, p=5), 10, 1),
          MetricBar(TCI.name, format_units(TCI.units), colormaps[1], tickmarks(data[:, :, 1, 1], 5, 5, expand=0, p=5), 10, 1)],
     ]
+    
+    if smooth: # Smooth curves due to heat exchanger network and discontinuities in design decisionss
+        A, B, M, N = data.shape
+        for m in range(M):
+            for n in range(N):
+                metric_data = data[:, :, m, n]
+                data[:, :, m, n] = gaussian_filter(metric_data, smooth)
+                # for a in range(A):
+                #     values = metric_data[a, :]
+                #     values.sort()
+                #     p = np.arange(values.size)
+                #     coeff = np.polyfit(p, values, 5)
+                #     values[:] = np.polyval(coeff, p)
+                # for b in range(B):
+                #     values = metric_data[:, b]
+                #     values.sort()
+                #     p = np.arange(values.size)
+                #     coeff = np.polyfit(p, values, 5)
+                #     values[:] = np.polyval(coeff, p)
+    
     fig, axes, CSs, CB = plot_contour_2d(
         100.*X, 100.*Y, Z, data, xlabel, ylabel, xticks, yticks, metric_bars, 
         styleaxiskw=dict(xtick0=True), label=True,
@@ -354,7 +376,7 @@ def plot_relative_sorghum_oil_content_and_cane_oil_content_contours(
     
 def plot_recovery_and_oil_content_contours(
         load=False, metric_index=0, N_decimals=1, configurations=None,
-        N_points=20, yticks=None, titles=None, cmap=None,
+        N_points=20, yticks=None, titles=None, cmap=None, smooth=None,
     ):
     if yticks is None: yticks = [5, 7.5, 10, 12.5, 15]
     if configurations is None:
@@ -379,6 +401,25 @@ def plot_recovery_and_oil_content_contours(
     np.save(file, data)
     data = data[:, :, :, :, metric_index]
     data = np.swapaxes(data, 2, 3)
+    
+    if smooth: # Smooth curves due to heat exchanger network and discontinuities in design decisionss
+        A, B, M, N = data.shape
+        for m in range(M):
+            for n in range(N):
+                metric_data = data[:, :, m, n]
+                data[:, :, m, n] = gaussian_filter(metric_data, smooth)
+                # for a in range(A):
+                #     values = metric_data[a, :]
+                #     # values.sort()
+                #     p = np.arange(values.size)
+                #     coeff = np.polyfit(p, values, 3)
+                #     values[:] = np.polyval(coeff, p)
+                # for b in range(B):
+                #     values = metric_data[:, b]
+                #     # values.sort()
+                #     p = np.arange(values.size)
+                #     coeff = np.polyfit(p, values, 3)
+                #     values[:] = np.polyval(coeff, p)
     
     # Plot contours
     xlabel = 'Crushing mill oil recovery [%]'
@@ -407,16 +448,7 @@ def plot_recovery_and_oil_content_contours(
     for i in range(N):
         for j in range(M):
             ax = axes[i, j]
-            CS = CSs[i, j]
             plt.sca(ax)
-            metric_data = data[:, :, i, j]
-            lb = metric_data.min()
-            ub = metric_data.max()
-            levels = [i for i in CS.levels if lb <= i <= ub]
-            CS = plt.contour(100.*X, 100.*Y, data=metric_data, zorder=1, linestyles='dashed', linewidths=1.,
-                             levels=levels, colors=[linecolor])
-            # ax.clabel(CS, levels=CS.levels, inline=True, fmt=lambda x: f'{round(x):,}',
-            #           colors=[linecolor], zorder=1e16)
             plt.fill_between([60, 90], [yticks[0]], [yticks[-1]], 
                               color=shadecolor,
                               linewidth=1)

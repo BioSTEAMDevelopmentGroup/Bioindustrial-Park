@@ -28,6 +28,7 @@ __all__ = (
     'montecarlo_results_configuration_comparison',
     'montecarlo_results_agile_comparison',
     'montecarlo_results_crude_comparison',
+    'get_minimum_GWP_reduction',
 )
 
 results_folder = os.path.join(os.path.dirname(__file__), 'results')
@@ -110,39 +111,40 @@ def get_monte_carlo(name, features=None, cache={}):
         df_b = get_monte_carlo(key.b)[index]
         row_a = df_a.shape[0]
         row_b = df_b.shape[0]
-        if row_a != row_b:
-            length = min(row_a, row_b)
-            mc = df_a.iloc[:length] - df_b.iloc[:length]
-        else:
-            mc = df_a - df_b
+        try:
+            assert row_a == row_b, "shape mismatch"
+        except:
+            breakpoint()
+        mc = df_a - df_b
     else:
         raise Exception('unknown error')
+    mc = mc.dropna(how='all', axis=0)
     return mc
 
 
 def montecarlo_results(with_units=False):
     results = {}    
-    for name in oc.configuration_names + oc.comparison_names + oc.other_comparison_names + ('O3', 'O4', 'O1 - O3', 'O2 - O4'):
+    for name in oc.configuration_names + oc.comparison_names:
         try: 
             df = get_monte_carlo(name)
         except:
             warn(f'could not load {name}', RuntimeWarning)
             continue
         results[name] = dct = {}
-        if name in ('O1', 'O2'):
-            index = f.ethanol_over_biodiesel.index
-            key = get_monte_carlo_key(index, dct, with_units)
-            data = df[f.ethanol_production.index].values / df[f.biodiesel_production.index].values
-            q05, q25, q50, q75, q95 = np.percentile(data, [5,25,50,75,95], axis=0)
-            dct[key] = {
-                'mean': np.mean(data),
-                'std': np.std(data),
-                'q05': q05,
-                'q25': q25,
-                'q50': q50,
-                'q75': q75,
-                'q95': q95,
-            }
+        # if name in ('O1', 'O2'):
+        #     index = f.ethanol_over_biodiesel.index
+        #     key = get_monte_carlo_key(index, dct, with_units)
+        #     data = df[f.ethanol_production.index].values / df[f.biodiesel_production.index].values
+        #     q05, q25, q50, q75, q95 = np.percentile(data, [5,25,50,75,95], axis=0)
+        #     dct[key] = {
+        #         'mean': np.mean(data),
+        #         'std': np.std(data),
+        #         'q05': q05,
+        #         'q25': q25,
+        #         'q50': q50,
+        #         'q75': q75,
+        #         'q95': q95,
+        #     }
         for metric in (*f.tea_monte_carlo_metric_mockups, *f.tea_monte_carlo_derivative_metric_mockups,
                        *f.lca_monte_carlo_metric_mockups, *f.lca_monte_carlo_derivative_metric_mockups,
                        f.GWP_ethanol_displacement, f.GWP_ethanol_allocation):
@@ -184,6 +186,41 @@ def montecarlo_results(with_units=False):
 
 # %% Monte carlo values for manuscript
 
+def get_minimum_GWP_reduction():
+    L_per_gal = 3.7854
+    gal_per_GGE_ethanol = 1.5
+    L_per_GGE_ethanol = L_per_gal * gal_per_GGE_ethanol
+    gal_per_GGE_biodiesel = 0.9536
+    L_per_GGE_biodiesel = L_per_gal * gal_per_GGE_biodiesel
+    GWP_ethanol_economic = GWP_biodiesel_economic = 0
+    GWP_ethanol_energy = GWP_biodiesel_energy = 0
+    GWP_ethanol_economic_index = f.GWP_ethanol.index
+    GWP_ethanol_energy_index = f.GWP_ethanol_allocation.index
+    GWP_biodiesel_economic_index = f.GWP_biodiesel.index
+    GWP_biodiesel_energy_index = f.GWP_biodiesel_allocation.index
+    # https://www.epa.gov/sites/default/files/2016-07/documents/select-ghg-results-table-v1.pdf
+    GWP_ethanol_dist_and_use = 3.7 * 114000 / 1e6 # kgCO2e per GGE
+    GWP_biodiesel_dist_and_use = 3.4 * 114000 / 1e6 # kgCO2e per GGE
+    for name in ('O1', 'O2'): 
+        df = get_monte_carlo(name)
+        GWP_ethanol_economic = max(GWP_ethanol_economic, df[GWP_ethanol_economic_index].max())
+        GWP_ethanol_energy = max(GWP_ethanol_energy, df[GWP_ethanol_energy_index].max())
+        GWP_biodiesel_economic = max(GWP_biodiesel_economic, df[GWP_biodiesel_economic_index].max())
+        GWP_biodiesel_energy = max(GWP_biodiesel_energy, df[GWP_biodiesel_energy_index].max())
+    # https://www.epa.gov/sites/default/files/2016-07/documents/select-ghg-results-table-v1.pdf
+    GWP_ethanol_economic *= L_per_GGE_ethanol # per L to per GGE
+    GWP_ethanol_energy *= L_per_GGE_ethanol # per L to per GGE
+    GWP_biodiesel_economic *= L_per_GGE_biodiesel # per L to per GGE
+    GWP_biodiesel_energy *= L_per_GGE_biodiesel # per L to per GGE
+    GWP_diesel = 11.058 # kgCO2e per GGE
+    GWP_gasoline = 11.1948 # kgCO2e per GGE
+    return {
+        'Ethanol-economic': 100 * (1 - (GWP_ethanol_economic + GWP_ethanol_dist_and_use) / GWP_gasoline),
+        'Ethanol-energy': 100 * (1 - (GWP_ethanol_energy + GWP_ethanol_dist_and_use)/ GWP_gasoline),
+        'Biodiesel-economic': 100 * (1 - (GWP_biodiesel_economic + GWP_biodiesel_dist_and_use)/ GWP_diesel),
+        'Biodiesel-energy': 100 * (1 - (GWP_biodiesel_energy + GWP_biodiesel_dist_and_use) / GWP_diesel),
+    }
+
 def montecarlo_results_short(names, metrics=None, derivative=None):
     if metrics is None:
         if derivative:
@@ -211,6 +248,18 @@ def montecarlo_results_short(names, metrics=None, derivative=None):
                 dct[key] = f"{-q50} [{-q95}, {-q05}] -negative-"
             else:
                 dct[key] = f"{q50} [{q05}, {q95}]"
+        if name == 'O2 - O1':
+            df_O2O1 = df
+            df_O1 = get_monte_carlo('O1')
+            for metric in (f.biodiesel_production, f.ethanol_production):
+                index = metric.index
+                key = f"% {get_monte_carlo_key(index, {}, False)} increase"
+                data = 100. * (df_O2O1[index].values / df_O1[index].values)
+                q05, q50, q95 = roundsigfigs(np.percentile(data, [5, 50, 95], axis=0), 3)
+                if q50 < 0:
+                    dct[key] = f"{-q50} [{-q95}, {-q05}] -negative-"
+                else:
+                    dct[key] = f"{q50} [{q05}, {q95}]"
     return results
 
 def montecarlo_results_feedstock_comparison():

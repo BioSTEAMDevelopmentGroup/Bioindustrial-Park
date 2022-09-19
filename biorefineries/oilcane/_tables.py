@@ -47,7 +47,7 @@ def save_detailed_expenditure_tables(sigfigs=3):
     teas = [get_tea(i) for i in IDs]
     product_IDs = [oc.ethanol.ID, oc.biodiesel.ID]
     tables = {
-        'VOC': bst.report.voc_table(syss, product_IDs, names),
+        'VOC': bst.report.voc_table(syss, product_IDs, names, with_products=True),
         'FOC': cs.foc_table(teas, names),
         'CAPEX': cs.capex_table(teas, names),
     }
@@ -106,7 +106,7 @@ def save_detailed_life_cycle_tables(sigfigs=3):
              'Conventional Oilcane Biorefinery',
              'Cellulosic Oilcane Biorefinery',]
     syss = [get(i, 'sys') for i in IDs]
-    ethanol_streams = [get(i, 'ethanol') for i in IDs]
+    ethanol_streams = [(get(i, 'advanced_ethanol'), get(i, 'cellulosic_ethanol')) for i in IDs]
     index = ['Energy allocation',
              'Economic allocation',
              'Displacement allocation']
@@ -131,13 +131,13 @@ def save_detailed_life_cycle_tables(sigfigs=3):
             syss, oc.GWP, ethanol_streams, 'ethanol', names
         ),
         'Energy allocation factors': bst.report.lca_property_allocation_factor_table(
-            syss, property='energy', units='GGE/hr', system_names=names,
+            syss, property='energy', units='GGE/hr', system_names=names, groups=('ethanol',),
         ),
         'Economic allocation factors': bst.report.lca_property_allocation_factor_table(
-            syss, property='revenue', units='USD/hr', system_names=names,
+            syss, property='revenue', units='USD/hr', system_names=names, groups=('ethanol',),
         ),
         'Displacement allocation factors': bst.report.lca_displacement_allocation_factor_table(
-            syss, ethanol_streams, oc.GWP, names
+            syss, ethanol_streams, oc.GWP, names, groups=('ethanol',),
         ),
         'GWP ethanol': df_gwp,
     }

@@ -435,7 +435,7 @@ def load(name, cache=cache, reduce_chemicals=True,
             recycle_data = {}
             @oilcane_sys.add_bounded_numerical_specification(
                 x0=minimum_fraction_processed, x1=maximum_fraction_processed, 
-                xtol=1e-3, ytol=1000, args=(splitter,)
+                xtol=1e-4, ytol=100, args=(splitter,)
             )
             def adjust_bagasse_to_boiler(split, splitter):
                 # n[0] += 1
@@ -577,14 +577,12 @@ def load(name, cache=cache, reduce_chemicals=True,
     # Set non-negligible characterization factors
     if number not in cellulosic_configurations:
         for i in ('FGD_lime', 'cellulase', 'urea', 'caustic', 'cellulosic_ethanol'): MockStream(i)
-    if number not in cellulosic_ethanol_configurations:
-        for i in ('cellulosic_ethanol',): MockStream(i)
     if number not in biodiesel_configurations: 
         for i in ('catalyst', 'methanol', 'HCl', 'NaOH', 'crude_glycerol', 'pure_glycerine'): MockStream(i)
     if number not in ethanol_configurations:
-        for i in ('denaturant', 'ethanol'): MockStream(i)
-    if number not in conventional_ethanol_configurations:
-        for i in ('advanced_ethanol',): MockStream(i)
+        for i in ('denaturant', 'ethanol', 'advanced_ethanol'): MockStream(i)
+    # if number not in conventional_ethanol_configurations:
+    #     for i in ('advanced_ethanol',): MockStream(i)
     if number not in actag_configurations:
         MockStream('acTAG')
         
@@ -615,7 +613,8 @@ def load(name, cache=cache, reduce_chemicals=True,
         oilcane_sys.update_configuration([*sys.units, RIN_splitter])
         assert RIN_splitter in oilcane_sys.units
     elif number in conventional_ethanol_configurations:
-        s.ethanol.register_alias('advanced_ethanol')
+        s.ethanol.ID = 'advanced_ethanol'
+        s.advanced_ethanol.register_alias('ethanol')
         
     set_GWPCF(feedstock, 'sugarcane')
     set_GWPCF(s.H3PO4, 'H3PO4')
@@ -1082,12 +1081,12 @@ def load(name, cache=cache, reduce_chemicals=True,
     
     @metric(name='Ethanol GWP', element='Energy allocation', units='kg*CO2*eq / L')
     def GWP_ethanol_allocation(): # Cradle to gate
-        return GWP_biofuel_allocation.get() / 1.5
+        return GWP_biofuel_allocation.get() / 1.5 / L_per_gal
     
     @metric(name='Biodiesel GWP', element='Energy allocation', units='kg*CO2*eq / L')
     def GWP_biodiesel_allocation(): # Cradle to gate
         if number > 0:
-            return GWP_biofuel_allocation.get() / 0.9536
+            return GWP_biofuel_allocation.get() / 0.9536 / L_per_gal
         else:
             return 0.
     

@@ -698,8 +698,8 @@ def plot_kde_2d(name, metrics=(GWP_ethanol, MFPP), xticks=None, yticks=None,
     sX, sY = [kde_comparison_settings[i] for i in metrics]
     _, xlabel, fx = sX
     _, ylabel, fy = sY
-    xs = np.array([[df[Xi] for df in dfs]])
-    ys = np.array([[df[Yi] for df in dfs]])
+    xs = np.array([[df[Xi].values for df in dfs]])
+    ys = np.array([[df[Yi].values for df in dfs]])
     if fx: xs *= fx
     if fy: ys *= fy
     ticklabels = [True, True] if ticklabels else [False, False]
@@ -808,9 +808,9 @@ def plot_feedstock_cellulosic_comparison_kde():
 def plot_feedstock_comparison_kde(fs=None):
     plot_kde_2d(
         ('O1 - S1', 'O2 - S2'),
-        yticks=[[-15, 0, 15, 30, 45]],
+        yticks=[[-18, 0, 18, 36, 54]],
         xticks=[[-0.12, -0.09, -0.06, -0.03, 0, 0.03, 0.06],
-                [-0.75, -0.5, -0.25, 0., 0.25, 0.5]],
+                [-0.06, -0.03, 0., 0.03, 0.06, 0.09]],
         top_right='GWP\nTradeoff()',
         bottom_left='MFPP\nTradeoff()',
         top_left='Oilcane\nFavored()',
@@ -828,13 +828,13 @@ def plot_feedstock_comparison_kde(fs=None):
 
 def plot_configuration_comparison_kde(fs=None):
     plot_kde(
-        'O1 - O2',
-        yticks=[-30, -20, -10, 0, 10, 20],
-        xticks=[-0.75, -0.6, -0.45, -0.3, -0.15, 0, 0.15, 0.3],
+        'O2 - O1',
+        yticks=sorted([-1 * i for i in [-39, -26, -13, 0, 13, 26]]),
+        xticks=sorted([-1 * i for i in [-0.06, -0.04, -0.02, 0, 0.02, 0.04]]),
         top_right='GWP\nTradeoff()',
         bottom_left='MFPP\nTradeoff()',
-        top_left='DC Favored()',
-        bottom_right='ICF\nFavored()',
+        top_left='ICF\nFavored()',
+        bottom_right='DC Favored()',
         fs=fs,
     )
     for i in ('svg', 'png'):
@@ -861,10 +861,10 @@ def plot_separated_configuration_comparison_kde():
 def plot_crude_configuration_comparison_kde():
     plot_kde_2d(
         ('O1 - O3', 'O2 - O4'),
-        yticks=[[-10, 0, 10, 20, 30]],
+        yticks=[[0, 10, 20, 30, 40]],
         xticks=[
             [-0.3, -0.24, -0.18, -0.12, -0.06, 0],
-            [-0.5, -0.4, -0.3, -0.2, -0.1, 0]
+            [-0.15, -0.12, -0.09, -0.06, -0.03, 0]
         ],
         top_right='GWP\nTradeoff()',
         bottom_left='MFPP\nTradeoff()',
