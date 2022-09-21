@@ -2008,14 +2008,16 @@ class HydrogenationEstersReactor(Reactor):
     _F_BM_default = {**Reactor._F_BM_default,
             'PdC catalyst': 1}
     mcat_frac = 0.5 # fraction of catalyst by weight in relation to the reactant (TAL)
-    TAL_to_esters_conversion = 0.5-1e-3
     mono_di_hydroxy_esters_conversion_ratio = 0.5
-    catalyst_deactivation_k = 2e-3/10
-    
+    TAL_to_esters_and_DHL_conversion = 0.9
+    esters_DHL_conversion_ratio = 0.5
+    TAL_to_esters_conversion = esters_DHL_conversion_ratio * TAL_to_esters_and_DHL_conversion
+    # catalyst_deactivation_k = 2e-3/10
+    catalyst_replacements_per_year = 1.
     hydrogenation_rxns = ParallelRxn([
             #   Reaction definition   Reactant   Conversion
             Rxn('TAL + 2H2 + Ethanol -> Ethyl_5_hydroxyhexanoate',         'TAL',   TAL_to_esters_conversion*mono_di_hydroxy_esters_conversion_ratio),
-            Rxn('TAL + 2H2 + Ethanol -> Ethyl_3_5_dihydroxyhexanoate',         'TAL',   TAL_to_esters_conversion*(1.-mono_di_hydroxy_esters_conversion_ratio)),
+            Rxn('TAL + H2 + Ethanol + H2O -> Ethyl_3_5_dihydroxyhexanoate',         'TAL',   TAL_to_esters_conversion*(1.-mono_di_hydroxy_esters_conversion_ratio)),
             Rxn('TAL + 2H2 -> HMTHP',         'TAL',   1e-6), # conversion from Huber group experimental data
             # Rxn('HMDHP + H2 -> HMTHP',         'HMDHP',   1.-1e-5),
             # ])
@@ -2082,8 +2084,9 @@ class HydrogenationEstersReactor(Reactor):
         for i in self.outs:
             i.T = self.T
         
-        spent_catalyst.imol['Pd'] = fresh_catalyst.imol['Pd'] =\
-            self.catalyst_deactivation_k * (feed.imol['TAL'] - effluent.imol['TAL'])
+        spent_catalyst.imass['Pd'] = fresh_catalyst.imass['Pd'] =\
+            self.mcat_frac * self.ins[0].imass['TAL'] * self.tau * self.catalyst_replacements_per_year/ 7884.0
+            # self.catalyst_deactivation_k * (feed.imol['TAL'] - effluent.imol['TAL'])
             # self.catalyst_deactivation_k * reagent.imol['H2']
             
             # effluent.imol['Ethyl_5_hydroxyhexanoate'])

@@ -15,6 +15,7 @@ This module is a modified implementation of modules from the following:
 # %% Setup
 
 import numpy as np
+import biosteam as bst
 import thermosteam as tmo
 from math import exp
 from warnings import warn
@@ -1895,3 +1896,10 @@ class HClKOHRecovery(Reactor):
         
     def _cost(self):
         super()._cost()
+
+class SuccinicAcidCrystallizer(bst.BatchCrystallizer):
+    
+    def _run(self):
+        # code that gets t and T based on %recovery
+        0
+        

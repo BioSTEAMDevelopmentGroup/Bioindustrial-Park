@@ -44,7 +44,7 @@ solvent_IDs = [
                 'Toluene',
                 'Trioctylamine',
                 'Isoamyl alcohol',
-                '5137-55-3', # CAS number for Aliquat 336
+                # '5137-55-3', # CAS number for Aliquat 336
                 # 'Water',
                 'Benzene',
                 '143-28-2', # CAS number for Oleyl alcohol
@@ -196,8 +196,8 @@ def run_solvents_barrage(stream, # Stream from which you wish to extract the sol
                                 T = T)
     
     mixed_stream = tmo.Stream('mixed_stream')
-    extract_phase = 'l'
-    raffinate_phase = 'L'
+    # extract_phase = 'L'
+    # raffinate_phase = 'l'
     
     # %%% Functions
     
@@ -223,6 +223,10 @@ def run_solvents_barrage(stream, # Stream from which you wish to extract the sol
         mixed_stream.lle(T=T, top_chemical = solvent_chemical.ID)
         # mixed_stream.lle(T=T)
         # mixed_stream.show(N=100, composition=True)
+        extract_phase = 'l' if mixed_stream.imol['l', solvent_ID]/mixed_stream.imol['l', 'Water'] >\
+            mixed_stream.imol['L', solvent_ID]/mixed_stream.imol['L', 'Water']\
+            else 'L'
+        raffinate_phase = 'L' if extract_phase=='l' else 'l'
         K_solute_in_solvent = get_K(solute.ID, mixed_stream, extract_phase, raffinate_phase)
         # K_Glucose_in_solvent = get_K('Glucose', mixed_stream, extract_phase, raffinate_phase)
         # print(K_solute_in_solvent)

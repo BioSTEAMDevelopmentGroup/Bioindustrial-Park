@@ -411,7 +411,7 @@ EH = tmo.Chemical('Ethyl hexanoate')
 
 Ethyl_5_HydroxyHexanoate = chemical_defined('Ethyl_5_hydroxyhexanoate',
                                             # phase='l', 
-                                            formula='C14H28O3', 
+                                            formula='C8H16O3', 
                        # Hf=-233200*_cal2joule,
                        )
 Ethyl_5_HydroxyHexanoate.Dortmund.update({1:2, 2:3, 3:1, 14:1, 22:1})
@@ -425,7 +425,7 @@ Ethyl_5_HydroxyHexanoate.Tm = 0. + 273.15 # assumed
 
 Ethyl_3_5_dihydroxyhexanoate = chemical_defined('Ethyl_3_5_dihydroxyhexanoate',
                                             # phase='l', 
-                                            formula='C14H28O4', 
+                                            formula='C8H16O4', 
                        # Hf=-233200*_cal2joule,
                        )
 

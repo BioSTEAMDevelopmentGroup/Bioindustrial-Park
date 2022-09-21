@@ -3,17 +3,15 @@
 """
 Created on Sun Aug 23 12:11:15 2020
 
-Modified from the cornstover biorefinery constructed in Cortes-Peña et al., 2020,
-with modification of fermentation system for 2,3-Butanediol instead of the original ethanol
+Modified from the biorefineries constructed in [1], [2], and [3] for the production of
+[1] 3-hydroxypropionic acid, [2] lactic acid, and [3] ethanol from lignocellulosic feedstocks
 
-[1] Cortes-Peña et al., BioSTEAM: A Fast and Flexible Platform for the Design, 
-    Simulation, and Techno-Economic Analysis of Biorefineries under Uncertainty. 
-    ACS Sustainable Chem. Eng. 2020, 8 (8), 3302–3310. 
-    https://doi.org/10.1021/acssuschemeng.9b07040.
+[1]	Bhagwat et al., Sustainable Production of Acrylic Acid via 3-Hydroxypropionic Acid from Lignocellulosic Biomass. ACS Sustainable Chem. Eng. 2021, 9 (49), 16659–16669. https://doi.org/10.1021/acssuschemeng.1c05441
+[2]	Li et al., Sustainable Lactic Acid Production from Lignocellulosic Biomass. ACS Sustainable Chem. Eng. 2021, 9 (3), 1341–1351. https://doi.org/10.1021/acssuschemeng.0c08055
+[3]	Cortes-Peña et al., BioSTEAM: A Fast and Flexible Platform for the Design, Simulation, and Techno-Economic Analysis of Biorefineries under Uncertainty. ACS Sustainable Chem. Eng. 2020, 8 (8), 3302–3310. https://doi.org/10.1021/acssuschemeng.9b07040
 
-All units are explicitly defined here for transparency and easy reference
 
-@author: yalinli_cabbi
+@author: sarangbhagwat
 """
 
 
@@ -68,8 +66,9 @@ AC401 = u.AC401
 # U401 = u.U401
 
 F401 = u.F401
+M403 = u.M403
 
-F402 = u.F402
+# F402 = u.F402
 # H403 = u.H403
 
 # H402 = u.H402
@@ -217,7 +216,24 @@ D = shape.Triangle(0.198, 0.2527, 0.304)
 def set_natural_gas_price(gas_price):
     BT.natural_gas_price = gas_price
 
+H2_fresh = s.H2_fresh
+baseline_H2_fresh_price = H2_fresh.price
+D = shape.Triangle(0.8*baseline_H2_fresh_price, baseline_H2_fresh_price, 1.2*baseline_H2_fresh_price)
+@param(name='H2 price', element='TEA', kind='isolated', units='$/kg',
+        baseline=baseline_H2_fresh_price, distribution=D)
+def set_H2_price(H2_fresh_price):
+    H2_fresh.price = H2_fresh_price
+    
 
+PdC_fresh = s.PdC_fresh
+baseline_PdC_fresh_price = PdC_fresh.price
+D = shape.Triangle(0.8*baseline_PdC_fresh_price, baseline_PdC_fresh_price, 1.2*baseline_PdC_fresh_price)
+@param(name='PdC price', element='TEA', kind='isolated', units='$/kg',
+        baseline=baseline_PdC_fresh_price, distribution=D)
+def set_H2_price(PdC_fresh_price):
+    PdC_fresh.price = PdC_fresh_price
+    
+    
 D = shape.Triangle(0.067, 0.070, 0.074)
 @param(name='Electricity unit price', element='TEA', kind='isolated', units='$/kWh',
        baseline=0.070, distribution=D)
@@ -241,6 +257,15 @@ D = shape.Triangle(0.460, 0.7328, 0.978)
        baseline=0.7328, distribution=D)
 def set_ethanol_price(etoh_price):
     ethanol_fresh.price = etoh_price
+    
+
+#%% ######################## Feedstock parameters ########################
+U101 = u.U101
+D = shape.Triangle(604.125*0.8, 604.125, 604.125*1.2)
+@param(name='Feedstock capacity', element=U101, kind='coupled', units='kg/h',
+       baseline=604.125, distribution=D)
+def set_feedstock_capacity(feedstock_capacity):
+    feedstock.F_mass = feedstock_capacity
     
 #%% ######################## Conversion parameters ########################
 
@@ -350,18 +375,18 @@ D = shape.Uniform(0.05, 0.95) # assumed
 def set_adsorption_ethanol_retention(wr):
     AC401.wet_retention = wr
 
-D = shape.Uniform(0.01, 0.09) # assumed
-@param(name='Ethanol retention in product after drying', element=F402, kind='coupled', units='g-ethanol/g-TAL',
-        baseline=0.05, distribution=D)
-def set_drying_ethanol_retention_in_product_stream(ethanol_retention_drying):
-    F402.product_ethanol_content = ethanol_retention_drying
+# D = shape.Uniform(0.01, 0.09) # assumed
+# @param(name='Ethanol retention in product after drying', element=F402, kind='coupled', units='g-ethanol/g-TAL',
+#         baseline=0.05, distribution=D)
+# def set_drying_ethanol_retention_in_product_stream(ethanol_retention_drying):
+#     F402.product_ethanol_content = ethanol_retention_drying
     
 D = shape.Triangle(0.144945, 0.166880, 0.187718) # experimental data from Singh group
 @param(name='TAL solubility in ethanol', element=F401, kind='coupled', units='g-TAL/g-solution',
        baseline=0.166880, distribution=D)
 def set_TAL_solubility_ethanol(solubility):
     F401.TAL_solubility_in_ethanol_ww = solubility
-    
+    M403.TAL_solubility_in_ethanol_ww = solubility
 
 R401 = u.R401
 baseline_mono_di_hydroxy_esters_conversion_ratio = R401.mono_di_hydroxy_esters_conversion_ratio
@@ -370,32 +395,60 @@ D = shape.Triangle(0.8*baseline_mono_di_hydroxy_esters_conversion_ratio,
                    1.2*baseline_mono_di_hydroxy_esters_conversion_ratio) # experimental data from Huber group
 @param(name='mono_di_hydroxy_esters_conversion_ratio', element=R401, kind='coupled', units='%',
        baseline=baseline_mono_di_hydroxy_esters_conversion_ratio, distribution=D)
-def set_TAL_solubility_ethanol(mono_di_hydroxy_esters_conversion_ratio):
+def set_mono_di_hydroxy_esters_conversion_ratio(mono_di_hydroxy_esters_conversion_ratio):
     R401.mono_di_hydroxy_esters_conversion_ratio = mono_di_hydroxy_esters_conversion_ratio
     R401.hydrogenation_rxns[0].X = R401.TAL_to_esters_conversion * mono_di_hydroxy_esters_conversion_ratio
     R401.hydrogenation_rxns[1].X = R401.TAL_to_esters_conversion * (1.-mono_di_hydroxy_esters_conversion_ratio)
-    R401.TAL_to_DHL_rxn.X = 1. - sum([i.X for i in list(R401.hydrogenation_rxns[:5]) if not i==R401.TAL_to_DHL_rxn and i.reactant=='TAL'])
+    # R401.TAL_to_DHL_rxn.X = 1. - sum([i.X for i in list(R401.hydrogenation_rxns[:5]) if not i==R401.TAL_to_DHL_rxn and i.reactant=='TAL'])
 
-baseline_TAL_to_esters_conversion = R401.TAL_to_esters_conversion
-D = shape.Triangle(0.8*baseline_TAL_to_esters_conversion, 
-                   baseline_TAL_to_esters_conversion, 
-                   1.2*baseline_TAL_to_esters_conversion) # experimental data from Huber group
-@param(name='TAL_to_esters_conversion', element=R401, kind='coupled', units='%',
-       baseline=baseline_TAL_to_esters_conversion, distribution=D)
-def set_TAL_solubility_ethanol(TAL_to_esters_conversion):
-    R401.TAL_to_esters_conversion = TAL_to_esters_conversion
+
+
+baseline_esters_DHL_conversion_ratio = R401.esters_DHL_conversion_ratio
+D = shape.Triangle(0.9*baseline_esters_DHL_conversion_ratio, 
+                   baseline_esters_DHL_conversion_ratio, 
+                   1.1*baseline_esters_DHL_conversion_ratio) # experimental data from Huber group
+@param(name='esters_DHL_conversion_ratio', element=R401, kind='coupled', units='%',
+       baseline=baseline_esters_DHL_conversion_ratio, distribution=D)
+def set_esters_DHL_conversion_ratio(esters_DHL_conversion_ratio):
+    TAL_to_esters_and_DHL_conversion = R401.TAL_to_esters_and_DHL_conversion
+    R401.esters_DHL_conversion_ratio = esters_DHL_conversion_ratio
+    R401.TAL_to_esters_conversion = TAL_to_esters_conversion =\
+        TAL_to_esters_and_DHL_conversion * esters_DHL_conversion_ratio - 5e-5
+    R401.TAL_to_DHL_rxn.X =\
+        TAL_to_esters_and_DHL_conversion * (1-esters_DHL_conversion_ratio) - 5e-5
     R401.hydrogenation_rxns[0].X = TAL_to_esters_conversion * R401.mono_di_hydroxy_esters_conversion_ratio
     R401.hydrogenation_rxns[1].X = TAL_to_esters_conversion * (1.-R401.mono_di_hydroxy_esters_conversion_ratio)
-    R401.TAL_to_DHL_rxn.X = 1. - sum([i.X for i in list(R401.hydrogenation_rxns[:5]) if not i==R401.TAL_to_DHL_rxn and i.reactant=='TAL'])
-  
-baseline_catalyst_deactivation_k = R401.catalyst_deactivation_k
-D = shape.Triangle(0.8*baseline_catalyst_deactivation_k, 
-                   baseline_catalyst_deactivation_k, 
-                   1.2*baseline_catalyst_deactivation_k) # experimental data from Huber group
-@param(name='Pd|C catalyst deactivation k', element=R401, kind='coupled', units='s^-1',
-       baseline=baseline_TAL_to_esters_conversion, distribution=D)
-def set_TAL_solubility_ethanol(catalyst_deactivation_k):
-    R401.catalyst_deactivation_k = catalyst_deactivation_k
+    
+    R401.hydrogenation_rxns[4].X = 5e-5
+    
+
+baseline_TAL_to_esters_and_DHL_conversion = R401.TAL_to_esters_and_DHL_conversion
+D = shape.Triangle(0.9*baseline_TAL_to_esters_and_DHL_conversion, 
+                    baseline_TAL_to_esters_and_DHL_conversion, 
+                   1.1*baseline_TAL_to_esters_and_DHL_conversion) # experimental data from Huber group
+@param(name='TAL_to_esters_and_DHL_conversion', element=R401, kind='coupled', units='%',
+       baseline=baseline_TAL_to_esters_and_DHL_conversion, distribution=D)
+def set_TAL_to_esters_and_DHL_conversion(TAL_to_esters_and_DHL_conversion):
+    R401.TAL_to_esters_conversion = TAL_to_esters_conversion =\
+        TAL_to_esters_and_DHL_conversion * R401.esters_DHL_conversion_ratio - 5e-5
+    R401.TAL_to_DHL_rxn.X =\
+        TAL_to_esters_and_DHL_conversion * (1-R401.esters_DHL_conversion_ratio) - 5e-5
+    R401.hydrogenation_rxns[0].X = TAL_to_esters_conversion * R401.mono_di_hydroxy_esters_conversion_ratio
+    R401.hydrogenation_rxns[1].X = TAL_to_esters_conversion * (1.-R401.mono_di_hydroxy_esters_conversion_ratio)
+    
+    R401.hydrogenation_rxns[4].X = 5e-5
+    # R401.TAL_to_DHL_rxn.X = min(0.499, max(1e-6, 1. - sum([i.X for i in R401.TAL_conversion_rxns if i.reactant=='TAL']) +R401.TAL_to_DHL_rxn.X))
+
+
+
+baseline_catalyst_replacements_per_year = R401.catalyst_replacements_per_year
+D = shape.Uniform(0.5*baseline_catalyst_replacements_per_year, 
+                   # baseline_catalyst_replacements_per_year, 
+                   1.5*baseline_catalyst_replacements_per_year) # assumed
+@param(name='Pd|C catalyst replacement frequency', element=R401, kind='coupled', units='y^-1',
+       baseline=baseline_catalyst_replacements_per_year, distribution=D)
+def set_catalyst_deactivation(catalyst_replacements_per_year):
+    R401.catalyst_replacements_per_year = catalyst_replacements_per_year
     
 
 # D = shape.Uniform(0.01, 0.09) # assumed
