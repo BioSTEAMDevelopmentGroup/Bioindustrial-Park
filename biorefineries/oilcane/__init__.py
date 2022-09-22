@@ -528,12 +528,12 @@ def load(name, cache=cache, reduce_chemicals=True,
         sys.operation_parameter(set_xylose_yield)
         
         dct['cane_mode'] = cane_mode = sys.operation_mode(oilcane_sys,
-            operating_hours=180*24, oil_content=0.05, feedstock=feedstock.copy(),
+            operating_hours=180*24, oil_content=0.10, feedstock=feedstock.copy(),
             z_mass_carbs_baseline=0.1491, glucose_yield=85, xylose_yield=65, 
             FFA_content=0.10, PL_content=0.10
         )
         dct['sorghum_mode'] = sorghum_mode = sys.operation_mode(oilcane_sys, 
-            operating_hours=60*24, oil_content=0.05, glucose_yield=79, xylose_yield=86,
+            operating_hours=60*24, oil_content=0.07, glucose_yield=79, xylose_yield=86,
             feedstock=oilsorghum,
             z_mass_carbs_baseline=0.1371, FFA_content=0.10, PL_content=0.10,
         )

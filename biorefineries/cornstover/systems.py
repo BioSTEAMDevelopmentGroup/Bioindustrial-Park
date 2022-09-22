@@ -376,9 +376,9 @@ def create_dilute_acid_pretreatment_system(
         ammonia.imol['NH4OH'] = 2. * pretreated_biomass.imol['H2SO4']
         ammonia_process_water.imass['Water'] = 2435.6 * ammonia.imol['NH4OH']
     
+    @T203.add_specification
     def neutralization():
         T203._run(); neutralization_rxn.adiabatic_reaction(T203.outs[0])
-    T203.specification = neutralization
 
 @bst.SystemFactory(
     ID='saccharification_sys',
@@ -680,11 +680,11 @@ def create_integrated_bioprocess_saccharification_and_cofermentation_system(
         D401-1-1-M401-0-T302
     
         stripping_water_over_vent = stripping_water.mol / 21202.490455845436
+        @D401.add_specification(run=True)
         def update_stripping_water():
             stripping_water, vent = D401.ins
             stripping_water.mol[:] = stripping_water_over_vent * vent.F_mass
-            D401._run()
-        D401.specification = update_stripping_water
+        
     elif has_vent:
         M304 = bst.Mixer('M304', (R302-0, R303-0), vent)
         R303-1-T302

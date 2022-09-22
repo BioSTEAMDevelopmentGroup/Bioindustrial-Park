@@ -45,7 +45,7 @@ def save_detailed_expenditure_tables(sigfigs=3):
     ]
     syss = [get_sys(i) for i in IDs]
     teas = [get_tea(i) for i in IDs]
-    product_IDs = [oc.ethanol.ID, oc.biodiesel.ID]
+    product_IDs = [oc.advanced_ethanol.ID, oc.cellulosic_ethanol.ID, oc.biodiesel.ID]
     tables = {
         'VOC': bst.report.voc_table(syss, product_IDs, names, with_products=True),
         'FOC': cs.foc_table(teas, names),

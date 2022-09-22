@@ -115,8 +115,8 @@ advanced_ethanol_prices = ethanol_no_RIN_prices + RIN_D5_prices
 # plt.plot(biodiesel_prices)
 
 electricity_prices = []
-def triangular_distribution(x):
-    a, b, c = fit_triangular_distribution(x)
+def triangular_distribution(x, median=False):
+    a, b, c = fit_triangular_distribution(x, median)
     return shape.Triangle(a, c, b)
 
 def triangular_distribution_median(a, b, c):
@@ -143,7 +143,7 @@ def fit_triangular_distribution(x, median=False):
     return a, b, c
 
 def plot_triangular_distribution(a, b, c):
-    return plt.plot([a, c, b], [0, 2 / (b - a), 0])
+    return plt.plot([a, b, c], [0, 2 / (b - a), 1])
 
 def plot_histogram(x, *args, bins=10, density=True, **kwargs):
     return plt.hist(x, *args, **kwargs)

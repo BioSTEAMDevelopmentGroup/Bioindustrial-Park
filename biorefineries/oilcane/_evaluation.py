@@ -13,7 +13,7 @@ from ._distributions import (
     mean_RIN_D5_price,
 )
 from ._feature_mockups import (
-    all_metric_mockups,
+    all_metric_mockups, GWP_ethanol_allocation, GWP_biodiesel_allocation,
 )
 from ._parse_configuration import (
     parse,
@@ -163,6 +163,7 @@ def save_pickled_results(N, configurations=None, rule='L', optimize=True):
     filterwarnings('ignore', category=bst.exceptions.DesignWarning)
     filterwarnings('ignore', category=bst.exceptions.CostWarning)
     if configurations is None: configurations = oc.configuration_names
+    # liter_per_gal = 3.7854
     for name in configurations:
         oc.load(name)
         np.random.seed(1)
@@ -170,8 +171,13 @@ def save_pickled_results(N, configurations=None, rule='L', optimize=True):
         oc.model.load_samples(samples, optimize=optimize, ss=False)
         file = monte_carlo_file(name, False)
         oc.model.load_pickled_results(
-            file=autoload_file_name(name)
+            file=autoload_file_name(name),
+            safe=False
         )
+        # The energy allocated GWP was on a per gallon basis in the last Monte Carlo simulation
+        # TODO: Rerun simulations and to remove this commented code block
+        # oc.model.table[GWP_ethanol_allocation.index] /= liter_per_gal
+        # oc.model.table[GWP_biodiesel_allocation.index] /= liter_per_gal
         oc.model.table.to_excel(file)
         oc.model.table = oc.model.table.dropna(how='all', axis=1)
         for i in oc.model.metrics:
