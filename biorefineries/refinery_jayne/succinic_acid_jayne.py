@@ -10,6 +10,7 @@ Created on Sun Sep  4 18:45:24 2022
 
 import biosteam as bst
 from biosteam import settings, units
+from biorefineries.refinery_jayne.crystallization_class_test_module_jayne import SuccinicAcidCrystallizer
 
 #%% Streams
 
@@ -45,12 +46,12 @@ S2 = units.SolidsSeparator('S2', ins=('crude_calcium_succinate','sulfuric_acid')
 # Mixer before ion exchange column
 M1 = units.Mixer('M1', ins=('crude_succinic_acid','elution_water'),outs='')
 
-# Ion exchange column
-S3 = units.LiquidsSplitSettler('S3', ins=M1.outs[0], outs=('dilute_water_to_WWT','liquid_succinic_acid'),
-                               split=0.3)
+# # Ion exchange column
+# S3 = units.LiquidsSplitSettler('S3', ins=M1.outs[0], outs=('dilute_water_to_WWT','liquid_succinic_acid'),
+#                                split=0.3)
 
 # Crystallization
-C1 = units.BatchCrystallizer('C1', ins='liquid_succinic_acid', outs='wet_succinic_acid_crystals')
+C1 = units.BatchCrystallizer('C1', ins=M1.outs[0], outs='wet_succinic_acid_crystals')
 
 # Drying
 S4 = units.RotaryVacuumFilter('S4', ins='wet_succinic_acid_crystals',outs=('dry_succinic_acid_crystals',
