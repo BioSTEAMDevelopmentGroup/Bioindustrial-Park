@@ -489,7 +489,8 @@ def create_cane_combined_1_and_2g_pretreatment(ins, outs):
     )
     screened_juice, bagasse, fiber_fines = juicing_sys.outs
     
-    S1 = bst.Splitter(200, bagasse, split=0.85)
+    S1 = bst.Splitter(200, bagasse, split=0.85) # 15% is sent to cogeneration
+    S1.isbagasse_splitter = True
     
     create_bagasse_drying_system(ins=S1-1, outs=bagasse_to_boiler, area=200)
     
@@ -510,13 +511,13 @@ def create_cane_combined_1_and_2g_pretreatment(ins, outs):
     # Acetyl: 3.0%
     conveying_belt.hemicellulose_rxn = tmo.Reaction('30.2 Hemicellulose -> 24.9 Xylan + 1.7 Arabinan + 0.6 Galactan + 3 Acetate', 'Hemicellulose', 1.0, basis='wt')
     conveying_belt.hemicellulose_rxn.basis = 'mol'
+    @conveying_belt.add_specification
     def convert_hemicellulose():
         conveying_belt.run()
         bagasse = conveying_belt.outs[0]
         conveying_belt.cellulose_rxn(bagasse)
         conveying_belt.hemicellulose_rxn(bagasse)
         
-    conveying_belt.specification = convert_hemicellulose
     hot_water_pretreatment_sys, hw_dct = brf.cornstover.create_hot_water_pretreatment_system(
         outs=(hydrolysate, pretreatment_wastewater),
         ins=S1-0,
@@ -912,7 +913,7 @@ def create_oilcane_to_biodiesel_and_ethanol_combined_1_and_2g_post_fermentation_
         area=900,
     )
     HXN = bst.HeatExchangerNetwork(1000,
-        ignored=lambda: [u.D801.boiler, u.D802.boiler, u.H803, u.H802, u.H801, u.H804, u.H806, u.H809, oil_pretreatment_dct['F3']],
+        ignored=lambda: [u.H402, u.D801.boiler, u.D802.boiler, u.H803, u.H802, u.H801, u.H804, u.H806, u.H809, oil_pretreatment_dct['F3']],
         Qmin=1e3,
     )
     HXN.acceptable_energy_balance_error = 0.01
@@ -952,6 +953,7 @@ def create_sugarcane_to_ethanol_combined_1_and_2g(ins, outs):
         area=500,
     )
     s = f.stream
+    u = f.unit
     M501 = bst.Mixer(700, (wastewater_treatment_sys-1, lignin, C603_3-0, s.filter_cake, bagasse_to_boiler))
     MX = bst.Mixer(400, [condensate, stripper_process_water])
     brf.cornstover.create_facilities(
@@ -971,6 +973,7 @@ def create_sugarcane_to_ethanol_combined_1_and_2g(ins, outs):
         area=900,
     )
     HXN = bst.HeatExchangerNetwork(1000,
+        ignored=lambda: [u.H401, u.H402],
         Qmin=1e3,
     )
     HXN.acceptable_energy_balance_error = 0.01
@@ -1141,7 +1144,7 @@ def create_oilcane_to_biodiesel_combined_1_and_2g_post_fermentation_oil_separati
         recycle_process_water_streams=(condensate, evaporator_condensate),
         HXN_kwargs=dict(
             ID=1000,
-            ignored=lambda: [u.D801.boiler, u.D802.boiler, u.H803, u.H802, u.H801, u.H804, u.H806, u.H809, oil_pretreatment_dct['F3']],
+            ignored=lambda: [u.H401, u.D801.boiler, u.D802.boiler, u.H803, u.H802, u.H801, u.H804, u.H806, u.H809, oil_pretreatment_dct['F3']],
             Qmin=1e3,
             acceptable_energy_balance_error=0.01,
         ),

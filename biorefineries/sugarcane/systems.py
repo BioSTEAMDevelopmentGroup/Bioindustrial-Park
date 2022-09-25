@@ -471,13 +471,13 @@ def create_juicing_system_up_to_clarification(ins, outs, pellet_bagasse=None,
         H3PO4.imass['H3PO4', 'Water'] = 0.00025 * F_mass
     
     # Specifications within a system
+    @P202.add_specification
     def correct_wash_water():
         P202._run()
         solids = P202.outs[0].imol['Ash', 'CaO', 'Cellulose',
                                    'Hemicellulose', 'Lignin'].sum()
         rvf_wash_water.imol['Water'] = 0.0574 * solids
     
-    P202.specification = correct_wash_water
 
 @SystemFactory(
     ID='juicing_sys',
@@ -1025,6 +1025,7 @@ def create_sucrose_fermentation_system(ins, outs,
     S302 = units.MockSplitter('S302', C301-0, (1-R301, 'Yeast'))
     R301.titer = titer # g / L
     R301.productivity = productivity # g / L-h
+    @S302.add_specification
     def adjust_yeast_recycle():
         recycle, beer = S302.outs
         feed, = S302.ins
@@ -1035,7 +1036,6 @@ def create_sucrose_fermentation_system(ins, outs,
         beer.separate_out(recycle, energy_balance=False)
         beer.mol[beer.mol < 0.] = 0.
         beer.T = recycle.T = feed.T
-    S302.specification = adjust_yeast_recycle
     
     def get_titer():
         s = R301.outs[1]

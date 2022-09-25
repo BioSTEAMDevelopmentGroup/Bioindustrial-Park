@@ -91,14 +91,12 @@ from ._oil_extraction_specification import (
 )
 from ._distributions import (
     ethanol_no_RIN_price_distribution,
-    biodiesel_no_RIN_price_distribution,
     natural_gas_price_distribution,
     biodiesel_price_distribution,
     mean_biodiesel_price,
     cellulosic_ethanol_price_distribution,
     advanced_ethanol_price_distribution,
     mean_ethanol_no_RIN_price,
-    mean_biodiesel_no_RIN_price,
     mean_advanced_ethanol_price,
     mean_cellulosic_ethanol_price,
     mean_glycerol_price,
@@ -145,7 +143,6 @@ comparison_names = (
     'O2* - O2',  
 )
 
-
 def load_chemicals():
     global chemicals, _chemicals_loaded
     chemicals = create_chemicals()
@@ -165,7 +162,8 @@ _derivative_disabled = False
 cache = {}
 
 def load(name, cache=cache, reduce_chemicals=True, 
-         enhanced_cellulosic_performance=False, RIN=True):
+         enhanced_cellulosic_performance=False, RIN=True,
+         avoid_natural_gas=True):
     dct = globals()
     number, agile = dct['configuration'] = configuration = parse(name)
     key = (number, agile, enhanced_cellulosic_performance, RIN)
@@ -428,6 +426,47 @@ def load(name, cache=cache, reduce_chemicals=True,
     HXN.vle_quenched_streams = False
     BT = flowsheet(bst.BoilerTurbogenerator)
     BT.boiler_efficiency = 0.89
+    for splitter in flowsheet.unit:
+        if getattr(splitter, 'isbagasse_splitter', False):
+            dct['bagasse_splitter'] = splitter
+            # n = [0]
+            minimum_fraction_processed = 0.3
+            maximum_fraction_processed = 1.
+            recycle_data = {}
+            @oilcane_sys.add_bounded_numerical_specification(
+                x0=minimum_fraction_processed, x1=maximum_fraction_processed, 
+                xtol=1e-4, ytol=100, args=(splitter,)
+            )
+            def adjust_bagasse_to_boiler(split, splitter):
+                # n[0] += 1
+                # Returns energy consumption at given fraction processed (not sent to boiler).
+                splitter.split[:] = split
+                operation_mode = getattr(sys, 'active_operation_mode', None)
+                if split in (minimum_fraction_processed, maximum_fraction_processed):
+                    key = (operation_mode, minimum_fraction_processed)
+                else:
+                    key = (operation_mode, 'last')
+                if key in recycle_data: 
+                    material_data = recycle_data[key]
+                else:
+                    recycle_data[key] = material_data = oilcane_sys.get_material_data()
+                oilcane_sys.simulate(material_data=material_data, update_material_data=True)
+                excess = BT._excess_electricity_without_natural_gas
+                if split == 1. and excess > 0:
+                    splitter.neglect_natural_gas_streams = False
+                    return 0 # No need to burn bagasse
+                elif split == minimum_fraction_processed and excess < 0: 
+                    splitter.neglect_natural_gas_streams = False
+                    return 0 # Cannot satisfy energy demand even at 30% sent to boiler (or minimum fraction processed)
+                else:
+                    splitter.neglect_natural_gas_streams = True
+                    return excess
+            @oilcane_sys.add_specification(args=(splitter,))
+            def assume_negligible_natural_gas_streams(splitter):
+                if splitter.neglect_natural_gas_streams:
+                    for i in natural_gas_streams: i.empty()
+                # print(n)
+                # n[0] = 0
     
     if abs(number) in cellulosic_configurations:
         prs = flowsheet(cs.units.PretreatmentReactorSystem)
@@ -489,12 +528,12 @@ def load(name, cache=cache, reduce_chemicals=True,
         sys.operation_parameter(set_xylose_yield)
         
         dct['cane_mode'] = cane_mode = sys.operation_mode(oilcane_sys,
-            operating_hours=180*24, oil_content=0.05, feedstock=feedstock.copy(),
+            operating_hours=180*24, oil_content=0.10, feedstock=feedstock.copy(),
             z_mass_carbs_baseline=0.1491, glucose_yield=85, xylose_yield=65, 
             FFA_content=0.10, PL_content=0.10
         )
         dct['sorghum_mode'] = sorghum_mode = sys.operation_mode(oilcane_sys, 
-            operating_hours=60*24, oil_content=0.05, glucose_yield=79, xylose_yield=86,
+            operating_hours=60*24, oil_content=0.07, glucose_yield=79, xylose_yield=86,
             feedstock=oilsorghum,
             z_mass_carbs_baseline=0.1371, FFA_content=0.10, PL_content=0.10,
         )
@@ -538,14 +577,12 @@ def load(name, cache=cache, reduce_chemicals=True,
     # Set non-negligible characterization factors
     if number not in cellulosic_configurations:
         for i in ('FGD_lime', 'cellulase', 'urea', 'caustic', 'cellulosic_ethanol'): MockStream(i)
-    if number not in cellulosic_ethanol_configurations:
-        for i in ('cellulosic_ethanol',): MockStream(i)
     if number not in biodiesel_configurations: 
         for i in ('catalyst', 'methanol', 'HCl', 'NaOH', 'crude_glycerol', 'pure_glycerine'): MockStream(i)
     if number not in ethanol_configurations:
-        for i in ('denaturant', 'ethanol'): MockStream(i)
-    if number not in conventional_ethanol_configurations:
-        for i in ('advanced_ethanol',): MockStream(i)
+        for i in ('denaturant', 'ethanol', 'advanced_ethanol'): MockStream(i)
+    # if number not in conventional_ethanol_configurations:
+    #     for i in ('advanced_ethanol',): MockStream(i)
     if number not in actag_configurations:
         MockStream('acTAG')
         
@@ -564,15 +601,20 @@ def load(name, cache=cache, reduce_chemicals=True,
             # outs: stream sequence
             # [0] Advanced biofuel ethanol
             # [1] Cellulosic biofuel ethanol
-            RIN_splitter.split[:] = (
-                (juice_sugar := s.juice.imass['Glucose', 'Sucrose'].sum()) 
-                / (juice_sugar + s.slurry.imass['Glucose', 'Xylose', 'Arabinose'].sum())
+            glucose_yield = fermentor.cofermentation.X[0]
+            xylose_yield = fermentor.cofermentation.X[1]
+            juice_sugar = s.juice.imass['Glucose', 'Sucrose'].sum() * glucose_yield
+            hydrolysate_sugar = (
+                s.slurry.imass['Glucose'] * glucose_yield
+                + s.slurry.imass['Xylose', 'Arabinose'].sum() * xylose_yield
             )
+            RIN_splitter.split[:] = juice_sugar / (juice_sugar + hydrolysate_sugar)
         
         oilcane_sys.update_configuration([*sys.units, RIN_splitter])
         assert RIN_splitter in oilcane_sys.units
     elif number in conventional_ethanol_configurations:
-        s.ethanol.register_alias('advanced_ethanol')
+        s.ethanol.ID = 'advanced_ethanol'
+        s.advanced_ethanol.register_alias('ethanol')
         
     set_GWPCF(feedstock, 'sugarcane')
     set_GWPCF(s.H3PO4, 'H3PO4')
@@ -664,6 +706,7 @@ def load(name, cache=cache, reduce_chemicals=True,
         aepd = advanced_ethanol_price_distribution 
         maep = mean_advanced_ethanol_price
     else:
+        raise NotImplementedError('biodiesel price distribution without RINs has not been implemented in `_distributions.py` module')
         bpd = biodiesel_no_RIN_price_distribution 
         mbp = mean_biodiesel_no_RIN_price
         cepd = aepd = ethanol_no_RIN_price_distribution 
@@ -899,12 +942,12 @@ def load(name, cache=cache, reduce_chemicals=True,
         direct_nonbiogenic_emissions = lambda: sum([i.F_mol for i in natural_gas_streams]) * chemicals.CO2.MW * sys.operating_hours
     electricity = lambda: sys.operating_hours * sys.power_utility.rate
     
-    # def get_GWP_mean_ethanol_price():
-    #     if number in cellulosic_ethanol_configurations:
-    #         f = float(RIN_splitter.split.mean())
-    #         return f * mean_advanced_ethanol_price + (1 - f) * mean_cellulosic_ethanol_price
-    #     else:
-    #         return mean_advanced_ethanol_price
+    def get_GWP_mean_ethanol_price():
+        if number in cellulosic_ethanol_configurations:
+            f = float(RIN_splitter.split.mean())
+            return f * mean_advanced_ethanol_price + (1 - f) * mean_cellulosic_ethanol_price
+        else:
+            return mean_advanced_ethanol_price
     
     sys.define_process_impact(
         key=GWP,
@@ -961,14 +1004,14 @@ def load(name, cache=cache, reduce_chemicals=True,
     def GWP_displacement(): # Cradle to gate
         GWP_total = sys.get_total_feeds_impact(GWP) + min(electricity(), 0) * GWP_characterization_factors['Electricity'] # kg CO2 eq. / yr
         sales = (
-            biodiesel_flow() * mean_biodiesel_no_RIN_price
-            + ethanol_flow() * mean_ethanol_no_RIN_price
+            biodiesel_flow() * mean_biodiesel_price
+            + ethanol_flow() * get_GWP_mean_ethanol_price()
             + crude_glycerol_flow() * mean_glycerol_price
         )
         GWP_per_USD = GWP_total / sales
         return {
-            'Ethanol': GWP_per_USD * mean_ethanol_no_RIN_price,
-            'Biodiesel': GWP_per_USD * mean_biodiesel_no_RIN_price,
+            'Ethanol': GWP_per_USD * get_GWP_mean_ethanol_price(),
+            'Biodiesel': GWP_per_USD * mean_biodiesel_price,
             'Crude glycerol': GWP_per_USD * mean_glycerol_price,
         }
     dct['GWP_displacement'] = GWP_displacement
@@ -978,8 +1021,8 @@ def load(name, cache=cache, reduce_chemicals=True,
         GWP_material = sys.get_total_feeds_impact(GWP) # kg CO2 eq. / yr
         GWP_emissions = sys.get_process_impact(GWP) # kg CO2 eq. / yr
         sales = (
-            biodiesel_flow() * mean_biodiesel_no_RIN_price
-            + ethanol_flow() * mean_ethanol_no_RIN_price
+            biodiesel_flow() * mean_biodiesel_price
+            + ethanol_flow() * get_GWP_mean_ethanol_price()
             + crude_glycerol_flow() * mean_glycerol_price
             + max(-electricity(), 0) * mean_electricity_price
         )
@@ -987,12 +1030,12 @@ def load(name, cache=cache, reduce_chemicals=True,
 
     @metric(name='Ethanol GWP', element='Economic allocation', units='kg*CO2*eq / L')
     def GWP_ethanol(): # Cradle to gate
-        return GWP_economic.get() * mean_ethanol_no_RIN_price
+        return GWP_economic.get() * get_GWP_mean_ethanol_price()
     
     @metric(name='Biodiesel GWP', element='Economic allocation', units='kg*CO2*eq / L')
     def GWP_biodiesel(): # Cradle to gate
         if number > 0:
-            return GWP_economic.get() * mean_biodiesel_no_RIN_price
+            return GWP_economic.get() * mean_biodiesel_price
         else:
             return 0.
     
@@ -1038,12 +1081,12 @@ def load(name, cache=cache, reduce_chemicals=True,
     
     @metric(name='Ethanol GWP', element='Energy allocation', units='kg*CO2*eq / L')
     def GWP_ethanol_allocation(): # Cradle to gate
-        return GWP_biofuel_allocation.get() / 1.5
+        return GWP_biofuel_allocation.get() / 1.5 / L_per_gal
     
     @metric(name='Biodiesel GWP', element='Energy allocation', units='kg*CO2*eq / L')
     def GWP_biodiesel_allocation(): # Cradle to gate
         if number > 0:
-            return GWP_biofuel_allocation.get() / 0.9536
+            return GWP_biofuel_allocation.get() / 0.9536 / L_per_gal
         else:
             return 0.
     
@@ -1056,14 +1099,16 @@ def load(name, cache=cache, reduce_chemicals=True,
 
     @metric(units='USD/MT')
     def MFPP_derivative():
-        if number < 0: return 0.
-        if _derivative_disabled: return np.nan
+        if number < 0:
+            return 0.
+        if _derivative_disabled:
+            return np.nan
         if agile:
             cane_mode.oil_content += 0.01
             sorghum_mode.oil_content += 0.01
         else:
             oil_extraction_specification.load_oil_content(oil_extraction_specification.oil_content + 0.01)
-        sys.simulate()  
+        sys.simulate()
         # value = (kg_per_MT * tea.solve_price(feedstock) - MFPP.cache)
         # feedstock.price = tea.solve_price(feedstock)
         # print('AFTER')
@@ -1113,12 +1158,12 @@ def load(name, cache=cache, reduce_chemicals=True,
 
     @metric(name='Ethanol GWP derivative', element='Ethanol', units='kg*CO2*eq / L')
     def GWP_ethanol_derivative(): # Cradle to gate
-        return GWP_economic_derivative.get() * mean_ethanol_no_RIN_price
+        return GWP_economic_derivative.get() * get_GWP_mean_ethanol_price()
     
     @metric(name='Biodiesel GWP derivative', element='Biodiesel', units='kg*CO2*eq / L')
     def GWP_biodiesel_derivative(): # Cradle to gate
         if number > 0:
-            return GWP_economic_derivative.get() * mean_biodiesel_no_RIN_price
+            return GWP_economic_derivative.get() * mean_biodiesel_price
         else:
             return 0.
     
@@ -1200,6 +1245,7 @@ def load(name, cache=cache, reduce_chemicals=True,
     if cache is not None: cache[key] = dct.copy()
     
     ## Simulation
+    HXN.acceptable_energy_balance_error = 0.02
     HXN.force_ideal_thermo = True
     HXN.cache_network = True
     HXN.avoid_recycle = True

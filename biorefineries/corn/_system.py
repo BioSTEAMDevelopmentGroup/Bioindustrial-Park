@@ -154,7 +154,18 @@ def create_system(ID='corn_sys', flowsheet=None):
     P410 = bst.Pump('P410', V409-1)
     MX = bst.Mixer('MX', [P410-0, P406-0])
     MX-0-1-E401
-    E413 = bst.HXprocess('E413', (PX-0, None), U=0.79496, ft=1.0)
+    E413 = bst.HXprocess('E413', (PX-0, None), U=0.79496, ft=1.0, T_lim0=360) # Limit temperature to not have vapor.
+    @E413.add_specification
+    def no_vapor():
+        E413.run()
+        outlet = E413.outs[0]
+        while outlet.phase != 'l':
+            E413.T_lim0 -= 1
+            E413.run()
+            if E413.T_lim0 < 350:
+                raise RuntimeError('bubble point is lower than expected')
+        E413.T_lim0 = 360
+            
     P411 = bst.Pump('P411', E413-0)
     
     ethanol_purification_sys = create_ethanol_purification_system(

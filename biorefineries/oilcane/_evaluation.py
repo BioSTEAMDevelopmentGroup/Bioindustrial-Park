@@ -10,11 +10,10 @@ from warnings import warn
 from biorefineries import oilcane as oc
 from ._distributions import (
     mean_RIN_D3_price,
-    mean_RIN_D4_price,
     mean_RIN_D5_price,
 )
 from ._feature_mockups import (
-    all_metric_mockups
+    all_metric_mockups, GWP_ethanol_allocation, GWP_biodiesel_allocation,
 )
 from ._parse_configuration import (
     parse,
@@ -36,6 +35,7 @@ __all__ = (
     'evaluate_MFPP_across_ethanol_and_biodiesel_prices',
     'evaluate_MFPP_benefit_across_ethanol_and_biodiesel_prices',
     'run_uncertainty_and_sensitivity',
+    'save_pickled_results',
     'run_all',
 )
 
@@ -143,7 +143,6 @@ def evaluate_MFPP_across_ethanol_and_biodiesel_prices(ethanol_price, biodiesel_p
     )
     ethanol_RIN_price = split * mean_RIN_D5_price + (1 - split) * mean_RIN_D3_price
     ethanol_price = ethanol_price + ethanol_RIN_price
-    biodiesel_price = biodiesel_price + mean_RIN_D4_price
     return (
         baseline_price 
         + (ethanol_price * ethanol_flow + biodiesel_price * biodiesel_flow) / feedstock_flow
@@ -159,13 +158,41 @@ def evaluate_MFPP_benefit_across_ethanol_and_biodiesel_prices(ethanol_price, bio
     MFPP = evaluate_MFPP_across_ethanol_and_biodiesel_prices(ethanol_price, biodiesel_price, configuration)
     return MFPP - MFPP_baseline
 
+def save_pickled_results(N, configurations=None, rule='L', optimize=True):
+    from warnings import filterwarnings
+    filterwarnings('ignore', category=bst.exceptions.DesignWarning)
+    filterwarnings('ignore', category=bst.exceptions.CostWarning)
+    if configurations is None: configurations = oc.configuration_names
+    # liter_per_gal = 3.7854
+    for name in configurations:
+        oc.load(name)
+        np.random.seed(1)
+        samples = oc.model.sample(N, rule)
+        oc.model.load_samples(samples, optimize=optimize, ss=False)
+        file = monte_carlo_file(name, False)
+        oc.model.load_pickled_results(
+            file=autoload_file_name(name),
+            safe=False
+        )
+        # The energy allocated GWP was on a per gallon basis in the last Monte Carlo simulation
+        # TODO: Rerun simulations and to remove this commented code block
+        # oc.model.table[GWP_ethanol_allocation.index] /= liter_per_gal
+        # oc.model.table[GWP_biodiesel_allocation.index] /= liter_per_gal
+        oc.model.table.to_excel(file)
+        oc.model.table = oc.model.table.dropna(how='all', axis=1)
+        for i in oc.model.metrics:
+            if i.index not in oc.model.table: oc.model._metrics.remove(i)
+        oc.model.table = oc.model.table.dropna(how='any', axis=0)
+        rho, p = oc.model.spearman_r()
+        file = spearman_file(name)
+        rho.to_excel(file)
+
 def run_uncertainty_and_sensitivity(name, N, rule='L',
                                     across_oil_content=False, 
                                     sample_cache={},
                                     autosave=True,
                                     autoload=True,
                                     optimize=True):
-    np.random.seed(1)
     from warnings import filterwarnings
     filterwarnings('ignore', category=bst.exceptions.DesignWarning)
     filterwarnings('ignore', category=bst.exceptions.CostWarning)
@@ -174,6 +201,7 @@ def run_uncertainty_and_sensitivity(name, N, rule='L',
     if key in sample_cache:
         samples = sample_cache[key]
     else:
+        np.random.seed(1)
         sample_cache[key] = samples = oc.model.sample(N, rule)
     oc.model.load_samples(samples, optimize=optimize, ss=False)
     file = monte_carlo_file(name, across_oil_content)
@@ -226,7 +254,11 @@ def run_uncertainty_and_sensitivity(name, N, rule='L',
         if not success:
             raise RuntimeError('evaluation failed')
         oc.model.table.to_excel(file)
-        rho, p = oc.model.spearman_r()
+        oc.model.table = oc.model.table.dropna(how='all', axis=1)
+        for i in oc.model.metrics:
+            if i.index not in oc.model.table: oc.model._metrics.remove(i)
+        oc.model.table = oc.model.table.dropna(how='any', axis=0)
+        rho, p = oc.model.spearman_r(filter='omit nan')
         file = spearman_file(name)
         rho.to_excel(file)
 
