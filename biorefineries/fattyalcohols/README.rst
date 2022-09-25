@@ -2,8 +2,6 @@
 fattyalcohols: Production of fatty alcohols by fermentation of sugars
 =====================================================================
 
-.. figure:: ./images/LAOs_areas.png
-
 This library models the production of fatty alcohols produced by fermentation.
 The library is not yet complete as it only includes the fermentation section
 without any separation or purification of products. A tentative date for 
