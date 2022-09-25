@@ -19,6 +19,7 @@ import thermosteam as tmo
 # # available methods are {'ROWLINSON_POLING', 'DADGOSTAR_SHAW', 'ROWLINSON_BONDI'}
 # Biodiesel.Cn.method = 'ROWLINSON_BONDI'
 
+##All the TAGs are based on Ruiz-Gutiérrez et. al (1998)
 # chems is the object containing all chemicals used in this biorefinery
 Cobalt_chloride = tmo.Chemical('Cobalt_chloride',
                                search_ID = '7646-79-9',
@@ -37,14 +38,92 @@ chems = tmo.Chemicals([
     tmo.Chemical('Nitrogen'),
     tmo.Chemical('Oxygen'),
     tmo.Chemical('Methanol'),
+    tmo.Chemical('Glycerol'),
+    tmo.Chemical('Sodium_methoxide',formula ='NaOCH3'),
+    tmo.Chemical('HCl'),
+    tmo.Chemical('NaOH'),
+    
+###All the chemicals related to TAGs in HOSO
+    tmo.Chemical('OOO', search_ID = '122-32-7'),
+    tmo.Chemical('LLL', search_ID = '537-40-6'),
+    
+    tmo.Chemical('OOL',
+                 search_ID = '104485-08-7',
+                 phase ='l',
+                 search_db = False),
+    
+    tmo.Chemical('LLO', 
+                 search_ID = '2190-22-9',
+                 phase = 'l',
+                 search_db = False),
+    
+    tmo.Chemical('SOO',
+                 search_ID = '79517-06-9',
+                 phase ='l',
+                 search_db = False),
+    
+    tmo.Chemical('PLO', 
+                 search_ID = '2680-59-3',
+                 phase = 'l',
+                 search_db = False),
+      
+    tmo.Chemical('PoOO',
+                 search_ID = 'PubChem= 9544083',
+                 phase ='l',
+                 search_db = False),
+
+    tmo.Chemical('POO',
+                 search_ID = '',
+                 phase ='l',
+                 search_db = False),
+    
+    tmo.Chemical('POS', 
+                 search_ID = 'PubChem = 129723993',
+                 phase = 'l',
+                 search_db = False),
+    
+    tmo.Chemical('POP',
+                 search_ID = '2190-25-2',
+                 phase ='l',
+                 search_db = False),
+    
+    tmo.Chemical('PLS',
+                 search_ID = 'PubChem = 102332193',
+                 phase ='l',
+                 search_db = False),
+    
+##chemical for representing phospholipids, taken directly from lipidcane biorefinery
+    tmo.Chemical('Phosphatidylinositol', 
+                 formula='C47H83O13P',
+                     search_db=False, 
+                     CAS='383907-36-6',
+                     default=True,
+                     Hf=-1.779e6, # Assume same as TAG on a weight basis
+                     phase='l'),
+  
+##All the chemicals that go in the Biodiesel
+
+    tmo.Chemical('Methyl_oleate'),
+    tmo.Chemical('Methyl_palmitate'),
+    tmo.Chemical('Methyl_stearate'),
+    tmo.Chemical('Methyl_linoleate'), 
+    tmo.Chemical('Methyl_palmitoleate',search_ID ='1120-25-8'),
+    
+## Extra chems for lipidcane compatibility
+    tmo.Chemical('Monoolein', search_ID = '111-03-5'),
+    tmo.Chemical('DiOlein', search_ID = '2465-32-9'),
+   
+    
     ### Chemicals that were missing some properties
     ### TODO.xxx check if this is a good assumption with Yoel
     
     #Tungstic_acid boiling point: https://en.wikipedia.org/wiki/Tungstic_acid
-    tungsten,
-    tmo.Chemical('tungstic_acid', Tb = 1746, phase = 's', 
-                 Hvap=tungsten.Hvap, Psat=tungsten.Psat,
-                 default = True),
+    tmo.Chemical('tungstic_acid', 
+                            Tb = 1746, 
+                            phase = 's', 
+                            Hvap=tungsten.Hvap,
+                            Psat=tungsten.Psat,
+                            default = True),
     
     ###Using cobalt chloride instead of acetate as allowed by the patent
     ###cobalt acetate has a few missing properties, further GWP data not available
@@ -67,6 +146,16 @@ chems = tmo.Chemicals([
                  Tb = 516.7+273.15,
                  phase = 's',
                  default=True),
+    
+    tmo.Chemical('OOL',
+                 search_ID = '104485-08-7',
+                 phase ='l',
+                 search_db = False),
+    
+    tmo.Chemical('LLO', 
+                 search_ID = '2190-22-9',
+                 phase = 'l',
+                 search_db = False),
     ##Below lacks Hvap etc models
     # Sulfonated_polystyrene = chemical_database('Sulfonated_polystyrene',
     #                                            search_ID = '98-70-4',
@@ -74,27 +163,37 @@ chems = tmo.Chemicals([
     ##Hence using polystyrene
     tmo.Chemical('Polystyrene'),
     ##Hence using polystyrene
-    
-
-])
+  ])
 chems.polystyrene_based_catalyst.copy_models_from(chems.Polystyrene,
                                         ['Hvap','Psat','sigma', 
                                          'epsilon', 'kappa', 'V',
                                          'Cn', 'mu'])
+for chemical in chems: chemical.default()
 
-lipidcane_chems = lipidcane.chemicals.copy()
-for chemical in lipidcane_chems: chemical.default()
-chems.extend(lipidcane_chems)
-chems.extend(sc.chemicals.copy())
 chems.compile()
-chems.set_synonym('OleicAcid', 'FFA')
+chems.define_group('TAG', ( 'OOO','LLL','OOL',
+                           'LLO','SOO','PLO',
+                           'PoOO','POO','POS',
+                           'POP','PLS'))
+
+chems.define_group('Lipid', ('OOO','LLL','OOL',
+                           'LLO','SOO','PLO',
+                           'PoOO','POO','POS',
+                           'POP','PLS'))
+chems.define_group('Oil', ('OOO','LLL','OOL',
+                           'LLO','SOO','PLO',
+                           'PoOO','POO','POS',
+                           'POP','PLS'))
+
+chems.define_group('Biodiesel', ('Methyl_oleate',
+                                 'Methyl_palmitate',
+                                 'Methyl_stearate',
+                                 'Methyl_linoleate',
+                                 'Methyl_palmitoleate'))
+chems.set_synonym('Water', 'H2O')
+chems.set_synonym('Phosphatidylinositol','PL')
 chems.set_synonym('MonoOlein', 'MAG')
 chems.set_synonym('DiOlein', 'DAG')
-chems.set_synonym('TriOlein', 'TAG')
-chems.define_group('Lipid', ('PL', 'FFA', 'MAG', 'DAG', 'TAG'))
-chems.define_group('Oil', ('PL', 'FFA', 'MAG', 'DAG', 'TAG'))
-chems.set_synonym('Water', 'H2O')
-chems.set_synonym('Yeast', 'DryYeast')
-chems.set_synonym('Biodiesel', 'Methyl_oleate')
+chems.set_synonym('Methanol','methanol')
 bst.settings.set_thermo(chems)
 chems.show()
