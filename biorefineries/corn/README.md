@@ -135,7 +135,7 @@ Getting Started
 References
 ----------
 <a id="1">[1]</a> 
-    J. R. Kwiatkowski, A. J. McAloon, F. Taylor and D. B. Johnston,
+    J.R. Kwiatkowski, A. J. McAloon, F. Taylor and D. B. Johnston,
     Modeling the process and costs of fuel ethanol production by the corn 
     dry-grind process, Industrial Crops and Products, 2006, 23, 288–296. 
     https://www.sciencedirect.com/science/article/pii/S0926669005000944
