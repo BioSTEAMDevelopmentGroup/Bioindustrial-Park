@@ -1,8 +1,8 @@
-======================================
-corn: Conventional dry milling process
-======================================
+====================================
+corn: Conventional dry grind process
+====================================
 
-Co-production of ethanol, distiller's dried grains with solubles (DDGS), and low-grade oil from the corn kernel through a dry milling process.
+Co-production of ethanol, distiller's dried grains with solubles (DDGS), and low-grade oil from the corn kernel through the conventional dry grind process, [1]_, [2]_ the biorefinery is modeled based on Kwiatkowski et al. [1]_.
 
 Getting Started
 ---------------
@@ -131,3 +131,7 @@ Getting Started
 	[9] s81
 	    phase: 'l', T: 298.15 K, P: 101325 Pa
 	    flow: 0
+
+.. [1] J. R. Kwiatkowski, A. J. McAloon, F. Taylor and D. B. Johnston, Modeling the process and costs of fuel ethanol production by the corn dry-grind process, Industrial Crops and Products, 2006, 23, 288–296. https://www.sciencedirect.com/science/article/pii/S0926669005000944
+
+.. [2] C. Kurambhatti, D. Kumar and V. Singh, Impact of Fractionation Process on the Technical and Economic Viability of Corn Dry Grind Ethanol Process, Processes, 2019, 7, 578. https://www.mdpi.com/2227-9717/7/9/578
