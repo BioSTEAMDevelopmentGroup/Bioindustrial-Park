@@ -152,7 +152,7 @@ def create_system(ID='corn_sys', flowsheet=None):
     V409 = bst.VentScrubber('V409', (scrubber_water, V405-0), gas=('CO2', 'O2'))
     V409.add_specification(update_scrubber_wash_water)
     P410 = bst.Pump('P410', V409-1)
-    MX = bst.Mixer('MX', [P410-0, P406-0])
+    MX = bst.Mixer('MX', P406-0)
     MX-0-1-E401
     E413 = bst.HXprocess('E413', (PX-0, None), U=0.79496, ft=1.0, T_lim0=360) # Limit temperature to not have vapor.
     @E413.add_specification
