@@ -51,7 +51,7 @@ def create_cs_comparison_systems(biodegradability=1): # will be multiplied by 0.
         'system_name': 'cornstover_sys',
         'create_wastewater_process': wwt_kwdct,
         'BT': 'BT',
-        'new_wwt_connections': {'sludge': ('M501', 0), 'biogas': ('BT', 1)},
+        'new_wwt_connections': {'sludge': ('slurry_mixer', 1), 'biogas': ('gas_mixer', 0)},
         'CF_dct': CF_dct,
         }
     exist_sys, new_sys = create_comparison_systems(info, cs, sys_dct)
