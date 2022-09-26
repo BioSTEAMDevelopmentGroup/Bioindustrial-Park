@@ -20,10 +20,8 @@ from biosteam import SystemFactory
     ins = [dict(ID = 'mixed_products_for_separation'),
            dict(ID = 'fresh_EA'),
           ],
-    outs = [dict(ID = 'solid_catalyst'),
-            dict(ID = 'aqueous_raffinate'),
-            dict(ID = 'organic_phase_for_PS'),
-            
+    outs = [dict(ID = 'aqueous_raffinate'),
+            dict(ID = 'organic_phase_for_PS'),            
             ],
     fixed_ins_size = False,
     fixed_outs_size = False,     
@@ -31,17 +29,8 @@ from biosteam import SystemFactory
 
 def organic_separation_system(ins,outs,T_in):
     mixed_products_for_separation,fresh_EA, = ins
-    solid_catalyst,aqueous_raffinate,organic_phase_for_PS,  = outs
-    
- 
-    S105 = bst.units.SolidsCentrifuge(ins = mixed_products_for_separation,
-                    outs = (solid_catalyst,
-                        'mixture_for_PS',
-                             ),
-                    moisture_content = 0.2,
-                    split={'bea_zeolite':1.0})
-    
-     
+    aqueous_raffinate,organic_phase_for_PS,  = outs
+   
     recycle = bst.Stream('recycle',
                           Ethyl_acetate = 10,
                           units = 'kg/hr')
@@ -70,7 +59,7 @@ def organic_separation_system(ins,outs,T_in):
                               T = T_in,
                               )
     L201 = bst.units.MultiStageMixerSettlers('L201', 
-                                    ins= ( S105-1,L201_H-0), 
+                                    ins= ( mixed_products_for_separation,L201_H-0), 
                                     outs=( aqueous_raffinate,
                                             'organic_phase_extract_with_EA',
                                           ), 
@@ -108,3 +97,4 @@ def organic_separation_system(ins,outs,T_in):
                                   P=10132.5,
                                   partial_condenser=False                                  
                                   )
+    D201.check_LHK = False

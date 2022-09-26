@@ -58,6 +58,8 @@ def crude_HOSO_oil_to_biodiesel(ins,outs):
     crude_vegetable_oil, water_for_degumming, = ins
     degummed_oil,polar_lipids, = outs
     # biodiesel,crude_glycerol,wastewater, = outs
+    # add citation for this here Degumming of rapeseed and sunflower oils 
+    # add % of PL removed using water degumming
     
     M00 = bst.MixTank(ID = 'Mix_tank_for_degumming',
                                          ins = (crude_vegetable_oil,
@@ -75,21 +77,23 @@ def crude_HOSO_oil_to_biodiesel(ins,outs):
                                                    TAG = 1,
                                                    Water = 0))
     
-    # sys = lc.create_transesterification_and_biodiesel_separation_system()
-    # bst.F(bst.Transesterification)[0].transesterification = tmo.ParallelReaction([
-    #     tmo.Reaction('OOO + 3Methanol -> 3Methyl_oleate + Glycerol', reactant='OOO',  X=0.99),
-    #     tmo.Reaction('LLL + 3Methanol -> 3Methyl_linoleate + Glycerol', reactant='LLL',  X=0.99),
-    #     tmo.Reaction('OOL + 3Methanol -> 2Methyl_oleate + Methyl_linoleate + Glycerol', reactant='OOL',  X=0.99),
-    #     tmo.Reaction('LLO + 3Methanol -> Methyl_oleate + 2Methyl_linoleate + Glycerol', reactant='LLO',  X=0.99),
-    #     tmo.Reaction('SOO + 3Methanol -> Methyl_stearate + 2Methyl_oleate + Glycerol', reactant='SOO',  X=0.99),
-    #     tmo.Reaction('PLO + 3Methanol -> Methyl_palmitate+ Methyl_oleate + Methyl_linoleate + Glycerol', reactant='PLO',  X=0.99),
-    #     tmo.Reaction('PoOO + 3Methanol -> Methyl_palmitoleate + 2Methyl_oleate + Glycerol', reactant='PoOO',  X=0.99),
-    #     tmo.Reaction('POO + 3Methanol -> Methyl_palmitate + 2Methyl_oleate + Glycerol', reactant='POO',  X=0.99),
-    #     tmo.Reaction('POS + 3Methanol -> Methyl_palmitate + Methyl_oleate + Methyl_stearate + Glycerol', reactant='POS',  X=0.99),
-    #     tmo.Reaction('POP + 3Methanol -> 2Methyl_palmitate + Methyl_oleate + Glycerol', reactant='POP',  X=0.99),
-    #     tmo.Reaction('PLS + 3Methanol -> Methyl_palmitate + Methyl_linoleate + Methyl_stearate + Glycerol', reactant='PLS',  X=0.99),
-    #       ])
-    
+    sys = lc.create_transesterification_and_biodiesel_separation_system(ins = M001-0)
+    reactors = bst.F(bst.Transesterification)
+    reactions = tmo.ParallelReaction([
+        tmo.Reaction('OOO + 3Methanol -> 3Methyl_oleate + Glycerol', reactant='OOO',  X=0.99),
+        tmo.Reaction('LLL + 3Methanol -> 3Methyl_linoleate + Glycerol', reactant='LLL',  X=0.99),
+        tmo.Reaction('OOL + 3Methanol -> 2Methyl_oleate + Methyl_linoleate + Glycerol', reactant='OOL',  X=0.99),
+        tmo.Reaction('LLO + 3Methanol -> Methyl_oleate + 2Methyl_linoleate + Glycerol', reactant='LLO',  X=0.99),
+        tmo.Reaction('SOO + 3Methanol -> Methyl_stearate + 2Methyl_oleate + Glycerol', reactant='SOO',  X=0.99),
+        tmo.Reaction('PLO + 3Methanol -> Methyl_palmitate+ Methyl_oleate + Methyl_linoleate + Glycerol', reactant='PLO',  X=0.99),
+        tmo.Reaction('PoOO + 3Methanol -> Methyl_palmitoleate + 2Methyl_oleate + Glycerol', reactant='PoOO',  X=0.99),
+        tmo.Reaction('POO + 3Methanol -> Methyl_palmitate + 2Methyl_oleate + Glycerol', reactant='POO',  X=0.99),
+        tmo.Reaction('POS + 3Methanol -> Methyl_palmitate + Methyl_oleate + Methyl_stearate + Glycerol', reactant='POS',  X=0.99),
+        tmo.Reaction('POP + 3Methanol -> 2Methyl_palmitate + Methyl_oleate + Glycerol', reactant='POP',  X=0.99),
+        tmo.Reaction('PLS + 3Methanol -> Methyl_palmitate + Methyl_linoleate + Methyl_stearate + Glycerol', reactant='PLS',  X=0.99),
+    ])
+    for reactor in reactors: reactor.transesterification = reactions
+   
     
 ob0 = crude_HOSO_oil_to_biodiesel()
 ob0.simulate()

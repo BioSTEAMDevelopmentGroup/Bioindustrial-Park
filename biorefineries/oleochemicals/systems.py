@@ -5,12 +5,20 @@ Created on Tue Jul 19 18:52:22 2022
 @author: Lavanya, Yoel
 """
 import biosteam as bst
-from .nonanoic_acid_production import nonanoic_acid_production_system
-from .organic_separation import organic_separation_system
-from .oxidative_cleavage import oxidative_cleavage_system
-from .primary_separation import primary_separation_system
-from .secondary_separation import secondary_separation_system
-from .solvent_recovery import solvent_recovery_system
+# from .nonanoic_acid_production import nonanoic_acid_production_system
+# from .organic_separation import organic_separation_system
+# from .oxidative_cleavage import oxidative_cleavage_system
+# from .primary_separation import primary_separation_system
+# from .secondary_separation import secondary_separation_system
+# from .solvent_recovery import solvent_recovery_system
+
+from nonanoic_acid_production import nonanoic_acid_production_system
+from organic_separation import organic_separation_system
+from oxidative_cleavage import oxidative_cleavage_system
+from primary_separation import primary_separation_system
+from secondary_separation import secondary_separation_system
+from solvent_recovery import solvent_recovery_system
+
 
 #TODO.xxx add actual catalyst with tin and titanium
          
@@ -31,7 +39,7 @@ from .solvent_recovery import solvent_recovery_system
                                           ),
            dict(ID = 'fresh_Cat',
                        units = 'kg/hr',
-                       bea_zeolite = 10,
+                       fresh_Cat = 10,
                        price = 7.7),           
            dict(ID = 'fresh_EA',
                       Ethyl_acetate = 1000,
@@ -65,20 +73,26 @@ from .solvent_recovery import solvent_recovery_system
 def azelaic_acid_system(ins, outs):    
     fresh_OA, fresh_HP, water_for_oxidative_cleavage, fresh_Cat,fresh_EA, water_for_extraction,solvent_for_extraction, = ins
 
-    conversion_sys = oxidative_cleavage_system(ins= (fresh_OA, fresh_HP, water_for_oxidative_cleavage,fresh_Cat),
-                                                                  T_in = 70 + 273.15)    
+    conversion_sys = oxidative_cleavage_system(ins= (fresh_OA, 
+                                                     fresh_HP,
+                                                     water_for_oxidative_cleavage,
+                                                     fresh_Cat),
+                                               T_in = 70 + 273.15)    
     mixed_oxidation_products, = conversion_sys.outs
     
-    organic_phase_sys = organic_separation_system(ins = (mixed_oxidation_products, fresh_EA), 
-                                                                     T_in = 273.15 + 70)
+    organic_phase_sys = organic_separation_system(ins = (mixed_oxidation_products, 
+                                                         fresh_EA), 
+                                                  T_in = 273.15 + 70)
    
-    organic_phase_for_separation = organic_phase_sys.outs[2]
+    organic_phase_for_separation = organic_phase_sys.outs[1]
     primary_separation_sys = primary_separation_system(ins = organic_phase_for_separation, 
-                                                                          Tin = 240+273.15)
+                                                       Tin = 240+273.15)
     nonanoic_acid_crude_product, AA_crude_product, epoxy_stearic_acid_bottoms, = primary_separation_sys.outs
     
-    secondary_separation_sys = secondary_separation_system(ins = (AA_crude_product,water_for_extraction,solvent_for_extraction),
-                                                                   # recovered_NMS_solvent_stream),
+    secondary_separation_sys = secondary_separation_system(ins = (AA_crude_product,
+                                                                  water_for_extraction,
+                                                                  solvent_for_extraction),
+                                                                    # recovered_NMS_solvent_stream),
                                                            Tin = 273.15 + 200)
     
     NMS_solvent_MCA_extract, recovered_raffinate_solvent, AA_high_purity_product, = secondary_separation_sys.outs
