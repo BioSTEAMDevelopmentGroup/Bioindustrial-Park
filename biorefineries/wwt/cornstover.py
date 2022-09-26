@@ -51,7 +51,7 @@ def create_cs_comparison_systems(biodegradability=1): # will be multiplied by 0.
         'system_name': 'cornstover_sys',
         'create_wastewater_process': wwt_kwdct,
         'BT': 'BT',
-        'new_wwt_connections': {'sludge': ('M501', 0), 'biogas': ('BT', 1)},
+        'new_wwt_connections': {'sludge': ('slurry_mixer', 1), 'biogas': ('gas_mixer', 0)},
         'CF_dct': CF_dct,
         }
     exist_sys, new_sys = create_comparison_systems(info, cs, sys_dct)
@@ -92,8 +92,8 @@ def create_cs_comparison_models():
             'PT glucan-to-glucose': ('reactions', 0),
             'PT xylan-to-xylose': ('reactions', 8),
             'EH glucan-to-glucose': ('saccharification', 2),
-            'FERM glucan-to-product': ('cofermentation', 0),
-            'FERM xylan-to-product': ('cofermentation', 4),
+            'FERM glucose-to-product': ('cofermentation', 0),
+            'FERM xylose-to-product': ('cofermentation', 4),
             },
         'BT': 'BT',
         'BT_eff': ('boiler_efficiency', 'turbogenerator_efficiency'),

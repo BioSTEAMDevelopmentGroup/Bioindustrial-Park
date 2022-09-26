@@ -542,7 +542,18 @@ RIN_per_gal = 1.843 # $/liquid gal
 LNG_gal_to_Btu = 84820 # HHV, https://h2tools.org/hyarc/calculator-tools/lower-and-higher-heating-values-fuels
 RIN_per_Btu = RIN_per_gal / LNG_gal_to_Btu # $/Btu
 RIN_g_per_Btu = 0.0191 # HHV, https://h2tools.org/hyarc/calculator-tools/lower-and-higher-heating-values-fuels
-RIN_price = RIN_per_Btu / RIN_g_per_Btu * 1e3 # $/kg
+RIN_price = RIN_per_Btu / RIN_g_per_Btu * 1e3 # $1.14/kg
+
+#!!! NEED TO DOUBLE-CHECK THE UNIT OF RIN
+# is it in $/gal LNG or $/ethanol gallon equivalent?
+# (the above calculation is for $/gal LNG)
+# if for $/ethanol gallon equivalent
+HHV_natural_gas = 52.21 # MJ/kg
+Btu_per_MJ = 0.001055
+HHV_natural_gas /= Btu_per_MJ # Btu/kg
+HHV_ethanol = 84530 # Btu/gal
+natural_gas_to_ethanol = HHV_natural_gas/HHV_ethanol # gal ethanol/kg natural gas
+RIN_price2 = RIN_per_gal * natural_gas_to_ethanol #  $1.08/kg
 
 # Wastewater disposal (page 9 of Schueller)
 # COD excess cost is $0.127/0.2065 per lb ($280/455 per tonne), average to $0.16675/lb, or 0.3676/kg

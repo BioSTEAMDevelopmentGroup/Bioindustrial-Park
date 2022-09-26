@@ -67,7 +67,7 @@ def create_comparison_systems(info, functions, sys_dct={}):
         for info in infos:
             if isinstance(info, str): # stream info given as stream ID
                 streams.append(getattr(s_reg, info))
-            else: # stream info given as source unit ID, # in outs
+            else: # stream info given as source unit ID and sequence in outs
                 streams.append(getattr(u_reg, info[0]).outs[info[1]])
         return streams
 
@@ -196,7 +196,7 @@ def simulate_systems(exist_sys, new_sys, info):
     print(f'\nNew system IRR: {new_tea.solve_IRR():.2%}')
     FERM_product = info['FERM_product']
     for sys in (exist_sys, new_sys):
-        for fn in (get_MPSP, get_GWP):
+        for fn in (get_MPSP, get_GWP): # allocate based on value
             fn(sys, FERM_product)
     get_COD_breakdown(getattr(new_sys.flowsheet.unit, f'S{info["WWT_ID"]}04').ins[0])
 

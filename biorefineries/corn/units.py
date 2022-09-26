@@ -303,6 +303,9 @@ class PlantAir_CIP_WasteWater_Facilities(bst.Facility):
     def __init__(self, ID, corn):
         self.corn = corn
         super().__init__(ID)
+        F_BM = {'Facilities': 1}
+        F_BM.update(self.F_BM)
+        self.F_BM = F_BM
         
     def _run(self):
         pass

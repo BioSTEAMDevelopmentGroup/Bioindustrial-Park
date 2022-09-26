@@ -92,7 +92,7 @@ def create_sc1g_comparison_models():
         'fermentor': 'R301',
         'reactions': {
             'PT glucan-to-glucose': ('hydrolysis_reaction', ),
-            'FERM glucan-to-product': ('fermentation_reaction', ),
+            'FERM glucose-to-product': ('fermentation_reaction', ),
             },
         'BT': 'BT401',
         'BT_eff': ('boiler_efficiency', 'turbogenerator_efficiency'),
