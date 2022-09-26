@@ -275,7 +275,9 @@ def create_lipid_pretreatment_system(ins, outs):
           dict(ID='wastewater',
                price=price['Waste'])]
 )
-def create_transesterification_and_biodiesel_separation_system(ins, outs):
+def create_transesterification_and_biodiesel_separation_system(ins, outs,
+        transesterification_reactions=None,
+    ):
     ### Streams ###
     
     oil, = ins
@@ -341,8 +343,10 @@ def create_transesterification_and_biodiesel_separation_system(ins, outs):
     S401 = bst.FakeSplitter('S401')
     
     # First Reactor
-    R401 = units.Transesterification('R401', efficiency=0.90, excess_methanol=1.,
-                                     T=333.15, x_catalyst=x_cat)
+    R401 = units.Transesterification('R401', 
+        efficiency=0.90, excess_methanol=1., T=333.15, x_catalyst=x_cat,
+        transesterification=transesterification_reactions,
+    )
     
     # Centrifuge to remove glycerol
     C401 = units.LiquidsSplitCentrifuge('C401',
@@ -358,8 +362,10 @@ def create_transesterification_and_biodiesel_separation_system(ins, outs):
     P405 = units.Pump('P405')
     
     # Second Reactor
-    R402 = units.Transesterification('R402', efficiency=0.90, excess_methanol=1., 
-                                     T=333.15, x_catalyst=x_cat)
+    R402 = units.Transesterification('R402',
+        efficiency=0.90, excess_methanol=1., T=333.15, x_catalyst=x_cat,
+        transesterification=transesterification_reactions,
+    )
     @R402.add_specification
     def adjust_feed_to_reactors():
         R402._run()
@@ -554,6 +560,7 @@ def create_transesterification_and_biodiesel_separation_system(ins, outs):
     D402.outs[0].imol['Methanol', 'Glycerol', 'Water'] = [0.00127, 3.59e-05, 0.0244]
     
     bst.mark_disjunction(P411-0)
+    T405.outs[0].hidden_connection(T406)
     
 
 @SystemFactory(

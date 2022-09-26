@@ -110,7 +110,7 @@ chems = tmo.Chemicals([
     tmo.Chemical('Methyl_palmitoleate',search_ID ='1120-25-8'),
     
 ## Extra chems for lipidcane compatibility
-    tmo.Chemical('Monoolein', search_ID = '111-03-5'),
+    tmo.Chemical('MonoOlein', search_ID = '111-03-5'),
     tmo.Chemical('DiOlein', search_ID = '2465-32-9'),
    
     
