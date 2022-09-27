@@ -199,7 +199,7 @@ def add_urea_MgSO4_nutrients(fermentor, seedtrain=None):
             urea.imass['Urea'] = 0.5 * F_vol
             MgSO4.imass['MgSO4'] = 0.04 * F_vol
             
-        @fermentor.add_specification(run=True)
+        @fermentor.add_specification(run=True, impacted_units=[Urea_storage, MgSO4_storage])
         def adjust_urea_and_MgSO4_feed_to_fermentor():
             feed, seed, *others, urea, MgSO4, = fermentor.ins
             if 'Lipid' in feed.chemicals:
@@ -210,12 +210,10 @@ def add_urea_MgSO4_nutrients(fermentor, seedtrain=None):
             MgSO4.imass['MgSO4'] = 0.04 * F_vol
             S301.ins[0].mix_from(S301.outs)
             S302.ins[0].mix_from(S302.outs)
-            for i in Urea_storage.path_until(fermentor): i.run()
-            for i in MgSO4_storage.path_until(fermentor): i.run()
     else:
         fermentor.ins.append(Urea_storage-0)
         fermentor.ins.append(MgSO4_storage-0)
-        @fermentor.add_specification(run=True)
+        @fermentor.add_specification(run=True, impacted_units=[Urea_storage, MgSO4_storage])
         def adjust_nutrients_feed_to_fermentor():
             feed, *others, urea, MgSO4, = fermentor.ins
             if 'Lipid' in feed.chemicals:
@@ -224,8 +222,6 @@ def add_urea_MgSO4_nutrients(fermentor, seedtrain=None):
                 F_vol = sum([i.F_vol for i in others], feed.F_vol)
             urea.imass['Urea'] = 0.5 * F_vol
             MgSO4.imass['MgSO4'] = 0.04 * F_vol
-            for i in Urea_storage.path_until(fermentor): i.run()
-            for i in MgSO4_storage.path_until(fermentor): i.run()
 
 def add_urea_nutrient(fermentor, seedtrain=None):
     urea = bst.Stream('urea', price=90/907.185) # https://www.alibaba.com/product-detail/High-Quality-UREA-Fertilizer-Factory-price_1600464698965.html?spm=a2700.galleryofferlist.topad_classic.d_title.a69046eeVn83ML
@@ -250,7 +246,7 @@ def add_urea_nutrient(fermentor, seedtrain=None):
             F_vol = sum([i.F_vol - i.ivol['Lipid'] for i in feeds])
             urea.imass['Urea'] = 0.5 * F_vol
             
-        @fermentor.add_specification(run=True)
+        @fermentor.add_specification(run=True, impacted_units=[Urea_storage])
         def adjust_urea_and_MgSO4_feed_to_fermentor():
             feed, seed, *others, urea, = fermentor.ins
             if 'Lipid' in feed.chemicals:
@@ -260,10 +256,9 @@ def add_urea_nutrient(fermentor, seedtrain=None):
             urea.imass['Urea'] = 0.5 * F_vol
             S301.ins[0].mix_from(S301.outs)
             Urea_storage.ins[0].imol['Urea'] = S301.ins[0].imol['Urea']
-            for i in Urea_storage.path_until(fermentor): i.run()
     else:
         fermentor.ins.append(Urea_storage-0)
-        @fermentor.add_specification(run=True)
+        @fermentor.add_specification(run=True, impacted_units=[Urea_storage])
         def adjust_nutrients_feed_to_fermentor():
             feed, *others, urea, = fermentor.ins
             if 'Lipid' in feed.chemicals:
@@ -271,7 +266,6 @@ def add_urea_nutrient(fermentor, seedtrain=None):
             else:
                 F_vol = sum([i.F_vol for i in others], feed.F_vol)
             Urea_storage.ins[0].imass['Urea'] = 0.5 * F_vol
-            for i in Urea_storage.path_until(fermentor): i.run()
             
 # %% Juicing and evaporation
 
@@ -605,11 +599,10 @@ def create_ethanol_purification_system_after_beer_column(ins, outs, IDs={}):
     D303-1-P303
     M304.denaturant_fraction = 0.022
     
-    @M304.add_specification(run=True)
+    @M304.add_specification(run=True, impacted_units=[T303])
     def adjust_denaturant():
         pure_ethanol = M304.ins[1]
         denaturant.imol['Octane'] = M304.denaturant_fraction * pure_ethanol.F_mass / 114.232
-        for i in T303.path_until(M304): i._run()
     
     (denaturant-T303-P305-0, U301-1-H304-0-T302-0-P304-0)-M304-T304
 
