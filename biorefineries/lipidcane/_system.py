@@ -517,7 +517,7 @@ def create_transesterification_and_biodiesel_separation_system(ins, outs,
     #  0.4 wt % free lipids (lower to 0.35)
     
     # Find Water Flow
-    @T405.add_specification
+    @T405.add_specification(prioritize=True)
     def adjust_biodiesel_wash_water():
         total_glycerol =  (C401.outs[1].imol['Glycerol'] + R402.outs[0].imol['Glycerol'])
         wash_water = (x_water / (1 - x_water) * total_glycerol

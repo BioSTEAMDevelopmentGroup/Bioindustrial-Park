@@ -99,7 +99,6 @@ def crude_HOSO_oil_to_biodiesel(ins,outs):
    
     
 ob0 = crude_HOSO_oil_to_biodiesel()
-ob0.prioritize_unit(F.T405)
 ob0.simulate()
 ob0.show()
 
