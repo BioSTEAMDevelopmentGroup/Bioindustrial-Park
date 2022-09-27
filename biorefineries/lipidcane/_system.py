@@ -560,7 +560,6 @@ def create_transesterification_and_biodiesel_separation_system(ins, outs,
     D402.outs[0].imol['Methanol', 'Glycerol', 'Water'] = [0.00127, 3.59e-05, 0.0244]
     
     bst.mark_disjunction(P411-0)
-    T405.outs[0].hidden_connection(T406)
     
 
 @SystemFactory(
