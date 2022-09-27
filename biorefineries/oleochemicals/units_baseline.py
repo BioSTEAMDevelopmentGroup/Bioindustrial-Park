@@ -132,7 +132,8 @@ class OxidativeCleavageReactor(bst.ContinuousReactor):
         X2 = 0.2
         # X3 = 0.2
         Product_formation = PRxn([Rxn('MDHSA + 1.5 Oxygen  -> Pelargonic_acid + Monomethyl_azelate','MDHSA', X = X1),
-                                  Rxn('MDHSA  ->  Caprylic_acid + Monomethyl_azelate','MDHSA', X = X2)])                        
+                                  Rxn('MDHSA  ->  Caprylic_acid + Monomethyl_azelate','MDHSA', X = X2)
+                                  ])                        
         #TODO.xxx check again possible decarboxylation https://doi.org/10.1016/j.renene.2018.01.107
         #TODO.xxx check again Organic Reactions in Strong Alkalis. Part V.l Alkali Fusion of Epoxides and Ethers 
 

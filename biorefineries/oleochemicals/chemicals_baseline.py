@@ -163,15 +163,22 @@ chems = tmo.Chemicals([
     ##Hence using polystyrene
     tmo.Chemical('Polystyrene'),
     ##Hence using polystyrene
+    tmo.Chemical('Tripalmitin')
   ])
 chems.polystyrene_based_catalyst.copy_models_from(chems.Polystyrene,
                                         ['Hvap','Psat','sigma', 
                                          'epsilon', 'kappa', 'V',
                                          'Cn', 'mu'])
+PPP = tmo.Chemical('Tripalmitin')
+TAGs = chems['OOO','LLL','OOL','LLO','SOO','PLO',
+             'PoOO','POO','POS','POP','PLS']
+for i in TAGs:
+    i.copy_models_from(PPP, ['mu'])
+    
 for chemical in chems: chemical.default()
 
 chems.compile()
-chems.define_group('TAG', ( 'OOO','LLL','OOL',
+chems.define_group('TAG', ('OOO','LLL','OOL',
                            'LLO','SOO','PLO',
                            'PoOO','POO','POS',
                            'POP','PLS'))
@@ -190,6 +197,7 @@ chems.define_group('Biodiesel', ('Methyl_oleate',
                                  'Methyl_stearate',
                                  'Methyl_linoleate',
                                  'Methyl_palmitoleate'))
+
 chems.set_synonym('Water', 'H2O')
 chems.set_synonym('Phosphatidylinositol','PL')
 chems.set_synonym('MonoOlein', 'MAG')
