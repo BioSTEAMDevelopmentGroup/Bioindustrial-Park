@@ -24,17 +24,28 @@ import thermosteam as tmo
 Cobalt_chloride = tmo.Chemical('Cobalt_chloride',
                                search_ID = '7646-79-9',
                                phase = 's')
+
+    
 tungsten = tmo.Chemical('tungsten')
 chems = tmo.Chemicals([
+    #Dihydroxylation chemicals
     tmo.Chemical('Hydrogen_peroxide', phase='l'),
     tmo.Chemical('Water'),
+    # #Chemical for acid degumming 
+    tmo.Chemical('Citric_acid'),
     #look into phase of the below
     tmo.Chemical('MDHSA', search_ID = '1115-01-1'),
     tmo.Chemical('Pelargonic_acid'),
     tmo.Chemical('Azelaic_acid'),
+# Products of oxidative_cleavage
     tmo.Chemical('Monomethyl_azelate'),
     tmo.Chemical('Suberic_acid'),
     tmo.Chemical('Caprylic_acid'),
+    tmo.Chemical('Hexanoic_acid'),
+    tmo.Chemical('Heptanoic_acid'),
+    tmo.Chemical('Hexanoic_acid'),
+    tmo.Chemical('Malonic_acid'),
+# Oxidants used
     tmo.Chemical('Nitrogen'),
     tmo.Chemical('Oxygen'),
     tmo.Chemical('Methanol'),
@@ -175,6 +186,7 @@ def create_new_chemical(ID, phase='s', **constants):
         chems.append(solid)
         return solid
     
+  
 HCl = create_new_chemical('HCl', formula='HCl')
 NaOH = create_new_chemical('NaOH', formula='NaOH')
    
@@ -182,21 +194,6 @@ NaOH = create_new_chemical('NaOH', formula='NaOH')
 for chemical in (HCl, NaOH):
         V = fn.rho_to_V(rho=1e5, MW=chemical.MW)
         chemical.V.add_model(V, top_priority=True)
-
-
-# chems['HCl'].V = fn.rho_to_V(rho=1e5, MW=chems['HCl'].MW)
-# chems['NaOH'].V = fn.rho_to_V(rho=1e5, MW=chems['NaOH'].MW)
-# tmo.Chemical('NaOH').V.g.method_P = 'ABBOTT'
-# for chemical in (chems.HCl, chems.NaOH):
-#         V = fn.rho_to_V(rho=1e5,
-#                         MW=chemical.MW)
-#         chemical.V.g.add_method(f= V) #, #top_priority=True)
-# chems['MonoOlein'].copy_models_from (chems.Monopalmitin,
-#                                             ['V', 'sigma',
-#                                              'kappa', 'Cn'])
-# chems['DiOlein'].copy_models_from (chems.Dipalmitin,
-#                                             ['V', 'sigma',
-#                                              'kappa', 'Cn'])
 
 
 PPP = tmo.Chemical('Tripalmitin')
