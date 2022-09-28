@@ -20,9 +20,9 @@ from biosteam.units.design_tools import compute_vacuum_system_power_and_cost
 from biosteam.units.design_tools import PressureVessel
 #This is based on the Novomont patent released in 2016
 ##dihydroxylation_reaction to dihydroxylate the unsaturated feed
-
 ##TODO.xxx check with Yoel if the Vmax is right (1MMGal in ft3), mentioned in literature are 80L and 50L
 # TODO.xxx  account for catalyst volume   
+
 @SystemFactory(
     ID = 'crude_HOSO_oil_to_biodiesel',
     ins=[dict(ID='crude_vegetable_oil',
@@ -38,7 +38,9 @@ from biosteam.units.design_tools import PressureVessel
               POS = 0.8,
               POP = 0.25,
               PLS = 0.25,
-              PL=0.99),
+              PL=0.99,
+              MAG = 0,
+              DAG = 0),
          dict(ID = 'water_for_degumming',
               Water = 100)
          ],
@@ -95,8 +97,6 @@ def crude_HOSO_oil_to_biodiesel(ins,outs):
                                                                         outs = (biodiesel,
                                                                                 crude_glycerol,
                                                                                 wastewater))
-   
-    
 ob0 = crude_HOSO_oil_to_biodiesel()
 ob0.simulate()
 ob0.show()
