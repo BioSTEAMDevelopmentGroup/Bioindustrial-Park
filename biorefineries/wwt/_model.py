@@ -641,8 +641,8 @@ def add_metrics(model, model_dct, f, u, s, get_obj):
 
     tea = sys.TEA
     product = get_obj(s, 'FERM_product')
-    gal_or_kg = 'gal' if product.ID=='ethanol' else 'kg'
-    factor = 2.9867 if product.ID=='ethanol' else 1. # 2.9867 is cs.ethanol_density_kggal
+    gal_or_kg = 'gal' if 'ethanol' in product.ID else 'kg'
+    factor = 2.9867 if 'ethanol' in product.ID else 1. # 2.9867 is cs.ethanol_density_kggal
 
     ww = s.search('ww')
     X = model_dct['wwt_ID']
