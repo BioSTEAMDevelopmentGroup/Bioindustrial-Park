@@ -32,11 +32,12 @@ CF_dct = { # all streams are feeds
     'CSL': ('CSL',),
     'DAP': ('DAP',),
     'FGD_lime': ('Lime', 0.4513), # lime and water
-    'H3PO4': ('H3PO4',),
+    'H3PO4': ('H3PO4',), # moisture content already adjusted
     'lime': ('CaO', 0.046), # CaO and water
     'natural_gas': ('CH4',),
     'polymer': ('Polymer'),
     'sugarcane': ('Sugarcane',), # moisture content already adjusted
+    'urea': ('Urea',),
     }
 
 
@@ -132,11 +133,11 @@ if __name__ == '__main__':
     # exist_sys, new_sys = simulate_sc2g_systems(biodegradability=1)
     # exist_model, new_model = create_sc2g_comparison_models()
     exist_model, new_model = evaluate_sc2g_models(
-        include_baseline=True,
-        include_uncertainty=True,
-        # include_BMP=True,
-        N_uncertainty=100,
+        # include_baseline=True,
+        # include_uncertainty=True,
+        include_BMP=True,
+        # N_uncertainty=100,
         # uncertainty_skip_exist=True,
-        # N_BMP=10,
+        N_BMP=100,
         # BMPs=(0.5, 0.9499,), # allow for minor error
         )

@@ -34,8 +34,8 @@ CF_dct = {
     'DAP': ('DAP',),
     'denaturant': ('Denaturant'),
     'FGD_lime': ('Lime', 0.4513), # lime and water
-    'H3PO4': ('H3PO4',),
-    'HCl': ('HCl',),
+    'H3PO4': ('H3PO4',), # moisture content already adjusted
+    'HCl': ('HCl',), # moisture content already adjusted
     'lime': ('CaO', 0.046), # CaO and water
     'methanol': ('Methanol',),
     'NaOH': ('NaOH',),
@@ -43,6 +43,7 @@ CF_dct = {
     'oilcane': ('Oilcane',), # moisture content already adjusted
     'polymer': ('Polymer',),
     'pure_glycerine': ('GlycerinPure',),
+    'urea': ('Urea',),
     ##### Co-products #####
     'biodiesel': ('Biodiesel',), # has <0.01 wt% impurities
     'crude_glycerol': ('GlycerinCrude',),
@@ -145,11 +146,11 @@ if __name__ == '__main__':
     # exist_sys, new_sys = simulate_oc2g_systems(biodegradability=1)
     # exist_model, new_model = create_oc2g_comparison_models()
     exist_model, new_model = evaluate_oc2g_models(
-        include_baseline=True,
-        include_uncertainty=True,
-        # include_BMP=True,
-        N_uncertainty=100,
+        # include_baseline=True,
+        # include_uncertainty=True,
+        include_BMP=True,
+        # N_uncertainty=100,
         # uncertainty_skip_exist=True,
-        # N_BMP=10,
+        N_BMP=100,
         # BMPs=(0.5, 0.9499,), # allow for minor error
         )

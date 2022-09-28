@@ -29,15 +29,14 @@ CF_dct = {
     ##### Feeds #####
     'denaturant': ('Denaturant'),
     # 'dryer_natural_gas': ('CH4',), # used to be in the registry, but not any more
-    'H3PO4': ('H3PO4',),
+    'H3PO4': ('H3PO4',), # moisture content already adjusted
     'lime': ('CaO', 0.046), # CaO and water
     'polymer': ('Polymer',),
     'sugarcane': ('Sugarcane',), # moisture content already adjusted
     ##### Co-products #####
-    # 'Yeast': ('Yeast',), # no price considered, no GWP considered (probably used in fermentation)
     # `fiber_fines`, `wastewater`, `vinasse` taken care of by WWT
     # `filter_cake` taken care of by BT
-    # `s41` (from `T302`) is empty
+    # 'Yeast': ('Yeast',), # no price considered, no GWP considered (probably used in fermentation)
     }
 
 

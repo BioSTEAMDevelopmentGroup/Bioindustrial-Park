@@ -27,11 +27,11 @@ info = {
 
 CF_dct = {
     ##### Feeds #####
-    'alpha_amylase': ('AlphaAmylase',), # 0.00082 soluble protein and water #!!! check concentration
+    'alpha_amylase': ('AlphaAmylase',), # 0.00082 soluble protein and water
     'ammonia': ('NH3',),
     'corn': ('Corn',), # adjust for the moisture content
     'denaturant': ('Denaturant',),
-    'gluco_amylase': ('GlucoAmylase',), # 0.0011 soluble protein and water #!!! check concentration
+    'gluco_amylase': ('GlucoAmylase',), # 0.0011 soluble protein and water
     'lime': ('CaO',),
     'natural_gas': ('CH4',),
     'steam':('Steam',),

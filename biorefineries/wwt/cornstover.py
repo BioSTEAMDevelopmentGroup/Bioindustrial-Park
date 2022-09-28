@@ -128,11 +128,11 @@ if __name__ == '__main__':
     # exist_sys, new_sys = simulate_cs_systems(biodegradability=1)
     # exist_model, new_model = create_cs_comparison_models()
     exist_model, new_model = evaluate_cs_models(
-        include_baseline=True,
-        include_uncertainty=True,
-        # include_BMP=True,
-        N_uncertainty=100,
+        # include_baseline=True,
+        # include_uncertainty=True,
+        include_BMP=True,
+        # N_uncertainty=100,
         # uncertainty_skip_exist=True,
-        # N_BMP=10,
+        N_BMP=100,
         # BMPs=(0.5, 0.9499,), # allow for minor error
         )
