@@ -120,10 +120,9 @@ def summarize_BMPs(
             except:
                 per = 'kg'
                 MPSP.extend(get_vals(df, f'MPSP [$/{per}]', indices))
-
-            GWP.extend(get_vals(df, f'GWP [kg CO2/{per}]', indices))
+            GWP.extend(get_vals(df, f'Product GWP disp [kg CO2/{per}]', indices))
             COD_price.extend(get_vals(df, 'COD price [$/tonne]', indices))
-            COD_GWP.extend(get_vals(df, 'COD GWP [kg CO2/tonne]', indices))
+            COD_GWP.extend(get_vals(df, 'COD GWP disp [kg CO2/tonne]', indices))
 
     MPSP_df = pd.DataFrame.from_dict(MPSPs)
     MPSP_df.index = pd.MultiIndex.from_product(
@@ -166,7 +165,8 @@ def summarize_spearman(
             key_GWP = f'Product GWP disp [kg CO2/{unit}]'
             tops = []
             for df in dfs:
-                df['abs_MPSP'] = df[key_MPSP].abs()
+                try: df['abs_MPSP'] = df[key_MPSP].abs()
+                except: breakpoint()
                 df['abs_GWP'] = df[key_GWP].abs()
                 select = [df.sort_values(by=[key], ascending=False)[:cutoff_rank]
                         for key in ('abs_MPSP', 'abs_GWP')]
@@ -187,6 +187,8 @@ def summarize_spearman(
 # %%
 
 if __name__ == '__main__':
-    # summarize_baselines()
-    # summarize_BMPs()
-    summarize_spearman()
+    summarize_baselines()
+    summarize_BMPs()
+    summarize_spearman(
+        N=100,
+        )
