@@ -66,8 +66,8 @@ def test_cn_baseline():
 
     print_comparison('Corn', 'gal', MPSP_original, None, MPSP_wwt, GWP_wwt)
     
-    simulated = [MPSP_original, MPSP_wwt]
-    cached = [1.449975, 1.473153783329886]
+    simulated = [MPSP_original, MPSP_wwt, GWP_wwt]
+    cached = [1.449975, 1.473153783329886, 2.9232636178160716]
     assert_allclose(simulated, cached, rtol=1e-2)
     return simulated
 
