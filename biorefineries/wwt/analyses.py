@@ -157,7 +157,7 @@ def summarize_spearman(
     get_path = lambda module, kind, N: os.path.join(dir_path, f'{module}_{kind}_{N}.xlsx')
     read_df = lambda path: pd.read_excel(pd.ExcelFile(path), 'Spearman', index_col=[0, 1])
     kinds = ('exist', 'new')
-    with pd.ExcelWriter(os.path.join(dir_path, f'summary_uncertainties_{N}.xlsx')) as writer:
+    with pd.ExcelWriter(os.path.join(dir_path, f'summary_spearman_{N}.xlsx')) as writer:
         for module in modules:
             dfs = [read_df(get_path(module, kind, N)).iloc[:, :2] for kind in kinds]
             unit = 'gal' if module!='la' else 'kg'
