@@ -18,13 +18,12 @@ from biorefineries.lipidcane import create_transesterification_and_biodiesel_sep
 from biorefineries.lipidcane import units
 from biosteam.units.design_tools import compute_vacuum_system_power_and_cost
 from biosteam.units.design_tools import PressureVessel
-#This is based on the Novomont patent released in 2016
-##dihydroxylation_reaction to dihydroxylate the unsaturated feed
 
-##TODO.xxx check with Yoel if the Vmax is right (1MMGal in ft3), mentioned in literature are 80L and 50L
-# TODO.xxx  account for catalyst volume   
+# The following process is based on the Novomont patent released in 2016
+
 @SystemFactory(
     ID = 'crude_HOSO_oil_to_biodiesel',
+# The inlet composition of the oil is based on available literature
     ins=[dict(ID='crude_vegetable_oil',
               Water=0.01,
               OOO = 65,
@@ -38,45 +37,77 @@ from biosteam.units.design_tools import PressureVessel
               POS = 0.8,
               POP = 0.25,
               PLS = 0.25,
-              PL=0.99),
+              PL=0.99,
+              MAG = 0,
+              DAG = 0),
          dict(ID = 'water_for_degumming',
-              Water = 100)
+              Water = 100,
+              T = 25 + 273.15),
+         dict(ID = 'water_for_degumming_2',
+              Water = 100,
+              T= 25+ 273.15),
+         dict(ID = 'acid_for_degumming',
+              Citric_acid = 100,
+              T = 25+273.15)
          ],
     outs=[
           dict(ID='polar_lipids'),
-           dict(ID='biodiesel'),
-           dict(ID = 'crude_glycerol'),
-           dict(ID = 'wastewater'),
-          ],
+          dict(ID ='degumming_wastewater'),
+          dict(ID='biodiesel'),
+          dict(ID = 'crude_glycerol'),
+          dict(ID = 'wastewater'),
+            ],
     fixed_outs_size = True,     
               )
-# Crude rapeseed and sunflower oils were degummed by heating the oils to 80 °C, 
-# mixed with water (to 5% vol.) and stirred for 15 min by magnetic stirrer. Then, the mixture 
-# was centrifuged for 20 minutes.
 
 def crude_HOSO_oil_to_biodiesel(ins,outs):
-    crude_vegetable_oil, water_for_degumming, = ins
-    polar_lipids,biodiesel,crude_glycerol,wastewater, = outs
-    # biodiesel,crude_glycerol,wastewater, = outs
-    # add citation for this here Degumming of rapeseed and sunflower oils 
-    # add % of PL removed using water degumming
-    
-    M00 = bst.MixTank(ID = 'Mix_tank_for_degumming',
-                                         ins = (crude_vegetable_oil,
-                                                water_for_degumming))
-    def adjust_degumming_water(): 
-      #based on saved doc on degumming 
-      water_for_degumming.F_vol = 0.05* crude_vegetable_oil.F_vol
-      M00.add_specification(adjust_degumming_water, run=True)  
-    
-    M001 = bst.LiquidsSplitCentrifuge(ID = 'Centrifuge_for_PL_removal',
-                                      ins = M00-0,
+    crude_vegetable_oil, water_for_degumming,acid_for_degumming,water_for_degumming_2 = ins
+    polar_lipids,degumming_wastewater,biodiesel,crude_glycerol,wastewater, = outs
+
+# Storage tanks and pumping the oil out
+    T101 = bst.units.StorageTank('T101',
+                              ins = crude_vegetable_oil,
+                              outs ='biodiesel_to_pump' )
+    P101 = bst.units.Pump('P101',
+                      ins = T101-0,
+                      outs = 'biodiesel_to_reactor_mixer')
+# Using just acid degumming as the only degumming method (Ask Yoel if that is okay,
+    H001 = bst.HXutility('Crude_oil_heating',
+                         ins = P101-0,
+                         T = 273.15 + 80)
+#Mixing required qunatities of acid solution and veg oil   
+    M001 = bst.MixTank(ID = 'Mix_tank_for_degumming',
+                       ins = (H001-0,
+                              water_for_degumming,
+                              acid_for_degumming,
+                       ))
+    def adjust_degumming_components(): 
+      acid_for_degumming.F_mass = 0.3 * water_for_degumming.F_mass
+      (acid_for_degumming + water_for_degumming).F_vol =  0.02 * H001-0
+      M001.add_specification(adjust_degumming_components, run=True) 
+      
+#Cooling the mixture       
+    H002 = bst.HXutility('Crude_oil_mix_cooling',
+                         ins = M001-0,
+                         T = 273.15 + 25)
+#Adding 1% water solution to the mix
+    M002 = bst.MixTank(ID = 'Second_Mix_tank_for_degumming',
+                                         ins = (H002-0,
+                                                water_for_degumming_2))
+                                                                                                   
+    def adjust_degumming_components_2():
+       water_for_degumming_2.F_vol = 0.01*H002-0            
+       M002.add_specification(adjust_degumming_components_2,
+                                     run=True)  
+#Centrifuging the degummed oil out, assuming 97% extraction using acid degumming
+    C001 = bst.LiquidsSplitCentrifuge(ID = 'Centrifuge_for_PL_removal',
+                                       ins = M002-0,
                                       outs = ('degummed_oil', 
                                               polar_lipids),
-                                      split = dict(PL = 0,
+                                      split = dict(PL = 0.3,
                                                    TAG = 1,
-                                                   Water = 0))
-    
+                                                   Water = 0,
+                                                   Citric_acid = 0))    
     
     reactions = tmo.ParallelReaction([
         tmo.Reaction('OOO + 3Methanol -> 3Methyl_oleate + Glycerol', reactant='OOO',  X=0.90),
@@ -91,142 +122,133 @@ def crude_HOSO_oil_to_biodiesel(ins,outs):
         tmo.Reaction('POP + 3Methanol -> 2Methyl_palmitate + Methyl_oleate + Glycerol', reactant='POP',  X=0.90),
         tmo.Reaction('PLS + 3Methanol -> Methyl_palmitate + Methyl_linoleate + Methyl_stearate + Glycerol', reactant='PLS',  X=0.90),
     ])
-    sys = lc.create_transesterification_and_biodiesel_separation_system(ins = M001-0,
-                                                                        transesterification_reactions = reactions,
+    sys = lc.create_transesterification_and_biodiesel_separation_system(ins = C001-0,
                                                                         outs = (biodiesel,
-                                                                                crude_glycerol,
-                                                                                wastewater))
-   
-    
+                                                                        crude_glycerol,
+                                                                        wastewater))
 ob0 = crude_HOSO_oil_to_biodiesel()
 ob0.simulate()
 ob0.show()
 
-# @SystemFactory(
-#     ID = 'dihydroxylation_reaction',
-#     ins = [dict(ID='biodiesel',
-#                 ),
-#            dict(ID='fresh_HP',
-#                 Hydrogen_peroxide = 100,
-#                 T = 298.15),
-#            dict(ID='water_for_dihydroxylation',
-#                 Water = 100,
-#                 T = 298.15),
-#            dict(ID = 'fresh_tungsetn_catalyst',
-#                 tungstic_acid = 100)],           
-#     outs = [dict(ID = 'diol_product'),
-#             dict(ID = 'water_for_reuse')
-#             ],
-#     fixed_outs_size = True,     
-#               )
+#After the oil is degummed, 
+# all the oil is directly sent to the dihydroxylation system
 
-# def dihydroxylation_system(ins,outs):
-#     biodiesel, fresh_HP, water_for_dihydroxylation, fresh_tunsgten_catalyst = ins
-#     diol_product,water_for_reuse = outs
-    
-# #Feedtanks and pumps
-# # Oleic_acid_feedtank
-#     T101 = bst.units.StorageTank('T101',
-#                               ins = biodiesel ,
-#                               outs ='biodiesel_to_pump' )
-#     P101 = bst.units.Pump('P101',
-#                       ins = T101-0,
-#                       outs = 'biodiesel_to_reactor_mixer')
+@SystemFactory(
+    ID = 'dihydroxylation_reaction',
+    ins = [dict(ID='biodiesel',
+                ),
+            dict(ID='fresh_HP',
+                Hydrogen_peroxide = 100,
+                T = 298.15),
+            dict(ID='water_for_dihydroxylation',
+                Water = 100,
+                T = 298.15),
+            dict(ID = 'fresh_tungsetn_catalyst',
+                tungstic_acid = 100)],           
+    outs = [dict(ID = 'diol_product'),
+            dict(ID = 'water_for_reuse')
+            ],
+    fixed_outs_size = True,     
+              )
 
-# # Fresh_Hydrogen_peroxide_feedtank
+def dihydroxylation_system(ins,outs):
+    biodiesel, fresh_HP, water_for_dihydroxylation, fresh_tunsgten_catalyst = ins
+    diol_product,water_for_reuse = outs
 
-#     T102 =  bst.units.StorageTank('T102',
-#                                ins = fresh_HP,
-#                                outs = 'fresh_HP_to_pump')
-#     P102 = bst.units.Pump('P102',
-#                       ins = T102-0,
-#                       outs = 'HP_to_mixer')
-# # Fresh_water_feedtank
-#     T103  = bst.units.StorageTank('T103_1',
-#                               ins = water_for_dihydroxylation,
-#                               outs = 'fresh_water_to_pump')
-#     P103 = bst.units.Pump('P103_1',
-#                       ins = T103-0,
-#                       outs ='water_to_mixer')
+# Fresh_Hydrogen_peroxide_feedtank
 
-# # Catalyst_feed_tank
-#     T104 = bst.units.StorageTank('T104',
-#                               ins = fresh_tunsgten_catalyst ,
-#                               outs = 'fresh_catalyst_to_pump')
+    T102 =  bst.units.StorageTank('T102',
+                                ins = fresh_HP,
+                                outs = 'fresh_HP_to_pump')
+    P102 = bst.units.Pump('P102',
+                      ins = T102-0,
+                      outs = 'HP_to_mixer')
+# Fresh_water_feedtank
+    T103  = bst.units.StorageTank('T103_1',
+                              ins = water_for_dihydroxylation,
+                              outs = 'fresh_water_to_pump')
+    P103 = bst.units.Pump('P103_1',
+                      ins = T103-0,
+                      outs ='water_to_mixer')
 
-#     def adjust_tungsten_catalyst_flow():
-#         fresh_tunsgten_catalyst.F_mass = biodiesel.F_mass * 48/10000
+# Catalyst_feed_tank
+    T104 = bst.units.StorageTank('T104',
+                              ins = fresh_tunsgten_catalyst ,
+                              outs = 'fresh_catalyst_to_pump')
+
+    def adjust_tungsten_catalyst_flow():
+        fresh_tunsgten_catalyst.F_mass = biodiesel.F_mass * 48/10000
       
-#     T104.add_specification(adjust_tungsten_catalyst_flow, run=True)
+    T104.add_specification(adjust_tungsten_catalyst_flow, run=True)
     
-# #Mixer for hydrogen_peroxide solution
-#     M101 = bst.units.Mixer('M101',
-#                         ins = (P102-0,                               
-#                                P103-0),
-#                         outs = 'feed_to_reactor_mixer')
+#Mixer for hydrogen_peroxide solution
+    M101 = bst.units.Mixer('M101',
+                        ins = (P102-0,                               
+                                P103-0),
+                        outs = 'feed_to_reactor_mixer')
     
 
-#     def adjust_HP_feed_flow(): 
-#       #conversion factor based on the patent  
-#        fresh_HP.F_mass = 0.6*0.2299999* biodiesel.F_mass
-#        water_for_dihydroxylation.F_mass = 0.4 *0.2299999 * biodiesel.F_mass
-#     M101.add_specification(adjust_HP_feed_flow, run=True)   
+    def adjust_HP_feed_flow(): 
+      #conversion factor based on the patent  
+        fresh_HP.F_mass = 0.6*0.2299999* biodiesel.F_mass
+        water_for_dihydroxylation.F_mass = 0.4 *0.2299999 * biodiesel.F_mass
+    M101.add_specification(adjust_HP_feed_flow, run=True)   
       
-# #Mixer for reactor feed, adds the Hydrogen_peroxide sol and oleic acid
-# #Need to add catalyst to it as a separate stream
-#     M102 = bst.units.Mixer('M102',
-#                         ins = (P101-0,
-#                                M101-0,
-#                                T104-0),
-#                         outs = 'feed_to_heat_exchanger')
+#Mixer for reactor feed, adds the Hydrogen_peroxide sol and oleic acid
+#Need to add catalyst to it as a separate stream
+    M102 = bst.units.Mixer('M102',
+                        ins = (P101-0,
+                                M101-0,
+                                T104-0),
+                        outs = 'feed_to_heat_exchanger')
 
-#     R101_H1 = bst.units.HXutility('R101_H1',
-#                              ins = M102-0,
-#                              outs = 'feed_to_oleochemicals_reactor',
-#                              T = 100 + 273.15
-#                              )
+    R101_H1 = bst.units.HXutility('R101_H1',
+                              ins = M102-0,
+                              outs = 'feed_to_oleochemicals_reactor',
+                              T = 100 + 273.15
+                              )
     
-#     R101 = units_baseline.DihydroxylationReactor('R101',
-#                                 ins = R101_H1-0, 
-#                                 outs = ('diol_product'),
-#                                 P = 101325,
-#                                 T = 62 + 273.15,
-#                                 V_max=133666, 
-#                                 # in m3 (equivalent to 1 MMGal), 
-#                                 # this is including catalyst volume
-#                                                               )
-#     R101_P1 = bst.units.Pump('R101_P1',
-#                              ins = R101-0,
-#                              outs = diol_product,
-#                              P = 20*10)
-#     #Vacuum system
-#     vacuum_results =  compute_vacuum_system_power_and_cost(
-#                       F_mass=0, F_vol=0,
-#                       P_suction=0.10*10e5,
-#                       vessel_volume= 133666,
-#                       vacuum_system_preference='Steam-jet ejector'
-#                       )
-#     R101_H2 = bst.units.HXutility('R101_H2',
-#                              ins = R101-1,
-#                              outs = 'condensed_water',
-#                              T = 20 + 273.15
-#                              )
+    R101 = units_baseline.DihydroxylationReactor('R101',
+                                ins = R101_H1-0, 
+                                outs = ('diol_product'),
+                                P = 101325,
+                                T = 62 + 273.15,
+                                V_max=133666, 
+                                # in m3 (equivalent to 1 MMGal), 
+                                # this is including catalyst volume
+                                                              )
+    R101_P1 = bst.units.Pump('R101_P1',
+                              ins = R101-0,
+                              outs = diol_product,
+                              P = 20*10)
+    #Vacuum system
+    vacuum_results =  compute_vacuum_system_power_and_cost(
+                      F_mass=0, F_vol=0,
+                      P_suction=0.10*10e5,
+                      vessel_volume= 133666,
+                      vacuum_system_preference='Steam-jet ejector'
+                      )
+    R101_H2 = bst.units.HXutility('R101_H2',
+                              ins = R101-1,
+                              outs = 'condensed_water',
+                              T = 20 + 273.15
+                              )
     
-# ## TODO.xxx Check with Yoel if the following specs are right, ask him how to 
-# ## get all the water in the liquid phase
-# ## TODO.xxx Check with Yoel if the vent.P pressure set is right
+## TODO.xxx Check with Yoel if the following specs are right, ask him how to 
+## get all the water in the liquid phase
+## TODO.xxx Check with Yoel if the vent.P pressure set is right
 
-#     C101 = bst.units.PolytropicCompressor('K', 
-#                                           ins= R101_H2-0,
-#                                           outs=water_for_reuse,
-#                                           vle = True,
-#                                           P=101325,
-#                                           eta=1)  
+    C101 = bst.units.PolytropicCompressor('K', 
+                                          ins= R101_H2-0,
+                                          outs=water_for_reuse,
+                                          vle = True,
+                                          P=101325,
+                                          eta=1)  
     
 
-# ob1 = dihydroxylation_system(ins=ob0.outs[2]) 
-# ob1.simulate()
-# ob1.show()
+ob1 = dihydroxylation_system(ins=ob0.outs[1]) 
+ob1.simulate()
+ob1.show()
     
 
 # ## oxidative_cleavage_system to cleave the dihydroxylated feed to 

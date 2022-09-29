@@ -130,16 +130,19 @@ class OxidativeCleavageReactor(bst.ContinuousReactor):
         X1 = 0.8
         # decarboxylations conversion
         X2 = 0.2
-        # X3 = 0.2
+        X3 = 0.2
+        X4 = 0.9
         Product_formation = PRxn([Rxn('MDHSA + 1.5 Oxygen  -> Pelargonic_acid + Monomethyl_azelate','MDHSA', X = X1),
-                                  Rxn('MDHSA  ->  Caprylic_acid + Monomethyl_azelate','MDHSA', X = X2)])                        
+                                 ])                        
         #TODO.xxx check again possible decarboxylation https://doi.org/10.1016/j.renene.2018.01.107
         #TODO.xxx check again Organic Reactions in Strong Alkalis. Part V.l Alkali Fusion of Epoxides and Ethers 
-
-        # Side_reaction = SRxn([Rxn('Pelargonic_acid   -> Caprylic_acid + carbon_dioxide ', 'Pelargonic_acid', X= X2),
-                                # Rxn('Monomethyl_azelate -> suberic_acid + carbon_dioxide', 'Monomethyl_azelate', X = X3),
-                              # ])
-        oxidative_cleavage_rxnsys = RxnSys(Product_formation)
+        ##We are only accounting for methyl_linoleate and methyl_palmitoleate not others because they apparently don't participate
+        Side_reaction = SRxn([Rxn('Pelargonic_acid   -> Caprylic_acid + carbon_dioxide ', 'Pelargonic_acid', X= X2),
+                              Rxn('Monomethyl_azelate -> Suberic_acid + carbon_dioxide', 'Monomethyl_azelate', X = X3),
+                              Rxn('Methyl_palmitoleate -> Azelaic_acid + Heptanoic_acid', 'Methyl_palmitoleate', X = X4),
+                              Rxn('Methyl_linoleate -> Azelaic_acid + Malonic_acid + Hexanoic_acid', 'Methyl_linoleate', X = X4),
+                              ])
+        oxidative_cleavage_rxnsys = RxnSys(Product_formation, Side_reaction )
         self.reactions = oxidative_cleavage_rxnsys
             
     def _run(self):
