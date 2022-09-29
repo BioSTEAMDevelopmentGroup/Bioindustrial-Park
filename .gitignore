@@ -30,13 +30,14 @@ docs/_build/*
 docs/_static/*
 docs/_templates/*
 
-# Data #
-########
+# Data/results #
+################
 *.xlsx
 *.png
 *.jpeg
 *.svg
 *.npy
+biorefineries/wwt/results
 
 # Compiled source #
 ###################
