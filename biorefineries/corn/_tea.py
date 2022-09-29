@@ -7,6 +7,7 @@
 # for license details.
 """
 """
+import biosteam as bst
 from biosteam.process_tools import UnitGroup
 from biorefineries import corn as cn
 from biorefineries.sugarcane import ConventionalEthanolTEA
@@ -53,7 +54,7 @@ def tea_summary():
          'Utilities':
              {'Electricity': f * sum([i.cost for i in power_utilities]),
               'Steam': f * (sum([i.cost for i in heating_utilities]) + cn.steam.cost),
-              'Natural gas': f * cn.D610.natural_gas_cost,
+              'Natural gas': f * bst.stream_utility_prices['Natural gas']*cn.natural_gas.F_mass,
               'Cooling water': f * sum([i.cost for i in cooling_utilities])},
          'Labor and supplies': 
              {'Plant operations': cn.corn_tea.labor_cost * (1. + cn.corn_tea.fringe_benefits + cn.corn_tea.supplies),
