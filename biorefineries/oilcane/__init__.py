@@ -621,10 +621,9 @@ def load(name, cache=cache, reduce_chemicals=True,
     set_GWPCF(s.lime, 'lime', dilution=0.046) # Diluted with water
     set_GWPCF(s.denaturant, 'gasoline')
     set_GWPCF(s.FGD_lime, 'lime', dilution=0.451)
-    set_GWPCF(s.cellulase, 'cellulase', dilution=0.02) 
+    set_GWPCF(s.cellulase, 'cellulase', dilution=0.05) 
     set_GWPCF(s.urea, 'urea')
     set_GWPCF(s.caustic, 'NaOH', 0.5)
-    set_GWPCF(s.catalyst, 'NaOH', 0.5)
     set_GWPCF(s.catalyst, 'methanol catalyst mixture')
     set_GWPCF(s.methanol, 'methanol')
     set_GWPCF(s.HCl, 'HCl')
