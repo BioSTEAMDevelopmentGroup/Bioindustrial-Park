@@ -29,6 +29,7 @@ CF_dct = { # all streams are feeds
     'caustic': ('NaOH', 0.5), # NaOH and water
     'cellulase': ('Cellulase', 0.05), # cellulase and water
     'denaturant': ('Denaturant'),
+    'dryer_natural_gas': ('CH4',),
     'CSL': ('CSL',),
     'DAP': ('DAP',),
     'FGD_lime': ('Lime', 0.4513), # lime and water

@@ -31,6 +31,7 @@ CF_dct = {
     # 'dryer_natural_gas': ('CH4',), # used to be in the registry, but not any more
     'H3PO4': ('H3PO4',), # moisture content already adjusted
     'lime': ('CaO', 0.046), # CaO and water
+    'natural_gas': ('CH4',), # actually empty
     'polymer': ('Polymer',),
     'sugarcane': ('Sugarcane',), # moisture content already adjusted
     ##### Co-products #####

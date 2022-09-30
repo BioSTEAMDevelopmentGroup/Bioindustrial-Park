@@ -61,7 +61,6 @@ def create_comparison_systems(info, functions, sys_dct={}):
     main_f.set_flowsheet(exist_f)
     exist_u = exist_f.unit
     exist_s = exist_f.stream
-
     def get_streams(u_reg, s_reg, infos):
         streams = []
         for info in infos:
@@ -97,7 +96,6 @@ def create_comparison_systems(info, functions, sys_dct={}):
     dct['_system_loaded'] = False
     module.load(**kwdct['load'])
     new_sys_temp = dct[kwdct['system_name']]
-
     new_f = bst.Flowsheet.from_flowsheets('new', (main_f,))
     main_f.set_flowsheet(new_f)
     new_u = new_f.unit

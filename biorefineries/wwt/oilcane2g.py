@@ -33,6 +33,7 @@ CF_dct = {
     'CSL': ('CSL',),
     'DAP': ('DAP',),
     'denaturant': ('Denaturant'),
+    'dryer_natural_gas': ('CH4',),
     'FGD_lime': ('Lime', 0.4513), # lime and water
     'H3PO4': ('H3PO4',), # moisture content already adjusted
     'HCl': ('HCl',), # moisture content already adjusted

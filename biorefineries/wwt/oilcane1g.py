@@ -29,7 +29,7 @@ CF_dct = {
     ##### Feeds #####
     'catalyst': ('TEcatalyst',), # methanol and NaOCH3
     'denaturant': ('Denaturant'),
-    # 'dryer_natural_gas': ('CH4',), # used to be in the registry, but not any more
+    'dryer_natural_gas': ('CH4',),
     'H3PO4': ('H3PO4',), # moisture content already adjusted
     'HCl': ('HCl',), # moisture content already adjusted
     'lime': ('CaO', 0.046), # CaO and water

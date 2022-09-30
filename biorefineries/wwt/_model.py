@@ -306,7 +306,7 @@ def add_1G_parameters(model, model_dct, f, u, s, get_obj, get_rxn, param):
 
         b = -1.7 # average of 2.4/1 kg CO2/kg COD removed for aerobic/primarily anaerobic processes
         D = get_default_distribution('uniform', b)
-        @param(name='Wastewater GWP', element=ww, kind='cost', units='kg CO2/kg COD',
+        @param(name='Wastewater CF', element=ww, kind='cost', units='kg CO2/kg COD',
                 baseline=b, distribution=D)
         def set_wastewater_COD_GWP(GWP):
             ww_cod = get_COD(ww) * ww.F_vol # kg COD/hr
@@ -680,9 +680,9 @@ def add_metrics(model, model_dct, f, u, s, get_obj):
         # Economic allocation
         # net = feed + process + utility - product
         total_GWP = cache_dct[f'Total GWP{suffix}'] = (
-            net +
-            max(sys.get_total_products_impact('GWP'), 0) - # positive if having product credit
-            min(sys.get_net_electricity_impact('GWP'), 0) # negative if producing electricity
+            net
+            + max(sys.get_total_products_impact('GWP'), 0) # positive if having product credit
+            - min(sys.get_net_electricity_impact('GWP'), 0) # negative if producing electricity
             )
         hourly_GWP = total_GWP / hours
         product_ratio = cache_dct[f'Product ratio{suffix}']
