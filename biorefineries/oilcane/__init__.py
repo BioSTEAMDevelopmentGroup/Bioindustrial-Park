@@ -998,22 +998,8 @@ def load(name, cache=cache, reduce_chemicals=True,
     
     @metric(units='%')
     def heat_exchanger_network_error():
-        return HXN.energy_balance_percent_error if HXN else 0.    
+        return HXN.energy_balance_percent_error if HXN else 0.
 
-    def GWP_displacement(): # Cradle to gate
-        GWP_total = sys.get_total_feeds_impact(GWP) + min(electricity(), 0) * GWP_characterization_factors['Electricity'] # kg CO2 eq. / yr
-        sales = (
-            biodiesel_flow() * mean_biodiesel_price
-            + ethanol_flow() * get_GWP_mean_ethanol_price()
-            + crude_glycerol_flow() * mean_glycerol_price
-        )
-        GWP_per_USD = GWP_total / sales
-        return {
-            'Ethanol': GWP_per_USD * get_GWP_mean_ethanol_price(),
-            'Biodiesel': GWP_per_USD * mean_biodiesel_price,
-            'Crude glycerol': GWP_per_USD * mean_glycerol_price,
-        }
-    dct['GWP_displacement'] = GWP_displacement
 
     @metric(name='GWP', element='Economic allocation', units='kg*CO2*eq / USD')
     def GWP_economic(): # Cradle to gate
