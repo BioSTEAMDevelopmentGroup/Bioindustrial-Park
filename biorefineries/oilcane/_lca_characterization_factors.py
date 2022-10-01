@@ -42,7 +42,7 @@ GWP_characterization_factors = { # Material GWP cradle-to-gate [kg*CO2*eq / kg]
 }
 
 GWP_characterization_factors['methanol catalyst mixture'] = (
-    GWP_characterization_factors['methanol'] * 0.75 + GWP_characterization_factors['NaOH'] * 0.25
+    GWP_characterization_factors['methanol'] * 0.75 + GWP_characterization_factors['NaOCH3'] * 0.25
 )
 
 def set_GWPCF(stream, name, dilution=1.):
