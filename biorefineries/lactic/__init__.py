@@ -112,14 +112,15 @@ def simulate_fermentation_improvement(funcs=None, lactic_tea=None, flowsheet=Non
     flowsheet = flowsheet or bst.main_flowsheet
     funcs = funcs or create_funcs(lactic_tea=lactic_tea, flowsheet=flowsheet)
     u = flowsheet.unit
-    flowsheet.system.lactic_sys.simulate()
+    sys = flowsheet.system.lactic_sys
+    sys.simulate()
     R301_X = u.R301.cofermentation_rxns.X
     R302_X = u.R302.cofermentation_rxns.X
     u.R301.target_yield = 0.95
     R301_X[0] = R301_X[3] = 0.95
     R301_X[1] = R301_X[4] = 0
     R302_X[1] = R302_X[4] = 0
-    simulate_and_print(flowsheet)
+    simulate_and_print(funcs=funcs, lactic_tea=sys.TEA, flowsheet=flowsheet)
 
 
 global simulate_separation_improvement
@@ -127,10 +128,11 @@ def simulate_separation_improvement(funcs=None, lactic_tea=None, flowsheet=None)
     flowsheet = flowsheet or bst.main_flowsheet
     funcs = funcs or create_funcs(lactic_tea=lactic_tea, flowsheet=flowsheet)
     u = flowsheet.unit
-    flowsheet.system.lactic_sys.simulate()
+    sys = flowsheet.system.lactic_sys
+    sys.simulate()
     u.R402.X_factor = 0.9/u.R402.esterification_rxns.X[0]
     u.R403.hydrolysis_rxns.X[:] = 0.9
-    simulate_and_print(flowsheet)
+    simulate_and_print(funcs=funcs, lactic_tea=sys.TEA, flowsheet=flowsheet)
 
 
 global simulate_operating_improvement
