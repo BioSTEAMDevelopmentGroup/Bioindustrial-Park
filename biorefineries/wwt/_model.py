@@ -1041,7 +1041,7 @@ def evaluate_models(
         include_BMP=False,
         percentiles=(0, 0.05, 0.25, 0.5, 0.75, 0.95, 1),
         seed=3221, N_uncertainty=1000, uncertainty_skip_exist=False,
-        N_BMP=100, BMPs=(0.5, 0.6, 0.7, 0.8, 0.9, 0.9499), # 0.9499 is for minor error
+        N_BMP=100, BMPs=(0.5, 0.6, 0.7, 0.8, 0.9, 0.9499), # 0.9499 allows for minor error
         ):
     args = [exist_model, new_model, abbr]
     if include_baseline: run_baseline(*args)
