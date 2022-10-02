@@ -219,6 +219,9 @@ class SeedTrain(Unit):
             )
         else:
             self.saccharification = None
+    
+    _setup = Unit._setup
+    
     def _run(self):
         vent, effluent= self.outs
         effluent.mix_from(self.ins, energy_balance=False)
@@ -329,11 +332,11 @@ class Saccharification(bst.BatchBioreactor):
             Rxn('Cellobiose + H2O -> 2Glucose',       'Cellobiose',  1.0000, chemicals)]
         )
         
+    _setup = Unit._setup
+        
     @property
     def saccharification(self):
         return self.reactions
-        
-    def _setup(self): pass
         
     @property
     def vent(self):

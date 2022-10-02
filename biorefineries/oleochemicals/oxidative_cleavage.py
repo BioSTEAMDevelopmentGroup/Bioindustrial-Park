@@ -49,8 +49,8 @@ def oxidative_cleavage_system(ins,outs,T_in):
                               ins = water_for_oxidative_cleavage,
                               outs = 'fresh_water_to_pump')
     P103_1 = bst.units.Pump('P103_1',
-                      ins = T103_1-0,
-                      outs ='water_to_conc_mixer')
+                            ins = T103_1-0,
+                            outs ='water_to_conc_mixer')
 
 # Catalyst_feed_tank
     T104 = bst.units.StorageTank('T104',
@@ -66,16 +66,17 @@ def oxidative_cleavage_system(ins,outs,T_in):
     
 #Mixer for hydrogen_peroxide solution
     M101 = bst.units.Mixer('M101',
-                        ins = (P102-0,                               
-                               P103_1-0),
+                        ins = (P102.outs[0],                               
+                               P103_1.outs[0]),
                         outs = 'feed_to_reactor_mixer')
     
 
     def adjust_HP_feed_flow():   
-      fresh_HP.F_mass = fresh_OA.F_mass * 0.958 
-      water_for_oxidative_cleavage.F_mass = fresh_OA.F_mass * 2.008
+      fresh_HP.F_mass =  0.958 * fresh_OA.F_mass
+      water_for_oxidative_cleavage.F_mass = 2.008 * fresh_OA.F_mass 
    
-    M101.add_specification(adjust_HP_feed_flow, run=True)   
+    M101.add_specification(adjust_HP_feed_flow,
+                           run=True)   
 
       
 #Mixer for reactor feed, adds the h2O2 sol and oleic acid

@@ -24,24 +24,35 @@ import thermosteam as tmo
 Cobalt_chloride = tmo.Chemical('Cobalt_chloride',
                                search_ID = '7646-79-9',
                                phase = 's')
+
+    
 tungsten = tmo.Chemical('tungsten')
 chems = tmo.Chemicals([
+    #Dihydroxylation chemicals
     tmo.Chemical('Hydrogen_peroxide', phase='l'),
     tmo.Chemical('Water'),
+    # #Chemical for acid degumming 
+    tmo.Chemical('Citric_acid'),
     #look into phase of the below
     tmo.Chemical('MDHSA', search_ID = '1115-01-1'),
     tmo.Chemical('Pelargonic_acid'),
     tmo.Chemical('Azelaic_acid'),
+# Products of oxidative_cleavage
     tmo.Chemical('Monomethyl_azelate'),
     tmo.Chemical('Suberic_acid'),
     tmo.Chemical('Caprylic_acid'),
+    tmo.Chemical('Hexanoic_acid'),
+    tmo.Chemical('Heptanoic_acid'),
+    tmo.Chemical('Hexanoic_acid'),
+    tmo.Chemical('Malonic_acid'),
+# Oxidants used
     tmo.Chemical('Nitrogen'),
     tmo.Chemical('Oxygen'),
     tmo.Chemical('Methanol'),
     tmo.Chemical('Glycerol'),
     tmo.Chemical('Sodium_methoxide',formula ='NaOCH3'),
-    tmo.Chemical('HCl'),
-    tmo.Chemical('NaOH'),
+    # tmo.Chemical('HCl'),
+    # tmo.Chemical('NaOH'),
     
 ###All the chemicals related to TAGs in HOSO
     tmo.Chemical('OOO', search_ID = '122-32-7'),
@@ -108,14 +119,7 @@ chems = tmo.Chemicals([
     tmo.Chemical('Methyl_stearate'),
     tmo.Chemical('Methyl_linoleate'), 
     tmo.Chemical('Methyl_palmitoleate',search_ID ='1120-25-8'),
-    
-## Extra chems for lipidcane compatibility
-    tmo.Chemical('Monoolein', search_ID = '111-03-5'),
-    tmo.Chemical('DiOlein', search_ID = '2465-32-9'),
-   
-    
-    ### Chemicals that were missing some properties
-    ### TODO.xxx check if this is a good assumption with Yoel
+     
     
     #Tungstic_acid boiling point: https://en.wikipedia.org/wiki/Tungstic_acid
     tmo.Chemical('tungstic_acid', 
@@ -163,15 +167,45 @@ chems = tmo.Chemicals([
     ##Hence using polystyrene
     tmo.Chemical('Polystyrene'),
     ##Hence using polystyrene
+    #For lipidcane compatibility
+    tmo.Chemical('MonoOlein',search_ID = '111-03-5'),
+    # tmo.Chemical('DiOlein',search_ID = 'PubChem = 6505653'),
+    tmo.Chemical('Dipalmitin'),
+    tmo.Chemical('Monopalmitin')
   ])
 chems.polystyrene_based_catalyst.copy_models_from(chems.Polystyrene,
                                         ['Hvap','Psat','sigma', 
                                          'epsilon', 'kappa', 'V',
                                          'Cn', 'mu'])
+LiquidMethanol = chems['Methanol'].at_state(phase='l', copy=True)
+chems['Sodium_methoxide'].copy_models_from (chems.Methanol,
+                                            ['V', 'sigma',
+                                             'kappa', 'Cn'])
+def create_new_chemical(ID, phase='s', **constants):
+        solid = tmo.Chemical.blank(ID, phase=phase, **constants)
+        chems.append(solid)
+        return solid
+    
+  
+HCl = create_new_chemical('HCl', formula='HCl')
+NaOH = create_new_chemical('NaOH', formula='NaOH')
+   
+# Solubles don't occupy much volume
+for chemical in (HCl, NaOH):
+        V = fn.rho_to_V(rho=1e5, MW=chemical.MW)
+        chemical.V.add_model(V, top_priority=True)
+
+
+PPP = tmo.Chemical('Tripalmitin')
+TAGs = chems['OOO','LLL','OOL','LLO','SOO','PLO',
+             'PoOO','POO','POS','POP','PLS']
+for i in TAGs:
+    i.copy_models_from(PPP, ['mu'])
+    
 for chemical in chems: chemical.default()
 
 chems.compile()
-chems.define_group('TAG', ( 'OOO','LLL','OOL',
+chems.define_group('TAG', ('OOO','LLL','OOL',
                            'LLO','SOO','PLO',
                            'PoOO','POO','POS',
                            'POP','PLS'))
@@ -190,9 +224,10 @@ chems.define_group('Biodiesel', ('Methyl_oleate',
                                  'Methyl_stearate',
                                  'Methyl_linoleate',
                                  'Methyl_palmitoleate'))
+
 chems.set_synonym('Water', 'H2O')
 chems.set_synonym('Phosphatidylinositol','PL')
 chems.set_synonym('MonoOlein', 'MAG')
-chems.set_synonym('DiOlein', 'DAG')
+chems.set_synonym('Dipalmitin', 'DAG')
 bst.settings.set_thermo(chems)
 chems.show()

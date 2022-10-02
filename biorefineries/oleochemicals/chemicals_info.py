@@ -26,12 +26,16 @@ def create_chemicals():
     Ethylheptane_3 = tmo.Chemical('Ethylheptane_3',search_ID ='3-Ethylheptane')
     Ethylheptane_4 = tmo.Chemical('Ethylheptane_4', search_ID ='4-Ethylheptane') 
     bicyclo_octane = tmo.Chemical('bicyclo_octane',search_ID = '6221-55-2')
-    
+    Linoleic_acid = tmo.Chemical('Linoleic_acid',search_ID = '60-33-3')
+    Palmitic_acid = tmo.Chemical('Palmitic_acid',search_ID = '57-10-3')
+    Stearic_acid =  tmo.Chemical('Stearic Acid',search_ID = '57-11-4')
+    Other_FAs = tmo.Chemical('Other_FAs', search_ID = '67701-02-4')
+    EPS = tmo.Chemical('EPS', search_ID = '24560-98-3')   
    
     ozo_chemicals = tmo.Chemicals(
         ['Water','Hydrogen_peroxide','Oleic_acid',
          'Nonanal','Nonanoic_acid','Azelaic_acid',
-         'oxiraneoctanoic_acid,_3-octyl-','Hexane',
+         'Hexane',
          'Ethyl_acetate','Octane',
          'pentene',
          'Methylcyclohexane',
@@ -53,24 +57,25 @@ def create_chemicals():
           Dimethyl_heptane_3_3,
           Ethylheptane_3,
           Ethylheptane_4,
+          Palmitic_acid,
+          Stearic_acid,
+          Other_FAs,
+          EPS
           ])      
-    
-    
-    #Solid Catalyst not available in the database
-    #TODO.xxx Add ref for the below
-    # Catalyst = create_new_chemical(
-    #         'Phosphotungstic_acid',
-    #         # formula="H3PW12O40",
-    #         # MW=2880.2,
-    #         #CAS = '7783-03-1',
-    #         CAS='1343-93-7',
-    #        phase = 'l',
-    #        # rho = 2850 
-    #     )
-    
+
+    Catalyst = create_new_chemical(
+            'Phosphotungstic_acid',
+            # formula="H3PW12O40",
+            # MW=2880.2,
+            #CAS = '7783-03-1',
+            CAS='1343-93-7',
+            phase = 'l',
+            # rho = 2850 
+        )
+## Impurities in oleic acid
+
     #https://www.fishersci.com/shop/products/phosphotungstic-acid-hydrate-thermo-scientific/AA4011614
     #rho = 2.852g/cm3
-    #conversion = 
     
     #####I think the chemmical is actually this###
     # https://www.sigmaaldrich.com/US/en/product/aldrich/455970
@@ -88,23 +93,23 @@ def create_chemicals():
         CAS = '2553-17-5'
     )
     
-#TODO.xxx find a better assumption for the catalyst
+#TODO.xxx use this catalyst later for heterogeneous system
    
-    bea_zeolite = create_new_chemical(
-                  'bea_zeolite',
-                  search_ID = '1318-02-1',
-                  phase = 's',
-                  Tb = 10000+273,
-                  CAS = '1318-02-1')
-    aluminium_oxide = tmo.Chemical('1344-28-1')
-    bea_zeolite.copy_models_from(aluminium_oxide, ['V', 'Hvap', 'Psat', 'mu', 'kappa'])
+    # bea_zeolite = create_new_chemical(
+    #               'bea_zeolite',
+    #               search_ID = '1318-02-1',
+    #               phase = 's',
+    #               Tb = 10000+273,
+    #               CAS = '1318-02-1')
+    # aluminium_oxide = tmo.Chemical('1344-28-1')
+    # bea_zeolite.copy_models_from(aluminium_oxide, ['V', 'Hvap', 'Psat', 'mu', 'kappa'])
 
     for chemical in ozo_chemicals: chemical.default()
     
     Dortmund = ozo_chemicals.Oxononanoic_acid.Dortmund
     Dortmund.set_group_counts_by_name(dict(COOH=1, CH2=7, CHO=1))
     ozo_chemicals.compile()
-    ozo_chemicals.set_synonym('oxiraneoctanoic_acid,_3-octyl-' ,'Epoxy_stearic_acid') 
+    ozo_chemicals.set_synonym('Phosphotungstic_acid', 'fresh_Cat')
     
     for i in ozo_chemicals:
         if not i.locked_state: i.V.g.method_P = 'IDEAL'

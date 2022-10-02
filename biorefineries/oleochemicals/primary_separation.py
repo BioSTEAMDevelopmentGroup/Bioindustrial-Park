@@ -72,3 +72,4 @@ def primary_separation_system(ins,outs,Tin):
                                        Hr=0.999,
                                        partial_condenser=False,
                                     )
+    D203.check_LHK = False

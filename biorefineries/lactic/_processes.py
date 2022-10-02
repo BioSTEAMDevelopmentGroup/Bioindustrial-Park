@@ -230,6 +230,7 @@ def create_SSCF_conversion_process(feed, flowsheet=None, **extras): # extras is 
         seed_recycle.run()
         return R301.effluent_titer-R301.target_titer
 
+    @seed_recycle.add_specification
     def adjust_R301_water():
         water_R301.empty()
         set_yield(R301.target_yield, R301, R302)
@@ -248,10 +249,8 @@ def create_SSCF_conversion_process(feed, flowsheet=None, **extras): # extras is 
                 set_yield(lactic_yield, R301, R302)
             seed_recycle.run()
 
-    PS301 = bst.units.ProcessSpecification('PS301', ins=R301-0,
-                                            specification=adjust_R301_water)
     ######################## System ########################
-    System('conversion_sys', path=(M301, H301, seed_recycle, PS301))
+    System('conversion_sys', path=(M301, H301, seed_recycle))
 
 
 def create_SHF_conversion_process(feed, cell_mass_split,
@@ -382,6 +381,7 @@ def create_SHF_conversion_process(feed, cell_mass_split,
         # highest from collected papers)
         return sugar_conc-220
 
+    @ferm_loop.add_specification
     def adjust_ferm_loop():
         water_R301.empty()
         S302.split = 1
@@ -414,11 +414,8 @@ def create_SHF_conversion_process(feed, cell_mass_split,
                 set_yield(lactic_yield, R301, R302)
             seed_recycle.run()
 
-    PS301 = bst.units.ProcessSpecification('PS301', ins=R301_P1-0,
-                                            specification=adjust_ferm_loop)
-
     ######################## System ########################
-    System('conversion_sys', path=(M301, H301, R300, S301, ferm_loop, PS301))
+    System('conversion_sys', path=(M301, H301, R300, S301, ferm_loop))
 
 
 # %%
@@ -778,17 +775,6 @@ def create_facilities(CHP_wastes, CHP_biogas='', CHP_side_streams=(),
     plant_air_in =  Stream('plant_air_in', phase='g', N2=0.79, O2=0.21, units='kg/hr')
 
     ######################## Units ########################
-    # Update ratios associated with the feedstock flowrate
-    def update_facility_streams():
-        flowrate_ratio = units.get_flow_tpd(flowsheet=flowsheet) / 2205
-        ammonia_CHP.imass['NH4OH'] = flowrate_ratio * 1054 * 35.046/17.031 # NH3 to NH4OH
-        firewater_in.imass['H2O'] = flowrate_ratio * 8021
-        CIP_chems_in.imass['H2O'] = flowrate_ratio * 145
-        plant_air_in.F_mass = flowrate_ratio * 1372608
-
-    PS601 = bst.ProcessSpecification('PS601', ins=ammonia_CHP,
-                                     specification=update_facility_streams)
-
     # 7-day storage time similar to ethanol's in ref [1]
     T601 = bst.units.StorageTank('T601', ins=u.F402_P-0, tau=7*24, V_wf=0.9,
                                   vessel_type='Floating roof',
@@ -824,7 +810,7 @@ def create_facilities(CHP_wastes, CHP_biogas='', CHP_side_streams=(),
     M601 = bst.units.Mixer('M601', ins=CHP_wastes, outs='wastes_to_CHP')
 
     # Blowdown is discharged
-    CHP = facilities.CHP('CHP', ins=(M601-0, CHP_biogas, lime_CHP, PS601-0,
+    CHP = facilities.CHP('CHP', ins=(M601-0, CHP_biogas, lime_CHP, ammonia_CHP,
                                      boiler_chems, baghouse_bag, natural_gas,
                                      'boiler_makeup_water'),
                          B_eff=0.8, TG_eff=0.85, combustibles=combustibles,
@@ -854,3 +840,12 @@ def create_facilities(CHP_wastes, CHP_biogas='', CHP_side_streams=(),
         BDM = bst.units.BlowdownMixer('BDM',ins=(CHP.outs[-1], CT.outs[-1]),
                                       outs=u.M501.ins[-1])
         PWC.recycled_blowdown_streams = BDM.outs
+        
+    # Update ratios associated with the feedstock flowrate
+    @T601.add_specification
+    def update_facility_streams():
+        flowrate_ratio = units.get_flow_tpd(flowsheet=flowsheet) / 2205
+        ammonia_CHP.imass['NH4OH'] = flowrate_ratio * 1054 * 35.046/17.031 # NH3 to NH4OH
+        firewater_in.imass['H2O'] = flowrate_ratio * 8021
+        CIP_chems_in.imass['H2O'] = flowrate_ratio * 145
+        plant_air_in.F_mass = flowrate_ratio * 1372608

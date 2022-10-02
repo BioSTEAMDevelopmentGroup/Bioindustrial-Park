@@ -27,26 +27,13 @@ class OxidativeCleavageReactor(bst.BatchBioreactor):
                                    tau = tau , N = N, V = V, T = T, 
                                    P = P ,Nmin = Nmin , Nmax = Nmax)
         
-        c = self.chemicals      
-        
+        c = self.chemicals           
         self.Oleic_acid_conversion = 0.808
-        #Oleic_acid formula = C18H34O2
-        #EPS formula = C18H34O3
-        
         #self.nonanal_selectivity = 0.094 
-        #mol EPS/ mol OA
-                             
-        self.selectivity_oxiraneoctanoic_acid = 0.071
+        #self.selectivity_oxiraneoctanoic_acid = 0.071
         #self.Oxononanoic_acid_selectivity = 0.029
-        #'C9H16O3'
-        
         #self.Nonanoic_acid_selectivity = 0.277 
-        #C9H18O2
-        
-        
         self.selectivity_Azelaic_acid = 0.442 * 2 
-        #carbon moles of EPS*(1 mol of EPS/ 9 C moles)/ carbon moles of oleic acid*(1 mol of OA/ 18 C moles)
-        # AA C9H16O4
         
     def _setup(self):
         # selectivity_Azelaic_acid = selectivity_Nonanoic_acid = X2 * X1
@@ -58,22 +45,27 @@ class OxidativeCleavageReactor(bst.BatchBioreactor):
         X1 = 1 - (self.selectivity_oxiraneoctanoic_acid)
         X2 = self.selectivity_Azelaic_acid / X1
                 
-        self.reactions = tmo.SeriesReaction([
-            tmo.Rxn('Oleic_acid + H2O2   -> Epoxy_stearic_acid + Water ', 'Oleic_acid', X=self.Oleic_acid_conversion),
-            tmo.Rxn('Epoxy_stearic_acid + H2O2 -> Nonanal + Oxononanoic_acid + H2O', 'oxiraneoctanoic_acid,_3-octyl-', X = X1),
-            tmo.Rxn('Nonanal + Oxononanoic_acid + 2H2O2 -> Azelaic_acid + Nonanoic_acid+ 2H2O', 'Nonanal', X = X2),
-                    ])
+        # self.reactions = tmo.SeriesReaction([
+        #     tmo.Rxn('Oleic_acid + Hydrogen_peroxide  -> Epoxy_stearic_acid + Water ', 'Oleic_acid', X=self.Oleic_acid_conversion),
+        #     tmo.Rxn('Epoxy_stearic_acid + Hydrogen_peroxide -> Nonanal + Oxononanoic_acid + Water', 'oxiraneoctanoic_acid,_3-octyl-', X = X1),
+        #     tmo.Rxn('Nonanal + Oxononanoic_acid + 2Hydrogen_peroxide -> Azelaic_acid + Nonanoic_acid+ 2Water', 'Nonanal', X = X2),
+        #             ]) 
 
         
         #NEEDS TO BE CONFIRMED WITH DANIM
-        
+        #Issue is with accounting for all selectivities of all the products        
         # Epoxide_formation = SRxn([Rxn('Oleic_acid + H2O2   -> Epoxy_stearic_acid ', 'Oleic_acid', X=self.Oleic_acid_conversion),
         #                           Rxn('Epoxy_stearic_acid + H2O -> DHSA', 'Epoxy_stearic_acid', X = 1),
-        #                           Rxn('DHSA -> Nonanal + Oxononanoic_acid', 'DHSA', X = X1)])
+        #                           Rxn('DHSA + H2O2 -> Nonanal + Oxononanoic_acid ', 'DHSA', X = 1),
         
-        # Product_formation = PRxn([ Rxn('Nonanal + H2O2 ->  Nonanoic_acid', 'Nonanal', X = X2),
-        #                            Rxn('Oxononanoic_acid + H2O2 -> Azelaic_acid', 'Oxononanoic_acid', X = X2),
-        #                         ])
+        #                     PRxn([Rxn('Nonanal + H2O2 ->  Nonanoic_acid', 'Nonanal', X = don't know),
+                                   #Rxn('Nonanoic_acid ->  Octane + CO2', 'Nonanoic_acid', X = don't know),
+                                   #Rxn('Oxononanoic_acid + H2O2 ->  Azelaic_acid', 'Oxononanoic_acid', X = don't know),
+                                   #Rxn('Oxononanoic_acid -> CO2 + Octanal', 'Oxononanoic_acid', X = X2),
+                                   #Rxn('Octanal + Octane + H2O2-> CO2 + 2Octanal', 'Oxononanoic_acid', X = X2),
+                                   #Rxn('Octanal + H2O2 -> Octanoic_acid ', 'Oxononanoic_acid', X = X2),
+        #                          #Rxn('Octanal + H2O2 -> Octanoic_acid ', 'Oxononanoic_acid', X = X2),
+        ])
 
         # oxidative_cleavage_rxnsys = RxnSys(Epoxide_formation,Product_formation)
         # self.reactions = oxidative_cleavage_rxnsys

@@ -320,7 +320,7 @@ def plot_relative_sorghum_oil_content_and_cane_oil_content_contours(
     data = data[:, :, configuration_index, [0, 6]]
     
     # Plot contours
-    xlabel = "Oil-sorghum oil content\n[dry wt. %]" 
+    xlabel = "Oil-sorghum oil content [dry wt. %]" 
     if relative: xlabel = ('relative ' + xlabel).capitalize()
     ylabel = 'Oilcane oil content\n[dry wt. %]'
     yticks = [5, 7.5, 10, 12.5, 15]
@@ -368,10 +368,10 @@ def plot_relative_sorghum_oil_content_and_cane_oil_content_contours(
         100.*X, 100.*Y, Z, data, xlabel, ylabel, xticks, yticks, metric_bars, 
         styleaxiskw=dict(xtick0=True), label=True,
     )
-    for i in axes.flatten():
-        plt.sca(i)
-        plot_scatter_points([7], [10], marker='*', s=100, color=startcolor,
-                            edgecolor=edgecolor, clip_on=False, zorder=3)
+    # for i in axes.flatten():
+    #     plt.sca(i)
+    #     plot_scatter_points([7], [10], marker='*', s=100, color=startcolor,
+    #                         edgecolor=edgecolor, clip_on=False, zorder=3)
     return fig, axes
     
 def plot_recovery_and_oil_content_contours(
@@ -400,7 +400,7 @@ def plot_recovery_and_oil_content_contours(
         )
     np.save(file, data)
     data = data[:, :, :, :, metric_index]
-    data = np.swapaxes(data, 2, 3)
+    # data = np.swapaxes(data, 2, 3)
     
     if smooth: # Smooth curves due to heat exchanger network and discontinuities in design decisionss
         A, B, M, N = data.shape
@@ -460,8 +460,8 @@ def plot_recovery_and_oil_content_contours(
                                linewidth=1.0)
             if hasattr(ax, '_cached_ytwin'):                
                 plt.sca(ax._cached_ytwin)
-            plot_scatter_points([60], [10], marker='*', s=100, color=startcolor,
-                                edgecolor=edgecolor, clip_on=False, zorder=3)
+            # plot_scatter_points([60], [10], marker='*', s=100, color=startcolor,
+            #                     edgecolor=edgecolor, clip_on=False, zorder=3)
             # plot_scatter_points([ub], [15], marker='*', s=100, color=targetcolor,
             #                     edgecolor=edgecolor, clip_on=False, zorder=3)
     return fig, axes

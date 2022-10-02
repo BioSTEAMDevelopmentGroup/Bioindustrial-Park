@@ -28,6 +28,7 @@ class SeedTrain(SeedTrain):
         ])
         
     def _setup(self):
+        super()._setup()
         self.outs[0].phase = 'g'
         
     def _run(self):
