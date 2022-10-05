@@ -999,7 +999,6 @@ def run_uncertainty(exist_model, new_model, abbr, percentiles, seed, N,
     exist_model.load_samples(exist_samples)
     dir_path = dir_path or os.path.join(results_path, 'uncertainties')
     if not os.path.isdir(dir_path): os.mkdir(dir_path)
-
     notify = ceil(N/10)
     if not skip_exist:
         print(f'\n\n Exist model for {abbr}: N = {N}')

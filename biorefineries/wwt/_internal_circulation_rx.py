@@ -322,7 +322,7 @@ class InternalCirculationRx(bst.MixTank):
 
         pumps = (self.effluent_pump, self.sludge_pump)
         for i in range(2):
-            pumps[i].ins[0] = self.outs[i+1].copy() # use `.proxy()` will interfere `_run`
+            pumps[i].ins[0].copy_like(self.outs[i+1]) # use `.proxy()` will interfere `_run`
             pumps[i].simulate()
             self.power_utility.rate += pumps[i].power_utility.rate
 
