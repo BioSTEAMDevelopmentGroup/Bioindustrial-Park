@@ -135,7 +135,12 @@ def create_comparison_systems(info, functions, sys_dct={}):
         SolidsMixer = bst.Mixer('SolidsMixer', ins=solids_streams, outs=solids)
 
     if sludge_ID:
-        getattr(new_u, sludge_u).ins[sludge_idx] = getattr(new_s, sludge_ID)
+        exist_sludge_stream = getattr(new_u, sludge_u).ins[sludge_idx]
+        if sludge_u == 'slurry_mixer' and exist_sludge_stream.ID != 'sludge': # cornstover biorefinery
+            # Using print instead of warn so that it won't be ignored
+            print(f"\n\n Slurry connection changed for {kwdct['system_name']}\n\n")
+            getattr(new_u, sludge_u).ins[sludge_idx-1] = getattr(new_s, sludge_ID)
+        else: getattr(new_u, sludge_u).ins[sludge_idx] = getattr(new_s, sludge_ID)
         getattr(new_u, biogas_u).ins[biogas_idx] = getattr(new_s, biogas_ID)
 
     if add_BT:

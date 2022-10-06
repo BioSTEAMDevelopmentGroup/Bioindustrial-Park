@@ -61,29 +61,41 @@ def get_wwt_metrics(f, gal_or_kg='gal'):
                 if p.name == name: break
             p.baseline = 0
     
-    df_wwt = exist_model.metrics_at_baseline()
+    df_exist = exist_model.metrics_at_baseline()
+    df_new = new_model.metrics_at_baseline()
     key = ('Biorefinery', f'MPSP [$/{gal_or_kg}]')
-    MPSP_wwt = df_wwt[key]
+    MPSP_exist = df_exist[key]
+    MPSP_new = df_new[key]
     key = ('Biorefinery', f'Product GWP disp [kg CO2/{gal_or_kg}]')
-    GWP_wwt = df_wwt[key]
-    return MPSP_wwt, GWP_wwt
+    GWP_exist = df_exist[key]
+    GWP_new = df_new[key]
+    return MPSP_exist, GWP_exist, MPSP_new, GWP_new
 
 
 def print_comparison(
         module, gal_or_kg='gal',
         MPSP_original=None, GWP_original=None,
-        MPSP_wwt=None, GWP_wwt=None,
+        MPSP_exist=None, GWP_exist=None,
+        MPSP_new=None, GWP_new=None,
         ):
     print(f'\n {module} biorefinery')
-    print(f'Original module MESP: ${MPSP_original:.2f}/{gal_or_kg}.')
-    if GWP_original: print(f'Original module GWP: {GWP_original:.2f} kg CO2/{gal_or_kg}.')
-    print(f'WWT module MESP: ${MPSP_wwt:.2f}/{gal_or_kg}.')
-    print(f'WWT module GWP: {GWP_wwt:.2f} kg CO2/{gal_or_kg}.')
+    print('\nOriginal:')
+    print('---------')
+    print(f'MESP: ${MPSP_original:.2f}/{gal_or_kg}.')
+    if GWP_original: print(f'GWP: {GWP_original:.2f} kg CO2/{gal_or_kg}.')
+    print('\nExist:')
+    print('------')
+    print(f'MESP: ${MPSP_exist:.2f}/{gal_or_kg}.')
+    print(f'GWP: {GWP_exist:.2f} kg CO2/{gal_or_kg}.')
+    print('\nNew:')
+    print('----')
+    print(f'MESP: ${MPSP_new:.2f}/{gal_or_kg}.')
+    print(f'GWP: {GWP_new:.2f} kg CO2/{gal_or_kg}.')
     
     
 def check(name, simulated, rtol=1e-2):
     if not check_results: return
-    cached = cached_df.loc[name][1:5].dropna().values.astype('float')
+    cached = cached_df.loc[name][1:7].dropna().values.astype('float')
     assert_allclose(simulated, cached, rtol=rtol)
 
 
@@ -100,11 +112,11 @@ def test_cn_baseline():
     MPSP_original = cn.corn_sys.TEA.solve_price(cn.ethanol) * ethanol_kg_per_gal
 
     from biorefineries.wwt.corn import create_cn_comparison_models
-    MPSP_wwt, GWP_wwt = get_wwt_metrics(create_cn_comparison_models)
+    outs = get_wwt_metrics(create_cn_comparison_models)
 
-    print_comparison('Corn', 'gal', MPSP_original, None, MPSP_wwt, GWP_wwt)
+    print_comparison('Corn', 'gal', MPSP_original, None, *outs)
     
-    simulated = [MPSP_original, MPSP_wwt, GWP_wwt]
+    simulated = (MPSP_original, *outs)
     check('corn', simulated)
     return simulated
 
@@ -119,12 +131,12 @@ def test_sc1g_baseline():
     GWP_original = df_original[oc_GWP_key]/ethanol_kg_per_L*ethanol_kg_per_gal
 
     from biorefineries.wwt.sugarcane1g import create_sc1g_comparison_models
-    MPSP_wwt, GWP_wwt = get_wwt_metrics(create_sc1g_comparison_models)
+    outs = get_wwt_metrics(create_sc1g_comparison_models)
 
     name = 'sugarcane1g'
-    print_comparison(name, 'gal', MPSP_original, GWP_original, MPSP_wwt, GWP_wwt)
+    print_comparison(name, 'gal', MPSP_original, GWP_original, *outs)
     
-    simulated = [MPSP_original, GWP_original, MPSP_wwt, GWP_wwt]
+    simulated = (MPSP_original, GWP_original, *outs)
     check(name, simulated)
     return simulated
 
@@ -139,12 +151,12 @@ def test_oc1g_baseline():
     GWP_original = df_original[oc_GWP_key]/ethanol_kg_per_L*ethanol_kg_per_gal
     
     from biorefineries.wwt.oilcane1g import create_oc1g_comparison_models
-    MPSP_wwt, GWP_wwt = get_wwt_metrics(create_oc1g_comparison_models)
+    outs = get_wwt_metrics(create_oc1g_comparison_models)
 
     name = 'oilcane1g'
-    print_comparison(name, 'gal', MPSP_original, GWP_original, MPSP_wwt, GWP_wwt)
+    print_comparison(name, 'gal', MPSP_original, GWP_original, *outs)
     
-    simulated = [MPSP_original, GWP_original, MPSP_wwt, GWP_wwt]
+    simulated = (MPSP_original, GWP_original, *outs)
     check(name, simulated)
     return simulated
 
@@ -156,12 +168,12 @@ def test_cs_baseline():
     MPSP_original = cs.cornstover_sys.TEA.solve_price(cs.ethanol) * ethanol_kg_per_gal
     
     from biorefineries.wwt.cornstover import create_cs_comparison_models
-    MPSP_wwt, GWP_wwt = get_wwt_metrics(create_cs_comparison_models)
+    outs = get_wwt_metrics(create_cs_comparison_models)
     
     name = 'cornstover'
-    print_comparison(name, 'gal', MPSP_original, None, MPSP_wwt, GWP_wwt)
+    print_comparison(name, 'gal', MPSP_original, None, *outs)
     
-    simulated = [MPSP_original, MPSP_wwt, GWP_wwt]
+    simulated = (MPSP_original, *outs)
     check(name, simulated)
     return simulated
 
@@ -176,12 +188,12 @@ def test_sc2g_baseline():
     GWP_original = df_original[oc_GWP_key]/ethanol_kg_per_L*ethanol_kg_per_gal
     
     from biorefineries.wwt.sugarcane2g import create_sc2g_comparison_models
-    MPSP_wwt, GWP_wwt = get_wwt_metrics(create_sc2g_comparison_models)
+    outs = get_wwt_metrics(create_sc2g_comparison_models)
 
     name = 'sugarcane2g'
-    print_comparison(name, 'gal', MPSP_original, GWP_original, MPSP_wwt, GWP_wwt)
+    print_comparison(name, 'gal', MPSP_original, GWP_original, *outs)
     
-    simulated = [MPSP_original, GWP_original, MPSP_wwt, GWP_wwt]
+    simulated = (MPSP_original, GWP_original, *outs)
     check(name, simulated)
     return simulated
 
@@ -196,12 +208,12 @@ def test_oc2g_baseline():
     GWP_original = df_original[oc_GWP_key]/ethanol_kg_per_L*ethanol_kg_per_gal
     
     from biorefineries.wwt.oilcane2g import create_oc2g_comparison_models
-    MPSP_wwt, GWP_wwt = get_wwt_metrics(create_oc2g_comparison_models)
+    outs = get_wwt_metrics(create_oc2g_comparison_models)
 
     name = 'oilcane2g'
-    print_comparison(name, 'gal', MPSP_original, GWP_original, MPSP_wwt, GWP_wwt)
+    print_comparison(name, 'gal', MPSP_original, GWP_original, *outs)
     
-    simulated = [MPSP_original, GWP_original, MPSP_wwt, GWP_wwt]
+    simulated = (MPSP_original, GWP_original, *outs)
     check(name, simulated)
     return simulated
 
@@ -214,11 +226,11 @@ def test_la_baseline():
     GWP_original = la.funcs['get_GWP']()
     
     from biorefineries.wwt.lactic import create_la_comparison_models
-    MPSP_wwt, GWP_wwt = get_wwt_metrics(create_la_comparison_models, 'kg')
+    outs = get_wwt_metrics(create_la_comparison_models, 'kg')
 
     name = 'lactic'
-    print_comparison(name, 'kg', MPSP_original, GWP_original, MPSP_wwt, GWP_wwt)
+    print_comparison(name, 'kg', MPSP_original, GWP_original, *outs)
     
-    simulated = [MPSP_original, GWP_original, MPSP_wwt, GWP_wwt]
+    simulated = (MPSP_original, GWP_original, *outs)
     check(name, simulated)
     return simulated
