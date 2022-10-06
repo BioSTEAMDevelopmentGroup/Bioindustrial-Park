@@ -140,6 +140,6 @@ if __name__ == '__main__':
     exist_model, new_model = evaluate_oc1g_models( # 1G BMP should be high
         include_baseline=True,
         include_uncertainty=True,
-        N_uncertainty=100,
+        N_uncertainty=1000,
         # uncertainty_skip_exist=True,
         )

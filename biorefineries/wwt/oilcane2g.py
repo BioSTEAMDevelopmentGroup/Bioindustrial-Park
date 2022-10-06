@@ -150,7 +150,7 @@ if __name__ == '__main__':
         # include_baseline=True,
         # include_uncertainty=True,
         include_BMP=True,
-        # N_uncertainty=100,
+        # N_uncertainty=1000,
         # uncertainty_skip_exist=True, # for testing
         N_BMP=100,
         # BMPs=(0.5, 0.9499,), # for testing, 0.9499 allows for minor error

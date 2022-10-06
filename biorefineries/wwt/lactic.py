@@ -134,10 +134,10 @@ if __name__ == '__main__':
     # exist_sys, new_sys = simulate_la_systems(biodegradability=1)
     # exist_model, new_model = create_la_comparison_models()
     exist_model, new_model = evaluate_la_models(
-        include_baseline=True,
-        include_uncertainty=True,
+        # include_baseline=True,
+        # include_uncertainty=True,
         include_BMP=True,
-        N_uncertainty=100,
+        # N_uncertainty=1000,
         # uncertainty_skip_exist=True, # for testing
         N_BMP=100,
         # BMPs=(0.5, 0.9499,), # for testing, 0.9499 allows for minor error
