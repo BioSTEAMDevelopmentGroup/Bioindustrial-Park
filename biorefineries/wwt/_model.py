@@ -85,6 +85,9 @@ def add_biorefinery_parameters(model, model_dct, f, u, s, get_obj, get_rxn, para
         # natural gas set separately
         b = stream.price
         if b and stream not in (product, *ng_streams):
+            if 'ethanol' in stream.ID.lower() and stream.imass['Ethanol']:
+                print(f'\n\nPrice/CF for stream {stream.ID} not added as uncertain parameter.\n\n')
+                continue # do not add advanced/cellulose
             D = get_default_distribution('triangle', b)
             param(Setter(stream, 'price'), name=f'{stream.ID} price',
                   kind='cost', element=stream, units='USD/kg',
