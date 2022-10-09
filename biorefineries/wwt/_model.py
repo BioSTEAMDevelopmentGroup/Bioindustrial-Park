@@ -967,15 +967,17 @@ def save_model_results(model, path, percentiles):
     dct['data'] = model.table.iloc[:, index_p:]
     dct['percentiles'] = dct['data'].quantile(q=percentiles)
     rho, p = model.spearman_r(filter='omit nan')
-    rho.columns = pd.Index([i.name_with_units for i in model.metrics])
-    dct['spearman'] = rho
+    rho.columns = p.collumns = pd.Index([i.name_with_units for i in model.metrics])
+    dct['spearman_rho'] = rho
+    dct['spearman_p'] = p
 
     with pd.ExcelWriter(path) as writer:
         dct['parameters'].to_excel(writer, sheet_name='Parameters')
         dct['data'].to_excel(writer, sheet_name='Uncertainty results')
         if 'percentiles' in dct.keys():
             dct['percentiles'].to_excel(writer, sheet_name='Percentiles')
-        dct['spearman'].to_excel(writer, sheet_name='Spearman')
+        dct['spearman_rho'].to_excel(writer, sheet_name='Spearman rho')
+        dct['spearman_p'].to_excel(writer, sheet_name='Spearman p')
         model.table.to_excel(writer, sheet_name='Raw data')
 
 
