@@ -970,6 +970,7 @@ def save_model_results(model, path, percentiles):
     dct['data'] = model.table.iloc[:, index_p:]
     dct['percentiles'] = dct['data'].quantile(q=percentiles)
     rho, p = model.spearman_r(filter='omit nan')
+    p.index = rho.index
     rho.columns = p.collumns = pd.Index([i.name_with_units for i in model.metrics])
     dct['spearman_rho'] = rho
     dct['spearman_p'] = p
