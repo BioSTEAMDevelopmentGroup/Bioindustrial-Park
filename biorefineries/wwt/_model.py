@@ -172,7 +172,7 @@ def add_biodiesel_parameters(model, model_dct, f, u, s, get_obj, get_rxn, param)
     b = 0.1 if isinstance(oil_extraction_specification.oil_content, bool) else oil_extraction_specification.oil_content
     D = get_default_distribution('uniform', b, lb=0, ub=1)
     @param(name='Feedstock oil content', element=oil_extraction_specification,
-           units='dry mass', kind='coupled', baseline=b, distribution=D)
+           units='% dry mass', kind='coupled', baseline=b, distribution=D)
     def set_feedstock_oil_content(i):
         oil_extraction_specification.load_oil_content(i)
 
@@ -198,7 +198,7 @@ def add_biodiesel_parameters(model, model_dct, f, u, s, get_obj, get_rxn, param)
     b = max(oil_extraction_specification.crushing_mill_oil_recovery, 0.6) # sometimes it's 0.4
     D = get_default_distribution('uniform', b, lb=0, ub=1)
     @param(name='Crushing mill oil recovery', element=oil_extraction_specification,
-           units='', kind='coupled', baseline=b, distribution=D)
+           units='-', kind='coupled', baseline=b, distribution=D)
     def set_crushing_mill_oil_recovery(i):
         oil_extraction_specification.load_crushing_mill_oil_recovery(i)
 
@@ -322,7 +322,7 @@ def add_2G_parameters(model, model_dct, f, u, s, get_obj, get_rxn, param):
     b = EH_mixer.enzyme_loading
     try: D = shape.Triangle(10, b, 30)
     except: D = shape.Triangle(10/1e3, b, 30/1e3)
-    @param(name='EH enzyme loading', element=EH_mixer, kind='coupled', units='mg protein/glucan',
+    @param(name='EH enzyme loading', element=EH_mixer, kind='coupled', units='mg protein/g glucan',
            baseline=b, distribution=D)
     def set_EH_enzyme_loading(loading):
         EH_mixer.enzyme_loading = loading
