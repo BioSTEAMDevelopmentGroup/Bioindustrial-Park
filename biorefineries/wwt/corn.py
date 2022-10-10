@@ -27,11 +27,11 @@ info = {
 
 CF_dct = {
     ##### Feeds #####
-    'alpha_amylase': ('AlphaAmylase',), # 0.00082 soluble protein and water #!!! check concentration
+    'alpha_amylase': ('AlphaAmylase',), # 0.00082 soluble protein and water
     'ammonia': ('NH3',),
     'corn': ('Corn',), # adjust for the moisture content
     'denaturant': ('Denaturant',),
-    'gluco_amylase': ('GlucoAmylase',), # 0.0011 soluble protein and water #!!! check concentration
+    'gluco_amylase': ('GlucoAmylase',), # 0.0011 soluble protein and water
     'lime': ('CaO',),
     'natural_gas': ('CH4',),
     'steam':('Steam',),
@@ -133,6 +133,6 @@ if __name__ == '__main__':
     exist_model, new_model = evaluate_cn_models( # 1G BMP should be high
         include_baseline=True,
         include_uncertainty=True,
-        N_uncertainty=100,
+        N_uncertainty=1000,
         # uncertainty_skip_exist=True,
         )

@@ -51,7 +51,7 @@ def create_cs_comparison_systems(biodegradability=1): # will be multiplied by 0.
         'system_name': 'cornstover_sys',
         'create_wastewater_process': wwt_kwdct,
         'BT': 'BT',
-        'new_wwt_connections': {'sludge': ('slurry_mixer', 1), 'biogas': ('gas_mixer', 0)},
+        'new_wwt_connections': {'sludge': ('slurry_mixer', 0), 'biogas': ('gas_mixer', 0)},
         'CF_dct': CF_dct,
         }
     exist_sys, new_sys = create_comparison_systems(info, cs, sys_dct)
@@ -128,11 +128,11 @@ if __name__ == '__main__':
     # exist_sys, new_sys = simulate_cs_systems(biodegradability=1)
     # exist_model, new_model = create_cs_comparison_models()
     exist_model, new_model = evaluate_cs_models(
-        include_baseline=True,
-        include_uncertainty=True,
-        # include_BMP=True,
-        N_uncertainty=100,
-        # uncertainty_skip_exist=True,
-        # N_BMP=10,
-        # BMPs=(0.5, 0.9499,), # allow for minor error
+        # include_baseline=True,
+        # include_uncertainty=True,
+        include_BMP=True,
+        # N_uncertainty=1000,
+        # uncertainty_skip_exist=True, # for testing
+        N_BMP=100,
+        # BMPs=(0.5, 0.9499,), # for testing, 0.9499 allows for minor error
         )
