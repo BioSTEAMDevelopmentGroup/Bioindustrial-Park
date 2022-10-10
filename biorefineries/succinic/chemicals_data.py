@@ -136,7 +136,7 @@ AmmoniumAcetate = chemical_database('AmmoniumAcetate', phase='l',
 
 # # Solubility of CalciumSuccinate is 3.2 g/L in water as Ca2+ based on 
 # # Burgess and Drasdo, Polyhedron 1993, 12 (24), 2905–2911, which is 12.5 g/L as CaSA
-# # Baseline CalciumSuccinate is ~14 g/L in fermentation broth, thus assumes all 
+# # Baseline Calcium is ~14 g/L in fermentation broth, thus assumes all 
 # # CalciumSuccinate in liquid phase
 # CalciumSuccinate = chemical_database('CalciumSuccinate', phase='l')
 
