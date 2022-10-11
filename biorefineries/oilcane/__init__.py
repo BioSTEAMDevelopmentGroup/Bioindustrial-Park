@@ -730,9 +730,9 @@ def load(name, cache=cache, reduce_chemicals=True,
 
     # https://www.eia.gov/energyexplained/natural-gas/prices.php
     @parameter(distribution=natural_gas_price_distribution, element=s.natural_gas, units='USD/m3',
-               baseline=4.73 / 35.3146667)
+               baseline=4.73 * 35.3146667/1e3)
     def set_natural_gas_price(price): # Triangular distribution fitted over the past 10 years Sep 2009 to March 2021
-        BT.natural_gas_price = price / V_ng
+        BT.natural_gas_price = price * V_ng
 
     # https://www.eia.gov/outlooks/aeo/pdf/00%20AEO2021%20Chart%20Library.pdf
     # Data from historical prices, 2010-2020
