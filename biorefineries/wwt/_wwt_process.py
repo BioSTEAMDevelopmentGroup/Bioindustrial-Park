@@ -45,7 +45,13 @@ Rxn = tmo.reaction.Reaction
 ParallelRxn = tmo.reaction.ParallelReaction
 CEPCI = bst.units.design_tools.CEPCI_by_year
 
-__all__ = ('create_wastewater_process', 'CHP', 'Skipped',)
+__all__ = (
+    'BiogasUpgrading',
+    'create_wastewater_process',
+    'CHP',
+    'ReverseOsmosis',
+    'Skipped',
+    )
 
 
 # %%
