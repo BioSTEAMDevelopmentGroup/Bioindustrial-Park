@@ -553,10 +553,9 @@ LHV_ethanol = 77000 # Btu/gal per the statue instead of the 76330 from the H2 to
 LNG_to_ethanol = LHV_LNG/LHV_ethanol # gal ethanol/kg LNG
 RIN_price = RIN_per_gal * LNG_to_ethanol # $/kg LNG
 
-# Natural gas price for 2015-2021, in $/mcf ($/1000 cf), see
-# https://github.com/BioSTEAMDevelopmentGroup/Bioindustrial-Park/blob/f06d4bf6823a727540f0e0c5b59add383851b203/biorefineries/oilcane/_distributions.py (2015-2019)
-# https://github.com/BioSTEAMDevelopmentGroup/Bioindustrial-Park/blob/e3aa490c78559a6560175878201c1473575767e8/biorefineries/oilcane/_distributions.py (2017-2021)
-# [4.26, 3.71, 4.16, 4.23, 3.81,3.43, 6.11]
+# Natural gas price for 2015-2021, in $/mcf ($/1000 cf), U.S. EIA, city gate price
+# https://www.eia.gov/dnav/ng/hist/n3050us3a.htm, accessed 2022/10/11
+# [4.26, 3.71, 4.16, 4.23, 3.81, 3.43, 6.02]
 
 # Wastewater disposal (page 9 of Schueller)
 # COD excess cost is $0.127/0.2065 per lb ($280/455 per tonne), average to $0.16675/lb, or 0.3676/kg
