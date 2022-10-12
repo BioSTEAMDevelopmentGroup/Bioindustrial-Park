@@ -89,7 +89,7 @@ def create_system(ID='LAOs_sys', stainless_steel=True):
         recycle_nitrogen.imass['Nitrogen'] = F_mass_N2
         recycle_nitrogen.phase = 'g'
     
-    T107.specification = adjust_nitrogen_flow
+    T107.add_specification(adjust_nitrogen_flow)
     T107 - 0 - 1 - M103
     D101 = units.ShortcutColumn('D101', H104-0, LHK=('Decene', 'Tridecane'), 
                                 k=1.05, Lr=0.999, Hr=0.90, is_divided=True)
@@ -125,7 +125,7 @@ def create_system(ID='LAOs_sys', stainless_steel=True):
         wastewater = M104.outs[1]
         wastewater.price = -0.33 * (1 - wastewater.imass['Water', 'NaCl'].sum() / wastewater.F_mass)
     
-    M104.specification = adjust_price_per_organics
+    M104.add_specification(adjust_price_per_organics)
     M104.outs[1].price = -0.33 # USD / kg organics
     P109 = units.Pump('P109', M104-0, 1**F.unit.M101)
     H109 = units.HXutility('H109', D102-0, T=320, V=0)
