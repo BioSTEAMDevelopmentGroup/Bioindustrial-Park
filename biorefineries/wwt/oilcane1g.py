@@ -29,9 +29,9 @@ CF_dct = {
     ##### Feeds #####
     'catalyst': ('TEcatalyst',), # methanol and NaOCH3
     'denaturant': ('Denaturant'),
-    # 'dryer_natural_gas': ('CH4',), # used to be in the registry, but not any more
-    'H3PO4': ('H3PO4',),
-    'HCl': ('HCl',),
+    'dryer_natural_gas': ('CH4',),
+    'H3PO4': ('H3PO4',), # moisture content already adjusted
+    'HCl': ('HCl',), # moisture content already adjusted
     'lime': ('CaO', 0.046), # CaO and water
     'methanol': ('Methanol',),
     'NaOH': ('NaOH',),
@@ -42,10 +42,9 @@ CF_dct = {
     ##### Co-products #####
     'biodiesel': ('Biodiesel',), # has <0.01 wt% impurities
     'crude_glycerol': ('GlycerinCrude',),
-    # 'Yeast': ('Yeast',), # no price considered, no GWP considered (probably used in fermentation)
     # `fiber_fines`, `wastewater`, `vinasse` taken care of by WWT
     # `filter_cake` taken care of by BT
-    # `s46` (from `T302`) is empty
+    # 'Yeast': ('Yeast',), # no price considered, no GWP considered (probably used in fermentation)
     }
 
 
@@ -141,6 +140,6 @@ if __name__ == '__main__':
     exist_model, new_model = evaluate_oc1g_models( # 1G BMP should be high
         include_baseline=True,
         include_uncertainty=True,
-        N_uncertainty=100,
+        N_uncertainty=1000,
         # uncertainty_skip_exist=True,
         )

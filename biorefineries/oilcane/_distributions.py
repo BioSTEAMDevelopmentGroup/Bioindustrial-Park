@@ -99,9 +99,9 @@ ethanol_no_RIN_prices = np.array([
 ])
 assert len(ethanol_no_RIN_prices) == 5
 
-natural_gas_prices = np.array([ # City gate [USD / cf] 2017 to 2021
+natural_gas_prices = np.array([ # City gate [USD / mcf] 2017 to 2021, mcf = 1,000 cf
     4.16, 4.23, 3.81, 3.43, 6.11
-]) / 35.3146667 # To USD / m3
+]) * 35.3146667/1e3 # To USD / m3
 
 
 # %% Shorten data to 2017 - 2022 because of data limitations for cellulosic ethanol RINs 

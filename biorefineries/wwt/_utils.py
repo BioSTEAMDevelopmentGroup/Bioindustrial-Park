@@ -538,22 +538,20 @@ _GDP_2007to2016 = 1.160
 # https://www.epa.gov/fuels-registration-reporting-and-compliance-help/rin-trades-and-price-information
 # D3 designation based on entry Q of the approved pathways
 # https://www.epa.gov/renewable-fuel-standard-program/approved-pathways-renewable-fuel
-RIN_per_gal = 1.843 # $/liquid gal
-LNG_gal_to_Btu = 84820 # HHV, https://h2tools.org/hyarc/calculator-tools/lower-and-higher-heating-values-fuels
-RIN_per_Btu = RIN_per_gal / LNG_gal_to_Btu # $/Btu
-RIN_g_per_Btu = 0.0191 # HHV, https://h2tools.org/hyarc/calculator-tools/lower-and-higher-heating-values-fuels
-RIN_price = RIN_per_Btu / RIN_g_per_Btu * 1e3 # $1.14/kg
+RIN_per_gal = 1.843 # $/gal ethanol
 
-#!!! NEED TO DOUBLE-CHECK THE UNIT OF RIN
-# is it in $/gal LNG or $/ethanol gallon equivalent?
-# (the above calculation is for $/gal LNG)
-# if for $/ethanol gallon equivalent
-HHV_natural_gas = 52.21 # MJ/kg
+# According to the statue:
+# https://www.ecfr.gov/current/title-40/chapter-I/subchapter-C/part-80/subpart-M/section-80.1415
+# https://www.ecfr.gov/current/title-40/chapter-I/subchapter-C/part-80/subpart-M/section-80.1426
+# "(5) 77,000 Btu (lower heating value) of compressed natural gas (CNG) or liquefied natural gas (LNG) shall represent one gallon of renewable fuel with an equivalence value of 1.0."
+# All heating values from the H2 tools, accessed 9/27/2022
+# https://h2tools.org/hyarc/calculator-tools/lower-and-higher-heating-values-fuels
+LHV_LNG = 48.62 # MJ/kg, liquefied natural gas
 Btu_per_MJ = 0.001055
-HHV_natural_gas /= Btu_per_MJ # Btu/kg
-HHV_ethanol = 84530 # Btu/gal
-natural_gas_to_ethanol = HHV_natural_gas/HHV_ethanol # gal ethanol/kg natural gas
-RIN_price2 = RIN_per_gal * natural_gas_to_ethanol #  $1.08/kg
+LHV_LNG /= Btu_per_MJ # Btu/kg
+LHV_ethanol = 77000 # Btu/gal per the statue instead of the 76330 from the H2 tools website
+LNG_to_ethanol = LHV_LNG/LHV_ethanol # gal ethanol/kg LNG
+RIN_price = RIN_per_gal * LNG_to_ethanol # $/kg LNG
 
 # Wastewater disposal (page 9 of Schueller)
 # COD excess cost is $0.127/0.2065 per lb ($280/455 per tonne), average to $0.16675/lb, or 0.3676/kg
@@ -675,7 +673,6 @@ ng_CF = 0.3899 + 1/16.04246*44.0095
 # GREET 70% water wet mass, ecoinvent market for sugarcane, RoW, is 0.047651 (71.4% water)
 sugarcane_CF = 28.1052/1e3/(1-0.75)*(1-0.7)
 
-#!!! Need to double-check enzyme-related GWPs: AlphaAmylase, Cellulase, GlucoAmylase, Yeast
 GWP_CFs = {
     ##### Feeds #####
     'AlphaAmylase': 1.2043, # assumed to be for the solution
@@ -694,7 +691,7 @@ GWP_CFs = {
     'Ethanol': 1.4610 + 1/46.06844*44.0095*2, # not the denatured one, CO2 emission included
     'GlucoAmylase': 5.5135, # assumed to be for the solution
     'GlycerinPure': glycerin_pure_CF,
-    'H2SO4': 43.3831/1e3, # assumed to be concentrated solution
+    'H2SO4': 43.3831/1e3, # assumed to be for the solution
     'H3PO4': 1.0619, # assumed to be concentrated solution
     'HCl': 1.9683, # in the US, assumed to be concentrated solution
     'Methanol': 0.4866 + 1/32.04186*44.0095, # combined upstream, CO2 emission included
@@ -705,6 +702,7 @@ GWP_CFs = {
     'Polymer': 0, # for existing wastewater treatment, small quantity, ignored
     'Steam': 0.0860362, # per MJ, GREET 2021, mix natural gas and still gas
     'Sugarcane': sugarcane_CF,
+    'Urea': 1.2223, # urea production
     'Yeast': 2.5554, # assumed to be for the solution
     ##### Products, no needs to make product CFs negative #####
     # # If want to allocate based on the value

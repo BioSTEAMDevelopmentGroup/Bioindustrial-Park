@@ -85,6 +85,9 @@ def add_biorefinery_parameters(model, model_dct, f, u, s, get_obj, get_rxn, para
         # natural gas set separately
         b = stream.price
         if b and stream not in (product, *ng_streams):
+            if 'ethanol' in stream.ID.lower() and 'ethanol' in model_dct['FERM_product'] and stream.imass['Ethanol']:
+                print(f'\n\nPrice/CF for stream {stream.ID} not added as uncertain parameter.\n\n')
+                continue # do not add advanced/cellulose
             D = get_default_distribution('triangle', b)
             param(Setter(stream, 'price'), name=f'{stream.ID} price',
                   kind='cost', element=stream, units='USD/kg',
@@ -169,11 +172,10 @@ def add_biodiesel_parameters(model, model_dct, f, u, s, get_obj, get_rxn, param)
     oil_extraction_specification = OilExtractionSpecification(
             sys, [feedstock], isplit_a, isplit_b, model_dct['isplit_efficiency_is_reversed']
         )
-    b = oil_extraction_specification.oil_content
-    b = 0.05 if isinstance(b, bool) else b
+    b = 0.1 if isinstance(oil_extraction_specification.oil_content, bool) else oil_extraction_specification.oil_content
     D = get_default_distribution('uniform', b, lb=0, ub=1)
     @param(name='Feedstock oil content', element=oil_extraction_specification,
-           units='dry mass', kind='coupled', baseline=b, distribution=D)
+           units='% dry mass', kind='coupled', baseline=b, distribution=D)
     def set_feedstock_oil_content(i):
         oil_extraction_specification.load_oil_content(i)
 
@@ -196,10 +198,10 @@ def add_biodiesel_parameters(model, model_dct, f, u, s, get_obj, get_rxn, param)
     # Oil retained in the bagasse after crushing,
     # not using the range in the biorefinery as the baseline is 0.6 and
     # the distribution is uniform, 0.6-0.9
-    b = 0.6 # oil_extraction_specification.crushing_mill_oil_recovery default is somehow 0.4
+    b = max(oil_extraction_specification.crushing_mill_oil_recovery, 0.6) # sometimes it's 0.4
     D = get_default_distribution('uniform', b, lb=0, ub=1)
     @param(name='Crushing mill oil recovery', element=oil_extraction_specification,
-           units='', kind='coupled', baseline=b, distribution=D)
+           units='-', kind='coupled', baseline=b, distribution=D)
     def set_crushing_mill_oil_recovery(i):
         oil_extraction_specification.load_crushing_mill_oil_recovery(i)
 
@@ -208,7 +210,6 @@ def add_biodiesel_parameters(model, model_dct, f, u, s, get_obj, get_rxn, param)
         # not using the range in the biorefinery as the baseline is 0.7 and
         # the distribution is uniform, 0.7-0.9
         b = oil_extraction_specification.saccharification_oil_recovery
-        if b != 0.7: raise RuntimeError()
         D = get_default_distribution('uniform', b, lb=0, ub=1)
         @param(name='EH oil recovery', element=oil_extraction_specification,
                units='', kind='coupled', baseline=b, distribution=D)
@@ -281,7 +282,7 @@ def add_1G_parameters(model, model_dct, f, u, s, get_obj, get_rxn, param):
 
     # Fermentation
     fermentor = get_obj(u, 'fermentor')
-    rxn = get_rxn(fermentor, 'FERM glucan-to-product')
+    rxn = get_rxn(fermentor, 'FERM glucose-to-product')
     b = rxn.X
     D = get_default_distribution('triangle', b, ratio=0.05, lb=0, ub=1)
     @param(name='FERM glucose-to-product', element=fermentor, kind='coupled', units='-',
@@ -308,7 +309,7 @@ def add_1G_parameters(model, model_dct, f, u, s, get_obj, get_rxn, param):
 
         b = -1.7 # average of 2.4/1 kg CO2/kg COD removed for aerobic/primarily anaerobic processes
         D = get_default_distribution('uniform', b)
-        @param(name='Wastewater GWP', element=ww, kind='cost', units='kg CO2/kg COD',
+        @param(name='Wastewater CF', element=ww, kind='cost', units='kg CO2/kg COD',
                 baseline=b, distribution=D)
         def set_wastewater_COD_GWP(GWP):
             ww_cod = get_COD(ww) * ww.F_vol # kg COD/hr
@@ -324,7 +325,7 @@ def add_2G_parameters(model, model_dct, f, u, s, get_obj, get_rxn, param):
     b = EH_mixer.enzyme_loading
     try: D = shape.Triangle(10, b, 30)
     except: D = shape.Triangle(10/1e3, b, 30/1e3)
-    @param(name='EH enzyme loading', element=EH_mixer, kind='coupled', units='mg protein/glucan',
+    @param(name='EH enzyme loading', element=EH_mixer, kind='coupled', units='mg protein/g glucan',
            baseline=b, distribution=D)
     def set_EH_enzyme_loading(loading):
         EH_mixer.enzyme_loading = loading
@@ -643,8 +644,8 @@ def add_metrics(model, model_dct, f, u, s, get_obj):
 
     tea = sys.TEA
     product = get_obj(s, 'FERM_product')
-    gal_or_kg = 'gal' if product.ID=='ethanol' else 'kg'
-    factor = 2.9867 if product.ID=='ethanol' else 1. # 2.9867 is cs.ethanol_density_kggal
+    gal_or_kg = 'gal' if 'ethanol' in product.ID else 'kg'
+    factor = 2.9867 if 'ethanol' in product.ID else 1. # 2.9867 is cs.ethanol_density_kggal
 
     ww = s.search('ww')
     X = model_dct['wwt_ID']
@@ -682,9 +683,9 @@ def add_metrics(model, model_dct, f, u, s, get_obj):
         # Economic allocation
         # net = feed + process + utility - product
         total_GWP = cache_dct[f'Total GWP{suffix}'] = (
-            net +
-            max(sys.get_total_products_impact('GWP'), 0) - # positive if having product credit
-            min(sys.get_net_electricity_impact('GWP'), 0) # negative if producing electricity
+            net
+            + max(sys.get_total_products_impact('GWP'), 0) # positive if having product credit
+            - min(sys.get_net_electricity_impact('GWP'), 0) # negative if producing electricity
             )
         hourly_GWP = total_GWP / hours
         product_ratio = cache_dct[f'Product ratio{suffix}']
@@ -964,20 +965,23 @@ def copy_samples(original, new, exclude=()):
 def save_model_results(model, path, percentiles):
     dct = {}
     index_p = len(model.parameters)
-    dct['parameters'] = model.table.iloc[:, :index_p].astype('float')
-    dct['data'] = model.table.iloc[:, index_p:].astype('float')
+    model.table = model.table.astype('float') # prevent error in spearman
+    dct['parameters'] = model.table.iloc[:, :index_p]
+    dct['data'] = model.table.iloc[:, index_p:]
     dct['percentiles'] = dct['data'].quantile(q=percentiles)
-
     rho, p = model.spearman_r(filter='omit nan')
-    rho.columns = pd.Index([i.name_with_units for i in model.metrics])
-    dct['spearman'] = rho
+    p.index = rho.index
+    rho.columns = p.collumns = pd.Index([i.name_with_units for i in model.metrics])
+    dct['spearman_rho'] = rho
+    dct['spearman_p'] = p
 
     with pd.ExcelWriter(path) as writer:
         dct['parameters'].to_excel(writer, sheet_name='Parameters')
         dct['data'].to_excel(writer, sheet_name='Uncertainty results')
         if 'percentiles' in dct.keys():
             dct['percentiles'].to_excel(writer, sheet_name='Percentiles')
-        dct['spearman'].to_excel(writer, sheet_name='Spearman')
+        dct['spearman_rho'].to_excel(writer, sheet_name='Spearman rho')
+        dct['spearman_p'].to_excel(writer, sheet_name='Spearman p')
         model.table.to_excel(writer, sheet_name='Raw data')
 
 
@@ -1001,7 +1005,6 @@ def run_uncertainty(exist_model, new_model, abbr, percentiles, seed, N,
     exist_model.load_samples(exist_samples)
     dir_path = dir_path or os.path.join(results_path, 'uncertainties')
     if not os.path.isdir(dir_path): os.mkdir(dir_path)
-
     notify = ceil(N/10)
     if not skip_exist:
         print(f'\n\n Exist model for {abbr}: N = {N}')
@@ -1043,14 +1046,14 @@ def evaluate_models(
         include_BMP=False,
         percentiles=(0, 0.05, 0.25, 0.5, 0.75, 0.95, 1),
         seed=3221, N_uncertainty=1000, uncertainty_skip_exist=False,
-        BMPs=(0.5, 0.6, 0.7, 0.8, 0.9, 0.9499), N_BMP=100, # 0.9499 is for minor error
+        N_BMP=100, BMPs=(0.5, 0.6, 0.7, 0.8, 0.9, 0.9499), # 0.9499 allows for minor error
         ):
     args = [exist_model, new_model, abbr]
     if include_baseline: run_baseline(*args)
 
     args.extend([percentiles, seed, N_uncertainty, uncertainty_skip_exist])
     if include_uncertainty: run_uncertainty(*args)
-
-    args.pop(-1)
+    args.pop(-1) # pop `uncertainty_skip_exist`
+    args.pop(-1) # pop `N_uncertainty`
     args.extend([N_BMP, BMPs])
     if include_BMP: run_across_BMP(*args)
