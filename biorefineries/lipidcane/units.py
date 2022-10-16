@@ -51,7 +51,6 @@ class BlendingTankWithSkimming(bst.MixTank):
 class GlycerolysisReactor(bst.ContinuousReactor):
     _N_ins = 2
     _N_outs = 2
-    _N_heat_utilities = 1
     def __init__(self, ID='', ins=None, outs=(), thermo=None, *, 
                  P=101325, T=273.15 + 230, 
                  tau=2.0, V_wf=0.8, V_max=355,
@@ -108,7 +107,7 @@ class GlycerolysisReactor(bst.ContinuousReactor):
         
     def _design(self):
         bst.ContinuousReactor._design(self)
-        self.heat_utilities[0](self.Hnet, self.T)
+        self.add_heat_utility(self.Hnet, self.T)
         
         
         

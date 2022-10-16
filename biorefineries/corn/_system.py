@@ -238,7 +238,7 @@ def create_system(ID='corn_sys', flowsheet=None):
     )
     other_facilities = u.PlantAir_CIP_WasteWater_Facilities('other_facilities', corn)
     HXN = bst.HeatExchangerNetwork('HXN', 
-        units=lambda: [fu.Ev607.components['evaporators'][0], fu.T503_T507.condenser]
+        units=lambda: [fu.Ev607.evaporators[0], fu.T503_T507.condenser]
     )
     globals().update(f.unit.data)
     return f.create_system('corn_sys')
