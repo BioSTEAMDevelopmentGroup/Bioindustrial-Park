@@ -32,7 +32,7 @@ _Gcal2kJ = 4184e3
 
 @cost('Dry flow rate', 'Pretreatment reactor system', units='kg/hr',
       S=83333, CE=522, cost=19812400 * 0.993, n=0.6, kW=4578, BM=1.5)
-class PretreatmentReactorSystem(Unit, bst.units.design_tools.PressureVessel):
+class PretreatmentReactorSystem(bst.units.design_tools.PressureVessel, Unit):
     _N_ins = 1
     _N_outs = 2
     _graphics = bst.Flash._graphics

@@ -48,26 +48,15 @@ class BlendingTankWithSkimming(bst.MixTank):
         vegetable_oil.mol -= polar_lipids.mol
 
 
-class GlycerolysisReactor(bst.ContinuousReactor):
+class GlycerolysisReactor(bst.CSTR):
+    _ins_size_is_fixed = False
     _N_ins = 2
     _N_outs = 2
-    def __init__(self, ID='', ins=None, outs=(), thermo=None, *, 
-                 P=101325, T=273.15 + 230, 
-                 tau=2.0, V_wf=0.8, V_max=355,
-                 length_to_diameter=2, kW_per_m3=0.985,
-                 vessel_material='Stainless steel 316',
-                 vessel_type='Vertical'):
-        bst.ContinuousReactor.__init__(self,
-            ID, ins, outs, thermo,
-            P=P, tau=tau, V_wf=V_wf, V_max=V_max,
-            length_to_diameter=length_to_diameter, 
-            kW_per_m3=kW_per_m3,
-            vessel_material='Stainless steel 316',
-            vessel_type='Vertical'
-        )
-        self.P = P
-        self.T = T
-        
+    T_default = 273.15 + 230
+    P_default = 101325
+    
+    def _setup(self):
+        super()._setup()
         # End result is near 100% conversion of FFAs with selectivity
         # of 42% MAG, 47% DAG, 11% TAG:
         # [1] Erik Anderson. Superior Process Technologies. 
@@ -105,9 +94,6 @@ class GlycerolysisReactor(bst.ContinuousReactor):
         self.glycerolysis(effluent)
         vent.copy_flow(effluent, ('N2', 'Water'), remove=True)
         
-    def _design(self):
-        bst.ContinuousReactor._design(self)
-        self.add_heat_utility(self.Hnet, self.T)
         
         
         

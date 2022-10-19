@@ -347,7 +347,8 @@ def create_oilcane_to_biodiesel_and_ethanol_1g(
     )
     def get_hx_issues():
         hxs = [u.E301, u.D601.boiler, u.D602.boiler, u.H601, u.H602, u.H603, u.H604, oil_pretreatment_dct['F3'], u.H606]
-        if 'condenser' in u.E401.components: hxs.append(u.E401.components['condenser'])
+        condenser = getattr(u.E401, 'condenser', None)
+        if condenser: hxs.append(condenser)
         return hxs
     
     HXN = bst.HeatExchangerNetwork(900, 
