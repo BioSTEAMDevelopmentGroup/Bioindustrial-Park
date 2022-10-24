@@ -7,7 +7,7 @@ import biosteam as bst
 import thermosteam as tmo
 import flexsolve as flx
 import numpy as np
-import units_baseline
+from biorefineries.oleochemicals import units_baseline
 import chemicals_baseline
 from biosteam import main_flowsheet as F
 from biosteam import units, SystemFactory
@@ -147,7 +147,7 @@ ob0.show()
             dict(ID='water_for_dihydroxylation',
                 Water = 100,
                 T = 298.15),
-            dict(ID = 'fresh_tungsetn_catalyst',
+            dict(ID = 'fresh_tungsten_catalyst',
                 Tungstic_acid = 100),
             dict(ID = 'recycled_tungstic_acid',
                  )],           
@@ -182,7 +182,7 @@ def dihydroxylation_system(ins,outs):
     
     def adjust_tungsten_catalyst_flow():
           required_total_tungsten_catalyst = biodiesel.F_mass * 48/10000
-          fresh_tunsgten_catalyst.F_mass = required_total_tungsten_catalyst - recycled_tungstic_acid              
+          fresh_tunsgten_catalyst.F_mass = required_total_tungsten_catalyst - recycled_tungstic_acid.F_mass              
     T104.add_specification(adjust_tungsten_catalyst_flow, run=True)
     
     M101 = bst.units.Mixer('combining_recycled_and_new_tungstic_acid',
@@ -227,16 +227,17 @@ def dihydroxylation_system(ins,outs):
                                 tau = 6,
                                 length_to_diameter = 2,
                                 V_max = 133666,
-                                T_condenser = 60 + 273.15                                # in m3 (equivalent to 1 MMGal), 
+                                # in m3 (equivalent to 1 MMGal), 
                                 # this is including catalyst volume
                                                               )
 ## Condensate volume is zero because no vle happening at that temp pressure
 # Pumping the mixture out using a gear pump to the oxidative cleavage section
 # TODO: is the below required now?
-    # R101_P1 = bst.units.Pump('R101_P1',
-    #                           ins = R101-1,
-    #                           outs = diol_product,
-    #                           P = 20*100000)
+    R101_P1 = bst.units.Pump('R101_P1',
+                              ins = R101-1,
+                              outs = diol_product,
+                              P = 20*100000)
+    
 ob1 = dihydroxylation_system(ins=ob0.outs[1]) 
 ob1.simulate()
 ob1.show()
@@ -583,4 +584,4 @@ ob7.simulate()
 ob7.show()
 
 #Connecting recycle streams for tungstic_acid
-ob7.outs[0] = ob1.ins[4]
+# ob1.ins[4] = ob7.outs[0]

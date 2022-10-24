@@ -20,41 +20,11 @@ from biosteam.units.design_tools import PressureVessel,pressure_vessel_material_
 class DihydroxylationReactor(bst.CSTR):
     _N_ins = 1
     _N_outs = 2
-       
-# V_max is max volume of a reactor in feet3
-    def __init__(self, ID='',
-                 ins=None, 
-                 outs=(),
-                 thermo=None, 
-                 P=None,
-                 T= None, 
-                 tau=None,
-                 V_wf=0.9,
-                 V_max = None, 
-                 dT_hx_loop = None,
-                 kW_per_m3=0.985,
-                 vessel_material='Stainless steel 316',
-                 vessel_type='Vertical'):
-        super().__init__( ID,
-                         ins,
-                         outs,
-                         thermo,
-                         P,
-                         T,
-                         tau,
-                         V_wf,V_max,dT_hx_loop,kW_per_m3,
-                         vessel_material,vessel_type)
-    
-## The two heatutilities are both for the vaccuum system -steam and for the cooling water
-        self.P = P
-        self.T = T
-        self.tau = tau
-        self.V_max = V_max
-        self.dT_hx_loop = dT_hx_loop
                 
-    def _setup(self):   
+    def _setup(self):  
+            super()._setup()  
             Dihydroxylation_reaction = Rxn('Methyl_oleate + Hydrogen_peroxide -> MDHSA ', 'Methyl_oleate', X = 0.9)
-            Catalyst_dissolution = Rxn('Tungstic_acid -> Tungstate_ion + H+', X = 0.99)   
+            Catalyst_dissolution = Rxn('Tungstic_acid -> Tungstate_ion + Hydrogen_ion', 'Tungstic_acid',X = 0.9)   
             DihydroxylationReactor_rxnsys = RxnSys(Dihydroxylation_reaction, Catalyst_dissolution)
             self.reactions = DihydroxylationReactor_rxnsys                       
           
@@ -71,41 +41,15 @@ class DihydroxylationReactor(bst.CSTR):
 ##TODO: Find out how much fo the h202 is getting removed ay the first
 ## and then remove the rest by decomposition 
        
-class OxidativeCleavageReactor(bst.ContinuousReactor):
+class OxidativeCleavageReactor(bst.CSTR):
     _N_ins = 1
     _N_outs = 2
        
 # V_max is max volume of a reactor in feet3
-    def __init__(self, ID='',
-                 ins=None, 
-                 outs=(),
-                 thermo=None, 
-                 P=None,
-                 T= None, 
-                 tau=None,
-                 V_wf=0.9,
-                 V_max = None, 
-                 dT_hx_loop = None,
-                 kW_per_m3=0.985,
-                 vessel_material='Stainless steel 316',
-                 vessel_type='Vertical'):
-        super().__init__( ID,
-                         ins,
-                         outs,
-                         thermo,
-                         P,
-                         T,
-                         tau,
-                         V_wf,V_max,dT_hx_loop,kW_per_m3,
-                         vessel_material,vessel_type)
-    
+   
 ## The two heatutilities are both for the vaccuum system -steam and for the cooling water
-        self.P = P
-        self.T = T
-        self.tau = tau
-        self.V_max = V_max
-        self.dT_hx_loop = dT_hx_loop
-    def _setup(self):           
+    def _setup(self):          
+        super()._setup()         
         #oxidative_cleavage_conversion
         X1 = 0.8
         # decarboxylations conversion
@@ -212,34 +156,16 @@ class Zeolite_packed_bed_reactor(Unit, PressureVessel, isabstract = True):
         vent.T = effluent.T = self.T
         vent.P = effluent.P = self.P
 
-class Calcium_hydroxide_reactor(bst.ContinuousReactor):
+class Calcium_hydroxide_reactor(bst.CSTR):
     _N_ins = 1
     _N_outs = 1
     
-## V_max is max volume of a reactor in feet3
-    def __init__(self, ID='', ins=None, outs=(), thermo=None, 
-                 P=101325, T= None, 
-                 tau=2.0, V_wf=0.8, V_max = None, 
-                 length_to_diameter=2, kW_per_m3=0.985,
-                 vessel_material='Stainless steel 316',
-                 vessel_type='Vertical'):
-        
-        bst.ContinuousReactor.__init__(self,
-            ID, ins, outs, thermo,
-            P=P, tau=tau, V_wf=V_wf, V_max=V_max,
-            length_to_diameter=length_to_diameter, 
-            kW_per_m3=kW_per_m3,
-            vessel_material='Stainless steel 316',
-            vessel_type='Vertical'
-        )
-        self.P = P
-        self.T = T
-        
+       
     def _setup(self):  
-                        
+        super()._setup()                  
         self.reactions = tmo.SeriesReaction([
                 tmo.Rxn('Cobalt_ion + Calcium_hydroxide + Acetate = Calcium_acetate + Cobalt_hydroxide', 'Cobalt_ion', X = 0.99),
-                tmo.Rxn('Tungstate_ion + Calcium_hydroxide + H+ = Calcium_tungstate + H2O', 'Tungstate_ion', X = 0.99)
+                tmo.Rxn('Tungstate_ion + Calcium_hydroxide + Hydrogen_ion = Calcium_tungstate + H2O', 'Tungstate_ion', X = 0.99)
                 ])
             
     def _run(self):
@@ -251,54 +177,17 @@ class Calcium_hydroxide_reactor(bst.ContinuousReactor):
         vent.T = self.T
         effluent.P = self.P
         
-class Acid_precipitation_reactor(bst.ContinuousReactor):
+class Acid_precipitation_reactor(bst.CSTR):
     _N_ins = 1
     _N_outs = 1
- #: [bool] If True, number of reactors (N) is chosen as to minimize installation cost in every simulation. Otherwise, N remains constant.
-    autoselect_N = False    
-    #: [float] Cleaning and unloading time (hr).
-    tau_0 = 3    
-    #: [float] Fraction of filled tank to total tank volume.
-    V_wf = 0.9    
-    def _get_design_info(self):
-        return (('Cleaning and unloading time', self.tau_0, 'hr'),
-                ('Working volume fraction', self.V_wf, '')) 
-    
-    @property
-    def effluent(self):
-        return self.outs[0]
-    
-    @effluent.setter
-    def effluent(self,effluent):
-        self.outs[0]=effluent
         
-## V_max is max volume of a reactor in feet3
-
-    def __init__(self, ID='', ins=None, outs=(), thermo=None, 
-                 P=101325, T= None, 
-                 tau=2.0, V_wf=0.8, V_max = None, 
-                 length_to_diameter=2, kW_per_m3=0.985,
-                 vessel_material='Stainless steel 316',
-                 vessel_type='Vertical'):
-        
-        bst.ContinuousReactor.__init__(self,
-            ID, ins, outs, thermo,
-            P=P, tau=tau, V_wf=V_wf, V_max=V_max,
-            length_to_diameter=length_to_diameter, 
-            kW_per_m3=kW_per_m3,
-            vessel_material='Stainless steel 316',
-            vessel_type='Vertical'
-        )
-        self.P = P
-        self.T = T
-        
-    def _setup(self):  
+    def _setup(self): 
+        super()._setup()
         # Not sure about the below, how do we have ions for the below                         
         self.reactions = tmo.ParallelReaction([
                 tmo.Rxn('Calcium_tungstate + HCl = Tungstic_acid + Calcium_chloride', 'Calcium_tungstate',X = 0.9),
                 tmo.Rxn('Cobalt_hydroxide + HCl = Cobalt_chloride + Water','Cobalt_hydroxide', X = 0.9)
-                ])
-            
+                ])            
     def _run(self):
         feed = self.ins[0]
         effluent,vent, = self.outs       
