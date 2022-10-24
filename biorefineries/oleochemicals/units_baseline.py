@@ -17,96 +17,94 @@ import numpy as np
 from biosteam import Unit
 from biosteam.units.design_tools import PressureVessel,pressure_vessel_material_factors as factors
 
-
-## TODO.xxx need to add a vaccuum system inside the unit operation
-## TODO: the vle is not running in the class need to discuss that
-class DihydroxylationReactor(bst.ContinuousReactor):
+class DihydroxylationReactor(bst.CSTR):
     _N_ins = 1
     _N_outs = 2
-    auxiliary_unit_names = ('heat_exchanger',)
-        
-## V_max is max volume of a reactor in feet3
-    def __init__(self, ID='', ins=None, outs=(), thermo=None, 
+       
+# V_max is max volume of a reactor in feet3
+    def __init__(self, ID='',
+                 ins=None, 
+                 outs=(),
+                 thermo=None, 
                  P=None,
                  T= None, 
                  tau=None,
                  V_wf=0.9,
                  V_max = None, 
-                 length_to_diameter= None, 
+                 dT_hx_loop = None,
                  kW_per_m3=0.985,
                  vessel_material='Stainless steel 316',
-                 vessel_type='Vertical',
-                 T_condenser = None):
-        
-        bst.ContinuousReactor.__init__(self,
-            ID, ins, outs, thermo,
-            P=P, tau=tau, V_wf=V_wf, V_max=V_max,
-            length_to_diameter=length_to_diameter, 
-            kW_per_m3=kW_per_m3,
-            vessel_material='Stainless steel 316',
-            vessel_type='Vertical'
-        )        
+                 vessel_type='Vertical'):
+        super().__init__( ID,
+                         ins,
+                         outs,
+                         thermo,
+                         P,
+                         T,
+                         tau,
+                         V_wf,V_max,dT_hx_loop,kW_per_m3,
+                         vessel_material,vessel_type)
+    
 ## The two heatutilities are both for the vaccuum system -steam and for the cooling water
-        self._multi_stream = ms = MultiStream(None, thermo=self.thermo)
-        self.heat_exchanger = hx = HXutility(None, (None,), ms, thermo=self.thermo)
-        self.heat_utilities = (*hx.heat_utilities, bst.HeatUtility(), bst.HeatUtility())
         self.P = P
         self.T = T
         self.tau = tau
-        self.length_to_diameter = length_to_diameter 
-        self.T_condenser = T_condenser
-        self._vapor = vapor = Stream('top')
-        self._liquid =liquid = Stream('bottom')
-        
+        self.V_max = V_max
+        self.dT_hx_loop = dT_hx_loop
+                
     def _setup(self):   
-#TODO: Might have to change this during uncertainity analysis, keep it outside
-        Dihydroxylation_reaction = Rxn('Methyl_oleate + Hydrogen_peroxide -> MDHSA ', 'Methyl_oleate', X = 0.9)
-        Catalyst_dissolution = Rxn('Tungstic_acid -> Tungstate_ion + H+', X = 0.99)   
-        DihydroxylationReactor_rxnsys = RxnSys(Dihydroxylation_reaction, Catalyst_dissolution)
-        self.reactions = DihydroxylationReactor_rxnsys                       
+            Dihydroxylation_reaction = Rxn('Methyl_oleate + Hydrogen_peroxide -> MDHSA ', 'Methyl_oleate', X = 0.9)
+            Catalyst_dissolution = Rxn('Tungstic_acid -> Tungstate_ion + H+', X = 0.99)   
+            DihydroxylationReactor_rxnsys = RxnSys(Dihydroxylation_reaction, Catalyst_dissolution)
+            self.reactions = DihydroxylationReactor_rxnsys                       
           
     def _run(self):        
-        condensate,effluent, = self.outs
-        condensate.mix_from(self.ins)
-        self.reactions(condensate)
-        ms = self._multi_stream = MultiStream('ms', phases='lg')
-        ms.copy_like(condensate)
-        ms.vle(T = self.T, P = self.P)
-        ms.show()
-        condensate.copy_like(ms['g'])
-        effluent.copy_like(ms['l'])
-        hx = self.heat_exchanger
-        hx.ins[0].copy_like(condensate)
-        hx.T = self.T_condenser
-        hx.run()
-        condensate.copy_like(hx.outs[0])
-      
-## TODO: add the HE and VS in the reactor acc Yoel code
-## Find out how much fo the h202 is getting removed ay the first
+            condensate,effluent, = self.outs
+            condensate.mix_from(self.ins)
+            self.reactions(condensate)
+            ms = self._multi_stream = MultiStream('ms', phases='lg')
+            ms.copy_like(condensate)
+            ms.vle(T = self.T, P = self.P)
+            condensate.copy_like(ms['g'])
+            effluent.copy_like(ms['l'])
+            
+##TODO: Find out how much fo the h202 is getting removed ay the first
 ## and then remove the rest by decomposition 
        
 class OxidativeCleavageReactor(bst.ContinuousReactor):
     _N_ins = 1
     _N_outs = 2
-    
-    def __init__(self, ID='', ins=None, outs=(), thermo=None, 
-                 P=101325, T= None, 
-                 tau= None, V_wf=0.8, V_max = None, 
-                 length_to_diameter=2, kW_per_m3=0.985,
+       
+# V_max is max volume of a reactor in feet3
+    def __init__(self, ID='',
+                 ins=None, 
+                 outs=(),
+                 thermo=None, 
+                 P=None,
+                 T= None, 
+                 tau=None,
+                 V_wf=0.9,
+                 V_max = None, 
+                 dT_hx_loop = None,
+                 kW_per_m3=0.985,
                  vessel_material='Stainless steel 316',
                  vessel_type='Vertical'):
-        
-        bst.ContinuousReactor.__init__(self,
-            ID, ins, outs, thermo,
-            P=P, tau=tau, V_wf=V_wf, V_max=V_max,
-            length_to_diameter=length_to_diameter, 
-            kW_per_m3=kW_per_m3,
-            vessel_material='Stainless steel 316',
-            vessel_type='Vertical')  
-        self.T = T
+        super().__init__( ID,
+                         ins,
+                         outs,
+                         thermo,
+                         P,
+                         T,
+                         tau,
+                         V_wf,V_max,dT_hx_loop,kW_per_m3,
+                         vessel_material,vessel_type)
+    
+## The two heatutilities are both for the vaccuum system -steam and for the cooling water
         self.P = P
+        self.T = T
         self.tau = tau
-
+        self.V_max = V_max
+        self.dT_hx_loop = dT_hx_loop
     def _setup(self):           
         #oxidative_cleavage_conversion
         X1 = 0.8
@@ -146,6 +144,19 @@ class OxidativeCleavageReactor(bst.ContinuousReactor):
         vent.copy_flow(effluent, ('Nitrogen', 'Oxygen','Carbon_dioxide'), remove=True)
         vent.T = effluent.T = self.T
         vent.P = effluent.P = self.P
+        
+class CentrifugeVacuumVessel(bst.Unit):
+        auxiliary_unit_names = ('vacuum_system',) # Mark attributes as auxiliary
+        _units = {'Total volume': 'm3'} # This is needed for the vacuum system
+        P = 1000 # Pa
+        tau = 4 # hr
+
+        def _run(self):
+            self.outs[0].P = 1000 # Pa
+    
+        def _design(self):
+             self.design_results['Total volume'] = self.feed.F_vol * self.tau
+             self.vacuum_system = bst.VacuumSystem(self)
 
 class Zeolite_packed_bed_reactor(Unit, PressureVessel, isabstract = True):
 #resin and the emulsified mixture    
