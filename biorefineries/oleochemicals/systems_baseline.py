@@ -7,7 +7,7 @@ import biosteam as bst
 import thermosteam as tmo
 import flexsolve as flx
 import numpy as np
-import units_baseline
+from biorefineries.oleochemicals import units_baseline
 import chemicals_baseline
 from biosteam import main_flowsheet as F
 from biosteam import units, SystemFactory
@@ -130,12 +130,12 @@ ob0 = crude_HOSO_oil_to_biodiesel()
 ob0.simulate()
 ob0.show()
 
-#After degumming and production of biodiesel, it is sent for dihydroxylation
-#The flowrates for both the tungstic acid and H2O2 are adjusted acc to the flowrate of biodiesel coming 
+# After degumming and production of biodiesel, it is sent for dihydroxylation
+# The flowrates for both the tungstic acid and H2O2 are adjusted acc to the flowrate of biodiesel coming 
 # Acc. to literature methyl oleate (technical purity approximately 85%; flow rate 10 kg/h); 
 # An aqueous solution of hydrogen peroxide at 60% (flow rate 2.3 kg/h); 
 # Tungstic acid (HWO) (flow rate 48 g/h).
-# TODO.xxx ask for solids storage to Yoel/ ask if conveyer belt should be used - add a purchase cost algorithm of these things
+# TODO.xxx ask for solids storage to Yoel add a purchase cost algorithm of these things
 
 @SystemFactory(
     ID = 'dihydroxylation_reaction',
@@ -147,8 +147,10 @@ ob0.show()
             dict(ID='water_for_dihydroxylation',
                 Water = 100,
                 T = 298.15),
-            dict(ID = 'fresh_tungsetn_catalyst',
-                Tungstic_acid = 100)],           
+            dict(ID = 'fresh_tungsten_catalyst',
+                Tungstic_acid = 100),
+            dict(ID = 'recycled_tungstic_acid',
+                 )],           
     outs = [dict(ID = 'condensate'),
             dict(ID = 'diol_product'),
             ],
@@ -156,10 +158,9 @@ ob0.show()
               )
 
 def dihydroxylation_system(ins,outs):
-    biodiesel, fresh_HP, water_for_dihydroxylation, fresh_tunsgten_catalyst = ins
+    biodiesel, fresh_HP, water_for_dihydroxylation, fresh_tunsgten_catalyst,recycled_tungstic_acid, = ins
     condensate,diol_product, = outs
 # Fresh_Hydrogen_peroxide_feedtank
-
     T102 =  bst.units.StorageTank('T102',
                                 ins = fresh_HP,
                                 outs = 'fresh_HP_to_pump')
@@ -176,16 +177,19 @@ def dihydroxylation_system(ins,outs):
 
 # Catalyst_feed_tank
     T104 = bst.units.StorageTank('T104',
-                              ins = fresh_tunsgten_catalyst ,
+                              ins = (fresh_tunsgten_catalyst),
                               outs = 'fresh_catalyst_to_pump')
-
+    
     def adjust_tungsten_catalyst_flow():
-        fresh_tunsgten_catalyst.F_mass = biodiesel.F_mass * 48/10000
-      
+          required_total_tungsten_catalyst = biodiesel.F_mass * 48/10000
+          fresh_tunsgten_catalyst.F_mass = required_total_tungsten_catalyst - recycled_tungstic_acid.F_mass              
     T104.add_specification(adjust_tungsten_catalyst_flow, run=True)
     
+    M101 = bst.units.Mixer('combining_recycled_and_new_tungstic_acid',
+                           ins = (T104-0,
+                                  recycled_tungstic_acid))
 #Mixer for hydrogen_peroxide solution
-    M101 = bst.units.Mixer('M101',
+    M102 = bst.units.Mixer('M102',
                         ins = (P102-0,                               
                                 P103-0),
                         outs = 'feed_to_reactor_mixer')
@@ -195,16 +199,16 @@ def dihydroxylation_system(ins,outs):
       #conversion factor based on the patent  
         fresh_HP.F_mass = 0.6*0.2299999* biodiesel.F_mass
         water_for_dihydroxylation.F_mass = 0.4 *0.2299999 * biodiesel.F_mass
-    M101.add_specification(adjust_HP_feed_flow, run=True)   
+    M102.add_specification(adjust_HP_feed_flow, run=True)   
       
-    M102 = bst.units.Mixer('M102',
+    M103 = bst.units.Mixer('M102',
                         ins = (biodiesel,
-                                M101-0,
-                                T104-0),
+                                M102-0,
+                                M101-0),
                         outs = 'feed_to_heat_exchanger')
 
     R101_H1 = bst.units.HXutility('R101_H1',
-                              ins = M102-0,
+                              ins = M103-0,
                               outs = 'feed_to_oleochemicals_reactor',
                               T = 62 + 273.15
                               )
@@ -223,15 +227,17 @@ def dihydroxylation_system(ins,outs):
                                 tau = 6,
                                 length_to_diameter = 2,
                                 V_max = 133666,
-                                T_condenser = 60 + 273.15                                # in m3 (equivalent to 1 MMGal), 
+                                # in m3 (equivalent to 1 MMGal), 
                                 # this is including catalyst volume
                                                               )
 ## Condensate volume is zero because no vle happening at that temp pressure
 # Pumping the mixture out using a gear pump to the oxidative cleavage section
+# TODO: is the below required now?
     R101_P1 = bst.units.Pump('R101_P1',
                               ins = R101-1,
                               outs = diol_product,
                               P = 20*100000)
+    
 ob1 = dihydroxylation_system(ins=ob0.outs[1]) 
 ob1.simulate()
 ob1.show()
@@ -281,7 +287,6 @@ def oxidative_cleavage_system(ins,outs):
                               outs = 'feed_to_oxidative_cleavage_reactor',
                               T = 60 + 273.15
                               )
-## TODO: add auxillary units for pump and HX
     R202 = units_baseline.OxidativeCleavageReactor('R202',
                                 ins = R201_H-0, 
                                 outs = (vented_gas,
@@ -344,8 +349,7 @@ def organic_phase_separation(ins,outs):
                                                 'Methyl_linoleate':1,
                                                 'Methyl_palmitoleate':1,
                                                 'Tungstic_acid': 0,
-                                                'Cobalt_acetate': 0,
-                                                
+                                                'Cobalt_acetate': 0,                                                
                                                 })
                                               )
     
@@ -355,10 +359,7 @@ ob3.show()
 
 ### Degassing portion (400 level)
 ### This is remove the moisture from the separated oily phase
-### TODO.xxx Ask Yoel if other products need to be remoced out as well
-### TODO.xxx Ask Yoel if this needs to be done using Vaccuum
-### How to remove just water
-
+### Flash runs on vaccuum
 
 @SystemFactory(
     ID = 'degassing_the_oily_phase',
@@ -379,16 +380,17 @@ def degassing_the_oily_phase(ins,outs):
                             T = 40 + 273.15,
                             P = 15000
                                   )
-    # Can have some loss, add specs for removing water only
 ob4 =  degassing_the_oily_phase(ins = ob3.outs[0])
 ob4.simulate()
 ob4.show()               
  
     
-##Nonanoic acid separation (500 level)
-## The issue with the below is that, the Monomethyl azelate that is produced
-## has a lower BP than most of the MCA's
-## However, papers and patents disregard this!
+#Nonanoic acid separation (500 level)
+# The issue with the below is that, the Monomethyl azelate that is produced
+# has a lower BP than most of the MCA's
+# However, papers and patents disregard this!
+# Heatsensitivity of fatty acids is given by: Oleochemicals: all time players of green chemistry
+# By Antonio Zarli
 
 @SystemFactory(
     ID = 'nonanoic_acid_separation',
@@ -410,10 +412,7 @@ def nonanoic_acid_fraction_separation(ins,outs):
     
     H501 = bst.HXutility(ins = dried_crude_fatty_acids,
                           T = 260 + 273)
-
-# TODO.xxx check if these can be done using high P and temperatures
-# Below ususally need vaccuum
-    
+   
     D501 = bst.BinaryDistillation('D501',
                                     ins = H501 - 0,
                                     outs = ('heavy_fatty_acids_1',
@@ -452,8 +451,6 @@ ob5 = nonanoic_acid_fraction_separation(ins = ob4.outs[1])
 ob5.simulate()
 ob5.show()
 
-# TODO.xxx how to incorporate three consecutive columns for hydrolysis,
-## Aslo ask what to do about catalys coming out as a solid in the stream
 ## How to make it look like a solid bed
 # Hydrolysis of FAME's to produce fatty acids (600 level)
 
@@ -519,64 +516,72 @@ ob6.show()
                   Water = 100,
                   units = 'kg/hr'
                 )],       
-    outs = [dict(ID = 'Tungstic_acid_for_reuse'),
-            dict(ID = 'cobalt_acetate_aqueous_mixture_for_reuse')
+    outs = [dict(ID = 'recovered_tungstic_acid'),
+            dict(ID = 'recovered_cobalt_acetate')
             ],
     fixed_outs_size = True,     
               )
 def catalyst_recovery_from_aqueous_stream (ins,outs):
     aqueous_stream_from_disc_separator,Calcium_hydroxide_1,Calcium_hydroxide_2,Fuming_hydrochloric_acid,Water_for_HCl_prep,Water_for_precipitate_washing, = ins
-    Tungstic_acid_for_reuse, cobalt_acetate_aqueous_mixture_for_reuse, = outs
+    recovered_tungstic_acid, recovered_cobalt_catalyst_mixture, = outs
     
-# Adding the calcium hydroxide to the entire mixture
-# TODO.xxx Ask Yoel how to heat a mixture in a MixTank
-    
+# Adding the calcium hydroxide to the entire mixture 
+##TODO: in the patent this below mixture is held for like 15 mins
     R701 = bst.units_baseline.Calcium_hydroxide_reactor(ins = (aqueous_stream_from_disc_separator,
                                                                 Calcium_hydroxide_1),
                                                         outs = ('greenish_precipitate'),
                                                         T = 50+273.15,
                                                         P = 101325,
                                                         V_max=133666)
-## TODO: How to do this under vaccuum 
-    S701 = bst.units.SolidsCentrifuge('S701', ins = R701-0,
-                                      outs = 'greenish_precipitate',
+
+## The precipitate was seperated under vaccuum, using a centrifuge for separation and a vaccuum system
+   
+    V701 = bst.units_baseline.CentrifugeVacuumVessel(ID = 'V701', ins = R701-0) 
+##TODO: account for other component splits as well
+##TODO: all of the tungsten and cobalt reacts to form the tungstate and hydroxide complexes
+    S701 = bst.units.SolidsCentrifuge('S701', ins = V701-0,
+                                      outs = 'greenish_catalyst_precipitate',
                                       split = {['Calcium_tungstate', 1],
-                                               ['Cobalt_hydroxide', 1],
-                                               ['Calcium_acetate',0]})
+                                                ['Cobalt_hydroxide', 1],
+                                                ['Calcium_acetate',0]})
+    
     M701 = bst.MixTank(ins = (Fuming_hydrochloric_acid,
                               Water_for_HCl_prep),
-                       outs = ('6N_HCl'))
-# Tungsten or Cobalt should be twice as much of the alkali hydroxide 
+                        outs = ('6N_HCl'))
     
+# alkali hydroxide is 5-20 times more than cobalt or tungsten in moles     
     def adjust_water_for_6N_HCl():
           Water_for_HCl_prep.imass['Water'] = Fuming_hydrochloric_acid.F_mass*2
     M701.add_specification(adjust_water_for_6N_HCl, run=True)  
     
                                                         
-    R702 = bst.units_baseline.Acid_precipitation_reactor(ins = (R701-0,M701-0),
+    R702 = bst.units_baseline.Acid_precipitation_reactor(ins = (S701-0,M701-0),
                                                           outs = ('stream_for_tungstic_acid_separation'),
                                                           T = 90+273.15,
                                                           P = 101325,
                                                           V_max=133666
-                                                        )
+                                                          )
     M702 = bst.MixTank(ins = (R702-0,
                               Water_for_precipitate_washing))                  
                         
     S702 = bst.units.SolidCentrifuge(ins = M701-0,
-                                     outs = ('Tungstic_acid'),
-                                     split = {['Tungstic_acid', 1],
+                                      outs = (recovered_tungstic_acid,
+                                              recovered_cobalt_catalyst_mixture),
+                                      split = {['Tungstic_acid', 1],
                                               ['Cobalt_chloride', 0],
                                               ['HCl',0],
                                               ['Water',0]})
     
-    # Add calcium hydroxide again to neutralose HCl remaining
+    # Add calcium hydroxide again to neutralise HCl remaining
     M703 = bst.MixTank(ins = (S702-1,
                               Calcium_hydroxide_2)) 
     def adjust_CaOH2():
           Calcium_hydroxide_2.imass['Calcium_hydroxide'] = S702.outs[1].imass['HCl']
     M703.add_specification(adjust_CaOH2, run=True) 
     
-    
+ob7 = catalyst_recovery_from_aqueous_stream(ins = ob3.outs[1]) 
+ob7.simulate()
+ob7.show()
 
-    
-    
+#Connecting recycle streams for tungstic_acid
+# ob1.ins[4] = ob7.outs[0]

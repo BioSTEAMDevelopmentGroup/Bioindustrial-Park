@@ -65,7 +65,7 @@ class OxidativeCleavageReactor(bst.BatchBioreactor):
                                    #Rxn('Octanal + Octane + H2O2-> CO2 + 2Octanal', 'Oxononanoic_acid', X = X2),
                                    #Rxn('Octanal + H2O2 -> Octanoic_acid ', 'Oxononanoic_acid', X = X2),
         #                          #Rxn('Octanal + H2O2 -> Octanoic_acid ', 'Oxononanoic_acid', X = X2),
-        ])
+        # ])
 
         # oxidative_cleavage_rxnsys = RxnSys(Epoxide_formation,Product_formation)
         # self.reactions = oxidative_cleavage_rxnsys
