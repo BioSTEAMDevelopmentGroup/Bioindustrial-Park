@@ -54,6 +54,7 @@ class GlycerolysisReactor(bst.CSTR):
     _N_outs = 2
     T_default = 273.15 + 230
     P_default = 101325
+    tau_default = 2
     
     def _setup(self):
         super()._setup()

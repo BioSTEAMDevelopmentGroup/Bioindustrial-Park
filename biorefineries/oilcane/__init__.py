@@ -581,6 +581,7 @@ def load(name, cache=cache, reduce_chemicals=True,
         for i in ('catalyst', 'methanol', 'HCl', 'NaOH', 'crude_glycerol', 'pure_glycerine'): MockStream(i)
     if number not in ethanol_configurations:
         for i in ('denaturant', 'ethanol', 'advanced_ethanol'): MockStream(i)
+        if number in cellulosic_configurations: MockStream('cellulosic_ethanol')
     # if number not in conventional_ethanol_configurations:
     #     for i in ('advanced_ethanol',): MockStream(i)
     if number not in actag_configurations:

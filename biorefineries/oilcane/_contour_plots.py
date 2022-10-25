@@ -41,6 +41,7 @@ __all__ = (
     'plot_relative_sorghum_oil_content_and_cane_oil_content_contours',
     'plot_ethanol_and_biodiesel_price_contours',
     'plot_recovery_and_oil_content_contours_biodiesel_only',
+    'plot_recovery_and_oil_content_contours_with_oilsorghum_only',
 )
 
 filterwarnings('ignore', category=bst.exceptions.DesignWarning)
@@ -92,6 +93,8 @@ def _add_letter_labels(axes, xpos, ypos, colors):
         letters=np.array([['A', 'C'], ['B', 'D']])
     elif shape == (3, 2):
         letters=np.array([['A', 'D'], ['B', 'E'], ['C', 'F']])
+    elif shape == (2, 1):
+        letters=np.array([['A'], ['B']])
     for i in range(M):
         for j in range(N):
             ax = axes[i, j]
@@ -119,7 +122,23 @@ def plot_recovery_and_oil_content_contours_manuscript(load=True, fs=8, smooth=1)
     for i in ('svg', 'png'):
         file = os.path.join(images_folder, f'recovery_and_oil_content_contours.{i}')
         plt.savefig(file, transparent=True)
-        
+
+def plot_recovery_and_oil_content_contours_with_oilsorghum_only(fs=10, smooth=1):
+    set_font(size=fs)
+    set_figure_size(4, 1.1)
+    fig, axes = plot_recovery_and_oil_content_contours(
+        load=True, 
+        smooth=smooth,
+        with_oilsorghum_only=True
+    )
+    colors = np.zeros([2, 1], object)
+    colors[:] = [[light_letter_color], [light_letter_color]]
+    # _add_letter_labels(axes, 1 - 0.68, 0.7, colors)
+    plt.subplots_adjust(left=.2, right=0.92, wspace=0.1 * (fs/8) ** 2, top=0.9, bottom=0.10)
+    for i in ('svg', 'png'):
+        file = os.path.join(images_folder, f'recovery_and_oil_content_contours.{i}')
+        plt.savefig(file, transparent=True)
+
 def plot_recovery_and_oil_content_contours_biodiesel_only(load=True, fs=8, metric_indices=None):
     set_font(size=fs)
     set_figure_size()
@@ -377,11 +396,16 @@ def plot_relative_sorghum_oil_content_and_cane_oil_content_contours(
 def plot_recovery_and_oil_content_contours(
         load=False, metric_index=0, N_decimals=1, configurations=None,
         N_points=20, yticks=None, titles=None, cmap=None, smooth=None,
+        with_oilsorghum_only=False,
     ):
     if yticks is None: yticks = [5, 7.5, 10, 12.5, 15]
     if configurations is None:
-        configurations = np.array([['O1', 'O1*'], ['O2', 'O2*']])
-        if titles is None: titles = ['Oilcane Only', 'Oilcane & Oil-sorghum']
+        if with_oilsorghum_only:
+            configurations = np.array([['O1*'], ['O2*']])
+            if titles is None: titles = ['Oilcane & Oil-sorghum']
+        else:
+            configurations = np.array([['O1', 'O1*'], ['O2', 'O2*']])
+            if titles is None: titles = ['Oilcane Only', 'Oilcane & Oil-sorghum']
         
     # Generate contour data
     x = np.linspace(0.40, 1.0, N_points)
@@ -400,7 +424,9 @@ def plot_recovery_and_oil_content_contours(
         )
     np.save(file, data)
     data = data[:, :, :, :, metric_index]
-    # data = np.swapaxes(data, 2, 3)
+    
+    if with_oilsorghum_only:
+        data = data[:, :, :, -1:]
     
     if smooth: # Smooth curves due to heat exchanger network and discontinuities in design decisionss
         A, B, M, N = data.shape
@@ -445,8 +471,8 @@ def plot_recovery_and_oil_content_contours(
         fillcolor=None, styleaxiskw=dict(xtick0=False), label=True,
     )
     M, N = configurations.shape
-    for i in range(N):
-        for j in range(M):
+    for i in range(M):
+        for j in range(N):
             ax = axes[i, j]
             plt.sca(ax)
             plt.fill_between([60, 90], [yticks[0]], [yticks[-1]], 
