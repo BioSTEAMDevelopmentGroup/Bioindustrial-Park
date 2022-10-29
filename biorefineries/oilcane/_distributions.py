@@ -13,11 +13,17 @@ from math import sqrt, ceil
 
 __all__ = (
     'ethanol_no_RIN_price_distribution', 
-    'biodiesel_price_distribution',
+    'advanced_ethanol_price_distribution',
+    'cellulosic_ethanol_price_distribution',
+    'biomass_based_diesel_price_distribution',
+    'cellulosic_based_diesel_price_distribution',
     'natural_gas_price_distribution',
     'mean_glycerol_price',
     'mean_ethanol_no_RIN_price',
-    'mean_biodiesel_price',
+    'mean_advanced_ethanol_price',
+    'mean_cellulosic_ethanol_price',
+    'mean_biomass_based_diesel_price',
+    'mean_cellulosic_based_diesel_price',
     'mean_natural_gas_price',
     'mean_electricity_price',
     'mean_soymeal_price',
@@ -55,6 +61,7 @@ def get_RIN_credit_by_year_June2017_to_May2022(df):
 
 # June 2017 to May 2022 (start of year is offset by 6 months)
 RIN_D3_prices = get_RIN_credit_by_year_June2017_to_May2022(df_D3) / liter_per_gal
+RIN_D4_prices = get_RIN_credit_by_year_June2017_to_May2022(df_D4) / liter_per_gal
 RIN_D5_prices = get_RIN_credit_by_year_June2017_to_May2022(df_D5) / liter_per_gal
 RIN_D6_prices = get_RIN_credit_by_year_June2017_to_May2022(df_D6) / liter_per_gal
 
@@ -76,7 +83,7 @@ ethanol_with_D6RIN_prices = np.array([ # USD / gal Jan 2021  - May 2022, by mont
 assert len(ethanol_no_RIN_prices) + len(ethanol_with_D6RIN_prices) == 5 * 12
 
 # Includes RIN D4
-biodiesel_prices = np.array([ # USD / gal June 2017 - June 2022, by month
+biomass_based_diesel_prices = np.array([ # USD / gal June 2017 - June 2022, by month
     3.13, 3.23, 3.31, 3.33, 3.3, 3.34, 3.23, 3.45, 3.16, 3.04, 3.02, 3.13,
     3.11, 3.02, 3.01, 3.04, 3.09, 3.09, 3.06, 3.12, 3.24, 3.08, 2.98, 2.86,
     2.87, 2.91, 2.99, 3.06, 3.13, 3.21, 3.26, 3.35, 3.11, 2.97, 2.77, 2.74, 
@@ -90,7 +97,9 @@ def by_month_to_year(arr):
         np.mean(arr[12*i: 12*i+12]) for i in range(N_years)
     ])
 
-biodiesel_prices = by_month_to_year(biodiesel_prices)
+biomass_based_diesel_prices = by_month_to_year(biomass_based_diesel_prices)
+biodiesel_no_RIN_prices = biomass_based_diesel_prices - RIN_D4_prices
+cellulosic_based_diesel_prices = biodiesel_no_RIN_prices + RIN_D3_prices * 1.5
 ethanol_no_RIN_prices = by_month_to_year(ethanol_no_RIN_prices)
 ethanol_with_D6RIN_prices = by_month_to_year(ethanol_with_D6RIN_prices)
 ethanol_no_RIN_prices = np.array([
@@ -112,7 +121,7 @@ advanced_ethanol_prices = ethanol_no_RIN_prices + RIN_D5_prices
 
 # plt.plot(cellulosic_ethanol_prices)
 # plt.plot(advanced_ethanol_prices)
-# plt.plot(biodiesel_prices)
+# plt.plot(biomass_based_diesel_prices)
 
 electricity_prices = []
 def triangular_distribution(x, median=False):
@@ -155,7 +164,8 @@ electricity_price_distribution = shape.Triangle(0.0583, 0.065, 0.069)
 ethanol_no_RIN_price_distribution = triangular_distribution(ethanol_no_RIN_prices)
 advanced_ethanol_price_distribution = triangular_distribution(advanced_ethanol_prices)
 cellulosic_ethanol_price_distribution = triangular_distribution(cellulosic_ethanol_prices)
-biodiesel_price_distribution = triangular_distribution(biodiesel_prices)
+biomass_based_diesel_price_distribution = triangular_distribution(biomass_based_diesel_prices)
+cellulosic_based_diesel_price_distribution = triangular_distribution(cellulosic_based_diesel_prices)
 # biodiesel_minus_ethanol_price_distribution = triangular_distribution(biodiesel_minus_ethanol_prices)
 natural_gas_price_distribution = triangular_distribution(natural_gas_prices)
 
@@ -165,7 +175,8 @@ mean_RIN_D5_price = np.mean(RIN_D5_prices)
 mean_ethanol_no_RIN_price = np.mean(ethanol_no_RIN_prices)
 mean_cellulosic_ethanol_price = np.mean(cellulosic_ethanol_prices)
 mean_advanced_ethanol_price = np.mean(advanced_ethanol_prices)
-mean_biodiesel_price = np.mean(biodiesel_prices)
+mean_biomass_based_diesel_price = np.mean(biomass_based_diesel_prices)
+mean_cellulosic_based_diesel_price = np.mean(cellulosic_based_diesel_prices)
 mean_natural_gas_price = np.mean(natural_gas_prices)
 mean_electricity_price = sum([0.0583, 0.065, 0.069]) / 3.
 mean_soymeal_price = 0.33 # 10 yr average; https://markets.businessinsider.com/commodities/soybean-meal-price?op=1
