@@ -28,15 +28,23 @@ class DihydroxylationReactor(bst.CSTR):
             DihydroxylationReactor_rxnsys = RxnSys(Dihydroxylation_reaction, Catalyst_dissolution)
             self.reactions = DihydroxylationReactor_rxnsys                       
           
-    def _run(self):        
-            condensate,effluent, = self.outs
-            condensate.mix_from(self.ins)
-            self.reactions(condensate)
-            ms = self._multi_stream = MultiStream('ms', phases='lg')
-            ms.copy_like(condensate)
-            ms.vle(T = self.T, P = self.P)
-            condensate.copy_like(ms['g'])
-            effluent.copy_like(ms['l'])
+    def _run(self):  
+        vent, effluent = self.outs
+        effluent.mix_from(self.ins, energy_balance=False)
+        self.reactions(effluent)
+        effluent.T = vent.T = self.T
+        effluent.P = vent.P = self.P
+        vent.phase = 'g'
+        vent.empty()
+        vent.receive_vent(effluent, energy_balance=False)
+            # condensate,effluent, = self.outs
+            # condensate.mix_from(self.ins)
+            # self.reactions(condensate)
+            # ms = self._multi_stream = MultiStream('ms', phases='lg')
+            # ms.copy_like(condensate)
+            # ms.vle(T = self.T, P = self.P)
+            # condensate.copy_like(ms['g'])
+            # effluent.copy_like(ms['l'])
             
 ##TODO: Find out how much fo the h202 is getting removed ay the first
 ## and then remove the rest by decomposition 
