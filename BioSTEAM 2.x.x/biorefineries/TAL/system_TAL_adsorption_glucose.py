@@ -321,7 +321,7 @@ def create_TAL_sys(ins, outs):
     
     H401 = bst.units.HXutility('H401', ins=S401-1, outs = ('broth_to_adsorbtion',), T=30. + 273.15)
     
-    M401 = bst.Mixer('M401', ins=(Ethanol_desorption, '', '', ''), outs=('mixed_ethanol_for_desorption'))
+    M401 = bst.Mixer('M401', ins=(Ethanol_desorption, '',), outs=('mixed_ethanol_for_desorption'))
     S402 = bst.FakeSplitter('S402', ins=M401-0, outs=('ethanol_to_AC401', 'ethanol_to_AC2'))
     def M401_spec():
         makeup_ethanol, recycled_ethanol = M401.ins
