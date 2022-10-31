@@ -17,7 +17,7 @@ import numpy as np
 from biosteam import Unit
 from biosteam.units.design_tools import PressureVessel,pressure_vessel_material_factors as factors
 
-class DihydroxylationReactor(bst.CSTR):
+class DihydroxylationReactor(bst.units.CSTR):
     _N_ins = 1
     _N_outs = 2
                 
@@ -49,7 +49,7 @@ class DihydroxylationReactor(bst.CSTR):
 ##TODO: Find out how much fo the h202 is getting removed ay the first
 ## and then remove the rest by decomposition 
        
-class OxidativeCleavageReactor(bst.CSTR):
+class OxidativeCleavageReactor(bst.units.CSTR):
     _N_ins = 1
     _N_outs = 2
        
@@ -164,7 +164,7 @@ class Zeolite_packed_bed_reactor(Unit, PressureVessel, isabstract = True):
         vent.T = effluent.T = self.T
         vent.P = effluent.P = self.P
 
-class Calcium_hydroxide_reactor(bst.CSTR):
+class Calcium_hydroxide_reactor(bst.units.CSTR):
     _N_ins = 1
     _N_outs = 1
     
@@ -185,7 +185,7 @@ class Calcium_hydroxide_reactor(bst.CSTR):
         vent.T = self.T
         effluent.P = self.P
         
-class Acid_precipitation_reactor(bst.CSTR):
+class Acid_precipitation_reactor(bst.units.CSTR):
     _N_ins = 1
     _N_outs = 1
         

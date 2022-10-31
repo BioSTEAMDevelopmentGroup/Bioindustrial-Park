@@ -6,9 +6,6 @@ Created on Sat Aug 20 21:47:53 2022
 import biosteam as bst
 import biosteam.units
 import thermosteam as tmo
-from biorefineries import lipidcane
-
-from biorefineries import sugarcane as sc
 from thermosteam import functional as fn
 from chemicals import atoms_to_Hill
 import thermosteam as tmo

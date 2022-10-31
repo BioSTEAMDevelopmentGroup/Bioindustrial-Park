@@ -17,8 +17,9 @@ from biosteam import SystemFactory
     ID = 'solvent_recovery',
     ins = [ dict(ID = 'solvent_extract_mixture'),
             ],
-    outs = [dict(ID = 'crude_nonoanoic_acid'),
-            dict(ID = 'recovered_NMS_solvent_stream')
+    outs = [dict(ID = 'recovered_NMS_solvent_stream'),
+            dict(ID = 'crude_nonoanoic_acid'),
+            
             ],
     fixed_ins_size = False,
     fixed_outs_size = False,     
