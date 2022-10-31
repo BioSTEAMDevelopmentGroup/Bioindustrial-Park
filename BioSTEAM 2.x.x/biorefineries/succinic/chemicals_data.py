@@ -337,6 +337,7 @@ BSA.Tb = 226.5 + 273.15
 BSA.Tm = 130. + 273.15
 
 # HMTHP = chemical_copied('HMTHP', TAL)
+
 HMTHP = chemical_database(ID='HMTHP', search_ID='674-26-0',)
 HMTHP.Tm = 273.15 + (27.+28.)/2. # CAS SciFinder 674-26-0
 HMTHP.Tb = 273.15 + (148.+151.)/2. # CAS SciFinder 674-26-0

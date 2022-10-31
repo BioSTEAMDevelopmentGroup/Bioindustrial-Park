@@ -335,7 +335,10 @@ def set_dehydration_overall_conversion(X):
     R401.BDO_to_MEK_rxn.X = X * R401.BDO_to_MEK_selectivity
     R401.BDO_to_MEK_rxn.X = X * R401.BDO_to_IBA_selectivity
 
-D = shape.Triangle(0.813, 0.9, 0.96) # lb: https://doi.org/10.1039/C5RA23251A ; m: https://doi.org/10.1021/acs.iecr.6b03678; ub: https://doi.org/10.1021/i300007a025
+D = shape.Triangle(0.813, 0.9, 0.96) 
+# lower bound: https://doi.org/10.1039/C5RA23251A 
+# mode: https://doi.org/10.1021/acs.iecr.6b03678
+# upper bound: https://doi.org/10.1021/i300007a025
 @param(name='dehydration 2,3-BDO -> MEK selectivity', element=R401, kind='coupled', units='%',
    baseline=0.9, distribution=D)
 def set_dehydration_MEK_selectivity(S):

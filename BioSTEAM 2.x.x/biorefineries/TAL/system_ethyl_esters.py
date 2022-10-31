@@ -1072,7 +1072,8 @@ spec = ProcessSpecification(
     substrates=('Xylose', 'Glucose'),
     products=('TAL',),
     
-    spec_1=0.19,
+    # spec_1=0.19,
+    spec_1=0.3,
     spec_2=15.,
     spec_3=0.19,
     
@@ -1086,7 +1087,8 @@ spec = ProcessSpecification(
     pre_conversion_units = TAL_sys.split(u.M304.ins[0])[0],
     
     # set baseline fermentation performance here
-    baseline_yield = 0.19,
+    # baseline_yield = 0.19,
+    baseline_yield = 0.3,
     baseline_titer = 15.,
     baseline_productivity = 0.19,
     
