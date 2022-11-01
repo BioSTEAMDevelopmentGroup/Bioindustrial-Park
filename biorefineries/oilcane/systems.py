@@ -1045,7 +1045,7 @@ def create_oilcane_to_biodiesel_1g(
     post_fermentation_oil_separation_sys = create_post_fermentation_oil_separation_system(
         ins=product,
         mockup=True,
-        area=400,
+        area=300,
     )
     oil, thick_vinasse, evaporator_condensate_b = post_fermentation_oil_separation_sys.outs
     oil_pretreatment_sys, oil_pretreatment_dct = create_oil_pretreatment_system(
@@ -1055,7 +1055,7 @@ def create_oilcane_to_biodiesel_1g(
         area=600,
         udct=True,
     )
-    bst.Mixer(400, [thick_vinasse, condensate], vinasse)
+    bst.Mixer(300, [thick_vinasse, condensate], vinasse)
     oil, polar_lipids, wastewater = oil_pretreatment_sys.outs
     
     # Fresh degummed oil
@@ -1119,7 +1119,7 @@ def create_oilcane_to_biodiesel_combined_1_and_2g_post_fermentation_oil_separati
     post_fermentation_oil_separation_sys, pfls_dct = create_post_fermentation_oil_separation_system(
         ins=beer,
         mockup=True,
-        area=600,
+        area=400,
         udct=True,
         separate_cellmass=True,
         free_oil=lambda: hydrolysate_and_juice_mixer.outs[0].imass['Oil'],

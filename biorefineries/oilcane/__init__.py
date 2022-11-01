@@ -322,8 +322,7 @@ def load(name, cache=cache, reduce_chemicals=False,
         area_names = [
             'Feedstock handling', 
             'Juicing', 
-            'TAG prod.', 
-            'Oil ext.',
+            'Oil prod. & ext.',
             'Biod. prod.', 
             'CH&P',
             'Utilities',
@@ -336,9 +335,8 @@ def load(name, cache=cache, reduce_chemicals=False,
             'Feedstock handling', 
             'Juicing', 
             'Pretreatment',
-            'TAG prod.',
+            'Oil prod. & ext.',
             'Wastewater treatment',
-            'Oil ext.',
             'CH&P', 
             'Biod. prod.',
             'Utilities',
@@ -424,10 +422,12 @@ def load(name, cache=cache, reduce_chemicals=False,
                 HXN = HXN_group.units[0]
                 assert isinstance(HXN, bst.HeatExchangerNetwork)
         unit_groups[-1].metrics[-1].getter = lambda: 0.    
+    HXN.replace_unit_heat_utilities = True
     HXN.raise_energy_balance_error = True
     HXN.vle_quenched_streams = False
     BT = flowsheet(bst.BoilerTurbogenerator)
-    BT.boiler_efficiency = 0.89
+    if number not in cellulosic_configurations:
+        BT.boiler_efficiency = 0.89
     for splitter in flowsheet.unit:
         if getattr(splitter, 'isbagasse_splitter', False):
             dct['bagasse_splitter'] = splitter

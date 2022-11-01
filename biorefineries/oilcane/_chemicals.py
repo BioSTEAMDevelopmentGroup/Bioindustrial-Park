@@ -36,20 +36,22 @@ def create_acetyl_diolein():
 def create_chemicals():
     from biorefineries import lipidcane as lc
     from biorefineries import cornstover as cs
-    removed = {'SuccinicAcid', 'H2SO4', 'Z_mobilis', 'Oil'}
+    removed = {'SuccinicAcid', 'H2SO4', 'Z_mobilis', 'Oil', 'Yeast'}
     chemicals = tmo.Chemicals([
         i for i in (lc.chemicals.tuple + cs.chemicals.tuple) if i.ID not in removed
     ])
     chemicals.extend([
         create_acetyl_diolein(),
         tmo.Chemical('Urea', default=True, phase='l'),
+        chemicals.Glucose.copy('Yeast'),
     ])
     chemicals.compile()
     chemicals.set_synonym('AcetylDiOlein', 'AcTAG')
     chemicals.define_group('Lipid', ['PL', 'FFA', 'MAG', 'DAG', 'TAG', 'AcTAG'])
     chemicals.define_group('lipid', ['PL', 'FFA', 'MAG', 'DAG', 'TAG', 'AcTAG'])
     chemicals.define_group('Oil', ['PL', 'FFA', 'MAG', 'DAG', 'TAG'])
-    chemicals.set_synonym('DryYeast', 'Cellmass')
+    chemicals.set_synonym('Yeast', 'DryYeast')
+    chemicals.set_synonym('Yeast', 'Cellmass')
     chemicals.AcetylDiOlein.V.method_P = chemicals.TriOlein.V.method_P = None
     chemicals.set_synonym('Cellmass', 'Cells')
     chemicals.set_synonym('Cellmass', 'cellmass')
