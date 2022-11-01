@@ -650,6 +650,7 @@ def load(name, cache=cache, reduce_chemicals=False,
     else:
         # A biodiesel stream should already exist
         s.biodiesel.register_alias('biomass_based_diesel')
+        MockStream('cellulosic_based_diesel')
     
         
     set_GWPCF(feedstock, 'sugarcane')
