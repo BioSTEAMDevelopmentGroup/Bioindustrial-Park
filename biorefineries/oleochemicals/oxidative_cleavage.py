@@ -3,7 +3,7 @@
 Created on Fri Oct 29 08:18:19 2021
 @author: yrc2
 """
-from biorefineries.oleochemicals import units
+from biorefineries.oleochemicals import units_experimental
 import biosteam as bst
 import thermosteam as tmo
 import flexsolve as flx
@@ -11,7 +11,7 @@ import numpy as np
 
 from biosteam import SystemFactory
 
-######################## Units ########################
+######################## units_experimental ########################
 @SystemFactory(
     ID = 'oxidative_clevage',
     ins = [dict(ID='fresh_OA'),
@@ -97,7 +97,7 @@ def oxidative_cleavage_system(ins,outs,T_in):
     
 ### TODO.xxx check if catalyst volume is still required
 
-    R101 = units.OxidativeCleavageReactor('R101',
+    R101 = units_experimental.OxidativeCleavageReactor('R101',
                                 ins = R101_H-0, 
                                 outs = mixed_oxidation_products,
                                 V=3785 + 1.213553930851268e-06

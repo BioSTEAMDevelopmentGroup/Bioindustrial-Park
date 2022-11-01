@@ -6,9 +6,6 @@ Created on Sat Aug 20 21:47:53 2022
 import biosteam as bst
 import biosteam.units
 import thermosteam as tmo
-from biorefineries import lipidcane
-
-from biorefineries import sugarcane as sc
 from thermosteam import functional as fn
 from chemicals import atoms_to_Hill
 import thermosteam as tmo
@@ -59,7 +56,7 @@ chems = tmo.Chemicals([
     tmo.Chemical('Oxygen'),
     tmo.Chemical('Carbon_dioxide'),
     tmo.Chemical('Methanol'),
-    tmo.Chemical('Glycerol'),
+    tmo.Chemical('Glycerol', rho = 1261.3, phase = 'l'),
     tmo.Chemical('Sodium_methoxide',formula ='NaOCH3'),
    
 ###All the chemicals related to TAGs in HOSO
@@ -242,9 +239,12 @@ V_of_cobalt_acetate_tetrahydrate = fn.rho_to_V(1730,chems['Cobalt_acetate_tetrah
 chems['Cobalt_acetate_tetrahydrate'].V.add_model(V_of_cobalt_acetate_tetrahydrate,
                                                  top_priority = True)
 ## Tungstate ion default to properties
-chems['Tungstate_ion'].copy_models_from(Tungsten,
+chems['Tungstate_ion'].copy_models_from(chems['Tungstic_acid'],
                                         ['Hvap',
-                                         'Psat'])
+                                         'Psat',
+                                         'Cn',
+                                         'V',
+                                         'mu'])
 ## Hydrogen ion defaults to properties of hydrogen
 chems['Hydrogen_ion'].copy_models_from(Hydrogen,
                                        ['Hvap',
@@ -262,6 +262,8 @@ chems['Calcium_tungstate'].V.add_model(fn.rho_to_V(5800,
 
 ## Changing this for Azelaic acid as it probably didnt work during a distillation process
 chems['Azelaic_acid'].Cn.method = 'LASTOVKA_S'
+# chems['Glycerol'].Cn.method = 'LASTOVKA_S'
+
 #TODO.xxx check if Psat from liquid methanol is a good idea
 def create_new_chemical(ID, phase='s', **constants):
         solid = tmo.Chemical.blank(ID, phase=phase, **constants)

@@ -79,7 +79,7 @@ def secondary_separation_system(ins,outs,Tin):
             'K': np.array([0.064657614,
                            1.664369695]),
             'IDs' :('Azelaic_acid',
-                    'oxiraneoctanoic_acid,_3-octyl-',
+                    'Epoxy_stearic_acid',
                     ),
             
             'phi' : 0.595

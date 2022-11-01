@@ -7,7 +7,7 @@ Created on Thu Jun 23 15:24:11 2022
 from biosteam import main_flowsheet as f
 import biosteam as bst
 import thermosteam as tmo
-from biorefineries.oleochemicals import units
+from biorefineries.oleochemicals import units_experimental
 import flexsolve as flx
 import numpy as np
 # from biorefineries.oleochemicals.streams_storage_specs import * 
@@ -31,10 +31,6 @@ def organic_separation_system(ins,outs,T_in):
     mixed_products_for_separation,fresh_EA, = ins
     aqueous_raffinate,organic_phase_for_PS,  = outs
    
-    recycle = bst.Stream('recycle',
-                          Ethyl_acetate = 10,
-                          units = 'kg/hr')
-  
     T105 = bst.units.StorageTank ('T105', 
                               ins = fresh_EA,
                               outs = 'fresh_EA_to_pump')
@@ -43,21 +39,40 @@ def organic_separation_system(ins,outs,T_in):
                       ins = T105-0,
                       outs ='to_mixer')
     
+    ##TODO: below code entirely for recyling ethyl acetate
+    # recycle = bst.Stream('recycle',
+    #                       Ethyl_acetate = 10,
+    #                       units = 'kg/hr')
+  
+    # M105 = bst.units.Mixer('M105',
+    #                         ins = (P105-0,recycle),
+    #                         outs = ('EA_for_extraction'))   
+
+    # def adjust_EA_recycle():
+    #     fresh_EA.sink.run_until(M105)   
+    #     fresh_EA.F_mass = mixed_products_for_separation.F_mass - recycle.F_mass 
+    # M105.add_specification(adjust_EA_recycle, run=True)  
+    
+    # #Hot ethyl acetate extraction
+    # L201_H = bst.units.HXutility('L201_H',
+    #                           ins = M105-0,
+    #                           outs = 'feed_to_ethyl_extraction',
+    #                           T = T_in,
+    #                           )
+
+##code that I am using rn to see if that works!    
     M105 = bst.units.Mixer('M105',
-                            ins = (P105-0,recycle),
+                            ins = (P105-0),
                             outs = ('EA_for_extraction'))   
 
-    def adjust_EA_recycle():
-        fresh_EA.sink.run_until(M105)   
-        fresh_EA.F_mass = mixed_products_for_separation.F_mass - recycle.F_mass 
-    M105.add_specification(adjust_EA_recycle, run=True)  
-    
     #Hot ethyl acetate extraction
     L201_H = bst.units.HXutility('L201_H',
                               ins = M105-0,
                               outs = 'feed_to_ethyl_extraction',
                               T = T_in,
                               )
+    
+    
     L201 = bst.units.MultiStageMixerSettlers('L201', 
                                     ins= ( mixed_products_for_separation,L201_H-0), 
                                     outs=( aqueous_raffinate,
@@ -88,7 +103,7 @@ def organic_separation_system(ins,outs,T_in):
     
     D201 = bst.units.ShortcutColumn("D201",
                                   ins = L201-1, 
-                                  outs=(recycle,
+                                  outs=('recycle',
                                         organic_phase_for_PS),
                                   LHK = ('Ethyl_acetate',
                                           'Nonanal'),

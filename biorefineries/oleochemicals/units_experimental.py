@@ -9,33 +9,25 @@ from thermosteam import Rxn, RxnSys, PRxn, SRxn, settings, Chemical, Stream
 class OxidativeCleavageReactor(bst.BatchBioreactor):
     _N_ins = 1
     _N_outs = 1
-    
-    @property
-    def effluent(self):
-        return self.outs[0]
-    
-    @effluent.setter
-    def effluent(self,effluent):
-        self.outs[0]=effluent
+  
+    # def __init__(self, ID='', ins=None, outs=(), thermo=None,
+    #              tau=17, N=None, V=None, T=373.15, P=101325,
+    #              Nmin=2, Nmax=36):
         
-    
-    def __init__(self, ID='', ins=None, outs=(), thermo=None,
-                 tau=17, N=None, V=None, T=373.15, P=101325,
-                 Nmin=2, Nmax=36):
-        
-        bst.BatchBioreactor.__init__(self, ID, ins, outs, thermo,
-                                   tau = tau , N = N, V = V, T = T, 
-                                   P = P ,Nmin = Nmin , Nmax = Nmax)
-        
-        c = self.chemicals           
-        self.Oleic_acid_conversion = 0.808
-        #self.nonanal_selectivity = 0.094 
-        #self.selectivity_oxiraneoctanoic_acid = 0.071
-        #self.Oxononanoic_acid_selectivity = 0.029
-        #self.Nonanoic_acid_selectivity = 0.277 
-        self.selectivity_Azelaic_acid = 0.442 * 2 
+    #     bst.BatchBioreactor.__init__(self, ID, ins, outs, thermo,
+    #                                tau = tau , N = N, V = V, T = T, 
+    #                                P = P ,Nmin = Nmin , Nmax = Nmax)
+       
+    # c = self.chemicals           
+    # self.Oleic_acid_conversion = 0.808
+    # self.nonanal_selectivity = 0.094 
+    # self.selectivity_oxiraneoctanoic_acid = 0.071
+    # self.Oxononanoic_acid_selectivity = 0.029
+    # self.Nonanoic_acid_selectivity = 0.277 
+    # self.selectivity_Azelaic_acid = 0.442 * 2 
         
     def _setup(self):
+        super()._setup() 
         # selectivity_Azelaic_acid = selectivity_Nonanoic_acid = X2 * X1
         # selectivity_Nonanal = selectivity_Oxonanoic_acid = X1 * (1 - X2)
         # selectivity_oxiraneoctanoic_acid,_3-octyl- = (1 - X1)
@@ -47,39 +39,38 @@ class OxidativeCleavageReactor(bst.BatchBioreactor):
                 
         # self.reactions = tmo.SeriesReaction([
         #     tmo.Rxn('Oleic_acid + Hydrogen_peroxide  -> Epoxy_stearic_acid + Water ', 'Oleic_acid', X=self.Oleic_acid_conversion),
-        #     tmo.Rxn('Epoxy_stearic_acid + Hydrogen_peroxide -> Nonanal + Oxononanoic_acid + Water', 'oxiraneoctanoic_acid,_3-octyl-', X = X1),
+        #     tmo.Rxn('Epoxy_stearic_acid + Hydrogen_peroxide -> Nonanal + Oxononanoic_acid + Water', 'Epoxy_stearic_acid', X = X1),
         #     tmo.Rxn('Nonanal + Oxononanoic_acid + 2Hydrogen_peroxide -> Azelaic_acid + Nonanoic_acid+ 2Water', 'Nonanal', X = X2),
         #             ]) 
-
+     
+        Epoxide_formation = SRxn([Rxn('Oleic_acid + H2O2   -> Epoxy_stearic_acid ', 'Oleic_acid', X= 0.808),
+                                  Rxn('Epoxy_stearic_acid + H2O -> DHSA', 'Epoxy_stearic_acid', X = 1),
+                                  Rxn('DHSA + H2O2 -> Nonanal + Oxononanoic_acid ', 'DHSA', X = 1)])
         
-        #NEEDS TO BE CONFIRMED WITH DANIM
-        #Issue is with accounting for all selectivities of all the products        
-        # Epoxide_formation = SRxn([Rxn('Oleic_acid + H2O2   -> Epoxy_stearic_acid ', 'Oleic_acid', X=self.Oleic_acid_conversion),
-        #                           Rxn('Epoxy_stearic_acid + H2O -> DHSA', 'Epoxy_stearic_acid', X = 1),
-        #                           Rxn('DHSA + H2O2 -> Nonanal + Oxononanoic_acid ', 'DHSA', X = 1),
+        Side_reactions_1 =    SRxn([Rxn('Nonanal + H2O2 ->  Nonanoic_acid', 'Nonanal', X = 0.2),
+                                    Rxn('Nonanoic_acid ->  Octane + CO2', 'Nonanoic_acid', X = 0.2),
+                                    Rxn('Octane + H2O2 -> Octanal', 'Octane', X = 0.4)])
+        Side_reactions_2 = PRxn([ Rxn('Oxononanoic_acid -> CO2 + Octanal', 'Oxononanoic_acid', X = X2),
+                                  Rxn('Oxononanoic_acid + H2O2 ->  Azelaic_acid', 'Oxononanoic_acid', X = 0.3),
+                                ])  
+        Side_reactions_3 = PRxn([ Rxn('Octanal + H2O2 -> Octanoic_acid ', 'Octanal', X = 0.2),
+                                  Rxn('Octanoic_acid + H2O2 -> Heptanal + CO2', X = 0.4),
+                                  Rxn('Heptanal + H2O2 -> Heptanoic_acid', X = 0.5)])
+        # this paper says that linoleic acid produces azelaic acid along with the famous thesis pdf
+        # https://doi.org/10.1016/j.indcrop.2022.115139
+        Impurities_side_reactions = PRxn([Rxn('Linoleic_acid -> Azelaic_acid + Malonic_acid + Hexanoic_acid', X = 0.8)
+                                         ])                          
+                                                  
         
-        #                     PRxn([Rxn('Nonanal + H2O2 ->  Nonanoic_acid', 'Nonanal', X = don't know),
-                                   #Rxn('Nonanoic_acid ->  Octane + CO2', 'Nonanoic_acid', X = don't know),
-                                   #Rxn('Oxononanoic_acid + H2O2 ->  Azelaic_acid', 'Oxononanoic_acid', X = don't know),
-                                   #Rxn('Oxononanoic_acid -> CO2 + Octanal', 'Oxononanoic_acid', X = X2),
-                                   #Rxn('Octanal + Octane + H2O2-> CO2 + 2Octanal', 'Oxononanoic_acid', X = X2),
-                                   #Rxn('Octanal + H2O2 -> Octanoic_acid ', 'Oxononanoic_acid', X = X2),
-        #                          #Rxn('Octanal + H2O2 -> Octanoic_acid ', 'Oxononanoic_acid', X = X2),
-        # ])
-
-        # oxidative_cleavage_rxnsys = RxnSys(Epoxide_formation,Product_formation)
-        # self.reactions = oxidative_cleavage_rxnsys
+        oxidative_cleavage_rxnsys = RxnSys(Epoxide_formation,Side_reactions_1,Side_reactions_2,Side_reactions_3,Impurities_side_reactions)
+        self.reactions = oxidative_cleavage_rxnsys
         
     def _run(self):
         feed = self.ins[0]
-        effluent = self.outs[0]
-        
+        effluent = self.outs[0]        
         #https://thermosteam.readthedocs.io/en/latest/_modules/thermosteam/_stream.html#Stream.copy_like
         effluent.copy_like(feed)
-              
         self.reactions(effluent) 
-        
-        
         effluent.T = self.T
         effluent.P = self.P
         

@@ -28,7 +28,7 @@ from biosteam import SystemFactory
 
 def primary_separation_system(ins,outs,Tin):
     organic_phase_for_separation, = ins
-    Nonanoic_acid_crude_product, AA_crude_product, Epoxy_stearic_acid_bottoms = outs
+    nonanoic_acid_crude_product, AA_crude_product, epoxy_stearic_acid_bottoms, = outs
 
 # MCA removal, should be around 40% acc to literature
     Water = tmo.Chemical('Water')    
@@ -41,7 +41,7 @@ def primary_separation_system(ins,outs,Tin):
 
     D202 = bst.units.BinaryDistillation("D202",
                                         ins = D202_H-0,
-                                        outs=(Nonanoic_acid_crude_product,
+                                        outs=(nonanoic_acid_crude_product,
                                               'Azelaic_acid_rich_bottom'),
                                         LHK = ('Nonanoic_acid',
                                                'Azelaic_acid'),
@@ -64,7 +64,7 @@ def primary_separation_system(ins,outs,Tin):
     D203 = bst.units.BinaryDistillation("D203",
                                        ins = D203_H-0, 
                                        outs=(AA_crude_product,
-                                             Epoxy_stearic_acid_bottoms),
+                                             epoxy_stearic_acid_bottoms),
                                        LHK = ('Azelaic_acid',
                                               'Epoxy_stearic_acid'),
                                        k=2,
