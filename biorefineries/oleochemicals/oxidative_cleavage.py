@@ -18,12 +18,13 @@ from biosteam import SystemFactory
            dict(ID='fresh_HP'),
            dict(ID='water_for_oxidative_cleavage'),
            dict(ID = 'fresh_Cat')],           
-    outs = [dict(ID = 'mixed_oxidation_products')],
+    outs = [dict(ID = 'vented_products'),
+            dict(ID = 'mixed_oxidation_products')],
     fixed_outs_size = True,     
               )
 def oxidative_cleavage_system(ins,outs,T_in):
-    fresh_OA, fresh_HP, water_for_oxidative_cleavage, fresh_Cat = ins
-    mixed_oxidation_products, = outs
+    fresh_OA, fresh_HP, water_for_oxidative_cleavage, fresh_Cat, = ins
+    vented_products,mixed_oxidation_products, = outs
     
 #Feedtanks and pumps
 # Oleic_acid_feedtank
@@ -95,12 +96,15 @@ def oxidative_cleavage_system(ins,outs,T_in):
                              T = T_in
                              )
     
+    
 ### TODO.xxx check if catalyst volume is still required
 
     R101 = units_experimental.OxidativeCleavageReactor('R101',
                                 ins = R101_H-0, 
-                                outs = mixed_oxidation_products,
-                                V=3785 + 1.213553930851268e-06
+                                outs = (vented_products,
+                                        mixed_oxidation_products),
+                                V=3785 + 1.213553930851268e-06,
+                                tau = 17
                                 # in m3 (equivalent to 1 MMGal), 
                                 # this is including catalyst volume
                                                               )
