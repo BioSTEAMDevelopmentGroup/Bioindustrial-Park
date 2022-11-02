@@ -29,14 +29,16 @@ CF_dct = { # all streams are feeds
     'caustic': ('NaOH', 0.5), # NaOH and water
     'cellulase': ('Cellulase', 0.05), # cellulase and water
     'denaturant': ('Denaturant'),
+    'dryer_natural_gas': ('CH4',),
     'CSL': ('CSL',),
     'DAP': ('DAP',),
     'FGD_lime': ('Lime', 0.4513), # lime and water
-    'H3PO4': ('H3PO4',),
+    'H3PO4': ('H3PO4',), # moisture content already adjusted
     'lime': ('CaO', 0.046), # CaO and water
     'natural_gas': ('CH4',),
     'polymer': ('Polymer'),
     'sugarcane': ('Sugarcane',), # moisture content already adjusted
+    'urea': ('Urea',),
     }
 
 
@@ -95,8 +97,8 @@ def create_sc2g_comparison_models():
             'PT glucan-to-glucose': ('reactions', 0),
             'PT xylan-to-xylose': ('reactions', 8),
             'EH glucan-to-glucose': ('saccharification', 2),
-            'FERM glucan-to-product': ('cofermentation', 0),
-            'FERM xylan-to-product': ('cofermentation', 1),
+            'FERM glucose-to-product': ('cofermentation', 0),
+            'FERM xylose-to-product': ('cofermentation', 1),
             },
         'BT': 'BT701',
         'BT_eff': ('boiler_efficiency', 'turbogenerator_efficiency'),
@@ -132,11 +134,11 @@ if __name__ == '__main__':
     # exist_sys, new_sys = simulate_sc2g_systems(biodegradability=1)
     # exist_model, new_model = create_sc2g_comparison_models()
     exist_model, new_model = evaluate_sc2g_models(
-        include_baseline=True,
-        include_uncertainty=True,
-        # include_BMP=True,
-        N_uncertainty=100,
-        # uncertainty_skip_exist=True,
-        # N_BMP=10,
-        # BMPs=(0.5, 0.9499,), # allow for minor error
+        # include_baseline=True,
+        # include_uncertainty=True,
+        include_BMP=True,
+        # N_uncertainty=1000,
+        # uncertainty_skip_exist=True, # for testing
+        N_BMP=100,
+        # BMPs=(0.5, 0.9499,), # for testing, 0.9499 allows for minor error
         )

@@ -22,7 +22,8 @@ from ._feature_mockups import (
     tea_monte_carlo_derivative_metric_mockups,
     lca_monte_carlo_metric_mockups, 
     lca_monte_carlo_derivative_metric_mockups,
-    MFPP, TCI, electricity_production, natural_gas_consumption,
+    MFPP, TCI, electricity_production,
+    # natural_gas_consumption,
     ethanol_production, biodiesel_production,
     GWP_ethanol, GWP_biodiesel, GWP_electricity,
     GWP_ethanol_allocation, GWP_biodiesel_allocation,
@@ -31,7 +32,7 @@ from ._feature_mockups import (
     ethanol_production_derivative,
     biodiesel_production_derivative,
     electricity_production_derivative,
-    natural_gas_consumption_derivative,
+    # natural_gas_consumption_derivative,
     GWP_ethanol_derivative,
 )
 from ._load_data import (
@@ -92,7 +93,8 @@ area_colors = {
     'Storage': CABBI_colors.grey,
     'HXN': colors.orange,
     'Heat exchanger network': colors.orange,
-    'TAG prod.': CABBI_colors.blue,
+    'Oil prod. & ext.': CABBI_colors.blue,
+    'Oil production and extraction': CABBI_colors.blue,
 }
 
 area_hatches = {
@@ -113,6 +115,8 @@ area_hatches = {
     'HXN': '+',
     'Heat exchanger network': '+',
     'TAG prod.': '/',
+    'Oil prod. & ext.': '/',
+    'Oil production and extraction': '/',
 }
 
 for i in area_colors: area_colors[i] = area_colors[i].tint(20)
@@ -131,7 +135,7 @@ mc_metric_settings = {
     'TCI': (TCI, f"TCI\n[{format_units('10^6*USD')}]", None),
     'production': (production, f"Production\n[{format_units('L/MT')}]", None),
     'electricity_production': (electricity_production, f"Elec. prod.\n[{format_units('kWhr/MT')}]", None),
-    'natural_gas_consumption': (natural_gas_consumption, f"NG cons.\n[{format_units('m^3/MT')}]", None),
+    # 'natural_gas_consumption': (natural_gas_consumption, f"NG cons.\n[{format_units('m^3/MT')}]", None),
     'GWP_ethanol_displacement': (GWP_ethanol_displacement, "GWP$_{\\mathrm{displacement}}$" f"\n[{GWP_units_L}]", None),
     'GWP_economic': ((GWP_ethanol, GWP_biodiesel), "GWP$_{\\mathrm{economic}}$" f"\n[{GWP_units_L}]", None),
     'GWP_energy': ((GWP_ethanol_allocation, GWP_biodiesel_allocation), "GWP$_{\\mathrm{energy}}$" f"\n[{GWP_units_L}]", None),
@@ -142,7 +146,7 @@ mc_comparison_settings = {
     'TCI': (TCI, r"$\Delta$" + f"TCI\n[{format_units('10^6*USD')}]", None),
     'production': (production, r"$\Delta$" + f"Production\n[{format_units('L/MT')}]", None),
     'electricity_production': (electricity_production, r"$\Delta$" + f"Elec. prod.\n[{format_units('kWhr/MT')}]", None),
-    'natural_gas_consumption': (natural_gas_consumption, r"$\Delta$" + f"NG cons.\n[{format_units('m^3/MT')}]", None),
+    # 'natural_gas_consumption': (natural_gas_consumption, r"$\Delta$" + f"NG cons.\n[{format_units('m^3/MT')}]", None),
     'GWP_ethanol_displacement': (GWP_ethanol_displacement, r"$\Delta$" + "GWP$_{\\mathrm{displacement}}$" f"\n[{GWP_units_L}]", None),
     'GWP_economic': (GWP_ethanol, r"$\Delta$" + "GWP$_{\\mathrm{economic}}$" f"\n[{GWP_units_L}]", None),
     'GWP_energy': (GWP_ethanol_allocation, r"$\Delta$" + "GWP$_{\\mathrm{energy}}$" f"\n[{GWP_units_L}]", None),
@@ -154,7 +158,7 @@ mc_derivative_metric_settings = {
     'TCI': (TCI_derivative,  r"$\Delta$" + format_units(r"TCI/OC").replace('cdot', r'cdot \Delta') + f"\n[{format_units('10^6*USD')}]", None),
     'production': ((ethanol_production_derivative, biodiesel_production_derivative), r"$\Delta$" + format_units(r"Prod./OC").replace('cdot', r'cdot \Delta') + f"\n[{format_units('L/MT')}]", None),
     'electricity_production': (electricity_production_derivative, r"$\Delta$" + format_units(r"EP/OC").replace('cdot', r'cdot \Delta') + f"\n[{format_units('kWhr/MT')}]", None),
-    'natural_gas_consumption': (natural_gas_consumption_derivative, r"$\Delta$" + format_units(r"NGC/OC").replace('cdot', r'cdot \Delta') + f"\n[{format_units('m^3/MT')}]", None),
+    # 'natural_gas_consumption': (natural_gas_consumption_derivative, r"$\Delta$" + format_units(r"NGC/OC").replace('cdot', r'cdot \Delta') + f"\n[{format_units('m^3/MT')}]", None),
     'GWP_economic': (GWP_ethanol_derivative, r"$\Delta$" + r"GWP $\cdot \Delta \mathrm{OC}^{-1}$" f"\n[{GWP_units_L_small}]", 1000),
 }
 
@@ -366,7 +370,7 @@ def plot_montecarlo_derivative():
         # ], dtype=object),
         labels=['DC', 'ICF'],
         color_wheel = CABBI_colors.wheel([
-            'blue_light', 'green_dirty', 'orange', 'green', 'grey', 'brown',
+            'blue_light', 'green_dirty', 'orange', 'green', 'grey', 
             'orange', 
         ])
     )
@@ -397,7 +401,7 @@ def plot_montecarlo_absolute():
                 'Sugarcane &\nSorghum ICF', 'Oilcane &\nOil-sorghum ICF'],
         xrot=90,
         color_wheel = CABBI_colors.wheel([
-            'blue_light', 'green_dirty', 'orange', 'green', 'grey', 'brown',
+            'blue_light', 'green_dirty', 'orange', 'green', 'grey',
             'orange', 'orange', 'green', 'orange', 'green',
         ])
     )
@@ -426,7 +430,7 @@ def plot_spearman_tea(with_units=None, aspect_ratio=0.8, **kwargs):
         ],
         kind='TEA',
         with_units=with_units,
-        cutoff=0.025,
+        cutoff=0.05,
         **kwargs
     )
     plt.subplots_adjust(left=0.45, right=0.975, top=0.98, bottom=0.08)
@@ -448,7 +452,7 @@ def plot_spearman_tea_short(**kwargs):
         ],
         kind='TEA',
         with_units=False,
-        cutoff=0.025,
+        cutoff=0.05,
         top=5,
         legend=True,
         legend_kwargs={'loc': 'upper left'},
@@ -505,7 +509,7 @@ def plot_spearman_lca(with_units=None, aspect_ratio=0.65, **kwargs):
         file = os.path.join(images_folder, f'spearman_lca.{i}')
         plt.savefig(file, transparent=True)
 
-def plot_breakdowns(biodiesel_only=True):
+def plot_breakdowns(biodiesel_only=False):
     set_font(size=8)
     set_figure_size(aspect_ratio=0.68)
     fig, axes = plt.subplots(nrows=1, ncols=2)
@@ -698,8 +702,8 @@ def plot_kde_2d(name, metrics=(GWP_ethanol, MFPP), xticks=None, yticks=None,
     sX, sY = [kde_comparison_settings[i] for i in metrics]
     _, xlabel, fx = sX
     _, ylabel, fy = sY
-    xs = np.array([[df[Xi] for df in dfs]])
-    ys = np.array([[df[Yi] for df in dfs]])
+    xs = np.array([[df[Xi].values for df in dfs]])
+    ys = np.array([[df[Yi].values for df in dfs]])
     if fx: xs *= fx
     if fy: ys *= fy
     ticklabels = [True, True] if ticklabels else [False, False]
@@ -808,9 +812,9 @@ def plot_feedstock_cellulosic_comparison_kde():
 def plot_feedstock_comparison_kde(fs=None):
     plot_kde_2d(
         ('O1 - S1', 'O2 - S2'),
-        yticks=[[-15, 0, 15, 30, 45]],
+        yticks=[[-18, 0, 18, 36, 54]],
         xticks=[[-0.12, -0.09, -0.06, -0.03, 0, 0.03, 0.06],
-                [-0.75, -0.5, -0.25, 0., 0.25, 0.5]],
+                [-0.06, -0.03, 0., 0.03, 0.06, 0.09]],
         top_right='GWP\nTradeoff()',
         bottom_left='MFPP\nTradeoff()',
         top_left='Oilcane\nFavored()',
@@ -828,13 +832,13 @@ def plot_feedstock_comparison_kde(fs=None):
 
 def plot_configuration_comparison_kde(fs=None):
     plot_kde(
-        'O1 - O2',
-        yticks=[-20, 0, 20, 40, 60],
-        xticks=[-0.75, -0.6, -0.45, -0.3, -0.15, 0, 0.15, 0.3],
+        'O2 - O1',
+        yticks=sorted([-1 * i for i in [-39, -26, -13, 0, 13, 26]]),
+        xticks=sorted([-1 * i for i in [-0.06, -0.04, -0.02, 0, 0.02, 0.04]]),
         top_right='GWP\nTradeoff()',
         bottom_left='MFPP\nTradeoff()',
-        top_left='DC Favored()',
-        bottom_right='ICF\nFavored()',
+        top_left='ICF\nFavored()',
+        bottom_right='DC Favored()',
         fs=fs,
     )
     for i in ('svg', 'png'):
@@ -861,10 +865,10 @@ def plot_separated_configuration_comparison_kde():
 def plot_crude_configuration_comparison_kde():
     plot_kde_2d(
         ('O1 - O3', 'O2 - O4'),
-        yticks=[[-10, 0, 10, 20, 30]],
+        yticks=[[0, 10, 20, 30, 40]],
         xticks=[
             [-0.3, -0.24, -0.18, -0.12, -0.06, 0],
-            [-0.5, -0.4, -0.3, -0.2, -0.1, 0]
+            [-0.15, -0.12, -0.09, -0.06, -0.03, 0]
         ],
         top_right='GWP\nTradeoff()',
         bottom_left='MFPP\nTradeoff()',
@@ -1016,9 +1020,11 @@ def plot_monte_carlo(derivative=False, absolute=True, comparison=True,
     if color_wheel is None: color_wheel = CABBI_colors.wheel()
     N_rows = len(rows)
     if axes_box is None:
-        fig, axes_box = plt.subplots(ncols=ncols, nrows=int(round(N_rows / ncols)))
+        nrows = int(round(N_rows / ncols))
+        fig, axes_box = plt.subplots(ncols=ncols, nrows=nrows)
         plt.subplots_adjust(wspace=0.45)
     else:
+        nrows = N_rows
         fig = None
     axes = axes_box.transpose()
     axes = axes.flatten()
@@ -1103,7 +1109,7 @@ def plot_monte_carlo(derivative=False, absolute=True, comparison=True,
         if yticks[0] < 0.:
             bst.plots.plot_horizontal_line(0, color=CABBI_colors.black.RGBn, lw=0.8, linestyle='--')
         try:
-            xticklabels = xtext if ax in axes_box[-1] else []
+            xticklabels = xtext if (ax in axes_box[-1] or i == N_rows - 1) else []
         except:
             xticklabels = xtext if i == N_rows - 1 else []
         bst.plots.style_axis(ax,  
@@ -1115,6 +1121,10 @@ def plot_monte_carlo(derivative=False, absolute=True, comparison=True,
             offset_xticks=True,
             xrot=xrot,
         )
+    for i in range(N_rows, nrows * ncols):
+        ax = axes[i]
+        plt.sca(ax)
+        plt.axis('off')
     if fig is None:
         fig = plt.gcf()
     else:
@@ -1160,8 +1170,9 @@ def plot_spearman(configurations, labels=None, metric=None,
         (f'Cane operating days [120 $-$ 180 {operating_days}]', []),
         (f'Sorghum operating days [30 $-$ 60 {operating_days}]', ['S2', 'S1', 'O1', 'O2']),
         (f'Crushing capacity [1.2 $-$ 2.0 {capacity}]', []),
-        (f'Ethanol price [0.269, 0.476, 0.758 {stream_price}]', []),
-        (f'Relative biodiesel price [0.255, 0.430, 0.719 {stream_price}]', []),
+        (f'Cellulosic ethanol price [0.655, 1.02, 1.03 {stream_price}]', ['S1', 'O1', 'S1*', 'O1*']),
+        (f'Advanced ethanol price [0.414, 0.599, 0.705 {stream_price}]', []),
+        (f'Biodiesel price [0.800, 0.801, 1.57 {stream_price}]', ['S1', 'S2', 'S1*', 'S2*']),
         (f'Natural gas price [0.105, 0.122, 0.175 {ng_price}]', ['S1', 'O1', 'S1*', 'O1*']),
         (f'Electricity price [0.0583, 0.065, 0.069 {electricity_price}]', ['S2', 'O2', 'S2*', 'O2*']),
          ('IRR [10 $-$ 15 %]', []),

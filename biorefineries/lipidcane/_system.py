@@ -244,8 +244,7 @@ def create_lipid_pretreatment_system(ins, outs):
     M2 = bst.Mixer('M2', [P2-0, glycerol_recycle])
     R1 = GlycerolysisReactor('R1', [H3-0, M2-0, N2])
     P7 = bst.Pump('P7', R1-1, hx_stream, P=101325.)
-    
-    @R1.add_specification(run=True)
+    @R1.add_specification(run=True, impacted_units=[T2])
     def adjust_feed_flow_rates():
         lipid = R1.ins[0]
         required_glycerol = 1.5 * (
@@ -258,7 +257,6 @@ def create_lipid_pretreatment_system(ins, outs):
         else:
             T2.ins[0].imol['Glycerol'] = required_glycerol
         R1.ins[2].ivol['N2'] = lipid.F_vol
-        for i in T2.path_until(R1): i._run()
         
     H4 = bst.HXutility('H4', H3-1, T=333.15, V=0)
     C1 = bst.LiquidsSplitCentrifuge('C1', H4-0, ['', glycerol_recycle],
@@ -275,7 +273,9 @@ def create_lipid_pretreatment_system(ins, outs):
           dict(ID='wastewater',
                price=price['Waste'])]
 )
-def create_transesterification_and_biodiesel_separation_system(ins, outs):
+def create_transesterification_and_biodiesel_separation_system(ins, outs,
+        transesterification_reactions=None,
+    ):
     ### Streams ###
     
     oil, = ins
@@ -341,8 +341,10 @@ def create_transesterification_and_biodiesel_separation_system(ins, outs):
     S401 = bst.FakeSplitter('S401')
     
     # First Reactor
-    R401 = units.Transesterification('R401', efficiency=0.90, excess_methanol=1.,
-                                     T=333.15, x_catalyst=x_cat)
+    R401 = units.Transesterification('R401', 
+        efficiency=0.90, excess_methanol=1., T=333.15, x_catalyst=x_cat,
+        transesterification=transesterification_reactions,
+    )
     
     # Centrifuge to remove glycerol
     C401 = units.LiquidsSplitCentrifuge('C401',
@@ -358,15 +360,16 @@ def create_transesterification_and_biodiesel_separation_system(ins, outs):
     P405 = units.Pump('P405')
     
     # Second Reactor
-    R402 = units.Transesterification('R402', efficiency=0.90, excess_methanol=1., 
-                                     T=333.15, x_catalyst=x_cat)
-    
+    R402 = units.Transesterification('R402',
+        efficiency=0.90, excess_methanol=1., T=333.15, x_catalyst=x_cat,
+        transesterification=transesterification_reactions,
+    )
+    @R402.add_specification
     def adjust_feed_to_reactors():
         R402._run()
         for i in S401.outs:
             if isinstance(i, bst.Junction): i._run()
         S401.ins[0].mix_from(S401.outs)
-    R402.specification = adjust_feed_to_reactors
     
     # Centrifuge to remove glycerol
     C402 = units.LiquidsSplitCentrifuge('C402',
@@ -381,6 +384,7 @@ def create_transesterification_and_biodiesel_separation_system(ins, outs):
     
     # Acids and bases per catalyst by mol
     k1 = 0.323/1.5; k2 = 1.060/1.5; k3 = 0.04505/1.5
+    @T404.add_specification
     def adjust_acid_and_base():
         T404._run()
         # Adjust according to USDA biodiesel model
@@ -393,8 +397,6 @@ def create_transesterification_and_biodiesel_separation_system(ins, outs):
         HCl.imol['Water'] = f * mol12
         HCl1.imol['Water'] = f * mol1
         HCl2.imol['Water'] = f * mol2
-    
-    T404.specification = adjust_acid_and_base
     
     ### Biodiesel Purification Section ###
     
@@ -471,6 +473,7 @@ def create_transesterification_and_biodiesel_separation_system(ins, outs):
                         partial_condenser=False)
     P413 = units.Pump('P413', P=101325.,)
     
+    @D402.add_specification
     def startup_water():
         imol = D402.ins[0].imol
         water, glycerol = imol['Water', 'Glycerol']
@@ -481,8 +484,6 @@ def create_transesterification_and_biodiesel_separation_system(ins, outs):
         # Remove accumulation
         D402.outs[0].imol['Water'] = 800.*C402.outs[0].imol['Glycerol']
         D402.outs[0].T = D402.outs[0].bubble_point_at_P().T
-            
-    D402.specification = startup_water
     
     # Condense recycle methanol
     H403 = units.HXutility('H403', V=0, T=315)
@@ -514,6 +515,7 @@ def create_transesterification_and_biodiesel_separation_system(ins, outs):
     #  0.4 wt % free lipids (lower to 0.35)
     
     # Find Water Flow
+    @T405.add_specification(prioritize=True)
     def adjust_biodiesel_wash_water():
         total_glycerol =  (C401.outs[1].imol['Glycerol'] + R402.outs[0].imol['Glycerol'])
         wash_water = (x_water / (1 - x_water) * total_glycerol
@@ -524,7 +526,6 @@ def create_transesterification_and_biodiesel_separation_system(ins, outs):
         biodiesel_wash_water.imol['Water'] = wash_water if wash_water > 0 else 0.
         T405._run()
     
-    T405.specification = adjust_biodiesel_wash_water
     D402-0-H404-0-P412
     
     # Biodiesel wash

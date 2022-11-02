@@ -10,6 +10,7 @@ import biosteam as bst
 import thermosteam as tmo
 import numpy as np
 import math
+from matplotlib import pyplot as plt
 
 ln = math.log
 BatchCrystallizer = bst.BatchCrystallizer
@@ -111,8 +112,6 @@ flowsheet_sys.diagram(kind='cluster', number=True, format='png')
 
 
 #%% Get plot data 
-
-from matplotlib import pyplot as plt
 
 N = 50
 recoveries = np.linspace(0.55, 0.9, N)

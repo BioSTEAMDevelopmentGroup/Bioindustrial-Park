@@ -100,7 +100,7 @@ def create_system(ID='corn_sys', flowsheet=None):
     
     u = cn.units
     MH101 = u.GrainHandling('MH101', corn)
-    MH101.specification = refresh_feed_specifications
+    MH101.add_specification(refresh_feed_specifications)
     V102 = u.CornStorage('V102', MH101-0)
     MH103 = u.CleaningSystem('MH103', V102-0, split=0.997)
     M104 = u.HammerMill('M104', MH103-0)
@@ -150,11 +150,22 @@ def create_system(ID='corn_sys', flowsheet=None):
     V412 = bst.StorageTank('V412', E316-1, tau=4)
     PX = bst.Pump('PX', V412-0)
     V409 = bst.VentScrubber('V409', (scrubber_water, V405-0), gas=('CO2', 'O2'))
-    V409.specification = update_scrubber_wash_water
+    V409.add_specification(update_scrubber_wash_water)
     P410 = bst.Pump('P410', V409-1)
-    MX = bst.Mixer('MX', [P410-0, P406-0])
+    MX = bst.Mixer('MX', P406-0)
     MX-0-1-E401
-    E413 = bst.HXprocess('E413', (PX-0, None), U=0.79496, ft=1.0)
+    E413 = bst.HXprocess('E413', (PX-0, None), U=0.79496, ft=1.0, T_lim0=360) # Limit temperature to not have vapor.
+    @E413.add_specification
+    def no_vapor():
+        E413.run()
+        outlet = E413.outs[0]
+        while outlet.phase != 'l':
+            E413.T_lim0 -= 1
+            E413.run()
+            if E413.T_lim0 < 350:
+                raise RuntimeError('bubble point is lower than expected')
+        E413.T_lim0 = 360
+            
     P411 = bst.Pump('P411', E413-0)
     
     ethanol_purification_sys = create_ethanol_purification_system(
@@ -215,7 +226,7 @@ def create_system(ID='corn_sys', flowsheet=None):
     MX5 = bst.Mixer('MX5', (Ev607-1, P410-0, fu.P508-0))
     MX6 = bst.Mixer('MX6', (C603_2-1, MH604-0))
     D610 = bst.DrumDryer('D610', (MX6-0, 'dryer_air', 'natural_gas'), moisture_content=0.10, split=dict(Ethanol=1.0))
-    X611 = bst.ThermalOxidizer('X611', (D610-1, 'oxidizer_air'))
+    X611 = bst.ThermalOxidizer('X611', (D610-1, 'oxidizer_air', ''))
     MH612 = u.DDGSHandling('MH612', D610-0, DDGS)
     T608 = bst.facilities.ProcessWaterCenter(
         'T608', 
@@ -227,7 +238,7 @@ def create_system(ID='corn_sys', flowsheet=None):
     )
     other_facilities = u.PlantAir_CIP_WasteWater_Facilities('other_facilities', corn)
     HXN = bst.HeatExchangerNetwork('HXN', 
-        units=lambda: [fu.Ev607.components['evaporators'][0], fu.T503_T507.condenser]
+        units=lambda: [fu.Ev607.evaporators[0], fu.T503_T507.condenser]
     )
     globals().update(f.unit.data)
     return f.create_system('corn_sys')

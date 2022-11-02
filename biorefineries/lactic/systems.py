@@ -49,7 +49,7 @@ def create_system(ID='lactic_sys', kind='SSCF', if_HXN=True, if_BDM=False,
     create_pretreatment_process(feed=u.U101-0, flowsheet=flowsheet)
     create_conversion_process(kind=kind, feed=u.P201-0, flowsheet=flowsheet,
                               cell_mass_split=cell_mass_split)
-    create_separation_process(feed=u.PS301-0, kind=kind,
+    create_separation_process(feed=u.R301-0, kind=kind,
                               flowsheet=flowsheet,
                               cell_mass_split=cell_mass_split,
                               gypsum_split=gypsum_split)

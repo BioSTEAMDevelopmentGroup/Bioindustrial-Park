@@ -88,7 +88,7 @@ Naming conventions:
     
     U = Other units
     
-    PS = Process specificiation, not physical units, but for adjusting streams
+    PS = Process specification, not physical units, but for adjusting streams
 
 Processes:
     100: Feedstock preprocessing

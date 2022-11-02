@@ -29,15 +29,15 @@ CF_dct = {
     ##### Feeds #####
     'denaturant': ('Denaturant'),
     # 'dryer_natural_gas': ('CH4',), # used to be in the registry, but not any more
-    'H3PO4': ('H3PO4',),
+    'H3PO4': ('H3PO4',), # moisture content already adjusted
     'lime': ('CaO', 0.046), # CaO and water
+    'natural_gas': ('CH4',), # actually empty
     'polymer': ('Polymer',),
     'sugarcane': ('Sugarcane',), # moisture content already adjusted
     ##### Co-products #####
-    # 'Yeast': ('Yeast',), # no price considered, no GWP considered (probably used in fermentation)
     # `fiber_fines`, `wastewater`, `vinasse` taken care of by WWT
     # `filter_cake` taken care of by BT
-    # `s41` (from `T302`) is empty
+    # 'Yeast': ('Yeast',), # no price considered, no GWP considered (probably used in fermentation)
     }
 
 
@@ -92,7 +92,7 @@ def create_sc1g_comparison_models():
         'fermentor': 'R301',
         'reactions': {
             'PT glucan-to-glucose': ('hydrolysis_reaction', ),
-            'FERM glucan-to-product': ('fermentation_reaction', ),
+            'FERM glucose-to-product': ('fermentation_reaction', ),
             },
         'BT': 'BT401',
         'BT_eff': ('boiler_efficiency', 'turbogenerator_efficiency'),
@@ -130,6 +130,6 @@ if __name__ == '__main__':
     exist_model, new_model = evaluate_sc1g_models( # 1G BMP should be high
         include_baseline=True,
         include_uncertainty=True,
-        N_uncertainty=100,
+        N_uncertainty=1000,
         # uncertainty_skip_exist=True,
         )

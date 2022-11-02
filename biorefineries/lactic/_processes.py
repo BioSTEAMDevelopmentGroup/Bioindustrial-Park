@@ -156,12 +156,12 @@ def create_pretreatment_process(feed, flowsheet=None):
 
     # Neutralize pretreatment hydrolysate
     M205 = units.AmmoniaMixer('M205', ins=(ammonia_M205, water_M205))
+    @M205.add_specification
     def update_ammonia_and_mix():
         hydrolysate = F201.outs[1]
         # Load 10% extra
         ammonia_M205.imol['NH4OH'] = (2*hydrolysate.imol['H2SO4']) * 1.1
         M205._run()
-    M205.specification = update_ammonia_and_mix
 
     T204 = units.AmmoniaAdditionTank('T204', ins=(F201-1, M205-0))
     P201 = units.HydrolysatePump('P201', ins=T204-0)
@@ -221,19 +221,20 @@ def create_SSCF_conversion_process(feed, flowsheet=None, **extras): # extras is 
     # Add dilution water to achieve the lower titer
     def titer_at_water(water):
         water_R301.imass['Water'] = water
-        seed_recycle._run()
+        seed_recycle.run()
         return R301.effluent_titer-R301.target_titer
 
     # Lower yield to achieve the lower titer
     def titer_at_yield(lactic_yield):
         set_yield(lactic_yield, R301, R302)
-        seed_recycle._run()
+        seed_recycle.run()
         return R301.effluent_titer-R301.target_titer
 
+    @seed_recycle.add_specification
     def adjust_R301_water():
         water_R301.empty()
         set_yield(R301.target_yield, R301, R302)
-        seed_recycle._run()
+        seed_recycle.run()
         if R301.effluent_titer > R301.target_titer:
             if R301.allow_dilution:
                 water_R301.imass['Water'] = IQ_interpolation(
@@ -246,12 +247,10 @@ def create_SSCF_conversion_process(feed, flowsheet=None, **extras): # extras is 
                     xtol=0.001, ytol=0.01, maxiter=50,
                     args=(), checkbounds=False)
                 set_yield(lactic_yield, R301, R302)
-            seed_recycle._run()
+            seed_recycle.run()
 
-    PS301 = bst.units.ProcessSpecification('PS301', ins=R301-0,
-                                            specification=adjust_R301_water)
     ######################## System ########################
-    System('conversion_sys', path=(M301, H301, seed_recycle, PS301))
+    System('conversion_sys', path=(M301, H301, seed_recycle))
 
 
 def create_SHF_conversion_process(feed, cell_mass_split,
@@ -320,6 +319,7 @@ def create_SHF_conversion_process(feed, cell_mass_split,
                                 neutralization=True, mode='batch',
                                 allow_dilution=False,
                                 allow_concentration=False)
+    @R301.add_specification
     def update_split():
         if R301.feed_freq == 1 and R301.allow_concentration:
             S302._isplit = S302.thermo.chemicals.isplit(0)
@@ -328,7 +328,6 @@ def create_SHF_conversion_process(feed, cell_mass_split,
             S302._isplit = S302.thermo.chemicals.isplit(split)
         S302._run()
         R301._run()
-    R301.specification = update_split
 
     R301_P1 = bst.units.Pump('R301_P1', ins=R301-0)
     R301_P2 = bst.units.Pump('R301_P2', ins=R301-1)
@@ -346,13 +345,13 @@ def create_SHF_conversion_process(feed, cell_mass_split,
     # Add dilution water to achieve the lower titer
     def titer_at_water(water):
         water_R301.imass['Water'] = water
-        seed_recycle._run()
+        seed_recycle.run()
         return R301.effluent_titer-R301.target_titer
 
     # Lower yield to achieve the lower titer
     def titer_at_yield(lactic_yield):
         set_yield(lactic_yield, R301, R302)
-        seed_recycle._run()
+        seed_recycle.run()
         return R301.effluent_titer-R301.target_titer
 
     # Adjust V of the multi-effect evaporator to the maximum possible sugar concentration
@@ -365,12 +364,12 @@ def create_SHF_conversion_process(feed, cell_mass_split,
     # Adjust V of the multi-effect evaporator to achieve the set sugar concentration
     def titer_at_V(V):
         E301.V = V
-        ferm_loop._run()
+        ferm_loop.run()
         return R301.effluent_titer-R301.target_titer
 
     def sugar_at_V(V):
         E301.V = V
-        ferm_loop._run()
+        ferm_loop.run()
         # In continuous mode, incoming sugar is immediately consumed, therefore
         # sugar concentration is always held at the same level (as effluent sugar
         # concentration in batch mode)
@@ -382,12 +381,13 @@ def create_SHF_conversion_process(feed, cell_mass_split,
         # highest from collected papers)
         return sugar_conc-220
 
+    @ferm_loop.add_specification
     def adjust_ferm_loop():
         water_R301.empty()
         S302.split = 1
         E301.V = 0
         set_yield(R301.target_yield, R301, R302)
-        ferm_loop._run()
+        ferm_loop.run()
         if R301.effluent_titer < R301.target_titer:
             if R301.allow_concentration:
                 equip_max_V = IQ_interpolation(f=get_max_V, x0=0, x1=1,
@@ -412,13 +412,10 @@ def create_SHF_conversion_process(feed, cell_mass_split,
                     xtol=0.001, ytol=0.01, maxiter=50,
                     args=(), checkbounds=False)
                 set_yield(lactic_yield, R301, R302)
-            seed_recycle._run()
-
-    PS301 = bst.units.ProcessSpecification('PS301', ins=R301_P1-0,
-                                            specification=adjust_ferm_loop)
+            seed_recycle.run()
 
     ######################## System ########################
-    System('conversion_sys', path=(M301, H301, R300, S301, ferm_loop, PS301))
+    System('conversion_sys', path=(M301, H301, R300, S301, ferm_loop))
 
 
 # %%
@@ -468,23 +465,22 @@ def create_separation_process(feed, cell_mass_split, gypsum_split,
                               outs=(gypsum, ''))
 
     # To avoid flash temperature lower than inlet temperature
+    @S402.add_specification
     def adjust_F401_T():
         S402._run()
         if S402.ins[0].T > F401.T:
             F401.T = F401.ins[0].T
         else: F401.T = 379
-    S402.specification = adjust_F401_T
 
     # Separate out the majority of water
     F401 = bst.units.Flash('F401', ins=S402-1, outs=('F401_g', 'F401_l'), T=379, P=101325,
                            vessel_material='Stainless steel 316')
-
+    # @F401.add_specification
     # def adjust_F401_T():
     #     if F401.ins[0].T > F401.T:
     #         F401.T = F401.ins[0].T
     #     else: F401.T = 379
     #     F401._run()
-    # F401.specification = adjust_F401_T
 
     # Condense waste vapor for recycling
     F401_H = bst.units.HXutility('F401_H', ins=F401-0, V=0, rigorous=True)
@@ -596,6 +592,7 @@ def create_separation_process(feed, cell_mass_split, gypsum_split,
         purity = F402.outs[1].get_mass_composition('LacticAcid')
         return purity-0.88
 
+    @F402.add_specification
     def adjust_F402_V():
         H2O_molfrac = D404_P.outs[0].get_molar_composition('H2O')
         V0 = H2O_molfrac
@@ -605,7 +602,6 @@ def create_separation_process(feed, cell_mass_split, gypsum_split,
         # F402.V = IQ_interpolation(f=purity_at_V, x0=0.001, x1=0.999,
         #                           xtol=0.001, ytol=0.001, maxiter=50,
         #                           args=(), checkbounds=False)
-    F402.specification = adjust_F402_V
 
     F402_H1 = bst.units.HXutility('F402_H1', ins=F402-0, outs=3-R403, V=0, rigorous=True)
 
@@ -779,17 +775,6 @@ def create_facilities(CHP_wastes, CHP_biogas='', CHP_side_streams=(),
     plant_air_in =  Stream('plant_air_in', phase='g', N2=0.79, O2=0.21, units='kg/hr')
 
     ######################## Units ########################
-    # Update ratios associated with the feedstock flowrate
-    def update_facility_streams():
-        flowrate_ratio = units.get_flow_tpd(flowsheet=flowsheet) / 2205
-        ammonia_CHP.imass['NH4OH'] = flowrate_ratio * 1054 * 35.046/17.031 # NH3 to NH4OH
-        firewater_in.imass['H2O'] = flowrate_ratio * 8021
-        CIP_chems_in.imass['H2O'] = flowrate_ratio * 145
-        plant_air_in.F_mass = flowrate_ratio * 1372608
-
-    PS601 = bst.ProcessSpecification('PS601', ins=ammonia_CHP,
-                                     specification=update_facility_streams)
-
     # 7-day storage time similar to ethanol's in ref [1]
     T601 = bst.units.StorageTank('T601', ins=u.F402_P-0, tau=7*24, V_wf=0.9,
                                   vessel_type='Floating roof',
@@ -825,7 +810,7 @@ def create_facilities(CHP_wastes, CHP_biogas='', CHP_side_streams=(),
     M601 = bst.units.Mixer('M601', ins=CHP_wastes, outs='wastes_to_CHP')
 
     # Blowdown is discharged
-    CHP = facilities.CHP('CHP', ins=(M601-0, CHP_biogas, lime_CHP, PS601-0,
+    CHP = facilities.CHP('CHP', ins=(M601-0, CHP_biogas, lime_CHP, ammonia_CHP,
                                      boiler_chems, baghouse_bag, natural_gas,
                                      'boiler_makeup_water'),
                          B_eff=0.8, TG_eff=0.85, combustibles=combustibles,
@@ -855,3 +840,12 @@ def create_facilities(CHP_wastes, CHP_biogas='', CHP_side_streams=(),
         BDM = bst.units.BlowdownMixer('BDM',ins=(CHP.outs[-1], CT.outs[-1]),
                                       outs=u.M501.ins[-1])
         PWC.recycled_blowdown_streams = BDM.outs
+        
+    # Update ratios associated with the feedstock flowrate
+    @T601.add_specification
+    def update_facility_streams():
+        flowrate_ratio = units.get_flow_tpd(flowsheet=flowsheet) / 2205
+        ammonia_CHP.imass['NH4OH'] = flowrate_ratio * 1054 * 35.046/17.031 # NH3 to NH4OH
+        firewater_in.imass['H2O'] = flowrate_ratio * 8021
+        CIP_chems_in.imass['H2O'] = flowrate_ratio * 145
+        plant_air_in.F_mass = flowrate_ratio * 1372608

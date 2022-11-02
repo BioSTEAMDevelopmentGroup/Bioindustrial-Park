@@ -61,13 +61,12 @@ def create_comparison_systems(info, functions, sys_dct={}):
     main_f.set_flowsheet(exist_f)
     exist_u = exist_f.unit
     exist_s = exist_f.stream
-
     def get_streams(u_reg, s_reg, infos):
         streams = []
         for info in infos:
             if isinstance(info, str): # stream info given as stream ID
                 streams.append(getattr(s_reg, info))
-            else: # stream info given as source unit ID, # in outs
+            else: # stream info given as source unit ID and sequence in outs
                 streams.append(getattr(u_reg, info[0]).outs[info[1]])
         return streams
 
@@ -97,7 +96,6 @@ def create_comparison_systems(info, functions, sys_dct={}):
     dct['_system_loaded'] = False
     module.load(**kwdct['load'])
     new_sys_temp = dct[kwdct['system_name']]
-
     new_f = bst.Flowsheet.from_flowsheets('new', (main_f,))
     main_f.set_flowsheet(new_f)
     new_u = new_f.unit
@@ -137,7 +135,12 @@ def create_comparison_systems(info, functions, sys_dct={}):
         SolidsMixer = bst.Mixer('SolidsMixer', ins=solids_streams, outs=solids)
 
     if sludge_ID:
-        getattr(new_u, sludge_u).ins[sludge_idx] = getattr(new_s, sludge_ID)
+        exist_sludge_stream = getattr(new_u, sludge_u).ins[sludge_idx]
+        if sludge_u == 'slurry_mixer' and exist_sludge_stream.ID != 'sludge': # cornstover biorefinery
+            # Using print instead of warn so that it won't be ignored
+            print(f"\n\n Slurry connection changed for {kwdct['system_name']}\n\n")
+            getattr(new_u, sludge_u).ins[sludge_idx-1] = getattr(new_s, sludge_ID)
+        else: getattr(new_u, sludge_u).ins[sludge_idx] = getattr(new_s, sludge_ID)
         getattr(new_u, biogas_u).ins[biogas_idx] = getattr(new_s, biogas_ID)
 
     if add_BT:
@@ -196,7 +199,7 @@ def simulate_systems(exist_sys, new_sys, info):
     print(f'\nNew system IRR: {new_tea.solve_IRR():.2%}')
     FERM_product = info['FERM_product']
     for sys in (exist_sys, new_sys):
-        for fn in (get_MPSP, get_GWP):
+        for fn in (get_MPSP, get_GWP): # allocate based on value
             fn(sys, FERM_product)
     get_COD_breakdown(getattr(new_sys.flowsheet.unit, f'S{info["WWT_ID"]}04').ins[0])
 

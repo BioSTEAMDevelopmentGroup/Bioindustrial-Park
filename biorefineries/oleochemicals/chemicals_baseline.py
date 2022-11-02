@@ -6,108 +6,314 @@ Created on Sat Aug 20 21:47:53 2022
 import biosteam as bst
 import biosteam.units
 import thermosteam as tmo
-# from biorefineries.lipidcane import create_lipid_pretreatment_system, create_transesterification_and_biodiesel_separation_system
-# from biorefineries.lipidcane import chemicals
-# bst.settings.set_thermo(chemicals)
+from thermosteam import functional as fn
+from chemicals import atoms_to_Hill
+import thermosteam as tmo
 
-#Figure the following out
-# vegetable_oil = bst.Stream(ID='vegetable_oil',
-#                            Water=0.0184,
-#                            TAG=11.1)
-# biodiesel = bst.Stream(ID = 'biodiesel')
-# crude_glycerol = bst.Stream(ID = 'crude_glycerol')
-# wastewater = bst.Stream(ID = 'wastewater')
-# create_transesterification_and_biodiesel_separation_system(
-#         ins= vegetable_oil, 
-#         outs=[biodiesel, crude_glycerol,wastewater],)
-# create_transesterification_and_biodiesel_separation_system().simulate()
-
-# chems is the object containing all chemicals used in this biorefinery
-chems = tmo.Chemicals([])
-
-# To keep track of which chemicals are available in the database and which
-# are created from scratch
-database_chemicals_dict = {}
-copied_chemicals_dict = {}
-defined_chemicals_dict = {}
-
-def chemical_database(ID, phase=None, **kwargs):
-    chemical = tmo.Chemical(ID, **kwargs)
-    if phase:
-        chemical.at_state(phase)
-        chemical.phase_ref = phase
-    chems.append(chemical)
-    database_chemicals_dict[ID] = f'{ID}: {chemical.formula}/{chemical.MW}'
-    return chemical
-
-def chemical_copied(ID, ref_chemical, **data):
-    chemical = ref_chemical.copy(ID)
-    chems.append(chemical)
-    for i, j in data.items(): setattr(chemical, i, j)
-    copied_chemicals_dict[ID] = f'{ID}: {chemical.formula}/{chemical.MW}'
-    return chemical
-
-def chemical_defined(ID, **kwargs):
-    chemical = tmo.Chemical.blank(ID, **kwargs)
-    chems.append(chemical)
-    defined_chemicals_dict[ID] = f'{ID}: {chemical.formula}/{chemical.MW}'
-    return chemical
 
 ##Chemicals that are already in the data base
+# Biodiesel = chemical_database('Methyl_oleate', phase = 'l')
+# # available methods are {'ROWLINSON_POLING', 'DADGOSTAR_SHAW', 'ROWLINSON_BONDI'}
+# Biodiesel.Cn.method = 'ROWLINSON_BONDI'
+
+##All the TAGs are based on Ruiz-Gutiérrez et. al (1998)
+# chems is the object containing all chemicals used in this biorefinery
+Cobalt_chloride = tmo.Chemical('Cobalt_chloride',
+                                search_ID = '7646-79-9',
+                                phase = 's')    
+Tungsten = tmo.Chemical('Tungsten')
+Cobalt = tmo.Chemical('Cobalt')
+Hydrogen = tmo.Chemical('Hydrogen')
+
+chems = tmo.Chemicals([
+    #Dihydroxylation chemicals
+    tmo.Chemical('Hydrogen_peroxide', phase='l'),
+    tmo.Chemical('Water'),
+    # #Chemical for acid degumming 
+    tmo.Chemical('Citric_acid'),
+    #look into phase of the below
+    tmo.Chemical('MDHSA', search_ID = '1115-01-1', phase = 'l'),
+    tmo.Chemical('Pelargonic_acid'),
+    tmo.Chemical('Azelaic_acid', phase = 's'),
+# Products of oxidative_cleavage
+    tmo.Chemical('Monomethyl_azelate'),
+    tmo.Chemical('Suberic_acid'),
+    tmo.Chemical('Caprylic_acid'),
+    tmo.Chemical('Hexanoic_acid'),
+    tmo.Chemical('Heptanoic_acid'),
+    tmo.Chemical('Hexanoic_acid'),
+    tmo.Chemical('Malonic_acid'),
+    
+# Products of emulsification
+    tmo.Chemical('Palmitic_acid'),
+    tmo.Chemical('Stearic_acid'),
+    tmo.Chemical('Oleic_acid'),
+    tmo.Chemical('Linoleic_acid', search_ID = '60-33-3'),
+    tmo.Chemical('Palmitoleic_acid', search_ID = '373-49-9'),
+
+# Oxidants used and other gaseous products
+    tmo.Chemical('Nitrogen'),
+    tmo.Chemical('Oxygen'),
+    tmo.Chemical('Carbon_dioxide'),
+    tmo.Chemical('Methanol'),
+    tmo.Chemical('Glycerol', rho = 1261.3, phase = 'l'),
+    tmo.Chemical('Sodium_methoxide',formula ='NaOCH3'),
+   
+###All the chemicals related to TAGs in HOSO
+    tmo.Chemical('OOO', search_ID = '122-32-7'),
+    tmo.Chemical('LLL', search_ID = '537-40-6'),
+    
+    tmo.Chemical('OOL',
+                 search_ID = '104485-08-7',
+                 phase ='l',
+                 search_db = False),
+    
+    tmo.Chemical('LLO', 
+                 search_ID = '2190-22-9',
+                 phase = 'l',
+                 search_db = False),
+    
+    tmo.Chemical('SOO',
+                 search_ID = '79517-06-9',
+                 phase ='l',
+                 search_db = False),
+    
+    tmo.Chemical('PLO', 
+                 search_ID = '2680-59-3',
+                 phase = 'l',
+                 search_db = False),
+      
+    tmo.Chemical('PoOO',
+                 search_ID = 'PubChem= 9544083',
+                 phase ='l',
+                 search_db = False),
+
+    tmo.Chemical('POO',
+                 search_ID = '',
+                 phase ='l',
+                 search_db = False),
+    
+    tmo.Chemical('POS', 
+                 search_ID = 'PubChem = 129723993',
+                 phase = 'l',
+                 search_db = False),
+    
+    tmo.Chemical('POP',
+                 search_ID = '2190-25-2',
+                 phase ='l',
+                 search_db = False),
+    
+    tmo.Chemical('PLS',
+                 search_ID = 'PubChem = 102332193',
+                 phase ='l',
+                 search_db = False),
+    
+##chemical for representing phospholipids, taken directly from lipidcane biorefinery
+    tmo.Chemical('Phosphatidylinositol', 
+                 formula='C47H83O13P',
+                     search_db=False, 
+                     CAS='383907-36-6',
+                     default=True,
+                     Hf=-1.779e6, # Assume same as TAG on a weight basis
+                     phase='l'),
+  
+##All the chemicals that go in the Biodiesel
+
+    tmo.Chemical('Methyl_oleate', phase = 'l'),
+    tmo.Chemical('Methyl_palmitate', phase = 'l'),
+    tmo.Chemical('Methyl_stearate', phase = 'l'),
+    tmo.Chemical('Methyl_linoleate', phase = 'l'), 
+    tmo.Chemical('Methyl_palmitoleate',search_ID ='1120-25-8',
+                                       phase = 'l'),
+     
+## Catalyst data    
+## Tungstic_acid boiling point: https://en.wikipedia.org/wiki/Tungstic_acid
+## TODO: Ask Yoel about the phase of tungstic acid
+    tmo.Chemical('Tungstic_acid', 
+                  Tb = 1746, 
+                  phase = 's', 
+                  Hvap=Tungsten.Hvap,
+                  Psat=Tungsten.Psat,
+                  default = True),
+    tmo.Chemical.blank('Tungstate_ion',
+                     CAS = '12737-86-9',
+                     # smiles = '[O-][W](=O)(=O)[O-]', 
+                     # InChI = 'InChI=1S/4O.W/q;;2*-1', 
+                     # InChI_key = 'PBYZMCDFOULPGH-UHFFFAOYSA-N', 
+                     # pubchemid = '24465', 
+                     # iupac_name = ('dioxido(dioxo)tungsten'),
+                     # common_name = 'tungsten_ion',  
+                     Tb = Tungsten.Tb
+                 ),
+    tmo.Chemical('Hydrogen_ion',
+                 Tb = Hydrogen.Tb),    
+## TODO: GWP data for cobalt acetate missing, figure it out 
+## cobalt_acetate_tetrahydrate Tb: 
+    Cobalt_chloride,
+    tmo.Chemical('Cobalt_acetate_tetrahydrate',
+                 search_ID = '6147-53-1',
+                 Tb = 117.1+273.15, 
+                 phase = 's',
+                 Hvap=Cobalt_chloride.Hvap,
+                 Psat=Cobalt_chloride.Psat,
+                 default=True),
+    tmo.Chemical('Acetate'),
+## TODO: defaulting the below to water for now, maybe look for a better assumption
+    tmo.Chemical('Cobalt(2+)',
+                 Hvap=Cobalt.Hvap,
+                 Psat=Cobalt.Psat,
+                 Tb=Cobalt.Tb,
+                 default = True),
+    
+    ###Modelling amberlyte catalyst like a solid catalyst
+    ##Using sunfonated_polystyrene boiling point
+    ##https://www.chemsrc.com/en/cas/39389-20-3_843683.html#:~:text=amberlyst%28r%29%2015%20CAS%20Number%3A%2039389-20-3%3A%20Molecular%20Weight%3A%20314.39900%3A,Point%3A%20266.3%C2%BAC%3A%20Symbol%3A%20GHS07%3A%20Signal%20Word%3A%20Warning%20%C3%97
+    
+    ##Resin for hydrolysis
+    tmo.Chemical('polystyrene_based_catalyst',
+                 search_db=False,
+                 Tb = 516.7+273.15,
+                 phase = 's',
+                 default=True),
+    ##For catalyst recovery chemicals required
+    tmo.Chemical('Calcium_hydroxide'),
+    
+    tmo.Chemical.blank('Calcium_tungstate',
+                       CAS = '7790-75-2',
+                       MW = 287.92,
+                       Tb = Tungsten.Tb,   
+                       phase = 's'),
+    
+    tmo.Chemical('Calcium_acetate',                      
+                  phase = 'l'),
+    
+    tmo.Chemical('Cobalt_hydroxide',                      
+                  phase = 's'),
+    
+    
+    ##Below lacks Hvap etc models
+    # Sulfonated_polystyrene = chemical_database('Sulfonated_polystyrene',
+    #                                            search_ID = '98-70-4',
+    #                                            )
+    ##Hence using polystyrene
+    tmo.Chemical('Polystyrene', phase = 's'),
+    
+##For lipidcane compatibility
+    tmo.Chemical('MonoOlein',search_ID = '111-03-5'),
+    # tmo.Chemical('DiOlein',search_ID = 'PubChem = 6505653'),
+    tmo.Chemical('Dipalmitin'),
+    tmo.Chemical('Monopalmitin'),
+    
+    #Below TAG's not a part of the database    
+    tmo.Chemical('OOL',
+                 search_ID = '104485-08-7',
+                 phase ='l',
+                 search_db = False),
+    
+    tmo.Chemical('LLO', 
+                 search_ID = '2190-22-9',
+                 phase = 'l',
+                 search_db = False),
+
+                 ])
+
+##Modelling the properties of resin used for hydrolysis based on polystyrene
+chems.polystyrene_based_catalyst.copy_models_from(chems.Polystyrene,
+                                        ['Hvap','Psat','sigma', 
+                                         'epsilon', 'kappa', 'V',
+                                         'Cn', 'mu'])
+LiquidMethanol = chems['Methanol'].at_state(phase='l', copy=True)
+chems['Sodium_methoxide'].copy_models_from (LiquidMethanol,
+                                            ['V', 'sigma',
+                                             'kappa', 'Cn',
+                                             'Psat'])
+## The oxidative cleavage catalyst properties are based on cobalt chloride
+chems['Cobalt_acetate_tetrahydrate'].copy_models_from(Cobalt_chloride,
+                                            ['sigma',
+                                             'kappa', 'Cn',
+                                             ])
+## The density of cobalt acetate tetrahydrate is available in the literature, rho is 1730 Kg/m3
+## https://scifinder-n.cas.org/searchDetail/substance/634d77a73c1f076117e95f61/substanceDetails
+## Cobalt acetate dissolution reaction data
+V_of_cobalt_acetate_tetrahydrate = fn.rho_to_V(1730,chems['Cobalt_acetate_tetrahydrate'].MW)
+chems['Cobalt_acetate_tetrahydrate'].V.add_model(V_of_cobalt_acetate_tetrahydrate,
+                                                 top_priority = True)
+## Tungstate ion default to properties
+chems['Tungstate_ion'].copy_models_from(chems['Tungstic_acid'],
+                                        ['Hvap',
+                                         'Psat',
+                                         'Cn',
+                                         'V',
+                                         'mu'])
+## Hydrogen ion defaults to properties of hydrogen
+chems['Hydrogen_ion'].copy_models_from(Hydrogen,
+                                       ['Hvap',
+                                        'Psat'])
+## Products of the precipitation reaction
+## https://scifinder-n.cas.org/searchDetail/substance/634db2343c1f076117eb77ce/substanceDetails
+chems['Calcium_tungstate'].copy_models_from(Tungsten,
+                                            ['Hvap',
+                                             'Psat'])
+chems['Calcium_tungstate'].V.add_model(fn.rho_to_V(5800,
+                                                   chems['Calcium_tungstate'].MW),
+                                                   top_priority = True)
 
 
-Biodiesel = chemical_database('Methyl_oleate', phase = 'l')
-# available methods are {'ROWLINSON_POLING', 'DADGOSTAR_SHAW', 'ROWLINSON_BONDI'}
-Biodiesel.Cn.method = 'ROWLINSON_BONDI'
-Hydrogen_peroxide = chemical_database('Hydrogen_peroxide',phase = 'l')
-Water =  chemical_database('Water')
-#look into phase of the below
-MDHSA = chemical_database('MDHSA',search_ID = '1115-01-1')
-Pelargonic_acid = chemical_database('Pelargonic_acid')
-Azelaic_acid = chemical_database('Azelaic_acid')
-Monomethyl_azelate = chemical_database('Monomethyl_azelate')
-Suberic_acid = chemical_database('Suberic_acid')
-Caprylic_acid = chemical_database('Caprylic_acid')
-Nitrogen = chemical_database('Nitrogen')
-Oxygen = chemical_database('Oxygen')
-Methanol = chemical_database('Methanol')
-### Chemicals that were missing some properties
-### TODO.xxx check if this is a good assumption with Yoel
-Tungsten = chemical_database('tungsten')
-#Tungstic_acid boiling point: https://en.wikipedia.org/wiki/Tungstic_acid
-Tungsten_catalyst = chemical_database('tungstic_acid', Tb = 1746, phase = 's')
-Tungsten_catalyst.copy_models_from(Tungsten,['Hvap','Psat'])
 
-###Using cobalt chloride instead of acetate as allowed by the patent
-###cobalt acetate has a few missing properties, further GWP data not available
-Cobalt_chloride = chemical_database('Cobalt_chloride',search_ID = '7646-79-9',
-                                    phase = 's')
-# cobalt_acetate_Tb: https://www.chemsrc.com/en/cas/71-48-7_34110.html
-Cobalt_catalyst = chemical_database('Cobalt_acetate',Tb = 117.1+273.15, 
-                                    phase = 's')
-Cobalt_catalyst.copy_models_from(Cobalt_chloride,['Hvap','Psat'])
-#defaulting the rest of the properties to that of water
-Cobalt_catalyst.default()
+## Changing this for Azelaic acid as it probably didnt work during a distillation process
+chems['Azelaic_acid'].Cn.method = 'LASTOVKA_S'
+# chems['Glycerol'].Cn.method = 'LASTOVKA_S'
 
-###Modelling amberlyte catalyst like a solid catalyst
-##Using sunfonated_polystyrene boiling point
-##https://www.chemsrc.com/en/cas/39389-20-3_843683.html#:~:text=amberlyst%28r%29%2015%20CAS%20Number%3A%2039389-20-3%3A%20Molecular%20Weight%3A%20314.39900%3A,Point%3A%20266.3%C2%BAC%3A%20Symbol%3A%20GHS07%3A%20Signal%20Word%3A%20Warning%20%C3%97
+#TODO.xxx check if Psat from liquid methanol is a good idea
+def create_new_chemical(ID, phase='s', **constants):
+        solid = tmo.Chemical.blank(ID, phase=phase, **constants)
+        chems.append(solid)
+        return solid
+    
+NaOH = create_new_chemical('NaOH', formula='NaOH')
+HCl = create_new_chemical('HCl', formula='HCl')
 
-##Chemicals not in the database
-Amberlyst_catalyst = chemical_defined('polystyrene_based_catalyst',
-                                       Tb = 516.7+273.15,
-                                       phase = 's')
-##Below lacks Hvap etc models
-# Sulfonated_polystyrene = chemical_database('Sulfonated_polystyrene',
-#                                            search_ID = '98-70-4',
-#                                            )
-##Hence using polystyrene
-Polystyrene = chemical_database('Polystyrene')
-##Hence using polystyrene
-Amberlyst_catalyst.copy_models_from(Polystyrene,
-                                    ['Hvap','Psat','sigma', 
-                                     'epsilon', 'kappa', 'V',
-                                     'Cn', 'mu'])
+# Solubles don't occupy much volume
+for chemical in (HCl, NaOH):
+        V = fn.rho_to_V(rho=1e5, MW=chemical.MW)
+        chemical.V.add_model(V, top_priority=True)
+ 
+
+PPP = tmo.Chemical('Tripalmitin')
+TAGs = chems['OOO','LLL','OOL','LLO','SOO','PLO',
+             'PoOO','POO','POS','POP','PLS']
+for i in TAGs:
+    i.copy_models_from(PPP, ['mu'])
+    
+for chemical in chems: chemical.default()
+
 chems.compile()
-tmo.settings.set_thermo(chems)
-chems.show()
+chems.define_group('TAG', ('OOO','LLL','OOL',
+                           'LLO','SOO','PLO',
+                           'PoOO','POO','POS',
+                           'POP','PLS'))
+
+chems.define_group('Lipid', ('OOO','LLL','OOL',
+                           'LLO','SOO','PLO',
+                           'PoOO','POO','POS',
+                           'POP','PLS'))
+chems.define_group('Oil', ('OOO','LLL','OOL',
+                           'LLO','SOO','PLO',
+                           'PoOO','POO','POS',
+                           'POP','PLS'))
+
+chems.define_group('Biodiesel', ('Methyl_oleate',
+                                 'Methyl_palmitate',
+                                 'Methyl_stearate',
+                                 'Methyl_linoleate',
+                                 'Methyl_palmitoleate'))
+
+chems.set_synonym('Water', 'H2O')
+chems.set_synonym('Carbon_dioxide','CO2')
+chems.set_synonym('Phosphatidylinositol','PL')
+chems.set_synonym('MonoOlein', 'MAG')
+chems.set_synonym('Dipalmitin', 'DAG')
+chems.set_synonym('Cobalt(2+)','Cobalt_ion')
+chems.set_synonym('Hydrogen_ion', 'H+')
+bst.settings.set_thermo(chems)
+# chems.show()

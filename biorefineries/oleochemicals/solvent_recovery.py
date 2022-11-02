@@ -16,9 +16,10 @@ from biosteam import SystemFactory
 @SystemFactory(
     ID = 'solvent_recovery',
     ins = [ dict(ID = 'solvent_extract_mixture'),
-           ],
-    outs = [dict(ID = 'crude_nonoanoic_acid'),
-            dict(ID = 'recovered_NMS_solvent_stream')
+            ],
+    outs = [dict(ID = 'recovered_NMS_solvent_stream'),
+            dict(ID = 'crude_nonoanoic_acid'),
+            
             ],
     fixed_ins_size = False,
     fixed_outs_size = False,     
@@ -29,16 +30,16 @@ def solvent_recovery_system(ins,outs,T_out):
     recovered_NMS_solvent_stream,crude_nonoanoic_acid, = outs
     
     D601_H = bst.HXutility('D601_H',
-                           ins = solvent_extract_mixture,
-                           T = T_out
+                            ins = solvent_extract_mixture,
+                            T = T_out
                           )
 #This is being run at atm pressure and at about 135deg acc to the patent     
     D601_1 = bst.ShortcutColumn('D601_1',
                               ins = solvent_extract_mixture,
                               outs =(recovered_NMS_solvent_stream,
-                                     crude_nonoanoic_acid),
+                                      crude_nonoanoic_acid),
                               LHK = ('toluene',
-                                     'Azelaic_acid'),
+                                      'Azelaic_acid'),
                               k = 2,
                               x_bot = 0.7,
                               y_top = 0.7

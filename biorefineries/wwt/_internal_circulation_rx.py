@@ -17,9 +17,7 @@ TODO:
     - Check with Brian's AnMBR paper and see the COD<1300 mg/L not preferable thing
 '''
 
-import sympy as sp
-import biosteam as bst
-import thermosteam as tmo
+import sympy as sp, biosteam as bst, thermosteam as tmo
 from biosteam.exceptions import DesignError
 from . import (
     get_BD_dct,
@@ -324,7 +322,7 @@ class InternalCirculationRx(bst.MixTank):
 
         pumps = (self.effluent_pump, self.sludge_pump)
         for i in range(2):
-            pumps[i].ins[0] = self.outs[i+1].copy() # use `.proxy()` will interfere `_run`
+            pumps[i].ins[0].copy_like(self.outs[i+1]) # use `.proxy()` will interfere `_run`
             pumps[i].simulate()
             self.power_utility.rate += pumps[i].power_utility.rate
 

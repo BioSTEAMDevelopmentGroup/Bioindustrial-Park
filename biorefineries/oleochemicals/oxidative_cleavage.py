@@ -3,7 +3,7 @@
 Created on Fri Oct 29 08:18:19 2021
 @author: yrc2
 """
-from biorefineries.oleochemicals import units
+from biorefineries.oleochemicals import units_experimental
 import biosteam as bst
 import thermosteam as tmo
 import flexsolve as flx
@@ -11,19 +11,20 @@ import numpy as np
 
 from biosteam import SystemFactory
 
-######################## Units ########################
+######################## units_experimental ########################
 @SystemFactory(
     ID = 'oxidative_clevage',
     ins = [dict(ID='fresh_OA'),
            dict(ID='fresh_HP'),
            dict(ID='water_for_oxidative_cleavage'),
            dict(ID = 'fresh_Cat')],           
-    outs = [dict(ID = 'mixed_oxidation_products')],
+    outs = [dict(ID = 'vented_products'),
+            dict(ID = 'mixed_oxidation_products')],
     fixed_outs_size = True,     
               )
 def oxidative_cleavage_system(ins,outs,T_in):
-    fresh_OA, fresh_HP, water_for_oxidative_cleavage, fresh_Cat = ins
-    mixed_oxidation_products, = outs
+    fresh_OA, fresh_HP, water_for_oxidative_cleavage, fresh_Cat, = ins
+    vented_products,mixed_oxidation_products, = outs
     
 #Feedtanks and pumps
 # Oleic_acid_feedtank
@@ -49,8 +50,8 @@ def oxidative_cleavage_system(ins,outs,T_in):
                               ins = water_for_oxidative_cleavage,
                               outs = 'fresh_water_to_pump')
     P103_1 = bst.units.Pump('P103_1',
-                      ins = T103_1-0,
-                      outs ='water_to_conc_mixer')
+                            ins = T103_1-0,
+                            outs ='water_to_conc_mixer')
 
 # Catalyst_feed_tank
     T104 = bst.units.StorageTank('T104',
@@ -66,16 +67,17 @@ def oxidative_cleavage_system(ins,outs,T_in):
     
 #Mixer for hydrogen_peroxide solution
     M101 = bst.units.Mixer('M101',
-                        ins = (P102-0,                               
-                               P103_1-0),
+                        ins = (P102.outs[0],                               
+                               P103_1.outs[0]),
                         outs = 'feed_to_reactor_mixer')
     
 
     def adjust_HP_feed_flow():   
-      fresh_HP.F_mass = fresh_OA.F_mass * 0.958 
-      water_for_oxidative_cleavage.F_mass = fresh_OA.F_mass * 2.008
+      fresh_HP.F_mass =  0.958 * fresh_OA.F_mass
+      water_for_oxidative_cleavage.F_mass = 2.008 * fresh_OA.F_mass 
    
-    M101.add_specification(adjust_HP_feed_flow, run=True)   
+    M101.add_specification(adjust_HP_feed_flow,
+                           run=True)   
 
       
 #Mixer for reactor feed, adds the h2O2 sol and oleic acid
@@ -94,12 +96,15 @@ def oxidative_cleavage_system(ins,outs,T_in):
                              T = T_in
                              )
     
+    
 ### TODO.xxx check if catalyst volume is still required
 
-    R101 = units.OxidativeCleavageReactor('R101',
+    R101 = units_experimental.OxidativeCleavageReactor('R101',
                                 ins = R101_H-0, 
-                                outs = mixed_oxidation_products,
-                                V=3785 + 1.213553930851268e-06
+                                outs = (vented_products,
+                                        mixed_oxidation_products),
+                                V=3785 + 1.213553930851268e-06,
+                                tau = 17
                                 # in m3 (equivalent to 1 MMGal), 
                                 # this is including catalyst volume
                                                               )

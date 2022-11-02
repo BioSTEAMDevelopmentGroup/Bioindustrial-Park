@@ -1,38 +1,13 @@
-#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Created on Sun Aug 23 12:11:15 2020
+Created on Tue Nov  1 18:00:42 2022
+
 @author: sarangbhagwat
-
-This module is a modified implementation of modules from the following:
-[1]	Bhagwat et al., Sustainable Production of Acrylic Acid via 3-Hydroxypropionic Acid from Lignocellulosic Biomass. ACS Sustainable Chem. Eng. 2021, 9 (49), 16659–16669. https://doi.org/10.1021/acssuschemeng.1c05441
-[2]	Li et al., Sustainable Lactic Acid Production from Lignocellulosic Biomass. ACS Sustainable Chem. Eng. 2021, 9 (3), 1341–1351. https://doi.org/10.1021/acssuschemeng.0c08055
-[3]	Cortes-Peña et al., BioSTEAM: A Fast and Flexible Platform for the Design, Simulation, and Techno-Economic Analysis of Biorefineries under Uncertainty. ACS Sustainable Chem. Eng. 2020, 8 (8), 3302–3310. https://doi.org/10.1021/acssuschemeng.9b07040
-
-All units are explicitly defined here for transparency and easy reference
-Naming conventions:
-    D = Distillation column
-    F = Flash tank
-    H = Heat exchange
-    M = Mixer
-    P = Pump (including conveying belt)
-    R = Reactor
-    S = Splitter (including solid/liquid separator)
-    T = Tank or bin for storage
-    U = Other units
-Processes:
-    100: Feedstock preprocessing
-    200: Pretreatment
-    300: Conversion
-    400: Separation
-    500: Wastewater treatment
-    600: Facilities
 """
-
-# %% Setup
 
 import biosteam as bst
 import thermosteam as tmo
+
 import flexsolve as flx
 import numpy as np
 
@@ -55,7 +30,7 @@ from biorefineries.make_a_biorefinery.auto_waste_management import AutoWasteMana
 Rxn = tmo.reaction.Reaction
 ParallelRxn = tmo.reaction.ParallelReaction
 
-bst.speed_up()
+# bst.speed_up()
 flowsheet = bst.Flowsheet('succinic')
 bst.main_flowsheet.set_flowsheet(flowsheet)
 
@@ -87,8 +62,12 @@ def create_succinic_sys(ins, outs):
         isplit['SuccinicAcid', 'LacticAcid', 'Ethanol'] = isplit[ID]
        
     process_groups = []
+    feedstock = Stream('feedstock',
+                        baseline_feedflow.copy(),
+                        units='kg/hr',
+                        price=price['Feedstock'])
     
-    # %% 
+    U101 = units.FeedstockPreprocessing('U101', ins=feedstock)
     
     # =============================================================================
     # Feedstock
@@ -135,21 +114,23 @@ def create_succinic_sys(ins, outs):
                                      outs='steam_M201',
                                      T=99.+273.15, rigorous=True)
     
-    H_M201.heat_utilities[0].heat_transfer_efficiency = 1.
+    # H_M201.heat_utilities[0].heat_transfer_efficiency = 1.
+    @H_M201.add_specification(run=False)
     def H_M201_specification():
         T201._run()
         acid_imass = T201.outs[0].imass['SulfuricAcid']
         H_M201.ins[0].imass['Water'] = acid_imass / 0.05
         # H_M201.ins[0].imass['H2SO4'] = H_M201.ins[0].imass['Water']/1000.
         H_M201._run()
-    H_M201.specification = H_M201_specification
+        
     # H_M201._cost = lambda: None
     # H_M201._design = lambda: None
     # H_M201.heat_utilities[0].heat_exchanger = None
     H_M202 = bst.units.HXutility('H_M202', ins=water_M202,
                                      outs='hot_water_M202',
                                      T=99.+273.15, rigorous=True)
-    H_M202.heat_utilities[0].heat_transfer_efficiency = 1.
+    # H_M202.heat_utilities[0].heat_transfer_efficiency = 1.
+    @H_M202.add_specification(run=False)
     def H_M202_specification():
         U101._run()
         H_M201.run()
@@ -163,7 +144,7 @@ def create_succinic_sys(ins, outs):
         H_M202.ins[0].imass['Water'] = total_mass - mixture_F_mass
         # H_M202.ins[0].imass['H2SO4'] = H_M202.ins[0].imass['Water']/1000.
         H_M202._run()
-    H_M202.specification = H_M202_specification
+    
     
     
     # Prepare sulfuric acid
@@ -179,7 +160,7 @@ def create_succinic_sys(ins, outs):
     # Mix feedstock/sulfuric acid mixture and steam
     # M203 = units.SteamMixer('M203', ins=(M202-0, water_M203), P=5.5*101325)
     M203 = bst.units.SteamMixer('M203', ins=(M202-0, '', water_M203), P=5.5*101325)
-    M203.heat_utilities[0].heat_transfer_efficiency = 1.
+    # M203.heat_utilities[0].heat_transfer_efficiency = 1.
     R201 = units.PretreatmentReactorSystem('R201', ins=M203-0, outs=('R201_g', 'R201_l'))
     
     # Pump bottom of the pretreatment products to the oligomer conversion tank
@@ -199,12 +180,13 @@ def create_succinic_sys(ins, outs):
     
     # Neutralize pretreatment hydrolysate
     M205 = units.AmmoniaMixer('M205', ins=(ammonia_M205, water_M205))
+    @M205.add_specification(run=False)
     def update_ammonia_and_mix():
         hydrolysate = F201.outs[1]
         # Load 10% extra
         ammonia_M205.imol['NH4OH'] = (2*hydrolysate.imol['H2SO4']) * 1.1
         M205._run()
-    M205.specification = update_ammonia_and_mix
+    
     
     T204 = units.AmmoniaAdditionTank('T204', ins=(F201-1, M205-0))
     P201 = units.HydrolysatePump('P201', ins=T204-0)
@@ -297,63 +279,18 @@ def create_succinic_sys(ins, outs):
     # Cofermentation
     
     R302 = units.CoFermentation('R302', 
-                                    ins=(S302-1, '', CSL, ''),
-                                    outs=('fermentation_effluent', 'CO2_fermentation'))
-    
+                                    ins=(S302-1, 'seed', CSL, 'CO2_feed'),
+                                    outs=('fermentation_broth', 'fermentation_vent'))
+    @R302.add_specification(run=False)
     def include_seed_CSL_in_cofermentation(): # note: effluent always has 0 CSL
         R302._run()
         R302.ins[2].F_mass*=1./(1-S302.split[0])
-    R302.specification = include_seed_CSL_in_cofermentation
+    
     
     # ferm_ratio is the ratio of conversion relative to the fermenter
     R303 = units.SeedTrain('R303', ins=(S302-0, ''), outs=('seed', 'CO2_seedtrain'), ferm_ratio=0.9)
     
     T301 = units.SeedHoldTank('T301', ins=R303-0, outs=1-R302)
-    
-     # %% 
-    
-    # =============================================================================
-    # Separation streams
-    # =============================================================================
-    
-    # !!! Any separation input streams (output from storage) aside from the feedstock or fermentation broth go here
-    
-    
-    # =============================================================================
-    # Separation units
-    # =============================================================================
-    
-    # !!! Replace this fake unit with separation process units
-    
-    bst.FakeSplitter._N_outs = 4
-    S401 = bst.FakeSplitter('S401', ins=R302-0, outs=('s_product', 's_byproduct_1', 's_byproduct_2', 'S401_to_boiler', 'S401_to_WWT'))
-    S401.line = 'Fake separation process'
-    S401._graphics = bst.Unit._graphics
-    def S401_spec():
-        S401_ins_0 = S401.ins[0].copy()
-
-        product_mol = S401_ins_0.imol['SuccinicAcid']
-        S401_ins_0.imol['SuccinicAcid'] -= product_mol
-        S401.outs[0].imol['SuccinicAcid'] = product_mol
-        
-        sw_mol = S401_ins_0.imol['FermMicrobe', 'Lignin']
-        S401_ins_0.imol['FermMicrobe', 'Lignin'] -= sw_mol
-        S401.outs[3].imol['FermMicrobe', 'Lignin'] = sw_mol
-        
-        retained_water_mol = S401_ins_0.imol['Water']*0.05 # arbitrary
-        S401_ins_0.imol['Water'] -= retained_water_mol
-        S401.outs[3].imol['Water'] = retained_water_mol
-        
-        # byproduct_1_mol = S401_ins_0.imol['LacticAcid']
-        # S401_ins_0.imol['LacticAcid'] -= byproduct_1_mol
-        # S401.outs[1].imol['LacticAcid'] = byproduct_1_mol
-        
-        byproduct_2_mol = S401_ins_0.imol['Ethanol']
-        S401_ins_0.imol['Ethanol'] -= byproduct_2_mol
-        S401.outs[2].imol['Ethanol'] = byproduct_2_mol
-        
-        S401.outs[4].mol[:] = S401_ins_0.mol[:]
-    S401.specification = S401_spec
     
     # %% 
     
@@ -375,8 +312,8 @@ def create_succinic_sys(ins, outs):
     # =============================================================================
     
     # Mix waste liquids for treatment
-    M501 = bst.units.Mixer('M501', ins=(''
-                                        # F301-1, 
+    M501 = bst.units.Mixer('M501', ins=('',
+                                        R302-0, 
                                         # S401-1,
                                         # F401-0,
                                         # r_S402_s-1, r_S403_s-1, r_S404_s-1,
@@ -387,24 +324,42 @@ def create_succinic_sys(ins, outs):
     # This represents the total cost of wastewater treatment system
     WWT_cost = units.WastewaterSystemCost('WWTcost501', ins=M501-0)
     
-    R501 = units.AnaerobicDigestion('R501', ins=WWT_cost-0,
+    # R501 = units.AnaerobicDigestion('R501', ins=WWT_cost-0,
+    #                                 outs=('biogas', 'anaerobic_treated_water', 
+    #                                       'anaerobic_sludge'),
+    #                                 reactants=soluble_organics,
+    #                                 split=find_split(splits_df.index,
+    #                                                  splits_df['stream_611'],
+    #                                                  splits_df['stream_612'],
+    #                                                  chemical_groups),
+    #                                 T=35+273.15)
+    
+    R501 = bst.AnaerobicDigestion('R501', ins=WWT_cost-0,
                                     outs=('biogas', 'anaerobic_treated_water', 
                                           'anaerobic_sludge'),
-                                    reactants=soluble_organics,
-                                    split=find_split(splits_df.index,
+                                    # reactants=soluble_organics,
+                                    sludge_split=find_split(splits_df.index,
                                                      splits_df['stream_611'],
                                                      splits_df['stream_612'],
                                                      chemical_groups),
-                                    T=35+273.15)
-    
+                                    # T=35+273.15,
+                                    )
     get_flow_dry_tpd = lambda: (feedstock.F_mass-feedstock.imass['H2O'])*24/907.185
     
     # Mix recycled stream and wastewater after R501
     M502 = bst.units.Mixer('M502', ins=(R501-1, ''))
-    R502 = units.AerobicDigestion('R502', ins=(M502-0, air_lagoon, aerobic_caustic),
-                                  outs=('aerobic_vent', 'aerobic_treated_water'),
-                                  reactants=soluble_organics,
-                                  ratio=get_flow_dry_tpd()/2205)
+    # R502 = units.AerobicDigestion('R502', ins=(M502-0, air_lagoon, aerobic_caustic),
+    #                               outs=('aerobic_vent', 'aerobic_treated_water'),
+    #                               reactants=soluble_organics,
+    #                               ratio=get_flow_dry_tpd()/2205)
+    
+    R502 = bst.AerobicDigestion('R502', ins=(M502-0, 
+                                                air_lagoon, aerobic_caustic,
+                                               ),
+                                  outs=('aerobic_vent', 'aerobic_treated_water', 
+                                        # 'sludge',
+                                        ),
+                                  )
     
     # Membrane bioreactor to split treated wastewater from R502
     S501 = bst.units.Splitter('S501', ins=R502-1, outs=('membrane_treated_water', 
@@ -444,8 +399,8 @@ def create_succinic_sys(ins, outs):
     S504.line = 'Reverse osmosis'
     
     # Mix solid wastes to boiler turbogenerator
-    M505 = bst.units.Mixer('M505', ins=(''
-                                        # S301-0, 
+    M505 = bst.units.Mixer('M505', ins=('',
+                                        S301-0, 
                                         # S401-0, 
                                         # F401-0, D401-0,
                                         ), 
@@ -505,49 +460,56 @@ def create_succinic_sys(ins, outs):
     # Facilities units
     # =============================================================================
 
-    # 7-day storage time, similar to ethanol's in Humbird et al.   
-    # Product storage
-    T601 = bst.StorageTank('T601', ins=S401-0, tau=7.*24., V_wf=0.9, # !!! ins should be the product stream
-                                         vessel_type='Floating roof',
-                                         vessel_material='Stainless steel')
-    T601.line = 'ProductStorageTank'
-    T601_P = bst.Pump('T601_P', ins=T601-0, outs=product_stream)
+    # # 7-day storage time, similar to ethanol's in Humbird et al.   
+    # # Product storage
+    # T601 = bst.StorageTank('T601', ins=S401-0, tau=7.*24., V_wf=0.9, # !!! ins should be the product stream
+    #                                      vessel_type='Floating roof',
+    #                                      vessel_material='Stainless steel')
+    # T601.line = 'ProductStorageTank'
+    # T601_P = bst.Pump('T601_P', ins=T601-0, outs=product_stream)
     
-    # Byproduct 1 storage
-    T602 = bst.StorageTank('T602', ins=S401-1, tau=7.*24., V_wf=0.9, # !!! ins should be a byproduct, if any
-                                          vessel_type='Floating roof',
-                                          vessel_material='Stainless steel')   
+    # # Byproduct 1 storage
+    # T602 = bst.StorageTank('T602', ins=S401-1, tau=7.*24., V_wf=0.9, # !!! ins should be a byproduct, if any
+    #                                       vessel_type='Floating roof',
+    #                                       vessel_material='Stainless steel')   
     
-    # T602.line = 'ByProduct1StorageTank'
-    # T602_P = bst.Pump('T602_P', ins=T602-0, outs=byproduct_1_stream)
+    # # T602.line = 'ByProduct1StorageTank'
+    # # T602_P = bst.Pump('T602_P', ins=T602-0, outs=byproduct_1_stream)
     
-    # Byproduct 1 storage
-    T603 = bst.StorageTank('T603', ins=S401-2, tau=7.*24., V_wf=0.9, # !!! ins should be a byproduct, if any
-                                          vessel_type='Floating roof',
-                                          vessel_material='Stainless steel')   
-    T603.line = 'ByProduct2StorageTank'
-    T603_P = bst.Pump('T603_P', ins=T603-0, outs=byproduct_2_stream)
+    # # Byproduct 1 storage
+    # T603 = bst.StorageTank('T603', ins=S401-2, tau=7.*24., V_wf=0.9, # !!! ins should be a byproduct, if any
+    #                                       vessel_type='Floating roof',
+    #                                       vessel_material='Stainless steel')   
+    # T603.line = 'ByProduct2StorageTank'
+    # T603_P = bst.Pump('T603_P', ins=T603-0, outs=byproduct_2_stream)
     
-    # Storage tanks for other process inputs (besides water)
-    #!!! Replace these default tau values with better assumptions
-    T604 = bst.StorageTank('T604', ins=saccharification_enzyme_fresh, tau=7.*24., V_wf=0.9,
-                                          vessel_type='Floating roof',
-                                          vessel_material='Stainless steel')   
-    T604.line = 'EnzymeStorageTank'
-    T604_P = bst.Pump('T604_P', ins=T604-0, outs=enzyme)
+    # # Storage tanks for other process inputs (besides water)
+    # #!!! Replace these default tau values with better assumptions
+    # T604 = bst.StorageTank('T604', ins=saccharification_enzyme_fresh, tau=7.*24., V_wf=0.9,
+    #                                       vessel_type='Floating roof',
+    #                                       vessel_material='Stainless steel')   
+    # T604.line = 'EnzymeStorageTank'
+    # T604_P = bst.Pump('T604_P', ins=T604-0, outs=enzyme)
     
     
     # Misc. facilities
-    CIP = facilities.CIP('CIP901', ins=CIP_chems_in, outs='CIP_chems_out')
-    ADP = facilities.ADP('ADP902', ins=plant_air_in, outs='plant_air_out',
-                         ratio=get_flow_dry_tpd()/2205)
+    # CIP = facilities.CIP('CIP901', ins=CIP_chems_in, outs='CIP_chems_out')
+    
+    CIP = bst.CIPpackage('CIP901')
+    
+    # ADP = facilities.ADP('ADP902', ins=plant_air_in, outs='plant_air_out',
+    #                      ratio=get_flow_dry_tpd()/2205)
     
     
-    FWT = units.FireWaterTank('FWT903', ins=fire_water_in, outs='fire_water_out')
+    ADP = bst.AirDistributionPackage('ADP902')
+    # FWT = units.FireWaterTank('FWT903', ins=fire_water_in, outs='fire_water_out')
     
-    CWP = facilities.CWP('CWP802', ins='return_chilled_water',
-                         outs='process_chilled_water')
+    FWT = bst.FireWaterTank('FWT903')
     
+    # CWP = facilities.CWP('CWP802', ins='return_chilled_water',
+    #                      outs='process_chilled_water')
+    
+    CWP = bst.ChilledWaterPackage('CWP802')
     # M505-0 is the liquid/solid mixture, R501-0 is the biogas, blowdown is discharged
     # BT = facilities.BT('BT', ins=(M505-0, R501-0, 
     #                                           FGD_lime, boiler_chems,
@@ -574,32 +536,37 @@ def create_succinic_sys(ins, outs):
     #                                    turbogenerator_efficiency=0.85)
     
     # Blowdown is discharged
-    CT = facilities.CT('CT801', ins=('return_cooling_water', cooling_tower_chems,
-                                  'CT_makeup_water'),
-                       outs=('process_cooling_water', 'cooling_tower_blowdown'))
+    
+    
+    CT = bst.facilities.CoolingTower('CT801')
+    
+    # CT = facilities.CT('CT801', ins=('return_cooling_water', cooling_tower_chems,
+    #                               'CT_makeup_water'),
+    #                    outs=('process_cooling_water', 'cooling_tower_blowdown'))
     
     # All water used in the system, here only consider water usage,
     # if heating needed, then heeating duty required is considered in BT
     
-    AWM = AutoWasteManagement('AWM905', wastewater_mixer=M501, boiler_solids_mixer=M505,
-                              to_wastewater_mixer_ID_key='to_WWT',
-                              to_boiler_solids_mixer_ID_key='to_boiler')
+    # AWM = AutoWasteManagement('AWM905', wastewater_mixer=M501, boiler_solids_mixer=M505,
+    #                           to_wastewater_mixer_ID_key='to_WWT',
+    #                           to_boiler_solids_mixer_ID_key='to_boiler')
     
     process_water_streams = (enzyme_water,
                              aerobic_caustic, 
                              CIP.ins[-1], BT.ins[-1], CT.ins[-1])
     
-    PWC = facilities.PWC('PWC904', ins=(system_makeup_water, S504-0),
-                         process_water_streams=process_water_streams,
-                         recycled_blowdown_streams=None,
-                         outs=('process_water', 'discharged_water'))
+    # PWC = facilities.PWC('PWC904', ins=(system_makeup_water, S504-0),
+    #                      process_water_streams=process_water_streams,
+    #                      recycled_blowdown_streams=None,
+    #                      outs=('process_water', 'discharged_water'))
     
+    PWC = bst.ProcessWaterCenter('PWC904')
     # Heat exchange network
     HXN = bst.facilities.HeatExchangerNetwork('HXN1001',
                                               # ignored=[H401, H402],
                                               )
     def HXN_no_run_cost():
-        HXN.heat_utilities = tuple()
+        HXN.heat_utilities = []
         HXN._installed_cost = 0.
     
     # To simulate without HXN, uncomment the following 3 lines:
@@ -610,10 +577,9 @@ def create_succinic_sys(ins, outs):
     # HXN = HX_Network('HXN')
     
     globals().update({'get_flow_dry_tpd': get_flow_dry_tpd})
-    
-# %% System setup
-
+#%%
 succinic_sys = create_succinic_sys()
+# succinic_sys.simulate()
 
 u = flowsheet.unit
 s = flowsheet.stream
@@ -654,7 +620,7 @@ succinic_tea = SuccinicTEA(system=succinic_sys, IRR=0.10, duration=(2016, 2046),
         # BT is not included in this TEA
         OSBL_units=(u.U101, u.WWTcost501,
                     # u.T601, u.T602, 
-                    u.T601, u.T602, u.T603, u.T604,
+                    # u.T601, u.T602, u.T603, u.T604,
                     # u.T606, u.T606_P,
                     u.CWP802, u.CT801, u.PWC904, u.CIP901, u.ADP902, u.FWT903, u.BT701),
         warehouse=0.04, site_development=0.09, additional_piping=0.045,

@@ -99,8 +99,8 @@ def create_la_comparison_models():
             'PT glucan-to-glucose': ('pretreatment_rxns', 0),
             'PT xylan-to-xylose': ('pretreatment_rxns', 4),
             'EH glucan-to-glucose': ('saccharification_rxns', 2),
-            'FERM glucan-to-product': ('cofermentation_rxns', 0),
-            'FERM xylan-to-product': ('cofermentation_rxns', 3),
+            'FERM glucose-to-product': ('cofermentation_rxns', 0),
+            'FERM xylose-to-product': ('cofermentation_rxns', 3),
             },
         'BT': 'CHP',
         'BT_eff': ('B_eff', 'TG_eff'),
@@ -134,11 +134,11 @@ if __name__ == '__main__':
     # exist_sys, new_sys = simulate_la_systems(biodegradability=1)
     # exist_model, new_model = create_la_comparison_models()
     exist_model, new_model = evaluate_la_models(
-        include_baseline=True,
-        include_uncertainty=True,
-        # include_BMP=True,
-        N_uncertainty=100,
-        # uncertainty_skip_exist=True,
-        # N_BMP=10,
-        # BMPs=(0.5, 0.9499,), # allow for minor error
+        # include_baseline=True,
+        # include_uncertainty=True,
+        include_BMP=True,
+        # N_uncertainty=1000,
+        # uncertainty_skip_exist=True, # for testing
+        N_BMP=100,
+        # BMPs=(0.5, 0.9499,), # for testing, 0.9499 allows for minor error
         )
