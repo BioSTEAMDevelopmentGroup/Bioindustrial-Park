@@ -3,7 +3,7 @@
 Created on Thu Jun 23 15:56:37 2022
 @author: LavanyaKudli
 """
-from biorefineries.oleochemicals import units
+from biorefineries.oleochemicals import units_experimental
 import biosteam as bst
 import thermosteam as tmo
 import flexsolve as flx
@@ -43,14 +43,16 @@ def primary_separation_system(ins,outs,Tin):
                                         ins = D202_H-0,
                                         outs=(nonanoic_acid_crude_product,
                                               'Azelaic_acid_rich_bottom'),
-                                        LHK = ('Nonanoic_acid',
-                                               'Azelaic_acid'),
+                                        LHK = ('Malonic_acid',
+                                               'Azelaic_acid'
+                                               ),
                                         k=2,
-                                        Lr=0.995,
-                                        Hr=0.995,
+                                        Lr=0.9,
+                                        Hr=0.9,
                                         P = 3333,
                                         partial_condenser=False
                                         )
+    
 
 
 #Crude Azelaic acid recovery through seperation of bottoms
@@ -60,16 +62,17 @@ def primary_separation_system(ins,outs,Tin):
     D203_steam.P = Water.Psat(620)
     D203_H = bst.HXutility('D203_H',
                         ins = D202-1,
-                        T = 600)
+                        T = 550)
     D203 = bst.units.BinaryDistillation("D203",
                                        ins = D203_H-0, 
                                        outs=(AA_crude_product,
                                              epoxy_stearic_acid_bottoms),
-                                       LHK = ('Azelaic_acid',
-                                              'Epoxy_stearic_acid'),
+                                       LHK = ('Oleic_acid',
+                                              'DHSA'),
                                        k=2,
                                        Lr=0.999, 
                                        Hr=0.999,
+                                       P = 5000,
                                        partial_condenser=False,
                                     )
-    D203.check_LHK = False
+    # D203.check_LHK = False

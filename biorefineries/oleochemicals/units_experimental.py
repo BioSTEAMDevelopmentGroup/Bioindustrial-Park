@@ -4,90 +4,51 @@ Created on Fri Oct 29 08:17:38 2021
 """
 import biosteam as bst
 import thermosteam as tmo
-from thermosteam import Rxn, RxnSys, PRxn, SRxn, settings, Chemical, Stream
+from thermosteam import Rxn, RxnSys, PRxn, SRxn, settings, Chemical, Stream, MultiStream, equilibrium
 
 class OxidativeCleavageReactor(bst.BatchBioreactor):
     _N_ins = 1
-    _N_outs = 1
-  
-    # def __init__(self, ID='', ins=None, outs=(), thermo=None,
-    #              tau=17, N=None, V=None, T=373.15, P=101325,
-    #              Nmin=2, Nmax=36):
-        
-    #     bst.BatchBioreactor.__init__(self, ID, ins, outs, thermo,
-    #                                tau = tau , N = N, V = V, T = T, 
-    #                                P = P ,Nmin = Nmin , Nmax = Nmax)
-       
-    # c = self.chemicals           
-    # self.Oleic_acid_conversion = 0.808
-    # self.nonanal_selectivity = 0.094 
-    # self.selectivity_oxiraneoctanoic_acid = 0.071
-    # self.Oxononanoic_acid_selectivity = 0.029
-    # self.Nonanoic_acid_selectivity = 0.277 
-    # self.selectivity_Azelaic_acid = 0.442 * 2 
+    _N_outs = 2
         
     def _setup(self):
         super()._setup() 
-        # selectivity_Azelaic_acid = selectivity_Nonanoic_acid = X2 * X1
-        # selectivity_Nonanal = selectivity_Oxonanoic_acid = X1 * (1 - X2)
-        # selectivity_oxiraneoctanoic_acid,_3-octyl- = (1 - X1)
-        
-        #Considering that 
-        X=self.Oleic_acid_conversion
-        X1 = 1 - (self.selectivity_oxiraneoctanoic_acid)
-        X2 = self.selectivity_Azelaic_acid / X1
-                
-        # self.reactions = tmo.SeriesReaction([
-        #     tmo.Rxn('Oleic_acid + Hydrogen_peroxide  -> Epoxy_stearic_acid + Water ', 'Oleic_acid', X=self.Oleic_acid_conversion),
-        #     tmo.Rxn('Epoxy_stearic_acid + Hydrogen_peroxide -> Nonanal + Oxononanoic_acid + Water', 'Epoxy_stearic_acid', X = X1),
-        #     tmo.Rxn('Nonanal + Oxononanoic_acid + 2Hydrogen_peroxide -> Azelaic_acid + Nonanoic_acid+ 2Water', 'Nonanal', X = X2),
-        #             ]) 
-     
+#TODO: change the reaction conversions
         Epoxide_formation = SRxn([Rxn('Oleic_acid + H2O2   -> Epoxy_stearic_acid ', 'Oleic_acid', X= 0.808),
-                                  Rxn('Epoxy_stearic_acid + H2O -> DHSA', 'Epoxy_stearic_acid', X = 1),
-                                  Rxn('DHSA + H2O2 -> Nonanal + Oxononanoic_acid ', 'DHSA', X = 1)])
+                                  Rxn('Epoxy_stearic_acid + H2O -> DHSA', 'Epoxy_stearic_acid', X = 0.8),
+                                  Rxn('DHSA + H2O2 -> Nonanal + Oxononanoic_acid ', 'DHSA', X = 0.8)])
         
-        Side_reactions_1 =    SRxn([Rxn('Nonanal + H2O2 ->  Nonanoic_acid', 'Nonanal', X = 0.2),
-                                    Rxn('Nonanoic_acid ->  Octane + CO2', 'Nonanoic_acid', X = 0.2),
+        Side_reactions_1 =    SRxn([Rxn('Nonanal + H2O2 ->  Nonanoic_acid', 'Nonanal', X = 1),
+                                    Rxn('Nonanoic_acid ->  Octane + CO2', 'Nonanoic_acid', X = 1),
                                     Rxn('Octane + H2O2 -> Octanal', 'Octane', X = 0.4)])
-        Side_reactions_2 = PRxn([ Rxn('Oxononanoic_acid -> CO2 + Octanal', 'Oxononanoic_acid', X = X2),
-                                  Rxn('Oxononanoic_acid + H2O2 ->  Azelaic_acid', 'Oxononanoic_acid', X = 0.3),
+        Side_reactions_2 = PRxn([ Rxn('Oxononanoic_acid -> CO2 + Octanal', 'Oxononanoic_acid', X = 0.2),
+                                  Rxn('Oxononanoic_acid + H2O2 ->  Azelaic_acid', 'Oxononanoic_acid', X = 0.8),
                                 ])  
         Side_reactions_3 = PRxn([ Rxn('Octanal + H2O2 -> Octanoic_acid ', 'Octanal', X = 0.2),
-                                  Rxn('Octanoic_acid + H2O2 -> Heptanal + CO2', X = 0.4),
-                                  Rxn('Heptanal + H2O2 -> Heptanoic_acid', X = 0.5)])
-        # this paper says that linoleic acid produces azelaic acid along with the famous thesis pdf
-        # https://doi.org/10.1016/j.indcrop.2022.115139
-        Impurities_side_reactions = PRxn([Rxn('Linoleic_acid -> Azelaic_acid + Malonic_acid + Hexanoic_acid', X = 0.8)
-                                         ])                          
-                                                  
+                                  Rxn('Octanoic_acid + H2O2 -> Heptanal + CO2', 'Octanoic_acid',X = 0.4),
+                                  Rxn('Heptanal + H2O2 -> Heptanoic_acid','Heptanal', X = 0.5)])
         
-        oxidative_cleavage_rxnsys = RxnSys(Epoxide_formation,Side_reactions_1,Side_reactions_2,Side_reactions_3,Impurities_side_reactions)
+        # linoleic acid conversion to azelaic acid reported in: #https://doi.org/10.1016/j.indcrop.2022.115139
+        Impurities_side_reactions = PRxn([Rxn('Linoleic_acid -> Azelaic_acid + Malonic_acid + Hexanoic_acid','Linoleic_acid', X = 0.8)
+                                         ])  
+    
+        oxidative_cleavage_rxnsys = RxnSys(Epoxide_formation,
+                                           Side_reactions_1,
+                                           Side_reactions_2,
+                                           Side_reactions_3,
+                                           Impurities_side_reactions)
         self.reactions = oxidative_cleavage_rxnsys
         
     def _run(self):
         feed = self.ins[0]
-        effluent = self.outs[0]        
-        #https://thermosteam.readthedocs.io/en/latest/_modules/thermosteam/_stream.html#Stream.copy_like
+        vent,effluent = self.outs
         effluent.copy_like(feed)
         self.reactions(effluent) 
+        vent.copy_flow(effluent,'CO2',remove = True)
+        effluent.copy_like(effluent)
         effluent.T = self.T
         effluent.P = self.P
         
-class Separator(bst.Unit):
   
-    _N_outs = 6
-        
-    def _run(self):
-        feed = self.ins[0]
-        IDs = ['Oleic_acid','Nonanal','Nonanoic_acid','Azelaic_acid', 
-                  'Oxononanoic_acid', 'oxiraneoctanoic_acid,_3-octyl-','Water']
-        outs = self.outs[0]
-        
-        for stream, ID in zip(self.outs,IDs):
-            stream.imol[ID] = feed.imol[ID]
-           
-            
 class AACrystalliser(bst.units.BatchCrystallizer):
   
     def __init__(self, ID='', ins=None, outs=(), thermo=None, *,  
@@ -131,12 +92,6 @@ class AACrystalliser(bst.units.BatchCrystallizer):
         outlet.imass['s','Nonanoic_acid'] = feed.imass['Nonanoic_acid']
 
         
-        # self.reactions = tmo.SeriesReaction([
-        #     tmo.Rxn('Oleic_acid + H2O2   -> Epoxy_stearic_acid + Water ', 'Oleic_acid', X=self.Oleic_acid_conversion),
-        #     tmo.Rxn('Epoxy_stearic_acid + H2O2 -> Nonanal + Oxononanoic_acid + H2O', 'oxiraneoctanoic_acid,_3-octyl-', X = X1),
-        #     tmo.Rxn('Nonanal + Oxononanoic_acid + 2H2O2 -> Azelaic_acid + Nonanoic_acid+ 2H2O', 'Nonanal', X = X2),
-        #            ])
-  
     
 # #Solubility data
 # #Pelargonic acid is insoluble in water
@@ -146,9 +101,34 @@ class AACrystalliser(bst.units.BatchCrystallizer):
 # # S = 1.96T - 76.0
 # #Therefore, we assume azelaic acid solubility at 95 deg cel is 110g/l
 
+#TODO: Use the below while writing reaction conversions
+        # self.reactions = tmo.SeriesReaction([
+        #     tmo.Rxn('Oleic_acid + H2O2   -> Epoxy_stearic_acid + Water ', 'Oleic_acid', X=self.Oleic_acid_conversion),
+        #     tmo.Rxn('Epoxy_stearic_acid + H2O2 -> Nonanal + Oxononanoic_acid + H2O', 'oxiraneoctanoic_acid,_3-octyl-', X = X1),
+        #     tmo.Rxn('Nonanal + Oxononanoic_acid + 2H2O2 -> Azelaic_acid + Nonanoic_acid+ 2H2O', 'Nonanal', X = X2),
+        #            ])
+          # selectivity_Azelaic_acid = selectivity_Nonanoic_acid = X2 * X1
+        # selectivity_Nonanal = selectivity_Oxonanoic_acid = X1 * (1 - X2)
+        # selectivity_oxiraneoctanoic_acid,_3-octyl- = (1 - X1)
+        
+        #Considering that 
+        # X=self.Oleic_acid_conversion
+        # X1 = 1 - (self.selectivity_oxiraneoctanoic_acid)
+        # X2 = self.selectivity_Azelaic_acid / X1
 
-
-
+# class Separator(bst.Unit):
+  
+#     _N_outs = 6
+        
+#     def _run(self):
+#         feed = self.ins[0]
+#         IDs = ['Oleic_acid','Nonanal','Nonanoic_acid','Azelaic_acid', 
+#                   'Oxononanoic_acid', 'oxiraneoctanoic_acid,_3-octyl-','Water']
+#         outs = self.outs[0]
+        
+#         for stream, ID in zip(self.outs,IDs):
+#             stream.imol[ID] = feed.imol[ID]
+           
 
 
 

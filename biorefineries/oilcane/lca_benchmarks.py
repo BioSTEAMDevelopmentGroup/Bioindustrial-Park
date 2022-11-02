@@ -6,8 +6,8 @@ Created on Thu Oct 28 01:40:51 2021
 """
 from biorefineries.oilcane._distributions import (
     mean_glycerol_price,
-    mean_ethanol_price,
-    mean_biodiesel_price,
+    mean_advanced_ethanol_price,
+    mean_biomass_based_diesel_price,
     mean_natural_gas_price,
     mean_electricity_price,    
     mean_soymeal_price,
@@ -27,12 +27,12 @@ GWP_total = (
 ) # kg CO2 eq. / kg biodiesel produced
 total_economic = (
     glycerol_mass / 0.8 * mean_glycerol_price
-    + biodiesel_mass / 3.3111 * mean_biodiesel_price
+    + biodiesel_mass / 3.3111 * mean_biomass_based_diesel_price
     + soymeal_mass * mean_soymeal_price
 ) # Revenue in USD / kg biodiesel
 GWP_economic = GWP_total / total_economic # kg CO2 eq. / USD
 GWP_glycerol_economic = GWP_economic *  mean_glycerol_price # kg CO2 eq. / kg-glycerol
-GWP_biodiesel_economic = GWP_economic *  mean_biodiesel_price # kg CO2 eq. / gal-biodiesel
+GWP_biodiesel_economic = GWP_economic *  mean_biomass_based_diesel_price # kg CO2 eq. / gal-biodiesel
 GWP_soymeal_economic = GWP_economic *  mean_soymeal_price # kg CO2 eq. / kg soymeal
 
 # Sugarcane biorefinery; cradle to biorefinery gate (no transportation)
@@ -51,11 +51,11 @@ GWP_ethanol_ecoinvent = 0.42413 / 0.95 * ethanol_density_kggal # kg CO2 eq. / ga
 # )
 GWP_total = GWP_ethanol_ecoinvent / ethanol_allocation # kg CO2 eq. / gal-ethanol produced
 total_economic = (
-    mean_ethanol_price
+    mean_advanced_ethanol_price
     + kWh_per_gal_ethanol * mean_electricity_price
 ) # USD / gal ethanol produced
 GWP_economic = GWP_total / total_economic # kg CO2 eq. / USD
-GWP_ethanol_economic = GWP_economic * mean_ethanol_price # kg CO2 eq. / gal-ethanol
+GWP_ethanol_economic = GWP_economic * mean_advanced_ethanol_price # kg CO2 eq. / gal-ethanol
 GWP_electricity_economic = GWP_economic * mean_electricity_price # kg CO2 eq. / kWhr
 
 

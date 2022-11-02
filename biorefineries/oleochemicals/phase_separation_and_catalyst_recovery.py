@@ -16,20 +16,22 @@ from biosteam import SystemFactory
 
 
 @SystemFactory(
-    ID = 'organic_phase_separation',
+    ID = 'phase_separation_and_catalyst_recovery',
     ins = [dict(ID = 'mixed_products_for_separation'),
            dict(ID = 'fresh_EA'),
           ],
-    outs = [dict(ID = 'aqueous_raffinate'),
-            dict(ID = 'organic_phase_for_PS'),            
+    outs = [
+            dict(ID = 'organic_phase_for_PS'), 
+            dict(ID = 'catalyst_for_reuse'),
+            dict(ID = 'aqueous_raffinate'),
             ],
     fixed_ins_size = False,
     fixed_outs_size = False,     
               )
 
-def organic_separation_system(ins,outs,T_in):
+def phase_separation_and_catalyst_recovery_system(ins,outs,T_in):
     mixed_products_for_separation,fresh_EA, = ins
-    aqueous_raffinate,organic_phase_for_PS,  = outs
+    organic_phase_for_PS,catalyst_for_reuse,aqueous_raffinate,  = outs
    
     T105 = bst.units.StorageTank ('T105', 
                               ins = fresh_EA,
@@ -60,29 +62,33 @@ def organic_separation_system(ins,outs,T_in):
     #                           T = T_in,
     #                           )
 
-##code that I am using rn to see if that works!    
+##below M105 and L201 are temporary because recycles were not working 
     M105 = bst.units.Mixer('M105',
                             ins = (P105-0),
                             outs = ('EA_for_extraction'))   
 
-    #Hot ethyl acetate extraction
+    #Hot ethyl acetate extraction to separate out the entire catalyst into one phase as mentioned in DOI: 10.1039/d2re00160h    
     L201_H = bst.units.HXutility('L201_H',
                               ins = M105-0,
                               outs = 'feed_to_ethyl_extraction',
                               T = T_in,
-                              )
-    
+                              )    
     
     L201 = bst.units.MultiStageMixerSettlers('L201', 
-                                    ins= ( mixed_products_for_separation,L201_H-0), 
-                                    outs=( aqueous_raffinate,
-                                            'organic_phase_extract_with_EA',
+                                    ins= ( mixed_products_for_separation,
+                                          L201_H-0), 
+                                    outs=('aqueous_raffinate_with_catalyst',
+                                          'organic_phase_extract_with_EA',
                                           ), 
                                     N_stages= 5,       
                                     )
-    
+#Added a spec to make sure all the phosphotungstic acid remains in the aqueous phase
+
+   
     def cache_Ks(ms):
         feed, solvent = ms.ins
+        WPOM_influent = ms.ins[0].imol['Phosphotungstic_acid']
+        ms.ins[0].imol['Phosphotungstic_acid'] = 0
         if not ms.partition_data:
             s_mix = bst.Stream.sum(ms.ins)
             s_mix.lle(T=s_mix.T, top_chemical='Ethyl_acetate')
@@ -94,22 +100,27 @@ def organic_separation_system(ins,outs,T_in):
                 'phi': 0.5,
                 }
             ms._setup() 
+        L201.ins[0].imol['Phosphotungstic_acid'] = WPOM_influent
+        L201.outs[0].imol['Phosphotungstic_acid'] = WPOM_influent
     
     L201.add_specification(cache_Ks, args=[L201], run=True)
 
-#Separation of Ethyl actetate and organic mixture
-# No heating required as the temperature high enough to yield separation
-# TODO.XXX FIGURE OUT IF VACCUUM DISTILLATION IS NEEDED
-    
-    D201 = bst.units.ShortcutColumn("D201",
-                                  ins = L201-1, 
-                                  outs=('recycle',
-                                        organic_phase_for_PS),
-                                  LHK = ('Ethyl_acetate',
-                                          'Nonanal'),
-                                  k=2,Lr=0.9999, 
-                                  Hr=0.9999,
-                                  P=10132.5,
-                                  partial_condenser=False                                  
+#Separation of Ethyl actetate and organic mixture using a flash tank
+#Using a flash to remove solvent, set the temperature according to organic separator   
+    D201 = bst.units.Flash("D201",
+                           ins = L201-1, 
+                           outs=('recycle',
+                                 organic_phase_for_PS),
+                           T =  77 + 273.15,
+                           P=10132.5,
                                   )
-    D201.check_LHK = False
+#Catalyst separation, using a splitter to emulate AMS nanofiltration membrane
+#TODO: cost the below using costs of an AMS membrane    
+    S201 = bst.Splitter('S201',
+                        ins = L201.outs[0],
+                        outs = (catalyst_for_reuse,
+                                aqueous_raffinate,
+                                ),
+                        split={'Phosphotungstic_acid': 0.8},
+                        )
+
