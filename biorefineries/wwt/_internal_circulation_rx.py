@@ -330,7 +330,7 @@ class InternalCirculationRx(bst.MixTank):
         if self.method == 'separate':
             D['Bottom reactor volume'] = self.Vb
             D['Top reactor volume'] = self.Vt
-        breakpoint()
+
 
     def _cost(self):       
         bst.MixTank._cost(self)
