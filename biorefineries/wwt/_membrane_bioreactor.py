@@ -7,8 +7,7 @@
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
 # for license details.
 
-import math
-import biosteam as bst
+import math, biosteam as bst
 from biosteam.exceptions import DesignError
 from . import (
     default_insolubles,
@@ -223,9 +222,10 @@ class AnMBR(bst.Unit):
         self.include_pump_building_cost = include_pump_building_cost
         self.include_excavation_cost = include_excavation_cost
 
-        # Initiate the attributes
-        self.heat_exchanger = hx = bst.HXutility(None, None, None, T=T)
-        self.heat_utilities = hx.heat_utilities
+        # Initialize the attributes
+        hx_in = bst.Stream(f'{ID}_hx_in')
+        hx_out = bst.Stream(f'{ID}_hx_out')
+        self.heat_exchanger = bst.HXutility(ID=f'{ID}_hx', ins=hx_in, outs=hx_out)
         self._refresh_rxns()
 
         for k, v in kwargs.items():
@@ -300,7 +300,7 @@ class AnMBR(bst.Unit):
         biogas, perm, sludge, air_out = self.outs
         degassing = self._degassing
 
-        # Initiate the streams
+        # Initialize the streams
         biogas.phase = 'g'
         biogas.empty()
 
@@ -351,9 +351,8 @@ class AnMBR(bst.Unit):
         air_out.link_with(air_in)
         air_in.T = 17 + 273.15
         self._design_blower()
-
-        if self.T is not None:
-            perm.T = sludge.T = biogas.T = air_out.T = self.T
+        
+        if self.T is not None: perm.T = sludge.T = biogas.T = air_out.T = self.T
 
 
     # Called by _run
@@ -455,7 +454,43 @@ class AnMBR(bst.Unit):
     # _design
     # =========================================================================
     def _design(self):
-        D = self.design_results
+        # Heat loss, assume air is 17°C, ground is 10°C
+        T = self.T
+        if T is None: loss = 0.
+        else:
+            N_train, L_CSTR, W_tank, D_tank = \
+                self.N_train, self.L_CSTR, self.W_tank, self.D_tank
+            A_W = 2 * (L_CSTR+W_tank) * D_tank
+            A_F = L_CSTR * W_tank
+            A_W *= N_train * _ft2_to_m2
+            A_F *= N_train * _ft2_to_m2
+
+            loss = 0.7 * (T-(17+273.15)) * A_W # 0.7 W/m2/°C for wall
+            loss += 1.7 * (T-(10+273.15)) * A_F # 1.7 W/m2/°C for floor
+            loss += 0.95 * (T-(17+273.15)) * A_F # 0.95 W/m2/°C for floating cover
+            loss *= 3.6 # W (J/s) to kJ/hr
+
+        # Stream heating
+        hx = self.heat_exchanger
+        inf = self._inf
+        hx_ins0, hx_outs0 = hx.ins[0], hx.outs[0]
+        hx_ins0.copy_flow(inf)
+        hx_outs0.copy_flow(inf)
+        hx_ins0.T = inf.T
+        hx_outs0.T = T
+        hx.H = hx_ins0.H + loss # stream heating and heat loss
+        hx.simulate_as_auxiliary_exchanger(ins=hx.ins, outs=hx.outs)
+
+        # # Fluid heating
+        # inf = self._inf
+        # if T:
+        #     H_at_T = inf.thermo.mixture.H(mol=inf.mol, phase='l', T=T, P=101325)
+        #     duty = -(inf.H - H_at_T)
+        # else:
+        #     duty = 0
+        # self.heat_exchanger.simulate_as_auxiliary_exchanger(duty, inf)
+        
+        D = self.design_results     
         D['Treatment train'] = self.N_train
         D['Cassette per train'] = self.cas_per_tank
         D['Module per cassette'] = self.mod_per_cas
@@ -685,7 +720,6 @@ class AnMBR(bst.Unit):
     def _cost(self):
         D, C = self.design_results, self.baseline_purchase_costs
 
-        ### Capital ###
         # Concrete and excavation
         VEX, VWC, VSC = \
             D['Excavation [ft3]'], D['Wall concrete [ft3]'], D['Slab concrete [ft3]']
@@ -724,33 +758,6 @@ class AnMBR(bst.Unit):
         # Degassing membrane
         C['Degassing membrane'] = 10000 * D['Degassing membrane']
 
-        ### Heat and power ###
-        # Heat loss, assume air is 17°C, ground is 10°C
-        T = self.T
-        if T is None:
-            loss = 0.
-        else:
-            N_train, L_CSTR, W_tank, D_tank = \
-                self.N_train, self.L_CSTR, self.W_tank, self.D_tank
-            A_W = 2 * (L_CSTR+W_tank) * D_tank
-            A_F = L_CSTR * W_tank
-            A_W *= N_train * _ft2_to_m2
-            A_F *= N_train * _ft2_to_m2
-
-            loss = 0.7 * (T-(17+273.15)) * A_W / 1e3 # 0.7 W/m2/°C for wall
-            loss += 1.7 * (T-(10+273.15)) * A_F / 1e3 # 1.7 W/m2/°C for floor
-            loss += 0.95 * (T-(17+273.15)) * A_F / 1e3 # 0.95 W/m2/°C for floating cover
-        self._heat_loss = loss
-
-        # Fluid heating
-        inf = self._inf
-        if T:
-            H_at_T = inf.thermo.mixture.H(mol=inf.mol, phase='l', T=T, P=101325)
-            duty = -(inf.H - H_at_T)
-        else:
-            duty = 0
-        self.heat_exchanger.simulate_as_auxiliary_exchanger(duty, inf)
-
         # Pumping
         pumping = 0.
         for ID in self._pumps:
@@ -763,7 +770,7 @@ class AnMBR(bst.Unit):
         sparging = 0. # submerge design not implemented
         degassing = 3 * self.N_degasser # assume each uses 3 kW
 
-        self.power_utility.rate = sparging + degassing + pumping + loss
+        self.power_utility.rate = sparging + degassing + pumping
 
 
     # Called by _cost

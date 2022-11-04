@@ -394,7 +394,6 @@ def create_wastewater_process(ins, outs, process_ID='6', flowsheet=None,
                      include_aerobic_filter=False,
                      add_GAC=False,
                      include_degassing_membrane=True,
-                     T=None, # heat loss will be adjusted later
                      # Below include in the TEA
                      include_pump_building_cost=False,
                      include_excavation_cost=False, **AnMBR_kwargs)
@@ -406,7 +405,6 @@ def create_wastewater_process(ins, outs, process_ID='6', flowsheet=None,
         RX03 = PolishingFilter(f'R{X}03', ins=(RX02-1, '', f'air_R{X}03'), outs=RX03_outs,
                               filter_type='aerobic',
                               include_degassing_membrane=False,
-                              T=None, # heat loss will be adjusted later
                               # Below include in the TEA
                               include_pump_building_cost=False,
                               include_excavation_cost=False,

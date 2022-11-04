@@ -17,7 +17,7 @@ TODO:
     - Check with Brian's AnMBR paper and see the COD<1300 mg/L not preferable thing
 '''
 
-import sympy as sp, biosteam as bst, thermosteam as tmo
+import sympy as sp, biosteam as bst
 from biosteam.exceptions import DesignError
 from . import (
     get_BD_dct,
@@ -144,10 +144,10 @@ class InternalCirculationRx(bst.MixTank):
         self.vessel_material = vessel_material
         self.kW_per_m3 = kW_per_m3
         self.T = T
-
         # Initialize the attributes
-        self.heat_exchanger = hx = bst.HXutility(None, None, None, T=T)
-        self.heat_utilities = hx.heat_utilities
+        hx_in = bst.Stream(f'{ID}_hx_in')
+        hx_out = bst.Stream(f'{ID}_hx_out')
+        self.heat_exchanger = bst.HXutility(ID=f'{ID}_hx', ins=hx_in, outs=hx_out, T=T)
         self._refresh_rxns()
         # Conversion will be adjusted in the _run function
         self._decay_rxn = self.chemicals.WWTsludge.get_combustion_reaction(conversion=0.)
@@ -204,7 +204,7 @@ class InternalCirculationRx(bst.MixTank):
         growth_rxns(inf.mol)
         biogas_rxns(inf.mol)
 
-        gas = tmo.Stream(phase='g')
+        gas = bst.Stream(phase='g')
         degassing(gas, inf)
         Se = self.compute_COD(inf)
 
@@ -238,8 +238,7 @@ class InternalCirculationRx(bst.MixTank):
                 i.imol['O2'] = max(0, i.imol['O2'])
                 degassing(biogas, i)
 
-        if self.T:
-            biogas.T = eff.T = waste.T = self.T
+        if self.T: biogas.T = eff.T = waste.T = self.T
 
 
     def _run_separate(self, run_inputs):
@@ -307,6 +306,22 @@ class InternalCirculationRx(bst.MixTank):
         'Gas chamber volume': 'm3'
         }
     def _design(self):
+        hx = self.heat_exchanger
+        ins0 = self.ins[0]
+        hx.ins[0].copy_flow(ins0)
+        hx.outs[0].copy_flow(ins0)
+        hx.ins[0].T = ins0.T
+        hx.ins[0].P = hx.outs[0].P = ins0.P
+        hx.simulate_as_auxiliary_exchanger(ins=hx.ins, outs=hx.outs)
+        
+        # inf, T = self.ins[0], self.T
+        # if T:
+        #     H_at_T = inf.thermo.mixture.H(mol=inf.mol, phase='l', T=T, P=101325)
+        #     duty = -(inf.H - H_at_T) if self.T else 0.
+        # else:
+        #     duty = 0.
+        # self.heat_exchanger.simulate_as_auxiliary_exchanger(duty, inf)
+        
         D = self.design_results
         D['HRT'] = D['Residence time'] = self.HRT
         D['SRT'] = self.SRT
@@ -315,24 +330,27 @@ class InternalCirculationRx(bst.MixTank):
         if self.method == 'separate':
             D['Bottom reactor volume'] = self.Vb
             D['Top reactor volume'] = self.Vt
+        breakpoint()
 
-
-    def _cost(self):
+    def _cost(self):       
         bst.MixTank._cost(self)
+        
+        #!!! Make sure `proxy` will not interfere `_run`
+        for p in (self.effluent_pump, self.sludge_pump): p.simulate()
+        from warnings import warn
+        warn('Please make sure the power utility of effluent and sludge pumps are correctly added.')
+        
+        # power_utility = self.power_utility
+        # pumps = (self.effluent_pump, self.sludge_pump)
+        # for p in pumps:
+        #     p.simulate()
+        #     power_utility.rate += p.power_utility.rate
 
-        pumps = (self.effluent_pump, self.sludge_pump)
-        for i in range(2):
-            pumps[i].ins[0].copy_like(self.outs[i+1]) # use `.proxy()` will interfere `_run`
-            pumps[i].simulate()
-            self.power_utility.rate += pumps[i].power_utility.rate
-
-        inf, T = self.ins[0], self.T
-        if T:
-            H_at_T = inf.thermo.mixture.H(mol=inf.mol, phase='l', T=T, P=101325)
-            duty = -(inf.H - H_at_T) if self.T else 0.
-        else:
-            duty = 0.
-        self.heat_exchanger.simulate_as_auxiliary_exchanger(duty, inf)
+        # pumps = (self.effluent_pump, self.sludge_pump)
+        # for i in range(2):
+        #     pumps[i].ins[0].copy_like(self.outs[i+1]) # use `.proxy()` will interfere `_run`
+        #     pumps[i].simulate()
+        #     self.power_utility.rate += pumps[i].power_utility.rate
 
 
     @property
