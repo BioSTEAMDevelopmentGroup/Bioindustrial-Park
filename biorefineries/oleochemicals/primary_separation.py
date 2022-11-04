@@ -3,7 +3,7 @@
 Created on Thu Jun 23 15:56:37 2022
 @author: LavanyaKudli
 """
-from biorefineries.oleochemicals import units
+from biorefineries.oleochemicals import units_experimental
 import biosteam as bst
 import thermosteam as tmo
 import flexsolve as flx
@@ -28,7 +28,7 @@ from biosteam import SystemFactory
 
 def primary_separation_system(ins,outs,Tin):
     organic_phase_for_separation, = ins
-    Nonanoic_acid_crude_product, AA_crude_product, Epoxy_stearic_acid_bottoms = outs
+    nonanoic_acid_crude_product, AA_crude_product, epoxy_stearic_acid_bottoms, = outs
 
 # MCA removal, should be around 40% acc to literature
     Water = tmo.Chemical('Water')    
@@ -41,16 +41,18 @@ def primary_separation_system(ins,outs,Tin):
 
     D202 = bst.units.BinaryDistillation("D202",
                                         ins = D202_H-0,
-                                        outs=(Nonanoic_acid_crude_product,
+                                        outs=(nonanoic_acid_crude_product,
                                               'Azelaic_acid_rich_bottom'),
-                                        LHK = ('Nonanoic_acid',
-                                               'Azelaic_acid'),
+                                        LHK = ('Malonic_acid',
+                                               'Azelaic_acid'
+                                               ),
                                         k=2,
-                                        Lr=0.995,
-                                        Hr=0.995,
+                                        Lr=0.9,
+                                        Hr=0.9,
                                         P = 3333,
                                         partial_condenser=False
                                         )
+    
 
 
 #Crude Azelaic acid recovery through seperation of bottoms
@@ -60,16 +62,17 @@ def primary_separation_system(ins,outs,Tin):
     D203_steam.P = Water.Psat(620)
     D203_H = bst.HXutility('D203_H',
                         ins = D202-1,
-                        T = 600)
+                        T = 550)
     D203 = bst.units.BinaryDistillation("D203",
                                        ins = D203_H-0, 
                                        outs=(AA_crude_product,
-                                             Epoxy_stearic_acid_bottoms),
-                                       LHK = ('Azelaic_acid',
-                                              'Epoxy_stearic_acid'),
+                                             epoxy_stearic_acid_bottoms),
+                                       LHK = ('Oleic_acid',
+                                              'DHSA'),
                                        k=2,
                                        Lr=0.999, 
                                        Hr=0.999,
+                                       P = 5000,
                                        partial_condenser=False,
                                     )
-    D203.check_LHK = False
+    # D203.check_LHK = False

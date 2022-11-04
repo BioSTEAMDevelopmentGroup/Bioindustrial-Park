@@ -84,7 +84,8 @@ def create_fattyalcohol_production_sys(ID='fattyalcohol_production_sys',
     T103 = fa_units.CSLStorageTank('T103', CSL)
     T104 = units.StorageTank('T104', salt, tau=one_week)
     T106 = fa_units.DAPStorageTank('T106', DAP)
-        
+    
+    @M101.add_specification
     def balance_feeds_to_bioreactor():
         feed_imol = mixed_bioreactor_feed.imol
         glucose.imol['Glucose'] = feed_imol['Glucose']
@@ -96,7 +97,6 @@ def create_fattyalcohol_production_sys(ID='fattyalcohol_production_sys',
         DAP.imol['DAP'] = feed_imol['DAP']
         M101._run()
     
-    M101.specification = balance_feeds_to_bioreactor
     M102 = units.Mixer('M102',
                        ins=(T101-0, P102-0, T103-0, T104-0, T106-0,
                             process_water, cell_recycle))
@@ -121,7 +121,7 @@ def create_fattyalcohol_production_sys(ID='fattyalcohol_production_sys',
                                      fermentation_reaction=fatty_alcohol_production,
                                      postfermentation_reaction=yeast_growth, T=310.15, tau=32, 
                                      V=3785, Nmin=2, Nmax=32)
-    R101.specification = make_sure_enough_CSL_and_DAP_are_fed
+    R101.add_specification(make_sure_enough_CSL_and_DAP_are_fed)
     T105 = units.StorageTank('T105', ins=R101-1, tau=2)
     solids_split = chemicals.kwarray({'Cells': 0.999})
     solids_split[solids_split == 0] = 0.001

@@ -244,8 +244,7 @@ def create_lipid_pretreatment_system(ins, outs):
     M2 = bst.Mixer('M2', [P2-0, glycerol_recycle])
     R1 = GlycerolysisReactor('R1', [H3-0, M2-0, N2])
     P7 = bst.Pump('P7', R1-1, hx_stream, P=101325.)
-    M2.prioritize = True
-    @R1.add_specification(run=True)
+    @R1.add_specification(run=True, impacted_units=[T2])
     def adjust_feed_flow_rates():
         lipid = R1.ins[0]
         required_glycerol = 1.5 * (
@@ -258,8 +257,6 @@ def create_lipid_pretreatment_system(ins, outs):
         else:
             T2.ins[0].imol['Glycerol'] = required_glycerol
         R1.ins[2].ivol['N2'] = lipid.F_vol
-        T2.path_until(R1)
-        for i in T2.path_until(R1): i._run()
         
     H4 = bst.HXutility('H4', H3-1, T=333.15, V=0)
     C1 = bst.LiquidsSplitCentrifuge('C1', H4-0, ['', glycerol_recycle],

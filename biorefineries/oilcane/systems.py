@@ -145,38 +145,38 @@ def create_acTAG_separation_system(ins, outs):
 )
 def create_post_fermentation_oil_separation_system(ins, outs, wastewater_concentration=None,
                                                    target_oil_content=60, 
-                                                   separate_cellmass=False):
+                                                   separate_cellmass=False,
+                                                   free_oil=None):
     oil, wastewater, evaporator_condensate = outs
     if separate_cellmass:     
         cellmass = bst.Stream('cellmass')
         outs.insert(1, cellmass)
     V605 = bst.MixTank('V605', ins)
     P606 = bst.Pump('P606', V605-0)
-    Ev607 = bst.MultiEffectEvaporator('Ev607',
+    EvX = bst.MultiEffectEvaporator('Ev607',
         ins=P606-0,
         P=(101325, 69682, 47057, 30953),
         V=0.90, V_definition='First-effect',
         thermo=oil.thermo.ideal(),
         flash=False,
     )
-    Ev607.target_oil_content = target_oil_content # kg / kg
-    Ev607.remove_evaporators = False
-    P_original = tuple(Ev607.P)
+    EvX.target_oil_content = target_oil_content # kg / kg
+    EvX.remove_evaporators = False
+    P_original = tuple(EvX.P)
     Pstart = P_original[0]
     Plast = P_original[-1]
     N = len(P_original)
-    @Ev607.add_specification(run=False)
+    def x_oil(V): # Objective function for specification
+        EvX.V = V
+        EvX.run()
+        effluent = EvX.outs[0]
+        oil = free_oil() if free_oil else effluent.imass['Oil']
+        total = effluent.imass['Oil', 'Water'].sum()
+        return EvX.target_oil_content - 1000 * oil / total
+    
+    @EvX.add_specification(run=False)
     def adjust_evaporation():
-        EvX = Ev607
         V_last = EvX.V
-        def x_oil(V):
-            EvX.V = V
-            EvX.run()
-            effluent = EvX.outs[0]
-            oil = effluent.imass['Oil']
-            total = effluent.imass['Oil', 'Water'].sum()
-            return EvX.target_oil_content - 1000 * oil / total
-        
         x0 = 0.
         x1 = 0.5
         EvX.P = P_original
@@ -201,7 +201,7 @@ def create_post_fermentation_oil_separation_system(ins, outs, wastewater_concent
             y1 = x_oil(x1)
             EvX.V = flx.IQ_interpolation(x_oil, 1e-6, x1, y0, y1, x=V_last, ytol=1e-5, xtol=1e-6)
         
-    P607 = bst.Pump('P607', Ev607-0, P=101325.)
+    P607 = bst.Pump('P607', EvX-0, P=101325.)
     C603_2 = bst.LiquidsSplitCentrifuge('C603_2', P607-0, (oil, ''), 
                                         split={'Oil': 0.99,
                                                'Water': 0.0001})
@@ -211,7 +211,7 @@ def create_post_fermentation_oil_separation_system(ins, outs, wastewater_concent
         stream = C603_3-1
     else:
         stream = C603_2-1
-    S601 = bst.Splitter('S601', ins=Ev607-1, outs=['', evaporator_condensate], split=0.5)
+    S601 = bst.Splitter('S601', ins=EvX-1, outs=['', evaporator_condensate], split=0.5)
     M601 = bst.Mixer('M601', [S601-0, stream], wastewater)
     M601.target_wastewater_concentration = 60. # kg / m3
     @M601.add_specification(run=True)
@@ -347,7 +347,8 @@ def create_oilcane_to_biodiesel_and_ethanol_1g(
     )
     def get_hx_issues():
         hxs = [u.E301, u.D601.boiler, u.D602.boiler, u.H601, u.H602, u.H603, u.H604, oil_pretreatment_dct['F3'], u.H606]
-        if 'condenser' in u.E401.components: hxs.append(u.E401.components['condenser'])
+        condenser = getattr(u.E401, 'condenser', None)
+        if condenser: hxs.append(condenser)
         return hxs
     
     HXN = bst.HeatExchangerNetwork(900, 
@@ -589,6 +590,7 @@ def create_cane_to_combined_1_and_2g_fermentation(
     hydrolysate_sink = hydrolysate.sink
     hydrolysate_sink.ins[0] = None
     MX = bst.Mixer(400, [hydrolysate, juice])
+    MX.register_alias('hydrolysate_and_juice_mixer')
     if fed_batch:
         if 'Sugar' not in MX.chemicals:
             MX.chemicals.define_group('Sugar', ('Glucose', 'Sucrose', 'Xylose'))
@@ -1043,7 +1045,7 @@ def create_oilcane_to_biodiesel_1g(
     post_fermentation_oil_separation_sys = create_post_fermentation_oil_separation_system(
         ins=product,
         mockup=True,
-        area=400,
+        area=300,
     )
     oil, thick_vinasse, evaporator_condensate_b = post_fermentation_oil_separation_sys.outs
     oil_pretreatment_sys, oil_pretreatment_dct = create_oil_pretreatment_system(
@@ -1053,7 +1055,7 @@ def create_oilcane_to_biodiesel_1g(
         area=600,
         udct=True,
     )
-    bst.Mixer(400, [thick_vinasse, condensate], vinasse)
+    bst.Mixer(300, [thick_vinasse, condensate], vinasse)
     oil, polar_lipids, wastewater = oil_pretreatment_sys.outs
     
     # Fresh degummed oil
@@ -1093,12 +1095,12 @@ def create_oilcane_to_biodiesel_combined_1_and_2g_post_fermentation_oil_separati
     biodiesel, crude_glycerol = outs
     X = 0.60 if fed_batch else 0.495
     cofermentation = tmo.PRxn(
-        [tmo.Rxn('CO2 + Xylose -> H2O + TAG', 'Xylose', X, correct_atomic_balance=True),
-         tmo.Rxn('CO2 + Glucose -> H2O + TAG', 'Glucose', X, correct_atomic_balance=True),
+        [tmo.Rxn('CO2 + Glucose -> H2O + TAG', 'Glucose', X, correct_atomic_balance=True),
+         tmo.Rxn('CO2 + Xylose -> H2O + TAG', 'Xylose', X, correct_atomic_balance=True),
          tmo.Rxn('Xylose -> Cellmass', 'Xylose', 0.99 - X, correct_mass_balance=True),
          tmo.Rxn('Glucose -> Cellmass', 'Glucose', 0.99 - X, correct_mass_balance=True)],
     )
-    oilcane_to_fermentation_sys = create_cane_to_combined_1_and_2g_fermentation('oilcane_to_fermentation_sys',
+    oilcane_to_fermentation_sys, ofs_dct = create_cane_to_combined_1_and_2g_fermentation('oilcane_to_fermentation_sys',
         ins=oilcane, 
         product_group='Lipid',
         titer=89.4 if fed_batch else 27.4,
@@ -1109,18 +1111,49 @@ def create_oilcane_to_biodiesel_combined_1_and_2g_post_fermentation_oil_separati
         SeedTrain=units.SeedTrain,
         include_scrubber=False,
         fed_batch=fed_batch,
+        udct=True,
         mockup=True
     )
     beer, lignin, condensate, pretreatment_wastewater, fiber_fines, bagasse_to_boiler = oilcane_to_fermentation_sys.outs
+    hydrolysate_and_juice_mixer = bst.F.hydrolysate_and_juice_mixer
     post_fermentation_oil_separation_sys, pfls_dct = create_post_fermentation_oil_separation_system(
         ins=beer,
         mockup=True,
-        area=600,
+        area=400,
         udct=True,
         separate_cellmass=True,
+        free_oil=lambda: hydrolysate_and_juice_mixer.outs[0].imass['Oil'],
     )
     backend_oil, cellmass, wastewater, evaporator_condensate = post_fermentation_oil_separation_sys.outs
     backend_oil.ID = 'backend_oil'
+    # Upstream recycle of cell mass to pretreatment for oil recovery (process intensification)
+    biomass_mixer = bst.Mixer(300, cellmass)
+    steam_mixer = ofs_dct['Steam mixer']
+    biomass_mixer.insert(steam_mixer.ins[0])
+    
+    # Specify to only recover lipids in solution post-fermentation
+    oil_centrifuge = pfls_dct['Liquids centrifuge']
+    @oil_centrifuge.add_specification(run=True)
+    def recover_lipids_in_solution():
+        recovered_oil = hydrolysate_and_juice_mixer.outs[0].imass['Oil']
+        total_oil = oil_centrifuge.ins[0].imass['Oil']
+        split = recovered_oil / total_oil
+        if recovered_oil > total_oil: 
+            raise RuntimeError("computed lipid recovery is infeasible (over 100%) "
+                               "probably due to error in system network")
+        oil_centrifuge.isplit['Oil'] = split
+      
+    # Move recovery of oil in solution to after hydrolysis and before fermentation
+    fermentation_effluent = oil_centrifuge.ins[0]
+    aqueous_stream = oil_centrifuge.outs[1]
+    segment = bst.Segment(fermentation_effluent, aqueous_stream)
+    segment.pop(join_ends=True)
+    segment.insert(hydrolysate_and_juice_mixer.outs[0])
+      
+    # Cells contain all the oil
+    cellmass_centrifuge = pfls_dct['Solids centrifuge']
+    cellmass_centrifuge.isplit['Oil'] = 0.99 # Equivalent to cell mass split
+    
     oil_pretreatment_sys, oil_pretreatment_dct = create_oil_pretreatment_system(
         ins=backend_oil,
         outs=['', 'polar_lipids', ''],

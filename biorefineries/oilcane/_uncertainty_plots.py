@@ -93,7 +93,8 @@ area_colors = {
     'Storage': CABBI_colors.grey,
     'HXN': colors.orange,
     'Heat exchanger network': colors.orange,
-    'TAG prod.': CABBI_colors.blue,
+    'Oil prod. & ext.': CABBI_colors.blue,
+    'Oil production and extraction': CABBI_colors.blue,
 }
 
 area_hatches = {
@@ -114,6 +115,8 @@ area_hatches = {
     'HXN': '+',
     'Heat exchanger network': '+',
     'TAG prod.': '/',
+    'Oil prod. & ext.': '/',
+    'Oil production and extraction': '/',
 }
 
 for i in area_colors: area_colors[i] = area_colors[i].tint(20)

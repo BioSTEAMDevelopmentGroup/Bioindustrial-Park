@@ -32,7 +32,7 @@ _Gcal2kJ = 4184e3
 
 @cost('Dry flow rate', 'Pretreatment reactor system', units='kg/hr',
       S=83333, CE=522, cost=19812400 * 0.993, n=0.6, kW=4578, BM=1.5)
-class PretreatmentReactorSystem(Unit, bst.units.design_tools.PressureVessel):
+class PretreatmentReactorSystem(bst.units.design_tools.PressureVessel, Unit):
     _N_ins = 1
     _N_outs = 2
     _graphics = bst.Flash._graphics
@@ -146,7 +146,6 @@ class PretreatmentReactorSystem(Unit, bst.units.design_tools.PressureVessel):
 @cost('Stage #5 reactor volume', 'Stage #5 agitators',
       cost=43e3/2, S=200e3*_gal2m3, kW=10, CE=522, n=0.5, BM=1.5)
 class SeedTrain(Unit):
-    _N_heat_utilities = 1
     _N_ins = 1
     _N_outs = 2
     _ins_size_is_fixed = False
@@ -241,7 +240,7 @@ class SeedTrain(Unit):
             Design[f'Stage #{i} reactor volume'] = vol
             vol *= 10 
         Design['Flow rate'] = sum([i.F_mass for i in self.outs])
-        self.heat_utilities[0](self.Hnet, self.T)
+        self.add_heat_utility(self.Hnet, self.T)
 
     def _cost(self):
         N = self.N_trains
@@ -265,7 +264,6 @@ class SeedTrain(Unit):
 class ContinuousPresaccharification(Unit):
     _N_ins = 1
     _N_outs = 1
-    _N_heat_utilities = 1
     
     #: Residence time of countinuous saccharification tanks (hr)
     tau_tank = 24
@@ -306,7 +304,6 @@ class ContinuousPresaccharification(Unit):
 class Saccharification(bst.BatchBioreactor):
     _N_ins = 1
     _N_outs = 1
-    _N_heat_utilities = 1
         
     #: Unload and clean up time (hr)
     tau_0 = 4
@@ -419,11 +416,11 @@ class CoFermentation(bst.BatchBioreactor):
         vent.phase = 'g'
         effluent.mix_from(feeds, energy_balance=False)
         if self.loss: self.loss(effluent)
-        self.cofermentation(effluent)
-        if self.CSL_to_constituents: self.CSL_to_constituents(effluent)
         if self.lipid_reaction: 
             self.lipid_reaction.force_reaction(effluent)
             effluent.empty_negative_flows()
+        self.cofermentation(effluent)
+        if self.CSL_to_constituents: self.CSL_to_constituents(effluent)
         vent.empty()
         vent.receive_vent(effluent, energy_balance=False)
         
@@ -442,7 +439,6 @@ class SaccharificationAndCoFermentation(Unit):
     _N_ins = 1
     _N_outs = 3
     _ins_size_is_fixed = False
-    _N_heat_utilities = 1
         
     #: Saccharification temperature (K)
     T_saccharification = 48+273.15
@@ -535,10 +531,9 @@ class SaccharificationAndCoFermentation(Unit):
         Design['Flow rate'] = v_0 / self.N_reactors
         tau = self.tau_saccharification + self.tau_cofermentation
         Design.update(size_batch(v_0, tau, self.tau_0, self.N_reactors, self.V_wf))
-        hu_fermentation, = self.heat_utilities
         Design['Batch duty'] = batch_duty = self._batch_duty
         Design['Reactor duty'] = reactor_duty = self.Hnet - batch_duty
-        hu_fermentation(reactor_duty + batch_duty, effluent.T)
+        self.add_heat_utility(reactor_duty + batch_duty, effluent.T)
    
 
 
@@ -554,7 +549,6 @@ class SimultaneousSaccharificationAndCoFermentation(Unit):
     _N_ins = 1
     _N_outs = 2
     _ins_size_is_fixed = False
-    _N_heat_utilities = 1
         
     #: Saccharification temperature (K)
     T_saccharification = 48+273.15
@@ -636,9 +630,8 @@ class SimultaneousSaccharificationAndCoFermentation(Unit):
         Design = self.design_results
         Design['Flow rate'] = v_0 / self.N_reactors
         Design.update(size_batch(v_0, self.tau, self.tau_0, self.N_reactors, self.V_wf))
-        hu_fermentation, = self.heat_utilities
         Design['Reactor duty'] = reactor_duty = self.Hnet
-        hu_fermentation(reactor_duty, effluent.T)
+        self.add_heat_utility(reactor_duty, effluent.T)
 
 
 # %% Pretreatment separations 
