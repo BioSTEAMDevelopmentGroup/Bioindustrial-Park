@@ -770,7 +770,8 @@ def add_metrics(model, model_dct, f, u, s, get_obj):
             solids_mixer = sludge.sink
             solids_idx = sludge.get_connection().sink_index
             biogas = get_obj(s, 'biogas')
-            biogas_idx = biogas.get_connection().sink_index
+            gas_mixer = u.gas_mixer
+            gas_idx = biogas.get_connection().sink_index
             BT = get_obj(u, 'BT')
             sludge_dummy = Stream('sludge_dummy')
             biogas_dummy = Stream('biogas_dummy')
@@ -785,7 +786,7 @@ def add_metrics(model, model_dct, f, u, s, get_obj):
                 # Disconnect WWT system and clear cost
                 solids_mixer.ins[solids_idx] = sludge_dummy
                 Caching.ins[0] = ww_in
-                BT.ins[biogas_idx] = biogas_dummy
+                gas_mixer.ins[gas_idx] = biogas_dummy
                 Caching.clear_wwt = True
                 for u in wwt_downstream_units:
                     if not u in Caching.wwt_units: u.simulate()
@@ -816,10 +817,12 @@ def add_metrics(model, model_dct, f, u, s, get_obj):
                 # Reconnect WWT system
                 ww_in_unit.ins[ww_in_idx] = ww_in
                 solids_mixer.ins[solids_idx] = sludge
-                BT.ins[1] = biogas
+                gas_mixer.ins[gas_idx] = biogas
                 Caching.ins[0] = SX04.outs[1]
                 Caching.clear_wwt = False
-                for u in wwt_downstream_units: u.simulate()
+                for u in wwt_downstream_units:
+                    try: u.simulate()
+                    except: breakpoint()
                 product.price = product_default_price
 
                 return MPSP_no_wwt

@@ -116,7 +116,7 @@ class WWTpump(bst.Unit):
                     if not bst.main_flowsheet is obj.system.flowsheet:
                         bst.main_flowsheet.set_flowsheet(obj.system.flowsheet)
                 pump = WWTpump(
-                    ID=f'{obj.ID}_{i}',
+                    ID=f'.{obj.ID}_{i}',
                     ins=ins_dct[i],
                     pump_type=type_dct[i],
                     add_inputs=inputs_dct[i])
