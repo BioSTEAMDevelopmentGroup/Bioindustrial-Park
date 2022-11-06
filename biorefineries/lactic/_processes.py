@@ -138,8 +138,9 @@ def create_pretreatment_process(feed, flowsheet=None):
     # Mix sulfuric acid and feedstock, adjust water loading for pretreatment
     M202 = units.PretreatmentMixer('M202', ins=(feed, M201-0, water_M202))
 
-    # Mix feedstock/sulfuric acid mixture and steam
-    M203 = bst.SteamMixer('M203', ins=(M202-0, steam_M203), P=5.5*101325)
+    # Mix feedstock/sulfuric acid mixture and steam,
+    # the last stream is just a placeholder for warm process water
+    M203 = bst.SteamMixer('M203', ins=(M202-0, steam_M203, ''), P=5.5*101325)
     R201 = units.AcidPretreatment('R201', ins=M203-0, outs=('R201_g', 'R201_l'))
 
     # Pump bottom of the pretreatment products to the oligomer conversion tank
