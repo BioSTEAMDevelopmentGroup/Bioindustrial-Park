@@ -145,15 +145,17 @@ class InternalCirculationRx(bst.MixTank):
         self.kW_per_m3 = kW_per_m3
         self.T = T
         # Initialize the attributes
+        ID = self.ID
         self._inf = bst.Stream(f'{ID}_inf')
         hx_in = bst.Stream(f'{ID}_hx_in')
         hx_out = bst.Stream(f'{ID}_hx_out')
+        # Add '.' in ID for auxiliary units
         self.heat_exchanger = bst.HXutility(ID=f'.{ID}_hx', ins=hx_in, outs=hx_out, T=T)
         self._refresh_rxns()
         # Conversion will be adjusted in the _run function
         self._decay_rxn = self.chemicals.WWTsludge.get_combustion_reaction(conversion=0.)
-        self.effluent_pump = bst.Pump(f'.{self.ID}_eff', ins=self.outs[1].proxy(f'{ID}_eff'))
-        self.sludge_pump = bst.Pump(f'.{self.ID}_sludge', ins=self.outs[2].proxy(f'{ID}_sludge'))
+        self.effluent_pump = bst.Pump(f'.{ID}_eff', ins=self.outs[1].proxy(f'{ID}_eff'))
+        self.sludge_pump = bst.Pump(f'.{ID}_sludge', ins=self.outs[2].proxy(f'{ID}_sludge'))
 
         for k, v in kwargs.items(): setattr(self, k, v)
 
@@ -327,8 +329,7 @@ class InternalCirculationRx(bst.MixTank):
         hx.ins[0].P = hx.outs[0].P = ins0.P
         hx.simulate_as_auxiliary_exchanger(ins=hx.ins, outs=hx.outs)
 
-        pumps = (self.effluent_pump, self.sludge_pump)
-        for i in range(2): pumps[i].simulate()
+        for p in (self.effluent_pump, self.sludge_pump): p.simulate()
 
 
     @property

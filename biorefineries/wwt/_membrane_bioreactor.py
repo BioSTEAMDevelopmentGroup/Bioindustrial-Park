@@ -223,12 +223,14 @@ class AnMBR(bst.Unit):
         self.include_excavation_cost = include_excavation_cost
 
         # Initialize the attributes
+        ID = self.ID
         self._inf = bst.Stream(f'{ID}_inf')
         self._mixed = bst.Stream(f'{ID}_mixed')
         self._retent = bst.Stream(f'{ID}_retent')
         self._recir = bst.Stream(f'{ID}_recir')        
         hx_in = bst.Stream(f'{ID}_hx_in')
         hx_out = bst.Stream(f'{ID}_hx_out')
+        # Add '.' in ID for auxiliary units
         self.heat_exchanger = bst.HXutility(ID=f'.{ID}_hx', ins=hx_in, outs=hx_out)
         self._refresh_rxns()
 
@@ -669,8 +671,7 @@ class AnMBR(bst.Unit):
         pipe_ss, pump_ss, hdpe = 0., 0., 0.
         for i in pumps:
             p = getattr(self, f'{i}_pump')
-            if p == None:
-                continue
+            if p == None: continue
 
             p.simulate()
             pipe_ss += p.design_results['Pipe stainless steel [kg]']
@@ -733,7 +734,7 @@ class AnMBR(bst.Unit):
         hx_outs0.copy_flow(inf)
         hx_ins0.T = inf.T
         hx_outs0.T = T
-        hx.H = hx_ins0.H + loss # stream heating and heat loss
+        hx.H = hx_outs0.H + loss # stream heating and heat loss
         hx.simulate_as_auxiliary_exchanger(ins=hx.ins, outs=hx.outs)
 
         # Pump

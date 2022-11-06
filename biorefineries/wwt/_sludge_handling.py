@@ -60,9 +60,11 @@ class SludgeHandling(bst.Unit):
         self.solubles = tuple(solubles)
         self.solids = tuple(i.ID for i in self.chemicals
                             if (i.ID not in solubles) and (i.locked_state!='g'))
-        self._mixed = bst.Stream(f'{self.ID}_mixed')
-        self.effluent_pump = bst.Pump(f'.{self.ID}_eff', ins=self.outs[0].proxy(f'{ID}_eff'))
-        self.sludge_pump = bst.Pump(f'.{self.ID}_sludge', ins=self.outs[1].proxy(f'{ID}_sludge'))
+        ID = self.ID
+        self._mixed = bst.Stream(f'{ID}_mixed')
+        # Add '.' in ID for auxiliary units
+        self.effluent_pump = bst.Pump(f'.{ID}_eff_pump', ins=self.outs[0].proxy(f'{ID}_eff'))
+        self.sludge_pump = bst.Pump(f'.{ID}_sludge_pump', ins=self.outs[1].proxy(f'{ID}_sludge'))
 
 
     @staticmethod
@@ -180,13 +182,17 @@ class BeltThickener(SludgeHandling):
         self.design_results['Number of thickners'] = N
         self.F_BM['Thickeners'] = 1.7 # ref [2]
         self.baseline_purchase_costs['Thickeners'] = 4000 * N
-        self.power_utility.rate = self.power_demand * N
+
+
+    def _cost(self):
+        super()._cost()
+        self.power_utility.rate += self.power_demand * self.N_thickener
 
 
     @property
     def N_thickener(self):
         '''[int] Number of required belt thickeners.'''
-        return self._N
+        return self._N_thickener
 
 
 class SludgeCentrifuge(SludgeHandling, bst.SolidsCentrifuge):
