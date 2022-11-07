@@ -161,7 +161,7 @@ class CT(Facility):
     def __init__(self, ID='', ins=None, outs=()):
         Facility.__init__(self, ID, ins, outs)
         self.agent = HeatUtility.get_cooling_agent('cooling_water')
-        self._hu_cooling = HeatUtility(f'{self.ID}_hu_cooling')
+        self._hu_cooling = HeatUtility(unit=self)
 
     def _run(self):
         return_cw, ct_chems, makeup_water = self.ins
@@ -290,8 +290,8 @@ class CHP(Facility):
         self.combustibles = combustibles if isinstance(combustibles[0], str) else [i.ID for i in combustibles]
         self._combustible_feeds = Stream(f'{ID}_combustible_feeds')
         self.side_streams_to_heat = side_streams_to_heat
-        self.side_streams_lps = HeatUtility()
-        self._hu_cooling = HeatUtility()
+        self.side_streams_lps = HeatUtility(unit=self)
+        self._hu_cooling = HeatUtility(unit=self)
 
         self.emission_rxns =  ParallelRxn([
     #               Reaction definition                     Reactant         Conversion
