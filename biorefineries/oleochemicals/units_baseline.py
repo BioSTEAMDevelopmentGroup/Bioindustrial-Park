@@ -16,8 +16,27 @@ from math import ceil
 import numpy as np 
 from biosteam import Unit
 from biosteam.units.design_tools import PressureVessel,pressure_vessel_material_factors as factors
+from biosteam.units.design_tools import TankPurchaseCostAlgorithm
+from biosteam.utils import ExponentialFunctor
+from biosteam.units.decorators import cost
+from biosteam.units.design_tools.cost_index import CEPCI_by_year
 
-class DihydroxylationReactor(bst.units.CSTR):
+
+#Add details about the below
+#Costing is based on volume. Ref: Warren Sieder
+   
+bst.StorageTank.purchase_cost_algorithms["Solids handling bin"] = TankPurchaseCostAlgorithm(
+    ExponentialFunctor(A=646, n=0.46),
+    V_min=10, V_max=1e5, V_units='ft^3',
+    CE=567, material='Carbon steel',
+)
+bst.StorageTank.purchase_cost_algorithms["Compressed air storage"] = TankPurchaseCostAlgorithm(
+    ExponentialFunctor(A=1.6e5 / (20 ** 0.81), n=0.81),
+    V_min=1, V_max=500, V_units='m^3',
+    CE=525.4, material='Carbon steel',
+)
+    
+class DihydroxylationReactor(bst.CSTR):
     _N_ins = 1
     _N_outs = 2
                 
@@ -49,7 +68,7 @@ class DihydroxylationReactor(bst.units.CSTR):
 ##TODO: Find out how much fo the h202 is getting removed ay the first
 ## and then remove the rest by decomposition 
        
-class OxidativeCleavageReactor(bst.units.CSTR):
+class OxidativeCleavageReactor(bst.cstr):
     _N_ins = 1
     _N_outs = 2
        
@@ -109,38 +128,47 @@ class CentrifugeVacuumVessel(bst.Unit):
         def _design(self):
              self.design_results['Total volume'] = self.feed.F_vol * self.tau
              self.vacuum_system = bst.VacuumSystem(self)
+             
+#TODO: check which form is the resin in and BM  
+         
+# @cost(basis='acid resin volume', 
+#       ID='Zeolite bed emulsification column',
+#       units='m^3',
+#       cost=17.60,
+#       S=1,
+#       ub = 18,
+#       CE=CEPCI_by_year[2007],
+#       n=0.95)
 
-class Zeolite_packed_bed_reactor(Unit, PressureVessel, isabstract = True):
+@cost(basis='resin volume', 
+      ID='Zeolite bed emulsification column',
+      units='m^3',
+      cost=100000*0.8,
+      n=1,
+      S=30,
+      ub = 2000,
+      CE=CEPCI_by_year[2007],
+      BM = 1.65
+      )
+
+class Zeolite_packed_bed_reactor(Unit):
 #resin and the emulsified mixture    
     _N_ins = 1
-#methanol vapour along with water and the fatty
-    _N_outs = 2      
-## pressure according to what was suggested by the patent
-## V_wf = basically
-    
-    def __init__(self, ID='', ins=(), outs=(),
-                 P=101325, tau=0.5, V_wf=0.8,
-                 T =None,
-                 length_to_diameter=2, 
-                 wall_thickness_factor=1,
-                 vessel_material='Stainless steel 316',
-                 vessel_type='Vertical'):
-        
-           Unit.__init__(self, ID, ins, outs)
-           self.P = P
-           self.tau = tau
-           self.V_wf = V_wf
-           self.length_to_diameter = length_to_diameter
-           self.wall_thickness_factor = wall_thickness_factor
-           self.vessel_material = vessel_material
-           self.vessel_type = vessel_type
-           self.T = T
-
+#methanol and water vapour coming from top
+# the fatty acid mixture coming from bottom
+    _N_outs = 2 
+     
+    def __init__(self, ID, ins, outs,P,T):
+         Unit.__init__(self, ID, ins, outs)
+         self.P = P
+         self.T = T
           
     def _setup(self):           
-        #oxidative_cleavage_conversion
+##The monoesters of Saturated carboxylic acids present in the 
+# residual organic phase can advantageously be hydrolyzed in 
+# alcohol and Saturated carboxylic acids. 
         X1 = 0.9
-## TODO.xxx make the reaction system name more descriptive
+## TODO conversions for each reaction unavailable!
         Product_formation = PRxn([Rxn('Monomethyl_azelate + Water  -> Methanol + Azelaic_acid','Monomethyl_azelate', X = X1),
                                   Rxn('Methyl_palmitate + Water  -> Methanol + Palmitic_acid','Methyl_palmitate', X = X1),
                                   Rxn('Methyl_stearate + Water  -> Methanol + Stearic_acid','Methyl_stearate', X = X1),
@@ -151,6 +179,16 @@ class Zeolite_packed_bed_reactor(Unit, PressureVessel, isabstract = True):
         oxidative_cleavage_rxnsys = RxnSys(Product_formation)
         self.reactions = oxidative_cleavage_rxnsys
             
+    def _design(self):
+        Feed = self.ins
+        Feed_moles_for_exchange = sum(Feed.imol['Monomethyl_azelate'],
+                                      Feed.imol['Methyl_palmitate '],
+                                      Feed.imol['Methyl_stearate'],
+                                      Feed.imol['Methyl_palmitoleate'],
+                                      Feed.imol['Methyl_oleate'])
+        Design = self.design_results
+        Design['resin volume'] = self.Feed_moles_for_exchange/1800
+  
     def _run(self):
         feed = self.ins[0]
         effluent,vent,  = self.outs    
@@ -163,8 +201,10 @@ class Zeolite_packed_bed_reactor(Unit, PressureVessel, isabstract = True):
         vent.copy_flow(effluent, ('Methanol', 'Water'), remove=True)
         vent.T = effluent.T = self.T
         vent.P = effluent.P = self.P
-
-class Calcium_hydroxide_reactor(bst.units.CSTR):
+        
+        
+#TODO: Should catalyst regeneration be continuous or batch?
+class Calcium_hydroxide_reactor(bst.units.cstr):
     _N_ins = 1
     _N_outs = 1
     
@@ -185,7 +225,7 @@ class Calcium_hydroxide_reactor(bst.units.CSTR):
         vent.T = self.T
         effluent.P = self.P
         
-class Acid_precipitation_reactor(bst.units.CSTR):
+class Acid_precipitation_reactor(bst.units.cstr):
     _N_ins = 1
     _N_outs = 1
         
