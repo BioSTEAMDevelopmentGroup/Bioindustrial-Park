@@ -403,10 +403,8 @@ class CHP(Facility):
         for i in heating_utilities:
             i.reverse()
 
-        if hu_cooling.duty != 0:
-            self.heat_utilities = tuple([hu_cooling, *heating_utilities])
-        else:
-            self.heat_utilities = tuple(heating_utilities)
+        if hu_cooling.duty != 0: self.heat_utilities = [hu_cooling, *heating_utilities]
+        else: self.heat_utilities = list(heating_utilities)
 
         total_steam_mol = sum([i.flow for i in system_heating_utilities.values()])
         total_steam = total_steam_mol * self.chemicals.H2O.MW
