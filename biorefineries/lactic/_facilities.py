@@ -290,8 +290,8 @@ class CHP(Facility):
         self.combustibles = combustibles if isinstance(combustibles[0], str) else [i.ID for i in combustibles]
         self._combustible_feeds = Stream(f'{ID}_combustible_feeds')
         self.side_streams_to_heat = side_streams_to_heat
-        self.side_streams_lps = HeatUtility(f'{ID}_side_streams_lps')
-        self._hu_cooling = HeatUtility(f'{ID}_hu_cooling')
+        self.side_streams_lps = HeatUtility()
+        self._hu_cooling = HeatUtility()
 
         self.emission_rxns =  ParallelRxn([
     #               Reaction definition                     Reactant         Conversion
@@ -368,10 +368,8 @@ class CHP(Facility):
 
         # Use lps to account for the energy needed for the side steam
         if side_streams_to_heat:
-            if not side_streams_lps:
-                side_streams_lps.load_agent(lps)
-            side_streams_lps(unit_duty=sum([i.H for i in side_streams_to_heat]),
-                             T_in=298.15)
+            if not side_streams_lps: side_streams_lps.load_agent(lps)
+            side_streams_lps(unit_duty=sum([i.H for i in side_streams_to_heat]), T_in=298.15)
             system_heating_utilities['CHP - side_streams_lps'] = side_streams_lps
         else: side_streams_lps.empty
 
