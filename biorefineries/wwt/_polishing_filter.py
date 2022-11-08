@@ -122,10 +122,12 @@ class PolishingFilter(bst.Unit):
         self.include_degassing_membrane = include_degassing_membrane
         self.include_pump_building_cost = include_pump_building_cost
         self.include_excavation_cost = include_excavation_cost
-
-        # Initiate the attributes
-        self.heat_exchanger = hx = bst.HXutility(None, None, None, T=T)
-        self.heat_utilities = hx.heat_utilities
+        # Initialize the attributes
+        ID = self.ID
+        hx_in = bst.Stream(f'{ID}_hx_in')
+        hx_out = bst.Stream(f'{ID}_hx_out')
+        # Add '.' in ID for auxiliary units
+        self.heat_exchanger = bst.HXutility(ID=f'.{ID}_hx', ins=hx_in, outs=hx_out)
         self._refresh_rxns()
 
 
@@ -151,8 +153,8 @@ class PolishingFilter(bst.Unit):
 
 
     @staticmethod
-    def _degassing(receiving_stream, original_stream):
-        InternalCirculationRx._degassing(receiving_stream, original_stream)
+    def _degassing(original_stream, receiving_stream):
+        InternalCirculationRx._degassing(original_stream, receiving_stream)
 
 
     @staticmethod
@@ -172,7 +174,7 @@ class PolishingFilter(bst.Unit):
         biogas, eff, waste, air_out = self.outs
         degassing = self._degassing
 
-        # Initiate the streams
+        # Initialize the streams
         biogas.phase = 'g'
         biogas.empty()
 
@@ -203,28 +205,26 @@ class PolishingFilter(bst.Unit):
             air_in.empty()
 
         if self.filter_type == 'anaerobic':
-            degassing(biogas, eff)
-            degassing(biogas, waste)
+            degassing(eff, biogas)
+            degassing(waste, biogas)
             air_in.empty()
             air_out.empty()
         else:
             biogas.empty()
-            degassing(air_out, eff)
-            degassing(air_out, waste)
+            degassing(eff, air_out)
+            degassing(waste, air_out)
             air_out.imol['N2'] += air_in.imol['N2']
             air_out.imol['O2'] += air_in.imol['O2']
             self._recir_ratio = None
 
-        if self.T is not None:
-            biogas.T = eff.T = waste.T = air_out.T = self.T
+        if self.T is not None: biogas.T = eff.T = waste.T = air_out.T = self.T
 
 
     def _design(self):
+        ### Concrete and excavation ###
         D = self.design_results
         func = self._design_anaerobic if self.filter_type=='anaerobic' \
             else self._design_aerobic
-
-        ### Concrete and excavation ###
         V, VWC, VSC, VEX = func()
         D['Volume [ft3]'] = V
         D['Wall concrete [ft3]'] = VWC
@@ -373,11 +373,10 @@ class PolishingFilter(bst.Unit):
     #     return N_AF, d_AF, D_AF, V_m_AF, VWC_AF, VWC_AF, VEX_PB
 
     def _cost(self):
+        # Concrete and excavation
         D, C, F_BM, lifetime = self.design_results, self.baseline_purchase_costs, \
             self.F_BM, self._default_equipment_lifetime
-
-        ### Capital ###
-        # Concrete and excavation
+            
         VEX, VWC, VSC = \
             D['Excavation [ft3]'], D['Wall concrete [ft3]'], D['Slab concrete [ft3]']
         # 27 is to convert the VEX from ft3 to yard3
@@ -409,11 +408,9 @@ class PolishingFilter(bst.Unit):
         for k in C.keys():
             F_BM[k] = 1 if not F_BM.get(k) else F_BM.get(k)
 
-        ### Heat and power ###
         # Heat loss, assume air is 17°C, ground is 10°C
         T = self.T
-        if T is None:
-            loss = 0.
+        if T is None: loss = 0.
         else:
             N_filter, d, D = self.N_filter, self.d, self.D
             A_W = pi * d * D
@@ -421,31 +418,31 @@ class PolishingFilter(bst.Unit):
             A_W *= N_filter * _ft2_to_m2
             A_F *= N_filter * _ft2_to_m2
 
-            loss = 0.7 * (T-(17+273.15)) * A_W / 1e3 # 0.7 W/m2/°C for wall
-            loss += 1.7 * (T-(10+273.15)) * A_F / 1e3 # 1.7 W/m2/°C for floor
-        self._heat_loss = loss
+            loss = 0.7 * (T-(17+273.15)) * A_W # 0.7 W/m2/°C for wall
+            loss += 1.7 * (T-(10+273.15)) * A_F # 1.7 W/m2/°C for floor
+            loss *= 3.6 # W (J/s) to kJ/hr
 
-        # Fluid heating
+        # Stream heating
+        hx = self.heat_exchanger
         inf = self._inf
-        if T:
-            H_at_T = inf.thermo.mixture.H(mol=inf.mol, phase='l', T=T, P=101325)
-            duty = -(inf.H - H_at_T)
-        else:
-            duty = 0
-        self.heat_exchanger.simulate_as_auxiliary_exchanger(duty, inf)
+        hx_ins0, hx_outs0 = hx.ins[0], hx.outs[0]
+        hx_ins0.copy_flow(inf)
+        hx_outs0.copy_flow(inf)
+        hx_ins0.T = inf.T
+        hx_outs0.T = T
+        hx.H = hx_outs0.H + loss # stream heating and heat loss
+        hx.simulate_as_auxiliary_exchanger(ins=hx.ins, outs=hx.outs)
 
         # Pumping
         pumping = 0.
         for ID in self._pumps:
-            # if p is None:
-            #     continue
             p = getattr(self, f'{ID}_pump')
             pumping += p.power_utility.rate
 
         # Degassing
         degassing = 3 * self.N_degasser # assume each uses 3 kW
 
-        self.power_utility.rate = loss + pumping + degassing
+        self.power_utility.rate = pumping + degassing
 
 
     @property

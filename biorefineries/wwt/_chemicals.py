@@ -12,7 +12,7 @@
 Set properties of the chemicals used in the biorefineries.
 
 Part of the chemical data is from the lactic acid biorefinery:
-https://github.com/BioSTEAMDevelopmentGroup/Bioindustrial-Park/tree/master/BioSTEAM%202.x.x/biorefineries/lactic
+https://github.com/BioSTEAMDevelopmentGroup/Bioindustrial-Park/tree/master/biorefineries/lactic
 '''
 
 from warnings import warn

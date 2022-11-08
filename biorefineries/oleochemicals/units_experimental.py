@@ -48,7 +48,42 @@ class OxidativeCleavageReactor(bst.BatchBioreactor):
         effluent.T = self.T
         effluent.P = self.P
         
-  
+class HeterogeneousReactor(bst.BatchBioreactor):
+    _N_ins = 1
+    _N_outs = 2
+        
+    def _setup(self):
+        super()._setup() 
+#Below reaction conversions are based on experimental results
+#TODO: modify reactions below to change the reactant conversions
+#Can add hydrogen peroxide decomposition reaction as well
+        Epoxide_formation = SRxn([Rxn('Oleic_acid + H2O2   -> Epoxy_stearic_acid ', 'Oleic_acid', X= 0.684),
+                                  Rxn('Epoxy_stearic_acid + H2O -> DHSA', 'Epoxy_stearic_acid', X = 0.8),
+                                  Rxn('DHSA + H2O2 -> Nonanal + Oxononanoic_acid ', 'DHSA', X = 0.8)])
+        
+        Side_reactions_1 =    SRxn([Rxn('Nonanal + H2O2 ->  Nonanoic_acid', 'Nonanal', X = 1),
+                                   ])
+        Side_reactions_2 = PRxn([Rxn('Oxononanoic_acid + H2O2 ->  Azelaic_acid', 'Oxononanoic_acid', X = 0.8),
+                                ])  
+
+        oxidative_cleavage_rxnsys = RxnSys(Epoxide_formation,
+                                           Side_reactions_1,
+                                           Side_reactions_2,
+                                           )
+        self.reactions = oxidative_cleavage_rxnsys
+        
+    def _run(self):
+        feed = self.ins[0]
+        vent,effluent = self.outs
+        effluent.copy_like(feed)
+        self.reactions(effluent) 
+        vent.copy_flow(effluent,'CO2',remove = True)
+        effluent.copy_like(effluent)
+        effluent.T = self.T
+        effluent.P = self.P
+
+    
+
 class AACrystalliser(bst.units.BatchCrystallizer):
   
     def __init__(self, ID='', ins=None, outs=(), thermo=None, *,  

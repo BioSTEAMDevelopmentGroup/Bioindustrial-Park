@@ -767,10 +767,11 @@ def add_metrics(model, model_dct, f, u, s, get_obj):
             SX04 = u.search(f'S{X}04') # RO
             ww_out = SX04.ins[0] # SX04.outs[0] is Caching.ins[0]
             sludge = get_obj(s, 'sludge')
-            solids_mixer = sludge.sink
+            solids_sink = sludge.sink
             solids_idx = sludge.get_connection().sink_index
             biogas = get_obj(s, 'biogas')
-            biogas_idx = biogas.get_connection().sink_index
+            gas_sink = biogas.sink
+            gas_idx = biogas.get_connection().sink_index
             BT = get_obj(u, 'BT')
             sludge_dummy = Stream('sludge_dummy')
             biogas_dummy = Stream('biogas_dummy')
@@ -783,9 +784,9 @@ def add_metrics(model, model_dct, f, u, s, get_obj):
                 product.price = tea.solve_price(product) # MPSP with WWT system
 
                 # Disconnect WWT system and clear cost
-                solids_mixer.ins[solids_idx] = sludge_dummy
+                solids_sink.ins[solids_idx] = sludge_dummy
                 Caching.ins[0] = ww_in
-                BT.ins[biogas_idx] = biogas_dummy
+                gas_sink.ins[gas_idx] = biogas_dummy
                 Caching.clear_wwt = True
                 for u in wwt_downstream_units:
                     if not u in Caching.wwt_units: u.simulate()
@@ -815,11 +816,13 @@ def add_metrics(model, model_dct, f, u, s, get_obj):
 
                 # Reconnect WWT system
                 ww_in_unit.ins[ww_in_idx] = ww_in
-                solids_mixer.ins[solids_idx] = sludge
-                BT.ins[1] = biogas
+                solids_sink.ins[solids_idx] = sludge
+                gas_sink.ins[gas_idx] = biogas
                 Caching.ins[0] = SX04.outs[1]
                 Caching.clear_wwt = False
-                for u in wwt_downstream_units: u.simulate()
+                for u in wwt_downstream_units:
+                    try: u.simulate()
+                    except: breakpoint()
                 product.price = product_default_price
 
                 return MPSP_no_wwt

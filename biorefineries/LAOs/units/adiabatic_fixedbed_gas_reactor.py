@@ -37,15 +37,12 @@ class AdiabaticFixedbedGasReactor(bst.design_tools.PressureVessel, bst.Unit):
     def _default_vessel_type(self):
         return 'Vertical'
     
-    def _setup(self):
-        effluent, = self.outs
-        effluent.P = self.P
-        effluent.phase = 'g'
-    
     def _run(self):
         feed, = self.ins
         assert feed.phase == 'g', 'feed phase must be a gas'
         effluent, = self.outs
+        effluent.P = self.P
+        effluent.phase = 'g'
         effluent.copy_like(feed)
         self.reaction.adiabatic_reaction(effluent)
         
