@@ -621,7 +621,9 @@ def load(name, cache=cache, reduce_chemicals=False,
     elif number in conventional_ethanol_configurations:
         s.ethanol.ID = 'advanced_ethanol'
         s.advanced_ethanol.register_alias('ethanol')
-    if number in biodiesel_configurations and number in cellulosic_configurations:
+    if (number not in cellulosic_ethanol_configurations
+        and number in biodiesel_configurations
+        and number in cellulosic_configurations):
         # Note that GREET cellulosic ethanol from corn stover results in a 
         # GWP of 0.41 kg CO2-eq / L-ethanol. So the cellulosic ethanol from
         # bagasse (~0.34, 0.32 for configurations S2 and O2) can certainly
