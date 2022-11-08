@@ -150,7 +150,6 @@ class CT(Facility):
 
     _N_ins = 3
     _N_outs = 2
-    _N_heat_utilities = 1
     _units= {'Flow rate': 'kg/hr'}
 
     network_priority = 1
@@ -162,6 +161,7 @@ class CT(Facility):
     def __init__(self, ID='', ins=None, outs=()):
         Facility.__init__(self, ID, ins, outs)
         self.agent = HeatUtility.get_cooling_agent('cooling_water')
+        self._hu_cooling = HeatUtility(unit=self)
 
     def _run(self):
         return_cw, ct_chems, makeup_water = self.ins
@@ -185,7 +185,7 @@ class CT(Facility):
                         number += 1
                         total_duty -= hu.duty
 
-        hu_cooling = self.heat_utilities[0]
+        hu_cooling = self._hu_cooling
         hu_cooling.mix_from([i for i in system_cooling_water_utilities.values()])
         hu_cooling.reverse()
         self.system_cooling_water_duty = -hu_cooling.duty
@@ -250,7 +250,7 @@ class CHP(Facility):
         [2] Blowdown water.
 
     B_eff : float
-        Fraction of heat transfered to steam.
+        Fraction of heat transferred to steam.
     TG_eff : float
         Fraction of steam heat converted to electricity.
     combustibles : tuple(str or obj)
@@ -284,12 +284,14 @@ class CHP(Facility):
     def __init__(self, ID='', ins=None, outs=(), *, B_eff=0.8,
                  TG_eff=0.85, combustibles=(), side_streams_to_heat=()):
         Facility.__init__(self, ID, ins, outs)
+        ID = self.ID
         self.B_eff = B_eff
         self.TG_eff = TG_eff
         self.combustibles = combustibles if isinstance(combustibles[0], str) else [i.ID for i in combustibles]
-        self._combustible_feeds = Stream(f'{self.ID}_combustible_feeds')
+        self._combustible_feeds = Stream(f'{ID}_combustible_feeds')
         self.side_streams_to_heat = side_streams_to_heat
-        self.side_streams_lps = None
+        self.side_streams_lps = HeatUtility(unit=self)
+        self._hu_cooling = HeatUtility(unit=self)
 
         self.emission_rxns =  ParallelRxn([
     #               Reaction definition                     Reactant         Conversion
@@ -366,12 +368,10 @@ class CHP(Facility):
 
         # Use lps to account for the energy needed for the side steam
         if side_streams_to_heat:
-            if not side_streams_lps:
-                side_streams_lps = self.side_streams_lps = HeatUtility()
-                side_streams_lps.load_agent(lps)
-            side_streams_lps(unit_duty=sum([i.H for i in side_streams_to_heat]),
-                             T_in=298.15)
+            if not side_streams_lps: side_streams_lps.load_agent(lps)
+            side_streams_lps(unit_duty=sum([i.H for i in side_streams_to_heat]), T_in=298.15)
             system_heating_utilities['CHP - side_streams_lps'] = side_streams_lps
+        else: side_streams_lps.empty
 
         system_heating_demand = self.system_heating_demand = \
             sum([i.duty for i in system_heating_utilities.values()])
@@ -379,7 +379,7 @@ class CHP(Facility):
         CHP_heat_surplus = self.CHP_heat_surplus = heat_generated - system_heating_demand
         self.system_steam_demand = sum([i.flow for i in system_heating_utilities.values()])
 
-        hu_cooling = HeatUtility()
+        hu_cooling = self._hu_cooling
 
         # CHP can meet system heating/steam demand
         if CHP_heat_surplus >0:
@@ -403,10 +403,8 @@ class CHP(Facility):
         for i in heating_utilities:
             i.reverse()
 
-        if hu_cooling.duty != 0:
-            self.heat_utilities = tuple([hu_cooling, *heating_utilities])
-        else:
-            self.heat_utilities = tuple(heating_utilities)
+        if hu_cooling.duty != 0: self.heat_utilities = [hu_cooling, *heating_utilities]
+        else: self.heat_utilities = list(heating_utilities)
 
         total_steam_mol = sum([i.flow for i in system_heating_utilities.values()])
         total_steam = total_steam_mol * self.chemicals.H2O.MW

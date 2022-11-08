@@ -7,8 +7,7 @@
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
 # for license details.
 
-import math
-import biosteam as bst
+import math, biosteam as bst
 from biosteam.exceptions import DesignError
 from . import (
     default_insolubles,
@@ -223,13 +222,19 @@ class AnMBR(bst.Unit):
         self.include_pump_building_cost = include_pump_building_cost
         self.include_excavation_cost = include_excavation_cost
 
-        # Initiate the attributes
-        self.heat_exchanger = hx = bst.HXutility(None, None, None, T=T)
-        self.heat_utilities = hx.heat_utilities
+        # Initialize the attributes
+        ID = self.ID
+        self._inf = bst.Stream(f'{ID}_inf')
+        self._mixed = bst.Stream(f'{ID}_mixed')
+        self._retent = bst.Stream(f'{ID}_retent')
+        self._recir = bst.Stream(f'{ID}_recir')        
+        hx_in = bst.Stream(f'{ID}_hx_in')
+        hx_out = bst.Stream(f'{ID}_hx_out')
+        # Add '.' in ID for auxiliary units
+        self.heat_exchanger = bst.HXutility(ID=f'.{ID}_hx', ins=hx_in, outs=hx_out)
         self._refresh_rxns()
 
-        for k, v in kwargs.items():
-            setattr(self, k, v)
+        for k, v in kwargs.items(): setattr(self, k, v)
 
         self._check_design()
 
@@ -276,8 +281,8 @@ class AnMBR(bst.Unit):
 
 
     @staticmethod
-    def _degassing(receiving_stream, original_stream):
-        InternalCirculationRx._degassing(receiving_stream, original_stream)
+    def _degassing(original_stream, receiving_stream):
+        InternalCirculationRx._degassing(original_stream, receiving_stream)
 
 
     @staticmethod
@@ -300,41 +305,42 @@ class AnMBR(bst.Unit):
         biogas, perm, sludge, air_out = self.outs
         degassing = self._degassing
 
-        # Initiate the streams
+        # Initialize the streams
         biogas.phase = 'g'
         biogas.empty()
 
-        inf = raw.copy()
-        inf.mix_from((raw, recycled))
-        self._inf = inf.copy() # this stream will be preserved (i.e., no reaction)
+        mixed = self._mixed
+        mixed.mix_from((raw, recycled))
+        self._inf.copy_like(mixed) # this stream will be preserved (i.e., no reaction)
 
         # Chemicals for cleaning, assume all chemicals will be used up
         # 2.2 L/yr/cmd of 12.5 wt% solution (15% vol)
         naocl.empty()
         naocl.imass['NaOCl', 'Water'] = [0.125, 1-0.125]
-        naocl.F_vol = (2.2/1e3/365/24) * (inf.F_vol*24) # m3/hr solution
+        naocl.F_vol = (2.2/1e3/365/24) * (mixed.F_vol*24) # m3/hr solution
 
         # 0.6 L/yr/cmd of 100 wt% solution, 13.8 lb/kg
         citric.empty()
-        citric.ivol['CitricAcid'] = (0.6/1e3/365/24) * (inf.F_vol*24) # m3/hr pure
+        citric.ivol['CitricAcid'] = (0.6/1e3/365/24) * (mixed.F_vol*24) # m3/hr pure
 
         # 0.35 L/yr/cmd of 38% solution, 3.5 lb/gal
         bisulfite.empty()
         bisulfite.imass['Bisulfite', 'Water'] = [0.38, 1-0.38]
-        bisulfite.F_vol = (0.35/1e3/365/24) * (inf.F_vol*24) # m3/hr solution
+        bisulfite.F_vol = (0.35/1e3/365/24) * (mixed.F_vol*24) # m3/hr solution
 
         # For pump design
         self._compute_mod_case_tank_N()
         Q_R_mgd, Q_IR_mgd = self._compute_liq_flows()
-        retent, recir = inf.copy(), inf.copy()
+        retent, recir = self._retent, self._recir
+        retent.copy_like(mixed)
+        recir.copy_like(mixed)
         retent.F_mass *= Q_R_mgd / self.Q_mgd
         recir.F_mass *= Q_IR_mgd / self.Q_mgd
-        self._retent, self._recir = retent, recir
 
         # Effluents
-        self.growth_rxns(inf.mol)
-        self.biogas_rxns(inf.mol)
-        inf.split_to(perm, sludge, self._isplit.data)
+        self.growth_rxns(mixed.mol)
+        self.biogas_rxns(mixed.mol)
+        mixed.split_to(perm, sludge, self._isplit.data)
 
         sludge_conc = self._sludge_conc
         insolubles = tuple(i.ID for i in self.chemicals if i.ID in default_insolubles)
@@ -344,16 +350,15 @@ class AnMBR(bst.Unit):
             sludge.ivol['Water'] = m_insolubles/sludge_conc
             perm.ivol['Water'] += diff
 
-        degassing(biogas, perm)
-        degassing(biogas, sludge)
+        degassing(perm, biogas)
+        degassing(sludge, biogas)
 
         # Gas for sparging, no sparging needed if submerged or using GAC
         air_out.link_with(air_in)
         air_in.T = 17 + 273.15
         self._design_blower()
-
-        if self.T is not None:
-            perm.T = sludge.T = biogas.T = air_out.T = self.T
+        
+        if self.T is not None: perm.T = sludge.T = biogas.T = air_out.T = self.T
 
 
     # Called by _run
@@ -454,8 +459,8 @@ class AnMBR(bst.Unit):
     # =========================================================================
     # _design
     # =========================================================================
-    def _design(self):
-        D = self.design_results
+    def _design(self):        
+        D = self.design_results     
         D['Treatment train'] = self.N_train
         D['Cassette per train'] = self.cas_per_tank
         D['Module per cassette'] = self.mod_per_cas
@@ -626,9 +631,7 @@ class AnMBR(bst.Unit):
     def _design_pump(self):
         rx_type, m_config, pumps = \
             self.reactor_type, self.membrane_configuration, self._pumps
-
-        # IDs = ['perm', 'retent', 'recir', 'sludge', 'naocl', 'citric', 'bisulfite']
-
+        
         ins_dct = {
             'perm': self.outs[1].proxy(),
             'retent': self._retent,
@@ -668,8 +671,7 @@ class AnMBR(bst.Unit):
         pipe_ss, pump_ss, hdpe = 0., 0., 0.
         for i in pumps:
             p = getattr(self, f'{i}_pump')
-            if p == None:
-                continue
+            if p == None: continue
 
             p.simulate()
             pipe_ss += p.design_results['Pipe stainless steel [kg]']
@@ -685,7 +687,6 @@ class AnMBR(bst.Unit):
     def _cost(self):
         D, C = self.design_results, self.baseline_purchase_costs
 
-        ### Capital ###
         # Concrete and excavation
         VEX, VWC, VSC = \
             D['Excavation [ft3]'], D['Wall concrete [ft3]'], D['Slab concrete [ft3]']
@@ -709,6 +710,33 @@ class AnMBR(bst.Unit):
             ldpe += i.baseline_purchase_costs['Packing LDPE [m3]']
             hdpe += i.baseline_purchase_costs['Packing HDPE [m3]']
 
+        # Heat loss, assume air is 17°C, ground is 10°C
+        T = self.T
+        if T is None: loss = 0.
+        else:
+            N_train, L_CSTR, W_tank, D_tank = \
+                self.N_train, self.L_CSTR, self.W_tank, self.D_tank
+            A_W = 2 * (L_CSTR+W_tank) * D_tank
+            A_F = L_CSTR * W_tank
+            A_W *= N_train * _ft2_to_m2
+            A_F *= N_train * _ft2_to_m2
+
+            loss = 0.7 * (T-(17+273.15)) * A_W # 0.7 W/m2/°C for wall
+            loss += 1.7 * (T-(10+273.15)) * A_F # 1.7 W/m2/°C for floor
+            loss += 0.95 * (T-(17+273.15)) * A_F # 0.95 W/m2/°C for floating cover
+            loss *= 3.6 # W (J/s) to kJ/hr
+
+        # Stream heating
+        hx = self.heat_exchanger
+        inf = self._inf
+        hx_ins0, hx_outs0 = hx.ins[0], hx.outs[0]
+        hx_ins0.copy_flow(inf)
+        hx_outs0.copy_flow(inf)
+        hx_ins0.T = inf.T
+        hx_outs0.T = T
+        hx.H = hx_outs0.H + loss # stream heating and heat loss
+        hx.simulate_as_auxiliary_exchanger(ins=hx.ins, outs=hx.outs)
+
         # Pump
         # Note that maintenance and operating costs are included as a lumped
         # number in the biorefinery thus not included here
@@ -724,46 +752,18 @@ class AnMBR(bst.Unit):
         # Degassing membrane
         C['Degassing membrane'] = 10000 * D['Degassing membrane']
 
-        ### Heat and power ###
-        # Heat loss, assume air is 17°C, ground is 10°C
-        T = self.T
-        if T is None:
-            loss = 0.
-        else:
-            N_train, L_CSTR, W_tank, D_tank = \
-                self.N_train, self.L_CSTR, self.W_tank, self.D_tank
-            A_W = 2 * (L_CSTR+W_tank) * D_tank
-            A_F = L_CSTR * W_tank
-            A_W *= N_train * _ft2_to_m2
-            A_F *= N_train * _ft2_to_m2
-
-            loss = 0.7 * (T-(17+273.15)) * A_W / 1e3 # 0.7 W/m2/°C for wall
-            loss += 1.7 * (T-(10+273.15)) * A_F / 1e3 # 1.7 W/m2/°C for floor
-            loss += 0.95 * (T-(17+273.15)) * A_F / 1e3 # 0.95 W/m2/°C for floating cover
-        self._heat_loss = loss
-
-        # Fluid heating
-        inf = self._inf
-        if T:
-            H_at_T = inf.thermo.mixture.H(mol=inf.mol, phase='l', T=T, P=101325)
-            duty = -(inf.H - H_at_T)
-        else:
-            duty = 0
-        self.heat_exchanger.simulate_as_auxiliary_exchanger(duty, inf)
-
         # Pumping
         pumping = 0.
         for ID in self._pumps:
             p = getattr(self, f'{ID}_pump')
-            if p is None:
-                continue
+            if p is None: continue
             pumping += p.power_utility.rate
 
         # Gas
         sparging = 0. # submerge design not implemented
         degassing = 3 * self.N_degasser # assume each uses 3 kW
 
-        self.power_utility.rate = sparging + degassing + pumping + loss
+        self.power_utility.rate = sparging + degassing + pumping
 
 
     # Called by _cost
