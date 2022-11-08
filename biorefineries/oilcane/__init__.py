@@ -1291,6 +1291,7 @@ def load(name, cache=cache, reduce_chemicals=False,
         WWTsys.set_tolerance(mol=10, method='fixed-point')
         # sys.track_recycle(WWTsys.recycle)
     sys.simulate()
+    feedstock.price = MFPP()
     if reduce_chemicals: 
         oilcane_sys.reduce_chemicals()
         oilcane_sys._load_stream_links()

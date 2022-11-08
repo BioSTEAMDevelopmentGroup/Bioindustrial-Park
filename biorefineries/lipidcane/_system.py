@@ -590,7 +590,11 @@ def create_lipidcane_to_biodiesel_and_conventional_ethanol_system(ins, outs):
     )
     
     # Hydrolyze lipid bodies
-    T201 = units.EnzymeTreatment('T201', (feedstock_handling_sys-0, enzyme), T=323.15)  # T=50
+    # Note: It seems odd that there is such a small amount of water in this 
+    # treatment, but we stick to the original paper for consistency.
+    # Also, it seems odd that the temperature is low during treatment. Regardless,
+    # this biorefinery is only used for validation of biosteam.
+    T201 = units.EnzymeTreatment('T201', (feedstock_handling_sys-0, enzyme))
     
     @T201.add_specification(run=True)
     def update_enzyme():
