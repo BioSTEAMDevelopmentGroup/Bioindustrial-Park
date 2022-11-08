@@ -1907,8 +1907,10 @@ class SuccinicAcidCrystallizer(BatchCrystallizer):
     def __init__(self, ID='', ins=None, outs=(), 
                  target_recovery=0.6,
                  thermo=None,
-                 tau=None, N=None, V=None, T=305.15,
-                 Nmin=2, Nmax=36, vessel_material='Carbon steel',
+                 tau=6, N=None, V=None, T=305.15,
+                 Nmin=2, Nmax=36, 
+                 T_range=(274., 372.5),
+                 vessel_material='Stainless steel 316',
                  kW=0.00746):
         
         BatchCrystallizer.__init__(self, ID, ins, outs, thermo,
@@ -1916,7 +1918,9 @@ class SuccinicAcidCrystallizer(BatchCrystallizer):
                      Nmin, Nmax, vessel_material,
                      kW)
         self.target_recovery = target_recovery
-    
+        self.T_range = T_range
+        self.tau = tau
+        
     def get_T_from_target_recovery(self, target_recovery):
         self.target_recovery=target_recovery
         
@@ -1933,13 +1937,6 @@ class SuccinicAcidCrystallizer(BatchCrystallizer):
         return ln(x_end_gpL/29.098)/0.0396 + 273.15
         # return T
     
-    def get_t_from_target_recovery(self, target_recovery):
-        in_stream = self.ins[0]
-        x_start = in_stream.imol['SuccinicAcid']/sum(in_stream.imol['Water', 'SuccinicAcid'])
-        x_end = (1-target_recovery)*x_start
-        # !!! model here
-        return 4 # hours # mock output for now
-    
     def set_effluent_composition_from_recovery(self, recovery):
         in_stream = self.ins[0]
         self.outs[0].imass['s', 'SuccinicAcid'] = recovery*in_stream.imass['SuccinicAcid']
@@ -1947,7 +1944,7 @@ class SuccinicAcidCrystallizer(BatchCrystallizer):
     
     def get_effective_recovery_from_T(self, T):
         in_stream = self.ins[0]
-        SA_mass_dissolved_end = exp((T - 273.15)*0.0396) * 29.098 * in_stream.F_vol
+        SA_mass_dissolved_end = 29.098*exp(0.0396*(T-273.15)) * in_stream.F_vol
         SA_mass_total = self.ins[0].imass['SuccinicAcid']
         recovery = 1.-SA_mass_dissolved_end/SA_mass_total
         return recovery
@@ -1961,9 +1958,22 @@ class SuccinicAcidCrystallizer(BatchCrystallizer):
         # out_stream.sle(T=self.T, solute='SuccinicAcid')
         out_stream.phases=('l', 's')
         self.effective_recovery = effective_recovery = target_recovery
-        self.T = T = self.get_T_from_target_recovery(target_recovery)
-        if T>in_stream.T:
-            self.T = T = in_stream.T
-            self.effective_recovery = effective_recovery = self.get_effective_recovery_from_T(T)
-        self.tau = self.get_t_from_target_recovery(effective_recovery)
+        
+        Tmin, Tmax = self.T_range
+        rec_at_Tmin, rec_at_Tmax = self.get_effective_recovery_from_T(Tmin-273.15),\
+            self.get_effective_recovery_from_T(Tmax-273.15)
+        
+        if rec_at_Tmin < target_recovery:
+            self.T = Tmin
+            self.effective_recovery = rec_at_Tmin
+        elif rec_at_Tmax > target_recovery:
+            self.T = Tmin
+            self.effective_recovery = rec_at_Tmax
+        else:
+            self.T = T = self.get_T_from_target_recovery(target_recovery)
+            if T>in_stream.T:
+                self.T = T = in_stream.T
+                self.effective_recovery = effective_recovery = self.get_effective_recovery_from_T(T-273.15)
+        
+        # self.tau = self.get_t_from_target_recovery(effective_recovery)
         self.set_effluent_composition_from_recovery(effective_recovery)

@@ -292,6 +292,70 @@ def create_succinic_sys(ins, outs):
     
     T301 = units.SeedHoldTank('T301', ins=R303-0, outs=1-R302)
     
+    S401 = bst.SolidsCentrifuge('S401', ins=R302-0, 
+                            outs=('S401_solid_waste', 'S401_1'),
+                            solids=['FermMicrobe'], split={'FermMicrobe':0.995})
+    
+    C401 = units.SuccinicAcidCrystallizer('C401', ins=S401-1, outs=('C401_0',), 
+                                   target_recovery=0.98,
+                                   tau=6,
+                                   N=4,
+                                   )
+    
+    S402 = bst.SolidsCentrifuge('S402', ins=C401-0, 
+                            outs=('S402_solid_SuccinicAcid', 'S402_1'),
+                            solids=['SuccinicAcid', 'FermMicrobe'], split={'SuccinicAcid':0.995,
+                                                                           'FermMicrobe':0.995})
+        
+    # @S402.add_specification(run=False)
+    # def S402_spec():
+    #     S402._run()
+    #     tot_SA = S402.ins[0].imol['SuccinicAcid']
+    #     # split_SA = S402.split['SuccinicAcid']
+    #     split_SA = sum(S402.split) # update
+    #     S402.outs[0].phases=('s', 'l')
+    #     S402.outs[0].imol['s', 'SuccinicAcid'] = split_SA*tot_SA
+    #     S402.outs[0].imol['l', 'SuccinicAcid'] = 0.
+        
+    #     S402.outs[1].phases=('s', 'l')
+    #     S402.outs[1].imol['s', 'SuccinicAcid'] = 0.
+    #     S402.outs[1].imol['l', 'SuccinicAcid'] = (1.-split_SA)*tot_SA
+        
+        
+    F401 = bst.MultiEffectEvaporator('F401', ins=S402-1, outs=('F401_l', 'F401_g'),
+                                            P = (101325, 73581, 50892, 32777, 20000), V = 0.5)
+    
+    @F401.add_specification(run=False)
+    def F401_spec():
+        instream = F401.ins[0]
+        F401.V = 0.6*instream.imol['Water']/sum([instream.imol[c.ID] for c in instream.vle_chemicals])
+        F401._run()
+    
+    C402 = units.SuccinicAcidCrystallizer('C402', ins=F401-0, outs=('C402_0',), 
+                                   target_recovery=0.98,
+                                   tau=6,
+                                   N=4,
+                                   )
+
+    S403 = bst.SolidsCentrifuge('S403', ins=C402-0, 
+                            outs=('S403_solid_SuccinicAcid', 'S403_1'),
+                            solids=['SuccinicAcid', 'FermMicrobe'], split={'SuccinicAcid':0.995,
+                                                                           'FermMicrobe':0.995})
+        
+    # @S403.add_specification(run=False)
+    # def S403_spec():
+    #     S403._run()
+    #     tot_SA = S403.ins[0].imol['SuccinicAcid']
+    #     # split_SA = S403.split['SuccinicAcid']
+    #     split_SA = sum(S403.split) # update
+    #     S403.outs[0].phases=('s', 'l')
+    #     S403.outs[0].imol['s', 'SuccinicAcid'] = split_SA*tot_SA
+    #     S403.outs[0].imol['l', 'SuccinicAcid'] = 0.
+        
+    #     S403.outs[1].phases=('s', 'l')
+    #     S403.outs[1].imol['s', 'SuccinicAcid'] = 0.
+    #     S403.outs[1].imol['l', 'SuccinicAcid'] = (1.-split_SA)*tot_SA
+        
     # %% 
     
     # =============================================================================
@@ -313,7 +377,7 @@ def create_succinic_sys(ins, outs):
     
     # Mix waste liquids for treatment
     M501 = bst.units.Mixer('M501', ins=('',
-                                        R302-0, 
+                                        S403-1,
                                         # S401-1,
                                         # F401-0,
                                         # r_S402_s-1, r_S403_s-1, r_S404_s-1,
@@ -400,7 +464,8 @@ def create_succinic_sys(ins, outs):
     
     # Mix solid wastes to boiler turbogenerator
     M505 = bst.units.Mixer('M505', ins=('',
-                                        S301-0, 
+                                        S301-0,
+                                        S401-0,
                                         # S401-0, 
                                         # F401-0, D401-0,
                                         ), 
@@ -427,7 +492,7 @@ def create_succinic_sys(ins, outs):
     
     # !!! All product and byproduct streams (with prices) go here
     # product_stream 
-    product_stream = Stream('product_stream', units='kg/hr', price=price['Succinic acid']) # set an arbitrary price as this will be solved for
+    SuccinicAcid = Stream('SuccinicAcid', units='kg/hr', price=price['Succinic acid']) # set an arbitrary price as this will be solved for
     # byproduct 1 stream
     
     # byproduct_1_stream = Stream('byproduct_1_stream', units='kg/hr', price=price['Lactic acid'])
@@ -461,12 +526,13 @@ def create_succinic_sys(ins, outs):
     # =============================================================================
 
     # # 7-day storage time, similar to ethanol's in Humbird et al.   
-    # # Product storage
-    # T601 = bst.StorageTank('T601', ins=S401-0, tau=7.*24., V_wf=0.9, # !!! ins should be the product stream
-    #                                      vessel_type='Floating roof',
-    #                                      vessel_material='Stainless steel')
-    # T601.line = 'ProductStorageTank'
-    # T601_P = bst.Pump('T601_P', ins=T601-0, outs=product_stream)
+    # Product storage
+    M601 = bst.Mixer('M601', ins=(S402-0, S403-0), outs=('mixed_SuccinicAcid_to_storage'))
+    T601 = bst.StorageTank('T601', ins=M601-0, tau=7.*24., V_wf=0.9, # !!! ins should be the product stream
+                                          vessel_type='Floating roof',
+                                          vessel_material='Stainless steel')
+    T601.line = 'SuccinicAcidStorageTank'
+    T601_P = bst.Pump('T601_P', ins=T601-0, outs=(SuccinicAcid,))
     
     # # Byproduct 1 storage
     # T602 = bst.StorageTank('T602', ins=S401-1, tau=7.*24., V_wf=0.9, # !!! ins should be a byproduct, if any
@@ -584,7 +650,7 @@ succinic_sys = create_succinic_sys()
 u = flowsheet.unit
 s = flowsheet.stream
 feedstock = s.feedstock
-product_stream = s.product_stream
+product_stream = s.SuccinicAcid
 # byproduct_1_stream = s.byproduct_1_stream
 byproduct_2_stream = s.byproduct_2_stream
 
@@ -687,7 +753,7 @@ def get_product_stream_MPSP():
         succinic_sys.simulate()
     for i in range(num_solve_tea):
         product_stream.price = succinic_tea.solve_price(product_stream)
-    return product_stream.price
+    return product_stream.price * product_stream.F_mass / product_stream.imass['SuccinicAcid']
 
 # get_product_stream_MPSP()
 
