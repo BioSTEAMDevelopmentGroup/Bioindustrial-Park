@@ -20,7 +20,7 @@ info = {
     'abbr': 'oc1g',
     'WWT_ID': '11',
     'is2G': False,
-    'FERM_product': 'ethanol',
+    'FERM_product': ['ethanol',],
     'add_BT': False,
     'ww_price': None,
     }

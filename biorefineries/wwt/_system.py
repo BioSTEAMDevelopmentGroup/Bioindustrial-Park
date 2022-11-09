@@ -11,7 +11,7 @@ import biosteam as bst
 from biosteam import main_flowsheet as main_f
 from . import (
     add_wwt_chemicals, create_wastewater_process, CHP as CHPunit, Skipped,
-    get_COD_breakdown, update_product_prices,
+    get_COD_breakdown, update_cane_price, update_product_prices,
     IRR_at_ww_price, ww_price_at_IRR, get_MPSP, GWP_CFs, add_CFs, get_GWP,
     )
 
@@ -176,6 +176,11 @@ def create_comparison_systems(info, functions, sys_dct={}):
     new_tea = new_sys_temp.TEA.copy(new_sys)
     exist_tea.IRR = new_tea.IRR = kwdct.get('IRR')
 
+    # Set oilcane feedstock price to default: https://github.com/BioSTEAMDevelopmentGroup/Bioindustrial-Park/issues/51
+    if abbr in ['sc1g', 'sc2g', 'oc1g', 'oc2g']:
+        update_cane_price(exist_s)
+        update_cane_price(new_s)
+
     if kwdct['update_product_price']:
         update_product_prices(exist_s)
         update_product_prices(new_s)
@@ -197,10 +202,10 @@ def simulate_systems(exist_sys, new_sys, info):
     print(f'\n\n{info["abbr"]} module:')
     print(f'\nExisting system IRR: {exist_tea.solve_IRR():.2%}')
     print(f'\nNew system IRR: {new_tea.solve_IRR():.2%}')
-    FERM_product = info['FERM_product']
+    FERM_products = info['FERM_products']
     for sys in (exist_sys, new_sys):
         for fn in (get_MPSP, get_GWP): # allocate based on value
-            fn(sys, FERM_product)
+            fn(sys, FERM_products)
     get_COD_breakdown(getattr(new_sys.flowsheet.unit, f'S{info["WWT_ID"]}04').ins[0])
 
     if not info['is2G']:
