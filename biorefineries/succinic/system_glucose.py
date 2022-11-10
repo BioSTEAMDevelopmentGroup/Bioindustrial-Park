@@ -66,135 +66,18 @@ def create_succinic_sys(ins, outs):
         isplit['SuccinicAcid', 'LacticAcid', 'Ethanol'] = isplit[ID]
        
     process_groups = []
-    feedstock = Stream('feedstock',
-                        baseline_feedflow.copy(),
-                        units='kg/hr',
-                        price=price['Feedstock'])
+    feedstock = Stream('feedstock')
+    feedstock.imass['Glucose'] = 29000.
+    feedstock.imass['H2O'] = 500.
+    feedstock.price = price['Glucose']*feedstock.imass['Glucose']/feedstock.F_mass
     
-    U101 = units.FeedstockPreprocessing('U101', ins=feedstock)
-    
-    # =============================================================================
-    # Feedstock
-    # =============================================================================
-    
-    feedstock = Stream('feedstock',
-                        baseline_feedflow.copy(),
-                        units='kg/hr',
-                        price=price['Feedstock'])
+    feedstock.F_mass = 50000 
     
     U101 = units.FeedstockPreprocessing('U101', ins=feedstock)
     
     # Handling costs/utilities included in feedstock cost thus not considered here
     U101.cost_items['System'].cost = 0
     U101.cost_items['System'].kW = 0
-    
-    
-
-    # =============================================================================
-    # Pretreatment streams
-    # =============================================================================
-    
-    # For pretreatment, 93% purity
-    sulfuric_acid_T201 = Stream('sulfuric_acid_T201', units='kg/hr')
-    # To be mixed with sulfuric acid, flow updated in SulfuricAcidMixer
-    water_M201 = Stream('water_M201', T=300, units='kg/hr')
-        
-    # To be used for feedstock conditioning
-    water_M202 = Stream('water_M202', T=300, units='kg/hr')
-    
-    # To be added to the feedstock/sulfuric acid mixture, flow updated by the SteamMixer
-    water_M203 = Stream('water_M203', phase='l', T=300, P=13.*101325, units='kg/hr')
-    
-    # For neutralization of pretreatment hydrolysate
-    ammonia_M205 = Stream('ammonia_M205', phase='l', units='kg/hr')
-    # To be used for ammonia addition, flow updated by AmmoniaMixer
-    water_M205 = Stream('water_M205', units='kg/hr')
-    
-    
-    # =============================================================================
-    # Pretreatment units
-    # =============================================================================
-    H_M201 = bst.units.HXutility('H_M201', ins=water_M201,
-                                     outs='steam_M201',
-                                     T=99.+273.15, rigorous=True)
-    
-    # H_M201.heat_utilities[0].heat_transfer_efficiency = 1.
-    @H_M201.add_specification(run=False)
-    def H_M201_specification():
-        T201._run()
-        acid_imass = T201.outs[0].imass['SulfuricAcid']
-        H_M201.ins[0].imass['Water'] = acid_imass / 0.05
-        # H_M201.ins[0].imass['H2SO4'] = H_M201.ins[0].imass['Water']/1000.
-        H_M201._run()
-        
-    # H_M201._cost = lambda: None
-    # H_M201._design = lambda: None
-    # H_M201.heat_utilities[0].heat_exchanger = None
-    H_M202 = bst.units.HXutility('H_M202', ins=water_M202,
-                                     outs='hot_water_M202',
-                                     T=99.+273.15, rigorous=True)
-    # H_M202.heat_utilities[0].heat_transfer_efficiency = 1.
-    @H_M202.add_specification(run=False)
-    def H_M202_specification():
-        U101._run()
-        H_M201.run()
-        M201._run()
-        feedstock, acid = U101.outs[0], M201.outs[0]
-        recycled_water = H201.outs[0]
-        mixture_F_mass = feedstock.F_mass + acid.F_mass
-        mixture_imass_water = feedstock.imass['Water'] + acid.imass['Water'] + \
-            recycled_water.imass['Water']
-        total_mass = (mixture_F_mass - mixture_imass_water)/M202.solid_loading
-        H_M202.ins[0].imass['Water'] = total_mass - mixture_F_mass
-        # H_M202.ins[0].imass['H2SO4'] = H_M202.ins[0].imass['Water']/1000.
-        H_M202._run()
-    
-    
-    
-    # Prepare sulfuric acid
-    get_feedstock_dry_mass = lambda: feedstock.F_mass - feedstock.imass['H2O']
-    T201 = units.SulfuricAcidAdditionTank('T201', ins=sulfuric_acid_T201,
-                                          feedstock_dry_mass=get_feedstock_dry_mass())
-    
-    M201 = units.SulfuricAcidMixer('M201', ins=(T201-0, H_M201-0))
-        
-    # Mix sulfuric acid and feedstock, adjust water loading for pretreatment
-    M202 = units.PretreatmentMixer('M202', ins=(U101-0, M201-0, H_M202-0, ''))
-    
-    # Mix feedstock/sulfuric acid mixture and steam
-    # M203 = units.SteamMixer('M203', ins=(M202-0, water_M203), P=5.5*101325)
-    M203 = bst.units.SteamMixer('M203', ins=(M202-0, '', water_M203), P=5.5*101325)
-    # M203.heat_utilities[0].heat_transfer_efficiency = 1.
-    R201 = units.PretreatmentReactorSystem('R201', ins=M203-0, outs=('R201_g', 'R201_l'))
-    
-    # Pump bottom of the pretreatment products to the oligomer conversion tank
-    T202 = units.BlowdownTank('T202', ins=R201-1)
-    T203 = units.OligomerConversionTank('T203', ins=T202-0)
-    F201 = units.PretreatmentFlash('F201', ins=T203-0,
-                                   outs=('F201_waste_vapor', 'F201_to_fermentation'),
-                                   P=101325, Q=0)
-    
-    M204 = bst.units.Mixer('M204', ins=(R201-0, F201-0))
-    @M204.add_specification(run=True)
-    def valve():
-        M204.ins[0].P = 101325
-    H201 = bst.units.HXutility('H201', ins=M204-0,
-                               outs='condensed_pretreatment_waste_vapor',
-                               V=0, rigorous=True)
-    
-    # Neutralize pretreatment hydrolysate
-    M205 = units.AmmoniaMixer('M205', ins=(ammonia_M205, water_M205))
-    @M205.add_specification(run=False)
-    def update_ammonia_and_mix():
-        hydrolysate = F201.outs[1]
-        # Load 10% extra
-        ammonia_M205.imol['NH4OH'] = (2*hydrolysate.imol['H2SO4']) * 1.1
-        M205._run()
-    
-    
-    T204 = units.AmmoniaAdditionTank('T204', ins=(F201-1, M205-0))
-    P201 = units.HydrolysatePump('P201', ins=T204-0)
-    
     
     # %% 
     
@@ -214,63 +97,28 @@ def create_succinic_sys(ins, outs):
     
     # For diluting concentrated, inhibitor-reduced hydrolysate
     dilution_water = Stream('dilution_water', units='kg/hr')
-    
+    # dilution_water.imol['Water'] =  5000. # flow updated automatically 
     natural_gas_drying = Stream('natural_gas_drying', units = 'kg/hr', price=0.218)
+    
+    
     # =============================================================================
     # Conversion units
     # =============================================================================
     
     # Cool hydrolysate down to fermentation temperature at 50°C
-    H301 = bst.units.HXutility('H301', ins=P201-0, T=50+273.15)
+    H301 = bst.units.HXutility('H301', ins=U101-0, T=50+273.15)
     
-    # Mix enzyme with the cooled pretreatment hydrolysate
-    M301 = units.EnzymeHydrolysateMixer('M301', ins=(H301-0, enzyme, enzyme_water))
+
+
+    M304 = bst.units.Mixer('M304', ins=(H301-0, dilution_water))
+    M304.water_to_sugar_mol_ratio = 200
     
-    # Mix pretreatment hydrolysate/enzyme mixture with fermentation seed
-    M302 = bst.units.Mixer('M302', ins=(M301-0, ''))
-    
-    
-    # Saccharification and Cofermentation
-    # R301 = units.SaccharificationAndCoFermentation('R301', 
-    #                                                ins=(M302-0, CSL),
-    #                                                outs=('fermentation_effluent', 
-    #                                                      'sidedraw'))
-    
-    # Saccharification
-    # Saccharification
-    R301 = units.Saccharification('R301', 
-                                    ins=M301-0,
-                                    outs=('saccharification_effluent'))
-    R301.tau_saccharification = 24. 
-    
-    def fix_split(isplit, ID):
-        isplit['Hexanol', 'Acetate', 'AceticAcid'] = isplit[ID]
-                           
-   
-    # Remove solids from fermentation broth, modified from the pressure filter in Humbird et al.
-    S301_index = [splits_df.index[0]] + splits_df.index[2:].to_list()
-    S301_cell_mass_split = [splits_df['stream_571'][0]] + splits_df['stream_571'][2:].to_list()
-    S301_filtrate_split = [splits_df['stream_535'][0]] + splits_df['stream_535'][2:].to_list()
-    S301 = units.CellMassFilter('S301', ins=R301-0, outs=('solids', ''),
-                                moisture_content=0.35,
-                                split=find_split(S301_index,
-                                                  S301_cell_mass_split,
-                                                  S301_filtrate_split,
-                                                  chemical_groups))
-    fix_split(S301.isplit, 'Glucose')
-    
-    
-    F301 = bst.units.MultiEffectEvaporator('F301', ins=S301-1, outs=('F301_l', 'F301_g'),
-                                            P = (101325, 73581, 50892, 32777, 20000), V = 0.813)
-                                            # P = (101325, 73581, 50892, 32777, 20000), V = 0.001)
-    F301.V = 0.797 #for sugars concentration of 591.25 g/L (599.73 g/L after cooling to 30 C)
-    
-    
-    F301_P = units.SuccinicAcidPump('F301_P', ins=F301-1)
-   
-        
-    M304_P = units.SuccinicAcidPump('M304_P', ins=F301-0)
-    M304 = bst.units.Mixer('M304', ins=(M304_P-0, dilution_water))
+    @M304.add_specification()
+    def adjust_M304_water():
+        M304_ins_1 = M304.ins[1]
+        M304_ins_1.imol['Water'] = M304.water_to_sugar_mol_ratio * M304.ins[0].imol['Glucose', 'Xylose'].sum()
+        M304._run()
+    # M304.specification = adjust_M304_water()
     
     M304_H = bst.units.HXutility('M304_H', ins=M304-0, T=30+273.15, rigorous=True)
     
@@ -280,6 +128,7 @@ def create_succinic_sys(ins, outs):
                         outs = ('to_seedtrain', 'to_cofermentation'),
                         split = 0.07) # split = inoculum ratio
     
+
     # Cofermentation
     
     R302 = units.CoFermentation('R302', 
@@ -489,7 +338,7 @@ def create_succinic_sys(ins, outs):
     
     # Mix solid wastes to boiler turbogenerator
     M505 = bst.units.Mixer('M505', ins=('',
-                                        S301-0,
+                                        # S301-0,
                                         S401-0,
                                         # S401-0, 
                                         # F401-0, D401-0,
@@ -726,20 +575,20 @@ succinic_no_BT_tea = succinic_tea
 seed_train_system = bst.System('seed_train_system', path=(u.S302, u.R303, u.T301))
 
 spec = ProcessSpecification(
-    evaporator = u.F301,
-    pump = u.F301_P,
+    evaporator = None,
+    pump = None,
     mixer = u.M304,
     heat_exchanger = u.M304_H,
-    seed_train_system = seed_train_system,
+    seed_train_system = [],
     reactor= u.R302,
     reaction_name='fermentation_reaction',
     substrates=('Xylose', 'Glucose'),
-    products=('SuccinicAcid',),
+    products=('TAL',),
     
-    spec_1=0.19,
-    spec_2=28.,
+    # spec_1=0.19,
+    spec_1=0.3,
+    spec_2=15.,
     spec_3=0.19,
-
     
     xylose_utilization_fraction = 0.80,
     feedstock = feedstock,
@@ -751,9 +600,10 @@ spec = ProcessSpecification(
     pre_conversion_units = succinic_sys.split(u.M304.ins[0])[0],
     
     # set baseline fermentation performance here
+    # baseline_yield = 0.19,
     baseline_yield = 0.8,
-    baseline_titer = 40.,
-    baseline_productivity = 0.5,
+    baseline_titer = 100.,
+    baseline_productivity = 1.0,
     
     # baseline_yield = 0.30,
     # baseline_titer = 25.,
@@ -762,10 +612,34 @@ spec = ProcessSpecification(
     feedstock_mass = feedstock.F_mass,
     pretreatment_reactor = None)
 
-spec.load_spec_1 = spec.load_yield
-spec.load_spec_2 = spec.load_titer
-spec.load_spec_3 = spec.load_productivity
 
+
+def M304_titer_obj_fn(water_to_sugar_mol_ratio):
+    M304, R302 = u.M304, u.R302
+    M304.water_to_sugar_mol_ratio = water_to_sugar_mol_ratio
+    # M304.specifications[0][0]()
+    M304.simulate()
+    u.M304_H._run()
+    u.S302._run()
+    u.R303._run()
+    u.T301._run()
+    # R302.specifications[0][0]()
+    R302.simulate()
+    # broth = R302.outs[0]
+    # return broth.imass['TAL']/broth.F_vol - R302.titer_to_load
+    return R302.effluent_titer - R302.titer_to_load
+
+def load_titer_with_glucose(titer_to_load):
+    spec.spec_2 = titer_to_load
+    u.R302.titer_to_load = titer_to_load
+    flx.IQ_interpolation(M304_titer_obj_fn, 1e-3, 20000.)
+    # u.AC401.regeneration_velocity = min(14.4, 3.1158 + ((14.4-3.1158)/(30.-3.))*(titer_to_load-3.)) # heuristic to obtain regeneration velocity at which MPSP is minimum fitted to results from simulations at target_recovery=0.99 
+    # u.AC401.regeneration_velocity = 14.4
+    
+
+spec.load_spec_1 = spec.load_yield
+spec.load_spec_3 = spec.load_productivity
+spec.load_spec_2 = load_titer_with_glucose
 # %% 
 # =============================================================================
 # Simulate system and get results
@@ -830,10 +704,12 @@ for i in unit_groups:
         i.metrics[-1].getter = lambda: 0. # Material cost
     if i.name == 'cooling tower and chilled water package':
         i.metrics[1].getter = lambda: 0. # Cooling duty
+
 HXN = None
 for HXN_group in unit_groups:
     if HXN_group.name == 'heat exchanger network':
         HXN_group.filter_savings = False
+        HXN_group.units.append(u.HXN1001)
         HXN = HXN_group.units[0]
         assert isinstance(HXN, HeatExchangerNetwork)
         
@@ -882,4 +758,4 @@ def TEA_breakdown(print_output=False):
                 print(f"{j}: {format(metric_breakdowns_i[j], '.3f')}")
     return metric_breakdowns
 
-TEA_breakdown()
+TEA_breakdown()# -*- coding: utf-8 -*-
