@@ -20,7 +20,7 @@ info = {
     'abbr': 'sc2g',
     'WWT_ID': '5',
     'is2G': True,
-    'FERM_product': 'ethanol',
+    'FERM_product': ['advanced_ethanol', 'cellulosic_ethanol',],
     'add_BT': False,
     'ww_price': None,
     }

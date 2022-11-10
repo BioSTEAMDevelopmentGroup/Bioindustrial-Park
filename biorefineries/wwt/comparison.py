@@ -28,11 +28,11 @@ cornstover results were updated with
 # General functions
 # =============================================================================
 
-import os, pandas as pd, biosteam as bst
+import os, pandas as pd
 from numpy.testing import assert_allclose
 # Ethanol conversion factor
 from biorefineries.oilcane import ethanol_kg_per_gal, ethanol_kg_per_L, GWP_characterization_factors
-from biorefineries.wwt import results_path, GWP_CFs
+from biorefineries.wwt import results_path, update_cane_price, GWP_CFs
 
 path = os.path.join(results_path, 'comparison.xlsx')
 cached_df = pd.read_excel(path, 'comparison', header=[0], index_col=[0])
@@ -40,6 +40,11 @@ cached_df = pd.read_excel(path, 'comparison', header=[0], index_col=[0])
 oc_GWP_key = ('Displacement allocation', 'Ethanol GWP [kg*CO2*eq / L]')
 
 check_results = False
+
+# Now the feedstock price is set to MFPP by default
+def get_oilcane_original_MESP(oc_module, products):
+    update_cane_price(oc_module.sys.flowsheet.stream)
+    return oc_module.oilcane_sys.TEA.solve_price(products) * ethanol_kg_per_gal
 
 def update_oilcane_CFs(original_model):
     stream = original_model.system.flowsheet.stream
@@ -130,7 +135,7 @@ def test_cn_baseline():
 def test_sc1g_baseline():
     from biorefineries import oilcane as oc
     oc.load('S1')
-    MPSP_original = oc.oilcane_sys.TEA.solve_price(oc.ethanol) * ethanol_kg_per_gal
+    MPSP_original = get_oilcane_original_MESP(oc, oc.ethanol)
     update_oilcane_CFs(oc.model)
     df_original = oc.model.metrics_at_baseline()
     GWP_original = df_original[oc_GWP_key]/ethanol_kg_per_L*ethanol_kg_per_gal
@@ -150,7 +155,7 @@ def test_sc1g_baseline():
 def test_oc1g_baseline():
     from biorefineries import oilcane as oc
     oc.load('O1')
-    MPSP_original = oc.oilcane_sys.TEA.solve_price(oc.ethanol) * ethanol_kg_per_gal
+    MPSP_original = get_oilcane_original_MESP(oc, oc.ethanol)
     update_oilcane_CFs(oc.model)
     df_original = oc.model.metrics_at_baseline()
     GWP_original = df_original[oc_GWP_key]/ethanol_kg_per_L*ethanol_kg_per_gal
@@ -187,7 +192,7 @@ def test_cs_baseline():
 def test_sc2g_baseline():
     from biorefineries import oilcane as oc
     oc.load('S2')
-    MPSP_original = oc.oilcane_sys.TEA.solve_price(oc.ethanol) * ethanol_kg_per_gal
+    MPSP_original = get_oilcane_original_MESP(oc, [oc.advanced_ethanol, oc.cellulosic_ethanol])
     update_oilcane_CFs(oc.model)
     df_original = oc.model.metrics_at_baseline()
     GWP_original = df_original[oc_GWP_key]/ethanol_kg_per_L*ethanol_kg_per_gal
@@ -207,7 +212,7 @@ def test_sc2g_baseline():
 def test_oc2g_baseline():
     from biorefineries import oilcane as oc
     oc.load('O2')
-    MPSP_original = oc.oilcane_sys.TEA.solve_price(oc.ethanol) * ethanol_kg_per_gal
+    MPSP_original = get_oilcane_original_MESP(oc, [oc.advanced_ethanol, oc.cellulosic_ethanol])
     update_oilcane_CFs(oc.model)
     df_original = oc.model.metrics_at_baseline()
     GWP_original = df_original[oc_GWP_key]/ethanol_kg_per_L*ethanol_kg_per_gal
