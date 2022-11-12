@@ -427,15 +427,17 @@ def add_2G_parameters(model, model_dct, f, u, s, get_obj, get_rxn, param):
             rxn.X = X
 
         # Fermentation
-        if model_dct['FERM_product']=='ethanol':
+        products = list(model_dct['FERM_product'])
+        if 'ethanol' in products[0]:
             D_g = shape.Triangle(0.9, b_g, 0.97)
             D_x = shape.Triangle(0.75, b_x, 0.9)
-        elif model_dct['FERM_product']=='lactic_acid':
+        elif 'lactic_acid' in products[0]:
             D_g = shape.Triangle(0.55, b_g, 0.93)
             D_x = shape.Triangle(0.55, b_x, 0.93)
-        elif model_dct['FERM_product']=='acrylic_acid':
-            D_g = get_default_distribution('triangle', b_g, ratio=0.2)
-            D_x = get_default_distribution('triangle', b_x, ratio=0.2)
+        # # 3HP module not added
+        # elif model_dct['FERM_product']=='acrylic_acid':
+        #     D_g = get_default_distribution('triangle', b_g, ratio=0.2)
+        #     D_x = get_default_distribution('triangle', b_x, ratio=0.2)
         else: raise ValueError(f"Fermentation product {model_dct['FERM_product']} not recognized.")
 
     @param(name='FERM glucose-to-product', element=fermentor, kind='coupled', units='-',
@@ -732,7 +734,7 @@ def add_metrics(model, model_dct, f, u, s, get_obj):
     else:
         isa = isinstance
         if wwt_system.ID == 'exist_sys_wwt':
-            if not model_dct['FERM_product'] == 'lactic_acid':
+            if not 'lactic_acid' in model_dct['FERM_product']:
                 for WWTC in wwt_system.units:
                     if isa(WWTC, WastewaterSystemCost):
                         ww_in = WWTC.outs[0]
