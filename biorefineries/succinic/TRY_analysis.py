@@ -421,6 +421,11 @@ for p in productivities:
 
 import contourplots
 
+yields = np.linspace(0.4, 0.9, steps) # x axis values
+titers = np.linspace(40., 120., steps) # y axis values
+productivities = np.arange(0.1, 2.1, 0.1) # z axis values
+MPSPs = results_metric_1 # too big to show here; shape = z * x * y # color (or w) axis values
+
 contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_1, # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., MPSP
                                 x_data=100*yields, # x axis values
                                 y_data=titers, # y axis values
