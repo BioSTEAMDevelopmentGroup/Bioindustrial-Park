@@ -297,551 +297,152 @@ succinic_metrics = [get_product_MPSP, get_product_purity, get_production]
 steps = 10
 
 # Yield, titer, productivity (rate)
-spec_1 = np.linspace(0.5, 0.8, steps) # yield
-spec_2 = np.linspace(30., 100., steps) # titer
+spec_1 = yields = np.linspace(0.4, 0.9, steps) # yield
+spec_2 = titers = np.linspace(40., 120., steps) # titer
 # spec_1 = np.linspace(0.2, 0.99, steps) # yield
 # spec_2 = np.linspace(45, 225, steps) # titer
-spec_3 = np.array([spec.baseline_productivity,]) # productivity
+spec_3 = productivities = np.arange(0.1, 2.1, 0.1)
 # spec.load_spec_1 = spec.load_yield
 # spec.load_spec_2 = spec.load_titer
 # spec.load_spec_3 = spec.load_productivity
 xlabel = "Yield"
 ylabel = 'Titer [$\mathrm{g} \cdot \mathrm{L}^{-1}$]'
-# xticks = [0.33, 0.66, 0.99]
 xticks = [0.1, 0.3, 0.5, 0.7, 0.9]
-# yticks = [75, 150, 225]
 yticks = [0, 5, 10, 15, 20, 25, 30]
-# xticks = [0.2, 0.6, 0.99]
-# yticks = [45, 135, 225]
 spec_3_units = "$\mathrm{g} \cdot \mathrm{L}^{-1} \cdot \mathrm{hr}^{-1}$"
-
-# # Yield, titer, productivity (rate)
-# spec_1 = np.linspace(0.70, 0.90, 10) # yield
-# spec_2 = np.linspace(90, 130, 10) # titer
-# spec_3 = np.array([1]) # productivity
-# spec.load_spec_1 = spec.load_yield
-# spec.load_spec_2 = spec.load_titer
-# spec.load_spec_3 = spec.load_productivity
-# xlabel = "Yield"
-# ylabel = 'Titer [$\mathrm{g} \cdot \mathrm{L}^{-1}$]'
-# xticks = [.75, .80, .85, .90]
-# yticks = [90, 100, 110, 120, 130]
-# spec_3_units = "$\mathrm{g} \cdot \mathrm{L}^{-1} \cdot \mathrm{hr}^{-1}$"
-
-# # Dehydration conversion, titer, feedstock price
-# spec_1 = np.linspace(0.50, 0.80, 3)
-# spec_2 = np.linspace(40, 200, 3)
-# spec_3 = np.array([7.126, 71.26, 712.26])
-# spec.load_spec_1 = spec.load_dehydration_conversion
-# spec.load_spec_2 = spec.load_titer
-# spec.load_spec_3 = spec.load_feedstock_price
-# xlabel = "Dehydration conversion [%]"
-# ylabel = 'Titer [$\mathrm{g} \cdot \mathrm{L}^{-1}$]'
-# xticks = [.50, .60, .70, .80]
-# yticks = [40, 80, 120, 160, 200]
-# spec_3_units = "$\mathrm{\$} \cdot \mathrm{dry-ton}^{-1}$"
-
-# # Byproducts (Acetoin and IBA) selling price, titer, feedstock price
-# spec_1 = np.linspace(1, 2000, 10)
-# spec_2 = np.linspace(40, 200, 10)
-# spec_3 = np.array([7.126, 71.26, 712.26])
-# spec.load_spec_1 = spec.load_byproducts_price
-# spec.load_spec_2 = spec.load_titer
-# spec.load_spec_3 = spec.load_feedstock_price
-# xlabel = "Acetoin and IBA selling price [$\mathrm{\$} \cdot \mathrm{ton}^{-1}$]"
-# ylabel = 'Titer [$\mathrm{g} \cdot \mathrm{L}^{-1}$]'
-# xticks = [0, 400, 800, 1200, 1600, 2000]
-# yticks = [40, 80, 120, 160, 200]
-# spec_3_units = "$\mathrm{\$} \cdot \mathrm{dry-ton}^{-1}$"
 
 spec_1, spec_2 = np.meshgrid(spec_1, spec_2)
 
-# titers_2 = np.linspace(70, 190, 5)
-# yields_2 = np.linspace(0.70, 0.90, 5)
-# productivities_2 = np.array([0.5, 1, 1.5])
-# titers_2, yields_2 = np.meshgrid(titers_2, yields_2)
-
-# utilizes_xylose = False
-
+results_metric_1 = []
 
 # %% Run TRY analysis 
-
-data_1 = succinic_data = spec.evaluate_across_specs(
-        succinic_sys, spec_1, spec_2, succinic_metrics, spec_3)
-
-# spec.load_spec_1 = spec.load_dehydration_conversion
-# spec.load_spec_2 = spec.load_titer
-# spec.load_spec_3 = spec.load_feedstock_price
-# data_1 = succinic_data = spec.evaluate_across_specs(
-#         succinic_sys, spec_1, spec_2, succinic_metrics, spec_3)
-# utilizes_xylose = True
-# data_2 = succinic_data = spec.evaluate_across_TRY(
-#         succinic_sys, titers_2, yields_2, succinic_metrics, productivities_2)
-
-
-
-
-# %% Save generated data
-
-
-dateTimeObj = datetime.now()
-minute = '0' + str(dateTimeObj.minute) if len(str(dateTimeObj.minute))==1 else str(dateTimeObj.minute)
-file_to_save = 'succinic_TRY_%s.%s.%s-%s.%s'%(dateTimeObj.year, dateTimeObj.month, dateTimeObj.day, dateTimeObj.hour, minute)
-np.save(file_to_save, data_1)
-
-pd.DataFrame(data_1[:, :, 0, :][:,:,0]/907.185).to_csv('MPSP-'+file_to_save+'.csv')
-pd.DataFrame(data_1[:, :, 1, :][:,:,0]).to_csv('product_purity-'+file_to_save+'.csv')
-pd.DataFrame(data_1[:, :, 2, :][:,:,0]*succinic_tea.operating_hours).to_csv('production_capacity-'+file_to_save+'.csv')
-
-
-# %% Load previously saved data
-file_to_load = file_to_save
-# file_to_load = 'C:/Users/saran/Documents/Academia/Spring 2020/BioSTEAM/Bioindustrial-Park/BioSTEAM 2.x.x/biorefineries/TAL/succinic_TRY_2020.9.22-16.44'
-data_1 = np.load(file_to_load+'.npy')
-# data_1 = np.load('succinic_TRY_2022.3.18-22.15.npy')
-data_1_copy = copy.deepcopy(data_1)
-
-data_2 = data_1
-
-d1_Metric1 = data_1[:, :, 0, :]
-d1_Metric2 = data_1[:, :, 1, :]
-d1_Metric3 = data_1[:, :, 2, :]
-
-d2_Metric1 = data_2[:, :, 0, :]
-d2_Metric2 = data_2[:, :, 1, :]
-d2_Metric3 = data_2[:, :, 2, :]
-
-# %% Functions to make regions with total sugars > 150 g/L and total inhibitors > 1000 mg/L
-# also infeasible
-
-
-def make_oversaccharine_region_infeasible():
-    # mask = d1_Metric2>150.
-    # data_1_copy[mask] = np.nan
-    # # d1_Metric1[mask] = np.nan
-    # # d1_Metric2[mask] = np.nan
-    # # d1_Metric3[mask] = np.nan
-    # # d2_Metric1[mask] = np.nan
-    # # d2_Metric2[mask] = np.nan
-    # # d2_Metric3[mask] = np.nan
-    infeas = np.where(d1_Metric2>150.)
-    data_1_copy[infeas] = np.nan
-# make_oversaccharine_region_infeasible()
-
-
-def make_inhibited_region_infeasible():
-    infeas = np.where(d1_Metric3>1000.)
-    data_1_copy[infeas] = np.nan
-    # d1_Metric1[infeas] = np.nan
-    # d1_Metric2[infeas] = np.nan
-    # d1_Metric3[infeas] = np.nan
-    # d2_Metric1[infeas] = np.nan
-    # d2_Metric2[infeas] = np.nan
-    # d2_Metric3[infeas] = np.nan
-    
-# make_inhibited_region_infeasible()
-
-
-# # %% Plot contours1
-# # data_2 = data_1
-
-
-# # data_1_copy = copy.deepcopy(data_1)
-
-# Metric_1_tickmarks = tickmarks(
-#     dmin = min(d1_Metric1[~np.isnan(d1_Metric1)].min(), d2_Metric1[~np.isnan(d2_Metric1)].min()),
-#     dmax = max(d1_Metric1[~np.isnan(d1_Metric1)].max(), d2_Metric1[~np.isnan(d2_Metric1)].max())
-# )
-# Metric_2_tickmarks = tickmarks(
-#     dmin = min(d1_Metric2[~np.isnan(d1_Metric2)].min(), d2_Metric2[~np.isnan(d2_Metric2)].min()),
-#     dmax = max(d1_Metric2[~np.isnan(d1_Metric2)].max(), d2_Metric2[~np.isnan(d2_Metric2)].max())
-# )
-# Metric_3_tickmarks = tickmarks(
-#     dmin = min(d1_Metric3[~np.isnan(d1_Metric3)].min(), d2_Metric3[~np.isnan(d2_Metric3)].min()),
-#     dmax = max(d1_Metric3[~np.isnan(d1_Metric3)].max(), d2_Metric3[~np.isnan(d2_Metric3)].max())
-# )
-
-# # Metric_3_tickmarks = [0.0*1000, 0.24*1000, 0.48*1000, 0.72*1000, 0.96*1000, 1.2*1000]
-
-# # Metric_1_tickmarks = [2100, 2800, 3500, 4200, 4900, 5600, 6300]
-# Metric_1_tickmarks = [1500, 2000, 2500, 3000, 3500, 4000, 4500]
-# # Metric_2_tickmarks = [0,1,2,3,4,5,6]
-# Metric_2_tickmarks = [0, 100, 200, 300, 400]
-# # Metric_3_tickmarks = [48, 72, 96, 120, 144]
-# Metric_3_tickmarks = [200, 400, 600, 800, 1000, 1200]
-
-
-# def plot(data, titers, yields, productivities, 
-#          Metric_1_tickmarks, Metric_2_tickmarks, Metric_3_tickmarks):
-#     metric_bars = (MetricBar('MPSP\n', MPSP_units, CABBI_green_colormap(),
-#                              Metric_1_tickmarks,
-#                              1 + int((max(Metric_1_tickmarks) - min(Metric_1_tickmarks))/250)),
-#                    MetricBar('Total sugars\n', VOC_units, CABBI_blue_colormap(), # plt.cm.get_cmap('magma_r'),
-#                              Metric_2_tickmarks,
-#                              1 + int((max(Metric_2_tickmarks) - min(Metric_2_tickmarks))/25)),
-#                    MetricBar('Total inhibitors\n', FCI_units,
-#                              plt.cm.get_cmap('bone_r'), # plt.cm.get_cmap('bone_r'),
-#                              Metric_3_tickmarks,
-#                              1 + int((max(Metric_3_tickmarks) - min(Metric_3_tickmarks))/100)),)
-    
-#     return plot_contour_2d(titers, yields, productivities, data, 
-#                                 xlabel, ylabel, xticks, yticks, metric_bars, 
-#                                 Z_value_format=lambda Z: f"{Z:.1f} [{spec_3_units}]",
-#                                 fillblack=False)
-
-
-
-
-
-
-# metric_bars = (MetricBar('MPSP', MPSP_units, CABBI_green_colormap(),
-#                          Metric_1_tickmarks, 800),
-#                MetricBar('Total sugars', VOC_units, CABBI_blue_colormap(), # plt.cm.get_cmap('magma_r'),
-#                          Metric_2_tickmarks, 80),
-#                MetricBar("Relative impact on MPSP\n[impact of titer : impact of yield]", FCI_units,
-#                          plt.cm.get_cmap('BrBG'), # plt.cm.get_cmap('bone_r'),
-#                          Metric_3_tickmarks, 100))
+for p in productivities:
+    data_1 = succinic_data = spec.evaluate_across_specs(
+            succinic_sys, spec_1, spec_2, succinic_metrics, [p])
     
     
-# # if succinic_metrics[1] is get_succinic_sugars_conc:
-# make_oversaccharine_region_infeasible()
-# # # if succinic_metrics[2] is get_succinic_inhibitors_conc:
-# make_inhibited_region_infeasible()
-
-# fig, axes = plot(data_1_copy, spec_1, spec_2, spec_3, Metric_1_tickmarks, Metric_2_tickmarks, Metric_3_tickmarks)
-# # spec_2 = 100 * spec_2
-# index_feas_1 = d1_Metric2[:, :, 0]<150.
-# index_feas_2 = d1_Metric3[:, :, 0]<1000.
-# CS1, CS2, CS3, CS4 = 0, 0, 0, 0
-# for i, ax_col in enumerate(axes[:, :len(spec_3)].transpose()):
-#     MSP = data_1_copy[:, :, 0, i]
-#     sugars_orig = data_1[:, :, 1, i]
-#     inhibitors_orig = data_1[:, :, 2, i]
-#     MSP_orig = data_1[:, :, 0, i]
-#     j=0
-#     for ax in ax_col:
+    # %% Save generated data
+    
+    
+    dateTimeObj = datetime.now()
+    minute = '0' + str(dateTimeObj.minute) if len(str(dateTimeObj.minute))==1 else str(dateTimeObj.minute)
+    file_to_save = 'succinic_TRY_%s.%s.%s-%s.%s'%(dateTimeObj.year, dateTimeObj.month, dateTimeObj.day, dateTimeObj.hour, minute)
+    np.save(file_to_save, data_1)
+    
+    pd.DataFrame(data_1[:, :, 0, :][:,:,0]/907.185).to_csv('MPSP-'+file_to_save+'.csv')
+    pd.DataFrame(data_1[:, :, 1, :][:,:,0]).to_csv('product_purity-'+file_to_save+'.csv')
+    pd.DataFrame(data_1[:, :, 2, :][:,:,0]*succinic_tea.operating_hours).to_csv('production_capacity-'+file_to_save+'.csv')
+    
+    
+    # %% Load previously saved data
+    file_to_load = file_to_save
+    # file_to_load = 'C:/Users/saran/Documents/Academia/Spring 2020/BioSTEAM/Bioindustrial-Park/BioSTEAM 2.x.x/biorefineries/TAL/succinic_TRY_2020.9.22-16.44'
+    data_1 = np.load(file_to_load+'.npy')
+    # data_1 = np.load('succinic_TRY_2022.3.18-22.15.npy')
+    data_1_copy = copy.deepcopy(data_1)
+    
+    data_2 = data_1
+    
+    d1_Metric1 = data_1[:, :, 0, :]
+    d1_Metric2 = data_1[:, :, 1, :]
+    d1_Metric3 = data_1[:, :, 2, :]
+    
+    d2_Metric1 = data_2[:, :, 0, :]
+    d2_Metric2 = data_2[:, :, 1, :]
+    d2_Metric3 = data_2[:, :, 2, :]
+    
+    # %% Functions to make regions with total sugars > 150 g/L and total inhibitors > 1000 mg/L
+    # also infeasible
+    
+    
+    def make_oversaccharine_region_infeasible():
+        # mask = d1_Metric2>150.
+        # data_1_copy[mask] = np.nan
+        # # d1_Metric1[mask] = np.nan
+        # # d1_Metric2[mask] = np.nan
+        # # d1_Metric3[mask] = np.nan
+        # # d2_Metric1[mask] = np.nan
+        # # d2_Metric2[mask] = np.nan
+        # # d2_Metric3[mask] = np.nan
+        infeas = np.where(d1_Metric2>150.)
+        data_1_copy[infeas] = np.nan
+    # make_oversaccharine_region_infeasible()
+    
+    
+    def make_inhibited_region_infeasible():
+        infeas = np.where(d1_Metric3>1000.)
+        data_1_copy[infeas] = np.nan
+        # d1_Metric1[infeas] = np.nan
+        # d1_Metric2[infeas] = np.nan
+        # d1_Metric3[infeas] = np.nan
+        # d2_Metric1[infeas] = np.nan
+        # d2_Metric2[infeas] = np.nan
+        # d2_Metric3[infeas] = np.nan
         
-#         plt.sca(ax)
-#         # ax.set_facecolor('black')
-#         # ax.patch.set_facecolor(CABBI_brown)
-#         ax.xaxis.set_minor_locator(AML())
-#         ax.yaxis.set_minor_locator(AML())
-#         ax.tick_params(which='both', top=True, bottom=True, left=True, right=True)
-#         ax.tick_params(which='minor', direction = 'inout', length = 4)
-#         ax.tick_params(which='major', length = 10)
-#         # ax.tick_params(which='both', width=2)
-#         # ax.tick_params(which='major', length=7)
-#         # ax.tick_params(which='minor', length=4, color='r')
-
-#         if j==0: # MPSP plot only
-#             Z_infeas_1 = MSP_orig * 0. + 1.
-#             Z_infeas_2 = MSP_orig * 0. + 1.
-#             Z_infeas_3 = MSP_orig * 0. + 1.
-#             # Z_infeas_1[index_infeas_2] = np.nan
-#             # Z_infeas_1[index_infeas_1] = np.nan
-            
-#             Z_infeas_2[index_feas_2] = np.nan
-#             Z_infeas_3[(index_feas_1 | index_feas_2)] = np.nan
-            
-#             CS2 = plt.contourf(spec_1, spec_2, Z_infeas_1, zorder=0,
-#                               levels=1, colors=[oversaccharine_shadecolor])
-#             CS3 = plt.contourf(spec_1, spec_2, Z_infeas_2, zorder=0,
-#                               levels=1, colors=[inhibited_shadecolor])
-#             CS4 = plt.contourf(spec_1, spec_2, Z_infeas_3, zorder=0,
-#                               levels=1, colors=[overlap_color])
-            
-
-                
-                
-#             # CS2_lines = plt.contour(CS2, zorder=1e9, linewidths=1000.,
-#             #             levels=[0, 2], colors=[oversaccharine_shadecolor])
-#             # CS3_lines = plt.contour(CS3, zorder=1e9, linewidths=1000.,
-#             #             levels=[0, 2], colors=[inhibited_shadecolor])
-#             # make_oversaccharine_region_infeasible()
-#             # make_inhibited_region_infeasible()
-            
-#             CS1 = plt.contourf(spec_1, spec_2, MSP, zorder=1e6,
-#                               levels=SA_price_range, colors=[marketrange_shadecolor])
-#             CS1_lines = plt.contour(CS1, zorder=1e6, linestyles='dashed', linewidths=1.,
-#                         levels=SA_price_range, colors=[linecolor_dark])
-#             plt.clabel(CS1_lines, levels=SA_price_range, inline_spacing = 0., \
-#                        fmt=lambda x: format(x,'.0f'), inline=True, fontsize=12)
-#             CS1_lines = plt.contour(CS1, zorder=1e6, linestyles='dashed', linewidths=1.,
-#                         levels=SA_price_range, colors=[linecolor_dark])
-#             plt.clabel(CS1_lines, levels=SA_price_range, inline_spacing = 0., 
-#                        fmt=lambda x: format(x,'.0f'), inline=True, fontsize=12)
-            
-#             CS1a_lines = plt.contour(CS1, zorder=1e6, linestyles='solid', linewidths=0.9,
-#                         levels=[2500, 3000, 3500], colors=[linecolor_dark])
-#             plt.clabel(CS1a_lines, levels=[2500, 3000, 3500], inline_spacing = 0., \
-#                        fmt=lambda x: format(x,'.0f'), inline=True,
-#                        manual = [(0.97, 205), (0.85,154), (0.75,120)], fontsize=12)
-#             CS1b_lines = plt.contour(CS1, zorder=1e6, linestyles='solid', linewidths=0.9,
-#                         levels=[4000, 4500], colors=[linecolor_dark])
-#             plt.clabel(CS1b_lines, levels=[4000, 4500], inline_spacing = 0., \
-#                        fmt=lambda x: format(x,'.0f'), inline=True, fontsize=12)
-#         elif j==1: # sugars plot only
-#             CS2_lines = plt.contour(spec_1, spec_2, sugars_orig, zorder=1e6, linestyles='solid', linewidths=0.9,
-#             levels=[50, 100], colors=[linecolor_dark])
-#             plt.clabel(CS2_lines, levels=[50,100], inline_spacing = 0., \
-#                        manual = [(0.9, 135), (0.75,135)], 
-#                        fmt=lambda x: format(x,'.1f'), inline=True, fontsize=12)
-#             CS2a_lines = plt.contour(spec_1, spec_2, sugars_orig, zorder=1e6, linestyles='dashed', linewidths=1.,
-#             levels=[150.], colors=[linecolor_dark])
-#             plt.clabel(CS2a_lines, levels=[150.], inline_spacing = 0., \
-#                         manual = [(0.65,135)],
-#                         fmt=lambda x: format(x,'.0f'), inline=True, fontsize=12)
-            
-#         elif j==2: # inhibitors plot only
-#             CS3_lines = plt.contour(spec_1, spec_2, inhibitors_orig, zorder=1e6, linestyles='dashed', linewidths=1.,
-#                         levels=[1000.], colors=[linecolor_light])
-#             plt.clabel(CS3_lines, levels=[1000.], inline_spacing = 0., \
-#                         manual = [(0.45,110)],
-#                         fmt=lambda x: format(x,'.1f'), inline=True, fontsize=12)
-#             CS3a_lines = plt.contour(spec_1, spec_2, inhibitors_orig, zorder=1e6, linestyles='solid', linewidths=.7,
-#                         levels=[600, 800], colors=[linecolor_dark])
-#             plt.clabel(CS3a_lines, levels=[600, 800], inline_spacing = 0., \
-#                         manual = [(0.725,110), (0.575,110)],
-#                         fmt=lambda x: format(x,'.0f'), inline=True, fontsize=12)
-                
-            
-#             # infeas_1 = spec_1.copy()
-#             # infeas_1[d1_Metric3<1000.] = np.nan
-#             # infeas_1 = spec_1[np.where(d1_Metric3>1000.)[0:2]], 100*spec_2[np.where(d1_Metric3>1000.)[0:2]]
-#             # infeas_2 = spec_1[np.where(d1_Metric2>150.)[0:2]], 100*spec_2[np.where(d1_Metric2>150.)[0:2]]
-            
-            
-            
-#             # ax.fill(infeas_1[0], infeas_1[1], [oversaccharine_shadecolor], zorder = 1e9)
-#             # ax.fill(infeas_2[0], infeas_2[1], [inhibited_shadecolor], zorder = 1e9)
-#             # for i in range(len(infeas_1[0])):
-#             #     ax.scatter(infeas_1[0][i], infeas_1[1][i], color=[oversaccharine_shadecolor], plotnonfinite =True)
-            
-            
-#         j+=1
-        
-# add_markers = False
-
-# if add_markers:
+    # make_inhibited_region_infeasible()
+    # %% Plot contours2
+    # data_2 = data_1
+    MPSP_units = r"$\mathrm{\$} \cdot \mathrm{ton}^{-1}$"
     
-#     axes_lab_spec_3 = axes[:, 0]
-#     for i, ax in enumerate(axes_lab_spec_3):
-#         plt.sca(ax)
-#         # plt.clabel(CS, fmt=lambda x: format(x,'.0f'), inline=1, fontsize=12)
-#         plot_scatter_points([lab_spec_1], [lab_spec_2], marker='^', s=80, color=markercolor,
-#                             edgecolor=edgecolor)
+    # VOC_units = "$" + million_dollar + r"\cdot \mathrm{yr}^{-1}$"
+    # FCI_units = f"${million_dollar}$"
+    VOC_units = r"$\mathrm{g} \cdot \mathrm{L}^{-1}$"
+    # VOC_units = r"$\mathrm{kg CO2 eq.} \cdot \mathrm{kg MEK}^{-1}$"
+    # FCI_units = r"$\mathrm{mg} \cdot \mathrm{L}^{-1}$"
+    FCI_units = r"$\mathrm{mg} \cdot \mathrm{L}^{-1}$"
+    # FCI_units = r"$\mathrm{MJ eq.} \cdot \mathrm{kg MEK}^{-1}$"
+    # data_1_copy = copy.deepcopy(data_1)
     
-#     axes_target_spec_3 = axes[:, 0]
-#     for ax in axes_target_spec_3:
-#         plt.sca(ax)
-#         plot_scatter_points([target_spec_1], [target_spec_2], marker='s', s=80, color=markercolor,
-#                             edgecolor=edgecolor)
+    Metric_1_tickmarks = tickmarks(
+        dmin = min(d1_Metric1[~np.isnan(d1_Metric1)].min(), d2_Metric1[~np.isnan(d2_Metric1)].min()),
+        dmax = max(d1_Metric1[~np.isnan(d1_Metric1)].max(), d2_Metric1[~np.isnan(d2_Metric1)].max())
+    )
+    Metric_2_tickmarks = tickmarks(
+        dmin = min(d1_Metric2[~np.isnan(d1_Metric2)].min(), d2_Metric2[~np.isnan(d2_Metric2)].min()),
+        dmax = max(d1_Metric2[~np.isnan(d1_Metric2)].max(), d2_Metric2[~np.isnan(d2_Metric2)].max())
+    )
+    Metric_3_tickmarks = tickmarks(
+        dmin = min(d1_Metric3[~np.isnan(d1_Metric3)].min(), d2_Metric3[~np.isnan(d2_Metric3)].min()),
+        dmax = max(d1_Metric3[~np.isnan(d1_Metric3)].max(), d2_Metric3[~np.isnan(d2_Metric3)].max())
+    )
     
-# plt.show()
-
-# # fig_to_save = file_to_save + '.png'
-
-# # plt.savefig(fig_to_save, format = 'png', dpi=500)
-
-
-# %% Plot contours2
-# data_2 = data_1
-MPSP_units = r"$\mathrm{\$} \cdot \mathrm{ton}^{-1}$"
-
-# VOC_units = "$" + million_dollar + r"\cdot \mathrm{yr}^{-1}$"
-# FCI_units = f"${million_dollar}$"
-VOC_units = r"$\mathrm{g} \cdot \mathrm{L}^{-1}$"
-# VOC_units = r"$\mathrm{kg CO2 eq.} \cdot \mathrm{kg MEK}^{-1}$"
-# FCI_units = r"$\mathrm{mg} \cdot \mathrm{L}^{-1}$"
-FCI_units = r"$\mathrm{mg} \cdot \mathrm{L}^{-1}$"
-# FCI_units = r"$\mathrm{MJ eq.} \cdot \mathrm{kg MEK}^{-1}$"
-# data_1_copy = copy.deepcopy(data_1)
-
-Metric_1_tickmarks = tickmarks(
-    dmin = min(d1_Metric1[~np.isnan(d1_Metric1)].min(), d2_Metric1[~np.isnan(d2_Metric1)].min()),
-    dmax = max(d1_Metric1[~np.isnan(d1_Metric1)].max(), d2_Metric1[~np.isnan(d2_Metric1)].max())
-)
-Metric_2_tickmarks = tickmarks(
-    dmin = min(d1_Metric2[~np.isnan(d1_Metric2)].min(), d2_Metric2[~np.isnan(d2_Metric2)].min()),
-    dmax = max(d1_Metric2[~np.isnan(d1_Metric2)].max(), d2_Metric2[~np.isnan(d2_Metric2)].max())
-)
-Metric_3_tickmarks = tickmarks(
-    dmin = min(d1_Metric3[~np.isnan(d1_Metric3)].min(), d2_Metric3[~np.isnan(d2_Metric3)].min()),
-    dmax = max(d1_Metric3[~np.isnan(d1_Metric3)].max(), d2_Metric3[~np.isnan(d2_Metric3)].max())
-)
-
-# Metric_3_tickmarks = [0.0*1000, 0.24*1000, 0.48*1000, 0.72*1000, 0.96*1000, 1.2*1000]
-
-# Metric_1_tickmarks = [3000, 4500, 6000, 7500, 9000, 10500, 12000, 13500]
-# Metric_1_tickmarks = [2000, 2500, 3000, 3500, 4000, 4500]
-# Metric_2_tickmarks = [4, 5, 6, 7, 8, 9, 10]
-Metric_2_tickmarks = [0, 50, 100, 150, 200, 250, 300]
-# Metric_3_tickmarks = [60, 70, 80, 90, 100, 110, 120]
-Metric_3_tickmarks = [0, 300, 600, 900, 1200, 1500]
-
-
-def plot(data, titers, yields, productivities, 
-         Metric_1_tickmarks, Metric_2_tickmarks, Metric_3_tickmarks):
-    metric_bars = (MetricBar('MPSP\n', MPSP_units, CABBI_green_colormap(),
-                             Metric_1_tickmarks,
-                             1 + int((max(Metric_1_tickmarks) - min(Metric_1_tickmarks))/250)),
-                   MetricBar(' \n', ' ',
-                            CABBI_blue_colormap(), # plt.cm.get_cmap('magma_r'),
-                             Metric_2_tickmarks, 
-                             1 + int((max(Metric_2_tickmarks) - min(Metric_2_tickmarks))/6.25)),
-                   MetricBar(' \n', ' ',
-                             plt.cm.get_cmap('bone_r'), # plt.cm.get_cmap('bone_r'),
-                             Metric_3_tickmarks,
-                             1 + int((max(Metric_3_tickmarks) - min(Metric_3_tickmarks))/62.5)))
+    # Metric_3_tickmarks = [0.0*1000, 0.24*1000, 0.48*1000, 0.72*1000, 0.96*1000, 1.2*1000]
     
-    return plot_contour_2d(titers, yields, productivities, data, 
-                                xlabel, ylabel, xticks, yticks, metric_bars, 
-                                Z_value_format=lambda Z: f"{Z:.1f} [{spec_3_units}]",)
-                                # fillblack=False)
-
-
-
-
-
-
-metric_bars = (MetricBar('MPSP', MPSP_units, CABBI_green_colormap(),
-                         Metric_1_tickmarks, 800),
-               MetricBar('Total sugars', VOC_units, CABBI_blue_colormap(), # plt.cm.get_cmap('magma_r'),
-                         Metric_2_tickmarks, 80),
-               MetricBar("Relative impact on MPSP\n[impact of titer : impact of yield]", FCI_units,
-                         plt.cm.get_cmap('BrBG'), # plt.cm.get_cmap('bone_r'),
-                         Metric_3_tickmarks, 100))
+    # Metric_1_tickmarks = [3000, 4500, 6000, 7500, 9000, 10500, 12000, 13500]
+    # Metric_1_tickmarks = [2000, 2500, 3000, 3500, 4000, 4500]
+    # Metric_2_tickmarks = [4, 5, 6, 7, 8, 9, 10]
+    Metric_2_tickmarks = [0, 50, 100, 150, 200, 250, 300]
+    # Metric_3_tickmarks = [60, 70, 80, 90, 100, 110, 120]
+    Metric_3_tickmarks = [0, 300, 600, 900, 1200, 1500]
     
-    
-# if succinic_metrics[1] is get_succinic_sugars_conc:
-# make_oversaccharine_region_infeasible()
-# # if succinic_metrics[2] is get_succinic_inhibitors_conc:
-# make_inhibited_region_infeasible()
+    results_metric_1.append(data_1[:, :, 0, :][:,:,0]/907.185)
 
-fig, axes = plot(data_1_copy, spec_1, spec_2, spec_3, Metric_1_tickmarks, Metric_2_tickmarks, Metric_3_tickmarks)
-# spec_2 = 100 * spec_2
-index_feas_1 = d1_Metric2[:, :, 0]<150.
-index_feas_2 = d1_Metric3[:, :, 0]<1000.
-CS1, CS2, CS3, CS4 = 0, 0, 0, 0
-for i, ax_col in enumerate(axes[:, :len(spec_3)].transpose()):
-    MSP = data_1_copy[:, :, 0, i]
-    sugars_orig = data_1[:, :, 1, i]
-    inhibitors_orig = data_1[:, :, 2, i]
-    MSP_orig = data_1[:, :, 0, i]
-    j=0
-    for ax in ax_col:
-        
-        plt.sca(ax)
-        # ax.set_facecolor('black')
-        # ax.patch.set_facecolor(CABBI_brown)
-        ax.xaxis.set_minor_locator(AML())
-        ax.yaxis.set_minor_locator(AML())
-        ax.tick_params(which='both', top=True, bottom=True, left=True, right=True)
-        ax.tick_params(which='minor', direction = 'inout', length = 4)
-        ax.tick_params(which='major', length = 10)
-        # ax.tick_params(which='minor', left=True, bottom = True, direction = 'inout')
-        if j==0: # MPSP plot only
-            Z_infeas_1 = MSP_orig * 0. + 1.
-            Z_infeas_2 = MSP_orig * 0. + 1.
-            Z_infeas_3 = MSP_orig * 0. + 1.
-            # Z_infeas_1[index_infeas_2] = np.nan
-            # Z_infeas_1[index_infeas_1] = np.nan
-            
-            Z_infeas_2[index_feas_2] = np.nan
-            Z_infeas_3[(index_feas_1 | index_feas_2)] = np.nan
-            
-            # CS2 = plt.contourf(spec_1, spec_2, Z_infeas_1, zorder=0,
-            #                   levels=1, colors=[oversaccharine_shadecolor])
-            # CS3 = plt.contourf(spec_1, spec_2, Z_infeas_2, zorder=0,
-            #                   levels=1, colors=[inhibited_shadecolor])
-            # CS4 = plt.contourf(spec_1, spec_2, Z_infeas_3, zorder=0,
-            #                   levels=1, colors=[overlap_color])
-            
+#%% Plot MPSP vs titer, yield, and productivity
 
-                
-                
-            # CS2_lines = plt.contour(CS2, zorder=1e9, linewidths=1000.,
-            #             levels=[0, 2], colors=[oversaccharine_shadecolor])
-            # CS3_lines = plt.contour(CS3, zorder=1e9, linewidths=1000.,
-            #             levels=[0, 2], colors=[inhibited_shadecolor])
-            # make_oversaccharine_region_infeasible()
-            # make_inhibited_region_infeasible()
-            
-            CS1 = plt.contourf(spec_1, spec_2, MSP, zorder=1e6,
-                              levels=SA_price_range, colors=[marketrange_shadecolor])
-            CS1_lines = plt.contour(CS1, zorder=1e6, linestyles='dashed', linewidths=1.,
-                        levels=SA_price_range, colors=[linecolor_dark])
-            plt.clabel(CS1_lines, levels=SA_price_range, inline_spacing = 0., \
-                       fmt=lambda x: format(x,'.0f'), inline=True, fontsize=12,
-                       manual = [(0.925, 30), (0.925, 40)])
-            # CS1_lines = plt.contour(CS1, zorder=1e6, linestyles='dashed', linewidths=1.,
-            #             levels=SA_price_range, colors=[linecolor_dark])
-            # plt.clabel(CS1_lines, levels=SA_price_range, inline_spacing = 0., 
-            #            fmt=lambda x: format(x,'.0f'), inline=True, fontsize=12)
-            
-            # CS1a_lines = plt.contour(CS1, zorder=1e6, linestyles='solid', linewidths=0.9,
-            #             levels=[2500, 3000, 3500], colors=[linecolor_dark],)
-            # plt.clabel(CS1a_lines, levels=[2500, 3000, 3500], inline_spacing = 0., \
-            #            fmt=lambda x: format(x,'.0f'), inline=True, fontsize=12,
-            #            manual = [(0.925, 90), (0.925, 80), (0.925, 70)])
-            CS1b_lines = plt.contour(CS1, zorder=1e6, linestyles='solid', linewidths=0.9,
-                        levels=[3500, 4000, 4500, 5000], colors=[linecolor_dark])
-            plt.clabel(CS1b_lines, levels=[3500, 4000, 4500, 5000], inline_spacing = 0., \
-                       fmt=lambda x: format(x,'.0f'), inline=True, fontsize=12,
-                       manual = [(0.925, 80), (0.925, 70), (0.925, 60), (0.925, 50)])
-        elif j==1: # sugars plot only
-            CS2_lines = plt.contour(spec_1, spec_2, sugars_orig, zorder=1e6, linestyles='solid', linewidths=0.9,
-            levels=[25, 50], colors=[linecolor_dark])
-            plt.clabel(CS2_lines, levels=[25, 50], inline_spacing = 0.,
-                       fmt=lambda x: format(x,'.1f'), inline=True, fontsize=12)
-            CS2a_lines = plt.contour(spec_1, spec_2, sugars_orig, zorder=1e6, linestyles='dashed', linewidths=1.,
-            levels=[150.], colors=[linecolor_light])
-            plt.clabel(CS2a_lines, levels=[150.], inline_spacing = 0., \
-                        fmt=lambda x: format(x,'.0f'), inline=True, fontsize=12)
-            
-        elif j==2: # inhibitors plot only
-            CS3_lines = plt.contour(spec_1, spec_2, inhibitors_orig, zorder=1e6, linestyles='dashed', linewidths=1.,
-                        levels=[1000.], colors=[linecolor_light])
-            plt.clabel(CS3_lines, levels=[1000.], inline_spacing = 0., \
-                        fmt=lambda x: format(x,'.1f'), inline=True, fontsize=12)
-            CS3a_lines = plt.contour(spec_1, spec_2, inhibitors_orig, zorder=1e6, linestyles='solid', linewidths=.7,
-                        levels=[250, 500, 750], colors=[linecolor_dark])
-            plt.clabel(CS3a_lines, levels=[250, 500, 750], inline_spacing = 0.,
-                        fmt=lambda x: format(x,'.0f'), inline=True, fontsize=12)
-            # infeas_1 = spec_1.copy()
-            # infeas_1[d1_Metric3<1000.] = np.nan
-            # infeas_1 = spec_1[np.where(d1_Metric3>1000.)[0:2]], 100*spec_2[np.where(d1_Metric3>1000.)[0:2]]
-            # infeas_2 = spec_1[np.where(d1_Metric2>150.)[0:2]], 100*spec_2[np.where(d1_Metric2>150.)[0:2]]
-            
-            
-            
-            # ax.fill(infeas_1[0], infeas_1[1], [oversaccharine_shadecolor], zorder = 1e9)
-            # ax.fill(infeas_2[0], infeas_2[1], [inhibited_shadecolor], zorder = 1e9)
-            # for i in range(len(infeas_1[0])):
-            #     ax.scatter(infeas_1[0][i], infeas_1[1][i], color=[oversaccharine_shadecolor], plotnonfinite =True)
-            
-            
-        j+=1
-        
-add_markers = False
+import contourplots
 
-if add_markers:
-    
-    axes_lab_spec_3 = axes[:, 0]
-    for i, ax in enumerate(axes_lab_spec_3):
-        plt.sca(ax)
-        # plt.clabel(CS, fmt=lambda x: format(x,'.0f'), inline=1, fontsize=12)
-        plot_scatter_points([lab_spec_1], [lab_spec_2], marker='^', s=80, color=markercolor,
-                            edgecolor=edgecolor)
-    
-    axes_target_spec_3 = axes[:, 0]
-    for ax in axes_target_spec_3:
-        plt.sca(ax)
-        plot_scatter_points([target_spec_1], [target_spec_2], marker='s', s=80, color=markercolor,
-                            edgecolor=edgecolor)
-    
-plt.show()
-
-# fig_to_save = file_to_save + '.png'
-
-# plt.savefig(fig_to_save, format = 'png', dpi=500)
+contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_1, # shape = z * x * y
+                                x_data=100*yields,
+                                y_data=titers,
+                                z_data=productivities,
+                                x_label=r"$\bfYield$", # title of the x axis
+                                y_label=r"$\bfTiter$", # title of the y axis
+                                z_label=r"$\bfProductivity$", # title of the z axis
+                                w_label=r"$\bfMPSP$", # title of the color axis
+                                x_ticks=[40, 50, 60, 70, 80, 90],
+                                y_ticks=[40, 60, 80, 100, 120],
+                                z_ticks=[0, 0.2, 0.4, 0.6, 0.8, 1.0, 1.2, 1.4, 1.6, 1.8, 2.0],
+                                w_levels=Metric_1_tickmarks, # unlabeled, filled contour areas (labeled and ticked only on color bar)
+                                w_ticks=np.array([0.5, 0.6, 0.8, 1.1]), # labeled, lined contours; a subset of w_levels
+                                x_units=r"$\mathrm{\% theoretical}$",
+                                y_units=r"$\mathrm{g} \cdot \mathrm{L}^{-1}$",
+                                z_units=r"$\mathrm{g} \cdot \mathrm{L}^{-1}  \cdot \mathrm{h}^{-1}$",
+                                w_units=r"$\mathrm{\$} \cdot \mathrm{kg}^{-1}$",
+                                fmt_clabel=lambda cvalue: "{:.2f}".format(cvalue), # format of contour labels
+                                cmap='viridis',
+                                z_marker_color='b',
+                                axis_title_fonts={'size': {'x': 12, 'y':12, 'z':12, 'w':12},},
+                                fps=12, # animation frames (z values traversed) per second
+                                n_loops='inf', # the number of times the animated contourplot 
+                                animated_contourplot_filename='animated_contourplot'
+                                 )
