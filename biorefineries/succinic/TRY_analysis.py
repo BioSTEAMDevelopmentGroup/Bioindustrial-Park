@@ -421,10 +421,10 @@ for p in productivities:
 
 import contourplots
 
-contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_1, # shape = z * x * y
-                                x_data=100*yields,
-                                y_data=titers,
-                                z_data=productivities,
+contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_1, # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., MPSP
+                                x_data=100*yields, # x axis values
+                                y_data=titers, # y axis values
+                                z_data=productivities, # z axis values
                                 x_label=r"$\bfYield$", # title of the x axis
                                 y_label=r"$\bfTiter$", # title of the y axis
                                 z_label=r"$\bfProductivity$", # title of the z axis
@@ -432,17 +432,17 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_1, 
                                 x_ticks=[40, 50, 60, 70, 80, 90],
                                 y_ticks=[40, 60, 80, 100, 120],
                                 z_ticks=[0, 0.2, 0.4, 0.6, 0.8, 1.0, 1.2, 1.4, 1.6, 1.8, 2.0],
-                                w_levels=Metric_1_tickmarks, # unlabeled, filled contour areas (labeled and ticked only on color bar)
+                                w_levels=np.arange(0.4, 1.8, 0.1), # levels for unlabeled, filled contour areas (labeled and ticked only on color bar)
                                 w_ticks=np.array([0.5, 0.6, 0.8, 1.1]), # labeled, lined contours; a subset of w_levels
                                 x_units=r"$\mathrm{\% theoretical}$",
                                 y_units=r"$\mathrm{g} \cdot \mathrm{L}^{-1}$",
                                 z_units=r"$\mathrm{g} \cdot \mathrm{L}^{-1}  \cdot \mathrm{h}^{-1}$",
                                 w_units=r"$\mathrm{\$} \cdot \mathrm{kg}^{-1}$",
                                 fmt_clabel=lambda cvalue: "{:.2f}".format(cvalue), # format of contour labels
-                                cmap='viridis',
-                                z_marker_color='b',
+                                cmap=CABBI_green_colormap(), # can use 'viridis' or other default matplotlib colormaps
+                                z_marker_color='g', # default matplotlib color names
                                 axis_title_fonts={'size': {'x': 12, 'y':12, 'z':12, 'w':12},},
                                 fps=12, # animation frames (z values traversed) per second
-                                n_loops='inf', # the number of times the animated contourplot 
-                                animated_contourplot_filename='animated_contourplot'
+                                n_loops='inf', # the number of times the animated contourplot should loop animation over z; infinite by default
+                                animated_contourplot_filename='MPSP_animated_contourplot' # file name to save animated contourplot as (no extensions)
                                  )
