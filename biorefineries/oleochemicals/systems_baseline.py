@@ -59,10 +59,14 @@ from biosteam import ProcessWaterCenter
               T = 25+273.15)
           ],
     outs=[
-          dict(ID='polar_lipids'),
-            dict(ID='biodiesel'),
-            dict(ID = 'crude_glycerol'),
-            dict(ID = 'wastewater_biodiesel_production'),
+#TODO: ask Yoel if polar lipids can be stored and sold        
+          dict(ID='polar_lipids_to_boilerturbogenerator'),
+#Biodiesel produced in this unit is oxidatively cleaved           
+          dict(ID='biodiesel'),
+#Co-product of the process          
+          dict(ID = 'crude_glycerol'),
+#Wastwater burned in the boilerturbogenerator  
+          dict(ID = 'wastewater1_to_boilerturbogenerator'),
             ],
     fixed_outs_size = True,     
               )
@@ -70,7 +74,7 @@ from biosteam import ProcessWaterCenter
 
 def crude_HOSO_oil_to_biodiesel(ins,outs):
     crude_vegetable_oil, water_for_degumming,acid_for_degumming,water_for_degumming_2 = ins
-    polar_lipids,biodiesel,crude_glycerol,wastewater_biodiesel_production, = outs
+    polar_lipids_to_boilerturbogenerator,biodiesel,crude_glycerol,wastewater1_to_boilerturbogenerator, = outs
 
 # Storage tanks and pumping the oil out
     T101 = bst.units.StorageTank('T101',
@@ -114,7 +118,7 @@ def crude_HOSO_oil_to_biodiesel(ins,outs):
     C001 = bst.LiquidsSplitCentrifuge(ID = 'Centrifuge_for_PL_removal',
                                         ins = M002-0,
                                       outs = ('degummed_oil', 
-                                              polar_lipids),
+                                              polar_lipids_to_boilerturbogenerator),
                                       split = dict(PL = 0.3,
                                                     TAG = 1,
                                                     Water = 0,
@@ -136,7 +140,7 @@ def crude_HOSO_oil_to_biodiesel(ins,outs):
     sys = lc.create_transesterification_and_biodiesel_separation_system(ins = C001-0,
                                                                         outs = (biodiesel,
                                                                                 crude_glycerol,
-                                                                                wastewater_biodiesel_production),
+                                                                                wastewater1_to_boilerturbogenerator),
                                                                         transesterification_reactions = reactions
                                                                         )
 ob0 = crude_HOSO_oil_to_biodiesel()
@@ -155,7 +159,7 @@ ob0.show()
            dict(ID = 'recycled_tungstic_acid'),
            dict(ID='water_for_dihydroxylation'),
            dict(ID='biodiesel')],     
-      
+     
     outs = [dict(ID = 'condensate'),
             dict(ID = 'diol_product'),
             ],
@@ -176,7 +180,7 @@ def dihydroxylation_system(ins,outs):
                       ins = T102-0,
                       outs = 'HP_to_mixer')
 
-# Catalyst_feed_tank
+#Tungstic acid Catalyst feed tank
     T104 = bst.units.StorageTank('T104',
                                             ins = (fresh_tunsgten_catalyst),
                                             outs = 'fresh_catalyst_to_pump',
@@ -191,7 +195,7 @@ def dihydroxylation_system(ins,outs):
     M101 = bst.units.Mixer('combining_recycled_and_new_tungstic_acid',
                            ins = (T104-0,
                                   recycled_tungstic_acid))
-#Mixer for hydrogen_peroxide solution
+#Mixer for 60% hydrogen_peroxide solution
     M102 = bst.units.Mixer('M102',
                         ins = (P102-0,                               
                                water_for_dihydroxylation),
@@ -204,7 +208,7 @@ def dihydroxylation_system(ins,outs):
         water_for_dihydroxylation.F_mass = 0.4 *0.2299999 * biodiesel.F_mass
     M102.add_specification(adjust_HP_feed_flow, run=True) 
     
-#TODO: is it a better practise to add mixers or directly three feeds      
+    
     M103 = bst.units.Mixer('M102',
                         ins = (biodiesel,
                                 M102-0,
@@ -265,14 +269,14 @@ ob1.show()
                 Oxygen = 21,
                 Nitrogen = 79,
                 units = 'kg/hr')],                                   
-    outs = [dict(ID = 'vented_gas'),
+    outs = [dict(ID = 'ventedgas_to_boilerturbogenerator'),
             dict(ID = 'mixed_oxidation_products')],
     fixed_outs_size = True,     
               )
 #TODO: What to do with vented gas
 def oxidative_cleavage_system(ins,outs):
     vicinal_diol_product,cobalt_catalyst_stream,air, = ins
-    vented_gas,mixed_oxidation_products, = outs 
+    ventedgas_to_boilerturbogenerator,mixed_oxidation_products, = outs 
     
 #Pressure vessels are used to store gases above 3psig which converts to 0.02 MPa
     T201 = bst.StorageTank(ins = air,
@@ -307,10 +311,9 @@ def oxidative_cleavage_system(ins,outs):
                               outs = 'feed_to_oxidative_cleavage_reactor',
                               T = 60 + 273.15
                               )
-#TODO: What to do with vented gas
     R202 = units_baseline.OxidativeCleavageReactor('R202',
                                 ins = R201_H-0, 
-                                outs = (vented_gas,
+                                outs = (ventedgas_to_boilerturbogenerator,
                                         'mixed_oxidation_products'),
                                 tau = 3.5,
                                 P = 20*10e5,
@@ -328,8 +331,12 @@ ob2 = oxidative_cleavage_system(ins = ob1.outs[1])
 ob2.simulate()
 ob2.show()
 
-# organic_phase_separation to separate aqueous portion 
-# aqueous portion contains catalysts and leftover hydrogen peroxide (300 level)
+# organic_phase_separation to separate aqueous portion (300 level)
+# aqueous portion contains catalysts and leftover hydrogen peroxide 
+# All the ions are water soluble
+# organic phase contains the mixed oxidation products
+# Splits were based on the fact that none of the organics are soluble at that temperature
+
 @SystemFactory(
     ID = 'organic_phase_separation',
     ins = [dict(ID='mixed_oxidation_products')],                  
@@ -388,18 +395,18 @@ ob3.show()
 @SystemFactory(
     ID = 'degassing_the_oily_phase',
     ins = [dict(ID='fatty_acids_with_some_moisture')],       
-    outs = [dict(ID = 'wastewater_degassing_unit'),
+    outs = [dict(ID = 'wastewater2_to_boilerturbogenerator'),
             dict(ID = 'dried_crude_fatty_acids')
             ],
     fixed_outs_size = True,     
               )
 def degassing_the_oily_phase(ins,outs):
     fatty_acids_with_some_moisture, = ins
-    wastewater_degassing_unit,dried_crude_fatty_acids, = outs 
+    wastewater2_to_boilerturbogenerator,dried_crude_fatty_acids, = outs 
     
     F401 = bst.units.Flash(ID = 'F401',
                             ins = fatty_acids_with_some_moisture,
-                            outs = (wastewater_degassing_unit,
+                            outs = (wastewater2_to_boilerturbogenerator,
                                     dried_crude_fatty_acids),
                             
                             T = 40 + 273.15,
@@ -409,12 +416,11 @@ ob4 =  degassing_the_oily_phase(ins = ob3.outs[0])
 ob4.simulate()
 ob4.show()               
     
-#Nonanoic acid separation (500 level)
+# Nonanoic acid separation (500 level)
 # The issue with the below is that, the Monomethyl azelate that is produced
 # has a lower BP than most of the MCA's
 # However, papers and patents disregard this!
-# Heatsensitivity of fatty acids is given by: Oleochemicals: all time players of green chemistry
-# By Antonio Zarli
+# Heatsensitivity of fatty acids is mentioned in: Oleochemicals: all time players of green chemistry By Antonio Zarli
 
 @SystemFactory(
     ID = 'nonanoic_acid_separation',
@@ -429,6 +435,7 @@ def nonanoic_acid_fraction_separation(ins,outs):
     dried_crude_fatty_acids, = ins
     Pelargonic_acid_rich_fraction,heavy_fatty_acids, = outs
     
+#TODO: have I specified it correctly?    
     Water = tmo.Chemical('Water')
     D501_steam = bst.HeatUtility.get_heating_agent('high_pressure_steam')
     D501_steam.T = 620
@@ -477,7 +484,6 @@ ob5.show()
 
 
 # Hydrolysis of FAME's to produce fatty acids (600 level)
-# Add assumptions
 @SystemFactory(
     ID = 'azelaic_acid_production',
     ins = [dict(ID='crude_heavy_fatty_acids'),
@@ -508,6 +514,9 @@ def hydrolysis_of_organic_fraction(ins,outs):
     def adjust_water_for_emuslification():
         water_for_emulsification.imass['Water'] = crude_heavy_fatty_acids.F_mass*3
     M601.add_specification(adjust_water_for_emuslification, run=True)  
+    
+#Process parameters for emulsification of fatty esters to acids
+#Change reaction conversions    
     X1 = 0.9
     Product_formation = PRxn([Rxn('Monomethyl_azelate + Water  -> Methanol + Azelaic_acid','Monomethyl_azelate', X = X1),
                           Rxn('Methyl_palmitate + Water  -> Methanol + Palmitic_acid','Methyl_palmitate', X = X1),
@@ -689,9 +698,17 @@ ob7.show()
 # Connecting recycle streams for tungstic_acid
 ob1.ins[2] = ob7.outs[1]
 
-##All the Facilities
-#Facility to take care of fresh water and waste water used (800 level)
-#List of fresh water and waste
+#All the Facilities
+# Facility to take care of fresh water and waste water used (800 level)
+# List of fresh water and waste
+
+#Streams to boiler turbogenerator
+#Liquid/Solid waste streams mixer
+M801 = bst.Mixer(ins = (polar_lipids_to_boilerturbogenerator,
+                        wastewater1_to_boilerturbogenerator,
+                        ventedgas_to_boilerturbogenerator))
+# bst.BoilerTurbogenerator()
+
 # F.stream.water_for_dihydroxylation
 # F.stream.wastewater_catalyst_recovery
 # F.stream.wastewater_degassing_unit
@@ -704,7 +721,7 @@ ob1.ins[2] = ob7.outs[1]
 # F.stream.water_for_degumming2    
 
 # bst.ProcessWaterCenter(ID = 'ProcessWaterCenter_801',
-#                        ins = () 
+#                         ins = () 
    
 
 
