@@ -30,6 +30,7 @@ chems = tmo.Chemicals([
     tmo.Chemical('Hydrogen_peroxide', phase='l'),
     tmo.Chemical('Water'),
     # #Chemical for acid degumming 
+
     tmo.Chemical('Citric_acid'),
     #look into phase of the below
     tmo.Chemical('MDHSA', search_ID = '1115-01-1', phase = 'l'),
@@ -220,7 +221,9 @@ chems = tmo.Chemicals([
                  search_ID = '2190-22-9',
                  phase = 'l',
                  search_db = False),
-
+#Natural gas for heating purposes 
+    tmo.Chemical('Natural_gas',
+                 search_ID = 'CH4')    
                  ])
 
 ##Modelling the properties of resin used for hydrolysis based on polystyrene
@@ -325,6 +328,7 @@ chems.define_group('Biodiesel', ('Methyl_oleate',
                                  'Methyl_linoleate',
                                  'Methyl_palmitoleate'))
 
+chems.define_group('Air', ['Oxygen', 'Nitrogen'],composition=[0.21,0.79])
 chems.set_synonym('Water', 'H2O')
 chems.set_synonym('Carbon_dioxide','CO2')
 chems.set_synonym('Phosphatidylinositol','PL')
@@ -332,5 +336,6 @@ chems.set_synonym('MonoOlein', 'MAG')
 chems.set_synonym('Dipalmitin', 'DAG')
 chems.set_synonym('Cobalt(2+)','Cobalt_ion')
 chems.set_synonym('Hydrogen_ion', 'H+')
+chems.set_synonym('Pelargonic_acid','Nonanoic_acid')
 bst.settings.set_thermo(chems)
 # chems.show()
