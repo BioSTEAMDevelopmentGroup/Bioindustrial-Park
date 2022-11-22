@@ -79,7 +79,7 @@ from .systems import (
     create_oilcane_to_biodiesel_combined_1_and_2g_post_fermentation_oil_separation
 )
 from ._parse_configuration import (
-    parse,
+    parse_configuration,
     format_configuration,
 )
 from ._tea import (
@@ -163,12 +163,11 @@ def enable_derivative(enable=True):
 _derivative_disabled = False
 cache = {}
 
-def load(name, cache=cache, reduce_chemicals=False, 
-         enhanced_cellulosic_performance=False, RIN=True,
+def load(name, cache=cache, reduce_chemicals=False, RIN=True,
          avoid_natural_gas=True):
     dct = globals()
-    number, agile = dct['configuration'] = configuration = parse(name)
-    key = (number, agile, enhanced_cellulosic_performance, RIN)
+    number, agile = dct['configuration'] = configuration = parse_configuration(name)
+    key = (number, agile, RIN)
     if cache is not None and key in cache:
         dct.update(cache[key])
         return
@@ -177,8 +176,6 @@ def load(name, cache=cache, reduce_chemicals=False,
     global HXN, BT
     if not _chemicals_loaded: load_chemicals()
     flowsheet_name = format_configuration(configuration, latex=False)
-    if enhanced_cellulosic_performance:
-        flowsheet_name += '_enhanced_fermentation'
     flowsheet = bst.Flowsheet(flowsheet_name)
     main_flowsheet.set_flowsheet(flowsheet)
     bst.settings.set_thermo(chemicals)
@@ -1233,22 +1230,12 @@ def load(name, cache=cache, reduce_chemicals=False,
         p.baseline = x
     
     if number in cellulosic_ethanol_configurations:
-        if enhanced_cellulosic_performance:
-            set_baseline(set_sorghum_glucose_yield, 97.5)
-            set_baseline(set_sorghum_xylose_yield, 97.5)
-            set_baseline(set_cane_glucose_yield, 97.5)
-            set_baseline(set_cane_xylose_yield, 97.5)
-            set_baseline(set_glucose_to_ethanol_yield, 95)
-            set_baseline(set_xylose_to_ethanol_yield, 95)
-            set_baseline(set_cofermentation_titer, 120.)
-            set_baseline(set_cofermentation_productivity, 2.0)
-        else:
-            set_baseline(set_sorghum_glucose_yield, 79)
-            set_baseline(set_sorghum_xylose_yield, 86)
-            set_baseline(set_cane_glucose_yield, 91.0)
-            set_baseline(set_cane_xylose_yield, 97.5)
-            set_baseline(set_glucose_to_ethanol_yield, 90)
-            set_baseline(set_xylose_to_ethanol_yield, 42)
+        set_baseline(set_sorghum_glucose_yield, 79)
+        set_baseline(set_sorghum_xylose_yield, 86)
+        set_baseline(set_cane_glucose_yield, 91.0)
+        set_baseline(set_cane_xylose_yield, 97.5)
+        set_baseline(set_glucose_to_ethanol_yield, 90)
+        set_baseline(set_xylose_to_ethanol_yield, 42)
     set_baseline(set_cane_oil_content, 10)
     set_baseline(set_saccharification_oil_recovery, 70)
     set_baseline(set_crushing_mill_oil_recovery, 60)
