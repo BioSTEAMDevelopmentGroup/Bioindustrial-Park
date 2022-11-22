@@ -12,7 +12,7 @@ __all__ = (
     'Configuration',
     'ConfigurationComparison',
     'name_to_configuration',
-    'parse',
+    'parse_configuration',
     'format_name',
     'format_configuration',
     'format_comparison',
@@ -41,7 +41,7 @@ def name_to_configuration(name):
     name = name.replace(' ', '')
     return Configuration((-1 if name.startswith('S') else 1) * int(name[1]), '*' in name)
 
-def parse(x):
+def parse_configuration(x):
     if isinstance(x, int):
         return Configuration(x)
     elif isinstance(x, str):
@@ -71,7 +71,7 @@ def parse(x):
             raise ValueError(f'could not parse {x}')
     
 def format_name(name):
-    key = parse(name)
+    key = parse_configuration(name)
     if isinstance(key, Configuration):
         return format_configuration(key)
     elif isinstance(key, ConfigurationComparison):
