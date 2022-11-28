@@ -1922,7 +1922,7 @@ class SuccinicAcidCrystallizer(BatchCrystallizer):
         self.tau = tau
         
     def get_T_from_target_recovery(self, target_recovery):
-        self.target_recovery=target_recovery
+        # self.target_recovery=target_recovery
         
         in_stream = self.ins[0]
         x_start = in_stream.imol['SuccinicAcid']/sum(in_stream.imol['Water', 'SuccinicAcid'])
@@ -1944,9 +1944,10 @@ class SuccinicAcidCrystallizer(BatchCrystallizer):
     
     def get_effective_recovery_from_T(self, T):
         in_stream = self.ins[0]
+        out_stream = self.outs[0]
         SA_mass_dissolved_end = 29.098*exp(0.0396*(T-273.15)) * in_stream.F_vol
         SA_mass_total = self.ins[0].imass['SuccinicAcid']
-        recovery = 1.-SA_mass_dissolved_end/SA_mass_total
+        recovery = 1. - min(1., SA_mass_dissolved_end/SA_mass_total)
         return recovery
     
     def _run(self):
@@ -1957,11 +1958,11 @@ class SuccinicAcidCrystallizer(BatchCrystallizer):
         out_stream.copy_like(in_stream)
         # out_stream.sle(T=self.T, solute='SuccinicAcid')
         out_stream.phases=('l', 's')
-        self.effective_recovery = effective_recovery = target_recovery
+        self.effective_recovery = target_recovery
         
         Tmin, Tmax = self.T_range
-        rec_at_Tmin, rec_at_Tmax = self.get_effective_recovery_from_T(Tmin-273.15),\
-            self.get_effective_recovery_from_T(Tmax-273.15)
+        rec_at_Tmin, rec_at_Tmax = self.get_effective_recovery_from_T(Tmin),\
+            self.get_effective_recovery_from_T(Tmax)
         
         if rec_at_Tmin < target_recovery:
             self.T = Tmin
@@ -1973,7 +1974,13 @@ class SuccinicAcidCrystallizer(BatchCrystallizer):
             self.T = T = self.get_T_from_target_recovery(target_recovery)
             if T>in_stream.T:
                 self.T = T = in_stream.T
-                self.effective_recovery = effective_recovery = self.get_effective_recovery_from_T(T-273.15)
+                self.effective_recovery = self.get_effective_recovery_from_T(T-273.15)
         
         # self.tau = self.get_t_from_target_recovery(effective_recovery)
-        self.set_effluent_composition_from_recovery(effective_recovery)
+        # print(self.ID, effective_recovery, self.effective_recovery)
+        self.set_effluent_composition_from_recovery(self.effective_recovery)
+        
+        if self.effective_recovery>0.:
+            out_stream.T =self.T
+        else:
+            self.T = out_stream.T = in_stream.T

@@ -21,9 +21,9 @@ last_infeasible_simulation = [] # yield, titer
 def get_IDs(units_list):
     return [i.ID for i in units_list]
 
-bugfix = True
+bugfix = False
 
-error = False
+error = True
 
 # from biosteam.process_tools.reactor_specification import evaluate_across_TRY
 _kg_per_ton = 907.18474
@@ -310,7 +310,7 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
         data = np.zeros([M, P])
         for i in range(P):
             self.load_spec_3(spec_3[i])
-            self.reactor._summary()
+            # self.reactor._summary()
             data[:, i] = [j() for j in metrics]
         print(data)
         return data

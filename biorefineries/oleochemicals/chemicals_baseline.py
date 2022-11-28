@@ -23,13 +23,14 @@ Cobalt_chloride = tmo.Chemical('Cobalt_chloride',
                                 phase = 's')    
 Tungsten = tmo.Chemical('Tungsten')
 Cobalt = tmo.Chemical('Cobalt')
-Hydrogen = tmo.Chemical('Hydrogen')
+Hydrogen = tmo.Chemical('Hydrogen',phase = 'l')
 
 chems = tmo.Chemicals([
     #Dihydroxylation chemicals
     tmo.Chemical('Hydrogen_peroxide', phase='l'),
     tmo.Chemical('Water'),
     # #Chemical for acid degumming 
+
     tmo.Chemical('Citric_acid'),
     #look into phase of the below
     tmo.Chemical('MDHSA', search_ID = '1115-01-1', phase = 'l'),
@@ -135,18 +136,20 @@ chems = tmo.Chemicals([
                   Hvap=Tungsten.Hvap,
                   Psat=Tungsten.Psat,
                   default = True),
-    tmo.Chemical.blank('Tungstate_ion',
-                     CAS = '12737-86-9',
-                     # smiles = '[O-][W](=O)(=O)[O-]', 
-                     # InChI = 'InChI=1S/4O.W/q;;2*-1', 
-                     # InChI_key = 'PBYZMCDFOULPGH-UHFFFAOYSA-N', 
-                     # pubchemid = '24465', 
-                     # iupac_name = ('dioxido(dioxo)tungsten'),
-                     # common_name = 'tungsten_ion',  
-                     Tb = Tungsten.Tb
+    tmo.Chemical('Tungstate_ion',
+                 search_db = False,
+                 CAS = '12737-86-9',
+                 Hvap=Tungsten.Hvap,
+                 Psat=Tungsten.Psat,
+                 formula = 'O4W-2',
+                 MW =  tmo.Chemical('Tungstic_acid').MW,
+                 phase = 'l',
+                 Tb = Tungsten.Tb
                  ),
     tmo.Chemical('Hydrogen_ion',
-                 Tb = Hydrogen.Tb),    
+                 Tb = Hydrogen.Tb,
+                 phase = 'l',
+                 ),    
 ## TODO: GWP data for cobalt acetate missing, figure it out 
 ## cobalt_acetate_tetrahydrate Tb: 
     Cobalt_chloride,
@@ -157,11 +160,12 @@ chems = tmo.Chemicals([
                  Hvap=Cobalt_chloride.Hvap,
                  Psat=Cobalt_chloride.Psat,
                  default=True),
-    tmo.Chemical('Acetate'),
+    tmo.Chemical('Acetate_ion', phase = 'l', search_ID = '71-50-1'),
 ## TODO: defaulting the below to water for now, maybe look for a better assumption
     tmo.Chemical('Cobalt(2+)',
                  Hvap=Cobalt.Hvap,
                  Psat=Cobalt.Psat,
+                 phase = 'l',
                  Tb=Cobalt.Tb,
                  default = True),
     
@@ -176,13 +180,16 @@ chems = tmo.Chemicals([
                  phase = 's',
                  default=True),
     ##For catalyst recovery chemicals required
-    tmo.Chemical('Calcium_hydroxide'),
-    
+    tmo.Chemical('Calcium_hydroxide',
+                 phase = 's',
+                 default = True),
+    tmo.Chemical('Calcium_chloride'),    
     tmo.Chemical.blank('Calcium_tungstate',
                        CAS = '7790-75-2',
                        MW = 287.92,
                        Tb = Tungsten.Tb,   
-                       phase = 's'),
+                       phase = 's',
+                       formula = 'CaWO4'),
     
     tmo.Chemical('Calcium_acetate',                      
                   phase = 'l'),
@@ -214,7 +221,9 @@ chems = tmo.Chemicals([
                  search_ID = '2190-22-9',
                  phase = 'l',
                  search_db = False),
-
+#Natural gas for heating purposes 
+    tmo.Chemical('Natural_gas',
+                 search_ID = 'CH4')    
                  ])
 
 ##Modelling the properties of resin used for hydrolysis based on polystyrene
@@ -244,11 +253,15 @@ chems['Tungstate_ion'].copy_models_from(chems['Tungstic_acid'],
                                          'Psat',
                                          'Cn',
                                          'V',
-                                         'mu'])
+                                         'mu'
+                                         ])
 ## Hydrogen ion defaults to properties of hydrogen
 chems['Hydrogen_ion'].copy_models_from(Hydrogen,
                                        ['Hvap',
-                                        'Psat'])
+                                        'Psat',
+                                        'mu',
+                                        'V',
+                                        'Cn'])
 ## Products of the precipitation reaction
 ## https://scifinder-n.cas.org/searchDetail/substance/634db2343c1f076117eb77ce/substanceDetails
 chems['Calcium_tungstate'].copy_models_from(Tungsten,
@@ -257,12 +270,19 @@ chems['Calcium_tungstate'].copy_models_from(Tungsten,
 chems['Calcium_tungstate'].V.add_model(fn.rho_to_V(5800,
                                                    chems['Calcium_tungstate'].MW),
                                                    top_priority = True)
+chems['Acetate_ion'].copy_models_from(tmo.Chemical('Acetate'),
+                                      ['mu',
+                                       'Psat',
+                                       'Hvap',
+                                       'sigma',
+                                       
+                                       ])
 
 
 
 ## Changing this for Azelaic acid as it probably didnt work during a distillation process
 chems['Azelaic_acid'].Cn.method = 'LASTOVKA_S'
-# chems['Glycerol'].Cn.method = 'LASTOVKA_S'
+
 
 #TODO.xxx check if Psat from liquid methanol is a good idea
 def create_new_chemical(ID, phase='s', **constants):
@@ -274,7 +294,7 @@ NaOH = create_new_chemical('NaOH', formula='NaOH')
 HCl = create_new_chemical('HCl', formula='HCl')
 
 # Solubles don't occupy much volume
-for chemical in (HCl, NaOH):
+for chemical in (HCl, NaOH,):
         V = fn.rho_to_V(rho=1e5, MW=chemical.MW)
         chemical.V.add_model(V, top_priority=True)
  
@@ -308,6 +328,7 @@ chems.define_group('Biodiesel', ('Methyl_oleate',
                                  'Methyl_linoleate',
                                  'Methyl_palmitoleate'))
 
+chems.define_group('Air', ['Oxygen', 'Nitrogen'],composition=[0.21,0.79])
 chems.set_synonym('Water', 'H2O')
 chems.set_synonym('Carbon_dioxide','CO2')
 chems.set_synonym('Phosphatidylinositol','PL')
@@ -315,5 +336,6 @@ chems.set_synonym('MonoOlein', 'MAG')
 chems.set_synonym('Dipalmitin', 'DAG')
 chems.set_synonym('Cobalt(2+)','Cobalt_ion')
 chems.set_synonym('Hydrogen_ion', 'H+')
+chems.set_synonym('Pelargonic_acid','Nonanoic_acid')
 bst.settings.set_thermo(chems)
 # chems.show()
