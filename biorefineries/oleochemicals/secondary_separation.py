@@ -49,7 +49,7 @@ def secondary_separation_system(ins,outs,Tin):
          current_concentation = feed_AA / feed.F_mass
          water.imass['Water'] = (1 / M301.target_concentation - 1 / current_concentation) * feed_AA
          
-    
+##THis below unit just combines the recycle and recovered stream    
 ### TODO.xxx add the solvent recycle stream and check solvent amount 
    # #Solvent_extraction
    #  M304 = bst.units.Mixer('M304',
@@ -74,7 +74,8 @@ def secondary_separation_system(ins,outs,Tin):
         partition_data = {
                'raffinate_chemicals': ('Water',),
                'extract_chemicals': ('Nonanoic_acid',
-                                     'cycloheptane','toluene','bicyclo_octane',
+                                     'cycloheptane',
+                                     'toluene','bicyclo_octane',
                                      'Octane'),
             'K': np.array([0.064657614,
                            1.664369695]),

@@ -596,13 +596,14 @@ _316_over_304 = 1.2
 class CoFermentation(Reactor):
     _N_ins = 3
     _N_outs = 2
-    _N_heat_utilities = 1
+    # _N_heat_utilities = 1
     _units= {**Reactor._units,
             'Fermenter size': 'kg',
             'Recirculation flow rate': 'kg/hr',
             'Duty': 'kJ/hr'}
     _F_BM_default = {**Reactor._F_BM_default,
-            'Heat exchangers': 3.17}
+            # 'Heat exchangers': 3.17,
+            }
 
     auxiliary_unit_names = ('heat_exchanger',)
 
@@ -638,7 +639,7 @@ class CoFermentation(Reactor):
         self.allow_concentration = allow_concentration
         self.mixed_feed = tmo.Stream('mixed_feed')
 
-        self.heat_exchanger = HXutility(None, None, None, T=T)
+        # self.heat_exchanger = HXutility(None, None, None, T=T)
         
         self.cofermentation_rxns = ParallelRxn([
         #      Reaction definition            Reactant    Conversion
@@ -752,7 +753,7 @@ class CoFermentation(Reactor):
         # baseline_purchase_costs = self.baseline_purchase_costs
         baseline_purchase_costs = self.baseline_purchase_costs
 
-        hx = self.heat_exchanger
+        # hx = self.heat_exchanger
 
         if self.mode == 'Batch':
             raise NotImplementedError('Batch mode is not currently implemented for this biorefinery')
@@ -762,18 +763,18 @@ class CoFermentation(Reactor):
             
             Reactor._cost(self)
             
-            N = Design['Number of reactors']
-            single_rx_effluent = self._mixture.copy()
-            hx.simulate_as_auxiliary_exchanger(duty=Design['Duty']/N, 
-                                            stream=single_rx_effluent)
-            self.auxiliary_unit_names = names = tuple([f'heat_exchanger_{i}' for i in range(N)])
-            for i in names: setattr(self, i, hx)
-            hu_total = self.heat_utilities[0]
-            hu_single_rx = hx.heat_utilities[0]
-            hu_total.copy_like(hu_single_rx)
-            self.heat_utilities = tuple([self.heat_utilities[0]] * N)
+            # N = Design['Number of reactors']
+            # single_rx_effluent = self._mixture.copy()
+            # hx.simulate_as_auxiliary_exchanger(duty=Design['Duty']/N, 
+            #                                 stream=single_rx_effluent)
+            # self.auxiliary_unit_names = names = tuple([f'heat_exchanger_{i}' for i in range(N)])
+            # for i in names: setattr(self, i, hx)
+            # hu_total = self.heat_utilities[0]
+            # hu_single_rx = hx.heat_utilities[0]
+            # hu_total.copy_like(hu_single_rx)
+            # self.heat_utilities = tuple([self.heat_utilities[0]] * N)
             
-            hu_total.heat_exchanger = None
+            # hu_total.heat_exchanger = None
             
 
 
@@ -897,10 +898,11 @@ class DehydrationReactor(Reactor):
     _N_ins = 4
     _N_outs = 2
     
-    _N_heat_utilities = 1
+    # _N_heat_utilities = 1
     _F_BM_default = {**Reactor._F_BM_default,
             'TiO2 catalyst': 1,
-            'Heat exchangers': 3.17}
+            # 'Heat exchangers': 3.17,
+            }
 
     mcat_frac = 12/1.5 # kg per kg/h # 1/WHSV # Calculated from Dishisha et al. 2015
 
@@ -921,7 +923,7 @@ class DehydrationReactor(Reactor):
         self.wall_thickness_factor = wall_thickness_factor
         self.vessel_material = vessel_material
         self.vessel_type = vessel_type
-        self.heat_exchanger = HXutility(None, None, None, T=T)
+        # self.heat_exchanger = HXutility(None, None, None, T=T)
         self.tau = tau
         self.X = X
         
@@ -933,10 +935,10 @@ class DehydrationReactor(Reactor):
             ])     
         HP_to_AA_rxn = dehydration_reactions[0]
         
-        feed, fresh_catalyst, recycled_HP, recycled_water = self.ins
+        feed, fresh_catalyst, recycled_HP = self.ins
         effluent, spent_catalyst = self.outs
   
-        effluent.mix_from([feed, recycled_HP, recycled_water])
+        effluent.mix_from([feed, recycled_HP])
         effluent.T = self.T
         effluent.P = feed.P
         self.dehydration_reactions(effluent.mol)
@@ -948,21 +950,21 @@ class DehydrationReactor(Reactor):
             
     def _cost(self):
         super()._cost()
-        hx = self.heat_exchanger
-        N = self.design_results['Number of reactors']
-        single_rx_effluent = self.outs[0].copy()
-        single_rx_effluent.mol[:] /= N
+        # hx = self.heat_exchanger
+        # N = self.design_results['Number of reactors']
+        # single_rx_effluent = self.outs[0].copy()
+        # single_rx_effluent.mol[:] /= N
         
-        hx.simulate_as_auxiliary_exchanger(duty=(self.Hnet)/N, 
-                                            stream=single_rx_effluent)
-        hu_total = self.heat_utilities[0]
-        hu_single_rx = hx.heat_utilities[0]
-        hu_total.copy_like(hu_single_rx)
-        hu_total.scale(N)
+        # hx.simulate_as_auxiliary_exchanger(duty=(self.Hnet)/N, 
+        #                                     stream=single_rx_effluent)
+        # hu_total = self.heat_utilities[0]
+        # hu_single_rx = hx.heat_utilities[0]
+        # hu_total.copy_like(hu_single_rx)
+        # hu_total.scale(N)
         
-        self.purchase_costs['Heat exchangers'] = hx.purchase_cost * N
-        self.baseline_purchase_costs['Heat exchangers'] = hx.baseline_purchase_cost * N
-        self.installed_costs['Heat exchangers'] = hx.installed_cost * N
+        # self.purchase_costs['Heat exchangers'] = hx.purchase_cost * N
+        # self.baseline_purchase_costs['Heat exchangers'] = hx.baseline_purchase_cost * N
+        # self.installed_costs['Heat exchangers'] = hx.installed_cost * N
         self.baseline_purchase_costs['TiO2 catalyst'] = self.mcat_frac * self.ins[0].F_mass * price['TiO2']
             
 
@@ -1040,8 +1042,7 @@ class AnaerobicDigestion(Unit):
         liquid_mol = self.multi_stream.imol['l']	
         treated_water.mol = liquid_mol * self.split	
         sludge.mol = liquid_mol - treated_water.mol	
-        # biogas.receive_vent(treated_water, accumulate=True)	
-        biogas.receive_vent(treated_water)
+        biogas.receive_vent(treated_water, accumulate=True)	
         biogas.T = treated_water.T = sludge.T = T
         
     def _design(self):

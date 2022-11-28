@@ -27,6 +27,10 @@ from biorefineries.succinic.chemicals_data import chems, chemical_groups, \
 from biorefineries.succinic.tea import TemplateTEA as SuccinicTEA
 from biorefineries.make_a_biorefinery.auto_waste_management import AutoWasteManagement
 
+from hxn._heat_exchanger_network import HeatExchangerNetwork
+
+HeatExchangerNetwork = bst.facilities.HeatExchangerNetwork
+
 Rxn = tmo.reaction.Reaction
 ParallelRxn = tmo.reaction.ParallelReaction
 
@@ -204,14 +208,14 @@ def create_succinic_sys(ins, outs):
     enzyme_water = Stream('enzyme_water', units='kg/hr')
     
     # Corn steep liquor as nitrogen nutrient for microbes, flow updated in R301
-    CSL = Stream('CSL', units='kg/hr')
+    CSL = Stream('CSL', units='kg/hr', price=price['CSL'])
     # Lime for neutralization of produced acid
     # fermentation_lime = Stream('fermentation_lime', units='kg/hr')
     
     # For diluting concentrated, inhibitor-reduced hydrolysate
     dilution_water = Stream('dilution_water', units='kg/hr')
     
-    
+    natural_gas_drying = Stream('natural_gas_drying', units = 'kg/hr', price=0.218)
     # =============================================================================
     # Conversion units
     # =============================================================================
@@ -296,66 +300,85 @@ def create_succinic_sys(ins, outs):
                             outs=('S401_solid_waste', 'S401_1'),
                             solids=['FermMicrobe'], split={'FermMicrobe':0.995})
     
-    C401 = units.SuccinicAcidCrystallizer('C401', ins=S401-1, outs=('C401_0',), 
+    
+    F401 = bst.MultiEffectEvaporator('F401', ins=S401-1, outs=('F401_l', 'F401_g'),
+                                            P = (101325, 73581, 50892, 32777, 20000), V = 0.5)
+    F401.V_water_multiplier = 0.1
+    @F401.add_specification(run=False)
+    def F401_spec():
+        instream = F401.ins[0]
+        instream.imol['Ethanol'] = 0
+        F401.V = F401.V_water_multiplier*instream.imol['Water']/sum([instream.imol[c.ID] for c in instream.vle_chemicals])
+        F401._run()
+        
+    C401 = units.SuccinicAcidCrystallizer('C401', ins=F401-0, outs=('C401_0',), 
                                    target_recovery=0.98,
                                    tau=6,
                                    N=4,
                                    )
     
-    S402 = bst.SolidsCentrifuge('S402', ins=C401-0, 
+    S402 = bst.PressureFilter('S402', ins=C401-0, 
                             outs=('S402_solid_SuccinicAcid', 'S402_1'),
-                            solids=['SuccinicAcid', 'FermMicrobe'], split={'SuccinicAcid':0.995,
-                                                                           'FermMicrobe':0.995})
-        
-    # @S402.add_specification(run=False)
-    # def S402_spec():
-    #     S402._run()
-    #     tot_SA = S402.ins[0].imol['SuccinicAcid']
-    #     # split_SA = S402.split['SuccinicAcid']
-    #     split_SA = sum(S402.split) # update
-    #     S402.outs[0].phases=('s', 'l')
-    #     S402.outs[0].imol['s', 'SuccinicAcid'] = split_SA*tot_SA
-    #     S402.outs[0].imol['l', 'SuccinicAcid'] = 0.
-        
-    #     S402.outs[1].phases=('s', 'l')
-    #     S402.outs[1].imol['s', 'SuccinicAcid'] = 0.
-    #     S402.outs[1].imol['l', 'SuccinicAcid'] = (1.-split_SA)*tot_SA
-        
-        
-    F401 = bst.MultiEffectEvaporator('F401', ins=S402-1, outs=('F401_l', 'F401_g'),
+                            # solids=['SuccinicAcid', 'FermMicrobe'], 
+                            split={'SuccinicAcid':0.995,
+                                   'FermMicrobe':0.995})
+    
+    @S402.add_specification(run=False)
+    def S402_spec():
+        S402_instream = S402.ins[0]
+        S402.isplit['SuccinicAcid'] = S402_instream.imol['s', 'SuccinicAcid']/S402_instream.imol['SuccinicAcid']
+        S402._run()
+        S402_solids = S402.outs[0]
+        S402_solids.phases = ('s', 'l')
+        for c in S402_solids.chemicals:
+            c_ID = c.ID
+            if not (c_ID=='Water' or c_ID =='H2O'):
+                S402_solids.imol['s',c_ID] = S402_solids.imol[c_ID]
+                S402_solids.imol['l',c_ID] = 0
+        S402.outs[1].phases = ('l')
+
+    F402 = bst.MultiEffectEvaporator('F402', ins=S402-1, outs=('F402_l', 'F402_g'),
                                             P = (101325, 73581, 50892, 32777, 20000), V = 0.5)
+    F402.V_water_multiplier = 0.8
+    @F402.add_specification(run=False)
+    def F402_spec():
+        instream = F402.ins[0]
+        F402.V = F402.V_water_multiplier*instream.imol['Water']/sum([instream.imol[c.ID] for c in instream.vle_chemicals])
+        F402._run()
     
-    @F401.add_specification(run=False)
-    def F401_spec():
-        instream = F401.ins[0]
-        F401.V = 0.6*instream.imol['Water']/sum([instream.imol[c.ID] for c in instream.vle_chemicals])
-        F401._run()
-    
-    C402 = units.SuccinicAcidCrystallizer('C402', ins=F401-0, outs=('C402_0',), 
+    C402 = units.SuccinicAcidCrystallizer('C402', ins=F402-0, outs=('C402_0',), 
                                    target_recovery=0.98,
                                    tau=6,
                                    N=4,
                                    )
 
-    S403 = bst.SolidsCentrifuge('S403', ins=C402-0, 
+    S403 = bst.PressureFilter('S403', ins=C402-0, 
                             outs=('S403_solid_SuccinicAcid', 'S403_1'),
-                            solids=['SuccinicAcid', 'FermMicrobe'], split={'SuccinicAcid':0.995,
-                                                                           'FermMicrobe':0.995})
-        
-    # @S403.add_specification(run=False)
-    # def S403_spec():
-    #     S403._run()
-    #     tot_SA = S403.ins[0].imol['SuccinicAcid']
-    #     # split_SA = S403.split['SuccinicAcid']
-    #     split_SA = sum(S403.split) # update
-    #     S403.outs[0].phases=('s', 'l')
-    #     S403.outs[0].imol['s', 'SuccinicAcid'] = split_SA*tot_SA
-    #     S403.outs[0].imol['l', 'SuccinicAcid'] = 0.
-        
-    #     S403.outs[1].phases=('s', 'l')
-    #     S403.outs[1].imol['s', 'SuccinicAcid'] = 0.
-    #     S403.outs[1].imol['l', 'SuccinicAcid'] = (1.-split_SA)*tot_SA
-        
+                            # solids=['SuccinicAcid', 'FermMicrobe'], 
+                            split={'SuccinicAcid':0.995,
+                                   'FermMicrobe':0.995})
+    @S403.add_specification(run=False)
+    def S403_spec():
+        S403_instream = S403.ins[0]
+        S403.isplit['SuccinicAcid'] = S403_instream.imol['s', 'SuccinicAcid']/S403_instream.imol['SuccinicAcid']
+        S403._run()
+        S403_solids = S403.outs[0]
+        S403_solids.phases = ('s', 'l')
+        for c in S403_solids.chemicals:
+            c_ID = c.ID
+            if not (c_ID=='Water' or c_ID =='H2O'):
+                S403_solids.imol['s',c_ID] = S403_solids.imol[c_ID]
+                S403_solids.imol['l',c_ID] = 0
+        S403.outs[1].phases = ('l')
+    
+    M401 = bst.Mixer('M401', ins=(S402-0, S403-0), outs=('mixed_wet_SuccinicAcid'))
+    
+    F403 = bst.DrumDryer('F403', ins=(M401-0, 'dryer_air_in', natural_gas_drying,),
+                         outs=('dry_solids', 'hot_air', 'emissions'),
+                         split={'SuccinicAcid': 1e-4,
+                                    'FermMicrobe': 0.}
+                         )
+
     # %% 
     
     # =============================================================================
@@ -377,7 +400,9 @@ def create_succinic_sys(ins, outs):
     
     # Mix waste liquids for treatment
     M501 = bst.units.Mixer('M501', ins=('',
+                                        F401-1,
                                         S403-1,
+                                        F402-1,
                                         # S401-1,
                                         # F401-0,
                                         # r_S402_s-1, r_S403_s-1, r_S404_s-1,
@@ -527,8 +552,8 @@ def create_succinic_sys(ins, outs):
 
     # # 7-day storage time, similar to ethanol's in Humbird et al.   
     # Product storage
-    M601 = bst.Mixer('M601', ins=(S402-0, S403-0), outs=('mixed_SuccinicAcid_to_storage'))
-    T601 = bst.StorageTank('T601', ins=M601-0, tau=7.*24., V_wf=0.9, # !!! ins should be the product stream
+    
+    T601 = bst.StorageTank('T601', ins=F403-0, tau=7.*24., V_wf=0.9, # !!! ins should be the product stream
                                           vessel_type='Floating roof',
                                           vessel_material='Stainless steel')
     T601.line = 'SuccinicAcidStorageTank'
@@ -628,7 +653,7 @@ def create_succinic_sys(ins, outs):
     
     PWC = bst.ProcessWaterCenter('PWC904')
     # Heat exchange network
-    HXN = bst.facilities.HeatExchangerNetwork('HXN1001',
+    HXN = HeatExchangerNetwork('HXN1001',
                                               # ignored=[H401, H402],
                                               )
     def HXN_no_run_cost():
@@ -810,7 +835,7 @@ for HXN_group in unit_groups:
     if HXN_group.name == 'heat exchanger network':
         HXN_group.filter_savings = False
         HXN = HXN_group.units[0]
-        assert isinstance(HXN, bst.HeatExchangerNetwork)
+        assert isinstance(HXN, HeatExchangerNetwork)
         
 unit_groups[-1].metrics[-1] = bst.evaluation.Metric('Mat. cost', 
                                                     getter=lambda: BT.natural_gas_price * BT.natural_gas.F_mass, 
