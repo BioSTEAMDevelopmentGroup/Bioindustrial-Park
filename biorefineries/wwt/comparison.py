@@ -11,7 +11,8 @@
 This module was used to compare the cost and 100-year greenhouse gas emission
 between the original biorefinery modules and those implemented in this wwt module.
 
-environment for the comparison in results/ dir, most of the results were from cloned repos:
+environment for the archived results https://github.com/yalinli2/biorefinery-WWT-archived-results,
+most of the results were from the following cloned repositories:
     - thermosteam@qsdsan, commit 15a38b24fd424a7f654ddf8bab5b845cfdbf77bb
     - biosteam@qsdsan, commit 7f39c802fe149a7dfd40d49e86db73896dd683c1
     - biorefineries@wwt, commit f3c3d37a342f1da8f582f71520fbd76d645e16e5
