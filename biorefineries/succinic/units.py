@@ -433,15 +433,17 @@ class CoFermentation(Unit):
 
         self.cofermentation_rxns = ParallelRxn([
         #      Reaction definition            Reactant    Conversion
-        Rxn('Glucose + 2 CO2 -> 2 SuccinicAcid + 2 O2',        'Glucose',   0.8), 
+        Rxn('Glucose + 2 CO2 -> 2 SuccinicAcid + 2 O2',        'Glucose',   0.7), 
         Rxn('Glucose -> 3 AceticAcid',               'Glucose',   1e-8),
         Rxn('Glucose -> 2 Ethanol + 2 CO2',               'Glucose',   1e-8),
         Rxn('Glucose -> 6 FermMicrobe',       'Glucose',   0.05),
+        Rxn('Glucose -> 2 PyruvicAcid',     'Glucose',    0.1),
         
-        Rxn('Xylose + 1.667 CO2 -> 1.667 SuccinicAcid + 0.833 O2',       'Xylose',    0.8),
+        Rxn('Xylose + 1.667 CO2 -> 1.667 SuccinicAcid + 0.833 O2',       'Xylose',    0.7),
         Rxn('Xylose -> 2.5 AceticAcid',       'Xylose',    1e-8),
         Rxn('Xylose -> 1.667 Ethanol + 1.667 CO2',       'Xylose',    1e-8),
         Rxn('Xylose -> 5 FermMicrobe',        'Xylose',    0.05),
+        Rxn('3 Xylose -> 5 PyruvicAcid',    'Xylose',   0.1)
         ])
 
         self.CO2_generation_rxns = ParallelRxn([
@@ -449,16 +451,20 @@ class CoFermentation(Unit):
             Rxn('Xylose -> 5CO2 + 5H2O', 'Xylose', 1.)])
         
         self.glucose_to_succinic_acid_rxn = self.cofermentation_rxns[0]
-        self.xylose_to_succinic_acid_rxn = self.cofermentation_rxns[4]
+        self.xylose_to_succinic_acid_rxn = self.cofermentation_rxns[5]
+        
+        self.glucose_to_pyryuvic_acid_rxn = self.cofermentation_rxns[4]
+        self.xylose_to_pyryuvic_acid_rxn = self.cofermentation_rxns[9]
+        
         
         self.glucose_to_acetic_acid_rxn = self.cofermentation_rxns[1]
-        self.xylose_to_acetic_acid_rxn = self.cofermentation_rxns[5]
+        self.xylose_to_acetic_acid_rxn = self.cofermentation_rxns[6]
         
         self.glucose_to_ethanol_rxn = self.cofermentation_rxns[2]
-        self.xylose_to_ethanol_rxn = self.cofermentation_rxns[6]
+        self.xylose_to_ethanol_rxn = self.cofermentation_rxns[7]
         
         self.glucose_to_microbe_rxn = self.cofermentation_rxns[3]
-        self.xylose_to_microbe_rxn = self.cofermentation_rxns[7]
+        self.xylose_to_microbe_rxn = self.cofermentation_rxns[8]
         
         self.glucose_to_CO2_rxn = self.CO2_generation_rxns[0]
         self.xylose_to_CO2_rxn = self.CO2_generation_rxns[1]

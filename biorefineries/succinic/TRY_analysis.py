@@ -294,7 +294,7 @@ succinic_metrics = [get_product_MPSP, get_product_purity, get_production]
 # succinic_metrics = [get_succinic_MPSP, get_GWP, get_FEC]
 
 # %% Generate 3-specification meshgrid and set specification loading functions
-steps = 10
+steps = 6
 
 # Yield, titer, productivity (rate)
 spec_1 = yields = np.linspace(0.4, 0.9, steps) # yield
@@ -421,10 +421,10 @@ for p in productivities:
 
 import contourplots
 
-yields = np.linspace(0.4, 0.9, steps) # x axis values
-titers = np.linspace(40., 120., steps) # y axis values
-productivities = np.arange(0.1, 2.1, 0.1) # z axis values
-MPSPs = results_metric_1 # too big to show here; shape = z * x * y # color (or w) axis values
+# yields = np.linspace(0.4, 0.9, steps) # x axis values
+# titers = np.linspace(40., 120., steps) # y axis values
+# productivities = np.arange(0.1, 2.1, 0.1) # z axis values
+# MPSPs = results_metric_1 # too big to show here; shape = z * x * y # color (or w) axis values
 
 contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_1, # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., MPSP
                                 x_data=100*yields, # x axis values
@@ -449,5 +449,6 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_1, 
                                 axis_title_fonts={'size': {'x': 12, 'y':12, 'z':12, 'w':12},},
                                 fps=12, # animation frames (z values traversed) per second
                                 n_loops='inf', # the number of times the animated contourplot should loop animation over z; infinite by default
-                                animated_contourplot_filename='MPSP_animated_contourplot' # file name to save animated contourplot as (no extensions)
-                                 )
+                                animated_contourplot_filename='MPSP_animated_contourplot', # file name to save animated contourplot as (no extensions)
+                                keep_frames=False, # leaves frame PNG files undeleted after running; False by default
+                                )

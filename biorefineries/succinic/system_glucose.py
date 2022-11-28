@@ -71,7 +71,7 @@ def create_succinic_sys(ins, outs):
     feedstock.imass['H2O'] = 500.
     feedstock.price = price['Glucose']*feedstock.imass['Glucose']/feedstock.F_mass
     
-    feedstock.F_mass = 50000 
+    feedstock.F_mass = 50e3
     
     U101 = units.FeedstockPreprocessing('U101', ins=feedstock)
     
@@ -159,10 +159,13 @@ def create_succinic_sys(ins, outs):
         instream.imol['Ethanol'] = 0
         F401.V = F401.V_water_multiplier*instream.imol['Water']/sum([instream.imol[c.ID] for c in instream.vle_chemicals])
         F401._run()
-        
-    C401 = units.SuccinicAcidCrystallizer('C401', ins=F401-0, outs=('C401_0',), 
+    
+    F401_P = bst.Pump('F401_P', ins=F401-0, P=101325.)
+    
+    C401 = units.SuccinicAcidCrystallizer('C401', ins=F401_P-0, outs=('C401_0',), 
                                    target_recovery=0.98,
                                    tau=6,
+                                   T_range=(273.15+2., 372.5),
                                    N=4,
                                    )
     
@@ -172,10 +175,12 @@ def create_succinic_sys(ins, outs):
                             split={'SuccinicAcid':0.995,
                                    'FermMicrobe':0.995})
     
+    S402.recovery = 0.95
     @S402.add_specification(run=False)
     def S402_spec():
+        S402_recovery = S402.recovery
         S402_instream = S402.ins[0]
-        S402.isplit['SuccinicAcid'] = S402_instream.imol['s', 'SuccinicAcid']/S402_instream.imol['SuccinicAcid']
+        S402.isplit['SuccinicAcid'] = S402_recovery*S402_instream.imol['s', 'SuccinicAcid']/S402_instream.imol['SuccinicAcid']
         S402._run()
         S402_solids = S402.outs[0]
         S402_solids.phases = ('s', 'l')
@@ -195,9 +200,12 @@ def create_succinic_sys(ins, outs):
         F402.V = F402.V_water_multiplier*instream.imol['Water']/sum([instream.imol[c.ID] for c in instream.vle_chemicals])
         F402._run()
     
-    C402 = units.SuccinicAcidCrystallizer('C402', ins=F402-0, outs=('C402_0',), 
+    F402_P = bst.Pump('F402_P', ins=F402-0, P=101325.)
+    
+    C402 = units.SuccinicAcidCrystallizer('C402', ins=F402_P-0, outs=('C402_0',), 
                                    target_recovery=0.98,
                                    tau=6,
+                                   T_range=(273.15+2., 372.5),
                                    N=4,
                                    )
 
@@ -206,10 +214,12 @@ def create_succinic_sys(ins, outs):
                             # solids=['SuccinicAcid', 'FermMicrobe'], 
                             split={'SuccinicAcid':0.995,
                                    'FermMicrobe':0.995})
+    S403.recovery = 0.95
     @S403.add_specification(run=False)
     def S403_spec():
+        S403_recovery = S403.recovery
         S403_instream = S403.ins[0]
-        S403.isplit['SuccinicAcid'] = S403_instream.imol['s', 'SuccinicAcid']/S403_instream.imol['SuccinicAcid']
+        S403.isplit['SuccinicAcid'] = S403_recovery*S403_instream.imol['s', 'SuccinicAcid']/S403_instream.imol['SuccinicAcid']
         S403._run()
         S403_solids = S403.outs[0]
         S403_solids.phases = ('s', 'l')
@@ -601,7 +611,7 @@ spec = ProcessSpecification(
     
     # set baseline fermentation performance here
     # baseline_yield = 0.19,
-    baseline_yield = 0.8,
+    baseline_yield = 0.7,
     baseline_titer = 100.,
     baseline_productivity = 1.0,
     

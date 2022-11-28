@@ -12,7 +12,8 @@ import flexsolve as flx
 import numpy as np
 
 from numba import njit
-from biosteam.process_tools import BoundedNumericalSpecification
+# from biosteam.process_tools import BoundedNumericalSpecification
+from biosteam import BoundedNumericalSpecification
 from biorefineries.succinic._process_specification import ProcessSpecification
 from biosteam import System
 from thermosteam import Stream
