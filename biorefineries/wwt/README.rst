@@ -5,7 +5,7 @@ wwt: High-Rate Wastewater Treatment and Resource Recovery Process
 Description
 -----------
 
-This repository contains the modules for the design of a high-rate wastewater treatment (WWT) and energy/water recovery process. This process was implemented for seven different biorefineries:
+This repository contains the modules for the design of a high-rate wastewater treatment (WWT) and energy/water recovery process as described in Li et al. [1]_ This process was implemented for seven different biorefineries:
 	
 - CN (corn-to-ethanol) as in the `corn <https://github.com/BioSTEAMDevelopmentGroup/Bioindustrial-Park/tree/master/biorefineries/corn>`_ module, implementation and comparison codes in `corn.py <https://github.com/BioSTEAMDevelopmentGroup/Bioindustrial-Park/blob/master/biorefineries/wwt/corn.py>`_
 - SC-1G (sugarcane juice-to-ethanol) as in the `oilcane <https://github.com/BioSTEAMDevelopmentGroup/Bioindustrial-Park/tree/master/biorefineries/oilcane>`_ module (S1 configuration), implementation and comparison codes in `sugarcane1g.py <https://github.com/BioSTEAMDevelopmentGroup/Bioindustrial-Park/blob/master/biorefineries/wwt/sugarcane1g.py>`_
