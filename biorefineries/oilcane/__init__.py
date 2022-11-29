@@ -233,7 +233,7 @@ def load(name, cache=cache, reduce_chemicals=False, RIN=True,
          avoid_natural_gas=True):
     dct = globals()
     number, agile, energycane = dct['configuration'] = configuration = parse_configuration(name)
-    key = (number, agile, RIN)
+    key = (number, agile, energycane, RIN)
     if cache is not None and key in cache:
         dct.update(cache[key])
         return
@@ -268,8 +268,21 @@ def load(name, cache=cache, reduce_chemicals=False, RIN=True,
         s.oilcane.register_alias('feedstock')
     feedstock = s.feedstock
     
+    chemicals.define_group(
+        name='Fiber',
+        IDs=['Cellulose', 'Hemicellulose', 'Lignin'],
+        composition=[0.4704 , 0.2775, 0.2520],
+        wt=True, # Composition is given as weight
+    )
+    chemicals.define_group(
+        name='Sugar',
+        IDs=['Sucrose', 'Glucose'],
+        # Default composition as equimolar
+    )
+    
     if energycane:
         feedstock.reset_flow(**energycane_dct, total_flow=feedstock.F_mass, units='kg/hr')
+        feedstock.ID = 'energycane'
     
     BT = flowsheet(bst.BoilerTurbogenerator)
     if number not in cellulosic_configurations: BT.boiler_efficiency = 0.89
@@ -387,11 +400,22 @@ def load(name, cache=cache, reduce_chemicals=False, RIN=True,
         sys.operation_parameter(set_glucose_yield)
         sys.operation_parameter(set_xylose_yield)
         
-        dct['cane_mode'] = cane_mode = sys.operation_mode(cane_sys,
-            operating_hours=180*24, oil_content=0.10, feedstock=feedstock.copy(),
-            z_mass_carbs_baseline=0.1491, glucose_yield=85, xylose_yield=65, 
-            FFA_content=0.10, PL_content=0.10
-        )
+        if energycane:
+            dct['cane_mode'] = cane_mode = sys.operation_mode(cane_sys,
+                operating_hours=180*24, oil_content=0.02, feedstock=feedstock.copy(),
+                z_mass_carbs_baseline=0.091,
+                z_mass_solids_baseline=0., 
+                z_mass_ash_baseline=0.028,
+                z_mass_water_baseline=0.60,
+                glucose_yield=85, xylose_yield=65, 
+                FFA_content=0.10, PL_content=0.10
+            )
+        else:
+            dct['cane_mode'] = cane_mode = sys.operation_mode(cane_sys,
+                operating_hours=180*24, oil_content=0.10, feedstock=feedstock.copy(),
+                z_mass_carbs_baseline=0.1491, glucose_yield=85, xylose_yield=65, 
+                FFA_content=0.10, PL_content=0.10
+            )
         dct['sorghum_mode'] = sorghum_mode = sys.operation_mode(cane_sys, 
             operating_hours=60*24, oil_content=0.07, glucose_yield=79, xylose_yield=86,
             feedstock=oilsorghum,
