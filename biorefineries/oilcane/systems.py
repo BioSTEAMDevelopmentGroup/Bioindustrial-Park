@@ -34,7 +34,6 @@ from ..lipidcane import (
 )
 import biorefineries as brf
 from biorefineries.oilcane import units
-from collections import deque
 import numpy as np
 
 __all__ = (

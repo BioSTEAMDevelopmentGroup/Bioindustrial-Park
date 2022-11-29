@@ -5,7 +5,7 @@ Created on Thu Nov  4 14:39:10 2021
 @author: yrc2
 """
 from . import _feature_mockups as f
-from ._parse_configuration import parse, Configuration, ConfigurationComparison
+from ._parse_configuration import parse_configuration, Configuration, ConfigurationComparison
 from warnings import warn
 from thermosteam.utils import roundsigfigs
 import biorefineries.oilcane as oc
@@ -35,14 +35,14 @@ results_folder = os.path.join(os.path.dirname(__file__), 'results')
 images_folder = os.path.join(os.path.dirname(__file__), 'images')
 
 def spearman_file(name):
-    number, agile = parse(name)
+    number, agile = parse_configuration(name)
     filename = f'oilcane_spearman_{number}'
     if agile: filename += '_agile'
     filename += '.xlsx'
     return os.path.join(results_folder, filename)
 
 def monte_carlo_file(name, across_oil_content=False, extention='xlsx'):
-    number, agile = parse(name)
+    number, agile = parse_configuration(name)
     filename = f'oilcane_monte_carlo_{number}'
     if agile: filename += '_agile'
     if across_oil_content: filename += '_across_oil_content'
@@ -54,7 +54,7 @@ def autoload_file_name(name):
     return os.path.join(results_folder, filename)
 
 def get_monte_carlo_across_oil_content(name, metric, derivative=False):
-    key = parse(name)
+    key = parse_configuration(name)
     if isinstance(key, Configuration):
         df = pd.read_excel(
             monte_carlo_file(key, True),
@@ -80,7 +80,7 @@ def get_monte_carlo_key(index, dct, with_units=False):
     return key
 
 def get_monte_carlo(name, features=None, cache={}):
-    key = parse(name)
+    key = parse_configuration(name)
     if isinstance(key, Configuration):
         if key in cache:
             df = cache[key]

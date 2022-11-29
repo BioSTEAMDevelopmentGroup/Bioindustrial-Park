@@ -16,7 +16,7 @@ from ._feature_mockups import (
     all_metric_mockups, GWP_ethanol_allocation, GWP_biodiesel_allocation,
 )
 from ._parse_configuration import (
-    parse,
+    parse_configuration,
     Configuration,
 )
 from ._load_data import (
@@ -122,7 +122,7 @@ evaluate_configurations_across_sorghum_and_cane_oil_content = no_derivative(
 
 # def evaluate_MFPP_benefit_uncertainty_across_ethanol_and_biodiesel_prices(name, ethanol_price, biodiesel_price, baseline=None):
 #     if baseline is None:
-#         configuration = parse(name)
+#         configuration = parse_configuration(name)
 #         number, agile = configuration
 #         assert number > 0
 #         baseline = Configuration(-number, agile)
@@ -206,7 +206,7 @@ def run_uncertainty_and_sensitivity(name, N, rule='L',
     oc.model.load_samples(samples, optimize=optimize, ss=False)
     file = monte_carlo_file(name, across_oil_content)
     if across_oil_content:
-        if parse(name).number < 0:
+        if parse_configuration(name).number < 0:
             oc.model.evaluate(notify=int(N/10))
             oc.model.evaluate_across_coordinate(
                 name='Oil content',

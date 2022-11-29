@@ -20,10 +20,10 @@ __all__ = (
 
 def asconfiguration(x):
     try:
-        number, agile = x
-        return Configuration(int(number), bool(agile))
+        number, agile, energycane = x
+        return Configuration(int(number), bool(agile), bool(energycane))
     except:
-        return Configuration(int(x), False)
+        return Configuration(int(x), False, False)
 
 def ascomparison(x):
     a, b = x
@@ -32,6 +32,7 @@ def ascomparison(x):
 class Configuration(NamedTuple):
     number: int
     agile: bool = False
+    energycane: bool = False
    
 class ConfigurationComparison(NamedTuple):
     a: Configuration
@@ -39,7 +40,7 @@ class ConfigurationComparison(NamedTuple):
 
 def name_to_configuration(name):
     name = name.replace(' ', '')
-    return Configuration((-1 if name.startswith('S') else 1) * int(name[1]), '*' in name)
+    return Configuration((-1 if name.startswith('S') else 1) * int(name[1:].strip('*+')), '*' in name, '+' in name)
 
 def parse_configuration(x):
     if isinstance(x, int):
@@ -57,8 +58,7 @@ def parse_configuration(x):
             else:
                 raise RuntimeError('cannot parse multiple subtractions')
         else:
-            factor = -1 if x.startswith('S') else 1
-            return Configuration(factor * int(x[1:].strip('*')), '*' in x)
+            return name_to_configuration(x)
     elif isinstance(x, (Configuration, ConfigurationComparison)):
         return x
     else:
@@ -80,7 +80,7 @@ def format_name(name):
         raise Exception('unknown error')
 
 def format_configuration(configuration, latex=True):
-    number, agile = configuration
+    number, agile, energycane = configuration
     if number < 0:
         name = f"S{number}"
     else:
@@ -90,6 +90,7 @@ def format_configuration(configuration, latex=True):
     if latex:
         name = r'$\mathtt{' + name + '}$'
     if agile: name += '*'
+    if energycane: name += '+'
     return name
 
 def format_comparison(comparison):
