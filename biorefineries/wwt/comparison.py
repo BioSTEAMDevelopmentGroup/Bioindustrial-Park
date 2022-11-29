@@ -13,14 +13,14 @@ between the original biorefinery modules and those implemented in this wwt modul
 
 environment for the archived results https://github.com/yalinli2/biorefinery-WWT-archived-results,
 most of the results were from the following cloned repositories:
-    - thermosteam@qsdsan, commit 15a38b24fd424a7f654ddf8bab5b845cfdbf77bb
-    - biosteam@qsdsan, commit 7f39c802fe149a7dfd40d49e86db73896dd683c1
-    - biorefineries@wwt, commit f3c3d37a342f1da8f582f71520fbd76d645e16e5
+    - thermosteam, commit 15a38b24fd424a7f654ddf8bab5b845cfdbf77bb
+    - biosteam, commit 7f39c802fe149a7dfd40d49e86db73896dd683c1
+    - biorefineries, commit f3c3d37a342f1da8f582f71520fbd76d645e16e5
 
-cornstover results were updated with
-    - thermosteam@qsdsan, commit d66a745a9393dc5415921092371df2cb80fd7839
-    - biosteam@qsdsan, commit 0994e6d662163d0ff52c952ecdc6cb5b7e06bd53
-    - biorefineries@wwt, commit bf1c4e178abebebe84a869379f29f4ed9bd0a0c6
+cornstover results were updated with:
+    - thermosteam, commit d66a745a9393dc5415921092371df2cb80fd7839
+    - biosteam, commit 0994e6d662163d0ff52c952ecdc6cb5b7e06bd53
+    - biorefineries, commit bf1c4e178abebebe84a869379f29f4ed9bd0a0c6
 '''
 
 # %%
