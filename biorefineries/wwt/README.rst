@@ -15,7 +15,7 @@ This repository contains the modules for the design of a high-rate wastewater tr
 - OC-2G (oilcane juice and bagasse-to-ethanol and oil-to-biodiesel) as in the `oilcane <https://github.com/BioSTEAMDevelopmentGroup/Bioindustrial-Park/tree/master/biorefineries/oilcane>`_ module (O2 configuration), implementation and comparison codes in `oilcane2g.py <https://github.com/BioSTEAMDevelopmentGroup/Bioindustrial-Park/blob/master/biorefineries/wwt/oilcane2g.py>`_
 - LA (corn stover-to-lactic acid) as in the `lactic <https://github.com/BioSTEAMDevelopmentGroup/Bioindustrial-Park/tree/master/biorefineries/lactic>`_ module, implementation and comparison codes in `lactic.py <https://github.com/BioSTEAMDevelopmentGroup/Bioindustrial-Park/blob/master/biorefineries/wwt/lactic.py>`_
 
-Codes for a quick comparison of key biorefinery metrics (baseline) can be found in `comparison.py <https://github.com/BioSTEAMDevelopmentGroup/Bioindustrial-Park/blob/master/biorefineries/wwt/comparison.py>`_ (codes for full comparison in the respective modules as listed above). Archived results generated from this module can be found in the `biorefinery-WWT-archived-results repository <https://github.com/yalinli2/biorefinery-WWT-archived-results>`_
+Codes for a quick comparison of key biorefinery metrics (baseline) can be found in `comparison.py <https://github.com/BioSTEAMDevelopmentGroup/Bioindustrial-Park/blob/master/biorefineries/wwt/comparison.py>`_ (together with the environment used to generate the results; codes for full comparison in the respective modules as listed above). Archived results generated from this module can be found in the `biorefinery-WWT-archived-results repository <https://github.com/yalinli2/biorefinery-WWT-archived-results>`_
 
 
 References
