@@ -16,7 +16,9 @@ from biosteam import main_flowsheet as f
 from numpy import array
 
 __all__ = ('set_lipid_fraction',
-           'get_lipid_fraction')
+           'get_lipid_fraction',
+           'set_composition',
+           'get_composition')
 
 def set_lipid_fraction(lipid_fraction, stream=None,
                        PL_fraction=0.,
@@ -25,7 +27,10 @@ def set_lipid_fraction(lipid_fraction, stream=None,
                        z_mass_ash_baseline=0.006,
                        z_mass_solids_baseline=0.015,
                        z_mass_water_baseline=0.7):
-    """Adjust composition of lipid cane to achieve desired oil fraction (dry weight)."""
+    """Adjust composition of lipid cane to achieve desired oil fraction (dry weight)
+    assuming that an increase in lipid content is accompanied by a decrease in sugar
+    content using an energy balance and an increase in fiber using a mass balance 
+    (lipid is more energy dense than sugar)."""
     if not stream: stream = f.stream.lipidcane
     thermo = stream.thermo
     carbs_IDs = ('Glucose', 'Sucrose')
@@ -75,6 +80,55 @@ def set_lipid_fraction(lipid_fraction, stream=None,
     imass[fiber_IDs] = r_mass_fiber * z_mass_fiber * F_mass
     if any(stream.mol < 0):
         raise ValueError(f'lipid cane oil composition of {z_mass_lipid/z_dry*100:.0f}% dry weight is infeasible')
+
+def set_composition(
+        stream,
+        # By weight (e.g., g water / g cane)
+        moisture,
+        # By dry weight (e.g., g lipid / g dry cane)
+        lipid, 
+        fiber, 
+        solids,
+        ash,
+        # By lipid weight (e.g., g TAG / g Lipid)
+        TAG,
+        FFA,
+        PL,
+    ):
+    """Set the composition of a sugarcane stream by dry weight 
+    (lipid, fiber, ash, and solids), total moisture content (moisture),
+    and lipid weight (TAG, FFA, PL)."""
+    imass = stream.imass
+    dry_content = 1 - moisture
+    F_mass = stream.F_mass
+    total_dry = F_mass * dry_content
+    total_lipid = total_dry * lipid
+    imass['TAG'] = total_lipid * TAG
+    imass['FFA'] = total_lipid * FFA
+    imass['PL'] = total_lipid * PL
+    imass['Fiber'] = total_dry * fiber
+    imass['Water'] = F_mass * moisture
+    imass['Ash'] = total_dry * ash
+    imass['Solids'] = total_dry * solids
+    imass['Sugar'] = F_mass - stream.F_mass - imass['Sugar']
+
+def get_composition(stream):
+    total = stream.F_mass
+    imass = stream.imass
+    water = imass['Water']
+    total_dry = total - water
+    total_lipid = imass['Lipid']
+    return dict(
+        moisture=water / total,
+        lipid=total_lipid / total_dry,
+        sugar=imass['Sugar'] / total_dry,
+        fiber=imass['Fiber'] / total_dry,
+        solids=imass['Solids'] / total_dry,
+        ash=imass['Ash'] / total_dry,
+        TAG=imass['TAG'] / total_lipid if total_lipid else 0.,
+        FFA=imass['FFA'] / total_lipid if total_lipid else 0.,
+        PL=imass['PL'] / total_lipid if total_lipid else 0.,
+    )
 
 def get_lipid_fraction(stream=None):
     if not stream: stream = f.stream.lipidcane

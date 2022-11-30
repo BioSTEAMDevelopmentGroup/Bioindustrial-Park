@@ -63,6 +63,7 @@ import thermosteam as tmo
 from biorefineries.sugarcane import create_sugarcane_to_ethanol_system, create_sugarcane_to_sugar_and_ethanol_system
 from biorefineries.lipidcane import (
     set_lipid_fraction as set_oil_fraction, 
+    get_composition, set_composition,
 )
 from biosteam import main_flowsheet, UnitGroup
 from chaospy import distributions as shape

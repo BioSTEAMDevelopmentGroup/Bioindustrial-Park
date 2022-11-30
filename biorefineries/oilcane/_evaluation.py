@@ -8,6 +8,7 @@ import numpy as np
 import biosteam as bst
 from warnings import warn
 from biorefineries import oilcane as oc
+from biorefineries.lipidcane import get_composition, set_composition
 from ._distributions import (
     mean_RIN_D3_price,
     mean_RIN_D5_price,
@@ -31,6 +32,7 @@ __all__ = (
     'evaluate_configurations_across_sorghum_and_cane_oil_content',
     # 'evaluate_MFPP_uncertainty_across_ethanol_and_biodiesel_prices',
     # 'evaluate_MFPP_benefit_uncertainty_across_ethanol_and_biodiesel_prices',
+    'evaluate_metrics_across_composition',
     'evaluate_MFPP_benefit_across_ethanol_and_biodiesel_prices',
     'evaluate_MFPP_across_ethanol_and_biodiesel_prices',
     'evaluate_MFPP_benefit_across_ethanol_and_biodiesel_prices',
@@ -101,7 +103,7 @@ evaluate_configurations_across_sorghum_and_cane_oil_content = no_derivative(
         excluded=['configurations', 'relative'],
         signature=f'(),(),(c),()->(c,{N_metrics})'
     )
-)              
+)
 
 # def evaluate_MFPP_uncertainty_across_ethanol_and_biodiesel_prices(name, ethanol_price, biodiesel_price):
 #     table = get_monte_carlo(name)
@@ -157,6 +159,23 @@ def evaluate_MFPP_benefit_across_ethanol_and_biodiesel_prices(ethanol_price, bio
     MFPP_baseline = evaluate_MFPP_across_ethanol_and_biodiesel_prices(ethanol_price, biodiesel_price, baseline)
     MFPP = evaluate_MFPP_across_ethanol_and_biodiesel_prices(ethanol_price, biodiesel_price, configuration)
     return MFPP - MFPP_baseline
+
+def evaluate_metrics_at_composition(oil, fiber, water, configuration):
+    composition = get_composition(oc.feedstock)
+    composition['lipid'] = oil
+    composition['fiber'] = fiber
+    set_composition(**composition)
+    oc.load(configuration)
+    oc.sys.simulate()
+    return np.array([i() for i in oc.model.metrics])
+
+evaluate_metrics_across_composition = no_derivative(
+    np.vectorize(
+        evaluate_metrics_at_composition, 
+        excluded=['configuration'],
+        signature=f'(),(),()->({N_metrics})'
+    )
+)
 
 def save_pickled_results(N, configurations=None, rule='L', optimize=True):
     from warnings import filterwarnings
