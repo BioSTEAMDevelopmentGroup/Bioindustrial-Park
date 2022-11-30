@@ -787,8 +787,18 @@ def load(name, cache=cache, reduce_chemicals=False, RIN=True,
     def set_cane_oil_content(cane_oil_content):
         if agile:
             cane_mode.oil_content = cane_oil_content / 100.
+        elif energycane:
+            oil_extraction_specification.load_oil_content(
+                cane_oil_content / 100.,
+                z_mass_carbs_baseline=0.091,
+                z_mass_solids_baseline=0., 
+                z_mass_ash_baseline=0.028,
+                z_mass_water_baseline=0.60,
+            )
         else:
-            oil_extraction_specification.load_oil_content(cane_oil_content / 100.)
+            oil_extraction_specification.load_oil_content(
+                cane_oil_content / 100.
+            )
 
     @uniform(-3., 0., element='oilsorghum', units='dry wt. %', kind='coupled',
              baseline=0.)
@@ -1116,7 +1126,10 @@ def load(name, cache=cache, reduce_chemicals=False, RIN=True,
         set_baseline(set_cane_xylose_yield, 97.5)
         set_baseline(set_glucose_to_ethanol_yield, 90)
         set_baseline(set_xylose_to_ethanol_yield, 42)
-    set_baseline(set_cane_oil_content, 10)
+    if energycane:
+        set_baseline(set_cane_oil_content, 2)
+    else:
+        set_baseline(set_cane_oil_content, 10)
     set_baseline(set_saccharification_oil_recovery, 70)
     set_baseline(set_crushing_mill_oil_recovery, 60)
     set_baseline(set_advanced_ethanol_price, maep) 

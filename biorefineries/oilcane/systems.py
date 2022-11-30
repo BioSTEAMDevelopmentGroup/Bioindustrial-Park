@@ -143,9 +143,8 @@ def create_acTAG_separation_system(ins, outs):
           dict(ID='evaporator_condensate')], 
 )
 def create_post_fermentation_oil_separation_system(ins, outs, wastewater_concentration=None,
-                                                   target_oil_content=60, 
-                                                   separate_cellmass=False,
-                                                   free_oil=None):
+                                                   target_oil_and_solids_content=60, 
+                                                   separate_cellmass=False):
     oil, wastewater, evaporator_condensate = outs
     if separate_cellmass:     
         cellmass = bst.Stream('cellmass')
@@ -159,7 +158,7 @@ def create_post_fermentation_oil_separation_system(ins, outs, wastewater_concent
         thermo=oil.thermo.ideal(),
         flash=False,
     )
-    EvX.target_oil_content = target_oil_content # kg / kg
+    EvX.target_oil_and_solids_content = target_oil_and_solids_content # kg / m3
     EvX.remove_evaporators = False
     P_original = tuple(EvX.P)
     Pstart = P_original[0]
@@ -169,9 +168,9 @@ def create_post_fermentation_oil_separation_system(ins, outs, wastewater_concent
         EvX.V = V
         EvX.run()
         effluent = EvX.outs[0]
-        oil = free_oil() if free_oil else effluent.imass['Oil']
-        total = effluent.imass['Oil', 'Water'].sum()
-        return EvX.target_oil_content - 1000 * oil / total
+        moisture = effluent.imass['Water']
+        total = effluent.F_mass
+        return EvX.target_oil_and_solids_content - 1000. * (1. - moisture / total)
     
     @EvX.add_specification(run=False)
     def adjust_evaporation():
@@ -1121,7 +1120,6 @@ def create_oilcane_to_biodiesel_combined_1_and_2g_post_fermentation_oil_separati
         area=400,
         udct=True,
         separate_cellmass=True,
-        free_oil=lambda: hydrolysate_and_juice_mixer.outs[0].imass['Oil'],
     )
     backend_oil, cellmass, wastewater, evaporator_condensate = post_fermentation_oil_separation_sys.outs
     backend_oil.ID = 'backend_oil'
@@ -1157,7 +1155,7 @@ def create_oilcane_to_biodiesel_combined_1_and_2g_post_fermentation_oil_separati
         ins=backend_oil,
         outs=['', 'polar_lipids', ''],
         mockup=True,
-        area=800,
+        area=600,
         udct=True
     )
     oil, polar_lipids, wastewater_small = oil_pretreatment_sys.outs
@@ -1166,7 +1164,7 @@ def create_oilcane_to_biodiesel_combined_1_and_2g_post_fermentation_oil_separati
         ins=oil, 
         outs=[biodiesel, crude_glycerol, ''],
         mockup=True,
-        area=800,
+        area=600,
     )
     
     s = f.stream
@@ -1175,14 +1173,14 @@ def create_oilcane_to_biodiesel_combined_1_and_2g_post_fermentation_oil_separati
         feedstock=s.bagasse,
         recycle_process_water_streams=(condensate, evaporator_condensate),
         HXN_kwargs=dict(
-            ID=1000,
-            ignored=lambda: [u.H401, u.D801.boiler, u.D802.boiler, u.H803, u.H802, u.H801, u.H804, u.H806, u.H809, oil_pretreatment_dct['F3']],
+            ID=900,
+            ignored=lambda: [u.H401, u.D601.boiler, u.D602.boiler, u.H603, u.H602, u.H601, u.H604, u.H606, u.H609, oil_pretreatment_dct['F3']],
             Qmin=1e3,
             acceptable_energy_balance_error=0.01,
         ),
         CHP_kwargs=dict(area=700),
         WWT_kwargs=dict(area=500),
-        area=900,
+        area=800,
     )
     
 @SystemFactory(

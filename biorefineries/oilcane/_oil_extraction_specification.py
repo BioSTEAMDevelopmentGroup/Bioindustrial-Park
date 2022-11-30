@@ -25,7 +25,7 @@ class MockExtractionSpecification:
     def load_crushing_mill_oil_recovery(self, recovery):
         pass
     
-    def load_oil_content(self, oil_content):
+    def load_oil_content(self, oil_content, **kwargs):
         pass
     
     def load_specifications(self, 
@@ -93,12 +93,12 @@ class OilExtractionSpecification:
     def MFPP(self):
         return self.system.TEA.solve_price(self.feedstocks)
     
-    def load_oil_content(self, oil_content):
+    def load_oil_content(self, oil_content, **kwargs):
         if self.locked_oil_content: return
         for i in self.feedstocks: 
             set_oil_fraction(
                 oil_content, i, PL_fraction=self.PL_content, 
-                FFA_fraction=self.FFA_content
+                FFA_fraction=self.FFA_content, **kwargs,
             )
         self.oil_content = oil_content
       
