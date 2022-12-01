@@ -172,7 +172,7 @@ def create_succinic_sys(ins, outs):
     @R302.add_specification(run=False)
     def include_seed_CSL_in_cofermentation(): # note: effluent always has 0 CSL
         # R302.show(N=100)
-        # R302._run()
+        R302._run()
         R302.ins[2].F_mass*=1./(1-S302.split[0])
         R302._run()
     
