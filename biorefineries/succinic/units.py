@@ -4,11 +4,17 @@
 Created on Sun Aug 23 12:11:15 2020
 
 This module is a modified implementation of modules from the following:
-[1]	Bhagwat et al., Sustainable Production of Acrylic Acid via 3-Hydroxypropionic Acid from Lignocellulosic Biomass. ACS Sustainable Chem. Eng. 2021, 9 (49), 16659–16669. https://doi.org/10.1021/acssuschemeng.1c05441
-[2]	Li et al., Sustainable Lactic Acid Production from Lignocellulosic Biomass. ACS Sustainable Chem. Eng. 2021, 9 (3), 1341–1351. https://doi.org/10.1021/acssuschemeng.0c08055
-[3]	Cortes-Peña et al., BioSTEAM: A Fast and Flexible Platform for the Design, Simulation, and Techno-Economic Analysis of Biorefineries under Uncertainty. ACS Sustainable Chem. Eng. 2020, 8 (8), 3302–3310. https://doi.org/10.1021/acssuschemeng.9b07040
+[i]	Bhagwat et al., Sustainable Production of Acrylic Acid via 3-Hydroxypropionic Acid from Lignocellulosic Biomass. ACS Sustainable Chem. Eng. 2021, 9 (49), 16659–16669. https://doi.org/10.1021/acssuschemeng.1c05441
+[ii]	Li et al., Sustainable Lactic Acid Production from Lignocellulosic Biomass. ACS Sustainable Chem. Eng. 2021, 9 (3), 1341–1351. https://doi.org/10.1021/acssuschemeng.0c08055
+[iii]	Cortes-Peña et al., BioSTEAM: A Fast and Flexible Platform for the Design, Simulation, and Techno-Economic Analysis of Biorefineries under Uncertainty. ACS Sustainable Chem. Eng. 2020, 8 (8), 3302–3310. https://doi.org/10.1021/acssuschemeng.9b07040
 
 @author: sarangbhagwat
+
+References:
+[3] Aden et al., Process Design Report for Stover Feedstock: Lignocellulosic
+    Biomass to Ethanol Process Design and Economics Utilizing Co-Current Dilute
+    Acid Prehydrolysis and Enzymatic Hydrolysis for Corn Stover; NREL/TP-510-32438;
+    National Renewable Energy Lab (NREL), 2002.
 """
 
 
@@ -39,7 +45,7 @@ _Gcal_2_kJ = 4.184 * 1e6 # (also MMkcal/hr)
 Rxn = tmo.reaction.Reaction
 ParallelRxn = tmo.reaction.ParallelReaction
 
-compute_succinic_acid_titer = lambda effluent: effluent.imass['SuccinicAcid'] / effluent.F_vol
+compute_succinic_acid_titer = lambda effluent: (effluent.imass['SuccinicAcid']+ (118.09/156.15)*effluent.imass['CalciumSuccinate'])/ effluent.F_vol
 
 compute_succinic_acid_mass = lambda effluent: effluent.imass['SuccinicAcid']
 
@@ -413,24 +419,34 @@ class Saccharification(Unit):
       kW=74.57, cost=47200, S=(42607+443391+948+116), CE=CEPCI[2009], n=0.8, BM=2.3)
 
 class CoFermentation(Unit):    
-    _N_ins = 4
+    _N_ins = 6
     _N_outs = 2
     _units= {'Fermenter size': 'kg',
              'Recirculation flow rate': 'kg/hr'}             
 
-    
+    neutralization_safety_factor = 1.
     # Co-Fermentation time (hr)
     tau_cofermentation = 120
     
 
     CSL_loading = 10 # kg/m3
     
-    def __init__(self, ID='', ins=None, outs=(), T=30+273.15):
+    def __init__(self, ID='', ins=None, outs=(), T=30+273.15, neutralization=False):
         Unit.__init__(self, ID, ins, outs)
         # Same T for saccharificatoin and co-fermentation
         self.T = T
+        self.neutralization = neutralization
         
-
+        self.sucrose_hydrolysis_rxns = ParallelRxn([
+        #      Reaction definition            Reactant    Conversion
+        Rxn('Sucrose + H2O -> 2 Glucose',        'Sucrose',   1.-1e-4), 
+        ])
+        
+        # self.fructose_to_glucose_rxns = ParallelRxn([
+        # #      Reaction definition            Reactant    Conversion
+        # Rxn('Fructose -> Glucose',        'Fructose',   1.-1e-4), 
+        # ])
+        
         self.cofermentation_rxns = ParallelRxn([
         #      Reaction definition            Reactant    Conversion
         Rxn('Glucose + 2 CO2 -> 2 SuccinicAcid + 2 O2',        'Glucose',   0.7), 
@@ -445,7 +461,14 @@ class CoFermentation(Unit):
         Rxn('Xylose -> 5 FermMicrobe',        'Xylose',    0.05),
         Rxn('3 Xylose -> 5 PyruvicAcid',    'Xylose',   0.1)
         ])
-
+        
+        self.neutralization_rxns = ParallelRxn([
+        #   Reaction definition                                               Reactant  Conversion
+        # Rxn('2 LacticAcid + CalciumDihydroxide -> CalciumLactate + 2 H2O',  'LacticAcid',   1.),
+        Rxn('2 AceticAcid + CalciumDihydroxide -> CalciumAcetate + 2 H2O',  'AceticAcid',   1.),
+        Rxn('SuccinicAcid + CalciumDihydroxide -> CalciumSuccinate + 2H2O', 'SuccinicAcid', 1.)
+            ])
+        
         self.CO2_generation_rxns = ParallelRxn([
             Rxn('Glucose -> 6CO2 + 6H2O', 'Glucose', 1.),
             Rxn('Xylose -> 5CO2 + 5H2O', 'Xylose', 1.)])
@@ -478,21 +501,32 @@ class CoFermentation(Unit):
         # Rxn('2 AceticAcid + CalciumDihydroxide -> CalciumAcetate + 2 H2O',  'AceticAcid',   1),
         # Rxn('SuccinicAcid + CalciumDihydroxide -> CalciumSuccinate + 2H2O', 'SuccinicAcid', 1)
         #     ])
-
+    
+    CO2_safety_factor = 3.
+    
     def _run(self):
-        feed, sugars, CSL, CO2 = self.ins
+        feed, sugars, CSL, CO2, lime, recycled_CO2 = self.ins
         
         effluent, vapor = self.outs
         effluent.mix_from([feed, sugars])
+        # effluent.phase='l'
+        # try:
+        self.sucrose_hydrolysis_rxns(effluent.mol)
+        # except:
+        #     breakpoint()
+        # self.fructose_to_glucose_rxns(effluent.mol)
         
-        CO2.imol['CO2'] = 2 * self.glucose_to_succinic_acid_rxn.X * effluent.imol['Glucose']\
-            + 1.667 * self.xylose_to_succinic_acid_rxn.X * effluent.imol['Xylose']
-        
-        effluent.mix_from([effluent, CO2])
+        CO2.imol['CO2'] = max(0, (2 * self.glucose_to_succinic_acid_rxn.X * effluent.imol['Glucose']\
+            + 1.667 * self.xylose_to_succinic_acid_rxn.X * effluent.imol['Xylose'])\
+            * self.CO2_safety_factor\
+            - recycled_CO2.imol['CO2'])
+            
+        effluent.mix_from([effluent, CO2, recycled_CO2])
         # ss = Stream(None)
         # effluent.copy_like(feed)
         effluent.T = vapor.T = self.T
         CSL.imass['CSL'] = (sugars.F_vol+feed.F_vol) * self.CSL_loading 
+        
         
         self.cofermentation_rxns(effluent.mol)
         vapor.imol['CO2', 'O2'] = effluent.imol['CO2', 'O2']
@@ -504,8 +538,29 @@ class CoFermentation(Unit):
         effluent.imol['O2'] = 0
         effluent.imass['CSL'] = 0
         
+        if self.neutralization:
+            # Set feed lime mol to match rate of acids production, add 10% extra
+            lime.imol['Lime'] = (
+                                # effluent.imol['LacticAcid']/2/self.neutralization_rxns.X[0] \
+                                effluent.imol['AceticAcid']/2/self.neutralization_rxns.X[0] \
+                                +effluent.imol['SuccinicAcid']/self.neutralization_rxns.X[1]) \
+                                * self.neutralization_safety_factor
+            effluent.mix_from((effluent, lime))
+            # self.neutralization_rxns.adiabatic_reaction(effluent)
+            self.neutralization_rxns(effluent.mol)
+        else:
+            lime.empty()
+            
         self.effluent_titer = compute_succinic_acid_titer(effluent)
         
+        vapor.imol['CO2'] += max(0, self.mol_atom_in('C')-self.mol_atom_out('C'))
+    
+    def mol_atom_in(self, atom):
+        return sum([stream.get_atomic_flow(atom) for stream in self.ins])
+    
+    def mol_atom_out(self, atom):
+        return sum([stream.get_atomic_flow(atom) for stream in self.outs])
+    
     def _design(self):
         Design = self.design_results
         total_mass_flow = sum([instream.F_mass for instream in self.ins])
@@ -547,18 +602,22 @@ class SeedTrain(Unit):
         Unit.__init__(self, ID, ins, outs)
         self.T = T
         self.ferm_ratio = ferm_ratio
-
+        self.sucrose_hydrolysis_rxns = ParallelRxn([
+        #      Reaction definition            Reactant    Conversion
+        Rxn('Sucrose + H2O -> 2 Glucose',        'Sucrose',   1.-1e-4), 
+        ])
+        
         self.cofermentation_rxns = ParallelRxn([
         #      Reaction definition            Reactant    Conversion
-        Rxn('Glucose + 2 CO2 -> 2 SuccinicAcid + 2 O2',        'Glucose',   0.8), 
-        Rxn('Glucose -> 3 AceticAcid',               'Glucose',   1e-8),
-        Rxn('Glucose -> 2 Ethanol + 2 CO2',               'Glucose',   1e-8),
-        Rxn('Glucose -> 6 FermMicrobe',       'Glucose',   0.05),
+        Rxn('Glucose + 2 CO2 -> 2 SuccinicAcid + 2 O2',        'Glucose',   0.7*ferm_ratio), 
+        Rxn('Glucose -> 3 AceticAcid',               'Glucose',   1e-8*ferm_ratio),
+        Rxn('Glucose -> 2 Ethanol + 2 CO2',               'Glucose',   1e-8*ferm_ratio),
+        Rxn('Glucose -> 6 FermMicrobe',       'Glucose',   0.05*ferm_ratio),
         
-        Rxn('Xylose + 1.667 CO2 -> 1.667 SuccinicAcid + 0.833 O2',       'Xylose',    0.8),
-        Rxn('Xylose -> 2.5 AceticAcid',       'Xylose',    1e-8),
-        Rxn('Xylose -> 1.667 Ethanol + 1.667 CO2',       'Xylose',    1e-8),
-        Rxn('Xylose -> 5 FermMicrobe',        'Xylose',    0.05),
+        Rxn('Xylose + 1.667 CO2 -> 1.667 SuccinicAcid + 0.833 O2',       'Xylose',    0.7*ferm_ratio),
+        Rxn('Xylose -> 2.5 AceticAcid',       'Xylose',    1e-8*ferm_ratio),
+        Rxn('Xylose -> 1.667 Ethanol + 1.667 CO2',       'Xylose',    1e-8*ferm_ratio),
+        Rxn('Xylose -> 5 FermMicrobe',        'Xylose',    0.05*ferm_ratio),
         ])
 
         self.CO2_generation_rxns = ParallelRxn([
@@ -579,17 +638,21 @@ class SeedTrain(Unit):
         
         self.glucose_to_CO2_rxn = self.CO2_generation_rxns[0]
         self.xylose_to_CO2_rxn = self.CO2_generation_rxns[1]
-        
+    
+    CO2_safety_factor = 3.
     def _run(self):
         feed, CO2 = self.ins
         
         effluent, vapor = self.outs
         # effluent.mix_from([feed, CO2])
         
-        CO2.imol['CO2'] = 2 * self.glucose_to_succinic_acid_rxn.X * feed.imol['Glucose']\
-            + 1.667 * self.xylose_to_succinic_acid_rxn.X * feed.imol['Xylose']
+        CO2.imol['CO2'] = (2 * self.glucose_to_succinic_acid_rxn.X * (feed.imol['Glucose'] + 2*feed.imol['Sucrose'])\
+            + 1.667 * self.xylose_to_succinic_acid_rxn.X * feed.imol['Xylose'])\
+            *self.CO2_safety_factor
         
         effluent.mix_from([feed, CO2])
+        
+        self.sucrose_hydrolysis_rxns(effluent.mol)
         # ss = Stream(None)
         # effluent.copy_like(feed)
         effluent.T = vapor.T = self.T
@@ -604,7 +667,14 @@ class SeedTrain(Unit):
         effluent.imol['CO2'] = 0
         effluent.imol['O2'] = 0
         effluent.imass['CSL'] = 0
-
+        
+        vapor.imol['CO2'] += max(0, self.mol_atom_in('C')-self.mol_atom_out('C'))
+    
+    def mol_atom_in(self, atom):
+        return sum([stream.get_atomic_flow(atom) for stream in self.ins])
+    
+    def mol_atom_out(self, atom):
+        return sum([stream.get_atomic_flow(atom) for stream in self.outs])
 
     def _design(self):
         Design = self.design_results
@@ -936,56 +1006,84 @@ class Decantation(Unit):
 
 #!!! TODO: Add cooling utility
 
-# class AcidulationReactor(Reactor):
-#     _N_ins = 2
-#     _N_outs = 1
-    
-#     acidulation_rxns = ParallelRxn([
-#         #   Reaction definition                                           Reactant        Conversion
-#         Rxn('CalciumLactate + H2SO4 -> 2 LacticAcid + CaSO4',         'CalciumLactate',       1),
-#         Rxn('CalciumAcetate + H2SO4 -> 2 AceticAcid + CaSO4',         'CalciumAcetate',       1),
-#         Rxn('CalciumSuccinate + H2SO4 -> SuccinicAcid + CaSO4',       'CalciumSuccinate',     1),
-#         Rxn('2 AmmoniumHydroxide + H2SO4 -> AmmoniumSulfate + 2 H2O', 'AmmoniumHydroxide',    1),
-#         Rxn('CalciumDihydroxide + H2SO4 -> CaSO4 + 2 H2O',            'CalciumDihydroxide',   1)
-#             ])
-            
-#     def _run(self):
-#         feed, acid = self.ins
-#         effluent = self.outs[0]
-#         rxns = self.acidulation_rxns
-#         chemicals = self.chemicals        
+class AcidulationReactor(Reactor):
+    _N_ins = 2
+    _N_outs = 1
+
+    def _setup(self):
+        super()._setup()
+        self.acidulation_rxns = ParallelRxn([
+        #   Reaction definition                                           Reactant        Conversion
+        Rxn('CalciumLactate + H2SO4 -> 2 LacticAcid + CaSO4',         'CalciumLactate',       1),
+        Rxn('CalciumAcetate + H2SO4 -> 2 AceticAcid + CaSO4',         'CalciumAcetate',       1),
+        Rxn('CalciumSuccinate + H2SO4 -> SuccinicAcid + CaSO4',       'CalciumSuccinate',     1),
+        Rxn('2 AmmoniumHydroxide + H2SO4 -> AmmoniumSulfate + 2 H2O', 'AmmoniumHydroxide',    1),
+        Rxn('CalciumDihydroxide + H2SO4 -> CaSO4 + 2 H2O',            'CalciumDihydroxide',   1)
+            ])
+
+    bypass = False
+    acidulation_safety_factor = 1.
+    def _run(self):
+        if self.bypass:
+            self.ins[1].empty()
+            self.outs[0].copy_like(self.ins[0])
+        else:
+            feed, acid = self.ins
+            effluent = self.outs[0]
+            rxns = self.acidulation_rxns
+            chemicals = self.chemicals
+
+            acid_index = chemicals.index('H2SO4')
+            reactant_indices = chemicals.indices(rxns.reactants)
+            needed_acid = 0
+            for i in range(len(reactant_indices)):
+                index = reactant_indices[i]
+                needed_acid += -(rxns.stoichiometry[i][acid_index])/rxns.X[i] * feed.mol[index]
+
+            # Set feed acid mol to match acidulation needs with (acidulation_safety_factor-1)*100 % extra
+            acid.imol['H2SO4'] = needed_acid * self.acidulation_safety_factor
+            acid.imass['H2O'] = acid.imass['H2SO4'] / 0.93 * 0.07 # 93% purity
+            effluent.mix_from([feed, acid])
+            # rxns.adiabatic_reaction(effluent)
+            rxns(effluent.mol)
+
+    def _design(self):
+        if self.bypass: self.design_results.clear()
+        else: super()._design()
+
+    def _cost(self):
+        if self.bypass: self.baseline_purchase_costs.clear()
+        else: super()._cost()
         
-#         acid_index = chemicals.index('H2SO4')
-#         reactant_indices = chemicals.indices(rxns.reactants)
-#         needed_acid = 0
-#         for i in range(len(reactant_indices)):
-#             index = reactant_indices[i]
-#             needed_acid += -(rxns.stoichiometry[i][acid_index])/rxns.X[i] * feed.mol[index]
-        
-#         # Set feed acid mol to match acidulation needs with 5% extra
-#         acid.imol['H2SO4'] = needed_acid * 1.05
-#         acid.imass['H2O'] = acid.imass['H2SO4'] / 0.93 * 0.07 # 93% purity
-#         effluent.mix_from([feed, acid])
-#         rxns.adiabatic_reaction(effluent)
-        
-# # Filter to separate gypsum from the acidified fermentation broth
-# @cost(basis='Feed flow rate', ID='Hydroclone & rotary drum filter', units='kg/hr',
-#       # Size based on stream 239 in Aden et al.,
-#       # no power as Centrifuge in AerobicDigestion in Humbird et al. has no power
-#       cost=187567, S=272342, CE=389.5, n=0.39, BM=1.4)
-# @cost(basis='Filtrate flow rate', ID='Filtered hydrolysate pump', units='kg/hr',
-#       # Size based on stream 230 in Aden et al.,
-#       # power based on SaccharificationAndCoFermentation Filtrate Saccharification transfer pumps
-#       kW=74.57*265125/421776, cost=31862, S=265125, CE=386.5, n=0.79, BM=2.8)
-# class GypsumFilter(SolidsSeparator):
-#     _N_ins = 1
-#     _units = {'Feed flow rate': 'kg/hr',
-#               'Filtrate flow rate': 'kg/hr'}
-    
-#     def _design(self):
-#         Design = self.design_results
-#         Design['Feed flow rate'] = self.ins[0].F_mass
-#         Design['Filtrate flow rate'] = self.outs[1].F_mass
+# Filter to separate gypsum from the acidified fermentation broth
+@cost(basis='Feed flow rate', ID='Hydrocyclone & rotary drum filter', units='kg/hr',
+      # Size based on stream 239 in ref [3]
+      cost=187567, S=272342, CE=CEPCI[1998], n=0.39, BM=1.4)
+@cost(basis='Filtrate flow rate', ID='Filtered hydrolysate pump', units='kg/hr',
+      # Size based on stream 230 in ref [3], power based on
+      # SaccharificationAndCoFermentation Filtrate Saccharification transfer pumps
+      kW=74.57*265125/421776, cost=31862, S=265125, CE=CEPCI[1997], n=0.79, BM=2.8)
+class GypsumFilter(SolidsSeparator):
+    _N_ins = 1
+    _units = {'Feed flow rate': 'kg/hr',
+              'Filtrate flow rate': 'kg/hr'}
+    bypass = False
+
+    def _run(self):
+        if self.bypass:
+            self.outs[0].empty()
+            self.outs[1].copy_like(self.ins[0])
+        else: super()._run()
+
+    def _design(self):
+        if self.bypass: self.design_results.clear()
+        else:
+            self.design_results['Feed flow rate'] = self.ins[0].F_mass
+            self.design_results['Filtrate flow rate'] = self.outs[1].F_mass
+
+    def _cost(self):
+        if self.bypass: self.baseline_purchase_costs.clear()
+        else: self._decorated_cost()
 
 # class Esterification(Reactor):
 #     """
@@ -1466,7 +1564,7 @@ class AerobicDigestion(Unit):
       cost=96000, S=1981, CE=CEPCI[2010], n=0.7, BM=1.5)
 @cost(basis='Flow rate', ID='Pump', units='kg/hr',
       kW=0.37285, cost=7493, S=1981, CE=CEPCI[2010], n=0.8, BM=2.3)
-class SulfuricAcidStorageTank(Unit): pass
+class SulfuricAcidStorage(Unit): pass
 
 #!!! Instead of copying the H2SO4, I suggest we use BioSTEAM's storage tank
 # Dipotassium hydrogen phosphate storage tank
@@ -1496,23 +1594,19 @@ class AmmoniaStorageTank(Unit): pass
       kW=0.37285, cost=3000, S=1393, CE=CEPCI[2009], n=0.8, BM=3.1)
 class CSLstorageTank(Unit): pass
 
-# # For storage of lime used in separation and waste treatment,
-# # design copied from cornstover biorefinery in Aden et al.
-# # Base flow from stream 27 of Aden et al.
-# @cost(basis='Flow rate', ID='Storage bin', units='kg/hr',
-#       cost=136370, S=2395, CE=386.5, n=0.46, BM=1.3)
-# # Cost not scaled, thus used n=0
-# # Power usage scaled based on M104 in Humbird et al., 
-# # (truck dumper hopper for feedstock handling) 
-# @cost(basis='Flow rate', ID='Feeder', units='kg/hr',
-#       kW=37.285/3500*140, cost=3900, S=2395, CE=386.5, n=0, BM=1.3)
-# # Power usage scaled based on M-106 in Humbird et al.
-# # (dust collection system for feedstock handling) 
-# @cost(basis='Flow rate', ID='Unloading blower', units='kg/hr',
-#       kW=18.6425*7425/8500, cost=99594, S=2395, CE=389.5, n=0.5, BM=1.4)
-# @cost(basis='Flow rate', ID='Dust vent baghouse', units='kg/hr',
-#       cost=140707, S=2395, CE=386.5, n=1, BM=1.5)
-# class LimeStorageBin(Unit): pass
+# For storage of lime used in separation and waste treatment as in ref [3]
+@cost(basis='Flow rate', ID='Storage bin', units='kg/hr',
+      cost=136370, S=2395, CE=CEPCI[1997], n=0.46, BM=1.3)
+# Cost not scaled, thus used n=0
+# Power usage scaled based on M104 (truck dumper hopper) in ref [1]
+@cost(basis='Flow rate', ID='Feeder', units='kg/hr',
+      kW=37.285/3500*140, cost=3900, S=2395, CE=CEPCI[1997], n=0, BM=1.3)
+# Power usage scaled based on M-106 (dust collection system) in ref [1]
+@cost(basis='Flow rate', ID='Unloading blower', units='kg/hr',
+      kW=18.6425*7425/8500, cost=99594, S=2395, CE=CEPCI[1998], n=0.5, BM=1.4)
+@cost(basis='Flow rate', ID='Dust vent baghouse', units='kg/hr',
+      cost=140707, S=2395, CE=CEPCI[1997], n=1, BM=1.5)
+class LimeStorage(Unit): pass
 
 @cost(basis='Flow rate', ID='Tank', units='kg/hr',
       cost=803000, S=8343, CE=CEPCI[2009], n=0.7, BM=1.7)
@@ -1935,10 +2029,10 @@ class SuccinicAcidCrystallizer(BatchCrystallizer):
         # print(x_start)
         x_end = (1-target_recovery)*x_start
         # T = self.get_T_from_x_end(x_end)
-        water_vol = self.ins[0].ivol['Water']
-        SA_mass = self.ins[0].imass['SuccinicAcid']
+        tot_vol = in_stream.ivol['Water'] + (1-target_recovery)*in_stream.ivol['SuccinicAcid']
+        SA_mass = in_stream.imass['SuccinicAcid']
         SA_remaining = (1-target_recovery)*SA_mass
-        x_end_gpL = SA_remaining/water_vol
+        x_end_gpL = SA_remaining/tot_vol
         # print(x_end,x_end_gpL)
         return ln(x_end_gpL/29.098)/0.0396 + 273.15
         # return T
@@ -1951,8 +2045,16 @@ class SuccinicAcidCrystallizer(BatchCrystallizer):
     def get_effective_recovery_from_T(self, T):
         in_stream = self.ins[0]
         out_stream = self.outs[0]
-        SA_mass_dissolved_end = 29.098*exp(0.0396*(T-273.15)) * in_stream.F_vol
+        
+        # method 1
+        # SA_mass_dissolved_end = 29.098*exp(0.0396*(T-273.15)) * in_stream.F_vol
+        
+        # method 2
+        SA_vol_per_mass = 0.0008252419812169215
+        f_T = 29.098*exp(0.0396*(T-273.15))
+        SA_mass_dissolved_end = (f_T*in_stream.ivol['Water'])/(1-f_T*SA_vol_per_mass)
         SA_mass_total = self.ins[0].imass['SuccinicAcid']
+        if SA_mass_dissolved_end<0: SA_mass_dissolved_end = SA_mass_total # higher temp can give negative values
         recovery = 1. - min(1., SA_mass_dissolved_end/SA_mass_total)
         return recovery
     
@@ -1980,7 +2082,7 @@ class SuccinicAcidCrystallizer(BatchCrystallizer):
             self.T = T = self.get_T_from_target_recovery(target_recovery)
             if T>in_stream.T:
                 self.T = T = in_stream.T
-                self.effective_recovery = self.get_effective_recovery_from_T(T-273.15)
+                self.effective_recovery = self.get_effective_recovery_from_T(T)
         
         # self.tau = self.get_t_from_target_recovery(effective_recovery)
         # print(self.ID, effective_recovery, self.effective_recovery)

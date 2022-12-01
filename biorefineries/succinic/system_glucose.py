@@ -28,6 +28,9 @@ from biorefineries.succinic.tea import TemplateTEA as SuccinicTEA
 from biorefineries.make_a_biorefinery.auto_waste_management import AutoWasteManagement
 
 from hxn._heat_exchanger_network import HeatExchangerNetwork
+from biorefineries.sugarcane import create_juicing_system_up_to_clarification
+
+import math
 
 HeatExchangerNetwork = bst.facilities.HeatExchangerNetwork
 
@@ -59,25 +62,42 @@ System.default_molar_tolerance = 0.1
 System.default_relative_molar_tolerance = 0.0001 # supersedes absolute tolerance
 System.strict_convergence = True # True => throw exception if system does not converge; False => continue with unconverged system
 
+exp = math.exp
+def get_succinic_acid_solubility_gpL(T):
+    return 29.098*exp(0.0396*(T-273.15))
+
 # %% System
 @SystemFactory(ID = 'succinic_sys')
 def create_succinic_sys(ins, outs):
     def fix_split(isplit, ID):
         isplit['SuccinicAcid', 'LacticAcid', 'Ethanol'] = isplit[ID]
-       
+    
     process_groups = []
-    feedstock = Stream('feedstock')
-    feedstock.imass['Glucose'] = 29000.
-    feedstock.imass['H2O'] = 500.
-    feedstock.price = price['Glucose']*feedstock.imass['Glucose']/feedstock.F_mass
     
-    feedstock.F_mass = 50e3
+    # #%% Feedstock - Glucose
+    # feedstock = Stream('feedstock')
+    # feedstock.imass['Glucose'] = 29000.
+    # feedstock.imass['H2O'] = 500.
+    # feedstock.price = price['Glucose']*feedstock.imass['Glucose']/feedstock.F_mass
     
-    U101 = units.FeedstockPreprocessing('U101', ins=feedstock)
+    # feedstock.F_mass = 50e3
     
-    # Handling costs/utilities included in feedstock cost thus not considered here
-    U101.cost_items['System'].cost = 0
-    U101.cost_items['System'].kW = 0
+    # U101 = units.FeedstockPreprocessing('U101', ins=feedstock)
+    
+    # # Handling costs/utilities included in feedstock cost thus not considered here
+    # U101.cost_items['System'].cost = 0
+    # U101.cost_items['System'].kW = 0
+    
+    #%% Feedstock - Sugarcane
+    # Sugarcane juicing subprocess
+    sugarcane_juicing_sys = create_juicing_system_up_to_clarification()
+    u = sugarcane_juicing_sys.flowsheet.unit
+    s = sugarcane_juicing_sys.flowsheet.stream
+    feedstock = s.sugarcane
+    
+    feedstock.F_mass = 96000. # to produce SA at 58,000 metric tonne / year at baseline
+    
+    sugarcane_juicing_sys.flowsheet.diagram('thorough')
     
     # %% 
     
@@ -100,13 +120,26 @@ def create_succinic_sys(ins, outs):
     # dilution_water.imol['Water'] =  5000. # flow updated automatically 
     natural_gas_drying = Stream('natural_gas_drying', units = 'kg/hr', price=0.218)
     
-    
+    lime_neutralization = Stream('lime_neutralization', units='kg/hr', 
+                                 # price=price['Lime'],
+                                 )
+    CO2_seedtrain = Stream('CO2_seedtrain', units='kg/hr',
+                              price=price['Liquid carbon dioxide'],
+                              P=1*101325.)
+    CO2_fermentation = Stream('CO2_fermentation', units='kg/hr',
+                              price=price['Liquid carbon dioxide'],
+                              P=1*101325.)
     # =============================================================================
     # Conversion units
     # =============================================================================
     
+    #!!!
+    # sugarcane_juicing_sys.simulate()
+    # u.C201.show(N=100)
+    # u.C201.show('cwt100')
+    
     # Cool hydrolysate down to fermentation temperature at 50°C
-    H301 = bst.units.HXutility('H301', ins=U101-0, T=50+273.15)
+    H301 = bst.units.HXutility('H301', ins=u.C201-0, T=50+273.15)
     
 
 
@@ -116,11 +149,12 @@ def create_succinic_sys(ins, outs):
     @M304.add_specification()
     def adjust_M304_water():
         M304_ins_1 = M304.ins[1]
-        M304_ins_1.imol['Water'] = M304.water_to_sugar_mol_ratio * M304.ins[0].imol['Glucose', 'Xylose'].sum()
+        M304_ins_0 = M304.ins[0]
+        M304_ins_1.imol['Water'] = M304.water_to_sugar_mol_ratio * (M304_ins_0.imol['Glucose', 'Xylose'].sum() + 2*M304_ins_0.imol['Sucrose'])
         M304._run()
     # M304.specification = adjust_M304_water()
     
-    M304_H = bst.units.HXutility('M304_H', ins=M304-0, T=30+273.15, rigorous=True)
+    M304_H = bst.units.HXutility('M304_H', ins=M304-0, T=30+273.15, rigorous=False)
     
     # Mix pretreatment hydrolysate/enzyme mixture with fermentation seed
     
@@ -132,27 +166,99 @@ def create_succinic_sys(ins, outs):
     # Cofermentation
     
     R302 = units.CoFermentation('R302', 
-                                    ins=(S302-1, 'seed', CSL, 'CO2_feed'),
-                                    outs=('fermentation_broth', 'fermentation_vent'))
+                                    ins=(S302-1, 'seed', CSL, CO2_fermentation, lime_neutralization, ''),
+                                    outs=('fermentation_broth', 'fermentation_vent'),
+                                    neutralization=False)
     @R302.add_specification(run=False)
     def include_seed_CSL_in_cofermentation(): # note: effluent always has 0 CSL
-        R302._run()
+        # R302.show(N=100)
+        # R302._run()
         R302.ins[2].F_mass*=1./(1-S302.split[0])
+        R302._run()
     
     
     # ferm_ratio is the ratio of conversion relative to the fermenter
-    R303 = units.SeedTrain('R303', ins=(S302-0, ''), outs=('seed', 'CO2_seedtrain'), ferm_ratio=0.9)
+    R303 = units.SeedTrain('R303', ins=(S302-0, CO2_seedtrain), outs=('seed', 'vent_seedtrain'), ferm_ratio=0.9)
+    
+    M305 = bst.Mixer('M305', ins=(R302-1, R303-1,), outs=('mixed_fermentation_and_seed_vent'))
     
     T301 = units.SeedHoldTank('T301', ins=R303-0, outs=1-R302)
+    
+    #%% Separation streams
+    sulfuric_acid_R401 = Stream('sulfuric_acid_R401', units='kg/hr')
+    
+    gypsum = Stream('gypsum', units='kg/hr', price=price['Gypsum'])
+    
+    makeup_MEA_A401 = Stream('makeup_MEA_A401', units='kg/hr', price=price['Monoethanolamine'])
+    
+    #%% Separation units
+    
+    
+    A401 = bst.AmineAbsorption('A401', ins=(M305-0, makeup_MEA_A401, 'makeup_water'), outs=('absorption_vent', 'captured_CO2'),
+                               CO2_recovery=0.5)
+    
+    @A401.add_specification(run=False)
+    def A401_spec():
+        # A401.outs[1].phase='g'
+        A401._run()
+        A401.outs[1].phase='g'
+    K401 = bst.IsothermalCompressor('K401', ins=A401-1, outs=('recycled_CO2'), P=500*101325., 
+                                    # vle=True,
+                                    eta=0.6,
+                                    )
+    K401-0-5-R302
+    
+    @K401.add_specification(run=False)
+    def K401_spec():
+        # A401.outs[1].phases=('g','l')
+        s1, s2 = K401.ins[0], K401.outs[0]
+        for Kstream in s1, s2:
+            Kstream.imol['CO2_compressible'] = Kstream.imol['CO2']
+            Kstream.imol['CO2'] = 0.
+        K401._run()
+        for Kstream in s1, s2:
+            Kstream.imol['CO2'] = Kstream.imol['CO2_compressible']
+            Kstream.imol['CO2_compressible'] = 0.
+        K401.outs[0].phase='l'
+        
+        # A401.show(N=100)
+        # R302.show(N=100)
+        # K401.show(N=100)
+        
     
     S401 = bst.SolidsCentrifuge('S401', ins=R302-0, 
                             outs=('S401_solid_waste', 'S401_1'),
                             solids=['FermMicrobe'], split={'FermMicrobe':0.995})
     
+    R401 = units.AcidulationReactor('R401', ins=(S401-1, sulfuric_acid_R401),
+                                    P=101325, tau=1, V_wf=0.8, length_to_diameter=2,
+                                    kW_per_m3=0.0985, wall_thickness_factor=1.5,
+                                    vessel_material='Stainless steel 316',
+                                    vessel_type='Vertical')
+    R401_P = bst.units.Pump('R401_P', ins=R401-0)
+
+    @R401.add_specification(run=True)
+    def R401_spec():
+        R401.bypass = not R302.neutralization # bypass if not neutralizing
+        
+    @R401_P.add_specification(run=True)
+    def R401_P_spec():
+        R401_P.bypass = not R302.neutralization # bypass if not neutralizing
+        
+    S404 = units.GypsumFilter('S404', ins=R401_P-0,
+                              moisture_content=0.2,
+                              split=0., # updated
+                              outs=(gypsum, ''))
     
-    F401 = bst.MultiEffectEvaporator('F401', ins=S401-1, outs=('F401_l', 'F401_g'),
+    @S404.add_specification(run=True)
+    def S404_spec():
+        S404.isplit['Gypsum'] = 1.-1e-4
+        S404.isplit['Water'] = 0.01
+        S404.bypass = not R302.neutralization # bypass if not neutralizing
+    
+    F401 = bst.MultiEffectEvaporator('F401', ins=S404-1, outs=('F401_l', 'F401_g'),
                                             P = (101325, 73581, 50892, 32777, 20000), V = 0.5)
-    F401.V_water_multiplier = 0.1
+    F401.V_water_multiplier = 0.8
     @F401.add_specification(run=False)
     def F401_spec():
         instream = F401.ins[0]
@@ -163,7 +269,7 @@ def create_succinic_sys(ins, outs):
     F401_P = bst.Pump('F401_P', ins=F401-0, P=101325.)
     
     C401 = units.SuccinicAcidCrystallizer('C401', ins=F401_P-0, outs=('C401_0',), 
-                                   target_recovery=0.98,
+                                   target_recovery=0.95,
                                    tau=6,
                                    T_range=(273.15+2., 372.5),
                                    N=4,
@@ -175,7 +281,7 @@ def create_succinic_sys(ins, outs):
                             split={'SuccinicAcid':0.995,
                                    'FermMicrobe':0.995})
     
-    S402.recovery = 0.95
+    S402.recovery = 0.85
     @S402.add_specification(run=False)
     def S402_spec():
         S402_recovery = S402.recovery
@@ -203,9 +309,9 @@ def create_succinic_sys(ins, outs):
     F402_P = bst.Pump('F402_P', ins=F402-0, P=101325.)
     
     C402 = units.SuccinicAcidCrystallizer('C402', ins=F402_P-0, outs=('C402_0',), 
-                                   target_recovery=0.98,
+                                   target_recovery=0.95,
                                    tau=6,
-                                   T_range=(273.15+2., 372.5),
+                                   T_range=(273.15+2., 373.15-2.),
                                    N=4,
                                    )
 
@@ -214,7 +320,8 @@ def create_succinic_sys(ins, outs):
                             # solids=['SuccinicAcid', 'FermMicrobe'], 
                             split={'SuccinicAcid':0.995,
                                    'FermMicrobe':0.995})
-    S403.recovery = 0.95
+    
+    S403.recovery = 0.85
     @S403.add_specification(run=False)
     def S403_spec():
         S403_recovery = S403.recovery
@@ -233,7 +340,7 @@ def create_succinic_sys(ins, outs):
     M401 = bst.Mixer('M401', ins=(S402-0, S403-0), outs=('mixed_wet_SuccinicAcid'))
     
     F403 = bst.DrumDryer('F403', ins=(M401-0, 'dryer_air_in', natural_gas_drying,),
-                         outs=('dry_solids', 'hot_air', 'emissions'),
+                         outs=('dry_solids', 'hot_air', 'dryer_emissions'),
                          split={'SuccinicAcid': 1e-4,
                                     'FermMicrobe': 0.}
                          )
@@ -350,6 +457,8 @@ def create_succinic_sys(ins, outs):
     M505 = bst.units.Mixer('M505', ins=('',
                                         # S301-0,
                                         S401-0,
+                                        u.U202-0,
+                                        u.C202-0,
                                         # S401-0, 
                                         # F401-0, D401-0,
                                         ), 
@@ -369,7 +478,12 @@ def create_succinic_sys(ins, outs):
     # =============================================================================
     
     # !!! All fresh streams (with prices) go here
-    saccharification_enzyme_fresh = tmo.Stream('saccharification_enzyme_fresh', price=price['Enzyme'])
+    # saccharification_enzyme_fresh = tmo.Stream('saccharification_enzyme_fresh', price=price['Enzyme'])
+    
+    lime_fresh = Stream('lime_fresh', units='kg/hr', 
+                                  price=price['Lime'],
+                                 )
+    sulfuric_acid_fresh = Stream('sulfuric_acid_fresh', units='kg/hr', price=price['Sulfuric acid'])
     
     # Water used to keep system water usage balanced
     system_makeup_water = Stream('system_makeup_water', price=price['Makeup water'])
@@ -434,13 +548,15 @@ def create_succinic_sys(ins, outs):
     # T603_P = bst.Pump('T603_P', ins=T603-0, outs=byproduct_2_stream)
     
     # # Storage tanks for other process inputs (besides water)
-    # #!!! Replace these default tau values with better assumptions
-    # T604 = bst.StorageTank('T604', ins=saccharification_enzyme_fresh, tau=7.*24., V_wf=0.9,
-    #                                       vessel_type='Floating roof',
-    #                                       vessel_material='Stainless steel')   
-    # T604.line = 'EnzymeStorageTank'
-    # T604_P = bst.Pump('T604_P', ins=T604-0, outs=enzyme)
+    T602 = units.LimeStorage('T604', ins=lime_fresh, 
+                             outs=lime_neutralization,
+                             # tau=7.*24., V_wf=0.9,
+                                          # vessel_type='Floating roof',
+                                          # vessel_material='Stainless steel',
+                                          )   
     
+    T603 = units.SulfuricAcidStorage('T602', ins=sulfuric_acid_fresh,
+                                     outs=sulfuric_acid_R401)
     
     # Misc. facilities
     # CIP = facilities.CIP('CIP901', ins=CIP_chems_in, outs='CIP_chems_out')
@@ -527,13 +643,14 @@ def create_succinic_sys(ins, outs):
     # HXN = HX_Network('HXN')
     
     globals().update({'get_flow_dry_tpd': get_flow_dry_tpd})
+
 #%%
 succinic_sys = create_succinic_sys()
 # succinic_sys.simulate()
 
 u = flowsheet.unit
 s = flowsheet.stream
-feedstock = s.feedstock
+feedstock = s.sugarcane
 product_stream = s.SuccinicAcid
 # byproduct_1_stream = s.byproduct_1_stream
 byproduct_2_stream = s.byproduct_2_stream
@@ -560,7 +677,9 @@ globals().update(flowsheet.to_dict())
 # Income tax was changed from 0.35 to 0.21 based on Davis et al., 2018 (new legislation)
 
 succinic_tea = SuccinicTEA(system=succinic_sys, IRR=0.10, duration=(2016, 2046),
-        depreciation='MACRS7', income_tax=0.21, operating_days=0.9*365,
+        depreciation='MACRS7', income_tax=0.21, 
+        # operating_days=0.9*365,
+        operating_days = 200,
         lang_factor=None, construction_schedule=(0.08, 0.60, 0.32),
         startup_months=3, startup_FOCfrac=1, startup_salesfrac=0.5,
         startup_VOCfrac=0.75, WC_over_FCI=0.05,
@@ -568,7 +687,9 @@ succinic_tea = SuccinicTEA(system=succinic_sys, IRR=0.10, duration=(2016, 2046),
         # biosteam Splitters and Mixers have no cost, 
         # cost of all wastewater treatment units are included in WWT_cost,
         # BT is not included in this TEA
-        OSBL_units=(u.U101, u.WWTcost501,
+        OSBL_units=(
+                    # u.U101, 
+                    u.WWTcost501,
                     # u.T601, u.T602, 
                     # u.T601, u.T602, u.T603, u.T604,
                     # u.T606, u.T606_P,
@@ -590,16 +711,16 @@ spec = ProcessSpecification(
     mixer = u.M304,
     heat_exchanger = u.M304_H,
     seed_train_system = [],
+    seed_train = u.R303,
     reactor= u.R302,
     reaction_name='fermentation_reaction',
     substrates=('Xylose', 'Glucose'),
-    products=('TAL',),
+    products=('SuccinicAcid',),
     
     # spec_1=0.19,
-    spec_1=0.3,
-    spec_2=15.,
-    spec_3=0.19,
-    
+    spec_1=0.7,
+    spec_2=100.,
+    spec_3=1.0,
     xylose_utilization_fraction = 0.80,
     feedstock = feedstock,
     dehydration_reactor = None,
@@ -614,6 +735,7 @@ spec = ProcessSpecification(
     baseline_yield = 0.7,
     baseline_titer = 100.,
     baseline_productivity = 1.0,
+    neutralization=False,
     
     # baseline_yield = 0.30,
     # baseline_titer = 25.,
@@ -685,7 +807,6 @@ succinic_sys.diagram('cluster')
 
 area_names = [
     'feedstock',
-    'pretreatment',
     'conversion',
     'separation',
     'wastewater',
@@ -715,18 +836,22 @@ for i in unit_groups:
     if i.name == 'cooling tower and chilled water package':
         i.metrics[1].getter = lambda: 0. # Cooling duty
 
-HXN = None
-for HXN_group in unit_groups:
-    if HXN_group.name == 'heat exchanger network':
-        HXN_group.filter_savings = False
-        HXN_group.units.append(u.HXN1001)
-        HXN = HXN_group.units[0]
-        assert isinstance(HXN, HeatExchangerNetwork)
-        
+# HXN = None
+# for HXN_group in unit_groups:
+#     if HXN_group.name == 'heat exchanger network':
+#         HXN_group.filter_savings = False
+#         if not HXN in HXN_group.units:
+#             HXN_group.units.append(u.HXN1001)
+#         HXN = HXN_group.units[0]
+#         assert isinstance(HXN, HeatExchangerNetwork)
+
+# F403 = u.F403
 unit_groups[-1].metrics[-1] = bst.evaluation.Metric('Mat. cost', 
-                                                    getter=lambda: BT.natural_gas_price * BT.natural_gas.F_mass, 
+                                                    getter=lambda: BT.natural_gas_price * BT.natural_gas.F_mass,
+                                                    # + F403.ins[2].cost, 
                                                     units='USD/hr',
                                                     element=None)
+
 
 unit_groups_dict = {}
 for i in unit_groups:
@@ -739,21 +864,41 @@ CWP = u.CWP802
 
 #%% TEA breakdown
 
-def TEA_breakdown(print_output=False):
+def TEA_breakdown(print_output=False, fractions=False):
     metric_breakdowns = {i.name: {} for i in unit_groups[0].metrics}
     for ug in unit_groups:
         for metric in ug.metrics:
+            denominator = 1.
+            if fractions:
+                metric_name = metric.name
+                if metric_name=='Inst. eq. cost':
+                    denominator = succinic_tea.installed_equipment_cost/1e6
+                elif metric_name=='Cooling':
+                    denominator=0
+                    for i in list(CT.heat_utilities) + list(u.CWP802.heat_utilities):
+                        if i.flow<0 and i.duty>0:
+                            denominator += i.duty/1e6
+                elif metric_name=='Heating':
+                    for i in list(BT.heat_utilities):
+                        if i.flow<0 and i.duty<0:
+                            denominator -= i.duty/1e6
+                elif metric_name=='Elec. cons.':
+                    denominator = succinic_sys.power_utility.consumption/1e3
+                elif metric_name=='Elec. prod.':
+                    denominator = succinic_sys.power_utility.production/1e3
+                elif metric_name=='Mat. cost':
+                    denominator = (succinic_tea.material_cost/succinic_tea.operating_hours) + BT.natural_gas.F_mass*BT.natural_gas_price
             # storage_metric_val = None
             if not ug.name=='storage':
                 if ug.name=='other facilities':
-                    metric_breakdowns[metric.name]['storage and ' + ug.name] = metric() + unit_groups_dict['storage'].metrics[ug.metrics.index(metric)]()
+                    metric_breakdowns[metric.name]['storage and ' + ug.name] = (metric() + unit_groups_dict['storage'].metrics[ug.metrics.index(metric)]())/denominator
                 else:
-                    metric_breakdowns[metric.name][ug.name] = metric()
+                    metric_breakdowns[metric.name][ug.name] = metric()/denominator
                     
                     
-            # if ug.name=='natural gas':
-            #     if metric.name=='Mat. cost':
-            #         metric_breakdowns[metric.name][ug.name] = BT.natural_gas.F_mass*BT.natural_gas_price
+            if ug.name=='natural gas':
+                if metric.name=='Mat. cost':
+                    metric_breakdowns[metric.name][ug.name] = BT.natural_gas.F_mass*BT.natural_gas_price/denominator
             
             
             # else:
@@ -768,4 +913,4 @@ def TEA_breakdown(print_output=False):
                 print(f"{j}: {format(metric_breakdowns_i[j], '.3f')}")
     return metric_breakdowns
 
-TEA_breakdown()# -*- coding: utf-8 -*-
+TEA_breakdown(print_output=True, fractions=True)# -*- coding: utf-8 -*-

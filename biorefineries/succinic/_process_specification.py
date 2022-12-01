@@ -191,11 +191,15 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
                  'baseline_productivity',
                  'HXN_new_HXs',
                  'HXN_new_HX_utils',
-                 'HXN_Q_bal_percent_error_dict',)
+                 'HXN_Q_bal_percent_error_dict',
+                 'seed_train',
+                 'neutralization'
+                 )
     
     def __init__(self, evaporator, pump, mixer, heat_exchanger, seed_train_system, 
                  reactor, reaction_name, substrates, products,
                  spec_1, spec_2, spec_3, xylose_utilization_fraction,
+                 seed_train, neutralization,
                  feedstock, dehydration_reactor, byproduct_streams, HXN, maximum_inhibitor_concentration=1.,
                  pre_conversion_units = None, juicing_sys=None, baseline_yield =0.49, baseline_titer = 54.8,
                  baseline_productivity=0.76, tolerable_HXN_energy_balance_percent_error=2., HXN_intolerable_points=[],
@@ -204,6 +208,7 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
                   load_spec_1=None, load_spec_2=None, load_spec_3=None):
         self.substrates = substrates
         self.reactor = reactor #: [Unit] Reactor unit operation
+        self.neutralization = reactor.neutralization = neutralization
         self.products = products #: tuple[str] Names of main products
         self.spec_1 = spec_1 #: [float] g products / L effluent
         self.spec_2 = spec_2 #: [float] Weight fraction of theoretical yield.
@@ -220,6 +225,9 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
         self.juicing_sys = juicing_sys
         self.baseline_yield = baseline_yield
         self.baseline_titer = baseline_titer
+        
+        self.seed_train = seed_train
+        
         self.baseline_productivity = baseline_productivity
         self.HXN_new_HXs = HXN_new_HXs
         self.HXN_new_HX_utils = HXN_new_HX_utils
@@ -254,7 +262,7 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
         self.titer_inhibitor_specification.maximum_inhibitor_concentration = value
         self.load_specifications(spec_1=self.spec_1, spec_2=self.spec_2, spec_3=self.spec_3)
     
-    def load_specifications(self, spec_1=None, spec_2=None, spec_3=None,):
+    def load_specifications(self, spec_1=None, spec_2=None, spec_3=None, neutralization=False):
         """
         Load ferementation specifications.
         Parameters
@@ -267,12 +275,12 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
         productivity : float, optional
             g products / L effluent / hr
         """
+        self.reactor.neutralization = neutralization
         self.load_spec_1(spec_1 or self.spec_1)
         self.load_spec_2(spec_2 or self.spec_2)
         self.spec_2 = spec_2
         
         self.load_spec_3(spec_3 or self.spec_3)
-    
     # def load_baseline_TRY(self):
     #     self.load_yield(spec.baseline_yield)
     #     spec.spec_1
@@ -395,9 +403,10 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
         """
         # print(yield_)
         reactor = self.reactor
+        seed_train = self.seed_train
         self.spec_1 = reactor.glucose_to_succinic_acid_rxn.X = reactor.xylose_to_succinic_acid_rxn.X = yield_
+        seed_train.glucose_to_succinic_acid_rxn.X = seed_train.xylose_to_succinic_acid_rxn.X = yield_ * seed_train.ferm_ratio
         
-        reactor.xylose_to_succinic_acid_rxn.X = yield_
         # rem_glucose = min(0.13, 1. - reactor.glucose_to_succinic_acid_rxn.X)
         # reactor.glucose_to_acetic_acid_rxn.X = (55./130.) * rem_glucose
         # reactor.glucose_to_glycerol_rxn.X = (25./130.) * rem_glucose
@@ -581,6 +590,7 @@ class TiterAndInhibitorsSpecification:
     
     def __init__(self, evaporator, pump, mixer, heat_exchanger, seed_train_system, reactor, 
                  target_titer, product,
+                 # seed_train,
                  maximum_inhibitor_concentration=1.,
                  products=('SuccinicAcid',),
                  sugars = ('Glucose', 'Xylose', 'Arabinose', 'Sucrose'),
