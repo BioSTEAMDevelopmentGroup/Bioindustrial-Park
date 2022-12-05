@@ -259,7 +259,7 @@ def load(name, cache=cache, reduce_chemicals=False, RIN=True,
     cane_sys.set_tolerance(rmol=1e-5, mol=1e-2, subsystems=True, subfactor=1.5)
     
     if number == 1:
-        cane_sys.prioritize_unit(u.T608)
+        cane_sys.prioritize_unit(u.T508)
     elif number == 2:
         cane_sys.prioritize_unit(u.T808)
     
@@ -308,19 +308,19 @@ def load(name, cache=cache, reduce_chemicals=False, RIN=True,
         for splitter in flowsheet.unit:
             if getattr(splitter, 'isbagasse_splitter', False):
                 dct['bagasse_splitter'] = splitter
-                minimum_fraction_processed = 0.3
-                maximum_fraction_processed = 1.
+                minimum_fraction_burned = 0
+                maximum_fraction_burned = 0.7
                 recycle_data = {}
                 @cane_sys.add_bounded_numerical_specification(
-                    x0=minimum_fraction_processed, x1=maximum_fraction_processed, 
+                    x0=minimum_fraction_burned, x1=maximum_fraction_burned, 
                     xtol=1e-4, ytol=100, args=(splitter,)
                 )
-                def adjust_bagasse_to_boiler(split, splitter):
+                def adjust_bagasse_to_boiler(fraction_burned, splitter):
                     # Returns energy consumption at given fraction processed (not sent to boiler).
-                    splitter.split[:] = split
+                    splitter.split[:] = 1 - fraction_burned
                     operation_mode = getattr(sys, 'active_operation_mode', None)
-                    if split in (minimum_fraction_processed, maximum_fraction_processed):
-                        key = (operation_mode, minimum_fraction_processed)
+                    if fraction_burned in (minimum_fraction_burned, maximum_fraction_burned):
+                        key = (operation_mode, fraction_burned)
                     else:
                         key = (operation_mode, 'last')
                     if key in recycle_data: 
@@ -329,11 +329,11 @@ def load(name, cache=cache, reduce_chemicals=False, RIN=True,
                         recycle_data[key] = material_data = cane_sys.get_material_data()
                     cane_sys.simulate(material_data=material_data, update_material_data=True)
                     excess = BT._excess_electricity_without_natural_gas
-                    if split == 1. and excess > 0:
-                        splitter.neglect_natural_gas_streams = False
+                    if fraction_burned == minimum_fraction_burned and excess > 0:
+                        splitter.neglect_natural_gas_streams = False # No need to neglect
                         return 0 # No need to burn bagasse
-                    elif split == minimum_fraction_processed and excess < 0: 
-                        splitter.neglect_natural_gas_streams = False
+                    elif fraction_burned == maximum_fraction_burned and excess < 0: 
+                        splitter.neglect_natural_gas_streams = False # Cannot be neglected
                         return 0 # Cannot satisfy energy demand even at 30% sent to boiler (or minimum fraction processed)
                     else:
                         splitter.neglect_natural_gas_streams = True
@@ -923,6 +923,14 @@ def load(name, cache=cache, reduce_chemicals=False, RIN=True,
         if value < 0.: value = 0.
         return value
     
+    @metric(units='GGE/MT')
+    def net_energy_production():
+        GGE_biodiesel_annual = biodiesel_production.get() / 0.9536 / L_per_gal
+        GGE_ethanol_annual = ethanol_production.get() / 1.5 / L_per_gal
+        GEE_electricity_production = max(-electricity() * 3600 / 114000, 0.) / feedstock_consumption.get()
+        GEE_crude_glycerol = crude_glycerol_flow() * 0.1059 / feedstock_consumption.get()
+        return (GGE_biodiesel_annual + GGE_ethanol_annual + GEE_electricity_production + GEE_crude_glycerol)
+    
     @metric(units='m3/MT')
     def natural_gas_consumption():
         value = natural_gas_flow() / feedstock_consumption.get()
@@ -935,7 +943,6 @@ def load(name, cache=cache, reduce_chemicals=False, RIN=True,
     @metric(units='%')
     def heat_exchanger_network_error():
         return HXN.energy_balance_percent_error if HXN else 0.
-
 
     @metric(name='GWP', element='Economic allocation', units='kg*CO2*eq / USD')
     def GWP_economic(): # Cradle to gate

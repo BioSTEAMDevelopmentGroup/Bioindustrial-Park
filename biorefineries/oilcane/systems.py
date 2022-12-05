@@ -289,7 +289,7 @@ def create_oilcane_to_biodiesel_and_ethanol_1g(
         ins=oil,
         mockup=True,
         outs=['', 'polar_lipids', ''],
-        area=600,
+        area=500,
         udct=True,
     )
     MX = bst.Mixer(400, [thick_vinasse, evaporator_condensate_a], vinasse)
@@ -303,19 +303,19 @@ def create_oilcane_to_biodiesel_and_ethanol_1g(
         ins=oil, 
         outs=[biodiesel, crude_glycerol, ''],
         mockup=True,
-        area=600,
+        area=500,
         udct=True,
     )
-    MX = bst.Mixer(600, [transesterification_and_biodiesel_separation_sys-2, wastewater], 'wastewater')
+    MX = bst.Mixer(500, [transesterification_and_biodiesel_separation_sys-2, wastewater], 'wastewater')
 
     ### Facilities ###
     s = f.stream
     u = f.unit
-    MX2 = bst.Mixer(700,
+    MX2 = bst.Mixer(600,
         [polar_lipids, bagasse]
     )
     # Burn bagasse from conveyor belt
-    bst.BoilerTurbogenerator(700,
+    bst.BoilerTurbogenerator(600,
         (MX2-0, '', 
          'boiler_makeup_water',
          'natural_gas',
@@ -324,7 +324,7 @@ def create_oilcane_to_biodiesel_and_ethanol_1g(
         ('emissions', 'rejected_water_and_blowdown', 'ash_disposal'),
         turbogenerator_efficiency=0.85
     )
-    bst.CoolingTower(800)
+    bst.CoolingTower(700)
     makeup_water_streams = (s.cooling_tower_makeup_water,
                             s.boiler_makeup_water)
     process_water_streams = (s.imbibition_water,
@@ -334,9 +334,9 @@ def create_oilcane_to_biodiesel_and_ethanol_1g(
                              s.stripping_water,
                              *makeup_water_streams)
     makeup_water = bst.Stream('makeup_water', price=0.000254)
-    MX = bst.Mixer(800, [evaporator_condensate_b, stripper_bottoms_product], 'recycle_process_water')
-    bst.ChilledWaterPackage(800)
-    bst.ProcessWaterCenter(800,
+    MX = bst.Mixer(700, [evaporator_condensate_b, stripper_bottoms_product], 'recycle_process_water')
+    bst.ChilledWaterPackage(700)
+    bst.ProcessWaterCenter(700,
         (MX-0, makeup_water),
         (),
         None,
@@ -344,12 +344,12 @@ def create_oilcane_to_biodiesel_and_ethanol_1g(
         process_water_streams
     )
     def get_hx_issues():
-        hxs = [u.E301, u.D601.boiler, u.D602.boiler, u.H601, u.H602, u.H603, u.H604, oil_pretreatment_dct['F3'], u.H606]
+        hxs = [u.E301, u.D501.boiler, u.D502.boiler, u.H501, u.H502, u.H503, u.H504, oil_pretreatment_dct['F3'], u.H506]
         condenser = getattr(u.E401, 'condenser', None)
         if condenser: hxs.append(condenser)
         return hxs
     
-    HXN = bst.HeatExchangerNetwork(900, 
+    HXN = bst.HeatExchangerNetwork(800, 
         ignored=get_hx_issues,
         Qmin=1e5,
     )

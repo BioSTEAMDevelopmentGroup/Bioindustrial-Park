@@ -161,19 +161,31 @@ def evaluate_MFPP_benefit_across_ethanol_and_biodiesel_prices(ethanol_price, bio
     return MFPP - MFPP_baseline
 
 def evaluate_metrics_at_composition(oil, fiber, water, configuration):
+    oc.load(configuration)
     composition = get_composition(oc.feedstock)
     composition['lipid'] = oil
     composition['fiber'] = fiber
-    set_composition(**composition)
-    oc.load(configuration)
+    composition['moisture'] = water
+    FFA = oc.oil_extraction_specification.FFA_content
+    PL = oc.oil_extraction_specification.PL_content
+    composition['TAG'] = 1. - FFA - PL
+    composition['FFA'] = FFA
+    composition['PL'] = PL
+    del composition['sugar'] # Sugar is backcalculated in `set_composition`
+    try:
+        set_composition(oc.feedstock, **composition)
+    except ValueError:
+        return np.array([np.nan for i in oc.model.metrics])
     oc.sys.simulate()
+    # print('oil:', oil, ', fiber:', fiber, ', water:', water)
+    # print(np.array([oc.model.metrics[0](), oc.model.metrics[2]()]))
     return np.array([i() for i in oc.model.metrics])
 
 evaluate_metrics_across_composition = no_derivative(
     np.vectorize(
         evaluate_metrics_at_composition, 
         excluded=['configuration'],
-        signature=f'(),(),()->({N_metrics})'
+        signature=f'(),(),(),()->({N_metrics})'
     )
 )
 

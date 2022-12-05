@@ -13,10 +13,13 @@ import os
 import pandas as pd
 import numpy as np
 import biosteam as bst
+from typing import NamedTuple
 
 __all__ = (
     'images_folder',
     'results_folder',
+    'feedstocks_folder',
+    'get_composition_data',
     'spearman_file',
     'monte_carlo_file',
     'autoload_file_name',
@@ -33,6 +36,38 @@ __all__ = (
 
 results_folder = os.path.join(os.path.dirname(__file__), 'results')
 images_folder = os.path.join(os.path.dirname(__file__), 'images')
+feedstocks_folder = os.path.join(os.path.dirname(__file__), 'feedstocks')
+
+# %% Load feedstock data
+
+class OilcaneCompositionPerformance(NamedTuple):
+    oil_content: float
+    biomass_yield: float
+
+def get_composition_data(filter_poor_lines=True):
+    file = os.path.join(feedstocks_folder, 'oilcane_composition_data.xlsx')
+    data = pd.read_excel(file, header=[0, 1], index_col=[0])
+    if filter_poor_lines: 
+        index = data.index
+        good_lines = set(index)
+        performances = []
+        for name in index:
+            line = data.loc[name]
+            performance = OilcaneCompositionPerformance(
+                line['Stem Oil (dw)']['Mean'],
+                line['Dry biomass yield (% WT)']['Mean'],
+            )
+            performances.append(performance)
+        for name, performance in zip(index, performances):
+            for other_name, other_performance in zip(index, performances):
+                if (name != other_name 
+                    and performance.oil_content < other_performance.oil_content
+                    and performance.biomass_yield < other_performance.biomass_yield):
+                    good_lines.discard(name)
+        data = data.loc[[name for name in index if name in good_lines]]
+    return data
+
+# %% Load simulation data
 
 def spearman_file(name):
     number, agile = parse_configuration(name)

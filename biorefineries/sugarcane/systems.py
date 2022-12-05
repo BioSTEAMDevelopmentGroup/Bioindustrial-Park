@@ -1033,8 +1033,8 @@ def create_sucrose_fermentation_system(ins, outs,
     def get_titer():
         s = R301.outs[1]
         ignored = s.ivol[ignored_volume] if ignored_volume in s.chemicals else 0.
-        ignored_product = sum([i.imass[product_group] for i in R301.ins])
-        ignored_product_vol = sum([i.ivol[product_group] for i in R301.ins])
+        ignored_product = P306.outs[0].imass[product_group]
+        ignored_product_vol = P306.outs[0].ivol[product_group]
         return (s.imass[product_group] - ignored_product) / (s.F_vol - ignored_product_vol - ignored)
     R301.get_titer = get_titer
     

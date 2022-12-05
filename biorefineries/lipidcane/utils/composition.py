@@ -110,7 +110,10 @@ def set_composition(
     imass['Water'] = F_mass * moisture
     imass['Ash'] = total_dry * ash
     imass['Solids'] = total_dry * solids
-    imass['Sugar'] = F_mass - stream.F_mass - imass['Sugar']
+    imass['Sugar'] = 0.
+    sugar = F_mass - stream.F_mass
+    if sugar < 0.: raise ValueError('composition is infeasibile')
+    imass['Sugar'] = sugar
 
 def get_composition(stream):
     total = stream.F_mass

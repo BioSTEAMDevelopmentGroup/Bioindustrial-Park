@@ -7,7 +7,7 @@ Created on Fri Jun  4 23:44:10 2021
 from biorefineries import oilcane as oc
 import biosteam as bst
 import numpy as np
-from biosteam.utils import colors
+from biosteam.utils import colors, GG_colors
 from matplotlib.colors import LinearSegmentedColormap
 import matplotlib.pyplot as plt
 from biosteam.plots import (
@@ -41,10 +41,20 @@ __all__ = (
     # 'plot_ethanol_and_biodiesel_price_contours',
     'plot_recovery_and_oil_content_contours_biodiesel_only',
     'plot_recovery_and_oil_content_contours_with_oilsorghum_only',
+    'plot_metrics_across_composition'
 )
 
 filterwarnings('ignore', category=bst.exceptions.DesignWarning)
-    
+line_colors = [
+    GG_colors.orange.RGBn,
+    GG_colors.purple.RGBn,
+    GG_colors.green.RGBn,
+    GG_colors.blue.RGBn,
+    GG_colors.yellow.RGBn,
+    colors.CABBI_teal.RGBn,
+    colors.CABBI_grey.RGBn,
+    colors.CABBI_brown.RGBn,
+]
 shadecolor = (*colors.neutral.RGBn, 0.20)
 linecolor = (*colors.neutral_shade.RGBn, 0.85)
 targetcolor = (*colors.red_tint.RGBn, 1)
@@ -105,6 +115,22 @@ def _add_letter_labels(axes, xpos, ypos, colors):
             ax.text((xlb + xub) * xpos, (yub + ylb) * ypos, letter, color=colors[i, j],
                      horizontalalignment='center',verticalalignment='center',
                      fontsize=12, fontweight='bold', zorder=1e17)
+
+def plot_metrics_across_composition_manuscript(load=True, fs=8, smooth=1):
+    set_font(size=fs)
+    set_figure_size()
+    fig, axes = plot_metrics_across_composition(
+        load=load, 
+        smooth=smooth,
+    )
+    colors = np.zeros([2, 2], object)
+    colors[:] = [[light_letter_color, light_letter_color],
+                 [light_letter_color, light_letter_color]]
+    _add_letter_labels(axes, 1 - 0.68, 0.7, colors)
+    plt.subplots_adjust(right=0.92, wspace=0.1 * (fs/8) ** 2, top=0.9, bottom=0.10)
+    for i in ('svg', 'png'):
+        file = os.path.join(images_folder, f'recovery_and_oil_content_contours.{i}')
+        plt.savefig(file, transparent=True)
 
 def plot_recovery_and_oil_content_contours_manuscript(load=True, fs=8, smooth=1):
     set_font(size=fs)
@@ -309,7 +335,97 @@ def plot_relative_sorghum_oil_content_and_cane_oil_content_contours_manuscript(l
 #                             marker='o', s=2, color=(*colors.brown.RGBn, 1),
 #                             edgecolor=(*colors.brown.RGBn, 1), clip_on=True, zorder=3)
 #     return fig, axes
+
+def metrics_across_oil_and_fiber_content(load):
+    # Generate contour data
+    x = np.linspace(0., 0.04, 5)
+    y = np.linspace(0.35, 0.75, 5)
+    z = np.array([0.6, 0.65, 0.7])
+    configuration = 'O6+'
+    X, Y, Z = np.meshgrid(x, y, z)
+    folder = os.path.dirname(__file__)
+    file = 'composition_analysis.npy'
+    file = os.path.join(folder, file)
+    if load:
+        data = np.load(file)
+    else:
+        from warnings import filterwarnings
+        filterwarnings('ignore')
+        # This returns data of all metrics for the given configuration,
+        # but we are mainly interested in MFPP and productivity in L biodiesel per MT cane.
+        data = oc.evaluate_metrics_across_composition(
+            X, Y, Z, configuration,
+        ) 
+    np.save(file, data)
+    return X, Y, Z, data
+
+def plot_metrics_across_composition(
+        load=False, N_decimals=1, 
+        yticks=None, titles=None, 
+        cmap=None, smooth=None,
+    ):
+    metric_indices=[0, 2]
+    MFPP = oc.all_metric_mockups[0] # Maximum feedstock purchase price
+    BP = oc.all_metric_mockups[2] # Biodiesel production
+    # EP = oc.all_metric_mockups[5] # Energy production
+    X, Y, Z, data = metrics_across_oil_and_fiber_content(load)
+    data = data[:, :, :, metric_indices]
+    xticks = [0,   1,   2,   3,   4]
+    yticks = [35,  45,  55,  65,  75]
+    if smooth: # Smooth curves due to heat exchanger network and discontinuities in design decisionss
+        A, B, C, D = data.shape
+        for i in range(C):
+            for j in range(D):
+                data[:, :, i, j] = gaussian_filter(data[:, :, i, j], smooth)
+    data = np.swapaxes(data, 2, 3)
+    # Plot contours
+    xlabel = 'Oil content [dry wt. %]'
+    ylabel = "Fiber content [dry wt. %]"
+    if titles is None: titles = np.array(['60% moisture', '65% moisture', '70% moisture'])
+    metric_bars = [
+        MetricBar(MFPP.name, format_units(MFPP.units), colormaps[0], tickmarks(data[:, :, 0, :], 5, 1, expand=0, p=0.5), 10, 1),
+        MetricBar('Biod. prod.', format_units(BP.units), plt.cm.get_cmap('copper'), tickmarks(data[:, :, 1, :], 5, 5, expand=0, p=5), 10, 1),
+        # MetricBar(EP.name, format_units(EP.units), colormaps[2], tickmarks(data[:, :, 2, :], 5, 5, expand=0, p=5), 10, 1),
+    ]
+    fig, axes, CSs, CB = plot_contour_2d(
+        100.*X[:, :, 0], 100.*Y[:, :, 0], titles, data, xlabel, ylabel, xticks, yticks, metric_bars, 
+        styleaxiskw=dict(xtick0=True), label=True,
+    )
+    def determine_axis_column(moisture_content):
+        for column, axis_moisture in enumerate([60, 65, 70]):
+            if abs(moisture_content - axis_moisture) < 2.5:
+                return column
+        raise RuntimeError('could not determine axis with similar moisture content')
     
+    df = oc.get_composition_data()
+    names = df.index
+    lines = []
+    for name, color in zip(names, line_colors):
+        data = df.loc[name]
+        lines.append(
+            (name, 
+             data['Stem Oil (dw)']['Mean'] * 100, 
+             data['Fiber (dw)']['Mean'] * 100,
+             data['Water (wt)']['Mean'] * 100,
+             color)
+        )
+    
+    txtbox = dict(boxstyle='round', facecolor=colors.neutral.shade(20).RGBn, 
+                  edgecolor='None', alpha=0.9)
+    for *axes_columns, _ in axes:
+        for (name, lipid, fiber, moisture, color) in lines:
+            index = determine_axis_column(moisture)
+            plt.sca(axes_columns[index]._cached_ytwin)
+            plt.text(
+                lipid + 0.1, fiber + 2, name, weight='bold', c=color,
+                bbox=txtbox,
+            )
+            plot_scatter_points(
+                [lipid], [fiber], marker='o', s=50, 
+                color=color, edgecolor=edgecolor, clip_on=False, zorder=1e6,
+            )
+    return fig, axes
+
 def relative_sorghum_oil_content_and_cane_oil_content_data(load, relative):
     # Generate contour data
     y = np.linspace(0.05, 0.15, 20)
@@ -433,18 +549,6 @@ def plot_recovery_and_oil_content_contours(
             for n in range(N):
                 metric_data = data[:, :, m, n]
                 data[:, :, m, n] = gaussian_filter(metric_data, smooth)
-                # for a in range(A):
-                #     values = metric_data[a, :]
-                #     # values.sort()
-                #     p = np.arange(values.size)
-                #     coeff = np.polyfit(p, values, 3)
-                #     values[:] = np.polyval(coeff, p)
-                # for b in range(B):
-                #     values = metric_data[:, b]
-                #     # values.sort()
-                #     p = np.arange(values.size)
-                #     coeff = np.polyfit(p, values, 3)
-                #     values[:] = np.polyval(coeff, p)
     
     # Plot contours
     xlabel = 'Crushing mill oil recovery [%]'
@@ -456,8 +560,6 @@ def plot_recovery_and_oil_content_contours(
     metric = oc.all_metric_mockups[metric_index]
     units = metric.units if metric.units == '%' else format_units(metric.units)
     if cmap is None: cmap = colormaps[metric_index]
-    # if metric_index == 10:
-    #     breakpoint()
     mb = lambda x, name=None: MetricBar(
         metric.name if name is None else name, units if name is None else "", cmap, 
         tickmarks(data[:, :, x, :], 5, 0.1, expand=0, p=0.1, f=lambda x: round(x, N_decimals)),
