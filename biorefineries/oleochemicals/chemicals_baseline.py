@@ -30,12 +30,28 @@ chems = tmo.Chemicals([
     tmo.Chemical('Hydrogen_peroxide', phase='l'),
     tmo.Chemical('Water'),
     # #Chemical for acid degumming 
-
     tmo.Chemical('Citric_acid'),
-    #look into phase of the below
-    tmo.Chemical('MDHSA', search_ID = '1115-01-1', phase = 'l'),
-    tmo.Chemical('Pelargonic_acid'),
-    tmo.Chemical('Azelaic_acid', phase = 's'),
+    
+#TODO: look into phase of the below
+    tmo.Chemical('MDHSA', 
+                 search_ID = '1115-01-1', 
+                 phase = 'l'),
+#Ref for dihydroxy_palmitic_acid: https://www.chemsrc.com/en/cas/29242-09-9_803992.html    
+    tmo.Chemical('Dihydroxy_palmitic_acid',
+                 search_ID = '29242-09-9',
+                 search_db = False,
+                 Tb = 458 + 273.15,
+                 formula = 'C16H32O4',
+                 phase = 'l'
+                 ),
+#Ref for tetrahydroxy_octadecanoic_acid: https://www.chemsrc.com/en/cas/541-82-2_148112.html
+    tmo.Chemical('Tetrahydroxy_octadecanoic_acid',
+                 search_ID = '541-82-2', 
+                 search_db = False, 
+                 Tb = 583.1+273.15,
+                 formula = 'C18H36O6',
+                 phase = 'l'),
+    
 # Products of oxidative_cleavage
     tmo.Chemical('Monomethyl_azelate'),
     tmo.Chemical('Suberic_acid'),
@@ -44,13 +60,15 @@ chems = tmo.Chemicals([
     tmo.Chemical('Heptanoic_acid'),
     tmo.Chemical('Hexanoic_acid'),
     tmo.Chemical('Malonic_acid'),
+    tmo.Chemical('Pelargonic_acid'),
     
-# Products of emulsification
+# Products of hydrolysis
     tmo.Chemical('Palmitic_acid'),
     tmo.Chemical('Stearic_acid'),
     tmo.Chemical('Oleic_acid'),
     tmo.Chemical('Linoleic_acid', search_ID = '60-33-3'),
     tmo.Chemical('Palmitoleic_acid', search_ID = '373-49-9'),
+    tmo.Chemical('Azelaic_acid', phase = 's'),
 
 # Oxidants used and other gaseous products
     tmo.Chemical('Nitrogen'),
@@ -119,7 +137,6 @@ chems = tmo.Chemicals([
                      phase='l'),
   
 ##All the chemicals that go in the Biodiesel
-
     tmo.Chemical('Methyl_oleate', phase = 'l'),
     tmo.Chemical('Methyl_palmitate', phase = 'l'),
     tmo.Chemical('Methyl_stearate', phase = 'l'),
@@ -205,7 +222,7 @@ chems = tmo.Chemicals([
     ##Hence using polystyrene
     tmo.Chemical('Polystyrene', phase = 's'),
     
-##For lipidcane compatibility
+##For imported lipidcane module compatibility
     tmo.Chemical('MonoOlein',search_ID = '111-03-5'),
     # tmo.Chemical('DiOlein',search_ID = 'PubChem = 6505653'),
     tmo.Chemical('Dipalmitin'),
@@ -223,7 +240,13 @@ chems = tmo.Chemicals([
                  search_db = False),
 #Natural gas for heating purposes 
     tmo.Chemical('Natural_gas',
-                 search_ID = 'CH4')    
+                 search_ID = 'CH4'),
+#Solvent for countercurrent extraction of azelaic acid
+    tmo.Chemical('Octane'),
+    tmo.Chemical('Cycloheptane'),
+    tmo.Chemical('Bicyclo_octane',search_ID = '6221-55-2'),
+    tmo.Chemical('Toluene')
+    
                  ])
 
 ##Modelling the properties of resin used for hydrolysis based on polystyrene
@@ -275,13 +298,32 @@ chems['Acetate_ion'].copy_models_from(tmo.Chemical('Acetate'),
                                        'Psat',
                                        'Hvap',
                                        'sigma',
-                                       
                                        ])
 
 
 
 ## Changing this for Azelaic acid as it probably didnt work during a distillation process
 chems['Azelaic_acid'].Cn.method = 'LASTOVKA_S'
+
+## Modelling properties of dihydroxylated compounds as MDHSA
+chems['Dihydroxy_palmitic_acid'].copy_models_from(chems['MDHSA'],
+                                                  ['Hvap',
+                                                   'Psat',
+                                                   'Cn',
+                                                   'V',
+                                                   'mu'
+                                                   ])
+# chems['Dihydroxy_palmitic_acid'].Cn.method = 'LASTOVKA_S'
+
+                                                  
+chems['Tetrahydroxy_octadecanoic_acid'].copy_models_from(chems['MDHSA'],
+                                                         ['Hvap',
+                                                          'Psat',
+                                                          'Cn',
+                                                          'V',
+                                                          'mu'
+                                                          ])
+# chems['Tetrahydroxy_octadecanoic_acid'].Cn.method = 'LASTOVKA_S'
 
 
 #TODO.xxx check if Psat from liquid methanol is a good idea
@@ -327,6 +369,16 @@ chems.define_group('Biodiesel', ('Methyl_oleate',
                                  'Methyl_stearate',
                                  'Methyl_linoleate',
                                  'Methyl_palmitoleate'))
+
+#composition of VM_Naphtha based on https://www.cdc.gov/niosh/npg/npgd0664.html#:~:text=None%20reported%20%5BNote%3A%20VM%26P%20Naphtha%20is%20a%20refined,Exposure%20Routes%20inhalation%2C%20ingestion%2C%20skin%20and%2For%20eye%20contact
+chems.define_group('VM_Naphtha',['Octane',
+                                 'Cycloheptane',
+                                 'Bicyclo_octane',
+                                 'Toluene'], 
+                                 composition = [0.55,
+                                                0.30,
+                                                0.02,
+                                                0.12])
 
 chems.define_group('Air', ['Oxygen', 'Nitrogen'],composition=[0.21,0.79])
 chems.set_synonym('Water', 'H2O')
