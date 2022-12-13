@@ -76,7 +76,9 @@ from .systems import (
     create_oilcane_to_crude_oil_and_ethanol_1g,
     create_oilcane_to_crude_oil_and_ethanol_combined_1_and_2g_post_fermentation_oil_separation,
     create_oilcane_to_biodiesel_1g,
-    create_oilcane_to_biodiesel_combined_1_and_2g_post_fermentation_oil_separation
+    create_oilcane_to_biodiesel_combined_1_and_2g_post_fermentation_oil_separation,
+    create_oilcane_to_biodiesel_and_actag_1g,
+    create_oilcane_to_biodiesel_and_actag_combined_1_and_2g_post_fermentation_oil_separation
 )
 from ._parse_configuration import (
     parse_configuration,
@@ -171,8 +173,8 @@ system_factories = {
     6: create_oilcane_to_biodiesel_combined_1_and_2g_post_fermentation_oil_separation,
     7: create_oilcane_to_biodiesel_1g,
     8: create_oilcane_to_biodiesel_combined_1_and_2g_post_fermentation_oil_separation,
-    # 9: create_oilcane_to_biodiesel_and_actag_1g,
-    # 10: create_oilcane_to_biodiesel_and_actag_combined_1_and_2g_post_fermentation_oil_separation,
+    9: create_oilcane_to_biodiesel_and_actag_1g,
+    10: create_oilcane_to_biodiesel_and_actag_combined_1_and_2g_post_fermentation_oil_separation,
 }
 system_factory_options = {
     -1: dict(use_area_convention=True, pellet_bagasse=False),
@@ -203,7 +205,7 @@ area_names = {
     # 9: ['Feedstock handling', 'Juicing', 'TAG prod.', 'Oil ext.', 'AcTAG sep.', 
     #     'Biod. prod.', 'CH&P', 'Utilities', 'HXN', 'Storage'],
     # 10: ['Feedstock handling', 'Juicing', 'Pretreatment', 'TAG prod.', 'AcTAG sep.', 
-    #      'Wastewater treatment', 'Oil ext.', 'CH&P',  'Biod. prod.', 'Utilities', 'HXN', 'Storage'],
+    #       'Wastewater treatment', 'Oil ext.', 'CH&P',  'Biod. prod.', 'Utilities', 'HXN', 'Storage'],
 }
 area_names[7] = area_names[5]
 area_names[8] = area_names[6]
@@ -275,17 +277,20 @@ def load(name, cache=cache, reduce_chemicals=False, RIN=True,
     if number not in cellulosic_configurations: BT.boiler_efficiency = 0.89
     
     ## Unit groups
-    areas = area_names[number]
-    rename_storage_units(cane_sys.units, len(areas) * 100)
-    unit_groups = UnitGroup.group_by_area(cane_sys.units)
-    for i, j in zip(unit_groups, areas): i.name = j
-    for i in unit_groups: i.autofill_metrics(shorthand=True)
-    
-    for HXN_group in unit_groups:
-        if HXN_group.name == 'HXN':
-            HXN_group.filter_savings = False # Allow negative values in heat utilities
-            HXN = HXN_group.units[0]
-            assert isinstance(HXN, bst.HeatExchangerNetwork)
+    if number in area_names:
+        areas = area_names[number]
+        rename_storage_units(cane_sys.units, len(areas) * 100)
+        unit_groups = UnitGroup.group_by_area(cane_sys.units)
+        for i, j in zip(unit_groups, areas): i.name = j
+        for i in unit_groups: i.autofill_metrics(shorthand=True)
+        
+        for HXN_group in unit_groups:
+            if HXN_group.name == 'HXN':
+                HXN_group.filter_savings = False # Allow negative values in heat utilities
+                HXN = HXN_group.units[0]
+                assert isinstance(HXN, bst.HeatExchangerNetwork)
+    else:
+        HXN = flowsheet(bst.HeatExchangerNetwork)
     HXN.raise_energy_balance_error = True
     HXN.vle_quenched_streams = False
     
@@ -1135,7 +1140,10 @@ def load(name, cache=cache, reduce_chemicals=False, RIN=True,
         WWTsys.set_tolerance(mol=10, method='fixed-point')
         # sys.track_recycle(WWTsys.recycle)
     sys.simulate()
-    feedstock.price = tea.solve_price(feedstock)
+    if number in (9, 10):
+        s.acTAG.price = tea.solve_price(s.acTAG)
+    else:
+        feedstock.price = tea.solve_price(feedstock)
     if reduce_chemicals: 
         cane_sys.reduce_chemicals()
         cane_sys._load_stream_links()

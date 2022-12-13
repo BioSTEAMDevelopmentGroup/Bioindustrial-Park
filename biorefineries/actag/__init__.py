@@ -22,6 +22,8 @@ from biosteam.plots import (
     plot_contour_single_metric,
 )
 
+folder = os.path.join(os.path.dirname(__file__), 'results')
+
 # %% Baseline and targets
 # L_per_gal = 3.7854
 # biodiesel_L_per_kg = 1.143245447132373
@@ -146,6 +148,7 @@ def load(configuration, simulate=None, cache={}):
             # oc.biodiesel.price = mean_biodiesel_price_5yr
         else:
             raise ValueError(f"invalid configuration '{configuration}'; only 1 and 2 are valid")
+        flowsheet(bst.BoilerTurbogenerator).boiler_efficiency = 0.80
         u = flowsheet.unit
         s = flowsheet.stream
         dct.update(flowsheet.to_dict())
@@ -168,6 +171,7 @@ def load(configuration, simulate=None, cache={}):
             fermentation = u.R301
         else:
             tea = oc.tea
+        tea.duration = (2020, 2050)
         sys.set_tolerance(rmol=1e-6, mol=1e-3, subsystems=True)
         dct['fermentation'] = fermentation 
         fermentation.product_yield = 0.34
@@ -264,7 +268,6 @@ def fermentation_data(configuration, load):
     z = np.array([50, 75, 100])
     w = np.array([0.0625, 0.7])
     X, Y, Z = np.meshgrid(x, y, z)
-    folder = os.path.dirname(__file__)
     file = f'fermentation_data_{configuration}.npy'
     file = os.path.join(folder, file)
     if load:
@@ -279,27 +282,6 @@ def fermentation_data(configuration, load):
     #         if 
     np.save(file, data)
     return X, Y, z, w, data
-
-def save_contour_plot_data(configuration):
-    X, Y, selectivities, productivities, data = fermentation_data(configuration, load)
-    yields = np.linspace(30, 90, N)
-    titers = np.linspace(5, 60, N)
-    MPSP_data = data[:, :, :, :, 0]
-    folder = os.path.dirname(__file__)
-    if configuration == 1:
-        configuration_name = 'sugarcane'
-    elif configuration == 2:
-        configuration_name = 'switchgrass'
-    for i, selectivity in enumerate(selectivities):
-        for j, productivity in enumerate(productivities):
-            file = f'{configuration_name}_biorefinery_selectivity_{selectivity}_productivity_{productivity}.xlsx'
-            file = os.path.join(folder, file)
-            pd.DataFrame(
-                data=MPSP_data[:, :, i, j],
-                index=pd.MultiIndex.from_tuples([(i,) for i in yields], names=['Yield [% theoretical]']),
-                columns=pd.MultiIndex.from_tuples([(i,) for i in titers], names=['Titer [g / L]']),
-            ).to_excel(file, startrow=1)
-    
 
 def save_tables():
     import biorefineries.actag as actag
@@ -317,7 +299,6 @@ def save_tables():
     actag.load(4, 'target')
     tea2_target = actag.tea
     sys2_target = actag.sys
-    folder = os.path.dirname(__file__)
     file = 'tables.xlsx'
     file = os.path.join(folder, file)
     writer = pd.ExcelWriter(file)
@@ -335,6 +316,25 @@ def save_tables():
         ['Baseline conventional', 'Baseline cellulosic', 
          'Target conventional', 'Target cellulosic']).to_excel(writer, 'FOC')
     writer.save()
+
+def save_reports():
+    import biorefineries.actag as actag
+    actag.load(3, 'baseline')
+    actag.sys.save_report(
+        file=os.path.join(folder, 'oilcane_juice_baseline_results.xlsx')
+    )
+    actag.load(3, 'target')
+    actag.sys.save_report(
+        file=os.path.join(folder, 'oilcane_juice_target_results.xlsx')
+    )
+    actag.load(4, 'baseline')
+    actag.sys.save_report(
+        file=os.path.join(folder, 'oilcane_juice_and_hydrolysate_baseline_results.xlsx')
+    )
+    actag.load(4, 'target')
+    actag.sys.save_report(
+        file=os.path.join(folder, 'oilcane_juice_and_hydrolysate_target_results.xlsx')
+    )
     
 def save_plots(load=True, single_bar=False):
     import matplotlib.pyplot as plt
