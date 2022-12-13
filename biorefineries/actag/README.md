@@ -1,4 +1,4 @@
-# oilcane: Oilcane Biorefineries for AcTAG and Biodiesel Production
+# actag: Oilcane Biorefineries for AcTAG and Biodiesel Production
 
 This module contains oilcane biorefinery configurations coproduction 
 AcTAG and biodiesel. Two configurations are currently available: (I) 
