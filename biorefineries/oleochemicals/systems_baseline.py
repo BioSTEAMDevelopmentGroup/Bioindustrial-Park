@@ -559,6 +559,10 @@ def hydrolysis_of_organic_fraction(ins,outs):
                                    water_for_emulsification,
                                   ),
                             outs = ('emulsified_mixture'))
+    
+#The following number represents the total initial number of exchangeable moles.
+# This number of moles will keep on decreasing as the reaction progresses
+    
     exchangeable_moles = ((crude_heavy_fatty_acids.imol['Methyl_palmitate'],
                   crude_heavy_fatty_acids.imol['Methyl_oleate'],
                   crude_heavy_fatty_acids.imol['Methyl_stearate'],
@@ -570,14 +574,13 @@ def hydrolysis_of_organic_fraction(ins,outs):
         water_for_emulsification.imol['Water'] = total_moles*30
     M601.add_specification(adjust_water_for_emuslification, run=True)  
        
-# Calculating the total moles of compounds that need to be exchanged
-
 # 1L of resin can exchange 1800 moles
 # required amount of resin in L is total_moles/1800  of resin
 # density of the resin is: 1.28*density of air ref:https://www.sigmaaldrich.com/US/en/product/supelco/10322
 # density of resin(g/L): 1.28*1.29 = 1.65
 # grams of resin required = total_moles/1800 
-# for a cylindrical tower with a csa of 5m2 with a radius 2.23m
+# for a cylindrical tower with a csa of 5m2 with a radius 2.23m ref: rules of thumb 
+
     Volume_of_resin = total_moles/1800
     height_of_the_cylinder = Volume_of_resin/(3.14* 5)
     total_height = height_of_the_cylinder + 2.5
