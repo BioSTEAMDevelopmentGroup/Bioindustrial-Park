@@ -39,46 +39,46 @@ bst.StorageTank.purchase_cost_algorithms["Compressed air storage"] = TankPurchas
 class DihydroxylationReactor(bst.CSTR):
     _N_ins = 1
     _N_outs = 2
-                
-    def _setup(self):  
+
+#this ref highlights that a stoichiometric amount of h2O2 is required to dihydroxylate ref:https://doi.org/10.1021/ja01298a065    
+#Novovols's patent mentions that linoeleic and palmitoleic acid esters can be oxidatively cleaved
+#this would mean that they can also get dihydroxylated 
+#Methyl palmitate has no unsaturation, therefore doesn't participate in the reaction
+#Methyl stearate has no unsaturation, therefore doesn't participate in the reaction  
+#https://pubchem.ncbi.nlm.nih.gov/compound/9_10_12_13-Tetrahydroxyoctadecanoic-acid
+#https://pubchem.ncbi.nlm.nih.gov/compound/193113  
+
+#TODO: don't know the reaction conversion of dihydroxylation reaction
+    def _setup(self):
             super()._setup()  
-            Dihydroxylation_reaction = Rxn('Methyl_oleate + Hydrogen_peroxide -> MDHSA ', 'Methyl_oleate', X = 0.9)
-            Catalyst_dissolution = Rxn('Tungstic_acid -> Tungstate_ion + Hydrogen_ion', 'Tungstic_acid',X = 0.9)   
+            Dihydroxylation_reaction = PRxn([Rxn('Methyl_oleate + Hydrogen_peroxide -> MDHSA ', 'Methyl_oleate', X = 0.9),
+                                             Rxn('Methyl_linoleate + Hydrogen_peroxide -> Tetrahydroxy_octadecanoic_acid', 'Methyl_linoleate', X = 0.9),
+                                             Rxn('Methyl_palmitoleate + Hydrogen_peroxide -> Dihydroxy_palmitic_acid', 'Methyl_palmitoleate', X = 0.9)
+                                            ])
+            Catalyst_dissolution = Rxn('Tungstic_acid -> Tungstate_ion + Hydrogen_ion', 'Tungstic_acid',X = 0.999)   
             DihydroxylationReactor_rxnsys = RxnSys(Dihydroxylation_reaction, Catalyst_dissolution)
             self.reactions = DihydroxylationReactor_rxnsys                       
           
     def _run(self):  
-        vent, effluent = self.outs
-        effluent.mix_from(self.ins, energy_balance=False)
-        self.reactions(effluent)
-        effluent.T = vent.T = self.T
-        effluent.P = vent.P = self.P
-        vent.phase = 'g'
-        vent.empty()
-        vent.receive_vent(effluent, energy_balance=False)
-            # condensate,effluent, = self.outs
-            # condensate.mix_from(self.ins)
-            # self.reactions(condensate)
-            # ms = self._multi_stream = MultiStream('ms', phases='lg')
-            # ms.copy_like(condensate)
-            # ms.vle(T = self.T, P = self.P)
-            # condensate.copy_like(ms['g'])
-            # effluent.copy_like(ms['l'])
+            condensate,effluent, = self.outs
+            condensate.mix_from(self.ins)
+            self.reactions(condensate)
+            ms = self._multi_stream = MultiStream('ms', phases='lg')
+            ms.copy_like(condensate)
+            ms.vle(T = self.T, P = self.P)
+            condensate.copy_like(ms['g'])
+            effluent.copy_like(ms['l'])
             
-##TODO: Find out how much fo the h202 is getting removed ay the first
-## and then remove the rest by decomposition 
-       
-class OxidativeCleavageReactor(bst.cstr):
+     
+class OxidativeCleavageReactor(bst.CSTR):
     _N_ins = 1
     _N_outs = 2
        
-# V_max is max volume of a reactor in feet3
-   
-## The two heatutilities are both for the vaccuum system -steam and for the cooling water
     def _setup(self):          
-        super()._setup()         
+        super()._setup()  
+#TODO:reaction conversions missing
         #oxidative_cleavage_conversion
-        X1 = 0.8
+        X1 = 0.9
         # decarboxylations conversion
         X2 = 0.2
         X3 = 0.2
@@ -90,7 +90,7 @@ class OxidativeCleavageReactor(bst.cstr):
                                  ])                        
         #TODO.xxx check again possible decarboxylation https://doi.org/10.1016/j.renene.2018.01.107
         #TODO.xxx check again Organic Reactions in Strong Alkalis. Part V.l Alkali Fusion of Epoxides and Ethers 
-        ##We are only accounting for methyl_linoleate and methyl_palmitoleate not others because they apparently don't participate
+        ##We are only accounting for methyl_linoleate and methyl_palmitoleate because they have unsaturations
         Side_reaction = PRxn([Rxn('Pelargonic_acid   -> Caprylic_acid + 1 CO2 ', 'Pelargonic_acid', X= X2),
                               Rxn('Monomethyl_azelate -> Suberic_acid + 1 CO2', 'Monomethyl_azelate', X = X3),
                               Rxn('Methyl_palmitoleate -> Azelaic_acid + Heptanoic_acid', 'Methyl_palmitoleate', X = X4),
@@ -98,7 +98,7 @@ class OxidativeCleavageReactor(bst.cstr):
                               ])
         #Because the cobalt tetrahydrate complex is soluble in water (380 g/L (20 ºC))
         #acc https://www.chemsrc.com/en/cas/6147-53-1_830295.html
-        Catalyst_dissolution = Rxn('Cobalt_acetate_tetrahydrate -> Cobalt_ion + 2 Acetate + 4 H2O', X = X5)
+        Catalyst_dissolution = Rxn('Cobalt_acetate_tetrahydrate -> Cobalt_ion + 2 Acetate_ion + 4 H2O','Cobalt_acetate_tetrahydrate', X = X5)
         oxidative_cleavage_rxnsys = RxnSys(Product_formation, Side_reaction, Catalyst_dissolution)
         self.reactions = oxidative_cleavage_rxnsys
             
@@ -129,120 +129,128 @@ class CentrifugeVacuumVessel(bst.Unit):
              self.design_results['Total volume'] = self.feed.F_vol * self.tau
              self.vacuum_system = bst.VacuumSystem(self)
              
-#TODO: check which form is the resin in and BM  
-         
-# @cost(basis='acid resin volume', 
-#       ID='Zeolite bed emulsification column',
-#       units='m^3',
-#       cost=17.60,
-#       S=1,
-#       ub = 18,
-#       CE=CEPCI_by_year[2007],
-#       n=0.95)
-
-@cost(basis='resin volume', 
-      ID='Zeolite bed emulsification column',
-      units='m^3',
-      cost=100000*0.8,
-      n=1,
-      S=30,
-      ub = 2000,
-      CE=CEPCI_by_year[2007],
-      BM = 1.65
-      )
-
-class Zeolite_packed_bed_reactor(Unit):
-#resin and the emulsified mixture    
+             
+class HydrolysisReactor(bst.CSTR):
     _N_ins = 1
-#methanol and water vapour coming from top
-# the fatty acid mixture coming from bottom
-    _N_outs = 2 
-     
-    def __init__(self, ID, ins, outs,P,T):
-         Unit.__init__(self, ID, ins, outs)
-         self.P = P
-         self.T = T
-          
-    def _setup(self):           
-##The monoesters of Saturated carboxylic acids present in the 
-# residual organic phase can advantageously be hydrolyzed in 
-# alcohol and Saturated carboxylic acids. 
-        X1 = 0.9
-## TODO conversions for each reaction unavailable!
-        Product_formation = PRxn([Rxn('Monomethyl_azelate + Water  -> Methanol + Azelaic_acid','Monomethyl_azelate', X = X1),
-                                  Rxn('Methyl_palmitate + Water  -> Methanol + Palmitic_acid','Methyl_palmitate', X = X1),
-                                  Rxn('Methyl_stearate + Water  -> Methanol + Stearic_acid','Methyl_stearate', X = X1),
-                                  Rxn('Methyl_linoleate + Water  -> Methanol + Linoleic_acid','Methyl_linoleate', X = X1),
-                                  Rxn('Methyl_palmitoleate + Water  -> Methanol + Palmitoleic_acid','Methyl_palmitoleate', X = X1),
-                                  Rxn('Methyl_oleate + Water  -> Methanol + Oleic_acid','Methyl_oleate', X = X1)])
-                                          
-        oxidative_cleavage_rxnsys = RxnSys(Product_formation)
-        self.reactions = oxidative_cleavage_rxnsys
-            
-    def _design(self):
-        Feed = self.ins
-        Feed_moles_for_exchange = sum(Feed.imol['Monomethyl_azelate'],
-                                      Feed.imol['Methyl_palmitate '],
-                                      Feed.imol['Methyl_stearate'],
-                                      Feed.imol['Methyl_palmitoleate'],
-                                      Feed.imol['Methyl_oleate'])
-        Design = self.design_results
-        Design['resin volume'] = self.Feed_moles_for_exchange/1800
-  
-    def _run(self):
-        feed = self.ins[0]
-        effluent,vent,  = self.outs    
-        #https://thermosteam.readthedocs.io/en/latest/_modules/thermosteam/_stream.html#Stream.copy_like
-        effluent.copy_like(feed)              
-        self.reactions(effluent)
-        effluent.T = self.T
-        effluent.P = self.P
-        vent.phase = 'g'
-        vent.copy_flow(effluent, ('Methanol', 'Water'), remove=True)
-        vent.T = effluent.T = self.T
-        vent.P = effluent.P = self.P
+    _N_outs = 2
+       
+    def _setup(self):          
+        super()._setup()      
+        # Process parameters for emulsification of fatty esters to acids in a 
+        # packed bed ion exchange column
+        X_hydrolysis = 0.30
+        Product_formation = PRxn([Rxn('Monomethyl_azelate + Water  -> Methanol + Azelaic_acid','Monomethyl_azelate', X = X_hydrolysis ),
+                          Rxn('Methyl_palmitate + Water  -> Methanol + Palmitic_acid','Methyl_palmitate', X = X_hydrolysis ),
+                          Rxn('Methyl_stearate + Water  -> Methanol + Stearic_acid','Methyl_stearate', X = X_hydrolysis),
+                          Rxn('Methyl_linoleate + Water  -> Methanol + Linoleic_acid','Methyl_linoleate', X = X_hydrolysis),
+                          Rxn('Methyl_palmitoleate + Water  -> Methanol + Palmitoleic_acid','Methyl_palmitoleate', X = 0.1),
+                          Rxn('Methyl_oleate + Water  -> Methanol + Oleic_acid','Methyl_oleate', X = 0.1)])
+        self.reactions = RxnSys(Product_formation)
         
+    # def _design(self):
+    #       self.design_results['Total regenerant volume'] = self.feed.F_vol * self.tau
+    #       self.vacuum_system = bst.VacuumSystem(self)
+            
+    def _run(self):
+            condensate,effluent, = self.outs
+            condensate.mix_from(self.ins)
+            self.reactions(condensate)
+            ms = self._multi_stream = MultiStream('ms', phases='lg')
+            ms.copy_like(condensate)
+            ms.vle(T = self.T, P = self.P)
+            condensate.copy_like(ms['g'])
+            effluent.copy_like(ms['l'])
+            
+        # feed = self.ins[0]
+        # vent, effluent = self.outs   
+        # #https://thermosteam.readthedocs.io/en/latest/_modules/thermosteam/_stream.html#Stream.copy_like
+        # effluent.copy_like(feed)              
+        # self.reactions(effluent)
+        # ms = self._multi_stream = MultiStream('ms', phases='lg')
+        # ms.copy_like(self.reactions(effluent))
+        # ms.vle(T = self.T, P = self.P)
+        # vent.copy_like(ms['g'])
+        # effluent.copy_like(ms['l'])
+        
+class AACrystalliser(bst.units.BatchCrystallizer):
+  
+    def __init__(self, ID='', ins=None, outs=(), thermo=None, *,  
+                 T = None
+                  ):
+        bst.BatchCrystallizer.__init__(self, ID, ins, outs, thermo,
+                                        tau=2, V=1e6, T=T)
+        # https://www.alfa.com/en/catalog/B21568/
+        # https://www.chembk.com/en/chem/Nonanoic%20acid#:~:text=Nonanoic%20acid%20-%20Nature%20Open%20Data%20Verified%20Data,yellow.%20Slightly%20special%20odor.%20Melting%20Point%2011-12.5%20%C2%B0c.
+        self.AA_molefraction_330_15K = 0.0006996
+        self.AA_molefraction_280_15K = 0.0000594
+#       self.NA_solubility_gL_at20DEGC = 0.267/1000
+#       #Nonanoic acid melting point is 12.5
+                        
+    @property
+    def Hnet(self):
+        effluent = self.outs[0]
+        solids = effluent['s']
+        H_out = - sum([i.Hfus * j for i,j in zip(self.chemicals, solids.mol) if i.Hfus])
+        return H_out 
+
+    def solubility(self, T):
+        delta_T = 330.15 - 280.15
+        delta_S = self.AA_molefraction_330_15K - self.AA_molefraction_280_15K
+        m = delta_S/delta_T
+        b = m*330.15
+        c = self.AA_molefraction_330_15K - b
+        S = m*T + c
+        return S
+    
+#Assuming inlet at saturation. Therefore adding the feed at saturation of 330.15
+    def _run(self):
+        feed = self.ins[0]    
+        outlet = self.outs[0]
+        outlet.copy_like(feed)
+        outlet.phases = ('s', 'l')
+        x = self.solubility(self.T)
+        outlet.sle('Azelaic_acid',
+                    solubility=x,
+                    T = self.T)
+        outlet.imass['s','Nonanoic_acid'] = feed.imass['Nonanoic_acid']        
         
 #TODO: Should catalyst regeneration be continuous or batch?
-class Calcium_hydroxide_reactor(bst.units.cstr):
-    _N_ins = 1
+class Calcium_hydroxide_reactor(bst.CSTR):
+    _N_ins = 2
     _N_outs = 1
     
        
     def _setup(self):  
         super()._setup()                  
-        self.reactions = tmo.SeriesReaction([
-                tmo.Rxn('Cobalt_ion + Calcium_hydroxide + Acetate = Calcium_acetate + Cobalt_hydroxide', 'Cobalt_ion', X = 0.99),
-                tmo.Rxn('Tungstate_ion + Calcium_hydroxide + Hydrogen_ion = Calcium_tungstate + H2O', 'Tungstate_ion', X = 0.99)
+        self.reactions = tmo.ParallelReaction([
+                tmo.Rxn('Cobalt_ion + Calcium_hydroxide + Acetate_ion -> Calcium_acetate + Cobalt_hydroxide', 'Cobalt_ion', X = 0.999),
+                tmo.Rxn('Tungstate_ion + Calcium_hydroxide + Hydrogen_ion -> Calcium_tungstate + H2O', 'Tungstate_ion', X = 0.999)
                 ])
             
     def _run(self):
-        feed = self.ins[0]
-        effluent,vent, = self.outs       
+        feed = self.ins
+        effluent, = self.outs  
+        effluent.mix_from(feed)
         #https://thermosteam.readthedocs.io/en/latest/_modules/thermosteam/_stream.html#Stream.copy_like
-        effluent.copy_like(feed)              
         self.reactions(effluent)
-        vent.T = self.T
         effluent.P = self.P
         
-class Acid_precipitation_reactor(bst.units.cstr):
-    _N_ins = 1
+class Acid_precipitation_reactor(bst.CSTR):
+    _N_ins = 2
     _N_outs = 1
         
     def _setup(self): 
         super()._setup()
         # Not sure about the below, how do we have ions for the below                         
         self.reactions = tmo.ParallelReaction([
-                tmo.Rxn('Calcium_tungstate + HCl = Tungstic_acid + Calcium_chloride', 'Calcium_tungstate',X = 0.9),
-                tmo.Rxn('Cobalt_hydroxide + HCl = Cobalt_chloride + Water','Cobalt_hydroxide', X = 0.9)
+                tmo.Rxn('Calcium_tungstate + HCl -> Tungstic_acid + Calcium_chloride', 'Calcium_tungstate',X = 0.999),
+                tmo.Rxn('Cobalt_hydroxide + HCl -> Cobalt_chloride + Water','Cobalt_hydroxide', X = 0.999)
                 ])            
     def _run(self):
-        feed = self.ins[0]
-        effluent,vent, = self.outs       
+        feed = self.ins
+        effluent, = self.outs  
+        effluent.mix_from(feed)
         #https://thermosteam.readthedocs.io/en/latest/_modules/thermosteam/_stream.html#Stream.copy_like
-        effluent.copy_like(feed)              
         self.reactions(effluent)
-        vent.T = self.T
         effluent.P = self.P
-
-              
+        

@@ -20,7 +20,7 @@ info = {
     'abbr': 'la',
     'WWT_ID': '5',
     'is2G': True,
-    'FERM_product': 'lactic_acid',
+    'FERM_product': ['lactic_acid',],
     'add_BT': False,
     'ww_price': None,
     }

@@ -110,7 +110,7 @@ amberlyst_15_price = 153.252 * _chemical_2020to2016
 # https://www.alibaba.com/product-detail/Tricalcium-Phosphate-Tricalcium-Phosphate-TCP-Tricalcium_60744013678.html?spm=a2700.galleryofferlist.0.0.42f16684C9iJhz&s=p
 TCP_price = 850 / _kg_per_ton # tricalcium (di)phosphate
 
-
+liquid_CO2_price = 0.350 # 350 2022$/MT according to https://www.chemanalyst.com/Pricing-data/liquid-carbon-dioxide-1090
 # TAL_price = 1.88 # initial value
 SA_price = 1.88 # initial value
 
@@ -162,7 +162,7 @@ activated_carbon_price = 41. # $/ft^3 # Seader et al.
 
 succinic_acid_price = 1.5 # initial value to solve MPSP
 
-
+MEA_price = (1021.69 + 1855.65)/(2*1000) # Average of bounds of Nov 2014 - Oct 2017 range from https://www.intratec.us/chemical-markets/monoethanolamine-price
 # All in 2016$/kg
 price = {'SA': SA_price,
          'TCP': TCP_price,
@@ -198,9 +198,11 @@ price = {'SA': SA_price,
          'Natural gas': natural_gas_price,
          'Methanol': methanol_price,
          'Ethanol': ethanol_price,
+         'Liquid carbon dioxide': liquid_CO2_price,
          # Below currently not in use
          'Gypsum': gypsum_price,
          'Denaturant': denaturant_price,
+         'Monoethanolamine': MEA_price,
          'Amberlyst15': amberlyst_15_price,
          'DAP': 0.1645 * _lb_per_kg,
          'Activated carbon': activated_carbon_price,

@@ -68,7 +68,8 @@ __all__ = (
     'kph_to_tpd',
     'rename_storage_units',
     # TEA/LCA
-    'prices', 'update_product_prices', 'IRR_at_ww_price', 'ww_price_at_IRR', 'get_MPSP',
+    'prices', 'update_cane_price', 'update_product_prices',
+    'IRR_at_ww_price', 'ww_price_at_IRR', 'get_MPSP',
     'GWP_CFs', 'add_CFs', 'get_GWP',
     )
 
@@ -565,7 +566,7 @@ prices = { # $/kg unless otherwise noted
     'biodiesel': 1.38, # $/kg, lipidcane biorefinery
     'bisulfite': 0.08, # $/L
     'citric_acid': 0.22, # $/L
-    'ethanol': 0.789, # $/kg, lipidcane biorefinery
+    'advanced_ethanol': 0.789, # $/kg, lipidcane biorefinery
     'lactic_acid': 1.9, # $/kg, lactic acid biorefinery
     'naocl': 0.14, # $/L
     'RIN': RIN_price, # in addition to the natural gas price
@@ -573,9 +574,14 @@ prices = { # $/kg unless otherwise noted
 #    'caustics': 0.2627, # lactic acid biorefinery, price['NaOH]/2 as the caustic is 50% NaOH/water
 #    'polymer': 2.6282 / _lb_per_kg / _GDP_2007to2016, # Davis et al.
     }
+prices['cellulosic_ethanol'] = prices['advanced_ethanol']
+
+def update_cane_price(stream_registry):
+    cane = stream_registry.search('sugarcane') or stream_registry.search('oilcane')
+    cane.price = 0.035
 
 def update_product_prices(stream_registry):
-    for p in 'ethanol', 'biodiesel', 'lactic_acid':
+    for p in ['advanced_ethanol', 'cellulosic_ethanol', 'biodiesel', 'lactic_acid']:
         if stream_registry.search(p):
             stream_registry.search(p).price = prices[p]
 
@@ -602,16 +608,16 @@ def ww_price_at_IRR(ww_stream, tea, IRR, print_msg=True):
 
 
 ethanol_density_kggal = 2.9867 # cs.ethanol_density_kggal
-def get_MPSP(system, product='ethanol', print_msg=True):
+def get_MPSP(system, products=['ethanol',], print_msg=True):
     tea = system.TEA
-    product = system.flowsheet.stream.search(product)
-    if product.ID=='ethanol':
+    products = [system.flowsheet.stream.search(p) for p in list(products)]
+    if 'ethanol' in products[0].ID:
         txt = ('MESP', 'gal')
         factor = ethanol_density_kggal
     else:
         txt = ('MPSP', 'kg')
         factor = 1.
-    price = tea.solve_price(product) * factor
+    price = tea.solve_price(products) * factor
 
     for unit in system.units:
         if hasattr(unit, 'cache_dct'):
@@ -620,16 +626,17 @@ def get_MPSP(system, product='ethanol', print_msg=True):
 
     sale_dct = {}
     for stream in system.products:
-        if stream is product: continue
+        if stream in products: continue
         if stream.price:
             if stream.price < 0: continue # a waste stream, not a product
             sale_dct[f'{stream.ID} ratio'] = stream.cost
     sale_dct['Electricity ratio'] = max(0, -system.power_utility.cost)
-    sale_dct['Product ratio'] = product.F_mass*price/factor
+    sale_dct['Product ratio'] = sum(p.F_mass for p in products)*price/factor
     hourly_sales = sum(v for v in sale_dct.values())
     cache_dct.update({k:v/hourly_sales for k, v in sale_dct.items()})
 
-    if print_msg: print(f'\n{txt[0]} of {product.ID} for {system.ID}: ${price:.2f}/{txt[1]}.')
+    IDs = [p.ID for p in products]
+    if print_msg: print(f'\n{txt[0]} of {", ".join(IDs)} for {system.ID}: ${price:.2f}/{txt[1]}.')
     return price
 
 
@@ -751,11 +758,10 @@ def add_CFs(stream_registry, unit_registry, stream_CF_dct):
 
 
 # Allocation based on the value
-def get_GWP(system, product='ethanol', print_msg=True):
-    s_reg = system.flowsheet.stream
-    product = s_reg.search(product)
-    if product.ID=='ethanol':
-        txt = ('GWP', 'gal')
+def get_GWP(system, products=['ethanol',], print_msg=True):
+    products = [system.flowsheet.stream.search(p) for p in list(products)]
+    if 'ethanol' in products[0].ID:
+        txt = ('MESP', 'gal')
         factor = ethanol_density_kggal
     else:
         txt = ('GWP', 'kg')
@@ -771,6 +777,7 @@ def get_GWP(system, product='ethanol', print_msg=True):
             min(system.get_total_products_impact('GWP'), 0) - # positive if having product credit
             min(system.get_net_electricity_impact('GWP'), 0) # negative if producing electricity
             )
-    GWP = total_GWP/system.operating_hours * factor * cache_dct['Product ratio']/product.F_mass
-    if print_msg: print(f'\n{txt[0]} of {product.ID} for {system.ID}: {GWP:.2f} kg CO2/{txt[1]}.')
+    GWP = total_GWP/system.operating_hours * factor * cache_dct['Product ratio']/sum(p.F_mass for p in products)
+    IDs = [p.ID for p in products]
+    if print_msg: print(f'\n{txt[0]} of {", ".join(IDs)} for {system.ID}: {GWP:.2f} kg CO2/{txt[1]}.')
     return GWP

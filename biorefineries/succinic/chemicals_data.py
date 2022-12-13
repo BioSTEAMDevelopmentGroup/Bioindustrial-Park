@@ -22,11 +22,12 @@ with modification of fermentation system for TAL instead of the original ethanol
 
 import thermosteam as tmo
 from thermosteam import functional as fn
+from biorefineries.sugarcane import chemicals as sugarcane_chems
 # from biorefineries import sugarcane as sc
-__all__ = ('TAL_chemicals', 'chemical_groups', 'soluble_organics', 'combustibles')
+__all__ = ('SA_chemicals', 'chemical_groups', 'soluble_organics', 'combustibles')
 
 # chems is the object containing all chemicals used in this biorefinery
-chems = TAL_chemicals = tmo.Chemicals([])
+chems = SA_chemicals = tmo.Chemicals([])
 
 # To keep track of which chemicals are available in the database and which
 # are created from scratch
@@ -108,10 +109,9 @@ AmmoniumSulfate = chemical_database('AmmoniumSulfate', phase='l',
 NaNO3 = chemical_database('NaNO3', phase='l', Hf=-118756*_cal2joule)
 # NIST https://webbook.nist.gov/cgi/cbook.cgi?ID=C7757826&Mask=2, accessed 04/07/2020
 Na2SO4 = chemical_database('Na2SO4', phase='l', Hf=-1356.38e3)
-# CaSO4 = chemical_database('CaSO4', phase='s', Hf=-342531*_cal2joule)
-# The default Perry 151 model has a crazy value, use another model instead
-# CaSO4.Cn.move_up_model_priority('Constant', 0)
-# 
+CaSO4 = chemical_database('CaSO4', phase='s', Hf=-342531*_cal2joule)
+# The default Perry 151 value is likely to be wrong, use another model instead
+CaSO4.Cn.move_up_model_priority('LASTOVKA_S', 0)
 
 # =============================================================================
 # Soluble organic salts
@@ -129,16 +129,16 @@ AmmoniumAcetate = chemical_database('AmmoniumAcetate', phase='l',
 # Lactic Acid by the Fermentation of Whey: a Design and Cost Study. 
 # Commonwealth Scientific and Industrial Research Organization, Australia, 
 # which was also cited by other studies, but the origianl source cannot be found online
-# CalciumLactate = chemical_database('CalciumLactate', phase='l',
-#                                    Hf=-1686.1e3)
+CalciumLactate = chemical_database('CalciumLactate', phase='l',
+                                    Hf=-1686.1e3)
 # # Hf from Lange's Handbook of Chemistry, 15th edn., Table 6.3, PDF page 631
-# CalciumAcetate = chemical_database('CalciumAcetate', phase='l', Hf=-1514.73e3)
+CalciumAcetate = chemical_database('CalciumAcetate', phase='l', Hf=-1514.73e3)
 
 # # Solubility of CalciumSuccinate is 3.2 g/L in water as Ca2+ based on 
 # # Burgess and Drasdo, Polyhedron 1993, 12 (24), 2905–2911, which is 12.5 g/L as CaSA
 # # Baseline CalciumSuccinate is ~14 g/L in fermentation broth, thus assumes all 
 # # CalciumSuccinate in liquid phase
-# CalciumSuccinate = chemical_database('CalciumSuccinate', phase='l')
+CalciumSuccinate = chemical_database('CalciumSuccinate', phase='l')
 
 # =============================================================================
 # Soluble organics
@@ -269,8 +269,9 @@ for i in DHL.get_missing_properties():
 
 # TAL.Cn.l.add_method(tmo.Chemical('Succinic acid').Cn.l)
 
+PyruvicAcid = chemical_database(ID='PyruvicAcid', search_ID='Pyruvic acid')
 SuccinicAcid = chemical_database(ID='SuccinicAcid', search_ID='Succinic acid')
-
+LacticAcid = chemical_database(ID='LacticAcid', search_ID='Lactic acid')
 SA = Sorbicacid =  chemical_database(ID='SorbicAcid', search_ID='Sorbic acid')
 
 HEA = tmo.Chemical('2-hexenoic acid')
@@ -398,6 +399,7 @@ Glucan.copy_models_from(Glucose, ['Cn'])
 Mannan = chemical_copied('Mannan', Glucan)
 Galactan = chemical_copied('Galactan', Glucan)
 
+MEA = chemical_database(ID='MEA', search_ID='Monoethanolamine')
 Xylan = chemical_defined('Xylan', phase='s', formula='C5H8O4', Hf=-182100*_cal2joule)
 Xylan.copy_models_from(Xylose, ['Cn'])
 Arabinan = chemical_copied('Arabinan', Xylan)
@@ -415,7 +417,7 @@ Lignin.Hf = -108248*_cal2joule/tmo.Chemical('Vanillin').MW*Lignin.MW
 P4O10 = chemical_database('P4O10', phase='s', Hf=-713.2*_cal2joule)
 Ash = chemical_database('Ash', search_ID='CaO', phase='s', Hf=-151688*_cal2joule,
                         HHV=0, LHV=0)
-CaSO4 = chemical_database('CaSO4')
+# CaSO4 = chemical_database('CaSO4')
 # This is to copy the solid state of Xylose,
 # cannot directly use Xylose as Xylose is locked at liquid state now
 Tar = chemical_copied('Tar', Xylose, phase_ref='s')
@@ -471,10 +473,13 @@ chemical_groups = dict(
     OrganicSolubleSolids = ('AmmoniumAcetate', 'SolubleLignin', 'Extract', 'CSL',
                             # 'Triacetic acid lactone',
                             'SorbicAcid', 'HMTHP',
-                            'PotassiumSorbate', 'ButylSorbate', 'VitaminA', 'VitaminD2'),
-                            # 'LacticAcid', 'CalciumLactate', 'CalciumAcetate',
-                            # 'EthylLactate', 'EthylAcetate', 'SuccinicAcid',
-                            # 'CalciumSuccinate', 'EthylSuccinate', 
+                            'PotassiumSorbate', 'ButylSorbate', 'VitaminA', 'VitaminD2',
+                            'LacticAcid', 'CalciumLactate', 'CalciumAcetate',
+                            # 'EthylLactate', 'EthylAcetate', 
+                            'SuccinicAcid',
+                            'CalciumSuccinate', 
+                            ),
+                            # 'EthylSuccinate', 
                             # 'Methanol', 'MethylLactate', 'MethylAcetate'),
     InorganicSolubleSolids = ('AmmoniumSulfate', 'NaOH', 'HNO3', 'NaNO3',
                               # 'DAP',
@@ -593,6 +598,29 @@ for chemical in chems: chemical.default()
 
 # Though set_thermo will first compile the Chemicals object,
 # compile beforehand is easier to debug because of the helpful error message
+
+chems.append(sugarcane_chems.H3PO4)
+chems.append(sugarcane_chems.Cellulose)
+chems.append(sugarcane_chems.Hemicellulose)
+chems.append(sugarcane_chems.CaO)
+chems.append(sugarcane_chems.Solids)
+chems.append(sugarcane_chems.Flocculant)
+
+chems.append(tmo.Chemical(ID='CO2_compressible', search_ID='CO2'))
+# for c1 in sugarcane_chems:
+#     c1_exists = False
+#     if not c1 in chems:
+#         for c2 in chems:
+#             if c1.iupac_name == c2.iupac_name:
+#                 c1_exists = True
+#     else:
+#         c1_exists = True
+#     if not c1_exists:
+#         try:
+#             chems.append(c1)
+#         except:
+#             pass
+    
 chems.compile()
 tmo.settings.set_thermo(chems)
 chems.set_synonym('CalciumDihydroxide', 'Lime')
@@ -622,7 +650,7 @@ chems.set_synonym('Denaturant', 'Octane')
 chems.set_synonym('CO2', 'CarbonDioxide')
 chems.set_synonym('CarbonMonoxide', 'CO')
 chems.set_synonym('NitricOxide', 'NO')
-# chems.set_synonym('CaSO4', 'Gypsum')
+chems.set_synonym('CaSO4', 'Gypsum')
 chems.set_synonym('P4O10', 'PhosphorusPentoxide')
 chems.set_synonym('Na2SO4', 'SodiumSulfate')
 chems.set_synonym('AmmoniumHydroxide', 'NH4OH')
