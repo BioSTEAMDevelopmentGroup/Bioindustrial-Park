@@ -21,7 +21,7 @@ biorefineries/LAOs/units/__init__.py
 biorefineries/LAOs/units/adiabatic_fixedbed_gas_reactor.py
 biorefineries/LAOs/units/nitrogen_generation_package.py
 biorefineries/LAOs/units/surge_tank.py
-biorefineries/corn/README.rst
+biorefineries/corn/README.md
 biorefineries/corn/__init__.py
 biorefineries/corn/_chemicals.py
 biorefineries/corn/_process_settings.py
@@ -97,6 +97,7 @@ biorefineries/lipidcane/units.py
 biorefineries/lipidcane/utils/__init__.py
 biorefineries/lipidcane/utils/composition.py
 biorefineries/oilcane/README.md
+biorefineries/oilcane/RIN_prices.csv
 biorefineries/oilcane/S1_breakdown.xlsx
 biorefineries/oilcane/__init__.py
 biorefineries/oilcane/_across_time_plots.py
@@ -104,6 +105,7 @@ biorefineries/oilcane/_chemicals.py
 biorefineries/oilcane/_contour_plots.py
 biorefineries/oilcane/_distributions.py
 biorefineries/oilcane/_evaluation.py
+biorefineries/oilcane/_feature_mockups.py
 biorefineries/oilcane/_lca_characterization_factors.py
 biorefineries/oilcane/_load_data.py
 biorefineries/oilcane/_oil_extraction_specification.py
@@ -112,9 +114,7 @@ biorefineries/oilcane/_process_settings.py
 biorefineries/oilcane/_tables.py
 biorefineries/oilcane/_tea.py
 biorefineries/oilcane/_uncertainty_plots.py
-biorefineries/oilcane/_variable_mockups.py
 biorefineries/oilcane/distributions.xlsx
-biorefineries/oilcane/integrated_fermentation.xlsx
 biorefineries/oilcane/lca_benchmarks.py
 biorefineries/oilcane/oil_content_analysis.npy
 biorefineries/oilcane/oil_extraction_analysis.npy
@@ -122,7 +122,6 @@ biorefineries/oilcane/price_contours.npy
 biorefineries/oilcane/price_contours_benefit.npy
 biorefineries/oilcane/price_contours_enhanced.npy
 biorefineries/oilcane/sankey_plot.ipynb
-biorefineries/oilcane/separated_fermentation.xlsx
 biorefineries/oilcane/systems.py
 biorefineries/oilcane/units.py
 biorefineries/oilcane/webapp_model.py

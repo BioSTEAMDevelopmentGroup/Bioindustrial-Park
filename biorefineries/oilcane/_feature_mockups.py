@@ -62,10 +62,10 @@ from biosteam import MockFeature
     MockFeature('Income tax', '%', 'Biorefinery'),
 )
      
-(MFPP, feedstock_consumption, biodiesel_production, ethanol_production, 
+(MFPP, feedstock_consumption, biodiesel_production, biodiesel_yield, ethanol_production, 
  net_energy_production, electricity_production, natural_gas_consumption, TCI, 
  heat_exchanger_network_error, GWP_economic, GWP_ethanol, GWP_biodiesel, 
- GWP_crude_glycerol, GWP_electricity, GWP_ethanol_displacement,
+ GWP_crude_glycerol, GWP_electricity, GWP_ethanol_displacement, GWP_biodiesel_displacement,
  GWP_biofuel_allocation, GWP_ethanol_allocation,
  GWP_biodiesel_allocation, GWP_crude_glycerol_allocation,
  MFPP_derivative, 
@@ -78,6 +78,7 @@ from biosteam import MockFeature
     MockFeature('MFPP', 'USD/MT', 'Biorefinery'),
     MockFeature('Feedstock consumption', 'MT/yr', 'Biorefinery'),
     MockFeature('Biodiesel production', 'L/MT', 'Biorefinery'),
+    MockFeature('Biodiesel yield', 'L/hc', 'Biorefinery'),
     MockFeature('Ethanol production', 'L/MT', 'Biorefinery'),
     MockFeature('Electricity production', 'kWhr/MT', 'Biorefinery'),
     MockFeature('Net energy production', 'GGE/MT', 'Biorefinery'),
@@ -90,6 +91,7 @@ from biosteam import MockFeature
     MockFeature('Crude glycerol GWP', 'kg*CO2*eq / kg', 'Economic allocation'),
     MockFeature('Electricity GWP', 'kg*CO2*eq / MWhr', 'Economic allocation'),
     MockFeature('Ethanol GWP', 'kg*CO2*eq / L', 'Displacement allocation'),
+    MockFeature('Biodiesel GWP', 'kg*CO2*eq / L', 'Displacement allocation'),
     MockFeature('Biofuel GWP', 'kg*CO2*eq / GGE', 'Energy allocation'),
     MockFeature('Ethanol GWP', 'kg*CO2*eq / L', 'Energy allocation'),
     MockFeature('Biodiesel GWP', 'kg*CO2*eq / L', 'Energy allocation'),

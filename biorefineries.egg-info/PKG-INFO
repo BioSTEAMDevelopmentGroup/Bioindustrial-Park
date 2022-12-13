@@ -1,12 +1,12 @@
 Metadata-Version: 2.1
 Name: biorefineries
-Version: 2.23.18
+Version: 2.23.20
 Summary: Biorefinery models in BioSTEAM
 Home-page: https://github.com/BioSTEAMDevelopmentGroup/Bioindustrial-Park/tree/master/biorefineries/BioSTEAM 2.x.x/biorefineries
+Download-URL: https://github.com/BioSTEAMDevelopmentGroup/Bioindustrial-Park/tree/master/biorefineries/BioSTEAM 2.x.x/biorefineries
 Author: Yoel Cortes-Pena
 Author-email: yoelcortes@gmail.com
 License: MIT
-Download-URL: https://github.com/BioSTEAMDevelopmentGroup/Bioindustrial-Park/tree/master/biorefineries/BioSTEAM 2.x.x/biorefineries
 Keywords: chemical process simmulation bioprocess engineering mass CABBI biorefinery biofuel bioproducts lipid-cane corn stover
 Platform: Windows
 Platform: Mac
@@ -19,7 +19,7 @@ Classifier: Programming Language :: Python :: 3.7
 Classifier: Topic :: Scientific/Engineering
 Classifier: Topic :: Scientific/Engineering :: Chemistry
 Classifier: Topic :: Scientific/Engineering :: Mathematics
-Requires-Python: >=3.8
+Requires-Python: >=3.9
 License-File: LICENSE.txt
 
 =====================================================================

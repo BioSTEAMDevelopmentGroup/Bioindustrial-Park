@@ -98,7 +98,7 @@ def by_month_to_year(arr):
     ])
 
 biomass_based_diesel_prices = by_month_to_year(biomass_based_diesel_prices)
-biodiesel_no_RIN_prices = biomass_based_diesel_prices - RIN_D4_prices
+biodiesel_no_RIN_prices = biomass_based_diesel_prices - RIN_D4_prices * 1.5
 cellulosic_based_diesel_prices = biodiesel_no_RIN_prices + RIN_D3_prices * 1.5
 ethanol_no_RIN_prices = by_month_to_year(ethanol_no_RIN_prices)
 ethanol_with_D6RIN_prices = by_month_to_year(ethanol_with_D6RIN_prices)

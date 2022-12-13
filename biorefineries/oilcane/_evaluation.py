@@ -8,7 +8,6 @@ import numpy as np
 import biosteam as bst
 from warnings import warn
 from biorefineries import oilcane as oc
-from biorefineries.lipidcane import get_composition, set_composition
 from ._distributions import (
     mean_RIN_D3_price,
     mean_RIN_D5_price,
@@ -49,6 +48,10 @@ def no_derivative(f):
         finally:
             oc.enable_derivative()
     return f_derivative_disabled
+
+def evaluate_feedstock_lines(N):
+    df = oc.get_composition_data()
+    load_composition
 
 def evaluate_configurations_across_recovery_and_oil_content(
         recovery, oil_content, configurations, 
@@ -162,18 +165,9 @@ def evaluate_MFPP_benefit_across_ethanol_and_biodiesel_prices(ethanol_price, bio
 
 def evaluate_metrics_at_composition(oil, fiber, water, configuration):
     oc.load(configuration)
-    composition = get_composition(oc.feedstock)
-    composition['lipid'] = oil
-    composition['fiber'] = fiber
-    composition['moisture'] = water
-    FFA = oc.oil_extraction_specification.FFA_content
-    PL = oc.oil_extraction_specification.PL_content
-    composition['TAG'] = 1. - FFA - PL
-    composition['FFA'] = FFA
-    composition['PL'] = PL
-    del composition['sugar'] # Sugar is backcalculated in `set_composition`
+    cs = oc.composition_specification
     try:
-        set_composition(oc.feedstock, **composition)
+        oc.load_composition(oc.feedstock, oil, fiber, water, cs.FFA, cs.PL)
     except ValueError:
         return np.array([np.nan for i in oc.model.metrics])
     oc.sys.simulate()
@@ -219,7 +213,7 @@ def save_pickled_results(N, configurations=None, rule='L', optimize=True):
         rho.to_excel(file)
 
 def run_uncertainty_and_sensitivity(name, N, rule='L',
-                                    across_oil_content=False, 
+                                    across_lines=False, 
                                     sample_cache={},
                                     autosave=True,
                                     autoload=True,
@@ -234,36 +228,38 @@ def run_uncertainty_and_sensitivity(name, N, rule='L',
     else:
         np.random.seed(1)
         sample_cache[key] = samples = oc.model.sample(N, rule)
-    oc.model.load_samples(samples, optimize=optimize, ss=False)
-    file = monte_carlo_file(name, across_oil_content)
-    if across_oil_content:
-        if parse_configuration(name).number < 0:
-            oc.model.evaluate(notify=int(N/10))
-            oc.model.evaluate_across_coordinate(
-                name='Oil content',
-                f_coordinate=lambda x: None,
-                coordinate=oc.oil_content,
-                notify=int(N/10), 
-                notify_coordinate=True,
-                xlfile=file,
-                re_evaluate=False,
+    oc.model.load_samples(samples, optimize=optimize)
+    file = monte_carlo_file(name, across_lines)
+    N_notify = min(int(N/10), 20)
+    autosave = N_notify if autosave else False
+    if across_lines:
+        df = oc.get_composition_data()
+        def set_line(line):
+            np.random.seed(1)
+            oc.set_line_composition_parameters(line)
+            oc.line = line
+            oc.model.load_samples(oc.model.sample(N, rule=rule), optimize=optimize)
+        
+        @no_derivative
+        def evaluate(**kwargs):
+            autoload_file = autoload_file_name(oc.line)
+            oc.model.evaluate(
+                autosave=autosave, 
+                autoload=autoload,
+                file=autoload_file,
+                **kwargs,
             )
-        else:
-            def f(x):
-                oc.oil_extraction_specification.locked_oil_content = False
-                oc.oil_extraction_specification.load_oil_content(x)
-                oc.oil_extraction_specification.locked_oil_content = True
-            oc.model.evaluate_across_coordinate(
-                name='Oil content',
-                f_coordinate=f,
-                coordinate=oc.oil_content,
-                notify=int(N/10), 
-                notify_coordinate=True,
-                xlfile=file,
-            )
+            
+        oc.model.evaluate_across_coordinate(
+            name='Line',
+            notify=int(N/10),
+            f_coordinate=set_line,
+            f_evaluate=evaluate,
+            coordinate=df.index,
+            notify_coordinate=True,
+            xlfile=file,
+        )
     else:
-        N = min(int(N/10), 20)
-        autosave = N if autosave else False
         autoload_file = autoload_file_name(name)
         success = False
         for i in range(3):
@@ -295,12 +291,12 @@ def run_uncertainty_and_sensitivity(name, N, rule='L',
 
 run = run_uncertainty_and_sensitivity
     
-def run_all(N, across_oil_content=False, rule='L', configurations=None,
+def run_all(N, across_lines=False, rule='L', configurations=None,
             filter=None,**kwargs):
     if configurations is None: configurations = oc.configuration_names
     for name in configurations:
         if filter and not filter(name): continue
         print(f"Running {name}:")
         run_uncertainty_and_sensitivity(
-            name, N, rule, across_oil_content, **kwargs
+            name, N, rule, across_lines, **kwargs
         )

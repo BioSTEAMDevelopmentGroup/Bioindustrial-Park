@@ -6,7 +6,7 @@ Created on Fri Nov  5 01:34:00 2021
 """
 import biosteam as bst
 import biorefineries.oilcane as oc
-from biosteam.utils import CABBI_colors, colors
+from biosteam.utils import CABBI_colors, GG_colors, colors
 from thermosteam.utils import set_figure_size, set_font, roundsigfigs
 from thermosteam.units_of_measure import format_units
 from colorpalette import Palette
@@ -24,7 +24,7 @@ from ._feature_mockups import (
     lca_monte_carlo_derivative_metric_mockups,
     MFPP, TCI, electricity_production,
     # natural_gas_consumption,
-    ethanol_production, biodiesel_production,
+    ethanol_production, biodiesel_production, biodiesel_yield,
     GWP_ethanol, GWP_biodiesel, GWP_electricity,
     GWP_ethanol_allocation, GWP_biodiesel_allocation,
     GWP_economic, MFPP_derivative, 
@@ -38,9 +38,11 @@ from ._feature_mockups import (
 from ._load_data import (
     images_folder,
     get_monte_carlo,
+    get_line_monte_carlo,
     spearman_file,
 )
 import os
+from colorpalette import ColorWheel
 from._parse_configuration import format_name
 
 __all__ = (
@@ -52,6 +54,7 @@ __all__ = (
     'plot_montecarlo_agile_comparison',
     'plot_montecarlo_derivative',
     'plot_montecarlo_absolute',
+    'plot_lines_monte_carlo_manuscript',
     'plot_spearman_tea',
     'plot_spearman_lca',
     'plot_spearman_tea_short',
@@ -118,7 +121,16 @@ area_hatches = {
     'Oil prod. & ext.': '/',
     'Oil production and extraction': '/',
 }
-
+line_color_wheel = ColorWheel([
+    GG_colors.orange,
+    GG_colors.purple,
+    GG_colors.green,
+    GG_colors.blue,
+    GG_colors.yellow,
+    colors.CABBI_teal,
+    colors.CABBI_grey,
+    colors.CABBI_brown,
+])
 for i in area_colors: area_colors[i] = area_colors[i].tint(20)
 palette = Palette(**area_colors)
 letter_color = colors.neutral.shade(25).RGBn
@@ -139,6 +151,11 @@ mc_metric_settings = {
     'GWP_ethanol_displacement': (GWP_ethanol_displacement, "GWP$_{\\mathrm{displacement}}$" f"\n[{GWP_units_L}]", None),
     'GWP_economic': ((GWP_ethanol, GWP_biodiesel), "GWP$_{\\mathrm{economic}}$" f"\n[{GWP_units_L}]", None),
     'GWP_energy': ((GWP_ethanol_allocation, GWP_biodiesel_allocation), "GWP$_{\\mathrm{energy}}$" f"\n[{GWP_units_L}]", None),
+}
+
+mc_line_metric_settings = {
+    'Biodiesel production': (biodiesel_production, f"Biodiesel production\n[{format_units('L/MT')}]"),
+    'Biodiesel yield': (biodiesel_yield, f"Biodiesel yield\n[{format_units('L/hc')}]")
 }
 
 mc_comparison_settings = {
@@ -414,6 +431,28 @@ def plot_montecarlo_absolute():
     plt.subplots_adjust(left=0.12, right=0.95, wspace=0.40, top=0.98, bottom=0.2)
     for i in ('svg', 'png'):
         file = os.path.join(images_folder, f'montecarlo_absolute.{i}')
+        plt.savefig(file, transparent=True)
+    
+def plot_lines_monte_carlo_manuscript():
+    set_font(size=8)
+    set_figure_size(aspect_ratio=.85)
+    fig, axes = plot_lines_monte_carlo(
+        ncols=1,
+        metrics=['Biodiesel production', 'Biodiesel yield'],
+        expand=0.1, 
+        xrot=90,
+        configuration='O6',
+        color_wheel = line_color_wheel,
+    )
+    for ax, letter in zip(axes, 'ABCDEFGHIJ'):
+        plt.sca(ax)
+        ylb, yub = plt.ylim()
+        plt.text(-0.25, ylb + (yub - ylb) * 0.92, letter, color=letter_color,
+                 horizontalalignment='center',verticalalignment='center',
+                 fontsize=12, fontweight='bold')
+    plt.subplots_adjust(left=0.12, right=0.95, wspace=0.40, top=0.98, bottom=0.15)
+    for i in ('svg', 'png'):
+        file = os.path.join(images_folder, f'montecarlo_lines.{i}')
         plt.savefig(file, transparent=True)
     
 def plot_spearman_tea(with_units=None, aspect_ratio=0.8, **kwargs):
@@ -1098,6 +1137,116 @@ def plot_monte_carlo(derivative=False, absolute=True, comparison=True,
         for i in range(N_rows):
             ax = axes[i]
             plt.sca(ax)
+            plot(data[i, j], j)
+            plt.ylabel(ylabels[i])
+    
+    for i in range(N_rows):
+        ax = axes[i]
+        plt.sca(ax)
+        yticks = tickmarks[i]
+        plt.ylim([yticks[0], yticks[1]])
+        if yticks[0] < 0.:
+            bst.plots.plot_horizontal_line(0, color=CABBI_colors.black.RGBn, lw=0.8, linestyle='--')
+        try:
+            xticklabels = xtext if (ax in axes_box[-1] or i == N_rows - 1) else []
+        except:
+            xticklabels = xtext if i == N_rows - 1 else []
+        bst.plots.style_axis(ax,  
+            xticks = xticks,
+            yticks = yticks,
+            xticklabels= xticklabels, 
+            ytick0=False,
+            ytickf=False,
+            offset_xticks=True,
+            xrot=xrot,
+        )
+    for i in range(N_rows, nrows * ncols):
+        ax = axes[i]
+        plt.sca(ax)
+        plt.axis('off')
+    if fig is None:
+        fig = plt.gcf()
+    else:
+        plt.subplots_adjust(hspace=0)
+    fig.align_ylabels(axes)
+    return fig, axes
+
+
+def plot_lines_monte_carlo(
+        configuration=None, metrics=None, labels=None, tickmarks=None, 
+        ncols=1, expand=None, step_min=None, xrot=None, color_wheel=None, axes_box=None
+    ):
+    df = oc.get_composition_data()
+    columns = df.index
+    rows, ylabels = zip(*[mc_line_metric_settings[i] for i in metrics])
+    if color_wheel is None: color_wheel = CABBI_colors.wheel()
+    N_rows = len(rows)
+    if axes_box is None:
+        nrows = int(round(N_rows / ncols))
+        fig, axes_box = plt.subplots(ncols=ncols, nrows=nrows)
+        plt.subplots_adjust(wspace=0.45)
+    else:
+        nrows = N_rows
+        fig = None
+    axes = axes_box.transpose()
+    axes = axes.flatten()
+    N_cols = len(columns)    
+    xtext = labels or columns
+    N_marks = len(xtext)
+    xticks = tuple(range(N_marks))
+    
+    def get_data(metric, line, configuration):
+        df = get_line_monte_carlo(line, configuration, metric)
+        values = df.values
+        return values
+    
+    def plot(arr, position):
+        if arr.ndim == 2:
+            N = arr.shape[1]
+            width = 0.618 / N
+            boxwidth = 0.618 / (N + 1/N)
+            plots = []
+            for i in range(N):
+                color = color_wheel.next()
+                boxplot = monte_carlo_box_plot(
+                    data=arr[:, i], positions=[position + (i-(N-1)/2)*width], 
+                    light_color=color.RGBn, 
+                    dark_color=color.shade(60).RGBn,
+                    width=boxwidth,
+                    hatch=getattr(color, 'hatch', None),
+                )
+                plots.append(boxplot)
+            return plots
+        else:
+            color = color_wheel.next()
+            return monte_carlo_box_plot(
+                data=arr, positions=[position], 
+                light_color=color.RGBn, 
+                dark_color=color.shade(60).RGBn,
+                width=0.618,
+            )
+    
+    data = np.zeros([N_rows, N_cols], dtype=object)
+    data[:] = [[get_data(i, j, configuration) for j in columns] for i in rows]
+    
+    if tickmarks is None: 
+        tickmarks = [
+            bst.plots.rounded_tickmarks_from_data(
+                i, step_min=step_min, N_ticks=8, lb_max=0, center=0,
+                f=roundsigfigs, expand=expand,
+                f_min=lambda x: np.percentile(x, 5),
+                f_max=lambda x: np.percentile(x, 95),
+            ) 
+            for i in data
+        ]
+
+    xf = len(columns) - 0.5
+    for i in range(N_rows):
+        color_wheel.restart()
+        for j in range(N_cols):
+            ax = axes[i]
+            plt.sca(ax)
+            plt.xlim(-0.5, xf)
             plot(data[i, j], j)
             plt.ylabel(ylabels[i])
     

@@ -125,6 +125,7 @@ def plot_metrics_across_composition_manuscript(load=True, fs=8, smooth=1):
     )
     colors = np.zeros([2, 2], object)
     colors[:] = [[light_letter_color, light_letter_color],
+                 [light_letter_color, light_letter_color],
                  [light_letter_color, light_letter_color]]
     _add_letter_labels(axes, 1 - 0.68, 0.7, colors)
     plt.subplots_adjust(right=0.92, wspace=0.1 * (fs/8) ** 2, top=0.9, bottom=0.10)
@@ -347,7 +348,7 @@ def metrics_across_oil_and_fiber_content(load):
     file = 'composition_analysis.npy'
     file = os.path.join(folder, file)
     if load:
-        data = np.load(file)
+        data = np.load(file, allow_pickle=True)
     else:
         from warnings import filterwarnings
         filterwarnings('ignore')
@@ -383,8 +384,8 @@ def plot_metrics_across_composition(
     ylabel = "Fiber content [dry wt. %]"
     if titles is None: titles = np.array(['60% moisture', '65% moisture', '70% moisture'])
     metric_bars = [
-        MetricBar(MFPP.name, format_units(MFPP.units), colormaps[0], tickmarks(data[:, :, 0, :], 5, 1, expand=0, p=0.5), 10, 1),
-        MetricBar('Biod. prod.', format_units(BP.units), plt.cm.get_cmap('copper'), tickmarks(data[:, :, 1, :], 5, 5, expand=0, p=5), 10, 1),
+        MetricBar(MFPP.name, format_units(MFPP.units), colormaps[0], tickmarks(data[:, :, 0, :], 8, 1, expand=0, p=0.5), 10, 1),
+        MetricBar('Biod. prod.', format_units(BP.units), plt.cm.get_cmap('copper'), tickmarks(data[:, :, 1, :], 8, 1, expand=0, p=0.5), 10, 1),
         # MetricBar(EP.name, format_units(EP.units), colormaps[2], tickmarks(data[:, :, 2, :], 5, 5, expand=0, p=5), 10, 1),
     ]
     fig, axes, CSs, CB = plot_contour_2d(
@@ -417,7 +418,7 @@ def plot_metrics_across_composition(
             index = determine_axis_column(moisture)
             plt.sca(axes_columns[index]._cached_ytwin)
             plt.text(
-                lipid + 0.1, fiber + 2, name, weight='bold', c=color,
+                lipid + 0.1, fiber + 1, name, weight='bold', c=color,
                 bbox=txtbox,
             )
             plot_scatter_points(

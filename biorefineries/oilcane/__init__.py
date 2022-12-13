@@ -13,7 +13,7 @@ from . import (
     _chemicals,
     systems,
     _tea,
-    _oil_extraction_specification,
+    utils,
     _distributions,
     _evaluation,
     _uncertainty_plots,
@@ -28,7 +28,7 @@ from ._chemicals import *
 from ._contour_plots import *
 from .systems import *
 from ._tea import *
-from ._oil_extraction_specification import *
+from .utils import *
 from ._distributions import *
 from ._evaluation import *
 from ._uncertainty_plots import *
@@ -44,7 +44,7 @@ __all__ = (
     *_chemicals.__all__,
     *systems.__all__,
     *_tea.__all__,
-    *_oil_extraction_specification.__all__,
+    *utils.__all__,
     *_distributions.__all__,
     *_evaluation.__all__,
     *_uncertainty_plots.__all__,
@@ -86,8 +86,9 @@ from ._parse_configuration import (
 from ._tea import (
     create_tea,
 )
-from ._oil_extraction_specification import (
+from .utils import (
     OilExtractionSpecification,
+    CaneCompositionSpecification,
     MockExtractionSpecification,
 )
 from ._distributions import (
@@ -141,6 +142,7 @@ biodiesel_L_per_kg = biodiesel_gal_per_kg * L_per_gal
 biodiesel_kg_per_L = 1. / biodiesel_L_per_kg
 ethanol_L_per_kg = ethanol_gal_per_kg * L_per_gal
 ethanol_kg_per_L = 1. / ethanol_L_per_kg
+dry_biomass_yield = None
 
 cellulosic_configurations = frozenset([-2, 2, 4, 6, 8])
 biodiesel_configurations = frozenset([1, 2, 5, 6, 7, 8])
@@ -200,7 +202,7 @@ area_names = {
     5: ['Feedstock handling', 'Juicing', 'Oil prod. & ext.', 'Biod. prod.', 
         'CH&P', 'Utilities', 'HXN', 'Storage'],
     6: ['Feedstock handling',  'Juicing', 'Pretreatment', 'Oil prod. & ext.',
-        'Wastewater treatment', 'CH&P', 'Biod. prod.', 'Utilities', 'HXN', 'Storage'],
+        'Wastewater treatment', 'Biod. prod.', 'CH&P', 'Utilities', 'HXN', 'Storage'],
     # 9: ['Feedstock handling', 'Juicing', 'TAG prod.', 'Oil ext.', 'AcTAG sep.', 
     #     'Biod. prod.', 'CH&P', 'Utilities', 'HXN', 'Storage'],
     # 10: ['Feedstock handling', 'Juicing', 'Pretreatment', 'TAG prod.', 'AcTAG sep.', 
@@ -433,7 +435,8 @@ def load(name, cache=cache, reduce_chemicals=False, RIN=True,
         
     tea.income_tax = 0.21 # Davis et al. 2018; https://www.nrel.gov/docs/fy19osti/71949.pdf
     
-    ## Specification for analysis
+    ## Specifications for analysis
+    dct['composition_specification'] = composition_specification = CaneCompositionSpecification(feedstock)
     if number < 0:
         isplit_a = None
         isplit_b = None
@@ -451,7 +454,7 @@ def load(name, cache=cache, reduce_chemicals=False, RIN=True,
                 break
         
         oil_extraction_specification = OilExtractionSpecification(
-            sys, [feedstock], isplit_a, isplit_b, 
+            sys, isplit_a, isplit_b, 
         )
     
     
@@ -769,7 +772,7 @@ def load(name, cache=cache, reduce_chemicals=False, RIN=True,
     @default(10, element='oilcane', units='% oil', kind='coupled')
     def set_cane_PL_content(cane_PL_content):
         if agile: cane_mode.PL_content = cane_PL_content / 100.
-        else: oil_extraction_specification.PL_content = cane_PL_content / 100.
+        else: composition_specification.PL = cane_PL_content / 100.
     
     @default(10, element='oilsorghum', units='% oil', kind='coupled')
     def set_sorghum_PL_content(sorghum_PL_content):
@@ -778,7 +781,7 @@ def load(name, cache=cache, reduce_chemicals=False, RIN=True,
     @default(10, element='oilcane', units='% oil', kind='coupled')
     def set_cane_FFA_content(cane_FFA_content):
         if agile: cane_mode.FFA_content = cane_FFA_content / 100.
-        else: oil_extraction_specification.FFA_content = cane_FFA_content / 100.
+        else: composition_specification.FFA = cane_FFA_content / 100.
     
     @default(10, element='oilsorghum', units='% oil', kind='coupled')
     def set_sorghum_FFA_content(sorghum_FFA_content):
@@ -786,10 +789,11 @@ def load(name, cache=cache, reduce_chemicals=False, RIN=True,
 
     @uniform(5., 15., element='oilcane', units='dry wt. %', kind='coupled')
     def set_cane_oil_content(cane_oil_content):
+        if number < 0: return
         if agile:
             cane_mode.oil_content = cane_oil_content / 100.
         elif energycane:
-            oil_extraction_specification.load_oil_content(
+            composition_specification.load_oil_content(
                 cane_oil_content / 100.,
                 z_mass_carbs_baseline=0.091,
                 z_mass_solids_baseline=0., 
@@ -797,13 +801,14 @@ def load(name, cache=cache, reduce_chemicals=False, RIN=True,
                 z_mass_water_baseline=0.60,
             )
         else:
-            oil_extraction_specification.load_oil_content(
+            composition_specification.load_oil_content(
                 cane_oil_content / 100.
             )
 
     @uniform(-3., 0., element='oilsorghum', units='dry wt. %', kind='coupled',
              baseline=0.)
     def set_relative_sorghum_oil_content(relative_sorghum_oil_content):
+        if number < 0: return
         if agile:
             sorghum_mode.oil_content = cane_mode.oil_content + relative_sorghum_oil_content / 100.
 
@@ -913,6 +918,13 @@ def load(name, cache=cache, reduce_chemicals=False, RIN=True,
     def biodiesel_production():
         return biodiesel_flow() / feedstock_consumption.get()
     
+    @metric(units='L/hc')
+    def biodiesel_yield():
+        if dry_biomass_yield is None: 
+            return None
+        else:
+            return biodiesel_flow() / feedstock_consumption.get() * dry_biomass_yield
+    
     @metric(units='L/MT')
     def ethanol_production():
         return ethanol_flow() / feedstock_consumption.get()
@@ -991,6 +1003,18 @@ def load(name, cache=cache, reduce_chemicals=False, RIN=True,
         else:
             return 0.
     
+    @metric(name='Biodiesel GWP', element='Displacement allocation', units='kg*CO2*eq / L')
+    def GWP_biodiesel_displacement(): # Cradle to gate
+        if number in biodiesel_configurations:
+            GWP_material = sys.get_total_feeds_impact(GWP)
+            GWP_electricity_production = GWP_characterization_factors['Electricity'] * electricity_production.get() * feedstock_consumption.get()
+            GWP_coproducts = sys.get_total_products_impact(GWP)
+            GWP_emissions = sys.get_process_impact(GWP) # kg CO2 eq. / yr
+            GWP_total = GWP_material + GWP_emissions - GWP_electricity_production - GWP_coproducts # kg CO2 eq. / yr
+            return GWP_total / (biodiesel_production.get() * feedstock_consumption.get())
+        else:
+            return 0.
+    
     # DO NOT DELETE:
     # import thermosteam as tmo
     # glycerol = tmo.Chemical('Glycerol')
@@ -1036,7 +1060,7 @@ def load(name, cache=cache, reduce_chemicals=False, RIN=True,
             cane_mode.oil_content += 0.01
             sorghum_mode.oil_content += 0.01
         else:
-            oil_extraction_specification.load_oil_content(oil_extraction_specification.oil_content + 0.01)
+            composition_specification.load_oil_content(oil_extraction_specification.oil_content + 0.01)
         sys.simulate()
         # value = (kg_per_MT * tea.solve_price(feedstock) - MFPP.cache)
         # feedstock.price = tea.solve_price(feedstock)
