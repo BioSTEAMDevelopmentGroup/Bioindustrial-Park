@@ -184,7 +184,6 @@ def create_lipidcane_to_biodiesel_and_conventional_ethanol_system(ins, outs):
     
     process_water_streams = (s.imbibition_water,
                              s.biodiesel_wash_water,
-                             s.oil_wash_water,
                              s.rvf_wash_water,
                              s.stripping_water,
                              *makeup_water_streams)

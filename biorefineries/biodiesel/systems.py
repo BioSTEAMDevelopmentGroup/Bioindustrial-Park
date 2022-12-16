@@ -19,6 +19,7 @@ References
 """
 import biosteam as bst
 from . import units
+from . import streams as s
 import numpy as np
 from biosteam import SystemFactory
 
@@ -30,10 +31,8 @@ __all__ = (
 
 @SystemFactory(
     ID='lipid_wash_sys',
-    ins=[dict(ID='lipid'),
-         dict(ID='lipid_wash_water')],
-    outs=[dict(ID='washed_lipid'),
-          dict(ID='spent_wash_water')]
+    ins=[s.lipid, s.lipid_wash_water],
+    outs=[s.washed_lipid, s.spent_wash_water]
 )
 def create_lipid_wash_system(ins, outs):  
     lipid, lipid_wash_water = ins
@@ -74,17 +73,8 @@ def create_lipid_wash_system(ins, outs):
 
 @SystemFactory(
     ID="lipid_pretreatment_sys",
-    ins=[dict(ID='crude_vegetable_oil',
-              Water=0.0184,
-              TAG=11.1,
-              PL=0.1),
-         dict(ID='acetone',
-              price=0.80),
-         dict(ID='pure_glycerine',
-              price=0.65)],
-    outs=[dict(ID='degummed_oil'),
-          dict(ID='polar_lipids'),
-          dict(ID='wastewater')]
+    ins=[s.crude_vegetable_oil, s.acetone, s.pure_glycerine],
+    outs=[s.degummed_oil, s.polar_lipids, s.wastewater]
 )
 def create_lipid_pretreatment_system(ins, outs):
     crude_vegetable_oil, acetone, pure_glycerine = ins
@@ -158,13 +148,8 @@ def create_lipid_pretreatment_system(ins, outs):
 
 @SystemFactory(
     ID="transesterification_and_biodiesel_separation_sys",
-    ins=[dict(ID='vegetable_oil',
-              Water=0.0184,
-              TAG=11.1)],
-    outs=[dict(ID='biodiesel'),
-          dict(ID='crude_glycerol'),
-          dict(ID='wastewater',
-               price=-0.33)]
+    ins=[s.vegetable_oil],
+    outs=[s.biodiesel, s.crude_glycerol, s.wastewater]
 )
 def create_transesterification_and_biodiesel_separation_system(ins, outs,
         transesterification_reactions=None,

@@ -14,24 +14,25 @@ import thermosteam as tmo
 import biosteam as bst
 from biosteam import main_flowsheet as f
 from biosteam import SystemFactory
-from ..sugarcane import (
-    add_urea_nutrient,
-    create_bagasse_drying_system,
-    create_sucrose_fermentation_system,
-    create_sucrose_to_ethanol_system,
+from biorefineries.ethanol import (
     create_beer_distillation_system,
     create_ethanol_purification_system_after_beer_column,
 )
-from ..lipidcane import (
+from biorefineries.biodiesel import (
     create_lipid_wash_system,
-    create_feedstock_handling_system,
-    create_juicing_system,
     create_lipid_pretreatment_system as create_oil_pretreatment_system,
-    create_juicing_and_lipid_extraction_system as create_juicing_and_oil_extraction_system,
     create_transesterification_and_biodiesel_separation_system,
-    create_lipidcane_to_biodiesel_and_conventional_ethanol_system as create_oilcane_to_biodiesel_and_conventional_ethanol_system,
-    price,
 )
+from ..cane import (
+    add_urea_nutrient,
+    create_juicing_system,
+    create_feedstock_handling_system,
+    create_bagasse_drying_system,
+    create_sucrose_to_ethanol_system,
+    create_lipidcane_to_biodiesel_and_conventional_ethanol_system as create_oilcane_to_biodiesel_and_conventional_ethanol_system,
+    create_juicing_and_lipid_extraction_system as create_juicing_and_oil_extraction_system,
+)
+from ..lipidcane import price
 import biorefineries as brf
 from biorefineries.oilcane import units
 import numpy as np

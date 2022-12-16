@@ -10,11 +10,13 @@
 from . import (_process_settings,
                _chemicals,
                _tea,
+               _system,
 )
 
 __all__ = [*_process_settings.__all__,
            *_chemicals.__all__,
            *_tea.__all__,
+           *_system.__all__,
            'lipidcane_sys',
            'lipidcane_tea', 
            'flowsheet',
@@ -23,6 +25,7 @@ __all__ = [*_process_settings.__all__,
 from ._process_settings import *
 from ._chemicals import *
 from ._tea import *
+from ._system import *
 
 _system_loaded = False
 _chemicals_loaded = False

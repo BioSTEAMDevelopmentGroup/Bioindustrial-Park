@@ -85,12 +85,12 @@ def create_facilities(
     outs=[s.ethanol],
 )
 def create_cellulosic_ethanol_system(ins, outs, include_blowdown_recycle=False):
-    feedstock, denaturant = ins
+    feedstock, sulfuric_acid, ammonia, denaturant = ins
     ethanol, = outs
     U101 = units.FeedStockHandling('U101', feedstock)
     U101.cost_items['System'].cost = 0.
     pretreatment_sys = create_dilute_acid_pretreatment_system(
-        ins=U101-0,
+        ins=[U101-0, sulfuric_acid, ammonia],
         mockup=True
     )
     fermentation_sys = create_cellulosic_fermentation_system(

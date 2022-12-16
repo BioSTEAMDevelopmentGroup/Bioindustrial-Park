@@ -9,7 +9,7 @@
 """
 import biosteam as bst
 from biorefineries import corn as cn
-from biorefineries.sugarcane import create_ethanol_purification_system
+from biorefineries.ethanol import create_ethanol_purification_system
 from ._process_settings import price
 
 __all__ = ('create_system',)

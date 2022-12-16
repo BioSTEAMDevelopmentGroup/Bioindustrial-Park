@@ -6,8 +6,8 @@ Created on Thu Dec 15 20:56:00 2022
 """
 from biorefineries.cellulosic import systems
 
-__all__ = systems.__all__
+__all__ = [*systems.__all__, 'create_system']
 
 from biorefineries.cellulosic.systems import *
 
-create_systems = create_cellulosic_ethanol_system
+create_system = create_cellulosic_ethanol_system

@@ -92,6 +92,11 @@ def create_juicing_system_without_treatment(ins, outs, pellet_bagasse=None,
     # Store juice before treatment
     T202 = bst.StorageTank('T202', S201-0, untreated_juice,
                              tau=4, vessel_material='Carbon steel')
+    
+    if 'Lipid' in bst.settings.chemicals:
+        u = f.unit
+        u.U201.isplit['Lipid'] = 0.90 # Crushing mill
+        u.S201.isplit['Lipid'] = 1.0 # Fiber screener #1
 
 
 @SystemFactory(
@@ -189,6 +194,10 @@ def create_juicing_system_up_to_clarification(ins, outs, pellet_bagasse=None,
         solids = P202.outs[0].imol['Ash', 'CaO', 'Cellulose',
                                    'Hemicellulose', 'Lignin'].sum()
         rvf_wash_water.imol['Water'] = 0.0574 * solids
+        
+    if 'Lipid' in bst.settings.chemicals:
+        u = f.unit
+        u.C201.isplit['Lipid'] = 0.99 # Clarifier
     
 
 @SystemFactory(
@@ -218,3 +227,6 @@ def create_juicing_system_with_fiber_screener(ins, outs, pellet_bagasse=None,
                                             Sucrose=0.998,
                                             Water=0.998))
     S202.mesh_opening = 2
+    if 'Lipid' in bst.settings.chemicals:
+        u = f.unit
+        u.S202.isplit['Lipid'] = 0.999  # Fiber screener #2

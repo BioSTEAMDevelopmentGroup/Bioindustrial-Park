@@ -6,7 +6,7 @@ Created on Thu Dec 15 21:33:49 2022
 """
 from biorefineries.tea import cellulosic_ethanol_tea
 
-__all__ = cellulosic_ethanol_tea.__all__
+__all__ = [*cellulosic_ethanol_tea.__all__, 'create_tea']
 
 from biorefineries.tea.cellulosic_ethanol_tea import *
 
