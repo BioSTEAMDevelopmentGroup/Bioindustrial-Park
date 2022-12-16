@@ -18,6 +18,7 @@ References
 
 """
 import biosteam as bst
+from . import units
 import numpy as np
 from biosteam import SystemFactory
 
@@ -103,7 +104,7 @@ def create_lipid_pretreatment_system(ins, outs):
     P2 = bst.Pump('P2', T2-0, P=101325.)
     N2 = bst.Stream('N2', phase='g')
     acetone_recycle = bst.Stream()
-    T3 = bst.BlendingTankWithSkimming('T3', 
+    T3 = units.BlendingTankWithSkimming('T3', 
         [P10-0, acetone_recycle], 
     )
     @T3.add_specification(run=True)
@@ -134,7 +135,7 @@ def create_lipid_pretreatment_system(ins, outs):
     H3 = bst.HXprocess('H3', [P4-0, hx_stream])
     glycerol_recycle = bst.Stream()
     M2 = bst.Mixer('M2', [P2-0, glycerol_recycle])
-    R1 = bst.GlycerolysisReactor('R1', [H3-0, M2-0, N2])
+    R1 = units.GlycerolysisReactor('R1', [H3-0, M2-0, N2])
     P7 = bst.Pump('P7', R1-1, hx_stream, P=101325.)
     @R1.add_specification(run=True, impacted_units=[T2])
     def adjust_feed_flow_rates():
@@ -233,7 +234,7 @@ def create_transesterification_and_biodiesel_separation_system(ins, outs,
     S401 = bst.FakeSplitter('S401')
     
     # First Reactor
-    R401 = bst.Transesterification('R401', 
+    R401 = units.Transesterification('R401', 
         efficiency=0.90, excess_methanol=1., T=333.15, x_catalyst=x_cat,
         transesterification=transesterification_reactions,
     )
@@ -252,7 +253,7 @@ def create_transesterification_and_biodiesel_separation_system(ins, outs,
     P405 = bst.Pump('P405')
     
     # Second Reactor
-    R402 = bst.Transesterification('R402',
+    R402 = units.Transesterification('R402',
         efficiency=0.90, excess_methanol=1., T=333.15, x_catalyst=x_cat,
         transesterification=transesterification_reactions,
     )

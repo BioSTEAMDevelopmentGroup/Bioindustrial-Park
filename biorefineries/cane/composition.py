@@ -11,14 +11,19 @@ energy balance the given oil composition of lipid cane to determine its
 composition.
 
 """
+import thermosteam as tmo
 from thermosteam import Stream
 from biosteam import main_flowsheet as f
-from numpy import array
+import numpy as np
 
-__all__ = ('set_lipid_fraction',
-           'get_lipid_fraction',
-           'set_composition',
-           'get_composition')
+__all__ = (
+    'set_lipid_fraction',
+    'get_lipid_fraction',
+    'set_sugarcane_composition',
+    'convert_fiber_to_lignocelluosic_components',
+    'set_composition',
+    'get_composition'
+)
 
 def set_lipid_fraction(lipid_fraction, stream=None,
                        PL_fraction=0.,
@@ -80,6 +85,57 @@ def set_lipid_fraction(lipid_fraction, stream=None,
     imass[fiber_IDs] = r_mass_fiber * z_mass_fiber * F_mass
     if any(stream.mol < 0):
         raise ValueError(f'lipid cane oil composition of {z_mass_lipid/z_dry*100:.0f}% dry weight is infeasible')
+
+def set_sugarcane_composition(stream, water, fiber, sugar):
+    chemicals = stream.chemicals
+    if 'Sugar' not in chemicals:
+        IDs = ('Sucrose', 'Glucose')
+        chemicals.define_group('Sugar', IDs, composition=stream.imass[IDs], wt=True)
+    if 'Fiber' not in chemicals:
+        IDs = ('Cellulose', 'Hemicellulose', 'Lignin')
+        chemicals.define_group('Fiber', IDs, composition=stream.imass[IDs], wt=True)
+    if 'Other' not in chemicals:
+        IDs = ('Ash', 'Solids')
+        chemicals.define_group('Other', IDs, composition=stream.imass[IDs], wt=True)
+    F_mass = stream.F_mass
+    other = 1 - water - fiber - sugar
+    assert other > 0, (water, fiber, sugar, other)
+    stream.imass['Water', 'Fiber', 'Sugar', 'Other'] = F_mass * np.array([water, fiber, sugar, other])
+
+def convert_fiber_to_lignocelluosic_components(stream, ignore_acetate=False):
+    chemicals = stream.chemicals
+    if chemicals is convert_fiber_to_lignocelluosic_components.last_chemicals:
+        prxn = convert_fiber_to_lignocelluosic_components.last_reaction
+    else:
+        cellulose_rxn = tmo.Reaction('Cellulose -> Glucan', 'Cellulose', 1.0,
+                                     basis='wt', chemicals=chemicals)
+        cellulose_rxn.basis = 'mol'
+        # Bagasse composition https://www.sciencedirect.com/science/article/pii/S0144861710005072
+        # South american; by HPLC
+        # Glucan: 41.3%
+        # Xylan: 24.9%
+        # Galactan: 0.6%
+        # Arabinan: 1.7%
+        # Lignin: 23.2%
+        # Acetyl: 3.0%
+        if ignore_acetate:
+            hemicellulose_rxn = tmo.Reaction(
+                '27.2 Hemicellulose -> 24.9 Xylan + 1.7 Arabinan + 0.6 Galactan', 'Hemicellulose', 
+                1.0, basis='wt', chemicals=chemicals
+            )
+        else:
+            hemicellulose_rxn = tmo.Reaction(
+                '30.2 Hemicellulose -> 24.9 Xylan + 1.7 Arabinan + 0.6 Galactan + 3 Acetate', 'Hemicellulose', 
+                1.0, basis='wt', chemicals=chemicals
+            )
+        hemicellulose_rxn.basis = 'mol'
+        convert_fiber_to_lignocelluosic_components.last_chemicals = chemicals
+        convert_fiber_to_lignocelluosic_components.last_reaction = prxn = tmo.ParallelReaction(
+            [cellulose_rxn, hemicellulose_rxn]
+        )
+    prxn(stream)
+
+convert_fiber_to_lignocelluosic_components.last_chemicals = None
 
 def set_composition(
         stream,

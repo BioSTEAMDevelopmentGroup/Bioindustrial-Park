@@ -7,8 +7,8 @@
 # for license details.
 """
 """
-from .splitting import Splitter
-from .decorators import cost
+from biosteam.units.splitting import Splitter
+from biosteam.units.decorators import cost
 
 __all__ = ('MolecularSieve',)
 

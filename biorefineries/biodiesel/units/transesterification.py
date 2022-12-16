@@ -7,8 +7,8 @@
 # for license details.
 """
 """
-from .. import Unit
-from .decorators import cost
+from biosteam import Unit
+from biosteam.units.decorators import cost
 from thermosteam.reaction import Reaction, ParallelReaction
 
 __all__ = ('Transesterification',)

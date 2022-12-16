@@ -13,23 +13,20 @@ import numpy as np
 import biosteam as bst
 from biosteam import main_flowsheet as f
 from biosteam import SystemFactory
+from ... import streams as s
 from biorefineries.biodiesel import (
     create_lipid_wash_system,
     create_transesterification_and_biodiesel_separation_system,
 )
-from ._process_settings import price
 from biorefineries.cane.systems.juicing import (
     create_feedstock_handling_system, 
     create_juicing_system_up_to_clarification,
-    create_juicing_system_with_fiber_screener,
 )
 from biorefineries.cane.systems.sugarcane import (
     create_sucrose_to_ethanol_system,
 )
 
 __all__ = (
-    'create_feedstock_handling_system',
-    'create_juicing_system',
     'create_juicing_and_lipid_extraction_system',
     'create_lipidcane_to_biodiesel_and_conventional_ethanol_system',
 )
@@ -39,33 +36,17 @@ __all__ = (
 
 @SystemFactory(
     ID='juicing_and_lipid_extraction_sys',
-    ins=[dict(ID='lipidcane',
-              Ash=2000.042,
-              Cellulose=26986.69,
-              Glucose=2007.067,
-              Hemicellulose=15922.734,
-              Lignin=14459.241,
-              TAG=10035.334,
-              Solids=5017.667,
-              Sucrose=22746.761,
-              Water=234157.798,
-              units='kg/hr',
-              price=price['Lipid cane']),
+    ins=[s.lipidcane,
          *create_juicing_system_up_to_clarification.ins[1:]],
-    outs=[dict(ID='screened_juice'),
-          dict(ID='lipid'),
-          dict(ID='bagasse'),
-          dict(ID='fiber_fines'),
-          dict(ID='spent_oil_wash_water')]
+    outs=[s.screened_juice,
+          s.lipid,
+          s.bagasse,
+          s.fiber_fines,
+          s.spent_oil_wash_water]
 )
 def create_juicing_and_lipid_extraction_system(ins, outs, pellet_bagasse=None):
     lipidcane, H3PO4, lime, polymer = ins
     screened_juice, lipid, bagasse, fiber_fines, spent_oil_wash_water = outs
-    
-    oil_wash_water = bst.Stream('oil_wash_water',
-                                Water=1350,
-                                units='kg/hr',
-                                T=358.15)  # to T207
     juicing_sys = create_juicing_system_up_to_clarification(
         pellet_bagasse=pellet_bagasse,
         ins=[lipidcane, H3PO4, lime, polymer], 
@@ -109,45 +90,17 @@ def create_juicing_and_lipid_extraction_system(ins, outs, pellet_bagasse=None):
     clarified_juice-T207-T207_2
     T207-T207_2-1-S202
 
-@SystemFactory(
-    ID='juicing_sys',
-    ins=create_juicing_and_lipid_extraction_system.ins,
-    outs=[dict(ID='screened_juice'),
-          dict(ID='bagasse'),
-          dict(ID='fiber_fines')]
-)
-def create_juicing_system(ins, outs, pellet_bagasse=None, dry_bagasse=None):
-    lipidcane, H3PO4, lime, polymer = ins
-    screened_juice, bagasse, fiber_fines = outs
-    
-    oil_wash_water = bst.Stream('oil_wash_water',
-                                Water=1350,
-                                units='kg/hr',
-                                T=358.15)  # to T207
-    juicing_sys = create_juicing_system_with_fiber_screener(
-        pellet_bagasse=pellet_bagasse,
-        ins=[lipidcane, H3PO4, lime, polymer], 
-        outs=[screened_juice, bagasse, fiber_fines],
-        dry_bagasse=dry_bagasse,
-        mockup=True,
-    )
-    u = f.unit
-    u.U201.isplit['Lipid'] = 0.90 # Crushing mill
-    u.S201.isplit['Lipid'] = 1.0 # Fiber screener #1
-    u.C201.isplit['Lipid'] = 0.99 # Clarifier
-    u.S202.isplit['Lipid'] = 0.999  # Fiber screener #2
-
 
 @SystemFactory(
     ID='lipidcane_sys',
     ins=[*create_juicing_and_lipid_extraction_system.ins,
          create_sucrose_to_ethanol_system.ins[1]],
-    outs=[dict(ID='ethanol', price=price['Ethanol']),
-          dict(ID='biodiesel', price=price['Biodiesel']),
-          dict(ID='crude_glycerol', price=price['Crude glycerol']),
-          dict(ID='wastewater'),
-          dict(ID='emissions'),
-          dict(ID='ash_disposal')]
+    outs=[s.ethanol,
+          s.biodiesel,
+          s.crude_glycerol,
+          s.wastewater,
+          s.emissions,
+          s.ash_disposal]
 )
 def create_lipidcane_to_biodiesel_and_conventional_ethanol_system(ins, outs):
     

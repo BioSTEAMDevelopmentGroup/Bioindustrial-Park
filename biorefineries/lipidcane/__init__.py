@@ -7,27 +7,21 @@
 # for license details.
 """
 """
-from . import (utils,
-               _process_settings,
+from . import (_process_settings,
                _chemicals,
-               _system,
                _tea,
 )
 
-__all__ = [*utils.__all__,
-           *_process_settings.__all__,
+__all__ = [*_process_settings.__all__,
            *_chemicals.__all__,
-           *_system.__all__,
            *_tea.__all__,
            'lipidcane_sys',
            'lipidcane_tea', 
            'flowsheet',
 ]
 
-from .utils import *
 from ._process_settings import *
 from ._chemicals import *
-from ._system import *
 from ._tea import *
 
 _system_loaded = False

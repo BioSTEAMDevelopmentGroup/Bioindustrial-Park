@@ -10,7 +10,12 @@
 import biosteam as bst
 import pandas as pd
 
-__all__ = ('ConventionalEthanolTEA', 'create_tea', 'capex_table', 'foc_table')
+__all__ = (
+    'ConventionalEthanolTEA', 
+    'create_conventional_ethanol_tea', 
+    'capex_table', 
+    'foc_table'
+)
 
 class ConventionalEthanolTEA(bst.TEA):
     """
@@ -92,16 +97,25 @@ class ConventionalEthanolTEA(bst.TEA):
         return (FCI*(self.property_tax + self.property_insurance
                      + self.maintenance + self.administration)
                 + self.labor_cost*(1+self.fringe_benefits+self.supplies))
-    
-def create_tea(system, cls=ConventionalEthanolTEA):
-    return cls(system, IRR=0.15,
-               duration=(2018, 2038),
-               depreciation='MACRS7', income_tax=0.35,
-               operating_days=200, lang_factor=3,
-               construction_schedule=(0.4, 0.6), WC_over_FCI=0.05,
-               labor_cost=2.5e6, fringe_benefits=0.4,
-               property_tax=0.001, property_insurance=0.005,
-               supplies=0.20, maintenance=0.01, administration=0.005)
+
+def create_conventional_ethanol_tea(
+        system, cls=ConventionalEthanolTEA, IRR=0.15,
+        duration=(2018, 2038), depreciation='MACRS7', income_tax=0.35,
+        operating_days=200, lang_factor=3, construction_schedule=(0.4, 0.6), 
+        WC_over_FCI=0.05, labor_cost=2.5e6, fringe_benefits=0.4,
+        property_tax=0.001, property_insurance=0.005, supplies=0.20, 
+        maintenance=0.01, administration=0.005
+    ): # Values default to sugarcane biorefinery
+    return cls(system, 
+        IRR=IRR,
+        duration=duration,
+        depreciation=depreciation, income_tax=income_tax,
+        operating_days=operating_days, lang_factor=lang_factor,
+        construction_schedule=construction_schedule, WC_over_FCI=WC_over_FCI,
+        labor_cost=labor_cost, fringe_benefits=fringe_benefits,
+        property_tax=property_tax, property_insurance=property_insurance,
+        supplies=supplies, maintenance=maintenance, administration=administration
+    )
 
 def capex_table(tea):
     purchase_cost = tea.purchase_cost /1e6
