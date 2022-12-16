@@ -68,6 +68,7 @@ chems = tmo.Chemicals([
     tmo.Chemical('Oleic_acid'),
     tmo.Chemical('Linoleic_acid', search_ID = '60-33-3'),
     tmo.Chemical('Palmitoleic_acid', search_ID = '373-49-9'),
+#TODO:should I set the phase or not?    
     tmo.Chemical('Azelaic_acid', phase = 's'),
 
 # Oxidants used and other gaseous products

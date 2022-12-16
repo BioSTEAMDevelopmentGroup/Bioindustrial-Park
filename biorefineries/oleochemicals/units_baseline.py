@@ -20,6 +20,7 @@ from biosteam.units.design_tools import TankPurchaseCostAlgorithm
 from biosteam.utils import ExponentialFunctor
 from biosteam.units.decorators import cost
 from biosteam.units.design_tools.cost_index import CEPCI_by_year
+from typing import Optional
 
 
 #Add details about the below
@@ -94,8 +95,7 @@ class OxidativeCleavageReactor(bst.CSTR):
         #TODO.xxx check again possible decarboxylation https://doi.org/10.1016/j.renene.2018.01.107
         #TODO.xxx check again Organic Reactions in Strong Alkalis. Part V.l Alkali Fusion of Epoxides and Ethers 
         ##We are only accounting for methyl_linoleate and methyl_palmitoleate because they have unsaturated bonds
-        #TODO: add the intermediates and their reactions
-        
+
         Side_reaction = PRxn([Rxn('Pelargonic_acid   -> Caprylic_acid + 1 CO2 ', 'Pelargonic_acid', X= X2),
                               Rxn('Monomethyl_azelate -> Suberic_acid + 1 CO2', 'Monomethyl_azelate', X = X3),
                               Rxn('Methyl_palmitoleate -> Azelaic_acid + Heptanoic_acid', 'Methyl_palmitoleate', X = X4),
@@ -134,146 +134,6 @@ class CentrifugeVacuumVessel(bst.Unit):
              self.design_results['Total volume'] = self.feed.F_vol * self.tau
              self.vacuum_system = bst.VacuumSystem(self)
              
-class HydrolysisSystem(bst.Unit, isabstract = True):
-    _N_ins = 1
-    _N_outs = 7
-    
-    auxiliary_unit_names = ('condensate_1',
-                            'condensate_2',
-                            'condensate_3',
-                            'effluent_1',
-                            'effluent_2',
-                            'effluent_3',
-                            'holding_tank_1',
-                            'holding_tank_2',
-                            'hydrolysis_column_1',
-                            'hydrolysis_column_2',
-                            'hydrolysis_column_3',
-                            'distillation_column_1',
-                            'distillation_column_2',
-                            'distillation_column_3'
-                            )
-    def __init__(self, ID='', ins=None, outs=(), thermo=None, *, 
-                 T_hydrolysis: Optional[float]=None,#all the three reactors run at the same temperature T 
-                 P_hydrolysis: Optional[float]=None,#all the three reactors run at the same pressure P
-                 tau_hydrolysis_column: Optional[float]=None,#all the three reactors run at the same residence time tau
-                 tau_holding_tank: Optional[float]=None,#all holding tanks are the same residence time
-                 V_wf: Optional[float]=None, #TODO
-                 total_height = None,
-                 V_max_hydrolysis: Optional[float]=None): #all the three reactors have the same V_max
-#TODO: add other arguments to the class later
-        Unit.__init__(self, ID, ins, outs, thermo)
-#Methanol and water mixture is condensate coming from the hydrolysis       
-        self.condensate_1 = bst.MultiStream(None,[None],T = None,P = None, thermo = self.thermo)
-        self.condensate_2 = bst.MultiStream(None,[None],T = None,P = None, thermo = self.thermo)
-        self.condensate_3 = bst.MultiStream(None,[None],T = None,P = None, thermo = self.thermo)
-#Organic products coming from each column       
-        self.effluent_1 = bst.MultiStream(None,[None],T = None,P = None, thermo = self.thermo)
-        self.effluent_2 = bst.MultiStream(None,[None],T = None,P = None, thermo = self.thermo)
-        self.effluent_3 = bst.MultiStream(None,[None],T = None,P = None, thermo = self.thermo)
-#Holding tanks after each hydrolysis column        
-        self.holding_tank_1 = bst.StorageTank(None, (None),(None), thermo = self.thermo)
-        self.holding_tank_2 = bst.StorageTank(None, (None),(None), thermo = self.thermo)
-#Hydrolysis columns filled with resin      
-        #TODO: try the below out or else pass an argument for _N_outs
-        self.hydrolysis_column_1 = bst.CSTR(None, (None),(None,None), thermo = self.thermo)
-        self.hydrolysis_column_2 = bst.CSTR(None, (None),(None,None), thermo = self.thermo)
-        self.hydrolysis_column_3 = bst.CSTR(None, (None),(None,None), thermo = self.thermo)
-#Distillation columns for separating out methanol water       
-        self.distillation_column_1 = bst.BinaryDistillation(None, (None),(None), thermo = self.thermo)
-        self.distillation_column_2 = bst.BinaryDistillation(None, (None),(None), thermo = self.thermo)
-        self.distillation_column_3 = bst.BinaryDistillation(None, (None),(None), thermo = self.thermo)
-        
-    def _setup(self): 
-            #Process parameters for emulsification of fatty esters to acids in a 
-            # packed bed ion exchange column
-            X_hydrolysis = 0.30
-            Product_formation = PRxn([Rxn('Monomethyl_azelate + Water  -> Methanol + Azelaic_acid','Monomethyl_azelate', X = X_hydrolysis ),
-                              Rxn('Methyl_palmitate + Water  -> Methanol + Palmitic_acid','Methyl_palmitate', X = X_hydrolysis ),
-                              Rxn('Methyl_stearate + Water  -> Methanol + Stearic_acid','Methyl_stearate', X = X_hydrolysis),
-                              Rxn('Methyl_linoleate + Water  -> Methanol + Linoleic_acid','Methyl_linoleate', X = X_hydrolysis),
-                              Rxn('Methyl_palmitoleate + Water  -> Methanol + Palmitoleic_acid','Methyl_palmitoleate', X = 0.1),
-                              Rxn('Methyl_oleate + Water  -> Methanol + Oleic_acid','Methyl_oleate', X = 0.1)])
-            self.reactions = RxnSys(Product_formation)  
-            
-    def _run(self):
-            feed = self.ins
-            tops_1,bottoms_1,tops_2,bottoms_2,tops_3,bottoms_3,organic_mixture, = self.outs
-#assuming the feed enters directly after forming a solution with water
-            self.hydrolysis_column_1.ins[0] = feed
-            self.hydrolysis_column_1.T = self.T_hydrolysis
-            # 3.14*5*self.total_height, #decided based on amount of resin required,
-            self.hydrolysis_column_1.V_max = self.V_max_hydrolysis
-            self.hydrolysis_column_1.P = self.P_hydrolysis #Columns being operated at atmospheric pressure acc to the patent
-            self.hydrolysis_column_1.tau = self.tau_hydrolysis_column #Sum of reaction time and the regeneration time = 6.5 hours
-            ms = self._multi_stream = MultiStream('ms', phases='lg')
-            ms.mix_from(self.hydrolysis_column_1.ins[0])
-            ms.vle(T = self.T_hydrolysis, P = self.P_hydrolysis)
-            self.condensate_1.copy_like(ms['g'])
-            self.effluent_1.copy_like(ms['l'])
-            self.condensate_1.vle(T = self.T_hydrolysis, P = self.P_hydrolysis)
-            self.hydrolysis_column_1.outs[0].copy_like(self.condensate_1)
-            self.hydrolysis_column_1.outs[1].copy_like(self.effluent_1)
-            self.distillation_column_1.ins[0] = self.hydrolysis_column_1.outs[0]
-            self.distillation_column_1.LHK =('Methanol','Water')
-            self.distillation_column_1.Lr = 0.999
-            self.distillation_column_1.Hr = 0.999
-            self.distillation_column_1.k = 2
-            tops_1 = self.distillation_column_1.outs[0]
-            bottoms_1 = self.distillation_column_1.outs[1]
-            
-            self.holding_tank_1.ins[0] = self.hydrolysiscolumn_1.outs[1] # Inlet of the first holding tank is the outlet of the previous hydrolysis column
-            self.holding_tank_1.tau = self.tau_holding_tank # Holing tank has a residence time of 6.5 hours considering the sum of reaction and regeneration time
-            self.hydrolysis_column_2.ins[0] =  self.storage_tank_1.outs[0] #Outlet of the first holding tank becomes the inlet of the second hydrolysis column
-            
-            self.hydrolysis_column_2.ins[0] = feed
-            self.hydrolysis_column_2.T = self.T_hydrolysis
-            # 3.14*5*self.total_height, #decided based on amount of resin required,
-            self.hydrolysis_column_2.V_max = self.V_max_hydrolysis
-            self.hydrolysis_column_2.P = self.P_hydrolysis #Columns being operated at atmospheric pressure acc to the patent
-            self.hydrolysis_column_2.tau = self.tau_hydrolysis_column #Sum of reaction time and the regeneration time = 6.5 hours
-            ms = self._multi_stream = MultiStream('ms', phases='lg')
-            ms.mix_from(self.hydrolysis_column_2.ins[0])
-            ms.vle(T = self.T_hydrolysis, P = self.P_hydrolysis)
-            self.condensate_2.copy_like(ms['g'])
-            self.effluent_2.copy_like(ms['l'])
-            self.condensate_2.vle(T = self.T_hydrolysis, P = self.P_hydrolysis)
-            self.hydrolysis_column_2.outs[0].copy_like(self.condensate_2)
-            self.hydrolysis_column_2.outs[1].copy_like(self.effluent_2)
-            self.distillation_column_2.ins[0] = self.hydrolysis_column_2.outs[0]
-            self.distillation_column_2.LHK =('Methanol','Water')
-            self.distillation_column_2.Lr = 0.999
-            self.distillation_column_2.Hr = 0.999
-            self.distillation_column_2.k = 2
-            tops_2 = self.distillation_column_2.outs[0]
-            bottoms_2 = self.distillation_column_2.outs[1]
-                      
-            self.holding_tank_2.ins[0] =  self.hydrolysis_column_2.outs[1] #Outlet of the second hydrolysis column becomes the inlet of the second holding tank
-            self.holding_tank_2.tau = self.tau_holding_tank
-           
-            self.hydrolysis_column_3.ins[0] = feed
-            self.hydrolysis_column_3.T = self.T_hydrolysis
-            # 3.14*5*self.total_height, #decided based on amount of resin required,
-            self.hydrolysis_column_3.V_max = self.V_max_hydrolysis
-            self.hydrolysis_column_3.P = self.P_hydrolysis #Columns being operated at atmospheric pressure acc to the patent
-            self.hydrolysis_column_3.tau = self.tau_hydrolysis_column #Sum of reaction time and the regeneration time = 6.5 hours
-            ms = self._multi_stream = MultiStream('ms', phases='lg')
-            ms.mix_from(self.hydrolysis_column_3.ins[0])
-            ms.vle(T = self.T_hydrolysis, P = self.P_hydrolysis)
-            self.condensate_3.copy_like(ms['g'])
-            self.effluent_3.copy_like(ms['l'])
-            self.condensate_3.vle(T = self.T_hydrolysis, P = self.P_hydrolysis)
-            self.hydrolysis_column_3.outs[0].copy_like(self.condensate_3)
-            self.hydrolysis_column_3.outs[1].copy_like(self.effluent_3)
-            self.distillation_column_3.ins[0] = self.hydrolysis_column_3.outs[0]
-            self.distillation_column_3.LHK =('Methanol','Water')
-            self.distillation_column_3.Lr = 0.999
-            self.distillation_column_3.Hr = 0.999
-            self.distillation_column_3.k = 2
-            tops_3 = self.distillation_column_2.outs[0]
-            bottoms_3 = self.distillation_column_2.outs[1]
-            organic_mixture = self.hydrolysis_column_3.outs[1]     
-
              
 class HydrolysisReactor(bst.CSTR):
     _N_ins = 1
@@ -302,21 +162,164 @@ class HydrolysisReactor(bst.CSTR):
             self.reactions(condensate)
             ms = self._multi_stream = MultiStream('ms', phases='lg')
             ms.copy_like(condensate)
-            ms.vle(T = self.T, P = self.P)
+#TODO: this thing runs even when there are no arguments and still shows assert ==2 error            
+            ms.vle(T = 100+273.15 , P = 101325)
             condensate.copy_like(ms['g'])
-            effluent.copy_like(ms['l'])
-            
-        # feed = self.ins[0]
-        # vent, effluent = self.outs   
-        # #https://thermosteam.readthedocs.io/en/latest/_modules/thermosteam/_stream.html#Stream.copy_like
-        # effluent.copy_like(feed)              
-        # self.reactions(effluent)
-        # ms = self._multi_stream = MultiStream('ms', phases='lg')
-        # ms.copy_like(self.reactions(effluent))
-        # ms.vle(T = self.T, P = self.P)
-        # vent.copy_like(ms['g'])
-        # effluent.copy_like(ms['l'])
+            effluent.copy_like(ms['l'])             
+             
+class HydrolysisSystem(bst.CSTR, isabstract = True):
+    _N_ins = 1
+    _N_outs = 7
+    
+#The below is a list of unit operations that comprise the Hydrolysis system    
+    auxiliary_unit_names = (
+                            'holding_tank_1',
+                            'holding_tank_2',
+                            'hydrolysis_column_1',
+                            'hydrolysis_column_2',
+                            'hydrolysis_column_3',
+                            'distillation_column_1',
+                            'distillation_column_2',
+                            'distillation_column_3'
+                            )
+    def __init__(self, ID='', ins=None, outs=(), thermo=None, *, 
+                 T: Optional[float]=None, 
+                 P: Optional[float]=None, #all the three reactors run at the same pressure P
+                 tau = None,#all the three reactors run at the same residence time tau
+                 #all holding tanks are the same residence time
+                 V_max: Optional[float]=None): #all the three reactors have the same V_max
+#TODO: add other arguments to the class later
+#TODO: AttributeError: <HydrolysisSystem: HS601> 'MissingStream' object has no attribute 'P'
+        super().__init__()   
+
+        self.T= T
+        self.P= P
+        self.tau= tau
+        self.V_max = V_max
+#Methanol and water mixture is condensate coming from the hydrolysis
+        self.condensate_1 = bst.MultiStream(None, thermo = self.thermo)
+        self.condensate_2 = bst.MultiStream(None, thermo = self.thermo)
+        self.condensate_3 = bst.MultiStream(None, thermo = self.thermo)
+#Organic products coming from each column       
+        self.effluent_1 = bst.MultiStream(None, thermo = self.thermo)
+        self.effluent_2 = bst.MultiStream(None, thermo = self.thermo)
+        self.effluent_3 = bst.MultiStream(None, thermo = self.thermo)
+#Holding tanks after each hydrolysis column        
+        self.holding_tank_1 = bst.StorageTank(None, (None),(None), thermo = self.thermo)
+        self.holding_tank_2 = bst.StorageTank(None, (None),(None), thermo = self.thermo)
+#Hydrolysis columns filled with resin      
+        self.hydrolysis_column_1 = HydrolysisReactor(None, T =None, P = None,V_max = None, tau = None, thermo = self.thermo)
+        self.hydrolysis_column_2 = HydrolysisReactor(None, T =None, P = None,V_max = None, tau = None, thermo = self.thermo)
+        self.hydrolysis_column_3 = HydrolysisReactor(None, T =None, P = None,V_max = None, tau = None, thermo = self.thermo)
         
+#Distillation columns for separating out methanol water     
+#TODO: how to solve the error: ValueError: must specify either x_top and y_top, or Lr and Hr
+        self.distillation_column_1 = bst.BinaryDistillation(None,  LHK = ('Methanol','Water'),Lr = 0.999, Hr = 0.999,   k = 2, thermo = self.thermo)
+        self.distillation_column_2 = bst.BinaryDistillation(None, LHK = ('Methanol','Water'),Lr = 0.999, Hr = 0.999,   k = 2,  thermo = self.thermo)
+        self.distillation_column_3 = bst.BinaryDistillation(None, LHK = ('Methanol','Water'),Lr = 0.999, Hr = 0.999,   k = 2,  thermo = self.thermo)
+        
+    # def _setup(self): 
+    #         #Process parameters for emulsification of fatty esters to acids in a 
+    #         # packed bed ion exchange column
+    #         super()._setup()
+    #         X_hydrolysis = 0.30
+    #         Product_formation = PRxn([Rxn('Monomethyl_azelate + Water  -> Methanol + Azelaic_acid','Monomethyl_azelate', X = X_hydrolysis ),
+    #                                   Rxn('Methyl_palmitate + Water  -> Methanol + Palmitic_acid','Methyl_palmitate', X = X_hydrolysis ),
+    #                                   Rxn('Methyl_stearate + Water  -> Methanol + Stearic_acid','Methyl_stearate', X = X_hydrolysis),
+    #                                   Rxn('Methyl_linoleate + Water  -> Methanol + Linoleic_acid','Methyl_linoleate', X = X_hydrolysis),
+    #                                   Rxn('Methyl_palmitoleate + Water  -> Methanol + Palmitoleic_acid','Methyl_palmitoleate', X = 0.1),
+    #                                   Rxn('Methyl_oleate + Water  -> Methanol + Oleic_acid','Methyl_oleate', X = 0.1)])
+    #         self.reactions = RxnSys(Product_formation)  
+            
+    def _run(self):
+            feed = self.ins[0]
+            tops_1,bottoms_1,tops_2,bottoms_2,tops_3,bottoms_3,organic_mixture, = self.outs
+#assuming the feed enters directly after forming a solution with water
+            self.hydrolysis_column_1.ins[0] = feed
+            self.hydrolysis_column_1.T = self.T
+            # # 3.14*5*self.total_height, #decided based on amount of resin required,
+            self.hydrolysis_column_1.V_max = self.V_max
+            self.hydrolysis_column_1.P = self.P #Columns being operated at atmospheric pressure acc to the patent
+            self.hydrolysis_column_1.tau = self.tau #Sum of reaction time and the regeneration time = 6.5 hours
+            # self.reactions(self.hydrolysis_column_1.ins[0])
+            self.hydrolysis_column_1.simulate()
+            self.hydrolysis_column_1.show()
+            # ms = self._multi_stream = MultiStream('ms', phases='lg')
+            # ms = self.hydrolysis_column_1.outs[0]
+            # ms.vle(T = 100+273.15, P = 101325)
+            # self.condensate_1.copy_like(ms['g'])
+            # self.condensate_1.P = 101325
+            # self.effluent_1.copy_like(ms['l'])
+                       
+            self.distillation_column_1.ins[0] = self.hydrolysis_column_1.outs[0].copy()
+            # self.distillation_column_1.LHK = ('Methanol','Water')
+            # self.distillation_column_1.Lr = 0.999
+            # self.distillation_column_1.Hr = 0.999
+            # self.distillation_column_1.k = 2
+            # self.distillation_column_1.P = 101325
+            self.distillation_column_1.simulate()
+            tops_1 = self.distillation_column_1.outs[0]
+            bottoms_1 = self.distillation_column_1.outs[1]
+            
+            
+            self.holding_tank_1.ins[0] = self.hydrolysis_column_1.outs[1] # Inlet of the first holding tank is the outlet of the previous hydrolysis column
+            self.holding_tank_1.tau = self.tau_holding_tank # Holing tank has a residence time of 6.5 hours considering the sum of reaction and regeneration time
+            self.holding_tank_1.simulate()
+            
+            self.hydrolysis_column_2.ins[0] =  self.storage_tank_1.outs[0] #Outlet of the first holding tank becomes the inlet of the second hydrolysis column
+            self.hydrolysis_column_2.T = self.T
+            # 3.14*5*self.total_height, #decided based on amount of resin required,
+            self.hydrolysis_column_2.V_max = self.V_max
+            self.hydrolysis_column_2.P = self.P #Columns being operated at atmospheric pressure acc to the patent
+            self.hydrolysis_column_2.tau = self.tau#Sum of reaction time and the regeneration time = 6.5 hours
+            # self.reactions(self.hydrolysis_column_2.ins[0])
+            # self.hydrolysis_column_2.simulate()
+            # ms = self._multi_stream = MultiStream('ms', phases='lg')
+            # ms.mix_from(self.hydrolysis_column_2.ins[0])
+            # ms.vle(T = 100+273.15, P = 101325)
+            # self.condensate_2.copy_like(ms['g'])
+            # self.condensate_2.P = 101325
+            # self.effluent_2.copy_like(ms['l'])
+                        
+            self.distillation_column_2.ins[0] = self.hydrolysis_column_1.outs[0]
+            # self.distillation_column_2.LHK =('Methanol','Water')
+            # self.distillation_column_2.Lr = 0.999
+            # self.distillation_column_2.Hr = 0.999
+            # self.distillation_column_2.k = 2
+            # self.distillation_column_2.P = 101325
+            self.distillation_column_2.simulate()
+            tops_2 = self.distillation_column_2.outs[0]
+            bottoms_2 = self.distillation_column_2.outs[1]
+                      
+            self.holding_tank_2.ins[0] = self.hydrolysis_column_1.outs[1] #Outlet of the second hydrolysis column becomes the inlet of the second holding tank
+            self.holding_tank_2.tau = self.tau_holding_tank
+            self.holding_tank_2.simulate()
+            
+            self.hydrolysis_column_3.T = self.T
+            # # 3.14*5*self.total_height, #decided based on amount of resin required,
+            self.hydrolysis_column_3.V_max = self.V_max
+            self.hydrolysis_column_3.P = self.P #Columns being operated at atmospheric pressure acc to the patent
+            self.hydrolysis_column_3.tau = self.tau #Sum of reaction time and the regeneration time = 6.5 hours
+            # self.reactions(self.hydrolysis_column_3.ins[0])
+            # self.hydrolysis_column_3.simulate()            
+            # ms = self._multi_stream = MultiStream('ms', phases='lg')
+            # ms.mix_from(self.hydrolysis_column_3.ins[0])
+            # ms.vle(T = 100+273.15, P = 101325)
+            # self.condensate_3.copy_like(ms['g'])
+            # self.condensate_3.P = 101325
+            # self.effluent_3.copy_like(ms['l'])
+                        
+            self.distillation_column_3.ins[0] = self.hydrolysis_column_3.outs[0]
+            # self.distillation_column_3.LHK =('Methanol','Water')
+            # self.distillation_column_3.Lr = 0.999
+            # self.distillation_column_3.Hr = 0.999
+            # self.distillation_column_3.k = 2
+            # self.distillation_column_3.P = 101325
+            self.distillation_column_3.simulate()
+            tops_3 = self.distillation_column_2.outs[0]
+            bottoms_3 = self.distillation_column_2.outs[1]
+            organic_mixture = self.hydrolysis_column_3.outs[1]
+            
 class AACrystalliser(bst.units.BatchCrystallizer):
   
     def __init__(self, ID='', ins=None, outs=(), thermo=None, *,  
