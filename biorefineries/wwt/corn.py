@@ -13,14 +13,14 @@
 from biorefineries import corn as cn
 from biorefineries.wwt import (
     create_comparison_systems, simulate_systems,
-    create_comparison_models,evaluate_models,
+    create_comparison_models, evaluate_models,
     )
 
 info = {
     'abbr': 'cn',
     'WWT_ID': '7',
     'is2G': False,
-    'FERM_product': 'ethanol',
+    'FERM_product': ['ethanol',],
     'add_BT': True,
     'ww_price': None,
     }

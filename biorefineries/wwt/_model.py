@@ -65,7 +65,7 @@ class DictSetter:
 def add_biorefinery_parameters(model, model_dct, f, u, s, get_obj, get_rxn, param):
     # Flowrate
     feedstock = get_obj(s, 'feedstock')
-    product = get_obj(s, 'FERM_product')
+    products = list(get_obj(s, 'FERM_product'))
     b = feedstock.F_mass
     D = get_default_distribution('triangle', b)
     @param(name='Feedstock flowrate', element=feedstock, kind='coupled', units='kg/hr',
@@ -84,10 +84,10 @@ def add_biorefinery_parameters(model, model_dct, f, u, s, get_obj, get_rxn, para
         # Not changing the default price for the main product,
         # natural gas set separately
         b = stream.price
-        if b and stream not in (product, *ng_streams):
+        if b and (stream not in products+ng_streams):
             if 'ethanol' in stream.ID.lower() and 'ethanol' in model_dct['FERM_product'] and stream.imass['Ethanol']:
                 print(f'\n\nPrice/CF for stream {stream.ID} not added as uncertain parameter.\n\n')
-                continue # do not add advanced/cellulose
+                continue # do not add advanced/cellulosic ethanol
             D = get_default_distribution('triangle', b)
             param(Setter(stream, 'price'), name=f'{stream.ID} price',
                   kind='cost', element=stream, units='USD/kg',
@@ -234,8 +234,7 @@ def add_biodiesel_parameters(model, model_dct, f, u, s, get_obj, get_rxn, param)
     @param(name='TE oil-to-product', element=TE_rx, kind='coupled', units='-',
            baseline=b, distribution=D)
     def set_TE_oil_to_product(X):
-        for idx in idices:
-            rxns[idx].X = X
+        for idx in idices: rxns[idx].X = X
 
     return model
 
@@ -428,15 +427,17 @@ def add_2G_parameters(model, model_dct, f, u, s, get_obj, get_rxn, param):
             rxn.X = X
 
         # Fermentation
-        if model_dct['FERM_product']=='ethanol':
+        products = list(model_dct['FERM_product'])
+        if 'ethanol' in products[0]:
             D_g = shape.Triangle(0.9, b_g, 0.97)
             D_x = shape.Triangle(0.75, b_x, 0.9)
-        elif model_dct['FERM_product']=='lactic_acid':
+        elif 'lactic_acid' in products[0]:
             D_g = shape.Triangle(0.55, b_g, 0.93)
             D_x = shape.Triangle(0.55, b_x, 0.93)
-        elif model_dct['FERM_product']=='acrylic_acid':
-            D_g = get_default_distribution('triangle', b_g, ratio=0.2)
-            D_x = get_default_distribution('triangle', b_x, ratio=0.2)
+        # # 3HP module not added
+        # elif model_dct['FERM_product']=='acrylic_acid':
+        #     D_g = get_default_distribution('triangle', b_g, ratio=0.2)
+        #     D_x = get_default_distribution('triangle', b_x, ratio=0.2)
         else: raise ValueError(f"Fermentation product {model_dct['FERM_product']} not recognized.")
 
     @param(name='FERM glucose-to-product', element=fermentor, kind='coupled', units='-',
@@ -643,9 +644,10 @@ def add_metrics(model, model_dct, f, u, s, get_obj):
     wwt_system = get_obj(f.system, 'wwt_system')
 
     tea = sys.TEA
-    product = get_obj(s, 'FERM_product')
-    gal_or_kg = 'gal' if 'ethanol' in product.ID else 'kg'
-    factor = 2.9867 if 'ethanol' in product.ID else 1. # 2.9867 is cs.ethanol_density_kggal
+    products = list(get_obj(s, 'FERM_product'))
+    gal_or_kg = 'gal' if 'ethanol' in products[0].ID else 'kg'
+    factor = 2.9867 if 'ethanol' in products[0].ID else 1. # 2.9867 is cs.ethanol_density_kggal
+    get_F_mass = lambda: sum(i.F_mass for i in products)
 
     ww = s.search('ww')
     X = model_dct['wwt_ID']
@@ -655,16 +657,16 @@ def add_metrics(model, model_dct, f, u, s, get_obj):
         suffix = '' if not no_WWT else '_no WWT'
         suffix += '' if not with_RIN else '_RIN'
         cache_dct = Caching.cache_dct
-        cache_dct[f'MPSP{suffix}'] = price = tea.solve_price(product)*factor
+        cache_dct[f'MPSP{suffix}'] = price = tea.solve_price(products)*factor
 
         sale_dct = {}
         for stream in sys.products:
-            if stream is product: continue
+            if stream in products: continue
             if stream.price:
                 if stream.price < 0: continue # a waste stream, not a product
                 sale_dct[f'{stream.ID} ratio{suffix}'] = stream.cost
         sale_dct[f'Electricity ratio{suffix}'] = max(0, -sys.power_utility.cost)
-        sale_dct[f'Product ratio{suffix}'] = product.F_mass*price/factor
+        sale_dct[f'Product ratio{suffix}'] = get_F_mass()*price/factor
         hourly_sales = sum(v for v in sale_dct.values())
         cache_dct.update({k:v/hourly_sales for k, v in sale_dct.items()})
 
@@ -678,7 +680,7 @@ def add_metrics(model, model_dct, f, u, s, get_obj):
         # Displacement
         net = cache_dct[f'Net GWP{suffix}'] = sys.get_net_impact('GWP')
         hours = sys.operating_hours
-        GWP_disp = cache_dct[f'Product GWP disp{suffix}'] = net/hours/product.F_mass*factor
+        GWP_disp = cache_dct[f'Product GWP disp{suffix}'] = net/hours/get_F_mass()*factor
 
         # Economic allocation
         # net = feed + process + utility - product
@@ -690,7 +692,7 @@ def add_metrics(model, model_dct, f, u, s, get_obj):
         hourly_GWP = total_GWP / hours
         product_ratio = cache_dct[f'Product ratio{suffix}']
         cache_dct[f'Product GWP econ{suffix}'] = \
-            hourly_GWP * product_ratio / product.F_mass * factor
+            hourly_GWP * product_ratio / get_F_mass() * factor
         if with_RIN:
             RNG = s.search('RNG')
             cache_dct[f'RNG yield{suffix}'] = RNG.F_mass * sys.operating_hours
@@ -712,7 +714,7 @@ def add_metrics(model, model_dct, f, u, s, get_obj):
             GWP_net_diff = (cache_dct['Net GWP_RIN']-cache_dct['Net GWP']) / 1e3 # tonne CO2/yr
             GWP_tot_diff = (cache_dct['Total GWP_RIN']-cache_dct['Total GWP']) / 1e3 # tonne CO2/yr
             cost_diff = cache_dct['MPSP'] - cache_dct['MPSP_RIN'] # $/unit product
-            cost_diff *= product.F_mass/factor*sys.operating_hours # $/yr
+            cost_diff *= get_F_mass()/factor*sys.operating_hours # $/yr
             cache_dct['CO2 cost net'] = cost_diff / GWP_net_diff
             cache_dct['CO2 cost total'] = cost_diff / GWP_tot_diff
             Upgrading.ratio = 0
@@ -723,7 +725,7 @@ def add_metrics(model, model_dct, f, u, s, get_obj):
         def get_MPSP_no_WWT():
             ww_price = ww.price
             ww.price = 0
-            price = tea.solve_price(product)
+            price = tea.solve_price(products)
             ww.price = ww_price
             return price * factor
         metrics0 = [ # this should be the same as the "MPSP no WWT" calculated from the new system
@@ -732,7 +734,7 @@ def add_metrics(model, model_dct, f, u, s, get_obj):
     else:
         isa = isinstance
         if wwt_system.ID == 'exist_sys_wwt':
-            if not model_dct['FERM_product'] == 'lactic_acid':
+            if not 'lactic_acid' in model_dct['FERM_product']:
                 for WWTC in wwt_system.units:
                     if isa(WWTC, WastewaterSystemCost):
                         ww_in = WWTC.outs[0]
@@ -780,8 +782,9 @@ def add_metrics(model, model_dct, f, u, s, get_obj):
             @ignore_docking_warnings
             def get_MPSP_no_WWT():
                 cache_dct = Caching.cache_dct
-                product_default_price = product.price
-                product.price = tea.solve_price(product) # MPSP with WWT system
+                default_price_dct = {p:p.price for p in products}
+                MPSP_w_WWT = tea.solve_price(products) # MPSP with WWT system
+                for p in products: p.price = MPSP_w_WWT
 
                 # Disconnect WWT system and clear cost
                 solids_sink.ins[solids_idx] = sludge_dummy
@@ -799,8 +802,8 @@ def add_metrics(model, model_dct, f, u, s, get_obj):
                 GWP_econ = cache_dct['Product GWP econ']
                 GWP_no_wwt_disp = get_GWP(no_WWT=True)
                 GWP_no_wwt_econ = cache_dct['Product GWP econ_no WWT']
-                ww_GWP_disp = (GWP_disp-GWP_no_wwt_disp)/factor*product.F_mass/brine.F_mass
-                ww_GWP_econ = (GWP_econ-GWP_no_wwt_econ)/factor*product.F_mass/brine.F_mass
+                ww_GWP_disp = (GWP_disp-GWP_no_wwt_disp)/factor*get_F_mass()/brine.F_mass
+                ww_GWP_econ = (GWP_econ-GWP_no_wwt_econ)/factor*get_F_mass()/brine.F_mass
                 cache_dct['WW GWP disp'] = ww_GWP_disp * 1e3 # g CO2e/kg
                 cache_dct['WW GWP econ'] = ww_GWP_econ * 1e3
 
@@ -820,10 +823,8 @@ def add_metrics(model, model_dct, f, u, s, get_obj):
                 gas_sink.ins[gas_idx] = biogas
                 Caching.ins[0] = SX04.outs[1]
                 Caching.clear_wwt = False
-                for u in wwt_downstream_units:
-                    try: u.simulate()
-                    except: breakpoint()
-                product.price = product_default_price
+                for u in wwt_downstream_units: u.simulate()
+                for p, price in default_price_dct.items(): p.price = price
 
                 return MPSP_no_wwt
 
@@ -842,7 +843,7 @@ def add_metrics(model, model_dct, f, u, s, get_obj):
                 Metric('Product GWP econ_no WWT', lambda: Caching.cache_dct['Product GWP econ_no WWT'], f'kg CO2/{gal_or_kg}'),
                 Metric('CO2 cost net', lambda: Caching.cache_dct['CO2 cost net'], '$/tonne CO2'),
                 Metric('CO2 cost total', lambda: Caching.cache_dct['CO2 cost total'], '$/tonne CO2'),
-                Metric('Product yield', lambda: product.F_mass/factor*sys.operating_hours, f'{gal_or_kg}/yr'),
+                Metric('Product yield', lambda: get_F_mass()/factor*sys.operating_hours, f'{gal_or_kg}/yr'),
                 # GWP breakdowns
                 Metric('Net GWP', lambda: Caching.cache_dct['Net GWP'], 'kg CO2/yr'), # displacement
                 Metric('Total GWP', lambda: Caching.cache_dct['Total GWP'], 'kg CO2/yr'),
@@ -944,7 +945,12 @@ def create_comparison_models(system, model_dct):
     f = model.system.flowsheet
     u = f.unit
     s = f.stream
-    get_obj = lambda registry, key: registry.search(model_dct.get(key))
+    
+    def get_obj(registry, keys):
+        vals = model_dct.get(keys)
+        if not vals: return None
+        elif isinstance(vals, str): return registry.search(vals)
+        else: return [registry.search(val) for val in vals]
 
     model = add_parameters(model, model_dct, f, u, s, get_obj)
     model = add_metrics(model, model_dct, f, u, s, get_obj)
@@ -974,7 +980,7 @@ def save_model_results(model, path, percentiles):
     dct['percentiles'] = dct['data'].quantile(q=percentiles)
     rho, p = model.spearman_r(filter='omit nan')
     p.index = rho.index
-    rho.columns = p.collumns = pd.Index([i.name_with_units for i in model.metrics])
+    rho.columns = p.columns = pd.Index([i.name_with_units for i in model.metrics])
     dct['spearman_rho'] = rho
     dct['spearman_p'] = p
 

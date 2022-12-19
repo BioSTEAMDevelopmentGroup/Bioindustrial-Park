@@ -14,12 +14,7 @@ from math import floor
 from warnings import warn
 import thermosteam as tmo
 from thermosteam import Stream
-import biosteam as bst
 
-def get_instance(objs, type):
-    isa = isinstance
-    for i in objs:
-        if isa(i, type): return i 
 
 def get_unit_atomic_balance(unit, atom='C'):
     return (sum([i.get_atomic_flow(atom) for i in unit.ins]), 
@@ -127,9 +122,9 @@ class LCA:
         return self
 
     def __init__(self, system, system_chemicals, CFs, feedstock, feedstock_ID, main_product,
-                 cooling_and_chilled_water_production_units, co_product, co_product_CFs,
+                 cooling_and_chilled_water_production_units,
                  FU='1 kg', has_turbogenerator=True, demand_allocation_method='steam pool',
-                 BT_sys = None, BT=None, CT=None, CWP=None):
+                 BT_sys = None):
         #: [System] System being evaluated.
         self.system = system
         self.system_chemicals = system_chemicals
@@ -155,16 +150,12 @@ class LCA:
         
         self.BT_sys = BT_sys # for older biorefineries
         
-        self.BT = BT or get_instance(self.units, bst.BoilerTurbogenerator)
-        self.CT = CT or get_instance(self.units, bst.CoolingTower)
-        self.CWP = CWP or get_instance(self.units, bst.ChilledWaterPackage)
+        self.BT = self.units.BT
+        self.CT = self.units.CT
+        self.CWP = self.units.CWP
         self.cooling_and_chilled_water_production_units = cooling_and_chilled_water_production_units
         
-        self.co_product = co_product
-        self.co_product_CFs = co_product_CFs
-    @property
-    def electricity_demand(self):
-        return sum([i.power_utility.consumption for i in self.units])
+        system._LCA = self
 
     @property
     def LCA_streams(self):
@@ -321,7 +312,7 @@ class LCA:
     
     @property
     def EOL_GWP(self): 
-        return (self.main_product.get_atomic_flow('C') + self.co_product.get_atomic_flow('C')) * self.system_chemicals.CO2.MW/self.main_product.F_mass
+        return self.main_product.get_atomic_flow('C') * self.system_chemicals.CO2.MW/self.main_product.F_mass
     
     @property
     def direct_emissions_GWP(self): 
@@ -354,22 +345,18 @@ class LCA:
     def electricity_demand_non_cooling_GWP(self): 
         return  self.steam_frac_electricity_non_cooling * self.total_steam_GWP + self.electricity_frac_non_cooling * self.net_electricity_GWP
     
-    @property
-    def co_product_GWP(self):
-        return (self.co_product_CFs['GWP']*self.co_product.F_mass)/self.main_product.F_mass
-    
+  
     @property
     def GWP(self): 
         return  self.FGHTP_GWP + self.material_GWP + self.ng_GWP +\
-                       self.net_electricity_GWP + self.direct_emissions_GWP - self.co_product_GWP
+                       self.net_electricity_GWP + self.direct_emissions_GWP 
     
     @property
     def GWP_alternative(self): 
         return  self.FGHTP_GWP + self.material_GWP +\
                          self.non_BT_direct_emissions_GWP + self.heating_demand_GWP +\
                              self.cooling_demand_GWP +\
-                             self.electricity_demand_non_cooling_GWP -\
-                            self.co_product_GWP
+                             self.electricity_demand_non_cooling_GWP 
                             
     def GWP_by_ID(self, ID):
         return self.LCA_stream.imass[ID] * self.GWP_CF_stream.imass[ID]/self.main_product.F_mass
@@ -456,21 +443,15 @@ class LCA:
     def ng_FEC(self): 
         return self.CFs['FEC_CFs']['CH4']*self.streams.natural_gas.F_mass/self.main_product.F_mass
     
-    @property
-    def co_product_FEC(self):
-        return (self.co_product_CFs['FEC']*self.co_product.F_mass)/self.main_product.F_mass
-    
     # Total FEC
     @property
     def FEC(self): 
-        return self.material_FEC + self.net_electricity_FEC + self.feedstock_FEC + self.ng_FEC\
-            - self.co_product_FEC
+        return self.material_FEC + self.net_electricity_FEC + self.feedstock_FEC + self.ng_FEC 
     
     @property
     def FEC_alternative(self): 
         return self.material_FEC + self.feedstock_FEC + self.heating_demand_FEC +\
-        self.cooling_demand_FEC + self.electricity_demand_non_cooling_FEC\
-            - self.co_product_FEC
+        self.cooling_demand_FEC + self.electricity_demand_non_cooling_FEC 
 
 
     
