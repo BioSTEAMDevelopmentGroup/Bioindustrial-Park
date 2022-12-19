@@ -19,7 +19,7 @@ from biorefineries.biodiesel import (
 )
 from .fermentation import create_cane_to_combined_1_and_2g_fermentation
 from .lipid_extraction import create_post_fermentation_oil_separation_system
-from biorefineries.oilcane import units
+from .. import units
 from .. import streams as s
 
 __all__ = (

@@ -23,7 +23,7 @@ from ..juicing import (
 )
 from ..fermentation import create_sucrose_fermentation_system
 from ..lipid_extraction import create_lipid_exctraction_system
-from biorefineries.oilcane import units
+from ... import units
 from ... import streams as s
 
 __all__ = (

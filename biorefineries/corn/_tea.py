@@ -10,7 +10,7 @@
 import biosteam as bst
 from biosteam.process_tools import UnitGroup
 from biorefineries import corn as cn
-from biorefineries.sugarcane import ConventionalEthanolTEA
+from biorefineries.tea import ConventionalEthanolTEA
 
 __all__ = ('create_tea', 'tea_summary')
 
