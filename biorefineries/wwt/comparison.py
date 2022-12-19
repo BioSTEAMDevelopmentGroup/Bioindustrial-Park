@@ -43,7 +43,7 @@ check_results = False
 # Now the feedstock price is set to MFPP by default
 def get_oilcane_original_MESP(oc_module, products):
     update_cane_price(oc_module.sys.flowsheet.stream)
-    return oc_module.oilcane_sys.TEA.solve_price(products) * ethanol_kg_per_gal
+    return oc_module.tea.solve_price(products) * ethanol_kg_per_gal
 
 def update_oilcane_CFs(original_model):
     stream = original_model.system.flowsheet.stream
