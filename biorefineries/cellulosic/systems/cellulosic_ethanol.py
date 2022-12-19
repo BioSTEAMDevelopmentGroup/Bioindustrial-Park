@@ -17,6 +17,7 @@ from biorefineries.cellulosic import units
 
 __all__ = (
     'create_cellulosic_ethanol_system',
+    'create_facilities',
 )
 
 def create_facilities(

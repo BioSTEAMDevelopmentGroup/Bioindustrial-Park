@@ -10,4 +10,4 @@ __all__ = [*chemicals.__all__, 'create_chemicals']
 
 from biorefineries.cane.chemicals import *
 
-create_chemicals = create_sugarcane_to_ethanol_chemicals
+create_chemicals = create_sugarcane_chemicals

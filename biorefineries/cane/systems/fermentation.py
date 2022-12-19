@@ -7,8 +7,12 @@ Created on Thu Dec 21 11:05:24 2017
 import numpy as np
 import biosteam as bst
 import flexsolve as flx
+import thermosteam as tmo
 from biosteam import SystemFactory
+from .pretreatment import create_cane_combined_1_and_2g_pretreatment
+from biorefineries.cellulosic import create_cellulosic_fermentation_system
 from .. import streams as s
+from .. import units
 
 __all__ = (
     'add_urea_MgSO4_nutrients',
@@ -363,6 +367,232 @@ def create_sucrose_fermentation_system(ins, outs,
     
     if add_urea:
         add_urea_nutrient(R301)
+    
+@SystemFactory(
+    ID='cane_to_fermentation_sys',
+    ins=[s.cane],
+    outs=[s.beer, s.lignin, s.condensate, s.pretreatment_wastewater,
+          s.fiber_fines, s.bagasse_to_boiler],
+)
+def create_cane_to_combined_1_and_2g_fermentation(
+        ins, outs, titer=None, productivity=None, product_group=None,
+        SeedTrain=None, CoFermentation=None, ignored_volume=None,
+        cofermentation_reactions=None,
+        seed_train_reactions=None,
+        fed_batch=None,
+        include_scrubber=None,
+    ):
+    """
+    Create a system that produces crude oil and a fermentation-derived product 
+    (without purification).
+    
+    """
+    oilcane, = ins
+    beer, lignin, condensate, pretreatment_wastewater, fiber_fines, bagasse_to_boiler = outs
+    if fed_batch is None: fed_batch = False
+    if SeedTrain is None: SeedTrain = units.SeedTrain
+    if CoFermentation is None: CoFermentation = units.CoFermentation
+    if product_group is None: product_group = 'Ethanol'
+    if productivity is None: productivity = 0.95
+    if titer is None: titer = 68.5
+    pretreatment_sys = create_cane_combined_1_and_2g_pretreatment(
+        ins=oilcane, 
+        outs=['juice', 'pretreated_biomass', pretreatment_wastewater, fiber_fines, bagasse_to_boiler]
+    )
+    juice, pretreated_biomass, pretreatment_wastewater, fiber_fines, bagasse_to_boiler = pretreatment_sys.outs
+    cellulosic_fermentation_sys, cfdct = create_cellulosic_fermentation_system(
+        ins=(pretreated_biomass,),
+        outs=['vent', beer, lignin],
+        mockup=True,
+        area=400,
+        udct=True,
+        kind='Saccharification and Co-Fermentation',
+        cofermentation_reactions=cofermentation_reactions,
+        seed_train_reactions=seed_train_reactions,
+        insoluble_solids_loading=0.23,
+        SeedTrain=SeedTrain,
+        CoFermentation=CoFermentation,
+        add_nutrients=False,
+        solids_loading=0.23, # 30 wt/vol % solids content in saccharification
+        include_scrubber=include_scrubber,
+    )
+    seedtrain = cfdct['R302']
+    cofermentation = cfdct['R303'] # Cofermentation
+    add_urea_nutrient(cofermentation, seedtrain)
+    pressurefilter = cfdct['S303'] # Pressure filter
+    pressurefilter.tag = "bagasse oil extraction"
+    pressurefilter.isplit['Lipid'] = 1. - 0.7
+    hydrolysate = pressurefilter.outs[1]
+    hydrolysate_sink = hydrolysate.sink
+    hydrolysate_sink.ins[0] = None
+    MX = bst.Mixer(400, [hydrolysate, juice])
+    MX.register_alias('hydrolysate_and_juice_mixer')
+    if fed_batch:
+        if 'Sugar' not in MX.chemicals:
+            MX.chemicals.define_group('Sugar', ('Glucose', 'Sucrose', 'Xylose'))
+        SX0 = bst.Splitter(400, MX-0, split=0.2)
+        EvX = bst.MultiEffectEvaporator(400, ins=SX0-1, 
+                                        P=(101325, 69682, 47057, 30953, 19781),
+                                        V_definition='First-effect',
+                                        thermo=hydrolysate.thermo.ideal(),
+                                        flash=False,
+                                        V=0.05)
+        EvX.brix = 95
+        def get_brix():
+            effluent = EvX.outs[0]
+            water = effluent.imass['Water']
+            if water < 1: water = 1
+            return 100 * effluent.imass['Sugar'] / water
+        
+        def brix_objective(V):
+            EvX.V = V
+            EvX.run()
+            return EvX.brix - get_brix()
+        
+        @EvX.add_specification(run=False)
+        def adjust_glucose_concentration():
+            V_guess = EvX.V
+            EvX.V = flx.IQ_interpolation(
+                brix_objective, 0., 0.2, x=V_guess, ytol=0.1, maxiter=1000,
+            )
+        
+        MT1 = bst.MixTank(400, EvX-0)
+        SX1 = bst.Splitter(400, ins=EvX-1, outs=[condensate, ''], split=0.9)
+        SX2 = bst.Splitter(400, ins=MT1-0, split=0.07)
+        to_seed_train, to_cofermentation = SX2.outs
+        seedtrain.ins.append(to_seed_train)
+        cofermentation.ins.append(to_cofermentation)
+        PX = bst.Pump(400, ins=SX1-1, P=101325.)
+        @SX1.add_specification(run=False)
+        def sugar_concentration_adjustment():
+            dilution_water = MX.ins[1]
+            sugar_path = EvX.path_until(cofermentation, inclusive=False)[1:]
+            for i in sugar_path: i.run()
+            path = SX1.path_until(cofermentation, inclusive=True)
+            beer = cofermentation.outs[1]
+            target_titer = cofermentation.titer
+            def f(removed_water_split):
+                SX1.split[:] = removed_water_split
+                for unit in path: unit.run()
+                return target_titer - get_titer()
+            dilution_water.imass['Water'] = 0.
+            x0 = 0
+            x1 = 0.999
+            y0 = f(x0)
+            if y0 < 0.:
+                product = float(beer.imass[product_group])
+                current_titer = get_titer()
+                ignored_product = PX.outs[0].imass[product_group]
+                required_water = (1./target_titer - 1./current_titer) * (product - ignored_product) * 1000.
+                dilution_water.imass['Water'] = max(required_water, 0)
+            else:
+                y1 = f(x1)
+                if y1 > 0.:
+                    long_path = [SX0, EvX, *sugar_path]
+                    for split in (0.15, 0.10, 0.5, 0.):
+                        SX0.split[:] = split
+                        for i in long_path: i.run()
+                        y1 = f(x1)
+                        if y1 < 0.: break
+                SX1.split[:] = flx.IQ_interpolation(f, x0, x1, y0, y1, x=SX1.split[0], ytol=1e-5, xtol=1e-6)
+            cofermentation.tau = target_titer / cofermentation.productivity 
+            SX0.split[:] = 0.2 # Restart
+    else:
+        EvX = bst.MultiEffectEvaporator(400, ins=MX-0, outs=('', condensate),
+                                        P=(101325, 69682, 47057, 30953, 19781),
+                                        V_definition='First-effect',
+                                        thermo=hydrolysate.thermo.ideal(),
+                                        flash=False,
+                                        V=0.05) # fraction evaporated
+        PX = bst.Pump(400, ins=EvX-0, P=101325.)
+        P_original = tuple(EvX.P)
+        Pstart = P_original[0]
+        Plast = P_original[-1]
+        N = len(P_original)
+        @EvX.add_specification(run=True)
+        def evaporation():
+            path = EvX.path_until(cofermentation, inclusive=True)
+            beer = cofermentation.outs[1]
+            target_titer = cofermentation.titer
+            V_last = EvX.V
+            EvX.P = P_original
+            EvX._reload_components = True
+            def f(V):
+                EvX.V = V
+                for unit in path: unit.run()
+                return target_titer - get_titer()
+            MX.ins[1].imass['Water'] = 0.
+            y0 = f(0)
+            if y0 < 0.:
+                product = float(beer.imass[product_group])
+                current_titer = get_titer()
+                feed = PX.outs[0]
+                ignored_product = feed.imass[product_group] if product_group in feed.chemicals else 0.
+                T, P = beer.thermal_condition
+                rho = beer.chemicals.Water.rho('l', T, P)
+                dilution_water = (1./target_titer - 1./current_titer) * (product - ignored_product) * rho
+                mx_path = MX.path_until(cofermentation, inclusive=True)
+                def f(dilution_water):
+                    MX.ins[1].imass['Water'] = max(dilution_water, 0)
+                    for unit in mx_path: unit.run()
+                    return target_titer - get_titer()
+                x0 = 0
+                x1 = dilution_water * 5
+                y0 = f(0)
+                if y0 < 0: 
+                    y1 = f(x1)
+                    try:
+                        MX.ins[1].imass['Water'] = flx.IQ_interpolation(
+                            f, x0, x1, y0, y1, x=dilution_water, ytol=1e-3, xtol=1e-3, maxiter=1000,
+                        )
+                    except:
+                        breakpoint()
+            else:
+                for i in range(1, N):
+                    if f(1e-6) < 0.:
+                        EvX.P = np.linspace(Pstart, Plast, N - i)
+                        EvX._reload_components = True
+                    else:
+                        break
+                x0 = 0.
+                x1 = 0.1
+                y1 = f(x1)
+                while y1 > 0:
+                    if x1 > 0.9: 
+                        breakpoint()
+                        raise RuntimeError('infeasible to evaporate any more water')
+                    x0 = x1            
+                    x1 += 0.1
+                    y1 = f(x1)
+                EvX.V = flx.IQ_interpolation(f, x0, x1, y0, y1, x=V_last, ytol=1e-5, xtol=1e-6)
+            cofermentation.tau = target_titer / cofermentation.productivity 
+    
+    syrup_sink = EvX.outs[0].sink
+    syrup_sink.sucrose_hydrolysis_reaction = tmo.Reaction(
+        'Sucrose + Water -> 2Glucose', 'Sucrose', 1.00
+    )
+    
+    @syrup_sink.add_specification(run=True)
+    def hydrolysis():
+        syrup, = syrup_sink.ins
+        syrup_sink.sucrose_hydrolysis_reaction.force_reaction(syrup)
+        if syrup.imol['Water'] < 0: syrup.imol['Water'] = 0.
+    
+    MX = bst.Mixer(400, [PX-0, 'dilution_water'])
+    if fed_batch: MX.ins.append(SX0-0)
+    HX = bst.HXutility(400, MX-0, T=305.15) 
+    HX-0-hydrolysate_sink
+    
+    def get_titer():
+        beer = cofermentation.outs[1]
+        feed = EvX.outs[0]
+        ignored = beer.ivol[ignored_volume] if ignored_volume in cofermentation.chemicals else 0.
+        ignored_product = feed.imass[product_group] if product_group in feed.chemicals else 0.
+        ignored_product_vol = feed.ivol[product_group] if product_group in feed.chemicals else 0.
+        return (beer.imass[product_group] - ignored_product) / (beer.ivol['Water', product_group].sum() - ignored_product_vol - ignored)
+    cofermentation.get_titer = get_titer
+    cofermentation.titer = titer
+    cofermentation.productivity = productivity
     
 @SystemFactory(
     ID='molasses_fermentation_sys',

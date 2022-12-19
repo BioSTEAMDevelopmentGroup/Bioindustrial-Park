@@ -17,7 +17,7 @@ from .. import streams as s
 __all__ = (
     'create_feedstock_handling_system',
     'create_juicing_system_up_to_clarification',
-    'create_juicing_system_with_fiber_screener',
+    'create_juicing_system',
 )
 
 @SystemFactory(
@@ -205,8 +205,7 @@ def create_juicing_system_up_to_clarification(ins, outs, pellet_bagasse=None,
     ins=[s.sugarcane, s.H3PO4, s.lime, s.polymer],
     outs=[s.screened_juice, s.bagasse, s.fiber_fines]
 )          
-def create_juicing_system_with_fiber_screener(ins, outs, pellet_bagasse=None,
-                                              dry_bagasse=None):
+def create_juicing_system(ins, outs, pellet_bagasse=None, dry_bagasse=None):
     screened_juice, bagasse, fiber_fines = outs
     sys = create_juicing_system_up_to_clarification(
         None, ins, ['', bagasse],

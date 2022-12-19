@@ -10,10 +10,19 @@
 import thermosteam as tmo
 from thermosteam import functional as fn
 from chemicals import atoms_to_Hill
+from thermosteam.utils import chemical_cache
+from biorefineries import cellulosic
 
-__all__ = ('create_sugarcane_to_ethanol_chemicals',)
+__all__ = (
+    'create_sugarcane_chemicals',
+    'create_oilcane_chemicals',
+    'create_cellulosic_oilcane_chemicals',
+    'create_acyl_olein',
+    'create_acetyl_diolein',
+)
 
-def create_sugarcane_to_ethanol_chemicals():
+@chemical_cache
+def create_sugarcane_chemicals():
     (Water, Ethanol, Glucose, Sucrose, H3PO4, P4O10, CO2, Octane, O2, N2, CH4) = chemicals = tmo.Chemicals(
         ['Water', 'Ethanol', 'Glucose', 'Sucrose', 'H3PO4', 'P4O10',
          'CO2', 'Octane', 'O2', 'N2', 'CH4']
@@ -91,6 +100,7 @@ def create_sugarcane_to_ethanol_chemicals():
     
     return chemicals
 
+@chemical_cache
 def create_acyl_olein(N_acyl):
     # Assume properties are similar between oleic and palmitic chains
     Hf_oleic_acid = -764.80e3
@@ -138,9 +148,35 @@ def create_acyl_olein(N_acyl):
     if ID == 'MonoOlein': chemical.mu.add_model(lambda T: 0.0001)
     return chemical
 
-def create_oilcane_to_ethanol_biodiesel_chemicals():
+@chemical_cache
+def create_acetyl_diolein():
+    # Assume properties are similar between oleic and palmitic chains
+    Hf_oleic_acid = -764.80e3
+    Hf_triolein = -1776e3
+    Hf_acetic_acid = -483.58e3
+    ID_model = 'Palmitin'
+    ID = 'AcetylDiOlein'
+    # Ac + TAG -> acTAG + FFA
+    # Hrxn = acTAG + FFA - (TAG + Ac)  # Assume Hrxn is negligible
+    # acTAG = Hrxn - FFA + TAG + Ac
+    Hf = Hf_triolein - Hf_oleic_acid + Hf_acetic_acid
+    model = tmo.Chemical(ID_model).at_state(phase='l', copy=True)
+    formula = atoms_to_Hill({'C': 41, 'H':75, 'O': 6})
+    chemical = tmo.Chemical(ID, search_db=False, phase='l', phase_ref='l',
+                            formula=formula, Hf=Hf)
+    chemical._Dortmund = group_counts = model.Dortmund.copy()
+    group_counts.set_group_counts_by_name({'CH=CH': 2, 'CH':1, 'CH2': 28, 'CH3': 3, 'CH2COO': 2, 'COOH': 1}, reset=True)
+    chemical.V.add_model(fn.rho_to_V(rho=900, MW=chemical.MW))
+    chemical.mu.add_method(900 * 20.3e-6)
+    chemical.Cn.add_method(model.Cp(298.15) * chemical.MW)
+    chemical.copy_models_from(model, ['sigma', 'kappa'])
+    return chemical
+
+@chemical_cache
+def create_oilcane_chemicals():
+    chemicals = create_sugarcane_chemicals().copy()
     (Water, Ethanol, Glucose, Sucrose, H3PO4, P4O10, CO2, Octane, O2, N2, CH4, 
-     Ash, Cellulose, Hemicellulose, Flocculant, Lignin, Solids, DryYeast, CaO) = chemicals = create_sugarcane_to_ethanol_chemicals()
+     Ash, Cellulose, Hemicellulose, Flocculant, Lignin, Solids, DryYeast, CaO) = chemicals
     
     ### Define common chemicals ###
     Biodiesel = tmo.Chemical('Biodiesel',
@@ -193,4 +229,30 @@ def create_oilcane_to_ethanol_biodiesel_chemicals():
     chemicals.define_group('Oil', ('PL', 'FFA', 'MAG', 'DAG', 'TAG'))
     chemicals.set_synonym('Water', 'H2O')
     chemicals.set_synonym('Yeast', 'DryYeast')
+    return chemicals
+
+@chemical_cache
+def create_cellulosic_oilcane_chemicals():
+    oilcane_chemicals = create_oilcane_chemicals()
+    cellulosic_chemicals = cellulosic.create_cellulosic_ethanol_chemicals()
+    removed = {'SuccinicAcid', 'H2SO4', 'Z_mobilis', 'Oil', 'Yeast'}
+    chemicals = tmo.Chemicals([
+        i for i in (oilcane_chemicals.tuple + cellulosic_chemicals.tuple) if i.ID not in removed
+    ])
+    chemicals.extend([
+        create_acetyl_diolein(),
+        tmo.Chemical('Urea', default=True, phase='l'),
+        chemicals.Glucose.copy('Yeast'),
+    ])
+    chemicals.compile()
+    chemicals.set_synonym('AcetylDiOlein', 'AcTAG')
+    chemicals.define_group('Lipid', ['PL', 'FFA', 'MAG', 'DAG', 'TAG', 'AcTAG'])
+    chemicals.define_group('lipid', ['PL', 'FFA', 'MAG', 'DAG', 'TAG', 'AcTAG'])
+    chemicals.define_group('Oil', ['PL', 'FFA', 'MAG', 'DAG', 'TAG'])
+    chemicals.set_synonym('Yeast', 'DryYeast')
+    chemicals.set_synonym('Yeast', 'Cellmass')
+    chemicals.AcetylDiOlein.V.method_P = chemicals.TriOlein.V.method_P = None
+    chemicals.set_synonym('Cellmass', 'Cells')
+    chemicals.set_synonym('Cellmass', 'cellmass')
+    chemicals.set_synonym('TriOlein', 'TAG')
     return chemicals

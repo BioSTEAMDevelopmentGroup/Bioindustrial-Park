@@ -1,14 +1,17 @@
 # -*- coding: utf-8 -*-
 """
 """
-from . import sugarcane_to_ethanol
-from . import sugarcane_to_sugar_ethanol
+from . import ethanol
+from . import sugar_ethanol
+from . import cellulosic_ethanol 
 
 __all__ = (
-    *sugarcane_to_ethanol.__all__,
-    *sugarcane_to_sugar_ethanol.__all__,
+    *ethanol.__all__,
+    *sugar_ethanol.__all__,
+    *cellulosic_ethanol.__all__,
 )
 
-from .sugarcane_to_ethanol import *
-from .sugarcane_to_sugar_ethanol import *
+from .ethanol import *
+from .sugar_ethanol import *
+from .cellulosic_ethanol import *
 

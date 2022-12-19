@@ -4,6 +4,7 @@
 from biosteam import stream_kwargs
 from biorefineries.ethanol.streams import *
 from biorefineries.biodiesel.streams import *
+from biorefineries.cellulosic.streams import *
 
 bagasse = stream_kwargs('bagasse')
 bagasse_pellets = stream_kwargs('bagasse_pellets')
@@ -33,6 +34,15 @@ lipidcane = stream_kwargs('lipidcane',
     units='kg/hr',
     price=0.03455,
 )
+oilcane = lipidcane.copy()
+oilcane['ID'] = 'oilcane'
+TAG = oilcane['TAG']
+oilcane['TAG'] = 0.80 * TAG
+oilcane['PL'] = 0.10 * TAG
+oilcane['FFA'] = 0.10 * TAG
+cane = stream_kwargs('cane')
+condensate = stream_kwargs('condensate')
+bagasse_to_boiler = stream_kwargs('bagasse_to_boiler')
 shredded_cane = stream_kwargs('shredded_cane')
 untreated_juice = stream_kwargs('untreated_juice')
 H3PO4 = stream_kwargs('H3PO4',
@@ -61,6 +71,7 @@ screened_juice = stream_kwargs('screened_juice',
     units='kg/hr',
     T=372
 )
+stillage = stream_kwargs('stillage')
 fiber_fines = stream_kwargs('fiber_fines')
 evaporator_condensate = stream_kwargs('evaporator_condensate')
 vent = stream_kwargs('vent')
@@ -70,5 +81,9 @@ emissions = stream_kwargs('emissions')
 ash_disposal = stream_kwargs('ash_disposal')
 molasses = stream_kwargs('molasses')
 lipid = stream_kwargs('lipid')
+cellmass = stream_kwargs('cellmass')
+fermentation_effluent = stream_kwargs('fermentation_effluent')
 spent_oil_wash_water = stream_kwargs('spent_oil_wash_water')
 sugar = stream_kwargs('sugar', price=0.419) # https://markets.businessinsider.com/commodities/sugar-price?op=1 (3/18/2022)
+acTAG = stream_kwargs('acTAG', price=1.633) 
+crude_oil = stream_kwargs('crude_oil', price=0.661) # 30 cts / lb (vegetable); 5yr average https://www.ams.usda.gov/mnreports/lswagenergy.pdf

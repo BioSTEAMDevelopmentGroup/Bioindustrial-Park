@@ -8,30 +8,51 @@ import biosteam as bst
 from biosteam import SystemFactory, F
 from ... import streams as s
 from biorefineries.ethanol import (
-    create_beer_distillation_system,
-    create_ethanol_purification_system_after_beer_column,
+    create_ethanol_purification_system,
 )
-from ..fermentation import create_molasses_fermentation_system
-from ..juicing import create_feedstock_handling_system, create_juicing_system_with_fiber_screener
-from ..sugar import create_sugar_crystallization_system
+from ..fermentation import create_sucrose_fermentation_system
+from ..juicing import create_feedstock_handling_system, create_juicing_system
 
 __all__ = (
-    'create_sugarcane_to_sugar_and_molasses_system',
-    'create_sugarcane_to_sugar_and_ethanol_system',
+    'create_sucrose_to_ethanol_system',
+    'create_sugarcane_to_ethanol_system',
 )
 
-# %% Sugarcane to sugar and ethanol
+# %% Sugarcane to ethanol
+
+@SystemFactory(
+    ID='sucrose_to_ethanol_sys',
+    ins=[s.screened_juice, s.denaturant],
+    outs=[s.ethanol, s.stillage, s.recycle_process_water, s.evaporator_condensate]
+)
+def create_sucrose_to_ethanol_system(ins, outs, add_urea=False):
+    screened_juice, denaturant = ins
+    ethanol, stillage, recycle_process_water, evaporator_condensate = outs
     
+    beer = bst.Stream()
+    
+    create_sucrose_fermentation_system(
+        ins=screened_juice,
+        outs=[beer, evaporator_condensate],
+        mockup=True,
+        add_urea=add_urea,
+    )
+    create_ethanol_purification_system(
+        ins=[beer, denaturant], 
+        outs=[ethanol, stillage, recycle_process_water],
+        mockup=True
+    )
+
 @SystemFactory(
     ID='sugarcane_sys', 
-    ins=[s.sugarcane, s.H3PO4, s.lime, s.polymer], 
-    outs=[s.sugar, s.molasses, s.wastewater, s.emissions, s.ash_disposal]
+    ins=[s.sugarcane, s.H3PO4, s.lime, s.polymer, s.denaturant], 
+    outs=[s.ethanol, s.vinasse, s.wastewater, s.emissions, s.ash_disposal]
 )
-def create_sugarcane_to_sugar_and_molasses_system(ins, outs, 
+def create_sugarcane_to_ethanol_system(ins, outs, 
                                        use_area_convention=False,
                                        pellet_bagasse=None):
-    sugarcane, H3PO4, lime, polymer, = ins
-    sugar, molasses, wastewater, emissions, ash_disposal = outs
+    sugarcane, H3PO4, lime, polymer, denaturant = ins
+    ethanol, vinasse, wastewater, emissions, ash_disposal = outs
     
     feedstock_handling_sys = create_feedstock_handling_system(
         area=100 if use_area_convention else None,
@@ -39,21 +60,20 @@ def create_sugarcane_to_sugar_and_molasses_system(ins, outs,
         outs=[''],
         mockup=True,
     )
-    juicing_sys = create_juicing_system_with_fiber_screener(
+    juicing_sys = create_juicing_system(
         area=200 if use_area_convention else None,
         ins=[feedstock_handling_sys-0, H3PO4, lime, polymer],
         pellet_bagasse=pellet_bagasse,
         mockup=True
     )
-    
-    sugar_crystallization_sys, edct = create_sugar_crystallization_system(
+    ethanol_production_sys, edct = create_sucrose_to_ethanol_system(
         area=300 if use_area_convention else None,
         udct=True,
-        ins=juicing_sys-0, outs=(sugar, molasses),
+        ins=(juicing_sys-0, denaturant), outs=(ethanol, vinasse),
         mockup=True
     )
     M305 = bst.Mixer(400 if use_area_convention else 'M305', 
-        ins=(juicing_sys-2,),
+        ins=(juicing_sys-2, *ethanol_production_sys-[2, 3]),
         outs=wastewater
     )
     
@@ -70,6 +90,7 @@ def create_sugarcane_to_sugar_and_molasses_system(ins, outs,
                             F.boiler_makeup_water)
     process_water_streams = (F.imbibition_water,
                              F.rvf_wash_water,
+                             F.stripping_water,
                              *makeup_water_streams)
     makeup_water = bst.Stream('makeup_water', price=0.000254)
     CWP = bst.ChilledWaterPackage(500 if use_area_convention else 'CWP')
@@ -79,7 +100,11 @@ def create_sugarcane_to_sugar_and_molasses_system(ins, outs,
                                    None,
                                    makeup_water_streams,
                                    process_water_streams)
-    HXN = bst.HeatExchangerNetwork(600 if use_area_convention else 'HXN')
+    
+    F301 = edct['F301']
+    D303 = edct['D303']
+    HXN = bst.HeatExchangerNetwork(600 if use_area_convention else 'HXN',
+                                   units=[F301, D303.condenser])
     
     # if vinasse_to_wastewater:
     #     plant_air = bst.Stream('plant_air', N2=83333, units='kg/hr')
@@ -92,19 +117,3 @@ def create_sugarcane_to_sugar_and_molasses_system(ins, outs,
     #         ins=[vinasse],
     #         mockup=True,
     #     )
-
-@SystemFactory(
-    ID='sugarcane_sys', 
-    ins=[s.sugarcane, s.H3PO4, s.lime, s.polymer], 
-    outs=[s.sugar, s.ethanol]
-)
-def create_sugarcane_to_sugar_and_ethanol_system(ins, outs):
-    sugar, ethanol = outs
-    sugar_and_molasses_sys = create_sugarcane_to_sugar_and_molasses_system(ins=ins, outs=[sugar], mockup=True)
-    sugar, molasses, wastewater, emissions, ash_disposal = sugar_and_molasses_sys.outs
-    molasses_fermentation_sys = create_molasses_fermentation_system(ins=molasses, mockup=True)
-    beer, = molasses_fermentation_sys.outs
-    beer_distillation_sys = create_beer_distillation_system(ins=beer, mockup=True)
-    distilled_beer, stillage = beer_distillation_sys.outs
-    create_ethanol_purification_system_after_beer_column(ins=distilled_beer, outs=ethanol, mockup=True)
-    

@@ -6,7 +6,7 @@
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
 # for license details.
 
-from biorefineries.lipidcane import (
+from biorefineries.cane.composition import (
     set_lipid_fraction as set_oil_fraction,
     get_composition,
 )

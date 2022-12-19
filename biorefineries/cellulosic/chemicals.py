@@ -5,7 +5,7 @@ Created on Thu Jun 27 23:12:04 2019
 @author: yoelr
 """
 import thermosteam as tmo
-from biorefineries import lipidcane as lc 
+from thermosteam.utils import chemical_cache
 from thermosteam import functional as fn
 import pandas as pd
 
@@ -96,9 +96,11 @@ def get_grouped_chemicals(stream, units='kmol/hr'):
 
 # %% Chemicals object and define functions
 
+@chemical_cache
 def create_cellulosic_ethanol_chemicals():
+    from biorefineries import cane
     chems = tmo.Chemicals([])
-    
+    oilcane_chemicals = cane.create_oilcane_chemicals()
     def append_single_phase_chemical(ID, search_ID=None, **data):
         chemical = tmo.Chemical(ID, search_ID=search_ID, **data)
         try: chemical.at_state(phase=chemical.phase_ref)
@@ -138,9 +140,9 @@ def create_cellulosic_ethanol_chemicals():
     
     # As is in data bank
     chems.extend(
-        tmo.Chemicals([lc.chemicals.Water, lc.chemicals.Ethanol, 'AceticAcid',
-                       'Furfural', lc.chemicals.Glycerol, 'H2SO4', 'NH3', 
-                       'LacticAcid', 'SuccinicAcid', lc.chemicals.P4O10])
+        tmo.Chemicals([oilcane_chemicals.Water, oilcane_chemicals.Ethanol, 'AceticAcid',
+                       'Furfural', oilcane_chemicals.Glycerol, 'H2SO4', 'NH3', 
+                       'LacticAcid', 'SuccinicAcid', oilcane_chemicals.P4O10])
     )
     chems.H2SO4.at_state('l')
     append_single_phase_chemical('Lime', 'Ca(OH)2')
@@ -187,8 +189,8 @@ def create_cellulosic_ethanol_chemicals():
     chems.Acetate.Hf = -103373
     
     # Chemicals taken from previous study
-    chems.append(lc.chemicals.Ash)
-    chems.append(lc.chemicals.NaOH)
+    chems.append(oilcane_chemicals.Ash)
+    chems.append(oilcane_chemicals.NaOH)
     append_new_single_phase_chemical('Lignin',
                                      formula='C8H8O3',
                                      Hf=-108248*cal2joule)

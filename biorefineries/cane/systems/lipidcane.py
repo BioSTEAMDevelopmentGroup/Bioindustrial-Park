@@ -13,7 +13,7 @@ import numpy as np
 import biosteam as bst
 from biosteam import main_flowsheet as f
 from biosteam import SystemFactory
-from ... import streams as s
+from .. import streams as s
 from biorefineries.biodiesel import (
     create_lipid_wash_system,
     create_transesterification_and_biodiesel_separation_system,
