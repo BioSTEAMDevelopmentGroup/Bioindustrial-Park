@@ -1171,6 +1171,8 @@ def load(name, cache=cache, reduce_chemicals=False, RIN=True,
     set_baseline(set_crude_glycerol_price, mean_glycerol_price)
     set_baseline(set_natural_gas_price, mean_natural_gas_price)
     set_baseline(set_electricity_price, mean_electricity_price)
+    if number in cellulosic_ethanol_configurations:
+        get_stream('ethanol').price = 0.789
     if number > 0:
         set_baseline(set_cane_PL_content, 10)
         set_baseline(set_cane_FFA_content, 10)

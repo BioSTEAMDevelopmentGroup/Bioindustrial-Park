@@ -2,9 +2,9 @@
 """
 """
 from biosteam import stream_kwargs
+from biorefineries.cellulosic.streams import *
 from biorefineries.ethanol.streams import *
 from biorefineries.biodiesel.streams import *
-from biorefineries.cellulosic.streams import *
 
 bagasse = stream_kwargs('bagasse')
 bagasse_pellets = stream_kwargs('bagasse_pellets')
