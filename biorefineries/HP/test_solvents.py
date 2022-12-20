@@ -188,24 +188,24 @@ for result in filtered_results:
     result[1][0].show()
     print('\n')
     
-# %% Unit initialization and tests
-solvent_to_run = '1-octanol'
-set_solvent(solvent_to_run)
-partition_data = dict(IDs=(solute.ID, 'Water', solvent_to_run,
-                            'AceticAcid', 'Glycerol',), 
-            K=np.array([1./results_dict[solvent_to_run][1],
-                        1/results_dict[solvent_to_run][2],
-                        results_dict[solvent_to_run][3],
-                       results_dict[solvent_to_run][5],
-                       results_dict[solvent_to_run][6]]),
-            phi = 0.5)
+# # %% Unit initialization and tests
+# solvent_to_run = '1-octanol'
+# set_solvent(solvent_to_run)
+# partition_data = dict(IDs=(solute.ID, 'Water', solvent_to_run,
+#                             'AceticAcid', 'Glycerol',), 
+#             K=np.array([1./results_dict[solvent_to_run][1],
+#                         1/results_dict[solvent_to_run][2],
+#                         results_dict[solvent_to_run][3],
+#                        results_dict[solvent_to_run][5],
+#                        results_dict[solvent_to_run][6]]),
+#             phi = 0.5)
 
-MS = bst.units.MultiStageMixerSettlers('MS', ins = (process_stream, solvent_stream),
-                                      outs = ('raffinate', 'extract'),
-                                      N_stages = 5, partition_data = partition_data,) 
+# MS = bst.units.MultiStageMixerSettlers('MS', ins = (process_stream, solvent_stream),
+#                                       outs = ('raffinate', 'extract'),
+#                                       N_stages = 5, partition_data = partition_data,) 
 
-MS.simulate()
-MS.show(N=100, composition=True, flow='kg/hr')
+# MS.simulate()
+# MS.show(N=100, composition=True, flow='kg/hr')
 
 
 # %% For 3-HP only

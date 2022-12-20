@@ -20,7 +20,7 @@ info = {
     'abbr': 'sc1g',
     'WWT_ID': '8',
     'is2G': False,
-    'FERM_product': 'ethanol',
+    'FERM_product': ['ethanol',],
     'add_BT': False,
     'ww_price': None,
     }
@@ -52,7 +52,7 @@ def create_sc1g_comparison_systems(biodegradability=1): # will be multiplied by 
     wwt_kwdct['skip_AeF'] = True
     sys_dct = {
         'load': {'name': 'S1', 'cache': None, 'reduce_chemicals': False},
-        'system_name': 'oilcane_sys',
+        'system_name': 'sugarcane_sys',
         'create_wastewater_process': wwt_kwdct,
         # `wastewater` is mixed from `fiber_fines` (taken care of),
         # `stripper_bottoms_product` (~20 mg/L COD), and `evaporator_condensate` (only water)

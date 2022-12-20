@@ -9,14 +9,13 @@ import flexsolve as flx
 import numpy as np
 from biosteam.exceptions import InfeasibleRegion
 from biorefineries.HP.units import compute_HP_titer, compute_HP_mass
-from winsound import Beep
-# from biorefineries.HP import system_light_lle_vacuum_distillation
+# from winsound import Beep
 
 _red_highlight_white_text = '\033[1;47;41m'
 _yellow_text = '\033[1;33m'
 _reset_text = '\033[1;0m'
 
-skip_infeasible_titers = True
+skip_infeasible_titers = True # if running feedstock carbohydrate/sugar content analysis, set this to False
 last_infeasible_simulation = [] # yield, titer
 
 def get_IDs(units_list):
@@ -126,7 +125,7 @@ def evaluate_across_specs(spec, system,
                 # Beep(320, 250)
             except Exception as e2:
                 print(str(e2))
-                Beep(640, 500)
+                # Beep(640, 500)
                 spec.count_exceptions += 1
                 print(_red_highlight_white_text+f"Point failed; returning metric values as np.nan."+_reset_text)
                 spec.exceptions_dict[spec.count] = (e1, e2)
@@ -610,7 +609,8 @@ class TiterAndInhibitorsSpecification:
         self.pump._run()
         self.mixer._run()
         self.heat_exchanger._run()
-        self.seed_train_system._converge()
+        # self.seed_train_system._converge()
+        self.seed_train_system.simulate()
         self.reactor._run()
     
     def calculate_titer(self):
