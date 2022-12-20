@@ -14,7 +14,7 @@ import pandas as pd
 import numpy as np
 import biosteam as bst
 from typing import NamedTuple
-from biorefineries.lipidcane import get_composition, set_composition
+from biorefineries.cane.composition import get_composition, set_composition
 
 __all__ = (
     'images_folder',
