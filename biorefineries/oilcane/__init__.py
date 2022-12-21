@@ -142,7 +142,8 @@ biodiesel_L_per_kg = biodiesel_gal_per_kg * L_per_gal
 biodiesel_kg_per_L = 1. / biodiesel_L_per_kg
 ethanol_L_per_kg = ethanol_gal_per_kg * L_per_gal
 ethanol_kg_per_L = 1. / ethanol_L_per_kg
-dry_biomass_yield = None
+dry_biomass_yield = None # MT / hc
+baseline_dry_biomass_yield = 39 # MT / hc 
 
 cellulosic_configurations = frozenset([-2, 2, 4, 6, 8])
 biodiesel_configurations = frozenset([1, 2, 5, 6, 7, 8])
@@ -1050,6 +1051,14 @@ def load(name, cache=cache, reduce_chemicals=False, RIN=True,
         else:
             return 0.
 
+    @metric(units='%')
+    def IRR():
+        if dry_biomass_yield is None: return None
+        # Set prelimiary feedstock price assuming 10% is due to transportation
+        # and 90% is based on productivity (a function of height)
+        feedstock.price = (0.9 * dry_biomass_yield / baseline_dry_biomass_yield + 0.10) * 0.035
+        return 100. * tea.solve_IRR()
+
     @metric(units='USD/MT')
     def MFPP_derivative():
         if number < 0:
@@ -1060,7 +1069,7 @@ def load(name, cache=cache, reduce_chemicals=False, RIN=True,
             cane_mode.oil_content += 0.01
             sorghum_mode.oil_content += 0.01
         else:
-            composition_specification.load_oil_content(oil_extraction_specification.oil_content + 0.01)
+            composition_specification.load_oil_content(composition_specification.oil_content + 0.01)
         sys.simulate()
         # value = (kg_per_MT * tea.solve_price(feedstock) - MFPP.cache)
         # feedstock.price = tea.solve_price(feedstock)
