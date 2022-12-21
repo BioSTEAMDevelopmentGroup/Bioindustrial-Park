@@ -1056,7 +1056,7 @@ def load(name, cache=cache, reduce_chemicals=False, RIN=True,
         if dry_biomass_yield is None: return None
         # Set prelimiary feedstock price assuming 10% is due to transportation
         # and 90% is based on productivity (a function of height)
-        feedstock.price = (0.9 * dry_biomass_yield / baseline_dry_biomass_yield + 0.10) * 0.035
+        feedstock.price = (0.9 * baseline_dry_biomass_yield / dry_biomass_yield + 0.10) * 0.035
         return 100. * tea.solve_IRR()
 
     @metric(units='USD/MT')
