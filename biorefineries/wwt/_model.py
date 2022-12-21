@@ -655,6 +655,8 @@ def add_metrics(model, model_dct, f, u, s, get_obj):
     Caching = u.search('Caching')
 
     def get_MPSP(no_WWT=False, with_RIN=False, product_price=None):
+        # breakpoint()
+        
         suffix = '' if not no_WWT else '_no WWT'
         suffix += '' if not with_RIN else '_RIN'
         cache_dct = Caching.cache_dct
@@ -679,7 +681,7 @@ def add_metrics(model, model_dct, f, u, s, get_obj):
         cache_dct = Caching.cache_dct
 
         # Displacement
-        net = cache_dct[f'Net GWP{suffix}'] = sys.get_net_impact('GWP')
+        net = cache_dct[f'Net GWP{suffix}'] = sys.get_net_impact('GWP')       
         hours = sys.operating_hours
         GWP_disp = cache_dct[f'Product GWP disp{suffix}'] = net/hours/get_F_mass()*factor
 
@@ -784,6 +786,7 @@ def add_metrics(model, model_dct, f, u, s, get_obj):
             def get_MPSP_no_WWT():
                 cache_dct = Caching.cache_dct
                 default_price_dct = {p:p.price for p in products}
+                
                 MPSP_w_WWT = tea.solve_price(products) # MPSP with WWT system
                 for p in products: p.price = MPSP_w_WWT
 

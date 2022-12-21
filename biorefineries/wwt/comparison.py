@@ -69,7 +69,7 @@ def get_wwt_metrics(f, gal_or_kg='gal'):
             for p in exist_model.parameters:
                 if p.name == name: break
             p.baseline = 0
-    outs = []
+    outs = []    
     df_exist = exist_model.metrics_at_baseline()
     df_new = new_model.metrics_at_baseline()
     MPSP_key = ('Biorefinery', f'MPSP [$/{gal_or_kg}]')
