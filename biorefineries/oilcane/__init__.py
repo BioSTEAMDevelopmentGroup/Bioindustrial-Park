@@ -1069,7 +1069,7 @@ def load(name, cache=cache, reduce_chemicals=False, RIN=True,
             cane_mode.oil_content += 0.01
             sorghum_mode.oil_content += 0.01
         else:
-            composition_specification.load_oil_content(composition_specification.oil_content + 0.01)
+            composition_specification.load_oil_content(composition_specification.oil + 0.01)
         sys.simulate()
         # value = (kg_per_MT * tea.solve_price(feedstock) - MFPP.cache)
         # feedstock.price = tea.solve_price(feedstock)
