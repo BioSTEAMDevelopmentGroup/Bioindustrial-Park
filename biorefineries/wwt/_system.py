@@ -192,6 +192,14 @@ def create_comparison_systems(info, functions, sys_dct={}):
     RX02.ins[3].characterization_factors['GWP'] = GWP_CFs['CitricAcid']
     RX02.ins[4].characterization_factors['GWP'] = GWP_CFs['Bisulfite']
 
+    for name in (
+            'low_pressure_steam',
+            'medium_pressure_steam',
+            'high_pressure_steam',
+            ):
+        agent = bst.HeatUtility.get_agent(name)
+        agent.heat_transfer_price = agent.regeneration_price = 0.
+
     return exist_sys, new_sys
 
 
