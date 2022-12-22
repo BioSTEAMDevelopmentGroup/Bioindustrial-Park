@@ -306,6 +306,7 @@ def create_chemicals(set_thermo=True):
     chems.set_alias('NH3', 'Ammonia')
     chems.set_alias('NH4OH', 'AmmoniumHydroxide')
     chems.set_alias('AmmoniumSulfate', 'NH4SO4')
+    chems.set_alias('AmmoniumSulfate', '(NH4)2SO4')
     chems.set_alias('Na2SO4', 'SodiumSulfate')
     chems.set_alias('CalciumDihydroxide', 'Lime')
     chems.set_alias('CaSO4', 'Gypsum')
