@@ -17,7 +17,6 @@ from biosteam.process_tools import UnitGroup
 from ..cellulosic.systems.pretreatment import create_dilute_acid_pretreatment_system
 from . import (
     create_preprocessing_process,
-    # create_pretreatment_process,
     create_conversion_process,
     create_separation_process,
     create_wastewater_process,
@@ -91,7 +90,6 @@ def create_system(ID='lactic_sys', kind='SSCF', if_HXN=True, if_BDM=False,
         'separation': (s.water_R403,)
         }
     create_facilities(solids_to_boiler, gas_to_boiler=u.R501-0,
-                      # CHP_side_streams=(s.water_M201, s.water_M202, s.steam_M203),
                       treated_water=u.S505-0,
                       process_water_streams=process_water_streams,
                       if_HXN=if_HXN, if_BDM=if_BDM, flowsheet=flowsheet)
