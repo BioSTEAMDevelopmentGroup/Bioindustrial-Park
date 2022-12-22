@@ -61,16 +61,15 @@ Processes:
 import biosteam as bst
 from flexsolve import aitken_secant, IQ_interpolation
 from biosteam import Stream, System
-
 from . import (
     price, get_baseline_feedflow, set_yield,
     _units as units,
-    _facilities as facilities,
+    # _facilities as facilities,
     )
 
 __all__ = (
     'create_preprocessing_process',
-    'create_pretreatment_process',
+    # 'create_pretreatment_process',
     'create_conversion_process',
     'create_separation_process',
     'create_wastewater_process',
@@ -90,8 +89,8 @@ def create_preprocessing_process(flowsheet=None):
 
     ######################## Units ########################
     U101 = units.FeedstockPreprocessing('U101', ins=feedstock,
-                                        outs=('processed', 'diverted_to_CHP'),
-                                        diversion_to_CHP=0)
+                                        outs=('processed', 'diverted'),
+                                        divert_ratio=0)
 
     ######################## System ########################
     System('preprocessing_sys', path=(U101,))
@@ -103,73 +102,73 @@ def create_preprocessing_process(flowsheet=None):
 # Acid pretreatment
 # =============================================================================
 
-def create_pretreatment_process(feed, flowsheet=None):
-    flowsheet = flowsheet or bst.main_flowsheet
+# def create_pretreatment_process(feed, flowsheet=None):
+#     flowsheet = flowsheet or bst.main_flowsheet
 
-    ######################## Streams ########################
-    # For pretreatment, 93% purity
-    sulfuric_acid_T201 = Stream('sulfuric_acid_T201', units='kg/hr')
-    # To be mixed with sulfuric acid, flow updated in SulfuricAcidMixer
-    water_M201 = Stream('water_M201', T=114+273.15, units='kg/hr')
+#     ######################## Streams ########################
+#     # For pretreatment, 93% purity
+#     sulfuric_acid_T201 = Stream('sulfuric_acid_T201', units='kg/hr')
+#     # To be mixed with sulfuric acid, flow updated in SulfuricAcidMixer
+#     water_M201 = Stream('water_M201', T=114+273.15, units='kg/hr')
 
-    # To be used for feedstock conditioning
-    water_M202 = Stream('water_M202', T=95+273.15, units='kg/hr')
+#     # To be used for feedstock conditioning
+#     water_M202 = Stream('water_M202', T=95+273.15, units='kg/hr')
 
-    # To be added to the feedstock/sulfuric acid mixture, flow updated by the SteamMixer
-    steam_M203 = Stream('steam_M203', phase='g', T=268+273.15, P=13*101325, units='kg/hr')
+#     # To be added to the feedstock/sulfuric acid mixture, flow updated by the SteamMixer
+#     steam_M203 = Stream('steam_M203', phase='g', T=268+273.15, P=13*101325, units='kg/hr')
 
-    # For neutralization of pretreatment hydrolysate
-    ammonia_M205 = Stream('ammonia_M205', phase='l', units='kg/hr')
-    # To be used for ammonia addition, flow updated by AmmoniaMixer
-    water_M205 = Stream('water_M205', units='kg/hr')
+#     # For neutralization of pretreatment hydrolysate
+#     ammonia_M205 = Stream('ammonia_M205', phase='l', units='kg/hr')
+#     # To be used for ammonia addition, flow updated by AmmoniaMixer
+#     water_M205 = Stream('water_M205', units='kg/hr')
 
-    ######################## Units ########################
-    # Prepare sulfuric acid
-    # Total processed feedstock
+#     ######################## Units ########################
+#     # Prepare sulfuric acid
+#     # Total processed feedstock
 
-    feedstock = flowsheet.stream.feedstock
-    U101 = flowsheet.unit.U101
-    feedstock_dry_mass=(feedstock.F_mass-feedstock.imass['H2O'])*(1-U101.diversion_to_CHP)
-    T201 = units.SulfuricAcidAdditionTank('T201', ins=sulfuric_acid_T201,
-                                          feedstock_dry_mass=feedstock_dry_mass)
+#     feedstock = flowsheet.stream.feedstock
+#     U101 = flowsheet.unit.U101
+#     feedstock_dry_mass=(feedstock.F_mass-feedstock.imass['H2O'])*(1-U101.diversion_to_CHP)
+#     T201 = units.SulfuricAcidAdditionTank('T201', ins=sulfuric_acid_T201,
+#                                           feedstock_dry_mass=feedstock_dry_mass)
 
-    M201 = units.SulfuricAcidMixer('M201', ins=(T201-0, water_M201))
+#     M201 = units.SulfuricAcidMixer('M201', ins=(T201-0, water_M201))
 
-    # Mix sulfuric acid and feedstock, adjust water loading for pretreatment
-    M202 = units.PretreatmentMixer('M202', ins=(feed, M201-0, water_M202))
+#     # Mix sulfuric acid and feedstock, adjust water loading for pretreatment
+#     M202 = units.PretreatmentMixer('M202', ins=(feed, M201-0, water_M202))
 
-    # Mix feedstock/sulfuric acid mixture and steam,
-    # the last stream is just a placeholder for warm process water
-    M203 = bst.SteamMixer('M203', ins=(M202-0, steam_M203, ''), P=5.5*101325)
-    R201 = units.AcidPretreatment('R201', ins=M203-0, outs=('R201_g', 'R201_l'))
+#     # Mix feedstock/sulfuric acid mixture and steam,
+#     # the last stream is just a placeholder for warm process water
+#     M203 = bst.SteamMixer('M203', ins=(M202-0, steam_M203, ''), P=5.5*101325)
+#     R201 = units.AcidPretreatment('R201', ins=M203-0, outs=('R201_g', 'R201_l'))
 
-    # Pump bottom of the pretreatment products to the oligomer conversion tank
-    T202 = units.BlowdownTank('T202', ins=R201-1)
-    T203 = units.OligomerConversionTank('T203', ins=T202-0)
-    F201 = units.PretreatmentFlash('F201', ins=T203-0,
-                                   outs=('F201_waste_vapor', 'F201_to_fermentation'),
-                                   P=101325, Q=0)
+#     # Pump bottom of the pretreatment products to the oligomer conversion tank
+#     T202 = units.BlowdownTank('T202', ins=R201-1)
+#     T203 = units.OligomerConversionTank('T203', ins=T202-0)
+#     F201 = units.PretreatmentFlash('F201', ins=T203-0,
+#                                    outs=('F201_waste_vapor', 'F201_to_fermentation'),
+#                                    P=101325, Q=0)
 
-    M204 = bst.units.Mixer('M204', ins=(R201-0, F201-0))
-    H201 = units.WasteVaporCondenser('H201', ins=M204-0,
-                                     outs='condensed_pretreatment_waste_vapor',
-                                     V=0, rigorous=True)
+#     M204 = bst.units.Mixer('M204', ins=(R201-0, F201-0))
+#     H201 = units.WasteVaporCondenser('H201', ins=M204-0,
+#                                      outs='condensed_pretreatment_waste_vapor',
+#                                      V=0, rigorous=True)
 
-    # Neutralize pretreatment hydrolysate
-    M205 = units.AmmoniaMixer('M205', ins=(ammonia_M205, water_M205))
-    @M205.add_specification
-    def update_ammonia_and_mix():
-        hydrolysate = F201.outs[1]
-        # Load 10% extra
-        ammonia_M205.imol['NH4OH'] = (2*hydrolysate.imol['H2SO4']) * 1.1
-        M205._run()
+#     # Neutralize pretreatment hydrolysate
+#     M205 = units.AmmoniaMixer('M205', ins=(ammonia_M205, water_M205))
+#     @M205.add_specification
+#     def update_ammonia_and_mix():
+#         hydrolysate = F201.outs[1]
+#         # Load 10% extra
+#         ammonia_M205.imol['NH4OH'] = (2*hydrolysate.imol['H2SO4']) * 1.1
+#         M205._run()
 
-    T204 = units.AmmoniaAdditionTank('T204', ins=(F201-1, M205-0))
-    P201 = units.HydrolysatePump('P201', ins=T204-0)
+#     T204 = units.AmmoniaAdditionTank('T204', ins=(F201-1, M205-0))
+#     P201 = units.HydrolysatePump('P201', ins=T204-0)
 
-    ######################## System ########################
-    System('pretreatment_sys',
-           path=(T201, M201, M202, M203, R201, T202, T203, F201, M204, H201, M205, T204, P201))
+#     ######################## System ########################
+#     System('pretreatment_sys',
+#            path=(T201, M201, M202, M203, R201, T202, T203, F201, M204, H201, M205, T204, P201))
 
 
 # %%
@@ -729,15 +728,18 @@ def create_wastewater_process(ww_streams, AD_split, MB_split,
 # Facilities
 # =============================================================================
 
-def create_facilities(CHP_wastes, CHP_biogas='', CHP_side_streams=(),
-                      process_water_streams={}, recycled_water='',
-                      combustibles=None, if_HXN=True, if_BDM=False,
+def create_facilities(solids_to_boiler, gas_to_boiler='',
+                      treated_water='', process_water_streams={},
+                      # combustibles=None,
+                      if_HXN=True, if_BDM=False,
                       flowsheet=None):
     flowsheet = flowsheet or bst.main_flowsheet
     u = flowsheet.unit
     s = flowsheet.stream
-    chemicals = bst.settings.get_chemicals()
-    combustibles = combustibles or chemicals.combustibles
+    feedstock = s.feedstock
+    
+    # chemicals = bst.settings.get_chemicals()
+    # combustibles = combustibles or chemicals.combustibles
 
     ######################## Streams ########################
     # Final product
@@ -746,23 +748,26 @@ def create_facilities(CHP_wastes, CHP_biogas='', CHP_side_streams=(),
     # Process chemicals
     sulfuric_acid = Stream('sulfuric_acid', units='kg/hr', price=price['H2SO4'])
     ammonia = Stream('ammonia', units='kg/hr', price=price['NH4OH'])
+    
+    
     CSL = Stream('CSL', units='kg/hr', price=price['CSL'])
     lime = Stream('lime', units='kg/hr', price=price['Lime'])
     ethanol = Stream('ethanol', units='kg/hr', price=price['Ethanol'])
 
-    # Chemicals used/generated in CHP
-    lime_CHP = Stream('lime_CHP', units='kg/hr', price=price['Lime'])
-    ammonia_CHP = Stream('ammonia_CHP', units='kg/hr')
+    # Chemicals used/generated in the boiler
+    lime_boiler = Stream('lime_boiler', units='kg/hr', price=price['Lime'])
+    # ammonia_CHP = Stream('ammonia_CHP', units='kg/hr')
     boiler_chems = Stream('boiler_chems', units='kg/hr', price=price['Boiler chems'])
-    baghouse_bag = Stream('baghouse_bag', units='kg/hr', price=price['Baghouse bag'])
+    # baghouse_bag = Stream('baghouse_bag', units='kg/hr', price=price['Baghouse bag'])
+    
     # Supplementary natural gas for CHP if produced steam not enough for regenerating
     # all steam streams required by the system
     natural_gas = Stream('natural_gas', units='kg/hr', price=price['Natural gas'])
-    vent_CHP = Stream('vent_CHP', phase='g', units='kg/hr')
-    ash = Stream('ash', units='kg/hr', price=price['Ash disposal'])
+    # vent_CHP = Stream('vent_CHP', phase='g', units='kg/hr')
+    # ash = Stream('ash', units='kg/hr', price=price['Ash disposal'])
 
-    cooling_tower_chems = Stream('cooling_tower_chems', units='kg/hr',
-                                 price=price['Cooling tower chems'])
+    # cooling_tower_chems = Stream('cooling_tower_chems', units='kg/hr',
+    #                              price=price['Cooling tower chems'])
 
     system_makeup_water = Stream('system_makeup_water', price=price['Makeup water'])
 
@@ -783,13 +788,18 @@ def create_facilities(CHP_wastes, CHP_biogas='', CHP_side_streams=(),
     T601.line = 'Lactic acid storage'
     bst.units.Pump('T601_P', ins=T601-0, outs=lactic_acid)
 
-    T602 = units.SulfuricAcidStorage('T602', ins=sulfuric_acid)
-    bst.units.ReversedSplitter('T602_S', ins=T602-0,
-                               outs=(s.sulfuric_acid_T201, s.sulfuric_acid_R401))
+    # Pretreatment sulfuric acid/ammonia storage considered in the process
+    units.SulfuricAcidStorage('T602', ins=sulfuric_acid, outs=s.sulfuric_acid_R401)
+    units.AmmoniaStorage('T603', ins=ammonia, outs=s.ammonia_R502)
+    
+    
+    # T602 = units.SulfuricAcidStorage('T602', ins=sulfuric_acid)
+    # bst.units.ReversedSplitter('T602_S', ins=T602-0,
+    #                            outs=(s.sulfuric_acid_T201, s.sulfuric_acid_R401))
 
-    T603 = units.AmmoniaStorage('T603', ins=ammonia)
-    bst.units.ReversedSplitter('T603_S', ins=T603-0,
-                                outs=(s.ammonia_M205, s.ammonia_R502, ammonia_CHP))
+    # T603 = units.AmmoniaStorage('T603', ins=ammonia)
+    # bst.units.ReversedSplitter('T603_S', ins=T603-0,
+    #                             outs=(s.ammonia_M205, s.ammonia_R502))
 
     units.CSLstorage('T604', ins=CSL, outs=s.CSL_R301)
 
@@ -805,48 +815,103 @@ def create_facilities(CHP_wastes, CHP_biogas='', CHP_side_streams=(),
     T606.line = 'Ethanol storage'
     bst.units.Pump('T606_P', ins=T606-0, outs=s.ethanol_R402)
 
-    units.FirewaterStorage('T607', ins=firewater_in, outs='firewater_out')
+
+    FT = bst.units.FireWaterTank('FT', ins=firewater_in, outs='firewater_out')
+    FT.fire_water_over_feedstock = 0.08
+    @FT.add_specification(run=True)
+    def adjust_fire_water(): firewater_in.imass['Water'] = feedstock.F_mass * FT.fire_water_over_feedstock
+
+
+
 
     # Mix solid wastes to CHP
-    M601 = bst.units.Mixer('M601', ins=CHP_wastes, outs='wastes_to_CHP')
+    M601 = bst.units.Mixer('M601', ins=solids_to_boiler, outs='wastes_to_CHP')
 
-    # Blowdown is discharged
-    CHP = facilities.CHP('CHP', ins=(M601-0, CHP_biogas, lime_CHP, ammonia_CHP,
-                                     boiler_chems, baghouse_bag, natural_gas,
-                                     'boiler_makeup_water'),
-                         B_eff=0.8, TG_eff=0.85, combustibles=combustibles,
-                         side_streams_to_heat=CHP_side_streams,
-                         outs=(vent_CHP, ash, 'boiler_blowdown'))
+    # Mix additional streams needed for heating
+    additional_streams = (s.warm_process_water_1, s.warm_process_water_2, s.steam_M203)
+    side_steam = Stream('side_steam', units='kg/hr')
+    BT = bst.facilities.BoilerTurbogenerator(
+        'BT',
+        ins=(
+            M601-0, gas_to_boiler, 'boiler_makeup_water', natural_gas, lime_boiler, boiler_chems
+            ),
+        side_steam=side_steam,
+        natural_gas_price = price['Natural gas'],
+        ash_disposal_price = price['Ash disposal'],
+        )
+    BT.register_alias('CHP')
+    @BT.add_specification(run=True)
+    def adjust_side_steam(): side_steam.mix_from(additional_streams)
+    
+    # process_water_streams = (*process_water_streams, BT-1, CT-1)
+    
+    # # Blowdown is discharged    
+    # CHP = facilities.CHP('CHP', ins=(M601-0, CHP_biogas, lime_CHP, ammonia_CHP,
+    #                                  boiler_chems, baghouse_bag, natural_gas,
+    #                                  'boiler_makeup_water'),
+    #                      B_eff=0.8, TG_eff=0.85, combustibles=combustibles,
+    #                      side_streams_to_heat=CHP_side_streams,
+    #                      outs=(vent_CHP, ash, 'boiler_blowdown'))
 
-    # Blowdown is discharged
-    CT = facilities.CT('CT', ins=('return_cooling_water', cooling_tower_chems,
-                                  'CT_makeup_water'),
-                       outs=('process_cooling_water', 'cooling_tower_blowdown'))
+    CT = bst.facilities.CoolingTower('CT')
+    CT.ins[-1].price = price['Cooling tower chems']
+    
+
+    # # Blowdown is discharged
+    # CT = facilities.CT('CT', ins=('return_cooling_water', cooling_tower_chems,
+    #                               'CT_makeup_water'),
+    #                    outs=('process_cooling_water', 'cooling_tower_blowdown'))
+    
+    
 
     # All water used in the system, here only consider water consumption,
     # if heating needed, then heating duty required is considered in CHP
-    process_water_streams['facilities'] = (CHP.ins[-1], CT.ins[-1])
-    PWC = facilities.PWC('PWC', ins=(system_makeup_water, recycled_water),
-                         process_water_streams=sum(process_water_streams.values(), ()),
-                         recycled_blowdown_streams=(),
-                         outs=('process_water', 'discharged_water'))
+    process_water_streams['facilities'] = (BT.outs[1], CT.outs[1])
+    
+    bst.facilities.ProcessWaterCenter(
+        'PWC',
+        ins=(treated_water, system_makeup_water, 'direct_recycled_water'),
+        outs=('process_water', 'discharged_water'),
+        makeup_water_streams=(BT-1, CT-1),
+        process_water_streams=sum(process_water_streams.values(), ()),
+    )
+    
+    
+    # PWC = facilities.PWC('PWC', ins=(system_makeup_water, recycled_water),
+    #                      process_water_streams=sum(process_water_streams.values(), ()),
+    #                      recycled_blowdown_streams=(),
+    #                      outs=('process_water', 'discharged_water'))
 
-    facilities.ADP('ADP', ins=plant_air_in, outs='plant_air_out',
-                   ratio=units.get_flow_tpd(flowsheet=flowsheet)/2205)
-    facilities.CIP('CIP', ins=CIP_chems_in, outs='CIP_chems_out')
+
+    ADP = bst.facilities.AirDistributionPackage('ADP', ins=plant_air_in, outs='plant_air_out')
+    ADP.plant_air_over_feedstock = 0.8
+    @ADP.add_specification(run=True)
+    def adjust_plant_air(): plant_air_in.imass['N2'] = feedstock.F_mass * ADP.plant_air_over_feedstock
+
+
+    
+    
+    
+    CIP = bst.facilities.CIPpackage('CIP', ins=CIP_chems_in, outs='CIP_chems_out')
+    CIP.CIP_over_feedstock = 0.00121
+    @CIP.add_specification(run=True)
+    def adjust_CIP(): CIP_chems_in.imass['H2O'] = feedstock.F_mass * CIP.CIP_over_feedstock
+    
+    
 
     # Optional facilities
     if if_HXN: bst.units.HeatExchangerNetwork('HXN')
     if if_BDM:
-        BDM = bst.units.BlowdownMixer('BDM',ins=(CHP.outs[-1], CT.outs[-1]),
-                                      outs=u.M501.ins[-1])
-        PWC.recycled_blowdown_streams = BDM.outs
+        bst.units.BlowdownMixer('BDM',
+                                ins=(BT.outs[1], CT.outs[1]),
+                                outs=u.M501.ins[-1])
+        # PWC.recycled_blowdown_streams = BDM.outs
         
-    # Update ratios associated with the feedstock flowrate
-    @T601.add_specification
-    def update_facility_streams():
-        flowrate_ratio = units.get_flow_tpd(flowsheet=flowsheet) / 2205
-        ammonia_CHP.imass['NH4OH'] = flowrate_ratio * 1054 * 35.046/17.031 # NH3 to NH4OH
-        firewater_in.imass['H2O'] = flowrate_ratio * 8021
-        CIP_chems_in.imass['H2O'] = flowrate_ratio * 145
-        plant_air_in.F_mass = flowrate_ratio * 1372608
+    # # Update ratios associated with the feedstock flowrate
+    # @T601.add_specification
+    # def update_facility_streams():
+    #     flowrate_ratio = units.get_flow_tpd(flowsheet=flowsheet) / 2205
+    #     ammonia_CHP.imass['NH4OH'] = flowrate_ratio * 1054 * 35.046/17.031 # NH3 to NH4OH
+    #     firewater_in.imass['H2O'] = flowrate_ratio * 8021
+    #     CIP_chems_in.imass['H2O'] = flowrate_ratio * 145
+    #     plant_air_in.F_mass = flowrate_ratio * 1372608
