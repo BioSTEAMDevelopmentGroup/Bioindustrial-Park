@@ -63,7 +63,7 @@ def get_flow_tpd(flowsheet=None):
     flowsheet = flowsheet or main_flowsheet
     feedstock = flowsheet.stream.feedstock
     U101 = flowsheet.unit.U101
-    return (feedstock.F_mass-feedstock.imass['H2O'])*24/907.1847*(1-U101.diversion_to_CHP)
+    return (feedstock.F_mass-feedstock.imass['H2O'])*24/907.1847*(1-U101.divert_ratio)
 
 
 # %%
@@ -79,15 +79,15 @@ class FeedstockPreprocessing(Unit):
     # 2205 U.S. ton/day (2000 metric tonne/day) as in ref [1]
     _cached_flow_rate = 2205
 
-    def __init__(self, ID='', ins=None, outs=(), thermo=None, diversion_to_CHP=0):
+    def __init__(self, ID='', ins=None, outs=(), thermo=None, divert_ratio=0):
         Unit.__init__(self, ID, ins, outs, thermo)
         self._baseline_flow_rate = get_baseline_feedflow(self.chemicals).sum()
-        self.diversion_to_CHP = diversion_to_CHP
+        self.divert_ratio = divert_ratio
 
     def _run(self):
         total = self.ins[0]
         processed, burned = self.outs
-        burned.mass = self.diversion_to_CHP * total.mass
+        burned.mass = self.divert_ratio * total.mass
         processed.mass = total.mass - burned.mass
 
     def _design(self):

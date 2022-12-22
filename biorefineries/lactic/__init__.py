@@ -142,7 +142,7 @@ def simulate_operating_improvement(funcs=None, lactic_tea=None, flowsheet=None):
     s = flowsheet.stream
     u = flowsheet.unit
     flowsheet.system.lactic_sys.simulate()
-    u.U101.diversion_to_CHP = 0.25
+    u.U101.divert_ratio = 0.25
     MPSP = funcs['simulate_get_MPSP']()
     print('\n---------- Simulation Results ----------')
     print(f'MPSP is ${MPSP:.3f}/kg')
