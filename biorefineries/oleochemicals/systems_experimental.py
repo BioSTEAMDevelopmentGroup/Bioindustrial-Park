@@ -99,8 +99,7 @@ def azelaic_acid_system(ins, outs):
     vented_products,catalyst_for_reuse, aqueous_raffinate,nonanoic_acid_crude_product,AA_crude_product,epoxy_stearic_acid_bottoms, = outs
     # solvent_for_extraction, = ins
     # epoxy_stearic_acid_bottoms,recovered_raffinate_solvent, AA_high_purity_product,azelaic_acid_for_recycle, crude_nonanal, nonanoic_acid_product,recovered_NMS_solvent_stream,crude_nonoanoic_acid, = outs
-
-#TODO: ask Yoel how to deal with vented products? do we need to capture them?    
+   
     conversion_sys = oxidative_cleavage_system(ins= (fresh_OA, 
                                                      fresh_HP,
                                                      water_for_oxidative_cleavage,
@@ -110,7 +109,7 @@ def azelaic_acid_system(ins, outs):
                                                T_in = 70 + 273.15)    
     mixed_oxidation_products = conversion_sys.outs[1]
     
-#TODO: change name of organic separation system to just separation     
+    
     organic_phase_sys = phase_separation_and_catalyst_recovery_system(ins = (mixed_oxidation_products, 
                                                           fresh_EA), 
                                                   outs = ('organic_phase_for_PS',

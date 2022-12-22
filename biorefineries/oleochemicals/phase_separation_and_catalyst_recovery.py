@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 """
 Created on Thu Jun 23 15:24:11 2022
-
 @author: LavanyaKudli
 """
 from biosteam import main_flowsheet as f
@@ -82,9 +81,7 @@ def phase_separation_and_catalyst_recovery_system(ins,outs,T_in):
                                           ), 
                                     N_stages= 5,       
                                     )
-#Added a spec to make sure all the phosphotungstic acid remains in the aqueous phase
-
-   
+#Added a spec to make sure all the phosphotungstic acid remains in the aqueous phase   
     def cache_Ks(ms):
         feed, solvent = ms.ins
         WPOM_influent = ms.ins[0].imol['Phosphotungstic_acid']
