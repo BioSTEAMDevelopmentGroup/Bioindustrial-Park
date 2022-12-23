@@ -23,6 +23,8 @@ from . import (
     create_facilities,
     get_splits,
     price,
+    set_GWPCF,
+    set_FECCF,
     )
 
 __all__ = ('create_system',)
@@ -51,8 +53,13 @@ def create_system(ID='lactic_sys', kind='SSCF', if_HXN=True, if_BDM=False,
     # For pretreatment, 93% purity
     sulfuric_acid_T201 = bst.Stream('sulfuric_acid_T201', units='kg/hr',
                                     H2SO4=0.93, H2O=0.07, price=price['H2SO4'])
+    set_GWPCF(sulfuric_acid_T201, 'H2SO4')
+    set_FECCF(sulfuric_acid_T201, 'H2SO4')    
+    
     # For neutralization of pretreatment hydrolysate
     ammonia_M205 = bst.Stream('ammonia_M205', phase='l', units='kg/hr', NH4OH=1, price=price['NH4OH'])
+    set_GWPCF(ammonia_M205, 'NH4OH')
+    set_FECCF(ammonia_M205, 'NH4OH')
     
     pretreatment_sys = create_dilute_acid_pretreatment_system(
         ins=[u.U101-0, sulfuric_acid_T201, ammonia_M205],
@@ -63,7 +70,6 @@ def create_system(ID='lactic_sys', kind='SSCF', if_HXN=True, if_BDM=False,
     s.ammonia_process_water.register_alias('water_M205')
     pretreatment_sys.register_alias('pretreatment_sys')
     
-    # create_pretreatment_process(feed=u.U101-0, flowsheet=flowsheet)
     create_conversion_process(kind=kind, feed=u.P202-0, flowsheet=flowsheet,
                               cell_mass_split=cell_mass_split)
     create_separation_process(feed=u.R301-0, kind=kind,

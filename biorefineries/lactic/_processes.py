@@ -62,8 +62,12 @@ import biosteam as bst
 from flexsolve import aitken_secant, IQ_interpolation
 from biosteam import Stream, System
 from . import (
-    price, get_baseline_feedflow, set_yield,
     _units as units,
+    get_baseline_feedflow, 
+    price,
+    set_GWPCF,
+    set_FECCF,
+    set_yield,
     )
 
 __all__ = (
@@ -81,16 +85,14 @@ def create_preprocessing_process(flowsheet=None):
     flowsheet = flowsheet or bst.main_flowsheet
     chemicals = bst.settings.get_chemicals()
 
-    ##### Streams #####
+    # Feedstock impacts not considered due to large variations
     feedstock = Stream('feedstock', get_baseline_feedflow(chemicals),
                         units='kg/hr', price=price['Feedstock'])
 
-    ##### Units #####
     U101 = units.FeedstockPreprocessing('U101', ins=feedstock,
                                         outs=('processed', 'diverted'),
                                         divert_ratio=0)
 
-    ##### System #####
     System('preprocessing_sys', path=(U101,))
 
 
@@ -112,12 +114,14 @@ def create_SSCF_conversion_process(feed, flowsheet=None, **extras): # extras is 
     flowsheet = flowsheet or bst.main_flowsheet
 
     ##### Streams #####
-    # flow updated in EnzymeHydrolysateMixer
+    # Flow updated in EnzymeHydrolysateMixer
     enzyme_M301 = Stream('enzyme_M301', units='kg/hr', price=price['Enzyme'])
+    set_GWPCF(enzyme_M301, 'Enzyme')
+    set_FECCF(enzyme_M301, 'Enzyme')
     # Used to adjust enzymatic hydrolysis solid loading, flow updated in EnzymeHydrolysateMixer
     water_M301 = Stream('water_M301', units='kg/hr')
     # Corn steep liquor as nitrogen nutrient for microbes, flow updated in R301
-    CSL_R301 = Stream('CSL_R301', units='kg/hr')
+    CSL_R301 = Stream('CSL_R301', units='kg/hr')   
     # Lime for neutralization of produced acid
     lime_R301 = Stream('lime_R301', units='kg/hr')
     # Water used to dilute the saccharified stream to achieve a lower titer target
@@ -576,6 +580,9 @@ def create_wastewater_process(ww_streams, AD_split, MB_split,
     ##### Streams #####
     ammonia_R502 = Stream('ammonia_R502', units='kg/hr')
     caustic_R502 = Stream('caustic_R502', units='kg/hr', price=price['NaOH'])
+    set_GWPCF(caustic_R502, 'NaOH')
+    set_FECCF(caustic_R502, 'NaOH')
+    
     polymer_R502 = Stream('polymer_R502', units='kg/hr', price=price['WWT polymer'])
     air_R502 = Stream('air_R502', phase='g', units='kg/hr')
     vent_R502 = Stream('vent_R502', phase='g', units='kg/hr')
@@ -667,19 +674,34 @@ def create_facilities(solids_to_boiler, gas_to_boiler='',
 
     # Process chemicals
     sulfuric_acid = Stream('sulfuric_acid', units='kg/hr', price=price['H2SO4'])
+    set_GWPCF(sulfuric_acid, 'H2SO4')
+    set_FECCF(sulfuric_acid, 'H2SO4')
+    
     ammonia = Stream('ammonia', units='kg/hr', price=price['NH4OH'])
+    set_GWPCF(ammonia, 'NH4OH')
+    set_FECCF(ammonia, 'NH4OH')
     
     CSL = Stream('CSL', units='kg/hr', price=price['CSL'])
+    set_GWPCF(CSL, 'CSL')
+    set_FECCF(CSL, 'CSL')        
+        
     lime = Stream('lime', units='kg/hr', price=price['Lime'])
+    set_GWPCF(lime, 'Lime')
+    set_FECCF(lime, 'Lime')
+    
     ethanol = Stream('ethanol', units='kg/hr', price=price['Ethanol'])
+    set_GWPCF(ethanol, 'Ethanol')
+    set_FECCF(ethanol, 'Ethanol')
 
     # Chemicals used/generated in the boiler
-    lime_boiler = Stream('lime_boiler', units='kg/hr', price=price['Lime'])
+    lime_boiler = Stream('lime_boiler') # price and CFs set in the speciation
     boiler_chems = Stream('boiler_chems', units='kg/hr', price=price['Boiler chems'])
     
     # Supplementary natural gas for CHP if produced steam not enough for regenerating
     # all steam streams required by the system
     natural_gas = Stream('natural_gas', units='kg/hr', price=price['Natural gas'])
+    set_GWPCF(natural_gas, 'CH4')
+    set_FECCF(natural_gas, 'CH4')
 
     system_makeup_water = Stream('system_makeup_water', price=price['Makeup water'])
 
@@ -740,7 +762,15 @@ def create_facilities(solids_to_boiler, gas_to_boiler='',
         )
     BT.register_alias('CHP')
     @BT.add_specification(run=True)
-    def adjust_side_steam(): side_steam.mix_from(additional_streams)
+    def adjust_side_stream(): side_steam.mix_from(additional_streams)
+    
+    @BT.add_specification()
+    def adjust_price_CF():
+        if lime_boiler.F_mass == 0: dilution = 1.
+        else: dilution = lime_boiler.imass['CalciumDihydroxide']/lime_boiler.F_mass
+        lime_boiler.price = price['Lime'] * dilution
+        set_GWPCF(lime_boiler, 'Lime', dilution=dilution)
+        set_FECCF(lime_boiler, 'Lime', dilution=dilution)
     
     CT = bst.facilities.CoolingTower('CT')
     CT.ins[-1].price = price['Cooling tower chems']

@@ -167,18 +167,28 @@ def create_funcs(lactic_tea=None, flowsheet=None):
 
     funcs = {'simulate_get_MPSP': simulate_get_MPSP}
 
-    ######################## LCA ########################
-    CFs = get_CFs(flowsheet=flowsheet)
+    ##### LCA #####
+    get_lactic_flow = lambda: lactic_sys.get_mass_flow(s.lactic_acid)
     # 100-year global warming potential (GWP) from material flows
-    LCA_streams = set([i for i in lactic_sys.feeds if getattr(i, 'price', None)])
-    LCA_stream = s.search('LCA_stream') or bst.Stream('LCA_stream', units='kg/hr')
+    funcs['get_material_GWP'] = get_material_GWP = \
+        lambda: lactic_sys.get_total_feeds_impact('GWP')/get_lactic_flow()
+    
+    
+    
+    
+    # CFs = get_CFs(flowsheet=flowsheet)
+    # # 100-year global warming potential (GWP) from material flows
+    # LCA_streams = set([i for i in lactic_sys.feeds if getattr(i, 'price', None)])
+    # LCA_stream = s.search('LCA_stream') or bst.Stream('LCA_stream', units='kg/hr')
 
-    def get_material_GWP():
-        LCA_stream.mass = sum(i.mass for i in LCA_streams)
-        chemical_GWP = LCA_stream.mass*CFs['GWP_CF_stream'].mass
-        # feedstock_GWP = s.feedstock.F_mass*CFs['GWP_CFs']['Corn stover']
-        return chemical_GWP.sum()/s.lactic_acid.F_mass
-    funcs['get_material_GWP'] = get_material_GWP
+    # def get_material_GWP():
+    #     material_GWP = lactic_sys.get_total_feeds_impact('GWP')
+        
+    #     LCA_stream.mass = sum(i.mass for i in LCA_streams)
+    #     chemical_GWP = LCA_stream.mass*CFs['GWP_CF_stream'].mass
+    #     # feedstock_GWP = s.feedstock.F_mass*CFs['GWP_CFs']['Corn stover']
+    #     return chemical_GWP.sum()/s.lactic_acid.F_mass
+    # funcs['get_material_GWP'] = get_material_GWP
 
     # GWP from onsite emission (e.g., combustion) of non-biogenic carbons
     get_onsite_GWP = lambda: (s.natural_gas.get_atomic_flow('C')+s.ethanol.get_atomic_flow('C')) \
@@ -186,32 +196,34 @@ def create_funcs(lactic_tea=None, flowsheet=None):
     funcs['get_onsite_GWP'] = get_onsite_GWP
 
     # GWP from electricity
-    get_electricity_use = lambda: sum(i.power_utility.rate for i in lactic_sys.units)
+    get_electricity_use = lambda: sum(i.power_utility.rate for i in lactic_sys.units) # kW
     funcs['get_electricity_use'] = get_electricity_use
-    get_electricity_GWP = lambda: get_electricity_use()*CFs['GWP_CFs']['Electricity'] \
-        / s.lactic_acid.F_mass
-    funcs['get_electricity_GWP'] = get_electricity_GWP
+    funcs['get_electricity_GWP'] = get_electricity_GWP = \
+        lambda: lactic_sys.get_net_electricity_impact('GWP')/get_lactic_flow()
+    
+    # get_electricity_GWP = lambda: get_electricity_use()*CFs['GWP_CFs']['Electricity'] \
+    #     / s.lactic_acid.F_mass
+    # funcs['get_electricity_GWP'] = get_electricity_GWP
 
-    # CO2 fixed in lactic acid product
-    get_fixed_GWP = lambda: \
-        s.lactic_acid.get_atomic_flow('C')*44.0095/s.lactic_acid.F_mass
-    funcs['get_fixed_GWP'] = get_fixed_GWP
-
-    get_GWP = lambda: get_material_GWP()+get_onsite_GWP()+get_electricity_GWP()
-    funcs['get_GWP'] = get_GWP
+    funcs['get_GWP'] = lambda: get_material_GWP()+get_onsite_GWP()+get_electricity_GWP()
 
     # Fossil energy consumption (FEC) from materials
-    def get_material_FEC():
-        LCA_stream.mass = sum(i.mass for i in LCA_streams)
-        chemical_FEC = LCA_stream.mass*CFs['FEC_CF_stream'].mass
-        # feedstock_FEC = feedstock.F_mass*CFs['FEC_CFs']['Corn stover']
-        return chemical_FEC.sum()/s.lactic_acid.F_mass
-    funcs['get_material_FEC'] = get_material_FEC
+    funcs['get_material_FEC'] = get_material_FEC = \
+        lambda: lactic_sys.get_total_feeds_impact('FEC')/get_lactic_flow()
+    
+    # def get_material_FEC():
+    #     LCA_stream.mass = sum(i.mass for i in LCA_streams)
+    #     chemical_FEC = LCA_stream.mass*CFs['FEC_CF_stream'].mass
+    #     # feedstock_FEC = feedstock.F_mass*CFs['FEC_CFs']['Corn stover']
+    #     return chemical_FEC.sum()/s.lactic_acid.F_mass
+    # funcs['get_material_FEC'] = get_material_FEC
 
     # FEC from electricity
-    get_electricity_FEC = lambda: \
-        get_electricity_use()*CFs['FEC_CFs']['Electricity']/s.lactic_acid.F_mass
-    funcs['get_electricity_FEC'] = get_electricity_FEC
+    funcs['get_electricity_FEC'] = get_electricity_FEC = \
+        lambda: lactic_sys.get_net_electricity_impact('FEC')/get_lactic_flow()
+    # get_electricity_FEC = lambda: \
+    #     get_electricity_use()*CFs['FEC_CFs']['Electricity']/s.lactic_acid.F_mass
+    # funcs['get_electricity_FEC'] = get_electricity_FEC
 
     # Total FEC
     get_FEC = lambda: get_material_FEC()+get_electricity_FEC()

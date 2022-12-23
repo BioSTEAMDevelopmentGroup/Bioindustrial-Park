@@ -95,7 +95,7 @@ def create_model(kind='SSCF'):
                Metric('Annual electricity credit', get_electricity_credit, '10^6 $/yr')
                ]
 
-    ######## Capital cost breakdown ########
+    ##### Capital cost breakdown #####
     def get_installed_cost(group):
         return lambda: group.get_installed_cost()
     for group in groups:
@@ -269,7 +269,7 @@ def create_model(kind='SSCF'):
 
     model_dct['index_IRR'] = len(metrics)
 
-    ######## Global warming potential ########
+    ##### Global warming potential #####
     get_GWP = funcs['get_GWP']
     get_FEC = funcs['get_FEC']
     metrics.extend((
@@ -311,7 +311,7 @@ def create_model(kind='SSCF'):
         Metric('GWP check', check_GWP, 'kg CO2-eq/kg', 'GWP')
         ))
 
-    ######## Fossil energy consumption ########
+    ##### Fossil energy consumption #####
     get_electricity_FEC = funcs['get_electricity_FEC']
     get_CH4_FEC = lambda: CFs['FEC_CFs']['CH4']*natural_gas.F_mass/lactic_acid.F_mass
     get_lime_FEC = lambda: \
@@ -355,7 +355,7 @@ def create_model(kind='SSCF'):
         # This does nothing
         feedstock.T = feedstock.T
 
-    ######## TEA parameters ########
+    ##### TEA parameters #####
     # U101 = SSCF.U101
     # D = baseline_uniform(2205, 0.1)
     # @param(name='Feedstock flow rate', element=feedstock, kind='coupled', units='dry-ton/day',
@@ -424,7 +424,7 @@ def create_model(kind='SSCF'):
     def set_electricity_price(price):
         bst.PowerUtility.price = price
 
-    ######## Pretreatment parameters ########
+    ##### Pretreatment parameters #####
     M202 = u.M202
     D = shape.Triangle(0.25, 0.3, 0.4)
     @param(name='Pretreatment solids loading', element=M202, kind='coupled', units='%',
@@ -453,7 +453,7 @@ def create_model(kind='SSCF'):
     def set_R201_xylan_conversion(X):
         R201.pretreatment_rxns[4].X = X
 
-    ######## Conversion parameters ########
+    ##### Conversion parameters #####
     M301 = u.M301
     D = shape.Triangle(0.175, 0.2, 0.25)
     @param(name='Enzymatic hydrolysis solids loading', element=M301, kind='coupled', units='%',
@@ -524,7 +524,7 @@ def create_model(kind='SSCF'):
     def set_inoculum_ratio(ratio):
         R301.inoculum_ratio = ratio
 
-    ######## Separation parameters ########
+    ##### Separation parameters #####
     S402 = u.S402
     D = shape.Triangle(0.95, 0.995, 1)
     @param(name='Gypsum split', element=S402, kind='coupled', units='',
@@ -554,7 +554,7 @@ def create_model(kind='SSCF'):
     def set_R403_conversion_factor(X):
         R403.hydrolysis_rxns.X[:] = X
 
-    ######## Separation parameters ########
+    ##### Separation parameters #####
     D = baseline_uniform(0.8, 0.1)
     @param(name='boiler efficiency', element=CHP, kind='coupled', units='%',
            baseline=0.8, distribution=D)

@@ -31,16 +31,11 @@ References
 
 '''
 
-
-# %%
-
-# =============================================================================
-# Setup
-# =============================================================================
-
 import biosteam as bst
 
-__all__ = ('price', 'get_CFs', 'load_process_settings')
+__all__ = ('load_process_settings', 'price', 'set_GWPCF', 'set_FECCF', 
+           # 'set_LCA_CFs',
+           'get_CFs')
 
 
 # %%
@@ -71,7 +66,9 @@ def load_process_settings(CE=541.7): # year 2016
     for i in (lps, mps, hps, cooling):
         i.heat_transfer_price = i.regeneration_price = 0
 
-    bst.PowerUtility.price = price['Power']
+    bst.PowerUtility.price = price['Electricity']
+    set_GWPCF(bst.PowerUtility, 'Electricity')
+    set_FECCF(bst.PowerUtility, 'Electricity')
 
 
 # %%
@@ -178,10 +175,9 @@ price = {
     'Ethanol': ethanol_price,
     'Baghouse bag': baghouse_bag_price,
     'Natural gas': natural_gas_price,
-    'Power': 0.070, # $/kWh, from EIA AEO, 2010-2019 average (0.067-0.074 range)
+    'Electricity': 0.070, # $/kWh, from EIA AEO, 2010-2019 average (0.067-0.074 range)
     'Lactic acid': 1.9, # the average of $1.7-2.1/kg
     }
-price['Electricity'] = price['Power']
 
 
 # %%
@@ -190,6 +186,94 @@ price['Electricity'] = price['Power']
 # Characterization factors (CFs) for life cycle analysis (LCA), all from ref [3]
 # if not noted, note that it is unclear if in-plant receiving and preprocessing
 # (~50% of the total impact per ref [4]) of feedstock is included in ref [3]
+# =============================================================================
+
+##### 100-year global warming potential (GWP) in kg CO2-eq/kg unless noted otherwise #####
+GWP_CFs = {
+    'CH4': 0.40, # NA NG from shale and conventional recovery
+    'CSL': 1.55,
+    'Electricity': (0.48, 0.48), # assume production==consumption, both in kg CO2-eq/kWh
+    'Enzyme': 2.24, # won't make a big diff (<4%) if it's 12.24 (~ ecoinvent value)
+    'Ethanol': 1.44,
+    'H2SO4': 44.47/1e3,   
+    'Lime': 1.29 * 56.0774/74.093, # CaO to Ca(OH)2
+    'NaOH': 2.11,
+    'NH4OH': 2.64 * 0.4860, # chemicals.NH3.MW/chemicals.NH4OH.MW,    
+    }
+
+# Not used, just as a reference
+ref_GWP_CFs = {}
+ref_GWP_CFs['CaCO3'] = 10.30/1e3
+ref_GWP_CFs['Gypsum'] = -4.20/1e3
+# Lactic acid from corn stover
+ref_GWP_CFs['Lactic acid_GREET'] = 1.80
+# From ref [5], lactic acid production, RoW, TRACI global warming,
+# substitution, consequential, long-term
+ref_GWP_CFs['Lactic acid_fossil'] = 5.2796
+
+
+##### Fossil energy consumption (FEC), in MJ/kg of material unless noted otherwise #####
+FEC_CFs = {
+    'CH4': 50, # NA NG from shale and conventional recovery
+    'CSL': 12,
+    'Electricity': (5.926, 5.926), # assume production==consumption, both in MJ/kWh
+    'Ethanol': 16,
+    'Enzyme': 26,
+    'H2SO4': 568.98/1e3,
+    'Lime': 4.896 * 56.0774/74.093, # CaO to Ca(OH)2
+    'NaOH': 29,
+    'NH4OH': 42 * 0.4860, # chemicals.NH3.MW/chemicals.NH4OH.MW,
+    }
+
+# Not used, just as a reference
+ref_FEC_CFs = {}
+ref_FEC_CFs['CaCO3'] = 133.19/1e3
+ref_FEC_CFs['Gypsum'] = -44.19/1e3
+# From corn stover
+FEC_CFs['Lactic acid'] = 29
+# From ref [5], lactic acid production, RoW, cumulative energy demand, fossil,
+# substitution, consequential, long-term
+FEC_CFs['Lactic acid_fossil'] = 91.265
+
+
+def set_GWPCF(obj, name='', dilution=None):
+    if not dilution: obj.characterization_factors['GWP'] = GWP_CFs[name]
+    else: obj.characterization_factors['GWP'] = GWP_CFs[name] * dilution
+
+def set_FECCF(obj, name='', dilution=None):
+    if not dilution: obj.characterization_factors['FEC'] = FEC_CFs[name]
+    else: obj.characterization_factors['FEC'] = FEC_CFs[name] * dilution
+    
+
+# def set_LCA_CFs(flowsheet):
+#     s = flowsheet.stream
+#     set_GWPCF(s.natural_gas, 'CH4')
+#     set_FECCF(s.natural_gas, 'CH4')
+#     set_GWPCF(s.CSL, 'CSL')
+#     set_FECCF(s.CSL, 'CSL')
+#     set_GWPCF(bst.PowerUtility, 'Electricity')
+#     set_FECCF(bst.PowerUtility, 'Electricity')
+#     set_GWPCF(s.enzyme_M301, 'Enzyme')
+#     set_FECCF(s.enzyme_M301, 'Enzyme')
+#     set_GWPCF(s.ethanol, 'Ethanol')
+#     set_FECCF(s.ethanol, 'Ethanol')
+#     for sulfuric_acid in (s.sulfuric_acid_T201, s.sulfuric_acid):
+#         set_GWPCF(sulfuric_acid, 'H2SO4')
+#         set_FECCF(sulfuric_acid, 'H2SO4')
+#     for lime in (s.lime, s.lime_boiler):
+#         set_GWPCF(lime, 'Lime', chemical='CalciumDihydroxide')
+#         set_FECCF(lime, 'Lime', chemical='CalciumDihydroxide')
+#     set_GWPCF(s.caustic_R502, 'NaOH')
+#     set_FECCF(s.caustic_R502, 'NaOH')
+#     for ammonia in (s.ammonia_M205, s.ammonia):
+#         set_GWPCF(ammonia, 'NH4OH')
+#         set_FECCF(ammonia, 'NH4OH')
+
+
+# %%
+
+# =============================================================================
+# Outdated
 # =============================================================================
 
 def get_CFs(flowsheet=None):
