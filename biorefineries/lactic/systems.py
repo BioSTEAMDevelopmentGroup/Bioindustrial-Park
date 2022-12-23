@@ -16,6 +16,7 @@ import biosteam as bst
 from biosteam.process_tools import UnitGroup
 from ..cellulosic.systems.pretreatment import create_dilute_acid_pretreatment_system
 from . import (
+    create_chemicals,
     create_preprocessing_process,
     create_conversion_process,
     create_separation_process,
@@ -36,6 +37,8 @@ def create_system(ID='lactic_sys', kind='SSCF', if_HXN=True, if_BDM=False,
                   flowsheet=None, return_groups=False,
                   cell_mass_split=None, gypsum_split=None,
                   AD_split=None, MB_split=None):
+    try: bst.settings.get_chemicals()
+    except: create_chemicals()
     kind = kind.upper()
     flowsheet = flowsheet or bst.main_flowsheet
     s = flowsheet.stream

@@ -40,7 +40,6 @@ from ._process_settings import *
 from ._processes import *
 from ._tea import *
 from .systems import *
-from .models import *
 
 from . import (
     _chemicals,
@@ -50,7 +49,6 @@ from . import (
     _processes,
     _tea,
     systems,
-    models,
     )
 
 _chemicals_loaded = False
@@ -78,8 +76,9 @@ def _load_system(kind='SSCF', **sys_kwdct):
     bst.settings.set_thermo(chemicals)
     load_process_settings()
     lactic_sys, groups = create_system(kind=kind, return_groups=True, flowsheet=flowsheet, **sys_kwdct)
-    global Area100, Area200, Area300, Area400, Area500, Area600
-    Area100, Area200, Area300, Area400, Area500, HXN, CHP, CT, Area600 = groups
+    global Area100, Area200, Area300, Area400, Area500, Area600, CHP
+    Area100, Area200, Area300, Area400, Area500, HXN, BT, CT, Area600 = groups
+    CHP = BT
     lactic_tea = create_tea(flowsheet=flowsheet)
     funcs = create_funcs(lactic_tea=lactic_tea, flowsheet=flowsheet)
     global _system_loaded
@@ -168,7 +167,7 @@ def create_funcs(lactic_tea=None, flowsheet=None):
     funcs = {'simulate_get_MPSP': simulate_get_MPSP}
 
     ##### LCA #####
-    get_lactic_flow = lambda: lactic_sys.get_mass_flow(s.lactic_acid)
+    funcs['get_lactic_flow'] = get_lactic_flow = lambda: lactic_sys.get_mass_flow(s.lactic_acid)
     # 100-year global warming potential (GWP) from material flows
     funcs['get_material_GWP'] = get_material_GWP = \
         lambda: lactic_sys.get_total_feeds_impact('GWP')/get_lactic_flow()
@@ -214,6 +213,8 @@ def create_funcs(lactic_tea=None, flowsheet=None):
 #         if name in dct: return dct[name]
 #     raise AttributeError(f'module "{__name__}" has no attribute "{name}."')
 
+from .models import *
+from . import models
 
 __all__ = (
     'auom', 'CEPCI',

@@ -16,10 +16,10 @@
 # Setup
 # =============================================================================
 
-import numpy as np, biosteam as bst
+import biosteam as bst
 from biosteam.evaluation import Model, Metric
 from chaospy import distributions as shape
-from . import get_CFs, create_system, set_yield, feedstock_factor
+from . import create_system, create_funcs, set_yield, feedstock_factor
 
 __all__ = ('create_model',)
 
@@ -30,13 +30,14 @@ __all__ = ('create_model',)
 # Models for uncertainty and sensitivity analyses
 # =============================================================================
 
-def create_model(kind='SSCF'):
-    flowsheet, groups, teas, funcs = create_system(kind, return_all=True)
-    CFs = get_CFs()
-    bst.main_flowsheet.set_flowsheet(flowsheet)
+def create_model(flowsheet=None, kind='SSCF'):
+    if not flowsheet:
+        lactic_sys = create_system(kind=kind)
+        flowsheet = lactic_sys.flowsheet
+    else: lactic_sys = flowsheet.system.lactic_sys
+    lactic_sys.simulate() # need this to initialize some settings
     s = flowsheet.stream
     u = flowsheet.unit
-    sys = flowsheet.system
 
     # =============================================================================
     # Overall biorefinery metrics
@@ -44,7 +45,8 @@ def create_model(kind='SSCF'):
 
     # Minimum product selling price of lactic_acid stream
     lactic_acid = s.lactic_acid
-    lactic_tea = teas['lactic_tea']
+    funcs = create_funcs(lactic_tea=lactic_sys.TEA, flowsheet=flowsheet)
+    lactic_tea = lactic_sys.TEA
     def get_MPSP():
         lactic_acid.price = 0
         for i in range(3):
@@ -53,9 +55,8 @@ def create_model(kind='SSCF'):
 
     feedstock = s.feedstock
     # Yield in 10^6 kg/yr
-    # lactic_no_CHP_tea = teas['lactic_no_CHP_tea']
     get_annual_factor = lambda: lactic_tea.operating_days*24
-    get_total_yield = lambda: lactic_acid.F_mass*get_annual_factor()/1e6
+    get_total_yield = lambda: funcs['get_lactic_flow']()/1e6
     # Yield in % of dry feedstock
     get_mass_yield = lambda: lactic_acid.F_mass/(feedstock.F_mass-feedstock.imass['Water'])
     R301 = u.R301
@@ -70,17 +71,11 @@ def create_model(kind='SSCF'):
     # Including negative product sales (ash/gypsum disposal) but excluding electricity credit
     gypsum = s.gypsum
     get_gypsum_sale = lambda: gypsum.F_mass*gypsum.price*get_annual_factor()/1e6
-    ash = s.ash
+    ash = s.ash_disposal
     get_ash_sale = lambda: ash.F_mass*ash.price*get_annual_factor()/1e6
     get_operating_cost = lambda: lactic_tea.AOC/1e6-get_gypsum_sale()-get_ash_sale()
     # Including negative product sales (ash/gypsum disposal) but excluding electricity credit
     get_material_cost = lambda: lactic_tea.material_cost/1e6-get_gypsum_sale()-get_ash_sale()
-    # System power usage, individual unit power usage should be positive
-    CHP = u.CHP
-    excess_power = lambda: CHP.electricity_generated
-    electricity_price = bst.PowerUtility.price
-    # Electricity credit is positive if getting revenue from excess electricity
-    get_electricity_credit = lambda: (excess_power()*electricity_price*get_annual_factor())/1e6
 
     metrics = [Metric('MPSP', get_MPSP, '$/kg'),
                Metric('Total product yield', get_total_yield, '10^6 kg/yr'),
@@ -92,50 +87,23 @@ def create_model(kind='SSCF'):
                Metric('Annual operating cost', get_operating_cost, '10^6 $/yr'),
                Metric('Annual material cost', get_material_cost, '10^6 $/yr'),
                Metric('Annual product sale', get_lactic_sale, '10^6 $/yr'),
-               Metric('Annual electricity credit', get_electricity_credit, '10^6 $/yr')
                ]
 
-    ##### Capital cost breakdown #####
-    def get_installed_cost(group):
-        return lambda: group.get_installed_cost()
-    for group in groups:
-        if group.name == 'preprocessing_group': continue
-        metrics.append(
-            Metric(group.name, get_installed_cost(group), '10^6 $', 'Installed cost'))
-
-    # All checks should be ~0
-    check_installed_cost = \
-        lambda: sum(get_installed_cost(group)()
-                    for group in groups) - lactic_tea.installed_equipment_cost/1e6
-    metrics.append(Metric('Check', check_installed_cost, '10^6 $', 'Installed cost'))
-
     ##### Material cost and product sale breakdown #####
-
-    TEA_feeds = teas['TEA_feeds']
-    TEA_products = teas['TEA_products']
+    TEA_feeds = [i for i in lactic_sys.feeds if i.price]
+    TEA_products = [i for i in lactic_sys.products if i.price]
 
     def get_material_cost(feed):
         return lambda: feed.price*feed.F_mass*get_annual_factor()/1e6
     for feed in TEA_feeds:
         metrics.append(Metric(feed.ID, get_material_cost(feed), '10^6 $/yr', 'Material cost'))
 
-    # Sulfuric acid used in pretreatment and separation processes
-    T602_S = u.T602_S
-    get_pretreatment_sulfuric_acid_ratio = lambda: T602_S.outs[0].F_mass/T602_S.F_mass_out
-    # Ammonia used in pretreatment and CHP process
-    T603_S = u.T603_S
-    get_pretreatment_ammonia_ratio = lambda: T603_S.outs[0].F_mass/T602_S.F_mass_out
-
     check_material_cost = lambda: sum(get_material_cost(feed)()
                                       for feed in TEA_feeds) - lactic_tea.material_cost/1e6
 
-    metrics.extend((
-        Metric('Pretreatment sulfuric acid ratio', get_pretreatment_sulfuric_acid_ratio,
-               '%', 'Material cost'),
-        Metric('Pretreatment ammonia ratio', get_pretreatment_ammonia_ratio,
-               '%', 'Material cost'),
+    metrics.append(
         Metric('Check', check_material_cost, '10^6 $/yr', 'Material cost')
-        ))
+        )
 
     def get_product_sale(stream):
         return lambda: stream.price*stream.F_mass*get_annual_factor()/1e6
@@ -146,128 +114,34 @@ def create_model(kind='SSCF'):
             - lactic_tea.sales/1e6
     metrics.append(Metric('Check', check_product_sale, '10^6 $/yr', 'Product sale'))
 
-
-    ##### Heating demand breakdown (positive if needs heating) #####
-    get_system_heating_demand = lambda: CHP.system_heating_demand/1e6
-    get_pretreatment_steam_heating_demand = lambda: CHP.side_streams_lps.duty/1e6
-    HXN = u.HXN
-    get_HXN_heating_demand = lambda: sum(i.duty for i in HXN.heat_utilities
-                                        if i.flow*i.duty>0)/1e6
-    get_CHP_heating_demand = lambda: sum(i.duty for i in CHP.heat_utilities
-                                        if i.flow*i.duty>0)/1e6
-
-    def get_heating_demand(group):
-        return lambda: group.get_heating_duty()
-
-    for group in groups:
-        if group.name in ('preprocessing_group', 'HXN_group', 'CHP_group'): continue
-        # The only heating demand for the pretreatment system is the heat needed to
-        # generate the side steam
-        if group.name == 'pretreatment_group':
-            metrics.append(Metric(group.name, get_pretreatment_steam_heating_demand, '10^6 kJ/hr',
-                                    'Heating demand'))
-        else: metrics.append(Metric(group.name, get_heating_demand(group), '10^6 kJ/hr',
-                                      'Heating demand'))
-
-    check_heating_demand = \
-        lambda: sum((get_heating_demand(group)() for group in groups),
-                    get_pretreatment_steam_heating_demand()) + \
-                    get_HXN_heating_demand() + get_CHP_heating_demand()
-
+    ##### Utilities #####
+    get_system_heating_demand = lambda: lactic_sys.get_heating_duty()/1e9
+    get_system_cooling_water_duty = lambda: lactic_sys.get_cooling_duty()/1e9
     metrics.extend((
-        Metric('HXN', get_HXN_heating_demand, '10^6 kJ/hr', 'Heating demand'),
-        Metric('CHP', get_CHP_heating_demand, '10^6 kJ/hr', 'Heating demand'),
-        Metric('Sum', get_system_heating_demand, '10^6 kJ/hr', 'Heating demand'),
-        Metric('Check', check_heating_demand, '10^6 kJ/hr', 'Heating demand')
-        ))
-
-    ##### Cooling demand breakdown (negative if needs cooling) #####
-    CT = u.CT
-    get_system_cooling_water_duty = lambda: CT.system_cooling_water_duty/1e6
-    get_HXN_cooling_demand = lambda: sum(i.duty for i in HXN.heat_utilities
-                                        if i.flow*i.duty<0)/1e6
-    get_CT_cooling_water_duty = lambda: sum(i.duty for i in CT.heat_utilities
-                                        if i.flow*i.duty<0)/1e6
-
-    def get_cooling_demand(group):
-        return lambda: -group.get_cooling_duty()
-
-    for group in groups:
-        if group.name in ('preprocessing_group', 'HXN_group', 'CT_group'): continue
-        else: metrics.append(Metric(group.name, get_cooling_demand(group),
-                                      '10^6 kJ/yr', 'Cooling demand'))
-
-    check_cooling_demand = \
-        lambda: sum(get_cooling_demand(group)() for group in groups) + \
-                    get_HXN_cooling_demand() + get_CT_cooling_water_duty()
-
-    metrics.extend((
-        Metric('HXN', get_HXN_cooling_demand, '10^6 kJ/hr', 'Cooling demand'),
-        Metric('CT', get_CT_cooling_water_duty, '10^6 kJ/hr', 'Cooling demand'),
-        Metric('Sum', get_system_cooling_water_duty, '10^6 kJ/hr', 'Cooling demand'),
-        Metric('Check', check_cooling_demand, '10^6 kJ/hr', 'Cooling demand')
-        ))
-
-
-    ##### Power demand breakdown (positive if using power) #####
-    lactic_sys = sys.lactic_sys
-    get_electricity_use = funcs['get_electricity_use']
-
-    def get_power_demand(group):
-        return lambda: sum(i.rate for i in group.power_utilities)
-
-    for group in groups:
-        if group.name == 'preprocessing_group': continue
-        metrics.append(Metric(group.name, get_power_demand(group), 'kW', 'Power demand'))
-
-    check_power_demand = lambda: sum(get_power_demand(group)()
-                                     for group in groups) - get_electricity_use()
-    metrics.extend((
-        Metric('Sum', get_electricity_use, 'kW', 'Power demand'),
-        Metric('Check', check_power_demand, 'kW', 'Power demand')
-        ))
-
-    ##### Utility cost breakdown (including heating, cooling, and power) #####
-    get_system_utility_cost = lambda: lactic_tea.utility_cost/1e6
-
-    def get_utility_cost(group):
-        return lambda: sum(i.utility_cost for i in group.units)*get_annual_factor()/1e6
-
-    for group in groups:
-        if group.name == 'preprocessing_group': continue
-        metrics.append(Metric(group.name, get_utility_cost(group), '10^6 $/yr', 'Utility cost'))
-
-    check_utility_cost = \
-        lambda: sum(get_utility_cost(group)() for group in groups) \
-            - get_system_utility_cost()
-
-    metrics.extend((
-        Metric('Sum', get_system_utility_cost, '10^6 $/yr', 'Utility cost'),
-        Metric('Check', check_utility_cost, '10^6 $/yr', 'Utility cost')
+        Metric('Total', get_system_heating_demand, '10^6 MJ/yr', ' Heating demand'),
+        Metric('Total', get_system_cooling_water_duty, '10^6 MJ/yr', 'Cooling demand'),
+        Metric('Total', funcs['get_electricity_use'], 'kW', 'Power demand'),
         ))
 
     # To see if TEA converges well for each simulation
     get_NPV = lambda: lactic_tea.NPV
     metrics.append(Metric('NPV', get_NPV, '$', 'TEA'))
 
-    model_dct = {'index_TEA': len(metrics)}
+    # # Evalute system at different internal rates of return
+    # def create_IRR_metrics(IRR):
+    #     def get_IRR_based_MPSP():
+    #         lactic_tea.IRR = IRR
+    #         return get_MPSP()
+    #     return [Metric('MPSP', get_IRR_based_MPSP, '$/kg', f'IRR={IRR:.0%}'),
+    #             Metric('NPV', get_NPV, '$', f'IRR={IRR:.0%}')]
 
-    ##### Evalute system at different internal rates of return #####
-    def create_IRR_metrics(IRR):
-        def get_IRR_based_MPSP():
-            lactic_tea.IRR = IRR
-            return get_MPSP()
-        return [Metric('MPSP', get_IRR_based_MPSP, '$/kg', f'IRR={IRR:.0%}'),
-                Metric('NPV', get_NPV, '$', f'IRR={IRR:.0%}')]
-
-    # This is to ensure Monte Carlo results will be at 10% IRR
-    IRR1 = np.arange(0, 0.10, 0.01)
-    IRR2 = np.arange(0.11, 0.41, 0.01)
-    model_dct['IRRs'] = IRRs = IRR1.tolist() + IRR2.tolist() + [0.1]
-    for IRR in IRRs:
-        metrics.extend((i for i in create_IRR_metrics(IRR)))
-
-    model_dct['index_IRR'] = len(metrics)
+    # # This is to ensure Monte Carlo results will be at 10% IRR
+    # import numpy as np
+    # IRR1 = np.arange(0, 0.10, 0.01)
+    # IRR2 = np.arange(0.11, 0.41, 0.01)
+    # model_dct['IRRs'] = IRRs = IRR1.tolist() + IRR2.tolist() + [0.1]
+    # for IRR in IRRs:
+    #     metrics.extend((i for i in create_IRR_metrics(IRR)))
 
     ##### Global warming potential #####
     get_GWP = funcs['get_GWP']
@@ -281,15 +155,16 @@ def create_model(kind='SSCF'):
     get_electricity_GWP = funcs['get_electricity_GWP']
 
     natural_gas = s.natural_gas
-    get_CH4_production_GWP = lambda: \
-        CFs['GWP_CFs']['CH4']*natural_gas.F_mass/lactic_acid.F_mass
+    get_CH4_production_GWP = lambda: lactic_sys.get_material_impact(natural_gas, 'GWP')/funcs['get_lactic_flow']()
     get_CH4_onsite_GWP = lambda: \
          natural_gas.get_atomic_flow('C')*natural_gas.chemicals.CO2.MW/lactic_acid.F_mass
 
     lime = s.lime
-    lime_CHP = s.lime_CHP
-    get_lime_GWP  = lambda: \
-        CFs['GWP_CFs']['Lime']*(lime.F_mass+lime_CHP.F_mass)/lactic_acid.F_mass
+    lime_boiler = s.lime_boiler
+    get_lime_GWP  = lambda: (
+        lactic_sys.get_material_impact(lime, 'GWP') + 
+        lactic_sys.get_material_impact(lime_boiler, 'GWP')
+        ) / funcs['get_lactic_flow']()
 
     ethanol = s.ethanol
     get_ethanol_onsite_GWP = lambda: \
@@ -313,31 +188,24 @@ def create_model(kind='SSCF'):
 
     ##### Fossil energy consumption #####
     get_electricity_FEC = funcs['get_electricity_FEC']
-    get_CH4_FEC = lambda: CFs['FEC_CFs']['CH4']*natural_gas.F_mass/lactic_acid.F_mass
-    get_lime_FEC = lambda: \
-        CFs['FEC_CFs']['Lime']*(lime.F_mass+lime_CHP.F_mass)/lactic_acid.F_mass
+    get_CH4_FEC = lambda: lactic_sys.get_material_impact(natural_gas, 'FEC')/funcs['get_lactic_flow']()
+    get_lime_FEC  = lambda: (
+        lactic_sys.get_material_impact(lime, 'FEC') + 
+        lactic_sys.get_material_impact(lime_boiler, 'FEC')
+        ) / funcs['get_lactic_flow']()
 
     get_material_FEC = funcs['get_material_FEC']
     get_other_materials_FEC = lambda: get_material_FEC()-get_CH4_FEC()-get_lime_FEC()
-
-    check_FEC = lambda: get_FEC() - get_material_FEC() - \
-        get_system_utility_cost()*1e6/get_annual_factor()/bst.PowerUtility.price * \
-        CFs['FEC_CFs']['Electricity']/lactic_acid.F_mass
 
     metrics.extend((
         Metric('Electricity', get_electricity_FEC, 'MJ/kg', 'FEC'),
         Metric('Natural gas', get_CH4_FEC, 'MJ/kg', 'FEC'),
         Metric('Lime', get_lime_FEC, 'MJ/kg', 'FEC'),
         Metric('Other materials', get_other_materials_FEC, 'MJ/kg', 'FEC'),
-        Metric('FEC check', check_FEC, 'MJ/kg', 'FEC')
         ))
 
-    # =============================================================================
-    # Construct base model and add parameters
-    # =============================================================================
-
-    model_dct['model'] = model = Model(lactic_sys, metrics)
-
+    ##### Construct base model and add parameters #####
+    model = Model(lactic_sys, metrics)
     param = model.parameter
 
     def baseline_uniform(baseline, ratio):
@@ -375,14 +243,12 @@ def create_model(kind='SSCF'):
             baseline=1, distribution=D)
     def set_TCI_ratio(new_ratio):
         old_ratio = lactic_tea._TCI_ratio_cached
-        # old_ratio = lactic_no_CHP_tea._TCI_ratio_cached
         for unit in lactic_sys.units:
             if hasattr(unit, 'cost_items'):
                 for item in unit.cost_items:
                     unit.cost_items[item].cost /= old_ratio
                     unit.cost_items[item].cost *= new_ratio
         lactic_tea._TCI_ratio_cached = new_ratio
-        # lactic_no_CHP_tea._TCI_ratio_cached = new_ratio
 
     # Only include materials that account for >5% of total annual material cost,
     # enzyme not included as it's cost is more affected by the loading (considered later)
@@ -393,18 +259,21 @@ def create_model(kind='SSCF'):
         feedstock.price = price / feedstock_factor
 
     sulfuric_acid = s.sulfuric_acid
+    sulfuric_acid_T201 = s.sulfuric_acid_T201
     D = shape.Triangle(0.0910, 0.0948, 0.1046)
     @param(name='Sulfuric acid unit price', element='TEA', kind='isolated', units='$/kg',
            baseline=0.0948, distribution=D)
     def set_sulfuric_acid_price(price):
-        sulfuric_acid.price = price
+        sulfuric_acid.price = sulfuric_acid_T201.price = price
 
     D = shape.Triangle(0.160, 0.262, 0.288)
     @param(name='Lime unit price', element='TEA', kind='isolated', units='$/kg',
            baseline=0.262, distribution=D)
     def set_lime_price(price):
         lime.price = price
-        lime_CHP.price = price
+        if lime_boiler.F_mass == 0: dilution = 0.451 # default setting
+        else: dilution = lime_boiler.imass['CalciumDihydroxide']/lime_boiler.F_mass
+        lime_boiler.price = price * dilution
 
     D = shape.Triangle(0.198, 0.253, 0.304)
     @param(name='Natural gas unit price', element='TEA', kind='isolated', units='$/kg',
@@ -425,33 +294,32 @@ def create_model(kind='SSCF'):
         bst.PowerUtility.price = price
 
     ##### Pretreatment parameters #####
-    M202 = u.M202
+    M203 = u.M203
     D = shape.Triangle(0.25, 0.3, 0.4)
-    @param(name='Pretreatment solids loading', element=M202, kind='coupled', units='%',
+    @param(name='Pretreatment solids loading', element=M203, kind='coupled', units='%',
            baseline=0.3, distribution=D)
     def set_pretreatment_solids_loading(loading):
-        M202.solids_loading = loading
+        M203.solids_loading = loading
 
     T201 = u.T201
-    D = shape.Triangle(10, 22.1, 35)
+    D = shape.Triangle(10, 22.1, 35) # 23.16 is used as the default in the dilute_acid module
     @param(name='Pretreatment sulfuric acid loading', element=T201,
            kind='coupled', units='mg/g', baseline=22.1, distribution=D)
     def set_pretreatment_sulfuric_acid_loading(loading):
-        T201.feedstock_dry_mass = feedstock.F_mass - feedstock.imass['H2O']
-        T201.acid_loading = loading
+        T201.sulfuric_acid_loading_per_dry_mass = loading / 1000
 
     R201 = u.R201
     D = shape.Triangle(0.06, 0.099, 0.12)
     @param(name='Pretreatment glucan-to-glucose', element=R201, kind='coupled', units='%',
            baseline=0.099, distribution=D)
     def set_R201_glucan_conversion(X):
-        R201.pretreatment_rxns[0].X = X
+        R201.reactions[0].X = X
 
     D = shape.Triangle(0.8, 0.9, 0.92)
     @param(name='Pretreatment xylan-to-xylose', element=R201, kind='coupled', units='%',
            baseline=0.9, distribution=D)
     def set_R201_xylan_conversion(X):
-        R201.pretreatment_rxns[4].X = X
+        R201.reactions[8].X = X
 
     ##### Conversion parameters #####
     M301 = u.M301
@@ -555,10 +423,11 @@ def create_model(kind='SSCF'):
         R403.hydrolysis_rxns.X[:] = X
 
     ##### Separation parameters #####
+    BT = u.BT
     D = baseline_uniform(0.8, 0.1)
-    @param(name='boiler efficiency', element=CHP, kind='coupled', units='%',
+    @param(name='boiler efficiency', element=BT, kind='coupled', units='%',
            baseline=0.8, distribution=D)
     def set_boiler_efficiency(efficiency):
-        CHP.B_eff = efficiency
+        BT.boiler_efficiency = efficiency
 
-    return model_dct
+    return model
