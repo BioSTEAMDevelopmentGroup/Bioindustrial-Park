@@ -493,14 +493,16 @@ class Reactor(Unit, PressureVessel, isabstract=True):
         if G is None:
             return self._kW_per_m3
         else:
-            mixture = Stream()
-            mixture.mix_from(self.ins)
-            kW_per_m3 = mixture.mu*(G**2)/1e3
+            if not hasattr(self, '_mixed_in'):
+                mixed_in = self._mixed_in = Stream(f'{self.ID}_mixed_in')
+            else: mixed_in = self._mixed_in
+            mixed_in.mix_from(self.ins)
+            kW_per_m3 = mixed_in.mu*(G**2)/1e3
             return kW_per_m3
     @kW_per_m3.setter
     def kW_per_m3(self, i):
         if self.mixing_intensity and i is not None:
-            raise AttributeError('mixing_intensity is provided, kw_per_m3 will be calculated.')
+            raise AttributeError('`mixing_intensity` is provided, kw_per_m3 will be calculated.')
         else:
             self._kW_per_m3 = i
 
@@ -1253,7 +1255,7 @@ class HydrolysisReactor(Reactor):
             Rxn('EthylAcetate + H2O -> AceticAcid + Ethanol',         'EthylAcetate',   0.8),
             Rxn('EthylSuccinate + 2 H2O -> SuccinicAcid + 2 Ethanol', 'EthylSuccinate', 0.8),
             ])
-        self._mixed = Stream(f'{self.ID}_mixed')
+        if not hasattr(self, '_mixed'): self._mixed = Stream(f'{self.ID}_mixed')
 
 
     def _run(self):
