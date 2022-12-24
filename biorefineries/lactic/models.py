@@ -19,7 +19,13 @@
 import biosteam as bst
 from biosteam.evaluation import Model, Metric
 from chaospy import distributions as shape
-from . import create_system, create_funcs, set_yield, feedstock_factor
+from . import (
+    create_funcs, 
+    create_system,
+    feedstock_factor,
+    load_process_settings,
+    set_yield,
+    )
 
 __all__ = ('create_model',)
 
@@ -32,6 +38,7 @@ __all__ = ('create_model',)
 
 def create_model(flowsheet=None, kind='SSCF'):
     if not flowsheet:
+        load_process_settings()
         lactic_sys = create_system(kind=kind)
         flowsheet = lactic_sys.flowsheet
     else: lactic_sys = flowsheet.system.lactic_sys
