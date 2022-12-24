@@ -748,22 +748,23 @@ def create_facilities(solids_to_boiler, gas_to_boiler='',
     # Mix solid wastes to CHP
     M601 = bst.units.Mixer('M601', ins=solids_to_boiler, outs='wastes_to_CHP')
 
-    # Mix additional streams needed for heating
-    additional_streams = (s.warm_process_water_1, s.warm_process_water_2, s.steam_M203)
-    side_steam = Stream('side_steam', units='kg/hr')
+    # # Mix additional streams needed for heating,
+    # # H in s.warm_process_water_2, s.steam_M203 already considered in
+    # # M203, the `SteamMixer`
+    # additional_streams = (s.warm_process_water_1, s.warm_process_water_2, s.steam_M203)
+    # side_steam = Stream('side_steam', units='kg/hr')
     BT = bst.facilities.BoilerTurbogenerator(
         'BT',
         ins=(
             M601-0, gas_to_boiler, 'boiler_makeup_water', natural_gas, lime_boiler, boiler_chems
             ),
-        side_steam=side_steam,
+        side_steam=s.warm_process_water_1,
         natural_gas_price = price['Natural gas'],
         ash_disposal_price = price['Ash disposal'],
         )
     BT.register_alias('CHP')
-    @BT.add_specification(run=True)
-    def adjust_side_stream(): side_steam.mix_from(additional_streams)
-    
+    # @BT.add_specification(run=True)
+    # def adjust_side_stream(): side_steam.mix_from(additional_streams)
     @BT.add_specification()
     def adjust_price_CF():
         if lime_boiler.F_mass == 0: dilution = 1.
