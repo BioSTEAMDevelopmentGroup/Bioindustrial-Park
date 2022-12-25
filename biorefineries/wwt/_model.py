@@ -655,8 +655,6 @@ def add_metrics(model, model_dct, f, u, s, get_obj):
     Caching = u.search('Caching')
 
     def get_MPSP(no_WWT=False, with_RIN=False, product_price=None):
-        # breakpoint()
-        
         suffix = '' if not no_WWT else '_no WWT'
         suffix += '' if not with_RIN else '_RIN'
         cache_dct = Caching.cache_dct
