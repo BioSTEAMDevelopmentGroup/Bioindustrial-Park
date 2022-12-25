@@ -154,6 +154,8 @@ cellulosic_ethanol_configurations = cellulosic_configurations.intersection(ethan
 ethanol_biodiesel_configurations = ethanol_configurations.intersection(biodiesel_configurations)
 cellulosic_ethanol_biodiesel_configurations = ethanol_biodiesel_configurations.intersection(cellulosic_ethanol_configurations)
 conventional_ethanol_biodiesel_configurations = ethanol_biodiesel_configurations.difference(cellulosic_ethanol_configurations)
+cellulosic_oil_configurations = cellulosic_configurations.intersection(biodiesel_configurations).difference(ethanol_configurations)
+oil_configurations = biodiesel_configurations.difference(cellulosic_configurations).difference(ethanol_configurations)
 
 configuration_names = (
     'S1', 'O1', 'S2', 'O2', 'S1*', 'O1*', 'S2*', 'O2*', 'O3', 'O4', 'O5', 'O6', 'O7', 'O8', # 'O9', 'O10',
@@ -746,10 +748,6 @@ def load(name, cache=cache, reduce_chemicals=False, RIN=True,
              baseline=50, kind='coupled')
     def set_xylose_to_ethanol_yield(xylose_to_ethanol_yield):
         if number in cellulosic_ethanol_configurations:
-            # fermentor.cofermentation[6].X = 0.004 # Baseline
-            # fermentor.cofermentation[7].X = 0.046 # Baseline
-            # fermentor.cofermentation[8].X = 0.009 # Baseline
-            # fermentor.loss[1].X = 0.03 # Baseline
             xylose_to_ethanol_yield *= 0.01
             split = np.mean(u.S401.split)
             X1 = split * seed_train.reactions.X[1]
@@ -1220,13 +1218,3 @@ def load(name, cache=cache, reduce_chemicals=False, RIN=True,
         cane_sys.reduce_chemicals()
         cane_sys._load_stream_links()
         HXN.simulate()
-
-def test_model_convergence_speed(configuration, N, **kwargs):
-    load(configuration)
-    model.metrics = []
-    @model.metric
-    def N_iter(): return sum([i._iter for i in model.system.subsystems])
-    samples = model.sample(N, 'L')
-    model.load_samples(samples, **kwargs)
-    model.evaluate()
-    return model.table

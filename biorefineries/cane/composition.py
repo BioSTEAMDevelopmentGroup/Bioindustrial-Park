@@ -15,6 +15,11 @@ import thermosteam as tmo
 from thermosteam import Stream
 from biosteam import main_flowsheet as f
 import numpy as np
+from typing import NamedTuple
+import pandas as pd
+from biorefineries import cane
+import chaospy as cp
+import os
 
 __all__ = (
     'set_lipid_fraction',
@@ -22,8 +27,15 @@ __all__ = (
     'set_sugarcane_composition',
     'convert_fiber_to_lignocelluosic_components',
     'set_composition',
-    'get_composition'
+    'get_composition',
+    'CaneCompositionSpecification',
+    'set_composition_parameters',
+    'set_line_composition_parameters',
 )
+
+data_folder = os.path.join(os.path.dirname(__file__), 'data')
+
+# %% Functional tools
 
 def set_lipid_fraction(lipid_fraction, stream=None,
                        PL_fraction=0.,
@@ -194,3 +206,280 @@ def get_lipid_fraction(stream=None):
     imass = stream.imass
     F_dry_mass = stream.F_mass - imass['Water']
     return imass['Lipid'] / F_dry_mass
+
+# %% Loading composition data
+
+cane_line_composition_data = None
+
+class OilcaneCompositionPerformance(NamedTuple):
+    oil_content: float
+    biomass_yield: float
+
+def get_composition_data():
+    global cane_line_composition_data
+    if cane_line_composition_data is None:
+        file = os.path.join(data_folder, 'cane_composition_data.xlsx')
+        data = pd.read_excel(file, header=[0, 1], index_col=[0])
+        # Filter poor lines 
+        index = data.index
+        good_lines = set(index)
+        performances = {}
+        for name in index:
+            line = data.loc[name]
+            performance = OilcaneCompositionPerformance(
+                line['Stem Oil (dw)']['Mean'],
+                line['Dry biomass yield (% WT)']['Mean'],
+            )
+            performances[name] = performance
+        for name, performance in performances.items():
+            for other_name, other_performance in performances.items():
+                if (name != other_name 
+                    and performance.oil_content < other_performance.oil_content
+                    and performance.biomass_yield < other_performance.biomass_yield):
+                    good_lines.discard(name)
+        names = sorted([name for name in index if name in good_lines], 
+                       key=lambda name: performances[name].oil_content)
+        cane_line_composition_data = data.loc[names]
+    return cane_line_composition_data
+
+def load_composition(feedstock, oil, fiber, water, FFA, PL):
+    composition = get_composition(feedstock)
+    composition['lipid'] = oil
+    composition['fiber'] = fiber
+    composition['moisture'] = water
+    composition['TAG'] = 1. - FFA - PL
+    composition['FFA'] = FFA
+    composition['PL'] = PL
+    del composition['sugar'] # Sugar is backcalculated in `set_composition`
+    set_composition(feedstock, **composition)
+
+
+# %% Specification class
+    
+class CaneCompositionSpecification:
+    """
+    Create a CaneCompositionSpecification object for setting the 
+    composition of cane feedstocks.
+    
+    Parameters
+    ----------
+    feedstock : Stream
+        Cane feedstock.
+    oil : float 
+        Oil content of feedstocks [dry wt. %].
+    moisture : float 
+        Moisture content of feedstocks [wt. %].
+    fiber : float 
+        Fiber content of feedstocks [dry wt. %].
+    FFA : float 
+        FFA content of feedstocks [oil wt. %].
+    PL : float 
+        PL content of feedstocks [oil wt. %].
+    
+    """
+    __slots__ = (
+        'feedstock',
+        'oil',
+        'FFA',
+        'PL',
+        'moisture',
+        'fiber',
+    )
+    
+    def __init__(self, feedstock, oil=None, moisture=None, fiber=None, FFA=None, PL=None):
+        composition = get_composition(feedstock) # Get default values
+        self.feedstock = feedstock #: [Stream] Cane feedstock.
+        self.oil = composition['lipid'] if oil is None else oil #: [float] Oil content of feedstocks [dry wt. %].
+        self.moisture = composition['moisture'] if moisture is None else moisture
+        self.fiber = composition['fiber'] if fiber is None else fiber
+        self.FFA = composition['FFA'] if FFA is None else FFA
+        self.PL = composition['PL'] if PL is None else PL
+        
+    def load_oil_content(self, oil=None, **kwargs):
+        """
+        Set the oil content [dry wt. %] of cane feedstocks assuming that an 
+        increase in oil content is accompanied by a decrease in sugar content 
+        using an energy balance and an increase in fiber using a mass balance 
+        (oil is more energy dense than sugar).
+        
+        """
+        if oil is None: oil = self.oil
+        set_lipid_fraction(
+            oil, self.feedstock, PL_fraction=self.PL, 
+            FFA_fraction=self.FFA, **kwargs,
+        )
+        self.oil = oil
+        
+    def load_composition(self, oil=None, moisture=None, fiber=None, FFA=None, PL=None):
+        if oil is None: oil = self.oil
+        if moisture is None: moisture = self.moisture
+        if fiber is None: fiber = self.fiber
+        if FFA is None: FFA = self.FFA
+        if PL is None: PL = self.PL
+        load_composition(self.feedstock, oil, moisture, fiber, FFA, PL)
+        try:
+            assert (self.feedstock.mol >= 0.).all()
+        except:
+            breakpoint()
+    
+# %% Model parameter extentions
+    
+def bounded_gaussian_distribution_from_mean_and_std(mean, std):
+    if mean == 0: mean = 1e-6
+    if std == 0: std = mean / 1e3
+    normal = cp.Normal(mean, std)
+    trunc = cp.Trunc(normal, lower=mean - 2 * std, upper=mean + 2 * std)
+    return trunc
+
+def set_line_composition_parameters(line):
+    df = get_composition_data()
+    line = df.loc[line]
+    oil = line['Stem Oil (dw)']
+    water = line['Water (wt)']
+    fiber = line['Fiber (dw)']
+    biomass = line['Dry biomass yield (MT/hc)']
+    set_composition_parameters(
+        oil['Mean'],
+        oil['STD'],
+        fiber['Mean'],
+        fiber['STD'],
+        water['Mean'],
+        water['STD'],
+        biomass['Mean'],
+        biomass['STD'],
+    )
+    
+def set_composition_parameters(
+        mean_oil_content,
+        std_oil_content,
+        mean_fiber_content,
+        std_fiber_content,
+        mean_moisture_content,
+        std_moisture_content,
+        mean_biomass_yield,
+        std_biomass_yield,
+    ):
+    try:
+        _reset_composition_parameters_for_cane_line(
+            mean_oil_content,
+            std_oil_content,
+            mean_fiber_content,
+            std_fiber_content,
+            mean_moisture_content,
+            std_moisture_content,
+            mean_biomass_yield,
+            std_biomass_yield,
+        )
+    except:
+        _add_model_composition_parameters_for_cane_line(
+            mean_oil_content,
+            std_oil_content,
+            mean_fiber_content,
+            std_fiber_content,
+            mean_moisture_content,
+            std_moisture_content,
+            mean_biomass_yield,
+            std_biomass_yield,
+        )
+
+def _add_model_composition_parameters_for_cane_line(
+        mean_oil_content,
+        std_oil_content,
+        mean_fiber_content,
+        std_fiber_content,
+        mean_moisture_content,
+        std_moisture_content,
+        mean_biomass_yield,
+        std_biomass_yield,
+        model=None,
+    ):
+    if model is None: model = cane.model
+    removed = {cane.set_cane_oil_content, cane.set_relative_sorghum_oil_content}
+    model.parameters = tuple([i for i in model.parameters if i not in removed])
+    parameter = model.parameter
+    @parameter(
+        element=cane.feedstock, 
+        baseline=mean_oil_content,
+        distribution=bounded_gaussian_distribution_from_mean_and_std(
+            mean_oil_content, std_oil_content
+        ),
+        units='dw %',
+    )
+    def set_cane_oil_content(oil_content):
+        cane.composition_specification.oil = oil_content
+    
+    @parameter(
+        element=cane.feedstock, 
+        baseline=mean_fiber_content,
+        distribution=bounded_gaussian_distribution_from_mean_and_std(
+            mean_fiber_content, std_fiber_content
+        ),
+        units='dw %',
+    )
+    def set_cane_fiber_content(fiber_content):
+        cane.composition_specification.fiber = fiber_content
+    
+    @parameter(
+        element=cane.feedstock, 
+        baseline=mean_moisture_content,
+        distribution=bounded_gaussian_distribution_from_mean_and_std(
+            mean_moisture_content, std_moisture_content
+        ),
+        units='wt %',
+    )
+    def set_cane_moisture_content(moisture_content):
+        cane.composition_specification.moisture = moisture_content
+        cane.composition_specification.load_composition()
+        
+    @parameter(
+        element=cane.feedstock, 
+        baseline=mean_biomass_yield,
+        distribution=bounded_gaussian_distribution_from_mean_and_std(
+            mean_biomass_yield, std_biomass_yield
+        ),
+        units='dry MT/hc',
+    )
+    def set_cane_biomass_yield(biomass_yield):
+        cane.dry_biomass_yield = biomass_yield
+        
+    cane.set_cane_oil_content = set_cane_oil_content
+    cane.set_cane_fiber_content = set_cane_fiber_content
+    cane.set_cane_moisture_content = set_cane_moisture_content
+    cane.set_cane_biomass_yield = set_cane_biomass_yield
+    
+def _reset_composition_parameters_for_cane_line(
+        mean_oil_content,
+        std_oil_content,
+        mean_fiber_content,
+        std_fiber_content,
+        mean_moisture_content,
+        std_moisture_content,
+        mean_biomass_yield,
+        std_biomass_yield,
+        parameters=None, 
+    ):
+    if parameters is None: 
+        parameters = (
+            cane.set_cane_oil_content, 
+            cane.set_cane_fiber_content, 
+            cane.set_cane_moisture_content,
+            cane.set_cane_biomass_yield,
+        )
+    oil, fiber, moisture, biomass = parameters
+    oil.baseline = mean_oil_content
+    oil.distribution = bounded_gaussian_distribution_from_mean_and_std(
+        mean_oil_content, std_oil_content
+    )
+    fiber.baseline = mean_fiber_content
+    fiber.distribution = bounded_gaussian_distribution_from_mean_and_std(
+        mean_fiber_content, std_fiber_content
+    )
+    moisture.baseline = mean_moisture_content
+    moisture.distribution = bounded_gaussian_distribution_from_mean_and_std(
+        mean_moisture_content, std_moisture_content
+    )
+    biomass.baseline = mean_biomass_yield
+    biomass.distribution = bounded_gaussian_distribution_from_mean_and_std(
+        mean_biomass_yield, std_biomass_yield
+    )
+    
