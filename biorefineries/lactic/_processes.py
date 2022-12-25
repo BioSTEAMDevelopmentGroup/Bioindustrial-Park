@@ -634,7 +634,7 @@ def create_wastewater_process(ww_streams, AD_split, MB_split,
     # Ref [1] included polymer addition in process flow diagram, but did not include
     # in the variable operating cost, thus followed ref [4] to add polymer in AerobicDigestion
     S504 = units.SludgeCentrifuge('S504', ins=S503-1,
-                                  outs=('S504_centrate', 'S504_CHP'),
+                                  outs=('S504_centrate', 'S504_boiler'),
                                   COD_chemicals=COD_chemicals,
                                   solubles=solubles, insolubles=insolubles)
 
@@ -697,7 +697,7 @@ def create_facilities(solids_to_boiler, gas_to_boiler='',
     lime_boiler = Stream('lime_boiler') # price and CFs set in the speciation
     boiler_chems = Stream('boiler_chems', units='kg/hr', price=price['Boiler chems'])
     
-    # Supplementary natural gas for CHP if produced steam not enough for regenerating
+    # Supplementary natural gas for the boiler if produced steam not enough for regenerating
     # all steam streams required by the system
     natural_gas = Stream('natural_gas', units='kg/hr', price=price['Natural gas'])
     set_GWPCF(natural_gas, 'CH4')
@@ -728,7 +728,7 @@ def create_facilities(solids_to_boiler, gas_to_boiler='',
 
     units.CSLstorage('T604', ins=CSL, outs=s.CSL_R301)
 
-    # Lime used in CHP not included here for sizing, as it's relatively minor (~6%)
+    # Lime used in the boiler not included here for sizing, as it's relatively minor (~6%)
     # compared to lime used in fermentation and including it will cause problem in
     # simulation (facilities simulated after system)
     units.LimeStorage('T605', ins=lime, outs=s.lime_R301)
@@ -745,14 +745,17 @@ def create_facilities(solids_to_boiler, gas_to_boiler='',
     @FT.add_specification(run=True)
     def adjust_fire_water(): firewater_in.imass['Water'] = feedstock.F_mass * FT.fire_water_over_feedstock
 
-    # Mix solid wastes to CHP
-    M601 = bst.units.Mixer('M601', ins=solids_to_boiler, outs='wastes_to_CHP')
+    # Mix solid wastes to the boiler
+    M601 = bst.units.Mixer('M601', ins=solids_to_boiler, outs='solids_to_boiler')
 
     # # Mix additional streams needed for heating,
     # # H in s.warm_process_water_2, s.steam_M203 already considered in
     # # M203, the `SteamMixer`
     # additional_streams = (s.warm_process_water_1, s.warm_process_water_2, s.steam_M203)
     # side_steam = Stream('side_steam', units='kg/hr')
+    
+    agents = [bst.HeatUtility.get_heating_agent(f'{i}_pressure_steam')
+              for i in ('low', 'medium', 'high')]
     BT = bst.facilities.BoilerTurbogenerator(
         'BT',
         ins=(
@@ -761,6 +764,9 @@ def create_facilities(solids_to_boiler, gas_to_boiler='',
         side_steam=s.warm_process_water_1,
         natural_gas_price = price['Natural gas'],
         ash_disposal_price = price['Ash disposal'],
+        satisfy_system_electricity_demand=False,
+        agent=agents[0],
+        other_agents=agents[1:],
         )
     BT.register_alias('CHP')
     # @BT.add_specification(run=True)
@@ -777,7 +783,7 @@ def create_facilities(solids_to_boiler, gas_to_boiler='',
     CT.ins[-1].price = price['Cooling tower chems']
 
     # All water used in the system, here only consider water consumption,
-    # if heating needed, then heating duty required is considered in CHP
+    # if heating needed, then heating duty required is considered in the boiler
     process_water_streams['facilities'] = (BT.outs[1], CT.outs[1])
     bst.facilities.ProcessWaterCenter(
         'PWC',
