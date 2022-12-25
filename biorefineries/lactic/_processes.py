@@ -702,6 +702,7 @@ def create_facilities(solids_to_boiler, gas_to_boiler='',
     natural_gas = Stream('natural_gas', units='kg/hr', price=price['Natural gas'])
     set_GWPCF(natural_gas, 'CH4')
     set_FECCF(natural_gas, 'CH4')
+    ash_disposal = Stream('ash_disposal', units='kg/hr', price=price['Ash disposal'])
 
     system_makeup_water = Stream('system_makeup_water', price=price['Makeup water'])
 
@@ -761,9 +762,10 @@ def create_facilities(solids_to_boiler, gas_to_boiler='',
         ins=(
             M601-0, gas_to_boiler, 'boiler_makeup_water', natural_gas, lime_boiler, boiler_chems
             ),
+        outs=['emissions', 'rejected_water_and_blowdown', ash_disposal],
         side_steam=s.warm_process_water_1,
-        natural_gas_price = price['Natural gas'],
-        ash_disposal_price = price['Ash disposal'],
+        natural_gas_price=0, # price separately set by the stream
+        ash_disposal_price=0, # price separately set by the stream
         satisfy_system_electricity_demand=False,
         agent=agents[0],
         other_agents=agents[1:],
