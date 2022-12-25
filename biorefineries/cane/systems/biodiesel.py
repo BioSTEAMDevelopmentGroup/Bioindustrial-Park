@@ -67,12 +67,14 @@ def create_oilcane_to_biodiesel_1g(
     crushing_mill.isplit['Lipid'] = 0.90
     
     ### Ethanol section ###
-    fermrxn = tmo.Rxn('CO2 + Glucose -> H2O + TAG', 'Glucose', 
-                      (0.6 if fed_batch else 0.495), correct_atomic_balance=True)
+    X_ferm = 0.6 if fed_batch else 0.495
+    fermrxn = tmo.Rxn('CO2 + Glucose -> H2O + TAG', 'Glucose', X_ferm, correct_atomic_balance=True)
+    growrxn = tmo.Rxn('Glucose -> Cellmass', 'Glucose', 0.99 - X_ferm, correct_atomic_balance=True)
     fermentation_sys, epdct = create_sucrose_fermentation_system(
         ins=[screened_juice],
         scrubber=False,
         fermentation_reaction=fermrxn,
+        cell_growth_reaction=growrxn,
         fed_batch=fed_batch,
         titer=89.4 if fed_batch else 27.4,
         productivity=0.61 if fed_batch else 0.31,

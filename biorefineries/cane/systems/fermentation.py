@@ -137,7 +137,7 @@ def add_urea_nutrient(fermentor, seedtrain=None):
 def create_sucrose_fermentation_system(ins, outs,
         scrubber=None, product_group=None, Fermentor=None, titer=None,
         productivity=None, ignored_volume=None, fermentation_reaction=None,
-        fed_batch=None, add_urea=False,
+        fed_batch=None, add_urea=False, cell_growth_reaction=None
     ):
     screened_juice, = ins
     beer, evaporator_condensate, vent = outs
@@ -305,6 +305,7 @@ def create_sucrose_fermentation_system(ins, outs,
         ins=[H301-0, ''],
         outs=fermentor_outs, 
         tau=9, N=4, fermentation_reaction=fermentation_reaction,
+        cell_growth_reaction=cell_growth_reaction,
     ) 
     if fed_batch: R301.ins.append(MT1.outs[0])
     T301 = bst.StorageTank('T301', R301-1, tau=4, vessel_material='Carbon steel')

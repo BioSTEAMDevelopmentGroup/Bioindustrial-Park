@@ -3,19 +3,39 @@
 """
 import biorefineries.oilcane as oc
 import biosteam as bst
-import thermosteam as tmo
 import numpy as np
 import itertools
 from functools import cache
 import pandas as pd
 import os
+from thermosteam.utils import style_axis
 from warnings import filterwarnings
-from thermosteam.utils import GG_colors
+from thermosteam.utils import GG_colors, colors
 from matplotlib import pyplot as plt
 
 results_folder = os.path.join(os.path.dirname(__file__), 'results')
-indicator_colors = (GG_colors.red, GG_colors.blue, GG_colors.yellow)
-indicators = ('IRR [%]', 'GWP [kg-CO2-eq / L]', 'biodiesel yield [MT / hc]')
+indicator_colors = (
+    colors.neutral, GG_colors.purple, GG_colors.orange, GG_colors.green,
+    GG_colors.red, GG_colors.blue, GG_colors.yellow,
+)
+indicator_sizes = (3, 3, 3,
+                   2, 2, 2,
+                   1, 1, 1,)
+indicators = (
+    'IRR', # %
+    'GWP', # kg-CO2-eq / L
+    'BY', # Biodiesel yield [MT / hc]
+)
+indicator_configurations = {
+    'IRR-GWP-BY': [1, 1, 1],
+    'GWP-BY': [0, 1, 1],
+    'IRR-BY': [1, 0, 1],
+    'IRR-GWP': [1, 1, 0],
+    'IRR': [1, 0, 0],
+    'GWP': [0, 1, 0],
+    'BY': [0, 0, 1],
+}
+indicator_configurations = {i: np.array(j).reshape([3, 1]) for i, j in indicator_configurations.items()}
 lines = ('WT', 'Energycane', '1566')
 maximize_indicator_guide = {
     indicators[0]: True,
@@ -23,7 +43,7 @@ maximize_indicator_guide = {
     indicators[2]: True,
 }
 
-def create_scenarios(ranges, n=3):
+def create_scenarios(ranges, n=5):
     linspaces = [np.linspace(*i, n) for i in ranges]
     scenarios = itertools.product(*linspaces)
     return np.array(list(scenarios))
@@ -40,9 +60,10 @@ def create_model(configuration=None):
     parameter = model.parameter
     metric = model.metric
     
-    @parameter(bounds=(50, 100), units='% Sugarcane', baseline=60)
-    def set_oilcane_biomass_yield(biomass_yield):
-        oc.dry_biomass_yield = oc.baseline_dry_biomass_yield * biomass_yield * 0.01
+    @parameter(bounds=(50, 100), units='% sugarcane', baseline=60)
+    def set_oilcane_biomass_yield(oilcane_biomass_yield):
+        if oc.feedstock.imass['Lipid'] / (oc.feedstock.F_mass - oc.feedstock.imass['Water']) > 0.001:
+            oc.dry_biomass_yield = oc.baseline_dry_biomass_yield * oilcane_biomass_yield * 0.01
     
     @parameter(bounds=(50, 90), units='%', baseline=60)
     def set_fermentation_yield(fermentation_yield):
@@ -51,9 +72,9 @@ def create_model(configuration=None):
             i.X[:2] = fermentation_yield
             i.X[2:] = 0.99 - fermentation_yield
     
-    parameter(oc.set_cane_glucose_yield)
-    parameter(oc.set_cane_xylose_yield)
-    parameter(oc.set_saccharification_oil_recovery)
+    parameter(oc.set_cane_glucose_yield, name='Glucose yield')
+    parameter(oc.set_cane_xylose_yield, name='Xylose yield')
+    parameter(oc.set_saccharification_oil_recovery, name='Oil recovery')
 
     metric(oc.IRR)
     metric(oc.GWP_biodiesel_displacement)
@@ -79,41 +100,50 @@ def set_cane_line(line):
     oc.feedstock.set_CF(
         oc.GWP, GWP_sugarcane * (0.9 * oc.baseline_dry_biomass_yield / oc.dry_biomass_yield + 0.10)
     )
-    
+
+indicator_results = None   
 def evaluate_winners():
+    global indicator_results
     filterwarnings('ignore')
     model = create_model()
     scenarios = create_scenarios([i.bounds for i in model.parameters])
     model.load_samples(scenarios)
-    indicator_results = {i: [] for i in indicators}
-    indices = [i.index for i in model.metrics]
-    for line in lines:
-        set_cane_line(line)
-        model.evaluate()
-        for indicator, index in zip(indicators, indices):
-            indicator_results[indicator].append(model.table[index].copy())
-    winner_results = {i: {j: [] for j in indicators} for i in lines}
-    for indicator in indicators:
-        f = np.argmax if maximize_indicator_guide[indicator] else np.argmin
-        winners = f(np.hstack(indicator_results[indicator]), axis=0)
-        for scenario, winner in zip(scenarios, winners):
-            line = lines[winner]
-            winner_results[line][indicator].append(scenario)
+    if indicator_results is None:
+        indices = [i.index for i in model.metrics]
+        indicator_results = {i: [] for i in indicators}
+        for line in lines:
+            set_cane_line(line)
+            model.evaluate()
+            for indicator, index in zip(indicators, indices):
+                indicator_results[indicator].append(model.table[index].copy())
+    indicator_winners = np.vstack([
+        (np.argmax if maximize_indicator_guide[i] else np.argmin)(
+            np.vstack(indicator_results[i]), axis=0, keepdims=True,
+        )
+        for i in indicators
+    ])
+    
+    winner_results = {i: {j: [] for j in indicator_configurations} for i in lines}
+    for n, line in enumerate(lines):
+        score_board = indicator_winners == n
+        for indicator, configuration in indicator_configurations.items():
+            winner_results[line][indicator] = scenarios[np.where((score_board == configuration).all(axis=0))]
+        
     for line in lines:
         line_results = winner_results[line]
         xlfile = os.path.join(results_folder, f"{line}_winner.xlsx")
         with pd.ExcelWriter(xlfile) as writer:
-            for indicator in indicators:
+            for indicator in indicator_configurations:
                 pd.DataFrame(
                     line_results[indicator], columns=[i.name for i in model.parameters]
                 ).to_excel(
                     writer, 
-                    sheet_name=indicator.split('[')[0].strip(' ')
+                    sheet_name=indicator
                 )
         
 def plot_winner_lines():
-    model = bst.create_model('mockup')
-    axes = plt.subplots(len(lines))
+    model = create_model()
+    fig, axes = plt.subplots(len(lines))
     parameters = model.parameters
     x = list(range(len(parameters)))
     
@@ -125,22 +155,19 @@ def plot_winner_lines():
     for ax, line in zip(axes, lines):
         plt.sca(ax)
         xlfile = os.path.join(results_folder, f"{line}_winner.xlsx")
-        for color, indicator in zip(indicator_colors, indicators):
-            df = pd.read_excel(xlfile, sheet_name=pd.read_excel())
-            values = normalize_parameter_values(df.values())
+        for indicator, color, size in zip(indicator_configurations, indicator_colors, indicator_sizes):
+            df = pd.read_excel(xlfile, index_col=0, sheet_name=indicator)
+            values = normalize_parameter_values(df.values)
             for y in values: 
-                plt.plot(x, y, c=color.RGBn, alpha=0.5)
-        
-        tmo.plots.style_axis(
+                plt.plot(x, y, c=color.RGBn, lw=size)
+        plt.ylim([0, 1])
+        style_axis(
             ax, xticks=x, yticks=[0, 1],
-            xticklabels=[f"{i.min} {i.units}\n{i.name}" for i in parameters],
+            xticklabels=[f"{i.bounds[0]}\n{i.name}\n[{i.units}]" for i in parameters],
             yticklabels=['Min', 'Max'],
         )
         plt.sca(ax._cached_ytwin)
-        plt.xticks(x, [f"{i.max} {i.units}" for i in parameters])
+        plt.xticks(x, [f"{i.bounds[1]}" for i in parameters])
+    plt.subplots_adjust(right=0.92, hspace=1, top=0.9, bottom=0.10)
             
                 
-                    
-if __name__ == '__main__':
-    evaluate_winners()
-        
