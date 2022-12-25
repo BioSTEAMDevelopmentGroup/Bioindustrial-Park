@@ -103,8 +103,9 @@ def create_comparison_systems(info, functions, sys_dct={}):
 
     if is2G: # replace the conventional wastewater treatment process with new ones
         units_to_discard = [u for u in new_u if (u.ID[1]==WWT_ID or u.ID=='WWTC')]
-        streams_to_discard = [s for s in sum([u.outs for u in units_to_discard], [])]
-        streams_to_discard += [s for s in sum([u.ins for u in units_to_discard], []) if s.source is None]
+        aux_units_to_discard = sum([u.auxiliary_units for u in units_to_discard], [])
+        streams_to_discard = [s for s in sum([u.outs for u in units_to_discard+aux_units_to_discard], [])]
+        streams_to_discard += [s for s in sum([u.ins for u in units_to_discard+aux_units_to_discard], []) if s.source is None]
         # # Slower than above
         # streams_to_discard = [s for s in new_s if (
         #     s.source in units_to_discard or
