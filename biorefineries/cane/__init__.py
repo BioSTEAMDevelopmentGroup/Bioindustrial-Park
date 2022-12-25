@@ -7,7 +7,7 @@ from . import oil_extraction
 from . import process_settings
 from . import units
 from . import systems
-from . import configurations
+from . import biorefinery
 
 __all__ = (
     *chemicals.__all__,
@@ -16,7 +16,7 @@ __all__ = (
     *process_settings.__all__,
     *units.__all__,
     *systems.__all__,
-    *configurations.__all__,
+    *biorefinery.__all__,
 )
 
 from .chemicals import *
@@ -25,4 +25,4 @@ from .oil_extraction import *
 from .process_settings import *
 from .units import *
 from .systems import *
-from .configurations import *
+from .biorefinery import *
