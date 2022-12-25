@@ -56,8 +56,8 @@ def create_la_comparison_systems(biodegradability=1): # will be multiplied by 0.
         # 'load': {'print_results': False}, # need to run `simulate_and_print` for results to match
         'system_name': 'lactic_sys',
         'create_wastewater_process': wwt_kwdct,
-        'BT': 'CHP',
-        'new_wwt_connections': {'sludge': ('M601', 0), 'biogas': ('CHP', 1)},
+        'BT': 'BT',
+        'new_wwt_connections': {'sludge': ('M601', 0), 'biogas': ('BT', 1)},
         'CF_dct': CF_dct,
         }
     exist_sys, new_sys = create_comparison_systems(info, la, sys_dct)
@@ -89,7 +89,7 @@ def create_la_comparison_models():
         'CF_dct': CF_dct,
         'feedstock': 'feedstock',
         'FERM_product': info['FERM_product'],
-        'sludge': 'wastes_to_CHP',
+        'sludge': 'solids_to_boiler',
         'biogas': 'biogas',
         'PT_solids_mixer': 'M203',
         'PT_rx': 'R201',
