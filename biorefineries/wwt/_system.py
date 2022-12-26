@@ -9,6 +9,7 @@
 
 import biosteam as bst
 from biosteam import main_flowsheet as main_f
+from biorefineries.cane.biorefinery import Biorefinery
 from . import (
     add_wwt_chemicals, create_wastewater_process, CHP as CHPunit, Skipped,
     get_COD_breakdown, update_cane_price, update_product_prices,
@@ -55,7 +56,12 @@ def create_comparison_systems(info, functions, sys_dct={}):
     dct['_chemicals_loaded'] = True
     dct['chemicals'] = chemicals
     dct['_system_loaded'] = False
+    if 'cane' in kwdct['system_name']:
+        kwdct['load']['chemicals'] = chemicals
+        clear_cache = True
+    else: clear_cache = False
     module.load(**kwdct['load'])
+    
     exist_sys_temp = dct[kwdct['system_name']]
     exist_f = bst.Flowsheet.from_flowsheets('exist', (main_f,))
     main_f.set_flowsheet(exist_f)
@@ -94,6 +100,7 @@ def create_comparison_systems(info, functions, sys_dct={}):
 
     ##### With the new wastewater treatment process #####
     dct['_system_loaded'] = False
+    if clear_cache: Biorefinery.cache.clear()
     module.load(**kwdct['load'])
     new_sys_temp = dct[kwdct['system_name']]
     new_f = bst.Flowsheet.from_flowsheets('new', (main_f,))
