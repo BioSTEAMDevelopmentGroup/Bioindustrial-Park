@@ -116,7 +116,7 @@ system_factories = {
     10: create_oilcane_to_biodiesel_and_actag_combined_1_and_2g_post_fermentation_oil_separation,
 }
 system_factory_options = {
-    -1: dict(use_area_convention=True, pellet_bagasse=False),
+    -1: dict(use_area_convention=True, pellet_bagasse=False, dry_bagasse=True),
     5: dict(fed_batch=True),
     6: dict(fed_batch=True),
     7: dict(fed_batch=False),

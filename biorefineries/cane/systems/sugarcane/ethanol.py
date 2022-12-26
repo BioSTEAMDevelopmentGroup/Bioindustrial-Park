@@ -50,7 +50,8 @@ def create_sucrose_to_ethanol_system(ins, outs, add_urea=False):
 )
 def create_sugarcane_to_ethanol_system(ins, outs, 
                                        use_area_convention=False,
-                                       pellet_bagasse=None):
+                                       pellet_bagasse=None,
+                                       dry_bagasse=None):
     sugarcane, H3PO4, lime, polymer, denaturant = ins
     ethanol, vinasse, wastewater, emissions, ash_disposal = outs
     
@@ -64,6 +65,7 @@ def create_sugarcane_to_ethanol_system(ins, outs,
         area=200 if use_area_convention else None,
         ins=[feedstock_handling_sys-0, H3PO4, lime, polymer],
         pellet_bagasse=pellet_bagasse,
+        dry_bagasse=dry_bagasse,
         mockup=True
     )
     ethanol_production_sys, edct = create_sucrose_to_ethanol_system(
