@@ -196,8 +196,9 @@ class Biorefinery:
         baseline_dry_biomass_yield = self.baseline_dry_biomass_yield
         f = baseline_dry_biomass_yield / dry_biomass_yield
         feedstock.price = (0.9 * f + 0.10) * 0.035
+        # Make the same assumption for the cane feedstock (subject to change).
         feedstock.set_CF(
-            GWP,  * (0.9 * f + 0.10)
+            GWP, GWP_characterization_factors['sugarcane'] * (0.9 * f + 0.10)
         )
         
     def __new__(cls, name, chemicals=None, reduce_chemicals=False, 
@@ -748,10 +749,14 @@ class Biorefinery:
         fed_batch = system_factory_options.get(number, {}).get('fed_batch')
         @performance(60 if fed_batch else 49.5, 95, units='%', element='Cofermenation', kind='coupled')
         def set_glucose_to_microbial_oil_yield(glucose_to_microbial_oil_yield):
+            glucose_to_microbial_oil_yield *= 0.01
+            cell_growth = 0.99 - glucose_to_microbial_oil_yield # Almost all the rest goes towards cell mass
             if number in cellulosic_oil_configurations:
-                glucose_to_microbial_oil_yield *= 0.01
                 seed_train.reactions.X[0] = fermentor.cofermentation.X[0] = glucose_to_microbial_oil_yield 
-                seed_train.reactions.X[2] = fermentor.cofermentation.X[2] = 0.99 - glucose_to_microbial_oil_yield # Almost all the rest goes towards cell mass
+                seed_train.reactions.X[2] = fermentor.cofermentation.X[2] = cell_growth
+            elif number in oil_configurations:
+                fermentor.fermentation_reaction[0] = glucose_to_microbial_oil_yield
+                fermentor.cell_growth_reaction[0] = cell_growth
         
         @performance(60 if fed_batch else 49.5, 95, units='%', element='Cofermenation', kind='coupled')
         def set_xylose_to_microbial_oil_yield(xylose_to_microbial_oil_yield):
@@ -821,7 +826,7 @@ class Biorefinery:
         @default_gwp(feedstock.characterization_factors[GWP], name='GWP', 
                  element=feedstock, units='kg*CO2-eq/kg')
         def set_feedstock_GWP(value):
-            if number > 0:
+            if number > 0 and self.dry_biomass_yield is None:
                 feedstock.characterization_factors[GWP] = value
         
         @default_gwp(methanol.characterization_factors[GWP], name='GWP', 
@@ -1089,7 +1094,6 @@ class Biorefinery:
         def natural_gas_consumption_derivative():
             if number < 0: return 0.
             if self._derivative_disabled: return np.nan
-            # print('natural gas production derivative', value)
             return natural_gas_consumption.difference()
         
         @metric(units='10^6*USD')
