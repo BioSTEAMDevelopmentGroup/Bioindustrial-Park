@@ -203,7 +203,7 @@ class Biorefinery:
         
     def __new__(cls, name, chemicals=None, reduce_chemicals=False, 
                  avoid_natural_gas=True, conversion_performance_distribution=None,
-                 year=None):
+                 year=None, cache=cache):
         if year is None: year = 2022
         if conversion_performance_distribution is None: 
             conversion_performance_distribution = "longterm"
@@ -211,8 +211,8 @@ class Biorefinery:
             conversion_performance_distribution = conversion_performance_distribution.replace(' ', '').replace('-', ' ').lower()
         number, agile, energycane = configuration = parse_configuration(name)
         key = (number, agile, energycane, conversion_performance_distribution, year)
-        if key in cls.cache: 
-            return cls.cache[key]
+        if cache and key in cache: 
+            return cache[key]
         else:
             self = super().__new__(cls)
         flowsheet_name = format_configuration(configuration, latex=False)
@@ -1196,7 +1196,7 @@ class Biorefinery:
         self.composition_specification = composition_specification
         self.oil_extraction_specification = oil_extraction_specification
         self.__dict__.update(flowsheet.to_dict())
-        cls.cache[key] = self
+        if cache is not None: cache[key] = self
         
         ## Simulation
         sys.simulate()
