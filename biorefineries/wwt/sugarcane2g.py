@@ -51,7 +51,7 @@ CF_dct = { # all streams are feeds
 def create_sc2g_comparison_systems(biodegradability=1): # will be multiplied by 0.86/0.05 for biogas/cell mass
     wwt_kwdct = dict.fromkeys(('IC_kwargs', 'AnMBR_kwargs',), {'biodegradability': biodegradability,})
     sys_dct = {
-        'load': {'name': 'S2', 'cache': None, 'reduce_chemicals': False},
+        'load': {'name': 'S2', 'reduce_chemicals': False},
         'system_name': 'sugarcane_sys',
         'create_wastewater_process': wwt_kwdct,
         'BT': 'BT701',

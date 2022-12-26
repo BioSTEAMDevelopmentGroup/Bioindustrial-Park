@@ -58,7 +58,7 @@ def create_oc1g_comparison_systems(biodegradability=1): # will be multiplied by 
     wwt_kwdct = dict.fromkeys(('IC_kwargs', 'AnMBR_kwargs',), {'biodegradability': biodegradability,})
     wwt_kwdct['skip_AeF'] = True
     sys_dct = {
-        'load': {'name': 'O1', 'cache': None, 'reduce_chemicals': False},
+        'load': {'name': 'O1', 'reduce_chemicals': False},
         'system_name': 'oilcane_sys',
         'BT': 'BT601',
         'create_wastewater_process': wwt_kwdct,
