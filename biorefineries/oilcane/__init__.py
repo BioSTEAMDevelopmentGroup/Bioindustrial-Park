@@ -48,8 +48,6 @@ from biorefineries.cane import Biorefinery
 
 disable_derivative = Biorefinery.disable_derivative    
 enable_derivative = Biorefinery.enable_derivative
-
-_derivative_disabled = False
 cache = Biorefinery.cache
 
 def load(*args, **kwargs):
