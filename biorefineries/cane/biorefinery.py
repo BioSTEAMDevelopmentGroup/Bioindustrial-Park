@@ -19,7 +19,6 @@ from chaospy import distributions as shape
 import numpy as np
 from .process_settings import load_process_settings
 from .chemicals import create_cellulosic_oilcane_chemicals as create_chemicals
-from biorefineries import cane
 from biorefineries.cellulosic import PretreatmentReactorSystem as PRS
 from .systems import (
     create_sugarcane_to_ethanol_system,

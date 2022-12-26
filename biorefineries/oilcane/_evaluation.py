@@ -8,19 +8,10 @@ import numpy as np
 import biosteam as bst
 from warnings import warn
 from biorefineries import oilcane as oc
-from ._distributions import (
-    mean_RIN_D3_price,
-    mean_RIN_D5_price,
-)
 from ._feature_mockups import (
-    all_metric_mockups, GWP_ethanol_allocation, GWP_biodiesel_allocation,
-)
-from ._parse_configuration import (
-    parse_configuration,
-    Configuration,
+    all_metric_mockups, 
 )
 from ._load_data import (
-    get_monte_carlo,
     monte_carlo_file,
     autoload_file_name,
     spearman_file,
@@ -29,12 +20,7 @@ from ._load_data import (
 __all__ = (
     'evaluate_configurations_across_recovery_and_oil_content',
     'evaluate_configurations_across_sorghum_and_cane_oil_content',
-    # 'evaluate_MFPP_uncertainty_across_ethanol_and_biodiesel_prices',
-    # 'evaluate_MFPP_benefit_uncertainty_across_ethanol_and_biodiesel_prices',
     'evaluate_metrics_across_composition',
-    'evaluate_MFPP_benefit_across_ethanol_and_biodiesel_prices',
-    'evaluate_MFPP_across_ethanol_and_biodiesel_prices',
-    'evaluate_MFPP_benefit_across_ethanol_and_biodiesel_prices',
     'run_uncertainty_and_sensitivity',
     'save_pickled_results',
     'run_all',
@@ -48,10 +34,6 @@ def no_derivative(f):
         finally:
             oc.enable_derivative()
     return f_derivative_disabled
-
-def evaluate_feedstock_lines(N):
-    df = oc.get_composition_data()
-    load_composition
 
 def evaluate_configurations_across_recovery_and_oil_content(
         recovery, oil_content, configurations, 
@@ -107,61 +89,6 @@ evaluate_configurations_across_sorghum_and_cane_oil_content = no_derivative(
         signature=f'(),(),(c),()->(c,{N_metrics})'
     )
 )
-
-# def evaluate_MFPP_uncertainty_across_ethanol_and_biodiesel_prices(name, ethanol_price, biodiesel_price):
-#     table = get_monte_carlo(name)
-#     oilcane_price = table[oc.MFPP.index].to_numpy()[:, np.newaxis] # USD/ton
-#     biodiesel_flow = table[oc.biodiesel_production.index].to_numpy()[:, np.newaxis] * 1e6 # gal/yr
-#     ethanol_price_baseline = table[oc.set_ethanol_price.index].to_numpy()[:, np.newaxis]
-#     biodiesel_price_baseline = table[oc.set_biodiesel_price.index].to_numpy()[:, np.newaxis]
-#     ethanol_flow = table[oc.ethanol_production.index].to_numpy()[:, np.newaxis] * 1e6 # gal/yr
-#     feedstock_flow = table[oc.feedstock_consumption.index].to_numpy()[:, np.newaxis] # ton/yr
-#     baseline_price = (
-#         oilcane_price
-#         - (ethanol_price_baseline * ethanol_flow + biodiesel_price_baseline * biodiesel_flow) / feedstock_flow
-#     )
-#     return (
-#         baseline_price 
-#         + (ethanol_price[np.newaxis, :] * ethanol_flow + biodiesel_price[np.newaxis, :] * biodiesel_flow) / feedstock_flow
-#     )
-
-# def evaluate_MFPP_benefit_uncertainty_across_ethanol_and_biodiesel_prices(name, ethanol_price, biodiesel_price, baseline=None):
-#     if baseline is None:
-#         configuration = parse_configuration(name)
-#         number, agile = configuration
-#         assert number > 0
-#         baseline = Configuration(-number, agile)
-#     MFPP_baseline = evaluate_MFPP_uncertainty_across_ethanol_and_biodiesel_prices(baseline, ethanol_price, biodiesel_price)
-#     MFPP = evaluate_MFPP_uncertainty_across_ethanol_and_biodiesel_prices(name, ethanol_price, biodiesel_price)
-#     return MFPP - MFPP_baseline
-@no_derivative
-def evaluate_MFPP_across_ethanol_and_biodiesel_prices(ethanol_price, biodiesel_price, configuration=None):
-    if configuration is not None: oc.load(configuration)
-    feedstock_flow = oc.flows['feedstock']()
-    biodiesel_flow = oc.flows['biodiesel']()
-    ethanol_flow = oc.flows['ethanol']()
-    split = oc.advanced_ethanol.F_mol / (oc.advanced_ethanol.F_mol + oc.cellulosic_ethanol.F_mol)
-    baseline_price = (
-        oc.tea.solve_price(oc.oilcane) * oc.kg_per_MT
-        - ((oc.advanced_ethanol.price * split + oc.cellulosic_ethanol.price * (1 - split)) * ethanol_flow  * oc.ethanol_kg_per_L
-           + oc.biodiesel.price * oc.biodiesel_kg_per_L * biodiesel_flow) / feedstock_flow
-    )
-    ethanol_RIN_price = split * mean_RIN_D5_price + (1 - split) * mean_RIN_D3_price
-    ethanol_price = ethanol_price + ethanol_RIN_price
-    return (
-        baseline_price 
-        + (ethanol_price * ethanol_flow + biodiesel_price * biodiesel_flow) / feedstock_flow
-    )
-
-def evaluate_MFPP_benefit_across_ethanol_and_biodiesel_prices(ethanol_price, biodiesel_price, baseline=None, configuration=None):
-    if configuration is None: configuration = oc.configuration
-    if baseline is None:
-        number, agile = configuration
-        assert number > 0
-        baseline = Configuration(-number, agile)
-    MFPP_baseline = evaluate_MFPP_across_ethanol_and_biodiesel_prices(ethanol_price, biodiesel_price, baseline)
-    MFPP = evaluate_MFPP_across_ethanol_and_biodiesel_prices(ethanol_price, biodiesel_price, configuration)
-    return MFPP - MFPP_baseline
 
 def evaluate_metrics_at_composition(oil, fiber, water, configuration):
     oc.load(configuration)

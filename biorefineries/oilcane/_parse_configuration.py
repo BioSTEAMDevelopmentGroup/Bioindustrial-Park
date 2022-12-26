@@ -20,7 +20,14 @@ __all__ = (
 
 def asconfiguration(x):
     try:
-        number, agile, energycane = x
+        if (n:=len(x)) == 1:
+            number, = x
+            agile = energycane = False
+        elif n == 2:
+            number, agile = x    
+            energycane = False
+        elif n == 3:
+            number, agile, energycane = x
         return Configuration(int(number), bool(agile), bool(energycane))
     except:
         return Configuration(int(x), False, False)
