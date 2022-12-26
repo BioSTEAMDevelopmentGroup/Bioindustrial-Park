@@ -205,8 +205,8 @@ class HydrolysisSystem(bst.CSTR, isabstract = True):
         self.effluent_2 = bst.MultiStream(None, thermo = self.thermo)
         self.effluent_3 = bst.MultiStream(None, thermo = self.thermo)
 #Holding tanks after each hydrolysis column        
-        self.holding_tank_1 = bst.StorageTank(None, (None),(None), thermo = self.thermo)
-        self.holding_tank_2 = bst.StorageTank(None, (None),(None), thermo = self.thermo)
+        self.holding_tank_1 = bst.StorageTank(None, (None,),(None,), thermo = self.thermo)
+        self.holding_tank_2 = bst.StorageTank(None, (None,),(None,), thermo = self.thermo)
 #Hydrolysis columns filled with resin      
         self.hydrolysis_column_1 = HydrolysisReactor(None, T =None, P = None,V_max = None, tau = None, thermo = self.thermo)
         self.hydrolysis_column_2 = HydrolysisReactor(None, T =None, P = None,V_max = None, tau = None, thermo = self.thermo)
@@ -232,10 +232,10 @@ class HydrolysisSystem(bst.CSTR, isabstract = True):
     #         self.reactions = RxnSys(Product_formation)  
             
     def _run(self):
-            feed = self.ins[0]
+            feed, = self.ins
             tops_1,bottoms_1,tops_2,bottoms_2,tops_3,bottoms_3,organic_mixture, = self.outs
 #assuming the feed enters directly after forming a solution with water
-            self.hydrolysis_column_1.ins[0] = feed
+            self.hydrolysis_column_1.ins[0].copy_like(feed)
             self.hydrolysis_column_1.T = self.T
             # # 3.14*5*self.total_height, #decided based on amount of resin required,
             self.hydrolysis_column_1.V_max = self.V_max
@@ -251,7 +251,7 @@ class HydrolysisSystem(bst.CSTR, isabstract = True):
             # self.condensate_1.P = 101325
             # self.effluent_1.copy_like(ms['l'])
                        
-            self.distillation_column_1.ins[0] = self.hydrolysis_column_1.outs[0].copy()
+            self.distillation_column_1.ins[0].copy_like(self.hydrolysis_column_1.outs[0])
             # self.distillation_column_1.LHK = ('Methanol','Water')
             # self.distillation_column_1.Lr = 0.999
             # self.distillation_column_1.Hr = 0.999
