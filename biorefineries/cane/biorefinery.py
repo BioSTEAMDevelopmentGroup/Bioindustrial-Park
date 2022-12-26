@@ -190,7 +190,7 @@ class Biorefinery:
     
     def update_dry_biomass_yield(self, dry_biomass_yield):
         self.dry_biomass_yield = dry_biomass_yield
-        # Set prelimiary feedstock price assuming 10% is due to transportation
+        # Set preliminary feedstock price assuming 10% is due to transportation
         # and 90% is based on productivity (a function of height)
         feedstock = self.feedstock
         baseline_dry_biomass_yield = self.baseline_dry_biomass_yield
@@ -200,7 +200,7 @@ class Biorefinery:
             GWP,  * (0.9 * f + 0.10)
         )
         
-    def __new__(cls, name, reduce_chemicals=False, 
+    def __new__(cls, name, chemicals=None, reduce_chemicals=False, 
                  avoid_natural_gas=True, conversion_performance_distribution=None,
                  year=None):
         if year is None: year = 2022
@@ -217,7 +217,8 @@ class Biorefinery:
         flowsheet_name = format_configuration(configuration, latex=False)
         flowsheet = bst.Flowsheet(flowsheet_name)
         main_flowsheet.set_flowsheet(flowsheet)
-        chemicals = self.chemicals
+        if chemicals: self._chemicals = chemicals
+        else: chemicals = self.chemicals
         bst.settings.set_thermo(chemicals)
         load_process_settings()
         s = flowsheet.stream
