@@ -102,13 +102,14 @@ def add_biorefinery_parameters(model, model_dct, f, u, s, get_obj, get_rxn, para
 
     # Natural gas is a utility stream in some biorefineries, need to be added separately
     Upgrading = u.search('Upgrading')
-    b = bst.stream_utility_prices['Natural gas']
+    b = ng_streams[0].price if ng_streams else 0.
+    b = b or bst.stream_utility_prices['Natural gas']
     D = get_default_distribution('triangle', b)
     @param(name='Natural gas price', element='biorefinery', kind='cost', units='$/kg',
            baseline=b, distribution=D)
     def set_natural_gas_price(price):
-        for ng in ng_streams:
-            if ng: ng.price = price
+        if ng_streams: 
+            for ng in ng_streams: ng.price = price
         bst.stream_utility_prices['Natural gas'] = price
         if Upgrading: Upgrading.FNG_price = price
 
