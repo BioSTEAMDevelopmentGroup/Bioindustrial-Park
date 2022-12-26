@@ -31,47 +31,9 @@ References
 
 '''
 
-
-# %%
-
-# =============================================================================
-# Setup
-# =============================================================================
-
 import biosteam as bst
 
-__all__ = ('price', 'get_CFs', 'load_process_settings')
-
-
-# %%
-
-def load_process_settings(CE=541.7): # year 2016
-    bst.CE = CE
-
-    # These settings are sufficient to get baseline lactic acid price within $0.002/kg
-    # of the final stabilized results
-    bst.System.default_converge_method = 'fixed-point' # aitken isn't stable
-    bst.System.default_maxiter = 1500
-    bst.System.default_molar_tolerance = 0.02
-
-    lps = bst.HeatUtility.get_heating_agent('low_pressure_steam')
-    mps = bst.HeatUtility.get_heating_agent('medium_pressure_steam')
-    hps = bst.HeatUtility.get_heating_agent('high_pressure_steam')
-    mps.T = 233 + 273.15
-    hps.T = 266 + 273.15
-
-    cooling = bst.HeatUtility.get_cooling_agent('cooling_water')
-    cooling.regeneration_price = 0
-    cooling.T = 28 + 273.15
-    cooling.T_limit = cooling.T + 9
-
-    # Side steam in CHP not a heat utility, thus will cause problem in TEA utility
-    # cost calculation if price not set to 0 here, costs for regeneration of heating
-    # and cooling utilities will be considered as CAPEX and OPEX of CHP and CT, respectively
-    for i in (lps, mps, hps, cooling):
-        i.heat_transfer_price = i.regeneration_price = 0
-
-    bst.PowerUtility.price = price['Power']
+__all__ = ('load_process_settings', 'price', 'set_GWPCF', 'set_FECCF',)
 
 
 # %%
@@ -178,10 +140,9 @@ price = {
     'Ethanol': ethanol_price,
     'Baghouse bag': baghouse_bag_price,
     'Natural gas': natural_gas_price,
-    'Power': 0.070, # $/kWh, from EIA AEO, 2010-2019 average (0.067-0.074 range)
+    'Electricity': 0.070, # $/kWh, from EIA AEO, 2010-2019 average (0.067-0.074 range)
     'Lactic acid': 1.9, # the average of $1.7-2.1/kg
     }
-price['Electricity'] = price['Power']
 
 
 # %%
@@ -192,70 +153,91 @@ price['Electricity'] = price['Power']
 # (~50% of the total impact per ref [4]) of feedstock is included in ref [3]
 # =============================================================================
 
-def get_CFs(flowsheet=None):
-    flowsheet = flowsheet or bst.main_flowsheet
-    chemicals = bst.settings.get_chemicals()
-    CFs = {}
+##### 100-year global warming potential (GWP) in kg CO2-eq/kg unless noted otherwise #####
+GWP_CFs = {
+    'CH4': 0.40, # NA NG from shale and conventional recovery
+    'CSL': 1.55,
+    'Electricity': (0.48, 0.48), # assume production==consumption, both in kg CO2-eq/kWh
+    'Enzyme': 2.24, # won't make a big diff (<4%) if it's 12.24 (~ ecoinvent value)
+    'Ethanol': 1.44,
+    'H2SO4': 44.47/1e3,   
+    'Lime': 1.29 * 56.0774/74.093, # CaO to Ca(OH)2
+    'NaOH': 2.11,
+    'NH4OH': 2.64 * 0.4860, # chemicals.NH3.MW/chemicals.NH4OH.MW,    
+    }
 
-    ##### 100-year global warming potential (GWP) in kg CO2-eq/kg #####
-    GWP_CFs = {
-        'NH4OH': 2.64 * 0.4860, # chemicals.NH3.MW/chemicals.NH4OH.MW,
-        'CSL': 1.55,
-        'CH4': 0.40, # NA NG from shale and conventional recovery
-        'Enzyme': 2.24, # won't make a big diff (<4%) if it's 12.24 (~ ecoinvent value)
-        'Lime': 1.29 * 56.0774/74.093, # CaO to Ca(OH)2
-        'NaOH': 2.11,
-        'H2SO4': 44.47/1e3,
-        'Ethanol': 1.44
-        }
-
-    GWP_CF_array = chemicals.kwarray(GWP_CFs)
-    # In kg CO2-eq/kg of material
-    GWP_CF_stream = flowsheet.stream.search('GWP_CF_stream') or \
-        bst.Stream('GWP_CF_stream', GWP_CF_array, units='kg/hr')
-
-    GWP_CFs['CaCO3'] = 10.30/1e3
-    GWP_CFs['Gypsum'] = -4.20/1e3
-    # In kg CO2-eq/kWh
-    GWP_CFs['Electricity'] = 0.48
-    # Lactic acid from corn stover
-    GWP_CFs['Lactic acid_GREET'] = 1.80
-    # From ref [5], lactic acid production, RoW, TRACI global warming,
-    # substitution, consequential, long-term
-    GWP_CFs['Lactic acid_fossil'] = 5.2796
-
-    CFs['GWP_CFs'] = GWP_CFs
-    CFs['GWP_CF_stream'] = GWP_CF_stream
+# Not used, just as a reference
+ref_GWP_CFs = {}
+ref_GWP_CFs['CaCO3'] = 10.30/1e3
+ref_GWP_CFs['Gypsum'] = -4.20/1e3
+# Lactic acid from corn stover
+ref_GWP_CFs['Lactic acid_GREET'] = 1.80
+# From ref [5], lactic acid production, RoW, TRACI global warming,
+# substitution, consequential, long-term
+ref_GWP_CFs['Lactic acid_fossil'] = 5.2796
 
 
-    ##### Fossil energy consumption (FEC), in MJ/kg of material #####
-    FEC_CFs = {
-        'NH4OH': 42 * 0.4860, # chemicals.NH3.MW/chemicals.NH4OH.MW,
-        'CSL': 12,
-        'CH4': 50, # NA NG from shale and conventional recovery
-        'Enzyme': 26,
-        'Lime': 4.896 * 56.0774/74.093, # CaO to Ca(OH)2
-        'NaOH': 29,
-        'H2SO4': 568.98/1e3,
-        'Ethanol': 16
-        }
+##### Fossil energy consumption (FEC), in MJ/kg of material unless noted otherwise #####
+FEC_CFs = {
+    'CH4': 50, # NA NG from shale and conventional recovery
+    'CSL': 12,
+    'Electricity': (5.926, 5.926), # assume production==consumption, both in MJ/kWh
+    'Ethanol': 16,
+    'Enzyme': 26,
+    'H2SO4': 568.98/1e3,
+    'Lime': 4.896 * 56.0774/74.093, # CaO to Ca(OH)2
+    'NaOH': 29,
+    'NH4OH': 42 * 0.4860, # chemicals.NH3.MW/chemicals.NH4OH.MW,
+    }
 
-    FEC_CF_array = chemicals.kwarray(FEC_CFs)
-    # In MJ/kg of material
-    FEC_CF_stream = flowsheet.stream.search('FEC_CF_stream') or \
-        bst.Stream('FEC_CF_stream', FEC_CF_array, units='kg/hr')
+# Not used, just as a reference
+ref_FEC_CFs = {}
+ref_FEC_CFs['CaCO3'] = 133.19/1e3
+ref_FEC_CFs['Gypsum'] = -44.19/1e3
+# From corn stover
+FEC_CFs['Lactic acid'] = 29
+# From ref [5], lactic acid production, RoW, cumulative energy demand, fossil,
+# substitution, consequential, long-term
+FEC_CFs['Lactic acid_fossil'] = 91.265
 
-    FEC_CFs['CaCO3'] = 133.19/1e3
-    FEC_CFs['Gypsum'] = -44.19/1e3
-    # In MJ/kWh
-    FEC_CFs['Electricity'] = 5.926
-    # From corn stover
-    FEC_CFs['Lactic acid'] = 29
-    # From ref [5], lactic acid production, RoW, cumulative energy demand, fossil,
-    # substitution, consequential, long-term
-    FEC_CFs['Lactic acid_fossil'] = 91.265
 
-    CFs['FEC_CFs'] = FEC_CFs
-    CFs['FEC_CF_stream'] = FEC_CF_stream
+def set_GWPCF(obj, name='', dilution=None):
+    if not dilution: obj.characterization_factors['GWP'] = GWP_CFs[name]
+    else: obj.characterization_factors['GWP'] = GWP_CFs[name] * dilution
 
-    return CFs
+def set_FECCF(obj, name='', dilution=None):
+    if not dilution: obj.characterization_factors['FEC'] = FEC_CFs[name]
+    else: obj.characterization_factors['FEC'] = FEC_CFs[name] * dilution
+    
+    
+# %%
+
+def load_process_settings(CE=541.7): # year 2016
+    bst.CE = CE
+
+    # These settings are sufficient to get baseline lactic acid price within $0.002/kg
+    # of the final stabilized results
+    bst.System.default_converge_method = 'fixed-point' # aitken isn't stable
+    bst.System.default_maxiter = 1500
+    bst.System.default_molar_tolerance = 0.02
+
+    lps = bst.HeatUtility.get_heating_agent('low_pressure_steam')
+    mps = bst.HeatUtility.get_heating_agent('medium_pressure_steam')
+    hps = bst.HeatUtility.get_heating_agent('high_pressure_steam')
+    mps.T = 233 + 273.15
+    hps.T = 266 + 273.15
+
+    cooling = bst.HeatUtility.get_cooling_agent('cooling_water')
+    cooling.regeneration_price = 0
+    cooling.T = 28 + 273.15
+    cooling.T_limit = cooling.T + 9
+
+    # Side steam in CHP not a heat utility, thus will cause problem in TEA utility
+    # cost calculation if price not set to 0 here, costs for regeneration of heating
+    # and cooling utilities will be considered as CAPEX and OPEX of CHP and CT, respectively
+    for i in (lps, mps, hps, cooling):
+        i.heat_transfer_price = i.regeneration_price = 0
+
+    bst.PowerUtility.price = price['Electricity']
+    set_GWPCF(bst.PowerUtility, 'Electricity')
+    set_FECCF(bst.PowerUtility, 'Electricity')

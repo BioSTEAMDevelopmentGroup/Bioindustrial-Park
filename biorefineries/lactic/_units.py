@@ -42,8 +42,7 @@ import thermosteam as tmo
 from math import exp, pi, ceil
 from biosteam import Stream, Unit, main_flowsheet
 from biosteam.exceptions import DesignError
-from biosteam.units import Flash, HXutility, Mixer, MixTank, Pump, \
-    SolidsSeparator, StorageTank
+from biosteam.units import HXutility, Mixer, SolidsSeparator, StorageTank
 from biosteam.units.design_tools import PressureVessel, pressure_vessel_material_factors as factors
 from biosteam.units.decorators import cost
 from . import (
@@ -63,7 +62,7 @@ def get_flow_tpd(flowsheet=None):
     flowsheet = flowsheet or main_flowsheet
     feedstock = flowsheet.stream.feedstock
     U101 = flowsheet.unit.U101
-    return (feedstock.F_mass-feedstock.imass['H2O'])*24/907.1847*(1-U101.diversion_to_CHP)
+    return (feedstock.F_mass-feedstock.imass['H2O'])*24/907.1847*(1-U101.divert_ratio)
 
 
 # %%
@@ -79,225 +78,16 @@ class FeedstockPreprocessing(Unit):
     # 2205 U.S. ton/day (2000 metric tonne/day) as in ref [1]
     _cached_flow_rate = 2205
 
-    def __init__(self, ID='', ins=None, outs=(), thermo=None, diversion_to_CHP=0):
+    def __init__(self, ID='', ins=None, outs=(), thermo=None, divert_ratio=0):
         Unit.__init__(self, ID, ins, outs, thermo)
         self._baseline_flow_rate = get_baseline_feedflow(self.chemicals).sum()
-        self.diversion_to_CHP = diversion_to_CHP
+        self.divert_ratio = divert_ratio
 
     def _run(self):
         total = self.ins[0]
         processed, burned = self.outs
-        burned.mass = self.diversion_to_CHP * total.mass
+        burned.mass = self.divert_ratio * total.mass
         processed.mass = total.mass - burned.mass
-
-    def _design(self):
-        self.design_results['Flow rate'] = self.outs[0].F_mass
-
-
-# %%
-
-# =============================================================================
-# Pretreatment
-# =============================================================================
-
-@cost(basis='Flow rate', ID='Tank', units='kg/hr',
-      cost=6210, S=1981, CE=CEPCI[2010],  n=0.7, BM=3)
-@cost(basis='Flow rate', ID='Pump', units='kg/hr',
-      cost=8000, S=3720, CE=CEPCI[2009],  n=0.8, BM=2.3)
-class SulfuricAcidAdditionTank(Unit):
-    _N_ins = 1
-    _N_outs = 1
-
-    acid_loading = 22.1
-
-    # Baseline is (18+4.1) mg/g dry biomass as in ref [1], 93% purity
-    def __init__(self, ID='', ins=None, outs=(), *, feedstock_dry_mass):
-        Unit.__init__(self, ID, ins, outs)
-        self.feedstock_dry_mass = feedstock_dry_mass
-
-    def _run(self):
-        self.ins[0].imass['H2SO4'] = self.feedstock_dry_mass * (self.acid_loading/1000)
-        self.ins[0].imass['H2O'] = self.ins[0].imass['H2SO4'] / 0.93 * 0.07
-        self.outs[0].copy_like(self.ins[0])
-
-# Sulfuric acid in-line mixer
-@cost(basis='Flow rate', ID='Mixer', units='kg/hr',
-      cost=6000, S=136260, CE=CEPCI[2009], n=0.5, BM=1)
-class SulfuricAcidMixer(Unit):
-    _N_ins = 2
-    _N_outs = 1
-    _graphics = Mixer._graphics
-
-    def _run(self):
-        acid, water = self.ins
-        mixture = self.outs[0]
-        # 0.05 is from 1842/36629 from streams 710 and 516 in ref [1]
-        water.imass['Water'] = acid.imass['SulfuricAcid'] / 0.05
-        mixture.mix_from([water, acid])
-
-# Adjust pretreatment water loading, 30% from Table 5 on Page 21 of ref [1]
-class PretreatmentMixer(Mixer):
-    _N_ins = 3
-    _N_outs = 1
-
-    solids_loading = 0.3
-
-    def _run(self):
-        feedstock, acid, water = self.ins
-        mixture_out = self.outs[0]
-
-        mixture = feedstock.copy()
-        mixture.mix_from([feedstock, acid])
-
-        total_mass = (mixture.F_mass-mixture.imass['Water'])/self.solids_loading
-        water.imass['Water'] = total_mass - mixture.F_mass
-
-        mixture_out.mix_from([mixture, water])
-
-
-@cost(basis='Dry flow rate', ID='Pretreatment reactor', units='kg/hr',
-      kW=5120, cost=19812400, S=83333, CE=CEPCI[2009], n=0.6, BM=1.5)
-class AcidPretreatment(Unit):
-    _N_ins = 1
-    _N_outs = 2
-    _graphics = Flash._graphics
-
-    def __init__(self, ID='', ins=None, outs=(), T=130+273.15):
-        Unit.__init__(self, ID, ins, outs)
-        self._multistream = tmo.MultiStream(None)
-        self.T = T
-        vapor, liquid = self.outs
-        vapor.phase = 'g'
-
-        self.pretreatment_rxns = ParallelRxn([
-            # Below from Table 6 on Page 22 in ref [1]
-            #            Reaction definition                 Reactant   Conversion
-            Rxn('Glucan + H2O -> Glucose',                   'Glucan',   0.099),
-            Rxn('Glucan + H2O -> GlucoseOligomer',           'Glucan',   0.003),
-            Rxn('Glucan -> HMF + 2 H2O',                     'Glucan',   0.003),
-            Rxn('Sucrose -> HMF + Glucose + 2H2O',           'Sucrose',  1),
-            Rxn('Xylan + H2O -> Xylose',                     'Xylan',    0.9),
-            Rxn('Xylan + H2O -> XyloseOligomer',             'Xylan',    0.024),
-            Rxn('Xylan -> Furfural + 2 H2O',                 'Xylan',    0.05),
-            Rxn('Acetate -> AceticAcid',                     'Acetate',  1),
-            Rxn('Lignin -> SolubleLignin',                   'Lignin',   0.05),
-            # Below from Page 106 of ref [1]
-            Rxn('Mannan + H2O -> Mannose',                   'Mannan',   0.9),
-            Rxn('Mannan + H2O -> MannoseOligomer',           'Mannan',   0.024),
-            Rxn('Mannan -> HMF + 2 H2O',                     'Mannan',   0.05),
-            Rxn('Galactan + H2O -> Galactose',               'Galactan', 0.9),
-            Rxn('Galactan + H2O -> GalactoseOligomer',       'Galactan', 0.024),
-            Rxn('Galactan -> HMF + 2 H2O',                   'Galactan', 0.05),
-            Rxn('Arabinan + H2O -> Arabinose',               'Arabinan', 0.9),
-            Rxn('Arabinan + H2O -> ArabinoseOligomer',       'Arabinan', 0.024),
-            Rxn('Arabinan -> Furfural + 2 H2O',              'Arabinan', 0.05),
-            Rxn('Furfural -> Tar',                           'Furfural', 1),
-            Rxn('HMF -> Tar',                                'HMF',      1)
-            ])
-
-    def _run(self):
-        ms = self._multistream
-        feed = self.ins[0]
-        vapor, liquid = self.outs
-        liquid.copy_like(feed)
-        self.pretreatment_rxns(liquid.mol)
-        ms.copy_like(liquid)
-        H = ms.H + ms.Hf - feed.Hf
-        ms.vle(T=self.T, H=H)
-        vapor.mol = ms.imol['g']
-        liquid.mol = ms.imol['l']
-        vapor.T = liquid.T = ms.T
-        vapor.P = liquid.P = ms.P
-
-# Costs of Tank and Agitator included in the Pump
-@cost(basis='Flow rate', ID='Tank', units='kg/hr',
-      cost=0, S=264116, CE=CEPCI[2009], n=0.7, BM=2)
-@cost(basis='Flow rate', ID='Agitator', units='kg/hr',
-      kW=170, cost=0, S=252891, CE=CEPCI[2009], n=0.5, BM=1.5)
-@cost(basis='Flow rate', ID='Pump', units='kg/hr',
-      kW=93.2125, cost=25365, S=292407, CE=CEPCI[2010], n=0.8, BM=2.3)
-class BlowdownTank(Unit): pass
-
-@cost(basis='Flow rate', ID='Tank', units='kg/hr',
-      cost=203000, S=264116, CE=CEPCI[2009], n=0.7, BM=2)
-@cost(basis='Flow rate', ID='Agitator', units='kg/hr',
-      kW=170, cost=90000, S=264116, CE=CEPCI[2009], n=0.5, BM=1.5)
-@cost(basis='Flow rate', ID='Pump', units='kg/hr',
-      kW=55.9275, cost=17408, S=292407, CE=CEPCI[2009], n=0.8, BM=2.3)
-class OligomerConversionTank(Unit): pass
-
-# Pretreatment flash tank
-@cost(basis='Liquid flow', ID='Tank', units='kg/hr',
-      cost=511000, S=264116, CE=CEPCI[2009], n=0.7, BM=2)
-@cost(basis='Liquid flow', ID='Agitator', units='kg/hr',
-      kW=170, cost=90000, S=252891, CE=CEPCI[2009], n=0.5, BM=1.5)
-@cost(basis='Liquid flow', ID='Pump', units='kg/hr',
-      kW=55.9275, cost=30000, S=204390, CE=CEPCI[2009], n=0.8, BM=2.3)
-class PretreatmentFlash(Flash):
-    _units= {'Liquid flow': 'kg/hr'}
-
-    def _run(self):
-        influent = self.ins[0]
-        vapor, liquid = self.outs
-
-        ms = tmo.MultiStream()
-        ms.copy_like(influent)
-        ms.vle(P=101325, H=ms.H)
-
-        vapor.mol = ms.imol['g']
-        vapor.phase = 'g'
-        liquid.mol = ms.imol['l']
-        vapor.T = liquid.T = ms.T
-        vapor.P = liquid.P = ms.P
-
-    def _design(self):
-        self.design_results['Liquid flow'] = self.outs[1].F_mass
-
-# Ammonia in-line mixer
-@cost(basis='Flow rate', ID='Mixer', units='kg/hr',
-	  # Size basis on the total flow, not just ammonia,
-      # thus assuming difference caused by MWs of NH3 and NH4OH is negligible
-      cost=5000, S=157478, CE=CEPCI[2009], n=0.5, BM=1)
-class AmmoniaMixer(Mixer):
-    def _run(self):
-        ammonia, water = self.ins
-        mixture = self.outs[0]
-
-        # Make 10% ammonia solution
-        water.imass['Water'] = ammonia.imass['AmmoniumHydroxide'] * (1-0.1)/0.1
-        mixture.mix_from([ammonia, water])
-
-# Ammonia addition tank, size based on the total flow, not just ammonia,
-# thus assuming size difference caused by MWs of NH3 and NH4OH is negligible,
-# pumping is provided by a separate HydrolysatePump unit
-@cost(basis='Flow rate', ID='Tank', units='kg/hr',
-      cost=236000, S=410369, CE=CEPCI[2009], n=0.7, BM=2)
-@cost(basis='Flow rate', ID='Agitator', units='kg/hr',
-      kW=7.457, cost=21900, S=410369, CE=CEPCI[2009], n=0.5, BM=1.5)
-class AmmoniaAdditionTank(MixTank):
-    def _run(self):
-        #                                      Reaction definition      Reactant Conversion
-        self.neutralization_rxn = Rxn('2 NH4OH + H2SO4 -> NH4SO4 + 2 H2O', 'H2SO4', 1)
-
-        MixTank._run(self)
-        self.neutralization_rxn.adiabatic_reaction(self.outs[0])
-
-@cost(basis='Duty', ID='Condenser', units='kJ/hr',
-      # 2 is the duty in MMkca/hr
-      cost=34000, S=-2*_Gcal_2_kJ, CE=CEPCI[2009], n=0.7, BM=2.2)
-class WasteVaporCondenser(HXutility):
-
-    def _design(self):
-        super()._design()
-        self.design_results['Duty'] = self.Hnet
-        
-
-# Transport hydrolysate to enzymatic hydrolysis and fermentation
-@cost(basis='Flow rate', ID='Pump', units='kg/hr',
-      kW=74.57, cost=22500, S=402194, CE=CEPCI[2009], n=0.8, BM=2.3)
-class HydrolysatePump(Unit):
-    _units = {'Flow rate': 'kg/hr'}
-    _graphics = Pump._graphics
 
     def _design(self):
         self.design_results['Flow rate'] = self.outs[0].F_mass
@@ -703,14 +493,16 @@ class Reactor(Unit, PressureVessel, isabstract=True):
         if G is None:
             return self._kW_per_m3
         else:
-            mixture = Stream()
-            mixture.mix_from(self.ins)
-            kW_per_m3 = mixture.mu*(G**2)/1e3
+            if not hasattr(self, '_mixed_in'):
+                mixed_in = self._mixed_in = Stream(f'{self.ID}_mixed_in')
+            else: mixed_in = self._mixed_in
+            mixed_in.mix_from(self.ins)
+            kW_per_m3 = mixed_in.mu*(G**2)/1e3
             return kW_per_m3
     @kW_per_m3.setter
     def kW_per_m3(self, i):
         if self.mixing_intensity and i is not None:
-            raise AttributeError('mixing_intensity is provided, kw_per_m3 will be calculated.')
+            raise AttributeError('`mixing_intensity` is provided, kw_per_m3 will be calculated.')
         else:
             self._kW_per_m3 = i
 
@@ -1463,7 +1255,7 @@ class HydrolysisReactor(Reactor):
             Rxn('EthylAcetate + H2O -> AceticAcid + Ethanol',         'EthylAcetate',   0.8),
             Rxn('EthylSuccinate + 2 H2O -> SuccinicAcid + 2 Ethanol', 'EthylSuccinate', 0.8),
             ])
-        self._mixed = Stream(f'{self.ID}_mixed')
+        if not hasattr(self, '_mixed'): self._mixed = Stream(f'{self.ID}_mixed')
 
 
     def _run(self):
@@ -1856,9 +1648,3 @@ class SpecialStorage(StorageTank):
             self.design_results['Number of tanks'] = 0
             self.baseline_purchase_costs['Tanks'] = 0
         else: StorageTank._cost(self)
-
-@cost(basis='Flow rate', ID='Tank', units='kg/hr',
-      cost=803000, S=8343, CE=CEPCI[2009], n=0.7, BM=1.7)
-@cost(basis='Flow rate', ID='Pump', units='kg/hr',
-      kW=93.2125, cost=15000, S=8343, CE=CEPCI[2009], n=0.8, BM=3.1)
-class FirewaterStorage(Unit): pass

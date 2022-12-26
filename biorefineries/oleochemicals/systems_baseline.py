@@ -18,7 +18,6 @@ from biorefineries.lipidcane import units
 from biosteam.units.design_tools import compute_vacuum_system_power_and_cost
 from biosteam.units.design_tools import PressureVessel
 from biosteam.units.decorators import cost
-from ion_exchange_hydrolysis_column import Ion_exchange_hydrolysis_column
 from thermosteam import Rxn, RxnSys, PRxn, SRxn, settings, Chemical, Stream, MultiStream, equilibrium
 from biosteam import ProcessWaterCenter
 
@@ -488,7 +487,7 @@ def nonanoic_acid_fraction_separation(ins,outs):
                                   outs = (Pelargonic_acid_rich_fraction,
                                           'heavy_fatty_acids_2'),
                                   LHK = ('Pelargonic_acid',
-                                          'Malonic_acid'
+                                          'Monomethyl_azelate'
                                           ),
                                   Lr = 0.90,
                                   Hr = 0.90,
@@ -512,243 +511,243 @@ ADP802 = bst.facilities.AirDistributionPackage(ID = 'ADP802',
                                                outs = ('air_for_azelaic_acid_drying'),
                                                       )
 
-# Hydrolysis of FAME's to produce fatty acids (600 level)
-@SystemFactory(
-    ID = 'azelaic_acid_production',
-    ins = [dict(ID='crude_heavy_fatty_acids'),
-            dict(ID ='water_for_emulsification',
-                Water = 10000,
-                units = 'kg/hr'),
-            # dict(ID = 'acid_for_regeneration_1',
-            #       HCl = 100/1000,#Kg of HCl, density of HCl assumed to be 1.49, ref: Wiki, required amount of HCl is 50g/L of resin
-            #       units = 'kg/hr'
-            #      ),
-            # dict(ID = 'acid_for_regeneration_2',
-            #       HCl = 100/1000,#Kg of HCl, density of HCl assumed to be 1.49, ref: Wiki, required amount of HCl is 50g/L of resin
-            #       units = 'kg/hr'
-            #      ),
-            # dict(ID = 'acid_for_regeneration_3',
-            #       HCl = 100/1000,#Kg of HCl, density of HCl assumed to be 1.49, ref: Wiki, required amount of HCl is 50g/L of resin
-            #       units = 'kg/hr'
-            #      ),
-            dict(ID = 'hot_water_for_extraction',
-                Water = 1000,
-                units = 'kg/hr'),
-            dict(ID = 'solvent_for_extraction',
-                VM_Naphta = 1000,
-                units = 'kg/hr'),
-            ],  
+# # Hydrolysis of FAME's to produce fatty acids (600 level)
+# @SystemFactory(
+#     ID = 'azelaic_acid_production',
+#     ins = [dict(ID='crude_heavy_fatty_acids'),
+#             dict(ID ='water_for_emulsification',
+#                 Water = 10000,
+#                 units = 'kg/hr'),
+#             # dict(ID = 'acid_for_regeneration_1',
+#             #       HCl = 100/1000,#Kg of HCl, density of HCl assumed to be 1.49, ref: Wiki, required amount of HCl is 50g/L of resin
+#             #       units = 'kg/hr'
+#             #      ),
+#             # dict(ID = 'acid_for_regeneration_2',
+#             #       HCl = 100/1000,#Kg of HCl, density of HCl assumed to be 1.49, ref: Wiki, required amount of HCl is 50g/L of resin
+#             #       units = 'kg/hr'
+#             #      ),
+#             # dict(ID = 'acid_for_regeneration_3',
+#             #       HCl = 100/1000,#Kg of HCl, density of HCl assumed to be 1.49, ref: Wiki, required amount of HCl is 50g/L of resin
+#             #       units = 'kg/hr'
+#             #      ),
+#             dict(ID = 'hot_water_for_extraction',
+#                 Water = 1000,
+#                 units = 'kg/hr'),
+#             dict(ID = 'solvent_for_extraction',
+#                 VM_Naphta = 1000,
+#                 units = 'kg/hr'),
+#             ],  
     
-    outs = [
-            # dict(ID = 'acid_wastewater3_to_boilerturbogenerator'),
-            # dict(ID = 'acid_wastewater4_to_boilerturbogenerator'),
-            # dict(ID = 'acid_wastewater5_to_boilerturbogenerator'),
-            dict(ID = 'wastewater6_to_boilerturbogenerator'),
-            dict(ID = 'azelaic_acid'),
-            ],
-    fixed_outs_size = True,     
-              )
-def hydrolysis_of_organic_fraction(ins,outs):
-    crude_heavy_fatty_acids,water_for_emulsification,hot_water_for_extraction,solvent_for_extraction, = ins
-    wastewater6_to_boilerturbogenerator,azelaic_acid, = outs
-# acid_wastewater3_to_boilerturbogenerator,acid_wastewater4_to_boilerturbogenerator,acid_wastewater5_to_boilerturbogenerator,
-#Storage tank for storing the mixture
-    T601 = bst.StorageTank(ID = 'T601',
-                            ins = (crude_heavy_fatty_acids),
-                            outs = ('crude_heavy_fatty_acids'))
-#Mix tank for making the emulsion
-    M601 = bst.units.MixTank('M601',
-                            ins = (T601-0,
-                                    water_for_emulsification,
-                                  ),
-                            outs = ('emulsified_mixture'))
+#     outs = [
+#             # dict(ID = 'acid_wastewater3_to_boilerturbogenerator'),
+#             # dict(ID = 'acid_wastewater4_to_boilerturbogenerator'),
+#             # dict(ID = 'acid_wastewater5_to_boilerturbogenerator'),
+#             dict(ID = 'wastewater6_to_boilerturbogenerator'),
+#             dict(ID = 'azelaic_acid'),
+#             ],
+#     fixed_outs_size = True,     
+#               )
+# def hydrolysis_of_organic_fraction(ins,outs):
+#     crude_heavy_fatty_acids,water_for_emulsification,hot_water_for_extraction,solvent_for_extraction, = ins
+#     wastewater6_to_boilerturbogenerator,azelaic_acid, = outs
+# # acid_wastewater3_to_boilerturbogenerator,acid_wastewater4_to_boilerturbogenerator,acid_wastewater5_to_boilerturbogenerator,
+# #Storage tank for storing the mixture
+#     T601 = bst.StorageTank(ID = 'T601',
+#                             ins = (crude_heavy_fatty_acids),
+#                             outs = ('crude_heavy_fatty_acids'))
+# #Mix tank for making the emulsion
+#     M601 = bst.units.MixTank('M601',
+#                             ins = (T601-0,
+#                                     water_for_emulsification,
+#                                   ),
+#                             outs = ('emulsified_mixture'))
     
-#The following number represents the total initial number of exchangeable moles.
-# This number of moles will keep on decreasing as the reaction progresses
+# #The following number represents the total initial number of exchangeable moles.
+# # This number of moles will keep on decreasing as the reaction progresses
     
-    exchangeable_moles = ((crude_heavy_fatty_acids.imol['Methyl_palmitate'],
-                  crude_heavy_fatty_acids.imol['Methyl_oleate'],
-                  crude_heavy_fatty_acids.imol['Methyl_stearate'],
-                  crude_heavy_fatty_acids.imol['Methyl_linoleate'],
-                  crude_heavy_fatty_acids.imol['Monomethyl_azelate']))
-    total_moles = sum(exchangeable_moles)    
+#     exchangeable_moles = ((crude_heavy_fatty_acids.imol['Methyl_palmitate'],
+#                   crude_heavy_fatty_acids.imol['Methyl_oleate'],
+#                   crude_heavy_fatty_acids.imol['Methyl_stearate'],
+#                   crude_heavy_fatty_acids.imol['Methyl_linoleate'],
+#                   crude_heavy_fatty_acids.imol['Monomethyl_azelate']))
+#     total_moles = sum(exchangeable_moles)    
                            
-    def adjust_water_for_emuslification():
-        water_for_emulsification.imol['Water'] = total_moles*30
-    M601.add_specification(adjust_water_for_emuslification, run=True)  
+#     def adjust_water_for_emuslification():
+#         water_for_emulsification.imol['Water'] = total_moles*30
+#     M601.add_specification(adjust_water_for_emuslification, run=True)  
        
-# 1L of resin can exchange 1800 moles
-# required amount of resin in L is total_moles/1800  of resin
-# density of the resin is: 1.28*density of air ref:https://www.sigmaaldrich.com/US/en/product/supelco/10322
-# density of resin(g/L): 1.28*1.29 = 1.65
-# grams of resin required = total_moles/1800 
-# for a cylindrical tower with a csa of 5m2 with a radius 2.23m ref: rules of thumb 
+# # 1L of resin can exchange 1800 moles
+# # required amount of resin in L is total_moles/1800  of resin
+# # density of the resin is: 1.28*density of air ref:https://www.sigmaaldrich.com/US/en/product/supelco/10322
+# # density of resin(g/L): 1.28*1.29 = 1.65
+# # grams of resin required = total_moles/1800 
+# # for a cylindrical tower with a csa of 5m2 with a radius 2.23m ref: rules of thumb 
 
-    Volume_of_resin = total_moles/1800
-    height_of_the_cylinder = Volume_of_resin/(3.14* 5)
-    total_height = height_of_the_cylinder + 2.5
-# regenerant equivalents = 100/36.5    
-# regenerant ratio = 2.7*100/1.8 = 152%, this is the suggested excess ref: http://www.dardel.info/IX/processes/regeneration.html
-# CSA assumed: 5m2 Ref: rule of thumb book
-    HS601 = units_baseline.HydrolysisSystem(ID = 'HS601',
-                                            ins = M601-0,
-                                            outs = ('tops_1',
-                                                    'bottoms_1',
-                                                    'tops_2',
-                                                    'bottoms_2',
-                                                    'tops_3',
-                                                    'bottoms_3',
-                                                    'organic_mixture_to_next_reactor'),
-                                            T = 100+273.15,
-                                            V_max = 3.14*5*total_height, #decided based on amount of resin required,
-                                            tau= 6.5,
-                                            #considers regeneration time,
-                                            P = 101325,
-                                            )
+#     Volume_of_resin = total_moles/1800
+#     height_of_the_cylinder = Volume_of_resin/(3.14* 5)
+#     total_height = height_of_the_cylinder + 2.5
+# # regenerant equivalents = 100/36.5    
+# # regenerant ratio = 2.7*100/1.8 = 152%, this is the suggested excess ref: http://www.dardel.info/IX/processes/regeneration.html
+# # CSA assumed: 5m2 Ref: rule of thumb book
+#     HS601 = units_baseline.HydrolysisSystem(ID = 'HS601',
+#                                             ins = M601-0,
+#                                             outs = ('tops_1',
+#                                                     'bottoms_1',
+#                                                     'tops_2',
+#                                                     'bottoms_2',
+#                                                     'tops_3',
+#                                                     'bottoms_3',
+#                                                     'organic_mixture_to_next_reactor'),
+#                                             T = 100+273.15,
+#                                             V_max = 3.14*5*total_height, #decided based on amount of resin required,
+#                                             tau= 6.5,
+#                                             #considers regeneration time,
+#                                             P = 101325,
+#                                             )
 
-    T605 = bst.MixTank( ID = 'T605',
-                        ins = (HS601-0,
-                                HS601-2,
-                                HS601-4))
+#     T605 = bst.MixTank( ID = 'T605',
+#                         ins = (HS601-0,
+#                                 HS601-2,
+#                                 HS601-4))
     
-    T606 = bst.MixTank(ID = 'T606',
-                        ins = (HS601-1,
-                                HS601-3,
-                                HS601-5))
+#     T606 = bst.MixTank(ID = 'T606',
+#                         ins = (HS601-1,
+#                                 HS601-3,
+#                                 HS601-5))
    
-# A falling film evaporator was used to separate out the Azelaic acid from the diols and residue
-#These carboxylic acids can be further separated out by evaporating the Nonanoic acid fraction   
-    D604 =  bst.BinaryDistillation('D604',
-                                  ins = HS601-6,
-                                  outs = ('azelaic_acid_rich_fraction',
-                                          'diols_and_other_fatty_acids'
-                                          ),
-                                  LHK = ('Azelaic_acid', 
-                                          'MDHSA'
-                                          ),
-                                  Lr=0.995,
-                                  Hr=0.995,
-                                  P = 500,#comsistent with US patent 2818113
-                                  k = 2,
-                                  partial_condenser= False
-                                  )
-    def LHK_check():
-        D604.check_LHK = False
-    D604.add_specification(LHK_check, run = True)       
+# # A falling film evaporator was used to separate out the Azelaic acid from the diols and residue
+# #These carboxylic acids can be further separated out by evaporating the Nonanoic acid fraction   
+#     D604 =  bst.BinaryDistillation('D604',
+#                                   ins = HS601-6,
+#                                   outs = ('azelaic_acid_rich_fraction',
+#                                           'diols_and_other_fatty_acids'
+#                                           ),
+#                                   LHK = ('Azelaic_acid', 
+#                                           'MDHSA'
+#                                           ),
+#                                   Lr=0.995,
+#                                   Hr=0.995,
+#                                   P = 500,#comsistent with US patent 2818113
+#                                   k = 2,
+#                                   partial_condenser= False
+#                                   )
+#     def LHK_check():
+#         D604.check_LHK = False
+#     D604.add_specification(LHK_check, run = True)       
         
-# Hot water extraction to separate out azelaic acid crystals
-#Hot_water_and_crude_azelaic_mixture
-    HX601 = bst.HXutility(ins = hot_water_for_extraction,
-                          outs = 'hot_water_for_extraction',
-                          T = 100+273.15)
-    def water_for_extraction():
-        hot_water_for_extraction.F_vol = 4*D604.outs[0].F_vol
-    HX601.add_specification(water_for_extraction, run = True)
+# # Hot water extraction to separate out azelaic acid crystals
+# #Hot_water_and_crude_azelaic_mixture
+#     HX601 = bst.HXutility(ins = hot_water_for_extraction,
+#                           outs = 'hot_water_for_extraction',
+#                           T = 100+273.15)
+#     def water_for_extraction():
+#         hot_water_for_extraction.F_vol = 4*D604.outs[0].F_vol
+#     HX601.add_specification(water_for_extraction, run = True)
     
-# If azelaic acid increases above 10% by weight the solution acts as a solvent for water insoluble materials. 
-    M602 = bst.Mixer('M602',ins = (D604-0,
-                                    solvent_for_extraction))
-    def solvent_for_extraction():
-        solvent_for_extraction.F_vol = 0.4*D604.outs[0].F_vol
-    M602.add_specification(solvent_for_extraction, run = True)
-#TODO: use the extract as well    
-    MMS601 = bst.units.MultiStageMixerSettlers(ID = 'MMS601',
-                                              ins = (M602-0,
-                                                      HX601-0),
-                                              outs = ('raffinate_AA',
-                                                      'extract_MCAs'
-                                                      ),
-                                              partition_data={
-                                                  'raffinate_chemicals': ('Water'),
-                                                  'extract_chemicals': ('Cycloheptane',#solvent
-                                                                        'Toluene',#solvent
-                                                                        'Bicyclo_octane',#solvent
-                                                                        'Octane',#solvent
-                                                                        'Caprylic_acid',#C8 MCA
-                                                                        'Hexanoic_acid',#C6 MCA
-                                                                        'Heptanoic_acid',#C7 MCA
-                                                                        'Pelargonic_acid',#C9MCA
-                                                                        'Methyl_palmitate',#D17 MCA
-                                                                        'Methyl_stearate',#D19 MCA
-                                                                        'Methyl_linoleate',#D19 MCA
-                                                                        'Methyl_palmitoleate',#D19 MCA
-                                                                        ),
+# # If azelaic acid increases above 10% by weight the solution acts as a solvent for water insoluble materials. 
+#     M602 = bst.Mixer('M602',ins = (D604-0,
+#                                     solvent_for_extraction))
+#     def solvent_for_extraction():
+#         solvent_for_extraction.F_vol = 0.4*D604.outs[0].F_vol
+#     M602.add_specification(solvent_for_extraction, run = True)
+# #TODO: use the extract as well    
+#     MMS601 = bst.units.MultiStageMixerSettlers(ID = 'MMS601',
+#                                               ins = (M602-0,
+#                                                       HX601-0),
+#                                               outs = ('raffinate_AA',
+#                                                       'extract_MCAs'
+#                                                       ),
+#                                               partition_data={
+#                                                   'raffinate_chemicals': ('Water'),
+#                                                   'extract_chemicals': ('Cycloheptane',#solvent
+#                                                                         'Toluene',#solvent
+#                                                                         'Bicyclo_octane',#solvent
+#                                                                         'Octane',#solvent
+#                                                                         'Caprylic_acid',#C8 MCA
+#                                                                         'Hexanoic_acid',#C6 MCA
+#                                                                         'Heptanoic_acid',#C7 MCA
+#                                                                         'Pelargonic_acid',#C9MCA
+#                                                                         'Methyl_palmitate',#D17 MCA
+#                                                                         'Methyl_stearate',#D19 MCA
+#                                                                         'Methyl_linoleate',#D19 MCA
+#                                                                         'Methyl_palmitoleate',#D19 MCA
+#                                                                         ),
                                                                         
-                                                  'K': np.array([1.664369695,
-                                                                  1.664369695,
-                                                                  1.664369695,
-                                                                  0.064657614,
-                                                                  0.06466,
-                                                                  0.06466,
-                                                                  0.05905,                                                                 
-                                                                  ]),
-                                                  'IDs': (
-                                                          #intermediate products parititon only to the organic phase
-                                                          'MDHSA',#Diol compound
-                                                          'Dihydroxy_palmitic_acid',#Diol compound
-                                                          'Tetrahydroxy_octadecanoic_acid',#Diol compound
-                                                          'Methyl_oleate',#C19 MCA
-                                                          'Azelaic_acid',#C9 DCA
-                                                          'Monomethyl_azelate',#C10 DCA
-                                                          'Suberic_acid',#C8 DCA
-                                                          # 'Malonic_acid',#D3 DCA
-                                                          ),
-                                                  'phi': 0.590 # Initial phase fraction guess. This is optional.
-                                                    },
-                                              N_stages= 12)
-# #Option 1
-#     C601 = units_baseline.AACrystalliser(ID = 'C601',
-#                                          ins = MMS601-0,
-#                                          T = 280,
-#                                          outs = azelaic_acid)
-#Option 2(Preferrred method) - Evaportation Drying zone - US patent: METHOD FOR PURIFYING AZELAIC ACID 
-    F601 = bst.units.Flash(ID = 'F601',
-                            ins = MMS601-0,
-                            outs = (wastewater6_to_boilerturbogenerator,
-                                    'azelaic_acid_for_purification'
-                                    # 'azelaic_acid_for_drying_step'
-                                    ),
-                            T =  110+ 273.15,# Ref: METHOD FOR PURIFYING AZELAIC ACID (US 2003/0032825 A1)
-                            P = 3333
-                                  )
-    #Range is 235-280 deg Cel with a pressure between 1-30 mmHg
-    F601.outs[1].T = 240+ 273.15
-    D605 = bst.units.BinaryDistillation(ID = 'D605',
-                                        ins = F601-1,
-                                        outs = ('lighter_boiling_impurities',
-                                                'heavy_boiling_azelaic_acid_stream'
-                                                ),
-                                        # T =  260+ 273.15,# Ref: METHOD FOR PURIFYING AZELAIC ACID (US 2003/0032825 A1)
-                                        LHK = ('Suberic_acid',
-                                                'Azelaic_acid'),
-                                        Lr=0.995,
-                                        Hr=0.995,
-                                        P = 2000,#comsistent with US patent 2818113
-                                        k = 2,
-                                        partial_condenser= False                                        
-                                        )
-    #Range is 220-280 deg Cel with a pressure between 1-10 mm Hg
-    D605.outs[1].T = 260+273.15                                        
-    D606 = bst.units.BinaryDistillation(ID = 'D606',
-                                        ins = D605-1,
-                                        outs = (azelaic_acid,
-                                                'heavy_boiling_compounds'
-                                                ),
-                                      LHK = ('Azelaic_acid', 
-                                              'Oleic_acid'
-                                                ),
-                                        Lr=0.80,
-                                        Hr=0.80,
-                                        P = 1300,#comsistent with US patent 2818113
-                                        k = 2,
-                                        partial_condenser= False)
-    def LHK_check():
-        D606.check_LHK = False
-    D606.add_specification(LHK_check, run = True) 
+#                                                   'K': np.array([1.664369695,
+#                                                                   1.664369695,
+#                                                                   1.664369695,
+#                                                                   0.064657614,
+#                                                                   0.06466,
+#                                                                   0.06466,
+#                                                                   0.05905,                                                                 
+#                                                                   ]),
+#                                                   'IDs': (
+#                                                           #intermediate products parititon only to the organic phase
+#                                                           'MDHSA',#Diol compound
+#                                                           'Dihydroxy_palmitic_acid',#Diol compound
+#                                                           'Tetrahydroxy_octadecanoic_acid',#Diol compound
+#                                                           'Methyl_oleate',#C19 MCA
+#                                                           'Azelaic_acid',#C9 DCA
+#                                                           'Monomethyl_azelate',#C10 DCA
+#                                                           'Suberic_acid',#C8 DCA
+#                                                           # 'Malonic_acid',#D3 DCA
+#                                                           ),
+#                                                   'phi': 0.590 # Initial phase fraction guess. This is optional.
+#                                                     },
+#                                               N_stages= 12)
+# # #Option 1
+# #     C601 = units_baseline.AACrystalliser(ID = 'C601',
+# #                                          ins = MMS601-0,
+# #                                          T = 280,
+# #                                          outs = azelaic_acid)
+# #Option 2(Preferrred method) - Evaportation Drying zone - US patent: METHOD FOR PURIFYING AZELAIC ACID 
+#     F601 = bst.units.Flash(ID = 'F601',
+#                             ins = MMS601-0,
+#                             outs = (wastewater6_to_boilerturbogenerator,
+#                                     'azelaic_acid_for_purification'
+#                                     # 'azelaic_acid_for_drying_step'
+#                                     ),
+#                             T =  110+ 273.15,# Ref: METHOD FOR PURIFYING AZELAIC ACID (US 2003/0032825 A1)
+#                             P = 3333
+#                                   )
+#     #Range is 235-280 deg Cel with a pressure between 1-30 mmHg
+#     F601.outs[1].T = 240+ 273.15
+#     D605 = bst.units.BinaryDistillation(ID = 'D605',
+#                                         ins = F601-1,
+#                                         outs = ('lighter_boiling_impurities',
+#                                                 'heavy_boiling_azelaic_acid_stream'
+#                                                 ),
+#                                         # T =  260+ 273.15,# Ref: METHOD FOR PURIFYING AZELAIC ACID (US 2003/0032825 A1)
+#                                         LHK = ('Suberic_acid',
+#                                                 'Azelaic_acid'),
+#                                         Lr=0.995,
+#                                         Hr=0.995,
+#                                         P = 2000,#comsistent with US patent 2818113
+#                                         k = 2,
+#                                         partial_condenser= False                                        
+#                                         )
+#     #Range is 220-280 deg Cel with a pressure between 1-10 mm Hg
+#     D605.outs[1].T = 260+273.15                                        
+#     D606 = bst.units.BinaryDistillation(ID = 'D606',
+#                                         ins = D605-1,
+#                                         outs = (azelaic_acid,
+#                                                 'heavy_boiling_compounds'
+#                                                 ),
+#                                       LHK = ('Azelaic_acid', 
+#                                               'Oleic_acid'
+#                                                 ),
+#                                         Lr=0.80,
+#                                         Hr=0.80,
+#                                         P = 1300,#comsistent with US patent 2818113
+#                                         k = 2,
+#                                         partial_condenser= False)
+#     def LHK_check():
+#         D606.check_LHK = False
+#     D606.add_specification(LHK_check, run = True) 
     
-ob6 = hydrolysis_of_organic_fraction(ins = ob5.outs[1]) 
-ob6.simulate()
-ob6.show()
+# ob6 = hydrolysis_of_organic_fraction(ins = ob5.outs[1]) 
+# ob6.simulate()
+# ob6.show()
 
  
 # ### Catalyst recovery area (700)
