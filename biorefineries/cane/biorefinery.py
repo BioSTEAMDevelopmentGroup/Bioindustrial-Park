@@ -208,7 +208,7 @@ class Biorefinery:
         if conversion_performance_distribution is None: 
             conversion_performance_distribution = "longterm"
         else:
-            conversion_performance_distribution = conversion_performance_distribution.replace(' ', '').replace('-', ' ').lower()
+            conversion_performance_distribution = conversion_performance_distribution.replace(' ', '').replace('-', '').lower()
         number, agile, energycane = configuration = parse_configuration(name)
         key = (number, agile, energycane, conversion_performance_distribution, year)
         if cache and key in cache: 
