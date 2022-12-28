@@ -7,17 +7,19 @@
 # for license details.
 """
 """
-from thermosteam import functional as fn
 import thermosteam as tmo
+from biorefineries.cane import create_oilcane_chemicals
+from biorefineries.cellulosic import create_cellulosic_ethanol_chemicals
 
 __all__ = ('create_chemicals',)
 
 def create_chemicals():
-    from biorefineries import lipidcane as lc, cornstover as cs
-    chemicals = lc.chemicals['Water', 'Ethanol', 'Glucose', 'H3PO4', 'P4O10', 
-                             'CO2', 'Octane', 'O2', 'CH4', 'Ash', 
-                             'Yeast', 'CaO', 'TAG', 'Cellulose']
-    chemicals += cs.chemicals['H2SO4', 'N2', 'SO2']
+    oc_chemicals = create_oilcane_chemicals()
+    chemicals = oc_chemicals['Water', 'Ethanol', 'Glucose', 'H3PO4', 'P4O10', 
+                             'CO2', 'Octane', 'O2', 'CH4', 'Ash', 'Yeast', 
+                             'CaO', 'TAG', 'Cellulose']
+    cs_chemicals = create_cellulosic_ethanol_chemicals()
+    chemicals += cs_chemicals['H2SO4', 'N2', 'SO2']
     chemicals = tmo.Chemicals([*chemicals, 'NH3'])
     Starch = chemicals.Cellulose.copy('Starch', aliases=())
     Fiber = chemicals.Cellulose.copy('Fiber', aliases=())

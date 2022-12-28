@@ -8,6 +8,7 @@ from . import process_settings
 from . import units
 from . import systems
 from . import biorefinery
+from . import evaluation
 
 __all__ = (
     *chemicals.__all__,
@@ -17,6 +18,7 @@ __all__ = (
     *units.__all__,
     *systems.__all__,
     *biorefinery.__all__,
+    *evaluation.__all__,
 )
 
 from .chemicals import *
@@ -26,3 +28,4 @@ from .process_settings import *
 from .units import *
 from .systems import *
 from .biorefinery import *
+from .evaluation import *

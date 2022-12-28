@@ -13,6 +13,7 @@ from biosteam.utils import MockStream
 import thermosteam as tmo
 from biorefineries.cane.composition import (
     set_lipid_fraction as set_oil_fraction,
+    set_line_composition_parameters,
 )
 from biosteam import main_flowsheet, UnitGroup
 from chaospy import distributions as shape
@@ -88,17 +89,9 @@ cellulosic_ethanol_configurations = cellulosic_configurations.intersection(ethan
 ethanol_biodiesel_configurations = ethanol_configurations.intersection(biodiesel_configurations)
 cellulosic_ethanol_biodiesel_configurations = ethanol_biodiesel_configurations.intersection(cellulosic_ethanol_configurations)
 conventional_ethanol_biodiesel_configurations = ethanol_biodiesel_configurations.difference(cellulosic_ethanol_configurations)
-cellulosic_oil_configurations = cellulosic_configurations.intersection(biodiesel_configurations).difference(ethanol_configurations)
-oil_configurations = biodiesel_configurations.difference(cellulosic_configurations).difference(ethanol_configurations)
+oil_configurations = biodiesel_configurations.difference(ethanol_configurations)
+cellulosic_oil_configurations = oil_configurations.intersection(cellulosic_configurations)
 
-configuration_names = (
-    'S1', 'O1', 'S2', 'O2', 'S1*', 'O1*', 'S2*', 'O2*', 'O3', 'O4', 'O5', 'O6', 'O7', 'O8', # 'O9', 'O10',
-    'S2+', 'O2+', 'S2*+', 'O2*+', 'O4+', 'O6+', 'O8+', # 'O9'
-)
-comparison_names = ( 
-    'O1 - S1', 'O2 - S2',  'O2 - O1', 'O1* - O1',  'O2* - O2', 'O5 - O7',
-    'O6 - O8', 'O5 - O7', 'O6 - O5', 'O8 - O7',
-)
 system_factories = {
     -1: create_sugarcane_to_ethanol_system,
     -2: create_sugarcane_to_ethanol_combined_1_and_2g,
@@ -171,6 +164,7 @@ class Biorefinery:
     cache = {}
     dry_biomass_yield = None # MT / hc
     baseline_dry_biomass_yield = 39 # MT / hc 
+    set_feedstock_line = set_line_composition_parameters
     
     @property
     def chemicals(self):
@@ -203,7 +197,7 @@ class Biorefinery:
         
     def __new__(cls, name, chemicals=None, reduce_chemicals=False, 
                  avoid_natural_gas=True, conversion_performance_distribution=None,
-                 year=None, cache=cache):
+                 year=None, cache=cache, feedstock_line=None):
         if year is None: year = 2022
         if conversion_performance_distribution is None: 
             conversion_performance_distribution = "longterm"
@@ -447,8 +441,8 @@ class Biorefinery:
                 # outs: stream sequence
                 # [0] Advanced biofuel ethanol
                 # [1] Cellulosic biofuel ethanol
-                glucose_yield = fermentor.cofermentation.X[0]
-                xylose_yield = fermentor.cofermentation.X[1]
+                glucose_yield = fermentor.cofermentation[0].product_yield('Ethanol', 'wt')
+                xylose_yield = fermentor.cofermentation[1].product_yield('Ethanol', 'wt')
                 juice_sugar = s.juice.imass['Glucose', 'Sucrose'].sum() * glucose_yield
                 hydrolysate_sugar = (
                     s.slurry.imass['Glucose'] * glucose_yield
@@ -481,8 +475,8 @@ class Biorefinery:
                     # outs: stream sequence
                     # [0] Biomass based diesel
                     # [1] Cellulosic based diesel
-                    glucose_yield = fermentor.cofermentation.X[0]
-                    xylose_yield = fermentor.cofermentation.X[1]
+                    glucose_yield = fermentor.cofermentation[0].product_yield('TriOlein', 'wt')
+                    xylose_yield = fermentor.cofermentation[1].product_yield('TriOlein', 'wt')
                     juice_sugar = s.juice.imass['Glucose', 'Sucrose'].sum() * glucose_yield
                     hydrolysate_sugar = (
                         s.slurry.imass['Glucose'] * glucose_yield
@@ -644,10 +638,7 @@ class Biorefinery:
         def set_natural_gas_price(price): # Triangular distribution fitted over the past 10 years Sep 2009 to March 2021
             BT.natural_gas_price = price * V_ng
     
-        # https://www.eia.gov/outlooks/aeo/pdf/00%20AEO2021%20Chart%20Library.pdf
-        # Data from historical prices, 2010-2020
-        @triangular(0.0583, 0.065, 0.069, units='USD/kWhr',
-                    baseline=0.0637)
+        @parameter(distribution=dist.electricity_price_distribution, units='USD/kWhr', baseline=dist.mean_electricity_price)
         def set_electricity_price(electricity_price): 
             bst.PowerUtility.price = electricity_price
         
@@ -1133,27 +1124,28 @@ class Biorefinery:
             else:
                 return 0.
     
-        def competitive_oilcane_biomass_yield_objective(biomass_yield, IRR_target):
-            self.update_dry_biomass_yield(biomass_yield * self.baseline_dry_biomass_yield)
-            return tea.solve_IRR() - IRR_target
-    
-        @metric(name='Competitive oilcane biomass yield', element=feedstock, units='% sugarcane')
-        def competitive_oilcane_biomass_yield():
-            if name not in oil_configurations: return np.nan
-            oil = composition_specification.oil
-            material_data = sys.get_material_data()
-            composition_specification.load_oil_content(0)
-            sys.simulate()
-            self.update_dry_biomass_yield(self.baseline_dry_biomass_yield)
-            IRR_target = tea.solve_IRR()
-            composition_specification.load_oil_content(oil)
-            sys.simulate(material_data=material_data)
-            return flx.IQ_interpolation(
-                competitive_oilcane_biomass_yield_objective, 0.2, 2., 
-                args=(IRR_target,), x=competitive_oilcane_biomass_yield.cache,
-            )
-            
+        @metric(units='%')
+        def ROI():
+            return 100. * tea.ROI
         
+        def competitive_oilcane_biomass_yield_objective(biomass_yield):
+            self.update_dry_biomass_yield(biomass_yield * self.baseline_dry_biomass_yield)
+            return tea.ROI - self.ROI_sugarcane
+        
+        @metric(name='Competitive oilcane biomass yield', element='Biorefinery', units='% sugarcane')
+        def competitive_oilcane_biomass_yield():
+            if number not in oil_configurations or self.ROI_sugarcane is None: return np.nan
+            if composition_specification.oil == 0: return 100.
+            f = competitive_oilcane_biomass_yield_objective
+            x0 = 0.2
+            x1 = 2.
+            if (y0:=f(x0)) > 0. or (y1:=f(x1)) < 0.:
+                return np.nan
+            else:
+                return 100. * flx.IQ_interpolation(
+                    f, x0, x1, y0, y1,
+                )
+            
         # Single point evaluation for detailed design results
         def set_baseline(p, x):
             p.setter(x)
@@ -1195,7 +1187,9 @@ class Biorefinery:
         self.configuration = configuration
         self.composition_specification = composition_specification
         self.oil_extraction_specification = oil_extraction_specification
+        self.ROI_sugarcane = None
         self.__dict__.update(flowsheet.to_dict())
+        if feedstock_line: self.set_feedstock_line(feedstock_line)
         if cache is not None: cache[key] = self
         
         ## Simulation

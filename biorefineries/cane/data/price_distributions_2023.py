@@ -30,7 +30,7 @@ __all__ = (
 )
 
 liter_per_gal = 3.7854
-RINfile = os.path.join(os.path.dirname(__file__), 'RIN_prices_2022.csv')
+RINfile = os.path.join(os.path.dirname(__file__), 'RIN_prices_2023.csv')
 df_RIN = pd.read_csv(RINfile)
 df_D3 = df_RIN[df_RIN['Fuel (D Code)'] == 'D3'] # Cellulosic ethanol
 df_D4 = df_RIN[df_RIN['Fuel (D Code)'] == 'D4'] # Biodiesel
@@ -68,27 +68,28 @@ RIN_D6_prices = get_RIN_credit_by_year_June2017_to_May2022(df_D6) / liter_per_ga
 
 # %% Raw data
 
-ethanol_no_RIN_prices = np.array([ # USD / gal May 2017 - Dec 2020, by month
-    1.6, 1.62, 1.64, 1.55, 1.19, 0.98, 0.95, 1.0, 1.11, 1.25, 1.31,
+ethanol_no_RIN_prices = np.array([ # USD / gal Aug 2017 - Dec 2020, by month
+    1.55, 1.19, 0.98, 0.95, 1.0, 1.11, 1.25, 1.31,
     1.34, 1.4, 1.41, 1.31, 1.2, 1.21, 1.19, 1.08, 1.09, 1.12, 1.18, 1.17,
     1.21, 1.36, 1.31, 1.3, 1.22, 1.39, 1.44, 1.32, 1.15, 1.03, 0.84, 0.59,
     0.75, 0.85, 0.91, 0.87, 0.95, 0.94, 0.78, 0.6, 
 ]) / liter_per_gal
 
-ethanol_with_D6RIN_prices = np.array([ # USD / gal Jan 2021  - May 2022, by month
+ethanol_with_D6RIN_prices = np.array([ # USD / gal Jan 2021  - Aug 2022, by month
     1.55, 1.73, 1.87, 2.15, 2.62, 2.53, 2.37, 2.35, 2.52, 2.62, 3.42, 3.11, 
-    2.22, 2.17, 2.49, 2.64, 2.82
+    2.22, 2.17, 2.49, 2.64, 2.82, 2.91, 2.80, 2.72
 ]) / liter_per_gal
 
 assert len(ethanol_no_RIN_prices) + len(ethanol_with_D6RIN_prices) == 5 * 12
 
 # Includes RIN D4
-biomass_based_diesel_prices = np.array([ # USD / gal June 2017 - June 2022, by month
-    3.13, 3.23, 3.31, 3.33, 3.3, 3.34, 3.23, 3.45, 3.16, 3.04, 3.02, 3.13,
+biomass_based_diesel_prices = np.array([ # USD / gal June 2017 - Sep 2022, by month
+    3.33, 3.3, 3.34, 3.23, 3.45, 3.16, 3.04, 3.02, 3.13,
     3.11, 3.02, 3.01, 3.04, 3.09, 3.09, 3.06, 3.12, 3.24, 3.08, 2.98, 2.86,
     2.87, 2.91, 2.99, 3.06, 3.13, 3.21, 3.26, 3.35, 3.11, 2.97, 2.77, 2.74, 
     2.87, 2.92, 3.12, 3.3, 2.88, 3.51, 3.61, 4.08, 4.5, 4.91, 5.0, 5.5, 5.99, 
-    5.95, 5.91, 5.71, 5.6, 5.49, 4.88, 4.83, 6.03, 6.5, 6.99, 7.53, 7.35
+    5.95, 5.91, 5.71, 5.6, 5.49, 4.88, 4.83, 6.03, 6.5, 6.99, 7.53, 7.35, 
+    6.63, 6.59, 6.72
 ]) / liter_per_gal
 
 def by_month_to_year(arr):
@@ -112,6 +113,9 @@ natural_gas_prices = np.array([ # City gate [USD / mcf] 2017 to 2021, mcf = 1,00
     4.16, 4.23, 3.81, 3.43, 6.11
 ]) * 35.3146667/1e3 # To USD / m3
 
+electricity_prices = np.array([ # Industrial retail prices, 2011 to 2021 https://www.eia.gov/electricity/data.php
+    6.82, 6.67, 6.89, 7.10, 6.91, 6.76, 6.88, 6.92, 6.81, 6.67, 7.18
+]) / 100.
 
 # %% Shorten data to 2017 - 2022 because of data limitations for cellulosic ethanol RINs 
 
@@ -164,10 +168,7 @@ cellulosic_ethanol_price_distribution = triangular_distribution(cellulosic_ethan
 biomass_based_diesel_price_distribution = triangular_distribution(biomass_based_diesel_prices)
 cellulosic_based_diesel_price_distribution = triangular_distribution(cellulosic_based_diesel_prices)
 natural_gas_price_distribution = triangular_distribution(natural_gas_prices)
-
-# https://www.eia.gov/outlooks/aeo/pdf/00%20AEO2021%20Chart%20Library.pdf
-# Data from historical prices, 2010-2020
-electricity_price_distribution = shape.Triangle(0.0583, 0.065, 0.069)
+electricity_price_distribution = triangular_distribution(electricity_prices)
 
 # Mean values
 mean_glycerol_price = (0.10 + 0.22) * 0.5 
@@ -179,7 +180,7 @@ mean_advanced_ethanol_price = np.mean(advanced_ethanol_prices)
 mean_biomass_based_diesel_price = np.mean(biomass_based_diesel_prices)
 mean_cellulosic_based_diesel_price = np.mean(cellulosic_based_diesel_prices)
 mean_natural_gas_price = np.mean(natural_gas_prices)
-mean_electricity_price = sum([0.0583, 0.065, 0.069]) / 3.
+mean_electricity_price = np.mean(electricity_prices)
 mean_soymeal_price = 0.33 # 10 yr average; https://markets.businessinsider.com/commodities/soybean-meal-price?op=1
 
 # Short hand distributions names
