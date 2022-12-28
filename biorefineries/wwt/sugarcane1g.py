@@ -51,7 +51,7 @@ def create_sc1g_comparison_systems(biodegradability=1): # will be multiplied by 
     wwt_kwdct = dict.fromkeys(('IC_kwargs', 'AnMBR_kwargs',), {'biodegradability': biodegradability,})
     wwt_kwdct['skip_AeF'] = True
     sys_dct = {
-        'load': {'name': 'S1', 'reduce_chemicals': False},
+        'load': {'name': 'S1', 'cache': None, 'reduce_chemicals': False},
         'system_name': 'sugarcane_sys',
         'create_wastewater_process': wwt_kwdct,
         # `wastewater` is mixed from `fiber_fines` (taken care of),
