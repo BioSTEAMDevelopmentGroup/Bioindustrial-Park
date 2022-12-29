@@ -44,7 +44,7 @@ def create_tea(lactic_sys=None, OSBL_units=None, flowsheet=None):
 
     # 907.1847 is auom('ton').conversion_factor('kg')
     feedstock = s.feedstock
-    flow_tpd = (feedstock.F_mass-feedstock.imass['H2O'])*24/907.1847*(1-u.U101.diversion_to_CHP)
+    flow_tpd = (feedstock.F_mass-feedstock.imass['H2O'])*24/907.1847*(1-u.U101.divert_ratio)
 
     lactic_tea = LacticTEA(
             system=lactic_sys, IRR=0.10, duration=(2016, 2046),
@@ -60,6 +60,6 @@ def create_tea(lactic_sys=None, OSBL_units=None, flowsheet=None):
             labor_cost=3212962*flow_tpd/2205,
             labor_burden=0.90, property_insurance=0.007, maintenance=0.03,
             steam_power_depreciation='MACRS20',
-            boiler_turbogenerator=u.CHP,
+            boiler_turbogenerator=u.BT,
             )
     return lactic_tea

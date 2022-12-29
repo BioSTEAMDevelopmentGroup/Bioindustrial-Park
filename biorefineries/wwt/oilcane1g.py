@@ -60,12 +60,11 @@ def create_oc1g_comparison_systems(biodegradability=1): # will be multiplied by 
     sys_dct = {
         'load': {'name': 'O1', 'cache': None, 'reduce_chemicals': False},
         'system_name': 'oilcane_sys',
-        'BT': 'BT701',
+        'BT': 'BT601',
         'create_wastewater_process': wwt_kwdct,
         'ww_streams': ('fiber_fines', 'wastewater', 'vinasse',),
-        'solids_streams': ('filter_cake', ('M701', 0),),
-        'BT': 'BT701',
-        'new_wwt_connections': {'solids': ('BT701', 0), 'biogas': ('BT701', 1)},
+        'solids_streams': ('filter_cake', ('M601', 0),),
+        'new_wwt_connections': {'solids': ('BT601', 0), 'biogas': ('BT601', 1)},
         'CF_dct': CF_dct,
         }
     exist_sys, new_sys = create_comparison_systems(info, oc, sys_dct)
@@ -96,7 +95,7 @@ def create_oc1g_comparison_models():
         'FERM_product': info['FERM_product'],
         'PT_rx': 'R301',
         'fermentor': 'R301',
-        'TE_rx': 'U601',
+        'TE_rx': 'U501',
         'isplit_efficiency_is_reversed': False,
         'reactions': {
             'PT glucan-to-glucose': ('hydrolysis_reaction', ),
@@ -104,7 +103,7 @@ def create_oc1g_comparison_models():
             'FERM oil-to-FFA': ('oil_reaction', 0), # not fermentation, but happens in the fermentor
             'TE oil-to-product': ('transesterification', (0, 1, 2)),
             },
-        'BT': 'BT701',
+        'BT': 'BT601',
         'BT_eff': ('boiler_efficiency', 'turbogenerator_efficiency'),
         'wwt_system': 'exist_sys_wwt',
         'wwt_ID': info['WWT_ID'],
