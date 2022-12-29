@@ -9,7 +9,7 @@
 """
 import biosteam as bst
 from biosteam.process_tools import UnitGroup
-from biorefineries import corn as cn
+from biorefineries import corn
 from biorefineries.tea import ConventionalEthanolTEA
 
 __all__ = ('create_tea', 'tea_summary')
@@ -24,7 +24,8 @@ def create_tea(system, cls=ConventionalEthanolTEA):
                property_tax=0.001, property_insurance=0.005,
                supplies=0.20, maintenance=0.01, administration=0.005)
 
-def tea_summary():
+def tea_summary(*args, **kwargs):
+    cn = corn.Biorefinery(*args, **kwargs)
     operating_days = cn.corn_tea.operating_days
     f = operating_days * 24
     ug = UnitGroup('biorefinery', cn.corn_tea.units)

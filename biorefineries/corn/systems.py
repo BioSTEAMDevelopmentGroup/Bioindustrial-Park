@@ -8,9 +8,9 @@
 """
 """
 import biosteam as bst
-from biorefineries import corn as cn
 from biorefineries.ethanol import create_ethanol_purification_system
-from ._process_settings import price
+from .process_settings import price
+from . import units
 
 __all__ = ('create_system',)
 
@@ -98,21 +98,20 @@ def create_system(ID='corn_sys', flowsheet=None):
         
     ### Units ###
     
-    u = cn.units
-    MH101 = u.GrainHandling('MH101', corn)
+    MH101 = units.GrainHandling('MH101', corn)
     MH101.add_specification(refresh_feed_specifications)
-    V102 = u.CornStorage('V102', MH101-0)
-    MH103 = u.CleaningSystem('MH103', V102-0, split=0.997)
-    M104 = u.HammerMill('M104', MH103-0)
-    V105 = u.MilledCornSurgeTank('V105', M104-0)
-    W106 = u.MilledCornHopper('W106', V105-0)
-    V107 = u.MilledCornWeighTank('V107', W106-0)
-    V301 = u.AlphaAmylaseTank('V301', alpha_amylase)
+    V102 = units.CornStorage('V102', MH101-0)
+    MH103 = units.CleaningSystem('MH103', V102-0, split=0.997)
+    M104 = units.HammerMill('M104', MH103-0)
+    V105 = units.MilledCornSurgeTank('V105', M104-0)
+    W106 = units.MilledCornHopper('W106', V105-0)
+    V107 = units.MilledCornWeighTank('V107', W106-0)
+    V301 = units.AlphaAmylaseTank('V301', alpha_amylase)
     P302 = bst.Pump('P302', V301-0)
-    V303 = u.AmmoniaTank('V303', ammonia)
+    V303 = units.AmmoniaTank('V303', ammonia)
     P304 = bst.Pump('P304', V303-0)
-    V305 = u.LimeHopper('V305', lime)
-    V307 = u.SlurryMixTank('V307', (V107-0, P302-0, P304-0, V305-0, recycled_process_water, backwater))
+    V305 = units.LimeHopper('V305', lime)
+    V307 = units.SlurryMixTank('V307', (V107-0, P302-0, P304-0, V305-0, recycled_process_water, backwater))
     @V307.add_specification(run=True)
     def correct_recycle_dilution_water():
         F_mass_others = MH101._F_mass_others + backwater.F_mass
@@ -121,29 +120,29 @@ def create_system(ID='corn_sys', flowsheet=None):
     
     P311 = bst.Pump('P311', V307-0, P=1e6)
     E312 = bst.HXprocess('E312', (P311-0, None), U=0.56783, ft=1.0, T_lim0=410.)
-    E313 = u.JetCooker('E313', (E312-0, steam))
-    V314 = u.CookedSlurrySurgeTank('V314', E313-0)
+    E313 = units.JetCooker('E313', (E312-0, steam))
+    V314 = units.CookedSlurrySurgeTank('V314', E313-0)
     P308 = bst.Pump('P308', V314-0)
     P308-0-1-E312
     # E315 = bst.HXutility('E315', E312-1, U=0.9937, ft=1.0, T= + 273.15)
     
     HX101 = bst.HXutility('HX101', E312-1, U=1.5, T=87 + 273.15, ft=1.0)
-    V310 = u.Liquefaction('V310', HX101-0)
+    V310 = units.Liquefaction('V310', HX101-0)
     E316 = bst.HXprocess('E316', (V310-0, None), U=0.85174, ft=1.0, dT=12)
     
-    V317 = u.GlucoAmylaseTank('V317', gluco_amylase)
+    V317 = units.GlucoAmylaseTank('V317', gluco_amylase)
     P318 = bst.Pump('P318', V317-0)
-    V319 = u.SulfuricAcidTank('V319', sulfuric_acid)
+    V319 = units.SulfuricAcidTank('V319', sulfuric_acid)
     P320 = bst.Pump('P320', V319-0)
-    V321 = u.Saccharification('V321', (P318-0, P320-0, E316-0))
+    V321 = units.Saccharification('V321', (P318-0, P320-0, E316-0))
     P322 = bst.Pump('P322', V321-0)
     E401 = bst.HXprocess('E401', (P322-0, None),
                          phase0='l', phase1='l',
                          U=0.99370, ft=0.85)
     E402 = bst.HXutility('E402', E401-0, ft=0.95, U=0.9937, T=32.2 + 273.15)
-    V403 = u.YeastTank('V403', yeast)
+    V403 = units.YeastTank('V403', yeast)
     P404 = bst.Pump('P404', V403-0)
-    V405 = u.SSF('V405', (E402-0, P404-0), outs=('CO2', ''), V=1.9e3)
+    V405 = units.SSF('V405', (E402-0, P404-0), outs=('CO2', ''), V=1.9e3)
     P406 = bst.Pump('P406', V405-1)
     P407 = bst.Pump('P407', E401-1)
     P407-0-1-E316
@@ -190,17 +189,17 @@ def create_system(ID='corn_sys', flowsheet=None):
             'Distillation bottoms product pump': 'P508',
         }
     )
-    f = flowsheet or cn.flowsheet
-    fu = f.unit
-    fu.X504.approx_duty = False
-    fu.T501.Rmin = 0.0001
-    fu.T503_T507.k = 1.05
-    fu.T501.P = 101325
-    fu.P502-0-1-E413
-    fu.MX4.denaturant_fraction = 0.04345
+    f = flowsheet or bst.main_flowsheet
+    u = f.unit
+    u.X504.approx_duty = False
+    u.T501.Rmin = 0.0001
+    u.T503_T507.k = 1.05
+    u.T501.P = 101325
+    u.P502-0-1-E413
+    u.MX4.denaturant_fraction = 0.04345
     V601 = bst.MixTank('V601', E413-1)
     P602 = bst.Pump('P602', V601-0)
-    C603 = u.DDGSCentrifuge('C603', P602-0,
+    C603 = units.DDGSCentrifuge('C603', P602-0,
         split=dict(
             Water=0.8285,
             Ethanol=0.8285,
@@ -212,7 +211,7 @@ def create_system(ID='corn_sys', flowsheet=None):
             SolubleProtein=0.8285,
             InsolubleProtein=0.08)
     )
-    MH604 = u.WetDDGSConveyor('MH604', C603-1)
+    MH604 = units.WetDDGSConveyor('MH604', C603-1)
     S1 = bst.Splitter('S1', C603-0, (backwater, ''), split=0.208)
     V605 = bst.MixTank('V605', S1-1)
     P606 = bst.Pump('P606', V605-0)
@@ -223,11 +222,11 @@ def create_system(ID='corn_sys', flowsheet=None):
     ) 
     C603_2 = bst.LiquidsSplitCentrifuge('C603_2', Ev607-0, (crude_oil, ''), split={'Oil':0.99})
     
-    MX5 = bst.Mixer('MX5', (Ev607-1, P410-0, fu.P508-0))
+    MX5 = bst.Mixer('MX5', (Ev607-1, P410-0, u.P508-0))
     MX6 = bst.Mixer('MX6', (C603_2-1, MH604-0))
     D610 = bst.DrumDryer('D610', (MX6-0, 'dryer_air', 'natural_gas'), moisture_content=0.10, split=dict(Ethanol=1.0))
     X611 = bst.ThermalOxidizer('X611', (D610-1, 'oxidizer_air', ''))
-    MH612 = u.DDGSHandling('MH612', D610-0, DDGS)
+    MH612 = units.DDGSHandling('MH612', D610-0, DDGS)
     T608 = bst.facilities.ProcessWaterCenter(
         'T608', 
         (MX5-0, 'makeup_water'), 
@@ -236,9 +235,9 @@ def create_system(ID='corn_sys', flowsheet=None):
         (),
         (recycled_process_water,)
     )
-    other_facilities = u.PlantAir_CIP_WasteWater_Facilities('other_facilities', corn)
+    other_facilities = units.PlantAir_CIP_WasteWater_Facilities('other_facilities', corn)
     HXN = bst.HeatExchangerNetwork('HXN', 
-        units=lambda: [fu.Ev607.evaporators[0], fu.T503_T507.condenser]
+        units=lambda: [u.Ev607.evaporators[0], u.T503_T507.condenser]
     )
     globals().update(f.unit.data)
     return f.create_system('corn_sys')

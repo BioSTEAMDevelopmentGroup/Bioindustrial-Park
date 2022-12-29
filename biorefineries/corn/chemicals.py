@@ -10,9 +10,11 @@
 import thermosteam as tmo
 from biorefineries.cane import create_oilcane_chemicals
 from biorefineries.cellulosic import create_cellulosic_ethanol_chemicals
+from thermosteam.utils import chemical_cache
 
 __all__ = ('create_chemicals',)
 
+@chemical_cache
 def create_chemicals():
     oc_chemicals = create_oilcane_chemicals()
     chemicals = oc_chemicals['Water', 'Ethanol', 'Glucose', 'H3PO4', 'P4O10', 
