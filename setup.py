@@ -30,6 +30,7 @@ setup(
                            'ethanol/*',
                            'biodiesel/*',
                            'biodiesel/units/*',
+                           'tea/*',
                            'lipidcane/*', 
                            'lipidcane/utils/*', 
                            'oilcane/*',
