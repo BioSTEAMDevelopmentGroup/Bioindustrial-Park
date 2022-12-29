@@ -16,7 +16,6 @@ References
 import biosteam as bst
 from biosteam import SystemFactory
 from . import streams as s
-from . import units
 
 __all__ = (
     'create_beer_distillation_system',
@@ -89,7 +88,7 @@ def create_ethanol_purification_system_after_beer_column(ins, outs, IDs={}):
                            T=115+273.15, V=1, heat_only=True)
     
     # Molecular sieve
-    U301 = units.MolecularSieve(IDs.get('Molecular sieves', 'U301'),
+    U301 = bst.MolecularSieve(IDs.get('Molecular sieves', 'U301'),
                                 split=(2165.14/13356.04, 1280.06/1383.85),
                                 order=('Ethanol', 'Water'))
     

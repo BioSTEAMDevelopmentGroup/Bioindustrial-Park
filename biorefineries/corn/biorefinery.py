@@ -32,6 +32,7 @@ class Biorefinery:
         self = super().__new__(cls)
         bst.settings.set_thermo(self.chemicals)
         load_process_settings()
+        self.flowsheet = flowsheet
         self.corn_sys = self.sys = sys = create_system()
         sys.simulate()
         self.corn_tea = self.tea = tea = create_tea(sys)
