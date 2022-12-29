@@ -21,6 +21,8 @@ setup(
         {'biorefineries': ['biorefineries/*',
                            'cane/*',
                            'cane/systems/*',
+                           'cane/systems/oilcane/*',
+                           'cane/systems/sugarcane/*',
                            'cane/units/*',
                            'cane/data/*',
                            'cellulosic/*',
