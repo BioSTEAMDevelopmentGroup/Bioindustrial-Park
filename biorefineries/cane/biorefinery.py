@@ -296,7 +296,10 @@ class Biorefinery:
                             material_data = recycle_data[key]
                         else:
                             recycle_data[key] = material_data = cane_sys.get_material_data()
-                        cane_sys.simulate(material_data=material_data, update_material_data=True)
+                        try:
+                            cane_sys.simulate(material_data=material_data, update_material_data=True)
+                        except:
+                            cane_sys.simulate()
                         excess = BT._excess_electricity_without_natural_gas
                         if fraction_burned == minimum_fraction_burned and excess > 0:
                             splitter.neglect_natural_gas_streams = False # No need to neglect
@@ -741,20 +744,21 @@ class Biorefinery:
         @performance(60 if fed_batch else 49.5, 95, units='%', element='Cofermenation', kind='coupled')
         def set_glucose_to_microbial_oil_yield(glucose_to_microbial_oil_yield):
             glucose_to_microbial_oil_yield *= 0.01
-            cell_growth = 0.99 - glucose_to_microbial_oil_yield # Almost all the rest goes towards cell mass
+            cell_growth = min(0.99 - glucose_to_microbial_oil_yield, 0.3 * glucose_to_microbial_oil_yield) # Almost all the rest goes towards cell mass
             if number in cellulosic_oil_configurations:
                 seed_train.reactions.X[0] = fermentor.cofermentation.X[0] = glucose_to_microbial_oil_yield 
                 seed_train.reactions.X[2] = fermentor.cofermentation.X[2] = cell_growth
             elif number in oil_configurations:
-                fermentor.fermentation_reaction[0] = glucose_to_microbial_oil_yield
-                fermentor.cell_growth_reaction[0] = cell_growth
+                fermentor.fermentation_reaction.X[0] = glucose_to_microbial_oil_yield
+                fermentor.cell_growth_reaction.X[0] = cell_growth
         
         @performance(60 if fed_batch else 49.5, 95, units='%', element='Cofermenation', kind='coupled')
         def set_xylose_to_microbial_oil_yield(xylose_to_microbial_oil_yield):
             if number in cellulosic_oil_configurations:
                 xylose_to_microbial_oil_yield *= 0.01
+                cell_growth = min(0.99 - xylose_to_microbial_oil_yield, 0.3 * xylose_to_microbial_oil_yield)
                 seed_train.reactions.X[1] = fermentor.cofermentation.X[1] = xylose_to_microbial_oil_yield 
-                seed_train.reactions.X[3] = fermentor.cofermentation.X[3] = 0.99 - xylose_to_microbial_oil_yield # Almost all the rest goes towards cell mass
+                seed_train.reactions.X[3] = fermentor.cofermentation.X[3] = cell_growth # Almost all the rest goes towards cell mass
     
         @performance(89.4 if fed_batch else 27.4, 137, units='g/L', element='Cofermentation', kind='coupled')
         def set_cofermentation_microbial_oil_titer(microbial_oil_titer):
@@ -1130,11 +1134,11 @@ class Biorefinery:
         
         def competitive_oilcane_biomass_yield_objective(biomass_yield):
             self.update_dry_biomass_yield(biomass_yield * self.baseline_dry_biomass_yield)
-            return tea.ROI - self.ROI_sugarcane
+            return tea.ROI - self.ROI_oilcane_target
         
         @metric(name='Competitive oilcane biomass yield', element='Biorefinery', units='% sugarcane')
         def competitive_oilcane_biomass_yield():
-            if number not in oil_configurations or self.ROI_sugarcane is None: return np.nan
+            if self.ROI_oilcane_target is None: return np.nan
             if composition_specification.oil == 0: return 100.
             f = competitive_oilcane_biomass_yield_objective
             x0 = 0.2
@@ -1145,6 +1149,30 @@ class Biorefinery:
                 return 100. * flx.IQ_interpolation(
                     f, x0, x1, y0, y1,
                 )
+            
+        def competitive_microbial_oil_yield_objective(microbial_oil_yield):
+            self.update_dry_biomass_yield(self.baseline_dry_biomass_yield)
+            set_glucose_to_microbial_oil_yield.setter(microbial_oil_yield)
+            set_xylose_to_microbial_oil_yield.setter(microbial_oil_yield)
+            self.sys.simulate()
+            return tea.ROI - self.ROI_microbial_oil_target
+        
+        @metric(name='Competitive microbial oil yield', element='Biorefinery', units='wt. %')
+        def competitive_microbial_oil_yield():
+            if self.ROI_microbial_oil_target is None: return np.nan
+            f = competitive_microbial_oil_yield_objective
+            x0 = 20
+            x1 = 95
+            if (y0:=f(x0)) > 0. or (y1:=f(x1)) < 0.:
+                return np.nan
+            else:
+                flx.IQ_interpolation(
+                    f, x0, x1, y0, y1, xtol=1e-2, ytol=1e-3,
+                )
+                if number in cellulosic_oil_configurations:
+                    return 100. * fermentor.cofermentation[0].product_yield(product='TriOlein', basis='wt')
+                elif number in oil_configurations:
+                    return 100. * fermentor.fermentation_reaction[0].product_yield(product='TriOlein', basis='wt')
             
         # Single point evaluation for detailed design results
         def set_baseline(p, x):
@@ -1187,7 +1215,8 @@ class Biorefinery:
         self.configuration = configuration
         self.composition_specification = composition_specification
         self.oil_extraction_specification = oil_extraction_specification
-        self.ROI_sugarcane = None
+        self.ROI_oilcane_target = None
+        self.ROI_microbial_oil_target = None
         self.__dict__.update(flowsheet.to_dict())
         if feedstock_line: self.set_feedstock_line(feedstock_line)
         if cache is not None: cache[key] = self

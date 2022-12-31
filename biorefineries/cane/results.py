@@ -49,7 +49,11 @@ def monte_carlo_file(name, across_lines=False, across_oil_content=None, extentio
     if agile: filename += '_agile'
     if energycane: filename += '_energycane'
     if across_lines: filename += '_across_lines'
-    if across_oil_content: filename += '_across_lines_across_oil_content'
+    if across_oil_content: 
+        if isinstance(across_oil_content, str):
+            filename += f"_{across_oil_content.replace(' ', '_')}"
+        else:
+            filename += '_across_oil_content'
     filename += '.' + extention
     return os.path.join(results_folder, filename)
 

@@ -478,7 +478,7 @@ def create_cane_to_combined_1_and_2g_fermentation(
                 return target_titer - get_titer()
             dilution_water.imass['Water'] = 0.
             x0 = 0
-            x1 = 0.999
+            x1 = 0.99
             y0 = f(x0)
             if y0 < 0.:
                 product = float(beer.imass[product_group])
@@ -490,12 +490,15 @@ def create_cane_to_combined_1_and_2g_fermentation(
                 y1 = f(x1)
                 if y1 > 0.:
                     long_path = [SX0, EvX, *sugar_path]
-                    for split in (0.15, 0.10, 0.5, 0.):
+                    for split in (0.15, 0.10, 0.05, 0.):
                         SX0.split[:] = split
                         for i in long_path: i.run()
                         y1 = f(x1)
                         if y1 < 0.: break
-                SX1.split[:] = flx.IQ_interpolation(f, x0, x1, y0, y1, x=SX1.split[0], ytol=1e-5, xtol=1e-6)
+                if y1 < 0:
+                    SX1.split[:] = flx.IQ_interpolation(f, x0, x1, y0, y1, x=SX1.split[0], ytol=1e-5, xtol=1e-6)
+                else:
+                    target_titer = get_titer() # Cannot achieve target titer, so just go with the highest
             cofermentation.tau = target_titer / cofermentation.productivity 
             SX0.split[:] = 0.2 # Restart
     else:

@@ -4,7 +4,7 @@ Created on Fri Jun  4 23:44:10 2021
 
 @author: yrc2
 """
-from biorefineries import oilcane as oc
+from biorefineries import cane
 import biosteam as bst
 import numpy as np
 from biosteam.utils import colors, GG_colors
@@ -208,7 +208,7 @@ def metrics_across_oil_and_fiber_content(configuration, load):
         filterwarnings('ignore')
         # This returns data of all metrics for the given configuration,
         # but we are mainly interested in MFPP and productivity in L biodiesel per MT cane.
-        data = oc.evaluate_metrics_across_composition(
+        data = cane.evaluate_metrics_across_composition(
             X, Y, Z, configuration,
         ) 
     np.save(file, data)
@@ -221,8 +221,8 @@ def plot_metrics_across_composition(
     ):
     if configuration is None: configuration = 'O2'
     metric_indices=[0, 2]
-    MFPP = oc.all_metric_mockups[0] # Maximum feedstock purchase price
-    BP = oc.all_metric_mockups[2] # Biodiesel production
+    MFPP = cane.all_metric_mockups[0] # Maximum feedstock purchase price
+    BP = cane.all_metric_mockups[2] # Biodiesel production
     # EP = oc.all_metric_mockups[5] # Energy production
     X, Y, Z, data = metrics_across_oil_and_fiber_content(load)
     data = data[:, :, :, metric_indices]
@@ -253,7 +253,7 @@ def plot_metrics_across_composition(
                 return column
         raise RuntimeError('could not determine axis with similar moisture content')
     
-    df = oc.get_composition_data()
+    df = cane.get_composition_data()
     names = df.index
     lines = []
     for name, color in zip(names, line_colors):
@@ -295,7 +295,7 @@ def relative_sorghum_oil_content_and_cane_oil_content_data(load, relative):
     if load:
         data = np.load(file)
     else:
-        data = oc.evaluate_configurations_across_sorghum_and_cane_oil_content(
+        data = cane.evaluate_configurations_across_sorghum_and_cane_oil_content(
             X, Y, configurations, relative,
         )
     np.save(file, data)
@@ -315,8 +315,8 @@ def plot_relative_sorghum_oil_content_and_cane_oil_content_contours(
     ylabel = 'Oilcane oil content\n[dry wt. %]'
     yticks = [5, 7.5, 10, 12.5, 15]
     xticks = [-3, -2, -1, 0] if relative else [2, 5, 7.5, 10, 12.5, 15]
-    MFPP = oc.all_metric_mockups[0]
-    TCI = oc.all_metric_mockups[6]
+    MFPP = cane.all_metric_mockups[0]
+    TCI = cane.all_metric_mockups[6]
     if configuration_index == 0:
         Z = np.array(["Direct Cogeneration"])
         data = data[:, :, :, np.newaxis]
@@ -390,7 +390,7 @@ def plot_recovery_and_oil_content_contours(
     if load:
         data = np.load(file)
     else:
-        data = oc.evaluate_configurations_across_recovery_and_oil_content(
+        data = cane.evaluate_configurations_across_recovery_and_oil_content(
             X, Y, configurations,
         )
     np.save(file, data)
@@ -413,7 +413,7 @@ def plot_recovery_and_oil_content_contours(
                f'Integrated Co-Fermentation\n{ylabel}']
     xticks = [40, 50, 60, 70, 80, 90, 100]
     
-    metric = oc.all_metric_mockups[metric_index]
+    metric = cane.all_metric_mockups[metric_index]
     units = metric.units if metric.units == '%' else format_units(metric.units)
     if cmap is None: cmap = colormaps[metric_index]
     mb = lambda x, name=None: MetricBar(
