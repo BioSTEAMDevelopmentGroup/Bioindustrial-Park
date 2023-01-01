@@ -1,12 +1,57 @@
 # -*- coding: utf-8 -*-
 """
-Created on Thu Jun  6 00:55:03 2019
+.. contents:: :local:
 
-Equipment from the Humbird 2011 Report.
-    
-Humbird, D., Davis, R., Tao, L., Kinchin, C., Hsu, D., Aden, A., Dudgeon, D. (2011). Process Design and Economics for Biochemical Conversion of Lignocellulosic Biomass to Ethanol: Dilute-Acid Pretreatment and Enzymatic Hydrolysis of Corn Stover (No. NREL/TP-5100-47764, 1013269). https://doi.org/10.2172/1013269
+Reactors
+--------
+.. autoclass:: biorefineries.cellulosic.units.PretreatmentReactorSystem
+.. autoclass:: biorefineries.cellulosic.units.SeedTrain
+.. autoclass:: biorefineries.cellulosic.units.ContinuousPresaccharification
+.. autoclass:: biorefineries.cellulosic.units.Saccharification
+.. autoclass:: biorefineries.cellulosic.units.CoFermentation
+.. autoclass:: biorefineries.cellulosic.units.SaccharificationAndCoFermentation
+.. autoclass:: biorefineries.cellulosic.units.SimultaneousSaccharificationAndCoFermentation
 
-@author: yoelr
+Separations
+-----------
+.. autoclass:: biorefineries.cellulosic.units.ReverseOsmosis
+.. autoclass:: biorefineries.cellulosic.units.Nanofilter
+.. autoclass:: biorefineries.cellulosic.units.HydrolyzateSolidLiquidSeparator
+.. autoclass:: biorefineries.cellulosic.units.PretreatmentFlash
+
+Feedstock handling
+------------------
+.. autoclass:: biorefineries.cellulosic.units.FeedStockHandling
+
+Tanks
+-----
+.. autoclass:: biorefineries.cellulosic.units.AmmoniaStorageTank
+.. autoclass:: biorefineries.cellulosic.units.AmmoniaReacidificationTank
+.. autoclass:: biorefineries.cellulosic.units.BeerTank
+.. autoclass:: biorefineries.cellulosic.units.CSLStorageTank
+.. autoclass:: biorefineries.cellulosic.units.DAPStorageTank
+.. autoclass:: biorefineries.cellulosic.units.AmmoniaAdditionTank
+.. autoclass:: biorefineries.cellulosic.units.AmmoniaMixer
+.. autoclass:: biorefineries.cellulosic.units.EnzymeHydrolysateMixer
+.. autoclass:: biorefineries.cellulosic.units.SulfuricAcidMixer
+.. autoclass:: biorefineries.cellulosic.units.SeedHoldTank
+.. autoclass:: biorefineries.cellulosic.units.SulfuricAcidStorageTank
+.. autoclass:: biorefineries.cellulosic.units.SulfuricAcidTank
+.. autoclass:: biorefineries.cellulosic.units.OligomerConversionTank
+
+Heat exchange
+-------------
+.. autoclass:: biorefineries.cellulosic.units.HydrolysateHeatExchanger
+.. autoclass:: biorefineries.cellulosic.units.PretreatmentWasteHeater
+.. autoclass:: biorefineries.cellulosic.units.WasteVaporCondenser
+
+Pumps
+-----
+.. autoclass:: biorefineries.cellulosic.units.HydrolysatePump
+.. autoclass:: biorefineries.cellulosic.units.BlowdownDischargePump
+.. autoclass:: biorefineries.cellulosic.units.HydrolyzatePump
+.. autoclass:: biorefineries.cellulosic.units.ReacidifiedHydrolyzatePump
+
 """
 from biosteam.units.design_tools.geometry import cylinder_diameter_from_volume
 from thermosteam import MultiStream
