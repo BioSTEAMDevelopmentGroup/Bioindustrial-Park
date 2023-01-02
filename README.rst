@@ -11,6 +11,11 @@ Bioindustrial-Park: BioSTEAM's Premier Biorefinery Models and Results
 
 .. contents::
 
+Workshops
+---------
+Join us on Friday, Jan 20, 9:15-10:15am CST, for a BioSTEAM workshop! 
+Email biosteamdevelopmentgroup@gmail.com for details.
+
 What is the Bioindustrial-Park?
 -------------------------------
 
