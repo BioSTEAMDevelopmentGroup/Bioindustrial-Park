@@ -1,7 +1,5 @@
 # -*- coding: utf-8 -*-
 """
-.. contents:: :local:
-
 .. autofunction:: biorefineries.cellulosic.systems.cellulosic_ethanol.create_cellulosic_ethanol_system
 
 """

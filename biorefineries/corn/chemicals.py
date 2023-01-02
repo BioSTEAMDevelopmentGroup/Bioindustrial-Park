@@ -6,6 +6,8 @@
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
 # for license details.
 """
+.. autofunction:: biorefineries.corn.chemicals.create_chemicals
+
 """
 import thermosteam as tmo
 from biorefineries.cane import create_oilcane_chemicals

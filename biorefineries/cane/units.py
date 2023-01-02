@@ -1,8 +1,17 @@
 # -*- coding: utf-8 -*-
 """
-Created on Mon Apr 19 03:19:53 2021
+.. contents:: :local:
 
-@author: yrc2
+Reactors
+--------
+.. autoclass:: biorefineries.cane.units.SeedTrain
+.. autoclass:: biorefineries.cane.units.CoFermentation
+
+Separations
+-----------
+.. autoclass:: biorefineries.cane.units.OleinCrystallizer
+    
+
 """
 import biosteam as bst
 from thermosteam import PRxn, Rxn

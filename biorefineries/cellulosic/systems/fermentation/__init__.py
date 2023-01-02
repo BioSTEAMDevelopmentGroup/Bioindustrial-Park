@@ -1,7 +1,5 @@
 # -*- coding: utf-8 -*-
 """
-.. contents:: :local:
-
 .. autofunction:: biorefineries.cellulosic.systems.create_cofermentation_system
 .. autofunction:: biorefineries.cellulosic.systems.create_integrated_bioprocess_saccharification_and_cofermentation_system
 .. autofunction:: biorefineries.cellulosic.systems.create_saccharification_system

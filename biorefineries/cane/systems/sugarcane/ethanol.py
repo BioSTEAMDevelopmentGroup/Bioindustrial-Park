@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Created on Thu Dec 21 11:05:24 2017
-@author: Yoel
 """
 import biosteam as bst
 from biosteam import SystemFactory, F

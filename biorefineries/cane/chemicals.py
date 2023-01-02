@@ -6,6 +6,14 @@
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
 # for license details.
 """
+.. contents:: :local:
+
+.. autofunction:: biorefineries.cane.chemicals.create_sugarcane_chemicals
+.. autofunction:: biorefineries.cane.chemicals.create_oilcane_chemicals
+.. autofunction:: biorefineries.cane.chemicals.create_cellulosic_oilcane_chemicals
+.. autofunction:: biorefineries.cane.chemicals.create_acyl_olein
+.. autofunction:: biorefineries.cane.chemicals.create_acetyl_diolein
+
 """
 import thermosteam as tmo
 from thermosteam import functional as fn

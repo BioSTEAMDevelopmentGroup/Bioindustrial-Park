@@ -1,7 +1,5 @@
 # -*- coding: utf-8 -*-
 """
-.. contents:: :local:
-
 .. autofunction:: biorefineries.cellulosic.systems.create_hot_water_pretreatment_system
 .. autofunction:: biorefineries.cellulosic.systems.create_dilute_acid_pretreatment_system
 .. autofunction:: biorefineries.cellulosic.systems.create_ammonia_fiber_expansion_pretreatment_system

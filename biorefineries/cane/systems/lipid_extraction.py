@@ -6,8 +6,6 @@
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
 # for license details.
 """
-The complete oilcane biorefinery system is created here.
-
 """
 import flexsolve as flx
 import numpy as np
