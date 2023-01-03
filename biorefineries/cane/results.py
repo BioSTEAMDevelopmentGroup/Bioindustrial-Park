@@ -37,9 +37,10 @@ images_folder = os.path.join(os.path.dirname(__file__), 'images')
 # %% Load simulation data
 
 def spearman_file(name):
-    number, agile = parse_configuration(name)
+    number, agile, energy_cane = parse_configuration(name)
     filename = f'oilcane_spearman_{number}'
     if agile: filename += '_agile'
+    if energy_cane: filename += '_energy_cane'
     filename += '.xlsx'
     return os.path.join(results_folder, filename)
 

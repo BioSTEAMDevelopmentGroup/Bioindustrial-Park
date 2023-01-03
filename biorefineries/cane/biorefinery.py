@@ -744,7 +744,7 @@ class Biorefinery:
         @performance(60 if fed_batch else 49.5, 95, units='%', element='Cofermenation', kind='coupled')
         def set_glucose_to_microbial_oil_yield(glucose_to_microbial_oil_yield):
             glucose_to_microbial_oil_yield *= 0.01
-            cell_growth = min(0.99 - glucose_to_microbial_oil_yield, 0.3 * glucose_to_microbial_oil_yield) # Almost all the rest goes towards cell mass
+            cell_growth = min(0.99 - glucose_to_microbial_oil_yield, 0.4 * glucose_to_microbial_oil_yield) # Almost all the rest goes towards cell mass
             if number in cellulosic_oil_configurations:
                 seed_train.reactions.X[0] = fermentor.cofermentation.X[0] = glucose_to_microbial_oil_yield 
                 seed_train.reactions.X[2] = fermentor.cofermentation.X[2] = cell_growth
@@ -756,7 +756,7 @@ class Biorefinery:
         def set_xylose_to_microbial_oil_yield(xylose_to_microbial_oil_yield):
             if number in cellulosic_oil_configurations:
                 xylose_to_microbial_oil_yield *= 0.01
-                cell_growth = min(0.99 - xylose_to_microbial_oil_yield, 0.3 * xylose_to_microbial_oil_yield)
+                cell_growth = min(0.99 - xylose_to_microbial_oil_yield, 0.4 * xylose_to_microbial_oil_yield)
                 seed_train.reactions.X[1] = fermentor.cofermentation.X[1] = xylose_to_microbial_oil_yield 
                 seed_train.reactions.X[3] = fermentor.cofermentation.X[3] = cell_growth # Almost all the rest goes towards cell mass
     
