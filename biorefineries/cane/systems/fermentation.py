@@ -429,7 +429,7 @@ def create_cane_to_combined_1_and_2g_fermentation(
     if fed_batch:
         if 'Sugar' not in MX.chemicals:
             MX.chemicals.define_group('Sugar', ('Glucose', 'Sucrose', 'Xylose'))
-        SX0 = bst.Splitter(400, MX-0, split=0.2)
+        syrup_source = SX0 = bst.Splitter(400, MX-0, split=0.2)
         EvX = bst.MultiEffectEvaporator(400, ins=SX0-1, 
                                         P=(101325, 69682, 47057, 30953, 19781),
                                         V_definition='First-effect',
@@ -500,12 +500,14 @@ def create_cane_to_combined_1_and_2g_fermentation(
             cofermentation.tau = target_titer / cofermentation.productivity 
             SX0.split[:] = 0.2 # Restart
     else:
-        EvX = bst.MultiEffectEvaporator(400, ins=MX-0, outs=('', condensate),
-                                        P=(101325, 69682, 47057, 30953, 19781),
-                                        V_definition='First-effect',
-                                        thermo=hydrolysate.thermo.ideal(),
-                                        flash=False,
-                                        V=0.05) # fraction evaporated
+        syrup_source = EvX = bst.MultiEffectEvaporator(
+            400, ins=MX-0, outs=('', condensate),
+            P=(101325, 69682, 47057, 30953, 19781),
+            V_definition='First-effect',
+            thermo=hydrolysate.thermo.ideal(),
+            flash=False,
+            V=0.05
+        ) # fraction evaporated
         PX = bst.Pump(400, ins=EvX-0, P=101325.)
         P_original = tuple(EvX.P)
         Pstart = P_original[0]
@@ -574,9 +576,9 @@ def create_cane_to_combined_1_and_2g_fermentation(
         'Sucrose + Water -> 2Glucose', 'Sucrose', 1.00
     )
     
-    @syrup_sink.add_specification(run=True)
+    @syrup_source.add_specification(run=True)
     def hydrolysis():
-        syrup, = syrup_sink.ins
+        syrup, = syrup_source.ins
         syrup_sink.sucrose_hydrolysis_reaction.force_reaction(syrup)
         if syrup.imol['Water'] < 0: syrup.imol['Water'] = 0.
     
