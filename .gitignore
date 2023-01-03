@@ -1,6 +1,6 @@
 build
 dist
-BioSTEAM 2.x.x/biorefineries.egg-info
+biorefineries.egg-info
 **/results/*
 **/.ipynb_checkpoints
 **/__pycache__
@@ -37,6 +37,9 @@ docs/_templates/*
 *.jpeg
 *.svg
 *.npy
+*.csv
+*.jpg
+*.JPG
 biorefineries/wwt/results
 
 # Compiled source #
