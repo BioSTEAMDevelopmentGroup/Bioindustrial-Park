@@ -286,11 +286,12 @@ def run_uncertainty_and_sensitivity(name, N, rule='L',
         br.model.load_samples(samples, optimize=optimize)
         autoload_file = autoload_file_name(name)
         success = False
+        if not derivative: br.disable_derivative()
         for i in range(3):
             try:
                 if derivative and name not in ('O1', 'O2'): br.disable_derivative()
                 br.model.evaluate(
-                    notify=N,
+                    notify=int(N/10),
                     autosave=autosave,
                     autoload=autoload,
                     file=autoload_file
@@ -300,7 +301,7 @@ def run_uncertainty_and_sensitivity(name, N, rule='L',
                 warn('failed evaluation; restarting without cache')
             else:
                 success = True
-                br.enable_derivative()
+                if derivative: br.enable_derivative()
                 break
         if not success:
             raise RuntimeError('evaluation failed')
