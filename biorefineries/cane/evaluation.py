@@ -144,10 +144,11 @@ def run_uncertainty_and_sensitivity(name, N, rule='L',
                                     sample_cache={},
                                     autosave=True,
                                     autoload=True,
-                                    optimize=True):
+                                    optimize=True,
+                                    **kwargs):
     filterwarnings('ignore', category=bst.exceptions.DesignWarning)
     filterwarnings('ignore', category=bst.exceptions.CostWarning)
-    br = cane.Biorefinery(name, cache=None)
+    br = cane.Biorefinery(name, cache=None, **kwargs)
     file = monte_carlo_file(name, across_lines, across_oil_content)
     N_notify = min(int(N/10), 20)
     autosave = N_notify if autosave else False
@@ -281,6 +282,8 @@ def run_uncertainty_and_sensitivity(name, N, rule='L',
             xlfile=file,
         )
     else:
+        samples = br.model.sample(N, rule)
+        br.model.load_samples(samples, optimize=optimize)
         autoload_file = autoload_file_name(name)
         success = False
         for i in range(3):
