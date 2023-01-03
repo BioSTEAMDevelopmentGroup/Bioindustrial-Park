@@ -9,6 +9,7 @@
 
 import biosteam as bst
 from biosteam import main_flowsheet as main_f
+from biorefineries.cane.biorefinery import Biorefinery
 from . import (
     add_wwt_chemicals, create_wastewater_process, CHP as CHPunit, Skipped,
     get_COD_breakdown, update_cane_price, update_product_prices,
@@ -55,7 +56,12 @@ def create_comparison_systems(info, functions, sys_dct={}):
     dct['_chemicals_loaded'] = True
     dct['chemicals'] = chemicals
     dct['_system_loaded'] = False
+    if 'cane' in kwdct['system_name']:
+        kwdct['load']['chemicals'] = chemicals
+        clear_cache = True
+    else: clear_cache = False
     module.load(**kwdct['load'])
+    
     exist_sys_temp = dct[kwdct['system_name']]
     exist_f = bst.Flowsheet.from_flowsheets('exist', (main_f,))
     main_f.set_flowsheet(exist_f)
@@ -94,6 +100,7 @@ def create_comparison_systems(info, functions, sys_dct={}):
 
     ##### With the new wastewater treatment process #####
     dct['_system_loaded'] = False
+    if clear_cache: Biorefinery.cache.clear()
     module.load(**kwdct['load'])
     new_sys_temp = dct[kwdct['system_name']]
     new_f = bst.Flowsheet.from_flowsheets('new', (main_f,))
@@ -103,8 +110,9 @@ def create_comparison_systems(info, functions, sys_dct={}):
 
     if is2G: # replace the conventional wastewater treatment process with new ones
         units_to_discard = [u for u in new_u if (u.ID[1]==WWT_ID or u.ID=='WWTC')]
-        streams_to_discard = [s for s in sum([u.outs for u in units_to_discard], [])]
-        streams_to_discard += [s for s in sum([u.ins for u in units_to_discard], []) if s.source is None]
+        aux_units_to_discard = sum([u.auxiliary_units for u in units_to_discard], [])
+        streams_to_discard = [s for s in sum([u.outs for u in units_to_discard+aux_units_to_discard], [])]
+        streams_to_discard += [s for s in sum([u.ins for u in units_to_discard+aux_units_to_discard], []) if s.source is None]
         # # Slower than above
         # streams_to_discard = [s for s in new_s if (
         #     s.source in units_to_discard or
@@ -191,6 +199,14 @@ def create_comparison_systems(info, functions, sys_dct={}):
     RX02.ins[2].characterization_factors['GWP'] = GWP_CFs['NaOCl']
     RX02.ins[3].characterization_factors['GWP'] = GWP_CFs['CitricAcid']
     RX02.ins[4].characterization_factors['GWP'] = GWP_CFs['Bisulfite']
+
+    for name in (
+            'low_pressure_steam',
+            'medium_pressure_steam',
+            'high_pressure_steam',
+            ):
+        agent = bst.HeatUtility.get_agent(name)
+        agent.heat_transfer_price = agent.regeneration_price = 0.
 
     return exist_sys, new_sys
 

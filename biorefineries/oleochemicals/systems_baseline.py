@@ -18,19 +18,20 @@ from biorefineries.lipidcane import units
 from biosteam.units.design_tools import compute_vacuum_system_power_and_cost
 from biosteam.units.design_tools import PressureVessel
 from biosteam.units.decorators import cost
-from ion_exchange_hydrolysis_column import Ion_exchange_hydrolysis_column
 from thermosteam import Rxn, RxnSys, PRxn, SRxn, settings, Chemical, Stream, MultiStream, equilibrium
 from biosteam import ProcessWaterCenter
 
 # F_baseline = bst.Flowsheet('azelaic_acid_baseline')
 # bst.main_flowsheet.set_flowsheet(F_baseline)  
-
 # The following process is based on the Novomont patent released in 2016
 # TODO: look for characterisation factors in oilcane
-
+#TODO: how to deal with errors on 
 @SystemFactory(
     ID = 'crude_HOSO_oil_to_biodiesel',
 # The inlet composition of the oil is based on available literature
+# converting the oil to methyl oleate before performing reactions on it
+# main purpose of doing this was to compare it with published TEA literature for azelaic acid production
+
     ins=[dict(ID='crude_vegetable_oil',
               Water=0.01,
               OOO = 65,
@@ -47,7 +48,7 @@ from biosteam import ProcessWaterCenter
               PL=0.99,
               MAG = 0,
               DAG = 0,
-              characterization_factors = {'GWP100',1.1}),
+              characterization_factors = {'GWP100': 1.1}),
           dict(ID = 'water_for_degumming',
               Water = 100,
               T = 25 + 273.15),
@@ -59,7 +60,7 @@ from biosteam import ProcessWaterCenter
               T = 25+273.15)
           ],
     outs=[
-#TODO: ask Yoel if polar lipids can be stored and sold        
+#Lipids in this process are being burned in the boilerturbogenerator        
           dict(ID='polar_lipids_to_boilerturbogenerator'),
 #Biodiesel produced in this unit is oxidatively cleaved           
           dict(ID='biodiesel'),
@@ -70,7 +71,6 @@ from biosteam import ProcessWaterCenter
             ],
     fixed_outs_size = True,     
               )
-#TODO: How to deal with polarlipids - disposal?
 
 def crude_HOSO_oil_to_biodiesel(ins,outs):
     crude_vegetable_oil, water_for_degumming,acid_for_degumming,water_for_degumming_2 = ins
@@ -122,8 +122,9 @@ def crude_HOSO_oil_to_biodiesel(ins,outs):
                                       split = dict(PL = 0.3,
                                                     TAG = 1,
                                                     Water = 0,
-                                                    Citric_acid = 0))    
+                                                    Citric_acid = 0)) 
     
+#with these reaction conversions we get approx 85% methyl oleate    
     reactions = tmo.ParallelReaction([
         tmo.Reaction('OOO + 3Methanol -> 3Methyl_oleate + Glycerol', reactant='OOO',  X=0.90),
         tmo.Reaction('LLL + 3Methanol -> 3Methyl_linoleate + Glycerol', reactant='LLL',  X=0.90),
@@ -152,6 +153,7 @@ ob0.show()
 # Acc. to literature methyl oleate (technical purity approximately 85%; flow rate 10 kg/h); 
 # An aqueous solution of hydrogen peroxide at 60% (flow rate 2.3 kg/h); 
 # Tungstic acid (HWO) (flow rate 48 g/h).
+
 @SystemFactory(
     ID = 'dihydroxylation_reaction',
     ins = [dict(ID='fresh_HP'),
@@ -165,7 +167,6 @@ ob0.show()
             ],
     fixed_outs_size = True,     
               )
-
 def dihydroxylation_system(ins,outs):
     fresh_HP, fresh_tunsgten_catalyst,recycled_tungstic_acid,water_for_dihydroxylation,biodiesel,  = ins
     condensate,diol_product, = outs
@@ -182,61 +183,55 @@ def dihydroxylation_system(ins,outs):
 
 #Tungstic acid Catalyst feed tank
     T104 = bst.units.StorageTank('T104',
-                                            ins = (fresh_tunsgten_catalyst),
-                                            outs = 'fresh_catalyst_to_pump',
-                                            vessel_type  = "Solids handling bin",
-                                            vessel_material='Carbon steel')
+                                 ins = (fresh_tunsgten_catalyst),
+                                 outs = 'fresh_catalyst_to_pump',
+                                 vessel_type  = "Solids handling bin",
+                                 vessel_material='Carbon steel')
     
+#acc. to the patent tungstic acid is preferably 0.06% and 1.5% by moles with respect to the total moles of unsaturations
     def adjust_tungsten_catalyst_flow():
-          required_total_tungsten_catalyst = biodiesel.F_mass * 48/10000
-          fresh_tunsgten_catalyst.F_mass = required_total_tungsten_catalyst - recycled_tungstic_acid.F_mass              
+          moles_of_unsaturation = biodiesel.imol['Methyl_oleate']+ 2*biodiesel.imol['Methyl_linoleate'] + biodiesel.imol['Methyl_palmitoleate'] 
+          fresh_tunsgten_catalyst.imol['Tungstic_acid'] =0.0078*moles_of_unsaturation - recycled_tungstic_acid.imol['Tungstic_acid']
+          #Based on the average of 0.06% and 1.5%
     T104.add_specification(adjust_tungsten_catalyst_flow, run=True)
     
     M101 = bst.units.Mixer('combining_recycled_and_new_tungstic_acid',
                            ins = (T104-0,
                                   recycled_tungstic_acid))
-#Mixer for 60% hydrogen_peroxide solution
+#Mixer for 60% hydrogen_peroxide solution(wt/wt)
     M102 = bst.units.Mixer('M102',
                         ins = (P102-0,                               
                                water_for_dihydroxylation),
                         outs = 'feed_to_reactor_mixer')
     
-
     def adjust_HP_feed_flow(): 
-      #conversion factor based on the patent  
         fresh_HP.F_mass = 0.6*0.2299999* biodiesel.F_mass
         water_for_dihydroxylation.F_mass = 0.4 *0.2299999 * biodiesel.F_mass
-    M102.add_specification(adjust_HP_feed_flow, run=True) 
+    M102.add_specification(adjust_HP_feed_flow, run=True)     
     
-    
-    M103 = bst.units.Mixer('M102',
+#to combine all the inlets to the reactor    
+    M103 = bst.units.Mixer('M103',
                         ins = (biodiesel,
                                 M102-0,
                                 M101-0),
                         outs = 'feed_to_heat_exchanger')
 
     R101_H1 = bst.units.HXutility('R101_H1',
-                              ins = M103-0,
-                              outs = 'feed_to_oleochemicals_reactor',
-                              T = 62 + 273.15
-                              )
+                                  ins = M103-0,
+                                  outs = 'feed_to_oleochemicals_reactor',
+                                  T = 62 + 273.15
+                                  )
 ## Reaction temperature given in the patent as 62 deg cel
 ## Reaction was conducted under vaccuum under absolute pressure of 0.10-0.20*10^5 Pa
-#TODO: what to do regatding hydrogen peroxide and water that doesn't come out
-
     R101 = units_baseline.DihydroxylationReactor('R101',
-                                ins = R101_H1-0, 
-                                outs = (condensate,
-                                        'diol_product'                                        
-                                        ),
-                                P = 0.20*10e5,
-                                T = 62 + 273.15,
-                                tau = 6,
-                                # V_max = 133666,
-                                # in m3 (equivalent to 1 MMGal), 
-                                # this is including catalyst volume
-                                                              )
-## Condensate volume is zero because no vle happening at that temp pressure
+                                                 ins = R101_H1-0, 
+                                                 outs = (condensate,
+                                                         'diol_product'                                        
+                                                         ),
+                                                 P = 0.02*10e5,#lower than the specs, no water was coming out at the specs
+                                                 T = 62 + 273.15, #specs based on the patent
+                                                 tau = 6, #residence time based on the patent
+                                                 )
 # Pumping the mixture out using a gear pump to the oxidative cleavage section
     R101_P1 = bst.units.Pump('R101_P1',
                               ins = R101-1,
@@ -262,17 +257,14 @@ plant_air = bst.Stream(ID = 'plant_air',
                        Air = 1000,
                        units = 'kg/hr')
 
-#TODO: why can there not be two outlets?
 ADP801 = bst.facilities.AirDistributionPackage(ID = 'ADP801',
                                                ins = plant_air,
-                                               outs = ('air_for_oxidative_cleavage'))
-                                                       # 'air_for_azelaic_acid_drying'))
-
-    
+                                               outs = ('air_for_oxidative_cleavage')
+                                                )    
 ## oxidative_cleavage_system to cleave the dihydroxylated feed to produce the fatty acids
 @SystemFactory(
     ID = 'oxidative_cleavage_reaction',
-    ins = [dict(ID='vicinal_diol_product'),
+    ins = [dict(ID='diol_product'),
             dict(ID ='cobalt_catalyst_stream',
                 Cobalt_acetate_tetrahydrate  = 0.015,
                 water = (1- 0.015),
@@ -284,7 +276,7 @@ ADP801 = bst.facilities.AirDistributionPackage(ID = 'ADP801',
     fixed_outs_size = True,     
               )
 def oxidative_cleavage_system(ins,outs):
-    vicinal_diol_product,cobalt_catalyst_stream,air_for_oxidative_cleavage, = ins
+    diol_product,cobalt_catalyst_stream,air_for_oxidative_cleavage, = ins
     ventedgas_to_boilerturbogenerator,mixed_oxidation_products, = outs 
     
 #Pressure vessels are used to store gases above 3psig which converts to 0.02 MPa
@@ -296,8 +288,8 @@ def oxidative_cleavage_system(ins,outs):
                           ins = T201-0,
                           outs = 'pressurised_air',
                           P = 20*10e5)
-#TODO: cobalt acetate tetrahydrate needs to be regulated 15-25 deg celc    
-#Incompatibilty with CS material not mentioned 
+#Ideally, cobalt acetate tetrahydrate needs to be regulated 15-25 deg celc in the storage vessel. However, it was not considered here
+
     T201 = bst.StorageTank('T201',
                             ins = cobalt_catalyst_stream,
                             outs = 'cobalt_catalyst_stream',
@@ -305,21 +297,27 @@ def oxidative_cleavage_system(ins,outs):
                             vessel_material = 'Carbon steel'
                                   )
     M201 = bst.units.Mixer('M201',
-                        ins = (vicinal_diol_product,
+                        ins = (diol_product,
                                 T201-0,
                                 P201-0),
                         outs = 'feed_to_heat_exchanger')
     
+    
+    total_diol_moles =  diol_product.imol['MDHSA'] + diol_product.imol['Tetrahydroxy_octadecanoic_acid'] + diol_product.imol['Dihydroxy_palmitic_acid']       
+#Cobalt catalyst required is preferably between 0.3% and 1.5% by moles     
     def adjust_flowrates():
-        cobalt_catalyst_stream.F_mass = vicinal_diol_product.F_mass* 2/11.4
-        air_for_oxidative_cleavage.imass['Air'] = vicinal_diol_product.F_mass* 13/11.4
-    M201.add_specification(adjust_flowrates, run=True)       
- 
+        cobalt_catalyst_stream.imol['Cobalt_acetate_tetrahydrate'] = 0.009*total_diol_moles  #based on the average of 0.3% and 1.5%
+#Air exiting the reactor should preferably be around 10%       
+        air_for_oxidative_cleavage.imass['Air'] = diol_product.F_mass* 13/11.4
+#TODO: ask Yoel if scaling up can be done using mass in case of air also, that 7% of air is actually being vented out       
+    M201.add_specification(adjust_flowrates, run=True)   
+    
     R201_H = bst.units.HXutility('R201_H',
                               ins = M201-0,
                               outs = 'feed_to_oxidative_cleavage_reactor',
                               T = 60 + 273.15
                               )
+    
     R202 = units_baseline.OxidativeCleavageReactor('R202',
                                 ins = R201_H-0, 
                                 outs = (ventedgas_to_boilerturbogenerator,
@@ -330,7 +328,6 @@ def oxidative_cleavage_system(ins,outs):
                                 V_max=133666
                                 )
     
-
     R202_V1 = bst.units.IsenthalpicValve(ID = 'R202_V1',
                                          ins = R202-1,
                                           outs = mixed_oxidation_products,
@@ -341,7 +338,7 @@ ob2 = oxidative_cleavage_system(ins = (ob1.outs[1],
                                                   Cobalt_acetate_tetrahydrate  = 0.015,
                                                   water = (1- 0.015),
                                                   units = 'kg/hr'),
-                                       ADP801-0) ) 
+                                       ADP801-0)) 
 ob2.simulate()
 ob2.show()
 
@@ -350,6 +347,8 @@ ob2.show()
 # All the ions are water soluble
 # organic phase contains the mixed oxidation products
 # Splits were based on the fact that none of the organics are soluble at that temperature
+
+#TODO: check if this is okayy
 
 @SystemFactory(
     ID = 'organic_phase_separation',
@@ -370,8 +369,12 @@ def organic_phase_separation(ins,outs):
                                                   aqueous_phase),
                                             split = ({
                                                 'Hydrogen_peroxide': 0.0,   
-                                                'Water': 0.3,
+                                                'Water': 0.7,
+                                                #intermediate products in the org phase
                                                 'MDHSA': 1,
+                                                'Dihydroxy_palmitic_acid':1,
+                                                'Tetrahydroxy_octadecanoic_acid':1,
+                                                #products in the org phase
                                                 'Pelargonic_acid' : 1,
                                                 'Azelaic_acid': 1,
                                                 'Methyl_oleate': 1,
@@ -390,11 +393,13 @@ def organic_phase_separation(ins,outs):
                                                 'Methyl_palmitoleate':1,
                                                 'Tungstic_acid': 0,
                                                 'Cobalt_ion' :0,
-                                                 'Acetate_ion': 0,    
-                                                 'H2O':0,
-                                                 'Tungstate_ion':0,
-                                                 'Hydrogen_ion':0,
-                                                 'Cobalt_acetate_tetrahydrate':0
+                                                'Acetate_ion': 0,    
+                                                'H2O':0,
+                                                'Tungstate_ion':0,
+                                                'Hydrogen_ion':0,
+                                                'Cobalt_acetate_tetrahydrate':0,
+                                                'Dihydroxy_palmitic_acid':1,
+                                                'Tetrahydroxy_octadecanoic_acid':1
                                                 })
                                               )
     
@@ -404,8 +409,6 @@ ob3.show()
 
 ### Degassing portion (400 level)
 ### This is remove the moisture from the separated oily phase
-### Flash runs on vaccuum
-##TODO: check conditions
 @SystemFactory(
     ID = 'degassing_the_oily_phase',
     ins = [dict(ID='fatty_acids_with_some_moisture')],       
@@ -424,18 +427,15 @@ def degassing_the_oily_phase(ins,outs):
                                     dried_crude_fatty_acids),
                             
                             T = 40 + 273.15,
-                            P = 15000
+                            P = 1000
                                   )
 ob4 =  degassing_the_oily_phase(ins = ob3.outs[0])
 ob4.simulate()
 ob4.show()               
     
-# Nonanoic acid separation (500 level)
-# The issue with the below is that, the Monomethyl azelate that is produced
-# has a lower BP than most of the MCA's
-# However, papers and patents disregard this!
+# Nonanoic acid (Pelargonic acid) (500 level)
 # Heatsensitivity of fatty acids is mentioned in: Oleochemicals: all time players of green chemistry By Antonio Zarli
-
+#Novomont's patent does not mention the pressures for separation of pelargonic acid and monomethyl azelate
 @SystemFactory(
     ID = 'nonanoic_acid_separation',
     ins = [dict(ID='dried_crude_fatty_acids')],       
@@ -449,35 +449,25 @@ def nonanoic_acid_fraction_separation(ins,outs):
     dried_crude_fatty_acids, = ins
     Pelargonic_acid_rich_fraction,heavy_fatty_acids, = outs
     
-#TODO: have I specified it correctly?    
+#TODO: is below okay   
     Water = tmo.Chemical('Water')
     D501_steam = bst.HeatUtility.get_heating_agent('high_pressure_steam')
     D501_steam.T = 620
     D501_steam.P = Water.Psat(620)
-    
-    H501 = bst.HXutility(ins = dried_crude_fatty_acids,
-                          T = 260 + 273)
-   
+
+    H501 = bst.HXutility(ID = 'H501',
+                        ins = dried_crude_fatty_acids,
+                          T = 230 + 273)
+
+#Pelargonic acid is separated under vaccuum of 25 mm Hg i.e 5000 Pa pressures in conventional processes 
+#Ref: US patent 2818113, Method for making Azelaic acid
+
     D501 = bst.BinaryDistillation('D501',
-                                    ins = H501 - 0,
-                                    outs = ('heavy_fatty_acids_1',
-                                            'crude_Pelargonic_acid_fraction'
-                                            ),
-                                    LHK = ('Monomethyl_azelate',
-                                          'Hexanoic_acid'),
-                                    Lr=0.99955,
-                                    Hr=0.9995,
-                                    P = 5000,
-                                    k = 2,
-                                    partial_condenser=False
-                                  )
-    
-    D502 = bst.BinaryDistillation('D502',
-                                  ins = D501 - 1,
+                                  ins = H501-0,
                                   outs = (Pelargonic_acid_rich_fraction,
                                           'heavy_fatty_acids_2'),
                                   LHK = ('Pelargonic_acid',
-                                          'Malonic_acid'
+                                          'Monomethyl_azelate'
                                           ),
                                   Lr = 0.90,
                                   Hr = 0.90,
@@ -485,10 +475,7 @@ def nonanoic_acid_fraction_separation(ins,outs):
                                   k = 2,
                                   partial_condenser=False
                                   )
-    M501 = bst.Mixer('M501',ins = (D501-0,D502-1),
-                            outs= ('heavy_fatty_acids')
-                            )
-    P501 = bst.Pump('P501', ins = M501-0,
+    P501 = bst.Pump('P501', ins = D501-1,
                       outs = heavy_fatty_acids)
     
 
@@ -496,193 +483,308 @@ ob5 = nonanoic_acid_fraction_separation(ins = ob4.outs[1])
 ob5.simulate()
 ob5.show()
 
+ADP802 = bst.facilities.AirDistributionPackage(ID = 'ADP802',
+                                               ins = plant_air,
+                                               outs = ('air_for_azelaic_acid_drying'),
+                                                      )
 
 # Hydrolysis of FAME's to produce fatty acids (600 level)
 @SystemFactory(
     ID = 'azelaic_acid_production',
     ins = [dict(ID='crude_heavy_fatty_acids'),
-           dict(ID ='water_for_emulsification',
+            dict(ID ='water_for_emulsification',
                 Water = 10000,
                 units = 'kg/hr'),
-           dict(ID = 'acid_for_regeneration',
-                 HCl = 10000,
-                 units = 'kg/hr'
-                 ),
-           dict(ID = 'hot_water_for_extraction',
+#TODO: What does concentration mean in the Rohm and Haas pdf for the ion exchange            
+            # dict(ID = 'acid_for_regeneration',
+            #       HCl = 100/1000,#Kg of HCl, density of HCl assumed to be 1.49, ref: Wiki, required amount of HCl is 50g/L of resin
+            #       units = 'kg/hr'
+            #      ),
+            dict(ID = 'hot_water_for_extraction',
                 Water = 1000,
                 units = 'kg/hr'),
-           dict(ID = 'air_for_azelaic_acid_drying',
-                Air = 1000,
+            dict(ID = 'solvent_for_extraction',
+                VM_Naphta = 1000,
                 units = 'kg/hr'),
-           dict(ID = 'natural_gas_for_azelaic_acid_drying',
-                Natural_gas = 1000,
-                units = 'kg/hr')
             ],  
-#TODO: vented mixture is nothing but methanol and water     
-    outs = [dict(ID = 'methanol_water_mixture'),
-            dict(ID = 'wastewater3_to_boilerturbogenerator'),
-            dict(ID = 'azelaic_acid'),
+    
+    outs = [
+            dict(ID = 'wastewater6_to_boilerturbogenerator'),
+            dict(ID = 'Azelaic_acid_product_stream'),
             ],
     fixed_outs_size = True,     
               )
 def hydrolysis_of_organic_fraction(ins,outs):
-    crude_heavy_fatty_acids,water_for_emulsification,acid_for_regeneration,hot_water_for_extraction,air_for_azelaic_acid_drying,natural_gas_for_azelaic_acid_drying, = ins
-    methanol_water_mixture,wastewater3_to_boilerturbogenerator,azelaic_acid, = outs
+    crude_heavy_fatty_acids,water_for_emulsification,hot_water_for_extraction,solvent_for_extraction, = ins
+    wastewater6_to_boilerturbogenerator,Azelaic_acid_product_stream, = outs
 
-# resin_for_hydrolysis, 
+#Mix tank for making the emulsion
     M601 = bst.units.MixTank('M601',
                             ins = (crude_heavy_fatty_acids,
-                                   water_for_emulsification,
+                                    water_for_emulsification,
                                   ),
-                            outs = ('emulsified_mixture'))
+                            outs = ('emulsified_mixture'),
+                            tau = 6.5)
+    
+#The following number represents the total initial number of exchangeable moles.
+# This number of moles will keep on decreasing as the reaction progresses
+    
+    exchangeable_moles = ((crude_heavy_fatty_acids.imol['Methyl_palmitate'],
+                           crude_heavy_fatty_acids.imol['Methyl_oleate'],
+                           crude_heavy_fatty_acids.imol['Methyl_stearate'],
+                           crude_heavy_fatty_acids.imol['Methyl_linoleate'],
+                           crude_heavy_fatty_acids.imol['Monomethyl_azelate']))
+    total_moles = sum(exchangeable_moles)    
                            
     def adjust_water_for_emuslification():
-        water_for_emulsification.imass['Water'] = crude_heavy_fatty_acids.F_mass*3
+        water_for_emulsification.imol['Water'] = total_moles*40
     M601.add_specification(adjust_water_for_emuslification, run=True)  
+       
+# 1L of resin can exchange 1800 moles
+# required amount of resin in L is total_moles/1800  of resin
+# density of the resin is: 1.28*density of air ref:https://www.sigmaaldrich.com/US/en/product/supelco/10322
+# density of resin(g/L): 1.28*1.29 = 1.65
+# grams of resin required = total_moles/1800 
+#TODO: add page number for the ref
+# for a cylindrical tower with a csa of 5m2 with a radius 2.23m ref: rules of thumb 
+    Total_volume_of_resin = total_moles/1800
+    height_of_the_cylinder = Total_volume_of_resin/(3.14* 5)
+    total_height = height_of_the_cylinder + 2.5
+# regenerant equivalents = 100/36.5    
+# regenerant ratio = 2.7*100/1.8 = 152%, this is the suggested excess ref: http://www.dardel.info/IX/processes/regeneration.html
+# CSA assumed: 5m2 Ref: rule of thumb book
+#Amount of acid required for regeneration: 50g*Volume of resin
+    Total_amount_of_acid_in_Kg = 50*Total_volume_of_resin/1000
     
-# Process parameters for emulsification of fatty esters to acids in a 
-# packed bed ion exchange column
-# TODO: change reaction conversions
-    X1 = 0.995
-    Product_formation = PRxn([Rxn('Monomethyl_azelate + Water  -> Methanol + Azelaic_acid','Monomethyl_azelate', X = X1),
-                          Rxn('Methyl_palmitate + Water  -> Methanol + Palmitic_acid','Methyl_palmitate', X = X1),
-                          Rxn('Methyl_stearate + Water  -> Methanol + Stearic_acid','Methyl_stearate', X = X1),
-                          Rxn('Methyl_linoleate + Water  -> Methanol + Linoleic_acid','Methyl_linoleate', X = X1),
-                          Rxn('Methyl_palmitoleate + Water  -> Methanol + Palmitoleic_acid','Methyl_palmitoleate', X = X1),
-                          Rxn('Methyl_oleate + Water  -> Methanol + Oleic_acid','Methyl_oleate', X = X1)])
-                                  
-    oxidative_cleavage_rxnsys = RxnSys(Product_formation)
-#TODO: discuss how youve added the code and also modify process conditions 
-#TODO: Do something about the vented mixture, can that be sold?
-    R601 = Ion_exchange_hydrolysis_column('R601',
-                                         ins=(M601-0,
-                                          acid_for_regeneration),
-                                         outs = ('DCA_rich_organic_fraction',
-                                                 methanol_water_mixture),
-                                         regeneration_fluid=dict(HCl=1, phase='l', units='kg/hr'),
-                                         split = ({                                               
-                                             'Water': 0.,
-                                             'MDHSA': 1,
-                                             'Pelargonic_acid' : 1,
-                                             'Azelaic_acid': 1,
-                                             'Methyl_oleate': 1,
-                                             'Monomethyl_azelate' : 1,
-                                             'Suberic_acid': 1,
-                                             'Caprylic_acid': 1,
-                                             'Hexanoic_acid': 1,
-                                             'Heptanoic_acid': 1,
-                                             'Malonic_acid': 1,
-                                             'Methyl_oleate': 1,
-                                             'Methyl_palmitate': 1,
-                                             'Methyl_stearate':1,
-                                             'Methyl_linoleate':1,
-                                             'Methyl_palmitoleate':1,
-                                             'Palmitic_acid': 1.45,
-                                             'Stearic_acid': 1.11,
-                                             'Oleic_acid': 2.81,
-                                             'Linoleic_acid': 0.177,
-                                             'Palmitoleic_acid': 0.00989,
-                                             'Methanol': 0
-                                             }),
-                                         adsorbate_ID='Water',
-                                         reactions = oxidative_cleavage_rxnsys 
-                                          )
+    R601 = units_baseline.HydrolysisReactor(ID = 'R601_1',
+                                              ins = M601-0,
+                                              outs = ('methanol_water_mixture_for_separation',
+                                                      'organic_mixture_to_next_reactor'),
+                                              T = 100+273.15,
+                                              V_max =  3.14*5*total_height/3, #decided based on amount of resin required,
+                                              tau = 6.5, #considers regeneration time,
+                                              P = 101325
+                                              )
+    
+    T601 = bst.StorageTank('T601_holding_tank',
+                           ins = R601-1,
+                           outs = 'reaction_mixture',
+                           tau = 6.5)
+   
+    D601 = bst.BinaryDistillation(ID = 'D601',
+                                  ins = R601-0,
+                                  outs = ('Methanol',
+                                          'Water'),
+                                  LHK = ('Methanol',
+                                          'Water'),
+                                  Lr = 0.999,
+                                  Hr = 0.999,
+                                  k = 2
+                              )    
+    R602 = units_baseline.HydrolysisReactor(ID = 'R602',
+                    ins = T601-0,
+                    outs = ('methanol_water_mixture_for_separation',
+                            'organic_mixture_to_next_reactor'),
+                    T = 100+273.15,
+                    V_max =  3.14*5*total_height/3, #decided based on amount of resin required,
+                    tau = 6.5,
+                    P = 101325
+                    ) 
+    T602 = bst.StorageTank('T602_holding_tank',
+                           ins = R602-1,
+                           outs = 'reaction_mixture',
+                           tau = 6.5)
+    
+    D602 = bst.BinaryDistillation(ID = 'D602',
+                              ins = R602-0,
+                              outs = ('Methanol',
+                                      'Water'),
+                              LHK = ('Methanol',
+                                      'Water'),
+                              Lr = 0.999,
+                              Hr = 0.999,
+                              k = 2
+                              )
+    R603 = units_baseline.HydrolysisReactor(ID = 'R603',
+                    ins = T602-0,
+                    outs = ('methanol_water_mixture_for_separation',
+                            'organic_mixture_to_next_reactor'),
+                    T = 100+273.15,
+                    V_max =  3.14*5*total_height/3, #decided based on amount of resin required,
+                    tau = 6.5,
+                    P = 101325
+                    ) 
+
+    D603 = bst.BinaryDistillation(ID = 'D603',
+                              ins = R603-0,
+                              outs = ('Methanol',
+                                      'Water'),
+                              LHK = ('Methanol',
+                                      'Water'),
+                              Lr = 0.9,
+                              Hr = 0.9,
+                              k = 2
+                              )      
+#Mix tank to collect all the methanol
+    T605 = bst.MixTank( ID = 'T605',
+                        ins = (D601-0,
+                               D602-0,
+                               D603-0
+                               ))
+    
+#Mix tank to collect all the water    
+    T606 = bst.MixTank(ID = 'T606',
+                        ins = (D601-1,
+                               D602-1,
+                               D603-1
+                                ))
+   
+#Azelaic acid is distilled off at 500 Pa pressures in conventional processes 
+#Ref: US patent 2818113, Method for making Azelaic acid
 # A falling film evaporator was used to separate out the Azelaic acid from the diols and residue
-# The azelaic acid fractio   
-    FFE601 = bst.MultiEffectEvaporator('FFE601',
-                                       ins=R601-0,
-                                       outs=('azelaic_acid_fraction',
-                                             'diols_and_residue',
-                                             ),
-                                       V=0.1, V_definition='First-effect',
-                                       P=(73581,6000, 50892, 32777, 20000))
-    
 #These carboxylic acids can be further separated out by evaporating the Nonanoic acid fraction   
-#TODO: think about pressures
-    D601 =  bst.BinaryDistillation('D601',
-                                  ins = FFE601 - 0,
-                                  outs = ('crude_Pelargonic_acid_fraction',
-                                          'azelaic_acid_rich_fraction',),
-                                  LHK = ('Suberic_acid',
-                                         'Azelaic_acid'),
-                                  Lr=0.999,
-                                  Hr=0.999,
-                                  P = 500,
+
+#TODO: check the azeotrope that is forming!!
+    D604 =  bst.BinaryDistillation('D604',
+                                  ins = R603-1,
+                                  outs = ('azelaic_acid_rich_fraction',
+                                          'diols_and_other_fatty_acids'
+                                          ),
+                                  LHK = ('Azelaic_acid', 
+                                          'Monomethyl_azelate'
+                                          ),
+                                  Lr=0.9999,
+                                  Hr=0.9999,
+                                  P = 500,#comsistent with US patent 2818113
                                   k = 2,
                                   partial_condenser= False
                                   )
-    def LHK_check():
-       D601.check_LHK = False
-    D601.add_specification(LHK_check, run = True)       
-        
-# Hot water extraction to separate out azelaic acid crystals
-#Hot_water_and_crude_azelaic_mixture
+    
+# Hot water extraction to separate out azelaic acid because azelaic acid shows solubility in water
+#TODO: check what the below spec is based on
     HX601 = bst.HXutility(ins = hot_water_for_extraction,
                           outs = 'hot_water_for_extraction',
                           T = 100+273.15)
+    def water_for_extraction():
+        hot_water_for_extraction.F_vol = 4*D604.outs[0].F_vol
+    HX601.add_specification(water_for_extraction, run = True)
+    
 # If azelaic acid increases above 10% by weight the solution acts as a solvent for water insoluble materials. 
-#TODO: add partition data, think about adding a solvent along with water extraction!
+    M602 = bst.Mixer('M602',ins = (D604-0,
+                                    solvent_for_extraction))
+    def solvent_for_extraction():
+        solvent_for_extraction.F_vol = 0.4*D604.outs[0].F_vol
+    M602.add_specification(solvent_for_extraction, run = True)
+#TODO: use the extract as well    
     MMS601 = bst.units.MultiStageMixerSettlers(ID = 'MMS601',
-                                              ins = (D601-1,HX601-0),
-                                              outs = ('other_carboxylic_acids',
-                                                      'raffinate_with_azelaic_acid',
-                                                      ),                                              
-                                              N_stages= 6)
+                                              ins = (M602-0,
+                                                      HX601-0),
+                                              outs = ('raffinate_AA',
+                                                      'extract_MCAs'
+                                                      ),
+                                              partition_data={
+                                                  'raffinate_chemicals': ('Water'),
+                                                  'extract_chemicals': ('Cycloheptane',#solvent
+                                                                        'Toluene',#solvent
+                                                                        'Bicyclo_octane',#solvent
+                                                                        'Octane',#solvent
+                                                                        'Caprylic_acid',#C8 MCA
+                                                                        'Hexanoic_acid',#C6 MCA
+                                                                        'Heptanoic_acid',#C7 MCA
+                                                                        'Pelargonic_acid',#C9MCA
+                                                                        'Methyl_palmitate',#D17 MCA
+                                                                        'Methyl_stearate',#D19 MCA
+                                                                        'Methyl_linoleate',#D19 MCA
+                                                                        'Methyl_palmitoleate',#D19 MCA
+                                                                        ),
+                                                                        
+                                                  'K': np.array([1.664369695,
+                                                                  1.664369695,
+                                                                  1.664369695,
+                                                                  0.064657614,
+                                                                  0.06466,
+                                                                  0.06466,
+                                                                  0.05905,                                                                 
+                                                                  ]),
+                                                  'IDs': (
+                                                          #intermediate products parititon only to the organic phase
+                                                          'MDHSA',#Diol compound
+                                                          'Dihydroxy_palmitic_acid',#Diol compound
+                                                          'Tetrahydroxy_octadecanoic_acid',#Diol compound
+                                                          'Methyl_oleate',#C19 MCA
+                                                          'Azelaic_acid',#C9 DCA
+                                                          'Monomethyl_azelate',#C10 DCA
+                                                          'Suberic_acid',#C8 DCA
+                                                          # 'Malonic_acid',#D3 DCA
+                                                          ),
+                                                  'phi': 0.590 # Initial phase fraction guess. This is optional.
+                                                    },
+                                              N_stages= 12)
     
-    MMS601.target_concentation = 0.10
-    def AA_composition():
-            feed, water = D601.ins
-            feed_AA = feed.imass['Azelaic_acid']
-            current_concentation = feed_AA / feed.F_mass
-            water.imass['Water'] = (1 / MMS601.target_concentation - 1 / current_concentation) * feed_AA
-    MMS601.add_specification(run=True)
-    
-    F601 = bst.units.Flash(ID = 'F401',
+
+#Option 2(Preferrred method) - Evaportation Drying zone - US patent: METHOD FOR PURIFYING AZELAIC ACID 
+    F601 = bst.units.Flash(ID = 'F601',
                             ins = MMS601-0,
-                            outs = (wastewater3_to_boilerturbogenerator,
-                                    'azelaic_acid_for_drying_step'),
-                            T =  + 273.15,
-                            P = 15000
+                            outs = (wastewater6_to_boilerturbogenerator,
+                                    'azelaic_acid_for_purification'
+                                    # 'azelaic_acid_for_drying_step'
+                                    ),
+                            T =  110+ 273.15,# Ref: METHOD FOR PURIFYING AZELAIC ACID (US 2003/0032825 A1)
+                            P = 3333
                                   )
-    DR601 = bst.units.DrumDryer(ID = 'DR601',
-                                ins = (F601-1,
-                                       air_for_azelaic_acid_drying,
-                                       natural_gas_for_azelaic_acid_drying),
-                                outs = (azelaic_acid,
-                                        'hot_air',
-                                        'emissions_to_boilerturbogenerator'),
-                                split = ({
-                                    'Hydrogen_peroxide': 1,   
-                                    'Water': 1,
-                                    'MDHSA': 1,
-                                    'Pelargonic_acid' : 1,
-                                    'Azelaic_acid': 0,
-                                    'Methyl_oleate': 1,
-                                    'Monomethyl_azelate' : 1,
-                                    'Suberic_acid': 1,
-                                    'Caprylic_acid': 1,
-                                    'Hexanoic_acid': 1,
-                                    'Heptanoic_acid': 1,
-                                    'Malonic_acid': 1,
-                                    'Methanol':1,
-                                    'Glycerol': 1,
-                                    'Methyl_oleate': 1,
-                                    'Methyl_palmitate': 1,
-                                    'Methyl_stearate':1,
-                                    'Methyl_linoleate':1,
-                                    'Methyl_palmitoleate':1,
-                                    'Tungstic_acid': 1,
-                                    'Cobalt_ion' :1,
-                                     'Acetate_ion': 1,    
-                                     'H2O':1,
-                                     'Tungstate_ion':1,
-                                     'Hydrogen_ion':1,
-                                     'Cobalt_acetate_tetrahydrate':1
-                                    }))
-    
+#Range is 235-280 deg Cel with a pressure between 1-30 mmHg
+#TODO: ask yoel when azeotrope this? RuntimeError: <BinaryDistillation: D605> cannot meet specifications! stages > 100
+    F601.outs[1].T = 240+ 273.15
+    D605 = bst.units.BinaryDistillation(ID = 'D605',
+                                        ins = F601-1,
+                                        outs = ('lighter_boiling_impurities',
+                                                'heavy_boiling_azelaic_acid_stream'
+                                                ),
+                                        # T =  260+ 273.15,# Ref: METHOD FOR PURIFYING AZELAIC ACID (US 2003/0032825 A1)
+                                        LHK = ('Stearic_acid',
+                                                'Monomethyl_azelate'
+                                                ),
+                                        Lr=0.995,
+                                        Hr=0.995,
+                                        P = 2000,#comsistent with US patent 2818113
+                                        k = 2,
+                                        partial_condenser= False                                        
+                                        )
+#Range is 220-280 deg Cel with a pressure between 1-10 mm Hg
+#Azelaic acid free of lower boiling compounds comes out from the bottom of the previous column
+    D605.outs[1].T = 260+273.15   
+#TODO: add a reaction with this distillation column to convert azelaic acid anhydrides to azelaic acid                                    
+    D606 = bst.units.BinaryDistillation(ID = 'D606',
+                                        ins = D605-1,
+                                        outs = ('azelaic_acid_product_stream',
+                                                'heavy_boiling_compounds'
+                                                ),
+                                        LHK = ('Azelaic_acid',
+                                              'Monomethyl_azelate'
+                                                ),
+                                        Lr=0.99,
+                                        Hr=0.99,
+                                        P = 1300,#comsistent with US patent 2818113
+                                        k = 2,
+                                        partial_condenser= False)
+    def LHK_check():
+        D606.check_LHK = False
+    D606.add_specification(LHK_check, run = True) 
+    HX602 = bst.HXutility(ID = 'HX602',
+                          ins = D606.outs[0],
+                          outs = 'Pre_cooled_stream',
+                          T = 150 +273.15)
+
+    D607 = units_baseline.SolidsFlaker(ID = 'D607',
+                                       ins = HX602.outs[0],
+                                       outs = Azelaic_acid_product_stream,
+                                       capacity_per_m2 = 500, # 72 - 1080 Kg/hour.m2 #Ref: Rule of thumb
+                                       power_rate_Kw =  1, #Power: 0.9–1.1 kW/m2#Ref: Rule of thumb for Grooved surface drums for liquids that will not wet the surface..
+                                       T_out = 60 + 273.15 ) #Lower than the melting point of Stearic acid
 ob6 = hydrolysis_of_organic_fraction(ins = ob5.outs[1]) 
 ob6.simulate()
 ob6.show()
+
  
 ### Catalyst recovery area (700)
 @SystemFactory(
@@ -769,7 +871,7 @@ def catalyst_recovery_from_aqueous_stream (ins,outs):
                                                           )
     S702 = bst.units.RotaryVacuumFilter(ID = 'S702',
                                       ins = (R702-0,
-                                             water_for_precipitate_washing),
+                                              water_for_precipitate_washing),
                                       outs = (recovered_tungstic_acid,
                                               'recovered_cobalt_acetate_mixture'),
                                       split = {'Tungstic_acid':0.99,
@@ -804,7 +906,7 @@ calcium_hydroxide = bst.Stream(ID ='Calcium_hydroxide',
 
 aqueous_stream_from_disc_separator = ob3.outs[1]
 ob7 = catalyst_recovery_from_aqueous_stream(ins = (calcium_hydroxide,
-                                                   aqueous_stream_from_disc_separator))
+                                                    aqueous_stream_from_disc_separator))
 ob7.simulate()
 ob7.show()
 
@@ -819,34 +921,34 @@ ob1.ins[2] = ob7.outs[1]
 #Liquid/Solid waste streams mixer
 M801 = bst.Mixer( ID = 'M801',
                   ins = (F.polar_lipids_to_boilerturbogenerator,
-                        F.wastewater1_to_boilerturbogenerator,
-                        F.wastewater2_to_boilerturbogenerator,
-                        F.wastewater4_to_boilerturbogenerator,
+                          F.wastewater1_to_boilerturbogenerator,
+                          F.wastewater2_to_boilerturbogenerator,
+                          F.wastewater6_to_boilerturbogenerator,
                         ),
                   outs = ('total_effluent_to_be_burned')
                   )
 #This unit burns the streams provided to it to generate electricity
 BT801 = bst.BoilerTurbogenerator(ID ='BT801',
                                   ins = (M801-0,
-                                   F.stream.ventedgas_to_boilerturbogenerator,
-                                   'boiler_makeup_water',
-                                   'natural_gas',
-                                   'FGD_lime',
-                                   'boilerchems'),
+                                    F.stream.ventedgas_to_boilerturbogenerator,
+                                    'boiler_makeup_water',
+                                    'natural_gas',
+                                    'FGD_lime',
+                                    'boilerchems'),
                                   outs = ('emissions',
-                                   'rejected_water_and_blowdown',
-                                   'ash_disposal'),
+                                    'rejected_water_and_blowdown',
+                                    'ash_disposal'),
                                   turbogenerator_efficiency=0.85
                                   )
 #All the streams that are required in the different sections for production of azelaic acid
 process_water_streams_available = (F.stream.water_for_dihydroxylation,#Water used for dihydroxylation reaction
-                                   F.stream.water_for_emulsification,#Water used for hydrolysis and emulsification 
-                                   F.stream.water_for_RVF,#Water used for rotary vaccum filter
-                                   F.stream.water_for_HCl_prep,#Water used for making 6N Hcl from Conc. HCl
-                                   F.stream.water_for_precipitate_washing,#Water used for washing the catalyst precipitate washing
-                                   F.stream.water_for_degumming,#Water used for degumming the oils from the polar lipids
-                                   F.stream.water_for_degumming_2#Second Water stream used for degumming the oils from the polar lipids
-                                   )
+                                    F.stream.water_for_emulsification,#Water used for hydrolysis and emulsification 
+                                    F.stream.water_for_RVF,#Water used for rotary vaccum filter
+                                    F.stream.water_for_HCl_prep,#Water used for making 6N Hcl from Conc. HCl
+                                    F.stream.water_for_precipitate_washing,#Water used for washing the catalyst precipitate washing
+                                    F.stream.water_for_degumming,#Water used for degumming the oils from the polar lipids
+                                    F.stream.water_for_degumming_2#Second Water stream used for degumming the oils from the polar lipids
+                                    )
                                   
 CT801 = bst.CoolingTower(ID ='CT801')
 makeup_water_streams_available = (F.stream.cooling_tower_makeup_water,#This comes from the CoolingTower class, check CoolingTower source code for more info
@@ -855,16 +957,32 @@ makeup_water_streams_available = (F.stream.cooling_tower_makeup_water,#This come
 #TODO: check/this process is not currently generating any streams that need to be recycled
 makeup_water = bst.Stream('makeup_water', price=0.000254)
 bst.ProcessWaterCenter(ID = 'PW801',
-                       ins = ('clean_water',
+                        ins = ('clean_water',
                               makeup_water,
-                             ),
-                       outs = ('process_water', 'wastewater'),
-                       thermo = None,
-                       makeup_water_streams = makeup_water_streams_available,
-                       process_water_streams = process_water_streams_available 
-                       )
+                              ),
+                        outs = ('process_water', 'wastewater'),
+                        thermo = None,
+                        makeup_water_streams = makeup_water_streams_available,
+                        process_water_streams = process_water_streams_available 
+                        )
 #TODO: what if there is no cooling?
 bst.ChilledWaterPackage('CW801')
-#TODO: CIP needed? fire water? heat exchanger network? blowdown mixer?
-
-
+#TODO: CIP needed? add 
+# fire water? heat exchanger network? blowdown mixer?
+ # HS601 = units_baseline.HydrolysisSystem(ID = 'HS601',
+ #                                         ins = (M601-0,
+ #                                                ),
+ #                                         outs = ('tops_1',
+ #                                                 'bottoms_1',
+ #                                                 'tops_2',
+ #                                                 'bottoms_2',
+ #                                                 'tops_3',
+ #                                                 'bottoms_3',
+ #                                                 'organic_mixture_to_next_reactor'),
+ #                                         T = 100+273.15,
+ #                                         V_max = 3.14*5*total_height/3, #decided based on amount of resin required for each column
+ #                                         tau= 6.5,
+ #                                         #considers regeneration time,
+ #                                         P = 101325,
+                                         
+ #                                         # )

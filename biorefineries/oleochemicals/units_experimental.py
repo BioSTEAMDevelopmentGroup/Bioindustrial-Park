@@ -7,7 +7,7 @@ import thermosteam as tmo
 from thermosteam import Rxn, RxnSys, PRxn, SRxn, settings, Chemical, Stream, MultiStream, equilibrium
 
 class OxidativeCleavageReactor(bst.BatchBioreactor):
-    _N_ins = 1
+    _N_ins = 3
     _N_outs = 2
         
     def _setup(self):
@@ -20,6 +20,7 @@ class OxidativeCleavageReactor(bst.BatchBioreactor):
         Side_reactions_1 =    SRxn([Rxn('Nonanal + H2O2 ->  Nonanoic_acid', 'Nonanal', X = 1),
                                     Rxn('Nonanoic_acid ->  Octane + CO2', 'Nonanoic_acid', X = 1),
                                     Rxn('Octane + H2O2 -> Octanal', 'Octane', X = 0.4)])
+        
         Side_reactions_2 = PRxn([ Rxn('Oxononanoic_acid -> CO2 + Octanal', 'Oxononanoic_acid', X = 0.2),
                                   Rxn('Oxononanoic_acid + H2O2 ->  Azelaic_acid', 'Oxononanoic_acid', X = 0.8),
                                 ])  
@@ -39,12 +40,13 @@ class OxidativeCleavageReactor(bst.BatchBioreactor):
         self.reactions = oxidative_cleavage_rxnsys
         
     def _run(self):
-        feed = self.ins[0]
+        OA_feed,HP_solution,catalyst = self.ins
         vent,effluent = self.outs
-        effluent.copy_like(feed)
+        effluent.mix_from([OA_feed,HP_solution,catalyst])
         self.reactions(effluent) 
         vent.copy_flow(effluent,'CO2',remove = True)
         effluent.copy_like(effluent)
+        effluent.show()
         effluent.T = self.T
         effluent.P = self.P
         
@@ -62,14 +64,14 @@ class HeterogeneousReactor(bst.BatchBioreactor):
                                   Rxn('DHSA + H2O2 -> Nonanal + Oxononanoic_acid ', 'DHSA', X = 0.8)])
         
         Side_reactions_1 =    SRxn([Rxn('Nonanal + H2O2 ->  Nonanoic_acid', 'Nonanal', X = 1),
-                                   ])
+                                    ])
         Side_reactions_2 = PRxn([Rxn('Oxononanoic_acid + H2O2 ->  Azelaic_acid', 'Oxononanoic_acid', X = 0.8),
                                 ])  
 
         oxidative_cleavage_rxnsys = RxnSys(Epoxide_formation,
-                                           Side_reactions_1,
-                                           Side_reactions_2,
-                                           )
+                                            Side_reactions_1,
+                                            Side_reactions_2,
+                                            )
         self.reactions = oxidative_cleavage_rxnsys
         
     def _run(self):

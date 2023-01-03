@@ -5,7 +5,45 @@
 # This module is under the UIUC open-source license. See 
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
 # for license details.
-"""TankPurchaseCostAlgorithm
+"""
+.. contents:: :local:
+
+Tanks
+-----
+.. autoclass:: biorefineries.corn.units.CornStorage
+.. autoclass:: biorefineries.corn.units.MilledCornWeighTank
+.. autoclass:: biorefineries.corn.units.MilledCornSurgeTank
+.. autoclass:: biorefineries.corn.units.AmmoniaTank
+.. autoclass:: biorefineries.corn.units.AlphaAmylaseTank
+.. autoclass:: biorefineries.corn.units.SlurryMixTank
+.. autoclass:: biorefineries.corn.units.CookedSlurrySurgeTank
+.. autoclass:: biorefineries.corn.units.GlucoAmylaseTank
+.. autoclass:: biorefineries.corn.units.SulfuricAcidTank
+.. autoclass:: biorefineries.corn.units.YeastTank
+
+Reactors
+--------
+.. autoclass:: biorefineries.corn.units.Liquefaction
+.. autoclass:: biorefineries.corn.units.JetCooker
+.. autoclass:: biorefineries.corn.units.Saccharification
+
+Solids handling
+---------------
+.. autoclass:: biorefineries.corn.units.GrainHandling
+.. autoclass:: biorefineries.corn.units.HammerMill
+.. autoclass:: biorefineries.corn.units.CleaningSystem
+.. autoclass:: biorefineries.corn.units.MilledCornHopper
+.. autoclass:: biorefineries.corn.units.LimeHopper
+.. autoclass:: biorefineries.corn.units.WetDDGSConveyor
+.. autoclass:: biorefineries.corn.units.Liquefaction
+.. autoclass:: biorefineries.corn.units.SimultaneousSaccharificationFermentation
+.. autoclass:: biorefineries.corn.units.DDGSHandling
+.. autoclass:: biorefineries.corn.units.DDGSCentrifuge
+
+Facilities
+----------
+.. autoclass:: biorefineries.corn.units.PlantAir_CIP_WasteWater_Facilities
+
 """
 import biosteam as bst
 import thermosteam as tmo

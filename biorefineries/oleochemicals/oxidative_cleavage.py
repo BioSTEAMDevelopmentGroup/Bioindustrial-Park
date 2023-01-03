@@ -81,29 +81,32 @@ def oxidative_cleavage_system(ins,outs,T_in):
       
 #Mixer for reactor feed, adds the h2O2 sol and oleic acid
 #Need to add catalyst to it as a separate stream
-    M102 = bst.units.Mixer('M102',
-                        ins = (P101-0,
-                               M101-0,
-                               P104-0),
-                        outs = 'feed_to_heat_exchanger')
+    # M102 = bst.units.Mixer('M102',
+    #                     ins = (P101-0,
+    #                            M101-0,
+    #                            P104-0),
+    #                     outs = 'feed_to_heat_exchanger')
 
                
-#Batch oleochemicals process
-    R101_H = bst.units.HXutility('R101_H',
-                             ins = M102-0,
-                             outs = 'feed_to_oleochemicals_reactor',
-                             T = T_in
-                             )
+# #Batch oleochemicals process
+#     R101_H = bst.units.HXutility('R101_H',
+#                              ins = M102-0,
+#                              outs = 'feed_to_oleochemicals_reactor',
+#                              T = T_in
+#                              )
     
     
 ### TODO.xxx check if catalyst volume is still required
 
     R101 = units_experimental.OxidativeCleavageReactor('R101',
-                                ins = R101_H-0, 
+                                ins = (P101-0,#OA
+                                       M101-0,#HP solution
+                                       P104-0),#Catalyst
                                 outs = (vented_products,
                                         mixed_oxidation_products),
                                 V=3785 + 1.213553930851268e-06,
-                                tau = 17
+                                tau = 17,
+                                T = 70 +273.15
                                 # in m3 (equivalent to 1 MMGal), 
                                 # this is including catalyst volume
                                                               )

@@ -102,13 +102,14 @@ def add_biorefinery_parameters(model, model_dct, f, u, s, get_obj, get_rxn, para
 
     # Natural gas is a utility stream in some biorefineries, need to be added separately
     Upgrading = u.search('Upgrading')
-    b = bst.stream_utility_prices['Natural gas']
+    b = ng_streams[0].price if ng_streams else 0.
+    b = b or bst.stream_utility_prices['Natural gas']
     D = get_default_distribution('triangle', b)
     @param(name='Natural gas price', element='biorefinery', kind='cost', units='$/kg',
            baseline=b, distribution=D)
     def set_natural_gas_price(price):
-        for ng in ng_streams:
-            if ng: ng.price = price
+        if ng_streams: 
+            for ng in ng_streams: ng.price = price
         bst.stream_utility_prices['Natural gas'] = price
         if Upgrading: Upgrading.FNG_price = price
 
@@ -152,7 +153,7 @@ def add_biorefinery_parameters(model, model_dct, f, u, s, get_obj, get_rxn, para
 def add_biodiesel_parameters(model, model_dct, f, u, s, get_obj, get_rxn, param):
     # Some of the distributions differ from those in the reference
     # as the reference uses more optimistic values
-    from biorefineries.oilcane import OilExtractionSpecification
+    from biorefineries.oilcane import OilExtractionSpecification, CaneCompositionSpecification
     sys = model.system
 
     isplit_a = isplit_b = None
@@ -169,31 +170,32 @@ def add_biodiesel_parameters(model, model_dct, f, u, s, get_obj, get_rxn, param)
     # not using the range in the biorefinery as the baseline is 0.05 and
     # the distribution is uniform, 0.05-0.15
     feedstock = get_obj(s, 'feedstock')
+    composition_specification = CaneCompositionSpecification(feedstock)
     oil_extraction_specification = OilExtractionSpecification(
-            sys, [feedstock], isplit_a, isplit_b, model_dct['isplit_efficiency_is_reversed']
+            sys, isplit_a, isplit_b,
         )
-    b = 0.1 if isinstance(oil_extraction_specification.oil_content, bool) else oil_extraction_specification.oil_content
+    b = 0.1 if isinstance(composition_specification.oil, bool) else composition_specification.oil
     D = get_default_distribution('uniform', b, lb=0, ub=1)
     @param(name='Feedstock oil content', element=oil_extraction_specification,
            units='% dry mass', kind='coupled', baseline=b, distribution=D)
     def set_feedstock_oil_content(i):
-        oil_extraction_specification.load_oil_content(i)
+        composition_specification.load_oil_content(i)
 
     # Free fatty acid content as a fraction of the feedstock oil content
-    b = oil_extraction_specification.FFA_content
+    b = composition_specification.FFA
     D = get_default_distribution('uniform', b, lb=0, ub=1)
     @param(name='Feedstock free fatty acid content', element=oil_extraction_specification,
            units='frac of oil', kind='coupled', baseline=b, distribution=D)
     def set_free_fatty_acid_content(i):
-        oil_extraction_specification.FFA_content = i
+        composition_specification.FFA = i
 
     # Polar lipid content as a fraction of the feedstock oil content
-    b = oil_extraction_specification.PL_content
+    b = composition_specification.PL
     D = get_default_distribution('uniform', b, lb=0, ub=1)
     @param(name='Feedstock polar lipid content', element=oil_extraction_specification,
            units='frac of oil', kind='coupled', baseline=b, distribution=D)
     def set_polar_lipid_content(i):
-        oil_extraction_specification.PL_content = i
+        composition_specification.PL = i
 
     # Oil retained in the bagasse after crushing,
     # not using the range in the biorefinery as the baseline is 0.6 and
@@ -678,7 +680,7 @@ def add_metrics(model, model_dct, f, u, s, get_obj):
         cache_dct = Caching.cache_dct
 
         # Displacement
-        net = cache_dct[f'Net GWP{suffix}'] = sys.get_net_impact('GWP')
+        net = cache_dct[f'Net GWP{suffix}'] = sys.get_net_impact('GWP')       
         hours = sys.operating_hours
         GWP_disp = cache_dct[f'Product GWP disp{suffix}'] = net/hours/get_F_mass()*factor
 
@@ -783,6 +785,7 @@ def add_metrics(model, model_dct, f, u, s, get_obj):
             def get_MPSP_no_WWT():
                 cache_dct = Caching.cache_dct
                 default_price_dct = {p:p.price for p in products}
+                
                 MPSP_w_WWT = tea.solve_price(products) # MPSP with WWT system
                 for p in products: p.price = MPSP_w_WWT
 
