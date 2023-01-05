@@ -6,7 +6,7 @@ Created on Thu Nov  4 14:44:17 2021
 """
 from biosteam import MockFeature
 
-(set_crushing_mill_oil_recovery, set_saccharification_oil_recovery, 
+(set_crushing_mill_oil_recovery, set_microbial_oil_recovery, set_bagasse_oil_recovery, 
  set_cane_operating_days, set_sorghum_operating_days, 
  set_plant_capacity, 
  set_ethanol_price, set_biodiesel_price, set_natural_gas_price, set_electricity_price, 
@@ -24,7 +24,8 @@ from biosteam import MockFeature
  set_income_tax,
  ) = all_parameter_mockups = (
     MockFeature('Crushing mill oil recovery', '%', 'biorefinery'),
-    MockFeature('Saccharification oil recovery', '%', 'biorefinery'),
+    MockFeature('Microbial oil recovery', '%', 'biorefinery'),
+    MockFeature('Bagasse oil recovery', '%', 'biorefinery'),
     MockFeature('Cane operating days', 'day/yr', 'biorefinery'),
     MockFeature('Sorghum operating days', 'day/yr', 'biorefinery'),
     MockFeature('Annual crushing capacity', 'MT/yr', 'biorefinery'),
@@ -81,8 +82,8 @@ from biosteam import MockFeature
     MockFeature('Biodiesel production', 'L/MT', 'Biorefinery'),
     MockFeature('Biodiesel yield', 'L/hc', 'Biorefinery'),
     MockFeature('Ethanol production', 'L/MT', 'Biorefinery'),
-    MockFeature('Electricity production', 'kWhr/MT', 'Biorefinery'),
     MockFeature('Net energy production', 'GGE/MT', 'Biorefinery'),
+    MockFeature('Electricity production', 'kWhr/MT', 'Biorefinery'),
     MockFeature('Natural gas consumption', 'm3/MT', 'Biorefinery'),
     MockFeature('TCI', '10^6*USD', 'Biorefinery'),
     MockFeature('Heat exchanger network error', '%', 'Biorefinery'),

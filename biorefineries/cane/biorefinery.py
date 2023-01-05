@@ -408,25 +408,15 @@ class Biorefinery:
         ## Specifications for analysis
         self.composition_specification = composition_specification = CaneCompositionSpecification(feedstock)
         if number < 0:
-            isplit_a = None
-            isplit_b = None
             oil_extraction_specification = MockExtractionSpecification()
         else:
-            isplit_b = isplit_a = None
-            for i in cane_sys.cost_units:
-                if getattr(i, 'tag', None) == 'oil extraction':
-                    isplit_a = i.isplit
-                    break
-            
-            for i in cane_sys.cost_units:
-                if getattr(i, 'tag', None) == 'bagasse oil extraction':
-                    isplit_b = i.isplit
-                    break
-            
+            crushing_mill = flowsheet(bst.CrushingMill) # Separates bagasse
+            pressure_filter = flowsheet(bst.PressureFilter) # Separates lignin
+            cellmass_centrifuge = flowsheet(bst.SolidsCentrifuge) # Separates cell mass
+            microbial_oil_recovery = 0.9 # Baseline
             oil_extraction_specification = OilExtractionSpecification(
-                sys, isplit_a, isplit_b, 
+                sys, crushing_mill, pressure_filter, cellmass_centrifuge, microbial_oil_recovery, 
             )
-        
         
         ## Account for cellulosic vs advanced RINs
         if number in cellulosic_ethanol_configurations:
@@ -453,7 +443,7 @@ class Biorefinery:
                 )
                 RIN_splitter.split[:] = juice_sugar / (juice_sugar + hydrolysate_sugar)
             
-            cane_sys.update_configuration([*sys.units, RIN_splitter])
+            cane_sys.update_configuration([*cane_sys.units, RIN_splitter])
             assert RIN_splitter in cane_sys.units
         elif number in conventional_ethanol_configurations:
             s.ethanol.ID = 'advanced_ethanol'
@@ -487,7 +477,7 @@ class Biorefinery:
                     )
                     RIN_splitter.split[:] = juice_sugar / (juice_sugar + hydrolysate_sugar)
                 
-                cane_sys.update_configuration([*sys.units, RIN_splitter])
+                cane_sys.update_configuration([*cane_sys.units, RIN_splitter])
                 assert RIN_splitter in cane_sys.units
             else:
                 # A biodiesel stream should already exist
@@ -594,9 +584,13 @@ class Biorefinery:
         def set_crushing_mill_oil_recovery(oil_recovery):
             oil_extraction_specification.load_crushing_mill_oil_recovery(oil_recovery / 100.)
         
+        @performance(90.0, 95, units='%', kind='coupled')
+        def set_microbial_oil_recovery(microbial_oil_recovery):
+            oil_extraction_specification.load_microbial_oil_recovery(microbial_oil_recovery / 100.)
+        
         @performance(70.0, 90, units='%', kind='coupled')
-        def set_saccharification_oil_recovery(saccharification_oil_recovery):
-            oil_extraction_specification.load_saccharification_oil_recovery(saccharification_oil_recovery / 100.)
+        def set_bagasse_oil_recovery(bagasse_oil_recovery):
+            oil_extraction_specification.load_bagasse_oil_recovery(bagasse_oil_recovery / 100.)
     
         # Baseline from Huang's 2016 paper, but distribution more in line with Florida sugarcane harvesting (3-5 months)
         @uniform(4 * 30, 6 * 30, units='day/yr', baseline=180)
@@ -1190,7 +1184,7 @@ class Biorefinery:
             set_baseline(set_cane_oil_content, 2)
         else:
             set_baseline(set_cane_oil_content, 10)
-        set_baseline(set_saccharification_oil_recovery, 70)
+        set_baseline(set_bagasse_oil_recovery, 70)
         set_baseline(set_crushing_mill_oil_recovery, 60)
         set_baseline(set_advanced_ethanol_price, dist.maep) 
         set_baseline(set_cellulosic_ethanol_price, dist.mcep) 

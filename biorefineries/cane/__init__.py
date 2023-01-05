@@ -9,6 +9,7 @@ from . import units
 from . import systems
 from . import biorefinery
 from . import evaluation
+from . import results
 
 __all__ = (
     *chemicals.__all__,
@@ -19,6 +20,7 @@ __all__ = (
     *systems.__all__,
     *biorefinery.__all__,
     *evaluation.__all__,
+    *results.__all__,
 )
 
 from .chemicals import *
@@ -29,3 +31,4 @@ from .units import *
 from .systems import *
 from .biorefinery import *
 from .evaluation import *
+from .results import *

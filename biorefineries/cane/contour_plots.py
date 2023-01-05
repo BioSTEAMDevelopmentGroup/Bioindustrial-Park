@@ -341,18 +341,6 @@ def plot_relative_sorghum_oil_content_and_cane_oil_content_contours(
             for n in range(N):
                 metric_data = data[:, :, m, n]
                 data[:, :, m, n] = gaussian_filter(metric_data, smooth)
-                # for a in range(A):
-                #     values = metric_data[a, :]
-                #     values.sort()
-                #     p = np.arange(values.size)
-                #     coeff = np.polyfit(p, values, 5)
-                #     values[:] = np.polyval(coeff, p)
-                # for b in range(B):
-                #     values = metric_data[:, b]
-                #     values.sort()
-                #     p = np.arange(values.size)
-                #     coeff = np.polyfit(p, values, 5)
-                #     values[:] = np.polyval(coeff, p)
     
     fig, axes, CSs, CB = plot_contour_2d(
         100.*X, 100.*Y, Z, data, xlabel, ylabel, xticks, yticks, metric_bars, 

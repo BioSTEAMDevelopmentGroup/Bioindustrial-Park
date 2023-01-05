@@ -13,7 +13,7 @@ __all__ = (
 
 class MockExtractionSpecification:
     
-    def load_saccharification_oil_recovery(self, bagasse_recovery):
+    def load_bagasse_oil_recovery(self, bagasse_recovery):
         pass
       
     def load_crushing_mill_oil_recovery(self, recovery):
@@ -34,7 +34,7 @@ class OilExtractionSpecification:
     ----------
     system : System
         System associated to feedstocks.
-    isplit_crushing_mill : ChemicalIndexer
+    crushing_mill : ChemicalIndexer
         Defines extraction recovery as a material split.
         
     Notes
@@ -45,38 +45,61 @@ class OilExtractionSpecification:
     
     __slots__ = (
         'feedstocks',
-        'isplit_crushing_mill',
-        'isplit_saccharification',
+        'crushing_mill',
+        'pressure_filter',
+        'cellmass_centrifuge',
         'crushing_mill_oil_recovery',
-        'saccharification_oil_recovery',
-        'isplit_recovery_is_reversed',
+        'bagasse_oil_recovery',
+        'microbial_oil_recovery',
     )
     
-    def __init__(self, system, isplit_crushing_mill, isplit_saccharification=None):
-        self.isplit_crushing_mill = isplit_crushing_mill #: [SplitIndexer] Defines extraction recovery as a material split.
-        self.isplit_saccharification = isplit_saccharification #: [SplitIndexer] Defines extraction recovery from bagasse as a material split.
-        if isplit_crushing_mill is not None: 
-            self.crushing_mill_oil_recovery = isplit_crushing_mill['Oil'].mean()
+    def __init__(self, system, crushing_mill, pressure_filter=None, cellmass_centrifuge=None, microbial_oil_recovery=None):
+        self.crushing_mill = crushing_mill #: [Unit] Defines extraction recovery as a material split.
+        self.pressure_filter = pressure_filter #: [Unit] Defines extraction recovery from bagasse as a material split.
+        self.cellmass_centrifuge = cellmass_centrifuge
+        if crushing_mill is not None: 
+            self.crushing_mill_oil_recovery = crushing_mill.isplit['Oil'].mean()
         else:
             self.crushing_mill_oil_recovery = None
-        if isplit_saccharification is not None: 
-            self.saccharification_oil_recovery = 1 - isplit_saccharification['Oil'].mean()
+        if pressure_filter is not None: 
+            self.bagasse_oil_recovery = 1 - pressure_filter.isplit['Oil'].mean()
+            if pressure_filter in cellmass_centrifuge.get_downstream_units(facilities=False):
+                # Microbial oil is removed further downstream
+                @pressure_filter.add_specification(run=True)
+                def adjust_oil_recovery():
+                    cellmass = self.cellmass_centrifuge.outs[0]
+                    pressure_filter = self.pressure_filter
+                    bagasse_oil_recovery = self.bagasse_oil_recovery
+                    microbial_oil_recovery = self.microbial_oil_recovery
+                    f = cellmass.imass['Oil'] / pressure_filter.ins[0].imass['Oil']
+                    pressure_filter.isplit['Oil'] = (1.
+                        - f * microbial_oil_recovery
+                        - (1. - f) * bagasse_oil_recovery
+                    )
+            else:
+                @pressure_filter.add_specification(run=True)
+                def adjust_oil_recovery():
+                    self.pressure_filter.isplit['Oil'] = 1. - self.bagasse_oil_recovery
         else:
-            self.saccharification_oil_recovery = None
+            self.bagasse_oil_recovery = None
+        self.microbial_oil_recovery = microbial_oil_recovery
       
     def load_crushing_mill_oil_recovery(self, recovery):
-        if self.isplit_crushing_mill is None: return
+        if self.crushing_mill is None: return
         self.crushing_mill_oil_recovery = recovery
-        self.isplit_crushing_mill['Oil'] = 1. - recovery
+        self.crushing_mill.isplit['Oil'] = 1. - recovery
     
-    def load_saccharification_oil_recovery(self, recovery):
-        if self.isplit_saccharification is None: return
-        self.saccharification_oil_recovery = recovery
-        self.isplit_saccharification['Oil'] = 1. - recovery
+    def load_bagasse_oil_recovery(self, recovery):
+        if self.pressure_filter is None: return
+        self.bagasse_oil_recovery = recovery 
+    
+    def load_microbial_oil_recovery(self, recovery):
+        if self.pressure_filter is None: return
+        self.microbial_oil_recovery = recovery 
     
     def load_specifications(self, 
             crushing_mill_oil_recovery=None,
-            saccharification_oil_recovery=None,
+            bagasse_oil_recovery=None,
         ):
         """
         Load oil extraction specifications.
@@ -93,8 +116,8 @@ class OilExtractionSpecification:
         """
         if crushing_mill_oil_recovery is None: 
             crushing_mill_oil_recovery = self.crushing_mill_oil_recovery
-        if saccharification_oil_recovery is None:
-            saccharification_oil_recovery = self.saccharification_oil_recovery
+        if bagasse_oil_recovery is None:
+            bagasse_oil_recovery = self.bagasse_oil_recovery
         self.load_crushing_mill_oil_recovery(crushing_mill_oil_recovery)
-        self.load_saccharification_oil_recovery(saccharification_oil_recovery)
+        self.load_bagasse_oil_recovery(bagasse_oil_recovery)
     
