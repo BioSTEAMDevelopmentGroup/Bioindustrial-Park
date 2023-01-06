@@ -2003,7 +2003,7 @@ class HydrogenationEstersReactor(Reactor):
     """
     A hydrogenation reactor to produce esters from TAL.
     """
-    _N_ins = 3
+    _N_ins = 5
     _N_outs = 2
     _F_BM_default = {**Reactor._F_BM_default,
             'PdC catalyst': 1}
@@ -2013,7 +2013,7 @@ class HydrogenationEstersReactor(Reactor):
     esters_DHL_conversion_ratio = 0.5
     TAL_to_esters_conversion = esters_DHL_conversion_ratio * TAL_to_esters_and_DHL_conversion
     # catalyst_deactivation_k = 2e-3/10
-    catalyst_replacements_per_year = 1.
+    catalyst_replacements_per_year = 0. # deprecated variable
     hydrogenation_rxns = ParallelRxn([
             #   Reaction definition   Reactant   Conversion
             Rxn('TAL + 2H2 + Ethanol -> Ethyl_5_hydroxyhexanoate',         'TAL',   TAL_to_esters_conversion*mono_di_hydroxy_esters_conversion_ratio),
@@ -2047,7 +2047,7 @@ class HydrogenationEstersReactor(Reactor):
         self.heat_exchanger = hx = HXutility(None, None, None, T=T) 
         
     def _run(self):
-        feed, recycle, reagent, fresh_catalyst = self.ins
+        feed, recycle, reagent, fresh_catalyst, recovered_catalyst = self.ins
         effluent, vented_gas, spent_catalyst = self.outs
         
         # effluent.imol['HMDHP'] += 1e-10
@@ -2084,8 +2084,10 @@ class HydrogenationEstersReactor(Reactor):
         for i in self.outs:
             i.T = self.T
         
-        spent_catalyst.imass['Pd'] = fresh_catalyst.imass['Pd'] =\
+        spent_catalyst.imass['Pd'] =\
             self.mcat_frac * self.ins[0].imass['TAL'] * self.tau * self.catalyst_replacements_per_year/ 7884.0
+        # spent_catalyst.imass['Pd'] = fresh_catalyst.imass['Pd'] =\
+            
             # self.catalyst_deactivation_k * (feed.imol['TAL'] - effluent.imol['TAL'])
             # self.catalyst_deactivation_k * reagent.imol['H2']
             
@@ -2096,7 +2098,11 @@ class HydrogenationEstersReactor(Reactor):
         
             # Alternative 
             # reagent.imol['H2']
-    
+        
+        # catalyst leaves in the effluent (recovered downstream)
+        effluent.imass['Pd'] = self.mcat_frac * self.ins[0].imass['TAL']
+        fresh_catalyst.imass['Pd'] = max(0, effluent.imass['Pd'] - recovered_catalyst.imass['Pd'])
+        
     def _design(self):
         Reactor._design(self)
         duty = sum([i.H for i in self.outs]) - sum([i.H for i in self.ins])

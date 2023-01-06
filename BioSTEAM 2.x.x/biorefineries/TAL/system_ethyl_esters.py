@@ -174,8 +174,8 @@ def create_TAL_sys(ins, outs):
     feedstock.imass['H2O'] = 500.
     feedstock.price = price['Glucose']*feedstock.imass['Glucose']/feedstock.F_mass
     
-    feedstock.F_mass = 604.125 # at the baseline, matches the reported production capacity of ethyl 3-HH by Guangzhou Magnolia Flavor and Fragrance at https://www.alibaba.com/product-detail/ETHYL-3-HYDROXYHEXANOATE-CAS-2305-25_1600386938301.html?spm=a2700.galleryofferlist.normal_offer.d_title.674572a5vNji1o
-    
+    # feedstock.F_mass = 604.125 # at the baseline, matches the reported production capacity of ethyl 3-HH by Guangzhou Magnolia Flavor and Fragrance at https://www.alibaba.com/product-detail/ETHYL-3-HYDROXYHEXANOATE-CAS-2305-25_1600386938301.html?spm=a2700.galleryofferlist.normal_offer.d_title.674572a5vNji1o
+    feedstock.F_mass = 19301.5 # at the baseline, this produces 20,000 metric tonnes of mixed esters annually
     U101 = units.FeedstockPreprocessing('U101', ins=feedstock)
     
     # Handling costs/utilities included in feedstock cost thus not considered here
@@ -500,12 +500,25 @@ def create_TAL_sys(ins, outs):
             flx.IQ_interpolation(M403_obj_fn, 0., 1000.)
     
     
-    R401 = units.HydrogenationEstersReactor('R401', ins=(M403-0, 'recycled_reactants', H2_hydrogenation, PdC_hydrogenation), 
+    R401 = units.HydrogenationEstersReactor('R401', ins=(M403-0, 'recycled_reactants', H2_hydrogenation, PdC_hydrogenation, ''), 
                                             outs=('mixed_hydrogenation_products', 'vented_gas', spent_PdC),
                                             tau = 2.333 * 2.,
                                             P=34.5423*101325.)
     
-    F403 = bst.Flash('F403', ins=R401-0, outs = ('volatiles', 'bottom_product_esters'), 
+    S405 = bst.units.SolidsCentrifuge('S405', ins=R401-0, outs=('S405_recovered_PdC_catalyst', 'S405_filtrate'),
+                                moisture_content=0.00,
+                                split={'Pd': 1- (0.2*R401.tau/7884)},
+                                solids=['Pd'],
+                                )
+    S405.PdC_recovery_over_project_period = 0.8 # fraction of catalyst recovered at the end of the project
+    @S405.add_specification(run=True)
+    def S405_spec():
+        PdC_loss_over_project_period = 1. - S405.PdC_recovery_over_project_period
+        S405.isplit['Pd'] = 1. - (PdC_loss_over_project_period * R401.tau / S405.system.TEA.operating_hours)
+    
+    S405-0-4-R401
+    
+    F403 = bst.Flash('F403', ins=S405-1, outs = ('volatiles', 'bottom_product_esters'), 
                       V = 0.6, 
                       P=101325./20.) 
     
@@ -1088,7 +1101,7 @@ spec = ProcessSpecification(
     
     # set baseline fermentation performance here
     # baseline_yield = 0.19,
-    baseline_yield = 0.3,
+    baseline_yield = 0.19,
     baseline_titer = 15.,
     baseline_productivity = 0.19,
     

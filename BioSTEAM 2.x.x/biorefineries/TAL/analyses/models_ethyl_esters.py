@@ -261,9 +261,9 @@ def set_ethanol_price(etoh_price):
 
 #%% ######################## Feedstock parameters ########################
 U101 = u.U101
-D = shape.Triangle(604.125*0.8, 604.125, 604.125*1.2)
+D = shape.Triangle(19301.5*0.8, 19301.5, 19301.5*1.2)
 @param(name='Feedstock capacity', element=U101, kind='coupled', units='kg/h',
-       baseline=604.125, distribution=D)
+       baseline=19301.5, distribution=D)
 def set_feedstock_capacity(feedstock_capacity):
     feedstock.F_mass = feedstock_capacity
     
@@ -440,15 +440,24 @@ def set_TAL_to_esters_and_DHL_conversion(TAL_to_esters_and_DHL_conversion):
     # R401.TAL_to_DHL_rxn.X = min(0.499, max(1e-6, 1. - sum([i.X for i in R401.TAL_conversion_rxns if i.reactant=='TAL']) +R401.TAL_to_DHL_rxn.X))
 
 
-
-baseline_catalyst_replacements_per_year = R401.catalyst_replacements_per_year
-D = shape.Uniform(0.5*baseline_catalyst_replacements_per_year, 
-                   # baseline_catalyst_replacements_per_year, 
-                   1.5*baseline_catalyst_replacements_per_year) # assumed
-@param(name='Pd|C catalyst replacement frequency', element=R401, kind='coupled', units='y^-1',
-       baseline=baseline_catalyst_replacements_per_year, distribution=D)
-def set_catalyst_deactivation(catalyst_replacements_per_year):
-    R401.catalyst_replacements_per_year = catalyst_replacements_per_year
+S405=u.S405
+baseline_PdC_recovery_over_project_period = S405.PdC_recovery_over_project_period
+D = shape.Uniform(0.8*baseline_PdC_recovery_over_project_period, 
+                   1.2*baseline_PdC_recovery_over_project_period) # assumed
+@param(name='Pd|C catalyst recovery over project period', element=S405, kind='coupled', units='%',
+       baseline=baseline_PdC_recovery_over_project_period, distribution=D)
+def set_catalyst_recovery(PdC_rec):
+    S405.PdC_recovery_over_project_period = PdC_rec
+    
+    
+# baseline_catalyst_replacements_per_year = R401.catalyst_replacements_per_year
+# D = shape.Uniform(0.5*baseline_catalyst_replacements_per_year, 
+#                    # baseline_catalyst_replacements_per_year, 
+#                    1.5*baseline_catalyst_replacements_per_year) # assumed
+# @param(name='Pd|C catalyst replacement frequency', element=R401, kind='coupled', units='y^-1',
+#        baseline=baseline_catalyst_replacements_per_year, distribution=D)
+# def set_catalyst_deactivation(catalyst_replacements_per_year):
+#     R401.catalyst_replacements_per_year = catalyst_replacements_per_year
     
 
 # D = shape.Uniform(0.01, 0.09) # assumed
