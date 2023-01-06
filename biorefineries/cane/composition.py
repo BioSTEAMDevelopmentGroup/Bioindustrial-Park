@@ -17,7 +17,6 @@ from biosteam import main_flowsheet as f
 import numpy as np
 from typing import NamedTuple
 import pandas as pd
-from biorefineries import cane
 import chaospy as cp
 import os
 
@@ -31,6 +30,8 @@ __all__ = (
     'CaneCompositionSpecification',
     'set_composition_parameters',
     'set_line_composition_parameters',
+    'load_composition',
+    'get_composition_data',
 )
 
 data_folder = os.path.join(os.path.dirname(__file__), 'data')

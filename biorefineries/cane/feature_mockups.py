@@ -8,7 +8,7 @@ from biosteam import MockFeature
 
 (set_crushing_mill_oil_recovery, set_microbial_oil_recovery, set_bagasse_oil_recovery, 
  set_cane_operating_days, set_sorghum_operating_days, 
- set_plant_capacity, 
+ set_annual_crushing_capacity, set_crude_oil_price,
  set_ethanol_price, set_biodiesel_price, set_natural_gas_price, set_electricity_price, 
  set_IRR, set_crude_glycerol_price, set_pure_glycerol_price,
  set_saccharification_reaction_time, set_cellulase_price, 
@@ -29,6 +29,7 @@ from biosteam import MockFeature
     MockFeature('Cane operating days', 'day/yr', 'biorefinery'),
     MockFeature('Sorghum operating days', 'day/yr', 'biorefinery'),
     MockFeature('Annual crushing capacity', 'MT/yr', 'biorefinery'),
+    MockFeature('Price', 'UDA/barrel', 'Crude oil'),
     MockFeature('Price', 'USD/L', 'Stream-ethanol'),
     MockFeature('Price', 'USD/L', 'Stream-biodiesel'),
     MockFeature('Price', 'USD/m3', 'Stream-natural gas'),
@@ -64,7 +65,7 @@ from biosteam import MockFeature
 )
      
 (MFPP, feedstock_consumption, biodiesel_production, biodiesel_yield, ethanol_production, 
- net_energy_production, electricity_production, natural_gas_consumption, TCI, 
+ electricity_production, net_energy_production, natural_gas_consumption, TCI, 
  heat_exchanger_network_error, GWP_economic, GWP_ethanol, GWP_biodiesel, 
  GWP_crude_glycerol, GWP_electricity, GWP_ethanol_displacement, GWP_biodiesel_displacement,
  GWP_biofuel_allocation, GWP_ethanol_allocation,
@@ -82,8 +83,8 @@ from biosteam import MockFeature
     MockFeature('Biodiesel production', 'L/MT', 'Biorefinery'),
     MockFeature('Biodiesel yield', 'L/hc', 'Biorefinery'),
     MockFeature('Ethanol production', 'L/MT', 'Biorefinery'),
-    MockFeature('Net energy production', 'GGE/MT', 'Biorefinery'),
     MockFeature('Electricity production', 'kWhr/MT', 'Biorefinery'),
+    MockFeature('Net energy production', 'GGE/MT', 'Biorefinery'),
     MockFeature('Natural gas consumption', 'm3/MT', 'Biorefinery'),
     MockFeature('TCI', '10^6*USD', 'Biorefinery'),
     MockFeature('Heat exchanger network error', '%', 'Biorefinery'),

@@ -5,7 +5,6 @@ Created on Fri Nov  5 01:34:00 2021
 @author: yrc2
 """
 import biosteam as bst
-import biorefineries.oilcane as oc
 from biosteam.utils import CABBI_colors, GG_colors, colors
 from thermosteam.utils import set_figure_size, set_font, roundsigfigs
 from thermosteam.units_of_measure import format_units
@@ -15,9 +14,9 @@ import matplotlib.patches as mpatches
 from warnings import warn
 import numpy as np
 import pandas as pd
-from matplotlib.gridspec import GridSpec
-from . import _feature_mockups as features
-from ._feature_mockups import (
+from biorefineries import cane
+from . import feature_mockups as features
+from .feature_mockups import (
     tea_monte_carlo_metric_mockups,
     tea_monte_carlo_derivative_metric_mockups,
     lca_monte_carlo_metric_mockups, 
@@ -35,15 +34,16 @@ from ._feature_mockups import (
     # natural_gas_consumption_derivative,
     GWP_ethanol_derivative,
 )
-from ._load_data import (
+from .results import (
     images_folder,
+    monte_carlo_file,
     get_monte_carlo,
     get_line_monte_carlo,
     spearman_file,
 )
 import os
 from colorpalette import ColorWheel
-from._parse_configuration import format_name
+from.parse_configuration import format_name
 
 __all__ = (
     'plot_all',
@@ -64,8 +64,6 @@ __all__ = (
     'plot_monte_carlo',
     'plot_spearman',
     'plot_configuration_breakdown',
-    'plot_TCI_areas_across_oil_content',
-    'plot_heatmap_comparison',
     'plot_feedstock_conventional_comparison_kde',
     'plot_feedstock_cellulosic_comparison_kde',
     'plot_configuration_comparison_kde',
@@ -75,6 +73,8 @@ __all__ = (
     'plot_agile_comparison_kde',
     'plot_separated_configuration_comparison_kde',
     'plot_unlabeled_feedstock_conventional_comparison_kde',
+    'plot_competitive_biomass_yield_across_oil_content',
+    'plot_competitive_microbial_oil_yield_across_oil_content',
     'area_colors',
     'area_hatches',
 )
@@ -533,74 +533,6 @@ def plot_breakdowns(biodiesel_only=False):
         file = os.path.join(images_folder, name)
         plt.savefig(file, transparent=True)
 
-# %% Heatmap
-
-def get_fraction_in_same_direction(data, direction):
-    return (direction * data >= 0.).sum(axis=0) / data.size
-
-def get_median(data):
-    return roundsigfigs(np.percentile(data, 50, axis=0))
-
-def plot_heatmap_comparison(comparison_names=None, xlabels=None):
-    if comparison_names is None: comparison_names = oc.comparison_names
-    columns = comparison_names
-    if xlabels is None: xlabels = [format_name(i).replace(' ', '') for i in comparison_names]
-    def get_data(metric, name):
-        df = get_monte_carlo(name, metric)
-        values = df.values
-        return values
-    
-    GWP_economic, GWP_ethanol, GWP_biodiesel, GWP_electricity, GWP_crude_glycerol, = lca_monte_carlo_metric_mockups
-    MFPP, TCI, ethanol_production, biodiesel_production, electricity_production, natural_gas_consumption = tea_monte_carlo_metric_mockups
-    GWP_ethanol_displacement = features.GWP_ethanol_displacement
-    GWP_ethanol_allocation = features.GWP_ethanol_allocation
-    rows = [
-        MFPP, 
-        TCI, 
-        ethanol_production, 
-        biodiesel_production,
-        electricity_production,
-        natural_gas_consumption,
-        GWP_ethanol_displacement,
-        GWP_ethanol_allocation,
-        GWP_ethanol, # economic
-    ]
-    ylabels = [
-        f"MFPP\n[{format_units('USD/MT')}]",
-        f"TCI\n[{format_units('10^6*USD')}]",
-        f"Ethanol production\n[{format_units('L/MT')}]",
-        f"Biodiesel production\n[{format_units('L/MT')}]",
-        f"Elec. prod.\n[{format_units('kWhr/MT')}]",
-        f"NG cons.\n[{format_units('m^3/MT')}]",
-        "GWP$_{\\mathrm{displacement}}$" f"\n[{GWP_units_L}]",
-        "GWP$_{\\mathrm{energy}}$" f"\n[{GWP_units_L}]",
-        "GWP$_{\\mathrm{economic}}$" f"\n[{GWP_units_L}]",
-    ]
-    N_rows = len(rows)
-    N_cols = len(comparison_names)
-    data = np.zeros([N_rows, N_cols], dtype=object)
-    data[:] = [[get_data(i, j) for j in columns] for i in rows]
-    medians = np.zeros_like(data, dtype=float)
-    fractions = medians.copy()
-    for i in range(N_rows):
-        for j in range(N_cols):
-            medians[i, j] = x = get_median(data[i, j])
-            fractions[i, j] = get_fraction_in_same_direction(data[i, j], 1 if x > 0 else -1)
-            
-    fig, ax = plt.subplots()
-    mbar = bst.plots.MetricBar(
-        'Fraction in the same direction [%]', ticks=[-100, -75, -50, -25, 0, 25, 50, 75, 100],
-        cmap=plt.cm.get_cmap('RdYlGn')
-    )
-    im, cbar = bst.plots.plot_heatmap(
-        100 * fractions, vmin=0, vmax=100, ax=ax, cell_labels=medians,
-        metric_bar=mbar, xlabels=xlabels, ylabels=ylabels,
-    )
-    cbar.ax.set_ylabel(mbar.title, rotation=-90, va="bottom")
-    plt.sca(ax)
-    ax.spines[:].set_visible(False)
-    plt.grid(True, 'major', 'both', lw=1, color='w', ls='-')
-
 # %% KDE
 
 
@@ -611,7 +543,7 @@ def plot_kde(name, metrics=(GWP_ethanol, MFPP), xticks=None, yticks=None,
     set_font(size=fs or 8)
     set_figure_size(width='half', aspect_ratio=aspect_ratio)
     Xi, Yi = [i.index for i in metrics]
-    df = oc.get_monte_carlo(name, metrics)
+    df = get_monte_carlo(name, metrics)
     y = df[Yi].values
     x = df[Xi].values
     sX, sY = [kde_comparison_settings[i] for i in metrics]
@@ -648,7 +580,7 @@ def plot_kde_fake_scenarios_ethanol_price(name, xticks=None, yticks=None,
     all_features = (*metrics, ethanol_price, relative_biodiesel_price, 
                     ethanol_production, biodiesel_production)
     Xi, Yi = [i.index for i in metrics]
-    df = oc.get_monte_carlo(name, all_features)
+    df = get_monte_carlo(name, all_features)
     x = df[Xi].values
     y = df[Yi].values
     ethanol_price_range = [0.269, 0.758 * 2]
@@ -697,7 +629,7 @@ def plot_kde_2d(name, metrics=(GWP_ethanol, MFPP), xticks=None, yticks=None,
     set_figure_size(aspect_ratio=0.6)
     if isinstance(name, str): name = (name,)
     Xi, Yi = [i.index for i in metrics]
-    dfs = [oc.get_monte_carlo(i, metrics) for i in name]
+    dfs = [get_monte_carlo(i, metrics) for i in name]
     sX, sY = [kde_comparison_settings[i] for i in metrics]
     _, xlabel, fx = sX
     _, ylabel, fy = sY
@@ -903,10 +835,10 @@ def plot_agile_comparison_kde(fs=None):
 
 def plot_open_comparison_kde(overlap=False):
     metrics = [MFPP, TCI, GWP_ethanol, biodiesel_production]
-    df_conventional_oc = oc.get_monte_carlo('O1', metrics)
-    df_cellulosic_oc = oc.get_monte_carlo('O2', metrics)
-    df_conventional_sc = oc.get_monte_carlo('S1', metrics)
-    df_cellulosic_sc = oc.get_monte_carlo('S2', metrics)
+    df_conventional_oc = get_monte_carlo('O1', metrics)
+    df_cellulosic_oc = get_monte_carlo('O2', metrics)
+    df_conventional_sc = get_monte_carlo('S1', metrics)
+    df_cellulosic_sc = get_monte_carlo('S2', metrics)
     MFPPi = MFPP.index
     TCIi = TCI.index
     if overlap:
@@ -984,8 +916,8 @@ def plot_monte_carlo(derivative=False, absolute=True, comparison=True,
         metric_info = mc_derivative_metric_settings
         default_metrics = list(metric_info)
     else:
-        default_configuration_names = oc.configuration_names[:-2]
-        default_comparison_names = oc.comparison_names
+        default_configuration_names = configuration_names[:-2]
+        default_comparison_names = comparison_names
         if comparison:
             metric_info = mc_comparison_settings
         else:
@@ -1131,12 +1063,39 @@ def plot_monte_carlo(derivative=False, absolute=True, comparison=True,
     fig.align_ylabels(axes)
     return fig, axes
 
+def plot_competitive_biomass_yield_across_oil_content(
+        configuration=None,
+    ):
+    if configuration is None: configuration = 'O2'
+    file = monte_carlo_file(configuration, across_lines=False, across_oil_content='oilcane vs sugarcane')
+    df = pd.read_excel(file, sheet_name=features.competitive_oilcane_biomass_yield.short_description, index_col=0)
+    fig = plt.figure()
+    oil_fraction = np.array(df.columns) * 100
+    plt.ylabel('Competitive biomass yield [%]')
+    bst.plots.plot_montecarlo_across_coordinate(oil_fraction, df)
+    for i in ('svg', 'png'):
+        file = os.path.join(images_folder, f'competitive_biomass_yield_MCAC_{configuration}.{i}')
+        plt.savefig(file, transparent=True)
+
+def plot_competitive_microbial_oil_yield_across_oil_content(
+        configuration=None,
+    ):
+    if configuration is None: configuration = 'O6'
+    file = monte_carlo_file(configuration, across_lines=False, across_oil_content='microbial oil vs bioethanol')
+    df = pd.read_excel(file, sheet_name=features.competitive_oilcane_biomass_yield.short_description, index_col=0)
+    fig = plt.figure()
+    oil_fraction = np.array(df.columns) * 100
+    plt.ylabel('Competitive microbial oil yield [wt %]')
+    bst.plots.plot_montecarlo_across_coordinate(oil_fraction, df)
+    for i in ('svg', 'png'):
+        file = os.path.join(images_folder, f'competitive_microbial_oil_yield_MCAC_{configuration}.{i}')
+        plt.savefig(file, transparent=True)
 
 def plot_lines_monte_carlo(
         configuration=None, metrics=None, labels=None, tickmarks=None, 
         ncols=1, expand=None, step_min=None, xrot=None, color_wheel=None, axes_box=None
     ):
-    df = oc.get_composition_data()
+    df = cane.get_composition_data()
     columns = df.index
     rows, ylabels = zip(*[mc_line_metric_settings[i] for i in metrics])
     if color_wheel is None: color_wheel = CABBI_colors.wheel()
@@ -1375,10 +1334,10 @@ def plot_spearman(configurations, labels=None, metric=None,
 # %% Other
 
 def plot_configuration_breakdown(name, across_coordinate=False, **kwargs):
-    oc.load(name)
+    oc = cane.Biorefinery(name)
     if across_coordinate:
         return bst.plots.plot_unit_groups_across_coordinate(
-            oc.set_cane_oil_content,
+            cane.set_cane_oil_content,
             [5, 7.5, 10, 12.5],
             'Feedstock oil content [dry wt. %]',
             oc.unit_groups,
@@ -1421,29 +1380,6 @@ def plot_configuration_breakdown(name, across_coordinate=False, **kwargs):
             ),
             **kwargs,
         )
-
-def plot_TCI_areas_across_oil_content(configuration='O2'):
-    oc.load(configuration)
-    data = {i.name: [] for i in oc.unit_groups}
-    increasing_areas = []
-    decreasing_areas = []
-    oil_contents = np.linspace(5, 15, 10)
-    for i in oil_contents:
-        oc.set_cane_oil_content(i)
-        oc.sys.simulate()
-        for i in oc.unit_groups: data[i.name].append(i.get_installed_cost())
-    for name, group_data in data.items():
-        lb, *_, ub = group_data
-        if ub > lb: 
-            increasing_areas.append(group_data)
-        else:
-            decreasing_areas.append(group_data)
-    increasing_values = np.sum(increasing_areas, axis=0)
-    increasing_values -= increasing_values[0]
-    decreasing_values = np.sum(decreasing_areas, axis=0)
-    decreasing_values -= decreasing_values[-1]
-    plt.plot(oil_contents, increasing_values, label='Oil & fiber areas')
-    plt.plot(oil_contents, decreasing_values, label='Sugar areas')
     
 # def plot_monte_carlo_across_oil_content(kind=0, derivative=False):
 #     MFPP, TCI, *production, electricity_production, natural_gas_consumption = tea_monte_carlo_metric_mockups

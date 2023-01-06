@@ -19,6 +19,9 @@ class MockExtractionSpecification:
     def load_crushing_mill_oil_recovery(self, recovery):
         pass
     
+    def load_microbial_oil_recovery(self, recovery):
+        pass
+    
     def load_specifications(self, 
             recovery=None,
             bagasse_recovery=None,\

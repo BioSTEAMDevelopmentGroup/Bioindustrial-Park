@@ -56,6 +56,7 @@ from .data.lca_characterization_factors import (
 
 __all__ = (
     'Biorefinery',
+    'YRCP2023',
 )
 
 PRS_cost_item = PRS.cost_items['Pretreatment reactor system']
@@ -160,11 +161,17 @@ def get_price_distributions_module(year):
 def rename_storage_units(units, storage_area):
     bst.rename_units([i for i in units if bst.is_storage_unit(i)], storage_area)
 
+def YRCP2023():
+    Biorefinery.default_prices_correleted_to_crude_oil = True
+    Biorefinery.default_year = 2023
+
 class Biorefinery:
     cache = {}
     dry_biomass_yield = None # MT / hc
     baseline_dry_biomass_yield = 39 # MT / hc 
     set_feedstock_line = set_line_composition_parameters
+    default_prices_correleted_to_crude_oil = False
+    default_year = 2022
     
     @property
     def chemicals(self):
@@ -197,12 +204,15 @@ class Biorefinery:
         
     def __new__(cls, name, chemicals=None, reduce_chemicals=False, 
                  avoid_natural_gas=True, conversion_performance_distribution=None,
-                 year=None, cache=cache, feedstock_line=None):
-        if year is None: year = 2022
+                 year=None, cache=cache, feedstock_line=None,
+                 prices_correleted_to_crude_oil=None):
+        if year is None: year = cls.default_year
         if conversion_performance_distribution is None: 
             conversion_performance_distribution = "longterm"
         else:
             conversion_performance_distribution = conversion_performance_distribution.replace(' ', '').replace('-', '').lower()
+        if prices_correleted_to_crude_oil is None:
+            prices_correleted_to_crude_oil = cls.default_prices_correleted_to_crude_oil
         number, agile, energycane = configuration = parse_configuration(name)
         key = (number, agile, energycane, conversion_performance_distribution, year)
         if cache and key in cache: 
@@ -609,35 +619,67 @@ class Biorefinery:
         def set_annual_crushing_capacity(annual_crushing_capacity):
             sys.rescale(feedstock, kg_per_MT * annual_crushing_capacity / tea.operating_hours / feedstock.F_mass)
     
-        # USDA ERS historical price data with EPA RIN prices
-        @parameter(distribution=dist.cepd, element=cellulosic_ethanol, 
-                   baseline=dist.mcep, units='USD/L')
-        def set_cellulosic_ethanol_price(price): # Triangular distribution fitted over the past 10 years Sep 2009 to Nov 2020
-            cellulosic_ethanol.price = price * ethanol_L_per_kg
-            
-        @parameter(distribution=dist.aepd, element=advanced_ethanol, 
-                   baseline=dist.maep, units='USD/L')
-        def set_advanced_ethanol_price(price): # Triangular distribution fitted over the past 10 years Sep 2009 to Nov 2020
-            advanced_ethanol.price = price * ethanol_L_per_kg
-            
-        # USDA ERS historical price data
-        @parameter(distribution=dist.bpd, element=biomass_based_diesel, units='USD/L', baseline=dist.mbp)
-        def set_biomass_based_diesel_price(price): # Triangular distribution fitted over the past 10 years Sep 2009 to March 2021
-            biomass_based_diesel.price = price * biodiesel_L_per_kg
-    
-        @parameter(distribution=dist.cbpd, element=cellulosic_based_diesel, units='USD/L', baseline=dist.mcbp)
-        def set_cellulosic_based_diesel_price(price): # Triangular distribution fitted over the past 10 years Sep 2009 to March 2021
-            cellulosic_based_diesel.price = price * biodiesel_L_per_kg
-    
-        # https://www.eia.gov/energyexplained/natural-gas/prices.php
-        @parameter(distribution=dist.natural_gas_price_distribution, element=s.natural_gas, units='USD/m3',
-                   baseline=4.73 * 35.3146667/1e3)
-        def set_natural_gas_price(price): # Triangular distribution fitted over the past 10 years Sep 2009 to March 2021
-            BT.natural_gas_price = price * V_ng
-    
-        @parameter(distribution=dist.electricity_price_distribution, units='USD/kWhr', baseline=dist.mean_electricity_price)
-        def set_electricity_price(electricity_price): 
-            bst.PowerUtility.price = electricity_price
+        @parameter(distribution=dist.copd, element='Crude oil', baseline=dist.mcop, units='USD/barrel')
+        def set_crude_oil_price(price):
+            self.crude_oil_price = price
+        
+        if prices_correleted_to_crude_oil:
+            @parameter(distribution=dist.cepd_offset, element=cellulosic_ethanol, baseline=0., units='USD/L')
+            def set_cellulosic_ethanol_price(price): 
+                cellulosic_ethanol.price = (dist.f_cep * self.crude_oil_price + price) * ethanol_L_per_kg
+                
+            @parameter(distribution=dist.aepd_offset, element=advanced_ethanol, baseline=0., units='USD/L')
+            def set_advanced_ethanol_price(price): 
+                advanced_ethanol.price =  (dist.f_aep * self.crude_oil_price + price) * ethanol_L_per_kg
+                
+            # USDA ERS historical price data
+            @parameter(distribution=dist.bpd_offset, element=biomass_based_diesel, units='USD/L', baseline=0.)
+            def set_biomass_based_diesel_price(price):
+                biomass_based_diesel.price =  (dist.f_bp * self.crude_oil_price + price) * biodiesel_L_per_kg
+        
+            @parameter(distribution=dist.cbpd_offset, element=cellulosic_based_diesel, units='USD/L', baseline=0.)
+            def set_cellulosic_based_diesel_price(price):
+                cellulosic_based_diesel.price =  (dist.f_cbp * self.crude_oil_price + price) * biodiesel_L_per_kg
+        
+            # https://www.eia.gov/energyexplained/natural-gas/prices.php
+            @parameter(distribution=dist.ngpd_offset, element=s.natural_gas, units='USD/m3', baseline=0.)
+            def set_natural_gas_price(price): 
+                BT.natural_gas_price =  (dist.f_ngp * self.crude_oil_price + price) * V_ng
+        
+            @parameter(distribution=dist.elecpd_offset, units='USD/kWhr', baseline=0.)
+            def set_electricity_price(electricity_price): 
+                bst.PowerUtility.price = dist.f_elecp * self.crude_oil_price + electricity_price
+                
+        else:
+            # USDA ERS historical price data with EPA RIN prices
+            @parameter(distribution=dist.cepd, element=cellulosic_ethanol, 
+                       baseline=dist.mcep, units='USD/L')
+            def set_cellulosic_ethanol_price(price): # Triangular distribution fitted over the past 10 years Sep 2009 to Nov 2020
+                cellulosic_ethanol.price = price * ethanol_L_per_kg
+                
+            @parameter(distribution=dist.aepd, element=advanced_ethanol, 
+                       baseline=dist.maep, units='USD/L')
+            def set_advanced_ethanol_price(price): # Triangular distribution fitted over the past 10 years Sep 2009 to Nov 2020
+                advanced_ethanol.price = price * ethanol_L_per_kg
+                
+            # USDA ERS historical price data
+            @parameter(distribution=dist.bpd, element=biomass_based_diesel, units='USD/L', baseline=dist.mbp)
+            def set_biomass_based_diesel_price(price): # Triangular distribution fitted over the past 10 years Sep 2009 to March 2021
+                biomass_based_diesel.price = price * biodiesel_L_per_kg
+        
+            @parameter(distribution=dist.cbpd, element=cellulosic_based_diesel, units='USD/L', baseline=dist.mcbp)
+            def set_cellulosic_based_diesel_price(price): # Triangular distribution fitted over the past 10 years Sep 2009 to March 2021
+                cellulosic_based_diesel.price = price * biodiesel_L_per_kg
+        
+            # https://www.eia.gov/energyexplained/natural-gas/prices.php
+            @parameter(distribution=dist.natural_gas_price_distribution, element=s.natural_gas, units='USD/m3',
+                       baseline=4.73 * 35.3146667/1e3)
+            def set_natural_gas_price(price): 
+                BT.natural_gas_price = price * V_ng
+        
+            @parameter(distribution=dist.electricity_price_distribution, units='USD/kWhr', baseline=dist.mean_electricity_price)
+            def set_electricity_price(electricity_price): 
+                bst.PowerUtility.price = electricity_price
         
         # 10% is suggested for waste reducing, but 15% is suggested for investment
         @uniform(10., 15., units='%', baseline=10)
@@ -1135,8 +1177,8 @@ class Biorefinery:
             if self.ROI_oilcane_target is None: return np.nan
             if composition_specification.oil == 0: return 100.
             f = competitive_oilcane_biomass_yield_objective
-            x0 = 0.2
-            x1 = 2.
+            x0 = 0.1
+            x1 = 3
             if (y0:=f(x0)) > 0. or (y1:=f(x1)) < 0.:
                 return np.nan
             else:
@@ -1169,9 +1211,12 @@ class Biorefinery:
                     return 100. * fermentor.fermentation_reaction[0].product_yield(product='TriOlein', basis='wt')
             
         # Single point evaluation for detailed design results
-        def set_baseline(p, x):
+        def set_baseline(p, x=None):
+            if x is None:
+                x = p.baseline
+            else:
+                p.baseline = x
             p.setter(x)
-            p.baseline = x
         
         if number in cellulosic_ethanol_configurations:
             set_baseline(set_sorghum_glucose_yield, 79)
@@ -1186,13 +1231,14 @@ class Biorefinery:
             set_baseline(set_cane_oil_content, 10)
         set_baseline(set_bagasse_oil_recovery, 70)
         set_baseline(set_crushing_mill_oil_recovery, 60)
-        set_baseline(set_advanced_ethanol_price, dist.maep) 
-        set_baseline(set_cellulosic_ethanol_price, dist.mcep) 
-        set_baseline(set_biomass_based_diesel_price, dist.mbp)
-        set_baseline(set_cellulosic_based_diesel_price, dist.mcbp)
+        set_baseline(set_crude_oil_price) 
+        set_baseline(set_advanced_ethanol_price) 
+        set_baseline(set_cellulosic_ethanol_price) 
+        set_baseline(set_biomass_based_diesel_price)
+        set_baseline(set_cellulosic_based_diesel_price)
         set_baseline(set_crude_glycerol_price, dist.mean_glycerol_price)
-        set_baseline(set_natural_gas_price, dist.mean_natural_gas_price)
-        set_baseline(set_electricity_price, dist.mean_electricity_price)
+        set_baseline(set_natural_gas_price)
+        set_baseline(set_electricity_price)
         if number in cellulosic_ethanol_configurations:
             get_stream('ethanol').price = 0.789
         if number > 0:
@@ -1221,6 +1267,5 @@ class Biorefinery:
         if reduce_chemicals: 
             cane_sys.reduce_chemicals()
             cane_sys._load_stream_links()
-            HXN.simulate()
-            
+            sys.simulate()
         return self
