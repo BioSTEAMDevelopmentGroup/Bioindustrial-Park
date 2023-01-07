@@ -27,7 +27,7 @@ from biorefineries.succinic.chemicals_data import chems, chemical_groups, \
 from biorefineries.succinic.tea import TemplateTEA as SuccinicTEA
 from biorefineries.make_a_biorefinery.auto_waste_management import AutoWasteManagement
 
-from hxn._heat_exchanger_network import HeatExchangerNetwork
+from biosteam import HeatExchangerNetwork
 from biorefineries.sugarcane import create_juicing_system_up_to_clarification
 
 import math
@@ -268,10 +268,19 @@ def create_succinic_sys(ins, outs):
     
     F401_P = bst.Pump('F401_P', ins=F401-0, P=101325.)
     
+    # use for crystallizer class from last pull
+    # C401 = units.SuccinicAcidCrystallizer('C401', ins=F401_P-0, outs=('C401_0',), 
+    #                                target_recovery=0.95,
+    #                                tau=6,
+    #                                T_range=(273.15+2., 372.5),
+    #                                N=4,
+    #                                )
+    
+    # use for crystallizer class Jan 5th update
     C401 = units.SuccinicAcidCrystallizer('C401', ins=F401_P-0, outs=('C401_0',), 
-                                   target_recovery=0.95,
+                                   #target_recovery=0.95,
                                    tau=6,
-                                   T_range=(273.15+2., 372.5),
+                                   #T_range=(273.15+2., 372.5),
                                    N=4,
                                    )
     
@@ -308,10 +317,19 @@ def create_succinic_sys(ins, outs):
     
     F402_P = bst.Pump('F402_P', ins=F402-0, P=101325.)
     
+    # use for crystallizer class from last pull
+    # C402 = units.SuccinicAcidCrystallizer('C402', ins=F402_P-0, outs=('C402_0',), 
+    #                                target_recovery=0.95,
+    #                                tau=6,
+    #                                # T_range=(273.15+2., 373.15-2.),
+    #                                N=4,
+    #                                )
+    
+    # use for crystallizer class Jan 5th update
     C402 = units.SuccinicAcidCrystallizer('C402', ins=F402_P-0, outs=('C402_0',), 
-                                   target_recovery=0.95,
+                                   #target_recovery=0.95,
                                    tau=6,
-                                   T_range=(273.15+2., 373.15-2.),
+                                   #T_range=(273.15+2., 373.15-2.),
                                    N=4,
                                    )
 
@@ -913,4 +931,4 @@ def TEA_breakdown(print_output=False, fractions=False):
                 print(f"{j}: {format(metric_breakdowns_i[j], '.3f')}")
     return metric_breakdowns
 
-TEA_breakdown(print_output=True, fractions=True)# -*- coding: utf-8 -*-
+TEA_breakdown(print_output=True)# -*- coding: utf-8 -*-

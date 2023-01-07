@@ -2000,95 +2000,142 @@ class HClKOHRecovery(Reactor):
         super()._cost()
         
         
-#%% Crystallization
+# #%% Crystallization
+
+# class SuccinicAcidCrystallizer(BatchCrystallizer):
+    
+#     def __init__(self, ID='', ins=None, outs=(), 
+#                   target_recovery=0.6,
+#                   thermo=None,
+#                   tau=6, N=None, V=None, T=305.15,
+#                   Nmin=2, Nmax=36,
+#                   T_range=(274., 372.5),
+#                   vessel_material='Stainless steel 316',
+#                   kW=0.00746):
+        
+#         BatchCrystallizer.__init__(self, ID, ins, outs, thermo,
+#                       tau, N, V, T,
+#                       Nmin, Nmax, vessel_material,
+#                       kW)
+#         self.target_recovery = target_recovery
+#         self.T_range = T_range
+#         self.tau = tau
+        
+#     def get_T_from_target_recovery(self, target_recovery):
+#         # self.target_recovery=target_recovery
+        
+#         in_stream = self.ins[0]
+#         x_start = in_stream.imol['SuccinicAcid']/sum(in_stream.imol['Water', 'SuccinicAcid'])
+#         # print(x_start)
+#         x_end = (1-target_recovery)*x_start
+#         # T = self.get_T_from_x_end(x_end)
+#         tot_vol = in_stream.ivol['Water'] + (1-target_recovery)*in_stream.ivol['SuccinicAcid']
+#         SA_mass = in_stream.imass['SuccinicAcid']
+#         SA_remaining = (1-target_recovery)*SA_mass
+#         x_end_gpL = SA_remaining/tot_vol
+#         # print(x_end,x_end_gpL)
+#         return ln(x_end_gpL/29.098)/0.0396 + 273.15
+#         # return T
+    
+#     def set_effluent_composition_from_recovery(self, recovery):
+#         in_stream = self.ins[0]
+#         self.outs[0].imass['s', 'SuccinicAcid'] = recovery*in_stream.imass['SuccinicAcid']
+#         self.outs[0].imass['l', 'SuccinicAcid'] = (1-recovery)*in_stream.imass['SuccinicAcid']
+    
+#     def get_effective_recovery_from_T(self, T):
+#         in_stream = self.ins[0]
+#         out_stream = self.outs[0]
+        
+#         # method 1
+#         # SA_mass_dissolved_end = 29.098*exp(0.0396*(T-273.15)) * in_stream.F_vol
+        
+#         # method 2
+#         SA_vol_per_mass = 0.0008252419812169215
+#         f_T = 29.098*exp(0.0396*(T-273.15))
+#         SA_mass_dissolved_end = (f_T*in_stream.ivol['Water'])/(1-f_T*SA_vol_per_mass)
+#         SA_mass_total = self.ins[0].imass['SuccinicAcid']
+#         if SA_mass_dissolved_end<0: SA_mass_dissolved_end = SA_mass_total # higher temp can give negative values
+#         recovery = 1. - min(1., SA_mass_dissolved_end/SA_mass_total)
+#         return recovery
+    
+#     def _run(self):
+#         in_stream, = self.ins
+#         out_stream, = self.outs
+#         target_recovery = self.target_recovery
+        
+#         out_stream.copy_like(in_stream)
+#         # out_stream.sle(T=self.T, solute='SuccinicAcid')
+#         out_stream.phases=('l', 's')
+#         self.effective_recovery = target_recovery
+        
+#         Tmin, Tmax = self.T_range
+#         rec_at_Tmin, rec_at_Tmax = self.get_effective_recovery_from_T(Tmin),\
+#             self.get_effective_recovery_from_T(Tmax)
+        
+#         if rec_at_Tmin < target_recovery:
+#             self.T = Tmin
+#             self.effective_recovery = rec_at_Tmin
+#         elif rec_at_Tmax > target_recovery:
+#             self.T = Tmin
+#             self.effective_recovery = rec_at_Tmax
+#         else:
+#             self.T = T = self.get_T_from_target_recovery(target_recovery)
+#             if T>in_stream.T:
+#                 self.T = T = in_stream.T
+#                 self.effective_recovery = self.get_effective_recovery_from_T(T)
+        
+#         # self.tau = self.get_t_from_target_recovery(effective_recovery)
+#         # print(self.ID, effective_recovery, self.effective_recovery)
+#         self.set_effluent_composition_from_recovery(self.effective_recovery)
+        
+#         if self.effective_recovery>0.:
+#             out_stream.T =self.T
+#         else:
+#             self.T = out_stream.T = in_stream.T
+
+
+#%% Crystallization class 2
+# addition of solubility vs. starting concentration equation, code matching last pull commented out above
 
 class SuccinicAcidCrystallizer(BatchCrystallizer):
     
-    def __init__(self, ID='', ins=None, outs=(), 
-                 target_recovery=0.6,
-                 thermo=None,
-                 tau=6, N=None, V=None, T=305.15,
-                 Nmin=2, Nmax=36, 
-                 T_range=(274., 372.5),
-                 vessel_material='Stainless steel 316',
-                 kW=0.00746):
+    def __init__(self, ID='', ins=None, outs=(),
+                  thermo=None,
+                  tau=6, N=None, V=None, T=273.15, # Keeping T at 0 C
+                  Nmin=2, Nmax=36,
+                  vessel_material='Stainless steel 316',
+                  kW=0.00746):
         
         BatchCrystallizer.__init__(self, ID, ins, outs, thermo,
-                     tau, N, V, T,
-                     Nmin, Nmax, vessel_material,
-                     kW)
-        self.target_recovery = target_recovery
-        self.T_range = T_range
-        self.tau = tau
+                      tau, N, V, T,
+                      Nmin, Nmax, vessel_material,
+                      kW)
         
-    def get_T_from_target_recovery(self, target_recovery):
-        # self.target_recovery=target_recovery
+    def effluent_phases_mass_flow_rates_from_liquid_outs_density(self, ins):
+        # set ins
+        # use solubility to obtain effluent SA concentration
+        # find volum flow rate of liquid outs
+        # use solubility to obtain effluent SA concentration
+        # use volum flow rate of liquid outs + solubility of liquid outs to get mass flow of liquid outs
+        # find the difference of solid succinic acid in the outlet stream
         
         in_stream = self.ins[0]
-        x_start = in_stream.imol['SuccinicAcid']/sum(in_stream.imol['Water', 'SuccinicAcid'])
-        # print(x_start)
-        x_end = (1-target_recovery)*x_start
-        # T = self.get_T_from_x_end(x_end)
-        tot_vol = in_stream.ivol['Water'] + (1-target_recovery)*in_stream.ivol['SuccinicAcid']
-        SA_mass = in_stream.imass['SuccinicAcid']
-        SA_remaining = (1-target_recovery)*SA_mass
-        x_end_gpL = SA_remaining/tot_vol
-        # print(x_end,x_end_gpL)
-        return ln(x_end_gpL/29.098)/0.0396 + 273.15
-        # return T
-    
-    def set_effluent_composition_from_recovery(self, recovery):
-        in_stream = self.ins[0]
-        self.outs[0].imass['s', 'SuccinicAcid'] = recovery*in_stream.imass['SuccinicAcid']
-        self.outs[0].imass['l', 'SuccinicAcid'] = (1-recovery)*in_stream.imass['SuccinicAcid']
-    
-    def get_effective_recovery_from_T(self, T):
-        in_stream = self.ins[0]
-        out_stream = self.outs[0]
+        q_in = in_stream.F_vol # m3/hr
+        c_sa0 = in_stream.imass['SuccinicAcid'] / in_stream.F_vol    # kg/m3
+        rho_sa_solid = .005 # kg/m3
         
-        # method 1
-        # SA_mass_dissolved_end = 29.098*exp(0.0396*(T-273.15)) * in_stream.F_vol
+        c_sa_liquid = 19.669 * ln(c_sa0) + 3.4134    # kg/m3
+        q_liquid = (q_in * (c_sa0 - rho_sa_solid)) / (c_sa_liquid - rho_sa_solid)    # m3/hr
+        m_liquid = q_liquid*c_sa_liquid    # kg/hr
         
-        # method 2
-        SA_vol_per_mass = 0.0008252419812169215
-        f_T = 29.098*exp(0.0396*(T-273.15))
-        SA_mass_dissolved_end = (f_T*in_stream.ivol['Water'])/(1-f_T*SA_vol_per_mass)
-        SA_mass_total = self.ins[0].imass['SuccinicAcid']
-        if SA_mass_dissolved_end<0: SA_mass_dissolved_end = SA_mass_total # higher temp can give negative values
-        recovery = 1. - min(1., SA_mass_dissolved_end/SA_mass_total)
-        return recovery
-    
+        self.outs[0].imass['l', 'SuccinicAcid'] = m_liquid
+        self.outs[0].imass['s', 'SuccinicAcid'] = in_stream.imass['SuccinicAcid'] - m_liquid
+        
     def _run(self):
         in_stream, = self.ins
         out_stream, = self.outs
-        target_recovery = self.target_recovery
         
         out_stream.copy_like(in_stream)
-        # out_stream.sle(T=self.T, solute='SuccinicAcid')
         out_stream.phases=('l', 's')
-        self.effective_recovery = target_recovery
         
-        Tmin, Tmax = self.T_range
-        rec_at_Tmin, rec_at_Tmax = self.get_effective_recovery_from_T(Tmin),\
-            self.get_effective_recovery_from_T(Tmax)
-        
-        if rec_at_Tmin < target_recovery:
-            self.T = Tmin
-            self.effective_recovery = rec_at_Tmin
-        elif rec_at_Tmax > target_recovery:
-            self.T = Tmin
-            self.effective_recovery = rec_at_Tmax
-        else:
-            self.T = T = self.get_T_from_target_recovery(target_recovery)
-            if T>in_stream.T:
-                self.T = T = in_stream.T
-                self.effective_recovery = self.get_effective_recovery_from_T(T)
-        
-        # self.tau = self.get_t_from_target_recovery(effective_recovery)
-        # print(self.ID, effective_recovery, self.effective_recovery)
-        self.set_effluent_composition_from_recovery(self.effective_recovery)
-        
-        if self.effective_recovery>0.:
-            out_stream.T =self.T
-        else:
-            self.T = out_stream.T = in_stream.T
+        self.effluent_phases_mass_flow_rates_from_liquid_outs_density(self.ins)
