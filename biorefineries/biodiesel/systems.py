@@ -2,9 +2,9 @@
 """
 .. contents:: :local:
     
-.. autoclass:: biorefineries.create_lipid_wash_system
-.. autoclass:: biorefineries.create_lipid_pretreatment_system
-.. autoclass:: biorefineries.create_transesterification_and_biodiesel_separation_system
+.. autofunction:: biorefineries.biodiesel.systems.create_lipid_wash_system
+.. autofunction:: biorefineries.biodiesel.systems.create_lipid_pretreatment_system
+.. autofunction:: biorefineries.biodiesel.systems.create_transesterification_and_biodiesel_separation_system
 
 References
 ----------

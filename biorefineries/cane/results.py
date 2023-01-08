@@ -37,9 +37,10 @@ images_folder = os.path.join(os.path.dirname(__file__), 'images')
 # %% Load simulation data
 
 def spearman_file(name):
-    number, agile = parse_configuration(name)
+    number, agile, energy_cane = parse_configuration(name)
     filename = f'oilcane_spearman_{number}'
     if agile: filename += '_agile'
+    if energy_cane: filename += '_energy_cane'
     filename += '.xlsx'
     return os.path.join(results_folder, filename)
 
@@ -49,7 +50,11 @@ def monte_carlo_file(name, across_lines=False, across_oil_content=None, extentio
     if agile: filename += '_agile'
     if energycane: filename += '_energycane'
     if across_lines: filename += '_across_lines'
-    if across_oil_content: filename += '_across_lines_across_oil_content'
+    if across_oil_content: 
+        if isinstance(across_oil_content, str):
+            filename += f"_{across_oil_content.replace(' ', '_')}"
+        else:
+            filename += '_across_oil_content'
     filename += '.' + extention
     return os.path.join(results_folder, filename)
 

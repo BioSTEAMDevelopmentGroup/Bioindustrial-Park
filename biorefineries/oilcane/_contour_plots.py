@@ -192,15 +192,14 @@ def plot_relative_sorghum_oil_content_and_cane_oil_content_contours_manuscript(l
 
 # %% General    
 
-def metrics_across_oil_and_fiber_content(load):
+def metrics_across_oil_and_fiber_content(configuration, load):
     # Generate contour data
     x = np.linspace(0., 0.04, 5)
     y = np.linspace(0.35, 0.75, 5)
     z = np.array([0.6, 0.65, 0.7])
-    configuration = 'O6+'
     X, Y, Z = np.meshgrid(x, y, z)
     folder = os.path.dirname(__file__)
-    file = 'composition_analysis.npy'
+    file = f'{configuration}_composition_analysis.npy'
     file = os.path.join(folder, file)
     if load:
         data = np.load(file, allow_pickle=True)
@@ -216,10 +215,11 @@ def metrics_across_oil_and_fiber_content(load):
     return X, Y, Z, data
 
 def plot_metrics_across_composition(
-        load=False, N_decimals=1, 
+        configuration=None, load=False, N_decimals=1, 
         yticks=None, titles=None, 
         cmap=None, smooth=None,
     ):
+    if configuration is None: configuration = 'O2'
     metric_indices=[0, 2]
     MFPP = oc.all_metric_mockups[0] # Maximum feedstock purchase price
     BP = oc.all_metric_mockups[2] # Biodiesel production

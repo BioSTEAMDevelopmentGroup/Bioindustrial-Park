@@ -144,10 +144,11 @@ def run_uncertainty_and_sensitivity(name, N, rule='L',
                                     sample_cache={},
                                     autosave=True,
                                     autoload=True,
-                                    optimize=True):
+                                    optimize=True,
+                                    **kwargs):
     filterwarnings('ignore', category=bst.exceptions.DesignWarning)
     filterwarnings('ignore', category=bst.exceptions.CostWarning)
-    br = cane.Biorefinery(name, cache=None)
+    br = cane.Biorefinery(name, cache=None, **kwargs)
     file = monte_carlo_file(name, across_lines, across_oil_content)
     N_notify = min(int(N/10), 20)
     autosave = N_notify if autosave else False
@@ -178,32 +179,54 @@ def run_uncertainty_and_sensitivity(name, N, rule='L',
             xlfile=file,
         )
     elif across_oil_content:
-        # Replace `set_cane_oil_content` parameter with `set_sugarcane_ROI`.
-        # The actual distribution does not matter because these values are updated
-        # on the first coordinate when the oil content is 0 (i.e., when the feedstock is sugarcane).s
-        def set_sugarcane_ROI(ROI_sugarcane):
-            br.ROI_sugarcane = ROI_sugarcane / 100
-    
+        evaluate = None
         parameter = br.set_cane_oil_content
-        parameter.name = 'Sugarcane ROI'
-        parameter.units = '%'
-        parameter.setter = set_sugarcane_ROI
+        parameter.name = 'ROI target'
         parameter.element = 'Biorefinery'
         parameter.distribution = shape.Uniform(0.1, 0.2)
-        br.set_sugarcane_ROI = parameter
+        br.set_ROI_target = parameter
         del br.set_cane_oil_content
-        
         samples = br.model.sample(N, rule)
         br.model.load_samples(samples, optimize=optimize)
+        if across_oil_content == 'oilcane vs sugarcane':
+            # Replace `set_cane_oil_content` parameter with `set_ROI_target`.
+            # The actual distribution does not matter because these values are updated
+            # on the first coordinate when the oil content is 0 (i.e., when the feedstock is sugarcane).
+            
+            def set_ROI_oilcane_target(ROI_oilcane_target):
+                br.ROI_oilcane_target = ROI_oilcane_target / 100
+            
+            br.set_ROI_target.setter = set_ROI_oilcane_target
+            parameter.units = 'Sugarcane %'
+            br.model.metrics = [br.competitive_oilcane_biomass_yield]
+            br_sugarcane = cane.Biorefinery(name.replace('O', 'S'))
+        elif across_oil_content == 'microbial oil vs bioethanol':
+            
+            def set_ROI_microbial_oil_target(ROI_microbial_oil_target):
+                br.ROI_microbial_oil_target = ROI_microbial_oil_target / 100
+            
+            br.set_ROI_target.setter = set_ROI_microbial_oil_target
+            parameter.units = 'wt. %'
+            ethanol_name = name.replace('5', '1').replace('6', '2')
+            br_ethanol = cane.Biorefinery(ethanol_name)
+            br.feedstock.price = br_ethanol.feedstock.price = 0.035 # Same feedstock, same price, but actual price does not matter
+            parameter = br_ethanol.set_cane_oil_content
+            parameter.setter = lambda obj: None # Dissable parameter
+            br_ethanol.model.metrics = [br_ethanol.ROI]
+            br.model.metrics = [br.competitive_microbial_oil_yield] # Only interested in this
+            br.model.specification = lambda: None # No need to simulate before metric
+            br_ethanol.model.load_samples(samples)
+            br_sugarcane = cane.Biorefinery(ethanol_name.replace('O', 'S'))
+        
+        br_sugarcane.model.metrics = [br_sugarcane.ROI]
+        br_sugarcane.model.load_samples(samples)
         
         @no_derivative
         def evaluate(**kwargs):
             oil_content = int(100 * br.composition_specification.oil)
             autoload_file = autoload_file_name(f"{name}_{oil_content}_oil_content")
-            if br.configuration.number in (1, 2) and br.composition_specification.oil == 0.:
+            if across_oil_content == 'oilcane vs sugarcane' and br.composition_specification.oil == 0.:
                 # Configurations 1 and 2 do not work at zero oil content, so gotta go with respective sugarcane configuration.
-                br_sugarcane = cane.Biorefinery(name.replace('O', 'S'))
-                br_sugarcane.model.load_samples(samples)
                 br_sugarcane.model.evaluate(
                     autosave=autosave, 
                     autoload=autoload,
@@ -211,6 +234,37 @@ def run_uncertainty_and_sensitivity(name, N, rule='L',
                     **kwargs,
                 )
                 br.model.table.iloc[:, :] = br_sugarcane.model.table
+                # Given the oil content, also find the oilcane biomass yield
+                # required to get the same ROI as sugarcane.
+                br.model.table[br.set_ROI_target.index] = column = br.model.table[br.ROI.index]
+                br.model._samples[:, br.model.parameters.index(br.set_ROI_target)] = column.values
+            elif across_oil_content == 'microbial oil vs bioethanol':
+                # For configurations 5 and 6, find the microbial oil yield required
+                # to get the same ROI as bioethanol production
+                if br.composition_specification.oil == 0.:
+                    br_sugarcane.model.evaluate(
+                        autosave=autosave, 
+                        autoload=autoload,
+                        file=autoload_file,
+                        **kwargs,
+                    )
+                    br.model.table[br.set_ROI_target.index] = column = br_sugarcane.model.table[br.ROI.index]
+                else:
+                    br_ethanol.composition_specification.load_oil_content(br.composition_specification.oil) # Load coordinate (oil content)
+                    br_ethanol.model.evaluate(
+                        autosave=autosave, 
+                        autoload=autoload,
+                        file=autoload_file,
+                        **kwargs,
+                    )
+                    br.model.table[br.set_ROI_target.index] = column = br_ethanol.model.table[br.ROI.index]
+                br.model._samples[:, br.model.parameters.index(br.set_ROI_target)] = column.values
+                br.model.evaluate(
+                    autosave=autosave, 
+                    autoload=autoload,
+                    file=autoload_file,
+                    **kwargs,
+                )
             else:
                 br.model.evaluate(
                     autosave=autosave, 
@@ -218,10 +272,6 @@ def run_uncertainty_and_sensitivity(name, N, rule='L',
                     file=autoload_file,
                     **kwargs,
                 )
-            if br.composition_specification.oil == 0.:
-                br.model.table[br.set_sugarcane_ROI.index] = column = br.model.table[br.ROI.index]
-                br.model._samples[:, br.model.parameters.index(br.set_sugarcane_ROI)] = column.values
-            
         br.model.evaluate_across_coordinate(
             name='Oil content',
             notify=int(N/10),
@@ -232,13 +282,16 @@ def run_uncertainty_and_sensitivity(name, N, rule='L',
             xlfile=file,
         )
     else:
+        samples = br.model.sample(N, rule)
+        br.model.load_samples(samples, optimize=optimize)
         autoload_file = autoload_file_name(name)
         success = False
+        if not derivative: br.disable_derivative()
         for i in range(3):
             try:
                 if derivative and name not in ('O1', 'O2'): br.disable_derivative()
                 br.model.evaluate(
-                    notify=N,
+                    notify=int(N/10),
                     autosave=autosave,
                     autoload=autoload,
                     file=autoload_file
@@ -248,7 +301,7 @@ def run_uncertainty_and_sensitivity(name, N, rule='L',
                 warn('failed evaluation; restarting without cache')
             else:
                 success = True
-                br.enable_derivative()
+                if derivative: br.enable_derivative()
                 break
         if not success:
             raise RuntimeError('evaluation failed')

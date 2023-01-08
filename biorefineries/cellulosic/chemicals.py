@@ -1,8 +1,23 @@
 # -*- coding: utf-8 -*-
 """
-Created on Thu Jun 27 23:12:04 2019
+.. contents:: :local:
 
-@author: yoelr
+Chemicals
+---------
+.. autofunction:: biorefineries.cellulosic.chemicals.create_cellulosic_ethanol_chemicals
+    
+Utilities
+---------
+.. autofunction:: biorefineries.cellulosic.chemicals.get_grouped_chemicals
+    
+Data
+----
+.. autodata:: biorefineries.cellulosic.chemicals.chemical_groups
+   :annotation:
+.. autodata:: biorefineries.cellulosic.chemicals.default_nonsolids
+.. autodata:: biorefineries.cellulosic.chemicals.default_insoluble_solids
+.. autodata:: biorefineries.cellulosic.chemicals.default_ignored
+
 """
 import thermosteam as tmo
 from thermosteam.utils import chemical_cache
@@ -32,14 +47,19 @@ rho = 1540 # kg/m3
 cal2joule = 4.184
 
 # These defaults are used within system factories for pretreatment and fermentation.
+
+#: Default liquid chemicals for saccharification solids-loading specification
 default_nonsolids = ['Water', 'Ethanol', 'AceticAcid', 
                      'Furfural', 'H2SO4', 'NH3', 'HMF']
 
+#: Default insolible chemicals for saccharification solids-loading specification
 default_insoluble_solids = ['Glucan', 'Mannan', 'Xylan', 
                             'Arabinan', 'Galactan', 'Lignin']
 
+#: Default ignored chemicals for saccharification solids-loading specification
 default_ignored = ['TAG', 'DAG', 'MAG', 'FFA', 'PL']
 
+#: Chemical groups for `get_grouped_chemicals` function
 chemical_groups = dict(
         OtherSugars = ('Arabinose',
                        'Mannose',

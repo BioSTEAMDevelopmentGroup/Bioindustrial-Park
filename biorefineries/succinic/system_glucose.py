@@ -139,7 +139,11 @@ def create_succinic_sys(ins, outs):
     # u.C201.show('cwt100')
     
     # Cool hydrolysate down to fermentation temperature at 50°C
-    H301 = bst.units.HXutility('H301', ins=u.C201-0, T=50+273.15)
+    
+    F301 = bst.MultiEffectEvaporator('F301', ins=u.C201-0, outs=('F301_l', 'F301_g'),
+                                            P = (101325, 73581, 50892, 32777, 20000), V = 1e-4)
+    
+    H301 = bst.units.HXutility('H301', ins=F301-0, T=50+273.15)
     
 
 
@@ -195,14 +199,14 @@ def create_succinic_sys(ins, outs):
     
     
     A401 = bst.AmineAbsorption('A401', ins=(M305-0, makeup_MEA_A401, 'makeup_water'), outs=('absorption_vent', 'captured_CO2'),
-                               CO2_recovery=0.5)
+                               CO2_recovery=0.52)
     
     @A401.add_specification(run=False)
     def A401_spec():
         # A401.outs[1].phase='g'
         A401._run()
         A401.outs[1].phase='g'
-    K401 = bst.IsothermalCompressor('K401', ins=A401-1, outs=('recycled_CO2'), P=500*101325., 
+    K401 = bst.IsothermalCompressor('K401', ins=A401-1, outs=('recycled_CO2'), P=3e7, 
                                     # vle=True,
                                     eta=0.6,
                                     )
@@ -258,14 +262,24 @@ def create_succinic_sys(ins, outs):
     
     F401 = bst.MultiEffectEvaporator('F401', ins=S404-1, outs=('F401_l', 'F401_g'),
                                             P = (101325, 73581, 50892, 32777, 20000), V = 0.5)
-    F401.V_water_multiplier = 0.8
-    @F401.add_specification(run=False)
-    def F401_spec():
-        instream = F401.ins[0]
-        instream.imol['Ethanol'] = 0
-        F401.V = F401.V_water_multiplier*instream.imol['Water']/sum([instream.imol[c.ID] for c in instream.vle_chemicals])
-        F401._run()
+    # F401.V_water_multiplier = 0.8
+    # @F401.add_specification(run=False)
+    # def F401_spec():
+    #     instream = F401.ins[0]
+    #     instream.imol['Ethanol'] = 0
+    #     F401.V = F401.V_water_multiplier*instream.imol['Water']/sum([instream.imol[c.ID] for c in instream.vle_chemicals])
+    #     F401._run()
     
+    F401.target_concentration = 0.12
+    @F401.add_bounded_numerical_specification(x0=1e-3, x1=1.-1e-3, xtol=1e-4, ytol=1e-4,
+                                              x=0.8)
+    def F401_obj_f(V):
+        F401.V=V
+        F401._run()
+        F401_l = F401.outs[0]
+        return F401_l.imass['SuccinicAcid']/F401_l.F_mass - F401.target_concentration
+    
+    F401.add_specification()
     F401_P = bst.Pump('F401_P', ins=F401-0, P=101325.)
     
     C401 = units.SuccinicAcidCrystallizer('C401', ins=F401_P-0, outs=('C401_0',), 
@@ -299,12 +313,21 @@ def create_succinic_sys(ins, outs):
 
     F402 = bst.MultiEffectEvaporator('F402', ins=S402-1, outs=('F402_l', 'F402_g'),
                                             P = (101325, 73581, 50892, 32777, 20000), V = 0.5)
-    F402.V_water_multiplier = 0.8
-    @F402.add_specification(run=False)
-    def F402_spec():
-        instream = F402.ins[0]
-        F402.V = F402.V_water_multiplier*instream.imol['Water']/sum([instream.imol[c.ID] for c in instream.vle_chemicals])
+    # F402.V_water_multiplier = 0.8
+    # @F402.add_specification(run=False)
+    # def F402_spec():
+    #     instream = F402.ins[0]
+    #     F402.V = F402.V_water_multiplier*instream.imol['Water']/sum([instream.imol[c.ID] for c in instream.vle_chemicals])
+    #     F402._run()
+    
+    F402.target_concentration = 0.5
+    @F402.add_bounded_numerical_specification(x0=1e-3, x1=1.-1e-3, xtol=1e-4, ytol=1e-4,
+                                              x=0.8)
+    def F402_obj_f(V):
+        F402.V=V
         F402._run()
+        F402_l = F402.outs[0]
+        return F402_l.imass['SuccinicAcid']/F402_l.F_mass - F402.target_concentration
     
     F402_P = bst.Pump('F402_P', ins=F402-0, P=101325.)
     
@@ -344,7 +367,12 @@ def create_succinic_sys(ins, outs):
                          split={'SuccinicAcid': 1e-4,
                                     'FermMicrobe': 0.}
                          )
-
+    
+    M402 = bst.LiquidsMixingTank('M402', ins=(F401-1, F402-1), outs=('dilute_pyruvic_acid'))
+    
+    # S404 = bst.Splitter('S404', ins=M402-0, outs=('recycled_pyruvic_acid', 'waste_pyruvic_acid'), split=0.99)
+    
+    # S403-0-5-R302
     # %% 
     
     # =============================================================================
@@ -366,9 +394,12 @@ def create_succinic_sys(ins, outs):
     
     # Mix waste liquids for treatment
     M501 = bst.units.Mixer('M501', ins=('',
-                                        F401-1,
+                                        F301-1,
+                                        # F401-1,
+                                        # F402-1,
                                         S403-1,
-                                        F402-1,
+                                        M402-0,
+                                        # S404-1,
                                         # S401-1,
                                         # F401-0,
                                         # r_S402_s-1, r_S403_s-1, r_S404_s-1,
@@ -732,9 +763,9 @@ spec = ProcessSpecification(
     
     # set baseline fermentation performance here
     # baseline_yield = 0.19,
-    baseline_yield = 0.7,
-    baseline_titer = 100.,
-    baseline_productivity = 1.0,
+    baseline_yield = 0.3814, # 0.5 g/g-glucose
+    baseline_titer = 113.,
+    baseline_productivity = 0.68,
     neutralization=False,
     
     # baseline_yield = 0.30,
@@ -761,10 +792,26 @@ def M304_titer_obj_fn(water_to_sugar_mol_ratio):
     # return broth.imass['TAL']/broth.F_vol - R302.titer_to_load
     return R302.effluent_titer - R302.titer_to_load
 
+def F301_titer_obj_fn(V):
+    F301.V = V
+    F301.simulate()
+    H301._run()
+    M304.simulate()
+    u.M304_H._run()
+    u.S302._run()
+    u.R303._run()
+    u.T301._run()
+    R302.simulate()
+    return R302.effluent_titer - R302.titer_to_load
+
 def load_titer_with_glucose(titer_to_load):
     spec.spec_2 = titer_to_load
     u.R302.titer_to_load = titer_to_load
-    flx.IQ_interpolation(M304_titer_obj_fn, 1e-3, 20000.)
+    if M304_titer_obj_fn(1e-4)<0:
+        flx.IQ_interpolation(F301_titer_obj_fn, 1e-4, 0.8)
+    else:
+        flx.IQ_interpolation(M304_titer_obj_fn, 1e-4, 30000.)
+
     # u.AC401.regeneration_velocity = min(14.4, 3.1158 + ((14.4-3.1158)/(30.-3.))*(titer_to_load-3.)) # heuristic to obtain regeneration velocity at which MPSP is minimum fitted to results from simulations at target_recovery=0.99 
     # u.AC401.regeneration_velocity = 14.4
     
@@ -914,3 +961,54 @@ def TEA_breakdown(print_output=False, fractions=False):
     return metric_breakdowns
 
 TEA_breakdown(print_output=True, fractions=True)# -*- coding: utf-8 -*-
+
+
+#%% Carbon balance
+
+def get_carbon_flow():
+    c_flow_units = []
+    for unit in u:
+        if sum([stream.get_atomic_flow('C') for stream in unit.ins])>0 or sum([stream.get_atomic_flow('C') for stream in unit.outs])>0:
+            c_flow_units.append(unit)
+    source=[]
+    target=[]
+    value=[]
+    carbon_feeds = [stream for stream in succinic_sys.feeds if stream.get_atomic_flow('C')>0]
+    label=[unit.ID  + ': ' + unit.__class__.__name__ for unit in c_flow_units] + [stream.ID for stream in carbon_feeds] + ['SuccinicAcid'] + ['Emissions']
+    for unit in c_flow_units:
+        for stream in unit.outs:
+            if stream.sink:
+                source.append(c_flow_units.index(unit))
+                target.append(c_flow_units.index(stream.sink))
+                value.append(stream.get_atomic_flow('C'))
+            else:
+                if not stream.ID==product_stream.ID:
+                    source.append(c_flow_units.index(unit))
+                    target.append(len(label)-1)
+                    value.append(stream.get_atomic_flow('C'))
+                else:
+                    source.append(c_flow_units.index(unit))
+                    target.append(len(label)-2)
+                    value.append(stream.get_atomic_flow('C'))
+    for stream in carbon_feeds:
+        source.append(label.index(stream.ID))
+        target.append(c_flow_units.index(stream.sink))
+        value.append(stream.get_atomic_flow('C'))
+    return source, target, value, label
+
+def plot_carbon_flow():
+    import plotly.graph_objs as go#create links
+    from plotly.offline import init_notebook_mode,  plot
+    init_notebook_mode()
+    source, target, value, label = get_carbon_flow()
+    link = dict(source=source, target=target, value=value, 
+    color=['rgba(0,0,0, 0.5)'] * len(source))#create nodes
+    node = dict(label=label, pad=15, thickness=8, 
+                color = ['blue' if ':' in label[i] else 'gray' for i in range(len(label))],
+               )#create a sankey object
+    chart = go.Sankey(link=link, node=node, arrangement="freeform")#build a figure
+    fig = go.Figure(chart)
+    plot(fig)
+    # fig.show()
+    # fig.write_image("fig1.png")
+    

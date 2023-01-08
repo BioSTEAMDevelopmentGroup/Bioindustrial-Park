@@ -1,5 +1,10 @@
 # -*- coding: utf-8 -*-
 """
+.. autofunction:: biorefineries.cellulosic.systems.create_hot_water_pretreatment_system
+.. autofunction:: biorefineries.cellulosic.systems.create_dilute_acid_pretreatment_system
+.. autofunction:: biorefineries.cellulosic.systems.create_ammonia_fiber_expansion_pretreatment_system
+.. autofunction:: biorefineries.cellulosic.systems.create_alkaline_pretreatment_system
+
 """
 from . import alkaline
 from . import ammonia_fiber_expansion

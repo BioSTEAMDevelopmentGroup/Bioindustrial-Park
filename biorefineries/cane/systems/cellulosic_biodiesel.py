@@ -6,8 +6,6 @@
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
 # for license details.
 """
-The complete oilcane biorefinery system is created here.
-
 """
 import thermosteam as tmo
 import biosteam as bst

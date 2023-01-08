@@ -11,6 +11,11 @@ Bioindustrial-Park: BioSTEAM's Premier Biorefinery Models and Results
 
 .. contents::
 
+Workshops
+---------
+Join us on Friday, Jan 20, 9:15-10:15am CST, for a BioSTEAM workshop! 
+Email biosteamdevelopmentgroup@gmail.com for details.
+
 What is the Bioindustrial-Park?
 -------------------------------
 
@@ -32,7 +37,7 @@ If you have an installation of Python with pip, simple install it with:
 
 To get the git version, run:
 
-    $ git clone git:github.com/yoelcortes/Bioindustrial-Park/tree/master/biorefineries/BioSTEAM 2.x.x/biorefineries
+    $ git clone https://github.com/BioSTEAMDevelopmentGroup/Bioindustrial-Park.git
 
 Documentation
 -------------

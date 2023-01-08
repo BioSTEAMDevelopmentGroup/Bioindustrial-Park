@@ -6,8 +6,6 @@
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
 # for license details.
 """
-The complete oilcane biorefinery system is created here.
-
 """
 import thermosteam as tmo
 import biosteam as bst
@@ -17,14 +15,14 @@ from biorefineries.biodiesel import (
     create_lipid_pretreatment_system as create_oil_pretreatment_system,
     create_transesterification_and_biodiesel_separation_system,
 )
-from ..juicing import (
+from .juicing import (
     create_juicing_system,
     create_feedstock_handling_system,
 )
-from ..fermentation import create_sucrose_fermentation_system
-from ..lipid_extraction import create_lipid_exctraction_system
-from ... import units
-from ... import streams as s
+from .fermentation import create_sucrose_fermentation_system
+from .lipid_extraction import create_lipid_exctraction_system
+from .. import units
+from .. import streams as s
 
 __all__ = (
     'create_oilcane_to_biodiesel_and_actag_1g',

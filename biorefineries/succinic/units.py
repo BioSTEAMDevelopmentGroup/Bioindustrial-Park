@@ -449,13 +449,13 @@ class CoFermentation(Unit):
         
         self.cofermentation_rxns = ParallelRxn([
         #      Reaction definition            Reactant    Conversion
-        Rxn('Glucose + 2 CO2 -> 2 SuccinicAcid + 2 O2',        'Glucose',   0.7), 
+        Rxn('Glucose + 2 CO2 -> 2 SuccinicAcid + O2',        'Glucose',   0.7), 
         Rxn('Glucose -> 3 AceticAcid',               'Glucose',   1e-8),
         Rxn('Glucose -> 2 Ethanol + 2 CO2',               'Glucose',   1e-8),
         Rxn('Glucose -> 6 FermMicrobe',       'Glucose',   0.05),
         Rxn('Glucose -> 2 PyruvicAcid',     'Glucose',    0.1),
         
-        Rxn('Xylose + 1.667 CO2 -> 1.667 SuccinicAcid + 0.833 O2',       'Xylose',    0.7),
+        Rxn('Xylose + 1.667 CO2 -> 1.667 SuccinicAcid + 0.4165 O2',       'Xylose',    0.7),
         Rxn('Xylose -> 2.5 AceticAcid',       'Xylose',    1e-8),
         Rxn('Xylose -> 1.667 Ethanol + 1.667 CO2',       'Xylose',    1e-8),
         Rxn('Xylose -> 5 FermMicrobe',        'Xylose',    0.05),
@@ -609,12 +609,12 @@ class SeedTrain(Unit):
         
         self.cofermentation_rxns = ParallelRxn([
         #      Reaction definition            Reactant    Conversion
-        Rxn('Glucose + 2 CO2 -> 2 SuccinicAcid + 2 O2',        'Glucose',   0.7*ferm_ratio), 
+        Rxn('Glucose + 2 CO2 -> 2 SuccinicAcid + O2',        'Glucose',   0.7*ferm_ratio), 
         Rxn('Glucose -> 3 AceticAcid',               'Glucose',   1e-8*ferm_ratio),
         Rxn('Glucose -> 2 Ethanol + 2 CO2',               'Glucose',   1e-8*ferm_ratio),
         Rxn('Glucose -> 6 FermMicrobe',       'Glucose',   0.05*ferm_ratio),
         
-        Rxn('Xylose + 1.667 CO2 -> 1.667 SuccinicAcid + 0.833 O2',       'Xylose',    0.7*ferm_ratio),
+        Rxn('Xylose + 1.667 CO2 -> 1.667 SuccinicAcid + 0.4165 O2',       'Xylose',    0.7*ferm_ratio),
         Rxn('Xylose -> 2.5 AceticAcid',       'Xylose',    1e-8*ferm_ratio),
         Rxn('Xylose -> 1.667 Ethanol + 1.667 CO2',       'Xylose',    1e-8*ferm_ratio),
         Rxn('Xylose -> 5 FermMicrobe',        'Xylose',    0.05*ferm_ratio),
@@ -2004,6 +2004,7 @@ class HClKOHRecovery(Reactor):
 
 class SuccinicAcidCrystallizer(BatchCrystallizer):
     
+    _SA_vol_per_mass = 0.0008252419812169215
     def __init__(self, ID='', ins=None, outs=(), 
                  target_recovery=0.6,
                  thermo=None,
@@ -2052,11 +2053,15 @@ class SuccinicAcidCrystallizer(BatchCrystallizer):
         # method 2
         SA_vol_per_mass = 0.0008252419812169215
         f_T = 29.098*exp(0.0396*(T-273.15))
-        SA_mass_dissolved_end = (f_T*in_stream.ivol['Water'])/(1-f_T*SA_vol_per_mass)
+        SA_mass_dissolved_end = in_stream.ivol['Water']*self.get_solubility_given_T(T)
         SA_mass_total = self.ins[0].imass['SuccinicAcid']
         if SA_mass_dissolved_end<0: SA_mass_dissolved_end = SA_mass_total # higher temp can give negative values
         recovery = 1. - min(1., SA_mass_dissolved_end/SA_mass_total)
         return recovery
+    
+    def get_solubility_given_T(self, T):
+        f_T = 29.098*exp(0.0396*(T-273.15))
+        return (f_T)/(1-f_T*self._SA_vol_per_mass) # g-succinic-acid/L-water
     
     def _run(self):
         in_stream, = self.ins

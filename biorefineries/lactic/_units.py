@@ -475,17 +475,6 @@ class Reactor(Unit, PressureVessel, isabstract=True):
 
             self.power_utility(self.kW_per_m3*Design['Total volume'])
 
-    @property
-    def BM(self):
-        vessel_type = self.vessel_type
-        if not vessel_type:
-            raise AttributeError('Vessel type not defined')
-        elif vessel_type == 'Vertical':
-            return self.BM_vertical
-        elif vessel_type == 'Horizontal':
-            return self.BM_horizontal
-        else:
-            raise RuntimeError('Invalid vessel type')
 
     @property
     def kW_per_m3(self):

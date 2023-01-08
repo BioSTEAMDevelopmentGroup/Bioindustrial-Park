@@ -1,8 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-Created on Thu Jun 27 23:12:28 2019
+.. autofunction:: biorefineries.cellulosic.systems.cellulosic_ethanol.create_cellulosic_ethanol_system
 
-@author: yoelr
 """
 
 import biosteam as bst

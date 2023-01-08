@@ -6,8 +6,6 @@
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
 # for license details.
 """
-The complete lipid-cane biorefinery system is created here.
-
 """
 import numpy as np
 import biosteam as bst

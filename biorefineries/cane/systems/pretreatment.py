@@ -1,8 +1,5 @@
 # -*- coding: utf-8 -*-
 """
-Created on Sun Dec 18 15:37:19 2022
-
-@author: yrc2
 """
 import thermosteam as tmo
 import biosteam as bst

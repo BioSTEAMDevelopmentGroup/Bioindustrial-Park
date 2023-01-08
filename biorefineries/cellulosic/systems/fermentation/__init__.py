@@ -1,5 +1,11 @@
 # -*- coding: utf-8 -*-
 """
+.. autofunction:: biorefineries.cellulosic.systems.create_cofermentation_system
+.. autofunction:: biorefineries.cellulosic.systems.create_integrated_bioprocess_saccharification_and_cofermentation_system
+.. autofunction:: biorefineries.cellulosic.systems.create_saccharification_system
+.. autofunction:: biorefineries.cellulosic.systems.create_simultaneous_saccharification_and_cofermentation_system
+.. autofunction:: biorefineries.cellulosic.systems.create_cellulosic_fermentation_system
+
 """
 from . import cofermentation
 from . import integrated_bioprocess

@@ -1,5 +1,11 @@
 # -*- coding: utf-8 -*-
 """
+.. contents:: :local:
+    
+.. autoclass:: biorefineries.biodiesel.units.GlycerolysisReactor
+.. autoclass:: biorefineries.biodiesel.units.BlendingTankWithSkimming
+.. autoclass:: biorefineries.biodiesel.units.Transesterification
+
 """
 from . import glycerolysis_reactor
 from . import skimming_tank

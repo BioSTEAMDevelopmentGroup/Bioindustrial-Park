@@ -6,8 +6,6 @@
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
 # for license details.
 """
-The complete oilcane biorefinery system is created here.
-
 """
 import thermosteam as tmo
 import biosteam as bst
@@ -68,7 +66,7 @@ def create_oilcane_to_biodiesel_1g(
     
     ### Ethanol section ###
     X_ferm = 0.6 if fed_batch else 0.495
-    fermrxn = tmo.Rxn('CO2 + Glucose -> H2O + TAG', 'Glucose', X_ferm, correct_atomic_balance=True)
+    fermrxn = tmo.Rxn('O2 + Glucose -> H2O + TAG', 'Glucose', X_ferm, correct_atomic_balance=True)
     growrxn = tmo.Rxn('Glucose -> Cellmass', 'Glucose', 0.99 - X_ferm, correct_atomic_balance=True)
     fermentation_sys, epdct = create_sucrose_fermentation_system(
         ins=[screened_juice],

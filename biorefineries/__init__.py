@@ -7,5 +7,5 @@
 # for license details.
 """
 """
-__version__ = '2.23.20'
+__version__ = '2.24.0'
 

@@ -1,8 +1,5 @@
 # -*- coding: utf-8 -*-
-"""
-Created on Thu Jun 27 23:12:28 2019
-
-@author: yoelr
+"""s
 """
 
 import biosteam as bst

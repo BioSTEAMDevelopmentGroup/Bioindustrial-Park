@@ -6,6 +6,10 @@
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
 # for license details.
 """
+.. contents:: :local:
+
+.. autofunction:: biorefineries.corn.systems.create_system
+
 """
 import biosteam as bst
 from biorefineries.ethanol import create_ethanol_purification_system

@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Created on Thu Dec 21 11:05:24 2017
-@author: Yoel
 """
 import numpy as np
 import biosteam as bst
@@ -17,6 +15,7 @@ from .. import streams as s
 __all__ = (
     'create_feedstock_handling_system',
     'create_juicing_system_up_to_clarification',
+    'create_juicing_system_without_treatment',
     'create_juicing_system',
 )
 
