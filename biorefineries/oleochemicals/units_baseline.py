@@ -260,6 +260,7 @@ class AACrystalliser(bst.units.BatchCrystallizer):
         outlet.imass['s','Nonanoic_acid'] = feed.imass['Nonanoic_acid']        
         
 #TODO: Should catalyst regeneration be continuous or batch?
+#TODO: check reaction conversions
 class Calcium_hydroxide_reactor(bst.CSTR):
     _N_ins = 2
     _N_outs = 1
