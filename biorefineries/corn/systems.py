@@ -13,7 +13,7 @@
 """
 import biosteam as bst
 from biorefineries.ethanol import create_ethanol_purification_system
-from .process_settings import price
+from .process_settings import BiorefinerySettings
 from . import units
 
 __all__ = ('create_system',)
@@ -22,41 +22,40 @@ import warnings
 import numpy as np
 warnings.filterwarnings("error", category=np.ComplexWarning)
 
-SLURRY_SOLIDS_CONTENT = 0.311   # g Corn / g Total
-SLURRY_AMMONIA_LOADING = 0.002  # g Ammonia / g dry Corn
-SLURRY_LIME_LOADING = 0.00012   # g Lime / g dry Corn
-LIQUEFACTION_ALPHA_AMYLASE_LOADING = 0.0007    # g Enzyme / g dry Corn
-SACCHARIFICATION_SULFURIC_ACID_LOADING = 0.001 # g Enzyme / g dry Corn
-SACCHARIFICATION_GLUCO_AMYLASE_LOADING = 0.002 # g H2SO4 / g dry Corn
-SCRUBBER_WASH_WATER_OVER_VENT = 1.21 # g Water / g Vent
-
-def create_system(ID='corn_sys', flowsheet=None):
+def create_system(flowsheet=None, biorefinery_settings=None):
+    settings = biorefinery_settings or BiorefinerySettings()
+    system_ID = settings.system_ID
+    feedstock_ID = 'corn' if 'corn' in system_ID else 'feedstock'
+    parameters = settings.process_parameters
+    prices = settings.stream_prices
+    GWP_CFs = settings.stream_GWP_CFs
+    
+    get_stream_kwargs = lambda key: {
+        'price': prices.get(key, 0.),
+        'characterization_factors': {'GWP': GWP_CFs.get(key, 0.)},
+        'units': 'kg/hr',
+        }
+    
     ### Streams ###
     
     chemicals = bst.settings.get_chemicals()
     
-    z_mass_corn = chemicals.kwarray(
-        dict(Starch=0.612,
-             Water=0.15,
-             Fiber=0.1067,
-             SolubleProtein=0.034,
-             InsolubleProtein=0.0493,
-             Oil=0.034,
-             Ash=0.014)
-    )
+    z_mass_corn = chemicals.kwarray(settings.feedstock_composition)
 
-    F_mass_corn = 46211.6723 # kg / hr
+    F_mass_corn = settings.feedstock_hourly_mass_flow
     mass_corn = F_mass_corn * z_mass_corn
 
-    corn = bst.Stream('corn', flow=mass_corn, price=price['Corn'], units='kg/hr')
-    crude_oil = bst.Stream('crude_oil', price=price['Crude oil'], units='kg/hr')
-    ammonia = bst.Stream('ammonia', NH3=89.723, price=price['Ammonia'], units='kg/hr')
-    lime = bst.Stream('lime', CaO=53.609, price=price['Lime'], units='kg/hr') 
+    feedstock = bst.Stream(feedstock_ID, flow=mass_corn, **get_stream_kwargs(feedstock_ID.capitalize()))
+    feedstock.register_alias('feedstock')
+    crude_oil = bst.Stream('crude_oil', **get_stream_kwargs('Crude oil'))
+    ammonia = bst.Stream('ammonia', NH3=89.723, **get_stream_kwargs('Ammonia'))
+    lime = bst.Stream('lime', CaO=53.609, **get_stream_kwargs('Lime'))
     alpha_amylase = bst.Stream('alpha_amylase',
                                SolubleProtein=0.00082,
                                Water=0.99918,
-                               price=price['Enzyme'],
-                               units='kg/hr')
+                               **get_stream_kwargs('Enzyme'))
+    # F_mass for this (and other feedstock-related streams)
+    # will be adjusted through specification
     alpha_amylase.F_mass = 32.467
     recycled_process_water = bst.Stream('recycled_process_water', 
                                         Water=1, 
@@ -64,45 +63,43 @@ def create_system(ID='corn_sys', flowsheet=None):
     gluco_amylase = bst.Stream('gluco_amylase', 
                                SolubleProtein=0.0011,
                                Water=0.9989,
-                               price=price['Enzyme'],
-                               units='kg/hr')
+                               **get_stream_kwargs('Enzyme'))
     gluco_amylase.F_mass = 46.895
     sulfuric_acid = bst.Stream('sulfuric_acid', 
                                H2SO4=1.,
-                               price=price['Sulfuric acid'],
-                               units='kg/hr')
+                               **get_stream_kwargs('Sulfuric acid'))
     sulfuric_acid.F_mass = 92.59300
     backwater = bst.Stream('backwater', Water=22484., units='kg/hr')
-    yeast = bst.Stream('yeast', Yeast=3.045, Water=63.335, price=price['Yeast'], units='kg/hr')
+    yeast = bst.Stream('yeast', Yeast=3.045, Water=63.335, **get_stream_kwargs('Yeast'))
     scrubber_water = bst.Stream('scrubber_water', Water=20139.4417, units='kg/hr')
-    ethanol = bst.Stream('ethanol', price=price['Ethanol'])
-    denaturant = bst.Stream('denaturant', price=price['Denaturant'])
+    ethanol = bst.Stream('ethanol', **get_stream_kwargs('Ethanol'))
+    denaturant = bst.Stream('denaturant', **get_stream_kwargs('Denaturant'))
     high_pressure_steam = bst.HeatUtility.get_agent('high_pressure_steam')
-    DDGS = bst.Stream('DDGS', price=price['DDGS'])
-    steam = bst.Stream('steam', Water=1, phase='g', 
-                       price=price['Steam'],
+    DDGS = bst.Stream('DDGS', **get_stream_kwargs('DDGS'))
+    steam = bst.Stream('steam', Water=1, phase='g',
                        T=high_pressure_steam.T,
-                       P=high_pressure_steam.P)
+                       P=high_pressure_steam.P,
+                       **get_stream_kwargs('Steam'))
     
     ### Process specifications ###
     
     def refresh_feed_specifications():
-        MH101._F_mass_dry_corn = F_mass_dry_corn = corn.F_mass - corn.imass['Water']
-        lime.F_mass = F_mass_lime = F_mass_dry_corn * SLURRY_LIME_LOADING
-        ammonia.F_mass = F_mass_ammonia = F_mass_dry_corn * SLURRY_AMMONIA_LOADING
-        alpha_amylase.F_mass = F_mass_aa = F_mass_dry_corn * LIQUEFACTION_ALPHA_AMYLASE_LOADING
-        sulfuric_acid.F_mass = F_mass_sa = F_mass_dry_corn * SACCHARIFICATION_SULFURIC_ACID_LOADING
-        gluco_amylase.F_mass = F_mass_ga = F_mass_dry_corn * SACCHARIFICATION_GLUCO_AMYLASE_LOADING
+        MH101._F_mass_dry_corn = F_mass_dry_corn = feedstock.F_mass - feedstock.imass['Water']
+        lime.F_mass = F_mass_lime = F_mass_dry_corn * parameters['slurry_lime_loading'] 
+        ammonia.F_mass = F_mass_ammonia = F_mass_dry_corn * parameters['slurry_ammonia_loading']
+        alpha_amylase.F_mass = F_mass_aa = F_mass_dry_corn * parameters['liquefaction_alpha_amylase_loading']
+        sulfuric_acid.F_mass = F_mass_sa = F_mass_dry_corn * parameters['saccharification_sulfuric_acid_loading']
+        gluco_amylase.F_mass = F_mass_ga = F_mass_dry_corn * parameters['saccharification_gluco_amylase_loading']
         MH101._F_mass_others = (F_mass_lime + F_mass_ammonia + F_mass_aa + F_mass_sa + F_mass_ga)
         MH101._run()
     
     def update_scrubber_wash_water():
-        scrubber_water.F_mass =  V409.ins[1].F_mass * SCRUBBER_WASH_WATER_OVER_VENT
+        scrubber_water.F_mass =  V409.ins[1].F_mass * parameters['scrubber_wash_water_over_vent']
         V409._run()
         
     ### Units ###
     
-    MH101 = units.GrainHandling('MH101', corn)
+    MH101 = units.GrainHandling('MH101', feedstock)
     MH101.add_specification(refresh_feed_specifications)
     V102 = units.CornStorage('V102', MH101-0)
     MH103 = units.CleaningSystem('MH103', V102-0, split=0.997)
@@ -116,11 +113,12 @@ def create_system(ID='corn_sys', flowsheet=None):
     P304 = bst.Pump('P304', V303-0)
     V305 = units.LimeHopper('V305', lime)
     V307 = units.SlurryMixTank('V307', (V107-0, P302-0, P304-0, V305-0, recycled_process_water, backwater))
+    slurry_solids_content = parameters['slurry_solids_content']
     @V307.add_specification(run=True)
     def correct_recycle_dilution_water():
         F_mass_others = MH101._F_mass_others + backwater.F_mass
         F_mass_dry_corn = MH101._F_mass_dry_corn
-        recycled_process_water.F_mass = F_mass_dry_corn * (1. - SLURRY_SOLIDS_CONTENT) / SLURRY_SOLIDS_CONTENT - F_mass_others
+        recycled_process_water.F_mass = F_mass_dry_corn * (1. - slurry_solids_content) / slurry_solids_content - F_mass_others
     
     P311 = bst.Pump('P311', V307-0, P=1e6)
     E312 = bst.HXprocess('E312', (P311-0, None), U=0.56783, ft=1.0, T_lim0=410.)
@@ -239,12 +237,19 @@ def create_system(ID='corn_sys', flowsheet=None):
         (),
         (recycled_process_water,)
     )
-    other_facilities = units.PlantAir_CIP_WasteWater_Facilities('other_facilities', corn)
+    other_facilities = units.PlantAir_CIP_WasteWater_Facilities('other_facilities', feedstock)
     HXN = bst.HeatExchangerNetwork('HXN', 
         units=lambda: [u.Ev607.evaporators[0], u.T503_T507.condenser]
     )
+    
+    other_unit_parameters = settings.other_unit_parameters
+    for ID, params in other_unit_parameters.items():
+        attr, val = params.items()
+        setattr(f.unit.search(ID), attr, val)
+        
     globals().update(f.unit.data)
-    return f.create_system('corn_sys')
+        
+    return f.create_system(system_ID)
     
     # System = bst.System
     

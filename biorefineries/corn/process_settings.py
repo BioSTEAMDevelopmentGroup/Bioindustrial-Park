@@ -9,11 +9,53 @@
 """
 import biosteam as bst
 
-__all__ = ('load_process_settings', 'price',)
+__all__ = (
+    'BiorefinerySettings',
+    'default_feedstock_composition',
+    'default_load_utility_settings',
+    'default_stream_GWP_CFs',
+    'default_stream_prices',
+    )
 
-def load_process_settings():
+
+class BiorefinerySettings:
+    '''
+    Containing the general parameters needed in biorefinery design/TEA/LCA
+    that can be modified to update the biorefinery.
+    '''
+    
+    def __init__(
+            self,
+            CEPCI=567, # 2013 chemical engineering plant capital index
+            load_utility_settings=None,
+            system_ID='corn_sys',
+            feedstock_composition={},
+            feedstock_hourly_mass_flow=46211.6723, # kg / hr
+            process_parameters={},
+            stream_prices={},
+            stream_GWP_CFs={},
+            other_unit_parameters={},
+            **kwargs,
+            ):
+        self.CEPCI = CEPCI
+        self.load_utility_settings = load_utility_settings or default_load_utility_settings
+        self.system_ID = system_ID
+        self.feedstock_composition = feedstock_composition or default_feedstock_composition
+        self.feedstock_hourly_mass_flow = feedstock_hourly_mass_flow
+        self.process_parameters = process_parameters or default_process_parameters
+        self.stream_prices = stream_prices or default_stream_prices
+        self.stream_GWP_CFs = stream_GWP_CFs or default_stream_GWP_CFs
+        self.other_unit_parameters = other_unit_parameters
+        for k, v in kwargs: setattr(self, k, v)
+        
+    def load_process_settings(self):
+        '''Set capital index and load utility settings'''
+        bst.CE = self.CEPCI
+        self.load_utility_settings()
+        
+
+def default_load_utility_settings():
     bst.process_tools.default_utilities()
-    bst.CE = 567 # 2013
     bst.PowerUtility.price = 0.07 # Value from Chinmay's report; 0.07, in original
     HeatUtility = bst.HeatUtility
     lps = HeatUtility.get_agent('low_pressure_steam')
@@ -21,16 +63,57 @@ def load_process_settings():
     lps.T = 152 + 273.15
     lps.P = Water.Psat(lps.T)
     lps.heat_transfer_efficiency = 1.0
-    lps.regeneration_price = price['Steam'] * Water.MW
+    lps.regeneration_price = default_stream_prices['Steam'] * Water.MW
     for agent in HeatUtility.heating_agents:
-        agent.regeneration_price = price['Steam'] * Water.MW
+        agent.regeneration_price = default_stream_prices['Steam'] * Water.MW
     cw = HeatUtility.get_agent('cooling_water')
     cw.regeneration_price = 0.073e-3 * Water.MW
     cw.T = 25. + 273.15
 
 
+# Feedstock weight composition
+default_feedstock_composition = {
+    'Starch': 0.612,
+    'Water': 0.15,
+    'Fiber': 0.1067,
+    'SolubleProtein': 0.034,
+    'InsolubleProtein': 0.0493,
+    'Oil': 0.034,
+    'Ash': 0.014
+    }
+
+
+# Process parameters
+default_process_parameters = {
+    'slurry_solids_content': 0.311,   # g Corn / g Total
+    'slurry_ammonia_loading': 0.002,  # g Ammonia / g dry Corn
+    'slurry_lime_loading': 0.00012,   # g Lime / g dry Corn
+    'liquefaction_alpha_amylase_loading': 0.0007,    # g Enzyme / g dry Corn
+    'saccharification_sulfuric_acid_loading': 0.001, # g Enzyme / g dry Corn
+    'saccharification_gluco_amylase_loading': 0.002, # g H2SO4 / g dry Corn
+    'scrubber_wash_water_over_vent': 1.21, # g Water / g Vent
+    }
+
+# Characterization factors for 100-year global warming potential
+#!!! Numbers are all fake now
+default_stream_GWP_CFs = {
+    'Ethanol': 1,
+    'Corn': 1,
+    'DDGS': 1,
+    'Yeast': 1,
+    'Enzyme': 1,
+    'Denaturant': 1,
+    'Sulfuric acid': 1,
+    'Ammonia': 1,
+    'Caustic': 1,
+    'Lime': 1,
+    'Steam': 1,
+    'Crude oil': 1,
+}
+
+
 # Raw material price (USD/kg)
-price = {
+default_stream_prices = {
     'Ethanol': 0.48547915353569393, 
     'Corn': 0.13227735731092652, # Value from Chinmay's report; 0.08476585075177462 in original
     'DDGS': 0.12026, # Value from Chinmay's report; 0.09687821462905594, in original
@@ -44,4 +127,5 @@ price = {
     'Steam': 12.86e-3, # Value from Chinmay's report; 17.08e-3 in original lipidcane report 
     'Crude oil': 0.56,
 }
+
 

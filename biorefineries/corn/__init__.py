@@ -36,4 +36,8 @@ from .biorefinery import *
 def load(*args, **kwargs):
     br = Biorefinery(*args, **kwargs)
     globals().update(br.__dict__)
-
+    globals().update({
+        'biorefinery': br,
+        'system': br.system,
+        'TEA': br.TEA,
+        })
