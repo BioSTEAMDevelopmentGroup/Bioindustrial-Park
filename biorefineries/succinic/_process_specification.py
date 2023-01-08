@@ -157,44 +157,6 @@ evaluate_across_specs = np.vectorize(
 
 class ProcessSpecification(bst.process_tools.ReactorSpecification):
     
-    __slots__ = ('reactor',
-                 'substrates',
-                 'products',
-                 'spec_1',
-                 'spec_2',
-                 'spec_3',
-                 'substrates',
-                 'xylose_utilization_fraction',
-                 'load_spec_1',
-                 'load_spec_2',
-                 'load_spec_3',
-                 'feedstock',
-                 'dehydration_reactor', 
-                 'byproduct_streams',
-                 'feedstock_mass',
-                 'pretreatment_reactor',
-                 'titer_inhibitor_specification',
-                 'seed_train_system',
-                 'HXN',
-                 'maximum_inhibitor_concentration',
-                 'count',
-                 'count_exceptions',
-                 'total_iterations',
-                 'average_HXN_energy_balance_percent_error',
-                 'tolerable_HXN_energy_balance_percent_error',
-                 'HXN_intolerable_points',
-                 'exceptions_dict',
-                 'pre_conversion_units',
-                 'juicing_sys',
-                 'baseline_yield',
-                 'baseline_titer',
-                 'baseline_productivity',
-                 'HXN_new_HXs',
-                 'HXN_new_HX_utils',
-                 'HXN_Q_bal_percent_error_dict',
-                 'seed_train',
-                 'neutralization'
-                 )
     
     def __init__(self, evaporator, pump, mixer, heat_exchanger, seed_train_system, 
                  reactor, reaction_name, substrates, products,
@@ -208,7 +170,7 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
                   load_spec_1=None, load_spec_2=None, load_spec_3=None):
         self.substrates = substrates
         self.reactor = reactor #: [Unit] Reactor unit operation
-        self.neutralization = reactor.neutralization = neutralization
+        self._neutralization = reactor.neutralization = neutralization
         self.products = products #: tuple[str] Names of main products
         self.spec_1 = spec_1 #: [float] g products / L effluent
         self.spec_2 = spec_2 #: [float] Weight fraction of theoretical yield.
@@ -262,7 +224,15 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
         self.titer_inhibitor_specification.maximum_inhibitor_concentration = value
         self.load_specifications(spec_1=self.spec_1, spec_2=self.spec_2, spec_3=self.spec_3)
     
-    def load_specifications(self, spec_1=None, spec_2=None, spec_3=None, neutralization=False):
+    @property
+    def neutralization(self):
+        return self._neutralization
+    
+    @neutralization.setter
+    def neutralization(self, value):
+        self._neutralization = self.reactor.neutralization = value
+    
+    def load_specifications(self, spec_1=None, spec_2=None, spec_3=None, neutralization=None):
         """
         Load ferementation specifications.
         Parameters
@@ -275,7 +245,8 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
         productivity : float, optional
             g products / L effluent / hr
         """
-        self.reactor.neutralization = neutralization
+        if not (neutralization==None):
+            self.neutralization = neutralization
         self.load_spec_1(spec_1 or self.spec_1)
         self.load_spec_2(spec_2 or self.spec_2)
         self.spec_2 = spec_2
