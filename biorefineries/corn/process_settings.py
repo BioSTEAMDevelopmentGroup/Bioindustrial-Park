@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 # BioSTEAM: The Biorefinery Simulation and Techno-Economic Analysis Modules
 # Copyright (C) 2020, Yoel Cortes-Pena <yoelcortes@gmail.com>
+#                     Yalin Li <mailto.yalin.li@gmail.com>
 # 
 # This module is under the UIUC open-source license. See 
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
@@ -26,26 +27,28 @@ class BiorefinerySettings:
     
     def __init__(
             self,
+            system_ID='corn_sys',
             CEPCI=567, # 2013 chemical engineering plant capital index
             load_utility_settings=None,
-            system_ID='corn_sys',
             feedstock_composition={},
             feedstock_hourly_mass_flow=46211.6723, # kg / hr
             process_parameters={},
             stream_prices={},
             stream_GWP_CFs={},
             other_unit_parameters={},
+            tea_parameters={},
             **kwargs,
             ):
+        self.system_ID = system_ID
         self.CEPCI = CEPCI
         self.load_utility_settings = load_utility_settings or default_load_utility_settings
-        self.system_ID = system_ID
         self.feedstock_composition = feedstock_composition or default_feedstock_composition
         self.feedstock_hourly_mass_flow = feedstock_hourly_mass_flow
         self.process_parameters = process_parameters or default_process_parameters
         self.stream_prices = stream_prices or default_stream_prices
         self.stream_GWP_CFs = stream_GWP_CFs or default_stream_GWP_CFs
         self.other_unit_parameters = other_unit_parameters
+        self.tea_parameters = tea_parameters
         for k, v in kwargs: setattr(self, k, v)
         
     def load_process_settings(self):
@@ -54,9 +57,13 @@ class BiorefinerySettings:
         self.load_utility_settings()
         
 
-def default_load_utility_settings():
+def default_load_utility_settings(
+        power_price=0.07, # Value from Chinmay's report; 0.07, in original
+        power_GWP_CFs=(1., 1.,), # consumption, production #!!! needs to be updated
+        ):
     bst.process_tools.default_utilities()
     bst.PowerUtility.price = 0.07 # Value from Chinmay's report; 0.07, in original
+    bst.PowerUtility.characterization_factors['GWP'] = power_GWP_CFs
     HeatUtility = bst.HeatUtility
     lps = HeatUtility.get_agent('low_pressure_steam')
     Water = lps.chemicals.Water

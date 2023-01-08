@@ -70,5 +70,5 @@ class Biorefinery:
     @property
     def TEA(self):
         system = self.system
-        tea = system.TEA or create_tea(system)
+        tea = system.TEA or create_tea(system, **self.biorefinery_settings.tea_parameters)
         return tea
