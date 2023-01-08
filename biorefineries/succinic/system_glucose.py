@@ -172,7 +172,7 @@ def create_succinic_sys(ins, outs):
     R302 = units.CoFermentation('R302', 
                                     ins=(S302-1, 'seed', CSL, CO2_fermentation, lime_neutralization, ''),
                                     outs=('fermentation_broth', 'fermentation_vent'),
-                                    neutralization=False)
+                                    neutralization=True)
     @R302.add_specification(run=False)
     def include_seed_CSL_in_cofermentation(): # note: effluent always has 0 CSL
         # R302.show(N=100)
@@ -285,7 +285,7 @@ def create_succinic_sys(ins, outs):
     C401 = units.SuccinicAcidCrystallizer('C401', ins=F401_P-0, outs=('C401_0',), 
                                    target_recovery=0.95,
                                    tau=6,
-                                   T_range=(273.15+2., 372.5),
+                                   T_range=(273.15+0.5, 372.5),
                                    N=4,
                                    )
     
@@ -334,7 +334,7 @@ def create_succinic_sys(ins, outs):
     C402 = units.SuccinicAcidCrystallizer('C402', ins=F402_P-0, outs=('C402_0',), 
                                    target_recovery=0.95,
                                    tau=6,
-                                   T_range=(273.15+2., 373.15-2.),
+                                   T_range=(273.15+0.5, 373.15-2.),
                                    N=4,
                                    )
 

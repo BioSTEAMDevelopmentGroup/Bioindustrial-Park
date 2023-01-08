@@ -294,14 +294,17 @@ succinic_metrics = [get_product_MPSP, get_product_purity, get_production]
 # succinic_metrics = [get_succinic_MPSP, get_GWP, get_FEC]
 
 # %% Generate 3-specification meshgrid and set specification loading functions
-steps = 15
+steps = 30
+
+# Neutralization
+spec.neutralization = True
 
 # Yield, titer, productivity (rate)
 spec_1 = yields = np.linspace(0.3, 0.8, steps) # yield
 spec_2 = titers = np.linspace(30., 130., steps) # titer
-# spec_1 = np.linspace(0.2, 0.99, steps) # yield
-# spec_2 = np.linspace(45, 225, steps) # titer
-spec_3 = productivities = np.linspace(0.1, 1.5, 6)
+# spec_3 = productivities = np.linspace(0.1, 1.5, 6) # productivity
+spec_3 = productivities = [0.68]
+
 # spec.load_spec_1 = spec.load_yield
 # spec.load_spec_2 = spec.load_titer
 # spec.load_spec_3 = spec.load_productivity

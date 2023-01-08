@@ -2074,21 +2074,26 @@ class SuccinicAcidCrystallizer(BatchCrystallizer):
         self.effective_recovery = target_recovery
         
         Tmin, Tmax = self.T_range
-        rec_at_Tmin, rec_at_Tmax = self.get_effective_recovery_from_T(Tmin),\
-            self.get_effective_recovery_from_T(Tmax)
         
-        if rec_at_Tmin < target_recovery:
-            self.T = Tmin
-            self.effective_recovery = rec_at_Tmin
-        elif rec_at_Tmax > target_recovery:
-            self.T = Tmin
-            self.effective_recovery = rec_at_Tmax
-        else:
-            self.T = T = self.get_T_from_target_recovery(target_recovery)
-            if T>in_stream.T:
-                self.T = T = in_stream.T
-                self.effective_recovery = self.get_effective_recovery_from_T(T)
         
+        if self.basis = 'water solubility':
+            
+            rec_at_Tmin, rec_at_Tmax = self.get_effective_recovery_from_T(Tmin),\
+                self.get_effective_recovery_from_T(Tmax)
+            
+            if rec_at_Tmin < target_recovery:
+                self.T = Tmin
+                self.effective_recovery = rec_at_Tmin
+            elif rec_at_Tmax > target_recovery:
+                self.T = Tmin
+                self.effective_recovery = rec_at_Tmax
+            else:
+                self.T = T = self.get_T_from_target_recovery(target_recovery)
+                if T>in_stream.T:
+                    self.T = T = in_stream.T
+                    self.effective_recovery = self.get_effective_recovery_from_T(T)
+        elif self.basis = 'concentration time profile':
+            
         # self.tau = self.get_t_from_target_recovery(effective_recovery)
         # print(self.ID, effective_recovery, self.effective_recovery)
         self.set_effluent_composition_from_recovery(self.effective_recovery)
