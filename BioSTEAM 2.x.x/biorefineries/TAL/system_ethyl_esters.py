@@ -175,7 +175,7 @@ def create_TAL_sys(ins, outs):
     feedstock.price = price['Glucose']*feedstock.imass['Glucose']/feedstock.F_mass
     
     # feedstock.F_mass = 604.125 # at the baseline, matches the reported production capacity of ethyl 3-HH by Guangzhou Magnolia Flavor and Fragrance at https://www.alibaba.com/product-detail/ETHYL-3-HYDROXYHEXANOATE-CAS-2305-25_1600386938301.html?spm=a2700.galleryofferlist.normal_offer.d_title.674572a5vNji1o
-    feedstock.F_mass = 19301.5 # at the baseline, this produces 20,000 metric tonnes of mixed esters annually
+    feedstock.F_mass = 29728.5 # at the baseline, this produces 20,000 metric tonnes of mixed esters annually
     U101 = units.FeedstockPreprocessing('U101', ins=feedstock)
     
     # Handling costs/utilities included in feedstock cost thus not considered here
@@ -1100,8 +1100,8 @@ spec = ProcessSpecification(
     pre_conversion_units = TAL_sys.split(u.M304.ins[0])[0],
     
     # set baseline fermentation performance here
-    # baseline_yield = 0.19,
-    baseline_yield = 0.19,
+    baseline_yield = 0.19, # baseline
+    # baseline_yield = 0.30, # ntfi
     baseline_titer = 15.,
     baseline_productivity = 0.19,
     

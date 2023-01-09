@@ -27,7 +27,7 @@ from chaospy import distributions as shape
 # from biosteam import main_flowsheet as find
 from biosteam.evaluation import Model, Metric
 # from biosteam.evaluation.evaluation_tools import Setter
-from TAL.system_ethyl_esters import TAL_sys, TAL_tea, u, s, unit_groups, spec, price
+from biorefineries.TAL.system_ethyl_esters import TAL_sys, TAL_tea, u, s, unit_groups, spec, price
 
 # get_annual_factor = lambda: TAL_tea._annual_factor
 
@@ -261,7 +261,7 @@ def set_ethanol_price(etoh_price):
 
 #%% ######################## Feedstock parameters ########################
 U101 = u.U101
-D = shape.Triangle(19301.5*0.8, 19301.5, 19301.5*1.2)
+D = shape.Triangle(29728.5*0.8, 29728.5, 29728.5*1.2)
 @param(name='Feedstock capacity', element=U101, kind='coupled', units='kg/h',
        baseline=19301.5, distribution=D)
 def set_feedstock_capacity(feedstock_capacity):
