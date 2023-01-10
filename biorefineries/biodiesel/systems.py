@@ -245,8 +245,6 @@ def create_transesterification_and_biodiesel_separation_system(ins, outs,
     @R402.add_specification
     def adjust_feed_to_reactors():
         R402._run()
-        for i in S401.outs:
-            if isinstance(i, bst.Junction): i._run()
         S401.ins[0].mix_from(S401.outs)
     
     # Centrifuge to remove glycerol
@@ -431,6 +429,14 @@ def create_transesterification_and_biodiesel_separation_system(ins, outs,
     methanol-T401-P401  # Mix fresh and recycled methanol
     catalyst-T402-P402  # Fresh catalyst
     (P411-0, P401-0, P402-0)-T404-P404-S401  # Mix Catalyst with Methanol
+    
+    @B401.add_specification
+    def vary_inlets():
+        B401.run()
+        catalyst.sink.run_until(T404)
+        methanol.sink.run_until(T404)
+        T404.run_until(S401)
+        S401.ins[0].mix_from([1**R401, 1**R402])
     
     # Initial guess
     D402.outs[0].imol['Methanol', 'Glycerol', 'Water'] = [0.00127, 3.59e-05, 0.0244]

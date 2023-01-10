@@ -256,11 +256,12 @@ def run_uncertainty_and_sensitivity(name, N, rule='L',
                         file=autoload_file,
                         **kwargs,
                     )
-                    br.model.table[br.set_ROI_target.index] = column = br.model.table[br_sugarcane.ROI.index]
+                    br.model.table[br.set_ROI_target.index] = column = br.model.table[br.ROI.index]
                     br.model._samples[:, br.model.parameters.index(br.set_ROI_target)] = column.values
                     br.model.table[br.competitive_oilcane_biomass_yield.index] = 100.
             elif across_oil_content == 'microbial oil vs bioethanol':
                 autoload_file += '_mo_vs_etoh'
+                assert name in ('O6', 'O5')
                 # For configurations 5 and 6, find the microbial oil yield required
                 # to get the same ROI as bioethanol production
                 if br.composition_specification.oil == 0.:

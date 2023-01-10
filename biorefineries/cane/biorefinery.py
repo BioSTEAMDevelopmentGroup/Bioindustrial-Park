@@ -421,7 +421,10 @@ class Biorefinery:
             oil_extraction_specification = MockExtractionSpecification()
         else:
             crushing_mill = flowsheet(bst.CrushingMill) # Separates bagasse
-            pressure_filter = flowsheet(bst.PressureFilter) # Separates lignin
+            if number in cellulosic_configurations:
+                pressure_filter = flowsheet(bst.PressureFilter) # Separates lignin
+            else:
+                pressure_filter  = None
             cellmass_centrifuge = flowsheet(bst.SolidsCentrifuge) # Separates cell mass
             microbial_oil_recovery = 0.9 # Baseline
             oil_extraction_specification = OilExtractionSpecification(
@@ -745,11 +748,10 @@ class Biorefinery:
                 # fermentor.cofermentation[2].X = 0.004 # Baseline
                 # fermentor.cofermentation[3].X = 0.006 # Baseline
                 # fermentor.loss[0].X = 0.03 # Baseline
-                split = np.mean(u.S401.split)
+                split = u.S401.split.mean()
                 X1 = split * seed_train.reactions.X[0]
                 X2 = split * seed_train.reactions.X[2]
                 X3 = (glucose_to_ethanol_yield - X1) / (1 - X1 - X2)
-                split = np.mean(u.S401.split)
                 X_excess = X3 * 1.0526 - 1
                 if X_excess > 0.: breakpoint()
                 fermentor.cofermentation.X[0] = X3
@@ -759,7 +761,7 @@ class Biorefinery:
         def set_xylose_to_ethanol_yield(xylose_to_ethanol_yield):
             if number in cellulosic_ethanol_configurations:
                 xylose_to_ethanol_yield *= 0.01
-                split = np.mean(u.S401.split)
+                split = u.S401.split.mean()
                 X1 = split * seed_train.reactions.X[1]
                 X2 = split * seed_train.reactions.X[3]
                 X3 = (xylose_to_ethanol_yield - X1) / (1 - X1 - X2)
