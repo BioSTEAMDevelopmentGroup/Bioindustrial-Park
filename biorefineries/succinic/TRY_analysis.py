@@ -18,7 +18,7 @@ import biosteam as bst
 from biosteam.utils import colors
 from matplotlib.ticker import AutoMinorLocator as AML
 
-from biorefineries.succinic.system_glucose import succinic_sys, succinic_tea, R302, spec, product_stream
+from biorefineries.succinic.system_sc import succinic_sys, succinic_tea, R302, spec, product_stream
 
 from matplotlib import pyplot as plt
 from  matplotlib.colors import LinearSegmentedColormap

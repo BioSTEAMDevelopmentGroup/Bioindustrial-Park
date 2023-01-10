@@ -452,13 +452,13 @@ class CoFermentation(Unit):
         Rxn('Glucose + 2 CO2 -> 2 SuccinicAcid + O2',        'Glucose',   0.7), 
         Rxn('Glucose -> 3 AceticAcid',               'Glucose',   1e-8),
         Rxn('Glucose -> 2 Ethanol + 2 CO2',               'Glucose',   1e-8),
-        Rxn('Glucose -> 6 FermMicrobe',       'Glucose',   0.05),
+        Rxn('Glucose -> 6 FermMicrobe',       'Glucose',   0.066),
         Rxn('Glucose -> 2 PyruvicAcid',     'Glucose',    0.1),
         
         Rxn('Xylose + 1.667 CO2 -> 1.667 SuccinicAcid + 0.4165 O2',       'Xylose',    0.7),
         Rxn('Xylose -> 2.5 AceticAcid',       'Xylose',    1e-8),
         Rxn('Xylose -> 1.667 Ethanol + 1.667 CO2',       'Xylose',    1e-8),
-        Rxn('Xylose -> 5 FermMicrobe',        'Xylose',    0.05),
+        Rxn('Xylose -> 5 FermMicrobe',        'Xylose',    0.066),
         Rxn('3 Xylose -> 5 PyruvicAcid',    'Xylose',   0.1)
         ])
         
@@ -612,12 +612,12 @@ class SeedTrain(Unit):
         Rxn('Glucose + 2 CO2 -> 2 SuccinicAcid + O2',        'Glucose',   0.7*ferm_ratio), 
         Rxn('Glucose -> 3 AceticAcid',               'Glucose',   1e-8*ferm_ratio),
         Rxn('Glucose -> 2 Ethanol + 2 CO2',               'Glucose',   1e-8*ferm_ratio),
-        Rxn('Glucose -> 6 FermMicrobe',       'Glucose',   0.05*ferm_ratio),
+        Rxn('Glucose -> 6 FermMicrobe',       'Glucose',   0.066*ferm_ratio),
         
         Rxn('Xylose + 1.667 CO2 -> 1.667 SuccinicAcid + 0.4165 O2',       'Xylose',    0.7*ferm_ratio),
         Rxn('Xylose -> 2.5 AceticAcid',       'Xylose',    1e-8*ferm_ratio),
         Rxn('Xylose -> 1.667 Ethanol + 1.667 CO2',       'Xylose',    1e-8*ferm_ratio),
-        Rxn('Xylose -> 5 FermMicrobe',        'Xylose',    0.05*ferm_ratio),
+        Rxn('Xylose -> 5 FermMicrobe',        'Xylose',    0.066*ferm_ratio),
         ])
 
         self.CO2_generation_rxns = ParallelRxn([
@@ -698,53 +698,6 @@ class SeedHoldTank(Unit): pass
 # =============================================================================
 
 
-class SorbicAcidCrystallizer(BatchCrystallizer):
-    
-    def __init__(self, ID='', ins=None, outs=(), thermo=None, *, 
-                 T=250., crystal_SA_purity=0.98, melt_water_purity=0.90,
-                 order=None):
-        BatchCrystallizer.__init__(self, ID, ins, outs, thermo,
-                                       tau=5, V=1e6, T=T)
-        self.melt_AcTAG_purity = melt_AcTAG_purity
-        self.crystal_TAG_purity = crystal_TAG_purity
-
-    @property
-    def Hnet(self):
-        feed = self.ins[0]
-        effluent = self.outs[0]
-        if 's' in feed.phases:
-            H_in = - sum([i.Hfus * j for i,j in zip(self.chemicals, feed['s'].mol) if i.Hfus])
-        else:
-            H_in = 0.
-        solids = effluent['s']
-        H_out = - sum([i.Hfus * j for i,j in zip(self.chemicals, solids.mol) if i.Hfus])
-        return H_out - H_in
-        
-    def _run(self):
-        outlet = self.outs[0]
-        outlet.phases = ('s', 'l')
-        crystal_TAG_purity = self.crystal_TAG_purity
-        melt_AcTAG_purity = self.melt_AcTAG_purity
-        feed = self.ins[0]
-        TAG, AcTAG = feed.imass['TAG', 'AcTAG'].value
-        total = TAG + AcTAG
-        minimum_melt_purity = AcTAG / total
-        minimum_crystal_purity = TAG / total
-        outlet.empty()
-        if crystal_TAG_purity < minimum_crystal_purity:
-            outlet.imol['s'] = feed.mol
-        elif melt_AcTAG_purity < minimum_melt_purity:
-            outlet.imol['l'] = feed.mol
-        else: # Lever rule
-            crystal_AcTAG_purity = (1. - crystal_TAG_purity)
-            melt_fraction = (minimum_melt_purity - crystal_AcTAG_purity) / (melt_AcTAG_purity - crystal_AcTAG_purity)
-            melt = melt_fraction * total
-            AcTAG_melt = melt * melt_AcTAG_purity
-            TAG_melt = melt - AcTAG
-            outlet.imass['l', ('AcTAG', 'TAG')] = [AcTAG_melt, TAG_melt]
-            outlet.imol['s'] = feed.mol - outlet.imol['l']
-        outlet.T = self.T
-        
 # Filter to separate fermentation broth into products liquid and solid
 @cost(basis='Solids flow rate', ID='Feed tank', units='kg/hr',
       cost=174800, S=31815, CE=CEPCI[2010], n=0.7, BM=2.0)
@@ -2009,6 +1962,9 @@ class SuccinicAcidCrystallizer(BatchCrystallizer):
                  target_recovery=0.6,
                  thermo=None,
                  tau=6, N=None, V=None, T=305.15,
+                 basis='water solubility',
+                 output_dissolved_concentration_function=None,
+                 fixed_operating_T=None,
                  Nmin=2, Nmax=36, 
                  T_range=(274., 372.5),
                  vessel_material='Stainless steel 316',
@@ -2021,6 +1977,9 @@ class SuccinicAcidCrystallizer(BatchCrystallizer):
         self.target_recovery = target_recovery
         self.T_range = T_range
         self.tau = tau
+        self.basis = basis
+        self.output_dissolved_concentration_function = output_dissolved_concentration_function
+        self.fixed_operating_T = fixed_operating_T
         
     def get_T_from_target_recovery(self, target_recovery):
         # self.target_recovery=target_recovery
@@ -2076,7 +2035,7 @@ class SuccinicAcidCrystallizer(BatchCrystallizer):
         Tmin, Tmax = self.T_range
         
         
-        if self.basis = 'water solubility':
+        if self.basis == 'water solubility':
             
             rec_at_Tmin, rec_at_Tmax = self.get_effective_recovery_from_T(Tmin),\
                 self.get_effective_recovery_from_T(Tmax)
@@ -2092,13 +2051,22 @@ class SuccinicAcidCrystallizer(BatchCrystallizer):
                 if T>in_stream.T:
                     self.T = T = in_stream.T
                     self.effective_recovery = self.get_effective_recovery_from_T(T)
-        elif self.basis = 'concentration time profile':
+            # self.tau = self.get_t_from_target_recovery(effective_recovery)
+            # print(self.ID, effective_recovery, self.effective_recovery)
+            self.set_effluent_composition_from_recovery(self.effective_recovery)
             
-        # self.tau = self.get_t_from_target_recovery(effective_recovery)
-        # print(self.ID, effective_recovery, self.effective_recovery)
-        self.set_effluent_composition_from_recovery(self.effective_recovery)
-        
-        if self.effective_recovery>0.:
-            out_stream.T =self.T
-        else:
-            self.T = out_stream.T = in_stream.T
+            if self.effective_recovery>0.:
+                out_stream.T =self.T
+            else:
+                self.T = out_stream.T = in_stream.T
+                
+    
+        elif self.basis == 'concentration out vs in at fixed T and t':
+            
+            output_conc = self.output_dissolved_concentration_function(out_stream.imass['SuccinicAcid']/out_stream.F_vol)
+            self.T = out_stream.T = self.fixed_operating_T
+            tot_SA = float(out_stream.imass['SuccinicAcid'])
+            still_dissolved_SA = output_conc * out_stream.F_vol
+            out_stream.imass['l', 'SuccinicAcid'] = min(tot_SA, still_dissolved_SA)
+            out_stream.imass['s', 'SuccinicAcid'] = recovered_SA = max(0, tot_SA - still_dissolved_SA)
+            self.effective_recovery = recovered_SA/tot_SA

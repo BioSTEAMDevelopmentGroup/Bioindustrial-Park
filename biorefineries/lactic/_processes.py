@@ -787,6 +787,7 @@ def create_facilities(solids_to_boiler, gas_to_boiler='',
     # All water used in the system, here only consider water consumption,
     # if heating needed, then heating duty required is considered in the boiler
     process_water_streams['facilities'] = (BT.outs[1], CT.outs[1])
+    
     bst.facilities.ProcessWaterCenter(
         'PWC',
         ins=(treated_water, system_makeup_water, 'direct_recycled_water'),
