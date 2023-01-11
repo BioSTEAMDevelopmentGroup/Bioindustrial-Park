@@ -26,7 +26,7 @@ from biosteam.units.design_tools.heat_transfer import compute_LMTD
 
 #Add details about the below
 #Costing is based on volume. Ref: Warren Sieder
-   
+  
 bst.StorageTank.purchase_cost_algorithms["Solids handling bin"] = TankPurchaseCostAlgorithm(
     ExponentialFunctor(A=646, n=0.46),
     V_min=10, V_max=1e5, V_units='ft^3',
@@ -76,7 +76,7 @@ class OxidativeCleavageReactor(bst.CSTR):
     # V_max is max volume of a reactor in feet3
     ## The two heatutilities are both for the vaccuum system -steam and for the cooling water
     
-    _N_ins = 1
+    _N_ins = 2
     _N_outs = 2
        
     def _setup(self):          
@@ -109,10 +109,10 @@ class OxidativeCleavageReactor(bst.CSTR):
         self.reactions = oxidative_cleavage_rxnsys
             
     def _run(self):
-        feed = self.ins[0]
-        vent, effluent = self.outs   
+        feed,air, = self.ins
+        vent, effluent, = self.outs   
         #https://thermosteam.readthedocs.io/en/latest/_modules/thermosteam/_stream.html#Stream.copy_like
-        effluent.copy_like(feed)              
+        effluent.mix_from(self.ins)              
         self.reactions(effluent)
         effluent.T = self.T
         effluent.P = self.P
@@ -146,11 +146,12 @@ class HydrolysisReactor(bst.CSTR):
         # packed bed ion exchange column
         X_hydrolysis = 0.30
         Product_formation = PRxn([Rxn('Monomethyl_azelate + Water  -> Methanol + Azelaic_acid','Monomethyl_azelate', X = X_hydrolysis ),
-                          Rxn('Methyl_palmitate + Water  -> Methanol + Palmitic_acid','Methyl_palmitate', X = X_hydrolysis ),
-                          Rxn('Methyl_stearate + Water  -> Methanol + Stearic_acid','Methyl_stearate', X = X_hydrolysis),
-                          Rxn('Methyl_linoleate + Water  -> Methanol + Linoleic_acid','Methyl_linoleate', X = X_hydrolysis),
-                          Rxn('Methyl_palmitoleate + Water  -> Methanol + Palmitoleic_acid','Methyl_palmitoleate', X = 0.1),
-                          Rxn('Methyl_oleate + Water  -> Methanol + Oleic_acid','Methyl_oleate', X = 0.1)])
+                                  Rxn('Methyl_palmitate + Water  -> Methanol + Palmitic_acid','Methyl_palmitate', X = X_hydrolysis ),
+                                  Rxn('Methyl_stearate + Water  -> Methanol + Stearic_acid','Methyl_stearate', X = X_hydrolysis),
+                                  Rxn('Methyl_linoleate + Water  -> Methanol + Linoleic_acid','Methyl_linoleate', X = X_hydrolysis),
+                                  # Rxn('Methyl_palmitoleate + Water  -> Methanol + Palmitoleic_acid','Methyl_palmitoleate', X = 0.1),
+                                  ])
+                                  # Rxn('Methyl_oleate + Water  -> Methanol + Oleic_acid','Methyl_oleate', X = 0.1)])
         self.reactions = RxnSys(Product_formation)
         
     # def _design(self):

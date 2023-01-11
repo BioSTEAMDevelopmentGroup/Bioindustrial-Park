@@ -9,7 +9,7 @@ import thermosteam as tmo
 from thermosteam import functional as fn
 from chemicals import atoms_to_Hill
 import thermosteam as tmo
-from thermosteam import Chemical
+from thermosteam import Chemicals
 from thermo import TDependentProperty
 
 
@@ -17,9 +17,7 @@ from thermo import TDependentProperty
 # Biodiesel = chemical_database('Methyl_oleate', phase = 'l')
 # # available methods are {'ROWLINSON_POLING', 'DADGOSTAR_SHAW', 'ROWLINSON_BONDI'}
 # Biodiesel.Cn.method = 'ROWLINSON_BONDI'
-
-##All the TAGs are based on Ruiz-Gutiérrez et. al (1998)
-# chems is the object containing all chemicals used in this biorefinery
+# chems is a list of all the chemicals used in this biorefinery
 Cobalt_chloride = tmo.Chemical('Cobalt_chloride',
                                 search_ID = '7646-79-9',
                                 phase = 's')    
@@ -29,17 +27,17 @@ Hydrogen = tmo.Chemical('Hydrogen',phase = 'l')
 
 chems = tmo.Chemicals([
     #Dihydroxylation chemicals
-    tmo.Chemical('Hydrogen_peroxide', phase='l'),
-    tmo.Chemical('Water'),
-    # #Chemical for acid degumming 
-    tmo.Chemical('Citric_acid'),
-    
+        tmo.Chemical('Hydrogen_peroxide', phase='l'),
+        tmo.Chemical('Water'),
+        # #Chemical for acid degumming 
+        tmo.Chemical('Citric_acid'),
+        
 #TODO: look into phase of the below
-    tmo.Chemical('MDHSA', 
+        tmo.Chemical('MDHSA', 
                  search_ID = '1115-01-1', 
                  phase = 'l'),
 #Ref for dihydroxy_palmitic_acid: https://www.chemsrc.com/en/cas/29242-09-9_803992.html    
-    tmo.Chemical('Dihydroxy_palmitic_acid',
+        tmo.Chemical('Dihydroxy_palmitic_acid',
                  search_ID = '29242-09-9',
                  search_db = False,
                  Tb = 458 + 273.15,
@@ -47,7 +45,7 @@ chems = tmo.Chemicals([
                  phase = 'l'
                  ),
 #Ref for tetrahydroxy_octadecanoic_acid: https://www.chemsrc.com/en/cas/541-82-2_148112.html
-    tmo.Chemical('Tetrahydroxy_octadecanoic_acid',
+        tmo.Chemical('Tetrahydroxy_octadecanoic_acid',
                  search_ID = '541-82-2', 
                  search_db = False, 
                  Tb = 583.1+273.15,
@@ -55,83 +53,83 @@ chems = tmo.Chemicals([
                  phase = 'l'),
     
 # Products of oxidative_cleavage
-    tmo.Chemical('Monomethyl_azelate'),
-    tmo.Chemical('Suberic_acid'),
-    tmo.Chemical('Caprylic_acid'),
-    tmo.Chemical('Hexanoic_acid'),
-    tmo.Chemical('Heptanoic_acid'),
-    tmo.Chemical('Hexanoic_acid'),
-    tmo.Chemical('Malonic_acid'),
-    tmo.Chemical('Pelargonic_acid'),
-    
+        tmo.Chemical('Monomethyl_azelate'),
+        tmo.Chemical('Suberic_acid'),
+        tmo.Chemical('Caprylic_acid'),
+        tmo.Chemical('Hexanoic_acid'),
+        tmo.Chemical('Heptanoic_acid'),
+        tmo.Chemical('Hexanoic_acid'),
+        tmo.Chemical('Malonic_acid'),
+        tmo.Chemical('Pelargonic_acid'),
+        
 # Products of hydrolysis
-    tmo.Chemical('Palmitic_acid'),
-    tmo.Chemical('Stearic_acid'),
-    tmo.Chemical('Oleic_acid'),
-    tmo.Chemical('Linoleic_acid', search_ID = '60-33-3'),
-    tmo.Chemical('Palmitoleic_acid', search_ID = '373-49-9'),
+        tmo.Chemical('Palmitic_acid'),
+        tmo.Chemical('Stearic_acid'),
+        tmo.Chemical('Oleic_acid'),
+        tmo.Chemical('Linoleic_acid', search_ID = '60-33-3'),
+        tmo.Chemical('Palmitoleic_acid', search_ID = '373-49-9'),
 #TODO:should I set the phase or not?    
-    tmo.Chemical('Azelaic_acid', phase = 's'),
+        tmo.Chemical('Azelaic_acid', phase = 's'),
 
 # Oxidants used and other gaseous products
-    tmo.Chemical('Nitrogen'),
-    tmo.Chemical('Oxygen'),
-    tmo.Chemical('Carbon_dioxide'),
-    tmo.Chemical('Methanol'),
-    tmo.Chemical('Glycerol', rho = 1261.3, phase = 'l'),
-    tmo.Chemical('Sodium_methoxide',formula ='NaOCH3'),
+        tmo.Chemical('Nitrogen'),
+        tmo.Chemical('Oxygen'),
+        tmo.Chemical('Carbon_dioxide'),
+        tmo.Chemical('Methanol'),
+        tmo.Chemical('Glycerol', rho = 1261.3, phase = 'l'),
+        tmo.Chemical('Sodium_methoxide',formula ='NaOCH3'),
    
 ###All the chemicals related to TAGs in HOSO
-    tmo.Chemical('OOO', search_ID = '122-32-7'),
-    tmo.Chemical('LLL', search_ID = '537-40-6'),
-    
-    tmo.Chemical('OOL',
+        tmo.Chemical('OOO', search_ID = '122-32-7'),
+        tmo.Chemical('LLL', search_ID = '537-40-6'),
+        
+        tmo.Chemical('OOL',
                  search_ID = '104485-08-7',
                  phase ='l',
                  search_db = False),
     
-    tmo.Chemical('LLO', 
-                 search_ID = '2190-22-9',
-                 phase = 'l',
-                 search_db = False),
+        tmo.Chemical('LLO', 
+                     search_ID = '2190-22-9',
+                     phase = 'l',
+                     search_db = False),
     
-    tmo.Chemical('SOO',
+        tmo.Chemical('SOO',
                  search_ID = '79517-06-9',
                  phase ='l',
                  search_db = False),
     
-    tmo.Chemical('PLO', 
+        tmo.Chemical('PLO', 
                  search_ID = '2680-59-3',
                  phase = 'l',
                  search_db = False),
       
-    tmo.Chemical('PoOO',
+        tmo.Chemical('PoOO',
                  search_ID = 'PubChem= 9544083',
                  phase ='l',
                  search_db = False),
 
-    tmo.Chemical('POO',
+        tmo.Chemical('POO',
                  search_ID = '',
                  phase ='l',
                  search_db = False),
     
-    tmo.Chemical('POS', 
+        tmo.Chemical('POS', 
                  search_ID = 'PubChem = 129723993',
                  phase = 'l',
                  search_db = False),
     
-    tmo.Chemical('POP',
+        tmo.Chemical('POP',
                  search_ID = '2190-25-2',
                  phase ='l',
                  search_db = False),
     
-    tmo.Chemical('PLS',
+        tmo.Chemical('PLS',
                  search_ID = 'PubChem = 102332193',
                  phase ='l',
                  search_db = False),
     
 ##chemical for representing phospholipids, taken directly from lipidcane biorefinery
-    tmo.Chemical('Phosphatidylinositol', 
+        tmo.Chemical('Phosphatidylinositol', 
                  formula='C47H83O13P',
                      search_db=False, 
                      CAS='383907-36-6',
@@ -140,23 +138,23 @@ chems = tmo.Chemicals([
                      phase='l'),
   
 ##All the chemicals that go in the Biodiesel
-    tmo.Chemical('Methyl_oleate', phase = 'l'),
-    tmo.Chemical('Methyl_palmitate', phase = 'l'),
-    tmo.Chemical('Methyl_stearate', phase = 'l'),
-    tmo.Chemical('Methyl_linoleate', phase = 'l'), 
-    tmo.Chemical('Methyl_palmitoleate',search_ID ='1120-25-8',
+        tmo.Chemical('Methyl_oleate', phase = 'l'),
+        tmo.Chemical('Methyl_palmitate', phase = 'l'),
+        tmo.Chemical('Methyl_stearate', phase = 'l'),
+        tmo.Chemical('Methyl_linoleate', phase = 'l'), 
+        tmo.Chemical('Methyl_palmitoleate',search_ID ='1120-25-8',
                                        phase = 'l'),
      
 ## Catalyst data    
 ## Tungstic_acid boiling point: https://en.wikipedia.org/wiki/Tungstic_acid
 ## TODO: Ask Yoel about the phase of tungstic acid
-    tmo.Chemical('Tungstic_acid', 
+        tmo.Chemical('Tungstic_acid', 
                   Tb = 1746, 
                   phase = 's', 
                   Hvap=Tungsten.Hvap,
                   Psat=Tungsten.Psat,
                   default = True),
-    tmo.Chemical('Tungstate_ion',
+        tmo.Chemical('Tungstate_ion',
                  search_db = False,
                  CAS = '12737-86-9',
                  Hvap=Tungsten.Hvap,
@@ -166,23 +164,23 @@ chems = tmo.Chemicals([
                  phase = 'l',
                  Tb = Tungsten.Tb
                  ),
-    tmo.Chemical('Hydrogen_ion',
+        tmo.Chemical('Hydrogen_ion',
                  Tb = Hydrogen.Tb,
                  phase = 'l',
                  ),    
 ## TODO: GWP data for cobalt acetate missing, figure it out 
 ## cobalt_acetate_tetrahydrate Tb: 
-    Cobalt_chloride,
-    tmo.Chemical('Cobalt_acetate_tetrahydrate',
+        Cobalt_chloride,
+        tmo.Chemical('Cobalt_acetate_tetrahydrate',
                  search_ID = '6147-53-1',
                  Tb = 117.1+273.15, 
                  phase = 's',
                  Hvap=Cobalt_chloride.Hvap,
                  Psat=Cobalt_chloride.Psat,
                  default=True),
-    tmo.Chemical('Acetate_ion', phase = 'l', search_ID = '71-50-1'),
-## TODO: defaulting the below to water for now, maybe look for a better assumption
-    tmo.Chemical('Cobalt(2+)',
+        tmo.Chemical('Acetate_ion', phase = 'l', search_ID = '71-50-1'),
+##  TODO: defaulting the below to water for now, maybe look for a better assumption
+        tmo.Chemical('Cobalt(2+)',
                  Hvap=Cobalt.Hvap,
                  Psat=Cobalt.Psat,
                  phase = 'l',
@@ -194,27 +192,27 @@ chems = tmo.Chemicals([
     ##https://www.chemsrc.com/en/cas/39389-20-3_843683.html#:~:text=amberlyst%28r%29%2015%20CAS%20Number%3A%2039389-20-3%3A%20Molecular%20Weight%3A%20314.39900%3A,Point%3A%20266.3%C2%BAC%3A%20Symbol%3A%20GHS07%3A%20Signal%20Word%3A%20Warning%20%C3%97
     
     ##Resin for hydrolysis
-    tmo.Chemical('polystyrene_based_catalyst',
+        tmo.Chemical('polystyrene_based_catalyst',
                  search_db=False,
                  Tb = 516.7+273.15,
                  phase = 's',
                  default=True),
     ##For catalyst recovery chemicals required
-    tmo.Chemical('Calcium_hydroxide',
+        tmo.Chemical('Calcium_hydroxide',
                  phase = 's',
                  default = True),
-    tmo.Chemical('Calcium_chloride'),    
-    tmo.Chemical.blank('Calcium_tungstate',
+        tmo.Chemical('Calcium_chloride'),    
+        tmo.Chemical.blank('Calcium_tungstate',
                        CAS = '7790-75-2',
                        MW = 287.92,
                        Tb = Tungsten.Tb,   
                        phase = 's',
                        formula = 'CaWO4'),
     
-    tmo.Chemical('Calcium_acetate',                      
-                  phase = 'l'),
+        tmo.Chemical('Calcium_acetate',                      
+                     phase = 'l'),
     
-    tmo.Chemical('Cobalt_hydroxide',                      
+        tmo.Chemical('Cobalt_hydroxide',                      
                   phase = 's'),
     
     
@@ -223,32 +221,32 @@ chems = tmo.Chemicals([
     #                                            search_ID = '98-70-4',
     #                                            )
     ##Hence using polystyrene
-    tmo.Chemical('Polystyrene', phase = 's'),
+        tmo.Chemical('Polystyrene', phase = 's'),
     
 ##For imported lipidcane module compatibility
-    tmo.Chemical('MonoOlein',search_ID = '111-03-5'),
-    # tmo.Chemical('DiOlein',search_ID = 'PubChem = 6505653'),
-    tmo.Chemical('Dipalmitin'),
-    tmo.Chemical('Monopalmitin'),
+        tmo.Chemical('MonoOlein',search_ID = '111-03-5'),
+        # tmo.Chemical('DiOlein',search_ID = 'PubChem = 6505653'),
+        tmo.Chemical('Dipalmitin'),
+        tmo.Chemical('Monopalmitin'),
     
     #Below TAG's not a part of the database    
-    tmo.Chemical('OOL',
+        tmo.Chemical('OOL',
                  search_ID = '104485-08-7',
                  phase ='l',
                  search_db = False),
     
-    tmo.Chemical('LLO', 
+        tmo.Chemical('LLO', 
                  search_ID = '2190-22-9',
                  phase = 'l',
                  search_db = False),
 #Natural gas for heating purposes 
-    tmo.Chemical('Natural_gas',
+        tmo.Chemical('Natural_gas',
                  search_ID = 'CH4'),
 #Solvent for countercurrent extraction of azelaic acid
-    tmo.Chemical('Octane'),
-    tmo.Chemical('Cycloheptane'),
-    tmo.Chemical('Bicyclo_octane',search_ID = '6221-55-2'),
-    tmo.Chemical('Toluene')
+        tmo.Chemical('Octane'),
+        tmo.Chemical('Cycloheptane'),
+        tmo.Chemical('Bicyclo_octane',search_ID = '6221-55-2'),
+        tmo.Chemical('Toluene')
     
                  ])
 #Fitting data for MMA
@@ -405,5 +403,5 @@ chems.set_synonym('Dipalmitin', 'DAG')
 chems.set_synonym('Cobalt(2+)','Cobalt_ion')
 chems.set_synonym('Hydrogen_ion', 'H+')
 chems.set_synonym('Pelargonic_acid','Nonanoic_acid')
-bst.settings.set_thermo(chems)
 # chems.show()
+# bst.settings.set_thermo(chems, cache= True)
