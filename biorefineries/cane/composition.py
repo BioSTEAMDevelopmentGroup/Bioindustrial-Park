@@ -96,7 +96,7 @@ def set_lipid_fraction(lipid_fraction, stream=None,
     imass[lipid_IDs] = r_mass_lipid * z_mass_lipid * F_mass
     imass[carbs_IDs] = r_mass_carbs * z_mass_carbs * F_mass
     imass[fiber_IDs] = r_mass_fiber * z_mass_fiber * F_mass
-    if any(stream.mol < 0):
+    if stream.mol.has_negatives():
         raise ValueError(f'lipid cane oil composition of {z_mass_lipid/z_dry*100:.0f}% dry weight is infeasible')
 
 def set_sugarcane_composition(stream, water, fiber, sugar):
