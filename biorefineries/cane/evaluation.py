@@ -150,7 +150,7 @@ def run_uncertainty_and_sensitivity(name, N, rule='L',
                                     **kwargs):
     filterwarnings('ignore', category=bst.exceptions.DesignWarning)
     filterwarnings('ignore', category=bst.exceptions.CostWarning)
-    br = cane.Biorefinery(name, cache=None, **kwargs)
+    br = cane.Biorefinery(name, **kwargs)
     file = monte_carlo_file(name, across_lines, across_oil_content)
     N_notify = min(int(N/10), 20)
     autosave = N_notify if autosave else False
@@ -228,7 +228,7 @@ def run_uncertainty_and_sensitivity(name, N, rule='L',
             br_sugarcane.model.metrics = [br_sugarcane.ROI]
             br_sugarcane.model.load_samples(samples)
         br.model.load_samples(samples, optimize=optimize)
-        
+        br.model.retry_evaluation = True
         @no_derivative
         def evaluate(**kwargs):
             oil_content = int(100 * br.composition_specification.oil)

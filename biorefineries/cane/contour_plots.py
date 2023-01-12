@@ -223,6 +223,7 @@ def plot_metrics_across_composition(
     if configuration is None: configuration = 'O2'
     metric_indices=[0, 6]
     MFPP = cane.all_metric_mockups[0] # Maximum feedstock purchase price
+    cane.all_metric_mockups
     # BP = cane.all_metric_mockups[2] # Biodiesel production
     EP = cane.all_metric_mockups[6] # Energy production
     X, Y, Z, data = metrics_across_oil_and_fiber_content(configuration, load)

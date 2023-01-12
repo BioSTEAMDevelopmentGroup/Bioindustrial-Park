@@ -1082,7 +1082,8 @@ def plot_competitive_microbial_oil_yield_across_oil_content(
     ):
     if configuration is None: configuration = 'O6'
     file = monte_carlo_file(configuration, across_lines=False, across_oil_content='microbial oil vs bioethanol')
-    df = pd.read_excel(file, sheet_name=features.competitive_oilcane_biomass_yield.short_description, index_col=0)
+    df = pd.read_excel(file, sheet_name=features.competitive_microbial_oil_yield.short_description, index_col=0)
+    df = df.dropna(axis=0)
     fig = plt.figure()
     oil_fraction = np.array(df.columns) * 100
     plt.ylabel('Competitive microbial oil yield [wt %]')

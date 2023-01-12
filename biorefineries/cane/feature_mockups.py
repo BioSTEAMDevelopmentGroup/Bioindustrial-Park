@@ -76,7 +76,7 @@ from biosteam import MockFeature
  TCI_derivative, GWP_economic_derivative, 
  GWP_ethanol_derivative, GWP_biodiesel_derivative,
  GWP_crude_glycerol_derivative, GWP_electricity_derivative,
- competitive_oilcane_biomass_yield,
+ competitive_oilcane_biomass_yield, competitive_microbial_oil_yield,
  ) = all_metric_mockups = (
     MockFeature('MFPP', 'USD/MT', 'Biorefinery'),
     MockFeature('Feedstock consumption', 'MT/yr', 'Biorefinery'),
@@ -111,7 +111,8 @@ from biosteam import MockFeature
     MockFeature('Biodiesel GWP derivative', 'kg*CO2*eq / L', 'Biodiesel'),
     MockFeature('Crude glycerol GWP derivative', 'kg*CO2*eq / kg', 'Crude glycerol'),
     MockFeature('Electricity GWP derivative', 'kg*CO2*eq / MWhr', 'Electricity'),
-    MockFeature('Competitive oilcane biomass yield', '% sugarcane', 'Biorefinery')
+    MockFeature('Competitive oilcane biomass yield', '% sugarcane', 'Biorefinery'),
+    MockFeature('Competitive microbial oil yield', 'wt. %', 'Biorefinery'),
 )
 
 tea_monte_carlo_metric_mockups = (

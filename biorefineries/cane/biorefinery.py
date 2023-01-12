@@ -289,7 +289,7 @@ class Biorefinery:
                     self.bagasse_splitter = splitter
                     minimum_fraction_burned = 0
                     maximum_fraction_burned = 0.7
-                    recycle_data = {}
+                    self.recycle_data = recycle_data = {}
                     @cane_sys.add_bounded_numerical_specification(
                         x0=minimum_fraction_burned, x1=maximum_fraction_burned, 
                         xtol=1e-4, ytol=100, args=(splitter,)
@@ -1262,6 +1262,10 @@ class Biorefinery:
         self.__dict__.update(flowsheet.to_dict())
         if feedstock_line: self.set_feedstock_line(feedstock_line)
         if cache is not None: cache[key] = self
+        
+        # Avoid erros in Monte Carlo of microbial oil production with huge cell
+        # mass production
+        flowsheet(bst.SludgeCentrifuge).strict_moisture_content = False
         
         ## Simulation
         sys.simulate()
