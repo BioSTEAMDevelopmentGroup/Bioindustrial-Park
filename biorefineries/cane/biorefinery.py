@@ -172,6 +172,7 @@ class Biorefinery:
     set_feedstock_line = set_line_composition_parameters
     default_prices_correleted_to_crude_oil = False
     default_year = 2022
+    baseline_moisture_content = 0.70
     
     @property
     def chemicals(self):
@@ -195,7 +196,13 @@ class Biorefinery:
         # and 90% is based on productivity (a function of height)
         feedstock = self.feedstock
         baseline_dry_biomass_yield = self.baseline_dry_biomass_yield
-        f = baseline_dry_biomass_yield / dry_biomass_yield
+        baseline_moisture_content = self.baseline_moisture_content
+        f_yield = baseline_dry_biomass_yield / dry_biomass_yield
+        moisture_content = feedstock.get_mass_fraction('Water')
+        dry_content = 1. - moisture_content
+        baseline_dry_content = 1. - baseline_moisture_content
+        f_dry = dry_content / baseline_dry_content
+        f = f_yield * f_dry
         feedstock.price = (0.9 * f + 0.10) * 0.035
         # Make the same assumption for the cane feedstock (subject to change).
         feedstock.set_CF(
@@ -1170,34 +1177,61 @@ class Biorefinery:
         def ROI():
             return 100. * tea.ROI
         
-        def competitive_oilcane_biomass_yield_objective(biomass_yield):
-            self.update_dry_biomass_yield(biomass_yield * self.baseline_dry_biomass_yield)
-            return tea.ROI - self.ROI_oilcane_target
+        def competitive_oilcane_biomass_yield_objective(biomass_yield, target):
+            self.update_dry_biomass_yield(biomass_yield)
+            return tea.ROI - target
         
-        @metric(name='Competitive oilcane biomass yield', element='Biorefinery', units='% sugarcane')
-        def competitive_oilcane_biomass_yield():
-            if self.ROI_oilcane_target is None: return np.nan
-            if composition_specification.oil == 0: return 100.
+        @metric(name='Competitive biomass yield', element='Feedstock', units='dry MT/hc')
+        def competitive_biomass_yield():
+            if self.ROI_target is None: return np.nan
+            if composition_specification.oil == 0: return self.baseline_dry_biomass_yield
             f = competitive_oilcane_biomass_yield_objective
-            x0 = 0.1
-            x1 = 3
-            if (y0:=f(x0)) > 0. or (y1:=f(x1)) < 0.:
+            x0 = 0.1 * self.baseline_dry_biomass_yield
+            x1 = 3 * self.baseline_dry_biomass_yield
+            args = (self.ROI_target,)
+            if (y0:=f(x0, *args)) > 0. or (y1:=f(x1, *args)) < 0.:
                 return np.nan
             else:
-                return 100. * flx.IQ_interpolation(
-                    f, x0, x1, y0, y1,
+                return flx.IQ_interpolation(
+                    f, x0, x1, y0, y1, args=args
                 )
+        
+        @metric(name='Energy competitive biomass yield', element='Feedstock', units='dry MT/hc')
+        def energy_competitive_biomass_yield():
+            if self.net_energy_target is None: return np.nan
+            NEP_target = self.net_energy_target
+            if composition_specification.oil == 0: return 100.
+            NEP = net_energy_production.cache
+            return self.baseline_dry_biomass_yield * NEP / NEP_target  
             
-        def competitive_microbial_oil_yield_objective(microbial_oil_yield):
+        def competitive_microbial_oil_yield_objective(microbial_oil_yield, target):
             self.update_dry_biomass_yield(self.baseline_dry_biomass_yield)
             set_glucose_to_microbial_oil_yield.setter(microbial_oil_yield)
             set_xylose_to_microbial_oil_yield.setter(microbial_oil_yield)
             self.sys.simulate()
-            return tea.ROI - self.ROI_microbial_oil_target
+            return tea.ROI - target
         
-        @metric(name='Competitive microbial oil yield', element='Biorefinery', units='wt. %')
+        @metric(name='Competitive microbial oil yield', element='Feedstock', units='wt. %')
         def competitive_microbial_oil_yield():
-            if self.ROI_microbial_oil_target is None: return np.nan
+            if self.ROI_target is None: return np.nan
+            f = competitive_microbial_oil_yield_objective
+            x0 = 20
+            x1 = 95
+            args = (self.ROI_target,)
+            if (y0:=f(x0, *args)) > 0. or (y1:=f(x1, *args)) < 0.:
+                return np.nan
+            else:
+                flx.IQ_interpolation(
+                    f, x0, x1, y0, y1, xtol=1e-2, ytol=1e-3, args=args,
+                )
+                if number in cellulosic_oil_configurations:
+                    return 100. * fermentor.cofermentation[0].product_yield(product='TriOlein', basis='wt')
+                elif number in oil_configurations:
+                    return 100. * fermentor.fermentation_reaction[0].product_yield(product='TriOlein', basis='wt')
+        
+        @metric(name='Energy competitive microbial oil yield', element='Feedstock', units='wt. %')
+        def energy_competitive_microbial_yield():
+            if self.net_energy_target is None: return np.nan
             f = competitive_microbial_oil_yield_objective
             x0 = 20
             x1 = 95
@@ -1205,13 +1239,13 @@ class Biorefinery:
                 return np.nan
             else:
                 flx.IQ_interpolation(
-                    f, x0, x1, y0, y1, xtol=1e-2, ytol=1e-3,
+                    f, x0, x1, y0, y1, xtol=1e-2, ytol=1e-3, args=(self.ROI_target,)
                 )
                 if number in cellulosic_oil_configurations:
                     return 100. * fermentor.cofermentation[0].product_yield(product='TriOlein', basis='wt')
                 elif number in oil_configurations:
                     return 100. * fermentor.fermentation_reaction[0].product_yield(product='TriOlein', basis='wt')
-            
+        
         # Single point evaluation for detailed design results
         def set_baseline(p, x=None):
             if x is None:
@@ -1257,15 +1291,16 @@ class Biorefinery:
         self.configuration = configuration
         self.composition_specification = composition_specification
         self.oil_extraction_specification = oil_extraction_specification
-        self.ROI_oilcane_target = None
-        self.ROI_microbial_oil_target = None
+        self.ROI_target = None
+        self.net_energy_target = None
         self.__dict__.update(flowsheet.to_dict())
         if feedstock_line: self.set_feedstock_line(feedstock_line)
         if cache is not None: cache[key] = self
         
         # Avoid erros in Monte Carlo of microbial oil production with huge cell
         # mass production
-        flowsheet(bst.SludgeCentrifuge).strict_moisture_content = False
+        if number in cellulosic_configurations:
+            flowsheet(bst.SludgeCentrifuge).strict_moisture_content = False
         
         ## Simulation
         sys.simulate()

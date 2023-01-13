@@ -221,11 +221,8 @@ def plot_metrics_across_composition(
         cmap=None, smooth=None,
     ):
     if configuration is None: configuration = 'O2'
-    metric_indices=[0, 6]
-    MFPP = cane.all_metric_mockups[0] # Maximum feedstock purchase price
-    cane.all_metric_mockups
-    # BP = cane.all_metric_mockups[2] # Biodiesel production
-    EP = cane.all_metric_mockups[6] # Energy production
+    metrics = COBY, NEP = [cane.competitive_oilcane_biomass_yield, cane.net_energy_production]
+    metric_indices = [cane.all_metric_mockups.index(i) for i in metrics] 
     X, Y, Z, data = metrics_across_oil_and_fiber_content(configuration, load)
     data = data[:, :, :, metric_indices]
     xticks = [0,   1,   2,   3,   4,   5]
@@ -244,9 +241,9 @@ def plot_metrics_across_composition(
     ylabel = "Fiber content [dry wt. %]"
     if titles is None: titles = np.array(['60% moisture', '65% moisture', '70% moisture'])
     metric_bars = [
-        MetricBar(MFPP.name, format_units(MFPP.units), colormaps[0], tickmarks(data[:, :, 0, :], 5, 1, expand=0, p=0.5), 18, 1),
+        MetricBar(COBY.name, format_units(COBY.units), colormaps[0], tickmarks(data[:, :, 0, :], 5, 1, expand=0, p=0.5), 18, 1),
         # MetricBar('Biod. prod.', format_units(BP.units), plt.cm.get_cmap('copper'), tickmarks(data[:, :, 1, :], 8, 1, expand=0, p=0.5), 10, 1),
-        MetricBar(EP.name, format_units(EP.units), colormaps[2], tickmarks(data[:, :, 1, :], 5, 1, expand=0, p=2), 20, 1),
+        MetricBar(NEP.name, format_units(NEP.units), colormaps[2], tickmarks(data[:, :, 1, :], 5, 1, expand=0, p=2), 20, 1),
     ]
     fig, axes, CSs, CB = plot_contour_2d(
         100.*X[:, :, 0], 100.*Y[:, :, 0], titles, data, xlabel, ylabel, xticks, yticks, metric_bars, 
