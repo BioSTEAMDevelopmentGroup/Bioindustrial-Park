@@ -151,9 +151,10 @@ class HydrolysisReactor(bst.CSTR):
         Product_formation = PRxn([Rxn('Monomethyl_azelate + Water  -> Methanol + Azelaic_acid','Monomethyl_azelate', X = X_hydrolysis ),
                                   Rxn('Methyl_palmitate + Water  -> Methanol + Palmitic_acid','Methyl_palmitate', X = X_hydrolysis ),
                                   Rxn('Methyl_stearate + Water  -> Methanol + Stearic_acid','Methyl_stearate', X = X_hydrolysis),
-                                  Rxn('Methyl_linoleate + Water  -> Methanol + Linoleic_acid','Methyl_linoleate', X = X_hydrolysis),
-                                  Rxn('Methyl_palmitoleate + Water  -> Methanol + Palmitoleic_acid','Methyl_palmitoleate', X = 0.1),                                  
-                                  Rxn('Methyl_oleate + Water  -> Methanol + Oleic_acid','Methyl_oleate', X = 0.1)])
+                                  Rxn('Methyl_linoleate + Water  -> Methanol + Linoleic_acid','Methyl_linoleate', X = X_hydrolysis)])
+                                  #Rxn('Methyl_palmitoleate + Water  -> Methanol + Palmitoleic_acid','Methyl_palmitoleate', X = 0.1), #Perhaps this can be ignored
+                                  
+                                  #Rxn('Methyl_oleate + Water  -> Methanol + Oleic_acid','Methyl_oleate', X = 0.1)])#Ignored, possible method for hydrolysis pdf doesn't dicuss these two reactions
         self.reactions = RxnSys(Product_formation)
       
     def _run(self):
@@ -167,7 +168,7 @@ class HydrolysisReactor(bst.CSTR):
             effluent.copy_like(ms['l'])    
 
 @cost(basis = 'Cooling area',
-      ID = 'SolidsFlaker',
+      ID = 'Solids',
       units='m^2', 
       cost=175000*2.75,
       CE=100,
@@ -296,8 +297,47 @@ class Acid_precipitation_reactor(bst.CSTR):
         #https://thermosteam.readthedocs.io/en/latest/_modules/thermosteam/_stream.html#Stream.copy_like
         self.reactions(effluent)
         effluent.P = self.P
+        
+# #TODO: this works when I pass a stream separately and simulate it
+# # 1L of resin can exchange 1800 moles
+# # required amount of resin in L is total_moles/1800  of resin
+# # density of the resin is: 1.28*density of air ref:https://www.sigmaaldrich.com/US/en/product/supelco/10322
+# # density of resin(g/L): 1.28*1.29 = 1.65
+# # grams of resin required = total_moles/1800 
+# # for a cylindrical tower with a csa of 5m2 with a radius 2.23m ref: rules of thumb 
+# # Cost of resin required: https://samcotech.com/how-much-does-it-cost-to-buy-maintain-and-dispose-of-ion-exchange-resins/ 
+#     Total_volume_of_resin = total_moles/1800
+#     height_of_the_cylinder = Total_volume_of_resin/(3.14* 5)
+#     total_height = height_of_the_cylinder + 2.5
+# # regenerant equivalents = 100/36.5    
+# # regenerant ratio = 2.7*100/1.8 = 152%, this is the suggested excess ref: http://www.dardel.info/IX/processes/regeneration.html
+# # CSA assumed: 5m2 Ref: rule of thumb book
+# # Cost of acid: same as price of HCl
+# #Amount of acid required for regeneration: 50g*Volume of resin
+# #TODO: ask Yoel what to do about the acid stream
+#     Total_amount_of_acid_in_Kg = 50*Total_volume_of_resin/1000
 
-class HydrolysisSystem(bst.Unit):
+# Cost of a strong cation exchanger resin: https://samcotech.com/how-much-does-it-cost-to-buy-maintain-and-dispose-of-ion-exchange-resins/
+# @cost(basis = 'Total_volume_of_resin',
+#       ID = 'HydrolysisSystem',
+#       units='L', 
+#       cost =130,#$40 to $200 per cubic foot
+#       S=28.31,
+#       n=1
+#       )
+#TODO: add lifetime and annual = 1
+# #Cost of acid needed for regeneration
+# @cost(basis = 'Total_mass_of_acid',
+#       ID = 'HydrolysisSystem',
+#       units='Kg', 
+#       cost=0.205,#Based on the price given in lipidcan._process_settings
+#       n=1,
+#       S=1,
+#       )
+class HydrolysisSystem(bst.Unit,isabstract = True):
+    _units = {'Total_volume_of_resin': 'L',
+              'Total_mass_of_acid': 'Kg'
+              }
     _N_ins = 1
     _N_outs = 7
     
@@ -318,13 +358,18 @@ class HydrolysisSystem(bst.Unit):
                  P: Optional[float]=None, #all the three reactors run at the same pressure P
                  tau = None,#all the three reactors and holding tanks run at the same residence time tau (30 mins of regeneration time and 6 hours of reaction time)
                  V_max: Optional[float]=None,#all the three reactors have the same V_max
+                 # Total_volume_of_resin = None,
+                 # Total_mass_of_acid = None                 
                  ):
-        Unit.__init__(self, ID='', ins=(), outs=(), thermo=None)
+        Unit.__init__(self, ID, ins, outs, thermo)
+        
         self.T= T
         self.P= P
         self.tau= tau
         self.V_max = V_max 
-        self.hydrolysis_column_1 = hydrolysis_column_1 = HydrolysisReactor(None, ins =(),
+        # self.Total_volume_of_resin = Total_volume_of_resin 
+        # self.Total_mass_of_acid = Total_mass_of_acid  
+        self.hydrolysis_column_1 = hydrolysis_column_1 = HydrolysisReactor(None, ins = (),
                                                                            outs = ('methanol_water_mixture_for_separation',
                                                                                    'organic_mixture_to_next_reactor'),
                                                                            T = self.T,
@@ -355,11 +400,31 @@ class HydrolysisSystem(bst.Unit):
                                                                                  tau = self.tau, #considers regeneration time,
                                                                                  P = self.P)
         self.distillation_column_3 = bst.BinaryDistillation(None,ins = hydrolysis_column_3-1,  LHK = ('Methanol','Water'),Lr = 0.999, Hr = 0.999,   k = 2)
+       
+        # fatty_ester_feed, = self.ins
+        # fatty_ester_feed.show()
+        # tops_1,bottoms_1,tops_2,bottoms_2,tops_3,bottoms_3,organic_mixture, = self.outs            
+        # self.hydrolysis_column_1.ins[0].copy_like(fatty_ester_feed)
+        # self.hydrolysis_column_1.simulate()  
+        # self.distillation_column_1.simulate()
+        # tops_1.copy_like(self.distillation_column_1.outs[0])
+        # bottoms_1.copy_like(self.distillation_column_1.outs[1]) 
+        # self.holding_tank_1.simulate() 
+        # self.hydrolysis_column_2.simulate()
+        # self.distillation_column_2.simulate()
+        # tops_2.copy_like(self.distillation_column_2.outs[0])
+        # bottoms_2.copy_like(self.distillation_column_2.outs[1])
+        # self.holding_tank_2.simulate()
+        # self.hydrolysis_column_3.simulate()
+        # self.distillation_column_3.simulate()
+        # tops_3.copy_like(self.distillation_column_2.outs[0])
+        # bottoms_3.copy_like(self.distillation_column_2.outs[1])
+        # organic_mixture.copy_like(self.hydrolysis_column_3.outs[1])
         
-
 #Distillation columns for separating out methanol water     
     def _run(self):
             fatty_ester_feed, = self.ins
+            fatty_ester_feed.show()            
             tops_1,bottoms_1,tops_2,bottoms_2,tops_3,bottoms_3,organic_mixture, = self.outs            
             self.hydrolysis_column_1.ins[0].copy_like(fatty_ester_feed)
             self.hydrolysis_column_1.simulate()  
@@ -377,3 +442,7 @@ class HydrolysisSystem(bst.Unit):
             tops_3.copy_like(self.distillation_column_2.outs[0])
             bottoms_3.copy_like(self.distillation_column_2.outs[1])
             organic_mixture.copy_like(self.hydrolysis_column_3.outs[1])
+            
+    # def _design(self):
+    #             self.design_results['Total_volume_of_resin']= self.Total_volume_of_resin
+    #             self.design_results['Total_mass_of_acid']= self.Total_mass_of_acid

@@ -68,8 +68,7 @@ chems = tmo.Chemicals([
         tmo.Chemical('Oleic_acid'),
         tmo.Chemical('Linoleic_acid', search_ID = '60-33-3'),
         tmo.Chemical('Palmitoleic_acid', search_ID = '373-49-9'),
-#TODO:should I set the phase or not?    
-        tmo.Chemical('Azelaic_acid', phase = 's'),
+        tmo.Chemical('Azelaic_acid'),
 
 # Oxidants used and other gaseous products
         tmo.Chemical('Nitrogen'),
@@ -338,7 +337,23 @@ chems['Tetrahydroxy_octadecanoic_acid'].copy_models_from(chems['MDHSA'],
                                                           'mu'
                                                           ])
 # chems['Tetrahydroxy_octadecanoic_acid'].Cn.method = 'LASTOVKA_S'
+Dortmund_1 = chems['Methyl_palmitoleate'].Dortmund
+Dict = {'CH3': 2,
+        'CH2': 11,
+        'CH2COO': 1,
+        'CH=CH' : 1}
+Dortmund_1.set_group_counts_by_name(Dict)
 
+# Dortmund_2 = chems['Nitrogen'].Dortmund
+# Dict = {'N':2}
+# Dortmund_2.set_group_counts_by_name(Dict)
+
+# Dortmund_1 = chems['Methyl_palmitoleate'].Dortmund
+# Dict = {'CH3': 2,
+#         'CH2': 11,
+#         'CH2COO': 1,
+#         'CH=CH' : 1}
+# Dortmund_1.set_group_counts_by_name(Dict)
 
 #TODO.xxx check if Psat from liquid methanol is a good idea
 def create_new_chemical(ID, phase='s', **constants):

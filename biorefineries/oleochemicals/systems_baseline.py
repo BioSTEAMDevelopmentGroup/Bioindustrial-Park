@@ -279,7 +279,7 @@ ob1 = dihydroxylation_system(ins = (bst.Stream(ID='fresh_HP',
                                                units = 'kg/hr'),
                                     bst.Stream(ID = 'fresh_tungsten_catalyst',
                                                Tungstic_acid = 1,
-                                               characterization_factors= ({'GWP100':6.85*10000/1000 })),#Value for tungstic acid was unavailable, therefore tungsten carbide value was assumed Ref: http://dx.doi.org/10.1016/j.jclepro.2017.02.184
+                                               characterization_factors= ({'GWP100':6.85*10000/1000 })),#TODO:Value for tungstic acid was unavailable, therefore tungsten carbide value was assumed Ref: http://dx.doi.org/10.1016/j.jclepro.2017.02.184
                                     bst.Stream(ID = 'recycled_tungstic_acid'),
                                     ob0.outs[1] #biodiesel from previous section
                                     ))
@@ -598,25 +598,96 @@ def hydrolysis_of_organic_fraction(ins,outs):
     Total_amount_of_acid_in_Kg = 50*Total_volume_of_resin/1000
     
     R601 = units_baseline.HydrolysisSystem(ID = 'R101',
-                                           ins = M601-0,
-                                           outs = ('methanol_1','Water_1',
-                                                   'methanol_2','water_2',
-                                                   'methanol_3','water_3',
-                                                   'organic_mixture_to_next_reactor'),
+                                            ins = M601-0,
+                                            outs = ('methanol_1','Water_1',
+                                                    'methanol_2','water_2',
+                                                    'methanol_3','water_3',
+                                                    'organic_mixture_to_next_reactor'),
                                             T = 100+273.15,
                                             V_max =  3.14*5*total_height/3, #decided based on amount of resin required,
                                             tau = 6.5, #considers regeneration time,
                                             P = 101325
-                                           )
-    R601.ins[0].copy_like(M601-0)
+                                            )
+    
+    
+    # R601 = units_baseline.HydrolysisReactor(ID = 'R601',
+    #                                           ins = M601-0,
+    #                                           outs = ('methanol_water_mixture_for_separation',
+    #                                                   'organic_mixture_to_next_reactor'),
+    #                                           T = 100+273.15,
+    #                                           V_max =  3.14*5*total_height/3, #decided based on amount of resin required,
+    #                                           tau = 6.5, #considers regeneration time,
+    #                                           P = 101325
+    #                                           )
+    
+    # HT601 = bst.StorageTank('HT601_holding_tank',
+    #                         ins = R601-1,
+    #                         outs = 'reaction_mixture',
+    #                         tau = 6.5)
+   
+    # D601 = bst.BinaryDistillation(ID = 'D601',
+    #                               ins = R601-0,
+    #                               outs = ('recovered_methanol',
+    #                                       'recovered_water'),
+    #                               LHK = ('Methanol',
+    #                                       'Water'),
+    #                               Lr = 0.999,
+    #                               Hr = 0.999,
+    #                               k = 2
+    #                           )    
+    # R602 = units_baseline.HydrolysisReactor(ID = 'R602',
+    #                 ins = HT601-0,
+    #                 outs = ('methanol_water_mixture_for_separation',
+    #                         'organic_mixture_to_next_reactor'),
+    #                 T = 100+273.15,
+    #                 V_max =  3.14*5*total_height/3, #decided based on amount of resin required,
+    #                 tau = 6.5,
+    #                 P = 101325
+    #                 ) 
+    # HT602 = bst.StorageTank('HT602_holding_tank',
+    #                         ins = R602-1,
+    #                         outs = 'reaction_mixture',
+    #                         tau = 6.5)
+    
+    # D602 = bst.BinaryDistillation(ID = 'D602',
+    #                               ins = R602-0,
+    #                               outs = ('recovered_methanol',
+    #                                       'recovered_water'),
+    #                               LHK = ('Methanol',
+    #                                       'Water'),
+    #                               Lr = 0.999,
+    #                               Hr = 0.999,
+    #                               k = 2
+    #                               )
+    # R603 = units_baseline.HydrolysisReactor(ID = 'R603',
+    #                                         ins = HT602-0,
+    #                                         outs = ('methanol_water_mixture_for_separation',
+    #                                                 'organic_mixture_to_next_reactor'),
+    #                                         T = 100+273.15,
+    #                                         V_max =  3.14*5*total_height/3, #decided based on amount of resin required,
+    #                                         tau = 6.5,
+    #                                         P = 101325
+    #                                         ) 
+
+    # D603 = bst.BinaryDistillation(ID = 'D603',
+    #                               ins = R603-0,
+    #                               outs = ('recovered_methanol',
+    #                                       'recovered_water'),
+    #                               LHK = ('Methanol',
+    #                                       'Water'),
+    #                               Lr = 0.9,
+    #                               Hr = 0.9,
+    #                               k = 2
+    #                               ) 
+    
 #Mix tank to collect all the methanol
 #Selling biomethanol might be more beneficial than recycling it because it sells at a higher price than conventional methanol
 # https://www.biofuelsdigest.com/bdigest/2017/08/24/methanol-and-bio-economy-now-and-the-future/
     T601 = bst.MixTank( ID = 'T601',
-                        ins = (R601-0,R601-2,R601-4
+                        ins = (R601-0,R601-2,R601-4,
                                 #D601-0,
                                 #D602-0,
-                                #D603-0
+                                # D603-0
                                 ),
                         outs = (methanol_for_recycle))
                                 # price = 1.75))
@@ -626,7 +697,8 @@ def hydrolysis_of_organic_fraction(ins,outs):
                         ins = (R601-1,R601-3,R601-5),
                               #D601-1,
                               #D602-1,
-                              #D603-1),
+                              # D603-1
+                              #),
                         outs = wastewater3_to_boilerturbogenerator)
    
 #Azelaic acid is distilled off at 399-533 Pa pressures in conventional processes 
@@ -636,6 +708,7 @@ def hydrolysis_of_organic_fraction(ins,outs):
 
     HX601 = bst.HXutility(ID = 'HX601',
                           ins = R601-6,
+                          #ins = R603-1,
                           outs = 'heated_azelaic_acid_rich_stream',
                           T = 270+273.15) #consistent with US patent 2818113
     
@@ -644,8 +717,8 @@ def hydrolysis_of_organic_fraction(ins,outs):
                                   outs = ('azelaic_acid_rich_fraction',
                                             diols_and_other_fatty_acids_for_recycling
                                           ),
-                                  LHK = ('Monomethyl_azelate',
-                                          'MDHSA'
+                                  LHK = ('Azelaic_acid',
+                                          'MDHSA'#TODO: think about the other two diols
                                           ),
                                   Lr=0.90,
                                   Hr=0.99,
@@ -654,7 +727,7 @@ def hydrolysis_of_organic_fraction(ins,outs):
                                   partial_condenser= False
                                   )
 #TODO: ask Yoel if there is another way    
-    D604.check_LHK = False    
+    # D604.check_LHK = False    
 # Hot water extraction to separate out azelaic acid because azelaic acid shows solubility in water
 # The top stream of D604 distillation column is the prepurified azelaic acid stream
 # The water is adjusted to make sure azelaic acid is 13% of total added water 
@@ -753,9 +826,9 @@ def hydrolysis_of_organic_fraction(ins,outs):
                                                 'heavy_boiling_azelaic_acid_stream'
                                                 ),
                                         # T =  260+ 273.15,# Ref: METHOD FOR PURIFYING AZELAIC ACID (US 2003/0032825 A1)
-                                        LHK = ('Azelaic_acid',
-                                                'Monomethyl_azelate'
-                                                ),
+                                        LHK = ('Monomethyl_azelate',
+                                               'MDHSA'
+                                               ),
                                         Lr=0.995,
                                         Hr=0.995,
                                         P = 2000,# consistent with US patent 2818113
@@ -775,8 +848,8 @@ def hydrolysis_of_organic_fraction(ins,outs):
                                         LHK = ('Azelaic_acid',
                                               'Monomethyl_azelate'
                                                 ),
-                                        Lr=0.99,
-                                        Hr=0.99,
+                                        Lr=0.999,
+                                        Hr=0.999,
                                         P = 1300,#comsistent with US patent 2818113
                                         k = 2,
                                         partial_condenser= False)
@@ -916,7 +989,7 @@ ob6.show()
 #     T701.add_specification(adjust_CaOH2, run=True)         
 
 # ob7 = catalyst_recovery_from_aqueous_stream(ins = (bst.Stream(ID ='calcium_hydroxide',
-#                                                                Calcium_hydroxide = 1,
+#                                                                 Calcium_hydroxide = 1,
 #                                                               units = 'kg/hr',
 #                                                               characterization_factors = ({'GWP100': 555.42/1000 })),#555.42 Kg of CO2/ ton of calcium nitrate # Ref: Greet, values for calcium hydroxide unavailable
 #                                                     bst.Stream(ID='aqueous_stream_from_disc_separator'),
@@ -1049,7 +1122,7 @@ ob6.show()
 # process_water_streams_available = (
 #                                     F_baseline.stream.water_for_emulsification,#Water used for hydrolysis and emulsification 
 #                                     F_baseline.stream.water_for_RVF,#Water used for rotary vaccum filter
-#                                     F_baseline.stream.water_for_HCl_prep,#Water used for making 6N Hcl from Conc. HCl
+#                                     # F_baseline.stream.water_for_HCl_prep,#Water used for making 6N Hcl from Conc. HCl
 #                                     F_baseline.stream.water_for_precipitate_washing,#Water used for washing the catalyst precipitate washing
 #                                     F_baseline.stream.water_for_degumming,#Water used for degumming the oils from the polar lipids
 #                                     F_baseline.stream.water_for_degumming_2,#Second Water stream used for degumming the oils from the polar lipids
@@ -1077,75 +1150,6 @@ ob6.show()
 # CIP901 = bst.CIPpackage('CIP901') #Cleaning in place for the boiler
 # FWT901 = bst.FireWaterTank('FWT901')#Water tank for fires
 
-
-
-    
-    # R601 = units_baseline.HydrolysisReactor(ID = 'R601',
-    #                                           ins = M601-0,
-    #                                           outs = ('methanol_water_mixture_for_separation',
-    #                                                   'organic_mixture_to_next_reactor'),
-    #                                           T = 100+273.15,
-    #                                           V_max =  3.14*5*total_height/3, #decided based on amount of resin required,
-    #                                           tau = 6.5, #considers regeneration time,
-    #                                           P = 101325
-    #                                           )
-    
-    # HT601 = bst.StorageTank('HT601_holding_tank',
-    #                         ins = R601-1,
-    #                         outs = 'reaction_mixture',
-    #                         tau = 6.5)
    
-    # D601 = bst.BinaryDistillation(ID = 'D601',
-    #                               ins = R601-0,
-    #                               outs = ('recovered_methanol',
-    #                                       'recovered_water'),
-    #                               LHK = ('Methanol',
-    #                                       'Water'),
-    #                               Lr = 0.999,
-    #                               Hr = 0.999,
-    #                               k = 2
-    #                           )    
-    # R602 = units_baseline.HydrolysisReactor(ID = 'R602',
-    #                 ins = HT601-0,
-    #                 outs = ('methanol_water_mixture_for_separation',
-    #                         'organic_mixture_to_next_reactor'),
-    #                 T = 100+273.15,
-    #                 V_max =  3.14*5*total_height/3, #decided based on amount of resin required,
-    #                 tau = 6.5,
-    #                 P = 101325
-    #                 ) 
-    # HT602 = bst.StorageTank('HT602_holding_tank',
-    #                         ins = R602-1,
-    #                         outs = 'reaction_mixture',
-    #                         tau = 6.5)
-    
-    # D602 = bst.BinaryDistillation(ID = 'D602',
-    #                               ins = R602-0,
-    #                               outs = ('recovered_methanol',
-    #                                       'recovered_water'),
-    #                               LHK = ('Methanol',
-    #                                       'Water'),
-    #                               Lr = 0.999,
-    #                               Hr = 0.999,
-    #                               k = 2
-    #                               )
-    # R603 = units_baseline.HydrolysisReactor(ID = 'R603',
-    #                                         ins = HT602-0,
-    #                                         outs = ('methanol_water_mixture_for_separation',
-    #                                                 'organic_mixture_to_next_reactor'),
-    #                                         T = 100+273.15,
-    #                                         V_max =  3.14*5*total_height/3, #decided based on amount of resin required,
-    #                                         tau = 6.5,
-    #                                         P = 101325
-    #                                         ) 
 
-    # D603 = bst.BinaryDistillation(ID = 'D603',
-    #                               ins = R603-0,
-    #                               outs = ('recovered_methanol',
-    #                                       'recovered_water'),
-    #                               LHK = ('Methanol',
-    #                                       'Water'),
-    #                               Lr = 0.999,
-    #                               Hr = 0.999,
-    #                               k = 2
-    #                               )    
+# #TODO: ask Yoel about how objects are simulated when inside a system()
