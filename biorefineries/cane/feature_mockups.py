@@ -76,7 +76,7 @@ from biosteam import MockFeature
  TCI_derivative, GWP_economic_derivative, 
  GWP_ethanol_derivative, GWP_biodiesel_derivative,
  GWP_crude_glycerol_derivative, GWP_electricity_derivative,
- competitive_biomass_yield, competitive_microbial_oil_yield,
+ ROI, competitive_biomass_yield, competitive_microbial_oil_yield,
  energy_competitive_biomass_yield, energy_competitive_microbial_oil_yield,
  ) = all_metric_mockups = (
     MockFeature('MFPP', 'USD/MT', 'Biorefinery'),
@@ -112,6 +112,7 @@ from biosteam import MockFeature
     MockFeature('Biodiesel GWP derivative', 'kg*CO2*eq / L', 'Biodiesel'),
     MockFeature('Crude glycerol GWP derivative', 'kg*CO2*eq / kg', 'Crude glycerol'),
     MockFeature('Electricity GWP derivative', 'kg*CO2*eq / MWhr', 'Electricity'),
+    MockFeature('ROI', '%', 'Biorefinery'),
     MockFeature('Competitive biomass yield', 'dry MT/hc', 'Feedstock'),
     MockFeature('Energy competitive biomass yield', 'dry MT/hc', 'Feedstock'),
     MockFeature('Competitive microbial oil yield', 'wt. %', 'Feedstock'),

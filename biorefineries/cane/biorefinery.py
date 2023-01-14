@@ -168,7 +168,7 @@ def YRCP2023():
 class Biorefinery:
     cache = {}
     dry_biomass_yield = None # MT / hc
-    baseline_dry_biomass_yield = 39 # MT / hc 
+    baseline_dry_biomass_yield = 25.62 # MT / hc 
     set_feedstock_line = set_line_composition_parameters
     default_prices_correleted_to_crude_oil = False
     default_year = 2022
@@ -1177,15 +1177,15 @@ class Biorefinery:
         def ROI():
             return 100. * tea.ROI
         
-        def competitive_oilcane_biomass_yield_objective(biomass_yield, target):
+        def competitive_biomass_yield_objective(biomass_yield, target):
             self.update_dry_biomass_yield(biomass_yield)
-            return tea.ROI - target
+            return 100. * tea.ROI - target
         
         @metric(name='Competitive biomass yield', element='Feedstock', units='dry MT/hc')
         def competitive_biomass_yield():
             if self.ROI_target is None: return np.nan
             if composition_specification.oil == 0: return self.baseline_dry_biomass_yield
-            f = competitive_oilcane_biomass_yield_objective
+            f = competitive_biomass_yield_objective
             x0 = 0.1 * self.baseline_dry_biomass_yield
             x1 = 3 * self.baseline_dry_biomass_yield
             args = (self.ROI_target,)
@@ -1209,7 +1209,7 @@ class Biorefinery:
             set_glucose_to_microbial_oil_yield.setter(microbial_oil_yield)
             set_xylose_to_microbial_oil_yield.setter(microbial_oil_yield)
             self.sys.simulate()
-            return tea.ROI - target
+            return 100 * tea.ROI - target
         
         @metric(name='Competitive microbial oil yield', element='Feedstock', units='wt. %')
         def competitive_microbial_oil_yield():

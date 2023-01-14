@@ -96,12 +96,19 @@ evaluate_configurations_across_sorghum_and_cane_oil_content = no_derivative(
 )
 
 def evaluate_metrics_at_composition(oil, fiber, water, configuration):
-    if oil <= 0.005 and configuration == 'O2':
-        configuration = 'S2'
     br = cane.Biorefinery(configuration)
     cs = br.composition_specification
+    if br.ROI_target is None:
+        if configuration == 'O2':
+            S2 = cane.Biorefinery('S2')
+            S2.set_cane_oil_content.setter(0)
+            S2.sys.simulate()
+            br.ROI_target = S2.ROI()
+        else:
+            br.set_cane_oil_content.setter(0)
+            br.ROI_target = br.ROI()
     try:
-        cane.load_composition(br.feedstock, oil, fiber, water, cs.FFA, cs.PL)
+        cane.load_composition(br.feedstock, oil, water, fiber, cs.FFA, cs.PL)
     except ValueError:
         return np.array([np.nan for i in br.model.metrics])
     br.sys.simulate()
@@ -194,7 +201,7 @@ def run_uncertainty_and_sensitivity(name, N, rule='L',
         samples = br.model.sample(N, rule)
         
         def set_ROI_target(ROI_target):
-            br.ROI_target = ROI_target / 100
+            br.ROI_target = ROI_target
             
         br.set_ROI_target.setter = set_ROI_target
         if across_oil_content == 'oilcane vs sugarcane':

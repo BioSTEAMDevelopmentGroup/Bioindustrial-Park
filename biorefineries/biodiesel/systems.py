@@ -358,14 +358,19 @@ def create_transesterification_and_biodiesel_separation_system(ins, outs,
         z_distillate_LK = D402.y_top
         z_bottoms_LK = D402.x_bot
         z_feed_LK = water / (water + glycerol)
-        if not (z_bottoms_LK < z_feed_LK < z_distillate_LK):
+        if (z_bottoms_LK < z_feed_LK < z_distillate_LK):
+            D402._run()
+            # Remove accumulation
+            D402.outs[0].imol['Water'] = 800. * C402.outs[0].imol['Glycerol']
+            D402.outs[0].T = D402.outs[0].bubble_point_at_P().T
+        else:
             z_feed_LK = 0.1 * z_bottoms_LK + 0.9 * z_distillate_LK
-            imol['Water'] = glycerol / (1 - z_feed_LK)
-        D402._run()
-        
-        # Remove accumulation
-        D402.outs[0].imol['Water'] = 800. * C402.outs[0].imol['Glycerol']
-        D402.outs[0].T = D402.outs[0].bubble_point_at_P().T
+            imol['Water'] = water = glycerol / (1 - z_feed_LK)
+            D402._run()
+            # Remove accumulation
+            D402.outs[0].imol['Water'] = water - w / g * glycerol
+            D402.outs[0].T = D402.outs[0].bubble_point_at_P().T
+            
     
     # Condense recycle methanol
     H403 = bst.HXutility('H403', V=0, T=315)

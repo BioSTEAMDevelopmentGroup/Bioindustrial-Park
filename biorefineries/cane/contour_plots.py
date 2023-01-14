@@ -120,7 +120,7 @@ def plot_metrics_across_composition_manuscript(load=True, configuration=None, fs
     _add_letter_labels(axes, 1 - 0.68, 0.7, colors)
     plt.subplots_adjust(right=0.92, wspace=0.1 * (fs/8) ** 2, top=0.9, bottom=0.10)
     for i in ('svg', 'png'):
-        file = os.path.join(images_folder, f'recovery_and_oil_content_contours.{i}')
+        file = os.path.join(images_folder, f'metrics_across_composition_contours.{i}')
         plt.savefig(file, transparent=True)
 
 def plot_recovery_and_oil_content_contours_manuscript(load=True, fs=8, smooth=1):
@@ -193,13 +193,15 @@ def plot_relative_sorghum_oil_content_and_cane_oil_content_contours_manuscript(l
 
 # %% General    
 
-def metrics_across_oil_and_fiber_content(configuration, load):
+def metrics_across_oil_and_fiber_content(configuration, load, xlim):
     # Generate contour data
-    x = np.linspace(0., 0.05, 5)
+    x0, xf = xlim
+    x = np.linspace(x0 / 100, xf / 100, 10)
     y = np.linspace(0.35, 0.75, 5)
     z = np.array([0.6, 0.65, 0.7])
     X, Y, Z = np.meshgrid(x, y, z)
     folder = os.path.dirname(__file__)
+    folder = os.path.join(folder, 'results')
     file = f'{configuration}_composition_analysis.npy'
     file = os.path.join(folder, file)
     if load:
@@ -221,12 +223,16 @@ def plot_metrics_across_composition(
         cmap=None, smooth=None,
     ):
     if configuration is None: configuration = 'O2'
-    metrics = COBY, NEP = [cane.competitive_oilcane_biomass_yield, cane.net_energy_production]
-    metric_indices = [cane.all_metric_mockups.index(i) for i in metrics] 
-    X, Y, Z, data = metrics_across_oil_and_fiber_content(configuration, load)
-    data = data[:, :, :, metric_indices]
-    xticks = [0,   1,   2,   3,   4,   5]
+    config = cane.parse_configuration(configuration)
+    if config.number > 4 or config.number < 0:
+        xticks = [0,   2,   4,   6,   8,   10]
+    else:
+        xticks = [2,   4,   6,   8,   10]
     yticks = [35,  45,  55,  65,  75]
+    metrics = COBY, NEP = [cane.competitive_biomass_yield, cane.net_energy_production]
+    metric_indices = [cane.all_metric_mockups.index(i) for i in metrics] 
+    X, Y, Z, data = metrics_across_oil_and_fiber_content(configuration, load, (xticks[0], xticks[-1]))
+    data = data[:, :, :, metric_indices]
     if smooth: # Smooth curves due to heat exchanger network and discontinuities in design decisionss
         A, B, C, D = data.shape
         for i in range(C):
@@ -241,7 +247,8 @@ def plot_metrics_across_composition(
     ylabel = "Fiber content [dry wt. %]"
     if titles is None: titles = np.array(['60% moisture', '65% moisture', '70% moisture'])
     metric_bars = [
-        MetricBar(COBY.name, format_units(COBY.units), colormaps[0], tickmarks(data[:, :, 0, :], 5, 1, expand=0, p=0.5), 18, 1),
+        # MetricBar(MFPP.name, format_units(MFPP.units), colormaps[1], tickmarks(data[:, :, 0, :], 5, 1, expand=0, p=0.5), 18, 1),
+        MetricBar(COBY.name, format_units(COBY.units), colormaps[0], tickmarks(data[:, :, 0, :], 5, 1, expand=0, p=0.5), 10, 1),
         # MetricBar('Biod. prod.', format_units(BP.units), plt.cm.get_cmap('copper'), tickmarks(data[:, :, 1, :], 8, 1, expand=0, p=0.5), 10, 1),
         MetricBar(NEP.name, format_units(NEP.units), colormaps[2], tickmarks(data[:, :, 1, :], 5, 1, expand=0, p=2), 20, 1),
     ]
@@ -263,9 +270,11 @@ def plot_metrics_across_composition(
         lines = []
         for name, color in zip(names, line_colors):
             data = df.loc[name]
+            oil = data['Stem oil (dw)']['Mean'] * 100
+            if oil < xticks[0]: continue
             lines.append(
                 (name, 
-                 data['Stem Oil (dw)']['Mean'] * 100, 
+                 oil, 
                  data['Fiber (dw)']['Mean'] * 100,
                  data['Water (wt)']['Mean'] * 100,
                  color)

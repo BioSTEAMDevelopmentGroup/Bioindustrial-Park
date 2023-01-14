@@ -1064,15 +1064,17 @@ def plot_monte_carlo(derivative=False, absolute=True, comparison=True,
     return fig, axes
 
 def plot_competitive_biomass_yield_across_oil_content(
-        configuration=None,
+        configuration=None, fs=None,
     ):
     if configuration is None: configuration = 'O2'
+    if fs is None: fs = 10
+    set_font(size=fs)
     file = monte_carlo_file(configuration, across_lines=False, across_oil_content='oilcane vs sugarcane')
     df = pd.read_excel(file, sheet_name=features.competitive_oilcane_biomass_yield.short_description, index_col=0)
     fig = plt.figure()
     oil_fraction = np.array(df.columns) * 100
     plt.ylabel('Competitive biomass yield [%]')
-    bst.plots.plot_montecarlo_across_coordinate(oil_fraction, df)
+    bst.plots.plot_montecarlo_across_coordinate(oil_fraction[:, 1:], df)
     for i in ('svg', 'png'):
         file = os.path.join(images_folder, f'competitive_biomass_yield_MCAC_{configuration}.{i}')
         plt.savefig(file, transparent=True)
