@@ -72,17 +72,14 @@ evaluate_configurations_across_recovery_and_oil_content = no_derivative(
     )
 )
 def evaluate_configurations_across_sorghum_and_cane_oil_content(
-        sorghum_oil_content, cane_oil_content, configurations, relative,
+        sorghum_oil_content, cane_oil_content, configurations,
     ):
     C = len(configurations)
     data = np.zeros([C, N_metrics])
     for ic in range(C):
-        br = cane.Biorefinery([int(configurations[ic]), True])
+        br = cane.Biorefinery([int(configurations[ic]), True, False])
         br.cane_mode.oil_content = cane_oil_content
-        if relative:
-            br.sorghum_mode.oil_content = cane_oil_content + sorghum_oil_content
-        else:
-            br.sorghum_mode.oil_content = sorghum_oil_content
+        br.sorghum_mode.oil_content = sorghum_oil_content
         br.sys.simulate()
         data[ic, :] = [j() for j in br.model.metrics]
     return data
@@ -90,8 +87,8 @@ def evaluate_configurations_across_sorghum_and_cane_oil_content(
 evaluate_configurations_across_sorghum_and_cane_oil_content = no_derivative(
     np.vectorize(
         evaluate_configurations_across_sorghum_and_cane_oil_content, 
-        excluded=['configurations', 'relative'],
-        signature=f'(),(),(c),()->(c,{N_metrics})'
+        excluded=['configurations'],
+        signature=f'(),(),(c)->(c,{N_metrics})'
     )
 )
 
@@ -158,6 +155,7 @@ def run_uncertainty_and_sensitivity(name, N, rule='L',
     filterwarnings('ignore', category=bst.exceptions.DesignWarning)
     filterwarnings('ignore', category=bst.exceptions.CostWarning)
     br = cane.Biorefinery(name, **kwargs)
+    br.model.retry_evaluation = True
     file = monte_carlo_file(name, across_lines, across_oil_content)
     N_notify = min(int(N/10), 20)
     autosave = N_notify if autosave else False
@@ -204,6 +202,7 @@ def run_uncertainty_and_sensitivity(name, N, rule='L',
             br.ROI_target = ROI_target
             
         br.set_ROI_target.setter = set_ROI_target
+        coordinate = np.linspace(0, 0.1, 15)
         if across_oil_content == 'oilcane vs sugarcane':
             # Replace `set_cane_oil_content` parameter with `set_ROI_target`.
             # The actual distribution does not matter because these values are updated
@@ -238,24 +237,37 @@ def run_uncertainty_and_sensitivity(name, N, rule='L',
         br.model.load_samples(samples, optimize=optimize)
         @no_derivative
         def evaluate(**kwargs):
-            oil_content = int(100 * br.composition_specification.oil)
+            oil_content = int(1000 * br.composition_specification.oil)
             autoload_file = autoload_file_name(f"{name}_{oil_content}_oil_content")
-            if across_oil_content == 'oilcane vs sugarcane' and br.composition_specification.oil == 0.:
+            if across_oil_content == 'oilcane vs sugarcane':
                 autoload_file += '_o_vs_s'
-                # Configurations 1 and 2 do not work at zero oil content, so gotta go with respective sugarcane configuration.
-                if br_sugarcane:
-                    br_sugarcane.model.evaluate(
-                        autosave=autosave, 
-                        autoload=autoload,
-                        file=autoload_file,
-                        **kwargs,
-                    )
-                    br.model.table.iloc[:, :] = br_sugarcane.model.table
-                    # Given the oil content, also find the oilcane biomass yield
-                    # required to get the same ROI as sugarcane.
-                    br.model.table[br.set_ROI_target.index] = column = br_sugarcane.model.table[br_sugarcane.ROI.index]
-                    br.model._samples[:, br.model.parameters.index(br.set_ROI_target)] = column.values
-                    br.model.table[br.competitive_biomass_yield.index] = br.baseline_dry_biomass_yield
+                if br.composition_specification.oil == 0.:
+                    # Configurations 1 and 2 do not work at zero oil content, so gotta go with respective sugarcane configuration.
+                    if br_sugarcane:
+                        br_sugarcane.update_dry_biomass_yield(br_sugarcane.baseline_dry_biomass_yield)
+                        br_sugarcane.model.evaluate(
+                            autosave=autosave, 
+                            autoload=autoload,
+                            file=autoload_file,
+                            **kwargs,
+                        )
+                        br.model.table.iloc[:, :] = br_sugarcane.model.table
+                        # Given the oil content, also find the oilcane biomass yield
+                        # required to get the same ROI as sugarcane.
+                        br.model.table[br.set_ROI_target.index] = column = br_sugarcane.model.table[br_sugarcane.ROI.index]
+                        br.model._samples[:, br.model.parameters.index(br.set_ROI_target)] = column.values
+                        br.model.table[br.competitive_biomass_yield.index] = br.baseline_dry_biomass_yield
+                    else:
+                        br.update_dry_biomass_yield(br.baseline_dry_biomass_yield)
+                        br.model.evaluate(
+                            autosave=autosave, 
+                            autoload=autoload,
+                            file=autoload_file,
+                            **kwargs,
+                        )
+                        br.model.table[br.set_ROI_target.index] = column = br.model.table[br.ROI.index]
+                        br.model._samples[:, br.model.parameters.index(br.set_ROI_target)] = column.values
+                        br.model.table[br.competitive_biomass_yield.index] = br.baseline_dry_biomass_yield
                 else:
                     br.model.evaluate(
                         autosave=autosave, 
@@ -263,15 +275,13 @@ def run_uncertainty_and_sensitivity(name, N, rule='L',
                         file=autoload_file,
                         **kwargs,
                     )
-                    br.model.table[br.set_ROI_target.index] = column = br.model.table[br.ROI.index]
-                    br.model._samples[:, br.model.parameters.index(br.set_ROI_target)] = column.values
-                    br.model.table[br.competitive_biomass_yield.index] = 100.
             elif across_oil_content == 'microbial oil vs bioethanol':
                 autoload_file += '_mo_vs_etoh'
                 assert name in ('O6', 'O5')
                 # For configurations 5 and 6, find the microbial oil yield required
                 # to get the same ROI as bioethanol production
                 if br.composition_specification.oil == 0.:
+                    br_sugarcane.update_dry_biomass_yield(br_sugarcane.baseline_dry_biomass_yield)
                     br_sugarcane.model.evaluate(
                         autosave=autosave, 
                         autoload=autoload,
@@ -295,19 +305,13 @@ def run_uncertainty_and_sensitivity(name, N, rule='L',
                     file=autoload_file,
                     **kwargs,
                 )
-            else:
-                br.model.evaluate(
-                    autosave=autosave, 
-                    autoload=autoload,
-                    file=autoload_file,
-                    **kwargs,
-                )
+            
         br.model.evaluate_across_coordinate(
             name='Oil content',
             notify=int(N/10),
             f_coordinate=br.composition_specification.load_oil_content,
             f_evaluate=evaluate,
-            coordinate=np.linspace(0, 0.1, 10),
+            coordinate=coordinate,
             notify_coordinate=True,
             xlfile=file,
         )

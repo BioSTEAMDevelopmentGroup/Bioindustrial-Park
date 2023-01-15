@@ -176,11 +176,11 @@ def plot_recovery_and_oil_content_contours_biodiesel_only(load=True, fs=8, metri
             file = os.path.join(images_folder, f'recovery_and_oil_content_contours_biodiesel_only_{i}.{j}')
             plt.savefig(file, transparent=True)
 
-def plot_relative_sorghum_oil_content_and_cane_oil_content_contours_manuscript(load=True, fs=8, smooth=0.9):
+def plot_relative_sorghum_oil_content_and_cane_oil_content_contours_manuscript(load=True, fs=8, smooth=0.9, configuration_index=None):
     set_font(size=fs)
     set_figure_size()
     fig, axes = plot_relative_sorghum_oil_content_and_cane_oil_content_contours(
-        load=load, smooth=smooth,
+        load=load, smooth=smooth, configuration_index=configuration_index,
     )
     colors = np.zeros([2, 2], object)
     colors[:] = [[light_letter_color, light_letter_color],
@@ -296,49 +296,53 @@ def plot_metrics_across_composition(
                 )
     return fig, axes
 
-def relative_sorghum_oil_content_and_cane_oil_content_data(load, relative):
+def relative_sorghum_oil_content_and_cane_oil_content_data(load, configurations):
     # Generate contour data
-    y = np.linspace(0.05, 0.15, 20)
-    x = np.linspace(-0.03, 0., 20) if relative else np.linspace(0.02, 0.15, 20)
+    y = np.linspace(0.01, 0.10, 20)
+    x = np.linspace(0.01, 0.10, 20)
     X, Y = np.meshgrid(x, y)
     folder = os.path.dirname(__file__)
-    file = 'oil_content_analysis.npy'
-    if relative: file = 'relative_' + file
+    file = 'oil_content_analysis_{''.join([str(i) fo i in configuratinos])}.npy'
     file = os.path.join(folder, file)
-    configurations = [1, 2]
+    if configurations is None: configurations = [1, 2]
     if load:
         data = np.load(file)
     else:
         data = cane.evaluate_configurations_across_sorghum_and_cane_oil_content(
-            X, Y, configurations, relative,
+            X, Y, configurations, 
         )
     np.save(file, data)
     return X, Y, data
     
 def plot_relative_sorghum_oil_content_and_cane_oil_content_contours(
-        load=False, configuration_index=..., relative=False, smooth=None,
+        load=False, configuration_index=None, relative=False, smooth=None,
     ):
+    if configuration_index is None: configuration_index = [1, 2]
     # Generate contour data
-    X, Y, data = relative_sorghum_oil_content_and_cane_oil_content_data(load, relative)
-    
-    data = data[:, :, configuration_index, [0, 6]]
+    X, Y, data = relative_sorghum_oil_content_and_cane_oil_content_data(load, configuration_index)
+    MFPP = cane.MFPP
+    TCI = cane.TCI
+    metrics = [MFPP, TCI]
+    metric_indices = [cane.all_metric_mockups.index(i) for i in metrics]
+    data = data[:, :, configuration_index, metric_indices]
     
     # Plot contours
     xlabel = "Oil-sorghum oil content [dry wt. %]" 
     if relative: xlabel = ('relative ' + xlabel).capitalize()
     ylabel = 'Oilcane oil content\n[dry wt. %]'
-    yticks = [5, 7.5, 10, 12.5, 15]
-    xticks = [-3, -2, -1, 0] if relative else [2, 5, 7.5, 10, 12.5, 15]
-    MFPP = cane.all_metric_mockups[0]
-    TCI = cane.all_metric_mockups[6]
+    yticks = [1, 2.5, 5, 7.5, 10]
+    xticks = [1, 2.5, 5, 7.5, 10]
     if configuration_index == 0:
         Z = np.array(["Direct Cogeneration"])
         data = data[:, :, :, np.newaxis]
     elif configuration_index == 1:
         Z = np.array(["Integrated Co-Fermentation"])
         data = data[:, :, :, np.newaxis]
-    elif configuration_index == ...:
+    elif configuration_index == [1, 2]:
         Z = np.array(["Direct Cogeneration", "Integrated Co-Fermentation"])
+        data = np.swapaxes(data, 2, 3)
+    elif configuration_index == [2, 6]:
+        Z = np.array(["Bioethanol", "Microbial oil"])
         data = np.swapaxes(data, 2, 3)
     else:
         raise ValueError('configuration index must be either 0 or 1')

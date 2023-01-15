@@ -1175,6 +1175,7 @@ class Biorefinery:
     
         @metric(units='%')
         def ROI():
+            if self.dry_biomass_yield is None: return np.nan
             return 100. * tea.ROI
         
         def competitive_biomass_yield_objective(biomass_yield, target):
@@ -1200,7 +1201,7 @@ class Biorefinery:
         def energy_competitive_biomass_yield():
             if self.net_energy_target is None: return np.nan
             NEP_target = self.net_energy_target
-            if composition_specification.oil == 0: return 100.
+            if composition_specification.oil == 0: return self.baseline_dry_biomass_yield
             NEP = net_energy_production.cache
             return self.baseline_dry_biomass_yield * NEP / NEP_target  
             
