@@ -901,8 +901,8 @@ class Biorefinery:
         
         if agile:
             feedstock_flow = lambda: sys.flow_rates[feedstock] / kg_per_MT # MT / yr
-            biodiesel_flow = lambda: sys.flow_rates.get(biodiesel, 0.) * biodiesel_L_per_kg # L / yr
-            ethanol_flow = lambda: (sys.flow_rates.get(cellulosic_ethanol, 0.) + sys.flow_rates.get(advanced_ethanol, 0.))* ethanol_L_per_kg # L / yr
+            biodiesel_flow = lambda: (sys.flow_rates.get(cellulosic_based_diesel, 0.) + sys.flow_rates.get(biomass_based_diesel, 0.)) * biodiesel_L_per_kg # L / yr
+            ethanol_flow = lambda: (sys.flow_rates.get(cellulosic_ethanol, 0.) + sys.flow_rates.get(advanced_ethanol, 0.)) * ethanol_L_per_kg # L / yr
             natural_gas_flow = lambda: sum([sys.flow_rates[i] for i in natural_gas_streams]) * V_ng # m3 / yr
             crude_glycerol_flow = lambda: sys.flow_rates.get(crude_glycerol, 0.) # kg / yr
             

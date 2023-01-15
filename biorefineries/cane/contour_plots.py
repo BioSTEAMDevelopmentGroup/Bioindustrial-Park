@@ -308,10 +308,12 @@ def relative_sorghum_oil_content_and_cane_oil_content_data(load, configurations)
     if load:
         data = np.load(file)
     else:
+        from warnings import filterwarnings; filterwarnings('ignore')
         data = cane.evaluate_configurations_across_sorghum_and_cane_oil_content(
             X, Y, configurations, 
         )
-    np.save(file, data)
+        np.save(file, data)
+        filterwarnings('warn')
     return X, Y, data
     
 def plot_relative_sorghum_oil_content_and_cane_oil_content_contours(
@@ -324,21 +326,15 @@ def plot_relative_sorghum_oil_content_and_cane_oil_content_contours(
     TCI = cane.TCI
     metrics = [MFPP, TCI]
     metric_indices = [cane.all_metric_mockups.index(i) for i in metrics]
-    data = data[:, :, configuration_index, metric_indices]
+    data = data[:, :, :, metric_indices]
     
     # Plot contours
     xlabel = "Oil-sorghum oil content [dry wt. %]" 
     if relative: xlabel = ('relative ' + xlabel).capitalize()
     ylabel = 'Oilcane oil content\n[dry wt. %]'
-    yticks = [1, 2.5, 5, 7.5, 10]
-    xticks = [1, 2.5, 5, 7.5, 10]
-    if configuration_index == 0:
-        Z = np.array(["Direct Cogeneration"])
-        data = data[:, :, :, np.newaxis]
-    elif configuration_index == 1:
-        Z = np.array(["Integrated Co-Fermentation"])
-        data = data[:, :, :, np.newaxis]
-    elif configuration_index == [1, 2]:
+    yticks = [1, 2.5, 4, 5.5, 7, 8.5, 10]
+    xticks = [1, 2.5, 4, 5.5, 7, 8.5, 10]
+    if configuration_index == [1, 2]:
         Z = np.array(["Direct Cogeneration", "Integrated Co-Fermentation"])
         data = np.swapaxes(data, 2, 3)
     elif configuration_index == [2, 6]:

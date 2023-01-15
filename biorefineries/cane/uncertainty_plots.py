@@ -131,6 +131,7 @@ line_color_wheel = ColorWheel([
     colors.CABBI_grey,
     colors.CABBI_brown,
 ])
+edgecolor = (*colors.CABBI_black.RGBn, 1)
 for i in area_colors: area_colors[i] = area_colors[i].tint(20)
 palette = Palette(**area_colors)
 letter_color = colors.neutral.shade(25).RGBn
@@ -1071,13 +1072,47 @@ def plot_competitive_biomass_yield_across_oil_content(
     set_font(size=fs)
     file = monte_carlo_file(configuration, across_lines=False, across_oil_content='oilcane vs sugarcane')
     df = pd.read_excel(file, sheet_name=features.competitive_biomass_yield.short_description, index_col=0)
-    fig = plt.figure()
-    oil_fraction = np.array(df.columns) * 100
-    plt.ylabel('Competitive biomass yield [dry MT/hc]')
+    oil_content = np.array(df.columns) * 100
+    plt.ylabel(f"Biomass yield [dry-{format_units('MT/hc')}]")
+    plt.xlabel('Oil content [dry wt. %]')
     if configuration == 'O2':
-        bst.plots.plot_montecarlo_across_coordinate(oil_fraction[1:], df.iloc[:, 1:])
+        oil_content = oil_content[1:]
+        biomass_yield = df.iloc[:, 1:]
+        biomass_yield_p50 = bst.plots.plot_montecarlo_across_coordinate(oil_content, biomass_yield)[2]
+        bst.plots.plot_vertical_line(oil_content[1])
     else:
-        bst.plots.plot_montecarlo_across_coordinate(oil_fraction, df)
+        biomass_yield_p50 = bst.plots.plot_montecarlo_across_coordinate(oil_content, df)[2]
+    plt.xlim([0, 10])
+    plt.ylim([0, 30])
+    df = cane.get_composition_data()
+    txtbox = dict(boxstyle='round', facecolor=colors.neutral.shade(20).RGBn, 
+                  edgecolor='None', alpha=0.9)
+    bst.plots.annotate_line(
+        'Financially\ncompetitive\ntarget', 3, oil_content, biomass_yield_p50,
+        dy=3, dy_text=0.8, position='over'
+    )   
+    bst.plots.style_axis(
+        ytick0=True,
+        ytickf=True,
+    )
+    for name, color in zip(df.index, line_color_wheel):
+        line = df.loc[name]
+        oil = line['Stem oil (dw)']['Mean'] * 100
+        biomass = line['Biomass yield (dry MT/hc)']['Mean']
+        # breakpoint()
+        bst.plots.plot_scatter_points(
+            [oil], [biomass], marker='X', s=100, color=color.RGBn,
+            edgecolor=edgecolor, clip_on=False, zorder=3
+        )
+        if name == '316':
+            oil += 0.2
+        if name == '19B':
+            oil -= 0.2
+            biomass += 0.2
+        plt.text(
+            oil + 0.1, biomass + 1, name, weight='bold', c=color.RGBn,
+            bbox=txtbox,
+        )
     for i in ('svg', 'png'):
         file = os.path.join(images_folder, f'competitive_biomass_yield_MCAC_{configuration}.{i}')
         plt.savefig(file, transparent=True)
@@ -1104,7 +1139,7 @@ def plot_lines_monte_carlo(
     df = cane.get_composition_data()
     columns = df.index
     rows, ylabels = zip(*[mc_line_metric_settings[i] for i in metrics])
-    if color_wheel is None: color_wheel = CABBI_colors.wheel()
+    if color_wheel is None: color_wheel = line_color_wheel
     N_rows = len(rows)
     if axes_box is None:
         nrows = int(round(N_rows / ncols))
