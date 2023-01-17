@@ -217,7 +217,7 @@ class OilcaneCompositionPerformance(NamedTuple):
     oil_content: float
     biomass_yield: float
 
-def get_composition_data(minimum_oil_content=None):
+def get_composition_data(minimum_oil_content=None, ignored=frozenset([316, '19B'])):
     global cane_line_composition_data, cane_minimum_oil_content
     if minimum_oil_content is None: minimum_oil_content = 0
     if cane_line_composition_data is None or minimum_oil_content != cane_minimum_oil_content:
@@ -241,8 +241,8 @@ def get_composition_data(minimum_oil_content=None):
                     and performance.biomass_yield < other_performance.biomass_yield
                     or performance.oil_content < minimum_oil_content):
                     good_lines.discard(name)
-        names = sorted([name for name in index if name in good_lines], 
-                       key=lambda name: performances[name].oil_content)
+        for i in ignored: good_lines.discard(i)
+        names = sorted([i for i in index if i in good_lines], key=lambda name: performances[name].oil_content)
         cane_line_composition_data = data.loc[names]
         cane_minimum_oil_content = minimum_oil_content
     return cane_line_composition_data

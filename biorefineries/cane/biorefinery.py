@@ -162,6 +162,7 @@ def rename_storage_units(units, storage_area):
     bst.rename_units([i for i in units if bst.is_storage_unit(i)], storage_area)
 
 def YRCP2023():
+    Biorefinery.default_conversion_performance_distribution = 'shortterm'
     Biorefinery.default_prices_correleted_to_crude_oil = True
     Biorefinery.default_year = 2023
 
@@ -171,6 +172,7 @@ class Biorefinery:
     baseline_dry_biomass_yield = 25.62 # MT / hc 
     set_feedstock_line = set_line_composition_parameters
     default_prices_correleted_to_crude_oil = False
+    default_conversion_performance_distribution = 'longterm'
     default_year = 2022
     baseline_moisture_content = 0.70
     
@@ -215,7 +217,7 @@ class Biorefinery:
                  prices_correleted_to_crude_oil=None):
         if year is None: year = cls.default_year
         if conversion_performance_distribution is None: 
-            conversion_performance_distribution = "longterm"
+            conversion_performance_distribution = cls.default_conversion_performance_distribution
         else:
             conversion_performance_distribution = conversion_performance_distribution.replace(' ', '').replace('-', '').lower()
         if prices_correleted_to_crude_oil is None:
@@ -831,7 +833,13 @@ class Biorefinery:
         def set_sorghum_FFA_content(sorghum_FFA_content):
             if agile: sorghum_mode.FFA_content = sorghum_FFA_content / 100. 
     
-        @performance(5., 15., element='oilcane', units='dry wt. %', kind='coupled')
+        if year == 2022:
+            oil_lim = [5, 15]
+        elif year == 2023:
+            oil_lim = [2, 10]
+        else:
+            raise Exception('invalid year')
+        @performance(*oil_lim, element='oilcane', units='dry wt. %', kind='coupled')
         def set_cane_oil_content(cane_oil_content):
             if number < 0: return
             if agile:
@@ -1214,7 +1222,7 @@ class Biorefinery:
         
         @metric(name='Competitive microbial oil yield', element='Feedstock', units='wt. %')
         def competitive_microbial_oil_yield():
-            if self.ROI_target is None: return np.nan
+            if self.ROI_target is None or self.microbial_oil_analysis_disactivated: return np.nan
             f = competitive_microbial_oil_yield_objective
             x0 = 20
             x1 = 95
@@ -1232,7 +1240,7 @@ class Biorefinery:
         
         @metric(name='Energy competitive microbial oil yield', element='Feedstock', units='wt. %')
         def energy_competitive_microbial_yield():
-            if self.net_energy_target is None: return np.nan
+            if self.net_energy_target is None or self.microbial_oil_analysis_disactivated: return np.nan
             f = competitive_microbial_oil_yield_objective
             x0 = 20
             x1 = 95
@@ -1240,7 +1248,7 @@ class Biorefinery:
                 return np.nan
             else:
                 flx.IQ_interpolation(
-                    f, x0, x1, y0, y1, xtol=1e-2, ytol=1e-3, args=(self.ROI_target,)
+                    f, x0, x1, y0, y1, xtol=1e-2, ytol=1e-3, args=(self.net_energy_target,)
                 )
                 if number in cellulosic_oil_configurations:
                     return 100. * fermentor.cofermentation[0].product_yield(product='TriOlein', basis='wt')
@@ -1294,6 +1302,7 @@ class Biorefinery:
         self.oil_extraction_specification = oil_extraction_specification
         self.ROI_target = None
         self.net_energy_target = None
+        self.microbial_oil_analysis_disactivated = True
         self.__dict__.update(flowsheet.to_dict())
         if feedstock_line: self.set_feedstock_line(feedstock_line)
         if cache is not None: cache[key] = self
