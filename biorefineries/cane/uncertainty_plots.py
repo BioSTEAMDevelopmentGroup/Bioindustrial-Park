@@ -159,7 +159,7 @@ mc_metric_settings = {
 
 mc_line_metric_settings = {
     'Biodiesel production': (biodiesel_production, f"Biodiesel production\n[{format_units('L/MT')}]"),
-    'Biodiesel yield': (biodiesel_yield, f"Biodiesel yield\n[{format_units('L/hc')}]"),
+    'Biodiesel yield': (biodiesel_yield, f"Biodiesel yield\n[{format_units('L/ha')}]"),
     'GWP biodiesel': (GWP_biodiesel, f"GWP Biodiesel [{GWP_units_L}]"),
     'ROI': (ROI, "Return on Investment [%]"),
 }
@@ -1129,7 +1129,7 @@ def _add_lines_biomass_yield_vs_oil_content():
     for name, color in zip(df.index, line_color_wheel):
         line = df.loc[name]
         oil = line['Stem oil (dw)']['Mean'] * 100
-        biomass = line['Biomass yield (dry MT/hc)']['Mean']
+        biomass = line['Biomass yield (dry MT/ha)']['Mean']
         # breakpoint()
         bst.plots.plot_scatter_points(
             [oil], [biomass], marker='X', s=100, color=color.RGBn,
@@ -1152,7 +1152,7 @@ def _plot_competitive_biomass_yield_across_oil_content(
     file = monte_carlo_file(configuration, across_lines=False, across_oil_content='oilcane vs sugarcane')
     df = pd.read_excel(file, sheet_name=features.competitive_biomass_yield.short_description, index_col=0)
     oil_content = np.array(df.columns) * 100
-    plt.ylabel(f"Biomass yield [dry-{format_units('MT/hc')}]")
+    plt.ylabel(f"Biomass yield [dry-{format_units('MT/ha')}]")
     if configuration == 'O2':
         oil_content = oil_content[1:]
         biomass_yield = df.iloc[:, 1:]

@@ -231,7 +231,7 @@ def get_composition_data(minimum_oil_content=None, ignored=frozenset([316, '19B'
             line = data.loc[name]
             performance = OilcaneCompositionPerformance(
                 line['Stem oil (dw)']['Mean'],
-                line['Biomass yield (dry MT/hc)']['Mean'],
+                line['Biomass yield (dry MT/ha)']['Mean'],
             )
             performances[name] = performance
         for name, performance in performances.items():
@@ -343,7 +343,7 @@ def set_line_composition_parameters(biorefinery, line):
     oil = line['Stem oil (dw)']
     water = line['Water (wt)']
     sugar = line['Sugar (dw)']
-    biomass = line['Biomass yield (dry MT/hc)']
+    biomass = line['Biomass yield (dry MT/ha)']
     set_composition_parameters(
         biorefinery,
         oil['Mean'],
@@ -448,7 +448,7 @@ def _add_model_composition_parameters_for_cane_line(
         distribution=bounded_gaussian_distribution_from_mean_and_std(
             mean_biomass_yield, std_biomass_yield
         ),
-        units='dry MT/hc',
+        units='dry MT/ha',
     )
     def set_cane_biomass_yield(biomass_yield):
         biorefinery.update_dry_biomass_yield(biomass_yield)

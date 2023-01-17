@@ -168,8 +168,8 @@ def YRCP2023():
 
 class Biorefinery:
     cache = {}
-    dry_biomass_yield = None # MT / hc
-    baseline_dry_biomass_yield = 25.62 # MT / hc 
+    dry_biomass_yield = None # MT / ha
+    baseline_dry_biomass_yield = 25.62 # MT / ha 
     set_feedstock_line = set_line_composition_parameters
     default_prices_correleted_to_crude_oil = False
     default_conversion_performance_distribution = 'longterm'
@@ -970,7 +970,7 @@ class Biorefinery:
         def biodiesel_production():
             return biodiesel_flow() / feedstock_consumption.get()
         
-        @metric(units='L/hc')
+        @metric(units='L/ha')
         def biodiesel_yield():
             if self.dry_biomass_yield is None: 
                 return None
@@ -1190,7 +1190,7 @@ class Biorefinery:
             self.update_dry_biomass_yield(biomass_yield)
             return 100. * tea.ROI - target
         
-        @metric(name='Competitive biomass yield', element='Feedstock', units='dry MT/hc')
+        @metric(name='Competitive biomass yield', element='Feedstock', units='dry MT/ha')
         def competitive_biomass_yield():
             if self.ROI_target is None: return np.nan
             if composition_specification.oil == 0: return self.baseline_dry_biomass_yield
@@ -1205,7 +1205,7 @@ class Biorefinery:
                     f, x0, x1, y0, y1, args=args
                 )
         
-        @metric(name='Energy competitive biomass yield', element='Feedstock', units='dry MT/hc')
+        @metric(name='Energy competitive biomass yield', element='Feedstock', units='dry MT/ha')
         def energy_competitive_biomass_yield():
             if self.net_energy_target is None: return np.nan
             NEP_target = self.net_energy_target
