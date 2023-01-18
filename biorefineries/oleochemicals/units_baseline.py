@@ -48,18 +48,14 @@ class DihydroxylationReactor(bst.CSTR):
 #this would mean that they can also get dihydroxylated 
 #Methyl palmitate has no unsaturation, therefore doesn't participate in the reaction
 #Methyl stearate has no unsaturation, therefore doesn't participate in the reaction  
-#https://pubchem.ncbi.nlm.nih.gov/compound/9_10_12_13-Tetrahydroxyoctadecanoic-acid
-#https://pubchem.ncbi.nlm.nih.gov/compound/193113  
-
 #TODO: don't know the reaction conversion of dihydroxylation reaction
     def _setup(self):
             super()._setup()  
             Dihydroxylation_reaction = PRxn([Rxn('Methyl_oleate + Hydrogen_peroxide -> MDHSA ', 'Methyl_oleate', X = 0.9),
-                                              Rxn('Methyl_linoleate + Hydrogen_peroxide -> Tetrahydroxy_octadecanoic_acid', 'Methyl_linoleate', X = 0.9),
+                                              Rxn('Methyl_linoleate + Hydrogen_peroxide -> Methyl_9_10_dihydroxylinoleate', 'Methyl_linoleate', X = 0.9),
                                               Rxn('Methyl_palmitoleate + Hydrogen_peroxide -> Dihydroxy_palmitic_acid', 'Methyl_palmitoleate', X = 0.9)
-                                            ])
-            Catalyst_dissolution = Rxn('Tungstic_acid -> Tungstate_ion + Hydrogen_ion', 'Tungstic_acid',X = 0.999)   
-            DihydroxylationReactor_rxnsys = RxnSys(Dihydroxylation_reaction, Catalyst_dissolution)
+                                            ])            
+            DihydroxylationReactor_rxnsys = RxnSys(Dihydroxylation_reaction)
             self.reactions = DihydroxylationReactor_rxnsys                       
           
     def _run(self):  
@@ -268,7 +264,7 @@ class Calcium_hydroxide_reactor(bst.CSTR):
         super()._setup()                  
         self.reactions = tmo.ParallelReaction([
                 tmo.Rxn('Cobalt_ion + Calcium_hydroxide + Acetate_ion -> Calcium_acetate + Cobalt_hydroxide', 'Cobalt_ion', X = 0.999),
-                tmo.Rxn('Tungstate_ion + Calcium_hydroxide + Hydrogen_ion -> Calcium_tungstate + H2O', 'Tungstate_ion', X = 0.999)
+                tmo.Rxn('Tungstic_acid + Calcium_hydroxide -> Calcium_tungstate + H2O', 'Tungstic_acid', X = 0.999)
                 ])
             
     def _run(self):
@@ -298,47 +294,13 @@ class Acid_precipitation_reactor(bst.CSTR):
         self.reactions(effluent)
         effluent.P = self.P
         
-# #TODO: this works when I pass a stream separately and simulate it
-# # 1L of resin can exchange 1800 moles
-# # required amount of resin in L is total_moles/1800  of resin
-# # density of the resin is: 1.28*density of air ref:https://www.sigmaaldrich.com/US/en/product/supelco/10322
-# # density of resin(g/L): 1.28*1.29 = 1.65
-# # grams of resin required = total_moles/1800 
-# # for a cylindrical tower with a csa of 5m2 with a radius 2.23m ref: rules of thumb 
-# # Cost of resin required: https://samcotech.com/how-much-does-it-cost-to-buy-maintain-and-dispose-of-ion-exchange-resins/ 
-#     Total_volume_of_resin = total_moles/1800
-#     height_of_the_cylinder = Total_volume_of_resin/(3.14* 5)
-#     total_height = height_of_the_cylinder + 2.5
-# # regenerant equivalents = 100/36.5    
-# # regenerant ratio = 2.7*100/1.8 = 152%, this is the suggested excess ref: http://www.dardel.info/IX/processes/regeneration.html
-# # CSA assumed: 5m2 Ref: rule of thumb book
-# # Cost of acid: same as price of HCl
-# #Amount of acid required for regeneration: 50g*Volume of resin
-# #TODO: ask Yoel what to do about the acid stream
-#     Total_amount_of_acid_in_Kg = 50*Total_volume_of_resin/1000
 
-# Cost of a strong cation exchanger resin: https://samcotech.com/how-much-does-it-cost-to-buy-maintain-and-dispose-of-ion-exchange-resins/
-# @cost(basis = 'Total_volume_of_resin',
-#       ID = 'HydrolysisSystem',
-#       units='L', 
-#       cost =130,#$40 to $200 per cubic foot
-#       S=28.31,
-#       n=1
-#       )
-#TODO: add lifetime and annual = 1
-# #Cost of acid needed for regeneration
-# @cost(basis = 'Total_mass_of_acid',
-#       ID = 'HydrolysisSystem',
-#       units='Kg', 
-#       cost=0.205,#Based on the price given in lipidcan._process_settings
-#       n=1,
-#       S=1,
-#       )
+
 class HydrolysisSystem(bst.Unit,isabstract = True):
     _units = {'Total_volume_of_resin': 'L',
               'Total_mass_of_acid': 'Kg'
               }
-    _N_ins = 1
+    _N_ins = 3
     _N_outs = 7
     
 #The below is a list of unit operations that comprise the Hydrolysis system    
@@ -400,30 +362,9 @@ class HydrolysisSystem(bst.Unit,isabstract = True):
                                                                                  tau = self.tau, #considers regeneration time,
                                                                                  P = self.P)
         self.distillation_column_3 = bst.BinaryDistillation(None,ins = hydrolysis_column_3-1,  LHK = ('Methanol','Water'),Lr = 0.999, Hr = 0.999,   k = 2)
-       
-        # fatty_ester_feed, = self.ins
-        # fatty_ester_feed.show()
-        # tops_1,bottoms_1,tops_2,bottoms_2,tops_3,bottoms_3,organic_mixture, = self.outs            
-        # self.hydrolysis_column_1.ins[0].copy_like(fatty_ester_feed)
-        # self.hydrolysis_column_1.simulate()  
-        # self.distillation_column_1.simulate()
-        # tops_1.copy_like(self.distillation_column_1.outs[0])
-        # bottoms_1.copy_like(self.distillation_column_1.outs[1]) 
-        # self.holding_tank_1.simulate() 
-        # self.hydrolysis_column_2.simulate()
-        # self.distillation_column_2.simulate()
-        # tops_2.copy_like(self.distillation_column_2.outs[0])
-        # bottoms_2.copy_like(self.distillation_column_2.outs[1])
-        # self.holding_tank_2.simulate()
-        # self.hydrolysis_column_3.simulate()
-        # self.distillation_column_3.simulate()
-        # tops_3.copy_like(self.distillation_column_2.outs[0])
-        # bottoms_3.copy_like(self.distillation_column_2.outs[1])
-        # organic_mixture.copy_like(self.hydrolysis_column_3.outs[1])
-        
 #Distillation columns for separating out methanol water     
     def _run(self):
-            fatty_ester_feed, = self.ins
+            fatty_ester_feed = self.ins[0]
             fatty_ester_feed.show()            
             tops_1,bottoms_1,tops_2,bottoms_2,tops_3,bottoms_3,organic_mixture, = self.outs            
             self.hydrolysis_column_1.ins[0].copy_like(fatty_ester_feed)
@@ -442,7 +383,75 @@ class HydrolysisSystem(bst.Unit,isabstract = True):
             tops_3.copy_like(self.distillation_column_2.outs[0])
             bottoms_3.copy_like(self.distillation_column_2.outs[1])
             organic_mixture.copy_like(self.hydrolysis_column_3.outs[1])
-            
-    # def _design(self):
-    #             self.design_results['Total_volume_of_resin']= self.Total_volume_of_resin
-    #             self.design_results['Total_mass_of_acid']= self.Total_mass_of_acid
+ 
+
+    # R601 = units_baseline.HydrolysisReactor(ID = 'R601',
+    #                                           ins = M601-0,
+    #                                           outs = ('methanol_water_mixture_for_separation',
+    #                                                   'organic_mixture_to_next_reactor'),
+    #                                           T = 100+273.15,
+    #                                           V_max =  3.14*5*total_height/3, #decided based on amount of resin required,
+    #                                           tau = 6.5, #considers regeneration time,
+    #                                           P = 101325
+    #                                           )
+    
+    # HT601 = bst.StorageTank('HT601_holding_tank',
+    #                         ins = R601-1,
+    #                         outs = 'reaction_mixture',
+    #                         tau = 6.5)
+   
+    # D601 = bst.BinaryDistillation(ID = 'D601',
+    #                               ins = R601-0,
+    #                               outs = ('recovered_methanol',
+    #                                       'recovered_water'),
+    #                               LHK = ('Methanol',
+    #                                       'Water'),
+    #                               Lr = 0.999,
+    #                               Hr = 0.999,
+    #                               k = 2
+    #                           )    
+    # R602 = units_baseline.HydrolysisReactor(ID = 'R602',
+    #                 ins = HT601-0,
+    #                 outs = ('methanol_water_mixture_for_separation',
+    #                         'organic_mixture_to_next_reactor'),
+    #                 T = 100+273.15,
+    #                 V_max =  3.14*5*total_height/3, #decided based on amount of resin required,
+    #                 tau = 6.5,
+    #                 P = 101325
+    #                 ) 
+    # HT602 = bst.StorageTank('HT602_holding_tank',
+    #                         ins = R602-1,
+    #                         outs = 'reaction_mixture',
+    #                         tau = 6.5)
+    
+    # D602 = bst.BinaryDistillation(ID = 'D602',
+    #                               ins = R602-0,
+    #                               outs = ('recovered_methanol',
+    #                                       'recovered_water'),
+    #                               LHK = ('Methanol',
+    #                                       'Water'),
+    #                               Lr = 0.999,
+    #                               Hr = 0.999,
+    #                               k = 2
+    #                               )
+    # R603 = units_baseline.HydrolysisReactor(ID = 'R603',
+    #                                         ins = HT602-0,
+    #                                         outs = ('methanol_water_mixture_for_separation',
+    #                                                 'organic_mixture_to_next_reactor'),
+    #                                         T = 100+273.15,
+    #                                         V_max =  3.14*5*total_height/3, #decided based on amount of resin required,
+    #                                         tau = 6.5,
+    #                                         P = 101325
+    #                                         ) 
+
+    # D603 = bst.BinaryDistillation(ID = 'D603',
+    #                               ins = R603-0,
+    #                               outs = ('recovered_methanol',
+    #                                       'recovered_water'),
+    #                               LHK = ('Methanol',
+    #                                       'Water'),
+    #                               Lr = 0.9,
+    #                               Hr = 0.9,
+    #                               k = 2
+    #                               ) 
+    
