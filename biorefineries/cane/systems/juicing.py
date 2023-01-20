@@ -64,10 +64,9 @@ def create_juicing_system_without_treatment(ins, outs, pellet_bagasse=None,
     @U201.add_specification(run=True)
     def update_imbibition_water():
         feed = U201.ins[0]
-        other_liquids = feed.imass['Lipid'] if 'Lipid' in feed.chemicals else 0.
-        moisture = feed.imass['Water'] + other_liquids
+        moisture = feed.imass['Water']
         dry = feed.F_mass - moisture
-        imbibition_water.imass['Water'] = 2.68333333 * dry - moisture
+        imbibition_water.imass['Water'] = max(2.68333333 * dry - moisture, 0)
     
     U202 = bst.ConveyingBelt('U202', U201-0, [''] if (pellet_bagasse or dry_bagasse) else [bagasse])
     
