@@ -735,10 +735,10 @@ def plot_feedstock_conventional_comparison_kde():
 def plot_feedstock_cellulosic_comparison_kde(fs=None):
     plot_kde(
         'O2 - S2',
-        yticks=[-16, -12, -8, -4, 0, 4, 8],
+        yticks=[-20, -15, -10, -5, 0, 5, 10],
         xticks=[-0.05, 0, 0.05, 0.1],
-        top_left='Oilcane Favored',
-        bottom_right='Sugarcane Favored',
+        top_left='Oilcane\nFavored()',
+        bottom_right='Sugarcane\nFavored()',
         top_right='GWP\nTradeoff()',
         bottom_left='MFPP\nTradeoff()',
         fs=fs,
