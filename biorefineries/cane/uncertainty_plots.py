@@ -22,7 +22,7 @@ from .feature_mockups import (
     tea_monte_carlo_derivative_metric_mockups,
     lca_monte_carlo_metric_mockups, 
     lca_monte_carlo_derivative_metric_mockups,
-    ROI, MFPP, TCI, electricity_production,
+    ROI, MFPP, TCI, electricity_production, GWP_biofuel_allocation,
     # natural_gas_consumption,
     ethanol_production, biodiesel_production, biodiesel_yield,
     GWP_ethanol, GWP_biodiesel, GWP_electricity,
@@ -139,6 +139,7 @@ for i in area_colors: area_colors[i] = area_colors[i].tint(20)
 palette = Palette(**area_colors)
 letter_color = colors.neutral.shade(25).RGBn
 GWP_units_L = '$\\mathrm{kg} \\cdot \\mathrm{CO}_{2}\\mathrm{eq} \\cdot \\mathrm{L}^{-1}$'
+GWP_units_GGE = GWP_units_L.replace('L', 'GGE')
 GWP_units_L_small = GWP_units_L.replace('kg', 'g')
 CABBI_colors.orange_hatch = CABBI_colors.orange.copy(hatch='////')
     
@@ -161,6 +162,7 @@ mc_line_metric_settings = {
     'Biodiesel production': (biodiesel_production, f"Biodiesel production\n[{format_units('L/MT')}]"),
     'Biodiesel yield': (biodiesel_yield, f"Biodiesel yield\n[{format_units('L/ha')}]"),
     'GWP biodiesel': (GWP_biodiesel, f"GWP Biodiesel [{GWP_units_L}]"),
+    'GWP biofuel': (GWP_biofuel_allocation, f"GWP [{GWP_units_GGE}]"),
     'ROI': (ROI, "Return on Investment [%]"),
 }
 
@@ -404,7 +406,7 @@ def plot_lines_monte_carlo_manuscript(fs=10):
     set_figure_size(aspect_ratio=.8)
     fig, axes = plot_lines_monte_carlo(
         ncols=1,
-        metrics=['ROI', 'GWP biodiesel'],
+        metrics=['ROI', 'GWP biofuel'],
         expand=0.1, 
         xrot=90,
         color_wheel = line_color_wheel,
@@ -570,7 +572,7 @@ def plot_kde(name, metrics=(GWP_ethanol, MFPP), xticks=None, yticks=None,
     plt.subplots_adjust(
         hspace=0.05, wspace=0.05,
         top=0.98, bottom=0.15,
-        left=0.15, right=0.98,
+        left=0.2, right=0.98,
     )
 
 def plot_kde_fake_scenarios_ethanol_price(name, xticks=None, yticks=None,
@@ -730,15 +732,16 @@ def plot_feedstock_conventional_comparison_kde():
         file = os.path.join(images_folder, f'feedstock_conventional_comparison_kde.{i}')
         plt.savefig(file, transparent=True)
 
-def plot_feedstock_cellulosic_comparison_kde():
+def plot_feedstock_cellulosic_comparison_kde(fs=None):
     plot_kde(
         'O2 - S2',
-        # yticks=[-40, -20, 0, 20, 40, 60, 80],
-        # xticks=[-5, -4, -3, -2, -1, 0],
+        yticks=[-16, -12, -8, -4, 0, 4, 8],
+        xticks=[-0.05, 0, 0.05, 0.1],
         top_left='Oilcane Favored',
         bottom_right='Sugarcane Favored',
         top_right='GWP\nTradeoff()',
         bottom_left='MFPP\nTradeoff()',
+        fs=fs,
         # fx=1000.,
     )
     for i in ('svg', 'png'):
@@ -1169,7 +1172,7 @@ def _plot_competitive_biomass_yield_across_oil_content(
                           color=(*colors.CABBI_grey.tint(60).RGBn, 0.9),
                           zorder=0)
         plt.text(
-            2, 5, 'Configuration\n trade-offs', c=colors.neutral.shade(50).RGBn,
+            (oil_content[0] + competitive_oil_content) / 2, 5, 'Configuration\n trade-offs', c=colors.neutral.shade(50).RGBn,
             ha='center', va='center', fontsize=12,
         )
         plt.text(

@@ -223,8 +223,8 @@ def plot_sorghum_oil_content_and_cane_oil_content_contours_manuscript(load=True,
         file = os.path.join(images_folder, f'relative_sorghum_oil_content_and_cane_oil_content_contours.{i}')
         plt.savefig(file, transparent=True)
 
-def plot_sorghum_oil_content_and_cane_oil_content_contours_seminar():
-    plot_sorghum_oil_content_and_cane_oil_content_contours_manuscript(True, 10, 1.3, [2, 6])
+def plot_sorghum_oil_content_and_cane_oil_content_contours_seminar(load=True):
+    plot_sorghum_oil_content_and_cane_oil_content_contours_manuscript(load, 10, 1.3, [2, 6])
 
 # %% General    
 
@@ -474,7 +474,6 @@ def relative_sorghum_oil_content_and_cane_oil_content_data(load, configurations)
             X, Y, configurations, 
         )
         np.save(file, data)
-        filterwarnings('warn')
     return X, Y, data
     
 def plot_sorghum_oil_content_and_cane_oil_content_contours(

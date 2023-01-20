@@ -192,6 +192,14 @@ class Biorefinery:
     def enable_derivative(cls, enable=True):
         cls._derivative_disabled = not enable
     
+    @property
+    def wet_biomass_yield(self):
+        dry_biomass_yield = self.dry_biomass_yield
+        if dry_biomass_yield is None: return None
+        moisture_content = self.feedstock.get_mass_fraction('Water')
+        dry_fraction = 1 - moisture_content
+        return dry_biomass_yield / dry_fraction
+    
     def update_dry_biomass_yield(self, dry_biomass_yield):
         self.dry_biomass_yield = dry_biomass_yield
         # Set preliminary feedstock price assuming 10% is due to transportation
@@ -597,8 +605,10 @@ class Biorefinery:
         
         if conversion_performance_distribution == 'shortterm':
             performance = potential_shortterm_gain_in_performance
+            oil_content_range = [2, 5]
         elif conversion_performance_distribution == 'longterm':
             performance = potential_longterm_gain_in_performance
+            oil_content_range = [5, 15]
         else:
             raise ValueError("`conversion_performance_distribution` must be either 'longterm' or 'shortterm")
             
@@ -833,13 +843,7 @@ class Biorefinery:
         def set_sorghum_FFA_content(sorghum_FFA_content):
             if agile: sorghum_mode.FFA_content = sorghum_FFA_content / 100. 
     
-        if year == 2022:
-            oil_lim = [5, 15]
-        elif year == 2023:
-            oil_lim = [2, 10]
-        else:
-            raise Exception('invalid year')
-        @performance(*oil_lim, element='oilcane', units='dry wt. %', kind='coupled')
+        @uniform(*oil_content_range, element='oilcane', units='dry wt. %', kind='coupled')
         def set_cane_oil_content(cane_oil_content):
             if number < 0: return
             if agile:
@@ -975,7 +979,7 @@ class Biorefinery:
             if self.dry_biomass_yield is None: 
                 return None
             else:
-                return biodiesel_flow() / feedstock_consumption.get() * self.dry_biomass_yield
+                return biodiesel_production.get() * self.wet_biomass_yield
         
         @metric(units='L/MT')
         def ethanol_production():

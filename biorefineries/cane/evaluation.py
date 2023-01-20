@@ -204,21 +204,30 @@ def run_uncertainty_and_sensitivity(name, N, rule='L',
     autosave = N_notify if autosave else False
     if across_lines:
         df = cane.get_composition_data()
-        
-        def set_line(line):
+        current_line = [None]
+        if name == 'O2': 
+            br_sugarcane = cane.Biorefinery(name.replace('O2', 'S2'), **kwargs)
+        def set_line(line, current_line=current_line):
+            if name == 'O2': 
+                config = br_sugarcane if line in ('WT', 'EC') else br
+            config.set_feedstock_line(line)
+            current_line[0] = line
             np.random.seed(1)
-            br.set_feedstock_line(line)
-            br.model.load_samples(br.model.sample(N, rule=rule), optimize=optimize)
+            config.model.load_samples(config.model.sample(N, rule=rule), optimize=optimize)
         
         @no_derivative
-        def evaluate(**kwargs):
-            autoload_file = autoload_file_name(f"{name}_{br.feedstock_line}")
-            br.model.evaluate(
+        def evaluate(current_line=current_line, **kwargs):
+            line = current_line[0]
+            if name == 'O2': config = br_sugarcane if line in ('WT', 'EC') else br
+            autoload_file = autoload_file_name(f"{name}_{config.feedstock_line}")
+            config.model.evaluate(
                 autosave=autosave, 
                 autoload=autoload,
                 file=autoload_file,
                 **kwargs,
             )
+            if config is br_sugarcane:
+                br.model.table = br_sugarcane.model.table
             
         br.model.evaluate_across_coordinate(
             name='Line',
