@@ -114,7 +114,6 @@ class OxidativeCleavageReactor(bst.CSTR):
         effluent.T = self.T
         effluent.P = self.P
         vent.phase = 'g'
-        # TODO: should copy like be used?
         vent.copy_flow(effluent, ('Nitrogen', 'Oxygen','Carbon_dioxide'), remove=True)
         vent.T = effluent.T = self.T
         vent.P = effluent.P = self.P
@@ -132,9 +131,7 @@ class CentrifugeVacuumVessel(bst.Unit):
               self.design_results['Total volume'] = self.feed.F_vol * self.tau
               self.vacuum_system = bst.VacuumSystem(self)
              
-# # @cost(basis = 'total_moles',
-# #       ID = 'HydrolysisReactor',
-# #       units = '')             
+           
 class HydrolysisReactor(bst.CSTR):
     _N_ins = 1
     _N_outs = 2
@@ -210,49 +207,7 @@ class SolidsFlaker(bst.Unit):
                               T_in = self.ins[0].T,
                               T_out = self.T_out)
         
-            
-class AACrystalliser(bst.units.BatchCrystallizer):
-  
-    def __init__(self, ID='', ins=None, outs=(), thermo=None, *,  
-                 T = None
-                  ):
-        bst.BatchCrystallizer.__init__(self, ID, ins, outs, thermo,
-                                        tau=2, V=1e6, T=T)
-        # https://www.alfa.com/en/catalog/B21568/
-        # https://www.chembk.com/en/chem/Nonanoic%20acid#:~:text=Nonanoic%20acid%20-%20Nature%20Open%20Data%20Verified%20Data,yellow.%20Slightly%20special%20odor.%20Melting%20Point%2011-12.5%20%C2%B0c.
-        self.AA_molefraction_330_15K = 0.0006996
-        self.AA_molefraction_280_15K = 0.0000594
-#       self.NA_solubility_gL_at20DEGC = 0.267/1000
-#       #Nonanoic acid melting point is 12.5
-                        
-    @property
-    def Hnet(self):
-        effluent = self.outs[0]
-        solids = effluent['s']
-        H_out = - sum([i.Hfus * j for i,j in zip(self.chemicals, solids.mol) if i.Hfus])
-        return H_out 
 
-    def solubility(self, T):
-        delta_T = 330.15 - 280.15
-        delta_S = self.AA_molefraction_330_15K - self.AA_molefraction_280_15K
-        m = delta_S/delta_T
-        b = m*330.15
-        c = self.AA_molefraction_330_15K - b
-        S = m*T + c
-        return S
-    
-#Assuming inlet at saturation. Therefore adding the feed at saturation of 330.15
-    def _run(self):
-        feed = self.ins[0]    
-        outlet = self.outs[0]
-        outlet.copy_like(feed)
-        outlet.phases = ('s', 'l')
-        x = self.solubility(self.T)
-        outlet.sle('Azelaic_acid',
-                    solubility=x,
-                    T = self.T)
-        outlet.imass['s','Nonanoic_acid'] = feed.imass['Nonanoic_acid']        
-        
 #TODO: Should catalyst regeneration be continuous or batch?
 #TODO: check reaction conversions
 class Calcium_hydroxide_reactor(bst.CSTR):
@@ -273,29 +228,28 @@ class Calcium_hydroxide_reactor(bst.CSTR):
         effluent.mix_from(feed)
         #https://thermosteam.readthedocs.io/en/latest/_modules/thermosteam/_stream.html#Stream.copy_like
         self.reactions(effluent)
+        effluent.copy_like(effluent)
         effluent.P = self.P
         
-class Acid_precipitation_reactor(bst.CSTR):
+class Acid_precipitation_tank(bst.CSTR):    
+    # auxiliary_unit_names = ('heat_exchanger')
     _N_ins = 2
-    _N_outs = 1
-        
+    _N_outs = 1   
+  
     def _setup(self): 
         super()._setup()
-        # Not sure about the below, how do we have ions for the below                         
-        self.reactions = tmo.ParallelReaction([
-                tmo.Rxn('Calcium_tungstate + HCl -> Tungstic_acid + Calcium_chloride', 'Calcium_tungstate',X = 0.999),
-                tmo.Rxn('Cobalt_hydroxide + HCl -> Cobalt_chloride + Water','Cobalt_hydroxide', X = 0.999)
-                ])            
+        Precipitation_reaction = tmo.ParallelReaction([
+                tmo.Rxn('Calcium_tungstate + 2Liquid_HCl -> Tungstic_acid + Calcium_chloride', 'Calcium_tungstate',X = 0.999),
+                tmo.Rxn('Cobalt_hydroxide + 2Liquid_HCl -> Cobalt_chloride + 2Water','Cobalt_hydroxide', X = 0.999)
+                ]) 
+        self.reactions = RxnSys(Precipitation_reaction)
+          
     def _run(self):
-        feed = self.ins
         effluent, = self.outs  
-        effluent.mix_from(feed)
-        #https://thermosteam.readthedocs.io/en/latest/_modules/thermosteam/_stream.html#Stream.copy_like
-        self.reactions(effluent)
-        effluent.P = self.P
+        effluent.mix_from(self.ins)
+        self.reactions(effluent)   
+        effluent.copy_like(effluent)
         
-
-
 class HydrolysisSystem(bst.Unit,isabstract = True):
     _units = {'Total_volume_of_resin': 'L',
               'Total_mass_of_acid': 'Kg'
@@ -364,8 +318,7 @@ class HydrolysisSystem(bst.Unit,isabstract = True):
         self.distillation_column_3 = bst.BinaryDistillation(None,ins = hydrolysis_column_3-1,  LHK = ('Methanol','Water'),Lr = 0.999, Hr = 0.999,   k = 2)
 #Distillation columns for separating out methanol water     
     def _run(self):
-            fatty_ester_feed = self.ins[0]
-            fatty_ester_feed.show()            
+            fatty_ester_feed = self.ins[0]    
             tops_1,bottoms_1,tops_2,bottoms_2,tops_3,bottoms_3,organic_mixture, = self.outs            
             self.hydrolysis_column_1.ins[0].copy_like(fatty_ester_feed)
             self.hydrolysis_column_1.simulate()  
@@ -384,74 +337,46 @@ class HydrolysisSystem(bst.Unit,isabstract = True):
             bottoms_3.copy_like(self.distillation_column_2.outs[1])
             organic_mixture.copy_like(self.hydrolysis_column_3.outs[1])
  
+            
+class AACrystalliser(bst.units.BatchCrystallizer):
+  
+    def __init__(self, ID='', ins=None, outs=(), thermo=None, *,  
+                 T = None
+                  ):
+        bst.BatchCrystallizer.__init__(self, ID, ins, outs, thermo,
+                                        tau=2, V=1e6, T=T)
+        # https://www.alfa.com/en/catalog/B21568/
+        # https://www.chembk.com/en/chem/Nonanoic%20acid#:~:text=Nonanoic%20acid%20-%20Nature%20Open%20Data%20Verified%20Data,yellow.%20Slightly%20special%20odor.%20Melting%20Point%2011-12.5%20%C2%B0c.
+        self.AA_molefraction_330_15K = 0.0006996
+        self.AA_molefraction_280_15K = 0.0000594
+#       self.NA_solubility_gL_at20DEGC = 0.267/1000
+#       #Nonanoic acid melting point is 12.5
+                        
+    @property
+    def Hnet(self):
+        effluent = self.outs[0]
+        solids = effluent['s']
+        H_out = - sum([i.Hfus * j for i,j in zip(self.chemicals, solids.mol) if i.Hfus])
+        return H_out 
 
-    # R601 = units_baseline.HydrolysisReactor(ID = 'R601',
-    #                                           ins = M601-0,
-    #                                           outs = ('methanol_water_mixture_for_separation',
-    #                                                   'organic_mixture_to_next_reactor'),
-    #                                           T = 100+273.15,
-    #                                           V_max =  3.14*5*total_height/3, #decided based on amount of resin required,
-    #                                           tau = 6.5, #considers regeneration time,
-    #                                           P = 101325
-    #                                           )
+    def solubility(self, T):
+        delta_T = 330.15 - 280.15
+        delta_S = self.AA_molefraction_330_15K - self.AA_molefraction_280_15K
+        m = delta_S/delta_T
+        b = m*330.15
+        c = self.AA_molefraction_330_15K - b
+        S = m*T + c
+        return S
     
-    # HT601 = bst.StorageTank('HT601_holding_tank',
-    #                         ins = R601-1,
-    #                         outs = 'reaction_mixture',
-    #                         tau = 6.5)
-   
-    # D601 = bst.BinaryDistillation(ID = 'D601',
-    #                               ins = R601-0,
-    #                               outs = ('recovered_methanol',
-    #                                       'recovered_water'),
-    #                               LHK = ('Methanol',
-    #                                       'Water'),
-    #                               Lr = 0.999,
-    #                               Hr = 0.999,
-    #                               k = 2
-    #                           )    
-    # R602 = units_baseline.HydrolysisReactor(ID = 'R602',
-    #                 ins = HT601-0,
-    #                 outs = ('methanol_water_mixture_for_separation',
-    #                         'organic_mixture_to_next_reactor'),
-    #                 T = 100+273.15,
-    #                 V_max =  3.14*5*total_height/3, #decided based on amount of resin required,
-    #                 tau = 6.5,
-    #                 P = 101325
-    #                 ) 
-    # HT602 = bst.StorageTank('HT602_holding_tank',
-    #                         ins = R602-1,
-    #                         outs = 'reaction_mixture',
-    #                         tau = 6.5)
-    
-    # D602 = bst.BinaryDistillation(ID = 'D602',
-    #                               ins = R602-0,
-    #                               outs = ('recovered_methanol',
-    #                                       'recovered_water'),
-    #                               LHK = ('Methanol',
-    #                                       'Water'),
-    #                               Lr = 0.999,
-    #                               Hr = 0.999,
-    #                               k = 2
-    #                               )
-    # R603 = units_baseline.HydrolysisReactor(ID = 'R603',
-    #                                         ins = HT602-0,
-    #                                         outs = ('methanol_water_mixture_for_separation',
-    #                                                 'organic_mixture_to_next_reactor'),
-    #                                         T = 100+273.15,
-    #                                         V_max =  3.14*5*total_height/3, #decided based on amount of resin required,
-    #                                         tau = 6.5,
-    #                                         P = 101325
-    #                                         ) 
-
-    # D603 = bst.BinaryDistillation(ID = 'D603',
-    #                               ins = R603-0,
-    #                               outs = ('recovered_methanol',
-    #                                       'recovered_water'),
-    #                               LHK = ('Methanol',
-    #                                       'Water'),
-    #                               Lr = 0.9,
-    #                               Hr = 0.9,
-    #                               k = 2
-    #                               ) 
-    
+#Assuming inlet at saturation. Therefore adding the feed at saturation of 330.15
+    def _run(self):
+        feed = self.ins[0]    
+        outlet = self.outs[0]
+        outlet.copy_like(feed)
+        outlet.phases = ('s', 'l')
+        x = self.solubility(self.T)
+        outlet.sle('Azelaic_acid',
+                    solubility=x,
+                    T = self.T)
+        outlet.imass['s','Nonanoic_acid'] = feed.imass['Nonanoic_acid']        
+        

@@ -173,7 +173,7 @@ chems = tmo.Chemicals([
                       Tb=3200.15,#Based on cobalt's BP
                       default = True),
 ##Chemicals required for catalyst recovery
-        tmo.Chemical('Calcium_hydroxide',default = True,phase = 'l'),
+        tmo.Chemical('Calcium_hydroxide',default = True,phase = 'l'),#assumed this phase because it is soluble in the reaction media it is used in
         tmo.Chemical('Calcium_chloride'),    
         tmo.Chemical.blank('Calcium_tungstate',
                        CAS = '7790-75-2',
@@ -181,12 +181,13 @@ chems = tmo.Chemicals([
                        Tb = 5828.15, #Based on tungsten's BP
                        formula = 'CaWO4',
                        phase = 's'),    
-        tmo.Chemical('Calcium_acetate'),
-        tmo.Chemical('Cobalt_hydroxide'),
+        tmo.Chemical('Calcium_acetate',default = True),
+        tmo.Chemical('Cobalt_hydroxide',default = True),
         tmo.Chemical('HCl2', search_ID = 'HCl'),
 ##Resin for hydrolysis
 ##Sulfonated_polystyrene with a search_ID = '98-70-4', lacks Hvap data, hence polystyrene's properties were used
-##Boiling point based on amberlyte, Ref:##https://www.chemsrc.com/en/cas/39389-20-3_843683.html#:~:text=amberlyst%28r%29%2015%20CAS%20Number%3A%2039389-20-3%3A%20Molecular%20Weight%3A%20314.39900%3A,Point%3A%20266.3%C2%BAC%3A%20Symbol%3A%20GHS07%3A%20Signal%20Word%3A%20Warning%20%C3%97
+##Boiling point based on amberlyte
+# Ref:##https://www.chemsrc.com/en/cas/39389-20-3_843683.html#:~:text=amberlyst%28r%29%2015%20CAS%20Number%3A%2039389-20-3%3A%20Molecular%20Weight%3A%20314.39900%3A,Point%3A%20266.3%C2%BAC%3A%20Symbol%3A%20GHS07%3A%20Signal%20Word%3A%20Warning%20%C3%97
         tmo.Chemical('polystyrene_based_catalyst',
                      search_ID='Polystyrene',
                      Tb = 516.7+273.15,
@@ -198,7 +199,13 @@ chems = tmo.Chemicals([
         tmo.Chemical('Monopalmitin'),
 #Natural gas for heating purposes 
         tmo.Chemical('Natural_gas',
-                 search_ID = 'CH4'),    
+                 search_ID = 'CH4'), 
+#Chemicals required by the boilerturbogenerator        
+        tmo.Chemical('Ash', MW = 1,
+                     phase = 's',
+                     search_db=False),
+        tmo.Chemical('P4O10',
+                     phase = 's')
                  ])
 
 #Fitting data for MMA based on ChemSep
@@ -275,6 +282,8 @@ chems.Acetate_ion.copy_models_from((chems.Acetate),
                                        'Hvap',
                                        'sigma',
                                        ])
+chems.Calcium_acetate.V.l.add_method(chems.Calcium_acetate.MW*0.000001/1.5)#density from: https://pubchem.ncbi.nlm.nih.gov/compound/Calcium-acetate#section=Density
+chems.Cobalt_hydroxide.V.l.add_method(chems.Cobalt_hydroxide.MW*1.0E-6/3.597)
 ## Modelling properties of dihydroxylated compounds as MDHSA
 chems.Dihydroxy_palmitic_acid.copy_models_from(chems.MDHSA,
                                                   ['Hvap',
@@ -314,6 +323,13 @@ chems.Sodium_methoxide.copy_models_from (LiquidMethanol,
                                             ['V', 'sigma',
                                              'kappa', 'Cn',
                                              'Psat'])
+
+#Properties of chemicals required by the boilerturbogenerator based on cane.chemicals.py
+chems.Ash.Cn.add_model(0.09 * 4.184 * chems.Ash.MW) 
+for chemical in [chems.Ash,chems.P4O10]:
+    V = fn.rho_to_V(rho=1540, MW=chemical.MW)
+    chemical.V.add_model(V, top_priority=True)
+    
 #The below NaOH and HCl are based on the cane refinery chemicals.py module
 def create_new_chemical(ID, phase='s', **constants):
         solid = tmo.Chemical.blank(ID, phase=phase, **constants)
@@ -369,4 +385,5 @@ chems.set_synonym('MonoOlein', 'MAG')
 chems.set_synonym('Dipalmitin', 'DAG')
 chems.set_synonym('Hydrogen_ion', 'H+')
 chems.set_synonym('Pelargonic_acid','Nonanoic_acid')
+chems.set_synonym('HCl2','Liquid_HCl')
 # chems.show()
