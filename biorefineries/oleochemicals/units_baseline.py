@@ -51,9 +51,10 @@ class DihydroxylationReactor(bst.CSTR):
 #TODO: don't know the reaction conversion of dihydroxylation reaction
     def _setup(self):
             super()._setup()  
-            Dihydroxylation_reaction = PRxn([Rxn('Methyl_oleate + Hydrogen_peroxide -> MDHSA ', 'Methyl_oleate', X = 0.9),
-                                              Rxn('Methyl_linoleate + Hydrogen_peroxide -> Methyl_9_10_dihydroxylinoleate', 'Methyl_linoleate', X = 0.9),
-                                              Rxn('Methyl_palmitoleate + Hydrogen_peroxide -> Dihydroxy_palmitic_acid', 'Methyl_palmitoleate', X = 0.9)
+            X1 = 0.9
+            Dihydroxylation_reaction = PRxn([Rxn('Methyl_oleate + Hydrogen_peroxide -> MDHSA ', 'Methyl_oleate', X = X1),
+                                              Rxn('Methyl_linoleate + Hydrogen_peroxide -> Methyl_9_10_dihydroxylinoleate', 'Methyl_linoleate', X = X1),
+                                              Rxn('Methyl_palmitoleate + Hydrogen_peroxide -> Dihydroxy_palmitic_acid', 'Methyl_palmitoleate', X = X1)
                                             ])            
             DihydroxylationReactor_rxnsys = RxnSys(Dihydroxylation_reaction)
             self.reactions = DihydroxylationReactor_rxnsys                       

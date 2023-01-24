@@ -6,8 +6,12 @@ Created on Sun Oct 23 16:17:35 2022
 """
 
 import biosteam as bst
+import chaospy
 from chaospy import distributions as shape
 from biorefineries.oleochemicals import systems_baseline 
+from systems_baseline import aa_baseline_sys
+from systems_baseline  import F_baseline
+import numpy as np
 #TODO: what to do about prices
 ##Prices from the literature
 ##Ref: https://doi.org/10.1016/j.indcrop.2020.112411
@@ -87,12 +91,12 @@ class TEA_baseline(bst.TEA):
                                    self.administration +self.plant_overhead                                  
                                    ))
     
-azelaic_baseline = TEA_baseline(system = systems_baseline.azelaic_acid_sys,
+tea_azelaic_baseline = TEA_baseline(system = systems_baseline.aa_baseline_sys,
                                 operating_days = 200,
                                 IRR = 0.1,duration=(2013,2023),
                                 depreciation = 'MACRS7',
                                 lang_factor = 3,income_tax = 0.35,
-                                construction_schedule = (0.4,0.6),
+                                construction_schedule = (2/3,1/3),#Econ. ref
                                 WC_over_FCI=0.05,
                                 labor_cost = 3600000,
                                 property_tax = 0.02,
@@ -103,6 +107,51 @@ azelaic_baseline = TEA_baseline(system = systems_baseline.azelaic_acid_sys,
                                 laboratory_charges = 0.18,
                                 operating_supervision = 0.18,
                                 plant_overhead = 0.6,
-                                OSBL_units = [systems_baseline.azelaic_acid_sys.facilities])    
+                                OSBL_units = [systems_baseline.aa_baseline_sys.facilities])    
     
+solve_IRR = tea_azelaic_baseline.solve_IRR
+total_utility_cost = lambda: tea_azelaic_baseline.utility_cost / 10**6 # In 10^6 USD/yr
+metrics = (bst.Metric('Internal rate of return', tea_azelaic_baseline.solve_IRR, '%'),
+           bst.Metric('Utility cost', total_utility_cost, '10^6 USD/yr'))
+model = bst.Model(aa_baseline_sys, metrics)
+crude_veg_oil_feedstock = F_baseline.stream.crude_vegetable_oil # The feedstock stream
+fresh_tungsten_catalyst = F_baseline.stream.fresh_tungsten_catalyst
+fresh_cobalt_catalyst = F_baseline.stream.fresh_cobalt_catalyst_stream
+
+lb = crude_veg_oil_feedstock.price * 0.9 # Minimum price
+ub = crude_veg_oil_feedstock.price * 1.1 # Maximum price
+@model.parameter(element=crude_veg_oil_feedstock,
+                 kind='isolated',
+                 units='USD/kg',
+                 distribution=shape.Uniform(lb, ub))
+def set_feed_price(feedstock_price):
+    crude_veg_oil_feedstock.price = feedstock_price
     
+@model.parameter(element = fresh_tungsten_catalyst,
+                 kind = 'isolated',
+                 units ='USD/kg',
+                 distribution = chaospy.Normal(mu = 3, sigma = 1))#USD/ton to USD/Kg
+def set_tungsten_catalyst_price(fresh_tungsten_catalyst_price):
+    fresh_tungsten_catalyst.price = fresh_tungsten_catalyst_price
+    
+@model.parameter(element = fresh_cobalt_catalyst,
+                 kind = 'isolated',
+                 units ='USD/kg',
+                 distribution = chaospy.Normal(mu = 10.918, sigma = 0.5))#USD/ton to USD/Kg
+def set_cobalt_catalyst_price(fresh_cobalt_catalyst_price):
+    fresh_cobalt_catalyst.price = fresh_cobalt_catalyst_price
+      
+
+N_samples = 50
+rule = 'L' # For Latin-Hypercube sampling
+np.random.seed(1234) # For consistent results
+samples = model.sample(N_samples, rule)
+model.load_samples(samples)
+model.evaluate(
+    notify=25 # Also print elapsed time after 50 simulations
+    )    
+df_rho, df_p = model.spearman_r()
+print(df_rho['Biorefinery', 'Utility cost [10^6 USD/yr]'])
+bst.plots.plot_spearman_1d(df_rho['Biorefinery', 'Utility cost [10^6 USD/yr]'],
+                           index=[i.describe() for i in model.parameters],
+                           name='annual_utility_costs [10^6 USD/yr]') 

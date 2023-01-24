@@ -75,26 +75,26 @@ def crude_HOSO_oil_to_biodiesel(ins,outs):
 # Stainless steel tanks are preferred for crude oils
 # Ref: Bailey's Industrial Oil and Fat Products, Edible Oil and Fat Products Processing Technologies By Alton Edward Bailey · 2005
 # From section 2.4: Equipment for storage and handling of crude fats and oils
-    T001 = bst.units.StorageTank('T001',
-                              ins = crude_vegetable_oil,
-                              outs ='biodiesel_to_pump',
-                              vessel_material='Stainless steel')
+    T1001 = bst.units.StorageTank('T1001',
+                               ins = crude_vegetable_oil,
+                               outs ='biodiesel_to_pump',
+                               vessel_material='Stainless steel')
     
-    P001 = bst.units.Pump('P001',
-                      ins = T001-0,
+    P1001 = bst.units.Pump('P1001',
+                      ins = T1001-0,
                       outs = 'biodiesel_to_reactor_mixer',
                       material = 'Stainless steel')
     
 # Using just acid degumming as the only degumming method
 #Ref: Zufarov, Oybek, Štefan Schmidt and Stanislav Sekretár. “Degumming of rapeseed and sunflower oils.” (2008).
-    H001 = bst.HXutility('Crude_oil_heating',
-                          ins = P001-0,
+    H1001 = bst.HXutility('H1001',
+                          ins = P1001-0,
                           outs = ('heated_crude_oil'),
                           T = 273.15 + 80)#Temp given in the ref
 #Mixing 30% of citric acid and then adding the solution 2% by vol to oil in a mixtank 
 #Ref: Zufarov, Oybek, Štefan Schmidt and Stanislav Sekretár. “Degumming of rapeseed and sunflower oils.” (2008).
-    M001 = bst.MixTank(ID = 'Mix_tank_for_degumming',
-                        ins = (H001-0,
+    M1001 = bst.MixTank(ID = 'T1002',
+                        ins = (H1001-0,
                               water_for_degumming,
                               citricacid_for_degumming),
                         outs = ('acid_water_mixture'),
@@ -103,32 +103,32 @@ def crude_HOSO_oil_to_biodiesel(ins,outs):
 #Ref:Zufarov, Oybek, Štefan Schmidt and Stanislav Sekretár. “Degumming of rapeseed and sunflower oils.” (2008).
     def adjust_degumming_components(): 
       citricacid_for_degumming.imass['Citric_acid'] = 0.3 * water_for_degumming.F_mass
-      (citricacid_for_degumming+ water_for_degumming).F_vol =  0.02 * H001-0
-      M001.add_specification(adjust_degumming_components, run=True)       
+      (citricacid_for_degumming+ water_for_degumming).F_vol =  0.02 * H1001-0
+      M1001.add_specification(adjust_degumming_components, run=True)       
 #Cooling the mixture       
-    H002 = bst.HXutility('Crude_oil_mix_cooling',
-                          ins = M001-0,
+    H1002 = bst.HXutility('H1002',
+                          ins = M1001-0,
                           outs = ('cooled_crude_oil'),
                           T = 273.15 + 25)
 #Adding 1% water solution to the mix
 #Ref:Zufarov, Oybek, Štefan Schmidt and Stanislav Sekretár. “Degumming of rapeseed and sunflower oils.” (2008).
-    M002 = bst.MixTank(ID = 'Second_Mix_tank_for_degumming',
-                       ins = (H002-0,
+    M1002 = bst.MixTank(ID = 'T1003',
+                       ins = (H1002-0,
                               water_for_degumming_2),
                        outs = ('water_oil_mixture'),                       
                        vessel_material='Stainless steel',
                        tau = 1)
                                                                                                    
     def adjust_degumming_components_2():
-        water_for_degumming_2.F_vol = 0.01*H002-0            
-        M002.add_specification(adjust_degumming_components_2,
+        water_for_degumming_2.F_vol = 0.01*H1002-0            
+        M1002.add_specification(adjust_degumming_components_2,
                                       run=True) 
        
 #Centrifuging the degummed oil out, assuming 97% removal of PL using acid degumming
 #Ref:Zufarov, Oybek, Štefan Schmidt and Stanislav Sekretár. “Degumming of rapeseed and sunflower oils.” (2008).
 #Results from the above suggest ~96% removal using the acid degumming process
-    C001 = bst.LiquidsSplitCentrifuge(ID = 'Centrifuge_for_PL_removal',
-                                        ins = M002-0,
+    C1001 = bst.LiquidsSplitCentrifuge(ID = 'C1001',
+                                        ins = M1002-0,
                                       outs = ('degummed_oil', 
                                               polar_lipids_to_boilerturbogenerator),
                                       split = dict(PL = 0.4,
@@ -151,7 +151,7 @@ def crude_HOSO_oil_to_biodiesel(ins,outs):
         tmo.Reaction('PLS + 3Methanol -> Methyl_palmitate + Methyl_linoleate + Methyl_stearate + Glycerol', reactant='PLS',  X=0.90),
     ])
     
-    sys = create_transesterification_and_biodiesel_separation_system(ins = C001-0,
+    sys = create_transesterification_and_biodiesel_separation_system(ins = C1001-0,
                                                                      outs = (biodiesel,
                                                                              crude_glycerol,
                                                                              wastewater1_to_boilerturbogenerator),
@@ -191,8 +191,6 @@ ob0 = crude_HOSO_oil_to_biodiesel(ins = (bst.Stream(ID='crude_vegetable_oil',# C
                                                     price = 0.55*2.391/0.45359237, #Citric acid price 0.55 $/lb,Updated Price = Older Price x [(Cost Index at Newer Date) / (Cost Index at Older Date)]   
                                                     units = 'kg/hr'))) #catergory of Inorganic chemicals, other than alkalies and chlorine, indices - 168.000 for August 2006, 401.693 for Dec 2022, ratio = 401.693 /168.000  Ref: Producer price index from https://fred.stlouisfed.org/
 
-ob0.simulate()
-ob0.show()
 #########################################################################################################
 # After degumming and production of biodiesel, it is sent for dihydroxylation
 # The flowrates for both the tungstic acid and H2O2 are adjusted acc to the flowrate of biodiesel coming 
@@ -295,13 +293,13 @@ ob1 = dihydroxylation_system(ins = (bst.Stream(ID='fresh_HP',
                                     recovered_tungstic_acid,
                                     ob0.outs[1] #biodiesel from previous section
                                     ))
-#Air distribution package
-plant_air = bst.Stream(ID = 'plant_air',
-                        Air = 1,
-                        units = 'kg/hr')
+# #Air distribution package
+# plant_air = bst.Stream(ID = 'plant_air',
+#                         Air = 1,
+#                         units = 'kg/hr')
 
 ADP801 = bst.facilities.AirDistributionPackage(ID = 'ADP801',
-                                                ins = plant_air,
+                                                ins = ('air_for_oxidative_cleavage'),
                                                 outs = ('air_for_oxidative_cleavage')
                                                 )    
 #########################################################################################################
@@ -489,7 +487,7 @@ def degassing_the_oily_phase(ins,outs):
 #When changed to a shortcut column, liquid heat cap method for
 #'112-62-9' Dadgostar shaw fails to extrapolate
 
-    F401 = bst.units.Flash (ID = 'F401',
+    F2001 = bst.units.Flash (ID = 'F2001',
                             ins = fatty_acids_with_some_moisture,
                             outs = (wastewater2_to_boilerturbogenerator,
                                     dried_crude_fatty_acids),                            
@@ -550,10 +548,6 @@ def nonanoic_acid_fraction_separation(ins,outs):
 
 ob5 = nonanoic_acid_fraction_separation(ins = ob4.outs[1]) 
 
-ADP802 = bst.facilities.AirDistributionPackage(ID = 'ADP802',
-                                                ins = plant_air,
-                                                outs = ('air_for_azelaic_acid_drying'),
-                                                      )
 #########################################################################################################
 # Hydrolysis of FAME's to produce fatty acids (600 level)
 @SystemFactory(
@@ -564,19 +558,20 @@ ADP802 = bst.facilities.AirDistributionPackage(ID = 'ADP802',
             dict(ID = 'solvent_for_extraction'),
             recycled_solvent_for_extraction,
             ],  
-    outs = [dict(ID = 'crude_methanol',price = price['Methanol']),
+    outs = [dict(ID = 'crude_methanol'),
             dict(ID = 'wastewater3_to_boilerturbogenerator'),
             dict(ID = 'diols_and_other_fatty_acids_for_recycling'),
             dict(ID = 'solvent_monocarboxylics_mixture'),
             dict(ID = 'wastewater6_to_boilerturbogenerator'),
             dict(ID = 'lighter_boiling_impurities_to_boilerturbogenerator'),
+            dict(ID = 'heavy_boiling_compounds_to_boilerturbogenerator'),
             dict(ID = 'azelaic_acid_product_stream'),
             ],
     fixed_outs_size = True,     
               )
 def hydrolysis_of_organic_fraction(ins,outs):
     crude_heavy_fatty_acids,water_for_emulsification,water_for_azelaicacid_extraction,solvent_for_extraction,recycled_solvent_for_extraction = ins
-    crude_methanol,wastewater3_to_boilerturbogenerator,diols_and_other_fatty_acids_for_recycling,solvent_monocarboxylics_mixture,wastewater6_to_boilerturbogenerator,lighter_boiling_impurities_to_boilerturbogenerator,azelaic_acid_product_stream, = outs
+    crude_methanol,wastewater3_to_boilerturbogenerator,diols_and_other_fatty_acids_for_recycling,solvent_monocarboxylics_mixture,wastewater6_to_boilerturbogenerator,lighter_boiling_impurities_to_boilerturbogenerator,heavy_boiling_compounds_to_boilerturbogenerator,azelaic_acid_product_stream, = outs
      
 #Mix tank for making the emulsion for the hydrolysis reaction
     M601 = bst.units.MixTank('M601',
@@ -836,7 +831,7 @@ def hydrolysis_of_organic_fraction(ins,outs):
     D606 = bst.units.BinaryDistillation(ID = 'D606',
                                         ins = D605-1,
                                         outs = ('azelaic_acid_product_stream',
-                                                'heavy_boiling_compounds'
+                                                heavy_boiling_compounds_to_boilerturbogenerator #TODO: think about what to do
                                                 ),
                                         LHK = ('Azelaic_acid',
                                               'Monomethyl_azelate'
@@ -874,12 +869,13 @@ ob6 = hydrolysis_of_organic_fraction(ins = (ob5.outs[1],
                                                         characterization_factors = ({'GWP100',0.87662}),#Ref ecoinvent: white spirit production, RoW, (Author: David FitzGerald)
                                                         price = 566*2.8535/55  ), #Ref: price available online for 55 gal, price adjusted based on density,#https://bulkchemicals2go.com/product/mineral-spirits-55-gallon-drums/
                                             recycled_solvent_for_extraction),
-                                     outs = (bst.Stream(ID = 'crude_methanol'),
+                                     outs = (bst.Stream(ID = 'crude_methanol',price = price['Methanol']),
                                              bst.Stream(ID = 'wastewater3_to_boilerturbogenerator'),
                                              recycled_diols_and_other_fatty_acids,
                                              bst.Stream(ID = 'solvent_monocarboxylics_mixture'),
                                              bst.Stream(ID = 'wastewater6_to_boilerturbogenerator'),
                                              bst.Stream(ID = 'lighter_boiling_impurities_to_boilerturbogenerator'),
+                                             bst.Stream(ID = 'heavy_boiling_compounds_to_boilerturbogenerator'),
                                              bst.Stream(ID = 'azelaic_acid_product_stream')))
 #########################################################################################################
 ## Catalyst recovery area (700)
@@ -904,7 +900,8 @@ def catalyst_recovery_from_aqueous_stream (ins,outs):
     calcium_hydroxide,aqueous_stream_from_disc_separator,water_for_RVF,water_for_dilution,conc_six_N_hydrochloric_acid,water_for_precipitate_washing, = ins
     wastewater4_to_boilerturbogenerator,recovered_tungstic_acid, recovered_mixture_of_cobalt_catalyst, = outs
     
-    T701 = bst.StorageTank(ins = calcium_hydroxide,
+    T701 = bst.StorageTank(ID = 'T701',
+                            ins = calcium_hydroxide,
                             outs = ('calcium_hydroxide_to_splitter'),
                             vessel_type  = "Solids handling bin",#Cost reference from warren sieder
                             vessel_material='Carbon steel'
@@ -1063,17 +1060,18 @@ def monocarboxylics_separation_and_solvent_recovery(ins,outs):
 ob8 = monocarboxylics_separation_and_solvent_recovery (ins = (ob6.outs[3],
                                                               ob5.outs[0]),
                                                        outs = (recycled_solvent_for_extraction,
-                                                              bst.Stream(ID = 'monocarboxylic_acids')))
+                                                              bst.Stream(ID = 'monocarboxylic_acids',
+                                                                         )))
 #########################################################################################################
 # Streams specs belonging to the cane biorefinery used for biodisel prep
 #TODO: adjusted these prices from 2013 to 2022
 #Methanol
-F_baseline.stream.s1.price = price['Methanol']
-F_baseline.stream.s1.characterization_factors = {'GWP100': GWP_characterization_factors['methanol']}
+F_baseline.stream.methanol.price = price['Methanol']
+F_baseline.stream.methanol.characterization_factors = {'GWP100': GWP_characterization_factors['methanol']}
 
 #Catalyst
-F_baseline.stream.s2.price = price['NaOCH3']
-F_baseline.stream.s2.characterization_factors = {'GWP100': GWP_characterization_factors['NaOCH3']}
+F_baseline.stream.catalyst.price = price['NaOCH3']
+F_baseline.stream.catalyst.characterization_factors = {'GWP100': GWP_characterization_factors['NaOCH3']}
 
 # #Biodiesel wash water
 # F_baseline.stream.biodiesel_wash_water.price = price['Water']
@@ -1105,7 +1103,10 @@ M901 = bst.Mixer( ID = 'M901',
                           F_baseline.wastewater2_to_boilerturbogenerator,
                           F_baseline.wastewater6_to_boilerturbogenerator,
                           F_baseline.condensate_to_boilerturbogenerator,
-                          F_baseline.wastewater3_to_boilerturbogenerator
+                          F_baseline.wastewater3_to_boilerturbogenerator,
+                          F_baseline.lighter_boiling_impurities_to_boilerturbogenerator,
+                          F_baseline.wastewater4_to_boilerturbogenerator,    
+                          F_baseline.stream.heavy_boiling_compounds_to_boilerturbogenerator,
                         ),
                   outs = ('total_effluent_to_be_burned')
                   )
@@ -1114,14 +1115,31 @@ BT901 = bst.BoilerTurbogenerator(ID ='BT901',
                                   ins = (M901-0,
                                           F_baseline.stream.ventedgas_to_boilerturbogenerator,
                                           'boiler_makeup_water',
-                                          'natural_gas',
-                                          'FGD_lime',
-                                          'boilerchems'),
+                                          bst.Stream(ID ='natural_gas',units = 'kg/hr'),
+                                          bst.Stream(ID ='lime_boiler',units = 'kg/hr', price = 0.1189*2.2046),#TODO: CURRENTLY BASED ON LACTIC ACID> PROCESS SETTINGS 2016 PRICES
+                                          bst.Stream(ID ='boiler_chems', units = 'kg/hr', price = 2.9772*2.2046),#TODO: CURRENTLY BASED ON LACTIC ACID> PROCESS SETTINGS 2016 PRICES
+                                          ),
                                   outs = ('emissions',
-                                    'rejected_water_and_blowdown',
-                                    'ash_disposal'),
-                                  turbogenerator_efficiency=0.85
+                                          'rejected_water_and_blowdown_to_PWT',#this can be reused as process water
+                                           bst.Stream(ID='ash_disposal',units = 'kg/hr')),
+                                  turbogenerator_efficiency=0.85,
+                                  natural_gas_price= 0.218, #TODO: change this price to current price
+                                  ash_disposal_price=-0.0318,#TODO: ask how to update the price,
+                                  satisfy_system_electricity_demand =  False, #TODO: ask what to do about this
+                                  
                                   )
+                                 
+CT901 = bst.CoolingTower(ID ='CT901')
+CT901.ins[-1].price = 1.7842*2.2046 #TODO: CURRENTLY BASED ON LACTIC ACID> PROCESS SETTINGS 2016 PRICES
+
+                         # ins = ('some_water_input',
+                         #        'cooling_tower_makeup_water',
+                         #        bst.Stream(ID = 'cooling_tower_chemicals',
+                         #                   units = 'kg/hr',
+                         #                   price = 0.3)),#TODO: correct this
+                         # outs = ('some_water_output',
+                         #         'cooling_tower_blowdown',
+                         #         'cooling_tower_evaporation'))
 #All the streams that are required in the different sections for production of azelaic acid
 process_water_streams_available = (
                                     F_baseline.stream.water_for_emulsification,#Water used for hydrolysis and emulsification 
@@ -1131,22 +1149,24 @@ process_water_streams_available = (
                                     F_baseline.stream.water_for_degumming,#Water used for degumming the oils from the polar lipids
                                     F_baseline.stream.water_for_degumming_2,#Second Water stream used for degumming the oils from the polar lipids
                                     F_baseline.stream.biodiesel_wash_water, #Wash water for biodiesel
-                                    F_baseline.stream.water_for_azelaicacid_extraction,
-                                    F_baseline.stream.lighter_boiling_impurities_to_boilerturbogenerator,
+                                    F_baseline.stream.water_for_azelaicacid_extraction,                                                                        
+                                    CT901.outs[1],#Cooling_tower_blowdown_from_cooling tower
+                                    BT901.outs[1]#rejected_water_and_blowdown from boilerturbogen
                                     
-                                    )
-                                  
-CT901 = bst.CoolingTower(ID ='CT901')
-makeup_water_streams_available = (F_baseline.stream.cooling_tower_makeup_water,#This comes from the CoolingTower class, check CoolingTower source code for more info
-                                  F_baseline.stream.boiler_makeup_water) #This is obtained from the BoilerTurbogenerator class
+                                    )                         
 
-makeup_water = bst.Stream('makeup_water', price=0.000254)#Ref: https://github.com/BioSTEAMDevelopmentGroup/Bioindustrial-Park/blob/master/biorefineries/lipidcane/_system.py
-PWT901 = bst.ProcessWaterCenter(ID = 'PW901',
+makeup_water_streams_available = (F_baseline.stream.cooling_tower_makeup_water,#This is the second inlet to cooling tower
+                                  F_baseline.stream.boiler_makeup_water) #This is the second inlet to boilerturbogen
+
+system_makeup_water = bst.Stream('system_makeup_water', price=0.000254)#Ref: https://github.com/BioSTEAMDevelopmentGroup/Bioindustrial-Park/blob/master/biorefineries/lipidcane/_system.py
+PWT901 = bst.ProcessWaterCenter(ID = 'PWT901',
                         ins = ('clean_water',
-                                makeup_water,
+                                system_makeup_water,
+                                'direct_recycled_water'
                               ),
-                        outs = ('process_water', 'wastewater'),
-                        thermo = None,
+                        outs = ('process_water',
+                                'waste'),
+                        # thermo = None,
                         makeup_water_streams = makeup_water_streams_available,
                         process_water_streams = process_water_streams_available 
                         )
@@ -1155,13 +1175,26 @@ CW901 = bst.ChilledWaterPackage('CW901') #Chilled water package for cooling requ
 # HXN901 = F_baseline.create_system('HXN901')
 # HXN901.simulate()
 # HXN.simulate()
-CIP901 = bst.CIPpackage('CIP901') #Cleaning in place for the boiler
-FWT901 = bst.FireWaterTank('FWT901')#Water tank for fires
 
+#TODO: below two units based on assumptions from lactic acid
+# Clean-in-place
+#Currently based on lactic acid biorefinery
+CIP901 = bst.CIPpackage('CIP901',ins ='CIP_chems_in', outs ='CIP_chems_out') #Cleaning in place for the boiler#TODO: ask why
+# CIP901.CIP_over_feedstock = 0.00121#TODO: where does this come from
+@CIP901.add_specification(run=True)
+def adjust_CIP(): CIP901.ins[0].imass['H2O'] = F_baseline.stream.crude_vegetable_oil.F_mass*0.00121
+
+#Fire Water tank 
+FWT901 = bst.FireWaterTank('FWT901', ins = 'Firewater_in', outs = 'Firewater_out')
+# FWT901.fire_water_over_feedstock = 0.08
+@FWT901.add_specification(run=True)
+def adjust_fire_water(): FWT901.ins[0].imass['Water'] =  F_baseline.stream.crude_vegetable_oil.F_mass*0.08
+
+#TODO: think about wastewater treatment
 #########################################################################################################
 
-azelaic_acid_sys = bst.System(ID = 'azelaic_acid_sys',
-                              path = (ob1,ob2,ob3,
+aa_baseline_sys = bst.System(ID = 'aa_baseline_sys',
+                              path = (ob0,ob1,ob2,ob3,
                                       ob4,ob5,ob6,
                                       ob7,ob8), 
                               recycle = (ob7.outs[1],# Connecting recycle streams for tungstic_acid
@@ -1170,15 +1203,63 @@ azelaic_acid_sys = bst.System(ID = 'azelaic_acid_sys',
                                                      # Ref for this is, Page 9 of patent: CONTINUOUS PROCESS FOR THE PRODUCTION OF DERVATIVES OF SATURATED CARBOXYLIC ACDS 
                                          ob8.outs[0] # Connecting recycle streams for solvent used for extraction of monocarboxylics in the process, VM&P Naphtha solvent
                                          ),
-                              facilities =(ADP801,ADP802,
+                              facilities =(ADP801,
                                            M901,BT901,CT901,
                                            PWT901,CW901,
                                            # HXN901,
                                            CIP901,FWT901
                                            ))
-azelaic_acid_sys.simulate()
-azelaic_acid_sys.show()
-#########################################################################################################
+aa_baseline_sys.simulate()
+aa_baseline_sys.show()
+
+# renaming the first system factory for biodiesel prep as the 1000 series
+biodiesel_prep_units = (F_baseline.unit.S402,#
+                        F_baseline.unit.T401,
+                        F_baseline.unit.P401,
+                        F_baseline.unit.T402,
+                        F_baseline.unit.P402,
+                        F_baseline.unit.T403,
+                        F_baseline.unit.P403,
+                        F_baseline.unit.T404,
+                        F_baseline.unit.P404,
+                        F_baseline.unit.S401,
+                        F_baseline.unit.R401,
+                        F_baseline.unit.C401,
+                        F_baseline.unit.P405,
+                        F_baseline.unit.R402,
+                        F_baseline.unit.C402,
+                        F_baseline.unit.T405,
+                        F_baseline.unit.P406,
+                        F_baseline.unit.C403,
+                        F_baseline.unit.F401,
+                        F_baseline.unit.P407,
+                        F_baseline.unit.H401,
+                        F_baseline.unit.P408,
+                        F_baseline.unit.T406,
+                        F_baseline.unit.P409,
+                        F_baseline.unit.C404,
+                        F_baseline.unit.T407,
+                        F_baseline.unit.P410,
+                        F_baseline.unit.D401,
+                        F_baseline.unit.H402,
+                        F_baseline.unit.D402,
+                        F_baseline.unit.P413,
+                        F_baseline.unit.H403,
+                        F_baseline.unit.P411,
+                        F_baseline.unit.H404,
+                        F_baseline.unit.P412,
+                        F_baseline.unit.T408,
+                        F_baseline.unit.T409,
+                        F_baseline.unit.B401)
+bst.rename_units(units = biodiesel_prep_units, area = 1000)
+bst.rename_unit(unit = F_baseline.F2001, area = 2000)
+# biodiesel_prep_units_group = bst.UnitGroup(name = '1000', units = biodiesel_prep_units)
+# # aa_baseline_production_areas = bst.UnitGroup(name = 'aa_baseline_production_areas',
+# #                                              units= (aa_baseline_sys.units,
+# #                                                      biodiesel_prep_units))
+aa_baseline_groups = bst.UnitGroup.group_by_area(aa_baseline_sys.units)
+
+# ########################################################################################################
    
   
     
