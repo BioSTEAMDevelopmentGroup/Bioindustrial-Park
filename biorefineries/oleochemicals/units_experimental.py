@@ -14,11 +14,11 @@ class OxidativeCleavageReactor(bst.BatchBioreactor):
         super()._setup() 
 #TODO: change the reaction conversions
         Epoxide_formation = SRxn([Rxn('Oleic_acid + H2O2   -> Epoxy_stearic_acid ', 'Oleic_acid', X= 0.808),
-                                  Rxn('Epoxy_stearic_acid + H2O -> DHSA', 'Epoxy_stearic_acid', X = 0.8),
+                                  Rxn('Epoxy_stearic_acid + H2O -> DHSA', 'Epoxy_stearic_acid', X = 0.750),
                                   Rxn('DHSA + H2O2 -> Nonanal + Oxononanoic_acid ', 'DHSA', X = 0.8)])
         
-        Side_reactions_1 =    SRxn([Rxn('Nonanal + H2O2 ->  Nonanoic_acid', 'Nonanal', X = 1),
-                                    Rxn('Nonanoic_acid ->  Octane + CO2', 'Nonanoic_acid', X = 1),
+        Side_reactions_1 =    SRxn([Rxn('Nonanal + H2O2 ->  Nonanoic_acid', 'Nonanal', X = 0.2),
+                                    Rxn('Nonanoic_acid ->  Octane + CO2', 'Nonanoic_acid', X = 0.2),
                                     Rxn('Octane + H2O2 -> Octanal', 'Octane', X = 0.4)])
         
         Side_reactions_2 = PRxn([ Rxn('Oxononanoic_acid -> CO2 + Octanal', 'Oxononanoic_acid', X = 0.2),
@@ -26,15 +26,15 @@ class OxidativeCleavageReactor(bst.BatchBioreactor):
                                 ])  
         Side_reactions_3 = PRxn([ Rxn('Octanal + H2O2 -> Octanoic_acid ', 'Octanal', X = 0.2),
                                   Rxn('Octanoic_acid + H2O2 -> Heptanal + CO2', 'Octanoic_acid',X = 0.4),
-                                  Rxn('Heptanal + H2O2 -> Heptanoic_acid','Heptanal', X = 0.5)])
+                                  Rxn('Heptanal + H2O2 -> Heptanoic_acid','Heptanal', X = 0.2)])
         
         # linoleic acid conversion to azelaic acid reported in: #https://doi.org/10.1016/j.indcrop.2022.115139
         Impurities_side_reactions = PRxn([Rxn('Linoleic_acid -> Azelaic_acid + Malonic_acid + Hexanoic_acid','Linoleic_acid', X = 0.8)
                                          ])  
     
         oxidative_cleavage_rxnsys = RxnSys(Epoxide_formation,
-                                           Side_reactions_1,
                                            Side_reactions_2,
+                                           Side_reactions_1,
                                            Side_reactions_3,
                                            Impurities_side_reactions)
         self.reactions = oxidative_cleavage_rxnsys

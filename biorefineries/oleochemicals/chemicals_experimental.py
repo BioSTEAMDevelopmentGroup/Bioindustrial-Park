@@ -2,18 +2,18 @@ import thermosteam as tmo
 from thermosteam import Chemical
 import biosteam as bst
 
-#Below list has all the chemicals required for both the homogeneous and the heterogeneous process
+#Below list has all the chemicals required for both the homogeneous
 chemicals_experimental= tmo.Chemicals([
 #Raw materials to the process
-#Feedstock: oleic acid (to be used as it is for the heterogeneous process as it requires >99% purity)  
+#Feedstock: oleic acid about 95% pure
                       tmo.Chemical('Oleic_acid',
                                    phase = 'l'),
-#Impurities in the feedstock of the homogeneous process
-#https://www.chemicalassociates.com/images/stories/virtuemart/product/sds/CA1331-High-Oleic-Vegetable-Oleic-Acid-SDS.pdf
-                      tmo.Chemical('Linoleic_acid',search_ID = '60-33-3', phase = 'l'),#About 6%
-                      tmo.Chemical('Palmitic_acid',search_ID = '57-10-3', phase = 'l'),#About 1%
-                      tmo.Chemical('Stearic Acid',search_ID = '57-11-4',phase = 'l'),#About 1%
-                      tmo.Chemical('Other_FAs', search_ID = '67701-02-4',phase = 'l'),#About 1%
+#Impurities in the feedstock of the homogeneous process, identified by GC-MS
+                      tmo.Chemical('Linoleic_acid',search_ID = '60-33-3', phase = 'l'),
+                      tmo.Chemical('Palmitic_acid',search_ID = '57-10-3', phase = 'l'),
+                      tmo.Chemical('Stearic_acid',search_ID = '57-11-4',phase = 'l'),
+                      tmo.Chemical('Vaccenic_acid', search_ID = '693-72-1',phase = 'l'),
+                      tmo.Chemical('Octadecenamide', search_ID = '4303-70-2', phase = 'l' ), 
                       
 #Oxidative cleavage oxidants (same for both homogeneous and heterogeneous process)
                       tmo.Chemical('Water'),
@@ -107,9 +107,10 @@ chemicals_experimental['Malonic_acid'].V.g.method_P = 'IDEAL'
 for chemical in chemicals_experimental: chemical.default()
 
 chemicals_experimental.compile()
-chemicals_experimental.set_synonym('Phosphotungstic_acid', 'fresh_Cat')
+chemicals_experimental.set_synonym('Phosphotungstic_acid', 'fresh_WPOM_Cat')
 chemicals_experimental.set_synonym('Acetonitrile','CH3CN')
 chemicals_experimental.set_synonym('Carbon_dioxide', 'CO2')
+chemicals_experimental.set_synonym('Palmitic_acid','Other_FAs')
 bst.settings.set_thermo(chemicals_experimental)
 
 # for i in chemicals_process_1: 
