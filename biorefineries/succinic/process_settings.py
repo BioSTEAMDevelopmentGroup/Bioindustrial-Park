@@ -27,6 +27,7 @@ _liter_per_gallon = 3.78541
 _ft3_per_m3 = 35.3147
 
 _chemical_2011to2016 = 102.5 / 91.7
+_chemical_2013to2016 = 1.03
 _chemical_2014to2016 = 1.01
 
 _chemical_2017to2016 = 1. / 1.02
@@ -107,7 +108,7 @@ natural_gas_price = 4.70/1e3*_ft3_per_m3*CH4_V * (1e3/CH4_MW)
 liquid_CO2_price = 0.3725 * _chemical_2022to2016
 
 
-succinic_acid_price = 1.5 # initial value to solve MPSP
+succinic_acid_price = ((2.86*38e3 + 2.50*40e3)/(38e3+40e3))*_chemical_2013to2016 # $2.75/kg in 2016$ # initial value to solve MPSP; when solving NPV, use this as the selling price
 
 # Monoethanol amine
 # 1021.69 $/MT in Nov 2014 - 1855.65 $/MT in Oct 2017 range from https://www.intratec.us/chemical-markets/monoethanolamine-price
@@ -184,68 +185,67 @@ CFs = {}
 # 100-year global warming potential (GWP) in kg CO2-eq/kg
 # =============================================================================
 GWP_CFs = {
-    'NH4OH': 2.64 * chems.NH3.MW/chems.NH4OH.MW,
-    'CSL': 1.55,
     'CH4': 0.40, # NA NG from shale and conventional recovery
-    'Enzyme': 2.24,
-    'Lime': 1.29,
+    'CSL': 1.55,
+    
+    # 'Enzyme': 2.24, 
+    # 'Ethanol': 1.44,
+    
+    'H2SO4': 44.47/1e3,   
+    'Lime': 1.29 * 56.0774/74.093, # CaO to Ca(OH)2
     'NaOH': 2.11,
-    'H2SO4': 44.47/1e3,
-    'Ethanol': 1.44,
+    'NH4OH': 2.64 * 0.4860, # chemicals.NH3.MW/chemicals.NH4OH.MW,   
+    'MEA': 3.4062, # ethanolamine production, RoW [monoethanolamine]
+    'H3PO4': 1.3598, # purification of wet-process phosphoric acid to industrial grade, product in 85% solution state, RoW # cradle-to-gate
+    'CO2': 0.87104, # ecoinvent 3.8 carbon dioxide production, liquid, RoW
     }
+
+
 
 GWP_CF_array = chems.kwarray(GWP_CFs)
 # In kg CO2-eq/kg of material
 GWP_CF_stream = tmo.Stream('GWP_CF_stream', GWP_CF_array, units='kg/hr')
+CFs['GWP_CF_stream'] = GWP_CF_stream
 
-GWP_CFs['Corn stover'] = 44.70/1e3 * 0.8
-GWP_CFs['Switchgrass'] = 87.81/1e3 * 0.8
-GWP_CFs['Miscanthus'] = 78.28/1e3 * 0.8
-GWP_CFs['CaCO3'] = 10.30/1e3
-GWP_CFs['Gypsum'] = -4.20/1e3
-# In kg CO2-eq/kWh
-GWP_CFs['Electricity'] = 0.48
-# From corn stover
-GWP_CFs['LacticAcid_GREET'] = 1.80
-# From ref [7], lactic acid production, RoW, TRACI global warming
-GWP_CFs['LacticAcid_fossil'] = 4.1787
+GWP_CFs['Electricity'] = 0.48 # assume production==consumption, both in kg CO2-eq/kWh
+GWP_CFs['Sugarcane'] = 0.12043 * 0.3/0.286 # ecoinvent 3.8 market for sugarcane, RoW
+# adjusted from dry wt content of 28.6% (their assumption) to 30% (our assumption)
+
 
 CFs['GWP_CFs'] = GWP_CFs
-CFs['GWP_CF_stream'] = GWP_CF_stream
 
 # =============================================================================
 # Fossil energy consumption (FEC), in MJ/kg of material
 # =============================================================================
 
+
 FEC_CFs = {
-    'NH4OH': 42 * chems.NH3.MW/chems.NH4OH.MW,
-    'CSL': 12,
     'CH4': 50, # NA NG from shale and conventional recovery
-    'Enzyme': 26,
-    'Lime': 4.896,
-    'NaOH': 29,
+    'CSL': 12,
+    
+    # 'Ethanol': 16,
+    # 'Enzyme': 26,
+    
     'H2SO4': 568.98/1e3,
-    'Ethanol': 16
+    'Lime': 4.896 * 56.0774/74.093, # CaO to Ca(OH)2
+    'NaOH': 29,
+    'NH4OH': 42 * 0.4860, # chemicals.NH3.MW/chemicals.NH4OH.MW,
+    'MEA': 67.898, # ethanolamine production, RoW [monoethanolamine]
+    'H3PO4': 16.538, # purification of wet-process phosphoric acid to industrial grade, product in 85% solution state, RoW # cradle-to-gate
+    'CO2': 7.4243, # ecoinvent 3.8 carbon dioxide production, liquid, RoW
     }
 
 FEC_CF_array = chems.kwarray(FEC_CFs)
 # In MJ/kg of material
 FEC_CF_stream = tmo.Stream('FEC_CF_stream', FEC_CF_array, units='kg/hr')
 
-FEC_CFs['Corn stover'] = 688.60/1e3 * 0.8
-FEC_CFs['Switchgrass'] = 892.41/1e3 * 0.8
-FEC_CFs['Miscanthus'] = 569.05/1e3 * 0.8
-FEC_CFs['CaCO3'] = 133.19/1e3
-FEC_CFs['Gypsum'] = -44.19/1e3
-# In MJ/kWh
-FEC_CFs['Electricity'] = 5.926
-# From corn stover
-FEC_CFs['LacticAcid'] = 29
-# From ref [7], lactic acid production, RoW, cumulative energy demand, fossil
-FEC_CFs['LacticAcid_fossil'] = 79.524
+CFs['FEC_CF_stream'] = FEC_CF_stream
+
+FEC_CFs['Electricity'] = 5.926 # assume production==consumption, both in MJ/kWh
+FEC_CFs['Sugarcane'] = 	0.40192 * 0.3/0.286 # ecoinvent 3.8 market for sugarcane, RoW
+# adjusted from dry wt content of 28.6% (their assumption) to 30% (our assumption)
 
 CFs['FEC_CFs'] = FEC_CFs
-CFs['FEC_CF_stream'] = FEC_CF_stream
 
 
 

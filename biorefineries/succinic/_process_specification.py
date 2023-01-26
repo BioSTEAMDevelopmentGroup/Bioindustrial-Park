@@ -416,7 +416,8 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
         specifications.
         
         """
-        self.reactor.tau = self.reactor.tau_cofermentation = self.spec_2 / productivity
+        # self.reactor.tau = self.reactor.tau_cofermentation = self.spec_2 / productivity
+        self.reactor.tau = self.spec_2 / productivity
         self.spec_3 = productivity
     
     def calculate_titer(self):

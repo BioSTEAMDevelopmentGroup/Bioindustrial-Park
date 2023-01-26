@@ -18,3 +18,14 @@ log_C0s = np.log(C0s)
 A, B = np.polyfit(log_C0s, Cts, 1)
 
 Ct_given_C0 = lambda C0: A*log(C0) + B
+
+# Plot
+plot = True
+if plot:
+    from matplotlib import pyplot as plt
+    C0s_fed = np.linspace(100, 250, 50)
+    Cts_pred = [Ct_given_C0(C0) for C0 in C0s_fed]
+    plt.plot(C0s_fed, Cts_pred)
+    plt.plot(C0s, Cts)
+    plt.show()
+    

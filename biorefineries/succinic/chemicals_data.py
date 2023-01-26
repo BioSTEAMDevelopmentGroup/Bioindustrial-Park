@@ -81,7 +81,7 @@ H2 = chemical_database('H2', phase='g')
 CH4 = chemical_database('CH4', phase='g')
 CarbonMonoxide = chemical_database('CarbonMonoxide', phase='g', 
                                         Hf=-26400*_cal2joule)
-CO2 = chemical_database('CO2', phase='g')
+CO2 = chemical_database('CO2',)
 NH3 = chemical_database('NH3', phase='g', Hf=-10963*_cal2joule)
 NitricOxide = chemical_database('NitricOxide', phase='g')
 NO2 = chemical_database('NO2', phase='g')
@@ -104,7 +104,7 @@ KCl = chemical_database('KCl', phase = 's')
 AmmoniumHydroxide = chemical_database('AmmoniumHydroxide', phase='l', Hf=-336.719e3)
 CalciumDihydroxide = chemical_database('CalciumDihydroxide',
                                         phase='s', Hf=-235522*_cal2joule)
-AmmoniumSulfate = chemical_database('AmmoniumSulfate', phase='l',
+DiammoniumSulfate = chemical_database('DiammoniumSulfate', phase='l',
                                     Hf=-288994*_cal2joule)
 NaNO3 = chemical_database('NaNO3', phase='l', Hf=-118756*_cal2joule)
 # NIST https://webbook.nist.gov/cgi/cbook.cgi?ID=C7757826&Mask=2, accessed 04/07/2020
@@ -121,6 +121,10 @@ Ethanol = chemical_database('Ethanol')
 Acetate = chemical_database('Acetate', phase='l', Hf=-108992*_cal2joule)
 AmmoniumAcetate = chemical_database('AmmoniumAcetate', phase='l', 
                                          Hf=-154701*_cal2joule)
+
+DiammoniumSuccinate = chemical_database('DiammoniumSuccinate', phase='l', 
+                                        )
+                                         # Hf=-154701*_cal2joule)
 
 # Hf from a Ph.D. dissertation (Lactic Acid Production from Agribusiness Waste Starch
 # Fermentation with Lactobacillus Amylophilus and Its Cradle-To-Gate Life 
@@ -270,6 +274,8 @@ for i in DHL.get_missing_properties():
 # TAL.Cn.l.add_method(tmo.Chemical('Succinic acid').Cn.l)
 
 PyruvicAcid = chemical_database(ID='PyruvicAcid', search_ID='Pyruvic acid')
+PyruvicAcid.Tb = 165. + 273.15
+
 SuccinicAcid = chemical_database(ID='SuccinicAcid', search_ID='Succinic acid')
 LacticAcid = chemical_database(ID='LacticAcid', search_ID='Lactic acid')
 SA = Sorbicacid =  chemical_database(ID='SorbicAcid', search_ID='Sorbic acid')
@@ -308,6 +314,7 @@ for i in PSA.get_missing_properties():
             PSA.copy_models_from(SA, [i])
         except:
             pass
+
 PSA.copy_models_from(H2O, ['V'])
         
 PolyPSA = chemical_defined(ID='PolyPSA', phase='s', 
@@ -481,7 +488,7 @@ chemical_groups = dict(
                             ),
                             # 'EthylSuccinate', 
                             # 'Methanol', 'MethylLactate', 'MethylAcetate'),
-    InorganicSolubleSolids = ('AmmoniumSulfate', 'NaOH', 'HNO3', 'NaNO3',
+    InorganicSolubleSolids = ('DiammoniumSulfate', 'NaOH', 'HNO3', 'NaNO3',
                               # 'DAP',
                               'BoilerChems', 'Na2SO4', 'AmmoniumHydroxide'),
     Furfurals = ('Furfural', 'HMF'),
@@ -645,7 +652,7 @@ chems.set_synonym('ButylSorbate', 'Butylsorbate')
 chems.set_synonym('H2O', 'Water')
 chems.set_synonym('H2SO4', 'SulfuricAcid')
 chems.set_synonym('NH3', 'Ammonia')
-chems.set_synonym('AmmoniumSulfate', 'NH4SO4')
+chems.set_synonym('DiammoniumSulfate', 'NH4SO4')
 chems.set_synonym('Denaturant', 'Octane')
 chems.set_synonym('CO2', 'CarbonDioxide')
 chems.set_synonym('CarbonMonoxide', 'CO')

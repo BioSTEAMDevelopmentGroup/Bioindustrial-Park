@@ -294,7 +294,7 @@ succinic_metrics = [get_product_MPSP, get_product_purity, get_production]
 # succinic_metrics = [get_succinic_MPSP, get_GWP, get_FEC]
 
 # %% Generate 3-specification meshgrid and set specification loading functions
-steps = 30
+steps = 15
 
 # Neutralization
 spec.neutralization = True
@@ -440,8 +440,8 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_1, 
                                 x_ticks=[30, 40, 50, 60, 70, 80],
                                 y_ticks=[30, 50, 70, 90, 110, 130],
                                 z_ticks=[0, 0.2, 0.4, 0.6, 0.8, 1.0, 1.2, 1.4, 1.6],
-                                w_levels=np.arange(0.8, 2.1, 0.1), # levels for unlabeled, filled contour areas (labeled and ticked only on color bar)
-                                w_ticks=np.array([0.8, 0.9, 1.1, 1.5]), # labeled, lined contours; a subset of w_levels
+                                w_levels=np.arange(1.0, 3., 0.1), # levels for unlabeled, filled contour areas (labeled and ticked only on color bar)
+                                w_ticks=np.array([1.1, 1.2, 1.4,  1.7, 2.0, 2.5]), # labeled, lined contours; a subset of w_levels
                                 x_units=r"$\mathrm{\% theoretical}$",
                                 y_units=r"$\mathrm{g} \cdot \mathrm{L}^{-1}$",
                                 z_units=r"$\mathrm{g} \cdot \mathrm{L}^{-1}  \cdot \mathrm{h}^{-1}$",

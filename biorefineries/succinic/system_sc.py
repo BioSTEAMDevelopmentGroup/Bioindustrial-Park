@@ -20,11 +20,12 @@ from biosteam.process_tools import UnitGroup
 from biosteam import SystemFactory
 
 from biorefineries.succinic import units, facilities
-from biorefineries.succinic.process_settings import price
+from biorefineries.succinic.process_settings import price, CFs
 from biorefineries.succinic.utils import find_split, splits_df, baseline_feedflow
 from biorefineries.succinic.chemicals_data import chems, chemical_groups, \
                                 soluble_organics, combustibles
 from biorefineries.succinic.tea import TemplateTEA as SuccinicTEA
+from biorefineries.succinic.lca import LCA as SuccinicLCA
 
 from biorefineries.succinic.crystallization_curvefit import Ct_given_C0
 
@@ -33,8 +34,11 @@ from biorefineries.make_a_biorefinery.auto_waste_management import AutoWasteMana
 from hxn._heat_exchanger_network import HeatExchangerNetwork
 from biorefineries.sugarcane import create_juicing_system_up_to_clarification
 
+from contourplots import stacked_bar_plot
+
 import math
 
+IQ_interpolation = flx.IQ_interpolation
 HeatExchangerNetwork = bst.facilities.HeatExchangerNetwork
 
 Rxn = tmo.reaction.Reaction
@@ -64,6 +68,8 @@ System.default_maxiter = 100
 System.default_molar_tolerance = 0.1
 System.default_relative_molar_tolerance = 0.0001 # supersedes absolute tolerance
 System.strict_convergence = True # True => throw exception if system does not converge; False => continue with unconverged system
+
+
 
 exp = math.exp
 def get_succinic_acid_solubility_gpL(T):
@@ -97,7 +103,7 @@ def create_succinic_sys(ins, outs):
     u = sugarcane_juicing_sys.flowsheet.unit
     s = sugarcane_juicing_sys.flowsheet.stream
     feedstock = s.sugarcane
-    feedstock.F_mass = 96000. # to produce SA at 58,000 metric tonne / year at baseline
+    feedstock.F_mass = 96000. # to produce SA at 34,000 metric tonne / year at baseline
     
     sugarcane_juicing_sys.flowsheet.diagram('thorough')
     
@@ -122,7 +128,7 @@ def create_succinic_sys(ins, outs):
     # dilution_water.imol['Water'] =  5000. # flow updated automatically 
     natural_gas_drying = Stream('natural_gas_drying', units = 'kg/hr', price=0.218)
     
-    lime_neutralization = Stream('lime_neutralization', units='kg/hr', 
+    base_neutralization = Stream('base_neutralization', units='kg/hr', 
                                  # price=price['Lime'],
                                  )
     CO2_seedtrain = Stream('CO2_seedtrain', units='kg/hr',
@@ -166,21 +172,34 @@ def create_succinic_sys(ins, outs):
     
 
     # Cofermentation
-    
+    S301 = bst.FakeSplitter('S301', ins=CO2_fermentation,
+                        outs = ('CO2_to_seedtrain', 'CO2_to_cofermentation'),
+                        )
+    @S301.add_specification(run=False)
+    def S301_spec():
+        S301.ins[0].imol['CO2'] = S301.outs[0].imol['CO2'] + S301.outs[1].imol['CO2']
+        
     R302 = units.CoFermentation('R302', 
-                                    ins=(S302-1, 'seed', CSL, CO2_fermentation, lime_neutralization, ''),
+                                    ins=(S302-1, 'seed', CSL, S301-1, base_neutralization, '', ''),
                                     outs=('fermentation_broth', 'fermentation_vent'),
-                                    neutralization=True)
+                                    neutralization=True,
+                                    neutralizing_agent='Lime')
     @R302.add_specification(run=False)
-    def include_seed_CSL_in_cofermentation(): # note: effluent always has 0 CSL
+    def R302_spec(): # note: effluent always has 0 CSL
         # R302.show(N=100)
         R302._run()
         R302.ins[2].F_mass*=1./(1-S302.split[0])
         R302._run()
+        S301.simulate()
     
     
     # ferm_ratio is the ratio of conversion relative to the fermenter
-    R303 = units.SeedTrain('R303', ins=(S302-0, CO2_seedtrain), outs=('seed', 'vent_seedtrain'), ferm_ratio=0.9)
+    R303 = units.SeedTrain('R303', ins=(S302-0, S301-0), outs=('seed', 'vent_seedtrain'), ferm_ratio=0.9)
+    
+    @R303.add_specification(run=False)
+    def R303_spec():
+        R303._run()
+        S301.simulate()
     
     M305 = bst.Mixer('M305', ins=(R302-1, R303-1,), outs=('mixed_fermentation_and_seed_vent'))
     
@@ -199,15 +218,24 @@ def create_succinic_sys(ins, outs):
     A401 = bst.AmineAbsorption('A401', ins=(M305-0, makeup_MEA_A401, 'makeup_water'), outs=('absorption_vent', 'captured_CO2'),
                                CO2_recovery=0.52)
     
+    def A401_obj_f(CO2_recovery):
+        A401.CO2_recovery = CO2_recovery
+        A401._run()
+        K401.specifications[0]()
+        R302.specifications[0]()
+        return R302.CO2_required
+
     @A401.add_specification(run=False)
     def A401_spec():
         # A401.outs[1].phase='g'
         A401._run()
+        IQ_interpolation(A401_obj_f, 0.05, 0.95, x=0.5, ytol=1e-4)
         A401.outs[1].phase='g'
     K401 = bst.IsothermalCompressor('K401', ins=A401-1, outs=('recycled_CO2'), P=3e7, 
                                     # vle=True,
                                     eta=0.6,
                                     )
+    
     K401-0-5-R302
     
     @K401.add_specification(run=False)
@@ -272,14 +300,18 @@ def create_succinic_sys(ins, outs):
                                     vessel_type='Vertical')
     R401_P = bst.units.Pump('R401_P', ins=R401-0)
 
-    @R401.add_specification(run=True)
-    def R401_spec():
-        R401.bypass = not R302.neutralization # bypass if not neutralizing
+    ## Controlling pH, so never bypass
+    
+    # @R401.add_specification(run=True)
+    # def R401_spec():
+    #     R401.bypass = not R302.neutralization # bypass if not neutralizing
         
-    @R401_P.add_specification(run=True)
-    def R401_P_spec():
-        R401_P.bypass = not R302.neutralization # bypass if not neutralizing
-        
+    # @R401_P.add_specification(run=True)
+    # def R401_P_spec():
+    #     R401_P.bypass = not R302.neutralization # bypass if not neutralizing
+    
+    ##
+    
     S405 = units.GypsumFilter('S405', ins=R401_P-0,
                               moisture_content=0.2,
                               split=0., # updated
@@ -288,8 +320,14 @@ def create_succinic_sys(ins, outs):
     @S405.add_specification(run=True)
     def S405_spec():
         S405.isplit['Gypsum'] = 1.-1e-4
+        S405.isplit['DiammoniumSulfate'] = 1.-1e-4 # Diammonium sulfate actually has high solubility in water
         S405.isplit['Water'] = 0.01
-        S405.bypass = not R302.neutralization # bypass if not neutralizing
+        
+        ## Controlling pH, so never bypass
+        
+        # S405.bypass = not R302.neutralization # bypass if not neutralizing
+        
+        ##
     
     F401 = bst.MultiEffectEvaporator('F401', ins=S405-1, outs=('F401_l', 'F401_g'),
                                             P = (101325, 73581, 50892, 32777, 20000), V = 0.5)
@@ -447,6 +485,7 @@ def create_succinic_sys(ins, outs):
                          split={'SuccinicAcid': 1e-4,
                                     'FermMicrobe': 0.}
                          )
+    F404.ins[2].price = 0.2527 # set to be same as BT.natural_gas_price
     
     M403 = bst.LiquidsMixingTank('M403', ins=(F401-1, F402-1, F403-1), outs=('dilute_pyruvic_acid'))
     
@@ -624,7 +663,7 @@ def create_succinic_sys(ins, outs):
     
     # # Storage tanks for other process inputs (besides water)
     T602 = units.LimeStorage('T604', ins=lime_fresh, 
-                             outs=lime_neutralization,
+                             outs=base_neutralization,
                              # tau=7.*24., V_wf=0.9,
                                           # vessel_type='Floating roof',
                                           # vessel_material='Stainless steel',
@@ -646,6 +685,8 @@ def create_succinic_sys(ins, outs):
                                                           'boilerchems'), 
                                                       outs=('gas_emission', 'boiler_blowdown_water', ash,),
                                                       turbogenerator_efficiency=0.85)
+    
+    BT.natural_gas_price = 0.2527
 
     CT = bst.facilities.CoolingTower('CT801')
     CT.ins[2].price = price['Cooling tower chems']
@@ -765,9 +806,10 @@ spec = ProcessSpecification(
     pre_conversion_units = succinic_sys.split(u.M304.ins[0])[0],
     
     # set baseline fermentation performance here
-    baseline_yield = 0.3814, # 0.5 g/g-glucose
-    baseline_titer = 114.,
-    baseline_productivity = 0.68,
+    # baseline_yield = 0.4478, # 0.587 g/g-glucose
+    baseline_yield = 0.3738, # 0.49 g/g-glucose
+    baseline_titer = 63.7,
+    baseline_productivity = 0.87,
     neutralization=False,
 
     feedstock_mass = feedstock.F_mass,
@@ -801,9 +843,9 @@ def load_titer_with_glucose(titer_to_load):
     spec.spec_2 = titer_to_load
     R302.titer_to_load = titer_to_load
     if M304_titer_obj_fn(1e-4)<0:
-        flx.IQ_interpolation(F301_titer_obj_fn, 1e-4, 0.8)
+        IQ_interpolation(F301_titer_obj_fn, 1e-4, 0.8, ytol=1e-3)
     else:
-        flx.IQ_interpolation(M304_titer_obj_fn, 1e-4, 30000.)
+        IQ_interpolation(M304_titer_obj_fn, 1e-4, 30000., ytol=1e-3)
  
 
 spec.load_spec_1 = spec.load_yield
@@ -858,8 +900,8 @@ unit_groups = bst.UnitGroup.group_by_area(succinic_sys.units)
 unit_groups.append(bst.UnitGroup('natural gas'))
 
 for i, j in zip(unit_groups, area_names): i.name = j
-for i in unit_groups: i.autofill_metrics(shorthand=True, 
-                                         electricity_production=True, 
+for i in unit_groups: i.autofill_metrics(shorthand=False, 
+                                         electricity_production=False, 
                                          material_cost=True)
 for i in unit_groups:
     if i.name == 'storage' or i.name=='other facilities' or i.name == 'cooling tower and chilled water package':
@@ -873,7 +915,7 @@ for HXN_group in unit_groups:
         assert isinstance(HXN_group.units[0], HeatExchangerNetwork)
 
 
-unit_groups[-1].metrics[-1] = bst.evaluation.Metric('Mat. cost', 
+unit_groups[-1].metrics[-1] = bst.evaluation.Metric('Material cost', 
                                                     getter=lambda: (BT.natural_gas_price * BT.natural_gas.F_mass) + F404.ins[2].cost, 
                                                     units='USD/hr',
                                                     element=None)
@@ -925,7 +967,7 @@ def TEA_breakdown(print_output=False, fractions=False):
                     
                     
             if ug.name=='natural gas':
-                if metric.name=='Mat. cost':
+                if metric.name=='Mat. cost' or metric.name=='Material cost':
                     metric_breakdowns[metric.name][ug.name] = BT.natural_gas.F_mass*BT.natural_gas_price/denominator
             
             
@@ -992,4 +1034,41 @@ def plot_carbon_flow():
     plot(fig)
     # fig.show()
     # fig.write_image("fig1.png")
+
+#%% IPCC 2013 GWP100a
+
+# succinic acid production, GLO: 3.182 kgCO2-eq/kg-SA
+# market for succinic acid, GLO: 3.2322 kgCO2-eq/kg-SA
+
+#%% FEC
+
+# succinic acid production, GLO: 67.463 MJ-eq/kg
+# market for succinic acid, GLO: 68.19 MJ-eq/kg
+
+#%% LCA
+
+succinic_LCA = SuccinicLCA(succinic_sys, CFs, sugarcane, product_stream, ['SuccinicAcid',], 
+                           [], CT801, CWP802, BT701, True,
+                           credit_feedstock_CO2_capture=True)
+
+
+#%% Plot figures
+plot = False
+if plot:
     
+    ## TEA breakdown figure
+    df = bst.UnitGroup.df_from_groups(
+        unit_groups, fraction=True,
+        scale_fractions_to_positive_values=False
+    )
+    
+    stacked_bar_plot(dataframe=df, 
+                     y_ticks=[-60, -40, -20, 0, 20, 40, 60, 80, 100, 120, 140, 160], 
+                     y_label=r"$\bfCost$" + " " + r"$\bfand$" + " " +  r"$\bfUtility$" + " " +  r"$\bfBreakdown$", 
+                     y_units = "%", 
+                     colors=['#7BBD84', '#F7C652', '#63C6CE', '#94948C', '#734A8C', '#D1C0E1', '#648496', '#B97A57', '#F8858A', 'magenta'],
+                     filename='TEA_breakdown_stacked_bar_plot')
+
+    ##
+    
+
