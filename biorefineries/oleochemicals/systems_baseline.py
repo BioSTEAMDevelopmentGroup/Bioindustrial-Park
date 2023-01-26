@@ -297,7 +297,7 @@ ob1 = dihydroxylation_system(ins = (bst.Stream(ID='fresh_HP',
 # plant_air = bst.Stream(ID = 'plant_air',
 #                         Air = 1,
 #                         units = 'kg/hr')
-
+#TODO: how to deal with this
 ADP801 = bst.facilities.AirDistributionPackage(ID = 'ADP801',
                                                 ins = ('air_for_oxidative_cleavage'),
                                                 outs = ('air_for_oxidative_cleavage')
@@ -1061,6 +1061,8 @@ ob8 = monocarboxylics_separation_and_solvent_recovery (ins = (ob6.outs[3],
                                                               ob5.outs[0]),
                                                        outs = (recycled_solvent_for_extraction,
                                                               bst.Stream(ID = 'monocarboxylic_acids',
+                                                                         price = 2, #2-5$
+                                                                         units = 'kg/hr'
                                                                          )))
 #########################################################################################################
 # Streams specs belonging to the cane biorefinery used for biodisel prep
@@ -1119,9 +1121,9 @@ BT901 = bst.BoilerTurbogenerator(ID ='BT901',
                                           bst.Stream(ID ='lime_boiler',units = 'kg/hr', price = 0.1189*2.2046),#TODO: CURRENTLY BASED ON LACTIC ACID> PROCESS SETTINGS 2016 PRICES
                                           bst.Stream(ID ='boiler_chems', units = 'kg/hr', price = 2.9772*2.2046),#TODO: CURRENTLY BASED ON LACTIC ACID> PROCESS SETTINGS 2016 PRICES
                                           ),
-                                  outs = ('emissions',
-                                          'rejected_water_and_blowdown_to_PWT',#this can be reused as process water
-                                           bst.Stream(ID='ash_disposal',units = 'kg/hr')),
+                                  outs = (bst.Stream('emissions',price = 0, units = 'kg/hr'),
+                                          bst.Stream('rejected_water_and_blowdown_to_PWT',price = 0, units = 'kg/hr'), #this can be reused as process water
+                                          bst.Stream(ID='ash_disposal',price = 0, units = 'kg/hr')),
                                   turbogenerator_efficiency=0.85,
                                   natural_gas_price= 0.218, #TODO: change this price to current price
                                   ash_disposal_price=-0.0318,#TODO: ask how to update the price,
@@ -1131,7 +1133,10 @@ BT901 = bst.BoilerTurbogenerator(ID ='BT901',
                                  
 CT901 = bst.CoolingTower(ID ='CT901')
 CT901.ins[-1].price = 1.7842*2.2046 #TODO: CURRENTLY BASED ON LACTIC ACID> PROCESS SETTINGS 2016 PRICES
-
+CT901.outs[1].price = 0
+CT901.outs[2].price = 0
+CT901.ins[0].price = 0
+CT901.outs[0].price = 0
                          # ins = ('some_water_input',
                          #        'cooling_tower_makeup_water',
                          #        bst.Stream(ID = 'cooling_tower_chemicals',
@@ -1164,8 +1169,8 @@ PWT901 = bst.ProcessWaterCenter(ID = 'PWT901',
                                 system_makeup_water,
                                 'direct_recycled_water'
                               ),
-                        outs = ('process_water',
-                                'waste'),
+                        outs = (bst.Stream(ID = 'process_water', price=price['Water'], units ='kg/hr'),
+                                bst.Stream(ID ='waste', price =0, units = 'kg/hr')),
                         # thermo = None,
                         makeup_water_streams = makeup_water_streams_available,
                         process_water_streams = process_water_streams_available 
@@ -1180,12 +1185,14 @@ CW901 = bst.ChilledWaterPackage('CW901') #Chilled water package for cooling requ
 # Clean-in-place
 #Currently based on lactic acid biorefinery
 CIP901 = bst.CIPpackage('CIP901',ins ='CIP_chems_in', outs ='CIP_chems_out') #Cleaning in place for the boiler#TODO: ask why
+CIP901.outs[0].price = 0
 # CIP901.CIP_over_feedstock = 0.00121#TODO: where does this come from
 @CIP901.add_specification(run=True)
 def adjust_CIP(): CIP901.ins[0].imass['H2O'] = F_baseline.stream.crude_vegetable_oil.F_mass*0.00121
 
 #Fire Water tank 
 FWT901 = bst.FireWaterTank('FWT901', ins = 'Firewater_in', outs = 'Firewater_out')
+FWT901.outs[0].price =0
 # FWT901.fire_water_over_feedstock = 0.08
 @FWT901.add_specification(run=True)
 def adjust_fire_water(): FWT901.ins[0].imass['Water'] =  F_baseline.stream.crude_vegetable_oil.F_mass*0.08

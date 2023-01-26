@@ -109,14 +109,15 @@ tea_azelaic_baseline = TEA_baseline(system = systems_baseline.aa_baseline_sys,
                                 plant_overhead = 0.6,
                                 OSBL_units = [systems_baseline.aa_baseline_sys.facilities])    
     
-solve_IRR = tea_azelaic_baseline.solve_IRR
-total_utility_cost = lambda: tea_azelaic_baseline.utility_cost / 10**6 # In 10^6 USD/yr
-metrics = (bst.Metric('Internal rate of return', tea_azelaic_baseline.solve_IRR, '%'),
-           bst.Metric('Utility cost', total_utility_cost, '10^6 USD/yr'))
+# solve_IRR = tea_azelaic_baseline.solve_IRR
+# total_utility_cost = lambda: tea_azelaic_baseline.utility_cost / 10**6 # In 10^6 USD/yr
+# metrics = (bst.Metric('Internal rate of return', tea_azelaic_baseline.solve_IRR, '%'),
+#            bst.Metric('Utility cost', total_utility_cost, '10^6 USD/yr'))
+metrics = (bst.Metric('Installed equipment cost',tea_azelaic_baseline.installed_equipment_cost,'USD'))
 model = bst.Model(aa_baseline_sys, metrics)
 crude_veg_oil_feedstock = F_baseline.stream.crude_vegetable_oil # The feedstock stream
-fresh_tungsten_catalyst = F_baseline.stream.fresh_tungsten_catalyst
-fresh_cobalt_catalyst = F_baseline.stream.fresh_cobalt_catalyst_stream
+# fresh_tungsten_catalyst = F_baseline.stream.fresh_tungsten_catalyst
+# fresh_cobalt_catalyst = F_baseline.stream.fresh_cobalt_catalyst_stream
 
 lb = crude_veg_oil_feedstock.price * 0.9 # Minimum price
 ub = crude_veg_oil_feedstock.price * 1.1 # Maximum price
@@ -127,19 +128,20 @@ ub = crude_veg_oil_feedstock.price * 1.1 # Maximum price
 def set_feed_price(feedstock_price):
     crude_veg_oil_feedstock.price = feedstock_price
     
-@model.parameter(element = fresh_tungsten_catalyst,
-                 kind = 'isolated',
-                 units ='USD/kg',
-                 distribution = chaospy.Normal(mu = 3, sigma = 1))#USD/ton to USD/Kg
-def set_tungsten_catalyst_price(fresh_tungsten_catalyst_price):
-    fresh_tungsten_catalyst.price = fresh_tungsten_catalyst_price
     
-@model.parameter(element = fresh_cobalt_catalyst,
-                 kind = 'isolated',
-                 units ='USD/kg',
-                 distribution = chaospy.Normal(mu = 10.918, sigma = 0.5))#USD/ton to USD/Kg
-def set_cobalt_catalyst_price(fresh_cobalt_catalyst_price):
-    fresh_cobalt_catalyst.price = fresh_cobalt_catalyst_price
+# @model.parameter(element = fresh_tungsten_catalyst,
+#                  kind = 'isolated',
+#                  units ='USD/kg',
+#                  distribution = chaospy.Normal(mu = 3, sigma = 1))#USD/ton to USD/Kg
+# def set_tungsten_catalyst_price(fresh_tungsten_catalyst_price):
+#     fresh_tungsten_catalyst.price = fresh_tungsten_catalyst_price
+    
+# @model.parameter(element = fresh_cobalt_catalyst,
+#                  kind = 'isolated',
+#                  units ='USD/kg',
+#                  distribution = chaospy.Normal(mu = 10.918, sigma = 0.5))#USD/ton to USD/Kg
+# def set_cobalt_catalyst_price(fresh_cobalt_catalyst_price):
+#     fresh_cobalt_catalyst.price = fresh_cobalt_catalyst_price
       
 
 N_samples = 50
@@ -151,7 +153,7 @@ model.evaluate(
     notify=25 # Also print elapsed time after 50 simulations
     )    
 df_rho, df_p = model.spearman_r()
-print(df_rho['Biorefinery', 'Utility cost [10^6 USD/yr]'])
-bst.plots.plot_spearman_1d(df_rho['Biorefinery', 'Utility cost [10^6 USD/yr]'],
+print(df_rho['Biorefinery', 'Installed equipment cost [USD]'])
+bst.plots.plot_spearman_1d(df_rho['Biorefinery', 'Installed equipment cost [USD]'],
                            index=[i.describe() for i in model.parameters],
-                           name='annual_utility_costs [10^6 USD/yr]') 
+                           name='Installed equipment cost [USD]') 
