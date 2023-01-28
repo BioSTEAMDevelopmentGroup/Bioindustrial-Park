@@ -62,7 +62,7 @@ def update_oilcane_CFs(original_model):
 
 def get_wwt_metrics(f, gal_or_kg='gal'):
     exist_model, new_model = f()
-    
+    print(exist_model.system.TEA.IRR, new_model.system.TEA.IRR)
     if exist_model.system.flowsheet.stream.search('ww'):
         # Adjust to be comparable with the original module
         for name in ('Wastewater price', 'Wastewater CF'):
@@ -129,6 +129,7 @@ def print_comparison(module, gal_or_kg, simulated,):
 def test_cn_baseline():
     from biorefineries import corn as cn
     cn.load()
+    cn.corn_sys.TEA.IRR = 0.1 # different from the default setting
     MPSP_original = cn.corn_sys.TEA.solve_price(cn.ethanol) * ethanol_kg_per_gal
     GWP_original = ''
 
@@ -137,6 +138,7 @@ def test_cn_baseline():
     global simulated
     simulated = [MPSP_original, GWP_original, *outs]
     print_comparison('Corn', 'gal', simulated)
+    
     return simulated
 
 
@@ -146,6 +148,7 @@ def test_sc1g_baseline():
     oc.load('S1')
     MPSP_original = get_oilcane_original_MESP(oc, oc.ethanol)
     update_oilcane_CFs(oc.model)
+    assert(oc.model.system.TEA.IRR == 0.1)
     df_original = oc.model.metrics_at_baseline()
     GWP_original = df_original[oc_GWP_key]/ethanol_kg_per_L*ethanol_kg_per_gal
 
@@ -163,6 +166,7 @@ def test_oc1g_baseline():
     oc.load('O1')
     MPSP_original = get_oilcane_original_MESP(oc, oc.ethanol)
     update_oilcane_CFs(oc.model)
+    assert(oc.model.system.TEA.IRR == 0.1)
     df_original = oc.model.metrics_at_baseline()
     GWP_original = df_original[oc_GWP_key]/ethanol_kg_per_L*ethanol_kg_per_gal
     
@@ -178,6 +182,7 @@ def test_oc1g_baseline():
 def test_cs_baseline():
     from biorefineries import cornstover as cs
     cs.load()
+    cs.cornstover_sys.TEA.IRR = 0.1
     MPSP_original = cs.cornstover_sys.TEA.solve_price(cs.ethanol) * ethanol_kg_per_gal
     GWP_original = ''
     
@@ -195,6 +200,7 @@ def test_sc2g_baseline():
     oc.load('S2')
     MPSP_original = get_oilcane_original_MESP(oc, [oc.advanced_ethanol, oc.cellulosic_ethanol])
     update_oilcane_CFs(oc.model)
+    assert(oc.model.system.TEA.IRR == 0.1)
     df_original = oc.model.metrics_at_baseline()
     GWP_original = df_original[oc_GWP_key]/ethanol_kg_per_L*ethanol_kg_per_gal
     
@@ -212,6 +218,7 @@ def test_oc2g_baseline():
     oc.load('O2')
     MPSP_original = get_oilcane_original_MESP(oc, [oc.advanced_ethanol, oc.cellulosic_ethanol])
     update_oilcane_CFs(oc.model)
+    assert(oc.model.system.TEA.IRR == 0.1)
     df_original = oc.model.metrics_at_baseline()
     GWP_original = df_original[oc_GWP_key]/ethanol_kg_per_L*ethanol_kg_per_gal
     
@@ -227,6 +234,7 @@ def test_oc2g_baseline():
 def test_la_baseline():
     from biorefineries import lactic as la
     la.load()
+    assert(la.lactic_sys.TEA.IRR == 0.1)
     MPSP_original = la.funcs['simulate_get_MPSP']()
     GWP_original = la.funcs['get_GWP']()
     
