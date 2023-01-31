@@ -4,7 +4,7 @@ lactic: Production of Lactic Acid from Lignocellulosic Biomass
 
 Simplified process flow scheme
 ------------------------------
-.. figure:: ./images/system_diagram.png
+.. figure:: ./lactic_sys.svg
 
 
 The biorefinery is developed for Li et al. [1]_ for the production of lactic acid
@@ -341,16 +341,11 @@ Processes:
 
 Analyses
 --------
-Multiple analysis modules (in ./analyses) were used to evaluate the biorefinery
-from different aspects for [1]_, including: full Monte Carlo simulation,
-titer-yield-productivity analysis for the fermentation performance space,
-and evaluate feedstocks of varying carbohydrate contents and prices.
+Multiple analysis modules (in `./analyses <https://github.com/BioSTEAMDevelopmentGroup/Bioindustrial-Park/tree/f56692d3bc06527b57dc77ed7cb929a40b59bc4d/BioSTEAM%202.x.x/biorefineries/lactic/analyses>`_) were used to evaluate the biorefinery from different aspects for [1]_, including: full Monte Carlo simulation, titer-yield-productivity analysis for the fermentation performance space, and evaluate feedstocks of varying carbohydrate contents and prices.
 
-Note that results used in the manuscript [1]_ were generated using biosteam v2.20.21,
-thermosteam v0.20.26, and dependencies (`commit f56692d <https://github.com/BioSTEAMDevelopmentGroup/Bioindustrial-Park/commit/f56692d3bc06527b57dc77ed7cb929a40b59bc4d>`_).
+Analyses (in ./analyses) performed for the paper [1]_ and archived results (see `commit f56692d <https://github.com/BioSTEAMDevelopmentGroup/Bioindustrial-Park/commit/f56692d3bc06527b57dc77ed7cb929a40b59bc4d>`_) were generated using biosteam v2.20.21, thermosteam v0.20.26, and dependencies.
 
-To reproduce the results, directly run the script of interest, and results will
-be saved as Excel files in the same directory path as the module.
+To reproduce the results, directly run the script of interest, and results will be saved as Excel files in the same directory path as the module.
 
 
 References

@@ -18,7 +18,7 @@ import biosteam as bst
 from biosteam.utils import colors
 from matplotlib.ticker import AutoMinorLocator as AML
 
-from biorefineries.succinic.system_glucose import succinic_sys, succinic_tea, R302, spec, product_stream
+from biorefineries.succinic.system_sc import succinic_sys, succinic_tea, R302, spec, product_stream
 
 from matplotlib import pyplot as plt
 from  matplotlib.colors import LinearSegmentedColormap
@@ -294,14 +294,17 @@ succinic_metrics = [get_product_MPSP, get_product_purity, get_production]
 # succinic_metrics = [get_succinic_MPSP, get_GWP, get_FEC]
 
 # %% Generate 3-specification meshgrid and set specification loading functions
-steps = 6
+steps = 15
+
+# Neutralization
+spec.neutralization = True
 
 # Yield, titer, productivity (rate)
-spec_1 = yields = np.linspace(0.4, 0.9, steps) # yield
-spec_2 = titers = np.linspace(40., 120., steps) # titer
-# spec_1 = np.linspace(0.2, 0.99, steps) # yield
-# spec_2 = np.linspace(45, 225, steps) # titer
-spec_3 = productivities = np.arange(0.1, 2.1, 0.1)
+spec_1 = yields = np.linspace(0.3, 0.8, steps) # yield
+spec_2 = titers = np.linspace(30., 130., steps) # titer
+# spec_3 = productivities = np.linspace(0.1, 1.5, 6) # productivity
+spec_3 = productivities = [0.68]
+
 # spec.load_spec_1 = spec.load_yield
 # spec.load_spec_2 = spec.load_titer
 # spec.load_spec_3 = spec.load_productivity
@@ -434,11 +437,11 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_1, 
                                 y_label=r"$\bfTiter$", # title of the y axis
                                 z_label=r"$\bfProductivity$", # title of the z axis
                                 w_label=r"$\bfMPSP$", # title of the color axis
-                                x_ticks=[40, 50, 60, 70, 80, 90],
-                                y_ticks=[40, 60, 80, 100, 120],
-                                z_ticks=[0, 0.2, 0.4, 0.6, 0.8, 1.0, 1.2, 1.4, 1.6, 1.8, 2.0],
-                                w_levels=np.arange(0.4, 1.8, 0.1), # levels for unlabeled, filled contour areas (labeled and ticked only on color bar)
-                                w_ticks=np.array([0.5, 0.6, 0.8, 1.1]), # labeled, lined contours; a subset of w_levels
+                                x_ticks=[30, 40, 50, 60, 70, 80],
+                                y_ticks=[30, 50, 70, 90, 110, 130],
+                                z_ticks=[0, 0.2, 0.4, 0.6, 0.8, 1.0, 1.2, 1.4, 1.6],
+                                w_levels=np.arange(1.0, 3., 0.1), # levels for unlabeled, filled contour areas (labeled and ticked only on color bar)
+                                w_ticks=np.array([1.1, 1.2, 1.4,  1.7, 2.0, 2.5]), # labeled, lined contours; a subset of w_levels
                                 x_units=r"$\mathrm{\% theoretical}$",
                                 y_units=r"$\mathrm{g} \cdot \mathrm{L}^{-1}$",
                                 z_units=r"$\mathrm{g} \cdot \mathrm{L}^{-1}  \cdot \mathrm{h}^{-1}$",
@@ -447,7 +450,7 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_1, 
                                 cmap=CABBI_green_colormap(), # can use 'viridis' or other default matplotlib colormaps
                                 z_marker_color='g', # default matplotlib color names
                                 axis_title_fonts={'size': {'x': 12, 'y':12, 'z':12, 'w':12},},
-                                fps=12, # animation frames (z values traversed) per second
+                                fps=3, # animation frames (z values traversed) per second
                                 n_loops='inf', # the number of times the animated contourplot should loop animation over z; infinite by default
                                 animated_contourplot_filename='MPSP_animated_contourplot', # file name to save animated contourplot as (no extensions)
                                 keep_frames=False, # leaves frame PNG files undeleted after running; False by default

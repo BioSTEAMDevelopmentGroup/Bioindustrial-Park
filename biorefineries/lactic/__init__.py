@@ -40,18 +40,15 @@ from ._process_settings import *
 from ._processes import *
 from ._tea import *
 from .systems import *
-from .models import *
 
 from . import (
     _chemicals,
     utils,
     _process_settings,
     _units,
-    _facilities,
     _processes,
     _tea,
     systems,
-    models,
     )
 
 _chemicals_loaded = False
@@ -79,8 +76,9 @@ def _load_system(kind='SSCF', **sys_kwdct):
     bst.settings.set_thermo(chemicals)
     load_process_settings()
     lactic_sys, groups = create_system(kind=kind, return_groups=True, flowsheet=flowsheet, **sys_kwdct)
-    global Area100, Area200, Area300, Area400, Area500, Area600
-    Area100, Area200, Area300, Area400, Area500, HXN, CHP, CT, Area600 = groups
+    global Area100, Area200, Area300, Area400, Area500, Area600, CHP
+    Area100, Area200, Area300, Area400, Area500, HXN, BT, CT, Area600 = groups
+    CHP = BT
     lactic_tea = create_tea(flowsheet=flowsheet)
     funcs = create_funcs(lactic_tea=lactic_tea, flowsheet=flowsheet)
     global _system_loaded
@@ -142,7 +140,7 @@ def simulate_operating_improvement(funcs=None, lactic_tea=None, flowsheet=None):
     s = flowsheet.stream
     u = flowsheet.unit
     flowsheet.system.lactic_sys.simulate()
-    u.U101.diversion_to_CHP = 0.25
+    u.U101.divert_ratio = 0.25
     MPSP = funcs['simulate_get_MPSP']()
     print('\n---------- Simulation Results ----------')
     print(f'MPSP is ${MPSP:.3f}/kg')
@@ -168,18 +166,11 @@ def create_funcs(lactic_tea=None, flowsheet=None):
 
     funcs = {'simulate_get_MPSP': simulate_get_MPSP}
 
-    ######################## LCA ########################
-    CFs = get_CFs(flowsheet=flowsheet)
+    ##### LCA #####
+    funcs['get_lactic_flow'] = get_lactic_flow = lambda: lactic_sys.get_mass_flow(s.lactic_acid)
     # 100-year global warming potential (GWP) from material flows
-    LCA_streams = set([i for i in lactic_sys.feeds if getattr(i, 'price', None)])
-    LCA_stream = s.search('LCA_stream') or bst.Stream('LCA_stream', units='kg/hr')
-
-    def get_material_GWP():
-        LCA_stream.mass = sum(i.mass for i in LCA_streams)
-        chemical_GWP = LCA_stream.mass*CFs['GWP_CF_stream'].mass
-        # feedstock_GWP = s.feedstock.F_mass*CFs['GWP_CFs']['Corn stover']
-        return chemical_GWP.sum()/s.lactic_acid.F_mass
-    funcs['get_material_GWP'] = get_material_GWP
+    funcs['get_material_GWP'] = get_material_GWP = \
+        lambda: lactic_sys.get_total_feeds_impact('GWP')/get_lactic_flow()
 
     # GWP from onsite emission (e.g., combustion) of non-biogenic carbons
     get_onsite_GWP = lambda: (s.natural_gas.get_atomic_flow('C')+s.ethanol.get_atomic_flow('C')) \
@@ -187,32 +178,20 @@ def create_funcs(lactic_tea=None, flowsheet=None):
     funcs['get_onsite_GWP'] = get_onsite_GWP
 
     # GWP from electricity
-    get_electricity_use = lambda: sum(i.power_utility.rate for i in lactic_sys.units)
+    get_electricity_use = lambda: sum(i.power_utility.rate for i in lactic_sys.units) # kW
     funcs['get_electricity_use'] = get_electricity_use
-    get_electricity_GWP = lambda: get_electricity_use()*CFs['GWP_CFs']['Electricity'] \
-        / s.lactic_acid.F_mass
-    funcs['get_electricity_GWP'] = get_electricity_GWP
+    funcs['get_electricity_GWP'] = get_electricity_GWP = \
+        lambda: lactic_sys.get_net_electricity_impact('GWP')/get_lactic_flow()
 
-    # CO2 fixed in lactic acid product
-    get_fixed_GWP = lambda: \
-        s.lactic_acid.get_atomic_flow('C')*44.0095/s.lactic_acid.F_mass
-    funcs['get_fixed_GWP'] = get_fixed_GWP
-
-    get_GWP = lambda: get_material_GWP()+get_onsite_GWP()+get_electricity_GWP()
-    funcs['get_GWP'] = get_GWP
+    funcs['get_GWP'] = lambda: get_material_GWP()+get_onsite_GWP()+get_electricity_GWP()
 
     # Fossil energy consumption (FEC) from materials
-    def get_material_FEC():
-        LCA_stream.mass = sum(i.mass for i in LCA_streams)
-        chemical_FEC = LCA_stream.mass*CFs['FEC_CF_stream'].mass
-        # feedstock_FEC = feedstock.F_mass*CFs['FEC_CFs']['Corn stover']
-        return chemical_FEC.sum()/s.lactic_acid.F_mass
-    funcs['get_material_FEC'] = get_material_FEC
+    funcs['get_material_FEC'] = get_material_FEC = \
+        lambda: lactic_sys.get_total_feeds_impact('FEC')/get_lactic_flow()
 
     # FEC from electricity
-    get_electricity_FEC = lambda: \
-        get_electricity_use()*CFs['FEC_CFs']['Electricity']/s.lactic_acid.F_mass
-    funcs['get_electricity_FEC'] = get_electricity_FEC
+    funcs['get_electricity_FEC'] = get_electricity_FEC = \
+        lambda: lactic_sys.get_net_electricity_impact('FEC')/get_lactic_flow()
 
     # Total FEC
     get_FEC = lambda: get_material_FEC()+get_electricity_FEC()
@@ -234,6 +213,8 @@ def create_funcs(lactic_tea=None, flowsheet=None):
 #         if name in dct: return dct[name]
 #     raise AttributeError(f'module "{__name__}" has no attribute "{name}."')
 
+from .models import *
+from . import models
 
 __all__ = (
     'auom', 'CEPCI',

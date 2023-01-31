@@ -5,7 +5,7 @@ Created on Thu Nov  4 14:39:10 2021
 @author: yrc2
 """
 from . import _feature_mockups as f
-from ._parse_configuration import parse, Configuration, ConfigurationComparison
+from ._parse_configuration import parse_configuration, Configuration, ConfigurationComparison
 from warnings import warn
 from thermosteam.utils import roundsigfigs
 import biorefineries.oilcane as oc
@@ -13,15 +13,21 @@ import os
 import pandas as pd
 import numpy as np
 import biosteam as bst
+from typing import NamedTuple
+from biorefineries.cane.composition import get_composition, set_composition
 
 __all__ = (
     'images_folder',
     'results_folder',
+    'feedstocks_folder',
+    'get_composition_data',
     'spearman_file',
     'monte_carlo_file',
     'autoload_file_name',
     'get_monte_carlo_across_oil_content',
     'get_monte_carlo',
+    'get_line_monte_carlo',
+    'load_composition',
     'montecarlo_results',
     'montecarlo_results_short',
     'montecarlo_results_feedstock_comparison',
@@ -33,28 +39,78 @@ __all__ = (
 
 results_folder = os.path.join(os.path.dirname(__file__), 'results')
 images_folder = os.path.join(os.path.dirname(__file__), 'images')
+feedstocks_folder = os.path.join(os.path.dirname(__file__), 'feedstocks')
+
+# %% Load feedstock data
+
+cane_line_composition_data = None
+
+class OilcaneCompositionPerformance(NamedTuple):
+    oil_content: float
+    biomass_yield: float
+
+def get_composition_data():
+    global cane_line_composition_data
+    if cane_line_composition_data is None:
+        file = os.path.join(feedstocks_folder, 'cane_composition_data.xlsx')
+        data = pd.read_excel(file, header=[0, 1], index_col=[0])
+        # Filter poor lines 
+        index = data.index
+        good_lines = set(index)
+        performances = {}
+        for name in index:
+            line = data.loc[name]
+            performance = OilcaneCompositionPerformance(
+                line['Stem Oil (dw)']['Mean'],
+                line['Dry biomass yield (% WT)']['Mean'],
+            )
+            performances[name] = performance
+        for name, performance in performances.items():
+            for other_name, other_performance in performances.items():
+                if (name != other_name 
+                    and performance.oil_content < other_performance.oil_content
+                    and performance.biomass_yield < other_performance.biomass_yield):
+                    good_lines.discard(name)
+        names = sorted([name for name in index if name in good_lines], 
+                       key=lambda name: performances[name].oil_content)
+        cane_line_composition_data = data.loc[names]
+    return cane_line_composition_data
+
+def load_composition(feedstock, oil, fiber, water, FFA, PL):
+    composition = get_composition(feedstock)
+    composition['lipid'] = oil
+    composition['fiber'] = fiber
+    composition['moisture'] = water
+    composition['TAG'] = 1. - FFA - PL
+    composition['FFA'] = FFA
+    composition['PL'] = PL
+    del composition['sugar'] # Sugar is backcalculated in `set_composition`
+    set_composition(feedstock, **composition)
+
+# %% Load simulation data
 
 def spearman_file(name):
-    number, agile = parse(name)
+    number, agile = parse_configuration(name)
     filename = f'oilcane_spearman_{number}'
     if agile: filename += '_agile'
     filename += '.xlsx'
     return os.path.join(results_folder, filename)
 
-def monte_carlo_file(name, across_oil_content=False, extention='xlsx'):
-    number, agile = parse(name)
+def monte_carlo_file(name, across_lines=False, extention='xlsx'):
+    number, agile, energycane = parse_configuration(name)
     filename = f'oilcane_monte_carlo_{number}'
     if agile: filename += '_agile'
-    if across_oil_content: filename += '_across_oil_content'
+    if energycane: filename += '_energycane'
+    if across_lines: filename += '_across_lines'
     filename += '.' + extention
     return os.path.join(results_folder, filename)
 
 def autoload_file_name(name):
-    filename = name.replace('*', '_agile')
+    filename = str(name).replace('*', '_agile')
     return os.path.join(results_folder, filename)
 
 def get_monte_carlo_across_oil_content(name, metric, derivative=False):
-    key = parse(name)
+    key = parse_configuration(name)
     if isinstance(key, Configuration):
         df = pd.read_excel(
             monte_carlo_file(key, True),
@@ -79,8 +135,25 @@ def get_monte_carlo_key(index, dct, with_units=False):
     if key in dct: key = f'{key}, {index[0]}'
     return key
 
+def get_line_monte_carlo(line, name, feature, cache={}):
+    configuration = parse_configuration(name)
+    key = (*configuration, feature.short_description)
+    if isinstance(configuration, Configuration):
+        if key in cache:
+            df = cache[key]
+        else:
+            file = monte_carlo_file(configuration, across_lines=True)
+            cache[key] = df = pd.read_excel(file, header=[0, 1], index_col=[0], sheet_name=feature.short_description)
+        mc = df[line]
+    elif isinstance(configuration, ConfigurationComparison):
+        raise ValueError('name cannot be a configuration comparison')
+    else:
+        raise Exception('unknown error')
+    mc = mc.dropna(how='all', axis=0)
+    return mc
+
 def get_monte_carlo(name, features=None, cache={}):
-    key = parse(name)
+    key = parse_configuration(name)
     if isinstance(key, Configuration):
         if key in cache:
             df = cache[key]
