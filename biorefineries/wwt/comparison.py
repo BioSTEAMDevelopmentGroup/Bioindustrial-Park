@@ -62,7 +62,6 @@ def update_oilcane_CFs(original_model):
 
 def get_wwt_metrics(f, gal_or_kg='gal'):
     exist_model, new_model = f()
-    print(exist_model.system.TEA.IRR, new_model.system.TEA.IRR)
     if exist_model.system.flowsheet.stream.search('ww'):
         # Adjust to be comparable with the original module
         for name in ('Wastewater price', 'Wastewater CF'):
