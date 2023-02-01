@@ -30,14 +30,9 @@ cornstover results were updated with:
 # =============================================================================
 
 import os
-# Ethanol conversion factors
-from biorefineries.cane.chemicals import create_cellulosic_oilcane_chemicals as create_oc_chemicals
-from biorefineries.cane.biorefinery import (
-    ethanol_kg_per_gal,
-    ethanol_kg_per_L,
-    GWP_characterization_factors
-    )
-from biorefineries.wwt import add_wwt_chemicals, results_path, update_cane_price, GWP_CFs
+# Ethanol conversion factor
+from biorefineries.oilcane import ethanol_kg_per_gal, ethanol_kg_per_L, GWP_characterization_factors
+from biorefineries.wwt import results_path, update_cane_price, GWP_CFs
 
 path = os.path.join(results_path, 'comparison.xlsx')
 
@@ -48,7 +43,7 @@ check_results = False
 # Now the feedstock price is set to MFPP by default
 def get_oilcane_original_MESP(oc_module, products):
     update_cane_price(oc_module.sys.flowsheet.stream)
-    return oc_module.tea.solve_price(products) * ethanol_kg_per_gal
+    return oc_module.oilcane_sys.TEA.solve_price(products) * ethanol_kg_per_gal
 
 def update_oilcane_CFs(original_model):
     stream = original_model.system.flowsheet.stream
@@ -67,14 +62,13 @@ def update_oilcane_CFs(original_model):
 
 def get_wwt_metrics(f, gal_or_kg='gal'):
     exist_model, new_model = f()
-    
     if exist_model.system.flowsheet.stream.search('ww'):
         # Adjust to be comparable with the original module
         for name in ('Wastewater price', 'Wastewater CF'):
             for p in exist_model.parameters:
                 if p.name == name: break
             p.baseline = 0
-    outs = []    
+    outs = []
     df_exist = exist_model.metrics_at_baseline()
     df_new = new_model.metrics_at_baseline()
     MPSP_key = ('Biorefinery', f'MPSP [$/{gal_or_kg}]')
@@ -134,6 +128,7 @@ def print_comparison(module, gal_or_kg, simulated,):
 def test_cn_baseline():
     from biorefineries import corn as cn
     cn.load()
+    cn.corn_sys.TEA.IRR = 0.1 # different from the default setting
     MPSP_original = cn.corn_sys.TEA.solve_price(cn.ethanol) * ethanol_kg_per_gal
     GWP_original = ''
 
@@ -142,21 +137,22 @@ def test_cn_baseline():
     global simulated
     simulated = [MPSP_original, GWP_original, *outs]
     print_comparison('Corn', 'gal', simulated)
+    
     return simulated
 
 
 # 1G sugarcane
 def test_sc1g_baseline():
-    from biorefineries.wwt.sugarcane1g import create_sc1g_comparison_models
-    outs = get_wwt_metrics(create_sc1g_comparison_models)
-    
-    from biorefineries.cane import Biorefinery
-    br = Biorefinery('S1', chemicals=add_wwt_chemicals(create_oc_chemicals()))
-    MPSP_original = get_oilcane_original_MESP(br, br.ethanol)
-    update_oilcane_CFs(br.model)
-    df_original = br.model.metrics_at_baseline()
+    from biorefineries import oilcane as oc
+    oc.load('S1')
+    MPSP_original = get_oilcane_original_MESP(oc, oc.ethanol)
+    update_oilcane_CFs(oc.model)
+    assert(oc.model.system.TEA.IRR == 0.1)
+    df_original = oc.model.metrics_at_baseline()
     GWP_original = df_original[oc_GWP_key]/ethanol_kg_per_L*ethanol_kg_per_gal
 
+    from biorefineries.wwt.sugarcane1g import create_sc1g_comparison_models
+    outs = get_wwt_metrics(create_sc1g_comparison_models)
     global simulated
     simulated = [MPSP_original, GWP_original, *outs]
     print_comparison('sugarcane1g', 'gal', simulated)
@@ -165,16 +161,16 @@ def test_sc1g_baseline():
 
 # 1G oilcane
 def test_oc1g_baseline():
+    from biorefineries import oilcane as oc
+    oc.load('O1')
+    MPSP_original = get_oilcane_original_MESP(oc, oc.ethanol)
+    update_oilcane_CFs(oc.model)
+    assert(oc.model.system.TEA.IRR == 0.1)
+    df_original = oc.model.metrics_at_baseline()
+    GWP_original = df_original[oc_GWP_key]/ethanol_kg_per_L*ethanol_kg_per_gal
+    
     from biorefineries.wwt.oilcane1g import create_oc1g_comparison_models
     outs = get_wwt_metrics(create_oc1g_comparison_models)
-    
-    from biorefineries.cane import Biorefinery
-    br = Biorefinery('O1', chemicals=add_wwt_chemicals(create_oc_chemicals()))
-    MPSP_original = get_oilcane_original_MESP(br, br.ethanol)
-    update_oilcane_CFs(br.model)
-    df_original = br.model.metrics_at_baseline()
-    GWP_original = df_original[oc_GWP_key]/ethanol_kg_per_L*ethanol_kg_per_gal
-
     global simulated
     simulated = [MPSP_original, GWP_original, *outs]
     print_comparison('oilcane1g', 'gal', simulated)
@@ -185,6 +181,7 @@ def test_oc1g_baseline():
 def test_cs_baseline():
     from biorefineries import cornstover as cs
     cs.load()
+    cs.cornstover_sys.TEA.IRR = 0.1
     MPSP_original = cs.cornstover_sys.TEA.solve_price(cs.ethanol) * ethanol_kg_per_gal
     GWP_original = ''
     
@@ -198,16 +195,16 @@ def test_cs_baseline():
 
 # 2G sugarcane
 def test_sc2g_baseline():
+    from biorefineries import oilcane as oc
+    oc.load('S2')
+    MPSP_original = get_oilcane_original_MESP(oc, [oc.advanced_ethanol, oc.cellulosic_ethanol])
+    update_oilcane_CFs(oc.model)
+    assert(oc.model.system.TEA.IRR == 0.1)
+    df_original = oc.model.metrics_at_baseline()
+    GWP_original = df_original[oc_GWP_key]/ethanol_kg_per_L*ethanol_kg_per_gal
+    
     from biorefineries.wwt.sugarcane2g import create_sc2g_comparison_models
     outs = get_wwt_metrics(create_sc2g_comparison_models)
-    
-    from biorefineries.cane import Biorefinery
-    br = Biorefinery('S2', chemicals=add_wwt_chemicals(create_oc_chemicals()))
-    MPSP_original = get_oilcane_original_MESP(br, [br.advanced_ethanol, br.cellulosic_ethanol])
-    update_oilcane_CFs(br.model)
-    df_original = br.model.metrics_at_baseline()
-    GWP_original = df_original[oc_GWP_key]/ethanol_kg_per_L*ethanol_kg_per_gal
-
     global simulated
     simulated = [MPSP_original, GWP_original, *outs]
     print_comparison('sugarcane2g', 'gal', simulated)
@@ -215,17 +212,17 @@ def test_sc2g_baseline():
 
 
 # 2G oilcane
-def test_oc2g_baseline():   
-    from biorefineries.wwt.oilcane2g import create_oc2g_comparison_models
-    outs = get_wwt_metrics(create_oc2g_comparison_models)
-    
-    from biorefineries.cane import Biorefinery
-    br = Biorefinery('O2', chemicals=add_wwt_chemicals(create_oc_chemicals()))
-    MPSP_original = get_oilcane_original_MESP(br, [br.advanced_ethanol, br.cellulosic_ethanol])
-    update_oilcane_CFs(br.model)
-    df_original = br.model.metrics_at_baseline()
+def test_oc2g_baseline():
+    from biorefineries import oilcane as oc
+    oc.load('O2')
+    MPSP_original = get_oilcane_original_MESP(oc, [oc.advanced_ethanol, oc.cellulosic_ethanol])
+    update_oilcane_CFs(oc.model)
+    assert(oc.model.system.TEA.IRR == 0.1)
+    df_original = oc.model.metrics_at_baseline()
     GWP_original = df_original[oc_GWP_key]/ethanol_kg_per_L*ethanol_kg_per_gal
     
+    from biorefineries.wwt.oilcane2g import create_oc2g_comparison_models
+    outs = get_wwt_metrics(create_oc2g_comparison_models)
     global simulated
     simulated = [MPSP_original, GWP_original, *outs]
     print_comparison('oilcane2g', 'gal', simulated)
@@ -236,6 +233,7 @@ def test_oc2g_baseline():
 def test_la_baseline():
     from biorefineries import lactic as la
     la.load()
+    assert(la.lactic_sys.TEA.IRR == 0.1)
     MPSP_original = la.funcs['simulate_get_MPSP']()
     GWP_original = la.funcs['get_GWP']()
     
