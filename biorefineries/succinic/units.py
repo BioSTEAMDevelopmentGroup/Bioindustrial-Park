@@ -28,7 +28,7 @@ from warnings import warn
 from flexsolve import aitken_secant
 from biosteam import Unit
 from biosteam.units import Flash, HXutility, Mixer, MixTank, Pump, \
-    SolidsSeparator, StorageTank, LiquidsSplitSettler
+    SolidsSeparator, StorageTank, LiquidsSplitSettler, Compressor
 from biosteam.units.decorators import cost
 from thermosteam import Stream, MultiStream
 from biorefineries.succinic.process_settings import price
@@ -422,7 +422,10 @@ class Saccharification(Unit):
       # Scaling basis based on sum of all streams into fermenter
       # (304, 306, 311, and 312 in ref [1])
       # and total residence time (batch hydrolysis and fermentation)
-      kW=268.452, cost=630000, S=(42607+443391+948+116)*(60+36),
+        # kW=268.452, 
+        kW=0, # overwritten; power utility calculated separately based on batch IBRL power per unit volume
+      cost=630000, 
+      S=(42607+443391+948+116)*(60+36),
       CE=CEPCI[2009], n=1, BM=1.5)
 @cost(basis='Recirculation flow rate', ID='Recirculation pump', units='kg/hr',
       # Scaling basis based on sum of all streams into fermenter
@@ -435,8 +438,9 @@ class Saccharification(Unit):
       kW=29.828, cost=68300, S=425878, CE=CEPCI[2009], n=0.5, BM=1.5)
 @cost(basis='Broth flow rate', ID='Surge tank pump', units='kg/hr',
       kW=93.2125, cost=26800, S=488719, CE=CEPCI[2009], n=0.8, BM=2.3)
+
 class CoFermentation(Reactor):
-    _N_ins = 7
+    _N_ins = 9
     _N_outs = 2
     _units= {
         **Reactor._units,
@@ -447,38 +451,45 @@ class CoFermentation(Reactor):
 
     auxiliary_unit_names = ('heat_exchanger',)
 
-    # Equals the split of saccharified slurry to seed train
-    inoculum_ratio = 0.07
 
     neutralization_safety_factor = 1.
     
-    CSL_loading = 10 # g/L (kg/m3)
+    # CSL_loading = 10 # g/L (kg/m3)
+    
+    CSL_loading = 0 # g/L (kg/m3) # N from diammonium sulfate
+    
+    effluent_titer = 0 # calculated during _run
 
-    target_titer = 130 # in g/L (kg/m3), the maximum titer in collected data
-
-    effluent_titer = 0
-
-    productivity = 0.89 # in g/L/hr
-
-    target_yield = 0.76 # in g/g-sugar
+    productivity = 0.657 # in g/L/h
 
     tau_batch_turnaround = 12 # in hr, the same as the seed train in ref [1]
 
-    tau_cofermentation = 0 # in hr
+    tau_cofermentation = 96 # in hr # IBRL batch run
 
-    max_sugar = 0 # g/L
-
-    CO2_safety_factor = 3.
+    CO2_safety_factor = 1.0015
     
-    mol_base_per_acid_pH_control = 0.1
+    mol_NH4OH_per_acid_pH_control = 0.2988 # from IBRL batch run
+    mol_lime_per_acid_pH_control = 0.2988/2 # mol NH4OH / 2
     
-    g_diammonium_sulfate_per_g_succinic_acid = 10/63.1 # IBRL batch run
+    g_diammonium_sulfate_per_g_succinic_acid = 4.5/63.1 # IBRL batch run
     
-    g_magnesium_sulfate_per_g_succinic_acid = 2/63.1 # IBRL batch run
+    g_magnesium_sulfate_per_g_succinic_acid = 0.9/63.1 # IBRL batch run
+    
+    mol_air_per_mol_succinic_acid = 5.300 # IBRL batch run
+    
+    max_batch_reactor_volume = 0.075 # m3 # 75 L - IBRL batch pilot scale
+    
+    max_continuous_reactor_volume = 3785.41178 # 1,000,000 gallon from ref [1]
+    
+    air_pressure = 3e7 # Pa
     
     def __init__(self, ID='', ins=None, outs=(), thermo=None, *, T=30+273.15,
-                 P=101325, V_wf=0.8, length_to_diameter=0.6,
-                 kW_per_m3=None, mixing_intensity=600,
+                 P=101325, V_wf=0.4, length_to_diameter=0.6,
+                 
+                 kW_per_m3=0.02 * 0.7355 / 0.075, # 0.02 HP for IBRL 75 L reactor
+                 
+                 mixing_intensity=None,
+                 
                  wall_thickness_factor=1,
                  vessel_material='Stainless steel 316',
                  vessel_type='Vertical',
@@ -539,14 +550,16 @@ class CoFermentation(Reactor):
         Rxn('Glucose + 2 CO2 -> 2 SuccinicAcid + O2',        'Glucose',   0.7), 
         Rxn('Glucose -> 3 AceticAcid',               'Glucose',   1e-8),
         Rxn('Glucose -> 2 Ethanol + 2 CO2',               'Glucose',   1e-8),
-        Rxn('Glucose -> 6 FermMicrobe',       'Glucose',   0.066),
-        Rxn('Glucose -> 2 PyruvicAcid',     'Glucose',    0.1),
+        Rxn('Glucose -> 6 FermMicrobe',       'Glucose',   0.186),
+        Rxn('Glucose -> 2 PyruvicAcid',     'Glucose',    0.006),
         
         Rxn('Xylose + 1.667 CO2 -> 1.667 SuccinicAcid + 0.4165 O2',       'Xylose',    0.7),
         Rxn('Xylose -> 2.5 AceticAcid',       'Xylose',    1e-8),
         Rxn('Xylose -> 1.667 Ethanol + 1.667 CO2',       'Xylose',    1e-8),
-        Rxn('Xylose -> 5 FermMicrobe',        'Xylose',    0.066),
-        Rxn('3 Xylose -> 5 PyruvicAcid',    'Xylose',   0.1)
+        Rxn('Xylose -> 5 FermMicrobe',        'Xylose',    0.186),
+        Rxn('3 Xylose -> 5 PyruvicAcid',    'Xylose',   0.006),
+        
+        # Rxn('Glucose -> Fructose',    'Glucose',   0.059)
         ])
         
         self.NH4OH_neutralization_rxns = ParallelRxn([
@@ -557,6 +570,17 @@ class CoFermentation(Reactor):
         Rxn('2 AceticAcid + 2 NH4OH -> AmmoniumAcetate + 2 H2O',  'AceticAcid',   1.),
         Rxn('SuccinicAcid + 2 NH4OH -> DiammoniumSuccinate + 2H2O', 'SuccinicAcid', 1.),
             ])
+        
+        
+        self.NH4OH_pH_control_rxns = ParallelRxn([
+        #   Reaction definition                                               Reactant  Conversion
+        # Rxn('2 LacticAcid + CalciumDihydroxide -> CalciumLactate + 2 H2O',  'LacticAcid',   1.),
+        # Rxn('2 AceticAcid + CalciumDihydroxide -> CalciumAcetate + 2 H2O',  'AceticAcid',   1.),
+        # Rxn('SuccinicAcid + CalciumDihydroxide -> CalciumSuccinate + 2H2O', 'SuccinicAcid', 1.),
+        Rxn('2 AceticAcid + 2 NH4OH -> AmmoniumAcetate + 2 H2O',  'NH4OH',   1.),
+        Rxn('SuccinicAcid + 2 NH4OH -> DiammoniumSuccinate + 2H2O', 'NH4OH', 1.),
+            ])
+        
         
         self.lime_neutralization_rxns = ParallelRxn([
         #   Reaction definition                                               Reactant  Conversion
@@ -600,9 +624,10 @@ class CoFermentation(Reactor):
         self.xylose_to_CO2_rxn = self.CO2_generation_rxns[1]
 
     def _run(self):
-        feed, sugars, CSL, CO2, base, recycled_CO2, nutrient_media = self.ins
+        feed, sugars, CSL, CO2, base, recycled_CO2, diammonium_sulfate, magnesium_sulfate, air = self.ins
         
         effluent, vapor = self.outs
+        effluent.empty()
         effluent.mix_from([feed, sugars])
         # effluent.phase='l'
         # try:
@@ -627,6 +652,7 @@ class CoFermentation(Reactor):
         
         
         self.cofermentation_rxns(effluent.mol)
+        vapor.empty()
         vapor.imol['CO2', 'O2'] = effluent.imol['CO2', 'O2']
         vapor.phase = 'g'
         
@@ -665,18 +691,53 @@ class CoFermentation(Reactor):
             #     base.empty()
             if self.pH_control:
                 # base.empty()
-                base.imol['Lime'] = self.mol_base_per_acid_pH_control * (
-                                    # effluent.imol['LacticAcid']/2/self.neutralization_rxns.X[0] \
-                                    # effluent.imol['AceticAcid']/2/self.lime_pH_control_rxns.X[0] \
-                                    +effluent.imol['SuccinicAcid']/self.lime_pH_control_rxns.X[1]) \
-                                    * self.neutralization_safety_factor
-                effluent.mix_from((effluent, base))
-                # self.neutralization_rxns.adiabatic_reaction(effluent)
-                self.lime_pH_control_rxns[1](effluent.mol)
-            
+                
+                if self.neutralizing_agent in ['Lime', 'CaO']:
+                    base.imol['Lime'] = self.mol_lime_per_acid_pH_control * (
+                                        # effluent.imol['LacticAcid']/2/self.neutralization_rxns.X[0] \
+                                        # effluent.imol['AceticAcid']/2/self.lime_pH_control_rxns.X[0] \
+                                        +effluent.imol['SuccinicAcid']/self.lime_pH_control_rxns.X[1]) \
+                                        * self.neutralization_safety_factor
+                    effluent.mix_from((effluent, base))
+                    # self.neutralization_rxns.adiabatic_reaction(effluent)
+                    self.lime_pH_control_rxns[1](effluent.mol)
+                    
+                elif self.neutralizing_agent in ['AmmoniumHydroxide', 'NH4OH']:
+                    base.imol['NH4OH'] = self.mol_NH4OH_per_acid_pH_control * (
+                                        # effluent.imol['LacticAcid']/2/self.neutralization_rxns.X[0] \
+                                        # effluent.imol['AceticAcid']/2/self.lime_pH_control_rxns.X[0] \
+                                        +effluent.imol['SuccinicAcid']/self.NH4OH_pH_control_rxns.X[1]) \
+                                        * self.neutralization_safety_factor
+                    effluent.mix_from((effluent, base))
+                    # self.neutralization_rxns.adiabatic_reaction(effluent)
+                    self.NH4OH_pH_control_rxns[1](effluent.mol)
+                    
+                    
         self.effluent_titer = compute_succinic_acid_titer(effluent)
         
-        vapor.imol['CO2'] += max(0, self.mol_atom_in('C')-self.mol_atom_out('C'))
+        self.effluent_mol_succinic_acid_eq = effluent_mol_succinic_acid_eq =\
+            effluent.imol['SuccinicAcid','CalciumSuccinate','DiammoniumSuccinate'].sum()
+        
+        self.effluent_mass_succinic_acid_eq = effluent_mass_succinic_acid_eq = effluent_mol_succinic_acid_eq*118.09
+        self.diammonium_sulfate_required = diammonium_sulfate_required = self.g_diammonium_sulfate_per_g_succinic_acid*effluent_mass_succinic_acid_eq
+        self.magnesium_sulfate_required = magnesium_sulfate_required = self.g_magnesium_sulfate_per_g_succinic_acid*effluent_mass_succinic_acid_eq
+        
+        diammonium_sulfate.imass['DiammoniumSulfate'] = diammonium_sulfate_required
+        magnesium_sulfate.imass['MagnesiumSulfate'] = magnesium_sulfate_required
+        
+        
+        
+        air.P = self.air_pressure
+        air.imol['N2'] = 0.79
+        air.imol['O2'] = 0.21
+        
+        air.F_mol = self.mol_air_per_mol_succinic_acid * effluent_mol_succinic_acid_eq
+        vapor.mix_from([vapor, air])
+        
+        self.abs_mass_bal_diff_CO2_added_to_vent = abs_mass_bal_diff_CO2_added_to_vent = \
+            max(0, self.mol_atom_in('C')-self.mol_atom_out('C'))
+        
+        vapor.imol['CO2'] += abs_mass_bal_diff_CO2_added_to_vent
 
 
     def _design(self):
@@ -685,12 +746,15 @@ class CoFermentation(Reactor):
         Design.clear()
 
         if mode == 'batch':
+            self._V_max = self.max_batch_reactor_volume
+            # Reactor._design(self)
             tau_tot = self.tau_batch_turnaround + self.tau_cofermentation
             Design['Fermenter size'] = self.outs[0].F_mass * tau_tot
             Design['Recirculation flow rate'] = self.F_mass_in
             Design['Broth flow rate'] = self.outs[0].F_mass
-        else:
-            self._Vmax = 3785.41178 # 1,000,000 gallon from ref [1]
+        
+        elif mode=='continuous':
+            self._V_max = self.max_continuous_reactor_volume
             Reactor._design(self)
             self.tau_cofermentation = self.tau
             # Include a backup fermenter for cleaning
@@ -704,24 +768,33 @@ class CoFermentation(Reactor):
 
 
     def _cost(self):
+        mode = self.mode
+        self.power_utility(0)
         Design = self.design_results
         purchase_costs = self.baseline_purchase_costs
         purchase_costs.clear()
         
-        if self.mode == 'batch':
+        if mode == 'batch':
             Unit._cost()
             self._decorated_cost()
             # Adjust fermenter cost for acid-resistant scenario
             if not self.neutralization:
                 purchase_costs['Fermenter'] *= _316_over_304
-                purchase_costs['Fermenter agitator'] *= _316_over_304
-        else:
+                if 'Fermenter agitator' in purchase_costs.keys():
+                    purchase_costs['Fermenter agitator'] *= _316_over_304
+            # self.power_utility(self.kW_per_m3*(self.outs[0].F_vol*self.tau/self.V_wf))
+            self.power_utility.consumption += self.kW_per_m3*(self.outs[0].F_vol*self.tau/self.V_wf)
+        elif mode == 'continuous':
             if not self.neutralization:
                 self.vessel_material= 'Stainless steel 316'
             Reactor._cost(self)
             N_working = Design['Number of reactors'] - 1 # subtract the one back-up
+            # self.power_utility(self.kW_per_m3*Design['Single reactor volume']*N_working)
+            # self.power_utility.consumption += self.kW_per_m3*Design['Single reactor volume']*N_working
+            
             # No power need for the back-up reactor
-            self.power_utility(self.kW_per_m3*Design['Single reactor volume']*N_working)
+        # Reactor._cost(self)
+        # N_working = Design['Number of reactors'] - 1 # subtract the one back-up
 
     @property
     def tau(self):
@@ -772,196 +845,7 @@ class CoFermentation(Reactor):
 
 
 
-@cost(basis='Fermenter size', ID='Fermentors', units='kg',
-      cost=10128000, S=(42607+443391+948+116)*(60+36), CE=CEPCI[2009], n=1, BM=1.5)
-@cost(basis='Fermenter size', ID='Agitators', units='kg',
-      # Scaling basis based on sum of all streams into fermenter
-      # (304, 306, 311, and 312 in Humbird et al.)
-      # and total residence time (batch hydrolysis and fermentation)
-      kW=22.371, cost=52500, S=(42607+443391+948+116)*(60+36), CE=CEPCI[2009], n=1, BM=1.5)
-@cost(basis='Recirculation flow rate', ID='Recirculation pumps', units='kg/hr',
-      # Scaling basis based on sum of all streams into fermenter
-      # (304, 306, 311, and 312 in Humbird et al.)
-      kW=74.57, cost=47200, S=(42607+443391+948+116), CE=CEPCI[2009], n=0.8, BM=2.3)
 
-class CoFermentation_old(Unit):    
-    _N_ins = 6
-    _N_outs = 2
-    _units= {'Fermenter size': 'kg',
-             'Recirculation flow rate': 'kg/hr'}             
-
-    neutralization_safety_factor = 1.
-    # Co-Fermentation time (hr)
-    tau_cofermentation = 120
-    
-
-    CSL_loading = 10 # kg/m3
-    
-    def __init__(self, ID='', ins=None, outs=(), T=30+273.15, 
-                 neutralization=False, neutralizing_agent='AmmoniumHydroxide'):
-        Unit.__init__(self, ID, ins, outs)
-        # Same T for saccharificatoin and co-fermentation
-        self.T = T
-        self.neutralization = neutralization
-        self.neutralizing_agent = neutralizing_agent
-        
-        self.sucrose_hydrolysis_rxns = ParallelRxn([
-        #      Reaction definition            Reactant    Conversion
-        Rxn('Sucrose + H2O -> 2 Glucose',        'Sucrose',   1.-1e-4), 
-        ])
-        
-        # self.fructose_to_glucose_rxns = ParallelRxn([
-        # #      Reaction definition            Reactant    Conversion
-        # Rxn('Fructose -> Glucose',        'Fructose',   1.-1e-4), 
-        # ])
-        
-        self.cofermentation_rxns = ParallelRxn([
-        #      Reaction definition            Reactant    Conversion
-        Rxn('Glucose + 2 CO2 -> 2 SuccinicAcid + O2',        'Glucose',   0.7), 
-        Rxn('Glucose -> 3 AceticAcid',               'Glucose',   1e-8),
-        Rxn('Glucose -> 2 Ethanol + 2 CO2',               'Glucose',   1e-8),
-        Rxn('Glucose -> 6 FermMicrobe',       'Glucose',   0.066),
-        Rxn('Glucose -> 2 PyruvicAcid',     'Glucose',    0.1),
-        
-        Rxn('Xylose + 1.667 CO2 -> 1.667 SuccinicAcid + 0.4165 O2',       'Xylose',    0.7),
-        Rxn('Xylose -> 2.5 AceticAcid',       'Xylose',    1e-8),
-        Rxn('Xylose -> 1.667 Ethanol + 1.667 CO2',       'Xylose',    1e-8),
-        Rxn('Xylose -> 5 FermMicrobe',        'Xylose',    0.066),
-        Rxn('3 Xylose -> 5 PyruvicAcid',    'Xylose',   0.1)
-        ])
-        
-        self.NH4OH_neutralization_rxns = ParallelRxn([
-        #   Reaction definition                                               Reactant  Conversion
-        # Rxn('2 LacticAcid + CalciumDihydroxide -> CalciumLactate + 2 H2O',  'LacticAcid',   1.),
-        # Rxn('2 AceticAcid + CalciumDihydroxide -> CalciumAcetate + 2 H2O',  'AceticAcid',   1.),
-        # Rxn('SuccinicAcid + CalciumDihydroxide -> CalciumSuccinate + 2H2O', 'SuccinicAcid', 1.),
-        Rxn('2 AceticAcid + 2 NH4OH -> AmmoniumAcetate + 2 H2O',  'AceticAcid',   1.),
-        Rxn('SuccinicAcid + 2 NH4OH -> DiammoniumSuccinate + 2H2O', 'SuccinicAcid', 1.),
-            ])
-        
-        self.lime_neutralization_rxns = ParallelRxn([
-        #   Reaction definition                                               Reactant  Conversion
-        # Rxn('2 LacticAcid + CalciumDihydroxide -> CalciumLactate + 2 H2O',  'LacticAcid',   1.),
-        Rxn('2 AceticAcid + CalciumDihydroxide -> CalciumAcetate + 2 H2O',  'AceticAcid',   1.),
-        Rxn('SuccinicAcid + CalciumDihydroxide -> CalciumSuccinate + 2H2O', 'SuccinicAcid', 1.),
-        # Rxn('2 AceticAcid + 2 NH4OH -> AmmoniumAcetate + 2 H2O',  'AceticAcid',   1.),
-        # Rxn('SuccinicAcid + 2 NH4OH -> DiammoniumSuccinate + 2H2O', 'SuccinicAcid', 1.),
-            ])
-        
-        
-        self.CO2_generation_rxns = ParallelRxn([
-            Rxn('Glucose -> 6CO2 + 6H2O', 'Glucose', 1.),
-            Rxn('Xylose -> 5CO2 + 5H2O', 'Xylose', 1.)])
-        
-        self.glucose_to_succinic_acid_rxn = self.cofermentation_rxns[0]
-        self.xylose_to_succinic_acid_rxn = self.cofermentation_rxns[5]
-        
-        self.glucose_to_pyryuvic_acid_rxn = self.cofermentation_rxns[4]
-        self.xylose_to_pyryuvic_acid_rxn = self.cofermentation_rxns[9]
-        
-        self.glucose_to_acetic_acid_rxn = self.cofermentation_rxns[1]
-        self.xylose_to_acetic_acid_rxn = self.cofermentation_rxns[6]
-        
-        self.glucose_to_ethanol_rxn = self.cofermentation_rxns[2]
-        self.xylose_to_ethanol_rxn = self.cofermentation_rxns[7]
-        
-        self.glucose_to_microbe_rxn = self.cofermentation_rxns[3]
-        self.xylose_to_microbe_rxn = self.cofermentation_rxns[8]
-        
-        self.glucose_to_CO2_rxn = self.CO2_generation_rxns[0]
-        self.xylose_to_CO2_rxn = self.CO2_generation_rxns[1]
-        
-        # self.cofermentation_rxns[1].X = \
-        #     max(0, 1- (.07 + self.cofermentation_rxns[0].X + self.cofermentation_rxns[2].X))
-        # Neutralization of lactic acid and acetic acid by base (Ca(OH)2)
-        # self.neutralization_rxns = ParallelRxn([
-        # #   Reaction definition                                               Reactant  Conversion
-        # Rxn('2 LacticAcid + CalciumDihydroxide -> CalciumLactate + 2 H2O',  'LacticAcid',   1),
-        # Rxn('2 AceticAcid + CalciumDihydroxide -> CalciumAcetate + 2 H2O',  'AceticAcid',   1),
-        # Rxn('SuccinicAcid + CalciumDihydroxide -> CalciumSuccinate + 2H2O', 'SuccinicAcid', 1)
-        #     ])
-    
-    CO2_safety_factor = 3.
-    
-    def _run(self):
-        feed, sugars, CSL, CO2, base, recycled_CO2 = self.ins
-        
-        effluent, vapor = self.outs
-        effluent.mix_from([feed, sugars])
-        # effluent.phase='l'
-        # try:
-        self.sucrose_hydrolysis_rxns(effluent.mol)
-        # except:
-        #     breakpoint()
-        # self.fructose_to_glucose_rxns(effluent.mol)
-        
-        self.CO2_required = CO2_required = (2 * self.glucose_to_succinic_acid_rxn.X * effluent.imol['Glucose']\
-            + 1.667 * self.xylose_to_succinic_acid_rxn.X * effluent.imol['Xylose'])\
-            * self.CO2_safety_factor\
-            - recycled_CO2.imol['CO2']
-            
-        
-        CO2.imol['CO2'] = max(0, CO2_required)
-            
-        effluent.mix_from([effluent, CO2, recycled_CO2])
-        # ss = Stream(None)
-        # effluent.copy_like(feed)
-        effluent.T = vapor.T = self.T
-        CSL.imass['CSL'] = (sugars.F_vol+feed.F_vol) * self.CSL_loading 
-        
-        
-        self.cofermentation_rxns(effluent.mol)
-        vapor.imol['CO2', 'O2'] = effluent.imol['CO2', 'O2']
-        vapor.phase = 'g'
-        
-        self.CO2_generation_rxns(effluent.mol)
-        
-        effluent.imol['CO2'] = 0
-        effluent.imol['O2'] = 0
-        effluent.imass['CSL'] = 0
-        
-        if self.neutralization:
-            if self.neutralizing_agent in ['Lime', 'CaO']:
-                # Set feed base mol to match rate of acids production, add 10% extra
-                base.imol['Lime'] = (
-                                    # effluent.imol['LacticAcid']/2/self.neutralization_rxns.X[0] \
-                                    effluent.imol['AceticAcid']/2/self.lime_neutralization_rxns.X[0] \
-                                    +effluent.imol['SuccinicAcid']/self.lime_neutralization_rxns.X[1]) \
-                                    * self.neutralization_safety_factor
-                effluent.mix_from((effluent, base))
-                # self.neutralization_rxns.adiabatic_reaction(effluent)
-                self.lime_neutralization_rxns(effluent.mol)
-            elif self.neutralizing_agent in ['AmmoniumHydroxide', 'NH4OH']:
-                # Set feed base mol to match rate of acids production, add 10% extra
-                base.imol['AmmoniumHydroxide'] = (
-                                    # effluent.imol['LacticAcid']/2/self.neutralization_rxns.X[0] \
-                                    effluent.imol['AceticAcid']/self.NH4OH_neutralization_rxns.X[0] \
-                                    +2*effluent.imol['SuccinicAcid']/self.NH4OH_neutralization_rxns.X[1]) \
-                                    * self.neutralization_safety_factor
-                effluent.mix_from((effluent, base))
-                # self.neutralization_rxns.adiabatic_reaction(effluent)
-                self.NH4OH_neutralization_rxns(effluent.mol)
-            # self.neutralization_rxns(effluent.mol)
-        else:
-            base.empty()
-            
-        self.effluent_titer = compute_succinic_acid_titer(effluent)
-        
-        vapor.imol['CO2'] += max(0, self.mol_atom_in('C')-self.mol_atom_out('C'))
-    
-    def mol_atom_in(self, atom):
-        return sum([stream.get_atomic_flow(atom) for stream in self.ins])
-    
-    def mol_atom_out(self, atom):
-        return sum([stream.get_atomic_flow(atom) for stream in self.outs])
-    
-    def _design(self):
-        Design = self.design_results
-        total_mass_flow = sum([instream.F_mass for instream in self.ins])
-        Design['Fermenter size'] = self.outs[0].F_mass * self.tau_cofermentation
-        Design['Recirculation flow rate'] = total_mass_flow
-        
-    
         
 # Seed train, 5 stages, 2 trains
 @cost(basis='Seed fermenter size', ID='Stage #1 fermenters', units='kg',
@@ -988,11 +872,11 @@ class SeedTrain(Unit):
              'Flow rate': 'kg/hr'}
     
     # Cycle time for each batch (hr), including 12 hr turnaround time 
-    tau_batch = 36
+    tau_batch = 96 + 12
     
     # ferm_ratio is the ratio of conversion relative to the fermenter
     
-    def __init__(self, ID='', ins=None, outs=(), T=30+273.15, ferm_ratio=0.95):
+    def __init__(self, ID='', ins=None, outs=(), T=30+273.15, ferm_ratio=0.9):
         Unit.__init__(self, ID, ins, outs)
         self.T = T
         self.ferm_ratio = ferm_ratio
@@ -1006,12 +890,15 @@ class SeedTrain(Unit):
         Rxn('Glucose + 2 CO2 -> 2 SuccinicAcid + O2',        'Glucose',   0.7*ferm_ratio), 
         Rxn('Glucose -> 3 AceticAcid',               'Glucose',   1e-8*ferm_ratio),
         Rxn('Glucose -> 2 Ethanol + 2 CO2',               'Glucose',   1e-8*ferm_ratio),
-        Rxn('Glucose -> 6 FermMicrobe',       'Glucose',   0.066*ferm_ratio),
+        Rxn('Glucose -> 6 FermMicrobe',       'Glucose',   0.186*ferm_ratio),
         
         Rxn('Xylose + 1.667 CO2 -> 1.667 SuccinicAcid + 0.4165 O2',       'Xylose',    0.7*ferm_ratio),
         Rxn('Xylose -> 2.5 AceticAcid',       'Xylose',    1e-8*ferm_ratio),
         Rxn('Xylose -> 1.667 Ethanol + 1.667 CO2',       'Xylose',    1e-8*ferm_ratio),
-        Rxn('Xylose -> 5 FermMicrobe',        'Xylose',    0.066*ferm_ratio),
+        Rxn('Xylose -> 5 FermMicrobe',        'Xylose',    0.186*ferm_ratio),
+        
+        # Rxn('Glucose -> Fructose',    'Glucose',   0.059*ferm_ratio),
+        
         ])
 
         self.CO2_generation_rxns = ParallelRxn([
@@ -1042,7 +929,7 @@ class SeedTrain(Unit):
         self.glucose_to_CO2_rxn = self.CO2_generation_rxns[0]
         self.xylose_to_CO2_rxn = self.CO2_generation_rxns[1]
     
-    CO2_safety_factor = 3.
+    CO2_safety_factor = 1.0015
     def _run(self):
         feed, CO2 = self.ins
         
@@ -2160,3 +2047,32 @@ class SuccinicAcidCrystallizer(BatchCrystallizer):
             out_stream.imass['l', 'SuccinicAcid'] = min(tot_SA, still_dissolved_SA)
             out_stream.imass['s', 'SuccinicAcid'] = recovered_SA = max(0, tot_SA - still_dissolved_SA)
             self.effective_recovery = recovered_SA/tot_SA
+
+
+#%% IsothermalCompressor 
+
+# Same as bst.IsothermalCompressor, except that it allows switching with compressible gases 
+# in specification while correctly calculating power requirements
+
+
+class IsothermalCompressor(Compressor, new_graphics=False):
+    def _run(self):
+        feed = self.ins[0]
+        out = self.outs[0]
+        self.ideal_power, self.ideal_duty = None, None
+        out.copy_like(feed)
+        out.P = self.P
+        out.T = feed.T
+        if self.vle is True: out.vle(T=out.T, P=out.P)
+        self.ideal_power, self.ideal_duty = self._calculate_ideal_power_and_duty()
+
+    def _design(self):
+        super()._design()
+        feed = self.ins[0]
+        outlet = self.outs[0]
+        ideal_power, ideal_duty = self._calculate_ideal_power_and_duty() if not (self.ideal_power and self.ideal_duty) else self.ideal_power, self.ideal_duty
+        Q = ideal_duty / self.eta
+        self.add_heat_utility(unit_duty=Q, T_in=feed.T, T_out=outlet.T)
+        self.design_results['Ideal power'] = ideal_power # kW
+        self.design_results['Ideal duty'] = ideal_duty # kJ / hr
+        self._set_power(ideal_power / self.eta)

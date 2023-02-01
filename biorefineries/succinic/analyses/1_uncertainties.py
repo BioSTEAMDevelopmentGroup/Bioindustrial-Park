@@ -56,7 +56,7 @@ timer.tic()
 
 # Set seed to make sure each time the same set of random numbers will be used
 np.random.seed(3221) # 3221
-N_simulation = 10 # 2000
+N_simulation = 100 # 2000
 
 samples = model.sample(N=N_simulation, rule='L')
 model.load_samples(samples)
@@ -226,11 +226,11 @@ import contourplots
 MPSP_baseline = 1.40
 MPSP_uncertainty = model.table.Biorefinery['Adjusted minimum selling price [$/kg]']
 market_range = (2.57, 2.94)
-
+biobased_lit_MPSP_range = (1.08, 3.63)
 
 contourplots.box_and_whiskers_plot(uncertainty_data=MPSP_uncertainty, 
                           baseline_value=MPSP_baseline, 
-                          range_for_comparison=market_range,
+                          range_for_comparison=biobased_lit_MPSP_range,
                           values_for_comparison=[],
                           n_minor_ticks=1,
                           y_label=r"$\bfMPSP$",

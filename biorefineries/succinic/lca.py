@@ -63,7 +63,8 @@ class LCA:
                  cooling_tower=None, chilled_water_processing_unit=None,
                  boiler=None, has_turbogenerator=None, feedstock_ID='Sugarcane',
                  FU='1 kg', demand_allocation_method='steam pool',
-                 credit_feedstock_CO2_capture=False,):
+                 credit_feedstock_CO2_capture=False, add_EOL_GWP=False,
+                 feedstock_mass_FU_kind='wet'):
         
         #: [System] System being evaluated.
         self.system = system
@@ -73,6 +74,10 @@ class LCA:
         self.streams = self.system.streams
         
         self.credit_feedstock_CO2_capture = credit_feedstock_CO2_capture
+        self.add_EOL_GWP = add_EOL_GWP
+        self.feedstock_mass_FU_kind = feedstock_mass_FU_kind
+        
+        
         self.feedstock_ID = feedstock_ID
         self.feeds = feeds = system.feeds
         self.priced_feeds = [i for i in feeds if i.price]
@@ -171,18 +176,18 @@ class LCA:
     
     @property
     def FGHTP_GWP(self):
-        return (self.feedstock.F_mass) \
- * self.CFs['GWP_CFs'][self.feedstock_ID]/self.main_product.F_mass
+        if self.feedstock_mass_FU_kind=='dry':
+            mass_flow = self.feedstock.F_mass-self.feedstock.imass['H2O']
+        elif self.feedstock_mass_FU_kind=='wet':
+            mass_flow = self.feedstock.F_mass
+        return mass_flow *self.CFs['GWP_CFs'][self.feedstock_ID]/self.main_product.F_mass
     
     @property
     def feedstock_CO2_capture(self):
-        if self.credit_feedstock_CO2_capture:
-            return self.feedstock.get_atomic_flow('C')* self.chemicals.CO2.MW/self.main_product.F_mass
-        else:
-            return 0
+        return self.feedstock.get_atomic_flow('C')* self.chemicals.CO2.MW/self.main_product.F_mass
     @property
     def feedstock_GWP(self): 
-        return self.FGHTP_GWP - self.feedstock_CO2_capture
+        return self.FGHTP_GWP - int(self.credit_feedstock_CO2_capture)*self.feedstock_CO2_capture
     #  feedstock_GWP(self): return  FGHTP_GWP()
     
     @property
@@ -193,7 +198,8 @@ class LCA:
     @property
     def net_electricity(self):
         return sum(i.power_utility.rate for i in self.system.units)
-    
+        # return self.BT.power_utility.rate + self.BT.electricity_demand
+        
     @property
     def net_electricity_GWP(self):
         return self.net_electricity*self.CFs['GWP_CFs']['Electricity'] \
@@ -202,10 +208,9 @@ class LCA:
     
     @property
     def electricity_demand(self): 
-        return -self.BT.power_utility.rate
-    @property
-    def electricity_use(self): # redundant
-        return -self.BT.power_utility.rate
+        # return sum([i.power_utility.consumption for i in self.system.units])
+        return self.BT.electricity_demand # excludes BT's electricity use
+
     
     @property
     def cooling_electricity_demand(self):
@@ -258,7 +263,7 @@ class LCA:
     
     @property
     def direct_emissions_GWP(self): 
-        return  self.emissions_GWP  - (self.feedstock_CO2_capture  - self.EOL_GWP )
+        return  self.emissions_GWP  - (int(self.credit_feedstock_CO2_capture)*self.feedstock_CO2_capture  - int(self.add_EOL_GWP)*self.EOL_GWP )
     
     @property
     def BT_direct_emissions_GWP(self): 

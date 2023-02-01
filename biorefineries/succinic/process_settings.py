@@ -117,6 +117,9 @@ succinic_acid_price = ((2.86*38e3 + 2.50*40e3)/(38e3+40e3))*_chemical_2013to2016
 MEA_price = (1021.69*_chemical_2014to2016 + 1855.65*_chemical_2017to2016)/(2*1000)
 
 
+diammonium_sulfate_price = 1.
+magnesium_sulfate_price = 1.
+
 # All in 2016$/kg
 price = {
          'Feedstock': feedstock_price,
@@ -142,6 +145,9 @@ price = {
          'Succinic acid': succinic_acid_price, # initial value to solve MPSP
          # Below currently not in use
          'Denaturant': denaturant_price,
+         'Diammonium sulfate': diammonium_sulfate_price,
+         'Magnesium sulfate': magnesium_sulfate_price,
+         
          }
     
 #!!! Round all prices to 4 *decimal places*
@@ -208,8 +214,13 @@ GWP_CF_stream = tmo.Stream('GWP_CF_stream', GWP_CF_array, units='kg/hr')
 CFs['GWP_CF_stream'] = GWP_CF_stream
 
 GWP_CFs['Electricity'] = 0.48 # assume production==consumption, both in kg CO2-eq/kWh
-GWP_CFs['Sugarcane'] = 0.12043 * 0.3/0.286 # ecoinvent 3.8 market for sugarcane, RoW
-# adjusted from dry wt content of 28.6% (their assumption) to 30% (our assumption)
+
+
+# GWP_CFs['Sugarcane'] = 0.12043 * 0.3/0.286 # ecoinvent 3.8 market for sugarcane, RoW
+# # adjusted from dry wt content of 28.6% (their assumption) to 30% (our assumption)
+
+
+GWP_CFs['Sugarcane'] = 0.2931 # GREET 2022
 
 
 CFs['GWP_CFs'] = GWP_CFs
@@ -242,8 +253,13 @@ FEC_CF_stream = tmo.Stream('FEC_CF_stream', FEC_CF_array, units='kg/hr')
 CFs['FEC_CF_stream'] = FEC_CF_stream
 
 FEC_CFs['Electricity'] = 5.926 # assume production==consumption, both in MJ/kWh
-FEC_CFs['Sugarcane'] = 	0.40192 * 0.3/0.286 # ecoinvent 3.8 market for sugarcane, RoW
-# adjusted from dry wt content of 28.6% (their assumption) to 30% (our assumption)
+
+# FEC_CFs['Sugarcane'] = 	0.40192 * 0.3/0.286 # ecoinvent 3.8 market for sugarcane, RoW
+# # adjusted from dry wt content of 28.6% (their assumption) to 30% (our assumption)
+
+FEC_CFs['Sugarcane'] = 	0.2265 # GREET 2022
+
+
 
 CFs['FEC_CFs'] = FEC_CFs
 

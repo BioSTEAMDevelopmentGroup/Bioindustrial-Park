@@ -75,8 +75,9 @@ H2O = chemical_database('H2O')
 # Gases
 # =============================================================================
 
-O2 = chemical_database('O2', phase='g', Hf=0)
-N2 = chemical_database('N2', phase='g', Hf=0)
+# O2 = chemical_database('O2', phase='g', Hf=0)
+# N2 = chemical_database('N2', phase='g', Hf=0)
+
 H2 = chemical_database('H2', phase='g')
 CH4 = chemical_database('CH4', phase='g')
 CarbonMonoxide = chemical_database('CarbonMonoxide', phase='g', 
@@ -106,6 +107,9 @@ CalciumDihydroxide = chemical_database('CalciumDihydroxide',
                                         phase='s', Hf=-235522*_cal2joule)
 DiammoniumSulfate = chemical_database('DiammoniumSulfate', phase='l',
                                     Hf=-288994*_cal2joule)
+
+MagnesiumSulfate = chemical_database('MagnesiumSulfate', phase='l',
+                                      )
 NaNO3 = chemical_database('NaNO3', phase='l', Hf=-118756*_cal2joule)
 # NIST https://webbook.nist.gov/cgi/cbook.cgi?ID=C7757826&Mask=2, accessed 04/07/2020
 Na2SO4 = chemical_database('Na2SO4', phase='l', Hf=-1356.38e3)
@@ -150,6 +154,7 @@ CalciumSuccinate = chemical_database('CalciumSuccinate', phase='l')
 
 AceticAcid = chemical_database('AceticAcid')
 Glucose = chemical_database('Glucose', phase = 'l')
+Fructose = chemical_database('Fructose', phase = 'l')
 
 # IBA = chemical_database('Isobutyraldehyde')
 # DPHP = chemical_database('DipotassiumHydrogenPhosphate',
@@ -614,6 +619,9 @@ chems.append(sugarcane_chems.Solids)
 chems.append(sugarcane_chems.Flocculant)
 
 chems.append(tmo.Chemical(ID='CO2_compressible', search_ID='CO2'))
+
+chems.append(tmo.Chemical(ID='O2',))
+chems.append(tmo.Chemical(ID='N2',))
 # for c1 in sugarcane_chems:
 #     c1_exists = False
 #     if not c1 in chems:

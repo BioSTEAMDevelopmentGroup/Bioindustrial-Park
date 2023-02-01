@@ -126,6 +126,53 @@ metrics_labels_dict = {
 for m, u_i in metrics_labels_dict.items():
     for ug in unit_groups:
         metrics.append(Metric(ug.name, ug.metrics[u_i[0]], u_i[1], m))
+        
+        
+## LCA
+
+# IPCC 2013 GWP100a
+metrics.append(Metric('Total GWP100a', lambda: succinic_LCA.GWP, 'kg-CO2-eq/kg', 'Biorefinery'))
+metrics.append(Metric('GWP100a - Heating demand', lambda: succinic_LCA.heating_demand_GWP, 'kg-CO2-eq/kg', 'Biorefinery'))
+metrics.append(Metric('GWP100a - Cooling demand', lambda: succinic_LCA.cooling_demand_GWP, 'kg-CO2-eq/kg', 'Biorefinery'))
+metrics.append(Metric('GWP100a - Electricity demand (non-cooling)', lambda: succinic_LCA.electricity_demand_non_cooling_GWP, 'kg-CO2-eq/kg', 'Biorefinery'))
+
+metrics.append(Metric('GWP100a - Feedstock (FGHTP) ', lambda: succinic_LCA.FGHTP_GWP, 'kg-CO2-eq/kg', 'Biorefinery'))
+metrics.append(Metric('GWP100a - Materials (except feedstock and BT.natural_gas) ', lambda: succinic_LCA.material_GWP, 'kg-CO2-eq/kg', 'Biorefinery'))
+
+# breakdown = succinic_LCA.material_GWP_breakdown
+# for k in lambda: breakdown.keys():
+# for k in ['CH4', 'CO2', 'H2SO4', 'CalciumDihydroxide', 'MEA', 'CSL', 'H3PO4']:
+#     metrics.append(Metric(f'GWP100a - Materials breakdown - {k}', lambda: succinic_LCA.material_GWP_breakdown[k], 'kg-CO2-eq/kg', 'Biorefinery'))
+metrics.append(Metric(f'GWP100a - Materials breakdown - CH4', lambda: succinic_LCA.material_GWP_breakdown['CH4'], 'kg-CO2-eq/kg', 'Biorefinery'))
+metrics.append(Metric(f'GWP100a - Materials breakdown - CO2', lambda: succinic_LCA.material_GWP_breakdown['CO2'], 'kg-CO2-eq/kg', 'Biorefinery'))
+metrics.append(Metric(f'GWP100a - Materials breakdown - H2SO4', lambda: succinic_LCA.material_GWP_breakdown['H2SO4'], 'kg-CO2-eq/kg', 'Biorefinery'))
+metrics.append(Metric(f'GWP100a - Materials breakdown - CalciumDihydroxide', lambda: succinic_LCA.material_GWP_breakdown['CalciumDihydroxide'], 'kg-CO2-eq/kg', 'Biorefinery'))
+metrics.append(Metric(f'GWP100a - Materials breakdown - MEA', lambda: succinic_LCA.material_GWP_breakdown['MEA'], 'kg-CO2-eq/kg', 'Biorefinery'))
+metrics.append(Metric(f'GWP100a - Materials breakdown - CSL', lambda: succinic_LCA.material_GWP_breakdown['CSL'], 'kg-CO2-eq/kg', 'Biorefinery'))
+metrics.append(Metric(f'GWP100a - Materials breakdown - H3PO4', lambda: succinic_LCA.material_GWP_breakdown['H3PO4'], 'kg-CO2-eq/kg', 'Biorefinery'))
+
+# FEC
+metrics.append(Metric('Total FEC', lambda: succinic_LCA.FEC, 'kg-CO2-eq/kg', 'Biorefinery'))
+metrics.append(Metric('FEC - Heating demand', lambda: succinic_LCA.heating_demand_FEC, 'kg-CO2-eq/kg', 'Biorefinery'))
+metrics.append(Metric('FEC - Cooling demand', lambda: succinic_LCA.cooling_demand_FEC, 'kg-CO2-eq/kg', 'Biorefinery'))
+metrics.append(Metric('FEC - Electricity demand (non-cooling)', lambda: succinic_LCA.electricity_demand_non_cooling_FEC, 'kg-CO2-eq/kg', 'Biorefinery'))
+
+metrics.append(Metric('FEC - Feedstock (FGHTP) ', lambda: succinic_LCA.feedstock_FEC, 'kg-CO2-eq/kg', 'Biorefinery'))
+metrics.append(Metric('FEC - Materials (except feedstock and BT.natural_gas) ', lambda: succinic_LCA.material_FEC, 'kg-CO2-eq/kg', 'Biorefinery'))
+
+# breakdown = succinic_LCA.material_FEC_breakdown
+# for k in lambda: breakdown.keys():
+# for k in ['CH4', 'CO2', 'H2SO4', 'CalciumDihydroxide', 'MEA', 'CSL', 'H3PO4']:
+#     metrics.append(Metric(f'FEC - Materials breakdown - {k}', lambda: succinic_LCA.material_FEC_breakdown[k], 'kg-CO2-eq/kg', 'Biorefinery'))
+metrics.append(Metric(f'FEC - Materials breakdown - CH4', lambda: succinic_LCA.material_FEC_breakdown['CH4'], 'kg-CO2-eq/kg', 'Biorefinery'))
+metrics.append(Metric(f'FEC - Materials breakdown - CO2', lambda: succinic_LCA.material_FEC_breakdown['CO2'], 'kg-CO2-eq/kg', 'Biorefinery'))
+metrics.append(Metric(f'FEC - Materials breakdown - H2SO4', lambda: succinic_LCA.material_FEC_breakdown['H2SO4'], 'kg-CO2-eq/kg', 'Biorefinery'))
+metrics.append(Metric(f'FEC - Materials breakdown - CalciumDihydroxide', lambda: succinic_LCA.material_FEC_breakdown['CalciumDihydroxide'], 'kg-CO2-eq/kg', 'Biorefinery'))
+metrics.append(Metric(f'FEC - Materials breakdown - MEA', lambda: succinic_LCA.material_FEC_breakdown['MEA'], 'kg-CO2-eq/kg', 'Biorefinery'))
+metrics.append(Metric(f'FEC - Materials breakdown - CSL', lambda: succinic_LCA.material_FEC_breakdown['CSL'], 'kg-CO2-eq/kg', 'Biorefinery'))
+metrics.append(Metric(f'FEC - Materials breakdown - H3PO4', lambda: succinic_LCA.material_FEC_breakdown['H3PO4'], 'kg-CO2-eq/kg', 'Biorefinery'))
+
+
 #%%
 # =============================================================================
 # Construct base model and add parameters
@@ -255,12 +302,12 @@ def set_succinic_productivity(succinic_prod):
     spec.spec_3 = succinic_prod
 ###
 
-D = shape.Triangle(0.8*0.066, 0.066, 1.2*0.066)
+D = shape.Triangle(0.8*0.05, 0.05, 1.2*0.05)
 @param(name='A. succinogenes yield', element='Conversion', kind='coupled', units='% theoretical',
-       baseline=0.066, distribution=D)
+       baseline=0.05, distribution=D)
 def set_microbe_yield(yield_):
-    R302.glucose_to_microbe_rxn.X = yield_
-    R303.glucose_to_microbe_rxn.X = R303.ferm_ratio*yield_
+    R302.glucose_to_microbe_rxn.X = R302.xylose_to_microbe_rxn.X = yield_
+    R303.glucose_to_microbe_rxn.X = R303.xylose_to_microbe_rxn.X = R303.ferm_ratio*yield_
    
 
 baseline_neutralization_safety_factor = R302.neutralization_safety_factor
