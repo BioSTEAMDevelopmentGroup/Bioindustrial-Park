@@ -26,13 +26,14 @@ _lb_per_kg = 2.20462
 _liter_per_gallon = 3.78541
 _ft3_per_m3 = 35.3147
 
+_GDP_2007_to_2016 = 1.114 / 0.961
 _chemical_2011to2016 = 102.5 / 91.7
-_chemical_2013to2016 = 1.03
-_chemical_2014to2016 = 1.01
+_chemical_2013to2016 = 102.5 / 101.3
+_chemical_2014to2016 = 102.5 / 105.3
 
-_chemical_2017to2016 = 1. / 1.02
+_chemical_2017to2016 = 102.5 / 106.9
 _chemical_2020to2016 = 102.5 / 113.8 # average of Jan and Feb
-_chemical_2022to2016 = 125.05 / 113.8
+_chemical_2022to2016 = 102.5 / 145.3
 
 # From sugarcane biorefinery
 feedstock_price = 0.03455
@@ -103,8 +104,8 @@ CH4_MW = chems.CH4.MW
 natural_gas_price = 4.70/1e3*_ft3_per_m3*CH4_V * (1e3/CH4_MW)
 
 # 365-380 2022$/MT according to https://www.chemanalyst.com/Pricing-data/liquid-carbon-dioxide-1090
-# Baseline: 0.409 2016$/kg
-# Uncertainty range: 0.401 - 0.418 2016$/kg
+# Baseline: 0.263 2016$/kg
+# Uncertainty range: 0.257 - 0.268 2016$/kg
 liquid_CO2_price = 0.3725 * _chemical_2022to2016
 
 
@@ -117,8 +118,18 @@ succinic_acid_price = ((2.86*38e3 + 2.50*40e3)/(38e3+40e3))*_chemical_2013to2016
 MEA_price = (1021.69*_chemical_2014to2016 + 1855.65*_chemical_2017to2016)/(2*1000)
 
 
-diammonium_sulfate_price = 1.
-magnesium_sulfate_price = 1.
+# Diammonium sulfate (ammonium sulfate)
+# mean of 0.161 (range 0.154-0.167)	$/kg in 2007 $	
+# mean of 0.187 (range of 0.178-0.194) $/kg when converted to 2016$
+# https://web.archive.org/web/20161125084558/http://www.icis.com:80/chemicals/channel-info-chemicals-a-z/
+diammonium_sulfate_price = 0.161 * _GDP_2007_to_2016 
+
+
+# Diammonium sulfate (ammonium sulfate)
+# mean of 0.436 (range 0.397-0.474)	$/kg in 2007 $	
+# mean of 0.505 (range of 0.460-0.549) $/kg when converted to 2016$
+# https://web.archive.org/web/20161125084558/http://www.icis.com:80/chemicals/channel-info-chemicals-a-z/                        
+magnesium_sulfate_price = 0.436 * _GDP_2007_to_2016
 
 # All in 2016$/kg
 price = {

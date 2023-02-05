@@ -19,6 +19,8 @@ Modified from the biorefineries constructed in [1], [2], and [3] for the product
 # =============================================================================
 # Setup
 # =============================================================================
+
+
 from warnings import filterwarnings
 filterwarnings('ignore')
 import numpy as np
@@ -29,7 +31,9 @@ from biosteam.utils import TicToc
 # from biorefineries.succinic.system_succinic_adsorption_glucose import (
 #     spec, succinic_sys,
 # )
-from biorefineries.succinic.analyses import models
+
+print('\n\nLoading model ...')
+from biorefineries.succinic.analyses import models_alt as models
 from datetime import datetime
 import os
 
@@ -38,12 +42,12 @@ percentiles = [0, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 1]
 
 
 model = models.succinic_model
+
+print('\nLoaded model.')
 system = succinic_sys = models.succinic_sys
 spec = models.spec
 unit_groups_dict = models.unit_groups_dict
 TEA_breakdown = models.TEA_breakdown
-
-print('\n\n')
 
 # %%
 
@@ -56,11 +60,12 @@ timer.tic()
 
 # Set seed to make sure each time the same set of random numbers will be used
 np.random.seed(3221) # 3221
-N_simulation = 100 # 2000
+N_simulation = 20 # 2000
 
+print('\n\nLoading samples ...')
 samples = model.sample(N=N_simulation, rule='L')
 model.load_samples(samples)
-
+print('\nLoaded samples.')
 
 ###############################
 # Bugfix barrage
@@ -140,16 +145,20 @@ def model_specification():
 model.specification = model_specification
 
 model.exception_hook = 'warn'
-
+print('\n\nSimulating baseline ...')
 baseline_initial = model.metrics_at_baseline()
 baseline = pd.DataFrame(data=np.array([[i for i in baseline_initial.values],]), 
                         columns=baseline_initial.keys())
-
+print('\nSimulated baseline.')
+print('\n\nEvaluating ...')
 model.evaluate(notify=5, autoload=True, autosave=20, file='unfinished_evaluation')
 model.table.to_excel('all_results.xlsx')
+print('\nFinished evaluation.')
 
 # Baseline results
+print('\n\nRe-simulating baseline ...')
 baseline_end = model.metrics_at_baseline()
+print('\nRe-simulated baseline.')
 dateTimeObj = datetime.now()
 minute = '0' + str(dateTimeObj.minute) if len(str(dateTimeObj.minute))==1 else str(dateTimeObj.minute)
 file_to_save = 'succinic_%s.%s.%s-%s.%s'%(dateTimeObj.year, dateTimeObj.month, dateTimeObj.day, dateTimeObj.hour, minute)\
@@ -223,24 +232,35 @@ import contourplots
 # Results under uncertainty
 
 # MPSP
-MPSP_baseline = 1.40
-MPSP_uncertainty = model.table.Biorefinery['Adjusted minimum selling price [$/kg]']
-market_range = (2.57, 2.94)
+MPSP_baseline = 1.529
+MPSP_uncertainty = [model.table.Biorefinery['Adjusted minimum selling price [$/kg]'],
+                    model.table.Biorefinery['Adjusted minimum selling price [$/kg]'],
+                    model.table.Biorefinery['Adjusted minimum selling price [$/kg]']]
+market_range = (2.53, 2.89)
 biobased_lit_MPSP_range = (1.08, 3.63)
 
 contourplots.box_and_whiskers_plot(uncertainty_data=MPSP_uncertainty, 
-                          baseline_value=MPSP_baseline, 
-                          range_for_comparison=biobased_lit_MPSP_range,
+                          baseline_values=[MPSP_baseline, MPSP_baseline, MPSP_baseline], 
+                          baseline_locations=[1,2,3],
+                          baseline_marker_colors=['w','w','w'],
+                          ranges_for_comparison=[biobased_lit_MPSP_range, market_range],
+                          ranges_for_comparison_colors=['#c0c1c2', '#646464'],
                           values_for_comparison=[],
                           n_minor_ticks=1,
+                          show_x_ticks=True,
+                          x_tick_labels=['Lab scale [batch]', 'Lab scale [fed-batch]', 'Pilot scale [batch]'],
                           y_label=r"$\bfMPSP$",
                           y_units=r"$\mathrm{\$} \cdot \mathrm{kg}^{-1}$",
                           y_ticks=np.arange(0., 5., 0.5),
                           save_file=True,
+                          fig_width = 5.,
+                          box_width=0.65,
                           filename=file_to_save+'_uncertainty_MPSP',
                           dpi=600,)
 
 # GWP100a
+
+
 
 #%%
 # Spearman's rank order correlation coefficients

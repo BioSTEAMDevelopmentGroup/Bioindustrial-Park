@@ -456,7 +456,7 @@ class CoFermentation(Reactor):
     
     # CSL_loading = 10 # g/L (kg/m3)
     
-    CSL_loading = 0 # g/L (kg/m3) # N from diammonium sulfate
+    CSL_loading = 10 # g/L (kg/m3) # some N from diammonium sulfate
     
     effluent_titer = 0 # calculated during _run
 

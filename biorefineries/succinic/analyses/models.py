@@ -27,7 +27,7 @@ from chaospy import distributions as shape
 from biosteam.evaluation import Model, Metric
 # from biosteam.evaluation.evaluation_tools import Setter
 from biorefineries.succinic.system_sc import succinic_sys, succinic_tea, succinic_LCA, u, s, unit_groups, unit_groups_dict, spec, price, TEA_breakdown
-
+from biorefineries.succinic.analyses.model_utils import EasyInputModel
 # get_annual_factor = lambda: succinic_tea._annual_factor
 
 
@@ -173,202 +173,34 @@ metrics.append(Metric(f'FEC - Materials breakdown - CSL', lambda: succinic_LCA.m
 metrics.append(Metric(f'FEC - Materials breakdown - H3PO4', lambda: succinic_LCA.material_FEC_breakdown['H3PO4'], 'kg-CO2-eq/kg', 'Biorefinery'))
 
 
-#%%
+#%% Generate the required namespace
+namespace_dict = {}
+exclude_from_globals = [
+    'search',
+    'register',
+    'register_safely',
+    'discard',
+    'clear',
+    'mark_safe_to_replace',
+    'unmark_safe_to_replace']
+
+namespace_dict.update({k:s.__getitem__(k) for k in s.__dir__() if not k in exclude_from_globals})
+namespace_dict.update({k:u.__getitem__(k) for k in u.__dir__() if not k in exclude_from_globals})
+namespace_dict['feedstock'] = s.sugarcane
+namespace_dict['product_stream'] = s.SuccinicAcid
+namespace_dict['succinic_tea'] = namespace_dict['tea'] = succinic_tea
+namespace_dict['spec'] = spec
+PowerUtility = bst.PowerUtility
+namespace_dict['PowerUtility'] = PowerUtility
+
+#%% 
 # =============================================================================
 # Construct base model and add parameters
 # =============================================================================
 
-model = succinic_model = Model(succinic_sys, metrics)
+model = succinic_model = EasyInputModel(succinic_sys, metrics, namespace_dict=namespace_dict)
 
-param = model.parameter
-
-def baseline_uniform(baseline, ratio):
-    return shape.Uniform(baseline*(1-ratio), baseline*(1+ratio))
-
-def baseline_triangle(baseline, ratio):
-    return shape.Triangle(baseline*(1-ratio), baseline, baseline*(1+ratio))
-
-# A fake parameter serving as a "blank" in sensitivity analysis to capture
-# fluctuations due to converging errors
-D = baseline_uniform(1, 0.1)
-@param(name='Blank parameter', element='TEA', kind='coupled', units='',
-       baseline=1, distribution=D)
-def set_blank_parameter(anything):
-    # This does nothing
-    feedstock.T = feedstock.T
-
-#%% ######################## TEA parameters ########################
-# U101 = SSCF.U101
-
-D = shape.Triangle(0.5479*0.9, 0.5479, 0.5479*1.1)
-@param(name='Plant uptime', element='TEA', kind='isolated', units='%',
-       baseline=0.5479, distribution=D)
-def set_plant_uptime(uptime):
-    succinic_tea.operating_days = 365. * uptime
-
-
-
-# Only include materials that account for >5% of annual material cost,
-D = shape.Triangle(0.8*price['Feedstock'], price['Feedstock'], 1.2*price['Feedstock'])
-@param(name='Feedstock unit price', element='TEA', kind='isolated', units='$/wet-kg',
-       baseline=price['Feedstock'], distribution=D)
-def set_feedstock_price(f_price):
-    # feedstock.price = f_price / _feedstock_factor
-    feedstock.price = f_price
-
-F404 = u.F404
-D = shape.Triangle(0.198, 0.2527, 0.304)
-@param(name='Natural gas unit price', element='TEA', kind='isolated', units='$/kg',
-        baseline=0.2527, distribution=D)
-def set_natural_gas_price(gas_price):
-    BT.natural_gas_price = F404.ins[2].price = gas_price
-
-
- 
-D = shape.Triangle(0.067, 0.070, 0.074)
-@param(name='Electricity unit price', element='TEA', kind='isolated', units='$/kWh',
-       baseline=0.070, distribution=D)
-def set_electricity_price(e_price):
-    bst.PowerUtility.price = e_price
-
-
-makeup_MEA_A401 = s.makeup_MEA_A401
-D = shape.Triangle(1.032, 1.426, 1.819)
-@param(name='Monoethanolamine unit price', element='TEA', kind='isolated', units='$/kg',
-       baseline=1.426, distribution=D)
-def set_MEA_price(MEA_price):
-    makeup_MEA_A401.price = MEA_price
-    
-CO2_fermentation = s.CO2_fermentation
-CO2_seedtrain = s.CO2_seedtrain
-D = shape.Triangle(0.401, 0.409, 0.418)
-@param(name='Liquid CO2 unit price', element='TEA', kind='isolated', units='$/kg',
-       baseline=0.409, distribution=D)
-def set_CO2_price(CO2_price):
-    CO2_fermentation.price = CO2_seedtrain.price = CO2_price
-    
-#%% ######################## Feedstock parameters ########################
-
-D = shape.Triangle(96000*0.8, 96000, 96000*1.2)
-@param(name='Feedstock capacity', element='Conversion', kind='coupled', units='kg/h',
-       baseline=96000, distribution=D)
-def set_feedstock_capacity(feedstock_capacity):
-    feedstock.F_mass = feedstock_capacity
-    
-#%% ######################## Conversion parameters ########################
-
-# Fermentation
-D = shape.Triangle(5, 10, 15)
-@param(name='CSL loading', element='Conversion', kind='coupled', units='g/L',
-       baseline=10, distribution=D)
-def set_CSL_loading(loading):
-    R302.CSL_loading = loading
-
-R302 = u.R302
-# 1e-6 is to avoid generating tiny negative flow (e.g., 1e-14)
-D = shape.Triangle(0.81, 0.9, 0.99)
-@param(name='Seed train fermentation ratio', element='Conversion', kind='coupled', units='%',
-       baseline=0.95, distribution=D)
-def set_ferm_ratio(ratio):
-    R303.ferm_ratio = ratio
-
-### Fermentation
-
-D = shape.Triangle(baseline_yield*0.8, baseline_yield, baseline_yield*1.2)
-@param(name='Succinic acid yield', element='Conversion', kind='coupled', units='g/g',
-       baseline=baseline_yield, distribution=D)
-def set_succinic_yield(succinic_yield):
-    # spec.load_specifications(succinic_yield,
-    #                           spec.spec_2,
-    #                           spec.spec_3)
-    spec.spec_1 = succinic_yield
-
-D = shape.Triangle(baseline_titer*0.8, baseline_titer, baseline_titer*1.2)
-@param(name='Succinic acid  titer', element='Conversion', kind='coupled', units='g/L',
-       baseline=baseline_titer, distribution=D)
-def set_succinic_titer(succinic_titer):
-    # spec.load_specifications(spec.spec_1,
-    #                           succinic_titer,
-    #                           spec.spec_3)
-    spec.spec_2 = succinic_titer
-    
-D = shape.Triangle(baseline_productivity*0.8, baseline_productivity, baseline_productivity*1.2)
-@param(name='Succinic acid  productivity', element='Conversion', kind='coupled', units='g/L/hr',
-       baseline=baseline_productivity, distribution=D)
-def set_succinic_productivity(succinic_prod):
-    # spec.load_specifications(spec.spec_1,
-    #                           spec.spec_2,
-    #                           succinic_prod)
-    spec.spec_3 = succinic_prod
-###
-
-D = shape.Triangle(0.8*0.05, 0.05, 1.2*0.05)
-@param(name='A. succinogenes yield', element='Conversion', kind='coupled', units='% theoretical',
-       baseline=0.05, distribution=D)
-def set_microbe_yield(yield_):
-    R302.glucose_to_microbe_rxn.X = R302.xylose_to_microbe_rxn.X = yield_
-    R303.glucose_to_microbe_rxn.X = R303.xylose_to_microbe_rxn.X = R303.ferm_ratio*yield_
-   
-
-baseline_neutralization_safety_factor = R302.neutralization_safety_factor
-D = shape.Triangle(0.8*baseline_neutralization_safety_factor, 
-                   1.*baseline_neutralization_safety_factor, 
-                   1.2*baseline_neutralization_safety_factor)
-@param(name='Neutralization or pH control safety factor', element='Conversion', kind='coupled', units='N/A',
-       baseline=baseline_neutralization_safety_factor, distribution=D)
-def set_safety_factor(safety_factor):
-    R302.neutralization_safety_factor = safety_factor
-
-#%%
-######################## Separation parameters ########################
-
-gypsum = s.gypsum
-D = shape.Uniform(-0.0288, 0.00776)
-@param(name='Gypsum unit price', element='TEA', kind='isolated', units='$/kg',
-       baseline=0, distribution=D)
-def set_gypsum_price(price):
-    gypsum.price = price
-
-
-
-C401, C402, C403 = u.C401, u.C402, u.C403
-baseline_crystallization_output_conc_multiplier = 1.
-D = shape.Triangle(0.8*baseline_crystallization_output_conc_multiplier, 
-                   baseline_crystallization_output_conc_multiplier,
-                   1.2*baseline_crystallization_output_conc_multiplier) # assumed
-@param(name='Crystallization output concentration multiplier', element='Separation', kind='coupled', units='N/A',
-       baseline=baseline_crystallization_output_conc_multiplier, distribution=D)
-def set_multiplier(multiplier):
-    C401.output_conc_multiplier = C402.output_conc_multiplier = C403.output_conc_multiplier = multiplier
-    
-
-S402, S403, S404 = u.S402, u.S403, u.S404
-baseline_crystallization_recovery = S402.recovery
-D = shape.Triangle(0.8*baseline_crystallization_recovery, 
-                   baseline_crystallization_output_conc_multiplier,
-                   1.2*baseline_crystallization_recovery) # assumed
-@param(name='Crystallization pressure filter recovery', element='Separation', kind='coupled', units='N/A',
-       baseline=baseline_crystallization_recovery, distribution=D)
-def set_recovery(recovery):
-    S402.recovery = S403.recovery = S404.recovery = recovery
-    
-    
-
-#%%
-######################## Facility parameters ########################
-D = baseline_uniform(0.8, 0.1)
-@param(name='boiler efficiency', element='Co-heat and power', units='%',
-       baseline=0.8, distribution=D)
-def set_boiler_efficiency(efficiency):
-    BT.boiler_efficiency = efficiency
-
-T601 = u.T601
-D = shape.Triangle(0.8*7*24, 7*24, 1.2*7*24)
-@param(name='Product succinic storage time', element='Storage', kind='coupled', units='h',
-       baseline=7*24, distribution=D)
-def set_product_storage_time(storage_time):
-    T601.tau = storage_time
-    
+model.load_parameter_distributions('pilot_scale-batch-model_parameter_distributions.xlsx')
 
 parameters = model.get_parameters()
 

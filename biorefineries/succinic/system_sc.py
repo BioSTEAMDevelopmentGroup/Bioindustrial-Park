@@ -5,6 +5,10 @@ Created on Tue Nov  1 18:00:42 2022
 @author: sarangbhagwat
 """
 
+# import os
+# os.environ['NUMBA_DISABLE_JIT'] = '1'
+
+
 import biosteam as bst
 import thermosteam as tmo
 
@@ -629,7 +633,7 @@ def create_succinic_sys(ins, outs):
     
     # !!! All fresh streams (with prices) go here
 
-    lime_fermentation = Stream('lime_fermentation', units='kg/hr', 
+    base_fermentation = Stream('base_fermentation', units='kg/hr', 
                                   price=price['Lime'],
                                  )
     sulfuric_acid_acidulation = Stream('sulfuric_acid_acidulation', units='kg/hr', price=price['Sulfuric acid'])
@@ -660,7 +664,7 @@ def create_succinic_sys(ins, outs):
     
     
     # # Storage tanks for other process inputs (besides water)
-    T602 = units.LimeStorage('T604', ins=lime_fermentation, 
+    T602 = units.LimeStorage('T604', ins=base_fermentation, 
                              outs=base_neutralization,
                              # tau=7.*24., V_wf=0.9,
                                           # vessel_type='Floating roof',
@@ -709,6 +713,9 @@ u.PWC901.ID = 'PWC904'
 
 
 BT = flowsheet('BT')
+
+BT.natural_gas_price = 0.2527
+BT.ins[4].price = price['Lime']
 
 globals().update(flowsheet.to_dict())
 
@@ -819,6 +826,7 @@ def load_titer_with_glucose(titer_to_load):
 spec.load_spec_1 = spec.load_yield
 spec.load_spec_3 = spec.load_productivity
 spec.load_spec_2 = load_titer_with_glucose
+
 # %% 
 # =============================================================================
 # Simulate system and get results
