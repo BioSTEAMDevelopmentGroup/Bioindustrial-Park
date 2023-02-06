@@ -32,8 +32,9 @@ from biosteam.utils import TicToc
 #     spec, succinic_sys,
 # )
 
-print('\n\nLoading model ...')
-from biorefineries.succinic.analyses import models_alt as models
+print('\n\nLoading system ...')
+from biorefineries.succinic.analyses import models
+print('\nLoaded system.')
 from datetime import datetime
 import os
 
@@ -43,7 +44,25 @@ percentiles = [0, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 1]
 
 model = models.succinic_model
 
-print('\nLoaded model.')
+#%%
+mode = 'lab_batch'
+
+#%%
+parameter_distributions_filename = None
+if mode == 'lab_batch':
+    parameter_distributions_filename = 'parameter-distributions_lab-scale_batch.xlsx'
+elif mode == 'lab_fed-batch':
+    parameter_distributions_filename = 'parameter-distributions_lab-scale_fed-batch.xlsx'
+elif mode == 'pilot_batch':
+    parameter_distributions_filename = 'parameter-distributions_pilot-scale_batch.xlsx'
+    
+    
+print(f'\n\nLoading parameter distributions ({mode}) ...')
+model.load_parameter_distributions(parameter_distributions_filename)
+print(f'\nLoaded parameter distributions ({mode}).')
+
+parameters = model.get_parameters()
+
 system = succinic_sys = models.succinic_sys
 spec = models.spec
 unit_groups_dict = models.unit_groups_dict
@@ -60,7 +79,7 @@ timer.tic()
 
 # Set seed to make sure each time the same set of random numbers will be used
 np.random.seed(3221) # 3221
-N_simulation = 20 # 2000
+N_simulation = 100 # 2000
 
 print('\n\nLoading samples ...')
 samples = model.sample(N=N_simulation, rule='L')
@@ -151,8 +170,8 @@ baseline = pd.DataFrame(data=np.array([[i for i in baseline_initial.values],]),
                         columns=baseline_initial.keys())
 print('\nSimulated baseline.')
 print('\n\nEvaluating ...')
-model.evaluate(notify=5, autoload=True, autosave=20, file='unfinished_evaluation')
-model.table.to_excel('all_results.xlsx')
+model.evaluate(notify=5, autoload=None, autosave=None, file=None)
+# model.table.to_excel('all_results.xlsx')
 print('\nFinished evaluation.')
 
 # Baseline results
@@ -161,7 +180,7 @@ baseline_end = model.metrics_at_baseline()
 print('\nRe-simulated baseline.')
 dateTimeObj = datetime.now()
 minute = '0' + str(dateTimeObj.minute) if len(str(dateTimeObj.minute))==1 else str(dateTimeObj.minute)
-file_to_save = 'succinic_%s.%s.%s-%s.%s'%(dateTimeObj.year, dateTimeObj.month, dateTimeObj.day, dateTimeObj.hour, minute)\
+file_to_save = mode+'_succinic_%s.%s.%s-%s.%s'%(dateTimeObj.year, dateTimeObj.month, dateTimeObj.day, dateTimeObj.hour, minute)\
     + '_' + str(N_simulation) + 'sims'
 
 baseline = baseline.append(baseline_end, ignore_index=True)
@@ -224,7 +243,7 @@ with pd.ExcelWriter(file_to_save+'_1_full_evaluation.xlsx') as writer:
     model.table.to_excel(writer, sheet_name='Raw data')
 
 
-os.remove("unfinished_evaluation") 
+# os.remove("unfinished_evaluation") 
 
 
 # %% Plot

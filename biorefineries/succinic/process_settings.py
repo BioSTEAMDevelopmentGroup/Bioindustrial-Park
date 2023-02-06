@@ -212,9 +212,11 @@ GWP_CFs = {
     'Lime': 1.29 * 56.0774/74.093, # CaO to Ca(OH)2
     'NaOH': 2.11,
     'NH4OH': 2.64 * 0.4860, # chemicals.NH3.MW/chemicals.NH4OH.MW,   
-    'MEA': 3.4062, # ethanolamine production, RoW [monoethanolamine]
-    'H3PO4': 1.3598, # purification of wet-process phosphoric acid to industrial grade, product in 85% solution state, RoW # cradle-to-gate
+    'MEA': 3.4062, # ecoinvent 3.8 ethanolamine production, RoW [monoethanolamine]
+    'H3PO4': 1.3598, # ecoinvent 3.8 purification of wet-process phosphoric acid to industrial grade, product in 85% solution state, RoW # cradle-to-gate
     'CO2': 0.87104, # ecoinvent 3.8 carbon dioxide production, liquid, RoW
+    'DiammoniumSulfate': 1.2901, # ecoinvent 3.8 market for ammonium sulfate, RoW
+    'MagnesiumSulfate': 1.0411, # ecoinvent 3.8 market for magnesium sulfate, GLO
     }
 
 
@@ -227,11 +229,11 @@ CFs['GWP_CF_stream'] = GWP_CF_stream
 GWP_CFs['Electricity'] = 0.48 # assume production==consumption, both in kg CO2-eq/kWh
 
 
-# GWP_CFs['Sugarcane'] = 0.12043 * 0.3/0.286 # ecoinvent 3.8 market for sugarcane, RoW
+GWP_CFs['Sugarcane'] = 0.12043 * 0.3/0.286 # ecoinvent 3.8 market for sugarcane, RoW
 # # adjusted from dry wt content of 28.6% (their assumption) to 30% (our assumption)
 
 
-GWP_CFs['Sugarcane'] = 0.2931 # GREET 2022
+# GWP_CFs['Sugarcane'] = 0.2931 # GREET 2022
 
 
 CFs['GWP_CFs'] = GWP_CFs
@@ -252,9 +254,11 @@ FEC_CFs = {
     'Lime': 4.896 * 56.0774/74.093, # CaO to Ca(OH)2
     'NaOH': 29,
     'NH4OH': 42 * 0.4860, # chemicals.NH3.MW/chemicals.NH4OH.MW,
-    'MEA': 67.898, # ethanolamine production, RoW [monoethanolamine]
-    'H3PO4': 16.538, # purification of wet-process phosphoric acid to industrial grade, product in 85% solution state, RoW # cradle-to-gate
+    'MEA': 67.898, # ecoinvent 3.8 ethanolamine production, RoW [monoethanolamine]
+    'H3PO4': 16.538, # ecoinvent 3.8 purification of wet-process phosphoric acid to industrial grade, product in 85% solution state, RoW # cradle-to-gate
     'CO2': 7.4243, # ecoinvent 3.8 carbon dioxide production, liquid, RoW
+    'DiammoniumSulfate': 15.166, # ecoinvent 3.8 market for ammonium sulfate, RoW
+    'MagnesiumSulfate': 13.805, # ecoinvent 3.8 market for magnesium sulfate, GLO
     }
 
 FEC_CF_array = chems.kwarray(FEC_CFs)
@@ -265,10 +269,10 @@ CFs['FEC_CF_stream'] = FEC_CF_stream
 
 FEC_CFs['Electricity'] = 5.926 # assume production==consumption, both in MJ/kWh
 
-# FEC_CFs['Sugarcane'] = 	0.40192 * 0.3/0.286 # ecoinvent 3.8 market for sugarcane, RoW
+FEC_CFs['Sugarcane'] = 	0.40192 * 0.3/0.286 # ecoinvent 3.8 market for sugarcane, RoW
 # # adjusted from dry wt content of 28.6% (their assumption) to 30% (our assumption)
 
-FEC_CFs['Sugarcane'] = 	0.2265 # GREET 2022
+# FEC_CFs['Sugarcane'] = 	0.2265 # GREET 2022
 
 
 

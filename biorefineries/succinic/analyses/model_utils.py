@@ -58,9 +58,9 @@ class EasyInputModel(Model):
             load_statements = codify(row['Load Statements'])
             
             D = None
-            if shape_data == 'Triangle':
+            if shape_data.lower() in ['triangular', 'triangle',]:
                 D = shape.Triangle(lower, midpoint, upper)
-            elif shape_data == 'Uniform':
+            elif shape_data.lower() in ['uniform',]:
                 D = shape.Uniform(lower, upper)
             
             param(name=name, 

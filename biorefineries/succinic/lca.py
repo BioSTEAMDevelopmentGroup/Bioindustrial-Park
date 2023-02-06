@@ -93,11 +93,11 @@ class LCA:
         self.FEC_CF_stream = CFs['FEC_CF_stream']
         
         self.feedstock = feedstock
-        self.main_product = tmo.Stream('LCA_main_product')
+        # self.main_product = tmo.Stream('LCA_main_product')
         self.main_product_chemical_IDs = main_product_chemical_IDs
-        for i in main_product_chemical_IDs:
-            self.main_product.imol[i] = main_product.imol[i]
-        
+        # for i in main_product_chemical_IDs:
+        #     self.main_product.imol[i] = main_product.imol[i]
+        self.main_product = main_product
         self.by_products = by_products
         
         self.FU_factor = 1. if FU==1. else 1.
@@ -120,6 +120,10 @@ class LCA:
         system._LCA = self
     
     @property
+    def main_product_kg_per_h(self):
+        return self.main_product.imass[self.main_product_chemical_IDs[0]]
+    
+    @property
     def carbon_balance_percent_error(self):
         total_C_in = sum([feed.get_atomic_flow('C') for feed in self.feeds])
         total_C_out = self.main_product.get_atomic_flow('C') + sum([emission.get_atomic_flow('C') for emission in self.emissions])
@@ -137,13 +141,13 @@ class LCA:
     @property
     def material_GWP(self): # does not include BT natural gas as it is an invisible BT stream BT.natural_gas with price BT.natural_gas_price
         chemical_GWP = self.material_GWP_array
-        return sum(chemical_GWP)/self.main_product.F_mass
+        return sum(chemical_GWP)/self.main_product_kg_per_h
 
     @property
     def material_GWP_breakdown(self):
         # self.LCA_stream.mass = sum(i.mass for i in self.LCA_streams)
         self.LCA_stream.mix_from(self.LCA_streams)
-        chemical_GWP_dict = {ID: self.LCA_stream.imass[ID] * self.GWP_CF_stream.imass[ID] / self.main_product.F_mass \
+        chemical_GWP_dict = {ID: self.LCA_stream.imass[ID] * self.GWP_CF_stream.imass[ID] / self.main_product_kg_per_h \
                              for ID in self.chem_IDs if not self.LCA_stream.imass[ID] * self.GWP_CF_stream.imass[ID] == 0.}
         return chemical_GWP_dict
     
@@ -167,12 +171,12 @@ class LCA:
     # GWP from combustion of non-biogenic carbons
     @property
     def ng_combustion_GWP(self):
-        return (self.natural_gas.get_atomic_flow('C')) * self.chemicals.CO2.MW / self.main_product.F_mass
-                               # +ethanol_fresh.get_atomic_flow('C'))* chemicals.CO2.MW / self.main_product.F_mass
+        return (self.natural_gas.get_atomic_flow('C')) * self.chemicals.CO2.MW / self.main_product_kg_per_h
+                               # +ethanol_fresh.get_atomic_flow('C'))* chemicals.CO2.MW / self.main_product_kg_per_h
     
     @property
     def ng_GWP(self):
-        return self.CFs['GWP_CFs']['CH4']*self.natural_gas.F_mass/self.main_product.F_mass
+        return self.CFs['GWP_CFs']['CH4']*self.natural_gas.F_mass/self.main_product_kg_per_h
     
     @property
     def FGHTP_GWP(self):
@@ -180,11 +184,11 @@ class LCA:
             mass_flow = self.feedstock.F_mass-self.feedstock.imass['H2O']
         elif self.feedstock_mass_FU_kind=='wet':
             mass_flow = self.feedstock.F_mass
-        return mass_flow *self.CFs['GWP_CFs'][self.feedstock_ID]/self.main_product.F_mass
+        return mass_flow *self.CFs['GWP_CFs'][self.feedstock_ID]/self.main_product_kg_per_h
     
     @property
     def feedstock_CO2_capture(self):
-        return self.feedstock.get_atomic_flow('C')* self.chemicals.CO2.MW/self.main_product.F_mass
+        return self.feedstock.get_atomic_flow('C')* self.chemicals.CO2.MW/self.main_product_kg_per_h
     @property
     def feedstock_GWP(self): 
         return self.FGHTP_GWP - int(self.credit_feedstock_CO2_capture)*self.feedstock_CO2_capture
@@ -192,7 +196,7 @@ class LCA:
     
     @property
     def emissions_GWP(self): 
-        return sum([stream.get_atomic_flow('C') for stream in self.emissions]) * self.chemicals.CO2.MW / self.main_product.F_mass
+        return sum([stream.get_atomic_flow('C') for stream in self.emissions]) * self.chemicals.CO2.MW / self.main_product_kg_per_h
     
     # GWP from electricity acquisition
     @property
@@ -203,7 +207,7 @@ class LCA:
     @property
     def net_electricity_GWP(self):
         return self.net_electricity*self.CFs['GWP_CFs']['Electricity'] \
-        / self.main_product.F_mass
+        / self.main_product_kg_per_h
     
     
     @property
@@ -259,7 +263,7 @@ class LCA:
     
     @property
     def EOL_GWP(self): 
-        return self.main_product.get_atomic_flow('C') * self.chemicals.CO2.MW/self.main_product.F_mass
+        return self.main_product.get_atomic_flow('C') * self.chemicals.CO2.MW/self.main_product_kg_per_h
     
     @property
     def direct_emissions_GWP(self): 
@@ -267,7 +271,7 @@ class LCA:
     
     @property
     def BT_direct_emissions_GWP(self): 
-        return ((sum([i.get_atomic_flow('C') for i in self.BT.outs])*self.chemicals['CO2'].MW / self.main_product.F_mass)\
+        return ((sum([i.get_atomic_flow('C') for i in self.BT.outs])*self.chemicals['CO2'].MW / self.main_product_kg_per_h)\
         / self.emissions_GWP ) * self.direct_emissions_GWP 
     
     @property
@@ -286,11 +290,12 @@ class LCA:
     
     @property
     def cooling_demand_GWP(self): 
-        return self.steam_frac_cooling * self.total_steam_GWP + self.electricity_frac_cooling * self.net_electricity_GWP
+        return self.steam_frac_cooling * self.total_steam_GWP + max(0, self.electricity_frac_cooling * self.net_electricity_GWP)
     
     @property
     def electricity_demand_non_cooling_GWP(self): 
-        return  self.steam_frac_electricity_non_cooling * self.total_steam_GWP + self.electricity_frac_non_cooling * self.net_electricity_GWP
+        return  self.steam_frac_electricity_non_cooling * self.total_steam_GWP + self.electricity_frac_non_cooling * self.net_electricity_GWP\
+            + min(0, + self.electricity_frac_cooling * self.net_electricity_GWP)
     
   
     @property
@@ -306,7 +311,7 @@ class LCA:
                              self.electricity_demand_non_cooling_GWP 
                             
     def GWP_by_ID(self, ID):
-        return self.LCA_stream.imass[ID] * self.GWP_CF_stream.imass[ID]/self.main_product.F_mass
+        return self.LCA_stream.imass[ID] * self.GWP_CF_stream.imass[ID]/self.main_product_kg_per_h
 
 
     
@@ -318,7 +323,7 @@ class LCA:
         chemical_FEC = self.material_FEC_array 
         # feedstock_FEC = self.feedstock.F_mass*CFs['FEC_CFs']['Corn stover']
         # return chemical_FEC.sum /main_product.F_mass
-        return sum(chemical_FEC)/self.main_product.F_mass
+        return sum(chemical_FEC)/self.main_product_kg_per_h
     
     @property
     def material_FEC_array(self):
@@ -335,7 +340,7 @@ class LCA:
         # self.LCA_stream.mass = sum(i.mass for i in self.LCA_streams)
         self.LCA_stream.mix_from(self.LCA_streams)
         FEC_CF_stream = self.FEC_CF_stream
-        chemical_FEC_dict = {ID: self.LCA_stream.imass[ID] * FEC_CF_stream.imass[ID] / self.main_product.F_mass \
+        chemical_FEC_dict = {ID: self.LCA_stream.imass[ID] * FEC_CF_stream.imass[ID] / self.main_product_kg_per_h \
                               for ID in self.chem_IDs if not self.LCA_stream.imass[ID] * FEC_CF_stream.imass[ID] == 0.}
         return chemical_FEC_dict
     
@@ -343,7 +348,7 @@ class LCA:
     def material_FEC_breakdown_fractional(self):
         chemical_FEC_dict = self.material_FEC_breakdown 
         tot_material_FEC = self.material_FEC 
-        for k,v in chemical_FEC_dict.items :
+        for k,v in chemical_FEC_dict.items():
             chemical_FEC_dict[k] /= tot_material_FEC
         return chemical_FEC_dict
     
@@ -351,13 +356,13 @@ class LCA:
     def material_FEC_breakdown_as_fraction_of_tot_FEC(self):
         chemical_FEC_dict = self.material_FEC_breakdown 
         tot_FEC = self.FEC 
-        for k,v in chemical_FEC_dict.items :
+        for k,v in chemical_FEC_dict.items():
             chemical_FEC_dict[k] /= tot_FEC
         return chemical_FEC_dict
     
     @property
     def net_electricity_FEC(self): 
-        return (self.net_electricity * self.CFs['FEC_CFs']['Electricity'])/self.main_product.F_mass
+        return (self.net_electricity * self.CFs['FEC_CFs']['Electricity'])/self.main_product_kg_per_h
     
     @property
     def total_steam_FEC(self):
@@ -370,26 +375,27 @@ class LCA:
     @property
     def cooling_demand_FEC(self):
         return self.steam_frac_cooling * self.total_steam_FEC  + \
-            self.electricity_frac_cooling * self.net_electricity_FEC 
+            max(0, self.electricity_frac_cooling * self.net_electricity_FEC)
     
     @property
     def electricity_demand_non_cooling_FEC(self):
         return self.steam_frac_electricity_non_cooling * self.total_steam_FEC + \
-            self.electricity_frac_non_cooling * self.net_electricity_FEC 
+            self.electricity_frac_non_cooling * self.net_electricity_FEC + \
+                min(0, self.electricity_frac_cooling * self.net_electricity_FEC)
     
     @property
     def feedstock_FEC(self): 
         return (self.feedstock.F_mass)\
-            * self.CFs['FEC_CFs'][self.feedstock_ID]/self.main_product.F_mass
+            * self.CFs['FEC_CFs'][self.feedstock_ID]/self.main_product_kg_per_h
 
 
     def FEC_by_ID(self, ID):
-        return self.LCA_stream.imass[ID] * self.FEC_CF_stream.imass[ID]/self.main_product.F_mass
+        return self.LCA_stream.imass[ID] * self.FEC_CF_stream.imass[ID]/self.main_product_kg_per_h
     
     
     @property
     def ng_FEC(self): 
-        return self.CFs['FEC_CFs']['CH4']*self.natural_gas.F_mass/self.main_product.F_mass
+        return self.CFs['FEC_CFs']['CH4']*self.natural_gas.F_mass/self.main_product_kg_per_h
     
     # Total FEC
     @property

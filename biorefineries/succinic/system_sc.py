@@ -184,7 +184,7 @@ def create_succinic_sys(ins, outs):
     
     S302 = bst.Splitter('S302', ins=M304_H-0,
                         outs = ('to_seedtrain', 'to_cofermentation'),
-                        split = 0.04) # split = inoculum ratio
+                        split = 0.025) # split = inoculum ratio
     
 
     # Cofermentation
@@ -681,6 +681,7 @@ def create_succinic_sys(ins, outs):
     
     HXN = HeatExchangerNetwork('HXN1001',
                                               # ignored=[H401, H402],
+                                              cache_network=True,
                                               )
     def HXN_no_run_cost():
         HXN.heat_utilities = []
@@ -743,7 +744,8 @@ succinic_tea = SuccinicTEA(system=succinic_sys, IRR=0.10, duration=(2016, 2046),
                     # u.T601, u.T602, 
                     # u.T601, u.T602, u.T603, u.T604,
                     # u.T606, u.T606_P,
-                    u.BT701, u.CT801, u.CWP802, u.CIP901, u.ADP902, u.FWT903, u.PWC904,),
+                    u.BT701, u.CT801, u.CWP802, u.CIP901, u.ADP902, u.FWT903, u.PWC904,
+                    ),
         warehouse=0.04, site_development=0.09, additional_piping=0.045,
         proratable_costs=0.10, field_expenses=0.10, construction=0.20,
         contingency=0.10, other_indirect_costs=0.10, 
@@ -827,29 +829,9 @@ spec.load_spec_1 = spec.load_yield
 spec.load_spec_3 = spec.load_productivity
 spec.load_spec_2 = load_titer_with_glucose
 
-# %% 
-# =============================================================================
-# Simulate system and get results
-# =============================================================================
 
-num_sims = 3
-num_solve_tea = 3
-def get_product_stream_MPSP():
-    for i in range(num_sims):
-        succinic_sys.simulate()
-    for i in range(num_solve_tea):
-        product_stream.price = succinic_tea.solve_price(product_stream)
-    return product_stream.price * product_stream.F_mass / product_stream.imass['SuccinicAcid']
 
-def simulate_and_print():
-    MPSP = get_product_stream_MPSP()
-    print('\n---------- Simulation Results ----------')
-    print(f'MPSP is ${MPSP:.3f}/kg')
-    print('----------------------------------------\n')
 
-get_product_stream_MPSP()
-spec.load_specifications(spec.baseline_yield, spec.baseline_titer, spec.baseline_productivity)
-simulate_and_print()
 
 # %% Diagram
 import biosteam as bst
@@ -873,7 +855,8 @@ area_names = [
 
 unit_groups = bst.UnitGroup.group_by_area(succinic_sys.units)
 
-unit_groups.append(bst.UnitGroup('natural gas'))
+unit_groups.append(bst.UnitGroup('natural gas (for steam generation)'))
+unit_groups.append(bst.UnitGroup('natural gas (for product drying)'))
 
 for i, j in zip(unit_groups, area_names): i.name = j
 for i in unit_groups: i.autofill_metrics(shorthand=False, 
@@ -892,8 +875,13 @@ for HXN_group in unit_groups:
         assert isinstance(HXN_group.units[0], HeatExchangerNetwork)
 
 
+unit_groups[-2].metrics[-1] = bst.evaluation.Metric('Material cost', 
+                                                    getter=lambda: BT.natural_gas_price * BT.natural_gas.F_mass, 
+                                                    units='USD/hr',
+                                                    element=None)
+
 unit_groups[-1].metrics[-1] = bst.evaluation.Metric('Material cost', 
-                                                    getter=lambda: (BT.natural_gas_price * BT.natural_gas.F_mass) + F404.ins[2].cost, 
+                                                    getter=lambda: F404.ins[2].cost, 
                                                     units='USD/hr',
                                                     element=None)
 
@@ -916,7 +904,44 @@ HXN = u.HXN1001
 
 # HXN1001.force_ideal_thermo = True
 
-#%% TEA breakdown
+
+# %% 
+# =============================================================================
+# Simulate system and get results
+# =============================================================================
+
+num_sims = 3
+num_solve_tea = 3
+def get_product_stream_MPSP():
+    for i in range(num_sims):
+        succinic_sys.simulate()
+    for i in range(num_solve_tea):
+        product_stream.price = succinic_tea.solve_price(product_stream)
+    return product_stream.price * product_stream.F_mass / product_stream.imass['SuccinicAcid']
+
+def simulate_and_print():
+    MPSP = get_product_stream_MPSP()
+    GWP = succinic_LCA.GWP
+    FEC = succinic_LCA.FEC
+    print('\n---------- Simulation Results ----------')
+    print(f'MPSP is ${MPSP:.3f}/kg')
+    print(f'GWP100a is {GWP:.3f} kg CO2-eq./kg')
+    print(f'FEC is {FEC:.3f} MJ/kg')
+    print('----------------------------------------\n')
+
+get_product_stream_MPSP()
+
+#%% LCA
+
+succinic_LCA = SuccinicLCA(succinic_sys, CFs, sugarcane, product_stream, ['SuccinicAcid',], 
+                           [], CT801, CWP802, BT701, True,
+                           credit_feedstock_CO2_capture=True, add_EOL_GWP=True)
+
+#%% Simulate and print
+spec.load_specifications(spec.baseline_yield, spec.baseline_titer, spec.baseline_productivity)
+simulate_and_print()
+
+#%% TEA breakdown (old)
 
 def TEA_breakdown(print_output=False, fractions=False):
     metric_breakdowns = {i.name: {} for i in unit_groups[0].metrics}
@@ -950,7 +975,7 @@ def TEA_breakdown(print_output=False, fractions=False):
                     metric_breakdowns[metric.name][ug.name] = metric()/denominator
                     
                     
-            if ug.name=='natural gas':
+            if ug.name=='natural gas (for steam generation)':
                 if metric.name=='Mat. cost' or metric.name=='Material cost':
                     metric_breakdowns[metric.name][ug.name] = BT.natural_gas.F_mass*BT.natural_gas_price/denominator
             
@@ -967,7 +992,7 @@ def TEA_breakdown(print_output=False, fractions=False):
                 print(f"{j}: {format(metric_breakdowns_i[j], '.3f')}")
     return metric_breakdowns
 
-TEA_breakdown(print_output=True, fractions=True)# -*- coding: utf-8 -*-
+# TEA_breakdown(print_output=True, fractions=True)# -*- coding: utf-8 -*-
 
 
 #%% Carbon balance
@@ -1037,11 +1062,6 @@ def plot_carbon_flow():
 
 ## GREET 2022
 # succinic acid, succinic acid bioproduct from sugars (corn stover): 26 MJ-eq/kg-SA (of which all 26 MJ-eq/kg-SA from natural gas)
-#%% LCA
-
-succinic_LCA = SuccinicLCA(succinic_sys, CFs, sugarcane, product_stream, ['SuccinicAcid',], 
-                           [], CT801, CWP802, BT701, True,
-                           credit_feedstock_CO2_capture=False)
 
 
 #%% Plot figures
@@ -1064,7 +1084,7 @@ if plot:
                      y_ticks=[-125, -100, -75, -50, -25, 0, 25, 50, 75, 100, 125, 150, 175, 200, 225], 
                      y_label=r"$\bfCost$" + " " + r"$\bfand$" + " " +  r"$\bfUtility$" + " " +  r"$\bfBreakdown$", 
                      y_units = "%", 
-                     colors=['#7BBD84', '#F7C652', '#63C6CE', '#94948C', '#734A8C', '#D1C0E1', '#648496', '#B97A57', '#F8858A', 'magenta'],
+                     colors=['#7BBD84', '#F7C652', '#63C6CE', '#94948C', '#734A8C', '#D1C0E1', '#648496', '#B97A57', '#F8858A', 'red', 'magenta'],
                      filename='TEA_breakdown_stacked_bar_plot')
 
     ##

@@ -26,7 +26,7 @@ from chaospy import distributions as shape
 # from biosteam import main_flowsheet as find
 from biosteam.evaluation import Model, Metric
 # from biosteam.evaluation.evaluation_tools import Setter
-from biorefineries.succinic.system_sc import succinic_sys, succinic_tea, succinic_LCA, u, s, unit_groups, unit_groups_dict, spec, price, TEA_breakdown
+from biorefineries.succinic.system_sc import succinic_sys, succinic_tea, succinic_LCA, u, s, unit_groups, unit_groups_dict, spec, price, TEA_breakdown, theoretical_max_g_succinic_acid_per_g_glucose
 from biorefineries.succinic.analyses.model_utils import EasyInputModel
 # get_annual_factor = lambda: succinic_tea._annual_factor
 
@@ -60,6 +60,7 @@ R302 = u.R302
 R303 = u.R303
 
 BT = u.BT701
+F404 = u.F404
 
 _feedstock_factor = feedstock.F_mass / (feedstock.F_mass-feedstock.imass['Water'])
 # Minimum selling price of succinic stream
@@ -85,7 +86,7 @@ get_overall_installed_cost = lambda: succinic_tea.installed_equipment_cost/1e6
 
 # Annual operating cost, note that AOC excludes electricity credit
 get_overall_AOC = lambda: succinic_tea.AOC/1e6
-get_material_cost = lambda: succinic_tea.material_cost/1e6
+get_material_cost = lambda: (succinic_tea.material_cost + F404.ins[2].cost * succinic_tea.operating_hours)/1e6
 # Annual sale revenue from products, note that electricity credit is not included,
 # but negative sales from waste disposal are included
 # (i.e., wastes are products of negative selling price)
@@ -192,6 +193,7 @@ namespace_dict['succinic_tea'] = namespace_dict['tea'] = succinic_tea
 namespace_dict['spec'] = spec
 PowerUtility = bst.PowerUtility
 namespace_dict['PowerUtility'] = PowerUtility
+namespace_dict['theoretical_max_g_succinic_acid_per_g_glucose'] = theoretical_max_g_succinic_acid_per_g_glucose
 
 #%% 
 # =============================================================================
@@ -200,8 +202,6 @@ namespace_dict['PowerUtility'] = PowerUtility
 
 model = succinic_model = EasyInputModel(succinic_sys, metrics, namespace_dict=namespace_dict)
 
-model.load_parameter_distributions('pilot_scale-batch-model_parameter_distributions.xlsx')
 
-parameters = model.get_parameters()
 
 
