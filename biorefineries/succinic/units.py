@@ -738,8 +738,12 @@ class CoFermentation(Reactor):
             max(0, self.mol_atom_in('C')-self.mol_atom_out('C'))
         
         vapor.imol['CO2'] += abs_mass_bal_diff_CO2_added_to_vent
-
-
+    
+    @property
+    def F_vol_in(self): # exclude gases
+        return sum([i.F_vol for i in self.ins if i.phase=='l' and i.F_mol and not (i.imol['CO2']/i.F_mol==1. 
+                                                                       or i.imol['O2']/i.F_mol>0.1)])
+    
     def _design(self):
         mode = self.mode
         Design = self.design_results

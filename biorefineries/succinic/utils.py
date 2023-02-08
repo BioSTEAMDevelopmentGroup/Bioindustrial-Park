@@ -316,3 +316,7 @@ def get_MPSP_without_capital_cost(product_stream, TEA, flowsheet, sys, product_c
         else:
             MPSP = product_stream.price
     return MPSP
+
+
+#%% Model utils
+

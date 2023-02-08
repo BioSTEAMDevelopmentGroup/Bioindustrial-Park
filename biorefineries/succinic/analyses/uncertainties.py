@@ -20,12 +20,21 @@ import biosteam as bst
 import thermosteam as tmo
 import contourplots
 print('\n\nLoading system ...')
-from biorefineries.succinic.analyses import models
+# from biorefineries
+# from biorefineries import succinic
+from biorefineries import succinic
+
+models = succinic.get_models()
+# from . import models
+
 print('\nLoaded system.')
 from datetime import datetime
 from biosteam.utils import TicToc
 import os
 
+# chdir = os.chdir
+succinic_filepath = succinic.__file__.replace('\\__init__.py', '')
+succinic_results_filepath = succinic_filepath + '\\analyses\\results\\'
 model = models.succinic_model
 
 system = succinic_sys = models.succinic_sys
@@ -36,78 +45,13 @@ tea = models.succinic_tea
 lca = models.succinic_LCA
 get_adjusted_MSP = models.get_adjusted_MSP
 
-#%% Bugfix barrage
-baseline_spec = {'spec_1': spec.baseline_yield,
-                 'spec_2': spec.baseline_titer,
-                 'spec_3': spec.baseline_productivity,}
-
-def reset_and_reload():
-    print('Resetting cache and emptying recycles ...')
-    system.reset_cache()
-    system.empty_recycles()
-    print('Loading and simulating with baseline specifications ...')
-    spec_1, spec_2, spec_3 = spec.spec_1, spec.spec_2, spec.spec_3
-    spec.load_specifications(**baseline_spec)
-    system.simulate()
-    print('Loading and simulating with required specifications ...')
-    spec.load_specifications(spec_1=spec_1, spec_2=spec_2, spec_3=spec_3)
-    system.simulate()
-    
-def reset_and_switch_solver(solver_ID):
-    system.reset_cache()
-    system.empty_recycles()
-    system.converge_method = solver_ID
-    print(f"Trying {solver_ID} ...")
-    spec.load_specifications(spec_1=spec.spec_1, spec_2=spec.spec_2, spec_3=spec.spec_3)
-    system.simulate()
-    
-def run_bugfix_barrage():
-    try:
-        reset_and_reload()
-    except Exception as e:
-        print(str(e))
-        try:
-            reset_and_switch_solver('fixedpoint')
-        except Exception as e:
-            print(str(e))
-            try:
-                reset_and_switch_solver('aitken')
-            except Exception as e:
-                print(str(e))
-                # print(_yellow_text+"Bugfix barrage failed.\n"+_reset_text)
-                print("Bugfix barrage failed.\n")
-                raise e
-###############################
-
-#%% Model specification
-pre_fermenter_units_path = list(spec.reactor.get_upstream_units())
-pre_fermenter_units_path.reverse()
-def model_specification():
-    try:
-        for i in pre_fermenter_units_path: i.simulate()
-        spec.load_specifications(spec_1=spec.spec_1, spec_2=spec.spec_2, spec_3=spec.spec_3)
-        model._system.simulate()
-    
-
-    except Exception as e:
-        str_e = str(e).lower()
-        print('Error in model spec: %s'%str_e)
-        # raise e
-        if 'sugar concentration' in str_e:
-            # flowsheet('AcrylicAcid').F_mass /= 1000.
-            raise e
-        else:
-            run_bugfix_barrage()
-            
-model.specification = model_specification
-
 # %% 
 
-N_simulations_per_mode = 1000 # 2000
+N_simulations_per_mode = 10 # 2000
 
 percentiles = [0, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 1]
 
-notification_interval = 5
+notification_interval = 50
 
 results_dict = {'Baseline':{'MPSP':{}, 'GWP100a':{}, 'FEC':{}, 
                             'GWP Breakdown':{}, 'FEC Breakdown':{},},
@@ -131,8 +75,12 @@ np.random.seed(3221) # 3221
 
 
 for i in range(len(modes)):
+    # ## Change working directory to biorefineries\\succinic
+    # chdir(succinic.__file__.replace('\\__init__.py', ''))
+    # ##
     mode = modes[i]
-    parameter_distributions_filename = parameter_distributions_filenames[i]
+    parameter_distributions_filename = succinic_filepath+\
+        '\\analyses\\parameter_distributions\\'+parameter_distributions_filenames[i]
     print(f'\n\nLoading parameter distributions ({mode}) ...')
     model.parameters = ()
     model.load_parameter_distributions(parameter_distributions_filename)
@@ -145,6 +93,9 @@ for i in range(len(modes)):
     model.load_samples(samples)
     print('\nLoaded samples.')
     
+    # ## Change working directory to biorefineries\\succinic\\analyses\\results
+    # chdir(succinic.__file__.replace('\\__init__.py', '')+'\\analyses\\results')
+    # ##
     
     model.exception_hook = 'warn'
     print('\n\nSimulating baseline ...')
@@ -168,8 +119,8 @@ for i in range(len(modes)):
         'other materials': material_GWP_breakdown['MEA'] + material_GWP_breakdown['NaOH'] + material_GWP_breakdown['H3PO4'],
         'natural gas (for steam generation)': lca.ng_GWP,
         'natural gas (for product drying)': material_GWP_breakdown['CH4'],
-        'direct non-biogenic emissions': lca.direct_emissions_GWP,
         'net electricity production': lca.net_electricity_GWP,
+        'direct non-biogenic emissions': lca.direct_emissions_GWP,
         }
     
     for k, v in results_dict['Baseline']['GWP Breakdown'][mode].items():
@@ -205,12 +156,13 @@ for i in range(len(modes)):
     print(f"\nRe-simulated baseline. MPSP = ${round(results_dict['Baseline']['MPSP'][mode],2)}/kg.")
     dateTimeObj = datetime.now()
     minute = '0' + str(dateTimeObj.minute) if len(str(dateTimeObj.minute))==1 else str(dateTimeObj.minute)
-    file_to_save = '_succinic_%s.%s.%s-%s.%s'%(dateTimeObj.year, dateTimeObj.month, dateTimeObj.day, dateTimeObj.hour, minute)\
+    file_to_save = succinic_results_filepath+\
+        '_succinic_%s.%s.%s-%s.%s'%(dateTimeObj.year, dateTimeObj.month, dateTimeObj.day, dateTimeObj.hour, minute)\
         + '_' + str(N_simulations_per_mode) + 'sims'
     
     baseline = baseline.append(baseline_end, ignore_index=True)
     baseline.index = ('initial', 'end')
-    baseline.to_excel(mode+'_'+file_to_save+'_0_baseline.xlsx')
+    baseline.to_excel(file_to_save+'_'+mode+'_0_baseline.xlsx')
     
     # Parameters
     parameters = model.get_parameters()
@@ -257,7 +209,7 @@ for i in range(len(modes)):
     
     #%%
     '''Output to Excel'''
-    with pd.ExcelWriter(mode+'_'+file_to_save+'_1_full_evaluation.xlsx') as writer:
+    with pd.ExcelWriter(file_to_save+'_'+mode+'_1_full_evaluation.xlsx') as writer:
         parameter_values.to_excel(writer, sheet_name='Parameters')
         TEA_results.to_excel(writer, sheet_name='TEA results')
         TEA_percentiles.to_excel(writer, sheet_name='TEA percentiles')
@@ -278,9 +230,21 @@ for i in range(len(modes)):
     results_dict['Sensitivity']['Spearman']['GWP100a'][mode] = df_rho['Biorefinery', 'Total GWP100a [kg-CO2-eq/kg]']
     results_dict['Sensitivity']['Spearman']['FEC'][mode] = df_rho['Biorefinery', 'Total FEC [kg-CO2-eq/kg]']
 
+#%% Clean up NaN values for plotting
+metrics = ['MPSP', 'GWP100a', 'FEC']
+tot_NaN_vals_dict = results_dict['Errors'] = {metric: {mode: 0 for mode in modes} for metric in metrics}
+for mode in modes:
+    for metric in metrics:
+        # median_val = np.median(results_dict['Uncertainty'][metric][mode])
+        median_val = 1.5
+        for i in range(len(results_dict['Uncertainty'][metric][mode])):
+            if np.isnan(results_dict['Uncertainty'][metric][mode][i]):
+                results_dict['Uncertainty'][metric][mode][i] = median_val
+                tot_NaN_vals_dict[metric][mode] += 1
 # %% Plots
 import contourplots
 
+                
 #%% Uncertainty
 
 ## MPSP
@@ -326,7 +290,8 @@ contourplots.box_and_whiskers_plot(uncertainty_data=GWP_uncertainty,
                           n_minor_ticks=1,
                           show_x_ticks=True,
                           x_tick_labels=['Lab scale [batch]', 'Lab scale [fed-batch]', 'Pilot scale [batch]'],
-                          y_label=r"$\bfGWP-100a$",
+                          # y_label=r"$\bfGWP-100a$",
+                          y_label=r"$\mathrm{\bfGWP}_{\bf100}$",
                           y_units=r"$\mathrm{kg CO}^{2}\mathrm{-eq.}\cdot\mathrm{kg}^{-1}$",
                           y_ticks=np.arange(0., 5., 0.5),
                           save_file=True,
@@ -374,47 +339,77 @@ df_TEA_breakdown = bst.UnitGroup.df_from_groups(
 
 contourplots.stacked_bar_plot(dataframe=df_TEA_breakdown, 
                  # y_ticks=[-200, -175, -150, -125, -100, -75, -50, -25, 0, 25, 50, 75, 100, 125, 150, 175], 
-                 y_ticks=[-150, -125, -100, -75, -50, -25, 0, 25, 50, 75, 100, 125, 150, 175, 200, 225, 250], 
+                 y_ticks=[-125, -100, -75, -50, -25, 0, 25, 50, 75, 100, 125, 150, 175, 200, 225], 
                  y_label=r"$\bfCost$" + " " + r"$\bfand$" + " " +  r"$\bfUtility$" + " " +  r"$\bfBreakdown$", 
                  y_units = "%", 
-                 colors=['#7BBD84', '#F7C652', '#63C6CE', '#94948C', '#734A8C', '#D1C0E1', '#648496', '#B97A57', '#F8858A', 'red', 'magenta'],
-                 filename='TEA_breakdown_stacked_bar_plot')
+                 colors=['#7BBD84', '#F7C652', '#63C6CE', '#94948C', '#734A8C', '#D1C0E1', '#648496', '#B97A57', '#D1C0E1', '#F8858A', '#F8858A', ],
+                 # 'red', 'magenta'],
+                 filename=file_to_save+'TEA_breakdown_stacked_bar_plot')
 
 #%%
 
 #%% LCA breakdown figures
 # GWP
-df_GWP_breakdown = pd.DataFrame([list(results_dict['Baseline']['FEC Breakdown'][modes[2]].keys()), list(results_dict['Baseline']['FEC Breakdown'][modes[2]].values())])
+temp_GWP_breakdown_dict = results_dict['Baseline']['GWP Breakdown'][modes[2]]
+GWP_breakdown_dict = {
+                        # 'areas': list(temp_GWP_breakdown_dict.keys()), 
+                      'contributions': [100*i for i in list(temp_GWP_breakdown_dict.values())]}
+GWP_breakdown_list = [100*v for k, v in temp_GWP_breakdown_dict.items()]
+df_GWP_breakdown = pd.DataFrame(GWP_breakdown_list,
+                                            index=list(temp_GWP_breakdown_dict.keys()),
+                                          # orient='index',
+                                           # columns=['contributions'],
+                                          )
+# df_GWP_breakdown['contributions']=df_GWP_breakdown['contributions'].astype(float)
 
 
 # df_GWP_breakdown['Net electricity production']*=-1
 # df_GWP_breakdown = df_GWP_breakdown.rename(columns={'Net electricity production': 'Net electricity demand'})
 
 contourplots.stacked_bar_plot(dataframe=df_GWP_breakdown, 
-                 # y_ticks=[-200, -175, -150, -125, -100, -75, -50, -25, 0, 25, 50, 75, 100, 125, 150, 175], 
-                 y_ticks=[-150, -125, -100, -75, -50, -25, 0, 25, 50, 75, 100, 125, 150, 175, 200, 225, 250], 
-                 y_label=r"$\bfGWP100a$" + r"$\bfBreakdown$",  
+                  y_ticks=[-50, -25, 0, 25, 50, 75, 100, 125, 150,], 
+                  # y_ticks=[-400, -300, -200, -100, 0, 100, 200, 300, 400], 
+                 # y_ticks = []
+                 # y_label=r"$\bfGWP-100a $" +" "+ r"$\bfBreakdown$",  
+                 y_label =r"$\mathrm{\bfGWP}_{\bf100}$",
                  y_units = "%", 
-                 colors=['#7BBD84', '#F7C652', '#63C6CE', '#94948C', '#734A8C', '#D1C0E1', '#648496', '#B97A57', '#F8858A', 'magenta'],
-                 filename='GWP_breakdown_stacked_bar_plot')
+                  colors=['#607429', '#E1F8C0', '#8FAE3E', 
+                          ],
+                  hatch_patterns=('\\', '//', 'x',  '|',),
+                  # '#94948C', '#734A8C', '#D1C0E1', '#648496', '#B97A57', '#F8858A', 'red', 'magenta'],
+                 filename=file_to_save+'GWP_breakdown_stacked_bar_plot',
+                 fig_width=3,
+                 fig_height=5.5)
 
 # FEC
-df_FEC_breakdown = pd.DataFrame([list(results_dict['Baseline']['FEC Breakdown'][modes[2]].keys()), list(results_dict['Baseline']['FEC Breakdown'][modes[2]].values())])
-
+temp_FEC_breakdown_dict = results_dict['Baseline']['FEC Breakdown'][modes[2]]
+FEC_breakdown_dict = {
+                        # 'areas': list(temp_FEC_breakdown_dict.keys()), 
+                      'contributions': [100*i for i in list(temp_FEC_breakdown_dict.values())]}
+FEC_breakdown_list = [100*v for k, v in temp_FEC_breakdown_dict.items()]
+df_FEC_breakdown = pd.DataFrame(FEC_breakdown_list,
+                                            index=list(temp_FEC_breakdown_dict.keys()),
+                                          # orient='index',
+                                           # columns=['contributions'],
+                                          )
 
 # df_FEC_breakdown['Net electricity production']*=-1
 # df_FEC_breakdown = df_FEC_breakdown.rename(columns={'Net electricity production': 'Net electricity demand'})
 
 contourplots.stacked_bar_plot(dataframe=df_FEC_breakdown, 
                  # y_ticks=[-200, -175, -150, -125, -100, -75, -50, -25, 0, 25, 50, 75, 100, 125, 150, 175], 
-                 y_ticks=[-150, -125, -100, -75, -50, -25, 0, 25, 50, 75, 100, 125, 150, 175, 200, 225, 250], 
-                 y_label=r"$\bfFEC$" + r"$\bfBreakdown$", 
+                 y_ticks=[-250, -200, -150, -100, -50, 0, 50, 100, 150, 200, 250, 300, 350], 
+                 y_label=r"$\bfFEC$" +" "+ r"$\bfBreakdown$", 
                  y_units = "%", 
-                 colors=['#7BBD84', '#F7C652', '#63C6CE', '#94948C', '#734A8C', '#D1C0E1', '#648496', '#B97A57', '#F8858A', 'magenta'],
-                 filename='FEC_breakdown_stacked_bar_plot')
+                 # colors=['#7BBD84', '#F7C652', '#63C6CE', '#94948C', '#734A8C', '#D1C0E1', '#648496', '#B97A57', '#F8858A', 'magenta'],
+                 colors=['#A100A1', '#FEC1FE', '#FF80FF', 
+                         ],
+                 hatch_patterns=('\\', '//', 'x',  '|',),
+                 filename=file_to_save+'FEC_breakdown_stacked_bar_plot',
+                 fig_width=3,
+                 fig_height=5.5)
 
-#%%
-# Spearman's rank order correlation coefficients
+#%% Spearman's rank order correlation coefficients
 bst_plots = bst.plots
 
 bst_plots.plot_spearman_1d(results_dict['Sensitivity']['Spearman']['MPSP'][modes[0]],

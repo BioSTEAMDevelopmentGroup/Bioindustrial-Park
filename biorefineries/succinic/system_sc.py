@@ -1065,7 +1065,7 @@ def plot_carbon_flow():
 
 
 #%% Plot figures
-plot = True
+plot = False
 if plot:
     
     ## TEA breakdown figure

@@ -20,7 +20,7 @@ A, B = np.polyfit(log_C0s, Cts, 1)
 Ct_given_C0 = lambda C0: A*log(C0) + B
 
 # Plot
-plot = True
+plot = False
 if plot:
     from matplotlib import pyplot as plt
     C0s_fed = np.linspace(100, 250, 50)

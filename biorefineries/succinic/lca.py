@@ -64,6 +64,7 @@ class LCA:
                  boiler=None, has_turbogenerator=None, feedstock_ID='Sugarcane',
                  FU='1 kg', demand_allocation_method='steam pool',
                  credit_feedstock_CO2_capture=False, add_EOL_GWP=False,
+                 conc_CO2_sequestered_in_liquid_waste_streams = 3, # g/L
                  feedstock_mass_FU_kind='wet'):
         
         #: [System] System being evaluated.
@@ -116,6 +117,8 @@ class LCA:
         self.natural_gas = self.BT.natural_gas
         self.CT = self.cooling_tower = cooling_tower
         self.CWP = self.chilled_water_processing_unit = chilled_water_processing_unit
+        
+        # self.conc_CO2_sequestered_in_liquid_waste_streams = conc_CO2_sequestered_in_liquid_waste_streams
         
         system._LCA = self
     
