@@ -133,33 +133,7 @@ class CentrifugeVacuumVessel(bst.Unit):
               self.vacuum_system = bst.VacuumSystem(self)
              
            
-class HydrolysisReactor(bst.CSTR):
-    _N_ins = 1
-    _N_outs = 2
-       
-    def _setup(self):          
-        super()._setup()      
-        # Process parameters for emulsification of fatty esters to acids in a 
-        # packed bed ion exchange column
-        X_hydrolysis = 0.30
-        Product_formation = PRxn([Rxn('Monomethyl_azelate + Water  -> Methanol + Azelaic_acid','Monomethyl_azelate', X = X_hydrolysis ),
-                                  Rxn('Methyl_palmitate + Water  -> Methanol + Palmitic_acid','Methyl_palmitate', X = X_hydrolysis ),
-                                  Rxn('Methyl_stearate + Water  -> Methanol + Stearic_acid','Methyl_stearate', X = X_hydrolysis),
-                                  Rxn('Methyl_linoleate + Water  -> Methanol + Linoleic_acid','Methyl_linoleate', X = X_hydrolysis)])
-                                  #Rxn('Methyl_palmitoleate + Water  -> Methanol + Palmitoleic_acid','Methyl_palmitoleate', X = 0.1), #Perhaps this can be ignored
-                                  
-                                  #Rxn('Methyl_oleate + Water  -> Methanol + Oleic_acid','Methyl_oleate', X = 0.1)])#Ignored, possible method for hydrolysis pdf doesn't dicuss these two reactions
-        self.reactions = RxnSys(Product_formation)
-      
-    def _run(self):
-            condensate,effluent, = self.outs
-            condensate.mix_from(self.ins)
-            self.reactions(condensate)
-            ms = self._multi_stream = MultiStream('ms', phases='lg')
-            ms.copy_like(condensate)
-            ms.vle(T = 100+273.15 , P = 101325)
-            condensate.copy_like(ms['g'])
-            effluent.copy_like(ms['l'])    
+
 
 @cost(basis = 'Cooling area',
       ID = 'Solids',
@@ -219,8 +193,8 @@ class Calcium_hydroxide_reactor(bst.CSTR):
     def _setup(self):  
         super()._setup()                  
         self.reactions = tmo.ParallelReaction([
-                tmo.Rxn('Cobalt_ion + Calcium_hydroxide + Acetate_ion -> Calcium_acetate + Cobalt_hydroxide', 'Cobalt_ion', X = 0.999),
-                tmo.Rxn('Tungstic_acid + Calcium_hydroxide -> Calcium_tungstate + H2O', 'Tungstic_acid', X = 0.999)
+                tmo.Rxn('Cobalt_ion + Calcium_hydroxide + Acetate_ion -> Calcium_acetate + Cobalt_hydroxide', 'Cobalt_ion', X = 0.99),
+                tmo.Rxn('Tungstic_acid + Calcium_hydroxide -> Calcium_tungstate + H2O', 'Tungstic_acid', X = 0.99)
                 ])
             
     def _run(self):
@@ -250,6 +224,44 @@ class Acid_precipitation_tank(bst.CSTR):
         effluent.mix_from(self.ins)
         self.reactions(effluent)   
         effluent.copy_like(effluent)
+        
+class HydrolysisReactor(bst.CSTR):
+    _N_ins = 2
+    _N_outs = 2
+       
+    def _setup(self):          
+        super()._setup()      
+        # Process parameters for emulsification of fatty esters to acids in a 
+        # packed bed ion exchange column
+        X_hydrolysis = 0.30
+        Product_formation = PRxn([Rxn('Monomethyl_azelate + Water  -> Methanol + Azelaic_acid','Monomethyl_azelate', X = X_hydrolysis ),
+                                  Rxn('Methyl_palmitate + Water  -> Methanol + Palmitic_acid','Methyl_palmitate', X = X_hydrolysis ),
+                                  Rxn('Methyl_stearate + Water  -> Methanol + Stearic_acid','Methyl_stearate', X = X_hydrolysis),
+                                  Rxn('Methyl_linoleate + Water  -> Methanol + Linoleic_acid','Methyl_linoleate', X = X_hydrolysis)])
+                                  #Rxn('Methyl_palmitoleate + Water  -> Methanol + Palmitoleic_acid','Methyl_palmitoleate', X = 0.1), #Perhaps this can be ignored
+                                  
+                                  #Rxn('Methyl_oleate + Water  -> Methanol + Oleic_acid','Methyl_oleate', X = 0.1)])#Ignored, possible method for hydrolysis pdf doesn't dicuss these two reactions
+        self.reactions = RxnSys(Product_formation)
+      
+    def _run(self):
+            condensate,effluent, = self.outs
+            condensate.mix_from(self.ins)
+            self.reactions(condensate)
+            ms = self._multi_stream = MultiStream('ms', phases='lg')
+            ms.copy_like(condensate)
+            ms.vle(T = 120+273.15, P = 1000000)
+            if ms['g'].F_mol:
+                condensate.copy_like(ms['g'])
+                effluent.copy_like(ms['l'])    
+            else:
+                ms.vle(T = 120+273.15 , P = 85000)   
+                if ms['g'].F_mol:
+                    condensate.copy_like(ms['g'])
+                    effluent.copy_like(ms['l'])  
+                else:
+                    ms.vle(T = 120+273.15 , P = 80000)              
+                    condensate.copy_like(ms['g'])
+                    effluent.copy_like(ms['l'])   
         
 class HydrolysisSystem(bst.Unit,isabstract = True):
     _units = {'Total_volume_of_resin': 'L',
@@ -286,52 +298,68 @@ class HydrolysisSystem(bst.Unit,isabstract = True):
         self.V_max = V_max 
         # self.Total_volume_of_resin = Total_volume_of_resin 
         # self.Total_mass_of_acid = Total_mass_of_acid  
-        self.hydrolysis_column_1 = hydrolysis_column_1 = HydrolysisReactor(None, ins = (),
+        self.hydrolysis_column_1 = hydrolysis_column_1 = HydrolysisReactor(None, ins = ('fatty_feed','water_feed'),
                                                                            outs = ('methanol_water_mixture_for_separation',
                                                                                    'organic_mixture_to_next_reactor'),
                                                                            T = self.T,
                                                                            V_max =  self.V_max, #decided based on amount of resin required,
                                                                            tau = self.tau, #considers regeneration time,
                                                                            P = self.P)
-        self.distillation_column_1 = bst.BinaryDistillation(None, ins = hydrolysis_column_1-0, LHK = ('Methanol','Water'),Lr = 0.999, Hr = 0.999,  k = 2)
+                
+        hydrolysis_column_1.outs[0].thermo.ideal()      
+        
+        self.distillation_column_1 = bst.BinaryDistillation(None, ins = hydrolysis_column_1-0, LHK = ('Methanol','Water'),Lr = 0.999, Hr = 0.99,  k = 2)
         
         self.holding_tank_1 = holding_tank_1 = bst.StorageTank(None, ins = hydrolysis_column_1-1 ,outs = ('organics_for_hydrolysis'),tau = 6.5)        
         
+                   
         self.hydrolysis_column_2 = hydrolysis_column_2 = HydrolysisReactor(None,
-                                                                           ins =holding_tank_1-0,
+                                                                           ins =(holding_tank_1-0,'water_2'),
                                                                            outs = ('methanol_water_mixture_for_separation',
                                                                                    'organic_mixture_to_next_reactor'),
                                                                            T = self.T,
                                                                            V_max =  self.V_max, #decided based on amount of resin required,
                                                                            tau = self.tau, #considers regeneration time,
                                                                            P = self.P)
-        self.distillation_column_2 = bst.BinaryDistillation(None, ins = hydrolysis_column_2-0, LHK = ('Methanol','Water'),Lr = 0.999, Hr = 0.999,   k = 2)
+ 
+        hydrolysis_column_2.outs[0].thermo.ideal()       
+        self.distillation_column_2 = bst.BinaryDistillation(None, ins = hydrolysis_column_2-0, LHK = ('Methanol','Water'),Lr = 0.999, Hr = 0.99,   k = 2)
         
         self.holding_tank_2 = holding_tank_2 = bst.StorageTank(None, ins = hydrolysis_column_2-1,outs = ('organics_for_hydrolysis'),tau = 6.5)        
         
-        self.hydrolysis_column_3 = hydrolysis_column_3 = HydrolysisReactor(None, ins = holding_tank_2-0 ,
+        
+        # Fatty_acid_mass_3 = holding_tank_2.outs[0].F_mass
+        # water_3 = bst.Stream('water_3', Water = 1, units = 'kg/hr',total_flow = (5/85)*Fatty_acid_mass_3)
+        self.hydrolysis_column_3 = hydrolysis_column_3 = HydrolysisReactor(None, ins = (holding_tank_2-0,'water_3'),
                                                                            outs = ('methanol_water_mixture_for_separation',
                                                                                    'organic_mixture_to_next_reactor'),
-                                                                           T = self.T,
-                                                                                 V_max =  self.V_max, #decided based on amount of resin required,
-                                                                                 tau = self.tau, #considers regeneration time,
-                                                                                 P = self.P)
-        self.distillation_column_3 = bst.BinaryDistillation(None,ins = hydrolysis_column_3-1,  LHK = ('Methanol','Water'),Lr = 0.999, Hr = 0.999,   k = 2)
+                                                                           T = self.T,#TODO: check this
+                                                                           V_max =  self.V_max, #decided based on amount of resin required,
+                                                                           tau = self.tau, #considers regeneration time,
+                                                                           P = 90000)#TODO: UNCERTAIN VARIABLE
+        hydrolysis_column_3.outs[0].thermo.ideal()
+        self.distillation_column_3 = bst.BinaryDistillation(None,ins = hydrolysis_column_3-0,  LHK = ('Methanol','Water'),Lr = 0.999, Hr = 0.99,   k = 2)
 #Distillation columns for separating out methanol water     
     def _run(self):
             fatty_ester_feed = self.ins[0]    
             tops_1,bottoms_1,tops_2,bottoms_2,tops_3,bottoms_3,organic_mixture, = self.outs            
             self.hydrolysis_column_1.ins[0].copy_like(fatty_ester_feed)
-            self.hydrolysis_column_1.simulate()  
+            self.hydrolysis_column_1.simulate()             
             self.distillation_column_1.simulate()
             tops_1.copy_like(self.distillation_column_1.outs[0])
             bottoms_1.copy_like(self.distillation_column_1.outs[1]) 
-            self.holding_tank_1.simulate() 
+            self.holding_tank_1.simulate()
+            Fatty_acid_mass_2 = self.holding_tank_1.outs[0].F_mass
+            water_2 = bst.Stream('water_2', Water = 1, units = 'kg/hr',total_flow = (5/85)*Fatty_acid_mass_2)
+            self.hydrolysis_column_2.ins[1].copy_like(water_2)
             self.hydrolysis_column_2.simulate()
             self.distillation_column_2.simulate()
             tops_2.copy_like(self.distillation_column_2.outs[0])
             bottoms_2.copy_like(self.distillation_column_2.outs[1])
             self.holding_tank_2.simulate()
+            Fatty_acid_mass_3 = self.holding_tank_2.outs[0].F_mass
+            water_3 = bst.Stream('water_3', Water = 1, units = 'kg/hr',total_flow = (5/85)*Fatty_acid_mass_3)
+            self.hydrolysis_column_3.ins[1].copy_like(water_3)
             self.hydrolysis_column_3.simulate()
             self.distillation_column_3.simulate()
             tops_3.copy_like(self.distillation_column_2.outs[0])
