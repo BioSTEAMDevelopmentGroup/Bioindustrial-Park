@@ -97,7 +97,8 @@ class OxidativeCleavageReactor(bst.CSTR):
 
         Side_reaction = PRxn([Rxn('Pelargonic_acid   -> Caprylic_acid + 1 CO2 ', 'Pelargonic_acid', X= X2),
                               Rxn('Monomethyl_azelate -> Suberic_acid + 1 CO2', 'Monomethyl_azelate', X = X3),
-                              Rxn('Methyl_palmitoleate -> Azelaic_acid + Heptanoic_acid', 'Methyl_palmitoleate', X = X4),
+                              # Rxn('Methyl_palmitoleate -> Azelaic_acid + Heptanoic_acid', 'Methyl_palmitoleate', X = X4),
+                              Rxn('Dihydroxy_palmitic_acid -> Monomethyl_azelate + Heptanoic_acid','Dihydroxy_palmitic_acid',X =X4),
                               Rxn('Methyl_linoleate -> Azelaic_acid + Malonic_acid + Hexanoic_acid', 'Methyl_linoleate', X = X4),
                               ])
         #Because the cobalt tetrahydrate complex is soluble in water (380 g/L (20 ºC))
@@ -136,7 +137,7 @@ class CentrifugeVacuumVessel(bst.Unit):
 
 
 @cost(basis = 'Cooling area',
-      ID = 'Solids',
+      ID = 'Solids_Flaker',
       units='m^2', 
       cost=175000*2.75,
       CE=100,
@@ -225,7 +226,7 @@ class Acid_precipitation_tank(bst.CSTR):
         self.reactions(effluent)   
         effluent.copy_like(effluent)
         
-class HydrolysisReactor(bst.CSTR):
+class HydrolysisReactor(bst.BatchBioreactor):
     _N_ins = 2
     _N_outs = 2
        
@@ -263,11 +264,20 @@ class HydrolysisReactor(bst.CSTR):
                     condensate.copy_like(ms['g'])
                     effluent.copy_like(ms['l'])   
         
+@cost(basis = 'Total_filter_area',
+      ID = 'Vibrating inclined screen',
+      units='m^2', 
+      cost=45000*2*1.3,
+      CE=100,
+      lb = 1.5,
+      ub = 7.5,
+      n=0.62,
+      S=1.5,
+      )
+          
 class HydrolysisSystem(bst.Unit,isabstract = True):
-    _units = {'Total_volume_of_resin': 'L',
-              'Total_mass_of_acid': 'Kg'
-              }
-    _N_ins = 3
+    _units = {'Total_filter_area': 'm^2'}
+    _N_ins = 4
     _N_outs = 7
     
 #The below is a list of unit operations that comprise the Hydrolysis system    
@@ -284,7 +294,7 @@ class HydrolysisSystem(bst.Unit,isabstract = True):
     
     def __init__(self, ID='', ins=(), outs=(),
                  thermo=None, *,T: Optional[float]=None, 
-                 P: Optional[float]=None, #all the three reactors run at the same pressure P
+                 P: Optional[float]=None, #all the three reactors run at the same pressure P #TODO: modify this
                  tau = None,#all the three reactors and holding tanks run at the same residence time tau (30 mins of regeneration time and 6 hours of reaction time)
                  V_max: Optional[float]=None,#all the three reactors have the same V_max
                  # Total_volume_of_resin = None,
@@ -296,13 +306,11 @@ class HydrolysisSystem(bst.Unit,isabstract = True):
         self.P= P
         self.tau= tau
         self.V_max = V_max 
-        # self.Total_volume_of_resin = Total_volume_of_resin 
-        # self.Total_mass_of_acid = Total_mass_of_acid  
-        self.hydrolysis_column_1 = hydrolysis_column_1 = HydrolysisReactor(None, ins = ('fatty_feed','water_feed'),
+        self.hydrolysis_column_1 = hydrolysis_column_1 = HydrolysisReactor(None, ins = ('fatty_feed','water_feed_1'),
                                                                            outs = ('methanol_water_mixture_for_separation',
                                                                                    'organic_mixture_to_next_reactor'),
                                                                            T = self.T,
-                                                                           V_max =  self.V_max, #decided based on amount of resin required,
+                                                                           V =  self.V_max, #decided based on amount of resin required,
                                                                            tau = self.tau, #considers regeneration time,
                                                                            P = self.P)
                 
@@ -314,11 +322,11 @@ class HydrolysisSystem(bst.Unit,isabstract = True):
         
                    
         self.hydrolysis_column_2 = hydrolysis_column_2 = HydrolysisReactor(None,
-                                                                           ins =(holding_tank_1-0,'water_2'),
+                                                                           ins =(holding_tank_1-0,'water_feed_2'),
                                                                            outs = ('methanol_water_mixture_for_separation',
                                                                                    'organic_mixture_to_next_reactor'),
                                                                            T = self.T,
-                                                                           V_max =  self.V_max, #decided based on amount of resin required,
+                                                                           V =  self.V_max, #decided based on amount of resin required,
                                                                            tau = self.tau, #considers regeneration time,
                                                                            P = self.P)
  
@@ -328,43 +336,50 @@ class HydrolysisSystem(bst.Unit,isabstract = True):
         self.holding_tank_2 = holding_tank_2 = bst.StorageTank(None, ins = hydrolysis_column_2-1,outs = ('organics_for_hydrolysis'),tau = 6.5)        
         
         
-        # Fatty_acid_mass_3 = holding_tank_2.outs[0].F_mass
-        # water_3 = bst.Stream('water_3', Water = 1, units = 'kg/hr',total_flow = (5/85)*Fatty_acid_mass_3)
-        self.hydrolysis_column_3 = hydrolysis_column_3 = HydrolysisReactor(None, ins = (holding_tank_2-0,'water_3'),
+        
+        self.hydrolysis_column_3 = hydrolysis_column_3 = HydrolysisReactor(None, ins = (holding_tank_2-0,
+                                                                                        'water_feed_3'),
                                                                            outs = ('methanol_water_mixture_for_separation',
                                                                                    'organic_mixture_to_next_reactor'),
                                                                            T = self.T,#TODO: check this
-                                                                           V_max =  self.V_max, #decided based on amount of resin required,
+                                                                           V =  self.V_max, #decided based on amount of resin required,
                                                                            tau = self.tau, #considers regeneration time,
                                                                            P = 90000)#TODO: UNCERTAIN VARIABLE
         hydrolysis_column_3.outs[0].thermo.ideal()
         self.distillation_column_3 = bst.BinaryDistillation(None,ins = hydrolysis_column_3-0,  LHK = ('Methanol','Water'),Lr = 0.999, Hr = 0.99,   k = 2)
 #Distillation columns for separating out methanol water     
     def _run(self):
-            fatty_ester_feed = self.ins[0]    
+            fatty_ester_feed = self.ins[0]
+            water_feed_1 = self.ins[1]
             tops_1,bottoms_1,tops_2,bottoms_2,tops_3,bottoms_3,organic_mixture, = self.outs            
             self.hydrolysis_column_1.ins[0].copy_like(fatty_ester_feed)
+            self.hydrolysis_column_1.ins[1].copy_like(water_feed_1)
             self.hydrolysis_column_1.simulate()             
             self.distillation_column_1.simulate()
             tops_1.copy_like(self.distillation_column_1.outs[0])
             bottoms_1.copy_like(self.distillation_column_1.outs[1]) 
             self.holding_tank_1.simulate()
             Fatty_acid_mass_2 = self.holding_tank_1.outs[0].F_mass
-            water_2 = bst.Stream('water_2', Water = 1, units = 'kg/hr',total_flow = (5/85)*Fatty_acid_mass_2)
-            self.hydrolysis_column_2.ins[1].copy_like(water_2)
+            water_feed_2 = bst.Stream('water_feed_2', Water = 1, units = 'kg/hr',total_flow = (5/85)*Fatty_acid_mass_2)
+            self.hydrolysis_column_2.ins[1].copy_like(water_feed_2)
             self.hydrolysis_column_2.simulate()
             self.distillation_column_2.simulate()
             tops_2.copy_like(self.distillation_column_2.outs[0])
             bottoms_2.copy_like(self.distillation_column_2.outs[1])
             self.holding_tank_2.simulate()
             Fatty_acid_mass_3 = self.holding_tank_2.outs[0].F_mass
-            water_3 = bst.Stream('water_3', Water = 1, units = 'kg/hr',total_flow = (5/85)*Fatty_acid_mass_3)
-            self.hydrolysis_column_3.ins[1].copy_like(water_3)
+            water_feed_3 = bst.Stream('water_feed_3', Water = 1, units = 'kg/hr',total_flow = (5/85)*Fatty_acid_mass_3)
+            self.hydrolysis_column_3.ins[1].copy_like(water_feed_3)
             self.hydrolysis_column_3.simulate()
             self.distillation_column_3.simulate()
             tops_3.copy_like(self.distillation_column_2.outs[0])
             bottoms_3.copy_like(self.distillation_column_2.outs[1])
             organic_mixture.copy_like(self.hydrolysis_column_3.outs[1])
+    def _design(self):
+        self.design_results['Total_filter_area']= self.ins[2].F_mass/(3600*3) #TODO: check what this is, 
+        #Solid flux = 2-5 Kg/s.m^2 #Ref: Rule of thumb 184 oage number ask Yoel
+                   
+            
  
             
 class AACrystalliser(bst.units.BatchCrystallizer):

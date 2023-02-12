@@ -310,16 +310,14 @@ def oxidative_cleavage_system(ins,outs):
     
 #Cobalt catalyst required is preferably between 0.3% and 1.5% by moles of diol molecules    
     def adjust_catalyst_flowrates():
-        M201._run()
+        # M201._run()
         total_diol_moles =  M201.outs[0].imol['MDHSA'] + M201.outs[0].imol['Methyl_9_10_dihydroxylinoleate'] + M201.outs[0].imol['Dihydroxy_palmitic_acid']     
         total_incoming_cobalt_catalyst_moles = recovered_mixture_of_cobalt_catalyst.imol['Cobalt_chloride'] + recovered_mixture_of_cobalt_catalyst.imol['Cobalt_hydroxide']
         a = ((0.009*total_diol_moles) - total_incoming_cobalt_catalyst_moles)*chems['Cobalt_acetate_tetrahydrate'].MW #based on the average of 0.3% and 1.5%  
         T202.ins[0].imass['Cobalt_acetate_tetrahydrate'] = a
         T202.ins[0].imass['Water'] = 65.66*a
         T202._run()
-    M201.add_specification(adjust_catalyst_flowrates, 
-                           # impacted_units = [T202],
-                           )    
+    M201.add_specification(adjust_catalyst_flowrates, impacted_units = [T202])    
     
     M203 = bst.units.Mixer('M203',
                         ins = (M201-0, #Diol mixture
@@ -376,7 +374,7 @@ def organic_phase_separation(ins,outs):
                                                   aqueous_phase),
                                             split = ({
                                                 'Hydrogen_peroxide': 0.0,   
-                                                'Water': 0.8,
+                                                'Water': 0.1,#TODO: uncertain
                                                 #intermediate products in the org phase
                                                 'MDHSA': 1,
                                                 'Dihydroxy_palmitic_acid':1,
@@ -518,24 +516,7 @@ def azelaic_acid_production(ins,outs):
     crude_heavy_fatty_acids,water_for_emulsification,water_for_azelaicacid_extraction,solvent_for_extraction,recycled_solvent_for_extraction = ins
     crude_methanol,wastewater3_to_boilerturbogenerator,diols_and_other_fatty_acids_for_recycling,solvent_monocarboxylics_mixture,wastewater6_to_boilerturbogenerator,lighter_boiling_impurities_to_boilerturbogenerator,heavy_boiling_compounds_to_boilerturbogenerator,azelaic_acid_product_stream, = outs
      
-#Mix tank for making the emulsion for the hydrolysis reaction
-    M601 = bst.units.MixTank('M601',
-                            ins = (crude_heavy_fatty_acids,
-                                    water_for_emulsification,
-                                  ),
-                            outs = ('emulsified_mixture'),
-                            tau = 6.5)   
-    def adjust_water_for_emuslification():
-#The following number represents the total initial number of exchangeable moles.
-# This number of moles will keep on decreasing as the reaction progresses    
-         exchangeable_moles = ((M601.ins[0].imol['Methyl_palmitate'],M601.ins[0].imol['Methyl_oleate'],
-                                M601.ins[0].imol['Methyl_stearate'],M601.ins[0].imol['Methyl_linoleate'],
-                                M601.ins[0].imol['Monomethyl_azelate']))
-         total_moles = sum(exchangeable_moles)       
-#Number of moles of water was addded such that the hydrolysis reaction takes place successfully                    
-         water_for_emulsification.imol['Water'] = total_moles*70 #TODO: THIS KEEPS CHANGING CONSTANTLY
-    M601.add_specification(adjust_water_for_emuslification, run=True)  
-       
+  
     T601 = bst.StorageTank(ID = 'T601_resin_regeneration_acid_tank',
                             ins = bst.Stream(ID = 'Liquid_HCl',
                                             Liquid_HCl = 1,
@@ -547,40 +528,18 @@ def azelaic_acid_production(ins,outs):
     P601 =  bst.Pump(ID = 'P601_resin_regeneration_acid_tank',
                       ins = T601-0,
                       outs = 'regeneration_acid_to_HydrolysisSystem') 
-    def adjust_acid_for_regeneration(): #TODO: adjust this based on the LHSV
-        M601._run()
-        exchangeable_moles = ((M601.ins[0].imol['Methyl_palmitate'],M601.ins[0].imol['Methyl_oleate'],
-                               M601.ins[0].imol['Methyl_stearate'],M601.ins[0].imol['Methyl_linoleate'],
-                               M601.ins[0].imol['Monomethyl_azelate']))
-        total_moles = sum(exchangeable_moles)
-        Total_volume_of_resin = total_moles/1800
-        height_of_the_cylinder = Total_volume_of_resin/(3.14* 5)
-        total_height = height_of_the_cylinder + 2.5 
-        Total_amount_of_acid_in_Kg = 50*Total_volume_of_resin/1000
-        T601.total_flow=50*Total_volume_of_resin
-    T601.add_specification(adjust_acid_for_regeneration,run = True)
-        
+       
     T602 = bst.StorageTank(ID = 'T602_hydrolysis_resin_tank',
                             ins = bst.Stream( ID = 'polystyrene_based_catalyst',
                                               polystyrene_based_catalyst= 1,
                                               units = 'kg/hr',
                                               price = 130/28.31),#$40 to $200 per 28.31L(1 cubic foot) Ref: Cost of a strong cation exchanger resin: https://samcotech.com/how-much-does-it-cost-to-buy-maintain-and-dispose-of-ion-exchange-resins/
                             outs = ('resin_to_HydrolysisSystem')) 
-    def adjust_resin_for_hydrolysis():
-        M601._run()
-        # exchangeable_moles = ((M601.ins[0].imol['Methyl_palmitate'],M601.ins[0].imol['Methyl_oleate'],
-        #                        M601.ins[0].imol['Methyl_stearate'],M601.ins[0].imol['Methyl_linoleate'],
-        #                        M601.ins[0].imol['Monomethyl_azelate']))
-        # total_moles = sum(exchangeable_moles)
-        # Total_volume_of_resin = total_moles/1800
-        Total_mass_of_resin = M601.outs[0].F_mass*0.1/0.9 #Acc to the patent, 10 parts by weight was of the catalyst, therefore the rest should be 90%
-        T602.total_flow = Total_mass_of_resin #TODO: think about filtering it out
-    T602.add_specification(adjust_resin_for_hydrolysis,run = True)
-    
     R601 = units_baseline.HydrolysisSystem(ID = 'R601',
-                                            ins = (M601-0,
+                                            ins = (crude_heavy_fatty_acids,
+                                                   water_for_emulsification,
+                                                    T602-0, #resin for hydrolysis
                                                     P601-0,#acid for regeneration
-                                                    T602-0 #resin for hydrolysis
                                                     ),
                                             outs = ('methanol_1','Water_1',
                                                     'methanol_2','water_2',
@@ -588,11 +547,16 @@ def azelaic_acid_production(ins,outs):
                                                     'organic_mixture_to_next_reactor'),
                                             T = 120+273.15,     #TODO: check this again                                       
                                             tau = 6.5, #considers regeneration time,
-                                            P = 1000000
+                                            P = 1000000,
+                                            V_max = 3785 ## Volume of each reactor in m3 (equivalent to 1 MMGal)
                                             )
+    
     def calculating_V_max_for_hydrolysis():
-        # T602._run()
-        height_of_the_cylinder = T602.total_flow/(3.14* 5)
+        Fatty_acid_mass_1 = crude_heavy_fatty_acids.F_mass
+        R601.ins[1].F_mass = water_mass_1 = Fatty_acid_mass_1*5/85 #Based on specs in the patent
+        R601.ins[2].F_mass = total_resin_required = (Fatty_acid_mass_1+water_mass_1)*(10/90)
+        R601.ins[3].F_vol = total_resin_required*3/0.77 #given density 0.770 Kg/m3 and 2-4 BV/h #TODO: check how to size acid
+        height_of_the_cylinder = total_resin_required/(3.14* 5)
         total_height = height_of_the_cylinder + 2.5
         R601.V_max =  3.14*5*total_height/3, #decided based on amount of resin required,
     R601.add_specification(calculating_V_max_for_hydrolysis, run = True)
@@ -656,6 +620,14 @@ def azelaic_acid_production(ins,outs):
                             outs = 'solvent_for_extraction',
                             vessel_material='Stainless steel')
  
+       
+    HX603 =  bst.HXutility(ID = 'HX603', ins = D604-0, 
+                            outs = ('cooled_reaction_mixture'),
+                            cool_only=True,
+                            T = 90+273.15) 
+    
+    M602 = bst.Mixer('M602',ins = (HX603-0,T605-0,recycled_solvent_for_extraction),
+                      outs = ('solvent_organics_mixture_for_extraction'))
     def solvent_for_extraction():
         D604._run()
         all_monocarboxylics = [D604.outs[0].imass['Methyl_oleate'],
@@ -669,16 +641,10 @@ def azelaic_acid_production(ins,outs):
                                 D604.outs[0].imass['Caprylic_acid'],
                                 D604.outs[0].imass['Suberic_acid']]
         Total_required_solvent = 2.2*sum(all_monocarboxylics)
-        T605.ins[0].F_mass = Total_required_solvent - recycled_solvent_for_extraction.F_mass
-    T605.add_specification(solvent_for_extraction, run = True)
-        
-    HX603 =  bst.HXutility(ID = 'HX603', ins = D604-0, 
-                            outs = ('cooled_reaction_mixture'),
-                            cool_only=True,
-                            T = 90+273.15) 
-    
-    M602 = bst.Mixer('M602',ins = (HX603-0,T605-0,recycled_solvent_for_extraction),
-                      outs = ('solvent_organics_mixture_for_extraction'))
+        recycled_solvent_for_extraction = M602.ins[2].F_mass
+        M602.ins[1].F_mass = Total_required_solvent - recycled_solvent_for_extraction
+        T605._run()
+    M602.add_specification(solvent_for_extraction, run = True)
  
 #The partition coefficients for the multistage mixer settler are based on 
 # METHOD FOR PURIFYING AZELAIC ACID , patent number : US 2003/0032825 A1     
@@ -714,6 +680,10 @@ def azelaic_acid_production(ins,outs):
                                                           'Monomethyl_azelate',#C10 DCA
                                                           'Suberic_acid',#C8 DCA
                                                           # 'Malonic_acid',#D3 DCA
+                                                          # 'Octane',
+                                                          # 'Cycloheptane',
+                                                          # 'Bicyclo_octane',
+                                                          # 'Toluene'
                                                           ),
                                                                                                                           
                                                   'K': np.array([1.664369695,#MDHSA
@@ -722,7 +692,8 @@ def azelaic_acid_production(ins,outs):
                                                                   0.064657614,#Methyl_oleate
                                                                   0.06466,#Azelaic acid
                                                                   0.06466,#Monomethyl azelate
-                                                                  0.05905,#Suberic acid                                                                 
+                                                                  0.05905,#Suberic acid  
+                                                                  
                                                                   ]),
                                                   'phi': 0.590 # Initial phase fraction guess. This is optional.
                                                     },
@@ -970,7 +941,7 @@ def create_system(ins,outs):
                                                         DAG = 0,#HOSO contains predominantly,98-99% of TAGs. Ref: Vegetable oils in food technology, chapter 5 - Sunflower  Oil - Maria A. Grompone
                                                         characterization_factors = {'GWP100': 0.76*99.99 + 0.00035559*0.01},##Global warming (incl. iLUC and biogenic CO2 uptake) in kg CO2-eq, Ref: #http://dx.doi.org/10.1016/j.jclepro.2014.10.011
                                                                                                      ##Ecoinvent: tap water production, conventional treatment, RoW, (Author: Marylène Dussault inactive)                       
-                                                        total_flow = 10000, #parameter that can be changed during analysis
+                                                        total_flow = 1000, #parameter that can be changed during analysis
                                                         price = 2.67*384.391/351,#Price available for sept 2012, adjusted to dec 2022. basis: Fats and Oils, inedible Ref:DOI 10.1007/s11743-013-1466-0
                                                         units = 'kg/hr'),
                                              bst.Stream(ID = 'water_for_degumming',
@@ -1203,12 +1174,15 @@ W901 = bst.create_wastewater_treatment_system(ID='W901',
                                               NaOH_price= 0.93*401.693/275.700, #Based on Catbio price ($/Kg) for Caustic soda (sodium hydroxide), liq., dst spot barge f.o.b. USG adjusted from 2021 Jan to 2022 Dec using Fred's PPI for basic inorganic chemicals  
                                               autopopulate=None)
 
-WastewaterSystemCost = bst.WastewaterSystemCost(ID='W901_systemcost', ins=(F_baseline.wastewater1_to_boilerturbogenerator,
-                                                                            F_baseline.wastewater2_to_boilerturbogenerator,
-                                                                            F_baseline.wastewater6_to_boilerturbogenerator,
-                                                                            F_baseline.condensate_to_boilerturbogenerator,
-                                                                            F_baseline.wastewater3_to_boilerturbogenerator,
-                                                                            F_baseline.wastewater4_to_boilerturbogenerator),
+M902 = bst.Mixer(ins=(F_baseline.wastewater1_to_boilerturbogenerator,
+                      F_baseline.wastewater2_to_boilerturbogenerator,
+                      F_baseline.wastewater6_to_boilerturbogenerator,
+                      F_baseline.condensate_to_boilerturbogenerator,
+                      F_baseline.wastewater3_to_boilerturbogenerator,
+                      F_baseline.wastewater4_to_boilerturbogenerator),
+                 outs = 'Total_wastewater_to_be_treated')
+WastewaterSystemCost = bst.WastewaterSystemCost(ID='W901_systemcost',
+                                                ins = M902-0,
                                                 outs=(), thermo=None)
     
 
@@ -1288,7 +1262,47 @@ aa_baseline_groups = bst.UnitGroup.group_by_area(aa_baseline_sys.units)
  #Ratio of [(Cost Index at Newer Date) / (Cost Index at Older Date)]   
  
      
+# #Mix tank for making the emulsion for the hydrolysis reaction
+#     M601 = bst.units.MixTank('M601',
+#                             ins = (crude_heavy_fatty_acids,
+#                                     water_for_emulsification,
+#                                   ),
+#                             outs = ('emulsified_mixture'),
+#                             tau = 6.5)   
+#     def adjust_water_for_emuslification():
+# #The following number represents the total initial number of exchangeable moles.
+# # This number of moles will keep on decreasing as the reaction progresses    
+#          exchangeable_moles = ((M601.ins[0].imol['Methyl_palmitate'],M601.ins[0].imol['Methyl_oleate'],
+#                                 M601.ins[0].imol['Methyl_stearate'],M601.ins[0].imol['Methyl_linoleate'],
+#                                 M601.ins[0].imol['Monomethyl_azelate']))
+#          total_moles = sum(exchangeable_moles)       
+# #Number of moles of water was addded such that the hydrolysis reaction takes place successfully                    
+#          water_for_emulsification.imol['Water'] = total_moles*70 #TODO: THIS KEEPS CHANGING CONSTANTLY
+#     M601.add_specification(adjust_water_for_emuslification, run=True)  
     
+    # def adjust_acid_for_regeneration(): #TODO: adjust this based on the LHSV
+    #     M601._run()
+    #     exchangeable_moles = ((M601.ins[0].imol['Methyl_palmitate'],M601.ins[0].imol['Methyl_oleate'],
+    #                            M601.ins[0].imol['Methyl_stearate'],M601.ins[0].imol['Methyl_linoleate'],
+    #                            M601.ins[0].imol['Monomethyl_azelate']))
+    #     total_moles = sum(exchangeable_moles)
+    #     Total_volume_of_resin = total_moles/1800
+    #     height_of_the_cylinder = Total_volume_of_resin/(3.14* 5)
+    #     total_height = height_of_the_cylinder + 2.5 
+    #     Total_amount_of_acid_in_Kg = 50*Total_volume_of_resin/1000
+    #     T601.total_flow=50*Total_volume_of_resin
+    # T601.add_specification(adjust_acid_for_regeneration,run = True)  
+    # def adjust_resin_for_hydrolysis():
+    #     M601._run()
+    #     # exchangeable_moles = ((M601.ins[0].imol['Methyl_palmitate'],M601.ins[0].imol['Methyl_oleate'],
+    #     #                        M601.ins[0].imol['Methyl_stearate'],M601.ins[0].imol['Methyl_linoleate'],
+    #     #                        M601.ins[0].imol['Monomethyl_azelate']))
+    #     # total_moles = sum(exchangeable_moles)
+    #     # Total_volume_of_resin = total_moles/1800
+    #     Total_mass_of_resin = M601.outs[0].F_mass*0.1/0.9 #Acc to the patent, 10 parts by weight was of the catalyst, therefore the rest should be 90%
+    #     T602.total_flow = Total_mass_of_resin #TODO: think about filtering it out
+    # T602.add_specification(adjust_resin_for_hydrolysis,run = True)
+        
     
     # ID = 'aa_baseline_sys',
     #                           path = (ob0,ob1,ob2,ob3,

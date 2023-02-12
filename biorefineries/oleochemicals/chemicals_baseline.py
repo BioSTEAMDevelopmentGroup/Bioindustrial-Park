@@ -29,9 +29,10 @@ chems = tmo.Chemicals([
                       CAS='383907-36-6',
                       default=True,
                       Hf=-1.779e6, # Assume same as TAG on a weight basis
-                      phase = 'l'),
+                      phase = 'l',
+                      ),
 #Crude glycerol is a product of transesterification
-        tmo.Chemical('Glycerol'), #rho = 1261.3), #phase = 'l'), 
+        tmo.Chemical('Glycerol'),
 #TAGs of High oleic sunflower oil
         tmo.Chemical('OOO', search_ID = '122-32-7',Hf = -1776e3),#from cane>chemicals
         tmo.Chemical('LLL', search_ID = '537-40-6',Hf = -1776e3),#TODO: Don't Asumming to be the same as OOO  
@@ -151,9 +152,9 @@ chems = tmo.Chemicals([
         tmo.Chemical('Azelaic_acid'),
 
 # Oxidants used and other gaseous products
-        tmo.Chemical('Nitrogen'),
-        tmo.Chemical('Oxygen'),
-        tmo.Chemical('Carbon_dioxide'),
+        tmo.Chemical('Nitrogen',phase = 'g'),
+        tmo.Chemical('Oxygen',phase = 'g'),
+        tmo.Chemical('Carbon_dioxide',phase = 'g'),
         
 #Solvent for countercurrent extraction of monocarboxylic acids
         tmo.Chemical('Octane'),
@@ -168,7 +169,7 @@ chems = tmo.Chemicals([
                   Tb = 1746,
                   default = True,
                   formula = 'H2WO4',
-                  phase = 's'),
+                  phase = 'l'),
         tmo.Chemical('Tungstate_ion',
                  search_db = False,
                  CAS = '12737-86-9',
@@ -191,12 +192,12 @@ chems = tmo.Chemicals([
                      phase = 'l'
                      ),
         tmo.Chemical('Cobalt_acetate_tetrahydrate',
-                      phase = 's',#TODO: explore phase
+                      phase = 'l',#TODO: explore phase
                       search_ID = '6147-53-1',
                       Tb = 117.1+273.15,
                       Hf = 0.45 #TODO: change
                       ),
-        tmo.Chemical('Acetate',default = True),
+        tmo.Chemical('Acetate',phase = 'l', default = True),
         tmo.Chemical('Acetate_ion', phase = 'l', search_ID = '71-50-1',default = True),
         tmo.Chemical('Cobalt_ion',search_ID ='Cobalt(2+)',  phase = 'l', 
                       Tb=3200.15,#Based on cobalt's BP
@@ -211,9 +212,9 @@ chems = tmo.Chemicals([
                        formula = 'CaWO4',
                        phase = 'l',
                        Hf = 0.45),#TODO: change    
-        tmo.Chemical('Calcium_acetate',default = True),
-        tmo.Chemical('Cobalt_hydroxide',default = True),
-        tmo.Chemical('HCl2', search_ID = 'HCl'),
+        tmo.Chemical('Calcium_acetate',phase = 'l', default = True),
+        tmo.Chemical('Cobalt_hydroxide',phase = 'l', default = True),
+        tmo.Chemical('HCl2',phase = 'l',search_ID = 'HCl'),
 ##Resin for hydrolysis
 ##Sulfonated_polystyrene with a search_ID = '98-70-4', lacks Hvap data, hence polystyrene's properties were used
 ##Boiling point based on amberlyte
@@ -235,9 +236,11 @@ chems = tmo.Chemicals([
                      MW = 1,
                      phase = 's',
                      search_db=False,
+                     default = True,
                      Hf = 0),
         tmo.Chemical('P4O10',
-                     phase = 's'),
+                     phase = 's',
+                     default = True),
 #WWTs sludge based on cellulosic.chemicals     
         tmo.Chemical('WWTsludge',
                      search_db = False,
@@ -336,9 +339,15 @@ chems.Acetate_ion.copy_models_from((chems.Acetate),
                                        'Hvap',
                                        'sigma',
                                        ])
-chems.Acetate_ion.V.add_method(chems.Acetate_ion.MW*10E-3/chems.Acetate.rho('l',298.15,101325))
-chems.Calcium_acetate.V.l.add_method(chems.Calcium_acetate.MW*0.000001/1.5)#density from: https://pubchem.ncbi.nlm.nih.gov/compound/Calcium-acetate#section=Density
-chems.Cobalt_hydroxide.V.l.add_method(chems.Cobalt_hydroxide.MW*1.0E-6/3.597)
+Acetate_rho = chems.Acetate.rho(298.15,101325)
+chems.Acetate_ion.V.add_method(chems.Acetate_ion.MW*10E-3/Acetate_rho)
+chems.Calcium_acetate.V.add_method(chems.Calcium_acetate.MW*0.000001/1.5)#density from: https://pubchem.ncbi.nlm.nih.gov/compound/Calcium-acetate#section=Density
+chems.Cobalt_hydroxide.V.add_method(chems.Cobalt_hydroxide.MW*1.0E-6/3.597)
+# chems.Cobalt_hydroxide.copy_models_from(tmo.Chemical('NaOH'),['Psat'])
+#TODO: change the below
+chems.Calcium_hydroxide.copy_models_from(tmo.Chemical('NaOH'),['Psat'])
+chems.Calcium_chloride.copy_models_from(tmo.Chemical('NaOH'),['Psat'])
+chems.Calcium_acetate.copy_models_from(tmo.Chemical('NaOH'),['Psat'])
 ## Modelling properties of dihydroxylated compounds as MDHSA
 chems.Dihydroxy_palmitic_acid.copy_models_from(chems.MDHSA,
                                                   ['Hvap',
@@ -471,13 +480,17 @@ for chemical in (HCl, NaOH,):
         V = fn.rho_to_V(rho=1e5, MW=chemical.MW)
         chemical.V.add_model(V, top_priority=True)
         chemical.default()
+NaOH.copy_models_from(tmo.Chemical('NaOH'),['Psat'])
+HCl.copy_models_from(tmo.Chemical('HCl'),['Psat'])        
+        
+chems.Ash.copy_models_from(tmo.Chemical('Water'),['Psat'])
+chems.P4O10.copy_models_from(tmo.Chemical('Water'),['Psat'])
+chems.WWTsludge.copy_models_from(tmo.Chemical('Water'),['Psat'])
+
 
     
 for chemical in chems: chemical.default()
-# TODO: ask what to do
-# chems.Biomass.at_state = 'l'
-
-
+#TODO: add viscosity for all the catalyst related chems
         
 chems.compile()
 chems.define_group('TAG', ('OOO','LLL','OOL',
