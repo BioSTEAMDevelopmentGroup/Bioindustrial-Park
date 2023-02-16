@@ -42,7 +42,7 @@ bst.StorageTank.purchase_cost_algorithms["Compressed air storage"] = TankPurchas
 class DihydroxylationReactor(bst.CSTR):
     _N_ins = 1
     _N_outs = 2
-
+    X_dih = 0.99
 #this ref highlights that a stoichiometric amount of h2O2 is required to dihydroxylate ref:https://doi.org/10.1021/ja01298a065    
 #Novovols's patent mentions that linoeleic and palmitoleic acid esters can be oxidatively cleaved
 #this would mean that they can also get dihydroxylated 
@@ -51,59 +51,52 @@ class DihydroxylationReactor(bst.CSTR):
 #TODO: don't know the reaction conversion of dihydroxylation reaction
     def _setup(self):
             super()._setup()  
-            X1 = 0.9
-            Dihydroxylation_reaction = PRxn([Rxn('Methyl_oleate + Hydrogen_peroxide -> MDHSA ', 'Methyl_oleate', X = X1),
-                                              Rxn('Methyl_linoleate + Hydrogen_peroxide -> Methyl_9_10_dihydroxylinoleate', 'Methyl_linoleate', X = X1),
-                                              Rxn('Methyl_palmitoleate + Hydrogen_peroxide -> Dihydroxy_palmitic_acid', 'Methyl_palmitoleate', X = X1)
+            Dihydroxylation_reaction = PRxn([Rxn('Methyl_oleate + Hydrogen_peroxide -> MDHSA ', 'Methyl_oleate', X = DihydroxylationReactor.X_dih),
+                                              Rxn('Methyl_linoleate + Hydrogen_peroxide -> Methyl_9_10_dihydroxylinoleate', 'Methyl_linoleate', X = DihydroxylationReactor.X_dih),
+                                              Rxn('Methyl_palmitoleate + Hydrogen_peroxide -> Dihydroxy_palmitic_acid', 'Methyl_palmitoleate', X = DihydroxylationReactor.X_dih)
                                             ])            
             DihydroxylationReactor_rxnsys = RxnSys(Dihydroxylation_reaction)
             self.reactions = DihydroxylationReactor_rxnsys                       
           
     def _run(self):  
+            feed = self.ins[0]
             condensate,effluent, = self.outs
             condensate.mix_from(self.ins)
             self.reactions(condensate)
-            ms = self._multi_stream = MultiStream('ms', phases='lg')
-            ms.copy_like(condensate)
-            ms.vle(T = self.T, P = self.P)
-            condensate.copy_like(ms['g'])
-            effluent.copy_like(ms['l'])
+            ms_dih = self._multi_stream = MultiStream('ms_dih', phases='lg')
+            ms_dih.copy_like(condensate)
+            ms_dih.vle(T = self.T, P = self.P)
+            condensate.copy_like(ms_dih['g'])
+            effluent.copy_like(ms_dih['l'])
             
      
 class OxidativeCleavageReactor(bst.CSTR):
     # V_max is max volume of a reactor in feet3
     ## The two heatutilities are both for the vaccuum system -steam and for the cooling water
-    
     _N_ins = 2
     _N_outs = 2
-       
+    X_oxidativecleavage = 0.8
+    X_decarboxylation = 0.2
+    X_side_rxn = 0.8
+
     def _setup(self):          
         super()._setup()  
-#TODO:reaction conversions missing
-        #oxidative_cleavage_conversion
-        X1 = 0.9
-        # decarboxylations conversion
-        X2 = 0.2
-        X3 = 0.2
-        X4 = 0.9
-        # catalyst decomposition, assuming all of it is soluble
-        X5 = 0.99
-        
-        Product_formation = PRxn([Rxn('MDHSA + 1.5 Oxygen  -> Pelargonic_acid + Monomethyl_azelate','MDHSA', X = X1),
+      
+        Product_formation = PRxn([Rxn('MDHSA + 1.5 Oxygen  -> Pelargonic_acid + Monomethyl_azelate','MDHSA', X = OxidativeCleavageReactor.X_oxidativecleavage),
                                   ])                        
         #TODO.xxx check again possible decarboxylation https://doi.org/10.1016/j.renene.2018.01.107
         #TODO.xxx check again Organic Reactions in Strong Alkalis. Part V.l Alkali Fusion of Epoxides and Ethers 
         ##We are only accounting for methyl_linoleate and methyl_palmitoleate because they have unsaturated bonds
 
-        Side_reaction = PRxn([Rxn('Pelargonic_acid   -> Caprylic_acid + 1 CO2 ', 'Pelargonic_acid', X= X2),
-                              Rxn('Monomethyl_azelate -> Suberic_acid + 1 CO2', 'Monomethyl_azelate', X = X3),
-                              # Rxn('Methyl_palmitoleate -> Azelaic_acid + Heptanoic_acid', 'Methyl_palmitoleate', X = X4),
-                              Rxn('Dihydroxy_palmitic_acid -> Monomethyl_azelate + Heptanoic_acid','Dihydroxy_palmitic_acid',X =X4),
-                              Rxn('Methyl_linoleate -> Azelaic_acid + Malonic_acid + Hexanoic_acid', 'Methyl_linoleate', X = X4),
+        Side_reaction = PRxn([Rxn('Pelargonic_acid   -> Caprylic_acid + 1 CO2 ', 'Pelargonic_acid', X = OxidativeCleavageReactor.X_decarboxylation),
+                              Rxn('Monomethyl_azelate -> Suberic_acid + 1 CO2', 'Monomethyl_azelate', X = OxidativeCleavageReactor.X_decarboxylation),
+                              Rxn('Dihydroxy_palmitic_acid -> Monomethyl_azelate + Heptanoic_acid','Dihydroxy_palmitic_acid',X = OxidativeCleavageReactor.X_side_rxn),
+                              Rxn('Methyl_linoleate -> Azelaic_acid + Malonic_acid + Hexanoic_acid', 'Methyl_linoleate', X = OxidativeCleavageReactor.X_side_rxn),
                               ])
         #Because the cobalt tetrahydrate complex is soluble in water (380 g/L (20 ºC))
         #acc https://www.chemsrc.com/en/cas/6147-53-1_830295.html
-        Catalyst_dissolution = Rxn('Cobalt_acetate_tetrahydrate -> Cobalt_ion + 2 Acetate_ion + 4 H2O','Cobalt_acetate_tetrahydrate', X = X5)
+        Catalyst_dissolution = Rxn('Cobalt_acetate_tetrahydrate -> Cobalt_ion + 2 Acetate_ion + 4 H2O','Cobalt_acetate_tetrahydrate', X = 0.99)       
+        # catalyst solubilitisation, assuming all of it is soluble
         oxidative_cleavage_rxnsys = RxnSys(Product_formation, Side_reaction, Catalyst_dissolution)
         self.reactions = oxidative_cleavage_rxnsys
             
@@ -194,8 +187,8 @@ class Calcium_hydroxide_reactor(bst.CSTR):
     def _setup(self):  
         super()._setup()                  
         self.reactions = tmo.ParallelReaction([
-                tmo.Rxn('Cobalt_ion + Calcium_hydroxide + Acetate_ion -> Calcium_acetate + Cobalt_hydroxide', 'Cobalt_ion', X = 0.99),
-                tmo.Rxn('Tungstic_acid + Calcium_hydroxide -> Calcium_tungstate + H2O', 'Tungstic_acid', X = 0.99)
+                tmo.Rxn('Cobalt_ion + Calcium_hydroxide + Acetate_ion -> Calcium_acetate + Cobalt_hydroxide', 'Cobalt_ion', X = 0.999),
+                tmo.Rxn('Tungstic_acid + Calcium_hydroxide -> Calcium_tungstate + H2O', 'Tungstic_acid', X = 0.999)
                 ])
             
     def _run(self):
@@ -215,8 +208,8 @@ class Acid_precipitation_tank(bst.CSTR):
     def _setup(self): 
         super()._setup()
         Precipitation_reaction = tmo.ParallelReaction([
-                tmo.Rxn('Calcium_tungstate + 2Liquid_HCl -> Tungstic_acid + Calcium_chloride', 'Calcium_tungstate',X = 0.999),
-                tmo.Rxn('Cobalt_hydroxide + 2Liquid_HCl -> Cobalt_chloride + 2Water','Cobalt_hydroxide', X = 0.999)
+                tmo.Rxn('Calcium_tungstate + 2Liquid_HCl -> Tungstic_acid + Calcium_chloride', 'Calcium_tungstate',X = 0.99),
+                tmo.Rxn('Cobalt_hydroxide + 2Liquid_HCl -> Cobalt_chloride + 2Water','Cobalt_hydroxide', X = 0.99)
                 ]) 
         self.reactions = RxnSys(Precipitation_reaction)
           
@@ -229,16 +222,17 @@ class Acid_precipitation_tank(bst.CSTR):
 class HydrolysisReactor(bst.BatchBioreactor):
     _N_ins = 2
     _N_outs = 2
+    X_hydrolysis = 0.30
        
     def _setup(self):          
         super()._setup()      
         # Process parameters for emulsification of fatty esters to acids in a 
         # packed bed ion exchange column
-        X_hydrolysis = 0.30
-        Product_formation = PRxn([Rxn('Monomethyl_azelate + Water  -> Methanol + Azelaic_acid','Monomethyl_azelate', X = X_hydrolysis ),
-                                  Rxn('Methyl_palmitate + Water  -> Methanol + Palmitic_acid','Methyl_palmitate', X = X_hydrolysis ),
-                                  Rxn('Methyl_stearate + Water  -> Methanol + Stearic_acid','Methyl_stearate', X = X_hydrolysis),
-                                  Rxn('Methyl_linoleate + Water  -> Methanol + Linoleic_acid','Methyl_linoleate', X = X_hydrolysis)])
+        
+        Product_formation = PRxn([Rxn('Monomethyl_azelate + Water  -> Methanol + Azelaic_acid','Monomethyl_azelate', X = HydrolysisReactor.X_hydrolysis),
+                                  Rxn('Methyl_palmitate + Water  -> Methanol + Palmitic_acid','Methyl_palmitate', X = HydrolysisReactor.X_hydrolysis),
+                                  Rxn('Methyl_stearate + Water  -> Methanol + Stearic_acid','Methyl_stearate', X = HydrolysisReactor.X_hydrolysis),
+                                  Rxn('Methyl_linoleate + Water  -> Methanol + Linoleic_acid','Methyl_linoleate', X = HydrolysisReactor.X_hydrolysis)])
                                   #Rxn('Methyl_palmitoleate + Water  -> Methanol + Palmitoleic_acid','Methyl_palmitoleate', X = 0.1), #Perhaps this can be ignored
                                   
                                   #Rxn('Methyl_oleate + Water  -> Methanol + Oleic_acid','Methyl_oleate', X = 0.1)])#Ignored, possible method for hydrolysis pdf doesn't dicuss these two reactions
@@ -248,21 +242,21 @@ class HydrolysisReactor(bst.BatchBioreactor):
             condensate,effluent, = self.outs
             condensate.mix_from(self.ins)
             self.reactions(condensate)
-            ms = self._multi_stream = MultiStream('ms', phases='lg')
-            ms.copy_like(condensate)
-            ms.vle(T = 120+273.15, P = 1000000)
-            if ms['g'].F_mol:
-                condensate.copy_like(ms['g'])
-                effluent.copy_like(ms['l'])    
+            ms_hr = self._multi_stream = MultiStream('ms_hr', phases='lg')
+            ms_hr.copy_like(condensate)
+            ms_hr.vle(T = 120+273.15, P = 1000000)
+            if ms_hr['g'].F_mol:
+                condensate.copy_like(ms_hr['g'])
+                effluent.copy_like(ms_hr['l'])    
             else:
-                ms.vle(T = 120+273.15 , P = 85000)   
-                if ms['g'].F_mol:
-                    condensate.copy_like(ms['g'])
-                    effluent.copy_like(ms['l'])  
+                ms_hr.vle(T = 120+273.15 , P = 85000)   
+                if ms_hr['g'].F_mol:
+                    condensate.copy_like(ms_hr['g'])
+                    effluent.copy_like(ms_hr['l'])  
                 else:
-                    ms.vle(T = 120+273.15 , P = 80000)              
-                    condensate.copy_like(ms['g'])
-                    effluent.copy_like(ms['l'])   
+                    ms_hr.vle(T = 120+273.15 , P = 80000)              
+                    condensate.copy_like(ms_hr['g'])
+                    effluent.copy_like(ms_hr['l'])   
         
 @cost(basis = 'Total_filter_area',
       ID = 'Vibrating inclined screen',
@@ -423,4 +417,64 @@ class AACrystalliser(bst.units.BatchCrystallizer):
                     solubility=x,
                     T = self.T)
         outlet.imass['s','Nonanoic_acid'] = feed.imass['Nonanoic_acid']        
+
+    # def __init__(self,ID,ins = (),outs=(), thermo=None,
+    #              T=None,
+    #              P=None,dT_hx_loop = None,
+    #              tau: Optional[float]=None,
+    #              V_wf: Optional[float]=None, 
+    #              V_max: Optional[float]=None,
+    #              length_to_diameter: Optional[float]=2, 
+    #              kW_per_m3: Optional[float]=0.985,
+    #              vessel_material: Optional[str]=None,
+    #              vessel_type: Optional[str]=None,
+    #              X_dih = None):
+    #     bst.CSTR.__init__(self,ID ='',
+    #                       ins = (),outs= (),
+    #                       thermo = None,
+    #                       T = None,
+    #                       P = None,
+    #                       dT_hx_loop = None,
+    #                       tau = None,
+    #                       V_wf=None, 
+    #                       V_max=None,
+    #                       length_to_diameter=2, 
+    #                       kW_per_m3=0.985,
+    #                       vessel_material=None,
+    #                       vessel_type = None,
+    #                       )
+    # self.X_dih = X_dih =0.99
+        # self.T = T
+        # self.P = P
+        # self.V_wf = 0.8
         
+        # self.vessel_material = 'Stainless steel 316' if vessel_material is None else vessel_material
+        # self.vessel_type = 'Vertical' if vessel_type is None else vessel_type
+    # def __init__(self,ID,ins,outs=(), thermo=None,
+    #              T=None,
+    #              P=None,dT_hx_loop = None,
+    #              tau: Optional[float]=None,
+    #              V_wf: Optional[float]=None, 
+    #              V_max: Optional[float]=None,
+    #              length_to_diameter: Optional[float]=2, 
+    #              kW_per_m3: Optional[float]=0.985,
+    #              vessel_material: Optional[str]=None,
+    #              vessel_type: Optional[str]=None,
+    #              X_oxidativecleavage = None,
+    #              X_decarboxylation = None,
+    #              X_side_rxn = None):
+    #     bst.CSTR.__init__(self,ID ='',
+    #                       ins = (),
+    #                       outs =(),
+    #                       thermo = None,
+    #                       T = None,
+    #                       P = None,
+    #                       dT_hx_loop = None,
+    #                       tau = None,
+    #                       V_wf=None, 
+    #                       V_max=None,
+    #                       length_to_diameter=2, 
+    #                       kW_per_m3=0.985,
+    #                       vessel_material=None,
+    #                       vessel_type = None,
+    #                       )               
