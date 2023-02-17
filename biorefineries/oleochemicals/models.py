@@ -43,14 +43,14 @@ get_system_cooling_water_duty = lambda: aa_baseline_sys.get_cooling_duty()/1e9
 get_NPV = lambda: azelaic_acid_tea.NPV
 metrics = [    
                # Metric('MPSP', get_MPSP, '$/kg'),
-               Metric('Total product yield', get_total_yield, '10^6 kg/yr'),
-               Metric('Product purity', get_purity, '%'),
+               # Metric('Total product yield', get_total_yield, '10^6 kg/yr'),
+               # Metric('Product purity', get_purity, '%'),
                # Metric('Total capital investment', get_overall_TCI, '10^6 $'),
                # Metric('Annual operating cost', get_operating_cost, '10^6 $/yr'),
                # Metric('Annual material cost', get_material_cost, '10^6 $/yr'),
                # Metric('Annual product sale', get_azelaic_acid_sale, '10^6 $/yr'),
-               # Metric('Total', get_system_heating_demand, '10^6 MJ/yr', ' Heating demand'),
-               # Metric('Total', get_system_cooling_water_duty, '10^6 MJ/yr', 'Cooling demand'),
+                Metric('Total', get_system_heating_demand, '10^6 MJ/yr', ' Heating demand'),
+                Metric('Total', get_system_cooling_water_duty, '10^6 MJ/yr', 'Cooling demand'),
                # Metric('NPV', get_NPV, '$', 'TEA')               
                ]
 model = Model(aa_baseline_sys, metrics)
@@ -101,7 +101,7 @@ def set_degassingcolumn_P(P_d):
 #5 nonanoic_acid_fraction_separation
 #Setting the lighter key recovery
 lb_Lr_D501 = 0.9
-ub_Lr_D501 = 0.9
+ub_Lr_D501 = 0.99
 @model.parameter(element=F_baseline.D501,
                  kind='coupled',
                  distribution=shape.Uniform(lb_Lr_D501,ub_Lr_D501))
@@ -110,7 +110,7 @@ def set_Lr_D501(Lr):
     
 ##Setting the heavier key recovery     
 lb_Hr_D501 = 0.9
-ub_Hr_D501 = 0.9
+ub_Hr_D501 = 0.99
 @model.parameter(element=F_baseline.D501,
                  kind='coupled',
                  distribution=shape.Uniform(lb_Hr_D501,ub_Hr_D501))
@@ -121,7 +121,7 @@ def set_Hr_D501(Hr):
 #6 separation of azelaic acid rich fraction and diols
 #Setting the lighter key recovery
 lb_Lr_D604 = 0.9
-ub_Lr_D604 = 0.9
+ub_Lr_D604 = 0.99
 @model.parameter(element=F_baseline.D604,
                  kind='coupled',
                  distribution=shape.Uniform(lb_Lr_D604,ub_Lr_D604))
@@ -130,7 +130,7 @@ def set_Lr_D604(Lr):
     
 ##Setting the heavier key recovery     
 lb_Hr_D604 = 0.9
-ub_Hr_D604 = 0.9
+ub_Hr_D604 = 0.99
 @model.parameter(element=F_baseline.D604,
                  kind='coupled',
                  distribution=shape.Uniform(lb_Hr_D604,ub_Hr_D604))
@@ -140,7 +140,7 @@ def set_Hr_D604(Hr):
 #7 separation of ligher boiling impurities from the azelaic acid product stream
 #Setting the lighter key recovery
 lb_Lr_D605 = 0.9
-ub_Lr_D605 = 0.9
+ub_Lr_D605 = 0.99
 @model.parameter(element=F_baseline.D605,
                  kind='coupled',
                  distribution=shape.Uniform(lb_Lr_D605,ub_Lr_D605))
@@ -149,7 +149,7 @@ def set_Lr_D605(Lr):
     
 ##Setting the heavier key recovery     
 lb_Hr_D605 = 0.9
-ub_Hr_D605 = 0.9
+ub_Hr_D605 = 0.99
 @model.parameter(element=F_baseline.D605,
                  kind='coupled',
                  distribution=shape.Uniform(lb_Hr_D605,ub_Hr_D605))

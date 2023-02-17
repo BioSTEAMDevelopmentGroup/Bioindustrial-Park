@@ -198,10 +198,12 @@ def dihydroxylation_system(ins,outs):
     def adjust_tungsten_catalyst_flow():
       tungstencatalyst_mass_factor =   0.0078
       moles_of_unsaturation = biodiesel.imol['Methyl_oleate']+ 2*biodiesel.imol['Methyl_linoleate'] + biodiesel.imol['Methyl_palmitoleate'] 
-      moles_of_tungstic_acid_required = tungstencatalyst_mass_factor*moles_of_unsaturation 
-      T102.outs[0].imol['Tungstic_acid'] = moles_of_tungstic_acid_required - recovered_tungstic_acid.imol['Tungstic_acid'] 
+#Since tungstic acid needs to be replaced every 6 cycles, per cycle 1/6th of the required needs to be added      
+      moles_of_tungstic_acid_required_per_cycle = tungstencatalyst_mass_factor*moles_of_unsaturation*(1/6)
+      M101.ins[0].imol['Tungstic_acid'] = fta_mol = fresh_tunsgten_catalyst = moles_of_tungstic_acid_required_per_cycle - recovered_tungstic_acid.imol['Tungstic_acid'] 
+      # M101.ins[0].imol['Tungstic_acid'] = fta_mol 
       T102._run()
-    T102.add_specification(adjust_tungsten_catalyst_flow, run=True,impacted_units = [M101])
+    M101.add_specification(adjust_tungsten_catalyst_flow, run=True,impacted_units = [T102])
     
 #acc. to the patent tungstic acid is preferably 0.06% and 1.5% by moles with respect to the total moles of unsaturations
 #TODO: WHEN CALCIUM TUNGSTATE REACTION HAPPENS AT 0.9 THIS FAILS, FIX THIS
@@ -224,10 +226,11 @@ def dihydroxylation_system(ins,outs):
                                                   outs = (condensate,
                                                           'diol_product'                                        
                                                           ),
-                                                  P = 0.2*1E5,
+                                                  P = 0.1*1E5,
                                                   T = 62 + 273.15, #specs based on the patent
                                                   tau = 6, #residence time based on the patent
                                                  )
+       
 # Pumping the mixture out using a gear pump to the oxidative cleavage section
     R101_P1 = bst.units.Pump('R101_P1',
                               ins = R101-1,
@@ -292,8 +295,10 @@ def oxidative_cleavage_system(ins,outs):
     
 #Cobalt catalyst required is preferably between 0.3% and 1.5% by moles of diol molecules    
     def adjust_catalyst_flowrates():
+        cycles_of_reuse = 6 #TODO: Assumption, coudnt find any literature
         cobaltcatalyst_mass_factor = 0.009 #based on the average of 0.3% and 1.5%  
         total_diol_moles =  M201.outs[0].imol['MDHSA'] + M201.outs[0].imol['Methyl_9_10_dihydroxylinoleate'] + M201.outs[0].imol['Dihydroxy_palmitic_acid']     
+        total_diol_moles_per_cycle = total_diol_moles/cycles_of_reuse
         total_incoming_cobalt_catalyst_moles = recovered_mixture_of_cobalt_catalyst.imol['Cobalt_chloride'] + recovered_mixture_of_cobalt_catalyst.imol['Cobalt_hydroxide']
         a = ((cobaltcatalyst_mass_factor*total_diol_moles) - total_incoming_cobalt_catalyst_moles)*chems['Cobalt_acetate_tetrahydrate'].MW 
         T202.ins[0].imass['Cobalt_acetate_tetrahydrate'] = a
@@ -412,7 +417,7 @@ def degassing_the_oily_phase(ins,outs):
                             outs = (wastewater2_to_boilerturbogenerator,
                                     dried_crude_fatty_acids),                            
                             T = 60+273.15,#temperature adjusted to get water out
-                            P = 20000 #Based on dihydroxylation reactors pressure set to evaporate water
+                            P = 10000 #Based on dihydroxylation reactors pressure set to evaporate water
                                   )
 
                
@@ -509,8 +514,8 @@ def azelaic_acid_production(ins,outs):
     T602 = bst.StorageTank(ID = 'T602_hydrolysis_resin_tank',
                             ins = bst.Stream( ID = 'polystyrene_based_catalyst',
                                               polystyrene_based_catalyst= 1,
-                                              units = 'kg/hr',
-                                              price = 130/28.31),#$40 to $200 per 28.31L(1 cubic foot) Ref: Cost of a strong cation exchanger resin: https://samcotech.com/how-much-does-it-cost-to-buy-maintain-and-dispose-of-ion-exchange-resins/
+                                              units = 'kg/hr',#The disposal costs are included in this
+                                              price = 130/28.31 + 0.04),#$40 to $200 per 28.31L(1 cubic foot) Ref: Cost of a strong cation exchanger resin: https://samcotech.com/how-much-does-it-cost-to-buy-maintain-and-dispose-of-ion-exchange-resins/
                             outs = ('resin_to_HydrolysisSystem')) 
     R601 = units_baseline.HydrolysisSystem(ID = 'R601',
                                             ins = (crude_heavy_fatty_acids,
@@ -843,19 +848,16 @@ def catalyst_recovery_from_aqueous_stream (ins,outs):
         #ratio based on 10ml of water used for dilution of 0.71g of Tungstic acid
         water_for_precipitate_washing.imass['Water'] = 7.142* S702.ins[0].imass['Tungstic_acid']
     S702.add_specification(adjust_water_for_precipitate_washing, run=True)
-    
-    def checking_tungstic_acid_mass_balance(): 
-        F_baseline.M101._run()
-        F_baseline.M102._run()
-        S702._run()
-        tungstencatalyst_mass_factor =   0.0078
-        moles_of_unsaturation = F_baseline.M102.ins[2].imol['Methyl_oleate']+ 2*F_baseline.M102.ins[2].imol['Methyl_linoleate'] + F_baseline.M102.ins[2].imol['Methyl_palmitoleate'] 
-        total_moles_of_tungstic_acid_required = tungstencatalyst_mass_factor*moles_of_unsaturation 
-        moles_of_tungstic_acid_recovered =  S702.outs[0].imol['Tungstic_acid']
-        fresh_moles_of_tungstic_acid = total_moles_of_tungstic_acid_required - moles_of_tungstic_acid_recovered
-        F_baseline.T102.outs[0].imol['Tungstic_acid'] = fresh_moles_of_tungstic_acid
-    F_baseline.T102.add_specification(checking_tungstic_acid_mass_balance, run=True,impacted_units = [F_baseline.M101])          
 
+# #Tungstic acid to be disposed later is collected into this tank
+#     T703 = bst.StorageTank('T703',
+#                            ins =  S702-0,
+#                            )
+#Tungstic acid can be recycled upto 6 times Ref: Comparative Analysis of Bio-based Azelaic Acid Synthesis Methods and Techno-Economic Evaluation of Theoretical Process Design     
+#Cost of disposing an inert solid catalyst to a landfill is 50$/ton Ref: Estimating Variable Production Costs - section on waste disposal costs
+#Ref book for tungstic acid waste disposal: Chemical Engineering Design Principles, Practice and Economics of Plant and Process Design By Gavin Towler, Ray Sinnott   
+     
+    
 # Add calcium hydroxide again to neutralise remaining HCl 
     M703 = bst.MixTank(ID = 'M703',
                         ins = (S702-1,
@@ -866,11 +868,10 @@ def catalyst_recovery_from_aqueous_stream (ins,outs):
         M703.ins[1].imass['Calcium_hydroxide']= 0.5*S702.outs[1].imol['Liquid_HCl']*chems['Calcium_hydroxide'].MW/1000
         Sp701._run()
     M703.add_specification(adjust_CaOH2,run = True)
-#Tungstic acid can be recycled upto 6 times Ref: Comparative Analysis of Bio-based Azelaic Acid Synthesis Methods and Techno-Economic Evaluation of Theoretical Process Design     
-#TODO: ask Yoel what to do about the tungstic acid disposal
-#Cost of disposing an inert solid catalyst to a landfill is 50$/ton Ref: Estimating Variable Production Costs - section on waste disposal costs
-#Ref book for tungstic acid waste disposal: Chemical Engineering Design Principles, Practice and Economics of Plant and Process Design By Gavin Towler, Ray Sinnott   
- 
+# #Cobalt catalyst to be disposed off later    
+#     T704 =bst.StorageTank('T704',
+#                           ins = S702-0,
+#                           )
 
 #########################################################################################################
 #Solvent recovery area (800 level)
@@ -968,9 +969,9 @@ def aa_baseline_sys(ins,outs):
                                                                                                                          #GREET for HP   
                                                 units = 'kg/hr'),
                                     bst.Stream(ID = 'fresh_tungsten_catalyst',
-                                                Tungstic_acid = 1,
+                                                Tungstic_acid = 1, #price for this has been corrected to account for its disposal
                                                 characterization_factors= ({'GWP100':6.85*10000/1000 }),#TODO:Value for tungstic acid was unavailable, therefore tungsten carbide value was assumed Ref: http://dx.doi.org/10.1016/j.jclepro.2017.02.184
-                                                price = 250),#Price for 98% pure tungstic acid#https://www.combi-blocks.com/cgi-bin/find.cgi?QF-0617
+                                                price = 250 + 0.04 ),#Price for 98% pure tungstic acid#https://www.combi-blocks.com/cgi-bin/find.cgi?QF-0617
                                     recovered_tungstic_acid,
                                     ob0.outs[1] #biodiesel from previous section
                                     ))
@@ -987,7 +988,7 @@ def aa_baseline_sys(ins,outs):
                                                         Water = 1- 1.5/100,
                                                         characterization_factors = {'GWP100',7.2691},#Greet, value based on cobalt nitrate),
                                                         units = 'kg/hr',
-                                                        price = 48.5),#Price available for 10Kg by Inframet
+                                                        price = 48.5 + 0.04),#Price available for 10Kg by Inframet
                                             recovered_mixture_of_cobalt_catalyst))
     ob3 = organic_phase_separation(ins = ob2.outs[1]) 
     ob4 =  degassing_the_oily_phase(ins = ob3.outs[0])
@@ -1019,7 +1020,6 @@ def aa_baseline_sys(ins,outs):
                                                   bst.Stream(ID = 'lighter_boiling_impurities_to_boilerturbogenerator'),
                                                   bst.Stream(ID = 'heavy_boiling_compounds_to_boilerturbogenerator'),
                                                   bst.Stream(ID = 'azelaic_acid_product_stream')))
-    # ob6.recycle = recycled_diols_and_other_fatty_acids
     ob7 = catalyst_recovery_from_aqueous_stream(ins = (bst.Stream(ID ='calcium_hydroxide',
                                                                   Calcium_hydroxide = 1,
                                                                   units = 'kg/hr',
@@ -1215,3 +1215,17 @@ bst.rename_unit(unit = F_baseline.F2001, area = 2000)
 # #                                                      biodiesel_prep_units))
 aa_baseline_groups = bst.UnitGroup.group_by_area(aa_baseline_sys.units)
 
+    
+#     def checking_tungstic_acid_mass_balance(): 
+#         F_baseline.M101._run()
+#         F_baseline.M102._run()
+#         S702._run()
+#         tungstencatalyst_mass_factor =   0.0078
+#         moles_of_unsaturation = F_baseline.M102.ins[2].imol['Methyl_oleate']+ 2*F_baseline.M102.ins[2].imol['Methyl_linoleate'] + F_baseline.M102.ins[2].imol['Methyl_palmitoleate'] 
+# #Since tungstic acid needs to be replaced every 6 cycles, we will use 1/6th of the amount
+# #total_moles_of_tungstic_acid_required*1/6
+#         total_moles_of_tungstic_acid_required = tungstencatalyst_mass_factor*moles_of_unsaturation
+#         moles_of_tungstic_acid_recovered =  S702.outs[0].imol['Tungstic_acid']
+#         fresh_moles_of_tungstic_acid = total_moles_of_tungstic_acid_required - moles_of_tungstic_acid_recovered
+#         F_baseline.T102.outs[0].imol['Tungstic_acid'] = fresh_moles_of_tungstic_acid
+#     F_baseline.T102.add_specification(checking_tungstic_acid_mass_balance, run=True,impacted_units = [F_baseline.M101])          

@@ -57,17 +57,20 @@ class DihydroxylationReactor(bst.CSTR):
                                             ])            
             DihydroxylationReactor_rxnsys = RxnSys(Dihydroxylation_reaction)
             self.reactions = DihydroxylationReactor_rxnsys                       
-          
+#The total amount of water evaporated is the total water added in the system          
     def _run(self):  
             feed = self.ins[0]
+            moles_water = feed.imol['Water']
+            feed.imol['Water'] = moles_water*0.1 #considering only 90% of water can be evaporated in the condensate
             condensate,effluent, = self.outs
-            condensate.mix_from(self.ins)
-            self.reactions(condensate)
-            ms_dih = self._multi_stream = MultiStream('ms_dih', phases='lg')
-            ms_dih.copy_like(condensate)
-            ms_dih.vle(T = self.T, P = self.P)
-            condensate.copy_like(ms_dih['g'])
-            effluent.copy_like(ms_dih['l'])
+            self.reactions(feed)
+            effluent.copy_like(feed)
+            #ms_dih = self._multi_stream = MultiStream('ms_dih', phases='lg')
+            #ms_dih.copy_like(condensate)
+            #ms_dih.vle(T = self.T, P = self.P)
+            condensate.imol['Water'] = moles_water*0.9 #TODO: change this later!
+            self.ins[0].imol['Water'] = moles_water
+            # effluent.copy_like(ms_dih['l'])
             
      
 class OxidativeCleavageReactor(bst.CSTR):
@@ -348,28 +351,38 @@ class HydrolysisSystem(bst.Unit,isabstract = True):
             tops_1,bottoms_1,tops_2,bottoms_2,tops_3,bottoms_3,organic_mixture, = self.outs            
             self.hydrolysis_column_1.ins[0].copy_like(fatty_ester_feed)
             self.hydrolysis_column_1.ins[1].copy_like(water_feed_1)
-            self.hydrolysis_column_1.simulate()             
-            self.distillation_column_1.simulate()
+            self.hydrolysis_column_1._setup()
+            self.hydrolysis_column_1._run()             
+            self.distillation_column_1._setup()
+            self.distillation_column_1._run()
             tops_1.copy_like(self.distillation_column_1.outs[0])
             bottoms_1.copy_like(self.distillation_column_1.outs[1]) 
-            self.holding_tank_1.simulate()
+            self.holding_tank_1._setup()
+            self.holding_tank_1._run()
             Fatty_acid_mass_2 = self.holding_tank_1.outs[0].F_mass
             water_feed_2 = bst.Stream('water_feed_2', Water = 1, units = 'kg/hr',total_flow = (5/85)*Fatty_acid_mass_2)
             self.hydrolysis_column_2.ins[1].copy_like(water_feed_2)
-            self.hydrolysis_column_2.simulate()
-            self.distillation_column_2.simulate()
+            self.hydrolysis_column_2._setup()
+            self.hydrolysis_column_2._run()
+            self.distillation_column_2._setup()
+            self.distillation_column_2._run()
             tops_2.copy_like(self.distillation_column_2.outs[0])
             bottoms_2.copy_like(self.distillation_column_2.outs[1])
-            self.holding_tank_2.simulate()
+            self.holding_tank_2._setup()
+            self.holding_tank_2._run()
             Fatty_acid_mass_3 = self.holding_tank_2.outs[0].F_mass
             water_feed_3 = bst.Stream('water_feed_3', Water = 1, units = 'kg/hr',total_flow = (5/85)*Fatty_acid_mass_3)
             self.hydrolysis_column_3.ins[1].copy_like(water_feed_3)
-            self.hydrolysis_column_3.simulate()
-            self.distillation_column_3.simulate()
+            self.hydrolysis_column_3._setup()
+            self.hydrolysis_column_3._run()
+            self.distillation_column_3._setup()
+            self.distillation_column_3._run()
             tops_3.copy_like(self.distillation_column_2.outs[0])
             bottoms_3.copy_like(self.distillation_column_2.outs[1])
             organic_mixture.copy_like(self.hydrolysis_column_3.outs[1])
+            
     def _design(self):
+        for i in self.auxiliary_units: i._summary()
         self.design_results['Total_filter_area']= self.ins[2].F_mass/(3600*3) #TODO: check what this is, 
         #Solid flux = 2-5 Kg/s.m^2 #Ref: Rule of thumb 184 oage number ask Yoel
                    
