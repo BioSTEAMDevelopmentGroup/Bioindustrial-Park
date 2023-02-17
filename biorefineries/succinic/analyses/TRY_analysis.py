@@ -321,11 +321,11 @@ get_product_GWP = lambda: succinic_LCA.GWP
 get_product_FEC = lambda: succinic_LCA.FEC
 # get_rel_impact_t_y = lambda: rel_impact_fn(steps)
 
-succinic_metrics = [get_product_MPSP, get_product_purity, get_production]
+succinic_metrics = [get_product_MPSP, get_product_GWP, get_product_FEC]
 # succinic_metrics = [get_succinic_MPSP, get_GWP, get_FEC]
 
 # %% Generate 3-specification meshgrid and set specification loading functions
-steps = 3
+steps = 50
 
 # Neutralization
 spec.neutralization = False
@@ -364,8 +364,8 @@ for p in productivities:
     np.save(succinic_results_filepath+file_to_save, data_1)
     
     pd.DataFrame(data_1[:, :, 0, :][:,:,0]/907.185).to_csv(succinic_results_filepath+'MPSP-'+file_to_save+'.csv')
-    pd.DataFrame(data_1[:, :, 1, :][:,:,0]).to_csv(succinic_results_filepath+'product_purity-'+file_to_save+'.csv')
-    pd.DataFrame(data_1[:, :, 2, :][:,:,0]*succinic_tea.operating_hours).to_csv(succinic_results_filepath+'production_capacity-'+file_to_save+'.csv')
+    pd.DataFrame(data_1[:, :, 1, :][:,:,0]).to_csv(succinic_results_filepath+'GWP-'+file_to_save+'.csv')
+    pd.DataFrame(data_1[:, :, 2, :][:,:,0]*succinic_tea.operating_hours).to_csv(succinic_results_filepath+'FEC-'+file_to_save+'.csv')
     
     
     # %% Load previously saved data
@@ -458,6 +458,11 @@ for p in productivities:
 import contourplots
 
 chdir(succinic_results_filepath)
+
+MPSP_units = r"$\mathrm{\$}\cdot\mathrm{kg}^{-1}$"
+GWP_units = r"$\mathrm{kg}$"+" "+ r"$\mathrm{CO}_{2}\mathrm{-eq.}\cdot\mathrm{kg}^{-1}$"
+FEC_units = r"$\mathrm{MJ}\cdot\mathrm{kg}^{-1}$"
+
 # yields = np.linspace(0.4, 0.9, steps) # x axis values
 # titers = np.linspace(40., 120., steps) # y axis values
 # productivities = np.arange(0.1, 2.1, 0.1) # z axis values
@@ -481,9 +486,10 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_1, 
                                 x_units=r"$\mathrm{\% theoretical}$",
                                 y_units=r"$\mathrm{g} \cdot \mathrm{L}^{-1}$",
                                 z_units=r"$\mathrm{g} \cdot \mathrm{L}^{-1}  \cdot \mathrm{h}^{-1}$",
-                                w_units=r"$\mathrm{\$} \cdot \mathrm{kg}^{-1}$",
+                                w_units=MPSP_units,
                                 fmt_clabel=lambda cvalue: "{:.2f}".format(cvalue), # format of contour labels
                                 cmap=CABBI_green_colormap(), # can use 'viridis' or other default matplotlib colormaps
+                                cbar_ticks=np.arange(1.0, 2.3, 0.2),
                                 z_marker_color='g', # default matplotlib color names
                                 axis_title_fonts={'size': {'x': 14, 'y':14, 'z':14, 'w':14},},
                                 fps=3, # animation frames (z values traversed) per second
@@ -500,19 +506,20 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_2, 
                                 x_label=r"$\bfYield$", # title of the x axis
                                 y_label=r"$\bfTiter$", # title of the y axis
                                 z_label=r"$\bfProductivity$", # title of the z axis
-                                w_label=r"$\bfMPSP$", # title of the color axis
+                                w_label=r"$\mathrm{\bfGWP}_{\bf100}$", # title of the color axis
                                 x_ticks=[20, 30, 40, 50, 60, 70, 80],
                                 # y_ticks=[30, 50, 70, 90, 110, 130],
                                 y_ticks=[20, 40, 60, 80, 100, 120],
                                 z_ticks=np.arange(0.0, 2.5, 0.5),
-                                w_levels=np.arange(1.0, 2.3, 0.1), # levels for unlabeled, filled contour areas (labeled and ticked only on color bar)
-                                w_ticks=np.array([1.1, 1.2, 1.3,  1.5, 1.8, 2.2]), # labeled, lined contours; a subset of w_levels
+                                w_levels=np.arange(0.0, 5.5, 0.5), # levels for unlabeled, filled contour areas (labeled and ticked only on color bar)
+                                w_ticks=np.array([1, 2, 3, 5,]), # labeled, lined contours; a subset of w_levels
                                 x_units=r"$\mathrm{\% theoretical}$",
                                 y_units=r"$\mathrm{g} \cdot \mathrm{L}^{-1}$",
                                 z_units=r"$\mathrm{g} \cdot \mathrm{L}^{-1}  \cdot \mathrm{h}^{-1}$",
-                                w_units=r"$\mathrm{\$} \cdot \mathrm{kg}^{-1}$",
+                                w_units=GWP_units,
                                 fmt_clabel=lambda cvalue: "{:.2f}".format(cvalue), # format of contour labels
                                 cmap=CABBI_green_colormap(), # can use 'viridis' or other default matplotlib colormaps
+                                cbar_ticks=np.arange(0.0, 6., 1.),
                                 z_marker_color='g', # default matplotlib color names
                                 axis_title_fonts={'size': {'x': 14, 'y':14, 'z':14, 'w':14},},
                                 fps=3, # animation frames (z values traversed) per second
@@ -530,19 +537,20 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_3, 
                                 x_label=r"$\bfYield$", # title of the x axis
                                 y_label=r"$\bfTiter$", # title of the y axis
                                 z_label=r"$\bfProductivity$", # title of the z axis
-                                w_label=r"$\bfMPSP$", # title of the color axis
+                                w_label=r"$\bfFEC$", # title of the color axis
                                 x_ticks=[20, 30, 40, 50, 60, 70, 80],
                                 # y_ticks=[30, 50, 70, 90, 110, 130],
                                 y_ticks=[20, 40, 60, 80, 100, 120],
                                 z_ticks=np.arange(0.0, 2.5, 0.5),
-                                w_levels=np.arange(1.0, 2.3, 0.1), # levels for unlabeled, filled contour areas (labeled and ticked only on color bar)
-                                w_ticks=np.array([1.1, 1.2, 1.3,  1.5, 1.8, 2.2]), # labeled, lined contours; a subset of w_levels
+                                w_levels=np.arange(-30, 90, 10), # levels for unlabeled, filled contour areas (labeled and ticked only on color bar)
+                                w_ticks=np.array([-20, 0, 10, 20, 50, 80]), # labeled, lined contours; a subset of w_levels
                                 x_units=r"$\mathrm{\% theoretical}$",
                                 y_units=r"$\mathrm{g} \cdot \mathrm{L}^{-1}$",
                                 z_units=r"$\mathrm{g} \cdot \mathrm{L}^{-1}  \cdot \mathrm{h}^{-1}$",
-                                w_units=r"$\mathrm{\$} \cdot \mathrm{kg}^{-1}$",
+                                w_units=FEC_units,
                                 fmt_clabel=lambda cvalue: "{:.2f}".format(cvalue), # format of contour labels
                                 cmap=CABBI_green_colormap(), # can use 'viridis' or other default matplotlib colormaps
+                                cbar_ticks=np.arange(-30, 90, 20),
                                 z_marker_color='g', # default matplotlib color names
                                 axis_title_fonts={'size': {'x': 14, 'y':14, 'z':14, 'w':14},},
                                 fps=3, # animation frames (z values traversed) per second

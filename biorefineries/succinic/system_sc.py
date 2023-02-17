@@ -39,7 +39,7 @@ from biorefineries.make_a_biorefinery.auto_waste_management import AutoWasteMana
 from biorefineries.cellulosic import create_facilities
 
 
-from hxn._heat_exchanger_network import HeatExchangerNetwork
+# from hxn._heat_exchanger_network import HeatExchangerNetwork
 from biorefineries.sugarcane import create_juicing_system_up_to_clarification
 
 from contourplots import stacked_bar_plot
@@ -1044,24 +1044,6 @@ def plot_carbon_flow():
     # fig.show()
     # fig.write_image("fig1.png")
 
-#%% GHG-100
-## GREET 2022
-# succinic acid, succinic acid bioproduct from sugars (corn stover): 0.7036 kg-CO2-eq/kg-SA
-
-#%% IPCC 2013 GWP100a
-
-## ecoinvent 3.8
-# succinic acid production, GLO: 3.182 kgCO2-eq/kg-SA
-# market for succinic acid, GLO: 3.2322 kgCO2-eq/kg-SA
-
-#%% FEC
-
-## ecoinvent 3.8
-# succinic acid production, GLO: 67.463 MJ-eq/kg-SA
-# market for succinic acid, GLO: 68.19 MJ-eq/kg-SA
-
-## GREET 2022
-# succinic acid, succinic acid bioproduct from sugars (corn stover): 26 MJ-eq/kg-SA (of which all 26 MJ-eq/kg-SA from natural gas)
 
 
 #%% Plot figures

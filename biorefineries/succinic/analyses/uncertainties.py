@@ -32,7 +32,7 @@ from datetime import datetime
 from biosteam.utils import TicToc
 import os
 
-# chdir = os.chdir
+chdir = os.chdir
 succinic_filepath = succinic.__file__.replace('\\__init__.py', '')
 succinic_results_filepath = succinic_filepath + '\\analyses\\results\\'
 model = models.succinic_model
@@ -47,7 +47,7 @@ get_adjusted_MSP = models.get_adjusted_MSP
 
 # %% 
 
-N_simulations_per_mode = 10 # 2000
+N_simulations_per_mode = 2000 # 2000
 
 percentiles = [0, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 1]
 
@@ -58,9 +58,14 @@ results_dict = {'Baseline':{'MPSP':{}, 'GWP100a':{}, 'FEC':{},
                 'Uncertainty':{'MPSP':{}, 'GWP100a':{}, 'FEC':{}},
                 'Sensitivity':{'Spearman':{'MPSP':{}, 'GWP100a':{}, 'FEC':{}}},}
 
-modes = ['lab_batch', 'lab_fed-batch', 'pilot_batch']
+modes = [
+            'lab_batch',
+           'lab_fed-batch', 
+           'pilot_batch',
+         ]
 
-parameter_distributions_filenames = ['parameter-distributions_lab-scale_batch.xlsx',
+parameter_distributions_filenames = [
+                                    'parameter-distributions_lab-scale_batch.xlsx',
                                     'parameter-distributions_lab-scale_fed-batch.xlsx',
                                     'parameter-distributions_pilot-scale_batch.xlsx',
                                     ]
@@ -244,10 +249,12 @@ for mode in modes:
 # %% Plots
 import contourplots
 
-                
+MPSP_units = r"$\mathrm{\$}\cdot\mathrm{kg}^{-1}$"
+GWP_units = r"$\mathrm{kg}$"+" "+ r"$\mathrm{CO}_{2}\mathrm{-eq.}\cdot\mathrm{kg}^{-1}$"
+FEC_units = r"$\mathrm{MJ}\cdot\mathrm{kg}^{-1}$"
 #%% Uncertainty
 
-## MPSP
+#%% MPSP
 MPSP_uncertainty = [results_dict['Uncertainty']['MPSP'][modes[0]],
                     results_dict['Uncertainty']['MPSP'][modes[1]],
                     results_dict['Uncertainty']['MPSP'][modes[2]]]
@@ -255,25 +262,30 @@ market_range = (2.53, 2.89)
 biobased_lit_MPSP_range = (1.08, 3.63)
 
 contourplots.box_and_whiskers_plot(uncertainty_data=MPSP_uncertainty, 
-                          baseline_values=[results_dict['Baseline']['MPSP'][mode] for mode in modes], 
+                          baseline_values=[results_dict['Baseline']['MPSP'][mode] for mode in modes],
+                          baseline_marker_shapes=["p", "s", "D"],
+                          baseline_marker_sizes=[10, 6, 6,],
                           baseline_locations=[1,2,3],
                           baseline_marker_colors=['w','w','w'],
+                          boxcolor="#A97802",
                           ranges_for_comparison=[biobased_lit_MPSP_range, market_range],
                           ranges_for_comparison_colors=['#c0c1c2', '#646464'],
                           values_for_comparison=[],
                           n_minor_ticks=1,
                           show_x_ticks=True,
-                          x_tick_labels=['Lab scale [batch]', 'Lab scale [fed-batch]', 'Pilot scale [batch]'],
+                          x_tick_labels=['Lab. scale [bat.]', 'Lab. scale [f.bat.]', 'Pilot scale [bat.]'],
+                          x_tick_wrap_width=6,
                           y_label=r"$\bfMPSP$",
-                          y_units=r"$\mathrm{\$}\cdot\mathrm{kg}^{-1}$",
+                          y_units=MPSP_units,
                           y_ticks=np.arange(0., 5., 0.5),
                           save_file=True,
-                          fig_width = 5.,
+                          fig_height=5.5,
+                          fig_width = 3.,
                           box_width=0.65,
                           filename=file_to_save+'_uncertainty_MPSP',
                           dpi=600,)
 
-## GWP100a
+#%% GWP100a
 GWP_uncertainty = [results_dict['Uncertainty']['GWP100a'][modes[0]],
                     results_dict['Uncertainty']['GWP100a'][modes[1]],
                     results_dict['Uncertainty']['GWP100a'][modes[2]]]
@@ -282,25 +294,30 @@ GWP_uncertainty = [results_dict['Uncertainty']['GWP100a'][modes[0]],
 biobased_lit_GWP_values = [1, 2, 3] #!!!
 contourplots.box_and_whiskers_plot(uncertainty_data=GWP_uncertainty, 
                           baseline_values=[results_dict['Baseline']['GWP100a'][mode] for mode in modes], 
+                          baseline_marker_shapes=["p", "s", "D"],
+                          baseline_marker_sizes=[10, 6, 6,],
                           baseline_locations=[1,2,3],
                           baseline_marker_colors=['w','w','w'],
+                          boxcolor='#607429',
                           # ranges_for_comparison=[biobased_lit_MPSP_range, market_range],
                           # ranges_for_comparison_colors=['#c0c1c2', '#646464'],
                           values_for_comparison=biobased_lit_GWP_values,
                           n_minor_ticks=1,
                           show_x_ticks=True,
-                          x_tick_labels=['Lab scale [batch]', 'Lab scale [fed-batch]', 'Pilot scale [batch]'],
+                          x_tick_labels=['Lab. scale [bat.]', 'Lab. scale [f.bat.]', 'Pilot scale [bat.]'],
+                          x_tick_wrap_width=6,
                           # y_label=r"$\bfGWP-100a$",
                           y_label=r"$\mathrm{\bfGWP}_{\bf100}$",
-                          y_units=r"$\mathrm{kg CO}^{2}\mathrm{-eq.}\cdot\mathrm{kg}^{-1}$",
+                          y_units=GWP_units,
                           y_ticks=np.arange(0., 5., 0.5),
                           save_file=True,
-                          fig_width = 5.,
+                          fig_height=5.5,
+                          fig_width = 3.,
                           box_width=0.65,
                           filename=file_to_save+'_uncertainty_GWP100a',
                           dpi=600,)
 
-## FEC
+#%% FEC
 FEC_uncertainty = [results_dict['Uncertainty']['FEC'][modes[0]],
                     results_dict['Uncertainty']['FEC'][modes[1]],
                     results_dict['Uncertainty']['FEC'][modes[2]]]
@@ -309,19 +326,24 @@ FEC_uncertainty = [results_dict['Uncertainty']['FEC'][modes[0]],
 biobased_lit_FEC_values = [1, 2, 3] #!!!
 contourplots.box_and_whiskers_plot(uncertainty_data=FEC_uncertainty, 
                           baseline_values=[results_dict['Baseline']['FEC'][mode] for mode in modes], 
+                          baseline_marker_shapes=["p", "s", "D"],
+                          baseline_marker_sizes=[10, 6, 6,],
                           baseline_locations=[1,2,3],
                           baseline_marker_colors=['w','w','w'],
+                          boxcolor='#A100A1',
                           # ranges_for_comparison=[biobased_lit_MPSP_range, market_range],
                           # ranges_for_comparison_colors=['#c0c1c2', '#646464'],
                           values_for_comparison=biobased_lit_FEC_values,
                           n_minor_ticks=1,
                           show_x_ticks=True,
-                          x_tick_labels=['Lab scale [batch]', 'Lab scale [fed-batch]', 'Pilot scale [batch]'],
+                          x_tick_labels=['Lab. scale [bat.]', 'Lab. scale [f.bat.]', 'Pilot scale [bat.]'],
+                          x_tick_wrap_width=6,
                           y_label=r"$\bfFEC$",
-                          y_units=r"$\mathrm{MJ}\cdot\mathrm{kg}^{-1}$",
-                          y_ticks=np.arange(-10, 10., 1.),
+                          y_units=FEC_units,
+                          y_ticks=np.arange(-20, 20., 5.),
                           save_file=True,
-                          fig_width = 5.,
+                          fig_height=5.5,
+                          fig_width = 3.,
                           box_width=0.65,
                           filename=file_to_save+'_uncertainty_FEC',
                           dpi=600,)
@@ -344,7 +366,8 @@ contourplots.stacked_bar_plot(dataframe=df_TEA_breakdown,
                  y_units = "%", 
                  colors=['#7BBD84', '#F7C652', '#63C6CE', '#94948C', '#734A8C', '#D1C0E1', '#648496', '#B97A57', '#D1C0E1', '#F8858A', '#F8858A', ],
                  # 'red', 'magenta'],
-                 filename=file_to_save+'TEA_breakdown_stacked_bar_plot')
+                 filename=file_to_save+'TEA_breakdown_stacked_bar_plot',
+                 fig_height=5.5*1.1777*0.94*1.0975)
 
 #%%
 
@@ -371,15 +394,15 @@ contourplots.stacked_bar_plot(dataframe=df_GWP_breakdown,
                   # y_ticks=[-400, -300, -200, -100, 0, 100, 200, 300, 400], 
                  # y_ticks = []
                  # y_label=r"$\bfGWP-100a $" +" "+ r"$\bfBreakdown$",  
-                 y_label =r"$\mathrm{\bfGWP}_{\bf100}$",
+                 y_label =r"$\mathrm{\bfGWP}_{\bf100}$" +" "+ r"$\bfBreakdown$",
                  y_units = "%", 
-                  colors=['#607429', '#E1F8C0', '#8FAE3E', 
+                  colors=['#E1F8C0', '#8FAE3E', '#607429', 
                           ],
                   hatch_patterns=('\\', '//', 'x',  '|',),
                   # '#94948C', '#734A8C', '#D1C0E1', '#648496', '#B97A57', '#F8858A', 'red', 'magenta'],
                  filename=file_to_save+'GWP_breakdown_stacked_bar_plot',
-                 fig_width=3,
-                 fig_height=5.5)
+                 fig_width=2,
+                 fig_height=5.5*1.1777*0.94)
 
 # FEC
 temp_FEC_breakdown_dict = results_dict['Baseline']['FEC Breakdown'][modes[2]]
@@ -402,43 +425,112 @@ contourplots.stacked_bar_plot(dataframe=df_FEC_breakdown,
                  y_label=r"$\bfFEC$" +" "+ r"$\bfBreakdown$", 
                  y_units = "%", 
                  # colors=['#7BBD84', '#F7C652', '#63C6CE', '#94948C', '#734A8C', '#D1C0E1', '#648496', '#B97A57', '#F8858A', 'magenta'],
-                 colors=['#A100A1', '#FEC1FE', '#FF80FF', 
+                 colors=['#FEC1FE', '#FF80FF', '#A100A1', 
                          ],
                  hatch_patterns=('\\', '//', 'x',  '|',),
                  filename=file_to_save+'FEC_breakdown_stacked_bar_plot',
-                 fig_width=3,
-                 fig_height=5.5)
+                 fig_width=2,
+                 fig_height=5.5*1.1777*0.94)
 
 #%% Spearman's rank order correlation coefficients
+from matplotlib import pyplot as plt
+chdir(succinic_results_filepath)
+plt.rcParams['font.sans-serif'] = "Arial"
+plt.rcParams['font.size'] = "7.5"
+
 bst_plots = bst.plots
 
-bst_plots.plot_spearman_1d(results_dict['Sensitivity']['Spearman']['MPSP'][modes[0]],
-                           index=[i.element_name + ': ' + i.name for i in model.parameters],
-                           name='Lab scale [batch] - MPSP [$/kg]')
-bst_plots.plot_spearman_1d(results_dict['Sensitivity']['Spearman']['GWP100a'][modes[1]],
-                           index=[i.element_name + ': ' + i.name for i in model.parameters],
-                           name='Lab scale [batch] - GWP100a [kg-CO2-eq./kg]')
-bst_plots.plot_spearman_1d(results_dict['Sensitivity']['Spearman']['FEC'][modes[2]],
-                           index=[i.element_name + ': ' + i.name for i in model.parameters],
-                           name='Lab scale [batch] - FEC [MJ/kg]')
+rho = r"$\mathrm{\rho}}$"
 
-bst_plots.plot_spearman_1d(results_dict['Sensitivity']['Spearman']['MPSP'][modes[0]],
+mode = modes[0]
+fig = bst_plots.plot_spearman_1d(results_dict['Sensitivity']['Spearman']['MPSP'][modes[0]],
                            index=[i.element_name + ': ' + i.name for i in model.parameters],
-                           name='Lab scale [fed-batch] - MPSP [$/kg]')
-bst_plots.plot_spearman_1d(results_dict['Sensitivity']['Spearman']['GWP100a'][modes[1]],
-                           index=[i.element_name + ': ' + i.name for i in model.parameters],
-                           name='Lab scale [fed-batch] - GWP100a [kg-CO2-eq./kg]')
-bst_plots.plot_spearman_1d(results_dict['Sensitivity']['Spearman']['FEC'][modes[2]],
-                           index=[i.element_name + ': ' + i.name for i in model.parameters],
-                           name='Lab scale [fed-batch] - FEC [MJ/kg]')
+                           name='MPSP - Lab scale [batch] '+"["+MPSP_units+"]", color="#A97802",
+                           xlabel_fn=lambda i: "Spearman's "+rho+ " with "+i)
+fig[0].savefig(mode+'MPSP-Spearman.png', dpi=600, bbox_inches='tight',
+            facecolor=fig[0].get_facecolor(),
+            transparent=False)
 
-bst_plots.plot_spearman_1d(results_dict['Sensitivity']['Spearman']['MPSP'][modes[0]],
+fig = bst_plots.plot_spearman_1d(results_dict['Sensitivity']['Spearman']['GWP100a'][modes[1]],
                            index=[i.element_name + ': ' + i.name for i in model.parameters],
-                           name='Pilot scale [batch] - MPSP [$/kg]')
-bst_plots.plot_spearman_1d(results_dict['Sensitivity']['Spearman']['GWP100a'][modes[1]],
+                           name='GWP100 - Lab scale [batch] '+"["+GWP_units+"]", color='#607429',
+                           xlabel_fn=lambda i: "Spearman's "+rho+ " with "+i)
+fig[0].savefig(mode+'GWP-Spearman.png', dpi=600, bbox_inches='tight',
+            facecolor=fig[0].get_facecolor(),
+            transparent=False)
+fig = bst_plots.plot_spearman_1d(results_dict['Sensitivity']['Spearman']['FEC'][modes[2]],
                            index=[i.element_name + ': ' + i.name for i in model.parameters],
-                           name='Pilot scale [batch] - GWP100a [kg-CO2-eq./kg]')
-bst_plots.plot_spearman_1d(results_dict['Sensitivity']['Spearman']['FEC'][modes[2]],
-                           index=[i.element_name + ': ' + i.name for i in model.parameters],
-                           name='Pilot scale [batch] - FEC [MJ/kg]')
+                           name='FEC - Lab scale [batch] '+"["+FEC_units+"]", color='#A100A1',
+                           xlabel_fn=lambda i: "Spearman's "+rho+ " with "+i)
+fig[0].savefig(mode+'FEC-Spearman.png', dpi=600, bbox_inches='tight',
+            facecolor=fig[0].get_facecolor(),
+            transparent=False)
 
+mode = modes[1]
+fig = bst_plots.plot_spearman_1d(results_dict['Sensitivity']['Spearman']['MPSP'][modes[0]],
+                           index=[i.element_name + ': ' + i.name for i in model.parameters],
+                           name='MPSP - Lab scale [fed-batch] '+"["+MPSP_units+"]", color="#A97802",
+                           xlabel_fn=lambda i: "Spearman's "+rho+ " with "+i)
+fig[0].savefig(mode+'MPSP-Spearman.png', dpi=600, bbox_inches='tight',
+            facecolor=fig[0].get_facecolor(),
+            transparent=False)
+
+fig = bst_plots.plot_spearman_1d(results_dict['Sensitivity']['Spearman']['GWP100a'][modes[1]],
+                           index=[i.element_name + ': ' + i.name for i in model.parameters],
+                           name='GWP100 - Lab scale [fed-batch] '+"["+GWP_units+"]", color='#607429',
+                           xlabel_fn=lambda i: "Spearman's "+rho+ " with "+i)
+fig[0].savefig(mode+'GWP-Spearman.png', dpi=600, bbox_inches='tight',
+            facecolor=fig[0].get_facecolor(),
+            transparent=False)
+
+fig = bst_plots.plot_spearman_1d(results_dict['Sensitivity']['Spearman']['FEC'][modes[2]],
+                           index=[i.element_name + ': ' + i.name for i in model.parameters],
+                           name='FEC - Lab scale [fed-batch] '+"["+FEC_units+"]", color='#A100A1',
+                           xlabel_fn=lambda i: "Spearman's "+rho+ " with "+i)
+fig[0].savefig(mode+'FEC-Spearman.png', dpi=600, bbox_inches='tight',
+            facecolor=fig[0].get_facecolor(),
+            transparent=False)
+
+mode = modes[2]
+fig = bst_plots.plot_spearman_1d(results_dict['Sensitivity']['Spearman']['MPSP'][modes[0]],
+                           index=[i.element_name + ': ' + i.name for i in model.parameters],
+                           name='MPSP - Pilot scale [batch] '+"["+MPSP_units+"]", color="#A97802",
+                           xlabel_fn=lambda i: "Spearman's "+rho+ " with "+i)
+fig[0].savefig(mode+'MPSP-Spearman.png', dpi=600, bbox_inches='tight',
+            facecolor=fig[0].get_facecolor(),
+            transparent=False)
+
+fig = bst_plots.plot_spearman_1d(results_dict['Sensitivity']['Spearman']['GWP100a'][modes[1]],
+                           index=[i.element_name + ': ' + i.name for i in model.parameters],
+                           name='GWP100 - Pilot scale [batch]a '+"["+GWP_units+"]", color='#607429',
+                           xlabel_fn=lambda i: "Spearman's "+rho+ " with "+i)
+fig[0].savefig(mode+'GWP-Spearman.png', dpi=600, bbox_inches='tight',
+            facecolor=fig[0].get_facecolor(),
+            transparent=False)
+
+fig = bst_plots.plot_spearman_1d(results_dict['Sensitivity']['Spearman']['FEC'][modes[2]],
+                           index=[i.element_name + ': ' + i.name for i in model.parameters],
+                           name='FEC - Pilot scale [batch] '+"["+FEC_units+"]", color='#A100A1',
+                           xlabel_fn=lambda i: "Spearman's "+rho+ " with "+i)
+fig[0].savefig(mode+'FEC-Spearman.png', dpi=600, bbox_inches='tight',
+            facecolor=fig[0].get_facecolor(),
+            transparent=False)
+
+#%% GHG-100
+## GREET 2022
+# succinic acid, succinic acid bioproduct from sugars (corn stover): 0.7036 kg-CO2-eq/kg-SA
+
+#%% IPCC 2013 GWP100a
+
+## ecoinvent 3.8
+# succinic acid production, GLO: 3.182 kgCO2-eq/kg-SA
+# market for succinic acid, GLO: 3.2322 kgCO2-eq/kg-SA
+
+#%% FEC
+
+## ecoinvent 3.8
+# succinic acid production, GLO: 67.463 MJ-eq/kg-SA
+# market for succinic acid, GLO: 68.19 MJ-eq/kg-SA
+
+## GREET 2022
+# succinic acid, succinic acid bioproduct from sugars (corn stover): 26 MJ-eq/kg-SA (of which all 26 MJ-eq/kg-SA from natural gas)
