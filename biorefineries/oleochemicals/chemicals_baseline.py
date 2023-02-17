@@ -11,11 +11,13 @@ from chemicals import atoms_to_Hill
 import thermosteam as tmo
 from thermosteam import Chemicals
 from thermo import TDependentProperty
-
+#TODO: how to tackle? RuntimeError: Failed to extrapolate integral of liquid heat capacity method 'ZABRANSKY_SPLINE_C' between T=298.15 to nan K for component with CASRN '122-32-7'
+#TODO: ask if every inorganic chemical neeeds Dortmund groups
+#TODO: the important chemicals with no PSAT are PL,CaOH2, CaCl2, 62-54-4, Ash,HCl,NaOH, WWTs_sludge, P4O10
 #chems is a list of all the chemicals used in this biorefinery
 chems = tmo.Chemicals([
 #Chemicals used in biodiesel production
-        tmo.Chemical('Sodium_methoxide',formula ='NaOCH3'),  #TODO.check if this should be here 
+        tmo.Chemical('Sodium_methoxide',formula ='NaOCH3',phase = 'l',default = True),   
         tmo.Chemical('Methanol'),
 #Chemical for acid degumming 
         tmo.Chemical('Citric_acid'),
@@ -27,54 +29,74 @@ chems = tmo.Chemicals([
                       CAS='383907-36-6',
                       default=True,
                       Hf=-1.779e6, # Assume same as TAG on a weight basis
-                      phase = 'l'),
+                      phase = 'l',
+                      ),
 #Crude glycerol is a product of transesterification
-        tmo.Chemical('Glycerol'), #rho = 1261.3), #phase = 'l'), 
+        tmo.Chemical('Glycerol'),
 #TAGs of High oleic sunflower oil
-        tmo.Chemical('OOO', search_ID = '122-32-7'),
-        tmo.Chemical('LLL', search_ID = '537-40-6'),  
+        tmo.Chemical('OOO', search_ID = '122-32-7',Hf = -1776e3),#from cane>chemicals
+        tmo.Chemical('LLL', search_ID = '537-40-6',Hf = -1776e3),#TODO: Don't Asumming to be the same as OOO  
 #Below TAG's not a part of the database    
         tmo.Chemical('OOL',
                      search_ID = '28880-78-6',#Based on reference search in CAS Finder
                      search_db = False,
-                     phase = 'l'),           
+                     formula = 'C57H102O6',#Based on reference search in CAS Finder
+                     phase = 'l',
+                     Hf = -1776e3),           
         tmo.Chemical('LLO', 
                          search_ID = '28409-91-8',#Based on reference search in CAS Finder
                          search_db = False,
-                         phase = 'l'),  
+                         formula = 'C57H100O6',#Based on reference search in CAS Finder
+                         phase = 'l',
+                         Hf = -1776e3),  
         tmo.Chemical('SOO',
                          search_ID = '29590-02-1',#Based on reference search in CAS Finder
                          search_db = False,
-                         phase = 'l'),    
+                         formula = 'C57H106O6',#Based on reference search in CAS Finder
+                         phase = 'l',
+                         Hf = -1776e3),    
         tmo.Chemical('PLO', 
                          search_ID = '26836-35-1',#Based on reference search in CAS Finder
                          search_db = False,
-                         phase = 'l'),         
+                         formula = 'C55H100O6',#Based on reference search in CAS Finder
+                         phase = 'l',
+                         Hf = -1776e3),         
         tmo.Chemical('PoOO',
                      search_ID = '38703-17-2',#Based on reference search in CAS Finder
                      search_db = False,
-                     phase = 'l'),
+                     formula = 'C55H100O6',#Based on reference search in CAS Finder
+                     phase = 'l',
+                     Hf = -1776e3),
         tmo.Chemical('POO',
                  search_ID = '27071-84-7',#Based on reference search in CAS Finder
                  search_db = False,
-                 phase = 'l'),
+                 formula = 'C55H102O6',#Based on reference search in CAS Finder
+                 phase = 'l',
+                 Hf = -1776e3),
     
         tmo.Chemical('POS', 
                  search_ID = '26836-31-7',#Based on reference search in CAS Finder
                  search_db = False,
-                 phase = 'l'),
+                 formula = 'C55H104O6', #Based on reference search in CAS Finder
+                 phase = 'l',
+                 Hf = -1776e3),
     
         tmo.Chemical('POP',
                  search_ID = '28409-94-1',#Based on reference search in CAS Finder
                  search_db = False,
-                 phase = 'l'),
+                 formula = 'C53H100O6',#Based on reference search in CAS Finder
+                 phase = 'l',
+                 Hf = -1776e3),
     
         tmo.Chemical('PLS',
                  search_ID = '26836-32-8',#Based on reference search in CAS Finder 
                  search_db = False,
-                 phase = 'l'),
+                 formula = 'C55H102O6',#Based on reference search in CAS Finder
+                 phase = 'l',
+                 Hf = -1776e3),
         tmo.Chemical('PPP',
-                     search_ID = 'Tripalmitin'),
+                     search_ID = 'Tripalmitin',
+                     Hf = -1776e3),
         
 ##Chemicals part of Biodiesel
         tmo.Chemical('Methyl_oleate'),
@@ -98,7 +120,8 @@ chems = tmo.Chemicals([
                  search_db = False,
                  Tb = 458 + 273.15,#CAS finder: 458.0±25.0 °C,Press: 760 Torr
                  formula = 'C16H32O4',
-                 MW = 288.42+273.15
+                 MW = 288.42+273.15,
+                 Hf = -1776e3
                  ),
 #Product 3
         tmo.Chemical('Methyl_9_10_dihydroxylinoleate',
@@ -107,6 +130,7 @@ chems = tmo.Chemicals([
                  MW = 328.492,
                  Tb = 449.4+273.15,#CAS finder: Tb =449.4±35.0 °C,Press: 760 Torr
                  formula = 'C19H36O4',
+                 Hf = -1776e3
                  ),
     
 # Products of oxidative_cleavage
@@ -128,9 +152,9 @@ chems = tmo.Chemicals([
         tmo.Chemical('Azelaic_acid'),
 
 # Oxidants used and other gaseous products
-        tmo.Chemical('Nitrogen'),
-        tmo.Chemical('Oxygen'),
-        tmo.Chemical('Carbon_dioxide'),
+        tmo.Chemical('Nitrogen',phase = 'g'),
+        tmo.Chemical('Oxygen',phase = 'g'),
+        tmo.Chemical('Carbon_dioxide',phase = 'g'),
         
 #Solvent for countercurrent extraction of monocarboxylic acids
         tmo.Chemical('Octane'),
@@ -140,50 +164,57 @@ chems = tmo.Chemicals([
      
 ## Catalysts used in the process   
 ## Tungstic_acid boiling point: https://en.wikipedia.org/wiki/Tungstic_acid
-       tmo.Chemical('Tungsten'),
+       tmo.Chemical('Tungsten',default = True),
        tmo.Chemical('Tungstic_acid', 
                   Tb = 1746,
                   default = True,
-                  phase = 's'),
+                  formula = 'H2WO4',
+                  phase = 'l'),
         tmo.Chemical('Tungstate_ion',
                  search_db = False,
                  CAS = '12737-86-9',
                  formula = 'O4W-2',
                  MW =  tmo.Chemical('Tungstic_acid').MW,#TODO: check this assumption
                  phase = 'l',
+                 default = True,
                  Tb = 5828.15 #Based on tungsten's BP
-                 ),
-        
-        tmo.Chemical('Cobalt'),
-        tmo.Chemical('Hydrogen'),
+                 ),        
+        tmo.Chemical('Cobalt',default = True),
+        tmo.Chemical('Hydrogen',default = True),
         tmo.Chemical('Hydrogen_ion',
                  Tb = 20.271,#Based on hydrogen's BP
                  phase = 'l',
+                 formula = 'H+',
+                 default = True
                  ),    
         tmo.Chemical('Cobalt_chloride',
-                     search_ID = '7646-79-9',
+                     search_ID = '7646-79-9', 
+                     phase = 'l'
                      ),
         tmo.Chemical('Cobalt_acetate_tetrahydrate',
-                      phase = 's',
+                      phase = 'l',#TODO: explore phase
                       search_ID = '6147-53-1',
-                      Tb = 117.1+273.15),
-        tmo.Chemical('Acetate'),
-        tmo.Chemical('Acetate_ion', phase = 'l', search_ID = '71-50-1'),
+                      Tb = 117.1+273.15,
+                      Hf = 0.45 #TODO: change
+                      ),
+        tmo.Chemical('Acetate',phase = 'l', default = True),
+        tmo.Chemical('Acetate_ion', phase = 'l', search_ID = '71-50-1',default = True),
         tmo.Chemical('Cobalt_ion',search_ID ='Cobalt(2+)',  phase = 'l', 
                       Tb=3200.15,#Based on cobalt's BP
                       default = True),
 ##Chemicals required for catalyst recovery
         tmo.Chemical('Calcium_hydroxide',default = True,phase = 'l'),#assumed this phase because it is soluble in the reaction media it is used in
-        tmo.Chemical('Calcium_chloride'),    
+        tmo.Chemical('Calcium_chloride',phase = 'l'),    
         tmo.Chemical.blank('Calcium_tungstate',
                        CAS = '7790-75-2',
                        MW = 287.92,
                        Tb = 5828.15, #Based on tungsten's BP
                        formula = 'CaWO4',
-                       phase = 's'),    
-        tmo.Chemical('Calcium_acetate',default = True),
-        tmo.Chemical('Cobalt_hydroxide',default = True),
-        tmo.Chemical('HCl2', search_ID = 'HCl'),
+                       phase = 'l',
+                       Hf = 0.45),#TODO: change    
+        tmo.Chemical('Calcium_acetate',phase = 'l', default = True),
+        tmo.Chemical('Cobalt_hydroxide',phase = 'l', default = True),
+        tmo.Chemical('HCl2',phase = 'l',search_ID = 'HCl'),
 ##Resin for hydrolysis
 ##Sulfonated_polystyrene with a search_ID = '98-70-4', lacks Hvap data, hence polystyrene's properties were used
 ##Boiling point based on amberlyte
@@ -199,13 +230,25 @@ chems = tmo.Chemicals([
         tmo.Chemical('Monopalmitin'),
 #Natural gas for heating purposes 
         tmo.Chemical('Natural_gas',
-                 search_ID = 'CH4'), 
+                     search_ID = 'CH4'), 
 #Chemicals required by the boilerturbogenerator        
-        tmo.Chemical('Ash', MW = 1,
+        tmo.Chemical('Ash',
+                     MW = 1,
                      phase = 's',
-                     search_db=False),
+                     search_db=False,
+                     default = True,
+                     Hf = 0),
         tmo.Chemical('P4O10',
-                     phase = 's')
+                     phase = 's',
+                     default = True),
+#WWTs sludge based on cellulosic.chemicals     
+        tmo.Chemical('WWTsludge',
+                     search_db = False,
+                     formula="CH1.64O0.39N0.23S0.0035",
+                     Hf=-23200.01*4.184,
+                     phase = 'l',
+                     default = True,
+                     )
                  ])
 
 #Fitting data for MMA based on ChemSep
@@ -223,16 +266,27 @@ chems['Monomethyl_azelate'].omega = 1.09913#Chemical compound generator DWSIM
 chems['Monomethyl_azelate'].Tb = 650.2#Chemical compound generator DWSIM
 
 #properties of TAGs that are missing
-chems.OOO.copy_models_from(chems.PPP,['mu'])
+chems.OOO.Cn.l.method = 'DADGOSTAR_SHAW'
+chems.PPP.Cn.l.method = 'DADGOSTAR_SHAW'
+chems.Methyl_palmitate.Cn.l.method = 'DADGOSTAR_SHAW'
+chems.Palmitic_acid.Cn.l.method = 'DADGOSTAR_SHAW'
+chems.Stearic_acid.Cn.l.method = 'DADGOSTAR_SHAW'
+chems.Oleic_acid.Cn.l.method = 'DADGOSTAR_SHAW'
+chems.Octane.Cn.l.method = 'DADGOSTAR_SHAW'
+chems.Natural_gas.Cn.l.method = 'DADGOSTAR_SHAW'
+# chems.Cobalt_chloride.Cn.l.method = 'ROWLINSON_BONDI'
+
+
+chems.OOO.copy_models_from(chems.PPP,['mu','Cn'])
 chems.LLL.copy_models_from(chems.PPP,['mu'])
 TAGs_with_unknown_props = ['OOL','LLO','SOO','PLO','PoOO',
                            'POO','POS','POP','PLS']
 for i in TAGs_with_unknown_props:
-    chems[i].copy_models_from(chems.OOO,['Hvap','Psat'])
+    chems[i].copy_models_from(chems.PPP,['Hvap','Psat','Cn'])
     chems[i].Tb = chems.OOO.Tb
     chems[i].copy_models_from(chems.PPP,['mu'])
     chems[i].V.add_model(fn.rho_to_V(rho=chems.OOO.rho('l', 298.15, 101325),
-                                     MW=chems.OOO.MW))#Liquid molar volume of these TAGs based on Triolein
+                                     MW=chems[i].MW))
     
 ## The oxidative cleavage catalyst properties are based on cobalt chloride
 chems.Cobalt_acetate_tetrahydrate.copy_models_from(chems.Cobalt_chloride,
@@ -252,18 +306,21 @@ chems.Tungstic_acid.copy_models_from(chems.Tungsten,
 ## Tungstate ion default to properties
 chems.Tungstate_ion.copy_models_from(chems.Tungsten,
                                      ['Hvap','Psat',
-                                      'Cn','V','mu'
+                                      'Cn','mu'
                                      ])
 ## Hydrogen ion defaults to properties of hydrogen
 chems.Hydrogen_ion.copy_models_from(chems.Hydrogen,
                                        ['Hvap',
                                         'Psat',
                                         'mu',
-                                        'V',
                                         'Cn'])
 chems.Cobalt_ion.copy_models_from(chems.Cobalt,
                                        ['Hvap',
                                         'Psat'])
+
+for i in ['Hydrogen_ion','Tungstate_ion','Cobalt_ion']:
+    V = fn.rho_to_V(rho=1e5, MW=chems[i].MW)
+    chems[i].V.add_model(V, top_priority=True)
 ## Products of the precipitation reaction
 ## https://scifinder-n.cas.org/searchDetail/substance/634db2343c1f076117eb77ce/substanceDetails
 chems.Calcium_hydroxide.V.add_model(fn.rho_to_V(2.34,
@@ -272,7 +329,7 @@ chems.Calcium_hydroxide.V.add_model(fn.rho_to_V(2.34,
     
 chems.Calcium_tungstate.copy_models_from(chems.Tungsten,
                                             ['Hvap',
-                                             'Psat'])
+                                             'Psat','Cn'])
 chems.Calcium_tungstate.V.add_model(fn.rho_to_V(5800,
                                                 chems.Calcium_tungstate.MW),
                                                 top_priority = True)
@@ -282,8 +339,15 @@ chems.Acetate_ion.copy_models_from((chems.Acetate),
                                        'Hvap',
                                        'sigma',
                                        ])
-chems.Calcium_acetate.V.l.add_method(chems.Calcium_acetate.MW*0.000001/1.5)#density from: https://pubchem.ncbi.nlm.nih.gov/compound/Calcium-acetate#section=Density
-chems.Cobalt_hydroxide.V.l.add_method(chems.Cobalt_hydroxide.MW*1.0E-6/3.597)
+Acetate_rho = chems.Acetate.rho(298.15,101325)
+chems.Acetate_ion.V.add_method(chems.Acetate_ion.MW*10E-3/Acetate_rho)
+chems.Calcium_acetate.V.add_method(chems.Calcium_acetate.MW*0.000001/1.5)#density from: https://pubchem.ncbi.nlm.nih.gov/compound/Calcium-acetate#section=Density
+chems.Cobalt_hydroxide.V.add_method(chems.Cobalt_hydroxide.MW*1.0E-6/3.597)
+# chems.Cobalt_hydroxide.copy_models_from(tmo.Chemical('NaOH'),['Psat'])
+#TODO: change the below
+chems.Calcium_hydroxide.copy_models_from(tmo.Chemical('NaOH'),['Psat'])
+chems.Calcium_chloride.copy_models_from(tmo.Chemical('NaOH'),['Psat'])
+chems.Calcium_acetate.copy_models_from(tmo.Chemical('NaOH'),['Psat'])
 ## Modelling properties of dihydroxylated compounds as MDHSA
 chems.Dihydroxy_palmitic_acid.copy_models_from(chems.MDHSA,
                                                   ['Hvap',
@@ -312,18 +376,91 @@ chems.Methyl_palmitoleate.Dortmund.set_group_counts_by_name({'CH3': 2,
                                                                 'CH=CH' : 1})
 
 chems.Nitrogen.PSRK.set_group_counts_by_name({'N2':1})
-chems.Methyl_palmitoleate.Dortmund.set_group_counts_by_name({'CH3': 2,
-                                                             'CH2': 11,
-                                                             'CH2COO': 1,
-                                                             'CH=CH' : 1})
+chems.OOL.Dortmund.set_group_counts_by_name({'CH3': 3,
+                                             'CH2': 13+13+11+2,
+                                             'CH=CH': 4,
+                                             'CH2COO':3,
+                                             'CH':1
+                                             })
+chems.LLO.Dortmund.set_group_counts_by_name({'CH3': 3,
+                                             'CH2': 11+13 +11+2,
+                                             'CH=CH': 5,
+                                             'CH2COO': 3,                                             
+                                             'CH':1
+                                             })
 
+chems.SOO.Dortmund.set_group_counts_by_name({'CH3':3,
+                                             'CH2':15+13+13+2,
+                                             'CH=CH':2,
+                                             'CH2COO':3,
+                                             'CH':1
+                                             })
+chems.PLO.Dortmund.set_group_counts_by_name({'CH3':3,
+                                             'CH2':11+13+13+2,
+                                             'CH=CH':2+1,
+                                             'CH2COO': 1+1+1,
+                                             'CH':1
+                                             })
+chems.PoOO.Dortmund.set_group_counts_by_name({'CH3':3,
+                                              'CH2':11+13+13+2,
+                                              'CH=CH':1+1+1,
+                                              'CH2COO': 1+1+1,
+                                              'CH':1                                                   
+                                                    })
+chems.POO.Dortmund.set_group_counts_by_name({'CH3':3,
+                                             'CH2':13+13+13+2,
+                                             'CH=CH':1,
+                                             'CH2COO': 1+1+1,
+                                             'CH':1  
+                                             })
+chems.POS.Dortmund.set_group_counts_by_name({'CH3':3,
+                                             'CH2':13+13+15+2,
+                                             'CH=CH':1,
+                                             'CH2COO': 1,
+                                             'CH':1  
+                                             })
+chems.POO.Dortmund.set_group_counts_by_name({'CH3':3,
+                                             'CH2':13+13+13+2,
+                                             'CH=CH':1+1,
+                                             'CH2COO': 1+1+1,
+                                             'CH':1  
+                                             })
+
+chems.POP.Dortmund.set_group_counts_by_name({'CH3':3,
+                                    'CH2':13+13+13+2,
+                                    'CH=CH':1,
+                                    'CH2COO': 1+1+1,
+                                    'CH':1  
+                                              })
+chems.PLS.Dortmund.set_group_counts_by_name({'CH3':3,
+                                             'CH2':13+11+15+2,
+                                             'CH=CH':2,
+                                             'CH2COO': 1+1+1,
+                                             'CH':1 })
+
+chems.Dihydroxy_palmitic_acid.Dortmund.set_group_counts_by_name({'CH3':1,
+                                                        'COOH':1,
+                                                        'CH2':12,
+                                                        'CH':2,
+                                                        'OH(S)':2})
+chems.Methyl_9_10_dihydroxylinoleate.Dortmund.set_group_counts_by_name({'CH3':2,
+                                                               'CH2':11,
+                                                               'CH=CH':1,
+                                                               'CH':2,
+                                                               'CH2COO':1,
+                                                               'OH(S)':2})
+chems.Dipalmitin.Dortmund.set_group_counts_by_name({'CH3':2,
+                                                    'CH2COO':2,
+                                                    'CH2':13+13+2,
+                                                    'CH':1,
+                                                    'OH(P)':1
+                                                    })
 #LiquidMethanol and Sodium_methoxide were added for cane biorefinery compatibility
-LiquidMethanol = chems['Methanol'].at_state(phase='l', copy=True)
+LiquidMethanol = tmo.Chemical('Methanol').at_state(phase='l', copy=True)
 chems.Sodium_methoxide.copy_models_from (LiquidMethanol,
                                             ['V', 'sigma',
-                                             'kappa', 'Cn',
-                                             'Psat'])
-
+                                              'kappa', 'Cn',
+                                                'Psat','mu'])
 #Properties of chemicals required by the boilerturbogenerator based on cane.chemicals.py
 chems.Ash.Cn.add_model(0.09 * 4.184 * chems.Ash.MW) 
 for chemical in [chems.Ash,chems.P4O10]:
@@ -342,10 +479,19 @@ HCl = create_new_chemical('HCl', formula='HCl')
 for chemical in (HCl, NaOH,):
         V = fn.rho_to_V(rho=1e5, MW=chemical.MW)
         chemical.V.add_model(V, top_priority=True)
+        chemical.default()
+NaOH.copy_models_from(tmo.Chemical('NaOH'),['Psat'])
+HCl.copy_models_from(tmo.Chemical('HCl'),['Psat'])        
+        
+chems.Ash.copy_models_from(tmo.Chemical('Water'),['Psat'])
+chems.P4O10.copy_models_from(tmo.Chemical('Water'),['Psat'])
+chems.WWTsludge.copy_models_from(tmo.Chemical('Water'),['Psat'])
+
 
     
 for chemical in chems: chemical.default()
-
+#TODO: add viscosity for all the catalyst related chems
+        
 chems.compile()
 chems.define_group('TAG', ('OOO','LLL','OOL',
                            'LLO','SOO','PLO',
@@ -386,4 +532,5 @@ chems.set_synonym('Dipalmitin', 'DAG')
 chems.set_synonym('Hydrogen_ion', 'H+')
 chems.set_synonym('Pelargonic_acid','Nonanoic_acid')
 chems.set_synonym('HCl2','Liquid_HCl')
+# chems.set_synonyn('WWTs_sludge','Biomass')
 # chems.show()
