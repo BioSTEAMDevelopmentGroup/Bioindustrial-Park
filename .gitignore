@@ -32,7 +32,7 @@ docs/_templates/*
 
 # Data/results #
 ################
-*.xlsx
+# *.xlsx # Excel files can now be used to set model parameter distributions; see succinic/model_utils/EasyInputModel
 *.png
 *.jpeg
 *.svg
