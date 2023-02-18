@@ -414,6 +414,14 @@ chems.Methyl_palmitoleate.Dortmund.set_group_counts_by_name({'CH3': 2,
                                                                 'CH=CH' : 1})
 
 chems.Nitrogen.PSRK.set_group_counts_by_name({'N2':1})
+
+chems.LLL.Dortmund.set_group_counts_by_name({'CH3': 3,
+                                             'CH2': 11+11+11+2,
+                                             'CH=CH': 2+2+2,
+                                             'CH2COO':3,
+                                             'CH':1
+                                             })
+
 chems.OOL.Dortmund.set_group_counts_by_name({'CH3': 3,
                                              'CH2': 13+13+11+2,
                                              'CH=CH': 4,

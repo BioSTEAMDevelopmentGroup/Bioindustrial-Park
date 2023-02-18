@@ -43,6 +43,7 @@ class DihydroxylationReactor(bst.CSTR):
     _N_ins = 1
     _N_outs = 2
     X_dih = 0.99
+#TODO: have an init and a self.X_dih with the conversion    
 #this ref highlights that a stoichiometric amount of h2O2 is required to dihydroxylate ref:https://doi.org/10.1021/ja01298a065    
 #Novovols's patent mentions that linoeleic and palmitoleic acid esters can be oxidatively cleaved
 #this would mean that they can also get dihydroxylated 

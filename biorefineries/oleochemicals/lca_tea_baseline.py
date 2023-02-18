@@ -8,9 +8,7 @@ Created on Sun Oct 23 16:17:35 2022
 import biosteam as bst
 import chaospy
 from chaospy import distributions as shape
-from biorefineries.oleochemicals import systems_baseline 
-from systems_baseline import aa_baseline_sys
-from systems_baseline  import F_baseline
+from biorefineries.oleochemicals.systems_baseline import aa_baseline_sys,F_baseline
 import numpy as np
 #TODO: what to do about prices
 ##Prices from the literature
@@ -92,23 +90,3 @@ class TEA_baseline(bst.TEA):
                                    self.administration +self.plant_overhead                                  
                                    ))
     
-tea_azelaic_baseline = TEA_baseline(system = systems_baseline.aa_baseline_sys,
-                                operating_days = 300,
-                                IRR = 0.1,duration=(2013,2023),
-                                depreciation = 'MACRS7',
-                                lang_factor = 3,income_tax = 0.35,
-                                construction_schedule = (2/3,1/3),#Econ. ref
-                                WC_over_FCI=0.05,
-                                labor_cost = 3600000,
-                                property_tax = 0.02,
-                                property_insurance = 0.02,
-                                supplies = 0.01,
-                                maintenance = 0.02,
-                                administration = 0.02,
-                                laboratory_charges = 0.18,
-                                operating_supervision = 0.18,
-                                plant_overhead = 0.6,
-                                OSBL_units = [systems_baseline.aa_baseline_sys.facilities])    
-
-aa_sys_op_hours = aa_baseline_sys.operating_hours = tea_azelaic_baseline.operating_days * 24
-  

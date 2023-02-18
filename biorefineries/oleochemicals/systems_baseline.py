@@ -21,16 +21,14 @@ from thermosteam import Rxn, RxnSys, PRxn, SRxn, settings, Chemical, Stream, Mul
 from biosteam import ProcessWaterCenter
 from biorefineries.lipidcane._process_settings import price #TODO: were these prices adjusted to 2013 prices?
 from biorefineries.cane.data.lca_characterization_factors import GWP_characterization_factors 
-#TODO: what reactor volumes should be assumed and what shouldnt be
 #Settings to set GWP100 as the main characterisation factor
 #List of questions
-# aa_production_sys.show() only tells me about convergence errors
-# aa_production_sys.diagram() spits out ValueError: cannot convert float NaN to integer
 
 GWP = 'GWP100'
 bst.settings.define_impact_indicator(key=GWP, units='kg*CO2e')
 #Settings to set the name of the flowsheet
 F_baseline = bst.Flowsheet('azelaic_acid_baseline')
+
 bst.main_flowsheet.set_flowsheet(F_baseline) 
 #Settings to set the chemicas for the flowsheet
 bst.settings.set_thermo(chems, cache= True) 
@@ -543,8 +541,8 @@ def azelaic_acid_production(ins,outs):
     def calculating_V_max_for_hydrolysis():
         Fatty_acid_mass_1 = crude_heavy_fatty_acids.F_mass
         R601.ins[1].imass['Water'] = water_mass_1 = Fatty_acid_mass_1*5/85 #Based on specs in the patent
-        R601.ins[2].F_mass = total_resin_required = (Fatty_acid_mass_1+water_mass_1)*(10/90)
-        R601.ins[3].F_vol = total_resin_required*3/0.77 #given density 0.770 Kg/m3 and 2-4 BV/h #TODO: check how to size acid ask Yoel
+        R601.ins[2].imass['polystyrene_based_catalyst'] = total_resin_required = (Fatty_acid_mass_1+water_mass_1)*(10/90)
+        R601.ins[3].ivol['Liquid_HCl'] = total_resin_required*3/0.77 #given density 0.770 Kg/m3 and 2-4 BV/h #TODO: check how to size acid ask Yoel
     R601.add_specification(calculating_V_max_for_hydrolysis, run = True)
      
 #Mix tank to collect all the methanol
@@ -916,7 +914,7 @@ def monocarboxylics_recovery_and_solvent_recovery(ins,outs):
 #########################################################################################################
 @SystemFactory(ID = 'aa_baseline_sys',
                )
-def aa_production_sys(ins,outs):
+def aa_baseline_sys(ins,outs):
 #Water for industrial use comes from public water supply: https://www.usgs.gov/mission-areas/water-resources/science/industrial-water-use#science
 
 # The following process is based on the Novomont patent released in 2016.
@@ -1061,141 +1059,110 @@ def aa_production_sys(ins,outs):
                                                                               price = 2, #2-5$
                                                                               units = 'kg/hr'
                                                                               )))
-                                                            
-   
-aa_production_sys = aa_production_sys()
-aa_production_sys.simulate()
+    # All the Facilities (900 level)
+    #Streams to boiler turbogenerator,Liquid/Solid waste streams mixer
+    M901 = bst.Mixer( ID = 'M901',
+                      ins = (F_baseline.polar_lipids_to_boilerturbogenerator,                          
+                              F_baseline.lighter_boiling_impurities_to_boilerturbogenerator,
+                              F_baseline.stream.heavy_boiling_compounds_to_boilerturbogenerator,
+                            ),
+                      outs = ('total_effluent_to_be_burned')
+                      )
+    #This unit burns the streams provided to it to generate electricity
+    BT901 = bst.BoilerTurbogenerator(ID ='BT901',
+                                      ins = (M901-0,
+                                              F_baseline.stream.ventedgas_to_boilerturbogenerator,
+                                              'boiler_makeup_water',
+                                              bst.Stream(ID ='natural_gas',units = 'kg/hr',characterization_factors={'GWP100': GWP_characterization_factors['CH4']}),
+                                              bst.Stream(ID ='lime_boiler',units = 'kg/hr', price = 0.12*401.693/275.700, characterization_factors={'GWP100': GWP_characterization_factors['lime']} ),#Taken from Catbio Lime, hydrated, bulk, t.l., f.o.b. works, Adjusted from Jan 2021 to Dec 2022
+                                              bst.Stream(ID ='boiler_chems', units = 'kg/hr', price = 2.9772*2.2046, characterization_factors={'GWP100': GWP_characterization_factors['lime']}),
+                                              ),
+                                      outs = (bst.Stream('emissions',price = 0, units = 'kg/hr'),
+                                              bst.Stream('rejected_water_and_blowdown_to_PWT',price = 0, units = 'kg/hr'), #this can be reused as process water
+                                              bst.Stream(ID='ash_disposal' , units = 'kg/hr')),
+                                      turbogenerator_efficiency=0.85,
+                                      natural_gas_price= 0.218, 
+                                      ash_disposal_price=-1.41e6 / (4279*7880),#Same as lactic acid biorefinery
+                                      satisfy_system_electricity_demand =  False, #TODO: ask what to do about this
+                                      
+                                      )
+    CW901 = bst.ChilledWaterPackage('CW901') #Chilled water package for cooling requirements                                 
+    CT901 = bst.CoolingTower(ID ='CT901')
+    CT901.ins[-1].price = 1.7842*2.2046 #TODO: CURRENTLY BASED ON LACTIC ACID> PROCESS SETTINGS 2016 PRICES, cooling tower chemicals
+    CT901.outs[1].price = 0 #'cooling_tower_blowdown'
+    CT901.outs[2].price = 0 #'cooling_tower_evaporation'
+    CT901.ins[0].price = 0 #'some_water_input',
+    CT901.outs[0].price = 0 #'some_water_output',
+    #CT901.ins[1] = #'cooling_tower_makeup_water'
+    #All the streams that are required in the different sections for production of azelaic acid
+
+    process_water_streams_available = (
+                                        F_baseline.stream.water_for_emulsification,#Water used for hydrolysis and emulsification 
+                                        F_baseline.stream.water_for_RVF,#Water used for rotary vaccum filter
+                                        F_baseline.stream.water_for_precipitate_washing,#Water used for washing the catalyst precipitate washing
+                                        F_baseline.stream.water_for_degumming,#Water used for degumming the oils from the polar lipids
+                                        F_baseline.stream.water_for_degumming_2,#Second Water stream used for degumming the oils from the polar lipids
+                                        F_baseline.stream.biodiesel_wash_water, #Wash water for biodiesel
+                                        F_baseline.stream.water_for_azelaicacid_extraction,                                                                        
+                                        CT901.outs[1],#Cooling_tower_blowdown_from_cooling tower
+                                        BT901.outs[1]#rejected_water_and_blowdown from boilerturbogen                                    
+                                        )                         
+
+    makeup_water_streams_available = (F_baseline.stream.cooling_tower_makeup_water,#This is the second inlet to cooling tower
+                                          F_baseline.stream.boiler_makeup_water) #This is the second inlet to boilerturbogen
+
+    system_makeup_water = bst.Stream('system_makeup_water', price = 3.945 *(217.9/132.9)/(3.78541*1000)) #Ref: DOE Annual water rates pdf,adjusted using FRED's PPI> Industry based> Utilities.(1kgal = 1000gal, 1gal = 3.78541 Kg)
+
+    PWT901 = bst.ProcessWaterCenter(ID = 'PWT901',
+                            ins = ('clean_water',
+                                    system_makeup_water,
+                                    #W901.outs[2] #TODO: ask?
+                                    ),
+                            outs = (bst.Stream(ID = 'process_water', units ='kg/hr'),
+                                    bst.Stream(ID ='unused_clean_water', price = 0, units = 'kg/hr')),
+                            makeup_water_streams = makeup_water_streams_available,
+                            process_water_streams = process_water_streams_available 
+                            )
+
+    # HXN = bst.HeatExchangerNetwork('HXN901', T_min_app = 5.)
+    #TODO: how to add this?
+    # HXN901 = F_baseline.create_system('HXN901')
+    # HXN901.simulate()
+    # HXN.simulate()
+    # List of fresh water and waste
+    W901 = bst.create_wastewater_treatment_system(ID='W901', 
+                                                  ins= (F_baseline.wastewater1_to_boilerturbogenerator,
+                                                        F_baseline.wastewater2_to_boilerturbogenerator,
+                                                        F_baseline.wastewater6_to_boilerturbogenerator,
+                                                        F_baseline.condensate,
+                                                        F_baseline.wastewater3_to_boilerturbogenerator,
+                                                        F_baseline.wastewater4_to_boilerturbogenerator),
+                                                  outs=(bst.Stream(ID = 'methane'),
+                                                        bst.Stream(ID = 'sludge'),
+                                                        bst.Stream(ID = 'treated_water'),
+                                                        bst.Stream(ID = 'waste_brine')),
+                                                  mockup=False, area=900, udct=None,
+                                                  operating_hours=None, autorename=None,#TODO: how to decide annual operating hours for this--
+                                                  NaOH_price= 0.93*401.693/275.700, #Based on Catbio price ($/Kg) for Caustic soda (sodium hydroxide), liq., dst spot barge f.o.b. USG adjusted from 2021 Jan to 2022 Dec using Fred's PPI for basic inorganic chemicals  
+                                                  autopopulate=None)
+
+# aa_baseline_sys.empty_recycles() # Restart simulation
+# aa_baseline_sys.set_tolerance(mol=1e-11, rmol=1e-11) # Set absolute and relative tolerances
+# aa_baseline_sys.simulate()
+# aa_baseline_sys.show()
+# aa_baseline_sys.set_tolerance(method='fixedpoint') # Set absolute and relative tolerances
+# aa_baseline_sys.empty_recycles() # Restart simulation
+# aa_baseline_sys.simulate()
+# aa_baseline_sys.show()
+#TODO: errors I dont understand
 #########################################################################################################
-# All the Facilities (900 level)
-#Streams to boiler turbogenerator,Liquid/Solid waste streams mixer
-M901 = bst.Mixer( ID = 'M901',
-                  ins = (F_baseline.polar_lipids_to_boilerturbogenerator,                          
-                          F_baseline.lighter_boiling_impurities_to_boilerturbogenerator,
-                          F_baseline.stream.heavy_boiling_compounds_to_boilerturbogenerator,
-                        ),
-                  outs = ('total_effluent_to_be_burned')
-                  )
-#This unit burns the streams provided to it to generate electricity
-BT901 = bst.BoilerTurbogenerator(ID ='BT901',
-                                  ins = (M901-0,
-                                          F_baseline.stream.ventedgas_to_boilerturbogenerator,
-                                          'boiler_makeup_water',
-                                          bst.Stream(ID ='natural_gas',units = 'kg/hr',characterization_factors={'GWP100': GWP_characterization_factors['CH4']}),
-                                          bst.Stream(ID ='lime_boiler',units = 'kg/hr', price = 0.12*401.693/275.700, characterization_factors={'GWP100': GWP_characterization_factors['lime']} ),#Taken from Catbio Lime, hydrated, bulk, t.l., f.o.b. works, Adjusted from Jan 2021 to Dec 2022
-                                          bst.Stream(ID ='boiler_chems', units = 'kg/hr', price = 2.9772*2.2046, characterization_factors={'GWP100': GWP_characterization_factors['lime']}),
-                                          ),
-                                  outs = (bst.Stream('emissions',price = 0, units = 'kg/hr'),
-                                          bst.Stream('rejected_water_and_blowdown_to_PWT',price = 0, units = 'kg/hr'), #this can be reused as process water
-                                          bst.Stream(ID='ash_disposal' , units = 'kg/hr')),
-                                  turbogenerator_efficiency=0.85,
-                                  natural_gas_price= 0.218, 
-                                  ash_disposal_price=-1.41e6 / (4279*7880),#Same as lactic acid biorefinery
-                                  satisfy_system_electricity_demand =  False, #TODO: ask what to do about this
-                                  
-                                  )
-CW901 = bst.ChilledWaterPackage('CW901') #Chilled water package for cooling requirements                                 
-CT901 = bst.CoolingTower(ID ='CT901')
-CT901.ins[-1].price = 1.7842*2.2046 #TODO: CURRENTLY BASED ON LACTIC ACID> PROCESS SETTINGS 2016 PRICES, cooling tower chemicals
-CT901.outs[1].price = 0 #'cooling_tower_blowdown'
-CT901.outs[2].price = 0 #'cooling_tower_evaporation'
-CT901.ins[0].price = 0 #'some_water_input',
-CT901.outs[0].price = 0 #'some_water_output',
-#CT901.ins[1] = #'cooling_tower_makeup_water'
-#All the streams that are required in the different sections for production of azelaic acid
-
-process_water_streams_available = (
-                                    F_baseline.stream.water_for_emulsification,#Water used for hydrolysis and emulsification 
-                                    F_baseline.stream.water_for_RVF,#Water used for rotary vaccum filter
-                                    F_baseline.stream.water_for_precipitate_washing,#Water used for washing the catalyst precipitate washing
-                                    F_baseline.stream.water_for_degumming,#Water used for degumming the oils from the polar lipids
-                                    F_baseline.stream.water_for_degumming_2,#Second Water stream used for degumming the oils from the polar lipids
-                                    F_baseline.stream.biodiesel_wash_water, #Wash water for biodiesel
-                                    F_baseline.stream.water_for_azelaicacid_extraction,                                                                        
-                                    CT901.outs[1],#Cooling_tower_blowdown_from_cooling tower
-                                    BT901.outs[1]#rejected_water_and_blowdown from boilerturbogen                                    
-                                    )                         
-
-makeup_water_streams_available = (F_baseline.stream.cooling_tower_makeup_water,#This is the second inlet to cooling tower
-                                      F_baseline.stream.boiler_makeup_water) #This is the second inlet to boilerturbogen
-
-system_makeup_water = bst.Stream('system_makeup_water', price = 3.945 *(217.9/132.9)/(3.78541*1000)) #Ref: DOE Annual water rates pdf,adjusted using FRED's PPI> Industry based> Utilities.(1kgal = 1000gal, 1gal = 3.78541 Kg)
-
-PWT901 = bst.ProcessWaterCenter(ID = 'PWT901',
-                        ins = ('clean_water',
-                                system_makeup_water,
-                                #W901.outs[2] #TODO: ask?
-                                ),
-                        outs = (bst.Stream(ID = 'process_water', units ='kg/hr'),
-                                bst.Stream(ID ='unused_clean_water', price = 0, units = 'kg/hr')),
-                        makeup_water_streams = makeup_water_streams_available,
-                        process_water_streams = process_water_streams_available 
-                        )
-
-# HXN = bst.HeatExchangerNetwork('HXN901', T_min_app = 5.)
-#TODO: how to add this?
-# HXN901 = F_baseline.create_system('HXN901')
-# HXN901.simulate()
-# HXN.simulate()
-# List of fresh water and waste
-W901 = bst.create_wastewater_treatment_system(ID='W901', 
-                                              ins= (F_baseline.wastewater1_to_boilerturbogenerator,
-                                                    F_baseline.wastewater2_to_boilerturbogenerator,
-                                                    F_baseline.wastewater6_to_boilerturbogenerator,
-                                                    F_baseline.condensate,
-                                                    F_baseline.wastewater3_to_boilerturbogenerator,
-                                                    F_baseline.wastewater4_to_boilerturbogenerator),
-                                              outs=(bst.Stream(ID = 'methane'),
-                                                    bst.Stream(ID = 'sludge'),
-                                                    bst.Stream(ID = 'treated_water'),
-                                                    bst.Stream(ID = 'waste_brine')),
-                                              mockup=False, area=900, udct=None,
-                                              operating_hours=None, autorename=None,#TODO: how to decide annual operating hours for this--
-                                              NaOH_price= 0.93*401.693/275.700, #Based on Catbio price ($/Kg) for Caustic soda (sodium hydroxide), liq., dst spot barge f.o.b. USG adjusted from 2021 Jan to 2022 Dec using Fred's PPI for basic inorganic chemicals  
-                                              autopopulate=None)
-
-M902 = bst.Mixer(ins=(F_baseline.wastewater1_to_boilerturbogenerator,
-                      F_baseline.wastewater2_to_boilerturbogenerator,
-                      F_baseline.wastewater6_to_boilerturbogenerator,
-                      F_baseline.condensate,
-                      F_baseline.wastewater3_to_boilerturbogenerator,
-                      F_baseline.wastewater4_to_boilerturbogenerator),
-                  outs = 'Total_wastewater_to_be_treated')
-# WastewaterSystemCost = bst.WastewaterSystemCost(ID='W901_systemcost',
-#                                                 ins = M902-0,
-#                                                 outs=(), thermo=None) #TODO: where should this be?
-    
-
-#########################################################################################################
-# Streams specs belonging to the cane biorefinery used for biodisel prep
-#Methanol
-F_baseline.stream.methanol.price = 0.792*401.693/275.700 #Based on Catbio costs adjusted from 2021 Jan to 2022 Dec using Fred's PPI for basic inorganic chemicals
-F_baseline.stream.methanol.characterization_factors = {'GWP100': GWP_characterization_factors['methanol']}
-
-#Catalyst
-F_baseline.stream.catalyst.price = 0.25*(price['NaOCH3']*401.693/259.900) + 0.75*( 0.792*401.693/275.700) #Adjusted from 2019 to 2022, Fred's PPI for industrial chemicals
-F_baseline.stream.catalyst.characterization_factors = {'GWP100': GWP_characterization_factors['methanol catalyst mixture']}
-
-#Biodiesel wash water
-F_baseline.stream.biodiesel_wash_water.price = 3.945 *(217.9/132.9)/(3.78541*1000)#Ref: DOE Annual water rates pdf,adjusted using FRED's PPI> Industry based> Utilities.(1kgal = 1000gal, 1gal = 3.78541 Kg)
-F_baseline.stream.biodiesel_wash_water.characterization_factors={'GWP100': 0.00035559}#Ecoinvent:tap water production, conventional treatment, RoW, (Author: Marylène Dussault inactive)
-
-#HCl 
-F_baseline.stream.HCl.price = 0.88*401.693/275.700 #Based on Catbio price ($/Kg) for Hydrogen peroxide, 35%, tech., tankcars, works, frt. equald. adjusted from 2021 Jan to 2022 Dec using Fred's PPI for basic inorganic chemicals 
-F_baseline.stream.HCl.characterization_factors = {'GWP100': GWP_characterization_factors['HCl']}
-
-#NaOH
-F_baseline.stream.NaOH.price = 0.93*401.693/275.700 #Based on Catbio price ($/Kg) for Caustic soda (sodium hydroxide), liq., dst spot barge f.o.b. USG adjusted from 2021 Jan to 2022 Dec using Fred's PPI for basic inorganic chemicals 
-F_baseline.stream.NaOH.characterization_factors = {'GWP100': GWP_characterization_factors['NaOH']}
 
 
-#ask Yoel if this should be considered or the prices from economic assessment paper should be taken instead
-#crude_glycerol
-F_baseline.stream.crude_glycerol.price = price['Crude glycerol']*401.693/275.700 #Adjusted from 2021 Jan to 2022 Dec based on FRED's PPI
-F_baseline.stream.crude_glycerol.characterization_factors = {'GWP100': GWP_characterization_factors['crude-glycerol']}
- 
-#######################################################################################################################33
-#####################################################################################################33
-
+#Problems:
+# aa_baseline_sys.empty_recycles() # Restart simulation
+# aa_baseline_sys.set_tolerance(mol=1e-11, rmol=1e-11) # Set absolute and relative tolerances
+# aa_baseline_sys.simulate()
+# aa_baseline_sys.show()
 
 
 
