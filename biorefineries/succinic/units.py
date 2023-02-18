@@ -10,11 +10,27 @@ This module is a modified implementation of modules from the following:
 
 @author: sarangbhagwat
 
-References:
+References
+----------
+[1] Humbird et al., Process Design and Economics for Biochemical Conversion of
+    Lignocellulosic Biomass to Ethanol: Dilute-Acid Pretreatment and Enzymatic
+    Hydrolysis of Corn Stover; Technical Report NREL/TP-5100-47764;
+    National Renewable Energy Lab (NREL), 2011.
+    https://www.nrel.gov/docs/fy11osti/47764.pdf
+[2] Davis et al., Process Design and Economics for the Conversion of Lignocellulosic
+    Biomass to Hydrocarbon Fuels and Coproducts: 2018 Biochemical Design Case Update;
+    NREL/TP-5100-71949; National Renewable Energy Lab (NREL), 2018.
+    https://doi.org/10.2172/1483234
 [3] Aden et al., Process Design Report for Stover Feedstock: Lignocellulosic
     Biomass to Ethanol Process Design and Economics Utilizing Co-Current Dilute
     Acid Prehydrolysis and Enzymatic Hydrolysis for Corn Stover; NREL/TP-510-32438;
     National Renewable Energy Lab (NREL), 2002.
+    https://doi.org/10.2172/1218326.
+[4] Davis et al., Process Design and Economics for the Conversion of Lignocellulosic
+    Biomass to Hydrocarbons: Dilute-Acid and Enzymatic Deconstruction of Biomass
+    to Sugars and Catalytic Conversion of Sugars to Hydrocarbons;
+    NREL/TP-5100-62498; National Renewable Energy Lab (NREL), 2015.
+    http://www.nrel.gov/docs/fy15osti/62498.pdf
 """
 
 
@@ -486,7 +502,7 @@ class CoFermentation(Reactor):
     def __init__(self, ID='', ins=None, outs=(), thermo=None, *, T=30+273.15,
                  P=101325, V_wf=0.4, length_to_diameter=0.6,
                  
-                 kW_per_m3=0.02 * 0.7355 / 0.075, # 0.02 HP for IBRL 75 L reactor
+                 kW_per_m3=0.02 * 0.7457 / 0.075, # including non-working volume # 0.02 HP for IBRL 75 L reactor
                  
                  mixing_intensity=None,
                  
@@ -744,6 +760,11 @@ class CoFermentation(Reactor):
         return sum([i.F_vol for i in self.ins if i.phase=='l' and i.F_mol and not (i.imol['CO2']/i.F_mol==1. 
                                                                        or i.imol['O2']/i.F_mol>0.1)])
     
+    @property
+    def F_vol_out(self): # exclude gases
+        return sum([i.F_vol for i in self.outs if i.phase=='l' and i.F_mol and not (i.imol['CO2']/i.F_mol==1. 
+                                                                       or i.imol['O2']/i.F_mol>0.1)])
+    
     def _design(self):
         mode = self.mode
         Design = self.design_results
@@ -753,7 +774,7 @@ class CoFermentation(Reactor):
             self._V_max = self.max_batch_reactor_volume
             # Reactor._design(self)
             tau_tot = self.tau_batch_turnaround + self.tau_cofermentation
-            Design['Fermenter size'] = self.outs[0].F_mass * tau_tot
+            Design['Fermenter size'] = self.outs[0].F_mass * tau_tot / self.V_wf
             Design['Recirculation flow rate'] = self.F_mass_in
             Design['Broth flow rate'] = self.outs[0].F_mass
         
@@ -787,7 +808,7 @@ class CoFermentation(Reactor):
                 if 'Fermenter agitator' in purchase_costs.keys():
                     purchase_costs['Fermenter agitator'] *= _316_over_304
             # self.power_utility(self.kW_per_m3*(self.outs[0].F_vol*self.tau/self.V_wf))
-            self.power_utility.consumption += self.kW_per_m3*(self.outs[0].F_vol*self.tau/self.V_wf)
+            self.power_utility.consumption += self.kW_per_m3*(self.outs[0].F_vol*self.tau)
         elif mode == 'continuous':
             if not self.neutralization:
                 self.vessel_material= 'Stainless steel 316'

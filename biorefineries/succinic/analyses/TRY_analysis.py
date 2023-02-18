@@ -21,7 +21,7 @@ from matplotlib.ticker import AutoMinorLocator as AML
 # from biorefineries.succinic.system_sc import succinic_sys, succinic_tea, R302, spec, product_stream
 
 from biorefineries import succinic
-from biorefineries.succinic.models import model, succinic_sys, succinic_tea, succinic_LCA, R302, spec, product_stream
+from biorefineries.succinic.models import model, succinic_sys, succinic_tea, succinic_LCA, R302, spec, product_stream, theoretical_max_g_succinic_acid_per_g_glucose
 from matplotlib import pyplot as plt
 from  matplotlib.colors import LinearSegmentedColormap
 import pandas as pd
@@ -48,6 +48,8 @@ parameter_distributions_filenames = ['parameter-distributions_lab-scale_batch.xl
                                     'parameter-distributions_pilot-scale_batch.xlsx',
                                     ]
 
+
+dateTimeObj = datetime.now()
 
 #%% Set mode
 # ## Change working directory to biorefineries\\succinic
@@ -358,9 +360,8 @@ for p in productivities:
     # %% Save generated data
     
     
-    dateTimeObj = datetime.now()
     minute = '0' + str(dateTimeObj.minute) if len(str(dateTimeObj.minute))==1 else str(dateTimeObj.minute)
-    file_to_save = mode+f'_{steps}_steps_'+'succinic_TRY_%s.%s.%s-%s.%s'%(dateTimeObj.year, dateTimeObj.month, dateTimeObj.day, dateTimeObj.hour, minute)
+    file_to_save = mode+f'_{steps}_steps_'+f'neutralization_{spec.neutralization}_'+ 'succinic_TRY_%s.%s.%s-%s.%s'%(dateTimeObj.year, dateTimeObj.month, dateTimeObj.day, dateTimeObj.hour, minute)
     np.save(succinic_results_filepath+file_to_save, data_1)
     
     pd.DataFrame(data_1[:, :, 0, :][:,:,0]/907.185).to_csv(succinic_results_filepath+'MPSP-'+file_to_save+'.csv')
@@ -471,6 +472,7 @@ FEC_units = r"$\mathrm{MJ}\cdot\mathrm{kg}^{-1}$"
 #%% MPSP
 contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_1, # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., MPSP
                                 x_data=100*yields, # x axis values
+                                # x_data = yields/theoretical_max_g_succinic_acid_per_g_glucose,
                                 y_data=titers, # y axis values
                                 z_data=productivities, # z axis values
                                 x_label=r"$\bfYield$", # title of the x axis
@@ -484,6 +486,7 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_1, 
                                 w_levels=np.arange(1.0, 2.3, 0.1), # levels for unlabeled, filled contour areas (labeled and ticked only on color bar)
                                 w_ticks=np.array([1.1, 1.2, 1.3,  1.5, 1.8, 2.2]), # labeled, lined contours; a subset of w_levels
                                 x_units=r"$\mathrm{\% theoretical}$",
+                                # x_units=r"$\mathrm{g} \cdot \mathrm{g}$" + " " + r"$\mathrm{glucose}$" + " " + r"$\mathrm{eq.}^{-1}$",
                                 y_units=r"$\mathrm{g} \cdot \mathrm{L}^{-1}$",
                                 z_units=r"$\mathrm{g} \cdot \mathrm{L}^{-1}  \cdot \mathrm{h}^{-1}$",
                                 w_units=MPSP_units,
@@ -514,6 +517,7 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_2, 
                                 w_levels=np.arange(0.0, 5.5, 0.5), # levels for unlabeled, filled contour areas (labeled and ticked only on color bar)
                                 w_ticks=np.array([1, 2, 3, 5,]), # labeled, lined contours; a subset of w_levels
                                 x_units=r"$\mathrm{\% theoretical}$",
+                                # x_units=r"$\mathrm{g} \cdot \mathrm{g}$" + " " + r"$\mathrm{glucose}$" + " " + r"$\mathrm{eq.}^{-1}$",
                                 y_units=r"$\mathrm{g} \cdot \mathrm{L}^{-1}$",
                                 z_units=r"$\mathrm{g} \cdot \mathrm{L}^{-1}  \cdot \mathrm{h}^{-1}$",
                                 w_units=GWP_units,
@@ -545,6 +549,7 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_3, 
                                 w_levels=np.arange(-30, 90, 10), # levels for unlabeled, filled contour areas (labeled and ticked only on color bar)
                                 w_ticks=np.array([-20, 0, 10, 20, 50, 80]), # labeled, lined contours; a subset of w_levels
                                 x_units=r"$\mathrm{\% theoretical}$",
+                                # x_units=r"$\mathrm{g} \cdot \mathrm{g}$" + " " + r"$\mathrm{glucose}$" + " " + r"$\mathrm{eq.}^{-1}$",
                                 y_units=r"$\mathrm{g} \cdot \mathrm{L}^{-1}$",
                                 z_units=r"$\mathrm{g} \cdot \mathrm{L}^{-1}  \cdot \mathrm{h}^{-1}$",
                                 w_units=FEC_units,

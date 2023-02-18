@@ -204,7 +204,7 @@ def create_succinic_sys(ins, outs):
                                     outs=('fermentation_broth', 'fermentation_vent'),
                                     neutralization=False,
                                     neutralizing_agent='Lime',
-                                    mode='continuous',
+                                    mode='batch',
                                     V_wf=0.4,
                                     )
     @R302.add_specification(run=False)
@@ -756,8 +756,9 @@ succinic_tea = SuccinicTEA(system=succinic_sys, IRR=0.10, duration=(2016, 2046),
 seed_train_system = bst.System('seed_train_system', path=(u.S302, u.R303, u.T301))
 
 theoretical_max_g_succinic_acid_per_g_glucose = (2*chems.SuccinicAcid.MW)/(chems.Glucose.MW) # ~1.311 g-succinic-acid/g-glucose
+
 spec = ProcessSpecification(
-    evaporator = None,
+    evaporator = u.F301,
     pump = None,
     mixer = u.M304,
     heat_exchanger = u.M304_H,
@@ -823,7 +824,7 @@ def load_titer_with_glucose(titer_to_load):
         IQ_interpolation(F301_titer_obj_fn, 1e-4, 0.8, ytol=1e-3)
     else:
         IQ_interpolation(M304_titer_obj_fn, 1e-4, 30000., ytol=1e-3)
- 
+    spec.titer_inhibitor_specification.check_sugar_concentration()
 
 spec.load_spec_1 = spec.load_yield
 spec.load_spec_3 = spec.load_productivity
