@@ -534,3 +534,106 @@ chems.set_synonym('Pelargonic_acid','Nonanoic_acid')
 chems.set_synonym('HCl2','Liquid_HCl')
 # chems.set_synonyn('WWTs_sludge','Biomass')
 # chems.show()
+# {GOOO : 91320000,GLLL : 91320000,
+#  GOOL : 91320000,GLLO : 91320000,
+#  GSOO : 91320000,GPLO : 89250000,
+#  GPoOO : 89250000,GPOO : 89250000,
+#  GPOS : 89250000,GPOP : 87180000,
+#  GPLS : 89250000}
+
+# {HOOO : 169240000,HLLL : 169240000,
+#  HOOL : 169240000,HLLO : 169240000,
+#  HSOO : 169240000,HPLO : 166740000,
+#  HPoOO :166740000,HPOO : 166740000,
+#  HPOS : 166740000,HPOP : 164240000,
+#  HPLS : 166740000}
+    
+def OOO_CCPsat_model(T):
+      R = 8.314
+      theta = 273.15
+      ln10 = 2.30258509
+      return (-91320000/(R*theta*ln10))+ ((169240000/R*ln10)((1/theta) - (1/T)))
+chems.OOO.Psat.add_method(f=OOO_CCPsat_model, Tmin=323.15, Tmax=573.15)
+
+def LLL_CCPsat_model(T):
+      R = 8.314
+      theta = 273.15
+      ln10 = 2.30258509
+      return (-91320000/(R*theta*ln10))+ ((169240000/R*ln10)((1/theta) - (1/T)))
+chems.LLL.Psat.add_method(f=LLL_CCPsat_model, Tmin=323.15, Tmax=573.15)
+
+def OOL_CCPsat_model(T):
+      R = 8.314
+      theta = 273.15
+      ln10 = 2.30258509
+      return (-91320000/(R*theta*ln10))+ ((169240000/R*ln10)((1/theta) - (1/T)))
+chems.OOL.Psat.add_method(f=OOL_CCPsat_model, Tmin=323.15, Tmax=573.15)
+
+def LLO_CCPsat_model(T):
+      R = 8.314
+      theta = 273.15
+      ln10 = 2.30258509
+      return (-91320000/(R*theta*ln10))+ ((169240000/R*ln10)((1/theta) - (1/T)))
+chems.LLO.Psat.add_method(f=LLO_CCPsat_model, Tmin=323.15, Tmax=573.15)
+
+def SOO_CCPsat_model(T):
+      R = 8.314
+      theta = 273.15
+      ln10 = 2.30258509
+      return (-91320000/(R*theta*ln10))+ ((169240000/R*ln10)((1/theta) - (1/T)))
+chems.SOO.Psat.add_method(f=SOO_CCPsat_model, Tmin=323.15, Tmax=573.15)
+
+def PLO_CCPsat_model(T):
+      R = 8.314
+      theta = 273.15
+      ln10 = 2.30258509
+      return (-89250000/(R*theta*ln10))+ ((166740000/R*ln10)((1/theta) - (1/T)))
+chems.PLO.Psat.add_method(f=PLO_CCPsat_model, Tmin=323.15, Tmax=573.15)
+
+def PoOO_CCPsat_model(T):
+      R = 8.314
+      theta = 273.15
+      ln10 = 2.30258509
+      return (-89250000/(R*theta*ln10))+ ((166740000/R*ln10)((1/theta) - (1/T)))
+chems.PoOO.Psat.add_method(f=PoOO_CCPsat_model, Tmin=323.15, Tmax=573.15)
+
+def POO_CCPsat_model(T):
+      R = 8.314
+      theta = 273.15
+      ln10 = 2.30258509
+      return (-89250000/(R*theta*ln10))+ ((166740000/R*ln10)((1/theta) - (1/T)))
+chems.POO.Psat.add_method(f=POO_CCPsat_model, Tmin=323.15, Tmax=573.15)
+
+def POS_CCPsat_model(T):
+      R = 8.314
+      theta = 273.15
+      ln10 = 2.30258509
+      return (-89250000/(R*theta*ln10))+ ((166740000/R*ln10)((1/theta) - (1/T)))
+chems.POS.Psat.add_method(f=POS_CCPsat_model, Tmin=323.15, Tmax=573.15)
+
+def POP_CCPsat_model(T):
+      R = 8.314
+      theta = 273.15
+      ln10 = 2.30258509
+      return (-87180000/(R*theta*ln10))+ ((164240000/R*ln10)((1/theta) - (1/T)))
+chems.POP.Psat.add_method(f=POP_CCPsat_model, Tmin=323.15, Tmax=573.15)
+
+def PLS_CCPsat_model(T):
+      R = 8.314
+      theta = 273.15
+      ln10 = 2.30258509
+      return (-89250000/(R*theta*ln10))+ ((166740000/R*ln10)((1/theta) - (1/T)))
+chems.PLS.Psat.add_method(f=PLS_CCPsat_model, Tmin=323.15, Tmax=573.15)
+
+def OOO_Cnl_model(T):
+      return 3*(397600 + 540.89*T) + (61355 + 148.23*T)
+chems.OOO.Cn.l.add_method(f=OOO_Cnl_model, Tmin= 298.15, Tmax=453.15)
+chems.LLL.Cn.l.add_method(f=OOO_Cnl_model, Tmin= 298.15, Tmax=453.15)
+chems.LLO.Cn.l.add_method(f=OOO_Cnl_model, Tmin= 298.15, Tmax=453.15)
+chems.OOL.Cn.l.add_method(f=OOO_Cnl_model, Tmin= 298.15, Tmax=453.15)
+
+
+
+def LLL_Cnl_model(T):
+      return 3*(397600 + 540.89*T) + (61355 + 148.23*T)
+chems.OOO.Cn.l.add_method(f=OOO_Cnl_model, Tmin= 298.15, Tmax=453.15)

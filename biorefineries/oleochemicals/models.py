@@ -6,9 +6,7 @@ Created on Wed Feb 15 13:45:33 2023
 import biosteam as bst
 import chaospy
 from chaospy import distributions as shape
-from biorefineries.oleochemicals import systems_baseline 
-from systems_baseline import aa_baseline_sys
-from systems_baseline  import F_baseline
+from biorefineries.oleochemicals.systems_baseline import F_baseline,aa_baseline_sys
 import numpy as np
 from lca_tea_baseline import tea_azelaic_baseline
 from biosteam.evaluation import Model, Metric
