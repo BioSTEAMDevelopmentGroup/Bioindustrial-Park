@@ -8,6 +8,7 @@ import thermosteam as tmo
 import flexsolve as flx
 import numpy as np
 from biorefineries.oleochemicals import units_baseline
+from units_baseline import *
 from biorefineries.oleochemicals.chemicals_baseline import chems
 from biosteam import Flowsheet
 from biosteam import main_flowsheet
@@ -22,6 +23,10 @@ from biorefineries.lipidcane._process_settings import price #TODO: were these pr
 from biorefineries.cane.data.lca_characterization_factors import GWP_characterization_factors 
 #TODO: what reactor volumes should be assumed and what shouldnt be
 #Settings to set GWP100 as the main characterisation factor
+#List of questions
+# aa_production_sys.show() only tells me about convergence errors
+# aa_production_sys.diagram() spits out ValueError: cannot convert float NaN to integer
+
 GWP = 'GWP100'
 bst.settings.define_impact_indicator(key=GWP, units='kg*CO2e')
 #Settings to set the name of the flowsheet
@@ -195,16 +200,6 @@ def dihydroxylation_system(ins,outs):
                             ins = (T102-0,
                                    recovered_tungstic_acid),
                             outs = ('tungstic_acid_for_dihydroxylation'))
-    def adjust_tungsten_catalyst_flow():
-      tungstencatalyst_mass_factor =   0.0078
-      moles_of_unsaturation = biodiesel.imol['Methyl_oleate']+ 2*biodiesel.imol['Methyl_linoleate'] + biodiesel.imol['Methyl_palmitoleate'] 
-#Since tungstic acid needs to be replaced every 6 cycles, per cycle 1/6th of the required needs to be added      
-      moles_of_tungstic_acid_required_per_cycle = tungstencatalyst_mass_factor*moles_of_unsaturation*(1/6)
-      M101.ins[0].imol['Tungstic_acid'] = fta_mol = fresh_tunsgten_catalyst = moles_of_tungstic_acid_required_per_cycle - recovered_tungstic_acid.imol['Tungstic_acid'] 
-      # M101.ins[0].imol['Tungstic_acid'] = fta_mol 
-      T102._run()
-    M101.add_specification(adjust_tungsten_catalyst_flow, run=True,impacted_units = [T102])
-    
 #acc. to the patent tungstic acid is preferably 0.06% and 1.5% by moles with respect to the total moles of unsaturations
 #TODO: WHEN CALCIUM TUNGSTATE REACTION HAPPENS AT 0.9 THIS FAILS, FIX THIS
 #to combine all the inlets to the reactor    
@@ -230,6 +225,18 @@ def dihydroxylation_system(ins,outs):
                                                   T = 62 + 273.15, #specs based on the patent
                                                   tau = 6, #residence time based on the patent
                                                  )
+        
+    def adjust_tungsten_catalyst_flow():
+      tungstencatalyst_mass_factor =   0.0078
+      moles_of_unsaturation = biodiesel.imol['Methyl_oleate']+ 2*biodiesel.imol['Methyl_linoleate'] + biodiesel.imol['Methyl_palmitoleate'] 
+#Since tungstic acid needs to be replaced every 6 cycles, per cycle 1/6th of the required needs to be added      
+      moles_of_tungstic_acid_required_per_cycle = tungstencatalyst_mass_factor*moles_of_unsaturation*(0.167)
+      T102.ins[0].imol['Tungstic_acid'] = fta_mol = moles_of_tungstic_acid_required_per_cycle - recovered_tungstic_acid.imol['Tungstic_acid'] 
+      M101.ins[0].imol['Tungstic_acid'] = fta_mol 
+      T102._run()
+      M101._run()
+    T102.add_specification(adjust_tungsten_catalyst_flow, run=True,impacted_units = [M101,M102])
+    
        
 # Pumping the mixture out using a gear pump to the oxidative cleavage section
     R101_P1 = bst.units.Pump('R101_P1',
@@ -535,7 +542,7 @@ def azelaic_acid_production(ins,outs):
     
     def calculating_V_max_for_hydrolysis():
         Fatty_acid_mass_1 = crude_heavy_fatty_acids.F_mass
-        R601.ins[1].F_mass= water_mass_1 = Fatty_acid_mass_1*5/85 #Based on specs in the patent
+        R601.ins[1].imass['Water'] = water_mass_1 = Fatty_acid_mass_1*5/85 #Based on specs in the patent
         R601.ins[2].F_mass = total_resin_required = (Fatty_acid_mass_1+water_mass_1)*(10/90)
         R601.ins[3].F_vol = total_resin_required*3/0.77 #given density 0.770 Kg/m3 and 2-4 BV/h #TODO: check how to size acid ask Yoel
     R601.add_specification(calculating_V_max_for_hydrolysis, run = True)
@@ -845,10 +852,11 @@ def catalyst_recovery_from_aqueous_stream (ins,outs):
         
  
     def adjust_water_for_precipitate_washing():
+        
         #ratio based on 10ml of water used for dilution of 0.71g of Tungstic acid
         water_for_precipitate_washing.imass['Water'] = 7.142* S702.ins[0].imass['Tungstic_acid']
     S702.add_specification(adjust_water_for_precipitate_washing, run=True)
-
+    
 # #Tungstic acid to be disposed later is collected into this tank
 #     T703 = bst.StorageTank('T703',
 #                            ins =  S702-0,
@@ -908,7 +916,7 @@ def monocarboxylics_recovery_and_solvent_recovery(ins,outs):
 #########################################################################################################
 @SystemFactory(ID = 'aa_baseline_sys',
                )
-def aa_baseline_sys(ins,outs):
+def aa_production_sys(ins,outs):
 #Water for industrial use comes from public water supply: https://www.usgs.gov/mission-areas/water-resources/science/industrial-water-use#science
 
 # The following process is based on the Novomont patent released in 2016.
@@ -1055,9 +1063,8 @@ def aa_baseline_sys(ins,outs):
                                                                               )))
                                                             
    
-aa_baseline_sys = aa_baseline_sys()
-aa_baseline_sys.simulate()
-aa_baseline_sys.show()       
+aa_production_sys = aa_production_sys()
+aa_production_sys.simulate()
 #########################################################################################################
 # All the Facilities (900 level)
 #Streams to boiler turbogenerator,Liquid/Solid waste streams mixer
@@ -1153,9 +1160,9 @@ M902 = bst.Mixer(ins=(F_baseline.wastewater1_to_boilerturbogenerator,
                       F_baseline.wastewater3_to_boilerturbogenerator,
                       F_baseline.wastewater4_to_boilerturbogenerator),
                   outs = 'Total_wastewater_to_be_treated')
-WastewaterSystemCost = bst.WastewaterSystemCost(ID='W901_systemcost',
-                                                ins = M902-0,
-                                                outs=(), thermo=None)
+# WastewaterSystemCost = bst.WastewaterSystemCost(ID='W901_systemcost',
+#                                                 ins = M902-0,
+#                                                 outs=(), thermo=None) #TODO: where should this be?
     
 
 #########################################################################################################
@@ -1186,34 +1193,60 @@ F_baseline.stream.NaOH.characterization_factors = {'GWP100': GWP_characterizatio
 F_baseline.stream.crude_glycerol.price = price['Crude glycerol']*401.693/275.700 #Adjusted from 2021 Jan to 2022 Dec based on FRED's PPI
 F_baseline.stream.crude_glycerol.characterization_factors = {'GWP100': GWP_characterization_factors['crude-glycerol']}
  
+#######################################################################################################################33
+#####################################################################################################33
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 ###############################################################################################################################################
 # renaming the first system factory for biodiesel prep as the 1000 series
-biodiesel_prep_units = (F_baseline.unit.S402,F_baseline.unit.T401,
-                        F_baseline.unit.P401,F_baseline.unit.T402,
-                        F_baseline.unit.P402,F_baseline.unit.T403,
-                        F_baseline.unit.P403,F_baseline.unit.T404,
-                        F_baseline.unit.P404,F_baseline.unit.S401,
-                        F_baseline.unit.R401,F_baseline.unit.C401,
-                        F_baseline.unit.P405,F_baseline.unit.R402,
-                        F_baseline.unit.C402,F_baseline.unit.T405,
-                        F_baseline.unit.P406,F_baseline.unit.C403,
-                        F_baseline.unit.F401,F_baseline.unit.P407,
-                        F_baseline.unit.H401,F_baseline.unit.P408,
-                        F_baseline.unit.T406,F_baseline.unit.P409,
-                        F_baseline.unit.C404,F_baseline.unit.T407,
-                        F_baseline.unit.P410,F_baseline.unit.D401,
-                        F_baseline.unit.H402,F_baseline.unit.D402,
-                        F_baseline.unit.P413,F_baseline.unit.H403,
-                        F_baseline.unit.P411,F_baseline.unit.H404,
-                        F_baseline.unit.P412,F_baseline.unit.T408,
-                        F_baseline.unit.T409,F_baseline.unit.B401)
-bst.rename_units(units = biodiesel_prep_units, area = 1000)
-bst.rename_unit(unit = F_baseline.F2001, area = 2000)
-# biodiesel_prep_units_group = bst.UnitGroup(name = '1000', units = biodiesel_prep_units)
-# # aa_baseline_production_areas = bst.UnitGroup(name = 'aa_baseline_production_areas',
-# #                                              units= (aa_baseline_sys.units,
-# #                                                      biodiesel_prep_units))
-aa_baseline_groups = bst.UnitGroup.group_by_area(aa_baseline_sys.units)
+# biodiesel_prep_units = (F_baseline.unit.S402,F_baseline.unit.T401,
+#                         F_baseline.unit.P401,F_baseline.unit.T402,
+#                         F_baseline.unit.P402,F_baseline.unit.T403,
+#                         F_baseline.unit.P403,F_baseline.unit.T404,
+#                         F_baseline.unit.P404,F_baseline.unit.S401,
+#                         F_baseline.unit.R401,F_baseline.unit.C401,
+#                         F_baseline.unit.P405,F_baseline.unit.R402,
+#                         F_baseline.unit.C402,F_baseline.unit.T405,
+#                         F_baseline.unit.P406,F_baseline.unit.C403,
+#                         F_baseline.unit.F401,F_baseline.unit.P407,
+#                         F_baseline.unit.H401,F_baseline.unit.P408,
+#                         F_baseline.unit.T406,F_baseline.unit.P409,
+#                         F_baseline.unit.C404,F_baseline.unit.T407,
+#                         F_baseline.unit.P410,F_baseline.unit.D401,
+#                         F_baseline.unit.H402,F_baseline.unit.D402,
+#                         F_baseline.unit.P413,F_baseline.unit.H403,
+#                         F_baseline.unit.P411,F_baseline.unit.H404,
+#                         F_baseline.unit.P412,F_baseline.unit.T408,
+#                         F_baseline.unit.T409,F_baseline.unit.B401)
+# bst.rename_units(units = biodiesel_prep_units, area = 1000)
+# bst.rename_unit(unit = F_baseline.F2001, area = 2000)
+# # biodiesel_prep_units_group = bst.UnitGroup(name = '1000', units = biodiesel_prep_units)
+# # # aa_baseline_production_areas = bst.UnitGroup(name = 'aa_baseline_production_areas',
+# # #                                              units= (aa_baseline_sys.units,
+# # #                                                      biodiesel_prep_units))
+# aa_baseline_groups = bst.UnitGroup.group_by_area(aa_baseline_sys.units)
 
     
 #     def checking_tungstic_acid_mass_balance(): 
