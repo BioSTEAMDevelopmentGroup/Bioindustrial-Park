@@ -9,7 +9,7 @@ Fermentation
 
 Pretreatment
 ------------
-.. automodule:: biorefineries.cellulosic.systems.fermentation
+.. automodule:: biorefineries.cellulosic.systems.pretreatment
 
 Cellulosic ethanol
 ------------------
