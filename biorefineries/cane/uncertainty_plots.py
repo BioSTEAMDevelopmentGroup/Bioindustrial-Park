@@ -163,7 +163,7 @@ mc_line_metric_settings = {
     'Biodiesel yield': (biodiesel_yield, f"Biodiesel yield\n[{format_units('L/ha')}]"),
     'GWP biodiesel': (GWP_biodiesel, f"GWP Biodiesel [{GWP_units_L}]"),
     'GWP biofuel': (GWP_biofuel_allocation, f"GWP [{GWP_units_GGE}]"),
-    'ROI': (ROI, "Return on Investment [%]"),
+    'ROI': (ROI, "ROI [%]"),
 }
 
 mc_comparison_settings = {
@@ -403,12 +403,16 @@ def plot_montecarlo_absolute():
     
 def plot_lines_monte_carlo_manuscript(fs=10):
     set_font(size=fs)
-    set_figure_size(aspect_ratio=.8)
+    set_figure_size(aspect_ratio=.65)
     fig, axes = plot_lines_monte_carlo(
         ncols=1,
         metrics=['ROI', 'GWP biofuel'],
+        labels=['Sugarcane', 'Energycane', 
+                '1566\n1.8% Oil', 
+                '1565\n2.0% Oil',
+                '1580\n5.4% Oil'],
         expand=0.1, 
-        xrot=90,
+        xrot=45,
         color_wheel = line_color_wheel,
     )
     for ax, letter in zip(axes.flat, 'ABCDEFGHIJ'):
@@ -417,7 +421,7 @@ def plot_lines_monte_carlo_manuscript(fs=10):
         plt.text(-0.25, ylb + (yub - ylb) * 0.92, letter, color=letter_color,
                  horizontalalignment='center',verticalalignment='center',
                  fontsize=12, fontweight='bold')
-    plt.subplots_adjust(left=0.12, right=0.95, wspace=0, top=0.95, bottom=0.15)
+    plt.subplots_adjust(left=0.12, right=0.95, wspace=0, top=0.95, bottom=0.2)
     for i in ('svg', 'png'):
         file = os.path.join(images_folder, f'montecarlo_lines.{i}')
         plt.savefig(file, transparent=True)
@@ -735,8 +739,8 @@ def plot_feedstock_conventional_comparison_kde():
 def plot_feedstock_cellulosic_comparison_kde(fs=None):
     plot_kde(
         'O2 - S2',
-        yticks=[-20, -15, -10, -5, 0, 5, 10],
-        xticks=[-0.05, 0, 0.05, 0.1],
+        yticks=[-15, 0, 15, 30, 45, 60],
+        xticks=[-0.2, -0.1, 0, 0.1, 0.2],
         top_left='Oilcane\nFavored()',
         bottom_right='Sugarcane\nFavored()',
         top_right='GWP\nTradeoff()',
@@ -1090,7 +1094,7 @@ def plot_competitive_biomass_yield_across_oil_content(
         fs=None,
     ):
     if fs is None: fs = 10
-    set_figure_size(aspect_ratio=1, width=5.5)
+    set_figure_size(aspect_ratio=0.8, width=5.5)
     fig, axes = plt.subplots(ncols=1, nrows=2)
     set_font(size=fs)
     bioethanol_ax, microbial_oil_ax = axes.flatten()
@@ -1120,7 +1124,7 @@ def plot_competitive_biomass_yield_across_oil_content(
         c=colors.neutral.shade(50).RGBn,
     )
     _add_lines_biomass_yield_vs_oil_content()
-    plt.subplots_adjust(hspace=0.05, left=0.1, right=0.96, bottom=0.08, top=0.95)
+    plt.subplots_adjust(hspace=0.05, left=0.1, right=0.96, bottom=0.10, top=0.95)
     for i in ('svg', 'png'):
         file = os.path.join(images_folder, f'competitive_biomass_yield_MCAC.{i}')
         plt.savefig(file, transparent=True)
@@ -1176,7 +1180,7 @@ def _plot_competitive_biomass_yield_across_oil_content(
             ha='center', va='center', fontsize=12,
         )
         plt.text(
-            0.25, 9, 'Infeasible', c=colors.neutral.shade(50).RGBn,
+            0.25, 12, 'Infeasible', c=colors.neutral.shade(50).RGBn,
             ha='left', va='center', fontsize=12, rotation='vertical',
         )
     else:

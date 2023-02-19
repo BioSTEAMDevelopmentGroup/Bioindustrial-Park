@@ -149,7 +149,7 @@ def plot_metrics_across_composition_configurations_manuscript(load=True, fs=8, s
     colors = np.zeros([2, 2], object)
     colors[:] = [[light_letter_color, light_letter_color],
                  [light_letter_color, light_letter_color]]
-    _add_letter_labels(axes, 1 - 0.88, 0.63, colors)
+    _add_letter_labels(axes, 1 - 0.86, 0.61, colors)
     plt.subplots_adjust(right=0.92, hspace=0.1, wspace=0.1, top=0.9, bottom=0.10)
     for i in ('svg', 'png'):
         file = os.path.join(images_folder, f'metrics_across_composition_contours.{i}')
