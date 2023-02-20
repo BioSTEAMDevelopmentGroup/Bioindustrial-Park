@@ -6,10 +6,69 @@ Created on Wed Feb 15 13:45:33 2023
 import biosteam as bst
 import chaospy
 from chaospy import distributions as shape
-from biorefineries.oleochemicals.systems_baseline import F_baseline,aa_baseline_sys
+from biorefineries.oleochemicals.systems_baseline import F_baseline
+from biorefineries.oleochemicals.systems_baseline import aa_baseline_sys
 import numpy as np
-from lca_tea_baseline import tea_azelaic_baseline
+from lca_tea_baseline import TEA_baseline
 from biosteam.evaluation import Model, Metric
+from biorefineries.lipidcane._process_settings import price #TODO: were these prices adjusted to 2013 prices?
+from biorefineries.cane.data.lca_characterization_factors import GWP_characterization_factors 
+
+aa_baseline_sys = aa_baseline_sys()
+aa_baseline_sys.set_tolerance(mol=0.01, rmol=0.01,subsystems = True)
+aa_baseline_sys.simulate()
+
+#########################################################################################################
+# Streams specs belonging to the cane biorefinery used for biodisel prep
+#Methanol
+F_baseline.stream.methanol.price = 0.792*401.693/275.700 #Based on Catbio costs adjusted from 2021 Jan to 2022 Dec using Fred's PPI for basic inorganic chemicals
+F_baseline.stream.methanol.characterization_factors = {'GWP100': GWP_characterization_factors['methanol']}
+
+#Catalyst
+F_baseline.stream.catalyst.price = 0.25*(price['NaOCH3']*401.693/259.900) + 0.75*( 0.792*401.693/275.700) #Adjusted from 2019 to 2022, Fred's PPI for industrial chemicals
+F_baseline.stream.catalyst.characterization_factors = {'GWP100': GWP_characterization_factors['methanol catalyst mixture']}
+
+#Biodiesel wash water
+F_baseline.stream.biodiesel_wash_water.price = 3.945 *(217.9/132.9)/(3.78541*1000)#Ref: DOE Annual water rates pdf,adjusted using FRED's PPI> Industry based> Utilities.(1kgal = 1000gal, 1gal = 3.78541 Kg)
+F_baseline.stream.biodiesel_wash_water.characterization_factors={'GWP100': 0.00035559}#Ecoinvent:tap water production, conventional treatment, RoW, (Author: Marylène Dussault inactive)
+
+#HCl 
+F_baseline.stream.HCl.price = 0.88*401.693/275.700 #Based on Catbio price ($/Kg) for Hydrogen peroxide, 35%, tech., tankcars, works, frt. equald. adjusted from 2021 Jan to 2022 Dec using Fred's PPI for basic inorganic chemicals 
+F_baseline.stream.HCl.characterization_factors = {'GWP100': GWP_characterization_factors['HCl']}
+
+#NaOH
+F_baseline.stream.NaOH.price = 0.93*401.693/275.700 #Based on Catbio price ($/Kg) for Caustic soda (sodium hydroxide), liq., dst spot barge f.o.b. USG adjusted from 2021 Jan to 2022 Dec using Fred's PPI for basic inorganic chemicals 
+F_baseline.stream.NaOH.characterization_factors = {'GWP100': GWP_characterization_factors['NaOH']}
+
+
+#ask Yoel if this should be considered or the prices from economic assessment paper should be taken instead
+#crude_glycerol
+F_baseline.stream.crude_glycerol.price = price['Crude glycerol']*401.693/275.700 #Adjusted from 2021 Jan to 2022 Dec based on FRED's PPI
+F_baseline.stream.crude_glycerol.characterization_factors = {'GWP100': GWP_characterization_factors['crude-glycerol']}
+ 
+#######################################################################################################################33
+#####################################################################################################33
+tea_azelaic_baseline = TEA_baseline(system = aa_baseline_sys,
+                                operating_days = 300,
+                                IRR = 0.1,duration=(2013,2023),
+                                depreciation = 'MACRS7',
+                                lang_factor = 3,income_tax = 0.35,
+                                construction_schedule = (2/3,1/3),#Econ. ref
+                                WC_over_FCI=0.05,
+                                labor_cost = 3600000,
+                                property_tax = 0.02,
+                                property_insurance = 0.02,
+                                supplies = 0.01,
+                                maintenance = 0.02,
+                                administration = 0.02,
+                                laboratory_charges = 0.18,
+                                operating_supervision = 0.18,
+                                plant_overhead = 0.6,
+                                # OSBL_units = [aa_baseline_sys.facilities]
+                                )    
+
+aa_sys_op_hours = aa_baseline_sys.operating_hours = tea_azelaic_baseline.operating_days * 24
+  
 
 #TODO: which reactor to use titer on and why
 aa_sys_op_hours = aa_baseline_sys.operating_hours = tea_azelaic_baseline.operating_days * 24
