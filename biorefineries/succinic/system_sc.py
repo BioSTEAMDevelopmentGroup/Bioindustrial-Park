@@ -158,12 +158,13 @@ def create_succinic_sys(ins, outs):
     # =============================================================================
     
 
-    # Cool hydrolysate down to fermentation temperature at 50°C
     
     F301 = bst.MultiEffectEvaporator('F301', ins=u.C201-0, outs=('F301_l', 'F301_g'),
                                             P = (101325, 73581, 50892, 32777, 20000), V = 1e-4)
     
-    H301 = bst.units.HXutility('H301', ins=F301-0, T=50+273.15)
+    # Cool hydrolysate down to fermentation temperature at 30°C
+    
+    H301 = bst.units.HXutility('H301', ins=F301-0, T=30+273.15)
     
 
 
@@ -187,14 +188,15 @@ def create_succinic_sys(ins, outs):
                         split = 0.025) # split = inoculum ratio
     
 
-    # Cofermentation
+    
     S301 = bst.FakeSplitter('S301', ins=CO2_fermentation,
                         outs = ('CO2_to_seedtrain', 'CO2_to_cofermentation'),
                         )
     @S301.add_specification(run=False)
     def S301_spec():
         S301.ins[0].imol['CO2'] = S301.outs[0].imol['CO2'] + S301.outs[1].imol['CO2']
-        
+      
+    # Cofermentation
     R302 = units.CoFermentation('R302', 
                                     ins=(S302-1, 'seed', CSL, S301-1, base_neutralization, 
                                          '', # CO2 recycle (K301-0)
@@ -227,7 +229,7 @@ def create_succinic_sys(ins, outs):
     @R303.add_specification(run=False)
     def R303_spec():
         R303._run()
-        S301.simulate()
+        S301.specifications[0]()
     
     M305 = bst.Mixer('M305', ins=(R302-1, R303-1,), outs=('mixed_fermentation_and_seed_vent'))
     
@@ -795,35 +797,42 @@ spec = ProcessSpecification(
 
 
 def M304_titer_obj_fn(water_to_sugar_mol_ratio):
-    M304, R302 = u.M304, u.R302
+    # M304, R302 = u.M304, u.R302
     M304.water_to_sugar_mol_ratio = water_to_sugar_mol_ratio
-    M304.simulate()
+    M304.specifications[0]()
     M304_H._run()
     S302._run()
-    R303._run()
+    R303.specifications[0]()
     T301._run()
-    R302.simulate()
+    # R302.simulate()
+    R302.specifications[0]()
     return R302.effluent_titer - R302.titer_to_load
 
 def F301_titer_obj_fn(V):
     F301.V = V
-    F301.simulate()
+    F301._run()
     H301._run()
-    M304.simulate()
+    M304.specifications[0]()
     M304_H._run()
     S302._run()
-    R303._run()
+    R303.specifications[0]()
     T301._run()
-    R302.simulate()
+    # R302.simulate()
+    R302.specifications[0]()
     return R302.effluent_titer - R302.titer_to_load
 
 def load_titer_with_glucose(titer_to_load):
     spec.spec_2 = titer_to_load
     R302.titer_to_load = titer_to_load
-    if M304_titer_obj_fn(1e-4)<0:
-        IQ_interpolation(F301_titer_obj_fn, 1e-4, 0.8, ytol=1e-3)
+    F301_titer_obj_fn(1e-4)
+    if M304_titer_obj_fn(1e-4)<0: # if the slightest dilution results in too low a conc
+        IQ_interpolation(F301_titer_obj_fn, 1e-4, 0.9, ytol=1e-2)
+    # elif F301_titer_obj_fn(1e-4)>0: # if the slightest evaporation results in too high a conc
     else:
-        IQ_interpolation(M304_titer_obj_fn, 1e-4, 30000., ytol=1e-3)
+        F301_titer_obj_fn(1e-4)
+        IQ_interpolation(M304_titer_obj_fn, 1e-4, 5000., ytol=1e-2)
+    # else:
+    #     raise RuntimeError('Unhandled load_titer case.')
     spec.titer_inhibitor_specification.check_sugar_concentration()
 
 spec.load_spec_1 = spec.load_yield

@@ -128,8 +128,9 @@ for i in range(len(modes)):
         'direct non-biogenic emissions': lca.direct_emissions_GWP,
         }
     
+    tot_positive_GWP = sum([v for v in results_dict['Baseline']['GWP Breakdown'][mode].values() if v>0])
     for k, v in results_dict['Baseline']['GWP Breakdown'][mode].items():
-        results_dict['Baseline']['GWP Breakdown'][mode][k] = v/tot_GWP
+        results_dict['Baseline']['GWP Breakdown'][mode][k] = v/tot_positive_GWP
       
     
     material_FEC_breakdown = lca.material_FEC_breakdown
@@ -146,9 +147,9 @@ for i in range(len(modes)):
         'natural gas (for product drying)': material_FEC_breakdown['CH4'],
         'net electricity production': lca.net_electricity_FEC,
         }
-    
+    tot_positive_FEC = sum([v for v in results_dict['Baseline']['FEC Breakdown'].values() if v>0])
     for k, v in results_dict['Baseline']['FEC Breakdown'][mode].items():
-        results_dict['Baseline']['FEC Breakdown'][mode][k] = v/tot_FEC
+        results_dict['Baseline']['FEC Breakdown'][mode][k] = v/tot_positive_FEC
     
     print(f"\nSimulated baseline. MPSP = ${round(results_dict['Baseline']['MPSP'][mode],2)}/kg.")
     print('\n\nEvaluating ...')
@@ -352,7 +353,7 @@ contourplots.box_and_whiskers_plot(uncertainty_data=FEC_uncertainty,
 #%% TEA breakdown figure
 df_TEA_breakdown = bst.UnitGroup.df_from_groups(
     unit_groups, fraction=True,
-    scale_fractions_to_positive_values=False,
+    scale_fractions_to_positive_values=True,
 )
 
 
@@ -361,7 +362,7 @@ df_TEA_breakdown = bst.UnitGroup.df_from_groups(
 
 contourplots.stacked_bar_plot(dataframe=df_TEA_breakdown, 
                  # y_ticks=[-200, -175, -150, -125, -100, -75, -50, -25, 0, 25, 50, 75, 100, 125, 150, 175], 
-                 y_ticks=[-125, -100, -75, -50, -25, 0, 25, 50, 75, 100, 125, 150, 175, 200, 225], 
+                 y_ticks=[-40, -20, 0, 20, 40, 60, 80, 100], 
                  y_label=r"$\bfCost$" + " " + r"$\bfand$" + " " +  r"$\bfUtility$" + " " +  r"$\bfBreakdown$", 
                  y_units = "%", 
                  colors=['#7BBD84', '#F7C652', '#63C6CE', '#94948C', '#734A8C', '#D1C0E1', '#648496', '#B97A57', '#D1C0E1', '#F8858A', '#F8858A', ],
@@ -390,7 +391,7 @@ df_GWP_breakdown = pd.DataFrame(GWP_breakdown_list,
 # df_GWP_breakdown = df_GWP_breakdown.rename(columns={'Net electricity production': 'Net electricity demand'})
 
 contourplots.stacked_bar_plot(dataframe=df_GWP_breakdown, 
-                  y_ticks=[-50, -25, 0, 25, 50, 75, 100, 125, 150,], 
+                  y_ticks=[-40, -20, 0, 20, 40, 60, 80, 100], 
                   # y_ticks=[-400, -300, -200, -100, 0, 100, 200, 300, 400], 
                  # y_ticks = []
                  # y_label=r"$\bfGWP-100a $" +" "+ r"$\bfBreakdown$",  
@@ -421,7 +422,7 @@ df_FEC_breakdown = pd.DataFrame(FEC_breakdown_list,
 
 contourplots.stacked_bar_plot(dataframe=df_FEC_breakdown, 
                  # y_ticks=[-200, -175, -150, -125, -100, -75, -50, -25, 0, 25, 50, 75, 100, 125, 150, 175], 
-                 y_ticks=[-250, -200, -150, -100, -50, 0, 50, 100, 150, 200, 250, 300, 350], 
+                 y_ticks=[-125, -100, -75, -50, -25, 0, 25, 50, 75, 100], 
                  y_label=r"$\bfFEC$" +" "+ r"$\bfBreakdown$", 
                  y_units = "%", 
                  # colors=['#7BBD84', '#F7C652', '#63C6CE', '#94948C', '#734A8C', '#D1C0E1', '#648496', '#B97A57', '#F8858A', 'magenta'],
