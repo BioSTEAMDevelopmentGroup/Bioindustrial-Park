@@ -147,7 +147,7 @@ for i in range(len(modes)):
         'natural gas (for product drying)': material_FEC_breakdown['CH4'],
         'net electricity production': lca.net_electricity_FEC,
         }
-    tot_positive_FEC = sum([v for v in results_dict['Baseline']['FEC Breakdown'].values() if v>0])
+    tot_positive_FEC = sum([v for v in results_dict['Baseline']['FEC Breakdown'][mode].values() if v>0])
     for k, v in results_dict['Baseline']['FEC Breakdown'][mode].items():
         results_dict['Baseline']['FEC Breakdown'][mode][k] = v/tot_positive_FEC
     
