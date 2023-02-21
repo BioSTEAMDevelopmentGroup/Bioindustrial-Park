@@ -226,7 +226,7 @@ GWP_CF_array = chems.kwarray(GWP_CFs)
 GWP_CF_stream = tmo.Stream('GWP_CF_stream', GWP_CF_array, units='kg/hr')
 CFs['GWP_CF_stream'] = GWP_CF_stream
 
-GWP_CFs['Electricity'] = 0.1247 # kg CO2-eq/kWh GREET 2022 US Mix  # assume production==consumption, both in kg CO2-eq/kWh
+GWP_CFs['Electricity'] = 0.4490 # kg CO2-eq/kWh GREET 2022 US Mix  # assume production==consumption, both in kg CO2-eq/kWh
 
 
 GWP_CFs['Sugarcane'] = 0.12043 * 0.3/0.286 # ecoinvent 3.8 market for sugarcane, RoW
@@ -267,7 +267,7 @@ FEC_CF_stream = tmo.Stream('FEC_CF_stream', FEC_CF_array, units='kg/hr')
 
 CFs['FEC_CF_stream'] = FEC_CF_stream
 
-FEC_CFs['Electricity'] = 1.590 # MJ/kWh # GREET 2022 US Mix #assume production==consumption, both in MJ/kWh
+FEC_CFs['Electricity'] = 5.724 # MJ/kWh # GREET 2022 US Mix #assume production==consumption, both in MJ/kWh
 
 FEC_CFs['Sugarcane'] = 	0.40192 * 0.3/0.286 # ecoinvent 3.8 market for sugarcane, RoW
 # # adjusted from dry wt content of 28.6% (their assumption) to 30% (our assumption)
