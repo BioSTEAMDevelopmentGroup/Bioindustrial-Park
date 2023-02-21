@@ -130,7 +130,7 @@ for i in range(len(modes)):
     
     tot_positive_GWP = sum([v for v in results_dict['Baseline']['GWP Breakdown'][mode].values() if v>0])
     for k, v in results_dict['Baseline']['GWP Breakdown'][mode].items():
-        results_dict['Baseline']['GWP Breakdown'][mode][k] = v/tot_GWP
+        results_dict['Baseline']['GWP Breakdown'][mode][k] = v/tot_positive_GWP
       
     
     material_FEC_breakdown = lca.material_FEC_breakdown
@@ -147,9 +147,9 @@ for i in range(len(modes)):
         'natural gas (for product drying)': material_FEC_breakdown['CH4'],
         'net electricity production': lca.net_electricity_FEC,
         }
-    
+    tot_positive_FEC = sum([v for v in results_dict['Baseline']['FEC Breakdown'].values() if v>0])
     for k, v in results_dict['Baseline']['FEC Breakdown'][mode].items():
-        results_dict['Baseline']['FEC Breakdown'][mode][k] = v/tot_FEC
+        results_dict['Baseline']['FEC Breakdown'][mode][k] = v/tot_positive_FEC
     
     print(f"\nSimulated baseline. MPSP = ${round(results_dict['Baseline']['MPSP'][mode],2)}/kg.")
     print('\n\nEvaluating ...')
