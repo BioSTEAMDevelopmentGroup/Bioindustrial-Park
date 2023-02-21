@@ -2108,7 +2108,7 @@ class HydrogenationEstersReactor(Reactor):
         duty = sum([i.H for i in self.outs]) - sum([i.H for i in self.ins])
         mixed_feed = tmo.Stream()
         mixed_feed.mix_from(self.ins)
-        self.heat_exchanger.simulate_as_auxiliary_exchanger(duty, mixed_feed)
+        # self.heat_exchanger.simulate_as_auxiliary_exchanger(duty, mixed_feed)
         
     def _cost(self):
         Reactor._cost(self)

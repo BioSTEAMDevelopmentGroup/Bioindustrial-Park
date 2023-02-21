@@ -69,7 +69,9 @@ from biosteam import SystemFactory
 from warnings import filterwarnings
 from biosteam.process_tools import BoundedNumericalSpecification
 from scipy.interpolate import interp2d
+from biorefineries.cellulosic import create_facilities
 
+HeatExchangerNetwork = bst.HeatExchangerNetwork
 # Based on experimental data from Singh group
 ts = [0.166666667,	0.5,	1,	2]
 Ts = [303.15, 323.15]
@@ -221,7 +223,7 @@ def create_TAL_sys(ins, outs):
         M304._run()
     # M304.specification = adjust_M304_water()
     
-    M304_H = bst.units.HXutility('M304_H', ins=M304-0, T=30+273.15, rigorous=True)
+    M304_H = bst.units.HXutility('M304_H', ins=M304-0, T=30+273.15, rigorous=False)
     
     # Mix pretreatment hydrolysate/enzyme mixture with fermentation seed
     
@@ -388,7 +390,7 @@ def create_TAL_sys(ins, outs):
     F401.flash=False
     F401.TAL_solubility_in_ethanol_ww = get_TAL_solubility_in_ethanol_ww()
     
-    @F401.add_specification()
+    @F401.add_bounded_numerical_specification(x0=1e-4, x1=1.-1e-4, ytol=1e-4)
     def F401_obj_fn(V):
         F401_b = F401.outs[0]
         # F401_ins_0 = F401.ins[0]
@@ -475,7 +477,7 @@ def create_TAL_sys(ins, outs):
                                   Ethanol_esterification, 
                                   ''),)
     M403.TAL_solubility_in_ethanol_ww = get_TAL_solubility_in_ethanol_ww()
-    # @M403.add_specification(run=True)
+    # @M403.add_bounded_numerical_specification(x0=0., x1=1000.)
     def M403_obj_fn(etoh_mass):
         M403_in_0 = M403.ins[0]
         # TAL_solubility_in_ethanol_ww = get_TAL_solubility_in_ethanol_ww()
@@ -526,19 +528,20 @@ def create_TAL_sys(ins, outs):
     S405-0-4-R401
     
     F403 = bst.Flash('F403', ins=S405-1, outs = ('volatiles', 'bottom_product_esters'), 
-                      V = 0.6, 
-                      P=101325./20.) 
+                      # V = 0.6, 
+                      T=100+273.15,
+                      P=101325./20.,) 
     
     # F403 = bst.units.MultiEffectEvaporator('F403', ins=R401-0, outs = ('bottom_product_esters', 'volatiles'), 
     #                                        # chemical='Ethanol',
     #                                         P = (101325, 73581, 50892, 32777, 20000), V = 0.7)
     
     
-    @F403.add_specification(run=True)
-    def F403_spec():
-        F403_ins_0 = F403.ins[0]
-        F403.V = sum(F403_ins_0.imol['Ethanol', 'Water'])/\
-        sum([F403_ins_0.imol[i.ID] for i in F403_ins_0.vle_chemicals])
+    # @F403.add_specification(run=True)
+    # def F403_spec():
+    #     F403_ins_0 = F403.ins[0]
+    #     F403.V = sum(F403_ins_0.imol['Ethanol', 'Water'])/\
+    #     sum([F403_ins_0.imol[i.ID] for i in F403_ins_0.vle_chemicals])
         # F403._run()
         
     # D401 = bst.units.ShortcutColumn('D401', ins=F403-0, outs=('D401_0', 'D401_1'),
@@ -618,75 +621,23 @@ def create_TAL_sys(ins, outs):
                                         # X401-1, S408-0,
                                         ))
     
-    # This represents the total cost of wastewater treatment system
-    WWT_cost = units.WastewaterSystemCost('WWTcost501', ins=M501-0)
-    
-    R501 = units.AnaerobicDigestion('R501', ins=WWT_cost-0,
-                                    outs=('biogas', 'anaerobic_treated_water', 
-                                          'anaerobic_sludge'),
-                                    reactants=soluble_organics + ['TAL'],
-                                    split=find_split(splits_df.index,
-                                                     splits_df['stream_611'],
-                                                     splits_df['stream_612'],
-                                                     chemical_groups),
-                                    T=35+273.15)
-    
-    get_flow_tpd = lambda: (feedstock.F_mass-feedstock.imass['H2O'])*24/907.185
-    
-    # Mix recycled stream and wastewater after R501
-    M502 = bst.units.Mixer('M502', ins=(R501-1, ''))
-    @M502.add_specification(run=True)
-    def M502_spec():
-        M503._run()
-        
-    R502 = units.AerobicDigestion('R502', ins=(M502-0, air_lagoon, aerobic_caustic),
-                                  outs=('aerobic_vent', 'aerobic_treated_water'),
-                                  reactants=soluble_organics,
-                                  ratio=get_flow_tpd()/2205)
-    
-    # Membrane bioreactor to split treated wastewater from R502
-    S501 = bst.units.Splitter('S501', ins=R502-1, outs=('membrane_treated_water', 
-                                                        'membrane_sludge'),
-                              split=find_split(splits_df.index,
-                                               splits_df['stream_624'],
-                                               splits_df['stream_625'],
-                                               chemical_groups))
-    
-    S501.line = 'Membrane bioreactor'
-    
-    # Recycled sludge stream of memberane bioreactor, the majority of it (96%)
-    # goes to aerobic digestion and the rest to sludge holding tank then to BT
-    S502 = bst.units.Splitter('S502', ins=S501-1, outs=('to_aerobic_digestion', 
-                                                        'to_boiler_turbogenerator'),
-                              split=0.96)
-    
-    M503 = bst.units.Mixer('M503', ins=(S502-0, 'centrate'), outs=1-M502)
-    
-    # Mix anaerobic and 4% of membrane bioreactor sludge
-    M504 = bst.units.Mixer('M504', ins=(R501-2, S502-1))
-    
-    # Sludge centrifuge to separate water (centrate) from sludge
-    S503 = bst.units.Splitter('S503', ins=M504-0, outs=(1-M503, 'sludge'),
-                              split=find_split(splits_df.index,
-                                               splits_df['stream_616'],
-                                               splits_df['stream_623'],
-                                               chemical_groups))
-    S503.line = 'Sludge centrifuge'
-    
-    # Reverse osmosis to treat membrane separated water
-    S504 = bst.units.Splitter('S504', ins=S501-0, outs=('discharged_water', 'waste_brine'),
-                              split=find_split(splits_df.index,
-                                               splits_df['stream_626'],
-                                               splits_df['stream_627'],
-                                               chemical_groups))
-    S504.line = 'Reverse osmosis'
+    wastewater_treatment_sys = bst.create_wastewater_treatment_system(
+        ins=M501-0,
+        mockup=True,
+        area=500,
+    )
     
     # Mix solid wastes to boiler turbogenerator
-    M505 = bst.units.Mixer('M505', ins=(S503-1, 
+    M505 = bst.units.Mixer('M505', ins=(
+                                        # S503-1, 
                                         S401-0, 
                                         # F403-0, D401-0,
                                         ), 
                             outs='wastes_to_boiler_turbogenerator')
+    
+    MX = bst.Mixer(400, ['', ''])
+    
+    
     
     
     # %% 
@@ -730,7 +681,13 @@ def create_TAL_sys(ins, outs):
     # ethanol_fresh = Stream('ethanol_fresh', Ethanol = get_feedstock_dry_mass()*48*22.1/1000*0.93, units='kg/hr', price=price['Ethanol'])
     # DPHP_fresh = Stream('DPHP_fresh', DPHP = get_feedstock_dry_mass()*50*22.1/1000*0.93, units='kg/hr', price=price['DPHP'])
     # Water used to keep system water usage balanced
+    
     system_makeup_water = Stream('system_makeup_water', price=price['Makeup water'])
+    
+    
+    imbibition_water = Stream('imbibition_water', price=price['Makeup water'])
+    rvf_wash_water = Stream('rvf_wash_water', price=price['Makeup water'])
+    dilution_water = Stream('dilution_water', price=price['Makeup water'])
     
     # TAL stream
     # TAL = Stream('TAL', units='kg/hr', price=price['TAL'])
@@ -742,30 +699,7 @@ def create_TAL_sys(ins, outs):
     # IBA = Stream('IBA', units='kg/hr', price=price['IBA'])
     # Chemicals used/generated in BT
     # FGD_lime = Stream('FGD_lime')
-    ash = Stream('ash', price=price['Ash disposal'])
-    # boiler_chems = Stream('boiler_chems', price=price['Boiler chems'])
-    # baghouse_bag = Stream('baghouse_bag', price=price['Baghouse bag'])
-    # Supplementary natural gas for BT if produced steam not enough for regenerating
-    # all steam streams required by the system
-    # natural_gas = Stream('natural_gas', price=price['Natural gas'])
-    
-    # Cooling tower chemicals
-    cooling_tower_chems = Stream('cooling_tower_chems', price=price['Cooling tower chems'])
-    
-    # 145 based on equipment M-910 (clean-in-place system) in Humbird et al.
-    CIP_chems_in = Stream('CIP_chems_in', Water=145*get_flow_tpd()/2205, units='kg/hr')
-    
-    # 1372608 based on stream 950 in Humbird et al.
-    # Air needed for multiple processes (including enzyme production that was not included here),
-    # not rigorously modeled, only scaled based on plant size
-    plant_air_in = Stream('plant_air_in', phase='g', units='kg/hr',
-                          N2=0.79*1372608*get_flow_tpd()/2205,
-                          O2=0.21*1372608*get_flow_tpd()/2205)
-    
-    # 8021 based on stream 713 in Humbird et al.
-    fire_water_in = Stream('fire_water_in', 
-                           Water=8021*get_flow_tpd()/2205, units='kg/hr')
-    
+
     # =============================================================================
     # Facilities units
     # =============================================================================
@@ -851,74 +785,45 @@ def create_TAL_sys(ins, outs):
     # T608.line = 'IBAStorageTank'
     # T608_P = units.TALPump('T608_P', ins=T608-0, outs=IBA)
     
+    s = flowsheet.stream
+    create_facilities(
+        solids_to_boiler=M505-0,
+        gas_to_boiler=wastewater_treatment_sys-0,
+        process_water_streams=[
+         s.imbibition_water,
+         s.rvf_wash_water,
+         s.dilution_water,
+         # s.makeup_water,
+         # s.fire_water,
+         # s.boiler_makeup_water,
+         # s.CIP,
+         # s.recirculated_chilled_water,
+         # s.s.3,
+         # s.cooling_tower_makeup_water,
+         # s.cooling_tower_chemicals,
+         ],
+        feedstock=s.feedstock,
+        RO_water=wastewater_treatment_sys-2,
+        recycle_process_water=MX-0,
+        BT_area=700,
+        area=900,
+    )
     
-    CIP = facilities.CIP('CIP901', ins=CIP_chems_in, outs='CIP_chems_out')
-    ADP = facilities.ADP('ADP902', ins=plant_air_in, outs='plant_air_out',
-                         ratio=get_flow_tpd()/2205)
-    
-    
-    FWT = units.FireWaterTank('FWT903', ins=fire_water_in, outs='fire_water_out')
-    
-    CWP = facilities.CWP('CWP802', ins='return_chilled_water',
-                         outs='process_chilled_water')
-    
-    # M505-0 is the liquid/solid mixture, R501-0 is the biogas, blowdown is discharged
-    # BT = facilities.BT('BT', ins=(M505-0, R501-0, 
-    #                                           FGD_lime, boiler_chems,
-    #                                           baghouse_bag, natural_gas,
-    #                                           'BT_makeup_water'),
-    #                                 B_eff=0.8, TG_eff=0.85,
-    #                                 combustibles=combustibles,
-    #                                 side_streams_to_heat=(water_M201, water_M202, steam_M203),
-    #                                 outs=('gas_emission', ash, 'boiler_blowdown_water'))
-    
-    BT = bst.facilities.BoilerTurbogenerator('BT701',
-                                                      ins=(M505-0,
-                                                          R501-0, 
-                                                          'boiler_makeup_water',
-                                                          'natural_gas',
-                                                          'lime',
-                                                          'boilerchems'), 
-                                                      outs=('gas_emission', 'boiler_blowdown_water', ash,),
-                                                      turbogenerator_efficiency=0.85,
-                                                      natural_gas_price=price['Natural gas'])
-    
-    # BT = bst.BDunits.BoilerTurbogenerator('BT',
-    #                                    ins=(M505-0, R501-0, 'boiler_makeup_water', 'natural_gas', FGD_lime, boiler_chems),
-    #                                    boiler_efficiency=0.80,
-    #                                    turbogenerator_efficiency=0.85)
-    
-    # Blowdown is discharged
-    CT = facilities.CT('CT801', ins=('return_cooling_water', cooling_tower_chems,
-                                  'CT_makeup_water'),
-                       outs=('process_cooling_water', 'cooling_tower_blowdown'))
-    
-    # All water used in the system, here only consider water usage,
-    # if heating needed, then heeating duty required is considered in BT
-    process_water_streams = (enzyme_water,
-                             aerobic_caustic, 
-                             CIP.ins[-1], BT.ins[-1], CT.ins[-1])
-    
-    PWC = facilities.PWC('PWC904', ins=(system_makeup_water, S504-0),
-                         process_water_streams=process_water_streams,
-                         recycled_blowdown_streams=None,
-                         outs=('process_water', 'discharged_water'))
-    
-    # Heat exchange network
-    HXN = bst.facilities.HeatExchangerNetwork('HXN1001',
-                                              ignored=lambda:[
-                                                       H401, 
+    HXN = HeatExchangerNetwork('HXN1001',
+                                               ignored=[H401, 
                                                        H402, 
                                                        # H403, 
                                                        # H404,
                                                        F403,
                                                        AC401.heat_exchanger_drying,
                                                        AC401.heat_exchanger_regeneration,
-                                                       F401.components['condenser'],
+                                                       # F401.components['condenser'],
                                                        ],
-                                                cache_network=True,
-                                                force_ideal_thermo=True,
-                                               )
+                                              cache_network=True,
+                                              )
+    def HXN_no_run_cost():
+        HXN.heat_utilities = []
+        HXN._installed_cost = 0.
 
     # HXN = HX_Network('HXN')
 
@@ -976,8 +881,40 @@ for ui in u:
 
 # TAL_no_BT_tea = TAL_tea
 
+product_stream = s.Mixed_esters
+
+feeds = TAL_sys.feeds
+
+products = [product_stream] # Don't include gypsum since we want to include carbon impurities in GWP calculation
+
+u.BT701.ID = 'BT701'
+u.CT901.ID = 'CT801'
+u.CWP901.ID = 'CWP802'
+u.CIP901.ID = 'CIP901'
+u.ADP901.ID = 'ADP902'
+u.FWT901.ID = 'FWT903'
+u.PWC901.ID = 'PWC904'
+
+
+BT = flowsheet('BT')
+
+BT.natural_gas_price = 0.2527
+BT.ins[4].price = price['Lime']
+
+globals().update(flowsheet.to_dict())
+
+# %%
+# =============================================================================
+# TEA
+# =============================================================================
+
+# Income tax was changed from 0.35 to 0.21 based on Davis et al., 2018 (new legislation)
+
+get_flow_dry_tpd = lambda: (feedstock.F_mass-feedstock.imass['H2O'])*24/907.185
 TAL_tea = TALTEA(system=TAL_sys, IRR=0.10, duration=(2016, 2046),
-        depreciation='MACRS7', income_tax=0.21, operating_days=0.9*365,
+        depreciation='MACRS7', income_tax=0.21, 
+        # operating_days=0.9*365,
+        operating_days = 200,
         lang_factor=None, construction_schedule=(0.08, 0.60, 0.32),
         startup_months=3, startup_FOCfrac=1, startup_salesfrac=0.5,
         startup_VOCfrac=0.75, WC_over_FCI=0.05,
@@ -985,19 +922,19 @@ TAL_tea = TALTEA(system=TAL_sys, IRR=0.10, duration=(2016, 2046),
         # biosteam Splitters and Mixers have no cost, 
         # cost of all wastewater treatment units are included in WWT_cost,
         # BT is not included in this TEA
-        OSBL_units=(u.U101, u.WWTcost501,
+        OSBL_units=(
+                    u.U501,
                     # u.T601, u.T602, 
-                    u.T603, u.T604, u.T620,
+                    # u.T601, u.T602, u.T603, u.T604,
                     # u.T606, u.T606_P,
-                    u.CWP802, u.CT801, u.PWC904, u.CIP901, u.ADP902, u.FWT903, u.BT701),
+                    u.BT701, u.CT801, u.CWP802, u.CIP901, u.ADP902, u.FWT903, u.PWC904,
+                    ),
         warehouse=0.04, site_development=0.09, additional_piping=0.045,
         proratable_costs=0.10, field_expenses=0.10, construction=0.20,
         contingency=0.10, other_indirect_costs=0.10, 
-        labor_cost=3212962*get_flow_tpd()/2205,
+        labor_cost=3212962*get_flow_dry_tpd()/2205,
         labor_burden=0.90, property_insurance=0.007, maintenance=0.03,
         steam_power_depreciation='MACRS20', boiler_turbogenerator=u.BT701)
-
-TAL_no_BT_tea = TAL_tea
 
 # # Removed because there is not double counting anyways.
 # # Removes feeds/products of BT_sys from TAL_sys to avoid double-counting
