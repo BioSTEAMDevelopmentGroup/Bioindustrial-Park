@@ -3,17 +3,28 @@
 """
 Created on Sun Aug 23 12:11:15 2020
 
-Modified from the cornstover biorefinery constructed in Cortes-Peña et al., 2020,
-with modification of fermentation system for 2,3-Butanediol instead of the original ethanol
-
-[1] Cortes-Peña et al., BioSTEAM: A Fast and Flexible Platform for the Design, 
-    Simulation, and Techno-Economic Analysis of Biorefineries under Uncertainty. 
-    ACS Sustainable Chem. Eng. 2020, 8 (8), 3302–3310. 
-    https://doi.org/10.1021/acssuschemeng.9b07040.
-
-All units are explicitly defined here for transparency and easy reference
 
 @author: sarangbhagwat
+
+References
+----------
+[1] Davis et al., Process Design and Economics for the Conversion of Lignocellulosic
+    Biomass to Hydrocarbon Fuels and Coproducts: 2018 Biochemical Design Case Update;
+    NREL/TP-5100-71949; National Renewable Energy Lab (NREL), 2018.
+    https://doi.org/10.2172/1483234
+[2] Aden et al., Process Design Report for Stover Feedstock: Lignocellulosic
+    Biomass to Ethanol Process Design and Economics Utilizing Co-Current Dilute
+    Acid Prehydrolysis and Enzymatic Hydrolysis for Corn Stover; NREL/TP-510-32438;
+    National Renewable Energy Lab (NREL), 2002.
+    https://doi.org/10.2172/1218326.
+[3] Argonne National Laboratory. The Greenhouse gases, Regulated Emissions,
+    and Energy use in Transportation (GREET) Model https://greet.es.anl.gov/
+    (accessed Aug 25, 2020).
+[4] Roni et al., Herbaceous Feedstock 2018 State of Technology Report;
+    INL/EXT-18-51654-Rev000; Idaho National Lab. (INL), 2020.
+    https://doi.org/10.2172/1615147.
+[5] ecoinvent 3.6 https://www.ecoinvent.org/home.html (accessed Aug 26, 2020).
+
 """
 
 import biosteam as bst
@@ -191,9 +202,7 @@ for i in (_lps, _mps, _hps, _cooling, _chilled):
 # %%
 
 # =============================================================================
-# Characterization factors (CFs) for life cycle analysis (LCA), all from ref [5] 
-# if not noted, note that it is unclear if in-plant receiving and preprocessing
-# (~50% of the total impact per ref [6]) of feedstock is included in ref [5]
+# Characterization factors (CFs) for life cycle analysis (LCA), all from ref [5] if not noted otherwise
 # =============================================================================
 
 CFs = {}
@@ -211,7 +220,7 @@ GWP_CFs = {
     'H2SO4': 44.47/1e3,   
     'Lime': 1.29 * 56.0774/74.093, # CaO to Ca(OH)2
     'NaOH': 2.11,
-    'NH4OH': 2.64 * 0.4860, # chemicals.NH3.MW/chemicals.NH4OH.MW,   
+    'NH4OH': 2.64 * 0.4860, # multiplied by chemicals.NH3.MW/chemicals.NH4OH.MW,   
     'MEA': 3.4062, # ecoinvent 3.8 ethanolamine production, RoW [monoethanolamine]
     'H3PO4': 1.3598, # ecoinvent 3.8 purification of wet-process phosphoric acid to industrial grade, product in 85% solution state, RoW # cradle-to-gate
     'CO2': 0.87104, # ecoinvent 3.8 carbon dioxide production, liquid, RoW
@@ -253,7 +262,7 @@ FEC_CFs = {
     'H2SO4': 568.98/1e3,
     'Lime': 4.896 * 56.0774/74.093, # CaO to Ca(OH)2
     'NaOH': 29,
-    'NH4OH': 42 * 0.4860, # chemicals.NH3.MW/chemicals.NH4OH.MW,
+    'NH4OH': 42 * 0.4860, # multiplied by chemicals.NH3.MW/chemicals.NH4OH.MW,
     'MEA': 67.898, # ecoinvent 3.8 ethanolamine production, RoW [monoethanolamine]
     'H3PO4': 16.538, # ecoinvent 3.8 purification of wet-process phosphoric acid to industrial grade, product in 85% solution state, RoW # cradle-to-gate
     'CO2': 7.4243, # ecoinvent 3.8 carbon dioxide production, liquid, RoW
@@ -273,7 +282,6 @@ FEC_CFs['Sugarcane'] = 	0.40192 * 0.3/0.286 # ecoinvent 3.8 market for sugarcane
 # # adjusted from dry wt content of 28.6% (their assumption) to 30% (our assumption)
 
 # FEC_CFs['Sugarcane'] = 	0.2265 # GREET 2022
-
 
 
 CFs['FEC_CFs'] = FEC_CFs
