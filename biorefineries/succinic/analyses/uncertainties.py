@@ -352,7 +352,7 @@ contourplots.box_and_whiskers_plot(uncertainty_data=FEC_uncertainty,
 #%% TEA breakdown figure
 df_TEA_breakdown = bst.UnitGroup.df_from_groups(
     unit_groups, fraction=True,
-    scale_fractions_to_positive_values=False,
+    scale_fractions_to_positive_values=True,
 )
 
 
@@ -361,7 +361,7 @@ df_TEA_breakdown = bst.UnitGroup.df_from_groups(
 
 contourplots.stacked_bar_plot(dataframe=df_TEA_breakdown, 
                  # y_ticks=[-200, -175, -150, -125, -100, -75, -50, -25, 0, 25, 50, 75, 100, 125, 150, 175], 
-                 y_ticks=[-125, -100, -75, -50, -25, 0, 25, 50, 75, 100, 125, 150, 175, 200, 225], 
+                 y_ticks=[-40, -20, 0, 20, 40, 60, 80, 100], 
                  y_label=r"$\bfCost$" + " " + r"$\bfand$" + " " +  r"$\bfUtility$" + " " +  r"$\bfBreakdown$", 
                  y_units = "%", 
                  colors=['#7BBD84', '#F7C652', '#63C6CE', '#94948C', '#734A8C', '#D1C0E1', '#648496', '#B97A57', '#D1C0E1', '#F8858A', '#F8858A', ],
