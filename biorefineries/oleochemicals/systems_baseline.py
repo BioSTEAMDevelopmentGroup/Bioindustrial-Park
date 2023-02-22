@@ -127,7 +127,7 @@ def crude_HOSO_oil_to_biodiesel(ins,outs,X_tes):
                                                    Citric_acid = 0)) 
     
 #with these reaction conversions we get approx 85% methyl oleate which is the same specification as the feed used in Novomont's patent
-    
+    # X_tes = X1
     reactions = tmo.ParallelReaction([
         tmo.Reaction('OOO + 3Methanol -> 3Methyl_oleate + Glycerol', reactant='OOO',  X = X_tes),
         tmo.Reaction('LLL + 3Methanol -> 3Methyl_linoleate + Glycerol', reactant='LLL',  X = X_tes),
@@ -195,20 +195,32 @@ def dihydroxylation_system(ins,outs):
                                   vessel_material='Carbon steel')
     
     M101 = bst.units.Mixer(ID = 'M101',
-                            ins = (T102-0,
-                                   recovered_tungstic_acid),
-                            outs = ('tungstic_acid_for_dihydroxylation'))
+                            ins = (P101-0,
+                                   T102-0,
+                                   recovered_tungstic_acid,
+                                   biodiesel),
+                            outs = ('feed_to_heat_exchanger'))
+    
+    def adjust_tungsten_catalyst_flow():
+            tungstencatalyst_mass_factor =   0.0078
+            moles_of_unsaturation = biodiesel.imol['Methyl_oleate']+ 2*biodiesel.imol['Methyl_linoleate'] + biodiesel.imol['Methyl_palmitoleate'] 
+#Since tungstic acid needs to be replaced every 6 cycles, per cycle 1/6th of the required needs to be added      
+            moles_of_tungstic_acid_required_per_cycle = tungstencatalyst_mass_factor*moles_of_unsaturation*(0.167)
+            M101.ins[1].imol['Tungstic_acid'] = moles_of_tungstic_acid_required_per_cycle - recovered_tungstic_acid.imol['Tungstic_acid']
+            T102._run()
+    M101.add_specification(adjust_tungsten_catalyst_flow,run = True)
+    
 #acc. to the patent tungstic acid is preferably 0.06% and 1.5% by moles with respect to the total moles of unsaturations
 #TODO: WHEN CALCIUM TUNGSTATE REACTION HAPPENS AT 0.9 THIS FAILS, FIX THIS
 #to combine all the inlets to the reactor    
-    M102 = bst.units.Mixer('M102', 
-                        ins = (P101-0,
-                               M101-0,
-                               biodiesel),
-                        outs = 'feed_to_heat_exchanger')
+    # M102 = bst.units.Mixer('M102', 
+    #                     ins = (P101-0,
+    #                            M101-0,
+    #                            biodiesel),
+    #                     outs = 'feed_to_heat_exchanger')
 
     R101_H1 = bst.units.HXutility('R101_H1',
-                                  ins = M102-0,
+                                  ins = M101-0,
                                   outs = 'feed_to_oleochemicals_reactor',
                                   T = 62 + 273.15
                                   )
@@ -224,17 +236,7 @@ def dihydroxylation_system(ins,outs):
                                                   tau = 6, #residence time based on the patent
                                                  )
         
-    def adjust_tungsten_catalyst_flow():
-      tungstencatalyst_mass_factor =   0.0078
-      moles_of_unsaturation = biodiesel.imol['Methyl_oleate']+ 2*biodiesel.imol['Methyl_linoleate'] + biodiesel.imol['Methyl_palmitoleate'] 
-#Since tungstic acid needs to be replaced every 6 cycles, per cycle 1/6th of the required needs to be added      
-      moles_of_tungstic_acid_required_per_cycle = tungstencatalyst_mass_factor*moles_of_unsaturation*(0.167)
-      T102.ins[0].imol['Tungstic_acid'] = fta_mol = moles_of_tungstic_acid_required_per_cycle - recovered_tungstic_acid.imol['Tungstic_acid'] 
-      M101.ins[0].imol['Tungstic_acid'] = fta_mol 
-      T102._run()
-      M101._run()
-    T102.add_specification(adjust_tungsten_catalyst_flow, run=True,impacted_units = [M101,M102])
-    
+   
        
 # Pumping the mixture out using a gear pump to the oxidative cleavage section
     R101_P1 = bst.units.Pump('R101_P1',
@@ -282,10 +284,10 @@ def oxidative_cleavage_system(ins,outs):
     def adjust_air_flowrate():
         air_mass_factor = 15/11.4 #TODO: how to access this?
         M201._run()
-        air_for_oxidative_cleavage.imass['Oxygen'] = 0.21*air_mass_factor*M201.outs[0].F_mass# (diol_product.F_mass)  #recycled_diols_and_other_fatty_acids.F_mass)
-        air_for_oxidative_cleavage.imass['Nitrogen'] = 0.79*air_mass_factor*M201.outs[0].F_mass#(diol_product.F_mass) #+ #  recycled_diols_and_other_fatty_acids.F_mass)
+        air_for_oxidative_cleavage.imass['Oxygen'] = 0.21*air_mass_factor*M201.outs[0].F_mass #(diol_product.F_mass)  #recycled_diols_and_other_fatty_acids.F_mass)
+        air_for_oxidative_cleavage.imass['Nitrogen'] = 0.79*air_mass_factor*M201.outs[0].F_mass #(diol_product.F_mass) #+ #  recycled_diols_and_other_fatty_acids.F_mass)        
         T201._run()
-    M201.add_specification(adjust_air_flowrate) 
+    M201.add_specification(adjust_air_flowrate,run=True)
      
 # Storage and Handling cost correlations from Warren Sieder for solids handling bin
     T202 = bst.StorageTank('T202',
@@ -294,30 +296,32 @@ def oxidative_cleavage_system(ins,outs):
                             vessel_type = 'Solids handling bin',
                             vessel_material = 'Carbon steel'
                             )
-    M202 = bst.Mixer(ID = 'M202',
-                     ins = (T202-0,recovered_mixture_of_cobalt_catalyst),
-                     outs = 'cobalt_catalyst_stream_to_reactor')
-    
+   
 #Cobalt catalyst required is preferably between 0.3% and 1.5% by moles of diol molecules    
+    M202 = bst.units.Mixer('M202',
+                        ins = (M201-0, #Diol mixture
+                               T202-0,#fresh_cobalt_catalyst
+                               recovered_mixture_of_cobalt_catalyst),#Cobalt acetate catalyst mixture
+                        outs = 'to_pre_reaction_feed_heating') 
     def adjust_catalyst_flowrates():
-        cycles_of_reuse = 6 #TODO: Assumption, coudnt find any literature
+        M201._run()
+        # cycles_of_reuse = 6 #TODO: Assumption, coudnt find any literature
         cobaltcatalyst_mass_factor = 0.009 #based on the average of 0.3% and 1.5%  
-        total_diol_moles =  M201.outs[0].imol['MDHSA'] + M201.outs[0].imol['Methyl_9_10_dihydroxylinoleate'] + M201.outs[0].imol['Dihydroxy_palmitic_acid']     
-        total_diol_moles_per_cycle = total_diol_moles/cycles_of_reuse
-        total_incoming_cobalt_catalyst_moles = recovered_mixture_of_cobalt_catalyst.imol['Cobalt_chloride'] + recovered_mixture_of_cobalt_catalyst.imol['Cobalt_hydroxide']
-        a = ((cobaltcatalyst_mass_factor*total_diol_moles) - total_incoming_cobalt_catalyst_moles)*chems['Cobalt_acetate_tetrahydrate'].MW 
+        total_diol_moles =  M202.ins[0].imol['MDHSA'] + M202.ins[0].imol['Methyl_9_10_dihydroxylinoleate'] + M202.ins[0].imol['Dihydroxy_palmitic_acid']     
+        total_diol_moles_per_cycle = total_diol_moles*(0.167)
+        # /cycles_of_reuse
+        total_incoming_cobalt_catalyst_moles = recovered_mixture_of_cobalt_catalyst.imol['Cobalt_chloride'] 
+        # + recovered_mixture_of_cobalt_catalyst.imol['Cobalt_hydroxide']
+        a = (cobaltcatalyst_mass_factor*total_diol_moles_per_cycle - total_incoming_cobalt_catalyst_moles)*chems['Cobalt_acetate_tetrahydrate'].MW 
         T202.ins[0].imass['Cobalt_acetate_tetrahydrate'] = a
         T202.ins[0].imass['Water'] = 65.66*a
         T202._run()
-    M201.add_specification(adjust_catalyst_flowrates, impacted_units = [T202])    
-    
-    M203 = bst.units.Mixer('M203',
-                        ins = (M201-0, #Diol mixture
-                               M202-0),#Cobalt acetate catalyst mixture
-                        outs = 'to_pre_reaction_feed_heating') 
+        M202._run()
+    M201.add_specification(adjust_catalyst_flowrates)
+
     
     R201_H = bst.units.HXutility('R201_H',
-                              ins = M203-0,
+                              ins = M202-0,
                               outs = 'feed_to_oxidative_cleavage_reactor',
                               T = 60 + 273.15
                               )
@@ -365,7 +369,7 @@ def organic_phase_separation(ins,outs):
                                                   aqueous_phase),
                                             split = ({
                                                 'Hydrogen_peroxide': 0.0,   
-                                                'Water': 0.1,#TODO: uncertain, how to get it out
+                                                'Water': 0.2,#TODO: uncertain, how to get it out
                                                 #intermediate products in the org phase
                                                 'MDHSA': 1,
                                                 'Dihydroxy_palmitic_acid':1,
@@ -473,11 +477,7 @@ def nonanoic_acid_fraction_separation(ins,outs):
                                   )
     
     P501 = bst.Pump('P501', ins = D501-1,
-                      outs = heavy_fatty_acids)
-    
-
-
-
+                      outs = heavy_fatty_acids)  
 #########################################################################################################
 # Hydrolysis of FAME's to produce fatty acids (600 level)
 @SystemFactory(
@@ -612,24 +612,24 @@ def azelaic_acid_production(ins,outs):
     
     M602 = bst.Mixer('M602',ins = (HX603-0,T605-0,recycled_solvent_for_extraction),
                       outs = ('solvent_organics_mixture_for_extraction'))
-    def solvent_for_extraction():
-        D604._run()
-        all_monocarboxylics = [D604.outs[0].imass['Methyl_oleate'],
-                                D604.outs[0].imass['Methyl_palmitate'],
-                                D604.outs[0].imass['Methyl_stearate'],
-                                D604.outs[0].imass['Methyl_linoleate'],
-                                D604.outs[0].imass['Methyl_palmitoleate'],
-                                D604.outs[0].imass['Hexanoic_acid'],
-                                D604.outs[0].imass['Heptanoic_acid'],
-                                D604.outs[0].imass['Pelargonic_acid'],
-                                D604.outs[0].imass['Caprylic_acid'],
-                                D604.outs[0].imass['Suberic_acid']]
-        Total_required_solvent = 2.2*sum(all_monocarboxylics)
-        recycled_solvent_for_extraction = M602.ins[2].F_mass
-        M602.ins[1].F_mass = Total_required_solvent - recycled_solvent_for_extraction
-        T605._run()
-    M602.add_specification(solvent_for_extraction, run = True)
- 
+    # def solvent_for_extraction():
+    #     D604._run()
+    #     all_monocarboxylics = [D604.outs[0].imass['Methyl_oleate'],
+    #                             D604.outs[0].imass['Methyl_palmitate'],
+    #                             D604.outs[0].imass['Methyl_stearate'],
+    #                             D604.outs[0].imass['Methyl_linoleate'],
+    #                             D604.outs[0].imass['Methyl_palmitoleate'],
+    #                             D604.outs[0].imass['Hexanoic_acid'],
+    #                             D604.outs[0].imass['Heptanoic_acid'],
+    #                             D604.outs[0].imass['Pelargonic_acid'],
+    #                             D604.outs[0].imass['Caprylic_acid'],
+    #                             D604.outs[0].imass['Suberic_acid']]
+    #     Total_required_solvent = 2.2*sum(all_monocarboxylics)
+    #     recycled_solvent_for_extraction_mass = M602.ins[2].F_mass
+    #     M602.ins[1].F_mass = Total_required_solvent - recycled_solvent_for_extraction_mass
+    #     T605._run()
+    #     M602._run()
+    # T605.add_specification(solvent_for_extraction)
 #The partition coefficients for the multistage mixer settler are based on 
 # METHOD FOR PURIFYING AZELAIC ACID , patent number : US 2003/0032825 A1     
     MMS601 = bst.units.MultiStageMixerSettlers(ID = 'MMS601',
@@ -855,6 +855,7 @@ def catalyst_recovery_from_aqueous_stream (ins,outs):
         water_for_precipitate_washing.imass['Water'] = 7.142* S702.ins[0].imass['Tungstic_acid']
     S702.add_specification(adjust_water_for_precipitate_washing, run=True)
     
+   
 # #Tungstic acid to be disposed later is collected into this tank
 #     T703 = bst.StorageTank('T703',
 #                            ins =  S702-0,
@@ -871,9 +872,13 @@ def catalyst_recovery_from_aqueous_stream (ins,outs):
                         outs = recovered_mixture_of_cobalt_catalyst) 
     def adjust_CaOH2():
         S702.specifications[0]()
+        S702._run()
         M703.ins[1].imass['Calcium_hydroxide']= 0.5*S702.outs[1].imol['Liquid_HCl']*chems['Calcium_hydroxide'].MW/1000
         Sp701._run()
-    M703.add_specification(adjust_CaOH2,run = True)
+        S702._run()
+        M703._run()
+    S702.add_specification(adjust_CaOH2)
+
 # #Cobalt catalyst to be disposed off later    
 #     T704 =bst.StorageTank('T704',
 #                           ins = S702-0,
@@ -894,17 +899,38 @@ def monocarboxylics_recovery_and_solvent_recovery(ins,outs):
     organic_solvent_stream_from_extractor,previously_recovered_pelargonic_acid_rich_stream, = ins
     recycled_solvent_for_extraction, monocarboxylic_acids_mixture, = outs
 
-    D801 = bst.BinaryDistillation(ID = 'D801',
+    D801 = bst.Flash(ID = 'D801',
                                   ins = organic_solvent_stream_from_extractor,
                                   outs = (recycled_solvent_for_extraction,
                                           'recovered_monocarboxylic_acids'),
-                                  P = 10000,
-                                  k = 2,
-                                  LHK = ('Bicyclo_octane',
-                                         'Pelargonic_acid'),
-                                  Lr = 0.99,
-                                  Hr = 0.99
+                                  P = 5000,
+                                  T = 383.75
+                                  # k = 2,
+                                  # LHK = ('Bicyclo_octane',
+                                  #        'Pelargonic_acid'),
+                                  # Lr = 0.99,
+                                  # Hr = 0.99
                                   )
+    def solvent_for_extraction():
+        F_baseline.unit.D604._run()
+        all_monocarboxylics = [F_baseline.unit.D604.outs[0].imass['Methyl_oleate'],
+                               F_baseline.unit. D604.outs[0].imass['Methyl_palmitate'],
+                               F_baseline.unit. D604.outs[0].imass['Methyl_stearate'],
+                               F_baseline.unit. D604.outs[0].imass['Methyl_linoleate'],
+                               F_baseline.unit. D604.outs[0].imass['Methyl_palmitoleate'],
+                               F_baseline.unit.D604.outs[0].imass['Hexanoic_acid'],
+                                F_baseline.unit.D604.outs[0].imass['Heptanoic_acid'],
+                                F_baseline.unit.D604.outs[0].imass['Pelargonic_acid'],
+                                F_baseline.unit.D604.outs[0].imass['Caprylic_acid'],
+                                F_baseline.unit.D604.outs[0].imass['Suberic_acid']]
+        Total_required_solvent = 2.2*sum(all_monocarboxylics)
+        recycled_solvent_for_extraction_mass = F_baseline.unit.M602.ins[2].F_mass
+        F_baseline.unit.M602.ins[1].F_mass = Total_required_solvent - D801.outs[1].F_mass
+        F_baseline.unit.T605._run()
+        F_baseline.unit.M602._run()
+    D801.add_specification(solvent_for_extraction,impacted_units = [F_baseline.unit.M602,
+                                                                    F_baseline.unit.MMS601
+                                                                    ])
     
     M801 = bst.Mixer(ID = 'M801',
                       ins = (D801-1, 
@@ -1025,7 +1051,7 @@ def aa_baseline_sys(ins,outs):
                                                   bst.Stream(ID = 'wastewater6_to_boilerturbogenerator'),
                                                   bst.Stream(ID = 'lighter_boiling_impurities_to_boilerturbogenerator'),
                                                   bst.Stream(ID = 'heavy_boiling_compounds_to_boilerturbogenerator'),
-                                                  bst.Stream(ID = 'azelaic_acid_product_stream')))
+                                                  bst.Stream(ID = 'azelaic_acid_product_stream',price = 201.72, units='kg/hr')))#http://www.ebiochem.com/product/azelaic-acid-99-9166#:~:text=wholesale%20Azelaic%20Acid%2099%25%20CAS%3A123-99-9%2Cbulk%20price%20%24201.72%2Fkg%3BCosmetic%20Raw,Azelaic%20Acid%2099%25%20View%20Larger%20Image%20FOB%20Price%3AUSD201.72%2Fkg
     ob7 = catalyst_recovery_from_aqueous_stream(ins = (bst.Stream(ID ='calcium_hydroxide',
                                                                   Calcium_hydroxide = 1,
                                                                   units = 'kg/hr',
@@ -1056,22 +1082,34 @@ def aa_baseline_sys(ins,outs):
                                                                   ob5.outs[0]),
                                                             outs = (recycled_solvent_for_extraction,
                                                                   bst.Stream(ID = 'monocarboxylic_acids',
-                                                                              price = 2, #2-5$
+                                                                              price = 27, #CAS finder: ~ 27$ 
                                                                               units = 'kg/hr'
                                                                               )))
+    
     # All the Facilities (900 level)
+    plant_air_in =  bst.Stream('plant_air_in',
+                               phase='g', Nitrogen=0.79, 
+                               Oxygen=0.21,units='kg/hr')
+    ADP901 = bst.AirDistributionPackage(ID='ADP901',
+                                        ins=plant_air_in,
+                                        outs = 'plant_air_out')
+    @ADP901.add_specification(run=True)
+    def adjust_plant_air(): plant_air_in.imass['Oxygen'] = F_baseline.air_for_oxidative_cleavage.imass['Oxygen']                                      
+    
     #Streams to boiler turbogenerator,Liquid/Solid waste streams mixer
     M901 = bst.Mixer( ID = 'M901',
-                      ins = (F_baseline.polar_lipids_to_boilerturbogenerator,                          
-                              F_baseline.lighter_boiling_impurities_to_boilerturbogenerator,
-                              F_baseline.stream.heavy_boiling_compounds_to_boilerturbogenerator,
+                     ins = (F_baseline.polar_lipids_to_boilerturbogenerator,                          
+                            F_baseline.lighter_boiling_impurities_to_boilerturbogenerator,
+                            F_baseline.stream.heavy_boiling_compounds_to_boilerturbogenerator,
+                            F_baseline.stream.ventedgas_to_boilerturbogenerator,
+                            F_baseline.wastewater1_to_boilerturbogenerator,
                             ),
                       outs = ('total_effluent_to_be_burned')
                       )
     #This unit burns the streams provided to it to generate electricity
     BT901 = bst.BoilerTurbogenerator(ID ='BT901',
                                       ins = (M901-0,
-                                              F_baseline.stream.ventedgas_to_boilerturbogenerator,
+                                              'gaseous_stream',
                                               'boiler_makeup_water',
                                               bst.Stream(ID ='natural_gas',units = 'kg/hr',characterization_factors={'GWP100': GWP_characterization_factors['CH4']}),
                                               bst.Stream(ID ='lime_boiler',units = 'kg/hr', price = 0.12*401.693/275.700, characterization_factors={'GWP100': GWP_characterization_factors['lime']} ),#Taken from Catbio Lime, hydrated, bulk, t.l., f.o.b. works, Adjusted from Jan 2021 to Dec 2022
@@ -1109,7 +1147,7 @@ def aa_baseline_sys(ins,outs):
                                         )                         
 
     makeup_water_streams_available = (F_baseline.stream.cooling_tower_makeup_water,#This is the second inlet to cooling tower
-                                          F_baseline.stream.boiler_makeup_water) #This is the second inlet to boilerturbogen
+                                      F_baseline.stream.boiler_makeup_water) #This is the second inlet to boilerturbogen
 
     system_makeup_water = bst.Stream('system_makeup_water', price = 3.945 *(217.9/132.9)/(3.78541*1000)) #Ref: DOE Annual water rates pdf,adjusted using FRED's PPI> Industry based> Utilities.(1kgal = 1000gal, 1gal = 3.78541 Kg)
 
@@ -1123,20 +1161,23 @@ def aa_baseline_sys(ins,outs):
                             makeup_water_streams = makeup_water_streams_available,
                             process_water_streams = process_water_streams_available 
                             )
-
-    # HXN = bst.HeatExchangerNetwork('HXN901', T_min_app = 5.)
-    #TODO: how to add this?
-    # HXN901 = F_baseline.create_system('HXN901')
-    # HXN901.simulate()
-    # HXN.simulate()
-    # List of fresh water and waste
+    W_H901 = bst.HXutility('W_H901',
+                          ins = F_baseline.wastewater6_to_boilerturbogenerator,
+                          outs = 'cooled_wastewater6_stream_',
+                          T = 300)
+    W_P901 = bst.units.IsenthalpicValve(ID = 'W_P901',
+                                          ins = W_H901-0,
+                                          outs = ('wastewater6_to_wastewatertreatment'),
+                                          P = 101325)   
+  
+   # List of fresh water and waste
     W901 = bst.create_wastewater_treatment_system(ID='W901', 
-                                                  ins= (F_baseline.wastewater1_to_boilerturbogenerator,
+                                                  ins= (
                                                         F_baseline.wastewater2_to_boilerturbogenerator,
-                                                        F_baseline.wastewater6_to_boilerturbogenerator,
-                                                        F_baseline.condensate,
                                                         F_baseline.wastewater3_to_boilerturbogenerator,
-                                                        F_baseline.wastewater4_to_boilerturbogenerator),
+                                                        F_baseline.wastewater4_to_boilerturbogenerator,
+                                                        W_P901-0,                                                        
+                                                        F_baseline.condensate),
                                                   outs=(bst.Stream(ID = 'methane'),
                                                         bst.Stream(ID = 'sludge'),
                                                         bst.Stream(ID = 'treated_water'),
@@ -1145,48 +1186,15 @@ def aa_baseline_sys(ins,outs):
                                                   operating_hours=None, autorename=None,#TODO: how to decide annual operating hours for this--
                                                   NaOH_price= 0.93*401.693/275.700, #Based on Catbio price ($/Kg) for Caustic soda (sodium hydroxide), liq., dst spot barge f.o.b. USG adjusted from 2021 Jan to 2022 Dec using Fred's PPI for basic inorganic chemicals  
                                                   autopopulate=None)
+    
+    # HXN = bst.HeatExchangerNetwork('HXN901', T_min_app = 5.)
+    #TODO: how to add this?
+    # HXN901 = F_baseline.create_system('HXN901')
+    # HXN901.simulate()
+    # HXN.simulate()
 
-# aa_baseline_sys.empty_recycles() # Restart simulation
-# aa_baseline_sys.set_tolerance(mol=1e-11, rmol=1e-11) # Set absolute and relative tolerances
-# aa_baseline_sys.simulate()
-# aa_baseline_sys.show()
-# aa_baseline_sys.set_tolerance(method='fixedpoint') # Set absolute and relative tolerances
-# aa_baseline_sys.empty_recycles() # Restart simulation
-# aa_baseline_sys.simulate()
-# aa_baseline_sys.show()
-#TODO: errors I dont understand
 #########################################################################################################
-
-
-#Problems:
-# aa_baseline_sys.empty_recycles() # Restart simulation
-# aa_baseline_sys.set_tolerance(mol=1e-11, rmol=1e-11) # Set absolute and relative tolerances
-# aa_baseline_sys.simulate()
-# aa_baseline_sys.show()
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-###############################################################################################################################################
+##############################################################################################################################################
 # renaming the first system factory for biodiesel prep as the 1000 series
 # biodiesel_prep_units = (F_baseline.unit.S402,F_baseline.unit.T401,
 #                         F_baseline.unit.P401,F_baseline.unit.T402,
@@ -1229,3 +1237,18 @@ def aa_baseline_sys(ins,outs):
 #         fresh_moles_of_tungstic_acid = total_moles_of_tungstic_acid_required - moles_of_tungstic_acid_recovered
 #         F_baseline.T102.outs[0].imol['Tungstic_acid'] = fresh_moles_of_tungstic_acid
 #     F_baseline.T102.add_specification(checking_tungstic_acid_mass_balance, run=True,impacted_units = [F_baseline.M101])          
+
+
+#     def adjust_tungsten_catalyst_flow():
+#             tungstencatalyst_mass_factor =   0.0078
+#             F_baseline.unit.S702._run()
+#             #ratio based on 10ml of water used for dilution of 0.71g of Tungstic acid
+#             water_for_precipitate_washing.imass['Water'] = 7.142* S702.ins[0].imass['Tungstic_acid']
+#             # F_baseline.S702.specifications[0]()
+#             moles_of_unsaturation = F_baseline.biodiesel.imol['Methyl_oleate']+ 2*F_baseline.biodiesel.imol['Methyl_linoleate'] + F_baseline.biodiesel.imol['Methyl_palmitoleate'] 
+# #Since tungstic acid needs to be replaced every 6 cycles, per cycle 1/6th of the required needs to be added      
+#             moles_of_tungstic_acid_required_per_cycle = tungstencatalyst_mass_factor*moles_of_unsaturation*(0.167)
+#             F_baseline.unit.M101.ins[1].imol['Tungstic_acid'] = moles_of_tungstic_acid_required_per_cycle - S702.outs[0].imol['Tungstic_acid']
+#             F_baseline.unit.T102._run()
+#             F_baseline.unit.M101._run()           
+#     S702.add_specification(adjust_tungsten_catalyst_flow,run = True)
