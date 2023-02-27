@@ -11,16 +11,8 @@ from chemicals import atoms_to_Hill
 import thermosteam as tmo
 from thermosteam import Chemicals
 from thermo import TDependentProperty
-#TODO: how to tackle? RuntimeError: Failed to extrapolate integral of liquid heat capacity method 'ZABRANSKY_SPLINE_C' between T=298.15 to nan K for component with CASRN '122-32-7'
-#TODO: ask if every inorganic chemical neeeds Dortmund groups
-#TODO: the important chemicals with no PSAT are PL,CaOH2, CaCl2, 62-54-4, Ash,HCl,NaOH, WWTs_sludge, P4O10
 #chems is a list of all the chemicals used in this biorefinery
-#Hf_formation_(OOO):-76.494*18 - 815.18
-#Hf_formation_(PPP):- -59.571*16 - 1358.7
-#Hf_formation_(PoPoPo):- -76.494*16 - 815.18
-#Hf_formation_(SSS):- -59.571*18 - 1358.7
-#Hf_formation_(LLL):-  -316.67*2 - 2466.4
-#Hf_formation_(LnLnLn):-  -316.67*3 - 2466.4
+
 chems = tmo.Chemicals([
 #Chemicals used in biodiesel production
         tmo.Chemical('Sodium_methoxide',formula ='NaOCH3',phase = 'l',default = True),   
@@ -41,7 +33,7 @@ chems = tmo.Chemicals([
 #Crude glycerol is a product of transesterification
         tmo.Chemical('Glycerol'),
 #TAGs of High oleic sunflower oil
-        tmo.Chemical('OOO', search_ID = '122-32-7',Hf = 1000*(-76.494*18 - 815.18) ),#from cane>chemicals
+        tmo.Chemical('OOO', search_ID = '122-32-7',Hf = 1000*(-76.494*18 - 815.18),phase_ref = 'l' ),#from cane>chemicals
         tmo.Chemical('LnLnLn', search_ID = '537-40-6',Hf = 1000*(-316.67*3 - 2466.4)),#This is Trilinolein
 #Below TAG's not a part of the database    
          tmo.Chemical('LLL',
@@ -266,6 +258,18 @@ chems = tmo.Chemicals([
         tmo.Chemical('P4O10',
                      phase = 's',
                      default = True),
+        tmo.Chemical('SO2',
+                     phase = 'g',
+                     ),
+    tmo.Chemical('CO', search_ID='CarbonMonoxide',
+                 phase='g', Hf=-26400* 4.184),#Ref: lactic acid chemicals 
+    tmo.Chemical('NH3', phase='g', Hf=-10963*4.184),
+    tmo.Chemical('NO', search_ID='NitricOxide', phase='g'),
+    tmo.Chemical('NO2', phase='g'),
+    tmo.Chemical('H2S', phase='g', Hf=-4927*4.184),
+    tmo.Chemical('SO2', phase='g'),
+    tmo.Chemical('CaSO4',search_ID = 'Calcium_sulfate'),
+    tmo.Chemical('Calcium_dihydroxide', phase='s', Hf=-235522*4.184),        
 #WWTs sludge based on cellulosic.chemicals     
         tmo.Chemical('WWTsludge',
                      search_db = False,
@@ -312,15 +316,9 @@ TAGs_with_unknown_props = [ 'LLL',
                             'POS','POP','PLS'
                           ]
 for i in TAGs_with_unknown_props:
-    # chems[i].copy_models_from(chems.PPP,[
-    #                                     #'Hvap',
-    #                                     'Psat',
-    #                                      #'Cn'
-    #                                      ])
     chems[i].Tb = chems.OOO.Tb
     chems[i].copy_models_from(chems.PPP,['mu'])
-    # chems[i].V.add_model(fn.rho_to_V(rho=chems.OOO.rho('l', 298.15, 101325),
-    #                                  MW=chems[i].MW))
+
     
 ## The oxidative cleavage catalyst properties are based on cobalt chloride
 chems.Cobalt_acetate_tetrahydrate.copy_models_from(chems.Cobalt_chloride,
@@ -501,91 +499,92 @@ chems.Dipalmitin.Dortmund.set_group_counts_by_name({'CH3':2,
                                                     'CH':1,
                                                     'OH(P)':1
                                                     })
-###############################################################################################################33   
-# def OOO_CCPsat_model(T):
-#       R = 8.314
-#       theta = 273.15
-#       ln10 = 2.30258509
-#       return (-91320000/(R*theta*ln10))+ ((169240000/R*ln10)((1/theta) - (1/T)))
+############################################################################################################### 
+def OOO_CCPsat_model(T):
+      R = 8.314
+      theta = 298.15
+      ln10 = 2.30258509
+      return ((-91320000/(R*theta*ln10))+ ((169240000/R*ln10)*((1/theta) - (1/T))))
 # chems.OOO.Psat.add_method(f=OOO_CCPsat_model, Tmin=323.15, Tmax=573.15)
 
 def LLL_CCPsat_model(T):
       R = 8.314
-      theta = 273.15
+      theta = 298.15
       ln10 = 2.30258509
-      return (-91320000/(R*theta*ln10))+ ((169240000/R*ln10)((1/theta) - (1/T)))
+      return (-91320000/(R*theta*ln10))+ ((169240000/R*ln10)*((1/theta) - (1/T)))
 chems.LLL.Psat.add_method(f=LLL_CCPsat_model, Tmin=323.15, Tmax=573.15)
 
 def OOL_CCPsat_model(T):
       R = 8.314
-      theta = 273.15
+      theta = 298.15
       ln10 = 2.30258509
-      return (-91320000/(R*theta*ln10))+ ((169240000/R*ln10)((1/theta) - (1/T)))
+      return (-91320000/(R*theta*ln10))+ ((169240000/R*ln10)*((1/theta) - (1/T)))
 chems.OOL.Psat.add_method(f=OOL_CCPsat_model, Tmin=323.15, Tmax=573.15)
 
 def LLO_CCPsat_model(T):
       R = 8.314
-      theta = 273.15
+      theta = 298.15
       ln10 = 2.30258509
-      return (-91320000/(R*theta*ln10))+ ((169240000/R*ln10)((1/theta) - (1/T)))
+      return (-91320000/(R*theta*ln10))+ ((169240000/R*ln10)*((1/theta) - (1/T)))
 chems.LLO.Psat.add_method(f=LLO_CCPsat_model, Tmin=323.15, Tmax=573.15)
 
 def SOO_CCPsat_model(T):
       R = 8.314
-      theta = 273.15
+      theta = 298.15
       ln10 = 2.30258509
-      return (-91320000/(R*theta*ln10))+ ((169240000/R*ln10)((1/theta) - (1/T)))
+      return (-91320000/(R*theta*ln10))+ ((169240000/R*ln10)*((1/theta) - (1/T)))
 chems.SOO.Psat.add_method(f=SOO_CCPsat_model, Tmin=323.15, Tmax=573.15)
 
 def PLO_CCPsat_model(T):
       R = 8.314
-      theta = 273.15
+      theta = 298.15
       ln10 = 2.30258509
-      return (-89250000/(R*theta*ln10))+ ((166740000/R*ln10)((1/theta) - (1/T)))
+      return (-89250000/(R*theta*ln10))+ ((166740000/R*ln10)*((1/theta) - (1/T)))
 chems.PLO.Psat.add_method(f=PLO_CCPsat_model, Tmin=323.15, Tmax=573.15)
 
 def PoOO_CCPsat_model(T):
       R = 8.314
-      theta = 273.15
+      theta = 298.15
       ln10 = 2.30258509
-      return (-89250000/(R*theta*ln10))+ ((166740000/R*ln10)((1/theta) - (1/T)))
+      return (-89250000/(R*theta*ln10))+ ((166740000/R*ln10)*((1/theta) - (1/T)))
 chems.PoOO.Psat.add_method(f=PoOO_CCPsat_model, Tmin=323.15, Tmax=573.15)
 
 def POO_CCPsat_model(T):
       R = 8.314
-      theta = 273.15
+      theta = 298.15
       ln10 = 2.30258509
-      return (-89250000/(R*theta*ln10))+ ((166740000/R*ln10)((1/theta) - (1/T)))
+      return (-89250000/(R*theta*ln10))+ ((166740000/R*ln10)*((1/theta) - (1/T)))
 chems.POO.Psat.add_method(f=POO_CCPsat_model, Tmin=323.15, Tmax=573.15)
 
 def POS_CCPsat_model(T):
       R = 8.314
-      theta = 273.15
+      theta = 298.15
       ln10 = 2.30258509
-      return (-89250000/(R*theta*ln10))+ ((166740000/R*ln10)((1/theta) - (1/T)))
+      return (-89250000/(R*theta*ln10))+ ((166740000/R*ln10)*((1/theta) - (1/T)))
 chems.POS.Psat.add_method(f=POS_CCPsat_model, Tmin=323.15, Tmax=573.15)
 
 def POP_CCPsat_model(T):
       R = 8.314
-      theta = 273.15
+      theta = 298.15
       ln10 = 2.30258509
-      return (-87180000/(R*theta*ln10))+ ((164240000/R*ln10)((1/theta) - (1/T)))
+      return (-87180000/(R*theta*ln10))+ ((164240000/R*ln10)*((1/theta) - (1/T)))
 chems.POP.Psat.add_method(f=POP_CCPsat_model, Tmin=323.15, Tmax=573.15)
 
 def PLS_CCPsat_model(T):
       R = 8.314
-      theta = 273.15
+      theta = 298.15
       ln10 = 2.30258509
-      return (-89250000/(R*theta*ln10))+ ((166740000/R*ln10)((1/theta) - (1/T)))
+      return (-89250000/(R*theta*ln10))+ ((166740000/R*ln10)*((1/theta) - (1/T)))
 chems.PLS.Psat.add_method(f=PLS_CCPsat_model, Tmin=323.15, Tmax=573.15)
 ###############################################################################################33
 #The model returns values in J/mol.K
-# def OOO_Cnl_model(T):
-#       return 3*(397600 + 540.89*T) + (61355 + 148.23*T)
-# chems.OOO.Cn.add_method(f=OOO_Cnl_model, Tmin= 298.15, Tmax=453.15)
-# chems.LLL.Cn.add_method(f=OOO_Cnl_model, Tmin= 298.15, Tmax=453.15)
-# chems.LLO.Cn.add_method(f=OOO_Cnl_model, Tmin= 298.15, Tmax=453.15)
-# chems.OOL.Cn.add_method(f=OOO_Cnl_model, Tmin= 298.15, Tmax=453.15)
+def OOO_Cnl_model(T):
+      return (3*(397600 + 540.89*T) + (61355 + 148.23*T))*(1/1000)
+# chems.OOO.Cn.l.add_method(f=OOO_Cnl_model, Tmin= 298.15, Tmax=453.15)
+chems.LLL.Cn.add_method(f=OOO_Cnl_model, Tmin= 298.15, Tmax=453.15)
+chems.LLO.Cn.add_method(f=OOO_Cnl_model, Tmin= 298.15, Tmax=453.15)
+chems.OOL.Cn.add_method(f=OOO_Cnl_model, Tmin= 298.15, Tmax=453.15)
+
 #The below Psat models return values in Pa (N/m)
 def SOO_Cnl_model(T):
       return (2*(397600 + 540.89*T) + (366930 + 685.76*T)+ (61355 + 148.23*T))*(1/1000)
@@ -607,14 +606,15 @@ chems.PLS.Cn.add_method(f=POP_Cnl_model, Tmin= 298.15, Tmax=453.15)
 chems.POS.Cn.add_method(f=POP_Cnl_model, Tmin= 298.15, Tmax=453.15)
 ###############################################################################################33
 #Adding the molar volumes
-# def OOO_Vl_model(T):
-#       return (3*((1 + 0.0009865*T)/4.2924)) + ((1 + 20.048*T)/0.00076923)
-# chems.OOO.V.add_method(f=OOO_Vl_model, Tmin= 258.15, Tmax=516.15)
+def OOO_Vl_model(T):
+      return ((3*((1 + 0.0009865*T)/4.2924)) + ((1 + 20.048*T)/0.00076923))*(1/1000)
+# chems.OOO.V.l.add_method(f=OOO_Vl_model, Tmin= 258.15, Tmax=516.15)
+# TODO: check what methodP means ...in the V.l definition
 def LLL_Vl_model(T):
       return ((3*((1 + 0.00074102*T)/4.1679)) + ((1 + 20.048*T)/0.00076923))*(1/1000)
 chems.LLL.V.add_method(f=LLL_Vl_model, Tmin= 258.15, Tmax=516.15)
 def OOL_Vl_model(T):
-      return ((1*((1 + 0.00074102*T)/4.1679)) + (2*((1 + 0.0009865*T)/4.2924))+  ((1 + 20.048*T)/0.00076923))*1/1000
+      return ((1*((1 + 0.00074102*T)/4.1679)) + (2*((1 + 0.0009865*T)/4.2924))+  ((1 + 20.048*T)/0.00076923))*(1/1000)
 chems.OOL.V.add_method(f=OOL_Vl_model, Tmin= 258.15, Tmax=516.15)
 def LLO_Vl_model(T):
       return ((2*((1 + 0.00074102*T)/4.1679)) + (1*((1 + 0.0009865*T)/4.2924))+  ((1 + 20.048*T)/0.00076923))*(1/1000)
@@ -640,6 +640,13 @@ chems.POP.V.add_method(f=POP_Vl_model, Tmin= 258.15, Tmax=516.15)
 def PLS_Vl_model(T):
       return ((1*((1 + 0.0013008*T)/5.0524))+ (1*((1 + 0.00074102*T)/4.1679)) +(1*((1 + 0.0014091*T)/4.6326))+  ((1 + 20.048*T)/0.00076923))*(1/1000)
 chems.PLS.V.add_method(f=PLS_Vl_model, Tmin= 258.15, Tmax=516.15)
+
+#Adding viscosity for the unknown TAGS
+#TODO: add viscosity
+# [ 'LLL','OOL','LLO','SOO',
+#         'PLO','PoOO','POO',
+#          'POS','POP','PLS']
+
 
 ########Heat of formation ##########################################################################
 #LiquidMethanol and Sodium_methoxide were added for cane biorefinery compatibility
@@ -673,8 +680,6 @@ HCl.copy_models_from(tmo.Chemical('HCl'),['Psat'])
 chems.Ash.copy_models_from(tmo.Chemical('Water'),['Psat'])
 chems.P4O10.copy_models_from(tmo.Chemical('Water'),['Psat'])
 chems.WWTsludge.copy_models_from(tmo.Chemical('Water'),['Psat'])
-
-
     
 for chemical in chems: chemical.default()
 #TODO: add viscosity for all the catalyst related chems
@@ -709,6 +714,8 @@ chems.define_group('VM_Naphtha',['Octane',
                                                 0.30,
                                                 0.02,
                                                 0.12])
+chems.define_group('COSOxNOxH2S',['NO', 'NO2',
+                                  'SO2','CO', 'H2S'])
 
 chems.define_group('Air', ['Oxygen', 'Nitrogen'],composition=[0.21,0.79])
 chems.set_synonym('Water', 'H2O')
@@ -719,9 +726,13 @@ chems.set_synonym('Dipalmitin', 'DAG')
 chems.set_synonym('Hydrogen_ion', 'H+')
 chems.set_synonym('Pelargonic_acid','Nonanoic_acid')
 chems.set_synonym('HCl2','Liquid_HCl')
+# chems.set_synonym('Calcium_dihydroxide', 'Lime')
+chems.set_synonym('CaSO4', 'Gypsum')
 # chems.set_synonyn('WWTs_sludge','Biomass')
 # chems.show()
 
+# Reference for below: Fragment-Based Approach for Estimating Thermophysical Properties of Fats and
+# Vegetable Oils for Modeling Biodiesel Production Processes
 #Dict for gibbs free energies
 # {GOOO : 91320000,GLLL : 91320000,
 #  GOOL : 91320000,GLLO : 91320000,
@@ -736,3 +747,9 @@ chems.set_synonym('HCl2','Liquid_HCl')
 #  HPoOO :166740000,HPOO : 166740000,
 #  HPOS : 166740000,HPOP : 164240000,
 #  HPLS : 166740000}
+#Hf_formation_(OOO):-76.494*18 - 815.18
+#Hf_formation_(PPP):- -59.571*16 - 1358.7
+#Hf_formation_(PoPoPo):- -76.494*16 - 815.18
+#Hf_formation_(SSS):- -59.571*18 - 1358.7
+#Hf_formation_(LLL):-  -316.67*2 - 2466.4
+#Hf_formation_(LnLnLn):-  -316.67*3 - 2466.4

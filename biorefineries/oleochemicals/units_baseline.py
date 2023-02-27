@@ -47,8 +47,8 @@ class DihydroxylationReactor(bst.CSTR):
 #this ref highlights that a stoichiometric amount of h2O2 is required to dihydroxylate ref:https://doi.org/10.1021/ja01298a065    
 #Novovols's patent mentions that linoeleic and palmitoleic acid esters can be oxidatively cleaved
 #this would mean that they can also get dihydroxylated 
-#Methyl palmitate has no unsaturation, therefore doesn't participate in the reaction
-#Methyl stearate has no unsaturation, therefore doesn't participate in the reaction  
+#Methyl palmitate has no unsaturation, therefore doesn't participate in the reaction #Also in ref: US 2008/0245995 A1
+#Methyl stearate has no unsaturation, therefore doesn't participate in the reaction  #Also in ref: US 2008/0245995 A1
 #TODO: don't know the reaction conversion of dihydroxylation reaction
     def _setup(self):
             super()._setup()  
@@ -62,14 +62,14 @@ class DihydroxylationReactor(bst.CSTR):
     def _run(self):  
             feed = self.ins[0]
             moles_water = feed.imol['Water']
-            feed.imol['Water'] = moles_water*0.1 #considering only 90% of water can be evaporated in the condensate
+            feed.imol['Water'] = moles_water*0.2 #considering only 90% of water can be evaporated in the condensate
             condensate,effluent, = self.outs
             self.reactions(feed)
             effluent.copy_like(feed)
             #ms_dih = self._multi_stream = MultiStream('ms_dih', phases='lg')
             #ms_dih.copy_like(condensate)
             #ms_dih.vle(T = self.T, P = self.P)
-            condensate.imol['Water'] = moles_water*0.9 #TODO: change this later!
+            condensate.imol['Water'] = moles_water*0.8 #TODO: change this later!
             self.ins[0].imol['Water'] = moles_water
             # effluent.copy_like(ms_dih['l'])
             
@@ -275,7 +275,7 @@ class HydrolysisReactor(bst.BatchBioreactor):
           
 class HydrolysisSystem(bst.Unit,isabstract = True):
     _units = {'Total_filter_area': 'm^2'}
-    _N_ins = 4
+    _N_ins = 5
     _N_outs = 7
     
 #The below is a list of unit operations that comprise the Hydrolysis system    
@@ -348,9 +348,10 @@ class HydrolysisSystem(bst.Unit,isabstract = True):
 #Distillation columns for separating out methanol water     
     def _run(self):
             fatty_ester_feed = self.ins[0]
+            recycled_ester_feed = self.ins[1]
             water_feed_1 = self.ins[1]
             tops_1,bottoms_1,tops_2,bottoms_2,tops_3,bottoms_3,organic_mixture, = self.outs            
-            self.hydrolysis_column_1.ins[0].copy_like(fatty_ester_feed)
+            self.hydrolysis_column_1.ins[0].mix_from([fatty_ester_feed,recycled_ester_feed])
             self.hydrolysis_column_1.ins[1].copy_like(water_feed_1)
             self.hydrolysis_column_1._setup()
             self.hydrolysis_column_1._run()             
