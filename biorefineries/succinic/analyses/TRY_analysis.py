@@ -327,7 +327,7 @@ succinic_metrics = [get_product_MPSP, get_product_GWP, get_product_FEC]
 # succinic_metrics = [get_succinic_MPSP, get_GWP, get_FEC]
 
 # %% Generate 3-specification meshgrid and set specification loading functions
-steps = 50
+steps = 10
 
 # Neutralization
 spec.neutralization = False
