@@ -275,7 +275,7 @@ class HydrolysisReactor(bst.BatchBioreactor):
           
 class HydrolysisSystem(bst.Unit,isabstract = True):
     _units = {'Total_filter_area': 'm^2'}
-    _N_ins = 4
+    _N_ins = 5
     _N_outs = 7
     
 #The below is a list of unit operations that comprise the Hydrolysis system    
@@ -348,9 +348,10 @@ class HydrolysisSystem(bst.Unit,isabstract = True):
 #Distillation columns for separating out methanol water     
     def _run(self):
             fatty_ester_feed = self.ins[0]
+            recycled_ester_feed = self.ins[1]
             water_feed_1 = self.ins[1]
             tops_1,bottoms_1,tops_2,bottoms_2,tops_3,bottoms_3,organic_mixture, = self.outs            
-            self.hydrolysis_column_1.ins[0].copy_like(fatty_ester_feed)
+            self.hydrolysis_column_1.ins[0].mix_from([fatty_ester_feed,recycled_ester_feed])
             self.hydrolysis_column_1.ins[1].copy_like(water_feed_1)
             self.hydrolysis_column_1._setup()
             self.hydrolysis_column_1._run()             
