@@ -61,7 +61,6 @@ def create_oilcane_to_biodiesel_1g(
     # pelleted_bagasse, = bagasse_pelleting_sys.outs
     jdct['S201'].isplit['Lipid'] = 1. # Vibrating screen
     crushing_mill = jdct['U201']
-    crushing_mill.tag = "oil extraction"
     crushing_mill.isplit['Lipid'] = 0.90
     
     ### Ethanol section ###
