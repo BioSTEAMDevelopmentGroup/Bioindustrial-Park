@@ -331,7 +331,7 @@ def create_sucrose_fermentation_system(ins, outs,
         recycle.imass['Yeast', 'Water'] = [yeast, yeast * m / (1 - m)]
         beer.copy_like(feed)
         beer.separate_out(recycle, energy_balance=False)
-        beer.mol[beer.mol < 0.] = 0.
+        beer.mol.remove_negatives()
         beer.T = recycle.T = feed.T
     
     def get_titer():

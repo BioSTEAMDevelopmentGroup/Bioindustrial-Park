@@ -126,6 +126,7 @@ def get_monte_carlo(name, features=None, cache={}):
                 *f.tea_monte_carlo_derivative_metric_mockups,
                 *f.lca_monte_carlo_metric_mockups, 
                 *f.lca_monte_carlo_derivative_metric_mockups,
+                f.net_energy_production,
                 f.GWP_ethanol_displacement,
                 f.GWP_ethanol_allocation,
             )
@@ -260,7 +261,8 @@ def montecarlo_results_short(names, metrics=None, derivative=None):
             metrics = [
                 f.MFPP, f.TCI, f.ethanol_production, f.biodiesel_production, 
                 f.electricity_production, f.natural_gas_consumption, f.GWP_ethanol_displacement, 
-                f.GWP_ethanol, f.GWP_ethanol_allocation, 
+                f.GWP_ethanol, f.GWP_ethanol, f.GWP_biodiesel, 
+                f.net_energy_production,
             ]
     results = {}
     for name in names:
@@ -268,7 +270,10 @@ def montecarlo_results_short(names, metrics=None, derivative=None):
         results[name] = dct = {}
         for metric in metrics:
             index = metric.index
-            data = df[index].values
+            try:
+                data = df[index].values
+            except:
+                breakpoint()
             q05, q50, q95 = roundsigfigs(np.percentile(data, [5, 50, 95], axis=0), 3)
             key = get_monte_carlo_key(index, dct, False)
             if q50 < 0:

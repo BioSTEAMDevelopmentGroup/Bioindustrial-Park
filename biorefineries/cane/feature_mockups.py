@@ -6,9 +6,9 @@ Created on Thu Nov  4 14:44:17 2021
 """
 from biosteam import MockFeature
 
-(set_crushing_mill_oil_recovery, set_saccharification_oil_recovery, 
+(set_crushing_mill_oil_recovery, set_microbial_oil_recovery, set_bagasse_oil_recovery, 
  set_cane_operating_days, set_sorghum_operating_days, 
- set_plant_capacity, 
+ set_annual_crushing_capacity, set_crude_oil_price,
  set_ethanol_price, set_biodiesel_price, set_natural_gas_price, set_electricity_price, 
  set_IRR, set_crude_glycerol_price, set_pure_glycerol_price,
  set_saccharification_reaction_time, set_cellulase_price, 
@@ -24,10 +24,12 @@ from biosteam import MockFeature
  set_income_tax,
  ) = all_parameter_mockups = (
     MockFeature('Crushing mill oil recovery', '%', 'biorefinery'),
-    MockFeature('Saccharification oil recovery', '%', 'biorefinery'),
+    MockFeature('Microbial oil recovery', '%', 'biorefinery'),
+    MockFeature('Bagasse oil recovery', '%', 'biorefinery'),
     MockFeature('Cane operating days', 'day/yr', 'biorefinery'),
     MockFeature('Sorghum operating days', 'day/yr', 'biorefinery'),
     MockFeature('Annual crushing capacity', 'MT/yr', 'biorefinery'),
+    MockFeature('Price', 'UDA/barrel', 'Crude oil'),
     MockFeature('Price', 'USD/L', 'Stream-ethanol'),
     MockFeature('Price', 'USD/L', 'Stream-biodiesel'),
     MockFeature('Price', 'USD/m3', 'Stream-natural gas'),
@@ -63,7 +65,7 @@ from biosteam import MockFeature
 )
      
 (MFPP, feedstock_consumption, biodiesel_production, biodiesel_yield, ethanol_production, 
- net_energy_production, electricity_production, natural_gas_consumption, TCI, 
+ electricity_production, net_energy_production, natural_gas_consumption, TCI, 
  heat_exchanger_network_error, GWP_economic, GWP_ethanol, GWP_biodiesel, 
  GWP_crude_glycerol, GWP_electricity, GWP_ethanol_displacement, GWP_biodiesel_displacement,
  GWP_biofuel_allocation, GWP_ethanol_allocation,
@@ -74,12 +76,13 @@ from biosteam import MockFeature
  TCI_derivative, GWP_economic_derivative, 
  GWP_ethanol_derivative, GWP_biodiesel_derivative,
  GWP_crude_glycerol_derivative, GWP_electricity_derivative,
- competitive_oilcane_biomass_yield,
+ ROI, competitive_biomass_yield, competitive_microbial_oil_yield,
+ energy_competitive_biomass_yield, energy_competitive_microbial_oil_yield,
  ) = all_metric_mockups = (
     MockFeature('MFPP', 'USD/MT', 'Biorefinery'),
     MockFeature('Feedstock consumption', 'MT/yr', 'Biorefinery'),
     MockFeature('Biodiesel production', 'L/MT', 'Biorefinery'),
-    MockFeature('Biodiesel yield', 'L/hc', 'Biorefinery'),
+    MockFeature('Biodiesel yield', 'L/ha', 'Biorefinery'),
     MockFeature('Ethanol production', 'L/MT', 'Biorefinery'),
     MockFeature('Electricity production', 'kWhr/MT', 'Biorefinery'),
     MockFeature('Net energy production', 'GGE/MT', 'Biorefinery'),
@@ -109,7 +112,11 @@ from biosteam import MockFeature
     MockFeature('Biodiesel GWP derivative', 'kg*CO2*eq / L', 'Biodiesel'),
     MockFeature('Crude glycerol GWP derivative', 'kg*CO2*eq / kg', 'Crude glycerol'),
     MockFeature('Electricity GWP derivative', 'kg*CO2*eq / MWhr', 'Electricity'),
-    MockFeature('Competitive oilcane biomass yield', '% sugarcane', 'Biorefinery')
+    MockFeature('ROI', '%', 'Biorefinery'),
+    MockFeature('Competitive biomass yield', 'dry MT/ha', 'Feedstock'),
+    MockFeature('Energy competitive biomass yield', 'dry MT/ha', 'Feedstock'),
+    MockFeature('Competitive microbial oil yield', 'wt. %', 'Feedstock'),
+    MockFeature('Energy competitive microbial oil yield', 'wt. %', 'Feedstock'),
 )
 
 tea_monte_carlo_metric_mockups = (
