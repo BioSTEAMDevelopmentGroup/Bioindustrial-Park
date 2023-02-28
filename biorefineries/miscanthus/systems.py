@@ -35,13 +35,14 @@ __all__ = ('create_ethanol_system',)
 # )
 feedstock_kwargs = cornstover_kwargs.copy()
 feedstock_kwargs.update({
-    'Glucan': 0.3,
+    'ID': 'miscanthus',
+    'Glucan': 0.28,
     })
 
 
 #!!! Needs updating, put the baseline values here, current numbers are placeholders
 prices = {
-    'miscanthus': 0.2, # $/kg include water
+    'miscanthus': 0.2, # $/kg including water
     'Electricity': 0.07,
     }
 
@@ -65,7 +66,7 @@ def create_ethanol_system(
         feedstock_kwargs=feedstock_kwargs,
         prices=prices,
         GWP_CFs=GWP_CFs,
-        CEPCI=bst.design_tools.CEPCI_by_year[2013], # which year the $ will be in
+        CEPCI=bst.design_tools.CEPCI_by_year[2011], # which year the $ will be in
         ):
     if CEPCI:
         if float(CEPCI) > 2000: CEPCI = bst.design_tools.CEPCI_by_year[CEPCI] # given year
