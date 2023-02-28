@@ -211,9 +211,10 @@ lab_spec_3 = 1
 SA_price_range = [6500, 7500]
 # temporary price range from https://www.alibaba.com/product-detail/hot-sale-C4H8O-butanon-mek_62345760689.html?spm=a2700.7724857.normalList.26.1d194486SbCyfR
 
-product_chemical_IDs = ['Octyl_5_hydroxyhexanoate', 'Octyl_3_5_dihydroxyhexanoate', 'DHL']
+product_chemical_IDs = ['Ethyl_5_hydroxyhexanoate', 'Ethyl_3_5_dihydroxyhexanoate', 'DHL']
 get_product_MPSP = lambda: TAL_tea.solve_price(product) * 907.185 / get_product_purity() # USD / ton
 get_product_purity = lambda: sum([product.imass[i] for i in product_chemical_IDs])/product.F_mass
+get_production = lambda: sum([product.imass[i] for i in product_chemical_IDs])
 # get_product_MPSP = lambda: TAL_tea.solve_price(product) / get_product_purity() # USD / kg
 get_TAL_VOC = lambda: TAL_tea.VOC / 1e6 # million USD / yr
 get_TAL_FCI = lambda: TAL_tea.FCI / 1e6 # million USD
@@ -294,21 +295,21 @@ get_TAL_inhibitors_conc = lambda: 1000*sum(R302.outs[0].imass['AceticAcid', 'Fur
 
 # get_rel_impact_t_y = lambda: rel_impact_fn(steps)
 
-TAL_metrics = [get_product_MPSP, get_TAL_sugars_conc, get_TAL_inhibitors_conc]
+TAL_metrics = [get_product_MPSP, get_product_purity, get_production]
 # TAL_metrics = [get_TAL_MPSP, get_GWP, get_FEC]
 
 # %% Generate 3-specification meshgrid and set specification loading functions
-steps = 20
+steps = 50
 
 # Yield, titer, productivity (rate)
 spec_1 = np.linspace(0.1, 0.9, steps) # yield
-spec_2 = np.linspace(0.5, 30., steps) # titer
+spec_2 = np.linspace(1., 30., steps) # titer
 # spec_1 = np.linspace(0.2, 0.99, steps) # yield
 # spec_2 = np.linspace(45, 225, steps) # titer
 spec_3 = np.array([spec.baseline_productivity,]) # productivity
-spec.load_spec_1 = spec.load_yield
+# spec.load_spec_1 = spec.load_yield
 # spec.load_spec_2 = spec.load_titer
-spec.load_spec_3 = spec.load_productivity
+# spec.load_spec_3 = spec.load_productivity
 xlabel = "Yield"
 ylabel = 'Titer [$\mathrm{g} \cdot \mathrm{L}^{-1}$]'
 # xticks = [0.33, 0.66, 0.99]
@@ -394,8 +395,8 @@ file_to_save = 'TAL_TRY_%s.%s.%s-%s.%s'%(dateTimeObj.year, dateTimeObj.month, da
 np.save(file_to_save, data_1)
 
 pd.DataFrame(data_1[:, :, 0, :][:,:,0]/907.185).to_csv('MPSP-'+file_to_save+'.csv')
-# pd.DataFrame(data_1[:, :, 1, :][:,:,0]).to_csv('GWP-'+file_to_save+'.csv')
-# pd.DataFrame(data_1[:, :, 2, :][:,:,0]).to_csv('FEC-'+file_to_save+'.csv')
+pd.DataFrame(data_1[:, :, 1, :][:,:,0]).to_csv('product_purity-'+file_to_save+'.csv')
+pd.DataFrame(data_1[:, :, 2, :][:,:,0]*TAL_tea.operating_hours).to_csv('production_capacity-'+file_to_save+'.csv')
 
 
 # %% Load previously saved data

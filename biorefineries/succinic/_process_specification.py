@@ -21,9 +21,9 @@ last_infeasible_simulation = [] # yield, titer
 def get_IDs(units_list):
     return [i.ID for i in units_list]
 
-bugfix = False
+bugfix = True
 
-error = True
+error = False
 
 # from biosteam.process_tools.reactor_specification import evaluate_across_TRY
 _kg_per_ton = 907.18474
@@ -134,8 +134,8 @@ def evaluate_across_specs(spec, system,
                         return get_metrics()
                     except:
                         Beep(640, 500)
-                        import pdb
-                        pdb.set_trace()
+                        # import pdb
+                        # pdb.set_trace()
                 except: pass
                 spec.count_exceptions += 1
                 print(_red_highlight_white_text+f"Point failed; returning metric values as np.nan."+_reset_text)
@@ -416,7 +416,8 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
         specifications.
         
         """
-        self.reactor.tau = self.reactor.tau_cofermentation = self.spec_2 / productivity
+        # self.reactor.tau = self.reactor.tau_cofermentation = self.spec_2 / productivity
+        self.reactor.tau = self.spec_2 / productivity
         self.spec_3 = productivity
     
     def calculate_titer(self):

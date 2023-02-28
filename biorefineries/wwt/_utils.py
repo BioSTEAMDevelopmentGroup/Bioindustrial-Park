@@ -548,8 +548,8 @@ RIN_per_gal = 1.843 # $/gal ethanol
 # All heating values from the H2 tools, accessed 9/27/2022
 # https://h2tools.org/hyarc/calculator-tools/lower-and-higher-heating-values-fuels
 LHV_LNG = 48.62 # MJ/kg, liquefied natural gas
-Btu_per_MJ = 0.001055
-LHV_LNG /= Btu_per_MJ # Btu/kg
+MJ_per_BTU = 0.001055
+LHV_LNG /= MJ_per_BTU # Btu/kg
 LHV_ethanol = 77000 # Btu/gal per the statue instead of the 76330 from the H2 tools website
 LNG_to_ethanol = LHV_LNG/LHV_ethanol # gal ethanol/kg LNG
 RIN_price = RIN_per_gal * LNG_to_ethanol # $/kg LNG
