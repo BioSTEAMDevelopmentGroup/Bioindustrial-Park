@@ -56,5 +56,6 @@ class GlycerolysisReactor(bst.CSTR):
         effluent.mix_from(self.ins, energy_balance=False)
         self.glycerolysis_baseline.force_reaction(effluent)
         self.glycerolysis(effluent)
+        effluent.mol.remove_negatives() # The correct glycerol flow rate is taken care of in a unit specification
         vent.copy_flow(effluent, ('N2', 'Water'), remove=True)
         

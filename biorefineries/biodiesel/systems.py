@@ -127,7 +127,7 @@ def create_lipid_pretreatment_system(ins, outs):
     M2 = bst.Mixer('M2', [P2-0, glycerol_recycle])
     R1 = units.GlycerolysisReactor('R1', [H3-0, M2-0, N2])
     P7 = bst.Pump('P7', R1-1, hx_stream, P=101325.)
-    @R1.add_specification(run=True, impacted_units=[T2])
+    @R1.add_specification
     def adjust_feed_flow_rates():
         lipid = R1.ins[0]
         required_glycerol = 1.5 * (
@@ -140,6 +140,7 @@ def create_lipid_pretreatment_system(ins, outs):
         else:
             T2.ins[0].imol['Glycerol'] = required_glycerol
         R1.ins[2].ivol['N2'] = lipid.F_vol
+        T2.run_until(P7)
         
     H4 = bst.HXutility('H4', H3-1, T=333.15, V=0)
     C1 = bst.LiquidsSplitCentrifuge('C1', H4-0, ['', glycerol_recycle],
@@ -245,8 +246,6 @@ def create_transesterification_and_biodiesel_separation_system(ins, outs,
     @R402.add_specification
     def adjust_feed_to_reactors():
         R402._run()
-        for i in S401.outs:
-            if isinstance(i, bst.Junction): i._run()
         S401.ins[0].mix_from(S401.outs)
     
     # Centrifuge to remove glycerol
@@ -354,14 +353,24 @@ def create_transesterification_and_biodiesel_separation_system(ins, outs,
     @D402.add_specification
     def startup_water():
         imol = D402.ins[0].imol
-        water, glycerol = imol['Water', 'Glycerol']
-        minimum_water = 5 * x_water * glycerol
-        if water < minimum_water:
-            imol['Water'] = minimum_water
-        D402._run()
-        # Remove accumulation
-        D402.outs[0].imol['Water'] = 800.*C402.outs[0].imol['Glycerol']
-        D402.outs[0].T = D402.outs[0].bubble_point_at_P().T
+        glycerol = imol['Glycerol']
+        imol['Water'] = water = (800. * C402.outs[0].imol['Glycerol'] + w / g * glycerol)
+        z_distillate_LK = D402.y_top
+        z_bottoms_LK = D402.x_bot
+        z_feed_LK = water / (water + glycerol)
+        if (z_bottoms_LK < z_feed_LK < z_distillate_LK):
+            D402._run()
+            # Remove accumulation
+            D402.outs[0].imol['Water'] = 800. * C402.outs[0].imol['Glycerol']
+            D402.outs[0].T = D402.outs[0].bubble_point_at_P().T
+        else:
+            z_feed_LK = 0.1 * z_bottoms_LK + 0.9 * z_distillate_LK
+            imol['Water'] = water = glycerol / (1 - z_feed_LK)
+            D402._run()
+            # Remove accumulation
+            D402.outs[0].imol['Water'] = water - w / g * glycerol
+            D402.outs[0].T = D402.outs[0].bubble_point_at_P().T
+            
     
     # Condense recycle methanol
     H403 = bst.HXutility('H403', V=0, T=315)
@@ -431,6 +440,14 @@ def create_transesterification_and_biodiesel_separation_system(ins, outs,
     methanol-T401-P401  # Mix fresh and recycled methanol
     catalyst-T402-P402  # Fresh catalyst
     (P411-0, P401-0, P402-0)-T404-P404-S401  # Mix Catalyst with Methanol
+    
+    @B401.add_specification
+    def vary_inlets():
+        B401.run()
+        catalyst.sink.run_until(T404)
+        methanol.sink.run_until(T404)
+        T404.run_until(S401)
+        S401.ins[0].mix_from([1**R401, 1**R402])
     
     # Initial guess
     D402.outs[0].imol['Methanol', 'Glycerol', 'Water'] = [0.00127, 3.59e-05, 0.0244]

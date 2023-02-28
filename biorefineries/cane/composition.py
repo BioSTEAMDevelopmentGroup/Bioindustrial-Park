@@ -17,7 +17,6 @@ from biosteam import main_flowsheet as f
 import numpy as np
 from typing import NamedTuple
 import pandas as pd
-from biorefineries import cane
 import chaospy as cp
 import os
 
@@ -31,6 +30,8 @@ __all__ = (
     'CaneCompositionSpecification',
     'set_composition_parameters',
     'set_line_composition_parameters',
+    'load_composition',
+    'get_composition_data',
 )
 
 data_folder = os.path.join(os.path.dirname(__file__), 'data')
@@ -95,7 +96,7 @@ def set_lipid_fraction(lipid_fraction, stream=None,
     imass[lipid_IDs] = r_mass_lipid * z_mass_lipid * F_mass
     imass[carbs_IDs] = r_mass_carbs * z_mass_carbs * F_mass
     imass[fiber_IDs] = r_mass_fiber * z_mass_fiber * F_mass
-    if any(stream.mol < 0):
+    if stream.mol.has_negatives():
         raise ValueError(f'lipid cane oil composition of {z_mass_lipid/z_dry*100:.0f}% dry weight is infeasible')
 
 def set_sugarcane_composition(stream, water, fiber, sugar):
@@ -210,14 +211,16 @@ def get_lipid_fraction(stream=None):
 # %% Loading composition data
 
 cane_line_composition_data = None
+cane_minimum_oil_content = None
 
 class OilcaneCompositionPerformance(NamedTuple):
     oil_content: float
     biomass_yield: float
 
-def get_composition_data():
-    global cane_line_composition_data
-    if cane_line_composition_data is None:
+def get_composition_data(minimum_oil_content=None, ignored=frozenset([316, '19B'])):
+    global cane_line_composition_data, cane_minimum_oil_content
+    if minimum_oil_content is None: minimum_oil_content = 0
+    if cane_line_composition_data is None or minimum_oil_content != cane_minimum_oil_content:
         file = os.path.join(data_folder, 'cane_composition_data.xlsx')
         data = pd.read_excel(file, header=[0, 1], index_col=[0])
         # Filter poor lines 
@@ -227,25 +230,27 @@ def get_composition_data():
         for name in index:
             line = data.loc[name]
             performance = OilcaneCompositionPerformance(
-                line['Stem Oil (dw)']['Mean'],
-                line['Dry biomass yield (% WT)']['Mean'],
+                line['Stem oil (dw)']['Mean'],
+                line['Biomass yield (dry MT/ha)']['Mean'],
             )
             performances[name] = performance
         for name, performance in performances.items():
             for other_name, other_performance in performances.items():
                 if (name != other_name 
                     and performance.oil_content < other_performance.oil_content
-                    and performance.biomass_yield < other_performance.biomass_yield):
+                    and performance.biomass_yield < other_performance.biomass_yield
+                    or performance.oil_content < minimum_oil_content):
                     good_lines.discard(name)
-        names = sorted([name for name in index if name in good_lines], 
-                       key=lambda name: performances[name].oil_content)
+        for i in ignored: good_lines.discard(i)
+        names = sorted([i for i in index if i in good_lines], key=lambda name: performances[name].oil_content)
         cane_line_composition_data = data.loc[names]
+        cane_minimum_oil_content = minimum_oil_content
     return cane_line_composition_data
 
-def load_composition(feedstock, oil, fiber, water, FFA, PL):
+def load_composition(feedstock, oil, water, fiber, FFA, PL):
     composition = get_composition(feedstock)
-    composition['lipid'] = oil
-    composition['fiber'] = fiber
+    composition['lipid'] = oil if oil > 0. else 0.
+    composition['fiber'] = fiber 
     composition['moisture'] = water
     composition['TAG'] = 1. - FFA - PL
     composition['FFA'] = FFA
@@ -335,16 +340,16 @@ def set_line_composition_parameters(biorefinery, line):
     df = get_composition_data()
     biorefinery.feedstock_line = str(line)
     line = df.loc[line]
-    oil = line['Stem Oil (dw)']
+    oil = line['Stem oil (dw)']
     water = line['Water (wt)']
-    fiber = line['Fiber (dw)']
-    biomass = line['Dry biomass yield (MT/hc)']
+    sugar = line['Sugar (dw)']
+    biomass = line['Biomass yield (dry MT/ha)']
     set_composition_parameters(
         biorefinery,
         oil['Mean'],
         oil['STD'],
-        fiber['Mean'],
-        fiber['STD'],
+        sugar['Mean'],
+        sugar['STD'],
         water['Mean'],
         water['STD'],
         biomass['Mean'],
@@ -355,8 +360,8 @@ def set_composition_parameters(
         biorefinery,
         mean_oil_content,
         std_oil_content,
-        mean_fiber_content,
-        std_fiber_content,
+        mean_sugar_content,
+        std_sugar_content,
         mean_moisture_content,
         std_moisture_content,
         mean_biomass_yield,
@@ -367,8 +372,8 @@ def set_composition_parameters(
             biorefinery,
             mean_oil_content,
             std_oil_content,
-            mean_fiber_content,
-            std_fiber_content,
+            mean_sugar_content,
+            std_sugar_content,
             mean_moisture_content,
             std_moisture_content,
             mean_biomass_yield,
@@ -379,8 +384,8 @@ def set_composition_parameters(
             biorefinery,
             mean_oil_content,
             std_oil_content,
-            mean_fiber_content,
-            std_fiber_content,
+            mean_sugar_content,
+            std_sugar_content,
             mean_moisture_content,
             std_moisture_content,
             mean_biomass_yield,
@@ -391,8 +396,8 @@ def _add_model_composition_parameters_for_cane_line(
         biorefinery,
         mean_oil_content,
         std_oil_content,
-        mean_fiber_content,
-        std_fiber_content,
+        mean_sugar_content,
+        std_sugar_content,
         mean_moisture_content,
         std_moisture_content,
         mean_biomass_yield,
@@ -415,17 +420,6 @@ def _add_model_composition_parameters_for_cane_line(
     
     @parameter(
         element=biorefinery.feedstock, 
-        baseline=mean_fiber_content,
-        distribution=bounded_gaussian_distribution_from_mean_and_std(
-            mean_fiber_content, std_fiber_content
-        ),
-        units='dw %',
-    )
-    def set_cane_fiber_content(fiber_content):
-        biorefinery.composition_specification.fiber = fiber_content
-    
-    @parameter(
-        element=biorefinery.feedstock, 
         baseline=mean_moisture_content,
         distribution=bounded_gaussian_distribution_from_mean_and_std(
             mean_moisture_content, std_moisture_content
@@ -434,7 +428,19 @@ def _add_model_composition_parameters_for_cane_line(
     )
     def set_cane_moisture_content(moisture_content):
         biorefinery.composition_specification.moisture = moisture_content
-        biorefinery.composition_specification.load_composition()
+        
+    @parameter(
+        element=biorefinery.feedstock, 
+        baseline=mean_sugar_content,
+        distribution=bounded_gaussian_distribution_from_mean_and_std(
+            mean_sugar_content, std_sugar_content
+        ),
+        units='dw %',
+    )
+    def set_cane_sugar_content(sugar_content):
+        cs = biorefinery.composition_specification
+        cs.fiber = (1. - cs.oil - sugar_content - 0.07) # Ash/solids is 7 wt. %
+        cs.load_composition()
         
     @parameter(
         element=biorefinery.feedstock, 
@@ -442,38 +448,43 @@ def _add_model_composition_parameters_for_cane_line(
         distribution=bounded_gaussian_distribution_from_mean_and_std(
             mean_biomass_yield, std_biomass_yield
         ),
-        units='dry MT/hc',
+        units='dry MT/ha',
     )
     def set_cane_biomass_yield(biomass_yield):
-        biorefinery.dry_biomass_yield = biomass_yield
+        biorefinery.update_dry_biomass_yield(biomass_yield)
         
     biorefinery.set_cane_oil_content = set_cane_oil_content
-    biorefinery.set_cane_fiber_content = set_cane_fiber_content
     biorefinery.set_cane_moisture_content = set_cane_moisture_content
     biorefinery.set_cane_biomass_yield = set_cane_biomass_yield
+    biorefinery.set_cane_sugar_content = set_cane_sugar_content
+    for p in (set_cane_oil_content, 
+              set_cane_biomass_yield,
+              set_cane_moisture_content,
+              set_cane_sugar_content):
+        p.setter(p.baseline)
     
 def _reset_composition_parameters_for_cane_line(
         biorefinery,
         mean_oil_content,
         std_oil_content,
-        mean_fiber_content,
-        std_fiber_content,
+        mean_sugar_content,
+        std_sugar_content,
         mean_moisture_content,
         std_moisture_content,
         mean_biomass_yield,
         std_biomass_yield,
     ):
     oil = biorefinery.set_cane_oil_content
-    fiber = biorefinery.set_cane_fiber_content
+    sugar = biorefinery.set_cane_sugar_content
     moisture = biorefinery.set_cane_moisture_content
     biomass = biorefinery.set_cane_biomass_yield
     oil.baseline = mean_oil_content
     oil.distribution = bounded_gaussian_distribution_from_mean_and_std(
         mean_oil_content, std_oil_content
     )
-    fiber.baseline = mean_fiber_content
-    fiber.distribution = bounded_gaussian_distribution_from_mean_and_std(
-        mean_fiber_content, std_fiber_content
+    sugar.baseline = mean_sugar_content
+    sugar.distribution = bounded_gaussian_distribution_from_mean_and_std(
+        mean_sugar_content, std_sugar_content
     )
     moisture.baseline = mean_moisture_content
     moisture.distribution = bounded_gaussian_distribution_from_mean_and_std(
@@ -483,4 +494,9 @@ def _reset_composition_parameters_for_cane_line(
     biomass.distribution = bounded_gaussian_distribution_from_mean_and_std(
         mean_biomass_yield, std_biomass_yield
     )
+    for p in (oil, 
+              moisture,
+              sugar,
+              biomass):
+        p.setter(p.baseline)
     

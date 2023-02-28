@@ -112,6 +112,9 @@ natural_gas_prices = np.array([ # City gate [USD / mcf] 2017 to 2021, mcf = 1,00
     4.16, 4.23, 3.81, 3.43, 6.11
 ]) * 35.3146667/1e3 # To USD / m3
 
+crude_oil_prices = np.array([ # USD / barrel West Texas Intermediate 2018 - 2022; https://www.macrotrends.net/1369/crude-oil-price-history-chart
+    65.23, 56.99, 39.68, 68.17, 94.53
+])
 
 # %% Shorten data to 2017 - 2022 because of data limitations for cellulosic ethanol RINs 
 
@@ -164,6 +167,7 @@ cellulosic_ethanol_price_distribution = triangular_distribution(cellulosic_ethan
 biomass_based_diesel_price_distribution = triangular_distribution(biomass_based_diesel_prices)
 cellulosic_based_diesel_price_distribution = triangular_distribution(cellulosic_based_diesel_prices)
 natural_gas_price_distribution = triangular_distribution(natural_gas_prices)
+crude_oil_price_distribution = triangular_distribution(crude_oil_prices)
 
 # https://www.eia.gov/outlooks/aeo/pdf/00%20AEO2021%20Chart%20Library.pdf
 # Data from historical prices, 2010-2020
@@ -181,6 +185,8 @@ mean_cellulosic_based_diesel_price = np.mean(cellulosic_based_diesel_prices)
 mean_natural_gas_price = np.mean(natural_gas_prices)
 mean_electricity_price = sum([0.0583, 0.065, 0.069]) / 3.
 mean_soymeal_price = 0.33 # 10 yr average; https://markets.businessinsider.com/commodities/soybean-meal-price?op=1
+mean_crude_oil_price = np.mean(crude_oil_prices)
+mcop = mean_crude_oil_price
 
 # Short hand distributions names
 cbpd = cellulosic_based_diesel_price_distribution 
@@ -191,3 +197,4 @@ cepd = cellulosic_ethanol_price_distribution
 mcep = mean_cellulosic_ethanol_price
 aepd = advanced_ethanol_price_distribution 
 maep = mean_advanced_ethanol_price
+copd = crude_oil_price_distribution

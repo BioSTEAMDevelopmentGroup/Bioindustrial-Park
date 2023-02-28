@@ -3,17 +3,15 @@
 """
 Created on Sun Aug 23 12:11:15 2020
 
-Modified from the cornstover biorefinery constructed in Cortes-Peña et al., 2020,
-with modification of fermentation system for 2,3-Butanediol instead of the original ethanol
+Modified from the biorefineries constructed in [1], [2], and [3] for the production of
+[1] 3-hydroxypropionic acid, [2] lactic acid, and [3] ethanol from lignocellulosic feedstocks
 
-[1] Cortes-Peña et al., BioSTEAM: A Fast and Flexible Platform for the Design, 
-    Simulation, and Techno-Economic Analysis of Biorefineries under Uncertainty. 
-    ACS Sustainable Chem. Eng. 2020, 8 (8), 3302–3310. 
-    https://doi.org/10.1021/acssuschemeng.9b07040.
+[1]	Bhagwat et al., Sustainable Production of Acrylic Acid via 3-Hydroxypropionic Acid from Lignocellulosic Biomass. ACS Sustainable Chem. Eng. 2021, 9 (49), 16659–16669. https://doi.org/10.1021/acssuschemeng.1c05441
+[2]	Li et al., Sustainable Lactic Acid Production from Lignocellulosic Biomass. ACS Sustainable Chem. Eng. 2021, 9 (3), 1341–1351. https://doi.org/10.1021/acssuschemeng.0c08055
+[3]	Cortes-Peña et al., BioSTEAM: A Fast and Flexible Platform for the Design, Simulation, and Techno-Economic Analysis of Biorefineries under Uncertainty. ACS Sustainable Chem. Eng. 2020, 8 (8), 3302–3310. https://doi.org/10.1021/acssuschemeng.9b07040
 
-All units are explicitly defined here for transparency and easy reference
 
-@author: yalinli_cabbi
+@author: sarangbhagwat
 """
 
 

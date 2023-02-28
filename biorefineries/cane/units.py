@@ -44,7 +44,7 @@ class SeedTrain(SeedTrain):
         vent, effluent= self.outs
         effluent.mix_from(self.ins, energy_balance=False)
         self.reactions.force_reaction(effluent)
-        effluent.mol[effluent.mol < 0.] = 0.
+        effluent.mol.remove_negatives()
         effluent.T = self.T
         vent.copy_flow(effluent, 'CO2', remove=True)
         

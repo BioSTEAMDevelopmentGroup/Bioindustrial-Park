@@ -92,6 +92,10 @@ biomass_based_diesel_prices = np.array([ # USD / gal June 2017 - Sep 2022, by mo
     6.63, 6.59, 6.72
 ]) / liter_per_gal
 
+crude_oil_prices = np.array([ # USD / barrel West Texas Intermediate 2018 - 2022; https://www.macrotrends.net/1369/crude-oil-price-history-chart
+    65.23, 56.99, 39.68, 68.17, 94.53
+])
+
 def by_month_to_year(arr):
     N_years = int(len(arr)/12)
     return np.array([ 
@@ -116,6 +120,8 @@ natural_gas_prices = np.array([ # City gate [USD / mcf] 2017 to 2021, mcf = 1,00
 electricity_prices = np.array([ # Industrial retail prices, 2011 to 2021 https://www.eia.gov/electricity/data.php
     6.82, 6.67, 6.89, 7.10, 6.91, 6.76, 6.88, 6.92, 6.81, 6.67, 7.18
 ]) / 100.
+
+electricity_prices = electricity_prices[-4:] # Only use the last 4 years in common
 
 # %% Shorten data to 2017 - 2022 because of data limitations for cellulosic ethanol RINs 
 
@@ -161,7 +167,6 @@ def plot_histogram(x, *args, bins=10, density=True, **kwargs):
     return plt.hist(x, *args, **kwargs)
 
 # Price distributions
-electricity_price_distribution = shape.Triangle(0.0583, 0.065, 0.069) # Data from historical prices, 2010-2020; https://www.eia.gov/outlooks/aeo/pdf/00%20AEO2021%20Chart%20Library.pdf
 ethanol_no_RIN_price_distribution = triangular_distribution(ethanol_no_RIN_prices)
 advanced_ethanol_price_distribution = triangular_distribution(advanced_ethanol_prices)
 cellulosic_ethanol_price_distribution = triangular_distribution(cellulosic_ethanol_prices)
@@ -169,6 +174,7 @@ biomass_based_diesel_price_distribution = triangular_distribution(biomass_based_
 cellulosic_based_diesel_price_distribution = triangular_distribution(cellulosic_based_diesel_prices)
 natural_gas_price_distribution = triangular_distribution(natural_gas_prices)
 electricity_price_distribution = triangular_distribution(electricity_prices)
+crude_oil_price_distribution = triangular_distribution(crude_oil_prices)
 
 # Mean values
 mean_glycerol_price = (0.10 + 0.22) * 0.5 
@@ -182,6 +188,7 @@ mean_cellulosic_based_diesel_price = np.mean(cellulosic_based_diesel_prices)
 mean_natural_gas_price = np.mean(natural_gas_prices)
 mean_electricity_price = np.mean(electricity_prices)
 mean_soymeal_price = 0.33 # 10 yr average; https://markets.businessinsider.com/commodities/soybean-meal-price?op=1
+mean_crude_oil_price = np.mean(crude_oil_prices)
 
 # Short hand distributions names
 cbpd = cellulosic_based_diesel_price_distribution 
@@ -192,3 +199,26 @@ cepd = cellulosic_ethanol_price_distribution
 mcep = mean_cellulosic_ethanol_price
 aepd = advanced_ethanol_price_distribution 
 maep = mean_advanced_ethanol_price
+mcop = mean_crude_oil_price
+copd = crude_oil_price_distribution
+
+f_ngp = np.mean(natural_gas_prices) / mcop
+f_elecp = np.mean(electricity_prices) / np.mean(crude_oil_prices[:-1])
+f_bp = mbp / mcop
+f_cbp = mcbp / mcop
+f_aep = maep / mcop
+f_cep = mcep / mcop
+
+ngp_offset = f_ngp * crude_oil_prices - natural_gas_prices
+elecp_offset = f_elecp * crude_oil_prices[:-1] - electricity_prices
+bp_offset = f_bp * crude_oil_prices - biomass_based_diesel_prices
+cbp_offset = f_cbp * crude_oil_prices - cellulosic_based_diesel_prices
+aep_offset = f_aep * crude_oil_prices - advanced_ethanol_prices
+cep_offset = f_cep * crude_oil_prices - cellulosic_ethanol_prices
+
+ngpd_offset = triangular_distribution(ngp_offset)
+elecpd_offset = triangular_distribution(elecp_offset)
+bpd_offset = triangular_distribution(bp_offset)
+cbpd_offset = triangular_distribution(cbp_offset)
+aepd_offset = triangular_distribution(aep_offset)
+cepd_offset = triangular_distribution(cep_offset)
