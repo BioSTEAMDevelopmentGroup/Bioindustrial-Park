@@ -62,7 +62,7 @@ def default_load_utility_settings(
         power_GWP_CFs=(1., 1.,), # consumption, production #!!! needs to be updated
         ):
     bst.process_tools.default_utilities()
-    bst.PowerUtility.price = 0.07 # Value from Chinmay's report; 0.07, in original
+    bst.PowerUtility.price = power_price
     bst.PowerUtility.characterization_factors['GWP'] = power_GWP_CFs
     HeatUtility = bst.HeatUtility
     lps = HeatUtility.get_agent('low_pressure_steam')
