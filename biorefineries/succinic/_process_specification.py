@@ -215,6 +215,8 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
                                             seed_train_system, reactor,
                  target_titer=100, product=reactor.outs[0], maximum_inhibitor_concentration=maximum_inhibitor_concentration)
     
+        self.flowsheet = flowsheet = bst.main_flowsheet
+        self.system = flowsheet('succinic_sys')
     # @maximum_inhibitor_concentration.getter
     def get_maximum_inhibitor_concentration(self):
         return self.titer_inhibitor_specification.maximum_inhibitor_concentration
@@ -232,6 +234,15 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
     def neutralization(self, value):
         self._neutralization = self.reactor.neutralization = value
     
+    def empty_system_products_and_utilities(self):
+        # flowsheet = self.flowsheet
+        sys = self.system
+        [i.empty() for i in sys.products]
+        for i in sys.units:
+            i.power_utility.empty()
+            i.heat_utilities = []
+
+        
     def load_specifications(self, spec_1=None, spec_2=None, spec_3=None, neutralization=None):
         """
         Load ferementation specifications.
@@ -245,6 +256,7 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
         productivity : float, optional
             g products / L effluent / hr
         """
+        self.empty_system_products_and_utilities()
         if not (neutralization==None):
             self.neutralization = neutralization
         self.load_spec_1(spec_1 or self.spec_1)

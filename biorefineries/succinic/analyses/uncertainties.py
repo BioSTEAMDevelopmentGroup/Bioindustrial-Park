@@ -422,7 +422,7 @@ df_FEC_breakdown = pd.DataFrame(FEC_breakdown_list,
 
 contourplots.stacked_bar_plot(dataframe=df_FEC_breakdown, 
                  # y_ticks=[-200, -175, -150, -125, -100, -75, -50, -25, 0, 25, 50, 75, 100, 125, 150, 175], 
-                 y_ticks=[-125, -100, -75, -50, -25, 0, 25, 50, 75, 100], 
+                 y_ticks=[-100, -75, -50, -25, 0, 25, 50, 75, 100], 
                  y_label=r"$\bfFEC$" +" "+ r"$\bfBreakdown$", 
                  y_units = "%", 
                  # colors=['#7BBD84', '#F7C652', '#63C6CE', '#94948C', '#734A8C', '#D1C0E1', '#648496', '#B97A57', '#F8858A', 'magenta'],
@@ -520,13 +520,16 @@ fig[0].savefig(mode+'FEC-Spearman.png', dpi=600, bbox_inches='tight',
 #%% GHG-100
 ## GREET 2022
 # succinic acid, succinic acid bioproduct from sugars (corn stover): 0.7036 kg-CO2-eq/kg-SA
+# incl. EOL GWP (1.4937 kg-CO2-eq/kg-SA): 2.1973 kg-CO2-eq/kg-SA
 
 #%% IPCC 2013 GWP100a
 
 ## ecoinvent 3.8
 # succinic acid production, GLO: 3.182 kgCO2-eq/kg-SA
-# market for succinic acid, GLO: 3.2322 kgCO2-eq/kg-SA
+# incl. EOL GWP (1.4937 kg-CO2-eq/kg-SA): 4.6757 kg-CO2-eq/kg-SA
 
+# market for succinic acid, GLO: 3.2322 kgCO2-eq/kg-SA
+# incl. EOL GWP (1.4937 kg-CO2-eq/kg-SA): 4.7259 kg-CO2-eq/kg-SA
 #%% FEC
 
 ## ecoinvent 3.8

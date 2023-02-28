@@ -82,22 +82,40 @@ linecolor_light = (*colors.neutral_tint.RGBn, 0.85)
 markercolor = (*colors.CABBI_orange.shade(5).RGBn, 1)
 edgecolor = (*colors.CABBI_black.RGBn, 1)
 
+# def CABBI_green_colormap(N_levels=90):
+#     """
+#     Return a matplotlib.colors.LinearSegmentedColormap object
+#     that serves as CABBI's green colormap theme for contour plots.
+    
+#     """
+#     # CABBI_colors = (colors.CABBI_yellow.tint(50).RGBn,
+#     #                 colors.CABBI_yellow.shade(10).RGBn,
+#     #                 colors.CABBI_green.RGBn,
+#     #                 colors.CABBI_green.shade(30).RGBn)
+
+#     CABBI_colors = (colors.CABBI_yellow.RGBn,
+#                     colors.CABBI_green.RGBn,
+#                     colors.CABBI_teal_green.shade(90).RGBn)
+#     return LinearSegmentedColormap.from_list('CABBI', CABBI_colors, N_levels)
+
 def CABBI_green_colormap(N_levels=90):
     """
     Return a matplotlib.colors.LinearSegmentedColormap object
     that serves as CABBI's green colormap theme for contour plots.
-    
+
     """
     # CABBI_colors = (colors.CABBI_yellow.tint(50).RGBn,
     #                 colors.CABBI_yellow.shade(10).RGBn,
     #                 colors.CABBI_green.RGBn,
     #                 colors.CABBI_green.shade(30).RGBn)
 
-    CABBI_colors = (colors.CABBI_yellow.RGBn,
-                    colors.CABBI_green.RGBn,
-                    colors.CABBI_teal_green.shade(30).RGBn)
-    return LinearSegmentedColormap.from_list('CABBI', CABBI_colors, N_levels)
+    CABBI_colors = (colors.CABBI_orange.RGBn,
+                    colors.CABBI_yellow.RGBn,
 
+                    colors.CABBI_green.RGBn,
+                    # colors.CABBI_teal_green.shade(50).RGBn,
+                    colors.grey_dark.RGBn)
+    return LinearSegmentedColormap.from_list('CABBI', CABBI_colors, N_levels)
 
 def CABBI_grey_colormap(N_levels=25):
     """
@@ -238,7 +256,12 @@ SA_price_range = [6500, 7500]
 # temporary price range from https://www.alibaba.com/product-detail/hot-sale-C4H8O-butanon-mek_62345760689.html?spm=a2700.7724857.normalList.26.1d194486SbCyfR
 
 product_chemical_IDs = ['SuccinicAcid',]
-get_product_MPSP = lambda: succinic_tea.solve_price(product) * 907.185 / get_product_purity() # USD / ton
+# get_product_MPSP = lambda: succinic_tea.solve_price(product) * 907.185 / get_product_purity() # USD / ton
+
+def get_product_MPSP():
+    model.specification()
+    return succinic_tea.solve_price(product) * 907.185 / get_product_purity() # USD / ton
+
 get_product_purity = lambda: sum([product.imass[i] for i in product_chemical_IDs])/product.F_mass
 get_production = lambda: sum([product.imass[i] for i in product_chemical_IDs])
 # get_product_MPSP = lambda: succinic_tea.solve_price(product) / get_product_purity() # USD / kg
@@ -482,8 +505,8 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_1, 
                                 x_ticks=[20, 30, 40, 50, 60, 70, 80],
                                 y_ticks=[20, 40, 60, 80, 100, 120],
                                 z_ticks=np.arange(0.0, 2.5, 0.5),
-                                w_levels=np.arange(0.9, 2.3, 0.1), # levels for unlabeled, filled contour areas (labeled and ticked only on color bar)
-                                w_ticks=np.array([0.9, 1.0, 1.1, 1.2, 1.3,  1.5, 1.8, 2.2,]), # labeled, lined contours; a subset of w_levels
+                                w_levels=np.arange(0.8, 2.3, 0.1), # levels for unlabeled, filled contour areas (labeled and ticked only on color bar)
+                                w_ticks=np.array([1.0, 1.1, 1.2, 1.3,  1.5, 1.8, 2.2,]), # labeled, lined contours; a subset of w_levels
                                 x_units=r"$\mathrm{\% theoretical}$",
                                 # x_units=r"$\mathrm{g} \cdot \mathrm{g}$" + " " + r"$\mathrm{glucose}$" + " " + r"$\mathrm{eq.}^{-1}$",
                                 y_units=r"$\mathrm{g} \cdot \mathrm{L}^{-1}$",
@@ -491,7 +514,7 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_1, 
                                 w_units=MPSP_units,
                                 fmt_clabel=lambda cvalue: "{:.2f}".format(cvalue), # format of contour labels
                                 cmap=CABBI_green_colormap(), # can use 'viridis' or other default matplotlib colormaps
-                                cbar_ticks=np.arange(1.0, 2.3, 0.2),
+                                cbar_ticks=np.arange(0.8, 2.3, 0.2),
                                 z_marker_color='g', # default matplotlib color names
                                 axis_title_fonts={'size': {'x': 14, 'y':14, 'z':14, 'w':14},},
                                 fps=3, # animation frames (z values traversed) per second
@@ -512,8 +535,8 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_2, 
                                 x_ticks=[20, 30, 40, 50, 60, 70, 80],
                                 y_ticks=[20, 40, 60, 80, 100, 120],
                                 z_ticks=np.arange(0.0, 2.5, 0.5),
-                                w_levels=np.arange(0.0, 5.5, 0.5), # levels for unlabeled, filled contour areas (labeled and ticked only on color bar)
-                                w_ticks=np.array([1, 2, 3, 5,]), # labeled, lined contours; a subset of w_levels
+                                w_levels=np.arange(0., 5.25, 0.25), # levels for unlabeled, filled contour areas (labeled and ticked only on color bar)
+                                w_ticks=np.array([2, 3, 5,]), # labeled, lined contours; a subset of w_levels
                                 x_units=r"$\mathrm{\% theoretical}$",
                                 # x_units=r"$\mathrm{g} \cdot \mathrm{g}$" + " " + r"$\mathrm{glucose}$" + " " + r"$\mathrm{eq.}^{-1}$",
                                 y_units=r"$\mathrm{g} \cdot \mathrm{L}^{-1}$",
@@ -543,16 +566,16 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_3, 
                                 x_ticks=[20, 30, 40, 50, 60, 70, 80],
                                 y_ticks=[20, 40, 60, 80, 100, 120],
                                 z_ticks=np.arange(0.0, 2.5, 0.5),
-                                w_levels=np.arange(-30, 90, 10), # levels for unlabeled, filled contour areas (labeled and ticked only on color bar)
-                                w_ticks=np.array([-20, 0, 10, 20, 50, 80]), # labeled, lined contours; a subset of w_levels
+                                w_levels=np.arange(-30, 100, 10), # levels for unlabeled, filled contour areas (labeled and ticked only on color bar)
+                                w_ticks=np.array([-20, -10, 0, 10, 20, 50, 90]), # labeled, lined contours; a subset of w_levels
                                 x_units=r"$\mathrm{\% theoretical}$",
                                 # x_units=r"$\mathrm{g} \cdot \mathrm{g}$" + " " + r"$\mathrm{glucose}$" + " " + r"$\mathrm{eq.}^{-1}$",
                                 y_units=r"$\mathrm{g} \cdot \mathrm{L}^{-1}$",
                                 z_units=r"$\mathrm{g} \cdot \mathrm{L}^{-1}  \cdot \mathrm{h}^{-1}$",
                                 w_units=FEC_units,
-                                fmt_clabel=lambda cvalue: "{:.2f}".format(cvalue), # format of contour labels
+                                fmt_clabel=lambda cvalue: "{:.0f}".format(cvalue), # format of contour labels
                                 cmap=CABBI_green_colormap(), # can use 'viridis' or other default matplotlib colormaps
-                                cbar_ticks=np.arange(-30, 90, 20),
+                                cbar_ticks=np.arange(-30, 100, 30),
                                 z_marker_color='g', # default matplotlib color names
                                 axis_title_fonts={'size': {'x': 14, 'y':14, 'z':14, 'w':14},},
                                 fps=3, # animation frames (z values traversed) per second

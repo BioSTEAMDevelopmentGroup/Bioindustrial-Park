@@ -665,15 +665,18 @@ class CoFermentation(Reactor):
         # effluent.copy_like(feed)
         effluent.T = vapor.T = self.T
         CSL.imass['CSL'] = (sugars.F_vol+feed.F_vol) * self.CSL_loading 
-        
+        self.unreacted_glucose = [effluent.imol['Glucose']]
         
         self.cofermentation_rxns(effluent.mol)
+        self.unreacted_glucose.append(effluent.imol['Glucose'])
         vapor.empty()
         vapor.imol['CO2', 'O2'] = effluent.imol['CO2', 'O2']
         vapor.phase = 'g'
         
+        
         self.CO2_generation_rxns(effluent.mol)
         
+        self.unreacted_glucose.append(effluent.imol['Glucose'])
         effluent.imol['CO2'] = 0
         effluent.imol['O2'] = 0
         effluent.imass['CSL'] = 0

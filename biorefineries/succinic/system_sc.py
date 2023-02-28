@@ -826,11 +826,11 @@ def load_titer_with_glucose(titer_to_load):
     R302.titer_to_load = titer_to_load
     F301_titer_obj_fn(1e-4)
     if M304_titer_obj_fn(1e-4)<0: # if the slightest dilution results in too low a conc
-        IQ_interpolation(F301_titer_obj_fn, 1e-4, 0.9, ytol=1e-2)
+        IQ_interpolation(F301_titer_obj_fn, 1e-4, 0.8, ytol=1e-4)
     # elif F301_titer_obj_fn(1e-4)>0: # if the slightest evaporation results in too high a conc
     else:
         F301_titer_obj_fn(1e-4)
-        IQ_interpolation(M304_titer_obj_fn, 1e-4, 5000., ytol=1e-2)
+        IQ_interpolation(M304_titer_obj_fn, 1e-4, 5000., ytol=1e-4)
     # else:
     #     raise RuntimeError('Unhandled load_titer case.')
     spec.titer_inhibitor_specification.check_sugar_concentration()
@@ -865,8 +865,10 @@ area_names = [
 
 unit_groups = bst.UnitGroup.group_by_area(succinic_sys.units)
 
+
 unit_groups.append(bst.UnitGroup('natural gas (for steam generation)'))
 unit_groups.append(bst.UnitGroup('natural gas (for product drying)'))
+unit_groups.append(bst.UnitGroup('electricity sale'))
 
 for i, j in zip(unit_groups, area_names): i.name = j
 for i in unit_groups: i.autofill_metrics(shorthand=False, 
@@ -894,6 +896,7 @@ unit_groups[-1].metrics[-1] = bst.evaluation.Metric('Material cost',
                                                     getter=lambda: F404.ins[2].cost, 
                                                     units='USD/hr',
                                                     element=None)
+
 
 for i in unit_groups:
     i.metric(i.get_net_electricity_production,
