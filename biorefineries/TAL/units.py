@@ -633,7 +633,228 @@ class CoFermentation(Unit):
         Design['Fermenter size'] = self.outs[0].F_mass * self.tau_cofermentation
         Design['Recirculation flow rate'] = total_mass_flow
         
+# @cost(basis='Fermenter size', ID='Fermenter', units='kg',
+#       cost=10128000, S=(42607+443391+948+116)*(60+36),
+#       CE=CEPCI[2009], n=1, BM=1.5)
+# @cost(basis='Fermenter size', ID='Fermenter gitator', units='kg',
+#       # Scaling basis based on sum of all streams into fermenter
+#       # (304, 306, 311, and 312 in ref [1])
+#       # and total residence time (batch hydrolysis and fermentation)
+#       kW=268.452, cost=630000, S=(42607+443391+948+116)*(60+36),
+#       CE=CEPCI[2009], n=1, BM=1.5)
+# @cost(basis='Recirculation flow rate', ID='Recirculation pump', units='kg/hr',
+#       # Scaling basis based on sum of all streams into fermenter
+#       # (304, 306, 311, and 312 in ref [1])
+#       kW=74.57, cost=47200, S=(42607+443391+948+116), CE=CEPCI[2009], n=0.8, BM=2.3)
+# # Surge tank to hold the fermentation broth
+# @cost(basis='Broth flow rate', ID='Surge tank', units='kg/hr',
+#       cost=636000, S=425878, CE=CEPCI[2009], n=0.7, BM=1.8)
+# @cost(basis='Broth flow rate', ID='Surge tank agitator', units='kg/hr',
+#       kW=29.828, cost=68300, S=425878, CE=CEPCI[2009], n=0.5, BM=1.5)
+# @cost(basis='Broth flow rate', ID='Surge tank pump', units='kg/hr',
+#       kW=93.2125, cost=26800, S=488719, CE=CEPCI[2009], n=0.8, BM=2.3)
+# class CoFermentation_new(Reactor):
+#     _N_ins = 6
+#     _N_outs = 2
+#     _units= {**Reactor._units,
+#             'Fermenter size': 'kg',
+#             'Recirculation flow rate': 'kg/hr',
+#             'Broth flow rate': 'kg/hr',
+#             'Duty': 'kJ/hr'}
+#     _F_BM_default = {**Reactor._F_BM_default,
+#            'Heat exchangers': 3.17}
+
+#     _N_heat_utilities = 1
+
+#     auxiliary_unit_names = ('heat_exchanger',)
+
+#     # Equals the split of saccharified slurry to seed train
+#     inoculum_ratio = 0.07
+
+#     CSL_loading = 10 # g/L (kg/m3)
+
+#     target_titer = 130 # in g/L (kg/m3), the maximum titer in collected data
+
+#     effluent_titer = 0
     
+#     productivity = 0.89 # in g/L/hr
+
+#     target_yield = 0.76 # in g/g-sugar
+
+#     tau_batch_turnaround = 12 # in hr, the same as the seed train in ref [1]
+
+#     tau_cofermentation = 0 # in hr
+
+#     max_sugar = 0 # g/L
+
+#     def __init__(self, ID='', ins=None, outs=(), thermo=None, *, T=50+273.15,
+#                  P=101325, V_wf=0.8, length_to_diameter=0.6,
+#                  kW_per_m3=None, mixing_intensity=300,
+#                  wall_thickness_factor=1,
+#                  vessel_material='Stainless steel 304',
+#                  vessel_type='Vertical',
+#                  neutralization=True,
+#                  mode='batch', feed_freq=1,
+#                  allow_dilution=False,
+#                  allow_concentration=False,
+#                  sugars=None):
+
+#         Unit.__init__(self, ID, ins, outs)
+#         self.T = T
+#         self.P = P
+#         self.V_wf = V_wf
+#         self.length_to_diameter = length_to_diameter
+#         self.mixing_intensity = mixing_intensity
+#         self.kW_per_m3 = kW_per_m3
+#         self.wall_thickness_factor = wall_thickness_factor
+#         self.vessel_material = vessel_material
+#         self.vessel_type = vessel_type
+#         self.neutralization = neutralization
+#         self.mode = mode
+#         self.feed_freq = feed_freq
+#         self.allow_dilution = allow_dilution
+#         self.allow_concentration = allow_concentration
+#         self.sugars = sugars or tuple(i.ID for i in self.chemicals.sugars)
+#         self._mixed_feed = Stream(f'{self.ID}_mixed_feed')
+#         self._tot_feed = Stream(f'{self.ID}_tot_feed')
+#         self._mixture = Stream(f'{self.ID}_mixture')
+#         self._single_rx_effluent = Stream(f'{self.ID}_single_rx_effluent')
+#         self.heat_exchanger = HXutility(None, None, None, T=T)
+
+#         # FermMicrobe reaction from ref [1]
+#         self.cofermentation_rxns = ParallelRxn([
+#         #      Reaction definition            Reactant    Conversion
+#         Rxn('Glucose -> 2 LacticAcid',        'Glucose',   0.76),
+#         Rxn('Glucose -> 3 AceticAcid',        'Glucose',   0.07),
+#         Rxn('Glucose -> 6 FermMicrobe',       'Glucose',   0.02),
+#         Rxn('3 Xylose -> 5 LacticAcid',       'Xylose',    0.76),
+#         Rxn('2 Xylose -> 5 AceticAcid',       'Xylose',    0.07),
+#         Rxn('Xylose -> 5 FermMicrobe',        'Xylose',    0.02)
+#         ])
+#         self._X = self.cofermentation_rxns.X.copy()
+
+#         # Neutralization of lactic acid and acetic acid by lime (Ca(OH)2)
+#         self.neutralization_rxns = ParallelRxn([
+#         #   Reaction definition                                               Reactant  Conversion
+#         Rxn('2 LacticAcid + CalciumDihydroxide -> CalciumLactate + 2 H2O',  'LacticAcid',   1),
+#         Rxn('2 AceticAcid + CalciumDihydroxide -> CalciumAcetate + 2 H2O',  'AceticAcid',   1),
+#         Rxn('SuccinicAcid + CalciumDihydroxide -> CalciumSuccinate + 2H2O', 'SuccinicAcid', 1)
+#             ])
+
+#     def _run(self):
+#         feed, sugars, CSL = self.ins
+        
+#         effluent, vapor = self.outs
+#         effluent.mix_from([feed, sugars])
+#         # ss = Stream(None)
+#         # effluent.copy_like(feed)
+#         effluent.T = vapor.T = self.T
+#         CSL.imass['CSL'] = (sugars.F_vol+feed.F_vol) * self.CSL_loading 
+        
+#         self.cofermentation_rxns(effluent.mol)
+#         vapor.imol['CO2'] = effluent.imol['CO2']
+#         vapor.phase = 'g'
+        
+#         self.CO2_generation_rxns(effluent.mol)
+        
+#         vapor = effluent.imol['CO2']
+#         effluent.imol['CO2'] = 0
+#         effluent.imass['CSL'] = 0
+        
+#         self.effluent_titer = compute_TAL_titer(effluent)
+
+
+#     def _design(self):
+#         mode = self.mode
+#         Design = self.design_results
+#         Design.clear()
+#         _mixture = self._mixture
+#         _mixture.mix_from((*self.ins[0:3], *self.ins[4:]))
+#         duty = Design['Duty'] = self._mixed_feed.H - _mixture.H
+
+#         if mode == 'batch':
+#             tau_tot = self.tau_batch_turnaround + self.tau_cofermentation
+#             Design['Fermenter size'] = self.outs[0].F_mass * tau_tot
+#             Design['Recirculation flow rate'] = self.F_mass_in
+#             Design['Broth flow rate'] = self.outs[0].F_mass
+#             self.heat_exchanger.simulate_as_auxiliary_exchanger(duty, _mixture)
+#         else:
+#             self._Vmax = 3785.41178 # 1,000,000 gallon from ref [1]
+#             Reactor._design(self)
+#             self.tau_cofermentation = self.tau
+#             # Include a backup fermenter for cleaning
+#             Design['Number of reactors'] += 1
+
+#     def _cost(self):
+#         Design = self.design_results
+#         purchase_costs = self.baseline_purchase_costs
+#         purchase_costs.clear()
+#         hx = self.heat_exchanger
+
+#         if self.mode == 'batch':
+#             Unit._cost()
+#             self._decorated_cost()
+#             # Adjust fermenter cost for acid-resistant scenario
+#             if not self.neutralization:
+#                 purchase_costs['Fermenter'] *= _316_over_304
+#                 purchase_costs['Agitator'] *= _316_over_304
+
+#         else:
+#             if not self.neutralization:
+#                 self.vessel_material= 'Stainless steel 316'
+#             Reactor._cost(self)
+
+#             N_working = Design['Number of reactors'] - 1 # subtract the one back-up
+#             single_rx_effluent = self._single_rx_effluent
+#             single_rx_effluent.copy_like(self._mixture)
+#             single_rx_effluent.mol[:] /= N_working
+#             hx.simulate_as_auxiliary_exchanger(duty=Design['Duty']/N_working,
+#                                                stream=single_rx_effluent)
+#             hu_total = self.heat_utilities[0]
+#             hu_single_rx = hx.heat_utilities[0]
+#             hu_total.copy_like(hu_single_rx)
+#             hu_total.scale(N_working)
+
+#             # No power need for the back-up reactor
+#             self.power_utility(self.kW_per_m3*Design['Single reactor volume']*N_working)
+
+#     @property
+#     def tau(self):
+#         return self.tau_cofermentation
+
+#     @property
+#     def mode(self):
+#         return self._mode
+#     @mode.setter
+#     def mode(self, i):
+#         if i.lower() in ('fed-batch', 'fedbatch', 'fed batch'):
+#             raise ValueError('For fed-batch, set fermentation to "batch" and ' \
+#                              'change feed_freq.')
+#         elif i.lower() in ('batch', 'continuous'):
+#             self._mode = i.lower()
+#             self.feed_freq = 1
+#         else:
+#             raise ValueError(f'Mode can only be "batch" or "continuous", not {i}.')
+
+#     @property
+#     def feed_freq(self):
+#         return self._feed_freq
+#     @feed_freq.setter
+#     def feed_freq(self, i):
+#         if not (int(i)==i and i >0):
+#             raise ValueError('feed_freq can only be positive integers.')
+#         elif self.mode == 'continuous' and int(i) != 1:
+#             raise ValueError('feed_freq can only be 1 for continuous mode.')
+#         else:
+#             self._feed_freq = int(i)
+
+#     @property
+#     def lactic_yield(self):
+#         X = self.cofermentation_rxns.X
+#         if not X[0] == X[3]:
+#             raise ValueError('Glucose and xylose has different yields.')
+#         return X[0]
+
         
 # Seed train, 5 stages, 2 trains
 @cost(basis='Seed fermenter size', ID='Stage #1 fermenters', units='kg',
@@ -1782,19 +2003,21 @@ class HydrogenationEstersReactor(Reactor):
     """
     A hydrogenation reactor to produce esters from TAL.
     """
-    _N_ins = 3
+    _N_ins = 5
     _N_outs = 2
     _F_BM_default = {**Reactor._F_BM_default,
             'PdC catalyst': 1}
     mcat_frac = 0.5 # fraction of catalyst by weight in relation to the reactant (TAL)
-    TAL_to_esters_conversion = 0.5-1e-3
     mono_di_hydroxy_esters_conversion_ratio = 0.5
-    catalyst_deactivation_k = 2e-3
-    
+    TAL_to_esters_and_DHL_conversion = 0.9
+    esters_DHL_conversion_ratio = 0.5
+    TAL_to_esters_conversion = esters_DHL_conversion_ratio * TAL_to_esters_and_DHL_conversion
+    # catalyst_deactivation_k = 2e-3/10
+    catalyst_replacements_per_year = 0. # deprecated variable
     hydrogenation_rxns = ParallelRxn([
             #   Reaction definition   Reactant   Conversion
             Rxn('TAL + 2H2 + Ethanol -> Ethyl_5_hydroxyhexanoate',         'TAL',   TAL_to_esters_conversion*mono_di_hydroxy_esters_conversion_ratio),
-            Rxn('TAL + 2H2 + Ethanol -> Ethyl_3_5_dihydroxyhexanoate',         'TAL',   TAL_to_esters_conversion*(1.-mono_di_hydroxy_esters_conversion_ratio)),
+            Rxn('TAL + H2 + Ethanol + H2O -> Ethyl_3_5_dihydroxyhexanoate',         'TAL',   TAL_to_esters_conversion*(1.-mono_di_hydroxy_esters_conversion_ratio)),
             Rxn('TAL + 2H2 -> HMTHP',         'TAL',   1e-6), # conversion from Huber group experimental data
             # Rxn('HMDHP + H2 -> HMTHP',         'HMDHP',   1.-1e-5),
             # ])
@@ -1811,11 +2034,20 @@ class HydrogenationEstersReactor(Reactor):
     TAL_to_DHL_rxn = hydrogenation_rxns[3]
     byproduct_formation_rxns  = ParallelRxn([
             #   Reaction definition   Reactant   Conversion
-            Rxn('TAL + H2O -> Acetylacetone + CO2',         'TAL',   1.-1e-5),
+            Rxn('TAL + H2O -> Pentenone + CO2',         'TAL',   1.-1e-5),
            ])
+    TAL_conversion_rxns = [i for i in hydrogenation_rxns if i.reactant=='TAL']
     
+    def __init__(self, ID, ins, outs, 
+                 tau = (7./3.) * 2., # from Huber group
+                 T=323., # from Huber group
+                 vessel_material='Stainless steel 316', **args):
+        Reactor.__init__(self, ID, ins, outs, tau=tau, vessel_material=vessel_material)
+        self.T = T
+        self.heat_exchanger = hx = HXutility(None, None, None, T=T) 
+        
     def _run(self):
-        feed, recycle, reagent, fresh_catalyst = self.ins
+        feed, recycle, reagent, fresh_catalyst, recovered_catalyst = self.ins
         effluent, vented_gas, spent_catalyst = self.outs
         
         # effluent.imol['HMDHP'] += 1e-10
@@ -1849,21 +2081,37 @@ class HydrogenationEstersReactor(Reactor):
         reagent.imol['H2'] -= extra_H2_mol_to_exclude
         effluent.imol['H2'] = 0.
         
-        spent_catalyst.imol['Pd'] = fresh_catalyst.imol['Pd'] =\
-            self.catalyst_deactivation_k * (feed.imol['TAL'] - effluent.imol['TAL'])
+        for i in self.outs:
+            i.T = self.T
+        
+        spent_catalyst.imass['Pd'] =\
+            self.mcat_frac * self.ins[0].imass['TAL'] * self.tau * self.catalyst_replacements_per_year/ 7884.0
+        # spent_catalyst.imass['Pd'] = fresh_catalyst.imass['Pd'] =\
             
+            # self.catalyst_deactivation_k * (feed.imol['TAL'] - effluent.imol['TAL'])
             # self.catalyst_deactivation_k * reagent.imol['H2']
             
             # effluent.imol['Ethyl_5_hydroxyhexanoate'])
             # effluent.imol['Ethyl_3_5_dihydroxyhexanoate'])
             # effluent.imol['DHL'])
             
-            
+        
             # Alternative 
             # reagent.imol['H2']
-            
+        
+        # catalyst leaves in the effluent (recovered downstream)
+        effluent.imass['Pd'] = self.mcat_frac * self.ins[0].imass['TAL']
+        fresh_catalyst.imass['Pd'] = max(0, effluent.imass['Pd'] - recovered_catalyst.imass['Pd'])
+        
+    def _design(self):
+        Reactor._design(self)
+        duty = sum([i.H for i in self.outs]) - sum([i.H for i in self.ins])
+        mixed_feed = tmo.Stream()
+        mixed_feed.mix_from(self.ins)
+        # self.heat_exchanger.simulate_as_auxiliary_exchanger(duty, mixed_feed)
+        
     def _cost(self):
-        super()._cost()
+        Reactor._cost(self)
         self.purchase_costs['PdC catalyst'] =\
             self.mcat_frac * self.ins[0].imass['TAL'] * self.tau * price['PdC']
             
