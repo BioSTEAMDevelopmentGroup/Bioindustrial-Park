@@ -21,15 +21,13 @@ GWP = 'GWP100'
 bst.settings.define_impact_indicator(key=GWP, units='kg*CO2e')
 # NG-Fired Simple-Cycle Gas Turbine CHP Plant, no transmission included
 bst.settings.set_electricity_CF(GWP, 0.36, basis='kWhr', units='kg*CO2e')
-
 aa_baseline_sys = aa_baseline_sys()
 # aa_baseline_sys.prioritize_unit(F_baseline.unit.S702)
 aa_baseline_sys.set_tolerance(mol=0.0,
                               rmol=0.001,
                               method = 'fixedpoint',
                               subsystems = True)
-aa_baseline_sys.simulate()
-  
+aa_baseline_sys.simulate()  
 #############################################################################################################
 # renaming the first system factory for biodiesel prep as the 1000 series
 biodiesel_prep_units = (F_baseline.unit.S402,F_baseline.unit.T401,
@@ -52,7 +50,6 @@ biodiesel_prep_units = (F_baseline.unit.S402,F_baseline.unit.T401,
                         F_baseline.unit.P412,F_baseline.unit.T408,
                         F_baseline.unit.T409,F_baseline.unit.B401)
 bst.rename_units(units = biodiesel_prep_units, area = 1000)
-bst.rename_unit(unit = F_baseline.F2001, area = 2000)
 aa_baseline_groups = bst.UnitGroup.group_by_area(aa_baseline_sys.units)
 groups_by_area = bst.UnitGroup.df_from_groups(aa_baseline_groups, fraction = True) #populates the dataframe as percentages
 plot_by_area = groups_by_area.plot.bar(stacked = True) #plot for all the areas stacked by metrics
@@ -64,6 +61,8 @@ plot_by_metric.plot.bar(stacked = True) #plot for all the metrics stacked by are
 
 
 # #########################################################################################################
+#TODO: add price later insiide the system
+F_baseline.pelargonic_acid_rich_fraction.price = 30
 # # Streams specs belonging to the cane biorefinery used for biodisel prep
 # #Methanol
 F_baseline.stream.methanol.price = 0.792*401.693/275.700 #Based on Catbio costs adjusted from 2021 Jan to 2022 Dec using Fred's PPI for basic inorganic chemicals
@@ -125,9 +124,7 @@ tea_azelaic_baseline = TEA_baseline(
                                                     F_baseline.PWT901, 
                                                     F_baseline.W901,
                                                     F_baseline.ADP901,
-                                                  ]
-                                    )                                                                      
-                                                         
+                                                  ])                                                         
                                    
 aa_sys_op_hours = aa_baseline_sys.operating_hours = tea_azelaic_baseline.operating_days * 24
 
@@ -161,19 +158,18 @@ get_NPV = lambda: azelaic_acid_tea.NPV
 # get_GWP = lambda: get_process_impact(key)
 
 metrics = [    
-                Metric('MPSP', get_MPSP, '$/kg'),
-                Metric('Total product yield', get_total_yield, '10^6 kg/yr'),
-                 Metric('Product purity', get_purity, '%'),
-                 Metric('Total capital investment', get_overall_TCI, '10^6 $'),
-                 Metric('Annual operating cost', get_operating_cost, '10^6 $/yr'),
-                 Metric('Annual material cost', get_material_cost, '10^6 $/yr'),
-                 # Metric('Annual product sale', get_azelaic_acid_sale, '10^6 $/yr'),
-                 Metric('Total', get_system_heating_demand, '10^6 MJ/yr', 'Heating demand'),
-                 Metric('Total', get_system_cooling_water_duty, '10^6 MJ/yr', 'Cooling demand'),
-                 Metric('NPV', get_NPV, '$', 'TEA'),
-                 # Metric('Total GWP', get_GWP, 'kg CO2-eq/kg', 'LCA'),
-    
-                ]
+            Metric('MPSP', get_MPSP, '$/kg'),
+            Metric('Total product yield', get_total_yield, '10^6 kg/yr'),
+            Metric('Product purity', get_purity, '%'),
+            Metric('Total capital investment', get_overall_TCI, '10^6 $'),
+            Metric('Annual operating cost', get_operating_cost, '10^6 $/yr'),
+            Metric('Annual material cost', get_material_cost, '10^6 $/yr'),
+            # Metric('Annual product sale', get_azelaic_acid_sale, '10^6 $/yr'),
+            Metric('Total', get_system_heating_demand, '10^6 MJ/yr', 'Heating demand'),
+            Metric('Total', get_system_cooling_water_duty, '10^6 MJ/yr', 'Cooling demand'),
+            Metric('NPV', get_NPV, '$', 'TEA'),
+            # Metric('Total GWP', get_GWP, 'kg CO2-eq/kg', 'LCA'),
+          ]
 model = Model(aa_baseline_sys, metrics, exception_hook='raise')
 #TODO: ask what check functions are in lactic acid models
 #################################################################################################
@@ -182,7 +178,7 @@ crude_oil_feedstock = F_baseline.stream.crude_vegetable_oil# The feedstock strea
 lb_o = crude_oil_feedstock.price * 0.9 # Minimum price #TODO: how else can i change this
 ub_o = crude_oil_feedstock.price * 1.1 # Maximum price
 @model.parameter(name = 'HOSO price',
-    element=crude_oil_feedstock, kind='isolated', units='USD/kg',
+                 element=crude_oil_feedstock, kind='isolated', units='USD/kg',
                   distribution=shape.Uniform(lb_o, ub_o))
 def set_feedstock_price(feedstock_price):
     crude_oil_feedstock.price = feedstock_price
@@ -191,7 +187,7 @@ fresh_tungsten_catalyst = F_baseline.stream.fresh_tungsten_catalyst
 lb_t = fresh_tungsten_catalyst.price*0.9
 ub_t = fresh_tungsten_catalyst.price*1.1
 @model.parameter(name = 'Tungsten catalyst price',
-    element=fresh_tungsten_catalyst, kind='isolated', units='USD/kg',
+                 element=fresh_tungsten_catalyst, kind='isolated', units='USD/kg',
                   distribution=shape.Uniform(lb_t, ub_t))
 def set_tungstencat_price(tungstencat_price):
     fresh_tungsten_catalyst.price = tungstencat_price
@@ -200,7 +196,7 @@ fresh_cobalt_catalyst = F_baseline.stream.fresh_cobalt_catalyst_stream
 lb_c = fresh_cobalt_catalyst.price*0.9
 ub_c = fresh_cobalt_catalyst.price*1.1
 @model.parameter(name = 'Cobalt acetate catalyst price',
-    element=fresh_cobalt_catalyst, kind='isolated', units='USD/kg',
+                 element=fresh_cobalt_catalyst, kind='isolated', units='USD/kg',
                   distribution=shape.Uniform(lb_c, ub_c))
 def set_cobaltcat_price(fresh_cobalt_catalyst_price):
     fresh_cobalt_catalyst.price = fresh_cobalt_catalyst_price   
@@ -210,7 +206,7 @@ fresh_solvent.price = 566*2.8535/55
 lb_s = fresh_solvent.price*0.9
 ub_s = fresh_solvent.price*1.1
 @model.parameter(name = 'VM&P Solvent price',
-    element=fresh_solvent, kind='isolated',
+                 element=fresh_solvent, kind='isolated',
                   units='USD/kg',
                   distribution=shape.Uniform(lb_s, ub_s))
 def set_solvent_price(fresh_solvent_price):
@@ -221,7 +217,7 @@ fresh_HP.price = 1.21*152.650/77.500
 lb_hp = fresh_HP.price*0.9
 ub_hp = fresh_HP.price*1.1
 @model.parameter(name = 'Hydrogen peroxide price',
-    element=fresh_HP, kind='isolated',
+                 element=fresh_HP, kind='isolated',
                   units='USD/kg',
                   distribution=shape.Uniform(lb_hp, ub_hp))
 def set_fresh_HP_price(fresh_HP_price):
@@ -229,7 +225,7 @@ def set_fresh_HP_price(fresh_HP_price):
 
 F_baseline.BT901.natural_gas_price = 0.253 #REF: lactic acid SI
 @model.parameter(name = 'Natural gas price',
-    element = F_baseline.BT901,
+                 element = F_baseline.BT901,
                  kind = 'isolated',
                  units='USD/kg',
                  distribution=shape.Triangle(0.198, 0.253, 0.304) #REF: lactic acid SI
@@ -237,7 +233,7 @@ F_baseline.BT901.natural_gas_price = 0.253 #REF: lactic acid SI
 def set_natural_gas_price(natural_gas_price):
         F_baseline.BT901.natural_gas_price = natural_gas_price
                  
-    
+
 #############################################################################################################33
 #coupled parameters
 #Process related parameters
@@ -303,37 +299,25 @@ ub6 = 0.99
 def set_X_side_rxn_conversion(X_side_rxn):
         F_baseline.unit.R202.X_side_rxn =  X_side_rxn
 
-# #7 separation of ligher boiling impurities from the azelaic acid product stream
-# #Setting the lighter key recovery
-# lb_Lr_D605 = 0.9
-# ub_Lr_D605 = 0.99
-# @model.parameter(element=F_baseline.D605,
-#                   kind='coupled',
-#                   distribution=shape.Uniform(lb_Lr_D605,
-#                                              ub_Lr_D605))
-# def set_Lr_D605(Lr):
-#     F_baseline.D605.Lr = Lr
+lb7 = 10000 
+ub7 = 1000000
+@model.parameter(name = 'Feedstock_capacity',
+                 element = F_baseline.stream.crude_vegetable_oil,
+                 kind = 'coupled',
+                 distribution=shape.Uniform(lb7,ub7)
+                 )
+def set_feedstock_input_flow(Cap):
+    F_baseline.stream.crude_vegetable_oil.F_mass = Cap    
     
-# ##Setting the heavier key recovery     
-# lb_Hr_D605 = 0.9
-# ub_Hr_D605 = 0.99
-# @model.parameter(element=F_baseline.D605,
-#                   kind='coupled',
-#                   distribution=shape.Uniform(lb_Hr_D605,
-#                                              ub_Hr_D605))
-# def set_Hr_D605(Hr):
-#     F_baseline.D501.Hr = Hr
-        
-
-# N_samples = 1000
-# rule = 'L' # For Latin-Hypercube sampling
-# np.random.seed(1234) # For consistent results
-# samples = model.sample(N_samples, rule)
-# model.load_samples(samples)
-# model.evaluate(
-#     notify=100 # Also print elapsed time after 50 simulations
-#               )
-# model.show()
+N_samples = 1000
+rule = 'L' # For Latin-Hypercube sampling
+np.random.seed(1234) # For consistent results
+samples = model.sample(N_samples, rule)
+model.load_samples(samples)
+model.evaluate(
+    notify=100 # Also print elapsed time after 50 simulations
+              )
+model.show()
 
  ############################################################################3
 # #4 Pressure for degassing_the_oily_phase
@@ -383,5 +367,25 @@ def set_X_side_rxn_conversion(X_side_rxn):
 # def set_Hr_D604(Hr):
 #     F_baseline.D604.Hr = Hr
     
-
+# #7 separation of ligher boiling impurities from the azelaic acid product stream
+# #Setting the lighter key recovery
+# lb_Lr_D605 = 0.9
+# ub_Lr_D605 = 0.99
+# @model.parameter(element=F_baseline.D605,
+#                   kind='coupled',
+#                   distribution=shape.Uniform(lb_Lr_D605,
+#                                              ub_Lr_D605))
+# def set_Lr_D605(Lr):
+#     F_baseline.D605.Lr = Lr
+    
+# ##Setting the heavier key recovery     
+# lb_Hr_D605 = 0.9
+# ub_Hr_D605 = 0.99
+# @model.parameter(element=F_baseline.D605,
+#                   kind='coupled',
+#                   distribution=shape.Uniform(lb_Hr_D605,
+#                                              ub_Hr_D605))
+# def set_Hr_D605(Hr):
+#     F_baseline.D501.Hr = Hr
+     
 # ############################################################################

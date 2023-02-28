@@ -232,6 +232,8 @@ chems = tmo.Chemicals([
         tmo.Chemical('Calcium_acetate',phase = 'l', default = True),
         tmo.Chemical('Cobalt_hydroxide',phase = 'l', default = True),
         tmo.Chemical('HCl2',phase = 'l',search_ID = 'HCl'),
+        tmo.Chemical('Sodium_hydroxide_liquid',phase = 'l', search_ID ='NaOH'),
+        tmo.Chemical('Sodium_acetate', phase = 'l'),
 ##Resin for hydrolysis
 ##Sulfonated_polystyrene with a search_ID = '98-70-4', lacks Hvap data, hence polystyrene's properties were used
 ##Boiling point based on amberlyte
