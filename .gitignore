@@ -2,7 +2,7 @@ build
 dist
 biorefineries.egg-info
 **/results
-**/tmp
+**/tmps
 **/.ipynb_checkpoints
 **/__pycache__
 *.pyc
