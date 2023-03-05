@@ -10,6 +10,49 @@ This module is a modified implementation of modules from the following:
 
 @author: sarangbhagwat
 """
+# from .import analyses, models
+from warnings import filterwarnings
+filterwarnings('ignore')
 
+modes = ['lab_batch', 'lab_fed-batch', 'pilot_batch']
+parameter_distributions_filenames = ['parameter-distributions_lab-scale_batch.xlsx',
+                                    'parameter-distributions_lab-scale_fed-batch.xlsx',
+                                    'parameter-distributions_pilot-scale_batch.xlsx',
+                                    ]
 
-__all__ = []
+def load(mode='pilot_batch'):
+    parameter_distributions_filename = 'analyses\\parameter_distributions\\'+parameter_distributions_filenames[modes.index(mode)]
+    # print(f'\n\nLoading parameter distributions ({mode}) ...')
+    from .models import model, simulate_and_print
+    model.parameters = ()
+    model.load_parameter_distributions(parameter_distributions_filename)
+    # print(f'\nLoaded parameter distributions ({mode}).')
+    
+    # parameters = model.get_parameters()
+    
+    # print('\n\nLoading samples ...')
+    # samples = model.sample(N=10, rule='L')
+    # model.load_samples(samples)
+    # print('\nLoaded samples.')
+    
+    
+    model.exception_hook = 'warn'
+    # print('\n\nSimulating baseline ...')
+    baseline_initial = model.metrics_at_baseline()
+    
+    simulate_and_print()
+    # baseline = DataFrame(data=array([[i for i in baseline_initial.values],]), 
+    #                         columns=baseline_initial.keys())
+
+def run_TRY_analysis():
+    from .analyses import TRY_analysis
+    print('TRY analysis complete. See analyses/results for figures and raw data.')
+def run_uncertainty_analysis():
+    from .analyses import uncertainties
+    print('Uncertainty and sensitivity analyses complete. See analyses/results for figures and raw data.')
+
+def get_models():
+    from . import models
+    return models
+
+__all__ = ['create_model', 'run_TRY_analysis', 'run_uncertainty_analysis', 'load', 'modes', 'parameter_distributions_filenames']

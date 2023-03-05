@@ -218,7 +218,7 @@ def simulate_systems(exist_sys, new_sys, info):
     print(f'\n\n{info["abbr"]} module:')
     print(f'\nExisting system IRR: {exist_tea.solve_IRR():.2%}')
     print(f'\nNew system IRR: {new_tea.solve_IRR():.2%}')
-    FERM_products = info['FERM_products']
+    FERM_products = info['FERM_product']
     for sys in (exist_sys, new_sys):
         for fn in (get_MPSP, get_GWP): # allocate based on value
             fn(sys, FERM_products)
