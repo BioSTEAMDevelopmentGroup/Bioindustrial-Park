@@ -513,6 +513,7 @@ class CoFermentation(Reactor):
                  neutralizing_agent='Lime',
                  mode='batch', feed_freq=1,
                  pH_control=True,
+                 base_neutralizes_product=True,
                  # allow_dilution=False,
                  # allow_concentration=False,
                  # sugars=None,
@@ -532,6 +533,7 @@ class CoFermentation(Reactor):
         self.mode = mode
         self.feed_freq = feed_freq
         self.pH_control=pH_control
+        self.base_neutralizes_product = base_neutralizes_product
         # self.allow_dilution = allow_dilution
         # self.allow_concentration = allow_concentration
         # self.sugars = sugars or tuple(i.ID for i in self.chemicals.sugars)
@@ -693,7 +695,10 @@ class CoFermentation(Reactor):
                                     * self.neutralization_safety_factor
                 effluent.mix_from((effluent, base))
                 # self.neutralization_rxns.adiabatic_reaction(effluent)
-                self.lime_neutralization_rxns(effluent.mol)
+                if self.base_neutralizes_product:
+                    self.lime_neutralization_rxns(effluent.mol)
+                else:
+                    effluent.imol['Lime'] = 0.
             elif self.neutralizing_agent in ['AmmoniumHydroxide', 'NH4OH']:
                 # Set feed base mol to match rate of acids production, add 10% extra
                 base.imol['AmmoniumHydroxide'] = (
@@ -703,7 +708,10 @@ class CoFermentation(Reactor):
                                     * self.neutralization_safety_factor
                 effluent.mix_from((effluent, base))
                 # self.neutralization_rxns.adiabatic_reaction(effluent)
-                self.NH4OH_neutralization_rxns(effluent.mol)
+                if self.base_neutralizes_product:
+                    self.NH4OH_neutralization_rxns(effluent.mol)
+                else:
+                    effluent.imol['AmmoniumHydroxide'] = 0.
             # self.neutralization_rxns(effluent.mol)
         else:
             # if not self.pH_control:
@@ -719,7 +727,10 @@ class CoFermentation(Reactor):
                                         * self.neutralization_safety_factor
                     effluent.mix_from((effluent, base))
                     # self.neutralization_rxns.adiabatic_reaction(effluent)
-                    self.lime_pH_control_rxns[1](effluent.mol)
+                    if self.base_neutralizes_product:
+                        self.lime_pH_control_rxns[1](effluent.mol)
+                    else:
+                        effluent.imol['Lime'] = 0.
                     
                 elif self.neutralizing_agent in ['AmmoniumHydroxide', 'NH4OH']:
                     base.imol['NH4OH'] = self.mol_NH4OH_per_acid_pH_control * (
@@ -729,7 +740,10 @@ class CoFermentation(Reactor):
                                         * self.neutralization_safety_factor
                     effluent.mix_from((effluent, base))
                     # self.neutralization_rxns.adiabatic_reaction(effluent)
-                    self.NH4OH_pH_control_rxns[1](effluent.mol)
+                    if self.base_neutralizes_product:
+                        self.NH4OH_pH_control_rxns[1](effluent.mol)
+                    else:
+                        effluent.imol['AmmoniumHydroxide'] = 0.
                     
                     
         self.effluent_titer = compute_succinic_acid_titer(effluent)

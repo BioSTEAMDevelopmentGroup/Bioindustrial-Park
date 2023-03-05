@@ -150,9 +150,11 @@ class LCA:
     def material_GWP_breakdown(self):
         # self.LCA_stream.mass = sum(i.mass for i in self.LCA_streams)
         self.LCA_stream.mix_from(self.LCA_streams)
+        chemical_GWP_dict_full = {'H2SO4':0}
         chemical_GWP_dict = {ID: self.LCA_stream.imass[ID] * self.GWP_CF_stream.imass[ID] / self.main_product_kg_per_h \
                              for ID in self.chem_IDs if not self.LCA_stream.imass[ID] * self.GWP_CF_stream.imass[ID] == 0.}
-        return chemical_GWP_dict
+        chemical_GWP_dict_full.update(chemical_GWP_dict)
+        return chemical_GWP_dict_full
     
     @property
     def material_GWP_breakdown_fractional(self):
@@ -343,9 +345,11 @@ class LCA:
         # self.LCA_stream.mass = sum(i.mass for i in self.LCA_streams)
         self.LCA_stream.mix_from(self.LCA_streams)
         FEC_CF_stream = self.FEC_CF_stream
+        chemical_FEC_dict_full = {'H2SO4':0}
         chemical_FEC_dict = {ID: self.LCA_stream.imass[ID] * FEC_CF_stream.imass[ID] / self.main_product_kg_per_h \
                               for ID in self.chem_IDs if not self.LCA_stream.imass[ID] * FEC_CF_stream.imass[ID] == 0.}
-        return chemical_FEC_dict
+        chemical_FEC_dict_full.update(chemical_FEC_dict)
+        return chemical_FEC_dict_full
     
     @property
     def material_FEC_breakdown_fractional(self):

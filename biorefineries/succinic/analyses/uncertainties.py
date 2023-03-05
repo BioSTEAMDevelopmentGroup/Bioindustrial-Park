@@ -117,15 +117,15 @@ for i in range(len(modes)):
     results_dict['Baseline']['GWP Breakdown'][mode] = {
         'feedstock*': lca.FGHTP_GWP,
         'lime': material_GWP_breakdown['CalciumDihydroxide'],
-        'sulfuric acid': material_GWP_breakdown['H2SO4'],
+        # 'sulfuric acid': material_GWP_breakdown['H2SO4'],
         'ammonium sulfate': material_GWP_breakdown['DiammoniumSulfate'],
         'magnesium sulfate': material_GWP_breakdown['MagnesiumSulfate'],
         'corn steep liquor': material_GWP_breakdown['CSL'],
         'other materials': material_GWP_breakdown['MEA'] + material_GWP_breakdown['NaOH'] + material_GWP_breakdown['H3PO4'],
-        'natural gas (for steam generation)': lca.ng_GWP,
-        'natural gas (for product drying)': material_GWP_breakdown['CH4'],
-        'net electricity production': lca.net_electricity_GWP,
-        'direct non-biogenic emissions': lca.direct_emissions_GWP,
+        'natural gas\n(for steam generation)': lca.ng_GWP,
+        'natural gas\n(product drying)': material_GWP_breakdown['CH4'],
+        'net electricity': lca.net_electricity_GWP,
+        'direct non-biogenic\nemissions': lca.direct_emissions_GWP,
         }
     
     tot_positive_GWP = sum([v for v in results_dict['Baseline']['GWP Breakdown'][mode].values() if v>0])
@@ -138,19 +138,24 @@ for i in range(len(modes)):
     results_dict['Baseline']['FEC Breakdown'][mode] = {
         'feedstock': lca.feedstock_FEC,
         'lime': material_FEC_breakdown['CalciumDihydroxide'],
-        'sulfuric acid': material_FEC_breakdown['H2SO4'],
+        # 'sulfuric acid': material_FEC_breakdown['H2SO4'],
         'ammonium sulfate': material_FEC_breakdown['DiammoniumSulfate'],
         'magnesium sulfate': material_FEC_breakdown['MagnesiumSulfate'],
         'corn steep liquor': material_FEC_breakdown['CSL'],
         'other materials': material_FEC_breakdown['MEA'] + material_FEC_breakdown['NaOH'] + material_FEC_breakdown['H3PO4'],
-        'natural gas (for steam generation)': lca.ng_GWP,
-        'natural gas (for product drying)': material_FEC_breakdown['CH4'],
-        'net electricity production': lca.net_electricity_FEC,
+        'natural gas\n(for steam generation)': lca.ng_GWP,
+        'natural gas\n(for product drying)': material_FEC_breakdown['CH4'],
+        'net electricity': lca.net_electricity_FEC,
         }
     tot_positive_FEC = sum([v for v in results_dict['Baseline']['FEC Breakdown'][mode].values() if v>0])
     for k, v in results_dict['Baseline']['FEC Breakdown'][mode].items():
         results_dict['Baseline']['FEC Breakdown'][mode][k] = v/tot_positive_FEC
     
+    if spec.reactor.base_neutralizes_product: # sulfuric acid for acidulation
+        results_dict['Baseline']['GWP Breakdown'][mode]['sulfuric acid'] = material_GWP_breakdown['H2SO4']
+        results_dict['Baseline']['FEC Breakdown'][mode]['sulfuric acid'] = material_FEC_breakdown['H2SO4']
+        
+        
     print(f"\nSimulated baseline. MPSP = ${round(results_dict['Baseline']['MPSP'][mode],2)}/kg.")
     print('\n\nEvaluating ...')
     model.evaluate(notify=notification_interval, autoload=None, autosave=None, file=None)
@@ -255,6 +260,12 @@ GWP_units = r"$\mathrm{kg}$"+" "+ r"$\mathrm{CO}_{2}\mathrm{-eq.}\cdot\mathrm{kg
 FEC_units = r"$\mathrm{MJ}\cdot\mathrm{kg}^{-1}$"
 #%% Uncertainty
 
+scenario_name_labels = ['Lab. batch', 
+                        'Lab. fed-batch', 
+                        'Pilot batch']
+
+def get_small_range(num, offset):
+    return(num-offset, num+offset)
 #%% MPSP
 MPSP_uncertainty = [results_dict['Uncertainty']['MPSP'][modes[0]],
                     results_dict['Uncertainty']['MPSP'][modes[1]],
@@ -274,11 +285,11 @@ contourplots.box_and_whiskers_plot(uncertainty_data=MPSP_uncertainty,
                           values_for_comparison=[],
                           n_minor_ticks=1,
                           show_x_ticks=True,
-                          x_tick_labels=['Lab. scale [bat.]', 'Lab. scale [f.bat.]', 'Pilot scale [bat.]'],
+                          x_tick_labels=scenario_name_labels,
                           x_tick_wrap_width=6,
                           y_label=r"$\bfMPSP$",
                           y_units=MPSP_units,
-                          y_ticks=np.arange(0., 5., 0.5),
+                          y_ticks=np.arange(0., 5.5, 0.5),
                           save_file=True,
                           fig_height=5.5,
                           fig_width = 3.,
@@ -287,6 +298,10 @@ contourplots.box_and_whiskers_plot(uncertainty_data=MPSP_uncertainty,
                           dpi=600,)
 
 #%% GWP100a
+
+biobased_GWPs = [1.83, 2.20, 2.37]
+fossilbased_GWPs = [3.27, 3.43, 10.3, 12.1]
+
 GWP_uncertainty = [results_dict['Uncertainty']['GWP100a'][modes[0]],
                     results_dict['Uncertainty']['GWP100a'][modes[1]],
                     results_dict['Uncertainty']['GWP100a'][modes[2]]]
@@ -300,17 +315,18 @@ contourplots.box_and_whiskers_plot(uncertainty_data=GWP_uncertainty,
                           baseline_locations=[1,2,3],
                           baseline_marker_colors=['w','w','w'],
                           boxcolor='#607429',
-                          # ranges_for_comparison=[biobased_lit_MPSP_range, market_range],
-                          # ranges_for_comparison_colors=['#c0c1c2', '#646464'],
+                          ranges_for_comparison=[get_small_range(i, 0.005) for i in biobased_GWPs+fossilbased_GWPs],
+                          ranges_for_comparison_colors=['#c0c1c2' for i in range(len(biobased_GWPs))] +\
+                                                       ['#646464' for i in range(len(fossilbased_GWPs))],
                           values_for_comparison=biobased_lit_GWP_values,
                           n_minor_ticks=1,
                           show_x_ticks=True,
-                          x_tick_labels=['Lab. scale [bat.]', 'Lab. scale [f.bat.]', 'Pilot scale [bat.]'],
+                          x_tick_labels=scenario_name_labels,
                           x_tick_wrap_width=6,
                           # y_label=r"$\bfGWP-100a$",
                           y_label=r"$\mathrm{\bfGWP}_{\bf100}$",
                           y_units=GWP_units,
-                          y_ticks=np.arange(0., 5., 0.5),
+                          y_ticks=np.arange(0., 14., 1.),
                           save_file=True,
                           fig_height=5.5,
                           fig_width = 3.,
@@ -319,6 +335,10 @@ contourplots.box_and_whiskers_plot(uncertainty_data=GWP_uncertainty,
                           dpi=600,)
 
 #%% FEC
+
+biobased_FECs = [26, 27.7, 32.7]
+fossilbased_FECs = [59.2, 60.8, 112, 124]
+
 FEC_uncertainty = [results_dict['Uncertainty']['FEC'][modes[0]],
                     results_dict['Uncertainty']['FEC'][modes[1]],
                     results_dict['Uncertainty']['FEC'][modes[2]]]
@@ -332,16 +352,17 @@ contourplots.box_and_whiskers_plot(uncertainty_data=FEC_uncertainty,
                           baseline_locations=[1,2,3],
                           baseline_marker_colors=['w','w','w'],
                           boxcolor='#A100A1',
-                          # ranges_for_comparison=[biobased_lit_MPSP_range, market_range],
-                          # ranges_for_comparison_colors=['#c0c1c2', '#646464'],
+                          ranges_for_comparison=[get_small_range(i, 0.061) for i in biobased_FECs+fossilbased_FECs],
+                          ranges_for_comparison_colors=['#c0c1c2' for i in range(len(biobased_FECs))] +\
+                                                       ['#646464' for i in range(len(fossilbased_FECs))],
                           values_for_comparison=biobased_lit_FEC_values,
                           n_minor_ticks=1,
                           show_x_ticks=True,
-                          x_tick_labels=['Lab. scale [bat.]', 'Lab. scale [f.bat.]', 'Pilot scale [bat.]'],
+                          x_tick_labels=scenario_name_labels,
                           x_tick_wrap_width=6,
                           y_label=r"$\bfFEC$",
                           y_units=FEC_units,
-                          y_ticks=np.arange(-20, 20., 5.),
+                          y_ticks=np.arange(-30, 140., 10.),
                           save_file=True,
                           fig_height=5.5,
                           fig_width = 3.,
@@ -360,6 +381,7 @@ df_TEA_breakdown = bst.UnitGroup.df_from_groups(
 # df_TEA_breakdown['Net electricity production']*=-1
 # df_TEA_breakdown = df_TEA_breakdown.rename(columns={'Net electricity production': 'Net electricity demand'})
 
+df_TEA_breakdown = df_TEA_breakdown.rename(columns={'Material cost': 'Operating cost'})
 contourplots.stacked_bar_plot(dataframe=df_TEA_breakdown, 
                  # y_ticks=[-200, -175, -150, -125, -100, -75, -50, -25, 0, 25, 50, 75, 100, 125, 150, 175], 
                  y_ticks=[-40, -20, 0, 20, 40, 60, 80, 100], 
@@ -517,10 +539,57 @@ fig[0].savefig(mode+'FEC-Spearman.png', dpi=600, bbox_inches='tight',
             facecolor=fig[0].get_facecolor(),
             transparent=False)
 
+#%% Dunn et al. 2015 data - extracted using WebPlotDigitizer
+
+# GHG-100
+# Bar0, 12.126849894291754
+# Bar1, 1.8266384778012683
+# Bar2, 3.247357293868922
+
+# FEC
+# Bar0, 112.33870967741936
+# Bar1, 42.05645161290324
+# Bar2, 27.66129032258065
+
+
 #%% GHG-100
+
 ## GREET 2022
 # succinic acid, succinic acid bioproduct from sugars (corn stover): 0.7036 kg-CO2-eq/kg-SA
-# incl. EOL GWP (1.4937 kg-CO2-eq/kg-SA): 2.1973 kg-CO2-eq/kg-SA
+# incl. EOL GWP (1.4937 kg-CO2-eq/kg-SA): 2.20 kg-CO2-eq/kg-SA
+
+## Dunn et al. 2015 (all cradle-to-grave)
+# fossil-derived: 12.13 kg-CO2-eq/kg-SA
+# corn stover-based, EDI: 3.25 kg-CO2-eq/kg-SA
+# corn stover-based, LLE: 1.83 kg-CO2-eq/kg-SA
+
+## Cok et al. 2014
+# corn-based w/ dir. crystallization: 0.88 kg-CO2-eq/kg-SA
+# incl. EOL GWP (1.4937 kg-CO2-eq/kg-SA): 2.37 kg-CO2-eq/kg-SA
+
+# fossil-based (3 alternative processes): 1.78, 1.94, 8.82 kg-CO2-eq/kg-SA
+# incl. EOL GWP (1.4937 kg-CO2-eq/kg-SA): 3.27,  3.43, 10.31 kg-CO2-eq/kg-SA
+
+
+#%% FEC
+## GREET 2022
+# succinic acid, succinic acid bioproduct from sugars (corn stover): 26 MJ-eq/kg-SA (of which all 26 MJ-eq/kg-SA from natural gas)
+
+## Dunn et al. 2015 (all cradle-to-gate)
+# fossil-derived: 112 MJ-eq/kg-SA
+# corn stover-based, EDI: 42.1 MJ-eq/kg-SA
+# corn stover-based, LLE: 27.7 MJ-eq/kg-SA
+
+## Cok et al. 2014
+# corn-based w/ dir. crystallization: 32.7 MJ-eq/kg-SA
+
+# fossil-based (3 alternative processes): 60.8, 59.2, 124.3 MJ-eq/kg-SA
+
+
+
+## ecoinvent 3.8
+# succinic acid production, GLO: 67.463 MJ-eq/kg-SA
+# market for succinic acid, GLO: 68.19 MJ-eq/kdg-SA
 
 #%% IPCC 2013 GWP100a
 
@@ -530,11 +599,4 @@ fig[0].savefig(mode+'FEC-Spearman.png', dpi=600, bbox_inches='tight',
 
 # market for succinic acid, GLO: 3.2322 kgCO2-eq/kg-SA
 # incl. EOL GWP (1.4937 kg-CO2-eq/kg-SA): 4.7259 kg-CO2-eq/kg-SA
-#%% FEC
 
-## ecoinvent 3.8
-# succinic acid production, GLO: 67.463 MJ-eq/kg-SA
-# market for succinic acid, GLO: 68.19 MJ-eq/kg-SA
-
-## GREET 2022
-# succinic acid, succinic acid bioproduct from sugars (corn stover): 26 MJ-eq/kg-SA (of which all 26 MJ-eq/kg-SA from natural gas)

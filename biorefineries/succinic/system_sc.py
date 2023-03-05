@@ -204,10 +204,12 @@ def create_succinic_sys(ins, outs):
                                          '',
                                          ), # air (K302-0)
                                     outs=('fermentation_broth', 'fermentation_vent'),
-                                    neutralization=False,
-                                    neutralizing_agent='Lime',
                                     mode='batch',
                                     V_wf=0.4,
+                                    neutralization=False,
+                                    pH_control=True,
+                                    neutralizing_agent='Lime',
+                                    base_neutralizes_product=False, # if True, acidulation is performed downstream
                                     )
     @R302.add_specification(run=False)
     def R302_spec(): # note: effluent always has 0 CSL
@@ -353,14 +355,15 @@ def create_succinic_sys(ins, outs):
 
     ## Controlling pH, so never bypass
     
-    # @R401.add_specification(run=True)
-    # def R401_spec():
-    #     R401.bypass = not R302.neutralization # bypass if not neutralizing
+    @R401.add_specification(run=True)
+    def R401_spec():
+        # R401.bypass = not R302.neutralization # bypass if not neutralizing
+        R401.bypass = not R302.base_neutralizes_product
         
-    # @R401_P.add_specification(run=True)
-    # def R401_P_spec():
-    #     R401_P.bypass = not R302.neutralization # bypass if not neutralizing
-    
+    @R401_P.add_specification(run=True)
+    def R401_P_spec():
+        # R401_P.bypass = not R302.neutralization # bypass if not neutralizing
+        R401_P.bypass = not R302.base_neutralizes_product
     ##
     
     S405 = units.GypsumFilter('S405', ins=R401_P-0,
@@ -376,7 +379,9 @@ def create_succinic_sys(ins, outs):
         
         ## Controlling pH, so bypass only if neutralizing agent is NH4OH
         
-        S405.bypass = R302.neutralizing_agent in ['AmmoniumHydroxide', 'NH4OH']
+        # S405.bypass = R302.neutralizing_agent in ['AmmoniumHydroxide', 'NH4OH']
+        
+        S405.bypass = not R302.base_neutralizes_product
         
         ##
     M404 = bst.Mixer('M404', ins=(S405-1, ''), outs=('crude_SA_to_crystallization'))
@@ -856,8 +861,8 @@ area_names = [
     'separation',
     'wastewater',
     'storage',
-    'co-heat and power',
-    'cooling tower and chilled water package',
+    'boiler & turbogenerator',
+    'cooling utility facilities',
     'other facilities',
     'heat exchanger network',
 ]
@@ -868,40 +873,52 @@ unit_groups = bst.UnitGroup.group_by_area(succinic_sys.units)
 
 unit_groups.append(bst.UnitGroup('natural gas (for steam generation)'))
 unit_groups.append(bst.UnitGroup('natural gas (for product drying)'))
-unit_groups.append(bst.UnitGroup('electricity sale'))
+
+unit_groups.append(bst.UnitGroup('fixed operating costs'))
+
 
 for i, j in zip(unit_groups, area_names): i.name = j
 for i in unit_groups: i.autofill_metrics(shorthand=False, 
                                          electricity_production=False, 
-                                         electricity_consumption=False,
+                                         electricity_consumption=True,
                                          material_cost=True)
 for i in unit_groups:
-    if i.name == 'storage' or i.name=='other facilities' or i.name == 'cooling tower and chilled water package':
+    if i.name == 'storage' or i.name=='other facilities' or i.name == 'cooling utility facilities':
         i.metrics[-1].getter = lambda: 0. # Material cost
-    if i.name == 'cooling tower and chilled water package':
+    if i.name == 'cooling utility facilities':
         i.metrics[1].getter = lambda: 0. # Cooling duty
-
+    if i.name == 'boiler & turbogenerator':
+        i.metrics[-1] = bst.evaluation.Metric('Material cost', 
+                                            getter=lambda: succinic_tea.utility_cost/succinic_tea.operating_hours, 
+                                            units='USD/hr',
+                                            element=None) # Material cost
+        # i.metrics[-2].getter = lambda: BT.power_utility.rate/1e3 # Electricity consumption [MW]
+        
 for HXN_group in unit_groups:
     if HXN_group.name == 'heat exchanger network':
         HXN_group.filter_savings = False
         assert isinstance(HXN_group.units[0], HeatExchangerNetwork)
 
 
-unit_groups[-2].metrics[-1] = bst.evaluation.Metric('Material cost', 
+unit_groups[-3].metrics[-1] = bst.evaluation.Metric('Material cost', 
                                                     getter=lambda: BT.natural_gas_price * BT.natural_gas.F_mass, 
                                                     units='USD/hr',
                                                     element=None)
 
-unit_groups[-1].metrics[-1] = bst.evaluation.Metric('Material cost', 
+unit_groups[-2].metrics[-1] = bst.evaluation.Metric('Material cost', 
                                                     getter=lambda: F404.ins[2].cost, 
                                                     units='USD/hr',
                                                     element=None)
 
+unit_groups[-1].metrics[-1] = bst.evaluation.Metric('Material cost', 
+                                                    getter=lambda: succinic_tea.FOC/succinic_tea.operating_hours, 
+                                                    units='USD/hr',
+                                                    element=None)
 
-for i in unit_groups:
-    i.metric(i.get_net_electricity_production,
-                'Net electricity production',
-                'kW')
+# for i in unit_groups:
+#     i.metric(i.get_net_electricity_production,
+#                 'Net electricity production',
+#                 'kW')
 
 
 
