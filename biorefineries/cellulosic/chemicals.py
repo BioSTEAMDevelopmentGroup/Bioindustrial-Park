@@ -206,7 +206,6 @@ def create_cellulosic_ethanol_chemicals():
     append_chemical_copy('Extract', chems.Glucose)
     append_chemical_copy('Acetate', chems.AceticAcid)
     append_chemical_copy('Tar', chems.Xylose)
-    chems.Acetate.Hf = -103373
     
     # Chemicals taken from previous study
     chems.append(oilcane_chemicals.Ash)
