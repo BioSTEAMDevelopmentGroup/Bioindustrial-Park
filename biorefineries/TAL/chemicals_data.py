@@ -22,6 +22,7 @@ with modification of fermentation system for TAL instead of the original ethanol
 
 import thermosteam as tmo
 from thermosteam import functional as fn
+from biorefineries.sugarcane import chemicals as sugarcane_chems
 # from biorefineries import sugarcane as sc
 __all__ = ('TAL_chemicals', 'chemical_groups', 'soluble_organics', 'combustibles')
 
@@ -712,6 +713,14 @@ for chemical in chems: chemical.default()
 
 # Though set_thermo will first compile the Chemicals object,
 # compile beforehand is easier to debug because of the helpful error message
+
+chems.append(sugarcane_chems.H3PO4)
+chems.append(sugarcane_chems.Cellulose)
+chems.append(sugarcane_chems.Hemicellulose)
+chems.append(sugarcane_chems.CaO)
+chems.append(sugarcane_chems.Solids)
+chems.append(sugarcane_chems.Flocculant)
+
 chems.compile()
 tmo.settings.set_thermo(chems)
 chems.set_synonym('CalciumDihydroxide', 'Lime')

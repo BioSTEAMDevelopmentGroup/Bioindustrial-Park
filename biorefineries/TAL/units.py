@@ -580,6 +580,12 @@ class CoFermentation(Unit):
             Rxn('Glucose -> 6CO2 + 6H2O', 'Glucose', 1.),
             Rxn('Xylose -> 5CO2 + 5H2O', 'Xylose', 1.)])
         
+        self.sucrose_hydrolysis_rxns = ParallelRxn([
+        #      Reaction definition            Reactant    Conversion
+        Rxn('Sucrose + H2O -> 2 Glucose',        'Sucrose',   1.-1e-4), 
+        ])
+        
+        
         self.glucose_to_TAL_rxn = self.cofermentation_rxns[0]
         self.xylose_to_TAL_rxn = self.cofermentation_rxns[4]
         
@@ -614,7 +620,7 @@ class CoFermentation(Unit):
         # effluent.copy_like(feed)
         effluent.T = vapor.T = self.T
         CSL.imass['CSL'] = (sugars.F_vol+feed.F_vol) * self.CSL_loading 
-        
+        self.sucrose_hydrolysis_rxns(effluent.mol)
         self.cofermentation_rxns(effluent.mol)
         vapor.imol['CO2'] = effluent.imol['CO2']
         vapor.phase = 'g'
@@ -922,6 +928,11 @@ class SeedTrain(Unit):
             Rxn('Glucose -> 6CO2 + 6H2O', 'Glucose', 1.),
             Rxn('Xylose -> 5CO2 + 5H2O', 'Xylose', 1.)])
         
+        self.sucrose_hydrolysis_rxns = ParallelRxn([
+        #      Reaction definition            Reactant    Conversion
+        Rxn('Sucrose + H2O -> 2 Glucose',        'Sucrose',   1.-1e-4), 
+        ])
+        
         self.glucose_to_TAL_rxn = self.cofermentation_rxns[0]
         self.xylose_to_TAL_rxn = self.cofermentation_rxns[4]
         
@@ -943,10 +954,11 @@ class SeedTrain(Unit):
         effluent.copy_like(feed)
         CO2.phase = 'g'
         
-        if 'Sucrose' in effluent.available_chemicals:
-            self.sucrose_hydrolysis_rxn.force_reaction(effluent)
-            if effluent.imol['Water'] < 0.: effluent.imol['Water'] = 0.
+        # if 'Sucrose' in effluent.available_chemicals:
+        #     self.sucrose_hydrolysis_rxns.force_reaction(effluent)
+        #     if effluent.imol['Water'] < 0.: effluent.imol['Water'] = 0.
         
+        self.sucrose_hydrolysis_rxns(effluent.mol)
         self.cofermentation_rxns(effluent.mol)
         self.CO2_generation_rxns(effluent.mol)
         
@@ -2321,7 +2333,7 @@ class Crystallization(Reactor):
     def _run(self):
         feed, reagent, recycle_reagent, recycle_feed = ins = self.ins
         effluent, KCl = outs = self.outs
-        
+        reagent.empty()
         reagent.imol['HCl'] = max(0, sum([i.imol['KSA'] for i in ins]) - sum([i.imol['HCl'] for i in ins]))
         # effluent = feed.copy()
         effluent.mix_from([feed, reagent, recycle_reagent, recycle_feed])
