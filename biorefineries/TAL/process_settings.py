@@ -167,6 +167,7 @@ PdC_price = 0.075*(2045./0.0311035) \
 spent_PdC_price = 1. # assumed
 
 price = {'SA': SA_price,
+         'PD': 1.5, # 2,4-pentanedione or acetylacetone
          'TCP': TCP_price,
          'AuPd': AuPd_price,
          'IBA': IBA_price,

@@ -175,6 +175,7 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
                  'pretreatment_reactor',
                  'titer_inhibitor_specification',
                  'seed_train_system',
+                 'seed_train',
                  'HXN',
                  'maximum_inhibitor_concentration',
                  'count',
@@ -193,7 +194,7 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
                  'HXN_new_HX_utils',
                  'HXN_Q_bal_percent_error_dict',)
     
-    def __init__(self, evaporator, pump, mixer, heat_exchanger, seed_train_system, 
+    def __init__(self, evaporator, pump, mixer, heat_exchanger, seed_train_system, seed_train,
                  reactor, reaction_name, substrates, products,
                  spec_1, spec_2, spec_3, xylose_utilization_fraction,
                  feedstock, dehydration_reactor, byproduct_streams, HXN, maximum_inhibitor_concentration=1.,
@@ -215,6 +216,7 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
         self.feedstock_mass = feedstock_mass
         self.pretreatment_reactor = pretreatment_reactor
         self.seed_train_system = seed_train_system
+        self.seed_train = seed_train
         self.HXN = HXN
         self.pre_conversion_units = pre_conversion_units
         self.juicing_sys = juicing_sys
@@ -310,7 +312,7 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
         data = np.zeros([M, P])
         for i in range(P):
             self.load_spec_3(spec_3[i])
-            self.reactor._summary()
+            # self.reactor._summary()
             data[:, i] = [j() for j in metrics]
         print(data)
         return data
@@ -394,10 +396,26 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
         
         """
         # print(yield_)
+        regular_microbe_conversion = 0.05
         reactor = self.reactor
+        seed_train = self.seed_train
         self.spec_1 = reactor.glucose_to_TAL_rxn.X = yield_
         
         reactor.xylose_to_TAL_rxn.X = yield_
+        
+        sum_sugar_conversion = reactor.glucose_to_TAL_rxn.X + reactor.glucose_to_microbe_rxn.X +\
+            reactor.glucose_to_VitaminA_rxn.X + reactor.glucose_to_VitaminD2_rxn.X
+        
+        if sum_sugar_conversion>=1:
+            reactor.glucose_to_microbe_rxn.X = seed_train.glucose_to_microbe_rxn.X =\
+            reactor.xylose_to_microbe_rxn.X = seed_train.xylose_to_microbe_rxn.X =\
+                sum_sugar_conversion - 1.
+        else:
+            reactor.glucose_to_microbe_rxn.X = seed_train.glucose_to_microbe_rxn.X =\
+            reactor.xylose_to_microbe_rxn.X = seed_train.xylose_to_microbe_rxn.X =\
+                regular_microbe_conversion
+            
+
         # rem_glucose = min(0.13, 1. - reactor.glucose_to_TAL_rxn.X)
         # reactor.glucose_to_acetic_acid_rxn.X = (55./130.) * rem_glucose
         # reactor.glucose_to_glycerol_rxn.X = (25./130.) * rem_glucose
