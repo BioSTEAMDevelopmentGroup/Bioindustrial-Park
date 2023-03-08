@@ -51,20 +51,37 @@ def create_system(flowsheet=None, biorefinery_settings=None):
     crude_oil = bst.Stream('crude_oil', **get_stream_kwargs('Crude oil'))
     ammonia = bst.Stream('ammonia', NH3=89.723, **get_stream_kwargs('Ammonia'))
     lime = bst.Stream('lime', CaO=53.609, **get_stream_kwargs('Lime'))
+
+    aa_price = prices.get('Alpha Amylase') or prices.get('Enzyme', 0.)
+    aa_CF = GWP_CFs.get('Alpha Amylase') or prices.get('Enzyme', 0.)
+    aa_kwargs = {
+        'price': aa_price,
+        'characterization_factors': {'GWP': aa_CF},
+        'units': 'kg/hr',
+        }
+
     alpha_amylase = bst.Stream('alpha_amylase',
                                SolubleProtein=0.00082,
                                Water=0.99918,
-                               **get_stream_kwargs('Enzyme'))
+                               **aa_kwargs)
     # F_mass for this (and other feedstock-related streams)
     # will be adjusted through specification
     alpha_amylase.F_mass = 32.467
     recycled_process_water = bst.Stream('recycled_process_water', 
                                         Water=1, 
                                         units='kg/hr')
+    ga_price = prices.get('Gluco Amylase') or prices.get('Enzyme', 0.)
+    ga_CF = GWP_CFs.get('Gluco Amylase') or prices.get('Enzyme', 0.)
+    ga_kwargs = {
+        'price': ga_price,
+        'characterization_factors': {'GWP': ga_CF},
+        'units': 'kg/hr',
+        }
+
     gluco_amylase = bst.Stream('gluco_amylase', 
                                SolubleProtein=0.0011,
                                Water=0.9989,
-                               **get_stream_kwargs('Enzyme'))
+                               **ga_kwargs)
     gluco_amylase.F_mass = 46.895
     sulfuric_acid = bst.Stream('sulfuric_acid', 
                                H2SO4=1.,
