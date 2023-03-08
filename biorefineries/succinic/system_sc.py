@@ -111,7 +111,7 @@ def create_succinic_sys(ins, outs):
     u = sugarcane_juicing_sys.flowsheet.unit
     s = sugarcane_juicing_sys.flowsheet.stream
     feedstock = s.sugarcane
-    feedstock.F_mass = 96000. # to produce SA at 34,000 metric tonne / year at baseline
+    feedstock.F_mass = 96000. # to produce SA at 28,000 metric tonne / year at baseline
     
     sugarcane_juicing_sys.flowsheet.diagram('thorough')
     
