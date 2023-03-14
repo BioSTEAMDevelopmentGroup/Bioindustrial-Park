@@ -18,7 +18,7 @@ auom = tmo.units_of_measure.AbsoluteUnitsOfMeasure
 # Using BioSTEAM's default values
 # (about the same as the previous dict, only as integers)
 CEPCI = bst.design_tools.CEPCI_by_year
-# # Legact Chemical Engineering Plant Cost Index from Chemical Engineering Magazine
+# # Legacy Chemical Engineering Plant Cost Index from Chemical Engineering Magazine
 # # (https://www.chemengonline.com/the-magazine/)
 # CEPCI = {1997: 386.5,
 #          1998: 389.5,

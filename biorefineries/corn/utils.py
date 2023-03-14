@@ -28,7 +28,7 @@ def dextrose_equivalent(n):
     -----
     The dextrose equivalent (DE) is a measure of the amount of reducing sugars 
     present in a sugar product, expressed as a percentage on a dry basis 
-    relative to dextrose. For polymerized glucose (i.e. dissacharides, 
+    relative to dextrose. For polymerized glucose (i.e. disaccharides, 
     oligosaccharides, and polysaccharides), the dextrose equivalent is given 
     by the following formula:
         

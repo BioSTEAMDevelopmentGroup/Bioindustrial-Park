@@ -81,13 +81,18 @@ __all__ = (
 
 # %%
 
-def create_preprocessing_process(flowsheet=None):
+def create_preprocessing_process(flowsheet=None, feedstock='feedstock'):
     flowsheet = flowsheet or bst.main_flowsheet
     chemicals = bst.settings.get_chemicals()
 
     # Feedstock impacts not considered due to large variations
-    feedstock = Stream('feedstock', get_baseline_feedflow(chemicals),
-                        units='kg/hr', price=price['Feedstock'])
+    if isinstance(feedstock, bst.Stream): # given as a stream obj
+        feedstock = feedstock
+    elif isinstance(feedstock, dict): # given as kwargs for stream
+        feedstock = Stream(**feedstock)
+    else: # only ID is given
+        feedstock = Stream(feedstock, get_baseline_feedflow(chemicals),
+                            units='kg/hr', price=price['Feedstock'])
 
     U101 = units.FeedstockPreprocessing('U101', ins=feedstock,
                                         outs=('processed', 'diverted'),
@@ -666,7 +671,7 @@ def create_facilities(solids_to_boiler, gas_to_boiler='',
     flowsheet = flowsheet or bst.main_flowsheet
     u = flowsheet.unit
     s = flowsheet.stream
-    feedstock = s.feedstock
+    feedstock = u.U101.ins[0]
 
     ##### Streams #####
     # Final product

@@ -60,8 +60,8 @@ ParallelRxn = tmo.reaction.ParallelReaction
 # Feedstock flow rate in dry U.S. ton per day, 907.1847 is auom('ton').conversion_factor('kg')
 def get_flow_tpd(flowsheet=None):
     flowsheet = flowsheet or main_flowsheet
-    feedstock = flowsheet.stream.feedstock
     U101 = flowsheet.unit.U101
+    feedstock = U101.ins[0]
     return (feedstock.F_mass-feedstock.imass['H2O'])*24/907.1847*(1-U101.divert_ratio)
 
 
