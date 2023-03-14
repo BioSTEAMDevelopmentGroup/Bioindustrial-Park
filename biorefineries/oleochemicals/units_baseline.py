@@ -34,7 +34,8 @@ bst.StorageTank.purchase_cost_algorithms["Solids handling bin"] = TankPurchaseCo
     CE=567, material='Carbon steel',
 )
 bst.StorageTank.purchase_cost_algorithms["Compressed air storage"] = TankPurchaseCostAlgorithm(
-    ExponentialFunctor(A=1.6e5 / (20 ** 0.81), n=0.81),
+    ExponentialFunctor(A=1.6e5 / (20 ** 0.81),
+                       n=0.81),
     V_min=1, V_max=500, V_units='m^3',
     CE=525.4, material='Carbon steel',
 )
@@ -77,7 +78,7 @@ class DihydroxylationReactor(bst.CSTR):
 class OxidativeCleavageReactor(bst.CSTR):
     # V_max is max volume of a reactor in feet3
     ## The two heatutilities are both for the vaccuum system -steam and for the cooling water
-    _N_ins = 2
+    _N_ins = 4
     _N_outs = 2
     X_oxidativecleavage = 0.8
     X_decarboxylation = 0.2
@@ -99,39 +100,49 @@ class OxidativeCleavageReactor(bst.CSTR):
                               ])
         #Because the cobalt tetrahydrate complex is soluble in water (380 g/L (20 ºC))
         #acc https://www.chemsrc.com/en/cas/6147-53-1_830295.html
-        Catalyst_dissolution = Rxn('Cobalt_acetate_tetrahydrate -> Cobalt_ion + 2 Acetate_ion + 4 H2O','Cobalt_acetate_tetrahydrate', X = 0.99)       
+        Catalyst_dissolution = Rxn('Cobalt_acetate_tetrahydrate -> Cobalt_ion + 2 Acetate_ion + 4 H2O','Cobalt_acetate_tetrahydrate', X = 0.9999)       
         # catalyst solubilitisation, assuming all of it is soluble
         oxidative_cleavage_rxnsys = RxnSys(Product_formation, Side_reaction, Catalyst_dissolution)
         self.reactions = oxidative_cleavage_rxnsys
             
     def _run(self):
-        feed,air, = self.ins
-        vent, effluent, = self.outs   
+        feed,catalyst1,catalyst2,air, = self.ins
+        vent, effluent, = self.outs 
+        effluent.phase = 'l'
         #https://thermosteam.readthedocs.io/en/latest/_modules/thermosteam/_stream.html#Stream.copy_like
         effluent.mix_from(self.ins)              
         self.reactions(effluent)
         effluent.T = self.T
         effluent.P = self.P
         vent.phase = 'g'
-        vent.copy_flow(effluent, ('Nitrogen', 'Oxygen','Carbon_dioxide'), remove=True)
+        vent.copy_flow(effluent, ('Carbon_dioxide','Nitrogen','Oxygen'), remove=True)
         vent.T = effluent.T = self.T
         vent.P = effluent.P = self.P
-        
-class CentrifugeVacuumVessel(bst.Unit):
-        auxiliary_unit_names = ('vacuum_system',) # Mark attributes as auxiliary
-        _units = {'Total volume': 'm3'} # This is needed for the vacuum system
-        P = 1000 # Pa
-        tau = 4 # hr
 
-        def _run(self):
-            self.outs[0].P = 1000 # Pa
+class DegassingVessel(bst.StorageTank, isabstract = True):
+    _N_ins = 1
+    _N_outs = 2
+    auxiliary_unit_names = ('vacuum_system',) # Mark attributes as auxiliary
+    _units = {'Total volume': 'm3'} # This is needed for the vacuum system
+    tau = 4
+    P = 10000
     
-        def _design(self):
-              self.design_results['Total volume'] = self.feed.F_vol * self.tau
-              self.vacuum_system = bst.VacuumSystem(self)
-             
-           
+    def _run(self):
+        feed = self.ins[0]
+        vent, effluent, = self.outs
+        effluent.phase = 'l'        
+        effluent.copy_like(feed)
+        vent.empty()
+        # vent.copy_flow(effluent,'Oxygen',remove = True)
+        # vent.copy_flow(effluent,'Nitrogen',remove = True)     
+        # vent.phase = 'g'
+        # vent.P = effluent.P = self.P
 
+    def _design(self):
+        self.design_results['Total volume'] = self.feed.F_vol * self.tau    
+        self.vacuum_system = bst.VacuumSystem(self)       
+
+DegassingVessel._stream_link_options = None
 
 @cost(basis = 'Cooling area',
       ID = 'Solids_Flaker',
@@ -156,13 +167,15 @@ class SolidsFlaker(bst.Unit):
                  outs = (),
                  capacity_per_m2 = None, 
                  power_rate_Kw = None,
-                 T_out = None
+                 T_out = None,
+                 flaker_tau= None
                 ):
         Unit.__init__(self, ID, ins, outs)
         self.ID = ID
         self.capacity_per_m2 = capacity_per_m2
         self.power_rate_Kw = power_rate_Kw 
         self.T_out = T_out
+        self.flaker_tau = flaker_tau
 
     def _run(self):
         feed, = self.ins
@@ -173,55 +186,28 @@ class SolidsFlaker(bst.Unit):
        
     def _design(self):
         self.design_results['Flaker capacity per unit area']= self.capacity_per_m2
-        A = self.capacity_per_m2*self.ins[0].F_mass
+        A = self.ins[0].F_mass*self.flaker_tau/self.capacity_per_m2
         self.design_results['Cooling area']= A
-        self.add_power_utility(self.power_rate_Kw * self.capacity_per_m2*self.ins[0].F_mass)
+        self.add_power_utility(self.power_rate_Kw * self.ins[0].F_mass*self.flaker_tau/self.capacity_per_m2)
         self.add_heat_utility( self.outs[0].H - self.ins[0].H, 
-                              T_in = self.ins[0].T,
-                              T_out = self.T_out)
+                                  T_in = self.ins[0].T,
+                                  T_out = self.T_out)
         
 
-#TODO: Should catalyst regeneration be continuous or batch?
-#TODO: check reaction conversions
-class Calcium_hydroxide_reactor(bst.CSTR):
-    _N_ins = 2
-    _N_outs = 1
+class Pressure_adjustment_valve(bst.Valve):
+    def __init__(self, ID='', ins=None, outs=(), thermo=None, *, P, vle=False):
+        Unit.__init__(self, ID, ins, outs, thermo)
+        self.P: float = P  #: Outlet pressure [Pa].
+        self.vle: bool = vle
     
-       
-    def _setup(self):  
-        super()._setup()                  
-        self.reactions = tmo.ParallelReaction([
-                tmo.Rxn('Cobalt_ion + Calcium_hydroxide + Acetate_ion -> Calcium_acetate + Cobalt_hydroxide', 'Cobalt_ion', X = 0.999),
-                tmo.Rxn('Tungstic_acid + Calcium_hydroxide -> Calcium_tungstate + H2O', 'Tungstic_acid', X = 0.999)
-                ])
-            
     def _run(self):
-        feed = self.ins
-        effluent, = self.outs  
-        effluent.mix_from(feed)
-        #https://thermosteam.readthedocs.io/en/latest/_modules/thermosteam/_stream.html#Stream.copy_like
-        self.reactions(effluent)
-        effluent.copy_like(effluent)
-        effluent.P = self.P
+        feed = self.ins[0]
+        out = self.outs[0]
+        out.copy_like(feed)
+        out.P = self.P
+        out.phase = 'l'
         
-class Acid_precipitation_tank(bst.CSTR):    
-    # auxiliary_unit_names = ('heat_exchanger')
-    _N_ins = 2
-    _N_outs = 1   
-  
-    def _setup(self): 
-        super()._setup()
-        Precipitation_reaction = tmo.ParallelReaction([
-                tmo.Rxn('Calcium_tungstate + 2Liquid_HCl -> Tungstic_acid + Calcium_chloride', 'Calcium_tungstate',X = 0.99),
-                tmo.Rxn('Cobalt_hydroxide + 2Liquid_HCl -> Cobalt_chloride + 2Water','Cobalt_hydroxide', X = 0.99)
-                ]) 
-        self.reactions = RxnSys(Precipitation_reaction)
-          
-    def _run(self):
-        effluent, = self.outs  
-        effluent.mix_from(self.ins)
-        self.reactions(effluent)   
-        effluent.copy_like(effluent)
+        
         
 class HydrolysisReactor(bst.BatchBioreactor):
     _N_ins = 2
@@ -388,6 +374,29 @@ class HydrolysisSystem(bst.Unit,isabstract = True):
         self.design_results['Total_filter_area']= self.ins[2].F_mass/(3600*3) #TODO: check what this is, 
         #Solid flux = 2-5 Kg/s.m^2 #Ref: Rule of thumb 184 oage number ask Yoel
                    
+class Sodium_hydroxide_tank(bst.units.tank.MixTank):
+    def _run(self):
+          effluent, = self.outs
+          self.precipitation_reaction_1 = tmo.Reaction('Cobalt_ion + 2 Sodium_hydroxide_liquid + Acetate_ion -> 2 Sodium_acetate + Cobalt_hydroxide', 'Cobalt_ion', X = 0.999)
+          effluent.mix_from(self.ins)
+          self.precipitation_reaction_1(effluent)
+          effluent.copy_like(effluent)
+          
+class Acid_precipitation_tank(bst.units.tank.MixTank):
+    def _run(self):
+          effluent, = self.outs
+          self.precipitation_reaction_2 = tmo.Reaction('Tungstic_acid + Calcium_chloride -> Calcium_tungstate + 2HCl2', 'Tungstic_acid', X = 0.999)
+          effluent.mix_from(self.ins)
+          self.precipitation_reaction_2(effluent)
+          effluent.copy_like(effluent)  
+          
+class Tungstic_acid_precipitation_tank(bst.units.tank.MixTank):
+    def _run(self):
+          effluent, = self.outs
+          self.precipitation_reaction_3 = tmo.Reaction('Calcium_tungstate + 2HCl2 -> Tungstic_acid + Calcium_chloride', 'Calcium_tungstate', X = 0.999)
+          effluent.mix_from(self.ins)
+          self.precipitation_reaction_3(effluent)
+          effluent.copy_like(effluent) 
             
  
             
@@ -431,65 +440,56 @@ class AACrystalliser(bst.units.BatchCrystallizer):
         outlet.sle('Azelaic_acid',
                     solubility=x,
                     T = self.T)
-        outlet.imass['s','Nonanoic_acid'] = feed.imass['Nonanoic_acid']        
+        outlet.imass['s','Nonanoic_acid'] = feed.imass['Nonanoic_acid']    
 
-    # def __init__(self,ID,ins = (),outs=(), thermo=None,
-    #              T=None,
-    #              P=None,dT_hx_loop = None,
-    #              tau: Optional[float]=None,
-    #              V_wf: Optional[float]=None, 
-    #              V_max: Optional[float]=None,
-    #              length_to_diameter: Optional[float]=2, 
-    #              kW_per_m3: Optional[float]=0.985,
-    #              vessel_material: Optional[str]=None,
-    #              vessel_type: Optional[str]=None,
-    #              X_dih = None):
-    #     bst.CSTR.__init__(self,ID ='',
-    #                       ins = (),outs= (),
-    #                       thermo = None,
-    #                       T = None,
-    #                       P = None,
-    #                       dT_hx_loop = None,
-    #                       tau = None,
-    #                       V_wf=None, 
-    #                       V_max=None,
-    #                       length_to_diameter=2, 
-    #                       kW_per_m3=0.985,
-    #                       vessel_material=None,
-    #                       vessel_type = None,
-    #                       )
-    # self.X_dih = X_dih =0.99
-        # self.T = T
-        # self.P = P
-        # self.V_wf = 0.8
         
-        # self.vessel_material = 'Stainless steel 316' if vessel_material is None else vessel_material
-        # self.vessel_type = 'Vertical' if vessel_type is None else vessel_type
-    # def __init__(self,ID,ins,outs=(), thermo=None,
-    #              T=None,
-    #              P=None,dT_hx_loop = None,
-    #              tau: Optional[float]=None,
-    #              V_wf: Optional[float]=None, 
-    #              V_max: Optional[float]=None,
-    #              length_to_diameter: Optional[float]=2, 
-    #              kW_per_m3: Optional[float]=0.985,
-    #              vessel_material: Optional[str]=None,
-    #              vessel_type: Optional[str]=None,
-    #              X_oxidativecleavage = None,
-    #              X_decarboxylation = None,
-    #              X_side_rxn = None):
-    #     bst.CSTR.__init__(self,ID ='',
-    #                       ins = (),
-    #                       outs =(),
-    #                       thermo = None,
-    #                       T = None,
-    #                       P = None,
-    #                       dT_hx_loop = None,
-    #                       tau = None,
-    #                       V_wf=None, 
-    #                       V_max=None,
-    #                       length_to_diameter=2, 
-    #                       kW_per_m3=0.985,
-    #                       vessel_material=None,
-    #                       vessel_type = None,
-    #                       )               
+
+    
+   
+          
+          
+#TODO: Should catalyst regeneration be continuous or batch?
+# #TODO: check reaction conversions
+# class Sodium_hydroxide_reactor(bst.CSTR):
+#     _N_ins = 2
+#     _N_outs = 1
+    
+       
+#     def _setup(self):  
+#         super()._setup()                  
+#         self.reactions = tmo.Reaction('Cobalt_ion + 2 Sodium_hydroxide_liquid + Acetate_ion -> 2 Sodium_acetate + Cobalt_hydroxide','Cobalt_ion', X = 0.999)               
+#     def _run(self):
+#         effluent, = self.outs  
+#         effluent.mix_from(self.ins)
+#         self.reactions(effluent)   
+#         effluent.copy_like(effluent)
+                
+# class Acid_precipitation_tank(bst.CSTR):    
+#     # auxiliary_unit_names = ('heat_exchanger')
+#     _N_ins = 2
+#     _N_outs = 1   
+  
+#     def _setup(self): 
+#         super()._setup()
+#         self.reactions = tmo.Reaction('Tungstic_acid + Calcium_chloride -> Calcium_tungstate + 2HCl2', 'Tungstic_acid', X = 0.999)
+          
+#     def _run(self):
+#         effluent, = self.outs  
+#         effluent.mix_from(self.ins)
+#         self.reactions(effluent)   
+#         effluent.copy_like(effluent)
+        
+# class Tungsacid_precipitation_tank(bst.CSTR):    
+#     # auxiliary_unit_names = ('heat_exchanger')
+#     _N_ins = 2
+#     _N_outs = 1   
+  
+#     def _setup(self): 
+#         super()._setup()
+#         self.reactions = tmo.Reaction('Calcium_tungstate + 2HCl2 -> Tungstic_acid + Calcium_chloride', 'Calcium_tungstate', X = 0.999)
+          
+#     def _run(self):
+#         effluent, = self.outs  
+#         effluent.mix_from(self.ins)
+#         self.reactions(effluent)   
+#         effluent.copy_like(effluent)              
