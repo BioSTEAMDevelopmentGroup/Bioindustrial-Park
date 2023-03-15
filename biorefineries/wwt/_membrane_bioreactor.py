@@ -459,8 +459,8 @@ class AnMBR(bst.Unit):
     # =========================================================================
     # _design
     # =========================================================================
-    def _design(self):        
-        D = self.design_results     
+    def _design(self):
+        D = self.design_results
         D['Treatment train'] = self.N_train
         D['Cassette per train'] = self.cas_per_tank
         D['Module per cassette'] = self.mod_per_cas
@@ -631,7 +631,7 @@ class AnMBR(bst.Unit):
     def _design_pump(self):
         rx_type, m_config, pumps = \
             self.reactor_type, self.membrane_configuration, self._pumps
-        
+
         ins_dct = {
             'perm': self.outs[1].proxy(),
             'retent': self._retent,
