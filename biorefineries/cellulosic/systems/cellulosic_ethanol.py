@@ -138,9 +138,3 @@ def create_cellulosic_ethanol_system(
         HXN=False,
         recycle_process_water_streams=[recycle_process_water],
     )
-
-    # bst.create_all_facilities(
-    #     feedstock, blowdown_recycle=include_blowdown_recycle, HXN=False,
-    #     recycle_process_water_streams=[recycle_process_water],
-    # )
-    
