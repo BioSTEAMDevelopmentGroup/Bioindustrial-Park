@@ -86,7 +86,7 @@ def create_facilities(
 )
 def create_cellulosic_ethanol_system(
         ins, outs,
-        include_blowdown_recycle=False,
+        include_blowdown_recycle=None,
         WWT_kwargs=None,
     ):
     feedstock, sulfuric_acid, ammonia, denaturant = ins
@@ -101,9 +101,10 @@ def create_cellulosic_ethanol_system(
         ins=pretreatment_sys-0,
         mockup=True,
     )
-    ethanol_purification_sys = create_ethanol_purification_system(
+    ethanol_purification_sys, udct = create_ethanol_purification_system(
         ins=[fermentation_sys-1, denaturant],
         outs=[ethanol],
+        udct=True,
         IDs={'Beer pump': 'P401',
              'Beer column heat exchange': 'H401',
              'Beer column': 'D402',
@@ -122,6 +123,9 @@ def create_cellulosic_ethanol_system(
              'Product tank': 'T703'},
         mockup=True,
     )
+    udct['H401'].dT = 10
+    udct['D402'].k = 1.4
+    udct['D403'].k = 1.4
     ethanol, stillage, recycle_process_water = ethanol_purification_sys.outs
     recycled_water = tmo.Stream(Water=1,
                                 T=47+273.15,
