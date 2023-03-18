@@ -87,9 +87,8 @@ def create_facilities(
 def create_cellulosic_ethanol_system(
         ins, outs,
         include_blowdown_recycle=False,
-        WWT='conventional',
-        WWT_kwargs={},
-        ):
+        WWT_kwargs=None,
+    ):
     feedstock, sulfuric_acid, ammonia, denaturant = ins
     ethanol, = outs
     U101 = units.FeedStockHandling('U101', feedstock)
@@ -133,7 +132,6 @@ def create_cellulosic_ethanol_system(
     bst.create_all_facilities(
         feedstock, 
         blowdown_recycle=include_blowdown_recycle,
-        WWT=WWT,
         WWT_kwargs=WWT_kwargs,
         HXN=False,
         recycle_process_water_streams=[recycle_process_water],
