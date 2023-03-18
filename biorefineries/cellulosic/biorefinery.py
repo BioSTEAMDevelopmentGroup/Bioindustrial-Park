@@ -34,21 +34,21 @@ class Biorefinery:
             self._chemicals = chemicals = create_cellulosic_ethanol_chemicals()
         return chemicals
     
-    def __new__(cls, configuration=None, cache=cache, chemicals=None, include_blowdown_recycle=None,
+    def __new__(cls, name=None, cache=cache, chemicals=None, include_blowdown_recycle=None,
                 feedstock_kwargs=None, prices=None, GWP_CFs=None):
         if include_blowdown_recycle is None: include_blowdown_recycle = False
-        if configuration is None: configuration = 'ethanol'
-        if configuration not in ('ethanol', 'corn stover ethanol'):
-            raise ValueError(f"configuration '{configuration}' is not available; "
-                              "only 'corn stover ethanol' or 'ethanol' are valid")
+        if name is None: name = 'ethanol'
+        if name not in ('ethanol', 'corn stover ethanol'):
+            raise ValueError(f"configuration '{name}' is not available; "
+                              "only 'corn stover ethanol' or 'ethanol' are valid names")
         
-        key = (configuration, include_blowdown_recycle)
+        key = (name, include_blowdown_recycle)
         if key in cache:
             return cache[key]
         else:
             cache[key] = self = super().__new__(cls)
         if chemicals is not None: self._chemicals = chemicals
-        self.flowsheet = bst.Flowsheet(configuration)
+        self.flowsheet = bst.Flowsheet(name)
         F.set_flowsheet(self.flowsheet)
         bst.settings.set_thermo(self.chemicals)
         load_process_settings()
