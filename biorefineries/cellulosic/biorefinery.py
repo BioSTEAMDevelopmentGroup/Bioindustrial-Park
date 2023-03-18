@@ -34,31 +34,27 @@ class Biorefinery:
             self._chemicals = chemicals = create_cellulosic_ethanol_chemicals()
         return chemicals
     
-    def __new__(cls, name=None, cache=cache, chemicals=None, include_blowdown_recycle=None,
-                feedstock_kwargs={}, prices={}, GWP_CFs={}):
+    def __new__(cls, configuration=None, cache=cache, chemicals=None, include_blowdown_recycle=None,
+                feedstock_kwargs=None, prices=None, GWP_CFs=None):
         if include_blowdown_recycle is None: include_blowdown_recycle = False
-        if name is None: name = 'corn stover ethanol'
+        if configuration is None: configuration = 'ethanol'
+        if configuration not in ('ethanol', 'corn stover ethanol'):
+            raise ValueError(f"configuration '{configuration}' is not available; "
+                              "only 'corn stover ethanol' or 'ethanol' are valid")
         
-        #!!! No need to limit the name to "corn stover ethanol"
-        # if name != 'corn stover ethanol':
-        #     raise ValueError(f"'{name}' is not available; "
-        #                       "only 'corn stover ethanol' is a valid name")
-        
-        key = (name, include_blowdown_recycle)
+        key = (configuration, include_blowdown_recycle)
         if key in cache:
             return cache[key]
         else:
             cache[key] = self = super().__new__(cls)
         if chemicals is not None: self._chemicals = chemicals
-        self.flowsheet = bst.Flowsheet(name)
+        self.flowsheet = bst.Flowsheet(configuration)
         F.set_flowsheet(self.flowsheet)
         bst.settings.set_thermo(self.chemicals)
         load_process_settings()
         sys = self.sys = create_cellulosic_ethanol_system(
             include_blowdown_recycle=include_blowdown_recycle
         )
-        name_lower = name.lower()
-        if 'corn' in name_lower and 'stover' in name_lower: self.cornstover_sys = sys
         # Replace feedstock
         stream = F.stream
         if feedstock_kwargs:
@@ -70,13 +66,19 @@ class Biorefinery:
             cornstover.disconnect_sink()
             sink.ins[0] = feedstock
             stream.discard(cornstover)
+        else:
+            self.cornstover_sys = sys # Feedstock defaults to corn stover
         # Update TEA and LCA settings
-        e_price = prices.pop('Electricity', None)
-        if e_price: bst.PowerUtility.price = e_price
-        for ID, price in prices.items(): stream.search(ID).price = price
-        e_CF = GWP_CFs.pop('Electricity', None)
-        if e_CF: bst.PowerUtility.characterization_factors['GWP'] = e_CF
-        for ID, CF in GWP_CFs.items(): stream.search(ID).characterization_factors['GWP'] = CF
+        if prices:
+            prices = prices.copy()
+            e_price = prices.pop('Electricity', None)
+            if e_price: bst.PowerUtility.price = e_price
+            for ID, price in prices.items(): stream.search(ID).price = price
+        if GWP_CFs:
+            GWP_CFs = GWP_CFs.copy()
+            e_CF = GWP_CFs.pop('Electricity', None)
+            if e_CF: bst.PowerUtility.characterization_factors['GWP'] = e_CF
+            for ID, CF in GWP_CFs.items(): stream.search(ID).characterization_factors['GWP'] = CF
         sys.simulate()
         u = F.unit
         OSBL_units = (u.WWTC, u.CWP, u.CT, u.PWC, u.ADP,
