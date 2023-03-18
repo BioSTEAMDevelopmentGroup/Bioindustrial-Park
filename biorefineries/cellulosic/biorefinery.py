@@ -37,10 +37,10 @@ class Biorefinery:
     def __new__(cls, name=None, cache=cache, chemicals=None, include_blowdown_recycle=None,
                 feedstock_kwargs=None, prices=None, GWP_CFs=None):
         if include_blowdown_recycle is None: include_blowdown_recycle = False
-        if name is None: name = 'ethanol'
-        if name not in ('ethanol', 'corn stover ethanol'):
+        if name is None: name = 'corn stover ethanol'
+        if 'ethanol' not in name:
             raise ValueError(f"configuration '{name}' is not available; "
-                              "only 'corn stover ethanol' or 'ethanol' are valid names")
+                              "only 'ethanol' is valid")
         
         key = (name, include_blowdown_recycle)
         if key in cache:
