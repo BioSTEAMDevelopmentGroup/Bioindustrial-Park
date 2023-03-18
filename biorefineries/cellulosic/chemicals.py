@@ -131,7 +131,7 @@ def create_cellulosic_ethanol_chemicals():
     def extend_single_phase_chemicals(IDs, **data):
         for ID in IDs: append_single_phase_chemical(ID, **data)
     
-    def append_new_single_phase_chemical(ID, source=None, **data):
+    def append_new_single_phase_chemical(ID, source=None, Cp=None, **data):
         chemical = tmo.Chemical.blank(ID, **data)
         if source: 
             default_phase_ref = source.phase_ref
@@ -141,6 +141,7 @@ def create_cellulosic_ethanol_chemicals():
         if not chemical.phase_ref:
             chemical.phase_ref = default_phase_ref
         chemical.at_state(chemical.phase_ref)
+        if Cp is not None: set_Cp(chemical, Cp)
         chemical.default()
         chems.append(chemical)
     
@@ -242,18 +243,23 @@ def create_cellulosic_ethanol_chemicals():
     append_new_single_phase_chemical('Biomass', formula="CH1.64O0.39N0.23S0.0035",
                                      Hf=-23200.01*cal2joule)
     append_new_single_phase_chemical('Cellulose', formula="C6H10O5", # Glucose monomer minus water
+                                     Cp=Cp_cellulosic,
                                      Hf=-233200.06*cal2joule)
     append_new_single_phase_chemical('Protein', formula="CH1.57O0.31N0.29S0.007",
                                      Hf=-17618*cal2joule)
     append_new_single_phase_chemical('Enzyme', formula="CH1.59O0.42N0.24S0.01",
                                      Hf=-17618*cal2joule)
     append_new_single_phase_chemical('Glucan', formula='C6H10O5',
+                                     Cp=Cp_cellulosic,
                                      Hf=-233200*cal2joule)
     append_new_single_phase_chemical('Xylan', formula="C5H8O4",
+                                     Cp=Cp_cellulosic,
                                      Hf=-182100*cal2joule)
     append_new_single_phase_chemical('Xylitol', formula="C5H12O5",
+                                     Cp=Cp_cellulosic,
                                      Hf=-243145*cal2joule)
     append_new_single_phase_chemical('Cellobiose', formula="C12H22O11",
+                                     Cp=Cp_cellulosic,
                                      Hf=-480900*cal2joule)
     append_new_single_phase_chemical('CSL', 
                                      formula='H2.8925O1.3275C1N0.0725S0.00175',
