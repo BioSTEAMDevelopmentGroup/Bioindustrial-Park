@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 # BioSTEAM: The Biorefinery Simulation and Techno-Economic Analysis Modules
 # Copyright (C) 2020, Yoel Cortes-Pena <yoelcortes@gmail.com>
+#                     Yalin Li <mailto.yalin.li@gmail.com>
 # 
 # This module is under the UIUC open-source license. See 
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
@@ -33,12 +34,16 @@ class Biorefinery:
             self._chemicals = chemicals = create_cellulosic_ethanol_chemicals()
         return chemicals
     
-    def __new__(cls, name=None, cache=cache, chemicals=None, include_blowdown_recycle=None):
+    def __new__(cls, name=None, cache=cache, chemicals=None, include_blowdown_recycle=None,
+                feedstock_kwargs={}, prices={}, GWP_CFs={}):
         if include_blowdown_recycle is None: include_blowdown_recycle = False
         if name is None: name = 'corn stover ethanol'
-        if name != 'corn stover ethanol':
-            raise ValueError(f"'{name}' is not available; "
-                              "only 'corn stover ethanol' is a valid name")
+        
+        #!!! No need to limit the name to "corn stover ethanol"
+        # if name != 'corn stover ethanol':
+        #     raise ValueError(f"'{name}' is not available; "
+        #                       "only 'corn stover ethanol' is a valid name")
+        
         key = (name, include_blowdown_recycle)
         if key in cache:
             return cache[key]
@@ -49,9 +54,29 @@ class Biorefinery:
         F.set_flowsheet(self.flowsheet)
         bst.settings.set_thermo(self.chemicals)
         load_process_settings()
-        self.sys = self.cornstover_sys = sys = create_cellulosic_ethanol_system(
+        sys = self.sys = create_cellulosic_ethanol_system(
             include_blowdown_recycle=include_blowdown_recycle
         )
+        name_lower = name.lower()
+        if 'corn' in name_lower and 'stover' in name_lower: self.cornstover_sys = sys
+        # Replace feedstock
+        stream = F.stream
+        if feedstock_kwargs:
+            cornstover = stream.search('cornstover')
+            feedstock_kwargs['ID'] = feedstock_kwargs.get('ID') or 'feedstock'
+            feedstock_kwargs['total_flow'] = feedstock_kwargs.get('total_flow') or cornstover.F_mass
+            feedstock = bst.Stream(**feedstock_kwargs)
+            sink = cornstover.sink
+            cornstover.disconnect_sink()
+            sink.ins[0] = feedstock
+            stream.discard(cornstover)
+        # Update TEA and LCA settings
+        e_price = prices.pop('Electricity', None)
+        if e_price: bst.PowerUtility.price = e_price
+        for ID, price in prices.items(): stream.search(ID).price = price
+        e_CF = GWP_CFs.pop('Electricity', None)
+        if e_CF: bst.PowerUtility.characterization_factors['GWP'] = e_CF
+        for ID, CF in GWP_CFs.items(): stream.search(ID).characterization_factors['GWP'] = CF
         sys.simulate()
         u = F.unit
         OSBL_units = (u.WWTC, u.CWP, u.CT, u.PWC, u.ADP,

@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 # BioSTEAM: The Biorefinery Simulation and Techno-Economic Analysis Modules
 # Copyright (C) 2020, Yoel Cortes-Pena <yoelcortes@gmail.com>
+#                     Yalin Li <mailto.yalin.li@gmail.com>
 # 
 # This module is under the UIUC open-source license. See 
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
@@ -36,4 +37,8 @@ from .biorefinery import *
 def load(*args, **kwargs):
     br = Biorefinery(*args, **kwargs)
     globals().update(br.__dict__)
-
+    globals().update({
+        'biorefinery': br,
+        'system': br.system,
+        'TEA': br.TEA,
+        })

@@ -307,7 +307,7 @@ class InternalCirculationRx(bst.MixTank):
         'Top reactor volume': 'm3',
         'Gas chamber volume': 'm3'
         }
-    def _design(self):      
+    def _design(self):
         D = self.design_results
         D['HRT'] = D['Residence time'] = self.HRT
         D['SRT'] = self.SRT
@@ -318,7 +318,7 @@ class InternalCirculationRx(bst.MixTank):
             D['Top reactor volume'] = self.Vt
 
 
-    def _cost(self):       
+    def _cost(self):
         bst.MixTank._cost(self)
         
         hx = self.heat_exchanger

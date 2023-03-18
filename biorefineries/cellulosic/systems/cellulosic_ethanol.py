@@ -84,7 +84,11 @@ def create_facilities(
           s.denaturant],
     outs=[s.ethanol],
 )
-def create_cellulosic_ethanol_system(ins, outs, include_blowdown_recycle=False):
+def create_cellulosic_ethanol_system(
+        ins, outs,
+        include_blowdown_recycle=False,
+        WWT_kwargs=None,
+    ):
     feedstock, sulfuric_acid, ammonia, denaturant = ins
     ethanol, = outs
     U101 = units.FeedStockHandling('U101', feedstock)
@@ -124,8 +128,11 @@ def create_cellulosic_ethanol_system(ins, outs, include_blowdown_recycle=False):
                                 P=3.9*101325,
                                 units='kg/hr')
     S401 = bst.PressureFilter('S401', (stillage, recycled_water))
+
     bst.create_all_facilities(
-        feedstock, blowdown_recycle=include_blowdown_recycle, HXN=False,
+        feedstock, 
+        blowdown_recycle=include_blowdown_recycle,
+        WWT_kwargs=WWT_kwargs,
+        HXN=False,
         recycle_process_water_streams=[recycle_process_water],
     )
-    

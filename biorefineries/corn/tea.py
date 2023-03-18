@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 # BioSTEAM: The Biorefinery Simulation and Techno-Economic Analysis Modules
 # Copyright (C) 2020, Yoel Cortes-Pena <yoelcortes@gmail.com>
+#                     Yalin Li <mailto.yalin.li@gmail.com>
 # 
 # This module is under the UIUC open-source license. See 
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
@@ -12,17 +13,29 @@ from biosteam.process_tools import UnitGroup
 from biorefineries import corn
 from biorefineries.tea import ConventionalEthanolTEA
 
-__all__ = ('create_tea', 'tea_summary')
+__all__ = ('create_tea', 'default_tea_parameters', 'tea_summary')
 
-def create_tea(system, cls=ConventionalEthanolTEA):
-    return cls(system, IRR=0.15,
-               duration=(2018, 2038),
-               depreciation='MACRS7', income_tax=0.35,
-               operating_days=330, lang_factor=4,
-               construction_schedule=(0.4, 0.6), WC_over_FCI=0.05,
-               labor_cost=2.3e6, fringe_benefits=0.4,
-               property_tax=0.001, property_insurance=0.005,
-               supplies=0.20, maintenance=0.01, administration=0.005)
+default_tea_parameters = dict(
+    IRR=0.15,
+    duration=(2018, 2038),
+    depreciation='MACRS7',
+    income_tax=0.35,
+    operating_days=330,
+    lang_factor=4,
+    construction_schedule=(0.4, 0.6),
+    WC_over_FCI=0.05,
+    labor_cost=2.3e6,
+    fringe_benefits=0.4,
+    property_tax=0.001,
+    property_insurance=0.005,
+    supplies=0.20,
+    maintenance=0.01,
+    administration=0.005,
+    )
+
+def create_tea(system, cls=ConventionalEthanolTEA, **tea_parameters):
+    tea_parameters = tea_parameters or default_tea_parameters
+    return cls(system, **tea_parameters)
 
 def tea_summary(*args, **kwargs):
     cn = corn.Biorefinery(*args, **kwargs)

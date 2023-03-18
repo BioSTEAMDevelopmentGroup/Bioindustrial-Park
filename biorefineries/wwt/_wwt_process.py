@@ -358,8 +358,7 @@ def create_wastewater_process(ins, outs, process_ID='6', flowsheet=None,
                             skip_IC=False, IC_kwargs={},
                             skip_AnMBR=False, AnMBR_kwargs={},
                             skip_AeF=False, AF_kwargs={}):
-    if flowsheet:
-        bst.main_flowsheet.set_flowsheet(flowsheet)
+    if flowsheet: bst.main_flowsheet.set_flowsheet(flowsheet)
     wwt_streams = ins
     RNG, biogas, sludge, recycled_water, brine = outs
 
