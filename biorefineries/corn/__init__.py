@@ -40,5 +40,5 @@ def load(*args, **kwargs):
     globals().update({
         'biorefinery': br,
         'system': br.system,
-        'TEA': br.TEA,
-        })
+        'tea': br.TEA,
+    })
