@@ -122,7 +122,7 @@ chems = tmo.Chemicals([
         tmo.Chemical('Methyl_palmitoleate',search_ID ='1120-25-8'),
 
 #Dihydroxylation chemicals
-            tmo.Chemical('Hydrogen_peroxide'),
+            tmo.Chemical('Hydrogen_peroxide',phase ='l'),
             tmo.Chemical('Water'),
 #Dihydroxylation products
 #Product 1       
@@ -148,6 +148,7 @@ chems = tmo.Chemicals([
                  Tb = 449.4+273.15,#CAS finder: Tb =449.4±35.0 °C,Press: 760 Torr
                  formula = 'C19H36O4',
                  Hf = -634.7*1000 #TODO: Ref:https://webbook.nist.gov/cgi/cbook.cgi?ID=C60333&Mask=2
+                 
                  ),
     
 # Products of oxidative_cleavage
@@ -169,6 +170,7 @@ chems = tmo.Chemicals([
         tmo.Chemical('Azelaic_acid'),
 
 # Oxidants used and other gaseous products
+#Liquid phase reaction?   
         tmo.Chemical('Nitrogen',phase = 'g'),
         tmo.Chemical('Oxygen',phase = 'g'),
         tmo.Chemical('Carbon_dioxide',phase = 'g'),
@@ -295,21 +297,17 @@ chems['Monomethyl_azelate'].Pc = 2.39587E+06#Chemical compound generator DWSIM
 chems['Monomethyl_azelate'].Tc = 837.971#Chemical compound generator DWSIM
 chems['Monomethyl_azelate'].omega = 1.09913#Chemical compound generator DWSIM
 chems['Monomethyl_azelate'].Tb = 650.2#Chemical compound generator DWSIM
+chems.Methyl_palmitate.Cn.l.method = 'ROWLINSON_BONDI'
+chems.Palmitic_acid.Cn.l.method = 'ROWLINSON_BONDI'
+chems.Stearic_acid.Cn.l.method = 'ROWLINSON_BONDI'
+chems.Oleic_acid.Cn.l.method = 'ROWLINSON_BONDI'
 
-#properties of TAGs that are missing
-# chems.OOO.Cn.l.method = 'DADGOSTAR_SHAW'
-# chems.PPP.Cn.l.method = 'DADGOSTAR_SHAW'
-chems.Methyl_palmitate.Cn.l.method = 'DADGOSTAR_SHAW'
-chems.Palmitic_acid.Cn.l.method = 'DADGOSTAR_SHAW'
-chems.Stearic_acid.Cn.l.method = 'DADGOSTAR_SHAW'
-chems.Oleic_acid.Cn.l.method = 'DADGOSTAR_SHAW'
-chems.Octane.Cn.l.method = 'DADGOSTAR_SHAW'
-chems.Natural_gas.Cn.l.method = 'DADGOSTAR_SHAW'
-# chems.Cobalt_chloride.Cn.l.method = 'ROWLINSON_BONDI'
+
+chems.Octane.Cn.l.method = 'DADGOSTAR_SHAW' #This method works for hydrocarbons
+chems.Natural_gas.Cn.l.method = 'DADGOSTAR_SHAW' #This method works for hydrocarbons
 
 
 chems.OOO.copy_models_from(chems.PPP,['mu',
-                                      # 'Cn'
                                       ])
 chems.LnLnLn.copy_models_from(chems.PPP,['mu'])
 TAGs_with_unknown_props = [ 'LLL',
@@ -320,6 +318,7 @@ TAGs_with_unknown_props = [ 'LLL',
 for i in TAGs_with_unknown_props:
     chems[i].Tb = chems.OOO.Tb
     chems[i].copy_models_from(chems.PPP,['mu'])
+    
 
     
 ## The oxidative cleavage catalyst properties are based on cobalt chloride
@@ -333,9 +332,9 @@ chems.Cobalt_acetate_tetrahydrate.copy_models_from(chems.Cobalt_chloride,
 ## The density of cobalt acetate tetrahydrate is available in the literature, rho is 1730 Kg/m3
 ## https://scifinder-n.cas.org/searchDetail/substance/634d77a73c1f076117e95f61/substanceDetails
 ## Cobalt acetate dissolution reaction data
-V_of_cobalt_acetate_tetrahydrate = fn.rho_to_V(1730,chems['Cobalt_acetate_tetrahydrate'].MW)
-chems.Cobalt_acetate_tetrahydrate.V.add_model(V_of_cobalt_acetate_tetrahydrate,
-                                                 top_priority = True)
+# V_of_cobalt_acetate_tetrahydrate = fn.rho_to_V(1730,chems['Cobalt_acetate_tetrahydrate'].MW)
+# chems.Cobalt_acetate_tetrahydrate.V.add_model(V_of_cobalt_acetate_tetrahydrate,
+                                                 # top_priority = True)
 chems.Tungstic_acid.copy_models_from(chems.Tungsten,
                                      ['Hvap','Psat'])
 # chems.Tungstic_acid.V.add_model(fn.rho_to_V(rho=5.59,#https://en.wikipedia.org/wiki/Tungstic_acid
@@ -351,11 +350,13 @@ chems.Hydrogen_ion.copy_models_from(chems.Hydrogen,
                                         'Psat',
                                         'mu',
                                         'Cn'])
-chems.Cobalt_ion.copy_models_from(chems.Cobalt,
-                                       ['Hvap',
-                                        'Psat'])
+# chems.Cobalt_ion.copy_models_from(chems.Cobalt,
+#                                        ['Hvap',
+#                                         'Psat'])
 
-for i in ['Hydrogen_ion','Tungstate_ion','Cobalt_ion']:
+for i in ['Hydrogen_ion','Tungstate_ion','Cobalt_ion',
+          'Acetate_ion','Cobalt_acetate_tetrahydrate',
+          'Cobalt_hydroxide','Tungstic_acid','Hydrogen_peroxide']:
     V = fn.rho_to_V(rho=1e5, MW=chems[i].MW)
     chems[i].V.add_model(V, top_priority=True)
 ## Products of the precipitation reaction
@@ -371,15 +372,16 @@ chems.Calcium_tungstate.V.add_model(fn.rho_to_V(5800,
                                                 chems.Calcium_tungstate.MW),
                                                 top_priority = True)
 chems.Acetate_ion.copy_models_from((chems.Acetate),
-                                      ['mu',
-                                       'Psat',
-                                       'Hvap',
-                                       'sigma',
+                                      [
+                                          # 'mu',
+                                       # 'Psat',
+                                        # 'Hvap',
+                                       # 'sigma',
                                        ])
-Acetate_rho = chems.Acetate.rho(298.15,101325)
-chems.Acetate_ion.V.add_method(chems.Acetate_ion.MW*10E-3/Acetate_rho)
+# TODO: Acetate_rho = chems.Acetate.rho(298.15,101325)
+# TODO: chems.Acetate_ion.V.add_method(chems.Acetate_ion.MW*10E-3/Acetate_rho)
 chems.Calcium_acetate.V.add_method(chems.Calcium_acetate.MW*0.000001/1.5)#density from: https://pubchem.ncbi.nlm.nih.gov/compound/Calcium-acetate#section=Density
-chems.Cobalt_hydroxide.V.add_method(chems.Cobalt_hydroxide.MW*1.0E-6/3.597)
+# chems.Cobalt_hydroxide.V.add_method(chems.Cobalt_hydroxide.MW*1.0E-6/3.597)#TODO: very little and solubility 3.20 mg/L
 # chems.Cobalt_hydroxide.copy_models_from(tmo.Chemical('NaOH'),['Psat'])
 #TODO: change the below
 chems.Calcium_hydroxide.copy_models_from(tmo.Chemical('NaOH'),['Psat'])
@@ -609,38 +611,38 @@ chems.POS.Cn.add_method(f=POP_Cnl_model, Tmin= 298.15, Tmax=453.15)
 ###############################################################################################33
 #Adding the molar volumes
 def OOO_Vl_model(T):
-      return ((3*((1 + 0.0009865*T)/4.2924)) + ((1 + 20.048*T)/0.00076923))*(1/1000)
+      return ((3*((1 + 0.0009865*T)/4.2924)) + ((1 + 0.00076923*T)/20.048))*(1/1000)
 # chems.OOO.V.l.add_method(f=OOO_Vl_model, Tmin= 258.15, Tmax=516.15)
 # TODO: check what methodP means ...in the V.l definition
 def LLL_Vl_model(T):
-      return ((3*((1 + 0.00074102*T)/4.1679)) + ((1 + 20.048*T)/0.00076923))*(1/1000)
+      return ((3*((1 + 0.00074102*T)/4.1679)) + ((1 + 0.00076923*T)/20.048))*(1/1000)
 chems.LLL.V.add_method(f=LLL_Vl_model, Tmin= 258.15, Tmax=516.15)
 def OOL_Vl_model(T):
-      return ((1*((1 + 0.00074102*T)/4.1679)) + (2*((1 + 0.0009865*T)/4.2924))+  ((1 + 20.048*T)/0.00076923))*(1/1000)
+      return ((1*((1 + 0.00074102*T)/4.1679)) + (2*((1 + 0.0009865*T)/4.2924))+  ((1 + 0.00076923*T)/20.048))*(1/1000)
 chems.OOL.V.add_method(f=OOL_Vl_model, Tmin= 258.15, Tmax=516.15)
 def LLO_Vl_model(T):
-      return ((2*((1 + 0.00074102*T)/4.1679)) + (1*((1 + 0.0009865*T)/4.2924))+  ((1 + 20.048*T)/0.00076923))*(1/1000)
+      return ((2*((1 + 0.00074102*T)/4.1679)) + (1*((1 + 0.0009865*T)/4.2924))+  ((1 + 0.00076923*T)/20.048))*(1/1000)
 chems.LLO.V.add_method(f=LLO_Vl_model, Tmin= 258.15, Tmax=516.15)
 def SOO_Vl_model(T):
-      return ((1*((1 + 0.0014091*T)/4.6326)) + (2*((1 + 0.0009865*T)/4.2924))+  ((1 + 20.048*T)/0.00076923))*(1/1000)
+      return ((1*((1 + 0.0014091*T)/4.6326)) + (2*((1 + 0.0009865*T)/4.2924))+  ((1 + 0.00076923*T)/20.048))*(1/1000)
 chems.SOO.V.add_method(f=SOO_Vl_model, Tmin= 258.15, Tmax=516.15)
 def PLO_Vl_model(T):
-      return ((1*((1 + 0.0013008*T)/5.0524))+ (1*((1 + 0.00074102*T)/4.1679)) + (1*((1 + 0.0009865*T)/4.2924)) + ((1 + 20.048*T)/0.00076923))*(1/1000)
+      return ((1*((1 + 0.0013008*T)/5.0524))+ (1*((1 + 0.00074102*T)/4.1679)) + (1*((1 + 0.0009865*T)/4.2924)) + ((1 + 0.00076923*T)/20.048))*(1/1000)
 chems.PLO.V.add_method(f=PLO_Vl_model, Tmin= 258.15, Tmax=516.15)
 def PoOO_Vl_model(T):
-      return ((1*((1 + 0.0013008*T)/5.0524))+ (2*((1 + 0.0009865*T)/4.2924)) + ((1 + 20.048*T)/0.00076923))*(1/1000)
+      return ((1*((1 + 0.0013008*T)/5.0524))+ (2*((1 + 0.0009865*T)/4.2924)) + ((1 + 0.00076923*T)/20.048))*(1/1000)
 chems.PoOO.V.add_method(f=PoOO_Vl_model, Tmin= 258.15, Tmax=516.15)
 def POO_Vl_model(T):
-      return ((1*((1 + 0.0013008*T)/5.0524))+ (2*((1 + 0.0009865*T)/4.2924)) + ((1 + 20.048*T)/0.00076923))*(1/1000)
+      return ((1*((1 + 0.0013008*T)/5.0524))+ (2*((1 + 0.0009865*T)/4.2924)) + ((1 + 0.00076923*T)/20.048))*(1/1000)
 chems.POO.V.add_method(f=POO_Vl_model, Tmin= 258.15, Tmax=516.15)
 def POS_Vl_model(T):
-      return ((1*((1 + 0.0013008*T)/5.0524))+ (1*((1 + 0.0009865*T)/4.2924)) +(1*((1 + 0.0014091*T)/4.6326))+ ((1 + 20.048*T)/0.00076923))*(1/1000)
+      return ((1*((1 + 0.0013008*T)/5.0524))+ (1*((1 + 0.0009865*T)/4.2924)) +(1*((1 + 0.0014091*T)/4.6326))+ ((1 + 0.00076923*T)/20.048))*(1/1000)
 chems.POS.V.add_method(f=POS_Vl_model, Tmin= 258.15, Tmax=516.15)
 def POP_Vl_model(T):
-      return ((2*((1 + 0.0013008*T)/5.0524))+ (1*((1 + 0.0009865*T)/4.2924)) + ((1 + 20.048*T)/0.00076923))*(1/1000)
+      return ((2*((1 + 0.0013008*T)/5.0524))+ (1*((1 + 0.0009865*T)/4.2924)) + ((1 + 0.00076923*T)/20.048))*(1/1000)
 chems.POP.V.add_method(f=POP_Vl_model, Tmin= 258.15, Tmax=516.15)
 def PLS_Vl_model(T):
-      return ((1*((1 + 0.0013008*T)/5.0524))+ (1*((1 + 0.00074102*T)/4.1679)) +(1*((1 + 0.0014091*T)/4.6326))+  ((1 + 20.048*T)/0.00076923))*(1/1000)
+      return ((1*((1 + 0.0013008*T)/5.0524))+ (1*((1 + 0.00074102*T)/4.1679)) +(1*((1 + 0.0014091*T)/4.6326))+  ((1 + 0.00076923*T)/20.048))*(1/1000)
 chems.PLS.V.add_method(f=PLS_Vl_model, Tmin= 258.15, Tmax=516.15)
 
 #Adding viscosity for the unknown TAGS

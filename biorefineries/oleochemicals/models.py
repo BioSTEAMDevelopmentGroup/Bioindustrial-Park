@@ -14,7 +14,8 @@ from lca_tea_baseline import TEA_baseline
 from biosteam.evaluation import Model, Metric
 from biorefineries.lipidcane._process_settings import price #TODO: were these prices adjusted to 2013 prices?
 from biorefineries.cane.data.lca_characterization_factors import GWP_characterization_factors 
-from biorefineries.cornstover import CellulosicEthanolTEA
+from biorefineries.tea.cellulosic_ethanol_tea import CellulosicEthanolTEA,create_cellulosic_ethanol_tea
+from thermosteam.utils import GG_colors
 
 #Settings to set GWP100 as the main characterisation factor
 GWP = 'GWP100'
@@ -24,10 +25,18 @@ bst.settings.set_electricity_CF(GWP, 0.36, basis='kWhr', units='kg*CO2e')
 aa_baseline_sys = aa_baseline_sys()
 # aa_baseline_sys.prioritize_unit(F_baseline.unit.S702)
 aa_baseline_sys.set_tolerance(mol=0.0,
-                              rmol=0.001,
+                              rmol=0.01,
                               method = 'fixedpoint',
                               subsystems = True)
-aa_baseline_sys.simulate()  
+
+aa_baseline_sys.simulate()
+# aa_baseline_sys._setup()
+# for i in aa_baseline_sys.units:
+#     print(F_baseline.R202.outs[1].phase)
+#     print(i)
+#     i.run()
+        
+    
 #############################################################################################################
 # renaming the first system factory for biodiesel prep as the 1000 series
 biodiesel_prep_units = (F_baseline.unit.S402,F_baseline.unit.T401,
@@ -58,7 +67,7 @@ plot_by_metric.plot.bar(stacked = True) #plot for all the metrics stacked by are
 #TODO: decide how to name areas
 #What to create boxplots for?
 # boxplot = plot_by_metric.boxplot(column=['Heating duty']) #for a specific column name, .boxplot() for the entire dataframe
-
+#
 
 # #########################################################################################################
 #TODO: add price later insiide the system
@@ -90,8 +99,16 @@ F_baseline.stream.NaOH.characterization_factors = {'GWP100': GWP_characterizatio
 F_baseline.stream.crude_glycerol.price = price['Crude glycerol']*401.693/275.700 #Adjusted from 2021 Jan to 2022 Dec based on FRED's PPI
 F_baseline.stream.crude_glycerol.characterization_factors = {'GWP100': GWP_characterization_factors['crude-glycerol']}
  
-# #######################################################################################################################33
-# #####################################################################################################33
+#Crude methanol
+F_baseline.crude_methanol.price =  0.792*401.693/275.700 #Based on Catbio costs adjusted from 2021 Jan to 2022 Dec using Fred's PPI for basic inorganic chemicals
+F_baseline.stream.methanol.characterization_factors = {'GWP100': GWP_characterization_factors['methanol']}
+
+#Pelargonic_acid fraction
+F_baseline.pelargonic_acid_rich_fraction.price = 16 #https://www.vigon.com/product/pelargonic-acid/
+
+
+#######################################################################################################################33
+#####################################################################################################33
 tea_azelaic_baseline = TEA_baseline(
                                     system = aa_baseline_sys,
                                     lang_factor = None,                                    
@@ -122,10 +139,10 @@ tea_azelaic_baseline = TEA_baseline(
                                                     F_baseline.CT901,
                                                     F_baseline.BT901,
                                                     F_baseline.PWT901, 
-                                                    F_baseline.W901,
+                                                    # F_baseline.W901,
                                                     F_baseline.ADP901,
-                                                  ])                                                         
-                                   
+                                                  ])         
+                                
 aa_sys_op_hours = aa_baseline_sys.operating_hours = tea_azelaic_baseline.operating_days * 24
 
 #functions to solve for different indicators
@@ -135,7 +152,6 @@ azelaic_acid = F_baseline.stream.azelaic_acid_product_stream
 azelaic_acid_tea = aa_baseline_sys.TEA
 def get_MPSP():
         azelaic_acid.price = 0
-        #TODO: ASK WHY? for i in range(3):
         MPSP = azelaic_acid.price = azelaic_acid_tea.solve_price(azelaic_acid)
         return MPSP
 
@@ -156,6 +172,15 @@ get_system_cooling_water_duty = lambda: aa_baseline_sys.get_cooling_duty()/1e9
 get_NPV = lambda: azelaic_acid_tea.NPV
 #Environmental impact
 # get_GWP = lambda: get_process_impact(key)
+# from biosteam import report
+# print(
+#     report.lca_inventory_table(
+#         systems=[system],
+#         key=GWP,
+#         items=[sc.ethanol], # For including products without characterization factors
+#     )
+# )
+#TODO: ask what should be a part of the items, currently AA and PA does not have a GWP
 
 metrics = [    
             Metric('MPSP', get_MPSP, '$/kg'),
@@ -170,7 +195,8 @@ metrics = [
             Metric('NPV', get_NPV, '$', 'TEA'),
             # Metric('Total GWP', get_GWP, 'kg CO2-eq/kg', 'LCA'),
           ]
-model = Model(aa_baseline_sys, metrics, exception_hook='raise')
+model = Model(aa_baseline_sys, metrics)
+              # exception_hook='raise')
 #TODO: ask what check functions are in lactic acid models
 #################################################################################################
 # #Isolated parameters
@@ -299,25 +325,25 @@ ub6 = 0.99
 def set_X_side_rxn_conversion(X_side_rxn):
         F_baseline.unit.R202.X_side_rxn =  X_side_rxn
 
-lb7 = 10000 
-ub7 = 1000000
-@model.parameter(name = 'Feedstock_capacity',
-                 element = F_baseline.stream.crude_vegetable_oil,
-                 kind = 'coupled',
-                 distribution=shape.Uniform(lb7,ub7)
-                 )
-def set_feedstock_input_flow(Cap):
-    F_baseline.stream.crude_vegetable_oil.F_mass = Cap    
+# lb7 = 10000 
+# ub7 = 1000000
+# @model.parameter(name = 'Feedstock_capacity',
+#                  element = F_baseline.stream.crude_vegetable_oil,
+#                  kind = 'coupled',
+#                  distribution=shape.Uniform(lb7,ub7)
+#                  )
+# def set_feedstock_input_flow(Cap):
+#     F_baseline.stream.crude_vegetable_oil.F_mass = Cap    
     
-N_samples = 1000
-rule = 'L' # For Latin-Hypercube sampling
-np.random.seed(1234) # For consistent results
-samples = model.sample(N_samples, rule)
-model.load_samples(samples)
-model.evaluate(
-    notify=100 # Also print elapsed time after 50 simulations
-              )
-model.show()
+# N_samples = 1000
+# rule = 'L' # For Latin-Hypercube sampling
+# np.random.seed(1234) # For consistent results
+# samples = model.sample(N_samples, rule)
+# model.load_samples(samples)
+# model.evaluate(
+#     notify=100 # Also print elapsed time after 100 simulations
+#               )
+# model.show()
 
  ############################################################################3
 # #4 Pressure for degassing_the_oily_phase
