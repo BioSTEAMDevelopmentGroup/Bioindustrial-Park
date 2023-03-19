@@ -33,7 +33,8 @@ __all__ = ('create_system',)
 
 # %%
 
-def create_system(ID='lactic_sys', kind='SSCF', if_HXN=True, if_BDM=False,
+def create_system(ID='lactic_sys', kind='SSCF', feedstock='feedstock',
+                  if_HXN=True, if_BDM=False,
                   flowsheet=None, return_groups=False,
                   cell_mass_split=None, gypsum_split=None,
                   AD_split=None, MB_split=None):
@@ -51,7 +52,7 @@ def create_system(ID='lactic_sys', kind='SSCF', if_HXN=True, if_BDM=False,
     AD_split = AD_split if AD_split is not None else _AD_split
     MB_split = MB_split if MB_split is not None else _MB_split
 
-    create_preprocessing_process(flowsheet=flowsheet)
+    create_preprocessing_process(flowsheet=flowsheet, feedstock=feedstock)
     
     # For pretreatment, 93% purity
     sulfuric_acid_T201 = bst.Stream('sulfuric_acid_T201', units='kg/hr',

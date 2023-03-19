@@ -1314,7 +1314,7 @@ class Biorefinery:
         # Avoid erros in Monte Carlo of microbial oil production with huge cell
         # mass production
         if number in cellulosic_configurations:
-            flowsheet(bst.SludgeCentrifuge).strict_moisture_content = False
+            flowsheet('SludgeCentrifuge').strict_moisture_content = False
         
         ## Simulation
         sys.simulate()

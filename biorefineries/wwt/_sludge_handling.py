@@ -110,7 +110,7 @@ class SludgeHandling(bst.Unit):
         self.SKIPPED = False
 
 
-    def _cost(self):           
+    def _cost(self):
         if self.SKIPPED == False:
             pumps = (self.effluent_pump, self.sludge_pump)
             for i in range(2): pumps[i].simulate()
@@ -179,7 +179,7 @@ class BeltThickener(SludgeHandling):
 
     def _design(self):
         self._N_thickener = N = math.ceil(self._mixed.F_vol/self.max_capacity)
-        self.design_results['Number of thickners'] = N
+        self.design_results['Number of thickeners'] = N
         self.F_BM['Thickeners'] = 1.7 # ref [2]
         self.baseline_purchase_costs['Thickeners'] = 4000 * N
 

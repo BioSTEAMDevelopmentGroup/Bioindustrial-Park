@@ -5,7 +5,9 @@ wwt: High-Rate Wastewater Treatment Process for Energy and Water Recovery
 Description
 -----------
 
-This repository contains the modules for the design of a high-rate wastewater treatment (WWT) and energy/water recovery process as described in Li et al. [1]_ This process was implemented for seven different biorefineries:
+This repository contains the modules for the design of a high-rate wastewater treatment (WWT) and energy/water recovery process as described in Li et al. [1]_ This module has been added as a whole to BioSTEAM's existing wastewater treatment configurations (the "high-rate") one.
+
+For the paper, this process was implemented for seven different biorefineries:
 	
 - CN (corn-to-ethanol) as in the `corn <https://github.com/BioSTEAMDevelopmentGroup/Bioindustrial-Park/tree/master/biorefineries/corn>`_ module, implementation and comparison codes in `corn.py <https://github.com/BioSTEAMDevelopmentGroup/Bioindustrial-Park/blob/master/biorefineries/wwt/corn.py>`_
 - SC-1G (sugarcane juice-to-ethanol) as in the `oilcane <https://github.com/BioSTEAMDevelopmentGroup/Bioindustrial-Park/tree/master/biorefineries/oilcane>`_ module (S1 configuration), implementation and comparison codes in `sugarcane1g.py <https://github.com/BioSTEAMDevelopmentGroup/Bioindustrial-Park/blob/master/biorefineries/wwt/sugarcane1g.py>`_
@@ -20,4 +22,4 @@ Codes for a quick comparison of key biorefinery metrics (baseline) can be found 
 
 References
 ----------
-.. [1] Li et al., Design of a High-Rate Wastewater Treatment Process for Energy and Water Recovery at Biorefineries. *In Prep.* 2022.
+.. [1] Li et al., Design of a High-Rate Wastewater Treatment Process for Energy and Water Recovery at Biorefineries. ACS Sustainable Chem. Eng. 2023, 11 (9), 3861–3872. https://doi.org/10.1021/acssuschemeng.2c07139.

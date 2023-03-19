@@ -43,7 +43,7 @@ def create_tea(lactic_sys=None, OSBL_units=None, flowsheet=None):
             OSBL_units.remove(i)
 
     # 907.1847 is auom('ton').conversion_factor('kg')
-    feedstock = s.feedstock
+    feedstock = u.U101.ins[0]
     flow_tpd = (feedstock.F_mass-feedstock.imass['H2O'])*24/907.1847*(1-u.U101.divert_ratio)
 
     lactic_tea = LacticTEA(
