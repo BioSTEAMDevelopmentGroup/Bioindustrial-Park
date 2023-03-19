@@ -2336,7 +2336,10 @@ class Crystallization(Reactor):
         reagent.empty()
         reagent.imol['HCl'] = max(0, sum([i.imol['KSA'] for i in ins]) - sum([i.imol['HCl'] for i in ins]))
         # effluent = feed.copy()
-        effluent.mix_from([feed, reagent, recycle_reagent, recycle_feed])
+        effluent.mix_from([feed, 
+                           reagent, 
+                           recycle_reagent, 
+                           recycle_feed])
         
         # effluent.T = feed.T
         # effluent.P = feed.P

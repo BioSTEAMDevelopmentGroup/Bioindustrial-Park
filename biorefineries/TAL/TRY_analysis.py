@@ -334,15 +334,15 @@ TAL_metrics = [get_product_MPSP, get_product_purity, get_production]
 # TAL_metrics = [get_TAL_MPSP, get_GWP, get_FEC]
 
 # %% Generate 3-specification meshgrid and set specification loading functions
-steps = 25
+steps = 30
 
 # Yield, titer, productivity (rate)
-spec_1 = yields = np.linspace(0.05, 0.95, steps) # yield
-spec_2 = titers = np.linspace(5., 100., steps) # titer
+spec_1 = yields = np.linspace(0.1, 0.5, steps) # yield
+spec_2 = titers = np.linspace(10., 50., steps) # titer
 # spec_1 = np.linspace(0.2, 0.99, steps) # yield
 # spec_2 = np.linspace(45, 225, steps) # titer
 spec_3 = productivities =\
-    np.arange(0.01, 1.01, 0.1)
+    np.arange(0.01, 0.31, 0.0025)
     # np.array([spec.baseline_productivity,]) # productivity
     
 # spec.load_spec_1 = spec.load_yield
@@ -527,17 +527,18 @@ FEC_units = r"$\mathrm{MJ}\cdot\mathrm{kg}^{-1}$"
 # MPSPs = results_metric_1 # too big to show here; shape = z * x * y # color (or w) axis values
 
 
-x_ticks=[0, 20, 40, 60, 80, 100]
-y_ticks=[0, 20, 40, 60, 80, 100]
-z_ticks=[0, 0.2, 0.4, 0.6, 0.8, 1.]
+x_ticks=[10, 20, 30, 40, 50]
+y_ticks=[10, 20, 30, 40, 50]
+z_ticks=[0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.30]
                                 
 #%% MPSP
-MPSP_w_levels = np.array([ 0., 2.5, 5., 7.5, 10., 12.5, 15.])
-contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_1, # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., MPSP
+# MPSP_w_levels = np.array([0., 2.5, 5., 7.5, 10., 12.5, 15., 17.5, 20., 22.5, 25.])
+MPSP_w_levels = np.arange(0., 15.5, 0.5)
+contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_1[:], # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., MPSP
                                 x_data=100*yields, # x axis values
                                 # x_data = yields/theoretical_max_g_TAL_acid_per_g_glucose,
                                 y_data=titers, # y axis values
-                                z_data=productivities, # z axis values
+                                z_data=productivities[:], # z axis values
                                 x_label=r"$\bfYield$", # title of the x axis
                                 y_label=r"$\bfTiter$", # title of the y axis
                                 z_label=r"$\bfProductivity$", # title of the z axis
@@ -546,22 +547,27 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_1, 
                                 y_ticks=y_ticks,
                                 z_ticks=z_ticks,
                                 w_levels=MPSP_w_levels, # levels for unlabeled, filled contour areas (labeled and ticked only on color bar)
-                                w_ticks=np.array([2.5, 5., 10., 15.]), # labeled, lined contours; a subset of w_levels
+                                w_ticks=np.array([4., 5., 10., 15., 25.]), # labeled, lined contours; a subset of w_levels
                                 x_units=r"$\mathrm{\%}$" + " " + r"$\mathrm{theoretical}$",
                                 # x_units=r"$\mathrm{g} \cdot \mathrm{g}$" + " " + r"$\mathrm{glucose}$" + " " + r"$\mathrm{eq.}^{-1}$",
                                 y_units=r"$\mathrm{g} \cdot \mathrm{L}^{-1}$",
                                 z_units=r"$\mathrm{g} \cdot \mathrm{L}^{-1}  \cdot \mathrm{h}^{-1}$",
                                 w_units=MPSP_units,
-                                fmt_clabel=lambda cvalue: "{:.2f}".format(cvalue), # format of contour labels
-                                # fmt_clabel=lambda cvalue: r"$\mathrm{\$}$"+"{:.2f}".format(cvalue)+r"$\cdot\mathrm{kg}^{-1}$", # format of contour labels
+                                # fmt_clabel=lambda cvalue: "{:.1f}".format(cvalue), # format of contour labels
+                                fmt_clabel=lambda cvalue: r"$\mathrm{\$}$"+" {:.1f} ".format(cvalue)+r"$\cdot\mathrm{kg}^{-1}$", # format of contour labels
                                 cmap=CABBI_green_colormap(), # can use 'viridis' or other default matplotlib colormaps
-                                cbar_ticks=MPSP_w_levels,
+                                cmap_over_color = colors.grey_dark.shade(8).RGBn,
+                                extend_cmap='max',
+                                # cbar_ticks=[0., 5., 10., 15., 20., 25.,],
+                                cbar_ticks=np.array([0., 2.5, 5., 7.5, 10., 12.5, 15.]),
                                 z_marker_color='g', # default matplotlib color names
                                 axis_title_fonts={'size': {'x': 14, 'y':14, 'z':14, 'w':14},},
-                                fps=3, # animation frames (z values traversed) per second
+                                fps=10, # animation frames (z values traversed) per second
                                 n_loops='inf', # the number of times the animated contourplot should loop animation over z; infinite by default
                                 animated_contourplot_filename='MPSP_animated_contourplot_'+file_to_save, # file name to save animated contourplot as (no extensions)
-                                keep_frames=False, # leaves frame PNG files undeleted after running; False by default
+                                keep_frames=True, # leaves frame PNG files undeleted after running; False by default
+                                comparison_range=[6.5, 7.5],
+                                comparison_range_hatch_pattern='////',
                                 )
 
 #%% GWP
