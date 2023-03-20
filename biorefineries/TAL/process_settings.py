@@ -149,6 +149,8 @@ AuPd_price = 60000.
 # https://www.alibaba.com/product-detail/Gas-Hydrogen-45kg-Lpg-Gas-Cylinder_62018626105.html?spm=a2700.galleryofferlist.0.0.e9ba7ce2O0TyvK
 hydrogen_price = 1.
 
+# https://www.energy.gov/eere/fuelcells/hydrogen-shot
+hydrogen_renewable_price = 5.
 # https://www.alibaba.com/product-detail/catalyst-raney-nickel-stainless-steel-square_60731133248.html?spm=a2700.galleryofferlist.0.0.2a583524IfakZZ
 RaneyNi_price = 30.
 
@@ -175,6 +177,7 @@ price = {'SA': SA_price,
          'KOH': KOH_price,
          'HCl': HCl_price,
          'Hydrogen': hydrogen_price,
+         'Renewable hydrogen': hydrogen_renewable_price,
          'Acetoin': acetoin_price,
          'RaneyNi': RaneyNi_price,
          'PdC': PdC_price,
