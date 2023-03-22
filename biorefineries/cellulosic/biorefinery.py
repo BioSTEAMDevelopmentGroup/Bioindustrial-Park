@@ -52,7 +52,7 @@ class Biorefinery:
         F.set_flowsheet(self.flowsheet)
         bst.settings.set_thermo(self.chemicals)
         load_process_settings()
-        sys = self.sys = create_cellulosic_ethanol_system(
+        sys = create_cellulosic_ethanol_system(
             include_blowdown_recycle=include_blowdown_recycle
         )
         # Replace feedstock
@@ -63,11 +63,14 @@ class Biorefinery:
             feedstock_kwargs['total_flow'] = feedstock_kwargs.get('total_flow') or cornstover.F_mass
             feedstock = bst.Stream(**feedstock_kwargs)
             sink = cornstover.sink
-            cornstover.disconnect_sink()
             sink.ins[0] = feedstock
-            stream.discard(cornstover)
+            new_sys = bst.System(f'{feedstock.ID}_sys', path=sys.units)
+            F.discard(cornstover)
+            F.discard(sys)
+            sys = new_sys
         else:
             self.cornstover_sys = sys # Feedstock defaults to corn stover
+        self.sys = sys
         # Update TEA and LCA settings
         if prices:
             prices = prices.copy()
@@ -84,9 +87,10 @@ class Biorefinery:
         OSBL_units = (u.WWTC, u.CWP, u.CT, u.PWC, u.ADP,
                       u.T701, u.T702, u.P701, u.P702, u.M701, u.FWT,
                       u.CSL_storage, u.DAP_storage, u.BT)
-        self.tea = self.cornstover_tea = tea = create_cellulosic_ethanol_tea(
+        self.tea = tea = create_cellulosic_ethanol_tea(
             sys, OSBL_units=OSBL_units
         )
+        if not feedstock_kwargs: self.cornstover_tea = tea
         ethanol = F.stream.ethanol
         ethanol.price = tea.solve_price(ethanol)
         self.ethanol_price_gal = ethanol.price * ethanol_density_kggal

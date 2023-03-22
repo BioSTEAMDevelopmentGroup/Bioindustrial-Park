@@ -15,22 +15,30 @@ from biorefineries.cellulosic.streams import cornstover as cornstover_kwargs
 __all__ = ('create_ethanol_system', 'create_lactic_system',)
 
 # Common settings for both biorefineries
-#!!! Comp was on dry basis but unclear if I can just set water to 0
-ethanol_feedstock_kwargs = cornstover_kwargs.copy()
-ethanol_feedstock_kwargs.update({
+#!!! Need to update the composition, etc.
+# here's what `cornstover_kwargs` looks like
+# cornstover = stream_kwargs(
+#     'cornstover',
+#     Glucan=0.28,
+#     Xylan=0.1562,
+#     Galactan=0.001144,
+#     Arabinan=0.01904,
+#     Mannan=0.0048,
+#     Lignin=0.12608,
+#     Acetate=0.01448,
+#     Protein=0.0248,
+#     Extract=0.1172,
+#     Ash=0.03944,
+#     Sucrose=0.00616,
+#     Water=0.2,
+#     total_flow=104229.16,
+#     units='kg/hr',
+#     price=0.05158816935126135,
+# )
+feedstock_kwargs = cornstover_kwargs.copy()
+feedstock_kwargs.update({
     'ID': 'miscanthus',
-    'Glucan':0.431,
-    'Xylan':0.209,
-    'Galactan':0.021,
-    'Arabinan':0.026,
-    'Mannan':0.01,
-    'Lignin':0.233,
-    'Acetate':0.039,
-    'Protein':0,
-    'Extract':0,
-    'Ash':0,
-    'Sucrose':0,
-    'Water':0,
+    'Glucan': 0.28,
     })
 
 
@@ -40,15 +48,16 @@ prices = {
     'Electricity': 0.07,
     }
 
+#!!! Needs to find the CF values, numbers here are placeholders
 GWP_CFs = {
-    'miscanthus': 0.08, #!!! kg/kg default from greet parameterization, need to set in simulation
-    'sulfuric_acid': 0.04, #kg/kg 
-    'ammonia': 2.84, # kg/kg
-    'cellulase': 2.24, #0% water
-    'CSL': 1.72,
-    'caustic': 0.71, # 75% water
-    'FGD_lime': 1.28, #kg/kg for CaO production 
-    'Electricity': (0.44, 0.44), # non-distributed US mix, assume consumption=production #!!! idk
+    'miscanthus': 1., # input from FDCIC
+    'sulfuric_acid': 1,
+    'ammonia': 1,
+    'cellulase': 1, #!!! note water content
+    'CSL': 1,
+    'caustic': 1, #!!! note water content    
+    'FGD_lime': 1, #!!! need to be clear if this is CaO or Ca(OH)2
+    'Electricity': (1., 1.,), # consumption, production
     }
 
 # Specific settings for the cellulosic ethanol biorefinery
@@ -64,7 +73,7 @@ ethanol_GWP_CFs.update({})
 def create_ethanol_system(
         flowsheet_name='ms_ethanol',
         system_name='ms_ethanol_sys',
-        feedstock_kwargs=ethanol_feedstock_kwargs,
+        feedstock_kwargs=feedstock_kwargs,
         prices=prices,
         GWP_CFs=GWP_CFs,
         CEPCI=bst.design_tools.CEPCI_by_year[2011], # which year the $ will be in
@@ -84,9 +93,6 @@ def create_ethanol_system(
 
 
 # Specific settings for the lactic acid biorefinery
-lactic_feedstock_kwargs = ethanol_feedstock_kwargs.copy()
-lactic_feedstock_kwargs['Extractives'] = lactic_feedstock_kwargs.pop('Extract')
-
 lactic_prices = prices.copy()
 lactic_prices.update({
     })
@@ -110,17 +116,27 @@ lactic_prices.update({
 #     lactic_acid
 #     ash_disposal
 
-
+#!!! this is old GREET value, needs to be updated
 lactic_GWP_CFs = GWP_CFs.copy()
+# GWP_CFs = {
+#     'CH4': 0.40, # NA NG from shale and conventional recovery
+#     'CSL': 1.55,
+#     'Electricity': (0.48, 0.48), # assume production==consumption, both in kg CO2-eq/kWh
+#     'Enzyme': 2.24, # won't make a big diff (<4%) if it's 12.24 (~ ecoinvent value)
+#     'Ethanol': 1.44,
+#     'H2SO4': 44.47/1e3,   
+#     'Lime': 1.29 * 56.0774/74.093, # CaO to Ca(OH)2
+#     'NaOH': 2.11,
+#     'NH4OH': 2.64 * 0.4860, # chemicals.NH3.MW/chemicals.NH4OH.MW,    
+#     }
 
 lactic_GWP_CFs.update({
     'natural_gas': 0.40+44/16, # NA NG from shale and conventional recovery, includes onsite emission
-    'CSL': 1.72,
-    'ethanol': 1.49+44/46, # includes onsite emission
-    'sulfuric_acid_T201': 0.04,
-    'Lime': 1.28 * 56.0774/74.093, # CaO to Ca(OH)2
-    'ammonia_M205': 2.84 * 0.4860, # chemicals.NH3.MW/chemicals.NH4OH.MW,    
-    'Electricity': (0.44, 0.44), # assume production==consumption, both in kg CO2-eq/kWh
+    'CSL': 1.55,
+    'ethanol': 1.44+44/46, # includes onsite emission
+    'sulfuric_acid_T201': 44.47/1e3,
+    'ammonia_M205': 2.64 * 0.4860, # chemicals.NH3.MW/chemicals.NH4OH.MW,    
+    'Electricity': (0.48, 0.48), # assume production==consumption, both in kg CO2-eq/kWh
     })
 
 lactic_GWP_CFs['enzyme_M301'] = lactic_GWP_CFs.pop('cellulase')
@@ -130,12 +146,10 @@ lactic_GWP_CFs['sulfuric_acid'] = lactic_GWP_CFs['sulfuric_acid_T201']
 lactic_GWP_CFs['ammonia'] = lactic_GWP_CFs['ammonia_M205']
 lactic_GWP_CFs['lime_boiler'] = lactic_GWP_CFs['lime']
 
-
-
 def create_lactic_system(
         flowsheet_name='ms_lactic',
         system_name='ms_lactic_sys',
-        feedstock_kwargs=lactic_feedstock_kwargs,
+        feedstock_kwargs=feedstock_kwargs,
         prices=lactic_prices,
         GWP_CFs=lactic_GWP_CFs,
         CEPCI=bst.design_tools.CEPCI_by_year[2011], # which year the $ will be in
