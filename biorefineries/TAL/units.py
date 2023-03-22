@@ -1215,7 +1215,19 @@ class Reactor(Unit, PressureVessel, isabstract=True):
             return self.BM_horizontal 
         else:
             raise RuntimeError("invalid vessel type")
-
+    
+    @property
+    def F_vol_in(self): # exclude gases
+        return sum([i.F_vol for i in self.ins if i.phase=='l' and i.F_mol and not (i.imol['CO2']/i.F_mol==1. 
+                                                                       or i.imol['O2']/i.F_mol>0.1
+                                                                       or i.imol['H2']/i.F_mol>0.1)])
+    
+    @property
+    def F_vol_out(self): # exclude gases
+        return sum([i.F_vol for i in self.outs if i.phase=='l' and i.F_mol and not (i.imol['CO2']/i.F_mol==1. 
+                                                                       or i.imol['O2']/i.F_mol>0.1
+                                                                       or i.imol['H2']/i.F_mol>0.1)])
+    
 #TODO:
 # 1. Find a source for recovery - the only thing I found for this is in Woods 2007 section 5.3.1 "allow both phases to have > 20% of the diameter and no less than 0.2 m to ensure that the exit phases do not become cross-contaminated"
 # 2. Do we need a backup reactor? - need to discuss
@@ -2141,13 +2153,13 @@ class HydrogenationReactor(Reactor):
     mcat_frac = 0.00001 # fraction of catalyst by weight in relation to the reactant (TAL)
     hydrogenation_rxns = ParallelRxn([
             #   Reaction definition   Reactant   Conversion
-            Rxn('TAL + 2H2 -> HMTHP',         'TAL',   0.7324), # conversion from Huber group experimental data
-            Rxn('HMDHP + H2 -> HMTHP',         'HMDHP',   1.-1e-5)
+            Rxn('TAL + 2H2 -> HMTHP',         'TAL',   0.968), # conversion from Huber group experimental data
+            # Rxn('HMDHP + H2 -> HMTHP',         'HMDHP',   1.-1e-5)
             ])
     byproduct_formation_rxns  = ParallelRxn([
             #   Reaction definition   Reactant   Conversion
-            Rxn('TAL + 3H2 -> DHL + H2O',         'TAL',   0.2125), # conversion from Huber group experimental data
-            Rxn('TAL + H2 -> HMDHP',         'TAL',   1-0.2125),  # conversion from Huber group experimental data
+            Rxn('TAL + 3H2 -> DHL + H2O',         'TAL',   1.-1e-5), # conversion from Huber group experimental data
+            # Rxn('TAL + H2 -> HMDHP',         'TAL',   1-0.2125),  # conversion from Huber group experimental data
             ])
     
     TAL_to_SA_rxn = hydrogenation_rxns[0]
@@ -2195,8 +2207,13 @@ class DehydrationReactor(Reactor):
     mcat_frac = 0.01 # fraction of catalyst by weight in relation to the reactant (TAL)
     dehydration_rxns = ParallelRxn([
             #   Reaction definition                                       Reactant   Conversion
-            Rxn('HMTHP -> PSA',         'HMTHP',   1.-1e-5) # conversion from Chia et al. 2012
+            Rxn('HMTHP -> PSA',         'HMTHP',   0.865) # conversion from Chia et al. 2012
                 ])
+    byproduct_formation_rxns  = ParallelRxn([
+            #   Reaction definition   Reactant   Conversion
+            Rxn('HMTHP -> DHL + H2O',         'HMTHP',   1.-1e-5), # conversion from Huber group experimental data
+            # Rxn('TAL + H2 -> HMDHP',         'TAL',   1-0.2125),  # conversion from Huber group experimental data
+            ])
     TAL_to_SA_rxn = dehydration_rxns[0]
     
     def _run(self):
@@ -2209,11 +2226,65 @@ class DehydrationReactor(Reactor):
         # effluent.P = feed.P
         
         self.dehydration_rxns(effluent.mol)
+        self.byproduct_formation_rxns(effluent.mol)
         
     def _cost(self):
         super()._cost()
         self.purchase_costs['RaneyNi catalyst'] =\
             self.mcat_frac * self.ins[0].imass['HMTHP'] * price['RaneyNi']
+
+            
+
+class RingOpeningHydrolysisReactor(Reactor):
+    """
+    A ring-opening and hydrolysis reactor.
+    """
+    _N_ins = 3
+    _N_outs = 1
+    _F_BM_default = {**Reactor._F_BM_default,
+            'RaneyNi catalyst': 1}
+    mcat_frac = 0.01 # fraction of catalyst by weight in relation to the reactant (TAL)
+    ring_opening_rxns = ParallelRxn([
+            #   Reaction definition                                       Reactant   Conversion
+            Rxn('PSA -> SA',         'PSA',   0.862) # conversion from Chia et al. 2012
+                ])
+    
+    PSA_to_SA_rxn = ring_opening_rxns[0]
+    hydrolysis_rxns = ParallelRxn([
+            #   Reaction definition                                       Reactant   Conversion
+            Rxn('SA + KOH -> KSA + H2O',         'SA',   1.-1e-5) # not mentioned in Viswanathan et al. 2020
+                ])
+    SA_to_KSA_rxn = hydrolysis_rxns[0]
+    byproduct_formation_rxns = ParallelRxn([
+            #   Reaction definition                                       Reactant   Conversion
+            Rxn('PSA -> 0.2PolyPSA',         'PSA',   1.-1e-5) # conversion from Chia et al. 2012
+                ])
+    def _run(self):
+        feed, recycle, reagent = self.ins
+        effluent = self.outs[0]
+        
+        # effluent = feed.copy()
+        
+        
+        # effluent = feed.copy()
+        effluent.mix_from([feed, recycle])
+        # effluent.T = feed.T
+        # effluent.P = feed.P
+        
+        self.ring_opening_rxns(effluent.mol)
+        
+        reagent.imol['KOH'] = max(0, effluent.imol['SA'] - effluent.imol['KOH'])
+        
+        effluent.mix_from([effluent, reagent])
+        
+        self.hydrolysis_rxns(effluent.mol)
+        self.byproduct_formation_rxns(effluent.mol)
+    def _cost(self):
+        super()._cost()
+        self.purchase_costs['RaneyNi catalyst'] =\
+            self.mcat_frac * self.ins[0].imass['HMTHP'] * price['RaneyNi']
+            
+
             
 class RingOpeningReactor(Reactor):
     """
@@ -2226,7 +2297,7 @@ class RingOpeningReactor(Reactor):
     mcat_frac = 0.01 # fraction of catalyst by weight in relation to the reactant (TAL)
     ring_opening_rxns = ParallelRxn([
             #   Reaction definition                                       Reactant   Conversion
-            Rxn('PSA -> SA',         'PSA',   0.667) # conversion from Chia et al. 2012
+            Rxn('PSA -> SA',         'PSA',   1.) # conversion from Chia et al. 2012
                 ])
     byproduct_formation_rxns = ParallelRxn([
             #   Reaction definition                                       Reactant   Conversion
@@ -2314,7 +2385,6 @@ class HydrolysisReactor(Reactor):
         self.purchase_costs['Amberlyst15 catalyst'] =\
             self.mcat_frac * self.ins[0].imass['SA'] * price['Amberlyst15']
             
-
 class Crystallization(Reactor):
     N_ins = 3
     _N_outs = 2
