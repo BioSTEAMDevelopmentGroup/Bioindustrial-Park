@@ -92,6 +92,9 @@ def create_sugarcane_chemicals():
         chemical.V.add_model(V, top_priority=True)
     
     # Add constant models for molar heat capacity of solids
+    # Lignocellulosic heat capacities:
+    # https://link.springer.com/article/10.1007/s10853-013-7815-6
+    # https://www.sciencedirect.com/science/article/pii/0032386182901252
     Ash.Cn.add_model(0.09 * 4.184 * Ash.MW) 
     CaO.Cn.add_model(1.02388 * CaO.MW) 
     Cellulose.Cn.add_model(1.364 * Cellulose.MW) 

@@ -37,8 +37,11 @@ __all__ = (
 
 # Common structural carbohydrates properties.
 
+# Lignocellulosic heat capacities:
 # Assume heat capacity of lignin, cellulose, and hemicellulose
 # and all components at 350 K are about the same.
+# https://link.springer.com/article/10.1007/s10853-013-7815-6
+# https://www.sciencedirect.com/science/article/pii/0032386182901252
 Cp_cellulosic = 1.364
 
 # Assume density is similar for most solids.
@@ -176,6 +179,8 @@ def create_cellulosic_ethanol_chemicals():
     append_single_phase_chemical('NaNO3', 'SodiumNitrate')
     append_single_phase_chemical('Oil', 'Oleic acid')
     append_single_phase_chemical('HMF', 'Hydroxymethylfurfural', phase='l')
+    chems.HMF.Hf = -99677 * cal2joule
+    chems.AmmoniumAcetate.Hf = -154701 * cal2joule
     
     # Will remain in the vapor phase
     extend_single_phase_chemicals(['N2', 'O2', 'CH4', 'H2S', 'SO2'])
