@@ -64,10 +64,8 @@ class Biorefinery:
             feedstock = bst.Stream(**feedstock_kwargs)
             sink = cornstover.sink
             sink.ins[0] = feedstock
-            new_sys = bst.System(f'{feedstock.ID}_sys', path=sys.units)
             F.discard(cornstover)
-            F.discard(sys)
-            sys = new_sys
+            sys.simulate(update_configuration=True)
         else:
             self.cornstover_sys = sys # Feedstock defaults to corn stover
         self.sys = sys
