@@ -1,17 +1,6 @@
-#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# BioSTEAM: The Biorefinery Simulation and Techno-Economic Analysis Modules
-# Copyright (C) 2020, Yoel Cortes-Pena <yoelcortes@gmail.com>
-# Bioindustrial-Park: BioSTEAM's Premier Biorefinery Models and Results
-# Copyright (C) 2020, Sarang Bhagwat <sarangb2@illinois.edu>
-# Yoel Cortes-Pena <yoelcortes@gmail.com>, and Yalin Li <mailto.yalin.li@gmail.com> (this biorefinery)
-# 
-# This module is under the UIUC open-source license. See 
-# github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
-# for license details.
-
 """
-Created on Mon Apr 13 10:24:42 2020
+Created on Sun Feb  5 00:40:41 2023
 
 Modified from the biorefineries constructed in [1], [2], and [3] for the production of
 [1] 3-hydroxypropionic acid, [2] lactic acid, and [3] ethanol from lignocellulosic feedstocks
@@ -20,290 +9,537 @@ Modified from the biorefineries constructed in [1], [2], and [3] for the product
 [2]	Li et al., Sustainable Lactic Acid Production from Lignocellulosic Biomass. ACS Sustainable Chem. Eng. 2021, 9 (3), 1341–1351. https://doi.org/10.1021/acssuschemeng.0c08055
 [3]	Cortes-Peña et al., BioSTEAM: A Fast and Flexible Platform for the Design, Simulation, and Techno-Economic Analysis of Biorefineries under Uncertainty. ACS Sustainable Chem. Eng. 2020, 8 (8), 3302–3310. https://doi.org/10.1021/acssuschemeng.9b07040
 
-
 @author: sarangbhagwat
 """
 
-
-# %% 
-
-# =============================================================================
-# Setup
-# =============================================================================
 from warnings import filterwarnings
 filterwarnings('ignore')
 import numpy as np
 import pandas as pd
-# import biosteam as bst
-from biosteam.utils import TicToc
-# from biorefineries.TAL.system_TAL_adsorption_glucose import (
-#     spec, TAL_sys,
-# )
-from biorefineries.TAL.analyses import models_ethyl_esters as models
+import biosteam as bst
+import thermosteam as tmo
+import contourplots
+print('\n\nLoading system ...')
+# from biorefineries
+# from biorefineries import TAL
+from biorefineries import TAL
+from biorefineries.TAL import models
+models = TAL.models
+# from . import models
+
+print('\nLoaded system.')
 from datetime import datetime
+from biosteam.utils import TicToc
 import os
 
-# R301 = flowsheet('R301')
-percentiles = [0, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 1]
-
-
+chdir = os.chdir
+TAL_filepath = TAL.__file__.replace('\\__init__.py', '')
+TAL_results_filepath = TAL_filepath + '\\analyses\\results\\'
 model = models.TAL_model
+
 system = TAL_sys = models.TAL_sys
 spec = models.spec
+unit_groups = models.unit_groups
 
+tea = models.TAL_tea
+# lca = models.TAL_LCA
+get_adjusted_MSP = models.get_adjusted_MSP
 
-print('\n\n')
+# %% 
 
-# %%
+N_simulations_per_mode = 1000 # 2000
 
-# =============================================================================
-# Evaluate and organize results for Monte Carlo analysis
-# =============================================================================
-# Initiate a timer
+percentiles = [0, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 1]
+
+notification_interval = 100
+
+results_dict = {'Baseline':{'MPSP':{}, 'GWP100a':{}, 'FEC':{}, 
+                            'GWP Breakdown':{}, 'FEC Breakdown':{},},
+                'Uncertainty':{'MPSP':{}, 'GWP100a':{}, 'FEC':{}},
+                'Sensitivity':{'Spearman':{'MPSP':{}, 'GWP100a':{}, 'FEC':{}}},}
+
+modes = [
+            'A',
+            'B',
+         ]
+
+parameter_distributions_filenames = [
+                                    'parameter-distributions_A.xlsx',
+                                    'parameter-distributions_B.xlsx',
+                                    ]
+
+#%%
+
 timer = TicToc('timer')
 timer.tic()
 
 # Set seed to make sure each time the same set of random numbers will be used
 np.random.seed(3221) # 3221
-N_simulation = 2000 # 2000
-
-samples = model.sample(N=N_simulation, rule='L')
-model.load_samples(samples)
 
 
-###############################
-# Bugfix barrage
-###############################
-
-
-baseline_spec = {'spec_1': spec.baseline_yield,
-                 'spec_2': spec.baseline_titer,
-                 'spec_3': spec.baseline_productivity,}
-
-def reset_and_reload():
-    print('Resetting cache and emptying recycles ...')
-    system.reset_cache()
-    system.empty_recycles()
-    print('Loading and simulating with baseline specifications ...')
-    spec_1, spec_2, spec_3 = spec.spec_1, spec.spec_2, spec.spec_3
-    spec.load_specifications(**baseline_spec)
-    system.simulate()
-    print('Loading and simulating with required specifications ...')
-    spec.load_specifications(spec_1=spec_1, spec_2=spec_2, spec_3=spec_3)
-    system.simulate()
+for i in range(len(modes)):
+    # ## Change working directory to biorefineries\\TAL
+    # chdir(TAL.__file__.replace('\\__init__.py', ''))
+    # ##
+    mode = modes[i]
+    parameter_distributions_filename = TAL_filepath+\
+        '\\analyses\\parameter_distributions\\'+parameter_distributions_filenames[i]
+    print(f'\n\nLoading parameter distributions ({mode}) ...')
+    model.parameters = ()
+    model.load_parameter_distributions(parameter_distributions_filename)
+    print(f'\nLoaded parameter distributions ({mode}).')
     
-def reset_and_switch_solver(solver_ID):
-    system.reset_cache()
-    system.empty_recycles()
-    system.converge_method = solver_ID
-    print(f"Trying {solver_ID} ...")
-    spec.load_specifications(spec_1=spec.spec_1, spec_2=spec.spec_2, spec_3=spec.spec_3)
-    system.simulate()
+    parameters = model.get_parameters()
     
-def run_bugfix_barrage():
-    try:
-        reset_and_reload()
-    except Exception as e:
-        print(str(e))
-        try:
-            reset_and_switch_solver('fixedpoint')
-        except Exception as e:
-            print(str(e))
-            try:
-                reset_and_switch_solver('aitken')
-            except Exception as e:
-                print(str(e))
-                # print(_yellow_text+"Bugfix barrage failed.\n"+_reset_text)
-                print("Bugfix barrage failed.\n")
-                raise e
-###############################
-
-spec.load_spec_1 = spec.load_yield
-# spec.load_spec_2 = spec.load_titer # defined in system
-spec.load_spec_3 = spec.load_productivity
-
-full_path = TAL_sys.path
-fermenter_index = full_path.index(spec.titer_inhibitor_specification.reactor)
-pre_fermenter_units_path = full_path[0:fermenter_index]
-
-def model_specification():
-    # !!!: bugfix barrage was removed for speed up, no failed evaluations found for now
-    try:
-        for i in pre_fermenter_units_path: i._run()
-        spec.load_specifications(spec_1=spec.spec_1, spec_2=spec.spec_2, spec_3=spec.spec_3)
-        model._system.simulate()
+    print('\n\nLoading samples ...')
+    samples = model.sample(N=N_simulations_per_mode, rule='L')
+    model.load_samples(samples)
+    print('\nLoaded samples.')
     
-    # print(spec.spec_1, spec.spec_2, spec.spec_3)
-    # print(spec.reactor.effluent_titer)
+    # ## Change working directory to biorefineries\\TAL\\analyses\\results
+    # chdir(TAL.__file__.replace('\\__init__.py', '')+'\\analyses\\results')
+    # ##
     
-    except Exception as e:
-        str_e = str(e).lower()
-        print('Error in model spec: %s'%str_e)
-        # raise e
-        if 'sugar concentration' in str_e:
-            # flowsheet('AcrylicAcid').F_mass /= 1000.
-            raise e
-        else:
-            run_bugfix_barrage()
-            
-model.specification = model_specification
+    model.exception_hook = 'warn'
+    print('\n\nSimulating baseline ...')
+    baseline_initial = model.metrics_at_baseline()
+    baseline = pd.DataFrame(data=np.array([[i for i in baseline_initial.values],]), 
+                            columns=baseline_initial.keys())
+    
+    results_dict['Baseline']['MPSP'][mode] = get_adjusted_MSP()
+    # results_dict['Baseline']['GWP100a'][mode] = tot_GWP = lca.GWP
+    # results_dict['Baseline']['FEC'][mode] = tot_FEC = lca.FEC
+    
+    # material_GWP_breakdown = lca.material_GWP_breakdown
+    
+    # results_dict['Baseline']['GWP Breakdown'][mode] = {
+    #     'feedstock*': lca.FGHTP_GWP,
+    #     'lime': material_GWP_breakdown['CalciumDihydroxide'],
+    #     # 'sulfuric acid': material_GWP_breakdown['H2SO4'],
+    #     'ammonium sulfate': material_GWP_breakdown['DiammoniumSulfate'],
+    #     'magnesium sulfate': material_GWP_breakdown['MagnesiumSulfate'],
+    #     'corn steep liquor': material_GWP_breakdown['CSL'],
+    #     'other materials': material_GWP_breakdown['MEA'] + material_GWP_breakdown['NaOH'] + material_GWP_breakdown['H3PO4'],
+    #     'natural gas\n(for steam generation)': lca.ng_GWP,
+    #     'natural gas\n(product drying)': material_GWP_breakdown['CH4'],
+    #     'net electricity': lca.net_electricity_GWP,
+    #     'direct non-biogenic\nemissions': lca.direct_emissions_GWP,
+    #     }
+    
+    # tot_positive_GWP = sum([v for v in results_dict['Baseline']['GWP Breakdown'][mode].values() if v>0])
+    # for k, v in results_dict['Baseline']['GWP Breakdown'][mode].items():
+    #     results_dict['Baseline']['GWP Breakdown'][mode][k] = v/tot_positive_GWP
+      
+    
+    # material_FEC_breakdown = lca.material_FEC_breakdown
+    
+    # results_dict['Baseline']['FEC Breakdown'][mode] = {
+    #     'feedstock': lca.feedstock_FEC,
+    #     'lime': material_FEC_breakdown['CalciumDihydroxide'],
+    #     # 'sulfuric acid': material_FEC_breakdown['H2SO4'],
+    #     'ammonium sulfate': material_FEC_breakdown['DiammoniumSulfate'],
+    #     'magnesium sulfate': material_FEC_breakdown['MagnesiumSulfate'],
+    #     'corn steep liquor': material_FEC_breakdown['CSL'],
+    #     'other materials': material_FEC_breakdown['MEA'] + material_FEC_breakdown['NaOH'] + material_FEC_breakdown['H3PO4'],
+    #     'natural gas\n(for steam generation)': lca.ng_GWP,
+    #     'natural gas\n(for product drying)': material_FEC_breakdown['CH4'],
+    #     'net electricity': lca.net_electricity_FEC,
+    #     }
+    # tot_positive_FEC = sum([v for v in results_dict['Baseline']['FEC Breakdown'][mode].values() if v>0])
+    # for k, v in results_dict['Baseline']['FEC Breakdown'][mode].items():
+    #     results_dict['Baseline']['FEC Breakdown'][mode][k] = v/tot_positive_FEC
+    
+    # if spec.reactor.base_neutralizes_product: # sulfuric acid for acidulation
+    #     results_dict['Baseline']['GWP Breakdown'][mode]['sulfuric acid'] = material_GWP_breakdown['H2SO4']
+    #     results_dict['Baseline']['FEC Breakdown'][mode]['sulfuric acid'] = material_FEC_breakdown['H2SO4']
+        
+        
+    print(f"\nSimulated baseline. MPSP = ${round(results_dict['Baseline']['MPSP'][mode],2)}/kg.")
+    print('\n\nEvaluating ...')
+    model.evaluate(notify=notification_interval, autoload=None, autosave=None, file=None)
+    print('\nFinished evaluation.')
+    
+    # Baseline results
+    print('\n\nRe-simulating baseline ...')
+    baseline_end = model.metrics_at_baseline()
+    print(f"\nRe-simulated baseline. MPSP = ${round(results_dict['Baseline']['MPSP'][mode],2)}/kg.")
+    dateTimeObj = datetime.now()
+    minute = '0' + str(dateTimeObj.minute) if len(str(dateTimeObj.minute))==1 else str(dateTimeObj.minute)
+    file_to_save = TAL_results_filepath+\
+        '_TAL_%s.%s.%s-%s.%s'%(dateTimeObj.year, dateTimeObj.month, dateTimeObj.day, dateTimeObj.hour, minute)\
+        + '_' + str(N_simulations_per_mode) + 'sims'
+    
+    baseline = baseline.append(baseline_end, ignore_index=True)
+    baseline.index = ('initial', 'end')
+    baseline.to_excel(file_to_save+'_'+mode+'_0_baseline.xlsx')
+    
+    # Parameters
+    parameters = model.get_parameters()
+    index_parameters = len(model.get_baseline_sample())
+    parameter_values = model.table.iloc[:, :index_parameters].copy()
+    
+    #%%
+    # TEA results
+    for index_TEA, i in enumerate(models.metrics):
+        if i.element == 'LCA': break
+    index_TEA = index_parameters + index_TEA
+    TEA_results = model.table.iloc[:, index_parameters:index_TEA].copy()
+    TEA_percentiles = TEA_results.quantile(q=percentiles)
+    
+    # LCA_results
+    LCA_results = \
+        model.table.iloc[:, index_TEA::].copy()
+    LCA_percentiles = LCA_results.quantile(q=percentiles)
+    
+    # # Spearman's rank correlation
+    
+    table = model.table
+    
+    model.table = model.table.dropna()
+    
+    spearman_results = model.spearman()
+    spearman_results.columns = pd.Index([i.name_with_units for i in model.metrics])
+    
+    model.table = table
+    
+    # Calculate the cumulative probabilitie of each parameter
+    probabilities = {}
+    for i in range(index_parameters):
+        p = parameters[i]
+        p_values = parameter_values.iloc[:, 2*i]
+        probabilities[p.name] = p.distribution.cdf(p_values)
+        parameter_values.insert(loc=2*i+1, 
+                          column=(parameter_values.iloc[:, 2*i].name[0], 'Probability'), 
+                          value=probabilities[p.name],
+                          allow_duplicates=True)
+    
+    run_number = samples.shape[0]
+    
+    
+    #%%
+    '''Output to Excel'''
+    with pd.ExcelWriter(file_to_save+'_'+mode+'_1_full_evaluation.xlsx') as writer:
+        parameter_values.to_excel(writer, sheet_name='Parameters')
+        TEA_results.to_excel(writer, sheet_name='TEA results')
+        TEA_percentiles.to_excel(writer, sheet_name='TEA percentiles')
+        LCA_results.to_excel(writer, sheet_name='LCA results')
+        LCA_percentiles.to_excel(writer, sheet_name='LCA percentiles')
+        spearman_results.to_excel(writer, sheet_name='Spearman')
+        # one_p_df.to_excel(writer, sheet_name='One-parameter')
+        model.table.to_excel(writer, sheet_name='Raw data')
+    
+    
+    results_dict['Uncertainty']['MPSP'][mode] = model.table.Biorefinery['Adjusted minimum selling price [$/kg]']
+    # results_dict['Uncertainty']['GWP100a'][mode] = model.table.Biorefinery['Total GWP100a [kg-CO2-eq/kg]']
+    # results_dict['Uncertainty']['FEC'][mode] = model.table.Biorefinery['Total FEC [kg-CO2-eq/kg]']
+    
+    df_rho, df_p = model.spearman_r()
+    
+    results_dict['Sensitivity']['Spearman']['MPSP'][mode] = df_rho['Biorefinery', 'Adjusted minimum selling price [$/kg]']
+    # results_dict['Sensitivity']['Spearman']['GWP100a'][mode] = df_rho['Biorefinery', 'Total GWP100a [kg-CO2-eq/kg]']
+    # results_dict['Sensitivity']['Spearman']['FEC'][mode] = df_rho['Biorefinery', 'Total FEC [kg-CO2-eq/kg]']
 
-model.exception_hook = 'warn'
+#%% Clean up NaN values for plotting
+metrics = ['MPSP', 
+           # 'GWP100a', 
+           # 'FEC',
+           ]
+tot_NaN_vals_dict = results_dict['Errors'] = {metric: {mode: 0 for mode in modes} for metric in metrics}
+for mode in modes:
+    for metric in metrics:
+        # median_val = np.median(results_dict['Uncertainty'][metric][mode])
+        median_val = 1.5
+        for i in range(len(results_dict['Uncertainty'][metric][mode])):
+            if np.isnan(results_dict['Uncertainty'][metric][mode][i]):
+                results_dict['Uncertainty'][metric][mode][i] = median_val
+                tot_NaN_vals_dict[metric][mode] += 1
+# %% Plots
+import contourplots
 
-baseline_initial = model.metrics_at_baseline()
-baseline = pd.DataFrame(data=np.array([[i for i in baseline_initial.values],]), 
-                        columns=baseline_initial.keys())
+MPSP_units = r"$\mathrm{\$}\cdot\mathrm{kg}^{-1}$"
+GWP_units = r"$\mathrm{kg}$"+" "+ r"$\mathrm{CO}_{2}\mathrm{-eq.}\cdot\mathrm{kg}^{-1}$"
+FEC_units = r"$\mathrm{MJ}\cdot\mathrm{kg}^{-1}$"
+#%% Uncertainty
 
-model.evaluate(notify=50, autoload=True, autosave=20, file='unfinished_evaluation')
-model.table.to_excel('all_results.xlsx')
 
-# Baseline results
-baseline_end = model.metrics_at_baseline()
-dateTimeObj = datetime.now()
-minute = '0' + str(dateTimeObj.minute) if len(str(dateTimeObj.minute))==1 else str(dateTimeObj.minute)
-file_to_save = 'TAL_%s.%s.%s-%s.%s'%(dateTimeObj.year, dateTimeObj.month, dateTimeObj.day, dateTimeObj.hour, minute)\
-    + '_' + str(N_simulation) + 'sims'
+def get_small_range(num, offset):
+    return(num-offset, num+offset)
+#%% MPSP
+modes = ['B',]
+MPSP_uncertainty = [results_dict['Uncertainty']['MPSP'][mode]
+                    for mode in modes
+                    ]
+market_range = (6.51, 7.43)
+# biobased_lit_MPSP_range = (1.08, 3.63)
+contourplots.box_and_whiskers_plot(uncertainty_data=MPSP_uncertainty, 
+                          baseline_values=[results_dict['Baseline']['MPSP'][mode] for mode in modes],
+                          baseline_marker_shapes=["D" for mode in modes],
+                          baseline_marker_sizes=[6 for mode in modes],
+                          baseline_locations=[i+1 for i in range(len(modes))],
+                          baseline_marker_colors=['w' for mode in modes],
+                          boxcolor="#A97802",
+                          ranges_for_comparison=[market_range,],
+                          ranges_for_comparison_colors=['#c0c1c2', 
+                                                        # '#646464',
+                                                        ],
+                          values_for_comparison=[],
+                          n_minor_ticks=4,
+                          show_x_ticks=True,
+                          x_tick_labels=modes,
+                          x_tick_wrap_width=6,
+                          y_label=r"$\bfMPSP$",
+                          y_units=MPSP_units,
+                          y_ticks=np.arange(0., 18.5, 2.5),
+                          save_file=True,
+                          fig_height=5.5,
+                          fig_width = 2.2,
+                          box_width=0.75,
+                          filename=file_to_save+'_uncertainty_MPSP',
+                          dpi=600,)
 
-baseline = baseline.append(baseline_end, ignore_index=True)
-baseline.index = ('initial', 'end')
-baseline.to_excel(file_to_save+'_0_baseline_esters.xlsx')
+#%% LCA
 
-# Parameters
-parameters = model.get_parameters()
-index_parameters = len(model.get_baseline_sample())
-parameter_values = model.table.iloc[:, :index_parameters].copy()
+# #%% GWP100a
+
+# biobased_GWPs = [1.83, 2.20, 2.37]
+# fossilbased_GWPs = [3.27, 3.43, 10.3, 12.1]
+
+# GWP_uncertainty = [results_dict['Uncertainty']['GWP100a'][modes[0]],
+#                     results_dict['Uncertainty']['GWP100a'][modes[1]],
+#                     results_dict['Uncertainty']['GWP100a'][modes[2]]]
+
+
+# biobased_lit_GWP_values = [1, 2, 3] #!!!
+# contourplots.box_and_whiskers_plot(uncertainty_data=GWP_uncertainty, 
+#                           baseline_values=[results_dict['Baseline']['GWP100a'][mode] for mode in modes], 
+#                           baseline_marker_shapes=["p", "s", "D"],
+#                           baseline_marker_sizes=[10, 6, 6,],
+#                           baseline_locations=[1,2,3],
+#                           baseline_marker_colors=['w','w','w'],
+#                           boxcolor='#607429',
+#                           ranges_for_comparison=[get_small_range(i, 0.005) for i in biobased_GWPs+fossilbased_GWPs],
+#                           ranges_for_comparison_colors=['#c0c1c2' for i in range(len(biobased_GWPs))] +\
+#                                                        ['#646464' for i in range(len(fossilbased_GWPs))],
+#                           values_for_comparison=biobased_lit_GWP_values,
+#                           n_minor_ticks=1,
+#                           show_x_ticks=True,
+#                           x_tick_labels=scenario_name_labels,
+#                           x_tick_wrap_width=6,
+#                           # y_label=r"$\bfGWP-100a$",
+#                           y_label=r"$\mathrm{\bfGWP}_{\bf100}$",
+#                           y_units=GWP_units,
+#                           y_ticks=np.arange(0., 14., 1.),
+#                           save_file=True,
+#                           fig_height=5.5,
+#                           fig_width = 3.,
+#                           box_width=0.65,
+#                           filename=file_to_save+'_uncertainty_GWP100a',
+#                           dpi=600,)
+
+# #%% FEC
+
+# biobased_FECs = [26, 27.7, 32.7]
+# fossilbased_FECs = [59.2, 60.8, 112, 124]
+
+# FEC_uncertainty = [results_dict['Uncertainty']['FEC'][modes[0]],
+#                     results_dict['Uncertainty']['FEC'][modes[1]],
+#                     results_dict['Uncertainty']['FEC'][modes[2]]]
+
+
+# biobased_lit_FEC_values = [1, 2, 3] #!!!
+# contourplots.box_and_whiskers_plot(uncertainty_data=FEC_uncertainty, 
+#                           baseline_values=[results_dict['Baseline']['FEC'][mode] for mode in modes], 
+#                           baseline_marker_shapes=["p", "s", "D"],
+#                           baseline_marker_sizes=[10, 6, 6,],
+#                           baseline_locations=[1,2,3],
+#                           baseline_marker_colors=['w','w','w'],
+#                           boxcolor='#A100A1',
+#                           ranges_for_comparison=[get_small_range(i, 0.061) for i in biobased_FECs+fossilbased_FECs],
+#                           ranges_for_comparison_colors=['#c0c1c2' for i in range(len(biobased_FECs))] +\
+#                                                        ['#646464' for i in range(len(fossilbased_FECs))],
+#                           values_for_comparison=biobased_lit_FEC_values,
+#                           n_minor_ticks=1,
+#                           show_x_ticks=True,
+#                           x_tick_labels=scenario_name_labels,
+#                           x_tick_wrap_width=6,
+#                           y_label=r"$\bfFEC$",
+#                           y_units=FEC_units,
+#                           y_ticks=np.arange(-30, 140., 10.),
+#                           save_file=True,
+#                           fig_height=5.5,
+#                           fig_width = 3.,
+#                           box_width=0.65,
+#                           filename=file_to_save+'_uncertainty_FEC',
+#                           dpi=600,)
+
+
+#%% TEA breakdown figure
+df_TEA_breakdown = bst.UnitGroup.df_from_groups(
+    unit_groups, fraction=True,
+    scale_fractions_to_positive_values=True,
+)
+
+
+# df_TEA_breakdown['Net electricity production']*=-1
+# df_TEA_breakdown = df_TEA_breakdown.rename(columns={'Net electricity production': 'Net electricity demand'})
+
+df_TEA_breakdown = df_TEA_breakdown.rename(columns={'Material cost': 'Operating cost'})
+contourplots.stacked_bar_plot(dataframe=df_TEA_breakdown, 
+                 # y_ticks=[-200, -175, -150, -125, -100, -75, -50, -25, 0, 25, 50, 75, 100, 125, 150, 175], 
+                 # y_ticks=[-60, -40, -20, 0, 20, 40, 60, 80, 100], 
+                 y_ticks = [-50, -25, 0, 25, 50, 75, 100],
+                 y_label=r"$\bfCost$" + " " + r"$\bfand$" + " " +  r"$\bfUtility$" + " " +  r"$\bfBreakdown$", 
+                 y_units = "%", 
+                 colors=['#7BBD84', '#F7C652', '#63C6CE', '#94948C', '#734A8C', '#D1C0E1', '#648496', '#B97A57', '#D1C0E1', '#F8858A', '#F8858A', ],
+                 # 'red', 'magenta'],
+                 filename=file_to_save+'TEA_breakdown_stacked_bar_plot',
+                 n_minor_ticks=4,
+                 fig_height=5.5*1.1777*0.94*1.0975)
 
 #%%
-# TEA results
-for index_TEA, i in enumerate(models.metrics):
-    if i.element == 'LCA': break
-index_TEA = index_parameters + index_TEA
-TEA_results = model.table.iloc[:, index_parameters:index_TEA].copy()
-TEA_percentiles = TEA_results.quantile(q=percentiles)
 
-# LCA_results
-LCA_results = \
-    model.table.iloc[:, index_TEA::].copy()
-LCA_percentiles = LCA_results.quantile(q=percentiles)
+#%% LCA breakdown figures
 
-# # Spearman's rank correlation
-
-table = model.table
-
-model.table = model.table.dropna()
-
-spearman_results = model.spearman()
-spearman_results.columns = pd.Index([i.name_with_units for i in model.metrics])
-
-model.table = table
-
-# Calculate the cumulative probabilitie of each parameter
-probabilities = {}
-for i in range(index_parameters):
-    p = parameters[i]
-    p_values = parameter_values.iloc[:, 2*i]
-    probabilities[p.name] = p.distribution.cdf(p_values)
-    parameter_values.insert(loc=2*i+1, 
-                      column=(parameter_values.iloc[:, 2*i].name[0], 'Probability'), 
-                      value=probabilities[p.name],
-                      allow_duplicates=True)
-
-run_number = samples.shape[0]
+# # GWP
+# temp_GWP_breakdown_dict = results_dict['Baseline']['GWP Breakdown'][modes[2]]
+# GWP_breakdown_dict = {
+#                         # 'areas': list(temp_GWP_breakdown_dict.keys()), 
+#                       'contributions': [100*i for i in list(temp_GWP_breakdown_dict.values())]}
+# GWP_breakdown_list = [100*v for k, v in temp_GWP_breakdown_dict.items()]
+# df_GWP_breakdown = pd.DataFrame(GWP_breakdown_list,
+#                                             index=list(temp_GWP_breakdown_dict.keys()),
+#                                           # orient='index',
+#                                            # columns=['contributions'],
+#                                           )
+# # df_GWP_breakdown['contributions']=df_GWP_breakdown['contributions'].astype(float)
 
 
-#%%
-'''Output to Excel'''
-with pd.ExcelWriter(file_to_save+'_1_full_evaluation_esters.xlsx') as writer:
-    parameter_values.to_excel(writer, sheet_name='Parameters')
-    TEA_results.to_excel(writer, sheet_name='TEA results')
-    TEA_percentiles.to_excel(writer, sheet_name='TEA percentiles')
-    LCA_results.to_excel(writer, sheet_name='LCA results')
-    LCA_percentiles.to_excel(writer, sheet_name='LCA percentiles')
-    spearman_results.to_excel(writer, sheet_name='Spearman')
-    # one_p_df.to_excel(writer, sheet_name='One-parameter')
-    model.table.to_excel(writer, sheet_name='Raw data')
+# # df_GWP_breakdown['Net electricity production']*=-1
+# # df_GWP_breakdown = df_GWP_breakdown.rename(columns={'Net electricity production': 'Net electricity demand'})
 
+# contourplots.stacked_bar_plot(dataframe=df_GWP_breakdown, 
+#                   y_ticks=[-40, -20, 0, 20, 40, 60, 80, 100], 
+#                   # y_ticks=[-400, -300, -200, -100, 0, 100, 200, 300, 400], 
+#                  # y_ticks = []
+#                  # y_label=r"$\bfGWP-100a $" +" "+ r"$\bfBreakdown$",  
+#                  y_label =r"$\mathrm{\bfGWP}_{\bf100}$" +" "+ r"$\bfBreakdown$",
+#                  y_units = "%", 
+#                   colors=['#E1F8C0', '#8FAE3E', '#607429', 
+#                           ],
+#                   hatch_patterns=('\\', '//', 'x',  '|',),
+#                   # '#94948C', '#734A8C', '#D1C0E1', '#648496', '#B97A57', '#F8858A', 'red', 'magenta'],
+#                  filename=file_to_save+'GWP_breakdown_stacked_bar_plot',
+#                  fig_width=2,
+#                  fig_height=5.5*1.1777*0.94)
 
-os.remove("unfinished_evaluation") 
-# %%
+# # FEC
+# temp_FEC_breakdown_dict = results_dict['Baseline']['FEC Breakdown'][modes[2]]
+# FEC_breakdown_dict = {
+#                         # 'areas': list(temp_FEC_breakdown_dict.keys()), 
+#                       'contributions': [100*i for i in list(temp_FEC_breakdown_dict.values())]}
+# FEC_breakdown_list = [100*v for k, v in temp_FEC_breakdown_dict.items()]
+# df_FEC_breakdown = pd.DataFrame(FEC_breakdown_list,
+#                                             index=list(temp_FEC_breakdown_dict.keys()),
+#                                           # orient='index',
+#                                            # columns=['contributions'],
+#                                           )
 
-# =============================================================================
-# Temporary codes for debugging
-# =============================================================================
+# # df_FEC_breakdown['Net electricity production']*=-1
+# # df_FEC_breakdown = df_FEC_breakdown.rename(columns={'Net electricity production': 'Net electricity demand'})
 
-# import numpy as np
-# from TAL.analyses import models
+# contourplots.stacked_bar_plot(dataframe=df_FEC_breakdown, 
+#                  # y_ticks=[-200, -175, -150, -125, -100, -75, -50, -25, 0, 25, 50, 75, 100, 125, 150, 175], 
+#                  y_ticks=[-100, -75, -50, -25, 0, 25, 50, 75, 100], 
+#                  y_label=r"$\bfFEC$" +" "+ r"$\bfBreakdown$", 
+#                  y_units = "%", 
+#                  # colors=['#7BBD84', '#F7C652', '#63C6CE', '#94948C', '#734A8C', '#D1C0E1', '#648496', '#B97A57', '#F8858A', 'magenta'],
+#                  colors=['#FEC1FE', '#FF80FF', '#A100A1', 
+#                          ],
+#                  hatch_patterns=('\\', '//', 'x',  '|',),
+#                  filename=file_to_save+'FEC_breakdown_stacked_bar_plot',
+#                  fig_width=2,
+#                  fig_height=5.5*1.1777*0.94)
 
-# model = models.model_full
-# np.random.seed(3221)
+#%% Spearman's rank order correlation coefficients
+from matplotlib import pyplot as plt
+chdir(TAL_results_filepath)
+plt.rcParams['font.sans-serif'] = "Arial"
+plt.rcParams['font.size'] = "7.5"
 
-# try: parameter = [parameters[-2]]
-# except: parameter = parameters
-# model.set_parameters(parameter)
+bst_plots = bst.plots
 
-# N_simulation = 20 # 1000
-# # samples = model.sample(N=N_simulation, rule='L')
-# samples = np.ones(N_simulation)
-# samples *= 0.070
+rho = r"$\mathrm{\rho}}$"
 
-# model.load_samples(samples)
-# model.evaluate()
+mode = modes[0]
+fig = bst_plots.plot_spearman_1d(results_dict['Sensitivity']['Spearman']['MPSP'][modes[0]],
+                           index=[i.element_name + ': ' + i.name for i in model.parameters],
+                           name='MPSP - Lab scale [batch] '+"["+MPSP_units+"]", color="#A97802",
+                           xlabel_fn=lambda i: "Spearman's "+rho+ " with "+i)
+fig[0].savefig(mode+'_MPSP-Spearman.png', dpi=600, bbox_inches='tight',
+            facecolor=fig[0].get_facecolor(),
+            transparent=False)
 
-# model.table.to_clipboard()
+# fig = bst_plots.plot_spearman_1d(results_dict['Sensitivity']['Spearman']['GWP100a'][modes[1]],
+#                            index=[i.element_name + ': ' + i.name for i in model.parameters],
+#                            name='GWP100 - Lab scale [batch] '+"["+GWP_units+"]", color='#607429',
+#                            xlabel_fn=lambda i: "Spearman's "+rho+ " with "+i)
+# fig[0].savefig(mode+'GWP-Spearman.png', dpi=600, bbox_inches='tight',
+#             facecolor=fig[0].get_facecolor(),
+#             transparent=False)
+# fig = bst_plots.plot_spearman_1d(results_dict['Sensitivity']['Spearman']['FEC'][modes[2]],
+#                            index=[i.element_name + ': ' + i.name for i in model.parameters],
+#                            name='FEC - Lab scale [batch] '+"["+FEC_units+"]", color='#A100A1',
+#                            xlabel_fn=lambda i: "Spearman's "+rho+ " with "+i)
+# fig[0].savefig(mode+'FEC-Spearman.png', dpi=600, bbox_inches='tight',
+#             facecolor=fig[0].get_facecolor(),
+#             transparent=False)
 
+# mode = modes[1]
+# fig = bst_plots.plot_spearman_1d(results_dict['Sensitivity']['Spearman']['MPSP'][modes[0]],
+#                            index=[i.element_name + ': ' + i.name for i in model.parameters],
+#                            name='MPSP - Lab scale [fed-batch] '+"["+MPSP_units+"]", color="#A97802",
+#                            xlabel_fn=lambda i: "Spearman's "+rho+ " with "+i)
+# fig[0].savefig(mode+'MPSP-Spearman.png', dpi=600, bbox_inches='tight',
+#             facecolor=fig[0].get_facecolor(),
+#             transparent=False)
 
+# fig = bst_plots.plot_spearman_1d(results_dict['Sensitivity']['Spearman']['GWP100a'][modes[1]],
+#                            index=[i.element_name + ': ' + i.name for i in model.parameters],
+#                            name='GWP100 - Lab scale [fed-batch] '+"["+GWP_units+"]", color='#607429',
+#                            xlabel_fn=lambda i: "Spearman's "+rho+ " with "+i)
+# fig[0].savefig(mode+'GWP-Spearman.png', dpi=600, bbox_inches='tight',
+#             facecolor=fig[0].get_facecolor(),
+#             transparent=False)
 
+# fig = bst_plots.plot_spearman_1d(results_dict['Sensitivity']['Spearman']['FEC'][modes[2]],
+#                            index=[i.element_name + ': ' + i.name for i in model.parameters],
+#                            name='FEC - Lab scale [fed-batch] '+"["+FEC_units+"]", color='#A100A1',
+#                            xlabel_fn=lambda i: "Spearman's "+rho+ " with "+i)
+# fig[0].savefig(mode+'FEC-Spearman.png', dpi=600, bbox_inches='tight',
+#             facecolor=fig[0].get_facecolor(),
+#             transparent=False)
 
+# mode = modes[2]
+# fig = bst_plots.plot_spearman_1d(results_dict['Sensitivity']['Spearman']['MPSP'][modes[0]],
+#                            index=[i.element_name + ': ' + i.name for i in model.parameters],
+#                            name='MPSP - Pilot scale [batch] '+"["+MPSP_units+"]", color="#A97802",
+#                            xlabel_fn=lambda i: "Spearman's "+rho+ " with "+i)
+# fig[0].savefig(mode+'MPSP-Spearman.png', dpi=600, bbox_inches='tight',
+#             facecolor=fig[0].get_facecolor(),
+#             transparent=False)
 
+# fig = bst_plots.plot_spearman_1d(results_dict['Sensitivity']['Spearman']['GWP100a'][modes[1]],
+#                            index=[i.element_name + ': ' + i.name for i in model.parameters],
+#                            name='GWP100 - Pilot scale [batch]a '+"["+GWP_units+"]", color='#607429',
+#                            xlabel_fn=lambda i: "Spearman's "+rho+ " with "+i)
+# fig[0].savefig(mode+'GWP-Spearman.png', dpi=600, bbox_inches='tight',
+#             facecolor=fig[0].get_facecolor(),
+#             transparent=False)
 
-#%% Evaluate MC across glycerol yield
-
-# import numpy as np
-# import os 
-# from biosteam.plots import plot_montecarlo_across_coordinate
-
-
-# # model = models.TAL_model
-# # spec = models.spec
-
-# prefix = os.path.dirname(__file__)
-# yield_gly_setter = spec.load_yield_glycerol
-
-
-# ygs = np.linspace(0.0001, 0.25, 20)
-# spec.TRY_analysis = False
-# model.evaluate_across_coordinate('Yield glycerol [% theo]', yield_gly_setter, ygs, 
-#                                   xlfile = os.path.join(prefix, 'mc_across_glycerol_yield_2.xlsx'),
-#                                   notify = 50)
-
-
-
-# #%% Plot MC across glycerol yield
-# import pandas as pd
-# from biosteam.plots import plot_montecarlo_across_coordinate
-# import os
-# import numpy as np
-
-# # ygs = np.linspace(0.0001, 0.25, 5)
-# prefix = os.path.dirname(__file__)
-# MC_across_gly_yield_df = pd.read_excel(os.path.join(prefix, 'mc_across_glycerol_yield_2.xlsx'),
-#                                                 'Bior. Mini. sell. price')
-
-
-# MC_across_gly_yield_df_array = np.array(MC_across_gly_yield_df)
-# y_list = []
-
-# for i in MC_across_gly_yield_df_array:
-#     y_list.append(i[1:])
-
-# MC_across_gly_yield = np.array(y_list)
-
-# MC_across_gly_yield = MC_across_gly_yield[~np.isnan(MC_across_gly_yield).any(axis=1), :] # filter out nans
- 
-# mcac = plot_montecarlo_across_coordinate(ygs, MC_across_gly_yield)
-
-
-
-
-
-
+# fig = bst_plots.plot_spearman_1d(results_dict['Sensitivity']['Spearman']['FEC'][modes[2]],
+#                            index=[i.element_name + ': ' + i.name for i in model.parameters],
+#                            name='FEC - Pilot scale [batch] '+"["+FEC_units+"]", color='#A100A1',
+#                            xlabel_fn=lambda i: "Spearman's "+rho+ " with "+i)
+# fig[0].savefig(mode+'FEC-Spearman.png', dpi=600, bbox_inches='tight',
+#             facecolor=fig[0].get_facecolor(),
+#             transparent=False)
