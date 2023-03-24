@@ -118,14 +118,13 @@ lactic_GWP_CFs.update({
     'CSL': 1.72,
     'ethanol': 1.49+44/46, # includes onsite emission
     'sulfuric_acid_T201': 0.04,
-    'Lime': 1.28 * 56.0774/74.093, # CaO to Ca(OH)2
     'ammonia_M205': 2.84 * 0.4860, # chemicals.NH3.MW/chemicals.NH4OH.MW,    
     'Electricity': (0.44, 0.44), # assume production==consumption, both in kg CO2-eq/kWh
     })
 
 lactic_GWP_CFs['enzyme_M301'] = lactic_GWP_CFs.pop('cellulase')
 lactic_GWP_CFs['caustic_R502'] = lactic_GWP_CFs.pop('caustic')
-lactic_GWP_CFs['lime'] = lactic_GWP_CFs.pop('FGD_lime') #!!! should use Ca(OH)2 here
+lactic_GWP_CFs['lime'] = lactic_GWP_CFs.pop('FGD_lime')*56.0774/74.093 # CaO to Ca(OH)2
 lactic_GWP_CFs['sulfuric_acid'] = lactic_GWP_CFs['sulfuric_acid_T201']
 lactic_GWP_CFs['ammonia'] = lactic_GWP_CFs['ammonia_M205']
 lactic_GWP_CFs['lime_boiler'] = lactic_GWP_CFs['lime']
@@ -154,7 +153,5 @@ def create_lactic_system(
     for ID, price in prices.items(): sf.search(ID).price = price
     e_CF = GWP_CFs.pop('Electricity', None)
     if e_CF: bst.PowerUtility.characterization_factors['GWP'] = e_CF
-    for ID, CF in GWP_CFs.items(): 
-        if not sf.search(ID): print(ID)
-        else: sf.search(ID).characterization_factors['GWP'] = CF
+    for ID, CF in GWP_CFs.items(): sf.search(ID).characterization_factors['GWP'] = CF
     return sys
