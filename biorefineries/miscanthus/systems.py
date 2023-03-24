@@ -154,5 +154,7 @@ def create_lactic_system(
     for ID, price in prices.items(): sf.search(ID).price = price
     e_CF = GWP_CFs.pop('Electricity', None)
     if e_CF: bst.PowerUtility.characterization_factors['GWP'] = e_CF
-    for ID, CF in GWP_CFs.items(): sf.search(ID).characterization_factors['GWP'] = CF
+    for ID, CF in GWP_CFs.items(): 
+        if not sf.search(ID): print(ID)
+        else: sf.search(ID).characterization_factors['GWP'] = CF
     return sys
