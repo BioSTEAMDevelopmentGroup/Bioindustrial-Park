@@ -137,7 +137,7 @@ def create_SSCF_conversion_process(feed, flowsheet=None, **extras): # extras is 
     # Mix enzyme with pretreatment hydrolysate
     M301 = units.EnzymeHydrolysateMixer('M301', ins=(feed, enzyme_M301, water_M301))
 
-    H301 = bst.units.HXutility('H301', ins=M301-0, T=50+273.15)
+    H301 = bst.HXutility('H301', ins=M301-0, T=50+273.15)
 
     R301 = units.SaccharificationAndCoFermentation(
         'R301', ins=(H301-0, '', CSL_R301, lime_R301, water_R301),
@@ -206,7 +206,7 @@ def create_SHF_conversion_process(feed, cell_mass_split,
     # Mix enzyme with pretreatment hydrolysate
     M301 = units.EnzymeHydrolysateMixer('M301', ins=(feed, enzyme_M301, water_M301))
 
-    H301 = bst.units.HXutility('H301', ins=M301-0, T=50+273.15)
+    H301 = bst.HXutility('H301', ins=M301-0, T=50+273.15)
 
     R300 = units.Saccharification('R300', ins=H301-0, outs=('saccharified_stream',))
 
@@ -214,15 +214,15 @@ def create_SHF_conversion_process(feed, cell_mass_split,
     S301 = units.CellMassFilter('S301', ins=R300-0, outs=('S301_cell_mass', ''),
                                 moisture_content=0.35, split=cell_mass_split)
 
-    S302 = bst.units.Splitter('S302', ins=S301-1, split=1-1e-6, # MEE needs something to run
-                              outs=('to_fermenter', 'to_MEE'))
+    S302 = bst.Splitter('S302', ins=S301-1, split=1-1e-6, # MEE needs something to run
+                        outs=('to_fermenter', 'to_MEE'))
 
-    E301 = bst.units.MultiEffectEvaporator('E301', ins=S302-1,
-                                           outs=('E301_solid', 'E301_condensate'),
-                                           P=(101325, 73581, 50892, 32777, 20000),
-                                           V=0.76)
+    E301 = bst.MultiEffectEvaporator('E301', ins=S302-1,
+                                     outs=('E301_solid', 'E301_condensate'),
+                                     P=(101325, 73581, 50892, 32777, 20000),
+                                     V=0.76)
 
-    E301_T = bst.units.StorageTank('E301_T', ins=E301-0, tau=0, V_wf=0.8)
+    E301_T = bst.StorageTank('E301_T', ins=E301-0, tau=0, V_wf=0.8)
     E301_T_old_design = E301_T._design
     # Total volume to hold is:
     # (Qtot is for the saccharified stream, Q for the tank, N is the feed_freq)
@@ -235,7 +235,7 @@ def create_SHF_conversion_process(feed, cell_mass_split,
         E301_T_old_design()
     E301_T._design = E301_T_design
 
-    E301_P = bst.units.Pump('E301_P', ins=E301_T-0)
+    E301_P = bst.Pump('E301_P', ins=E301_T-0)
     E301_P_old_cost = E301_P._cost
     def E301_P_cost():
         E301_P_old_cost()
@@ -261,8 +261,8 @@ def create_SHF_conversion_process(feed, cell_mass_split,
         S302._run()
         R301._run()
 
-    R301_P1 = bst.units.Pump('R301_P1', ins=R301-0)
-    R301_P2 = bst.units.Pump('R301_P2', ins=R301-1)
+    R301_P1 = bst.Pump('R301_P1', ins=R301-0)
+    R301_P2 = bst.Pump('R301_P2', ins=R301-1)
 
     R302 = units.SeedTrain('R302', ins=R301_P2-0, outs=('seed',))
 
@@ -378,7 +378,7 @@ def create_separation_process(feed, cell_mass_split, gypsum_split,
                                     moisture_content=0.35,
                                     split=cell_mass_split)
     else:
-        S401 = bst.units.SolidsCentrifuge('S401', ins=feed,
+        S401 = bst.SolidsCentrifuge('S401', ins=feed,
                                           outs=('S401_cell_mass', ''),
                                           split=cell_mass_split,
                                           solids=insolubles)
@@ -388,7 +388,7 @@ def create_separation_process(feed, cell_mass_split, gypsum_split,
                                     kW_per_m3=0.0985, wall_thickness_factor=1.5,
                                     vessel_material='Stainless steel 316',
                                     vessel_type='Vertical')
-    R401_P = bst.units.Pump('R401_P', ins=R401-0)
+    R401_P = bst.Pump('R401_P', ins=R401-0)
 
 
     S402 = units.GypsumFilter('S402', ins=R401_P-0,
@@ -405,7 +405,7 @@ def create_separation_process(feed, cell_mass_split, gypsum_split,
         else: F401.T = 379
 
     # Separate out the majority of water
-    F401 = bst.units.Flash('F401', ins=S402-1, outs=('F401_g', 'F401_l'), T=379, P=101325,
+    F401 = bst.Flash('F401', ins=S402-1, outs=('F401_g', 'F401_l'), T=379, P=101325,
                            vessel_material='Stainless steel 316')
     # @F401.add_specification
     # def adjust_F401_T():
@@ -415,20 +415,20 @@ def create_separation_process(feed, cell_mass_split, gypsum_split,
     #     F401._run()
 
     # Condense waste vapor for recycling
-    F401_H = bst.units.HXutility('F401_H', ins=F401-0, V=0, rigorous=True)
-    F401_P = bst.units.Pump('F401_P', ins=F401-1)
+    F401_H = bst.HXutility('F401_H', ins=F401-0, V=0, rigorous=True)
+    F401_P = bst.Pump('F401_P', ins=F401-1)
 
     # Separate out persisting water and more volatile components to
     # improve conversion of downstream esterification
-    D401 = bst.units.BinaryDistillation('D401', ins=F401_P-0,
+    D401 = bst.BinaryDistillation('D401', ins=F401_P-0,
                                         outs=('D401_g_volatiles', 'D401_l_LA'),
                                         LHK=('AceticAcid', 'Furfural'),
                                         is_divided=True,
                                         product_specification_format='Recovery',
                                         Lr=0.99, Hr=0.5, k=1.2,
                                         vessel_material='Stainless steel 316')
-    D401_H = bst.units.HXutility('D401_H', ins=D401-0, V=0, rigorous=True)
-    D401_P = bst.units.Pump('D401_P', ins=D401-1)
+    D401_H = bst.HXutility('D401_H', ins=D401-0, V=0, rigorous=True)
+    D401_P = bst.Pump('D401_P', ins=D401-1)
 
     # LA + EtOH --> EtLA + H2O
     # R402.ins[0] is volatile-removed fermentation broth, ~50% w/w conc. LA feed,
@@ -445,12 +445,12 @@ def create_separation_process(feed, cell_mass_split, gypsum_split,
                                 vessel_type='Vertical',
                                 catalyst_price=price['Amberlyst15'])
     # Increase pressure as the solution can be very thick for some designs
-    R402_P = bst.units.Pump('R402_P', ins=R402-0, dP_design=5*101325)
+    R402_P = bst.Pump('R402_P', ins=R402-0, dP_design=5*101325)
 
     # Distillation for recycling unreacted ethanol;
     # keep as BinaryDistillation so top product's ethanol doesn't exceed azeotropic conc.
     # during Monte Carlo
-    D402 = bst.units.BinaryDistillation('D402', ins=R402_P-0,
+    D402 = bst.BinaryDistillation('D402', ins=R402_P-0,
                                         outs=('D402_g_ethanol', 'D402_l'),
                                         LHK=('Ethanol', 'H2O'),
                                         is_divided=True,
@@ -458,8 +458,8 @@ def create_separation_process(feed, cell_mass_split, gypsum_split,
                                         Lr=0.99, Hr=0.45, k=1.2,
                                         vessel_material='Stainless steel 316')
 
-    D402_H = bst.units.HXutility('D402_H', ins=D402-0, outs=1-R402, V=0, rigorous=True)
-    D402_P = bst.units.Pump('D402_P', ins=D402-1)
+    D402_H = bst.HXutility('D402_H', ins=D402-0, outs=1-R402, V=0, rigorous=True)
+    D402_P = bst.Pump('D402_P', ins=D402-1)
 
     # ethanol_recycle = System('ethanol_recycle',
     #                          path=(R402, R402_P, D402, D402_H, D402_P),
@@ -467,7 +467,7 @@ def create_separation_process(feed, cell_mass_split, gypsum_split,
     separation_sys_units = [R402, R402_P, D402, D402_H, D402_P]
 
     # Principal recovery step; EtLA separated from less volatile impurities
-    D403 = bst.units.BinaryDistillation('D403', ins=D402_P-0,
+    D403 = bst.BinaryDistillation('D403', ins=D402_P-0,
                                         outs=('D403_g_esters', 'D403_l'),
                                     LHK=('EthylLactate', 'LacticAcid'),
                                     is_divided=True,
@@ -476,15 +476,15 @@ def create_separation_process(feed, cell_mass_split, gypsum_split,
                                     vessel_material='Stainless steel 316')
 
     # Condense reactants into liquid phase
-    D403_H = bst.units.HXutility('D403_H', ins=D403-0, V=0, rigorous=True)
-    D403_P = bst.units.Pump('D403_P', ins=D403-1)
+    D403_H = bst.HXutility('D403_H', ins=D403-0, V=0, rigorous=True)
+    D403_P = bst.Pump('D403_P', ins=D403-1)
 
     # S403.ins is the bottom of D403 (LA recycle stream), not the top (EtLA-rich product stream)
     # S403.outs[0] is recycled back to R402, the EsterificationReactor
     # S403.outs[1] is discarded to prevent accumulation
     # It might have been a better idea to mix this with R301-0,
     # but currently not possible to simulate this recycle stream
-    S403 = bst.units.Splitter('S403',ins=D403_P-0, outs=(2-R402, 'D403_l_to_waste'), split=0.97)
+    S403 = bst.Splitter('S403',ins=D403_P-0, outs=(2-R402, 'D403_l_to_waste'), split=0.97)
 
     # acid_ester_recycle = System('acid_ester_recycle',
     #                             path=(ethanol_recycle, D403, D403_H, D403_P, S403),
@@ -502,21 +502,21 @@ def create_separation_process(feed, cell_mass_split, gypsum_split,
                                    kW_per_m3=0.0985, wall_thickness_factor=1,
                                    vessel_material='Stainless steel 316',
                                    vessel_type='Vertical')
-    R403_P = bst.units.Pump('R403_P', ins=R403-0)
+    R403_P = bst.Pump('R403_P', ins=R403-0)
 
     # Distillation to recycle ethanol formed by hydrolysis of EtLA
-    D404 = bst.units.ShortcutColumn('D404', R403_P-0, outs=('D404_g', 'D404_l'),
+    D404 = bst.ShortcutColumn('D404', R403_P-0, outs=('D404_g', 'D404_l'),
                                     LHK=('Ethanol', 'H2O'),
                                     product_specification_format='Recovery',
                                     is_divided=True,
                                     Lr=0.9, Hr=0.9935, k=1.2,
                                     vessel_material='Stainless steel 316')
 
-    D404_H = bst.units.HXutility('D404_H', ins=D404-0, outs=4-R402, V=0, rigorous=True)
-    D404_P = bst.units.Pump('D404_P', ins=D404-1)
+    D404_H = bst.HXutility('D404_H', ins=D404-0, outs=4-R402, V=0, rigorous=True)
+    D404_P = bst.Pump('D404_P', ins=D404-1)
 
     # To get the final acid product
-    F402 = bst.units.Flash('F402', ins=D404_P-0, V=0.92, P=101325,
+    F402 = bst.Flash('F402', ins=D404_P-0, V=0.92, P=101325,
                             vessel_material='Stainless steel 316')
     def purity_at_V(V):
         F402.V = V
@@ -535,7 +535,7 @@ def create_separation_process(feed, cell_mass_split, gypsum_split,
         #                           xtol=0.001, ytol=0.001, maxiter=50,
         #                           args=(), checkbounds=False)
 
-    F402_H1 = bst.units.HXutility('F402_H1', ins=F402-0, outs=3-R403, V=0, rigorous=True)
+    F402_H1 = bst.HXutility('F402_H1', ins=F402-0, outs=3-R403, V=0, rigorous=True)
 
     # hydrolysis_recycle = System('hydrolysis_recycle',
     #                             path=(R403, R403_P, D404, D404_H, D404_P,
@@ -548,11 +548,11 @@ def create_separation_process(feed, cell_mass_split, gypsum_split,
         R403, R403_P, D404, D404_H, D404_P, F402, F402_H1
         ])
 
-    F402_H2 = bst.units.HXutility('F402_H2', ins=F402-1, T=345)
-    F402_P = bst.units.Pump('F402_P', ins=F402_H2-0)
+    F402_H2 = bst.HXutility('F402_H2', ins=F402-1, T=345)
+    F402_P = bst.Pump('F402_P', ins=F402_H2-0)
 
-    M401 = bst.units.Mixer('M401', ins=(D401_H-0, S403-1))
-    M401_P = bst.units.Pump('M401_P', ins=M401-0, outs='condensed_separation_waste_vapor')
+    M401 = bst.Mixer('M401', ins=(D401_H-0, S403-1))
+    M401_P = bst.Pump('M401_P', ins=M401-0, outs='condensed_separation_waste_vapor')
 
     ##### System #####
     # System('separation_sys',
@@ -595,7 +595,7 @@ def create_wastewater_process(ww_streams, AD_split, MB_split,
 
     ##### Units #####
     # Mix waste liquids for treatment
-    M501 = bst.units.Mixer('M501', ins=ww_streams)
+    M501 = bst.Mixer('M501', ins=ww_streams)
 
     if not bypass_R501:
         R501 = units.AnaerobicDigestion('R501', ins=M501-0,
@@ -627,7 +627,7 @@ def create_wastewater_process(ww_streams, AD_split, MB_split,
 
     # Recycled sludge stream of membrane bioreactor, the majority of it (96%)
     # goes to aerobic digestion
-    S502 = bst.units.Splitter('S502', ins=S501-1, outs=('to_aerobic_digestion', ''),
+    S502 = bst.Splitter('S502', ins=S501-1, outs=('to_aerobic_digestion', ''),
                               split=0.96)
 
     S503 = units.BeltThickener('S503', ins=(S503_ins0, S502-1),
@@ -644,7 +644,7 @@ def create_wastewater_process(ww_streams, AD_split, MB_split,
                                   solubles=solubles, insolubles=insolubles)
 
     # Mix recycles to aerobic digestion
-    M502 = bst.units.Mixer('M502', ins=(S502-0, S503-0, S504-0), outs=1-R502)
+    M502 = bst.Mixer('M502', ins=(S502-0, S503-0, S504-0), outs=1-R502)
 
     aerobic_recycle = System('aerobic_recycle',
                              path=(R502, S501, S502, S503, S504, M502),
@@ -722,11 +722,11 @@ def create_facilities(solids_to_boiler, gas_to_boiler='',
 
     ##### Units #####
     # 7-day storage time similar to ethanol's in ref [1]
-    T601 = bst.units.StorageTank('T601', ins=u.F402_P-0, tau=7*24, V_wf=0.9,
+    T601 = bst.StorageTank('T601', ins=u.F402_P-0, tau=7*24, V_wf=0.9,
                                   vessel_type='Floating roof',
                                   vessel_material='Stainless steel')
     T601.line = 'Lactic acid storage'
-    bst.units.Pump('T601_P', ins=T601-0, outs=lactic_acid)
+    bst.Pump('T601_P', ins=T601-0, outs=lactic_acid)
 
     # Pretreatment sulfuric acid/ammonia storage considered in the process
     units.SulfuricAcidStorage('T602', ins=sulfuric_acid, outs=s.sulfuric_acid_R401)
@@ -744,15 +744,15 @@ def create_facilities(solids_to_boiler, gas_to_boiler='',
                                 vessel_type='Floating roof',
                                 vessel_material='Carbon steel')
     T606.line = 'Ethanol storage'
-    bst.units.Pump('T606_P', ins=T606-0, outs=s.ethanol_R402)
+    bst.Pump('T606_P', ins=T606-0, outs=s.ethanol_R402)
 
-    FT = bst.units.FireWaterTank('FT', ins=firewater_in, outs='firewater_out')
+    FT = bst.FireWaterTank('FT', ins=firewater_in, outs='firewater_out')
     FT.fire_water_over_feedstock = 0.08
     @FT.add_specification(run=True)
     def adjust_fire_water(): firewater_in.imass['Water'] = feedstock.F_mass * FT.fire_water_over_feedstock
 
     # Mix solid wastes to the boiler
-    M601 = bst.units.Mixer('M601', ins=solids_to_boiler, outs='solids_to_boiler')
+    M601 = bst.Mixer('M601', ins=solids_to_boiler, outs='solids_to_boiler')
 
     # # Mix additional streams needed for heating,
     # # H in s.warm_process_water_2, s.steam_M203 already considered in
@@ -793,7 +793,7 @@ def create_facilities(solids_to_boiler, gas_to_boiler='',
     # if heating needed, then heating duty required is considered in the boiler
     process_water_streams['facilities'] = (BT.outs[1], CT.outs[1])
     
-    bst.facilities.ProcessWaterCenter(
+    bst.ProcessWaterCenter(
         'PWC',
         ins=(treated_water, system_makeup_water, 'direct_recycled_water'),
         outs=('process_water', 'discharged_water'),
@@ -801,7 +801,7 @@ def create_facilities(solids_to_boiler, gas_to_boiler='',
         process_water_streams=sum(process_water_streams.values(), ()),
     )
 
-    ADP = bst.facilities.AirDistributionPackage('ADP', ins=plant_air_in, outs='plant_air_out')
+    ADP = bst.AirDistributionPackage('ADP', ins=plant_air_in, outs='plant_air_out')
     ADP.plant_air_over_feedstock = 0.8
     @ADP.add_specification(run=True)
     def adjust_plant_air(): plant_air_in.imass['N2'] = feedstock.F_mass * ADP.plant_air_over_feedstock
@@ -812,8 +812,8 @@ def create_facilities(solids_to_boiler, gas_to_boiler='',
     def adjust_CIP(): CIP_chems_in.imass['H2O'] = feedstock.F_mass * CIP.CIP_over_feedstock
 
     # Optional facilities
-    if if_HXN: bst.units.HeatExchangerNetwork('HXN')
+    if if_HXN: bst.HeatExchangerNetwork('HXN')
     if if_BDM:
-        bst.units.BlowdownMixer('BDM',
-                                ins=(BT.outs[1], CT.outs[1]),
-                                outs=u.M501.ins[-1])
+        bst.BlowdownMixer('BDM',
+                          ins=(BT.outs[1], CT.outs[1]),
+                          outs=u.M501.ins[-1])
