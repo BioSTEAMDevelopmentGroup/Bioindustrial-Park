@@ -19,18 +19,18 @@ __all__ = ('create_ethanol_system', 'create_lactic_system',)
 ethanol_feedstock_kwargs = cornstover_kwargs.copy()
 ethanol_feedstock_kwargs.update({
     'ID': 'miscanthus',
-    'Glucan':0.431,
-    'Xylan':0.209,
-    'Galactan':0.021,
-    'Arabinan':0.026,
-    'Mannan':0.01,
-    'Lignin':0.233,
-    'Acetate':0.039,
+    'Glucan':0.3448,
+    'Xylan':0.1672,
+    'Galactan':0.0168,
+    'Arabinan':0.0208,
+    'Mannan':0.008,
+    'Lignin':0.1864,
+    'Acetate':0.0312,
     'Protein':0,
     'Extract':0,
     'Ash':0,
     'Sucrose':0,
-    'Water':0,
+    'Water':.2,
     })
 
 
