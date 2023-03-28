@@ -196,11 +196,12 @@ def create_cellulosic_ethanol_chemicals():
     append_single_phase_chemical('CO', 'Carbon monoxide', Hf=-110.522)
     
     # Will remain as  solid
-    extend_single_phase_chemicals(['Glucose', 'Xylose', 'Sucrose'], Hfus=0)
+    chems.extend([
+        oilcane_chemicals.Glucose,
+        tmo.Chemical('Xylose', phase='l', Hf=cal2joule*-249440),
+        oilcane_chemicals.Sucrose,
+    ])
     append_single_phase_chemical('CaSO4')
-    
-    subgroup = chems['Glucose', 'Xylose', 'Sucrose', 'CaSO4', 'AmmoniumSulfate']
-    for chemical in subgroup: set_Cp(chemical, Cp_cellulosic)
     
     # Analagous sugars
     append_chemical_copy('Mannose', chems.Glucose)
@@ -256,10 +257,12 @@ def create_cellulosic_ethanol_chemicals():
                                      Hf=-17618*cal2joule)
     append_new_single_phase_chemical('Glucan', formula='C6H10O5',
                                      Cp=Cp_cellulosic,
-                                     Hf=-233200*cal2joule)
+                                     Hf=-233200*cal2joule,
+                                     phase='s')
     append_new_single_phase_chemical('Xylan', formula="C5H8O4",
                                      Cp=Cp_cellulosic,
-                                     Hf=-182100*cal2joule)
+                                     Hf=-182100*cal2joule,
+                                     phase='s')
     append_new_single_phase_chemical('Xylitol', formula="C5H12O5",
                                      Cp=Cp_cellulosic,
                                      Hf=-243145*cal2joule)

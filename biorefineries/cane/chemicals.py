@@ -20,6 +20,7 @@ from thermosteam import functional as fn
 from chemicals import atoms_to_Hill
 from thermosteam.utils import chemical_cache
 from biorefineries import cellulosic
+import biosteam as bst
 
 __all__ = (
     'create_sugarcane_chemicals',
@@ -31,18 +32,19 @@ __all__ = (
 
 @chemical_cache
 def create_sugarcane_chemicals():
+    cal2J = 4.184
     (Water, Ethanol, Glucose, Sucrose, H3PO4, P4O10, CO2, Octane, O2, N2, CH4) = chemicals = tmo.Chemicals(
-        ['Water', 'Ethanol', 'Glucose', 'Sucrose', 'H3PO4', 'P4O10',
-         'CO2', 'Octane', 'O2', 'N2', 'CH4']
+        ['Water', 'Ethanol', 
+         tmo.Chemical('Glucose', phase='l', Hf=cal2J*-300428),
+         tmo.Chemical('Sucrose', phase='l', Hf=cal2J*-480900), 
+         tmo.Chemical('H3PO4', phase='s'),
+         tmo.Chemical('P4O10', phase='s'),
+         tmo.Chemical('CO2', phase='g'), 
+         'Octane', 
+         tmo.Chemical('O2', phase='g'), 
+         tmo.Chemical('N2', phase='g'), 
+         tmo.Chemical('CH4', phase='g')]
     )
-    O2.at_state(phase='g')
-    N2.at_state(phase='g')
-    CH4.at_state(phase='g')
-    CO2.at_state(phase='g')
-    H3PO4.at_state(phase='s')
-    P4O10.at_state(phase='s')
-    Glucose.at_state(phase='s')
-    Sucrose.at_state(phase='s')
     Glucose.N_solutes = 1
     Sucrose.N_solutes = 2
     
@@ -255,6 +257,9 @@ def create_cellulosic_oilcane_chemicals():
         tmo.Chemical('Urea', default=True, phase='l'),
         chemicals.Glucose.copy('Yeast'),
     ])
+    chemicals.extend(
+        bst.wastewater.high_rate.create_missing_wwt_chemicals(chemicals)
+    )
     chemicals.compile()
     chemicals.set_synonym('AcetylDiOlein', 'AcTAG')
     chemicals.define_group('Lipid', ['PL', 'FFA', 'MAG', 'DAG', 'TAG', 'AcTAG'])
