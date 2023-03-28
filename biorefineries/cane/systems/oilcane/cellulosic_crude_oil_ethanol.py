@@ -29,7 +29,7 @@ __all__ = (
     ins=create_oilcane_to_biodiesel_and_ethanol_1g.ins,
     outs=[s.ethanol, s.crude_oil],
 )
-def create_oilcane_to_crude_oil_and_ethanol_combined_1_and_2g_post_fermentation_oil_separation(ins, outs):
+def create_oilcane_to_crude_oil_and_ethanol_combined_1_and_2g_post_fermentation_oil_separation(ins, outs, WWT_kwargs=None):
     oilcane, = ins
     ethanol, crude_oil = outs
     
@@ -61,35 +61,25 @@ def create_oilcane_to_crude_oil_and_ethanol_combined_1_and_2g_post_fermentation_
     MX_process_water = bst.Mixer(800, (condensate, evaporator_condensate, stripper_process_water),
                                  'recycle_process_water')
     
-    wastewater_treatment_sys = bst.create_wastewater_treatment_system(
+    bst.Mixer(500,
         ins=[wastewater,
              fiber_fines,
              pretreatment_wastewater,
              evaporator_condensate],
-        mockup=True,
-        area=500,
     )
     s = f.stream
     u = f.unit
-    M501 = bst.Mixer(700, (wastewater_treatment_sys-1, lignin, cellmass, f.stream.filter_cake, bagasse_to_boiler))
-    create_facilities(
-        solids_to_boiler=M501-0,
-        gas_to_boiler=wastewater_treatment_sys-0,
-        process_water_streams=(s.imbibition_water,
-                               s.rvf_wash_water,
-                               s.stripping_water,
-                               s.caustic, 
-                               s.warm_process_water,
-                               s.pretreatment_steam,
-                               s.saccharification_water),
+    MX_solids = bst.Mixer(700, (lignin, cellmass, f.stream.filter_cake, bagasse_to_boiler))
+    if WWT_kwargs is None:
+        WWT_kwargs = dict(area=500)
+    else:
+        WWT_kwargs['area'] = 500
+    # TODO: Switch this to bst.create_all_facilities
+    bst.create_all_facilities(
         feedstock=s.bagasse,
-        RO_water=wastewater_treatment_sys-2,
-        recycle_process_water=MX_process_water-0,
-        BT_area=700,
+        recycle_process_water_streams=[MX_process_water-0],
+        WWT_kwargs=WWT_kwargs,
+        CHP_kwargs=dict(ID=700),
+        HXN_kwargs=dict(ID=900, ignored=[u.H401, u.H402], Qmin=1e3, acceptable_energy_balance_error=0.01),
         area=800,
     )
-    HXN = bst.HeatExchangerNetwork(900,
-        ignored=[u.H401, u.H402],
-        Qmin=1e3,
-    )
-    HXN.acceptable_energy_balance_error = 0.01

@@ -29,7 +29,7 @@ __all__ = (
     ins=[s.oilcane],
     outs=[s.biodiesel, s.crude_glycerol],
 )
-def create_oilcane_to_biodiesel_combined_1_and_2g_post_fermentation_oil_separation(ins, outs, fed_batch=True):
+def create_oilcane_to_biodiesel_combined_1_and_2g_post_fermentation_oil_separation(ins, outs, fed_batch=True, WWT_kwargs=None):
     oilcane, = ins
     biodiesel, crude_glycerol = outs
     X = 0.60 if fed_batch else 0.495
@@ -110,6 +110,11 @@ def create_oilcane_to_biodiesel_combined_1_and_2g_post_fermentation_oil_separati
     
     s = f.stream
     u = f.unit
+    if WWT_kwargs is None:
+        WWT_kwargs = dict(area=500)
+    else:
+        WWT_kwargs['area'] = 500
+        
     bst.create_all_facilities(
         feedstock=s.bagasse,
         recycle_process_water_streams=(condensate, evaporator_condensate),
@@ -120,6 +125,6 @@ def create_oilcane_to_biodiesel_combined_1_and_2g_post_fermentation_oil_separati
             acceptable_energy_balance_error=0.01,
         ),
         CHP_kwargs=dict(area=700),
-        WWT_kwargs=dict(area=500),
+        WWT_kwargs=WWT_kwargs,
         area=800,
     )

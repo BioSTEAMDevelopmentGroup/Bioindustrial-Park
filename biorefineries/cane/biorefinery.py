@@ -117,21 +117,21 @@ system_factory_options = {
 }
 area_names = {
     -1: ['Feedstock handling', 'Juicing', 'EtOH prod.', 'CH&P', 'Utilities', 
-         'HXN', 'Storage'],
+         'HXN', 'Storage', 'Wastewater treatment'],
     -2: ['Feedstock handling', 'Juicing', 'Pretreatment', 'EtOH prod.',
          'Wastewater treatment', 'CH&P', 'Utilities', 'HXN', 'Storage'],
     -3: ['Feedstock handling', 'Juicing', 'EtOH prod.', 'CH&P', 'Utilities', 
-         'HXN', 'Storage'],
+         'HXN', 'Storage', 'Wastewater treatment'],
     1: ['Feedstock handling', 'Juicing', 'EtOH prod.', 'Oil ext.', 'Biod. prod.', 
-        'CH&P', 'Utilities', 'HXN', 'Storage'],
+        'CH&P', 'Utilities', 'HXN', 'Storage', 'Wastewater treatment'],
     2: ['Feedstock handling', 'Juicing', 'Pretreatment', 'EtOH prod.', 'Wastewater treatment',
         'Oil ext.', 'CH&P',  'Biod. prod.', 'Utilities', 'HXN', 'Storage'],
     3: ['Feedstock handling', 'Juicing', 'EtOH prod.', 'Oil ext.',  'CH&P', 
-        'Utilities', 'HXN', 'Storage'],
+        'Utilities', 'HXN', 'Storage', 'Wastewater treatment'],
     4: ['Feedstock handling', 'Juicing', 'Pretreatment', 'EtOH prod.', 
         'Wastewater treatment', 'Oil ext.', 'CH&P', 'Utilities', 'HXN', 'Storage'],
     5: ['Feedstock handling', 'Juicing', 'Oil prod. & ext.', 'Biod. prod.', 
-        'CH&P', 'Utilities', 'HXN', 'Storage'],
+        'CH&P', 'Utilities', 'HXN', 'Storage', 'Wastewater treatment'],
     6: ['Feedstock handling',  'Juicing', 'Pretreatment', 'Oil prod. & ext.',
         'Wastewater treatment', 'Biod. prod.', 'CH&P', 'Utilities', 'HXN', 'Storage'],
     # 9: ['Feedstock handling', 'Juicing', 'TAG prod.', 'Oil ext.', 'AcTAG sep.', 
@@ -165,6 +165,7 @@ def YRCP2023():
     Biorefinery.default_conversion_performance_distribution = 'shortterm'
     Biorefinery.default_prices_correleted_to_crude_oil = True
     Biorefinery.default_year = 2023
+    Biorefinery.default_WWT = 'high-rate'
 
 class Biorefinery:
     cache = {}
@@ -174,6 +175,7 @@ class Biorefinery:
     default_prices_correleted_to_crude_oil = False
     default_conversion_performance_distribution = 'longterm'
     default_year = 2022
+    default_WWT = None
     baseline_moisture_content = 0.70
     
     @property
@@ -222,7 +224,7 @@ class Biorefinery:
     def __new__(cls, name, chemicals=None, reduce_chemicals=False, 
                  avoid_natural_gas=True, conversion_performance_distribution=None,
                  year=None, cache=cache, feedstock_line=None,
-                 prices_correleted_to_crude_oil=None):
+                 prices_correleted_to_crude_oil=None, WWT_kwargs=None):
         if year is None: year = cls.default_year
         if conversion_performance_distribution is None: 
             conversion_performance_distribution = cls.default_conversion_performance_distribution
@@ -230,8 +232,16 @@ class Biorefinery:
             conversion_performance_distribution = conversion_performance_distribution.replace(' ', '').replace('-', '').lower()
         if prices_correleted_to_crude_oil is None:
             prices_correleted_to_crude_oil = cls.default_prices_correleted_to_crude_oil
-        number, agile, energycane = configuration = parse_configuration(name)
-        key = (number, agile, energycane, conversion_performance_distribution, year)
+        number, agile, energycane, = configuration = parse_configuration(name)
+        if WWT_kwargs is None:
+            if cls.default_WWT is None:
+                WWT_key = None
+            else:
+                WWT_kwargs = dict(kind=cls.default_WWT)
+                WWT_key = cls.default_WWT
+        else:
+            WWT_key = WWT_kwargs.get('kind', None)
+        key = (number, agile, energycane, WWT_key, conversion_performance_distribution, year)
         if cache and key in cache: 
             return cache[key]
         else:
@@ -249,7 +259,7 @@ class Biorefinery:
         
         ## System
         if number in system_factories:
-            self.cane_sys = cane_sys = system_factories[number](operating_hours=24 * 200, **system_factory_options.get(number, {}))
+            self.cane_sys = cane_sys = system_factories[number](operating_hours=24 * 200, WWT_kwargs=WWT_kwargs, **system_factory_options.get(number, {}))
         else:
             raise NotImplementedError(number)
         cane_sys.set_tolerance(rmol=1e-5, mol=1e-2, subsystems=True, subfactor=1.5)
@@ -286,7 +296,7 @@ class Biorefinery:
         
         ## Unit groups
         areas = area_names[number]
-        rename_storage_units(cane_sys.units, len(areas) * 100)
+        rename_storage_units(cane_sys.units, (areas.index('Storage') + 1) * 100)
         unit_groups = UnitGroup.group_by_area(cane_sys.units)
         for i, j in zip(unit_groups, areas): i.name = j
         for i in unit_groups: i.autofill_metrics(shorthand=True)
@@ -295,7 +305,9 @@ class Biorefinery:
             if HXN_group.name == 'HXN':
                 HXN_group.filter_savings = False # Allow negative values in heat utilities
                 HXN = HXN_group.units[0]
-                assert isinstance(HXN, bst.HeatExchangerNetwork)
+                try:
+                    assert isinstance(HXN, bst.HeatExchangerNetwork)
+                except: breakpoint()
         HXN.raise_energy_balance_error = True
         HXN.vle_quenched_streams = False
         

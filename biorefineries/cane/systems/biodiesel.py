@@ -33,7 +33,7 @@ __all__ = (
     outs=[s.biodiesel, s.crude_glycerol, s.vinasse],
 )
 def create_oilcane_to_biodiesel_1g(
-            ins, outs, fed_batch=True,
+            ins, outs, fed_batch=True, WWT_kwargs=None,
         ):
     oilcane, = ins
     biodiesel, crude_glycerol, vinasse = outs
@@ -114,9 +114,15 @@ def create_oilcane_to_biodiesel_1g(
     bst.Mixer(600, [transesterification_and_biodiesel_separation_sys-2, wastewater], 'wastewater')
 
     ### Facilities ###
+    if WWT_kwargs:
+        WWT = True
+        WWT_kwargs['area'] = 1000
+    else:
+        WWT = False
+    
     u = f.unit
     bst.create_all_facilities(
-        feedstock=bagasse,
+        feedstock=None,
         recycle_process_water_streams=(evaporator_condensate_b,),
         HXN_kwargs=dict(
             ID=900,
@@ -125,6 +131,7 @@ def create_oilcane_to_biodiesel_1g(
             acceptable_energy_balance_error=0.01,
         ),
         CHP_kwargs=dict(area=700),
-        WWT=False,
+        WWT_kwargs=WWT_kwargs,
+        WWT=WWT,
         area=800,
     )
