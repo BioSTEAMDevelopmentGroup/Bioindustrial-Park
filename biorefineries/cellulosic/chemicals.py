@@ -219,10 +219,14 @@ def create_cellulosic_ethanol_chemicals():
     chems.append(oilcane_chemicals.NaOH)
     append_new_single_phase_chemical('Lignin',
                                      formula='C8H8O3',
+                                     phase='s',
                                      Hf=-108248*cal2joule)
     set_rho(chems.Lignin, 1540)
     set_Cp(chems.Lignin, Cp_cellulosic)
-    append_chemical_copy('SolubleLignin', chems.Lignin)
+    append_new_single_phase_chemical('SolubleLignin',
+                                     formula='C8H8O3',
+                                     phase='l',
+                                     Hf=-108248*cal2joule)
     
     # Create structural carbohydrates
     append_chemical_copy('GlucoseOligomer', chems.Glucose)
