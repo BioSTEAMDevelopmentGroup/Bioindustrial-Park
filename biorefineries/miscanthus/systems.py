@@ -116,7 +116,7 @@ lactic_GWP_CFs = GWP_CFs.copy()
 lactic_GWP_CFs.update({
     'natural_gas': 0.40+44/16, # NA NG from shale and conventional recovery, includes onsite emission
     'CSL': 1.72,
-    'ethanol': 1.49+44/46, # includes onsite emission
+    'ethanol': 1.49+44*2/46, # includes onsite emission
     'sulfuric_acid_T201': 0.04,
     'ammonia_M205': 2.84 * 0.4860, # chemicals.NH3.MW/chemicals.NH4OH.MW,    
     'Electricity': (0.44, 0.44), # assume production==consumption, both in kg CO2-eq/kWh
@@ -144,9 +144,6 @@ def create_lactic_system(
     sys = la.create_system(flowsheet=flowsheet, feedstock=feedstock_kwargs)
     la.create_tea(flowsheet=flowsheet)
     sf = sys.flowsheet.stream
-    
-    # sf.search('natural_gas').characterization_factors['GWP'] = GWP_CFs['natural_gas']
-    # sf.search('ethanol').characterization_factors['GWP'] = GWP_CFs['ethanol']
     
     e_price = prices.pop('Electricity', None)
     if e_price: bst.PowerUtility.price = e_price
