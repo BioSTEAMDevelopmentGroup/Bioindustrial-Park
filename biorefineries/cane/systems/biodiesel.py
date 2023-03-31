@@ -20,7 +20,9 @@ from .juicing import (
     create_juicing_system,
 )
 from .fermentation import create_sucrose_fermentation_system
-from .lipid_extraction import create_post_fermentation_oil_separation_system
+from .lipid_extraction import create_lipid_exctraction_system
+from ..data import microbial_oil_baseline as perf
+from .. import units
 from .. import streams as s
 
 __all__ = (
@@ -64,17 +66,33 @@ def create_oilcane_to_biodiesel_1g(
     crushing_mill.isplit['Lipid'] = 0.90
     
     ### Ethanol section ###
-    X_ferm = 0.6 if fed_batch else 0.495
-    fermrxn = tmo.Rxn('O2 + Glucose -> H2O + TAG', 'Glucose', X_ferm, correct_atomic_balance=True)
-    growrxn = tmo.Rxn('Glucose -> Cellmass', 'Glucose', 0.99 - X_ferm, correct_atomic_balance=True)
+    if fed_batch:
+        biomass_coeff = perf.fed_batch_biomass_growth_coefficient_mean
+        lipid_yield = perf.fed_batch_lipid_yield_mean
+        titer = perf.fed_batch_titer_mean
+        productivity = perf.fed_batch_productivity_mean
+    else:
+        biomass_coeff = perf.batch_biomass_growth_coefficient_mean
+        lipid_yield = perf.batch_lipid_yield_mean
+        titer = perf.batch_titer_mean
+        productivity = perf.batch_productivity_mean
+    
+    fermrxn = tmo.Rxn('O2 + Glucose -> H2O + TAG', 'Glucose', 1., correct_atomic_balance=True)
+    fermrxn.product_yield('TAG', basis='wt', product_yield=lipid_yield)
+    growrxn = tmo.Rxn(
+        f'Glucose -> {biomass_coeff: .3f} Cellmass + {1. - biomass_coeff: .3f} CO2', 'Glucose', 
+        0.999 - fermrxn.X, basis='wt', correct_mass_balance=True
+    )
     fermentation_sys, epdct = create_sucrose_fermentation_system(
         ins=[screened_juice],
         scrubber=False,
+        SeedTrain=units.SeedTrain,
+        seed_train_reaction=growrxn,
         fermentation_reaction=fermrxn,
         cell_growth_reaction=growrxn,
         fed_batch=fed_batch,
-        titer=89.4 if fed_batch else 27.4,
-        productivity=0.61 if fed_batch else 0.31,
+        titer=titer,
+        productivity=productivity,
         product_group='Lipid',
         mockup=True,
         area=300,
@@ -87,12 +105,12 @@ def create_oilcane_to_biodiesel_1g(
     fermentor.Nmin = 2
     fermentor.Nmax = 36
     product, condensate, vent = fermentation_sys.outs
-    post_fermentation_oil_separation_sys = create_post_fermentation_oil_separation_system(
+    post_fermentation_oil_separation_sys = create_lipid_exctraction_system(
         ins=product,
         mockup=True,
         area=300,
     )
-    oil, thick_vinasse, evaporator_condensate_b = post_fermentation_oil_separation_sys.outs
+    oil, cellmass, thick_vinasse = post_fermentation_oil_separation_sys.outs
     oil_pretreatment_sys, oil_pretreatment_dct = create_oil_pretreatment_system(
         ins=oil,
         mockup=True,
@@ -123,7 +141,6 @@ def create_oilcane_to_biodiesel_1g(
     u = f.unit
     bst.create_all_facilities(
         feedstock=None,
-        recycle_process_water_streams=(evaporator_condensate_b,),
         HXN_kwargs=dict(
             ID=900,
             ignored=lambda: [u.E301, u.D601.boiler, u.D602.boiler, u.H601, u.H602, u.H603, u.H604, oil_pretreatment_dct['F3']],

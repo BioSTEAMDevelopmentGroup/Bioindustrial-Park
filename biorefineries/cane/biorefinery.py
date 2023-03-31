@@ -34,6 +34,7 @@ from .systems import (
     create_oilcane_to_biodiesel_and_actag_1g,
     create_oilcane_to_biodiesel_and_actag_combined_1_and_2g_post_fermentation_oil_separation,
 )
+from .data import microbial_oil_baseline as perf
 from .parse_configuration import (
     parse_configuration,
     format_configuration,
@@ -455,6 +456,9 @@ class Biorefinery:
             else:
                 pressure_filter  = None
             cellmass_centrifuge = flowsheet(bst.SolidsCentrifuge) # Separates cell mass
+            if isinstance(cellmass_centrifuge, list):
+                cellmass_centrifuge = sorted([i for i in cellmass_centrifuge if type(i) is bst.SolidsCentrifuge], key=lambda x: x.ID)[0]
+            cellmass_centrifuge.strict_moisture_content = False
             microbial_oil_recovery = 0.9 # Baseline
             oil_extraction_specification = OilExtractionSpecification(
                 sys, crushing_mill, pressure_filter, cellmass_centrifuge, microbial_oil_recovery, 
@@ -810,10 +814,21 @@ class Biorefinery:
             if number in cellulosic_ethanol_configurations: fermentor.productivity = ethanol_productivity
     
         fed_batch = system_factory_options.get(number, {}).get('fed_batch')
-        @performance(60 if fed_batch else 49.5, 95, units='%', element='Cofermenation', kind='coupled')
+        if fed_batch:
+            lipid_yield = perf.fed_batch_lipid_yield_mean
+            titer = perf.fed_batch_titer_mean
+            productivity = perf.fed_batch_productivity_mean
+        else:
+            lipid_yield = perf.batch_lipid_yield_mean
+            titer = perf.batch_titer_mean
+            productivity = perf.batch_productivity_mean
+        max_lipid_yield_glucose = perf.max_lipid_yield_glucose
+        max_lipid_yield_xylose = perf.max_lipid_yield_xylose
+            
+        @performance(lipid_yield * 100, max_lipid_yield_glucose * 100, units='%', element='Cofermenation', kind='coupled')
         def set_glucose_to_microbial_oil_yield(glucose_to_microbial_oil_yield):
             glucose_to_microbial_oil_yield *= 0.01
-            cell_growth = min(0.99 - glucose_to_microbial_oil_yield, 0.4 * glucose_to_microbial_oil_yield) # Almost all the rest goes towards cell mass
+            cell_growth = 0.999 - glucose_to_microbial_oil_yield # Almost all the rest goes towards cell mass and CO2
             if number in cellulosic_oil_configurations:
                 seed_train.reactions.X[0] = fermentor.cofermentation.X[0] = glucose_to_microbial_oil_yield 
                 seed_train.reactions.X[2] = fermentor.cofermentation.X[2] = cell_growth
@@ -821,19 +836,19 @@ class Biorefinery:
                 fermentor.fermentation_reaction.X[0] = glucose_to_microbial_oil_yield
                 fermentor.cell_growth_reaction.X[0] = cell_growth
         
-        @performance(60 if fed_batch else 49.5, 95, units='%', element='Cofermenation', kind='coupled')
+        @performance(lipid_yield * 100, max_lipid_yield_xylose * 100, units='%', element='Cofermenation', kind='coupled')
         def set_xylose_to_microbial_oil_yield(xylose_to_microbial_oil_yield):
             if number in cellulosic_oil_configurations:
                 xylose_to_microbial_oil_yield *= 0.01
-                cell_growth = min(0.99 - xylose_to_microbial_oil_yield, 0.4 * xylose_to_microbial_oil_yield)
+                cell_growth = 0.999 - xylose_to_microbial_oil_yield
                 seed_train.reactions.X[1] = fermentor.cofermentation.X[1] = xylose_to_microbial_oil_yield 
-                seed_train.reactions.X[3] = fermentor.cofermentation.X[3] = cell_growth # Almost all the rest goes towards cell mass
+                seed_train.reactions.X[3] = fermentor.cofermentation.X[3] = cell_growth # Almost all the rest goes towards cell mass and CO2
     
-        @performance(89.4 if fed_batch else 27.4, 137, units='g/L', element='Cofermentation', kind='coupled')
+        @performance(titer, 137, units='g/L', element='Cofermentation', kind='coupled')
         def set_cofermentation_microbial_oil_titer(microbial_oil_titer):
             if number in cellulosic_oil_configurations: fermentor.titer = microbial_oil_titer
     
-        @performance(0.61 if fed_batch else 0.31, 1.902, units='g/L', element='Cofermentation')
+        @performance(productivity, 1.902, units='g/L', element='Cofermentation')
         def set_cofermentation_microbial_oil_productivity(microbial_oil_productivity):
             if number in cellulosic_oil_configurations: fermentor.productivity = microbial_oil_productivity
     

@@ -135,8 +135,13 @@ def add_urea_nutrient(fermentor, seedtrain=None):
 def create_sucrose_fermentation_system(ins, outs,
         scrubber=None, product_group=None, Fermentor=None, titer=None,
         productivity=None, ignored_volume=None, fermentation_reaction=None,
-        fed_batch=None, add_urea=False, cell_growth_reaction=None
+        fed_batch=None, add_urea=False, cell_growth_reaction=None, 
+        SeedTrain=None,
+        seed_train_reaction=None,
     ):
+    # Note: defaults to no seed train with yeast recycle.
+    # If seed train is given, no yeast is recycled.
+    # if SeedTrain or seed_train_reaction: raise NotImplementedError
     screened_juice, = ins
     beer, evaporator_condensate, vent = outs
     if titer is None: titer = 117.0056 # g / L
@@ -300,7 +305,7 @@ def create_sucrose_fermentation_system(ins, outs,
     
     # Ethanol Production
     R301 = Fermentor('R301', 
-        ins=[H301-0, ''],
+        ins=[H301-0],
         outs=fermentor_outs, 
         tau=9, N=4, fermentation_reaction=fermentation_reaction,
         cell_growth_reaction=cell_growth_reaction,
@@ -309,30 +314,36 @@ def create_sucrose_fermentation_system(ins, outs,
     T301 = bst.StorageTank('T301', R301-1, tau=4, vessel_material='Carbon steel')
     T301.line = 'Beer tank'
     
-    # Separate 99% of yeast
-    C301 = bst.SolidsCentrifuge('C301', 
-                                  ins=T301-0,
-                                  outs=('', '' if scrubber else beer),
-                                  split=(1-1e-6, 0.99, 1, 0.01),
-                                  order=('Ethanol', 'Glucose', 'H3PO4', 'DryYeast'),
-                                  solids=('DryYeast',))
-    C301.split[:] = 1. - C301.split
-    if 'Lipid' in C301.chemicals: C301.isplit['Lipid'] = 0.
-    
-    S302 = bst.MockSplitter('S302', C301-0, (1-R301, 'Yeast'))
+    if SeedTrain:
+        T301.outs[0] = beer
+    else:
+        # Separate 99% of yeast
+        C301 = bst.SolidsCentrifuge('C301', 
+                                      ins=T301-0,
+                                      outs=('', '' if scrubber else beer),
+                                      split=(1-1e-6, 0.99, 1, 0.01),
+                                      order=('Ethanol', 'Glucose', 'H3PO4', 'DryYeast'),
+                                      solids=('DryYeast',))
+        C301.split[:] = 1. - C301.split
+        if 'Lipid' in C301.chemicals: C301.isplit['Lipid'] = 0.
+        
+        S302 = bst.MockSplitter('S302', C301-0, ('', 'Yeast'))
+        R301.ins.append(S302-0)
+        
+        @S302.add_specification
+        def adjust_yeast_recycle():
+            recycle, beer = S302.outs
+            feed, = S302.ins
+            yeast = 0.1 * feed.F_mass
+            m = C301.moisture_content
+            recycle.imass['Yeast', 'Water'] = [yeast, yeast * m / (1 - m)]
+            beer.copy_like(feed)
+            beer.separate_out(recycle, energy_balance=False)
+            beer.mol.remove_negatives()
+            beer.T = recycle.T = feed.T
+        
     R301.titer = titer # g / L
     R301.productivity = productivity # g / L-h
-    @S302.add_specification
-    def adjust_yeast_recycle():
-        recycle, beer = S302.outs
-        feed, = S302.ins
-        yeast = 0.1 * feed.F_mass
-        m = C301.moisture_content
-        recycle.imass['Yeast', 'Water'] = [yeast, yeast * m / (1 - m)]
-        beer.copy_like(feed)
-        beer.separate_out(recycle, energy_balance=False)
-        beer.mol.remove_negatives()
-        beer.T = recycle.T = feed.T
     
     def get_titer():
         s = R301.outs[1]

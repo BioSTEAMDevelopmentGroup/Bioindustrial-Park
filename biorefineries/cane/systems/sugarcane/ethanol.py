@@ -90,7 +90,7 @@ def create_sugarcane_to_ethanol_system(ins, outs,
     if WWT_kwargs:
         outs.remove(vinasse)
         wastewater_treatment_sys = bst.create_wastewater_treatment_system(
-            700, ins=[vinasse], mockup=True, **WWT_kwargs
+             ins=[vinasse], mockup=True, area=700, **WWT_kwargs
         )
         treated_water = wastewater_treatment_sys.get_outlet('RO_treated_water')
         sludge = wastewater_treatment_sys.get_outlet('sludge')

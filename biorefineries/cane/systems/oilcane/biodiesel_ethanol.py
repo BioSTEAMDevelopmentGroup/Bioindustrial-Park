@@ -121,7 +121,7 @@ def create_oilcane_to_biodiesel_and_ethanol_1g(
         outs.remove(vinasse)
         MX1.ins.append(vinasse)
         wastewater_treatment_sys = bst.create_wastewater_treatment_system(
-            900, ins=[MX1-0], mockup=True, **WWT_kwargs
+            area=900, ins=[MX1-0], mockup=True, **WWT_kwargs
         )
         treated_water = wastewater_treatment_sys.get_outlet('RO_treated_water')
         sludge = wastewater_treatment_sys.get_outlet('sludge')

@@ -40,12 +40,9 @@ def create_lipid_exctraction_system(ins, outs):
         moisture_content=0.18, split=0.,
     )
     # X401 = bst.ThermalOxidizer('X401', (U403-1, 'oxidizer_air'), 'oxidizer_emissions')
-    U403 = bst.ScrewFeeder('U403', U402-0)
-    U404 = bst.Splitter('U404', U403-0, 
-        split=dict(cellmass=1, lipid=0.3, Water=0.8),
-    )
-    bst.ConveyingBelt('U405', U404-0, cellmass)
-    lipid_wash_sys = create_lipid_wash_system(ins=U404-1, outs=lipid, mockup=True)
+    U403 = bst.ScrewPress('U403', U402-0, split=dict(cellmass=1, lipid=0.3, Water=0.8),)
+    bst.ConveyingBelt('U405', U403-0, cellmass)
+    lipid_wash_sys = create_lipid_wash_system(ins=U403-1, outs=lipid, mockup=True)
     washed_lipid, spent_wash_water = lipid_wash_sys.outs
     bst.Mixer(ins=[spent_wash_water, U401-1], outs=wastewater)
 
