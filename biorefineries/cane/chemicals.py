@@ -70,9 +70,10 @@ def create_sugarcane_chemicals():
         'Yeast', 
         formula='CH1.61O0.56N0.16',
         rho=1540,
+        Cp=Glucose.Cp(298.15),
         default=True,
-        Hf=-130412.73,
     )
+    Yeast.Hf = Glucose.Hf / Glucose.MW * Yeast.MW # Same as glucose to ignore heats related to growth
     CaO = create_new_chemical('CaO', formula='CaO')
 
     
@@ -248,14 +249,13 @@ def create_oilcane_chemicals():
 def create_cellulosic_oilcane_chemicals():
     oilcane_chemicals = create_oilcane_chemicals()
     cellulosic_chemicals = cellulosic.create_cellulosic_ethanol_chemicals()
-    removed = {'SuccinicAcid', 'H2SO4', 'Z_mobilis', 'Oil', 'Yeast'}
+    removed = {'SuccinicAcid', 'H2SO4', 'Z_mobilis', 'Oil'}
     chemicals = tmo.Chemicals([
         i for i in (oilcane_chemicals.tuple + cellulosic_chemicals.tuple) if i.ID not in removed
     ])
     chemicals.extend([
         create_acetyl_diolein(),
         tmo.Chemical('Urea', default=True, phase='l'),
-        chemicals.Glucose.copy('Yeast'),
     ])
     chemicals.extend(
         bst.wastewater.high_rate.create_missing_wwt_chemicals(chemicals)
