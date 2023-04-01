@@ -533,7 +533,7 @@ class Biorefinery:
         for i in sys.units:
             if isinstance(i, bst.MultiEffectEvaporator): i.flash = False
         HXN.acceptable_energy_balance_error = 0.02
-        HXN.replace_unit_heat_utilities = True
+        HXN.replace_unit_heat_utilities = False
         HXN.force_ideal_thermo = True
         HXN.cache_network = True
         HXN.avoid_recycle = True
