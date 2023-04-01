@@ -123,7 +123,6 @@ def save_detailed_life_cycle_tables(sigfigs=3, product=None):
             'Oilcane B-DC [kg∙CO2e∙kg-1]',
             'Oilcane B-ICF [kg∙CO2e∙kg-1]',
         ]
-        methods = ('GWP_ethanol_allocation', 'GWP_ethanol', 'GWP_ethanol_displacement')
     elif product == 'ethanol':
         IDs = ('S1', 'S2', 'O1', 'O2')
         streams = [(get(i, 'advanced_ethanol'), get(i, 'cellulosic_ethanol')) for i in IDs]
