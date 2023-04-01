@@ -14,6 +14,7 @@ from . import contour_plots
 from . import feature_mockups
 from . import uncertainty_plots
 from . import parse_configuration
+from . import tables
 
 __all__ = (
     *chemicals.__all__,
@@ -28,6 +29,7 @@ __all__ = (
     *contour_plots.__all__,
     *uncertainty_plots.__all__,
     *parse_configuration.__all__,
+    *tables.__all__,
 )
 
 from .chemicals import *
@@ -43,3 +45,4 @@ from .contour_plots import *
 from .feature_mockups import *
 from .uncertainty_plots import *
 from .parse_configuration import *
+from .tables import *
