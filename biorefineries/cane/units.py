@@ -32,8 +32,8 @@ class SeedTrain(SeedTrain):
     #   Reaction definition                   Reactant    Conversion
     Rxn('Glucose -> 2 Ethanol + 2 CO2',       'Glucose',   0.9000, chemicals),
     Rxn('3 Xylose -> 5 Ethanol + 5 CO2',      'Xylose',    0.8000, chemicals),
-    Rxn('Glucose -> Cellmass',                'Glucose',  0.0473, chemicals),
-    Rxn('Xylose -> Cellmass',                 'Xylose',  0.0421, chemicals),
+    Rxn('Glucose -> Cellmass',                'Glucose',  0.0473, chemicals, correct_mass_balance=True),
+    Rxn('Xylose -> Cellmass',                 'Xylose',  0.0421, chemicals, correct_mass_balance=True),
         ])
         
     def _setup(self):
@@ -46,6 +46,7 @@ class SeedTrain(SeedTrain):
         self.reactions.force_reaction(effluent)
         effluent.mol.remove_negatives()
         effluent.T = self.T
+        vent.empty()
         vent.receive_vent(effluent, energy_balance=False)
         # vent.copy_flow(effluent, ('CO2', 'O2'), remove=True)
         
@@ -63,8 +64,8 @@ class CoFermentation(CoFermentation):
     #   Reaction definition                   Reactant    Conversion
     Rxn('Glucose -> 2 Ethanol + 2 CO2',       'Glucose',   0.9500, chemicals),
     Rxn('3 Xylose -> 5 Ethanol + 5 CO2',      'Xylose',    0.8500, chemicals),
-    Rxn('Glucose -> Cellmass',                'Glucose',  0.05, chemicals),
-    Rxn('Xylose -> Cellmass',                 'Xylose',  0.05, chemicals),
+    Rxn('Glucose -> Cellmass',                'Glucose',  0.05, chemicals, correct_mass_balance=True),
+    Rxn('Xylose -> Cellmass',                 'Xylose',  0.05, chemicals, correct_mass_balance=True),
         ])
         
         if 'CSL' in chemicals:
