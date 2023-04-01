@@ -36,18 +36,20 @@ images_folder = os.path.join(os.path.dirname(__file__), 'images')
 
 # %% Load simulation data
 
-def spearman_file(name):
+def spearman_file(name, line=None):
     number, agile, energy_cane = parse_configuration(name)
     filename = f'oilcane_spearman_{number}'
     if agile: filename += '_agile'
+    if line: filename += '_' + line
     if energy_cane: filename += '_energy_cane'
     filename += '.xlsx'
     return os.path.join(results_folder, filename)
 
-def monte_carlo_file(name, across_lines=False, across_oil_content=None, extention='xlsx'):
+def monte_carlo_file(name, across_lines=False, across_oil_content=None, line=None, extention='xlsx'):
     number, agile, energycane = parse_configuration(name)
     filename = f'oilcane_monte_carlo_{number}'
     if agile: filename += '_agile'
+    if line: filename += '_' + line
     if energycane: filename += '_energycane'
     if across_lines: filename += '_across_lines'
     if across_oil_content: 
@@ -58,8 +60,9 @@ def monte_carlo_file(name, across_lines=False, across_oil_content=None, extentio
     filename += '.' + extention
     return os.path.join(results_folder, filename)
 
-def autoload_file_name(name):
+def autoload_file_name(name, line=None):
     filename = str(name).replace('*', '_agile')
+    if line: filename += '_' + line
     return os.path.join(results_folder, filename)
 
 def get_monte_carlo_across_oil_content(name, metric, derivative=False):
@@ -105,13 +108,13 @@ def get_line_monte_carlo(line, name, feature, cache={}):
     mc = mc.dropna(how='all', axis=0)
     return mc
 
-def get_monte_carlo(name, features=None, cache={}):
+def get_monte_carlo(name, features=None, line=None, cache={}):
     key = parse_configuration(name)
     if isinstance(key, Configuration):
         if key in cache:
             df = cache[key]
         else:
-            file = monte_carlo_file(key)
+            file = monte_carlo_file(key, line=line)
             cache[key] = df = pd.read_excel(file, header=[0, 1], index_col=[0])
         if features is None:
             mc = df
@@ -134,8 +137,8 @@ def get_monte_carlo(name, features=None, cache={}):
             index = features.index
         else:
             index = [i.index for i in features]
-        df_a = get_monte_carlo(key.a)[index]
-        df_b = get_monte_carlo(key.b)[index]
+        df_a = get_monte_carlo(key.a, line=line)[index]
+        df_b = get_monte_carlo(key.b, line=line)[index]
         row_a = df_a.shape[0]
         row_b = df_b.shape[0]
         try:

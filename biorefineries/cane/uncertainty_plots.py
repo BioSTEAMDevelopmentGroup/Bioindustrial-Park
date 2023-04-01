@@ -76,7 +76,8 @@ __all__ = (
     'plot_unlabeled_feedstock_conventional_comparison_kde',
     'plot_competitive_biomass_yield_across_oil_content',
     'plot_competitive_microbial_oil_yield_across_oil_content',
-    'plot_microbial_oil_bioethanol_comparison_kde',
+    'plot_microbial_oil_bioethanol_oilcane_comparison_kde',
+    'plot_microbial_oil_bioethanol_sugarcane_comparison_kde',
     'area_colors',
     'area_hatches',
 )
@@ -524,7 +525,7 @@ def plot_breakdowns(biodiesel_only=False):
     set_figure_size(aspect_ratio=0.68)
     fig, axes = plt.subplots(nrows=1, ncols=2)
     plt.sca(axes[0])
-    c1, c2 = ('O5', 'O6') if biodiesel_only else ('O1', 'O2')
+    c1, c2 = ('O7', 'O8') if biodiesel_only else ('O1', 'O2')
     plot_configuration_breakdown(c1, ax=axes[0], legend=False)
     plt.sca(axes[1])
     plot_configuration_breakdown(c2, ax=axes[1], legend=True)
@@ -550,11 +551,12 @@ def plot_breakdowns(biodiesel_only=False):
 def plot_kde(name, metrics=(GWP_ethanol, MFPP), xticks=None, yticks=None,
              xbox_kwargs=None, ybox_kwargs=None, top_left='',
              top_right='Tradeoff', bottom_left='Tradeoff',
-             bottom_right='', fs=None, ticklabels=True, aspect_ratio=1.1):
+             bottom_right='', fs=None, ticklabels=True, aspect_ratio=1.1,
+             line=None):
     set_font(size=fs or 8)
     set_figure_size(width='half', aspect_ratio=aspect_ratio)
     Xi, Yi = [i.index for i in metrics]
-    df = get_monte_carlo(name, metrics)
+    df = get_monte_carlo(name, metrics, line)
     y = df[Yi].values
     x = df[Xi].values
     sX, sY = [kde_comparison_settings[i] for i in metrics]
@@ -635,12 +637,13 @@ def plot_kde_fake_scenarios_ethanol_price(name, xticks=None, yticks=None,
 def plot_kde_2d(name, metrics=(GWP_ethanol, MFPP), xticks=None, yticks=None,
                 top_left='', top_right='Tradeoff', bottom_left='Tradeoff',
                 bottom_right='', xbox_kwargs=None, ybox_kwargs=None, titles=None,
-                fs=None, ticklabels=True):
+                fs=None, ticklabels=True, line=None):
     set_font(size=fs or 8)
     set_figure_size(aspect_ratio=0.6)
     if isinstance(name, str): name = (name,)
+    if isinstance(line, str): line = len(name)*(line,)
     Xi, Yi = [i.index for i in metrics]
-    dfs = [get_monte_carlo(i, metrics) for i in name]
+    dfs = [get_monte_carlo(i, metrics, line) for i in zip(name, line)]
     sX, sY = [kde_comparison_settings[i] for i in metrics]
     _, xlabel, fx = sX
     _, ylabel, fy = sY
@@ -788,15 +791,31 @@ def plot_configuration_comparison_kde(fs=None):
         file = os.path.join(images_folder, f'configuration_comparison_kde.{i}')
         plt.savefig(file, transparent=True)
 
-def plot_microbial_oil_bioethanol_comparison_kde(fs=None):
+def plot_microbial_oil_bioethanol_oilcane_comparison_kde(fs=None):
     plot_kde(
-        'O6 - O2',
+        'O8 - O2',
         # yticks=sorted([-1 * i for i in [-39, -26, -13, 0, 13, 26]]),
         # xticks=sorted([-1 * i for i in [-0.06, -0.04, -0.02, 0, 0.02, 0.04]]),
         top_right='GWP\nTradeoff()',
         bottom_left='MFPP\nTradeoff()',
         top_left='Microbial Oil\nFavored()',
         bottom_right='Bioethanol\nFavored()',
+        fs=fs,
+    )
+    for i in ('svg', 'png'):
+        file = os.path.join(images_folder, f'microbial_oil_bioethanol_comparison_kde.{i}')
+        plt.savefig(file, transparent=True)
+
+def plot_microbial_oil_bioethanol_sugarcane_comparison_kde(fs=None):
+    plot_kde(
+        'O7 - S1',
+        # yticks=sorted([-1 * i for i in [-39, -26, -13, 0, 13, 26]]),
+        # xticks=sorted([-1 * i for i in [-0.06, -0.04, -0.02, 0, 0.02, 0.04]]),
+        top_right='GWP\nTradeoff()',
+        bottom_left='MFPP\nTradeoff()',
+        top_left='Microbial Oil\nFavored()',
+        bottom_right='Bioethanol\nFavored()',
+        line='WT',
         fs=fs,
     )
     for i in ('svg', 'png'):
@@ -1191,7 +1210,6 @@ def _plot_competitive_biomass_yield_across_oil_content(
         'Financially\ncompetitive\ntargets', 6, oil_content, biomass_yield_p50,
         dy=6, dy_text=0.8, position='over'
     )
-
 
 def plot_competitive_microbial_oil_yield_across_oil_content(
         configuration=None,
