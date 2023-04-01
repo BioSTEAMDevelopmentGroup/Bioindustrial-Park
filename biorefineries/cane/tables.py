@@ -117,7 +117,7 @@ def save_detailed_life_cycle_tables(sigfigs=3, product=None):
     if product == 'biodiesel':
         IDs = ('O1', 'O2', 'O7', 'O8')
         streams = [(get(i, 'cellulosic_based_diesel'), get(i, 'biomass_based_diesel')) for i in IDs]
-        names = columns = [
+        columns = [
             'Oilcane EB-DC [kg∙CO2e∙kg-1]',
             'Oilcane EB-ICF [kg∙CO2e∙kg-1]',
             'Oilcane B-DC [kg∙CO2e∙kg-1]',
@@ -126,7 +126,7 @@ def save_detailed_life_cycle_tables(sigfigs=3, product=None):
     elif product == 'ethanol':
         IDs = ('S1', 'S2', 'O1', 'O2')
         streams = [(get(i, 'advanced_ethanol'), get(i, 'cellulosic_ethanol')) for i in IDs]
-        names = columns = [
+        columns = [
             'Sugarcane E-DC [kg∙CO2e∙kg-1]',
             'Sugarcane E-ICF [kg∙CO2e∙kg-1]',
             'Oilcane EB-DC [kg∙CO2e∙kg-1]',
@@ -134,7 +134,7 @@ def save_detailed_life_cycle_tables(sigfigs=3, product=None):
         ]
     else:
         raise ValueError(f"product '{product}' is not valid; valid options include 'biodiesel' and 'ethanol'")
-    
+    names = [i.split(' [')[0] for i in columns]
     methods = (f'GWP_{product}_allocation', f'GWP_{product}', f'GWP_{product}_displacement')
     syss = [get(i, 'sys') for i in IDs]
     values = np.zeros([len(methods), len(IDs)])
