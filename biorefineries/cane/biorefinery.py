@@ -163,8 +163,9 @@ def rename_storage_units(units, storage_area):
     bst.rename_units([i for i in units if bst.is_storage_unit(i)], storage_area)
 
 def YRCP2023():
-    Biorefinery.default_conversion_performance_distribution = 'shortterm'
+    Biorefinery.default_conversion_performance_distribution = 'longterm'
     Biorefinery.default_prices_correleted_to_crude_oil = True
+    Biorefinery.default_oil_content_range = [2, 5]
     Biorefinery.default_year = 2023
     Biorefinery.default_WWT = 'high-rate'
 
@@ -177,6 +178,7 @@ class Biorefinery:
     default_conversion_performance_distribution = 'longterm'
     default_year = 2022
     default_WWT = None
+    default_oil_content_range = [5, 15]
     baseline_moisture_content = 0.70
     
     @property
@@ -225,7 +227,8 @@ class Biorefinery:
     def __new__(cls, name, chemicals=None, reduce_chemicals=False, 
                  avoid_natural_gas=True, conversion_performance_distribution=None,
                  year=None, cache=cache, feedstock_line=None,
-                 prices_correleted_to_crude_oil=None, WWT_kwargs=None):
+                 prices_correleted_to_crude_oil=None, WWT_kwargs=None,
+                 oil_content_range=None):
         if year is None: year = cls.default_year
         if conversion_performance_distribution is None: 
             conversion_performance_distribution = cls.default_conversion_performance_distribution
@@ -637,12 +640,13 @@ class Biorefinery:
         def triangular(lb, mid, ub, *args, **kwargs):
             return parameter(*args, distribution=shape.Triangle(lb, mid, ub), bounds=(lb, ub), **kwargs)
         
+        if oil_content_range is None:
+            oil_content_range = self.default_oil_content_range
+        
         if conversion_performance_distribution == 'shortterm':
             performance = potential_shortterm_gain_in_performance
-            oil_content_range = [2, 5]
         elif conversion_performance_distribution == 'longterm':
             performance = potential_longterm_gain_in_performance
-            oil_content_range = [5, 15]
         else:
             raise ValueError("`conversion_performance_distribution` must be either 'longterm' or 'shortterm")
             
