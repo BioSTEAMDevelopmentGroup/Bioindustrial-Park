@@ -556,6 +556,22 @@ class Biorefinery:
          biomass_based_diesel, cellulosic_based_diesel, natural_gas, 
          biodiesel, lime, H3PO4) = [get_stream(i) for i in stream_names]
         
+        def get_renamed_stream(search, ID):
+            if search in flowsheet.stream:
+                stream = s[search]  
+                stream.ID = ID
+            else:
+                stream = MockStream(ID)
+            return stream
+        
+        NaOCl = get_renamed_stream('naocl_R602', 'NaOCl')
+        citric_acid = get_renamed_stream('citric_R602', 'citric_acid')
+        bisulfite = get_renamed_stream('bisulfite_R602', 'bisulfite')
+        polishing_filter_air = get_renamed_stream('air_R603', 'polishing_filter_air')
+        polishing_filter_vent = get_renamed_stream('vent_R603', 'polishing_filter_vent')
+        set_GWPCF(NaOCl, 'NaOCl')
+        set_GWPCF(citric_acid, 'citric acid')
+        set_GWPCF(bisulfite, 'bisulfite')
         set_GWPCF(feedstock, 'sugarcane')
         set_GWPCF(H3PO4, 'H3PO4')
         set_GWPCF(lime, 'lime', dilution=0.046) # Diluted with water
