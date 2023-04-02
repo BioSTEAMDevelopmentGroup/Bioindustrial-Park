@@ -427,6 +427,10 @@ def run_sugarcane_microbial_oil_and_ethanol(N=None):
     run_uncertainty_and_sensitivity('O7', N, line='WT')
     run_uncertainty_and_sensitivity('S2', N, line='WT')
     run_uncertainty_and_sensitivity('O8', N, line='WT')
+    run_uncertainty_and_sensitivity('O1', N)
+    run_uncertainty_and_sensitivity('O7', N)
+    run_uncertainty_and_sensitivity('O2', N)
+    run_uncertainty_and_sensitivity('O8', N)
     
 def run_oilcane_microbial_oil_and_ethanol_across_oil_content(N=None):
     if N is None: N = 10

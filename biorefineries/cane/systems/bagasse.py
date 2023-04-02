@@ -25,6 +25,7 @@ def create_bagasse_pelleting_system(ins, outs):
         (U401-0, 'dryer_air', 'dryer_natural_gas'), 
         ('', 'dryer_outlet_air', 'dryer_emissions'),
         moisture_content=0.18, split=0.,
+        utility_agent='Steam',
     )
     # X401 = bst.ThermalOxidizer('X401', (U403-1, 'oxidizer_air'), 'oxidizer_emissions')
     U403 = bst.ScrewFeeder('U403', U402-0)

@@ -849,22 +849,31 @@ class Biorefinery:
             
         @performance(lipid_yield * 100, max_lipid_yield_glucose * 100, units='%', element='Cofermenation', kind='coupled')
         def set_glucose_to_microbial_oil_yield(glucose_to_microbial_oil_yield):
-            glucose_to_microbial_oil_yield *= 0.01
-            cell_growth = 0.999 - glucose_to_microbial_oil_yield # Almost all the rest goes towards cell mass and CO2
             if number in cellulosic_oil_configurations:
-                fermentor.cofermentation.X[0] = glucose_to_microbial_oil_yield 
-                fermentor.cofermentation.X[2] = cell_growth
+                fermentation_reaction = fermentor.cofermentation[0]
+                cell_growth_reaction = fermentor.cofermentation[2]
             elif number in oil_configurations:
-                fermentor.fermentation_reaction.X = glucose_to_microbial_oil_yield
-                fermentor.cell_growth_reaction.X = cell_growth
-        
+                fermentation_reaction = fermentor.fermentation_reaction
+                cell_growth_reaction = fermentor.cell_growth_reaction
+            else:
+                return
+            glucose_to_microbial_oil_yield *= 0.01
+            fermentation_reaction.product_yield(
+                product='TAG', product_yield=glucose_to_microbial_oil_yield, basis='wt'
+            )
+            glucose_to_microbial_oil_yield = fermentation_reaction.X
+            cell_growth_reaction.X = 0.999 - glucose_to_microbial_oil_yield # Almost all the rest goes towards cell mass and CO2
+            
         @performance(lipid_yield * 100, max_lipid_yield_xylose * 100, units='%', element='Cofermenation', kind='coupled')
         def set_xylose_to_microbial_oil_yield(xylose_to_microbial_oil_yield):
             if number in cellulosic_oil_configurations:
                 xylose_to_microbial_oil_yield *= 0.01
-                cell_growth = 0.999 - xylose_to_microbial_oil_yield
-                fermentor.cofermentation.X[1] = xylose_to_microbial_oil_yield 
-                fermentor.cofermentation.X[3] = cell_growth # Almost all the rest goes towards cell mass and CO2
+                fermentation_reaction = fermentor.cofermentation[1]
+                cell_growth_reaction = fermentor.cofermentation[3]
+                fermentation_reaction.product_yield(
+                    product='TAG', product_yield=xylose_to_microbial_oil_yield, basis='wt'
+                )
+                cell_growth_reaction.X = 0.999 - fermentation_reaction.X # Almost all the rest goes towards cell mass and CO2
     
         @performance(titer, 137, units='g/L', element='Cofermentation', kind='coupled')
         def set_cofermentation_microbial_oil_titer(microbial_oil_titer):
