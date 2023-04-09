@@ -1335,7 +1335,7 @@ class Biorefinery:
         if energycane:
             set_baseline(set_cane_oil_content, 2)
         else:
-            set_baseline(set_cane_oil_content, 10)
+            set_baseline(set_cane_oil_content, np.mean(oil_content_range))
         set_baseline(set_bagasse_oil_recovery, 70)
         set_baseline(set_crushing_mill_oil_recovery, 60)
         set_baseline(set_crude_oil_price) 
@@ -1373,6 +1373,10 @@ class Biorefinery:
         # mass production
         if number in cellulosic_configurations:
             flowsheet('SludgeCentrifuge').strict_moisture_content = False
+            flowsheet(bst.PressureFilter).isplit[
+                'Yeast', 'Glucan', 'Xylan', 'Arabinan', 'Galactan', 'Lignin',
+                'Solids',
+            ] = 1.
         
         ## Simulation
         sys.simulate()

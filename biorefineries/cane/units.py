@@ -47,8 +47,7 @@ class SeedTrain(SeedTrain):
         effluent.mol.remove_negatives()
         effluent.T = self.T
         vent.empty()
-        vent.receive_vent(effluent, energy_balance=False)
-        # vent.copy_flow(effluent, ('CO2', 'O2'), remove=True)
+        vent.copy_flow(effluent, ('CO2', 'O2'), remove=True)
         
 
 class CoFermentation(CoFermentation):

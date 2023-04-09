@@ -26,6 +26,7 @@ __all__ = (
     'run_all',
     'run_sugarcane_microbial_oil_and_ethanol',
     'run_oilcane_microbial_oil_and_ethanol_across_oil_content',
+    'run_oilcane_microbial_oil_and_ethanol_across_lines',
 )
 
 configuration_names = (
@@ -209,10 +210,15 @@ def run_uncertainty_and_sensitivity(name, N, rule='L',
         df = cane.get_composition_data()
         current_line = [line]
         if name == 'O2': 
-            br_sugarcane = cane.Biorefinery(name.replace('O2', 'S2'), **kwargs, feedstock_line=line)
+            sugarcane_name = name.replace('O2', 'S2')
+        else:
+            sugarcane_name = name
+        br_sugarcane = cane.Biorefinery(sugarcane_name, **kwargs, feedstock_line=line)
         def set_line(line, current_line=current_line):
-            if name == 'O2': 
+            if name in ('O1', 'O2'): 
                 config = br_sugarcane if line in ('WT', 'EC') else br
+            else:
+                config = br
             config.set_feedstock_line(line)
             current_line[0] = line
             np.random.seed(1)
@@ -221,7 +227,10 @@ def run_uncertainty_and_sensitivity(name, N, rule='L',
         @no_derivative
         def evaluate(current_line=current_line, **kwargs):
             line = current_line[0]
-            if name == 'O2': config = br_sugarcane if line in ('WT', 'EC') else br
+            if name in ('O1', 'O2'): 
+                config = br_sugarcane if line in ('WT', 'EC') else br
+            else:
+                config = br
             autoload_file = autoload_file_name(f"{name}_{config.feedstock_line}")
             config.model.evaluate(
                 autosave=autosave, 
@@ -262,7 +271,7 @@ def run_uncertainty_and_sensitivity(name, N, rule='L',
             # Replace `set_cane_oil_content` parameter with `set_ROI_target`.
             # The actual distribution does not matter because these values are updated
             # on the first coordinate when the oil content is 0 (i.e., when the feedstock is sugarcane).
-            if '5' in name or '6' in name:
+            if any([i in name for i in ('5', '6', '7', '8')]):
                 br_sugarcane = None
                 br.model.metrics = [br.ROI, br.competitive_biomass_yield, br.net_energy_production]
                 br.update_dry_biomass_yield(br.baseline_dry_biomass_yield)
@@ -272,7 +281,9 @@ def run_uncertainty_and_sensitivity(name, N, rule='L',
                 br_sugarcane = cane.Biorefinery(name.replace('O', 'S'))
                 br_sugarcane.update_dry_biomass_yield(br.baseline_dry_biomass_yield)
         elif across_oil_content == 'microbial oil vs bioethanol':
-            ethanol_name = name.replace('5', '1').replace('6', '2')
+            ethanol_name = name
+            for i, j in [('5', '1'), ('6', '2'), ('7', '1'), ('8', '2')]:
+                ethanol_name = ethanol_name.replace(i, j)
             br_ethanol = cane.Biorefinery(ethanol_name)
             br.feedstock.price = br_ethanol.feedstock.price = 0.035 # Same feedstock, same price, but actual price does not matter
             parameter = br_ethanol.set_cane_oil_content
@@ -421,7 +432,7 @@ def run_all(N, across_lines=False, rule='L', configurations=None,
         )
 
 def run_sugarcane_microbial_oil_and_ethanol(N=None):
-    if N is None: N = 100
+    if N is None: N = 1000
     cane.YRCP2023()
     run_uncertainty_and_sensitivity('S1', N, line='WT')
     run_uncertainty_and_sensitivity('O7', N, line='WT')
@@ -433,9 +444,17 @@ def run_sugarcane_microbial_oil_and_ethanol(N=None):
     run_uncertainty_and_sensitivity('O8', N)
     
 def run_oilcane_microbial_oil_and_ethanol_across_oil_content(N=None):
-    if N is None: N = 10
+    if N is None: N = 100
     cane.YRCP2023()
-    run_uncertainty_and_sensitivity('O7', N, across_oil_content=True)
-    run_uncertainty_and_sensitivity('O8', N, across_oil_content=True)
-    run_uncertainty_and_sensitivity('O1', N, across_oil_content=True)
-    run_uncertainty_and_sensitivity('O2', N, across_oil_content=True)        
+    run_uncertainty_and_sensitivity('O7', N, across_oil_content='oilcane vs sugarcane')
+    run_uncertainty_and_sensitivity('O8', N, across_oil_content='oilcane vs sugarcane')
+    run_uncertainty_and_sensitivity('O1', N, across_oil_content='oilcane vs sugarcane')
+    run_uncertainty_and_sensitivity('O2', N, across_oil_content='oilcane vs sugarcane')        
+    
+def run_oilcane_microbial_oil_and_ethanol_across_lines(N=None):
+    if N is None: N = 100
+    cane.YRCP2023()
+    run_uncertainty_and_sensitivity('O7', N, across_lines=True)
+    run_uncertainty_and_sensitivity('O8', N, across_lines=True)
+    run_uncertainty_and_sensitivity('O1', N, across_lines=True)
+    run_uncertainty_and_sensitivity('O2', N, across_lines=True)        
