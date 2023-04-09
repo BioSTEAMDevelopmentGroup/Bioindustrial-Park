@@ -32,11 +32,10 @@ __all__ = (
 
 @chemical_cache
 def create_sugarcane_chemicals():
-    cal2J = 4.184
     (Water, Ethanol, Glucose, Sucrose, H3PO4, P4O10, CO2, Octane, O2, N2, CH4) = chemicals = tmo.Chemicals(
         ['Water', 'Ethanol', 
-         tmo.Chemical('Glucose', phase='l', Hf=cal2J*-300428),
-         tmo.Chemical('Sucrose', phase='l', Hf=cal2J*-480900), 
+         tmo.Chemical('Glucose', phase='l'),
+         tmo.Chemical('Sucrose', phase='l'), 
          tmo.Chemical('H3PO4', phase='s'),
          tmo.Chemical('P4O10', phase='s'),
          tmo.Chemical('CO2', phase='g'), 
