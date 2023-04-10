@@ -90,6 +90,7 @@ def create_oilcane_to_biodiesel_1g(
         ins=[screened_juice],
         scrubber=False,
         SeedTrain=units.SeedTrain,
+        Fermentor=units.AeratedFermentation,
         seed_train_reaction=growrxn,
         fermentation_reaction=fermrxn,
         cell_growth_reaction=growrxn,
@@ -97,16 +98,12 @@ def create_oilcane_to_biodiesel_1g(
         titer=titer,
         productivity=productivity,
         product_group='Lipid',
+        fermentation_kwargs={},
         mockup=True,
         area=300,
         add_urea=True,
         udct=True,
     )
-    fermentor = epdct['R301']
-    fermentor.N = None
-    fermentor.V = 3785.4118
-    fermentor.Nmin = 2
-    fermentor.Nmax = 36
     product, condensate, vent = fermentation_sys.outs
     post_fermentation_oil_separation_sys = create_lipid_exctraction_system(
         ins=product,

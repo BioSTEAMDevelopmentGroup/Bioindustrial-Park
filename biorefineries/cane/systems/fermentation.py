@@ -136,7 +136,7 @@ def create_sucrose_fermentation_system(ins, outs,
         scrubber=None, product_group=None, Fermentor=None, titer=None,
         productivity=None, ignored_volume=None, fermentation_reaction=None,
         fed_batch=None, add_urea=False, cell_growth_reaction=None, 
-        SeedTrain=None,
+        SeedTrain=None, fermentation_kwargs=None,
         seed_train_reaction=None,
     ):
     # Note: defaults to no seed train with yeast recycle.
@@ -304,11 +304,16 @@ def create_sucrose_fermentation_system(ins, outs,
     H301 = bst.HXutility('H301', M301-0, T=273.15 + 30)
     
     # Ethanol Production
+    if fermentation_kwargs is None:
+        fermentation_kwargs = dict(
+            tau=9, N=4, 
+        )
     R301 = Fermentor('R301', 
         ins=[H301-0],
         outs=fermentor_outs, 
-        tau=9, N=4, fermentation_reaction=fermentation_reaction,
+        fermentation_reaction=fermentation_reaction,
         cell_growth_reaction=cell_growth_reaction,
+        **fermentation_kwargs,
     ) 
     if fed_batch: R301.ins.append(MT1.outs[0])
     T301 = bst.StorageTank('T301', R301-1, tau=4, vessel_material='Carbon steel')

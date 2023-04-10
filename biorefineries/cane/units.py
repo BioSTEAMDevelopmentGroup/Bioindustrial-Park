@@ -82,7 +82,50 @@ class CoFermentation(CoFermentation):
         else:
             self.lipid_reaction = self.oil_reaction = None
 
-            
+          
+class AeratedCoFermentation(bst.AeratedBioreactor): # For microbial oil production
+    V_max_default = 1000
+    def __init__(
+            self, ID='', ins=None, outs=(), thermo=None,  
+            *, cofermentation, **kwargs,
+        ):
+        bst.StirredTankReactor.__init__(self, ID, ins, outs, thermo, **kwargs)
+        chemicals = self.chemicals
+        self.hydrolysis_reaction = Rxn('Sucrose + Water -> 2Glucose', 'Sucrose', 1.00, chemicals)
+        self.cofermentation = cofermentation
+        self.lipid_reaction = self.oil_reaction = PRxn([
+            Rxn('TAG + 3Water -> 3FFA + Glycerol', 'TAG', 0.23, chemicals),
+            Rxn('TAG + Water -> FFA + DAG', 'TAG', 0.02, chemicals)
+        ])
+    
+    def run_reactions(self, effluent):
+        self.hydrolysis_reaction.force_reaction(effluent)
+        self.lipid_reaction.force_reaction(effluent)
+        if effluent.imol['H2O'] < 0.: effluent.imol['H2O'] = 0.
+        self.cofermentation.force_reaction(effluent)
+        
+class AeratedFermentation(bst.AeratedBioreactor): # For microbial oil production
+    V_max_default = 500
+    def __init__(
+            self, ID='', ins=None, outs=(), thermo=None,  
+            *, fermentation_reaction, cell_growth_reaction, **kwargs,
+        ):
+        bst.StirredTankReactor.__init__(self, ID, ins, outs, thermo, **kwargs)
+        chemicals = self.chemicals
+        self.hydrolysis_reaction = Rxn('Sucrose + Water -> 2Glucose', 'Sucrose', 1.00, chemicals)
+        self.fermentation_reaction = fermentation_reaction
+        self.cell_growth_reaction = cell_growth_reaction
+        self.lipid_reaction = self.oil_reaction = PRxn([
+            Rxn('TAG + 3Water -> 3FFA + Glycerol', 'TAG', 0.23, chemicals),
+            Rxn('TAG + Water -> FFA + DAG', 'TAG', 0.02, chemicals)
+        ])
+    
+    def run_reactions(self, effluent):
+        self.lipid_reaction.force_reaction(effluent)
+        if effluent.imol['H2O'] < 0.: effluent.imol['H2O'] = 0.
+        self.fermentation_reaction.force_reaction(effluent)
+        self.cell_growth_reaction.force_reaction(effluent)
+    
 class OleinCrystallizer(bst.BatchCrystallizer):
     
     def __init__(self, ID='', ins=None, outs=(), thermo=None, *, 

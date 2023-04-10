@@ -362,7 +362,10 @@ class Biorefinery:
             prs = flowsheet(bst.PretreatmentReactorSystem)
             saccharification = flowsheet(bst.Saccharification)
             seed_train = flowsheet(bst.SeedTrain)
-            fermentor = flowsheet(bst.CoFermentation)
+            try:
+                fermentor = flowsheet(bst.CoFermentation)
+            except:
+                fermentor = flowsheet(bst.AeratedBioreactor)
             self.pretreatment_rxnsys = tmo.ReactionSystem(
                 prs.reactions, saccharification.saccharification
             )
@@ -376,7 +379,10 @@ class Biorefinery:
             saccharification.saccharification.X[0] = 0.0 # Baseline
             prs.reactions.X[10] = 0.0 # baseline
         else:
-            fermentor = flowsheet(bst.Fermentation)
+            try:
+                fermentor = flowsheet(bst.Fermentation)
+            except:
+                fermentor = flowsheet(bst.AeratedBioreactor)
                 
         def set_glucose_yield(glucose_yield):
             if number in cellulosic_configurations:

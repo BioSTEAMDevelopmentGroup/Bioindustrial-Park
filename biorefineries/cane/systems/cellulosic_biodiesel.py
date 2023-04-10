@@ -76,7 +76,7 @@ def create_oilcane_to_biodiesel_combined_1_and_2g_post_fermentation_oil_separati
         productivity=productivity,
         cofermentation_reactions=cofermentation,
         seed_train_reactions=bst.Rxn(None, 'Glucose', 1.), # Easier to simulate reactions only at cofermentation reactor
-        CoFermentation=units.CoFermentation,
+        CoFermentation=units.AeratedCoFermentation,
         SeedTrain=units.SeedTrain,
         include_scrubber=False,
         fed_batch=fed_batch,
