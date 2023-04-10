@@ -358,7 +358,7 @@ def test_oilcane_O2():
     assert np.allclose(tea.material_cost, 99692586.37760958, rtol=5e-2)
     assert np.allclose(tea.installed_equipment_cost, 260577732.39089537, rtol=5e-2)
     assert np.allclose(tea.utility_cost, -4057102.602630536, rtol=5e-2)
-    assert np.allclose(units.get_heating_duty(), 373.79658082208766, rtol=5e-2)
+    assert np.allclose(units.get_cooling_duty(), 373.79658082208766, rtol=5e-2)
     assert np.allclose(units.get_cooling_duty(), 351.76465645262596, rtol=5e-2)
     assert np.allclose(units.get_electricity_consumption(), 23.60835447217956, rtol=5e-2)
     assert np.allclose(units.get_electricity_production(), 41.31363544392717, rtol=5e-2)

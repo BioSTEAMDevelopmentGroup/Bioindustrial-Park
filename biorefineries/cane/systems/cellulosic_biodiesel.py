@@ -48,16 +48,21 @@ def create_oilcane_to_biodiesel_combined_1_and_2g_post_fermentation_oil_separati
     glucose_fermrxn.product_yield('TAG', basis='wt', product_yield=lipid_yield)
     xylose_fermrxn = tmo.Rxn('O2 + Xylose -> H2O + TAG', 'Xylose', 1., correct_atomic_balance=True)
     xylose_fermrxn.product_yield('TAG', basis='wt', product_yield=lipid_yield)
-    glucose_growrxn = tmo.Rxn(
-        f'Glucose -> {biomass_coeff: .3f} Cellmass + {1. - biomass_coeff: .3f} CO2', 'Glucose', 
-        0.999 - glucose_fermrxn.X, basis='wt', correct_mass_balance=True
+    glucose_growrxn = (
+        tmo.Rxn('Glucose + O2 -> CO2 + H2O', 'Glucose', (1 - biomass_coeff),
+                  correct_atomic_balance=True)
+        + tmo.Rxn('Glucose -> Cellmass', 'Glucose', biomass_coeff, 
+                basis='wt', correct_mass_balance=True)
     )
-    glucose_growrxn.basis = 'mol'
-    xylose_growrxn = tmo.Rxn(
-        f'Xylose -> {biomass_coeff: .3f} Cellmass + {1. - biomass_coeff: .3f} CO2', 'Xylose', 
-        0.999 - xylose_fermrxn.X, basis='wt', correct_mass_balance=True
+    glucose_growrxn.X = 0.999 - glucose_fermrxn.X
+    xylose_growrxn = (
+        tmo.Rxn('Xylose + O2 -> CO2 + H2O', 'Xylose', (1 - biomass_coeff),
+                  correct_atomic_balance=True)
+        + tmo.Rxn('Xylose -> Cellmass', 'Xylose', biomass_coeff, 
+                basis='wt', correct_mass_balance=True)
     )
-    xylose_growrxn.basis = 'mol'
+    xylose_growrxn.X = 0.999 - glucose_fermrxn.X
+    
     cofermentation = tmo.PRxn(
         [glucose_fermrxn,
          xylose_fermrxn,
