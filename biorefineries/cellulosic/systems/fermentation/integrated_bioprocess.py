@@ -76,7 +76,7 @@ def create_integrated_bioprocess_saccharification_and_cofermentation_system(
         def adjust_CSL_and_DAP_feed_to_seed_train():
             feed, CSL1, DAP1 = R302.ins
             CSL1.imass['CSL'] = 0.0050 * feed.F_mass
-            DAP1.imass['DAP'] = 0.33 * feed.F_vol
+            DAP1.imass['DAP'] = 0.67 * feed.F_vol
         
     T301 = units.SeedHoldTank('T301', R302-1)
     R303 = SaccharificationAndCoFermentation(
