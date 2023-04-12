@@ -211,6 +211,9 @@ Furfural = chemical_database('Furfural')
 
 Hexanol = chemical_database('Hexanol')
 # Heptane = chemical_database('Heptane')
+
+
+THF = chemical_database(ID='Tetrahydrofuran')
 # Toluene = chemical_database('Toluene')
 # Tb from chemspider(chemenu database)
 # http://www.chemspider.com/Chemical-Structure.207215.html, accessed 04/07/2020
@@ -754,6 +757,8 @@ chems.set_synonym('NitricOxide', 'NO')
 chems.set_synonym('P4O10', 'PhosphorusPentoxide')
 chems.set_synonym('Na2SO4', 'SodiumSulfate')
 chems.set_synonym('AmmoniumHydroxide', 'NH4OH')
+
+chems.set_synonym('Tetrahydrofuran', 'THF')
 # chems.set_synonym('Isobutyraldehyde', 'IBA')
 
 

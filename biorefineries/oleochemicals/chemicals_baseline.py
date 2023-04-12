@@ -1,6 +1,5 @@
 """
 Created on Sat Aug 20 21:47:53 2022
-
 @author: Lavanya_Kudli
 """
 import biosteam as bst
@@ -11,28 +10,26 @@ from chemicals import atoms_to_Hill
 import thermosteam as tmo
 from thermosteam import Chemicals
 from thermo import TDependentProperty
+from biorefineries.oleochemicals import TAG_properties
+from TAG_properties import *
 #chems is a list of all the chemicals used in this biorefinery
 
 chems = tmo.Chemicals([
-#Chemicals used in biodiesel production
-        tmo.Chemical('Sodium_methoxide',formula ='NaOCH3',phase = 'l',default = True),   
-        tmo.Chemical('Methanol'),
-#Chemical for acid degumming 
-        tmo.Chemical('Citric_acid'),
-
-##chemical for representing phospholipids, taken directly from lipidcane biorefinery
-        tmo.Chemical('Phosphatidylinositol', 
+#Biodiesel preparation section chemicals
+        tmo.Chemical('Sodium_methoxide',formula ='NaOCH3',phase = 'l',default = True), #Catalyst
+        tmo.Chemical('Methanol'), 
+        tmo.Chemical('Citric_acid'),#Chemical for acid degumming 
+        tmo.Chemical('Phosphatidylinositol', ##chemical for representing phospholipids
                       formula='C47H83O13P',
                       search_db=False, 
                       CAS='383907-36-6',
                       MW = 	886.56,
                       default=True,
-                      Hf=1000*(-316.67*4 - 2466.4),#TODO: find a better assumption,assuming LLL with 4 bonds HF
-                      phase = 'l',
+                      Hf=-1.779e6,#taken from cane biorefinery
+                      phase = 'l',#taken from cane biorefinery
                       ),
-#Crude glycerol is a product of transesterification
-        tmo.Chemical('Glycerol'),
-#TAGs of High oleic sunflower oil
+        tmo.Chemical('Glycerol'),#By-product
+#TAGs of high oleic oils
         tmo.Chemical('OOO', search_ID = '122-32-7',Hf = 1000*(-76.494*18 - 815.18),phase_ref = 'l' ),#from cane>chemicals
         tmo.Chemical('LnLnLn', search_ID = '537-40-6',Hf = 1000*(-316.67*3 - 2466.4)),#This is Trilinolein
 #Below TAG's not a part of the database    
@@ -41,7 +38,7 @@ chems = tmo.Chemicals([
                       search_db = False,
                       formula = 'C54H96O6',#Based on reference search in CAS Finder
                       phase = 'l',
-                      Hf = (((2/3)*(-76.494*18 - 815.18))+((1/3)*(-316.67*2 - 2466.4)))*1000 
+                      Hf = (((2/3)*(-76.494*18 - 815.18))+((1/3)*(-316.67*2 - 2466.4)))*1000 #TODO: make a dictionary for these values
                       ),  
         tmo.Chemical('OOL',
                      search_ID = '28880-78-6',#Based on reference search in CAS Finder
@@ -113,43 +110,90 @@ chems = tmo.Chemicals([
                      search_ID = 'Tripalmitin',
                      Hf = 1000*(-59.571*16 - 1358.7)
                      ),
+        tmo.Chemical('SSS',
+                     search_ID = 'Tristearin',
+                     Hf = 1000*(-59.571*18 - 1358.7),
+                     phase = 'l'),
         
 ##Chemicals part of Biodiesel
         tmo.Chemical('Methyl_oleate'),
         tmo.Chemical('Methyl_palmitate'),
         tmo.Chemical('Methyl_stearate'),
         tmo.Chemical('Methyl_linoleate'), 
+        tmo.Chemical('Methyl_linolenate',search_ID = '301-00-8'),
         tmo.Chemical('Methyl_palmitoleate',search_ID ='1120-25-8'),
-
+     
 #Dihydroxylation chemicals
-            tmo.Chemical('Hydrogen_peroxide',phase ='l'),
-            tmo.Chemical('Water'),
+        tmo.Chemical('Hydrogen_peroxide',phase ='l'),
+        tmo.Chemical('Water',default = True),
 #Dihydroxylation products
 #Product 1       
         tmo.Chemical('MDHSA', 
                      search_ID = '1115-01-1', 
-                     Hf = -947.7*1000 #Wikepedia value for https://en.wikipedia.org/wiki/Stearic_acid
+                     Hf = -947.7*1000, #Wikepedia value for https://en.wikipedia.org/wiki/Stearic_acid
+                    phase ='l'
                     ),
 #Product 2
-#Ref for dihydroxy_palmitic_acid: https://www.chemsrc.com/en/cas/29242-09-9_803992.html    
-        tmo.Chemical('Dihydroxy_palmitic_acid',
-                 search_ID = '29242-09-9',
+        tmo.Chemical('Methyl_dihydroxy_palmitate',
+                 search_ID = '908329-09-9',#Reaxys CAS number for methyl 9,10-dihydroxy-palmitate
                  search_db = False,
-                 Tb = 458 + 273.15,#CAS finder: 458.0±25.0 °C,Press: 760 Torr
-                 formula = 'C16H32O4',
-                 MW = 288.42+273.15,
-                 Hf = -892*1000 #Wikepedia value for https://en.wikipedia.org/wiki/Palmitic_acid
+                 Tb = 458 + 273.15,#Based on 9,10 dihydroxy palmitic acid CAS finder (29242-09-9): 458.0±25.0 °C,Press: 760 Torr
+                 formula = 'C17H34O4',
+                 Hf = -892*1000, #Based on palmitic acid, Ref: https://en.wikipedia.org/wiki/Palmitic_acid
+                 phase = 'l'
                  ),
 #Product 3
-        tmo.Chemical('Methyl_9_10_dihydroxylinoleate',
-                 search_ID = '62071-03-8', 
+#Below properties based on DWSIM
+        tmo.Chemical('Tetrahydroxy_octadecanoate',
+                 search_ID = '61117-79-1', #Reaxys
                  search_db = False, 
-                 MW = 328.492,
-                 Tb = 449.4+273.15,#CAS finder: Tb =449.4±35.0 °C,Press: 760 Torr
-                 formula = 'C19H36O4',
-                 Hf = -634.7*1000 #TODO: Ref:https://webbook.nist.gov/cgi/cbook.cgi?ID=C60333&Mask=2
-                 
+                 MW = 362.51,
+                 Tb = 1077.57,#DWSIM                
+                 Hf = -3614.63*1000, #DWSIM
+                 phase = 'l'
                  ),
+# Product 4 
+#Below properties based on DWSIM   
+        tmo.Chemical.blank('Hexahydroxy_octadecanoate',#Structure obtained from Reaxys
+                           MW = 394.51,
+                           Tb = 1261.05,
+                           formula = 'C19H38O8',
+                           Hf = -4119.97*1000, #Assumed to be same as Linolenic acid
+                           phase = 'l'
+                           ),
+#Possible monoester of MDHSA with Pelargonic acid        
+        tmo.Chemical.blank('Monoester_MDHSA_PA',#Structure obtained from Reaxys                     
+                     CAS = '950910-15-3',
+                     MW = 470.73,
+                     Tb = 1084.12,#DWSIM
+                     formula = 'C28H54O5',#CAS generated compound
+                     Hf = -2705.64*1000, #DWSIM
+                     phase = 'l'
+                     ),
+#Possible diester of MDHSA with Monomethyl azelate acid        
+        tmo.Chemical.blank('Diester_MDHSA_PA',#Structure obtained from Reaxys
+                     
+                     MW = 610.76,
+                     Tb = 1274.15,
+                     formula = 'C37H70O6',
+                     Hf = -2540.21*1000,
+                     phase = 'l'),      
+        tmo.Chemical.blank('Monoester_MDHSA_MMA',#Structure obtained from Reaxys
+                     
+                     MW = 514.74,
+                     Tb = 1183.29,
+                     formula = 'C29H54O7' ,
+                     Hf =-2989.99*1000,
+                     phase = 'l'
+                     ),
+        tmo.Chemical.blank('Diester_MDHSA_MMA',#Structure obtained from Reaxys
+                     
+                     MW = 698.98,
+                     Tb =1472.49,
+                     formula = 'C39H70O10' ,
+                     Hf =-2979.85*1000,
+                     phase = 'l'),
+        
     
 # Products of oxidative_cleavage
         tmo.Chemical('Monomethyl_azelate'),
@@ -160,6 +204,8 @@ chems = tmo.Chemicals([
         tmo.Chemical('Hexanoic_acid'),
         tmo.Chemical('Malonic_acid'),
         tmo.Chemical('Pelargonic_acid'),
+        tmo.Chemical('Propanoic_acid'),
+        tmo.Chemical('Methyl_caprylate',search_ID = '111-11-5'),
         
 # Products of hydrolysis
         tmo.Chemical('Palmitic_acid'),
@@ -214,7 +260,7 @@ chems = tmo.Chemicals([
                       phase = 'l',#TODO: explore phase
                       search_ID = '6147-53-1',
                       Tb = 117.1+273.15,
-                      Hf = 0.45 #TODO: change
+                      Hf = -2.7151e+05 #Assumed to be the same as cobalt chloride for now
                       ),
         tmo.Chemical('Acetate',phase = 'l', default = True),
         tmo.Chemical('Acetate_ion', phase = 'l', search_ID = '71-50-1',default = True),
@@ -230,7 +276,7 @@ chems = tmo.Chemicals([
                        Tb = 5828.15, #Based on tungsten's BP
                        formula = 'CaWO4',
                        phase = 'l',
-                       Hf = 0.45),#TODO: change    
+                       Hf = -1002.82*1000),#Ref: Value for calcium hydroxide https://www.chemeurope.com/en/encyclopedia/Standard_enthalpy_change_of_formation_%28data_table%29.html
         tmo.Chemical('Calcium_acetate',phase = 'l', default = True),
         tmo.Chemical('Cobalt_hydroxide',phase = 'l', default = True),
         tmo.Chemical('HCl2',phase = 'l',search_ID = 'HCl'),
@@ -284,29 +330,18 @@ chems = tmo.Chemicals([
                      )
                  ])
 
-#Fitting data for MMA based on ChemSep
-# Ts = [i + 273.15 for i in  (148, 159, 120, 185.5, )]
-# Psats = [i / 760 * 101325 for i in (1, 3, 0.03, 11, )]
-# res, stats = TDependentProperty.fit_data_to_model(Ts=Ts, data=Psats, model='Antoine', do_statistics=True, multiple_tries=True, model_kwargs={'base': 10.0})
-# method = 'ANTOINE_POLING'
-# chems['Monomethyl_azelate'].Psat.ANTOINE_POLING_coefs = res['A'], res['B'], res['C']
-# chems['Monomethyl_azelate'].Psat.all_methods.add(method)
-# chems['Monomethyl_azelate'].Psat.method = method
-# chems['Monomethyl_azelate'].Psat.T_limits[method] = (100, chems['Monomethyl_azelate'].Psat.Tc)
+
 chems['Monomethyl_azelate'].Pc = 2.39587E+06#Chemical compound generator DWSIM
 chems['Monomethyl_azelate'].Tc = 837.971#Chemical compound generator DWSIM
 chems['Monomethyl_azelate'].omega = 1.09913#Chemical compound generator DWSIM
 chems['Monomethyl_azelate'].Tb = 650.2#Chemical compound generator DWSIM
+
 chems.Methyl_palmitate.Cn.l.method = 'ROWLINSON_BONDI'
 chems.Palmitic_acid.Cn.l.method = 'ROWLINSON_BONDI'
 chems.Stearic_acid.Cn.l.method = 'ROWLINSON_BONDI'
 chems.Oleic_acid.Cn.l.method = 'ROWLINSON_BONDI'
-
-
 chems.Octane.Cn.l.method = 'DADGOSTAR_SHAW' #This method works for hydrocarbons
 chems.Natural_gas.Cn.l.method = 'DADGOSTAR_SHAW' #This method works for hydrocarbons
-
-
 chems.OOO.copy_models_from(chems.PPP,['mu',
                                       ])
 chems.LnLnLn.copy_models_from(chems.PPP,['mu'])
@@ -317,8 +352,7 @@ TAGs_with_unknown_props = [ 'LLL',
                           ]
 for i in TAGs_with_unknown_props:
     chems[i].Tb = chems.OOO.Tb
-    chems[i].copy_models_from(chems.PPP,['mu'])
-    
+    chems[i].copy_models_from(chems.PPP,['mu'])  
 
     
 ## The oxidative cleavage catalyst properties are based on cobalt chloride
@@ -337,8 +371,6 @@ chems.Cobalt_acetate_tetrahydrate.copy_models_from(chems.Cobalt_chloride,
                                                  # top_priority = True)
 chems.Tungstic_acid.copy_models_from(chems.Tungsten,
                                      ['Hvap','Psat'])
-# chems.Tungstic_acid.V.add_model(fn.rho_to_V(rho=5.59,#https://en.wikipedia.org/wiki/Tungstic_acid
-                                            # MW = chems.Tungstic_acid))
 ## Tungstate ion default to properties
 chems.Tungstate_ion.copy_models_from(chems.Tungsten,
                                      ['Hvap','Psat',
@@ -350,12 +382,8 @@ chems.Hydrogen_ion.copy_models_from(chems.Hydrogen,
                                         'Psat',
                                         'mu',
                                         'Cn'])
-# chems.Cobalt_ion.copy_models_from(chems.Cobalt,
-#                                        ['Hvap',
-#                                         'Psat'])
-
 for i in ['Hydrogen_ion','Tungstate_ion','Cobalt_ion',
-          'Acetate_ion','Cobalt_acetate_tetrahydrate',
+          'Acetate_ion','Cobalt_acetate_tetrahydrate','Sodium_acetate',
           'Cobalt_hydroxide','Tungstic_acid','Hydrogen_peroxide']:
     V = fn.rho_to_V(rho=1e5, MW=chems[i].MW)
     chems[i].V.add_model(V, top_priority=True)
@@ -371,25 +399,14 @@ chems.Calcium_tungstate.copy_models_from(chems.Tungsten,
 chems.Calcium_tungstate.V.add_model(fn.rho_to_V(5800,
                                                 chems.Calcium_tungstate.MW),
                                                 top_priority = True)
-chems.Acetate_ion.copy_models_from((chems.Acetate),
-                                      [
-                                          # 'mu',
-                                       # 'Psat',
-                                        # 'Hvap',
-                                       # 'sigma',
-                                       ])
-# TODO: Acetate_rho = chems.Acetate.rho(298.15,101325)
-# TODO: chems.Acetate_ion.V.add_method(chems.Acetate_ion.MW*10E-3/Acetate_rho)
 chems.Calcium_acetate.V.add_method(chems.Calcium_acetate.MW*0.000001/1.5)#density from: https://pubchem.ncbi.nlm.nih.gov/compound/Calcium-acetate#section=Density
-# chems.Cobalt_hydroxide.V.add_method(chems.Cobalt_hydroxide.MW*1.0E-6/3.597)#TODO: very little and solubility 3.20 mg/L
-# chems.Cobalt_hydroxide.copy_models_from(tmo.Chemical('NaOH'),['Psat'])
 #TODO: change the below
 chems.Calcium_hydroxide.copy_models_from(tmo.Chemical('NaOH'),['Psat'])
 chems.Calcium_chloride.copy_models_from(tmo.Chemical('NaOH'),['Psat'])
 chems.Calcium_acetate.copy_models_from(tmo.Chemical('NaOH'),['Psat'])
 ## Modelling properties of dihydroxylated compounds as MDHSA
 ##TODO: find better assumptions for these below
-chems.Dihydroxy_palmitic_acid.copy_models_from(chems.MDHSA,
+chems.Methyl_dihydroxy_palmitate.copy_models_from(chems.MDHSA,
                                                   ['Hvap',
                                                    'Psat',
                                                    'Cn',
@@ -397,15 +414,38 @@ chems.Dihydroxy_palmitic_acid.copy_models_from(chems.MDHSA,
                                                    'mu'
                                                    ])
                                               
-chems.Methyl_9_10_dihydroxylinoleate.copy_models_from(chems.MDHSA,
-                                                         ['Hvap',
-                                                          'Psat',
-                                                          'Cn',
-                                                          'V',#rho_methyldihydroxylinoleate = 0.980±0.06 g/cm3,Temp: 20 °C; Press: 760 Torr
-                                                              #rho similar to MDHSA
-                                                          'mu',
-                                                          ])
-chems.Methyl_9_10_dihydroxylinoleate.Pc = chems.MDHSA.Pc
+chems.Tetrahydroxy_octadecanoate.copy_models_from(chems.MDHSA,['Hvap','Psat',
+                                                               'Cn','V','mu',
+                                                 ])
+chems.Tetrahydroxy_octadecanoate.Tc = 1379.78
+chems.Tetrahydroxy_octadecanoate.Pc = 1483852.13
+chems.Tetrahydroxy_octadecanoate.omega  = 0.84
+chems.Hexahydroxy_octadecanoate.copy_models_from(chems.MDHSA,['Hvap','Psat',
+                                                              'Cn','V','mu'])
+chems.Hexahydroxy_octadecanoate.Pc = 1741912.65
+chems.Hexahydroxy_octadecanoate.Tc = 1785.56
+chems.Hexahydroxy_octadecanoate.omega = 0.28
+
+chems.Monoester_MDHSA_PA.Pc = 728096.88
+chems.Monoester_MDHSA_PA.Tc = 1377.87
+chems.Monoester_MDHSA_PA.omega = 0.38
+chems.Monoester_MDHSA_PA.copy_models_from(chems.MDHSA,['Hvap','Psat','Cn','V','mu'])
+
+chems.Diester_MDHSA_PA.Pc = 469319.28
+chems.Diester_MDHSA_PA.Tc = 1753.52
+chems.Diester_MDHSA_PA.omega = -0.24
+chems.Diester_MDHSA_PA.copy_models_from(chems.MDHSA,['Hvap','Psat','Cn','V','mu'])
+
+chems.Monoester_MDHSA_MMA.Pc = 708841.01
+chems.Monoester_MDHSA_MMA.Tc = 1547.14
+chems.Monoester_MDHSA_MMA.omega = 0.19
+chems.Monoester_MDHSA_MMA.copy_models_from(chems.MDHSA,['Hvap','Psat','Cn','V','mu'])
+
+chems.Diester_MDHSA_MMA.Pc = 449627.03
+chems.Diester_MDHSA_MMA.Tc = 2269.6
+chems.Diester_MDHSA_MMA.omega = -0.46
+chems.Diester_MDHSA_MMA.copy_models_from(chems.MDHSA,['Hvap','Psat','Cn','V','mu'])
+
 chems.Cobalt_hydroxide.copy_models_from(chems.Cobalt_chloride,
                                         ['Hvap','Psat'])
 chems.Cobalt_hydroxide.Tb = 100+273.15 #https://www.chembk.com/en/chem/Cobalt%20hydroxide
@@ -486,17 +526,39 @@ chems.PLS.Dortmund.set_group_counts_by_name({'CH3':3,
                                              'CH2COO': 1+1+1,
                                              'CH':1 })
 
-chems.Dihydroxy_palmitic_acid.Dortmund.set_group_counts_by_name({'CH3':1,
-                                                        'COOH':1,
-                                                        'CH2':12,
-                                                        'CH':2,
+chems.Methyl_dihydroxy_palmitate.Dortmund.set_group_counts_by_name({'CH3':2,
+                                                        'CH2COO':1,
+                                                        'CH2':13,
                                                         'OH(S)':2})
-chems.Methyl_9_10_dihydroxylinoleate.Dortmund.set_group_counts_by_name({'CH3':2,
-                                                               'CH2':11,
-                                                               'CH=CH':1,
-                                                               'CH':2,
-                                                               'CH2COO':1,
-                                                               'OH(S)':2})
+chems.Tetrahydroxy_octadecanoate.Dortmund.set_group_counts_by_name({'CH3':2,
+                                                                    'CH2':15,
+                                                                    'CH2COO':1,
+                                                                    'OH(S)':4})
+chems.Hexahydroxy_octadecanoate.Dortmund.set_group_counts_by_name({'CH3':2,
+                                                                    'CH2':9,
+                                                                    'CH2COO':1,
+                                                                    'OH(S)':6})
+
+chems.Monoester_MDHSA_PA.Dortmund.set_group_counts_by_name({'CH3':3,
+                                                                 'CH2':13,
+                                                                 'CH2COO':2,
+                                                                 'OH(S)':1,
+                                                                 'CH': 2})                                                                    
+chems.Diester_MDHSA_PA.Dortmund.set_group_counts_by_name({'CH3':4,
+                                                                 'CH2':25,
+                                                                 'CH2COO':3,
+                                                                 'CH': 2})   
+   
+chems.Diester_MDHSA_MMA.Dortmund.set_group_counts_by_name({'CH3':4,
+                                                                 'CH2':23,
+                                                                 'CH2COO':5,
+                                                                 'CH': 2})   
+chems.Monoester_MDHSA_MMA.Dortmund.set_group_counts_by_name({'CH3':3,
+                                                                 'CH2':18,
+                                                                 'CH2COO':3,
+                                                                 'CH': 2,
+                                                                 'OH(S)': 1,
+                                                                 }) 
 chems.Dipalmitin.Dortmund.set_group_counts_by_name({'CH3':2,
                                                     'CH2COO':2,
                                                     'CH2':13+13+2,
@@ -504,154 +566,47 @@ chems.Dipalmitin.Dortmund.set_group_counts_by_name({'CH3':2,
                                                     'OH(P)':1
                                                     })
 ############################################################################################################### 
-def OOO_CCPsat_model(T):
-      R = 8.314
-      theta = 298.15
-      ln10 = 2.30258509
-      return ((-91320000/(R*theta*ln10))+ ((169240000/R*ln10)*((1/theta) - (1/T))))
+#The below Psat models return values in Pa (N/m)
 # chems.OOO.Psat.add_method(f=OOO_CCPsat_model, Tmin=323.15, Tmax=573.15)
-
-def LLL_CCPsat_model(T):
-      R = 8.314
-      theta = 298.15
-      ln10 = 2.30258509
-      return (-91320000/(R*theta*ln10))+ ((169240000/R*ln10)*((1/theta) - (1/T)))
 chems.LLL.Psat.add_method(f=LLL_CCPsat_model, Tmin=323.15, Tmax=573.15)
-
-def OOL_CCPsat_model(T):
-      R = 8.314
-      theta = 298.15
-      ln10 = 2.30258509
-      return (-91320000/(R*theta*ln10))+ ((169240000/R*ln10)*((1/theta) - (1/T)))
 chems.OOL.Psat.add_method(f=OOL_CCPsat_model, Tmin=323.15, Tmax=573.15)
-
-def LLO_CCPsat_model(T):
-      R = 8.314
-      theta = 298.15
-      ln10 = 2.30258509
-      return (-91320000/(R*theta*ln10))+ ((169240000/R*ln10)*((1/theta) - (1/T)))
 chems.LLO.Psat.add_method(f=LLO_CCPsat_model, Tmin=323.15, Tmax=573.15)
-
-def SOO_CCPsat_model(T):
-      R = 8.314
-      theta = 298.15
-      ln10 = 2.30258509
-      return (-91320000/(R*theta*ln10))+ ((169240000/R*ln10)*((1/theta) - (1/T)))
 chems.SOO.Psat.add_method(f=SOO_CCPsat_model, Tmin=323.15, Tmax=573.15)
-
-def PLO_CCPsat_model(T):
-      R = 8.314
-      theta = 298.15
-      ln10 = 2.30258509
-      return (-89250000/(R*theta*ln10))+ ((166740000/R*ln10)*((1/theta) - (1/T)))
 chems.PLO.Psat.add_method(f=PLO_CCPsat_model, Tmin=323.15, Tmax=573.15)
-
-def PoOO_CCPsat_model(T):
-      R = 8.314
-      theta = 298.15
-      ln10 = 2.30258509
-      return (-89250000/(R*theta*ln10))+ ((166740000/R*ln10)*((1/theta) - (1/T)))
 chems.PoOO.Psat.add_method(f=PoOO_CCPsat_model, Tmin=323.15, Tmax=573.15)
-
-def POO_CCPsat_model(T):
-      R = 8.314
-      theta = 298.15
-      ln10 = 2.30258509
-      return (-89250000/(R*theta*ln10))+ ((166740000/R*ln10)*((1/theta) - (1/T)))
 chems.POO.Psat.add_method(f=POO_CCPsat_model, Tmin=323.15, Tmax=573.15)
-
-def POS_CCPsat_model(T):
-      R = 8.314
-      theta = 298.15
-      ln10 = 2.30258509
-      return (-89250000/(R*theta*ln10))+ ((166740000/R*ln10)*((1/theta) - (1/T)))
 chems.POS.Psat.add_method(f=POS_CCPsat_model, Tmin=323.15, Tmax=573.15)
-
-def POP_CCPsat_model(T):
-      R = 8.314
-      theta = 298.15
-      ln10 = 2.30258509
-      return (-87180000/(R*theta*ln10))+ ((164240000/R*ln10)*((1/theta) - (1/T)))
 chems.POP.Psat.add_method(f=POP_CCPsat_model, Tmin=323.15, Tmax=573.15)
-
-def PLS_CCPsat_model(T):
-      R = 8.314
-      theta = 298.15
-      ln10 = 2.30258509
-      return (-89250000/(R*theta*ln10))+ ((166740000/R*ln10)*((1/theta) - (1/T)))
 chems.PLS.Psat.add_method(f=PLS_CCPsat_model, Tmin=323.15, Tmax=573.15)
 ###############################################################################################33
-#The model returns values in J/mol.K
-def OOO_Cnl_model(T):
-      return (3*(397600 + 540.89*T) + (61355 + 148.23*T))*(1/1000)
 # chems.OOO.Cn.l.add_method(f=OOO_Cnl_model, Tmin= 298.15, Tmax=453.15)
 chems.LLL.Cn.add_method(f=OOO_Cnl_model, Tmin= 298.15, Tmax=453.15)
 chems.LLO.Cn.add_method(f=OOO_Cnl_model, Tmin= 298.15, Tmax=453.15)
 chems.OOL.Cn.add_method(f=OOO_Cnl_model, Tmin= 298.15, Tmax=453.15)
-
-#The below Psat models return values in Pa (N/m)
-def SOO_Cnl_model(T):
-      return (2*(397600 + 540.89*T) + (366930 + 685.76*T)+ (61355 + 148.23*T))*(1/1000)
 chems.SOO.Cn.add_method(f=SOO_Cnl_model,Tmin= 298.15, Tmax=453.15)
-
-def PoOO_Cnl_model(T):
-      return (2*(397600 + 540.89*T) +(330360 + 616.35*T) + (61355 + 148.23*T))*(1/1000)
 chems.PoOO.Cn.add_method(f=PoOO_Cnl_model, Tmin= 298.15, Tmax=453.15)
 chems.PLO.Cn.add_method(f=PoOO_Cnl_model, Tmin= 298.15, Tmax=453.15)
 chems.POO.Cn.add_method(f=PoOO_Cnl_model, Tmin= 298.15, Tmax=453.15)
-
-def POP_Cnl_model(T):
-      return (1*(397600 + 540.89*T) +2*(330360 + 616.35*T) + (61355 + 148.23*T))*(1/1000)
 chems.POP.Cn.add_method(f=POP_Cnl_model, Tmin= 298.15, Tmax=453.15)
-
-def PLS_Cnl_model(T):
-      return (1*(397600 + 540.89*T) +1*(330360 + 616.35*T) + 1*(366930 + 685.76*T) + (61355 + 148.23*T))*(1/1000)
 chems.PLS.Cn.add_method(f=POP_Cnl_model, Tmin= 298.15, Tmax=453.15)
 chems.POS.Cn.add_method(f=POP_Cnl_model, Tmin= 298.15, Tmax=453.15)
 ###############################################################################################33
 #Adding the molar volumes
-def OOO_Vl_model(T):
-      return ((3*((1 + 0.0009865*T)/4.2924)) + ((1 + 0.00076923*T)/20.048))*(1/1000)
 # chems.OOO.V.l.add_method(f=OOO_Vl_model, Tmin= 258.15, Tmax=516.15)
 # TODO: check what methodP means ...in the V.l definition
-def LLL_Vl_model(T):
-      return ((3*((1 + 0.00074102*T)/4.1679)) + ((1 + 0.00076923*T)/20.048))*(1/1000)
 chems.LLL.V.add_method(f=LLL_Vl_model, Tmin= 258.15, Tmax=516.15)
-def OOL_Vl_model(T):
-      return ((1*((1 + 0.00074102*T)/4.1679)) + (2*((1 + 0.0009865*T)/4.2924))+  ((1 + 0.00076923*T)/20.048))*(1/1000)
 chems.OOL.V.add_method(f=OOL_Vl_model, Tmin= 258.15, Tmax=516.15)
-def LLO_Vl_model(T):
-      return ((2*((1 + 0.00074102*T)/4.1679)) + (1*((1 + 0.0009865*T)/4.2924))+  ((1 + 0.00076923*T)/20.048))*(1/1000)
 chems.LLO.V.add_method(f=LLO_Vl_model, Tmin= 258.15, Tmax=516.15)
-def SOO_Vl_model(T):
-      return ((1*((1 + 0.0014091*T)/4.6326)) + (2*((1 + 0.0009865*T)/4.2924))+  ((1 + 0.00076923*T)/20.048))*(1/1000)
 chems.SOO.V.add_method(f=SOO_Vl_model, Tmin= 258.15, Tmax=516.15)
-def PLO_Vl_model(T):
-      return ((1*((1 + 0.0013008*T)/5.0524))+ (1*((1 + 0.00074102*T)/4.1679)) + (1*((1 + 0.0009865*T)/4.2924)) + ((1 + 0.00076923*T)/20.048))*(1/1000)
 chems.PLO.V.add_method(f=PLO_Vl_model, Tmin= 258.15, Tmax=516.15)
-def PoOO_Vl_model(T):
-      return ((1*((1 + 0.0013008*T)/5.0524))+ (2*((1 + 0.0009865*T)/4.2924)) + ((1 + 0.00076923*T)/20.048))*(1/1000)
-chems.PoOO.V.add_method(f=PoOO_Vl_model, Tmin= 258.15, Tmax=516.15)
-def POO_Vl_model(T):
-      return ((1*((1 + 0.0013008*T)/5.0524))+ (2*((1 + 0.0009865*T)/4.2924)) + ((1 + 0.00076923*T)/20.048))*(1/1000)
 chems.POO.V.add_method(f=POO_Vl_model, Tmin= 258.15, Tmax=516.15)
-def POS_Vl_model(T):
-      return ((1*((1 + 0.0013008*T)/5.0524))+ (1*((1 + 0.0009865*T)/4.2924)) +(1*((1 + 0.0014091*T)/4.6326))+ ((1 + 0.00076923*T)/20.048))*(1/1000)
 chems.POS.V.add_method(f=POS_Vl_model, Tmin= 258.15, Tmax=516.15)
-def POP_Vl_model(T):
-      return ((2*((1 + 0.0013008*T)/5.0524))+ (1*((1 + 0.0009865*T)/4.2924)) + ((1 + 0.00076923*T)/20.048))*(1/1000)
 chems.POP.V.add_method(f=POP_Vl_model, Tmin= 258.15, Tmax=516.15)
-def PLS_Vl_model(T):
-      return ((1*((1 + 0.0013008*T)/5.0524))+ (1*((1 + 0.00074102*T)/4.1679)) +(1*((1 + 0.0014091*T)/4.6326))+  ((1 + 0.00076923*T)/20.048))*(1/1000)
 chems.PLS.V.add_method(f=PLS_Vl_model, Tmin= 258.15, Tmax=516.15)
-
-#Adding viscosity for the unknown TAGS
-#TODO: add viscosity
-# [ 'LLL','OOL','LLO','SOO',
-#         'PLO','PoOO','POO',
-#          'POS','POP','PLS']
-
-
+# chems.SSS.V.add_method(f=SSS_Vl_model, Tmin= 258.15, Tmax=516.15)
+chems.PoOO.V.add_method(f=PoOO_Vl_model, Tmin= 258.15, Tmax=516.15)
+chems.SSS.copy_models_from(chems.OOO, ['V','mu'])
+chems.PPP.copy_models_from(chems.OOO, ['V'])
 ########Heat of formation ##########################################################################
 #LiquidMethanol and Sodium_methoxide were added for cane biorefinery compatibility
 LiquidMethanol = tmo.Chemical('Methanol').at_state(phase='l', copy=True)
@@ -673,7 +628,7 @@ def create_new_chemical(ID, phase='s', **constants):
     
 NaOH = create_new_chemical('NaOH', formula='NaOH')
 HCl = create_new_chemical('HCl', formula='HCl')
-# Solubles don't occupy much volume
+# Assuming that solubles don't occupy much volume
 for chemical in (HCl, NaOH,):
         V = fn.rho_to_V(rho=1e5, MW=chemical.MW)
         chemical.V.add_model(V, top_priority=True)
@@ -686,13 +641,13 @@ chems.P4O10.copy_models_from(tmo.Chemical('Water'),['Psat'])
 chems.WWTsludge.copy_models_from(tmo.Chemical('Water'),['Psat'])
     
 for chemical in chems: chemical.default()
-#TODO: add viscosity for all the catalyst related chems
         
 chems.compile()
 chems.define_group('TAG', ('OOO','LLL','OOL',
                            'LLO','SOO','PLO',
                            'PoOO','POO','POS',
-                           'POP','PLS'))
+                           'POP','PLS','PPP',
+                           'LnLnLn','SSS'))
 
 chems.define_group('Lipid', ('OOO','LLL','OOL',
                            'LLO','SOO','PLO',
@@ -707,7 +662,7 @@ chems.define_group('Biodiesel', ('Methyl_oleate',
                                  'Methyl_palmitate',
                                  'Methyl_stearate',
                                  'Methyl_linoleate',
-                                 'Methyl_palmitoleate'))
+                                 'Methyl_linolenate'))
 
 #composition of VM_Naphtha based on https://www.cdc.gov/niosh/npg/npgd0664.html#:~:text=None%20reported%20%5BNote%3A%20VM%26P%20Naphtha%20is%20a%20refined,Exposure%20Routes%20inhalation%2C%20ingestion%2C%20skin%20and%2For%20eye%20contact
 chems.define_group('VM_Naphtha',['Octane',
@@ -730,30 +685,5 @@ chems.set_synonym('Dipalmitin', 'DAG')
 chems.set_synonym('Hydrogen_ion', 'H+')
 chems.set_synonym('Pelargonic_acid','Nonanoic_acid')
 chems.set_synonym('HCl2','Liquid_HCl')
-# chems.set_synonym('Calcium_dihydroxide', 'Lime')
 chems.set_synonym('CaSO4', 'Gypsum')
-# chems.set_synonyn('WWTs_sludge','Biomass')
-# chems.show()
 
-# Reference for below: Fragment-Based Approach for Estimating Thermophysical Properties of Fats and
-# Vegetable Oils for Modeling Biodiesel Production Processes
-#Dict for gibbs free energies
-# {GOOO : 91320000,GLLL : 91320000,
-#  GOOL : 91320000,GLLO : 91320000,
-#  GSOO : 91320000,GPLO : 89250000,
-#  GPoOO : 89250000,GPOO : 89250000,
-#  GPOS : 89250000,GPOP : 87180000,
-#  GPLS : 89250000}
-#Dict for enthalpy of vapourisation
-# {HOOO : 169240000,HLLL : 169240000,
-#  HOOL : 169240000,HLLO : 169240000,
-#  HSOO : 169240000,HPLO : 166740000,
-#  HPoOO :166740000,HPOO : 166740000,
-#  HPOS : 166740000,HPOP : 164240000,
-#  HPLS : 166740000}
-#Hf_formation_(OOO):-76.494*18 - 815.18
-#Hf_formation_(PPP):- -59.571*16 - 1358.7
-#Hf_formation_(PoPoPo):- -76.494*16 - 815.18
-#Hf_formation_(SSS):- -59.571*18 - 1358.7
-#Hf_formation_(LLL):-  -316.67*2 - 2466.4
-#Hf_formation_(LnLnLn):-  -316.67*3 - 2466.4

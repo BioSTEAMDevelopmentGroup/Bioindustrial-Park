@@ -15,7 +15,7 @@ from biosteam.evaluation import Model, Metric
 from biorefineries.lipidcane._process_settings import price #TODO: were these prices adjusted to 2013 prices?
 from biorefineries.cane.data.lca_characterization_factors import GWP_characterization_factors 
 from biorefineries.tea.cellulosic_ethanol_tea import CellulosicEthanolTEA,create_cellulosic_ethanol_tea
-from thermosteam.utils import GG_colors
+from thermosteam.utils import GG_colors,GG_light_colors
 
 #Settings to set GWP100 as the main characterisation factor
 GWP = 'GWP100'
@@ -23,16 +23,14 @@ bst.settings.define_impact_indicator(key=GWP, units='kg*CO2e')
 # NG-Fired Simple-Cycle Gas Turbine CHP Plant, no transmission included
 bst.settings.set_electricity_CF(GWP, 0.36, basis='kWhr', units='kg*CO2e')
 aa_baseline_sys = aa_baseline_sys()
-# aa_baseline_sys.prioritize_unit(F_baseline.unit.S702)
 aa_baseline_sys.set_tolerance(mol=0.0,
                               rmol=0.01,
-                              method = 'fixedpoint',
                               subsystems = True)
 
 aa_baseline_sys.simulate()
 # aa_baseline_sys._setup()
 # for i in aa_baseline_sys.units:
-#     print(F_baseline.R202.outs[1].phase)
+#     print(F_baseline.R202.outs[0].phase)
 #     print(i)
 #     i.run()
         
@@ -64,14 +62,19 @@ groups_by_area = bst.UnitGroup.df_from_groups(aa_baseline_groups, fraction = Tru
 plot_by_area = groups_by_area.plot.bar(stacked = True) #plot for all the areas stacked by metrics
 plot_by_metric =  groups_by_area.T
 plot_by_metric.plot.bar(stacked = True) #plot for all the metrics stacked by area
-#TODO: decide how to name areas
-#What to create boxplots for?
+#Code to set ticks
+# groups_by_area.plot.bar(stacked = True).set_yticks((10,50,100,150,200,250))
+#Code to move legend
+# .legend(loc = 'upper right')
+# .legend(loc = 'upper right',bbox_to_anchor=(1.5, 1))
+#code to change colours
+#.(stacked = True, color = 'b')
+
 # boxplot = plot_by_metric.boxplot(column=['Heating duty']) #for a specific column name, .boxplot() for the entire dataframe
 #
 
 # #########################################################################################################
 #TODO: add price later insiide the system
-F_baseline.pelargonic_acid_rich_fraction.price = 30
 # # Streams specs belonging to the cane biorefinery used for biodisel prep
 # #Methanol
 F_baseline.stream.methanol.price = 0.792*401.693/275.700 #Based on Catbio costs adjusted from 2021 Jan to 2022 Dec using Fred's PPI for basic inorganic chemicals
@@ -86,7 +89,7 @@ F_baseline.stream.biodiesel_wash_water.price = 3.945 *(217.9/132.9)/(3.78541*100
 F_baseline.stream.biodiesel_wash_water.characterization_factors={'GWP100': 0.00035559}#Ecoinvent:tap water production, conventional treatment, RoW, (Author: Marylène Dussault inactive)
 
 #HCl 
-F_baseline.stream.HCl.price = 0.88*401.693/275.700 #Based on Catbio price ($/Kg) for Hydrogen peroxide, 35%, tech., tankcars, works, frt. equald. adjusted from 2021 Jan to 2022 Dec using Fred's PPI for basic inorganic chemicals 
+F_baseline.stream.HCl.price = 0.14*401.693/275.700 #Based on Catbio price ($/Kg) for 22 deg baume, US gulf dom. adjusted from 2021 Jan to 2022 Dec using Fred's PPI for basic inorganic chemicals 
 F_baseline.stream.HCl.characterization_factors = {'GWP100': GWP_characterization_factors['HCl']}
 
 #NaOH
@@ -100,13 +103,15 @@ F_baseline.stream.crude_glycerol.price = price['Crude glycerol']*401.693/275.700
 F_baseline.stream.crude_glycerol.characterization_factors = {'GWP100': GWP_characterization_factors['crude-glycerol']}
  
 #Crude methanol
+#TODO:??? how is the price same methanol and crude methanol
 F_baseline.crude_methanol.price =  0.792*401.693/275.700 #Based on Catbio costs adjusted from 2021 Jan to 2022 Dec using Fred's PPI for basic inorganic chemicals
 F_baseline.stream.methanol.characterization_factors = {'GWP100': GWP_characterization_factors['methanol']}
 
 #Pelargonic_acid fraction
 F_baseline.pelargonic_acid_rich_fraction.price = 16 #https://www.vigon.com/product/pelargonic-acid/
-
-
+F_baseline.fatty_acids_blend = 3 #
+F_baseline.azelaic_acid_product_stream.price = 6.88 #Based on sebacic acid bulk price
+F_baseline.malonic_acid_rich_stream.price = 6.88 #1386/2.5 #https://www.laballey.com/products/malonic-acid-practical?variant=7219017711675
 #######################################################################################################################33
 #####################################################################################################33
 tea_azelaic_baseline = TEA_baseline(
@@ -138,8 +143,7 @@ tea_azelaic_baseline = TEA_baseline(
                                     OSBL_units = [  F_baseline.CW901,
                                                     F_baseline.CT901,
                                                     F_baseline.BT901,
-                                                    F_baseline.PWT901, 
-                                                    # F_baseline.W901,
+                                                    F_baseline.PWT901,
                                                     F_baseline.ADP901,
                                                   ])         
                                 
