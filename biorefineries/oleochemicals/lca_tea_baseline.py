@@ -11,34 +11,6 @@ from chaospy import distributions as shape
 from biorefineries.oleochemicals.systems_baseline import aa_baseline_sys,F_baseline
 import numpy as np
 
-#TODO: what to do about prices
-##Prices from the literature
-##Ref: https://doi.org/10.1016/j.indcrop.2020.112411
-#Raw material prices
-# #Given std deviation: 0.34, mean = 6.8
-# HOSO_price_USD_per_ton = shape.normal(mu = 6.8, sigma = 0.34)
-
-# ##Given std deviation: 5.8, mean = 0.302
-# Methanol_price_USD_per_ton = shape.normal(mu = 5.8, sigma = 0.302)
-
-# ##Given std deviation: 92, mean = 975
-# H2O2_USD_per_ton = shape.normal(mu = 975, sigma = 92)
-
-##Given std deviation: 1000, mean = 33000
-# Tungstic_acid_USD_per_ton = shape.normal(mu = 3000, sigma = 1000)
-
-##Given std deviation: 500, mean = 10918
-# Cobalt_acetate_USD_per_ton = shape.normal(mu = 10918, sigma = 500)
-
-#Given triangular distribution a:100, b: 500, c:200
-# Crude_glycerol_USD_per_ton = shape.Triangle(100, 500 ,200)
-
-#Product_prices
-# ##Given std deviation: 0.11, mean = 8.82
-# Azelaic_acid_USD_per_ton =  shape.normal(mu = 8.82, sigma = 0.11)
-# ##Given std deviation: 0.2, mean = 8.2
-# Pelargonic_acid_USD_per_ton = shape.normal(mu = 8.2, sigma = 0.2)
-
 #Modelled based on assumptions for a nth degree plant
 class TEA_baseline(bst.TEA):
     def __init__(self, system, IRR, duration, 
@@ -137,3 +109,30 @@ class TEA_baseline(bst.TEA):
                                        self.plant_overhead                                  
                                    ))
     
+#TODO: what to do about prices
+##Prices from the literature
+##Ref: https://doi.org/10.1016/j.indcrop.2020.112411
+#Raw material prices
+# #Given std deviation: 0.34, mean = 6.8
+# HOSO_price_USD_per_ton = shape.normal(mu = 6.8, sigma = 0.34)
+
+# ##Given std deviation: 5.8, mean = 0.302
+# Methanol_price_USD_per_ton = shape.normal(mu = 5.8, sigma = 0.302)
+
+# ##Given std deviation: 92, mean = 975
+# H2O2_USD_per_ton = shape.normal(mu = 975, sigma = 92)
+
+##Given std deviation: 1000, mean = 33000
+# Tungstic_acid_USD_per_ton = shape.normal(mu = 3000, sigma = 1000)
+
+##Given std deviation: 500, mean = 10918
+# Cobalt_acetate_USD_per_ton = shape.normal(mu = 10918, sigma = 500)
+
+#Given triangular distribution a:100, b: 500, c:200
+# Crude_glycerol_USD_per_ton = shape.Triangle(100, 500 ,200)
+
+#Product_prices
+# ##Given std deviation: 0.11, mean = 8.82
+# Azelaic_acid_USD_per_ton =  shape.normal(mu = 8.82, sigma = 0.11)
+# ##Given std deviation: 0.2, mean = 8.2
+# Pelargonic_acid_USD_per_ton = shape.normal(mu = 8.2, sigma = 0.2)

@@ -595,7 +595,7 @@ def create_succinic_sys(ins, outs):
     )
     
     # Mix solid wastes to boiler turbogenerator
-    M505 = bst.units.Mixer('M505', ins=('',
+    M510 = bst.units.Mixer('M510', ins=('',
                                         # S301-0,
                                         S401-0,
                                         u.U202-0,
@@ -609,7 +609,7 @@ def create_succinic_sys(ins, outs):
     
     s = flowsheet.stream
     create_facilities(
-        solids_to_boiler=M505-0,
+        solids_to_boiler=M510-0,
         gas_to_boiler=wastewater_treatment_sys-0,
         process_water_streams=[
          s.imbibition_water,
@@ -684,7 +684,7 @@ def create_succinic_sys(ins, outs):
    
     
     
-    # M505-0 is the liquid/solid mixture, R501-0 is the biogas, blowdown is discharged
+    # M510-0 is the liquid/solid mixture, R501-0 is the biogas, blowdown is discharged
     
     HXN = HeatExchangerNetwork('HXN1001',
                                               # ignored=[H401, H402],
@@ -1027,6 +1027,50 @@ def TEA_breakdown(print_output=False, fractions=False):
 
 #%% Carbon balance
 
+def get_carbon_flow_by_area():
+    c_flow_units = []
+    for ug in unit_groups:
+        sys_ID = ''.join(e for e in ug.name if e.isalnum())
+        ug_sys = ug.to_system(sys_ID)
+        ug_ins = [stream for stream in ug_sys.streams if stream.source not in ug_sys.units]
+        ug_outs = [stream for stream in ug_sys.streams if stream.sink not in ug_sys.units]
+        if sum([stream.get_atomic_flow('C') for stream in ug_ins])>0 or sum([stream.get_atomic_flow('C') for stream in ug_outs])>0:
+            c_flow_units.append(ug_sys)
+    # print(c_flow_units)
+    source=[]
+    target=[]
+    value=[]
+    carbon_feeds = [stream for stream in succinic_sys.feeds if stream.get_atomic_flow('C')>0]
+    label=[unit.ID  + ' process' for unit in c_flow_units] + [stream.ID for stream in carbon_feeds] + ['SuccinicAcid'] + ['Emissions']
+    for unit in c_flow_units:
+        ug_outs = [stream for stream in unit.streams if stream.sink not in unit.units]
+        # print(ug_outs)
+        for stream in ug_outs:
+            if stream.get_atomic_flow('C'):
+                if stream.sink:
+                    for ug in c_flow_units:
+                        if stream.sink in ug.units:
+                            target.append(c_flow_units.index(ug))
+                    source.append(c_flow_units.index(unit))
+                    value.append(stream.get_atomic_flow('C'))
+                else:
+                    if not stream.ID==product_stream.ID:
+                        source.append(c_flow_units.index(unit))
+                        target.append(len(label)-1)
+                        value.append(stream.get_atomic_flow('C'))
+                    else:
+                        source.append(c_flow_units.index(unit))
+                        target.append(len(label)-2)
+                        value.append(stream.get_atomic_flow('C'))
+    for stream in carbon_feeds:
+        source.append(label.index(stream.ID))
+        for ug in c_flow_units:
+            if stream.sink in ug.units:
+                target.append(c_flow_units.index(ug))
+        value.append(stream.get_atomic_flow('C'))
+    return source, target, value, label
+
+
 def get_carbon_flow():
     c_flow_units = []
     for unit in u:
@@ -1039,19 +1083,20 @@ def get_carbon_flow():
     label=[unit.ID  + ': ' + unit.__class__.__name__ for unit in c_flow_units] + [stream.ID for stream in carbon_feeds] + ['SuccinicAcid'] + ['Emissions']
     for unit in c_flow_units:
         for stream in unit.outs:
-            if stream.sink:
-                source.append(c_flow_units.index(unit))
-                target.append(c_flow_units.index(stream.sink))
-                value.append(stream.get_atomic_flow('C'))
-            else:
-                if not stream.ID==product_stream.ID:
+            if stream.get_atomic_flow('C'):
+                if stream.sink:
                     source.append(c_flow_units.index(unit))
-                    target.append(len(label)-1)
+                    target.append(c_flow_units.index(stream.sink))
                     value.append(stream.get_atomic_flow('C'))
                 else:
-                    source.append(c_flow_units.index(unit))
-                    target.append(len(label)-2)
-                    value.append(stream.get_atomic_flow('C'))
+                    if not stream.ID==product_stream.ID:
+                        source.append(c_flow_units.index(unit))
+                        target.append(len(label)-1)
+                        value.append(stream.get_atomic_flow('C'))
+                    else:
+                        source.append(c_flow_units.index(unit))
+                        target.append(len(label)-2)
+                        value.append(stream.get_atomic_flow('C'))
     for stream in carbon_feeds:
         source.append(label.index(stream.ID))
         target.append(c_flow_units.index(stream.sink))
@@ -1062,7 +1107,7 @@ def plot_carbon_flow():
     import plotly.graph_objs as go#create links
     from plotly.offline import init_notebook_mode,  plot
     init_notebook_mode()
-    source, target, value, label = get_carbon_flow()
+    source, target, value, label = get_carbon_flow_by_area()
     link = dict(source=source, target=target, value=value, 
     color=['rgba(0,0,0, 0.5)'] * len(source))#create nodes
     node = dict(label=label, pad=15, thickness=8, 

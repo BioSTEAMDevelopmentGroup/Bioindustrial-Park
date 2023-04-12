@@ -746,7 +746,7 @@ def create_facilities(solids_to_boiler, gas_to_boiler='',
     T606.line = 'Ethanol storage'
     bst.units.Pump('T606_P', ins=T606-0, outs=s.ethanol_R402)
 
-    FT = bst.units.FireWaterTank('FT', ins=firewater_in, outs='firewater_out')
+    FT = bst.facilities.FireWaterTank('FT', ins=firewater_in, outs='firewater_out')
     FT.fire_water_over_feedstock = 0.08
     @FT.add_specification(run=True)
     def adjust_fire_water(): firewater_in.imass['Water'] = feedstock.F_mass * FT.fire_water_over_feedstock
@@ -812,7 +812,7 @@ def create_facilities(solids_to_boiler, gas_to_boiler='',
     def adjust_CIP(): CIP_chems_in.imass['H2O'] = feedstock.F_mass * CIP.CIP_over_feedstock
 
     # Optional facilities
-    if if_HXN: bst.units.HeatExchangerNetwork('HXN')
+    if if_HXN: bst.facilities.HeatExchangerNetwork('HXN')
     if if_BDM:
         bst.units.BlowdownMixer('BDM',
                                 ins=(BT.outs[1], CT.outs[1]),
