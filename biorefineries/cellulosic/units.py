@@ -588,10 +588,10 @@ class SaccharificationAndCoFermentation(Unit):
     def _run(self):
         feed, *other = self.ins
         vent, effluent, sidedraw = self.outs
+        effluent.copy_like(feed)
         vent.P = effluent.P = self.P
         vent.T = effluent.T = self.T_fermentation
         vent.phase = 'g'
-        effluent.copy_like(feed)
         self.saccharification(effluent)
         self._batch_duty = effluent.Hnet - feed.Hnet
         sidedraw.copy_like(effluent)
