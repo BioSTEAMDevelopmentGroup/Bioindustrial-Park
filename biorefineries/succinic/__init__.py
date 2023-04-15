@@ -13,7 +13,9 @@ This module is a modified implementation of modules from the following:
 # from .import analyses, models
 from warnings import filterwarnings
 filterwarnings('ignore')
-
+from biorefineries import succinic
+succinic_filepath = succinic.__file__.replace('\\__init__.py', '')
+succinic_results_filepath = succinic_filepath + '\\analyses\\results\\'
 modes = ['lab_batch', 'lab_fed-batch', 'pilot_batch']
 parameter_distributions_filenames = ['parameter-distributions_lab-scale_batch.xlsx',
                                     'parameter-distributions_lab-scale_fed-batch.xlsx',
@@ -21,7 +23,7 @@ parameter_distributions_filenames = ['parameter-distributions_lab-scale_batch.xl
                                     ]
 
 def load(mode='pilot_batch'):
-    parameter_distributions_filename = 'analyses\\parameter_distributions\\'+parameter_distributions_filenames[modes.index(mode)]
+    parameter_distributions_filename = succinic_filepath+'\\analyses\\parameter_distributions\\'+parameter_distributions_filenames[modes.index(mode)]
     # print(f'\n\nLoading parameter distributions ({mode}) ...')
     from .models import model, simulate_and_print
     model.parameters = ()

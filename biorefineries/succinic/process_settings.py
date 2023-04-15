@@ -136,7 +136,7 @@ MEA_price = (1021.69*_chemical_2014to2016 + 1855.65*_chemical_2017to2016)/(2*100
 diammonium_sulfate_price = 0.161 * _GDP_2007_to_2016 
 
 
-# Diammonium sulfate (ammonium sulfate)
+# Magnesium sulfate
 # mean of 0.436 (range 0.397-0.474)	$/kg in 2007 $	
 # mean of 0.505 (range of 0.460-0.549) $/kg when converted to 2016$
 # https://web.archive.org/web/20161125084558/http://www.icis.com:80/chemicals/channel-info-chemicals-a-z/                        

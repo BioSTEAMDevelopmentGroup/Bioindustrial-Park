@@ -534,11 +534,11 @@ z_ticks=[0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.30]
 #%% MPSP
 # MPSP_w_levels = np.array([0., 2.5, 5., 7.5, 10., 12.5, 15., 17.5, 20., 22.5, 25.])
 MPSP_w_levels = np.arange(0., 18., 0.5)
-contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_1[:], # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., MPSP
+contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_1[19:], # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., MPSP
                                 x_data=100*yields, # x axis values
                                 # x_data = yields/theoretical_max_g_TAL_acid_per_g_glucose,
                                 y_data=titers, # y axis values
-                                z_data=productivities[:], # z axis values
+                                z_data=productivities[19:], # z axis values
                                 x_label=r"$\bfYield$", # title of the x axis
                                 y_label=r"$\bfTiter$", # title of the y axis
                                 z_label=r"$\bfProductivity$", # title of the z axis
@@ -564,14 +564,14 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_1[:
                                 axis_title_fonts={'size': {'x': 14, 'y':14, 'z':14, 'w':14},},
                                 fps=10, # animation frames (z values traversed) per second
                                 n_loops='inf', # the number of times the animated contourplot should loop animation over z; infinite by default
-                                animated_contourplot_filename='MPSP_animated_contourplot_'+file_to_save, # file name to save animated contourplot as (no extensions)
+                                animated_contourplot_filename='part2_MPSP_animated_contourplot_'+file_to_save, # file name to save animated contourplot as (no extensions)
                                 keep_frames=True, # leaves frame PNG files undeleted after running; False by default
                                 comparison_range=[6.51, 7.43],
                                 comparison_range_hatch_pattern='////',
                                 )
 
 #%% GWP
-contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_2, # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., MPSP
+contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_2[], # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., MPSP
                                 x_data=100*yields, # x axis values
                                 y_data=titers, # y axis values
                                 z_data=productivities, # z axis values
