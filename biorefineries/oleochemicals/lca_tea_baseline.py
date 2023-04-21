@@ -81,14 +81,14 @@ class TEA_baseline(bst.TEA):
 #All assumptions for TDC are based on Warren Sieder's chapter 16     
     def _TDC(self, DPI):
         #"Contigency fees": 0.18*DPI + 0.03*DPI + 0.15*DPI 
-        #TODO: this fee can also be 35% ?
         self.total_depreciable_capital = 1.18* DPI
         return self.total_depreciable_capital
 #ALl assumps for FCI are based on Warren Sieder's chp 16
     def _FCI(self, TDC):
         total_depreciable_capital = TDC
         F_site = 1.15 #For US mid
-        FCI = F_site* total_depreciable_capital + 0.02*total_depreciable_capital + 0.02* total_depreciable_capital + 0.1*total_depreciable_capital
+        Sum = total_depreciable_capital + 0.02*total_depreciable_capital + 0.02* total_depreciable_capital + 0.1*total_depreciable_capital
+        FCI = F_site*Sum
         # FCI = F_site*(total_depreciable_capital 
         #               + "C_land" =  is 2% TDC= " 0.02*total_depreciable_capital 
         #               + "C_royalties" = initial C_royalties is 2% of TDC" =  0.02*total_depreciable_capital 

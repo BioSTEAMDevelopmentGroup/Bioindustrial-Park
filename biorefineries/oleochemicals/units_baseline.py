@@ -83,23 +83,28 @@ class OxidativeCleavageReactor(bst.CSTR):
     ## The two heatutilities are both for the vaccuum system -steam and for the cooling water
     _N_ins = 4
     _N_outs = 2
-    X_oxidativecleavage = 0.8
-    X_decarboxylation = 0.1
-    X_side_rxn = 0.2
+    X_oxidativecleavage = 0.8 #Some of the nonanal and oxo-nonanoic convert to azelaic and nonanoic acid
+    X_decarboxylation = 0.2 #Rest of it undergoes this
+    X_side_rxn = 0.2 #TODO: random number! vary this
+    X_decomposition = 0.99
 
     def _setup(self):          
         super()._setup()  
 #Product formation reactions based on       
-        Product_formation = PRxn([Rxn('MDHSA + 1.5 Oxygen  -> Pelargonic_acid + Monomethyl_azelate','MDHSA', X = OxidativeCleavageReactor.X_oxidativecleavage),
+        Product_formation = SRxn([Rxn('MDHSA + Oxygen  -> Nonanal + Methyl_oxo_nonanoicacid','MDHSA', X = 0.99),
+                                  Rxn('Methyl_oxo_nonanoicacid + Oxygen -> Monomethyl_azelate','Methyl_oxo_nonanoicacid',X =OxidativeCleavageReactor.X_oxidativecleavage),
+                                  Rxn('Nonanal + Oxygen -> Pelargonic_acid','Nonanal',X = OxidativeCleavageReactor.X_oxidativecleavage),                                  
                                   Rxn('Tetrahydroxy_octadecanoate +  3 Oxygen ->  Monomethyl_azelate + Malonic_acid + Hexanoic_acid', 'Tetrahydroxy_octadecanoate', X = OxidativeCleavageReactor.X_oxidativecleavage),
                                   Rxn('Hexahydroxy_octadecanoate +  3 Oxygen ->  Monomethyl_azelate + 2 Malonic_acid + Propanoic_acid', 'Hexahydroxy_octadecanoate', X = OxidativeCleavageReactor.X_oxidativecleavage),
                                   
                                   ])    
-        Side_reaction = PRxn([Rxn('Monomethyl_azelate -> Methyl_caprylate + 1 CO2', 'Monomethyl_azelate', X = OxidativeCleavageReactor.X_decarboxylation),
+        Side_reaction = PRxn([Rxn('Methyl_oxo_nonanoicacid + Oxygen -> Monomethyl_suberate + 1 CO2', 'Methyl_oxo_nonanoicacid', X = OxidativeCleavageReactor.X_decarboxylation),
+                              Rxn('Nonanal + Oxygen -> Methyl_caprylate + 1 CO2', 'Nonanal', X = OxidativeCleavageReactor.X_decarboxylation),                       
                               Rxn('MDHSA + Monomethyl_azelate-> Monoester_MDHSA_MMA + H2O', 'MDHSA', X =OxidativeCleavageReactor.X_side_rxn),
                               Rxn('MDHSA + 2Monomethyl_azelate-> Diester_MDHSA_MMA + 2H2O', 'MDHSA', X = OxidativeCleavageReactor.X_side_rxn),
                               Rxn('MDHSA + Pelargonic_acid -> Monoester_MDHSA_PA + 1H2O', 'MDHSA', X = OxidativeCleavageReactor.X_side_rxn),
-                              Rxn('MDHSA + 2Pelargonic_acid -> Diester_MDHSA_PA + 2H2O', 'MDHSA', X = OxidativeCleavageReactor.X_side_rxn),                          
+                              Rxn('MDHSA + 2Pelargonic_acid -> Diester_MDHSA_PA + 2H2O', 'MDHSA', X = OxidativeCleavageReactor.X_side_rxn),  
+                              Rxn('Hydrogen_peroxide -> Oxygen + H2O','Hydrogen_peroxide',X = OxidativeCleavageReactor.X_decomposition),
                               ])
         #Because the cobalt tetrahydrate complex is soluble in water (380 g/L (20 ºC))
         #acc https://www.chemsrc.com/en/cas/6147-53-1_830295.html
@@ -145,9 +150,9 @@ class DegassingVessel(bst.Unit, isabstract = True):
 
     def _design(self):
         self.design_results['Total volume'] = self.feed.F_vol * self.tau    
-        self.vacuum_system = bst.VacuumSystem(self)       
-
+        self.vacuum_system = bst.VacuumSystem(self) 
 DegassingVessel._stream_link_options = None
+
 
 @cost(basis = 'Total cooling area',
       ID = 'Solids_Flaker',
@@ -191,9 +196,9 @@ class SolidsFlaker(bst.Unit):
        
     def _design(self):
         self.design_results['Flaker capacity per unit area']= self.capacity_per_m2
-        # A = self.ins[0].F_mass*self.flaker_tau/self.capacity_per_m2
-        self.design_results['Total cooling area']= 10 #TODO: it wont make a difference if this is bet lb,ub
-        self.add_power_utility(self.power_rate_Kw * self.ins[0].F_mass*self.flaker_tau/self.capacity_per_m2)
+        A = self.ins[0].F_mass/self.capacity_per_m2
+        self.design_results['Total cooling area']= A #TODO: it wont make a difference if this is bet lb,ub
+        self.add_power_utility(self.power_rate_Kw * A)
         self.add_heat_utility( self.outs[0].H - self.ins[0].H, 
                                   T_in = self.ins[0].T,
                                   T_out = self.T_out)
@@ -217,13 +222,17 @@ class Pressure_adjustment_valve(bst.Valve):
 class HydrolysisReactor(bst.BatchBioreactor):
     _N_ins = 2
     _N_outs = 2
-    X_hydrolysis = 0.30
+    X_hydrolysis = 0.30 #Based on the hydrolysis patent (TODO: varry this as well)
        
     def _setup(self):          
         super()._setup()  
 #Hydrolysis of C8-C10 and C16-C18 esters only        
         Product_formation = PRxn([Rxn('Monomethyl_azelate + Water  -> Methanol + Azelaic_acid','Monomethyl_azelate', X = HydrolysisReactor.X_hydrolysis),
                                   Rxn('Methyl_palmitate + Water  -> Methanol + Palmitic_acid','Methyl_palmitate', X = HydrolysisReactor.X_hydrolysis),
+                                  Rxn('Methyl_stearate + Water  -> Methanol + Stearic_acid ','Methyl_stearate', X = HydrolysisReactor.X_hydrolysis),
+                                  Rxn('Methyl_linoleate + Water  -> Methanol + Linoleic_acid','Methyl_linoleate', X = HydrolysisReactor.X_hydrolysis),
+                                  Rxn('Methyl_linolenate + Water  -> Methanol + Linolenic_acid','Methyl_linolenate', X = HydrolysisReactor.X_hydrolysis),
+                                  Rxn('Methyl_oleate + Water -> Methanol + Oleic_acid','Methyl_oleate',X = HydrolysisReactor.X_hydrolysis)
                                   ])
         self.reactions = RxnSys(Product_formation)
       
@@ -376,49 +385,23 @@ class HydrolysisSystem(bst.Unit,isabstract = True):
 class Sodium_hydroxide_tank(bst.units.tank.MixTank):
     def _run(self):
           effluent, = self.outs
-          self.precipitation_reaction_1 = tmo.Reaction('Cobalt_acetate_tetrahydrate + 2 Sodium_hydroxide_liquid  -> 2 Sodium_acetate + Cobalt_hydroxide + 4H2O', 'Cobalt_acetate_tetrahydrate', X = 0.999)
+          precipitation_reaction_1 = PRxn([Rxn('Cobalt_acetate_tetrahydrate + 2 Sodium_hydroxide_liquid  -> 2 Sodium_acetate + Cobalt_hydroxide + 4H2O', 'Cobalt_acetate_tetrahydrate', X = 0.999),
+                                           Rxn('Tungstic_acid + 2 Sodium_hydroxide_liquid  -> Sodium_tungstate + H2O', 'Tungstic_acid', X = 0.999)
+                                          ])
+                          
+          self.reactions = RxnSys(precipitation_reaction_1)
           effluent.mix_from(self.ins)
-          self.precipitation_reaction_1(effluent)
+          self.reactions(effluent)
           effluent.copy_like(effluent)
 
-#   #TODO: Should catalyst regeneration be continuous or batch?
-#   # #TODO: check reaction conversions
-# class Sodium_hydroxide_reactor(bst.CSTR):
-#       _N_ins = 2
-#       _N_outs = 1
-      
-#       def _setup(self):  
-#           super()._setup()                  
-#           self.reactions = tmo.Reaction('Cobalt_ion + 2 Sodium_hydroxide_liquid + Acetate_ion -> 2 Sodium_acetate + Cobalt_hydroxide','Cobalt_ion', X = 0.999)               
-#       def _run(self):
-#           effluent, = self.outs  
-#           effluent.mix_from(self.ins)
-#           self.reactions(effluent)   
-#           effluent.copy_like(effluent)
-                          
+                         
 class Acid_precipitation_tank(bst.units.tank.MixTank):
     def _run(self):
           effluent, = self.outs
-          self.precipitation_reaction_2 = tmo.Reaction('Tungstic_acid + Calcium_chloride -> Calcium_tungstate + 2HCl2', 'Tungstic_acid', X = 0.999)
+          self.precipitation_reaction_2 = tmo.Reaction('Sodium_tungstate + Calcium_chloride -> Calcium_tungstate + Sodium_chloride', 'Sodium_tungstate', X = 0.999)
           effluent.mix_from(self.ins)
           self.precipitation_reaction_2(effluent)
           effluent.copy_like(effluent)  
-
-# class Acid_precipitation_tank(bst.CSTR):    
-#     # auxiliary_unit_names = ('heat_exchanger')
-#     _N_ins = 2
-#     _N_outs = 1   
-  
-#     def _setup(self): 
-#         super()._setup()
-#         self.reactions = tmo.Reaction('Tungstic_acid + Calcium_chloride -> Calcium_tungstate + 2HCl2', 'Tungstic_acid', X = 0.999)
-          
-#     def _run(self):
-#         effluent, = self.outs  
-#         effluent.mix_from(self.ins)
-#         self.reactions(effluent)   
-#         effluent.copy_like(effluent)
-          
 
 class Tungstic_acid_precipitation_tank(bst.units.tank.MixTank):
     def _run(self):
@@ -427,71 +410,18 @@ class Tungstic_acid_precipitation_tank(bst.units.tank.MixTank):
           effluent.mix_from(self.ins)
           self.precipitation_reaction_3(effluent)
           effluent.copy_like(effluent) 
-
-# class Tungsacid_precipitation_tank(bst.CSTR):    
-#     # auxiliary_unit_names = ('heat_exchanger')
-#     _N_ins = 2
-#     _N_outs = 1   
-  
-#     def _setup(self): 
-#         super()._setup()
-#         self.reactions = tmo.Reaction('Calcium_tungstate + 2HCl2 -> Tungstic_acid + Calcium_chloride', 'Calcium_tungstate', X = 0.999)
-          
-#     def _run(self):
-#         effluent, = self.outs  
-#         effluent.mix_from(self.ins)
-#         self.reactions(effluent)   
-#         effluent.copy_like(effluent)          
-          
-            
- 
-            
-class AACrystalliser(bst.units.BatchCrystallizer):
-  
-    def __init__(self, ID='', ins=None, outs=(), thermo=None, *,  
-                 T = None
-                  ):
-        bst.BatchCrystallizer.__init__(self, ID, ins, outs, thermo,
-                                        tau=2, V=1e6, T=T)
-        # https://www.alfa.com/en/catalog/B21568/
-        # https://www.chembk.com/en/chem/Nonanoic%20acid#:~:text=Nonanoic%20acid%20-%20Nature%20Open%20Data%20Verified%20Data,yellow.%20Slightly%20special%20odor.%20Melting%20Point%2011-12.5%20%C2%B0c.
-        self.AA_molefraction_330_15K = 0.0006996
-        self.AA_molefraction_280_15K = 0.0000594
-#       self.NA_solubility_gL_at20DEGC = 0.267/1000
-#       #Nonanoic acid melting point is 12.5
-                        
-    @property
-    def Hnet(self):
-        effluent = self.outs[0]
-        solids = effluent['s']
-        H_out = - sum([i.Hfus * j for i,j in zip(self.chemicals, solids.mol) if i.Hfus])
-        return H_out 
-
-    def solubility(self, T):
-        delta_T = 330.15 - 280.15
-        delta_S = self.AA_molefraction_330_15K - self.AA_molefraction_280_15K
-        m = delta_S/delta_T
-        b = m*330.15
-        c = self.AA_molefraction_330_15K - b
-        S = m*T + c
-        return S
-    
-#Assuming inlet at saturation. Therefore adding the feed at saturation of 330.15
-    def _run(self):
-        feed = self.ins[0]    
-        outlet = self.outs[0]
-        outlet.copy_like(feed)
-        outlet.phases = ('s', 'l')
-        x = self.solubility(self.T)
-        outlet.sle('Azelaic_acid',
-                    solubility=x,
-                    T = self.T)
-        outlet.imass['s','Nonanoic_acid'] = feed.imass['Nonanoic_acid']    
-
-        
-
-    
    
+class FFA_neutralisation_tank(bst.units.tank.MixTank):
+    def _run(self):
+          effluent, = self.outs
+          self.precipitation_reaction_3 = tmo.Reaction('Oleic_acid + Sodium_hydroxide_liquid -> Sodium_oleate + Water', 'Oleic_acid', X = 0.999)
+          effluent.mix_from(self.ins)
+          self.precipitation_reaction_3(effluent)
+          effluent.copy_like(effluent) 
+   
+          
+          
+    
           
           
 
