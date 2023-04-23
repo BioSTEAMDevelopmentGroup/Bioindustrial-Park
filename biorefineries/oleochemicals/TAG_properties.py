@@ -48,7 +48,9 @@ TAG_Dortmund_groups = {'LLL': {'CH3': 3, 'CH2': 11+11+11+2,'CH=CH': 2+2+2,'CH2CO
     }
 #Characterisation factors
 HOSO_GWP = {'GWP100': 0.76*99.99 + 0.00035559*0.01},##Global warming (incl. iLUC and biogenic CO2 uptake) in kg CO2-eq, Ref: #http://dx.doi.org/10.1016/j.jclepro.2014.10.011
-
+#General model for 
+# Hvap_f = 2093479.64*C_length+ 31397826.69
+# Gvap_f = 1653848.04*C_length + 22009767.68
 
 #Models for Psat
 def OOO_CCPsat_model(T):

@@ -133,6 +133,10 @@ chems = tmo.Chemicals([
                      Hf = -947.7*1000, #Wikepedia value for https://en.wikipedia.org/wiki/Stearic_acid
                     phase ='l'
                     ),
+        #Diketo deriviative: 7108-68-1
+        #methyl 9,10-dioxooctadecanoate
+        #Monoketo derivative: 7297-29-2
+        
 #Product 2
         tmo.Chemical('Methyl_dihydroxy_palmitate',
                  search_ID = '908329-09-9',#Reaxys CAS number for methyl 9,10-dihydroxy-palmitate
@@ -197,7 +201,7 @@ chems = tmo.Chemicals([
     
 # Products of oxidative_cleavage
         tmo.Chemical('Monomethyl_azelate'),
-        tmo.Chemical('Suberic_acid'),
+        tmo.Chemical('Monomethyl_suberate',search_ID = '3946-32-5'),
         tmo.Chemical('Caprylic_acid'),
         tmo.Chemical('Hexanoic_acid'),
         tmo.Chemical('Heptanoic_acid'),
@@ -206,12 +210,18 @@ chems = tmo.Chemicals([
         tmo.Chemical('Pelargonic_acid'),
         tmo.Chemical('Propanoic_acid'),
         tmo.Chemical('Methyl_caprylate',search_ID = '111-11-5'),
+        tmo.Chemical('Nonanal'),
+        tmo.Chemical('Methyl_oxo_nonanoicacid',
+                     search_ID = '1931-63-1'
+                     ),
         
 # Products of hydrolysis
         tmo.Chemical('Palmitic_acid'),
         tmo.Chemical('Stearic_acid'),
-        tmo.Chemical('Oleic_acid'),
+        tmo.Chemical('Oleic_acid',phase = 'l'),
+        tmo.Chemical('Sodium_oleate',Tb = 633 ,Hf = -764800.0,phase ='l'),
         tmo.Chemical('Linoleic_acid', search_ID = '60-33-3'),
+        tmo.Chemical('Linolenic_acid'),
         tmo.Chemical('Palmitoleic_acid', search_ID = '373-49-9'),
         tmo.Chemical('Azelaic_acid'),
 
@@ -225,7 +235,8 @@ chems = tmo.Chemicals([
         tmo.Chemical('Octane'),
         tmo.Chemical('Cycloheptane'),
         tmo.Chemical('Bicyclo_octane',search_ID = '6221-55-2'),
-        tmo.Chemical('Toluene'),        
+        tmo.Chemical('Toluene'), 
+        tmo.Chemical('Heptane'),
      
 ## Catalysts used in the process   
 ## Tungstic_acid boiling point: https://en.wikipedia.org/wiki/Tungstic_acid
@@ -235,6 +246,11 @@ chems = tmo.Chemicals([
                   default = True,
                   formula = 'H2WO4',
                   phase = 'l'),
+       tmo.Chemical('Sodium_tungstate',
+                    phase = 'l',
+                    Tb = 1746, #same as assumed above
+                    ),
+       tmo.Chemical('Sodium_chloride'),
         tmo.Chemical('Tungstate_ion',
                  search_db = False,
                  CAS = '12737-86-9',
@@ -337,9 +353,10 @@ chems['Monomethyl_azelate'].omega = 1.09913#Chemical compound generator DWSIM
 chems['Monomethyl_azelate'].Tb = 650.2#Chemical compound generator DWSIM
 
 chems.Methyl_palmitate.Cn.l.method = 'ROWLINSON_BONDI'
+# chems.Methyl_oleate.Cn.g.method = 'LASTOVKA_SHAW'
 chems.Palmitic_acid.Cn.l.method = 'ROWLINSON_BONDI'
 chems.Stearic_acid.Cn.l.method = 'ROWLINSON_BONDI'
-chems.Oleic_acid.Cn.l.method = 'ROWLINSON_BONDI'
+chems.Oleic_acid.Cn.method = 'ROWLINSON_BONDI'
 chems.Octane.Cn.l.method = 'DADGOSTAR_SHAW' #This method works for hydrocarbons
 chems.Natural_gas.Cn.l.method = 'DADGOSTAR_SHAW' #This method works for hydrocarbons
 chems.OOO.copy_models_from(chems.PPP,['mu',
@@ -354,7 +371,9 @@ for i in TAGs_with_unknown_props:
     chems[i].Tb = chems.OOO.Tb
     chems[i].copy_models_from(chems.PPP,['mu'])  
 
-    
+chems.Sodium_oleate.copy_models_from(chems.Oleic_acid,
+                                     ['mu','Hvap','Psat','Cn','V'])
+
 ## The oxidative cleavage catalyst properties are based on cobalt chloride
 chems.Cobalt_acetate_tetrahydrate.copy_models_from(chems.Cobalt_chloride,
                                                       ['sigma',                                                      
@@ -371,6 +390,8 @@ chems.Cobalt_acetate_tetrahydrate.copy_models_from(chems.Cobalt_chloride,
                                                  # top_priority = True)
 chems.Tungstic_acid.copy_models_from(chems.Tungsten,
                                      ['Hvap','Psat'])
+chems.Sodium_tungstate.copy_models_from(chems.Tungsten,
+                                     ['Hvap','Psat'])
 ## Tungstate ion default to properties
 chems.Tungstate_ion.copy_models_from(chems.Tungsten,
                                      ['Hvap','Psat',
@@ -384,7 +405,7 @@ chems.Hydrogen_ion.copy_models_from(chems.Hydrogen,
                                         'Cn'])
 for i in ['Hydrogen_ion','Tungstate_ion','Cobalt_ion',
           'Acetate_ion','Cobalt_acetate_tetrahydrate','Sodium_acetate',
-          'Cobalt_hydroxide','Tungstic_acid','Hydrogen_peroxide']:
+          'Cobalt_hydroxide','Tungstic_acid','Hydrogen_peroxide','Sodium_tungstate']:
     V = fn.rho_to_V(rho=1e5, MW=chems[i].MW)
     chems[i].V.add_model(V, top_priority=True)
 ## Products of the precipitation reaction

@@ -293,7 +293,7 @@ def create_succinic_sys(ins, outs):
         K302.ins[0].phase = 'g'
         K302.ins[0].mol[:] = K302.outs[0].mol[:]
         K302._run()
-    
+        
     #%% Separation streams
     sulfuric_acid_R401 = Stream('sulfuric_acid_R401', units='kg/hr')
     

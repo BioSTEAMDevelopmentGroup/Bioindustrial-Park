@@ -2112,7 +2112,7 @@ class IsothermalCompressor(Compressor, new_graphics=False):
         super()._design()
         feed = self.ins[0]
         outlet = self.outs[0]
-        ideal_power, ideal_duty = self._calculate_ideal_power_and_duty() if not (self.ideal_power and self.ideal_duty) else self.ideal_power, self.ideal_duty
+        (ideal_power, ideal_duty) = self._calculate_ideal_power_and_duty() if not (self.ideal_power and self.ideal_duty) else (self.ideal_power, self.ideal_duty)
         Q = ideal_duty / self.eta
         self.add_heat_utility(unit_duty=Q, T_in=feed.T, T_out=outlet.T)
         self.design_results['Ideal power'] = ideal_power # kW
