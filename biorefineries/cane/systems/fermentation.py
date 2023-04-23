@@ -55,7 +55,7 @@ def add_urea_MgSO4_nutrients(fermentor, seedtrain=None):
         @seedtrain.add_specification(run=True)
         def adjust_nutrients_to_seed_train():
             *feeds, urea, MgSO4 = seedtrain.ins
-            F_vol = sum([i.F_vol - i.ivol['Lipid'] for i in feeds])
+            F_vol = sum([i.F_vol - i.ivol['Lipid'] for i in feeds if i.phase != 'g'])
             urea.imass['Urea'] = 0.5 * F_vol
             MgSO4.imass['MgSO4'] = 0.04 * F_vol
             
@@ -63,9 +63,9 @@ def add_urea_MgSO4_nutrients(fermentor, seedtrain=None):
         def adjust_urea_and_MgSO4_feed_to_fermentor():
             feed, seed, *others, urea, MgSO4, = fermentor.ins
             if 'Lipid' in feed.chemicals:
-                F_vol = sum([i.F_vol - i.ivol['Lipid'] for i in others], feed.F_vol - feed.ivol['Lipid'])
+                F_vol = sum([i.F_vol - i.ivol['Lipid'] for i in others if i.phase != 'g'], feed.F_vol - feed.ivol['Lipid'])
             else:
-                F_vol = sum([i.F_vol for i in others], feed.F_vol)
+                F_vol = sum([i.F_vol for i in others if i.phase != 'g'], feed.F_vol)
             urea.imass['Urea'] = 0.5 * F_vol
             MgSO4.imass['MgSO4'] = 0.04 * F_vol
             S301.ins[0].mix_from(S301.outs)
@@ -77,9 +77,9 @@ def add_urea_MgSO4_nutrients(fermentor, seedtrain=None):
         def adjust_nutrients_feed_to_fermentor():
             feed, *others, urea, MgSO4, = fermentor.ins
             if 'Lipid' in feed.chemicals:
-                F_vol = sum([i.F_vol - i.ivol['Lipid'] for i in others], feed.F_vol - feed.ivol['Lipid'])
+                F_vol = sum([i.F_vol - i.ivol['Lipid'] for i in others if i.phase != 'g'], feed.F_vol - feed.ivol['Lipid'])
             else:
-                F_vol = sum([i.F_vol for i in others], feed.F_vol)
+                F_vol = sum([i.F_vol for i in others if i.phase != 'g'], feed.F_vol)
             urea.imass['Urea'] = 0.5 * F_vol
             MgSO4.imass['MgSO4'] = 0.04 * F_vol
 
@@ -103,16 +103,16 @@ def add_urea_nutrient(fermentor, seedtrain=None):
         @seedtrain.add_specification(run=True)
         def adjust_nutrients_to_seed_train():
             *feeds, urea, = seedtrain.ins
-            F_vol = sum([i.F_vol - i.ivol['Lipid'] for i in feeds])
+            F_vol = sum([i.F_vol - i.ivol['Lipid'] for i in feeds if i.phase != 'g'])
             urea.imass['Urea'] = 0.5 * F_vol
             
         @fermentor.add_specification(run=True, impacted_units=[Urea_storage])
         def adjust_urea_and_MgSO4_feed_to_fermentor():
             feed, seed, *others, urea, = fermentor.ins
             if 'Lipid' in feed.chemicals:
-                F_vol = sum([i.F_vol - i.ivol['Lipid'] for i in others], feed.F_vol - feed.ivol['Lipid'])
+                F_vol = sum([i.F_vol - i.ivol['Lipid'] for i in others if i.phase != 'g'], feed.F_vol - feed.ivol['Lipid'])
             else:
-                F_vol = sum([i.F_vol for i in others], feed.F_vol)
+                F_vol = sum([i.F_vol for i in others if i.phase != 'g'], feed.F_vol)
             urea.imass['Urea'] = 0.5 * F_vol
             S301.ins[0].mix_from(S301.outs)
             Urea_storage.ins[0].imol['Urea'] = S301.ins[0].imol['Urea']
@@ -122,9 +122,9 @@ def add_urea_nutrient(fermentor, seedtrain=None):
         def adjust_nutrients_feed_to_fermentor():
             feed, *others, urea, = fermentor.ins
             if 'Lipid' in feed.chemicals:
-                F_vol = sum([i.F_vol - i.ivol['Lipid'] for i in others], feed.F_vol - feed.ivol['Lipid'])
+                F_vol = sum([i.F_vol - i.ivol['Lipid'] for i in others if i.phase != 'g'], feed.F_vol - feed.ivol['Lipid'])
             else:
-                F_vol = sum([i.F_vol for i in others], feed.F_vol)
+                F_vol = sum([i.F_vol for i in others if i.phase != 'g'], feed.F_vol)
             Urea_storage.ins[0].imass['Urea'] = 0.5 * F_vol
   
 @SystemFactory(
@@ -193,12 +193,13 @@ def create_sucrose_fermentation_system(ins, outs,
         
         @SX1.add_specification(run=False)
         def sugar_concentration_adjustment():
+            target_titer = R301.titer
+            R301.tau = target_titer / R301.productivity 
             dilution_water = M301.ins[1]
             sugar_path = F301.path_until(R301, inclusive=False)[1:]
             for i in sugar_path: i.run()
             path = SX1.path_until(R301, inclusive=True)
             beer = R301.outs[1]
-            target_titer = R301.titer
             def f(removed_water_split):
                 SX1.split[:] = removed_water_split
                 for unit in path: unit.run()
@@ -223,7 +224,6 @@ def create_sucrose_fermentation_system(ins, outs,
                         y1 = f(x1)
                         if y1 < 0.: break
                 SX1.split[:] = flx.IQ_interpolation(f, x0, x1, y0, y1, x=SX1.split[0], ytol=1e-5, xtol=1e-6)
-            R301.tau = target_titer / R301.productivity 
             SX0.split[:] = 0.2 # Restart
     else:
         F301 = bst.MultiEffectEvaporator('F301',
@@ -249,6 +249,7 @@ def create_sucrose_fermentation_system(ins, outs,
         Plast = P_original[-1]
         @F301.add_specification(run=False)
         def evaporation():
+            R301.tau = R301.titer / R301.productivity
             V_guess = F301.V
             s_dilution_water = M301.ins[-1]
             s_dilution_water.empty()
@@ -294,7 +295,6 @@ def create_sucrose_fermentation_system(ins, outs,
                     breakpoint()
             if abs(R301.titer - get_titer()) > 1:
                 breakpoint()
-            R301.tau = R301.titer / R301.productivity
     
     # Mix sugar solutions
     M301 = bst.Mixer('M301', ins=(P306-0, dilution_water))

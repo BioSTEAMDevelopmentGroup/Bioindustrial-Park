@@ -85,7 +85,7 @@ def create_oilcane_to_biodiesel_1g(
         + tmo.Rxn('Glucose -> Cellmass', 'Glucose', biomass_coeff, 
                 basis='wt', correct_mass_balance=True)
     )
-    growrxn.X = 0.999 - fermrxn.X
+    growrxn.X = 0.999
     fermentation_sys, epdct = create_sucrose_fermentation_system(
         ins=[screened_juice],
         scrubber=False,

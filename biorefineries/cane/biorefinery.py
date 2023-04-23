@@ -868,7 +868,7 @@ class Biorefinery:
                 product='TAG', product_yield=glucose_to_microbial_oil_yield, basis='wt'
             )
             glucose_to_microbial_oil_yield = fermentation_reaction.X
-            cell_growth_reaction.X = 0.999 - glucose_to_microbial_oil_yield # Almost all the rest goes towards cell mass and CO2
+            cell_growth_reaction.X = 0.999 # Almost all the rest goes towards cell mass and CO2
             
         @performance(lipid_yield * 100, max_lipid_yield_xylose * 100, units='%', element='Cofermenation', kind='coupled')
         def set_xylose_to_microbial_oil_yield(xylose_to_microbial_oil_yield):
@@ -879,7 +879,7 @@ class Biorefinery:
                 fermentation_reaction.product_yield(
                     product='TAG', product_yield=xylose_to_microbial_oil_yield, basis='wt'
                 )
-                cell_growth_reaction.X = 0.999 - fermentation_reaction.X # Almost all the rest goes towards cell mass and CO2
+                cell_growth_reaction.X = 0.999 # Almost all the rest goes towards cell mass and CO2
     
         @performance(titer, 137, units='g/L', element='Cofermentation', kind='coupled')
         def set_cofermentation_microbial_oil_titer(microbial_oil_titer):

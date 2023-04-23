@@ -61,7 +61,7 @@ def create_oilcane_to_biodiesel_combined_1_and_2g_post_fermentation_oil_separati
         + tmo.Rxn('Xylose -> Cellmass', 'Xylose', biomass_coeff, 
                 basis='wt', correct_mass_balance=True)
     )
-    xylose_growrxn.X = 0.999 - glucose_fermrxn.X
+    xylose_growrxn.X = 0.999
     
     cofermentation = tmo.PRxn(
         [glucose_fermrxn,

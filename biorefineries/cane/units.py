@@ -108,10 +108,11 @@ class AeratedFermentation(bst.AeratedBioreactor): # For microbial oil production
     V_max_default = 500
     def __init__(
             self, ID='', ins=None, outs=(), thermo=None,  
-            *, fermentation_reaction, cell_growth_reaction, **kwargs,
+            *, fermentation_reaction, cell_growth_reaction, theta_O2=0.5, **kwargs,
         ):
         bst.StirredTankReactor.__init__(self, ID, ins, outs, thermo, **kwargs)
         chemicals = self.chemicals
+        self.theta_O2 = theta_O2
         self.hydrolysis_reaction = Rxn('Sucrose + Water -> 2Glucose', 'Sucrose', 1.00, chemicals)
         self.fermentation_reaction = fermentation_reaction
         self.cell_growth_reaction = cell_growth_reaction
@@ -121,6 +122,7 @@ class AeratedFermentation(bst.AeratedBioreactor): # For microbial oil production
         ])
     
     def run_reactions(self, effluent):
+        self.hydrolysis_reaction.force_reaction(effluent)
         self.lipid_reaction.force_reaction(effluent)
         if effluent.imol['H2O'] < 0.: effluent.imol['H2O'] = 0.
         self.fermentation_reaction.force_reaction(effluent)
