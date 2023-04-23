@@ -480,12 +480,13 @@ def create_cane_to_combined_1_and_2g_fermentation(
         PX = bst.Pump(400, ins=SX1-1, P=101325.)
         @SX1.add_specification(run=False)
         def sugar_concentration_adjustment():
+            target_titer = cofermentation.titer
+            cofermentation.tau = target_titer / cofermentation.productivity 
             dilution_water = MX.ins[1]
             sugar_path = EvX.path_until(cofermentation, inclusive=False)[1:]
             for i in sugar_path: i.run()
             path = SX1.path_until(cofermentation, inclusive=True)
             beer = cofermentation.outs[1]
-            target_titer = cofermentation.titer
             def f(removed_water_split):
                 SX1.split[:] = removed_water_split
                 for unit in path: unit.run()
@@ -513,7 +514,6 @@ def create_cane_to_combined_1_and_2g_fermentation(
                     SX1.split[:] = flx.IQ_interpolation(f, x0, x1, y0, y1, x=SX1.split[0], ytol=1e-5, xtol=1e-6)
                 else:
                     target_titer = get_titer() # Cannot achieve target titer, so just go with the highest
-            cofermentation.tau = target_titer / cofermentation.productivity 
             SX0.split[:] = 0.2 # Restart
     else:
         syrup_source = EvX = bst.MultiEffectEvaporator(
@@ -531,9 +531,10 @@ def create_cane_to_combined_1_and_2g_fermentation(
         N = len(P_original)
         @EvX.add_specification(run=True)
         def evaporation():
+            target_titer = cofermentation.titer
+            cofermentation.tau = target_titer / cofermentation.productivity 
             path = EvX.path_until(cofermentation, inclusive=True)
             beer = cofermentation.outs[1]
-            target_titer = cofermentation.titer
             V_last = EvX.V
             EvX.P = P_original
             EvX._reload_components = True
@@ -585,7 +586,6 @@ def create_cane_to_combined_1_and_2g_fermentation(
                     x1 += 0.1
                     y1 = f(x1)
                 EvX.V = flx.IQ_interpolation(f, x0, x1, y0, y1, x=V_last, ytol=1e-5, xtol=1e-6)
-            cofermentation.tau = target_titer / cofermentation.productivity 
     
     syrup_sink = EvX.outs[0].sink
     syrup_sink.sucrose_hydrolysis_reaction = tmo.Reaction(
