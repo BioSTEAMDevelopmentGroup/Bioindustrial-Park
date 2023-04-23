@@ -102,13 +102,11 @@ def create_system(flowsheet=None, biorefinery_settings=None):
     ### Process specifications ###
     
     def refresh_feed_specifications():
-        MH101._F_mass_dry_corn = F_mass_dry_corn = feedstock.F_mass - feedstock.imass['Water']
-        lime.F_mass = F_mass_lime = F_mass_dry_corn * parameters['slurry_lime_loading'] 
-        ammonia.F_mass = F_mass_ammonia = F_mass_dry_corn * parameters['slurry_ammonia_loading']
-        alpha_amylase.F_mass = F_mass_aa = F_mass_dry_corn * parameters['liquefaction_alpha_amylase_loading']
-        sulfuric_acid.F_mass = F_mass_sa = F_mass_dry_corn * parameters['saccharification_sulfuric_acid_loading']
-        gluco_amylase.F_mass = F_mass_ga = F_mass_dry_corn * parameters['saccharification_gluco_amylase_loading']
-        MH101._F_mass_others = (F_mass_lime + F_mass_ammonia + F_mass_aa + F_mass_sa + F_mass_ga)
+        F_mass_dry_corn = feedstock.F_mass - feedstock.imass['Water']
+        lime.F_mass = F_mass_dry_corn * parameters['slurry_lime_loading'] 
+        ammonia.F_mass = F_mass_dry_corn * parameters['slurry_ammonia_loading']
+        alpha_amylase.F_mass = F_mass_dry_corn * parameters['liquefaction_alpha_amylase_loading']
+        sulfuric_acid.F_mass = F_mass_dry_corn * parameters['saccharification_sulfuric_acid_loading']
         MH101._run()
     
     def update_scrubber_wash_water():
@@ -134,12 +132,12 @@ def create_system(flowsheet=None, biorefinery_settings=None):
     slurry_solids_content = parameters['slurry_solids_content']
     @V307.add_specification(run=True)
     def correct_recycle_dilution_water():
-        F_mass_others = MH101._F_mass_others + backwater.F_mass
-        F_mass_dry_corn = MH101._F_mass_dry_corn
+        F_mass_dry_corn = feedstock.F_mass - feedstock.imass['Water']
+        F_mass_others = lime.F_mass + ammonia.F_mass + alpha_amylase.F_mass + sulfuric_acid.F_mass + gluco_amylase.F_mass
         recycled_process_water.F_mass = F_mass_dry_corn * (1. - slurry_solids_content) / slurry_solids_content - F_mass_others
     
-    P311 = bst.Pump('P311', V307-0, P=1e6)
-    E312 = bst.HXprocess('E312', (P311-0, None), U=0.56783, ft=1.0, T_lim0=410.)
+    P311 = bst.Pump('P311', V307-0, P=2e6)
+    E312 = bst.HXprocess('E312', (P311-0, None), U=0.56783, ft=1.0)
     E313 = units.JetCooker('E313', (E312-0, steam))
     V314 = units.CookedSlurrySurgeTank('V314', E313-0)
     P308 = bst.Pump('P308', V314-0)
@@ -148,7 +146,7 @@ def create_system(flowsheet=None, biorefinery_settings=None):
     
     HX101 = bst.HXutility('HX101', E312-1, U=1.5, T=87 + 273.15, ft=1.0)
     V310 = units.Liquefaction('V310', HX101-0)
-    E316 = bst.HXprocess('E316', (V310-0, None), U=0.85174, ft=1.0, dT=12)
+    E316 = bst.HXprocess('E316', (V310-0, None), U=0.85174, ft=1.0, dT=5)
     
     V317 = units.GlucoAmylaseTank('V317', gluco_amylase)
     P318 = bst.Pump('P318', V317-0)
@@ -163,6 +161,15 @@ def create_system(flowsheet=None, biorefinery_settings=None):
     V403 = units.YeastTank('V403', yeast)
     P404 = bst.Pump('P404', V403-0)
     V405 = units.SSF('V405', (E402-0, P404-0), outs=('CO2', ''), V=1.9e3)
+    
+    @V405.add_specification(run=True, impacted_units=[V405])
+    def correct_saccharification_feed_flows():
+        mash = V405.ins[0]
+        mash_flow = mash.F_mass
+        mash_dry_flow = mash_flow - mash.imass['Water']
+        yeast.F_mass = parameters['yeast_loading'] * mash_flow
+        gluco_amylase.F_mass = parameters['saccharification_gluco_amylase_loading'] * mash_dry_flow
+    
     P406 = bst.Pump('P406', V405-1)
     P407 = bst.Pump('P407', E401-1)
     P407-0-1-E316
@@ -173,27 +180,15 @@ def create_system(flowsheet=None, biorefinery_settings=None):
     P410 = bst.Pump('P410', V409-1)
     MX = bst.Mixer('MX', P406-0)
     MX-0-1-E401
-    E413 = bst.HXprocess('E413', (PX-0, None), U=0.79496, ft=1.0, T_lim0=360) # Limit temperature to not have vapor.
-    @E413.add_specification
-    def no_vapor():
-        E413.run()
-        outlet = E413.outs[0]
-        while outlet.phase != 'l':
-            E413.T_lim0 -= 1
-            E413.run()
-            if E413.T_lim0 < 350:
-                raise RuntimeError('bubble point is lower than expected')
-        E413.T_lim0 = 360
-            
-    P411 = bst.Pump('P411', E413-0)
     
     ethanol_purification_sys = create_ethanol_purification_system(
-        ins=[P411-0, denaturant],
+        ins=[PX-0, denaturant],
         outs=ethanol,
-        beer_column_heat_integration=False,
+        beer_column_heat_integration=True,
         mockup=True,
         IDs={
             'Beer column': 'T501',
+            'Beer column heat exchange': 'E413',
             'Beer column bottoms product pump': 'P502',
             'Recycle mixer': 'MX3',
             'Distillation': 'T503_T507',
@@ -213,11 +208,14 @@ def create_system(flowsheet=None, biorefinery_settings=None):
     u = f.unit
     u.X504.approx_duty = False
     u.T501.Rmin = 0.0001
+    u.T501.k = 1.05
     u.T503_T507.k = 1.05
     u.T501.P = 101325
-    u.P502-0-1-E413
+    u.T503_T507.P = 101325
+    u.E413.U = 0.79496
+    u.E413.ft = 1.0
     u.MX4.denaturant_fraction = 0.04345
-    V601 = bst.MixTank('V601', E413-1)
+    V601 = bst.MixTank('V601', u.E413-1)
     P602 = bst.Pump('P602', V601-0)
     C603 = units.DDGSCentrifuge('C603', P602-0,
         split=dict(
@@ -256,9 +254,9 @@ def create_system(flowsheet=None, biorefinery_settings=None):
         (recycled_process_water,)
     )
     other_facilities = units.PlantAir_CIP_WasteWater_Facilities('other_facilities', feedstock)
-    HXN = bst.HeatExchangerNetwork('HXN', 
-        units=lambda: [u.Ev607.evaporators[0], u.T503_T507.condenser]
-    )
+    # HXN = bst.HeatExchangerNetwork('HXN', 
+    #     units=lambda: [u.Ev607.evaporators[0], u.T503_T507.condenser]
+    # )
     
     other_unit_parameters = settings.other_unit_parameters
     for ID, params in other_unit_parameters.items():

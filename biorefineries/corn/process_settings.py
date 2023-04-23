@@ -31,7 +31,7 @@ class BiorefinerySettings:
             CEPCI=567, # 2013 chemical engineering plant capital index
             load_utility_settings=None,
             feedstock_composition={},
-            feedstock_hourly_mass_flow=46211.6723, # kg / hr
+            feedstock_hourly_mass_flow=46375, # kg / hr
             process_parameters={},
             stream_prices={},
             stream_GWP_CFs={},
@@ -95,10 +95,11 @@ default_process_parameters = {
     'slurry_solids_content': 0.311,   # g Corn / g Total
     'slurry_ammonia_loading': 0.002,  # g Ammonia / g dry Corn
     'slurry_lime_loading': 0.00012,   # g Lime / g dry Corn
-    'liquefaction_alpha_amylase_loading': 0.0007,    # g Enzyme / g dry Corn
-    'saccharification_sulfuric_acid_loading': 0.001, # g Enzyme / g dry Corn
-    'saccharification_gluco_amylase_loading': 0.002, # g H2SO4 / g dry Corn
+    'liquefaction_alpha_amylase_loading': 0.00082,    # g Enzyme / g dry Corn
+    'saccharification_sulfuric_acid_loading': 0.001, # g H2SO4 / g dry Corn
+    'saccharification_gluco_amylase_loading': 0.0011, # g Enzyme / g dry Mash
     'scrubber_wash_water_over_vent': 1.21, # g Water / g Vent
+    'yeast_loading': 8e-5, # g Yeast (5 wt %) / g Mash
     }
 
 # Characterization factors for 100-year global warming potential
@@ -124,7 +125,7 @@ default_stream_prices = {
     'Ethanol': 0.48547915353569393, 
     'Corn': 0.13227735731092652, # Value from Chinmay's report; 0.08476585075177462 in original
     'DDGS': 0.12026, # Value from Chinmay's report; 0.09687821462905594, in original
-    'Yeast': 1.86, #* 3.045 / (63.335 + 3.045), # 1.86 in Chinmay's report; 0.907310526171629 in original
+    'Yeast': 1.86, # 1.86 in Chinmay's report; 0.907310526171629 in original
     'Enzyme': 2.25, # Value from Chinmay's report; 3.20739717428309 in original
     'Denaturant': 0.4355069727002459,
     'Sulfuric acid': 0.08971711759613593,
