@@ -129,7 +129,7 @@ evaluate_metrics_across_composition = no_derivative(
 
 def evaluate_metrics_across_composition_configurations(oil, fiber):
     data = np.zeros([2, N_metrics])
-    for i, configuration in enumerate(['O2', 'O6']):
+    for i, configuration in enumerate(['O2', 'O8']):
         br = cane.Biorefinery(configuration)
         cs = br.composition_specification
         if br.ROI_target is None:
@@ -199,6 +199,7 @@ def run_uncertainty_and_sensitivity(name, N, rule='L',
                                     optimize=True,
                                     line=None,
                                     **kwargs):
+    print(f"Running {name}!")
     filterwarnings('ignore', category=bst.exceptions.DesignWarning)
     filterwarnings('ignore', category=bst.exceptions.CostWarning)
     br = cane.Biorefinery(name, **kwargs)
@@ -426,13 +427,13 @@ def run_all(N, across_lines=False, rule='L', configurations=None,
     if configurations is None: configurations = configuration_names
     for name in configurations:
         if filter and not filter(name): continue
-        print(f"Running {name}:")
         run_uncertainty_and_sensitivity(
             name, N, rule, across_lines, **kwargs
         )
 
 def run_sugarcane_microbial_oil_and_ethanol(N=None):
     if N is None: N = 1000
+    filterwarnings('ignore')
     cane.YRCP2023()
     run_uncertainty_and_sensitivity('S1', N, line='WT')
     run_uncertainty_and_sensitivity('O7', N, line='WT')
@@ -445,6 +446,7 @@ def run_sugarcane_microbial_oil_and_ethanol(N=None):
     
 def run_oilcane_microbial_oil_and_ethanol_across_oil_content(N=None):
     if N is None: N = 100
+    filterwarnings('ignore')
     cane.YRCP2023()
     run_uncertainty_and_sensitivity('O7', N, across_oil_content='oilcane vs sugarcane')
     run_uncertainty_and_sensitivity('O8', N, across_oil_content='oilcane vs sugarcane')
@@ -453,6 +455,7 @@ def run_oilcane_microbial_oil_and_ethanol_across_oil_content(N=None):
     
 def run_oilcane_microbial_oil_and_ethanol_across_lines(N=None):
     if N is None: N = 100
+    filterwarnings('ignore')
     cane.YRCP2023()
     run_uncertainty_and_sensitivity('O7', N, across_lines=True)
     run_uncertainty_and_sensitivity('O8', N, across_lines=True)

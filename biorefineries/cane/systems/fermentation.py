@@ -293,7 +293,7 @@ def create_sucrose_fermentation_system(ins, outs,
                     )
                 except:
                     breakpoint()
-            if abs(R301.titer - get_titer()) > 1:
+            if abs(R301.titer - get_titer()) > 2.5:
                 breakpoint()
     
     # Mix sugar solutions

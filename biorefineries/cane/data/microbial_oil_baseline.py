@@ -47,10 +47,8 @@ fed_batch_productivity_std = 0.03 # g Lipid / L / hr
 fed_batch_lipid_yield_mean = 0.22 # g / g 
 fed_batch_lipid_yield_std = 0.01 # g / g 
 
-
 ### Computed values for simulation:
 feed_diverted_to_seed = seed_volume / (batch_volume + seed_volume) # 0.0588 by vol
-
 
 ### Useful values not used in simulation:
 batch_biomass_yield_mean = batch_lipid_yield_mean / batch_lipid_content_mean # 0.357 g microbe / g glucose
@@ -59,3 +57,14 @@ batch_biomass_growth_coefficient_mean = batch_biomass_yield_mean / (batch_biomas
 fed_batch_biomass_yield_mean = fed_batch_lipid_yield_mean / fed_batch_lipid_content_mean # 0.357 g microbe / g glucose
 fed_batch_CO2_yield_mean = 1 - fed_batch_biomass_yield_mean - fed_batch_lipid_yield_mean # 0.459 g CO2 / g glucose
 fed_batch_biomass_growth_coefficient_mean = fed_batch_biomass_yield_mean / (fed_batch_biomass_yield_mean + fed_batch_CO2_yield_mean) # 0.437 g CO2 / g CO2-Biomass
+
+### Data for hydrolysate
+hydrolysate_titer = 13.2 # g Lipid / L
+hydrolysate_lipid_content = 0.385 # by wt
+hydrolysate_sugar_concentration = 100 # g / L
+hydrolysate_time = 77.5 # hr
+hydrolysate_productivity = hydrolysate_titer / hydrolysate_time # 0.17 g / L / hr
+hydrolysate_lipid_yield = hydrolysate_titer / hydrolysate_sugar_concentration # 0.132 g / g
+hydrolysate_biomass_yield = hydrolysate_lipid_yield / hydrolysate_lipid_content # 0.343 g microbe / g glucose
+hydrolysate_CO2_yield = 1 - hydrolysate_biomass_yield - hydrolysate_lipid_yield # 0.525 g CO2 / g glucose
+hydrolysate_biomass_growth_coefficient = hydrolysate_biomass_yield / (hydrolysate_biomass_yield + hydrolysate_CO2_yield) # 0.395 g CO2 / g CO2-Biomass

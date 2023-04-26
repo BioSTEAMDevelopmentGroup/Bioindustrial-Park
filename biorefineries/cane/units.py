@@ -87,7 +87,9 @@ class AeratedCoFermentation(bst.AeratedBioreactor): # For microbial oil producti
     V_max_default = 1000
     def __init__(
             self, ID='', ins=None, outs=(), thermo=None,  
-            *, cofermentation, theta_O2=0.5, **kwargs,
+            *, cofermentation, theta_O2=0.5, 
+            Q_O2_consumption=-14382.95, # [kJ/kmol] equivalent to 110 kcal / mol as in https://www.academia.edu/19636928/Bioreactor_Design_for_Chemical_Engineers
+            **kwargs,
         ):
         bst.StirredTankReactor.__init__(self, ID, ins, outs, thermo, **kwargs)
         chemicals = self.chemicals
@@ -98,6 +100,7 @@ class AeratedCoFermentation(bst.AeratedBioreactor): # For microbial oil producti
             Rxn('TAG + 3Water -> 3FFA + Glycerol', 'TAG', 0.23, chemicals),
             Rxn('TAG + Water -> FFA + DAG', 'TAG', 0.02, chemicals)
         ])
+        self.Q_O2_consumption = Q_O2_consumption
     
     def run_reactions(self, effluent):
         self.hydrolysis_reaction.force_reaction(effluent)
@@ -109,7 +112,9 @@ class AeratedFermentation(bst.AeratedBioreactor): # For microbial oil production
     V_max_default = 500
     def __init__(
             self, ID='', ins=None, outs=(), thermo=None,  
-            *, fermentation_reaction, cell_growth_reaction, theta_O2=0.5, **kwargs,
+            *, fermentation_reaction, cell_growth_reaction, theta_O2=0.5,
+            Q_O2_consumption=14382.95, # [kJ/kmol] equivalent to 110 kcal / mol as in https://www.academia.edu/19636928/Bioreactor_Design_for_Chemical_Engineers
+            **kwargs,
         ):
         bst.StirredTankReactor.__init__(self, ID, ins, outs, thermo, **kwargs)
         chemicals = self.chemicals
@@ -121,6 +126,7 @@ class AeratedFermentation(bst.AeratedBioreactor): # For microbial oil production
             Rxn('TAG + 3Water -> 3FFA + Glycerol', 'TAG', 0.23, chemicals),
             Rxn('TAG + Water -> FFA + DAG', 'TAG', 0.02, chemicals)
         ])
+        self.Q_O2_consumption = Q_O2_consumption
     
     def run_reactions(self, effluent):
         self.hydrolysis_reaction.force_reaction(effluent)

@@ -278,7 +278,7 @@ def metrics_across_oil_and_fiber_content_configurations(load, xlim):
     return X, Y, data
 
 def plot_metrics_across_composition_configurations(
-        configuration=None, load=False, N_decimals=1, 
+        load=False, N_decimals=1, 
         yticks=None, titles=None, 
         cmap=None, smooth=None,
     ):

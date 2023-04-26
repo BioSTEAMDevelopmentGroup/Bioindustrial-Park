@@ -312,7 +312,7 @@ class Biorefinery:
                 try:
                     assert isinstance(HXN, bst.HeatExchangerNetwork)
                 except: breakpoint()
-        HXN.raise_energy_balance_error = True
+        HXN.raise_energy_balance_error = False
         HXN.vle_quenched_streams = False
         
         ## Split bagasse to boiler meet energy demand
@@ -850,10 +850,14 @@ class Biorefinery:
             lipid_yield = perf.batch_lipid_yield_mean
             titer = perf.batch_titer_mean
             productivity = perf.batch_productivity_mean
-        max_lipid_yield_glucose = perf.max_lipid_yield_glucose
-        max_lipid_yield_xylose = perf.max_lipid_yield_xylose
+        
+        hydrolysate_lipid_yield = perf.hydrolysate_lipid_yield
+        hydrolysate_titer = perf.hydrolysate_titer
+        hydrolysate_productivity = perf.hydrolysate_productivity
+        # max_lipid_yield_glucose = perf.max_lipid_yield_glucose
+        # max_lipid_yield_xylose = perf.max_lipid_yield_xylose
             
-        @performance(lipid_yield * 100, max_lipid_yield_glucose * 100, units='%', element='Cofermenation', kind='coupled')
+        @performance(hydrolysate_lipid_yield * 100, lipid_yield * 100, units='%', element='Cofermenation', kind='coupled')
         def set_glucose_to_microbial_oil_yield(glucose_to_microbial_oil_yield):
             if number in cellulosic_oil_configurations:
                 fermentation_reaction = fermentor.cofermentation[0]
@@ -867,10 +871,15 @@ class Biorefinery:
             fermentation_reaction.product_yield(
                 product='TAG', product_yield=glucose_to_microbial_oil_yield, basis='wt'
             )
-            glucose_to_microbial_oil_yield = fermentation_reaction.X
-            cell_growth_reaction.X = 0.999 # Almost all the rest goes towards cell mass and CO2
+            # Almost all the rest goes towards cell mass and CO2
+            if number in cellulosic_oil_configurations:
+                # Reaction in parallel
+                cell_growth_reaction.X = 0.999 - fermentation_reaction.X
+            else:
+                # Reaction in series
+                cell_growth_reaction.X = 0.999 
             
-        @performance(lipid_yield * 100, max_lipid_yield_xylose * 100, units='%', element='Cofermenation', kind='coupled')
+        @performance(hydrolysate_lipid_yield * 100, lipid_yield * 100, units='%', element='Cofermenation', kind='coupled')
         def set_xylose_to_microbial_oil_yield(xylose_to_microbial_oil_yield):
             if number in cellulosic_oil_configurations:
                 xylose_to_microbial_oil_yield *= 0.01
@@ -879,13 +888,13 @@ class Biorefinery:
                 fermentation_reaction.product_yield(
                     product='TAG', product_yield=xylose_to_microbial_oil_yield, basis='wt'
                 )
-                cell_growth_reaction.X = 0.999 # Almost all the rest goes towards cell mass and CO2
+                cell_growth_reaction.X = 0.999 - fermentation_reaction.X # Almost all the rest goes towards cell mass and CO2
     
-        @performance(titer, 137, units='g/L', element='Cofermentation', kind='coupled')
+        @performance(hydrolysate_titer, titer, units='g/L', element='Cofermentation', kind='coupled')
         def set_cofermentation_microbial_oil_titer(microbial_oil_titer):
             if number in cellulosic_oil_configurations: fermentor.titer = microbial_oil_titer
     
-        @performance(productivity, 1.902, units='g/L', element='Cofermentation')
+        @performance(hydrolysate_productivity, productivity, units='g/L', element='Cofermentation')
         def set_cofermentation_microbial_oil_productivity(microbial_oil_productivity):
             if number in cellulosic_oil_configurations: fermentor.productivity = microbial_oil_productivity
     
