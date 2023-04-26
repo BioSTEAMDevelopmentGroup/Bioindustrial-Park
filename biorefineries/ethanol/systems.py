@@ -27,7 +27,7 @@ def create_beer_distillation_system(ins, outs,
     # Beer column
     x_bot = 3.9106e-06
     y_top = 0.28
-    D302 = bst.BinaryDistillation(IDs.get('Beer column', 'D302'), P=6 * 101325,
+    D302 = bst.BinaryDistillation(IDs.get('Beer column', 'D302'), P=2.1 * 101325,
                                     outs=(distilled_beer, ''),
                                 y_top=y_top, x_bot=x_bot, k=1.1, Rmin=0.001,
                                 LHK=('Ethanol', 'Water'))
@@ -65,7 +65,7 @@ def create_ethanol_purification_system_after_beer_column(ins, outs, IDs={}):
                                 LHK=('Ethanol', 'Water'),
                                 tray_material='Stainless steel 304',
                                 vessel_material='Stainless steel 304',
-                                P=2 * 101325.,
+                                P=1.6 * 101325.,
                                 is_divided=True)
     D303.boiler.U = 1.85
     P303 = bst.Pump(IDs.get('Distillation bottoms product pump', 'P303'), 
