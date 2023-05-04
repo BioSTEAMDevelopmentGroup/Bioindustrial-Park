@@ -24,28 +24,19 @@ parameter_distributions_filenames = ['parameter-distributions_lab-scale_batch.xl
 
 def load(mode='pilot_batch'):
     parameter_distributions_filename = succinic_filepath+'\\analyses\\parameter_distributions\\'+parameter_distributions_filenames[modes.index(mode)]
-    # print(f'\n\nLoading parameter distributions ({mode}) ...')
     from .models import model, simulate_and_print
     model.parameters = ()
     model.load_parameter_distributions(parameter_distributions_filename)
-    # print(f'\nLoaded parameter distributions ({mode}).')
-    
-    # parameters = model.get_parameters()
-    
-    # print('\n\nLoading samples ...')
-    # samples = model.sample(N=10, rule='L')
-    # model.load_samples(samples)
-    # print('\nLoaded samples.')
-    
-    
+ 
     model.exception_hook = 'warn'
-    # print('\n\nSimulating baseline ...')
     baseline_initial = model.metrics_at_baseline()
-    
-    simulate_and_print()
-    # baseline = DataFrame(data=array([[i for i in baseline_initial.values],]), 
-    #                         columns=baseline_initial.keys())
 
+    globals().update({'simulate_and_print': simulate_and_print,
+                      'system': model.system,
+                       'flowsheet': model.system.flowsheet,
+                       'succinic_tea': model.system.TEA,
+                       'chemicals': model.system.feeds[0].chemicals,
+                      })
 def run_TRY_analysis():
     from .analyses import TRY_analysis
     print('TRY analysis complete. See analyses/results for figures and raw data.')

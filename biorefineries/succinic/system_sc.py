@@ -969,7 +969,7 @@ succinic_LCA = SuccinicLCA(succinic_sys, CFs, sugarcane, product_stream, ['Succi
 
 #%% Simulate and print
 spec.load_specifications(spec.baseline_yield, spec.baseline_titer, spec.baseline_productivity)
-simulate_and_print()
+get_product_stream_MPSP()
 
 #%% TEA breakdown (old)
 
