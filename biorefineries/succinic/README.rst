@@ -7,8 +7,8 @@ Process flowsheet
 .. figure:: ./images/system_diagram.png
 
 
-The biorefinery is developed for Tran, Mishra, Bhagwat et al. [1]_ for the production of 
-succinic acid from sugarcane in a biorefinery comprising juicing, fermentation, 
+This biorefinery is developed for Tran, Mishra, Bhagwat et al. [1]_ for the production of 
+succinic acid from sugarcane. It includes juicing, fermentation, 
 and separation processes. Part of the script is adopted from [2]_, [3]_, and [4]_.
 
 Installation
@@ -149,7 +149,7 @@ and titer-yield-productivity analysis for the fermentation performance space (su
 The crystallization simulation model was fit to experimental data (crystallization_curvefit.py).
 
 Note that results used in the manuscript [1]_ were generated using biosteam==2.36.4,
-thermosteam==0.33.0, contourplots==0.2.1, numpy==1.23.5, and dependencies (commit `<https://github.com/BioSTEAMDevelopmentGroup/Bioindustrial-Park/tree/04c07513b666a6f2a9e757e5d90a1517c1a752ee>`_).
+thermosteam==0.33.0, contourplots==0.2.1, numpy==1.23.5, and dependencies (`commit 2e44373 <https://github.com/BioSTEAMDevelopmentGroup/Bioindustrial-Park/tree/2e44373d10dc67fc09337bd330da5b34f0a421a0/biorefineries/succinic>`_).
 
 To reproduce the results, directly run the script of interest, and results will
 be saved as Excel files and figures in analyses/results.
