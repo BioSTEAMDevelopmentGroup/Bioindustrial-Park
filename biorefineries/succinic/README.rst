@@ -2,7 +2,7 @@
 Succinic: Production of Succinic Acid from Sugarcane
 =======================================================================================
 
-Simplified process flow scheme
+Process flowsheet
 ------------------------------
 .. figure:: ./images/system_diagram.png
 
