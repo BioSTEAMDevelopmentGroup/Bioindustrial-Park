@@ -157,7 +157,7 @@ be saved as Excel files and figures in analyses/results.
 
 References
 ----------
-.. [2] Tran, Mishra, Bhagwat et al., Sustainable Production of Acrylic Acid via 3-Hydroxypropionic Acid from Lignocellulosic Biomass. 
+.. [2] Tran, Mishra, Bhagwat et al., An End-to-end Pipeline for Succinic Acid Production at an Industrially Relevant Scale using Issatchenkia orientalis. 
     Nat. Commun. 2023.
     Submitted May 3, 2023.
 
