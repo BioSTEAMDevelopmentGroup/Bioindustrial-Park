@@ -157,7 +157,7 @@ be saved as Excel files and figures in analyses/results.
 
 References
 ----------
-.. [2] Tran, Mishra, Bhagwat et al., An End-to-end Pipeline for Succinic Acid Production at an Industrially Relevant Scale using Issatchenkia orientalis. 
+.. [1] Tran, Mishra, Bhagwat et al., An End-to-end Pipeline for Succinic Acid Production at an Industrially Relevant Scale using Issatchenkia orientalis. 
     Nat. Commun. 2023.
     Submitted May 3, 2023.
 
