@@ -158,11 +158,10 @@ be saved as Excel files and figures in analyses/results.
 References
 ----------
 .. [1] Tran, Mishra, Bhagwat et al., An End-to-end Pipeline for Succinic Acid Production at an Industrially Relevant Scale using Issatchenkia orientalis. 
-    Nat. Commun. 2023.
-    Submitted May 3, 2023.
+    Nat. Commun. 2023. Submitted May 3, 2023.
 
 .. [2] Bhagwat et al., Sustainable Production of Acrylic Acid via 3-Hydroxypropionic Acid from Lignocellulosic Biomass. 
-    ACS Sustainable Chem. Eng. 2021, 9 (49) 16659–16669
+    ACS Sustainable Chem. Eng. 2021, 9 (49) 16659–16669.
     `<https://doi.org/10.1021/acssuschemeng.1c05441>`_
 
 .. [3] Li et al., Sustainable Lactic Acid Production from Lignocellulosic Biomass.
