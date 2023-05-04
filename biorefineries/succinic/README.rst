@@ -14,13 +14,13 @@ and separation processes. Part of the script is adopted from [2]_, [3]_, and [4]
 Installation
 ------------
 In an environment with Python v3.9.15, do the following:
-1. Clone this repository (this may require a few minutes' time; git clone https://github.com/BioSTEAMDevelopmentGroup/Bioindustrial-Park)
-2. Add /Bioindustrial-Park/biorefineries to your Python paths
-3. Install the following packages in sequence (this may require a few minutes' time):
-	(i) biosteam==2.36.4
-	(ii) thermosteam==0.33.0
-	(iii) contourplots==0.2.1
-	(iv) numpy==1.23.5
+    (1) Clone this repository (this may require a few minutes' time; git clone https://github.com/BioSTEAMDevelopmentGroup/Bioindustrial-Park)
+    (2) Add /Bioindustrial-Park/biorefineries to your Python paths
+    (3) Install the following packages in sequence (this may require a few minutes' time):
+	    (i) biosteam==2.36.4
+	    (ii) thermosteam==0.33.0
+	    (iii) contourplots==0.2.1
+	    (iv) numpy==1.23.5
 
 Getting started
 ---------------
