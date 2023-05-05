@@ -730,30 +730,34 @@ class Biorefinery:
         def set_available_land(available_land):
             self.available_land = available_land
     
-        @parameter(distribution=dist.copd, element='Crude oil', baseline=dist.mcop, units='USD/barrel')
+        @parameter(distribution=dist.copd, element='crude oil', baseline=dist.mcop, units='USD/barrel')
         def set_crude_oil_price(price):
             self.crude_oil_price = price
         
+        @default(self.baseline_feedstock_price, element=feedstock, units='USD/kg')
+        def set_baseline_feedstock_price(price):
+            self.baseline_feedstock_price = price
+        
         if prices_correleted_to_crude_oil:
-            @parameter(distribution=dist.cepd_offset, element=cellulosic_ethanol, baseline=0., units='USD/L')
+            @parameter(distribution=dist.cepd_offset, element=cellulosic_ethanol.ID, baseline=0., units='USD/L')
             def set_cellulosic_ethanol_price(price): 
                 cellulosic_ethanol.price = (dist.f_cep * self.crude_oil_price + price) * ethanol_L_per_kg
                 
-            @parameter(distribution=dist.aepd_offset, element=advanced_ethanol, baseline=0., units='USD/L')
+            @parameter(distribution=dist.aepd_offset, element=advanced_ethanol.ID, baseline=0., units='USD/L')
             def set_advanced_ethanol_price(price): 
                 advanced_ethanol.price =  (dist.f_aep * self.crude_oil_price + price) * ethanol_L_per_kg
                 
             # USDA ERS historical price data
-            @parameter(distribution=dist.bpd_offset, element=biomass_based_diesel, units='USD/L', baseline=0.)
+            @parameter(distribution=dist.bpd_offset, element=biomass_based_diesel.ID, units='USD/L', baseline=0.)
             def set_biomass_based_diesel_price(price):
                 biomass_based_diesel.price =  (dist.f_bp * self.crude_oil_price + price) * biodiesel_L_per_kg
         
-            @parameter(distribution=dist.cbpd_offset, element=cellulosic_based_diesel, units='USD/L', baseline=0.)
+            @parameter(distribution=dist.cbpd_offset, element=cellulosic_based_diesel.ID, units='USD/L', baseline=0.)
             def set_cellulosic_based_diesel_price(price):
                 cellulosic_based_diesel.price =  (dist.f_cbp * self.crude_oil_price + price) * biodiesel_L_per_kg
         
             # https://www.eia.gov/energyexplained/natural-gas/prices.php
-            @parameter(distribution=dist.ngpd_offset, element=s.natural_gas, units='USD/m3', baseline=0.)
+            @parameter(distribution=dist.ngpd_offset, element=s.natural_gas.ID, units='USD/m3', baseline=0.)
             def set_natural_gas_price(price): 
                 BT.natural_gas_price =  (dist.f_ngp * self.crude_oil_price + price) * V_ng
         
@@ -763,27 +767,27 @@ class Biorefinery:
                 
         else:
             # USDA ERS historical price data with EPA RIN prices
-            @parameter(distribution=dist.cepd, element=cellulosic_ethanol, 
+            @parameter(distribution=dist.cepd, element=cellulosic_ethanol.ID, 
                        baseline=dist.mcep, units='USD/L')
             def set_cellulosic_ethanol_price(price): # Triangular distribution fitted over the past 10 years Sep 2009 to Nov 2020
                 cellulosic_ethanol.price = price * ethanol_L_per_kg
                 
-            @parameter(distribution=dist.aepd, element=advanced_ethanol, 
+            @parameter(distribution=dist.aepd, element=advanced_ethanol.ID, 
                        baseline=dist.maep, units='USD/L')
             def set_advanced_ethanol_price(price): # Triangular distribution fitted over the past 10 years Sep 2009 to Nov 2020
                 advanced_ethanol.price = price * ethanol_L_per_kg
                 
             # USDA ERS historical price data
-            @parameter(distribution=dist.bpd, element=biomass_based_diesel, units='USD/L', baseline=dist.mbp)
+            @parameter(distribution=dist.bpd, element=biomass_based_diesel.ID, units='USD/L', baseline=dist.mbp)
             def set_biomass_based_diesel_price(price): # Triangular distribution fitted over the past 10 years Sep 2009 to March 2021
                 biomass_based_diesel.price = price * biodiesel_L_per_kg
         
-            @parameter(distribution=dist.cbpd, element=cellulosic_based_diesel, units='USD/L', baseline=dist.mcbp)
+            @parameter(distribution=dist.cbpd, element=cellulosic_based_diesel.ID, units='USD/L', baseline=dist.mcbp)
             def set_cellulosic_based_diesel_price(price): # Triangular distribution fitted over the past 10 years Sep 2009 to March 2021
                 cellulosic_based_diesel.price = price * biodiesel_L_per_kg
         
             # https://www.eia.gov/energyexplained/natural-gas/prices.php
-            @parameter(distribution=dist.natural_gas_price_distribution, element=s.natural_gas, units='USD/m3',
+            @parameter(distribution=dist.natural_gas_price_distribution, element=s.natural_gas.ID, units='USD/m3',
                        baseline=4.73 * 35.3146667/1e3)
             def set_natural_gas_price(price): 
                 BT.natural_gas_price = price * V_ng
@@ -797,11 +801,11 @@ class Biorefinery:
         def set_IRR(IRR):
             tea.IRR = IRR / 100.
         
-        @uniform(0.10, 0.22, units='USD/kg', element=crude_glycerol)
+        @uniform(0.10, 0.22, units='USD/kg', element=crude_glycerol.ID)
         def set_crude_glycerol_price(price):
             crude_glycerol.price = price
     
-        @default(0.65, units='USD/kg', element=pure_glycerine)
+        @default(0.65, units='USD/kg', element=pure_glycerine.ID)
         def set_pure_glycerol_price(price):
             pure_glycerine.price = price
         
@@ -809,7 +813,7 @@ class Biorefinery:
         def set_saccharification_reaction_time(reaction_time):
             if abs(number) in cellulosic_configurations: saccharification.tau = reaction_time
         
-        @default(0.212, units='USD/kg', element=cellulase)
+        @default(0.212, units='USD/kg', element=cellulase.ID)
         def set_cellulase_price(price):
             cellulase.price = price
     
@@ -992,13 +996,13 @@ class Biorefinery:
                 u.R401.oil_reaction.X[0] = TAG_to_FFA_conversion / 100.
         
         @default_gwp(feedstock.characterization_factors[GWP], name='GWP', 
-                 element=feedstock, units='kg*CO2-eq/kg')
+                 element='sugarcane', units='kg*CO2-eq/kg')
         def set_feedstock_GWP(value):
             self.baseline_feedstock_CF = value
             self.update_feedstock()
         
         @default_gwp(methanol.characterization_factors[GWP], name='GWP', 
-                     element=methanol, units='kg*CO2-eq/kg')
+                     element=methanol.ID, units='kg*CO2-eq/kg')
         def set_methanol_GWP(value):
             methanol.characterization_factors[GWP] = value
         
@@ -1008,17 +1012,17 @@ class Biorefinery:
         #     crude_glycerol.characterization_factors[GWP] = value
         
         @default_gwp(pure_glycerine.characterization_factors[GWP], name='GWP', 
-                     element=pure_glycerine, units='kg*CO2-eq/kg')
+                     element=pure_glycerine.ID, units='kg*CO2-eq/kg')
         def set_pure_glycerine_GWP(value):
             pure_glycerine.characterization_factors[GWP] = value
         
         @default_gwp(cellulase.characterization_factors[GWP], name='GWP', 
-                     element=cellulase, units='kg*CO2-eq/kg')
+                     element=cellulase.ID, units='kg*CO2-eq/kg')
         def set_cellulase_GWP(value):
             cellulase.characterization_factors[GWP] = value * 0.02
         
         @default_gwp(natural_gas.characterization_factors[GWP], name='GWP', 
-                     element=natural_gas, units='kg*CO2-eq/kg')
+                     element=natural_gas.ID, units='kg*CO2-eq/kg')
         def set_natural_gas_GWP(value):
             for ng in natural_gas_streams:
                 ng.characterization_factors[GWP] = value
@@ -1081,6 +1085,22 @@ class Biorefinery:
         def MFPP():
             price = tea.solve_price(feedstock)
             return kg_per_MT * price
+        
+        @metric(units='USD/L')
+        def MESP():
+            ethanol_streams = [advanced_ethanol, cellulosic_ethanol]
+            ethanol_streams = [i for i in ethanol_streams if not i.isempty()]
+            if not ethanol_streams: return 0.
+            price = tea.solve_price(ethanol_streams)
+            return price / ethanol_L_per_kg
+        
+        @metric(units='USD/L')
+        def MBSP():
+            biodiesel_streams = [biomass_based_diesel, cellulosic_based_diesel]
+            biodiesel_streams = [i for i in biodiesel_streams if not i.isempty()]
+            if not biodiesel_streams: return 0.
+            price = tea.solve_price(biodiesel_streams)
+            return price / biodiesel_L_per_kg
         
         @metric(units='MT/yr')
         def feedstock_consumption():
@@ -1338,47 +1358,47 @@ class Biorefinery:
             NEP = net_energy_production.cache
             return self.baseline_dry_biomass_yield * NEP / NEP_target  
             
-        def competitive_microbial_oil_yield_objective(microbial_oil_yield, target):
-            self.update_dry_biomass_yield(self.baseline_dry_biomass_yield)
-            set_glucose_to_microbial_oil_yield.setter(microbial_oil_yield)
-            set_xylose_to_microbial_oil_yield.setter(microbial_oil_yield)
-            self.sys.simulate()
-            return 100 * tea.ROI - target
+        # def competitive_microbial_oil_yield_objective(microbial_oil_yield, target):
+        #     self.update_dry_biomass_yield(self.baseline_dry_biomass_yield)
+        #     set_glucose_to_microbial_oil_yield.setter(microbial_oil_yield)
+        #     set_xylose_to_microbial_oil_yield.setter(microbial_oil_yield)
+        #     self.sys.simulate()
+        #     return 100 * tea.ROI - target
         
-        @metric(name='Competitive microbial oil yield', element='Feedstock', units='wt. %')
-        def competitive_microbial_oil_yield():
-            if self.ROI_target is None or self.microbial_oil_analysis_disactivated: return np.nan
-            f = competitive_microbial_oil_yield_objective
-            x0 = 20
-            x1 = 95
-            args = (self.ROI_target,)
-            if (y0:=f(x0, *args)) > 0. or (y1:=f(x1, *args)) < 0.:
-                return np.nan
-            else:
-                flx.IQ_interpolation(
-                    f, x0, x1, y0, y1, xtol=1e-2, ytol=1e-3, args=args,
-                )
-                if number in cellulosic_oil_configurations:
-                    return 100. * fermentor.cofermentation[0].product_yield(product='TriOlein', basis='wt')
-                elif number in oil_configurations:
-                    return 100. * fermentor.fermentation_reaction[0].product_yield(product='TriOlein', basis='wt')
+        # @metric(name='Competitive microbial oil yield', element='Feedstock', units='wt. %')
+        # def competitive_microbial_oil_yield():
+        #     if self.ROI_target is None or self.microbial_oil_analysis_disactivated: return np.nan
+        #     f = competitive_microbial_oil_yield_objective
+        #     x0 = 20
+        #     x1 = 95
+        #     args = (self.ROI_target,)
+        #     if (y0:=f(x0, *args)) > 0. or (y1:=f(x1, *args)) < 0.:
+        #         return np.nan
+        #     else:
+        #         flx.IQ_interpolation(
+        #             f, x0, x1, y0, y1, xtol=1e-2, ytol=1e-3, args=args,
+        #         )
+        #         if number in cellulosic_oil_configurations:
+        #             return 100. * fermentor.cofermentation[0].product_yield(product='TriOlein', basis='wt')
+        #         elif number in oil_configurations:
+        #             return 100. * fermentor.fermentation_reaction[0].product_yield(product='TriOlein', basis='wt')
         
-        @metric(name='Energy competitive microbial oil yield', element='Feedstock', units='wt. %')
-        def energy_competitive_microbial_yield():
-            if self.net_energy_target is None or self.microbial_oil_analysis_disactivated: return np.nan
-            f = competitive_microbial_oil_yield_objective
-            x0 = 20
-            x1 = 95
-            if (y0:=f(x0)) > 0. or (y1:=f(x1)) < 0.:
-                return np.nan
-            else:
-                flx.IQ_interpolation(
-                    f, x0, x1, y0, y1, xtol=1e-2, ytol=1e-3, args=(self.net_energy_target,)
-                )
-                if number in cellulosic_oil_configurations:
-                    return 100. * fermentor.cofermentation[0].product_yield(product='TriOlein', basis='wt')
-                elif number in oil_configurations:
-                    return 100. * fermentor.fermentation_reaction[0].product_yield(product='TriOlein', basis='wt')
+        # @metric(name='Energy competitive microbial oil yield', element='Feedstock', units='wt. %')
+        # def energy_competitive_microbial_yield():
+        #     if self.net_energy_target is None or self.microbial_oil_analysis_disactivated: return np.nan
+        #     f = competitive_microbial_oil_yield_objective
+        #     x0 = 20
+        #     x1 = 95
+        #     if (y0:=f(x0)) > 0. or (y1:=f(x1)) < 0.:
+        #         return np.nan
+        #     else:
+        #         flx.IQ_interpolation(
+        #             f, x0, x1, y0, y1, xtol=1e-2, ytol=1e-3, args=(self.net_energy_target,)
+        #         )
+        #         if number in cellulosic_oil_configurations:
+        #             return 100. * fermentor.cofermentation[0].product_yield(product='TriOlein', basis='wt')
+        #         elif number in oil_configurations:
+        #             return 100. * fermentor.fermentation_reaction[0].product_yield(product='TriOlein', basis='wt')
         
         # Single point evaluation for detailed design results
         def set_baseline(p, x=None):

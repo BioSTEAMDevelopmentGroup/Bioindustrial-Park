@@ -451,12 +451,13 @@ def _add_model_composition_parameters_for_cane_line(
         units='dry MT/ha',
     )
     def set_cane_biomass_yield(biomass_yield):
-        biorefinery.update_dry_biomass_yield(biomass_yield)
+        biorefinery.dry_biomass_yield = biomass_yield
+        biorefinery.update_feedstock()
         
     biorefinery.set_cane_oil_content = set_cane_oil_content
     biorefinery.set_cane_moisture_content = set_cane_moisture_content
-    biorefinery.set_cane_biomass_yield = set_cane_biomass_yield
     biorefinery.set_cane_sugar_content = set_cane_sugar_content
+    biorefinery.set_cane_biomass_yield = set_cane_biomass_yield
     for p in (set_cane_oil_content, 
               set_cane_biomass_yield,
               set_cane_moisture_content,
