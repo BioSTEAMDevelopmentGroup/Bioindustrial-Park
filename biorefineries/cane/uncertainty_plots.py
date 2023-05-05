@@ -1131,7 +1131,7 @@ def plot_competitive_biomass_yield_across_oil_content(
     )
     _add_lines_biomass_yield_vs_oil_content()
     plt.sca(microbial_oil_ax)
-    _plot_competitive_biomass_yield_across_oil_content('O6')
+    _plot_competitive_biomass_yield_across_oil_content('O8')
     plt.xlabel('Oil content [dry wt. %]')
     bst.plots.style_axis(
         ytick0=False,
@@ -1214,7 +1214,7 @@ def _plot_competitive_biomass_yield_across_oil_content(
 def plot_competitive_microbial_oil_yield_across_oil_content(
         configuration=None,
     ):
-    if configuration is None: configuration = 'O6'
+    if configuration is None: configuration = 'O7'
     file = monte_carlo_file(configuration, across_lines=False, across_oil_content='microbial oil vs bioethanol')
     df = pd.read_excel(file, sheet_name=features.competitive_microbial_oil_yield.short_description, index_col=0)
     df = df.dropna(axis=0)
@@ -1230,7 +1230,7 @@ def plot_lines_monte_carlo(
         configurations=None, metrics=None, labels=None, tickmarks=None, 
         ncols=1, expand=None, step_min=None, xrot=None, color_wheel=None,
     ):
-    if configurations is None: configurations = ['O2', 'O6']
+    if configurations is None: configurations = ['O2', 'O8']
     df = cane.get_composition_data()
     columns = df.index
     rows, ylabels = zip(*[mc_line_metric_settings[i] for i in metrics])
