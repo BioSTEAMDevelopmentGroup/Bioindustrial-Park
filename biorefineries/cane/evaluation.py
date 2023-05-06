@@ -103,13 +103,11 @@ def evaluate_metrics_at_composition(oil, fiber, water, configuration):
         if configuration == 'O2':
             S2 = cane.Biorefinery('S2')
             S2.set_cane_oil_content.setter(0)
-            S2.update_dry_biomass_yield(br.baseline_dry_biomass_yield)
             S2.sys.simulate()
             br.ROI_target = S2.ROI()
         else:
             br.set_cane_oil_content.setter(0)
             br.composition_specification.oil = -1 # Not zero so that competitive biomass metric works
-            br.update_dry_biomass_yield(br.baseline_dry_biomass_yield)
             br.sys.simulate()
             br.ROI_target = br.ROI()
     try:
@@ -136,13 +134,11 @@ def evaluate_metrics_across_composition_configurations(oil, fiber):
             if configuration == 'O2':
                 S2 = cane.Biorefinery('S2')
                 S2.set_cane_oil_content.setter(0)
-                S2.update_dry_biomass_yield(br.baseline_dry_biomass_yield)
                 S2.sys.simulate()
                 br.ROI_target = S2.ROI()
             else:
                 br.set_cane_oil_content.setter(0)
                 br.composition_specification.oil = -1 # Not zero so that competitive biomass metric works
-                br.update_dry_biomass_yield(br.baseline_dry_biomass_yield)
                 br.sys.simulate()
                 br.ROI_target = br.ROI()
         water = 0.65
@@ -275,12 +271,10 @@ def run_uncertainty_and_sensitivity(name, N, rule='L',
             if any([i in name for i in ('5', '6', '7', '8')]):
                 br_sugarcane = None
                 br.model.metrics = [br.ROI, br.competitive_biomass_yield, br.net_energy_production]
-                br.update_dry_biomass_yield(br.baseline_dry_biomass_yield)
             else:
                 # Only sugarcane needs the ROI metric (which gets added later)
                 br.model.metrics = [br.competitive_biomass_yield, br.energy_competitive_biomass_yield]
                 br_sugarcane = cane.Biorefinery(name.replace('O', 'S'))
-                br_sugarcane.update_dry_biomass_yield(br.baseline_dry_biomass_yield)
         elif across_oil_content == 'microbial oil vs bioethanol':
             ethanol_name = name
             for i, j in [('5', '1'), ('6', '2'), ('7', '1'), ('8', '2')]:
@@ -294,8 +288,6 @@ def run_uncertainty_and_sensitivity(name, N, rule='L',
             br.model.specification = lambda: None # No need to simulate before metric
             br_ethanol.model.load_samples(samples)
             br_sugarcane = cane.Biorefinery(ethanol_name.replace('O', 'S'))
-            br_ethanol.update_dry_biomass_yield(br_ethanol.baseline_dry_biomass_yield)
-            br.update_dry_biomass_yield(br.baseline_dry_biomass_yield)
         else:
             raise ValueError(
                 "`across_oil_content` must be either 'oilcane vs sugarcane' "
@@ -429,7 +421,7 @@ def run_all(N, across_lines=False, rule='L', configurations=None,
         )
 
 def run_sugarcane_microbial_oil_and_ethanol(N=None):
-    if N is None: N = 5000
+    if N is None: N = 50
     filterwarnings('ignore')
     cane.YRCP2023()
     run_uncertainty_and_sensitivity('S1', N, line='WT')
@@ -442,7 +434,7 @@ def run_sugarcane_microbial_oil_and_ethanol(N=None):
     run_uncertainty_and_sensitivity('O8', N)
     
 def run_oilcane_microbial_oil_and_ethanol_across_oil_content(N=None):
-    if N is None: N = 1000
+    if N is None: N = 5
     filterwarnings('ignore')
     cane.YRCP2023()
     run_uncertainty_and_sensitivity('O7', N, across_oil_content='oilcane vs sugarcane')
@@ -451,7 +443,7 @@ def run_oilcane_microbial_oil_and_ethanol_across_oil_content(N=None):
     run_uncertainty_and_sensitivity('O2', N, across_oil_content='oilcane vs sugarcane')        
     
 def run_oilcane_microbial_oil_and_ethanol_across_lines(N=None):
-    if N is None: N = 1000
+    if N is None: N = 50
     filterwarnings('ignore')
     cane.YRCP2023()
     run_uncertainty_and_sensitivity('O7', N, across_lines=True)

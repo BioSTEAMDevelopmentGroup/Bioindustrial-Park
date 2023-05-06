@@ -9,7 +9,7 @@
 """
 import flexsolve as flx
 import biosteam as bst
-from math import sqrt
+from math import sqrt, log, exp
 from biosteam.utils import MockStream
 import thermosteam as tmo
 from biorefineries.cane.composition import (
@@ -162,6 +162,27 @@ def get_price_distributions_module(year):
 
 def rename_storage_units(units, storage_area):
     bst.rename_units([i for i in units if bst.is_storage_unit(i)], storage_area)
+
+def linear_fit(x0, x1, y0, y1):
+    m = (y1 - y0) / (x1 - x0)
+    b = y0 - m * x0
+    return m, b
+
+def linear_val(x, mb):
+    m, b = mb
+    return x * m + b
+
+def exponential_fit(x0, x1, y0, y1): # A x ^ n
+    x0 = log(x0)
+    x1 = log(x1)
+    y0 = log(y0)
+    y1 = log(y1)
+    n, logA = linear_fit(x0, x1, y0, y1)
+    return n, exp(logA)
+
+def exponential_val(x, nA): # b e ^ m
+    n, A = nA    
+    return A * x ** n
 
 def YRCP2023():
     Biorefinery.default_conversion_performance_distribution = 'longterm'
@@ -1322,36 +1343,107 @@ class Biorefinery:
         def ROI():
             return 100. * tea.ROI
         
-        def competitive_biomass_yield_objective(biomass_yield, target):
-            self.dry_biomass_yield = biomass_yield
-            F_mass = self.feedstock.F_mass
+        # def competitive_biomass_yield_objective(biomass_yield, target):
+        #     self.dry_biomass_yield = biomass_yield
+        #     F_mass = self.feedstock.F_mass
+        #     self.update_feedstock()
+        #     specifications = self.sys.specifications
+        #     self.sys.specifications = []
+        #     try:
+        #         self.sys.simulate()
+        #     finally:
+        #         self.sys.specifications = specifications
+        #     self.feedstock.F_mass = F_mass
+        #     return 100. * tea.ROI - target
+        
+        # @metric(name='Competitive biomass yield', element='Feedstock', units='dry MT/ha')
+        # def competitive_biomass_yield():
+        #     # assert self.ROI_target is None
+        #     if self.ROI_target is None: return np.nan
+        #     if composition_specification.oil == 0: return self.baseline_dry_biomass_yield
+        #     f = competitive_biomass_yield_objective
+        #     x0 = 0.1 * self.baseline_dry_biomass_yield
+        #     x1 = 3 * self.baseline_dry_biomass_yield
+        #     args = (self.ROI_target,)
+        #     if (y0:=f(x0, *args)) > 0. or (y1:=f(x1, *args)) < 0.:
+        #         return np.nan
+        #     else:
+        #         return flx.IQ_interpolation(
+        #             f, x0, x1, y0, y1, x=competitive_biomass_yield.get(evaluate=False),
+        #             args=args, 
+        #         )
+        
+        def NE_and_TCI_at_biomass_yield(dry_biomass_yield):
+            self.dry_biomass_yield = dry_biomass_yield
             self.update_feedstock()
-            self.feedstock.F_mass = F_mass
-            # specifications = self.sys.specifications
-            # self.sys.specifications = []
-            # try:
-            #     self.sys.simulate()
-            # finally:
-            #     self.sys.specifications = specifications
-            return 100. * tea.ROI - target
+            sys.simulate()
+            return tea.net_earnings, tea.TCI
+        
+        def competitive_biomass_yield_objective(biomass_yield, target, mb_NE, An_TCI):
+            return 100. * linear_val(biomass_yield, mb_NE) / exponential_val(biomass_yield, An_TCI) - target
         
         @metric(name='Competitive biomass yield', element='Feedstock', units='dry MT/ha')
         def competitive_biomass_yield():
+            # assert self.ROI_target is None
             if self.ROI_target is None: return np.nan
             if composition_specification.oil == 0: return self.baseline_dry_biomass_yield
+            x0 = self.dry_biomass_yield
+            x1 = 2 * x0
+            NE0, TCI0 = tea.net_earnings, tea.TCI
+            NE1, TCI1 = NE_and_TCI_at_biomass_yield(x1)
+            self.dry_biomass_yield = self.baseline_dry_biomass_yield # Reset dry biomass yield
+            mb_NE = linear_fit(x0, x1, NE0, NE1)
+            An_TCI = exponential_fit(x0, x1, TCI0, TCI1)
+            
+            # DO NOT DELETE: This is to validate the functional approximation made here
+            # from matplotlib import pyplot as plt
+            # N = 10
+            # xs = np.linspace(x0, x1, N)
+            # NEs, TCIs = zip(*[NE_and_TCI_at_biomass_yield(x) for x in xs])
+            # NEs = np.array(NEs)
+            # TCIs = np.array(TCIs)
+            # plt.figure()
+            # plt.plot(xs, NEs, label='NE actual')
+            # NEs_model = np.array([linear_val(x, mb_NE) for x in xs])
+            # plt.scatter(xs, NEs_model, label='NE model')
+            
+            # plt.figure()
+            # plt.plot(xs, TCIs, label='TCI actual')
+            # TCIs_model = np.array([exponential_val(x, An_TCI) for x in xs])
+            # plt.scatter(xs, TCIs_model, label='TCI model')
+            # dNEs = (NEs - NEs_model)
+            
+            # TCIs_log = np.log(TCIs)
+            # TCIs_model_log = np.log(TCIs_model)
+            # dTCIs_log = TCIs_log - TCIs_model_log
+            # TCI_ave_log = np.mean(TCIs_log)
+            # TCI_log_SSR = (dTCIs_log * dTCIs_log).sum()
+            # dTCIs_log_mean = (TCIs_log - TCI_ave_log)
+            # TCI_log_SST = (dTCIs_log_mean * dTCIs_log_mean).sum()
+            # R2_TCI_log = 1 - TCI_log_SSR / TCI_log_SST
+            # print(R2_TCI_log) # 0.9995
+            # assert R2_TCI_log > 0.999
+            
+            # NE_ave = np.mean(NEs)
+            # dNEs = NEs - NEs_model
+            # dNEs_mean = NEs - NE_ave
+            # NE_SSR = (dNEs * dNEs).sum()
+            # NE_SST = (dNEs_mean * dNEs_mean).sum()
+            # R2_NE = 1 - NE_SSR / NE_SST
+            
+            # print(R2_NE) # 0.9999
+            # assert R2_NE > 0.999
+            
             f = competitive_biomass_yield_objective
-            x0 = 0.1 * self.baseline_dry_biomass_yield
-            x1 = 2 * self.baseline_dry_biomass_yield
-            args = (self.ROI_target,)
-            if (y0:=f(x0, *args)) > 0. or (y1:=f(x1, *args)) < 0.:
-                return np.nan
-            else:
-                return flx.IQ_interpolation(
-                    f, x0, x1, y0, y1, args=args, maxiter=5, checkiter=False,
-                )
+            args = (self.ROI_target, mb_NE, An_TCI)
+            value = flx.IQ_interpolation(
+                f, 0.1 * x0, 10 * x1, args=args, 
+            )
+            return value
         
         @metric(name='Energy competitive biomass yield', element='Feedstock', units='dry MT/ha')
         def energy_competitive_biomass_yield():
+            # assert self.net_energy_target is None
             if self.net_energy_target is None: return np.nan
             NEP_target = self.net_energy_target
             if composition_specification.oil == 0: return self.baseline_dry_biomass_yield
@@ -1459,8 +1551,8 @@ class Biorefinery:
         if number in cellulosic_configurations:
             flowsheet('SludgeCentrifuge').strict_moisture_content = False
             flowsheet(bst.PressureFilter).isplit[
-                'Yeast', 'Glucan', 'Xylan', 'Arabinan', 'Galactan', 'Lignin',
-                'Solids',
+                'Yeast', 'Glucan', 'Xylan', 'Arabinan',
+                'Galactan', 'Lignin', 'Solids',
             ] = 1.
         
         ## Simulation

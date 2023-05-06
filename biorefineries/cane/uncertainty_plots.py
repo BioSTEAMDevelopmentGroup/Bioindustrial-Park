@@ -1177,6 +1177,7 @@ def _plot_competitive_biomass_yield_across_oil_content(
     if configuration is None: configuration = 'O2'
     file = monte_carlo_file(configuration, across_lines=False, across_oil_content='oilcane vs sugarcane')
     df = pd.read_excel(file, sheet_name=features.competitive_biomass_yield.short_description, index_col=0)
+    df = df.dropna()
     oil_content = np.array(df.columns) * 100
     plt.ylabel(f"Biomass yield [dry-{format_units('MT/ha')}]")
     if configuration == 'O2':
@@ -1188,7 +1189,10 @@ def _plot_competitive_biomass_yield_across_oil_content(
         # for i, j in zip(oil_content, biomass_yield_p50):
         #     print(i, j, np.polyval(coeff, i))
         target = cane.Biorefinery.baseline_dry_biomass_yield
-        competitive_oil_content = flx.aitken_secant(lambda x: np.polyval(coeff, x) - target, x0=4)
+        try:
+            competitive_oil_content = flx.aitken_secant(lambda x: np.polyval(coeff, x) - target, x0=4)
+        except:
+            breakpoint()
         # print(competitive_oil_content, np.polyval(coeff, competitive_oil_content), target)
         bst.plots.plot_vertical_line(competitive_oil_content)
         plt.fill_between([oil_content[0], competitive_oil_content], 0, 50,

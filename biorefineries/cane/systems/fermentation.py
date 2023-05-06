@@ -245,8 +245,6 @@ def create_sucrose_fermentation_system(ins, outs,
     
         F301.P_original = P_original = tuple(F301.P)
         N_evaps = len(P_original)
-        Pstart = P_original[0]
-        Plast = P_original[-1]
         @F301.add_specification(run=False)
         def evaporation():
             R301.tau = R301.titer / R301.productivity
@@ -267,8 +265,8 @@ def create_sucrose_fermentation_system(ins, outs,
                 y1 = f(x1, path)
                 if y1 > 0.: raise RuntimeError('cannot evaporate to target sugar concentration')
                 for i in range(1, N_evaps):
-                    if f(1e-6, path) < 0.:
-                        F301.P = np.linspace(Pstart, Plast, N_evaps - i)
+                    if f(1e-3, path) < 0.:
+                        F301.P = P_original[:-i]
                         F301._reload_components = True
                     else:
                         break
@@ -289,11 +287,11 @@ def create_sucrose_fermentation_system(ins, outs,
                     return R301.titer - get_titer()
                 try:
                     s_dilution_water.imass['Water'] = flx.IQ_interpolation(
-                        f, 0 , dilution_water * 5, x=dilution_water, ytol=1e-3, xtol=1e-9, maxiter=1000,
+                        f, 0 , 2 * dilution_water, x=dilution_water, ytol=1e-2, xtol=1e-6, maxiter=1000,
                     )
                 except:
-                    breakpoint()
-            if abs(R301.titer - get_titer()) > 2.5:
+                    f(dilution_water)
+            if abs(R301.titer - get_titer()) > 2:
                 breakpoint()
     
     # Mix sugar solutions

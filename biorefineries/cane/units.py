@@ -47,7 +47,7 @@ class SeedTrain(SeedTrain):
         effluent.mol.remove_negatives()
         effluent.T = self.T
         vent.empty()
-        vent.copy_flow(effluent, ('CO2', 'O2'), remove=True)
+        vent.copy_flow(effluent, ('CO2', 'O2', 'N2'), remove=True)
         
 
 class CoFermentation(CoFermentation):
@@ -102,6 +102,9 @@ class AeratedCoFermentation(bst.AeratedBioreactor): # For microbial oil producti
         ])
         self.Q_O2_consumption = Q_O2_consumption
     
+    def _run_vent(self, vent, effluent):
+        vent.receive_vent(effluent, energy_balance=False, ideal=True)
+    
     def run_reactions(self, effluent):
         self.hydrolysis_reaction.force_reaction(effluent)
         self.lipid_reaction.force_reaction(effluent)
@@ -127,6 +130,9 @@ class AeratedFermentation(bst.AeratedBioreactor): # For microbial oil production
             Rxn('TAG + Water -> FFA + DAG', 'TAG', 0.02, chemicals)
         ])
         self.Q_O2_consumption = Q_O2_consumption
+    
+    def _run_vent(self, vent, effluent):
+        vent.receive_vent(effluent, energy_balance=False, ideal=True)
     
     def run_reactions(self, effluent):
         self.hydrolysis_reaction.force_reaction(effluent)
