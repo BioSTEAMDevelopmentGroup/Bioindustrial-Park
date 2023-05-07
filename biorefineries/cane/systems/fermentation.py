@@ -9,6 +9,7 @@ import thermosteam as tmo
 from biosteam import SystemFactory
 from .pretreatment import create_cane_combined_1_and_2g_pretreatment
 from biorefineries.cellulosic import create_cellulosic_fermentation_system
+from warnings import warn
 from .. import streams as s
 from .. import units
 
@@ -265,7 +266,7 @@ def create_sucrose_fermentation_system(ins, outs,
                 y1 = f(x1, path)
                 if y1 > 0.: raise RuntimeError('cannot evaporate to target sugar concentration')
                 for i in range(1, N_evaps):
-                    if f(1e-3, path) < 0.:
+                    if f(1e-2, path) < 0.:
                         F301.P = P_original[:-i]
                         F301._reload_components = True
                     else:
@@ -276,8 +277,8 @@ def create_sucrose_fermentation_system(ins, outs,
                     x1 += 0.05
                     y1 = f(x1, path)
                 F301.V = flx.IQ_interpolation(
-                    f, x0, x1, y0, y1, x=V_guess, ytol=1e-3, xtol=1e-9, maxiter=1000,
-                    args=(path,),
+                    f, x0, x1, y0, y1, x=V_guess, ytol=1e-3, xtol=1e-9, maxiter=20,
+                    args=(path,), checkiter=False
                 )
             else:
                 mx_path = M301.path_until(R301, inclusive=True)
@@ -287,12 +288,14 @@ def create_sucrose_fermentation_system(ins, outs,
                     return R301.titer - get_titer()
                 try:
                     s_dilution_water.imass['Water'] = flx.IQ_interpolation(
-                        f, 0 , 2 * dilution_water, x=dilution_water, ytol=1e-2, xtol=1e-6, maxiter=1000,
+                        f, 0 , 2 * dilution_water, x=dilution_water, ytol=1e-2, xtol=1e-6, 
+                        maxiter=20, checkiter=False
                     )
                 except:
                     f(dilution_water)
-            if abs(R301.titer - get_titer()) > 2:
-                breakpoint()
+            if abs(R301.titer - get_titer()) > 1:
+                warn('titer specification could not be solved within 1 g/L; '
+                    f'target titer is {R301.titer:.2f} g/L and actual titer is {get_titer():.2f} g/L')
     
     # Mix sugar solutions
     M301 = bst.Mixer('M301', ins=(P306-0, dilution_water))
