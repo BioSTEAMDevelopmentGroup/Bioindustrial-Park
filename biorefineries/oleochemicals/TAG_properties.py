@@ -5,7 +5,7 @@ Created on Tue Mar 21 17:16:50 2023
 @author: Lavanya 
 """
 
-#Properties of TAGs based on #Add_citation
+#Properties of TAGs based on 
 
 #Heats of formation
 
@@ -27,6 +27,14 @@ TAG_Hfs = {'OOO': 1000*(-76.494*18 - 815.18),
             'Methyl_dihydroxy_palmitate': -892*1000, #Based on palmitic acid, Ref: https://en.wikipedia.org/wiki/Palmitic_acid
             'Tetrahydroxy_octadecanoate' : -634.7*1000 #Based on Hf for Linoleic acid, Ref:https://webbook.nist.gov/cgi/cbook.cgi?ID=C60333&Mask=2
             }
+# def TAG(name,property_name,unsaturation):
+# #relationships between enthalpy of formation, carbon number and unsaturation
+# def saturated_Hf(carbon_atoms):
+#     return 1000*(-59.571*carbon_atoms - 1358.7)#saturated
+# def mono_saturated_Hf(carbon_atoms):    
+#     return 1000*(-76.494*carbon_atoms - 815.18)#mono unsaturated
+# def unsaturated_saturated_Hf(carbon_atoms):
+#     return 1000*(316.67*carbon_atoms - 2466.4)#C18 compound number of double bonds
 
 #Fitting data for MMA based on ChemSep
 # Ts = [i + 273.15 for i in  (148, 159, 120, 185.5, )]

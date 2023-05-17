@@ -318,3 +318,69 @@ Created on Thu Apr  6 08:47:36 2023
 #                             T = 60+273.15,#temperature adjusted to get water out
 #                             P = 10000 #Based on dihydroxylation reactors pressure set to evaporate water
 #                                   )
+ # tmo.Chemical('OOL',
+ #              search_ID = '28880-78-6',#Based on reference search in CAS Finder
+ #              search_db = False,
+ #              formula = 'C57H102O6',#Based on reference search in CAS Finder
+ #              phase = 'l',
+ #              Hf = (((2/3)*(-76.494*18 - 815.18))+((1/3)*(-316.67*2 - 2466.4)))*1000 
+ #              ),           
+ # tmo.Chemical('LLO', 
+ #                  search_ID = '28409-91-8',#Based on reference search in CAS Finder
+ #                  search_db = False,
+ #                  formula = 'C57H100O6',#Based on reference search in CAS Finder
+ #                  phase = 'l',
+ #                  Hf = (((2/3)*(-316.67*2 - 2466.4))+((1/3)*(-76.494*18 - 815.18)))*1000
+ #                  ),  
+ # tmo.Chemical('SOO',
+ #                  search_ID = '29590-02-1',#Based on reference search in CAS Finder
+ #                  search_db = False,
+ #                  formula = 'C57H106O6',#Based on reference search in CAS Finder
+ #                  phase = 'l',
+ #                  Hf = 1000*(((1/3)*( -59.571*18 - 1358.7))+((2/3)*(-76.494*18 - 815.18)))
+ #                  ),      
+ # tmo.Chemical('PLO', 
+ #                  search_ID = '26836-35-1',#Based on reference search in CAS Finder
+ #                  search_db = False,
+ #                  formula = 'C55H100O6',#Based on reference search in CAS Finder
+ #                  phase = 'l',
+ #                  Hf = 1000*(((1/3)*(-76.494*18 - 815.18)) + ((1/3)*(-316.67*2 - 2466.4)) + ((1/3)*(-59.571*16 - 1358.7)))
+ #                  ),         
+ 
+ # tmo.Chemical('PoOO',
+ #              search_ID = '38703-17-2',#Based on reference search in CAS Finder
+ #              search_db = False,
+ #              formula = 'C55H100O6',#Based on reference search in CAS Finder
+ #              phase = 'l',
+ #              Hf = 1000*(((1/3)*(-76.494*16 - 815.18))+ ((2/3)*(-76.494*18 - 815.18)))),
+ # tmo.Chemical('POO',
+ #          search_ID = '27071-84-7',#Based on reference search in CAS Finder
+ #          search_db = False,
+ #          formula = 'C55H102O6',#Based on reference search in CAS Finder
+ #          phase = 'l',
+ #          Hf = 1000*(((2/3)*(-76.494*18 - 815.18)) + ((1/3)*(-59.571*16 - 1358.7)))
+ #          ),
+
+ # tmo.Chemical('POS', 
+ #          search_ID = '26836-31-7',#Based on reference search in CAS Finder
+ #          search_db = False,
+ #          formula = 'C55H104O6', #Based on reference search in CAS Finder
+ #          phase = 'l',
+ #          Hf = 1000*(((1/3)*(-76.494*18 - 815.18)) + ((1/3)*(-59.571*16 - 1358.7)) + ((1/3)*( -59.571*18 - 1358.7)))
+ #          ),
+
+ # tmo.Chemical('POP',
+ #          search_ID = '28409-94-1',#Based on reference search in CAS Finder
+ #          search_db = False,
+ #          formula = 'C53H100O6',#Based on reference search in CAS Finder
+ #          phase = 'l',
+ #          Hf = (((2/3)*(-59.571*16 - 1358.7)) + ((1/3)*(-76.494*18 - 815.18)))*1000
+ #          ),
+
+ # tmo.Chemical('PLS',
+ #          search_ID = '26836-32-8',#Based on reference search in CAS Finder 
+ #          search_db = False,
+ #          formula = 'C55H102O6',#Based on reference search in CAS Finder
+ #          phase = 'l',
+ #          Hf = 1000*(((1/3)*(-59.571*16 - 1358.7)) +((1/3)*(-59.571*18 - 1358.7))+ ((1/3)*( -316.67*2 - 2466.4)))
+ #          ),

@@ -2,20 +2,69 @@
 Created on Sat Aug 20 21:47:53 2022
 @author: Lavanya_Kudli
 """
+ #Composition of HoySoy
+ #Myristic_acid = 0.4
+ #C15_fatty_acid = 0.3
+ #PPP = 6.6
+ #Heptadecanoic_acid = 0.7
+ #Stearic_acid = SSS = 3.9
+ #AAA = 0.4
+ #BBB = 0.4
+ #C24_fatty_acid = 0.1
+ #PoPoPo = 0.1
+ #C17_1 = Na = 1.3
+ #OOO = 77.7
+ #C20_1 = GGG = 0.3
+ #LLL = 6.8
+ #LnLnLn = 1.9
+ 
+   # Water=0.05,
+   # OOO = 85.55,
+   # LLL = 5.74,
+   # LnLnLn = 0.16,
+   # SSS = 3.24,
+   # PPP = 3.34,                                                        
+   # PL  = 1, 
+   # MAG = 0,
+   # DAG = 0,
+   # Oleic_acid = 0.92,
+   # characterization_factors = {'GWP100': 0.76*99.99*0.01 + 0.00035559*0.01*0.01},##Global warming (incl. iLUC and biogenic CO2 uptake) in kg CO2-eq, Ref: #http://dx.doi.org/10.1016/j.jclepro.2014.10.011                                                                                                     
+   # total_flow = 35000,#4500 based on Matricias capacity, Azelaic acid hourly production is 70000*1000/(300*24)
+   # price = 2.67*384.391/351,#Price available for sept 2012, adjusted to dec 2022. basis: Fats and Oils, inedible Ref:DOI 10.1007/s11743-013-1466-0
+   # units = 'kg/hr',
+   # phase = 'l'
+
 import biosteam as bst
-import biosteam.units
 import thermosteam as tmo
 from thermosteam import functional as fn
 from chemicals import atoms_to_Hill
-import thermosteam as tmo
 from thermosteam import Chemicals
 from thermo import TDependentProperty
 from biorefineries.oleochemicals import TAG_properties
 from TAG_properties import *
-#chems is a list of all the chemicals used in this biorefinery
-
+#chems is a list of all the chemicals used in the azelaic acid production process
+#chemicals are listed based on their order of apperance in the production process
 chems = tmo.Chemicals([
-#Biodiesel preparation section chemicals
+#Biodiesel production
+#Feedstock(TAGs in the composition)[1]
+#TAGs of high oleic oils
+        tmo.Chemical('OOO', search_ID = '122-32-7',Hf = 1000*(-76.494*18 - 815.18),phase_ref = 'l' ),#from cane>chemicals
+        tmo.Chemical('LnLnLn', search_ID = '537-40-6',Hf = 1000*(-316.67*3 - 2466.4)),#This is Trilinolein
+        tmo.Chemical('LLL',
+                      search_ID = '7049-66-3',#Based on reference search in CAS Finder
+                      search_db = False,
+                      formula = 'C54H96O6',#Based on reference search in CAS Finder
+                      phase = 'l',
+                      Hf = (((2/3)*(-76.494*18 - 815.18))+((1/3)*(-316.67*2 - 2466.4)))*1000 #TODO: make a dictionary for these values
+                      ),         
+        tmo.Chemical('PPP',
+                     search_ID = 'Tripalmitin',
+                     Hf = 1000*(-59.571*16 - 1358.7)
+                     ),
+        tmo.Chemical('SSS',
+                     search_ID = 'Tristearin',
+                     Hf = 1000*(-59.571*18 - 1358.7),
+                     phase = 'l'),
         tmo.Chemical('Sodium_methoxide',formula ='NaOCH3',phase = 'l',default = True), #Catalyst
         tmo.Chemical('Methanol'), 
         tmo.Chemical('Citric_acid'),#Chemical for acid degumming 
@@ -29,91 +78,12 @@ chems = tmo.Chemicals([
                       phase = 'l',#taken from cane biorefinery
                       ),
         tmo.Chemical('Glycerol'),#By-product
-#TAGs of high oleic oils
-        tmo.Chemical('OOO', search_ID = '122-32-7',Hf = 1000*(-76.494*18 - 815.18),phase_ref = 'l' ),#from cane>chemicals
-        tmo.Chemical('LnLnLn', search_ID = '537-40-6',Hf = 1000*(-316.67*3 - 2466.4)),#This is Trilinolein
-#Below TAG's not a part of the database    
-         tmo.Chemical('LLL',
-                      search_ID = '7049-66-3',#Based on reference search in CAS Finder
-                      search_db = False,
-                      formula = 'C54H96O6',#Based on reference search in CAS Finder
-                      phase = 'l',
-                      Hf = (((2/3)*(-76.494*18 - 815.18))+((1/3)*(-316.67*2 - 2466.4)))*1000 #TODO: make a dictionary for these values
-                      ),  
-        tmo.Chemical('OOL',
-                     search_ID = '28880-78-6',#Based on reference search in CAS Finder
-                     search_db = False,
-                     formula = 'C57H102O6',#Based on reference search in CAS Finder
-                     phase = 'l',
-                     Hf = (((2/3)*(-76.494*18 - 815.18))+((1/3)*(-316.67*2 - 2466.4)))*1000 
-                     ),           
-        tmo.Chemical('LLO', 
-                         search_ID = '28409-91-8',#Based on reference search in CAS Finder
-                         search_db = False,
-                         formula = 'C57H100O6',#Based on reference search in CAS Finder
-                         phase = 'l',
-                         Hf = (((2/3)*(-316.67*2 - 2466.4))+((1/3)*(-76.494*18 - 815.18)))*1000
-                         ),  
-        tmo.Chemical('SOO',
-                         search_ID = '29590-02-1',#Based on reference search in CAS Finder
-                         search_db = False,
-                         formula = 'C57H106O6',#Based on reference search in CAS Finder
-                         phase = 'l',
-                         Hf = 1000*(((1/3)*( -59.571*18 - 1358.7))+((2/3)*(-76.494*18 - 815.18)))
-                         ),      
-        tmo.Chemical('PLO', 
-                         search_ID = '26836-35-1',#Based on reference search in CAS Finder
-                         search_db = False,
-                         formula = 'C55H100O6',#Based on reference search in CAS Finder
-                         phase = 'l',
-                         Hf = 1000*(((1/3)*(-76.494*18 - 815.18)) + ((1/3)*(-316.67*2 - 2466.4)) + ((1/3)*(-59.571*16 - 1358.7)))
-                         ),         
-        
-        tmo.Chemical('PoOO',
-                     search_ID = '38703-17-2',#Based on reference search in CAS Finder
-                     search_db = False,
-                     formula = 'C55H100O6',#Based on reference search in CAS Finder
-                     phase = 'l',
-                     Hf = 1000*(((1/3)*(-76.494*16 - 815.18))+ ((2/3)*(-76.494*18 - 815.18)))),
-        tmo.Chemical('POO',
-                 search_ID = '27071-84-7',#Based on reference search in CAS Finder
-                 search_db = False,
-                 formula = 'C55H102O6',#Based on reference search in CAS Finder
-                 phase = 'l',
-                 Hf = 1000*(((2/3)*(-76.494*18 - 815.18)) + ((1/3)*(-59.571*16 - 1358.7)))
-                 ),
-    
-        tmo.Chemical('POS', 
-                 search_ID = '26836-31-7',#Based on reference search in CAS Finder
-                 search_db = False,
-                 formula = 'C55H104O6', #Based on reference search in CAS Finder
-                 phase = 'l',
-                 Hf = 1000*(((1/3)*(-76.494*18 - 815.18)) + ((1/3)*(-59.571*16 - 1358.7)) + ((1/3)*( -59.571*18 - 1358.7)))
-                 ),
-    
-        tmo.Chemical('POP',
-                 search_ID = '28409-94-1',#Based on reference search in CAS Finder
-                 search_db = False,
-                 formula = 'C53H100O6',#Based on reference search in CAS Finder
-                 phase = 'l',
-                 Hf = (((2/3)*(-59.571*16 - 1358.7)) + ((1/3)*(-76.494*18 - 815.18)))*1000
-                 ),
-    
-        tmo.Chemical('PLS',
-                 search_ID = '26836-32-8',#Based on reference search in CAS Finder 
-                 search_db = False,
-                 formula = 'C55H102O6',#Based on reference search in CAS Finder
-                 phase = 'l',
-                 Hf = 1000*(((1/3)*(-59.571*16 - 1358.7)) +((1/3)*(-59.571*18 - 1358.7))+ ((1/3)*( -316.67*2 - 2466.4)))
-                 ),
-        tmo.Chemical('PPP',
-                     search_ID = 'Tripalmitin',
-                     Hf = 1000*(-59.571*16 - 1358.7)
-                     ),
-        tmo.Chemical('SSS',
-                     search_ID = 'Tristearin',
-                     Hf = 1000*(-59.571*18 - 1358.7),
-                     phase = 'l'),
+#Composition of HoySoy(Based on LCA of all the soybean oils reference)
+        tmo.Chemical('Myristic_acid'),#C14 SFA
+        tmo.Chemical('Pentadecylic_acid'), #C15 SFA
+        tmo.Chemical('Heptadecanoic_acid'), #C17 SFA
+        tmo.Chemical('Arachidic_acid'), #C20 SFA
+        tmo.Chemical('Behenic_acid'), #C22 SFA
         
 ##Chemicals part of Biodiesel
         tmo.Chemical('Methyl_oleate'),
@@ -122,6 +92,10 @@ chems = tmo.Chemicals([
         tmo.Chemical('Methyl_linoleate'), 
         tmo.Chemical('Methyl_linolenate',search_ID = '301-00-8'),
         tmo.Chemical('Methyl_palmitoleate',search_ID ='1120-25-8'),
+        tmo.Chemical('Methyl_myristate'),
+        tmo.Chemical('Arachidic_acid_methyl_ester', search_ID = '2566-89-4'),
+        tmo.Chemical('Methyl_behenate'),
+        
      
 #Dihydroxylation chemicals
         tmo.Chemical('Hydrogen_peroxide',phase ='l'),
@@ -218,7 +192,7 @@ chems = tmo.Chemicals([
 # Products of hydrolysis
         tmo.Chemical('Palmitic_acid'),
         tmo.Chemical('Stearic_acid'),
-        tmo.Chemical('Oleic_acid',phase = 'l'),
+        tmo.Chemical('Oleic_acid'),
         tmo.Chemical('Sodium_oleate',Tb = 633 ,Hf = -764800.0,phase ='l'),
         tmo.Chemical('Linoleic_acid', search_ID = '60-33-3'),
         tmo.Chemical('Linolenic_acid'),
@@ -356,17 +330,14 @@ chems.Methyl_palmitate.Cn.l.method = 'ROWLINSON_BONDI'
 # chems.Methyl_oleate.Cn.g.method = 'LASTOVKA_SHAW'
 chems.Palmitic_acid.Cn.l.method = 'ROWLINSON_BONDI'
 chems.Stearic_acid.Cn.l.method = 'ROWLINSON_BONDI'
-chems.Oleic_acid.Cn.method = 'ROWLINSON_BONDI'
+chems.Oleic_acid.Cn.l.method = 'ROWLINSON_BONDI'
 chems.Octane.Cn.l.method = 'DADGOSTAR_SHAW' #This method works for hydrocarbons
 chems.Natural_gas.Cn.l.method = 'DADGOSTAR_SHAW' #This method works for hydrocarbons
 chems.OOO.copy_models_from(chems.PPP,['mu',
                                       ])
 chems.LnLnLn.copy_models_from(chems.PPP,['mu'])
 TAGs_with_unknown_props = [ 'LLL',
-                            'OOL','LLO','SOO',
-                            'PLO','PoOO','POO',
-                            'POS','POP','PLS'
-                          ]
+                           ]
 for i in TAGs_with_unknown_props:
     chems[i].Tb = chems.OOO.Tb
     chems[i].copy_models_from(chems.PPP,['mu'])  
@@ -485,67 +456,67 @@ chems.LLL.Dortmund.set_group_counts_by_name({'CH3': 3,
                                              'CH':1
                                              })
 
-chems.OOL.Dortmund.set_group_counts_by_name({'CH3': 3,
-                                             'CH2': 13+13+11+2,
-                                             'CH=CH': 4,
-                                             'CH2COO':3,
-                                             'CH':1
-                                             })
-chems.LLO.Dortmund.set_group_counts_by_name({'CH3': 3,
-                                             'CH2': 11+13 +11+2,
-                                             'CH=CH': 5,
-                                             'CH2COO': 3,                                             
-                                             'CH':1
-                                             })
+# chems.OOL.Dortmund.set_group_counts_by_name({'CH3': 3,
+#                                              'CH2': 13+13+11+2,
+#                                              'CH=CH': 4,
+#                                              'CH2COO':3,
+#                                              'CH':1
+#                                              })
+# chems.LLO.Dortmund.set_group_counts_by_name({'CH3': 3,
+#                                              'CH2': 11+13 +11+2,
+#                                              'CH=CH': 5,
+#                                              'CH2COO': 3,                                             
+#                                              'CH':1
+#                                              })
 
-chems.SOO.Dortmund.set_group_counts_by_name({'CH3':3,
-                                             'CH2':15+13+13+2,
-                                             'CH=CH':2,
-                                             'CH2COO':3,
-                                             'CH':1
-                                             })
-chems.PLO.Dortmund.set_group_counts_by_name({'CH3':3,
-                                             'CH2':11+13+13+2,
-                                             'CH=CH':2+1,
-                                             'CH2COO': 1+1+1,
-                                             'CH':1
-                                             })
-chems.PoOO.Dortmund.set_group_counts_by_name({'CH3':3,
-                                              'CH2':11+13+13+2,
-                                              'CH=CH':1+1+1,
-                                              'CH2COO': 1+1+1,
-                                              'CH':1                                                   
-                                                    })
-chems.POO.Dortmund.set_group_counts_by_name({'CH3':3,
-                                             'CH2':13+13+13+2,
-                                             'CH=CH':1,
-                                             'CH2COO': 1+1+1,
-                                             'CH':1  
-                                             })
-chems.POS.Dortmund.set_group_counts_by_name({'CH3':3,
-                                             'CH2':13+13+15+2,
-                                             'CH=CH':1,
-                                             'CH2COO': 1,
-                                             'CH':1  
-                                             })
-chems.POO.Dortmund.set_group_counts_by_name({'CH3':3,
-                                             'CH2':13+13+13+2,
-                                             'CH=CH':1+1,
-                                             'CH2COO': 1+1+1,
-                                             'CH':1  
-                                             })
+# chems.SOO.Dortmund.set_group_counts_by_name({'CH3':3,
+#                                              'CH2':15+13+13+2,
+#                                              'CH=CH':2,
+#                                              'CH2COO':3,
+#                                              'CH':1
+#                                              })
+# chems.PLO.Dortmund.set_group_counts_by_name({'CH3':3,
+#                                              'CH2':11+13+13+2,
+#                                              'CH=CH':2+1,
+#                                              'CH2COO': 1+1+1,
+#                                              'CH':1
+#                                              })
+# chems.PoOO.Dortmund.set_group_counts_by_name({'CH3':3,
+#                                               'CH2':11+13+13+2,
+#                                               'CH=CH':1+1+1,
+#                                               'CH2COO': 1+1+1,
+#                                               'CH':1                                                   
+#                                                     })
+# chems.POO.Dortmund.set_group_counts_by_name({'CH3':3,
+#                                              'CH2':13+13+13+2,
+#                                              'CH=CH':1,
+#                                              'CH2COO': 1+1+1,
+#                                              'CH':1  
+#                                              })
+# chems.POS.Dortmund.set_group_counts_by_name({'CH3':3,
+#                                              'CH2':13+13+15+2,
+#                                              'CH=CH':1,
+#                                              'CH2COO': 1,
+#                                              'CH':1  
+#                                              })
+# chems.POO.Dortmund.set_group_counts_by_name({'CH3':3,
+#                                              'CH2':13+13+13+2,
+#                                              'CH=CH':1+1,
+#                                              'CH2COO': 1+1+1,
+#                                              'CH':1  
+#                                              })
 
-chems.POP.Dortmund.set_group_counts_by_name({'CH3':3,
-                                    'CH2':13+13+13+2,
-                                    'CH=CH':1,
-                                    'CH2COO': 1+1+1,
-                                    'CH':1  
-                                              })
-chems.PLS.Dortmund.set_group_counts_by_name({'CH3':3,
-                                             'CH2':13+11+15+2,
-                                             'CH=CH':2,
-                                             'CH2COO': 1+1+1,
-                                             'CH':1 })
+# chems.POP.Dortmund.set_group_counts_by_name({'CH3':3,
+#                                     'CH2':13+13+13+2,
+#                                     'CH=CH':1,
+#                                     'CH2COO': 1+1+1,
+#                                     'CH':1  
+#                                               })
+# chems.PLS.Dortmund.set_group_counts_by_name({'CH3':3,
+#                                              'CH2':13+11+15+2,
+#                                              'CH=CH':2,
+#                                              'CH2COO': 1+1+1,
+#                                              'CH':1 })
 
 chems.Methyl_dihydroxy_palmitate.Dortmund.set_group_counts_by_name({'CH3':2,
                                                         'CH2COO':1,
@@ -590,42 +561,42 @@ chems.Dipalmitin.Dortmund.set_group_counts_by_name({'CH3':2,
 #The below Psat models return values in Pa (N/m)
 # chems.OOO.Psat.add_method(f=OOO_CCPsat_model, Tmin=323.15, Tmax=573.15)
 chems.LLL.Psat.add_method(f=LLL_CCPsat_model, Tmin=323.15, Tmax=573.15)
-chems.OOL.Psat.add_method(f=OOL_CCPsat_model, Tmin=323.15, Tmax=573.15)
-chems.LLO.Psat.add_method(f=LLO_CCPsat_model, Tmin=323.15, Tmax=573.15)
-chems.SOO.Psat.add_method(f=SOO_CCPsat_model, Tmin=323.15, Tmax=573.15)
-chems.PLO.Psat.add_method(f=PLO_CCPsat_model, Tmin=323.15, Tmax=573.15)
-chems.PoOO.Psat.add_method(f=PoOO_CCPsat_model, Tmin=323.15, Tmax=573.15)
-chems.POO.Psat.add_method(f=POO_CCPsat_model, Tmin=323.15, Tmax=573.15)
-chems.POS.Psat.add_method(f=POS_CCPsat_model, Tmin=323.15, Tmax=573.15)
-chems.POP.Psat.add_method(f=POP_CCPsat_model, Tmin=323.15, Tmax=573.15)
-chems.PLS.Psat.add_method(f=PLS_CCPsat_model, Tmin=323.15, Tmax=573.15)
+# chems.OOL.Psat.add_method(f=OOL_CCPsat_model, Tmin=323.15, Tmax=573.15)
+# chems.LLO.Psat.add_method(f=LLO_CCPsat_model, Tmin=323.15, Tmax=573.15)
+# chems.SOO.Psat.add_method(f=SOO_CCPsat_model, Tmin=323.15, Tmax=573.15)
+# chems.PLO.Psat.add_method(f=PLO_CCPsat_model, Tmin=323.15, Tmax=573.15)
+# chems.PoOO.Psat.add_method(f=PoOO_CCPsat_model, Tmin=323.15, Tmax=573.15)
+# chems.POO.Psat.add_method(f=POO_CCPsat_model, Tmin=323.15, Tmax=573.15)
+# chems.POS.Psat.add_method(f=POS_CCPsat_model, Tmin=323.15, Tmax=573.15)
+# chems.POP.Psat.add_method(f=POP_CCPsat_model, Tmin=323.15, Tmax=573.15)
+# chems.PLS.Psat.add_method(f=PLS_CCPsat_model, Tmin=323.15, Tmax=573.15)
 ###############################################################################################33
 # chems.OOO.Cn.l.add_method(f=OOO_Cnl_model, Tmin= 298.15, Tmax=453.15)
 chems.LLL.Cn.add_method(f=OOO_Cnl_model, Tmin= 298.15, Tmax=453.15)
-chems.LLO.Cn.add_method(f=OOO_Cnl_model, Tmin= 298.15, Tmax=453.15)
-chems.OOL.Cn.add_method(f=OOO_Cnl_model, Tmin= 298.15, Tmax=453.15)
-chems.SOO.Cn.add_method(f=SOO_Cnl_model,Tmin= 298.15, Tmax=453.15)
-chems.PoOO.Cn.add_method(f=PoOO_Cnl_model, Tmin= 298.15, Tmax=453.15)
-chems.PLO.Cn.add_method(f=PoOO_Cnl_model, Tmin= 298.15, Tmax=453.15)
-chems.POO.Cn.add_method(f=PoOO_Cnl_model, Tmin= 298.15, Tmax=453.15)
-chems.POP.Cn.add_method(f=POP_Cnl_model, Tmin= 298.15, Tmax=453.15)
-chems.PLS.Cn.add_method(f=POP_Cnl_model, Tmin= 298.15, Tmax=453.15)
-chems.POS.Cn.add_method(f=POP_Cnl_model, Tmin= 298.15, Tmax=453.15)
+# chems.LLO.Cn.add_method(f=OOO_Cnl_model, Tmin= 298.15, Tmax=453.15)
+# chems.OOL.Cn.add_method(f=OOO_Cnl_model, Tmin= 298.15, Tmax=453.15)
+# chems.SOO.Cn.add_method(f=SOO_Cnl_model,Tmin= 298.15, Tmax=453.15)
+# chems.PoOO.Cn.add_method(f=PoOO_Cnl_model, Tmin= 298.15, Tmax=453.15)
+# chems.PLO.Cn.add_method(f=PoOO_Cnl_model, Tmin= 298.15, Tmax=453.15)
+# chems.POO.Cn.add_method(f=PoOO_Cnl_model, Tmin= 298.15, Tmax=453.15)
+# chems.POP.Cn.add_method(f=POP_Cnl_model, Tmin= 298.15, Tmax=453.15)
+# chems.PLS.Cn.add_method(f=POP_Cnl_model, Tmin= 298.15, Tmax=453.15)
+# chems.POS.Cn.add_method(f=POP_Cnl_model, Tmin= 298.15, Tmax=453.15)
 ###############################################################################################33
 #Adding the molar volumes
 # chems.OOO.V.l.add_method(f=OOO_Vl_model, Tmin= 258.15, Tmax=516.15)
 # TODO: check what methodP means ...in the V.l definition
 chems.LLL.V.add_method(f=LLL_Vl_model, Tmin= 258.15, Tmax=516.15)
-chems.OOL.V.add_method(f=OOL_Vl_model, Tmin= 258.15, Tmax=516.15)
-chems.LLO.V.add_method(f=LLO_Vl_model, Tmin= 258.15, Tmax=516.15)
-chems.SOO.V.add_method(f=SOO_Vl_model, Tmin= 258.15, Tmax=516.15)
-chems.PLO.V.add_method(f=PLO_Vl_model, Tmin= 258.15, Tmax=516.15)
-chems.POO.V.add_method(f=POO_Vl_model, Tmin= 258.15, Tmax=516.15)
-chems.POS.V.add_method(f=POS_Vl_model, Tmin= 258.15, Tmax=516.15)
-chems.POP.V.add_method(f=POP_Vl_model, Tmin= 258.15, Tmax=516.15)
-chems.PLS.V.add_method(f=PLS_Vl_model, Tmin= 258.15, Tmax=516.15)
+# chems.OOL.V.add_method(f=OOL_Vl_model, Tmin= 258.15, Tmax=516.15)
+# chems.LLO.V.add_method(f=LLO_Vl_model, Tmin= 258.15, Tmax=516.15)
+# chems.SOO.V.add_method(f=SOO_Vl_model, Tmin= 258.15, Tmax=516.15)
+# chems.PLO.V.add_method(f=PLO_Vl_model, Tmin= 258.15, Tmax=516.15)
+# chems.POO.V.add_method(f=POO_Vl_model, Tmin= 258.15, Tmax=516.15)
+# chems.POS.V.add_method(f=POS_Vl_model, Tmin= 258.15, Tmax=516.15)
+# chems.POP.V.add_method(f=POP_Vl_model, Tmin= 258.15, Tmax=516.15)
+# chems.PLS.V.add_method(f=PLS_Vl_model, Tmin= 258.15, Tmax=516.15)
 # chems.SSS.V.add_method(f=SSS_Vl_model, Tmin= 258.15, Tmax=516.15)
-chems.PoOO.V.add_method(f=PoOO_Vl_model, Tmin= 258.15, Tmax=516.15)
+# chems.PoOO.V.add_method(f=PoOO_Vl_model, Tmin= 258.15, Tmax=516.15)
 chems.SSS.copy_models_from(chems.OOO, ['V','mu'])
 chems.PPP.copy_models_from(chems.OOO, ['V'])
 ########Heat of formation ##########################################################################
@@ -664,26 +635,43 @@ chems.WWTsludge.copy_models_from(tmo.Chemical('Water'),['Psat'])
 for chemical in chems: chemical.default()
         
 chems.compile()
-chems.define_group('TAG', ('OOO','LLL','OOL',
-                           'LLO','SOO','PLO',
-                           'PoOO','POO','POS',
-                           'POP','PLS','PPP',
-                           'LnLnLn','SSS'))
+chems.define_group('TAG', ('OOO','LLL',# 'OOL',
+                           # 'LLO','SOO','PLO',
+                           # 'PoOO','POO','POS',
+                           # 'POP','PLS',
+                           'PPP',
+                           'LnLnLn','SSS',
+                           'Myristic_acid',
+                           'Pentadecylic_acid',
+                           'Heptadecanoic_acid',
+                           'Arachidic_acid',
+                           'Behenic_acid',
+                           ))
 
-chems.define_group('Lipid', ('OOO','LLL','OOL',
-                           'LLO','SOO','PLO',
-                           'PoOO','POO','POS',
-                           'POP','PLS'))
-chems.define_group('Oil', ('OOO','LLL','OOL',
-                           'LLO','SOO','PLO',
-                           'PoOO','POO','POS',
-                           'POP','PLS'))
+chems.define_group('Lipid', ('OOO','LLL',
+                             # 'OOL',
+                           # 'LLO','SOO','PLO',
+                           # 'PoOO','POO','POS',
+                           # 'POP',
+                           # 'PLS'
+                           ))
+chems.define_group('Oil', ('OOO','LLL',
+                           # 'OOL',
+                           # 'LLO','SOO','PLO',
+                           # 'PoOO','POO','POS',
+                           # 'POP','PLS'
+                           ))
 
 chems.define_group('Biodiesel', ('Methyl_oleate',
                                  'Methyl_palmitate',
                                  'Methyl_stearate',
                                  'Methyl_linoleate',
-                                 'Methyl_linolenate'))
+                                 'Methyl_linolenate',
+                                 'Methyl_myristate',
+                                 'Pentadecylic_acid',
+                                 'Arachidic_acid_methyl_ester',
+                                 'Methyl_behenate'
+                                 ))
 
 #composition of VM_Naphtha based on https://www.cdc.gov/niosh/npg/npgd0664.html#:~:text=None%20reported%20%5BNote%3A%20VM%26P%20Naphtha%20is%20a%20refined,Exposure%20Routes%20inhalation%2C%20ingestion%2C%20skin%20and%2For%20eye%20contact
 chems.define_group('VM_Naphtha',['Octane',

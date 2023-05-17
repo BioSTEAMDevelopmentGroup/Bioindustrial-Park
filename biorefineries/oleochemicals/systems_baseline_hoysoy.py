@@ -98,6 +98,11 @@ def crude_HOSO_oil_to_biodiesel(ins,outs,X_tes):
                                        SSS = 1,Water = 1,
                                        Oleic_acid  = 0,
                                        Sodium_oleate =0,
+                                       Myristic_acid = 1,
+                                       Pentadecylic_acid = 1,
+                                       Heptadecanoic_acid = 1,
+                                       Arachidic_acid = 1,
+                                       Behenic_acid = 1,
                                        ))
     
     
@@ -166,7 +171,10 @@ def crude_HOSO_oil_to_biodiesel(ins,outs,X_tes):
         tmo.Reaction('SSS + 3Methanol -> 3Methyl_stearate + Glycerol', reactant='SSS',  X = X_tes),
         tmo.Reaction('LnLnLn + 3Methanol -> 3Methyl_linolenate + Glycerol', reactant='LnLnLn',  X = X_tes),
         tmo.Reaction('PPP + 3Methanol -> 3Methyl_palmitate + Glycerol', reactant='PPP',  X = X_tes),
-                                    ])
+        tmo.Reaction('Myristic_acid + Methanol -> Methyl_myristate + Water', reactant = 'Myristic_acid',X = X_tes),
+        tmo.Reaction('Arachidic_acid + Methanol -> Arachidic_acid_methyl_ester + Water', reactant = 'Arachidic_acid',X = X_tes),
+        tmo.Reaction('Behenic_acid + Methanol -> Methyl_behenate + Water', reactant = 'Behenic_acid',X = X_tes),
+                                            ])
     
     sys = create_transesterification_and_biodiesel_separation_system(ins = C1001-0,
                                                                      outs = (biodiesel,
@@ -230,10 +238,11 @@ def dihydroxylation_system(ins,outs):
                             outs = ('feed_to_heat_exchanger'))
     
     def adjust_tungsten_catalyst_flow(tungstencatalyst_mass_factor):
-            moles_of_unsaturation = biodiesel.imol['Methyl_oleate']+ 2*biodiesel.imol['Methyl_linoleate'] + 3* biodiesel.imol['Methyl_linolenate'] 
+            moles_of_unsaturation = biodiesel.imol['Methyl_oleate']+ 2*biodiesel.imol['Methyl_linoleate'] + 3*biodiesel.imol['Methyl_linolenate'] 
             #Since tungstic acid needs to be replaced every 6 cycles, per cycle 1/6th of the required needs to be added      
             moles_of_tungstic_acid_required_per_cycle = tungstencatalyst_mass_factor*moles_of_unsaturation*(0.167)
-            M101.ins[1].imol['Tungstic_acid'] = moles_of_tungstic_acid_required_per_cycle - recovered_tungstic_acid.imol['Tungstic_acid']
+            mta = moles_of_tungstic_acid_required_per_cycle - recovered_tungstic_acid.imol['Tungstic_acid']
+            M101.ins[1].imol['Tungstic_acid'] = mta
             T102._run()
     M101.add_specification(adjust_tungsten_catalyst_flow,args = [0.0078], run = True)
    
@@ -393,6 +402,14 @@ def organic_phase_separation_and_catalyst_recovery(ins,outs):
                                                       'Methyl_dihydroxy_palmitate':1,'Tetrahydroxy_octadecanoate':1,
                                                       'Hexahydroxy_octadecanoate':1,  'Propanoic_acid':0,  'Monoester_MDHSA_MMA':1,
                                                       'Diester_MDHSA_MMA':1,'Monoester_MDHSA_PA':1,'Diester_MDHSA_PA':1,
+                                                      'Myristic_acid':1,
+                                                      'Pentadecylic_acid':1,
+                                                      'Heptadecanoic_acid':1,
+                                                      'Arachidic_acid':1,
+                                                      'Behenic_acid':1,
+                                                      'Methyl_myristate':1,
+                                                      'Arachidic_acid_methyl_ester':1,
+                                                      'Methyl_behenate':1,
                                                       #products arising out of catalyst separation
                                                       'Cobalt_chloride':0,'Calcium_hydroxide':0,
                                                       'Calcium_chloride':0,'Calcium_tungstate':0,
@@ -601,7 +618,7 @@ def organic_phase_separation_and_catalyst_recovery(ins,outs):
                        outs = 'tungstic_acid_mixture_for_washing')
     def adjusting_water_for_dilution():
         HX305._run()
-        M306.ins[1].imass['Water'] = 14*M306.ins[0].imass['Tungstic_acid']
+        M306.ins[1].imass['Water'] = M306.ins[0].imass['Tungstic_acid']
     M306.add_specification(adjusting_water_for_dilution, run = True)
     
     recycled_water_for_washing3 = bst.Stream(ID = 'recycled_water_for_washing3',
@@ -615,7 +632,7 @@ def organic_phase_separation_and_catalyst_recovery(ins,outs):
                        )
     
     def water_for_washing3():
-        recycled_water_for_washing3.imass['Water'] = M306.outs[0].F_mass
+        recycled_water_for_washing3.imass['Water'] = 3*M306.outs[0].F_mass
     M307.add_specification(water_for_washing3,run = True)        
     
     S305 = bst.LiquidsSplitCentrifuge(ID = 'S305',
@@ -623,7 +640,7 @@ def organic_phase_separation_and_catalyst_recovery(ins,outs):
                                 outs = ('moist_tungstic_acid',
                                         recycled_water_for_washing3),
                                 split = {'Hydrogen_peroxide': 0.0,   
-                                        'Water': 0.2,
+                                        'Water': 0.07,
                                         'Tungstic_acid': 1,
                                         'Cobalt_ion' :0,
                                         'Acetate_ion': 0,
@@ -866,13 +883,14 @@ def azelaic_acid_production(ins,outs):
                                    ),
                       outs = ('solvent_organics_mixture_for_extraction'))
    
-    def solvent_for_extraction(solvent_factor):
+    def solvent_for_extraction():
         # 0.3:1 to 2.5:1 ratio of solvent: weight of azelaic acid
         D = F_baseline.unit.D604
         D._run()
-        Total_required_solvent = solvent_factor*D604.outs[0].F_mass
+        Total_required_solvent = 0.3*D604.outs[0].F_mass
         M602.ins[1].F_mass = Total_required_solvent-M602.ins[2].F_mass
-    M602.add_specification(solvent_for_extraction,args = [0.3], run = True) 
+    M602.add_specification(solvent_for_extraction,run = True) 
+                           # args = [0.3], 
     
     recycled_water_for_LLE = bst.Stream('recycled_water_for_LLE') 
     M603 = bst.Mixer('M603',ins = (water_for_azelaicacid_extraction,
@@ -887,14 +905,22 @@ def azelaic_acid_production(ins,outs):
 # The partition coefficients for the multistage mixer settler are based on 
 # METHOD FOR PURIFYING AZELAIC ACID , patent number : US 2003/0032825 A1     
     MMS601 = bst.units.MultiStageMixerSettlers(ID = 'MMS601',
-                                   ins = (M602-0, HX602-0),
+                                   ins = (M602-0,
+                                          HX602-0),
                                    outs = ('raffinate_AA','solvent_monocarboxylics_mixture'),
                                    partition_data={'raffinate_chemicals': ('Water'),
                                                    'extract_chemicals': ('Cycloheptane','Toluene','Bicyclo_octane','Octane','Caprylic_acid','Hexanoic_acid',
                                                                          'Heptanoic_acid','Pelargonic_acid','Methyl_palmitate','Methyl_stearate','Methyl_linoleate',
                                                                          'Methyl_linolenate', 'Methyl_oleate','MDHSA','Tetrahydroxy_octadecanoate','Palmitic_acid',
                                                                          'Stearic_acid','Linoleic_acid','Propanoic_acid','Hexahydroxy_octadecanoate','Heptane',
-                                                                         'Linolenic_acid','Oleic_acid'),
+                                                                         'Linolenic_acid','Oleic_acid','Myristic_acid',
+                                                                         'Pentadecylic_acid',
+                                                                         'Heptadecanoic_acid',
+                                                                         'Arachidic_acid',
+                                                                         'Behenic_acid',
+                                                                         'Methyl_myristate',
+                                                                         'Arachidic_acid_methyl_ester',
+                                                                         'Methyl_behenate'),
                                                  'IDs': ('Malonic_acid',#<C8 DCA
                                                          'Monomethyl_suberate',#C8 DCA
                                                          'Azelaic_acid',#C9 DCA
@@ -916,6 +942,7 @@ def azelaic_acid_production(ins,outs):
         D._run()
         total_water_required =  4*D604.outs[0].F_mass
         M603.ins[0].F_mass = total_water_required - M603.ins[1].F_mass
+        HX602.run()
     M603.add_specification(water_for_extraction,run= True)
    
 #Option 2(Preferrred method) - Evaportation Drying zone - US patent: METHOD FOR PURIFYING AZELAIC ACID 
@@ -1040,21 +1067,26 @@ def aa_baseline_sys(ins,outs):
     recovered_tungstic_acid = bst.Stream(ID = 'recovered_tungstic_acid')
     recycled_diols_and_other_fatty_acids = bst.Stream(ID = 'recycled_diols_and_other_fatty_acids')
     recovered_mixture_of_cobalt_catalyst = bst.Stream(ID = 'recovered_mixture_of_cobalt_catalyst')  
-
+#TODO: currently adding the 2% of heptanedecenoic acid to triolein, look into it
     ob0 = crude_HOSO_oil_to_biodiesel(ins = (bst.Stream(ID='crude_vegetable_oil',#Composition based on latest report by NSA 2022
                                                         Water=0.05,
-                                                        OOO = 85.55,
-                                                        LLL = 5.74,
-                                                        LnLnLn = 0.16,
-                                                        SSS = 3.24,
-                                                        PPP = 3.34,                                                        
-                                                        PL  = 1, 
+                                                        OOO = 78,
+                                                        LLL = 7,
+                                                        LnLnLn = 2,
+                                                        SSS = 4,
+                                                        PPP = 6,
+                                                        Myristic_acid = 0.4,
+                                                        Pentadecylic_acid = 0.3,
+                                                        Heptadecanoic_acid = 0.7,
+                                                        Arachidic_acid = 0.4,
+                                                        Behenic_acid = 0.4,
+                                                        PL  = 0.57, 
                                                         MAG = 0,
                                                         DAG = 0,
-                                                        Oleic_acid = 0.92,
-                                                        characterization_factors = {'GWP100': 0.76*99.99 + 0.00035559*0.01},##Global warming (incl. iLUC and biogenic CO2 uptake) in kg CO2-eq, Ref: #http://dx.doi.org/10.1016/j.jclepro.2014.10.011                                                                                                     
+                                                        Oleic_acid = 0.07,
+                                                        characterization_factors = {'GWP100': 0.76*99.99*0.01 + 0.00035559*0.01*0.01},##Global warming (incl. iLUC and biogenic CO2 uptake) in kg CO2-eq, Ref: #http://dx.doi.org/10.1016/j.jclepro.2014.10.011                                                                                                     
                                                         total_flow = 35000,#4500 based on Matricias capacity, Azelaic acid hourly production is 70000*1000/(300*24)
-                                                        price = 2.67*384.391/351,#Price available for sept 2012, adjusted to dec 2022. basis: Fats and Oils, inedible Ref:DOI 10.1007/s11743-013-1466-0
+                                                        price = 0.99*384.391/351,#Price available for sept 2012, adjusted to dec 2022. basis: Fats and Oils, inedible Ref:DOI 10.1007/s11743-013-1466-0
                                                         units = 'kg/hr',
                                                         phase = 'l'),#874.7 kg/m³ assumed density
                                              bst.Stream(ID = 'base_for_saponification_of_FFA',
