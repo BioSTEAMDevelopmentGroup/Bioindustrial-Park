@@ -21,18 +21,16 @@ from thermosteam import Rxn, RxnSys, PRxn, SRxn, settings, Chemical, Stream, Mul
 from biosteam import ProcessWaterCenter
 from biorefineries.lipidcane._process_settings import price #TODO: were these prices adjusted to 2013 prices?
 from biorefineries.cane.data.lca_characterization_factors import GWP_characterization_factors 
-#REF characterization_factors=({'GWP100': 0.00035559}))),#Ecoinvent:tap water production, conventional treatment, RoW, (Author: Marylène Dussault inactive)
 #Settings to set the name of the flowsheet
 F_baseline = bst.Flowsheet('azelaic_acid_baseline')
 bst.main_flowsheet.set_flowsheet(F_baseline) 
-#Settings to set the chemicas for the flowsheet
+#Settings to set the chemicals required for the flowsheet
 bst.settings.set_thermo(chems, cache= True) 
 #########################################################################################################
 #The first section is to convert the crude oil to biodiesel
 #Area 1000
 @SystemFactory(
     ID = 'crude_HOSO_oil_to_biodiesel',
-
     ins=[dict(ID='crude_vegetable_oil'),
          dict(ID='base_for_saponification_of_FFA'),
          dict(ID = 'water_for_degumming'),
@@ -76,7 +74,7 @@ def crude_HOSO_oil_to_biodiesel(ins,outs,X_tes):
                           ins = P1001-0,
                           outs = ('heated_crude_oil'),
                           T = 273.15 + 95)#Temp given in the ref
-
+#TODO: find reference for below FFA process
     M1001 = units_baseline.FFA_neutralisation_tank('M1001',
                               ins = (H1001-0,
                                      base_for_saponification_of_FFA),
