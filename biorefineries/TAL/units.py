@@ -2207,7 +2207,7 @@ class DehydrationReactor(Reactor):
     mcat_frac = 0.01 # fraction of catalyst by weight in relation to the reactant (TAL)
     dehydration_rxns = ParallelRxn([
             #   Reaction definition                                       Reactant   Conversion
-            Rxn('HMTHP -> PSA',         'HMTHP',   0.865) # conversion from Chia et al. 2012
+            Rxn('HMTHP -> PSA',         'HMTHP',   0.842) # conversion from Chia et al. 2012
                 ])
     byproduct_formation_rxns  = ParallelRxn([
             #   Reaction definition   Reactant   Conversion
@@ -2246,7 +2246,7 @@ class RingOpeningHydrolysisReactor(Reactor):
     mcat_frac = 0.01 # fraction of catalyst by weight in relation to the reactant (TAL)
     ring_opening_rxns = ParallelRxn([
             #   Reaction definition                                       Reactant   Conversion
-            Rxn('PSA -> SA',         'PSA',   0.862) # conversion from Chia et al. 2012
+            Rxn('PSA -> SA',         'PSA',   0.999) # conversion from Chia et al. 2012
                 ])
     
     PSA_to_SA_rxn = ring_opening_rxns[0]

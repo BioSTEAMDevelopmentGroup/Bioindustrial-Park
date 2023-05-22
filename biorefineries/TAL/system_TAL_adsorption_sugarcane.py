@@ -70,6 +70,11 @@ from warnings import filterwarnings
 
 from biorefineries.cellulosic import create_facilities
 from biorefineries.sugarcane import create_juicing_system_up_to_clarification
+from biorefineries.TAL.process_areas import create_TAL_fermentation_process,\
+                        create_TAL_separation_solubility_exploit_process,\
+                        create_TAL_separation_adsorption_process
+
+from scipy.interpolate import interp2d
 
 filterwarnings('ignore')
 IQ_interpolation = flx.IQ_interpolation
@@ -95,6 +100,18 @@ bst.CE = 541.7
 # Set default thermo object for the system
 tmo.settings.set_thermo(TAL_chemicals)
 
+# Based on experimental data from Singh group
+ts = [0.166666667,	0.5,	1,	2]
+Ts = [303.15, 323.15]
+recoveries = [[0.791785714,	0.947,	0.960821429,	0.975035714],
+[0.92402381,	0.956595238,	0.96297619,	0.9785]]
+capacities = [[0.0739,	0.088386667,	0.089676667,	0.091003333],
+[0.086242222,	0.089282222,	0.089877778,	0.091326667]]
+
+# Interpolate
+rec_interp = interp2d(ts, Ts, recoveries)
+cap_interp = interp2d(ts, Ts, capacities)
+
 # %% Utils
 R = 8.314
 TAL_Hm = 30883.66976 # by Dannenfelser-Yalkowsky method
@@ -116,7 +133,7 @@ def get_TAL_solubility_in_water_gpL(T):
 def get_K(chem_ID, stream, phase_1, phase_2):
     return (stream[phase_1].imol[chem_ID]/stream[phase_1].F_mol)/max(1e-6, (stream[phase_2].imol[chem_ID]/stream[phase_2].F_mol))
 
-def get_TAL_solublity_in_solvent_very_rough(T, solvent_ID='Ethanol', units='g/L'):
+def get_TAL_solublity_in_solvent_very_rough(T, solvent_ID='Hexanol', units='g/L'):
     temp_stream =\
         tmo.Stream('temp_stream_get_TAL_solublity_in_solvent_very_rough')
     mol_water = mol_solvent = 1000
@@ -177,364 +194,37 @@ def create_TAL_sys(ins, outs):
     u = sugarcane_juicing_sys.flowsheet.unit
     s = sugarcane_juicing_sys.flowsheet.stream
     feedstock = s.sugarcane
-    feedstock.F_mass = 833333.3333 # produces SA at ~20718.2 metric tonne / year at baseline
+    feedstock.F_mass = 833333.3333 # produces TAL at ~20718.2 metric tonne / year at baseline
     
     sugarcane_juicing_sys.flowsheet.diagram('thorough')
 
     
-    # %% 
-    
-    # =============================================================================
-    # Conversion streams
-    # =============================================================================
-    
-    # Flow and price will be updated in EnzymeHydrolysateMixer
-    enzyme = Stream('enzyme', units='kg/hr', price=price['Enzyme'])
-    # Used to adjust enzymatic hydrolysis solid loading, will be updated in EnzymeHydrolysateMixer
-    enzyme_water = Stream('enzyme_water', units='kg/hr')
-    
-    # Corn steep liquor as nitrogen nutrient for microbes, flow updated in R301
-    CSL = Stream('CSL', units='kg/hr')
-    # Lime for neutralization of produced acid
-    # fermentation_lime = Stream('fermentation_lime', units='kg/hr')
-    
-    # For diluting concentrated, inhibitor-reduced hydrolysate
-    dilution_water = Stream('dilution_water', units='kg/hr')
-    
-    
-    # =============================================================================
-    # Conversion units
-    # =============================================================================
-    F301 = bst.MultiEffectEvaporator('F301', ins=u.C201-0, outs=('F301_l', 'F301_g'),
-                                            P = (101325, 73581, 50892, 32777, 20000), V = 0.1)
-    
-    
-    # Cool hydrolysate down to fermentation temperature at 30°C
-    H301 = bst.units.HXutility('H301', ins=F301-0, T=30+273.15)
-    
-
-
-    M304 = bst.units.Mixer('M304', ins=(H301-0, dilution_water))
-    M304.water_to_sugar_mol_ratio = 5.
-    
-    @M304.add_specification()
-    def adjust_M304_water():
-        M304_ins_1 = M304.ins[1]
-        M304_ins_1.imol['Water'] = M304.water_to_sugar_mol_ratio * M304.ins[0].imol['Glucose', 'Xylose'].sum()
-        M304._run()
-    # M304.specification = adjust_M304_water()
-    
-    M304_H = bst.units.HXutility('M304_H', ins=M304-0, T=30+273.15, rigorous=False)
-    
-    # Mix pretreatment hydrolysate/enzyme mixture with fermentation seed
-    
-    S302 = bst.Splitter('S302', ins=M304_H-0,
-                        outs = ('to_seedtrain', 'to_cofermentation'),
-                        split = 0.07) # split = inoculum ratio
-    
-    # Cofermentation
-    
-    R302 = units.CoFermentation('R302', 
-                                    ins=(S302-1, '', CSL),
-                                    outs=('fermentation_effluent', 'CO2_fermentation'))
-    @R302.add_specification()
-    def include_seed_CSL_in_cofermentation(): # note: effluent always has 0 CSL
-        R302._run()
-        R302.ins[2].F_mass*=1./(1-S302.split[0])
-    # R302.specification = include_seed_CSL_in_cofermentation
-    
-    # ferm_ratio is the ratio of conversion relative to the fermenter
-    R303 = units.SeedTrain('R303', ins=S302-0, outs=('seed', 'CO2_seedtrain'), ferm_ratio=0.9)
-    
-    T301 = units.SeedHoldTank('T301', ins=R303-0, outs=1-R302)
+    #%% Fermentation
+    fermentation_sys = create_TAL_fermentation_process(ins=(u.C201-0),
+                                                   )
     
     
     
-    # %% 
-    
-    # =============================================================================
-    # Separation streams
-    # =============================================================================
-    
-    # This flow will be automatically updated in CellMassFilter
-    # separation_sulfuric_acid = Stream('separation_sulfuric_acid', units='kg/hr')
-    
-    # # # To be mixed with sulfuric acid, will be updated in SulfuricAdditionTank
-    # # separation_acid_water = Stream('separation_acid_water', units='kg/hr')
-    
-    # separation_DPHP = Stream('DPHP', DPHP =feedstock_dry_mass*22.1/1000*0.93,
-    #                                     H2O=feedstock_dry_mass*22.1/1000*0.07, units='kg/hr')
-    
-    # # Ethanol for esterification reaction, will be updated in the EsterificationReactor
-    # separation_ethanol = Stream('separation_ethanol', Ethanol=feedstock_dry_mass*22.1/1000*0.93,
-    #                                     H2O=feedstock_dry_mass*22.1/1000*0.07, units='kg/hr')
-    
-    # For ester hydrolysis
-    # separation_hydrolysis_water = Stream('separation_hydrolysis_water', units='kg/hr')
-    
-    Ethanol_minimal = Stream('Ethanol_minimal', units = 'kg/hr')
-    # Heptane = Stream('Heptane', units = 'kg/hr')
-    # Toluene = Stream('Toluene', units = 'kg/hr')
-    
-    # Ethanol_s = Stream('Ethanol_s', units = 'kg/hr')
-    Heptane_s = Stream('Heptane_s', units = 'kg/hr')
-    Toluene_s = Stream('Toluene_s', units = 'kg/hr')
-    
-    Hydrogen = Stream('Hydrogen', units = 'kg/hr')
-    KOH = Stream('KOH', units = 'kg/hr')
-    HCl = Stream('HCl', units = 'kg/hr')
-    
+    # %% Separation
     Ethanol_desorption = Stream('Ethanol_desorption', units='kg/hr')
-    KOH = Stream('KOH', units = 'kg/hr')
-    HCl = Stream('HCl', units = 'kg/hr')
-    
-    # =============================================================================
-    # Separation units
-    # =============================================================================
-    
-    
-    # Fake unit to enable solid-liquid equilibrium for fermentation broth
-    U401 = bst.Unit('U401', ins=R302-0, outs=('fermentation_broth_first_sle'))
-    @U401.add_specification()
-    def U401_spec():
-        U401_ins_0 = U401.ins[0]
-        tot_TAL = U401_ins_0.imol['TAL']
-        U401_outs_0 = U401.outs[0]
-        U401_outs_0.copy_like(U401_ins_0)
-        mol_TAL_dissolved = get_mol_TAL_dissolved(U401_outs_0.T, U401_outs_0.imol['Water'])
-        # U401_outs_0.sle('TAL', U401_outs_0.T) #!!! TODO: use computationally cheaper way of changing from Stream to MultiStream
-        U401_outs_0.phases = ('s', 'l')
-        U401_outs_0.imol['l', 'TAL'] = min(mol_TAL_dissolved, tot_TAL)
-        U401_outs_0.imol['s', 'TAL'] = tot_TAL - min(mol_TAL_dissolved, tot_TAL)
-        
-    # U401.specification = U401_spec
-    
-    # Change broth temperature to adjust TAL solubility
-    H401 = bst.HXutility('H401', ins=U401-0, outs=('H401_0'), T=273.15+70.)
-    @H401.add_specification()
-    def H401_spec():
-        H401_ins_0 = H401.ins[0]
-        H401_ins_0_water=H401_ins_0.imol['Water']
-        tot_TAL = H401_ins_0.imol['TAL']
-        # H401_spec_obj_fn = lambda T: get_TAL_solubility_in_water_gpL(T) -\
-        #     H401_ins_0.imass['TAL']/H401_ins_0.F_vol
-        H401_spec_obj_fn = lambda T: min(0, get_mol_TAL_dissolved(T, H401_ins_0_water) - tot_TAL)
-        H401.T = IQ_interpolation(H401_spec_obj_fn, H401.ins[0].T, 99.+273.15)
-        H401._run()
-        H401_outs_0 = H401.outs[0]
-        mol_TAL_dissolved = get_mol_TAL_dissolved(H401_outs_0.T, H401_outs_0.imol['Water'])
-        # H401_outs_0.sle('TAL', H401_outs_0.T) #!!! TODO: use computationally cheaper way of changing from Stream to MultiStream
-        H401_outs_0.phases = ('l', 's')
-        H401_outs_0.imol['l', 'TAL'] = min(mol_TAL_dissolved, tot_TAL)
-        H401_outs_0.imol['s', 'TAL'] = max(0., round(tot_TAL - min(mol_TAL_dissolved, tot_TAL), 5))
-        # H401_outs_0.imol['s', 'TAL'] = max(0.0001, tot_TAL - min(mol_TAL_dissolved, tot_TAL))
-        # if H401_outs_0.imol['s', 'TAL'] == 0.0001:
-        #     H401_ins_0.imol['s', 'TAL'] += 0.0001 
-        
-    # H401.specification = H401_spec
-    
-    U402 = bst.FakeSplitter('U402', ins=H401-0, outs = ('thermally_decarboxylated_broth','vented_CO2'))
-    U402.decarboxylation_rxns = ParallelRxn([
-        Rxn('TAL + H2O -> PD + CO2', 'TAL',   0.25),
-        ])
-    
-    def get_TAL_decarboxylation_conversion(T=273.15+80.):
-        return (0.2*(T-273.15) + 8.)/100. # temporary
-        
-    # U402.decarboxylation_rxns[0].X = 0.25
-    
-    @U402.add_specification()
-    def U402_spec():
-        U402_outs_0 = U402.outs[0]
-        U402_outs_0.copy_like(U402.ins[0])
-        U402_outs_0.phases = ('l', 's')
-        # U402.decarboxylation_rxns[0].X = get_TAL_decarboxylation_conversion(T=U402_outs_0.T)
-        U402.decarboxylation_rxns[0](U402_outs_0['l'])
-        U402.outs[1].imol['CO2'] = U402_outs_0.imol['l', 'CO2']
-        U402.outs[1].phase = 'g'
-        U402_outs_0.imol['l', 'CO2'] = 0.
-    
-    # U402.specification = U402_spec
-    
-    # H401_design_og = H401._design
-    # def H401_design_modified():
-    #     H401.ins[0].copy_like(U401.ins[0])
-    #     H401.outs[0].copy_like(U401.ins[0])
-    #     H401_design_og()
-        
-    # # Remove solids from fermentation broth, modified from the pressure filter in Humbird et al.
-    S401_index = [splits_df.index[0]] + splits_df.index[2:].to_list()
-    S401_cell_mass_split = [splits_df['stream_571'][0]] + splits_df['stream_571'][2:].to_list()
-    S401_filtrate_split = [splits_df['stream_535'][0]] + splits_df['stream_535'][2:].to_list()
-    S401 = bst.units.SolidsCentrifuge('S401', ins=U402-0, outs=('S401_solid_fraction', 'S401_liquid_fraction'),
-                                # moisture_content=0.50,
-                                split=find_split(S401_index,
-                                                  S401_cell_mass_split,
-                                                  S401_filtrate_split,
-                                                  chemical_groups), 
-                                solids =\
-                                    ['Xylan', 'Glucan', 'Lignin', 'FermMicrobe',\
-                                      'Ash', 'Arabinan', 'Galactan', 'Mannan'])
-    
-    # def S401_TAL_split_spec():
-    #     S401._run()
-    #     S401_ins_0 = S401.ins[0]
-    #     TOT_TAL = S401_ins_0.imol['TAL']
-    #     dissolved_TAL = get_mol_TAL_dissolved(S401_ins_0.T, S401_ins_0.imol['Water'])
-        
-    #     S401.outs[0].imol['TAL'] = TOT_TAL - dissolved_TAL # crystallized TAL
-    #     S401.outs[1].imol['TAL'] = dissolved_TAL
-    
-    @S401.add_specification()
-    def S401_TAL_split_spec():
-        S401._run()
-        S401_ins_0 = S401.ins[0]
-        S401.outs[0].imol['s', 'TAL'] = S401_ins_0.imol['s', 'TAL']
-        S401.outs[1].imol['l', 'TAL'] = S401_ins_0.imol['l', 'TAL']
-    # S401.specification = S401_TAL_split_spec
-    
-    
-    H402 = bst.HXutility('H402', ins=S401-1, outs=('H402_0'), T=273.15+1.)
-    
-    # def HXcrystalize(stream, T=None, H=None, P=None, V=None):
-    #     tot_TAL = stream.imol['TAL']
-    #     mol_TAL_dissolved = get_mol_TAL_dissolved(stream.T, stream.imol['Water'])
-    #     stream.phases = ('s', 'l')
-    #     stream.T = H402.T
-    #     tal_dissolved = min(mol_TAL_dissolved, tot_TAL)
-    #     stream.imol['l', 'TAL'] = 
-    #     stream.imol['s', 'TAL'] = max(0.0001, tot_TAL - min(mol_TAL_dissolved, tot_TAL))
-    
-    H402.TAL_solubility_multiplier = 1.
-    @H402.add_specification()
-    def H402_spec():
-        H402._run()
-        H402_ins_0 = H402.ins[0]
-        tot_TAL = H402_ins_0.imol['TAL']
-        H402_outs_0 = H402.outs[0]
-        TAL_solubility = H402.TAL_solubility_multiplier * get_mol_TAL_dissolved(H402_outs_0.T, H402_outs_0.imol['Water'])
-        H402_outs_0.phases = ('s', 'l')
-        H402_outs_0.T = H402.T
-        TAL_dissolved = min(TAL_solubility, tot_TAL)
-        H402_outs_0.imol['l', 'TAL'] = TAL_dissolved
-        H402_outs_0.imol['s', 'TAL'] = max(0, tot_TAL - TAL_dissolved)
-        # H402_outs_0.imol['s', 'TAL'] = max(0.0001, tot_TAL - TAL_dissolved)
-        # if H402_outs_0.imol['s', 'TAL'] == 0.0001:
-        #     H402_ins_0.imol['s', 'TAL'] += 0.0001 
-        
-    # H402.specification = H402_spec
-    
-    S402 = bst.units.SolidsCentrifuge('S402', ins=H402-0, outs=('S402_solid_fraction', 'S402_liquid_fraction'),
-                                # moisture_content=0.50,
-                                split=find_split(S401_index,
-                                                  S401_cell_mass_split,
-                                                  S401_filtrate_split,
-                                                  chemical_groups), solids =\
-                                    ['Xylan', 'Glucan', 'Lignin', 'FermMicrobe',\
-                                      'Ash', 'Arabinan', 'Galactan', 'Mannan'])
-    @S402.add_specification()
-    def S402_TAL_split_spec():
-        # S402._run()
-        # S402_ins_0 = S402.ins[0]
-        # S402_outs_0 = S402.outs[0]
-        # S402_outs_0.imol['TAL'] = 1.
-        # S402_outs_0.sle('TAL', S402_outs_0.T) #!!! TODO: use computationally cheaper way of changing from Stream to MultiStream
-        # S402_outs_0.imol['s', 'TAL'] = S402_ins_0.imol['s', 'TAL']
-        # S402_outs_0.imol['l', 'TAL'] = 0.
-        # S402.outs[1].imol['TAL'] = S402_ins_0.imol['l', 'TAL']
-        S402_ins_0 = S402.ins[0]
-        solid_TAL = float(S402_ins_0.imol['s', 'TAL'])
-        S402_ins_0.imol['s', 'TAL'] = 0.
-        S402._run()
-        
-        S402.outs[0].imol['s', 'TAL'] = solid_TAL
-        S402.outs[1].imol['l', 'TAL'] = S402_ins_0.imol['l', 'TAL']
-        S402_ins_0.imol['s', 'TAL'] = solid_TAL
-        
-    # S402.specification = S402_TAL_split_spec
-    
-    H403 = bst.HXutility('H403', ins=S402-0, outs=('heated_TAL'), T=273.15+40.)
-    M401 = bst.Mixer('M401', ins=(H403-0, Ethanol_minimal, ''), outs=('saturated_TAL_in_ethanol',))
-    @M401.add_specification()
-    def adjust_M401_solvent():
-        M401_ins_0, M401_ins_1, M401_ins_2 = M401.ins
-        tot_TAL = M401_ins_0.imol['TAL']
-        ethanol_req = tot_TAL/get_TAL_solubility_in_ethanol_ww()
-        # \get_TAL_solublity_in_solvent_very_rough(M401_ins_0.T, 'Ethanol', 'mol/mol')
-        # print(ethanol_req, tot_TAL)
-        M401_ins_1.imol['Ethanol'] = max(0., ethanol_req-M401_ins_2.imol['Ethanol'])
-        M401._run()
-    
-
-    S405 = bst.AdsorptionColumnTSA(
-        'S405', ins=(M401-0, ''), 
-        outs=('diluteTAL', 'polarcompounds'),
-        split=1.,
-        adsorbate_ID='PolarComponents',
-    )
-    S405.isplit['PolarComponents'] = 0.1
-    
-    R401 = units.HydrogenationReactor('R401', ins = (S405-0, '', Hydrogen), outs = 'HMTHP',
-                                      vessel_material='Stainless steel 316',
-                                      tau=17)
-    
-    
-    R402 = units.DehydrationReactor('R402', ins = (R401-0, ''), outs = 'PSA',
-                                               vessel_material='Stainless steel 316',
-                                               tau = 18)
-    
-    R403 = units.RingOpeningHydrolysisReactor('R403', ins = (R402-0, '', KOH), outs = 'KSA',
-                                               vessel_material='Stainless steel 316',
-                                               tau=22)
-    
-    F401 = bst.MultiEffectEvaporator('F401', 
-                                     ins=R403-0, 
-                                     outs=('solid_KSA', 'ethanol_recycled',), 
-                                     P=(101325./10., 73581./10., 50892./10., 32777./10., 20000./10.),
-                                     V=1.-1e-5)
-    
-    # # F401 = bst.MultiEffectEvaporator('F401', ins=S406-1, outs=('F401_organics_to_boiler', 'F401_hexanol_to_recycle'),
-    # #                  V = 0.9999, 
-    # #                  P = 
-    # #                  ) # need to eventually change this to a rotary evaporator
-    U410 = bst.Unit('U410', ins=F401-0, outs=('sorbic_acid'))
-    
-    @U410.add_specification()
-    def U410_spec():
-        U410_0 = U410.outs[0]
-        U410_0.copy_like(U410.ins[0])
-        U410_0.imol['SA'] = U410_0.imol['KSA']
-        U410_0.imol['KSA'] = 0.
-    
-    F401-1-2-M401
-    
+    separation_sys = create_TAL_separation_adsorption_process(ins=(fermentation_sys-1,
+                                                                   Ethanol_desorption))
     # %% 
     
     # =============================================================================
     # Wastewater treatment streams
     # =============================================================================
     
-    # For aerobic digestion, flow will be updated in AerobicDigestion
-    air_lagoon = Stream('air_lagoon', phase='g', units='kg/hr')
-    
-    # To neutralize nitric acid formed by nitrification in aerobic digestion
-    # flow will be updated in AerobicDigestion
-    # The active chemical is modeled as NaOH, but the price is cheaper than that of NaOH
-    aerobic_caustic = Stream('aerobic_caustic', units='kg/hr', T=20+273.15, P=2*101325,
-                              price=price['Caustics'])
-    
+
     # =============================================================================
     # Wastewater treatment units
     # =============================================================================
     
     # Mix waste liquids for treatment
     M501 = bst.units.Mixer('M501', ins=(
-                                        F301-1,
-                                        # F401-0,
-                                        # S402-1,
-                                        # X401-1, 
-                                        # S408-0,
-                                        # S409-1,
+                                        u.F301-1,
+                                        separation_sys-2,
+                                        '', '', '', '',
                                         ))
     
     wastewater_treatment_sys = bst.create_wastewater_treatment_system(
@@ -544,11 +234,8 @@ def create_TAL_sys(ins, outs):
     )
     
     # Mix solid wastes to boiler turbogenerator
-    M510 = bst.units.Mixer('M510', ins=(S401-0, 
-                                        # F401-0,
-                                        # D401-0,
+    M510 = bst.units.Mixer('M510', ins=(separation_sys-1, 
                                         u.U202-0,
-                                        u.C202-0,
                                         ),
                             outs='wastes_to_boiler_turbogenerator')
     
@@ -561,25 +248,12 @@ def create_TAL_sys(ins, outs):
     # Facilities streams
     # =============================================================================
     
-    sulfuric_acid_fresh = Stream('sulfuric_acid_fresh',  price=price['Sulfuric acid'])
-    # TCP_fresh = Stream('TCP_fresh',  price=price['TCP'])
+    ethanol_fresh = Stream('ethanol_fresh',  price=price['Ethanol'])
     
-    ammonia_fresh = Stream('ammonia_fresh', price=price['AmmoniumHydroxide'])
+
     CSL_fresh = Stream('CSL_fresh', price=price['CSL'])
     # lime_fresh = Stream('lime_fresh', price=price['Lime'])
     
-    HCl_fresh = Stream('HCl_fresh', price=price['HCl'])
-    
-    ethanol_fresh = Stream('ethanol_fresh', price=price['Ethanol'])
-    # heptane_fresh = Stream('heptane_fresh', price=price['Heptane'])
-    # toluene_fresh = Stream('toluene_fresh', price=price['Toluene'])
-    
-    # hexanol_fresh_s = Stream('hexanol_fresh_s', price=price['Ethanol'])
-    heptane_fresh_s = Stream('heptane_fresh_s', price=price['Heptane'])
-    toluene_fresh_s = Stream('toluene_fresh_s', price=price['Toluene'])
-    
-    hydrogen_fresh = Stream('hydrogen_fresh', price=price['Renewable hydrogen'])
-    KOH_fresh = Stream('KOH_fresh', price=price['KOH'])
     # S401_out1_F_mass = S401.outs[1].F_mass
     
     # if not (S401_out1_F_mass == 0):
@@ -598,25 +272,11 @@ def create_TAL_sys(ins, outs):
     dilution_water = Stream('dilution_water', price=price['Makeup water'])
     # TAL stream
     # TAL = Stream('TAL', units='kg/hr', price=price['TAL'])
-    # SA product
-    SA = Stream('SA', units='kg/hr', price=price['SA'])
+    # TAL product
+    TAL = Stream('TAL', units='kg/hr', price=price['TAL'])
     
-    PD = Stream('PD', units = 'kg/hr', price=price['PD'])
-    # Acetoin product
-    # Acetoin = Stream('Acetoin', units='kg/hr', price=price['Acetoin'])
-    # # Isobutyraldehyde product
-    # IBA = Stream('IBA', units='kg/hr', price=price['IBA'])
-    # Chemicals used/generated in BT
-    # FGD_lime = Stream('FGD_lime')
-    ash = Stream('ash', price=price['Ash disposal'])
-    # boiler_chems = Stream('boiler_chems', price=price['Boiler chems'])
-    # baghouse_bag = Stream('baghouse_bag', price=price['Baghouse bag'])
-    # Supplementary natural gas for BT if produced steam not enough for regenerating
-    # all steam streams required by the system
-    # natural_gas = Stream('natural_gas', price=price['Natural gas'])
-    
-    # Cooling tower chemicals
-    cooling_tower_chems = Stream('cooling_tower_chems', price=price['Cooling tower chems'])
+
+
     
     # 145 based on equipment M-910 (clean-in-place system) in Humbird et al.
     # CIP_chems_in = Stream('CIP_chems_in', Water=145*get_flow_tpd()/2205, units='kg/hr')
@@ -635,85 +295,41 @@ def create_TAL_sys(ins, outs):
     # =============================================================================
     # Facilities units
     # =============================================================================
+
     
-    # T601 = units.SulfuricAcidStorageTank('T601', ins=sulfuric_acid_fresh,
-    #                                      outs=sulfuric_acid_T201)
-    # T601.line = 'Sulfuric acid storage tank'
-    # S601 = bst.units.ReversedSplitter('S601', ins=T601-0, 
-    #                                   outs=(pretreatment_sulfuric_acid, 
-    #                                         ''))
-    # T608 = units.TCPStorageTank('T608', ins=TCP_fresh,
-    #                                      outs='TCP_catalyst')
-    # T608-0-3-R401
-    # T608.line = 'Tricalcium diphosphate storage tank'
-    #
-    # T602 = units.AmmoniaStorageTank('T602', ins=ammonia_fresh, outs=ammonia_M205)
-    # T602.line = 'Ammonia storage tank'
-    
-    T603 = units.CSLstorageTank('T603', ins=CSL_fresh, outs=CSL)
+    T603 = units.CSLstorageTank('T603', ins=CSL_fresh, outs=1-fermentation_sys)
     T603.line = 'CSL storage tank'
     
-    # DPHP storage
-    #!!! Yalin suggests to use BioSTEAM's storage tank, and maybe we don't need the ConveryingBelt
-    # (Yalin removed that from lactic acid biorefinery)
-    T604 = units.DPHPStorageTank('T604', ins=ethanol_fresh)
+    # Ethanol storage
+    T604 = bst.units.StorageTank('T604', ins=ethanol_fresh)
     T604.line = 'Ethanol storage tank'
-    T604_P = units.TALPump('T604_P', ins=T604-0, outs = Ethanol_minimal)
-    # T604_P = bst.units.ConveyingBelt('T604_P', ins=T604-0, outs = Ethanol)
-    
-    # # 7-day storage time, similar to ethanol's in Humbird et al.
-    # T605 = units.DPHPStorageTank('T605', ins=heptane_fresh)
-    # T605.line = 'Heptane storage tank'
-    # T605_P = units.TALPump('T605_P', ins=T605-0, outs = Heptane)
-    
-    # T606 = units.DPHPStorageTank('T606', ins=toluene_fresh)
-    # T606.line = 'Toluene storage tank'
-    # T606_P = units.TALPump('T606_P', ins=T606-0, outs = Toluene)
-    
-    
-    T607 = units.DPHPStorageTank('T607', ins=hydrogen_fresh, outs = Hydrogen)
-    T607.line = 'Hydrogen storage tank'
-    
-    
-    
+    T604_P = units.TALPump('T604_P', ins=T604-0, outs = Ethanol_desorption)
+
     
     # 7-day storage time, similar to ethanol's in Humbird et al.
-    T620 = units.TALStorageTank('T620', ins=U410-0, tau=7*24, V_wf=0.9,
+    T620 = units.TALStorageTank('T620', ins=separation_sys-0, tau=7*24, V_wf=0.9,
                                           vessel_type='Floating roof',
                                           vessel_material='Stainless steel')
     
     
     
-    T620.line = 'SAStorageTank'
+    T620.line = 'TALStorageTank'
     
     
-    T620_P = units.TALPump('T620_P', ins=T620-0, outs=SA)
+    T620_P = units.TALPump('T620_P', ins=T620-0, outs=TAL)
     
     
-    
-    # T621 = units.TALStorageTank('T621', ins=S409-0, tau=7*24, V_wf=0.9,
-    #                                       vessel_type='Floating roof',
-    #                                       vessel_material='Stainless steel')
-    
-    
-    
-    # T621.line = 'PDStorageTank'
-    
-    
-    # T621_P = units.TALPump('T621_P', ins=T621-0, outs=PD)
-    
-    
-    
+
     
     s = flowsheet.stream
     create_facilities(
         solids_to_boiler=M510-0,
         gas_to_boiler=wastewater_treatment_sys-0,
         process_water_streams=[
-         s.imbibition_water,
-         s.rvf_wash_water,
-         s.dilution_water,
-         # s.makeup_water,
+         imbibition_water,
+         rvf_wash_water,
+         dilution_water,
+         system_makeup_water,
          # s.fire_water,
          # s.boiler_makeup_water,
          # s.CIP,
@@ -729,20 +345,22 @@ def create_TAL_sys(ins, outs):
         area=900,
     )
     
-    HXN = bst.HeatExchangerNetwork('HXN1001',
-                                                ignored=[
-                                                        H401, 
-                                                        H402, 
-                                                        H403, 
-                                                        S405,
+    # Heat exchanger network
+    HXN = bst.facilities.HeatExchangerNetwork('HXN1001',
+                                               ignored=lambda:[
+                                                       u.M304_H,
+                                                        # u.H202,
+                                                        # H401,
+                                                        # H402,
+                                                        # H403,
                                                         # H404,
-                                                        # F403,
-                                                        # AC401.heat_exchanger_drying,
-                                                        # AC401.heat_exchanger_regeneration,
-                                                        # # F401.components['condenser'],
+                                                        # A401.heat_exchanger_drying,
+                                                        # A401.heat_exchanger_regeneration,
+                                                        u.F401,
                                                         ],
-                                              cache_network=False,
-                                              )
+                                                # cache_network=True,
+                                                force_ideal_thermo=False,
+                                               )
     
     def HXN_no_run_cost():
         HXN.heat_utilities = []
@@ -767,7 +385,7 @@ u = f.unit
 s = f.stream
 
 feedstock = s.sugarcane
-SA = s.SA
+TAL = s.TAL
 get_flow_tpd = lambda: (feedstock.F_mass-feedstock.imass['H2O'])*24/907.185
 
 
@@ -776,7 +394,7 @@ TEA_feeds = set([i for i in TAL_sys.feeds if i.price]+ \
     [i for i in TAL_sys.feeds if i.price])
 
 TEA_products = set([i for i in TAL_sys.products if i.price]+ \
-    [i for i in TAL_sys.products if i.price]+[SA])
+    [i for i in TAL_sys.products if i.price]+[TAL])
     
     
 for ui in u:
@@ -955,12 +573,12 @@ HXN = u.HXN1001
 # =============================================================================
 
 
-def get_SA_MPSP():
+def get_TAL_MPSP():
     for i in range(3):
         TAL_sys.simulate()
     for i in range(3):
-        SA.price = TAL_tea.solve_price(SA)
-    return SA.price*SA.F_mass/SA.imass['SorbicAcid']
+        TAL.price = TAL_tea.solve_price(TAL)
+    return TAL.price*TAL.F_mass/TAL.imass['TAL']
 
 spec = ProcessSpecification(
     evaporator = u.F301,
@@ -1056,7 +674,7 @@ spec.load_spec_2 = load_titer_with_glucose
 # def calculate_MPSP(V):
 #     F301.V = V
 #     TAL_sys.simulate()
-#     MPSP = SA.price = TAL_tea.solve_price(SA, TAL_no_BT_tea)
+#     MPSP = TAL.price = TAL_tea.solve_price(TAL, TAL_no_BT_tea)
 #     return MPSP
 
 # vapor_fractions = np.linspace(0.20, 0.80)
@@ -1072,19 +690,19 @@ spec.load_spec_2 = load_titer_with_glucose
 
 # %% Full analysis
 def simulate_and_print():
-    get_SA_MPSP()
+    get_TAL_MPSP()
     print('\n---------- Simulation Results ----------')
-    print(f'MPSP is ${get_SA_MPSP():.3f}/kg')
-    # print(f'GWP is {get_GWP():.3f} kg CO2-eq/kg SA')
-    # print(f'FEC is {get_FEC():.2f} MJ/kg SA or {get_FEC()/SA_LHV:.2f} MJ/MJ SA')
-    # print(f'SPED is {get_SPED():.2f} MJ/kg SA or {get_SPED()/SA_LHV:.2f} MJ/MJ SA')
+    print(f'MPSP is ${get_TAL_MPSP():.3f}/kg')
+    # print(f'GWP is {get_GWP():.3f} kg CO2-eq/kg TAL')
+    # print(f'FEC is {get_FEC():.2f} MJ/kg TAL or {get_FEC()/TAL_LHV:.2f} MJ/MJ TAL')
+    # print(f'SPED is {get_SPED():.2f} MJ/kg TAL or {get_SPED()/TAL_LHV:.2f} MJ/MJ TAL')
     # print('--------------------\n')
 
 # simulate_and_print()
 # TAL_sys.simulate()
-get_SA_MPSP()
-# u.AC401.cycle_time = 4.
-# u.AC401.drying_time = 0.5 #!!! Drying time is updated to this value (overwritten the value passed during initialization)
+get_TAL_MPSP()
+# u.A401.cycle_time = 4.
+# u.A401.drying_time = 0.5 #!!! Drying time is updated to this value (overwritten the value passed during initialization)
 spec.load_specifications(spec.baseline_yield, spec.baseline_titer, spec.baseline_productivity)
 simulate_and_print()
 

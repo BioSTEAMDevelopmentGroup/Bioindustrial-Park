@@ -25,8 +25,17 @@ _kg_per_ton = 907.18474
 _lb_per_kg = 2.20462
 _liter_per_gallon = 3.78541
 _ft3_per_m3 = 35.3147
+
+_GDP_2007_to_2016 = 1.114 / 0.961
+_GDP_2008_to_2016 = 1.114 / 0.990
 _chemical_2011to2016 = 102.5 / 91.7
+_chemical_2013to2016 = 102.5 / 101.3
+_chemical_2014to2016 = 102.5 / 105.3
+
+_chemical_2017to2016 = 102.5 / 106.9
 _chemical_2020to2016 = 102.5 / 113.8 # average of Jan and Feb
+_chemical_2022to2016 = 102.5 / 145.3
+
 
 # From USD/dry-ton to USD/kg in 2016$, 20% moisture content
 # changed from Humbird et al., 2011 to Davis et al., 2018
@@ -168,6 +177,9 @@ PdC_price = 0.075*(2045./0.0311035) \
                        # activated carbon: $0.45/kg # https://www-sciencedirect-com.proxy2.library.illinois.edu/science/article/pii/S2590174522000411?via%3Dihub
 spent_PdC_price = 1. # assumed
 
+acetone_price = 0.63 * _GDP_2008_to_2016 * _lb_per_kg # average of range ($0.44 - $0.82 /lb) from https://web.archive.org/web/20161125084558/http://www.icis.com:80/chemicals/channel-info-chemicals-a-z/
+
+
 price = {'SA': SA_price,
          'PD': 1.5, # 2,4-pentanedione or acetylacetone
          'TCP': TCP_price,
@@ -187,6 +199,7 @@ price = {'SA': SA_price,
          'Hexanol': hexanol_price,
          'Heptane': heptane_price,
          'Toluene': toluene_price,
+         'Acetone': acetone_price,
          'Sulfuric acid': 0.0430 * _lb_per_kg,	
          # 0.1900 is for NH3	
          'AmmoniumHydroxide': 0.1900 * _lb_per_kg * 17.031/35.046,	

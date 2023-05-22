@@ -118,7 +118,6 @@ Na2SO4 = chemical_database('Na2SO4', phase='l', Hf=-1356.38e3)
 # Soluble organic salts
 # =============================================================================
 
-Ethanol = chemical_database('Ethanol')
 Acetate = chemical_database('Acetate', phase='l', Hf=-108992*_cal2joule)
 AmmoniumAcetate = chemical_database('AmmoniumAcetate', phase='l', 
                                          Hf=-154701*_cal2joule)
@@ -209,6 +208,8 @@ Furfural = chemical_database('Furfural')
 # Acetoin.Tb = 145.4 + 273.15
 
 
+Ethanol = chemical_database('Ethanol')
+Acetone = chemical_database('Acetone')
 Hexanol = chemical_database('Hexanol')
 # Heptane = chemical_database('Heptane')
 
