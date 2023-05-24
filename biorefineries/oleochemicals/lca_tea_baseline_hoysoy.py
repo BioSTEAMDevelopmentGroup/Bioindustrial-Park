@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Created on Sun Oct 23 16:17:35 2022 
 
@@ -8,7 +7,8 @@ Created on Sun Oct 23 16:17:35 2022
 import biosteam as bst
 import chaospy
 from chaospy import distributions as shape
-from biorefineries.oleochemicals.systems_baseline import aa_baseline_sys,F_baseline
+from biorefineries.oleochemicals.systems_baseline_hoysoy import aa_baseline_sys,F_baseline
+
 import numpy as np
 
 #Modelled based on assumptions for a nth degree plant
@@ -136,3 +136,4 @@ class TEA_baseline(bst.TEA):
 # Azelaic_acid_USD_per_ton =  shape.normal(mu = 8.82, sigma = 0.11)
 # ##Given std deviation: 0.2, mean = 8.2
 # Pelargonic_acid_USD_per_ton = shape.normal(mu = 8.2, sigma = 0.2)
+

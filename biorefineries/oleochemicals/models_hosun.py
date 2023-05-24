@@ -7,16 +7,17 @@ import biosteam as bst
 import numpy as np
 import chaospy
 from chaospy import distributions as shape
-from biorefineries.oleochemicals.systems_baseline import F_baseline
-from biorefineries.oleochemicals.systems_baseline import aa_baseline_sys
+from biorefineries.oleochemicals.systems_baseline_hosun import F_baseline
+from biorefineries.oleochemicals.systems_baseline_hosun import aa_baseline_sys
 import numpy as np
-from lca_tea_baseline import TEA_baseline
+from lca_tea_baseline_hosun import TEA_baseline
 from biosteam.evaluation import Model, Metric
 from biorefineries.lipidcane._process_settings import price #TODO: were these prices adjusted to 2013 prices?
 from biorefineries.cane.data.lca_characterization_factors import GWP_characterization_factors 
 from biorefineries.tea.cellulosic_ethanol_tea import CellulosicEthanolTEA,create_cellulosic_ethanol_tea
 from thermosteam.utils import GG_colors,GG_light_colors
 from units_baseline import HydrolysisReactor
+
 
 #Settings to set GWP100 as the main characterisation factor
 GWP = 'GWP100'
@@ -40,6 +41,7 @@ biodiesel_prep_units = (F_baseline.unit.S402,F_baseline.unit.T401,F_baseline.uni
                         F_baseline.unit.P411,F_baseline.unit.H404,F_baseline.unit.P412,F_baseline.unit.T408,F_baseline.unit.T409,F_baseline.unit.B401)
 bst.rename_units(units = biodiesel_prep_units, area = 1000)
 
+
 aa_baseline_groups = bst.UnitGroup.group_by_area(aa_baseline_sys.units)
 groups_by_area = bst.UnitGroup.df_from_groups(aa_baseline_groups, fraction = True) #populates the dataframe as percentages
 plot_by_area = groups_by_area.plot.bar(stacked = True) #plot for all the areas stacked by metrics
@@ -58,21 +60,27 @@ groups_by_area.T.plot.bar(stacked = True,color =  [ GG_colors.blue.RGBn,GG_light
 F_baseline.stream.methanol.price = 0.792*401.693/275.700 #Based on Catbio costs adjusted from 2021 Jan to 2022 Dec using Fred's PPI for basic inorganic chemicals
 F_baseline.stream.methanol.characterization_factors = {'GWP100': GWP_characterization_factors['methanol']}
 
+
 #Catalyst (25% methoxide and 75% methanol)
 F_baseline.stream.catalyst.price = 0.25*(price['NaOCH3']*401.693/259.900) + 0.75*( 0.792*401.693/275.700) #Adjusted from 2019 to 2022, Fred's PPI for industrial chemicals
 F_baseline.stream.catalyst.characterization_factors = {'GWP100': GWP_characterization_factors['methanol catalyst mixture']}
+
 
 #Biodiesel wash water
 F_baseline.stream.biodiesel_wash_water.price = 3.945/(3.78541*1000)#Ref: DOE Annual water rates pdf,adjusted using FRED's PPI> Industry based> Utilities.(1kgal = 1000gal, 1gal = 3.78541 Kg)
 # F_baseline.stream.biodiesel_wash_water.characterization_factors={'GWP100': 0.00035559}#Ecoinvent:tap water production, conventional treatment, RoW, (Author: Marylène Dussault inactive)
 
+
 #HCl 
 F_baseline.stream.HCl.price = 0.14*401.693/275.700 #Based on Catbio price ($/Kg) for 22 deg baume, US gulf dom. adjusted from 2021 Jan to 2022 Dec using Fred's PPI for basic inorganic chemicals 
 F_baseline.stream.HCl.characterization_factors = {'GWP100': GWP_characterization_factors['HCl']*0.35 + 0.00035559*0.65}
 
+
 #NaOH
 F_baseline.stream.NaOH.price = 0.93*401.693/275.700 #Based on Catbio price ($/Kg) for Caustic soda (sodium hydroxide), liq., dst spot barge f.o.b. USG adjusted from 2021 Jan to 2022 Dec using Fred's PPI for basic inorganic chemicals 
 F_baseline.stream.NaOH.characterization_factors = {'GWP100': GWP_characterization_factors['NaOH']}
+
+
 
 
 #ask Yoel if this should be considered or the prices from economic assessment paper should be taken instead
@@ -83,6 +91,7 @@ F_baseline.stream.NaOH.characterization_factors = {'GWP100': GWP_characterizatio
 #TODO:??? how is the price same methanol and crude methanol
 # F_baseline.stream.methanol.characterization_factors = {'GWP100': GWP_characterization_factors['methanol']}
 
+
 #https://www.teknorapex.com/why-esters-di-esters-polyol-esters-trimelliate-esters#:~:text=Synthetic%20esters%2C%20with%20their%20polarity%20and%20uniform%20structure%2C,metal%20surface%2C%20and%20improve%20cleanliness%20and%20sludge%20control.
 F_baseline.stream.recovered_C5_to_C8_MCA_fraction.price = 4.47*401.693/275.7 #Based on Adipic acid resin, resin grade bulk, hopper cars, frt. equald. #This is based on the fact that adipates are used in the making of lubricants 
 F_baseline.stream.pelargonic_acid_rich_fraction.price = 5.56*357.592/255.400 #thesis check #EXW price of glyphosate 95% AI was around 5.56 USD/Kg
@@ -91,13 +100,16 @@ F_baseline.stream.azelaic_acid_product_stream.price = 6.88*401.693/275.7 #Based 
 F_baseline.stream.crude_glycerol.price = price['Crude glycerol']*401.693/259.9 #check thesis
 F_baseline.crude_methanol.price =  0.792*401.693/275.700 #Based on Catbio costs adjusted from 2021 Jan to 2022 Dec using Fred's PPI for basic inorganic chemicals
 
+
 azelaic_acid = F_baseline.stream.azelaic_acid_product_stream
 recovered_C5_to_C8_MCA_fraction = F_baseline.stream.recovered_C5_to_C8_MCA_fraction
 pelargonic_acid_rich_fraction = F_baseline.stream.pelargonic_acid_rich_fraction
 fatty_acid_blend = F_baseline.stream.fatty_acid_blend
 
+
 #######################################################################################################################
 #####################################################################################################
+
 
 tea_azelaic_baseline = TEA_baseline(
                                     system = aa_baseline_sys,
@@ -134,12 +146,14 @@ tea_azelaic_baseline = TEA_baseline(
                                 
 aa_sys_op_hours = aa_baseline_sys.operating_hours = tea_azelaic_baseline.operating_days * 24
 
+
 #functions to solve for different indicators
 azelaic_acid_tea = aa_baseline_sys.TEA
 def get_MPSP():
         azelaic_acid.price = 0
         MPSP = azelaic_acid.price = azelaic_acid_tea.solve_price(azelaic_acid)
         return MPSP
+
 
 crude_HOSO = F_baseline.stream.crude_vegetable_oil
 # Yield in 10^6 kg/yr
@@ -170,6 +184,7 @@ solve_IRR = lambda: azelaic_acid_tea.solve_IRR()
 #  GWP_AA_revenue = (
     # GWP_per_USD * azelaic_acid.price
 # ) # kg
+
 
 metrics = [    
             Metric('MPSP', get_MPSP, '$/kg'),
@@ -209,6 +224,7 @@ ub_t = fresh_tungsten_catalyst.price*1.25
 def set_tungstencat_price(tungstencat_price):
     fresh_tungsten_catalyst.price = tungstencat_price
 
+
 fresh_cobalt_catalyst = F_baseline.stream.fresh_cobalt_catalyst_stream
 lb_c = fresh_cobalt_catalyst.price*0.75
 ub_c = fresh_cobalt_catalyst.price*1.25
@@ -217,6 +233,7 @@ ub_c = fresh_cobalt_catalyst.price*1.25
                   distribution=shape.Uniform(lb_c, ub_c))
 def set_cobaltcat_price(fresh_cobalt_catalyst_price):
     fresh_cobalt_catalyst.price = fresh_cobalt_catalyst_price   
+
 
 fresh_solvent = F_baseline.stream.solvent_for_extraction
 fresh_solvent.price = 0.996
@@ -229,6 +246,7 @@ ub_s = fresh_solvent.price*1.25
 def set_solvent_price(fresh_solvent_price):
         fresh_solvent.price = fresh_solvent_price  
 
+
 fresh_HP = F_baseline.stream.fresh_HP
 lb_hp = fresh_HP.price*0.75
 ub_hp = fresh_HP.price*1.25
@@ -239,6 +257,7 @@ ub_hp = fresh_HP.price*1.25
 def set_fresh_HP_price(fresh_HP_price):
         fresh_HP.price = fresh_HP_price 
 #TODO: ask the units in cane.data.price for mean_natural??
+
 
 F_baseline.BT901.natural_gas_price = 0.253 #REF: lactic acid SI
 @model.parameter(name = 'Natural gas price',
@@ -252,6 +271,7 @@ F_baseline.BT901.natural_gas_price = 0.253 #REF: lactic acid SI
 def set_natural_gas_price(natural_gas_price):
         F_baseline.BT901.natural_gas_price = natural_gas_price
 
+
 citric_acid = F_baseline.stream.citricacid_for_degumming
 lb_ca = citric_acid.price*0.75
 ub_ca = citric_acid.price*1.25
@@ -264,6 +284,7 @@ ub_ca = citric_acid.price*1.25
 def set_citric_acid_price(citric_acid_price):
        citric_acid.price  = citric_acid_price
 
+
 conc_hydrochloric_acid = F_baseline.stream.conc_hydrochloric_acid
 lb_hcl = conc_hydrochloric_acid.price*0.75
 ub_hcl = conc_hydrochloric_acid.price*1.25
@@ -275,6 +296,8 @@ ub_hcl = conc_hydrochloric_acid.price*1.25
                   )
 def set_HCl_price(conc_hydrochloric_acid_price):
        conc_hydrochloric_acid.price  = conc_hydrochloric_acid_price
+
+
 
 
 calcium_chloride = F_baseline.stream.calcium_chloride
@@ -290,6 +313,7 @@ ub_cc = calcium_chloride.price*1.25
 def set_calcium_chloride_price(calcium_chloride_price):
        calcium_chloride.price  = calcium_chloride_price
 
+
 polystyrene_based_catalyst = F_baseline.stream.polystyrene_based_catalyst
 polystyrene_based_catalyst.price = 5.55*280.446/240.300       
 lb_pbc =  1.84*280.446/240.300
@@ -302,6 +326,7 @@ ub_pbc = 9.199*280.446/240.300
                   )
 def set_polystyrene_based_catalyst_price(polystyrene_based_catalyst_price):
        polystyrene_based_catalyst.price  = polystyrene_based_catalyst_price       
+
 
      
 #############################################################################################################33
@@ -330,6 +355,7 @@ ub2 = 0.015
 def set_cobalt_acetate_moles(X_cam):
         F_baseline.unit.R202.specifications[0].args[0] = X_cam  
 
+
 #2 Dihydroxylation reaction conversion
 lb3 = 0.90
 ub3 = 0.99
@@ -352,6 +378,8 @@ def set_X_oxidativecleavage_conversion(X_oxidativecleavage):
         F_baseline.unit.R202.X_oxidativecleavage = X_oxidativecleavage        
 
 
+
+
 #3 Oxidative cleavage reaction conversion
 # F_baseline.OxidativeCleavageReactor.X_decarboxylation = 0.2
 lb5 = 0.1
@@ -362,6 +390,7 @@ ub5 = 0.5
                   distribution=shape.Uniform(lb5,ub5))
 def set_X_decarboxylation_conversion(X_decarboxylation):
         F_baseline.unit.R202.X_decarboxylation =  X_decarboxylation
+
 
 #3 Oxidative cleavage reaction conversion
 # F_baseline.OxidativeCleavageReactor.X_side_rxn = 0.8        
@@ -374,6 +403,7 @@ ub6 = 0.5
 def set_X_side_rxn_conversion(X_side_rxn):
         F_baseline.unit.R202.X_side_rxn =  X_side_rxn
 
+
 lb7 = 35000*0.95
 ub7 = 35000*1.05
 @model.parameter(name = 'Feedstock_capacity',
@@ -384,6 +414,7 @@ ub7 = 35000*1.05
 def set_feedstock_input_flow(Cap):
     F_baseline.stream.crude_vegetable_oil.F_mass = Cap  
 
+
 lb8 = 1.052
 ub8 = 1.315
 @model.parameter(name = 'Moles of air',
@@ -393,6 +424,7 @@ ub8 = 1.315
                   )
 def set_air_moles(X_air):
     F_baseline.unit.R202.specifications[0].args[1] = X_air
+
 
 lb9 = 0.3
 ub9 = 2.5
@@ -416,13 +448,12 @@ def set_irr(X_irr):
     azelaic_acid_tea.IRR = X_irr
     
 
-N_samples = 2000
-rule = 'L' # For Latin-Hypercube sampling
-np.random.seed(1234) # For consistent results
-samples = model.sample(N_samples, rule)
-model.load_samples(samples)
-model.evaluate(
-    notify=20 # Also print elapsed time after 100 simulations
-              )
-model.show()
-
+# N_samples = 2000
+# rule = 'L' # For Latin-Hypercube sampling
+# np.random.seed(1234) # For consistent results
+# samples = model.sample(N_samples, rule)
+# model.load_samples(samples)
+# model.evaluate(
+#     notify=20 # Also print elapsed time after 100 simulations
+#               )
+# model.show()

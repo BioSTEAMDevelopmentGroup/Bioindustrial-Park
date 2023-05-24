@@ -53,9 +53,11 @@ bst.settings.set_thermo(chems, cache= True)
     fixed_outs_size = True,     
               )
 
+
 def crude_HOSO_oil_to_biodiesel(ins,outs,X_tes):
     crude_vegetable_oil,base_for_saponification_of_FFA,water_for_degumming,citricacid_for_degumming,water_for_degumming_2 = ins
     polar_lipids_to_boilerturbogenerator,biodiesel,crude_glycerol,waste_to_boilerturbogenerator, = outs
+
 
 # Storage tanks and pumping the oil out
 # Stainless steel tanks are preferred for crude oils
@@ -76,6 +78,7 @@ def crude_HOSO_oil_to_biodiesel(ins,outs,X_tes):
                           ins = P1001-0,
                           outs = ('heated_crude_oil'),
                           T = 273.15 + 95)#Temp given in the ref
+
 
     M1001 = units_baseline.FFA_neutralisation_tank('M1001',
                               ins = (H1001-0,
@@ -158,6 +161,7 @@ def crude_HOSO_oil_to_biodiesel(ins,outs,X_tes):
 #Assumed to not affect the process significantly
 #TODO: find additional costs for refining and add them
 
+
 #with these reaction conversions we get approx 85% methyl oleate which is the same specification as the feed used in Novomont's patent
     # X_tes = X1
     reactions = tmo.ParallelReaction([
@@ -208,6 +212,7 @@ def dihydroxylation_system(ins,outs):
 #Moles of hydrogen peroxide in the patent = 0.6*2.3/ Mol. wt of hydrogen peroxide = 0.04057
 #Ratio of hydrogen peroxide moles/methyl oleate moles =0.04057/ 0.02866 = 1.415144
     
+
 
     def adjust_HP_feed_flow(): 
         moles_of_hydrogen_peroxide = 1.415144* biodiesel.imol['Methyl_oleate']
@@ -265,6 +270,7 @@ def dihydroxylation_system(ins,outs):
 def oxidative_cleavage_system(ins,outs):
     dihydroxylation_product,recycled_diols_and_other_fatty_acids,air_for_oxidative_cleavage,fresh_cobalt_catalyst_stream,recovered_mixture_of_cobalt_catalyst = ins    
     mixed_oxidation_products, = outs 
+
 
     M201 = bst.units.Mixer('M201',
                         ins = (dihydroxylation_product,
@@ -369,6 +375,7 @@ def oxidative_cleavage_system(ins,outs):
             ],
     fixed_outs_size = True,     
               )
+
 
 def organic_phase_separation_and_catalyst_recovery(ins,outs):
     oxidative_cleavage_products,sodium_hydroxide,water_for_NaOH_soln_prep,calcium_chloride,conc_hydrochloric_acid,water_for_dilution, = ins
@@ -480,6 +487,7 @@ def organic_phase_separation_and_catalyst_recovery(ins,outs):
         recycled_water_for_washing1.imass['Water'] = 3*S301.outs[0].imass['Cobalt_hydroxide']
         M308._run()
     S301.add_specification(water_for_washing1,run = True)       
+
 
     S302 = bst.LiquidsSplitCentrifuge(ID = 'S302',
                                 ins = M308-0,
@@ -655,6 +663,7 @@ def organic_phase_separation_and_catalyst_recovery(ins,outs):
 # Novomont's patent does not specify the pressures for separation of pelargonic acid and monomethyl azelate
 # The information was obtained from other patents
 
+
 @SystemFactory(
     ID = 'nonanoic_acid_fraction_separation',
     ins = [dict(ID='dried_crude_fatty_acids')],       
@@ -666,6 +675,7 @@ def organic_phase_separation_and_catalyst_recovery(ins,outs):
     fixed_outs_size = True,     
               )
 
+
 def nonanoic_acid_fraction_separation(ins,outs):
     dried_crude_fatty_acids, = ins
     C5_to_C8_fraction,pelargonic_acid_rich_fraction,heavy_fatty_acids, = outs
@@ -675,10 +685,12 @@ def nonanoic_acid_fraction_separation(ins,outs):
     D501_steam.T = 620
     D501_steam.P = Water.Psat(620)
 
+
     H501 = bst.HXutility(ID = 'H501',
                           ins = dried_crude_fatty_acids,
                           outs = ('dried_crude_fatty_acids'),
                           T = 20 + 273)
+
 
 #Pelargonic acid is separated under vaccuum of 25 mm Hg i.e 5000 Pa pressures in conventional processes #Ref: US patent 2818113, Method for making Azelaic acid
 #The top stream of the distillation column can be further purified. Ref: PROCESS FOR PURIFICATICATION OF PELARGONIC ACID, US patent: 2,890,230
@@ -799,6 +811,8 @@ def azelaic_acid_production(ins,outs):
     T603.add_specification(change_inlet_phase, run = True)        
 
 
+
+
 #Mix tank to collect all the water    
     T604 = bst.MixTank(ID = 'T604',
                         ins = (R601-1,R601-3,R601-5),
@@ -809,11 +823,13 @@ def azelaic_acid_production(ins,outs):
 #Ref: US patent 2818113, Method for making Azelaic acid
 #Further, acc. to the Novomont patent a falling film evaporator can be used to seperate azelaic acid from the diols and residue
 
+
     HX601 = bst.HXutility(ID = 'HX601',
                           ins = R601-6,
                           outs = 'heated_azelaic_acid_rich_stream',
                           T = 270+273.15) #consistent with US patent 2818113
     
+
 
     Water = bst.Chemical('Water')
     D604_steam = bst.HeatUtility.get_heating_agent('high_pressure_steam')
@@ -921,6 +937,7 @@ def azelaic_acid_production(ins,outs):
 #Option 2(Preferrred method) - Evaportation Drying zone - US patent: METHOD FOR PURIFYING AZELAIC ACID 
 #Generally temperatures up to about 280 C. are used at pressures of from 1.0 to 30 mm Hg. 
 
+
     # HX607 = bst.HXutility(ID = 'HX607',
     #                       ins = MMS601-0,
     #                       outs = 'heated_stream_aa_water_for_purification',
@@ -978,6 +995,7 @@ def azelaic_acid_production(ins,outs):
                           outs = 'Pre_cooled_stream',
                           T = 150 +273.15)
 
+
     D607 = units_baseline.SolidsFlaker(ID = 'D607',
                                         ins = HX604.outs[0],
                                         outs = azelaic_acid_product_stream,
@@ -986,6 +1004,7 @@ def azelaic_acid_production(ins,outs):
                                         T_out = 60 + 273.15,#Lower than the melting point of Stearic acid
                                         # flaker_tau = 3#TODO: uncertain! change this
                                         ) 
+
 
 ###Recycling the solvent
 #TODO: COST OUT OF BOUNDS FOR F608
@@ -1025,6 +1044,7 @@ def azelaic_acid_production(ins,outs):
                                  outs =recycled_solvent_for_extraction,
                                  P = 101325)
 
+
     
     
     
@@ -1034,12 +1054,14 @@ def azelaic_acid_production(ins,outs):
 def aa_baseline_sys(ins,outs):
 #Water for industrial use comes from public water supply: https://www.usgs.gov/mission-areas/water-resources/science/industrial-water-use#science
 
+
 # The following process is based on the Novomont patent released in 2016.
 # Patent Title:  CONTINUOUS PROCESS FOR THE PRODUCTION OF DERVATIVES OF SATURATED CARBOXYLIC ACIDS
 #Parameters that can be changed for uncertainity and sensitivity analysis
     recovered_tungstic_acid = bst.Stream(ID = 'recovered_tungstic_acid')
     recycled_diols_and_other_fatty_acids = bst.Stream(ID = 'recycled_diols_and_other_fatty_acids')
     recovered_mixture_of_cobalt_catalyst = bst.Stream(ID = 'recovered_mixture_of_cobalt_catalyst')  
+
 
     ob0 = crude_HOSO_oil_to_biodiesel(ins = (bst.Stream(ID='crude_vegetable_oil',#Composition based on latest report by NSA 2022
                                                         Water=0.05,
@@ -1219,6 +1241,7 @@ def aa_baseline_sys(ins,outs):
      #CT901.ins[1] = #'cooling_tower_makeup_water'
      #All the streams that are required in the different sections for production of azelaic acid
 
+
     process_water_streams_available = (
                                          F_baseline.stream.water_for_emulsification,#Water used for hydrolysis and emulsification 
                                          # F_baseline.stream.water_for_RVF,#Water used for rotary vaccum filter
@@ -1232,8 +1255,10 @@ def aa_baseline_sys(ins,outs):
                                          F_baseline.wastewater8
                                          )                         
 
+
     makeup_water_streams_available = (F_baseline.stream.cooling_tower_makeup_water,#This is the second inlet to cooling tower
                                        F_baseline.stream.boiler_makeup_water) #This is the second inlet to boilerturbogen
+
 
     system_makeup_water = bst.Stream('system_makeup_water', price = 3.945/(3.78541*1000),
                                      characterization_factors={'GWP100': 0.00035559})#Ecoinvent:tap water production, conventional treatment, RoW, (Author: Marylène Dussault inactive)) #Ref: DOE Annual water rates pdf,adjusted using FRED's PPI> Industry based> Utilities.(1kgal = 1000gal, 1gal = 3.78541 Kg)
