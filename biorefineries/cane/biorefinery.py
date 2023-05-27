@@ -1388,6 +1388,7 @@ class Biorefinery:
             if self.ROI_target is None: return np.nan
             if composition_specification.oil == 0: return self.baseline_dry_biomass_yield
             x0 = self.dry_biomass_yield
+            assert x0 < 100, "dry biomass yield over 100 dry MT / ha"
             x1 = 2 * x0
             NE0, TCI0 = tea.net_earnings, tea.TCI
             NE1, TCI1 = NE_and_TCI_at_biomass_yield(x1)
