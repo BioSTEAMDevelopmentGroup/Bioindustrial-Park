@@ -300,7 +300,7 @@ class CaneCompositionSpecification:
         self.FFA = composition['FFA'] if FFA is None else FFA
         self.PL = composition['PL'] if PL is None else PL
         
-    def load_oil_content(self, oil=None, **kwargs):
+    def load_oil_content(self, oil=None, moisture=None, **kwargs):
         """
         Set the oil content [dry wt. %] of cane feedstocks assuming that an 
         increase in oil content is accompanied by a decrease in sugar content 
@@ -309,9 +309,12 @@ class CaneCompositionSpecification:
         
         """
         if oil is None: oil = self.oil
+        if moisture is None: moisture = self.moisture
         set_lipid_fraction(
             oil, self.feedstock, PL_fraction=self.PL, 
-            FFA_fraction=self.FFA, **kwargs,
+            FFA_fraction=self.FFA, 
+            z_mass_water_baseline=moisture,
+            **kwargs,
         )
         self.oil = oil
         
@@ -451,12 +454,13 @@ def _add_model_composition_parameters_for_cane_line(
         units='dry MT/ha',
     )
     def set_cane_biomass_yield(biomass_yield):
-        biorefinery.update_dry_biomass_yield(biomass_yield)
+        biorefinery.dry_biomass_yield = biomass_yield
+        biorefinery.update_feedstock()
         
     biorefinery.set_cane_oil_content = set_cane_oil_content
     biorefinery.set_cane_moisture_content = set_cane_moisture_content
-    biorefinery.set_cane_biomass_yield = set_cane_biomass_yield
     biorefinery.set_cane_sugar_content = set_cane_sugar_content
+    biorefinery.set_cane_biomass_yield = set_cane_biomass_yield
     for p in (set_cane_oil_content, 
               set_cane_biomass_yield,
               set_cane_moisture_content,

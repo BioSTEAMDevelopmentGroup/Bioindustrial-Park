@@ -44,14 +44,15 @@ def create_sucrose_to_ethanol_system(ins, outs, add_urea=False):
 @SystemFactory(
     ID='sugarcane_sys', 
     ins=[s.sugarcane, s.H3PO4, s.lime, s.polymer, s.denaturant], 
-    outs=[s.ethanol, s.vinasse, s.wastewater, s.emissions, s.ash_disposal]
+    outs=[s.ethanol, s.vinasse, s.fiber_fines, s.emissions, s.ash_disposal]
 )
 def create_sugarcane_to_ethanol_system(ins, outs, 
                                        use_area_convention=False,
                                        pellet_bagasse=None,
-                                       dry_bagasse=None):
+                                       dry_bagasse=None,
+                                       WWT_kwargs=None):
     sugarcane, H3PO4, lime, polymer, denaturant = ins
-    ethanol, vinasse, wastewater, emissions, ash_disposal = outs
+    ethanol, vinasse, fiber_fines, emissions, ash_disposal = outs
     
     feedstock_handling_sys = create_feedstock_handling_system(
         area=100 if use_area_convention else None,
@@ -62,6 +63,7 @@ def create_sugarcane_to_ethanol_system(ins, outs,
     juicing_sys = create_juicing_system(
         area=200 if use_area_convention else None,
         ins=[feedstock_handling_sys-0, H3PO4, lime, polymer],
+        outs=['juice', 'bagasse', fiber_fines],
         pellet_bagasse=pellet_bagasse,
         dry_bagasse=dry_bagasse,
         mockup=True
@@ -73,38 +75,40 @@ def create_sugarcane_to_ethanol_system(ins, outs,
         mockup=True
     )
     M305 = bst.Mixer(400 if use_area_convention else 'M305', 
-        ins=(juicing_sys-2, *ethanol_production_sys-[2, 3]),
-        outs=wastewater
+        ins=ethanol_production_sys-[2, 3],
     )
     
     ### Facilities ###    
-    
-    BT = bst.BoilerTurbogenerator(400 if use_area_convention else 'BT',
-        (juicing_sys-1, '', 'boiler_makeup_water', 'natural_gas', '', ''),
-        outs=(emissions, 'rejected_water_and_blowdown', ash_disposal),
-        boiler_efficiency=0.80,
-        turbogenerator_efficiency=0.85
-    )
     CT = bst.CoolingTower(500 if use_area_convention else 'CT')
-    makeup_water_streams = (F.cooling_tower_makeup_water,
-                            F.boiler_makeup_water)
-    process_water_streams = (F.imbibition_water,
-                             F.rvf_wash_water,
-                             F.stripping_water,
-                             *makeup_water_streams)
-    makeup_water = bst.Stream('makeup_water', price=0.000254)
     CWP = bst.ChilledWaterPackage(500 if use_area_convention else 'CWP')
-    PWC = bst.ProcessWaterCenter(500 if use_area_convention else 'PWC',
-                                   (bst.Stream(), makeup_water),
-                                   (),
-                                   None,
-                                   makeup_water_streams,
-                                   process_water_streams)
     
     F301 = edct['F301']
     D303 = edct['D303']
     HXN = bst.HeatExchangerNetwork(600 if use_area_convention else 'HXN',
                                    units=[F301, D303.condenser])
+    MX1 = bst.Mixer(400, [juicing_sys-1])
+    if WWT_kwargs:
+        outs.remove(vinasse)
+        wastewater_treatment_sys = bst.create_wastewater_treatment_system(
+             ins=[vinasse], mockup=True, area=700, **WWT_kwargs
+        )
+        treated_water = wastewater_treatment_sys.get_outlet('RO_treated_water')
+        sludge = wastewater_treatment_sys.get_outlet('sludge')
+        biogas = wastewater_treatment_sys.get_outlet('biogas')
+        MX1.ins.append(sludge)
+    else:
+        treated_water = ''
+        biogas = ''
+    
+    BT = bst.BoilerTurbogenerator(400 if use_area_convention else 'BT',
+        (MX1-0, biogas, 'boiler_makeup_water', 'natural_gas', '', ''),
+        outs=(emissions, 'rejected_water_and_blowdown', ash_disposal),
+        boiler_efficiency=0.80,
+        turbogenerator_efficiency=0.85
+    )
+    PWC = bst.ProcessWaterCenter(500 if use_area_convention else 'PWC',
+                                 ins=[treated_water, 'makeup_RO_water', M305-0, ''],
+                                 process_water_price=0.000254)
     
     # if vinasse_to_wastewater:
     #     plant_air = bst.Stream('plant_air', N2=83333, units='kg/hr')

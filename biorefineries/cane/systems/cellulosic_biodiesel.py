@@ -17,6 +17,7 @@ from biorefineries.biodiesel import (
 )
 from .fermentation import create_cane_to_combined_1_and_2g_fermentation
 from .lipid_extraction import create_post_fermentation_oil_separation_system
+from ..data import microbial_oil_baseline as perf
 from .. import units
 from .. import streams as s
 
@@ -29,24 +30,53 @@ __all__ = (
     ins=[s.oilcane],
     outs=[s.biodiesel, s.crude_glycerol],
 )
-def create_oilcane_to_biodiesel_combined_1_and_2g_post_fermentation_oil_separation(ins, outs, fed_batch=True):
+def create_oilcane_to_biodiesel_combined_1_and_2g_post_fermentation_oil_separation(ins, outs, fed_batch=True, WWT_kwargs=None):
     oilcane, = ins
     biodiesel, crude_glycerol = outs
-    X = 0.60 if fed_batch else 0.495
+    if fed_batch:
+        biomass_coeff = perf.fed_batch_biomass_growth_coefficient_mean
+        lipid_yield = perf.fed_batch_lipid_yield_mean
+        titer = perf.fed_batch_titer_mean
+        productivity = perf.fed_batch_productivity_mean
+    else:
+        biomass_coeff = perf.batch_biomass_growth_coefficient_mean
+        lipid_yield = perf.batch_lipid_yield_mean
+        titer = perf.batch_titer_mean
+        productivity = perf.batch_productivity_mean
+    
+    glucose_fermrxn = tmo.Rxn('O2 + Glucose -> H2O + TAG', 'Glucose', 1., correct_atomic_balance=True)
+    glucose_fermrxn.product_yield('TAG', basis='wt', product_yield=lipid_yield)
+    xylose_fermrxn = tmo.Rxn('O2 + Xylose -> H2O + TAG', 'Xylose', 1., correct_atomic_balance=True)
+    xylose_fermrxn.product_yield('TAG', basis='wt', product_yield=lipid_yield)
+    glucose_growrxn = (
+        tmo.Rxn('Glucose + O2 -> CO2 + H2O', 'Glucose', (1 - biomass_coeff),
+                  correct_atomic_balance=True)
+        + tmo.Rxn('Glucose -> Cellmass', 'Glucose', biomass_coeff, 
+                basis='wt', correct_mass_balance=True)
+    )
+    glucose_growrxn.X = 0.999 - glucose_fermrxn.X
+    xylose_growrxn = (
+        tmo.Rxn('Xylose + O2 -> CO2 + H2O', 'Xylose', (1 - biomass_coeff),
+                  correct_atomic_balance=True)
+        + tmo.Rxn('Xylose -> Cellmass', 'Xylose', biomass_coeff, 
+                basis='wt', correct_mass_balance=True)
+    )
+    xylose_growrxn.X = 0.999 - xylose_fermrxn.X
+    
     cofermentation = tmo.PRxn(
-        [tmo.Rxn('CO2 + Glucose -> H2O + TAG', 'Glucose', X, correct_atomic_balance=True),
-         tmo.Rxn('CO2 + Xylose -> H2O + TAG', 'Xylose', X, correct_atomic_balance=True),
-         tmo.Rxn('Glucose -> Cellmass', 'Glucose', 0.99 - X, correct_mass_balance=True),
-         tmo.Rxn('Xylose -> Cellmass', 'Xylose', 0.99 - X, correct_mass_balance=True)],
+        [glucose_fermrxn,
+         xylose_fermrxn,
+         glucose_growrxn,
+         xylose_growrxn],
     )
     oilcane_to_fermentation_sys, ofs_dct = create_cane_to_combined_1_and_2g_fermentation('oilcane_to_fermentation_sys',
         ins=oilcane, 
         product_group='Lipid',
-        titer=89.4 if fed_batch else 27.4,
-        productivity=0.61 if fed_batch else 0.31,
+        titer=titer,
+        productivity=productivity,
         cofermentation_reactions=cofermentation,
-        seed_train_reactions=cofermentation,
-        CoFermentation=units.CoFermentation,
+        seed_train_reactions=bst.Rxn(None, 'Glucose', 1.), # Easier to simulate reactions only at cofermentation reactor
+        CoFermentation=units.AeratedCoFermentation,
         SeedTrain=units.SeedTrain,
         include_scrubber=False,
         fed_batch=fed_batch,
@@ -110,6 +140,11 @@ def create_oilcane_to_biodiesel_combined_1_and_2g_post_fermentation_oil_separati
     
     s = f.stream
     u = f.unit
+    if WWT_kwargs is None:
+        WWT_kwargs = dict(area=500)
+    else:
+        WWT_kwargs['area'] = 500
+        
     bst.create_all_facilities(
         feedstock=s.bagasse,
         recycle_process_water_streams=(condensate, evaporator_condensate),
@@ -120,6 +155,6 @@ def create_oilcane_to_biodiesel_combined_1_and_2g_post_fermentation_oil_separati
             acceptable_energy_balance_error=0.01,
         ),
         CHP_kwargs=dict(area=700),
-        WWT_kwargs=dict(area=500),
+        WWT_kwargs=WWT_kwargs,
         area=800,
     )
