@@ -300,7 +300,7 @@ class CaneCompositionSpecification:
         self.FFA = composition['FFA'] if FFA is None else FFA
         self.PL = composition['PL'] if PL is None else PL
         
-    def load_oil_content(self, oil=None, **kwargs):
+    def load_oil_content(self, oil=None, moisture=None, **kwargs):
         """
         Set the oil content [dry wt. %] of cane feedstocks assuming that an 
         increase in oil content is accompanied by a decrease in sugar content 
@@ -309,9 +309,12 @@ class CaneCompositionSpecification:
         
         """
         if oil is None: oil = self.oil
+        if moisture is None: moisture = self.moisture
         set_lipid_fraction(
             oil, self.feedstock, PL_fraction=self.PL, 
-            FFA_fraction=self.FFA, **kwargs,
+            FFA_fraction=self.FFA, 
+            z_mass_water_baseline=moisture,
+            **kwargs,
         )
         self.oil = oil
         
