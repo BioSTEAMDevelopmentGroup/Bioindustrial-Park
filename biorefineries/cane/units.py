@@ -88,10 +88,11 @@ class AeratedCoFermentation(bst.AeratedBioreactor): # For microbial oil producti
     def __init__(
             self, ID='', ins=None, outs=(), thermo=None,  
             *, cofermentation, theta_O2=0.5, 
-            Q_O2_consumption=-14382.95, # [kJ/kmol] equivalent to 110 kcal / mol as in https://www.academia.edu/19636928/Bioreactor_Design_for_Chemical_Engineers
+            dT_hx_loop=8,
+            Q_O2_consumption=-460240, # [kJ/kmol] equivalent to 110 kcal / mol as in https://www.academia.edu/19636928/Bioreactor_Design_for_Chemical_Engineers
             **kwargs,
         ):
-        bst.StirredTankReactor.__init__(self, ID, ins, outs, thermo, **kwargs)
+        bst.StirredTankReactor.__init__(self, ID, ins, outs, thermo, dT_hx_loop=dT_hx_loop, **kwargs)
         chemicals = self.chemicals
         self.theta_O2 = theta_O2
         self.hydrolysis_reaction = Rxn('Sucrose + Water -> 2Glucose', 'Sucrose', 1.00, chemicals)
@@ -116,10 +117,11 @@ class AeratedFermentation(bst.AeratedBioreactor): # For microbial oil production
     def __init__(
             self, ID='', ins=None, outs=(), thermo=None,  
             *, fermentation_reaction, cell_growth_reaction, theta_O2=0.5,
-            Q_O2_consumption=14382.95, # [kJ/kmol] equivalent to 110 kcal / mol as in https://www.academia.edu/19636928/Bioreactor_Design_for_Chemical_Engineers
+            dT_hx_loop=8,
+            Q_O2_consumption=-460240, # [kJ/kmol] equivalent to 110 kcal / mol as in https://www.academia.edu/19636928/Bioreactor_Design_for_Chemical_Engineers
             **kwargs,
         ):
-        bst.StirredTankReactor.__init__(self, ID, ins, outs, thermo, **kwargs)
+        bst.StirredTankReactor.__init__(self, ID, ins, outs, thermo, dT_hx_loop=dT_hx_loop, **kwargs)
         chemicals = self.chemicals
         self.theta_O2 = theta_O2
         self.hydrolysis_reaction = Rxn('Sucrose + Water -> 2Glucose', 'Sucrose', 1.00, chemicals)
