@@ -30,7 +30,11 @@ __all__ = (
     ins=[s.oilcane],
     outs=[s.biodiesel, s.crude_glycerol],
 )
-def create_oilcane_to_biodiesel_combined_1_and_2g_post_fermentation_oil_separation(ins, outs, fed_batch=True, WWT_kwargs=None):
+def create_oilcane_to_biodiesel_combined_1_and_2g_post_fermentation_oil_separation(
+        ins, outs, fed_batch=True, WWT_kwargs=None,
+        oil_extraction=None,
+    ):
+    if oil_extraction is None: oil_extraction = 'integrated'
     oilcane, = ins
     biodiesel, crude_glycerol = outs
     if fed_batch:
@@ -95,44 +99,61 @@ def create_oilcane_to_biodiesel_combined_1_and_2g_post_fermentation_oil_separati
     backend_oil, cellmass, wastewater, evaporator_condensate = post_fermentation_oil_separation_sys.outs
     backend_oil.ID = 'backend_oil'
     # Upstream recycle of cell mass to pretreatment for oil recovery (process intensification)
-    biomass_mixer = bst.Mixer(300, cellmass)
+    biomass_mixer = bst.Mixer(400, cellmass)
     steam_mixer = ofs_dct['Steam mixer']
     biomass_mixer.insert(steam_mixer.ins[0])
     
-    # Specify to only recover lipids in solution post-fermentation
+    # Recover all lipids in solution (after removing solids) post-fermentation
     oil_centrifuge = pfls_dct['Liquids centrifuge']
-    @oil_centrifuge.add_specification(run=True)
-    def recover_lipids_in_solution():
-        recovered_oil = hydrolysate_and_juice_mixer.outs[0].imass['Oil']
-        total_oil = oil_centrifuge.ins[0].imass['Oil']
-        split = recovered_oil / total_oil
-        if recovered_oil > total_oil: 
-            raise RuntimeError("computed lipid recovery is infeasible (over 100%) "
-                               "probably due to error in system network")
-        oil_centrifuge.isplit['Oil'] = split
+    oil_centrifuge.isplit['Oil'] = 1.0
       
-    # Move recovery of oil in solution to after hydrolysis and before fermentation
+    # Move recovery of oil in solution to after hydrolysis and before fermentation (do not include juice)
     fermentation_effluent = oil_centrifuge.ins[0]
     aqueous_stream = oil_centrifuge.outs[1]
     segment = bst.Segment(fermentation_effluent, aqueous_stream)
-    segment.pop(join_ends=True)
-    segment.insert(hydrolysate_and_juice_mixer.outs[0])
+    segment.disconnect(join_ends=True)
+    segment.insert(hydrolysate_and_juice_mixer.ins[0])
       
     # Cells contain all the oil
     cellmass_centrifuge = pfls_dct['Solids centrifuge']
-    cellmass_centrifuge.isplit['Oil'] = 0.99 # Equivalent to cell mass split
+    cellmass_centrifuge.isplit['Oil'] = 0.999 # Equivalent to cell mass split
+    
+    if oil_extraction == 'integrated':
+        # Already integrated
+        oil = backend_oil
+    elif oil_extraction == 'screwpress':
+        cellmass = cellmass_centrifuge.outs[0]
+        mixer = cellmass.sink
+        cellmass.disconnect_sink()
+        mixer.disconnect(join_ends=True)
+        U402 = bst.DrumDryer(400, 
+            (cellmass, 'dryer_air', 'dryer_natural_gas'), 
+            ('', 'dryer_outlet_air', 'dryer_emissions'),
+            moisture_content=0.18, split=0.,
+            utility_agent='Steam',
+        )
+        # X401 = bst.ThermalOxidizer('X401', (U403-1, 'oxidizer_air'), 'oxidizer_emissions')
+        U403 = bst.ScrewPress(400, U402-0, split=dict(cellmass=1, lipid=0.3, Water=0.8),)
+        bst.ConveyingBelt(400, U403-0, 'yeast_extract')
+        microbial_oil = U403-1
+        mixer.ins[:] = [microbial_oil, backend_oil]
+        oil = mixer.outs[0]
+    else:
+        raise ValueError(
+            f"oil_extraction must be either 'integrated' or 'extrussion', not {repr(oil_extraction)}"
+        )
     
     oil_pretreatment_sys, oil_pretreatment_dct = create_oil_pretreatment_system(
-        ins=backend_oil,
+        ins=oil,
         outs=['', 'polar_lipids', ''],
         mockup=True,
         area=600,
         udct=True
     )
-    oil, polar_lipids, wastewater_small = oil_pretreatment_sys.outs
+    pretreated_oil, polar_lipids, wastewater_small = oil_pretreatment_sys.outs
     
     create_transesterification_and_biodiesel_separation_system(
-        ins=oil, 
+        ins=pretreated_oil, 
         outs=[biodiesel, crude_glycerol, ''],
         mockup=True,
         area=600,

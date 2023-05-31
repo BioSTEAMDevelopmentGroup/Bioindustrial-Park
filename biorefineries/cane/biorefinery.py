@@ -83,8 +83,9 @@ biodiesel_kg_per_L = 1. / biodiesel_L_per_kg
 ethanol_L_per_kg = ethanol_gal_per_kg * L_per_gal
 ethanol_kg_per_L = 1. / ethanol_L_per_kg
 
-cellulosic_configurations = frozenset([-2, 2, 4, 6, 8])
-biodiesel_configurations = frozenset([1, 2, 5, 6, 7, 8])
+screwpress_microbial_oil_recovery = frozenset([9])
+cellulosic_configurations = frozenset([-2, 2, 4, 6, 8, 9])
+biodiesel_configurations = frozenset([1, 2, 5, 6, 7, 8, 9])
 ethanol_configurations = frozenset([-2, -1, 1, 2, 3, 4])
 actag_configurations = frozenset([9, 10])
 conventional_ethanol_configurations = ethanol_configurations.difference(cellulosic_configurations)
@@ -107,8 +108,9 @@ system_factories = {
     6: create_oilcane_to_biodiesel_combined_1_and_2g_post_fermentation_oil_separation,
     7: create_oilcane_to_biodiesel_1g,
     8: create_oilcane_to_biodiesel_combined_1_and_2g_post_fermentation_oil_separation,
-    9: create_oilcane_to_biodiesel_and_actag_1g,
-    10: create_oilcane_to_biodiesel_and_actag_combined_1_and_2g_post_fermentation_oil_separation,
+    9: create_oilcane_to_biodiesel_combined_1_and_2g_post_fermentation_oil_separation,
+    1j: create_oilcane_to_biodiesel_and_actag_1g,
+    2j: create_oilcane_to_biodiesel_and_actag_combined_1_and_2g_post_fermentation_oil_separation,
 }
 system_factory_options = {
     -1: dict(use_area_convention=True, pellet_bagasse=False, dry_bagasse=True),
@@ -116,6 +118,7 @@ system_factory_options = {
     6: dict(fed_batch=True),
     7: dict(fed_batch=False),
     8: dict(fed_batch=False),
+    9: dict(fed_batch=False, oil_extraction='screwpress'),
 }
 area_names = {
     -1: ['Feedstock handling', 'Juicing', 'EtOH prod.', 'CH&P', 'Utilities', 
@@ -142,7 +145,7 @@ area_names = {
     #      'Wastewater treatment', 'Oil ext.', 'CH&P',  'Biod. prod.', 'Utilities', 'HXN', 'Storage'],
 }
 area_names[7] = area_names[5]
-area_names[8] = area_names[6]
+area_names[9] = area_names[8] = area_names[6]
 
 price_distributions_2022 = None
 price_distributions_2023 = None
@@ -329,7 +332,8 @@ class Biorefinery:
         
         ## System
         if number in system_factories:
-            self.cane_sys = cane_sys = system_factories[number](operating_hours=24 * 200, WWT_kwargs=WWT_kwargs, **system_factory_options.get(number, {}))
+            self.cane_sys = cane_sys = system_factories[number](operating_hours=24 * 200, WWT_kwargs=WWT_kwargs,
+                                                                **system_factory_options.get(number, {}), autorename=True)
         else:
             raise NotImplementedError(number)
         cane_sys.set_tolerance(rmol=1e-5, mol=1e-2, subsystems=True, subfactor=1.5)
@@ -528,17 +532,22 @@ class Biorefinery:
             oil_extraction_specification = MockExtractionSpecification()
         else:
             crushing_mill = flowsheet(bst.CrushingMill) # Separates bagasse
+            _, screen = flowsheet(bst.VibratingScreen)
+            juice = screen.outs[0]
             if number in cellulosic_configurations:
                 pressure_filter = flowsheet(bst.PressureFilter) # Separates lignin
             else:
                 pressure_filter  = None
+            if number in screwpress_microbial_oil_recovery:
+                screw_press = flowsheet(bst.ScrewPress) # Separates oil from cell mass
+            else:
+                screw_press = None
             cellmass_centrifuge = flowsheet(bst.SolidsCentrifuge) # Separates cell mass
             if isinstance(cellmass_centrifuge, list):
                 cellmass_centrifuge = sorted([i for i in cellmass_centrifuge if type(i) is bst.SolidsCentrifuge], key=lambda x: x.ID)[0]
             cellmass_centrifuge.strict_moisture_content = False
-            microbial_oil_recovery = 0.9 # Baseline
             oil_extraction_specification = OilExtractionSpecification(
-                sys, crushing_mill, pressure_filter, cellmass_centrifuge, microbial_oil_recovery, 
+                sys, crushing_mill, pressure_filter, cellmass_centrifuge, juice, screw_press
             )
         
         ## Account for cellulosic vs advanced RINs
@@ -726,7 +735,7 @@ class Biorefinery:
         def set_crushing_mill_oil_recovery(oil_recovery):
             oil_extraction_specification.load_crushing_mill_oil_recovery(oil_recovery / 100.)
         
-        @performance(90.0, 95, units='%', kind='coupled')
+        @performance(70, 90, units='%', kind='coupled')
         def set_microbial_oil_recovery(microbial_oil_recovery):
             oil_extraction_specification.load_microbial_oil_recovery(microbial_oil_recovery / 100.)
         
@@ -1417,8 +1426,8 @@ class Biorefinery:
             # TCIs_log = np.log(TCIs)
             # TCIs_model_log = np.log(TCIs_model)
             # dTCIs_log = TCIs_log - TCIs_model_log
-            # TCI_ave_log = np.mean(TCIs_log)
             # TCI_log_SSR = (dTCIs_log * dTCIs_log).sum()
+            # TCI_ave_log = np.mean(TCIs_log)
             # dTCIs_log_mean = (TCIs_log - TCI_ave_log)
             # TCI_log_SST = (dTCIs_log_mean * dTCIs_log_mean).sum()
             # R2_TCI_log = 1 - TCI_log_SSR / TCI_log_SST
@@ -1564,3 +1573,21 @@ class Biorefinery:
             cane_sys._load_stream_links()
             sys.simulate()
         return self
+    
+    def oil_recovery(self):
+        f = self.flowsheet
+        tank = f(bst.BlendingTankWithSkimming)
+        recovered_oil = tank.ins[0].F_mass
+        microbial_oil = 0
+        for reactor in f(bst.StirredTankReactor):
+            microbial_oil += sum([i.imass['Oil'] for i in reactor.outs]) - sum([i.imass['Oil'] for i in reactor.ins])
+        biomass_oil = self.feedstock.imass['Oil']
+        total_oil = microbial_oil + biomass_oil
+        return {
+            '% Recovery': 100 * recovered_oil / total_oil,
+            'Microbial fraction': microbial_oil / total_oil,
+            'Biomass fraction': biomass_oil / total_oil,
+            'Oil recovery [kg/s]': recovered_oil / 3600,
+            'Total oil [kg/s]': total_oil / 3600,
+        }
+        
