@@ -102,6 +102,7 @@ class AeratedCoFermentation(bst.AeratedBioreactor): # For microbial oil producti
             Rxn('TAG + Water -> FFA + DAG', 'TAG', 0.02, chemicals)
         ])
         self.Q_O2_consumption = Q_O2_consumption
+        self.optimize_power = False
     
     def _run_vent(self, vent, effluent):
         vent.receive_vent(effluent, energy_balance=False, ideal=True)
@@ -132,6 +133,7 @@ class AeratedFermentation(bst.AeratedBioreactor): # For microbial oil production
             Rxn('TAG + Water -> FFA + DAG', 'TAG', 0.02, chemicals)
         ])
         self.Q_O2_consumption = Q_O2_consumption
+        self.optimize_power = False
     
     def _run_vent(self, vent, effluent):
         vent.receive_vent(effluent, energy_balance=False, ideal=True)

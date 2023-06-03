@@ -606,12 +606,12 @@ def create_cane_to_combined_1_and_2g_fermentation(
                 y0 = f(0)
                 if y0 < 0: 
                     y1 = f(x1)
-                    try:
-                        MX.ins[1].imass['Water'] = flx.IQ_interpolation(
-                            f, x0, x1, y0, y1, x=dilution_water, ytol=1e-3, xtol=1e-3, maxiter=1000,
-                        )
-                    except:
-                        breakpoint()
+                    # try:
+                    MX.ins[1].imass['Water'] = flx.IQ_interpolation(
+                        f, x0, x1, y0, y1, x=dilution_water, ytol=1e-3, xtol=1e-3, maxiter=1000,
+                    )
+                    # except:
+                    #     breakpoint()
             else:
                 for i in range(1, N):
                     if f(1e-6) < 0.:
