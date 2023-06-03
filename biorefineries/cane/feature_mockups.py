@@ -34,7 +34,7 @@ from biosteam import MockFeature
     MockFeature('Price', 'USD/L', 'ethanol'),
     MockFeature('Price', 'USD/L', 'biodiesel'),
     MockFeature('Price', 'USD/m3', 'natural gas'),
-    MockFeature('Electricity price', 'USD/kWhr', 'biorefinery'),
+    MockFeature('Price', 'USD/kWhr', 'electricity '),
     MockFeature('IRR', '%', 'biorefinery'),
     MockFeature('Price', 'USD/kg', 'crude glycerol'),
     MockFeature('Price', 'USD/kg', 'pure glycerine'),

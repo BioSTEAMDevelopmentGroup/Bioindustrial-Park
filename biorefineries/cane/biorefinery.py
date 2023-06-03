@@ -772,31 +772,33 @@ class Biorefinery:
             self.baseline_feedstock_price = price
         
         if prices_correleted_to_crude_oil:
-            @parameter(distribution=dist.cepd_offset, element=cellulosic_ethanol.ID, baseline=0., units='USD/L')
+            predict = lambda name, scalar: dist.models[name].predict(np.array([[scalar]]))[0]
+                                                                     
+            @parameter(distribution=dist.offsets['Cellulosic ethanol'], element=cellulosic_ethanol.ID, baseline=0., units='USD/L')
             def set_cellulosic_ethanol_price(price): 
-                cellulosic_ethanol.price = (dist.f_cep * self.crude_oil_price + price) * ethanol_L_per_kg
+                cellulosic_ethanol.price = predict('Cellulosic ethanol', self.crude_oil_price + price) * ethanol_L_per_kg
                 
-            @parameter(distribution=dist.aepd_offset, element=advanced_ethanol.ID, baseline=0., units='USD/L')
+            @parameter(distribution=dist.offsets['Advanced ethanol'], element=advanced_ethanol.ID, baseline=0., units='USD/L')
             def set_advanced_ethanol_price(price): 
-                advanced_ethanol.price =  (dist.f_aep * self.crude_oil_price + price) * ethanol_L_per_kg
+                advanced_ethanol.price =  predict('Advanced ethanol', self.crude_oil_price + price) * ethanol_L_per_kg
                 
             # USDA ERS historical price data
-            @parameter(distribution=dist.bpd_offset, element=biomass_based_diesel.ID, units='USD/L', baseline=0.)
+            @parameter(distribution=dist.offsets['Biomass based diesel'], element=biomass_based_diesel.ID, units='USD/L', baseline=0.)
             def set_biomass_based_diesel_price(price):
-                biomass_based_diesel.price =  (dist.f_bp * self.crude_oil_price + price) * biodiesel_L_per_kg
+                biomass_based_diesel.price =  predict('Biomass based diesel', self.crude_oil_price + price) * biodiesel_L_per_kg
         
-            @parameter(distribution=dist.cbpd_offset, element=cellulosic_based_diesel.ID, units='USD/L', baseline=0.)
+            @parameter(distribution=dist.offsets['Cellulosic based diesel'], element=cellulosic_based_diesel.ID, units='USD/L', baseline=0.)
             def set_cellulosic_based_diesel_price(price):
-                cellulosic_based_diesel.price =  (dist.f_cbp * self.crude_oil_price + price) * biodiesel_L_per_kg
+                cellulosic_based_diesel.price =  predict('Cellulosic based diesel', self.crude_oil_price + price) * biodiesel_L_per_kg
         
             # https://www.eia.gov/energyexplained/natural-gas/prices.php
-            @parameter(distribution=dist.ngpd_offset, element=s.natural_gas.ID, units='USD/m3', baseline=0.)
+            @parameter(distribution=dist.offsets['Natural gas'], element=s.natural_gas.ID, units='USD/m3', baseline=0.)
             def set_natural_gas_price(price): 
-                BT.natural_gas_price =  (dist.f_ngp * self.crude_oil_price + price) * V_ng
+                BT.natural_gas_price =  predict('Natural gas', self.crude_oil_price + price) * V_ng
         
-            @parameter(distribution=dist.elecpd_offset, units='USD/kWhr', baseline=0.)
-            def set_electricity_price(electricity_price): 
-                bst.PowerUtility.price = dist.f_elecp * self.crude_oil_price + electricity_price
+            @parameter(distribution=dist.offsets['Electricity'], element='electricity', units='USD/kWhr', baseline=0.)
+            def set_electricity_price(price): 
+                bst.PowerUtility.price = predict('Electricity', self.crude_oil_price + price)
                 
         else:
             # USDA ERS historical price data with EPA RIN prices
