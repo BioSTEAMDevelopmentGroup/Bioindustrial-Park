@@ -52,21 +52,25 @@ def create_oilcane_to_biodiesel_combined_1_and_2g_post_fermentation_oil_separati
     glucose_fermrxn.product_yield('TAG', basis='wt', product_yield=lipid_yield)
     xylose_fermrxn = tmo.Rxn('O2 + Xylose -> H2O + TAG', 'Xylose', 1., correct_atomic_balance=True)
     xylose_fermrxn.product_yield('TAG', basis='wt', product_yield=lipid_yield)
-    glucose_growrxn = (
-        tmo.Rxn('Glucose + O2 -> CO2 + H2O', 'Glucose', (1 - biomass_coeff),
-                  correct_atomic_balance=True)
-        + tmo.Rxn('Glucose -> Cellmass', 'Glucose', biomass_coeff, 
-                basis='wt', correct_mass_balance=True)
+    cellmass_rxn = tmo.Rxn(
+        'Glucose + Urea -> Yeast + H2O + CO2', 'Glucose', 1., 
+        correct_atomic_balance=True
     )
+    cellmass_rxn.product_yield('Yeast', 'wt', biomass_coeff)
+    combustion = tmo.Rxn('Glucose + O2 -> CO2 + H2O', 'Glucose', 1. - cellmass_rxn.X,
+                         correct_atomic_balance=True)
+    glucose_growrxn = cellmass_rxn + combustion
     glucose_growrxn.X = 0.999 - glucose_fermrxn.X
-    xylose_growrxn = (
-        tmo.Rxn('Xylose + O2 -> CO2 + H2O', 'Xylose', (1 - biomass_coeff),
-                  correct_atomic_balance=True)
-        + tmo.Rxn('Xylose -> Cellmass', 'Xylose', biomass_coeff, 
-                basis='wt', correct_mass_balance=True)
-    )
-    xylose_growrxn.X = 0.999 - xylose_fermrxn.X
     
+    cellmass_rxn = tmo.Rxn(
+        'Xylose + Urea -> Yeast + H2O + CO2', 'Xylose', 1., 
+        correct_atomic_balance=True
+    )
+    cellmass_rxn.product_yield('Yeast', 'wt', biomass_coeff)
+    combustion = tmo.Rxn('Xylose + O2 -> CO2 + H2O', 'Xylose', 1. - cellmass_rxn.X,
+                         correct_atomic_balance=True)
+    xylose_growrxn = cellmass_rxn + combustion
+    xylose_growrxn.X = 0.999 - xylose_fermrxn.X
     cofermentation = tmo.PRxn(
         [glucose_fermrxn,
          xylose_fermrxn,
@@ -106,23 +110,22 @@ def create_oilcane_to_biodiesel_combined_1_and_2g_post_fermentation_oil_separati
     # Recover all lipids in solution (after removing solids) post-fermentation
     oil_centrifuge = pfls_dct['Liquids centrifuge']
     oil_centrifuge.isplit['Oil'] = 1.0
-      
-    # Move recovery of oil in solution to after hydrolysis and before fermentation (do not include juice)
-    fermentation_effluent = oil_centrifuge.ins[0]
-    aqueous_stream = oil_centrifuge.outs[1]
-    segment = bst.Segment(fermentation_effluent, aqueous_stream)
-    segment.disconnect(join_ends=True)
-    segment.insert(hydrolysate_and_juice_mixer.ins[0])
-      
+    
     # Cells contain all the oil
     cellmass_centrifuge = pfls_dct['Solids centrifuge']
     cellmass_centrifuge.isplit['Oil'] = 0.999 # Equivalent to cell mass split
     
+    
     if oil_extraction == 'integrated':
-        # Already integrated
+        # Move recovery of oil in solution to after hydrolysis and before fermentation (do not include juice, which may not have much oil)
+        aqueous_stream = oil_centrifuge.outs[1]
+        fermentation_effluent = oil_centrifuge.ins[0]
+        segment = bst.Segment(fermentation_effluent, aqueous_stream)
+        segment.disconnect(join_ends=True)
+        segment.insert(hydrolysate_and_juice_mixer.ins[0])
         oil = backend_oil
     elif oil_extraction == 'screwpress':
-        cellmass = cellmass_centrifuge.outs[0]
+        cellmass, aqueous_stream = cellmass_centrifuge.outs
         mixer = cellmass.sink
         cellmass.disconnect_sink()
         mixer.disconnect(join_ends=True)
@@ -138,6 +141,17 @@ def create_oilcane_to_biodiesel_combined_1_and_2g_post_fermentation_oil_separati
         microbial_oil = U403-1
         mixer.ins[:] = [microbial_oil, backend_oil]
         oil = mixer.outs[0]
+        
+        # Replace oil and cell mass centrifuge with a 3-phase decanter centrifuge
+        decanter = bst.SolidLiquidsSplitCentrifuge(400,
+            ins=oil_centrifuge.ins[0],
+            outs=[backend_oil, aqueous_stream, cellmass],
+            solids_split=cellmass_centrifuge.split,
+            aqueous_split=1. - oil_centrifuge.split,
+            moisture_content=0.4,
+        )
+        oil_centrifuge.disconnect(discard=True)
+        cellmass_centrifuge.disconnect(discard=True)
     else:
         raise ValueError(
             f"oil_extraction must be either 'integrated' or 'extrussion', not {repr(oil_extraction)}"

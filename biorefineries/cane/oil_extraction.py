@@ -103,9 +103,18 @@ class OilExtractionSpecification:
                 else:
                     # No microbial oil
                     self.microbial_oil_recovery = microbial_oil_recovery
-                @pressure_filter.add_specification(run=True)
+                
+                @cellmass_centrifuge.add_specification(run=True)
                 def adjust_oil_recovery():
-                    self.pressure_filter.isplit['Oil'] = 1. - self.bagasse_oil_recovery
+                    cellmass_centrifuge = self.cellmass_centrifuge
+                    juice = self.juice
+                    total_oil = cellmass_centrifuge.ins[0].imass['Oil']
+                    juice_oil_fraction = juice.imass['Oil'] / total_oil
+                    bagasse_oil_fraction = pressure_filter.outs[1].imass['Oil'] / total_oil
+                    cellmass_centrifuge.aqueous_isplit['Oil'] = (1.
+                        - juice_oil_fraction * self.juice_oil_recovery
+                        - bagasse_oil_fraction * self.bagasse_oil_recovery
+                    )
       
     def load_crushing_mill_oil_recovery(self, recovery):
         if self.crushing_mill is None: return
@@ -115,6 +124,7 @@ class OilExtractionSpecification:
     def load_bagasse_oil_recovery(self, recovery):
         if self.pressure_filter is None: return
         self.bagasse_oil_recovery = recovery 
+        self.pressure_filter.isplit['Oil'] = 1. - self.bagasse_oil_recovery
     
     def load_microbial_oil_recovery(self, recovery):
         if self.cellmass_centrifuge is None: return

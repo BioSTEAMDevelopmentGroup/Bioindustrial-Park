@@ -79,12 +79,14 @@ def create_oilcane_to_biodiesel_1g(
     
     fermrxn = tmo.Rxn('O2 + Glucose -> H2O + TAG', 'Glucose', 1., correct_atomic_balance=True)
     fermrxn.product_yield('TAG', basis='wt', product_yield=lipid_yield)
-    growrxn = (
-        tmo.Rxn('Glucose + O2 -> CO2 + H2O', 'Glucose', (1 - biomass_coeff),
-                  correct_atomic_balance=True)
-        + tmo.Rxn('Glucose -> Cellmass', 'Glucose', biomass_coeff, 
-                basis='wt', correct_mass_balance=True)
+    cellmass_rxn = tmo.Rxn(
+        'Glucose -> H2O + CO2 + Yeast', 'Glucose', biomass_coeff, 
+        correct_atomic_balance=True
     )
+    cellmass_rxn.product_yield('Yeast', 'wt', biomass_coeff)
+    combustion = tmo.Rxn('Glucose + O2 -> CO2 + H2O', 'Glucose', 1. - cellmass_rxn.X,
+                         correct_atomic_balance=True)
+    growrxn = cellmass_rxn + combustion
     growrxn.X = 0.999
     fermentation_sys, epdct = create_sucrose_fermentation_system(
         ins=[screened_juice],
@@ -101,7 +103,7 @@ def create_oilcane_to_biodiesel_1g(
         fermentation_kwargs={},
         mockup=True,
         area=300,
-        add_urea=True,
+        add_urea=False,
         udct=True,
     )
     product, condensate, vent = fermentation_sys.outs

@@ -31,7 +31,8 @@ __all__ = (
 )
 
 @chemical_cache
-def create_sugarcane_chemicals():
+def create_sugarcane_chemicals(yeast_includes_nitrogen=None):
+    if yeast_includes_nitrogen is None: yeast_includes_nitrogen = False
     (Water, Ethanol, Glucose, Sucrose, H3PO4, P4O10, CO2, Octane, O2, N2, CH4) = chemicals = tmo.Chemicals(
         ['Water', 'Ethanol', 
          tmo.Chemical('Glucose', phase='l'),
@@ -67,7 +68,7 @@ def create_sugarcane_chemicals():
     Solids = create_new_chemical('Solids', MW=1.)
     Yeast = create_new_chemical(
         'Yeast', 
-        formula='CH1.61O0.56N0.16',
+        formula='CH1.61O0.56N0.16' if yeast_includes_nitrogen else 'CH1.61O0.56',
         rho=1540,
         Cp=Glucose.Cp(298.15),
         default=True,
@@ -186,8 +187,8 @@ def create_acetyl_diolein():
     return chemical
 
 @chemical_cache
-def create_oilcane_chemicals():
-    chemicals = create_sugarcane_chemicals().copy()
+def create_oilcane_chemicals(yeast_includes_nitrogen=None):
+    chemicals = create_sugarcane_chemicals(yeast_includes_nitrogen).copy()
     (Water, Ethanol, Glucose, Sucrose, H3PO4, P4O10, CO2, Octane, O2, N2, CH4, 
      Ash, Cellulose, Hemicellulose, Flocculant, Lignin, Solids, DryYeast, CaO) = chemicals
     
@@ -245,8 +246,8 @@ def create_oilcane_chemicals():
     return chemicals
 
 @chemical_cache
-def create_cellulosic_oilcane_chemicals():
-    oilcane_chemicals = create_oilcane_chemicals()
+def create_cellulosic_oilcane_chemicals(yeast_includes_nitrogen=None):
+    oilcane_chemicals = create_oilcane_chemicals(yeast_includes_nitrogen)
     cellulosic_chemicals = cellulosic.create_cellulosic_ethanol_chemicals()
     removed = {'SuccinicAcid', 'H2SO4', 'Z_mobilis', 'Oil'}
     chemicals = tmo.Chemicals([

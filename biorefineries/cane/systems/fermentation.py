@@ -21,7 +21,11 @@ __all__ = (
 
 # %% Fermentation extensions
 
-def add_urea_MgSO4_nutrients(fermentor, seedtrain=None):
+def add_urea_MgSO4_nutrients(fermentor, 
+        seedtrain=None,
+        seed_train_requirement=None,
+        fermentor_requirement=None,
+    ):
     urea = bst.Stream('urea', price=90/907.185) # https://www.alibaba.com/product-detail/High-Quality-UREA-Fertilizer-Factory-price_1600464698965.html?spm=a2700.galleryofferlist.topad_classic.d_title.a69046eeVn83ML
     MgSO4 = bst.Stream('MgSO4', price=110/907.185) # https://www.alibaba.com/product-detail/Magnesium-Sulfate-Sulphate-Sulphate-Magnesium-Sulfate_1600305131579.html?spm=a2700.galleryofferlist.topad_creative.d_image.ad602e15oP8kqh
     Urea_storage = bst.StorageTank('Urea_storage', urea)
@@ -56,19 +60,33 @@ def add_urea_MgSO4_nutrients(fermentor, seedtrain=None):
         @seedtrain.add_specification(run=True)
         def adjust_nutrients_to_seed_train():
             *feeds, urea, MgSO4 = seedtrain.ins
-            F_vol = sum([i.F_vol - i.ivol['Lipid'] for i in feeds if i.phase != 'g'])
-            urea.imass['Urea'] = 0.5 * F_vol
-            MgSO4.imass['MgSO4'] = 0.04 * F_vol
+            if seed_train_requirement:
+                urea_demand, MgSO4_demand = seed_train_requirement(
+                    seedtrain, [i for i in feeds if i.phase != 'g']
+                )
+            else:
+                F_vol = sum([i.F_vol - i.ivol['Lipid'] for i in feeds if i.phase != 'g'])
+                urea_demand = 0.5 * F_vol
+                MgSO4_demand = 0.04 * F_vol
+            urea.imass['Urea'] = urea_demand
+            MgSO4.imass['MgSO4'] = MgSO4_demand
             
         @fermentor.add_specification(run=True, impacted_units=[Urea_storage, MgSO4_storage])
         def adjust_urea_and_MgSO4_feed_to_fermentor():
             feed, seed, *others, urea, MgSO4, = fermentor.ins
-            if 'Lipid' in feed.chemicals:
-                F_vol = sum([i.F_vol - i.ivol['Lipid'] for i in others if i.phase != 'g'], feed.F_vol - feed.ivol['Lipid'])
+            if fermentor_requirement:
+                urea_demand, MgSO4_demand = fermentor_requirement(
+                    fermentor, [i for i in [feed, *others] if i.phase != 'g']
+                )
             else:
-                F_vol = sum([i.F_vol for i in others if i.phase != 'g'], feed.F_vol)
-            urea.imass['Urea'] = 0.5 * F_vol
-            MgSO4.imass['MgSO4'] = 0.04 * F_vol
+                if 'Lipid' in feed.chemicals:
+                    F_vol = sum([i.F_vol - i.ivol['Lipid'] for i in others if i.phase != 'g'], feed.F_vol - feed.ivol['Lipid'])
+                else:
+                    F_vol = sum([i.F_vol for i in others if i.phase != 'g'], feed.F_vol)
+                urea_demand = 0.5 * F_vol
+                MgSO4_demand = 0.04 * F_vol
+            urea.imass['Urea'] = urea_demand
+            MgSO4.imass['MgSO4'] = MgSO4_demand
             S301.ins[0].mix_from(S301.outs)
             S302.ins[0].mix_from(S302.outs)
     else:
@@ -77,14 +95,23 @@ def add_urea_MgSO4_nutrients(fermentor, seedtrain=None):
         @fermentor.add_specification(run=True, impacted_units=[Urea_storage, MgSO4_storage])
         def adjust_nutrients_feed_to_fermentor():
             feed, *others, urea, MgSO4, = fermentor.ins
-            if 'Lipid' in feed.chemicals:
-                F_vol = sum([i.F_vol - i.ivol['Lipid'] for i in others if i.phase != 'g'], feed.F_vol - feed.ivol['Lipid'])
+            if fermentor_requirement:
+                urea_demand, MgSO4_demand = fermentor_requirement(
+                    fermentor, [i for i in [feed, *others] if i.phase != 'g']
+                )
             else:
-                F_vol = sum([i.F_vol for i in others if i.phase != 'g'], feed.F_vol)
-            urea.imass['Urea'] = 0.5 * F_vol
-            MgSO4.imass['MgSO4'] = 0.04 * F_vol
+                if 'Lipid' in feed.chemicals:
+                    F_vol = sum([i.F_vol - i.ivol['Lipid'] for i in others if i.phase != 'g'], feed.F_vol - feed.ivol['Lipid'])
+                else:
+                    F_vol = sum([i.F_vol for i in others if i.phase != 'g'], feed.F_vol)
+                urea_demand = 0.5 * F_vol
+                MgSO4_demand = 0.04 * F_vol
+            urea.imass['Urea'] = urea_demand
+            MgSO4.imass['MgSO4'] = MgSO4_demand
 
-def add_urea_nutrient(fermentor, seedtrain=None):
+def add_urea_nutrient(fermentor, seedtrain=None, 
+                      seed_train_requirement=None,
+                      fermentor_requirement=None):
     urea = bst.Stream('urea', price=90/907.185) # https://www.alibaba.com/product-detail/High-Quality-UREA-Fertilizer-Factory-price_1600464698965.html?spm=a2700.galleryofferlist.topad_classic.d_title.a69046eeVn83ML
     Urea_storage = bst.StorageTank('Urea_storage', urea)
     if seedtrain:
@@ -104,17 +131,26 @@ def add_urea_nutrient(fermentor, seedtrain=None):
         @seedtrain.add_specification(run=True)
         def adjust_nutrients_to_seed_train():
             *feeds, urea, = seedtrain.ins
-            F_vol = sum([i.F_vol - i.ivol['Lipid'] for i in feeds if i.phase != 'g'])
-            urea.imass['Urea'] = 0.5 * F_vol
+            if seed_train_requirement:
+                urea.imass['Urea'] = seed_train_requirement(seedtrain, [i for i in feeds if i.phase != 'g'])
+            else:
+                F_vol = sum([i.F_vol - i.ivol['Lipid'] for i in feeds if i.phase != 'g'])
+                urea.imass['Urea'] = 0.5 * F_vol
             
         @fermentor.add_specification(run=True, impacted_units=[Urea_storage])
-        def adjust_urea_and_MgSO4_feed_to_fermentor():
+        def adjust_urea_feed_to_fermentor():
             feed, seed, *others, urea, = fermentor.ins
-            if 'Lipid' in feed.chemicals:
-                F_vol = sum([i.F_vol - i.ivol['Lipid'] for i in others if i.phase != 'g'], feed.F_vol - feed.ivol['Lipid'])
+            if fermentor_requirement:
+                urea_demand = fermentor_requirement(
+                    fermentor, [i for i in [feed, *others] if i.phase != 'g']
+                )
             else:
-                F_vol = sum([i.F_vol for i in others if i.phase != 'g'], feed.F_vol)
-            urea.imass['Urea'] = 0.5 * F_vol
+                if 'Lipid' in feed.chemicals:
+                    F_vol = sum([i.F_vol - i.ivol['Lipid'] for i in others if i.phase != 'g'], feed.F_vol - feed.ivol['Lipid'])
+                else:
+                    F_vol = sum([i.F_vol for i in others if i.phase != 'g'], feed.F_vol)
+                urea_demand = 0.5 * F_vol
+            urea.imass['Urea'] = urea_demand
             S301.ins[0].mix_from(S301.outs)
             Urea_storage.ins[0].imol['Urea'] = S301.ins[0].imol['Urea']
     else:
@@ -122,11 +158,17 @@ def add_urea_nutrient(fermentor, seedtrain=None):
         @fermentor.add_specification(run=True, impacted_units=[Urea_storage])
         def adjust_nutrients_feed_to_fermentor():
             feed, *others, urea, = fermentor.ins
-            if 'Lipid' in feed.chemicals:
-                F_vol = sum([i.F_vol - i.ivol['Lipid'] for i in others if i.phase != 'g'], feed.F_vol - feed.ivol['Lipid'])
+            if fermentor_requirement:
+                urea_demand = fermentor_requirement(
+                    fermentor, [i for i in [feed, *others] if i.phase != 'g'], urea
+                )
             else:
-                F_vol = sum([i.F_vol for i in others if i.phase != 'g'], feed.F_vol)
-            Urea_storage.ins[0].imass['Urea'] = 0.5 * F_vol
+                if 'Lipid' in feed.chemicals:
+                    F_vol = sum([i.F_vol - i.ivol['Lipid'] for i in others if i.phase != 'g'], feed.F_vol - feed.ivol['Lipid'])
+                else:
+                    F_vol = sum([i.F_vol for i in others if i.phase != 'g'], feed.F_vol)
+                urea_demand = 0.5 * F_vol
+            Urea_storage.ins[0].imass['Urea'] = urea_demand
   
 @SystemFactory(
     ID='sucrose_fermentation_sys',
@@ -136,9 +178,9 @@ def add_urea_nutrient(fermentor, seedtrain=None):
 def create_sucrose_fermentation_system(ins, outs,
         scrubber=None, product_group=None, Fermentor=None, titer=None,
         productivity=None, ignored_volume=None, fermentation_reaction=None,
-        fed_batch=None, add_urea=False, cell_growth_reaction=None, 
+        fed_batch=None, add_urea=None, cell_growth_reaction=None, 
         SeedTrain=None, fermentation_kwargs=None,
-        seed_train_reaction=None,
+        seed_train_reaction=None, nutrient_kwargs=None,
     ):
     # Note: defaults to no seed train with yeast recycle.
     # If seed train is given, no yeast is recycled.
@@ -381,8 +423,9 @@ def create_sucrose_fermentation_system(ins, outs,
                                   gas=('CO2', 'O2'))
         bst.Mixer('M302', ins=(C301-1, D301-1), outs=beer)
     
-    if add_urea:
-        add_urea_nutrient(R301)
+    if add_urea or (add_urea is None and nutrient_kwargs):
+        if nutrient_kwargs is None: nutrient_kwargs = {} 
+        add_urea_nutrient(R301, nutrient_kwargs)
     
 @SystemFactory(
     ID='cane_to_fermentation_sys',

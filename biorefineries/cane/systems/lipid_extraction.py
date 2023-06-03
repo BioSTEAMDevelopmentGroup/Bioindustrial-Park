@@ -122,9 +122,9 @@ def create_post_fermentation_oil_separation_system(ins, outs, wastewater_concent
     S601 = bst.Splitter('S601', ins=EvX-1, outs=['', evaporator_condensate], split=0.5)
     M601 = bst.Mixer('M601', [S601-0, stream], wastewater)
     M601.target_wastewater_concentration = 60. # kg / m3
-    @M601.add_specification(run=True)
+    @M601.add_specification(run=True, impacted_units=[S601])
     def adjust_wastewater_concentration():
-        concentrated_wastewater = C603_2.outs[1]
+        concentrated_wastewater = M601.ins[1]
         waste = concentrated_wastewater.F_mass - concentrated_wastewater.imass['Water'] 
         current_concentration = waste / concentrated_wastewater.F_vol
         required_water = (1./M601.target_wastewater_concentration - 1./current_concentration) * waste * 1000.
@@ -136,4 +136,3 @@ def create_post_fermentation_oil_separation_system(ins, outs, wastewater_concent
             elif split > 1.:
                 split = 1.
             S601.split[:] = split
-            for i in S601.path_until(M601): i.run()

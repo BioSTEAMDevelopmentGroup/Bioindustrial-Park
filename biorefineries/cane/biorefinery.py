@@ -87,7 +87,7 @@ screwpress_microbial_oil_recovery = frozenset([9])
 cellulosic_configurations = frozenset([-2, 2, 4, 6, 8, 9])
 biodiesel_configurations = frozenset([1, 2, 5, 6, 7, 8, 9])
 ethanol_configurations = frozenset([-2, -1, 1, 2, 3, 4])
-actag_configurations = frozenset([9, 10])
+actag_configurations = frozenset([10, 11])
 conventional_ethanol_configurations = ethanol_configurations.difference(cellulosic_configurations)
 cellulosic_ethanol_configurations = cellulosic_configurations.intersection(ethanol_configurations)
 ethanol_biodiesel_configurations = ethanol_configurations.intersection(biodiesel_configurations)
@@ -542,7 +542,10 @@ class Biorefinery:
                 screw_press = flowsheet(bst.ScrewPress) # Separates oil from cell mass
             else:
                 screw_press = None
-            cellmass_centrifuge = flowsheet(bst.SolidsCentrifuge) # Separates cell mass
+            if number in screwpress_microbial_oil_recovery:
+                cellmass_centrifuge = flowsheet(bst.SolidLiquidsSplitCentrifuge) # Separates cell mass, oil, and water
+            else:
+                cellmass_centrifuge = flowsheet(bst.SolidsCentrifuge) # Separates cell mass
             if isinstance(cellmass_centrifuge, list):
                 cellmass_centrifuge = sorted([i for i in cellmass_centrifuge if type(i) is bst.SolidsCentrifuge], key=lambda x: x.ID)[0]
             cellmass_centrifuge.strict_moisture_content = False
