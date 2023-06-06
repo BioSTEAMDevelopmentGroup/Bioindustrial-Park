@@ -90,9 +90,10 @@ class AeratedCoFermentation(bst.AeratedBioreactor): # For microbial oil producti
             *, cofermentation, theta_O2=0.5, 
             dT_hx_loop=8,
             Q_O2_consumption=-460240, # [kJ/kmol] equivalent to 110 kcal / mol as in https://www.academia.edu/19636928/Bioreactor_Design_for_Chemical_Engineers
+            batch=True,
             **kwargs,
         ):
-        bst.StirredTankReactor.__init__(self, ID, ins, outs, thermo, dT_hx_loop=dT_hx_loop, **kwargs)
+        bst.StirredTankReactor.__init__(self, ID, ins, outs, thermo, batch=batch, dT_hx_loop=dT_hx_loop, **kwargs)
         chemicals = self.chemicals
         self.theta_O2 = theta_O2
         self.hydrolysis_reaction = Rxn('Sucrose + Water -> 2Glucose', 'Sucrose', 1.00, chemicals)
@@ -103,6 +104,7 @@ class AeratedCoFermentation(bst.AeratedBioreactor): # For microbial oil producti
         ])
         self.Q_O2_consumption = Q_O2_consumption
         self.optimize_power = False
+        self.kLa_coefficients = "Van't Riet"
     
     def _run_vent(self, vent, effluent):
         vent.receive_vent(effluent, energy_balance=False, ideal=True)
@@ -120,9 +122,10 @@ class AeratedFermentation(bst.AeratedBioreactor): # For microbial oil production
             *, fermentation_reaction, cell_growth_reaction, theta_O2=0.5,
             dT_hx_loop=8,
             Q_O2_consumption=-460240, # [kJ/kmol] equivalent to 110 kcal / mol as in https://www.academia.edu/19636928/Bioreactor_Design_for_Chemical_Engineers
+            batch=True,
             **kwargs,
         ):
-        bst.StirredTankReactor.__init__(self, ID, ins, outs, thermo, dT_hx_loop=dT_hx_loop, **kwargs)
+        bst.StirredTankReactor.__init__(self, ID, ins, outs, thermo, batch=batch, dT_hx_loop=dT_hx_loop, **kwargs)
         chemicals = self.chemicals
         self.theta_O2 = theta_O2
         self.hydrolysis_reaction = Rxn('Sucrose + Water -> 2Glucose', 'Sucrose', 1.00, chemicals)
@@ -134,6 +137,7 @@ class AeratedFermentation(bst.AeratedBioreactor): # For microbial oil production
         ])
         self.Q_O2_consumption = Q_O2_consumption
         self.optimize_power = False
+        self.kLa_coefficients = "Van't Riet"
     
     def _run_vent(self, vent, effluent):
         vent.receive_vent(effluent, energy_balance=False, ideal=True)
