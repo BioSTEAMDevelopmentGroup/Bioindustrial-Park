@@ -19,6 +19,10 @@ from biorefineries.cane.composition import (
 from biosteam import main_flowsheet, UnitGroup
 from chaospy import distributions as shape
 import numpy as np
+from .feature_mockups import (
+    all_parameter_mockups,
+    all_metric_mockups, 
+)
 from .process_settings import load_process_settings
 from .chemicals import create_cellulosic_oilcane_chemicals as create_chemicals
 from biorefineries.cellulosic import PretreatmentReactorSystem as PRS
@@ -388,46 +392,52 @@ class Biorefinery:
         ## Split bagasse to boiler meet energy demand
         if avoid_natural_gas:
             for splitter in flowsheet.unit:
-                if getattr(splitter, 'isbagasse_splitter', False):
-                    self.bagasse_splitter = splitter
-                    minimum_fraction_burned = 0
-                    maximum_fraction_burned = 0.7
-                    self.recycle_data = recycle_data = {}
-                    @cane_sys.add_bounded_numerical_specification(
-                        x0=minimum_fraction_burned, x1=maximum_fraction_burned, 
-                        xtol=1e-4, ytol=100, args=(splitter,)
-                    )
-                    def adjust_bagasse_to_boiler(fraction_burned, splitter):
-                        # Returns energy consumption at given fraction processed (not sent to boiler).
-                        splitter.split[:] = 1 - fraction_burned
-                        operation_mode = getattr(sys, 'active_operation_mode', None)
-                        if fraction_burned in (minimum_fraction_burned, maximum_fraction_burned):
-                            key = (operation_mode, fraction_burned)
-                        else:
-                            key = (operation_mode, 'last')
-                        if key in recycle_data: 
-                            material_data = recycle_data[key]
-                        else:
-                            recycle_data[key] = material_data = cane_sys.get_material_data()
-                        try:
-                            cane_sys.simulate(material_data=material_data, update_material_data=True)
-                        except:
-                            cane_sys.simulate()
-                        excess = BT._excess_electricity_without_natural_gas
-                        if fraction_burned == minimum_fraction_burned and excess > 0:
-                            splitter.neglect_natural_gas_streams = False # No need to neglect
-                            return 0 # No need to burn bagasse
-                        elif fraction_burned == maximum_fraction_burned and excess < 0: 
-                            splitter.neglect_natural_gas_streams = False # Cannot be neglected
-                            return 0 # Cannot satisfy energy demand even at 30% sent to boiler (or minimum fraction processed)
-                        else:
-                            splitter.neglect_natural_gas_streams = True
-                            return excess
-                    @cane_sys.add_specification(args=(splitter,))
-                    def assume_negligible_natural_gas_streams(splitter):
-                        if splitter.neglect_natural_gas_streams:
-                            for i in natural_gas_streams: i.empty()
-            
+                if getattr(splitter, 'isbagasse_splitter', False): break
+            else:
+                avoid_natural_gas = False
+        if avoid_natural_gas:
+            cane_sys.add_specification(self.update_feedstock)
+            self.bagasse_splitter = splitter
+            minimum_fraction_burned = 0
+            maximum_fraction_burned = 0.7
+            self.recycle_data = recycle_data = {}
+            @cane_sys.add_bounded_numerical_specification(
+                x0=minimum_fraction_burned, x1=maximum_fraction_burned, 
+                xtol=1e-4, ytol=100, args=(splitter,)
+            )
+            def adjust_bagasse_to_boiler(fraction_burned, splitter):
+                # Returns energy consumption at given fraction processed (not sent to boiler).
+                splitter.split[:] = 1 - fraction_burned
+                operation_mode = getattr(sys, 'active_operation_mode', None)
+                if fraction_burned in (minimum_fraction_burned, maximum_fraction_burned):
+                    key = (operation_mode, fraction_burned)
+                else:
+                    key = (operation_mode, 'last')
+                if key in recycle_data: 
+                    material_data = recycle_data[key]
+                else:
+                    recycle_data[key] = material_data = cane_sys.get_material_data()
+                try:
+                    cane_sys.simulate(material_data=material_data, update_material_data=True)
+                except:
+                    cane_sys.simulate()
+                excess = BT._excess_electricity_without_natural_gas
+                if fraction_burned == minimum_fraction_burned and excess > 0:
+                    splitter.neglect_natural_gas_streams = False # No need to neglect
+                    return 0 # No need to burn bagasse
+                elif fraction_burned == maximum_fraction_burned and excess < 0: 
+                    splitter.neglect_natural_gas_streams = False # Cannot be neglected
+                    return 0 # Cannot satisfy energy demand even at 30% sent to boiler (or minimum fraction processed)
+                else:
+                    splitter.neglect_natural_gas_streams = True
+                    return excess
+            @cane_sys.add_specification(args=(splitter,))
+            def assume_negligible_natural_gas_streams(splitter):
+                if splitter.neglect_natural_gas_streams:
+                    for i in natural_gas_streams: i.empty()
+        else:
+            cane_sys.add_specification(self.update_feedstock, simulate=True)
+        
         if abs(number) in cellulosic_configurations:
             prs = flowsheet(bst.PretreatmentReactorSystem)
             saccharification = flowsheet(bst.Saccharification)
@@ -735,8 +745,8 @@ class Biorefinery:
             raise ValueError("`conversion_performance_distribution` must be either 'longterm' or 'shortterm")
             
         @performance(60, 90, units='%', kind='coupled')
-        def set_crushing_mill_oil_recovery(oil_recovery):
-            oil_extraction_specification.load_crushing_mill_oil_recovery(oil_recovery / 100.)
+        def set_juicing_oil_recovery(juicing_oil_recovery):
+            oil_extraction_specification.load_juicing_oil_recovery(juicing_oil_recovery / 100.)
         
         @performance(70, 90, units='%', kind='coupled')
         def set_microbial_oil_recovery(microbial_oil_recovery):
@@ -767,69 +777,76 @@ class Biorefinery:
         def set_crude_oil_price(price):
             self.crude_oil_price = price
         
-        @default(self.baseline_feedstock_price, element=feedstock, units='USD/kg')
+        @default(self.baseline_feedstock_price, element='feedstock', units='USD/kg')
         def set_baseline_feedstock_price(price):
             self.baseline_feedstock_price = price
         
         if prices_correleted_to_crude_oil:
             predict = lambda name, scalar: dist.models[name].predict(np.array([[scalar]]))[0]
                                                                      
-            @parameter(distribution=dist.offsets['Cellulosic ethanol'], element=cellulosic_ethanol.ID, baseline=0., units='USD/L')
+            @parameter(distribution=dist.offsets['Cellulosic ethanol'],
+                       element='Cellulosic ethanol', baseline=0., units='USD/L')
             def set_cellulosic_ethanol_price(price): 
                 cellulosic_ethanol.price = predict('Cellulosic ethanol', self.crude_oil_price + price) * ethanol_L_per_kg
                 
-            @parameter(distribution=dist.offsets['Advanced ethanol'], element=advanced_ethanol.ID, baseline=0., units='USD/L')
+            @parameter(distribution=dist.offsets['Advanced ethanol'],
+                       element='Advanced ethanol', baseline=0., units='USD/L')
             def set_advanced_ethanol_price(price): 
                 advanced_ethanol.price =  predict('Advanced ethanol', self.crude_oil_price + price) * ethanol_L_per_kg
                 
             # USDA ERS historical price data
-            @parameter(distribution=dist.offsets['Biomass based diesel'], element=biomass_based_diesel.ID, units='USD/L', baseline=0.)
+            @parameter(distribution=dist.offsets['Biomass based diesel'], 
+                       element='Biomass based diesel', units='USD/L', baseline=0.)
             def set_biomass_based_diesel_price(price):
                 biomass_based_diesel.price =  predict('Biomass based diesel', self.crude_oil_price + price) * biodiesel_L_per_kg
         
-            @parameter(distribution=dist.offsets['Cellulosic based diesel'], element=cellulosic_based_diesel.ID, units='USD/L', baseline=0.)
+            @parameter(distribution=dist.offsets['Cellulosic based diesel'],
+                       element='Cellulosic based diesel', units='USD/L', baseline=0.)
             def set_cellulosic_based_diesel_price(price):
                 cellulosic_based_diesel.price =  predict('Cellulosic based diesel', self.crude_oil_price + price) * biodiesel_L_per_kg
         
             # https://www.eia.gov/energyexplained/natural-gas/prices.php
-            @parameter(distribution=dist.offsets['Natural gas'], element=s.natural_gas.ID, units='USD/m3', baseline=0.)
+            @parameter(distribution=dist.offsets['Natural gas'],
+                       element='Natural gas', units='USD/m3', baseline=0.)
             def set_natural_gas_price(price): 
                 BT.natural_gas_price =  predict('Natural gas', self.crude_oil_price + price) * V_ng
         
-            @parameter(distribution=dist.offsets['Electricity'], element='electricity', units='USD/kWhr', baseline=0.)
+            @parameter(distribution=dist.offsets['Electricity'], element='electricity',
+                       units='USD/kWhr', baseline=0.)
             def set_electricity_price(price): 
                 bst.PowerUtility.price = predict('Electricity', self.crude_oil_price + price)
                 
         else:
             # USDA ERS historical price data with EPA RIN prices
-            @parameter(distribution=dist.cepd, element=cellulosic_ethanol.ID, 
+            @parameter(distribution=dist.cepd, element='Cellulosic ethanol', 
                        baseline=dist.mcep, units='USD/L')
             def set_cellulosic_ethanol_price(price): # Triangular distribution fitted over the past 10 years Sep 2009 to Nov 2020
                 cellulosic_ethanol.price = price * ethanol_L_per_kg
                 
-            @parameter(distribution=dist.aepd, element=advanced_ethanol.ID, 
+            @parameter(distribution=dist.aepd, element='Advanced ethanol', 
                        baseline=dist.maep, units='USD/L')
             def set_advanced_ethanol_price(price): # Triangular distribution fitted over the past 10 years Sep 2009 to Nov 2020
                 advanced_ethanol.price = price * ethanol_L_per_kg
                 
             # USDA ERS historical price data
-            @parameter(distribution=dist.bpd, element=biomass_based_diesel.ID, units='USD/L', baseline=dist.mbp)
+            @parameter(distribution=dist.bpd, element='Biomass based diesel', units='USD/L', baseline=dist.mbp)
             def set_biomass_based_diesel_price(price): # Triangular distribution fitted over the past 10 years Sep 2009 to March 2021
                 biomass_based_diesel.price = price * biodiesel_L_per_kg
         
-            @parameter(distribution=dist.cbpd, element=cellulosic_based_diesel.ID, units='USD/L', baseline=dist.mcbp)
+            @parameter(distribution=dist.cbpd, element='Cellulosic based diesel', units='USD/L', baseline=dist.mcbp)
             def set_cellulosic_based_diesel_price(price): # Triangular distribution fitted over the past 10 years Sep 2009 to March 2021
                 cellulosic_based_diesel.price = price * biodiesel_L_per_kg
         
             # https://www.eia.gov/energyexplained/natural-gas/prices.php
-            @parameter(distribution=dist.natural_gas_price_distribution, element=s.natural_gas.ID, units='USD/m3',
+            @parameter(distribution=dist.natural_gas_price_distribution, element='Natural gas', units='USD/m3',
                        baseline=4.73 * 35.3146667/1e3)
             def set_natural_gas_price(price): 
                 BT.natural_gas_price = price * V_ng
         
-            @parameter(distribution=dist.electricity_price_distribution, units='USD/kWhr', baseline=dist.mean_electricity_price)
-            def set_electricity_price(electricity_price): 
-                bst.PowerUtility.price = electricity_price
+            @parameter(distribution=dist.electricity_price_distribution, units='USD/kWhr',
+                       element='electricity', baseline=dist.mean_electricity_price)
+            def set_electricity_price(price): 
+                bst.PowerUtility.price = price
         
         # 10% is suggested for waste reducing, but 15% is suggested for investment
         @uniform(10., 15., units='%', baseline=10)
@@ -1034,7 +1051,6 @@ class Biorefinery:
                  element='sugarcane', units='kg*CO2-eq/kg')
         def set_feedstock_GWP(value):
             self.baseline_feedstock_CF = value
-            self.update_feedstock()
         
         @default_gwp(methanol.characterization_factors[GWP], name='GWP', 
                      element=methanol.ID, units='kg*CO2-eq/kg')
@@ -1527,7 +1543,7 @@ class Biorefinery:
         else:
             set_baseline(set_cane_oil_content, np.mean(oil_content_range))
         set_baseline(set_bagasse_oil_recovery, 70)
-        set_baseline(set_crushing_mill_oil_recovery, 60)
+        set_baseline(set_juicing_oil_recovery, 60)
         set_baseline(set_crude_oil_price) 
         set_baseline(set_advanced_ethanol_price) 
         set_baseline(set_cellulosic_ethanol_price) 
@@ -1577,6 +1593,17 @@ class Biorefinery:
             cane_sys.reduce_chemicals()
             cane_sys._load_stream_links()
             sys.simulate()
+        
+        ## Tests
+        try:
+            assert len(all_parameter_mockups) == len(model.parameters)
+            assert len(all_metric_mockups) == len(model.metrics)
+            for mockup, real in zip(all_parameter_mockups, model.parameters):
+                assert mockup.index == real.index
+            for mockup, real in zip(all_metric_mockups, model.metrics):
+                assert mockup.index == real.index
+        except:
+            breakpoint()
         return self
     
     def oil_recovery(self):

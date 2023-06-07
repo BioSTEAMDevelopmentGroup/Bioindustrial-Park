@@ -19,15 +19,14 @@ from .results import (
 __all__ = (
     'evaluate_configurations_across_recovery_and_oil_content',
     'evaluate_configurations_across_sorghum_and_cane_oil_content',
-    'evaluate_metrics_across_composition_configurations',
-    'evaluate_metrics_across_composition',
+    'evaluate_metrics_oil_recovery_integration',
+    'evaluate_metrics_at_biomass_yield',
     'run_uncertainty_and_sensitivity',
     'save_pickled_results',
     'run_all',
     'run_sugarcane_microbial_oil_and_ethanol',
     'run_oilcane_microbial_oil_and_ethanol_across_oil_content',
     'run_oilcane_microbial_oil_and_ethanol_across_lines',
-    'evaluate_metrics_across_biomass_yield_O7O8',
 )
 
 configuration_names = (
@@ -97,37 +96,9 @@ evaluate_configurations_across_sorghum_and_cane_oil_content = no_derivative(
     )
 )
 
-def evaluate_metrics_at_composition(oil, fiber, water, configuration):
-    br = cane.Biorefinery(configuration)
-    cs = br.composition_specification
-    if br.ROI_target is None:
-        if configuration == 'O2':
-            S2 = cane.Biorefinery('S2')
-            S2.set_cane_oil_content.setter(0)
-            S2.sys.simulate()
-            br.ROI_target = S2.ROI()
-        else:
-            br.set_cane_oil_content.setter(0)
-            br.composition_specification.oil = -1 # Not zero so that competitive biomass metric works
-            br.sys.simulate()
-            br.ROI_target = br.ROI()
-    try:
-        cane.load_composition(br.feedstock, oil, water, fiber, cs.FFA, cs.PL)
-    except ValueError:
-        return np.array([np.nan for i in br.model.metrics])
-    br.sys.simulate()
-    return np.array([i() for i in br.model.metrics])
-
-evaluate_metrics_across_composition = no_derivative(
-    np.vectorize(
-        evaluate_metrics_at_composition, 
-        excluded=['configuration'],
-        signature=f'(),(),(),()->({N_metrics})'
-    )
-)
-
-def evaluate_metrics_at_composition_configurations(oil, fiber):
-    data = np.zeros([2, N_metrics])
+@no_derivative
+def evaluate_metrics_at_composition(oil, fiber):
+    data = np.zeros([N_metrics, 2])
     for i, configuration in enumerate(['O2', 'O8']):
         br = cane.Biorefinery(configuration)
         cs = br.composition_specification
@@ -152,33 +123,34 @@ def evaluate_metrics_at_composition_configurations(oil, fiber):
             data[i, :] = [np.nan for i in br.model.metrics]
             continue
         br.sys.simulate()
-        data[i, :] = [i() for i in br.model.metrics]
+        data[:, i] = [i() for i in br.model.metrics]
     return data
 
-evaluate_metrics_across_composition_configurations = no_derivative(
-    np.vectorize(
-        evaluate_metrics_at_composition_configurations, 
-        signature=f'(),() ->(2, {N_metrics})'
-    )
-)
-
-def evaluate_metrics_at_biomass_yield_O7O8(oil, dry_biomass_yield):
-    data = np.zeros([2, N_metrics])
-    for i, configuration in enumerate(['O7', 'O8']):
+@no_derivative
+def evaluate_metrics_at_biomass_yield(oil, dry_biomass_yield):
+    data = np.zeros([N_metrics, 2])
+    for i, configuration in enumerate(['O7', 'O9']):
         br = cane.Biorefinery(configuration)
-        br.composition_specification.load_oil_content(oil, moisture=0.65)
+        br.composition_specification.load_oil_content(oil / 100, moisture=0.65)
         br.dry_biomass_yield = dry_biomass_yield
         br.update_feedstock()
         br.sys.simulate()
-        data[i, :] = [i() for i in br.model.metrics]
+        data[:, i] = [i() for i in br.model.metrics]
     return data
 
-evaluate_metrics_across_biomass_yield_O7O8 = no_derivative(
-    np.vectorize(
-        evaluate_metrics_at_biomass_yield_O7O8, 
-        signature=f'(),() ->(2, {N_metrics})'
-    )
-)
+
+@no_derivative
+def evaluate_metrics_oil_recovery_integration(microbial_oil_recovery, microbial_oil_yield):
+    data = np.zeros([N_metrics, 2])
+    for i, configuration in enumerate(['O9', 'O8']):
+        br = cane.Biorefinery(configuration)
+        br.set_microbial_oil_recovery.setter(microbial_oil_recovery)
+        br.set_glucose_to_microbial_oil_yield.setter(microbial_oil_yield)
+        br.set_xylose_to_microbial_oil_yield.setter(microbial_oil_yield)
+        br.sys.simulate()
+        data[:, i] = [i() for i in br.model.metrics]
+        if np.isnan(br.MBSP()): breakpoint()
+    return data
 
 def save_pickled_results(N, configurations=None, rule='L', optimize=True):
     from warnings import filterwarnings

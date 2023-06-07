@@ -4,10 +4,6 @@ Created on Thu Mar 30 18:08:06 2023
 
 @author: yrc2
 """
-# https://onlinelibrary.wiley.com/doi/full/10.1002/ejlt.201100014
-max_lipid_yield_glucose = 0.32 # g / g
-max_lipid_yield_xylose = 0.34 # g / g
-
 ### Data from https://link.springer.com/article/10.1007/s00253-016-7815-y#Sec2
 gL_OD600 = 0.64 # From correspondance with authors [g / L / OD600]
 
@@ -68,3 +64,13 @@ hydrolysate_lipid_yield = hydrolysate_titer / hydrolysate_sugar_concentration # 
 hydrolysate_biomass_yield = hydrolysate_lipid_yield / hydrolysate_lipid_content # 0.343 g microbe / g glucose
 hydrolysate_CO2_yield = 1 - hydrolysate_biomass_yield - hydrolysate_lipid_yield # 0.525 g CO2 / g glucose
 hydrolysate_biomass_growth_coefficient = hydrolysate_biomass_yield / (hydrolysate_biomass_yield + hydrolysate_CO2_yield) # 0.395 g Biomass / g CO2-Biomass
+
+### Potential range https://onlinelibrary.wiley.com/doi/full/10.1002/ejlt.201100014
+max_lipid_yield_glucose = 0.32 # g / g
+max_lipid_yield_xylose = 0.34 # g / g
+max_titer = 100 # Arbitrary but comparible to ethanol production  [g Lipid / L]
+max_productivity = 1.0 # Arbitrary but comparible to ethanol production [g Lipid / L / hr]
+min_lipid_yield_glucose = 0.08 # g / g
+min_lipid_yield_xylose = 0.08 # g / g
+min_titer = 10 # Arbitrary but comparible to baseline  [g Lipid / L]
+min_productivity = 0.1 # Arbitrary but comparible to baseline [g Lipid / L / hr]

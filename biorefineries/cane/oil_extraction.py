@@ -16,7 +16,7 @@ class MockExtractionSpecification:
     def load_bagasse_oil_recovery(self, bagasse_recovery):
         pass
       
-    def load_crushing_mill_oil_recovery(self, recovery):
+    def load_juicing_oil_recovery(self, recovery):
         pass
     
     def load_microbial_oil_recovery(self, recovery):
@@ -116,7 +116,7 @@ class OilExtractionSpecification:
                     # No microbial oil
                     self.microbial_oil_recovery = microbial_oil_recovery
       
-    def load_crushing_mill_oil_recovery(self, recovery):
+    def load_juicing_oil_recovery(self, recovery):
         if self.crushing_mill is None: return
         self.crushing_mill_oil_recovery = recovery
         self.crushing_mill.isplit['Oil'] = 1. - recovery
@@ -130,11 +130,11 @@ class OilExtractionSpecification:
         if self.cellmass_centrifuge is None: return
         self.microbial_oil_recovery = recovery 
         if self.screw_press: self.screw_press.isplit['Oil'] = 1. - recovery
-            
     
     def load_specifications(self, 
             crushing_mill_oil_recovery=None,
             bagasse_oil_recovery=None,
+            microbial_oil_recovery=None,
         ):
         """
         Load oil extraction specifications.
@@ -153,6 +153,9 @@ class OilExtractionSpecification:
             crushing_mill_oil_recovery = self.crushing_mill_oil_recovery
         if bagasse_oil_recovery is None:
             bagasse_oil_recovery = self.bagasse_oil_recovery
-        self.load_crushing_mill_oil_recovery(crushing_mill_oil_recovery)
+        if microbial_oil_recovery is None:
+            microbial_oil_recovery = self.microbial_oil_recovery
+        self.load_juicing_oil_recovery(crushing_mill_oil_recovery)
         self.load_bagasse_oil_recovery(bagasse_oil_recovery)
+        self.load_microbial_oil_recovery(microbial_oil_recovery)
     

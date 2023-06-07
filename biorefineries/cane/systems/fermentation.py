@@ -649,11 +649,22 @@ def create_cane_to_combined_1_and_2g_fermentation(
     
     def get_titer():
         beer = cofermentation.outs[1]
+        # has_ignored_rxn = hasattr(cofermentation, 'lipid_reaction')
+        # if has_ignored_rxn:
+        #     old_mol = beer.mol.copy()
+        #     revrxn = bst.SRxn([
+        #         bst.Rxn('OleicAcid + DiOlein -> Water + TriOlein ', reactant='DiOlein', X=1., basis='mol'),
+        #         bst.Rxn('Glycerol + 3 OleicAcid -> 3 Water + TriOlein ', reactant='Glycerol', X=1., basis='mol'),
+        #     ])
+        #     revrxn(beer)
         feed = EvX.outs[0]
         ignored = beer.ivol[ignored_volume] if ignored_volume in cofermentation.chemicals else 0.
         ignored_product = feed.imass[product_group] if product_group in feed.chemicals else 0.
         ignored_product_vol = feed.ivol[product_group] if product_group in feed.chemicals else 0.
-        return (beer.imass[product_group] - ignored_product) / (beer.ivol['Water', product_group].sum() - ignored_product_vol - ignored)
+        titer = (beer.imass[product_group] - ignored_product) / (beer.ivol['Water', product_group].sum() - ignored_product_vol - ignored)
+        # if has_ignored_rxn:
+        #     beer.mol = old_mol
+        return titer
     cofermentation.get_titer = get_titer
     cofermentation.titer = titer
     cofermentation.productivity = productivity
