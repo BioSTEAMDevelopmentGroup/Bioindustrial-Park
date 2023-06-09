@@ -84,7 +84,7 @@ class CoFermentation(CoFermentation):
 
           
 class AeratedCoFermentation(bst.AeratedBioreactor): # For microbial oil production
-    V_max_default = 1000
+    V_max_default = 500
     def __init__(
             self, ID='', ins=None, outs=(), thermo=None,  
             *, cofermentation, theta_O2=0.5, 

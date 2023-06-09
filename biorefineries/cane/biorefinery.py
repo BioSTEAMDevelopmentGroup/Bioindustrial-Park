@@ -194,7 +194,8 @@ def exponential_val(x, nA): # b e ^ m
 def YRCP2023():
     Biorefinery.default_conversion_performance_distribution = 'longterm'
     Biorefinery.default_prices_correleted_to_crude_oil = True
-    Biorefinery.default_oil_content_range = [2, 5]
+    Biorefinery.default_oil_content_range = [0, 15]
+    Biorefinery.default_baseline_oil_content = 1.8
     Biorefinery.default_year = 2023
     Biorefinery.default_WWT = 'high-rate'
 
@@ -208,6 +209,7 @@ class Biorefinery:
     default_year = 2022
     default_WWT = None
     default_oil_content_range = [5, 15]
+    default_baseline_oil_content = 10
     baseline_moisture_content = 0.70
     baseline_feedstock_CF = GWP_characterization_factors['sugarcane'] # [kg CO2-eq / kg sugarcane] with transportation
     baseline_feedstock_price = 0.035 # [USD / kg sugarcane] with transportation
@@ -294,8 +296,8 @@ class Biorefinery:
         max_lipid_yield_xylose = perf.max_lipid_yield_xylose
         self.set_glucose_to_microbial_oil_yield.setter(max_lipid_yield_glucose * 100)
         self.set_xylose_to_microbial_oil_yield.setter(max_lipid_yield_xylose * 100)
-        self.set_cofermentation_microbial_oil_productivity.setter(1.902) # Similar to sugarcane ethanol
-        self.set_cofermentation_microbial_oil_titer.setter(137) # Similar to sugarcane ethanol
+        self.set_fermentation_microbial_oil_productivity.setter(1.902) # Similar to sugarcane ethanol
+        self.set_fermentation_microbial_oil_titer.setter(137) # Similar to sugarcane ethanol
         
     def __new__(cls, name, chemicals=None, reduce_chemicals=False, 
                  avoid_natural_gas=True, conversion_performance_distribution=None,
@@ -463,7 +465,8 @@ class Biorefinery:
                 fermentor = flowsheet(bst.Fermentation)
             except:
                 fermentor = flowsheet(bst.AeratedBioreactor)
-                
+        self.fermentor = fermentor
+        
         def set_glucose_yield(glucose_yield):
             if number in cellulosic_configurations:
                 glucose_yield *= 0.01
@@ -989,13 +992,13 @@ class Biorefinery:
                 )
                 cell_growth_reaction.X = 0.999 - fermentation_reaction.X # Almost all the rest goes towards cell mass and CO2
     
-        @performance(hydrolysate_titer, titer, units='g/L', element='Cofermentation', kind='coupled')
-        def set_cofermentation_microbial_oil_titer(microbial_oil_titer):
-            if number in cellulosic_oil_configurations: fermentor.titer = microbial_oil_titer
+        @performance(hydrolysate_titer, titer, units='g/L', element='Fermentation', kind='coupled')
+        def set_fermentation_microbial_oil_titer(microbial_oil_titer):
+            if number in oil_configurations: fermentor.titer = microbial_oil_titer
     
-        @performance(hydrolysate_productivity, productivity, units='g/L', element='Cofermentation')
-        def set_cofermentation_microbial_oil_productivity(microbial_oil_productivity):
-            if number in cellulosic_oil_configurations: fermentor.productivity = microbial_oil_productivity
+        @performance(hydrolysate_productivity, productivity, units='g/L', element='Fermentation')
+        def set_fermentation_microbial_oil_productivity(microbial_oil_productivity):
+            if number in oil_configurations: fermentor.productivity = microbial_oil_productivity
     
         @default(10, element='oilcane', units='% oil', kind='coupled')
         def set_cane_PL_content(cane_PL_content):
@@ -1344,25 +1347,25 @@ class Biorefinery:
             if self._derivative_disabled: return 0.
             return GWP_economic.difference()
     
-        @metric(name='Ethanol GWP derivative', element='Ethanol', units='kg*CO2*eq / L')
+        @metric(name='GWP derivative', element='Ethanol', units='kg*CO2*eq / L')
         def GWP_ethanol_derivative(): # Cradle to gate
             return GWP_economic_derivative.get() * get_GWP_mean_ethanol_price()
         
-        @metric(name='Biodiesel GWP derivative', element='Biodiesel', units='kg*CO2*eq / L')
+        @metric(name='GWP derivative', element='Biodiesel', units='kg*CO2*eq / L')
         def GWP_biodiesel_derivative(): # Cradle to gate
             if number > 0:
                 return GWP_economic_derivative.get() * get_GWP_mean_biodiesel_price()
             else:
                 return 0.
         
-        @metric(name='Crude glycerol GWP derivative', element='Crude glycerol', units='kg*CO2*eq / kg')
+        @metric(name='GWP derivative', element='Crude glycerol', units='kg*CO2*eq / kg')
         def GWP_crude_glycerol_derivative(): # Cradle to gate
             if number > 0:
                 return GWP_economic_derivative.get() * dist.mean_glycerol_price
             else:
                 return 0.
         
-        @metric(name='Electricity GWP derivative', element='Electricity', units='kg*CO2*eq / MWhr')
+        @metric(name='GWP derivative', element='Electricity', units='kg*CO2*eq / MWhr')
         def GWP_electricity_derivative(): # Cradle to gate
             if electricity_production.get():
                 return GWP_economic_derivative.get() * dist.mean_electricity_price * 1000.
@@ -1541,7 +1544,7 @@ class Biorefinery:
         if energycane:
             set_baseline(set_cane_oil_content, 2)
         else:
-            set_baseline(set_cane_oil_content, np.mean(oil_content_range))
+            set_baseline(set_cane_oil_content, self.default_baseline_oil_content)
         set_baseline(set_bagasse_oil_recovery, 70)
         set_baseline(set_juicing_oil_recovery, 60)
         set_baseline(set_crude_oil_price) 

@@ -17,6 +17,7 @@ from biosteam.plots import (
     plot_vertical_line,
     rounded_tickmarks_from_data as tickmarks,
     plot_scatter_points,
+    plot_contour_single_metric,
 )
 from thermosteam.units_of_measure import format_units
 from thermosteam.utils import set_figure_size, set_font
@@ -407,16 +408,17 @@ def contour_file(name):
     file = name + '.npy'
     return os.path.join(folder, file)
 
-def plot_oil_recovery_integration(
+def plot_fermentation_performance(
         load=False, 
     ):
     metrics = [feature.MBSP, feature.GWP_biodiesel]
     metrics_index = [feature.all_metric_mockups.index(i) for i in metrics]
     X, Y, Z = generate_contour_data(
-        cane.evaluate_metrics_oil_recovery_integration,
+        cane.evaluate_fermentation_performance, # TODO
         xlim=[50, 90],
         ylim=[100 * perf.min_lipid_yield_glucose, 100 * perf.max_lipid_yield_glucose],
         file=contour_file('oil_recovery_integration'),
+        n=10,
         load=load,
     )
     Z = Z[:, :, metrics_index, :]
@@ -427,17 +429,59 @@ def plot_oil_recovery_integration(
     yticks = rounded_linspace(
         100 * perf.min_lipid_yield_glucose, 100 * perf.max_lipid_yield_glucose, 5, 
     )
-    print(yticks)
     titles = ['Mechanical oil recovery', 'Integrated oil recovery']
     
     d0 = Z[:, :, 0, :]
     d1 = Z[:, :, 1, :]
+    d2 = Z[:, :, 2, :]
     metric_bars = [
-        MetricBar('MBSP', format_units('USD/L'), plt.cm.get_cmap('viridis_r'), tickmarks(d0[~np.isnan(d0)], 5, 1, expand=0, p=0.5), 25, 1),
-        MetricBar("GWP", format_units('USD/L'), plt.cm.get_cmap('inferno'), tickmarks(d1[~np.isnan(d1)], 5, 1, expand=0, p=0.5), 25, 1),
+        MetricBar('MBSP', format_units('USD/L'), plt.cm.get_cmap('viridis_r'), tickmarks(d0[~np.isnan(d0)], 5, 1, expand=0, p=0.5), 15, 1),
+        MetricBar('ROI', format_units('% USD'), plt.cm.get_cmap('viridis'), tickmarks(d1[~np.isnan(d1)], 5, 1, expand=0, p=1), 15, 1),
+        MetricBar("GWP", format_units('USD/L'), plt.cm.get_cmap('inferno_r'), tickmarks(d2[~np.isnan(d2)], 5, 0.1, expand=0, p=0.1), 15, 1),
     ]
     fig, axes, CSs, CB, other_axes = plot_contour_2d(
         X, Y, Z, xlabel, ylabel, xticks, yticks, metric_bars,  titles,
+        fillcolor=None, styleaxiskw=dict(xtick0=False), label=True,
+    )
+    return fig, other_axes
+
+def plot_oil_recovery_integration(
+        load=False, 
+    ):
+    productivity = np.array([
+        perf.hydrolysate_productivity, 
+        perf.batch_productivity_mean, 
+        perf.fed_batch_productivity_mean
+    ])
+    X, Y, Z = generate_contour_data(
+        cane.evaluate_metrics_oil_recovery_integration,
+        xlim=[50, 90],
+        ylim=[100 * perf.min_lipid_yield_glucose, 100 * perf.max_lipid_yield_glucose],
+        args=(
+            productivity,
+        ),
+        file=contour_file('oil_recovery_integration'),
+        load=load,
+        n=10,
+    )
+    metric = feature.biodiesel_production
+    metric_index = cane.all_metric_mockups.index(metric)
+    Z = Z[..., metric_index]
+    # Plot contours
+    xlabel = 'Microbial oil recovery [%]'
+    ylabel = "Microb. oil yield [wt. %]"
+    units = r'$g \cdot L^{-1} \cdot h^{-1}$'
+    ylabels = [f"{ylabel}\nat {round(i, 2)} {units}" for i in productivity]
+    xticks = [50, 60, 70, 80, 90]
+    yticks = rounded_linspace(
+        100 * perf.min_lipid_yield_glucose, 100 * perf.max_lipid_yield_glucose, 5, 
+    )
+    titles = ['Mechanical oil recovery', 'Integrated oil recovery']
+    metric_bar = MetricBar(
+        metric.name, format_units(metric.units), plt.cm.get_cmap('viridis_r'), tickmarks(Z[~np.isnan(Z)], 5, 1, expand=0, p=0.5), 15, 1
+    )
+    fig, axes, CSs, CB, other_axes = plot_contour_single_metric(
+        X, Y, Z, xlabel, ylabels, xticks, yticks, metric_bar,  titles,
         fillcolor=None, styleaxiskw=dict(xtick0=False), label=True,
     )
     return fig, other_axes

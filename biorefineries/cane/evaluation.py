@@ -138,18 +138,19 @@ def evaluate_metrics_at_biomass_yield(oil, dry_biomass_yield):
         data[:, i] = [i() for i in br.model.metrics]
     return data
 
-
 @no_derivative
-def evaluate_metrics_oil_recovery_integration(microbial_oil_recovery, microbial_oil_yield):
-    data = np.zeros([N_metrics, 2])
-    for i, configuration in enumerate(['O9', 'O8']):
-        br = cane.Biorefinery(configuration)
-        br.set_microbial_oil_recovery.setter(microbial_oil_recovery)
-        br.set_glucose_to_microbial_oil_yield.setter(microbial_oil_yield)
-        br.set_xylose_to_microbial_oil_yield.setter(microbial_oil_yield)
-        br.sys.simulate()
-        data[:, i] = [i() for i in br.model.metrics]
-        if np.isnan(br.MBSP()): breakpoint()
+def evaluate_metrics_oil_recovery_integration(microbial_oil_recovery, microbial_oil_yield, productivity):
+    nrows = productivity.size
+    data = np.zeros([nrows, 2, N_metrics])
+    for i in range(nrows):
+        for j, configuration in enumerate(['O9', 'O8']):
+            br = cane.Biorefinery(configuration)
+            br.set_fermentation_microbial_oil_productivity.setter(productivity[i])
+            br.set_microbial_oil_recovery.setter(microbial_oil_recovery)
+            br.set_glucose_to_microbial_oil_yield.setter(microbial_oil_yield)
+            br.set_xylose_to_microbial_oil_yield.setter(microbial_oil_yield)
+            br.sys.simulate()
+            data[i, j, :] = [i() for i in br.model.metrics]
     return data
 
 def save_pickled_results(N, configurations=None, rule='L', optimize=True):
