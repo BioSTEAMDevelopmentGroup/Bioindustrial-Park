@@ -109,7 +109,7 @@ class AeratedCoFermentation(bst.AeratedBioreactor): # For microbial oil producti
     def _run_vent(self, vent, effluent):
         vent.receive_vent(effluent, energy_balance=False, ideal=True)
     
-    def run_reactions(self, effluent):
+    def _run_reactions(self, effluent):
         self.hydrolysis_reaction.force_reaction(effluent)
         self.lipid_reaction.force_reaction(effluent)
         if effluent.imol['H2O'] < 0.: effluent.imol['H2O'] = 0.
@@ -142,7 +142,7 @@ class AeratedFermentation(bst.AeratedBioreactor): # For microbial oil production
     def _run_vent(self, vent, effluent):
         vent.receive_vent(effluent, energy_balance=False, ideal=True)
     
-    def run_reactions(self, effluent):
+    def _run_reactions(self, effluent):
         self.hydrolysis_reaction.force_reaction(effluent)
         self.lipid_reaction.force_reaction(effluent)
         if effluent.imol['H2O'] < 0.: effluent.imol['H2O'] = 0.
