@@ -33,7 +33,7 @@ def create_beer_distillation_system(ins, outs,
                                 LHK=('Ethanol', 'Water'))
     D302.tray_material = 'Stainless steel 304'
     D302.vessel_material = 'Stainless steel 304'
-    D302.boiler.U = 1.85
+    D302.reboiler.U = 1.85
     P302 = bst.Pump(IDs.get('Beer column bottoms product pump', 'P302'), P=6 * 101325.)
     
     # Heat up before beer column
@@ -67,7 +67,7 @@ def create_ethanol_purification_system_after_beer_column(ins, outs, IDs={}):
                                 vessel_material='Stainless steel 304',
                                 P=1.6 * 101325.,
                                 is_divided=True)
-    D303.boiler.U = 1.85
+    D303.reboiler.U = 1.85
     P303 = bst.Pump(IDs.get('Distillation bottoms product pump', 'P303'), 
                       outs=recycle_process_water)
     
