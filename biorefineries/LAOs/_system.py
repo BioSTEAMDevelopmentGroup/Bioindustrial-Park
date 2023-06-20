@@ -215,7 +215,7 @@ def create_system(ID='LAOs_sys', stainless_steel=True):
             if isa(i, bst.HX):
                 i.material = 'Stainless steel/stainless steel'
             elif isa(i, bst.BinaryDistillation):
-                i.boiler.material = i.condenser.material = 'Stainless steel/stainless steel'
+                i.reboiler.material = i.condenser.material = 'Stainless steel/stainless steel'
                 i.vessel_material = 'Stainless steel 304'
                 i.tray_material = 'Stainless steel 304'
             elif isa(i, bst.Pump):

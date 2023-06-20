@@ -98,7 +98,7 @@ def create_oilcane_to_biodiesel_and_ethanol_combined_1_and_2g_post_fermentation_
         ),
         HXN_kwargs=dict(
             ID=1000, 
-            ignored=lambda: [u.H402, u.D801.boiler, u.D802.boiler, u.H803, u.H802, u.H801, u.H804, u.H806, u.H809, oil_pretreatment_dct['F3']],
+            ignored=lambda: [u.H402, u.D801.reboiler, u.D802.reboiler, u.H803, u.H802, u.H801, u.H804, u.H806, u.H809, oil_pretreatment_dct['F3']],
             Qmin=1e3,
             acceptable_energy_balance_error=0.01
         ),

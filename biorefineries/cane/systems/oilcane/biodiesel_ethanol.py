@@ -145,7 +145,7 @@ def create_oilcane_to_biodiesel_and_ethanol_1g(
     )
     
     def get_hx_issues():
-        hxs = [u.E301, u.D501.boiler, u.D502.boiler, u.H501, u.H502, u.H503, u.H504, oil_pretreatment_dct['F3'], u.H506]
+        hxs = [u.E301, u.D501.reboiler, u.D502.reboiler, u.H501, u.H502, u.H503, u.H504, oil_pretreatment_dct['F3'], u.H506]
         condenser = getattr(u.E401, 'condenser', None)
         if condenser: hxs.append(condenser)
         return hxs
