@@ -16,7 +16,7 @@ from biorefineries.biodiesel import (
     create_transesterification_and_biodiesel_separation_system,
 )
 from .fermentation import create_cane_to_combined_1_and_2g_fermentation
-from .lipid_extraction import create_lipid_exctraction_system
+from .lipid_extraction import create_lipid_extraction_system
 from .biodiesel_actag import create_acTAG_separation_system
 from .. import units
 from .. import streams as s
@@ -68,7 +68,7 @@ def create_oilcane_to_biodiesel_and_actag_combined_1_and_2g_post_fermentation_oi
         X[0] = X[3] = product_yield * selectivity
         X[1] = X[4] = product_yield * (1. - selectivity)
     
-    lipid_exctraction_sys, ledct = create_lipid_exctraction_system(
+    lipid_exctraction_sys, ledct = create_lipid_extraction_system(
         ins=beer,
         mockup=True,
         area=400,

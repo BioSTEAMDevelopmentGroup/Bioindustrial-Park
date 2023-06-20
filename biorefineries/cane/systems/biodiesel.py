@@ -20,7 +20,7 @@ from .juicing import (
     create_juicing_system,
 )
 from .fermentation import create_sucrose_fermentation_system
-from .lipid_extraction import create_lipid_exctraction_system
+from .lipid_extraction import create_lipid_extraction_system
 from ..data import microbial_oil_baseline as perf
 from .. import units
 from .. import streams as s
@@ -107,7 +107,7 @@ def create_oilcane_to_biodiesel_1g(
         udct=True,
     )
     product, condensate, vent = fermentation_sys.outs
-    post_fermentation_oil_separation_sys = create_lipid_exctraction_system(
+    post_fermentation_oil_separation_sys = create_lipid_extraction_system(
         ins=product,
         mockup=True,
         area=300,

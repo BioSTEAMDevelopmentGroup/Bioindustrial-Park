@@ -69,7 +69,7 @@ def create_lipid_wash_system(ins, outs):
     def correct_lipid_wash_water():
         ins = T208.ins
         lipid, lipid_wash_water, recycle, *others = ins
-        lipid_wash_water.imol['Water'] = 0.185 * sum([i.imass['Lipid'] for i in ins]) - recycle.imol['Water']
+        lipid_wash_water.imass['Water'] = water = 0.185 * sum([i.imass['Lipid'] for i in ins]) - recycle.imass['Water']
 
 @SystemFactory(
     ID="lipid_pretreatment_sys",

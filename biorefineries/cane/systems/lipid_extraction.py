@@ -17,16 +17,16 @@ from biorefineries.biodiesel import (
     create_lipid_wash_system,
 )
 __all__ = (
-    'create_lipid_exctraction_system',
+    'create_lipid_extraction_system',
     'create_post_fermentation_oil_separation_system',
 )
 
 @SystemFactory(
-    ID='lipid_exctraction_sys',
+    ID='lipid_extraction_sys',
     ins=[s.fermentation_effluent],
     outs=[s.lipid, s.cellmass, s.wastewater],
 )
-def create_lipid_exctraction_system(ins, outs):
+def create_lipid_extraction_system(ins, outs):
     fermentation_effluent, = ins
     lipid, cellmass, wastewater, = outs
     U401 = bst.SolidsCentrifuge('U401', fermentation_effluent, ['', ''],
