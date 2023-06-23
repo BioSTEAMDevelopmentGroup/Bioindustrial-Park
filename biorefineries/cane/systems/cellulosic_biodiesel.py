@@ -185,7 +185,7 @@ def create_oilcane_to_biodiesel_combined_1_and_2g_post_fermentation_oil_separati
         recycle_process_water_streams=(condensate, evaporator_condensate),
         HXN_kwargs=dict(
             ID=900,
-            ignored=lambda: [u.H401, u.D601.boiler, u.D602.boiler, u.H603, u.H602, u.H601, u.H604, u.H606, u.H609, oil_pretreatment_dct['F3']],
+            ignored=lambda: [u.H401, u.D601.reboiler, u.D602.reboiler, u.H603, u.H602, u.H601, u.H604, u.H606, u.H609, oil_pretreatment_dct['F3']],
             Qmin=1e3,
             acceptable_energy_balance_error=0.01,
         ),
