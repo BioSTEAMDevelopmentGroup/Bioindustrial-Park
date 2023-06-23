@@ -145,7 +145,7 @@ def create_oilcane_to_biodiesel_1g(
         feedstock=None,
         HXN_kwargs=dict(
             ID=900,
-            ignored=lambda: [u.E301, u.D601.boiler, u.D602.boiler, u.H601, u.H602, u.H603, u.H604, oil_pretreatment_dct['F3']],
+            ignored=lambda: [u.E301, u.D601.reboiler, u.D602.reboiler, u.H601, u.H602, u.H603, u.H604, oil_pretreatment_dct['F3']],
             Qmin=1e5,
             acceptable_energy_balance_error=0.01,
         ),
