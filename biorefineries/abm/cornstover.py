@@ -157,7 +157,7 @@ def ABM_TEA_function(
     cs.cornstover_tea.duration = duration
     cs.cornstover_sys.simulate()
     cs.cornstover_tea.IRR = IRR
-    unit_group = cs.AllAreas
+    unit_group = bst.UnitGroup(units=cs.cornstover_sys.units)
     return {
         'MESP': cs.cornstover_tea.solve_price(cs.ethanol),
         'MFPP': cs.cornstover_tea.solve_price(cs.cornstover),
