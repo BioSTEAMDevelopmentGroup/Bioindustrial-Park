@@ -222,16 +222,17 @@ def plot_metrics_across_composition(
         cmap=None, smooth=None,
     ):
     xticks = [0,   2,   4,   6,   8,   10]
-    xlim = (xticks[0], xticks[-1])
+    xlim = (xticks[0] / 100, xticks[-1] / 100)
     yticks = [35,  45,  55,  65,  75]
-    ylim = (yticks[0], yticks[-1])
-    metrics = COBY, NEP = [cane.competitive_biomass_yield, cane.net_energy_production]
+    ylim = (yticks[0] / 100, yticks[-1] / 100)
+    metrics = COBY, MBSP = [cane.competitive_biomass_yield, cane.MBSP]
+    # metrics = COBY, NEP = [cane.competitive_biomass_yield, cane.net_energy_production]
     metric_indices = [cane.all_metric_mockups.index(i) for i in metrics] 
     X, Y, data = generate_contour_data(
         cane.evaluate_metrics_at_composition, 
         xlim, ylim, load=load, n = 10,
     )
-    data = data[:, :, :, metric_indices]
+    data = data[:, :, metric_indices, :]
     data[:, 0, 0, 0] = data[:, 1, 0, 0] + (data[:, 1, 0, 0] - data[:, 2, 0, 0])
     data[:, 0, 1, 0] = data[:, 1, 1, 0] + (data[:, 1, 1, 0] - data[:, 2, 1, 0])
     
@@ -245,10 +246,11 @@ def plot_metrics_across_composition(
         # MetricBar(MFPP.name, format_units(MFPP.units), colormaps[1], tickmarks(data[:, :, 0, :], 5, 1, expand=0, p=0.5), 18, 1),
         MetricBar('Comp. biomass yield', 'Dry-'+format_units('MT/ha'), plt.cm.get_cmap('viridis_r'), tickmarks(d0[~np.isnan(d0)], 5, 1, expand=0, p=0.5), 10, 1),
         # MetricBar('Biod. prod.', format_units(BP.units), plt.cm.get_cmap('copper'), tickmarks(data[:, :, 1, :], 8, 1, expand=0, p=0.5), 10, 1),
-        MetricBar('Net energy prod.', format_units(NEP.units), plt.cm.get_cmap('inferno'), tickmarks(d1[~np.isnan(d1)], 5, 1, expand=0, p=2), 20, 1),
+        MetricBar('MBSP', format_units(MBSP.units), plt.cm.get_cmap('inferno'), tickmarks(d1[~np.isnan(d1)], 5, 0.1, expand=0, p=2), 20, 1),
+        # MetricBar('Net energy prod.', format_units(NEP.units), plt.cm.get_cmap('inferno'), tickmarks(d1[~np.isnan(d1)], 5, 1, expand=0, p=2), 20, 1),
     ]
     fig, axes, CSs, CB = plot_contour_2d(
-        100.*X, 100.*Y, titles, data, xlabel, ylabel, xticks, yticks, metric_bars, 
+        100.*X, 100.*Y, titles, data, xlabel, ylabel, xticks, yticks, metric_bars=metric_bars, 
         styleaxiskw=dict(xtick0=True), label=True, wbar=2.1
     )
     try:
@@ -446,25 +448,31 @@ def plot_fermentation_performance(
     return fig, other_axes
 
 def plot_oil_recovery_integration(
-        load=False, 
+        load=False, metric=None,
     ):
     productivity = np.array([
         perf.hydrolysate_productivity, 
         perf.batch_productivity_mean, 
-        perf.fed_batch_productivity_mean
+    ])
+    titer = np.array([
+        perf.hydrolysate_titer, 
+        perf.batch_titer_mean, 
     ])
     X, Y, Z = generate_contour_data(
         cane.evaluate_metrics_oil_recovery_integration,
         xlim=[50, 90],
         ylim=[100 * perf.min_lipid_yield_glucose, 100 * perf.max_lipid_yield_glucose],
         args=(
-            productivity,
+            productivity, titer,
         ),
         file=contour_file('oil_recovery_integration'),
         load=load,
-        n=10,
+        n=5,
     )
-    metric = feature.biodiesel_production
+    if metric is None:
+        metric = feature.MBSP
+    elif isinstance(metric, str):
+        metric = getattr(feature, metric)
     metric_index = cane.all_metric_mockups.index(metric)
     Z = Z[..., metric_index]
     # Plot contours

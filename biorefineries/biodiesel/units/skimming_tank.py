@@ -33,7 +33,7 @@ class BlendingTankWithSkimming(bst.MixTank):
     def _run(self):
         feeds = self.ins
         polar_lipids, vegetable_oil = self.outs
-        vegetable_oil.mix_from(feeds)
+        vegetable_oil.mix_from(feeds, conserve_phases=True)
         polar_lipids.copy_thermal_condition(vegetable_oil)
         polar_lipids.imol['PL'] = vegetable_oil.imol['PL'] 
         polar_lipids.imass['Acetone'] = vegetable_oil.imass['PL'] * 2

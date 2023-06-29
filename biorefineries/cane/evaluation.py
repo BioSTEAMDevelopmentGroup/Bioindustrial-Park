@@ -19,6 +19,7 @@ from .results import (
 __all__ = (
     'evaluate_configurations_across_recovery_and_oil_content',
     'evaluate_configurations_across_sorghum_and_cane_oil_content',
+    'evaluate_metrics_at_composition',
     'evaluate_metrics_oil_recovery_integration',
     'evaluate_metrics_at_biomass_yield',
     'run_uncertainty_and_sensitivity',
@@ -115,12 +116,14 @@ def evaluate_metrics_at_composition(oil, fiber):
                 br.ROI_target = br.ROI()
         water = 0.65
         if oil == 0 and configuration == 'O2':
-            data[i, :] = [np.nan for i in br.model.metrics]
+            data[:, i] = [np.nan for i in br.model.metrics]
             continue
         try:
             cane.load_composition(br.feedstock, oil, water, fiber, cs.FFA, cs.PL)
-        except ValueError:
-            data[i, :] = [np.nan for i in br.model.metrics]
+        except ValueError as e:
+            print(e)
+            print(f'oil={oil}, water={water}, fiber={fiber}, FFA={cs.FFA}, PL={cs.PL}')
+            data[:, i] = [np.nan for i in br.model.metrics]
             continue
         br.sys.simulate()
         data[:, i] = [i() for i in br.model.metrics]
@@ -139,13 +142,14 @@ def evaluate_metrics_at_biomass_yield(oil, dry_biomass_yield):
     return data
 
 @no_derivative
-def evaluate_metrics_oil_recovery_integration(microbial_oil_recovery, microbial_oil_yield, productivity):
+def evaluate_metrics_oil_recovery_integration(microbial_oil_recovery, microbial_oil_yield, productivity, titer):
     nrows = productivity.size
     data = np.zeros([nrows, 2, N_metrics])
     for i in range(nrows):
         for j, configuration in enumerate(['O9', 'O8']):
             br = cane.Biorefinery(configuration)
             br.set_fermentation_microbial_oil_productivity.setter(productivity[i])
+            br.set_fermentation_microbial_oil_titer.setter(titer[i])
             br.set_microbial_oil_recovery.setter(microbial_oil_recovery)
             br.set_glucose_to_microbial_oil_yield.setter(microbial_oil_yield)
             br.set_xylose_to_microbial_oil_yield.setter(microbial_oil_yield)
@@ -422,10 +426,12 @@ def run_sugarcane_microbial_oil_and_ethanol(N=None):
     run_uncertainty_and_sensitivity('O7', N, line='WT')
     run_uncertainty_and_sensitivity('S2', N, line='WT')
     run_uncertainty_and_sensitivity('O8', N, line='WT')
+    run_uncertainty_and_sensitivity('O9', N, line='WT')
     run_uncertainty_and_sensitivity('O1', N)
     run_uncertainty_and_sensitivity('O7', N)
     run_uncertainty_and_sensitivity('O2', N)
     run_uncertainty_and_sensitivity('O8', N)
+    run_uncertainty_and_sensitivity('O9', N)
     
 def run_oilcane_microbial_oil_and_ethanol_across_oil_content(N=None):
     if N is None: N = 20
@@ -433,6 +439,7 @@ def run_oilcane_microbial_oil_and_ethanol_across_oil_content(N=None):
     cane.YRCP2023()
     run_uncertainty_and_sensitivity('O7', N, across_oil_content='oilcane vs sugarcane')
     run_uncertainty_and_sensitivity('O8', N, across_oil_content='oilcane vs sugarcane')
+    run_uncertainty_and_sensitivity('O9', N, across_oil_content='oilcane vs sugarcane')
     run_uncertainty_and_sensitivity('O1', N, across_oil_content='oilcane vs sugarcane')
     run_uncertainty_and_sensitivity('O2', N, across_oil_content='oilcane vs sugarcane')        
     
@@ -442,5 +449,6 @@ def run_oilcane_microbial_oil_and_ethanol_across_lines(N=None):
     cane.YRCP2023()
     run_uncertainty_and_sensitivity('O7', N, across_lines=True)
     run_uncertainty_and_sensitivity('O8', N, across_lines=True)
+    run_uncertainty_and_sensitivity('O9', N, across_lines=True)
     run_uncertainty_and_sensitivity('O1', N, across_lines=True)
     run_uncertainty_and_sensitivity('O2', N, across_lines=True)        

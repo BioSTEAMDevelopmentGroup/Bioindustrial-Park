@@ -235,7 +235,7 @@ def create_system(flowsheet=None, biorefinery_settings=None):
     P606 = bst.Pump('P606', V605-0)
     Ev607 = bst.MultiEffectEvaporator('Ev607',
         ins=P606-0,
-        P=(101325, 69682, 47057, 30953),
+        P=(101325, 69682, 47057, 30953, 19781),
         V=0.90
     ) 
     C603_2 = bst.LiquidsSplitCentrifuge('C603_2', Ev607-0, (crude_oil, ''), split={'Oil':0.99})

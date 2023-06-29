@@ -273,7 +273,7 @@ def create_sucrose_fermentation_system(ins, outs,
                                            screened_juice,
                                            P=(101325, 69682, 47057, 30953, 19781),
                                            outs=('', evaporator_condensate),
-                                           V_definition='First-effect',
+                                           V_definition='First-effect duty',
                                            thermo=dilution_water.thermo.ideal(),
                                            flash=False,
                                            V=0.3) # fraction evaporated
@@ -285,8 +285,10 @@ def create_sucrose_fermentation_system(ins, outs,
             F301.V = V
             for i in path: i.run()
             return R301.titer - get_titer()
-    
+        
         F301.P_original = P_original = tuple(F301.P)
+        Pstart = P_original[0]
+        Plast = P_original[-1]
         N_evaps = len(P_original)
         @F301.add_specification(run=False)
         def evaporation():
@@ -299,7 +301,7 @@ def create_sucrose_fermentation_system(ins, outs,
             F301._reload_components = True
             F301.V = 0
             for i in path: i.run()
-            dilution_water = get_dilution_water()
+            dilution_water = get_additional_dilution_water()
             f = titer_at_fraction_evaporated_objective
             if dilution_water < 0.:
                 x0 = 0.
@@ -308,8 +310,8 @@ def create_sucrose_fermentation_system(ins, outs,
                 y1 = f(x1, path)
                 if y1 > 0.: raise RuntimeError('cannot evaporate to target sugar concentration')
                 for i in range(1, N_evaps):
-                    if f(1e-2, path) < 0.:
-                        F301.P = P_original[:-i]
+                    if f(1e-6, path) < 0.:
+                        F301.P = np.linspace(Pstart, Plast, N_evaps - i)
                         F301._reload_components = True
                     else:
                         break
@@ -325,13 +327,12 @@ def create_sucrose_fermentation_system(ins, outs,
             else:
                 mx_path = M301.path_until(R301, inclusive=True)
                 def f(required_water):
-                    M301.ins[-1].imass['Water'] = max(required_water, 0)
+                    M301.ins[-1].imass['Water'] = required_water
                     for unit in mx_path: unit.run()
-                    return R301.titer - get_titer()
+                    return required_water + get_additional_dilution_water()
                 try:
-                    s_dilution_water.imass['Water'] = flx.IQ_interpolation(
-                        f, 0 , 2 * dilution_water, x=dilution_water, ytol=1e-2, xtol=1e-6, 
-                        maxiter=20, checkiter=False
+                    s_dilution_water.imass['Water'] = flx.wegstein(
+                        f, dilution_water, xtol=1, maxiter=20, checkiter=False
                     )
                 except:
                     f(dilution_water)
@@ -401,7 +402,7 @@ def create_sucrose_fermentation_system(ins, outs,
         return (s.imass[product_group] - ignored_product) / (s.F_vol - ignored_product_vol - ignored)
     R301.get_titer = get_titer
     
-    def get_dilution_water():
+    def get_additional_dilution_water():
         target = R301.titer
         current = get_titer()
         ignored_product = sum([i.imass[product_group] for i in R301.ins])
@@ -563,7 +564,7 @@ def create_cane_to_combined_1_and_2g_fermentation(
         syrup_source = EvX = bst.MultiEffectEvaporator(
             400, ins=MX-0, outs=('', condensate),
             P=(101325, 69682, 47057, 30953, 19781),
-            V_definition='First-effect',
+            V_definition='First-effect duty',
             thermo=hydrolysate.thermo.ideal(),
             flash=False,
             V=0.05
@@ -580,7 +581,6 @@ def create_cane_to_combined_1_and_2g_fermentation(
             path = EvX.path_until(cofermentation, inclusive=True)
             beer = cofermentation.outs[1]
             V_last = EvX.V
-            EvX.P = P_original
             EvX._reload_components = True
             def f(V):
                 EvX.V = V
@@ -589,29 +589,25 @@ def create_cane_to_combined_1_and_2g_fermentation(
             MX.ins[1].imass['Water'] = 0.
             y0 = f(0)
             if y0 < 0.:
-                product = float(beer.imass[product_group])
-                current_titer = get_titer()
-                feed = PX.outs[0]
-                ignored_product = feed.imass[product_group] if product_group in feed.chemicals else 0.
-                T, P = beer.thermal_condition
-                rho = beer.chemicals.Water.rho('l', T, P)
-                dilution_water = (1./target_titer - 1./current_titer) * (product - ignored_product) * rho
                 mx_path = MX.path_until(cofermentation, inclusive=True)
-                def f(dilution_water):
-                    MX.ins[1].imass['Water'] = max(dilution_water, 0)
+                def get_additional_dilution_water():
+                    product = beer.imass[product_group]
+                    current_titer = get_titer()
+                    feed = PX.outs[0]
+                    ignored_product = feed.imass[product_group] if product_group in feed.chemicals else 0.
+                    T, P = beer.thermal_condition
+                    rho = beer.chemicals.Water.rho('l', T, P)
+                    return (1./target_titer - 1./current_titer) * (product - ignored_product) * rho
+                
+                def f(water):
+                    MX.ins[1].imass['Water'] = water
                     for unit in mx_path: unit.run()
-                    return target_titer - get_titer()
-                x0 = 0
-                x1 = dilution_water * 5
-                y0 = f(0)
-                if y0 < 0: 
-                    y1 = f(x1)
-                    # try:
-                    MX.ins[1].imass['Water'] = flx.IQ_interpolation(
-                        f, x0, x1, y0, y1, x=dilution_water, ytol=1e-3, xtol=1e-3, maxiter=1000,
-                    )
-                    # except:
-                    #     breakpoint()
+                    return water + get_additional_dilution_water()
+                
+                MX.ins[1].imass['Water'] = flx.wegstein(
+                    f, x=get_additional_dilution_water(), xtol=1, 
+                    maxiter=10, checkiter=False
+                )
             else:
                 for i in range(1, N):
                     if f(1e-6) < 0.:

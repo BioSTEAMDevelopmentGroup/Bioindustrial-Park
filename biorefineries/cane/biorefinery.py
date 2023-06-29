@@ -187,7 +187,7 @@ def exponential_fit(x0, x1, y0, y1): # A x ^ n
     n, logA = linear_fit(x0, x1, y0, y1)
     return n, exp(logA)
 
-def exponential_val(x, nA): # b e ^ m
+def exponential_val(x, nA): # A x ^ n
     n, A = nA    
     return A * x ** n
 
@@ -195,6 +195,7 @@ def YRCP2023():
     Biorefinery.default_conversion_performance_distribution = 'longterm'
     Biorefinery.default_prices_correleted_to_crude_oil = True
     Biorefinery.default_oil_content_range = [0, 15]
+    Biorefinery.default_income_tax_range = [21, 21 + 1e-16] # Work around for constant value
     Biorefinery.default_baseline_oil_content = 1.8
     Biorefinery.default_year = 2023
     Biorefinery.default_WWT = 'high-rate'
@@ -209,6 +210,7 @@ class Biorefinery:
     default_year = 2022
     default_WWT = None
     default_oil_content_range = [5, 15]
+    default_income_tax_range = [21, 28] # Davis et al. 2018; https://www.nrel.gov/docs/fy19osti/71949.pdf
     default_baseline_oil_content = 10
     baseline_moisture_content = 0.70
     baseline_feedstock_CF = GWP_characterization_factors['sugarcane'] # [kg CO2-eq / kg sugarcane] with transportation
@@ -537,8 +539,6 @@ class Biorefinery:
             tea.operating_days = 200
             tea.IRR = 0.10
         
-        tea.income_tax = 0.21 # Davis et al. 2018; https://www.nrel.gov/docs/fy19osti/71949.pdf
-        
         ## Specifications for analysis
         self.composition_specification = composition_specification = CaneCompositionSpecification(feedstock)
         if number < 0:
@@ -852,7 +852,7 @@ class Biorefinery:
                 bst.PowerUtility.price = price
         
         # 10% is suggested for waste reducing, but 15% is suggested for investment
-        @uniform(10., 15., units='%', baseline=10)
+        @uniform(10., 15., units='%', baseline=10, element='')
         def set_IRR(IRR):
             tea.IRR = IRR / 100.
         
@@ -1081,7 +1081,9 @@ class Biorefinery:
             for ng in natural_gas_streams:
                 ng.characterization_factors[GWP] = value
         
-        @uniform(21., 28., baseline=21., name='Income tax', units='%')
+        income_tax_lb, income_tax_ub = self.default_income_tax_range
+        tea.income_tax = income_tax_lb / 100
+        @uniform(income_tax_lb, income_tax_ub, baseline=income_tax_lb, name='Income tax', units='%')
         def set_income_tax(income_tax):
             tea.income_tax = income_tax * 0.01
         
@@ -1293,9 +1295,9 @@ class Biorefinery:
             else:
                 return 0.
     
-        @metric(units='%')
-        def IRR():
-            return 100. * tea.solve_IRR()
+        # @metric(units='%')
+        # def IRR():
+        #     return 100. * tea.solve_IRR()
     
         @metric(units='USD/MT')
         def MFPP_derivative():
@@ -1413,7 +1415,7 @@ class Biorefinery:
             return tea.net_earnings, tea.TCI
         
         def competitive_biomass_yield_objective(biomass_yield, target, mb_NE, An_TCI):
-            return 100. * linear_val(biomass_yield, mb_NE) / exponential_val(biomass_yield, An_TCI) - target
+            return 100. * linear_val(biomass_yield, mb_NE) / exponential_val(max(biomass_yield, 1), An_TCI) - target
         
         @metric(name='Competitive biomass yield', element='Feedstock', units='dry MT/ha')
         def competitive_biomass_yield():
@@ -1470,8 +1472,8 @@ class Biorefinery:
             
             f = competitive_biomass_yield_objective
             args = (self.ROI_target, mb_NE, An_TCI)
-            value = flx.IQ_interpolation(
-                f, 0.1 * x0, 10 * x1, args=args, 
+            value = flx.aitken_secant(
+                f, x0, x1, args=args, 
             )
             return value
         

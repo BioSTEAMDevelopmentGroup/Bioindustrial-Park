@@ -103,11 +103,11 @@ class AeratedCoFermentation(bst.AeratedBioreactor): # For microbial oil producti
             Rxn('TAG + Water -> FFA + DAG', 'TAG', 0.02, chemicals)
         ])
         self.Q_O2_consumption = Q_O2_consumption
-        self.optimize_power = False
+        self.optimize_power = True
         self.kLa_coefficients = "Van't Riet"
     
     def _run_vent(self, vent, effluent):
-        vent.receive_vent(effluent, energy_balance=False, ideal=True)
+        vent.copy_flow(effluent, ('CO2', 'O2', 'N2'), remove=True)
     
     def _run_reactions(self, effluent):
         self.hydrolysis_reaction.force_reaction(effluent)
@@ -136,11 +136,11 @@ class AeratedFermentation(bst.AeratedBioreactor): # For microbial oil production
             Rxn('TAG + Water -> FFA + DAG', 'TAG', 0.02, chemicals)
         ])
         self.Q_O2_consumption = Q_O2_consumption
-        self.optimize_power = False
+        self.optimize_power = True
         self.kLa_coefficients = "Van't Riet"
     
     def _run_vent(self, vent, effluent):
-        vent.receive_vent(effluent, energy_balance=False, ideal=True)
+        vent.copy_flow(effluent, ('CO2', 'O2', 'N2'), remove=True)
     
     def _run_reactions(self, effluent):
         self.hydrolysis_reaction.force_reaction(effluent)
