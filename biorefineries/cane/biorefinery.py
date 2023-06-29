@@ -199,6 +199,7 @@ def YRCP2023():
     Biorefinery.default_baseline_oil_content = 1.8
     Biorefinery.default_year = 2023
     Biorefinery.default_WWT = 'high-rate'
+    Biorefinery._derivative_disabled = True
 
 class Biorefinery:
     cache = {}

@@ -504,6 +504,7 @@ def test_oilcane_O2_agile():
     assert np.allclose(units.get_cooling_duty(), 220.73238151625182, rtol=5e-2)
     assert np.allclose(units.get_electricity_consumption(), 18.39227250117013, rtol=5e-2)
     assert np.allclose(units.get_electricity_production(), 41.364516816155934, rtol=5e-2)
+    
 @default_settings
 def test_LAOs():
     from biorefineries import LAOs as module

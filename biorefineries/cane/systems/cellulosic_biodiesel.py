@@ -88,6 +88,7 @@ def create_oilcane_to_biodiesel_combined_1_and_2g_post_fermentation_oil_separati
         SeedTrain=units.SeedTrain,
         include_scrubber=False,
         fed_batch=fed_batch,
+        add_urea=False,
         udct=True,
         mockup=True
     )

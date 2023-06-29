@@ -441,6 +441,7 @@ def create_cane_to_combined_1_and_2g_fermentation(
         seed_train_reactions=None,
         fed_batch=None,
         include_scrubber=None,
+        add_urea=True,
     ):
     """
     Create a system that produces crude oil and a fermentation-derived product 
@@ -478,7 +479,7 @@ def create_cane_to_combined_1_and_2g_fermentation(
     )
     seedtrain = cfdct['R302']
     cofermentation = cfdct['R303'] # Cofermentation
-    add_urea_nutrient(cofermentation, seedtrain)
+    if add_urea: add_urea_nutrient(cofermentation, seedtrain)
     pressurefilter = cfdct['S303'] # Pressure filter
     pressurefilter.tag = "bagasse oil extraction"
     pressurefilter.isplit['Lipid'] = 1. - 0.7
