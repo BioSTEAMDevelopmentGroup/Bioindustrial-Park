@@ -100,29 +100,18 @@ evaluate_configurations_across_sorghum_and_cane_oil_content = no_derivative(
 @no_derivative
 def evaluate_metrics_at_composition(oil, fiber):
     data = np.zeros([N_metrics, 2])
-    for i, configuration in enumerate(['O2', 'O8']):
+    for i, configuration in enumerate(['O7', 'O9']):
         br = cane.Biorefinery(configuration)
         cs = br.composition_specification
         if br.ROI_target is None:
-            if configuration == 'O2':
-                S2 = cane.Biorefinery('S2')
-                S2.set_cane_oil_content.setter(0)
-                S2.sys.simulate()
-                br.ROI_target = S2.ROI()
-            else:
-                br.set_cane_oil_content.setter(0)
-                br.composition_specification.oil = -1 # Not zero so that competitive biomass metric works
-                br.sys.simulate()
-                br.ROI_target = br.ROI()
-        water = 0.65
-        if oil == 0 and configuration == 'O2':
-            data[:, i] = [np.nan for i in br.model.metrics]
-            continue
+            br.set_composition_by_line('WT')
+            br.sys.simulate()
+            br.ROI_target = br.ROI()
         try:
-            cane.load_composition(br.feedstock, oil, water, fiber, cs.FFA, cs.PL)
+            cane.load_composition(br.feedstock, oil, cs.moisture, fiber, cs.FFA, cs.PL)
         except ValueError as e:
             print(e)
-            print(f'oil={oil}, water={water}, fiber={fiber}, FFA={cs.FFA}, PL={cs.PL}')
+            print(f'oil={oil}, water={cs.water}, fiber={fiber}, FFA={cs.FFA}, PL={cs.PL}')
             data[:, i] = [np.nan for i in br.model.metrics]
             continue
         br.sys.simulate()
@@ -264,7 +253,7 @@ def run_uncertainty_and_sensitivity(name, N, rule='L',
             # Replace `set_cane_oil_content` parameter with `set_ROI_target`.
             # The actual distribution does not matter because these values are updated
             # on the first coordinate when the oil content is 0 (i.e., when the feedstock is sugarcane).
-            if any([i in name for i in ('5', '6', '7', '8')]):
+            if any([i in name for i in ('5', '6', '7', '8', '9')]):
                 br_sugarcane = None
                 br.model.metrics = [br.ROI, br.competitive_biomass_yield, br.net_energy_production]
             else:
@@ -425,12 +414,12 @@ def run_sugarcane_microbial_oil_and_ethanol(N=None):
     run_uncertainty_and_sensitivity('S1', N, line='WT')
     run_uncertainty_and_sensitivity('O7', N, line='WT')
     run_uncertainty_and_sensitivity('S2', N, line='WT')
-    run_uncertainty_and_sensitivity('O8', N, line='WT')
+    # run_uncertainty_and_sensitivity('O8', N, line='WT')
     run_uncertainty_and_sensitivity('O9', N, line='WT')
     run_uncertainty_and_sensitivity('O1', N)
     run_uncertainty_and_sensitivity('O7', N)
     run_uncertainty_and_sensitivity('O2', N)
-    run_uncertainty_and_sensitivity('O8', N)
+    # run_uncertainty_and_sensitivity('O8', N)
     run_uncertainty_and_sensitivity('O9', N)
     
 def run_oilcane_microbial_oil_and_ethanol_across_oil_content(N=None):
@@ -438,17 +427,17 @@ def run_oilcane_microbial_oil_and_ethanol_across_oil_content(N=None):
     filterwarnings('ignore')
     cane.YRCP2023()
     run_uncertainty_and_sensitivity('O7', N, across_oil_content='oilcane vs sugarcane')
-    run_uncertainty_and_sensitivity('O8', N, across_oil_content='oilcane vs sugarcane')
+    # run_uncertainty_and_sensitivity('O8', N, across_oil_content='oilcane vs sugarcane')
     run_uncertainty_and_sensitivity('O9', N, across_oil_content='oilcane vs sugarcane')
-    run_uncertainty_and_sensitivity('O1', N, across_oil_content='oilcane vs sugarcane')
-    run_uncertainty_and_sensitivity('O2', N, across_oil_content='oilcane vs sugarcane')        
+    # run_uncertainty_and_sensitivity('O1', N, across_oil_content='oilcane vs sugarcane')
+    # run_uncertainty_and_sensitivity('O2', N, across_oil_content='oilcane vs sugarcane')        
     
 def run_oilcane_microbial_oil_and_ethanol_across_lines(N=None):
     if N is None: N = 50
     filterwarnings('ignore')
     cane.YRCP2023()
     run_uncertainty_and_sensitivity('O7', N, across_lines=True)
-    run_uncertainty_and_sensitivity('O8', N, across_lines=True)
+    # run_uncertainty_and_sensitivity('O8', N, across_lines=True)
     run_uncertainty_and_sensitivity('O9', N, across_lines=True)
-    run_uncertainty_and_sensitivity('O1', N, across_lines=True)
-    run_uncertainty_and_sensitivity('O2', N, across_lines=True)        
+    # run_uncertainty_and_sensitivity('O1', N, across_lines=True)
+    # run_uncertainty_and_sensitivity('O2', N, across_lines=True)        

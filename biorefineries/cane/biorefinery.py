@@ -15,6 +15,7 @@ import thermosteam as tmo
 from biorefineries.cane.composition import (
     set_lipid_fraction as set_oil_fraction,
     set_line_composition_parameters,
+    set_composition_by_line,
 )
 from biosteam import main_flowsheet, UnitGroup
 from chaospy import distributions as shape
@@ -194,8 +195,8 @@ def exponential_val(x, nA): # A x ^ n
 def YRCP2023():
     Biorefinery.default_conversion_performance_distribution = 'longterm'
     Biorefinery.default_prices_correleted_to_crude_oil = True
-    Biorefinery.default_oil_content_range = [0, 15]
-    Biorefinery.default_income_tax_range = [21, 21 + 1e-16] # Work around for constant value
+    Biorefinery.default_oil_content_range = [0, 5]
+    Biorefinery.default_income_tax_range = [21, 21 + 1e-6] # Work around for constant value
     Biorefinery.default_baseline_oil_content = 1.8
     Biorefinery.default_year = 2023
     Biorefinery.default_WWT = 'high-rate'
@@ -206,6 +207,7 @@ class Biorefinery:
     baseline_dry_biomass_yield = 25.62 # dry MT / ha / yr
     baseline_available_land = 1600000 * 0.3 / baseline_dry_biomass_yield # ha
     set_feedstock_line = set_line_composition_parameters
+    set_composition_by_line = set_composition_by_line
     default_prices_correleted_to_crude_oil = False
     default_conversion_performance_distribution = 'longterm'
     default_year = 2022
@@ -424,8 +426,19 @@ class Biorefinery:
                     recycle_data[key] = material_data = cane_sys.get_material_data()
                 try:
                     cane_sys.simulate(material_data=material_data, update_material_data=True)
-                except:
-                    cane_sys.simulate()
+                except Exception as e:
+                    print(e)
+                    try:
+                        cane_sys.simulate()
+                    except Exception as e:
+                        print(e)
+                        breakpoint()
+                        try:
+                            cane_sys.empty_recycles()
+                            cane_sys.simulate()
+                        except Exception as e:
+                            print(e)
+                            breakpoint()
                 excess = BT._excess_electricity_without_natural_gas
                 if fraction_burned == minimum_fraction_burned and excess > 0:
                     splitter.neglect_natural_gas_streams = False # No need to neglect
@@ -1202,7 +1215,7 @@ class Biorefinery:
         def heat_exchanger_network_error():
             return HXN.energy_balance_percent_error if HXN else 0.
     
-        @metric(name='GWP', element='Economic allocation', units='kg*CO2*eq / USD')
+        @metric(name='GWP', element='Economic allocation', units='kg*CO2e / USD')
         def GWP_economic(): # Cradle to gate
             GWP_material = sys.get_total_feeds_impact(GWP) # kg CO2 eq. / yr
             GWP_emissions = sys.get_process_impact(GWP) # kg CO2 eq. / yr
@@ -1214,30 +1227,30 @@ class Biorefinery:
             )
             return (GWP_material + GWP_emissions) / sales
     
-        @metric(name='Ethanol GWP', element='Economic allocation', units='kg*CO2*eq / L')
+        @metric(name='Ethanol GWP', element='Economic allocation', units='kg*CO2e / L')
         def GWP_ethanol(): # Cradle to gate
             return GWP_economic.get() * get_GWP_mean_ethanol_price()
         
-        @metric(name='Biodiesel GWP', element='Economic allocation', units='kg*CO2*eq / L')
+        @metric(name='Biodiesel GWP', element='Economic allocation', units='kg*CO2e / L')
         def GWP_biodiesel(): # Cradle to gate
             if number > 0:
                 return GWP_economic.get() * get_GWP_mean_biodiesel_price()
             else:
                 return 0.
         
-        @metric(name='Crude glycerol GWP', element='Economic allocation', units='kg*CO2*eq / kg')
+        @metric(name='Crude glycerol GWP', element='Economic allocation', units='kg*CO2e / kg')
         def GWP_crude_glycerol(): # Cradle to gate
             if number in biodiesel_configurations:
                 return GWP_economic.get() * dist.mean_glycerol_price
             else:
                 return 0.
         
-        @metric(name='Electricity GWP', element='Economic allocation', units='kg*CO2*eq / MWhr')
+        @metric(name='Electricity GWP', element='Economic allocation', units='kg*CO2e / MWhr')
         def GWP_electricity(): # Cradle to gate
             if electricity_production.get():
                 return GWP_economic.get() * dist.mean_electricity_price * 1000.
     
-        @metric(name='Ethanol GWP', element='Displacement allocation', units='kg*CO2*eq / L')
+        @metric(name='Ethanol GWP', element='Displacement allocation', units='kg*CO2e / L')
         def GWP_ethanol_displacement(): # Cradle to gate
             if number in ethanol_configurations:
                 GWP_material = sys.get_total_feeds_impact(GWP)
@@ -1249,7 +1262,7 @@ class Biorefinery:
             else:
                 return 0.
         
-        @metric(name='Biodiesel GWP', element='Displacement allocation', units='kg*CO2*eq / L')
+        @metric(name='Biodiesel GWP', element='Displacement allocation', units='kg*CO2e / L')
         def GWP_biodiesel_displacement(): # Cradle to gate
             if number in biodiesel_configurations:
                 GWP_material = sys.get_total_feeds_impact(GWP)
@@ -1267,7 +1280,7 @@ class Biorefinery:
         # ethanol = tmo.Chemical('Ethanol')
         # glycerol_GGE = 0.80 * (glycerol.LHV / glycerol.MW) / 121300 # 0.1059 GGE / kg crude-glycerol
         
-        @metric(name='Biofuel GWP', element='Energy allocation', units='kg*CO2*eq / GGE')
+        @metric(name='Biofuel GWP', element='Energy allocation', units='kg*CO2e / GGE')
         def GWP_biofuel_allocation(): # Cradle to gate
             GWP_material = sys.get_total_feeds_impact(GWP)
             GWP_emissions = sys.get_process_impact(GWP) # kg CO2 eq. / yr
@@ -1278,18 +1291,18 @@ class Biorefinery:
             GEE_crude_glycerol = crude_glycerol_flow() * 0.1059
             return GWP_total / (GGE_biodiesel_annual + GGE_ethanol_annual + GEE_electricity_production + GEE_crude_glycerol)
         
-        @metric(name='Ethanol GWP', element='Energy allocation', units='kg*CO2*eq / L')
+        @metric(name='Ethanol GWP', element='Energy allocation', units='kg*CO2e / L')
         def GWP_ethanol_allocation(): # Cradle to gate
             return GWP_biofuel_allocation.get() / 1.5 / L_per_gal
         
-        @metric(name='Biodiesel GWP', element='Energy allocation', units='kg*CO2*eq / L')
+        @metric(name='Biodiesel GWP', element='Energy allocation', units='kg*CO2e / L')
         def GWP_biodiesel_allocation(): # Cradle to gate
             if number > 0:
                 return GWP_biofuel_allocation.get() / 0.9536 / L_per_gal
             else:
                 return 0.
         
-        @metric(name='Crude-glycerol GWP', element='Energy allocation', units='kg*CO2*eq / kg')
+        @metric(name='Crude-glycerol GWP', element='Energy allocation', units='kg*CO2e / kg')
         def GWP_crude_glycerol_allocation(): # Cradle to gate
             if number > 0:
                 return GWP_biofuel_allocation.get() * 0.1059
@@ -1344,31 +1357,31 @@ class Biorefinery:
             if self._derivative_disabled: return np.nan
             return TCI.difference()
         
-        @metric(name='GWP derivative', element='Economic allocation', units='kg*CO2*eq / USD')
+        @metric(name='GWP derivative', element='Economic allocation', units='kg*CO2e / USD')
         def GWP_economic_derivative(): # Cradle to gate
             if number < 0: return 0.
             if self._derivative_disabled: return 0.
             return GWP_economic.difference()
     
-        @metric(name='GWP derivative', element='Ethanol', units='kg*CO2*eq / L')
+        @metric(name='GWP derivative', element='Ethanol', units='kg*CO2e / L')
         def GWP_ethanol_derivative(): # Cradle to gate
             return GWP_economic_derivative.get() * get_GWP_mean_ethanol_price()
         
-        @metric(name='GWP derivative', element='Biodiesel', units='kg*CO2*eq / L')
+        @metric(name='GWP derivative', element='Biodiesel', units='kg*CO2e / L')
         def GWP_biodiesel_derivative(): # Cradle to gate
             if number > 0:
                 return GWP_economic_derivative.get() * get_GWP_mean_biodiesel_price()
             else:
                 return 0.
         
-        @metric(name='GWP derivative', element='Crude glycerol', units='kg*CO2*eq / kg')
+        @metric(name='GWP derivative', element='Crude glycerol', units='kg*CO2e / kg')
         def GWP_crude_glycerol_derivative(): # Cradle to gate
             if number > 0:
                 return GWP_economic_derivative.get() * dist.mean_glycerol_price
             else:
                 return 0.
         
-        @metric(name='GWP derivative', element='Electricity', units='kg*CO2*eq / MWhr')
+        @metric(name='GWP derivative', element='Electricity', units='kg*CO2e / MWhr')
         def GWP_electricity_derivative(): # Cradle to gate
             if electricity_production.get():
                 return GWP_economic_derivative.get() * dist.mean_electricity_price * 1000.

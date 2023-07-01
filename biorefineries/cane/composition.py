@@ -28,6 +28,7 @@ __all__ = (
     'set_composition',
     'get_composition',
     'CaneCompositionSpecification',
+    'set_composition_by_line',
     'set_composition_parameters',
     'set_line_composition_parameters',
     'load_composition',
@@ -339,6 +340,22 @@ def bounded_gaussian_distribution_from_mean_and_std(mean, std):
     trunc = cp.Trunc(normal, lower=mean - 2 * std, upper=mean + 2 * std)
     return trunc
 
+def set_composition_by_line(biorefinery, line):
+    df = get_composition_data()
+    biorefinery.feedstock_line = str(line)
+    line = df.loc[line]
+    oil = line['Stem oil (dw)']
+    water = line['Water (wt)']
+    sugar = line['Sugar (dw)']
+    biomass = line['Biomass yield (dry MT/ha)']
+    cs = biorefinery.composition_specification
+    cs.oil = oil['Mean']
+    cs.moisture = water['Mean']
+    cs.fiber = (1. - cs.oil - sugar['Mean'] - 0.07) # Ash/solids is 7 wt. %
+    cs.load_composition()
+    biorefinery.dry_biomass_yield = biomass['Mean']
+    biorefinery.update_feedstock()
+
 def set_line_composition_parameters(biorefinery, line):
     df = get_composition_data()
     biorefinery.feedstock_line = str(line)
@@ -394,7 +411,7 @@ def set_composition_parameters(
             mean_biomass_yield,
             std_biomass_yield,
         )
-
+        
 def _add_model_composition_parameters_for_cane_line(
         biorefinery,
         mean_oil_content,

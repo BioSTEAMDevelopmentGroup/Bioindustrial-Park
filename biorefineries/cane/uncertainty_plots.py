@@ -4,6 +4,7 @@ Created on Fri Nov  5 01:34:00 2021
 
 @author: yrc2
 """
+from typing import NamedTuple
 import biosteam as bst
 from biosteam.utils import CABBI_colors, GG_colors, colors
 from thermosteam.utils import set_figure_size, set_font, roundsigfigs
@@ -15,6 +16,7 @@ from warnings import warn
 import numpy as np
 import pandas as pd
 from biorefineries import cane
+import matplotlib.patches as patch
 import flexsolve as flx
 from . import feature_mockups as features
 from .feature_mockups import (
@@ -22,7 +24,7 @@ from .feature_mockups import (
     tea_monte_carlo_derivative_metric_mockups,
     lca_monte_carlo_metric_mockups, 
     lca_monte_carlo_derivative_metric_mockups,
-    ROI, MFPP, TCI, electricity_production, GWP_biofuel_allocation,
+    ROI, MFPP, MBSP, TCI, electricity_production, GWP_biofuel_allocation,
     # natural_gas_consumption,
     ethanol_production, biodiesel_production, biodiesel_yield,
     GWP_ethanol, GWP_biodiesel, GWP_electricity,
@@ -43,8 +45,9 @@ from .results import (
     spearman_file,
 )
 import os
-from colorpalette import ColorWheel
+from colorpalette import ColorWheel, Color
 from.parse_configuration import format_name
+from scipy import interpolate
 
 __all__ = (
     'plot_all',
@@ -126,9 +129,9 @@ area_hatches = {
 }
 line_color_wheel = ColorWheel([
     GG_colors.orange,
+    GG_colors.blue,
     GG_colors.purple,
     GG_colors.green,
-    GG_colors.blue,
     GG_colors.yellow,
     colors.CABBI_teal,
     colors.CABBI_grey,
@@ -164,6 +167,7 @@ mc_line_metric_settings = {
     'Biodiesel yield': (biodiesel_yield, f"Biodiesel yield\n[{format_units('L/ha')}]"),
     'GWP biodiesel': (GWP_biodiesel, f"GWP Biodiesel [{GWP_units_L}]"),
     'GWP biofuel': (GWP_biofuel_allocation, f"GWP [{GWP_units_GGE}]"),
+    'MBSP': (MBSP, f"MBSP [{format_units('USD/gal')}]"),
     'ROI': (ROI, "ROI [%]"),
 }
 
@@ -191,6 +195,13 @@ mc_derivative_metric_settings = {
 kde_metric_settings = {j[0]: j for j in mc_metric_settings.values()}
 kde_comparison_settings = {j[0]: j for j in mc_comparison_settings.values()}
 kde_derivative_settings = {j[0]: j for j in mc_derivative_metric_settings.values()}
+
+# %% Helpful classes
+
+class Point(NamedTuple):
+    x: float
+    y: float
+    c: np.array
 
 # %% Plots for publication
 
@@ -1118,58 +1129,135 @@ def plot_competitive_biomass_yield_across_oil_content(
     set_font(size=fs)
     bioethanol_ax, microbial_oil_ax = axes.flatten()
     plt.sca(bioethanol_ax)
-    _plot_competitive_biomass_yield_across_oil_content('O2')
+    xs, ys = _plot_competitive_biomass_yield_across_oil_content('O7')
+    plt.xlim([0, 10])
+    plt.ylim([0, 40])
     bst.plots.style_axis(
         xticklabels=False,
         ytick0=False,
         ytickf=True,
     )
     plt.text(
-        8.5, 43.5, '(A) Bioethanol', weight='bold',
-        ha='center', va='center', fontsize=12,
+        10 - 0.25, 35, '(A) Direct Cogeneration', weight='bold',
+        ha='right', va='center', fontsize=12,
         c=colors.neutral.shade(50).RGBn,
     )
-    _add_lines_biomass_yield_vs_oil_content()
+    f50 = interpolate.interp1d(xs, ys)
+    _add_lines_biomass_yield_vs_oil_content(f50)
     plt.sca(microbial_oil_ax)
-    _plot_competitive_biomass_yield_across_oil_content('O8')
+    xs, ys = _plot_competitive_biomass_yield_across_oil_content('O9')
+    plt.xlim([0, 10])
+    plt.ylim([0, 40])
     plt.xlabel('Oil content [dry wt. %]')
     bst.plots.style_axis(
         ytick0=False,
         ytickf=True,
     )
     plt.text(
-        8.5, 43.5, '(B) Microbial oil', weight='bold', 
-        ha='center', va='center', fontsize=12,
+        10 - 0.25, 35, '(B) Integrated CoFermentation', weight='bold', 
+        ha='right', va='center', fontsize=12,
         c=colors.neutral.shade(50).RGBn,
     )
-    _add_lines_biomass_yield_vs_oil_content()
+    f50 = interpolate.interp1d(xs, ys)
+    _add_lines_biomass_yield_vs_oil_content(f50)
     plt.subplots_adjust(hspace=0.05, left=0.1, right=0.96, bottom=0.10, top=0.95)
     for i in ('svg', 'png'):
         file = os.path.join(images_folder, f'competitive_biomass_yield_MCAC.{i}')
         plt.savefig(file, transparent=True)
 
-def _add_lines_biomass_yield_vs_oil_content():
+def _add_lines_biomass_yield_vs_oil_content(f50):
     df = cane.get_composition_data()
-    txtbox = dict(boxstyle='round', facecolor=colors.neutral.shade(20).RGBn, 
-                  edgecolor='None', alpha=0.9, pad=0.2)
+    points = {i: None for i in ('WT', '1566', '1580')}
     for name, color in zip(df.index, line_color_wheel):
         line = df.loc[name]
+        name = str(name)
+        if name not in points: continue
         oil = line['Stem oil (dw)']['Mean'] * 100
         biomass = line['Biomass yield (dry MT/ha)']['Mean']
-        # breakpoint()
+        points[name] = Point(oil, biomass, color.shade(50).RGBn)
         bst.plots.plot_scatter_points(
-            [oil], [biomass], marker='X', s=100, color=color.RGBn,
-            edgecolor=edgecolor, clip_on=False, zorder=3
+            [oil], [biomass], marker='o', s=20, color=color.RGBn,
+            edgecolor=edgecolor, clip_on=False, zorder=3,
+            linewidth=0.6,
         )
-        if name == '316':
-            oil += 0.3
-        if name == '19B':
-            oil -= 0.3
-            biomass += 0.3
-        plt.text(
-            oil + 0.2, biomass + 2, name, weight='bold', c=color.RGBn,
-            bbox=txtbox,
-        )
+    arrow = r'$\rightarrow$'
+    name = 'WT'
+    pnt = points[name]
+    y_target = f50(pnt.x)
+    dy2target = y_target - pnt.y
+    x_units = f"dry {format_units('wt')} % oil"
+    y_units = f"dry {format_units('MT/ha')}"
+    text = (
+        f"Line: {name}, {pnt.x:.1g} {x_units}\n"
+        f"Yield: {pnt.y:.1f} {y_units}"
+    )
+    bst.plots.annotate_point(
+        text, pnt.x, pnt.y, horizontalalignment='left', 
+        textcolor=pnt.c, linecolor=pnt.c,
+        dx=0.2, dy=4, dx_text=-0.1, dy_text=0, fontsize=8,
+    )
+    
+    name = '1566'
+    pnt = points[name]
+    y_target = f50(pnt.x)
+    dy2target = y_target - pnt.y
+    ax = plt.gca()
+    ax.annotate('',
+        xy=(pnt.x, y_target + 0.25), 
+        xytext=(pnt.x, pnt.y),
+        arrowprops=dict(arrowstyle="->", color=pnt.c),
+    )
+    
+    text = (
+        f"Line: {name}, {pnt.x:.1g} {x_units}\n"
+        f"Yield: {pnt.y:.1f} {arrow} {y_target:.1f} {y_units}\n"
+    )
+    
+    f"{dy2target:.0f} dry-{format_units('MT/ha')} to target"
+    bst.plots.annotate_point(
+        text, pnt.x, pnt.y, horizontalalignment='left', verticalalignment='center',
+        textcolor=pnt.c, linecolor=pnt.c,
+        dx=1.1, dy=8.5, dx_text=0.1, dy_text=0, fontsize=8,
+    )
+    
+    name = '1580'
+    pnt = points[name]
+    y_target = f50(pnt.x)
+    dy2target = y_target - pnt.y
+    ax = plt.gca()
+    ax.annotate('',
+        xy=(pnt.x, y_target + 0.25), 
+        xytext=(pnt.x, pnt.y),
+        arrowprops=dict(arrowstyle="->", color=pnt.c),
+    )
+    
+    text = (
+        f"Line: {name}, {pnt.x:.1g} {x_units}\n"
+        f"Yield: {pnt.y:.1f} {arrow} {y_target:.1f} {y_units}"
+    )
+    
+    f"{dy2target:.0f} dry-{format_units('MT/ha')} to target"
+    bst.plots.annotate_point(
+        text, pnt.x, pnt.y, horizontalalignment='left',
+        verticalalignment='center',
+        textcolor=pnt.c, linecolor=pnt.c,
+        dx=0.5, dy=0, dx_text=0.1, dy_text=0, fontsize=8,
+    )
+    
+    
+    # WT = points['WT']
+    # y_target = f50(WT.x)
+    
+    # text = (
+    #     f"WT: {WT.x:.1g} dry wt % Oil\n"
+    # )
+    # dy2target = y_target - WT.y
+    # f"{dy2target:.0f} dry-{format_units('MT/ha')} to target"
+    # bst.plots.annotate_point(
+    #     text, WT.x, WT.y, horizontalalignment='left', 
+    #     textcolor=WT.c.shade(50).RGBn, linecolor=edgecolor,
+    #     dx=0.5, dy=6, dx_text=-0.1, dy_text=1, fontsize=10,
+    # )
 
 def _plot_competitive_biomass_yield_across_oil_content(
         configuration=None,
@@ -1208,12 +1296,11 @@ def _plot_competitive_biomass_yield_across_oil_content(
         )
     else:
         biomass_yield_p50 = bst.plots.plot_montecarlo_across_coordinate(oil_content, df)[2]
-    plt.xlim([0, 10])
-    plt.ylim([0, 50])
     bst.plots.annotate_line(
-        'Financially\ncompetitive\ntargets', 6, oil_content, biomass_yield_p50,
-        dy=6, dy_text=0.8, position='over'
+        'Financially\ncompetitive\ntargets', 8, oil_content, biomass_yield_p50,
+        dy=4.5, dy_text=0.5, fontsize=10, linecolor=edgecolor,
     )
+    return (oil_content, biomass_yield_p50)
 
 def plot_competitive_microbial_oil_yield_across_oil_content(
         configuration=None,
