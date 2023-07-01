@@ -32,7 +32,7 @@ def ascomparison(x):
 class Configuration(NamedTuple):
     number: int
     agile: bool = False
-    energycane: bool = False
+    line: str = None
    
 class ConfigurationComparison(NamedTuple):
     a: Configuration
@@ -40,7 +40,11 @@ class ConfigurationComparison(NamedTuple):
 
 def name_to_configuration(name):
     name = name.replace(' ', '')
-    return Configuration((-1 if name.startswith('S') else 1) * int(name[1:].strip('*+')), '*' in name, '+' in name)
+    if ',' in name:
+        name, line = name.split(',')
+    else:
+        line = None
+    return Configuration((-1 if name.startswith('S') else 1) * int(name[1:].strip('*')), '*' in name, line or None)
 
 def parse_configuration(x):
     if isinstance(x, int):

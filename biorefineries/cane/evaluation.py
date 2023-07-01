@@ -178,27 +178,26 @@ def run_uncertainty_and_sensitivity(name, N, rule='L',
                                     autosave=True,
                                     autoload=True,
                                     optimize=True,
-                                    line=None,
                                     **kwargs):
     print(f"Running {name}!")
     filterwarnings('ignore', category=bst.exceptions.DesignWarning)
     filterwarnings('ignore', category=bst.exceptions.CostWarning)
     br = cane.Biorefinery(name, **kwargs)
     br.model.retry_evaluation = True
-    file = monte_carlo_file(name, across_lines, across_oil_content, line)
+    file = monte_carlo_file(name, across_lines, across_oil_content)
     N_notify = min(int(N/10), 20)
     autosave = N_notify if autosave else False
     if across_lines:
         df = cane.get_composition_data()
-        current_line = [line]
+        current_line = [None]
         if name == 'O2': 
             sugarcane_name = name.replace('O2', 'S2')
         else:
             sugarcane_name = name
-        br_sugarcane = cane.Biorefinery(sugarcane_name, **kwargs, feedstock_line=line)
+        br_sugarcane = cane.Biorefinery(f'{sugarcane_name},WT', **kwargs)
         def set_line(line, current_line=current_line):
             if name in ('O1', 'O2'): 
-                config = br_sugarcane if line in ('WT', 'EC') else br
+                config = br_sugarcane if line == 'WT' else br
             else:
                 config = br
             config.set_feedstock_line(line)
@@ -210,7 +209,7 @@ def run_uncertainty_and_sensitivity(name, N, rule='L',
         def evaluate(current_line=current_line, **kwargs):
             line = current_line[0]
             if name in ('O1', 'O2'): 
-                config = br_sugarcane if line in ('WT', 'EC') else br
+                config = br_sugarcane if line == 'WT' else br
             else:
                 config = br
             autoload_file = autoload_file_name(f"{name}_{config.feedstock_line}")
@@ -363,7 +362,7 @@ def run_uncertainty_and_sensitivity(name, N, rule='L',
             xlfile=file,
         )
     else:
-        autoload_file = autoload_file_name(name, line)
+        autoload_file = autoload_file_name(name)
         np.random.seed(1)
         samples = br.model.sample(N, rule)
         br.model.load_samples(samples, optimize=optimize)
@@ -393,7 +392,7 @@ def run_uncertainty_and_sensitivity(name, N, rule='L',
             if i.index not in br.model.table: br.model._metrics.remove(i)
         br.model.table = br.model.table.dropna(how='any', axis=0)
         rho, p = br.model.spearman_r(filter='omit nan')
-        file = spearman_file(name, line)
+        file = spearman_file(name)
         rho.to_excel(file)
 
 run = run_uncertainty_and_sensitivity
@@ -411,24 +410,24 @@ def run_sugarcane_microbial_oil_and_ethanol(N=None):
     if N is None: N = 50
     filterwarnings('ignore')
     cane.YRCP2023()
-    run_uncertainty_and_sensitivity('S1', N, line='WT')
-    run_uncertainty_and_sensitivity('O7', N, line='WT')
-    run_uncertainty_and_sensitivity('S2', N, line='WT')
-    # run_uncertainty_and_sensitivity('O8', N, line='WT')
-    run_uncertainty_and_sensitivity('O9', N, line='WT')
+    run_uncertainty_and_sensitivity('S1,WT', N)
+    run_uncertainty_and_sensitivity('S2,WT', N)
+    run_uncertainty_and_sensitivity('O7,WT', N)
+    run_uncertainty_and_sensitivity('O9,WT', N)
     run_uncertainty_and_sensitivity('O1', N)
-    run_uncertainty_and_sensitivity('O7', N)
     run_uncertainty_and_sensitivity('O2', N)
-    # run_uncertainty_and_sensitivity('O8', N)
+    run_uncertainty_and_sensitivity('O7', N)
     run_uncertainty_and_sensitivity('O9', N)
+    # run_uncertainty_and_sensitivity('O8', N, line='WT')
+    # run_uncertainty_and_sensitivity('O8', N)
     
 def run_oilcane_microbial_oil_and_ethanol_across_oil_content(N=None):
     if N is None: N = 20
     filterwarnings('ignore')
     cane.YRCP2023()
     run_uncertainty_and_sensitivity('O7', N, across_oil_content='oilcane vs sugarcane')
-    # run_uncertainty_and_sensitivity('O8', N, across_oil_content='oilcane vs sugarcane')
     run_uncertainty_and_sensitivity('O9', N, across_oil_content='oilcane vs sugarcane')
+    # run_uncertainty_and_sensitivity('O8', N, across_oil_content='oilcane vs sugarcane')
     # run_uncertainty_and_sensitivity('O1', N, across_oil_content='oilcane vs sugarcane')
     # run_uncertainty_and_sensitivity('O2', N, across_oil_content='oilcane vs sugarcane')        
     
@@ -437,7 +436,7 @@ def run_oilcane_microbial_oil_and_ethanol_across_lines(N=None):
     filterwarnings('ignore')
     cane.YRCP2023()
     run_uncertainty_and_sensitivity('O7', N, across_lines=True)
-    # run_uncertainty_and_sensitivity('O8', N, across_lines=True)
     run_uncertainty_and_sensitivity('O9', N, across_lines=True)
+    # run_uncertainty_and_sensitivity('O8', N, across_lines=True)
     # run_uncertainty_and_sensitivity('O1', N, across_lines=True)
     # run_uncertainty_and_sensitivity('O2', N, across_lines=True)        

@@ -36,21 +36,19 @@ images_folder = os.path.join(os.path.dirname(__file__), 'images')
 
 # %% Load simulation data
 
-def spearman_file(name, line=None):
-    number, agile, energy_cane = parse_configuration(name)
+def spearman_file(name):
+    number, agile, line = parse_configuration(name)
     filename = f'oilcane_spearman_{number}'
     if agile: filename += '_agile'
     if line: filename += '_' + line
-    if energy_cane: filename += '_energy_cane'
     filename += '.xlsx'
     return os.path.join(results_folder, filename)
 
-def monte_carlo_file(name, across_lines=False, across_oil_content=None, line=None, extention='xlsx'):
-    number, agile, energycane = parse_configuration(name)
+def monte_carlo_file(name, across_lines=False, across_oil_content=None, extention='xlsx'):
+    number, agile, line = parse_configuration(name)
     filename = f'oilcane_monte_carlo_{number}'
     if agile: filename += '_agile'
     if line: filename += '_' + line
-    if energycane: filename += '_energycane'
     if across_lines: filename += '_across_lines'
     if across_oil_content: 
         if isinstance(across_oil_content, str):
@@ -60,7 +58,11 @@ def monte_carlo_file(name, across_lines=False, across_oil_content=None, line=Non
     filename += '.' + extention
     return os.path.join(results_folder, filename)
 
-def autoload_file_name(name, line=None):
+def autoload_file_name(name):
+    if ',' in name:
+        name, line = name.split(',')
+    else:
+        line = None
     filename = str(name).replace('*', '_agile')
     if line: filename += '_' + line
     return os.path.join(results_folder, filename)
@@ -108,13 +110,13 @@ def get_line_monte_carlo(line, name, feature, cache={}):
     mc = mc.dropna(how='all', axis=0)
     return mc
 
-def get_monte_carlo(name, features=None, line=None, cache={}):
+def get_monte_carlo(name, features=None, cache={}):
     key = parse_configuration(name)
     if isinstance(key, Configuration):
         if key in cache:
             df = cache[key]
         else:
-            file = monte_carlo_file(key, line=line)
+            file = monte_carlo_file(key)
             cache[key] = df = pd.read_excel(file, header=[0, 1], index_col=[0])
         if features is None:
             mc = df
@@ -123,22 +125,14 @@ def get_monte_carlo(name, features=None, line=None, cache={}):
         else:
             mc = df[[i.index for i in features]]
     elif isinstance(key, ConfigurationComparison):
-        if features is None:
-            features = (
-                *f.tea_monte_carlo_metric_mockups, 
-                *f.tea_monte_carlo_derivative_metric_mockups,
-                *f.lca_monte_carlo_metric_mockups, 
-                *f.lca_monte_carlo_derivative_metric_mockups,
-                f.net_energy_production,
-                f.GWP_ethanol_displacement,
-                f.GWP_ethanol_allocation,
-            )
         if isinstance(features, bst.Feature):
             index = features.index
+        elif features is None:
+            index = slice(None)
         else:
             index = [i.index for i in features]
-        df_a = get_monte_carlo(key.a, line=line)[index]
-        df_b = get_monte_carlo(key.b, line=line)[index]
+        df_a = get_monte_carlo(key.a)[index]
+        df_b = get_monte_carlo(key.b)[index]
         row_a = df_a.shape[0]
         row_b = df_b.shape[0]
         try:
@@ -264,7 +258,7 @@ def montecarlo_results_short(names, metrics=None, derivative=None):
             metrics = [
                 f.MFPP, f.TCI, f.ethanol_production, f.biodiesel_production, 
                 f.electricity_production, f.natural_gas_consumption, f.GWP_ethanol_displacement, 
-                f.GWP_ethanol, f.GWP_ethanol, f.GWP_biodiesel, 
+                f.GWP_ethanol, f.GWP_ethanol, f.GWP_biodiesel, f.GWP_biofuel_allocation, f.MBSP,
                 f.net_energy_production,
             ]
     results = {}

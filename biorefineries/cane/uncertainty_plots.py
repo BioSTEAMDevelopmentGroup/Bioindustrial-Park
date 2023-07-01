@@ -73,6 +73,7 @@ __all__ = (
     'plot_configuration_comparison_kde',
     'plot_open_comparison_kde',
     'plot_feedstock_comparison_kde',
+    'plot_feedstock_comparison_kde_2023',
     'plot_crude_configuration_comparison_kde',
     'plot_agile_comparison_kde',
     'plot_separated_configuration_comparison_kde',
@@ -81,6 +82,7 @@ __all__ = (
     'plot_competitive_microbial_oil_yield_across_oil_content',
     'plot_microbial_oil_bioethanol_oilcane_comparison_kde',
     'plot_microbial_oil_bioethanol_sugarcane_comparison_kde',
+    'plot_microbial_oil_feedstock_comparison_kde',
     'area_colors',
     'area_hatches',
 )
@@ -176,6 +178,7 @@ mc_comparison_settings = {
     'TCI': (TCI, r"$\Delta$" + f"TCI\n[{format_units('10^6*USD')}]", None),
     'production': (production, r"$\Delta$" + f"Production\n[{format_units('L/MT')}]", None),
     'electricity_production': (electricity_production, r"$\Delta$" + f"Elec. prod.\n[{format_units('kWhr/MT')}]", None),
+    'GWP biofuel': (GWP_biofuel_allocation, r"$\Delta$" +  f"GWP [{GWP_units_GGE}]", None),
     # 'natural_gas_consumption': (natural_gas_consumption, r"$\Delta$" + f"NG cons.\n[{format_units('m^3/MT')}]", None),
     'GWP_ethanol_displacement': (GWP_ethanol_displacement, r"$\Delta$" + "GWP$_{\\mathrm{displacement}}$" f"\n[{GWP_units_L}]", None),
     'GWP_economic': (GWP_ethanol, r"$\Delta$" + "GWP$_{\\mathrm{economic}}$" f"\n[{GWP_units_L}]", None),
@@ -251,7 +254,7 @@ def plot_montecarlo_feedstock_comparison(axes_box=None, letters=None,
         ylb, yub = plt.ylim()
         plt.text(1.65, ylb + (yub - ylb) * 0.90, letter, color=letter_color,
                  horizontalalignment='center',verticalalignment='center',
-                 fontsize=12, fontweight='bold')
+                 fontsize=10, fontweight='bold')
         # if axes_box is None and letter in 'DH':
         #     x = 0.5
         #     plt.text(x, ylb - (yub - ylb) * 0.3, 
@@ -309,7 +312,7 @@ def plot_montecarlo_configuration_comparison(axes_box=None, letters=None,
         ylb, yub = plt.ylim()
         plt.text(x, ylb + (yub - ylb) * 0.90, letter, color=letter_color,
                  horizontalalignment='center',verticalalignment='center',
-                 fontsize=12, fontweight='bold')
+                 fontsize=10, fontweight='bold')
     if axes_box is None:
         plt.subplots_adjust(right=0.96, left=left, wspace=0.38, top=0.98, bottom=bottom)
         for i in ('svg', 'png'):
@@ -335,7 +338,7 @@ def plot_montecarlo_agile_comparison(axes_box=None, letters=None):
         ylb, yub = plt.ylim()
         plt.text(1.65, ylb + (yub - ylb) * 0.90, letter, color=letter_color,
                  horizontalalignment='center',verticalalignment='center',
-                 fontsize=12, fontweight='bold')
+                 fontsize=10, fontweight='bold')
         if axes_box is None and letter == 'B':
             plt.text(0.5, ylb - (yub - ylb) * 0.25, 
                       'Impact of integrating oilsorghum\nat an agile oilcane biorefinery', 
@@ -376,7 +379,7 @@ def plot_montecarlo_derivative():
         ylb, yub = plt.ylim()
         plt.text(1.65, ylb + (yub - ylb) * 0.90, letter, color=letter_color,
                  horizontalalignment='center',verticalalignment='center',
-                 fontsize=12, fontweight='bold')
+                 fontsize=10, fontweight='bold')
     plt.subplots_adjust(
         hspace=0, wspace=0.7,
         top=0.95, bottom=0.1,
@@ -407,7 +410,7 @@ def plot_montecarlo_absolute():
         ylb, yub = plt.ylim()
         plt.text(7.8, ylb + (yub - ylb) * 0.92, letter, color=letter_color,
                  horizontalalignment='center',verticalalignment='center',
-                 fontsize=12, fontweight='bold')
+                 fontsize=10, fontweight='bold')
     plt.subplots_adjust(left=0.12, right=0.95, wspace=0.40, top=0.98, bottom=0.2)
     for i in ('svg', 'png'):
         file = os.path.join(images_folder, f'montecarlo_absolute.{i}')
@@ -432,7 +435,7 @@ def plot_lines_monte_carlo_manuscript(fs=10):
         ylb, yub = plt.ylim()
         plt.text(-0.25, ylb + (yub - ylb) * 0.92, letter, color=letter_color,
                  horizontalalignment='center',verticalalignment='center',
-                 fontsize=12, fontweight='bold')
+                 fontsize=10, fontweight='bold')
     plt.subplots_adjust(left=0.12, right=0.95, wspace=0, top=0.95, bottom=0.2)
     for i in ('svg', 'png'):
         file = os.path.join(images_folder, f'montecarlo_lines.{i}')
@@ -550,7 +553,7 @@ def plot_breakdowns(biodiesel_only=False):
         xlb, xub = plt.xlim()
         plt.text((xlb + xub) * 0.5, ylb + (yub - ylb) * 1.2, letter, color=letter_color,
                   horizontalalignment='center',verticalalignment='center',
-                  fontsize=12, fontweight='bold')
+                  fontsize=10, fontweight='bold')
     for i in ('svg', 'png'):
         name = f'breakdowns_biodiesel_only.{i}' if biodiesel_only else f'breakdowns.{i}'
         file = os.path.join(images_folder, name)
@@ -562,12 +565,11 @@ def plot_breakdowns(biodiesel_only=False):
 def plot_kde(name, metrics=(GWP_ethanol, MFPP), xticks=None, yticks=None,
              xbox_kwargs=None, ybox_kwargs=None, top_left='',
              top_right='Tradeoff', bottom_left='Tradeoff',
-             bottom_right='', fs=None, ticklabels=True, aspect_ratio=1.1,
-             line=None):
+             bottom_right='', fs=None, ticklabels=True, aspect_ratio=1.1):
     set_font(size=fs or 8)
     set_figure_size(width='half', aspect_ratio=aspect_ratio)
     Xi, Yi = [i.index for i in metrics]
-    df = get_monte_carlo(name, metrics, line)
+    df = get_monte_carlo(name, metrics)
     y = df[Yi].values
     x = df[Xi].values
     sX, sY = [kde_comparison_settings[i] for i in metrics]
@@ -645,16 +647,15 @@ def plot_kde_fake_scenarios_ethanol_price(name, xticks=None, yticks=None,
         left=0.15, right=0.98,
     )
 
-def plot_kde_2d(name, metrics=(GWP_ethanol, MFPP), xticks=None, yticks=None,
+def plot_kde_2d(name, metrics=(GWP_biofuel_allocation, MFPP), xticks=None, yticks=None,
                 top_left='', top_right='Tradeoff', bottom_left='Tradeoff',
                 bottom_right='', xbox_kwargs=None, ybox_kwargs=None, titles=None,
-                fs=None, ticklabels=True, line=None):
+                fs=None, ticklabels=True):
     set_font(size=fs or 8)
     set_figure_size(aspect_ratio=0.6)
     if isinstance(name, str): name = (name,)
-    if isinstance(line, str): line = len(name)*(line,)
     Xi, Yi = [i.index for i in metrics]
-    dfs = [get_monte_carlo(i, metrics, line) for i in zip(name, line)]
+    dfs = [get_monte_carlo(i, metrics) for i in name]
     sX, sY = [kde_comparison_settings[i] for i in metrics]
     _, xlabel, fx = sX
     _, ylabel, fy = sY
@@ -698,7 +699,7 @@ def plot_kde_2d(name, metrics=(GWP_ethanol, MFPP), xticks=None, yticks=None,
             xlb, xub = plt.xlim()
             plt.text((xlb + xub) * 0.5, ylb + (yub - ylb) * 1.17, letter, color=letter_color,
                       horizontalalignment='center', verticalalignment='center',
-                      fontsize=12, fontweight='bold')
+                      fontsize=10, fontweight='bold')
 
 def plot_unlabeled_feedstock_conventional_comparison_kde(fake_scenarios=True):
     mfpp = kde_comparison_settings[MFPP]
@@ -787,6 +788,27 @@ def plot_feedstock_comparison_kde(fs=None):
         file = os.path.join(images_folder, f'feedstock_comparison_kde.{i}')
         plt.savefig(file, transparent=True)
 
+def plot_feedstock_comparison_kde_2023(fs=None):
+    plot_kde_2d(
+        ('O1 - S1', 'O2 - S2'),
+        yticks=[[-12, -9, -6, -3, 0, 3, 6]],
+        xticks=[[-0.08, -0.04, 0, 0.04, 0.08, 0.12],
+                [-0.16, -0.08, 0, 0.08, 0.16, 0.24]],
+        top_right='GWP\nTradeoff()',
+        bottom_left='MFPP\nTradeoff()',
+        top_left='Oilcane\nFavored()',
+        bottom_right='\nSugarcane\nFavored()',
+        titles=['(A) Direct Cogeneration', '(B) Integrated Co-Fermentation'],
+        fs=fs,
+    )
+    plt.subplots_adjust(
+        wspace=0,
+        
+    )
+    for i in ('svg', 'png'):
+        file = os.path.join(images_folder, f'feedstock_comparison_kde.{i}')
+        plt.savefig(file, transparent=True)
+
 def plot_configuration_comparison_kde(fs=None):
     plot_kde(
         'O2 - O1',
@@ -817,16 +839,31 @@ def plot_microbial_oil_bioethanol_oilcane_comparison_kde(fs=None):
         file = os.path.join(images_folder, f'microbial_oil_bioethanol_comparison_kde.{i}')
         plt.savefig(file, transparent=True)
 
-def plot_microbial_oil_bioethanol_sugarcane_comparison_kde(fs=None):
-    plot_kde(
-        'O7 - S1',
+def plot_microbial_oil_feedstock_comparison_kde(fs=None):
+    plot_kde_2d(
+        ('O7 - O7,WT', 'O9 - O9,WT'),
         # yticks=sorted([-1 * i for i in [-39, -26, -13, 0, 13, 26]]),
         # xticks=sorted([-1 * i for i in [-0.06, -0.04, -0.02, 0, 0.02, 0.04]]),
         top_right='GWP\nTradeoff()',
         bottom_left='MFPP\nTradeoff()',
         top_left='Microbial Oil\nFavored()',
         bottom_right='Bioethanol\nFavored()',
-        line='WT',
+        fs=fs,
+    )
+    for i in ('svg', 'png'):
+        file = os.path.join(images_folder, f'microbial_oil_bioethanol_comparison_kde.{i}')
+        plt.savefig(file, transparent=True)
+
+def plot_microbial_oil_bioethanol_sugarcane_comparison_kde(fs=None):
+    plot_kde_2d(
+        ('O7,WT - S1,WT', 'O9,WT - S2,WT'),
+        yticks=[[-100, -75, -50, -25, 0, 25]],
+        xticks=[[-0.12, -0.06, 0, 0.06, 0.12],
+                [-0.5, 0, 0.5, 1., 1.5]],
+        top_right='GWP\nTradeoff()',
+        bottom_left='MFPP\nTradeoff()',
+        top_left='Microbial Oil\nFavored()',
+        bottom_right='Bioethanol\nFavored()',
         fs=fs,
     )
     for i in ('svg', 'png'):
@@ -1123,13 +1160,13 @@ def plot_monte_carlo(derivative=False, absolute=True, comparison=True,
 def plot_competitive_biomass_yield_across_oil_content(
         fs=None,
     ):
-    if fs is None: fs = 10
+    if fs is None: fs = 8
     set_figure_size(aspect_ratio=0.8, width=5.5)
     fig, axes = plt.subplots(ncols=1, nrows=2)
     set_font(size=fs)
     bioethanol_ax, microbial_oil_ax = axes.flatten()
     plt.sca(bioethanol_ax)
-    xs, ys = _plot_competitive_biomass_yield_across_oil_content('O7')
+    xs, fys = _plot_competitive_biomass_yield_across_oil_content('O7')
     plt.xlim([0, 10])
     plt.ylim([0, 40])
     bst.plots.style_axis(
@@ -1139,13 +1176,12 @@ def plot_competitive_biomass_yield_across_oil_content(
     )
     plt.text(
         10 - 0.25, 35, '(A) Direct Cogeneration', weight='bold',
-        ha='right', va='center', fontsize=12,
+        ha='right', va='center', fontsize=10,
         c=colors.neutral.shade(50).RGBn,
     )
-    f50 = interpolate.interp1d(xs, ys)
-    _add_lines_biomass_yield_vs_oil_content(f50)
+    _add_lines_biomass_yield_vs_oil_content(*fys)
     plt.sca(microbial_oil_ax)
-    xs, ys = _plot_competitive_biomass_yield_across_oil_content('O9')
+    xs, fys = _plot_competitive_biomass_yield_across_oil_content('O9')
     plt.xlim([0, 10])
     plt.ylim([0, 40])
     plt.xlabel('Oil content [dry wt. %]')
@@ -1154,18 +1190,17 @@ def plot_competitive_biomass_yield_across_oil_content(
         ytickf=True,
     )
     plt.text(
-        10 - 0.25, 35, '(B) Integrated CoFermentation', weight='bold', 
-        ha='right', va='center', fontsize=12,
-        c=colors.neutral.shade(50).RGBn,
+        10 - 0.25, 35, '(B) Integrated Co-Fermentation', weight='bold', 
+        ha='right', va='center', fontsize=10,
+        c=bst.plots.title_color,
     )
-    f50 = interpolate.interp1d(xs, ys)
-    _add_lines_biomass_yield_vs_oil_content(f50)
+    _add_lines_biomass_yield_vs_oil_content(*fys)
     plt.subplots_adjust(hspace=0.05, left=0.1, right=0.96, bottom=0.10, top=0.95)
     for i in ('svg', 'png'):
         file = os.path.join(images_folder, f'competitive_biomass_yield_MCAC.{i}')
         plt.savefig(file, transparent=True)
 
-def _add_lines_biomass_yield_vs_oil_content(f50):
+def _add_lines_biomass_yield_vs_oil_content(f5, f50, f95):
     df = cane.get_composition_data()
     points = {i: None for i in ('WT', '1566', '1580')}
     for name, color in zip(df.index, line_color_wheel):
@@ -1183,8 +1218,7 @@ def _add_lines_biomass_yield_vs_oil_content(f50):
     arrow = r'$\rightarrow$'
     name = 'WT'
     pnt = points[name]
-    y_target = f50(pnt.x)
-    dy2target = y_target - pnt.y
+    y50_target = f50(pnt.x)
     x_units = f"dry {format_units('wt')} % oil"
     y_units = f"dry {format_units('MT/ha')}"
     text = (
@@ -1199,21 +1233,17 @@ def _add_lines_biomass_yield_vs_oil_content(f50):
     
     name = '1566'
     pnt = points[name]
-    y_target = f50(pnt.x)
-    dy2target = y_target - pnt.y
+    y5_target, y50_target, y95_target = f5(pnt.x), f50(pnt.x), f95(pnt.x)
     ax = plt.gca()
     ax.annotate('',
-        xy=(pnt.x, y_target + 0.25), 
+        xy=(pnt.x, y50_target + 0.25), 
         xytext=(pnt.x, pnt.y),
         arrowprops=dict(arrowstyle="->", color=pnt.c),
     )
-    
     text = (
         f"Line: {name}, {pnt.x:.1g} {x_units}\n"
-        f"Yield: {pnt.y:.1f} {arrow} {y_target:.1f} {y_units}\n"
+        f"Yield: {pnt.y:.1f} {arrow} {y50_target:.1f} [{y5_target:.1f}, {y95_target:.1f}] {y_units}\n"
     )
-    
-    f"{dy2target:.0f} dry-{format_units('MT/ha')} to target"
     bst.plots.annotate_point(
         text, pnt.x, pnt.y, horizontalalignment='left', verticalalignment='center',
         textcolor=pnt.c, linecolor=pnt.c,
@@ -1222,26 +1252,22 @@ def _add_lines_biomass_yield_vs_oil_content(f50):
     
     name = '1580'
     pnt = points[name]
-    y_target = f50(pnt.x)
-    dy2target = y_target - pnt.y
+    y5_target, y50_target, y95_target = f5(pnt.x), f50(pnt.x), f95(pnt.x)
     ax = plt.gca()
     ax.annotate('',
-        xy=(pnt.x, y_target + 0.25), 
+        xy=(pnt.x, y50_target + 0.25), 
         xytext=(pnt.x, pnt.y),
         arrowprops=dict(arrowstyle="->", color=pnt.c),
     )
-    
     text = (
         f"Line: {name}, {pnt.x:.1g} {x_units}\n"
-        f"Yield: {pnt.y:.1f} {arrow} {y_target:.1f} {y_units}"
+        f"Yield: {pnt.y:.1f} {arrow} {y50_target:.1f} [{y5_target:.1f}, {y95_target:.1f}] {y_units}\n"
     )
-    
-    f"{dy2target:.0f} dry-{format_units('MT/ha')} to target"
     bst.plots.annotate_point(
-        text, pnt.x, pnt.y, horizontalalignment='left',
+        text, pnt.x, pnt.y, horizontalalignment='right',
         verticalalignment='center',
         textcolor=pnt.c, linecolor=pnt.c,
-        dx=0.5, dy=0, dx_text=0.1, dy_text=0, fontsize=8,
+        dx=-0.5, dy=0, dx_text=-0.1, dy_text=0, fontsize=8,
     )
     
     
@@ -1260,47 +1286,28 @@ def _add_lines_biomass_yield_vs_oil_content(f50):
     # )
 
 def _plot_competitive_biomass_yield_across_oil_content(
-        configuration=None,
+        configuration,
     ):
-    if configuration is None: configuration = 'O2'
     file = monte_carlo_file(configuration, across_lines=False, across_oil_content='oilcane vs sugarcane')
     df = pd.read_excel(file, sheet_name=features.competitive_biomass_yield.short_description, index_col=0)
     df = df.dropna()
     oil_content = np.array(df.columns) * 100
     plt.ylabel(f"Biomass yield [dry-{format_units('MT/ha')}]")
-    if configuration == 'O2':
-        oil_content = oil_content[1:]
-        biomass_yield = df.iloc[:, 1:]
-        biomass_yield_p50 = bst.plots.plot_montecarlo_across_coordinate(oil_content, biomass_yield)[2]
-        bst.plots.plot_vertical_line(oil_content[0])
-        coeff = np.polyfit(oil_content, biomass_yield_p50, 3)
-        # for i, j in zip(oil_content, biomass_yield_p50):
-        #     print(i, j, np.polyval(coeff, i))
-        target = cane.Biorefinery.baseline_dry_biomass_yield
-        try:
-            competitive_oil_content = flx.aitken_secant(lambda x: np.polyval(coeff, x) - target, x0=4)
-        except:
-            breakpoint()
-        # print(competitive_oil_content, np.polyval(coeff, competitive_oil_content), target)
-        bst.plots.plot_vertical_line(competitive_oil_content)
-        plt.fill_between([oil_content[0], competitive_oil_content], 0, 50,
-                          color=(*colors.CABBI_grey.tint(60).RGBn, 0.9),
-                          zorder=0)
-        plt.text(
-            (oil_content[0] + competitive_oil_content) / 2, 5, 'Configuration\n trade-offs', c=colors.neutral.shade(50).RGBn,
-            ha='center', va='center', fontsize=12,
-        )
-        plt.text(
-            0.25, 12, 'Infeasible', c=colors.neutral.shade(50).RGBn,
-            ha='left', va='center', fontsize=12, rotation='vertical',
-        )
-    else:
-        biomass_yield_p50 = bst.plots.plot_montecarlo_across_coordinate(oil_content, df)[2]
-    bst.plots.annotate_line(
-        'Financially\ncompetitive\ntargets', 8, oil_content, biomass_yield_p50,
-        dy=4.5, dy_text=0.5, fontsize=10, linecolor=edgecolor,
+    biomass_yields = bst.plots.plot_montecarlo_across_coordinate(
+        oil_content, df, 
+        fill_color=CABBI_colors.green_dirty.tint(50).RGBn,
+        median_color=CABBI_colors.green_dirty.shade(10).RGBn,
+        p5_color=CABBI_colors.green_dirty.RGBn,
     )
-    return (oil_content, biomass_yield_p50)
+    index = [0, 2, 4]
+    f5, f50, f95 = [interpolate.interp1d(oil_content, biomass_yields[i]) for i in index]
+    bst.plots.annotate_point(
+        'Financially\ncompetitive\ntargets', 9, f50(9),
+        dy=4.5, dy_text=0.5, fontsize=8,
+        linecolor=CABBI_colors.green_dirty.shade(40).RGBn,
+        textcolor=CABBI_colors.green_dirty.shade(40).RGBn,
+    )
+    return (oil_content, (f5, f50, f95))
 
 def plot_competitive_microbial_oil_yield_across_oil_content(
         configuration=None,

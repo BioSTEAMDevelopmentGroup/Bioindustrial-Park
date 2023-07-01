@@ -195,7 +195,7 @@ def exponential_val(x, nA): # A x ^ n
 def YRCP2023():
     Biorefinery.default_conversion_performance_distribution = 'longterm'
     Biorefinery.default_prices_correleted_to_crude_oil = True
-    Biorefinery.default_oil_content_range = [0, 5]
+    Biorefinery.default_oil_content_range = [2, 5]
     Biorefinery.default_income_tax_range = [21, 21 + 1e-6] # Work around for constant value
     Biorefinery.default_baseline_oil_content = 1.8
     Biorefinery.default_year = 2023
@@ -305,9 +305,11 @@ class Biorefinery:
         self.set_fermentation_microbial_oil_titer.setter(137) # Similar to sugarcane ethanol
         
     def __new__(cls, name, chemicals=None, reduce_chemicals=False, 
-                 avoid_natural_gas=True, conversion_performance_distribution=None,
-                 year=None, cache=cache, feedstock_line=None,
-                 prices_correleted_to_crude_oil=None, WWT_kwargs=None,
+                 avoid_natural_gas=True, 
+                 conversion_performance_distribution=None,
+                 year=None, cache=cache, 
+                 prices_correleted_to_crude_oil=None,
+                 WWT_kwargs=None,
                  oil_content_range=None):
         if year is None: year = cls.default_year
         if conversion_performance_distribution is None: 
@@ -316,7 +318,7 @@ class Biorefinery:
             conversion_performance_distribution = conversion_performance_distribution.replace(' ', '').replace('-', '').lower()
         if prices_correleted_to_crude_oil is None:
             prices_correleted_to_crude_oil = cls.default_prices_correleted_to_crude_oil
-        number, agile, energycane, = configuration = parse_configuration(name)
+        number, agile, feedstock_line, = configuration = parse_configuration(name)
         if WWT_kwargs is None:
             if cls.default_WWT is None:
                 WWT_key = None
@@ -325,7 +327,7 @@ class Biorefinery:
                 WWT_key = cls.default_WWT
         else:
             WWT_key = WWT_kwargs.get('kind', None)
-        key = (number, agile, energycane, WWT_key, conversion_performance_distribution, year)
+        key = (number, agile, feedstock_line, WWT_key, conversion_performance_distribution, year)
         if cache and key in cache: 
             return cache[key]
         else:
@@ -371,10 +373,6 @@ class Biorefinery:
             IDs=['Sucrose', 'Glucose'],
             # Default composition as equimolar
         )
-        
-        if energycane:
-            feedstock.reset_flow(**energycane_dct, total_flow=feedstock.F_mass, units='kg/hr')
-            feedstock.ID = 'energycane'
         
         BT = flowsheet(bst.BoilerTurbogenerator)
         if number not in cellulosic_configurations: BT.boiler_efficiency = 0.89
@@ -432,7 +430,6 @@ class Biorefinery:
                         cane_sys.simulate()
                     except Exception as e:
                         print(e)
-                        breakpoint()
                         try:
                             cane_sys.empty_recycles()
                             cane_sys.simulate()
@@ -523,22 +520,11 @@ class Biorefinery:
             sys.operation_parameter(set_glucose_yield)
             sys.operation_parameter(set_xylose_yield)
             
-            if energycane:
-                self.cane_mode = cane_mode = sys.operation_mode(cane_sys,
-                    operating_hours=180*24, oil_content=0.02, feedstock=feedstock.copy(),
-                    z_mass_carbs_baseline=0.091,
-                    z_mass_solids_baseline=0., 
-                    z_mass_ash_baseline=0.028,
-                    z_mass_water_baseline=0.60,
-                    glucose_yield=85, xylose_yield=65, 
-                    FFA_content=0.10, PL_content=0.10
-                )
-            else:
-                self.cane_mode = cane_mode = sys.operation_mode(cane_sys,
-                    operating_hours=180*24, oil_content=0.10, feedstock=feedstock.copy(),
-                    z_mass_carbs_baseline=0.1491, glucose_yield=85, xylose_yield=65, 
-                    FFA_content=0.10, PL_content=0.10
-                )
+            self.cane_mode = cane_mode = sys.operation_mode(cane_sys,
+                operating_hours=180*24, oil_content=0.10, feedstock=feedstock.copy(),
+                z_mass_carbs_baseline=0.1491, glucose_yield=85, xylose_yield=65, 
+                FFA_content=0.10, PL_content=0.10
+            )
             self.sorghum_mode = sorghum_mode = sys.operation_mode(cane_sys, 
                 operating_hours=60*24, oil_content=0.07, glucose_yield=79, xylose_yield=86,
                 feedstock=oilsorghum,
@@ -1037,14 +1023,6 @@ class Biorefinery:
             if number < 0: return
             if agile:
                 cane_mode.oil_content = cane_oil_content / 100.
-            elif energycane:
-                composition_specification.load_oil_content(
-                    cane_oil_content / 100.,
-                    z_mass_carbs_baseline=0.091,
-                    z_mass_solids_baseline=0., 
-                    z_mass_ash_baseline=0.028,
-                    z_mass_water_baseline=0.60,
-                )
             else:
                 composition_specification.load_oil_content(
                     cane_oil_content / 100.
@@ -1557,10 +1535,7 @@ class Biorefinery:
             set_baseline(set_cane_xylose_yield, 97.5)
             set_baseline(set_glucose_to_ethanol_yield, 90)
             set_baseline(set_xylose_to_ethanol_yield, 42)
-        if energycane:
-            set_baseline(set_cane_oil_content, 2)
-        else:
-            set_baseline(set_cane_oil_content, self.default_baseline_oil_content)
+        set_baseline(set_cane_oil_content, self.default_baseline_oil_content)
         set_baseline(set_bagasse_oil_recovery, 70)
         set_baseline(set_juicing_oil_recovery, 60)
         set_baseline(set_crude_oil_price) 
@@ -1614,15 +1589,16 @@ class Biorefinery:
             sys.simulate()
         
         ## Tests
-        try:
-            assert len(all_parameter_mockups) == len(model.parameters)
-            assert len(all_metric_mockups) == len(model.metrics)
-            for mockup, real in zip(all_parameter_mockups, model.parameters):
-                assert mockup.index == real.index
-            for mockup, real in zip(all_metric_mockups, model.metrics):
-                assert mockup.index == real.index
-        except:
-            breakpoint()
+        if feedstock_line is None:
+            try:
+                assert len(all_parameter_mockups) == len(model.parameters)
+                assert len(all_metric_mockups) == len(model.metrics)
+                for mockup, real in zip(all_parameter_mockups, model.parameters):
+                    assert mockup.index == real.index
+                for mockup, real in zip(all_metric_mockups, model.metrics):
+                    assert mockup.index == real.index
+            except:
+                breakpoint()
         return self
     
     def oil_recovery(self):

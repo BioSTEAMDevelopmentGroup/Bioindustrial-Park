@@ -94,7 +94,6 @@ colormaps = [
 light_letter_color = colors.neutral.tint(98).RGBn
 letter_color = colors.neutral.tint(80).RGBn
 dark_letter_color = colors.neutral.shade(80).RGBn
-
 default_box_color = colors.neutral.RGBn
 
 # %% Plot functions for publication
@@ -118,7 +117,7 @@ def _add_letter_labels(axes, xpos, ypos, colors, box_color=None):
                 ax = ax._cached_ytwin
             ax.text((xlb + xub) * xpos, (yub + ylb) * ypos, letter, color=colors[i, j],
                      horizontalalignment='center',verticalalignment='center',
-                     fontsize=12, fontweight='bold', zorder=1, bbox=txtbox)
+                     fontsize=10, fontweight='bold', zorder=1, bbox=txtbox)
 
 def plot_metrics_across_composition_manuscript(load=True, fs=8, smooth=1):
     set_font(size=fs)
@@ -132,7 +131,7 @@ def plot_metrics_across_composition_manuscript(load=True, fs=8, smooth=1):
     )
     colors = np.zeros([1, 2], object)
     colors[:] = [[light_letter_color, light_letter_color]]
-    _add_letter_labels(axes, 1 - 0.9, 0.62, colors)
+    # _add_letter_labels(axes, 1 - 0.9, 0.62, colors)
     plt.subplots_adjust(left=0.1, right=0.95, wspace=0.15, top=0.9, bottom=0.15)
     for i in ('svg', 'png'):
         file = os.path.join(images_folder, f'metrics_across_composition_contours.{i}')
@@ -253,9 +252,9 @@ def plot_metrics_across_composition(
     # data[:, 0, 1, 0] = data[:, 1, 1, 0] + (data[:, 1, 1, 0] - data[:, 2, 1, 0])
     
     # Plot contours
-    xlabel = 'Oil content [dry wt. %]'
-    ylabel = "Fiber content [dry wt. %]"
-    if titles is None: titles = np.array(['Direct Cogeneration', 'Integrated CoFermentation'])
+    xlabel = 'Oil content [dry wt %]'
+    ylabel = "Fiber content [dry wt %]"
+    if titles is None: titles = np.array(['(A) Direct Cogeneration', '(B) Integrated Co-Fermentation'])
     d0 = data[:, :, 0, :]
     # d1 = data[:, :, 1, :]
     CBY_units = 'dry' + '-' + format_units('MT/ha')
@@ -336,8 +335,8 @@ def plot_metrics_across_biomass_yield(
     )
     data = data[:, :, metric_indices, :]
     # Plot contours
-    xlabel = 'Oil content [dry wt. %]'
-    ylabel = "Biomass yield [dry wt. %]"
+    xlabel = 'Oil content [dry wt %]'
+    ylabel = "Biomass yield [dry wt %]"
     if titles is None: titles = np.array(['Direct Cogeneration', 'Integrated Cofermentation'])
     d0 = data[:, :, 0, :]
     metric_bars = [
@@ -442,7 +441,7 @@ def contour_file(name):
 #     Z = Z[:, :, metrics_index, :]
 #     # Plot contours
 #     xlabel = 'Microbial oil recovery [%]'
-#     ylabel = "Microbial oil yield [wt. %]"
+#     ylabel = "Microbial oil yield [wt %]"
 #     xticks = [50, 60, 70, 80, 90]
 #     yticks = rounded_linspace(
 #         100 * perf.min_lipid_yield_glucose, 100 * perf.max_lipid_yield_glucose, 5, 
@@ -496,7 +495,7 @@ def plot_oil_recovery_integration(
     Z = Z[..., metric_index]
     # Plot contours
     xlabel = 'Microb. oil recovery [%]'
-    ylabel = "Microb. oil yield [wt. %]"
+    ylabel = "Microb. oil yield [wt %]"
     titer_units = r'$g \cdot L^{-1}$'
     productivity_units = r'$g \cdot L^{-1} \cdot h^{-1}$'
     ylabels = [f"{ylabel}\n"
@@ -530,8 +529,8 @@ def plot_sorghum_oil_content_and_cane_oil_content_contours(
     data = data[:, :, :, metric_indices]
     
     # Plot contours
-    xlabel = "Oil-sorghum oil content [dry wt. %]" 
-    ylabel = 'Oilcane oil content\n[dry wt. %]'
+    xlabel = "Oil-sorghum oil content [dry wt %]" 
+    ylabel = 'Oilcane oil content\n[dry wt %]'
     yticks = [2, 4, 6, 8, 10]
     xticks = [2, 4, 6, 8, 10]
     if configuration_index == [1, 2]:
@@ -629,7 +628,7 @@ def plot_recovery_and_oil_content_contours(
     
     # Plot contours
     xlabel = 'Crushing mill oil recovery [%]'
-    ylabel = "Oil content [dry wt. %]"
+    ylabel = "Oil content [dry wt %]"
     ylabels = [f'Direct Cogeneration\n{ylabel}',
                f'Integrated Co-Fermentation\n{ylabel}']
     xticks = [40, 50, 60, 70, 80, 90, 100]
