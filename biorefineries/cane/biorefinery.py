@@ -371,7 +371,8 @@ class Biorefinery:
         chemicals.define_group(
             name='Sugar',
             IDs=['Sucrose', 'Glucose'],
-            # Default composition as equimolar
+            composition=[13.7, 1.21],
+            wt=True,
         )
         
         BT = flowsheet(bst.BoilerTurbogenerator)
@@ -425,6 +426,7 @@ class Biorefinery:
                 try:
                     cane_sys.simulate(material_data=material_data, update_material_data=True)
                 except Exception as e:
+                    raise e
                     print(e)
                     try:
                         cane_sys.simulate()
@@ -547,6 +549,7 @@ class Biorefinery:
             crushing_mill = flowsheet(bst.CrushingMill) # Separates bagasse
             _, screen = flowsheet(bst.VibratingScreen)
             juice = screen.outs[0]
+            microbial_oil_centrifuge = None
             if number in cellulosic_configurations:
                 pressure_filter = flowsheet(bst.PressureFilter) # Separates lignin
             else:
@@ -558,12 +561,20 @@ class Biorefinery:
             if number in screwpress_microbial_oil_recovery:
                 cellmass_centrifuge = flowsheet(bst.SolidLiquidsSplitCentrifuge) # Separates cell mass, oil, and water
             else:
-                cellmass_centrifuge = flowsheet(bst.SolidsCentrifuge) # Separates cell mass
-            if isinstance(cellmass_centrifuge, list):
-                cellmass_centrifuge = sorted([i for i in cellmass_centrifuge if type(i) is bst.SolidsCentrifuge], key=lambda x: x.ID)[0]
+                if number == 8:
+                    cellmass_centrifuge = flowsheet(bst.SolidLiquidsSplitCentrifuge) # Separates cell mass
+                    for microbial_oil_centrifuge in flowsheet.unit:
+                        if microbial_oil_centrifuge.line == 'Microbial oil centrifuge': break
+                else:
+                    cellmass_centrifuge = flowsheet(bst.SolidsCentrifuge) # Separates cell mass
+                    microbial_oil_centrifuge = None
+                if isinstance(cellmass_centrifuge, list):
+                    cellmass_centrifuge = sorted([i for i in cellmass_centrifuge if type(i) is bst.SolidsCentrifuge], key=lambda x: x.ID)[0]
+                
             cellmass_centrifuge.strict_moisture_content = False
             oil_extraction_specification = OilExtractionSpecification(
-                sys, crushing_mill, pressure_filter, cellmass_centrifuge, juice, screw_press
+                sys, crushing_mill, pressure_filter, cellmass_centrifuge, 
+                microbial_oil_centrifuge, juice, screw_press, fermentor,
             )
         
         ## Account for cellulosic vs advanced RINs

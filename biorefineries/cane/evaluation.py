@@ -136,6 +136,7 @@ def evaluate_metrics_oil_recovery_integration(microbial_oil_recovery, microbial_
     data = np.zeros([nrows, 2, N_metrics])
     for i in range(nrows):
         for j, configuration in enumerate(['O9', 'O8']):
+            # print(configuration, microbial_oil_recovery, microbial_oil_yield)
             br = cane.Biorefinery(configuration)
             br.set_fermentation_microbial_oil_productivity.setter(productivity[i])
             br.set_fermentation_microbial_oil_titer.setter(titer[i])
@@ -194,7 +195,7 @@ def run_uncertainty_and_sensitivity(name, N, rule='L',
             sugarcane_name = name.replace('O2', 'S2')
         else:
             sugarcane_name = name
-        br_sugarcane = cane.Biorefinery(f'{sugarcane_name},WT', **kwargs)
+        br_sugarcane = cane.Biorefinery(f'{sugarcane_name}.WT', **kwargs)
         def set_line(line, current_line=current_line):
             if name in ('O1', 'O2'): 
                 config = br_sugarcane if line == 'WT' else br
@@ -407,13 +408,13 @@ def run_all(N, across_lines=False, rule='L', configurations=None,
         )
 
 def run_sugarcane_microbial_oil_and_ethanol(N=None):
-    if N is None: N = 50
+    if N is None: N = 2000
     filterwarnings('ignore')
     cane.YRCP2023()
-    run_uncertainty_and_sensitivity('S1,WT', N)
-    run_uncertainty_and_sensitivity('S2,WT', N)
-    run_uncertainty_and_sensitivity('O7,WT', N)
-    run_uncertainty_and_sensitivity('O9,WT', N)
+    run_uncertainty_and_sensitivity('S1.WT', N)
+    run_uncertainty_and_sensitivity('S2.WT', N)
+    run_uncertainty_and_sensitivity('O7.WT', N)
+    run_uncertainty_and_sensitivity('O9.WT', N)
     run_uncertainty_and_sensitivity('O1', N)
     run_uncertainty_and_sensitivity('O2', N)
     run_uncertainty_and_sensitivity('O7', N)
@@ -422,7 +423,7 @@ def run_sugarcane_microbial_oil_and_ethanol(N=None):
     # run_uncertainty_and_sensitivity('O8', N)
     
 def run_oilcane_microbial_oil_and_ethanol_across_oil_content(N=None):
-    if N is None: N = 20
+    if N is None: N = 200
     filterwarnings('ignore')
     cane.YRCP2023()
     run_uncertainty_and_sensitivity('O7', N, across_oil_content='oilcane vs sugarcane')
@@ -432,7 +433,7 @@ def run_oilcane_microbial_oil_and_ethanol_across_oil_content(N=None):
     # run_uncertainty_and_sensitivity('O2', N, across_oil_content='oilcane vs sugarcane')        
     
 def run_oilcane_microbial_oil_and_ethanol_across_lines(N=None):
-    if N is None: N = 50
+    if N is None: N = 1000
     filterwarnings('ignore')
     cane.YRCP2023()
     run_uncertainty_and_sensitivity('O7', N, across_lines=True)

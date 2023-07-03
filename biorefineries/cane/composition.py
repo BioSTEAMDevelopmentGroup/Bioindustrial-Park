@@ -218,7 +218,7 @@ class OilcaneCompositionPerformance(NamedTuple):
     oil_content: float
     biomass_yield: float
 
-def get_composition_data(minimum_oil_content=None, ignored=frozenset([316, '19B'])):
+def get_composition_data(minimum_oil_content=None, ignored=frozenset([316, '19B', 1565])):
     global cane_line_composition_data, cane_minimum_oil_content
     if minimum_oil_content is None: minimum_oil_content = 0
     if cane_line_composition_data is None or minimum_oil_content != cane_minimum_oil_content:

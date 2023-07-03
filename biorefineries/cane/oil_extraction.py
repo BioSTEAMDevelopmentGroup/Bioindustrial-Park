@@ -57,14 +57,19 @@ class OilExtractionSpecification:
         'bagasse_oil_recovery',
         'microbial_oil_recovery',
         'juice_oil_recovery',
+        'microbial_oil_centrifuge',
+        'bioreactor',
     )
     
-    def __init__(self, system, crushing_mill, pressure_filter=None, cellmass_centrifuge=None, juice=None, 
-                 screw_press=None, microbial_oil_recovery=None, juice_oil_recovery=None):
+    def __init__(self, system, crushing_mill, pressure_filter=None, cellmass_centrifuge=None, 
+                 microbial_oil_centrifuge=None, juice=None, screw_press=None, 
+                 bioreactor=None, microbial_oil_recovery=None, juice_oil_recovery=None):
         self.crushing_mill = crushing_mill #: [Unit] Defines extraction recovery as a material split.
         self.pressure_filter = pressure_filter #: [Unit] Defines extraction recovery from bagasse as a material split.
         self.screw_press = screw_press
         self.cellmass_centrifuge = cellmass_centrifuge
+        self.microbial_oil_centrifuge = microbial_oil_centrifuge
+        self.bioreactor = bioreactor
         self.juice = juice
         if crushing_mill is None: 
             self.crushing_mill_oil_recovery = None
@@ -78,23 +83,40 @@ class OilExtractionSpecification:
             self.bagasse_oil_recovery = None
         else:
             self.bagasse_oil_recovery = 1. - pressure_filter.isplit['Oil'].mean()
-            if pressure_filter in cellmass_centrifuge.get_downstream_units(facilities=False):
+            if microbial_oil_centrifuge:
                 if juice is None: raise ValueError('must pass both juice stream and pressure filter unit')
                 self.microbial_oil_recovery = 0.7 if microbial_oil_recovery is None else microbial_oil_recovery
                 # Microbial oil is removed further downstream
                 @pressure_filter.add_specification(run=True)
-                def adjust_oil_recovery():
-                    cellmass = self.cellmass_centrifuge.outs[0]
-                    juice = self.juice
+                def adjust_bagasse_oil_recovery():
                     pressure_filter = self.pressure_filter
+                    feedstock = self.crushing_mill.ins[0]
+                    juice = self.juice
+                    bagasse_oil = feedstock.imass['Oil'] - juice.imass['Oil']
                     total_oil = pressure_filter.ins[0].imass['Oil']
-                    juice_oil_fraction = juice.imass['Oil'] / total_oil
-                    cellmass_oil_fraction = cellmass.imass['Oil'] / total_oil
-                    bagasse_oil_fraction = 1. - juice_oil_fraction - cellmass_oil_fraction
+                    bagasse_oil_fraction = bagasse_oil / total_oil
                     pressure_filter.isplit['Oil'] = (1.
-                        - juice_oil_fraction * self.juice_oil_recovery
-                        - cellmass_oil_fraction * self.microbial_oil_recovery
                         - bagasse_oil_fraction * self.bagasse_oil_recovery
+                    )
+                    
+                @cellmass_centrifuge.add_specification(run=True)
+                def adjust_microbial_oil_split():
+                    bioreactor = self.bioreactor
+                    cellmass_oil = bioreactor.outs[1].imass['Oil'] - sum([i.imass['Oil'] for i in bioreactor.ins])
+                    cellmass_centrifuge = self.cellmass_centrifuge
+                    total_oil = cellmass_centrifuge.ins[0].imass['Oil']
+                    cellmass_centrifuge.aqueous_isplit['Oil'] = (1.
+                        - cellmass_oil / total_oil
+                    )
+                    
+                @microbial_oil_centrifuge.add_specification(run=True)
+                def adjust_microbial_oil_recovery():
+                    cellmass_centrifuge = self.cellmass_centrifuge
+                    cellmass_oil = cellmass_centrifuge.outs[2].imass['Oil']
+                    total_oil = microbial_oil_centrifuge.ins[0].imass['Oil']
+                    cellmass_oil_fraction = cellmass_oil / total_oil
+                    microbial_oil_centrifuge.isplit['Oil'] = (1.
+                        - cellmass_oil_fraction * self.microbial_oil_recovery
                     )
             else:
                 if screw_press:
@@ -104,13 +126,10 @@ class OilExtractionSpecification:
                     @cellmass_centrifuge.add_specification(run=True)
                     def adjust_oil_recovery():
                         cellmass_centrifuge = self.cellmass_centrifuge
-                        juice = self.juice
                         total_oil = cellmass_centrifuge.ins[0].imass['Oil']
-                        juice_oil_fraction = juice.imass['Oil'] / total_oil
-                        bagasse_oil_fraction = pressure_filter.outs[1].imass['Oil'] / total_oil
+                        cellmass_oil = bioreactor.outs[1].imass['Oil'] - sum([i.imass['Oil'] for i in bioreactor.ins])
                         cellmass_centrifuge.aqueous_isplit['Oil'] = (1.
-                            - juice_oil_fraction * self.juice_oil_recovery
-                            - bagasse_oil_fraction * self.bagasse_oil_recovery
+                            - cellmass_oil / total_oil
                         )
                 else:
                     # No microbial oil

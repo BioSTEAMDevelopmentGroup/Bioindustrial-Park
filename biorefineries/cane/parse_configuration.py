@@ -20,10 +20,10 @@ __all__ = (
 
 def asconfiguration(x):
     try:
-        number, agile, energycane = x
-        return Configuration(int(number), bool(agile), bool(energycane))
+        number, agile, line = x
+        return Configuration(int(number), bool(agile), line or None)
     except:
-        return Configuration(int(x), False, False)
+        return Configuration(int(x), False, None)
 
 def ascomparison(x):
     a, b = x
@@ -40,8 +40,8 @@ class ConfigurationComparison(NamedTuple):
 
 def name_to_configuration(name):
     name = name.replace(' ', '')
-    if ',' in name:
-        name, line = name.split(',')
+    if '.' in name:
+        name, line = name.split('.')
     else:
         line = None
     return Configuration((-1 if name.startswith('S') else 1) * int(name[1:].strip('*')), '*' in name, line or None)
@@ -84,17 +84,17 @@ def format_name(name):
         raise Exception('unknown error')
 
 def format_configuration(configuration, latex=True):
-    number, agile, energycane = configuration
+    number, agile, line = configuration
     if number < 0:
         name = f"S{number}"
     else:
         name = f"O{number}"
     if number == 0 or number > 10 or number < -3: 
         raise ValueError(f'invalid configuration {configuration}')
+    if line: name += "." + line
     if latex:
         name = r'$\mathtt{' + name + '}$'
     if agile: name += '*'
-    if energycane: name += '+'
     return name
 
 def format_comparison(comparison):

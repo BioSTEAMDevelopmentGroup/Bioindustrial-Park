@@ -114,17 +114,30 @@ def create_oilcane_to_biodiesel_combined_1_and_2g_post_fermentation_oil_separati
     
     # Cells contain all the oil
     cellmass_centrifuge = pfls_dct['Solids centrifuge']
-    cellmass_centrifuge.isplit['Oil'] = 0.999 # Equivalent to cell mass split
-    
+    cellmass_centrifuge.isplit['Oil'] = 1. # Equivalent to cell mass split
+    cellmass_centrifuge.line = 'Cellmass centrifuge'
     
     if oil_extraction == 'integrated':
-        # Move recovery of oil in solution to after hydrolysis and before fermentation (do not include juice, which may not have much oil)
-        aqueous_stream = oil_centrifuge.outs[1]
-        fermentation_effluent = oil_centrifuge.ins[0]
-        segment = bst.Segment(fermentation_effluent, aqueous_stream)
-        segment.disconnect(join_ends=True)
-        segment.insert(hydrolysate_and_juice_mixer.ins[0])
-        oil = backend_oil
+        PF = ofs_dct['Pretreatment flash']
+        LSC = bst.LiquidsSplitCentrifuge(400, ins='', split=1)
+        LSC.isplit['Oil'] = 0.3
+        LSC.insert(PF-1, inlet=0**LSC, outlet=LSC-0)
+        LSC.line = 'Microbial oil centrifuge'
+        MX = bst.Mixer(400, ins=[backend_oil, LSC-1])
+        oil = MX.outs[0]
+        
+        # Replace oil and cell mass centrifuge with a 3-phase decanter centrifuge
+        cellmass, aqueous_stream = cellmass_centrifuge.outs
+        decanter = bst.SolidLiquidsSplitCentrifuge(400,
+            ins=oil_centrifuge.ins[0],
+            outs=[backend_oil, aqueous_stream, cellmass],
+            solids_split=cellmass_centrifuge.split,
+            aqueous_split=1. - oil_centrifuge.split,
+            moisture_content=0.4,
+        )
+        oil_centrifuge.disconnect(discard=True)
+        cellmass_centrifuge.disconnect(discard=True)
+        steam_mixer.ins[0].source.prioritize = True
     elif oil_extraction == 'screwpress':
         cellmass, aqueous_stream = cellmass_centrifuge.outs
         mixer = cellmass.sink
