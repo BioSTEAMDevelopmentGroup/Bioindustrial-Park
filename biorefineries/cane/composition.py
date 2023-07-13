@@ -462,24 +462,16 @@ def _add_model_composition_parameters_for_cane_line(
         cs.fiber = (1. - cs.oil - sugar_content - 0.07) # Ash/solids is 7 wt. %
         cs.load_composition()
         
-    @parameter(
-        element=biorefinery.feedstock, 
-        baseline=mean_biomass_yield,
-        distribution=bounded_gaussian_distribution_from_mean_and_std(
-            mean_biomass_yield, std_biomass_yield
-        ),
-        units='dry MT/ha',
+    set_dry_biomass_yield = biorefinery.set_dry_biomass_yield
+    set_dry_biomass_yield.baseline = mean_biomass_yield
+    set_dry_biomass_yield.distribution = bounded_gaussian_distribution_from_mean_and_std(
+        mean_biomass_yield, std_biomass_yield
     )
-    def set_cane_biomass_yield(biomass_yield):
-        biorefinery.dry_biomass_yield = biomass_yield
-        biorefinery.update_feedstock()
-        
     biorefinery.set_cane_oil_content = set_cane_oil_content
     biorefinery.set_cane_moisture_content = set_cane_moisture_content
     biorefinery.set_cane_sugar_content = set_cane_sugar_content
-    biorefinery.set_cane_biomass_yield = set_cane_biomass_yield
     for p in (set_cane_oil_content, 
-              set_cane_biomass_yield,
+              set_dry_biomass_yield,
               set_cane_moisture_content,
               set_cane_sugar_content):
         p.setter(p.baseline)
@@ -498,7 +490,7 @@ def _reset_composition_parameters_for_cane_line(
     oil = biorefinery.set_cane_oil_content
     sugar = biorefinery.set_cane_sugar_content
     moisture = biorefinery.set_cane_moisture_content
-    biomass = biorefinery.set_cane_biomass_yield
+    biomass = biorefinery.set_dry_biomass_yield
     oil.baseline = mean_oil_content
     oil.distribution = bounded_gaussian_distribution_from_mean_and_std(
         mean_oil_content, std_oil_content

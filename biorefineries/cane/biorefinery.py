@@ -149,6 +149,7 @@ area_names = {
     # 10: ['Feedstock handling', 'Juicing', 'Pretreatment', 'TAG prod.', 'AcTAG sep.', 
     #      'Wastewater treatment', 'Oil ext.', 'CH&P',  'Biod. prod.', 'Utilities', 'HXN', 'Storage'],
 }
+
 area_names[7] = area_names[5]
 area_names[9] = area_names[8] = area_names[6]
 
@@ -195,11 +196,14 @@ def exponential_val(x, nA): # A x ^ n
 def YRCP2023():
     Biorefinery.default_conversion_performance_distribution = 'longterm'
     Biorefinery.default_prices_correleted_to_crude_oil = True
-    Biorefinery.default_oil_content_range = [2, 5]
+    Biorefinery.default_oil_content_range = [1.8, 5.4]
     Biorefinery.default_income_tax_range = [21, 21 + 1e-6] # Work around for constant value
     Biorefinery.default_baseline_oil_content = 1.8
     Biorefinery.default_year = 2023
     Biorefinery.default_WWT = 'high-rate'
+    Biorefinery.default_dry_biomass_yield_distribution = shape.Uniform(
+        0.19 * Biorefinery.baseline_dry_biomass_yield, Biorefinery.baseline_dry_biomass_yield
+    )
     Biorefinery._derivative_disabled = True
 
 class Biorefinery:
@@ -220,6 +224,19 @@ class Biorefinery:
     baseline_feedstock_price = 0.035 # [USD / kg sugarcane] with transportation
     baseline_transportation_cost = 0.11 * baseline_feedstock_price # Energy cane usage for cellulosic ethanol: estimation of feedstock costs; https://ageconsearch.umn.edu/record/46837/files/Energy%20Cane%20Feedstock%20Estimation_SAEA1.pdf
     baseline_transportation_CF = 0.029 * baseline_feedstock_CF # Estimated from GREET 2020
+    default_dry_biomass_yield_distribution = shape.Uniform(
+        baseline_dry_biomass_yield, baseline_dry_biomass_yield + 1e-6 # Work around for constant value
+    )
+    
+    cases = {
+        'constant biomass yield',
+    } # Special cases for Monte Carlo
+    
+    def constant_biomass_yield(self):
+        self.set_dry_biomass_yield.distribution = shape.Uniform(
+            self.baseline_dry_biomass_yield, 
+            self.baseline_dry_biomass_yield + 1e-6 # Work around for constant value
+        )
     
     def update_feedstock(self):
         feedstock = self.feedstock
@@ -304,13 +321,19 @@ class Biorefinery:
         self.set_fermentation_microbial_oil_productivity.setter(1.902) # Similar to sugarcane ethanol
         self.set_fermentation_microbial_oil_titer.setter(137) # Similar to sugarcane ethanol
         
-    def __new__(cls, name, chemicals=None, reduce_chemicals=False, 
-                 avoid_natural_gas=True, 
-                 conversion_performance_distribution=None,
-                 year=None, cache=cache, 
-                 prices_correleted_to_crude_oil=None,
-                 WWT_kwargs=None,
-                 oil_content_range=None):
+    def __new__(cls,
+            name, chemicals=None,
+            avoid_natural_gas=True, 
+            conversion_performance_distribution=None,
+            year=None, cache=cache, 
+            prices_correleted_to_crude_oil=None,
+            WWT_kwargs=None,
+            oil_content_range=None,
+            remove_biodiesel_production=None,
+            update_feedstock_price=None,
+            simulate=True,
+        ):
+        if update_feedstock_price is None: update_feedstock_price = True
         if year is None: year = cls.default_year
         if conversion_performance_distribution is None: 
             conversion_performance_distribution = cls.default_conversion_performance_distribution
@@ -318,7 +341,7 @@ class Biorefinery:
             conversion_performance_distribution = conversion_performance_distribution.replace(' ', '').replace('-', '').lower()
         if prices_correleted_to_crude_oil is None:
             prices_correleted_to_crude_oil = cls.default_prices_correleted_to_crude_oil
-        number, agile, feedstock_line, = configuration = parse_configuration(name)
+        number, agile, feedstock_line, case = configuration = parse_configuration(name)
         if WWT_kwargs is None:
             if cls.default_WWT is None:
                 WWT_key = None
@@ -327,7 +350,9 @@ class Biorefinery:
                 WWT_key = cls.default_WWT
         else:
             WWT_key = WWT_kwargs.get('kind', None)
-        key = (number, agile, feedstock_line, WWT_key, conversion_performance_distribution, year)
+        key = (number, agile, feedstock_line,
+               WWT_key, conversion_performance_distribution,
+               year, case)
         if cache and key in cache: 
             return cache[key]
         else:
@@ -347,6 +372,19 @@ class Biorefinery:
         if number in system_factories:
             self.cane_sys = cane_sys = system_factories[number](operating_hours=24 * 200, WWT_kwargs=WWT_kwargs,
                                                                 **system_factory_options.get(number, {}), autorename=True)
+            if remove_biodiesel_production:
+                unit = flowsheet(bst.BlendingTankWithSkimming)
+                microbial_oil = unit.ins[0]
+                microbial_oil.ID = 'microbial_oil'
+                microbial_oil.price = 0.661
+                remove_units = {unit, *unit.get_downstream_units()}
+                self.cane_sys = cane_sys = bst.System.from_units(
+                    'cane_sys',
+                    units=set(cane_sys.units).difference(remove_units),
+                )
+                s.catalyst.empty()
+                s.HCl.empty()
+                s.methanol.empty()
         else:
             raise NotImplementedError(number)
         cane_sys.set_tolerance(rmol=1e-5, mol=1e-2, subsystems=True, subfactor=1.5)
@@ -783,11 +821,25 @@ class Biorefinery:
         def set_sorghum_operating_days(sorghum_operating_days):
             if agile: sorghum_mode.operating_hours = sorghum_operating_days * 24
         
-        @default(self.baseline_available_land, units='ha / yr', kind='isolated')
+        @default(self.baseline_available_land, element='feedstock',
+                 units='ha / yr', kind='isolated')
         def set_available_land(available_land):
             self.available_land = available_land
+            
+        @parameter(
+            element='feedstock', 
+            baseline=self.baseline_dry_biomass_yield,
+            distribution=self.default_dry_biomass_yield_distribution,
+            units='dry MT/ha',
+        )
+        def set_dry_biomass_yield(dry_biomass_yield):
+            if number < 0:
+                self.dry_biomass_yield = self.baseline_dry_biomass_yield 
+            else:
+                self.dry_biomass_yield = dry_biomass_yield
     
-        @parameter(distribution=dist.copd, element='crude oil', baseline=dist.mcop, units='USD/barrel')
+        @parameter(distribution=dist.copd, element='crude oil', 
+                   baseline=dist.mcop, units='USD/barrel')
         def set_crude_oil_price(price):
             self.crude_oil_price = price
         
@@ -890,9 +942,9 @@ class Biorefinery:
         def set_cellulase_loading(cellulase_loading):
             if abs(number) in cellulosic_configurations: cellulase_mixer.enzyme_loading = cellulase_loading
         
-        @default(PRS_cost_item.cost, units='million USD', element='Pretreatment reactor system')
+        @default(PRS_cost_item.cost / 1e6, units='million USD', element='Pretreatment reactor system')
         def set_reactor_base_cost(base_cost):
-            PRS_cost_item.cost = base_cost
+            PRS_cost_item.cost = base_cost * 1e6
         
         @performance(85, 97.5, units='%', element='Pretreatment and saccharification', kind='coupled')
         def set_cane_glucose_yield(cane_glucose_yield):
@@ -1089,7 +1141,7 @@ class Biorefinery:
         @uniform(income_tax_lb, income_tax_ub, baseline=income_tax_lb, name='Income tax', units='%')
         def set_income_tax(income_tax):
             tea.income_tax = income_tax * 0.01
-        
+                    
         if agile:
             feedstock_flow = lambda: sys.flow_rates[feedstock] / kg_per_MT # MT / yr
             biodiesel_flow = lambda: (sys.flow_rates.get(cellulosic_based_diesel, 0.) + sys.flow_rates.get(biomass_based_diesel, 0.)) * biodiesel_L_per_kg # L / yr
@@ -1430,7 +1482,7 @@ class Biorefinery:
             x1 = 2 * x0
             NE0, TCI0 = tea.net_earnings, tea.TCI
             NE1, TCI1 = NE_and_TCI_at_biomass_yield(x1)
-            self.dry_biomass_yield = self.baseline_dry_biomass_yield # Reset dry biomass yield
+            self.dry_biomass_yield = x0 # Reset dry biomass yield
             mb_NE = linear_fit(x0, x1, NE0, NE1)
             An_TCI = exponential_fit(x0, x1, TCI0, TCI1)
             
@@ -1582,6 +1634,9 @@ class Biorefinery:
         if feedstock_line: self.set_feedstock_line(feedstock_line)
         if cache is not None: cache[key] = self
         
+        if case is not None:
+            getattr(self, case)()
+        
         # Avoid erros in Monte Carlo of microbial oil production with huge cell
         # mass production
         if number in cellulosic_configurations:
@@ -1592,12 +1647,10 @@ class Biorefinery:
             ] = 1.
         
         ## Simulation
-        sys.simulate()
-        feedstock.price = tea.solve_price(feedstock)
-        if reduce_chemicals: 
-            cane_sys.reduce_chemicals()
-            cane_sys._load_stream_links()
+        if simulate:
             sys.simulate()
+            if update_feedstock_price:
+                feedstock.price = tea.solve_price(feedstock)
         
         ## Tests
         if feedstock_line is None:

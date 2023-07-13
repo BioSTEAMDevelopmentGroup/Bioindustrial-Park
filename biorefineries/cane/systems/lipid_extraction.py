@@ -69,7 +69,7 @@ def create_post_fermentation_oil_separation_system(ins, outs, wastewater_concent
         flash=False,
     )
     EvX.target_oil_and_solids_content = target_oil_and_solids_content # kg / m3
-    EvX.remove_evaporators = False
+    EvX.remove_evaporators = True
     P_original = tuple(EvX.P)
     Pstart = P_original[0]
     Plast = P_original[-1]
@@ -80,7 +80,10 @@ def create_post_fermentation_oil_separation_system(ins, outs, wastewater_concent
         effluent = EvX.outs[0]
         moisture = effluent.imass['Water']
         total = effluent.F_mass
-        return EvX.target_oil_and_solids_content - 1000. * (1. - moisture / total)
+        if total == 0.: 
+            return 0.
+        else:
+            return EvX.target_oil_and_solids_content - 1000. * (1. - moisture / total)
     
     @EvX.add_specification(run=False)
     def adjust_evaporation():
@@ -93,7 +96,7 @@ def create_post_fermentation_oil_separation_system(ins, outs, wastewater_concent
         if y0 <= 0.:
             EvX.V = x0
             return
-        elif EvX.remove_evaporators:
+        else:
             EvX._load_components()
             for i in range(1, N):
                 if x_oil(1e-6) < 0.:
@@ -103,11 +106,6 @@ def create_post_fermentation_oil_separation_system(ins, outs, wastewater_concent
                     break    
             y1 = x_oil(x1)
             EvX.V = flx.IQ_interpolation(x_oil, x0, x1, y0, y1, x=V_last, ytol=1e-5, xtol=1e-6)
-        elif x_oil(1e-6) < 0.:
-            EvX.V = 1e-6
-        else:
-            y1 = x_oil(x1)
-            EvX.V = flx.IQ_interpolation(x_oil, 1e-6, x1, y0, y1, x=V_last, ytol=1e-5, xtol=1e-6)
         
     P607 = bst.Pump('P607', EvX-0, P=101325.)
     C603_2 = bst.LiquidsSplitCentrifuge('C603_2', P607-0, (lipid, ''), 

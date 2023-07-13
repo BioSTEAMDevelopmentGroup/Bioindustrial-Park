@@ -5,10 +5,14 @@ Created on Thu Nov  4 14:44:17 2021
 @author: yrc2
 """
 from biosteam import MockFeature
+from thermosteam.units_of_measure import format_units
+from thermosteam.utils import roundsigfigs
+import pandas as pd
 
 (set_juicing_oil_recovery, set_microbial_oil_recovery, set_bagasse_oil_recovery, 
  set_cane_operating_days, set_sorghum_operating_days, 
- set_available_land, set_crude_oil_price, set_baseline_feedstock_price,
+ set_available_land, set_dry_biomass_yield, set_crude_oil_price, 
+ set_baseline_feedstock_price,
  set_cellulosic_ethanol_price, set_advanced_ethanol_price,
  set_biomass_based_diesel_price, set_cellulosic_based_diesel_price,
  set_natural_gas_price, set_electricity_price, 
@@ -32,7 +36,8 @@ from biosteam import MockFeature
     MockFeature('Bagasse oil recovery', '%', '-'),
     MockFeature('Cane operating days', 'day/yr', '-'),
     MockFeature('Sorghum operating days', 'day/yr', '-'),
-    MockFeature('Available land', 'ha / yr', '-'),
+    MockFeature('Available land', 'ha / yr', 'Feedstock'),
+    MockFeature('Dry biomass yield', 'dry MT/ha', 'Feedstock'),
     MockFeature('Price', 'USD/barrel', 'Crude oil'),
     MockFeature('Price', 'USD/kg', 'Feedstock'),
     MockFeature('Price', 'USD/L', 'Cellulosic ethanol'),
@@ -162,3 +167,226 @@ lca_monte_carlo_derivative_metric_mockups = (
     GWP_electricity_derivative,
     GWP_crude_glycerol_derivative,
 )
+
+def get_YRCP2023_spearman_names(configuration, kind=None):
+    from biorefineries.cane import Biorefinery, YRCP2023
+    YRCP2023()
+    br = Biorefinery('O1', simulate=False)
+    name = 'name'
+    full_name = 'full_name'
+    tea_spearman_labels = {
+        br.set_juicing_oil_recovery: name,
+        br.set_microbial_oil_recovery: name,
+        br.set_bagasse_oil_recovery: name,
+        br.set_cane_operating_days: name,
+        br.set_available_land: name,
+        br.set_dry_biomass_yield: name,
+        br.set_crude_oil_price: full_name, 
+        br.set_baseline_feedstock_price: 'Baseline feedstock price',
+        # br.set_cellulosic_ethanol_price: full_name,
+        # br.set_advanced_ethanol_price: full_name,
+        br.set_biomass_based_diesel_price: full_name,
+        br.set_cellulosic_based_diesel_price: full_name,
+        br.set_natural_gas_price: full_name,
+        br.set_electricity_price: full_name, 
+        br.set_IRR: name,
+        br.set_crude_glycerol_price: full_name,
+        br.set_pure_glycerol_price: full_name,
+        br.set_saccharification_reaction_time: full_name,
+        br.set_cellulase_price: full_name, 
+        br.set_cellulase_loading: name,
+        br.set_reactor_base_cost: ('PTRS base cost', 'MMUSD'),
+        br.set_cane_glucose_yield: 'Glucan to glucose yield',
+        br.set_cane_xylose_yield: 'Xylan to xylose yield', 
+        # br.set_glucose_to_ethanol_yield: ('Glucose to ethanol yield', '% theoretical'),
+        # br.set_xylose_to_ethanol_yield: ('Xylose to ethanol yield', '% theoretical'),
+        # br.set_cofermentation_ethanol_titer: full_name,
+        # br.set_cofermentation_ethanol_productivity: full_name,
+        br.set_glucose_to_microbial_oil_yield: name, 
+        br.set_xylose_to_microbial_oil_yield: name, 
+        br.set_fermentation_microbial_oil_titer: name, 
+        br.set_fermentation_microbial_oil_productivity: name, 
+        br.set_cane_PL_content: name, 
+        br.set_cane_FFA_content: name,
+        br.set_cane_oil_content: name, 
+        br.set_TAG_to_FFA_conversion: name,
+    }
+    GWP_spearman_labels = {
+        br.set_feedstock_GWP: 'Baseline feedstock GWP',
+        br.set_methanol_GWP: full_name, 
+        br.set_pure_glycerine_GWP: full_name,
+        br.set_cellulase_GWP: full_name,
+        br.set_natural_gas_GWP: full_name,
+    }
+    if configuration == 'O7':
+        del GWP_spearman_labels[br.set_cellulase_GWP]
+        del GWP_spearman_labels[br.set_natural_gas_GWP]
+        del tea_spearman_labels[br.set_cellulosic_based_diesel_price]
+        del tea_spearman_labels[br.set_saccharification_reaction_time]
+        del tea_spearman_labels[br.set_cellulase_price]
+        del tea_spearman_labels[br.set_cellulase_loading]
+        del tea_spearman_labels[br.set_reactor_base_cost]
+        del tea_spearman_labels[br.set_cane_glucose_yield]
+        del tea_spearman_labels[br.set_cane_xylose_yield]
+        del tea_spearman_labels[br.set_xylose_to_microbial_oil_yield]
+        del tea_spearman_labels[br.set_bagasse_oil_recovery]
+    elif configuration == 'O9':
+        pass
+    else:
+        raise ValueError(configuration)
+    def with_units(f, name, units=None):
+        d = f.distribution
+        dname = type(d).__name__
+        if units is None: units = f.units
+        if dname == 'Triangle':
+            distribution = ', '.join([format(j, '.3g')
+                                      for j in d._repr.values()])
+        elif dname == 'Uniform':
+            distribution = ' $-$ '.join([format(j, '.3g')
+                                         for j in d._repr.values()])
+        return f"{name}\n[{distribution} {format_units(units)}]"
+        
+    def get_full_name(f):
+        a = f.element_name
+        if a == 'Cofermentation':
+            a = 'Co-Fermentation'
+        b = f.name
+        if b == 'GWP': 
+            return f"{a} {b}"
+        else:
+            return f"{a} {b.lower()}"
+        
+    for dct in (GWP_spearman_labels, tea_spearman_labels):
+        for i, j in tuple(dct.items()):
+            if j == name:
+                dct[i.index] = with_units(i, i.name)
+            elif j == full_name:
+                dct[i.index] = with_units(i, get_full_name(i))
+            elif isinstance(j, tuple):
+                dct[i.index] = with_units(i, *j)
+            elif isinstance(j, str):
+                dct[i.index] = with_units(i, j)
+            else:
+                raise TypeError(str(j))
+            del dct[i]
+    
+    lca_spearman_labels = {
+        i: j for i, j in
+        tea_spearman_labels.items()
+        if not any([k in ''.join(i) for k in ('price', 'cost', 'days', 'land', 'IRR')])
+    }
+    lca_spearman_labels.update(GWP_spearman_labels)
+    if kind == 'TEA':
+        return tea_spearman_labels
+    elif kind == 'LCA':
+        return lca_spearman_labels
+    else:
+        return tea_spearman_labels, lca_spearman_labels
+    
+def get_YRCP2023_distribution_table(kind=None, file=None):
+    from biorefineries.cane import Biorefinery, YRCP2023
+    YRCP2023()
+    br = Biorefinery('O1', simulate=False)
+    name = 'name'
+    full_name = 'full_name'
+    parameters = {
+        br.set_juicing_oil_recovery: name,
+        br.set_microbial_oil_recovery: name,
+        br.set_bagasse_oil_recovery: name,
+        br.set_cane_operating_days: name,
+        br.set_available_land: name,
+        br.set_dry_biomass_yield: name,
+        br.set_crude_oil_price: full_name, 
+        br.set_baseline_feedstock_price: 'Baseline feedstock price',
+        br.set_cellulosic_ethanol_price: full_name,
+        br.set_advanced_ethanol_price: full_name,
+        br.set_biomass_based_diesel_price: full_name,
+        br.set_cellulosic_based_diesel_price: full_name,
+        br.set_natural_gas_price: full_name,
+        br.set_electricity_price: full_name, 
+        br.set_IRR: name,
+        br.set_crude_glycerol_price: full_name,
+        br.set_pure_glycerol_price: full_name,
+        br.set_saccharification_reaction_time: full_name,
+        br.set_cellulase_price: full_name, 
+        br.set_cellulase_loading: name,
+        br.set_reactor_base_cost: ('PTRS base cost', 'MMUSD'),
+        br.set_cane_glucose_yield: 'Glucan to glucose yield',
+        br.set_cane_xylose_yield: 'Xylan to xylose yield', 
+        br.set_glucose_to_ethanol_yield: ('Glucose to ethanol yield', '% theoretical'),
+        br.set_xylose_to_ethanol_yield: ('Xylose to ethanol yield', '% theoretical'),
+        br.set_cofermentation_ethanol_titer: full_name,
+        br.set_cofermentation_ethanol_productivity: full_name,
+        br.set_glucose_to_microbial_oil_yield: name, 
+        br.set_xylose_to_microbial_oil_yield: name, 
+        br.set_fermentation_microbial_oil_titer: name, 
+        br.set_fermentation_microbial_oil_productivity: name, 
+        br.set_cane_PL_content: name, 
+        br.set_cane_FFA_content: name,
+        br.set_cane_oil_content: name, 
+        br.set_TAG_to_FFA_conversion: name,
+        br.set_feedstock_GWP: 'Baseline feedstock GWP',
+        br.set_methanol_GWP: full_name, 
+        br.set_pure_glycerine_GWP: full_name,
+        br.set_cellulase_GWP: full_name,
+        br.set_natural_gas_GWP: full_name,
+    }
+    def with_units(f, name, units=None):
+        if units is None: units = f.units
+        return f"{name}\n[{units}]"
+        
+    def get_distribution_dict(f):
+        d = f.distribution
+        dname = type(d).__name__
+        values = [roundsigfigs(j, 3) for j in d._repr.values()]
+        if dname == 'Triangle':
+            return {
+                'Shape': 'Triangular',
+                'Lower': values[0],
+                'Upper': values[2],
+                'Mode': values[1],
+            }
+            
+        elif dname == 'Uniform':
+            return {
+                'Shape': 'Uniform',
+                'Lower': values[0],
+                'Upper': values[1],
+                'Mode': '-',
+            }
+    
+    def get_full_name(f):
+        a = f.element_name
+        if a == 'Cofermentation':
+            a = 'Co-Fermentation'
+        b = f.name
+        if b == 'GWP': 
+            return f"{a} {b}"
+        else:
+            return f"{a} {b.lower()}"
+    
+    rows = []
+    for i, j in parameters.items():
+        if j == name:
+            parameter_name = with_units(i, i.name)
+        elif j == full_name:
+            parameter_name = with_units(i, get_full_name(i))
+        elif isinstance(j, tuple):
+            parameter_name = with_units(i, *j)
+        elif isinstance(j, str):
+            parameter_name = with_units(i, j)
+        else:
+            raise TypeError(str(j))
+        rows.append({
+            'Parameter': parameter_name,
+            'Baseline': roundsigfigs(i.baseline, 3),
+            **get_distribution_dict(i),
+        })
+    table = pd.DataFrame(
+        rows, 
+        index=list(
+            range(1, len(parameters) + 1)
+        )
+    )
+    # table.index.name = '#'
+    return table

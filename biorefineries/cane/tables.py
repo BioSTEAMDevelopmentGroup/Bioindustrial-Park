@@ -15,44 +15,52 @@ from thermosteam.utils import array_roundsigfigs
 
 __all__ = (
     'save_detailed_expenditure_tables',
-    'save_detailed_life_cycle_tables',   
+    'save_detailed_life_cycle_tables',  
+    'save_YRCP2023_distribution_table',
 )
 
-def save_detailed_expenditure_tables(sigfigs=3):
+def save_detailed_expenditure_tables(sigfigs=3, product=None):
     folder = os.path.dirname(__file__)
     folder = os.path.join(folder, 'results')
     filename = 'expenditures.xlsx'
     file = os.path.join(folder, filename)
     writer = pd.ExcelWriter(file)
+    if product is None: product = 'biodiesel'
     
     def get_sys(name):
-        brf = Biorefinery(name)
+        brf = Biorefinery(name, update_feedstock_price=False)
         return brf.sys
     
     def get_tea(name):
-        brf = Biorefinery(name)
+        brf = Biorefinery(name, update_feedstock_price=False)
         return brf.tea
-    IDs = (
-        'S1',
-        'S2', 
-        'O1', 
-        'O2',
-        'O7',
-        'O8',
-    )
-    names = [
-        'Sugarcane E-DC',
-        'Sugarcane E-ICF',
-        # 'Sugarcane B-DC',
-        # 'Sugarcane B-ICF',
-        'Oilcane EB-DC',
-        'Oilcane EB-ICF',
-        'Oilcane B-DC',
-        'Oilcane B-ICF',
-    ]
+    if product == 'biodiesel':
+        cane.YRCP2023()
+        IDs = (
+            'O7.WT',
+            'O9.WT',
+        )
+        names = [
+            'DC',
+            'ICF',
+        ]
+        product_IDs = [
+            'cellulosic_based_diesel',
+            'biomass_based_diesel'
+        ]
+    else:
+        IDs = (
+            'S1',
+            'S2', 
+            'O1', 
+            'O2'
+        )
+        product_IDs = [
+            'advanced_ethanol', 
+            'cellulosic_ethanol'
+        ]
     syss = [get_sys(i) for i in IDs]
     teas = [get_tea(i) for i in IDs]
-    product_IDs = ['advanced_ethanol', 'cellulosic_ethanol', 'biodiesel']
     tables = {
         'VOC': bst.report.voc_table(syss, product_IDs, names, with_products=True),
         'FOC': foc_table(teas, names),
@@ -70,7 +78,7 @@ def save_detailed_expenditure_tables(sigfigs=3):
         #     )
         #     tables[key] = table.reindex(new_index)
         table.to_excel(writer, key)
-    writer.save()
+    writer.close()
     return tables
     
 def save_detailed_life_cycle_tables(sigfigs=3, product=None):
@@ -115,13 +123,12 @@ def save_detailed_life_cycle_tables(sigfigs=3, product=None):
              'Economic allocation',
              'Displacement allocation']
     if product == 'biodiesel':
-        IDs = ('O1', 'O2', 'O7', 'O8')
+        cane.YRCP2023()
+        IDs = ('O7.WT', 'O9.WT')
         streams = [(get(i, 'cellulosic_based_diesel'), get(i, 'biomass_based_diesel')) for i in IDs]
         columns = [
-            'Oilcane EB-DC [kg∙CO2e∙kg-1]',
-            'Oilcane EB-ICF [kg∙CO2e∙kg-1]',
-            'Oilcane B-DC [kg∙CO2e∙kg-1]',
-            'Oilcane B-ICF [kg∙CO2e∙kg-1]',
+            'DC [kg∙CO2e∙kg-1]',
+            'ICF [kg∙CO2e∙kg-1]',
         ]
     elif product == 'ethanol':
         IDs = ('S1', 'S2', 'O1', 'O2')
@@ -164,5 +171,14 @@ def save_detailed_life_cycle_tables(sigfigs=3, product=None):
     for key, table in tables.items(): 
         array_roundsigfigs(table.values, sigfigs=3, inplace=True)
         table.to_excel(writer, key) 
-    writer.save()
+    writer.close()
     return tables
+
+def save_YRCP2023_distribution_table():
+    folder = os.path.dirname(__file__)
+    folder = os.path.join(folder, 'results')
+    filename = 'parameters.xlsx'
+    file = os.path.join(folder, filename)
+    table = cane.get_YRCP2023_distribution_table() 
+    table.to_excel(file)
+    return table

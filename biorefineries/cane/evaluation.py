@@ -28,6 +28,7 @@ __all__ = (
     'run_sugarcane_microbial_oil_and_ethanol',
     'run_oilcane_microbial_oil_and_ethanol_across_oil_content',
     'run_oilcane_microbial_oil_and_ethanol_across_lines',
+    'run_oilcane_ethanol_constant_biomass',
 )
 
 configuration_names = (
@@ -133,9 +134,9 @@ def evaluate_metrics_at_biomass_yield(oil, dry_biomass_yield):
 @no_derivative
 def evaluate_metrics_oil_recovery_integration(microbial_oil_recovery, microbial_oil_yield, productivity, titer):
     nrows = productivity.size
-    data = np.zeros([nrows, 2, N_metrics])
+    data = np.zeros([nrows, 3, N_metrics])
     for i in range(nrows):
-        for j, configuration in enumerate(['O9', 'O8']):
+        for j, configuration in enumerate(['O7', 'O9', 'O8']):
             # print(configuration, microbial_oil_recovery, microbial_oil_yield)
             br = cane.Biorefinery(configuration)
             br.set_fermentation_microbial_oil_productivity.setter(productivity[i])
@@ -234,6 +235,7 @@ def run_uncertainty_and_sensitivity(name, N, rule='L',
         )
     elif across_oil_content:
         evaluate = None
+        # Remove cane oil content setter and replace with ROI target setter
         parameter = br.set_cane_oil_content
         parameter.name = 'ROI target'
         parameter.element = 'Biorefinery'
@@ -241,6 +243,10 @@ def run_uncertainty_and_sensitivity(name, N, rule='L',
         br.set_ROI_target = parameter
         parameter.units = '%'
         del br.set_cane_oil_content
+        # Ignore dry biomass yield setter
+        parameter = br.set_dry_biomass_yield
+        parameter.setter(br.baseline_dry_biomass_yield)
+        parameter.setter = lambda parameter: None
         np.random.seed(1)
         samples = br.model.sample(N, rule)
         
@@ -248,7 +254,7 @@ def run_uncertainty_and_sensitivity(name, N, rule='L',
             br.ROI_target = ROI_target
             
         br.set_ROI_target.setter = set_ROI_target
-        coordinate = np.linspace(0, 0.1, 15)
+        coordinate = np.linspace(0, 0.1, 20)
         if across_oil_content == 'oilcane vs sugarcane':
             # Replace `set_cane_oil_content` parameter with `set_ROI_target`.
             # The actual distribution does not matter because these values are updated
@@ -421,7 +427,16 @@ def run_sugarcane_microbial_oil_and_ethanol(N=None):
     run_uncertainty_and_sensitivity('O9', N)
     # run_uncertainty_and_sensitivity('O8', N, line='WT')
     # run_uncertainty_and_sensitivity('O8', N)
-    
+
+def run_oilcane_ethanol_constant_biomass(N=None):
+    if N is None: N = 2000
+    filterwarnings('ignore')
+    cane.YRCP2023()
+    run_uncertainty_and_sensitivity('O1|constant biomass yield', N)
+    run_uncertainty_and_sensitivity('O2|constant biomass yield', N)
+    run_uncertainty_and_sensitivity('O7|constant biomass yield', N)
+    run_uncertainty_and_sensitivity('O9|constant biomass yield', N)
+
 def run_oilcane_microbial_oil_and_ethanol_across_oil_content(N=None):
     if N is None: N = 200
     filterwarnings('ignore')

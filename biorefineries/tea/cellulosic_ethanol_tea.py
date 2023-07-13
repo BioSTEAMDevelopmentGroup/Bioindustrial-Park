@@ -222,7 +222,6 @@ def capex_table(teas, names=None):
     TCI = FCI + working_capital
     capex.entry('Total capital investment (TCI)', TCI)
     if names is None: names = [i.system.ID for i in teas]
-    names = [i + ' MM$' for i in names]
     return capex.table(names)
 
 voc_table = bst.report.voc_table
@@ -238,5 +237,4 @@ def foc_table(teas, names=None):
     foc.entry('Maintenance', tea.maintenance * ISBL, f'{tea.maintenance:.1%} of ISBL')
     foc.entry('Property insurance', tea.property_insurance * ISBL, f'{tea.property_insurance:.1%} of ISBL')
     if names is None: names = [i.system.ID for i in teas]
-    names = [i + ' MM$/yr' for i in names]
     return foc.table(names)

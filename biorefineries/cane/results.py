@@ -29,6 +29,8 @@ __all__ = (
     'montecarlo_results_agile_comparison',
     'montecarlo_results_crude_comparison',
     'get_minimum_GWP_reduction',
+    'mcr_sc_microbial_oil_comparison',
+    'mcr_sc_microbial_oil',
 )
 
 results_folder = os.path.join(os.path.dirname(__file__), 'results')
@@ -37,19 +39,21 @@ images_folder = os.path.join(os.path.dirname(__file__), 'images')
 # %% Load simulation data
 
 def spearman_file(name):
-    number, agile, line = parse_configuration(name)
+    number, agile, line, case = parse_configuration(name)
     filename = f'oilcane_spearman_{number}'
     if agile: filename += '_agile'
     if line: filename += '_' + line
+    if case: filename += '_' + case
     filename += '.xlsx'
     return os.path.join(results_folder, filename)
 
 def monte_carlo_file(name, across_lines=False, across_oil_content=None, extention='xlsx'):
-    number, agile, line = parse_configuration(name)
+    number, agile, line, case = parse_configuration(name)
     filename = f'oilcane_monte_carlo_{number}'
     if agile: filename += '_agile'
     if line: filename += '_' + line
     if across_lines: filename += '_across_lines'
+    if case: filename += '_' + case
     if across_oil_content: 
         if isinstance(across_oil_content, str):
             filename += f"_{across_oil_content.replace(' ', '_')}"
@@ -59,12 +63,18 @@ def monte_carlo_file(name, across_lines=False, across_oil_content=None, extentio
     return os.path.join(results_folder, filename)
 
 def autoload_file_name(name):
-    if ',' in name:
-        name, line = name.split(',')
+    if '.' in name:
+        name, line = name.split('.')
     else:
         line = None
+    if '|' in name:
+        name, case = name.split('|')
+        case = case.replace(' ', '_')
+    else:
+        case = None
     filename = str(name).replace('*', '_agile')
     if line: filename += '_' + line
+    if case: filename += '_' + case
     return os.path.join(results_folder, filename)
 
 def get_monte_carlo_across_oil_content(name, metric, derivative=False):
@@ -323,3 +333,45 @@ def montecarlo_results_crude_comparison():
             'O2 - O4',
         ],
     )
+
+def mcr_sc_microbial_oil_comparison():
+    return montecarlo_results_short(
+        names=[
+            'O7.WT - S1.WT',
+            'O9.WT - S2.WT',
+        ],
+        metrics=[
+            f.ROI,
+            f.GWP_biofuel_allocation,
+        ]
+    )
+
+def mcr_sc_microbial_oil():
+    return montecarlo_results_short(
+        names=[
+            'O7.WT',
+            'O9.WT',
+        ],
+        metrics=[
+            f.MBSP,
+            f.GWP_biodiesel_allocation,
+            f.biodiesel_yield,
+        ]
+    )
+
+def affordable_biomass_yield_loss(M, p5, p95, oil_content=None):
+    baseline = 25.6
+    if oil_content is None: oil_content = 1
+    M = roundsigfigs(
+        (100 - 100 * M / baseline) / oil_content,
+        3
+    )
+    p5 = roundsigfigs(
+        (100 - 100 * p5 / baseline) / oil_content,
+        3
+    )
+    p95 = roundsigfigs(
+        (100 - 100 * p95 / baseline) / oil_content,
+        3
+    )
+    return f"{M:.3g} [{p95}, {p5}] %"
