@@ -179,6 +179,7 @@ def crude_HOSO_oil_to_biodiesel(ins,outs,X_tes):
                                                                              crude_glycerol,
                                                                              waste_to_boilerturbogenerator),
                                                                      transesterification_reactions = reactions)
+
 #########################################################################################################
 # After degumming and production of biodiesel, it is sent for dihydroxylation
 # The flowrates for both the tungstic acid and H2O2 are adjusted acc to the flowrate of biodiesel coming 
@@ -389,15 +390,16 @@ def organic_phase_separation_and_catalyst_recovery(ins,outs):
                                             split = ({'Hydrogen_peroxide': 0.0,   
                                                       'Water': 0.5,#Assuming full separation
                                                       #intermediate products in the org phase
-                                                      'MDHSA': 1,'Methyl_dihydroxy_palmitate':1,'Tetrahydroxy_octadecanoate':1,
+                                                      'MDHSA': 1,'Tetrahydroxy_octadecanoate':1,
                                                       #products in the org phase
                                                       'Pelargonic_acid' : 1,'Azelaic_acid': 1,'Methyl_oleate': 1,'Monomethyl_azelate' : 1,
                                                       'Monomethyl_suberate': 1,'Caprylic_acid': 1,'Hexanoic_acid': 1,'Heptanoic_acid': 1,
                                                       'Malonic_acid': 0,'Methanol':0,'Glycerol': 0,'Methyl_oleate': 1,
                                                       'Methyl_palmitate': 1,'Methyl_stearate':1,'Methyl_linoleate':1,
                                                       'Methyl_linolenate':1,'Methyl_caprylate':1,
-                                                      'Tungstic_acid': 0,'Cobalt_ion' :0,'Acetate_ion': 0,'Cobalt_acetate_tetrahydrate':0,
-                                                      'Methyl_dihydroxy_palmitate':1,'Tetrahydroxy_octadecanoate':1,
+                                                      'Tungstic_acid': 0,
+                                                      'Cobalt_acetate_tetrahydrate':0,
+                                                      'Tetrahydroxy_octadecanoate':1,
                                                       'Hexahydroxy_octadecanoate':1,  'Propanoic_acid':0,  'Monoester_MDHSA_MMA':1,
                                                       'Diester_MDHSA_MMA':1,'Monoester_MDHSA_PA':1,'Diester_MDHSA_PA':1,
                                                       'Myristic_acid':1,
@@ -473,7 +475,6 @@ def organic_phase_separation_and_catalyst_recovery(ins,outs):
                                 split = {'Hydrogen_peroxide': 0.0,   
                                                 'Water': 0.0,
                                                 'Tungstic_acid': 0,
-                                                'Cobalt_ion' :0,'Acetate_ion': 0,
                                                 'Cobalt_acetate_tetrahydrate':0,
                                                 #products arising out of catalyst separation
                                                 'Sodium_hydroxide_liquid':0,
@@ -544,8 +545,8 @@ def organic_phase_separation_and_catalyst_recovery(ins,outs):
                                 outs = ('moist_calcium_tungstate',
                                         wastewater8),
                                 split = {'Hydrogen_peroxide': 0, 'Water': 0,
-                                         'Tungstic_acid': 0,'Cobalt_ion' :0,
-                                         'Acetate_ion': 0,'Cobalt_chloride':0,
+                                         'Tungstic_acid': 0,
+                                         'Cobalt_chloride':0,
                                          'Calcium_hydroxide':0,'Calcium_chloride':0,
                                          'Calcium_tungstate':1,'Calcium_acetate':0,
                                          'Cobalt_hydroxide':0,'HCl2':0,'Malonic_acid':0},
@@ -570,8 +571,6 @@ def organic_phase_separation_and_catalyst_recovery(ins,outs):
                                 split = {'Hydrogen_peroxide': 0.0,   
                                                 'Water': 0.2,
                                                 'Tungstic_acid': 0,
-                                                'Cobalt_ion' :0,
-                                                'Acetate_ion': 0,
                                                 'Cobalt_chloride':0,'Calcium_hydroxide':0,
                                                 'Calcium_chloride':0,'Calcium_tungstate':1,
                                                 'Calcium_acetate':0,'Cobalt_hydroxide':0,
@@ -586,8 +585,6 @@ def organic_phase_separation_and_catalyst_recovery(ins,outs):
                          split = {'Hydrogen_peroxide': 1,   
                                          'Water': 1,
                                          'Tungstic_acid': 1,
-                                         'Cobalt_ion' :1,
-                                         'Acetate_ion': 1,
                                          'Cobalt_chloride':1,
                                          'Calcium_hydroxide':0,
                                          'Calcium_chloride':1,'Calcium_tungstate':0,
@@ -640,8 +637,6 @@ def organic_phase_separation_and_catalyst_recovery(ins,outs):
                                 split = {'Hydrogen_peroxide': 0.0,   
                                         'Water': 0.07,
                                         'Tungstic_acid': 1,
-                                        'Cobalt_ion' :0,
-                                        'Acetate_ion': 0,
                                         'Cobalt_chloride':0,'Calcium_hydroxide':0,
                                         'Calcium_chloride':0,'Calcium_tungstate':0,
                                         'Calcium_acetate':0,'Cobalt_hydroxide':0,
@@ -656,8 +651,6 @@ def organic_phase_separation_and_catalyst_recovery(ins,outs):
                          split = {'Hydrogen_peroxide': 1,   
                                          'Water': 1,
                                          'Tungstic_acid': 0,
-                                         'Cobalt_ion' :1,
-                                         'Acetate_ion': 1,
                                          'Cobalt_chloride':1,
                                          'Calcium_hydroxide':0,
                                          'Calcium_chloride':1,'Calcium_tungstate':1,

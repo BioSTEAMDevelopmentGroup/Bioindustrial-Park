@@ -7,7 +7,7 @@ Created on Tue Mar 21 17:16:50 2023
 
 #Properties of TAGs based on 
 #Heats of formation
-#TAG heat of formation values are based on table 5, equations (e) to (h) (Zong et al., 2010)
+#TAG heat of formation values are based on table 5, equations (e) to (h) (Zong et al., 2010),corrected document
 def TAG_Hf(name,carbon_atoms = 0,double_bonds = 0):
 # relationship between liquid enthalpy of formation, carbon number and unsaturation
     if name == 'Saturated':
@@ -18,14 +18,58 @@ def TAG_Hf(name,carbon_atoms = 0,double_bonds = 0):
         return 1000*(316.67*double_bonds - 2466.4)#C18 compound number of double bonds
 
 
-# TAG_Hfs = {'OOO': 1000*(-76.494*18 - 815.18),
-#             'LnLnLn': 1000*(-316.67*3 - 2466.4),
-#             'LLL':(((2/3)*(-76.494*18 - 815.18))+((1/3)*(-316.67*2 - 2466.4)))*1000,
-#             'PPP': 1000*(-59.571*16 - 1358.7),
-#             'SSS': 1000*(-59.571*18 - 1358.7 ),
-#             'Methyl_dihydroxy_palmitate': -892*1000, #Based on palmitic acid, Ref: https://en.wikipedia.org/wiki/Palmitic_acid
-#             'Tetrahydroxy_octadecanoate' : -634.7*1000 #Based on Hf for Linoleic acid, Ref:https://webbook.nist.gov/cgi/cbook.cgi?ID=C60333&Mask=2
-#             }
+MMA_properties = {'Pc': 2.39587E+06,
+                  'Tc': 837.971,
+                  'omega': 1.09913,
+                  'Tb': 650.2,
+                  }
+TAG_Dortmund_groups = {'LLL': {'CH3': 3, 'CH2': 11+11+11+2,'CH=CH': 2+2+2,'CH2COO':3,'CH':1},
+                       
+    }
+
+
+#Models for Psat (Works for temperatures between 323.15K to 573.15K)
+#The model assumes that double bonds in the fatty acid have no effect on the vapour pressure of the TAG
+#This model is valid for carbon numbers 4 to 22
+def TAG_Psat_model(T):
+      carbon_number = 18
+      R = 8314.3 #J/(kmol.K)
+      theta = 298.15 #K
+      ln10 = 2.30258509 #unitless
+      delta_Gvap_FA_fragment = 1653848.04*carbon_number + 22009767.68 #J/kmol
+      delta_Hvap_FA_fragment = 2093479.64*carbon_number + 31397826.69 #J/kmol
+      delta_Gvap_gly_fragment = -7.388*1e7 #J/kmol
+      delta_Hvap_gly_fragment = -3.476*1e7 #J/kmol
+      delta_Hvap = (3*(delta_Hvap_FA_fragment))+delta_Hvap_gly_fragment #J/kmol
+      delta_Gvap = (3*(delta_Gvap_FA_fragment))+delta_Gvap_gly_fragment #J/kmol
+      return ((-delta_Gvap/(R*theta*ln10))+ ((delta_Hvap/R*ln10)*((1/theta) - (1/T)))) #function of T(K)
+
+
+#Heat capacity models
+#The model returns values in J/mol.K
+#saturated fatty acid fragments with carbon number ranging from 4 to 18 are regressed against literature heat capacity data 
+#temperatures ranging from 298.15 K to 453.15 K.
+def TAG_Cnl_model(T):
+    carbon_number = 18 #Currently set for linoleic acid (C18)
+    A1 = 21028.920*carbon_number - 2485.721 #(J/(kmol K))
+    A2 = 31.459476*carbon_number - 82.038794 #(J/(kmol K2))
+    return ((3*(A1+A2*T)) + ((6.1355*1e4) + 148.23*T))*(1/1000)#J/mol
+#For unsaturated compounds values are available in Table 8 
+def LLL_Cnl_model(T):
+    A1 =  3.9760 * 1e5
+    A2 = 540.89
+    return ((3*(A1+(A2*T))) + ((6.1355*1e4) + 148.23*T))*(1/1000)
+
+#Molar volumes
+#Temp  range from 253.15 K to 516.15 K
+def LLL_Vl_model(T):
+    B1 =  4.1679 #kmol/m3
+    B2 = 7.4102/1e4 #K-1
+    B1_gly =  20.048#kmol/m3
+    B2_gly = 7.6923/1e4#K-1
+    return ((3*(1 + B2*T)/B1) + ((1+ B2_gly*T)/B1_gly))*(1/1000)
+
+
 
 #Fitting data for MMA based on ChemSep
 # Ts = [i + 273.15 for i in  (148, 159, 120, 185.5, )]
@@ -38,44 +82,4 @@ def TAG_Hf(name,carbon_atoms = 0,double_bonds = 0):
 # chems['Monomethyl_azelate'].Psat.T_limits[method] = (100, chems['Monomethyl_azelate'].Psat.Tc)
 #Chemical compound generator DWSIM
 
-
-
-
-MMA_properties = {'Pc': 2.39587E+06,
-                  'Tc': 837.971,
-                  'omega': 1.09913,
-                  'Tb': 650.2,
-                  }
-TAG_Dortmund_groups = {'LLL': {'CH3': 3, 'CH2': 11+11+11+2,'CH=CH': 2+2+2,'CH2COO':3,'CH':1},
-                       
-    }
-#Characterisation factors
-HOSO_GWP = {'GWP100': 0.76*99.99 + 0.00035559*0.01},##Global warming (incl. iLUC and biogenic CO2 uptake) in kg CO2-eq, Ref: #http://dx.doi.org/10.1016/j.jclepro.2014.10.011
-#General model for 
-# Hvap_f = 2093479.64*C_length+ 31397826.69
-# Gvap_f = 1653848.04*C_length + 22009767.68
-
-#Models for Psat
-def OOO_CCPsat_model(T):
-      R = 8.314
-      theta = 298.15
-      ln10 = 2.30258509
-      return ((-91320000/(R*theta*ln10))+ ((169240000/R*ln10)*((1/theta) - (1/T))))
-def LLL_CCPsat_model(T):
-          R = 8.314
-          theta = 298.15
-          ln10 = 2.30258509
-          return (-91320000/(R*theta*ln10))+ ((169240000/R*ln10)*((1/theta) - (1/T)))
-
-#Heat capacity models
-#The model returns values in J/mol.K
-def OOO_Cnl_model(T):
-      return (3*(397600 + 540.89*T) + (61355 + 148.23*T))*(1/1000)
-#Molar volumes
-def OOO_Vl_model(T):
-      return ((3*((1 + 0.0009865*T)/4.2924)) + ((1 + 0.00076923*T)/20.048))*(1/1000)
-def LLL_Vl_model(T):
-      return ((3*((1 + 0.00074102*T)/4.1679)) + ((1 + 0.00076923*T)/20.048))*(1/1000)
-def SSS_Vl_model(T):
-      return ((3*((1 + 0.0014091*T)/4.6326))+  ((1 + 0.00076923*T)/20.048))*(1/1000)
 

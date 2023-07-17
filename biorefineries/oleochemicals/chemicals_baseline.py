@@ -11,6 +11,7 @@ from thermo import TDependentProperty
 from biorefineries.oleochemicals import TAG_properties
 from TAG_properties import TAG_Hf
 from TAG_properties import *
+
 #chems is a list of all the chemicals used in the azelaic acid production process
 chems = tmo.Chemicals([
 #1.Biodiesel production
@@ -40,9 +41,9 @@ chems = tmo.Chemicals([
                      Hf = TAG_Hf(name = 'Saturated',carbon_atoms = 18),
                      phase = 'l'),
 #Base used for neutralisation of free fatty acids in the crude oil mixture        
-        tmo.Chemical('Sodium_hydroxide_liquid',
+        tmo.Chemical('Sodium_hydroxide_solid',
                      search_ID ='NaOH',                     
-                     phase = 'l', ),     
+                     phase = 's', ),     
 #Chemical for acid degumming         
         tmo.Chemical('Citric_acid'),
 #Chemical for representing the gumns (phospholipids)        
@@ -56,10 +57,11 @@ chems = tmo.Chemicals([
                       phase = 'l',#taken from cane biorefinery in Bioindustrial park
                       ), 
 #Tranesterification section   
-#Transesterification catalyst     
+#Transesterification catalyst
+#Phase based on cane.chemicals.py     
         tmo.Chemical('Sodium_methoxide',
                      formula ='NaOCH3',
-                     phase = 'l',
+                     phase = 's',
                      default = True), 
 #Tranesterification reagent        
         tmo.Chemical('Methanol'), 
@@ -169,12 +171,12 @@ chems = tmo.Chemicals([
                   Tb = 1746,#Tungstic_acid boiling point: https://en.wikipedia.org/wiki/Tungstic_acid
                   default = True,
                   formula = 'H2WO4',
-                  phase = 'l'),
+                  phase = 's'),
         tmo.Chemical('Cobalt_acetate_tetrahydrate',
                       search_ID = '6147-53-1',
                       Tb = 117.1+273.15,
                       Hf = -2.7151e+05, #Assumed to be the same as cobalt chloride for now
-                      phase = 'l',
+                      phase = 's',
                       ),
 #Catalyst recovery section
 #Reagents and products of the catalyst recovery section
@@ -186,7 +188,7 @@ chems = tmo.Chemicals([
         tmo.Chemical('Hydrogen',default = True),  
         tmo.Chemical('Cobalt_chloride',
                      search_ID = '7646-79-9', 
-                     phase = 'l'
+                     phase = 's'
                      ),
         tmo.Chemical('Acetate',phase = 'l', default = True),
         tmo.Chemical('Calcium_hydroxide',default = True,phase = 'l'),
@@ -199,16 +201,18 @@ chems = tmo.Chemicals([
                        phase = 'l',
                        Hf = -1002.82*1000),#Ref: Value for calcium hydroxide https://www.chemeurope.com/en/encyclopedia/Standard_enthalpy_change_of_formation_%28data_table%29.html
         tmo.Chemical('Calcium_acetate',phase = 'l', default = True),
-        tmo.Chemical('Cobalt_hydroxide',phase = 'l', default = True),
+        tmo.Chemical('Cobalt_hydroxide',phase = 's', default = True), #Solid because not soluble in water
         tmo.Chemical('HCl2',phase = 'l',search_ID = 'HCl'),
         tmo.Chemical('Sodium_acetate', phase = 'l'),
-        tmo.Chemical('Tungsten',default = True), #TODO: try phase = 'l'
+        tmo.Chemical('Tungsten',default = True, phase = 's'), #TODO: try phase = 'l'
+        tmo.Chemical('Chromic_acid',default = True,phase = 's'),#Because properties in the same vertical column of a periodic table remain the same
 #Hydrolysis section        
 #Products of hydrolysis
+
         tmo.Chemical('Palmitic_acid'),
         tmo.Chemical('Stearic_acid'),
         tmo.Chemical('Oleic_acid'),
-        tmo.Chemical('Sodium_oleate',Tb = 633 ,Hf = -764800.0,phase ='l'),
+        tmo.Chemical('Sodium_oleate',Tb = 633 ,Hf = -764800.0,phase ='l'),#Hf based on Oleic acid
         tmo.Chemical('Linoleic_acid', search_ID = '60-33-3'),
         tmo.Chemical('Linolenic_acid'),
         tmo.Chemical('Palmitoleic_acid', search_ID = '373-49-9'),
@@ -216,6 +220,7 @@ chems = tmo.Chemicals([
 #Resin for hydrolysis
 ##Sulfonated_polystyrene with a search_ID = '98-70-4', lacks Hvap data, hence polystyrene's properties were used
 ##Boiling point based on amberlyte
+#Solid phase as the chemical beads are insoluble in water
 # Ref:##https://www.chemsrc.com/en/cas/39389-20-3_843683.html#:~:text=amberlyst%28r%29%2015%20CAS%20Number%3A%2039389-20-3%3A%20Molecular%20Weight%3A%20314.39900%3A,Point%3A%20266.3%C2%BAC%3A%20Symbol%3A%20GHS07%3A%20Signal%20Word%3A%20Warning%20%C3%97
         tmo.Chemical('polystyrene_based_catalyst',
                      search_ID='Polystyrene',
@@ -224,8 +229,7 @@ chems = tmo.Chemicals([
                      default=True),  
 #Multistage countercurrent extraction        
 #Solvent for countercurrent extraction of monocarboxylic acids
-        tmo.Chemical('Heptane'), 
-        
+        tmo.Chemical('Heptane'),
 #Facilities        
 #Natural gas for heating purposes 
         tmo.Chemical('Natural_gas',
@@ -272,58 +276,66 @@ chems['Monomethyl_azelate'].Tc = 837.971#Chemical compound generator DWSIM
 chems['Monomethyl_azelate'].omega = 1.09913#Chemical compound generator DWSIM
 chems['Monomethyl_azelate'].Tb = 650.2#Chemical compound generator DWSIM
 
+#Changing liquid heat capacity methods
 chems.Methyl_palmitate.Cn.l.method = 'ROWLINSON_BONDI'
 chems.Palmitic_acid.Cn.l.method = 'ROWLINSON_BONDI'
 chems.Stearic_acid.Cn.l.method = 'ROWLINSON_BONDI'
 chems.Oleic_acid.Cn.l.method = 'ROWLINSON_BONDI'
 chems.Natural_gas.Cn.l.method = 'DADGOSTAR_SHAW' #This method works for hydrocarbons
-
-
+chems.Monomethyl_azelate.Cn.g.method = 'LASTOVKA_SHAW'
+#Making assumptions for viscosity of TAGS
 TAGs_with_unknown_props = [ 'LLL','OOO','LnLnLn']
 for i in TAGs_with_unknown_props:
     chems[i].copy_models_from(chems.PPP,['mu'])  
-
+    
+#Making assumptions for Sodium oleate
 chems.Sodium_oleate.copy_models_from(chems.Oleic_acid,['mu','Hvap','Psat','Cn','V'])
 
 ## The oxidative cleavage catalyst properties are based on cobalt chloride
 chems.Cobalt_acetate_tetrahydrate.copy_models_from(chems.Cobalt_chloride,
                                                       ['sigma',  
                                                        'kappa',
+                                                       'mu'
                                                        ])
-chems.Tungstic_acid.copy_models_from(chems.Tungsten,
+chems.Tungstic_acid.copy_models_from(chems.Chromic_acid,
                                      ['Hvap','Psat'])
-chems.Sodium_tungstate.copy_models_from(chems.Tungsten,
+chems.Sodium_tungstate.copy_models_from(chems.Chromic_acid,
                                      ['Hvap','Psat'])
-for i in ['Cobalt_acetate_tetrahydrate','Sodium_acetate',
-          'Cobalt_hydroxide','Tungstic_acid','Hydrogen_peroxide','Sodium_tungstate']:
-    V = fn.rho_to_V(rho=1e5, MW=chems[i].MW)
-    chems[i].V.add_model(V, top_priority=True)
-chems.Calcium_hydroxide.V.add_model(fn.rho_to_V(2.34,
-                                                chems.Calcium_hydroxide.MW),
-                                                top_priority = True)
-    
-chems.Calcium_tungstate.copy_models_from(chems.Tungsten,
+
+chems.Calcium_tungstate.copy_models_from(chems.Chromic_acid,
                                             ['Hvap',
                                              'Psat','Cn'])
 chems.Calcium_tungstate.V.add_model(fn.rho_to_V(5800,
                                                 chems.Calcium_tungstate.MW),
                                                 top_priority = True)
+#Assuming that the following compounds do not occupy much volume
+for i in ['Cobalt_acetate_tetrahydrate','Sodium_acetate',
+          'Cobalt_hydroxide','Tungstic_acid','Hydrogen_peroxide','Sodium_tungstate']:
+    V = fn.rho_to_V(rho=1e5, MW=chems[i].MW)
+    chems[i].V.add_model(V, top_priority=True)
+    
+#TODO: check assumpt    
+chems.Calcium_hydroxide.V.add_model(fn.rho_to_V(2.34,
+                                                chems.Calcium_hydroxide.MW),
+                                                top_priority = True)
+    
+
 chems.Calcium_acetate.V.add_method(chems.Calcium_acetate.MW*0.000001/1.5)#density from: https://pubchem.ncbi.nlm.nih.gov/compound/Calcium-acetate#section=Density
 #TODO: change the below
 chems.Calcium_hydroxide.copy_models_from(tmo.Chemical('NaOH'),['Psat'])
 chems.Calcium_chloride.copy_models_from(tmo.Chemical('NaOH'),['Psat'])
 chems.Calcium_acetate.copy_models_from(tmo.Chemical('NaOH'),['Psat'])
+chems.Cobalt_hydroxide.copy_models_from(chems.Cobalt_chloride,['Hvap','Psat'])
+chems.Cobalt_hydroxide.Tb = 100+273.15 #https://www.chembk.com/en/chem/Cobalt%20hydroxide
 
-## Modelling properties of dihydroxylated compounds as MDHSA
-##TODO: find better assumptions for these below
-                                             
-chems.Tetrahydroxy_octadecanoate.copy_models_from(chems.MDHSA,['Hvap','Psat',
-                                                               'Cn','V','mu',])
+
+## Modelling properties of dihydroxylated compounds, mono and diester side products as MDHSA                                    
+chems.Tetrahydroxy_octadecanoate.copy_models_from(chems.MDHSA,['Hvap','Psat','Cn','V','mu',])
 chems.Tetrahydroxy_octadecanoate.Tc = 1379.78 #DWSIM
 chems.Tetrahydroxy_octadecanoate.Pc = 1483852.13#DWSIM
 chems.Tetrahydroxy_octadecanoate.omega  = 0.84#DWSIM
-chems.Hexahydroxy_octadecanoate.copy_models_from(chems.MDHSA,['Hvap','Psat',
-                                                              'Cn','V','mu'])
+
+chems.Hexahydroxy_octadecanoate.copy_models_from(chems.MDHSA,['Hvap','Psat','Cn','V','mu'])
 chems.Hexahydroxy_octadecanoate.Pc = 1741912.65#DWSIM
 chems.Hexahydroxy_octadecanoate.Tc = 1785.56#DWSIM
 chems.Hexahydroxy_octadecanoate.omega = 0.28#DWSIM
@@ -348,8 +360,6 @@ chems.Diester_MDHSA_MMA.Tc = 2269.6#DWSIM
 chems.Diester_MDHSA_MMA.omega = -0.46#DWSIM
 chems.Diester_MDHSA_MMA.copy_models_from(chems.MDHSA,['Hvap','Psat','Cn','V','mu'])
 
-chems.Cobalt_hydroxide.copy_models_from(chems.Cobalt_chloride,['Hvap','Psat'])
-chems.Cobalt_hydroxide.Tb = 100+273.15 #https://www.chembk.com/en/chem/Cobalt%20hydroxide
 
 ##Adding missing dortmund properties for the following chemicals
 chems.Methyl_palmitoleate.Dortmund.set_group_counts_by_name({'CH3': 2,
@@ -395,34 +405,28 @@ chems.Monoester_MDHSA_MMA.Dortmund.set_group_counts_by_name({'CH3':3,
                                                                  'CH': 2,
                                                                  'OH(S)': 1,
                                                                  }) 
+#For lipidcane module compatibility
 chems.Dipalmitin.Dortmund.set_group_counts_by_name({'CH3':2,
                                                     'CH2COO':2,
                                                     'CH2':13+13+2,
                                                     'CH':1,
                                                     'OH(P)':1
                                                     })
-############################################################################################################### 
-#The below Psat models return values in Pa (N/m)
-# chems.OOO.Psat.add_method(f=OOO_CCPsat_model, Tmin=323.15, Tmax=573.15)
-chems.LLL.Psat.add_method(f=LLL_CCPsat_model, Tmin=323.15, Tmax=573.15)
-###############################################################################################33
-# chems.OOO.Cn.l.add_method(f=OOO_Cnl_model, Tmin= 298.15, Tmax=453.15)
-chems.LLL.Cn.add_method(f=OOO_Cnl_model, Tmin= 298.15, Tmax=453.15)
-###############################################################################################33
-#Adding the molar volumes
-# chems.OOO.V.l.add_method(f=OOO_Vl_model, Tmin= 258.15, Tmax=516.15)
-# TODO: check what methodP means ...in the V.l definition
+
+#Adding models for unknown TAG properties based on [1]
+chems.LLL.Psat.add_method(f=TAG_Psat_model, Tmin=323.15, Tmax=573.15)
+chems.LLL.Cn.add_method(f=LLL_Cnl_model, Tmin= 298.15, Tmax=453.15)
 chems.LLL.V.add_method(f=LLL_Vl_model, Tmin= 258.15, Tmax=516.15)
 chems.SSS.copy_models_from(chems.OOO, ['V','mu'])
 chems.PPP.copy_models_from(chems.OOO, ['V'])
 
-########Heat of formation ##########################################################################
 #LiquidMethanol and Sodium_methoxide were added for cane biorefinery compatibility
+#They are used as catalysts in the tranesterification section
 LiquidMethanol = tmo.Chemical('Methanol').at_state(phase='l', copy=True)
 chems.Sodium_methoxide.copy_models_from (LiquidMethanol,
-                                            ['V', 'sigma',
-                                              'kappa', 'Cn',
-                                                'Psat','mu'])
+                                         ['V', 'sigma',
+                                          'kappa', 'Cn',
+                                          'Psat','mu'])
 #Properties of chemicals required by the boilerturbogenerator based on cane.chemicals.py
 chems.Ash.Cn.add_model(0.09 * 4.184 * chems.Ash.MW) 
 for chemical in [chems.Ash,chems.P4O10]:
@@ -442,12 +446,14 @@ for chemical in (HCl, NaOH,):
         chemical.V.add_model(V, top_priority=True)
         chemical.default()
 NaOH.copy_models_from(tmo.Chemical('NaOH'),['Psat'])
-HCl.copy_models_from(tmo.Chemical('HCl'),['Psat'])     
+HCl.copy_models_from(tmo.Chemical('HCl'),['Psat'])  
    
+#Making assumptions for chemicals required/produced by the facilities   
 chems.Ash.copy_models_from(tmo.Chemical('Water'),['Psat'])
 chems.P4O10.copy_models_from(tmo.Chemical('Water'),['Psat'])
 chems.WWTsludge.copy_models_from(tmo.Chemical('Water'),['Psat'])
-    
+
+#Defaulting other missing properties if any to water
 for chemical in chems: chemical.default()
         
 chems.compile()
@@ -477,15 +483,7 @@ chems.define_group('Biodiesel', ('Methyl_oleate',
                                  'Methyl_behenate'
                                  ))
 
-# #composition of VM_Naphtha based on https://www.cdc.gov/niosh/npg/npgd0664.html#:~:text=None%20reported%20%5BNote%3A%20VM%26P%20Naphtha%20is%20a%20refined,Exposure%20Routes%20inhalation%2C%20ingestion%2C%20skin%20and%2For%20eye%20contact
-# chems.define_group('VM_Naphtha',['Octane',
-#                                  'Cycloheptane',
-#                                  'Bicyclo_octane',
-#                                  'Toluene'], 
-#                                  composition = [0.55,
-#                                                 0.30,
-#                                                 0.02,
-#                                                 0.12])
+
 chems.define_group('COSOxNOxH2S',['NO', 'NO2',
                                   'SO2','CO', 'H2S'])
 
@@ -495,34 +493,9 @@ chems.set_synonym('Carbon_dioxide','CO2')
 chems.set_synonym('Phosphatidylinositol','PL')
 chems.set_synonym('MonoOlein', 'MAG')
 chems.set_synonym('Dipalmitin', 'DAG')
-chems.set_synonym('Hydrogen_ion', 'H+')
 chems.set_synonym('Pelargonic_acid','Nonanoic_acid')
 chems.set_synonym('HCl2','Liquid_HCl')
 chems.set_synonym('CaSO4', 'Gypsum')
 
-# #Product 2
-# #Dihydroxy product of
-#         tmo.Chemical('Methyl_dihydroxy_palmitate',
-#                  search_ID = '908329-09-9',#Reaxys CAS number for methyl 9,10-dihydroxy-palmitate
-#                  search_db = False,
-#                  Tb = 458 + 273.15,#Based on 9,10 dihydroxy palmitic acid CAS finder (29242-09-9): 458.0±25.0 °C,Press: 760 Torr
-#                  formula = 'C17H34O4',
-#                  Hf = -892*1000, #Based on palmitic acid, Ref: https://en.wikipedia.org/wiki/Palmitic_acid
-#                  phase = 'l'
-#                  # ),
-       # tmo.Chemical('Tungstate_ion',
-       #           search_db = False,
-       #           CAS = '12737-86-9',
-       #           formula = 'O4W-2',
-       #           MW =  tmo.Chemical('Tungstic_acid').MW,#TODO: check this assumption
-       #           phase = 'l',
-       #           default = True,
-       #           Tb = 5828.15 #Based on tungsten's BP
-       #           # ),  
-       
-## The density of cobalt acetate tetrahydrate is available in the literature, rho is 1730 Kg/m3
-## https://scifinder-n.cas.org/searchDetail/substance/634d77a73c1f076117e95f61/substanceDetails
-## Cobalt acetate dissolution reaction data
-# V_of_cobalt_acetate_tetrahydrate = fn.rho_to_V(1730,chems['Cobalt_acetate_tetrahydrate'].MW)
-# chems.Cobalt_acetate_tetrahydrate.V.add_model(V_of_cobalt_acetate_tetrahydrate,
-                                                 # top_priority = True)
+###References###
+#[1] DOI: 10.1021/ie100160v
