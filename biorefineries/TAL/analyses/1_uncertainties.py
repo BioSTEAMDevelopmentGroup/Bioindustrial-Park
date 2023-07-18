@@ -16,6 +16,7 @@ from warnings import filterwarnings
 filterwarnings('ignore')
 import numpy as np
 import pandas as pd
+from chaospy import distributions as shape
 import biosteam as bst
 import thermosteam as tmo
 import contourplots
@@ -42,12 +43,13 @@ spec = models.spec
 unit_groups = models.unit_groups
 
 tea = models.TAL_tea
-# lca = models.TAL_LCA
+lca = models.TAL_lca
 get_adjusted_MSP = models.get_adjusted_MSP
+per_kg_KSA_to_per_kg_SA = models.per_kg_KSA_to_per_kg_SA
 
 # %% 
 
-N_simulations_per_mode = 1000 # 2000
+N_simulations_per_mode = 5000 # 2000
 
 percentiles = [0, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 1]
 
@@ -60,12 +62,12 @@ results_dict = {'Baseline':{'MPSP':{}, 'GWP100a':{}, 'FEC':{},
 
 modes = [
             'A',
-            'B',
+            # 'B',
          ]
 
 parameter_distributions_filenames = [
                                     'parameter-distributions_A.xlsx',
-                                    'parameter-distributions_B.xlsx',
+                                    # 'parameter-distributions_B.xlsx',
                                     ]
 
 #%%
@@ -76,6 +78,61 @@ timer.tic()
 # Set seed to make sure each time the same set of random numbers will be used
 np.random.seed(3221) # 3221
 
+def load_additional_params():
+    u = model.system.flowsheet.unit
+    param = model.parameter
+    A401 = u.A401
+    F401 = u.F401
+    M405 = u.M405
+
+    D = shape.Triangle(0.0739, 0.0910, 0.2474) # experimental data from Singh group
+    @param(name='Adsorbent unsaturated capacity', element=A401, kind='coupled', units='g/g',
+           baseline=0.0910, distribution=D)
+    def set_adsorbent_cap(cap):
+        A401.adsorbent_capacity = cap
+
+    D = shape.Uniform(0.4, 0.6) # Seader et al., Table 15.2
+    @param(name='Adsorbent void volume fraction', element=A401, kind='coupled', units='L/L',
+           baseline=0.5, distribution=D)
+    def set_adsorbent_vvf(frac):
+        A401.void_fraction = frac
+
+    D = shape.Uniform(500, 900) # Seader et al., Table 15.2
+    @param(name='Adsorbent solid particle density', element=A401, kind='coupled', units='kg/m^3',
+           baseline=700, distribution=D)
+    def set_adsorbent_solid_rho(rho):
+        A401.rho_adsorbent_solid = rho
+
+    D = shape.Triangle(0.8*0.07795, 0.07795, 1.2*0.07795) # experimental data from Singh group
+    @param(name='Desorption single-wash partition coefficient', element=A401, kind='coupled', units='(g/L)/(g/L)',
+           baseline=0.07795, distribution=D)
+    def set_desorption_K(K):
+        A401.K = K
+        
+    D = shape.Uniform(0.1, 1.9) # assumed
+    @param(name='Adsorbent replacement period', element=A401, kind='coupled', units='y',
+           baseline=1., distribution=D)
+    def set_adsorbent_lifetime(lt):
+        A401._default_equipment_lifetime['Activated carbon'] = lt
+
+    D = shape.Uniform(0.05, 0.95) # assumed
+    @param(name='Regeneration fluid retention in column', element=A401, kind='coupled', units='L-ethanol/L-void',
+           baseline=0.5, distribution=D)
+    def set_adsorption_ethanol_retention(wr):
+        A401.wet_retention = wr
+
+    # D = shape.Uniform(0.01, 0.09) # assumed
+    # @param(name='Ethanol retention in product after drying', element=F402, kind='coupled', units='g-ethanol/g-TAL',
+    #         baseline=0.05, distribution=D)
+    # def set_drying_ethanol_retention_in_product_stream(ethanol_retention_drying):
+    #     F402.product_ethanol_content = ethanol_retention_drying
+        
+    D = shape.Triangle(0.144945, 0.166880, 0.187718) # experimental data from Singh group
+    @param(name='TAL solubility in ethanol', element=F401, kind='coupled', units='g-TAL/g-solution',
+           baseline=0.166880, distribution=D)
+    def set_TAL_solubility_ethanol(solubility):
+        F401.TAL_solubility_in_ethanol_ww = solubility
+        M405.TAL_solubility_in_ethanol_ww = solubility
 
 for i in range(len(modes)):
     # ## Change working directory to biorefineries\\TAL
@@ -87,6 +144,8 @@ for i in range(len(modes)):
     print(f'\n\nLoading parameter distributions ({mode}) ...')
     model.parameters = ()
     model.load_parameter_distributions(parameter_distributions_filename)
+    
+    load_additional_params()
     print(f'\nLoaded parameter distributions ({mode}).')
     
     parameters = model.get_parameters()
@@ -107,8 +166,8 @@ for i in range(len(modes)):
                             columns=baseline_initial.keys())
     
     results_dict['Baseline']['MPSP'][mode] = get_adjusted_MSP()
-    # results_dict['Baseline']['GWP100a'][mode] = tot_GWP = lca.GWP
-    # results_dict['Baseline']['FEC'][mode] = tot_FEC = lca.FEC
+    results_dict['Baseline']['GWP100a'][mode] = tot_GWP = lca.GWP * per_kg_KSA_to_per_kg_SA
+    results_dict['Baseline']['FEC'][mode] = tot_FEC = lca.FEC * per_kg_KSA_to_per_kg_SA
     
     # material_GWP_breakdown = lca.material_GWP_breakdown
     
@@ -229,15 +288,15 @@ for i in range(len(modes)):
         model.table.to_excel(writer, sheet_name='Raw data')
     
     
-    results_dict['Uncertainty']['MPSP'][mode] = model.table.Biorefinery['Adjusted minimum selling price [$/kg]']
-    # results_dict['Uncertainty']['GWP100a'][mode] = model.table.Biorefinery['Total GWP100a [kg-CO2-eq/kg]']
-    # results_dict['Uncertainty']['FEC'][mode] = model.table.Biorefinery['Total FEC [kg-CO2-eq/kg]']
+    results_dict['Uncertainty']['MPSP'][mode] = model.table.Biorefinery['Adjusted minimum selling price [$/kg SA-eq.]']
+    results_dict['Uncertainty']['GWP100a'][mode] = model.table.Biorefinery['Total GWP100a [kg-CO2-eq/kg]']
+    results_dict['Uncertainty']['FEC'][mode] = model.table.Biorefinery['Total FEC [kg-CO2-eq/kg]']
     
     df_rho, df_p = model.spearman_r()
     
-    results_dict['Sensitivity']['Spearman']['MPSP'][mode] = df_rho['Biorefinery', 'Adjusted minimum selling price [$/kg]']
-    # results_dict['Sensitivity']['Spearman']['GWP100a'][mode] = df_rho['Biorefinery', 'Total GWP100a [kg-CO2-eq/kg]']
-    # results_dict['Sensitivity']['Spearman']['FEC'][mode] = df_rho['Biorefinery', 'Total FEC [kg-CO2-eq/kg]']
+    results_dict['Sensitivity']['Spearman']['MPSP'][mode] = df_rho['Biorefinery', 'Adjusted minimum selling price [$/kg SA-eq.]']
+    results_dict['Sensitivity']['Spearman']['GWP100a'][mode] = df_rho['Biorefinery', 'Total GWP100a [kg-CO2-eq/kg]']
+    results_dict['Sensitivity']['Spearman']['FEC'][mode] = df_rho['Biorefinery', 'Total FEC [kg-CO2-eq/kg]']
 
 #%% Clean up NaN values for plotting
 metrics = ['MPSP', 
@@ -265,7 +324,7 @@ FEC_units = r"$\mathrm{MJ}\cdot\mathrm{kg}^{-1}$"
 def get_small_range(num, offset):
     return(num-offset, num+offset)
 #%% MPSP
-modes = ['B',]
+# modes = ['A',]
 MPSP_uncertainty = [results_dict['Uncertainty']['MPSP'][mode]
                     for mode in modes
                     ]
@@ -285,7 +344,7 @@ contourplots.box_and_whiskers_plot(uncertainty_data=MPSP_uncertainty,
                           values_for_comparison=[],
                           n_minor_ticks=4,
                           show_x_ticks=True,
-                          x_tick_labels=modes,
+                          x_tick_labels=[' '],
                           x_tick_wrap_width=6,
                           y_label=r"$\bfMPSP$",
                           y_units=MPSP_units,
@@ -299,78 +358,80 @@ contourplots.box_and_whiskers_plot(uncertainty_data=MPSP_uncertainty,
 
 #%% LCA
 
-# #%% GWP100a
+#%% GWP100a
 
-# biobased_GWPs = [1.83, 2.20, 2.37]
-# fossilbased_GWPs = [3.27, 3.43, 10.3, 12.1]
+biobased_GWPs = [1.83, 2.20, 2.37]
+fossilbased_GWPs = [3.27, 3.43, 10.3, 12.1]
 
-# GWP_uncertainty = [results_dict['Uncertainty']['GWP100a'][modes[0]],
-#                     results_dict['Uncertainty']['GWP100a'][modes[1]],
-#                     results_dict['Uncertainty']['GWP100a'][modes[2]]]
-
-
-# biobased_lit_GWP_values = [1, 2, 3] #!!!
-# contourplots.box_and_whiskers_plot(uncertainty_data=GWP_uncertainty, 
-#                           baseline_values=[results_dict['Baseline']['GWP100a'][mode] for mode in modes], 
-#                           baseline_marker_shapes=["p", "s", "D"],
-#                           baseline_marker_sizes=[10, 6, 6,],
-#                           baseline_locations=[1,2,3],
-#                           baseline_marker_colors=['w','w','w'],
-#                           boxcolor='#607429',
-#                           ranges_for_comparison=[get_small_range(i, 0.005) for i in biobased_GWPs+fossilbased_GWPs],
-#                           ranges_for_comparison_colors=['#c0c1c2' for i in range(len(biobased_GWPs))] +\
-#                                                        ['#646464' for i in range(len(fossilbased_GWPs))],
-#                           values_for_comparison=biobased_lit_GWP_values,
-#                           n_minor_ticks=1,
-#                           show_x_ticks=True,
-#                           x_tick_labels=scenario_name_labels,
-#                           x_tick_wrap_width=6,
-#                           # y_label=r"$\bfGWP-100a$",
-#                           y_label=r"$\mathrm{\bfGWP}_{\bf100}$",
-#                           y_units=GWP_units,
-#                           y_ticks=np.arange(0., 14., 1.),
-#                           save_file=True,
-#                           fig_height=5.5,
-#                           fig_width = 3.,
-#                           box_width=0.65,
-#                           filename=file_to_save+'_uncertainty_GWP100a',
-#                           dpi=600,)
-
-# #%% FEC
-
-# biobased_FECs = [26, 27.7, 32.7]
-# fossilbased_FECs = [59.2, 60.8, 112, 124]
-
-# FEC_uncertainty = [results_dict['Uncertainty']['FEC'][modes[0]],
-#                     results_dict['Uncertainty']['FEC'][modes[1]],
-#                     results_dict['Uncertainty']['FEC'][modes[2]]]
+GWP_uncertainty = [results_dict['Uncertainty']['GWP100a'][modes[0]],
+                    # results_dict['Uncertainty']['GWP100a'][modes[1]],
+                    # results_dict['Uncertainty']['GWP100a'][modes[2]],
+                    ]
 
 
-# biobased_lit_FEC_values = [1, 2, 3] #!!!
-# contourplots.box_and_whiskers_plot(uncertainty_data=FEC_uncertainty, 
-#                           baseline_values=[results_dict['Baseline']['FEC'][mode] for mode in modes], 
-#                           baseline_marker_shapes=["p", "s", "D"],
-#                           baseline_marker_sizes=[10, 6, 6,],
-#                           baseline_locations=[1,2,3],
-#                           baseline_marker_colors=['w','w','w'],
-#                           boxcolor='#A100A1',
-#                           ranges_for_comparison=[get_small_range(i, 0.061) for i in biobased_FECs+fossilbased_FECs],
-#                           ranges_for_comparison_colors=['#c0c1c2' for i in range(len(biobased_FECs))] +\
-#                                                        ['#646464' for i in range(len(fossilbased_FECs))],
-#                           values_for_comparison=biobased_lit_FEC_values,
-#                           n_minor_ticks=1,
-#                           show_x_ticks=True,
-#                           x_tick_labels=scenario_name_labels,
-#                           x_tick_wrap_width=6,
-#                           y_label=r"$\bfFEC$",
-#                           y_units=FEC_units,
-#                           y_ticks=np.arange(-30, 140., 10.),
-#                           save_file=True,
-#                           fig_height=5.5,
-#                           fig_width = 3.,
-#                           box_width=0.65,
-#                           filename=file_to_save+'_uncertainty_FEC',
-#                           dpi=600,)
+biobased_lit_GWP_values = [1, 2, 3] #!!!
+contourplots.box_and_whiskers_plot(uncertainty_data=GWP_uncertainty, 
+                          baseline_values=[results_dict['Baseline']['GWP100a'][mode] for mode in modes], 
+                          baseline_marker_shapes=["D"],
+                          baseline_marker_sizes=[6,],
+                          baseline_locations=[1,],
+                          baseline_marker_colors=['w',],
+                          boxcolor='#607429',
+                          # ranges_for_comparison=[get_small_range(i, 0.005) for i in biobased_GWPs+fossilbased_GWPs],
+                          # ranges_for_comparison_colors=['#c0c1c2' for i in range(len(biobased_GWPs))] +\
+                          #                               ['#646464' for i in range(len(fossilbased_GWPs))],
+                          # values_for_comparison=biobased_lit_GWP_values,
+                          n_minor_ticks=1,
+                          show_x_ticks=True,
+                          x_tick_labels=['',],
+                          x_tick_wrap_width=6,
+                          # y_label=r"$\bfGWP-100a$",
+                          y_label=r"$\mathrm{\bfGWP}_{\bf100}$",
+                          y_units=GWP_units,
+                          y_ticks=np.arange(0., 12., 1.),
+                          save_file=True,
+                          fig_height=5.5,
+                          fig_width = 3.,
+                          box_width=0.65,
+                          filename=file_to_save+'_uncertainty_GWP100a',
+                          dpi=600,)
+
+#%% FEC
+
+biobased_FECs = [26, 27.7, 32.7]
+fossilbased_FECs = [59.2, 60.8, 112, 124]
+
+FEC_uncertainty = [results_dict['Uncertainty']['FEC'][modes[0]],
+                    # results_dict['Uncertainty']['FEC'][modes[1]],
+                    # results_dict['Uncertainty']['FEC'][modes[2]],
+                    ]
+
+
+biobased_lit_FEC_values = [1, 2, 3] #!!!
+contourplots.box_and_whiskers_plot(uncertainty_data=FEC_uncertainty, 
+                          baseline_values=[results_dict['Baseline']['FEC'][mode] for mode in modes], 
+                          baseline_marker_shapes=["D",],
+                          baseline_marker_sizes=[ 6,],
+                          baseline_locations=[1,],
+                          baseline_marker_colors=['w',],
+                          boxcolor='#A100A1',
+                          # ranges_for_comparison=[get_small_range(i, 0.061) for i in biobased_FECs+fossilbased_FECs],
+                          # ranges_for_comparison_colors=['#c0c1c2' for i in range(len(biobased_FECs))] +\
+                          #                               ['#646464' for i in range(len(fossilbased_FECs))],
+                          # values_for_comparison=biobased_lit_FEC_values,
+                          n_minor_ticks=1,
+                          show_x_ticks=True,
+                          x_tick_labels=[' '],
+                          x_tick_wrap_width=6,
+                          y_label=r"$\bfFEC$",
+                          y_units=FEC_units,
+                          y_ticks=np.arange(-110, -50., 10.),
+                          save_file=True,
+                          fig_height=5.5,
+                          fig_width = 3.,
+                          box_width=0.65,
+                          filename=file_to_save+'_uncertainty_FEC',
+                          dpi=600,)
 
 
 #%% TEA breakdown figure
@@ -471,28 +532,44 @@ bst_plots = bst.plots
 rho = r"$\mathrm{\rho}}$"
 
 mode = modes[0]
+
+
+
 fig = bst_plots.plot_spearman_1d(results_dict['Sensitivity']['Spearman']['MPSP'][modes[0]],
                            index=[i.element_name + ': ' + i.name for i in model.parameters],
-                           name='MPSP - Lab scale [batch] '+"["+MPSP_units+"]", color="#A97802",
-                           xlabel_fn=lambda i: "Spearman's "+rho+ " with "+i)
+                           name='MPSP '+"["+MPSP_units+"]", color="#A97802",
+                           # xlabel_fn=lambda i: "Spearman's "+rho+ " with "+i,
+                           )
+
+fig[0].set_figwidth(6)
+fig[0].set_figheight(10)
+
 fig[0].savefig(mode+'_MPSP-Spearman.png', dpi=600, bbox_inches='tight',
             facecolor=fig[0].get_facecolor(),
             transparent=False)
 
-# fig = bst_plots.plot_spearman_1d(results_dict['Sensitivity']['Spearman']['GWP100a'][modes[1]],
-#                            index=[i.element_name + ': ' + i.name for i in model.parameters],
-#                            name='GWP100 - Lab scale [batch] '+"["+GWP_units+"]", color='#607429',
-#                            xlabel_fn=lambda i: "Spearman's "+rho+ " with "+i)
-# fig[0].savefig(mode+'GWP-Spearman.png', dpi=600, bbox_inches='tight',
-#             facecolor=fig[0].get_facecolor(),
-#             transparent=False)
-# fig = bst_plots.plot_spearman_1d(results_dict['Sensitivity']['Spearman']['FEC'][modes[2]],
-#                            index=[i.element_name + ': ' + i.name for i in model.parameters],
-#                            name='FEC - Lab scale [batch] '+"["+FEC_units+"]", color='#A100A1',
-#                            xlabel_fn=lambda i: "Spearman's "+rho+ " with "+i)
-# fig[0].savefig(mode+'FEC-Spearman.png', dpi=600, bbox_inches='tight',
-#             facecolor=fig[0].get_facecolor(),
-#             transparent=False)
+fig = bst_plots.plot_spearman_1d(results_dict['Sensitivity']['Spearman']['GWP100a'][modes[0]],
+                            index=[i.element_name + ': ' + i.name for i in model.parameters],
+                            name='GWP100'+"["+GWP_units+"]", color='#607429',
+                            # xlabel_fn=lambda i: "Spearman's "+rho+ " with "+i,
+                            )
+fig[0].set_figwidth(6)
+fig[0].set_figheight(10)
+
+fig[0].savefig(mode+'GWP-Spearman.png', dpi=600, bbox_inches='tight',
+            facecolor=fig[0].get_facecolor(),
+            transparent=False)
+fig = bst_plots.plot_spearman_1d(results_dict['Sensitivity']['Spearman']['FEC'][modes[0]],
+                            index=[i.element_name + ': ' + i.name for i in model.parameters],
+                            name='FEC'+"["+FEC_units+"]", color='#A100A1',
+                            # xlabel_fn=lambda i: "Spearman's "+rho+ " with "+i,
+                            )
+fig[0].set_figwidth(6)
+fig[0].set_figheight(10)
+
+fig[0].savefig(mode+'FEC-Spearman.png', dpi=600, bbox_inches='tight',
+            facecolor=fig[0].get_facecolor(),
+            transparent=False)
 
 # mode = modes[1]
 # fig = bst_plots.plot_spearman_1d(results_dict['Sensitivity']['Spearman']['MPSP'][modes[0]],

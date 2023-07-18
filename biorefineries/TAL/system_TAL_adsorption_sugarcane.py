@@ -608,7 +608,7 @@ spec = ProcessSpecification(
     
     # set baseline fermentation performance here
     baseline_yield = 0.19,
-    baseline_titer = 28.,
+    baseline_titer = 23.,
     baseline_productivity = 0.19,
     
     # baseline_yield = 0.30,
