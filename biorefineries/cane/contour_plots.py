@@ -10,15 +10,20 @@ import numpy as np
 from biosteam.utils import colors, GG_colors
 import matplotlib.pyplot as plt
 from biosteam.plots import (
+    rounded_linspace,
+    generate_contour_data,
     plot_contour_2d,
     MetricBar,
     plot_vertical_line,
     rounded_tickmarks_from_data as tickmarks,
     plot_scatter_points,
+    plot_contour_single_metric,
 )
 from thermosteam.units_of_measure import format_units
 from thermosteam.utils import set_figure_size, set_font
 from .results import images_folder
+from . import feature_mockups as feature
+from .data import microbial_oil_baseline as perf
 from warnings import filterwarnings
 from scipy.ndimage.filters import gaussian_filter
 from colorpalette import ColorWheel
@@ -26,24 +31,26 @@ import os
 
 __all__ = (
     'plot_sorghum_oil_content_and_cane_oil_content_contours_manuscript',
-    'plot_metrics_across_composition_configurations_manuscript',
+    'plot_metrics_across_composition_manuscript',
+    'plot_metrics_across_biomass_yield_manuscript',
     'plot_sorghum_oil_content_and_cane_oil_content_contours_seminar',
-    'plot_metrics_across_composition_configurations',
     'plot_recovery_and_oil_content_contours_manuscript',
+    'plot_oil_recovery_integration_manuscript',
     'plot_recovery_and_oil_content_contours',
     'plot_sorghum_oil_content_and_cane_oil_content_contours',
     'plot_recovery_and_oil_content_contours_biodiesel_only',
     'plot_recovery_and_oil_content_contours_with_oilsorghum_only',
+    'plot_metrics_across_biomass_yield',
     'plot_metrics_across_composition',
-    'plot_metrics_across_composition_manuscript',
+    'plot_oil_recovery_integration',
 )
 
 filterwarnings('ignore', category=bst.exceptions.DesignWarning)
 line_color_wheel = ColorWheel([
     GG_colors.orange,
+    GG_colors.blue,
     GG_colors.purple,
     GG_colors.green,
-    GG_colors.blue,
     GG_colors.yellow,
     colors.CABBI_teal,
     colors.CABBI_grey,
@@ -88,21 +95,12 @@ colormaps = [
 light_letter_color = colors.neutral.tint(98).RGBn
 letter_color = colors.neutral.tint(80).RGBn
 dark_letter_color = colors.neutral.shade(80).RGBn
-
 default_box_color = colors.neutral.RGBn
 
 # %% Plot functions for publication
 
 def _add_letter_labels(axes, xpos, ypos, colors, box_color=None):
-    M, N = shape = colors.shape
-    if shape == (2, 2):
-        letters=np.array([['A', 'C'], ['B', 'D']])
-    elif shape == (3, 2):
-        letters=np.array([['A', 'D'], ['B', 'E'], ['C', 'F']])
-    elif shape == (2, 3):
-        letters=np.array([['A', 'C', 'E'], ['B', 'D', 'F']])
-    elif shape == (2, 1):
-        letters=np.array([['A'], ['B']])
+    M, N = colors.shape
     if box_color is None:
         box_color = default_box_color
     txtbox = dict(boxstyle='round', facecolor=box_color, 
@@ -120,39 +118,61 @@ def _add_letter_labels(axes, xpos, ypos, colors, box_color=None):
                 ax = ax._cached_ytwin
             ax.text((xlb + xub) * xpos, (yub + ylb) * ypos, letter, color=colors[i, j],
                      horizontalalignment='center',verticalalignment='center',
-                     fontsize=12, fontweight='bold', zorder=1, bbox=txtbox)
+                     fontsize=10, fontweight='bold', zorder=1, bbox=txtbox)
 
-def plot_metrics_across_composition_manuscript(load=True, configuration=None, fs=8, smooth=1):
+def plot_metrics_across_composition_manuscript(load=True, fs=8, smooth=1):
     set_font(size=fs)
-    set_figure_size()
+    width = None
+    aspect_ratio = 0.5
+    #x = 0.58
+    set_figure_size(width=width, aspect_ratio=aspect_ratio)
     fig, axes = plot_metrics_across_composition(
-        configuration=configuration,
         load=load, 
         smooth=smooth,
     )
-    colors = np.zeros([2, 3], object)
-    colors[:] = [[light_letter_color, light_letter_color, light_letter_color],
-                 [light_letter_color, light_letter_color, light_letter_color]]
-    _add_letter_labels(axes, 1 - 0.88, 0.63, colors)
-    plt.subplots_adjust(right=0.92, hspace=0.1, wspace=0.1, top=0.9, bottom=0.10)
+    colors = np.zeros([1, 2], object)
+    colors[:] = [[light_letter_color, light_letter_color]]
+    # _add_letter_labels(axes, 1 - 0.9, 0.62, colors)
+    plt.subplots_adjust(left=0.1, right=0.95, wspace=0.15, top=0.9, bottom=0.15)
     for i in ('svg', 'png'):
         file = os.path.join(images_folder, f'metrics_across_composition_contours.{i}')
         plt.savefig(file, transparent=True)
 
-def plot_metrics_across_composition_configurations_manuscript(load=True, fs=8, smooth=1):
+def plot_metrics_across_biomass_yield_manuscript(load=True, fs=8, smooth=1):
     set_font(size=fs)
-    set_figure_size()
-    fig, axes = plot_metrics_across_composition_configurations(
+    width = None
+    aspect_ratio = 0.8
+    #x = 0.58
+    set_figure_size(width=width, aspect_ratio=aspect_ratio)
+    fig, axes = plot_metrics_across_biomass_yield(
         load=load, 
         smooth=smooth,
     )
     colors = np.zeros([2, 2], object)
     colors[:] = [[light_letter_color, light_letter_color],
                  [light_letter_color, light_letter_color]]
-    _add_letter_labels(axes, 1 - 0.86, 0.61, colors)
-    plt.subplots_adjust(right=0.92, hspace=0.1, wspace=0.1, top=0.9, bottom=0.10)
+    _add_letter_labels(axes, 0.9, 0.8, colors)
+    plt.subplots_adjust(left=0.1, right=0.95, wspace=0.15, top=0.9, bottom=0.15)
     for i in ('svg', 'png'):
-        file = os.path.join(images_folder, f'metrics_across_composition_contours.{i}')
+        file = os.path.join(images_folder, f'metrics_biomass_yield_contours.{i}')
+        plt.savefig(file, transparent=True)
+
+def plot_oil_recovery_integration_manuscript(load=True, fs=8):
+    set_font(size=fs)
+    width = None
+    aspect_ratio = 0.8
+    #x = 0.58
+    set_figure_size(width=width, aspect_ratio=aspect_ratio)
+    fig, axes, other_axes = plot_oil_recovery_integration(
+        load=load, 
+    )
+    colors = np.zeros([2, 3], object)
+    colors[:] = [[light_letter_color, light_letter_color, light_letter_color],
+                 [light_letter_color, light_letter_color, light_letter_color]]
+    _add_letter_labels(axes, 0.62, 0.62, colors)
+    plt.subplots_adjust(left=0.12, right=0.95, wspace=0.15, top=0.9, bottom=0.15)
+    for i in ('svg', 'png'):
+        file = os.path.join(images_folder, f'oil_recovery_integration_contours.{i}')
         plt.savefig(file, transparent=True)
 
 def plot_recovery_and_oil_content_contours_manuscript(load=True, fs=8, smooth=1):
@@ -228,96 +248,48 @@ def plot_sorghum_oil_content_and_cane_oil_content_contours_seminar(load=True):
 
 # %% General    
 
-def metrics_across_oil_and_fiber_content(configuration, load, xlim):
-    # Generate contour data
-    x0, xf = xlim
-    x = np.linspace(x0 / 100, xf / 100, 10)
-    y = np.linspace(0.35, 0.75, 5)
-    z = np.array([0.6, 0.65, 0.7])
-    X, Y, Z = np.meshgrid(x, y, z)
-    folder = os.path.dirname(__file__)
-    folder = os.path.join(folder, 'results')
-    file = f'{configuration}_composition_analysis.npy'
-    file = os.path.join(folder, file)
-    if load:
-        data = np.load(file, allow_pickle=True)
-    else:
-        from warnings import filterwarnings
-        bst.System.strict_convergence = False
-        filterwarnings('ignore')
-        # This returns data of all metrics for the given configuration,
-        # but we are mainly interested in MFPP and productivity in L biodiesel per MT cane.
-        data = cane.evaluate_metrics_across_composition(
-            X, Y, Z, configuration,
-        ) 
-    np.save(file, data)
-    return X, Y, Z, data
-
-def metrics_across_oil_and_fiber_content_configurations(load, xlim):
-    # Generate contour data
-    x0, xf = xlim
-    x = np.linspace(x0 / 100, xf / 100, 10)
-    y = np.linspace(0.35, 0.75, 5)
-    X, Y = np.meshgrid(x, y)
-    folder = os.path.dirname(__file__)
-    folder = os.path.join(folder, 'results')
-    file = 'configurations_composition_analysis.npy'
-    file = os.path.join(folder, file)
-    if load:
-        data = np.load(file, allow_pickle=True)
-    else:
-        from warnings import filterwarnings
-        bst.System.strict_convergence = False
-        filterwarnings('ignore')
-        # This returns data of all metrics for the given configuration,
-        # but we are mainly interested in MFPP and productivity in L biodiesel per MT cane.
-        data = cane.evaluate_metrics_across_composition_configurations(
-            X, Y,
-        ) 
-    np.save(file, data)
-    return X, Y, data
-
-def plot_metrics_across_composition_configurations(
-        configuration=None, load=False, N_decimals=1, 
+def plot_metrics_across_composition(
+        load=False, N_decimals=1, 
         yticks=None, titles=None, 
         cmap=None, smooth=None,
     ):
     xticks = [0,   2,   4,   6,   8,   10]
-    xlim = (0, 10)
-    # xticks_right = [0,   2,   4,   6,   8,   10]
-    # xlim_right = (0, 10)
-    # xticks_left = [2, 4, 6, 8, 10]
-    # xlim_left = (0.5, 10)
-    yticks = [35,  45,  55,  65,  75]
-    metrics = COBY, NEP = [cane.competitive_biomass_yield, cane.net_energy_production]
+    xlim = np.array([xticks[0], xticks[-1]])
+    yticks = [35,  45,  55,  65]
+    ylim = np.array([yticks[0], yticks[-1]])
+    metrics = CBY, = [cane.competitive_biomass_yield]
+    # metrics = CBY, NEP = [cane.competitive_biomass_yield, cane.net_energy_production]
     metric_indices = [cane.all_metric_mockups.index(i) for i in metrics] 
-    X, Y, data = metrics_across_oil_and_fiber_content_configurations(load, xlim)
-    data = data[:, :, :, metric_indices]
-    data[:, 0, 0, 0] = data[:, 1, 0, 0] + (data[:, 1, 0, 0] - data[:, 2, 0, 0])
-    data[:, 0, 0, 1] = data[:, 1, 0, 1] + (data[:, 1, 0, 1] - data[:, 2, 0, 1])
-    if smooth: # Smooth curves due to heat exchanger network and discontinuities in design decisionss
-        A, B, C, D = data.shape
-        for i in range(C):
-            for j in range(D):
-                try:
-                    data[:, :, i, j] = gaussian_filter(np.asarray(data[:, :, i, j], dtype=float), smooth)
-                except:
-                    breakpoint()
-    data = np.swapaxes(data, 2, 3)
+    cane.YRCP2023()
+    X, Y, data = generate_contour_data(
+        cane.evaluate_metrics_at_composition, 
+        file=contour_file('configurations_compositional_analysis'),
+        xlim=xlim / 100, ylim=ylim / 100, load=load, n = 10,
+    )
+    data = data[:, :, metric_indices, :]
+    # data[:, 0, 0, 0] = data[:, 1, 0, 0] + (data[:, 1, 0, 0] - data[:, 2, 0, 0])
+    # data[:, 0, 1, 0] = data[:, 1, 1, 0] + (data[:, 1, 1, 0] - data[:, 2, 1, 0])
+    
     # Plot contours
-    xlabel = 'Oil content [dry wt. %]'
-    ylabel = "Fiber content [dry wt. %]"
-    if titles is None: titles = np.array(['Bioethanol', 'Microbial oil'])
+    xlabel = 'Oil content [dw %]'
+    ylabel = "Fiber content [dw %]"
+    if titles is None: titles = np.array(['(A) Direct Cogeneration', '(B) Integrated Co-Fermentation'])
     d0 = data[:, :, 0, :]
-    d1 = data[:, :, 1, :]
+    # d1 = data[:, :, 1, :]
+    CBY_units = 'dry' + '-' + format_units('MT/ha')
     metric_bars = [
         # MetricBar(MFPP.name, format_units(MFPP.units), colormaps[1], tickmarks(data[:, :, 0, :], 5, 1, expand=0, p=0.5), 18, 1),
-        MetricBar('Comp. biomass yield', 'Dry-'+format_units('MT/ha'), plt.cm.get_cmap('viridis_r'), tickmarks(d0[~np.isnan(d0)], 5, 1, expand=0, p=0.5), 10, 1),
+        MetricBar('Competitive biomass yield', CBY_units, 
+                  plt.cm.get_cmap('viridis_r'), 
+                  tickmarks(d0[~np.isnan(d0)], 5, 1, expand=0, p=0.5),
+                  15, 1),
         # MetricBar('Biod. prod.', format_units(BP.units), plt.cm.get_cmap('copper'), tickmarks(data[:, :, 1, :], 8, 1, expand=0, p=0.5), 10, 1),
-        MetricBar('Net energy prod.', format_units(NEP.units), plt.cm.get_cmap('inferno'), tickmarks(d1[~np.isnan(d1)], 5, 1, expand=0, p=2), 20, 1),
+        # MetricBar('MBSP', format_units(MBSP.units), plt.cm.get_cmap('inferno_r'), tickmarks(d1[~np.isnan(d1)], 5, 0.1, expand=0, p=0.5), 20, 1),
+        # MetricBar('Net energy prod.', format_units(NEP.units), plt.cm.get_cmap('inferno'), tickmarks(d1[~np.isnan(d1)], 5, 1, expand=0, p=2), 20, 1),
     ]
-    fig, axes, CSs, CB = plot_contour_2d(
-        100.*X, 100.*Y, titles, data, xlabel, ylabel, xticks, yticks, metric_bars, 
+    fig, axes, CSs, CB, other_axes = plot_contour_2d(
+        100.*X, 100.*Y, data, xlabel, ylabel, xticks, yticks, 
+        metric_bars=metric_bars, titles=titles, 
         styleaxiskw=dict(xtick0=True), label=True, wbar=2.1
     )
     try:
@@ -329,13 +301,14 @@ def plot_metrics_across_composition_configurations(
         lines = []
         for name, color in zip(names, line_color_wheel):
             data = df.loc[name]
-            if str(name) in ('19B', '316'): continue
-            oil = data['Stem oil (dw)']['Mean'] * 100
+            name = str(name)
+            if name in ('19B', '316', '1565'): continue
             lines.append(
                 (name, 
-                 oil, 
+                 data['Stem oil (dw)']['Mean'] * 100, 
                  data['Fiber (dw)']['Mean'] * 100,
                  data['Water (wt)']['Mean'] * 100,
+                 data['Biomass yield (dry MT/ha)']['Mean'],
                  color.RGBn)
             )
         for i in axes.flat: 
@@ -343,81 +316,72 @@ def plot_metrics_across_composition_configurations(
                 plt.sca(i); plt.xlim(xlim)
                 plt.sca(i._cached_ytwin); plt.xlim(xlim)
         txtbox = dict(boxstyle='round', facecolor=colors.neutral.shade(20).RGBn, 
-                      edgecolor='None', alpha=0.999, pad=0.2)
+                      edgecolor='None', alpha=0.99, pad=0.1)
         
-        for *axes_columns, _ in axes:
-            for (name, lipid, fiber, moisture, color) in lines:
-                left, right = axes_columns
-                plt.sca(right._cached_ytwin)
-                plt.text(
-                    lipid + 0.1, fiber + 1, name, weight='bold', c=color,
-                    bbox=txtbox,
-                )
-                plot_scatter_points(
-                    [lipid], [fiber], marker='X', s=50, 
-                    color=color, edgecolor=edgecolor, clip_on=False, zorder=1e6,
-                )
-                
-                plt.sca(left)
-                plt.xlim([0.5, 10])
-                if lipid > 0.5:
-                    plt.text(
-                        lipid + 0.1, fiber + 1, name, weight='bold', c=color,
-                        bbox=txtbox,
-                    )
+        for i, (*axes_columns, _) in enumerate(axes):
+            for (name, lipid, fiber, moisture, biomass_yield, color) in lines:
+                for j, ax in enumerate(axes_columns):
+                    plt.sca(ax._cached_ytwin)
+                    feedstock = 'Sugarcane' if name == 'WT' else 'Oilcane'
+                    if name == '1580':
+                        text = f"{feedstock} {name}:\n{biomass_yield:.0f} {CBY_units}"
+                        txtbox_1580 = txtbox.copy()
+                        txtbox_1580['pad'] = 0.3
+                        plt.text(
+                            lipid + 0.15, fiber, text, c=color,
+                            verticalalignment='bottom',
+                            bbox=txtbox_1580, 
+                        )
+                    else:
+                    
+                        text = f"{feedstock} {name}: {biomass_yield:.0f} {CBY_units}"
+                        plt.text(
+                            lipid + 0.15, fiber, text, c=color,
+                            verticalalignment='bottom',
+                            bbox=txtbox, 
+                        )
                     plot_scatter_points(
-                        [lipid], [fiber], marker='X', s=50, 
+                        [lipid], [fiber], marker='o', s=20,  linewidth=0.6,
                         color=color, edgecolor=edgecolor, clip_on=False, zorder=1e6,
                     )
                     
     return fig, axes
 
-def plot_metrics_across_composition(
-        configuration=None, load=False, N_decimals=1, 
+def plot_metrics_across_biomass_yield(
+        load=False, N_decimals=1, 
         yticks=None, titles=None, 
         cmap=None, smooth=None,
     ):
-    if configuration is None: configuration = 'O2'
-    config = cane.parse_configuration(configuration)
-    if config.number > 4 or config.number < 0:
-        xticks = [0,   2,   4,   6,   8,   10]
-        xlim = (0, 10)
-    else:
-        xticks = [2, 4, 6, 8, 10]
-        xlim = (0.5, 10)
-    yticks = [35,  45,  55,  65,  75]
-    metrics = COBY, NEP = [cane.competitive_biomass_yield, cane.net_energy_production]
+    xticks = [0,   2,   4,   6,   8,   10]
+    xlim = (xticks[0], xticks[-1])
+    yticks = [4, 10, 16, 22, 28]
+    ylim = (yticks[0], yticks[-1])
+    metrics = MBSP, GWP = [cane.MBSP, cane.GWP_biofuel_allocation]
     metric_indices = [cane.all_metric_mockups.index(i) for i in metrics] 
-    X, Y, Z, data = metrics_across_oil_and_fiber_content(configuration, load, xlim)
-    data = data[:, :, :, metric_indices]
-    if smooth: # Smooth curves due to heat exchanger network and discontinuities in design decisionss
-        A, B, C, D = data.shape
-        for i in range(C):
-            for j in range(D):
-                try:
-                    data[:, :, i, j] = gaussian_filter(np.asarray(data[:, :, i, j], dtype=float), smooth)
-                except:
-                    breakpoint()
-    data = np.swapaxes(data, 2, 3)
-    # Plot contours
-    xlabel = 'Oil content [dry wt. %]'
-    ylabel = "Fiber content [dry wt. %]"
-    if titles is None: titles = np.array(['60% moisture', '65% moisture', '70% moisture'])
-    metric_bars = [
-        # MetricBar(MFPP.name, format_units(MFPP.units), colormaps[1], tickmarks(data[:, :, 0, :], 5, 1, expand=0, p=0.5), 18, 1),
-        MetricBar('Comp. biomass yield', format_units(COBY.units), colormaps[0], tickmarks(data[:, :, 0, :], 5, 1, expand=0, p=0.5), 10, 1),
-        # MetricBar('Biod. prod.', format_units(BP.units), plt.cm.get_cmap('copper'), tickmarks(data[:, :, 1, :], 8, 1, expand=0, p=0.5), 10, 1),
-        MetricBar('Net energy prod.', format_units(NEP.units), colormaps[2], tickmarks(data[:, :, 1, :], 5, 1, expand=0, p=2), 20, 1),
-    ]
-    fig, axes, CSs, CB = plot_contour_2d(
-        100.*X[:, :, 0], 100.*Y[:, :, 0], titles, data, xlabel, ylabel, xticks, yticks, metric_bars, 
-        styleaxiskw=dict(xtick0=True), label=True, wbar=2.1
+    cane.YRCP2023()
+    X, Y, data = generate_contour_data(
+        cane.evaluate_metrics_at_biomass_yield,
+        xlim, ylim, file=contour_file('configurations_biomass_yield_analysis'),
+        smooth=smooth,
+        load=load,
+        n=10,
     )
-    def determine_axis_column(moisture_content):
-        for column, axis_moisture in enumerate([60, 65, 70]):
-            if abs(moisture_content - axis_moisture) < 2.5:
-                return column
-        raise RuntimeError('could not determine axis with similar moisture content')
+    data = data[:, :, metric_indices, :]
+    # Plot contours
+    xlabel = 'Oil content [dw %]'
+    ylabel = "Biomass yield [dw %]"
+    if titles is None: titles = np.array(['Direct Cogeneration', 'Integrated Co-Fermentation'])
+    d0 = data[:, :, 0, :]
+    metric_bars = [
+        MetricBar('MBSP', format_units('USD/L'), plt.cm.get_cmap('viridis_r'), tickmarks(d0[~np.isnan(d0)], 5, 1, expand=0, p=0.5), 15, 1),
+        MetricBar('GWP', format_units(GWP.units).replace('CO2', 'CO_2'), plt.cm.get_cmap('inferno_r'), tickmarks(d0[~np.isnan(d0)], 5, 0.1, expand=0, p=0.1), 15, 1),
+    ]
+    fig, axes, CSs, CB, other_axes = plot_contour_2d(
+        X, Y, data, xlabel, ylabel, xticks, yticks, 
+        metric_bars=metric_bars, titles=titles,
+        styleaxiskw=dict(xtick0=True), 
+        label=True, wbar=2.1
+    )
     try:
         df = cane.get_composition_data()
     except:
@@ -427,13 +391,12 @@ def plot_metrics_across_composition(
         lines = []
         for name, color in zip(names, line_color_wheel):
             data = df.loc[name]
+            if str(name) in ('19B', '316', '1565'): continue
             oil = data['Stem oil (dw)']['Mean'] * 100
-            if oil < 1.5: continue
             lines.append(
                 (name, 
                  oil, 
-                 data['Fiber (dw)']['Mean'] * 100,
-                 data['Water (wt)']['Mean'] * 100,
+                 data['Biomass yield (dry MT/ha)']['Mean'],
                  color.RGBn)
             )
         for i in axes.flat: 
@@ -441,19 +404,36 @@ def plot_metrics_across_composition(
                 plt.sca(i); plt.xlim(xlim)
                 plt.sca(i._cached_ytwin); plt.xlim(xlim)
         txtbox = dict(boxstyle='round', facecolor=colors.neutral.shade(20).RGBn, 
-                      edgecolor='None', alpha=0.99, pad=0.2)
-        for *axes_columns, _ in axes:
-            for (name, lipid, fiber, moisture, color) in lines:
-                index = determine_axis_column(moisture)
-                plt.sca(axes_columns[index]._cached_ytwin)
-                plt.text(
-                    lipid + 0.1, fiber + 1, name, weight='bold', c=color,
-                    bbox=txtbox,
-                )
-                plot_scatter_points(
-                    [lipid], [fiber], marker='X', s=50, 
-                    color=color, edgecolor=edgecolor, clip_on=False, zorder=1e6,
-                )
+                      edgecolor='None', alpha=0.999, pad=0.3)
+        
+        for (name, lipid, biomass_yield, color) in lines:
+            feedstock = 'Sugarcane' if name == 'WT' else 'Oilcane'
+            line_results = cane.evaluate_metrics_at_biomass_yield(lipid, biomass_yield)[metric_indices]
+            for i, (*axes_columns, _) in enumerate(axes):
+                mb = metric_bars[i]
+                units = mb.units.replace('CO2', 'CO_2')
+                x = lipid + 0.2
+                y = biomass_yield
+                if biomass_yield > 25:
+                    verticalalignment = 'top'
+                elif biomass_yield < 10:
+                    verticalalignment = 'bottom'
+                else:
+                    verticalalignment = 'center'
+                    
+                for j, ax in enumerate(axes_columns):
+                    plt.sca(ax._cached_ytwin)
+                    value = line_results[i, j]
+                    text = f"{feedstock} {name}:\n{value:.1f} {units}"
+                    plt.text(
+                        x, y, text, c=color,
+                        bbox=txtbox, verticalalignment=verticalalignment,
+                    )
+                    plot_scatter_points(
+                        [lipid], [biomass_yield], marker='o', s=20,  linewidth=0.6,
+                        color=color, edgecolor=edgecolor, clip_on=False, zorder=1e6,
+                    )
+                    
     return fig, axes
 
 def relative_sorghum_oil_content_and_cane_oil_content_data(load, configurations):
@@ -476,6 +456,148 @@ def relative_sorghum_oil_content_and_cane_oil_content_data(load, configurations)
         np.save(file, data)
     return X, Y, data
     
+def contour_file(name):
+    folder = os.path.dirname(__file__)
+    file = name + '.npy'
+    return os.path.join(folder, file)
+
+# def plot_fermentation_performance(
+#         load=False, 
+#     ):
+#     metrics = [feature.MBSP, feature.GWP_biodiesel]
+#     metrics_index = [feature.all_metric_mockups.index(i) for i in metrics]
+#     X, Y, Z = generate_contour_data(
+#         cane.evaluate_fermentation_performance, # TODO
+#         xlim=[50, 90],
+#         ylim=[100 * perf.min_lipid_yield_glucose, 100 * perf.max_lipid_yield_glucose],
+#         file=contour_file('oil_recovery_integration'),
+#         n=10,
+#         load=load,
+#     )
+#     Z = Z[:, :, metrics_index, :]
+#     # Plot contours
+#     xlabel = 'Microbial oil recovery [%]'
+#     ylabel = "Microbial oil yield [wt %]"
+#     xticks = [50, 60, 70, 80, 90]
+#     yticks = rounded_linspace(
+#         100 * perf.min_lipid_yield_glucose, 100 * perf.max_lipid_yield_glucose, 5, 
+#     )
+#     titles = ['Mechanical oil recovery', 'Integrated oil recovery']
+    
+#     d0 = Z[:, :, 0, :]
+#     d1 = Z[:, :, 1, :]
+#     d2 = Z[:, :, 2, :]
+#     metric_bars = [
+#         MetricBar('MBSP', format_units('USD/L'), plt.cm.get_cmap('viridis_r'), tickmarks(d0[~np.isnan(d0)], 5, 1, expand=0, p=0.5), 15, 1),
+#         MetricBar('ROI', format_units('% USD'), plt.cm.get_cmap('viridis'), tickmarks(d1[~np.isnan(d1)], 5, 1, expand=0, p=1), 15, 1),
+#         MetricBar("GWP", format_units('USD/L'), plt.cm.get_cmap('inferno_r'), tickmarks(d2[~np.isnan(d2)], 5, 0.1, expand=0, p=0.1), 15, 1),
+#     ]
+#     fig, axes, CSs, CB, other_axes = plot_contour_2d(
+#         X, Y, Z, xlabel, ylabel, xticks, yticks, metric_bars,  titles,
+#         fillcolor=None, styleaxiskw=dict(xtick0=False), label=True,
+#     )
+#     return fig, other_axes
+
+def plot_oil_recovery_integration(
+        load=False, metric=None,
+    ):
+    productivity = np.array([
+        perf.hydrolysate_productivity, 
+        perf.batch_productivity_mean, 
+    ])
+    titer = np.array([
+        perf.hydrolysate_titer, 
+        perf.batch_titer_mean, 
+    ])
+    cane.YRCP2023()
+    X, Y, Z = generate_contour_data(
+        cane.evaluate_metrics_oil_recovery_integration,
+        xlim=[50, 90],
+        ylim=[100 * perf.min_lipid_yield_glucose, 100 * perf.fed_batch_lipid_yield_mean],
+        args=(
+            productivity, titer,
+        ),
+        file=contour_file('oil_recovery_integration'),
+        load=load,
+        n=10,
+    )
+    if metric is None:
+        metric = feature.MBSP
+    elif isinstance(metric, str):
+        metric = getattr(feature, metric)
+    metric_index = cane.all_metric_mockups.index(metric)
+    Z = Z[..., metric_index]
+    Z = Z[:, :, :len(titer), :]
+    # Plot contours
+    xlabel = 'Microbial oil recovery [%]'
+    ylabel = "Microbial oil yield [wt %]"
+    titer_units = r'$g \cdot L^{-1}$'
+    productivity_units = r'$g \cdot L^{-1} \cdot h^{-1}$'
+    ylabels = [f"{ylabel}\n"
+               f"productivity = {round(productivity[i], 2)} {productivity_units}\n"
+               f"titer = {round(titer[i], 2)} {titer_units}"
+               for i in range(len(productivity))]
+    xticks = [50, 60, 70, 80, 90]
+    yticks = [12, 14, 16, 18, 20, 22]
+    titles = ['Direct Cogeneration',
+              'Integrated\nCo-Fermentation', 
+              'Integrated Co-Fermentation\n& Recovery']
+    units = format_units(metric.units)
+    metric_bar = MetricBar(
+        metric.name, units, plt.cm.get_cmap('viridis_r'), tickmarks(Z[~np.isnan(Z)], 5, 0.5, expand=0, p=0.5), 25, 2
+    )
+    fig, axes, CSs, CB, other_axes = plot_contour_single_metric(
+        X, Y, Z, xlabel, ylabels, xticks, yticks, metric_bar,  titles,
+        fillcolor=None, styleaxiskw=dict(xtick0=False), label=True,
+    )
+    txtbox = dict(boxstyle='round', facecolor=colors.neutral.shade(20).RGBn, 
+                  edgecolor='None', alpha=0.99, pad=0.1)
+    color = GG_colors.orange.RGBn
+    x = 70
+    y = 100 * perf.hydrolysate_lipid_yield
+    basline_values = cane.evaluate_metrics_oil_recovery_integration(
+        x, y, 
+        np.array([perf.hydrolysate_productivity]),
+        np.array([perf.hydrolysate_titer])
+    )
+    for i, ax in enumerate(axes[0, :3]):
+        plt.sca(ax._cached_ytwin)
+        value = basline_values[0, i, metric_index]
+        text = f'Baseline:\n{value:.2f} {units}'
+        plt.text(
+            x + 0.9, y + 0.7, text, c=color,
+            verticalalignment='center',
+            bbox=txtbox, 
+        )
+        plot_scatter_points(
+            [x], [y], 
+            marker='o', s=20, linewidth=0.6,
+            color=color, edgecolor=edgecolor, clip_on=False, zorder=1e6,
+        )
+    color = GG_colors.yellow.RGBn
+    x = 70
+    y = 100 * perf.batch_lipid_yield_mean
+    target_values = cane.evaluate_metrics_oil_recovery_integration(
+        x, y, 
+        np.array([perf.batch_productivity_mean]),
+        np.array([perf.batch_titer_mean])
+    )
+    for i, ax in enumerate(axes[1, :3]):
+        plt.sca(ax._cached_ytwin)
+        value = target_values[0, i, metric_index]
+        text = f'Target:\n{value:.2f} {units}'
+        plt.text(
+            x + 0.9, y + 0.7, text, c=color,
+            verticalalignment='center',
+            bbox=txtbox, 
+        )
+        plot_scatter_points(
+            [x], [y], 
+            marker='o', s=20, linewidth=0.6,
+            color=color, edgecolor=edgecolor, clip_on=False, zorder=1e6,
+        )
+    return fig, axes, other_axes
+
 def plot_sorghum_oil_content_and_cane_oil_content_contours(
         load=False, configuration_index=None, smooth=None,
     ):
@@ -489,8 +611,8 @@ def plot_sorghum_oil_content_and_cane_oil_content_contours(
     data = data[:, :, :, metric_indices]
     
     # Plot contours
-    xlabel = "Oil-sorghum oil content [dry wt. %]" 
-    ylabel = 'Oilcane oil content\n[dry wt. %]'
+    xlabel = "Oil-sorghum oil content [dw %]" 
+    ylabel = 'Oilcane oil content\n[dw %]'
     yticks = [2, 4, 6, 8, 10]
     xticks = [2, 4, 6, 8, 10]
     if configuration_index == [1, 2]:
@@ -588,7 +710,7 @@ def plot_recovery_and_oil_content_contours(
     
     # Plot contours
     xlabel = 'Crushing mill oil recovery [%]'
-    ylabel = "Oil content [dry wt. %]"
+    ylabel = "Oil content [dw %]"
     ylabels = [f'Direct Cogeneration\n{ylabel}',
                f'Integrated Co-Fermentation\n{ylabel}']
     xticks = [40, 50, 60, 70, 80, 90, 100]

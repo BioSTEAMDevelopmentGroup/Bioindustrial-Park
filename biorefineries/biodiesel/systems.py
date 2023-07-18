@@ -69,7 +69,7 @@ def create_lipid_wash_system(ins, outs):
     def correct_lipid_wash_water():
         ins = T208.ins
         lipid, lipid_wash_water, recycle, *others = ins
-        lipid_wash_water.imol['Water'] = 0.185 * sum([i.imass['Lipid'] for i in ins]) - recycle.imol['Water']
+        lipid_wash_water.imass['Water'] = water = 0.185 * sum([i.imass['Lipid'] for i in ins]) - recycle.imass['Water']
 
 @SystemFactory(
     ID="lipid_pretreatment_sys",
@@ -92,10 +92,11 @@ def create_lipid_pretreatment_system(ins, outs):
     P1 = bst.Pump('P1', T1-0, P=101325.)
     T2 = bst.StorageTank('T2', pure_glycerine, tau=7*24)
     P2 = bst.Pump('P2', T2-0, P=101325.)
+    H6 = bst.HXutility('H6', P10-0, T=320, rigorous=False)
     N2 = bst.Stream('N2', phase='g')
     acetone_recycle = bst.Stream()
     T3 = units.BlendingTankWithSkimming('T3', 
-        [P10-0, acetone_recycle], 
+        [H6-0, acetone_recycle], 
     )
     @T3.add_specification(run=True)
     def adjust_acetone_flow_rate():
@@ -113,10 +114,10 @@ def create_lipid_pretreatment_system(ins, outs):
     
     P3 = bst.Pump('P3', T3-1, P=101325)
     F1 = bst.Flash('F1', P3-0, V=1., P=101325)
-    H1 = bst.HXutility('H1', F1-0, V=0, rigorous=True)
+    H1 = bst.HXutility('H1', F1-0, T=320, V=0, rigorous=False)
     P5 = bst.Pump('P5', H1-0, P=101325)
     F2 = bst.Flash('F2', T3-0, ['', polar_lipids], V=1.0, P=101325)
-    H2 = bst.HXutility('H2', F2-0, V=0, rigorous=True)
+    H2 = bst.HXutility('H2', F2-0, T=320, V=0, rigorous=False)
     P6 = bst.Pump('P6', H2-0, P=101325)
     M1 = bst.Mixer('M1', [P1-0, P5-0, P6-0], acetone_recycle)
     # bst.mark_disjunction(acetone_recycle)

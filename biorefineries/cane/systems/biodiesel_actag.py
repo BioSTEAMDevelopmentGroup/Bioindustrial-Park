@@ -20,7 +20,7 @@ from .juicing import (
     create_feedstock_handling_system,
 )
 from .fermentation import create_sucrose_fermentation_system
-from .lipid_extraction import create_lipid_exctraction_system
+from .lipid_extraction import create_lipid_extraction_system
 from .. import units
 from .. import streams as s
 
@@ -134,7 +134,7 @@ def create_oilcane_to_biodiesel_and_actag_1g(
         fermrxn.X[0] = product_yield * selectivity
         fermrxn.X[1] = product_yield * (1. - selectivity)
     
-    post_fermentation_oil_separation_sys, ledct = create_lipid_exctraction_system(
+    post_fermentation_oil_separation_sys, ledct = create_lipid_extraction_system(
         ins=product,
         outs=[None, None, vinasse],
         mockup=True,

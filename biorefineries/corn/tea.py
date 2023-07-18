@@ -15,6 +15,7 @@ from biorefineries.tea import ConventionalEthanolTEA
 
 __all__ = ('create_tea', 'default_tea_parameters', 'tea_summary')
 
+
 default_tea_parameters = dict(
     IRR=0.15,
     duration=(2018, 2038),
@@ -31,7 +32,7 @@ default_tea_parameters = dict(
     supplies=0.20,
     maintenance=0.01,
     administration=0.005,
-    )
+)
 
 def create_tea(system, cls=ConventionalEthanolTEA, **tea_parameters):
     tea_parameters = tea_parameters or default_tea_parameters

@@ -32,8 +32,8 @@ class SeedTrain(SeedTrain):
     #   Reaction definition                   Reactant    Conversion
     Rxn('Glucose -> 2 Ethanol + 2 CO2',       'Glucose',   0.9000, chemicals),
     Rxn('3 Xylose -> 5 Ethanol + 5 CO2',      'Xylose',    0.8000, chemicals),
-    Rxn('Glucose -> Cellmass',                'Glucose',  0.0473, chemicals),
-    Rxn('Xylose -> Cellmass',                 'Xylose',  0.0421, chemicals),
+    Rxn('Glucose -> Cellmass',                'Glucose',  0.0473, chemicals, correct_mass_balance=True),
+    Rxn('Xylose -> Cellmass',                 'Xylose',  0.0421, chemicals, correct_mass_balance=True),
         ])
         
     def _setup(self):
@@ -46,7 +46,8 @@ class SeedTrain(SeedTrain):
         self.reactions.force_reaction(effluent)
         effluent.mol.remove_negatives()
         effluent.T = self.T
-        vent.copy_flow(effluent, 'CO2', remove=True)
+        vent.empty()
+        vent.copy_flow(effluent, ('CO2', 'O2', 'N2'), remove=True)
         
 
 class CoFermentation(CoFermentation):
@@ -62,8 +63,8 @@ class CoFermentation(CoFermentation):
     #   Reaction definition                   Reactant    Conversion
     Rxn('Glucose -> 2 Ethanol + 2 CO2',       'Glucose',   0.9500, chemicals),
     Rxn('3 Xylose -> 5 Ethanol + 5 CO2',      'Xylose',    0.8500, chemicals),
-    Rxn('Glucose -> Cellmass',                'Glucose',  0.05, chemicals),
-    Rxn('Xylose -> Cellmass',                 'Xylose',  0.05, chemicals),
+    Rxn('Glucose -> Cellmass',                'Glucose',  0.05, chemicals, correct_mass_balance=True),
+    Rxn('Xylose -> Cellmass',                 'Xylose',  0.05, chemicals, correct_mass_balance=True),
         ])
         
         if 'CSL' in chemicals:
@@ -81,7 +82,75 @@ class CoFermentation(CoFermentation):
         else:
             self.lipid_reaction = self.oil_reaction = None
 
-            
+          
+class AeratedCoFermentation(bst.AeratedBioreactor): # For microbial oil production
+    V_max_default = 500
+    def __init__(
+            self, ID='', ins=None, outs=(), thermo=None,  
+            *, cofermentation, theta_O2=0.5, 
+            dT_hx_loop=8,
+            Q_O2_consumption=-460240, # [kJ/kmol] equivalent to 110 kcal / mol as in https://www.academia.edu/19636928/Bioreactor_Design_for_Chemical_Engineers
+            batch=True,
+            **kwargs,
+        ):
+        bst.StirredTankReactor.__init__(self, ID, ins, outs, thermo, batch=batch, dT_hx_loop=dT_hx_loop, **kwargs)
+        chemicals = self.chemicals
+        self.theta_O2 = theta_O2
+        self.hydrolysis_reaction = Rxn('Sucrose + Water -> 2Glucose', 'Sucrose', 1.00, chemicals)
+        self.cofermentation = cofermentation
+        self.lipid_reaction = self.oil_reaction = PRxn([
+            Rxn('TAG + 3Water -> 3FFA + Glycerol', 'TAG', 0.23, chemicals),
+            Rxn('TAG + Water -> FFA + DAG', 'TAG', 0.02, chemicals)
+        ])
+        self.Q_O2_consumption = Q_O2_consumption
+        self.optimize_power = True
+        self.kLa_coefficients = "Van't Riet"
+    
+    def _run_vent(self, vent, effluent):
+        vent.copy_flow(effluent, ('CO2', 'O2', 'N2'), remove=True)
+        assert not effluent.imol['CO2', 'O2', 'N2'].any()
+    
+    def _run_reactions(self, effluent):
+        self.hydrolysis_reaction.force_reaction(effluent)
+        self.lipid_reaction.force_reaction(effluent)
+        if effluent.imol['H2O'] < 0.: effluent.imol['H2O'] = 0.
+        self.cofermentation.force_reaction(effluent)
+        
+class AeratedFermentation(bst.AeratedBioreactor): # For microbial oil production
+    V_max_default = 500
+    def __init__(
+            self, ID='', ins=None, outs=(), thermo=None,  
+            *, fermentation_reaction, cell_growth_reaction, theta_O2=0.5,
+            dT_hx_loop=8,
+            Q_O2_consumption=-460240, # [kJ/kmol] equivalent to 110 kcal / mol as in https://www.academia.edu/19636928/Bioreactor_Design_for_Chemical_Engineers
+            batch=True,
+            **kwargs,
+        ):
+        bst.StirredTankReactor.__init__(self, ID, ins, outs, thermo, batch=batch, dT_hx_loop=dT_hx_loop, **kwargs)
+        chemicals = self.chemicals
+        self.theta_O2 = theta_O2
+        self.hydrolysis_reaction = Rxn('Sucrose + Water -> 2Glucose', 'Sucrose', 1.00, chemicals)
+        self.fermentation_reaction = fermentation_reaction
+        self.cell_growth_reaction = cell_growth_reaction
+        self.lipid_reaction = self.oil_reaction = PRxn([
+            Rxn('TAG + 3Water -> 3FFA + Glycerol', 'TAG', 0.23, chemicals),
+            Rxn('TAG + Water -> FFA + DAG', 'TAG', 0.02, chemicals)
+        ])
+        self.Q_O2_consumption = Q_O2_consumption
+        self.optimize_power = True
+        self.kLa_coefficients = "Van't Riet"
+    
+    def _run_vent(self, vent, effluent):
+        vent.copy_flow(effluent, ('CO2', 'O2', 'N2'), remove=True)
+        assert not effluent.imol['CO2', 'O2', 'N2'].any()
+    
+    def _run_reactions(self, effluent):
+        self.hydrolysis_reaction.force_reaction(effluent)
+        self.lipid_reaction.force_reaction(effluent)
+        if effluent.imol['H2O'] < 0.: effluent.imol['H2O'] = 0.
+        self.fermentation_reaction.force_reaction(effluent)
+        self.cell_growth_reaction.force_reaction(effluent)
+    
 class OleinCrystallizer(bst.BatchCrystallizer):
     
     def __init__(self, ID='', ins=None, outs=(), thermo=None, *, 

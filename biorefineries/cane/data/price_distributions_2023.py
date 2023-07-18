@@ -10,6 +10,7 @@ import pandas as pd
 import os
 from chaospy import distributions as shape
 from math import sqrt
+from sklearn.linear_model import LinearRegression
 
 __all__ = (
     'ethanol_no_RIN_price_distribution', 
@@ -158,6 +159,7 @@ def fit_triangular_distribution(x, median=False):
     else:
         c = 3 * np.mean(x) - (a + b)
         if c < a: c = a + 1e-6
+        elif c > b: c = b - 1e-6
     return a, b, c
 
 def plot_triangular_distribution(a, b, c):
@@ -202,23 +204,34 @@ maep = mean_advanced_ethanol_price
 mcop = mean_crude_oil_price
 copd = crude_oil_price_distribution
 
-f_ngp = np.mean(natural_gas_prices) / mcop
-f_elecp = np.mean(electricity_prices) / np.mean(crude_oil_prices[:-1])
-f_bp = mbp / mcop
-f_cbp = mcbp / mcop
-f_aep = maep / mcop
-f_cep = mcep / mcop
+# Use linear regression to create models with crude oil price as the predictor
+predictor = crude_oil_prices[:, np.newaxis]
+prices = {
+    'Natural gas': natural_gas_prices,
+    'Biomass based diesel': biomass_based_diesel_prices,
+    'Cellulosic based diesel': cellulosic_based_diesel_prices,
+    'Advanced ethanol': advanced_ethanol_prices,
+    'Cellulosic ethanol': cellulosic_ethanol_prices,
+}
 
-ngp_offset = f_ngp * crude_oil_prices - natural_gas_prices
-elecp_offset = f_elecp * crude_oil_prices[:-1] - electricity_prices
-bp_offset = f_bp * crude_oil_prices - biomass_based_diesel_prices
-cbp_offset = f_cbp * crude_oil_prices - cellulosic_based_diesel_prices
-aep_offset = f_aep * crude_oil_prices - advanced_ethanol_prices
-cep_offset = f_cep * crude_oil_prices - cellulosic_ethanol_prices
+models = {
+    name: LinearRegression().fit(predictor, data)
+    for name, data in prices.items()
+}
 
-ngpd_offset = triangular_distribution(ngp_offset)
-elecpd_offset = triangular_distribution(elecp_offset)
-bpd_offset = triangular_distribution(bp_offset)
-cbpd_offset = triangular_distribution(cbp_offset)
-aepd_offset = triangular_distribution(aep_offset)
-cepd_offset = triangular_distribution(cep_offset)
+scores = {
+    name: model.score(predictor, prices[name]) for name, model in models.items()
+}
+
+offsets = {
+    name: model.predict(predictor) - prices[name] for name, model in models.items()    
+}
+
+offsets = {
+    name: triangular_distribution(model.predict(predictor) - prices[name]) for name, model in models.items()    
+}
+
+prices['Electricity'] = electricity_prices
+models['Electricity'] = emodel = LinearRegression().fit(predictor[:-1], electricity_prices)
+scores['Electricity'] = emodel.score(predictor[:-1], electricity_prices) # R2s
+offsets['Electricity'] = triangular_distribution(emodel.predict(predictor[:-1]) - electricity_prices)

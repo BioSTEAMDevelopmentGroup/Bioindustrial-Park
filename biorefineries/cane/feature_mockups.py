@@ -5,41 +5,53 @@ Created on Thu Nov  4 14:44:17 2021
 @author: yrc2
 """
 from biosteam import MockFeature
+from thermosteam.units_of_measure import format_units
+from thermosteam.utils import roundsigfigs
+import pandas as pd
 
-(set_crushing_mill_oil_recovery, set_microbial_oil_recovery, set_bagasse_oil_recovery, 
+(set_juicing_oil_recovery, set_microbial_oil_recovery, set_bagasse_oil_recovery, 
  set_cane_operating_days, set_sorghum_operating_days, 
- set_annual_crushing_capacity, set_crude_oil_price,
- set_ethanol_price, set_biodiesel_price, set_natural_gas_price, set_electricity_price, 
+ set_available_land, set_dry_biomass_yield, set_crude_oil_price, 
+ set_baseline_feedstock_price,
+ set_cellulosic_ethanol_price, set_advanced_ethanol_price,
+ set_biomass_based_diesel_price, set_cellulosic_based_diesel_price,
+ set_natural_gas_price, set_electricity_price, 
  set_IRR, set_crude_glycerol_price, set_pure_glycerol_price,
  set_saccharification_reaction_time, set_cellulase_price, 
  set_cellulase_loading, set_reactor_base_cost,
  set_cane_glucose_yield, set_cane_xylose_yield, 
  set_sorghum_glucose_yield, set_sorghum_xylose_yield, 
  set_glucose_to_ethanol_yield, set_xylose_to_ethanol_yield,
- set_cofermentation_titer, set_cofermentation_productivity,
+ set_cofermentation_ethanol_titer, set_cofermentation_ethanol_productivity,
+ set_glucose_to_microbial_oil_yield, set_xylose_to_microbial_oil_yield,
+ set_fermentation_microbial_oil_titer, set_fermentation_microbial_oil_productivity,
  set_cane_PL_content, set_sorghum_PL_content, set_cane_FFA_content,
  set_sorghum_FFA_content,  set_cane_oil_content, set_relative_sorghum_oil_content,
- set_TAG_to_FFA_conversion, set_oilcane_GWP, set_methanol_GWP, 
+ set_TAG_to_FFA_conversion, set_feedstock_GWP, set_methanol_GWP, 
  set_pure_glycerine_GWP, set_cellulase_GWP, set_natural_gas_GWP,
  set_income_tax,
- ) = all_parameter_mockups = (
-    MockFeature('Crushing mill oil recovery', '%', 'biorefinery'),
-    MockFeature('Microbial oil recovery', '%', 'biorefinery'),
-    MockFeature('Bagasse oil recovery', '%', 'biorefinery'),
-    MockFeature('Cane operating days', 'day/yr', 'biorefinery'),
-    MockFeature('Sorghum operating days', 'day/yr', 'biorefinery'),
-    MockFeature('Annual crushing capacity', 'MT/yr', 'biorefinery'),
-    MockFeature('Price', 'UDA/barrel', 'Crude oil'),
-    MockFeature('Price', 'USD/L', 'Stream-ethanol'),
-    MockFeature('Price', 'USD/L', 'Stream-biodiesel'),
-    MockFeature('Price', 'USD/m3', 'Stream-natural gas'),
-    MockFeature('Electricity price', 'USD/kWhr', 'biorefinery'),
-    MockFeature('IRR', '%', 'biorefinery'),
-    MockFeature('Price', 'USD/kg', 'Stream-crude glycerol'),
-    MockFeature('Price', 'USD/kg', 'Stream-pure glycerine'),
+) = all_parameter_mockups = (
+    MockFeature('Juicing oil recovery', '%', '-'),
+    MockFeature('Microbial oil recovery', '%', '-'),
+    MockFeature('Bagasse oil recovery', '%', '-'),
+    MockFeature('Cane operating days', 'day/yr', '-'),
+    MockFeature('Sorghum operating days', 'day/yr', '-'),
+    MockFeature('Available land', 'ha / yr', 'Feedstock'),
+    MockFeature('Dry biomass yield', 'dry MT/ha', 'Feedstock'),
+    MockFeature('Price', 'USD/barrel', 'Crude oil'),
+    MockFeature('Price', 'USD/kg', 'Feedstock'),
+    MockFeature('Price', 'USD/L', 'Cellulosic ethanol'),
+    MockFeature('Price', 'USD/L', 'Advanced ethanol'),
+    MockFeature('Price', 'USD/L', 'Biomass based diesel'),
+    MockFeature('Price', 'USD/L', 'Cellulosic based diesel'),
+    MockFeature('Price', 'USD/m3', 'Natural gas'),
+    MockFeature('Price', 'USD/kWhr', 'Electricity'),
+    MockFeature('IRR', '%', '-'),
+    MockFeature('Price', 'USD/kg', 'Crude glycerol'),
+    MockFeature('Price', 'USD/kg', 'Pure glycerine'),
     MockFeature('Reaction time', 'hr', 'Saccharification'),
-    MockFeature('Price', 'USD/kg', 'cellulase'),
-    MockFeature('Cellulase loading', 'wt. % cellulose', 'cellulase'),
+    MockFeature('Price', 'USD/kg', 'Cellulase'),
+    MockFeature('Cellulase loading', 'wt. % cellulose', 'Cellulase'),
     MockFeature('Base cost', 'million USD', 'Pretreatment reactor system'),
     MockFeature('Cane glucose yield', '%', 'Pretreatment and saccharification'),
     MockFeature('Sorghum glucose yield', '%', 'Pretreatment and saccharification'),
@@ -47,76 +59,79 @@ from biosteam import MockFeature
     MockFeature('Sorghum xylose yield', '%', 'Pretreatment and saccharification'),
     MockFeature('Glucose to ethanol yield', '%', 'Cofermenation'),
     MockFeature('Xylose to ethanol yield', '%', 'Cofermenation'),
-    MockFeature('Titer', 'g/L', 'Cofermentation'),
-    MockFeature('Productivity', 'g/L', 'Cofermentation'),
-    MockFeature('Cane PL content', '% oil', 'oilcane'),
-    MockFeature('Sorghum PL content', '% oil', 'oilsorghum'),
-    MockFeature('Cane FFA content', '% oil', 'oilcane'),
-    MockFeature('Sorghum FFA content', '% oil', 'oilsorghum'),
-    MockFeature('Cane oil content', 'dry wt. %', 'oilcane'),
-    MockFeature('Relative sorghum oil content', 'dry wt. %', 'oilsorghum'),
-    MockFeature('TAG to FFA conversion', '% oil', 'biorefinery'),
-    MockFeature('GWP', 'kg*CO2-eq/kg', 'Stream-oilcane'),
-    MockFeature('GWP', 'kg*CO2-eq/kg', 'Stream-methanol'),
-    MockFeature('GWP', 'kg*CO2-eq/kg', 'Stream-pure glycerine'),
-    MockFeature('GWP', 'kg*CO2-eq/kg', 'Stream-cellulase'),
-    MockFeature('GWP', 'kg*CO2-eq/kg', 'Stream-natural gas'),
-    MockFeature('Income tax', '%', 'Biorefinery'),
+    MockFeature('Ethanol titer', 'g/L', 'Cofermentation'),
+    MockFeature('Ethanol productivity', 'g/L', 'Cofermentation'),
+    MockFeature('Glucose to microbial oil yield', '%', 'Cofermenation'),
+    MockFeature('Xylose to microbial oil yield', '%', 'Cofermenation'),
+    MockFeature('Microbial oil titer', 'g/L', 'Fermentation'),
+    MockFeature('Microbial oil productivity', 'g/L', 'Fermentation'),
+    MockFeature('Cane PL content', '% oil', 'Oilcane'),
+    MockFeature('Sorghum PL content', '% oil', 'Oilsorghum'),
+    MockFeature('Cane FFA content', '% oil', 'Oilcane'),
+    MockFeature('Sorghum FFA content', '% oil', 'Oilsorghum'),
+    MockFeature('Cane oil content', 'dry wt. %', 'Oilcane'),
+    MockFeature('Relative sorghum oil content', 'dry wt. %', 'Oilsorghum'),
+    MockFeature('TAG to FFA conversion', '% oil', '-'),
+    MockFeature('GWP', 'kg*CO2-eq/kg', 'Sugarcane'),
+    MockFeature('GWP', 'kg*CO2-eq/kg', 'Methanol'),
+    MockFeature('GWP', 'kg*CO2-eq/kg', 'Pure glycerine'),
+    MockFeature('GWP', 'kg*CO2-eq/kg', 'Cellulase'),
+    MockFeature('GWP', 'kg*CO2-eq/kg', 'Natural gas'),
+    MockFeature('Income tax', '%', '-'),
 )
      
-(MFPP, feedstock_consumption, biodiesel_production, biodiesel_yield, ethanol_production, 
+(MFPP, MESP, MBSP, feedstock_consumption, biodiesel_production, biodiesel_yield, ethanol_production, 
  electricity_production, net_energy_production, natural_gas_consumption, TCI, 
  heat_exchanger_network_error, GWP_economic, GWP_ethanol, GWP_biodiesel, 
  GWP_crude_glycerol, GWP_electricity, GWP_ethanol_displacement, GWP_biodiesel_displacement,
  GWP_biofuel_allocation, GWP_ethanol_allocation,
  GWP_biodiesel_allocation, GWP_crude_glycerol_allocation,
- IRR, MFPP_derivative, 
- biodiesel_production_derivative, ethanol_production_derivative, 
+ MFPP_derivative, biodiesel_production_derivative, ethanol_production_derivative, 
  electricity_production_derivative, natural_gas_consumption_derivative, 
  TCI_derivative, GWP_economic_derivative, 
  GWP_ethanol_derivative, GWP_biodiesel_derivative,
  GWP_crude_glycerol_derivative, GWP_electricity_derivative,
- ROI, competitive_biomass_yield, competitive_microbial_oil_yield,
- energy_competitive_biomass_yield, energy_competitive_microbial_oil_yield,
+ ROI, competitive_biomass_yield, energy_competitive_biomass_yield,
+ # competitive_microbial_oil_yield,
+ # energy_competitive_microbial_oil_yield,
  ) = all_metric_mockups = (
-    MockFeature('MFPP', 'USD/MT', 'Biorefinery'),
-    MockFeature('Feedstock consumption', 'MT/yr', 'Biorefinery'),
-    MockFeature('Biodiesel production', 'L/MT', 'Biorefinery'),
-    MockFeature('Biodiesel yield', 'L/ha', 'Biorefinery'),
-    MockFeature('Ethanol production', 'L/MT', 'Biorefinery'),
-    MockFeature('Electricity production', 'kWhr/MT', 'Biorefinery'),
-    MockFeature('Net energy production', 'GGE/MT', 'Biorefinery'),
-    MockFeature('Natural gas consumption', 'm3/MT', 'Biorefinery'),
-    MockFeature('TCI', '10^6*USD', 'Biorefinery'),
-    MockFeature('Heat exchanger network error', '%', 'Biorefinery'),
-    MockFeature('GWP', 'kg*CO2*eq / USD', 'Economic allocation'),
-    MockFeature('Ethanol GWP', 'kg*CO2*eq / L', 'Economic allocation'),
-    MockFeature('Biodiesel GWP', 'kg*CO2*eq / L', 'Economic allocation'),
-    MockFeature('Crude glycerol GWP', 'kg*CO2*eq / kg', 'Economic allocation'),
-    MockFeature('Electricity GWP', 'kg*CO2*eq / MWhr', 'Economic allocation'),
-    MockFeature('Ethanol GWP', 'kg*CO2*eq / L', 'Displacement allocation'),
-    MockFeature('Biodiesel GWP', 'kg*CO2*eq / L', 'Displacement allocation'),
-    MockFeature('Biofuel GWP', 'kg*CO2*eq / GGE', 'Energy allocation'),
-    MockFeature('Ethanol GWP', 'kg*CO2*eq / L', 'Energy allocation'),
-    MockFeature('Biodiesel GWP', 'kg*CO2*eq / L', 'Energy allocation'),
-    MockFeature('Crude-glycerol GWP', 'kg*CO2*eq / kg', 'Energy allocation'),
-    MockFeature('IRR', '%', 'Biorefinery'),
-    MockFeature('MFPP derivative', 'USD/MT', 'Biorefinery'),
-    MockFeature('Biodiesel production derivative', 'L/MT', 'Biorefinery'),
-    MockFeature('Ethanol production derivative', 'L/MT', 'Biorefinery'),
-    MockFeature('Electricity production derivative', 'kWhr/MT', 'Biorefinery'),
-    MockFeature('Natural gas consumption derivative', 'cf/MT', 'Biorefinery'),
-    MockFeature('TCI derivative', '10^6*USD', 'Biorefinery'),
-    MockFeature('GWP derivative', 'kg*CO2*eq / USD', 'Economic allocation'),
-    MockFeature('Ethanol GWP derivative', 'kg*CO2*eq / L', 'Ethanol'),
-    MockFeature('Biodiesel GWP derivative', 'kg*CO2*eq / L', 'Biodiesel'),
-    MockFeature('Crude glycerol GWP derivative', 'kg*CO2*eq / kg', 'Crude glycerol'),
-    MockFeature('Electricity GWP derivative', 'kg*CO2*eq / MWhr', 'Electricity'),
-    MockFeature('ROI', '%', 'Biorefinery'),
+    MockFeature('MFPP', 'USD/MT', '-'),
+    MockFeature('MESP', 'USD/L', '-'),
+    MockFeature('MBSP', 'USD/L', '-'),
+    MockFeature('Feedstock consumption', 'MT/yr', '-'),
+    MockFeature('Biodiesel production', 'L/MT', '-'),
+    MockFeature('Biodiesel yield', 'L/ha', '-'),
+    MockFeature('Ethanol production', 'L/MT', '-'),
+    MockFeature('Electricity production', 'kWhr/MT', '-'),
+    MockFeature('Net energy production', 'GGE/MT', '-'),
+    MockFeature('Natural gas consumption', 'm3/MT', '-'),
+    MockFeature('TCI', '10^6*USD', '-'),
+    MockFeature('Heat exchanger network error', '%', '-'),
+    MockFeature('GWP', 'kg*CO2e / USD', 'Economic allocation'),
+    MockFeature('Ethanol GWP', 'kg*CO2e / L', 'Economic allocation'),
+    MockFeature('Biodiesel GWP', 'kg*CO2e / L', 'Economic allocation'),
+    MockFeature('Crude glycerol GWP', 'kg*CO2e / kg', 'Economic allocation'),
+    MockFeature('Electricity GWP', 'kg*CO2e / MWhr', 'Economic allocation'),
+    MockFeature('Ethanol GWP', 'kg*CO2e / L', 'Displacement allocation'),
+    MockFeature('Biodiesel GWP', 'kg*CO2e / L', 'Displacement allocation'),
+    MockFeature('Biofuel GWP', 'kg*CO2e / GGE', 'Energy allocation'),
+    MockFeature('Ethanol GWP', 'kg*CO2e / L', 'Energy allocation'),
+    MockFeature('Biodiesel GWP', 'kg*CO2e / L', 'Energy allocation'),
+    MockFeature('Crude-glycerol GWP', 'kg*CO2e / kg', 'Energy allocation'),
+    MockFeature('MFPP derivative', 'USD/MT', '-'),
+    MockFeature('Biodiesel production derivative', 'L/MT', '-'),
+    MockFeature('Ethanol production derivative', 'L/MT', '-'),
+    MockFeature('Electricity production derivative', 'kWhr/MT', '-'),
+    MockFeature('Natural gas consumption derivative', 'cf/MT', '-'),
+    MockFeature('TCI derivative', '10^6*USD', '-'),
+    MockFeature('GWP derivative', 'kg*CO2e / USD', 'Economic allocation'),
+    MockFeature('GWP derivative', 'kg*CO2e / L', 'Ethanol'),
+    MockFeature('GWP derivative', 'kg*CO2e / L', 'Biodiesel'),
+    MockFeature('GWP derivative', 'kg*CO2e / kg', 'Crude glycerol'),
+    MockFeature('GWP derivative', 'kg*CO2e / MWhr', 'Electricity'),
+    MockFeature('ROI', '%', '-'),
     MockFeature('Competitive biomass yield', 'dry MT/ha', 'Feedstock'),
     MockFeature('Energy competitive biomass yield', 'dry MT/ha', 'Feedstock'),
-    MockFeature('Competitive microbial oil yield', 'wt. %', 'Feedstock'),
-    MockFeature('Energy competitive microbial oil yield', 'wt. %', 'Feedstock'),
 )
 
 tea_monte_carlo_metric_mockups = (
@@ -152,3 +167,226 @@ lca_monte_carlo_derivative_metric_mockups = (
     GWP_electricity_derivative,
     GWP_crude_glycerol_derivative,
 )
+
+def get_YRCP2023_spearman_names(configuration, kind=None):
+    from biorefineries.cane import Biorefinery, YRCP2023
+    YRCP2023()
+    br = Biorefinery('O1', simulate=False)
+    name = 'name'
+    full_name = 'full_name'
+    tea_spearman_labels = {
+        br.set_juicing_oil_recovery: name,
+        br.set_microbial_oil_recovery: name,
+        br.set_bagasse_oil_recovery: name,
+        br.set_cane_operating_days: name,
+        br.set_available_land: name,
+        br.set_dry_biomass_yield: name,
+        br.set_crude_oil_price: full_name, 
+        br.set_baseline_feedstock_price: 'Baseline feedstock price',
+        # br.set_cellulosic_ethanol_price: full_name,
+        # br.set_advanced_ethanol_price: full_name,
+        br.set_biomass_based_diesel_price: full_name,
+        br.set_cellulosic_based_diesel_price: full_name,
+        br.set_natural_gas_price: full_name,
+        br.set_electricity_price: full_name, 
+        br.set_IRR: name,
+        br.set_crude_glycerol_price: full_name,
+        br.set_pure_glycerol_price: full_name,
+        br.set_saccharification_reaction_time: full_name,
+        br.set_cellulase_price: full_name, 
+        br.set_cellulase_loading: name,
+        br.set_reactor_base_cost: ('PTRS base cost', 'MMUSD'),
+        br.set_cane_glucose_yield: 'Glucan to glucose yield',
+        br.set_cane_xylose_yield: 'Xylan to xylose yield', 
+        # br.set_glucose_to_ethanol_yield: ('Glucose to ethanol yield', '% theoretical'),
+        # br.set_xylose_to_ethanol_yield: ('Xylose to ethanol yield', '% theoretical'),
+        # br.set_cofermentation_ethanol_titer: full_name,
+        # br.set_cofermentation_ethanol_productivity: full_name,
+        br.set_glucose_to_microbial_oil_yield: name, 
+        br.set_xylose_to_microbial_oil_yield: name, 
+        br.set_fermentation_microbial_oil_titer: name, 
+        br.set_fermentation_microbial_oil_productivity: name, 
+        br.set_cane_PL_content: name, 
+        br.set_cane_FFA_content: name,
+        br.set_cane_oil_content: name, 
+        br.set_TAG_to_FFA_conversion: name,
+    }
+    GWP_spearman_labels = {
+        br.set_feedstock_GWP: 'Baseline feedstock GWP',
+        br.set_methanol_GWP: full_name, 
+        br.set_pure_glycerine_GWP: full_name,
+        br.set_cellulase_GWP: full_name,
+        br.set_natural_gas_GWP: full_name,
+    }
+    if configuration == 'O7':
+        del GWP_spearman_labels[br.set_cellulase_GWP]
+        del GWP_spearman_labels[br.set_natural_gas_GWP]
+        del tea_spearman_labels[br.set_cellulosic_based_diesel_price]
+        del tea_spearman_labels[br.set_saccharification_reaction_time]
+        del tea_spearman_labels[br.set_cellulase_price]
+        del tea_spearman_labels[br.set_cellulase_loading]
+        del tea_spearman_labels[br.set_reactor_base_cost]
+        del tea_spearman_labels[br.set_cane_glucose_yield]
+        del tea_spearman_labels[br.set_cane_xylose_yield]
+        del tea_spearman_labels[br.set_xylose_to_microbial_oil_yield]
+        del tea_spearman_labels[br.set_bagasse_oil_recovery]
+    elif configuration == 'O9':
+        pass
+    else:
+        raise ValueError(configuration)
+    def with_units(f, name, units=None):
+        d = f.distribution
+        dname = type(d).__name__
+        if units is None: units = f.units
+        if dname == 'Triangle':
+            distribution = ', '.join([format(j, '.3g')
+                                      for j in d._repr.values()])
+        elif dname == 'Uniform':
+            distribution = ' $-$ '.join([format(j, '.3g')
+                                         for j in d._repr.values()])
+        return f"{name}\n[{distribution} {format_units(units)}]"
+        
+    def get_full_name(f):
+        a = f.element_name
+        if a == 'Cofermentation':
+            a = 'Co-Fermentation'
+        b = f.name
+        if b == 'GWP': 
+            return f"{a} {b}"
+        else:
+            return f"{a} {b.lower()}"
+        
+    for dct in (GWP_spearman_labels, tea_spearman_labels):
+        for i, j in tuple(dct.items()):
+            if j == name:
+                dct[i.index] = with_units(i, i.name)
+            elif j == full_name:
+                dct[i.index] = with_units(i, get_full_name(i))
+            elif isinstance(j, tuple):
+                dct[i.index] = with_units(i, *j)
+            elif isinstance(j, str):
+                dct[i.index] = with_units(i, j)
+            else:
+                raise TypeError(str(j))
+            del dct[i]
+    
+    lca_spearman_labels = {
+        i: j for i, j in
+        tea_spearman_labels.items()
+        if not any([k in ''.join(i) for k in ('price', 'cost', 'days', 'land', 'IRR')])
+    }
+    lca_spearman_labels.update(GWP_spearman_labels)
+    if kind == 'TEA':
+        return tea_spearman_labels
+    elif kind == 'LCA':
+        return lca_spearman_labels
+    else:
+        return tea_spearman_labels, lca_spearman_labels
+    
+def get_YRCP2023_distribution_table(kind=None, file=None):
+    from biorefineries.cane import Biorefinery, YRCP2023
+    YRCP2023()
+    br = Biorefinery('O1', simulate=False)
+    name = 'name'
+    full_name = 'full_name'
+    parameters = {
+        br.set_juicing_oil_recovery: name,
+        br.set_microbial_oil_recovery: name,
+        br.set_bagasse_oil_recovery: name,
+        br.set_cane_operating_days: name,
+        br.set_available_land: name,
+        br.set_dry_biomass_yield: name,
+        br.set_crude_oil_price: full_name, 
+        br.set_baseline_feedstock_price: 'Baseline feedstock price',
+        br.set_cellulosic_ethanol_price: full_name,
+        br.set_advanced_ethanol_price: full_name,
+        br.set_biomass_based_diesel_price: full_name,
+        br.set_cellulosic_based_diesel_price: full_name,
+        br.set_natural_gas_price: full_name,
+        br.set_electricity_price: full_name, 
+        br.set_IRR: name,
+        br.set_crude_glycerol_price: full_name,
+        br.set_pure_glycerol_price: full_name,
+        br.set_saccharification_reaction_time: full_name,
+        br.set_cellulase_price: full_name, 
+        br.set_cellulase_loading: name,
+        br.set_reactor_base_cost: ('PTRS base cost', 'MMUSD'),
+        br.set_cane_glucose_yield: 'Glucan to glucose yield',
+        br.set_cane_xylose_yield: 'Xylan to xylose yield', 
+        br.set_glucose_to_ethanol_yield: ('Glucose to ethanol yield', '% theoretical'),
+        br.set_xylose_to_ethanol_yield: ('Xylose to ethanol yield', '% theoretical'),
+        br.set_cofermentation_ethanol_titer: full_name,
+        br.set_cofermentation_ethanol_productivity: full_name,
+        br.set_glucose_to_microbial_oil_yield: name, 
+        br.set_xylose_to_microbial_oil_yield: name, 
+        br.set_fermentation_microbial_oil_titer: name, 
+        br.set_fermentation_microbial_oil_productivity: name, 
+        br.set_cane_PL_content: name, 
+        br.set_cane_FFA_content: name,
+        br.set_cane_oil_content: name, 
+        br.set_TAG_to_FFA_conversion: name,
+        br.set_feedstock_GWP: 'Baseline feedstock GWP',
+        br.set_methanol_GWP: full_name, 
+        br.set_pure_glycerine_GWP: full_name,
+        br.set_cellulase_GWP: full_name,
+        br.set_natural_gas_GWP: full_name,
+    }
+    def with_units(f, name, units=None):
+        if units is None: units = f.units
+        return f"{name}\n[{units}]"
+        
+    def get_distribution_dict(f):
+        d = f.distribution
+        dname = type(d).__name__
+        values = [roundsigfigs(j, 3) for j in d._repr.values()]
+        if dname == 'Triangle':
+            return {
+                'Shape': 'Triangular',
+                'Lower': values[0],
+                'Upper': values[2],
+                'Mode': values[1],
+            }
+            
+        elif dname == 'Uniform':
+            return {
+                'Shape': 'Uniform',
+                'Lower': values[0],
+                'Upper': values[1],
+                'Mode': '-',
+            }
+    
+    def get_full_name(f):
+        a = f.element_name
+        if a == 'Cofermentation':
+            a = 'Co-Fermentation'
+        b = f.name
+        if b == 'GWP': 
+            return f"{a} {b}"
+        else:
+            return f"{a} {b.lower()}"
+    
+    rows = []
+    for i, j in parameters.items():
+        if j == name:
+            parameter_name = with_units(i, i.name)
+        elif j == full_name:
+            parameter_name = with_units(i, get_full_name(i))
+        elif isinstance(j, tuple):
+            parameter_name = with_units(i, *j)
+        elif isinstance(j, str):
+            parameter_name = with_units(i, j)
+        else:
+            raise TypeError(str(j))
+        rows.append({
+            'Parameter': parameter_name,
+            'Baseline': roundsigfigs(i.baseline, 3),
+            **get_distribution_dict(i),
+        })
+    table = pd.DataFrame(
+        rows, 
+        index=list(
+            range(1, len(parameters) + 1)
+        )
+    )
+    # table.index.name = '#'
+    return table

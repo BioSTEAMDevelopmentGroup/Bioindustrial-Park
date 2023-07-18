@@ -50,7 +50,7 @@ def create_facilities(
     makeup_water = Stream('makeup_water', price=0.00025353160151260924)
     
     bst.facilities.ProcessWaterCenter(area or 'PWC',
-        (RO_water, makeup_water, recycle_process_water),
+        (RO_water, '', recycle_process_water, makeup_water),
         (),
         None,
         (BT-1, CT-1),

@@ -1,3 +1,11 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created on Wed May 31 09:27:27 2023
+
+@author: lavanyakudli
+"""
+
 # -*- coding: utf-8 -*-
 """
 Created on Tue Aug 23 07:37:23 2022
@@ -11,7 +19,7 @@ from biorefineries.oleochemicals import units_baseline
 from biorefineries.oleochemicals import prices_and_GWP_factors
 from units_baseline import *
 from biorefineries.oleochemicals.chemicals_baseline import chems
-from biosteam import Flowsheet as F
+from biosteam import Flowsheet
 from biosteam import main_flowsheet
 from biosteam import units, SystemFactory
 from biorefineries.biodiesel.systems import create_transesterification_and_biodiesel_separation_system
@@ -24,6 +32,14 @@ from biorefineries.lipidcane._process_settings import price
 from biorefineries.cane.data.lca_characterization_factors import GWP_characterization_factors 
 from biorefineries.oleochemicals import prices_and_GWP_factors
 from prices_and_GWP_factors import prices_per_Kg,GWP_factors
+
+# bst.preferences.T = 'K'
+# # bst.preferences.flow = 'kg/hr'
+# bst.preferences.N = 100
+# bst.preferences.P = 'Pa'
+# bst.preferences.composition = True
+# bst.preferences.light_mode()
+# bst.preferences.save()
 #Settings to set the name of the flowsheet
 F = bst.Flowsheet('azelaic_acid_baseline')
 bst.main_flowsheet.set_flowsheet(F) 
@@ -115,7 +131,7 @@ def crude_HOSO_oil_to_biodiesel(ins,outs,X_tes):
                          ins = T102-0,
                          outs = ('degummed_oil', 
                                   polar_lipids_to_boilerturbogenerator),
-                         split = dict(PL = 0.4,
+                         split = dict(PL = 0.1,
                                       TAG = 1,
                                       Water = 0,
                                       Citric_acid = 0,
@@ -136,14 +152,19 @@ def crude_HOSO_oil_to_biodiesel(ins,outs,X_tes):
                               outs = ('neutralised_oik_for_transesterification',
                                        'waste_to_BT'),
                               split = dict(
-                                       Sodium_hydroxide_solid = 0,
-                                       Phosphatidylinositol = 1,
-                                       OOO = 1,LnLnLn = 1,
-                                       LLL = 1,PPP = 1,
-                                       SSS = 1,Water = 1,
-                                       Oleic_acid  = 0,
-                                       Sodium_oleate =0,
-                                       ))
+                                        Sodium_hydroxide_solid = 0,
+                                        Phosphatidylinositol = 1,
+                                        OOO = 1,LnLnLn = 1,
+                                        LLL = 1,PPP = 1,
+                                        SSS = 1,Water = 1,
+                                        Oleic_acid  = 0,
+                                        Sodium_oleate =0,
+                                        Myristic_acid = 1,
+                                        Pentadecylic_acid = 1,
+                                        Heptadecanoic_acid = 1,
+                                        Arachidic_acid = 1,
+                                        Behenic_acid = 1,
+                                               ))
 #Bleaching process is for bleaching colour related impurities
 #Deodorisation process is for removing odors
 #Dewaxing processes are intended for waxes present in the oil crystallizes, they give hazy appearance to the oil, ignored for this process.
@@ -154,7 +175,10 @@ def crude_HOSO_oil_to_biodiesel(ins,outs,X_tes):
         tmo.Reaction('SSS + 3Methanol -> 3Methyl_stearate + Glycerol', reactant='SSS',  X = X_tes),
         tmo.Reaction('LnLnLn + 3Methanol -> 3Methyl_linolenate + Glycerol', reactant='LnLnLn',  X = X_tes),
         tmo.Reaction('PPP + 3Methanol -> 3Methyl_palmitate + Glycerol', reactant='PPP',  X = X_tes),
-                                    ])
+        tmo.Reaction('Myristic_acid + Methanol -> Methyl_myristate + Water', reactant = 'Myristic_acid',X = X_tes),
+        tmo.Reaction('Arachidic_acid + Methanol -> Arachidic_acid_methyl_ester + Water', reactant = 'Arachidic_acid',X = X_tes),
+        tmo.Reaction('Behenic_acid + Methanol -> Methyl_behenate + Water', reactant = 'Behenic_acid',X = X_tes),
+                                           ])
     
     sys = create_transesterification_and_biodiesel_separation_system(ins = S100-0,
                                                                      outs = (biodiesel,
@@ -305,10 +329,9 @@ def oxidative_cleavage_system(ins,outs):
         total_diol_moles =  dihydroxylation_product.imol['MDHSA'] +  dihydroxylation_product.imol['Tetrahydroxy_octadecanoate'] +  dihydroxylation_product.imol['Hexahydroxy_octadecanoate']
         # M300.outs[0].imol['MDHSA'] +  M300.outs[0].imol['Tetrahydroxy_octadecanoate'] +  M300.outs[0].imol['Hexahydroxy_octadecanoate']
         total_diol_moles_per_cycle = total_diol_moles/cycles_of_reuse
-        R300.ins[1].empty()
         total_incoming_cobalt_catalyst_moles = recovered_mixture_of_cobalt_catalyst.imol['Cobalt_hydroxide'] 
         b = cobaltcatalyst_mass_factor*total_diol_moles/cycles_of_reuse
-        a = max(0,(b - total_incoming_cobalt_catalyst_moles)*chems['Cobalt_acetate_tetrahydrate'].MW )
+        a = (b - total_incoming_cobalt_catalyst_moles)*chems['Cobalt_acetate_tetrahydrate'].MW 
         R300.ins[1].imass['Cobalt_acetate_tetrahydrate'] = a/g_to_Kg
         R300.ins[1].imass['Water'] = 65.66*a/g_to_Kg
         c = 0.21*air_mass_factor*(dihydroxylation_product.F_mass + recycled_diols_and_other_fatty_acids.F_mass)
@@ -373,6 +396,14 @@ def organic_phase_separation_and_catalyst_recovery(ins,outs):
                                                       'Calcium_chloride':0,'Calcium_tungstate':0,'Calcium_acetate':0,
                                                       'Cobalt_hydroxide':0,'HCl2':0,'Oxygen':1,'Nitrogen':1,'Carbon_dioxide':1,
                                                       'Malonic_acid':1,'Propanoic_acid':1,'Methyl_oxo_nonanoicacid':1,
+                                                      'Myristic_acid':1,
+                                                      'Pentadecylic_acid':1,
+                                                      'Heptadecanoic_acid':1,
+                                                      'Arachidic_acid':1,
+                                                      'Behenic_acid':1,
+                                                      'Methyl_myristate':1,
+                                                      'Arachidic_acid_methyl_ester':1,
+                                                      'Methyl_behenate':1,
                                                       }))
     
 #Degassing vessel is modelled to remove any water that might have remained.[7]
@@ -751,7 +782,7 @@ def azelaic_acid_production(ins,outs):
                                   ins = R601-0,
                                   LHK = ('Methanol','Water'),
                                   Lr = 0.999, Hr = 0.999,
-                                  k = 2,P = 30000)
+                                  k = 2,P = 90000)
     
     R602 = units_baseline.HydrolysisReactor(ID = 'R602',
                                             ins = (T606 -0,water_for_emulsification2,
@@ -783,7 +814,7 @@ def azelaic_acid_production(ins,outs):
                                   ins = R602-0,
                                   LHK = ('Methanol','Water'),
                                   Lr = 0.99, Hr = 0.99,
-                                  k = 2,P = 20000)
+                                  k = 2,P = 85000)
     
     R603 = units_baseline.HydrolysisReactor(ID = 'R603',
                                             ins = (T607-0,water_for_emulsification3,
@@ -809,7 +840,7 @@ def azelaic_acid_production(ins,outs):
                                   ins = R603-0,
                                   LHK = ('Methanol','Water'),
                                   Lr = 0.999, Hr = 0.999,
-                                  k = 2,P = 5000)
+                                  k = 2,P = 80000)
     
     T601 = bst.StorageTank(ID = 'T601',
                             ins = bst.Stream(ID = 'Liquid_HCl',
@@ -875,13 +906,9 @@ def azelaic_acid_production(ins,outs):
     # D604_steam = bst.HeatUtility.get_heating_agent('high_pressure_steam')
     # D604_steam.T = 620
     # D604_steam.P = Water.Psat(620)
-    
-    P605 = bst.Pump(ID = 'P605',
-                  ins = HX601-0, 
-                  P = 10000)
   
     D604 =  bst.BinaryDistillation('D604',
-                                  ins = P605-0,
+                                  ins = HX601-0,
                                   outs = ('azelaic_acid_rich_fraction',
                                           'diols_and_other_fatty_acids_for_recycling_for_cooling'
                                           ),
@@ -929,10 +956,11 @@ def azelaic_acid_production(ins,outs):
                       outs = ('solvent_organics_mixture_for_extraction'))
    
     def solvent_for_extraction(solvent_factor):
-        M602.run()
         # 0.3:1 to 2.5:1 ratio of solvent: weight of azelaic acid #[12]
+        # D604.run()
+        M602.run() 
         Total_required_solvent = solvent_factor*D604.outs[0].imass['Azelaic_acid']
-        M602.ins[1].imass['Heptane']  = max(0,Total_required_solvent-M602.ins[2].imass['Heptane'])
+        M602.ins[1].F_mass = Total_required_solvent-M602.ins[2].imass['Heptane']
     M602.add_specification(solvent_for_extraction,args = [0.3], run = True) 
     
     recycled_water_for_LLE = bst.Stream('recycled_water_for_LLE') 
@@ -944,20 +972,26 @@ def azelaic_acid_production(ins,outs):
                           ins = M603.outs[0],
                           outs = 'hot_water_for_extraction',
                           T = 90+273.15)
-    P606 = bst.Pump(ID = 'P606',
-                   ins = M602-0,
-                   P = 101325)
+
     
 # The partition coefficients for the multistage mixer settler are based on [14]
     MMS601 = bst.units.MultiStageMixerSettlers(ID = 'MMS601',
-                                   ins = (P606-0, HX602-0),
+                                   ins = (M602-0, HX602-0),
                                    outs = ('raffinate_AA','solvent_monocarboxylics_mixture'),
                                    partition_data={'raffinate_chemicals': ('Water'),
                                                    'extract_chemicals': ('Caprylic_acid','Hexanoic_acid',
                                                                          'Heptanoic_acid','Pelargonic_acid','Methyl_palmitate','Methyl_stearate','Methyl_linoleate',
                                                                          'Methyl_linolenate', 'Methyl_oleate','MDHSA','Tetrahydroxy_octadecanoate','Palmitic_acid',
                                                                          'Stearic_acid','Linoleic_acid','Propanoic_acid','Hexahydroxy_octadecanoate','Heptane',
-                                                                         'Linolenic_acid','Oleic_acid'),
+                                                                         'Linolenic_acid','Oleic_acid',
+                                                                         'Myristic_acid',
+                                                                         'Pentadecylic_acid',
+                                                                         'Heptadecanoic_acid',
+                                                                         'Arachidic_acid',
+                                                                         'Behenic_acid',
+                                                                         'Methyl_myristate',
+                                                                         'Arachidic_acid_methyl_ester',
+                                                                         'Methyl_behenate'),
                                                  'IDs': ('Malonic_acid',#<C8 DCA
                                                          'Monomethyl_suberate',#C8 DCA
                                                          'Azelaic_acid',#C9 DCA
@@ -975,12 +1009,18 @@ def azelaic_acid_production(ins,outs):
         # D604.run()
         total_water_required = water_mass_fraction*D604.outs[0].imass['Azelaic_acid']
         M603.ins[0].F_mass = total_water_required - M603.ins[1].F_mass
-        M603.run()
         HX602.run()
-    M603.add_specification(water_for_extraction,args = [4])
+    M603.add_specification(water_for_extraction,args = [4],run= True)
    
 #Evaportation Drying zone [14] 
 #Generally temperatures up to about 280 C. are used at pressures of from 1.0 to 30 mm Hg. 
+
+    # E601 = bst.MultiEffectEvaporator('E601',
+    #                                   ins=MMS601-0,
+    #                                   outs=('azelaic_acid_stream',
+    #                                         'recovered_water_stream'),
+    #                                   V=0.1, V_definition='Overall',
+    #                                   P=(1000, 500))
     
     E601 = bst.BinaryDistillation('E601',
                                       ins=MMS601-0,
@@ -994,8 +1034,8 @@ def azelaic_acid_production(ins,outs):
                                       k = 1.25,
                                       partial_condenser= False                                        
                                       )
-    E601.check_LHK = False
-                                       
+                                     
+    
     P602 = bst.Pump(ID = 'P602',
                     ins=E601-1, 
                     P=101325 / 4)
@@ -1051,53 +1091,29 @@ def azelaic_acid_production(ins,outs):
 
 
 ###Recycling the solvent
-    HX607 = bst.IsenthalpicValve(ID = 'HX607',
-                                 ins = MMS601-1,
-                                 P = 3000)
-
-    F608 = bst.Flash(ID = 'F608',
-                        ins = HX607-0 ,
-                        outs = ('recovered_heptane',
-                                'fatty_acid_blend_to_recovery'),
-                        P = 1500,
-                        T = 373)
-
-#TODO: what does the error f(y0) and f(Y1) need to have opp signs mean
-    # @F608.add_bounded_numerical_specification(x0=500, x1=5000, xtol=1e-9, ytol=1e-9)
-    # def f(x):
-    #     F608.P = x
-    #     F608.run() 
-    #     feed = F608.ins[0]
-    #     vapor = F608.outs[0]
-    #     Heptane_recovery = vapor.imass['Heptane'] / feed.imass['Heptane']
-    #     return Heptane_recovery - 0.99
     
-    # F608.check_LHK = False
+    F608 = bst.BinaryDistillation(ID = 'F608',
+                                    ins = MMS601-1 ,
+                                    outs = ('recovered_heptane',
+                                            'fatty_acid_blend'),
+                                    LHK = ('Heptane','Linoleic_acid'),
+                                    P = 80000,
+                                    Lr = 0.999,
+                                    Hr = 0.999,
+                                    k = 2
+                                   )
+    F608.check_LHK = False
 #TODO: try operating D608 at lower pressures
-    # HX609 = bst.HXutility(ID = 'HX609',
-    #                       ins = F608-1,
-    #                       T = 340,
-    #                       rigorous = True)
-
-    D608 = bst.ShortcutColumn(ID = 'D608',
+    D608 = bst.BinaryDistillation(ID = 'D608',
                                   ins = F608-1,
                                   outs = (fatty_acid_blend,
                                           'recovered_monomethyl_azelate_rich_stream'),
                                   LHK = ('Stearic_acid','Monomethyl_azelate'),
-                                  P = 500,
-                                  Lr = 0.90,
+                                  P = 3000,
+                                  Lr = 0.99,
                                   Hr = 0.99,
                                   k = 2
-                                    )
-    # @D608.add_bounded_numerical_specification(x0=200, x1=5000, xtol=1e-9, ytol=1e-3)
-    # def f(x):
-    #     D608.P = x
-    #     D608.run() 
-    #     feed = D608.ins[0]
-    #     vapor = D608.outs[0]
-    #     SA_recovery = vapor.imass['Stearic_acid'] / feed.imass['Stearic_acid']
-    #     return SA_recovery - 0.90
-    
+                                    )  
     M608 = bst.Mixer('M608', 
                     ins = (
                             D608-1,
@@ -1105,7 +1121,7 @@ def azelaic_acid_production(ins,outs):
                             ),
                     outs = 'monomethyl_azelate_rich_fraction_to_pump')
     
-    P604 = bst.Pump(ID = 'P604',ins = M608-0, outs = monomethyl_azelate_rich_fraction, P = 1000000)
+    P604 = bst.Pump(ins = M608-0, outs = monomethyl_azelate_rich_fraction, P = 1000000)
     
     FHX608 = bst.HXutility(ID = 'FHX608',
                            ins = F608-0,
@@ -1124,20 +1140,25 @@ def aa_baseline_sys(ins,outs):
     recovered_mixture_of_cobalt_catalyst = bst.Stream(ID = 'recovered_mixture_of_cobalt_catalyst')  
 
 
-    ob0 = crude_HOSO_oil_to_biodiesel(ins = (bst.Stream(ID='crude_vegetable_oil',#Composition by [17]
+    ob0 = crude_HOSO_oil_to_biodiesel(ins = (bst.Stream(ID='crude_hoysoy_vegetable_oil',#Composition by [17]
                                                         Water=0.05,
-                                                        OOO = 85.55,
-                                                        LLL = 5.74,
-                                                        LnLnLn = 0.16,
-                                                        SSS = 3.24,
-                                                        PPP = 3.34,                                                        
-                                                        PL  = 1, 
+                                                        OOO = 78,
+                                                        LLL = 7,
+                                                        LnLnLn = 2,
+                                                        SSS = 4,
+                                                        PPP = 6,
+                                                        Myristic_acid = 0.4,
+                                                        Pentadecylic_acid = 0.3,
+                                                        Heptadecanoic_acid = 0.7,
+                                                        Arachidic_acid = 0.4,
+                                                        Behenic_acid = 0.4,
+                                                        PL  = 0.57, 
                                                         MAG = 0,
                                                         DAG = 0,
-                                                        Oleic_acid = 0.92,
-                                                        characterization_factors = {'GWP100':GWP_factors['HoSun_oil']},
-                                                        total_flow = 3.34e+04,
-                                                        price = prices_per_Kg['Crude_HoSun_oil'],
+                                                        Oleic_acid = 0.07,
+                                                        characterization_factors = {'GWP100':GWP_factors['HoySoy_oil']},
+                                                        total_flow = 35000,
+                                                        price = prices_per_Kg['Crude_HoySoy_oil'],
                                                         units = 'kg/hr',
                                                         phase = 'l'),
                                              bst.Stream(ID = 'base_for_saponification_of_FFA',
@@ -1271,8 +1292,7 @@ def aa_baseline_sys(ins,outs):
                       ins = (F.polar_lipids_to_boilerturbogenerator, 
                              F.waste_to_boilerturbogenerator,
                              F.waste_to_BT,
-                             F.send_to_BT1,
-                             F.wastewater8,
+                             F.send_to_BT1
                              ),
                        outs = ('total_effluent_to_be_burned')
                        )
@@ -1292,7 +1312,7 @@ def aa_baseline_sys(ins,outs):
                                         turbogenerator_efficiency=0.40,
                                         natural_gas_price= prices_per_Kg['Natural_gas_price'], 
                                         ash_disposal_price=prices_per_Kg['Ash_disposal_price'],
-                                        satisfy_system_electricity_demand =  True,#TODO: run two scenarios
+                                        satisfy_system_electricity_demand =  False,#TODO: ask
                                       
                                         )
     CW901 = bst.ChilledWaterPackage('CW901') #Chilled water package for cooling requirements                                 
@@ -1313,7 +1333,7 @@ def aa_baseline_sys(ins,outs):
                                          F.stream.water_for_azelaicacid_extraction,                                                                        
                                          CT901.outs[1],#Cooling_tower_blowdown_from_cooling tower
                                          BT901.outs[1],#rejected_water_and_blowdown from boilerturbogen   
-                                         
+                                         F.wastewater8
                                          )                         
 
 
@@ -1326,8 +1346,7 @@ def aa_baseline_sys(ins,outs):
    
     MT901 = bst.Mixer(ID = 'MT901',
                       ins = (F.R200.outs[0],
-                             F.wastewater3,
-                             F.wastewater))
+                             F.wastewater3))
                       
     
     PWT901 = bst.ProcessWaterCenter(ID = 'PWT901',
@@ -1340,8 +1359,6 @@ def aa_baseline_sys(ins,outs):
                              makeup_water_streams = makeup_water_streams_available,
                              process_water_streams = process_water_streams_available 
                              )
-    # HXN = bst.facilities.HeatExchangerNetwork('HXN',ignored  = [F.D604,F.F608,F.D607,F.R200,F.R300])
-    
  
 #References
 #1 
