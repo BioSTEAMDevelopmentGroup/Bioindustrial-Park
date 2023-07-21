@@ -27,6 +27,7 @@ from .data import microbial_oil_baseline as perf
 from warnings import filterwarnings
 from scipy.ndimage.filters import gaussian_filter
 from colorpalette import ColorWheel
+from scipy.interpolate import LinearNDInterpolator
 import os
 
 __all__ = (
@@ -43,6 +44,7 @@ __all__ = (
     'plot_metrics_across_biomass_yield',
     'plot_metrics_across_composition',
     'plot_oil_recovery_integration',
+    'plot_lines_biomass_yield',
 )
 
 filterwarnings('ignore', category=bst.exceptions.DesignWarning)
@@ -52,9 +54,9 @@ line_color_wheel = ColorWheel([
     GG_colors.purple,
     GG_colors.green,
     GG_colors.yellow,
-    colors.CABBI_teal,
-    colors.CABBI_grey,
     colors.CABBI_brown,
+    colors.CABBI_grey,
+    colors.CABBI_teal,
 ])
 for i, color in enumerate(line_color_wheel.colors): line_color_wheel.colors[i] = color.tint(20)
 shadecolor = (*colors.neutral.RGBn, 0.20)
@@ -276,7 +278,7 @@ def plot_metrics_across_composition(
     if titles is None: titles = np.array(['(A) Direct Cogeneration', '(B) Integrated Co-Fermentation'])
     d0 = data[:, :, 0, :]
     # d1 = data[:, :, 1, :]
-    CBY_units = 'dry' + '-' + format_units('MT/ha')
+    CBY_units = format_units('DMT/ha/y')
     metric_bars = [
         # MetricBar(MFPP.name, format_units(MFPP.units), colormaps[1], tickmarks(data[:, :, 0, :], 5, 1, expand=0, p=0.5), 18, 1),
         MetricBar('Competitive biomass yield', CBY_units, 
@@ -347,6 +349,85 @@ def plot_metrics_across_composition(
                     
     return fig, axes
 
+def plot_lines_biomass_yield():
+    fig, ax = plt.subplots(nrows=1, ncols=1)
+    df = cane.get_composition_data(ignored=set())
+    names = df.index
+    key_lines = {'WT', 1566, 1580}
+    names = sorted(names, key=lambda x: x not in key_lines)
+    lines = []
+    for name, color in zip(names, line_color_wheel):
+        data = df.loc[name]
+        name = str(name)
+        lines.append(
+            (name, 
+             data['Stem oil (dw)']['Mean'] * 100, 
+             data['Fiber (dw)']['Mean'] * 100,
+             data['Water (wt)']['Mean'] * 100,
+             data['Biomass yield (dry MT/ha)']['Mean'],
+             color)
+        )
+    CBY_units = format_units('DMT/ha/y')
+    oil_units = 'dw %'
+    default_options = dict(
+        dx=0, dy=0, 
+        dx_text=0.05, dy_text=0, 
+        horizontalalignment='left', 
+        verticalalignment='bottom',
+    )
+    options = {
+        '19B': {'dx': 0.3, 'dy': 3, 
+                'dy_text': 0.05, 'dx_text': 0.02,
+                'verticalalignment': 'center'},
+        '1566': {'verticalalignment': 'top'},
+        '1580': {'horizontalalignment':'right', 'dx_text':-0.05},
+    }
+    lipids = []
+    biomass_yields = []
+    for (name, lipid, fiber, moisture, biomass_yield, color) in lines:
+        if name == 'WT':
+            feedstock = 'Sugarcane'
+            x0 = lipid
+            y0 = biomass_yield
+        else:
+            feedstock = 'Oilcane'
+        text = (
+            f"{feedstock} {name}: {lipid:.0f} {oil_units}, "
+            f"{biomass_yield:.0f} {CBY_units}"
+        )
+        bst.plots.annotate_point(
+            text, lipid, biomass_yield,
+            textcolor=color.shade(50).RGBn,
+            linecolor=color.shade(50).RGBn,
+            fontsize=10,
+            **(default_options | options.get(name, {})), 
+        )    
+        plot_scatter_points(
+            [lipid], [biomass_yield], marker='o', s=30,  linewidth=0.6,
+            color=color.RGBn, edgecolor=color.shade(50).RGBn,
+            clip_on=False, zorder=1e6,
+        )
+        lipids.append(lipid)
+        biomass_yields.append(biomass_yield)
+    
+    # # Linear regression that passes through point WT
+    # lipids = np.array(lipids)
+    # biomass_yields = np.array(biomass_yields)
+    # x = lipids - x0
+    # y = biomass_yields - y0
+    # m = (y * x).sum() / (x * x).sum()
+    # b = y0 - m * x0
+    # plt.plot(lipids, m * lipids + b, color=colors.CABBI_grey.shade(20).RGBn, 
+    #          zorder=-1e9)
+    plt.ylim([0, 30])
+    plt.yticks([5, 10, 15, 20, 25, 30])
+    plt.xlim([0, 6])
+    plt.xlabel(f'Oil content [{oil_units}]')
+    plt.ylabel(f'Biomass yield [{CBY_units}]')
+    for i in ('svg', 'png'):
+        file = os.path.join(images_folder, f'lines_oil_content_and_biomass_yield.{i}')
+        plt.savefig(file, transparent=True)
+
 def plot_metrics_across_biomass_yield(
         load=False, N_decimals=1, 
         yticks=None, titles=None, 
@@ -369,7 +450,8 @@ def plot_metrics_across_biomass_yield(
     data = data[:, :, metric_indices, :]
     # Plot contours
     xlabel = 'Oil content [dw %]'
-    ylabel = "Biomass yield [dw %]"
+    BY_units = format_units('DMT/ha/y')
+    ylabel = f"Biomass yield [{BY_units}]"
     if titles is None: titles = np.array(['Direct Cogeneration', 'Integrated Co-Fermentation'])
     d0 = data[:, :, 0, :]
     metric_bars = [
@@ -527,7 +609,6 @@ def plot_oil_recovery_integration(
         metric = getattr(feature, metric)
     metric_index = cane.all_metric_mockups.index(metric)
     Z = Z[..., metric_index]
-    Z = Z[:, :, :len(titer), :]
     # Plot contours
     xlabel = 'Microbial oil recovery [%]'
     ylabel = "Microbial oil yield [wt %]"
@@ -555,14 +636,13 @@ def plot_oil_recovery_integration(
     color = GG_colors.orange.RGBn
     x = 70
     y = 100 * perf.hydrolysate_lipid_yield
-    basline_values = cane.evaluate_metrics_oil_recovery_integration(
-        x, y, 
-        np.array([perf.hydrolysate_productivity]),
-        np.array([perf.hydrolysate_titer])
-    )
+    Z0 = Z[..., 0, :]
+    new_shape = [Z0.shape[0] * Z0.shape[1], Z0.shape[-1]]
+    interp = LinearNDInterpolator(list(zip(X.flatten(), Y.flatten())), Z0.reshape(new_shape))
+    baseline_values = interp(x, y)
     for i, ax in enumerate(axes[0, :3]):
         plt.sca(ax._cached_ytwin)
-        value = basline_values[0, i, metric_index]
+        value = baseline_values[i]
         text = f'Baseline:\n{value:.2f} {units}'
         plt.text(
             x + 0.9, y + 0.7, text, c=color,
@@ -577,14 +657,12 @@ def plot_oil_recovery_integration(
     color = GG_colors.yellow.RGBn
     x = 70
     y = 100 * perf.batch_lipid_yield_mean
-    target_values = cane.evaluate_metrics_oil_recovery_integration(
-        x, y, 
-        np.array([perf.batch_productivity_mean]),
-        np.array([perf.batch_titer_mean])
-    )
+    Z1 = Z[..., 1, :]
+    interp = LinearNDInterpolator(list(zip(X.flatten(), Y.flatten())), Z1.reshape(new_shape))
+    target_values = interp(x, y)
     for i, ax in enumerate(axes[1, :3]):
         plt.sca(ax._cached_ytwin)
-        value = target_values[0, i, metric_index]
+        value = target_values[i]
         text = f'Target:\n{value:.2f} {units}'
         plt.text(
             x + 0.9, y + 0.7, text, c=color,

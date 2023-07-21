@@ -172,7 +172,7 @@ mc_line_metric_settings = {
     # 'Biodiesel production': (biodiesel_production, f"Biodiesel production\n[{format_units('L/MT')}]"),
     'MBSP': (MBSP, f"MBSP\n[{format_units('USD/gal')}]"),
     'TCI': (TCI, f"TCI\n[{format_units('10^6*USD')}]"),
-    'Biodiesel yield': (biodiesel_yield, f"Biodiesel yield\n[{format_units('L/ha')}]"),
+    'Biodiesel yield': (biodiesel_yield, f"Biodiesel yield\n[{format_units('L/ha/y')}]"),
     # 'Electricity production': (electricity_production, f"Elec. prod.\n[{format_units('kWhr/MT')}]"),
     'GWP energy': (GWP_biodiesel_allocation,"GWP$_{\\mathrm{energy}}$\n" f"[{GWP_units_L}]"),
     'GWP economic': (GWP_biodiesel, "GWP$_{\\mathrm{economic}}$\n" f"[{GWP_units_L}]"),
@@ -897,7 +897,7 @@ def plot_microbial_oil_kde_2023(fs=None):
         x_center=1.29,
         y_center=617,
         xlabel="GWP$_{\\mathrm{energy}}$\n" f"[{GWP_units_L}]",
-        ylabel=f"Biodiesel yield\n[{format_units('L/ha')}]",
+        ylabel=f"Biodiesel yield\n[{format_units('L/ha/y')}]",
         fs=fs,
     )
     plt.subplots_adjust(
@@ -1252,36 +1252,38 @@ def plot_competitive_biomass_yield_across_oil_content(
         fs=None,
     ):
     if fs is None: fs = 8
-    set_figure_size(aspect_ratio=0.8, width=5.5)
+    set_figure_size(aspect_ratio=0.8)
     fig, axes = plt.subplots(ncols=1, nrows=2)
     set_font(size=fs)
-    bioethanol_ax, microbial_oil_ax = axes.flatten()
-    plt.sca(bioethanol_ax)
+    ax1, ax2 = axes.flatten()
+    plt.sca(ax1)
     xs, fys = _plot_competitive_biomass_yield_across_oil_content('O7')
-    plt.xlim([0, 10])
+    plt.xlim([0, 15])
     plt.ylim([0, 40])
     bst.plots.style_axis(
+        xticks=[0, 3, 6, 9, 12, 15],
         xticklabels=False,
         ytick0=False,
         ytickf=True,
     )
     plt.text(
-        10 - 0.25, 35, '(A) Direct Cogeneration', weight='bold',
+        15 - 0.25, 36, '(A) Direct Cogeneration', weight='bold',
         ha='right', va='center', fontsize=10,
         c=bst.plots.title_color,
     )
     _add_lines_biomass_yield_vs_oil_content(*fys)
-    plt.sca(microbial_oil_ax)
+    plt.sca(ax2)
     xs, fys = _plot_competitive_biomass_yield_across_oil_content('O9')
-    plt.xlim([0, 10])
+    plt.xlim([0, 15])
     plt.ylim([0, 40])
     plt.xlabel('Oil content [dw %]')
     bst.plots.style_axis(
+        xticks=[0, 3, 6, 9, 12, 15],
         ytick0=False,
         ytickf=True,
     )
     plt.text(
-        10 - 0.25, 35, '(B) Integrated Co-Fermentation', weight='bold', 
+        15 - 0.25, 36, '(B) Integrated Co-Fermentation', weight='bold', 
         ha='right', va='center', fontsize=10,
         c=bst.plots.title_color,
     )
@@ -1293,7 +1295,7 @@ def plot_competitive_biomass_yield_across_oil_content(
 
 def _add_lines_biomass_yield_vs_oil_content(f5, f50, f95):
     df = cane.get_composition_data()
-    points = {i: None for i in ('WT', '1566', '1580')}
+    points = {i: None for i in ('WT', '1566', '1580', 'Target')}
     for name, color in zip(df.index, line_color_wheel):
         line = df.loc[name]
         name = str(name)
@@ -1311,7 +1313,7 @@ def _add_lines_biomass_yield_vs_oil_content(f5, f50, f95):
     pnt = points[name]
     y50_target = f50(pnt.x)
     x_units = f"{format_units('dw')} % oil"
-    y_units = f"dry {format_units('MT/ha')}"
+    y_units = f"{format_units('DMT/ha/y')}"
     text = (
         f"Sugarcane {name}, {pnt.x:.2g} {x_units}\n"
         f"Yield: {pnt.y:.1f} {y_units}"
@@ -1319,7 +1321,7 @@ def _add_lines_biomass_yield_vs_oil_content(f5, f50, f95):
     bst.plots.annotate_point(
         text, pnt.x, pnt.y, horizontalalignment='left', 
         textcolor=pnt.c, linecolor=pnt.c,
-        dx=0.2, dy=4, dx_text=-0.1, dy_text=0, fontsize=8,
+        dx=0.3, dy=7, dx_text=-0.1, dy_text=0, fontsize=8,
     )
     
     name = '1566'
@@ -1338,7 +1340,7 @@ def _add_lines_biomass_yield_vs_oil_content(f5, f50, f95):
     bst.plots.annotate_point(
         text, pnt.x, pnt.y, horizontalalignment='left', verticalalignment='center',
         textcolor=pnt.c, linecolor=pnt.c,
-        dx=1.1, dy=9.5, dx_text=0.1, dy_text=0, fontsize=8,
+        dx=2.5, dy=13.5, dx_text=0.1, dy_text=0, fontsize=8,
     )
     
     name = '1580'
@@ -1355,39 +1357,39 @@ def _add_lines_biomass_yield_vs_oil_content(f5, f50, f95):
         f"Yield: {pnt.y:.1f} {arrow} {y50_target:.1f} [{y5_target:.1f}, {y95_target:.1f}] {y_units}\n"
     )
     bst.plots.annotate_point(
-        text, pnt.x, pnt.y, horizontalalignment='right',
+        text, pnt.x, pnt.y, horizontalalignment='left',
         verticalalignment='center',
         textcolor=pnt.c, linecolor=pnt.c,
-        dx=-0.4, dy=0, dx_text=-0.1, dy_text=0, fontsize=8,
+        dx=0.25, dy=0, dx_text=0.1, dy_text=0, fontsize=8,
     )
     
-    
-    # WT = points['WT']
-    # y_target = f50(WT.x)
-    
-    # text = (
-    #     f"WT: {WT.x:.1g} dw % Oil\n"
-    # )
-    # dy2target = y_target - WT.y
-    # f"{dy2target:.0f} dry-{format_units('MT/ha')} to target"
-    # bst.plots.annotate_point(
-    #     text, WT.x, WT.y, horizontalalignment='left', 
-    #     textcolor=WT.c.shade(50).RGBn, linecolor=edgecolor,
-    #     dx=0.5, dy=6, dx_text=-0.1, dy_text=1, fontsize=10,
-    # )
+    name = 'Target'
+    pnt = points[name]
+    y5_target, y50_target, y95_target = f5(pnt.x), f50(pnt.x), f95(pnt.x)
+    ax = plt.gca()
+    text = (
+        f"Oilcane {name}, {pnt.x:.2g} {x_units}\n"
+        f"Yield: {pnt.y:.1f} {y_units}"
+    )
+    bst.plots.annotate_point(
+        text, pnt.x, pnt.y, horizontalalignment='center',
+        verticalalignment='bottom',
+        textcolor=pnt.c, linecolor=pnt.c,
+        dx=0, dy=4.6, dx_text=0, dy_text=0.1, fontsize=8,
+    )
 
 def _plot_theoretical_competitive_biomass_yield_across_oil_content():
     f = 0.93 # Maximum fraction of fiber/sugar
     Yb = 25.62 # Baseline biomass yield
     Ym = 0.32 # Microbial oil yield
-    x = np.linspace(0, f) # Fraction of oil
+    x = np.linspace(0, 0.15) # Fraction of oil
     Yo = f * Yb * Ym / ((f - x) * Ym + x) # Theoretical oilcane yield
     # print(
     #     ((1 - Yo / Yb)[1:] / x[1:]).mean()
     # )
     plt.plot(100 * x, Yo, color=bst.plots.title_color, lw=1, zorder=0,
              linestyle='--')
-    x = 0.09
+    x = 0.14
     y = f * Yb * Ym / ((f - x) * Ym + x) # Theoretical oilcane yield
     bst.plots.annotate_point(
         'Theoretical\nmaximum\ntargets', 100 * x, y,
@@ -1395,7 +1397,6 @@ def _plot_theoretical_competitive_biomass_yield_across_oil_content():
         linecolor=bst.plots.title_color,
         textcolor=bst.plots.title_color,
         verticalalignment='bottom',
-        
     )
     
 def _plot_competitive_biomass_yield_across_oil_content(
@@ -1405,7 +1406,7 @@ def _plot_competitive_biomass_yield_across_oil_content(
     df = pd.read_excel(file, sheet_name=features.competitive_biomass_yield.short_description, index_col=0)
     df = df.dropna()
     oil_content = np.array(df.columns) * 100
-    plt.ylabel(f"Competitive biomass yield\n[dry-{format_units('MT/ha')}]")
+    plt.ylabel(f"Competitive biomass yield\n[{format_units('DMT/ha/y')}]")
     _plot_theoretical_competitive_biomass_yield_across_oil_content()
     biomass_yields = bst.plots.plot_montecarlo_across_coordinate(
         oil_content, df, 
@@ -1417,12 +1418,11 @@ def _plot_competitive_biomass_yield_across_oil_content(
     index = [0, 2, 4]
     f5, f50, f95 = [interpolate.interp1d(oil_content, biomass_yields[i]) for i in index]
     bst.plots.annotate_point(
-        'Financially\ncompetitive\ntargets', 8, f50(8),
-        dy=-5, dy_text=-0.5, fontsize=8,
+        'Financially\ncompetitive\ntargets', 13.5, f50(13.5),
+        dy=-4, dy_text=-0.5, fontsize=8,
         linecolor=CABBI_colors.green_dirty.shade(40).RGBn,
         textcolor=CABBI_colors.green_dirty.shade(40).RGBn,
         verticalalignment='top',
-        
     )
     return (oil_content, (f5, f50, f95))
 

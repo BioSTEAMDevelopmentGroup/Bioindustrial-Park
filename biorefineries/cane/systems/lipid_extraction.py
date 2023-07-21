@@ -29,21 +29,24 @@ __all__ = (
 def create_lipid_extraction_system(ins, outs):
     fermentation_effluent, = ins
     lipid, cellmass, wastewater, = outs
-    U401 = bst.SolidsCentrifuge('U401', fermentation_effluent, ['', ''],
-        split=dict(cellmass=0.98, lipid=0.98),
-        moisture_content=0.5,
-        solids=['cellmass'],
+    U401 = bst.SolidLiquidsSplitCentrifuge('U401',
+        ins=fermentation_effluent,
+        outs=['', '', ''],
+        aqueous_split=1,
+        solids_split=dict(Oil=1, cellmass=1),
+        moisture_content=0.4,
     )
     U402 = bst.DrumDryer('U402', 
-        (U401-0, 'dryer_air', 'dryer_natural_gas'), 
+        (U401-2, 'dryer_air', 'dryer_natural_gas'), 
         ('', 'dryer_outlet_air', 'dryer_emissions'),
         moisture_content=0.18, split=0.,
         utility_agent='Steam',
     )
     # X401 = bst.ThermalOxidizer('X401', (U403-1, 'oxidizer_air'), 'oxidizer_emissions')
     U403 = bst.ScrewPress('U403', U402-0, split=dict(cellmass=1, lipid=0.3, Water=0.8),)
+    M401 = bst.Mixer('M401', [U401-0, U403-1])
     bst.ConveyingBelt('U405', U403-0, cellmass)
-    lipid_wash_sys = create_lipid_wash_system(ins=U403-1, outs=lipid, mockup=True)
+    lipid_wash_sys = create_lipid_wash_system(ins=M401-0, outs=lipid, mockup=True)
     washed_lipid, spent_wash_water = lipid_wash_sys.outs
     bst.Mixer(ins=[spent_wash_water, U401-1], outs=wastewater)
 

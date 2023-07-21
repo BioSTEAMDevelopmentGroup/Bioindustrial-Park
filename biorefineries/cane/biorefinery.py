@@ -88,7 +88,7 @@ biodiesel_kg_per_L = 1. / biodiesel_L_per_kg
 ethanol_L_per_kg = ethanol_gal_per_kg * L_per_gal
 ethanol_kg_per_L = 1. / ethanol_L_per_kg
 
-screwpress_microbial_oil_recovery = frozenset([9])
+screwpress_microbial_oil_recovery = frozenset([7, 9])
 cellulosic_configurations = frozenset([-2, 2, 4, 6, 8, 9])
 biodiesel_configurations = frozenset([1, 2, 5, 6, 7, 8, 9])
 ethanol_configurations = frozenset([-2, -1, 1, 2, 3, 4])
@@ -313,14 +313,21 @@ class Biorefinery:
         dry_fraction = 1 - moisture_content
         return dry_biomass_yield / dry_fraction
         
-    def use_max_microbial_oil_performance(self):
+    def use_maximum_theoretical_microbial_oil_performance(self):
         max_lipid_yield_glucose = perf.max_lipid_yield_glucose
         max_lipid_yield_xylose = perf.max_lipid_yield_xylose
         self.set_glucose_to_microbial_oil_yield.setter(max_lipid_yield_glucose * 100)
         self.set_xylose_to_microbial_oil_yield.setter(max_lipid_yield_xylose * 100)
         self.set_fermentation_microbial_oil_productivity.setter(1.902) # Similar to sugarcane ethanol
         self.set_fermentation_microbial_oil_titer.setter(137) # Similar to sugarcane ethanol
-        
+    
+    def use_upper_microbial_oil_performance(self):
+        for i in (self.set_glucose_to_microbial_oil_yield,
+                  self.set_xylose_to_microbial_oil_yield,
+                  self.set_fermentation_microbial_oil_productivity,
+                  self.set_fermentation_microbial_oil_titer):
+            i.setter(i.bounds[1])
+    
     def __new__(cls,
             name, chemicals=None,
             avoid_natural_gas=True, 
@@ -357,6 +364,7 @@ class Biorefinery:
             return cache[key]
         else:
             self = super().__new__(cls)
+        self.configuration = configuration
         flowsheet_name = format_configuration(configuration, latex=False)
         flowsheet = bst.Flowsheet(flowsheet_name)
         main_flowsheet.set_flowsheet(flowsheet)
@@ -387,7 +395,9 @@ class Biorefinery:
                 s.methanol.empty()
         else:
             raise NotImplementedError(number)
-        cane_sys.set_tolerance(rmol=1e-5, mol=1e-2, subsystems=True, subfactor=1.5)
+        cane_sys.set_tolerance(
+            rmol=1e-5, mol=1e-2, subsystems=True,
+        )
         
         if number == 1:
             cane_sys.prioritize_unit(u.T508)
@@ -592,24 +602,23 @@ class Biorefinery:
                 pressure_filter = flowsheet(bst.PressureFilter) # Separates lignin
             else:
                 pressure_filter  = None
+            if 4 < number < 10:
+                cellmass_centrifuge = flowsheet(bst.SolidLiquidsSplitCentrifuge) # Separates cell mass, oil, and water
+                if isinstance(cellmass_centrifuge, list):
+                    cellmass_centrifuge = sorted([i for i in cellmass_centrifuge if type(i) is bst.SolidsCentrifuge], key=lambda x: x.ID)[0]
+                cellmass_centrifuge.strict_moisture_content = False
+            else:
+                cellmass_centrifuge = None
             if number in screwpress_microbial_oil_recovery:
                 screw_press = flowsheet(bst.ScrewPress) # Separates oil from cell mass
             else:
                 screw_press = None
-            if number in screwpress_microbial_oil_recovery:
-                cellmass_centrifuge = flowsheet(bst.SolidLiquidsSplitCentrifuge) # Separates cell mass, oil, and water
+            if number == 8:
+                for microbial_oil_centrifuge in flowsheet.unit:
+                    if microbial_oil_centrifuge.line == 'Microbial oil centrifuge': break
             else:
-                if number == 8:
-                    cellmass_centrifuge = flowsheet(bst.SolidLiquidsSplitCentrifuge) # Separates cell mass
-                    for microbial_oil_centrifuge in flowsheet.unit:
-                        if microbial_oil_centrifuge.line == 'Microbial oil centrifuge': break
-                else:
-                    cellmass_centrifuge = flowsheet(bst.SolidsCentrifuge) # Separates cell mass
-                    microbial_oil_centrifuge = None
-                if isinstance(cellmass_centrifuge, list):
-                    cellmass_centrifuge = sorted([i for i in cellmass_centrifuge if type(i) is bst.SolidsCentrifuge], key=lambda x: x.ID)[0]
-                
-            cellmass_centrifuge.strict_moisture_content = False
+                microbial_oil_centrifuge = None
+            
             oil_extraction_specification = OilExtractionSpecification(
                 sys, crushing_mill, pressure_filter, cellmass_centrifuge, 
                 microbial_oil_centrifuge, juice, screw_press, fermentor,
@@ -1350,10 +1359,6 @@ class Biorefinery:
             else:
                 return 0.
     
-        # @metric(units='%')
-        # def IRR():
-        #     return 100. * tea.solve_IRR()
-    
         @metric(units='USD/MT')
         def MFPP_derivative():
             if number < 0:
@@ -1541,6 +1546,10 @@ class Biorefinery:
             NEP = net_energy_production.cache
             return self.baseline_dry_biomass_yield * NEP / NEP_target  
             
+        @metric(units='%')
+        def IRR():
+            return 100. * tea.solve_IRR(financing=False)
+        
         # def competitive_microbial_oil_yield_objective(microbial_oil_yield, target):
         #     self.update_dry_biomass_yield(self.baseline_dry_biomass_yield)
         #     set_glucose_to_microbial_oil_yield.setter(microbial_oil_yield)
@@ -1645,6 +1654,18 @@ class Biorefinery:
                 'Yeast', 'Glucan', 'Xylan', 'Arabinan',
                 'Galactan', 'Lignin', 'Solids',
             ] = 1.
+        
+        try:
+            PolishingFilter = flowsheet(bst.wastewater.high_rate.PolishingFilter)
+        except:
+            pass
+        else:
+            def adjust_system_convergence(system):
+                system.converge_method = 'fixed-point'
+                system.maxiter = 500
+                system.molar_tolerance = 5
+            
+            PolishingFilter.recycle_system_hook = adjust_system_convergence
         
         ## Simulation
         if simulate:

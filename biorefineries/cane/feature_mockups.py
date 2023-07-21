@@ -91,7 +91,7 @@ import pandas as pd
  TCI_derivative, GWP_economic_derivative, 
  GWP_ethanol_derivative, GWP_biodiesel_derivative,
  GWP_crude_glycerol_derivative, GWP_electricity_derivative,
- ROI, competitive_biomass_yield, energy_competitive_biomass_yield,
+ ROI, competitive_biomass_yield, energy_competitive_biomass_yield, IRR
  # competitive_microbial_oil_yield,
  # energy_competitive_microbial_oil_yield,
  ) = all_metric_mockups = (
@@ -132,6 +132,7 @@ import pandas as pd
     MockFeature('ROI', '%', '-'),
     MockFeature('Competitive biomass yield', 'dry MT/ha', 'Feedstock'),
     MockFeature('Energy competitive biomass yield', 'dry MT/ha', 'Feedstock'),
+    MockFeature('IRR', '%', '-'),
 )
 
 tea_monte_carlo_metric_mockups = (
