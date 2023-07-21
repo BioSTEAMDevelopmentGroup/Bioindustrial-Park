@@ -292,7 +292,6 @@ FEC_CFs['Sugarcane'] = 	0.40192 * 0.3/0.286 # ecoinvent 3.8 market for sugarcane
 
 # FEC_CFs['Sugarcane'] = 	0.2265 # GREET 2022
 
-
 CFs['FEC_CFs'] = FEC_CFs
 
 

@@ -145,6 +145,7 @@ AmmoniumAcetate = chemical_database('AmmoniumAcetate', phase='l',
 # =============================================================================
 
 AceticAcid = chemical_database('AceticAcid')
+SodiumAcetate = chemical_database('SodiumAcetate')
 Glucose = chemical_database('Glucose', phase = 'l')
 
 # IBA = chemical_database('Isobutyraldehyde')
@@ -544,6 +545,9 @@ Tar = chemical_copied('Tar', Xylose, phase_ref='s')
 
 PdC = chemical_database('Pd', phase='s')
 
+NiSiO2 = chemical_database('NiSiO2', search_ID='Nickel on silica', phase='s') # modeled simply as nickel
+
+Amberlyst70_ = chemical_copied('Amberlyst70_', NiSiO2)
 # =============================================================================
 # Mixtures
 # =============================================================================
@@ -593,6 +597,7 @@ chemical_groups = dict(
     SugarOligomers = ('GlucoseOligomer', 'XyloseOligomer', 'GalactoseOligomer',
                       'ArabinoseOligomer', 'MannoseOligomer'),
     OrganicSolubleSolids = ('AmmoniumAcetate', 'SolubleLignin', 'Extract', 'CSL',
+                            'SodiumAcetate',
                             # 'Triacetic acid lactone',
                             'SorbicAcid', 'HMTHP',
                             'PotassiumSorbate', 'ButylSorbate', 'VitaminA', 'VitaminD2'),

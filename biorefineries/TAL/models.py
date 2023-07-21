@@ -26,10 +26,11 @@ from chaospy import distributions as shape
 # from biosteam import main_flowsheet as find
 from biosteam.evaluation import Model, Metric
 # from biosteam.evaluation.evaluation_tools import Setter
-from biorefineries.TAL.system_solubility_exploit_ethanol_glucose import TAL_sys, TAL_tea, u, s, unit_groups, unit_groups_dict, spec, price, TEA_breakdown, simulate_and_print
+from biorefineries.TAL.system_SA_adsorption_sugarcane import TAL_sys, TAL_tea, TAL_lca, u, s, unit_groups, unit_groups_dict, spec, price, TEA_breakdown, simulate_and_print, theoretical_max_g_TAL_per_g_glucose, TAL_chemicals
 from biorefineries.TAL.model_utils import EasyInputModel
 # get_annual_factor = lambda: TAL_tea._annual_factor
 
+per_kg_KSA_to_per_kg_SA = TAL_chemicals.PotassiumSorbate.MW/TAL_chemicals.SorbicAcid.MW
 
 get_annual_factor = lambda: TAL_tea.operating_days*24 # hours per year
 
@@ -52,8 +53,8 @@ baseline_yield, baseline_titer, baseline_productivity =\
 # =============================================================================
 
 feedstock = s.sugarcane
-product_stream = s.SA
-CSL = s.CSL
+product_stream = s.KSA_product
+# CSL = s.CSL_fresh
 
 
 R302 = u.R302
@@ -68,18 +69,18 @@ def get_MSP():
     for i in range(3):
         product_stream.price = TAL_tea.solve_price(product_stream)
     # return product_stream.price*product_stream.F_mass/sum(product_stream.imass['Octyl_5_hydroxyhexanoate','Octyl_3_5_dihydroxyhexanoate', 'DHL'])
-    return product_stream.price
+    return product_stream.price * per_kg_KSA_to_per_kg_SA
 
 # Mass flow rate of TAL stream
-get_yield = lambda: product_stream.imass['SorbicAcid']*get_annual_factor()/1e6
+get_yield = lambda: product_stream.imass['PotassiumSorbate']*get_annual_factor()/1e6
 # Purity (%) of TAL in the final product
-get_purity = lambda: product_stream.imass['SorbicAcid']/product_stream.F_mass
+get_purity = lambda: product_stream.imass['PotassiumSorbate']/product_stream.F_mass
 # Adjust for purity
 get_adjusted_MSP = lambda: get_MSP() / get_purity()
 get_adjusted_yield = lambda: get_yield() * get_purity()
 # Recovery (%) = recovered/amount in fermentation broth
-get_recovery = lambda: product_stream.imol['SorbicAcid']\
-    /(R302.outs[0].imol['TAL'])
+get_recovery = lambda: product_stream.imol['PotassiumSorbate']\
+    /(R302.outs[1].imol['TAL'])
 get_overall_TCI = lambda: TAL_tea.TCI/1e6
 
 get_overall_installed_cost = lambda: TAL_tea.installed_equipment_cost/1e6
@@ -97,10 +98,10 @@ electricity_price = bst.PowerUtility.price
 # Electricity credit is positive if getting revenue from excess electricity
 get_electricity_credit = lambda: (excess_power()*electricity_price*get_annual_factor())/1e6
 
-metrics = [Metric('Minimum selling price', get_MSP, '$/kg', 'Biorefinery'),
+metrics = [Metric('Minimum selling price', get_MSP, '$/kg SA-eq.', 'Biorefinery'),
            Metric('Product yield', get_yield, '10^6 kg/yr', 'Biorefinery'),
            Metric('Product purity', get_purity, '%', 'Biorefinery'),
-           Metric('Adjusted minimum selling price', get_adjusted_MSP, '$/kg', 'Biorefinery'),
+           Metric('Adjusted minimum selling price', get_adjusted_MSP, '$/kg SA-eq.', 'Biorefinery'),
            Metric('Adjusted product yield', get_adjusted_yield, '10^6 kg/yr', 'Biorefinery'),
            Metric('Product recovery', get_recovery, '%', 'Biorefinery'),
            Metric('Total capital investment', get_overall_TCI, '10^6 $', 'Biorefinery'),
@@ -129,49 +130,43 @@ for m, u_i in metrics_labels_dict.items():
         metrics.append(Metric(ug.name, ug.metrics[u_i[0]], u_i[1], m))
         
         
-# ## LCA
+## LCA
 
-# # IPCC 2013 GWP100a
-# metrics.append(Metric('Total GWP100a', lambda: TAL_LCA.GWP, 'kg-CO2-eq/kg', 'Biorefinery'))
-# metrics.append(Metric('GWP100a - Heating demand', lambda: TAL_LCA.heating_demand_GWP, 'kg-CO2-eq/kg', 'Biorefinery'))
-# metrics.append(Metric('GWP100a - Cooling demand', lambda: TAL_LCA.cooling_demand_GWP, 'kg-CO2-eq/kg', 'Biorefinery'))
-# metrics.append(Metric('GWP100a - Electricity demand (non-cooling)', lambda: TAL_LCA.electricity_demand_non_cooling_GWP, 'kg-CO2-eq/kg', 'Biorefinery'))
+# IPCC 2013 GWP100a
+metrics.append(Metric('Total GWP100a', lambda: TAL_lca.GWP*per_kg_KSA_to_per_kg_SA, 'kg-CO2-eq/kg', 'Biorefinery'))
+metrics.append(Metric('GWP100a - Heating demand', lambda: TAL_lca.heating_demand_GWP*per_kg_KSA_to_per_kg_SA, 'kg-CO2-eq/kg', 'Biorefinery'))
+metrics.append(Metric('GWP100a - Cooling demand', lambda: TAL_lca.cooling_demand_GWP*per_kg_KSA_to_per_kg_SA, 'kg-CO2-eq/kg', 'Biorefinery'))
+metrics.append(Metric('GWP100a - Electricity demand (non-cooling)', lambda: TAL_lca.electricity_demand_non_cooling_GWP*per_kg_KSA_to_per_kg_SA, 'kg-CO2-eq/kg', 'Biorefinery'))
 
-# metrics.append(Metric('GWP100a - Feedstock (FGHTP) ', lambda: TAL_LCA.FGHTP_GWP, 'kg-CO2-eq/kg', 'Biorefinery'))
-# metrics.append(Metric('GWP100a - Materials (except feedstock and BT.natural_gas) ', lambda: TAL_LCA.material_GWP, 'kg-CO2-eq/kg', 'Biorefinery'))
+metrics.append(Metric('GWP100a - Feedstock (FGHTP) ', lambda: TAL_lca.FGHTP_GWP*per_kg_KSA_to_per_kg_SA, 'kg-CO2-eq/kg', 'Biorefinery'))
+metrics.append(Metric('GWP100a - Materials (except feedstock and BT.natural_gas) ', lambda: TAL_lca.material_GWP*per_kg_KSA_to_per_kg_SA, 'kg-CO2-eq/kg', 'Biorefinery'))
 
-# # breakdown = TAL_LCA.material_GWP_breakdown
-# # for k in lambda: breakdown.keys():
-# # for k in ['CH4', 'CO2', 'H2SO4', 'CalciumDihydroxide', 'MEA', 'CSL', 'H3PO4']:
-# #     metrics.append(Metric(f'GWP100a - Materials breakdown - {k}', lambda: TAL_LCA.material_GWP_breakdown[k], 'kg-CO2-eq/kg', 'Biorefinery'))
-# metrics.append(Metric(f'GWP100a - Materials breakdown - CH4', lambda: TAL_LCA.material_GWP_breakdown['CH4'], 'kg-CO2-eq/kg', 'Biorefinery'))
-# metrics.append(Metric(f'GWP100a - Materials breakdown - CO2', lambda: TAL_LCA.material_GWP_breakdown['CO2'], 'kg-CO2-eq/kg', 'Biorefinery'))
-# metrics.append(Metric(f'GWP100a - Materials breakdown - H2SO4', lambda: TAL_LCA.material_GWP_breakdown['H2SO4'], 'kg-CO2-eq/kg', 'Biorefinery'))
-# metrics.append(Metric(f'GWP100a - Materials breakdown - CalciumDihydroxide', lambda: TAL_LCA.material_GWP_breakdown['CalciumDihydroxide'], 'kg-CO2-eq/kg', 'Biorefinery'))
-# metrics.append(Metric(f'GWP100a - Materials breakdown - MEA', lambda: TAL_LCA.material_GWP_breakdown['MEA'], 'kg-CO2-eq/kg', 'Biorefinery'))
-# metrics.append(Metric(f'GWP100a - Materials breakdown - CSL', lambda: TAL_LCA.material_GWP_breakdown['CSL'], 'kg-CO2-eq/kg', 'Biorefinery'))
-# metrics.append(Metric(f'GWP100a - Materials breakdown - H3PO4', lambda: TAL_LCA.material_GWP_breakdown['H3PO4'], 'kg-CO2-eq/kg', 'Biorefinery'))
 
-# # FEC
-# metrics.append(Metric('Total FEC', lambda: TAL_LCA.FEC, 'kg-CO2-eq/kg', 'Biorefinery'))
-# metrics.append(Metric('FEC - Heating demand', lambda: TAL_LCA.heating_demand_FEC, 'kg-CO2-eq/kg', 'Biorefinery'))
-# metrics.append(Metric('FEC - Cooling demand', lambda: TAL_LCA.cooling_demand_FEC, 'kg-CO2-eq/kg', 'Biorefinery'))
-# metrics.append(Metric('FEC - Electricity demand (non-cooling)', lambda: TAL_LCA.electricity_demand_non_cooling_FEC, 'kg-CO2-eq/kg', 'Biorefinery'))
+# metrics.append(Metric(f'GWP100a - Materials breakdown - CH4', lambda: TAL_lca.material_GWP_breakdown['CH4']*per_kg_KSA_to_per_kg_SA, 'kg-CO2-eq/kg', 'Biorefinery'))
+# metrics.append(Metric(f'GWP100a - Materials breakdown - CO2', lambda: TAL_lca.material_GWP_breakdown['CO2']*per_kg_KSA_to_per_kg_SA, 'kg-CO2-eq/kg', 'Biorefinery'))
+# metrics.append(Metric(f'GWP100a - Materials breakdown - H2SO4', lambda: TAL_lca.material_GWP_breakdown['H2SO4']*per_kg_KSA_to_per_kg_SA, 'kg-CO2-eq/kg', 'Biorefinery'))
+# metrics.append(Metric(f'GWP100a - Materials breakdown - CalciumDihydroxide', lambda: TAL_lca.material_GWP_breakdown['CalciumDihydroxide']*per_kg_KSA_to_per_kg_SA, 'kg-CO2-eq/kg', 'Biorefinery'))
+# metrics.append(Metric(f'GWP100a - Materials breakdown - MEA', lambda: TAL_lca.material_GWP_breakdown['MEA']*per_kg_KSA_to_per_kg_SA, 'kg-CO2-eq/kg', 'Biorefinery'))
+# metrics.append(Metric(f'GWP100a - Materials breakdown - CSL', lambda: TAL_lca.material_GWP_breakdown['CSL']*per_kg_KSA_to_per_kg_SA, 'kg-CO2-eq/kg', 'Biorefinery'))
+# metrics.append(Metric(f'GWP100a - Materials breakdown - H3PO4', lambda: TAL_lca.material_GWP_breakdown['H3PO4']*per_kg_KSA_to_per_kg_SA, 'kg-CO2-eq/kg', 'Biorefinery'))
 
-# metrics.append(Metric('FEC - Feedstock (FGHTP) ', lambda: TAL_LCA.feedstock_FEC, 'kg-CO2-eq/kg', 'Biorefinery'))
-# metrics.append(Metric('FEC - Materials (except feedstock and BT.natural_gas) ', lambda: TAL_LCA.material_FEC, 'kg-CO2-eq/kg', 'Biorefinery'))
+# FEC
+metrics.append(Metric('Total FEC', lambda: TAL_lca.FEC*per_kg_KSA_to_per_kg_SA, 'kg-CO2-eq/kg', 'Biorefinery'))
+metrics.append(Metric('FEC - Heating demand', lambda: TAL_lca.heating_demand_FEC*per_kg_KSA_to_per_kg_SA, 'kg-CO2-eq/kg', 'Biorefinery'))
+metrics.append(Metric('FEC - Cooling demand', lambda: TAL_lca.cooling_demand_FEC*per_kg_KSA_to_per_kg_SA, 'kg-CO2-eq/kg', 'Biorefinery'))
+metrics.append(Metric('FEC - Electricity demand (non-cooling)', lambda: TAL_lca.electricity_demand_non_cooling_FEC*per_kg_KSA_to_per_kg_SA, 'kg-CO2-eq/kg', 'Biorefinery'))
 
-# # breakdown = TAL_LCA.material_FEC_breakdown
-# # for k in lambda: breakdown.keys():
-# # for k in ['CH4', 'CO2', 'H2SO4', 'CalciumDihydroxide', 'MEA', 'CSL', 'H3PO4']:
-# #     metrics.append(Metric(f'FEC - Materials breakdown - {k}', lambda: TAL_LCA.material_FEC_breakdown[k], 'kg-CO2-eq/kg', 'Biorefinery'))
-# metrics.append(Metric(f'FEC - Materials breakdown - CH4', lambda: TAL_LCA.material_FEC_breakdown['CH4'], 'kg-CO2-eq/kg', 'Biorefinery'))
-# metrics.append(Metric(f'FEC - Materials breakdown - CO2', lambda: TAL_LCA.material_FEC_breakdown['CO2'], 'kg-CO2-eq/kg', 'Biorefinery'))
-# metrics.append(Metric(f'FEC - Materials breakdown - H2SO4', lambda: TAL_LCA.material_FEC_breakdown['H2SO4'], 'kg-CO2-eq/kg', 'Biorefinery'))
-# metrics.append(Metric(f'FEC - Materials breakdown - CalciumDihydroxide', lambda: TAL_LCA.material_FEC_breakdown['CalciumDihydroxide'], 'kg-CO2-eq/kg', 'Biorefinery'))
-# metrics.append(Metric(f'FEC - Materials breakdown - MEA', lambda: TAL_LCA.material_FEC_breakdown['MEA'], 'kg-CO2-eq/kg', 'Biorefinery'))
-# metrics.append(Metric(f'FEC - Materials breakdown - CSL', lambda: TAL_LCA.material_FEC_breakdown['CSL'], 'kg-CO2-eq/kg', 'Biorefinery'))
-# metrics.append(Metric(f'FEC - Materials breakdown - H3PO4', lambda: TAL_LCA.material_FEC_breakdown['H3PO4'], 'kg-CO2-eq/kg', 'Biorefinery'))
+metrics.append(Metric('FEC - Feedstock (FGHTP) ', lambda: TAL_lca.feedstock_FEC*per_kg_KSA_to_per_kg_SA, 'kg-CO2-eq/kg', 'Biorefinery'))
+metrics.append(Metric('FEC - Materials (except feedstock and BT.natural_gas) ', lambda: TAL_lca.material_FEC*per_kg_KSA_to_per_kg_SA, 'kg-CO2-eq/kg', 'Biorefinery'))
+
+
+# metrics.append(Metric(f'FEC - Materials breakdown - CH4', lambda: TAL_lca.material_FEC_breakdown['CH4']*per_kg_KSA_to_per_kg_SA, 'kg-CO2-eq/kg', 'Biorefinery'))
+# metrics.append(Metric(f'FEC - Materials breakdown - CO2', lambda: TAL_lca.material_FEC_breakdown['CO2']*per_kg_KSA_to_per_kg_SA, 'kg-CO2-eq/kg', 'Biorefinery'))
+# metrics.append(Metric(f'FEC - Materials breakdown - H2SO4', lambda: TAL_lca.material_FEC_breakdown['H2SO4']*per_kg_KSA_to_per_kg_SA, 'kg-CO2-eq/kg', 'Biorefinery'))
+# metrics.append(Metric(f'FEC - Materials breakdown - CalciumDihydroxide', lambda: TAL_lca.material_FEC_breakdown['CalciumDihydroxide']*per_kg_KSA_to_per_kg_SA, 'kg-CO2-eq/kg', 'Biorefinery'))
+# metrics.append(Metric(f'FEC - Materials breakdown - MEA', lambda: TAL_lca.material_FEC_breakdown['MEA']*per_kg_KSA_to_per_kg_SA, 'kg-CO2-eq/kg', 'Biorefinery'))
+# metrics.append(Metric(f'FEC - Materials breakdown - CSL', lambda: TAL_lca.material_FEC_breakdown['CSL']*per_kg_KSA_to_per_kg_SA, 'kg-CO2-eq/kg', 'Biorefinery'))
+# metrics.append(Metric(f'FEC - Materials breakdown - H3PO4', lambda: TAL_lca.material_FEC_breakdown['H3PO4']*per_kg_KSA_to_per_kg_SA, 'kg-CO2-eq/kg', 'Biorefinery'))
 
 
 #%% Generate the required namespace
@@ -193,8 +188,8 @@ namespace_dict['TAL_tea'] = namespace_dict['tea'] = TAL_tea
 namespace_dict['spec'] = spec
 PowerUtility = bst.PowerUtility
 namespace_dict['PowerUtility'] = PowerUtility
-namespace_dict['PD'] = s.PD
-# namespace_dict['theoretical_max_g_TAL_acid_per_g_glucose'] = theoretical_max_g_TAL_acid_per_g_glucose
+# namespace_dict['PD'] = s.PD
+namespace_dict['theoretical_max_g_TAL_per_g_glucose'] = theoretical_max_g_TAL_per_g_glucose
 
 #%% 
 
@@ -202,6 +197,8 @@ namespace_dict['PD'] = s.PD
 model = TAL_model = EasyInputModel(TAL_sys, metrics, namespace_dict=namespace_dict)
 
 
+
+    
 #%% Bugfix barrage
 baseline_spec = {'spec_1': spec.baseline_yield,
                  'spec_2': spec.baseline_titer,

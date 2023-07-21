@@ -115,7 +115,7 @@ class LCA:
         self.FU_factor = 1. if FU==1. else 1.
         # tmo.settings.set_thermo(chemicals)
         self.LCA_stream = Stream('LCA_stream', units='kg/hr')
-        self.LCA_streams = system.feeds
+        self.LCA_streams = [i for i in system.feeds if not i==feedstock]
         
         self.chem_IDs = [i.ID for i in chemicals]
         

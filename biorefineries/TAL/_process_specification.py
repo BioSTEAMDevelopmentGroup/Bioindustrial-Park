@@ -69,13 +69,13 @@ def evaluate_across_specs(spec, system,
                 except Exception as e:
                     print(str(e))
                     try:
-                        reset_and_switch_solver('aitken')
+                        reset_and_switch_solver('wegstein')
                     except Exception as e:
                         print(str(e))
                         print(_yellow_text+"Bugfix barrage failed."+_reset_text)
                         raise e
             finally:
-                system.converge_method = 'wegstein'
+                system.converge_method = 'aitken'
                 print('\n')
     
     def HXN_Q_bal_OK():
@@ -454,7 +454,8 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
         specifications.
         
         """
-        self.reactor.tau = self.reactor.tau_cofermentation = self.spec_2 / productivity
+        self.reactor.tau = self.reactor.tau_cofermentation = self.seed_train.tau_batch =\
+            self.spec_2 / productivity
         self.spec_3 = productivity
     
     def calculate_titer(self):

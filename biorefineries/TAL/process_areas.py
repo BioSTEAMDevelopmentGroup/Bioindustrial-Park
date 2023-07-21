@@ -96,13 +96,14 @@ decarb_conv_interp = interp1d(Ts_decarb, conversions_decarb)
 # 
 # Acetone washing to remove impurities from KSA
 def get_mass_acetone_needed_per_mass_KSA():
-    return 2. #!!! temporary
+    return 2. #!!! TODO: Ask Min Soo for exp data and update this
 
 #%% Fermentation
 
 @SystemFactory(ID = 'TAL_fermentation_process',
                ins=[dict(ID='sugar_juice_or_slurry', Glucose=10, Water=100),
                     dict(ID='CSL', CSL=100),
+                    dict(ID='Acetate_spiking', SodiumAcetate=100),
                ],
                 outs=[dict(ID='F301_top_product', Water=20),
                       dict(ID='fermentation_liquid_effluent', TAL=1, Water=100),
@@ -112,7 +113,7 @@ def get_mass_acetone_needed_per_mass_KSA():
                                                )
 def create_TAL_fermentation_process(ins, outs,):
     
-    sugar_juice_or_slurry, CSL = ins
+    sugar_juice_or_slurry, CSL, Acetate_spiking = ins
     F301_top_product, fermentation_liquid_effluent, fermentation_vent, seedtrain_vent = outs
       
     # =============================================================================
@@ -134,10 +135,10 @@ def create_TAL_fermentation_process(ins, outs,):
     F301_P = bst.Pump('F301_P', ins=F301-0, P=101325., )
     
     # Cool hydrolysate down to fermentation temperature at 30°C
-    H301 = bst.units.HXutility('H301', ins=F301_P-0, T=30+273.15,)
+    H301 = bst.units.HXutility('H301', ins=F301_P-0, T=30.+273.15,)
     
-    M304 = bst.units.Mixer('M304', ins=(H301-0, dilution_water))
-    M304.water_to_sugar_mol_ratio = 5.
+    M304 = bst.units.MixTank('M304', ins=(H301-0, dilution_water))
+    M304.water_to_sugar_mol_ratio = 5. # initial value
     
     @M304.add_specification()
     def adjust_M304_water():
@@ -145,17 +146,23 @@ def create_TAL_fermentation_process(ins, outs,):
         M304_ins_1.imol['Water'] = M304.water_to_sugar_mol_ratio * M304.ins[0].imol['Glucose', 'Xylose'].sum()
         M304._run()
     
-    M304_H = bst.units.HXutility('M304_H', ins=M304-0, T=30+273.15, rigorous=False)
+    M304_H = bst.units.HXutility('M304_H', ins=M304-0, T=30+273.15, rigorous=True)
     
     # Mix pretreatment hydrolysate/enzyme mixture with fermentation seed
     S302 = bst.Splitter('S302', ins=M304_H-0,
                         outs = ('to_seedtrain', 'to_cofermentation'),
                         split = 0.07) # split = inoculum ratio
-    
+    @S302.add_specification()
+    def S302_spec():
+        if S302.ins[0]['g'].F_mol: raise RuntimeError('S302.ins[0] has non-zero gas phase flow.')
+        S302._run()
+        for i in S302.outs: i.phases = ('l',)
     # Cofermentation
-    R302 = units.CoFermentation('R302', 
-                                    ins=(S302-1, '', CSL),
-                                    outs=(fermentation_liquid_effluent, fermentation_vent))
+    R302 = units.BatchCoFermentation('R302', 
+                                    ins=(S302-1, '', CSL, Acetate_spiking),
+                                    outs=(fermentation_vent, fermentation_liquid_effluent),
+                                    acetate_ID='AceticAcid',
+                                    )
     @R302.add_specification()
     def include_seed_CSL_in_cofermentation(): # note: effluent always has 0 CSL
         R302._run()
@@ -202,7 +209,6 @@ def create_TAL_separation_solubility_exploit_process(ins, outs,):
         U401_outs_0 = U401.outs[0]
         U401_outs_0.copy_like(U401_ins_0)
         mol_TAL_dissolved = get_mol_TAL_dissolved(U401_outs_0.T, U401_outs_0.imol['Water'])
-        # U401_outs_0.sle('TAL', U401_outs_0.T) #!!! TODO: use computationally cheaper way of changing from Stream to MultiStream
         U401_outs_0.phases = ('s', 'l')
         U401_outs_0.imol['l', 'TAL'] = min(mol_TAL_dissolved, tot_TAL)
         U401_outs_0.imol['s', 'TAL'] = tot_TAL - min(mol_TAL_dissolved, tot_TAL)
@@ -393,7 +399,7 @@ def create_TAL_separation_adsorption_process(ins, outs,):
         void_fraction = 0.5, # v/v # Seader et al. Table 15.2
         adsorbent_capacity=0.091, # default value for unsaturated capacity (updated in unit specification); conservative heuristic from Seider et. al. (2017) Product and Process Design Principles. Wiley
         T_regeneration=30. + 273.15, 
-        drying_time = 0.55, # h #!!! This is updated to 0.5 h after the first run
+        drying_time = 0.55, # h # This is updated to 0.5 h after the first run
         T_air = 351.39 + 10., # K # TAL_chemicals.Ethanol.Tb + 10
         air_velocity = 2160, # m/h
         vessel_material='Stainless steel 316',
@@ -445,21 +451,22 @@ def create_TAL_separation_adsorption_process(ins, outs,):
         return F401.TAL_solubility_in_ethanol_ww - F401_b.imass['TAL']/F401_b.F_mass
     
     P401 = bst.Pump('P401', ins=F401-1, P=101325.)
-
+    P402 = bst.Pump('P402', ins=F401-0, P=101325.)
+    
     F402 = bst.DrumDryer('F402', 
-                         ins=(F401-0, 'F402_air', 'F402_natural_gas'),
+                         ins=(P402-0, 'F402_air', 'F402_natural_gas'),
                          outs=('dry_TAL', 'F402_hot_air', 'F402_emissions'),
                          moisture_content=0.05, 
                          split=0.,
                          moisture_ID='Ethanol')
     
     H407 = bst.units.HXutility(
-        'H407', ins=F402-1, outs=('cooled_ethanol_laden_air'), 
+        'H407', ins=F402-1, outs=('H407_cooled_ethanol_laden_air'), 
         T=265.,
         rigorous=True
     )
     
-    S407 = bst.units.FakeSplitter('S407', ins=H407-0, outs=(S407_cool_air, 'ethanol_recovered_from_air'))
+    S407 = bst.units.FakeSplitter('S407', ins=H407-0, outs=(S407_cool_air, 'S407_ethanol_recovered_from_air'))
     
     @S407.add_specification()
     def S407_spec():
@@ -474,12 +481,12 @@ def create_TAL_separation_adsorption_process(ins, outs,):
     
     
     H402 = bst.units.HXutility(
-        'H402', ins=A401-2, outs=('cooled_ethanol_laden_air'), 
+        'H402', ins=A401-2, outs=('H402_cooled_ethanol_laden_air'), 
         T=265.,
         rigorous=True
     )
     
-    S403 = bst.units.FakeSplitter('S403', ins=H402-0, outs=(S403_cool_air, 'ethanol_recovered_from_air'))
+    S403 = bst.units.FakeSplitter('S403', ins=H402-0, outs=(S403_cool_air, 'S403_ethanol_recovered_from_air'))
     
     @S403.add_specification()
     def S403_spec():
@@ -540,68 +547,102 @@ def create_additional_TAL_recovery_process(ins, outs,):
                     dict(ID='H2_hydrogenation', H2=1),
                     dict(ID='KOH_hydrolysis', KOH=1),
                     dict(ID='acetone_purification', Acetone=1),
+                    dict(ID='fresh_catalyst_R401', NiSiO2=1),
+                    dict(ID='fresh_catalyst_R402', Amberlyst70_=1),
                ],
                 outs=[dict(ID='KSA', KSA=1),
                       dict(ID='impurities_to_boiler', DHL=0.1),
-                      dict(ID='S407_cool_air', N2=1),
+                      dict(ID='S410_cool_air', N2=1),
                       dict(ID='S408_cool_air', N2=1),
+                      dict(ID='spent_catalyst_R401', NiSiO2=0.1),
+                      dict(ID='spent_catalyst_R402', Amberlyst70_=0.1),
                                 ],
                                                )
 def create_TAL_to_sorbic_acid_upgrading_process(ins, outs,):
     
-    solid_TAL, ethanol_minimal, H2_hydrogenation, KOH_hydrolysis, acetone_purification = ins
-    KSA, impurities_to_boiler, S407_cool_air, S408_cool_air = outs
+    solid_TAL, ethanol_minimal, H2_hydrogenation, KOH_hydrolysis, acetone_purification,\
+        fresh_catalyst_R401, fresh_catalyst_R402 = ins
+    KSA, impurities_to_boiler, S410_cool_air, S408_cool_air,\
+        spent_catalyst_R401, spent_catalyst_R402 = outs
     
     M405 = bst.Mixer('M405', ins=(solid_TAL, ethanol_minimal, ''),
                      outs=('TAL_in_ethanol'))
     
+    M405.TAL_solubility_in_ethanol = get_TAL_solubility_in_ethanol_ww()
     @M405.add_specification()
     def M405_ethanol_spec():
         M405_TAL, M405_makeup_ethanol, M405_recycled_ethanol = M405.ins
         M405_mixed, = M405.outs
+        M405_makeup_ethanol.empty()
         mass_TAL = sum([i.imass['TAL'] for i in M405.ins])
         current_mass_ethanol = sum([i.imass['Ethanol'] for i in [M405_TAL, M405_recycled_ethanol]])
-        required_mass_ethanol = mass_TAL/get_TAL_solubility_in_ethanol_ww() - mass_TAL
+        M405.required_mass_ethanol = required_mass_ethanol = mass_TAL/M405.TAL_solubility_in_ethanol - mass_TAL
+        # M405.required_mass_ethanol = required_mass_ethanol = mass_TAL/get_TAL_solubility_in_ethanol_ww()
         M405_makeup_ethanol.imass['Ethanol'] = max(0., required_mass_ethanol-current_mass_ethanol)
         M405._run()
         
-    R401 = units.HydrogenationReactor('R401', ins = (M405-0, '', H2_hydrogenation), 
-                                      outs = 'HMTHP',
-                                      vessel_material='Stainless steel 316',
-                                      tau=12)
+    R401 = units.HydrogenationReactor('R401', ins = (M405-0, '', H2_hydrogenation, '', fresh_catalyst_R401), 
+                                      outs = ('HMTHP_and_cat_in_ethanol', spent_catalyst_R401),
+                                      vessel_material='Stainless steel 316',)
+    # !!! TODO:
+    # done -- Add catalyst recovery (centrifuge/filter)
+    # Add catalyst regeneration (https://doi.org/10.1006/jcat.1993.1265)
+    # 
     
-    R402 = units.DehydrationReactor('R402', ins = (R401-0, ''), 
-                                               outs = 'PSA',
-                                               vessel_material='Stainless steel 316',
-                                               tau=12)
+    hydrogenation_CR_process = create_catalyst_recovery_process(
+                                                ID='hydrogenation_CR_process',
+                                                ins=(R401-0,),
+                                                outs=('R401_product_stream_without_catalyst', 'R401_recycled_catalyst'),
+                                                split={'NiSiO2':1.-1e-5},
+                                                catalyst_phase='s',
+                                                product_stream_phase='l',
+                                                )
     
-    R403 = units.RingOpeningHydrolysisReactor('R403', ins = (R402-0, '', KOH_hydrolysis), 
+    hydrogenation_CR_process-1-3-R401
+    
+    # R401_CR2 = bst.1
+    R402 = units.DehydrationReactor('R402', ins = (hydrogenation_CR_process-0, '', '', fresh_catalyst_R402), 
+                                               outs = ('PSA_and_cat_in_ethanol', spent_catalyst_R402),
+                                               vessel_material='Stainless steel 316',)
+    dehydration_CR_process = create_catalyst_recovery_process(
+                                                ID='dehydration_CR_process',
+                                                ins=(R402-0,),
+                                                outs=('R402_product_stream_without_catalyst', 'R402_recycled_catalyst'),
+                                                split={'Amberlyst70_':1.-1e-5},
+                                                catalyst_phase='s',
+                                                product_stream_phase='l',
+                                                )
+    
+    dehydration_CR_process-1-2-R402
+    
+    R403 = units.RingOpeningHydrolysisReactor('R403', ins = (dehydration_CR_process-0, '', KOH_hydrolysis), 
                                    outs = 'KSA_in_ethanol',
-                                   vessel_material='Stainless steel 316',
-                                   tau=12)
+                                   vessel_material='Stainless steel 316',)
     
+    R403_P = bst.Pump('R403_P', ins=R403-0, P=101325.)
     F403 = bst.DrumDryer('F403', 
-                         ins=(R403-0, 'F403_air', 'F403_natural_gas'),
+                         ins=(R403_P-0, 'F403_air', 'F403_natural_gas'),
                          outs=('dry_KSA', 'F403_hot_air', 'F403_emissions'),
                          moisture_content=0.05, 
                          split=0.,
                          moisture_ID='Ethanol')
     
-    H407 = bst.units.HXutility(
-        'H407', ins=F403-1, outs=('cooled_ethanol_laden_air'), 
+    H410 = bst.units.HXutility(
+        'H410', ins=F403-1, outs=('H410_cooled_ethanol_laden_air'), 
         T=265.,
         rigorous=True
     )
     
-    S407 = bst.units.FakeSplitter('S407', ins=H407-0, outs=(S407_cool_air, 'ethanol_recovered_from_air'))
+    S410 = bst.units.FakeSplitter('S410', ins=H410-0, outs=(S410_cool_air, 'S410_ethanol_recovered_from_air'))
     
-    @S407.add_specification()
-    def S407_spec():
-        S407_ins_0 = S407.ins[0]
-        S407.outs[0].mol[:] = S407_ins_0['g'].mol[:]
-        S407.outs[1].mol[:] = S407_ins_0['l'].mol[:]
-    
-    S407-1-2-M405
+    @S410.add_specification()
+    def S410_spec():
+        S410_ins_0 = S410.ins[0]
+        S410.outs[0].mol[:] = S410_ins_0['g'].mol[:]
+        S410.outs[1].mol[:] = S410_ins_0['l'].mol[:]
+        M405.specifications[0]()
+        
+    S410-1-2-M405
     
     M406 = bst.Mixer('M406', ins=(F403-0, acetone_purification, ''),)
     
@@ -618,20 +659,21 @@ def create_TAL_to_sorbic_acid_upgrading_process(ins, outs,):
     
     S406 = bst.FakeSplitter('S406', ins=M406-0,
                         outs=(KSA, 'impurities_in_acetone'))
-    
+    S406.KSA_loss = 0.05 # %
     @S406.add_specification()
     def S406_spec():
         S406_ins_0 = S406.ins[0]
+        tot_KSA = S406_ins_0.imol['KSA']
         S406_outs_0, S406_outs_1 = S406.outs
-        S406_outs_0.imol['KSA'] = S406_ins_0.imol['KSA']
+        S406_outs_0.imol['KSA'] = (1.-S406.KSA_loss) * tot_KSA
         S406_outs_0.T = S406_ins_0.T
         S406_outs_1.copy_like(S406_ins_0)
-        S406_outs_1.imol['KSA'] = 0.
+        S406_outs_1.imol['KSA'] = S406.KSA_loss * tot_KSA
         
     F404 = bst.DrumDryer('F404', 
                          ins=(S406-1, 'F404_air', 'F404_natural_gas'),
                          outs=(impurities_to_boiler, 'F404_hot_air', 'F404_emissions'),
-                         moisture_content=0.05, 
+                         moisture_content=0.01, 
                          split=0.,
                          moisture_ID='Acetone')
     
@@ -650,3 +692,41 @@ def create_TAL_to_sorbic_acid_upgrading_process(ins, outs,):
         S408.outs[1].mol[:] = S408_ins_0['l'].mol[:]
     
     S408-1-2-M406
+
+#%% Utils
+
+# Catalyst recovery and regeneration factory
+@SystemFactory(ID = 'catalyst_recovery_process',
+               ins=[dict(ID='product_stream_with_catalyst', HMTHP=1, Water=100, NiSiO2=0.5),
+                    # dict(ID='regeneration_stream_in', N2=1, H2=0.2),
+                    ],
+                outs=[dict(ID='product_stream_without_catalyst', HMTHP=1, Water=100,),
+                       # dict(ID='regeneration_stream_out', N2=1, H2=0.2),
+                      dict(ID='recycled_catalyst', NiSiO2=0.5),
+                      ],
+                )
+
+def create_catalyst_recovery_process(ins, outs, split, 
+                                     moisture_content=0.,
+                                     catalyst_phase='s',
+                                     product_stream_phase='l',
+                                     ):
+    product_stream_with_catalyst, = ins
+    product_stream_without_catalyst, recycled_catalyst = outs
+    
+    ID = product_stream_with_catalyst.source.ID
+
+    CR = bst.PressureFilter(ID+'_CR', 
+                             ins=product_stream_with_catalyst,
+                             outs=(recycled_catalyst, product_stream_without_catalyst),
+                                   split=split,
+                                   moisture_content=moisture_content)
+    CR.catalyst_phase = catalyst_phase
+    CR.product_stream_phase = product_stream_phase
+    @CR.add_specification()
+    def CR_spec():
+        CR._run()
+        CR.outs[0].phase = CR.catalyst_phase
+        CR.outs[1].phase = CR.product_stream_phase
+        
+        

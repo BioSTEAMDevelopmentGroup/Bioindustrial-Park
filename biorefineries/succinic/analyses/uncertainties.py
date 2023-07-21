@@ -51,7 +51,7 @@ get_adjusted_MSP = models.get_adjusted_MSP
 
 # %% 
 
-N_simulations_per_mode = 2000 # 2000
+N_simulations_per_mode = 5000 # 2000
 
 percentiles = [0, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 1]
 
@@ -63,14 +63,14 @@ results_dict = {'Baseline':{'MPSP':{}, 'GWP100a':{}, 'FEC':{},
                 'Sensitivity':{'Spearman':{'MPSP':{}, 'GWP100a':{}, 'FEC':{}}},}
 
 modes = [
-            'lab_batch',
-           'lab_fed-batch', 
-           'pilot_batch',
+           #  'lab_batch',
+           # # 'lab_fed-batch', 
+            'pilot_batch',
          ]
 
 parameter_distributions_filenames = [
-                                    'parameter-distributions_lab-scale_batch.xlsx',
-                                    'parameter-distributions_lab-scale_fed-batch.xlsx',
+                                    # 'parameter-distributions_lab-scale_batch.xlsx',
+                                    # 'parameter-distributions_lab-scale_fed-batch.xlsx',
                                     'parameter-distributions_pilot-scale_batch.xlsx',
                                     ]
 
@@ -175,8 +175,15 @@ for i in range(len(modes)):
         '_succinic_%s.%s.%s-%s.%s'%(dateTimeObj.year, dateTimeObj.month, dateTimeObj.day, dateTimeObj.hour, minute)\
         + '_' + str(N_simulations_per_mode) + 'sims'
     
-    baseline = baseline.append(baseline_end, ignore_index=True)
-    baseline.index = ('initial', 'end')
+    # # baseline = baseline.append(baseline_end, ignore_index=True)
+    # baseline_end = pd.DataFrame(baseline_end)
+    # baseline = pd.concat([baseline, baseline_end], 
+    #                       ignore_index=True,
+    #                      )
+    
+    baseline.index = ('initial', 
+                      # 'end',
+                      )
     baseline.to_excel(file_to_save+'_'+mode+'_0_baseline.xlsx')
     
     # Parameters
@@ -185,6 +192,7 @@ for i in range(len(modes)):
     parameter_values = model.table.iloc[:, :index_parameters].copy()
     
     #%%
+    
     # TEA results
     for index_TEA, i in enumerate(models.metrics):
         if i.element == 'LCA': break
