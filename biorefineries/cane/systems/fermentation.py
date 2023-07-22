@@ -442,6 +442,10 @@ def create_cane_to_combined_1_and_2g_fermentation(
         fed_batch=None,
         include_scrubber=None,
         add_urea=True,
+        feedstock_handling_area=None,
+        juicing_area=None,
+        pretreatment_area=None,
+        fermentation_area=None,
     ):
     """
     Create a system that produces crude oil and a fermentation-derived product 
@@ -456,16 +460,20 @@ def create_cane_to_combined_1_and_2g_fermentation(
     if product_group is None: product_group = 'Ethanol'
     if productivity is None: productivity = 0.95
     if titer is None: titer = 68.5
+    if fermentation_area is None: fermentation_area = 400
     pretreatment_sys = create_cane_combined_1_and_2g_pretreatment(
         ins=oilcane, 
-        outs=['juice', 'pretreated_biomass', pretreatment_wastewater, fiber_fines, bagasse_to_boiler]
+        outs=['juice', 'pretreated_biomass', pretreatment_wastewater, fiber_fines, bagasse_to_boiler],
+        feedstock_handling_area=feedstock_handling_area,
+        juicing_area=juicing_area,
+        pretreatment_area=pretreatment_area,
     )
     juice, pretreated_biomass, pretreatment_wastewater, fiber_fines, bagasse_to_boiler = pretreatment_sys.outs
     cellulosic_fermentation_sys, cfdct = create_cellulosic_fermentation_system(
         ins=(pretreated_biomass,),
         outs=['vent', beer, lignin],
         mockup=True,
-        area=400,
+        area=fermentation_area,
         udct=True,
         kind='Saccharification and Co-Fermentation',
         cofermentation_reactions=cofermentation_reactions,
@@ -486,13 +494,13 @@ def create_cane_to_combined_1_and_2g_fermentation(
     hydrolysate = pressurefilter.outs[1]
     hydrolysate_sink = hydrolysate.sink
     hydrolysate_sink.ins[0] = None
-    MX = bst.Mixer(400, [hydrolysate, juice])
+    MX = bst.Mixer(fermentation_area, [hydrolysate, juice])
     MX.register_alias('hydrolysate_and_juice_mixer')
     if fed_batch:
         if 'Sugar' not in MX.chemicals:
             MX.chemicals.define_group('Sugar', ('Glucose', 'Sucrose', 'Xylose'))
-        syrup_source = SX0 = bst.Splitter(400, MX-0, split=0.2)
-        EvX = bst.MultiEffectEvaporator(400, ins=SX0-1, 
+        syrup_source = SX0 = bst.Splitter(fermentation_area, MX-0, split=0.2)
+        EvX = bst.MultiEffectEvaporator(fermentation_area, ins=SX0-1, 
                                         P=(101325, 69682, 47057, 30953, 19781),
                                         V_definition='First-effect',
                                         thermo=hydrolysate.thermo.ideal(),
@@ -517,13 +525,13 @@ def create_cane_to_combined_1_and_2g_fermentation(
                 brix_objective, 0., 0.2, x=V_guess, ytol=0.1, maxiter=1000,
             )
         
-        MT1 = bst.MixTank(400, EvX-0)
-        SX1 = bst.Splitter(400, ins=EvX-1, outs=[condensate, ''], split=0.9)
-        SX2 = bst.Splitter(400, ins=MT1-0, split=0.07)
+        MT1 = bst.MixTank(fermentation_area, EvX-0)
+        SX1 = bst.Splitter(fermentation_area, ins=EvX-1, outs=[condensate, ''], split=0.9)
+        SX2 = bst.Splitter(fermentation_area, ins=MT1-0, split=0.07)
         to_seed_train, to_cofermentation = SX2.outs
         seedtrain.ins.append(to_seed_train)
         cofermentation.ins.append(to_cofermentation)
-        PX = bst.Pump(400, ins=SX1-1, P=101325.)
+        PX = bst.Pump(fermentation_area, ins=SX1-1, P=101325.)
         @SX1.add_specification(run=False)
         def sugar_concentration_adjustment():
             target_titer = cofermentation.titer
@@ -563,14 +571,14 @@ def create_cane_to_combined_1_and_2g_fermentation(
             SX0.split[:] = 0.2 # Restart
     else:
         syrup_source = EvX = bst.MultiEffectEvaporator(
-            400, ins=MX-0, outs=('', condensate),
+            fermentation_area, ins=MX-0, outs=('', condensate),
             P=(101325, 69682, 47057, 30953, 19781),
             V_definition='First-effect duty',
             thermo=hydrolysate.thermo.ideal(),
             flash=False,
             V=0.05
         ) # fraction evaporated
-        PX = bst.Pump(400, ins=EvX-0, P=101325.)
+        PX = bst.Pump(fermentation_area, ins=EvX-0, P=101325.)
         P_original = tuple(EvX.P)
         Pstart = P_original[0]
         Plast = P_original[-1]
@@ -639,9 +647,9 @@ def create_cane_to_combined_1_and_2g_fermentation(
         syrup_sink.sucrose_hydrolysis_reaction.force_reaction(syrup)
         if syrup.imol['Water'] < 0: syrup.imol['Water'] = 0.
     
-    MX = bst.Mixer(400, [PX-0, 'dilution_water'])
+    MX = bst.Mixer(fermentation_area, [PX-0, 'dilution_water'])
     if fed_batch: MX.ins.append(SX0-0)
-    HX = bst.HXutility(400, MX-0, T=305.15) 
+    HX = bst.HXutility(fermentation_area, MX-0, T=305.15) 
     HX-0-hydrolysate_sink
     
     def get_titer():

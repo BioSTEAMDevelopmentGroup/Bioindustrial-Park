@@ -56,7 +56,7 @@ def create_oilcane_to_biodiesel_1g(
         dry_bagasse=True,
         mockup=True,
         udct=True,
-        area=200,
+        area=100,
     )
     screened_juice, bagasse, fiber_fines = juicing_sys.outs
     # bagasse_pelleting_sys = create_bagasse_pelleting_system(None, bagasse, area=200, mockup=True)
@@ -102,7 +102,7 @@ def create_oilcane_to_biodiesel_1g(
         product_group='Lipid',
         fermentation_kwargs={},
         mockup=True,
-        area=300,
+        area=200,
         add_urea=False,
         udct=True,
     )
@@ -110,14 +110,14 @@ def create_oilcane_to_biodiesel_1g(
     post_fermentation_oil_separation_sys = create_lipid_extraction_system(
         ins=product,
         mockup=True,
-        area=300,
+        area=200,
     )
     oil, cellmass, thick_vinasse = post_fermentation_oil_separation_sys.outs
     oil_pretreatment_sys, oil_pretreatment_dct = create_oil_pretreatment_system(
         ins=oil,
         mockup=True,
         outs=['', 'polar_lipids', ''],
-        area=600,
+        area=300,
         udct=True,
     )
     bst.Mixer(300, [thick_vinasse, condensate], vinasse)
@@ -128,15 +128,15 @@ def create_oilcane_to_biodiesel_1g(
         ins=oil, 
         outs=[biodiesel, crude_glycerol, ''],
         mockup=True,
-        area=600,
+        area=300,
         udct=True,
     )
-    bst.Mixer(600, [transesterification_and_biodiesel_separation_sys-2, wastewater], 'wastewater')
+    bst.Mixer(300, [transesterification_and_biodiesel_separation_sys-2, wastewater], 'wastewater')
 
     ### Facilities ###
     if WWT_kwargs:
         WWT = True
-        WWT_kwargs['area'] = 1000
+        WWT_kwargs['area'] = 700
     else:
         WWT = False
     
@@ -144,13 +144,13 @@ def create_oilcane_to_biodiesel_1g(
     bst.create_all_facilities(
         feedstock=None,
         HXN_kwargs=dict(
-            ID=900,
-            ignored=lambda: [u.E301, u.D601.reboiler, u.D602.reboiler, u.H601, u.H602, u.H603, u.H604, oil_pretreatment_dct['F3']],
+            ID=500,
+            ignored=lambda: [u.E201, u.D301.reboiler, u.D302.reboiler, u.H301, u.H302, u.H303, u.H304, oil_pretreatment_dct['F3']],
             Qmin=1e5,
             acceptable_energy_balance_error=0.01,
         ),
-        CHP_kwargs=dict(area=700),
+        CHP_kwargs=dict(area=600),
         WWT_kwargs=WWT_kwargs,
         WWT=WWT,
-        area=800,
+        area=400,
     )

@@ -90,21 +90,25 @@ def create_oilcane_to_biodiesel_combined_1_and_2g_post_fermentation_oil_separati
         fed_batch=fed_batch,
         add_urea=False,
         udct=True,
-        mockup=True
+        mockup=True,
+        feedstock_handling_area=100,
+        juicing_area=100,
+        pretreatment_area=200,
+        fermentation_area=300,
     )
     beer, lignin, condensate, pretreatment_wastewater, fiber_fines, bagasse_to_boiler = oilcane_to_fermentation_sys.outs
     hydrolysate_and_juice_mixer = bst.F.hydrolysate_and_juice_mixer
     post_fermentation_oil_separation_sys, pfls_dct = create_post_fermentation_oil_separation_system(
         ins=beer,
         mockup=True,
-        area=400,
+        area=300,
         udct=True,
         separate_cellmass=True,
     )
     backend_oil, cellmass, wastewater, evaporator_condensate = post_fermentation_oil_separation_sys.outs
     backend_oil.ID = 'backend_oil'
     # Upstream recycle of cell mass to pretreatment for oil recovery (process intensification)
-    biomass_mixer = bst.Mixer(400, cellmass)
+    biomass_mixer = bst.Mixer(300, cellmass)
     steam_mixer = ofs_dct['Steam mixer']
     biomass_mixer.insert(steam_mixer.ins[0])
     
@@ -119,16 +123,16 @@ def create_oilcane_to_biodiesel_combined_1_and_2g_post_fermentation_oil_separati
     
     if oil_extraction == 'integrated':
         PF = ofs_dct['Pretreatment flash']
-        LSC = bst.LiquidsSplitCentrifuge(400, ins='', split=1)
+        LSC = bst.LiquidsSplitCentrifuge(300, ins='', split=1)
         LSC.isplit['Oil'] = 0.3
         LSC.insert(PF-1, inlet=0**LSC, outlet=LSC-0)
         LSC.line = 'Microbial oil centrifuge'
-        MX = bst.Mixer(400, ins=[backend_oil, LSC-1])
+        MX = bst.Mixer(300, ins=[backend_oil, LSC-1])
         oil = MX.outs[0]
         
         # Replace oil and cell mass centrifuge with a 3-phase decanter centrifuge
         cellmass, aqueous_stream = cellmass_centrifuge.outs
-        decanter = bst.SolidLiquidsSplitCentrifuge(400,
+        decanter = bst.SolidLiquidsSplitCentrifuge(300,
             ins=oil_centrifuge.ins[0],
             outs=[backend_oil, aqueous_stream, cellmass],
             solids_split=cellmass_centrifuge.split,
@@ -143,21 +147,21 @@ def create_oilcane_to_biodiesel_combined_1_and_2g_post_fermentation_oil_separati
         mixer = cellmass.sink
         cellmass.disconnect_sink()
         mixer.disconnect(join_ends=True)
-        U402 = bst.DrumDryer(400, 
+        U402 = bst.DrumDryer(300, 
             (cellmass, 'dryer_air', 'dryer_natural_gas'), 
             ('', 'dryer_outlet_air', 'dryer_emissions'),
             moisture_content=0.18, split=0.,
             utility_agent='Steam',
         )
         # X401 = bst.ThermalOxidizer('X401', (U403-1, 'oxidizer_air'), 'oxidizer_emissions')
-        U403 = bst.ScrewPress(400, U402-0, split=dict(cellmass=1, lipid=0.3, Water=0.8),)
-        bst.ConveyingBelt(400, U403-0, 'yeast_extract')
+        U403 = bst.ScrewPress(300, U402-0, split=dict(cellmass=1, lipid=0.3, Water=0.8),)
+        bst.ConveyingBelt(300, U403-0, 'yeast_extract')
         microbial_oil = U403-1
         mixer.ins[:] = [microbial_oil, backend_oil]
         oil = mixer.outs[0]
         
         # Replace oil and cell mass centrifuge with a 3-phase decanter centrifuge
-        decanter = bst.SolidLiquidsSplitCentrifuge(400,
+        bst.SolidLiquidsSplitCentrifuge(300,
             ins=oil_centrifuge.ins[0],
             outs=[backend_oil, aqueous_stream, cellmass],
             solids_split=cellmass_centrifuge.split,
@@ -175,7 +179,7 @@ def create_oilcane_to_biodiesel_combined_1_and_2g_post_fermentation_oil_separati
         ins=oil,
         outs=['', 'polar_lipids', ''],
         mockup=True,
-        area=600,
+        area=400,
         udct=True
     )
     pretreated_oil, polar_lipids, wastewater_small = oil_pretreatment_sys.outs
@@ -184,26 +188,26 @@ def create_oilcane_to_biodiesel_combined_1_and_2g_post_fermentation_oil_separati
         ins=pretreated_oil, 
         outs=[biodiesel, crude_glycerol, ''],
         mockup=True,
-        area=600,
+        area=400,
     )
     
     s = f.stream
     u = f.unit
     if WWT_kwargs is None:
-        WWT_kwargs = dict(area=500)
+        WWT_kwargs = dict(area=800)
     else:
-        WWT_kwargs['area'] = 500
+        WWT_kwargs['area'] = 800
         
     bst.create_all_facilities(
         feedstock=s.bagasse,
         recycle_process_water_streams=(condensate, evaporator_condensate),
         HXN_kwargs=dict(
-            ID=900,
-            ignored=lambda: [u.H401, u.D601.reboiler, u.D602.reboiler, u.H603, u.H602, u.H601, u.H604, u.H606, u.H609, oil_pretreatment_dct['F3']],
+            ID=600,
+            ignored=lambda: [u.H201, u.D401.reboiler, u.D402.reboiler, u.H403, u.H402, u.H401, u.H404, u.H406, u.H409, oil_pretreatment_dct['F3']],
             Qmin=1e3,
             acceptable_energy_balance_error=0.01,
         ),
         CHP_kwargs=dict(area=700),
         WWT_kwargs=WWT_kwargs,
-        area=800,
+        area=500,
     )

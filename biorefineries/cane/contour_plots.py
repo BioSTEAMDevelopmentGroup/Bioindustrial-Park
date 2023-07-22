@@ -634,7 +634,7 @@ def plot_oil_recovery_integration(
     txtbox = dict(boxstyle='round', facecolor=colors.neutral.shade(20).RGBn, 
                   edgecolor='None', alpha=0.99, pad=0.1)
     color = GG_colors.orange.RGBn
-    x = 70
+    x = np.array([70, 70, 50])
     y = 100 * perf.hydrolysate_lipid_yield
     Z0 = Z[..., 0, :]
     new_shape = [Z0.shape[0] * Z0.shape[1], Z0.shape[-1]]
@@ -642,35 +642,34 @@ def plot_oil_recovery_integration(
     baseline_values = interp(x, y)
     for i, ax in enumerate(axes[0, :3]):
         plt.sca(ax._cached_ytwin)
-        value = baseline_values[i]
+        value = baseline_values[i, i]
         text = f'Baseline:\n{value:.2f} {units}'
         plt.text(
-            x + 0.9, y + 0.7, text, c=color,
+            x[i] + 0.9, y + 0.7, text, c=color,
             verticalalignment='center',
             bbox=txtbox, 
         )
         plot_scatter_points(
-            [x], [y], 
+            [x[i]], [y], 
             marker='o', s=20, linewidth=0.6,
             color=color, edgecolor=edgecolor, clip_on=False, zorder=1e6,
         )
     color = GG_colors.yellow.RGBn
-    x = 70
     y = 100 * perf.batch_lipid_yield_mean
     Z1 = Z[..., 1, :]
     interp = LinearNDInterpolator(list(zip(X.flatten(), Y.flatten())), Z1.reshape(new_shape))
     target_values = interp(x, y)
     for i, ax in enumerate(axes[1, :3]):
         plt.sca(ax._cached_ytwin)
-        value = target_values[i]
+        value = target_values[i, i]
         text = f'Target:\n{value:.2f} {units}'
         plt.text(
-            x + 0.9, y + 0.7, text, c=color,
+            x[i] + 0.9, y + 0.7, text, c=color,
             verticalalignment='center',
             bbox=txtbox, 
         )
         plot_scatter_points(
-            [x], [y], 
+            [x[i]], [y], 
             marker='o', s=20, linewidth=0.6,
             color=color, edgecolor=edgecolor, clip_on=False, zorder=1e6,
         )

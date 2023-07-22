@@ -140,10 +140,10 @@ area_names = {
         'Utilities', 'HXN', 'Storage', 'Wastewater treatment'],
     4: ['Feedstock handling', 'Juicing', 'Pretreatment', 'EtOH prod.', 
         'Wastewater treatment', 'Oil ext.', 'CH&P', 'Utilities', 'HXN', 'Storage'],
-    5: ['Feedstock handling', 'Juicing', 'Oil prod. & ext.', 'Biod. prod.', 
-        'CH&P', 'Utilities', 'HXN', 'Storage', 'Wastewater treatment'],
-    6: ['Feedstock handling',  'Juicing', 'Pretreatment', 'Oil prod. & ext.',
-        'Wastewater treatment', 'Biod. prod.', 'CH&P', 'Utilities', 'HXN', 'Storage'],
+    5: ['Juicing', 'Oil production', 'Biodiesel production',
+        'Utilities', 'HXN', 'CH&P', 'Wastewater treatment', 'Storage'],
+    6: ['Juicing', 'Pretreatment', 'Oil production', 'Biodiesel production',
+        'Utilities', 'HXN', 'CH&P', 'Wastewater treatment', 'Storage'],
     # 9: ['Feedstock handling', 'Juicing', 'TAG prod.', 'Oil ext.', 'AcTAG sep.', 
     #     'Biod. prod.', 'CH&P', 'Utilities', 'HXN', 'Storage'],
     # 10: ['Feedstock handling', 'Juicing', 'Pretreatment', 'TAG prod.', 'AcTAG sep.', 
@@ -752,7 +752,7 @@ class Biorefinery:
         for stream in natural_gas_streams: set_GWPCF(stream, 'CH4')
         
         ## Add BioSTEAM objects to module for easy access
-        dist = get_price_distributions_module(year)
+        self.price_distribution_module = dist = get_price_distributions_module(year)
         
         ## Model
         model = bst.Model(sys, exception_hook='raise', retry_evaluation=False)
@@ -809,7 +809,7 @@ class Biorefinery:
         def set_juicing_oil_recovery(juicing_oil_recovery):
             oil_extraction_specification.load_juicing_oil_recovery(juicing_oil_recovery / 100.)
         
-        @performance(70, 90, units='%', kind='coupled')
+        @performance(70, 75, units='%', kind='coupled')
         def set_microbial_oil_recovery(microbial_oil_recovery):
             oil_extraction_specification.load_microbial_oil_recovery(microbial_oil_recovery / 100.)
         
@@ -859,35 +859,35 @@ class Biorefinery:
         if prices_correleted_to_crude_oil:
             predict = lambda name, scalar: dist.models[name].predict(np.array([[scalar]]))[0]
                                                                      
-            @parameter(distribution=dist.offsets['Cellulosic ethanol'],
+            @parameter(distribution=dist.residual_distributions['Cellulosic ethanol'],
                        element='Cellulosic ethanol', baseline=0., units='USD/L')
             def set_cellulosic_ethanol_price(price): 
                 cellulosic_ethanol.price = predict('Cellulosic ethanol', self.crude_oil_price + price) * ethanol_L_per_kg
                 
-            @parameter(distribution=dist.offsets['Advanced ethanol'],
+            @parameter(distribution=dist.residual_distributions['Advanced ethanol'],
                        element='Advanced ethanol', baseline=0., units='USD/L')
             def set_advanced_ethanol_price(price): 
                 advanced_ethanol.price =  predict('Advanced ethanol', self.crude_oil_price + price) * ethanol_L_per_kg
                 
             # USDA ERS historical price data
-            @parameter(distribution=dist.offsets['Biomass based diesel'], 
+            @parameter(distribution=dist.residual_distributions['Biomass based diesel'], 
                        element='Biomass based diesel', units='USD/L', baseline=0.)
             def set_biomass_based_diesel_price(price):
                 biomass_based_diesel.price =  predict('Biomass based diesel', self.crude_oil_price + price) * biodiesel_L_per_kg
         
-            @parameter(distribution=dist.offsets['Cellulosic based diesel'],
+            @parameter(distribution=dist.residual_distributions['Cellulosic based diesel'],
                        element='Cellulosic based diesel', units='USD/L', baseline=0.)
             def set_cellulosic_based_diesel_price(price):
                 cellulosic_based_diesel.price =  predict('Cellulosic based diesel', self.crude_oil_price + price) * biodiesel_L_per_kg
         
             # https://www.eia.gov/energyexplained/natural-gas/prices.php
-            @parameter(distribution=dist.offsets['Natural gas'],
+            @parameter(distribution=dist.residual_distributions['Natural gas'],
                        element='Natural gas', units='USD/m3', baseline=0.)
             def set_natural_gas_price(price): 
                 BT.natural_gas_price =  predict('Natural gas', self.crude_oil_price + price) * V_ng
         
-            @parameter(distribution=dist.offsets['Electricity'], element='electricity',
-                       units='USD/kWhr', baseline=0.)
+            @parameter(distribution=dist.residual_distributions['Electricity'],
+                       element='Electricity', units='USD/kWhr', baseline=0.)
             def set_electricity_price(price): 
                 bst.PowerUtility.price = predict('Electricity', self.crude_oil_price + price)
                 
@@ -1548,7 +1548,16 @@ class Biorefinery:
             
         @metric(units='%')
         def IRR():
-            return 100. * tea.solve_IRR(financing=False)
+            finance_interest = tea.finance_interest
+            if finance_interest: 
+                IRR_original = tea.IRR
+                tea.IRR = finance_interest
+                financing = tea.NPV > 0 # Financing does not help otherwise
+                IRR = tea.solve_IRR(financing=financing)
+                tea.IRR = IRR_original
+            else:
+                IRR = tea.solve_IRR()
+            return 100. * IRR
         
         # def competitive_microbial_oil_yield_objective(microbial_oil_yield, target):
         #     self.update_dry_biomass_yield(self.baseline_dry_biomass_yield)

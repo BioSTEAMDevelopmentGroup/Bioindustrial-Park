@@ -96,6 +96,7 @@ biomass_based_diesel_prices = np.array([ # USD / gal June 2017 - Sep 2022, by mo
 crude_oil_prices = np.array([ # USD / barrel West Texas Intermediate 2018 - 2022; https://www.macrotrends.net/1369/crude-oil-price-history-chart
     65.23, 56.99, 39.68, 68.17, 94.53
 ])
+crude_oil_prices /= 119.240471 # To USD / L
 
 def by_month_to_year(arr):
     N_years = int(len(arr)/12)
@@ -168,6 +169,14 @@ def plot_triangular_distribution(a, b, c):
 def plot_histogram(x, *args, bins=10, density=True, **kwargs):
     return plt.hist(x, *args, **kwargs)
 
+def fit_gaussian_from_residuals(residuals):
+    std = np.std(residuals, ddof=2)
+    std2 = 2. * std
+    return shape.Trunc(
+        shape.Normal(0, std), 
+        lower=-std2, upper=std2,
+    )
+
 # Price distributions
 ethanol_no_RIN_price_distribution = triangular_distribution(ethanol_no_RIN_prices)
 advanced_ethanol_price_distribution = triangular_distribution(advanced_ethanol_prices)
@@ -223,15 +232,14 @@ scores = {
     name: model.score(predictor, prices[name]) for name, model in models.items()
 }
 
-offsets = {
+residuals = {
     name: model.predict(predictor) - prices[name] for name, model in models.items()    
 }
-
-offsets = {
-    name: triangular_distribution(model.predict(predictor) - prices[name]) for name, model in models.items()    
-}
-
 prices['Electricity'] = electricity_prices
 models['Electricity'] = emodel = LinearRegression().fit(predictor[:-1], electricity_prices)
 scores['Electricity'] = emodel.score(predictor[:-1], electricity_prices) # R2s
-offsets['Electricity'] = triangular_distribution(emodel.predict(predictor[:-1]) - electricity_prices)
+residuals['Electricity'] = emodel.predict(predictor[:-1]) - electricity_prices
+residual_distributions = {
+    name: fit_gaussian_from_residuals(diff) for name, diff in residuals.items()    
+}
+

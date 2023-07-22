@@ -112,6 +112,35 @@ area_colors = {
     'Oil production and extraction': CABBI_colors.blue,
 }
 
+area_colors_biodiesel = {
+    'Juicing': CABBI_colors.green_dirty,
+    'Oil production': CABBI_colors.blue,
+    'Pretreatment': CABBI_colors.teal,
+    'Wastewater treatment': colors.purple,
+    'CH&P': CABBI_colors.yellow,
+    'Co-Heat and Power': CABBI_colors.yellow,
+    'Utilities': colors.red,
+    'Storage': CABBI_colors.grey,
+    'HXN': colors.orange,
+    'Heat exchanger network': colors.orange,
+    'Biod. prod.': CABBI_colors.orange,
+    'Biodiesel production': CABBI_colors.orange,
+}
+area_hatches_biodiesel = {
+    'Juicing': '',
+    'Oil production': '',
+    'Biod. prod.': '',
+    'Biodiesel production': '',
+    'Pretreatment': '',
+    'Wastewater treatment': r'',
+    'CH&P': '',
+    'Co-Heat and Power': '',
+    'Utilities': '',
+    'Storage': '',
+    'HXN': '',
+    'Heat exchanger network': '',
+}
+
 area_hatches = {
     'Feedstock handling': 'x', 
     'Juicing': '-',
@@ -146,6 +175,7 @@ line_color_wheel = ColorWheel([
 for i, color in enumerate(line_color_wheel.colors): line_color_wheel.colors[i] = color.tint(20)
 edgecolor = (*colors.CABBI_black.RGBn, 1)
 for i in area_colors: area_colors[i] = area_colors[i].tint(20)
+for i in area_colors_biodiesel: area_colors_biodiesel[i] = area_colors_biodiesel[i].tint(20)
 palette = Palette(**area_colors)
 letter_color = colors.neutral.shade(25).RGBn
 GWP_units_L = '$\\mathrm{kg} \\cdot \\mathrm{CO}_{2}\\mathrm{eq} \\cdot \\mathrm{L}^{-1}$'
@@ -605,27 +635,56 @@ def plot_spearman_lca(with_units=None, aspect_ratio=0.65, **kwargs):
 def plot_breakdowns(biodiesel_only=False):
     set_font(size=8)
     set_figure_size(aspect_ratio=0.68)
-    fig, axes = plt.subplots(nrows=1, ncols=2)
-    plt.sca(axes[0])
-    c1, c2 = ('O7', 'O8') if biodiesel_only else ('O1', 'O2')
-    plot_configuration_breakdown(c1, ax=axes[0], legend=False)
-    plt.sca(axes[1])
-    plot_configuration_breakdown(c2, ax=axes[1], legend=True)
-    yticks = axes[1].get_yticks()
-    plt.yticks(yticks, ['']*len(yticks))
-    plt.ylabel('')
-    plt.subplots_adjust(left=0.09, right=0.96, wspace=0., top=0.84, bottom=0.31)
-    for ax, letter in zip(axes, ['(A) Direct Cogeneration', '(B) Integrated Co-Fermentation']):
-        plt.sca(ax)
-        ylb, yub = plt.ylim()
-        xlb, xub = plt.xlim()
-        plt.text((xlb + xub) * 0.5, ylb + (yub - ylb) * 1.2, letter, color=letter_color,
-                  horizontalalignment='center',verticalalignment='center',
-                  fontsize=10, fontweight='bold')
-    for i in ('svg', 'png'):
-        name = f'breakdowns_biodiesel_only.{i}' if biodiesel_only else f'breakdowns.{i}'
-        file = os.path.join(images_folder, name)
-        plt.savefig(file, transparent=True)
+    if biodiesel_only:
+        cane.YRCP2023()
+        fig, axes = plt.subplots(nrows=1, ncols=3)
+        configurations = ('O7', 'O9', 'O8')
+        yticks = [-20, 0, 20, 40, 60, 80, 100]
+        ytexts = ['']*len(yticks)
+        for i, config in enumerate(configurations):
+            ax = axes[i]
+            plt.sca(ax)
+            plot_configuration_breakdown(config, ax=ax, legend=i == 2, biodiesel_only=biodiesel_only)
+            if i: 
+                plt.yticks(yticks, ytexts)
+                plt.ylabel('')
+            else:
+                plt.yticks(yticks)
+        plt.subplots_adjust(left=0.07, right=0.98, wspace=0., top=0.84, bottom=0.31)
+        titles = ['(A) Direct\nCogeneration', '(B) Integrated\nCo-Fermentation', '(C) Integrated\nCo-Fermentation & Recovery']
+        for ax, letter in zip(axes, titles):
+            plt.sca(ax)
+            ylb, yub = plt.ylim()
+            xlb, xub = plt.xlim()
+            plt.text((xlb + xub) * 0.5, ylb + (yub - ylb) * 1.2, letter, color=letter_color,
+                      horizontalalignment='center',verticalalignment='center',
+                      fontsize=10, fontweight='bold')
+        for i in ('svg', 'png'):
+            name = f'breakdowns_biodiesel_only.{i}'
+            file = os.path.join(images_folder, name)
+            plt.savefig(file, transparent=True)
+    else:
+        fig, axes = plt.subplots(nrows=1, ncols=2)
+        plt.sca(axes[0])
+        c1, c2 = ('O1', 'O2')
+        plot_configuration_breakdown(c1, ax=axes[0], legend=False, biodiesel_only=biodiesel_only)
+        plt.sca(axes[1])
+        plot_configuration_breakdown(c2, ax=axes[1], legend=True, biodiesel_only=biodiesel_only)
+        yticks = axes[1].get_yticks()
+        plt.yticks(yticks, ['']*len(yticks))
+        plt.ylabel('')
+        plt.subplots_adjust(left=0.09, right=0.96, wspace=0., top=0.84, bottom=0.31)
+        for ax, letter in zip(axes, ['(A) Direct Cogeneration', '(B) Integrated Co-Fermentation']):
+            plt.sca(ax)
+            ylb, yub = plt.ylim()
+            xlb, xub = plt.xlim()
+            plt.text((xlb + xub) * 0.5, ylb + (yub - ylb) * 1.2, letter, color=letter_color,
+                      horizontalalignment='center',verticalalignment='center',
+                      fontsize=10, fontweight='bold')
+        for i in ('svg', 'png'):
+            name = f'breakdowns.{i}'
+            file = os.path.join(images_folder, name)
+            plt.savefig(file, transparent=True)
 
 # %% KDE
 
@@ -1737,16 +1796,31 @@ def plot_spearman_YRCP2023(configurations=None, labels=None,
 
 # %% Other
 
-def plot_configuration_breakdown(name, across_coordinate=False, **kwargs):
+def plot_configuration_breakdown(name, across_coordinate=False, 
+                                 biodiesel_only=None,
+                                 **kwargs):
     oc = cane.Biorefinery(name)
+    if biodiesel_only:
+        colors = [area_colors_biodiesel[i.name].RGBn for i in oc.unit_groups]
+        hatches = [area_hatches_biodiesel[i.name] for i in oc.unit_groups]
+        for i in oc.unit_groups:
+            if len(i.metrics) == 4: continue
+            i.metrics = i.metrics[:4]
+        units = sum([i.units for i in oc.unit_groups], [])
+        joint_group = bst.UnitGroup(None, units)
+        joint_group.autofill_metrics(shorthand=True, material_cost=False)
+    else:
+        colors = [area_colors[i.name].RGBn for i in oc.unit_groups]
+        hatches = [area_hatches[i.name] for i in oc.unit_groups]
+        joint_group = None
     if across_coordinate:
         return bst.plots.plot_unit_groups_across_coordinate(
             cane.set_cane_oil_content,
             [5, 7.5, 10, 12.5],
             'Feedstock oil content [dw %]',
             oc.unit_groups,
-            colors=[area_colors[i.name].RGBn for i in oc.unit_groups],
-            hatches=[area_hatches[i.name] for i in oc.unit_groups],
+            colors=colors,
+            hatches=hatches,
             **kwargs,
         )
     else:
@@ -1767,18 +1841,19 @@ def plot_configuration_breakdown(name, across_coordinate=False, **kwargs):
                 i.name = 'Biodiesel production'
             i.metrics[0].name = 'Inst. eq.\ncost'
             i.metrics[3].name = 'Elec.\ncons.'
-            i.metrics[4].name = 'Mat.\ncost'
+            if len(i.metrics) == 5: i.metrics[4].name = 'Mat.\ncost'
         
         return bst.plots.plot_unit_groups(
             oc.unit_groups,
-            colors=[area_colors[i.name].RGBn for i in oc.unit_groups],
-            hatches=[area_hatches[i.name] for i in oc.unit_groups],
+            colors=colors,
+            hatches=hatches,
             format_total=format_total,
             fraction=True,
+            joint_group=joint_group,
             legend_kwargs=dict(
-                loc='lower center',
+                loc='lower right' if biodiesel_only else 'lower center',
                 ncol=4,
-                bbox_to_anchor=(0, -0.52),
+                bbox_to_anchor=(0.9 if biodiesel_only else 0, -0.52),
                 labelspacing=1.5, handlelength=2.8,
                 handleheight=1, scale=0.8,
             ),
