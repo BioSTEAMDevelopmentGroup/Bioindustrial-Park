@@ -220,7 +220,7 @@ class Biorefinery:
     default_income_tax_range = [21, 28] # Davis et al. 2018; https://www.nrel.gov/docs/fy19osti/71949.pdf
     default_baseline_oil_content = 10
     baseline_moisture_content = 0.70
-    baseline_feedstock_CF = GWP_characterization_factors['sugarcane'] # [kg CO2-eq / kg sugarcane] with transportation
+    baseline_feedstock_CF = GWP_characterization_factors['sugarcane'] # [kg CO2e / kg sugarcane] with transportation
     baseline_feedstock_price = 0.035 # [USD / kg sugarcane] with transportation
     baseline_transportation_cost = 0.11 * baseline_feedstock_price # Energy cane usage for cellulosic ethanol: estimation of feedstock costs; https://ageconsearch.umn.edu/record/46837/files/Energy%20Cane%20Feedstock%20Estimation_SAEA1.pdf
     baseline_transportation_CF = 0.029 * baseline_feedstock_CF # Estimated from GREET 2020
@@ -253,7 +253,7 @@ class Biorefinery:
         )
     
     @property
-    def feedstock_CF(self): # [kg CO2-eq / kg] with transportation
+    def feedstock_CF(self): # [kg CO2e / kg] with transportation
         return (
             (self.baseline_feedstock_CF
              - self.baseline_transportation_CF) * self.baseline_dry_biomass_yield / self.dry_biomass_yield
@@ -268,7 +268,7 @@ class Biorefinery:
         )
     
     @property
-    def transportation_CF(self): # [kg CO2-eq / kg] 
+    def transportation_CF(self): # [kg CO2e / kg] 
         return (
             self.baseline_transportation_CF
             * sqrt(self.available_land / self.baseline_available_land)
@@ -627,7 +627,7 @@ class Biorefinery:
         ## Account for cellulosic vs advanced RINs
         if number in cellulosic_ethanol_configurations:
             # Note that GREET cellulosic ethanol from corn stover results in a 
-            # GWP of 0.41 kg CO2-eq / L-ethanol. So the cellulosic ethanol from
+            # GWP of 0.41 kg CO2e / L-ethanol. So the cellulosic ethanol from
             # bagasse (~0.34, 0.32 for configurations S2 and O2) can certainly
             # apply as an EPA cellulosic ethanol pathway.
             RIN_splitter = bst.Splitter('RIN_splitter',
@@ -661,7 +661,7 @@ class Biorefinery:
             if (number not in cellulosic_ethanol_configurations
                 and number in cellulosic_configurations):
                 # Note that GREET cellulosic ethanol from corn stover results in a 
-                # GWP of 0.41 kg CO2-eq / L-ethanol. So the cellulosic ethanol from
+                # GWP of 0.41 kg CO2e / L-ethanol. So the cellulosic ethanol from
                 # bagasse (~0.34, 0.32 for configurations S2 and O2) can certainly
                 # apply as an EPA cellulosic ethanol pathway.
                 RIN_splitter = bst.Splitter('RIN_splitter',
@@ -809,7 +809,8 @@ class Biorefinery:
         def set_juicing_oil_recovery(juicing_oil_recovery):
             oil_extraction_specification.load_juicing_oil_recovery(juicing_oil_recovery / 100.)
         
-        @performance(70, 75, units='%', kind='coupled')
+        @performance(70 if number in screwpress_microbial_oil_recovery else 50,
+                     90, units='%', kind='coupled')
         def set_microbial_oil_recovery(microbial_oil_recovery):
             oil_extraction_specification.load_microbial_oil_recovery(microbial_oil_recovery / 100.)
         
@@ -831,7 +832,7 @@ class Biorefinery:
             if agile: sorghum_mode.operating_hours = sorghum_operating_days * 24
         
         @default(self.baseline_available_land, element='feedstock',
-                 units='ha / yr', kind='isolated')
+                 units='ha', kind='isolated')
         def set_available_land(available_land):
             self.available_land = available_land
             
@@ -839,7 +840,7 @@ class Biorefinery:
             element='feedstock', 
             baseline=self.baseline_dry_biomass_yield,
             distribution=self.default_dry_biomass_yield_distribution,
-            units='dry MT/ha',
+            units='DMT/ha/yr',
         )
         def set_dry_biomass_yield(dry_biomass_yield):
             if number < 0:
@@ -848,7 +849,7 @@ class Biorefinery:
                 self.dry_biomass_yield = dry_biomass_yield
     
         @parameter(distribution=dist.copd, element='crude oil', 
-                   baseline=dist.mcop, units='USD/barrel')
+                   baseline=dist.mcop, units='USD/L')
         def set_crude_oil_price(price):
             self.crude_oil_price = price
         
@@ -887,7 +888,7 @@ class Biorefinery:
                 BT.natural_gas_price =  predict('Natural gas', self.crude_oil_price + price) * V_ng
         
             @parameter(distribution=dist.residual_distributions['Electricity'],
-                       element='Electricity', units='USD/kWhr', baseline=0.)
+                       element='Electricity', units='USD/kWh', baseline=0.)
             def set_electricity_price(price): 
                 bst.PowerUtility.price = predict('Electricity', self.crude_oil_price + price)
                 
@@ -918,7 +919,7 @@ class Biorefinery:
             def set_natural_gas_price(price): 
                 BT.natural_gas_price = price * V_ng
         
-            @parameter(distribution=dist.electricity_price_distribution, units='USD/kWhr',
+            @parameter(distribution=dist.electricity_price_distribution, units='USD/kWh',
                        element='electricity', baseline=dist.mean_electricity_price)
             def set_electricity_price(price): 
                 bst.PowerUtility.price = price
@@ -936,7 +937,7 @@ class Biorefinery:
         def set_pure_glycerol_price(price):
             pure_glycerine.price = price
         
-        @default(72, units='hr', element='Saccharification')
+        @default(72, units='h', element='Saccharification')
         def set_saccharification_reaction_time(reaction_time):
             if abs(number) in cellulosic_configurations: saccharification.tau = reaction_time
         
@@ -1013,7 +1014,7 @@ class Biorefinery:
         def set_cofermentation_ethanol_titer(ethanol_titer):
             if number in cellulosic_ethanol_configurations: fermentor.titer = ethanol_titer
     
-        @performance(0.951, 1.902, units='g/L', element='Cofermentation')
+        @performance(0.951, 1.902, units='g/L/h', element='Cofermentation')
         def set_cofermentation_ethanol_productivity(ethanol_productivity):
             if number in cellulosic_ethanol_configurations: fermentor.productivity = ethanol_productivity
     
@@ -1068,7 +1069,7 @@ class Biorefinery:
         def set_fermentation_microbial_oil_titer(microbial_oil_titer):
             if number in oil_configurations: fermentor.titer = microbial_oil_titer
     
-        @performance(hydrolysate_productivity, productivity, units='g/L', element='Fermentation')
+        @performance(hydrolysate_productivity, productivity, units='g/L/h', element='Fermentation')
         def set_fermentation_microbial_oil_productivity(microbial_oil_productivity):
             if number in oil_configurations: fermentor.productivity = microbial_oil_productivity
     
@@ -1115,32 +1116,32 @@ class Biorefinery:
                 u.R401.oil_reaction.X[0] = TAG_to_FFA_conversion / 100.
         
         @default_gwp(feedstock.characterization_factors[GWP], name='GWP', 
-                 element='sugarcane', units='kg*CO2-eq/kg')
+                 element='sugarcane', units='kg*CO2e/kg')
         def set_feedstock_GWP(value):
             self.baseline_feedstock_CF = value
         
         @default_gwp(methanol.characterization_factors[GWP], name='GWP', 
-                     element=methanol.ID, units='kg*CO2-eq/kg')
+                     element=methanol.ID, units='kg*CO2e/kg')
         def set_methanol_GWP(value):
             methanol.characterization_factors[GWP] = value
         
         # @default(crude_glycerol.characterization_factors[GWP], name='GWP', 
-        #          element=crude_glycerol, units='kg*CO2-eq/kg')
+        #          element=crude_glycerol, units='kg*CO2e/kg')
         # def set_crude_glycerol_GWP(value):
         #     crude_glycerol.characterization_factors[GWP] = value
         
         @default_gwp(pure_glycerine.characterization_factors[GWP], name='GWP', 
-                     element=pure_glycerine.ID, units='kg*CO2-eq/kg')
+                     element=pure_glycerine.ID, units='kg*CO2e/kg')
         def set_pure_glycerine_GWP(value):
             pure_glycerine.characterization_factors[GWP] = value
         
         @default_gwp(cellulase.characterization_factors[GWP], name='GWP', 
-                     element=cellulase.ID, units='kg*CO2-eq/kg')
+                     element=cellulase.ID, units='kg*CO2e/kg')
         def set_cellulase_GWP(value):
             cellulase.characterization_factors[GWP] = value * 0.02
         
         @default_gwp(natural_gas.characterization_factors[GWP], name='GWP', 
-                     element=natural_gas.ID, units='kg*CO2-eq/kg')
+                     element=natural_gas.ID, units='kg*CO2e/kg')
         def set_natural_gas_GWP(value):
             for ng in natural_gas_streams:
                 ng.characterization_factors[GWP] = value
@@ -1238,7 +1239,7 @@ class Biorefinery:
         def ethanol_production():
             return ethanol_flow() / feedstock_consumption.get()
         
-        @metric(units='kWhr/MT')
+        @metric(units='kWh/MT')
         def electricity_production():
             value = - electricity() / feedstock_consumption.get()
             if value < 0.: value = 0.
@@ -1295,7 +1296,7 @@ class Biorefinery:
             else:
                 return 0.
         
-        @metric(name='Electricity GWP', element='Economic allocation', units='kg*CO2e / MWhr')
+        @metric(name='Electricity GWP', element='Economic allocation', units='kg*CO2e / MWh')
         def GWP_electricity(): # Cradle to gate
             if electricity_production.get():
                 return GWP_economic.get() * dist.mean_electricity_price * 1000.
@@ -1385,7 +1386,7 @@ class Biorefinery:
             if self._derivative_disabled: return np.nan
             return ethanol_production.difference()
         
-        @metric(units='kWhr/MT')
+        @metric(units='kWh/MT')
         def electricity_production_derivative():
             if number < 0: return 0.
             if self._derivative_disabled: return np.nan
@@ -1427,7 +1428,7 @@ class Biorefinery:
             else:
                 return 0.
         
-        @metric(name='GWP derivative', element='Electricity', units='kg*CO2e / MWhr')
+        @metric(name='GWP derivative', element='Electricity', units='kg*CO2e / MWh')
         def GWP_electricity_derivative(): # Cradle to gate
             if electricity_production.get():
                 return GWP_economic_derivative.get() * dist.mean_electricity_price * 1000.
@@ -1546,7 +1547,7 @@ class Biorefinery:
             NEP = net_energy_production.cache
             return self.baseline_dry_biomass_yield * NEP / NEP_target  
             
-        @metric(units='%')
+        @metric(units='%', name='Breakeven IRR')
         def IRR():
             finance_interest = tea.finance_interest
             if finance_interest: 
@@ -1619,6 +1620,7 @@ class Biorefinery:
         set_baseline(set_cane_oil_content, self.default_baseline_oil_content)
         set_baseline(set_bagasse_oil_recovery, 70)
         set_baseline(set_juicing_oil_recovery, 60)
+        set_baseline(set_microbial_oil_recovery)
         set_baseline(set_crude_oil_price) 
         set_baseline(set_advanced_ethanol_price) 
         set_baseline(set_cellulosic_ethanol_price) 

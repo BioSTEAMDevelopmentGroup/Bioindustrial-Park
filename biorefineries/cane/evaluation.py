@@ -463,21 +463,20 @@ def run_oilcane_microbial_oil_across_oil_content(N=None, N_coordinate=None, conf
     filterwarnings('ignore')
     cane.YRCP2023()
     if configurations is None: configurations = ('O7', 'O9')
+    elif isinstance(configurations, str): configurations = [configurations]
     for config in configurations:
         run_uncertainty_and_sensitivity(config, N, across_oil_content='oilcane vs sugarcane', N_coordinate=N_coordinate)
     # run_uncertainty_and_sensitivity('O8', N, across_oil_content='oilcane vs sugarcane')
     # run_uncertainty_and_sensitivity('O1', N, across_oil_content='oilcane vs sugarcane')
     # run_uncertainty_and_sensitivity('O2', N, across_oil_content='oilcane vs sugarcane')        
     
-def run_oilcane_microbial_oil_across_lines(N=None):
+def run_oilcane_microbial_oil_across_lines(N=None, configurations=None):
     if N is None: N = 1000
     filterwarnings('ignore')
     cane.YRCP2023()
-    run_uncertainty_and_sensitivity('O7', N, across_lines=True)
-    run_uncertainty_and_sensitivity('O9', N, across_lines=True)
-    # run_uncertainty_and_sensitivity('O8', N, across_lines=True)
-    # run_uncertainty_and_sensitivity('O1', N, across_lines=True)
-    # run_uncertainty_and_sensitivity('O2', N, across_lines=True)       
+    if configurations is None: configurations = ('O7', 'O9')
+    elif isinstance(configurations, str): configurations = [configurations]
+    for i in configurations: run_uncertainty_and_sensitivity(i, N, across_lines=True)
 
 def save_target_biomass_yield(configuration='O7'):
     # Set CABBI feedstock target
