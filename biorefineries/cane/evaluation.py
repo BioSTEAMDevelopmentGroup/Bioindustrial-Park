@@ -263,7 +263,7 @@ def run_uncertainty_and_sensitivity(name, N, rule='L',
             
         br.set_ROI_target.setter = set_ROI_target
         coordinate = np.round(
-            np.linspace(0, 0.15, N_coordinate or 15),
+            np.linspace(0, 0.15, N_coordinate or 31),
             6,
         )
         if across_oil_content == 'oilcane vs sugarcane':

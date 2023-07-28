@@ -27,7 +27,7 @@ from .feature_mockups import (
     lca_monte_carlo_derivative_metric_mockups,
     ROI, MFPP, MBSP, TCI, electricity_production, GWP_biofuel_allocation,
     # natural_gas_consumption,
-    ethanol_production, biodiesel_production, biodiesel_yield,
+    ethanol_production, biodiesel_production, biodiesel_yield, IRR,
     GWP_ethanol, GWP_biodiesel, GWP_electricity,
     GWP_ethanol_allocation, GWP_biodiesel_allocation, GWP_biodiesel_displacement,
     GWP_economic, MFPP_derivative, 
@@ -202,13 +202,18 @@ mc_line_metric_settings = {
     # 'Biodiesel production': (biodiesel_production, f"Biodiesel production\n[{format_units('L/MT')}]"),
     'MBSP': (MBSP, f"MBSP\n[{format_units('USD/gal')}]"),
     'TCI': (TCI, f"TCI\n[{format_units('10^6*USD')}]"),
-    'Biodiesel yield': (biodiesel_yield, f"Biodiesel yield\n[{format_units('L/ha/y')}]"),
+    'IRR': (IRR, "IRR\n[%]"),
+    'ROI': (ROI, f"ROI\n[{format_units('%/y')}]"),
     # 'Electricity production': (electricity_production, f"Elec. prod.\n[{format_units('kWhr/MT')}]"),
+    'Biodiesel yield': (biodiesel_yield, f"Biodiesel yield\n[{format_units('L/ha/y')}]"),
     'GWP energy': (GWP_biodiesel_allocation,"GWP$_{\\mathrm{energy}}$\n" f"[{GWP_units_L}]"),
     'GWP economic': (GWP_biodiesel, "GWP$_{\\mathrm{economic}}$\n" f"[{GWP_units_L}]"),
     'GWP displacement': (GWP_biodiesel_displacement, "GWP$_{\\mathrm{displacement}}$\n" f"[{GWP_units_L}]"),
 }
-
+line_metrics = dict(
+    economic=['MBSP', 'TCI', 'Biodiesel yield'],
+    environmental=['GWP energy', 'GWP economic', 'GWP displacement']
+)
 mc_comparison_settings = {
     'MFPP': (MFPP, r"$\Delta$" + f"MFPP\n[{format_units('USD/MT')}]", None),
     'MBSP': (MBSP, r"$\Delta$" + f"MBSP\n[{format_units('USD/L')}]", None),
@@ -481,25 +486,29 @@ def plot_montecarlo_absolute_YRCP2023():
 def plot_lines_monte_carlo_manuscript(fs=8):
     set_font(size=fs)
     set_figure_size(aspect_ratio=1.2)
-    fig, axes = plot_lines_monte_carlo(
-        metrics=None,
-        labels=['Sugarcane WT\n0.03 wt % Oil', 
-                'Oilcane 1566\n1.8 wt % Oil', 
-                'Oilcane 1580\n5.4 wt % Oil'],
-        # tickmarks=[[0, 3, 6, 9, 12, 15],
-        #             [0, 2, 4, 6, 8, 10]], 
-        color_wheel = line_color_wheel,
-    )
-    for ax, letter in zip(axes.flat, 'ABCDEFGHIJKL'):
-        plt.sca(ax)
-        ylb, yub = plt.ylim()
-        plt.text(-0.25, ylb + (yub - ylb) * 0.9, letter, color=letter_color,
-                 horizontalalignment='center',verticalalignment='center',
-                 fontsize=10, fontweight='bold')
-    plt.subplots_adjust(left=0.12, right=0.95, wspace=0, top=0.95, bottom=0.1)
-    for i in ('svg', 'png'):
-        file = os.path.join(images_folder, f'montecarlo_lines.{i}')
-        plt.savefig(file, transparent=True)
+    for name, metrics in line_metrics.items():
+        fig, axes = plot_lines_monte_carlo(
+            metrics=metrics,
+            labels=['Sugarcane WT\n0.03 wt % Oil', 
+                    'Oilcane 1566\n1.8 wt % Oil', 
+                    'Oilcane 1580\n5.4 wt % Oil',
+                    'Oilcane Target\n10 wt % Oil'],
+            xrot=90,
+            # configurations=['O7'],
+            # tickmarks=[[0, 3, 6, 9, 12, 15],
+            #             [0, 2, 4, 6, 8, 10]], 
+            color_wheel = line_color_wheel,
+        )
+        for ax, letter in zip(axes.flat, 'ABCDEFGHIJKL'):
+            plt.sca(ax)
+            ylb, yub = plt.ylim()
+            plt.text(-0.25, ylb + (yub - ylb) * 0.9, letter, color=letter_color,
+                     horizontalalignment='center',verticalalignment='center',
+                     fontsize=10, fontweight='bold')
+        plt.subplots_adjust(left=0.12, right=0.95, wspace=0, top=0.95, bottom=0.15)
+        for i in ('svg', 'png'):
+            file = os.path.join(images_folder, f'montecarlo_lines_{name}.{i}')
+            plt.savefig(file, transparent=True)
     
 def plot_spearman_tea(with_units=None, aspect_ratio=0.8, **kwargs):
     set_font(size=8)
@@ -1513,6 +1522,7 @@ def plot_lines_monte_carlo(
     nrows = len(rows)
     ncols = len(configurations)
     fig, axes = plt.subplots(ncols=ncols, nrows=nrows)
+    axes = axes.reshape([nrows, ncols])
     plt.subplots_adjust(wspace=0.45)
     nmc = len(columns)    
     xtext = labels or columns

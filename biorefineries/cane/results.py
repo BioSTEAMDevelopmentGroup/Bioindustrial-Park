@@ -31,6 +31,8 @@ __all__ = (
     'get_minimum_GWP_reduction',
     'mcr_sc_microbial_oil_comparison',
     'mcr_sc_microbial_oil',
+    'mcr_target_microbial_oil',
+    'mcr_target_microbial_oil_comparison',
 )
 
 results_folder = os.path.join(os.path.dirname(__file__), 'results')
@@ -51,8 +53,8 @@ def monte_carlo_file(name, across_lines=False, across_oil_content=None, extentio
     number, agile, line, case = parse_configuration(name)
     filename = f'oilcane_monte_carlo_{number}'
     if agile: filename += '_agile'
-    if line: filename += '_' + line
     if across_lines: filename += '_across_lines'
+    elif line: filename += '_' + line
     if case: filename += '_' + case
     if across_oil_content: 
         if isinstance(across_oil_content, str):
@@ -121,38 +123,48 @@ def get_line_monte_carlo(line, name, feature, cache={}):
     return mc
 
 def get_monte_carlo(name, features=None, cache={}):
+    if features is None: features = f.all_metric_mockups
+    elif isinstance(features, bst.Feature): features = [features]
     key = parse_configuration(name)
+    index = tuple([i.index for i in features])
     if isinstance(key, Configuration):
         if key in cache:
             df = cache[key]
+        elif key.line:
+            if (subkey:=(key, index)) in cache:
+                df = cache[subkey]
+            else:
+                file = monte_carlo_file(key, across_lines=True)
+                line = key.line
+                data = np.hstack([
+                    pd.read_excel(
+                        file, header=[0, 1], index_col=[0], sheet_name=i.short_description
+                    )[line].values
+                    for i in features
+                ])
+                cache[subkey] = df = pd.DataFrame(
+                    data, 
+                    columns=pd.MultiIndex.from_tuples(
+                        index, names=['Element', 'Name']
+                    )
+                )
         else:
-            file = monte_carlo_file(key)
+            file = monte_carlo_file(key, features)
             cache[key] = df = pd.read_excel(file, header=[0, 1], index_col=[0])
-        if features is None:
-            mc = df
-        elif isinstance(features, bst.Feature):
-            mc = df[features.index]
-        else:
-            mc = df[[i.index for i in features]]
+            df = df[index]
     elif isinstance(key, ConfigurationComparison):
-        if isinstance(features, bst.Feature):
-            index = features.index
-        elif features is None:
-            index = slice(None)
-        else:
-            index = [i.index for i in features]
-        df_a = get_monte_carlo(key.a)[index]
-        df_b = get_monte_carlo(key.b)[index]
+        df_a = get_monte_carlo(key.a, features)
+        df_b = get_monte_carlo(key.b, features)
         row_a = df_a.shape[0]
         row_b = df_b.shape[0]
         try:
             assert row_a == row_b, "shape mismatch"
         except:
             breakpoint()
-        mc = df_a - df_b
+        df = df_a - df_b
     else:
         raise Exception('unknown error')
-    mc = mc.dropna(how='all', axis=0)
+    mc = df.dropna(how='all', axis=0)
     return mc
 
 
@@ -273,7 +285,7 @@ def montecarlo_results_short(names, metrics=None, derivative=None):
             ]
     results = {}
     for name in names:
-        df = get_monte_carlo(name)
+        df = get_monte_carlo(name, metrics)
         results[name] = dct = {}
         for metric in metrics:
             index = metric.index
@@ -356,6 +368,30 @@ def mcr_sc_microbial_oil():
             f.MBSP,
             f.GWP_biodiesel_allocation,
             f.biodiesel_yield,
+        ]
+    )
+
+def mcr_target_microbial_oil():
+    return montecarlo_results_short(
+        names=[
+            'O7.Target',
+            'O9.Target',
+        ],
+        metrics=[
+            f.MBSP,
+        ]
+    )
+
+def mcr_target_microbial_oil_comparison():
+    return montecarlo_results_short(
+        names=[
+            'O7.Target - O7.WT',
+            'O9.Target - O7.WT',
+        ],
+        metrics=[
+            f.biodiesel_yield,
+            f.TCI,
+            f.GWP_biodiesel_allocation,
         ]
     )
 

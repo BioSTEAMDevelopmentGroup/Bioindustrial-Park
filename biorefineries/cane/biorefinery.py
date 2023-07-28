@@ -208,7 +208,7 @@ def YRCP2023():
 
 class Biorefinery:
     cache = {}
-    baseline_dry_biomass_yield = 25.62 # dry MT / ha / yr
+    baseline_dry_biomass_yield = 25.62 # dry MT / ha / y
     baseline_available_land = 1600000 * 0.3 / baseline_dry_biomass_yield # ha
     set_feedstock_line = set_line_composition_parameters
     set_composition_by_line = set_composition_by_line
@@ -299,11 +299,11 @@ class Biorefinery:
         return 1000 * annual_crushing_capacity / self.tea.operating_hours / dry_content
     
     @property
-    def annual_crushing_capacity(self): # dry MT / yr
+    def annual_crushing_capacity(self): # dry MT / y
         return self.available_land * self.dry_biomass_yield
     
     @property
-    def baseline_annual_crushing_capacity(self): # dry MT / yr
+    def baseline_annual_crushing_capacity(self): # dry MT / y
         return self.baseline_available_land * self.baseline_dry_biomass_yield
     
     @property
@@ -819,7 +819,7 @@ class Biorefinery:
             oil_extraction_specification.load_bagasse_oil_recovery(bagasse_oil_recovery / 100.)
     
         # Baseline from Huang's 2016 paper, but distribution more in line with Florida sugarcane harvesting (3-5 months)
-        @uniform(4 * 30, 6 * 30, units='day/yr', baseline=180)
+        @uniform(4 * 30, 6 * 30, units='day/y', baseline=180)
         def set_cane_operating_days(cane_operating_days):
             if agile:
                 cane_mode.operating_hours = cane_operating_days * 24
@@ -827,7 +827,7 @@ class Biorefinery:
                 tea.operating_days = cane_operating_days
     
         # From Ed Cahoon and Huang 2017
-        @uniform(30, 60, units='day/yr', baseline=45)
+        @uniform(30, 60, units='day/y', baseline=45)
         def set_sorghum_operating_days(sorghum_operating_days):
             if agile: sorghum_mode.operating_hours = sorghum_operating_days * 24
         
@@ -840,7 +840,7 @@ class Biorefinery:
             element='feedstock', 
             baseline=self.baseline_dry_biomass_yield,
             distribution=self.default_dry_biomass_yield_distribution,
-            units='DMT/ha/yr',
+            units='DMT/ha/y',
         )
         def set_dry_biomass_yield(dry_biomass_yield):
             if number < 0:
@@ -1153,22 +1153,22 @@ class Biorefinery:
             tea.income_tax = income_tax * 0.01
                     
         if agile:
-            feedstock_flow = lambda: sys.flow_rates[feedstock] / kg_per_MT # MT / yr
-            biodiesel_flow = lambda: (sys.flow_rates.get(cellulosic_based_diesel, 0.) + sys.flow_rates.get(biomass_based_diesel, 0.)) * biodiesel_L_per_kg # L / yr
-            ethanol_flow = lambda: (sys.flow_rates.get(cellulosic_ethanol, 0.) + sys.flow_rates.get(advanced_ethanol, 0.)) * ethanol_L_per_kg # L / yr
-            natural_gas_flow = lambda: sum([sys.flow_rates[i] for i in natural_gas_streams]) * V_ng # m3 / yr
-            crude_glycerol_flow = lambda: sys.flow_rates.get(crude_glycerol, 0.) # kg / yr
+            feedstock_flow = lambda: sys.flow_rates[feedstock] / kg_per_MT # MT / y
+            biodiesel_flow = lambda: (sys.flow_rates.get(cellulosic_based_diesel, 0.) + sys.flow_rates.get(biomass_based_diesel, 0.)) * biodiesel_L_per_kg # L / y
+            ethanol_flow = lambda: (sys.flow_rates.get(cellulosic_ethanol, 0.) + sys.flow_rates.get(advanced_ethanol, 0.)) * ethanol_L_per_kg # L / y
+            natural_gas_flow = lambda: sum([sys.flow_rates[i] for i in natural_gas_streams]) * V_ng # m3 / y
+            crude_glycerol_flow = lambda: sys.flow_rates.get(crude_glycerol, 0.) # kg / y
             
             @sys.operation_metric(annualize=True)
             def direct_nonbiogenic_emissions(mode):
                 return sum([i.F_mol for i in natural_gas_streams]) * chemicals.CO2.MW
             
         else:
-            feedstock_flow = lambda: sys.operating_hours * feedstock.F_mass / kg_per_MT # MT / yr
-            biodiesel_flow = lambda: sys.operating_hours * biodiesel.F_mass * biodiesel_L_per_kg # L / yr
-            ethanol_flow = lambda: sys.operating_hours * ethanol.F_mass * ethanol_L_per_kg # L / yr
-            crude_glycerol_flow = lambda: sys.operating_hours * crude_glycerol.F_mass # kg / yr
-            natural_gas_flow = lambda: sum([i.F_mass for i in natural_gas_streams]) * sys.operating_hours * V_ng # m3 / yr
+            feedstock_flow = lambda: sys.operating_hours * feedstock.F_mass / kg_per_MT # MT / y
+            biodiesel_flow = lambda: sys.operating_hours * biodiesel.F_mass * biodiesel_L_per_kg # L / y
+            ethanol_flow = lambda: sys.operating_hours * ethanol.F_mass * ethanol_L_per_kg # L / y
+            crude_glycerol_flow = lambda: sys.operating_hours * crude_glycerol.F_mass # kg / y
+            natural_gas_flow = lambda: sum([i.F_mass for i in natural_gas_streams]) * sys.operating_hours * V_ng # m3 / y
             direct_nonbiogenic_emissions = lambda: sum([i.F_mol for i in natural_gas_streams]) * chemicals.CO2.MW * sys.operating_hours
         electricity = lambda: sys.operating_hours * sys.power_utility.rate
         
@@ -1223,7 +1223,7 @@ class Biorefinery:
             price = tea.solve_price(biodiesel_streams)
             return price / biodiesel_L_per_kg
         
-        @metric(units='MT/yr')
+        @metric(units='MT/y')
         def feedstock_consumption():
             return feedstock_flow()
         
@@ -1268,8 +1268,8 @@ class Biorefinery:
     
         @metric(name='GWP', element='Economic allocation', units='kg*CO2e / USD')
         def GWP_economic(): # Cradle to gate
-            GWP_material = sys.get_total_feeds_impact(GWP) # kg CO2 eq. / yr
-            GWP_emissions = sys.get_process_impact(GWP) # kg CO2 eq. / yr
+            GWP_material = sys.get_total_feeds_impact(GWP) # kg CO2 eq. / y
+            GWP_emissions = sys.get_process_impact(GWP) # kg CO2 eq. / y
             sales = (
                 biodiesel_flow() * get_GWP_mean_biodiesel_price()
                 + ethanol_flow() * get_GWP_mean_ethanol_price()
@@ -1307,8 +1307,8 @@ class Biorefinery:
                 GWP_material = sys.get_total_feeds_impact(GWP)
                 GWP_electricity_production = GWP_characterization_factors['Electricity'] * electricity_production.get() * feedstock_consumption.get()
                 GWP_coproducts = sys.get_total_products_impact(GWP)
-                GWP_emissions = sys.get_process_impact(GWP) # kg CO2 eq. / yr
-                GWP_total = GWP_material + GWP_emissions - GWP_electricity_production - GWP_coproducts # kg CO2 eq. / yr
+                GWP_emissions = sys.get_process_impact(GWP) # kg CO2 eq. / y
+                GWP_total = GWP_material + GWP_emissions - GWP_electricity_production - GWP_coproducts # kg CO2 eq. / y
                 return GWP_total / (ethanol_production.get() * feedstock_consumption.get())
             else:
                 return 0.
@@ -1319,8 +1319,8 @@ class Biorefinery:
                 GWP_material = sys.get_total_feeds_impact(GWP)
                 GWP_electricity_production = GWP_characterization_factors['Electricity'] * electricity_production.get() * feedstock_consumption.get()
                 GWP_coproducts = sys.get_total_products_impact(GWP)
-                GWP_emissions = sys.get_process_impact(GWP) # kg CO2 eq. / yr
-                GWP_total = GWP_material + GWP_emissions - GWP_electricity_production - GWP_coproducts # kg CO2 eq. / yr
+                GWP_emissions = sys.get_process_impact(GWP) # kg CO2 eq. / y
+                GWP_total = GWP_material + GWP_emissions - GWP_electricity_production - GWP_coproducts # kg CO2 eq. / y
                 return GWP_total / (biodiesel_production.get() * feedstock_consumption.get())
             else:
                 return 0.
@@ -1334,8 +1334,8 @@ class Biorefinery:
         @metric(name='Biofuel GWP', element='Energy allocation', units='kg*CO2e / GGE')
         def GWP_biofuel_allocation(): # Cradle to gate
             GWP_material = sys.get_total_feeds_impact(GWP)
-            GWP_emissions = sys.get_process_impact(GWP) # kg CO2 eq. / yr
-            GWP_total = GWP_material + GWP_emissions # kg CO2 eq. / yr
+            GWP_emissions = sys.get_process_impact(GWP) # kg CO2 eq. / y
+            GWP_total = GWP_material + GWP_emissions # kg CO2 eq. / y
             GGE_biodiesel_annual = (biodiesel_production.get() * feedstock_consumption.get()) / 0.9536 / L_per_gal
             GGE_ethanol_annual = (ethanol_production.get() * feedstock_consumption.get()) / 1.5 / L_per_gal
             GEE_electricity_production = max(-electricity() * 3600 / 114000, 0.) 
