@@ -113,7 +113,8 @@ def get_line_monte_carlo(line, name, feature, cache={}):
             df = cache[key]
         else:
             file = monte_carlo_file(configuration, across_lines=True)
-            cache[key] = df = pd.read_excel(file, header=[0, 1], index_col=[0], sheet_name=feature.short_description)
+            cache[key] = df = pd.read_excel(file, header=[0], index_col=[0], sheet_name=feature.short_description)
+            df.columns = [str(i) for i in df.columns]
         mc = df[line]
     elif isinstance(configuration, ConfigurationComparison):
         raise ValueError('name cannot be a configuration comparison')

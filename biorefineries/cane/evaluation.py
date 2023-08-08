@@ -489,9 +489,9 @@ def save_target_biomass_yield(configuration='O7'):
         index_col=0)
     CBY_df = CBY_df.dropna()
     oil_content = np.array(CBY_df.columns) * 100
-    q95 = np.percentile(CBY_df, 95, axis=0)
-    q95 = gaussian_filter(q95, 1)
-    f95 = interpolate.interp1d(oil_content, q95)
+    q100 = np.percentile(CBY_df, 100, axis=0)
+    q100 = gaussian_filter(q100, 1)
+    f100 = interpolate.interp1d(oil_content, q100)
     feedstock = br.feedstock.copy()
     composition_folder = os.path.join(os.path.dirname(__file__), 'data')
     file = os.path.join(composition_folder, 'cane_composition_data.xlsx')
@@ -501,7 +501,7 @@ def save_target_biomass_yield(configuration='O7'):
     df.loc['Target', ('Fiber (dw)', 'Mean')] = feedstock.get_mass_fraction('Fiber')
     df.loc['Target', ('Sugar (dw)', 'Mean')] = feedstock.get_mass_fraction('Sugar')
     df.loc['Target', ('Stem oil (dw)', 'Mean')] = feedstock.get_mass_fraction('Oil')
-    df.loc['Target', ('Biomass yield (dry MT/ha)', 'Mean')] = target_biomass_yield = f95(10)
+    df.loc['Target', ('Biomass yield (dry MT/ha)', 'Mean')] = target_biomass_yield = f100(10)
     df.loc['Target', ('Dry biomass yield (WT)', 'Mean')] = target_biomass_yield / br.baseline_dry_biomass_yield
     df.to_excel(
         file, 'Summarized'

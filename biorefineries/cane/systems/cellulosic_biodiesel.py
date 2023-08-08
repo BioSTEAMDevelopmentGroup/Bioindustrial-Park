@@ -123,11 +123,11 @@ def create_oilcane_to_biodiesel_combined_1_and_2g_post_fermentation_oil_separati
     
     if oil_extraction == 'integrated':
         PF = ofs_dct['Pretreatment flash']
-        LSC = bst.LiquidsSplitCentrifuge(300, ins='', split=1)
+        LSC = bst.LiquidsSplitCentrifuge(200, ins='', split=1)
         LSC.isplit['Oil'] = 0.3
         LSC.insert(PF-1, inlet=0**LSC, outlet=LSC-0)
         LSC.line = 'Microbial oil centrifuge'
-        MX = bst.Mixer(300, ins=[backend_oil, LSC-1])
+        MX = bst.Mixer(400, ins=[backend_oil, LSC-1])
         oil = MX.outs[0]
         
         # Replace oil and cell mass centrifuge with a 3-phase decanter centrifuge
