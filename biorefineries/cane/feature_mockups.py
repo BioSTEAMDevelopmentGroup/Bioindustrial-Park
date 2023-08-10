@@ -8,6 +8,8 @@ from biosteam import MockFeature
 from thermosteam.units_of_measure import format_units
 from thermosteam.utils import roundsigfigs
 import pandas as pd
+import numpy as np
+import os
 
 (set_juicing_oil_recovery, set_microbial_oil_recovery, set_bagasse_oil_recovery, 
  set_cane_operating_days, set_sorghum_operating_days, 
@@ -34,22 +36,22 @@ import pandas as pd
     MockFeature('Juicing oil recovery', '%', '-'),
     MockFeature('Microbial oil recovery', '%', '-'),
     MockFeature('Bagasse oil recovery', '%', '-'),
-    MockFeature('Cane operating days', 'day/yr', '-'),
-    MockFeature('Sorghum operating days', 'day/yr', '-'),
-    MockFeature('Available land', 'ha / yr', 'Feedstock'),
-    MockFeature('Dry biomass yield', 'dry MT/ha', 'Feedstock'),
-    MockFeature('Price', 'USD/barrel', 'Crude oil'),
+    MockFeature('Cane operating days', 'day/y', '-'),
+    MockFeature('Sorghum operating days', 'day/y', '-'),
+    MockFeature('Available land', 'ha', 'Feedstock'),
+    MockFeature('Dry biomass yield', 'DMT/ha/y', 'Feedstock'),
+    MockFeature('Price', 'USD/L', 'Crude oil'),
     MockFeature('Price', 'USD/kg', 'Feedstock'),
     MockFeature('Price', 'USD/L', 'Cellulosic ethanol'),
     MockFeature('Price', 'USD/L', 'Advanced ethanol'),
     MockFeature('Price', 'USD/L', 'Biomass based diesel'),
     MockFeature('Price', 'USD/L', 'Cellulosic based diesel'),
     MockFeature('Price', 'USD/m3', 'Natural gas'),
-    MockFeature('Price', 'USD/kWhr', 'Electricity'),
+    MockFeature('Price', 'USD/kWh', 'Electricity'),
     MockFeature('IRR', '%', '-'),
     MockFeature('Price', 'USD/kg', 'Crude glycerol'),
     MockFeature('Price', 'USD/kg', 'Pure glycerine'),
-    MockFeature('Reaction time', 'hr', 'Saccharification'),
+    MockFeature('Reaction time', 'h', 'Saccharification'),
     MockFeature('Price', 'USD/kg', 'Cellulase'),
     MockFeature('Cellulase loading', 'wt. % cellulose', 'Cellulase'),
     MockFeature('Base cost', 'million USD', 'Pretreatment reactor system'),
@@ -60,11 +62,11 @@ import pandas as pd
     MockFeature('Glucose to ethanol yield', '%', 'Cofermenation'),
     MockFeature('Xylose to ethanol yield', '%', 'Cofermenation'),
     MockFeature('Ethanol titer', 'g/L', 'Cofermentation'),
-    MockFeature('Ethanol productivity', 'g/L', 'Cofermentation'),
+    MockFeature('Ethanol productivity', 'g/L/h', 'Cofermentation'),
     MockFeature('Glucose to microbial oil yield', '%', 'Cofermenation'),
     MockFeature('Xylose to microbial oil yield', '%', 'Cofermenation'),
     MockFeature('Microbial oil titer', 'g/L', 'Fermentation'),
-    MockFeature('Microbial oil productivity', 'g/L', 'Fermentation'),
+    MockFeature('Microbial oil productivity', 'g/L/h', 'Fermentation'),
     MockFeature('Cane PL content', '% oil', 'Oilcane'),
     MockFeature('Sorghum PL content', '% oil', 'Oilsorghum'),
     MockFeature('Cane FFA content', '% oil', 'Oilcane'),
@@ -72,11 +74,11 @@ import pandas as pd
     MockFeature('Cane oil content', 'dry wt. %', 'Oilcane'),
     MockFeature('Relative sorghum oil content', 'dry wt. %', 'Oilsorghum'),
     MockFeature('TAG to FFA conversion', '% oil', '-'),
-    MockFeature('GWP', 'kg*CO2-eq/kg', 'Sugarcane'),
-    MockFeature('GWP', 'kg*CO2-eq/kg', 'Methanol'),
-    MockFeature('GWP', 'kg*CO2-eq/kg', 'Pure glycerine'),
-    MockFeature('GWP', 'kg*CO2-eq/kg', 'Cellulase'),
-    MockFeature('GWP', 'kg*CO2-eq/kg', 'Natural gas'),
+    MockFeature('GWP', 'kg*CO2e/kg', 'Sugarcane'),
+    MockFeature('GWP', 'kg*CO2e/kg', 'Methanol'),
+    MockFeature('GWP', 'kg*CO2e/kg', 'Pure glycerine'),
+    MockFeature('GWP', 'kg*CO2e/kg', 'Cellulase'),
+    MockFeature('GWP', 'kg*CO2e/kg', 'Natural gas'),
     MockFeature('Income tax', '%', '-'),
 )
      
@@ -91,18 +93,18 @@ import pandas as pd
  TCI_derivative, GWP_economic_derivative, 
  GWP_ethanol_derivative, GWP_biodiesel_derivative,
  GWP_crude_glycerol_derivative, GWP_electricity_derivative,
- ROI, competitive_biomass_yield, energy_competitive_biomass_yield,
+ ROI, competitive_biomass_yield, energy_competitive_biomass_yield, IRR
  # competitive_microbial_oil_yield,
  # energy_competitive_microbial_oil_yield,
  ) = all_metric_mockups = (
     MockFeature('MFPP', 'USD/MT', '-'),
     MockFeature('MESP', 'USD/L', '-'),
     MockFeature('MBSP', 'USD/L', '-'),
-    MockFeature('Feedstock consumption', 'MT/yr', '-'),
+    MockFeature('Feedstock consumption', 'MT/y', '-'),
     MockFeature('Biodiesel production', 'L/MT', '-'),
     MockFeature('Biodiesel yield', 'L/ha', '-'),
     MockFeature('Ethanol production', 'L/MT', '-'),
-    MockFeature('Electricity production', 'kWhr/MT', '-'),
+    MockFeature('Electricity production', 'kWh/MT', '-'),
     MockFeature('Net energy production', 'GGE/MT', '-'),
     MockFeature('Natural gas consumption', 'm3/MT', '-'),
     MockFeature('TCI', '10^6*USD', '-'),
@@ -111,7 +113,7 @@ import pandas as pd
     MockFeature('Ethanol GWP', 'kg*CO2e / L', 'Economic allocation'),
     MockFeature('Biodiesel GWP', 'kg*CO2e / L', 'Economic allocation'),
     MockFeature('Crude glycerol GWP', 'kg*CO2e / kg', 'Economic allocation'),
-    MockFeature('Electricity GWP', 'kg*CO2e / MWhr', 'Economic allocation'),
+    MockFeature('Electricity GWP', 'kg*CO2e / MWh', 'Economic allocation'),
     MockFeature('Ethanol GWP', 'kg*CO2e / L', 'Displacement allocation'),
     MockFeature('Biodiesel GWP', 'kg*CO2e / L', 'Displacement allocation'),
     MockFeature('Biofuel GWP', 'kg*CO2e / GGE', 'Energy allocation'),
@@ -121,17 +123,18 @@ import pandas as pd
     MockFeature('MFPP derivative', 'USD/MT', '-'),
     MockFeature('Biodiesel production derivative', 'L/MT', '-'),
     MockFeature('Ethanol production derivative', 'L/MT', '-'),
-    MockFeature('Electricity production derivative', 'kWhr/MT', '-'),
+    MockFeature('Electricity production derivative', 'kWh/MT', '-'),
     MockFeature('Natural gas consumption derivative', 'cf/MT', '-'),
     MockFeature('TCI derivative', '10^6*USD', '-'),
     MockFeature('GWP derivative', 'kg*CO2e / USD', 'Economic allocation'),
     MockFeature('GWP derivative', 'kg*CO2e / L', 'Ethanol'),
     MockFeature('GWP derivative', 'kg*CO2e / L', 'Biodiesel'),
     MockFeature('GWP derivative', 'kg*CO2e / kg', 'Crude glycerol'),
-    MockFeature('GWP derivative', 'kg*CO2e / MWhr', 'Electricity'),
+    MockFeature('GWP derivative', 'kg*CO2e / MWh', 'Electricity'),
     MockFeature('ROI', '%', '-'),
     MockFeature('Competitive biomass yield', 'dry MT/ha', 'Feedstock'),
     MockFeature('Energy competitive biomass yield', 'dry MT/ha', 'Feedstock'),
+    MockFeature('Breakeven IRR', '%', '-'),
 )
 
 tea_monte_carlo_metric_mockups = (
@@ -282,9 +285,45 @@ def get_YRCP2023_spearman_names(configuration, kind=None):
         return lca_spearman_labels
     else:
         return tea_spearman_labels, lca_spearman_labels
-    
-def get_YRCP2023_distribution_table(kind=None, file=None):
-    from biorefineries.cane import Biorefinery, YRCP2023
+
+def get_YRCP2023_correlated_distribution_table():
+    from biorefineries.cane import Biorefinery, YRCP2023, results_folder
+    YRCP2023()
+    br = Biorefinery('O1', simulate=False)
+    models = br.price_distribution_module.models
+    residuals = br.price_distribution_module.residuals
+    scores = br.price_distribution_module.scores
+    parameter_residuals = [
+        br.set_cellulosic_ethanol_price,
+        br.set_advanced_ethanol_price,
+        br.set_biomass_based_diesel_price,
+        br.set_cellulosic_based_diesel_price,
+        br.set_natural_gas_price,
+        br.set_electricity_price, 
+    ]
+    rows = []
+    for p in parameter_residuals:
+        name = p.element_name
+        model = models[name]
+        rows.append({
+            'Price': f"{name}",
+            'Units': p.units,
+            'Intercept': model.intercept_,
+            'Slope': model.coef_[0],
+            'Residual standard error': np.std(residuals[name], ddof=2),
+            'R2': round(scores[name], 3),
+        })
+    table = pd.DataFrame(
+        rows, 
+        index=list(range(35, len(rows) + 35)),
+    )
+    table.index.name = '#'
+    file = os.path.join(results_folder, 'correlated_distributions.xlsx')
+    table.to_excel(file)
+    return table
+
+def get_YRCP2023_distribution_table(kind=None):
+    from biorefineries.cane import Biorefinery, YRCP2023, results_folder
     YRCP2023()
     br = Biorefinery('O1', simulate=False)
     name = 'name'
@@ -298,12 +337,6 @@ def get_YRCP2023_distribution_table(kind=None, file=None):
         br.set_dry_biomass_yield: name,
         br.set_crude_oil_price: full_name, 
         br.set_baseline_feedstock_price: 'Baseline feedstock price',
-        br.set_cellulosic_ethanol_price: full_name,
-        br.set_advanced_ethanol_price: full_name,
-        br.set_biomass_based_diesel_price: full_name,
-        br.set_cellulosic_based_diesel_price: full_name,
-        br.set_natural_gas_price: full_name,
-        br.set_electricity_price: full_name, 
         br.set_IRR: name,
         br.set_crude_glycerol_price: full_name,
         br.set_pure_glycerol_price: full_name,
@@ -331,9 +364,10 @@ def get_YRCP2023_distribution_table(kind=None, file=None):
         br.set_cellulase_GWP: full_name,
         br.set_natural_gas_GWP: full_name,
     }
+    
     def with_units(f, name, units=None):
         if units is None: units = f.units
-        return f"{name}\n[{units}]"
+        return name, units
         
     def get_distribution_dict(f):
         d = f.distribution
@@ -368,17 +402,18 @@ def get_YRCP2023_distribution_table(kind=None, file=None):
     rows = []
     for i, j in parameters.items():
         if j == name:
-            parameter_name = with_units(i, i.name)
+            parameter_name, units = with_units(i, i.name)
         elif j == full_name:
-            parameter_name = with_units(i, get_full_name(i))
+            parameter_name, units = with_units(i, get_full_name(i))
         elif isinstance(j, tuple):
-            parameter_name = with_units(i, *j)
+            parameter_name, units = with_units(i, *j)
         elif isinstance(j, str):
-            parameter_name = with_units(i, j)
+            parameter_name, units = with_units(i, j)
         else:
             raise TypeError(str(j))
         rows.append({
             'Parameter': parameter_name,
+            'Units': units,
             'Baseline': roundsigfigs(i.baseline, 3),
             **get_distribution_dict(i),
         })
@@ -388,5 +423,7 @@ def get_YRCP2023_distribution_table(kind=None, file=None):
             range(1, len(parameters) + 1)
         )
     )
-    # table.index.name = '#'
+    file = os.path.join(results_folder, 'distributions.xlsx')
+    table.to_excel(file)
+    table.index.name = '#'
     return table

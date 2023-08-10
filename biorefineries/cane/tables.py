@@ -39,10 +39,12 @@ def save_detailed_expenditure_tables(sigfigs=3, product=None):
         IDs = (
             'O7.WT',
             'O9.WT',
+            'O8.WT',
         )
         names = [
             'DC',
             'ICF',
+            'ICFR',
         ]
         product_IDs = [
             'cellulosic_based_diesel',
@@ -124,11 +126,12 @@ def save_detailed_life_cycle_tables(sigfigs=3, product=None):
              'Displacement allocation']
     if product == 'biodiesel':
         cane.YRCP2023()
-        IDs = ('O7.WT', 'O9.WT')
+        IDs = ('O7.WT', 'O9.WT', 'O8.WT')
         streams = [(get(i, 'cellulosic_based_diesel'), get(i, 'biomass_based_diesel')) for i in IDs]
         columns = [
             'DC [kg∙CO2e∙kg-1]',
             'ICF [kg∙CO2e∙kg-1]',
+            'ICFR [kg∙CO2e∙kg-1]',
         ]
     elif product == 'ethanol':
         IDs = ('S1', 'S2', 'O1', 'O2')

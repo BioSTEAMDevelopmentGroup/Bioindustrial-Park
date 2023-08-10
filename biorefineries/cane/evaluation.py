@@ -1,11 +1,15 @@
 # -*- coding: utf-8 -*-
 """
 """
+import os
 import numpy as np
+import pandas as pd
 import biosteam as bst
 from warnings import warn
 from warnings import filterwarnings
 from biorefineries import cane
+from scipy import interpolate
+from scipy.ndimage.filters import gaussian_filter
 from chaospy import distributions as shape
 from .feature_mockups import (
     all_metric_mockups, 
@@ -26,9 +30,12 @@ __all__ = (
     'save_pickled_results',
     'run_all',
     'run_sugarcane_microbial_oil_and_ethanol',
-    'run_oilcane_microbial_oil_and_ethanol_across_oil_content',
-    'run_oilcane_microbial_oil_and_ethanol_across_lines',
+    'run_oilcane_microbial_oil_and_ethanol',
+    'run_oilcane_microbial_oil_across_oil_content',
+    'run_oilcane_microbial_oil_across_lines',
     'run_oilcane_ethanol_constant_biomass',
+    'run_oilcane_microbial_oil_constant_biomass',
+    'save_target_biomass_yield',
 )
 
 configuration_names = (
@@ -180,6 +187,7 @@ def run_uncertainty_and_sensitivity(name, N, rule='L',
                                     autosave=True,
                                     autoload=True,
                                     optimize=True,
+                                    N_coordinate=None,
                                     **kwargs):
     print(f"Running {name}!")
     filterwarnings('ignore', category=bst.exceptions.DesignWarning)
@@ -254,7 +262,10 @@ def run_uncertainty_and_sensitivity(name, N, rule='L',
             br.ROI_target = ROI_target
             
         br.set_ROI_target.setter = set_ROI_target
-        coordinate = np.linspace(0, 0.1, 20)
+        coordinate = np.round(
+            np.linspace(0, 0.15, N_coordinate or 31),
+            6,
+        )
         if across_oil_content == 'oilcane vs sugarcane':
             # Replace `set_cane_oil_content` parameter with `set_ROI_target`.
             # The actual distribution does not matter because these values are updated
@@ -417,12 +428,17 @@ def run_sugarcane_microbial_oil_and_ethanol(N=None):
     if N is None: N = 2000
     filterwarnings('ignore')
     cane.YRCP2023()
-    run_uncertainty_and_sensitivity('S1.WT', N)
-    run_uncertainty_and_sensitivity('S2.WT', N)
+    # run_uncertainty_and_sensitivity('S1.WT', N)
+    # run_uncertainty_and_sensitivity('S2.WT', N)
     run_uncertainty_and_sensitivity('O7.WT', N)
     run_uncertainty_and_sensitivity('O9.WT', N)
-    run_uncertainty_and_sensitivity('O1', N)
-    run_uncertainty_and_sensitivity('O2', N)
+    
+def run_oilcane_microbial_oil_and_ethanol(N=None):
+    if N is None: N = 2000
+    filterwarnings('ignore')
+    cane.YRCP2023()
+    # run_uncertainty_and_sensitivity('O1', N)
+    # run_uncertainty_and_sensitivity('O2', N)    
     run_uncertainty_and_sensitivity('O7', N)
     run_uncertainty_and_sensitivity('O9', N)
     # run_uncertainty_and_sensitivity('O8', N, line='WT')
@@ -434,25 +450,59 @@ def run_oilcane_ethanol_constant_biomass(N=None):
     cane.YRCP2023()
     run_uncertainty_and_sensitivity('O1|constant biomass yield', N)
     run_uncertainty_and_sensitivity('O2|constant biomass yield', N)
+
+def run_oilcane_microbial_oil_constant_biomass(N=None):
+    if N is None: N = 2000
+    filterwarnings('ignore')
+    cane.YRCP2023()
     run_uncertainty_and_sensitivity('O7|constant biomass yield', N)
     run_uncertainty_and_sensitivity('O9|constant biomass yield', N)
 
-def run_oilcane_microbial_oil_and_ethanol_across_oil_content(N=None):
+def run_oilcane_microbial_oil_across_oil_content(N=None, N_coordinate=None, configurations=None):
     if N is None: N = 200
     filterwarnings('ignore')
     cane.YRCP2023()
-    run_uncertainty_and_sensitivity('O7', N, across_oil_content='oilcane vs sugarcane')
-    run_uncertainty_and_sensitivity('O9', N, across_oil_content='oilcane vs sugarcane')
+    if configurations is None: configurations = ('O7', 'O9')
+    elif isinstance(configurations, str): configurations = [configurations]
+    for config in configurations:
+        run_uncertainty_and_sensitivity(config, N, across_oil_content='oilcane vs sugarcane', N_coordinate=N_coordinate)
     # run_uncertainty_and_sensitivity('O8', N, across_oil_content='oilcane vs sugarcane')
     # run_uncertainty_and_sensitivity('O1', N, across_oil_content='oilcane vs sugarcane')
     # run_uncertainty_and_sensitivity('O2', N, across_oil_content='oilcane vs sugarcane')        
     
-def run_oilcane_microbial_oil_and_ethanol_across_lines(N=None):
+def run_oilcane_microbial_oil_across_lines(N=None, configurations=None):
     if N is None: N = 1000
     filterwarnings('ignore')
     cane.YRCP2023()
-    run_uncertainty_and_sensitivity('O7', N, across_lines=True)
-    run_uncertainty_and_sensitivity('O9', N, across_lines=True)
-    # run_uncertainty_and_sensitivity('O8', N, across_lines=True)
-    # run_uncertainty_and_sensitivity('O1', N, across_lines=True)
-    # run_uncertainty_and_sensitivity('O2', N, across_lines=True)        
+    if configurations is None: configurations = ('O7', 'O9')
+    elif isinstance(configurations, str): configurations = [configurations]
+    for i in configurations: run_uncertainty_and_sensitivity(i, N, across_lines=True)
+
+def save_target_biomass_yield(configuration='O7'):
+    # Set CABBI feedstock target
+    br = cane.Biorefinery(configuration, simulate=False)
+    br.set_cane_oil_content.setter(10)
+    file = monte_carlo_file(configuration, across_lines=False, across_oil_content='oilcane vs sugarcane')
+    CBY_df = pd.read_excel(
+        file, 
+        sheet_name=cane.competitive_biomass_yield.short_description,
+        index_col=0)
+    CBY_df = CBY_df.dropna()
+    oil_content = np.array(CBY_df.columns) * 100
+    q100 = np.percentile(CBY_df, 100, axis=0)
+    q100 = gaussian_filter(q100, 1)
+    f100 = interpolate.interp1d(oil_content, q100)
+    feedstock = br.feedstock.copy()
+    composition_folder = os.path.join(os.path.dirname(__file__), 'data')
+    file = os.path.join(composition_folder, 'cane_composition_data.xlsx')
+    df = pd.read_excel(file, header=[0, 1], index_col=[0])
+    df.loc['Target', ('Water (wt)', 'Mean')] = feedstock.get_mass_fraction('Water')
+    feedstock.imass['Water'] = 0.
+    df.loc['Target', ('Fiber (dw)', 'Mean')] = feedstock.get_mass_fraction('Fiber')
+    df.loc['Target', ('Sugar (dw)', 'Mean')] = feedstock.get_mass_fraction('Sugar')
+    df.loc['Target', ('Stem oil (dw)', 'Mean')] = feedstock.get_mass_fraction('Oil')
+    df.loc['Target', ('Biomass yield (dry MT/ha)', 'Mean')] = target_biomass_yield = f100(10)
+    df.loc['Target', ('Dry biomass yield (WT)', 'Mean')] = target_biomass_yield / br.baseline_dry_biomass_yield
+    df.to_excel(
+        file, 'Summarized'
+    )

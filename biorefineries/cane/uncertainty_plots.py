@@ -27,7 +27,7 @@ from .feature_mockups import (
     lca_monte_carlo_derivative_metric_mockups,
     ROI, MFPP, MBSP, TCI, electricity_production, GWP_biofuel_allocation,
     # natural_gas_consumption,
-    ethanol_production, biodiesel_production, biodiesel_yield,
+    ethanol_production, biodiesel_production, biodiesel_yield, IRR,
     GWP_ethanol, GWP_biodiesel, GWP_electricity,
     GWP_ethanol_allocation, GWP_biodiesel_allocation, GWP_biodiesel_displacement,
     GWP_economic, MFPP_derivative, 
@@ -86,7 +86,9 @@ __all__ = (
     'plot_microbial_oil_kde_2023',
     'plot_spearman_tea_YRCP2023',
     'area_colors',
+    'area_colors_biodiesel',
     'area_hatches',
+    'area_hatches_biodiesel',
     'plot_spearman_YRCP2023',
     'plot_spearman_lca_YRCP2023',
 )
@@ -110,6 +112,35 @@ area_colors = {
     'Heat exchanger network': colors.orange,
     'Oil prod. & ext.': CABBI_colors.blue,
     'Oil production and extraction': CABBI_colors.blue,
+}
+
+area_colors_biodiesel = {
+    'Juicing': CABBI_colors.green_dirty,
+    'Oil production': CABBI_colors.blue,
+    'Pretreatment': CABBI_colors.teal,
+    'Wastewater treatment': colors.purple,
+    'CH&P': CABBI_colors.yellow,
+    'Co-Heat and Power': CABBI_colors.yellow,
+    'Utilities': colors.red,
+    'Storage': CABBI_colors.grey,
+    'HXN': colors.orange,
+    'Heat exchanger network': colors.orange,
+    'Biod. prod.': CABBI_colors.orange,
+    'Biodiesel production': CABBI_colors.orange,
+}
+area_hatches_biodiesel = {
+    'Juicing': '',
+    'Oil production': '',
+    'Biod. prod.': '',
+    'Biodiesel production': '',
+    'Pretreatment': '',
+    'Wastewater treatment': r'',
+    'CH&P': '',
+    'Co-Heat and Power': '',
+    'Utilities': '',
+    'Storage': '',
+    'HXN': '',
+    'Heat exchanger network': '',
 }
 
 area_hatches = {
@@ -146,6 +177,7 @@ line_color_wheel = ColorWheel([
 for i, color in enumerate(line_color_wheel.colors): line_color_wheel.colors[i] = color.tint(20)
 edgecolor = (*colors.CABBI_black.RGBn, 1)
 for i in area_colors: area_colors[i] = area_colors[i].tint(20)
+for i in area_colors_biodiesel: area_colors_biodiesel[i] = area_colors_biodiesel[i].tint(20)
 palette = Palette(**area_colors)
 letter_color = colors.neutral.shade(25).RGBn
 GWP_units_L = '$\\mathrm{kg} \\cdot \\mathrm{CO}_{2}\\mathrm{eq} \\cdot \\mathrm{L}^{-1}$'
@@ -172,13 +204,18 @@ mc_line_metric_settings = {
     # 'Biodiesel production': (biodiesel_production, f"Biodiesel production\n[{format_units('L/MT')}]"),
     'MBSP': (MBSP, f"MBSP\n[{format_units('USD/gal')}]"),
     'TCI': (TCI, f"TCI\n[{format_units('10^6*USD')}]"),
-    'Biodiesel yield': (biodiesel_yield, f"Biodiesel yield\n[{format_units('L/ha')}]"),
+    'IRR': (IRR, "IRR\n[%]"),
+    'ROI': (ROI, f"ROI\n[{format_units('%/y')}]"),
     # 'Electricity production': (electricity_production, f"Elec. prod.\n[{format_units('kWhr/MT')}]"),
+    'Biodiesel yield': (biodiesel_yield, f"Biodiesel yield\n[{format_units('L/ha/y')}]"),
     'GWP energy': (GWP_biodiesel_allocation,"GWP$_{\\mathrm{energy}}$\n" f"[{GWP_units_L}]"),
     'GWP economic': (GWP_biodiesel, "GWP$_{\\mathrm{economic}}$\n" f"[{GWP_units_L}]"),
     'GWP displacement': (GWP_biodiesel_displacement, "GWP$_{\\mathrm{displacement}}$\n" f"[{GWP_units_L}]"),
 }
-
+line_metrics = dict(
+    economic=['MBSP', 'TCI', 'Biodiesel yield'],
+    environmental=['GWP energy', 'GWP economic', 'GWP displacement']
+)
 mc_comparison_settings = {
     'MFPP': (MFPP, r"$\Delta$" + f"MFPP\n[{format_units('USD/MT')}]", None),
     'MBSP': (MBSP, r"$\Delta$" + f"MBSP\n[{format_units('USD/L')}]", None),
@@ -451,25 +488,29 @@ def plot_montecarlo_absolute_YRCP2023():
 def plot_lines_monte_carlo_manuscript(fs=8):
     set_font(size=fs)
     set_figure_size(aspect_ratio=1.2)
-    fig, axes = plot_lines_monte_carlo(
-        metrics=None,
-        labels=['Sugarcane WT\n0.03 wt % Oil', 
-                'Oilcane 1566\n1.8 wt % Oil', 
-                'Oilcane 1580\n5.4 wt % Oil'],
-        # tickmarks=[[0, 3, 6, 9, 12, 15],
-        #             [0, 2, 4, 6, 8, 10]], 
-        color_wheel = line_color_wheel,
-    )
-    for ax, letter in zip(axes.flat, 'ABCDEFGHIJKL'):
-        plt.sca(ax)
-        ylb, yub = plt.ylim()
-        plt.text(-0.25, ylb + (yub - ylb) * 0.9, letter, color=letter_color,
-                 horizontalalignment='center',verticalalignment='center',
-                 fontsize=10, fontweight='bold')
-    plt.subplots_adjust(left=0.12, right=0.95, wspace=0, top=0.95, bottom=0.1)
-    for i in ('svg', 'png'):
-        file = os.path.join(images_folder, f'montecarlo_lines.{i}')
-        plt.savefig(file, transparent=True)
+    for name, metrics in line_metrics.items():
+        fig, axes = plot_lines_monte_carlo(
+            metrics=metrics,
+            labels=['Sugarcane WT\n0.03 wt % Oil', 
+                    'Oilcane 1566\n1.8 wt % Oil', 
+                    'Oilcane 1580\n5.4 wt % Oil',
+                    'Oilcane Target\n10 wt % Oil'],
+            xrot=90,
+            # configurations=['O7'],
+            # tickmarks=[[0, 3, 6, 9, 12, 15],
+            #             [0, 2, 4, 6, 8, 10]], 
+            color_wheel = line_color_wheel,
+        )
+        for ax, letter in zip(axes.flat, 'ABCDEFGHIJKL'):
+            plt.sca(ax)
+            ylb, yub = plt.ylim()
+            plt.text(-0.25, ylb + (yub - ylb) * 0.9, letter, color=letter_color,
+                     horizontalalignment='center',verticalalignment='center',
+                     fontsize=10, fontweight='bold')
+        plt.subplots_adjust(left=0.12, right=0.95, wspace=0, top=0.95, bottom=0.15)
+        for i in ('svg', 'png'):
+            file = os.path.join(images_folder, f'montecarlo_lines_{name}.{i}')
+            plt.savefig(file, transparent=True)
     
 def plot_spearman_tea(with_units=None, aspect_ratio=0.8, **kwargs):
     set_font(size=8)
@@ -605,27 +646,56 @@ def plot_spearman_lca(with_units=None, aspect_ratio=0.65, **kwargs):
 def plot_breakdowns(biodiesel_only=False):
     set_font(size=8)
     set_figure_size(aspect_ratio=0.68)
-    fig, axes = plt.subplots(nrows=1, ncols=2)
-    plt.sca(axes[0])
-    c1, c2 = ('O7', 'O8') if biodiesel_only else ('O1', 'O2')
-    plot_configuration_breakdown(c1, ax=axes[0], legend=False)
-    plt.sca(axes[1])
-    plot_configuration_breakdown(c2, ax=axes[1], legend=True)
-    yticks = axes[1].get_yticks()
-    plt.yticks(yticks, ['']*len(yticks))
-    plt.ylabel('')
-    plt.subplots_adjust(left=0.09, right=0.96, wspace=0., top=0.84, bottom=0.31)
-    for ax, letter in zip(axes, ['(A) Direct Cogeneration', '(B) Integrated Co-Fermentation']):
-        plt.sca(ax)
-        ylb, yub = plt.ylim()
-        xlb, xub = plt.xlim()
-        plt.text((xlb + xub) * 0.5, ylb + (yub - ylb) * 1.2, letter, color=letter_color,
-                  horizontalalignment='center',verticalalignment='center',
-                  fontsize=10, fontweight='bold')
-    for i in ('svg', 'png'):
-        name = f'breakdowns_biodiesel_only.{i}' if biodiesel_only else f'breakdowns.{i}'
-        file = os.path.join(images_folder, name)
-        plt.savefig(file, transparent=True)
+    if biodiesel_only:
+        cane.YRCP2023()
+        fig, axes = plt.subplots(nrows=1, ncols=3)
+        configurations = ('O7', 'O9', 'O8')
+        yticks = [-20, 0, 20, 40, 60, 80, 100]
+        ytexts = ['']*len(yticks)
+        for i, config in enumerate(configurations):
+            ax = axes[i]
+            plt.sca(ax)
+            plot_configuration_breakdown(config, ax=ax, legend=i == 2, biodiesel_only=biodiesel_only)
+            if i: 
+                plt.yticks(yticks, ytexts)
+                plt.ylabel('')
+            else:
+                plt.yticks(yticks)
+        plt.subplots_adjust(left=0.07, right=0.98, wspace=0., top=0.84, bottom=0.31)
+        titles = ['(A) Direct\nCogeneration', '(B) Integrated\nCo-Fermentation', '(C) Integrated\nCo-Fermentation & Recovery']
+        for ax, letter in zip(axes, titles):
+            plt.sca(ax)
+            ylb, yub = plt.ylim()
+            xlb, xub = plt.xlim()
+            plt.text((xlb + xub) * 0.5, ylb + (yub - ylb) * 1.2, letter, color=letter_color,
+                      horizontalalignment='center',verticalalignment='center',
+                      fontsize=10, fontweight='bold')
+        for i in ('svg', 'png'):
+            name = f'breakdowns_biodiesel_only.{i}'
+            file = os.path.join(images_folder, name)
+            plt.savefig(file, transparent=True)
+    else:
+        fig, axes = plt.subplots(nrows=1, ncols=2)
+        plt.sca(axes[0])
+        c1, c2 = ('O1', 'O2')
+        plot_configuration_breakdown(c1, ax=axes[0], legend=False, biodiesel_only=biodiesel_only)
+        plt.sca(axes[1])
+        plot_configuration_breakdown(c2, ax=axes[1], legend=True, biodiesel_only=biodiesel_only)
+        yticks = axes[1].get_yticks()
+        plt.yticks(yticks, ['']*len(yticks))
+        plt.ylabel('')
+        plt.subplots_adjust(left=0.09, right=0.96, wspace=0., top=0.84, bottom=0.31)
+        for ax, letter in zip(axes, ['(A) Direct Cogeneration', '(B) Integrated Co-Fermentation']):
+            plt.sca(ax)
+            ylb, yub = plt.ylim()
+            xlb, xub = plt.xlim()
+            plt.text((xlb + xub) * 0.5, ylb + (yub - ylb) * 1.2, letter, color=letter_color,
+                      horizontalalignment='center',verticalalignment='center',
+                      fontsize=10, fontweight='bold')
+        for i in ('svg', 'png'):
+            name = f'breakdowns.{i}'
+            file = os.path.join(images_folder, name)
+            plt.savefig(file, transparent=True)
 
 # %% KDE
 
@@ -897,7 +967,7 @@ def plot_microbial_oil_kde_2023(fs=None):
         x_center=1.29,
         y_center=617,
         xlabel="GWP$_{\\mathrm{energy}}$\n" f"[{GWP_units_L}]",
-        ylabel=f"Biodiesel yield\n[{format_units('L/ha')}]",
+        ylabel=f"Biodiesel yield\n[{format_units('L/ha/y')}]",
         fs=fs,
     )
     plt.subplots_adjust(
@@ -1252,36 +1322,38 @@ def plot_competitive_biomass_yield_across_oil_content(
         fs=None,
     ):
     if fs is None: fs = 8
-    set_figure_size(aspect_ratio=0.8, width=5.5)
+    set_figure_size(aspect_ratio=0.8)
     fig, axes = plt.subplots(ncols=1, nrows=2)
     set_font(size=fs)
-    bioethanol_ax, microbial_oil_ax = axes.flatten()
-    plt.sca(bioethanol_ax)
+    ax1, ax2 = axes.flatten()
+    plt.sca(ax1)
     xs, fys = _plot_competitive_biomass_yield_across_oil_content('O7')
-    plt.xlim([0, 10])
+    plt.xlim([0, 15])
     plt.ylim([0, 40])
     bst.plots.style_axis(
+        xticks=[0, 3, 6, 9, 12, 15],
         xticklabels=False,
         ytick0=False,
         ytickf=True,
     )
     plt.text(
-        10 - 0.25, 35, '(A) Direct Cogeneration', weight='bold',
+        15 - 0.25, 36, '(A) Direct Cogeneration', weight='bold',
         ha='right', va='center', fontsize=10,
         c=bst.plots.title_color,
     )
     _add_lines_biomass_yield_vs_oil_content(*fys)
-    plt.sca(microbial_oil_ax)
+    plt.sca(ax2)
     xs, fys = _plot_competitive_biomass_yield_across_oil_content('O9')
-    plt.xlim([0, 10])
+    plt.xlim([0, 15])
     plt.ylim([0, 40])
     plt.xlabel('Oil content [dw %]')
     bst.plots.style_axis(
+        xticks=[0, 3, 6, 9, 12, 15],
         ytick0=False,
         ytickf=True,
     )
     plt.text(
-        10 - 0.25, 35, '(B) Integrated Co-Fermentation', weight='bold', 
+        15 - 0.25, 36, '(B) Integrated Co-Fermentation', weight='bold', 
         ha='right', va='center', fontsize=10,
         c=bst.plots.title_color,
     )
@@ -1293,7 +1365,7 @@ def plot_competitive_biomass_yield_across_oil_content(
 
 def _add_lines_biomass_yield_vs_oil_content(f5, f50, f95):
     df = cane.get_composition_data()
-    points = {i: None for i in ('WT', '1566', '1580')}
+    points = {i: None for i in ('WT', '1566', '1580', 'Target')}
     for name, color in zip(df.index, line_color_wheel):
         line = df.loc[name]
         name = str(name)
@@ -1311,7 +1383,7 @@ def _add_lines_biomass_yield_vs_oil_content(f5, f50, f95):
     pnt = points[name]
     y50_target = f50(pnt.x)
     x_units = f"{format_units('dw')} % oil"
-    y_units = f"dry {format_units('MT/ha')}"
+    y_units = f"{format_units('DMT/ha/y')}"
     text = (
         f"Sugarcane {name}, {pnt.x:.2g} {x_units}\n"
         f"Yield: {pnt.y:.1f} {y_units}"
@@ -1319,7 +1391,7 @@ def _add_lines_biomass_yield_vs_oil_content(f5, f50, f95):
     bst.plots.annotate_point(
         text, pnt.x, pnt.y, horizontalalignment='left', 
         textcolor=pnt.c, linecolor=pnt.c,
-        dx=0.2, dy=4, dx_text=-0.1, dy_text=0, fontsize=8,
+        dx=0.3, dy=7, dx_text=-0.1, dy_text=0, fontsize=8,
     )
     
     name = '1566'
@@ -1338,7 +1410,7 @@ def _add_lines_biomass_yield_vs_oil_content(f5, f50, f95):
     bst.plots.annotate_point(
         text, pnt.x, pnt.y, horizontalalignment='left', verticalalignment='center',
         textcolor=pnt.c, linecolor=pnt.c,
-        dx=1.1, dy=9.5, dx_text=0.1, dy_text=0, fontsize=8,
+        dx=2.5, dy=13.5, dx_text=0.1, dy_text=0, fontsize=8,
     )
     
     name = '1580'
@@ -1355,39 +1427,39 @@ def _add_lines_biomass_yield_vs_oil_content(f5, f50, f95):
         f"Yield: {pnt.y:.1f} {arrow} {y50_target:.1f} [{y5_target:.1f}, {y95_target:.1f}] {y_units}\n"
     )
     bst.plots.annotate_point(
-        text, pnt.x, pnt.y, horizontalalignment='right',
+        text, pnt.x, pnt.y, horizontalalignment='left',
         verticalalignment='center',
         textcolor=pnt.c, linecolor=pnt.c,
-        dx=-0.4, dy=0, dx_text=-0.1, dy_text=0, fontsize=8,
+        dx=0.25, dy=0, dx_text=0.1, dy_text=0, fontsize=8,
     )
     
-    
-    # WT = points['WT']
-    # y_target = f50(WT.x)
-    
-    # text = (
-    #     f"WT: {WT.x:.1g} dw % Oil\n"
-    # )
-    # dy2target = y_target - WT.y
-    # f"{dy2target:.0f} dry-{format_units('MT/ha')} to target"
-    # bst.plots.annotate_point(
-    #     text, WT.x, WT.y, horizontalalignment='left', 
-    #     textcolor=WT.c.shade(50).RGBn, linecolor=edgecolor,
-    #     dx=0.5, dy=6, dx_text=-0.1, dy_text=1, fontsize=10,
-    # )
+    name = 'Target'
+    pnt = points[name]
+    y5_target, y50_target, y95_target = f5(pnt.x), f50(pnt.x), f95(pnt.x)
+    ax = plt.gca()
+    text = (
+        f"Oilcane {name}, {pnt.x:.2g} {x_units}\n"
+        f"Yield: {pnt.y:.1f} {y_units}"
+    )
+    bst.plots.annotate_point(
+        text, pnt.x, pnt.y, horizontalalignment='center',
+        verticalalignment='bottom',
+        textcolor=pnt.c, linecolor=pnt.c,
+        dx=0, dy=4.6, dx_text=0, dy_text=0.1, fontsize=8,
+    )
 
 def _plot_theoretical_competitive_biomass_yield_across_oil_content():
     f = 0.93 # Maximum fraction of fiber/sugar
     Yb = 25.62 # Baseline biomass yield
     Ym = 0.32 # Microbial oil yield
-    x = np.linspace(0, f) # Fraction of oil
+    x = np.linspace(0, 0.15) # Fraction of oil
     Yo = f * Yb * Ym / ((f - x) * Ym + x) # Theoretical oilcane yield
     # print(
     #     ((1 - Yo / Yb)[1:] / x[1:]).mean()
     # )
     plt.plot(100 * x, Yo, color=bst.plots.title_color, lw=1, zorder=0,
              linestyle='--')
-    x = 0.09
+    x = 0.14
     y = f * Yb * Ym / ((f - x) * Ym + x) # Theoretical oilcane yield
     bst.plots.annotate_point(
         'Theoretical\nmaximum\ntargets', 100 * x, y,
@@ -1395,7 +1467,6 @@ def _plot_theoretical_competitive_biomass_yield_across_oil_content():
         linecolor=bst.plots.title_color,
         textcolor=bst.plots.title_color,
         verticalalignment='bottom',
-        
     )
     
 def _plot_competitive_biomass_yield_across_oil_content(
@@ -1405,7 +1476,7 @@ def _plot_competitive_biomass_yield_across_oil_content(
     df = pd.read_excel(file, sheet_name=features.competitive_biomass_yield.short_description, index_col=0)
     df = df.dropna()
     oil_content = np.array(df.columns) * 100
-    plt.ylabel(f"Competitive biomass yield\n[dry-{format_units('MT/ha')}]")
+    plt.ylabel(f"Competitive biomass yield\n[{format_units('DMT/ha/y')}]")
     _plot_theoretical_competitive_biomass_yield_across_oil_content()
     biomass_yields = bst.plots.plot_montecarlo_across_coordinate(
         oil_content, df, 
@@ -1417,12 +1488,11 @@ def _plot_competitive_biomass_yield_across_oil_content(
     index = [0, 2, 4]
     f5, f50, f95 = [interpolate.interp1d(oil_content, biomass_yields[i]) for i in index]
     bst.plots.annotate_point(
-        'Financially\ncompetitive\ntargets', 8, f50(8),
-        dy=-5, dy_text=-0.5, fontsize=8,
+        'Financially\ncompetitive\ntargets', 13.5, f50(13.5),
+        dy=-4, dy_text=-0.5, fontsize=8,
         linecolor=CABBI_colors.green_dirty.shade(40).RGBn,
         textcolor=CABBI_colors.green_dirty.shade(40).RGBn,
         verticalalignment='top',
-        
     )
     return (oil_content, (f5, f50, f95))
 
@@ -1454,6 +1524,7 @@ def plot_lines_monte_carlo(
     nrows = len(rows)
     ncols = len(configurations)
     fig, axes = plt.subplots(ncols=ncols, nrows=nrows)
+    axes = axes.reshape([nrows, ncols])
     plt.subplots_adjust(wspace=0.45)
     nmc = len(columns)    
     xtext = labels or columns
@@ -1473,7 +1544,7 @@ def plot_lines_monte_carlo(
             plots = []
             for i in range(N):
                 color = color_wheel.next()
-                boxplot = monte_carlo_box_plot(
+                boxplot = bst.plots.plot_montecarlo(
                     data=arr[:, i], positions=[position + (i-(N-1)/2)*width], 
                     light_color=color.RGBn, 
                     dark_color=color.shade(60).RGBn,
@@ -1484,10 +1555,11 @@ def plot_lines_monte_carlo(
             return plots
         else:
             color = color_wheel.next()
-            return monte_carlo_box_plot(
+            return bst.plots.plot_montecarlo(
                 data=arr, positions=[position], 
                 light_color=color.RGBn, 
                 dark_color=color.shade(60).RGBn,
+                hatch=getattr(color, 'hatch', None),
                 width=0.618,
             )
     
@@ -1527,6 +1599,36 @@ def plot_lines_monte_carlo(
             if yticks[0] < 0.:
                 bst.plots.plot_horizontal_line(0, color=CABBI_colors.black.RGBn,
                                                lw=0.8, linestyle='--')
+            if metrics[i] == 'MBSP':
+                if j == 0:
+                    lb = 0.80
+                    ub = 1.63
+                    plt.fill_between([-1, ncols + 2], lb, ub,
+                                     color=CABBI_colors.grey.tint(30).RGBn,
+                                     linewidth=1.0,
+                                     zorder=0)
+                    plt.text(1.5, (lb + ub) * 0.5, 'Market price (D4 RIN)',
+                             color=letter_color, 
+                             verticalalignment='center',
+                             horizontalalignment='center',
+                             fontweight='bold',
+                             fontsize=8,
+                             zorder=1)
+                else:
+                    lb = 1.16
+                    ub = 2.16
+                    plt.fill_between([-1, ncols + 2], lb, ub,
+                                     color=CABBI_colors.grey.tint(30).RGBn,
+                                     linewidth=1.0,
+                                     zorder=0)
+                    plt.text(1.5, (lb + ub) * 0.5, 'Market price (D3 RIN)',
+                             color=letter_color, 
+                             fontweight='bold',
+                             verticalalignment='center',
+                             horizontalalignment='center',
+                             fontsize=8,
+                             zorder=1)
+                    
             xticklabels = xtext if i == nrows - 1 else []
             yticklabels = j == 0
             bst.plots.style_axis(ax,  
@@ -1737,16 +1839,31 @@ def plot_spearman_YRCP2023(configurations=None, labels=None,
 
 # %% Other
 
-def plot_configuration_breakdown(name, across_coordinate=False, **kwargs):
+def plot_configuration_breakdown(name, across_coordinate=False, 
+                                 biodiesel_only=None,
+                                 **kwargs):
     oc = cane.Biorefinery(name)
+    if biodiesel_only:
+        colors = [area_colors_biodiesel[i.name].RGBn for i in oc.unit_groups]
+        hatches = [area_hatches_biodiesel[i.name] for i in oc.unit_groups]
+        for i in oc.unit_groups:
+            if len(i.metrics) == 4: continue
+            i.metrics = i.metrics[:4]
+        units = sum([i.units for i in oc.unit_groups], [])
+        joint_group = bst.UnitGroup(None, units)
+        joint_group.autofill_metrics(shorthand=True, material_cost=False)
+    else:
+        colors = [area_colors[i.name].RGBn for i in oc.unit_groups]
+        hatches = [area_hatches[i.name] for i in oc.unit_groups]
+        joint_group = None
     if across_coordinate:
         return bst.plots.plot_unit_groups_across_coordinate(
             cane.set_cane_oil_content,
             [5, 7.5, 10, 12.5],
             'Feedstock oil content [dw %]',
             oc.unit_groups,
-            colors=[area_colors[i.name].RGBn for i in oc.unit_groups],
-            hatches=[area_hatches[i.name] for i in oc.unit_groups],
+            colors=colors,
+            hatches=hatches,
             **kwargs,
         )
     else:
@@ -1767,18 +1884,19 @@ def plot_configuration_breakdown(name, across_coordinate=False, **kwargs):
                 i.name = 'Biodiesel production'
             i.metrics[0].name = 'Inst. eq.\ncost'
             i.metrics[3].name = 'Elec.\ncons.'
-            i.metrics[4].name = 'Mat.\ncost'
+            if len(i.metrics) == 5: i.metrics[4].name = 'Mat.\ncost'
         
         return bst.plots.plot_unit_groups(
             oc.unit_groups,
-            colors=[area_colors[i.name].RGBn for i in oc.unit_groups],
-            hatches=[area_hatches[i.name] for i in oc.unit_groups],
+            colors=colors,
+            hatches=hatches,
             format_total=format_total,
             fraction=True,
+            joint_group=joint_group,
             legend_kwargs=dict(
-                loc='lower center',
+                loc='lower right' if biodiesel_only else 'lower center',
                 ncol=4,
-                bbox_to_anchor=(0, -0.52),
+                bbox_to_anchor=(0.9 if biodiesel_only else 0, -0.52),
                 labelspacing=1.5, handlelength=2.8,
                 handleheight=1, scale=0.8,
             ),

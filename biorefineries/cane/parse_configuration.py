@@ -40,20 +40,21 @@ class ConfigurationComparison(NamedTuple):
     b: Configuration
 
 def name_to_configuration(name):
-    if '.' in name:
-        name, line = name.split('.')
-    else:
-        line = None
-    if '|' in name:
-        name, case = name.split('|')
-        case = case.rstrip(' ').replace(' ', '_')
-    else:
-        case = None
     if '*' in name:
         name = name.strip('*')
         agile = True
     else:
         agile = False
+    if '|' in name:
+        name, case = name.split('|')
+        case = case.rstrip(' ').replace(' ', '_')
+    else:
+        case = None
+    if '.' in name:
+        name, line = name.split('.')
+        line = line.rstrip(' ')
+    else:
+        line = None
     name = name.upper().replace(' ', '')
     return Configuration(
         (-1 if name.startswith('S') else 1) * int(name[1:]), 

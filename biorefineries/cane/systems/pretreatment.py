@@ -19,26 +19,32 @@ from .. import streams as s
     outs=[s.juice, s.hydrolysate, s.pretreatment_wastewater,
           s.fiber_fines, s.bagasse_to_boiler],
 )
-def create_cane_combined_1_and_2g_pretreatment(ins, outs):
+def create_cane_combined_1_and_2g_pretreatment(ins, outs,
+        feedstock_handling_area=None,
+        juicing_area=None,
+        pretreatment_area=None,
+    ):
     """
     Create a system that produces juice and hydrolysate from cane.
     
     """
     oilcane, = ins
     juice, hydrolysate, pretreatment_wastewater, fiber_fines, bagasse_to_boiler = outs
-    
+    if feedstock_handling_area is None: feedstock_handling_area = 100
+    if juicing_area is None: juicing_area = 200
+    if pretreatment_area is None: pretreatment_area = 300
     feedstock_handling_sys = create_feedstock_handling_system(
         ins=oilcane,
         outs='',
         mockup=True,
-        area=100
+        area=feedstock_handling_area,
     )
     juicing_sys, udct = create_juicing_system(
         ins=feedstock_handling_sys-0,
         outs=[juice, 'bagasse', fiber_fines],
         mockup=True,
         udct=True,
-        area=200,
+        area=juicing_area,
         dry_bagasse=False,
         pellet_bagasse=False,
     )
@@ -77,7 +83,7 @@ def create_cane_combined_1_and_2g_pretreatment(ins, outs):
         outs=(hydrolysate, pretreatment_wastewater),
         ins=S1-0,
         mockup=True,
-        area=300,
+        area=pretreatment_area,
         udct=True,
         solids_loading=0.50, # 50 wt/wt % solids content
     )
