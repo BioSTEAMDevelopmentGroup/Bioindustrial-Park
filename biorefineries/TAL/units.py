@@ -940,6 +940,12 @@ class BatchCoFermentation(BatchBioreactor):
     
     acetate_target_loading = 10 # g-AceticAcid-eq / L
     
+    #: [float] Cleaning and unloading time (hr).
+    tau_0 = 3
+    
+    #: [float] Fraction of filled tank to total tank volume.
+    V_wf = 0.5 # !!!
+    
     # autoselect_N  = True
     
     def __init__(self, ID='', ins=None, outs=(), 
@@ -978,9 +984,9 @@ class BatchCoFermentation(BatchBioreactor):
         
         # oxygen currently excluded from balance
         self.CO2_generation_rxns = ParallelRxn([
-            Rxn('Glucose -> 6CO2 + 6H2O', 'Glucose', 1.),
-            Rxn('Xylose -> 5CO2 + 5H2O', 'Xylose', 1.),
-            Rxn('AceticAcid -> 2CO2 + 2H2O', 'AceticAcid', 1.),
+            Rxn('Glucose -> 6CO2 + 6H2O', 'Glucose', 1.-1e-2),
+            Rxn('Xylose -> 5CO2 + 5H2O', 'Xylose', 1.-1e-2),
+            Rxn('AceticAcid -> 2CO2 + 2H2O', 'AceticAcid', 1.-1e-2),
             ])
         
         self.sucrose_hydrolysis_rxns = ParallelRxn([
