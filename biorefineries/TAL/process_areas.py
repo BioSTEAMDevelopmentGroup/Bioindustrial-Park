@@ -541,7 +541,7 @@ def create_additional_TAL_recovery_process(ins, outs,):
     
 #%% Upgrading TAL to sorbic acid
 
-@SystemFactory(ID = 'TAL_separation_adsorption_process',
+@SystemFactory(ID = 'TAL_to_sorbic_acid_upgrading_process',
                ins=[dict(ID='solid_TAL', TAL=1, ),
                     dict(ID='ethanol_minimal', Ethanol=1),
                     dict(ID='H2_hydrogenation', H2=1),

@@ -86,7 +86,9 @@ __all__ = (
     'plot_microbial_oil_kde_2023',
     'plot_spearman_tea_YRCP2023',
     'area_colors',
+    'area_colors_biodiesel',
     'area_hatches',
+    'area_hatches_biodiesel',
     'plot_spearman_YRCP2023',
     'plot_spearman_lca_YRCP2023',
 )
@@ -1542,7 +1544,7 @@ def plot_lines_monte_carlo(
             plots = []
             for i in range(N):
                 color = color_wheel.next()
-                boxplot = monte_carlo_box_plot(
+                boxplot = bst.plots.plot_montecarlo(
                     data=arr[:, i], positions=[position + (i-(N-1)/2)*width], 
                     light_color=color.RGBn, 
                     dark_color=color.shade(60).RGBn,
@@ -1553,10 +1555,11 @@ def plot_lines_monte_carlo(
             return plots
         else:
             color = color_wheel.next()
-            return monte_carlo_box_plot(
+            return bst.plots.plot_montecarlo(
                 data=arr, positions=[position], 
                 light_color=color.RGBn, 
                 dark_color=color.shade(60).RGBn,
+                hatch=getattr(color, 'hatch', None),
                 width=0.618,
             )
     
@@ -1596,6 +1599,36 @@ def plot_lines_monte_carlo(
             if yticks[0] < 0.:
                 bst.plots.plot_horizontal_line(0, color=CABBI_colors.black.RGBn,
                                                lw=0.8, linestyle='--')
+            if metrics[i] == 'MBSP':
+                if j == 0:
+                    lb = 0.80
+                    ub = 1.63
+                    plt.fill_between([-1, ncols + 2], lb, ub,
+                                     color=CABBI_colors.grey.tint(30).RGBn,
+                                     linewidth=1.0,
+                                     zorder=0)
+                    plt.text(1.5, (lb + ub) * 0.5, 'Market price (D4 RIN)',
+                             color=letter_color, 
+                             verticalalignment='center',
+                             horizontalalignment='center',
+                             fontweight='bold',
+                             fontsize=8,
+                             zorder=1)
+                else:
+                    lb = 1.16
+                    ub = 2.16
+                    plt.fill_between([-1, ncols + 2], lb, ub,
+                                     color=CABBI_colors.grey.tint(30).RGBn,
+                                     linewidth=1.0,
+                                     zorder=0)
+                    plt.text(1.5, (lb + ub) * 0.5, 'Market price (D3 RIN)',
+                             color=letter_color, 
+                             fontweight='bold',
+                             verticalalignment='center',
+                             horizontalalignment='center',
+                             fontsize=8,
+                             zorder=1)
+                    
             xticklabels = xtext if i == nrows - 1 else []
             yticklabels = j == 0
             bst.plots.style_axis(ax,  

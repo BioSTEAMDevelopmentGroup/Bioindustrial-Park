@@ -218,12 +218,13 @@ class OilcaneCompositionPerformance(NamedTuple):
     oil_content: float
     biomass_yield: float
 
-def get_composition_data(minimum_oil_content=None, ignored=frozenset([316, '19B', 1565])):
+def get_composition_data(minimum_oil_content=None, ignored=frozenset(['316', '19B', '1565'])):
     global cane_line_composition_data, cane_minimum_oil_content
     if minimum_oil_content is None: minimum_oil_content = 0
     if cane_line_composition_data is None or minimum_oil_content != cane_minimum_oil_content:
         file = os.path.join(data_folder, 'cane_composition_data.xlsx')
         data = pd.read_excel(file, header=[0, 1], index_col=[0])
+        data.index = [str(i) for i in data.index]
         # Filter poor lines 
         index = data.index
         good_lines = set(index)

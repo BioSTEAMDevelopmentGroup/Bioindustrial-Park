@@ -51,7 +51,6 @@ def create_oilcane_to_biodiesel_1g(
     
     juicing_sys, jdct = create_juicing_system(
         ins=feedstock_handling_sys-0,
-        outs=['', '', 'fiber_fines'],
         pellet_bagasse=False,
         dry_bagasse=True,
         mockup=True,

@@ -82,6 +82,7 @@ from biorefineries.succinic.lca import LCA as TALLCA
 filterwarnings('ignore')
 IQ_interpolation = flx.IQ_interpolation
 HeatExchangerNetwork = bst.HeatExchangerNetwork
+# from hxn._heat_exchanger_network import HeatExchangerNetwork
 Rxn = tmo.reaction.Reaction
 ParallelRxn = tmo.reaction.ParallelReaction
 
@@ -284,6 +285,7 @@ def create_TAL_sys(ins, outs):
                                                         u.R401,
                                                         u.R402,
                                                         u.R403,
+                                                        u.T602_P,
                                                         # H404,
                                                         # F403,
                                                         # AC401.heat_exchanger_drying,
@@ -298,9 +300,9 @@ def create_TAL_sys(ins, outs):
         HXN._installed_cost = 0.
     
     # # To simulate without HXN, simply uncomment the following 3 lines:
-    # HXN._cost = HXN_no_run_cost
-    # HXN.energy_balance_percent_error = 0.
-    # HXN.new_HXs = HXN.new_HX_utils = []
+    HXN._cost = HXN_no_run_cost
+    HXN.energy_balance_percent_error = 0.
+    HXN.new_HXs = HXN.new_HX_utils = []
 
 # %% 
 

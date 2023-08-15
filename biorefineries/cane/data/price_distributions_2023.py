@@ -28,6 +28,7 @@ __all__ = (
     'mean_natural_gas_price',
     'mean_electricity_price',
     'mean_soymeal_price',
+    'prices',
 )
 
 liter_per_gal = 3.7854
