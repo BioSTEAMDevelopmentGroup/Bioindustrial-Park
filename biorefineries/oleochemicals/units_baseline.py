@@ -130,7 +130,7 @@ class DegassingVessel(bst.Unit, isabstract = True):
     _N_ins = 1
     _N_outs = 2
     auxiliary_unit_names = ('vacuum_system',) # Mark attributes as auxiliary
-    _units = {'Total volume': 'm3'} # This is needed for the vacuum system
+    _units = {'Reactor volume': 'm3'} # This is needed for the vacuum system
     tau = 4
     P = 10000
     
@@ -146,7 +146,7 @@ class DegassingVessel(bst.Unit, isabstract = True):
         
 
     def _design(self):
-        self.design_results['Total volume'] = self.feed.F_vol * self.tau    
+        self.design_results['Reactor volume'] = self.feed.F_vol * self.tau    
         self.vacuum_system = bst.VacuumSystem(self) 
 DegassingVessel._stream_link_options = None
 

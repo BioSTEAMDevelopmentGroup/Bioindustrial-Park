@@ -127,6 +127,7 @@ chems = tmo.Chemicals([
         tmo.Chemical('Heptanoic_acid'),
         tmo.Chemical('Hexanoic_acid'),
         tmo.Chemical('Malonic_acid'),
+        tmo.Chemical('Adipic_acid'),
         tmo.Chemical('Pelargonic_acid'),
         tmo.Chemical('Propanoic_acid'),
         tmo.Chemical('Methyl_caprylate',search_ID = '111-11-5'),
@@ -192,7 +193,7 @@ chems = tmo.Chemicals([
                      ),
         tmo.Chemical('Acetate',phase = 'l', default = True),
         tmo.Chemical('Calcium_hydroxide',default = True,phase = 'l'),
-        tmo.Chemical('Calcium_chloride',phase = 'l'),    
+        tmo.Chemical('Calcium_chloride',phase = 's'),    
         tmo.Chemical.blank('Calcium_tungstate',
                        CAS = '7790-75-2',
                        MW = 287.92,
@@ -282,7 +283,7 @@ chems.Palmitic_acid.Cn.l.method = 'ROWLINSON_BONDI'
 chems.Stearic_acid.Cn.l.method = 'ROWLINSON_BONDI'
 chems.Oleic_acid.Cn.l.method = 'ROWLINSON_BONDI'
 chems.Natural_gas.Cn.l.method = 'DADGOSTAR_SHAW' #This method works for hydrocarbons
-chems.Monomethyl_azelate.Cn.g.method = 'LASTOVKA_SHAW'
+# chems.Monomethyl_azelate.Cn.g.method = 'LASTOVKA_SHAW'
 #Making assumptions for viscosity of TAGS
 TAGs_with_unknown_props = [ 'LLL','OOO','LnLnLn']
 for i in TAGs_with_unknown_props:
@@ -305,6 +306,7 @@ chems.Sodium_tungstate.copy_models_from(chems.Chromic_acid,
 chems.Calcium_tungstate.copy_models_from(chems.Chromic_acid,
                                             ['Hvap',
                                              'Psat','Cn'])
+chems.Monomethyl_azelate.copy_models_from(chems.Azelaic_acid,['Cn','Hvap'])
 chems.Calcium_tungstate.V.add_model(fn.rho_to_V(5800,
                                                 chems.Calcium_tungstate.MW),
                                                 top_priority = True)
@@ -318,7 +320,9 @@ for i in ['Cobalt_acetate_tetrahydrate','Sodium_acetate',
 chems.Calcium_hydroxide.V.add_model(fn.rho_to_V(2.34,
                                                 chems.Calcium_hydroxide.MW),
                                                 top_priority = True)
-    
+chems.Calcium_chloride.V.add_model(fn.rho_to_V(2.15,#Wiki
+                                                chems.Calcium_chloride.MW),
+                                                top_priority = True)    
 
 chems.Calcium_acetate.V.add_method(chems.Calcium_acetate.MW*0.000001/1.5)#density from: https://pubchem.ncbi.nlm.nih.gov/compound/Calcium-acetate#section=Density
 #TODO: change the below
@@ -360,6 +364,10 @@ chems.Diester_MDHSA_MMA.Tc = 2269.6#DWSIM
 chems.Diester_MDHSA_MMA.omega = -0.46#DWSIM
 chems.Diester_MDHSA_MMA.copy_models_from(chems.MDHSA,['Hvap','Psat','Cn','V','mu'])
 
+#TODO: added on 8/12/23..think about this
+chems.Malonic_acid.copy_models_from(chems.Adipic_acid,['mu'])
+chems.Methyl_palmitate.copy_models_from(chems.Methyl_oleate,['mu'])
+chems.Methyl_stearate.copy_models_from(chems.Methyl_oleate,['mu'])
 
 ##Adding missing dortmund properties for the following chemicals
 chems.Methyl_palmitoleate.Dortmund.set_group_counts_by_name({'CH3': 2,
