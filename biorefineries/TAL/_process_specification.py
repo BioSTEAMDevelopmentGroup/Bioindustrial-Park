@@ -104,7 +104,8 @@ def evaluate_across_specs(spec, system,
     print(f"yield = {format(100*float(spec_1),'.1f')} % theo.,  titer = {format(float(spec_2),'.2f')} g\u00b7L\u207b\u00b9,  prod. = {format(float(spec_3),'.2f')} g\u00b7L\u207b\u00b9\u00b7h\u207b\u00b9\n")
     try:
         spec.load_specifications(spec_1=spec_1, spec_2=spec_2)
-        system.simulate()
+        # system.simulate()
+        if spec.set_production_capacity: spec.set_production_capacity()
         return get_metrics()
     except Exception as e1:
         if error: raise e1
@@ -124,6 +125,7 @@ def evaluate_across_specs(spec, system,
             print(str_e1)
             try:
                 run_bugfix_barrage()
+                if spec.set_production_capacity: spec.set_production_capacity()
                 return get_metrics()
                 # Beep(320, 250)
             except Exception as e2:
@@ -192,7 +194,8 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
                  'baseline_productivity',
                  'HXN_new_HXs',
                  'HXN_new_HX_utils',
-                 'HXN_Q_bal_percent_error_dict',)
+                 'HXN_Q_bal_percent_error_dict',
+                 'set_production_capacity')
     
     def __init__(self, evaporator, pump, mixer, heat_exchanger, seed_train_system, seed_train,
                  reactor, reaction_name, substrates, products,
@@ -202,7 +205,7 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
                  baseline_productivity=0.76, tolerable_HXN_energy_balance_percent_error=2., HXN_intolerable_points=[],
                  HXN_new_HXs={}, HXN_new_HX_utils={}, HXN_Q_bal_percent_error_dict = {},
                  feedstock_mass=104192.83224417375, pretreatment_reactor = None,
-                  load_spec_1=None, load_spec_2=None, load_spec_3=None):
+                  load_spec_1=None, load_spec_2=None, load_spec_3=None, set_production_capacity=None):
         self.substrates = substrates
         self.reactor = reactor #: [Unit] Reactor unit operation
         self.products = products #: tuple[str] Names of main products
@@ -228,6 +231,7 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
         self.tolerable_HXN_energy_balance_percent_error = tolerable_HXN_energy_balance_percent_error
         self.HXN_intolerable_points = HXN_intolerable_points
         self.HXN_Q_bal_percent_error_dict = HXN_Q_bal_percent_error_dict
+        self.set_production_capacity = set_production_capacity
         
         self.count = 0 
         self.count_exceptions = 0
@@ -274,7 +278,9 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
         self.spec_2 = spec_2
         
         self.load_spec_3(spec_3 or self.spec_3)
-    
+        
+        # if self.set_production_capacity: self.set_production_capacity()
+        
     # def load_baseline_TRY(self):
     #     self.load_yield(spec.baseline_yield)
     #     spec.spec_1

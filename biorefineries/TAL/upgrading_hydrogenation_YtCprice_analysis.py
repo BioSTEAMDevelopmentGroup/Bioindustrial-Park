@@ -56,35 +56,37 @@ TAL_results_filepath = TAL_filepath + '\\analyses\\results\\'
 
 R401, R402, R403 = u.R401, u.R402, u.R403
 
-fresh_R402_cat_stream = R402.ins[3]
+fresh_R401_cat_stream = R401.ins[4]
 spec_upgrading = TAL._general_process_specification.GeneralProcessSpecification(
     system=TAL_sys,
-    baseline_spec_values=[R401.TAL_to_HMTHP_rxn.X, R402.HMTHP_to_PSA_rxn.X, R403.PSA_to_SA_rxn.X],
+    baseline_spec_values=[R401.TAL_to_HMTHP_rxn.X, 
+                          R401.tau, 
+                          fresh_R401_cat_stream.price],
     HXN = u.HXN1001,
     )
 
-def load_dehydration_PSA_yield(PSA_yield):
-    R402.HMTHP_to_PSA_rxn.X = PSA_yield
+def load_hydrogenation_HMTHP_yield(HMTHP_yield):
+    R401.TAL_to_HMTHP_rxn.X = HMTHP_yield
 
-def load_dehydration_time(dehydration_time):
-    R402.tau = dehydration_time
+def load_hydrogenation_time(hydrogenation_time):
+    R401.tau = hydrogenation_time
     
-def load_dehydration_cat_price(dehydration_cat_price):
-    fresh_R402_cat_stream.price = dehydration_cat_price
-    if type(dehydration_cat_price) == np.ndarray:
-        R402.Amberlyst70_catalyst_price = dehydration_cat_price[0]
+def load_hydrogenation_cat_price(hydrogenation_cat_price):
+    fresh_R401_cat_stream.price = hydrogenation_cat_price
+    if type(hydrogenation_cat_price) == np.ndarray:
+        R401.NiSiO2_catalyst_price = hydrogenation_cat_price[0]
     else:
-        R402.Amberlyst70_catalyst_price = dehydration_cat_price
+        R401.NiSiO2_catalyst_price = hydrogenation_cat_price
 
 spec_upgrading.load_spec_1, spec_upgrading.load_spec_2, spec_upgrading.load_spec_3 = \
-    load_dehydration_PSA_yield, load_dehydration_time, load_dehydration_cat_price
+    load_hydrogenation_HMTHP_yield, load_hydrogenation_time, load_hydrogenation_cat_price
 
 
 spec = spec_upgrading
 
 # %% Generate 3-specification meshgrid and set specification loading functions
 
-steps = (5, 5, 50)
+steps = (5, 5, 20)
 
 # Yield, titer, productivity (rate)
 spec_1 = PSA_yields = np.linspace(0.3, 0.999, steps[0]) # TAL->HMTHP conversion in the hydrogenation reactor
@@ -245,7 +247,7 @@ results_metric_3 = np.array(results_metric_3)
 
 #%% More plot stuff
 
-fps = 3
+fps = 6
 axis_title_fonts={'size': {'x': 8, 'y':8, 'z':8, 'w':8},}
 clabel_fontsize = 8.
 default_fontsize = 8.

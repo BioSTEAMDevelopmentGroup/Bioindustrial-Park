@@ -188,16 +188,12 @@ class GeneralProcessSpecification():
 
     def load_specifications(self, spec_1=None, spec_2=None, spec_3=None,):
         """
-        Load ferementation specifications.
+        Load specifications.
         Parameters
         ----------
-        yield_ : float, optional
-            Yield in weight fraction of substrates converted to product 
-            over theoretical yield. 
-        titer : float, optional
-            g products / L effluent
-        productivity : float, optional
-            g products / L effluent / hr
+        spec_1 : float, optional
+        spec_1 : float, optional
+        spec_1 : float, optional
         """
         self.spec_1 = spec_1
         self.load_spec_1(spec_1 or self.spec_1)
