@@ -759,9 +759,6 @@ def plot_kde_fake_scenarios_ethanol_price(name, xticks=None, yticks=None,
     ys = tuple([y + (i - df[ethanol_price.index]) * df[ethanol_production.index]
                   + (i + j - df[ethanol_price.index] + df[relative_biodiesel_price.index]) * df[biodiesel_production.index]
                 for (i, j) in zip(ethanol_price_range, biodiesel_price_range)])
-    
-    print(x.min(), x.max())
-    print(min(ys[0].min(), ys[1].min()), max(ys[0].max(), ys[1].max()))
     ax = bst.plots.plot_kde(
         y=ys, x=xs, xticks=xticks, yticks=yticks,
         xticklabels=ticklabels, yticklabels=ticklabels,
@@ -972,7 +969,6 @@ def plot_microbial_oil_kde_2023(fs=None):
     )
     plt.subplots_adjust(
         wspace=0,
-        
     )
     for i in ('svg', 'png'):
         file = os.path.join(images_folder, f'microbial_oil_kde.{i}')
@@ -1589,6 +1585,9 @@ def plot_lines_monte_carlo(
                 if k == 0: plt.ylabel(ylabels[i])
     
     titles = ['Direct Cogeneration', 'Integrated Co-Fermentation']
+    soybean_color = CABBI_colors.grey.shade(30).RGBn
+    MBSP_soybean = 617
+    GWP_soybean = 1.29
     for i in range(nrows):
         for j in range(ncols):
             ax = axes[i, j]
@@ -1628,6 +1627,30 @@ def plot_lines_monte_carlo(
                              horizontalalignment='center',
                              fontsize=8,
                              zorder=1)
+            elif metrics[i] == 'Biodiesel yield':
+                if j == 0:
+                    ax.annotate('Soybean',
+                        xy=(1.5, MBSP_soybean), 
+                        xytext=(1.6, MBSP_soybean * 2.5),
+                        arrowprops=dict(arrowstyle="->", color=soybean_color),
+                        color=soybean_color,
+                        fontsize=8,
+                        fontweight='bold',
+                    )
+                bst.plots.plot_horizontal_line(MBSP_soybean, color=soybean_color,
+                                               linestyle='-', zorder=0)
+            elif metrics[i] == 'GWP economic':
+                bst.plots.plot_horizontal_line(GWP_soybean, color=soybean_color,
+                                               linestyle='-', zorder=0)
+                if j == 0:
+                    ax.annotate('Soybean',
+                        xy=(0.5, GWP_soybean), 
+                        xytext=(0.6, GWP_soybean * 1.5),
+                        arrowprops=dict(arrowstyle="->", color=soybean_color),
+                        color=soybean_color,
+                        fontsize=8,
+                        fontweight='bold',
+                    )
                     
             xticklabels = xtext if i == nrows - 1 else []
             yticklabels = j == 0
