@@ -380,6 +380,8 @@ def mcr_target_microbial_oil():
         ],
         metrics=[
             f.MBSP,
+            f.GWP_biodiesel_allocation,
+            f.biodiesel_yield,
         ]
     )
 

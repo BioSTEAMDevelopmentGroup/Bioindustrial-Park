@@ -294,6 +294,7 @@ def create_sucrose_fermentation_system(ins, outs,
         def evaporation():
             R301.tau = R301.titer / R301.productivity
             V_guess = F301.V
+            F301.response('V')
             s_dilution_water = M301.ins[-1]
             s_dilution_water.empty()
             path = F301.path_until(R301, inclusive=True)
