@@ -293,8 +293,8 @@ GWP_CFs = {
     'CO2': 0.87104, # ecoinvent 3.8 carbon dioxide production, liquid, RoW
     'H2': 2.3716, # ecoinvent 3.8 market for hydrogen, liquid, RoW
     
-    'SodiumAcetate': 0., # !!! update
-    'AceticAcid': 0., # !!! update
+    'SodiumAcetate': 1., # !!! update
+    'AceticAcid': 1., # !!! update
     # 'DiammoniumSulfate': 1.2901, # ecoinvent 3.8 market for ammonium sulfate, RoW
     # 'MagnesiumSulfate': 1.0411, # ecoinvent 3.8 market for magnesium sulfate, GLO
     
@@ -344,8 +344,8 @@ FEC_CFs = {
     'CO2': 7.4243, # ecoinvent 3.8 carbon dioxide production, liquid, RoW
     'H2': 75.747, # ecoinvent 3.8 market for hydrogen, liquid, RoW
 
-    'SodiumAcetate': 0., # !!! update
-    'AceticAcid': 0., # !!! update
+    'SodiumAcetate': 1., # !!! update
+    'AceticAcid': 1., # !!! update
     # 'DiammoniumSulfate': 15.166, # ecoinvent 3.8 market for ammonium sulfate, RoW
     # 'MagnesiumSulfate': 13.805, # ecoinvent 3.8 market for magnesium sulfate, GLO
     

@@ -9,14 +9,14 @@ Created on Fri Jul 31 13:57:09 2020
 from warnings import filterwarnings
 import copy
 filterwarnings('ignore')
-from biosteam.process_tools import UnitGroup
+# from biosteam.process_tools import UnitGroup
 from biosteam.digraph import digraph_from_units, save_digraph
 from biosteam.utils import streams_from_units, filter_out_missing_streams, colors
 from biosteam.report import unit_result_tables, tables_to_excel, stream_table
 import numpy as np
 import biosteam as bst
-from biosteam.utils import colors
-from matplotlib.ticker import AutoMinorLocator as AML
+# from biosteam.utils import colors
+# from matplotlib.ticker import AutoMinorLocator as AML
 
 # from TAL.system_solubility_exploit import TAL_sys, TAL_tea, R302, spec
 from biorefineries import TAL
@@ -334,17 +334,24 @@ TAL_metrics = [get_product_MPSP, get_product_purity, get_production]
 # TAL_metrics = [get_TAL_MPSP, get_GWP, get_FEC]
 
 # %% Generate 3-specification meshgrid and set specification loading functions
-steps = 10
+steps = 20
 
 # Yield, titer, productivity (rate)
 spec_1 = yields = np.linspace(0.1, 0.5, steps) # yield
 spec_2 = titers = np.linspace(10., 50., steps) # titer
-# spec_1 = np.linspace(0.2, 0.99, steps) # yield
-# spec_2 = np.linspace(45, 225, steps) # titer
-spec_3 = productivities =\
-    np.arange(0.01, 0.37, 0.1)
-    # np.array([spec.baseline_productivity,]) # productivity
+
+
+# spec_3 = productivities =\
+#     np.arange(0.01, 0.37, 0.1)
     
+
+# spec_3 = productivities =\
+#     np.array([0.2*spec.baseline_productivity, spec.baseline_productivity, 5.*spec.baseline_productivity])
+    
+
+spec_3 = productivities =\
+    np.array([spec.baseline_productivity,])
+
 # spec.load_spec_1 = spec.load_yield
 # spec.load_spec_2 = spec.load_titer
 # spec.load_spec_3 = spec.load_productivity
@@ -531,6 +538,8 @@ x_ticks=[10, 20, 30, 40, 50]
 y_ticks=[10, 20, 30, 40, 50]
 z_ticks=[0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.30]
                                 
+keep_frames=True
+
 #%% MPSP
 # MPSP_w_levels = np.array([0., 2.5, 5., 7.5, 10., 12.5, 15., 17.5, 20., 22.5, 25.])
 MPSP_w_levels = np.arange(0., 15.5, 0.5)
@@ -566,7 +575,7 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_1, 
                                 fps=3, # animation frames (z values traversed) per second
                                 n_loops='inf', # the number of times the animated contourplot should loop animation over z; infinite by default
                                 animated_contourplot_filename='part2_MPSP_animated_contourplot_'+file_to_save, # file name to save animated contourplot as (no extensions)
-                                keep_frames=False, # leaves frame PNG files undeleted after running; False by default
+                                keep_frames=keep_frames, # leaves frame PNG files undeleted after running; False by default
                                 # comparison_range=[6.51 * 112.12652/126.11004, 7.43* 112.12652/126.11004], # maximum allowable TAL price = market price of SA ($/kg-SA) * molar mass of SA / molar mass of TAL
                                 # comparison_range_hatch_pattern='////',
                                 )
@@ -598,7 +607,7 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_2, 
                                 fps=3, # animation frames (z values traversed) per second
                                 n_loops='inf', # the number of times the animated contourplot should loop animation over z; infinite by default
                                 animated_contourplot_filename='GWP_animated_contourplot_'+file_to_save, # file name to save animated contourplot as (no extensions)
-                                keep_frames=False, # leaves frame PNG files undeleted after running; False by default
+                                keep_frames=keep_frames, # leaves frame PNG files undeleted after running; False by default
                                 )
 
 
@@ -629,5 +638,5 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_3, 
                                 fps=3, # animation frames (z values traversed) per second
                                 n_loops='inf', # the number of times the animated contourplot should loop animation over z; infinite by default
                                 animated_contourplot_filename='FEC_animated_contourplot_'+file_to_save, # file name to save animated contourplot as (no extensions)
-                                keep_frames=False, # leaves frame PNG files undeleted after running; False by default
+                                keep_frames=keep_frames, # leaves frame PNG files undeleted after running; False by default
                                 )
