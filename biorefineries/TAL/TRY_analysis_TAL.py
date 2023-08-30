@@ -20,7 +20,7 @@ from matplotlib.ticker import AutoMinorLocator as AML
 
 # from TAL.system_solubility_exploit import TAL_sys, TAL_tea, R302, spec
 from biorefineries import TAL
-from biorefineries.TAL.system_solubility_exploit_ethanol_glucose import TAL_sys, TAL_tea, R302, spec, SA
+from biorefineries.TAL.system_TAL_solubility_exploit_ethanol_sugarcane import TAL_sys, TAL_tea, R302, spec, TAL_product
 # from biorefineries.TAL.system_TAL_adsorption_glucose import TAL_sys, TAL_tea, R302, spec, SA
 # from biorefineries.TAL.system_ethyl_esters import TAL_sys, TAL_tea, R302, spec, Mixed_esters
 # get_GWP, get_non_bio_GWP, get_FEC, get_SPED
@@ -48,7 +48,7 @@ dateTimeObj = datetime.now()
 ig = np.seterr(invalid='ignore')
 # bst.speed_up()
 
-product = SA
+product = TAL_product
 
 #%% Filepath
 TAL_filepath = TAL.__file__.replace('\\__init__.py', '')
@@ -246,7 +246,7 @@ lab_spec_3 = 1
 SA_price_range = [6500, 7500]
 # temporary price range from https://www.alibaba.com/product-detail/hot-sale-C4H8O-butanon-mek_62345760689.html?spm=a2700.7724857.normalList.26.1d194486SbCyfR
 
-product_chemical_IDs = ['SorbicAcid']
+product_chemical_IDs = ['TAL',]
 get_product_MPSP = lambda: TAL_tea.solve_price(product) * 907.185 / get_product_purity() # USD / ton
 get_product_purity = lambda: sum([product.imass[i] for i in product_chemical_IDs])/product.F_mass
 get_production = lambda: sum([product.imass[i] for i in product_chemical_IDs])
@@ -334,7 +334,7 @@ TAL_metrics = [get_product_MPSP, get_product_purity, get_production]
 # TAL_metrics = [get_TAL_MPSP, get_GWP, get_FEC]
 
 # %% Generate 3-specification meshgrid and set specification loading functions
-steps = 25
+steps = 10
 
 # Yield, titer, productivity (rate)
 spec_1 = yields = np.linspace(0.1, 0.5, steps) # yield
@@ -342,7 +342,7 @@ spec_2 = titers = np.linspace(10., 50., steps) # titer
 # spec_1 = np.linspace(0.2, 0.99, steps) # yield
 # spec_2 = np.linspace(45, 225, steps) # titer
 spec_3 = productivities =\
-    np.arange(0.01, 0.31, 0.01)
+    np.arange(0.01, 0.37, 0.1)
     # np.array([spec.baseline_productivity,]) # productivity
     
 # spec.load_spec_1 = spec.load_yield
@@ -533,7 +533,7 @@ z_ticks=[0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.30]
                                 
 #%% MPSP
 # MPSP_w_levels = np.array([0., 2.5, 5., 7.5, 10., 12.5, 15., 17.5, 20., 22.5, 25.])
-MPSP_w_levels = np.arange(0., 18., 0.5)
+MPSP_w_levels = np.arange(0., 15.5, 0.5)
 contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_1, # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., MPSP
                                 x_data=100*yields, # x axis values
                                 # x_data = yields/theoretical_max_g_TAL_acid_per_g_glucose,
@@ -547,7 +547,8 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_1, 
                                 y_ticks=y_ticks,
                                 z_ticks=z_ticks,
                                 w_levels=MPSP_w_levels, # levels for unlabeled, filled contour areas (labeled and ticked only on color bar)
-                                w_ticks=np.array([4., 5., 10., 15., 25.]), # labeled, lined contours; a subset of w_levels
+                                w_ticks=np.array([1., 2., 3., 4., 5., 6., 8., 10., 11., 12., 13., 15.]), # labeled, lined contours; a subset of w_levels
+                                # w_ticks=[],
                                 x_units=r"$\mathrm{\%}$" + " " + r"$\mathrm{theoretical}$",
                                 # x_units=r"$\mathrm{g} \cdot \mathrm{g}$" + " " + r"$\mathrm{glucose}$" + " " + r"$\mathrm{eq.}^{-1}$",
                                 y_units=r"$\mathrm{g} \cdot \mathrm{L}^{-1}$",
@@ -562,12 +563,12 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_1, 
                                 cbar_ticks=np.array([0., 2.5, 5., 7.5, 10., 12.5, 15., 17.5]),
                                 z_marker_color='g', # default matplotlib color names
                                 axis_title_fonts={'size': {'x': 14, 'y':14, 'z':14, 'w':14},},
-                                fps=10, # animation frames (z values traversed) per second
+                                fps=3, # animation frames (z values traversed) per second
                                 n_loops='inf', # the number of times the animated contourplot should loop animation over z; infinite by default
                                 animated_contourplot_filename='part2_MPSP_animated_contourplot_'+file_to_save, # file name to save animated contourplot as (no extensions)
-                                keep_frames=True, # leaves frame PNG files undeleted after running; False by default
-                                comparison_range=[6.51, 7.43],
-                                comparison_range_hatch_pattern='////',
+                                keep_frames=False, # leaves frame PNG files undeleted after running; False by default
+                                # comparison_range=[6.51 * 112.12652/126.11004, 7.43* 112.12652/126.11004], # maximum allowable TAL price = market price of SA ($/kg-SA) * molar mass of SA / molar mass of TAL
+                                # comparison_range_hatch_pattern='////',
                                 )
 
 #%% GWP

@@ -297,6 +297,9 @@ GWP_CFs = {
     'AceticAcid': 0., # !!! update
     # 'DiammoniumSulfate': 1.2901, # ecoinvent 3.8 market for ammonium sulfate, RoW
     # 'MagnesiumSulfate': 1.0411, # ecoinvent 3.8 market for magnesium sulfate, GLO
+    
+    'NiSiO2':10., # !!! update
+    'Amberlyst70_':10., # !!! update
     }
 
 
@@ -345,6 +348,10 @@ FEC_CFs = {
     'AceticAcid': 0., # !!! update
     # 'DiammoniumSulfate': 15.166, # ecoinvent 3.8 market for ammonium sulfate, RoW
     # 'MagnesiumSulfate': 13.805, # ecoinvent 3.8 market for magnesium sulfate, GLO
+    
+    'NiSiO2':10., # !!! update
+    'Amberlyst70_':10., # !!! update
+    
     }
 
 FEC_CF_array = chems.kwarray(FEC_CFs)

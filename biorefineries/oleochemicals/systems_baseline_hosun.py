@@ -223,9 +223,13 @@ def dihydroxylation_system(ins,outs):
     def adjust_tungsten_catalyst_flow(tungstencatalyst_mass_factor,TA_cycles_of_reuse):
             moles_of_unsaturation = biodiesel.imol['Methyl_oleate']+ 2*biodiesel.imol['Methyl_linoleate'] + 3* biodiesel.imol['Methyl_linolenate'] 
             moles_of_tungstic_acid_required_per_cycle = tungstencatalyst_mass_factor * moles_of_unsaturation * 1/TA_cycles_of_reuse
-            M200.ins[1].imol['Tungstic_acid'] = moles_of_tungstic_acid_required_per_cycle - (recovered_tungstic_acid.imol['Tungstic_acid'])
+            if moles_of_tungstic_acid_required_per_cycle - (recovered_tungstic_acid.imol['Tungstic_acid']) <0:
+                M200.ins[1].imol['Tungstic_acid'] = 0
+                recovered_tungstic_acid.imol['Tungstic_acid'] = moles_of_tungstic_acid_required_per_cycle
+            else:
+                M200.ins[1].imol['Tungstic_acid'] = moles_of_tungstic_acid_required_per_cycle - (recovered_tungstic_acid.imol['Tungstic_acid'])
             M200.run()
-    M200.add_specification(adjust_tungsten_catalyst_flow,args = [0.0078,3 ])
+    M200.add_specification(adjust_tungsten_catalyst_flow,args = [0.0078,3])
     
 ##Dihydroxylation reaction is conducted under vaccuum under absolute pressure of 0.10-0.20*10^5 Pa [3]
     R200 = units_baseline.DihydroxylationReactor('R200',
@@ -308,9 +312,16 @@ def oxidative_cleavage_system(ins,outs):
         R300.ins[1].empty()
         total_incoming_cobalt_catalyst_moles = recovered_mixture_of_cobalt_catalyst.imol['Cobalt_hydroxide'] 
         b = cobaltcatalyst_mass_factor*total_diol_moles/cycles_of_reuse
-        a = max(0,(b - total_incoming_cobalt_catalyst_moles)*chems['Cobalt_acetate_tetrahydrate'].MW )
-        R300.ins[1].imass['Cobalt_acetate_tetrahydrate'] = a/g_to_Kg
-        R300.ins[1].imass['Water'] = 65.66*a/g_to_Kg
+        #a = max(0,(b - total_incoming_cobalt_catalyst_moles)*chems['Cobalt_acetate_tetrahydrate'].MW )
+        if b-total_incoming_cobalt_catalyst_moles < 0:
+            R300.ins[1].imol['Cobalt_acetate_tetrahydrate'] = 0
+            R300.ins[2].imol['Cobalt_hydroxide']  = b
+        else:
+            a = (b - total_incoming_cobalt_catalyst_moles)*chems['Cobalt_acetate_tetrahydrate'].MW 
+            R300.ins[1].imass['Cobalt_acetate_tetrahydrate']  = a/g_to_Kg
+            R300.ins[1].imass['Water'] =  65.66*a/g_to_Kg
+        # R300.ins[1].imass['Cobalt_acetate_tetrahydrate'] = a/g_to_Kg
+        # R300.ins[1].imass['Water'] = 65.66*a/g_to_Kg
         c = 0.21*air_mass_factor*(dihydroxylation_product.F_mass + recycled_diols_and_other_fatty_acids.F_mass)
         d = 0.79*air_mass_factor*(dihydroxylation_product.F_mass + recycled_diols_and_other_fatty_acids.F_mass)
         air_for_oxidative_cleavage.imass['Oxygen'] = c
@@ -734,7 +745,6 @@ def azelaic_acid_production(ins,outs):
                                               times_of_reuse = 50)
     def calculating_water_for_hydrolysis_1():
         Fatty_acid_mass_1 = R601.ins[0].F_mass 
-        # + R601.ins[3].F_mass
         R601.ins[1].imass['Water'] = water_mass_1 = Fatty_acid_mass_1*5/85 #90% of the mixture is FAs and water, water is 5% of the total[8]
     R601.add_specification(calculating_water_for_hydrolysis_1,run = True)
     
@@ -915,6 +925,7 @@ def azelaic_acid_production(ins,outs):
     HX603 =  bst.HXutility(ID = 'HX603', ins = D604-0, 
                             outs = ('reaction_mixture'),
                             T = 90+273.15) 
+    
 #Increasing pressure from 4000Pa to 101325Pa
     P603 = bst.Pump(ID = 'P603',
                     ins = HX603.outs[0],
@@ -923,8 +934,15 @@ def azelaic_acid_production(ins,outs):
     
     recycled_solvent_for_extraction = bst.Stream(ID = 'recycled_solvent_for_extraction')
     
+    H60  = bst.HXutility(ID = 'H60', 
+                          ins = recycled_solvent_for_extraction,
+                          outs = 'cooled_recycled_solvent',
+                          T = 20+273.15,
+                          #rigorous = True
+                          )
+   
     M602 = bst.Mixer('M602',ins = (P603-0,T605-0,
-                                   recycled_solvent_for_extraction
+                                   H60-0
                                    ),
                       outs = ('solvent_organics_mixture_for_extraction'))
    
@@ -932,7 +950,11 @@ def azelaic_acid_production(ins,outs):
         M602.run()
         # 0.3:1 to 2.5:1 ratio of solvent: weight of azelaic acid #[12]
         Total_required_solvent = solvent_factor*D604.outs[0].imass['Azelaic_acid']
-        M602.ins[1].imass['Heptane']  = max(0,Total_required_solvent-M602.ins[2].imass['Heptane'])
+        if Total_required_solvent-M602.ins[2].imass['Heptane'] < 0:
+            M602.ins[1].imass['Heptane']  = 0
+            M602.ins[2].imass['Heptane']  = Total_required_solvent
+        else:
+            M602.ins[1].imass['Heptane']  = Total_required_solvent-M602.ins[2].imass['Heptane']    
     M602.add_specification(solvent_for_extraction,args = [0.3], run = True) 
     
     recycled_water_for_LLE = bst.Stream('recycled_water_for_LLE') 
@@ -944,13 +966,14 @@ def azelaic_acid_production(ins,outs):
                           ins = M603.outs[0],
                           outs = 'hot_water_for_extraction',
                           T = 90+273.15)
+    P608 = bst.Pump(ID = 'P608',ins = HX602-0,P = 101325)
     P606 = bst.Pump(ID = 'P606',
                    ins = M602-0,
                    P = 101325)
     
 # The partition coefficients for the multistage mixer settler are based on [14]
     MMS601 = bst.units.MultiStageMixerSettlers(ID = 'MMS601',
-                                   ins = (P606-0, HX602-0),
+                                   ins = (P606-0, P608-0),
                                    outs = ('raffinate_AA','solvent_monocarboxylics_mixture'),
                                    partition_data={'raffinate_chemicals': ('Water'),
                                                    'extract_chemicals': ('Caprylic_acid','Hexanoic_acid',
@@ -970,35 +993,42 @@ def azelaic_acid_production(ins,outs):
                                                                   0.085755078,  
                                                                   ]),'phi': 0.590 # Initial phase fraction guess
                                                    },N_stages= 12)#[14]#TODO: check
-    def water_for_extraction(water_mass_fraction):
+    def water_for_extraction(x_water_fraction):
+        D604.run()
         #Weight of water to azelaic acid, 3.5:1 to 20:1 #TODO: check
-        # D604.run()
-        total_water_required = water_mass_fraction*D604.outs[0].imass['Azelaic_acid']
-        M603.ins[0].F_mass = total_water_required - M603.ins[1].F_mass
+        total_water_required = x_water_fraction*D604.outs[0].imass['Azelaic_acid']
+        # print(total_water_required)
+        if total_water_required-M603.ins[1]['l'].imass['Water'] < 0:
+            M603.ins[0].imass['Water']  = 0
+            M603.ins[1]['l'].imass['Water']  = total_water_required
+        else:
+            M603.ins[0].imass['Water']  = total_water_required-M603.ins[1]['l'].imass['Water']
+            # print(total_water_required-M603.ins[1]['l'].imass['Water'])
         M603.run()
-        HX602.run()
-    M603.add_specification(water_for_extraction,args = [4])
+    M603.add_specification(water_for_extraction,args = [4.5])
    
 #Evaportation Drying zone [14] 
 #Generally temperatures up to about 280 C. are used at pressures of from 1.0 to 30 mm Hg. 
+#TODO: error saying R601 is adding results in _run(), check_run() fails for R601
+    P607 = bst.Pump(ID = 'P607',
+                    ins=MMS601-0, 
+                    P= 10000)
     
     E601 = bst.BinaryDistillation('E601',
-                                      ins=MMS601-0,
-                                      outs=('recovered_water_stream'
-                                        'azelaic_acid_stream',
-                                            ),
-                                      P=101325,
-                                      LHK = ('Water','Azelaic_acid'),
-                                      Lr=0.999,
-                                      Hr=0.999,
-                                      k = 1.25,
-                                      partial_condenser= False                                        
-                                      )
-    E601.check_LHK = False
-                                       
-    P602 = bst.Pump(ID = 'P602',
-                    ins=E601-1, 
-                    P=101325 / 4)
+                    ins= P607-0,
+                     outs=('recovered_water_stream',
+                           'azelaic_acid_stream',
+                           ),
+                     
+                     LHK = (
+                         'Water',
+                         'Malonic_acid',
+                     ),
+                     Lr=0.99,
+                     Hr=0.99,
+                     P =3999.67105,#Using highest pressure 30mmHg to reduce costs [11]
+                     k = 1.25,
+                     partial_condenser= True)
     
 #Splitter to ensure 75% of the wastewater is being recycled  
     S601 = bst.Splitter(ID = 'S601',
@@ -1008,13 +1038,19 @@ def azelaic_acid_production(ins,outs):
                         split = 0.75) 
     
     HX606 = bst.HXutility(ID = 'HX606',
+                          outs = 'recycled_water_to_pump' ,
                           ins = S601-0,
-                          outs = recycled_water_for_LLE,
-                          T = 25+273.15
+                          T = 25+273.15,
+                          rigorous = True
                           )  
+    P609 = bst.Pump(ID = 'P609',
+                         ins = HX606-0,
+                         outs = recycled_water_for_LLE,
+                         P = 101325)
+    
 #Range is 235-280 deg Cel with a pressure between 1-30 mmHg [14]
     HX605 = bst.HXutility(ID = 'HX605',
-                          ins = P602-0,
+                          ins = E601-1,#P602-0,
                           outs = 'heated_aa_mix_for_sep',
                           T = 280+273)
   
@@ -1028,14 +1064,15 @@ def azelaic_acid_production(ins,outs):
                                             'Azelaic_acid',
                                             'Monomethyl_azelate',
                                         ),
-                                        Lr=0.999,
-                                        Hr=0.999,
-                                        P =  3999.67105,#Using highest pressure 30mmHg to reduce costs [11]
+                                        Lr=0.99,
+                                        Hr=0.99,
+                                        P = 3999.67105,#Using highest pressure 30mmHg to reduce costs [11]
                                         k = 1.25,
-                                        partial_condenser= False                                        
+                                        partial_condenser= True                                        
                                         )
+    # D605.check_LHK = False
    
-    HX604 = bst.HXutility(ID = 'HX642',
+    HX604 = bst.HXutility(ID = 'HX604',
                           ins = D605.outs[0],
                           outs = 'Pre_cooled_stream',
                           T = 150 +273.15)
@@ -1049,54 +1086,28 @@ def azelaic_acid_production(ins,outs):
                                         T_out = 60 + 273.15,#Lower than the melting point of Stearic acid
                                         ) 
 
-
 ###Recycling the solvent
     HX607 = bst.IsenthalpicValve(ID = 'HX607',
                                  ins = MMS601-1,
-                                 P = 3000)
+                                 P = 4000)
 
     F608 = bst.Flash(ID = 'F608',
                         ins = HX607-0 ,
-                        outs = ('recovered_heptane',
+                        outs = (recycled_solvent_for_extraction,
                                 'fatty_acid_blend_to_recovery'),
-                        P = 1500,
+                        P = 4000,
                         T = 373)
 
-#TODO: what does the error f(y0) and f(Y1) need to have opp signs mean
-    # @F608.add_bounded_numerical_specification(x0=500, x1=5000, xtol=1e-9, ytol=1e-9)
-    # def f(x):
-    #     F608.P = x
-    #     F608.run() 
-    #     feed = F608.ins[0]
-    #     vapor = F608.outs[0]
-    #     Heptane_recovery = vapor.imass['Heptane'] / feed.imass['Heptane']
-    #     return Heptane_recovery - 0.99
-    
-    # F608.check_LHK = False
-#TODO: try operating D608 at lower pressures
-    # HX609 = bst.HXutility(ID = 'HX609',
-    #                       ins = F608-1,
-    #                       T = 340,
-    #                       rigorous = True)
-
-    D608 = bst.ShortcutColumn(ID = 'D608',
+    D608 = bst.BinaryDistillation(ID = 'D608',
                                   ins = F608-1,
                                   outs = (fatty_acid_blend,
                                           'recovered_monomethyl_azelate_rich_stream'),
                                   LHK = ('Stearic_acid','Monomethyl_azelate'),
-                                  P = 500,
+                                  P = 3000,
                                   Lr = 0.90,
                                   Hr = 0.99,
                                   k = 2
                                     )
-    # @D608.add_bounded_numerical_specification(x0=200, x1=5000, xtol=1e-9, ytol=1e-3)
-    # def f(x):
-    #     D608.P = x
-    #     D608.run() 
-    #     feed = D608.ins[0]
-    #     vapor = D608.outs[0]
-    #     SA_recovery = vapor.imass['Stearic_acid'] / feed.imass['Stearic_acid']
-    #     return SA_recovery - 0.90
     
     M608 = bst.Mixer('M608', 
                     ins = (
@@ -1105,14 +1116,22 @@ def azelaic_acid_production(ins,outs):
                             ),
                     outs = 'monomethyl_azelate_rich_fraction_to_pump')
     
-    P604 = bst.Pump(ID = 'P604',ins = M608-0, outs = monomethyl_azelate_rich_fraction, P = 1000000)
-    
-    FHX608 = bst.HXutility(ID = 'FHX608',
-                           ins = F608-0,
-                           outs = recycled_solvent_for_extraction,
-                           T = 25 + 273.15)
-    #TODO: check why the phase of this stream still 'g'
-    
+    P604 = bst.Pump(ID = 'P604',ins = M608-0,
+                    outs = monomethyl_azelate_rich_fraction,
+                    P = 1000000)
+
+
+    # FHX608 = bst.HXutility(ID = 'FHX608',
+    #                        ins = F608-0,
+    #                        outs = recycled_solvent_for_extraction,
+    #                        T = 25 + 273.15,
+    #                        cool_only=  True)
+        
+    # P61 = bst.IsentropicCompressor(ID = 'P61',
+    #                    ins = FHX608-0,
+    #                    outs = recycled_solvent_for_extraction,
+    #                    P = 101325)
+
 #########################################################################################################
 @SystemFactory(ID = 'aa_baseline_sys',
                )
@@ -1136,7 +1155,7 @@ def aa_baseline_sys(ins,outs):
                                                         DAG = 0,
                                                         Oleic_acid = 0.92,
                                                         characterization_factors = {'GWP100':GWP_factors['HoSun_oil']},
-                                                        total_flow = 3.34e+04,
+                                                        total_flow = 33805.28676, #34635.99842,
                                                         price = prices_per_Kg['Crude_HoSun_oil'],
                                                         units = 'kg/hr',
                                                         phase = 'l'),
@@ -1194,12 +1213,12 @@ def aa_baseline_sys(ins,outs):
                                                         ),
                                             recovered_mixture_of_cobalt_catalyst))
     ob3 = organic_phase_separation_and_catalyst_recovery(ins = (ob2.outs[0],
-                                                         bst.Stream(ID ='sodium_hydroxide_for_cat_sep',
+                                                          bst.Stream(ID ='sodium_hydroxide_for_cat_sep',
                                                                     Sodium_hydroxide_solid = 1,
                                                                     units = 'kg/hr',
                                                                     price = prices_per_Kg['Sodium_hydroxide'],
                                                                     characterization_factors = {'GWP100': GWP_characterization_factors['NaOH']}), #TODO: add latest
-                                                         bst.Stream(ID = 'water_for_NaOH_soln_prep',
+                                                          bst.Stream(ID = 'water_for_NaOH_soln_prep',
                                                                     Water = 1,
                                                                     units = 'kg/hr'),
                                                         bst.Stream(ID = 'calcium_chloride_for_cat_sep',
@@ -1207,61 +1226,61 @@ def aa_baseline_sys(ins,outs):
                                                                     units = 'kg/hr',
                                                                     price = prices_per_Kg['Calcium_chloride'],
                                                                     characterization_factors =  {'GWP100':GWP_factors['Cobalt_nitrate']}),
-                                                         bst.Stream(ID ='conc_hydrochloric_acid', 
+                                                          bst.Stream(ID ='conc_hydrochloric_acid', 
                                                                     Liquid_HCl = 35/100,
                                                                     Water = 65/100,
                                                                     price = prices_per_Kg['HCl'],
                                                                     units = 'kg/hr',
                                                                     characterization_factors = {'GWP100':GWP_factors['Conc_HCl']}),
-                                                         bst.Stream(ID = 'water_for_dilution',
+                                                          bst.Stream(ID = 'water_for_dilution',
                                                                     Water = 1,
                                                                     units = 'kg/hr')),                                                                 
-                                                         outs = (
-                                                                 bst.Stream(ID = 'dried_crude_fatty_acids'),
-                                                                 recovered_mixture_of_cobalt_catalyst, 
-                                                                 bst.Stream(ID = 'wastewater8'),
-                                                                 bst.Stream(ID = 'hot_air1'),
-                                                                 bst.Stream(ID = 'emissions1'),                                                                 
-                                                                 recovered_tungstic_acid,
-                                                                 bst.Stream(ID = 'hot_air2'),
-                                                                 bst.Stream(ID = 'emissions2')  
-                                                                 ))
+                                                          outs = (
+                                                                  bst.Stream(ID = 'dried_crude_fatty_acids'),
+                                                                  recovered_mixture_of_cobalt_catalyst, 
+                                                                  bst.Stream(ID = 'wastewater8'),
+                                                                  bst.Stream(ID = 'hot_air1'),
+                                                                  bst.Stream(ID = 'emissions1'),                                                                 
+                                                                  recovered_tungstic_acid,
+                                                                  bst.Stream(ID = 'hot_air2'),
+                                                                  bst.Stream(ID = 'emissions2')  
+                                                                  ))
     ob5 = nonanoic_acid_fraction_separation(ins = (ob3.outs[0]))
                                             
     ob6 = azelaic_acid_production(ins = (ob5.outs[2],
-                                         bst.Stream(ID ='water_for_emulsification1',
-                                                     Water = 1,
-                                                     units = 'kg/hr'),
-                                         bst.Stream(ID ='water_for_emulsification2',
-                                                     Water = 1,
-                                                     units = 'kg/hr'),
-                                         bst.Stream(ID ='water_for_emulsification3',
-                                                     Water = 1,
-                                                     units = 'kg/hr'),
-                                         bst.Stream(ID = 'water_for_azelaicacid_extraction',
-                                                     Water = 1,
-                                                     units = 'kg/hr'),
-                                         bst.Stream(ID = 'solvent_for_MCA_extraction',
+                                          bst.Stream(ID ='water_for_emulsification1',
+                                                      Water = 1,
+                                                      units = 'kg/hr'),
+                                          bst.Stream(ID ='water_for_emulsification2',
+                                                      Water = 1,
+                                                      units = 'kg/hr'),
+                                          bst.Stream(ID ='water_for_emulsification3',
+                                                      Water = 1,
+                                                      units = 'kg/hr'),
+                                          bst.Stream(ID = 'water_for_azelaicacid_extraction',
+                                                      Water = 1,
+                                                      units = 'kg/hr'),
+                                          bst.Stream(ID = 'solvent_for_MCA_extraction',
                                                     Heptane = 1,
-                                                     units = 'kg/hr',
-                                                     price = prices_per_Kg['Heptane'],
-                                                     characterization_factors = {'GWP100':GWP_factors['Solvent']},
-                                                     ),
+                                                      units = 'kg/hr',
+                                                      price = prices_per_Kg['Heptane'],
+                                                      characterization_factors = {'GWP100':GWP_factors['Solvent']},
+                                                      ),
                                               ),
                                         outs = (bst.Stream(ID = 'crude_methanol',price = price['Methanol']),
                                                 bst.Stream(ID = 'wastewater3'),
                                                 recycled_diols_and_other_fatty_acids,
                                                 bst.Stream(ID = 'azelaic_acid_product_stream',
-                                                           units='kg/hr'),
+                                                            units='kg/hr'),
                                                 bst.Stream(ID = 'fatty_acid_blend',
-                                                           units = 'kg/hr')))
+                                                            units = 'kg/hr')))
 # All the Facilities (Area 900)
     plant_air_in =  bst.Stream('plant_air_in',
                                 phase='g', Nitrogen=0.79, 
                                 Oxygen=0.21,units='kg/hr')
     ADP901 = bst.AirDistributionPackage(ID='ADP901',
-                                         ins=plant_air_in,
-                                         outs = 'plant_air_out')
+                                          ins=plant_air_in,
+                                          outs = 'plant_air_out')
     @ADP901.add_specification(run=True)
     def adjust_plant_air(): 
         plant_air_in.imass['Oxygen'] = F.air_for_oxidative_cleavage.imass['Oxygen']                                      
@@ -1269,13 +1288,13 @@ def aa_baseline_sys(ins,outs):
 #Streams to boiler turbogenerator,Liquid/Solid waste streams mixer
     M901 = bst.Mixer( ID = 'M901',
                       ins = (F.polar_lipids_to_boilerturbogenerator, 
-                             F.waste_to_boilerturbogenerator,
-                             F.waste_to_BT,
-                             F.send_to_BT1,
-                             F.wastewater8,
-                             ),
-                       outs = ('total_effluent_to_be_burned')
-                       )
+                              F.waste_to_boilerturbogenerator,
+                              F.waste_to_BT,
+                              F.send_to_BT1,
+                              F.wastewater8,
+                              ),
+                        outs = ('total_effluent_to_be_burned')
+                        )
 #This unit burns the streams provided to it to generate electricity
     BT901 = bst.BoilerTurbogenerator(ID ='BT901',
                                         ins = (M901-0,
@@ -1304,43 +1323,43 @@ def aa_baseline_sys(ins,outs):
     CT901.outs[0].price = 0 
 #All the streams that are required in the different sections for production of azelaic acid
     process_water_streams_available = (
-                                         F.stream.water_for_emulsification1,#Water used for hydrolysis and emulsification
-                                         F.stream.water_for_emulsification2,#Water used for hydrolysis
-                                         F.stream.water_for_emulsification3,#Water used for hydrolysis
-                                         F.stream.water_for_degumming,#Water used for degumming the oils from the polar lipids
-                                         F.stream.water_for_degumming_2,#Second Water stream used for degumming the oils from the polar lipids
-                                         F.stream.biodiesel_wash_water, #Wash water for biodiesel
-                                         F.stream.water_for_azelaicacid_extraction,                                                                        
-                                         CT901.outs[1],#Cooling_tower_blowdown_from_cooling tower
-                                         BT901.outs[1],#rejected_water_and_blowdown from boilerturbogen   
+                                          F.stream.water_for_emulsification1,#Water used for hydrolysis and emulsification
+                                          F.stream.water_for_emulsification2,#Water used for hydrolysis
+                                          F.stream.water_for_emulsification3,#Water used for hydrolysis
+                                          F.stream.water_for_degumming,#Water used for degumming the oils from the polar lipids
+                                          F.stream.water_for_degumming_2,#Second Water stream used for degumming the oils from the polar lipids
+                                          F.stream.biodiesel_wash_water, #Wash water for biodiesel
+                                          F.stream.water_for_azelaicacid_extraction,                                                                        
+                                          CT901.outs[1],#Cooling_tower_blowdown_from_cooling tower
+                                          BT901.outs[1],#rejected_water_and_blowdown from boilerturbogen   
                                          
-                                         )                         
+                                          )                         
 
 
     makeup_water_streams_available = (F.stream.cooling_tower_makeup_water,#This is the second inlet to cooling tower
                                       F.stream.boiler_makeup_water #This is the second inlet to boilerturbogen
-                                       )
+                                        )
 
     system_makeup_water = bst.Stream('system_makeup_water', price = prices_per_Kg['System_makeup_water'],
-                                     characterization_factors={'GWP100': 0.00035559})#Ecoinvent:tap water production, conventional treatment, RoW, (Author: Marylène Dussault inactive)) #Ref: DOE Annual water rates pdf,adjusted using FRED's PPI> Industry based> Utilities.(1kgal = 1000gal, 1gal = 3.78541 Kg)
+                                      characterization_factors={'GWP100': 0.00035559})#Ecoinvent:tap water production, conventional treatment, RoW, (Author: Marylène Dussault inactive)) #Ref: DOE Annual water rates pdf,adjusted using FRED's PPI> Industry based> Utilities.(1kgal = 1000gal, 1gal = 3.78541 Kg)
    
     MT901 = bst.Mixer(ID = 'MT901',
                       ins = (F.R200.outs[0],
-                             F.wastewater3,
-                             F.wastewater))
+                              F.wastewater3,
+                              F.wastewater))
                       
     
     PWT901 = bst.ProcessWaterCenter(ID = 'PWT901',
-                             ins = ('clean_water',
-                                     system_makeup_water,
-                                     MT901-0                                     
-                                     ),
-                             outs = (bst.Stream(ID = 'process_water', units ='kg/hr'),
-                                     bst.Stream(ID ='unused_clean_water', price = 0, units = 'kg/hr')),
-                             makeup_water_streams = makeup_water_streams_available,
-                             process_water_streams = process_water_streams_available 
-                             )
-    # HXN = bst.facilities.HeatExchangerNetwork('HXN',ignored  = [F.D604,F.F608,F.D607,F.R200,F.R300])
+                              ins = ('clean_water',
+                                      system_makeup_water,
+                                      MT901-0                                     
+                                      ),
+                              outs = (bst.Stream(ID = 'process_water', units ='kg/hr'),
+                                      bst.Stream(ID ='unused_clean_water', price = 0, units = 'kg/hr')),
+                              makeup_water_streams = makeup_water_streams_available,
+                              process_water_streams = process_water_streams_available 
+                              )
+    # #HXN = bst.facilities.HeatExchangerNetwork('HXN',ignored  = [F.D604,F.F608,F.D607,F.R200,F.R300])
     
  
 #References

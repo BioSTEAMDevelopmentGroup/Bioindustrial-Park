@@ -21,11 +21,11 @@ from biorefineries.oleochemicals import prices_and_GWP_factors
 from prices_and_GWP_factors import prices_per_Kg, GWP_factors,transesterification_catalyst_price
 from biosteam import preferences
 from biosteam import report
-import contourplots
-from contourplots import stacked_bar_plot,box_and_whiskers_plot
+# import contourplots
+# from contourplots import stacked_bar_plot,box_and_whiskers_plot
 
 bst.preferences.T = 'K'
-# bst.preferences.flow = 'kg/hr'
+bst.preferences.flow = 'kg/hr'
 bst.preferences.N = 100
 bst.preferences.P = 'Pa'
 bst.preferences.composition = True
@@ -39,13 +39,14 @@ bst.settings.define_impact_indicator(key=GWP, units='kg*CO2e')
 bst.settings.set_electricity_CF(GWP,0.36, basis='kWhr', units='kg*CO2e')# From cane biorefinery #TODO:change
 bst.PowerUtility.price = 0.065  # Electricity price [USD/hr], based on lipidcane biorefinery #TODO: change
 aa_baseline_sys = aa_baseline_sys() #Includes the processes and facilities
-aa_baseline_sys.set_tolerance(mol=1e-7, 
-                              rmol=1e-2,
-                              subsystems=True)
+# aa_baseline_sys.empty_recyles()
+# aa_baseline_sys.set_tolerance(mol=1e-9, 
+                              # rmol=1e-1,
+                              # subsystems=True)
 aa_baseline_sys.simulate()
 
 
-#########################################################################################################
+# #########################################################################################################
 F.stream.crude_vegetable_oil.characterization_factors = {'GWP100':GWP_factors['HoSun_oil']}
 F.stream.base_for_saponification_of_FFA.characterization_factors = {'GWP100': GWP_characterization_factors['NaOH']}
 F.stream.citricacid_for_degumming.characterization_factors = {'GWP100':GWP_factors['Citric_acid']}                                                      
@@ -196,7 +197,7 @@ def solve_IRR(): return azelaic_acid_tea.solve_IRR()
 # Environmental impact calculation
 products = [azelaic_acid,recovered_C5_to_C8_MCA_fraction,pelargonic_acid_rich_fraction,fatty_acid_blend,crude_methanol,crude_glycerol]
 extra_streams = [F.resin_for_hydrolysis_1,F.resin_for_hydrolysis_2,F.resin_for_hydrolysis_3,
-                 F.regeneration_acid_to_HydrolysisSystem]
+                  F.regeneration_acid_to_HydrolysisSystem]
 #TODO: find what s48 and s50 are in extra streams
 emissions = [i for i in F.stream if i.source and not i.sink and not i in products and not i in extra_streams]
 
@@ -258,142 +259,142 @@ def get_net_GWP():
 
 #######################################################################################################################3
 metrics = [
-    #Metric('MPSP', get_MPSP, '$/kg'),
-    # Metric('Total product yield', get_total_yield, '10^6 kg/yr'),
-    # Metric('Product purity', get_purity, '%'),
-    # Metric('Total capital investment', get_overall_TCI, '10^6 $'),
-    # Metric('Annual operating cost', get_operating_cost, '10^6 $/yr'),
-    # Metric('Annual material cost', get_material_cost, '10^6 $/yr'),
-    # Metric('Total', get_system_heating_demand, 'KJ/yr', 'Heating demand'),
-    # Metric('Total', get_system_cooling_water_duty,'KJ/yr', 'Cooling demand'),
-    # Metric('NPV', get_NPV, '$', 'TEA'),
-    # Metric('Internal rate of return', solve_IRR, '%'),
+    Metric('MPSP', get_MPSP, '$/kg'),
+    Metric('Total product yield', get_total_yield, '10^6 kg/yr'),
+    Metric('Product purity', get_purity, '%'),
+    Metric('Total capital investment', get_overall_TCI, '10^6 $'),
+    Metric('Annual operating cost', get_operating_cost, '10^6 $/yr'),
+    Metric('Annual material cost', get_material_cost, '10^6 $/yr'),
+    Metric('Total', get_system_heating_demand, 'KJ/yr', 'Heating demand'),
+    Metric('Total', get_system_cooling_water_duty,'KJ/yr', 'Cooling demand'),
+    Metric('NPV', get_NPV, '$', 'TEA'),
+    Metric('Internal rate of return', solve_IRR, '%'),
     Metric('Net GWP', get_net_GWP, 'kg CO2-eq/kg', 'LCA'),
 ]
 model = Model(aa_baseline_sys,
-              metrics,
+              metrics,  
               exception_hook='raise'
               )
 
 
-lb_o = crude_oil_feedstock.price * 0.75
-ub_o = crude_oil_feedstock.price * 1.25  # Maximum price
-@model.parameter(name='HoSun oil price',
-                  element=crude_oil_feedstock, kind='isolated', units='USD/kg',
-                  distribution=shape.Uniform(lb_o, ub_o))
-def set_feedstock_price(feedstock_price):
-    crude_oil_feedstock.price = feedstock_price
+# lb_o = crude_oil_feedstock.price * 0.75
+# ub_o = crude_oil_feedstock.price * 1.25  # Maximum price
+# @model.parameter(name='HoSun oil price',
+#                   element=crude_oil_feedstock, kind='isolated', units='USD/kg',
+#                   distribution=shape.Uniform(lb_o, ub_o))
+# def set_feedstock_price(feedstock_price):
+#     crude_oil_feedstock.price = feedstock_price
 
 
-lb_t = fresh_tungsten_catalyst.price*0.75
-ub_t = fresh_tungsten_catalyst.price*1.25
-@model.parameter(name='Tungstic acid catalyst price',
-                  element=fresh_tungsten_catalyst, kind='isolated', units='USD/kg',
-                  distribution=shape.Uniform(lb_t, ub_t))
-def set_tungstencat_price(tungstencat_price):
-    fresh_tungsten_catalyst.price = tungstencat_price
+# lb_t = fresh_tungsten_catalyst.price*0.75
+# ub_t = fresh_tungsten_catalyst.price*1.25
+# @model.parameter(name='Tungstic acid catalyst price',
+#                   element=fresh_tungsten_catalyst, kind='isolated', units='USD/kg',
+#                   distribution=shape.Uniform(lb_t, ub_t))
+# def set_tungstencat_price(tungstencat_price):
+#     fresh_tungsten_catalyst.price = tungstencat_price
 
 
-lb_c = fresh_cobalt_catalyst.price*0.75
-ub_c = fresh_cobalt_catalyst.price*1.25
-@model.parameter(name='Cobalt acetate catalyst price',
-                  element=fresh_cobalt_catalyst, kind='isolated', units='USD/kg',
-                  distribution=shape.Uniform(lb_c, ub_c))
-def set_cobaltcat_price(fresh_cobalt_catalyst_price):
-    fresh_cobalt_catalyst.price = fresh_cobalt_catalyst_price
+# lb_c = fresh_cobalt_catalyst.price*0.75
+# ub_c = fresh_cobalt_catalyst.price*1.25
+# @model.parameter(name='Cobalt acetate catalyst price',
+#                   element=fresh_cobalt_catalyst, kind='isolated', units='USD/kg',
+#                   distribution=shape.Uniform(lb_c, ub_c))
+# def set_cobaltcat_price(fresh_cobalt_catalyst_price):
+#     fresh_cobalt_catalyst.price = fresh_cobalt_catalyst_price
 
 
-fresh_solvent.price = prices_per_Kg['Heptane']
-lb_s = fresh_solvent.price*0.75
-ub_s = fresh_solvent.price*1.25
+# fresh_solvent.price = prices_per_Kg['Heptane']
+# lb_s = fresh_solvent.price*0.75
+# ub_s = fresh_solvent.price*1.25
 
 
-@model.parameter(name='Heptane solvent price',
-                  element=fresh_solvent, kind='isolated',
-                  units='USD/kg',
-                  distribution=shape.Uniform(lb_s, ub_s))
-def set_solvent_price(fresh_solvent_price):
-    fresh_solvent.price = fresh_solvent_price
+# @model.parameter(name='Heptane solvent price',
+#                   element=fresh_solvent, kind='isolated',
+#                   units='USD/kg',
+#                   distribution=shape.Uniform(lb_s, ub_s))
+# def set_solvent_price(fresh_solvent_price):
+#     fresh_solvent.price = fresh_solvent_price
 
 
-lb_hp = fresh_HP.price*0.75
-ub_hp = fresh_HP.price*1.25
-@model.parameter(name='Hydrogen peroxide price',
-                  element=fresh_HP, kind='isolated',
-                  units='USD/kg',
-                  distribution=shape.Uniform(lb_hp, ub_hp))
-def set_fresh_HP_price(fresh_HP_price):
-    fresh_HP.price = fresh_HP_price
+# lb_hp = fresh_HP.price*0.75
+# ub_hp = fresh_HP.price*1.25
+# @model.parameter(name='Hydrogen peroxide price',
+#                   element=fresh_HP, kind='isolated',
+#                   units='USD/kg',
+#                   distribution=shape.Uniform(lb_hp, ub_hp))
+# def set_fresh_HP_price(fresh_HP_price):
+#     fresh_HP.price = fresh_HP_price
 
 
-@model.parameter(name='Natural gas price',
-                  element=F.BT901,
-                  kind='isolated',
-                  units='USD/kg',
-                  distribution=shape.Triangle(0.198,
-                                              0.253,
-                                              0.304)  # REF: lactic acid SI
-                  )
-def set_natural_gas_price(natural_gas_price):
-    F.BT901.natural_gas_price = natural_gas_price
+# @model.parameter(name='Natural gas price',
+#                   element=F.BT901,
+#                   kind='isolated',
+#                   units='USD/kg',
+#                   distribution=shape.Triangle(0.198,
+#                                               0.253,
+#                                               0.304)  # REF: lactic acid SI
+#                   )
+# def set_natural_gas_price(natural_gas_price):
+#     F.BT901.natural_gas_price = natural_gas_price
 
 
-lb_ca = citric_acid.price*0.75
-ub_ca = citric_acid.price*1.25
-@model.parameter(name='Citric acid price',
-                  element=citric_acid,
-                  kind='isolated',
-                  units='USD/kg',
-                  distribution=shape.Uniform(lb_ca, ub_ca)
-                  )
-def set_citric_acid_price(citric_acid_price):
-    citric_acid.price = citric_acid_price
+# lb_ca = citric_acid.price*0.75
+# ub_ca = citric_acid.price*1.25
+# @model.parameter(name='Citric acid price',
+#                   element=citric_acid,
+#                   kind='isolated',
+#                   units='USD/kg',
+#                   distribution=shape.Uniform(lb_ca, ub_ca)
+#                   )
+# def set_citric_acid_price(citric_acid_price):
+#     citric_acid.price = citric_acid_price
     
-lb_hcl = conc_hydrochloric_acid.price*0.75
-ub_hcl = conc_hydrochloric_acid.price*1.25
+# lb_hcl = conc_hydrochloric_acid.price*0.75
+# ub_hcl = conc_hydrochloric_acid.price*1.25
 
 
-@model.parameter(name='Conc HCl price',
-                  element=conc_hydrochloric_acid,
-                  kind='isolated',
-                  units='USD/kg',
-                  distribution=shape.Uniform(lb_hcl, ub_hcl)
-                  )
-def set_HCl_price(conc_hydrochloric_acid_price):
-    conc_hydrochloric_acid.price = conc_hydrochloric_acid_price
+# @model.parameter(name='Conc HCl price',
+#                   element=conc_hydrochloric_acid,
+#                   kind='isolated',
+#                   units='USD/kg',
+#                   distribution=shape.Uniform(lb_hcl, ub_hcl)
+#                   )
+# def set_HCl_price(conc_hydrochloric_acid_price):
+#     conc_hydrochloric_acid.price = conc_hydrochloric_acid_price
     
-calcium_chloride.price = prices_per_Kg['Calcium_chloride']
-lb_cc = calcium_chloride.price*0.75
-ub_cc = calcium_chloride.price*1.25
+# calcium_chloride.price = prices_per_Kg['Calcium_chloride']
+# lb_cc = calcium_chloride.price*0.75
+# ub_cc = calcium_chloride.price*1.25
 
 
-@model.parameter(name='Calcium chloride price',
-                  element=calcium_chloride,
-                  kind='isolated',
-                  units='USD/kg',
-                  distribution=shape.Uniform(lb_cc, ub_cc)
-                  )
-def set_calcium_chloride_price(calcium_chloride_price):
-    calcium_chloride.price = calcium_chloride_price
+# @model.parameter(name='Calcium chloride price',
+#                   element=calcium_chloride,
+#                   kind='isolated',
+#                   units='USD/kg',
+#                   distribution=shape.Uniform(lb_cc, ub_cc)
+#                   )
+# def set_calcium_chloride_price(calcium_chloride_price):
+#     calcium_chloride.price = calcium_chloride_price
 
-polystyrene_based_catalyst.price = prices_per_Kg['Resin']
-lb_pbc =  prices_per_Kg['Resin']*0.75
-ub_pbc =   prices_per_Kg['Resin']*1.25
+# polystyrene_based_catalyst.price = prices_per_Kg['Resin']
+# lb_pbc =  prices_per_Kg['Resin']*0.75
+# ub_pbc =   prices_per_Kg['Resin']*1.25
 
 
-@model.parameter(name='Hydrolysis resin price',
-                  element=polystyrene_based_catalyst,
-                  kind='isolated',
-                  units='USD/kg',
-                  distribution=shape.Uniform(lb_pbc, ub_pbc)
-                  )
-def set_polystyrene_based_catalyst_price(polystyrene_based_catalyst_price):
-    polystyrene_based_catalyst.price = polystyrene_based_catalyst_price
+# @model.parameter(name='Hydrolysis resin price',
+#                   element=polystyrene_based_catalyst,
+#                   kind='isolated',
+#                   units='USD/kg',
+#                   distribution=shape.Uniform(lb_pbc, ub_pbc)
+#                   )
+# def set_polystyrene_based_catalyst_price(polystyrene_based_catalyst_price):
+#     polystyrene_based_catalyst.price = polystyrene_based_catalyst_price
 
 
 # coupled parameters
 # Process related parameters
-##Tungstic acid mole ratio
+# #Tungstic acid mole ratio
 lb1 = 0.006
 ub1 = 0.15
 @model.parameter(name='Tungstic acid moles',
@@ -404,7 +405,7 @@ ub1 = 0.15
 def set_tungstic_acid_moles(X_tam):
     F.unit.M200.specifications[0].args[0] = X_tam
 
-##Cobalt acetate catalyst ratio
+# #Cobalt acetate catalyst ratio
 lb2 = 0.003
 ub2 = 0.015
 
@@ -420,7 +421,7 @@ def set_cobalt_acetate_moles(X_cam):
 
 ## Dihydroxylation reaction conversion
 lb3 = 0.90
-ub3 = 0.99
+ub3 = 0.95
 @model.parameter(name='Dihydroxylation reaction conversion',
                   element=F.R200,
                   kind='coupled',
@@ -432,7 +433,7 @@ def set_dihydroxylation_conversion(X_dih):
 ## Oxidative cleavage reaction conversion
 F.R300.X_oxidativecleavage = 0.8
 lb4 = 0.80
-ub4 = 0.90
+ub4 = 0.85
 @model.parameter(name='Oxidative cleavage reaction conversion',
                   element=F.R300,
                   kind='coupled',
@@ -476,15 +477,15 @@ def set_feedstock_input_flow(Cap):
     F.stream.crude_vegetable_oil.F_mass = Cap
 
 
-lb9 = 0.3
-ub9 = 2.5
-@model.parameter(name='Extraction solvent mass',
-                  element=F.M602,
-                  kind='coupled',
-                  distribution=shape.Uniform(lb9, ub9)
-                  )
-def set_solvent_mass(X_sm):
-    F.unit.M602.specifications[0].args[0] = X_sm
+# lb9 = 0.3
+# ub9 = 2.5
+# @model.parameter(name='Extraction solvent mass',
+#                   element=F.M602,
+#                   kind='coupled',
+#                   distribution=shape.Uniform(lb9, ub9)
+#                   )
+# def set_solvent_mass(X_sm):
+#     F.unit.M602.specifications[0].args[0] = X_sm
 
 #amaze
 lb10 = 0.08
@@ -519,19 +520,19 @@ ub14 = 10 #optimistic
                   )
 def set_cta(cycles_of_reuse):
     F.unit.M200.specifications[0].args[1] = cycles_of_reuse
+#TODO: remove the below because no basis and also interacts with other parameters
+# lb15 = 3 #current state assumed to be same as TA
+# ub15 = 10 #optimistic state randomly assigned
+# @model.parameter(name='Cobalt acetate reusability',
+#                   element=F.R300,
+#                   kind='coupled',
+#                   distribution=shape.Uniform(lb15, ub15)
+#                   )
+# def set_cca(cycles_of_reuse):
+#     F.unit.R300.specifications[0].args[0] = cycles_of_reuse
 
-lb15 = 3 #current state assumed to be same as TA
-ub15 = 10 #optimistic state randomly assigned
-@model.parameter(name='Cobalt acetate reusability',
-                  element=F.R300,
-                  kind='coupled',
-                  distribution=shape.Uniform(lb15, ub15)
-                  )
-def set_cca(cycles_of_reuse):
-    F.unit.R300.specifications[0].args[0] = cycles_of_reuse
 
-
-N_samples = 5
+N_samples = 50
 rule = 'L' # For Latin-Hypercube sampling
 np.random.seed(1234) # For consistent results
 samples = model.sample(N_samples, rule)

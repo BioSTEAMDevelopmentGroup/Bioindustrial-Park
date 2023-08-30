@@ -49,7 +49,7 @@ per_kg_KSA_to_per_kg_SA = models.per_kg_KSA_to_per_kg_SA
 
 # %% 
 
-N_simulations_per_mode = 5000 # 2000
+N_simulations_per_mode = 5 # 2000
 
 percentiles = [0, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 1]
 
