@@ -327,29 +327,42 @@ def create_TAL_separation_solubility_exploit_process(ins, outs,):
     C401.line = 'Crystallizer'
     
     S402 = bst.units.SolidsCentrifuge('S402', ins=C401-0, outs=('S402_solid_fraction', S402_liquid),
-                                # moisture_content=0.50,
-                                split=find_split(S401_index,
-                                                  S401_cell_mass_split,
-                                                  S401_filtrate_split,
-                                                  chemical_groups), solids =\
+                                moisture_content=0.50,
+                                # split=find_split(S401_index,
+                                #                   S401_cell_mass_split,
+                                #                   S401_filtrate_split,
+                                #                   chemical_groups), 
+                                split=0.95,
+                                solids =\
                                     ['Xylan', 'Glucan', 'Lignin', 'FermMicrobe',\
-                                      'Ash', 'Arabinan', 'Galactan', 'Mannan'])
-    @S402.add_specification()
-    def S402_TAL_split_spec():
-        S402_ins_0 = S402.ins[0]
-        solid_TAL = float(S402_ins_0.imol['s', 'TAL'])
-        S402_ins_0.imol['s', 'TAL'] = 0.
-        S402._run()
-        S402.outs[0].imol['s', 'TAL'] = solid_TAL
-        S402.outs[1].imol['l', 'TAL'] = S402_ins_0.imol['l', 'TAL']
-        S402_ins_0.imol['s', 'TAL'] = solid_TAL
-        S402.outs[1].phases = ('l',)
-        
-    
-    
-    H402 = bst.HXutility('H402', ins=S402-0, outs=(solid_TAL), T=273.15+30.)
+                                      'Ash', 'Arabinan', 'Galactan', 'Mannan',
+                                      'TAL'])
 
+    F402 = bst.DrumDryer('F402', 
+                         ins=(S402-0, 'F402_air', 'F402_natural_gas'),
+                         outs=(solid_TAL, 'F402_hot_air', 'F402_emissions'),
+                         moisture_content=0.05, 
+                         split=0.,
+                         moisture_ID='Water')
     
+    @F402.add_specification(run=False)
+    def F402_spec():
+        F402_ins_0 = F402.ins[0]
+        solid_TAL = float(F402_ins_0.imol['s', 'TAL'])
+        liquid_TAL = float(F402_ins_0.imol['l', 'TAL'])
+        
+        F402_ins_0.phases = ('l')
+        F402._run()
+        
+        F402_ins_0.phases = ('l', 's')
+        F402_ins_0.imol['s', 'TAL'] = solid_TAL
+        F402_ins_0.imol['l', 'TAL'] = liquid_TAL
+        
+        F402_outs_0 = F402.outs[0]
+        F402_outs_0.phases = ('l', 's')
+        F402_outs_0.imol['s', 'TAL'] = solid_TAL
+        F402_outs_0.imol['l', 'TAL'] = liquid_TAL
+        
     
 # %% Separation of TAL by adsorption on activated charcoal
 @SystemFactory(ID = 'TAL_separation_adsorption_process',

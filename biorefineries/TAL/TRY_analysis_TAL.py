@@ -58,7 +58,84 @@ TAL_filepath = TAL.__file__.replace('\\__init__.py', '')
 # ##
 TAL_results_filepath = TAL_filepath + '\\analyses\\results\\'
 
-# %%Colors
+#%%  Metrics
+
+# SA_price_range = [6500, 7500]
+
+product_chemical_IDs = ['TAL',]
+get_product_MPSP = lambda: TAL_tea.solve_price(product) / get_product_purity() # USD / pure-kg
+get_product_purity = lambda: sum([product.imass[i] for i in product_chemical_IDs])/product.F_mass
+get_production = lambda: sum([product.imass[i] for i in product_chemical_IDs])
+
+get_TAL_VOC = lambda: TAL_tea.VOC / 1e6 # million USD / yr
+get_TAL_FCI = lambda: TAL_tea.FCI / 1e6 # million USD
+
+
+get_TAL_sugars_conc = lambda: sum(R302.outs[0].imass['Glucose', 'Xylose'])/R302.outs[0].F_vol
+
+get_TAL_inhibitors_conc = lambda: 1000*sum(R302.outs[0].imass['AceticAcid', 'Furfural', 'HMF'])/R302.outs[0].F_vol
+
+
+TAL_metrics = [get_product_MPSP, lambda: TAL_lca.GWP, lambda: TAL_lca.FEC]
+
+# %% Generate 3-specification meshgrid and set specification loading functions
+
+steps = (50, 50, 1)
+
+# Yield, titer, productivity (rate)
+spec_1 = yields = np.linspace(0.1, 0.5, steps[0]) # yield
+spec_2 = titers = np.linspace(10., 50., steps[1]) # titer
+
+
+# spec_3 = productivities =\
+#     np.array([0.2*spec.baseline_productivity, spec.baseline_productivity, 5.*spec.baseline_productivity])
+
+spec_3 = productivities =\
+    np.array([spec.baseline_productivity,])
+
+#%% Plot stuff
+
+# Parameters analyzed across
+
+x_label = r"$\bfYield$" # title of the x axis
+x_units = r"$\mathrm{\%}$" + " " + r"$\mathrm{theoretical}$"
+x_ticks=[10, 20, 30, 40, 50]
+
+y_label = r"$\bfTiter$" # title of the y axis
+y_units =r"$\mathrm{g} \cdot \mathrm{L}^{-1}$"
+y_ticks=[10, 20, 30, 40, 50]
+
+
+z_label = r"$\bfProductivity$" # title of the z axis
+z_units =  r"$\mathrm{g} \cdot \mathrm{L}^{-1}  \cdot \mathrm{h}^{-1}$"
+z_ticks=[0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.30]
+
+# Metrics
+MPSP_w_label = r"$\bfMPSP$" # title of the color axis
+MPSP_units = r"$\mathrm{\$}\cdot\mathrm{kg}^{-1}$"
+
+GWP_w_label = r"$\mathrm{\bfGWP}_{\bf100}$"
+GWP_units = r"$\mathrm{kg}$"+" "+ r"$\mathrm{CO}_{2}\mathrm{-eq.}\cdot\mathrm{kg}^{-1}$"
+
+FEC_w_label = r"$\bfFEC$" # title of the color axis
+FEC_units = r"$\mathrm{MJ}\cdot\mathrm{kg}^{-1}$"
+
+#%% Colors
+
+marketrange_shadecolor = (*colors.neutral.shade(50).RGBn, 0.3)
+
+oversaccharine_shadecolor_raw = colors.CABBI_teal_green.tint(40)
+# oversaccharine_shadecolor_raw = colors.CABBI_green.shade(45)
+inhibited_shadecolor_raw = colors.CABBI_grey.shade(60)
+oversaccharine_shadecolor = (*oversaccharine_shadecolor_raw.RGBn, 1)
+inhibited_shadecolor = (*inhibited_shadecolor_raw.RGBn, 1)
+# overlap_color = (*(colors.CABBI_teal_green.tint(20).RGBn + colors.CABBI_black.tint(20).RGBn)/2, 1)
+overlap_color = (*(oversaccharine_shadecolor_raw.RGBn + inhibited_shadecolor_raw.RGBn)/2, 1)
+linecolor_dark = (*colors.CABBI_black.shade(40).RGBn, 0.95)
+linecolor_light = (*colors.neutral_tint.RGBn, 0.85)
+markercolor = (*colors.CABBI_orange.shade(5).RGBn, 1)
+edgecolor = (*colors.CABBI_black.RGBn, 1)
+
 
 def CABBI_green_colormap(N_levels=90):
     """
@@ -66,11 +143,6 @@ def CABBI_green_colormap(N_levels=90):
     that serves as CABBI's green colormap theme for contour plots.
 
     """
-    # CABBI_colors = (colors.CABBI_yellow.tint(50).RGBn,
-    #                 colors.CABBI_yellow.shade(10).RGBn,
-    #                 colors.CABBI_green.RGBn,
-    #                 colors.CABBI_green.shade(30).RGBn)
-
     CABBI_colors = (colors.CABBI_orange.RGBn,
                     colors.CABBI_yellow.RGBn,
 
@@ -83,7 +155,7 @@ def CABBI_green_colormap(N_levels=90):
 def CABBI_grey_colormap(N_levels=25):
     """
     Return a matplotlib.colors.LinearSegmentedColormap object
-    that serves as CABBI's green colormap theme for contour plots.
+    that serves as CABBI's grey colormap theme for contour plots.
     
     """
     CABBI_colors = (colors.CABBI_grey.RGBn,
@@ -94,7 +166,7 @@ def CABBI_grey_colormap(N_levels=25):
 def CABBI_blue_colormap(N_levels=25):
     """
     Return a matplotlib.colors.LinearSegmentedColormap object
-    that serves as CABBI's green colormap theme for contour plots.
+    that serves as CABBI's blue colormap theme for contour plots.
     
     """
     CABBI_colors = (colors.CABBI_blue_light.RGBn,
@@ -103,52 +175,29 @@ def CABBI_blue_colormap(N_levels=25):
                     colors.CABBI_green_dirty.shade(75).RGBn)
     return LinearSegmentedColormap.from_list('CABBI', CABBI_colors, N_levels)
 
-#%% 
-SA_price_range = [6500, 7500]
+#%% Tickmark utils (unused)
 
-product_chemical_IDs = ['TAL',]
-get_product_MPSP = lambda: TAL_tea.solve_price(product) * 907.185 / get_product_purity() # USD / ton
-get_product_purity = lambda: sum([product.imass[i] for i in product_chemical_IDs])/product.F_mass
-get_production = lambda: sum([product.imass[i] for i in product_chemical_IDs])
-# get_product_MPSP = lambda: TAL_tea.solve_price(product) / get_product_purity() # USD / kg
-get_TAL_VOC = lambda: TAL_tea.VOC / 1e6 # million USD / yr
-get_TAL_FCI = lambda: TAL_tea.FCI / 1e6 # million USD
+def tickmarks_from_data(data, accuracy=50, N_points=5):
+    dmin = data.min()
+    dmax = data.max()
+    return tickmarks(dmin, dmax, accuracy, N_points)
 
+def tickmarks(dmin, dmax, accuracy=50, N_points=5):
+    dmin = floor(dmin/accuracy) * accuracy
+    dmax = ceil(dmax/accuracy) * accuracy
+    step = (dmax - dmin) / (N_points - 1)
+    return [dmin + step * i for i in range(N_points)]
 
-get_TAL_sugars_conc = lambda: sum(R302.outs[0].imass['Glucose', 'Xylose'])/R302.outs[0].F_vol
-
-get_TAL_inhibitors_conc = lambda: 1000*sum(R302.outs[0].imass['AceticAcid', 'Furfural', 'HMF'])/R302.outs[0].F_vol
-
-# get_rel_impact_t_y = lambda: rel_impact_fn(steps)
-
-TAL_metrics = [get_product_MPSP, lambda: TAL_lca.GWP, lambda: TAL_lca.FEC]
-# TAL_metrics = [get_TAL_MPSP, get_GWP, get_FEC]
-
-# %% Generate 3-specification meshgrid and set specification loading functions
-steps = 20
-
-# Yield, titer, productivity (rate)
-spec_1 = yields = np.linspace(0.1, 0.5, steps) # yield
-spec_2 = titers = np.linspace(10., 50., steps) # titer
-
-
-# spec_3 = productivities =\
-#     np.array([0.2*spec.baseline_productivity, spec.baseline_productivity, 5.*spec.baseline_productivity])
-    
-spec_3 = productivities =\
-    np.array([spec.baseline_productivity,])
-
-
-#%%
+#%% Create meshgrid
 spec_1, spec_2 = np.meshgrid(spec_1, spec_2)
 
-#%%
+#%% Initial simulation
 # simulate_and_print()
 spec.load_specifications(yields[0], titers[0], productivities[0])
 spec.set_production_capacity()
 simulate_and_print()
 
-# %% Run TRY analysis
+# %% Run TRY analysis 
 system = TAL_sys
 HXN = spec.HXN
 results_metric_1, results_metric_2, results_metric_3 = [], [], []
@@ -159,7 +208,7 @@ def print_status(curr_no, total_no, s1, s2, s3, HXN_qbal_error, results=None, ex
     print('\n')
     print(s1, s2, s3)
     print('\n')
-    print(f'HXN qbal error = {round(HXN_qbal_error, 2)} %.')
+    print(f'HXN Qbal error = {round(HXN_qbal_error, 2)} %.')
     print('\n')
     print(results)
 
@@ -189,7 +238,7 @@ for p in productivities:
                 d1_Metric3[-1].append(TAL_metrics[2]())
                 
                 HXN_qbal_error = HXN.energy_balance_percent_error
-                if max_HXN_qbal_percent_error<HXN_qbal_error: max_HXN_qbal_percent_error = HXN_qbal_error
+                if abs(max_HXN_qbal_percent_error)<abs(HXN_qbal_error): max_HXN_qbal_percent_error = HXN_qbal_error
             
             except RuntimeError as e1:
                 d1_Metric1[-1].append(np.nan)
@@ -212,168 +261,247 @@ for p in productivities:
     d1_Metric1, d1_Metric2, d1_Metric3 = np.array(d1_Metric1), np.array(d1_Metric2), np.array(d1_Metric3)
     d1_Metric1, d1_Metric2, d1_Metric3 = d1_Metric1.transpose(), d1_Metric2.transpose(), d1_Metric3.transpose()
     
-    results_metric_1.append(d1_Metric1/907.185)
+    results_metric_1.append(d1_Metric1)
     results_metric_2.append(d1_Metric2)
     results_metric_3.append(d1_Metric3)
 
-print(f'Max HXN Q bal error was {round(max_HXN_qbal_percent_error, 3)} %.')
 
     # %% Save generated data
     
+    minute = '0' + str(dateTimeObj.minute) if len(str(dateTimeObj.minute))==1 else str(dateTimeObj.minute)
+    file_to_save = f'_{steps}_steps_'+'TAL_TRY_%s.%s.%s-%s.%s'%(dateTimeObj.year, dateTimeObj.month, dateTimeObj.day, dateTimeObj.hour, minute)
+    np.save(TAL_results_filepath+file_to_save, np.array([d1_Metric1, d1_Metric2, d1_Metric3]))
     
-    # minute = '0' + str(dateTimeObj.minute) if len(str(dateTimeObj.minute))==1 else str(dateTimeObj.minute)
-    # file_to_save = f'_{steps}_steps_'+'TAL_TRY_%s.%s.%s-%s.%s'%(dateTimeObj.year, dateTimeObj.month, dateTimeObj.day, dateTimeObj.hour, minute)
-    # np.save(TAL_results_filepath+file_to_save, data_1)
+    pd.DataFrame(d1_Metric1).to_csv(TAL_results_filepath+'MPSP-'+file_to_save+'.csv')
+    pd.DataFrame(d1_Metric2).to_csv(TAL_results_filepath+'GWP-'+file_to_save+'.csv')
+    pd.DataFrame(d1_Metric3).to_csv(TAL_results_filepath+'FEC-'+file_to_save+'.csv')
     
-    # pd.DataFrame(data_1[:, :, 0, :][:,:,0]/907.185).to_csv(TAL_results_filepath+'MPSP-'+file_to_save+'.csv')
-    # pd.DataFrame(data_1[:, :, 1, :][:,:,0]).to_csv(TAL_results_filepath+'GWP-'+file_to_save+'.csv')
-    # pd.DataFrame(data_1[:, :, 2, :][:,:,0]*TAL_tea.operating_hours).to_csv(TAL_results_filepath+'FEC-'+file_to_save+'.csv')
-    
-    
-    # %% Load previously saved data
-    # file_to_load = TAL_results_filepath+file_to_save
-    # # file_to_load = 'C:/Users/saran/Documents/Academia/Spring 2020/BioSTEAM/Bioindustrial-Park/BioSTEAM 2.x.x/biorefineries/TAL/TAL_TRY_2020.9.22-16.44'
-    # data_1 = np.load(file_to_load+'.npy')
-    # # data_1 = np.load('TAL_TRY_2022.3.18-22.15.npy')
-    # data_1_copy = copy.deepcopy(data_1)
-    
-    # data_2 = data_1
-    
-    # d1_Metric1 = data_1[:, :, 0, :]
-    # d1_Metric2 = data_1[:, :, 1, :]
-    # d1_Metric3 = data_1[:, :, 2, :]
-    
-    # d2_Metric1 = data_2[:, :, 0, :]
-    # d2_Metric2 = data_2[:, :, 1, :]
-    # d2_Metric3 = data_2[:, :, 2, :]
-    
-    
-    # results_metric_1.append(d1_Metric1[:,:,0]/907.185)
-    # results_metric_2.append(d1_Metric2[:,:,0])
-    # results_metric_3.append(d2_Metric3[:,:,0])
+
+#%% Report maximum HXN energy balance error
+print(f'Max HXN Q bal error was {round(max_HXN_qbal_percent_error, 3)} %.')
 
 #%% Plot metrics vs titer, yield, and productivity
 
 import contourplots
-
 chdir(TAL_results_filepath)
 
-MPSP_units = r"$\mathrm{\$}\cdot\mathrm{kg}^{-1}$"
-GWP_units = r"$\mathrm{kg}$"+" "+ r"$\mathrm{CO}_{2}\mathrm{-eq.}\cdot\mathrm{kg}^{-1}$"
-FEC_units = r"$\mathrm{MJ}\cdot\mathrm{kg}^{-1}$"
+results_metric_1 = np.array(results_metric_1)
+results_metric_2 = np.array(results_metric_2)
+results_metric_3 = np.array(results_metric_3)
 
-# yields = np.linspace(0.4, 0.9, steps) # x axis values
-# titers = np.linspace(40., 120., steps) # y axis values
-# productivities = np.arange(0.1, 2.1, 0.1) # z axis values
-# MPSPs = results_metric_1 # too big to show here; shape = z * x * y # color (or w) axis values
+#%% More plot utils
 
+from math import floor, log
+get_median = np.median
+np_round = np.round
 
-x_ticks=[10, 20, 30, 40, 50]
-y_ticks=[10, 20, 30, 40, 50]
-z_ticks=[0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.30]
-                                
-keep_frames=True
+def get_OOM(number):
+    return floor(log(number+1., 10))
 
-minute = '0' + str(dateTimeObj.minute) if len(str(dateTimeObj.minute))==1 else str(dateTimeObj.minute)
-file_to_save = f'_{steps}_steps_'+'TAL_TRY_%s.%s.%s-%s.%s'%(dateTimeObj.year, dateTimeObj.month, dateTimeObj.day, dateTimeObj.hour, minute)
+def my_round(x, base=5):
+    return base * round(x/base)
+
+def get_contour_info_from_metric_data(
+                                        metric_data, # numpy array
+                                        round_cbar_ticks_to_this_many_OOMs_lower_than_data_OOM=1,
+                                        n_levels_between_cbar_ticks=5,
+                                        n_stdevs_for_bounds=1,
+                                        lb=None,
+                                        ub=None,
+                                        multiply_step_size_by=0.5,
+                                        w_ticks_round_to_base_divisor=2,
+                                        remove_w_ticks_if_greater_than_this_fraction_of_successor=0.8,
+                                      ):
+    if not type(metric_data) == np.ndarray: metric_data = np.array(metric_data)
+    metric_data = metric_data[~np.isnan(metric_data)]
+    median, stdev = get_median(metric_data), metric_data.std()
+    bound_diff = n_stdevs_for_bounds*stdev
+    ub_temp = max(abs(median-bound_diff), abs(median+bound_diff))
+    # breakpoint()
+    OOM = get_OOM(ub_temp)
+    log_ub_temp = log(ub_temp, 10)
+    
+    round_to_decimal_place = None
+    
+    if log_ub_temp < 1.: 
+        round_to_decimal_place = int(round(ub_temp/(10.*round_cbar_ticks_to_this_many_OOMs_lower_than_data_OOM), 0))
+    else:
+        round_to_decimal_place = -OOM -1 + round_cbar_ticks_to_this_many_OOMs_lower_than_data_OOM
+    
+    if lb==None: lb = np_round(median - bound_diff, round_to_decimal_place)
+    if ub==None: ub = np_round(median + bound_diff, round_to_decimal_place)
+    
+    cbar_ticks_step_size = (10**OOM)/(round_cbar_ticks_to_this_many_OOMs_lower_than_data_OOM) * multiply_step_size_by
+    w_levels_step_size = cbar_ticks_step_size/n_levels_between_cbar_ticks
+    cbar_ticks = np.arange(lb, ub+cbar_ticks_step_size, cbar_ticks_step_size)
+    w_levels = np.arange(lb, ub+w_levels_step_size, w_levels_step_size)
+    
+    w_ticks_round_to_base = 10**-round_to_decimal_place / 2
+    w_ticks = [*set([lb, 
+               my_round(median-0.6*stdev, w_ticks_round_to_base),
+               my_round(median-0.4*stdev, w_ticks_round_to_base),  
+               my_round(median-0.2*stdev, w_ticks_round_to_base), 
+               np_round(median, round_to_decimal_place),
+               my_round(median+0.2*stdev, ), 
+               my_round(median+0.4*stdev, w_ticks_round_to_base),  
+               my_round(median+0.6*stdev, w_ticks_round_to_base), 
+               ub])]
+    
+    # w_ticks.sort()
+    # w_ticks_to_remove = []
+    # for i in range(len(w_ticks)-1):
+    #     if w_ticks[i]/w_ticks[i+1] > remove_w_ticks_if_greater_than_this_fraction_of_successor:
+    #         w_ticks_to_remove.append(w_ticks[i])
+    # for j in w_ticks_to_remove:
+    #     w_ticks.remove(j)
+    #     w_ticks.append(j-w_levels_step_size)
+        
+    w_ticks.sort()
+    w_ticks_to_remove = []
+    for i in range(len(w_ticks)-1):
+        if w_ticks[i]/w_ticks[i+1] > remove_w_ticks_if_greater_than_this_fraction_of_successor:
+            w_ticks_to_remove.append(w_ticks[i])
+    for j in w_ticks_to_remove:
+        w_ticks.remove(j)
+    
+    w_ticks.sort()
+    return w_levels, w_ticks, cbar_ticks
+
+#%% Get levels and ticks
+
+MPSP_w_levels, MPSP_w_ticks, MPSP_cbar_ticks = get_contour_info_from_metric_data(results_metric_1, lb=3)
+GWP_w_levels, GWP_w_ticks, GWP_cbar_ticks = get_contour_info_from_metric_data(results_metric_2,)
+_w_levels, FEC_w_ticks, FEC_cbar_ticks = get_contour_info_from_metric_data(results_metric_3,)
+
+#%% More plot stuff
+
+fps = 3
+axis_title_fonts={'size': {'x': 12, 'y':12, 'z':12, 'w':12},}
+clabel_fontsize = 12.
+default_fontsize = 10.
+keep_frames = True
 
 #%% MPSP
-# MPSP_w_levels = np.array([0., 2.5, 5., 7.5, 10., 12.5, 15., 17.5, 20., 22.5, 25.])
-MPSP_w_levels = np.arange(0., 15.5, 0.5)
+
+MPSP_w_levels = np.arange(3, 10.25, 0.25)
+MPSP_cbar_ticks = np.arange(3, 10.25, 0.5)
+MPSP_w_ticks = [4, 5, 6, 8, 10]
+# MPSP_w_levels = np.arange(0., 15.5, 0.5)
+
 contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_1, # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., MPSP
                                 x_data=100*yields, # x axis values
                                 # x_data = yields/theoretical_max_g_TAL_acid_per_g_glucose,
                                 y_data=titers, # y axis values
                                 z_data=productivities, # z axis values
-                                x_label=r"$\bfYield$", # title of the x axis
-                                y_label=r"$\bfTiter$", # title of the y axis
-                                z_label=r"$\bfProductivity$", # title of the z axis
-                                w_label=r"$\bfMPSP$", # title of the color axis
-                                x_ticks=x_ticks,
+                                x_label=x_label, # title of the x axis
+                                y_label=y_label, # title of the y axis
+                                z_label=z_label, # title of the z axis
+                                w_label=MPSP_w_label, # title of the color axis
+                                x_ticks=100*x_ticks,
                                 y_ticks=y_ticks,
                                 z_ticks=z_ticks,
                                 w_levels=MPSP_w_levels, # levels for unlabeled, filled contour areas (labeled and ticked only on color bar)
-                                w_ticks=np.array([1., 2., 3., 4., 5., 6., 8., 10., ]), # labeled, lined contours; a subset of w_levels
-                                # w_ticks=[],
-                                x_units=r"$\mathrm{\%}$" + " " + r"$\mathrm{theoretical}$",
-                                # x_units=r"$\mathrm{g} \cdot \mathrm{g}$" + " " + r"$\mathrm{glucose}$" + " " + r"$\mathrm{eq.}^{-1}$",
-                                y_units=r"$\mathrm{g} \cdot \mathrm{L}^{-1}$",
-                                z_units=r"$\mathrm{g} \cdot \mathrm{L}^{-1}  \cdot \mathrm{h}^{-1}$",
+                                w_ticks=MPSP_w_ticks, # labeled, lined contours; a subset of w_levels
+                                x_units=x_units,
+                                y_units=y_units,
+                                z_units=z_units,
                                 w_units=MPSP_units,
-                                # fmt_clabel=lambda cvalue: "{:.1f}".format(cvalue), # format of contour labels
-                                fmt_clabel=lambda cvalue: r"$\mathrm{\$}$"+" {:.1f} ".format(cvalue)+r"$\cdot\mathrm{kg}^{-1}$", # format of contour labels
+                                # fmt_clabel=lambda cvalue: r"$\mathrm{\$}$"+" {:.1f} ".format(cvalue)+r"$\cdot\mathrm{kg}^{-1}$", # format of contour labels
+                                fmt_clabel = lambda cvalue:  f"{round(cvalue,1)}",
                                 cmap=CABBI_green_colormap(), # can use 'viridis' or other default matplotlib colormaps
                                 cmap_over_color = colors.grey_dark.shade(8).RGBn,
                                 extend_cmap='max',
-                                # cbar_ticks=[0., 5., 10., 15., 20., 25.,],
-                                cbar_ticks=np.array([0., 2.5, 5., 7.5, 10., 12.5, 15., 17.5]),
+                                cbar_ticks=MPSP_cbar_ticks,
                                 z_marker_color='g', # default matplotlib color names
-                                axis_title_fonts={'size': {'x': 14, 'y':14, 'z':14, 'w':14},},
-                                fps=3, # animation frames (z values traversed) per second
+                                fps=fps, # animation frames (z values traversed) per second
                                 n_loops='inf', # the number of times the animated contourplot should loop animation over z; infinite by default
-                                animated_contourplot_filename='part2_MPSP_animated_contourplot_'+file_to_save, # file name to save animated contourplot as (no extensions)
+                                animated_contourplot_filename='MPSP_animated_contourplot_'+file_to_save, # file name to save animated contourplot as (no extensions)
                                 keep_frames=keep_frames, # leaves frame PNG files undeleted after running; False by default
-                                # comparison_range=[6.51 * 112.12652/126.11004, 7.43* 112.12652/126.11004], # maximum allowable TAL price = market price of SA ($/kg-SA) * molar mass of SA / molar mass of TAL
+                                axis_title_fonts=axis_title_fonts,
+                                clabel_fontsize = clabel_fontsize,
+                                default_fontsize = default_fontsize,
+                                comparison_range=[6.5, 7.5],
+                                n_minor_ticks = 1,
+                                cbar_n_minor_ticks = 1,
+                                # comparison_range=[MPSP_w_levels[-2], MPSP_w_levels[-1]],
                                 # comparison_range_hatch_pattern='////',
                                 )
 
 #%% GWP
-contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_2, # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., MPSP
+
+
+contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_2, # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., GWP
                                 x_data=100*yields, # x axis values
                                 y_data=titers, # y axis values
                                 z_data=productivities, # z axis values
-                                x_label=r"$\bfYield$", # title of the x axis
-                                y_label=r"$\bfTiter$", # title of the y axis
-                                z_label=r"$\bfProductivity$", # title of the z axis
-                                w_label=r"$\mathrm{\bfGWP}_{\bf100}$", # title of the color axis
-                                x_ticks=x_ticks,
+                                x_label=x_label, # title of the x axis
+                                y_label=y_label, # title of the y axis
+                                z_label=z_label, # title of the z axis
+                                w_label=GWP_w_label, # title of the color axis
+                                x_ticks=100*x_ticks,
                                 y_ticks=y_ticks,
                                 z_ticks=z_ticks,
-                                w_levels=np.arange(0., 5.25, 0.25), # levels for unlabeled, filled contour areas (labeled and ticked only on color bar)
-                                w_ticks=np.array([2, 3, 5,]), # labeled, lined contours; a subset of w_levels
-                                x_units=r"$\mathrm{\%}$" + " " + r"$\mathrm{theoretical}$",
-                                # x_units=r"$\mathrm{g} \cdot \mathrm{g}$" + " " + r"$\mathrm{glucose}$" + " " + r"$\mathrm{eq.}^{-1}$",
-                                y_units=r"$\mathrm{g} \cdot \mathrm{L}^{-1}$",
-                                z_units=r"$\mathrm{g} \cdot \mathrm{L}^{-1}  \cdot \mathrm{h}^{-1}$",
+                                w_levels=GWP_w_levels, # levels for unlabeled, filled contour areas (labeled and ticked only on color bar)
+                                w_ticks=GWP_w_ticks, # labeled, lined contours; a subset of w_levels
+                                x_units=x_units,
+                                y_units=y_units,
+                                z_units=z_units,
                                 w_units=GWP_units,
-                                fmt_clabel=lambda cvalue: "{:.2f}".format(cvalue), # format of contour labels
+                                fmt_clabel=lambda cvalue: r"$\mathrm{\$}$"+" {:.1f} ".format(cvalue)+r"$\cdot\mathrm{kg}^{-1}$", # format of contour labels
                                 cmap=CABBI_green_colormap(), # can use 'viridis' or other default matplotlib colormaps
-                                cbar_ticks=np.arange(0.0, 6., 1.),
+                                cmap_over_color = colors.grey_dark.shade(8).RGBn,
+                                extend_cmap='max',
+                                cbar_ticks=GWP_cbar_ticks,
                                 z_marker_color='g', # default matplotlib color names
-                                axis_title_fonts={'size': {'x': 14, 'y':14, 'z':14, 'w':14},},
-                                fps=3, # animation frames (z values traversed) per second
+                                fps=fps, # animation frames (z values traversed) per second
                                 n_loops='inf', # the number of times the animated contourplot should loop animation over z; infinite by default
                                 animated_contourplot_filename='GWP_animated_contourplot_'+file_to_save, # file name to save animated contourplot as (no extensions)
                                 keep_frames=keep_frames, # leaves frame PNG files undeleted after running; False by default
+                                axis_title_fonts=axis_title_fonts,
+                                clabel_fontsize = clabel_fontsize,
+                                default_fontsize = default_fontsize,
+                                cbar_n_minor_ticks=1,
+                                # comparison_range=[6.5, 7.5],
+                                # comparison_range=[GWP_w_levels[-2], GWP_w_levels[-1]],
+                                # comparison_range_hatch_pattern='////',
                                 )
 
 
 #%% FEC
-contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_3, # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., MPSP
+
+FEC
+contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_3, # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., FEC
                                 x_data=100*yields, # x axis values
                                 y_data=titers, # y axis values
                                 z_data=productivities, # z axis values
-                                x_label=r"$\bfYield$", # title of the x axis
-                                y_label=r"$\bfTiter$", # title of the y axis
-                                z_label=r"$\bfProductivity$", # title of the z axis
-                                w_label=r"$\bfFEC$", # title of the color axis
-                                x_ticks=x_ticks,
+                                x_label=x_label, # title of the x axis
+                                y_label=y_label, # title of the y axis
+                                z_label=z_label, # title of the z axis
+                                w_label=FEC_w_label, # title of the color axis
+                                x_ticks=100*x_ticks,
                                 y_ticks=y_ticks,
                                 z_ticks=z_ticks,
-                                w_levels=np.arange(-30, 100, 10), # levels for unlabeled, filled contour areas (labeled and ticked only on color bar)
-                                w_ticks=np.array([-20, -10, 0, 10, 20, 50, 90]), # labeled, lined contours; a subset of w_levels
-                                x_units=r"$\mathrm{\%}$" + " " + r"$\mathrm{theoretical}$",
-                                # x_units=r"$\mathrm{g} \cdot \mathrm{g}$" + " " + r"$\mathrm{glucose}$" + " " + r"$\mathrm{eq.}^{-1}$",
-                                y_units=r"$\mathrm{g} \cdot \mathrm{L}^{-1}$",
-                                z_units=r"$\mathrm{g} \cdot \mathrm{L}^{-1}  \cdot \mathrm{h}^{-1}$",
+                                w_levels=FEC_w_levels, # levels for unlabeled, filled contour areas (labeled and ticked only on color bar)
+                                w_ticks=FEC_w_ticks, # labeled, lined contours; a subset of w_levels
+                                x_units=x_units,
+                                y_units=y_units,
+                                z_units=z_units,
                                 w_units=FEC_units,
-                                fmt_clabel=lambda cvalue: "{:.0f}".format(cvalue), # format of contour labels
+                                fmt_clabel=lambda cvalue: r"$\mathrm{\$}$"+" {:.1f} ".format(cvalue)+r"$\cdot\mathrm{kg}^{-1}$", # format of contour labels
                                 cmap=CABBI_green_colormap(), # can use 'viridis' or other default matplotlib colormaps
-                                cbar_ticks=np.arange(-30, 100, 30),
+                                cmap_over_color = colors.grey_dark.shade(8).RGBn,
+                                extend_cmap='max',
+                                cbar_ticks=FEC_cbar_ticks,
                                 z_marker_color='g', # default matplotlib color names
-                                axis_title_fonts={'size': {'x': 14, 'y':14, 'z':14, 'w':14},},
-                                fps=3, # animation frames (z values traversed) per second
+                                fps=fps, # animation frames (z values traversed) per second
                                 n_loops='inf', # the number of times the animated contourplot should loop animation over z; infinite by default
                                 animated_contourplot_filename='FEC_animated_contourplot_'+file_to_save, # file name to save animated contourplot as (no extensions)
                                 keep_frames=keep_frames, # leaves frame PNG files undeleted after running; False by default
+                                axis_title_fonts=axis_title_fonts,
+                                clabel_fontsize = clabel_fontsize,
+                                default_fontsize = default_fontsize,
+                                cbar_n_minor_ticks=1,
+                                # comparison_range=[6.5, 7.5],
+                                # comparison_range=[FEC_w_levels[-2], FEC_w_levels[-1]],
+                                # comparison_range_hatch_pattern='////',
                                 )
