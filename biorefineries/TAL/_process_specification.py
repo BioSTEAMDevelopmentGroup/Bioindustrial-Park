@@ -103,8 +103,8 @@ def evaluate_across_specs(spec, system,
     print(f"\n\n----------\n{spec.count} / {spec.total_iterations}\n")
     print(f"yield = {format(100*float(spec_1),'.1f')} % theo.,  titer = {format(float(spec_2),'.2f')} g\u00b7L\u207b\u00b9,  prod. = {format(float(spec_3),'.2f')} g\u00b7L\u207b\u00b9\u00b7h\u207b\u00b9\n")
     try:
-        print(spec_3)
-        spec.load_specifications(spec_1=spec_1, spec_2=spec_2)
+        # print(spec_3)
+        spec.load_specifications(spec_1=spec_1, spec_2=spec_2, spec_3=spec_3[0])
         # system.simulate()
         # if spec.set_production_capacity: spec.set_production_capacity(desired_annual_production=spec.desired_annual_production)
         return get_metrics()
@@ -324,7 +324,7 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
         data = np.zeros([M, P])
         for i in range(P):
             self.load_spec_3(spec_3[i])
-            # if self.set_production_capacity: self.set_production_capacity(desired_annual_production=self.desired_annual_production)
+            if self.set_production_capacity: self.set_production_capacity(desired_annual_production=self.desired_annual_production)
             # self.reactor._summary()
             data[:, i] = [j() for j in metrics]
         print(data)

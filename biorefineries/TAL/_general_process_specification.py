@@ -7,6 +7,7 @@ Created on Mon May 29 15:30:15 2023
 
 import numpy as np
 from winsound import Beep
+from biosteam.exceptions import InfeasibleRegion
 
 _red_highlight_white_text = '\033[1;47;41m'
 _yellow_text = '\033[1;33m'
@@ -150,6 +151,10 @@ class GeneralProcessSpecification():
                  HXN_new_HXs={}, HXN_new_HX_utils={},
                  HXN_intolerable_points=[],
                  HXN_Q_bal_percent_error_dict={},
+                 max_sugar_concentration=600., # g/L
+                 evaporator=None,
+                 sugars=['Sucrose', 'Glucose', 'Fructose', 'Xylose',],
+                 
                 ):
         self.baseline_spec_values = baseline_spec_values
         self.spec_1, self.spec_2, self.spec_3 = spec_1, spec_2, spec_3
@@ -167,6 +172,9 @@ class GeneralProcessSpecification():
         self.total_iterations = 0
         self.average_HXN_energy_balance_percent_error = 0.
         self.exceptions_dict = {}
+        
+        self.evaporator = evaporator
+        self.sugars = sugars
         
     def evaluate_across_specs(self, system, 
             spec_1, spec_2, metrics, spec_3):
@@ -214,3 +222,17 @@ class GeneralProcessSpecification():
             data[:, i] = [j() for j in metrics]
         print(data)
         return data
+    
+    def check_sugar_concentration(self):
+        if self.calculate_sugar_concentration() > self.max_sugar_concentration:
+            raise InfeasibleRegion('sugar concentration')
+    
+    def calculate_sugar_concentration(self): # g / L
+        sugar_solution = self.sugar_solution
+        return sugar_solution.imass[self.sugars].sum() / sugar_solution.F_vol 
+    
+    @property
+    def sugar_solution(self):
+        return self.evaporator.outs[0]
+    
+    
