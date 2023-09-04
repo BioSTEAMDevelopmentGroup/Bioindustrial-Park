@@ -148,6 +148,7 @@ AceticAcid = chemical_database('AceticAcid')
 SodiumAcetate = chemical_database('SodiumAcetate')
 Glucose = chemical_database('Glucose', phase = 'l')
 
+CitricAcid = chemical_database('CitricAcid')
 # IBA = chemical_database('Isobutyraldehyde')
 # DPHP = chemical_database('DipotassiumHydrogenPhosphate',
 #                          search_ID='Dipotassium hydrogen phosphate',

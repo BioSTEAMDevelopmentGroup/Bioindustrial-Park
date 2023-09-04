@@ -111,7 +111,7 @@ def add_metrics_to_unit_groups(unit_groups,
         if i.name == 'cooling utility facilities':
             i.metrics[1].getter = lambda: 0. # Cooling duty
         if i.name == 'boiler & turbogenerator':
-            i.filter_savings = False
+            # i.filter_savings = False
             i.metrics[-1] = Metric('Material cost', 
                                                 getter=lambda: TEA.utility_cost/TEA.operating_hours, 
                                                 units='USD/hr',

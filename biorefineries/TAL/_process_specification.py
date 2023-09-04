@@ -103,9 +103,10 @@ def evaluate_across_specs(spec, system,
     print(f"\n\n----------\n{spec.count} / {spec.total_iterations}\n")
     print(f"yield = {format(100*float(spec_1),'.1f')} % theo.,  titer = {format(float(spec_2),'.2f')} g\u00b7L\u207b\u00b9,  prod. = {format(float(spec_3),'.2f')} g\u00b7L\u207b\u00b9\u00b7h\u207b\u00b9\n")
     try:
-        spec.load_specifications(spec_1=spec_1, spec_2=spec_2)
+        # print(spec_3)
+        spec.load_specifications(spec_1=spec_1, spec_2=spec_2, spec_3=spec_3[0])
         # system.simulate()
-        if spec.set_production_capacity: spec.set_production_capacity()
+        # if spec.set_production_capacity: spec.set_production_capacity(desired_annual_production=spec.desired_annual_production)
         return get_metrics()
     except Exception as e1:
         if error: raise e1
@@ -125,7 +126,7 @@ def evaluate_across_specs(spec, system,
             print(str_e1)
             try:
                 run_bugfix_barrage()
-                if spec.set_production_capacity: spec.set_production_capacity()
+                # if spec.set_production_capacity: spec.set_production_capacity(desired_annual_production=spec.desired_annual_production)
                 return get_metrics()
                 # Beep(320, 250)
             except Exception as e2:
@@ -133,6 +134,7 @@ def evaluate_across_specs(spec, system,
                 try: 
                     try:
                         system.simulate()
+                        # if spec.set_production_capacity: spec.set_production_capacity(desired_annual_production=spec.desired_annual_production)
                         return get_metrics()
                     except:
                         Beep(640, 500)
@@ -195,7 +197,9 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
                  'HXN_new_HXs',
                  'HXN_new_HX_utils',
                  'HXN_Q_bal_percent_error_dict',
-                 'set_production_capacity')
+                 'set_production_capacity',
+                 'desired_annual_production',
+                 )
     
     def __init__(self, evaporator, pump, mixer, heat_exchanger, seed_train_system, seed_train,
                  reactor, reaction_name, substrates, products,
@@ -205,7 +209,8 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
                  baseline_productivity=0.76, tolerable_HXN_energy_balance_percent_error=2., HXN_intolerable_points=[],
                  HXN_new_HXs={}, HXN_new_HX_utils={}, HXN_Q_bal_percent_error_dict = {},
                  feedstock_mass=104192.83224417375, pretreatment_reactor = None,
-                  load_spec_1=None, load_spec_2=None, load_spec_3=None, set_production_capacity=None):
+                  load_spec_1=None, load_spec_2=None, load_spec_3=None, set_production_capacity=None,
+                  desired_annual_production=25000.,):
         self.substrates = substrates
         self.reactor = reactor #: [Unit] Reactor unit operation
         self.products = products #: tuple[str] Names of main products
@@ -232,6 +237,7 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
         self.HXN_intolerable_points = HXN_intolerable_points
         self.HXN_Q_bal_percent_error_dict = HXN_Q_bal_percent_error_dict
         self.set_production_capacity = set_production_capacity
+        self.desired_annual_production = desired_annual_production
         
         self.count = 0 
         self.count_exceptions = 0
@@ -318,6 +324,7 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
         data = np.zeros([M, P])
         for i in range(P):
             self.load_spec_3(spec_3[i])
+            if self.set_production_capacity: self.set_production_capacity(desired_annual_production=self.desired_annual_production)
             # self.reactor._summary()
             data[:, i] = [j() for j in metrics]
         print(data)
@@ -409,8 +416,10 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
         
         reactor.xylose_to_TAL_rxn.X = yield_
         
+        reactor.acetate_to_TAL_rxn.X = yield_
+        
         sum_sugar_conversion = reactor.glucose_to_TAL_rxn.X + reactor.glucose_to_microbe_rxn.X +\
-            reactor.glucose_to_VitaminA_rxn.X + reactor.glucose_to_VitaminD2_rxn.X
+            reactor.glucose_to_VitaminA_rxn.X + reactor.glucose_to_CitricAcid_rxn.X
         
         if sum_sugar_conversion>=1:
             reactor.glucose_to_microbe_rxn.X = seed_train.glucose_to_microbe_rxn.X =\

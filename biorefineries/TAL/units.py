@@ -931,14 +931,22 @@ class Saccharification(Unit):
 class BatchCoFermentation(BatchBioreactor):
     # Co-Fermentation time (hr)
     
-    _N_ins = 5
+    _N_ins = 6
     _N_outs = 2
     
     tau_cofermentation = 120 # initial value; updated by spec.load_productivity
     
-    CSL_loading = 10 # kg/m3
+    CSL_loading = 32.5 # kg/m3
     
-    acetate_target_loading = 13.7 * (60.05196/82.033789) # g-AceticAcid-eq / L # 13.7 g-sodium acetate /L from Markham et al. 2018
+    acetate_target_loading = 13.667 * (60.05196/82.033789) # g-AceticAcid-eq / L # 13.667 g-sodium acetate /L as in Markham et al. 2018
+    
+    air_m3_per_h_per_m3_reactor = 3.5*60/3 # 3.5 slpm for a 3L bioreactor; Markham et al. 2018 # used when aeration_rate_basis=='fixed rate basis'
+    
+    DO_saturation_concentration_kg_per_m3 = 7.8e-3 # 7.8 mg/L at 28 degrees C # used when aeration_rate_basis=='DO saturation basis'
+    
+    DO_saturation_target_level = 0.5 # 50% saturation from Markham et al. 2018 # used when aeration_rate_basis=='DO saturation basis'
+    
+    air_flow_rate_safety_factor_for_DO_saturation_basis = 1.
     
     #: [float] Cleaning and unloading time (hr).
     tau_0 = 3
@@ -947,15 +955,19 @@ class BatchCoFermentation(BatchBioreactor):
     V_wf = 0.5 # !!!
     
     # autoselect_N  = True
+
     
     def __init__(self, ID='', ins=None, outs=(), 
-                 T=30+273.15,
+                 T=28+273.15,
                  P=101325., 
                  tau=120, # initial value; updated by spec.load_productivity
                  V=3785.,
                  acetate_ID='SodiumAcetate',
+                 aeration_rate_basis='fixed rate basis', # 'fixed rate basis' or 'DO saturation basis'
                  ):
         BatchBioreactor.__init__(self, ID, ins, outs, T=T, P=P, tau=tau, V=V)
+        
+        self.aeration_rate_basis = aeration_rate_basis
         
         self.acetate_ID = acetate_ID
         self.acetate_hydrolysis_rxns = ParallelRxn([
@@ -967,12 +979,12 @@ class BatchCoFermentation(BatchBioreactor):
         #      Reaction definition            Reactant    Conversion
         Rxn('Glucose -> 0.6667 TAL + 2 CO2',        'Glucose',   0.19), 
         Rxn('Glucose -> 0.3 VitaminA',               'Glucose',   1e-8), # retinol
-        Rxn('Glucose -> 0.214286 VitaminD2',               'Glucose',   1e-8), # ergosterol
+        Rxn('Glucose -> 0.214286 CitricAcid',               'Glucose',   1e-8), # ergosterol
         Rxn('Glucose -> 6 FermMicrobe',       'Glucose',   0.05),
         
         Rxn('Xylose -> 0.555583 TAL + 1.3334 CO2',       'Xylose',    0.19),
         Rxn('Xylose -> 0.25 VitaminA',       'Xylose',    1e-8),
-        Rxn('Xylose -> 0.17856 VitaminD2',       'Xylose',    1e-8),
+        Rxn('Xylose -> 0.17856 CitricAcid',       'Xylose',    1e-8),
         Rxn('Xylose -> 5 FermMicrobe',        'Xylose',    0.05),
         
         Rxn('AceticAcid -> 0.22218 TAL + 2CO2 + 6H2O',       'AceticAcid',    0.19),
@@ -982,11 +994,10 @@ class BatchCoFermentation(BatchBioreactor):
         
         ])
         
-        # oxygen currently excluded from balance
         self.CO2_generation_rxns = ParallelRxn([
-            Rxn('Glucose -> 6CO2 + 6H2O', 'Glucose', 1.-1e-2),
-            Rxn('Xylose -> 5CO2 + 5H2O', 'Xylose', 1.-1e-2),
-            Rxn('AceticAcid -> 2CO2 + 2H2O', 'AceticAcid', 1.-1e-2),
+            Rxn('Glucose + 6O2 -> 6CO2 + 6H2O', 'Glucose', 1.-1e-2),
+            Rxn('Xylose + 5O2 -> 5CO2 + 5H2O', 'Xylose', 1.-1e-2),
+            Rxn('AceticAcid + 2O2 -> 2CO2 + 2H2O', 'AceticAcid', 1.-1e-2),
             ])
         
         self.sucrose_hydrolysis_rxns = ParallelRxn([
@@ -1003,8 +1014,8 @@ class BatchCoFermentation(BatchBioreactor):
         self.xylose_to_VitaminA_rxn = self.cofermentation_rxns[5]
         self.acetate_to_VitaminA_rxn = self.cofermentation_rxns[9]
         
-        self.glucose_to_VitaminD2_rxn = self.cofermentation_rxns[2]
-        self.xylose_to_VitaminD2_rxn = self.cofermentation_rxns[6]
+        self.glucose_to_CitricAcid_rxn = self.cofermentation_rxns[2]
+        self.xylose_to_CitricAcid_rxn = self.cofermentation_rxns[6]
         self.acetate_to_VitaminD2_rxn = self.cofermentation_rxns[10]
         
         self.glucose_to_microbe_rxn = self.cofermentation_rxns[3]
@@ -1016,7 +1027,7 @@ class BatchCoFermentation(BatchBioreactor):
         self.acetate_to_CO2_rxn = self.CO2_generation_rxns[2]
 
     def _run(self):
-        feed, seed, CSL, Acetate_spiking, yeast_extract = self.ins
+        feed, seed, CSL, Acetate_spiking, yeast_extract, air = self.ins
         for i in [CSL, Acetate_spiking]: i.empty()
         
         vapor, effluent = self.outs
@@ -1027,25 +1038,51 @@ class BatchCoFermentation(BatchBioreactor):
         required_acetate_spiking = max(0, self.acetate_target_loading - current_acetate_loading)
         Acetate_spiking.imass[self.acetate_ID] = required_acetate_spiking * effluent.F_vol
         
-        effluent.mix_from([effluent, Acetate_spiking])
+        # air.P = self.air_pressure
+        air.imol['N2'] = 0.79
+        air.imol['O2'] = 0.21
         
-        # ss = Stream(None)
-        # effluent.copy_like(feed)
-        effluent.T = vapor.T = self.T
+        if self.aeration_rate_basis == 'DO saturation basis':
+            self.air_exit_F_mol_needed = air_exit_F_mol_needed = (1./0.21) * (1/32.) * self.air_flow_rate_safety_factor_for_DO_saturation_basis * self.DO_saturation_concentration_kg_per_m3 * self.DO_saturation_target_level\
+                *(seed.F_vol+feed.F_vol)
+            
+            air.F_mol = 1e6 # initial value; updated after reactions
+        
+        elif self.aeration_rate_basis == 'fixed rate basis':
+            air.F_vol = self.air_m3_per_h_per_m3_reactor * (seed.F_vol+feed.F_vol) * self.tau
+        
+        else: raise RuntimeError(f"Unsupported aeration_rate_basis ({self.aeration_rate_basis}); must be 'fixed rate basis' or 'DO saturation basis'.")
+        
         CSL.imass['CSL'] = (seed.F_vol+feed.F_vol) * self.CSL_loading 
+        
+        effluent.mix_from([effluent, Acetate_spiking, air])
+        effluent.T = vapor.T = self.T
         
         self.acetate_hydrolysis_rxns(effluent.mol)
         self.sucrose_hydrolysis_rxns(effluent.mol)
         self.cofermentation_rxns(effluent.mol)
         self.CO2_generation_rxns(effluent.mol)
         
-        vapor.imol['CO2'] = effluent.imol['CO2']
+        
+        if self.aeration_rate_basis == 'DO saturation basis':
+            O2_mol_remaining, N2_mol_remaining = effluent.imol['O2', 'N2']
+            O2_mol_excess = O2_mol_remaining - 0.21*self.air_exit_F_mol_needed
+            # N2_mol_excess = N2_mol_remaining - 0.79*air_exit_F_mol_needed
+            N2_mol_excess = O2_mol_excess * 0.79/0.21
+            air_mol_excess = O2_mol_excess + N2_mol_excess
+            
+            self.air_mol_excess = air_mol_excess
+        
+            air.F_mol -= air_mol_excess
+            effluent.imol['O2'] -= O2_mol_excess
+            effluent.imol['N2'] -= N2_mol_excess
+        
+        vapor.imol['CO2', 'O2', 'N2'] = effluent.imol['CO2', 'O2', 'N2']
         vapor.phase = 'g'
-        effluent.imol['CO2'] = 0
+        effluent.imol['CO2', 'O2', 'N2'] = 0, 0, 0
         effluent.imass['CSL'] = 0
         
         vapor.imol['CO2'] += CSL.get_atomic_flow('C')
-        
         
         # self.effluent_titer = compute_TAL_titer(effluent)
         # self.effluent = effluent

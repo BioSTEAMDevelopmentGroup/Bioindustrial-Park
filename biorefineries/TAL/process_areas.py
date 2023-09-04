@@ -32,7 +32,7 @@ def get_TAL_solubility_in_ethanol_ww():
     return 0.167682 # solubility of 157.425 g-TAL per L-ethanol
 
 def get_TAL_decarboxylation_conversion(T=273.15+80.):
-    return decarb_conv_interp(T)
+    return decarb_conv_interp(max(Ts_decarb[0], min(Ts_decarb[-1], T)))
     # return 1e-5
 
 
@@ -119,9 +119,10 @@ def create_TAL_fermentation_process(ins, outs,):
         for i in S302.outs: i.phases = ('l',)
     # Cofermentation
     R302 = units.BatchCoFermentation('R302', 
-                                    ins=(S302-1, '', CSL, Acetate_spiking, ''),
+                                    ins=(S302-1, '', CSL, Acetate_spiking, '', ''),
                                     outs=(fermentation_vent, fermentation_liquid_effluent),
                                     acetate_ID='AceticAcid',
+                                    aeration_rate_basis='DO saturation basis',
                                     )
     @R302.add_specification()
     def include_seed_CSL_in_cofermentation(): # note: effluent always has 0 CSL
@@ -133,7 +134,36 @@ def create_TAL_fermentation_process(ins, outs,):
     
     T301 = units.SeedHoldTank('T301', ins=R303-0, outs=1-R302)
 
-
+    K301 = bst.units.IsothermalCompressor('K301', ins='atmospheric_air', outs=('pressurized_air'), 
+                                    P=3e7,
+                                    # vle=True,
+                                    eta=0.6,
+                                    driver='Electric motor',
+                                    )
+    
+    @K301.add_specification(run=False)
+    def K301_spec():
+        # K301.P = R302.air_pressure
+        K301.ins[0].phase = 'g'
+        K301.ins[0].mol[:] = K301.outs[0].mol[:]
+        K301._run()
+    def K301_cost():
+        return 0
+    # K301._cost = K301_cost
+    # K301._design = K301_cost
+    
+    V301 = bst.units.IsenthalpicValve('V301', ins=K301-0,
+                                      P=101325.,
+                                      vle=False,
+                                      )
+    V301.line = 'Valve'
+    @V301.add_specification(run=False)
+    def V301_spec():
+        V301.ins[0].mol[:] = V301.outs[0].mol[:]
+        V301._run()
+        
+    V301-0-5-R302
+    
 #%% Separation of TAL by exploiting the temperature-sensitivity of TAL solubility 
 
 @SystemFactory(ID = 'TAL_separation_solubility_exploit_process',
@@ -317,7 +347,7 @@ def create_TAL_separation_solubility_exploit_process(ins, outs,):
         
     
     
-    H402 = bst.HXutility('H402', ins=S402-0, outs=(solid_TAL), T=273.15+40.)
+    H402 = bst.HXutility('H402', ins=S402-0, outs=(solid_TAL), T=273.15+30.)
 
     
     
