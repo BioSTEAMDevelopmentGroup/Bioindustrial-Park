@@ -125,12 +125,17 @@ def update_metric_units_of_unit_groups(unit_groups):
             if name in ('heating duty', 'cooling duty', 'steam use'):
                 # i.units = 'GJ/h'
                 i.units = 'GJ\u00b7h\u207b\u00b9'
+                # i.units = f'GJ\u00b7h{chr(0x2D)}\u00b9'
+                # i.units = 'GJ\u00b7$\mathdefault{h^{-1}}$'
             elif name in ('electricity consumption', 'power consumption'):
                 i.units = 'MW'
             elif name in ('operating cost', 'material cost'):
                 # i.units = 'MM$/y'
                 # i.units = 'MM$\u00b7y\u207b\u00b9'
                 i.units = '$\u00b7h\u207b\u00b9'
+                # i.units = f'GJ\u00b7h{chr(0x2D)}\u00b9'
+                # i.units = 'USD\u00b7$\mathdefault{h^{-1}}$'
+                
             elif name in ('installed equipment cost'):
                 i.units = 'MM$'
                 
@@ -211,10 +216,14 @@ def add_metrics_to_unit_groups(unit_groups,
         #                                       if i.agent.ID in ('chilled_brine', 'chilled brine')])
             
         if i.name == 'excess electricity':
-            i.metrics[-2].getter=lambda: TEA.utility_cost/TEA.operating_hours -\
+            i.metrics[-2].getter=\
+                lambda: TEA.utility_cost/TEA.operating_hours -\
                                         sum([i.cost for i in system.heat_utilities 
-                                            if i.agent.ID in ('chilled_brine', 'chilled brine')])
-        
+                                            if i.agent.ID in ('chilled_brine', 'chilled brine')])-\
+                                        sum([j.utility_cost-j.power_utility.cost
+                                              for j in natural_gas_utilizing_non_BT_system_units])
+                
+                # lambda: system.power_utility.cost
         ############## Electricity consumption ##############
         if i.name == 'cooling utility facilities':
             i.metrics[3].getter=lambda: sum([ui.power_utility.rate for ui in i.units])
