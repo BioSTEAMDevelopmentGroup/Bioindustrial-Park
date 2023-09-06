@@ -143,15 +143,13 @@ def create_TAL_fermentation_process(ins, outs,):
     
     @K301.add_specification(run=False)
     def K301_spec():
+        K301_ins_0 = K301.ins[0]
+        K301_ins_0.T = R302.T
         # K301.P = R302.air_pressure
-        K301.ins[0].phase = 'g'
-        K301.ins[0].mol[:] = K301.outs[0].mol[:]
+        K301_ins_0.phase = 'g'
+        K301_ins_0.mol[:] = K301.outs[0].mol[:]
         K301._run()
-    def K301_cost():
-        return 0
-    # K301._cost = K301_cost
-    # K301._design = K301_cost
-    
+
     V301 = bst.units.IsenthalpicValve('V301', ins=K301-0,
                                       P=101325.,
                                       vle=False,
@@ -344,7 +342,6 @@ def create_TAL_separation_solubility_exploit_process(ins, outs,):
                          moisture_content=0.05, 
                          split=0.,
                          moisture_ID='Water')
-    
     @F402.add_specification(run=False)
     def F402_spec():
         F402_ins_0 = F402.ins[0]

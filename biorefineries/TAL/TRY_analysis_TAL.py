@@ -20,7 +20,7 @@ import biosteam as bst
 
 # from TAL.system_solubility_exploit import TAL_sys, TAL_tea, R302, spec
 from biorefineries import TAL
-from biorefineries.TAL.system_TAL_solubility_exploit_ethanol_sugarcane import TAL_sys, TAL_tea, TAL_lca, R302, spec, TAL_product, simulate_and_print
+from biorefineries.TAL.system_TAL_solubility_exploit_ethanol_sugarcane import TAL_sys, TAL_tea, TAL_lca, R302, spec, TAL_product, simulate_and_print, theoretical_max_g_TAL_per_g_SA
 # from biorefineries.TAL.system_TAL_adsorption_glucose import TAL_sys, TAL_tea, R302, spec, SA
 # from biorefineries.TAL.system_ethyl_esters import TAL_sys, TAL_tea, R302, spec, Mixed_esters
 # get_GWP, get_non_bio_GWP, get_FEC, get_SPED
@@ -49,6 +49,13 @@ ig = np.seterr(invalid='ignore')
 # bst.speed_up()
 
 product = TAL_product
+
+SA_market_range=np.array([
+                          6.45, # 2022 North America price from https://www.chemanalyst.com/Pricing-data/sorbic-acid-1402
+                          7.43, # 2019 North America price from Sorbic Acid Market, Transparency Market Research
+                          ]) 
+
+TAL_maximum_viable_market_range = SA_market_range / theoretical_max_g_TAL_per_g_SA
 
 #%% Filepath
 TAL_filepath = TAL.__file__.replace('\\__init__.py', '')
@@ -83,8 +90,8 @@ TAL_metrics = [get_product_MPSP, lambda: TAL_lca.GWP, lambda: TAL_lca.FEC]
 steps = (50, 50, 1)
 
 # Yield, titer, productivity (rate)
-spec_1 = yields = np.linspace(0.1, 0.5, steps[0]) # yield
-spec_2 = titers = np.linspace(10., 50., steps[1]) # titer
+spec_1 = yields = np.linspace(0.05, 0.8, steps[0]) # yield
+spec_2 = titers = np.linspace(5., 80., steps[1]) # titer
 
 
 # spec_3 = productivities =\
@@ -99,16 +106,16 @@ spec_3 = productivities =\
 
 x_label = r"$\bfYield$" # title of the x axis
 x_units = r"$\mathrm{\%}$" + " " + r"$\mathrm{theoretical}$"
-x_ticks=[10, 20, 30, 40, 50]
+x_ticks = [0, 10, 20, 30, 40, 50, 60, 70, 80]
 
 y_label = r"$\bfTiter$" # title of the y axis
 y_units =r"$\mathrm{g} \cdot \mathrm{L}^{-1}$"
-y_ticks=[10, 20, 30, 40, 50]
+y_ticks = [0, 10, 20, 30, 40, 50, 60, 70, 80]
 
 
 z_label = r"$\bfProductivity$" # title of the z axis
 z_units =  r"$\mathrm{g} \cdot \mathrm{L}^{-1}  \cdot \mathrm{h}^{-1}$"
-z_ticks=[0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.30]
+z_ticks = [0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.30]
 
 # Metrics
 MPSP_w_label = r"$\bfMPSP$" # title of the color axis
@@ -371,21 +378,21 @@ def get_contour_info_from_metric_data(
 
 MPSP_w_levels, MPSP_w_ticks, MPSP_cbar_ticks = get_contour_info_from_metric_data(results_metric_1, lb=3)
 GWP_w_levels, GWP_w_ticks, GWP_cbar_ticks = get_contour_info_from_metric_data(results_metric_2,)
-_w_levels, FEC_w_ticks, FEC_cbar_ticks = get_contour_info_from_metric_data(results_metric_3,)
+# FEC_w_levels, FEC_w_ticks, FEC_cbar_ticks = get_contour_info_from_metric_data(results_metric_3,)
 
 #%% More plot stuff
 
 fps = 3
-axis_title_fonts={'size': {'x': 12, 'y':12, 'z':12, 'w':12},}
-clabel_fontsize = 12.
+axis_title_fonts={'size': {'x': 11, 'y':11, 'z':11, 'w':11},}
+clabel_fontsize = 11.
 default_fontsize = 10.
 keep_frames = True
 
 #%% MPSP
 
-MPSP_w_levels = np.arange(3, 10.25, 0.25)
-MPSP_cbar_ticks = np.arange(3, 10.25, 0.5)
-MPSP_w_ticks = [4, 5, 6, 8, 10]
+MPSP_w_levels = np.arange(2, 8.1, 0.2)
+MPSP_cbar_ticks = np.arange(2, 8.1, 1.)
+MPSP_w_ticks = [ 4, 4.5, 5, 8]
 # MPSP_w_levels = np.arange(0., 15.5, 0.5)
 
 contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_1, # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., MPSP
@@ -420,7 +427,7 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_1, 
                                 axis_title_fonts=axis_title_fonts,
                                 clabel_fontsize = clabel_fontsize,
                                 default_fontsize = default_fontsize,
-                                comparison_range=[6.5, 7.5],
+                                comparison_range=TAL_maximum_viable_market_range,
                                 n_minor_ticks = 1,
                                 cbar_n_minor_ticks = 1,
                                 # comparison_range=[MPSP_w_levels[-2], MPSP_w_levels[-1]],
@@ -447,7 +454,8 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_2, 
                                 y_units=y_units,
                                 z_units=z_units,
                                 w_units=GWP_units,
-                                fmt_clabel=lambda cvalue: r"$\mathrm{\$}$"+" {:.1f} ".format(cvalue)+r"$\cdot\mathrm{kg}^{-1}$", # format of contour labels
+                                # fmt_clabel=lambda cvalue: r"$\mathrm{\$}$"+" {:.1f} ".format(cvalue)+r"$\cdot\mathrm{kg}^{-1}$", # format of contour labels
+                                fmt_clabel = lambda cvalue:  f"{round(cvalue,1)}",
                                 cmap=CABBI_green_colormap(), # can use 'viridis' or other default matplotlib colormaps
                                 cmap_over_color = colors.grey_dark.shade(8).RGBn,
                                 extend_cmap='max',
@@ -468,8 +476,9 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_2, 
 
 
 #%% FEC
-
-FEC
+FEC_w_levels = np.arange(-40, 61, 2.5)
+FEC_cbar_ticks = np.arange(-40, 61, 5)
+FEC_w_ticks = [-30, -20, 0, 25, 50]
 contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_3, # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., FEC
                                 x_data=100*yields, # x axis values
                                 y_data=titers, # y axis values
@@ -487,7 +496,8 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_3, 
                                 y_units=y_units,
                                 z_units=z_units,
                                 w_units=FEC_units,
-                                fmt_clabel=lambda cvalue: r"$\mathrm{\$}$"+" {:.1f} ".format(cvalue)+r"$\cdot\mathrm{kg}^{-1}$", # format of contour labels
+                                # fmt_clabel=lambda cvalue: r"$\mathrm{\$}$"+" {:.1f} ".format(cvalue)+r"$\cdot\mathrm{kg}^{-1}$", # format of contour labels
+                                fmt_clabel = lambda cvalue:  f"{round(cvalue,1)}",
                                 cmap=CABBI_green_colormap(), # can use 'viridis' or other default matplotlib colormaps
                                 cmap_over_color = colors.grey_dark.shade(8).RGBn,
                                 extend_cmap='max',

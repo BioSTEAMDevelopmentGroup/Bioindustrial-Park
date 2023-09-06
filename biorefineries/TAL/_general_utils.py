@@ -34,11 +34,19 @@ def call_all_specifications_or_run(units_to_run):
 #%% Get some more unit groups for a given system
 def get_more_unit_groups(system,
                          groups_to_get=['wastewater',
-                                        'storage',
+                                        'storage & other facilities',
                                         'boiler & turbogenerator',
                                         'cooling utility facilities',
                                         'other facilities',
-                                        'heat exchanger network',]
+                                        'heat exchanger network',
+                                        'natural gas (for steam generation)',
+                                        'natural gas (for product drying)',
+                                        'chilled brine',
+                                        'fixed operating cost',
+                                        'electricity consumption',
+                                        'heating duty',
+                                        'excess electricity',
+                                        ]
                          ):
     unit_groups_temp = UnitGroup.group_by_area(system.units)
     u = system.flowsheet.unit
@@ -55,9 +63,12 @@ def get_more_unit_groups(system,
         wastewater_group.name = 'wastewater'
         unit_groups_.append(wastewater_group)
         
-    if 'storage' in groups_to_get:
-        storage_group = [i for i in unit_groups_temp if has_area_unit(i.units, 600)][0]
-        storage_group.name = 'storage'
+    if 'storage & other facilities' in groups_to_get:
+        storage_group = UnitGroup('storage & other facilities',
+        units=[i for i in unit_groups_temp if has_area_unit(i.units, 600)][0].units+\
+            [i for i in unit_groups_temp if has_area_unit(i.units, 900)][0].units,
+            )
+        # storage_group.name = 'storage & other facilities'
         unit_groups_.append(storage_group)
     
     if 'boiler & turbogenerator' in groups_to_get:
@@ -70,76 +81,161 @@ def get_more_unit_groups(system,
                                                          units=(u.CT801, u.CWP802,))
         unit_groups_.append(cooling_utility_facilities_group)
 
-    if 'other facilities' in groups_to_get:
-        other_facilities_group = [i for i in unit_groups_temp if has_area_unit(i.units, 900)][0]
-        other_facilities_group.name = 'other facilities'
-        unit_groups_.append(other_facilities_group)
+    # if 'other facilities' in groups_to_get:
+    #     other_facilities_group = [i for i in unit_groups_temp if has_area_unit(i.units, 900)][0]
+    #     other_facilities_group.name = 'other facilities'
+    #     unit_groups_.append(other_facilities_group)
     
     if 'heat exchanger network' in groups_to_get:
         heat_exchanger_network_group = UnitGroup('heat exchanger network', 
                                                          units=(u.HXN1001,))
         unit_groups_.append(heat_exchanger_network_group)
+        
+    if 'natural gas (for steam generation)' in groups_to_get:
+        unit_groups_.append(UnitGroup('natural gas (for steam generation)'))
+        
+    if 'natural gas (for product drying)' in groups_to_get:
+        unit_groups_.append(UnitGroup('natural gas (for product drying)'))
     
-    unit_groups_.append(UnitGroup('natural gas (for steam generation)'))
-    unit_groups_.append(UnitGroup('natural gas (for product drying)'))
-    unit_groups_.append(UnitGroup('fixed operating costs'))
+    if 'chilled brine' in groups_to_get:
+        unit_groups_.append(UnitGroup('chilled brine'))
     
+    if 'fixed operating cost' in groups_to_get:
+        unit_groups_.append(UnitGroup('fixed operating cost'))
+    # unit_groups_.append(UnitGroup('material cost'))
+    
+    if 'electricity consumption' in groups_to_get:
+        unit_groups_.append(UnitGroup('electricity consumption'))
+        
+    if 'heating duty' in groups_to_get:
+        unit_groups_.append(UnitGroup('heating duty'))
+        
+    # unit_groups_.append(UnitGroup('cooling duty'))
+    
+    if 'excess electricity' in groups_to_get:
+        unit_groups_.append(UnitGroup('excess electricity'))
+        
     return unit_groups_
 
+# %% Update units of all metrics in a list of unit groups
+def update_metric_units_of_unit_groups(unit_groups):
+    for ui in unit_groups:
+        for i in ui.metrics:
+            name = i.name.lower()
+            if name in ('heating duty', 'cooling duty', 'steam use'):
+                # i.units = 'GJ/h'
+                i.units = 'GJ\u00b7h\u207b\u00b9'
+            elif name in ('electricity consumption', 'power consumption'):
+                i.units = 'MW'
+            elif name in ('operating cost', 'material cost'):
+                # i.units = 'MM$/y'
+                # i.units = 'MM$\u00b7y\u207b\u00b9'
+                i.units = '$\u00b7h\u207b\u00b9'
+            elif name in ('installed equipment cost'):
+                i.units = 'MM$'
+                
 #%% Add metrics to a given list of unit groups
 def add_metrics_to_unit_groups(unit_groups, 
                                system,
                                TEA=None, 
+                               LCA=None,
                                BT=None,
                                hxn_class=HeatExchangerNetwork,
                                natural_gas_utilizing_non_BT_unit_classes = [DrumDryer,],
                                ):
     if not TEA:
         TEA = system.TEA
+    if not LCA:
+        LCA = system.LCA
     if not BT:
         BT = system.flowsheet.unit.BT701
     
     natural_gas_utilizing_non_BT_system_units = [ui for ui in system.units
                                                  if ui.__class__ in natural_gas_utilizing_non_BT_unit_classes]
+    
+
+    
+        
     for i in unit_groups: i.autofill_metrics(shorthand=False, 
                                              electricity_production=False, 
                                              electricity_consumption=True,
                                              material_cost=True)
+    
     for i in unit_groups:
-        if i.name == 'storage' or i.name=='other facilities' or i.name == 'cooling utility facilities':
-            i.metrics[-1].getter = lambda: 0. # Material cost
-        if i.name == 'cooling utility facilities':
-            i.metrics[1].getter = lambda: 0. # Cooling duty
-        if i.name == 'boiler & turbogenerator':
-            # i.filter_savings = False
-            i.metrics[-1] = Metric('Material cost', 
-                                                getter=lambda: TEA.utility_cost/TEA.operating_hours, 
-                                                units='USD/hr',
-                                                element=None) # Material cost
-            # i.metrics[-2].getter = lambda: BT.power_utility.rate/1e3 # Electricity consumption [MW]
-        if i.name == 'natural gas (for steam generation)':
-            i.metrics[-1] = Metric('Material cost', 
-                                                getter=lambda: BT.natural_gas_price * BT.natural_gas.F_mass, 
-                                                units='USD/hr',
-                                                element=None)
-        if i.name == 'natural gas (for product drying)':
-            pass
-        if i.name == 'fixed operating costs':
-            i.metrics[-1] = Metric('Material cost', 
-                                                getter=lambda: TEA.FOC/TEA.operating_hours, 
-                                                units='USD/hr',
-                                                element=None)
-        if i.name == 'natural gas (for product drying)':
-            
-            i.metrics[-1] = Metric('Material cost', 
-                                                getter=lambda: sum([i.utility_cost-i.power_utility.cost\
-                                                                    for i in natural_gas_utilizing_non_BT_system_units]), 
-                                                units='USD/hr',
-                                                element=None)
+        for j in i.metrics:
+            if j.name.lower()=='material cost':
+                j.name = 'Operating cost'
+        i.metrics.append(Metric('Steam use', 
+                                            getter=lambda: 0, 
+                                            units='GJ/h',
+                                            element=None))
+        # i.metrics.append(Metric('Operating cost', 
+        #                                     getter=lambda: 0, 
+        #                                     units='MM$/y',
+        #                                     element=None))
+                         
+    for i in unit_groups:
+        # i.metrics[-3].getter = i.get_material_cost*TEA.annual_operating_hours
+        
         if i.name == 'heat exchanger network':
             i.filter_savings = False
             assert isinstance(i.units[0], hxn_class)
-
+        if i.name == 'cooling utility facilities':
+            i.metrics[1].getter = lambda: 0. # Cooling duty
+            i.metrics[3].getter = lambda: sum([ui.power_utility.rate for ui in i.units])/1e3 # Electricity consumption [MW]
+        
+        ############## Operating cost ##############
+        if i.name == 'feedstock juicing':
+            i.metrics[-2].getter = lambda: sum([sum([j.cost for j in ui.ins]) for ui in i.units])
+        if i.name == 'storage & other facilities' or i.name == 'cooling utility facilities':
+            i.metrics[-2].getter = lambda: 0.
+        if i.name == 'natural gas (for steam generation)':
+            i.metrics[-2].getter=lambda: BT.natural_gas_price * BT.natural_gas.F_mass
+        if i.name == 'natural gas (for product drying)':
+            i.metrics[-2].getter=lambda: sum([j.utility_cost-j.power_utility.cost
+                                              for j in natural_gas_utilizing_non_BT_system_units])
+        if i.name == 'chilled brine':
+            i.metrics[-2].getter=lambda: sum([i.cost for i in system.heat_utilities 
+                                              if i.agent.ID in ('chilled_brine', 'chilled brine')])
+            
+        ##############  ##############
+        if i.name == 'fixed operating cost':
+            i.metrics[-2].getter=lambda: TEA.FOC/TEA.operating_hours
+            
+        # if i.name == 'material cost':
+        #     i.metrics[-2].getter=lambda: TEA.material_cost/TEA.operating_hours\
+        #                                 +BT.natural_gas_price * BT.natural_gas.F_mass\
+        #                                 +sum([j.utility_cost-j.power_utility.cost
+        #                                      for j in natural_gas_utilizing_non_BT_system_units])\
+        #                                 +sum([i.cost for i in system.heat_utilities 
+        #                                       if i.agent.ID in ('chilled_brine', 'chilled brine')])
+            
+        if i.name == 'excess electricity':
+            i.metrics[-2].getter=lambda: TEA.utility_cost/TEA.operating_hours -\
+                                        sum([i.cost for i in system.heat_utilities 
+                                            if i.agent.ID in ('chilled_brine', 'chilled brine')])
+        
+        ############## Electricity consumption ##############
+        if i.name == 'cooling utility facilities':
+            i.metrics[3].getter=lambda: sum([ui.power_utility.rate for ui in i.units])
+            
+        ############## Steam use ##############
+        if i.name == 'heating duty':
+            i.metrics[-1].getter=lambda: LCA.actual_steam_frac_heating*LCA.BT_steam_kJph_total/1e6
+            
+        # if i.name == 'cooling duty':
+        #     i.metrics[-2].getter=lambda: LCA.actual_steam_frac_cooling*LCA.BT_steam_kJph_total/1e6
+            
+        if i.name == 'electricity consumption':
+            i.metrics[-1].getter=lambda: (LCA.actual_steam_frac_electricity_non_cooling+\
+                                          LCA.actual_steam_frac_cooling)*\
+                                          LCA.BT_steam_kJph_total/1e6
+            
+        if i.name == 'excess electricity':
+            i.metrics[-1].getter=lambda: LCA.actual_steam_frac_excess*LCA.BT_steam_kJph_total/1e6
+        
+        update_metric_units_of_unit_groups(unit_groups)
+        
 #%% Set production capacity by adjusting feedstock capacity
 def set_production_capacity(
                             desired_annual_production, # pure metric tonne /y

@@ -278,6 +278,28 @@ class LCA:
     def steam_frac_electricity_non_cooling(self):
         return  self.steam_frac_turbogen * (1-(self.cooling_electricity_demand / self.electricity_demand))
     
+    ##
+    @property
+    def actual_steam_frac_heating(self): 
+        return self.BT_steam_kJph_heating/self.BT_steam_kJph_total
+    
+    @property
+    def actual_steam_frac_turbogen(self): 
+        return  self.BT_steam_kJph_turbogen / self.BT_steam_kJph_total 
+    
+    @property
+    def actual_steam_frac_cooling(self): 
+        return  self.actual_steam_frac_turbogen * self.cooling_electricity_demand / self.electricity_demand 
+    
+    @property
+    def actual_steam_frac_electricity_non_cooling(self):
+        return  self.actual_steam_frac_turbogen * (1-(self.cooling_electricity_demand / self.electricity_demand))
+    
+    @property
+    def actual_steam_frac_excess(self): 
+        return  self.BT_excess_steam_kJph_for_excess_electricity / self.BT_steam_kJph_total 
+    ##
+    
     @property
     def non_cooling_electricity_demand(self): 
         return  self.electricity_demand  -  self.cooling_electricity_demand 
