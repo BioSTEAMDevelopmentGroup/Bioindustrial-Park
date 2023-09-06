@@ -512,7 +512,7 @@ def create_HP_sys(ins, outs):
     
     D401_P = units.HPPump('D401_P', ins=M402-0, P=506625*5.4)
     
-    R402 = units.DehydrationReactor('R402', ins = (D401_P-0, makeup_TiO2_catalyst, '', ''),
+    R402 = units.DehydrationReactor('R402', ins = (D401_P-0, makeup_TiO2_catalyst, '',),
                                     outs = ('dilute_acryclic_acid', 'spent_TiO2_catalyst'),
                                     tau = 57.34/1.5, # Dishisha et al.
                                     T = 230. + 273.15,
