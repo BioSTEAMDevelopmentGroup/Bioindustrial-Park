@@ -936,7 +936,7 @@ class BatchCoFermentation(BatchBioreactor):
     
     tau_cofermentation = 120 # initial value; updated by spec.load_productivity
     
-    CSL_loading = 32.5 # kg/m3
+    CSL_loading = 32.5 # g/L
     
     acetate_target_loading = 13.667 * (60.05196/82.033789) # g-AceticAcid-eq / L # 13.667 g-sodium acetate /L as in Markham et al. 2018
     

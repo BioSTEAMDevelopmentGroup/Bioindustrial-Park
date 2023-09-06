@@ -20,7 +20,7 @@ import biosteam as bst
 
 # from TAL.system_solubility_exploit import TAL_sys, TAL_tea, R302, spec
 from biorefineries import TAL
-from biorefineries.TAL.system_TAL_solubility_exploit_ethanol_sugarcane import TAL_sys, TAL_tea, TAL_lca, R302, spec, TAL_product, simulate_and_print, theoretical_max_g_TAL_per_g_SA
+from biorefineries.TAL.system_TAL_solubility_exploit_ethanol_sugarcane import TAL_tea, TAL_lca, R302, spec, TAL_product, simulate_and_print, theoretical_max_g_TAL_per_g_SA
 # from biorefineries.TAL.system_TAL_adsorption_glucose import TAL_sys, TAL_tea, R302, spec, SA
 # from biorefineries.TAL.system_ethyl_esters import TAL_sys, TAL_tea, R302, spec, Mixed_esters
 # get_GWP, get_non_bio_GWP, get_FEC, get_SPED
@@ -41,6 +41,8 @@ import matplotlib.colors as mcolors
 from datetime import datetime
 import os
 
+from biorefineries.TAL import models_TAL_solubility_exploit as models
+
 chdir = os.chdir
 
 dateTimeObj = datetime.now()
@@ -57,13 +59,55 @@ SA_market_range=np.array([
 
 TAL_maximum_viable_market_range = SA_market_range / theoretical_max_g_TAL_per_g_SA
 
-#%% Filepath
+    
+#%% Filepaths
 TAL_filepath = TAL.__file__.replace('\\__init__.py', '')
 
 # ## Change working directory to biorefineries\\TAL\\analyses\\results
 # chdir(TAL.__file__.replace('\\__init__.py', '')+'\\analyses\\results')
 # ##
 TAL_results_filepath = TAL_filepath + '\\analyses\\results\\'
+
+#%% Load baseline
+model = models.TAL_model
+system = TAL_sys = models.TAL_sys
+
+modes = [
+            # 'A',
+            'B',
+         ]
+
+parameter_distributions_filenames = [
+                                    # 'parameter-distributions_A.xlsx',
+                                    'parameter-distributions_B.xlsx',
+                                    ]
+mode = modes[0]
+
+
+parameter_distributions_filename = TAL_filepath+\
+    '\\analyses\\parameter_distributions\\'+parameter_distributions_filenames[0]
+print(f'\n\nLoading parameter distributions ({mode}) ...')
+model.parameters = ()
+model.load_parameter_distributions(parameter_distributions_filename)
+
+# load_additional_params()
+print(f'\nLoaded parameter distributions ({mode}).')
+
+parameters = model.get_parameters()
+
+print('\n\nLoading samples ...')
+samples = model.sample(N=2000, rule='L')
+model.load_samples(samples)
+print('\nLoaded samples.')
+
+# ## Change working directory to biorefineries\\TAL\\analyses\\results
+# chdir(TAL.__file__.replace('\\__init__.py', '')+'\\analyses\\results')
+# ##
+
+model.exception_hook = 'warn'
+print('\n\nSimulating baseline ...')
+baseline_initial = model.metrics_at_baseline()
+
 
 #%%  Metrics
 
@@ -200,6 +244,8 @@ spec_1, spec_2 = np.meshgrid(spec_1, spec_2)
 
 #%% Initial simulation
 # simulate_and_print()
+
+print('\n\n Simulating the initial point to avoid bugs ...')
 spec.load_specifications(yields[0], titers[0], productivities[0])
 spec.set_production_capacity()
 simulate_and_print()
@@ -376,8 +422,8 @@ def get_contour_info_from_metric_data(
 
 #%% Get levels and ticks
 
-MPSP_w_levels, MPSP_w_ticks, MPSP_cbar_ticks = get_contour_info_from_metric_data(results_metric_1, lb=3)
-GWP_w_levels, GWP_w_ticks, GWP_cbar_ticks = get_contour_info_from_metric_data(results_metric_2,)
+# MPSP_w_levels, MPSP_w_ticks, MPSP_cbar_ticks = get_contour_info_from_metric_data(results_metric_1, lb=3)
+# GWP_w_levels, GWP_w_ticks, GWP_cbar_ticks = get_contour_info_from_metric_data(results_metric_2,)
 # FEC_w_levels, FEC_w_ticks, FEC_cbar_ticks = get_contour_info_from_metric_data(results_metric_3,)
 
 #%% More plot stuff
@@ -435,8 +481,9 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_1, 
                                 )
 
 #%% GWP
-
-
+GWP_w_levels = np.arange(0, 20, 0.4)
+GWP_cbar_ticks = np.arange(0, 20, 2.)
+GWP_w_ticks = [3, 4, 6, 10, 14, 20]
 contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_2, # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., GWP
                                 x_data=100*yields, # x axis values
                                 y_data=titers, # y axis values
@@ -468,7 +515,7 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_2, 
                                 axis_title_fonts=axis_title_fonts,
                                 clabel_fontsize = clabel_fontsize,
                                 default_fontsize = default_fontsize,
-                                cbar_n_minor_ticks=1,
+                                # cbar_n_minor_ticks=1,
                                 # comparison_range=[6.5, 7.5],
                                 # comparison_range=[GWP_w_levels[-2], GWP_w_levels[-1]],
                                 # comparison_range_hatch_pattern='////',
@@ -476,8 +523,8 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_2, 
 
 
 #%% FEC
-FEC_w_levels = np.arange(-40, 61, 2.5)
-FEC_cbar_ticks = np.arange(-40, 61, 5)
+FEC_w_levels = np.arange(-40, 61, 2.)
+FEC_cbar_ticks = np.arange(-40, 61, 10)
 FEC_w_ticks = [-30, -20, 0, 25, 50]
 contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_3, # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., FEC
                                 x_data=100*yields, # x axis values
