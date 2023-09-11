@@ -14,7 +14,7 @@ from biorefineries.TAL import units
 from biorefineries.TAL.process_settings import price, CFs
 from biorefineries.TAL.utils import find_split, splits_df
 from biorefineries.TAL.chemicals_data import chemical_groups
-from biorefineries.TAL.fit_TAL_solubility_in_water_one_parameter_van_laar_activity import get_mol_TAL_dissolved, get_TAL_solubility_in_water_gpL
+from biorefineries.TAL.models.solubility.fit_TAL_solubility_in_water_one_parameter_van_laar_activity import get_mol_TAL_dissolved, get_TAL_solubility_in_water_gpL
 from biosteam import SystemFactory
 from flexsolve import IQ_interpolation
 from scipy.interpolate import interp1d, interp2d
@@ -166,6 +166,7 @@ def create_TAL_fermentation_process(ins, outs,):
 
 @SystemFactory(ID = 'TAL_separation_solubility_exploit_process',
                ins=[dict(ID='fermentation_broth', TAL=1, Water=100),
+                    dict(ID='acetylacetone_fresh', Acetylacetone=1.),
                ],
                 outs=[dict(ID='decarboxylation_vent', CO2=20),
                       dict(ID='S401_solid', FermMicrobe=1, Water=1),
@@ -175,8 +176,8 @@ def create_TAL_fermentation_process(ins, outs,):
                                                )
 def create_TAL_separation_solubility_exploit_process(ins, outs,):
     
-    fermentation_broth, = ins
-    decarboxylation_vent, S401_solid, S402_liquid, solid_TAL = outs
+    fermentation_broth, acetylacetone_decarboxylation_equilibrium = ins
+    decarboxylation_vent, S401_solid, liquid_waste, solid_TAL = outs
     
     # =============================================================================
     # Separation streams
@@ -207,7 +208,6 @@ def create_TAL_separation_solubility_exploit_process(ins, outs,):
         U401_outs_0.imol['l', 'TAL'] = min(mol_TAL_dissolved, tot_TAL)
         U401_outs_0.imol['s', 'TAL'] = tot_TAL - min(mol_TAL_dissolved, tot_TAL)
         
- 
     # Change broth temperature to adjust TAL solubility
     H401 = bst.HXutility('H401', ins=U401-0, outs=('fermentation_broth_heated'), 
                          T=273.15+56., # initial value; updated in specification to minimum T required to completely dissolve TAL 
@@ -230,7 +230,6 @@ def create_TAL_separation_solubility_exploit_process(ins, outs,):
         lb_T = max(H401.lower_bound_T, H401_ins_0.T)
         ub_T = max(H401.upper_bound_T, H401_ins_0.T)
         
-        
         if tot_TAL>TAL_solubility_multiplier*get_mol_TAL_dissolved(ub_T, H401_ins_0_water):
             H401.T=ub_T
         elif tot_TAL<TAL_solubility_multiplier*get_mol_TAL_dissolved(lb_T, H401_ins_0_water):
@@ -246,21 +245,37 @@ def create_TAL_separation_solubility_exploit_process(ins, outs,):
         H401_outs_0.phases = ('l', 's')
         H401_outs_0.imol['l', 'TAL'] = min(mol_TAL_dissolved, tot_TAL)
         H401_outs_0.imol['s', 'TAL'] = max(0., round(tot_TAL - min(mol_TAL_dissolved, tot_TAL), 5))
+    
+    M401 = bst.LiquidsMixingTank('M401', ins=(H401-0, acetylacetone_decarboxylation_equilibrium), 
+                                 outs=('fermentation_broth_heated_mixed'))
+    M401.mol_acetylacetone_per_mol_TAL = 0.
+    @M401.add_specification(run=False)
+    def M401_spec():
+        M401.ins[1].imol['PD'] = M401.mol_acetylacetone_per_mol_TAL * M401.ins[0].imol['TAL']
+        M401._run()
 
-        
-    U402 = bst.FakeSplitter('U402', ins=H401-0, outs = ('thermally_decarboxylated_broth',decarboxylation_vent))
+    U402 = bst.FakeSplitter('U402', ins=M401-0, outs = ('thermally_decarboxylated_broth',decarboxylation_vent))
     U402.decarboxylation_rxns = ParallelRxn([
         Rxn('TAL + H2O -> PD + CO2', 'TAL',   0.25),
         ])
     U402.line = 'Background unit for decarboxylation'
     U402._graphics = U401._graphics
     
+    U402.decarboxylation_conversion_basis = 'fixed' # 'fixed' or 'temperature-dependent'
+    U402.decarboxylation_conversion = 0.225 # only used if basis is 'fixed' # experimental value at T= 80 C
+    
     @U402.add_specification()
     def U402_spec():
         U402_outs_0 = U402.outs[0]
         U402_outs_0.copy_like(U402.ins[0])
         U402_outs_0.phases = ('l', 's')
-        U402.decarboxylation_rxns[0].X = get_TAL_decarboxylation_conversion(T=U402_outs_0.T)
+        if U402.decarboxylation_conversion_basis == 'fixed':
+            U402.decarboxylation_rxns[0].X = U402.decarboxylation_conversion
+        elif U402.decarboxylation_conversion_basis == 'temperature-dependent':
+            U402.decarboxylation_rxns[0].X = get_TAL_decarboxylation_conversion(T=U402_outs_0.T)
+        else:
+            raise ValueError(f"U402.decarboxylation_conversion_basis must be 'fixed' or 'temperature-dependent', not '{U402.decarboxylation_conversion_basis}'.")
+        
         U402.decarboxylation_rxns[0].adiabatic_reaction(U402_outs_0['l'])
         U402.outs[1].imol['CO2'] = U402_outs_0.imol['l', 'CO2']
         U402.outs[1].phase = 'g'
@@ -324,24 +339,31 @@ def create_TAL_separation_solubility_exploit_process(ins, outs,):
                                    )
     C401.line = 'Crystallizer'
     
-    S402 = bst.units.SolidsCentrifuge('S402', ins=C401-0, outs=('S402_solid_fraction', S402_liquid),
+    S402 = bst.units.SolidsCentrifuge('S402', ins=C401-0, outs=('S402_solid_fraction', liquid_waste),
                                 moisture_content=0.50,
                                 # split=find_split(S401_index,
                                 #                   S401_cell_mass_split,
                                 #                   S401_filtrate_split,
                                 #                   chemical_groups), 
-                                split=0.95,
+                                split=1e-2,
                                 solids =\
                                     ['Xylan', 'Glucan', 'Lignin', 'FermMicrobe',\
                                       'Ash', 'Arabinan', 'Galactan', 'Mannan',
                                       'TAL'])
-
+    
+    
+    S402.solid_split = 0.95
+    
+    for i in S402.solids:
+        S402.isplit[i] = S402.solid_split
+    
     F402 = bst.DrumDryer('F402', 
                          ins=(S402-0, 'F402_air', 'F402_natural_gas'),
                          outs=(solid_TAL, 'F402_hot_air', 'F402_emissions'),
                          moisture_content=0.05, 
                          split=0.,
                          moisture_ID='Water')
+    
     @F402.add_specification(run=False)
     def F402_spec():
         F402_ins_0 = F402.ins[0]

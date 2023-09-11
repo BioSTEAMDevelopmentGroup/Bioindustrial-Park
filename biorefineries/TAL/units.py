@@ -979,12 +979,12 @@ class BatchCoFermentation(BatchBioreactor):
         #      Reaction definition            Reactant    Conversion
         Rxn('Glucose -> 0.6667 TAL + 2 CO2',        'Glucose',   0.19), 
         Rxn('Glucose -> 0.3 VitaminA',               'Glucose',   1e-8), # retinol
-        Rxn('Glucose -> 0.214286 CitricAcid',               'Glucose',   1e-8), # ergosterol
+        Rxn('Glucose + O2 -> CitricAcid + H2O',               'Glucose',   0.08856), # 2H+ excluded # from Markham et al.; 16 g/L citrate from 180 g/L glucose
         Rxn('Glucose -> 6 FermMicrobe',       'Glucose',   0.05),
         
         Rxn('Xylose -> 0.555583 TAL + 1.3334 CO2',       'Xylose',    0.19),
         Rxn('Xylose -> 0.25 VitaminA',       'Xylose',    1e-8),
-        Rxn('Xylose -> 0.17856 CitricAcid',       'Xylose',    1e-8),
+        Rxn('Xylose -> 0.8333 CitricAcid + H2O',               'Xylose',   1e-8),
         Rxn('Xylose -> 5 FermMicrobe',        'Xylose',    0.05),
         
         Rxn('AceticAcid -> 0.22218 TAL + 2CO2 + 6H2O',       'AceticAcid',    0.19),
@@ -1034,7 +1034,7 @@ class BatchCoFermentation(BatchBioreactor):
         
         effluent.mix_from([feed, seed])
         
-        current_acetate_loading = effluent.imass['AceticAcid'] / effluent.F_vol
+        current_acetate_loading = effluent.imass[self.acetate_ID] / effluent.F_vol
         required_acetate_spiking = max(0, self.acetate_target_loading - current_acetate_loading)
         Acetate_spiking.imass[self.acetate_ID] = required_acetate_spiking * effluent.F_vol
         
@@ -1043,7 +1043,7 @@ class BatchCoFermentation(BatchBioreactor):
         air.imol['O2'] = 0.21
         
         if self.aeration_rate_basis == 'DO saturation basis':
-            self.air_exit_F_mol_needed = air_exit_F_mol_needed = (1./0.21) * (1/32.) * self.air_flow_rate_safety_factor_for_DO_saturation_basis * self.DO_saturation_concentration_kg_per_m3 * self.DO_saturation_target_level\
+            self.air_exit_F_mol_needed = (1./0.21) * (1/32.) * self.air_flow_rate_safety_factor_for_DO_saturation_basis * self.DO_saturation_concentration_kg_per_m3 * self.DO_saturation_target_level\
                 *(seed.F_vol+feed.F_vol)
             
             air.F_mol = 1e6 # initial value; updated after reactions
@@ -1135,20 +1135,19 @@ class SeedTrain(Unit):
         Rxn('SodiumAcetate + H2O -> AceticAcid + NaOH',        'SodiumAcetate',   1.-1e-4), 
         ])
         
-        
         self.cofermentation_rxns = ParallelRxn([
         #      Reaction definition            Reactant    Conversion
         Rxn('Glucose -> 0.6667 TAL + 2 CO2',        'Glucose',   0.19), 
         Rxn('Glucose -> 0.3 VitaminA',               'Glucose',   1e-8), # retinol
-        Rxn('Glucose -> 0.214286 VitaminD2',               'Glucose',   1e-8), # ergosterol
+        Rxn('Glucose -> CitricAcid + H2O',               'Glucose',   0.08856), # O2 and 2H+ excluded # from Markham et al.; 16 g/L citrate from 180 g/L glucose
         Rxn('Glucose -> 6 FermMicrobe',       'Glucose',   0.05),
         
         Rxn('Xylose -> 0.555583 TAL + 1.3334 CO2',       'Xylose',    0.19),
         Rxn('Xylose -> 0.25 VitaminA',       'Xylose',    1e-8),
-        Rxn('Xylose -> 0.17856 VitaminD2',       'Xylose',    1e-8),
+        Rxn('Xylose -> 0.8333 CitricAcid + H2O',       'Xylose',    1e-8),
         Rxn('Xylose -> 5 FermMicrobe',        'Xylose',    0.05),
         
-        Rxn('AceticAcid -> 6 H2O + 2 CO2 + 0.222 TAL',       'AceticAcid',    0.19),
+        Rxn('AceticAcid -> 0.22218 TAL + 2CO2 + 6H2O',       'AceticAcid',    0.19),
         Rxn('AceticAcid -> 0.1 VitaminA',       'AceticAcid',    1e-8),
         Rxn('AceticAcid -> 0.0714 VitaminD2',       'AceticAcid',    1e-8),
         Rxn('AceticAcid -> 2 FermMicrobe',        'AceticAcid',    0.05),
@@ -1176,9 +1175,9 @@ class SeedTrain(Unit):
         self.xylose_to_VitaminA_rxn = self.cofermentation_rxns[5]
         self.acetate_to_VitaminA_rxn = self.cofermentation_rxns[9]
         
-        self.glucose_to_VitaminD2_rxn = self.cofermentation_rxns[2]
-        self.xylose_to_VitaminD2_rxn = self.cofermentation_rxns[6]
-        self.acetate_to_VitaminD2_rxn = self.cofermentation_rxns[10]
+        self.glucose_to_CitricAcid_rxn = self.cofermentation_rxns[2]
+        self.xylose_to_CitricAcid_rxn = self.cofermentation_rxns[6]
+        self.acetate_to_CitricAcid_rxn = self.cofermentation_rxns[10]
         
         self.glucose_to_microbe_rxn = self.cofermentation_rxns[3]
         self.xylose_to_microbe_rxn = self.cofermentation_rxns[7]
