@@ -132,9 +132,12 @@ def update_metric_units_of_unit_groups(unit_groups):
             elif name in ('operating cost', 'material cost'):
                 # i.units = 'MM$/y'
                 # i.units = 'MM$\u00b7y\u207b\u00b9'
-                i.units = '$\u00b7h\u207b\u00b9'
                 # i.units = f'GJ\u00b7h{chr(0x2D)}\u00b9'
                 # i.units = 'USD\u00b7$\mathdefault{h^{-1}}$'
+                
+                # i.units = '$\u00b7h\u207b\u00b9'
+                # i.units = r"$\mathrm{\$}\cdot\mathrm{h}^{-1}$"
+                i.units = r"$\mathrm{\$}$" + '\u00b7h\u207b\u00b9'
                 
             elif name in ('installed equipment cost'):
                 i.units = 'MM$'
