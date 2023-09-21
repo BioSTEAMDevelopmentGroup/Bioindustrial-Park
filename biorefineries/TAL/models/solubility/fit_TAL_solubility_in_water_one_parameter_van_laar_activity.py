@@ -15,12 +15,16 @@ import numpy as np
 from math import exp as math_exp
 from scipy.optimize import minimize
 from flexsolve import IQ_interpolation
+from biorefineries import TAL
 from biorefineries.TAL.models.solubility.plot_utils import plot_solubility_model
 import pandas as pd
 
 #%% Load experimental 
 
-experimental_data_df = pd.read_excel('experimental_data_TAL_solubility_in_water.xlsx')
+TAL_filepath = TAL.__file__.replace('\\__init__.py', '')
+
+
+experimental_data_df = pd.read_excel(TAL_filepath+'\\models\\solubility\\'+'experimental_data_TAL_solubility_in_water.xlsx')
 
 experimental_Ts = 273.15 + np.array(list(experimental_data_df['Temperature (degrees C)']))
 experimental_solubilities = np.array(list(experimental_data_df['TAL solubility in water (g-TAL/L-water)']))

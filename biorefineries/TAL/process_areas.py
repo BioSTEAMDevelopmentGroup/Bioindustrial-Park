@@ -207,9 +207,17 @@ def create_TAL_separation_solubility_exploit_process(ins, outs,):
         U401_outs_0.phases = ('s', 'l')
         U401_outs_0.imol['l', 'TAL'] = min(mol_TAL_dissolved, tot_TAL)
         U401_outs_0.imol['s', 'TAL'] = tot_TAL - min(mol_TAL_dissolved, tot_TAL)
+    
+    M401 = bst.LiquidsMixingTank('M401', ins=(U401-0, acetylacetone_decarboxylation_equilibrium), 
+                                 outs=('fermentation_broth_heated_mixed'))
+    M401.mol_acetylacetone_per_mol_TAL = 0.
+    @M401.add_specification(run=False)
+    def M401_spec():
+        M401.ins[1].imol['PD'] = M401.mol_acetylacetone_per_mol_TAL * M401.ins[0].imol['TAL']
+        M401._run()
         
     # Change broth temperature to adjust TAL solubility
-    H401 = bst.HXutility('H401', ins=U401-0, outs=('fermentation_broth_heated'), 
+    H401 = bst.HXutility('H401', ins=M401-0, outs=('fermentation_broth_heated'), 
                          T=273.15+56., # initial value; updated in specification to minimum T required to completely dissolve TAL 
                                        # (or current T, if current T is already higher than minimum required T)
                          )
@@ -246,15 +254,9 @@ def create_TAL_separation_solubility_exploit_process(ins, outs,):
         H401_outs_0.imol['l', 'TAL'] = min(mol_TAL_dissolved, tot_TAL)
         H401_outs_0.imol['s', 'TAL'] = max(0., round(tot_TAL - min(mol_TAL_dissolved, tot_TAL), 5))
     
-    M401 = bst.LiquidsMixingTank('M401', ins=(H401-0, acetylacetone_decarboxylation_equilibrium), 
-                                 outs=('fermentation_broth_heated_mixed'))
-    M401.mol_acetylacetone_per_mol_TAL = 0.
-    @M401.add_specification(run=False)
-    def M401_spec():
-        M401.ins[1].imol['PD'] = M401.mol_acetylacetone_per_mol_TAL * M401.ins[0].imol['TAL']
-        M401._run()
+    
 
-    U402 = bst.FakeSplitter('U402', ins=M401-0, outs = ('thermally_decarboxylated_broth',decarboxylation_vent))
+    U402 = bst.FakeSplitter('U402', ins=H401-0, outs = ('thermally_decarboxylated_broth',decarboxylation_vent))
     U402.decarboxylation_rxns = ParallelRxn([
         Rxn('TAL + H2O -> PD + CO2', 'TAL',   0.25),
         ])

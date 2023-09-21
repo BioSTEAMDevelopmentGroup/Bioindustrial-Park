@@ -18,8 +18,7 @@ def plot_kde_formatted(
                         xlabel = r"$\bfMPSP$" + " " + r"$\mathrm{\$}\cdot\mathrm{kg}^{-1}$",
                         
                         ylabel = r"$\mathrm{\bfGWP}_{\bf100}$" + " " + r"$\mathrm{kg}$"+" "+ r"$\mathrm{CO}_{2}\mathrm{-eq.}\cdot\mathrm{kg}^{-1}$",
-                        
-                        
+                           
                         xticks=None,
                         yticks=None,
                         
