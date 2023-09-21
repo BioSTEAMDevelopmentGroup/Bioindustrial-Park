@@ -377,7 +377,7 @@ def create_sucrose_fermentation_system(ins, outs,
         C301.split[:] = 1. - C301.split
         if 'Lipid' in C301.chemicals: C301.isplit['Lipid'] = 0.
         
-        S302 = bst.MockSplitter('S302', C301-0, ('', 'Yeast'))
+        S302 = bst.MockSplitter('S302', C301-0, ('', 'yeast'))
         R301.ins.append(S302-0)
         
         @S302.add_specification
