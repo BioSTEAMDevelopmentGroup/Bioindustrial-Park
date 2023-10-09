@@ -345,7 +345,7 @@ Multiple analysis modules (in `./analyses <https://github.com/BioSTEAMDevelopmen
 
 Analyses (in ./analyses) performed for the paper [1]_ and archived results (see `commit f56692d <https://github.com/BioSTEAMDevelopmentGroup/Bioindustrial-Park/commit/f56692d3bc06527b57dc77ed7cb929a40b59bc4d>`_) were generated using biosteam v2.20.21, thermosteam v0.20.26, and dependencies.
 
-To reproduce the results, directly run the script of interest, and results will be saved as Excel files in the same directory path as the module.
+To reproduce the results, set up the environment to be using the biosteam, thermosteam, and this biorefinery at `commit f56692d <https://github.com/BioSTEAMDevelopmentGroup/Bioindustrial-Park/commit/f56692d3bc06527b57dc77ed7cb929a40b59bc4d>`_, then directly run the script of interest, results will be saved as Excel files in the same directory path as the module.
 
 
 References
