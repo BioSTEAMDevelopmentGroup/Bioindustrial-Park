@@ -2,11 +2,6 @@
 lactic: Production of Lactic Acid from Lignocellulosic Biomass
 ==============================================================
 
-Simplified process flow scheme
-------------------------------
-.. figure:: ./lactic_sys.svg
-
-
 The biorefinery is developed for Li et al. [1]_ for the production of lactic acid
 via dilute sulfuric acid pretreatment, fermentation, and separation processes
 from lignocellulosic biomass. Part of the script is adopted from [2]_.
