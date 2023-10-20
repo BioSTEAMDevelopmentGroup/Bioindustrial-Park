@@ -193,9 +193,12 @@ Protein = chemical_defined('Protein', phase='l',
 Enzyme = chemical_defined('Enzyme', phase='l', 
                            formula='CH1.59O0.42N0.24S0.01', 
                            Hf=-17618*_cal2joule)
-# Properties of fermentation microbes copied from Z_mobilis as in Humbird et al.
+# Hf from Z_mobilis as in Humbird et al.
+# Empirical formula from Niehus et al. 2018 (DOI: 10.1155/2018/6393749)
 FermMicrobe = chemical_defined('FermMicrobe', phase='l',
-                      formula='CH1.8O0.5N0.2', Hf=-31169.39*_cal2joule)
+                      # formula='CH1.8O0.5N0.2', 
+                      formula='CH1.82O0.51N0.12',
+                      Hf=-31169.39*_cal2joule)
 WWTsludge = chemical_defined('WWTsludge', phase='s', 
                              formula='CH1.64O0.39N0.23S0.0035', 
                              Hf=-23200.01*_cal2joule)
@@ -397,7 +400,12 @@ for i in HMDHP.get_missing_properties():
             pass
         
 
-PD = Pentanedione = chemical_database(ID='PD', search_ID='2,4-pentanedione')
+PD = Pentanedione = chemical_database(ID='PD', search_ID='2,4-pentanedione') # Acetylacetone
+
+
+# PropylAcetate = chemical_database(ID='PropylAcetate', search_ID='Propyl acetate')
+
+
 VitaminA = chemical_database('VitaminA')
 VitaminD2 = chemical_database('VitaminD2')
 # Hfus from NIST, condensed phase, accessed 04/07/2020
@@ -496,11 +504,11 @@ for i in OctylDihydroxyHexanoate.get_missing_properties():
         except:
             pass
 
-Acetylacetone = chemical_database(ID='Acetylacetone', 
-                                                       # phase='s', 
-                                                       # formula='C6H6O3',
-                                                       # search_ID='Acetylacetone',
-                                                       )
+# Acetylacetone = chemical_database(ID='Acetylacetone', 
+#                                                        # phase='s', 
+#                                                        # formula='C6H6O3',
+#                                                        # search_ID='Acetylacetone',
+#                                                        )
 
 Pentenone = chemical_database(ID='Pentenone', search_ID='3-penten-2-one')
 
@@ -769,6 +777,8 @@ chems.set_synonym('Na2SO4', 'SodiumSulfate')
 chems.set_synonym('AmmoniumHydroxide', 'NH4OH')
 
 chems.set_synonym('Tetrahydrofuran', 'THF')
+
+chems.set_synonym('PD', 'Acetylacetone')
 # chems.set_synonym('Isobutyraldehyde', 'IBA')
 
 

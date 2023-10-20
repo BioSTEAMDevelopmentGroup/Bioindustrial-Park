@@ -20,7 +20,7 @@ from biosteam.utils import colors
 
 # from TAL.system_solubility_exploit import TAL_sys, TAL_tea, R302, spec
 from biorefineries import TAL
-from biorefineries.TAL.system_SA_adsorption_sugarcane import TAL_sys, TAL_tea, TAL_lca, R302, KSA_product, u, TAL_chemicals
+from biorefineries.TAL.systems.system_SA_adsorption_sugarcane import TAL_sys, TAL_tea, TAL_lca, R302, KSA_product, u, TAL_chemicals
 # from biorefineries.TAL.system_TAL_adsorption_glucose import TAL_sys, TAL_tea, R302, spec, SA
 # from biorefineries.TAL.system_ethyl_esters import TAL_sys, TAL_tea, R302, spec, Mixed_esters
 # get_GWP, get_non_bio_GWP, get_FEC, get_SPED
@@ -57,7 +57,7 @@ TAL_results_filepath = TAL_filepath + '\\analyses\\results\\'
 R401, R402, R403 = u.R401, u.R402, u.R403
 
 fresh_R401_cat_stream = R401.ins[4]
-spec_upgrading = TAL._general_process_specification.GeneralProcessSpecification(
+spec_upgrading = TAL.models._general_process_specification.GeneralProcessSpecification(
     system=TAL_sys,
     baseline_spec_values=[R401.TAL_to_HMTHP_rxn.X, 
                           R401.tau, 
@@ -89,9 +89,9 @@ spec = spec_upgrading
 steps = (5, 5, 20)
 
 # Yield, titer, productivity (rate)
-spec_1 = PSA_yields = np.linspace(0.3, 0.999, steps[0]) # TAL->HMTHP conversion in the hydrogenation reactor
-spec_2 = dehydration_times = np.linspace(0.1, 20., steps[1]) # HMTHP->PSA conversion in the dehydration reactor
-spec_3 = dehydration_cat_prices = np.linspace(10, 1000, steps[2])# PSA->SA conversion in the ring opening & hydrolysis reactor
+spec_1 = HMP_yields = np.linspace(0.3, 0.999, steps[0]) # TAL->HMTHP conversion in the hydrogenation reactor
+spec_2 = hydrogenation_times = np.linspace(0.1, 20., steps[1]) # HMTHP->HMP conversion in the hydrogenation reactor
+spec_3 = hydrogenation_cat_prices = np.linspace(10, 1000, steps[2])# HMP->SA conversion in the ring opening & hydrolysis reactor
 
 
 spec_1, spec_2 = np.meshgrid(spec_1, spec_2)
@@ -118,16 +118,16 @@ TAL_metrics = [get_product_MPSP, get_product_GWP, get_product_FEC]
 
 # Parameters analyzed across
 
-x_label = r"$\bfDehydration$" + " " + r"$\bfPSA$" + " " + r"$\bfYield$" # title of the x axis
+x_label = r"$\bfHydrogenation$" + " " + r"$\bfHMP$" + " " + r"$\bfYield$" # title of the x axis
 x_units = r"$\mathrm{\%}$" + " " + r"$\mathrm{theoretical}$"
 x_ticks=np.arange(0.3, 1.1, 0.1)
-
-y_label = r"$\bfDehydration$" + " " + r"$\bfReaction$" + " " + r"$\bfTime$" # title of the y axis
+ 
+y_label = r"$\bfHydrogenation$" + " " + r"$\bfReaction$" + " " + r"$\bfTime$" # title of the y axis
 y_units = r"$\mathrm{h}$"
 y_ticks=np.arange(0., 22., 2)
 
 
-z_label = r"$\bfDehydration$" + " " + r"$\bfCatalyst$" + " " + r"$\bfPrice$" # title of the z axis
+z_label = r"$\bfHydrogenation$" + " " + r"$\bfCatalyst$" + " " + r"$\bfPrice$" # title of the z axis
 z_units =  r"$\mathrm{\$}\cdot\mathrm{kg}^{-1}$"
 z_ticks=np.arange(0., 1100, 100)
 
@@ -211,7 +211,7 @@ def tickmarks(dmin, dmax, accuracy=50, N_points=5):
     return [dmin + step * i for i in range(N_points)]
 
 # %% Run TRY analysis 
-for p in dehydration_cat_prices:
+for p in hydrogenation_cat_prices:
     data_1 = TAL_data = spec.evaluate_across_specs(
             TAL_sys, spec_1, spec_2, TAL_metrics, [p])
     
@@ -251,7 +251,7 @@ fps = 6
 axis_title_fonts={'size': {'x': 8, 'y':8, 'z':8, 'w':8},}
 clabel_fontsize = 8.
 default_fontsize = 8.
-keep_frames = False
+keep_frames = True
 
 #%% More plot utils
 
@@ -335,9 +335,9 @@ MPSP_w_levels, MPSP_w_ticks, MPSP_cbar_ticks = get_contour_info_from_metric_data
 
 
 contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_1, # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., MPSP
-                                x_data=100*PSA_yields, # x axis values
-                                y_data=dehydration_times, # y axis values
-                                z_data=dehydration_cat_prices, # z axis values
+                                x_data=100*HMP_yields, # x axis values
+                                y_data=hydrogenation_times, # y axis values
+                                z_data=hydrogenation_cat_prices, # z axis values
                                 x_label=x_label, # title of the x axis
                                 y_label=y_label, # title of the y axis
                                 z_label=z_label, # title of the z axis
@@ -364,9 +364,9 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_1, 
                                 axis_title_fonts=axis_title_fonts,
                                 clabel_fontsize = clabel_fontsize,
                                 default_fontsize = default_fontsize,
-                                # comparison_range=[6.5, 7.5],
+                                comparison_range=[6.5, 7.5],
                                 # comparison_range=[MPSP_w_levels[-2], MPSP_w_levels[-1]],
-                                # comparison_range_hatch_pattern='////',
+                                comparison_range_hatch_pattern='////',
                                 )
 
 #%% GWP
@@ -374,9 +374,9 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_1, 
 GWP_w_levels, GWP_w_ticks, GWP_cbar_ticks = get_contour_info_from_metric_data(results_metric_2,)
 
 contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_2, # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., MPSP
-                                x_data=100*PSA_yields, # x axis values
-                                y_data=dehydration_times, # y axis values
-                                z_data=dehydration_cat_prices, # z axis values
+                                x_data=100*HMP_yields, # x axis values
+                                y_data=hydrogenation_times, # y axis values
+                                z_data=hydrogenation_cat_prices, # z axis values
                                 x_label=x_label, # title of the x axis
                                 y_label=y_label, # title of the y axis
                                 z_label=z_label, # title of the z axis
@@ -411,9 +411,9 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_2, 
 FEC_w_levels, FEC_w_ticks, FEC_cbar_ticks = get_contour_info_from_metric_data(results_metric_3,)
 
 contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_3, # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., MPSP
-                                x_data=100*PSA_yields, # x axis values
-                                y_data=dehydration_times, # y axis values
-                                z_data=dehydration_cat_prices, # z axis values
+                                x_data=100*HMP_yields, # x axis values
+                                y_data=hydrogenation_times, # y axis values
+                                z_data=hydrogenation_cat_prices, # z axis values
                                 x_label=x_label, # title of the x axis
                                 y_label=y_label, # title of the y axis
                                 z_label=z_label, # title of the z axis

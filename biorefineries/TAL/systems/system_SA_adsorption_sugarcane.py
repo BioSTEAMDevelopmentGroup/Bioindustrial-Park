@@ -59,8 +59,8 @@ from thermosteam import Stream
 # from biorefineries.cornstover import CellulosicEthanolTEA
 from biorefineries.TAL import units, facilities
 
-from biorefineries.TAL._process_specification import ProcessSpecification
-from biorefineries.TAL._general_process_specification import GeneralProcessSpecification
+from biorefineries.TAL.models._process_specification import ProcessSpecification
+from biorefineries.TAL.models._general_process_specification import GeneralProcessSpecification
 
 from biorefineries.TAL.process_settings import price, CFs
 from biorefineries.TAL.utils import find_split, splits_df, baseline_feedflow
@@ -539,9 +539,12 @@ spec = ProcessSpecification(
     substrates=('Xylose', 'Glucose'),
     products=('TAL',),
     
-    spec_1=0.0815/theoretical_max_g_TAL_per_g_glucose, # mean of 0.074 and 0.089 g/g (range from Cao et al. 2022)
-    spec_2=25.5, # mean of 0.074 and 0.089 g/g (range from Cao et al. 2022)
-    spec_3=0.215, # mean of 0.074 and 0.089 g/g (range from Cao et al. 2022)
+    # spec_1=0.0815/theoretical_max_g_TAL_per_g_glucose, # mean of 0.074 and 0.089 g/g (range from Cao et al. 2022)
+    spec_1=0.40482690786558706,
+    # spec_2=25.5, # mean of 0.074 and 0.089 g/g (range from Cao et al. 2022)
+    spec_2=35.9,
+    # spec_3=0.215, # mean of 0.074 and 0.089 g/g (range from Cao et al. 2022)
+    spec_3=0.12,
 
     
     xylose_utilization_fraction = 0.80,
@@ -555,9 +558,12 @@ spec = ProcessSpecification(
     pre_conversion_units = [],
     # !!! set baseline fermentation performance here
     # (ranges from Cao et al. 2022)
-    baseline_yield = 0.0815/theoretical_max_g_TAL_per_g_glucose, # mean of 0.074 and 0.089 g/g 
-    baseline_titer = 25.5, # mean of 23 and 28 g/L
-    baseline_productivity = 0.215, # mean of 0.19 and 0.24 g/L/h
+    # baseline_yield = 0.0815/theoretical_max_g_TAL_per_g_glucose, # mean of 0.074 and 0.089 g/g 
+    baseline_yield = 0.40482690786558706,
+    # baseline_titer = 25.5, # mean of 23 and 28 g/L
+    baseline_titer = 35.9,
+    # baseline_productivity = 0.215, # mean of 0.19 and 0.24 g/L/h
+    baseline_productivity = 0.12,
     
     # baseline_yield = 0.30,
     # baseline_titer = 25.,

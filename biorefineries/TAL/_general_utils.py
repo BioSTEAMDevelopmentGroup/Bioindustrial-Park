@@ -118,7 +118,7 @@ def get_more_unit_groups(system,
     return unit_groups_
 
 # %% Update units of all metrics in a list of unit groups
-def update_metric_units_of_unit_groups(unit_groups):
+def update_metric_unit_labels_of_unit_groups(unit_groups):
     for ui in unit_groups:
         for i in ui.metrics:
             name = i.name.lower()
@@ -137,7 +137,10 @@ def update_metric_units_of_unit_groups(unit_groups):
                 
                 # i.units = '$\u00b7h\u207b\u00b9'
                 # i.units = r"$\mathrm{\$}\cdot\mathrm{h}^{-1}$"
-                i.units = r"$\mathrm{\$}$" + '\u00b7h\u207b\u00b9'
+                
+                
+                # i.units = r"$\mathrm{\$}$" + '\u00b7h\u207b\u00b9'
+                i.units = r"$\mathrm{MM\$}$" + '\u00b7y\u207b\u00b9'
                 
             elif name in ('installed equipment cost'):
                 i.units = 'MM$'
@@ -246,7 +249,21 @@ def add_metrics_to_unit_groups(unit_groups,
         if i.name == 'excess electricity':
             i.metrics[-1].getter=lambda: LCA.actual_steam_frac_excess*LCA.BT_steam_kJph_total/1e6
         
-        update_metric_units_of_unit_groups(unit_groups)
+        
+        update_metric_unit_labels_of_unit_groups(unit_groups)
+        
+        
+    # Rearrange metrics
+    metrics_list_ordered = [
+                            'Installed equipment cost', 
+                            'Operating cost', 
+                            'Steam use',
+                            'Electricity consumption',
+                            'Cooling duty', 
+                            'Heating duty', 
+                            ]
+    for i in unit_groups:
+        i.metrics.sort(key = lambda x: metrics_list_ordered.index(x.name))
         
 #%% Set production capacity by adjusting feedstock capacity
 def set_production_capacity(

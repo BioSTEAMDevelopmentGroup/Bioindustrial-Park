@@ -20,7 +20,7 @@ from biosteam.utils import colors
 
 # from TAL.system_solubility_exploit import TAL_sys, TAL_tea, R302, spec
 from biorefineries import TAL
-from biorefineries.TAL.system_SA_adsorption_sugarcane import TAL_sys, TAL_tea, TAL_lca, R302, KSA_product, u, TAL_chemicals
+from biorefineries.TAL.systems.system_SA_adsorption_sugarcane import TAL_sys, TAL_tea, TAL_lca, R302, KSA_product, u, TAL_chemicals
 # from biorefineries.TAL.system_TAL_adsorption_glucose import TAL_sys, TAL_tea, R302, spec, SA
 # from biorefineries.TAL.system_ethyl_esters import TAL_sys, TAL_tea, R302, spec, Mixed_esters
 # get_GWP, get_non_bio_GWP, get_FEC, get_SPED
@@ -57,7 +57,7 @@ TAL_results_filepath = TAL_filepath + '\\analyses\\results\\'
 R401, R402, R403 = u.R401, u.R402, u.R403
 
 fresh_R401_cat_stream = R401.ins[4]
-spec_upgrading = TAL._general_process_specification.GeneralProcessSpecification(
+spec_upgrading = TAL.models._general_process_specification.GeneralProcessSpecification(
     system=TAL_sys,
     baseline_spec_values=[R401.TAL_to_HMTHP_rxn.X, 
                           R401.tau, 
@@ -89,7 +89,7 @@ spec = spec_upgrading
 steps = (5, 5, 20)
 
 # Yield, titer, productivity (rate)
-spec_1 = PSA_yields = np.linspace(0.1, 5, steps[0]) # TAL->HMTHP conversion in the hydrogenation reactor
+spec_1 = PSA_yields = np.linspace(0.01, 2, steps[0]) # TAL->HMTHP conversion in the hydrogenation reactor
 spec_2 = dehydration_times = np.linspace(0.1, 20., steps[1]) # HMTHP->PSA conversion in the dehydration reactor
 spec_3 = dehydration_cat_prices = np.linspace(10, 1000, steps[2])# PSA->SA conversion in the ring opening & hydrolysis reactor
 
@@ -368,6 +368,42 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_1, 
                                 # comparison_range=[MPSP_w_levels[-2], MPSP_w_levels[-1]],
                                 # comparison_range_hatch_pattern='////',
                                 )
+
+# #%%
+# contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_1, # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., MPSP
+#                                 x_data=PSA_yields, # x axis values
+#                                 y_data=dehydration_times, # y axis values
+#                                 z_data=dehydration_cat_prices, # z axis values
+#                                 x_label=x_label, # title of the x axis
+#                                 y_label=y_label, # title of the y axis
+#                                 z_label=z_label, # title of the z axis
+#                                 w_label=MPSP_w_label, # title of the color axis
+#                                 x_ticks=100*x_ticks,
+#                                 y_ticks=y_ticks,
+#                                 z_ticks=z_ticks,
+#                                 w_levels=MPSP_w_levels, # levels for unlabeled, filled contour areas (labeled and ticked only on color bar)
+#                                 w_ticks=MPSP_w_ticks, # labeled, lined contours; a subset of w_levels
+#                                 x_units=x_units,
+#                                 y_units=y_units,
+#                                 z_units=z_units,
+#                                 w_units=MPSP_units,
+#                                 fmt_clabel=lambda cvalue: r"$\mathrm{\$}$"+" {:.1f} ".format(cvalue)+r"$\cdot\mathrm{kg}^{-1}$", # format of contour labels
+#                                 cmap=CABBI_green_colormap(), # can use 'viridis' or other default matplotlib colormaps
+#                                 cmap_over_color = colors.grey_dark.shade(8).RGBn,
+#                                 extend_cmap='max',
+#                                 cbar_ticks=MPSP_cbar_ticks,
+#                                 z_marker_color='g', # default matplotlib color names
+#                                 fps=fps, # animation frames (z values traversed) per second
+#                                 n_loops='inf', # the number of times the animated contourplot should loop animation over z; infinite by default
+#                                 animated_contourplot_filename='MPSP_animated_contourplot_'+file_to_save, # file name to save animated contourplot as (no extensions)
+#                                 keep_frames=keep_frames, # leaves frame PNG files undeleted after running; False by default
+#                                 axis_title_fonts=axis_title_fonts,
+#                                 clabel_fontsize = clabel_fontsize,
+#                                 default_fontsize = default_fontsize,
+#                                 comparison_range=[6.5, 7.5],
+#                                 # comparison_range=[MPSP_w_levels[-2], MPSP_w_levels[-1]],
+#                                 comparison_range_hatch_pattern='////',
+#                                 )
 
 #%% GWP
 

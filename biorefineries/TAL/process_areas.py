@@ -125,9 +125,11 @@ def create_TAL_fermentation_process(ins, outs,):
                                     aeration_rate_basis='DO saturation basis',
                                     )
     @R302.add_specification()
-    def include_seed_CSL_in_cofermentation(): # note: effluent always has 0 CSL
+    def include_seed_CSL_Acetate_in_cofermentation(): # note: effluent always has 0 CSL
         R302._run()
-        R302.ins[2].F_mass*=1./(1-S302.split[0])
+        flow_multiplier = 1./(1-S302.split[0])
+        R302.ins[2].F_mass*=flow_multiplier
+        R302.ins[3].F_mass*=flow_multiplier
     
     # ferm_ratio is the ratio of conversion relative to the fermenter
     R303 = units.SeedTrain('R303', ins=S302-0, outs=('seed', seedtrain_vent), ferm_ratio=0.9)
@@ -166,7 +168,7 @@ def create_TAL_fermentation_process(ins, outs,):
 
 @SystemFactory(ID = 'TAL_separation_solubility_exploit_process',
                ins=[dict(ID='fermentation_broth', TAL=1, Water=100),
-                    dict(ID='acetylacetone_fresh', Acetylacetone=1.),
+                    dict(ID='acetylacetone_decarboxylation_equilibrium', PD=1.),
                ],
                 outs=[dict(ID='decarboxylation_vent', CO2=20),
                       dict(ID='S401_solid', FermMicrobe=1, Water=1),
@@ -264,7 +266,7 @@ def create_TAL_separation_solubility_exploit_process(ins, outs,):
     U402._graphics = U401._graphics
     
     U402.decarboxylation_conversion_basis = 'fixed' # 'fixed' or 'temperature-dependent'
-    U402.decarboxylation_conversion = 0.225 # only used if basis is 'fixed' # experimental value at T= 80 C
+    U402.decarboxylation_conversion = 0.225 # only used if basis is 'fixed' # experimental value at T = 80 degrees C
     
     @U402.add_specification()
     def U402_spec():
@@ -383,7 +385,22 @@ def create_TAL_separation_solubility_exploit_process(ins, outs,):
         F402_outs_0.phases = ('l', 's')
         F402_outs_0.imol['s', 'TAL'] = solid_TAL
         F402_outs_0.imol['l', 'TAL'] = liquid_TAL
-        
+
+#%% Unused: separation of acetylacetone formed by TAL decarboxylation in heated fermentation broths
+
+@SystemFactory(ID = 'acetylacetone_separation_distillation_process',
+               ins=[dict(ID='acetylacetone_in_fermentation_broth', PD=5, Water=100),
+               ],
+                outs=[dict(ID='acetylacetone_recovered', PD=4, Water=1),
+                      dict(ID='liquid_waste_to_WWT', PD=1, Water=99),
+                                ],
+                                               )
+def create_acetylacetone_separation_distillation_process(ins, outs):
+    acetylacetone_in_fermentation_broth, = ins
+    acetylacetone_recovered, liquid_waste_to_WWT = outs
+    
+    None
+    
     
 # %% Separation of TAL by adsorption on activated charcoal
 @SystemFactory(ID = 'TAL_separation_adsorption_process',

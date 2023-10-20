@@ -393,6 +393,15 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
         """[Stream] Reactor effluent."""
         return self.reactor.outs[0]
     
+    def get_sugar_to_TAL_conversion(self, unit):
+        return unit.glucose_to_TAL_rxn.X
+    
+    def get_sugar_conversion(self, unit):
+        return self.get_sugar_to_TAL_conversion(unit) +\
+            unit.glucose_to_microbe_rxn.X +\
+            unit.glucose_to_CitricAcid_rxn.X +\
+            unit.glucose_to_VitaminA_rxn.X
+    
     def load_yield(self, yield_):
         """
         Load yield specification.
@@ -401,36 +410,64 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
         ----------
         yield_ : float
             Yield in weight fraction of substrates converted to product 
-            over theoretical yield.  
+            over theoretical maximum yield.  
         
         Warnings
         --------
-        Changing the yield affects the titer.
+        At higher yields, to prevent >100% conversion of sugars, 
+        first citrate and then cell mass yields are decreased.
         
         """
-        # print(yield_)
-        regular_microbe_conversion = 0.05
         reactor = self.reactor
         seed_train = self.seed_train
-        self.spec_1 = reactor.glucose_to_TAL_rxn.X = yield_
+        get_sugar_conversion = self.get_sugar_conversion
+        get_sugar_to_TAL_conversion = self.get_sugar_to_TAL_conversion
         
-        reactor.xylose_to_TAL_rxn.X = yield_
+        self.spec_1 = reactor.glucose_to_TAL_rxn.X = reactor.acetate_to_TAL_rxn.X = yield_
+        seed_train.glucose_to_TAL_rxn.X = seed_train.acetate_to_TAL_rxn.X = yield_ * seed_train.ferm_ratio
         
-        reactor.acetate_to_TAL_rxn.X = yield_
-        
-        sum_sugar_conversion = reactor.glucose_to_TAL_rxn.X + reactor.glucose_to_microbe_rxn.X +\
-            reactor.glucose_to_VitaminA_rxn.X + reactor.glucose_to_CitricAcid_rxn.X
-        
-        if sum_sugar_conversion>=1:
-            reactor.glucose_to_microbe_rxn.X = seed_train.glucose_to_microbe_rxn.X =\
-            reactor.xylose_to_microbe_rxn.X = seed_train.xylose_to_microbe_rxn.X =\
-                sum_sugar_conversion - 1.
-        else:
-            reactor.glucose_to_microbe_rxn.X = seed_train.glucose_to_microbe_rxn.X =\
-            reactor.xylose_to_microbe_rxn.X = seed_train.xylose_to_microbe_rxn.X =\
-                regular_microbe_conversion
+        for unit in [reactor, seed_train]:
+            regular_microbe_conversion = unit.regular_microbe_conversion
+            regular_citric_acid_conversion = unit.regular_citric_acid_conversion
             
-
+            unit.xylose_to_TAL_rxn.X = yield_ * unit.ferm_ratio
+            unit.acetate_to_TAL_rxn.X = yield_ * unit.ferm_ratio
+            sugar_to_TAL_conversion = get_sugar_to_TAL_conversion(unit)
+            
+            # reset to regular cell mass yield
+            unit.glucose_to_microbe_rxn.X =\
+            unit.xylose_to_microbe_rxn.X =\
+                regular_microbe_conversion * unit.ferm_ratio
+            # reset to regular citric acid yield
+            unit.glucose_to_CitricAcid_rxn.X =\
+            unit.xylose_to_CitricAcid_rxn.X =\
+                regular_citric_acid_conversion * unit.ferm_ratio
+            
+            if sugar_to_TAL_conversion>=\
+                1. - regular_microbe_conversion - regular_citric_acid_conversion:
+                # first decrease citric acid production if needed
+                unit.glucose_to_CitricAcid_rxn.X =\
+                unit.xylose_to_CitricAcid_rxn.X =\
+                    max(1e-6, 1.-1e-6 - sugar_to_TAL_conversion - regular_microbe_conversion)
+                    
+                sum_sugar_conversion = get_sugar_conversion(unit)
+                if sum_sugar_conversion>=1.:
+                # then decrease cell mass yield if needed
+                    unit.glucose_to_microbe_rxn.X =\
+                    unit.xylose_to_microbe_rxn.X =\
+                        max(1e-6, 1.-2e-6 - sugar_to_TAL_conversion)
+                    
+            # else:
+            #     # reset to regular citric acid and cell mass yields
+            #     unit.glucose_to_microbe_rxn.X =\
+            #     unit.xylose_to_microbe_rxn.X =\
+            #         regular_microbe_conversion * unit.ferm_ratio
+                    
+            #     unit.glucose_to_CitricAcid_rxn.X =\
+            #     unit.xylose_to_CitricAcid_rxn.X =\
+            #         regular_citric_acid_conversion * unit.ferm_ratio
+                
+            
         # rem_glucose = min(0.13, 1. - reactor.glucose_to_TAL_rxn.X)
         # reactor.glucose_to_acetic_acid_rxn.X = (55./130.) * rem_glucose
         # reactor.glucose_to_glycerol_rxn.X = (25./130.) * rem_glucose

@@ -20,7 +20,7 @@ import biosteam as bst
 import thermosteam as tmo
 from biorefineries.TAL.chemicals_data import chems
 
-bst.CE = 541.7 # year 2016
+bst.CE = 607.5 # year 2022
 _kg_per_ton = 907.18474
 _lb_per_kg = 2.20462
 _liter_per_gallon = 3.78541
@@ -28,6 +28,8 @@ _ft3_per_m3 = 35.3147
 
 _GDP_2007_to_2016 = 1.114 / 0.961
 _GDP_2008_to_2016 = 1.114 / 0.990
+_GDP_2008_to_2010 = 1.012 / 0.990
+
 _chemical_2011to2016 = 102.5 / 91.7
 _chemical_2013to2016 = 102.5 / 101.3
 _chemical_2014to2016 = 102.5 / 105.3
@@ -36,10 +38,25 @@ _chemical_2017to2016 = 102.5 / 106.9
 _chemical_2020to2016 = 102.5 / 113.8 # average of Jan and Feb
 _chemical_2022to2016 = 102.5 / 145.3
 
+chem_index = { # Dictionary of chemical indices
+                    2010: 82.2,
+                    2011: 79.5,
+                    2012: 83.7,
+                    2013: 87.9,
+                    2014: 91.3,
+                    2015: 93.1,
+                    2016: 88.8,
+                    2017: 92.7,
+                    2018: 93.3,
+                    2019: 97.0,
+                    2020: 100.2,
+                    2021: 112.0,
+                    2022: 125.829,
+                    }
 
 # From USD/dry-ton to USD/kg in 2016$, 20% moisture content
 # changed from Humbird et al., 2011 to Davis et al., 2018
-feedstock_price = 71.26 / _kg_per_ton * 0.8 
+corn_stover_price = 71.26 / _kg_per_ton * 0.8 
 
 # 2.2 is the average whole-sale ethanol price between 2010-2019 in 2016 $/gal
 # based on Annual Energy Outlook (AEO) from Energy Information Adiministration (EIA)
@@ -110,7 +127,8 @@ baghouse_bag_price = 466833 / 5 / (24*365*0.96)
 # $3.68/Mcf and $5.65/Mcf, or $0.198/kg and $0.304/kg
 CH4_V = chems.CH4.V(298.15, 101325) # molar volume in m3/mol
 CH4_MW = chems.CH4.MW
-natural_gas_price = 4.70/1e3*_ft3_per_m3*CH4_V * (1e3/CH4_MW)
+natural_gas_price = 4.70/1e3*_ft3_per_m3*CH4_V * (1e3/CH4_MW) *\
+    chem_index[2019]/chem_index[2016]
 
 # https://www.rightpricechemicals.com/buy-amberlyst-15-ion-exchange-resin.html	
 # USD 383.13 for 2.5kg (largest available size order), accessed 06/11/2020
@@ -181,9 +199,10 @@ spent_PdC_price = 1. # assumed
 
 acetone_price = 0.63 * _GDP_2008_to_2016 * _lb_per_kg # average of range ($0.44 - $0.82 /lb) from https://web.archive.org/web/20161125084558/http://www.icis.com:80/chemicals/channel-info-chemicals-a-z/
 
-acetic_acid_price = 1.135 * _GDP_2008_to_2016 # average of range ($ 0.772 - 1.499 /kg) from # https://web.archive.org/web/20161125084558/http://www.icis.com:80/chemicals/channel-info-chemicals-a-z/
+acetic_acid_price = 1.135 * _GDP_2008_to_2010 * chem_index[2019]/chem_index[2010] # average of range ($ 0.772 - 1.499 /kg) from # https://web.archive.org/web/20161125084558/http://www.icis.com:80/chemicals/channel-info-chemicals-a-z/
 sodium_acetate_price = acetic_acid_price # unused
 
+CSL_price = 0.0339 * _lb_per_kg * chem_index[2019]/chem_index[2016] # from lactic acid paper
 amberlyst70_price = 30. #!!!
 
 acetylacetone_price = 1.5 # 2,4-pentanedione or acetylacetone
@@ -204,7 +223,7 @@ price = {'SA': SA_price,
          'Amberlyst-70': amberlyst70_price,
          'PdC': PdC_price,
          'Spent PdC': spent_PdC_price,
-         'Feedstock': feedstock_price,
+         'Corn stover': corn_stover_price,
          'Glucose': glucose_price,
          'Hexanol': hexanol_price,
          'Heptane': heptane_price,
@@ -213,7 +232,7 @@ price = {'SA': SA_price,
          'Sulfuric acid': 0.0430 * _lb_per_kg,	
          # 0.1900 is for NH3	
          'AmmoniumHydroxide': 0.1900 * _lb_per_kg * 17.031/35.046,	
-         'CSL': 0.0339 * _lb_per_kg,
+         'CSL': CSL_price,
          'Caustics': 0.2384 * _lb_per_kg * 0.5, # 50 wt% NaOH/water mixture	
          'Boiler chems': 2.9772 * _lb_per_kg,	
          'Lime': lime_price,

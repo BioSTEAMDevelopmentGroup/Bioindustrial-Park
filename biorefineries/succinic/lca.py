@@ -223,8 +223,9 @@ class LCA:
     # GWP from electricity acquisition
     @property
     def net_electricity(self):
-        return sum(i.power_utility.rate for i in self.system.units)
         # return self.BT.power_utility.rate + self.BT.electricity_demand
+        # return sum(i.power_utility.rate for i in self.system.units)
+        return self.system.power_utility.rate
         
     @property
     def net_electricity_GWP(self):
@@ -238,8 +239,8 @@ class LCA:
     
     @property
     def electricity_demand(self): 
-        # return sum([i.power_utility.consumption for i in self.system.units])
-        return self.BT.electricity_demand # excludes BT's electricity use
+        return sum([i.power_utility.consumption for i in self.system.units])
+        # return self.BT.electricity_demand # excludes BT's electricity use
 
     
     @property
@@ -251,13 +252,13 @@ class LCA:
         return sum([i.duty for i in self.BT.steam_utilities])
     
     @property
-    def BT_steam_kJph_turbogen(self): 
+    def BT_steam_kJph_turbogen_for_electricity_consumption_only(self): 
         BT = self.BT
         return 3600.*BT.electricity_demand/BT.turbogenerator_efficiency # 3600 to convert kW to kJph
     
     @property
     def BT_steam_kJph_total_excluding_excess(self): 
-        return self.BT_steam_kJph_heating + self.BT_steam_kJph_turbogen
+        return self.BT_steam_kJph_heating + self.BT_steam_kJph_turbogen_for_electricity_consumption_only
     
     @property
     def BT_steam_kJph_total(self):
@@ -267,16 +268,16 @@ class LCA:
         return self.BT_steam_kJph_heating/self.BT_steam_kJph_total_excluding_excess
     
     @property
-    def steam_frac_turbogen(self): 
-        return  self.BT_steam_kJph_turbogen / self.BT_steam_kJph_total_excluding_excess 
+    def steam_frac_turbogen_for_electricity_consumption_only(self): 
+        return  self.BT_steam_kJph_turbogen_for_electricity_consumption_only / self.BT_steam_kJph_total_excluding_excess 
     
     @property
     def steam_frac_cooling(self): 
-        return  self.steam_frac_turbogen * self.cooling_electricity_demand / self.electricity_demand 
+        return  self.steam_frac_turbogen_for_electricity_consumption_only * self.cooling_electricity_demand / self.electricity_demand 
     
     @property
     def steam_frac_electricity_non_cooling(self):
-        return  self.steam_frac_turbogen * (1-(self.cooling_electricity_demand / self.electricity_demand))
+        return  self.steam_frac_turbogen_for_electricity_consumption_only * (1-(self.cooling_electricity_demand / self.electricity_demand))
     
     ##
     @property
@@ -284,16 +285,16 @@ class LCA:
         return self.BT_steam_kJph_heating/self.BT_steam_kJph_total
     
     @property
-    def actual_steam_frac_turbogen(self): 
-        return  self.BT_steam_kJph_turbogen / self.BT_steam_kJph_total 
+    def actual_steam_frac_turbogen_for_electricity_consumption_only(self): 
+        return  self.BT_steam_kJph_turbogen_for_electricity_consumption_only / self.BT_steam_kJph_total 
     
     @property
     def actual_steam_frac_cooling(self): 
-        return  self.actual_steam_frac_turbogen * self.cooling_electricity_demand / self.electricity_demand 
+        return  self.actual_steam_frac_turbogen_for_electricity_consumption_only * self.cooling_electricity_demand / self.electricity_demand 
     
     @property
     def actual_steam_frac_electricity_non_cooling(self):
-        return  self.actual_steam_frac_turbogen * (1-(self.cooling_electricity_demand / self.electricity_demand))
+        return  self.actual_steam_frac_turbogen_for_electricity_consumption_only * (1-(self.cooling_electricity_demand / self.electricity_demand))
     
     @property
     def actual_steam_frac_excess(self): 
