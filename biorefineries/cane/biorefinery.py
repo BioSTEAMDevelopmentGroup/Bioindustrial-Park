@@ -454,7 +454,6 @@ class Biorefinery:
             self.bagasse_splitter = splitter
             minimum_fraction_burned = 0
             maximum_fraction_burned = 0.7
-            self.recycle_data = recycle_data = {}
             @cane_sys.add_bounded_numerical_specification(
                 x0=minimum_fraction_burned, x1=maximum_fraction_burned, 
                 xtol=1e-4, ytol=100, args=(splitter,)
@@ -462,30 +461,7 @@ class Biorefinery:
             def adjust_bagasse_to_boiler(fraction_burned, splitter):
                 # Returns energy consumption at given fraction processed (not sent to boiler).
                 splitter.split[:] = 1 - fraction_burned
-                operation_mode = getattr(sys, 'active_operation_mode', None)
-                if fraction_burned in (minimum_fraction_burned, maximum_fraction_burned):
-                    key = (operation_mode, fraction_burned)
-                else:
-                    key = (operation_mode, 'last')
-                if key in recycle_data: 
-                    material_data = recycle_data[key]
-                else:
-                    recycle_data[key] = material_data = cane_sys.get_material_data()
-                try:
-                    cane_sys.simulate(material_data=material_data, update_material_data=True)
-                except Exception as e:
-                    raise e
-                    print(e)
-                    try:
-                        cane_sys.simulate()
-                    except Exception as e:
-                        print(e)
-                        try:
-                            cane_sys.empty_recycles()
-                            cane_sys.simulate()
-                        except Exception as e:
-                            print(e)
-                            breakpoint()
+                cane_sys.simulate()
                 excess = BT._excess_electricity_without_natural_gas
                 if fraction_burned == minimum_fraction_burned and excess > 0:
                     splitter.neglect_natural_gas_streams = False # No need to neglect
@@ -819,7 +795,7 @@ class Biorefinery:
             oil_extraction_specification.load_bagasse_oil_recovery(bagasse_oil_recovery / 100.)
     
         # Baseline from Huang's 2016 paper, but distribution more in line with Florida sugarcane harvesting (3-5 months)
-        @uniform(4 * 30, 6 * 30, units='day/y', baseline=180)
+        @uniform(4 * 30, 6 * 30, units='day/y', baseline=180, kind='coupled')
         def set_cane_operating_days(cane_operating_days):
             if agile:
                 cane_mode.operating_hours = cane_operating_days * 24
@@ -827,12 +803,11 @@ class Biorefinery:
                 tea.operating_days = cane_operating_days
     
         # From Ed Cahoon and Huang 2017
-        @uniform(30, 60, units='day/y', baseline=45)
+        @uniform(30, 60, units='day/y', baseline=45, kind='coupled')
         def set_sorghum_operating_days(sorghum_operating_days):
             if agile: sorghum_mode.operating_hours = sorghum_operating_days * 24
         
-        @default(self.baseline_available_land, element='feedstock',
-                 units='ha', kind='isolated')
+        @default(self.baseline_available_land, element='feedstock', units='ha', kind='coupled')
         def set_available_land(available_land):
             self.available_land = available_land
             
@@ -840,7 +815,8 @@ class Biorefinery:
             element='feedstock', 
             baseline=self.baseline_dry_biomass_yield,
             distribution=self.default_dry_biomass_yield_distribution,
-            units='DMT/ha/y',
+            units='DMT/ha/y', 
+            kind='coupled',
         )
         def set_dry_biomass_yield(dry_biomass_yield):
             if number < 0:
@@ -1069,7 +1045,7 @@ class Biorefinery:
         def set_fermentation_microbial_oil_titer(microbial_oil_titer):
             if number in oil_configurations: fermentor.titer = microbial_oil_titer
     
-        @performance(hydrolysate_productivity, productivity, units='g/L/h', element='Fermentation')
+        @performance(hydrolysate_productivity, productivity, units='g/L/h', element='Fermentation', kind='coupled')
         def set_fermentation_microbial_oil_productivity(microbial_oil_productivity):
             if number in oil_configurations: fermentor.productivity = microbial_oil_productivity
     

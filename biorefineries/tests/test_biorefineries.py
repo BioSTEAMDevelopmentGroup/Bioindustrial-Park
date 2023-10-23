@@ -508,23 +508,26 @@ def test_oilcane_O2_agile():
 @default_settings
 def test_LAOs():
     from biorefineries import LAOs as module
-    try: module.load()
-    except: pass
+    if 'LAOs' in must_load:
+        module.load()
+    else:
+        try: module.load()
+        except: pass
     feedstock = module.glucose
     product = module.octene
     tea = module.LAOs_tea
     units = UnitGroup('Biorefinery', tea.units)
     assert np.allclose(tea.IRR, 0.1, rtol=5e-2)
     assert np.allclose(feedstock.price, 0.265, rtol=5e-2)
-    assert np.allclose(product.price, 1.289861475509996, rtol=5e-2)
-    assert np.allclose(tea.sales, 161175673.52938324, rtol=5e-2)
-    assert np.allclose(tea.material_cost, 135658829.45874006, rtol=5e-2)
-    assert np.allclose(tea.installed_equipment_cost, 54699221.91419212, rtol=5e-2)
-    assert np.allclose(tea.utility_cost, 2531383.5854514386, rtol=5e-2)
-    assert np.allclose(units.get_heating_duty(), 38.310783441715046, rtol=5e-2)
-    assert np.allclose(units.get_cooling_duty(), 123.69592718862404, rtol=5e-2)
-    assert np.allclose(units.get_electricity_consumption(), 3.5278713460948774, rtol=5e-2)
-    assert np.allclose(units.get_electricity_production(), 3.527871346094877, rtol=5e-2)
+    assert np.allclose(product.price, 1.2927068503051573, rtol=5e-2)
+    assert np.allclose(tea.sales, 161541697.4292124, rtol=5e-2)
+    assert np.allclose(tea.material_cost, 135665307.92992145, rtol=5e-2)
+    assert np.allclose(tea.installed_equipment_cost, 55078641.5870012, rtol=5e-2)
+    assert np.allclose(tea.utility_cost, 2763304.51643572, rtol=5e-2)
+    assert np.allclose(units.get_heating_duty(), 38.28531181149635, rtol=5e-2)
+    assert np.allclose(units.get_cooling_duty(), 123.70084024745563, rtol=5e-2)
+    assert np.allclose(units.get_electricity_consumption(), 3.577370692927678, rtol=5e-2)
+    assert np.allclose(units.get_electricity_production(), 3.577370692927677, rtol=5e-2)
     
 ### DO NOT DELETE:
 @pytest.mark.slow
@@ -578,22 +581,22 @@ def test_ethanol_adipic():
     assert np.allclose(units.get_electricity_production(), 0.0)
 
 if __name__ == '__main__':
-    generate_all_code()
-    # test_corn()
-    # test_sugarcane()
-    # test_lipidcane()
-    # test_cornstover()
-    # test_oilcane_S1()
-    # test_oilcane_S2()
-    # test_oilcane_O1()
-    # test_oilcane_O2()
-    # test_oilcane_O3()
-    # test_oilcane_O4()
-    # test_oilcane_S1_agile()
-    # test_oilcane_S2_agile()
-    # test_oilcane_O1_agile()
-    # test_oilcane_O2_agile()
-    # test_LAOs()
+    # generate_all_code()
+    test_corn()
+    test_sugarcane()
+    test_lipidcane()
+    test_cornstover()
+    test_oilcane_S1()
+    test_oilcane_S2()
+    test_oilcane_O1()
+    test_oilcane_O2()
+    test_oilcane_O3()
+    test_oilcane_O4()
+    test_oilcane_S1_agile()
+    test_oilcane_S2_agile()
+    test_oilcane_O1_agile()
+    test_oilcane_O2_agile()
+    test_LAOs()
     # test_HP_cellulosic()
     # test_HP_sugarcane()
     # test_lactic()

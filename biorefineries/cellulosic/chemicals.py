@@ -231,17 +231,15 @@ def create_cellulosic_ethanol_chemicals():
     # Create structural carbohydrates
     append_chemical_copy('GlucoseOligomer', chems.Glucose)
     set_Cp(chems.GlucoseOligomer, Cp_cellulosic)
-    chems.GlucoseOligomer._formula = None
-    chems.GlucoseOligomer.formula = "C6H10O5"
     chems.GlucoseOligomer.Hf = -233200*cal2joule
+    chems.GlucoseOligomer.formula = "C6H10O5"
     
     append_chemical_copy('GalactoseOligomer', chems.GlucoseOligomer)
     append_chemical_copy('MannoseOligomer', chems.GlucoseOligomer)
     append_chemical_copy('XyloseOligomer', chems.Xylose)
     set_Cp(chems.XyloseOligomer, Cp_cellulosic)
-    chems.XyloseOligomer._formula =None
-    chems.XyloseOligomer.formula = "C5H8O4"
     chems.XyloseOligomer.Hf = -182100*cal2joule
+    chems.XyloseOligomer.formula = "C5H8O4"
     
     append_chemical_copy('ArabinoseOligomer', chems.XyloseOligomer)
     

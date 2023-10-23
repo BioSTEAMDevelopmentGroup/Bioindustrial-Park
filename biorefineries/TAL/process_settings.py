@@ -186,8 +186,10 @@ sodium_acetate_price = acetic_acid_price # unused
 
 amberlyst70_price = 30. #!!!
 
+acetylacetone_price = 1.5 # 2,4-pentanedione or acetylacetone
+
 price = {'SA': SA_price,
-         'PD': 1.5, # 2,4-pentanedione or acetylacetone
+         'PD': acetylacetone_price, # 2,4-pentanedione or acetylacetone
          'TCP': TCP_price,
          'AuPd': AuPd_price,
          'IBA': IBA_price,
@@ -293,10 +295,15 @@ GWP_CFs = {
     'CO2': 0.87104, # ecoinvent 3.8 carbon dioxide production, liquid, RoW
     'H2': 2.3716, # ecoinvent 3.8 market for hydrogen, liquid, RoW
     
-    'SodiumAcetate': 0., # !!! update
-    'AceticAcid': 0., # !!! update
+    'SodiumAcetate': 1., # !!! update
+    'AceticAcid': 1.6198, # market for acetic acid, without water, in 98% solution state, GLO
+    
+    'PD': (2*(58.080)*3.5917 + 102.089*2.5435)/(2*100.117), # Acetylacetone; based on GLO/RoW IPCC 2013 CFs of markets for precursors acetone and acetyl anhydride
     # 'DiammoniumSulfate': 1.2901, # ecoinvent 3.8 market for ammonium sulfate, RoW
     # 'MagnesiumSulfate': 1.0411, # ecoinvent 3.8 market for magnesium sulfate, GLO
+    
+    'NiSiO2':10., # !!! update
+    'Amberlyst70_':10., # !!! update
     }
 
 
@@ -341,10 +348,17 @@ FEC_CFs = {
     'CO2': 7.4243, # ecoinvent 3.8 carbon dioxide production, liquid, RoW
     'H2': 75.747, # ecoinvent 3.8 market for hydrogen, liquid, RoW
 
-    'SodiumAcetate': 0., # !!! update
-    'AceticAcid': 0., # !!! update
+    'SodiumAcetate': 1., # !!! update
+    'AceticAcid': 45.611, # market for acetic acid, without water, in 98% solution state, GLO
+    
+    'PD': (2*(58.080)*66.852 + 102.089*70.817)/(2*100.117), # Acetylacetone; based on GLO/RoW cumulative energy demand CFs of markets for precursors acetone and acetyl anhydride
+    
     # 'DiammoniumSulfate': 15.166, # ecoinvent 3.8 market for ammonium sulfate, RoW
     # 'MagnesiumSulfate': 13.805, # ecoinvent 3.8 market for magnesium sulfate, GLO
+    
+    'NiSiO2':10., # !!! update
+    'Amberlyst70_':10., # !!! update
+    
     }
 
 FEC_CF_array = chems.kwarray(FEC_CFs)

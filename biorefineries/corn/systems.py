@@ -162,7 +162,7 @@ def create_system(flowsheet=None, biorefinery_settings=None):
     P404 = bst.Pump('P404', V403-0)
     V405 = units.SSF('V405', (E402-0, P404-0), outs=('CO2', ''), V=1.9e3)
     
-    @V405.add_specification(run=True, impacted_units=[V405])
+    @V405.add_specification(run=True)
     def correct_saccharification_feed_flows():
         mash = V405.ins[0]
         mash_flow = mash.F_mass

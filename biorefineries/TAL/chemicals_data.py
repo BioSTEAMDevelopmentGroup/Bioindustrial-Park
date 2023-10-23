@@ -148,6 +148,7 @@ AceticAcid = chemical_database('AceticAcid')
 SodiumAcetate = chemical_database('SodiumAcetate')
 Glucose = chemical_database('Glucose', phase = 'l')
 
+CitricAcid = chemical_database('CitricAcid')
 # IBA = chemical_database('Isobutyraldehyde')
 # DPHP = chemical_database('DipotassiumHydrogenPhosphate',
 #                          search_ID='Dipotassium hydrogen phosphate',
@@ -235,13 +236,14 @@ KSA = Potassiumsorbate = chemical_database(ID='PotassiumSorbate',
 
 TAL = Triaceticacidlactone = chemical_database(ID='TAL',
                                                search_ID='Triacetic acid lactone',
-                                               phase='s')
+                                                phase='s',
+                                               )
 Pyrone = chemical_database(ID='Pyrone',
                            search_ID='2-pyrone',
                            phase='s')
 
 TAL.Hfus = 30883.66976 # Dannenfelser-Yalkowsky method
-TAL.Tm = KSA.Tm = 185. + 273.15 # CAS SciFinder 675-10-5
+TAL.Tm = KSA.Tm = 185. + 273.15 # (experimental) CAS SciFinder 675-10-5
 TAL.Tb = KSA.Tb =  239.1 + 273.15# (predicted) CAS SciFinder 675-10-5
 TAL.Hf = Pyrone.Hf
 TAL.LHV = Pyrone.LHV
@@ -528,6 +530,8 @@ Arabinan = chemical_copied('Arabinan', Xylan)
 Lignin = chemical_database('Lignin', phase='s')
 # Hf scaled based on vanillin
 Lignin.Hf = -108248*_cal2joule/tmo.Chemical('Vanillin').MW*Lignin.MW
+
+Alanine = chemical_database('Alanine', phase='s')
 
 # =============================================================================
 # Insoluble inorganics
