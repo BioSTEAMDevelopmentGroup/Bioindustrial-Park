@@ -6,9 +6,9 @@ Created on Sat Aug 20 21:47:53 2022
 import thermosteam as tmo
 from thermosteam import functional as fn
 # from thermo import TDependentProperty
-from biorefineries.oleochemicals import TAG_properties
-from TAG_properties import TAG_Hf
-from TAG_properties import *
+from biorefineries.oleochemicals import tag_properties
+from tag_properties import TAG_Hf
+from tag_properties import *
 
 #chems is a list of all the chemicals used in the azelaic acid production process
 chems = tmo.Chemicals([

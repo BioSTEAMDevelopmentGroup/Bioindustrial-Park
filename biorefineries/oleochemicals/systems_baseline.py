@@ -14,8 +14,10 @@ from biosteam import main_flowsheet
 from biosteam import units, SystemFactory
 from biorefineries.biodiesel.systems import create_transesterification_and_biodiesel_separation_system
 from biosteam import ProcessWaterCenter
-from biorefineries.oleochemicals import Tag_compositions
-from Tag_compositions import hoysoy_vari_adjusted
+
+#TODO: check why M602 does not appear
+#TODO: check why T603 is also not traceable
+#TODO: discuss the heat exchanger network
 
 #Settings to set the name of the flowsheet
 F = bst.Flowsheet('azelaic_acid_baseline')
@@ -1059,9 +1061,7 @@ def azelaic_acid_production(ins,outs):
                    outs = 'recylec_solvent_to_M602',
                    pump_type='Gear')
    
-    M602 = bst.Mixer('M602',ins = (P603-0,T605-0,
-                                   P610-0
-                                   ),
+    M602 = bst.Mixer('M602',ins = (P603-0,T605-0,P610-0),
                       outs = ('solvent_organics_mixture_for_extraction'))
     H608 = bst.HXutility(ID = 'H608', 
                           ins = M602-0,
@@ -1131,9 +1131,9 @@ def azelaic_acid_production(ins,outs):
             M603.ins[1]['l'].imass['Water']  = total_water_required
         else:
             M603.ins[0].imass['Water']  = total_water_required-M603.ins[1]['l'].imass['Water']
-        M603.run()
-        HX602.run()
-    M603.add_specification(water_for_extraction,args = [5.5])
+        # M603.run()
+        # HX602.run()
+    M603.add_specification(water_for_extraction,args = [5.5],run = True)
    
 #Evaportation Drying zone [27]   
     
@@ -1249,17 +1249,17 @@ def azelaic_acid_production(ins,outs):
 
 @SystemFactory(ID = 'aa_baseline_sys',
                )
-def aa_baseline_sys(ins,outs):
+def aa_baseline_sys(ins,outs,tag_compositions):
     recovered_tungstic_acid = bst.Stream(ID = 'recovered_tungstic_acid')
     recycled_diols_and_other_fatty_acids = bst.Stream(ID = 'recycled_diols_and_other_fatty_acids')
     recovered_mixture_of_cobalt_catalyst = bst.Stream(ID = 'recovered_mixture_of_cobalt_catalyst')  
     
     ob0 = crude_HO_oil_to_biodiesel(ins = (bst.Stream(ID='crude_vegetable_oil',
-                                                        PPP = hoysoy_vari_adjusted['Vistive gold']['PPP'], 
-                                                        SSS=  hoysoy_vari_adjusted['Vistive gold']['SSS'],
-                                                        OOO=  hoysoy_vari_adjusted['Vistive gold']['OOO'],
-                                                        LLL=  hoysoy_vari_adjusted['Vistive gold']['LLL'],
-                                                        LnLnLn = hoysoy_vari_adjusted['Vistive gold']['LnLnLn'],
+                                                        PPP = tag_compositions['PPP'],
+                                                        SSS=  tag_compositions['SSS'],
+                                                        OOO=  tag_compositions['OOO'],
+                                                        LLL=  tag_compositions['LLL'],
+                                                        LnLnLn = tag_compositions['LnLnLn'],
                                                         PL= 1,
                                                         MAG=0,
                                                         DAG=0,

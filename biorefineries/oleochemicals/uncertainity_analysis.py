@@ -6,15 +6,16 @@ Created on Wed Oct 18 16:58:21 2023
 
 #TODO: how would we consider electricity use if BT901 purchases electricity from the grid
 
-from biorefineries.oleochemicals.systems_baseline_hosun import F
+from biorefineries.oleochemicals.systems_baseline import F
 from biorefineries.oleochemicals.chemicals_baseline import chems
-from biorefineries.oleochemicals.models_hosun import azelaic_acid_tea,aa_baseline
+from biorefineries.oleochemicals.system_simulate import azelaic_acid_tea,aa_baseline
 from tea_baseline import TEA_baseline
 from biosteam.evaluation import Model, Metric
 from prices_and_GWP_factors import prices_per_stream,utility_prices,GWP_per_stream,Utility_GWP_factors
 from warnings import filterwarnings; filterwarnings('ignore')
 from chaospy import distributions as shape
 import numpy as np
+
 #unit conversions
 KJpersec_to_KJhr = 3600 
 
@@ -97,16 +98,12 @@ Direct_emmisions_from_BT = get_total_direct_BT_emissions_GWP = lambda: (((sum([i
 Direct_emmisions_without_BT = get_total_non_BT_direct_emissions_GWP = lambda: get_total_direct_emissions_GWP() - get_total_direct_BT_emissions_GWP()
 
 
-
 #Material related impacts
 #TODO: check whether these impacts are direct or indirect
 get_feedstock_GWP = lambda: aa_baseline.get_material_impact(crude_vegetable_oil,key = 'GWP100')/aa_baseline.get_mass_flow(azelaic_acid)
 get_internal_materials_impact = lambda:(aa_baseline.get_material_impact(Resin,key ='GWP100')+aa_baseline.get_material_impact(Liquid_HCl,key ='GWP100'))/aa_baseline.get_mass_flow(azelaic_acid)
 #TODO: check again if the materials are right
 get_other_materials_impact = lambda: (aa_baseline.get_total_feeds_impact('GWP100')/aa_baseline.get_mass_flow(azelaic_acid))-get_feedstock_GWP() +get_internal_materials_impact()
-
-
-
 
 #Electrcity related impacts
 #Electricity is produced using steam and natural gas/or is directly purchased from the grid
@@ -197,8 +194,7 @@ metrics = [
     Metric('Internal rate of return', solve_IRR, '%'),
     Metric('Net GWP', get_net_GWP, 'kg CO2-eq/kg', 'LCA'),
 ]
-model = Model(aa_baseline,
-              metrics,  
+model = Model(aa_baseline,metrics,  
               exception_hook='warn' #raise
               )
 
@@ -207,6 +203,7 @@ lb_fac = 0.5
 ub_fac = 1.5
 
 #price distributions
+#TODO: fit historical prices for crude veg oil into different distributions
 lb_o = crude_vegetable_oil.price * lb_fac  # Minimum price
 ub_o = crude_vegetable_oil.price * ub_fac  # Maximum price
 @model.parameter(name='Crude oil price',
@@ -216,6 +213,7 @@ def set_feedstock_price(feedstock_price):
     crude_vegetable_oil.price = feedstock_price
 
 
+#find multiple lab prices and use those
 lb_t = fresh_tungsten_catalyst.price*lb_fac
 ub_t = fresh_tungsten_catalyst.price*ub_fac
 @model.parameter(name='Tungstic acid catalyst price',
@@ -225,6 +223,7 @@ def set_tungstencat_price(tungstencat_price):
     fresh_tungsten_catalyst.price = tungstencat_price
 
 
+#find multiple lab prices and use those
 lb_c = fresh_cobalt_catalyst.price*lb_fac
 ub_c = fresh_cobalt_catalyst.price*ub_fac
 @model.parameter(name='Cobalt acetate catalyst price',
@@ -243,7 +242,7 @@ ub_s = fresh_solvent.price*ub_fac
 def set_solvent_price(fresh_solvent_price):
     fresh_solvent.price = fresh_solvent_price
 
-
+#TODO: find multiple lab prices for different concentrations of HP
 lb_hp = fresh_HP.price*lb_fac
 ub_hp = fresh_HP.price*ub_fac
 @model.parameter(name='Hydrogen peroxide price',
@@ -253,6 +252,7 @@ ub_hp = fresh_HP.price*ub_fac
 def set_fresh_HP_price(fresh_HP_price):
     fresh_HP.price = fresh_HP_price
 
+#TODO: find historical prices and distributions
 lb_ngp = natural_gas.price*lb_fac
 ub_ngp = natural_gas.price*ub_fac
 @model.parameter(name='Natural gas price',
@@ -273,6 +273,7 @@ ub_ca = citric_acid.price*ub_fac
                   distribution=shape.Uniform(lb_ca, ub_ca))
 def set_citric_acid_price(citric_acid_price):
     citric_acid.price = citric_acid_price
+    
     
 lb_hcl = conc_hydrochloric_acid.price*lb_fac
 ub_hcl = conc_hydrochloric_acid.price*ub_fac
@@ -309,6 +310,7 @@ def set_polystyrene_based_catalyst_price(polystyrene_based_catalyst_price):
 # coupled parameters
 # Process related parameters
 # #Tungstic acid mole ratio
+#TODO: tungstic acid m
 lb1 = 0.001
 ub1 = 0.15
 @model.parameter(name='Tungstic acid moles',
@@ -433,11 +435,12 @@ ub14 = 20 #optimistic
                   )
 def set_cta(cycles_of_reuse):
     F.unit.M200.specifications[0].args[1] = cycles_of_reuse
+    
 
-N_samples = 1000
-rule = 'L' # For Latin-Hypercube sampling
-np.random.seed(1234) # For consistent results
-samples = model.sample(N_samples, rule)
-model.load_samples(samples)
-model.evaluate(notify=2)
-model.show()
+# N_samples = 1000
+# rule = 'L' # For Latin-Hypercube sampling
+# np.random.seed(1234) # For consistent results
+# samples = model.sample(N_samples, rule)
+# model.load_samples(samples)
+# model.evaluate(notify=2)
+# model.show()

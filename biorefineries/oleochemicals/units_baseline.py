@@ -280,7 +280,7 @@ class Methanolseparationsystem(bst.Unit,isabstract = True):
       def _run(self):
         feed = self.ins[0]
         top,bottom, = self.outs
-        if  feed.imass['Methanol']/feed.F_mass < 0.4:
+        if  feed.imass['Methanol']/feed.F_mass < 0.32:
             self.heat_exchanger1.ins[0].copy_like(feed)
             self.heat_exchanger1._setup()
             self.heat_exchanger1._run()

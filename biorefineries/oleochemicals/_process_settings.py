@@ -6,23 +6,12 @@ Created on Wed Oct 11 09:14:21 2023
 """
 
 import biosteam as bst
-import numpy as np
-import chaospy
-from chaospy import distributions as shape
-from biorefineries.oleochemicals.systems_baseline_hosun import F
-from biorefineries.oleochemicals.systems_baseline_hosun import aa_baseline_sys,crude_HO_oil_to_biodiesel,dihydroxylation_system,oxidative_cleavage_system,organic_phase_separation_and_catalyst_recovery,nonanoic_acid_fraction_separation,azelaic_acid_production
+from biorefineries.oleochemicals.systems_baseline import F
+# from biorefineries.oleochemicals.systems_baseline import aa_baseline_sys,crude_HO_oil_to_biodiesel,dihydroxylation_system,oxidative_cleavage_system,organic_phase_separation_and_catalyst_recovery,nonanoic_acid_fraction_separation,azelaic_acid_production
 from biorefineries.oleochemicals.chemicals_baseline import chems
-import numpy as np
 from tea_baseline import TEA_baseline
-from biosteam.evaluation import Model, Metric
-from biorefineries.lipidcane._process_settings import price
-from biorefineries.cane.data.lca_characterization_factors import GWP_characterization_factors
-from biorefineries.tea.cellulosic_ethanol_tea import CellulosicEthanolTEA, create_cellulosic_ethanol_tea
-from units_baseline import HydrolysisReactor
-from biorefineries.oleochemicals import prices_and_GWP_factors
-from prices_and_GWP_factors import prices_per_stream,GWP_per_stream
-from biosteam import preferences
-from biosteam import report
+from biorefineries.oleochemicals.prices_and_GWP_factors import prices_per_stream,GWP_per_stream
+# from biosteam import preferences
 
 
 
@@ -123,7 +112,7 @@ def tea_azelaic_baseline(system,WC_over_FCI,operating_days,payrate,IRR):
     system = system,    
     IRR=IRR,  
     duration=(2022, 2032),
-    depreciation='MACRS7',#Since MARCS was not available in Biosteam  
+    depreciation='MACRS7',#MARCS used in [1] was not available in Biosteam to us  
     income_tax=0.29+0.5,  #First value denotes federal corporate income tax for Illinois, second value denotes 
     #state income tax for Illinois [2],[3]
     operating_days=operating_days,  # Uncertain, can be varied
