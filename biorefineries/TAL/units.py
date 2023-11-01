@@ -549,10 +549,12 @@ class SeedTrain(Unit):
         Design['Flow rate'] = self.outs[0].F_mass
         Design['Seed fermenter size'] = self.outs[0].F_mass * self.tau_batch
         duty = sum([i.H for i in self.outs]) - sum([i.H for i in self.ins])
+        # duty = self.Hnet
         mixed_feed = tmo.Stream()
         mixed_feed.mix_from(self.outs)
         mixed_feed.T=self.ins[0].T
         # mixed_feed.vle(T=mixed_feed.T, P=mixed_feed.P)
+        mixed_feed-0-self.heat_exchanger
         self.heat_exchanger.simulate_as_auxiliary_exchanger(ins=(mixed_feed,), 
                                                             duty=duty,
                                                             vle=False)
@@ -604,10 +606,15 @@ class TALCrystallizer(BatchCrystallizer):
                  output_conc_multiplier=1.,
                  kW=0.00746):
         
-        BatchCrystallizer.__init__(self, ID, ins, outs, thermo,
+        BatchCrystallizer.__init__(self, 
+        # BatchCrystallizer._init(self,
+                                    ID, ins, outs, thermo,
                      tau, N, V, T,
                      Nmin, Nmax, vessel_material,
                      kW)
+        # self._ins = ins 
+        # self._outs = outs
+        
         self.target_recovery = target_recovery
         self.T_range = T_range
         self.tau = tau
