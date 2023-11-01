@@ -71,6 +71,18 @@ def LLL_Vl_model(T):
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
 #Fitting data for MMA based on ChemSep
 # Ts = [i + 273.15 for i in  (148, 159, 120, 185.5, )]
 # Psats = [i / 760 * 101325 for i in (1, 3, 0.03, 11, )]
